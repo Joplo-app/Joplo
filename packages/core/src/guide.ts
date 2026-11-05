@@ -89,7 +89,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - tsconfig 使用 jsx: 'react-jsxdev'、jsxImportSource: '@joplo-app/kit'、allowImportingTsExtensions: true。
 
 ## 数据 API
-- config({ name, description?, theme?: 'sketch'|'clean', layout?, home? })。
+- config({ name, description?, theme?: 主题名（内置 9 个或 themes/<name>.css，见 demo）, layout?, home? })。
 - layout(tree)；Outlet 放当前页面，<Slot name="actions"/> 声明可堆叠的插槽。
 - page({ title, layout?: string|false, viewport?: 'desktop'|'mobile' }, tree)。设备与演示画面的安排读 demo。
 - feature({ name, goal, cases, roles?, constraints?, rules?, questions?, pick? })。
