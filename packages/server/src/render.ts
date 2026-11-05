@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Browser } from 'playwright';
-import { JoploError, VIEWPORT_SIZE, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@tokenroll/joplo-core';
+import { JoploError, SUBTITLE_HEIGHT, VIEWPORT_SIZE, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@tokenroll/joplo-core';
 import type { RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';
@@ -107,7 +107,8 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     const next = state.completed ? undefined : sc.steps[position];
     const nextTargetId = next && 'target' in next.action ? next.action.target : null;
     const stage = STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];
-    const viewport = opts.viewport ?? stage;
+    // 舞台正下方是字幕区（与演示页一致）：页面高度加上字幕区，截图截舞台 + 字幕区
+    const viewport = opts.viewport ?? { width: stage.width, height: stage.height + SUBTITLE_HEIGHT };
 
     browser = await launch(playwright);
     const page = await browser.newPage({ viewport, deviceScaleFactor: opts.scale ?? 1, reducedMotion: 'reduce' });
@@ -119,7 +120,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     if (err) throw new JoploError('RENDER_FAILED', `渲染路由报告错误：${err}`);
 
     const report = (await page.evaluate(`(${COLLECT_REPORT})(${JSON.stringify({ nextTargetId, theme })})`)) as PageReport;
-    const png = await page.locator(opts.viewport ? '[data-jshot]' : '[data-joplo-stage]').screenshot({ type: 'png', animations: 'disabled' });
+    const png = await page.locator(opts.viewport ? '[data-jshot]' : '[data-jrender]').screenshot({ type: 'png', animations: 'disabled' });
     fs.mkdirSync(path.dirname(out), { recursive: true });
     if (opts.overwrite) fs.writeFileSync(out, png);
     else fs.writeFileSync(out, png, { flag: 'wx' });

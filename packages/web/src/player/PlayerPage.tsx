@@ -12,10 +12,10 @@ import { ChevronLeft, ChevronRight, Clapperboard, Ellipsis, Maximize, Minus, Pau
 import { stepTouchesLayer, type Project, type Scenario } from '@tokenroll/joplo-core';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
-import { ExplainCard } from './ExplainCard';
+import { Subtitle } from './Subtitle';
+import { subtitleFor } from './subtitle-content';
 import { SPEEDS, asSpeed } from '../runtime/pace';
-import { VIEWPORTS } from '../renderer/Stage';
-import { cameraFor, cameraPosition, cardPlan } from './cameraFor';
+import { cameraFor, cameraPosition } from './cameraFor';
 import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
 import { MOCK_CLS, OUTCOME_LABEL } from './labels';
@@ -177,7 +177,6 @@ function StepStrip({ snap, scenario, ctl }: { snap: Snapshot; scenario: Scenario
   const pos = st?.position ?? 0;
   const active = snap.activeStep;
   const shownIndex = active !== null ? active + 1 : pos; // 0 = 初始状态
-  const shown = shownIndex > 0 ? scenario.steps[shownIndex - 1] : null;
   const next = st && !st.completed ? scenario.steps[pos] : undefined;
   const done = st?.completed;
   const total = scenario.steps.length;
@@ -219,8 +218,9 @@ function StepStrip({ snap, scenario, ctl }: { snap: Snapshot; scenario: Scenario
               <strong>场景完成 · {OUTCOME_LABEL[done.outcome]}</strong> {done.text}
             </span>
           ) : (
-            <span className="shrink-0 truncate text-[14px] font-semibold">
-              第 {shownIndex} 步 · {shown ? (shown.kind === 'system' ? `系统：${shown.caption}` : shown.caption) : `初始状态${scenario.description ? `：${scenario.description}` : ''}`}
+            // 本步说明在字幕区（画面下方），这里只显示第几步，不重复说明
+            <span className="shrink-0 text-[14px] font-semibold" data-testid="step-index">
+              第 {shownIndex} / {total} 步
             </span>
           )}
           <span className="min-w-0 truncate text-[12px] text-[#6b6b6b]" data-testid="next-hint">
@@ -273,10 +273,9 @@ export function PlayerPage(p: PlayerPageProps) {
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
   const next = ctl.nextStep();
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
-  // 字幕 / 解说卡显示的步骤：正在播放的一步；自动播放停留期间是刚执行的一步
+  // 字幕区（画面下方）显示的步骤：正在播放的一步，否则是刚执行完的一步；第 0 步显示初始状态
   const pos = state?.position ?? 0;
-  const lastStep = scenario && pos > 0 ? scenario.steps[pos - 1] : null;
-  const shownStep = scenario && snap.activeStep !== null ? scenario.steps[snap.activeStep] : snap.playing ? lastStep : null;
+  const subtitle = subtitleFor(scenario, pos, snap.activeStep);
   const speed = asSpeed(p.speed ?? 1);
   useEffect(() => {
     ctl.speed = speed;
@@ -290,7 +289,7 @@ export function PlayerPage(p: PlayerPageProps) {
   // 视角层级与导演镜头（D43 / T-layers）：每层是独立画面，镜头只由步骤推导（cameraAt），切层级不改变步骤和产品状态。
   // 导演跟随时，下一步的操作目标不在当前层里，控制器会先请求切到它所在的层（leadLayer），再移动鼠标。
   const lead = p.layer === null ? snap.leadLayer : null;
-  // 系统步骤一开始就用这一步的镜头（与解说卡一致）；用户操作在提交之后才切
+  // 系统步骤一开始就用这一步的镜头（与字幕区一致）；用户操作在提交之后才切
   const camPos = cameraPosition(scenario, state?.position ?? 0, snap.activeStep);
   const plan = cameraFor(project, scenario?.id ?? null, camPos, p.layer ?? lead);
   const director = p.layer === null || plan.director;
@@ -299,11 +298,6 @@ export function PlayerPage(p: PlayerPageProps) {
   const camera = plan.spec;
   const shownScene = state ? project.scenes[plan.sceneId ?? state.sceneId] : undefined;
   const device = shownScene?.viewport === 'mobile' ? 'mobile' : 'desktop';
-  // 解说卡（T-director2）：用镜头的方案、导演跟随时在焦点旁弹出；镜头给它留出位置。手动选层时只显示底部字幕
-  const cardOn = useCam && director;
-  const stageW = VIEWPORTS[device].width;
-  const card = cardOn ? cardPlan(project, scenario?.id ?? null, plan, director, snap.activeStep ?? pos - 1, stageW) : null;
-  const spec = camera && card ? { ...camera, reserve: card.reserve } : camera;
   // 自由缩放：导演跟随时每一步由镜头重新接管；手动时保持，直到换层或点「适应画面」
   const zoomReset = director ? `d|${camPos}|${viewLayer}|${plan.sceneId ?? state?.sceneId ?? ''}` : `m|${viewLayer}|${plan.sceneId ?? state?.sceneId ?? ''}`;
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, director), [ctl, plan.sceneId, director]);
@@ -393,7 +387,7 @@ export function PlayerPage(p: PlayerPageProps) {
                   project={project}
                   state={state}
                   theme={p.theme}
-                  camera={spec}
+                  camera={camera}
                   sceneId={plan.sceneId}
                   zoom={{ resetKey: zoomReset, onApi: onZoomApi, onChange: (v) => setUserZoom(v ? v.k : null) }}
                   mode="demo"
@@ -407,12 +401,7 @@ export function PlayerPage(p: PlayerPageProps) {
                     ctl.setStageEl(el);
                     setStageEl(el);
                   }}
-                  overlay={
-                    <>
-                      <Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} caption={cardOn ? null : (shownStep?.caption ?? null)} hideSystem={cardOn} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />
-                      {card ? <ExplainCard stage={stageEl} stepKey={card.step.id} caption={card.step.caption} explain={card.step.explain ?? null} anchors={card.anchors} animate={!ctl.reducedMotion} /> : null}
-                    </>
-                  }
+                  overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />}
                 />
               </StageViewport>
             ) : (
@@ -441,6 +430,8 @@ export function PlayerPage(p: PlayerPageProps) {
               </div>
             ) : null}
           </div>
+          {/* 字幕区：画面下方、播放控制上方，不叠在画面上 */}
+          {scenario ? <Subtitle content={subtitle} theme={p.theme} /> : null}
           <Controls snap={snap} scenario={scenario} ctl={ctl} menu={p.menu} speed={speed} onSpeed={p.onSpeed} />
           {scenario ? <StepStrip snap={snap} scenario={scenario} ctl={ctl} /> : null}
         </main>

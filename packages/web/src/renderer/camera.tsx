@@ -21,8 +21,6 @@ export type CameraSpec = {
   targets: string[];
   /** 镜头标识（层级 + 目标）：变化时高光脉冲一次。 */
   key: string;
-  /** 聚焦时给解说卡留出的右侧 / 底部（画面像素）。 */
-  reserve?: { right: number; bottom: number } | null;
 };
 
 /**
@@ -68,7 +66,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
   const user = opts.user ?? null;
   const userRef = useRef<View | null>(user);
   userRef.current = user;
-  const specKey = spec ? `${spec.key}|${spec.targets.join(',')}|${spec.reserve ? `${spec.reserve.right},${spec.reserve.bottom}` : ''}` : '';
+  const specKey = spec ? `${spec.key}|${spec.targets.join(',')}` : '';
 
   const applyTo = (wrap: HTMLElement, v: View, smooth: boolean) => {
     current.current = v;
@@ -172,7 +170,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       const nodeScales = found
         .filter((f) => f.el.getAttribute('data-jtype') === 'Diagram.Node')
         .map((f) => (Number(f.el.closest('[data-jtype="Diagram"]')?.getAttribute('data-scale') ?? 1) || 1) * outer);
-      const { k, tx, ty } = fitCamera({ W, H, mode, bbox, nodeScales, bounds, reserve: spec.reserve ?? undefined });
+      const { k, tx, ty } = fitCamera({ W, H, mode, bbox, nodeScales, bounds });
       if (mode === 'focus') hadFocus.current = true;
       return { k, tx, ty, mode, rects: found.map((f) => ({ id: f.id, box: highlightRect(f.box) })), els: found.map((f) => f.el) };
     };

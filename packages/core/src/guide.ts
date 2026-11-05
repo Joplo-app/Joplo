@@ -123,7 +123,11 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 ## 视角层级与导演镜头：一屏讲清客户端与后端
 - 每个层级是一个完全独立的画面：layers: { client: layer('客户端视角', <ClientView/>), backend: layer('后端流转', <Arch/>) }；layer 的第二个参数是这一层自己的 JSX 树，按自己的布局占满整个舞台，不从路径页面里裁切。
 - 各层共享同一份状态（ui / data / inputs），切层不改变步骤；声明了 layers 的方案在演示页只显示各层画面。没有自动“全景”层：需要全景就自己声明一个，如 overview: layer('全景', <Overview/>)。
-- 较长的讲解写 explain('…')：.system('额度预检', '调用模型之前先预检额度', shot('billing'), explain('额度不足时在这里就拦下，不会产生模型费用'))。导演模式下焦点旁会弹出解说卡，大字显示这一步的说明，explain 显示在说明下方；手动选层时只显示底部字幕。自动播放每一步停留约 60ms/字（说明加解说，至少 3 秒），所以说明写完整的一句话即可，不必拆成很多步。
+- 字幕只用来点一句：画面下方的字幕区最多两行，一行说明、一行 explain('…')（小一号）。说明建议不超过 24 个字、explain 不超过 48 个字（英文按半个字算），超过时 check 报 CAPTION_TOO_LONG / EXPLAIN_TOO_LONG（只提示，不改你的文字）。自动播放每一步停留约 60ms/字，至少 3 秒。
+- 内容真的很多时，放进独立的说明层，由导演切过去讲，而不是把字幕写长：
+    layers: { arch: layer('后端流转', <Arch />), why: layer('设计理由', <Why />) },
+    .system('定义与实现分离', explain('大脑只看到工具定义'), shot('why_split'))   // why_split 是 <Why /> 里的一张卡片
+    .system('回到调用链', shot('biz', 'brain'))
 - 步骤里写镜头：.click('app_send', shot('msg_user'), shot('app', 'biz'))；每个 id 在包含它的层里解析，多层有同名 id 时各层都生效；第一个 shot 所在的层是导演层；shot() 让当时的导演层回到整层；没写 shot 的步骤沿用上一步，没写 shot 的点击会切到按钮所在的层。
 - 镜头可以对准任何带 id 的元素（组件、卡片、按钮、Diagram 节点 / 分组 / 连线）。播放时导演自动切层并推近焦点，观众也能手动切层或“只重放这一层”。
 - 不要为了“看得清”写很长的层：整层会缩进画面，细节靠 shot 推近。shot 的 id 不在任何层里时 check 报 SHOT_UNKNOWN；layer 的树为空时报 LAYER_UNKNOWN。
