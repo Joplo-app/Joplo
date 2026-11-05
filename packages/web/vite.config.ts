@@ -1,6 +1,6 @@
 /**
  * 独立的 Vite 配置只用于开发看板界面本身（`pnpm web:dev`，没有项目数据时只显示载入提示）。
- * 真正的看板由 `joplo dev`（@joplo/server 的 startDev）以内联配置启动：同一个 Vite 服务还负责编译项目与热更新。
+ * 真正的看板由 `joplo dev`（@tokenroll/joplo-server 的 startDev）以内联配置启动：同一个 Vite 服务还负责编译项目与热更新。
  */
 import path from 'node:path';
 import { defineConfig } from 'vite';

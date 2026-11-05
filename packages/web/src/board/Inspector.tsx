@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { Check, Copy, X } from 'lucide-react';
-import { findNode, isNodeDisabled, isNodeVisible, type PlayState, type Project, type Rule, type Selection } from '@joplo/core';
+import { findNode, isNodeDisabled, isNodeVisible, type PlayState, type Project, type Rule, type Selection } from '@tokenroll/joplo-core';
 import type { SelectionSync } from '../runtime/demo';
 import { optionOfNode, scenariosOf, shortName } from '../runtime/views';
 import { cn } from '@/lib/utils';

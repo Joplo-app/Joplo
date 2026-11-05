@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
-import { compile, validate, type Diagnostic, type ValidationReport } from '@joplo/core';
-import { loadAuthoring } from '@joplo/core/node';
+import { compile, validate, type Diagnostic, type ValidationReport } from '@tokenroll/joplo-core';
+import { loadAuthoring } from '@tokenroll/joplo-core/node';
 
 export async function check(dir: string, optionId?: string): Promise<ValidationReport & { name: string }> {
   const root = await realpath(resolve(dir));

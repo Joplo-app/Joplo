@@ -1,4 +1,4 @@
-import { feature, question, rule } from '@joplo/kit';
+import { feature, question, rule } from '@tokenroll/joplo-kit';
 
 export default feature({
   name: 'npm 包发布',

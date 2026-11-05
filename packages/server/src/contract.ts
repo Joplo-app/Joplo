@@ -1,7 +1,7 @@
 /**
  * v2 接口（ADR-0002）：CLI 只依赖这里导出的三个函数。由 T-board 实现，届时 index.ts 改为导出它们。
  */
-import type { Diagnostic } from '@joplo/core';
+import type { Diagnostic } from '@tokenroll/joplo-core';
 
 export type DevOptions = {
   projectDir: string;

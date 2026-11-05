@@ -1,13 +1,13 @@
 /**
- * 编译：作者的源文件（经 @joplo/kit 收集成数据）→ IR v2。组件词汇对齐 Mantine（D35），见 catalog.ts。
+ * 编译：作者的源文件（经 @tokenroll/joplo-kit 收集成数据）→ IR v2。组件词汇对齐 Mantine（D35），见 catalog.ts。
  *
  * 路径优先的堆叠（D28）：画面 = 布局 + 页面 + 各功能方案填入插槽的元素。
  * - dev 模式：每个方案在每个路径上各有一个画面 `<方案>@<路径>`，其中其他功能取选定方案，本功能取该方案；
  *   另有发布视图 `@<路径>`（全部取选定方案）。
  * - publish 模式：只有发布视图；只含选定方案的场景；去掉规则、情况、问题等创作侧信息（D33）。
  */
-import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo/kit/node';
-import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@joplo/kit';
+import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@tokenroll/joplo-kit/node';
+import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@tokenroll/joplo-kit';
 import { COMPONENT_TYPES, INTERACTIVE_TYPES, matchChoice, nodeLabel } from './catalog.ts';
 import { choicesOf } from './player.ts';
 import { Project, SCHEMA_VERSION, type SceneNode, type Scene, type Scenario, type Step, type Coverage } from './schema.ts';

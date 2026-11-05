@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
-import { JoploError, type Selection } from '@joplo/core';
+import { JoploError, type Selection } from '@tokenroll/joplo-core';
 
 export type SelectionView = { selection: Selection | null; lines: { number: number; text: string }[]; note?: string };
 export async function readSelection(dir: string): Promise<SelectionView> {

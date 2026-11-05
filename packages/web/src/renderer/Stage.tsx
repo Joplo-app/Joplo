@@ -4,7 +4,7 @@
  */
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { VIEWPORT_SIZE, type PlayState, type Project, type Toast } from '@joplo/core';
+import { VIEWPORT_SIZE, type PlayState, type Project, type Toast } from '@tokenroll/joplo-core';
 import { RenderContext, RenderNode, type RenderMode } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test as base, expect, type Page } from '@playwright/test';
-import type { PlayState } from '@joplo/core';
+import type { PlayState } from '@tokenroll/joplo-core';
 import { createDev, type InternalDevHandle } from '../../server/src/dev.ts';
 
 export const ROOT = path.resolve(import.meta.dirname, '../../..');

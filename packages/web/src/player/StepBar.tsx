@@ -2,7 +2,7 @@
  * 紧凑步骤条（一行）：重置、上一步、播放/暂停、下一步、字幕、步骤点、模拟标签。看板与发布站共用。
  */
 import { ChevronLeft, ChevronRight, Pause, Play, RotateCcw } from 'lucide-react';
-import type { Scenario } from '@joplo/core';
+import type { Scenario } from '@tokenroll/joplo-core';
 import type { Snapshot } from '../runtime/demo';
 import { cn } from '@/lib/utils';
 import { MOCK_CLS, OUTCOME_LABEL } from './labels';

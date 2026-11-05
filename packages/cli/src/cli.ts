@@ -1,7 +1,7 @@
 import { Command, CommanderError, Option } from 'commander';
 import { resolve } from 'node:path';
-import { COMPONENT_DOCS, guide, JoploError, skillIndex, skillTopic } from '@joplo/core';
-import type * as Server from '@joplo/server';
+import { COMPONENT_DOCS, guide, JoploError, skillIndex, skillTopic } from '@tokenroll/joplo-core';
+import type * as Server from '@tokenroll/joplo-server';
 import { check } from './check.ts';
 import { initProject, initSummary } from './init.ts';
 import { projectNotes } from './startup.ts';
@@ -34,18 +34,18 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   const line = (s: string) => stdout(s + '\n');
   const json = (value: unknown) => line(JSON.stringify(value));
   let exitCode = 0;
-  const serverPackage = '@joplo/server';
+  const serverPackage = '@tokenroll/joplo-server';
   const loadServer = deps.loadServer ?? (() => import(serverPackage));
   async function serverFunction<K extends 'startDev' | 'buildSite' | 'renderStep'>(name: K): Promise<typeof Server[K]> {
     let module: Record<string, unknown>;
     try { module = await loadServer(); }
-    catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo/server 无法加载 ${name}：${e instanceof Error ? e.message : String(e)}`); }
-    if (typeof module[name] !== 'function') throw new JoploError('UNSUPPORTED_ACTION', `@joplo/server 尚未提供 ${name}；请使用实现 IR v2 服务契约的版本`);
+    catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@tokenroll/joplo-server 无法加载 ${name}：${e instanceof Error ? e.message : String(e)}`); }
+    if (typeof module[name] !== 'function') throw new JoploError('UNSUPPORTED_ACTION', `@tokenroll/joplo-server 尚未提供 ${name}；请使用实现 IR v2 服务契约的版本`);
     return module[name] as typeof Server[K];
   }
   const program = new Command().name('joplo').description('Joplo：用 TSX 创作、演示和发布功能设计').exitOverride()
     .configureOutput({ writeOut: stdout, writeErr: stderr, outputError: () => {} });
-  // 读取项目的命令先检查项目里的 @joplo/kit 与 CLI 是否同一版本（只提示，不阻止）
+  // 读取项目的命令先检查项目里的 @tokenroll/joplo-kit 与 CLI 是否同一版本（只提示，不阻止）
   program.hook('preAction', (_root, action) => {
     for (const note of projectNotes(resolve(String(action.args[0] ?? '.')), action.name(), { cli: deps.cliVersion })) stderr(note + '\n');
   });

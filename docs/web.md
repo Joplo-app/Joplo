@@ -19,7 +19,7 @@ pnpm web:serve path/to/project --port 4800 --open
 | 职责 | 做法 |
 | --- | --- |
 | 看板界面 | Vite root 是 `packages/web`，React + Tailwind，界面本身也支持 HMR。 |
-| 项目编译 | 项目源文件用 `server.ssrLoadModule` 载入。插件 `joplo:project` 用 automatic JSX、`jsxImportSource: '@joplo/kit'`、development 模式转译，因此 jsxDEV 能拿到 `文件:行:列`。随后交给 core 的 `loadAuthoring` + `compile(…, 'dev')`。项目里的 `@joplo/kit` 指向本仓库的 kit 源码，所以项目可以放在任何目录。 |
+| 项目编译 | 项目源文件用 `server.ssrLoadModule` 载入。插件 `joplo:project` 用 automatic JSX、`jsxImportSource: '@tokenroll/joplo-kit'`、development 模式转译，因此 jsxDEV 能拿到 `文件:行:列`。随后交给 core 的 `loadAuthoring` + `compile(…, 'dev')`。项目里的 `@tokenroll/joplo-kit` 指向本仓库的 kit 源码，所以项目可以放在任何目录。 |
 | 热更新 | 项目目录下任何文件变化（`.joplo/`、`dist/`、`node_modules/`、`.git/` 除外）都会使项目模块失效、重新编译，并通过 HMR 自定义事件 `joplo:ir` 把新 IR 推给看板。页面不刷新，保持功能、方案、场景、位置（越界时夹到合法范围）和选中。编译是串行的，编译过程中又有变化时，结束后再编一次。 |
 
 - **Tailwind**：项目目录会追加为 `index.css` 的 `@source`，项目源文件里出现的 `className` 能被编译，并随文件变化热更新。build 同样如此。
@@ -104,7 +104,7 @@ pnpm web:serve path/to/project --port 4800 --open
 ## `buildSite`：静态发布站
 
 1. Vite 以中间件模式（不监听端口）载入项目，执行 `compile(…, 'publish')`，只保留选定方案。这一步已经去掉规则、情况、问题、备注和源路径；`publishPayload` 再去掉约束、角色、取舍、覆盖等创作侧字段（D33）。
-2. 对 `packages/web/site.html` 执行 `vite build`（强制 production）。构建时 `@joplo/core` 指向 `site/core-lite.ts`，只打包播放器和目录，不带 zod schema 与编译器。
+2. 对 `packages/web/site.html` 执行 `vite build`（强制 production）。构建时 `@tokenroll/joplo-core` 指向 `site/core-lite.ts`，只打包播放器和目录，不带 zod schema 与编译器。
 3. 后处理 HTML：
    - IR 内联为 `<script type="application/json" id="joplo-ir">`（已转义 `<`）；
    - 入口脚本内联为 `<script type="module">`；

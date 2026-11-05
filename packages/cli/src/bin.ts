@@ -1,6 +1,6 @@
 #!/usr/bin/env -S tsx
 /**
- * @joplo/cli 的命令入口。通常经由 `joplo` 包（packages/joplo）转发到这里；也可以直接运行。
+ * @tokenroll/joplo-cli 的命令入口。通常经由 `joplo` 包（packages/joplo）转发到这里；也可以直接运行。
  * 先检查 Node 版本再载入其余模块（发布构建会把 shebang 改为 node）。
  */
 const major = Number(/^(\d+)\./.exec(process.versions.node)?.[1] ?? 0);

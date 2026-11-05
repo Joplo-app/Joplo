@@ -11,7 +11,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { findNode, nodeLabel, stateAt, walkNodes, type Project, type Scene, type SceneNode, type Selection } from '@joplo/core';
+import { findNode, nodeLabel, stateAt, walkNodes, type Project, type Scene, type SceneNode, type Selection } from '@tokenroll/joplo-core';
 
 /** 浏览器提交的选中（服务端补全其余字段）。 */
 export const SelectionInput = z.strictObject({

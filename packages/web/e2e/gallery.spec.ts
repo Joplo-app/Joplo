@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { COMPONENT_TYPES } from '@joplo/core';
+import { COMPONENT_TYPES } from '@tokenroll/joplo-core';
 import { createDev, type InternalDevHandle } from '../../server/src/dev.ts';
 import { copyExample, expect, node, test } from './fixtures';
 

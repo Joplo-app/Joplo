@@ -5,7 +5,7 @@
  * - 当前方案的情况列表与覆盖芯片（缺口胶囊会展开并滚动到这里）。
  */
 import { useEffect, useRef } from 'react';
-import type { Project } from '@joplo/core';
+import type { Project } from '@tokenroll/joplo-core';
 import type { Snapshot } from '../runtime/demo';
 import { routeTree, shortName } from '../runtime/views';
 import { cn } from '@/lib/utils';

@@ -6,7 +6,7 @@
  * 另可加 Joplo 属性：id（可操作元素必填）、when（可见条件）、disabled（布尔或条件）、disabledReason、unmodeled、note。
  * 行为（点击后发生什么）不写在组件上，写在 option 的 flow 步骤里。浮层用 Modal / Drawer 的 opened={$.ui.x} 控制。
  *
- * 组件清单与 @joplo/core 的 COMPONENT_TYPES 一一对应（core/test/catalog.test.ts 检查）。
+ * 组件清单与 @tokenroll/joplo-core 的 COMPONENT_TYPES 一一对应（core/test/catalog.test.ts 检查）。
  */
 import { component, type Bind, type CondExpr, type JChild } from './node.ts';
 

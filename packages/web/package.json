@@ -1,5 +1,5 @@
 {
-  "name": "@joplo/web",
+  "name": "@tokenroll/joplo-web",
   "version": "0.1.0",
   "description": "Joplo 看板与发布站的预构建资源（含手绘字体，SIL OFL 1.1）",
   "license": "Apache-2.0",
@@ -19,7 +19,7 @@
     "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "@joplo/core": "workspace:*",
+    "@tokenroll/joplo-core": "workspace:*",
     "@playwright/test": "1.64.1",
     "@tailwindcss/vite": "4.3.4",
     "@types/react": "^19.3.0",

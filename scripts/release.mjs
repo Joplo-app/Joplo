@@ -111,11 +111,11 @@ function pack() {
       const pkg = JSON.parse(text);
       if (text.includes('workspace:')) die(`${t.name} 的 package.json 仍含 workspace: 协议`);
       if (pkg.version !== v) die(`${t.name} 版本是 ${pkg.version}，应为 ${v}`);
-      for (const [dep, range] of Object.entries(pkg.dependencies ?? {})) if ((dep === 'joplo' || dep.startsWith('@joplo/')) && range !== v) die(`${t.name} 依赖 ${dep}@${range}，应锁定为 ${v}`);
+      for (const [dep, range] of Object.entries(pkg.dependencies ?? {})) if ((dep === 'joplo' || dep.startsWith('@tokenroll/joplo-')) && range !== v) die(`${t.name} 依赖 ${dep}@${range}，应锁定为 ${v}`);
       const targets = (x) => (typeof x === 'string' ? [x] : x && typeof x === 'object' ? Object.values(x).flatMap(targets) : []);
       for (const target of [...targets(pkg.exports), ...targets(pkg.bin)]) if (!fs.existsSync(path.join(out, 'package', target))) die(`${t.name} 的 ${target} 不在 tarball 里`);
       if (files.some((f) => /(^|\/)src\/.*\.tsx?$/.test(f.file) || f.file.startsWith('test/'))) die(`${t.name} 带上了源码或测试`);
-      if (t.name === '@joplo/web' && !files.some((f) => f.file === 'dist/fonts/OFL.txt')) die('@joplo/web 缺少字体许可证 dist/fonts/OFL.txt');
+      if (t.name === '@tokenroll/joplo-web' && !files.some((f) => f.file === 'dist/fonts/OFL.txt')) die('@tokenroll/joplo-web 缺少字体许可证 dist/fonts/OFL.txt');
       if (pkg.license === LICENSE_PLACEHOLDER) warnLicense = true;
       const total = files.reduce((s, f) => s + f.size, 0);
       log(`  ${t.name.padEnd(14)} ${path.basename(t.file).padEnd(26)} ${String(files.length).padStart(4)} 个文件  解包 ${kb(total).padStart(8)}  tarball ${kb(fs.statSync(t.file).size).padStart(8)}`);
@@ -230,22 +230,22 @@ async function smoke() {
     assert(lastLine === '下一步：cd my-demo && npm install && npx joplo dev', `init 最后一行：${lastLine}`);
     const project = path.join(base, 'my-demo');
     const pkg = readJson(path.join(project, 'package.json'));
-    assert(pkg.devDependencies?.joplo === v && pkg.devDependencies?.['@joplo/kit'] === v, `init 应写入精确版本 ${v}：${JSON.stringify(pkg.devDependencies)}`);
+    assert(pkg.devDependencies?.joplo === v && pkg.devDependencies?.['@tokenroll/joplo-kit'] === v, `init 应写入精确版本 ${v}：${JSON.stringify(pkg.devDependencies)}`);
     sh(npxJoplo, ['init', 'my-demo'], base, { env: ua, expect: 1 });
-    log(`  ✓ init 写入 "joplo": "${v}", "@joplo/kit": "${v}"；非空目录拒绝`);
+    log(`  ✓ init 写入 "joplo": "${v}", "@tokenroll/joplo-kit": "${v}"；非空目录拒绝`);
 
     // 作者 className：Tailwind 要编译它
     const pageFile = path.join(project, 'routes/page.tsx');
     fs.writeFileSync(pageFile, fs.readFileSync(pageFile, 'utf8').replace('<Title order={2}>开始设计</Title>', '<Title order={2} className="tracking-[0.137em]">开始设计</Title>'));
 
     // 3. npm install：registry 上还没有这些版本，改用 tarball（版本号已在上面断言）
-    pkg.devDependencies = { joplo: tgz.joplo, '@joplo/kit': tgz['@joplo/kit'] };
+    pkg.devDependencies = { joplo: tgz.joplo, '@tokenroll/joplo-kit': tgz['@tokenroll/joplo-kit'] };
     pkg.overrides = overrides;
     fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
     sh(npm, ['install', ...npmFlags], project);
     const joplo = path.join(project, 'node_modules/.bin/joplo');
     assert(fs.realpathSync(joplo) === fs.realpathSync(path.join(project, 'node_modules/joplo/bin/joplo.cjs')), '项目的 .bin/joplo 应指向 joplo 入口包');
-    for (const n of ['joplo', '@joplo/cli', '@joplo/core', '@joplo/kit', '@joplo/server', '@joplo/web']) {
+    for (const n of ['joplo', '@tokenroll/joplo-cli', '@tokenroll/joplo-core', '@tokenroll/joplo-kit', '@tokenroll/joplo-server', '@tokenroll/joplo-web']) {
       const p = path.join(project, 'node_modules', n);
       assert(fs.existsSync(p) && !fs.lstatSync(p).isSymbolicLink(), `${n} 应从 tarball 安装（不是链接）`);
       assert(readJson(path.join(p, 'package.json')).version === v, `${n} 版本应为 ${v}`);
@@ -356,7 +356,7 @@ async function smoke() {
     }
     const scanned = [
       ...textFiles(extract),
-      ...['joplo', '@joplo'].flatMap((n) => textFiles(path.join(project, 'node_modules', n))),
+      ...['joplo', '@tokenroll'].flatMap((n) => textFiles(path.join(project, 'node_modules', n))),
       ...textFiles(path.join(project, 'dist')),
       ...textFiles(path.join(project, '.claude')),
     ];

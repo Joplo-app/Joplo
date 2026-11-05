@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { JoploError, type Diagnostic, type DomainFailure, type DomainResult } from '@joplo/core';
+import { JoploError, type Diagnostic, type DomainFailure, type DomainResult } from '@tokenroll/joplo-core';
 
 export function result<T>(projectId: string, summary: string, data: T, diagnostics: Diagnostic[] = []): DomainResult<T> {
   return { ok: true, projectId, revision: 0, requestId: randomUUID(), summary, changedIds: [], diagnostics, artifacts: [], data };

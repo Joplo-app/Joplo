@@ -5,7 +5,7 @@
  * - hash 路由（#/p/<路径>、#/f/<功能>、#/s/<场景>），file:// 直接打开也能工作。
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import type { Project } from '@joplo/core';
+import type { Project } from '@tokenroll/joplo-core';
 import { DemoController } from '../runtime/demo';
 import { routeTree, scenariosOf } from '../runtime/views';
 import { Stage, viewportOf } from '../renderer/Stage';

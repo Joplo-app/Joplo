@@ -1,6 +1,6 @@
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve } from 'node:path';
-import { JoploError } from '@joplo/core';
+import { JoploError } from '@tokenroll/joplo-core';
 import { detectPackageManager, pmCommands, type PackageManager } from './pm.ts';
 import { cliVersion } from './startup.ts';
 
@@ -12,26 +12,26 @@ export function packageName(dirName: string): string {
   return n || 'joplo-demo';
 }
 
-/** init 写入的 package.json：joplo 与 @joplo/kit 锁定为当前 CLI 的精确版本（D36：所有包同一版本）。 */
+/** init 写入的 package.json：joplo 与 @tokenroll/joplo-kit 锁定为当前 CLI 的精确版本（D36：所有包同一版本）。 */
 export function projectPackageJson(dirName: string, version: string): string {
   const pkg = {
     name: packageName(dirName),
     private: true,
     type: 'module',
     scripts: { dev: 'joplo dev', check: 'joplo check', build: 'joplo build' },
-    devDependencies: { joplo: version, '@joplo/kit': version },
+    devDependencies: { joplo: version, '@tokenroll/joplo-kit': version },
   };
   return JSON.stringify(pkg, null, 2) + '\n';
 }
 
-/** init 写入的 tsconfig.json：作者的 TSX 由 @joplo/kit 的 JSX 运行时收集成数据。 */
+/** init 写入的 tsconfig.json：作者的 TSX 由 @tokenroll/joplo-kit 的 JSX 运行时收集成数据。 */
 export function projectTsconfig(): string {
   const compilerOptions = {
     target: 'ES2023',
     module: 'ESNext',
     moduleResolution: 'Bundler',
     jsx: 'react-jsxdev',
-    jsxImportSource: '@joplo/kit',
+    jsxImportSource: '@tokenroll/joplo-kit',
     allowImportingTsExtensions: true,
     noEmit: true,
     strict: true,
@@ -64,11 +64,11 @@ export async function initProject(dir: string, name?: string, opts: { keep?: boo
   }
   const files: Record<string, string> = {
     'package.json': projectPackageJson(basename(root), version),
-    'joplo.config.ts': `import { config } from '@joplo/kit';\nexport default config({ name: ${JSON.stringify(name ?? (basename(root) || 'Joplo'))}, layout: 'app', home: '/' });\n`,
-    'layouts/app.tsx': `import { layout, Outlet, Slot } from '@joplo/kit';\nimport { AppShell } from '@joplo/kit/ui';\nexport default layout(\n  <AppShell padding="lg">\n    <AppShell.Main>\n      <Outlet />\n    </AppShell.Main>\n    <Slot name="overlay" />\n  </AppShell>,\n);\n`,
-    'routes/page.tsx': `import { page, Slot } from '@joplo/kit';\nimport { Group, Stack, Title } from '@joplo/kit/ui';\nexport default page(\n  { title: '首页' },\n  <Stack gap="md">\n    <Title order={2}>开始设计</Title>\n    <Group gap="sm">\n      <Slot name="actions" />\n    </Group>\n  </Stack>,\n);\n`,
-    'features/example/feature.ts': `import { feature } from '@joplo/kit';\nexport default feature({ name: '示例功能', goal: '点击按钮完成演示', cases: { happy: '正常完成' }, pick: 'a' });\n`,
-    'features/example/options/a.tsx': `import { option, flow, done } from '@joplo/kit';\nimport { Button } from '@joplo/kit/ui';\nexport default option({\n  name: '方案 A', idea: '一个按钮完成操作',\n  on: { '/': { actions: <Button id="start">开始</Button> } },\n  scenarios: { happy: flow('正常完成', { cases: ['happy'], start: '/' }).click('start', done('已完成')) },\n});\n`,
+    'joplo.config.ts': `import { config } from '@tokenroll/joplo-kit';\nexport default config({ name: ${JSON.stringify(name ?? (basename(root) || 'Joplo'))}, layout: 'app', home: '/' });\n`,
+    'layouts/app.tsx': `import { layout, Outlet, Slot } from '@tokenroll/joplo-kit';\nimport { AppShell } from '@tokenroll/joplo-kit/ui';\nexport default layout(\n  <AppShell padding="lg">\n    <AppShell.Main>\n      <Outlet />\n    </AppShell.Main>\n    <Slot name="overlay" />\n  </AppShell>,\n);\n`,
+    'routes/page.tsx': `import { page, Slot } from '@tokenroll/joplo-kit';\nimport { Group, Stack, Title } from '@tokenroll/joplo-kit/ui';\nexport default page(\n  { title: '首页' },\n  <Stack gap="md">\n    <Title order={2}>开始设计</Title>\n    <Group gap="sm">\n      <Slot name="actions" />\n    </Group>\n  </Stack>,\n);\n`,
+    'features/example/feature.ts': `import { feature } from '@tokenroll/joplo-kit';\nexport default feature({ name: '示例功能', goal: '点击按钮完成演示', cases: { happy: '正常完成' }, pick: 'a' });\n`,
+    'features/example/options/a.tsx': `import { option, flow, done } from '@tokenroll/joplo-kit';\nimport { Button } from '@tokenroll/joplo-kit/ui';\nexport default option({\n  name: '方案 A', idea: '一个按钮完成操作',\n  on: { '/': { actions: <Button id="start">开始</Button> } },\n  scenarios: { happy: flow('正常完成', { cases: ['happy'], start: '/' }).click('start', done('已完成')) },\n});\n`,
     'tsconfig.json': projectTsconfig(),
     '.gitignore': 'node_modules/\n.joplo/\ndist/\n',
   };
@@ -93,9 +93,9 @@ export function initSummary(r: InitResult, env: Record<string, string | undefine
   const rel = relative(process.cwd(), r.root) || '.';
   const top = [...new Set(r.written.map((f) => (f.includes('/') ? `${f.split('/')[0]}/` : f)))].filter((f) => !['package.json', 'tsconfig.json', '.gitignore'].includes(f));
   const lines = [`✓ 已创建 ${rel === '.' ? './' : `${rel}/`}${top.length ? `：${top.join('、')}` : ''}`];
-  if (r.written.includes('package.json')) lines.push(`✓ package.json  devDependencies: { "joplo": "${r.version}", "@joplo/kit": "${r.version}" }（锁定同一版本）`);
-  if (r.written.includes('tsconfig.json')) lines.push('✓ tsconfig.json jsxImportSource: "@joplo/kit"');
-  if (r.skipped.length) lines.push(`! 已存在、未改动：${r.skipped.join('、')}${r.skipped.includes('package.json') ? `（请确认 devDependencies 含 "joplo": "${r.version}" 与 "@joplo/kit": "${r.version}"）` : ''}`);
+  if (r.written.includes('package.json')) lines.push(`✓ package.json  devDependencies: { "joplo": "${r.version}", "@tokenroll/joplo-kit": "${r.version}" }（锁定同一版本）`);
+  if (r.written.includes('tsconfig.json')) lines.push('✓ tsconfig.json jsxImportSource: "@tokenroll/joplo-kit"');
+  if (r.skipped.length) lines.push(`! 已存在、未改动：${r.skipped.join('、')}${r.skipped.includes('package.json') ? `（请确认 devDependencies 含 "joplo": "${r.version}" 与 "@tokenroll/joplo-kit": "${r.version}"）` : ''}`);
   lines.push(nextStepLine(detectPackageManager(env), rel));
   return lines;
 }

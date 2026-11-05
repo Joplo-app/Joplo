@@ -1,5 +1,5 @@
 {
-  "name": "@joplo/server",
+  "name": "@tokenroll/joplo-server",
   "version": "0.1.0",
   "description": "Joplo 本地服务：dev 看板、build 发布站、render 截图",
   "license": "Apache-2.0",
@@ -16,9 +16,9 @@
     "prepublishOnly": "node ../../scripts/build-package.mjs"
   },
   "dependencies": {
-    "@joplo/core": "workspace:*",
-    "@joplo/kit": "workspace:*",
-    "@joplo/web": "workspace:*",
+    "@tokenroll/joplo-core": "workspace:*",
+    "@tokenroll/joplo-kit": "workspace:*",
+    "@tokenroll/joplo-web": "workspace:*",
     "@tailwindcss/vite": "4.3.4",
     "tailwindcss": "4.3.4",
     "vite": "8.3.5",

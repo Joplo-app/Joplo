@@ -5,7 +5,7 @@
  * IR 首次通过 /__joplo/ir 载入，之后由 HMR 自定义事件推送；编译出错时显示错误列表并保留上一次成功的画面。
  */
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import type { Diagnostic } from '@joplo/core';
+import type { Diagnostic } from '@tokenroll/joplo-core';
 import { DemoController } from '../runtime/demo';
 import { fetchIR, fetchSelection, putSelection, subscribeIR, type DevPayload } from '../runtime/dev-client';
 import { Stage, viewportOf, type Viewport } from '../renderer/Stage';

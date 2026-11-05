@@ -8,7 +8,7 @@
  * 端口被占用时直接报错（strictPort），不静默换端口。
  *
  * 看板界面有两种来源（web-assets.ts）：仓库里直接编译 packages/web/src（界面本身也热更新）；从 npm 安装时用
- * @joplo/web 预构建的 dist/app。后者的 `import.meta.hot` 在构建时改成了 `globalThis.__JOPLO_HOT__`，这里在页面里
+ * @tokenroll/joplo-web 预构建的 dist/app。后者的 `import.meta.hot` 在构建时改成了 `globalThis.__JOPLO_HOT__`，这里在页面里
  * 先用 Vite 客户端的 createHotContext 创建它，并以 JS 导入 project.css（作者 className，随项目文件热更新）。
  */
 import { spawn } from 'node:child_process';
@@ -18,7 +18,7 @@ import type http from 'node:http';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { createLogger, createServer, type Logger, type Plugin, type PluginOption, type ViteDevServer } from 'vite';
-import { JoploError, type Diagnostic, type Project } from '@joplo/core';
+import { JoploError, type Diagnostic, type Project } from '@tokenroll/joplo-core';
 import type { DevHandle, DevOptions } from './contract.ts';
 import { compileProject, invalidateProjectModules } from './project.ts';
 import { SelectionBody, readSelection, resolveSelection, writeSelection } from './selection.ts';
@@ -119,7 +119,7 @@ function serveDistAsset(web: DistWeb, pathname: string, res: http.ServerResponse
 /** dist 形态：在看板入口脚本之前创建 HMR 句柄、导入作者 className 的 CSS。 */
 export function injectDistBoot(html: string, web: DistWeb): string {
   const css = '/@fs/' + web.projectCss.split(path.sep).join('/').replace(/^\/+/, '');
-  const boot = `<script type="module">import { createHotContext } from '/@vite/client';\nimport ${JSON.stringify(css)};\nglobalThis.__JOPLO_HOT__ = createHotContext('/@joplo/board');</script>`;
+  const boot = `<script type="module">import { createHotContext } from '/@vite/client';\nimport ${JSON.stringify(css)};\nglobalThis.__JOPLO_HOT__ = createHotContext('/@tokenroll/joplo-board');</script>`;
   const at = html.search(/<script\b/i);
   return at < 0 ? html.replace('</head>', `${boot}\n</head>`) : html.slice(0, at) + boot + '\n    ' + html.slice(at);
 }
@@ -230,7 +230,7 @@ export async function createDev(opts: InternalDevOptions): Promise<InternalDevHa
       web.mode === 'dist'
         ? { noDiscovery: true, include: [] }
         : {
-            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'radix-ui', 'clsx', 'tailwind-merge', 'class-variance-authority', '@joplo/core > zod'],
+            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'radix-ui', 'clsx', 'tailwind-merge', 'class-variance-authority', '@tokenroll/joplo-core > zod'],
           },
     server: {
       host: '127.0.0.1',

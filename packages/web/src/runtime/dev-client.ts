@@ -2,7 +2,7 @@
  * 看板与 `joplo dev` 服务通信：首次载入取 IR，之后通过 Vite HMR 自定义事件 `joplo:ir` 接收新 IR（不整页刷新）。
  * 只有写接口（选中）需要本地令牌。
  */
-import type { Diagnostic, Project, Selection } from '@joplo/core';
+import type { Diagnostic, Project, Selection } from '@tokenroll/joplo-core';
 import type { SelectionInput, SelectionWriteResult } from './demo';
 
 export type DevPayload = { version: number; ok: boolean; project: Project | null; diagnostics: Diagnostic[]; home: string | null };

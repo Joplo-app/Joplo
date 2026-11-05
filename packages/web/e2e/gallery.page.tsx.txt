@@ -1,11 +1,11 @@
-import { page } from '@joplo/kit';
+import { page } from '@tokenroll/joplo-kit';
 import {
   Accordion, ActionIcon, Alert, Anchor, AppShell, Avatar, Badge, Blockquote, Box, Breadcrumbs, Burger, Button, Card, Center, ChatMessage,
   Checkbox, CloseButton, Code, Container, Custom, DataTable, Divider, Drawer, FileInput, Flex, Grid, Group, Image, Indicator, Kbd, List,
   Loader, Modal, MultiSelect, NavLink, Notification, NumberInput, Pagination, Paper, PasswordInput, Placeholder, Progress, PromptInput, Radio,
   RingProgress, ScrollArea, SegmentedControl, Select, SimpleGrid, Skeleton, Space, Stack, Stepper, Switch, Table, Tabs, Text, Textarea,
   TextInput, ThemeIcon, Timeline, Title, ToolCall,
-} from '@joplo/kit/ui';
+} from '@tokenroll/joplo-kit/ui';
 
 /** e2e 目录画廊：目录中的每个组件至少出现一次（由 gallery.spec.ts 写入临时项目）。 */
 export default page(

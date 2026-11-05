@@ -11,12 +11,12 @@ test.each([
   ['dev', 'startDev', []], ['build', 'buildSite', []], ['render', 'renderStep', ['--scenario-id', 's', '--out', 'a.png']],
 ] as const)('%s 动态导出缺失时明确失败', async (cmd, name, args) => {
   const r = await run([cmd, '.', ...args]);
-  expect(r.code).toBe(1); expect(r.stdout).toContain(name); expect(r.stdout).toContain('@joplo/server'); expect(r.loadServer).toHaveBeenCalledOnce();
+  expect(r.code).toBe(1); expect(r.stdout).toContain(name); expect(r.stdout).toContain('@tokenroll/joplo-server'); expect(r.loadServer).toHaveBeenCalledOnce();
 });
 test('动态 import 失败说明服务端不可用', async () => {
   let output = '';
   const code = await runCli(['dev'], { stdout: s => { output += s; }, stderr: () => {}, loadServer: async () => { throw Error('module missing'); } });
-  expect(code).toBe(1); expect(output).toContain('@joplo/server'); expect(output).toContain('module missing');
+  expect(code).toBe(1); expect(output).toContain('@tokenroll/joplo-server'); expect(output).toContain('module missing');
 });
 test('dev 参数与日志输出', async () => {
   const startDev = vi.fn(async (opts: any) => { opts.log('服务日志'); return { url: 'http://127.0.0.1:12345', close: async () => {} }; });

@@ -1,5 +1,5 @@
-import { $, set, type Bind } from '@joplo/kit';
-import type { EffectDef, Flow } from '@joplo/kit';
+import { $, set, type Bind } from '@tokenroll/joplo-kit';
+import type { EffectDef, Flow } from '@tokenroll/joplo-kit';
 
 /** 在终端输入一条命令并回车：flag 置为真，输出块随之出现，输入框清空。 */
 export const run = (f: Flow, cmd: string, flag: Bind, caption: string, ...effects: EffectDef[]): Flow =>

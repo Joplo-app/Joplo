@@ -1,5 +1,5 @@
-import { layout, Outlet, Slot } from '@joplo/kit';
-import { Anchor, AppShell, Group, Text } from '@joplo/kit/ui';
+import { layout, Outlet, Slot } from '@tokenroll/joplo-kit';
+import { Anchor, AppShell, Group, Text } from '@tokenroll/joplo-kit/ui';
 
 /** 开发者桌面：终端、Agent 会话、npm 网站三个窗口，用顶栏切换。 */
 export default layout(

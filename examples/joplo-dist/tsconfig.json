@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsxdev",
-    "jsxImportSource": "@joplo/kit",
+    "jsxImportSource": "@tokenroll/joplo-kit",
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,

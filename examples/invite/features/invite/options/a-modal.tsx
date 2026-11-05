@@ -1,5 +1,5 @@
-import { $, done, flow, not, notEmpty, option, rule, set, push, toast, undecided, uses } from '@joplo/kit';
-import { Alert, Button, Group, Loader, Modal, Select, Stack, Text, TextInput } from '@joplo/kit/ui';
+import { $, done, flow, not, notEmpty, option, rule, set, push, toast, undecided, uses } from '@tokenroll/joplo-kit';
+import { Alert, Button, Group, Loader, Modal, Select, Stack, Text, TextInput } from '@tokenroll/joplo-kit/ui';
 
 import { members, pending } from '../sample.ts';
 

@@ -26,5 +26,5 @@ const COMMANDS: Record<PackageManager, PmCommands> = {
 };
 export const pmCommands = (pm: PackageManager): PmCommands => COMMANDS[pm];
 
-/** 对齐 joplo 与 @joplo/kit 到同一版本的命令。 */
-export const alignCommand = (pm: PackageManager, version: string) => `${COMMANDS[pm].addDev} joplo@${version} @joplo/kit@${version}`;
+/** 对齐 joplo 与 @tokenroll/joplo-kit 到同一版本的命令。 */
+export const alignCommand = (pm: PackageManager, version: string) => `${COMMANDS[pm].addDev} joplo@${version} @tokenroll/joplo-kit@${version}`;

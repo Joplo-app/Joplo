@@ -4,7 +4,7 @@
  * 并暴露 window.__JOPLO_STATE__（当前 PlayState）。
  */
 import { useEffect, useMemo, useState } from 'react';
-import { stateAt, type PlayState, type Project } from '@joplo/core';
+import { stateAt, type PlayState, type Project } from '@tokenroll/joplo-core';
 import { fetchIR } from './runtime/dev-client';
 import { Stage } from './renderer/Stage';
 import { RoughRegistry, type StageTheme } from './renderer/rough';

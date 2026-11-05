@@ -1,5 +1,5 @@
 {
-  "name": "@joplo/cli",
+  "name": "@tokenroll/joplo-cli",
   "version": "0.1.0",
   "description": "Joplo 命令实现（init / dev / check / build / render / selection）；通常经由 joplo 命令入口使用",
   "license": "Apache-2.0",
@@ -19,8 +19,8 @@
     "prepublishOnly": "node ../../scripts/build-package.mjs"
   },
   "dependencies": {
-    "@joplo/core": "workspace:*",
-    "@joplo/server": "workspace:*",
+    "@tokenroll/joplo-core": "workspace:*",
+    "@tokenroll/joplo-server": "workspace:*",
     "commander": "^15.0.0",
     "tsx": "4.23.15"
   },

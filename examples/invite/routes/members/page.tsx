@@ -1,5 +1,5 @@
-import { $, page, Slot } from '@joplo/kit';
-import { DataTable, Group, Stack, Text, Title } from '@joplo/kit/ui';
+import { $, page, Slot } from '@tokenroll/joplo-kit';
+import { DataTable, Group, Stack, Text, Title } from '@tokenroll/joplo-kit/ui';
 
 export default page(
   { title: '成员' },

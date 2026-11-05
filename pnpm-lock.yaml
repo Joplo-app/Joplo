@@ -166,10 +166,10 @@ importers:
 
   .:
     devDependencies:
-      '@joplo/core':
+      '@tokenroll/joplo-core':
         specifier: workspace:*
         version: link:packages/core
-      '@joplo/kit':
+      '@tokenroll/joplo-kit':
         specifier: workspace:*
         version: link:packages/kit
       '@types/node':
@@ -187,10 +187,10 @@ importers:
 
   packages/cli:
     dependencies:
-      '@joplo/core':
+      '@tokenroll/joplo-core':
         specifier: workspace:*
         version: link:../core
-      '@joplo/server':
+      '@tokenroll/joplo-server':
         specifier: workspace:*
         version: link:../server
       commander:
@@ -202,7 +202,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@joplo/kit':
+      '@tokenroll/joplo-kit':
         specifier: workspace:*
         version: link:../kit
       zod:
@@ -211,7 +211,7 @@ importers:
 
   packages/joplo:
     dependencies:
-      '@joplo/cli':
+      '@tokenroll/joplo-cli':
         specifier: workspace:*
         version: link:../cli
 
@@ -219,18 +219,18 @@ importers:
 
   packages/server:
     dependencies:
-      '@joplo/core':
-        specifier: workspace:*
-        version: link:../core
-      '@joplo/kit':
-        specifier: workspace:*
-        version: link:../kit
-      '@joplo/web':
-        specifier: workspace:*
-        version: link:../web
       '@tailwindcss/vite':
         specifier: 4.3.4
         version: 4.3.4(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+      '@tokenroll/joplo-core':
+        specifier: workspace:*
+        version: link:../core
+      '@tokenroll/joplo-kit':
+        specifier: workspace:*
+        version: link:../kit
+      '@tokenroll/joplo-web':
+        specifier: workspace:*
+        version: link:../web
       tailwindcss:
         specifier: 4.3.4
         version: 4.3.4
@@ -250,15 +250,15 @@ importers:
 
   packages/web:
     devDependencies:
-      '@joplo/core':
-        specifier: workspace:*
-        version: link:../core
       '@playwright/test':
         specifier: 1.64.1
         version: 1.64.1
       '@tailwindcss/vite':
         specifier: 4.3.4
         version: 4.3.4(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+      '@tokenroll/joplo-core':
+        specifier: workspace:*
+        version: link:../core
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0

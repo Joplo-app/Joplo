@@ -1,5 +1,5 @@
-import type { Bind, CondExpr } from '@joplo/kit';
-import { Code, Stack, Text } from '@joplo/kit/ui';
+import type { Bind, CondExpr } from '@tokenroll/joplo-kit';
+import { Code, Stack, Text } from '@tokenroll/joplo-kit/ui';
 
 const TONE = { plain: 'dark.4', ok: 'green.8', warn: 'orange.8', error: 'red.8' } as const;
 

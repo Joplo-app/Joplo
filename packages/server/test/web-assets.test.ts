@@ -1,12 +1,12 @@
 /**
- * 发布形态：看板与发布站资源来自 @joplo/web 的预构建 dist；作者的 @joplo/kit 优先取项目里安装的那份；
+ * 发布形态：看板与发布站资源来自 @tokenroll/joplo-web 的预构建 dist；作者的 @tokenroll/joplo-kit 优先取项目里安装的那份；
  * Playwright 是可选依赖，缺失时只影响 render。
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { JoploError } from '@joplo/core';
+import { JoploError } from '@tokenroll/joplo-core';
 import { kitAliases, locateWebAssets, readWebDist, type WebAssets } from '../src/web-assets.ts';
 import { loadPlaywright, launchHint } from '../src/render.ts';
 
@@ -22,14 +22,14 @@ afterEach(() => {
 
 function fakeWebPackage(withManifest = true) {
   const web = temp();
-  fs.writeFileSync(path.join(web, 'package.json'), JSON.stringify({ name: '@joplo/web', version: '9.9.9' }));
+  fs.writeFileSync(path.join(web, 'package.json'), JSON.stringify({ name: '@tokenroll/joplo-web', version: '9.9.9' }));
   fs.mkdirSync(path.join(web, 'dist/app/assets'), { recursive: true });
   fs.writeFileSync(path.join(web, 'dist/app/index.html'), '<html></html>');
   fs.writeFileSync(path.join(web, 'dist/app/site.html'), '<html></html>');
   fs.writeFileSync(path.join(web, 'dist/project.css'), '@import "tailwindcss" source(none);');
   fs.writeFileSync(path.join(web, 'dist/site-files.json'), JSON.stringify(['site.html', 'assets/a.css']));
   if (withManifest)
-    fs.writeFileSync(path.join(web, 'dist/manifest.json'), JSON.stringify({ name: '@joplo/web', version: '9.9.9', format: 1, board: 'app/index.html', site: 'app/site.html', siteFiles: 'site-files.json', projectCss: 'project.css' }));
+    fs.writeFileSync(path.join(web, 'dist/manifest.json'), JSON.stringify({ name: '@tokenroll/joplo-web', version: '9.9.9', format: 1, board: 'app/index.html', site: 'app/site.html', siteFiles: 'site-files.json', projectCss: 'project.css' }));
   return web;
 }
 
@@ -66,22 +66,22 @@ describe('locateWebAssets / readWebDist', () => {
 describe('kitAliases', () => {
   const dist = (): WebAssets => ({ ...readWebDist(fakeWebPackage()) });
 
-  it('源码模式：@joplo/kit 指向仓库里的 kit 源码', () => {
+  it('源码模式：@tokenroll/joplo-kit 指向仓库里的 kit 源码', () => {
     const a = kitAliases(locateWebAssets({}), temp());
-    const kit = a.find((x) => String(x.find) === String(/^@joplo\/kit$/));
+    const kit = a.find((x) => String(x.find) === String(/^@tokenroll\/joplo-kit$/));
     expect(kit?.replacement).toBe(path.resolve(import.meta.dirname, '../../kit/src/index.ts'));
   });
 
-  it('发布形态：项目装了 @joplo/kit 就不加别名（按项目依赖解析，与 check 一致）', () => {
+  it('发布形态：项目装了 @tokenroll/joplo-kit 就不加别名（按项目依赖解析，与 check 一致）', () => {
     const project = temp();
-    fs.mkdirSync(path.join(project, 'node_modules/@joplo/kit'), { recursive: true });
-    fs.writeFileSync(path.join(project, 'node_modules/@joplo/kit/package.json'), JSON.stringify({ name: '@joplo/kit', version: '0.1.0' }));
+    fs.mkdirSync(path.join(project, 'node_modules/@tokenroll/joplo-kit'), { recursive: true });
+    fs.writeFileSync(path.join(project, 'node_modules/@tokenroll/joplo-kit/package.json'), JSON.stringify({ name: '@tokenroll/joplo-kit', version: '0.1.0' }));
     expect(kitAliases(dist(), project)).toEqual([]);
   });
 
-  it('发布形态：项目没装 @joplo/kit 时退回 CLI 自带的 kit，且不出现 @/ 源码别名', () => {
+  it('发布形态：项目没装 @tokenroll/joplo-kit 时退回 CLI 自带的 kit，且不出现 @/ 源码别名', () => {
     const a = kitAliases(dist(), temp());
-    expect(a.map((x) => String(x.find))).toEqual([String(/^@joplo\/kit$/), String(/^@joplo\/kit\/(ui|node|jsx-runtime|jsx-dev-runtime)$/)]);
+    expect(a.map((x) => String(x.find))).toEqual([String(/^@tokenroll\/joplo-kit$/), String(/^@tokenroll\/joplo-kit\/(ui|node|jsx-runtime|jsx-dev-runtime)$/)]);
     for (const x of a) expect(path.isAbsolute(String(x.replacement).replace('$1', 'ui'))).toBe(true);
   });
 });

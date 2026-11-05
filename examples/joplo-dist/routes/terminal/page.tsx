@@ -1,5 +1,5 @@
-import { page, Slot } from '@joplo/kit';
-import { Button, Card, Group, Stack, Text, TextInput, Title } from '@joplo/kit/ui';
+import { page, Slot } from '@tokenroll/joplo-kit';
+import { Button, Card, Group, Stack, Text, TextInput, Title } from '@tokenroll/joplo-kit/ui';
 
 /** 终端窗口：方案把命令输出堆叠到 lines 插槽，输入行所有方案共用。 */
 export default page(

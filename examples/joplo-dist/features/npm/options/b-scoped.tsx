@@ -1,17 +1,17 @@
-import { $, done, flow, notApplicable, option, rule, undecided, uses } from '@joplo/kit';
-import { Card, DataTable, Stack, Text, Title } from '@joplo/kit/ui';
+import { $, done, flow, notApplicable, option, rule, undecided, uses } from '@tokenroll/joplo-kit';
+import { Card, DataTable, Stack, Text, Title } from '@tokenroll/joplo-kit/ui';
 
 import { Cmd } from '../../../shared/term.tsx';
 import { run } from '../../../shared/steps.ts';
 import { errorLines, errorScenarios, errorState } from '../common.tsx';
 
 export default option({
-  name: 'B · joplo 入口 + @joplo/* 作用域包',
-  idea: 'joplo 只是一个很小的命令入口，转发到 @joplo/cli；作者项目依赖轻量的 @joplo/kit。与仓库现有的包结构一一对应',
+  name: 'B · joplo 入口 + @tokenroll/joplo-* 作用域包',
+  idea: 'joplo 只是一个很小的命令入口，转发到 @tokenroll/joplo-cli；作者项目依赖轻量的 @tokenroll/joplo-kit。与仓库现有的包结构一一对应',
   focus: '包的组织方式：按职责拆分，作者项目只装需要的部分',
   tradeoffs: [
-    '作者项目运行时只依赖约 40 KB 的 @joplo/kit；看板资源只在运行 CLI 时下载',
-    '现有示例和文档无需迁移（仍是 @joplo/kit、jsxImportSource "@joplo/kit"）',
+    '作者项目运行时只依赖约 40 KB 的 @tokenroll/joplo-kit；看板资源只在运行 CLI 时下载',
+    '现有示例和文档无需迁移（仍是 @tokenroll/joplo-kit、jsxImportSource "@tokenroll/joplo-kit"）',
     '6 个包要一起发版；项目里的 kit 与 CLI 版本可能错配，需要检查并提示',
   ],
 
@@ -26,8 +26,8 @@ export default option({
           out={
             'Need to install the following packages: joplo@0.1.0  Ok to proceed? (y) y\n' +
             '✓ 已创建 my-demo/：joplo.config.ts、layouts/、routes/、features/\n' +
-            '✓ package.json  devDependencies: { "joplo": "0.1.0", "@joplo/kit": "0.1.0" }（锁定同一版本）\n' +
-            '✓ tsconfig.json jsxImportSource: "@joplo/kit"\n' +
+            '✓ package.json  devDependencies: { "joplo": "0.1.0", "@tokenroll/joplo-kit": "0.1.0" }（锁定同一版本）\n' +
+            '✓ tsconfig.json jsxImportSource: "@tokenroll/joplo-kit"\n' +
             '下一步：cd my-demo && npm install && npx joplo dev'
           }
         />,
@@ -37,7 +37,7 @@ export default option({
           when={$.ui.dev}
           cmd="npx joplo dev"
           tone="ok"
-          out={'[joplo] 使用项目内的 joplo 0.1.0（@joplo/kit 0.1.0）\n[joplo] 看板：http://127.0.0.1:4790/'}
+          out={'[joplo] 使用项目内的 joplo 0.1.0（@tokenroll/joplo-kit 0.1.0）\n[joplo] 看板：http://127.0.0.1:4790/'}
         />,
         <Cmd
           id="b_skew"
@@ -45,8 +45,8 @@ export default option({
           cmd="npx joplo@latest check"
           tone="warn"
           out={
-            '! 项目里的 @joplo/kit 是 0.1.0，当前 CLI 是 0.2.0，两者的 IR 版本不同。\n' +
-            '  已改用项目内的 joplo 0.1.0 执行。要升级：npm i -D joplo@0.2.0 @joplo/kit@0.2.0\n' +
+            '! 项目里的 @tokenroll/joplo-kit 是 0.1.0，当前 CLI 是 0.2.0，两者的 IR 版本不同。\n' +
+            '  已改用项目内的 joplo 0.1.0 执行。要升级：npm i -D joplo@0.2.0 @tokenroll/joplo-kit@0.2.0\n' +
             '0 error, 2 warning'
           }
         />,
@@ -57,19 +57,19 @@ export default option({
       package: (
         <Card id="b_pkgs" withBorder>
           <Stack gap="sm">
-            <Title order={3}>@joplo（6 个包，版本同步）</Title>
-            <Text c="dimmed">用户只需要记住 npx joplo；作者项目依赖 @joplo/kit</Text>
+            <Title order={3}>@tokenroll/joplo-*（6 个包，版本同步）</Title>
+            <Text c="dimmed">用户只需要记住 npx joplo；作者项目依赖 @tokenroll/joplo-kit</Text>
             <DataTable
               id="tbl_pkgs"
               note="体积为估算"
               columns={[{ accessor: 'name', title: '包' }, { accessor: 'role', title: '作用' }, { accessor: 'size', title: '体积' }]}
               records={[
-                { name: 'joplo', role: '命令入口，转发到 @joplo/cli', size: '约 5 KB' },
-                { name: '@joplo/kit', role: '创作 SDK 与 JSX 运行时（作者项目依赖）', size: '约 40 KB' },
-                { name: '@joplo/cli', role: '命令实现', size: '约 60 KB' },
-                { name: '@joplo/core', role: '编译、校验、播放器', size: '约 200 KB' },
-                { name: '@joplo/server', role: 'dev / build / render', size: '约 100 KB' },
-                { name: '@joplo/web', role: '看板与发布站资源、手绘字体', size: '约 14 MB' },
+                { name: 'joplo', role: '命令入口，转发到 @tokenroll/joplo-cli', size: '约 5 KB' },
+                { name: '@tokenroll/joplo-kit', role: '创作 SDK 与 JSX 运行时（作者项目依赖）', size: '约 40 KB' },
+                { name: '@tokenroll/joplo-cli', role: '命令实现', size: '约 60 KB' },
+                { name: '@tokenroll/joplo-core', role: '编译、校验、播放器', size: '约 200 KB' },
+                { name: '@tokenroll/joplo-server', role: 'dev / build / render', size: '约 100 KB' },
+                { name: '@tokenroll/joplo-web', role: '看板与发布站资源、手绘字体', size: '约 14 MB' },
               ]}
             />
           </Stack>
@@ -81,8 +81,8 @@ export default option({
   state: { ui: { init: false, install: false, dev: false, skew: false, ...errorState } },
 
   rules: {
-    lockstep: rule('所有 @joplo/* 包与 joplo 使用同一版本号，一起发布；init 写入精确版本而不是 ^ 范围', { cases: ['version_skew', 'release'] }),
-    skew_warn: rule('CLI 发现项目内 @joplo/kit 版本不同时，改用项目内的 CLI 执行，并打印对齐命令', { cases: ['version_skew'], elements: ['b_skew'] }),
+    lockstep: rule('所有 @tokenroll/joplo-* 包与 joplo 使用同一版本号，一起发布；init 写入精确版本而不是 ^ 范围', { cases: ['version_skew', 'release'] }),
+    skew_warn: rule('CLI 发现项目内 @tokenroll/joplo-kit 版本不同时，改用项目内的 CLI 执行，并打印对齐命令', { cases: ['version_skew'], elements: ['b_skew'] }),
   },
 
   coverage: {
@@ -98,12 +98,12 @@ export default option({
           flow('新用户从零打开看板', { cases: ['first_run'], start: '/terminal', expected: '三条命令内打开看板' }),
           'npx joplo@latest init my-demo',
           $.ui.init,
-          'npx 只下载很小的 joplo 入口，生成项目并锁定 joplo 与 @joplo/kit 的版本',
+          'npx 只下载很小的 joplo 入口，生成项目并锁定 joplo 与 @tokenroll/joplo-kit 的版本',
           uses('one_command_start', 'lockstep'),
         ),
         'cd my-demo && npm install',
         $.ui.install,
-        '安装依赖：joplo 与 @joplo/kit 两个包',
+        '安装依赖：joplo 与 @tokenroll/joplo-kit 两个包',
       ),
       'npx joplo dev',
       $.ui.dev,

@@ -3,7 +3,7 @@
  * 缺口胶囊（点击切到审阅模式并展开情况列表）、模式切换、主题、“概念原型”标识。
  */
 import { Columns3, Eye, Hand, Map as MapIcon, Monitor, PenTool, Play, Smartphone, Square } from 'lucide-react';
-import type { Project } from '@joplo/core';
+import type { Project } from '@tokenroll/joplo-core';
 import type { Mode, Snapshot } from '../runtime/demo';
 import { gapCounts, optionsOf, scenariosOf } from '../runtime/views';
 import type { StageTheme } from '../renderer/rough';

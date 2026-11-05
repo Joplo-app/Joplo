@@ -1,18 +1,18 @@
 /**
- * 发包前预构建 @joplo/web 的运行时资源（`pnpm --filter @joplo/web build:dist`）。运行时不再读取 src/。
+ * 发包前预构建 @tokenroll/joplo-web 的运行时资源（`pnpm --filter @tokenroll/joplo-web build:dist`）。运行时不再读取 src/。
  *
  *   dist/app/index.html        看板（`joplo dev` 与 `joplo render` 用；Vite 开发服务以它为 root 提供）
  *   dist/app/site.html         发布站模板（`joplo build` 复制、内联 IR 与入口脚本）
  *   dist/app/assets/*          两者共用的 JS / CSS / 字体（字体按内容哈希命名，只存一份）
  *   dist/site-files.json       发布站需要复制的文件清单（不含看板专用的 JS）
  *   dist/project.css           作者 className 的 Tailwind 入口：与 index.css 相同的主题，但不扫描任何目录；
- *                              运行时由 @joplo/server 追加 `@source <项目目录>` 后编译
+ *                              运行时由 @tokenroll/joplo-server 追加 `@source <项目目录>` 后编译
  *   dist/fonts/OFL.txt         手绘字体（Excalifont、Xiaolai）的 SIL OFL 1.1 许可证
  *   dist/manifest.json         版本与格式号，server 据此确认资源齐全
  *
  * 看板的 IR 推送依赖 `import.meta.hot`（Vite HMR 自定义事件）。预构建产物里没有 HMR 运行时，所以这里把
  * src 中的 `import.meta.hot` 改写为 `globalThis.__JOPLO_HOT__`；`joplo dev` 在页面里先用
- * Vite 客户端的 createHotContext 创建它（见 @joplo/server 的 web-assets.ts）。
+ * Vite 客户端的 createHotContext 创建它（见 @tokenroll/joplo-server 的 web-assets.ts）。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -60,7 +60,7 @@ await build(common({
 
 // 2. 发布站：与 server 的 buildSite 同样的选项（单个入口脚本，便于内联成 file:// 可打开的页面）
 const siteOut = await build(common({
-  resolve: { alias: [{ find: /^@joplo\/core$/, replacement: path.join(SRC, 'site/core-lite.ts') }, { find: /^@\//, replacement: SRC + '/' }] },
+  resolve: { alias: [{ find: /^@tokenroll\/joplo-core$/, replacement: path.join(SRC, 'site/core-lite.ts') }, { find: /^@\//, replacement: SRC + '/' }] },
   build: {
     outDir: APP,
     emptyOutDir: false,
@@ -95,4 +95,4 @@ fs.copyFileSync(path.join(SRC, 'fonts/OFL.txt'), path.join(DIST, 'fonts/OFL.txt'
 // 5. 清单
 for (const f of ['index.html', 'site.html']) if (!fs.existsSync(path.join(APP, f))) throw new Error(`缺少 ${f}`);
 fs.writeFileSync(path.join(DIST, 'manifest.json'), JSON.stringify({ name: pkg.name, version: pkg.version, format: 1, board: 'app/index.html', site: 'app/site.html', siteFiles: 'site-files.json', projectCss: 'project.css' }, null, 2) + '\n');
-console.log(`@joplo/web ${pkg.version}：看板与发布站资源已写入 dist/（发布站 ${siteFiles.length} 个文件）`);
+console.log(`@tokenroll/joplo-web ${pkg.version}：看板与发布站资源已写入 dist/（发布站 ${siteFiles.length} 个文件）`);

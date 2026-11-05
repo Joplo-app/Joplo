@@ -1,4 +1,4 @@
-import { config } from '@joplo/kit';
+import { config } from '@tokenroll/joplo-kit';
 
 export default config({
   name: 'Joplo 分发：npm 包与 Agent 用法',

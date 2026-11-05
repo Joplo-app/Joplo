@@ -119,6 +119,7 @@
   - `joplo skill` 列出主题，`joplo skill <主题>` 输出该主题，每个主题少于 150 行；现有的 `joplo guide` 拆进这些主题。
   - `joplo skill install` 只写一个约 10 行的“指针” `.claude/skills/joplo/SKILL.md`，告诉 Agent 运行哪条命令；正文每次由项目安装的 CLI 输出，不会过期。
   - 已存在且被修改过的文件不覆盖，`--diff` 查看差异，`--force` 覆盖。
+- D38 npm 作用域（2026-11-05，取代 D36 中的 `@joplo/*`）：npm 上的 `@joplo` 组织属于另一个账号，无法发布。改用用户自己的 `@tokenroll` 组织，包名为 `@tokenroll/joplo-kit`、`-core`、`-cli`、`-server`、`-web`；入口包仍是不带作用域的 `joplo`，用户照样写 `npx joplo`。作者项目写 `import … from '@tokenroll/joplo-kit'`，tsconfig 写 `jsxImportSource: "@tokenroll/joplo-kit"`。许可证为 Apache-2.0。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

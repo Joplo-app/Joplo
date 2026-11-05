@@ -6,10 +6,10 @@
 | tsx | 4.23.15 | MIT | 运行 TS |
 | typescript | 6.0.3 | Apache-2.0 | 类型检查 |
 | vitest | 5.1.0 | MIT | 测试 |
-| react / react-dom | 19.3.1 | MIT | @joplo/web：界面 |
-| vite | 8.3.5 | MIT | @joplo/web：构建（server 在产物缺失/过期时自动调用） |
-| @vitejs/plugin-react | 6.2.1 | MIT | @joplo/web：构建 |
-| tailwindcss / @tailwindcss/vite | 4.3.4 | MIT | @joplo/web：样式 |
+| react / react-dom | 19.3.1 | MIT | @tokenroll/joplo-web：界面 |
+| vite | 8.3.5 | MIT | @tokenroll/joplo-web：构建（server 在产物缺失/过期时自动调用） |
+| @vitejs/plugin-react | 6.2.1 | MIT | @tokenroll/joplo-web：构建 |
+| tailwindcss / @tailwindcss/vite | 4.3.4 | MIT | @tokenroll/joplo-web：样式 |
 | shadcn（CLI，未作为依赖安装） | 4.23.0 | MIT | 用 `pnpm dlx shadcn@4.23.0 add …` 生成 `packages/web/src/components/ui/*` |
 | radix-ui | 1.8.1 | MIT | shadcn 组件的底层原语（Checkbox、Switch、Progress、Avatar 等） |
 | class-variance-authority | 0.7.1 | Apache-2.0 | shadcn 组件变体 |
@@ -20,8 +20,8 @@
 | roughjs | 4.6.6 | MIT | 手绘描边（种子由 node.id 哈希） |
 | Excalifont（字体，woff2 子集） | 1.000（取自 @excalidraw/excalidraw 0.18.1） | OFL-1.1 | 手绘主题拉丁字体，打包在 `packages/web/src/fonts/`，许可见同目录 OFL.txt |
 | Xiaolai SC 小赖字体（字体，woff2 子集） | 3.11（取自 @excalidraw/excalidraw 0.18.1） | OFL-1.1 | 手绘主题中文字体，同上 |
-| playwright | 1.64.1 | Apache-2.0 | @joplo/server：renderStep 截图（chromium 修订 1248） |
-| @playwright/test | 1.64.1 | Apache-2.0 | @joplo/web：浏览器测试 |
+| playwright | 1.64.1 | Apache-2.0 | @tokenroll/joplo-server：renderStep 截图（chromium 修订 1248） |
+| @playwright/test | 1.64.1 | Apache-2.0 | @tokenroll/joplo-web：浏览器测试 |
 | @types/react / @types/react-dom | 19.3.0 | MIT | 类型 |
 | commander | 15.0.0 | MIT | T-core：CLI 命令与参数解析 |
 | @modelcontextprotocol/sdk | 1.32.2 | MIT | T-core：官方 MCP stdio server/client；协议 2025-11-25 |
@@ -31,13 +31,13 @@
 
 ### T-board（v2 看板）追加
 
-| vite | 8.3.5 | MIT | @joplo/server 运行时依赖：startDev 单进程开发服务（看板 + ssrLoadModule 编译 + HMR）、buildSite 的 vite build（与 @joplo/web 同一版本） |
-| @vitejs/plugin-react | 6.2.1 | MIT | @joplo/server 运行时依赖：看板与发布站的 React 转译 |
-| tailwindcss / @tailwindcss/vite | 4.3.4 | MIT | @joplo/server 运行时依赖：以项目目录为 @source 编译 className |
-| @joplo/kit | workspace | — | @joplo/server：项目里的 `@joplo/kit` 别名到本仓库 kit 源码 |
+| vite | 8.3.5 | MIT | @tokenroll/joplo-server 运行时依赖：startDev 单进程开发服务（看板 + ssrLoadModule 编译 + HMR）、buildSite 的 vite build（与 @tokenroll/joplo-web 同一版本） |
+| @vitejs/plugin-react | 6.2.1 | MIT | @tokenroll/joplo-server 运行时依赖：看板与发布站的 React 转译 |
+| tailwindcss / @tailwindcss/vite | 4.3.4 | MIT | @tokenroll/joplo-server 运行时依赖：以项目目录为 @source 编译 className |
+| @tokenroll/joplo-kit | workspace | — | @tokenroll/joplo-server：项目里的 `@tokenroll/joplo-kit` 别名到本仓库 kit 源码 |
 ## IR v2 CLI 迁移（T-cli）
 
-- `@joplo/cli` 保留 commander 15，新增显式 tsx 4.23.15 运行时依赖，使用 `tsx/esm/api` 的 `tsImport` 载入作者项目并应用项目 tsconfig。
+- `@tokenroll/joplo-cli` 保留 commander 15，新增显式 tsx 4.23.15 运行时依赖，使用 `tsx/esm/api` 的 `tsImport` 载入作者项目并应用项目 tsconfig。
 - CLI 移除 `@modelcontextprotocol/sdk` 和直接 zod 依赖；上表 MCP SDK 为历史记录，当前 MCP 命令退役，留到产品 V2。core 仍通过 zod 校验 IR。
-- guide 使用 core catalog 生成组件清单，不增加依赖；dev/build/render 仅在调用时动态加载工作区 `@joplo/server`。
+- guide 使用 core catalog 生成组件清单，不增加依赖；dev/build/render 仅在调用时动态加载工作区 `@tokenroll/joplo-server`。
 - 此 worker 的文件所有权不含根 `pnpm-lock.yaml`；协调者合并 package.json 后需重新执行 `pnpm install` 更新锁文件，移除旧 SDK 依赖图。

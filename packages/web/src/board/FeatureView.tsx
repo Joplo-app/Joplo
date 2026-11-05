@@ -3,7 +3,7 @@
  * “按情况比较”：选一个情况，看每个方案的覆盖状态，一键进入对应场景。
  */
 import { useMemo, useState } from 'react';
-import { stateAt, type PlayState, type Project } from '@joplo/core';
+import { stateAt, type PlayState, type Project } from '@tokenroll/joplo-core';
 import { Stage, VIEWPORTS } from '../renderer/Stage';
 import type { StageTheme } from '../renderer/rough';
 import { browseSceneId, browseState, optionsOf, scenariosOf, shortName } from '../runtime/views';

@@ -1,6 +1,6 @@
 /**
  * npm 分发相关的 CLI 行为（D36）：包管理器识别、init 写入的 package.json / tsconfig、
- * 下一步命令、不覆盖已有文件、项目内 @joplo/kit 与 CLI 版本不一致时的提示。
+ * 下一步命令、不覆盖已有文件、项目内 @tokenroll/joplo-kit 与 CLI 版本不一致时的提示。
  */
 import { afterEach, describe, expect, test } from 'vitest';
 import { mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
@@ -17,8 +17,8 @@ const temp = async () => { const d = await realpath(await mkdtemp(join(tmpdir(),
 const VERSION = JSON.parse(await readFile(resolve(import.meta.dirname, '../package.json'), 'utf8')).version as string;
 
 async function fakeKit(project: string, version: string) {
-  await mkdir(join(project, 'node_modules/@joplo/kit'), { recursive: true });
-  await writeFile(join(project, 'node_modules/@joplo/kit/package.json'), JSON.stringify({ name: '@joplo/kit', version }));
+  await mkdir(join(project, 'node_modules/@tokenroll/joplo-kit'), { recursive: true });
+  await writeFile(join(project, 'node_modules/@tokenroll/joplo-kit/package.json'), JSON.stringify({ name: '@tokenroll/joplo-kit', version }));
 }
 
 describe('包管理器', () => {
@@ -50,15 +50,15 @@ describe('包管理器', () => {
 });
 
 describe('init', () => {
-  test('package.json 锁定 joplo 与 @joplo/kit 的精确版本；tsconfig 指向 @joplo/kit', async () => {
+  test('package.json 锁定 joplo 与 @tokenroll/joplo-kit 的精确版本；tsconfig 指向 @tokenroll/joplo-kit', async () => {
     const d = join(await temp(), 'my-demo');
     await initProject(d);
     const pkg = JSON.parse(await readFile(join(d, 'package.json'), 'utf8'));
-    expect(pkg).toMatchObject({ name: 'my-demo', private: true, type: 'module', devDependencies: { joplo: VERSION, '@joplo/kit': VERSION } });
+    expect(pkg).toMatchObject({ name: 'my-demo', private: true, type: 'module', devDependencies: { joplo: VERSION, '@tokenroll/joplo-kit': VERSION } });
     expect(VERSION).toMatch(/^\d+\.\d+\.\d+(-[\w.]+)?$/);
     expect(pkg.scripts).toMatchObject({ dev: 'joplo dev', check: 'joplo check', build: 'joplo build' });
     const ts = JSON.parse(await readFile(join(d, 'tsconfig.json'), 'utf8'));
-    expect(ts.compilerOptions).toMatchObject({ jsx: 'react-jsxdev', jsxImportSource: '@joplo/kit', moduleResolution: 'Bundler', allowImportingTsExtensions: true, noEmit: true, skipLibCheck: true });
+    expect(ts.compilerOptions).toMatchObject({ jsx: 'react-jsxdev', jsxImportSource: '@tokenroll/joplo-kit', moduleResolution: 'Bundler', allowImportingTsExtensions: true, noEmit: true, skipLibCheck: true });
   });
 
   test('包名从目录名推导为合法 npm 名', async () => {
@@ -107,8 +107,8 @@ describe('init', () => {
       expect(await runCli(['init', 'my-demo'], { stdout: s => { out += s; }, stderr: () => {} })).toBe(0);
     } finally { process.chdir(prev); if (ua === undefined) delete process.env.npm_config_user_agent; else process.env.npm_config_user_agent = ua; }
     expect(out).toContain('✓ 已创建 my-demo/');
-    expect(out).toContain(`"joplo": "${VERSION}", "@joplo/kit": "${VERSION}"`);
-    expect(out).toContain('jsxImportSource: "@joplo/kit"');
+    expect(out).toContain(`"joplo": "${VERSION}", "@tokenroll/joplo-kit": "${VERSION}"`);
+    expect(out).toContain('jsxImportSource: "@tokenroll/joplo-kit"');
     expect(out.trim().split('\n').at(-1)).toBe('下一步：cd my-demo && pnpm install && pnpm joplo dev');
   });
 });
@@ -116,7 +116,7 @@ describe('init', () => {
 describe('版本一致性', () => {
   test('CLI 版本取自自己的 package.json', () => { expect(cliVersion()).toBe(VERSION); });
 
-  test('项目里的 @joplo/kit 与 CLI 相同：没有提示', async () => {
+  test('项目里的 @tokenroll/joplo-kit 与 CLI 相同：没有提示', async () => {
     const d = await temp(); await fakeKit(d, VERSION);
     expect(projectNotes(d, 'check', { cli: VERSION, env: {} })).toEqual([]);
   });
@@ -125,10 +125,10 @@ describe('版本一致性', () => {
     const d = await temp(); await fakeKit(d, '0.0.9');
     const [n, ...rest] = projectNotes(d, 'check', { cli: '0.1.0', env: {} });
     expect(rest).toEqual([]);
-    expect(n).toContain('项目里的 @joplo/kit 是 0.0.9，当前 CLI 是 0.1.0');
-    expect(n).toContain('npm i -D joplo@0.1.0 @joplo/kit@0.1.0');
+    expect(n).toContain('项目里的 @tokenroll/joplo-kit 是 0.0.9，当前 CLI 是 0.1.0');
+    expect(n).toContain('npm i -D joplo@0.1.0 @tokenroll/joplo-kit@0.1.0');
     const [p] = projectNotes(d, 'build', { cli: '0.1.0', env: { npm_config_user_agent: 'pnpm/10 npm/?' } });
-    expect(p).toContain('pnpm add -D joplo@0.1.0 @joplo/kit@0.1.0');
+    expect(p).toContain('pnpm add -D joplo@0.1.0 @tokenroll/joplo-kit@0.1.0');
   });
 
   test('父目录的 node_modules 也算（与 Node 的解析一致）', async () => {
@@ -136,10 +136,10 @@ describe('版本一致性', () => {
     expect(projectNotes(join(d, 'sub'), 'dev', { cli: '0.1.0', env: {} })[0]).toContain('0.0.9');
   });
 
-  test('声明了 @joplo/kit 但没安装：提示先安装；没有 package.json：不提示', async () => {
+  test('声明了 @tokenroll/joplo-kit 但没安装：提示先安装；没有 package.json：不提示', async () => {
     const d = await temp();
     expect(projectNotes(d, 'check', { cli: '0.1.0', env: {} })).toEqual([]);
-    await writeFile(join(d, 'package.json'), JSON.stringify({ devDependencies: { '@joplo/kit': '0.1.0' } }));
+    await writeFile(join(d, 'package.json'), JSON.stringify({ devDependencies: { '@tokenroll/joplo-kit': '0.1.0' } }));
     expect(projectNotes(d, 'check', { cli: '0.1.0', env: {} })[0]).toContain('还没有安装依赖，先运行：npm install');
   });
 
@@ -149,8 +149,8 @@ describe('版本一致性', () => {
   });
 
   test('坏的 package.json 不让 CLI 崩溃', async () => {
-    const d = await temp(); await mkdir(join(d, 'node_modules/@joplo/kit'), { recursive: true });
-    await writeFile(join(d, 'node_modules/@joplo/kit/package.json'), '{oops');
+    const d = await temp(); await mkdir(join(d, 'node_modules/@tokenroll/joplo-kit'), { recursive: true });
+    await writeFile(join(d, 'node_modules/@tokenroll/joplo-kit/package.json'), '{oops');
     await writeFile(join(d, 'package.json'), '{oops');
     expect(projectNotes(d, 'check', { cli: '0.1.0', env: {} })).toEqual([]);
   });
@@ -163,7 +163,7 @@ describe('版本一致性', () => {
     const startDev = async () => ({ url: 'http://127.0.0.1:1/', close: async () => {} });
     out = ''; err = '';
     expect(await runCli(['dev', d], { stdout: s => { out += s; }, stderr: s => { err += s; }, loadServer: async () => ({ startDev }), cliVersion: '0.1.0' })).toBe(0);
-    expect(err).toContain('! 项目里的 @joplo/kit 是 0.0.9，当前 CLI 是 0.1.0');
+    expect(err).toContain('! 项目里的 @tokenroll/joplo-kit 是 0.0.9，当前 CLI 是 0.1.0');
     expect(out).toBe('http://127.0.0.1:1/\n');
   });
 });

@@ -3,7 +3,7 @@
  * 只做低保真近似：间距、字号、圆角用 Mantine 默认刻度；颜色映射到一组柔和的调色板。
  */
 import type { CSSProperties } from 'react';
-import { atWidth } from '@joplo/core';
+import { atWidth } from '@tokenroll/joplo-core';
 
 export const SPACING: Record<string, number> = { xs: 10, sm: 12, md: 16, lg: 20, xl: 32 };
 export const FONT: Record<string, number> = { xs: 12, sm: 14, md: 16, lg: 18, xl: 20 };

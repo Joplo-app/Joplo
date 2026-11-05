@@ -80,7 +80,7 @@ describe('TSX 邀请示例编译', () => {
   });
 
   it('编译错误带 文件:行号：未知组件、缺 id、函数属性、未知插槽', async () => {
-    const { jsx } = await import('@joplo/kit/jsx-runtime');
+    const { jsx } = await import('@tokenroll/joplo-kit/jsx-runtime');
     const bad = { ...authoring, features: {} } as AuthoringProject;
     bad.features = {
       x: {
