@@ -34,6 +34,104 @@
   --stage-info: #1c5fb8;
   --sel: #6741d9;
   --focus: #e8590c;
+
+  /* ---------- 看板 Token v1（D55，design/joplo-board.pen 的「设计 Token v1」）----------
+   * 看板界面只用 --jb-*（Tailwind 里是 bg-jb-* / text-jb-* / border-jb-*）；舞台、字幕、手机外框只读 --jp-*。
+   * 浅色是看板；深色（.jb-dark）用于全屏演示。黄色只标“当前 / 正在发生 / 主操作”；页面内不用阴影，只有浮层 e1。 */
+  --jb-bg-app: #F4F1EA;
+  --jb-bg-surface: #FFFFFF;
+  --jb-bg-subtle: #FAF8F3;
+  --jb-bg-sunken: #ECE8DE;
+  --jb-bg-hover: #F4F1EA;
+  --jb-bg-press: #ECE8DE;
+  --jb-bg-selected: #FFF2BF;
+  --jb-bg-inverse: #1E1E1E;
+  --jb-bg-inverse-hover: #2C2A26;
+  --jb-bg-inverse-press: #4A4740;
+  --jb-fg-default: #1E1E1E;
+  --jb-fg-muted: #6E6A60;
+  --jb-fg-faint: #9C978B;
+  --jb-fg-inverse: #FFFFFF;
+  --jb-fg-on-accent: #1E1E1E;
+  --jb-border-default: #DDD8CC;
+  --jb-border-strong: #1E1E1E;
+  --jb-accent: #FFD23F;
+  --jb-accent-hover: #FFE27A;
+  --jb-accent-press: #E0AE00;
+  --jb-status-danger: #C8402F;
+  --jb-status-danger-bg: #FBE7E3;
+  --jb-status-ok: #2F7A47;
+  --jb-status-ok-bg: #E5F2E8;
+  --jb-status-pending: #6E6A60;
+  --jb-status-na: #9C978B;
+  --jb-font: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --jb-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* 浮层 e1：1.5px 墨线 + 3px 实色偏移阴影，圆角 10 */
+  --jb-e1: 3px 3px 0 var(--jb-border-strong);
+}
+
+/* 深色（全屏演示、深色舞台四周） */
+.jb-dark {
+  --jb-bg-app: #141413;
+  --jb-bg-surface: #1E1E1E;
+  --jb-bg-subtle: #242320;
+  --jb-bg-sunken: #2C2A26;
+  --jb-bg-hover: #2C2A26;
+  --jb-bg-press: #3A3833;
+  --jb-bg-selected: #3A3220;
+  --jb-bg-inverse: #FFFFFF;
+  --jb-bg-inverse-hover: #F4F1EA;
+  --jb-bg-inverse-press: #ECE8DE;
+  --jb-fg-default: #F4F1EA;
+  --jb-fg-muted: #BDB7A9;
+  --jb-fg-faint: #6E6A60;
+  --jb-fg-inverse: #1E1E1E;
+  --jb-fg-on-accent: #1E1E1E;
+  --jb-border-default: #3A3833;
+  --jb-border-strong: #F4F1EA;
+  --jb-accent: #FFD23F;
+  --jb-accent-hover: #FFE27A;
+  --jb-accent-press: #E0AE00;
+  --jb-status-danger: #F0806F;
+  --jb-status-danger-bg: #3A1E1A;
+  --jb-status-ok: #7CC495;
+  --jb-status-ok-bg: #18301F;
+  --jb-status-pending: #BDB7A9;
+  --jb-status-na: #6E6A60;
+  --jb-e1: 3px 3px 0 var(--jb-border-strong);
+  color: var(--jb-fg-default);
+}
+
+@theme inline {
+  --color-jb-app: var(--jb-bg-app);
+  --color-jb-surface: var(--jb-bg-surface);
+  --color-jb-subtle: var(--jb-bg-subtle);
+  --color-jb-sunken: var(--jb-bg-sunken);
+  --color-jb-hover: var(--jb-bg-hover);
+  --color-jb-press: var(--jb-bg-press);
+  --color-jb-selected: var(--jb-bg-selected);
+  --color-jb-inverse: var(--jb-bg-inverse);
+  --color-jb-inverse-hover: var(--jb-bg-inverse-hover);
+  --color-jb-inverse-press: var(--jb-bg-inverse-press);
+  --color-jb-fg: var(--jb-fg-default);
+  --color-jb-muted: var(--jb-fg-muted);
+  --color-jb-faint: var(--jb-fg-faint);
+  --color-jb-on-inverse: var(--jb-fg-inverse);
+  --color-jb-on-accent: var(--jb-fg-on-accent);
+  --color-jb-line: var(--jb-border-default);
+  --color-jb-ink: var(--jb-border-strong);
+  --color-jb-accent: var(--jb-accent);
+  --color-jb-accent-hover: var(--jb-accent-hover);
+  --color-jb-accent-press: var(--jb-accent-press);
+  --color-jb-danger: var(--jb-status-danger);
+  --color-jb-danger-bg: var(--jb-status-danger-bg);
+  --color-jb-ok: var(--jb-status-ok);
+  --color-jb-ok-bg: var(--jb-status-ok-bg);
+  --color-jb-pending: var(--jb-status-pending);
+  --color-jb-na: var(--jb-status-na);
+  --font-jb: var(--jb-font);
+  --font-jb-mono: var(--jb-mono);
+  --shadow-jb-e1: var(--jb-e1);
 }
 
 @theme inline {
@@ -204,6 +302,35 @@
     white-space: nowrap;
     min-width: 0;
   }
+}
+
+/* ---------- 看板控件的公共样式（D55）---------- */
+/* 键盘焦点：2px 深黄（accent-press）描边，外移 2px；鼠标点击不显示 */
+.jb-focus:focus-visible {
+  outline: 2px solid var(--jb-accent-press);
+  outline-offset: 2px;
+}
+/* 浮层 e1：菜单、外观浮层、悬停卡片共用（portal 渲染，position: fixed） */
+.jb-pop {
+  background: var(--jb-bg-surface);
+  color: var(--jb-fg-default);
+  border: 1.5px solid var(--jb-border-strong);
+  border-radius: 10px;
+  box-shadow: var(--jb-e1);
+  font-family: var(--jb-font);
+}
+/* 轻提示 e2：墨底白字 */
+.jb-tip {
+  background: var(--jb-bg-inverse);
+  color: var(--jb-fg-inverse);
+  border-radius: 6px;
+  font-family: var(--jb-font);
+}
+.jb-noscrollbar {
+  scrollbar-width: none;
+}
+.jb-noscrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* 手绘描边：边框交给 rough 描边（覆盖 shadcn 组件自带的 border 工具类） */

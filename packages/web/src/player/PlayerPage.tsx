@@ -25,11 +25,11 @@ import { JoploLogo } from './JoploMark';
 import { Overlay } from './Overlay';
 import { StageViewport } from './StageViewport';
 import { strokeOfTheme } from '../renderer/themes';
-import { Btn, DirectorTag, MenuButton, Segmented, useWidth, type MenuItem, type Tone } from './controls';
+import { Btn, DirectorTag, MenuButton, Segmented, useWidth, type MenuEntry } from './controls';
 import { controlsRowCollapse, fullscreenBarCollapse, layerBarCollapse } from './controls-fit';
 
 export { Segmented } from './controls';
-export type { MenuItem } from './controls';
+export type { MenuItem, MenuEntry } from './controls';
 
 export type Crumb = { label: string; testid: string; onClick?: () => void };
 
@@ -72,10 +72,10 @@ function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
 }
 
 const playLabelOf = (snap: Snapshot) => (!snap.playing ? (snap.state?.completed ? '重新播放' : '播放') : snap.paused ? '继续' : '暂停');
-const speedItems = (speed: number, onSpeed: (v: number) => void): MenuItem[] => SPEEDS.map((v) => ({ id: `speed-${v}`, label: `速度 ${v}×`, checked: speed === v, onClick: () => onSpeed(v) }));
+const speedItems = (speed: number, onSpeed: (v: number) => void): MenuEntry[] => SPEEDS.map((v) => ({ id: `speed-${v}`, label: `速度 ${v}×`, checked: speed === v, onClick: () => onSpeed(v) }));
 
 /** 上一步 / 播放 / 下一步：宽度不够时只剩图标（tooltip 写明快捷键）。 */
-function NavButtons({ snap, scenario, ctl, iconOnly, size, tone, ids }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; iconOnly: boolean; size: 32 | 36; tone: Tone; ids: { prev: string; play: string; next: string } }) {
+function NavButtons({ snap, scenario, ctl, iconOnly, size, ids }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; iconOnly: boolean; size: 32 | 36; ids: { prev: string; play: string; next: string } }) {
   const pos = snap.state?.position ?? 0;
   const total = scenario?.steps.length ?? 0;
   const off = !scenario || snap.view !== 'stage';
@@ -83,20 +83,20 @@ function NavButtons({ snap, scenario, ctl, iconOnly, size, tone, ids }: { snap: 
   const playLabel = playLabelOf(snap);
   return (
     <>
-      <Btn icon={<ChevronLeft className="size-4" />} label="上一步" title="上一步（←）" iconOnly={iconOnly} size={size} tone={tone} onClick={() => ctl.prev()} disabled={off || (pos === 0 && !snap.busy)} data-testid={ids.prev} />
-      <Btn icon={playing ? <Pause className="size-4" /> : <Play className="size-4" />} label={playLabel} title={`${playLabel}（空格）`} aria-label={playLabel} iconOnly={iconOnly} size={size} tone={tone} variant="primary" className={iconOnly ? undefined : 'min-w-[96px]'} onClick={() => ctl.togglePlay()} disabled={off || total === 0} data-testid={ids.play} />
-      <Btn icon={<ChevronRight className="size-4" />} iconAfter label="下一步" title="下一步（→）" iconOnly={iconOnly} size={size} tone={tone} onClick={() => void ctl.next()} disabled={off || total === 0} data-testid={ids.next} />
+      <Btn icon={<ChevronLeft className="size-4" />} label="上一步" title="上一步（←）" iconOnly={iconOnly} size={size} onClick={() => ctl.prev()} disabled={off || (pos === 0 && !snap.busy)} data-testid={ids.prev} />
+      <Btn icon={playing ? <Pause className="size-4" /> : <Play className="size-4" />} label={playLabel} title={`${playLabel}（空格）`} aria-label={playLabel} iconOnly={iconOnly} size={size} variant="play" className={iconOnly ? undefined : 'min-w-[96px]'} onClick={() => ctl.togglePlay()} disabled={off || total === 0} data-testid={ids.play} />
+      <Btn icon={<ChevronRight className="size-4" />} iconAfter label="下一步" title="下一步（→）" iconOnly={iconOnly} size={size} onClick={() => void ctl.next()} disabled={off || total === 0} data-testid={ids.next} />
     </>
   );
 }
 
-function SpeedSegmented({ speed, onSpeed, tone, testid }: { speed: number; onSpeed: (v: number) => void; tone: Tone; testid: string }) {
-  return <Segmented label="播放速度" testid={testid} tone={tone} value={String(speed)} onChange={(v) => onSpeed(Number(v))} items={SPEEDS.map((v) => ({ value: String(v), label: `${v}×`, testid: `${testid}-${v}`, title: `自动播放速度 ${v}×` }))} />;
+function SpeedSegmented({ speed, onSpeed, testid }: { speed: number; onSpeed: (v: number) => void; testid: string }) {
+  return <Segmented label="播放速度" testid={testid} value={String(speed)} onChange={(v) => onSpeed(Number(v))} items={SPEEDS.map((v) => ({ value: String(v), label: `${v}×`, testid: `${testid}-${v}`, title: `自动播放速度 ${v}×` }))} />;
 }
 
 type LayerDef = { id: string; title: string };
 /** 层级切换：分段控件；收起时变成“层级：当前层 ▾”的下拉菜单。导演跟随时不高亮任何一项。 */
-function LayerSwitch({ layers, viewLayer, director, onLayer, collapsed, tone }: { layers: LayerDef[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; collapsed: boolean; tone: Tone }) {
+function LayerSwitch({ layers, viewLayer, director, onLayer, collapsed }: { layers: LayerDef[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; collapsed: boolean }) {
   const current = layers.find((l) => l.id === viewLayer)?.title ?? viewLayer;
   if (collapsed)
     return (
@@ -104,18 +104,17 @@ function LayerSwitch({ layers, viewLayer, director, onLayer, collapsed, tone }: 
         trigger={{ icon: undefined, label: director ? '层级' : `层级：${current}` }}
         label="切换层级"
         testid="layer-switch"
-        tone={tone}
+       
         size={32}
-        align="left"
-        placement={tone === 'dark' ? 'up' : 'down'}
+                placement="top-start"
         items={layers.map((l) => ({ id: `layer-${l.id}`, label: l.title, checked: !director && l.id === viewLayer, onClick: () => onLayer(l.id) }))}
       />
     );
-  return <Segmented label="层级" testid="layer-switch" tone={tone} value={director ? null : viewLayer} onChange={onLayer} items={layers.map((l) => ({ value: l.id, label: l.title, testid: `layer-${l.id}`, title: `手动查看「${l.title}」（导演暂停）` }))} />;
+  return <Segmented label="层级" testid="layer-switch" value={director ? null : viewLayer} onChange={onLayer} items={layers.map((l) => ({ value: l.id, label: l.title, testid: `layer-${l.id}`, title: `手动查看「${l.title}」（导演暂停）` }))} />;
 }
 
 /** 非全屏的播放控制行：⟲ 上一步 播放 下一步 速度 …… 「…」。宽度不够：先收三件套为图标，再把速度收进「…」。 */
-function Controls({ snap, scenario, ctl, menu, speed, onSpeed }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; menu: MenuItem[]; speed: number; onSpeed?: (v: number) => void }) {
+function Controls({ snap, scenario, ctl, menu, speed, onSpeed }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; menu: MenuEntry[]; speed: number; onSpeed?: (v: number) => void }) {
   const [ref, width] = useWidth();
   const c = controlsRowCollapse(width, playLabelOf(snap), onSpeed ? SPEEDS : []);
   const off = !scenario || snap.view !== 'stage';
@@ -124,10 +123,10 @@ function Controls({ snap, scenario, ctl, menu, speed, onSpeed }: { snap: Snapsho
   return (
     <div ref={ref} className="flex h-9 shrink-0 items-center gap-2 overflow-hidden" role="toolbar" aria-label="播放控制" data-testid="controls" data-collapsed={[...c].join(' ') || undefined}>
       <Btn icon={<RotateCcw className="size-4" />} label="回到第 0 步" iconOnly onClick={() => ctl.reset()} disabled={off} data-testid="ctl-reset" />
-      <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={c.has('nav')} size={36} tone="light" ids={{ prev: 'ctl-prev', play: 'ctl-play', next: 'ctl-next' }} />
-      {onSpeed && !speedInMenu ? <SpeedSegmented speed={speed} onSpeed={onSpeed} tone="light" testid="speed" /> : null}
+      <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={c.has('nav')} size={36} ids={{ prev: 'ctl-prev', play: 'ctl-play', next: 'ctl-next' }} />
+      {onSpeed && !speedInMenu ? <SpeedSegmented speed={speed} onSpeed={onSpeed} testid="speed" /> : null}
       <div className="ml-auto shrink-0">
-        <MenuButton trigger={{}} label="更多操作" testid="more-menu" items={items} />
+        <MenuButton trigger={{}} label="更多操作" testid="more-menu" items={items} placement="top-end" size={36} />
       </div>
     </div>
   );
@@ -139,18 +138,18 @@ function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer,
   const c = fullscreenBarCollapse(avail, playLabelOf(snap), onSpeed ? SPEEDS : [], layers.map((l) => l.title), director, current);
   const sep = <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-white/20" />;
   return (
-    <div className="flex h-12 max-w-full shrink-0 items-center gap-2 overflow-hidden rounded-full bg-[rgba(24,24,24,0.86)] px-2 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur" role="toolbar" aria-label="全屏播放控制" data-testid="fullscreen-controls" data-collapsed={[...c].join(' ') || undefined}>
-      <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={c.has('nav')} size={32} tone="dark" ids={{ prev: 'fs-prev', play: 'fs-play', next: 'fs-next' }} />
-      {onSpeed ? (c.has('speed') ? <MenuButton trigger={{ icon: <Gauge className="size-4" /> }} label={`播放速度（${speed}×）`} testid="fs-speed" tone="dark" size={32} width={160} items={speedItems(speed, onSpeed)} /> : <SpeedSegmented speed={speed} onSpeed={onSpeed} tone="dark" testid="fs-speed" />) : null}
+    <div className="jb-dark flex h-12 max-w-full shrink-0 items-center gap-2 overflow-hidden rounded-full bg-[rgba(24,24,24,0.86)] px-2 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur" role="toolbar" aria-label="全屏播放控制" data-testid="fullscreen-controls" data-collapsed={[...c].join(' ') || undefined}>
+      <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={c.has('nav')} size={32} ids={{ prev: 'fs-prev', play: 'fs-play', next: 'fs-next' }} />
+      {onSpeed ? (c.has('speed') ? <MenuButton trigger={{ icon: <Gauge className="size-4" /> }} label={`播放速度（${speed}×）`} testid="fs-speed" size={32} width={160} items={speedItems(speed, onSpeed)} /> : <SpeedSegmented speed={speed} onSpeed={onSpeed} testid="fs-speed" />) : null}
       {layers.length > 1 ? (
         <>
           {sep}
-          <LayerSwitch layers={layers} viewLayer={viewLayer} director={director} onLayer={onLayer} collapsed={c.has('layers')} tone="dark" />
-          <DirectorTag on={director} layerTitle={current} onToggle={onDirector} tone="dark" />
+          <LayerSwitch layers={layers} viewLayer={viewLayer} director={director} onLayer={onLayer} collapsed={c.has('layers')} />
+          <DirectorTag on={director} layerTitle={current} onToggle={onDirector} />
         </>
       ) : null}
       {sep}
-      <Btn icon={<Shrink className="size-4" />} label="退出全屏（Esc）" iconOnly size={32} tone="dark" onClick={onExit} data-testid="fs-exit" />
+      <Btn icon={<Shrink className="size-4" />} label="退出全屏（Esc）" iconOnly size={32} onClick={onExit} data-testid="fs-exit" />
     </div>
   );
 }
@@ -213,7 +212,7 @@ export type PlayerPageProps = {
   nav: ReactNode;
   /** 画面上方（缺口说明、编译错误等）。 */
   banner?: ReactNode;
-  menu: MenuItem[];
+  menu: MenuEntry[];
   /** 右侧抽屉等覆盖层（看板）。 */
   drawer?: ReactNode;
   /** 允许 ⌥+单击检查元素（看板）；发布站为 false，⌥+单击按普通单击处理。 */
@@ -410,7 +409,7 @@ export function PlayerPage(p: PlayerPageProps) {
           ) : null}
           {hasLayerBar ? (
             <div ref={layerBarRef} className="flex h-8 shrink-0 items-center gap-2 overflow-hidden" data-testid="layer-bar" data-collapsed={[...lc].join(' ') || undefined}>
-              <LayerSwitch layers={layers} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} collapsed={lc.has('layers')} tone="light" />
+              <LayerSwitch layers={layers} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} collapsed={lc.has('layers')} />
               <DirectorTag on={director} layerTitle={currentLayer} onToggle={toggleDirector} />
               <Btn icon={<RotateCw className="size-4" />} label="只重放这一层" title="从第 0 步开始，只用这一层的镜头播放；这一层没有变化的步骤快速带过" iconOnly={lc.has('replay')} size={32} onClick={replayLayer} data-testid="replay-layer" />
             </div>
