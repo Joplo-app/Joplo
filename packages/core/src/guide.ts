@@ -78,7 +78,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 
 ## 目录约定
 - joplo.config.ts：export default config({ name, layout: 'app', home: '/' })。
-- layouts/app.tsx：export default layout(<main><Outlet/><Slot name="overlay"/></main>)。
+- layouts/app.tsx：export default layout(<AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: 'sm' }}><AppShell.Navbar>…</AppShell.Navbar><AppShell.Main><Outlet/></AppShell.Main><Slot name="overlay"/></AppShell>)。
 - routes/page.tsx → /；routes/members/page.tsx → /members。只支持静态路径，不支持 [id]。
 - features/<f>/feature.ts：功能目标、情况、共享规则、待决问题、pick。
 - features/<f>/options/<o>.tsx：一个方案、路径堆叠、初始状态和场景。
@@ -93,7 +93,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - feature({ name, goal, cases, roles?, constraints?, rules?, questions?, pick? })。
 - option({ name, idea, on?, routes?, state?, rules?, questions?, coverage?, scenarios })。
 - on: { '/members': { actions: <Button id="invite">邀请</Button> } }：往已有路径的插槽加元素。
-- routes: { '/members/new': page({ title: '新增' }, <div/> ) }：为方案新增路径。
+- routes: { '/members/new': page({ title: '新增' }, <Stack>…</Stack>) }：为方案新增路径。
 - state: { ui: { ready: false }, data: {}, inputs: {} }：方案初始状态。
 - scenarios: { happy: flow('成功', { cases: ['happy'], start: '/members' }).click('invite', done('已完成')) }。
 - flow 的选项还可写 state、description、expected、mock、outcome，覆盖初始状态或说明模拟结果。
@@ -113,6 +113,12 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - $.ui.x / $.data.x / $.inputs.x 是整值绑定，不求值任意表达式。
 - when={$.ui.ready}；disabled={not($.ui.isAdmin)}。
 - not(x)、eq(x, value)、neq(x, value)、empty(x)、notEmpty(x)、oneOf(x, values)、and(...xs)、or(...xs)。
+- 浮层：<Modal id="dlg" opened={$.ui.open} title="…">；Drawer 同理，可见性只看 opened。
+
+## 布局与适配（组件与 Mantine 同名同参，不写 className）
+- 用 Stack / Group / SimpleGrid / Grid 的属性排版：<Group justify="space-between">、<SimpleGrid cols={{ base: 1, md: 3 }}>。
+- 响应式写成对象 { base, xs, sm, md, lg, xl }，或 visibleFrom="sm" / hiddenFrom="sm"；AppShell 在窄于 navbar.breakpoint 时自动收起导航。
+- 输入组件直接写 label：<TextInput id="email" label="邮箱"/>，自动字幕会用它。
 
 ## 规则与边界
 - rule('约束', { origin?, status?, cases?: ['happy'], elements?: ['invite'] })。

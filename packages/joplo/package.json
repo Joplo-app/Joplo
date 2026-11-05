@@ -25,5 +25,14 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TokenRollAI/Joplo.git",
+    "directory": "packages/joplo"
+  },
+  "homepage": "https://github.com/TokenRollAI/Joplo#readme",
+  "bugs": {
+    "url": "https://github.com/TokenRollAI/Joplo/issues"
   }
 }

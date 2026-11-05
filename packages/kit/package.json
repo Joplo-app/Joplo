@@ -47,5 +47,14 @@
       },
       "./package.json": "./package.json"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TokenRollAI/Joplo.git",
+    "directory": "packages/kit"
+  },
+  "homepage": "https://github.com/TokenRollAI/Joplo#readme",
+  "bugs": {
+    "url": "https://github.com/TokenRollAI/Joplo/issues"
   }
 }
