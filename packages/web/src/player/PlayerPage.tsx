@@ -8,17 +8,17 @@
  * 因此发布站的产物里不会出现。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Clapperboard, Ellipsis, Maximize, Minus, Pause, Play, Plus, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clapperboard, Ellipsis, Expand, Maximize, Minus, Pause, Play, Plus, RotateCcw, Shrink } from 'lucide-react';
 import { stepTouchesLayer, type Project, type Scenario } from '@tokenroll/joplo-core';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
 import { Subtitle } from './Subtitle';
+import { isFullscreenKey, useFullscreen, useIdleVisible } from './fullscreen';
 import { subtitleFor } from './subtitle-content';
 import { SPEEDS, asSpeed } from '../runtime/pace';
 import { cameraFor, cameraPosition } from './cameraFor';
 import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
-import { MOCK_CLS, OUTCOME_LABEL } from './labels';
 import { Overlay } from './Overlay';
 import { StageViewport } from './StageViewport';
 
@@ -172,14 +172,42 @@ function Controls({ snap, scenario, ctl, menu, speed, onSpeed }: { snap: Snapsho
   );
 }
 
+/** 全屏时浮在画面下方的播放控制：上一步、播放 / 暂停、下一步、速度（层级切换与导演开关由调用方放在旁边）。 */
+function FloatingControls({ snap, scenario, ctl, speed, onSpeed }: { snap: Snapshot; scenario: Scenario; ctl: DemoController; speed: number; onSpeed?: (v: number) => void }) {
+  const pos = snap.state?.position ?? 0;
+  const total = scenario.steps.length;
+  const playing = snap.playing && !snap.paused;
+  const playLabel = !snap.playing ? (snap.state?.completed ? '重新播放' : '播放') : snap.paused ? '继续' : '暂停';
+  const btn = 'flex h-8 items-center gap-1 rounded-md px-2.5 text-[13px] text-white hover:bg-white/15 disabled:opacity-40';
+  return (
+    <>
+      <button type="button" onClick={() => ctl.prev()} disabled={pos === 0 && !snap.busy} className={btn} data-testid="fs-prev" title="上一步（←）">
+        <ChevronLeft className="size-4" />
+        上一步
+      </button>
+      <button type="button" onClick={() => ctl.togglePlay()} disabled={total === 0} className={cn(btn, 'bg-white/15 font-medium')} data-testid="fs-play" title={`${playLabel}（空格）`} aria-label={playLabel}>
+        {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
+        {playLabel}
+      </button>
+      <button type="button" onClick={() => void ctl.next()} disabled={total === 0} className={btn} data-testid="fs-next" title="下一步（→）">
+        下一步
+        <ChevronRight className="size-4" />
+      </button>
+      {onSpeed ? (
+        <div className="w-[150px]">
+          <Segmented label="播放速度" testid="fs-speed" value={String(speed)} onChange={(v) => onSpeed(Number(v))} items={SPEEDS.map((v) => ({ value: String(v), label: `${v}×`, testid: `fs-speed-${v}` }))} />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function StepStrip({ snap, scenario, ctl }: { snap: Snapshot; scenario: Scenario; ctl: DemoController }) {
   const st = snap.state;
   const pos = st?.position ?? 0;
   const active = snap.activeStep;
   const shownIndex = active !== null ? active + 1 : pos; // 0 = 初始状态
-  const next = st && !st.completed ? scenario.steps[pos] : undefined;
-  const done = st?.completed;
-  const total = scenario.steps.length;
+  // 一行步骤芯片；说明、步数与结果都在字幕区（不重复）
   const listRef = useRef<HTMLOListElement>(null);
   useEffect(() => {
     listRef.current?.querySelector('[data-state="current"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -211,26 +239,6 @@ function StepStrip({ snap, scenario, ctl }: { snap: Snapshot; scenario: Scenario
         {chip(0, '初始', 'chip-initial')}
         {scenario.steps.map((s, i) => chip(i + 1, s.caption, `chip-${s.id}`, s.kind))}
       </ol>
-      <div className="mt-1 flex items-center gap-3">
-        <div className="flex min-w-0 flex-1 items-baseline gap-2 truncate" data-testid="caption">
-          {done && active === null ? (
-            <span data-testid="complete-banner" role="status" className={cn('shrink-0 text-[14px]', done.outcome === 'success' ? 'text-[#1f6e30]' : done.outcome === 'failure' ? 'text-[#a51d1d]' : 'text-[#3a3a3a]')}>
-              <strong>场景完成 · {OUTCOME_LABEL[done.outcome]}</strong> {done.text}
-            </span>
-          ) : (
-            // 本步说明在字幕区（画面下方），这里只显示第几步，不重复说明
-            <span className="shrink-0 text-[14px] font-semibold" data-testid="step-index">
-              第 {shownIndex} / {total} 步
-            </span>
-          )}
-          <span className="min-w-0 truncate text-[12px] text-[#6b6b6b]" data-testid="next-hint">
-            {total === 0 ? `这个场景没有步骤，只展示初始状态。${scenario.expected ? `预期：${scenario.expected}` : ''}` : next ? `下一步：${next.caption}` : done ? `这是${scenario.mock.label}的演示结果，不代表真实服务的返回` : '已到最后一步'}
-          </span>
-        </div>
-        <span className={cn('shrink-0 rounded border px-1.5 py-px text-[12px]', MOCK_CLS[scenario.mock.outcome])} data-testid="mock-label" title="演示中的结果是模拟的">
-          {scenario.mock.label}
-        </span>
-      </div>
     </section>
   );
 }
@@ -275,7 +283,7 @@ export function PlayerPage(p: PlayerPageProps) {
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
   // 字幕区（画面下方）显示的步骤：正在播放的一步，否则是刚执行完的一步；第 0 步显示初始状态
   const pos = state?.position ?? 0;
-  const subtitle = subtitleFor(scenario, pos, snap.activeStep);
+  const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null);
   const speed = asSpeed(p.speed ?? 1);
   useEffect(() => {
     ctl.speed = speed;
@@ -307,16 +315,25 @@ export function PlayerPage(p: PlayerPageProps) {
     void ctl.play({ fromStart: true, fast: (i) => !stepTouchesLayer(project, scenario.id, i, viewLayer) });
   };
 
-  // 键盘：← → 逐步，空格播放/暂停；按住 ⌥ 时标出可检查的元素
+  // 全屏（T-stage）：只保留舞台与字幕；播放控制浮在画面下方，鼠标静止约 2.5 秒后淡出
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const { full, toggle: toggleFull } = useFullscreen(rootRef);
+  const idle = useIdleVisible(full);
+
+  // 键盘：← → 逐步，空格播放/暂停，F 全屏（Esc 由浏览器退出）；按住 ⌥ 时标出可检查的元素
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Alt') setInspecting(e.type === 'keydown' && !!p.onInspect);
       if (e.type !== 'keydown') return;
       const t = e.target as HTMLElement;
       if (t.closest('input,textarea,select,[contenteditable],[data-joplo-stage],[role="menu"],[role="dialog"]')) return;
-      if (e.key === 'ArrowRight') void ctl.next();
+      if (isFullscreenKey(e, t)) {
+        e.preventDefault();
+        toggleFull();
+      } else if (e.key === 'ArrowRight') void ctl.next();
       else if (e.key === 'ArrowLeft') ctl.prev();
-      else if (e.key === ' ' && t.tagName !== 'BUTTON') {
+      // 全屏时空格总是播放 / 暂停（不触发刚点过、仍有焦点的按钮）
+      else if (e.key === ' ' && (t.tagName !== 'BUTTON' || full)) {
         e.preventDefault();
         ctl.togglePlay();
       }
@@ -330,60 +347,72 @@ export function PlayerPage(p: PlayerPageProps) {
       window.removeEventListener('keyup', onKey);
       window.removeEventListener('blur', blur);
     };
-  }, [ctl, p.onInspect]);
+  }, [ctl, p.onInspect, toggleFull, full]);
+
+  const layerSwitch = (
+    <>
+      <Segmented
+        label="层级"
+        testid="layer-switch"
+        value={director ? null : viewLayer}
+        onChange={(id) => p.onLayer(id)}
+        items={layers.map((l) => ({ value: l.id, label: l.title, testid: `layer-${l.id}`, title: `手动查看「${l.title}」（导演暂停）` }))}
+      />
+      {director ? (
+        <span className={cn('text-[12px]', full ? 'text-white/80' : 'text-[#6b6b6b]')} data-testid="director-layer">
+          导演：{layers.find((l) => l.id === viewLayer)?.title ?? viewLayer}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        aria-pressed={director}
+        onClick={() => p.onLayer(director ? viewLayer : null)}
+        data-testid="director"
+        title={director ? '导演跟随每一步切换层级与镜头；点一下改为手动' : '恢复导演：回到这一步的导演层'}
+        className={cn('flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[13px]', director ? 'border-[#1e1e1e] bg-[#1e1e1e] text-white' : 'bg-white text-[#3a3a3a] hover:bg-[#f8f9fa]')}
+      >
+        <Clapperboard className="size-3.5" />
+        导演{director ? '跟随' : '已暂停'}
+      </button>
+    </>
+  );
 
   return (
-    <div className="flex h-full flex-col bg-[#f8f9fa]" data-view={snap.view}>
-      <TopBar>
-        <Brand onClick={p.onBrand} />
-        <Breadcrumbs crumbs={p.crumbs} />
-      </TopBar>
+    <div ref={rootRef} className={cn('flex h-full flex-col', full ? 'bg-black' : 'bg-[#f8f9fa]')} data-view={snap.view} data-fullscreen={full ? '' : undefined} onMouseMove={full ? idle.poke : undefined} style={full && !idle.visible ? { cursor: 'none' } : undefined}>
+      {full ? null : (
+        <TopBar>
+          <Brand onClick={p.onBrand} />
+          <Breadcrumbs crumbs={p.crumbs} />
+        </TopBar>
+      )}
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r bg-white p-3" data-testid="left-nav">
-          {p.nav}
-        </aside>
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden p-3" data-inspecting={inspecting ? '' : undefined}>
-          {p.banner}
+        {full ? null : (
+          <aside className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r bg-white p-3" data-testid="left-nav">
+            {p.nav}
+          </aside>
+        )}
+        <main className={cn('flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden', full ? 'gap-0 p-0' : 'gap-2 p-3')} data-inspecting={inspecting ? '' : undefined}>
+          {full ? null : p.banner}
           {snap.playbackError ? (
             <div role="alert" className="rounded-md border border-[#b35c00] bg-[#fff8ee] px-3 py-1.5 text-[13px] text-[#8a4700]" data-testid="playback-error">
               <strong>演示回放出错：</strong>
               {snap.playbackError}
             </div>
           ) : null}
-          {useCam && layers.length > 1 ? (
+          {useCam && layers.length > 1 && !full ? (
             <div className="flex shrink-0 items-center gap-2" data-testid="layer-bar">
-              <Segmented
-                label="层级"
-                testid="layer-switch"
-                value={director ? null : viewLayer}
-                onChange={(id) => p.onLayer(id)}
-                items={layers.map((l) => ({ value: l.id, label: l.title, testid: `layer-${l.id}`, title: `手动查看「${l.title}」（导演暂停）` }))}
-              />
-              {director ? (
-                <span className="text-[12px] text-[#6b6b6b]" data-testid="director-layer">
-                  导演：{layers.find((l) => l.id === viewLayer)?.title ?? viewLayer}
-                </span>
-              ) : null}
-              <button
-                type="button"
-                aria-pressed={director}
-                onClick={() => p.onLayer(director ? viewLayer : null)}
-                data-testid="director"
-                title={director ? '导演跟随每一步切换层级与镜头；点一下改为手动' : '恢复导演：回到这一步的导演层'}
-                className={cn('flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[13px]', director ? 'border-[#1e1e1e] bg-[#1e1e1e] text-white' : 'bg-white text-[#3a3a3a] hover:bg-[#f8f9fa]')}
-              >
-                <Clapperboard className="size-3.5" />
-                导演{director ? '跟随' : '已暂停'}
-              </button>
+              {layerSwitch}
               <button type="button" onClick={replayLayer} data-testid="replay-layer" className="flex h-8 items-center gap-1 rounded-md border bg-white px-2.5 text-[13px] hover:bg-[#f8f9fa]" title="从第 0 步开始，只用这一层的镜头播放；这一层没有变化的步骤快速带过">
                 ↻ 只重放这一层
               </button>
             </div>
           ) : null}
-          <div className="relative flex min-h-0 flex-1 flex-col rounded-xl border bg-white" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
+          <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white', !full && 'rounded-xl border')} data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
             {state && shownScene ? (
               <StageViewport viewport={device} theme={p.theme} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
+                {(size) => (
                 <Stage
+                  viewportOverride={device === 'mobile' ? null : size}
                   project={project}
                   state={state}
                   theme={p.theme}
@@ -403,6 +432,7 @@ export function PlayerPage(p: PlayerPageProps) {
                   }}
                   overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />}
                 />
+                )}
               </StageViewport>
             ) : (
               <div className="flex flex-1 items-center justify-center p-8 text-center text-[14px] text-[#6b6b6b]" data-testid="no-scene">
@@ -421,9 +451,29 @@ export function PlayerPage(p: PlayerPageProps) {
                   <Maximize className="size-3.5" />
                   适应画面
                 </button>
+                <button type="button" aria-label={full ? '退出全屏' : '全屏'} title={full ? '退出全屏（Esc）' : '全屏（F）'} onClick={(e) => {
+                    e.currentTarget.blur();
+                    toggleFull();
+                  }} data-testid="fullscreen" className="flex size-7 items-center justify-center rounded-md border bg-white text-[#3a3a3a] hover:bg-[#f8f9fa]">
+                  {full ? <Shrink className="size-3.5" /> : <Expand className="size-3.5" />}
+                </button>
               </div>
             ) : null}
-            {p.stageHint ? <div className="pointer-events-none absolute bottom-2 right-3 text-[12px] text-[#9a9a9a]" data-testid="stage-hint">{p.stageHint}</div> : null}
+            {p.stageHint && !full ? <div className="pointer-events-none absolute bottom-2 right-3 text-[12px] text-[#9a9a9a]" data-testid="stage-hint">{p.stageHint}</div> : null}
+            {full && scenario ? (
+              // 全屏：播放控制浮在画面下方；鼠标静止约 2.5 秒后淡出，移动鼠标重新出现
+              <div
+                className={cn('absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-[rgba(30,30,30,0.82)] px-3 py-2 shadow-lg transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')}
+                role="toolbar"
+                aria-label="全屏播放控制"
+                data-testid="fullscreen-controls"
+                data-visible={idle.visible ? '' : undefined}
+                onMouseMove={idle.poke}
+              >
+                <FloatingControls snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} />
+                {useCam && layers.length > 1 ? <div className="ml-2 flex items-center gap-2 border-l border-white/20 pl-3">{layerSwitch}</div> : null}
+              </div>
+            ) : null}
             {p.flash ? (
               <div role="status" className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-md bg-[#1e1e1e] px-3 py-1.5 text-[13px] text-white shadow" data-testid="flash">
                 {p.flash}
@@ -431,9 +481,9 @@ export function PlayerPage(p: PlayerPageProps) {
             ) : null}
           </div>
           {/* 字幕区：画面下方、播放控制上方，不叠在画面上 */}
-          {scenario ? <Subtitle content={subtitle} theme={p.theme} /> : null}
-          <Controls snap={snap} scenario={scenario} ctl={ctl} menu={p.menu} speed={speed} onSpeed={p.onSpeed} />
-          {scenario ? <StepStrip snap={snap} scenario={scenario} ctl={ctl} /> : null}
+          {scenario ? <Subtitle content={subtitle} theme={p.theme} framed={full} dark={full} /> : null}
+          {full ? null : <Controls snap={snap} scenario={scenario} ctl={ctl} menu={p.menu} speed={speed} onSpeed={p.onSpeed} />}
+          {scenario && !full ? <StepStrip snap={snap} scenario={scenario} ctl={ctl} /> : null}
         </main>
       </div>
       {p.drawer}
