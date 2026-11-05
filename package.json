@@ -9,7 +9,10 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "web:dev": "pnpm --filter @joplo/web dev",
-    "web:build": "pnpm --filter @joplo/web build"
+    "web:build": "pnpm --filter @joplo/web build",
+    "test:e2e": "pnpm --filter @joplo/web test:e2e",
+    "web:serve": "tsx packages/server/scripts/serve.ts",
+    "docs:screenshots": "tsx packages/server/scripts/render-docs.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

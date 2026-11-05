@@ -1,0 +1,190 @@
+@import "tailwindcss";
+@import "./fonts/fonts.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.95 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.9 0 0);
+  --ring: oklch(0.6 0 0);
+
+  /* 舞台（原型）专用 */
+  --stage-ink: #1e1e1e;
+  --stage-muted: #6b6b6b;
+  --stage-paper: #ffffff;
+  --stage-danger: #c92a2a;
+  --stage-success: #2b8a3e;
+  --stage-warning: #b35c00;
+  --stage-info: #1c5fb8;
+  --sel: #6741d9;
+  --focus: #e8590c;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sel: var(--sel);
+  --color-focus: var(--focus);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+}
+
+/* 舞台规则放在 components 层，Tailwind 工具类（utilities 层）可以覆盖。 */
+@layer components {
+  /* ---------- 舞台主题 ---------- */
+  .jstage {
+    color: var(--stage-ink);
+    background: var(--stage-paper);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .jstage[data-theme="sketch"] {
+    font-family: "Joplo Excalifont", "Joplo Xiaolai", "PingFang SC", sans-serif;
+    font-size: 16px;
+  }
+  .jstage[data-theme="clean"] {
+    font-family: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+
+  /* 线框主题：1px 边框；手绘主题：边框交给 rough 描边 */
+  .jstage .jbox {
+    position: relative;
+    border: 1px solid transparent;
+  }
+  .jstage[data-theme="clean"] .jbox {
+    border-color: #3a3a3a;
+  }
+  .jstage[data-theme="clean"] .jbox[data-soft] {
+    border-color: #c8c8c8;
+  }
+  .jstage[data-theme="clean"] .jbox[data-dashed] {
+    border-style: dashed;
+  }
+  .jstage[data-theme="clean"] .jbox[data-tone="danger"] {
+    border-color: var(--stage-danger);
+  }
+  .jstage[data-theme="clean"] .jbox[data-fill="ink"] {
+    background: var(--stage-ink);
+  }
+  .jstage[data-theme="clean"] .jbox[data-noborder] {
+    border-color: transparent;
+  }
+  .jstage[data-theme="sketch"] .jbox {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .jbox > :not(.jrough) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 舞台元素的选中与焦点 */
+  .jstage [data-jid] {
+    outline: none;
+  }
+  .jstage [data-jinteractive]:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .jstage[data-mode="review"] [data-jid]:hover:not(:has([data-jid]:hover)) {
+    outline: 1px dashed color-mix(in oklab, var(--sel) 60%, transparent);
+    outline-offset: 2px;
+  }
+  .jstage[data-mode="review"] [data-jid] {
+    cursor: default;
+  }
+  .jstage[data-mode="demo"] [data-jinteractive] {
+    cursor: pointer;
+  }
+  .jstage [data-jid][data-jselected] {
+    outline: 2.5px solid var(--sel) !important;
+    outline-offset: 3px;
+  }
+
+  .jtrunc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+}
+
+/* rough 描边层：不进图层并加 !important，避免被组件库的 [&_svg]:size-* 等工具类改尺寸 */
+.jstage svg.jrough {
+  position: absolute !important;
+  inset: -1px !important;
+  width: calc(100% + 2px) !important;
+  height: calc(100% + 2px) !important;
+  max-width: none !important;
+  pointer-events: none !important;
+  overflow: visible;
+  z-index: 0;
+  flex-shrink: 0;
+}
+
+@keyframes jpulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.jfocus-ring {
+  animation: jpulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jfocus-ring {
+    animation: none;
+  }
+}
