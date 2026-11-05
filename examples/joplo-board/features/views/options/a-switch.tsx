@@ -48,7 +48,7 @@ export default option({
   scenarios: {
     switch_layer: flow('同一步换层级看', { cases: ['switch_layer', 'crowded'], start: '/views', expected: '停在同一步，只换怎么看' })
       .click('va_next', '全景里先走到第 1 步：客户端和后端挤在一屏', ...step(1))
-      .select('va_layer', '后端流转', '切到「后端流转」：还是第 1 步，架构图独占画面，镜头对准客户端和 Biz Server', uses('same_step'))
+      .select('va_layer', '后端流转', '切到「后端流转」：仍是第 1 步，换个视角', uses('same_step'))
       .click('va_next', '在这一层往下走：额度预检只在后端有变化', ...step(2), uses('shot_in_step'))
       .select('va_layer', '客户端视角', '切到「客户端视角」：同一步，客户端这一层没有变化')
       .click('va_next', ...step(3))
@@ -57,7 +57,7 @@ export default option({
       .system('结束', done('同一步从不同层级看')),
 
     replay_layer: flow('只在后端层重放', { cases: ['replay_layer'], start: '/views', state: { inputs: { va_layer: '后端流转' } } })
-      .click('va_replay', '在「后端流转」点“只重放这一层”：从第 0 步开始，只用后端的镜头', set($.ui.replaying, true))
+      .click('va_replay', '只重放后端层：从第 0 步开始', set($.ui.replaying, true))
       .system('重放：发送消息', ...step(1))
       .system('重放：额度预检', ...step(2))
       .system('重放：大脑推理', ...step(3))

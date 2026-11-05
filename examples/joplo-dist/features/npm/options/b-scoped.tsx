@@ -98,7 +98,7 @@ export default option({
           flow('新用户从零打开看板', { cases: ['first_run'], start: '/terminal', expected: '三条命令内打开看板' }),
           'npx joplo@latest init my-demo',
           $.ui.init,
-          'npx 只下载很小的 joplo 入口，生成项目并锁定 joplo 与 @tokenroll/joplo-kit 的版本',
+          '只下载小入口，生成项目并锁定版本',
           uses('one_command_start', 'lockstep'),
         ),
         'cd my-demo && npm install',
@@ -115,7 +115,7 @@ export default option({
       flow('npx 拉到更新的 CLI', { cases: ['version_skew'], outcome: 'other', mock: '模拟项目内为 0.1.0，最新版为 0.2.0', start: '/terminal' }),
       'npx joplo@latest check',
       $.ui.skew,
-      '发现版本不同：改用项目内的版本执行，并打印对齐命令',
+      '版本不同：改用项目内版本并提示',
       uses('skew_warn', 'prefer_local'),
     ).system('结束', done('结果仍然可信，用户知道怎样升级')),
 

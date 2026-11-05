@@ -177,7 +177,7 @@ export const sharedScenarios = (p: string) => ({
     .system('启动浏览器失败（模拟）', '说明原因和安装命令；装好后可以直接重试', set($.ui.exporting, false), set($.ui.exportErr, true), set($.ui.videoButton, '重试'), uses('video_local')),
 
   inspect: flow('检查一个元素', { cases: ['review'], start: '/play', description: '暂定手势：按住 ⌥ 单击（见待决问题）' })
-    .click(`${p}_pc_invite`, '按住 ⌥ 单击画面里的「邀请成员」：右侧弹出检查抽屉，原型不会被操作', set($.ui.drawer, true), uses('review_in_drawer'))
+    .click(`${p}_pc_invite`, '⌥+单击「邀请成员」：弹出检查抽屉', set($.ui.drawer, true), uses('review_in_drawer'))
     .click(`${p}_i_close`, '看完关闭抽屉，继续演示', set($.ui.drawer, false), done('看到规则、情况和源码位置')),
 
   publish_play: flow('观众在发布站上看', { cases: ['publish_play'], start: '/play', state: { ui: { publish: true } }, mock: '发布站视图' })

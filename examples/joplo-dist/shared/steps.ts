@@ -7,4 +7,4 @@ export const run = (f: Flow, cmd: string, flag: Bind, caption: string, ...effect
 
 /** 在 Claude Code 里输入一句话并发送。 */
 export const ask = (f: Flow, text: string, flag: Bind, caption: string): Flow =>
-  f.type('agent_prompt', text).click('agent_send', caption, set(flag, true), set($.inputs.agent_prompt, ''));
+  f.type('agent_prompt', text, '用户在 Claude Code 里提需求').click('agent_send', caption, set(flag, true), set($.inputs.agent_prompt, ''));

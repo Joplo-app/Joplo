@@ -51,7 +51,7 @@ export default option({
   scenarios: {
     ...sharedScenarios(P),
     switch: flow('切换方案和场景', { cases: ['switch'], start: '/play', expected: '左栏点一下就换，面包屑同步' })
-      .click('pa_sc_failure', '在方案 A 下点「发送失败后重试」：面包屑和步骤条换成这个场景，回到第 0 步',
+      .click('pa_sc_failure', '点「发送失败后重试」：换场景，回到第 0 步',
         set($.ui.sc, 'failure'), set($.ui.scenarioName, '发送失败后重试'), set($.ui.stepNo, 0), set($.ui.caption, '初始状态'), uses('header_minimal'))
       .click('pa_opt_b', '点方案 B：切到它的第一个场景', set($.ui.opt, 'b'), set($.ui.bOpen, true), set($.ui.sc, 'partial'), set($.ui.optionName, 'B · 批量邀请页'), set($.ui.scenarioName, '批量邀请部分失败'))
       .click('pa_opt_a', '再切回方案 A', set($.ui.opt, 'a'), set($.ui.sc, 'success'), set($.ui.optionName, 'A · 单人邮件邀请弹窗'), set($.ui.scenarioName, '管理员成功发出邀请'))

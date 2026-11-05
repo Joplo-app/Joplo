@@ -78,10 +78,10 @@ export default option({
 
   scenarios: {
     success: fillAndSend('管理员成功发出邀请', { cases: ['happy', 'duplicate_submit'], expected: '弹窗关闭，出现成功提示，新邀请进入待接受列表' })
-      .system('邀请请求成功（模拟）', '系统返回成功：关闭弹窗，新邀请出现在「待接受的邀请」中', ...sent),
+      .system('邀请请求成功（模拟）', '发送成功：弹窗关闭，邀请进入待接受', ...sent),
 
     failure: fillAndSend('发送失败后重试', { cases: ['request_failed'], outcome: 'failure', mock: '模拟失败后重试成功' })
-      .system('邀请请求失败（模拟网络超时）', '系统返回失败：弹窗保持打开，显示错误并保留已填写的内容',
+      .system('邀请请求失败（模拟网络超时）', '发送失败：弹窗不关，保留已填内容',
         set($.ui.sending, false), set($.ui.error, '网络超时。已保留你填写的内容，可以重试。'), uses('keep_input'))
       .click('btn_send', '点击「发送邀请」重试', set($.ui.sending, true), set($.ui.error, ''), uses('keep_input'))
       .system('邀请请求成功（模拟）', ...sent),

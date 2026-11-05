@@ -95,7 +95,7 @@ export default option({
       .system('首次打开看板', '空状态直接给出三条开始命令', done('用户知道下一步运行什么')),
 
     second_dev: flow('另一个终端再运行 joplo dev', { cases: ['second_dev', 'compile_error'], start: '/', mock: '模拟 ~/work/shop 有 2 个编译错误' })
-      .system('另一个终端：cd ~/work/shop && npx joplo dev', '发现 4790 上已有看板：只把项目注册进去并打开浏览器，不启动第二个进程',
+      .system('另一个终端：cd ~/work/shop && npx joplo dev', '已有看板在运行：只注册项目，不再起进程',
         set($.ui.shopAdded, true), set($.ui.project, 'shop'), toast.info('已加入正在运行的看板：网店结算'), uses('one_process'))
       .click('h_invite', '其他项目不受影响，照常可看', set($.ui.project, 'invite'))
       .click('h_shop', '点回「网店结算」：错误还在，修好源文件后自动刷新', set($.ui.project, 'shop'), done('一个进程，多个项目')),
@@ -105,6 +105,6 @@ export default option({
       .click('h_remove', '从列表移除这条记录', set($.ui.oldGone, true), set($.ui.project, 'invite'), toast('已从列表移除「旧原型」'), done('列表恢复干净')),
 
     publish_home: flow('观众打开发布站首页', { cases: ['publish_home'], start: '/', state: { ui: { publish: true } }, mock: '发布站视图' })
-      .click('h_view_invite', '观众只看到功能列表，没有缺口和本机路径；点「查看」进入演示', uses('no_local_info_on_site'), done('观众进入演示')),
+      .click('h_view_invite', '观众只看到功能列表，点「查看」看演示', uses('no_local_info_on_site'), done('观众进入演示')),
   },
 });

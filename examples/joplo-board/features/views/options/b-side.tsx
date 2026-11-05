@@ -54,10 +54,10 @@ export default option({
 
   scenarios: {
     switch_layer: flow('两层同时看', { cases: ['switch_layer'], start: '/views' })
-      .click('vb_next', '第 1 步：左边用户消息出现，右边客户端到 Biz Server 的连线同时亮起', ...step(1))
+      .click('vb_next', '第 1 步：左边出消息，右边连线同时亮起', ...step(1))
       .click('vb_next', '第 2 步：只有右边在变（额度预检）', ...step(2))
       .click('vb_next', ...step(3))
-      .click('vb_next', '第 4 步：左边 read_files 卡片和右边端侧执行器同时亮起，因果一目了然', ...step(4))
+      .click('vb_next', '第 4 步：左右同时亮起，因果一目了然', ...step(4))
       .system('结束', done('两层对照着看')),
 
     replay_layer: flow('只重放后端', { cases: ['replay_layer'], start: '/views' })

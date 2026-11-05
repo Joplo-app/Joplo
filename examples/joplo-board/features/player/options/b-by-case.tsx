@@ -59,7 +59,7 @@ export default option({
     switch: flow('按情况比较两个方案', { cases: ['switch', 'review'], start: '/play', expected: '同一个情况，切方案就能比较；没表达的直接显示为缺口' })
       .click('pb_c_failed', '点情况「发送请求失败」：播放方案 A 里覆盖它的场景',
         set($.ui.case, 'pb_c_failed'), set($.ui.scenarioName, '发送失败后重试'), set($.ui.stepNo, 0), uses('header_minimal'))
-      .select('pb_opt', 'B · 批量页', '顶部切到方案 B，情况保持不变：B 没有表达它，画面上方直接说明这是缺口',
+      .select('pb_opt', 'B · 批量页', '切到方案 B：没表达这个情况，直接显示缺口',
         set($.ui.optionName, 'B · 批量邀请页'), set($.ui.scenarioName, '（缺失）'), set($.ui.missing, true))
       .click('pb_c_happy', '换一个两边都有的情况', set($.ui.case, 'pb_c_happy'), set($.ui.missing, false), set($.ui.scenarioName, '批量邀请部分失败'))
       .click('pb_crumb_project', '面包屑第一段回到首页', go('/'), done('按情况比较方案，缺口直接可见')),

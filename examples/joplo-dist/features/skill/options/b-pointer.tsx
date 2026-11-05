@@ -89,7 +89,7 @@ export default option({
       flow('已有被修改过的 SKILL.md', { cases: ['existing_file'], outcome: 'other', mock: '模拟用户改过 SKILL.md', start: '/terminal' }),
       'npx joplo skill install',
       $.ui.exists,
-      '不覆盖用户改过的文件，给出查看差异和强制覆盖两种做法',
+      '不覆盖改过的文件，给出两种做法',
       uses('no_overwrite'),
     ),
     browse: browseScenario(['discover', 'on_demand']),

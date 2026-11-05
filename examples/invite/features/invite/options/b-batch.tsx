@@ -57,7 +57,7 @@ export default option({
   scenarios: {
     partial: flow('批量邀请，其中一个失败', { cases: ['happy'], mock: '模拟部分失败' })
       .click('btn_batch', '点击「批量邀请」进入独立页面', go('/members/invite'))
-      .type('in_emails', 'a@company.com\nb@company.com\nbad@')
+      .type('in_emails', 'a@company.com\nb@company.com\nbad@', '输入三个邮箱（含一个错的）')
       .select('sel_batch_role', '编辑者')
       .click('btn_batch_send', uses('partial_result'))
       .system('批量请求返回（模拟）', '2 个成功、1 个失败，逐个显示结果',

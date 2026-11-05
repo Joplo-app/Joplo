@@ -32,7 +32,7 @@ export default option({
   scenarios: {
     browse: browseScenario(['discover', 'on_demand']),
     no_hint: askLogin('用户没提醒，Agent 按习惯写 React', ['auto_discover'], { outcome: 'failure', mock: '模拟一个没读过 Joplo 用法的 Agent' })
-      .system('Agent 直接写 React 组件', 'Agent 不知道这是 Joplo 项目，写了带 onClick 的 React 组件', set($.ui.wrong, true))
+      .system('Agent 直接写 React 组件', 'Agent 不知道用 Joplo，写成了 React', set($.ui.wrong, true))
       .system('结束', done('产出不是 Joplo 原型，看板里看不到', 'failure')),
     hinted: ask(
       flow('用户提醒后，Agent 按需读取用法', { cases: ['discover', 'on_demand'], start: '/agent' }),
