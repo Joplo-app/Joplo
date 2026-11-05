@@ -12,6 +12,7 @@ import { parseSiteHash, siteHash, type PlayRoute, type SiteRoute } from '../runt
 import { scenariosOf } from '../runtime/views';
 import type { StageTheme } from '../renderer/rough';
 import { Brand, PlayerPage, TopBar, type MenuItem } from '../player/PlayerPage';
+import { ThemeStyles } from '../renderer/ThemeStyles';
 import { usePlaySync } from '../player/playRoute';
 import { copyText, downloadBlob, useFlash, useHash } from '../player/util';
 import { cn } from '@/lib/utils';
@@ -110,7 +111,8 @@ function ConceptBadge() {
 function SitePlayer({ project, play, navigate }: { project: Project; play: PlayRoute; navigate: (r: SiteRoute, replace?: boolean) => void }) {
   const ctl = useMemo(() => new DemoController(null), []);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
-  const [theme, setTheme] = useState<StageTheme>(project.theme);
+  // 发布站使用项目配置的主题（D51）；作者主题随 IR 一起打包
+  const theme: StageTheme = project.theme;
   const [flash, setFlash] = useFlash();
   useEffect(() => {
     ctl.setProject(project, 1, null);
@@ -150,11 +152,12 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
         );
       },
     },
-    { id: 'theme', label: '线框风格', checked: theme === 'clean', onClick: () => setTheme(theme === 'clean' ? 'sketch' : 'clean') },
     { id: 'link', label: '复制当前步骤的链接', onClick: () => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制')) },
   ];
   const scs = scenariosOf(project, resolved.optionId);
   return (
+    <>
+    <ThemeStyles themes={project.themes} />
     <PlayerPage
       ctl={ctl}
       snap={snap}
@@ -210,5 +213,6 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
       menu={menu}
       flash={flash}
     />
+    </>
   );
 }

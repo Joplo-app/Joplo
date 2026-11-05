@@ -257,7 +257,10 @@ export const Project = z.strictObject({
   schemaVersion: z.literal(SCHEMA_VERSION),
   name: z.string().min(1),
   description: z.string().default(''),
-  theme: z.enum(['sketch', 'clean']).default('sketch'),
+  /** 默认主题名（D51）：内置主题或 themes 里的作者主题。 */
+  theme: z.string().min(1).default('sketch'),
+  /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
+  themes: z.record(z.string(), z.string()).default({}),
   /** dev = 含全部方案（本地看板）；publish = 只含选定方案，且去掉创作侧信息（D33）。 */
   mode: z.enum(['dev', 'publish']),
   routes: z.record(z.string(), Route).default({}),

@@ -103,7 +103,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     const state: PlayState = stateAt(project, sc.id, position); // 回放失败会抛出 PLAYBACK_FAILED
     // 有层级的方案：截图与元素索引用这一步导演层的画面（每层一个独立画面）
     const scene = project.scenes[displaySceneId(project, sc.id, position)]!;
-    const theme = opts.theme ?? 'sketch';
+    const theme = opts.theme ?? project.theme ?? 'sketch';
     const next = state.completed ? undefined : sc.steps[position];
     const nextTargetId = next && 'target' in next.action ? next.action.target : null;
     const stage = STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];

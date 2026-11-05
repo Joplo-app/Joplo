@@ -18,7 +18,8 @@ type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 export type StateInit = { ui?: Record<string, Json>; data?: Record<string, Json>; inputs?: Record<string, Json> };
 
 // ---------- 项目、布局、页面 ----------
-export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: 'sketch' | 'clean'; layout?: string; home?: string; source?: string };
+/** theme：默认主题名——内置主题（sketch、clean、blueprint、nord、dracula、solarized-light、terminal、kraft、contrast）或项目 themes/<name>.css（D51）。 */
+export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; source?: string };
 export const config = (c: Omit<ConfigDef, 'kind' | 'source'>): ConfigDef => ({ kind: 'config', ...c, source: callsite() });
 
 export type LayoutDef = { kind: 'layout'; tree: JNode; source?: string };

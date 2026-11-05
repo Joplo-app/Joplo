@@ -22,7 +22,7 @@ import { createLogger, createServer, type Logger, type Plugin, type PluginOption
 import { JoploError, type Diagnostic, type Project } from '@tokenroll/joplo-core';
 import type { DevHandle, DevOptions } from './contract.ts';
 import { ExportHub, type ExportDeps } from './export.ts';
-import { Registry, clearServerInfo, joploHome, pidAlive, projectIdOf, readServerInfo, writeServerInfo, type ProjectRecord } from './home.ts';
+import { Registry, clearServerInfo, joploHome, normalizeSettings, pidAlive, projectIdOf, readServerInfo, readSettings, writeServerInfo, writeSettings, type BoardSettings, type ProjectRecord } from './home.ts';
 import { compileProject, invalidateProjectModules } from './project.ts';
 import { SelectionBody, readSelection, resolveSelection, writeSelection } from './selection.ts';
 import { IGNORED_DIRS, cssSourcePlugin, isProjectSource, joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
@@ -218,6 +218,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   const token = crypto.randomBytes(24).toString('hex');
   const web = locateWebAssets();
   const registry: RegistryLike = opts.home ? new Registry(opts.home) : new MemoryRegistry();
+  let memSettings: BoardSettings = { version: 1 };
   const slots = new Map<string, ProjectSlot>();
   let actualPort = port;
   let closed = false;
@@ -468,6 +469,16 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
           const method = req.method ?? 'GET';
           if (url.pathname === '/__joplo/ping' && method === 'GET') return sendJson(res, 200, { joplo: true, pid: process.pid });
           if (url.pathname === '/__joplo/projects' && method === 'GET') return sendJson(res, 200, { projects: summaries() });
+          // 看板设置（D51）：主题选择，存于 <JOPLO_HOME>/settings.json（没有 home 时只在内存里）
+          if (url.pathname === '/__joplo/settings' && method === 'GET') return sendJson(res, 200, { settings: opts.home ? readSettings(opts.home) : memSettings });
+          if (url.pathname === '/__joplo/settings' && method === 'PUT') {
+            if (!guardWrite(req, res)) return;
+            const b = await jsonBody(req, res);
+            if (!b.ok) return;
+            const next = (b.body as { settings?: unknown })?.settings;
+            memSettings = opts.home ? writeSettings(opts.home, next) : normalizeSettings(next);
+            return sendJson(res, 200, { settings: memSettings });
+          }
           if (url.pathname === '/__joplo/projects' && method === 'POST') {
             if (!guardWrite(req, res)) return;
             const b = await jsonBody(req, res);

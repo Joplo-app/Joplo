@@ -35,9 +35,9 @@ import {
   type ShellLayout,
 } from '@tokenroll/joplo-core';
 import { cn } from '@/lib/utils';
-import { Rough, RoughPath, roundRectPath, useStageTheme } from './rough';
+import { Rough, RoughPath, roundRectPath, useStageTheme, useStroke } from './rough';
 import { DESC_FONT, EDGE_FONT, FOCUS_EDGE_FONT, FOCUS_MOVE_MS, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, diagramStructure, edgeEmphasized, effectiveState, focusLayout, focusMembers, type FocusLayout, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
-import { DIMMED, FONT, INK, SOFT, SPACING, TITLE_SIZE, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf } from './style';
+import { ACCENT, BG, DANGER, onFill, DIMMED, FONT, INFO, INK, INK2, LINE, LINE_STRONG, MONO, OK, SOFT, SPACING, SUBTLE, SURFACE, TITLE_SIZE, WARN, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf, tint } from './style';
 
 export type RenderMode = 'review' | 'demo' | 'render';
 
@@ -77,8 +77,6 @@ const ShellContext = createContext<{ layout: ShellLayout; autoBurger: boolean } 
 
 const str = (v: unknown, fallback = ''): string => (v === undefined || v === null ? fallback : typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : JSON.stringify(v));
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
-const DANGER = '#e03131';
-const MONO = 'ui-monospace, SFMono-Regular, Menlo, "Joplo Xiaolai", monospace';
 
 type NodeProps = { node: SceneNode; p: Record<string, unknown>; disabled: boolean; children: ReactNode };
 
@@ -183,7 +181,7 @@ function Code({ node, p, children }: NodeProps) {
     style: {
       fontFamily: MONO,
       fontSize: block ? 13 : '0.88em',
-      background: bg ? light(bg) : '#f1f3f5',
+      background: bg ? light(bg) : SUBTLE,
       borderRadius: 4,
       padding: block ? '10px 12px' : '1px 5px',
       whiteSpace: block ? 'pre-wrap' : 'pre-wrap',
@@ -195,7 +193,7 @@ function Code({ node, p, children }: NodeProps) {
 }
 
 function Kbd({ node, p, children }: NodeProps) {
-  const root = useRoot(node, p, { className: 'jbox', style: { display: 'inline-block', fontFamily: MONO, fontSize: 12, padding: '0 6px', borderBottomWidth: 3, borderColor: '#adb5bd', borderRadius: 4, background: '#f8f9fa' } });
+  const root = useRoot(node, p, { className: 'jbox', style: { display: 'inline-block', fontFamily: MONO, fontSize: 12, padding: '0 6px', borderBottomWidth: 3, borderColor: LINE_STRONG, borderRadius: 4, background: SUBTLE } });
   return (
     <kbd {...root} data-soft="">
       {children}
@@ -204,7 +202,7 @@ function Kbd({ node, p, children }: NodeProps) {
 }
 
 function Blockquote({ node, p, children }: NodeProps) {
-  const c = color(p.color) ?? '#1c7ed6';
+  const c = color(p.color) ?? INFO;
   const root = useRoot(node, p, { style: { borderLeft: `4px solid ${c}`, background: light(c), padding: '12px 16px', borderRadius: 4 } });
   return (
     <blockquote {...root}>
@@ -225,8 +223,8 @@ function ListItem({ node, p, children }: NodeProps) {
 }
 
 function Anchor({ node, p, disabled, children }: NodeProps) {
-  const c = color(p.c) ?? '#1c5fb8';
-  const root = useRoot(node, p, { disabled, className: 'cursor-pointer', style: { color: disabled ? '#8a8a8a' : c, textDecoration: p.underline === 'never' ? 'none' : 'underline', textUnderlineOffset: 4, fontSize: fontSize(p.size) } });
+  const c = color(p.c) ?? INFO;
+  const root = useRoot(node, p, { disabled, className: 'cursor-pointer', style: { color: disabled ? DIMMED : c, textDecoration: p.underline === 'never' ? 'none' : 'underline', textUnderlineOffset: 4, fontSize: fontSize(p.size) } });
   return (
     <a {...root} role="link" tabIndex={0}>
       {children}
@@ -340,12 +338,12 @@ function Center({ node, p, children }: NodeProps) {
 }
 
 function Paper({ node, p, children }: NodeProps) {
-  const theme = useStageTheme();
+  const mode = useStroke();
   const border = p.withBorder === true;
   const shadow = typeof p.shadow === 'string' && p.shadow !== 'none';
   const root = useRoot(node, p, {
     className: border ? 'jbox' : undefined,
-    style: { background: '#fff', borderRadius: radius(p.radius ?? 'sm'), ...(shadow ? { boxShadow: theme === 'sketch' ? '4px 4px 0 rgba(30,30,30,0.12)' : '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.06)' } : {}), position: 'relative' },
+    style: { background: SURFACE, borderRadius: p.radius !== undefined ? radius(p.radius) : 'var(--jp-radius)', ...(shadow ? { boxShadow: 'var(--jp-shadow)' } : {}), position: 'relative' },
   });
   return (
     <div {...root} data-soft="">
@@ -360,8 +358,8 @@ function Card({ node, p, children }: NodeProps) {
   const pad = spaceNum(r('padding'), SPACING.md!);
   const border = p.withBorder === true;
   const root = useRoot(node, p, {
-    className: 'jbox jcard [.jstage[data-theme=clean]_&]:rounded-lg',
-    style: { display: 'flex', flexDirection: 'column', background: '#fff', padding: pad, ['--jcard-p' as string]: `${pad}px` },
+    className: 'jbox jcard [.jstage[data-stroke=clean]_&]:rounded-lg',
+    style: { display: 'flex', flexDirection: 'column', background: SURFACE, padding: pad, ['--jcard-p' as string]: `${pad}px` },
   });
   return (
     <div {...root} data-soft={border ? undefined : ''}>
@@ -383,7 +381,7 @@ function Divider({ node, p }: NodeProps) {
   const vertical = p.orientation === 'vertical';
   const label = p.label !== undefined ? str(p.label) : '';
   const pos = str(p.labelPosition, 'left');
-  const c = color(p.color) ?? '#d0d0d0';
+  const c = color(p.color) ?? LINE;
   const root = useRoot(node, p, { style: vertical ? { alignSelf: 'stretch', width: 1, background: c, flexShrink: 0 } : { display: 'flex', alignItems: 'center', gap: 8, width: '100%', color: DIMMED, fontSize: 13 } });
   if (vertical) return <div {...root} role="separator" aria-orientation="vertical" />;
   const line = <span style={{ flex: 1, height: 1, background: c }} />;
@@ -435,7 +433,7 @@ function AppShell({ node, p, children }: NodeProps) {
 
 function ShellHeader({ node, p, children }: NodeProps) {
   const shell = useContext(ShellContext);
-  const root = useRoot(node, p, { style: { gridArea: 'h', borderBottom: '1px solid #d6d6d6', background: '#fff', minWidth: 0, position: 'relative', zIndex: 2 } });
+  const root = useRoot(node, p, { style: { gridArea: 'h', borderBottom: `1px solid ${LINE}`, background: SURFACE, minWidth: 0, position: 'relative', zIndex: 2 } });
   if (shell?.layout.header?.collapsed) return null;
   return (
     <header {...root}>
@@ -457,8 +455,8 @@ function ShellSide({ node, p, children }: NodeProps) {
   const overlay = !!mobile && region && !region.collapsed;
   const root = useRoot(node, p, {
     style: overlay
-      ? { position: 'absolute', left: 0, right: 0, top: shell!.layout.header?.size ?? 0, bottom: 0, zIndex: 5, background: '#fff', overflow: 'auto', display: 'flex', flexDirection: 'column' }
-      : { gridArea: nav ? 'n' : 'a', background: '#fcfcfc', minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', [nav ? 'borderRight' : 'borderLeft']: '1px solid #d6d6d6' },
+      ? { position: 'absolute', left: 0, right: 0, top: shell!.layout.header?.size ?? 0, bottom: 0, zIndex: 5, background: SURFACE, overflow: 'auto', display: 'flex', flexDirection: 'column' }
+      : { gridArea: nav ? 'n' : 'a', background: SUBTLE, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', [nav ? 'borderRight' : 'borderLeft']: `1px solid ${LINE}` },
   });
   if (region?.collapsed) return null;
   return <nav {...root}>{children}</nav>;
@@ -474,7 +472,7 @@ function ShellMain({ node, p, children }: NodeProps) {
 
 function ShellFooter({ node, p, children }: NodeProps) {
   const shell = useContext(ShellContext);
-  const root = useRoot(node, p, { style: { gridArea: 'f', borderTop: '1px solid #d6d6d6', background: '#fff', minWidth: 0 } });
+  const root = useRoot(node, p, { style: { gridArea: 'f', borderTop: `1px solid ${LINE}`, background: SURFACE, minWidth: 0 } });
   if (shell?.layout.footer?.collapsed) return null;
   return <footer {...root}>{children}</footer>;
 }
@@ -503,20 +501,20 @@ function Burger({ node, p, disabled }: NodeProps) {
 
 const BADGE_H: Record<string, number> = { xs: 16, sm: 18, md: 20, lg: 26, xl: 32 };
 function Badge({ node, p, children }: NodeProps) {
-  const theme = useStageTheme();
+  const mode = useStroke();
   const variant = str(p.variant, 'filled');
   const base = color(p.color) ?? INK;
   const t =
     variant === 'outline' ? { stroke: base, text: base }
     : variant === 'light' ? { stroke: light(base), fill: light(base), text: base }
-    : variant === 'dot' || variant === 'default' ? { stroke: '#ced4da', text: INK }
+    : variant === 'dot' || variant === 'default' ? { stroke: LINE_STRONG, text: INK }
     : variant === 'transparent' ? { stroke: 'transparent', text: base }
-    : variant === 'white' ? { stroke: '#fff', fill: '#fff', text: base }
-    : { stroke: base, fill: base, text: '#fff' };
+    : variant === 'white' ? { stroke: SURFACE, fill: SURFACE, text: base }
+    : { stroke: base, fill: base, text: onFill(base) };
   const h = BADGE_H[str(p.size, 'md')] ?? 20;
   const root = useRoot(node, p, {
     className: 'jbox',
-    style: { display: 'inline-flex', alignItems: 'center', gap: 4, height: h + 4, padding: '0 10px', borderRadius: 999, fontSize: Math.max(11, h - 7), color: t.text, ...(theme === 'clean' ? boxStyle(t.stroke, t.fill) : {}), whiteSpace: 'nowrap', width: p.fullWidth ? '100%' : 'fit-content', justifyContent: 'center' },
+    style: { display: 'inline-flex', alignItems: 'center', gap: 4, height: h + 4, padding: '0 10px', borderRadius: 999, fontSize: Math.max(11, h - 7), color: t.text, ...(mode === 'clean' ? boxStyle(t.stroke, t.fill) : {}), whiteSpace: 'nowrap', width: p.fullWidth ? '100%' : 'fit-content', justifyContent: 'center' },
   });
   return (
     <span {...root}>
@@ -539,7 +537,7 @@ function initials(name: string): string {
 function Avatar({ node, p, children }: NodeProps) {
   const { state } = useCtx();
   const size = typeof p.size === 'number' ? p.size : (AVATAR[str(p.size, 'md')] ?? 38);
-  const c = color(p.color) ?? '#495057';
+  const c = color(p.color) ?? INK2;
   const name = str(p.name ?? p.alt) || textOf(node, state);
   const root = useRoot(node, p, { className: 'jbox', style: { width: size, height: size, borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(10, size * 0.4), color: c, background: light(c), flexShrink: 0, fontWeight: 600 } });
   return (
@@ -552,10 +550,10 @@ function Avatar({ node, p, children }: NodeProps) {
 
 function ImageBox({ node, p }: NodeProps) {
   const r = useR(p);
-  const root = useRoot(node, p, { className: 'jbox', style: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: dim(r('w')) ?? '100%', height: dim(r('h')) ?? 160, background: '#f4f4f4', color: DIMMED, fontSize: 13, borderRadius: radius(p.radius) } });
+  const root = useRoot(node, p, { className: 'jbox', style: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: dim(r('w')) ?? '100%', height: dim(r('h')) ?? 160, background: SUBTLE, color: DIMMED, fontSize: 13, borderRadius: radius(p.radius) } });
   return (
     <div {...root} role="img" aria-label={str(p.alt, '图片')} data-soft="">
-      <Rough seedKey={node.id} stroke={SOFT} fill="#e9e9e9" fillStyle="cross-hatch" />
+      <Rough seedKey={node.id} stroke={SOFT} fill={LINE} fillStyle="cross-hatch" />
       <span style={{ background: 'rgba(255,255,255,.9)', padding: '0 8px', borderRadius: 4 }}>🖼 {str(p.alt, '图片')}</span>
     </div>
   );
@@ -565,7 +563,7 @@ function ThemeIcon({ node, p, children }: NodeProps) {
   const size = typeof p.size === 'number' ? p.size : (AVATAR[str(p.size, 'md')] ?? 28) * 0.8;
   const c = color(p.color) ?? INK;
   const filled = str(p.variant, 'filled') === 'filled';
-  const root = useRoot(node, p, { className: 'jbox', style: { width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: radius(p.radius ?? 'sm'), background: filled ? c : light(c), color: filled ? '#fff' : c, flexShrink: 0, fontSize: size * 0.55 } });
+  const root = useRoot(node, p, { className: 'jbox', style: { width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: radius(p.radius ?? 'sm'), background: filled ? c : light(c), color: filled ? onFill(c) : c, flexShrink: 0, fontSize: size * 0.55 } });
   return (
     <span {...root}>
       <span>{children}</span>
@@ -606,12 +604,12 @@ function TimelineItem({ node, p, children }: NodeProps) {
   const root = useRoot(node, p, { style: { position: 'relative', paddingLeft: 30, paddingBottom: last ? 0 : 18 } });
   return (
     <div {...root} data-active={done ? '' : undefined}>
-      {last ? null : <span aria-hidden style={{ position: 'absolute', left: 9, top: 20, bottom: 0, width: 2, background: done && seq && i < seq.active ? c : '#dee2e6' }} />}
-      <span aria-hidden style={{ position: 'absolute', left: 0, top: 2, width: 20, height: 20, borderRadius: 10, border: `2px solid ${done ? c : '#ced4da'}`, background: done ? c : '#fff', color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {last ? null : <span aria-hidden style={{ position: 'absolute', left: 9, top: 20, bottom: 0, width: 2, background: done && seq && i < seq.active ? c : LINE }} />}
+      <span aria-hidden style={{ position: 'absolute', left: 0, top: 2, width: 20, height: 20, borderRadius: 10, border: `2px solid ${done ? c : LINE_STRONG}`, background: done ? c : SURFACE, color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {p.bullet !== undefined ? str(p.bullet) : null}
       </span>
       {p.title !== undefined ? <div style={{ fontWeight: 600, lineHeight: 1.5 }}>{str(p.title)}</div> : null}
-      <div style={{ color: '#4a4a4a', fontSize: 14, whiteSpace: 'pre-line' }}>{children}</div>
+      <div style={{ color: INK2, fontSize: 14, whiteSpace: 'pre-line' }}>{children}</div>
     </div>
   );
 }
@@ -620,10 +618,10 @@ function TimelineItem({ node, p, children }: NodeProps) {
 
 const cellPad = '8px 12px';
 function TableShell({ node, p, children }: NodeProps & { children: ReactNode }) {
-  const root = useRoot(node, p, { className: 'jbox [.jstage[data-theme=clean]_&]:rounded-md', style: { width: '100%', background: '#fff', overflowX: 'auto' } });
+  const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { width: '100%', background: SURFACE, overflowX: 'auto' } });
   return (
     <div {...root} data-soft="">
-      <Rough seedKey={node.id} stroke="#5a5a5a" strokeWidth={1.1} />
+      <Rough seedKey={node.id} stroke={INK2} strokeWidth={1.1} />
       {children}
     </div>
   );
@@ -730,7 +728,7 @@ function DataTable({ node, p }: NodeProps) {
 function Accordion({ node, p, children }: NodeProps) {
   const v = useInputValue(node, p);
   const open = new Set<string>(Array.isArray(v) ? v.map(String) : v !== undefined && v !== null && v !== '' ? [str(v)] : []);
-  const root = useRoot(node, p, { className: 'jbox [.jstage[data-theme=clean]_&]:rounded-md', style: { display: 'flex', flexDirection: 'column', background: '#fff' } });
+  const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { display: 'flex', flexDirection: 'column', background: SURFACE } });
   return (
     <AccordionContext.Provider value={{ open }}>
       <div {...root} data-soft="">
@@ -743,7 +741,7 @@ function Accordion({ node, p, children }: NodeProps) {
 function AccordionItem({ node, p, children }: NodeProps) {
   const acc = useContext(AccordionContext);
   const value = str(p.value);
-  const root = useRoot(node, p, { className: 'jacc-item', style: { borderBottom: '1px solid #e9ecef' } });
+  const root = useRoot(node, p, { className: 'jacc-item', style: { borderBottom: `1px solid ${LINE}` } });
   return (
     <AccordionItemContext.Provider value={{ value, open: !!acc?.open.has(value) }}>
       <div {...root}>{children}</div>
@@ -752,7 +750,7 @@ function AccordionItem({ node, p, children }: NodeProps) {
 }
 function AccordionControl({ node, p, disabled, children }: NodeProps) {
   const item = useContext(AccordionItemContext);
-  const root = useRoot(node, p, { disabled, style: { display: 'flex', alignItems: 'center', width: '100%', padding: '10px 14px', gap: 8, fontWeight: 500, textAlign: 'left', color: disabled ? '#8a8a8a' : undefined } });
+  const root = useRoot(node, p, { disabled, style: { display: 'flex', alignItems: 'center', width: '100%', padding: '10px 14px', gap: 8, fontWeight: 500, textAlign: 'left', color: disabled ? DIMMED : undefined } });
   return (
     <button {...root} type="button" aria-expanded={!!item?.open}>
       <span className="jtrunc" style={{ flex: 1 }} data-jtext="">
@@ -766,7 +764,7 @@ function AccordionControl({ node, p, disabled, children }: NodeProps) {
 }
 function AccordionPanel({ node, p, children }: NodeProps) {
   const item = useContext(AccordionItemContext);
-  const root = useRoot(node, p, { style: { padding: '0 14px 12px', whiteSpace: 'pre-line', fontSize: 14, color: '#3a3a3a' } });
+  const root = useRoot(node, p, { style: { padding: '0 14px 12px', whiteSpace: 'pre-line', fontSize: 14, color: INK2 } });
   if (item && !item.open) return null;
   return <div {...root}>{children}</div>;
 }
@@ -774,14 +772,14 @@ function AccordionPanel({ node, p, children }: NodeProps) {
 // ============ Alert / Notification / Loader / Progress ============
 
 function Alert({ node, p, children }: NodeProps) {
-  const theme = useStageTheme();
-  const c = color(p.color) ?? '#1c7ed6';
+  const mode = useStroke();
+  const c = color(p.color) ?? INFO;
   const variant = str(p.variant, 'light');
   const filled = variant === 'filled';
   const danger = p.color === 'red';
   const root = useRoot(node, p, {
-    className: 'jbox [.jstage[data-theme=clean]_&]:rounded-md',
-    style: { display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', padding: '12px 16px', background: filled ? c : variant === 'outline' || variant === 'white' ? '#fff' : light(c), color: filled ? '#fff' : INK, ...(theme === 'clean' ? { borderColor: c } : {}) },
+    className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md',
+    style: { display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', padding: '12px 16px', background: filled ? c : variant === 'outline' || variant === 'white' ? SURFACE : light(c), color: filled ? onFill(c) : INK, ...(mode === 'clean' ? { borderColor: c } : {}) },
   });
   return (
     <div {...root} role={danger ? 'alert' : 'status'}>
@@ -790,7 +788,7 @@ function Alert({ node, p, children }: NodeProps) {
         {p.icon !== undefined ? str(p.icon) : danger ? '!' : 'i'}
       </span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
-        {p.title !== undefined ? <div style={{ fontWeight: 700, color: filled ? '#fff' : c, lineHeight: 1.4 }}>{str(p.title)}</div> : null}
+        {p.title !== undefined ? <div style={{ fontWeight: 700, color: filled ? onFill(c) : c, lineHeight: 1.4 }}>{str(p.title)}</div> : null}
         <div style={{ fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-line' }}>{children}</div>
       </div>
       {p.withCloseButton ? (
@@ -803,8 +801,8 @@ function Alert({ node, p, children }: NodeProps) {
 }
 
 function Notification({ node, p, children }: NodeProps) {
-  const c = color(p.color) ?? '#1c7ed6';
-  const root = useRoot(node, p, { className: 'jbox [.jstage[data-theme=clean]_&]:rounded-md', style: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px 12px 20px', background: '#fff', boxShadow: '3px 3px 0 rgba(30,30,30,.1)', position: 'relative' } });
+  const c = color(p.color) ?? INFO;
+  const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px 12px 20px', background: SURFACE, boxShadow: '3px 3px 0 rgba(30,30,30,.1)', position: 'relative' } });
   return (
     <div {...root} role="status" data-soft="">
       <Rough seedKey={node.id} stroke={SOFT} />
@@ -812,7 +810,7 @@ function Notification({ node, p, children }: NodeProps) {
       {p.loading ? <Spinner size={18} c={c} /> : null}
       <div style={{ flex: 1, minWidth: 0 }}>
         {p.title !== undefined ? <div style={{ fontWeight: 600 }}>{str(p.title)}</div> : null}
-        <div style={{ fontSize: 14, color: '#4a4a4a', whiteSpace: 'pre-line' }}>{children}</div>
+        <div style={{ fontSize: 14, color: INK2, whiteSpace: 'pre-line' }}>{children}</div>
       </div>
       {p.withCloseButton === false ? null : (
         <span aria-hidden style={{ color: DIMMED }}>
@@ -846,7 +844,7 @@ function Spinner({ size = 18, c = INK, kind = 'oval' }: { size?: number; c?: str
 const LOADER: Record<string, number> = { xs: 14, sm: 18, md: 24, lg: 32, xl: 40 };
 function Loader({ node, p, children }: NodeProps) {
   const size = typeof p.size === 'number' ? p.size : (LOADER[str(p.size, 'md')] ?? 24);
-  const root = useRoot(node, p, { style: { display: 'inline-flex', alignItems: 'center', gap: 8, color: '#4a4a4a' } });
+  const root = useRoot(node, p, { style: { display: 'inline-flex', alignItems: 'center', gap: 8, color: INK2 } });
   return (
     <div {...root} role="status">
       <Spinner size={size} c={color(p.color) ?? INK} kind={str(p.type, 'oval')} />
@@ -860,7 +858,7 @@ function Progress({ node, p }: NodeProps) {
   const v = Math.max(0, Math.min(100, Number(p.value ?? 0) || 0));
   const h = typeof p.size === 'number' ? p.size : (PROGRESS_H[str(p.size, 'md')] ?? 8);
   const c = color(p.color) ?? INK;
-  const root = useRoot(node, p, { className: 'jbox', style: { width: '100%', height: h + 4, background: '#f1f3f5', borderRadius: 999, overflow: 'hidden' } });
+  const root = useRoot(node, p, { className: 'jbox', style: { width: '100%', height: h + 4, background: SUBTLE, borderRadius: 999, overflow: 'hidden' } });
   return (
     <div {...root} role="progressbar" aria-valuenow={v} data-soft="">
       <Rough seedKey={node.id} stroke={SOFT} strokeWidth={1} />
@@ -880,7 +878,7 @@ function RingProgress({ node, p }: NodeProps) {
   return (
     <div {...root} role="img">
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={rr} fill="none" stroke="#e9ecef" strokeWidth={th} />
+        <circle cx={size / 2} cy={size / 2} r={rr} fill="none" style={{ stroke: LINE }} strokeWidth={th} />
         {sections.map((s, i) => {
           const v = Math.max(0, Math.min(100, Number(s.value) || 0));
           const el = <circle key={i} cx={size / 2} cy={size / 2} r={rr} fill="none" stroke={color(s.color) ?? INK} strokeWidth={th} strokeDasharray={`${(L * v) / 100} ${L}`} strokeDashoffset={(-L * acc) / 100} />;
@@ -896,7 +894,7 @@ function RingProgress({ node, p }: NodeProps) {
 function Skeleton({ node, p, children }: NodeProps) {
   const r = useR(p);
   const h = dim(r('height') ?? r('h')) ?? (p.circle ? '40px' : '16px');
-  const root = useRoot(node, p, { style: { width: p.circle ? h : (dim(r('width') ?? r('w')) ?? '100%'), height: h, borderRadius: p.circle ? 999 : (radius(p.radius) ?? '4px'), background: '#ececec' } });
+  const root = useRoot(node, p, { style: { width: p.circle ? h : (dim(r('width') ?? r('w')) ?? '100%'), height: h, borderRadius: p.circle ? 999 : (radius(p.radius) ?? '4px'), background: LINE } });
   if (p.visible === false) return <>{children}</>;
   return <div {...root} aria-hidden />;
 }
@@ -926,7 +924,7 @@ function Overlay({ node, p, children }: NodeProps) {
       ? { width: '100%', height: '100%' }
       : { width: sizeOf(p.size, 440), maxWidth: '92%', maxHeight: '90%', ...(p.centered ? {} : { marginTop: '6%' }) };
   const root = useRoot(node, p, {
-    className: cn('jbox relative z-10 flex flex-col bg-white shadow-[6px_6px_0_rgba(30,30,30,0.18)] [.jstage[data-theme=clean]_&]:shadow-xl', !drawer && !full && '[.jstage[data-theme=clean]_&]:rounded-lg'),
+    className: cn('jbox relative z-10 flex flex-col bg-[var(--jp-surface)] shadow-[var(--jp-shadow)] [.jstage[data-stroke=clean]_&]:shadow-xl', !drawer && !full && '[.jstage[data-stroke=clean]_&]:rounded-lg'),
     style: { ...panelStyle, overflow: 'auto' },
   });
   if (!dialogLayer) return null;
@@ -973,26 +971,26 @@ function buttonTone(variant: string, c: string | undefined) {
     case 'transparent':
       return { stroke: 'transparent', text: base };
     case 'white':
-      return { stroke: '#e9ecef', fill: '#fff', text: base };
+      return { stroke: LINE, fill: SURFACE, text: base };
     case 'default':
-      return { stroke: '#adb5bd', fill: '#fff', text: INK };
+      return { stroke: LINE_STRONG, fill: SURFACE, text: INK };
     default:
-      return { stroke: base, fill: base, text: '#fff' };
+      return { stroke: base, fill: base, text: onFill(base) };
   }
 }
 
 function Button({ node, p, disabled, children }: NodeProps) {
-  const theme = useStageTheme();
+  const mode = useStroke();
   const variant = str(p.variant, 'filled');
   const t = buttonTone(variant, color(p.color));
   const h = BTN_H[str(p.size, 'md')] ?? 40;
   const loading = p.loading === true;
-  const stroke = disabled ? '#9a9a9a' : t.stroke;
-  const fill = disabled ? (t.fill && t.fill !== '#fff' ? '#d4d4d4' : undefined) : t.fill;
-  const text = disabled ? (t.fill && t.fill !== '#fff' ? '#5a5a5a' : '#8a8a8a') : t.text;
+  const stroke = disabled ? SOFT : t.stroke;
+  const fill = disabled ? (t.fill && t.fill !== SURFACE ? LINE_STRONG : undefined) : t.fill;
+  const text = disabled ? (t.fill && t.fill !== SURFACE ? INK2 : DIMMED) : t.text;
   const root = useRoot(node, p, {
     disabled,
-    className: cn('jbox', theme === 'clean' && 'rounded-md', disabled && 'cursor-not-allowed'),
+    className: cn('jbox', mode === 'clean' && 'rounded-md', disabled && 'cursor-not-allowed'),
     style: {
       display: 'inline-flex',
       alignItems: 'center',
@@ -1006,7 +1004,7 @@ function Button({ node, p, disabled, children }: NodeProps) {
       maxWidth: '100%',
       width: p.fullWidth ? '100%' : undefined,
       flexShrink: 0,
-      ...(theme === 'clean' ? { ...boxStyle(stroke, fill), ...(disabled ? { borderStyle: 'dashed' } : {}) } : {}),
+      ...(mode === 'clean' ? { ...boxStyle(stroke, fill), ...(disabled ? { borderStyle: 'dashed' } : {}) } : {}),
     },
   });
   return (
@@ -1024,15 +1022,15 @@ function Button({ node, p, disabled, children }: NodeProps) {
 
 const ICON_SIZE: Record<string, number> = { xs: 18, sm: 22, md: 28, lg: 34, xl: 44 };
 function ActionIcon({ node, p, disabled, children }: NodeProps) {
-  const theme = useStageTheme();
+  const mode = useStroke();
   const t = buttonTone(str(p.variant, 'filled'), color(p.color));
   const size = typeof p.size === 'number' ? p.size : (ICON_SIZE[str(p.size, 'md')] ?? 28);
   const round = p.radius === 'xl' || p.radius === 999;
-  const fill = disabled ? '#d4d4d4' : t.fill;
+  const fill = disabled ? LINE_STRONG : t.fill;
   const root = useRoot(node, p, {
     disabled,
     className: cn('jbox', disabled && 'cursor-not-allowed'),
-    style: { width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: disabled ? '#5a5a5a' : t.text, fontSize: size * 0.5, fontWeight: 700, borderRadius: round ? 999 : (radius(p.radius) ?? 6), ...(theme === 'clean' ? boxStyle(disabled ? SOFT : t.stroke, fill) : {}) },
+    style: { width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: disabled ? INK2 : t.text, fontSize: size * 0.5, fontWeight: 700, borderRadius: round ? 999 : (radius(p.radius) ?? 6), ...(mode === 'clean' ? boxStyle(disabled ? SOFT : t.stroke, fill) : {}) },
   });
   return (
     <button {...root} type="button" aria-label={str(p['aria-label'], nodeLabel(node))}>
@@ -1062,13 +1060,13 @@ function NavLink({ node, p, disabled, children }: NodeProps) {
       <a
         role="link"
         tabIndex={0}
-        className={cn('jbox flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[15px] [.jstage[data-theme=clean]_&]:rounded-md', !active && 'hover:bg-black/[0.03]')}
-        style={{ background: active ? light(c === INK ? '#495057' : c) : undefined, fontWeight: active ? 650 : 400, color: disabled ? '#8a8a8a' : active && c !== INK ? c : undefined }}
+        className={cn('jbox flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[15px] [.jstage[data-stroke=clean]_&]:rounded-md', !active && 'hover:bg-black/[0.03]')}
+        style={{ background: active ? light(c === INK ? INK2 : c) : undefined, fontWeight: active ? 650 : 400, color: disabled ? DIMMED : active && c !== INK ? c : undefined }}
         data-noborder={active ? undefined : ''}
         data-soft=""
         data-jcontrol={node.id}
       >
-        {active ? <Rough seedKey={node.id} stroke={SOFT} fill="#e6e6e6" fillStyle="solid" strokeWidth={1} /> : null}
+        {active ? <Rough seedKey={node.id} stroke={SOFT} fill={LINE} fillStyle="solid" strokeWidth={1} /> : null}
         {p.leftSection !== undefined ? <span aria-hidden>{str(p.leftSection)}</span> : null}
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="jtrunc" data-jtext="">
@@ -1125,8 +1123,8 @@ function InputBox({ node, p, disabled, children, minH = 40, open }: { node: Scen
   const err = typeof p.error === 'string' && p.error !== '';
   return (
     <div
-      className="jbox flex w-full items-center gap-2 px-3 [.jstage[data-theme=clean]_&]:rounded-md"
-      style={{ minHeight: minH, background: disabled ? '#f4f4f4' : '#fff', ...(err ? { borderColor: DANGER } : {}) }}
+      className="jbox flex w-full items-center gap-2 px-3 [.jstage[data-stroke=clean]_&]:rounded-md"
+      style={{ minHeight: minH, background: disabled ? SUBTLE : SURFACE, ...(err ? { borderColor: DANGER } : {}) }}
       data-jcontrol={node.id}
       role={open !== undefined ? 'combobox' : undefined}
       aria-expanded={open}
@@ -1140,7 +1138,7 @@ function InputBox({ node, p, disabled, children, minH = 40, open }: { node: Scen
   );
 }
 
-const FIELD_CLASS = 'min-w-0 flex-1 cursor-[inherit] resize-none border-none bg-transparent p-0 text-[15px] text-inherit outline-none placeholder:text-[#9a9a9a]';
+const FIELD_CLASS = 'min-w-0 flex-1 cursor-[inherit] resize-none border-none bg-transparent p-0 text-[15px] text-inherit outline-none placeholder:text-[var(--jp-faint)]';
 
 /** 只读的原生输入框：值来自状态，用户不能直接编辑（输入由步骤驱动）。 */
 function NativeInput({ label, value, placeholder, mask = false }: { label: string; value: unknown; placeholder: unknown; mask?: boolean }) {
@@ -1210,13 +1208,13 @@ function Select({ node, p, disabled }: NodeProps) {
             {multi && values.length ? (
               <span className="flex min-w-0 flex-1 flex-wrap gap-1 py-1.5">
                 {values.map((x) => (
-                  <span key={x} style={{ background: '#f1f3f5', borderRadius: 4, padding: '0 6px', fontSize: 13 }}>
+                  <span key={x} style={{ background: SUBTLE, borderRadius: 4, padding: '0 6px', fontSize: 13 }}>
                     {labelOf(x)} ×
                   </span>
                 ))}
               </span>
             ) : (
-              <span className={cn('jtrunc min-w-0 flex-1', values.length ? '' : 'text-[#9a9a9a]')} data-jtext="">
+              <span className={cn('jtrunc min-w-0 flex-1', values.length ? '' : 'text-[var(--jp-faint)]')} data-jtext="">
                 {values.length ? labelOf(values[0]!) : str(p.placeholder, '请选择')}
               </span>
             )}
@@ -1225,12 +1223,12 @@ function Select({ node, p, disabled }: NodeProps) {
             </span>
           </InputBox>
           {open && choices.length ? (
-            <div className="jbox absolute inset-x-0 top-[calc(100%+4px)] z-30 flex flex-col bg-white py-1 shadow-[4px_4px_0_rgba(30,30,30,0.12)] [.jstage[data-theme=clean]_&]:rounded-md" role="listbox" data-jdropdown="">
-              <Rough seedKey={`${node.id}:list`} stroke="#5a5a5a" strokeWidth={1.1} />
+            <div className="jbox absolute inset-x-0 top-[calc(100%+4px)] z-30 flex flex-col bg-[var(--jp-surface)] py-1 shadow-[var(--jp-shadow)] [.jstage[data-stroke=clean]_&]:rounded-md" role="listbox" data-jdropdown="">
+              <Rough seedKey={`${node.id}:list`} stroke={INK2} strokeWidth={1.1} />
               {choices.map((c) => {
                 const on = c.value === previewChoice || values.includes(c.value);
                 return (
-                  <div key={c.value} role="option" aria-selected={on} className={cn('px-3 py-1.5 text-[15px]', on && 'bg-[#ececec] font-semibold')}>
+                  <div key={c.value} role="option" aria-selected={on} className={cn('px-3 py-1.5 text-[15px]', on && 'bg-[var(--jp-subtle)] font-semibold')}>
                     {multi && values.includes(c.value) ? '✓ ' : ''}
                     {c.label}
                   </div>
@@ -1252,8 +1250,8 @@ function SegmentedControl({ node, p, disabled }: NodeProps) {
   const cur = pv !== null ? (choices.find((c) => c.value === pv || c.label === pv)?.value ?? null) : v !== undefined && v !== null && v !== '' ? str(v) : (choices[0]?.value ?? null);
   const root = useRoot(node, p, {
     disabled,
-    className: 'jbox [.jstage[data-theme=clean]_&]:rounded-md',
-    style: { display: p.fullWidth ? 'flex' : 'inline-flex', width: p.fullWidth ? '100%' : 'fit-content', padding: 4, gap: 2, background: '#f1f3f5' },
+    className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md',
+    style: { display: p.fullWidth ? 'flex' : 'inline-flex', width: p.fullWidth ? '100%' : 'fit-content', padding: 4, gap: 2, background: SUBTLE },
   });
   return (
     <div {...root} role="radiogroup" data-soft="" data-jcontrol={node.id}>
@@ -1261,7 +1259,7 @@ function SegmentedControl({ node, p, disabled }: NodeProps) {
       {choices.map((c) => {
         const on = c.value === cur;
         return (
-          <span key={c.value} role="radio" aria-checked={on} className={cn('relative px-3 py-1 text-[14px] [.jstage[data-theme=clean]_&]:rounded', on ? 'bg-white font-semibold shadow-sm' : 'text-[#6b6b6b]')} style={{ flex: p.fullWidth ? 1 : undefined, textAlign: 'center' }}>
+          <span key={c.value} role="radio" aria-checked={on} className={cn('relative px-3 py-1 text-[14px] [.jstage[data-stroke=clean]_&]:rounded', on ? 'bg-[var(--jp-surface)] font-semibold shadow-sm' : 'text-[var(--jp-muted)]')} style={{ flex: p.fullWidth ? 1 : undefined, textAlign: 'center' }}>
             {on ? <Rough seedKey={`${node.id}:${c.value}`} stroke={INK} strokeWidth={1.1} /> : null}
             <span className="relative">{c.label}</span>
           </span>
@@ -1280,7 +1278,7 @@ function Checkbox({ node, p, disabled }: NodeProps) {
       disabled={disabled}
       inline
       control={
-        <span className="jbox inline-flex shrink-0 items-center justify-center rounded-[3px]" style={{ width: 20, height: 20, marginTop: 1, background: checked ? INK : '#fff', color: '#fff', fontSize: 13, lineHeight: 1 }} data-jcontrol={node.id} role="checkbox" aria-checked={checked} tabIndex={0}>
+        <span className="jbox inline-flex shrink-0 items-center justify-center rounded-[3px]" style={{ width: 20, height: 20, marginTop: 1, background: checked ? INK : SURFACE, color: BG, fontSize: 13, lineHeight: 1 }} data-jcontrol={node.id} role="checkbox" aria-checked={checked} tabIndex={0}>
           <Rough seedKey={node.id} inset={1} stroke={disabled ? SOFT : INK} fill={checked ? INK : undefined} fillStyle="solid" />
           {checked ? <span>✓</span> : null}
         </span>
@@ -1299,8 +1297,8 @@ function Switch({ node, p, disabled }: NodeProps) {
       disabled={disabled}
       inline
       control={
-        <span className="relative inline-flex shrink-0 items-center rounded-full" style={{ width: 38, height: 22, background: on ? c : '#dee2e6', transition: 'background .2s', marginTop: 1 }} data-jcontrol={node.id} role="switch" aria-checked={on} tabIndex={0}>
-          <span style={{ position: 'absolute', left: on ? 18 : 2, width: 18, height: 18, borderRadius: 9, background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,.25)', transition: 'left .2s' }} />
+        <span className="relative inline-flex shrink-0 items-center rounded-full" style={{ width: 38, height: 22, background: on ? c : LINE, transition: 'background .2s', marginTop: 1 }} data-jcontrol={node.id} role="switch" aria-checked={on} tabIndex={0}>
+          <span style={{ position: 'absolute', left: on ? 18 : 2, width: 18, height: 18, borderRadius: 9, background: SURFACE, boxShadow: '0 1px 2px rgba(0,0,0,.25)', transition: 'left .2s' }} />
         </span>
       }
     />
@@ -1353,7 +1351,7 @@ function Tabs({ node, p, disabled, children }: NodeProps) {
   );
 }
 function TabsList({ node, p, children }: NodeProps) {
-  const root = useRoot(node, p, { className: p.grow ? 'jgrow' : undefined, style: { display: 'flex', gap: 2, borderBottom: '2px solid #e9ecef', justifyContent: p.grow ? 'stretch' : flexVal(p.justify, 'flex-start') } });
+  const root = useRoot(node, p, { className: p.grow ? 'jgrow' : undefined, style: { display: 'flex', gap: 2, borderBottom: `2px solid ${LINE}`, justifyContent: p.grow ? 'stretch' : flexVal(p.justify, 'flex-start') } });
   return (
     <div {...root} role="tablist">
       {children}
@@ -1364,7 +1362,7 @@ function TabsTab({ node, p, disabled, children }: NodeProps) {
   const ctx = useContext(ValueContext);
   const dis = disabled || !!ctx?.disabled;
   const active = ctx?.value !== null && ctx?.value === str(p.value);
-  const root = useRoot(node, p, { disabled: dis, style: { position: 'relative', padding: '8px 14px', marginBottom: -2, fontSize: 14, borderBottom: `2px solid ${active ? INK : 'transparent'}`, fontWeight: active ? 650 : 400, color: dis ? '#a0a0a0' : active ? INK : '#6b6b6b', display: 'inline-flex', gap: 6, alignItems: 'center' } });
+  const root = useRoot(node, p, { disabled: dis, style: { position: 'relative', padding: '8px 14px', marginBottom: -2, fontSize: 14, borderBottom: `2px solid ${active ? INK : 'transparent'}`, fontWeight: active ? 650 : 400, color: dis ? SOFT : active ? INK : DIMMED, display: 'inline-flex', gap: 6, alignItems: 'center' } });
   return (
     <button {...root} type="button" role="tab" aria-selected={active}>
       {p.leftSection !== undefined ? <span aria-hidden>{str(p.leftSection)}</span> : null}
@@ -1412,7 +1410,7 @@ function Pagination({ node, p, disabled }: NodeProps) {
   for (let i = 1; i <= total; i++) if (i === 1 || i === total || Math.abs(i - v) <= 1) pages.push(i);
     else if (pages[pages.length - 1] !== '…') pages.push('…');
   const cell = (label: string, on = false, key?: string | number) => (
-    <span key={key ?? label} className="jbox inline-flex items-center justify-center [.jstage[data-theme=clean]_&]:rounded" style={{ minWidth: 32, height: 32, padding: '0 6px', fontSize: 14, background: on ? INK : '#fff', color: on ? '#fff' : INK }} data-soft={on ? undefined : ''}>
+    <span key={key ?? label} className="jbox inline-flex items-center justify-center [.jstage[data-stroke=clean]_&]:rounded" style={{ minWidth: 32, height: 32, padding: '0 6px', fontSize: 14, background: on ? INK : SURFACE, color: on ? BG : INK }} data-soft={on ? undefined : ''}>
       <Rough seedKey={`${node.id}:${key ?? label}`} stroke={on ? INK : SOFT} fill={on ? INK : undefined} fillStyle="solid" strokeWidth={1} />
       <span>{label}</span>
     </span>
@@ -1451,7 +1449,7 @@ function StepperStep({ node, p, children }: NodeProps) {
   const root = useRoot(node, p, { style: { display: 'flex', alignItems: 'flex-start', gap: 8, flex: last ? '0 0 auto' : '1 1 0', minWidth: 0 } });
   return (
     <div {...root} data-active={cur ? '' : undefined}>
-      <span aria-hidden className="jbox inline-flex shrink-0 items-center justify-center rounded-full" style={{ width: 30, height: 30, background: done ? INK : '#fff', color: done ? '#fff' : INK, fontSize: 13, fontWeight: 700, borderColor: cur || done ? INK : '#ced4da' }}>
+      <span aria-hidden className="jbox inline-flex shrink-0 items-center justify-center rounded-full" style={{ width: 30, height: 30, background: done ? INK : SURFACE, color: done ? BG : INK, fontSize: 13, fontWeight: 700, borderColor: cur || done ? INK : LINE_STRONG }}>
         <Rough seedKey={node.id} shape="ellipse" stroke={cur || done ? INK : SOFT} fill={done ? INK : undefined} fillStyle="solid" inset={1} />
         <span>{done ? '✓' : i + 1}</span>
       </span>
@@ -1459,7 +1457,7 @@ function StepperStep({ node, p, children }: NodeProps) {
         {p.label !== undefined ? <span style={{ fontWeight: cur ? 700 : 500, fontSize: 14 }}>{str(p.label)}</span> : null}
         {p.description !== undefined ? <span style={{ fontSize: 12, color: DIMMED }}>{str(p.description)}</span> : null}
       </span>
-      {last ? null : <span aria-hidden style={{ flex: 1, height: 2, background: done ? INK : '#dee2e6', marginTop: 14, minWidth: 12 }} />}
+      {last ? null : <span aria-hidden style={{ flex: 1, height: 2, background: done ? INK : LINE, marginTop: 14, minWidth: 12 }} />}
       {cur && seq?.content ? createPortal(<div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>, seq.content) : null}
     </div>
   );
@@ -1473,11 +1471,11 @@ function ChatMessage({ node, p, children }: NodeProps) {
   return (
     <div {...root} data-from={user ? 'user' : 'assistant'}>
       <div
-        className={cn('flex max-w-[82%] flex-col gap-2', user && 'jbox px-4 py-2.5 [.jstage[data-theme=clean]_&]:rounded-lg')}
-        style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, ...(user ? { background: '#f1f3f5' } : { width: '100%' }) }}
+        className={cn('flex max-w-[82%] flex-col gap-2', user && 'jbox px-4 py-2.5 [.jstage[data-stroke=clean]_&]:rounded-lg')}
+        style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, ...(user ? { background: SUBTLE } : { width: '100%' }) }}
         data-soft=""
       >
-        {user ? <Rough seedKey={node.id} stroke={SOFT} fill="#f1f3f5" fillStyle="solid" /> : null}
+        {user ? <Rough seedKey={node.id} stroke={SOFT} fill={SUBTLE} fillStyle="solid" /> : null}
         {p.name !== undefined ? <span style={{ fontSize: 12, color: DIMMED }}>{str(p.name)}</span> : null}
         {children}
       </div>
@@ -1486,17 +1484,17 @@ function ChatMessage({ node, p, children }: NodeProps) {
 }
 
 const TOOL_STATE: Record<string, { text: string; c: string }> = {
-  running: { text: '运行中', c: '#1c5fb8' },
-  done: { text: '已完成', c: '#2b8a3e' },
+  running: { text: '运行中', c: INFO },
+  done: { text: '已完成', c: OK },
   error: { text: '出错', c: DANGER },
-  'input-streaming': { text: '准备中', c: '#6b6b6b' },
-  'input-available': { text: '运行中', c: '#1c5fb8' },
-  'output-available': { text: '已完成', c: '#2b8a3e' },
+  'input-streaming': { text: '准备中', c: DIMMED },
+  'input-available': { text: '运行中', c: INFO },
+  'output-available': { text: '已完成', c: OK },
   'output-error': { text: '出错', c: DANGER },
 };
 function ToolCall({ node, p, children }: NodeProps) {
   const s = TOOL_STATE[str(p.state, 'done')] ?? TOOL_STATE.done!;
-  const root = useRoot(node, p, { className: 'jbox [.jstage[data-theme=clean]_&]:rounded-md', style: { display: 'flex', flexDirection: 'column', gap: 4, width: '100%', background: '#fafafa', padding: '8px 12px', fontFamily: MONO, fontSize: 13 } });
+  const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { display: 'flex', flexDirection: 'column', gap: 4, width: '100%', background: SUBTLE, padding: '8px 12px', fontFamily: MONO, fontSize: 13 } });
   return (
     <div {...root} data-soft="">
       <Rough seedKey={node.id} stroke={SOFT} />
@@ -1504,7 +1502,7 @@ function ToolCall({ node, p, children }: NodeProps) {
         <span className="jtrunc">⚙ {str(p.title, '工具调用')}</span>
         <span style={{ color: s.c, flexShrink: 0 }}>{s.text}</span>
       </div>
-      <div style={{ whiteSpace: 'pre-wrap', color: '#4a4a4a' }}>{children}</div>
+      <div style={{ whiteSpace: 'pre-wrap', color: INK2 }}>{children}</div>
     </div>
   );
 }
@@ -1512,7 +1510,7 @@ function ToolCall({ node, p, children }: NodeProps) {
 function PromptInput({ node, p, disabled }: NodeProps) {
   const v = useInputValue(node, p);
   const has = v !== undefined && v !== null && v !== '';
-  const root = useRoot(node, p, { disabled, className: 'jbox [.jstage[data-theme=clean]_&]:rounded-xl', style: { flex: 1, minWidth: 0, width: '100%', minHeight: 44, padding: '10px 14px', whiteSpace: 'pre-wrap', color: has ? INK : '#9a9a9a', background: '#fff' } });
+  const root = useRoot(node, p, { disabled, className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-xl', style: { flex: 1, minWidth: 0, width: '100%', minHeight: 44, padding: '10px 14px', whiteSpace: 'pre-wrap', color: has ? INK : SOFT, background: SURFACE } });
   return (
     <div {...root} role="textbox" aria-readonly="true" tabIndex={0} data-jcontrol={node.id}>
       <Rough seedKey={node.id} />
@@ -1523,8 +1521,8 @@ function PromptInput({ node, p, disabled }: NodeProps) {
 
 // ============ 设备外框：终端与手机 ============
 
-const TERM_TONE: Record<string, string> = { plain: INK, ok: '#2b8a3e', warn: '#e67700', error: DANGER };
-const TERM_MONO = '[.jstage[data-theme=clean]_&]:font-mono';
+const TERM_TONE: Record<string, string> = { plain: INK, ok: OK, warn: WARN, error: DANGER };
+const TERM_MONO = '[.jstage[data-stroke=clean]_&]:font-mono';
 
 /**
  * 终端（低保真线框，与其他组件同一风格）：圆角窗口，左上角是 title；里面每条命令、每段输出各是一个带边框的圆角块。
@@ -1538,8 +1536,8 @@ function Terminal({ node, p, children }: NodeProps) {
     if (el) el.scrollTop = el.scrollHeight;
   });
   const root = useRoot(node, p, {
-    className: 'jbox [.jstage[data-theme=clean]_&]:rounded-[18px]',
-    style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', minHeight: 0, background: '#fff', padding: '12px 16px 16px' },
+    className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-[18px]',
+    style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', minHeight: 0, background: SURFACE, padding: '12px 16px 16px' },
   });
   return (
     <div {...root}>
@@ -1556,8 +1554,8 @@ function Terminal({ node, p, children }: NodeProps) {
 
 function TerminalCommand({ node, p, children }: NodeProps) {
   const root = useRoot(node, p, {
-    className: cn('jbox [.jstage[data-theme=clean]_&]:rounded-[10px]', TERM_MONO),
-    style: { display: 'flex', gap: 8, padding: '10px 16px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#fff', flexShrink: 0 },
+    className: cn('jbox [.jstage[data-stroke=clean]_&]:rounded-[10px]', TERM_MONO),
+    style: { display: 'flex', gap: 8, padding: '10px 16px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: SURFACE, flexShrink: 0 },
   });
   return (
     <div {...root}>
@@ -1571,8 +1569,8 @@ function TerminalCommand({ node, p, children }: NodeProps) {
 function TerminalOutput({ node, p, children }: NodeProps) {
   const tone = str(p.tone, 'plain');
   const root = useRoot(node, p, {
-    className: cn('jbox [.jstage[data-theme=clean]_&]:rounded-[14px]', TERM_MONO),
-    style: { padding: '10px 16px', minHeight: 56, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.55, background: '#fff', color: TERM_TONE[tone] ?? INK, flexShrink: 0 },
+    className: cn('jbox [.jstage[data-stroke=clean]_&]:rounded-[14px]', TERM_MONO),
+    style: { padding: '10px 16px', minHeight: 56, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.55, background: SURFACE, color: TERM_TONE[tone] ?? INK, flexShrink: 0 },
   });
   return (
     <div {...root} data-tone={tone in TERM_TONE ? tone : 'plain'}>
@@ -1588,14 +1586,14 @@ function TerminalInput({ node, p, disabled }: NodeProps) {
   const has = v !== undefined && v !== null && v !== '';
   const root = useRoot(node, p, {
     disabled,
-    className: cn('jbox [.jstage[data-theme=clean]_&]:rounded-[10px]', TERM_MONO),
-    style: { display: 'flex', gap: 8, alignItems: 'baseline', padding: '10px 16px', background: '#fff', flexShrink: 0 },
+    className: cn('jbox [.jstage[data-stroke=clean]_&]:rounded-[10px]', TERM_MONO),
+    style: { display: 'flex', gap: 8, alignItems: 'baseline', padding: '10px 16px', background: SURFACE, flexShrink: 0 },
   });
   return (
     <div {...root} data-soft="" data-dashed="">
       <Rough seedKey={node.id} shape="roundrect" radius={10} stroke={SOFT} dashed />
       <span aria-hidden style={{ flexShrink: 0 }}>{str(p.prompt, '$')}</span>
-      <span role="textbox" aria-readonly="true" tabIndex={0} data-jcontrol={node.id} style={{ minWidth: 0, flex: 1, whiteSpace: 'pre-wrap', color: has ? INK : '#9a9a9a' }}>
+      <span role="textbox" aria-readonly="true" tabIndex={0} data-jcontrol={node.id} style={{ minWidth: 0, flex: 1, whiteSpace: 'pre-wrap', color: has ? INK : SOFT }}>
         <span data-jtext="">{has ? str(v) : str(p.placeholder)}</span>
         <span aria-hidden style={{ display: 'inline-block', width: 2, height: '1.1em', marginLeft: 2, verticalAlign: 'text-bottom', background: INK }} />
       </span>
@@ -1625,16 +1623,18 @@ export function phoneFrameSize(width: number, height: number) {
  * scale 只做视觉缩放。主题取外层 ThemeContext（sketch 用手绘描边）。
  */
 export function PhoneFrame({ width, height, scale = 1, children, seed = 'phone' }: { width: number; height: number; scale?: number; children: ReactNode; seed?: string }) {
+  const mode = useStroke();
   const theme = useStageTheme();
-  const sketch = theme === 'sketch';
+  const sketch = mode === 'rough';
   const screenW = width + PHONE_SAFE.x * 2;
   const screenH = height + PHONE_SAFE.top + PHONE_SAFE.bottom;
   const W = screenW + PHONE_BEZEL * 2;
   const H = screenH + PHONE_BEZEL * 2;
-  const ink = '#1e1e1e';
+  const ink = INK;
   const size = phoneFrameSize(width, height);
   return (
-    <div style={{ width: size.width * scale, height: size.height * scale, position: 'relative', flexShrink: 0 }} data-jphone-frame="" data-theme={theme}>
+    // 舞台外的手机外框也跟随主题（.jtheme 在主题的作用范围里）
+    <div className="jtheme" style={{ width: size.width * scale, height: size.height * scale, position: 'relative', flexShrink: 0 }} data-jphone-frame="" data-theme={theme} data-stroke={mode}>
       <div style={{ position: 'absolute', left: 4, top: 0, width: W, height: H, transform: scale === 1 ? undefined : `scale(${scale})`, transformOrigin: '0 0' }}>
         {PHONE_BUTTONS.map((b, i) => (
           <div
@@ -1646,20 +1646,20 @@ export function PhoneFrame({ width, height, scale = 1, children, seed = 'phone' 
             {sketch ? <Rough seedKey={`${seed}:btn${i}`} strokeWidth={1.4} inset={0.5} /> : null}
           </div>
         ))}
-        <div style={{ position: 'absolute', inset: 0, borderRadius: PHONE_RADIUS, background: sketch ? '#fff' : ink, boxShadow: sketch ? 'none' : '0 18px 40px rgba(0,0,0,0.18)' }}>
+        <div style={{ position: 'absolute', inset: 0, borderRadius: PHONE_RADIUS, background: sketch ? SURFACE : ink, boxShadow: sketch ? 'none' : '0 18px 40px rgba(0,0,0,0.18)' }}>
           {sketch ? <Rough seedKey={`${seed}:body`} shape="roundrect" radius={PHONE_RADIUS} strokeWidth={2} roughness={0.8} inset={1.5} /> : null}
         </div>
         <div
-          style={{ position: 'absolute', left: PHONE_BEZEL, top: PHONE_BEZEL, width: screenW, height: screenH, borderRadius: PHONE_RADIUS - PHONE_BEZEL, overflow: 'hidden', background: '#fff', isolation: 'isolate' }}
+          style={{ position: 'absolute', left: PHONE_BEZEL, top: PHONE_BEZEL, width: screenW, height: screenH, borderRadius: PHONE_RADIUS - PHONE_BEZEL, overflow: 'hidden', background: SURFACE, isolation: 'isolate' }}
           data-jphone-screen=""
         >
           {sketch ? null : <div aria-hidden style={{ position: 'absolute', top: 12, left: '50%', width: 96, height: 24, marginLeft: -48, borderRadius: 12, background: ink }} />}
-          <div aria-hidden style={{ position: 'absolute', bottom: 9, left: '50%', width: 120, height: 4, marginLeft: -60, borderRadius: 2, background: sketch ? '#5a5a5a' : '#c8c8c8' }} />
+          <div aria-hidden style={{ position: 'absolute', bottom: 9, left: '50%', width: 120, height: 4, marginLeft: -60, borderRadius: 2, background: sketch ? INK2 : LINE_STRONG }} />
           <div style={{ position: 'absolute', left: PHONE_SAFE.x, top: PHONE_SAFE.top, width, height, overflow: 'hidden' }} data-jphone-content-box="">
             {children}
           </div>
         </div>
-        {sketch ? <div aria-hidden style={{ position: 'absolute', top: PHONE_BEZEL + 14, left: '50%', width: 64, height: 6, marginLeft: -32, borderRadius: 3, border: '1.5px solid #5a5a5a' }} /> : null}
+        {sketch ? <div aria-hidden style={{ position: 'absolute', top: PHONE_BEZEL + 14, left: '50%', width: 64, height: 6, marginLeft: -32, borderRadius: 3, border: `1.5px solid ${INK2}` }} /> : null}
       </div>
     </div>
   );
@@ -1719,13 +1719,13 @@ function useAppear(d: DiagramCtxValue | null): boolean {
 const DiagramContext = createContext<DiagramCtxValue | null>(null);
 
 const D_TONE: Record<string, { stroke: string; fill: string; text: string }> = {
-  idle: { stroke: INK, fill: '#ffffff', text: INK },
-  active: { stroke: '#1c7ed6', fill: '#e7f5ff', text: '#1864ab' },
-  ok: { stroke: '#2b8a3e', fill: '#ebfbee', text: '#2b8a3e' },
-  error: { stroke: DANGER, fill: '#fff5f5', text: DANGER },
-  dim: { stroke: '#adb5bd', fill: '#ffffff', text: '#868e96' },
+  idle: { stroke: INK, fill: SURFACE, text: INK },
+  active: { stroke: INFO, fill: tint(INFO), text: INFO },
+  ok: { stroke: OK, fill: tint(OK), text: OK },
+  error: { stroke: DANGER, fill: tint(DANGER), text: DANGER },
+  dim: { stroke: LINE_STRONG, fill: SURFACE, text: DIMMED },
 };
-const EDGE_TONE: Record<string, string> = { idle: '#495057', active: '#1c7ed6', ok: '#2b8a3e', error: DANGER, dim: '#ced4da' };
+const EDGE_TONE: Record<string, string> = { idle: INK2, active: INFO, ok: OK, error: DANGER, dim: LINE_STRONG };
 
 /** 节点外形（坐标系：盒子左上角 x,y，宽 w 高 h）。模块级常量，Rough 据此缓存。 */
 const SHAPE: Record<string, (x: number, y: number, w: number, h: number) => string> = {
@@ -1863,7 +1863,7 @@ function DiagramGroup({ node, p, children }: NodeProps) {
   const title = d?.layout.titles[node.id];
   const appear = useAppear(d);
   const root = useRoot(node, p, {
-    className: 'jbox [.jstage[data-theme=clean]_&]:rounded-[14px]',
+    className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-[14px]',
     style: box
       ? { position: 'absolute', left: box.x - d!.origin.x, top: box.y - d!.origin.y, width: box.w, height: box.h, background: d!.fl ? 'transparent' : 'rgba(248,249,250,0.7)', ...(d!.fl ? { pointerEvents: 'none' as const } : {}) }
       : { display: 'none' },
@@ -1874,12 +1874,12 @@ function DiagramGroup({ node, p, children }: NodeProps) {
   return (
     <motion.div {...root} data-soft="" data-dashed="" data-appear={appear ? '' : undefined} initial={appear ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       <div style={{ position: 'absolute', inset: 0, opacity: bgOpacity, transition: 'opacity .4s' }}>
-        <Rough seedKey={node.id} shape="roundrect" radius={14} stroke="#868e96" dashed strokeWidth={1.2} />
+        <Rough seedKey={node.id} shape="roundrect" radius={14} stroke={DIMMED} dashed strokeWidth={1.2} />
       </div>
       {title ? (
         <div
           data-jgroup-title=""
-          style={{ position: 'absolute', left: title.x - box.x, top: title.y - box.y, width: title.w, height: title.h, zIndex: d.fl ? 1 : 3, opacity: bgOpacity, transition: 'opacity .4s', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, background: 'rgba(248,249,250,0.95)', fontSize: GROUP_FONT, fontWeight: 600, color: '#5a5a5a', whiteSpace: 'nowrap' }}
+          style={{ position: 'absolute', left: title.x - box.x, top: title.y - box.y, width: title.w, height: title.h, zIndex: d.fl ? 1 : 3, opacity: bgOpacity, transition: 'opacity .4s', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, background: 'rgba(248,249,250,0.95)', fontSize: GROUP_FONT, fontWeight: 600, color: INK2, whiteSpace: 'nowrap' }}
         >
           {str(p.label)}
         </div>
@@ -1891,7 +1891,7 @@ function DiagramGroup({ node, p, children }: NodeProps) {
 
 function DiagramNode({ node, p }: NodeProps) {
   const d = useContext(DiagramContext);
-  const { theme, selectedId } = { theme: useStageTheme(), selectedId: useCtx().selectedId };
+  const { mode, selectedId } = { mode: useStroke(), selectedId: useCtx().selectedId };
   // 聚焦布局（T-director3）：小图里的节点移到小图位置；其余节点留在原位作背景（很淡、不参与交互）
   const member = !!d?.fl?.nodes[node.id];
   const bg = !!d?.fl && !member;
@@ -1927,7 +1927,7 @@ function DiagramNode({ node, p }: NodeProps) {
     >
       {/* 出现动画：淡入并轻微放大（只在挂载后出现的节点上播放） */}
       <motion.div style={{ position: 'absolute', inset: 0 }} initial={appear ? { opacity: 0, scale: 0.88 } : false} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
-      {theme === 'sketch' ? (
+      {mode === 'rough' ? (
         <div style={{ position: 'absolute', inset: 0 }}>
           <Rough seedKey={node.id} shape="custom" pathOf={SHAPE[shape]} stroke={tone.stroke} strokeWidth={sw} fill={tone.fill} fillStyle="solid" dashed={kind === 'external'} inset={1.5} />
         </div>
@@ -1991,7 +1991,7 @@ function MovingDot({ d, color, animate: anim, reverse = false }: { d: string; co
   return (
     <>
       <path ref={pathRef} d={d} fill="none" stroke="none" />
-      <circle ref={dotRef} r={5.5} fill={color} stroke="#fff" strokeWidth={1.5} data-jdot="" />
+      <circle ref={dotRef} r={5.5} style={{ fill: color, stroke: SURFACE }} strokeWidth={1.5} data-jdot="" />
     </>
   );
 }
@@ -1999,7 +1999,7 @@ function MovingDot({ d, color, animate: anim, reverse = false }: { d: string; co
 function DiagramEdge({ node, p }: NodeProps) {
   const dctx = useContext(DiagramContext);
   const { animate, selectedId } = useCtx();
-  const theme = useStageTheme();
+  const mode = useStroke();
   const attrs = useRootAttrs(node);
   const appear = useAppear(dctx);
   // 聚焦布局（T-director3）：小图里的连线用小图的走线；连向小图外部的线隐藏；其余留在原位作背景
@@ -2056,7 +2056,7 @@ function DiagramEdge({ node, p }: NodeProps) {
       <g {...attrs} data-state={state} data-async={p.async === true ? '' : undefined} data-appear={appear ? '' : undefined} style={{ opacity: state === 'dim' ? 0.5 : 1, transition: 'opacity .25s' }} mask={appear ? `url(#${maskId})` : undefined}>
         {/* 透明的粗线：⌥+单击检查连线时好点中 */}
         <path d={d} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: bg ? 'none' : 'stroke' }} />
-        {theme === 'sketch' ? (
+        {mode === 'rough' ? (
           <>
             <RoughPath seedKey={`${node.id}:line`} d={d} stroke={color} strokeWidth={sw} dashed={dashed} />
             <RoughPath seedKey={`${node.id}:head`} d={head} stroke={color} strokeWidth={1.2} fill={color} roughness={0.5} />
@@ -2083,8 +2083,8 @@ function DiagramEdge({ node, p }: NodeProps) {
           transition={{ duration: 0.3, delay: fadeIn && !bg ? (FOCUS_MOVE_MS / 1000) * 0.8 : 0 }}
         >
           <motion.g style={{ pointerEvents: bg ? 'none' : 'all', opacity: state === 'dim' ? 0.5 : 1 }} data-jedge-label="" data-jedge-for={node.id} initial={appear ? { opacity: 0 } : false} animate={{ opacity: state === 'dim' ? 0.5 : 1 }} transition={{ duration: 0.3, delay: appear ? 0.45 : 0 }}>
-            <rect x={lb.x} y={lb.y} width={lb.w} height={lb.h} rx={4} fill="#ffffff" fillOpacity={0.92} />
-            <text x={lb.x + lb.w / 2} y={lb.y + lb.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={labelFont} fontWeight={sub ? 600 : undefined} fill={state === 'idle' ? '#3a3a3a' : color}>
+            <rect x={lb.x} y={lb.y} width={lb.w} height={lb.h} rx={4} style={{ fill: SURFACE }} fillOpacity={0.92} />
+            <text x={lb.x + lb.w / 2} y={lb.y + lb.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={labelFont} fontWeight={sub ? 600 : undefined} fill={state === 'idle' ? INK2 : color}>
               {label}
             </text>
           </motion.g>
@@ -2098,22 +2098,22 @@ function DiagramEdge({ node, p }: NodeProps) {
 
 function Placeholder({ node, p }: NodeProps) {
   const h = dim(p.h ?? p.height) ?? '120px';
-  const root = useRoot(node, p, { className: 'jbox', style: { display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', background: '#fafafa', fontSize: 14, color: '#6b6b6b', height: h } });
+  const root = useRoot(node, p, { className: 'jbox', style: { display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', background: SUBTLE, fontSize: 14, color: DIMMED, height: h } });
   return (
     <div {...root} data-soft="">
-      <Rough seedKey={node.id} stroke={SOFT} fill="#e9e9e9" fillStyle="cross-hatch" />
-      <span className="rounded bg-white/90 px-2">{str(p.label, '占位')}</span>
+      <Rough seedKey={node.id} stroke={SOFT} fill={LINE} fillStyle="cross-hatch" />
+      <span className="rounded bg-[color-mix(in_srgb,var(--jp-surface)_90%,transparent)] px-2">{str(p.label, '占位')}</span>
     </div>
   );
 }
 
 function Custom({ node, p }: NodeProps) {
-  const root = useRoot(node, p, { className: 'jbox flex min-h-24 w-full flex-col items-center justify-center gap-1 bg-[repeating-linear-gradient(45deg,#fafafa,#fafafa_8px,#f2f2f2_8px,#f2f2f2_16px)] p-4 text-center' });
+  const root = useRoot(node, p, { className: 'jbox flex min-h-24 w-full flex-col items-center justify-center gap-1 bg-[repeating-linear-gradient(45deg,var(--jp-subtle),var(--jp-subtle)_8px,var(--jp-surface)_8px,var(--jp-surface)_16px)] p-4 text-center' });
   return (
     <div {...root} data-dashed="">
-      <Rough seedKey={node.id} dashed stroke="#5a5a5a" />
+      <Rough seedKey={node.id} dashed stroke={INK2} />
       <div className="font-semibold">自定义组件：{str(p.kind, '未命名')}（占位）</div>
-      <div className="text-[12px] text-[#6b6b6b]">目录中没有的组件，按声明的元素 ID 与状态演示</div>
+      <div className="text-[12px] text-[var(--jp-muted)]">目录中没有的组件，按声明的元素 ID 与状态演示</div>
     </div>
   );
 }

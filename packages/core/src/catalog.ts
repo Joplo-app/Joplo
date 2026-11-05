@@ -200,6 +200,14 @@ export const VIEWPORT_SIZE = { desktop: { width: 1280, height: 800 }, mobile: { 
  */
 export const SUBTITLE_HEIGHT = 84;
 
+/**
+ * 内置主题（D51）：每个主题是一个只写 CSS 变量（--jp-*）的样式表，CSS 在 web 包里（renderer/themes.ts）。
+ * 作者可以在项目根目录 themes/<name>.css 写自己的主题；与内置同名时用作者的。
+ */
+export const BUILTIN_THEMES = ['sketch', 'clean', 'blueprint', 'nord', 'dracula', 'solarized-light', 'terminal', 'kraft', 'contrast'] as const;
+/** 主题名：字母开头，字母、数字、连字符、下划线（也是 themes/ 下的文件名）。 */
+export const THEME_NAME = /^[A-Za-z][\w-]*$/;
+
 /** 字幕的“字数”：中文（及其他全角字符）一个算 1，英文、数字、标点按 0.5 算；空白不算。check 用它提示说明与 explain 过长。 */
 export function captionLength(s: string): number {
   let n = 0;

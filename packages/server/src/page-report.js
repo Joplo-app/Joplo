@@ -70,7 +70,8 @@
   }
 
   // 4. 字体
-  if (args.theme === 'sketch') {
+  // 主题用到手写字体时（--jp-font 含 Excalifont）检查它们已加载
+  if (/Excalifont|Xiaolai/.test(getComputedStyle(stage).fontFamily)) {
     const text = stage.innerText || '中文';
     if (!document.fonts.check('16px "Joplo Excalifont"', text) || !document.fonts.check('16px "Joplo Xiaolai"', text)) warnings.push('字体未加载：手写字体（Excalifont / Xiaolai）尚未就绪，截图可能使用了后备字体');
   }

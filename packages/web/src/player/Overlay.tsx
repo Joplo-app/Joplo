@@ -100,7 +100,7 @@ export function Overlay({
       </AnimatePresence>
 
       <div ref={setCursorEl} className="absolute left-0 top-0 will-change-transform" style={{ opacity: snap.cursorVisible ? 1 : 0 }} aria-hidden data-joverlay="cursor">
-        <MousePointer2 className="-ml-[3px] -mt-[2px] size-7 fill-white text-[#1e1e1e] drop-shadow" strokeWidth={1.6} />
+        <MousePointer2 className="-ml-[3px] -mt-[2px] size-7 fill-[var(--jp-surface)] text-[var(--jp-ink)] drop-shadow" strokeWidth={1.6} />
       </div>
 
 
@@ -117,7 +117,8 @@ function NoticeBubble({ anchor, W, H, kind, text, onBack, onDismiss }: { anchor:
   const below = anchor.y + anchor.h + 140 < H;
   const left = Math.max(8, Math.min(W - width - 8, anchor.x + anchor.w / 2 - width / 2));
   const top = below ? anchor.y + anchor.h + 10 : Math.max(8, anchor.y - 10 - 120);
-  const tone = kind === 'disabled' ? { border: '#6b6b6b', bg: '#ffffff', title: '不可用' } : kind === 'uncovered' ? { border: '#b35c00', bg: '#fff8ee', title: '演示范围外' } : { border: '#1c5fb8', bg: '#f2f6ff', title: '不是当前步骤' };
+  const mix = (c: string) => `color-mix(in srgb, ${c} 8%, var(--jp-surface))`;
+  const tone = kind === 'disabled' ? { border: 'var(--jp-muted)', bg: 'var(--jp-surface)', title: '不可用' } : kind === 'uncovered' ? { border: 'var(--jp-warn)', bg: mix('var(--jp-warn)'), title: '演示范围外' } : { border: 'var(--jp-info)', bg: mix('var(--jp-info)'), title: '不是当前步骤' };
   return (
     <div
       role="alert"
@@ -129,14 +130,14 @@ function NoticeBubble({ anchor, W, H, kind, text, onBack, onDismiss }: { anchor:
       <div className="mb-1 text-[14px] font-semibold" style={{ color: tone.border }}>
         {tone.title}
       </div>
-      <div className="leading-snug text-[#1e1e1e]">{text}</div>
+      <div className="leading-snug text-[var(--jp-ink)]">{text}</div>
       <div className="mt-2 flex justify-end gap-2">
         {kind === 'uncovered' ? (
-          <button type="button" className="whitespace-nowrap rounded border border-[#b35c00] bg-white px-2.5 py-1 text-[15px] text-[#b35c00] hover:bg-[#fff1dd]" onClick={onBack}>
+          <button type="button" className="whitespace-nowrap rounded border border-[var(--jp-warn)] bg-[var(--jp-surface)] px-2.5 py-1 text-[15px] text-[var(--jp-warn)] hover:opacity-80" onClick={onBack}>
             回到演示
           </button>
         ) : null}
-        <button type="button" className="whitespace-nowrap rounded px-2.5 py-1 text-[15px] text-[#6b6b6b] hover:bg-black/5" onClick={onDismiss}>
+        <button type="button" className="whitespace-nowrap rounded px-2.5 py-1 text-[15px] text-[var(--jp-muted)] hover:bg-black/5" onClick={onDismiss}>
           知道了
         </button>
       </div>

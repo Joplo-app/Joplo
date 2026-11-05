@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { VIEWPORT_SIZE, diagramStateAt, type PlayState, type Project, type Toast } from '@tokenroll/joplo-core';
 import { RenderContext, RenderNode, type RenderMode } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
+import { strokeOfTheme } from './themes';
 
 export const VIEWPORTS = VIEWPORT_SIZE;
 export type Viewport = keyof typeof VIEWPORTS;
@@ -88,6 +89,8 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   const scene = project.scenes[shownId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
+  // 主题（D51）：描边方式由主题的 --jp-stroke 决定（内置主题或项目 themes/<name>.css）
+  const stroke = useMemo(() => strokeOfTheme(theme, project.themes ?? {}), [theme, project.themes]);
   // 调用链（D48）：Diagram 节点与连线的 state 由每一步的 trace 推算（没写 state 时使用）
   const traced = useMemo(() => diagramStateAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -215,7 +218,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, registry }}>
+    <ThemeContext.Provider value={{ theme, stroke, registry }}>
       <div
         ref={(el) => {
           rootRef.current = el;
@@ -223,6 +226,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         }}
         data-joplo-stage=""
         data-theme={theme}
+        data-stroke={stroke}
         data-mode={mode}
         data-scene={shownId}
         data-width={vp.width}
@@ -253,7 +257,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
               </motion.div>
             </RenderContext.Provider>
           ) : (
-            <div className="flex h-full items-center justify-center text-[#c92a2a]">画面不存在：{shownId}</div>
+            <div className="flex h-full items-center justify-center text-[var(--jp-danger)]">画面不存在：{shownId}</div>
           )}
           <div ref={setDialogLayer} className="pointer-events-none absolute inset-0 z-20 [&>*]:pointer-events-auto" data-jlayer="dialog" />
           {camera ? <CameraLayer view={cam.view} animate={animate} pulseKey={camera.key} /> : null}
@@ -274,9 +278,9 @@ const CORNER_CLASS: Record<Corner, string> = {
   bc: 'left-1/2 -translate-x-1/2 bottom-5 items-center',
 };
 const TOAST_STYLE: Record<Toast['tone'], { c: string; bg: string; icon: string }> = {
-  success: { c: '#2b8a3e', bg: '#f3fbf4', icon: '✓' },
-  error: { c: '#c92a2a', bg: '#fff3f3', icon: '!' },
-  info: { c: '#1e1e1e', bg: '#ffffff', icon: 'i' },
+  success: { c: 'var(--jp-ok)', bg: 'color-mix(in srgb, var(--jp-ok) 8%, var(--jp-surface))', icon: '✓' },
+  error: { c: 'var(--jp-danger)', bg: 'color-mix(in srgb, var(--jp-danger) 8%, var(--jp-surface))', icon: '!' },
+  info: { c: 'var(--jp-ink)', bg: 'var(--jp-surface)', icon: 'i' },
 };
 
 /** Toast 放在舞台内；若与下一步操作目标重叠，换到其他角落。 */
@@ -332,7 +336,7 @@ function ToastLayer({ toasts, nextTargetId, animate, rootRef }: { toasts: Toast[
               <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white" style={{ background: st.c }}>
                 {st.icon}
               </span>
-              <span className="text-[15px] leading-snug text-[#1e1e1e]">{t.text}</span>
+              <span className="text-[15px] leading-snug text-[var(--jp-ink)]">{t.text}</span>
             </motion.div>
           );
         })}

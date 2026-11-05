@@ -8,7 +8,7 @@
  */
 import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@tokenroll/joplo-kit/node';
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@tokenroll/joplo-kit';
-import { COMPONENT_TYPES, DIRECTOR_LAYER, INTERACTIVE_TYPES, PAGE_LAYER, matchChoice, nodeLabel } from './catalog.ts';
+import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, INTERACTIVE_TYPES, PAGE_LAYER, matchChoice, nodeLabel } from './catalog.ts';
 import { choicesOf } from './player.ts';
 import { Project, SCHEMA_VERSION, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
 import type { Diagnostic } from './result.ts';
@@ -20,6 +20,8 @@ export type AuthoringProject = {
   layouts: Record<string, LayoutDef & { file: string }>;
   routes: Record<string, PageDef & { file: string }>;
   features: Record<string, { def: FeatureDef & { file: string }; options: Record<string, OptionDef & { file: string }> }>;
+  /** 作者主题（D51）：themes/<name>.css 的原文。 */
+  themes?: Record<string, string>;
 };
 
 export type CompileResult = { project: Project | null; diagnostics: Diagnostic[] };
@@ -41,6 +43,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     name: src.config.name,
     description: src.config.description ?? '',
     theme: src.config.theme ?? 'sketch',
+    themes: { ...(src.themes ?? {}) },
     mode,
     routes: {},
     features: {},
@@ -176,6 +179,13 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     return { id: sceneId, optionId: ctx?.qid ?? null, route: route.path, name: `${page.title}${ctx ? ` · ${ctx.def.name}` : ''}`, viewport: page.viewport ?? 'desktop', root };
   };
 
+  // 主题（D51）：config.theme 必须是内置主题或 themes/<name>.css
+  {
+    const t = src.config.theme ?? 'sketch';
+    const authorThemes = Object.keys(src.themes ?? {});
+    if (!(BUILTIN_THEMES as readonly string[]).includes(t) && !authorThemes.includes(t))
+      err('THEME_UNKNOWN', `config({ theme: '${t}' }) 不是内置主题（${BUILTIN_THEMES.join('、')}），项目里也没有 themes/${t}.css${authorThemes.length ? `（作者主题：${authorThemes.join('、')}）` : ''}`, src.config.source ?? `${src.config.file}:1:1`);
+  }
   const sceneFor = new Map<string, Scene>();
   const addScene = (s: Scene) => {
     sceneFor.set(s.id, s);

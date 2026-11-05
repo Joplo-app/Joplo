@@ -156,7 +156,7 @@ export async function openInEditor(projectId: string, at: string): Promise<{ ok:
 }
 
 /** 导出跟随页面自己的 viewport（D44：不再选择设备）。 */
-export type ExportRequest = { scenarioId: string; position: number; theme: 'sketch' | 'clean' };
+export type ExportRequest = { scenarioId: string; position: number; theme: string };
 
 /** 本机导出图片：服务端用 Playwright 渲染当前步骤（与 joplo render 同一渲染路径）。 */
 export async function exportImage(projectId: string, body: ExportRequest): Promise<{ ok: true; blob: Blob; name: string } | { ok: false; message: string }> {
@@ -210,3 +210,34 @@ export function watchVideo(projectId: string, cb: (job: VideoJob | null) => void
   })();
   return () => ac.abort();
 }
+
+// ---------- 看板设置（D51）：主题选择，存于 <JOPLO_HOME>/settings.json ----------
+export type BoardSettings = { version: 1; theme?: string | null; projects?: Record<string, { theme: string | null }> };
+
+export async function fetchSettings(): Promise<BoardSettings> {
+  try {
+    const res = await fetch('/__joplo/settings', { cache: 'no-store' });
+    if (!res.ok) return { version: 1 };
+    return ((await res.json()) as { settings: BoardSettings }).settings ?? { version: 1 };
+  } catch {
+    return { version: 1 };
+  }
+}
+
+export async function saveSettings(settings: BoardSettings): Promise<{ ok: true; settings: BoardSettings } | { ok: false; message: string }> {
+  try {
+    const res = await post('/__joplo/settings', { settings }, 'PUT');
+    if (!res.ok) return { ok: false, message: await readError(res) };
+    return { ok: true, settings: ((await res.json()) as { settings: BoardSettings }).settings };
+  } catch (e) {
+    return { ok: false, message: errMsg(e) };
+  }
+}
+
+/** 设置变化（同一页面里的设置页与演示页之间）通知。 */
+const settingsListeners = new Set<(s: BoardSettings) => void>();
+export const onSettings = (cb: (s: BoardSettings) => void) => {
+  settingsListeners.add(cb);
+  return () => settingsListeners.delete(cb);
+};
+export const emitSettings = (s: BoardSettings) => settingsListeners.forEach((cb) => cb(s));
