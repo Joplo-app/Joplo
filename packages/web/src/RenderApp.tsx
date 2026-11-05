@@ -1,11 +1,11 @@
 /**
- * 渲染专用路由：/?render=1&scenario=..&position=..&theme=..
+ * 渲染专用路由（renderStep 使用）：/?render=1&scenario=..&position=..&theme=..
  * 只渲染舞台，固定尺寸，关闭动画。字体与 rough 绘制都完成后设置 window.__JOPLO_READY__ = true，
  * 并暴露 window.__JOPLO_STATE__（当前 PlayState）。
  */
 import { useEffect, useMemo, useState } from 'react';
 import { stateAt, type PlayState, type Project } from '@joplo/core';
-import { fetchProject } from './api';
+import { fetchIR } from './runtime/dev-client';
 import { Stage } from './renderer/Stage';
 import { RoughRegistry, type StageTheme } from './renderer/rough';
 
@@ -25,8 +25,9 @@ export function RenderApp() {
 
   useEffect(() => {
     (async () => {
-      const r = await fetchProject();
-      if (!r.ok) return fail(r.error.message);
+      const r = await fetchIR();
+      if ('error' in r) return fail(r.error);
+      if (!r.project) return fail(r.diagnostics.map((d) => `${d.at ?? ''} ${d.message}`).join('；') || '项目没有成功编译');
       try {
         setData({ project: r.project, state: stateAt(r.project, scenarioId, position) });
       } catch (e) {

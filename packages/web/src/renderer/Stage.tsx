@@ -15,6 +15,18 @@ export function viewportOf(project: Project, state: PlayState): Viewport {
   return project.scenes[state.sceneId]?.viewport === 'mobile' ? 'mobile' : 'desktop';
 }
 
+/**
+ * 点击命中的元素：文本节点（#text）不单独响应；演示模式优先取最近的可操作祖先
+ * （点到按钮里的文字或图标也算点按钮），审阅模式取最内层的元素，便于精确选中。
+ */
+export function pickTarget(el: HTMLElement, mode: RenderMode): HTMLElement | null {
+  if (mode === 'demo') {
+    const inter = el.closest<HTMLElement>('[data-jinteractive]');
+    if (inter) return inter;
+  }
+  return el.closest<HTMLElement>('[data-jid]:not([data-jtype="#text"])');
+}
+
 export type StageProps = {
   project: Project;
   state: PlayState;
@@ -49,7 +61,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
 
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     if (!onNodeClick) return;
-    const hit = (e.target as HTMLElement).closest<HTMLElement>('[data-jid]');
+    const hit = pickTarget(e.target as HTMLElement, mode);
     if (!hit || !rootRef.current?.contains(hit)) return;
     e.preventDefault();
     onNodeClick(hit.dataset.jid!, toFramePoint(e.clientX, e.clientY));
@@ -58,7 +70,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     if (!onNodeClick || (e.key !== 'Enter' && e.key !== ' ')) return;
     const t = e.target as HTMLElement;
     if (t.tagName === 'BUTTON') return; // 原生按钮会自己触发 click
-    const hit = t.closest<HTMLElement>('[data-jid]');
+    const hit = pickTarget(t, mode);
     if (!hit) return;
     e.preventDefault();
     const r = hit.getBoundingClientRect();

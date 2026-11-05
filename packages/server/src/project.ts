@@ -1,0 +1,78 @@
+/**
+ * 用 Vite 的 ssrLoadModule 载入项目源文件，交给 core 的 loadAuthoring + compile。
+ * dev（看板、截图）与 build（发布站）共用这一条路径。
+ */
+import path from 'node:path';
+import { compile, type Diagnostic, type Project } from '@joplo/core';
+import { discoverFiles, loadAuthoring } from '@joplo/core/node';
+import type { ViteDevServer } from 'vite';
+import { isProjectSource } from './vite-shared.ts';
+
+export type CompileOutcome = {
+  /** 本次编译成功的 IR；失败时为 null。 */
+  project: Project | null;
+  diagnostics: Diagnostic[];
+  /** joplo.config 的 home（看板与发布站的首页路径）。 */
+  home: string | null;
+};
+
+const LOC_IN_MESSAGE = /((?:[\w@.-]+\/)*[\w@.-]+\.(?:tsx|ts|jsx|js|mts)):(\d+):(\d+)/;
+
+/** 运行时错误（模块求值时抛出）：从调用栈里找第一处项目文件位置。 */
+function stackLoc(projectDir: string, e: unknown): string | null {
+  const stack = e instanceof Error ? (e.stack ?? '') : '';
+  for (const line of stack.split('\n')) {
+    const m = /\(?((?:file:\/\/)?\/[^():\s]+):(\d+):(\d+)\)?\s*$/.exec(line);
+    if (!m) continue;
+    const file = decodeURIComponent(m[1]!.replace(/^file:\/\//, ''));
+    if (isProjectSource(projectDir, file)) return `${path.relative(projectDir, file).split(path.sep).join('/')}:${m[2]}:${m[3]}`;
+  }
+  return null;
+}
+
+export async function compileProject(server: ViteDevServer, projectDir: string, mode: 'dev' | 'publish'): Promise<CompileOutcome> {
+  const errorAt = new Map<string, string>(); // 载入失败的文件（绝对路径）→ 精确位置
+  const importer = async (abs: string) => {
+    try {
+      return (await server.ssrLoadModule(abs)) as Record<string, unknown>;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const m = LOC_IN_MESSAGE.exec(msg);
+      const at = m ? `${m[1]}:${m[2]}:${m[3]}` : stackLoc(projectDir, e);
+      if (at) errorAt.set(abs, at);
+      throw e instanceof Error ? e : new Error(msg);
+    }
+  };
+  const loaded = await loadAuthoring(projectDir, importer);
+  const rel = (abs: string) => path.relative(projectDir, abs).split(path.sep).join('/');
+  const byRel = new Map([...errorAt].map(([abs, at]) => [rel(abs), at]));
+  const seen = new Set<string>();
+  const diagnostics: Diagnostic[] = [];
+  for (const d of loaded.diagnostics) {
+    let out = d;
+    if (d.code === 'LOAD_FAILED' && d.at) {
+      const file = d.at.replace(/:\d+:\d+$/, '');
+      const precise = byRel.get(file);
+      if (precise) out = { ...d, at: precise, message: d.message.replace(/\x1b\[[0-9;]*m/g, '').split('\n')[0]! };
+    }
+    const key = `${out.code}|${out.at}|${out.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    diagnostics.push(out);
+  }
+  if (!loaded.authoring) return { project: null, diagnostics, home: null };
+  const home = loaded.authoring.config.home ?? null;
+  if (diagnostics.some((d) => d.severity === 'error')) return { project: null, diagnostics, home };
+  const r = compile(loaded.authoring, mode);
+  return { project: r.project, diagnostics: [...diagnostics, ...r.diagnostics], home };
+}
+
+/** 让项目源文件在下次载入时重新转译、重新求值。 */
+export function invalidateProjectModules(server: ViteDevServer, projectDir: string): void {
+  for (const env of Object.values(server.environments)) {
+    const graph = env.moduleGraph as unknown as { idToModuleMap: Map<string, { file: string | null }>; invalidateModule(m: unknown): void };
+    for (const mod of graph.idToModuleMap.values()) if (mod.file && isProjectSource(projectDir, mod.file)) graph.invalidateModule(mod);
+  }
+}
+
+export { discoverFiles };

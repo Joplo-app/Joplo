@@ -4,9 +4,10 @@
   const stage = document.querySelector('[data-joplo-stage]');
   const sr = stage.getBoundingClientRect();
   const warnings = [];
-  const els = Array.from(stage.querySelectorAll('[data-jid]'));
+  // 文本节点（#text）不进索引：它们属于父元素
+  const els = Array.from(stage.querySelectorAll('[data-jid]:not([data-jtype="#text"])'));
   const name = (el) => {
-    const owner = el.closest('[data-jid]');
+    const owner = el.closest('[data-jid]:not([data-jtype="#text"])');
     return owner ? `「${owner.dataset.jlabel ?? ''}」(${owner.dataset.jid})` : el.closest('[data-jtoast]') ? 'Toast' : el.closest('[data-jbackdrop]') ? '弹窗遮罩' : el.tagName.toLowerCase();
   };
   const elements = els.map((el) => {
@@ -15,7 +16,7 @@
     const style = getComputedStyle(el);
     const intersects = r.right > sr.left && r.left < sr.right && r.bottom > sr.top && r.top < sr.bottom;
     const visible = r.width > 0 && r.height > 0 && intersects && style.visibility !== 'hidden' && style.display !== 'none';
-    return { id: el.dataset.jid, type: el.dataset.jtype, label: el.dataset.jlabel ?? '', visible, disabled: el.hasAttribute('data-jdisabled'), box };
+    return { id: el.dataset.jid, type: el.dataset.jtype, label: el.dataset.jlabel ?? '', visible, disabled: el.hasAttribute('data-jdisabled'), at: el.dataset.jat ?? null, box };
   });
 
   const vw = window.innerWidth;

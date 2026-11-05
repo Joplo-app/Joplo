@@ -1,12 +1,11 @@
 /**
- * 本地预览服务与渲染截图（T-web）。CLI 只依赖这里导出的 startServer / renderStep。
+ * @joplo/server：CLI 只依赖这里导出的三个函数（接口见 contract.ts）。
  *
- * 安全边界（PRD 15.1）：
- * - 只绑定 127.0.0.1；每个请求校验 Host（127.0.0.1 / localhost + 端口），防 DNS 重绑定。
- * - 写接口校验 Origin（存在时必须是本服务）、Content-Type 与本地令牌（x-joplo-token）。
- * - 服务不写 project.joplo.json（那是 core 的职责），只写 .joplo/selection.json。
+ * - startDev：单进程 Vite 开发服务，提供看板、编译与热更新；选中写入 .joplo/selection.json。
+ * - buildSite：静态发布站（只含选定方案，hash 路由，file:// 可直接打开）。
+ * - renderStep：某个场景某一步之后的截图、元素索引（带 at）与渲染告警。
  */
-export type { RenderOptions, RenderResult, RenderedElement, ServeHandle, ServeOptions } from './types.ts';
-export { startServer } from './serve.ts';
+export type { BuildOptions, BuildResult, DevHandle, DevOptions, RenderOptions, RenderResult, RenderedElement } from './contract.ts';
+export { startDev } from './dev.ts';
+export { buildSite } from './build.ts';
 export { renderStep } from './render.ts';
-export { ensureWebBuild } from './web-build.ts';

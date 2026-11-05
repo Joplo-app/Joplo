@@ -1,21 +1,24 @@
 /**
- * 演示控制器。手动体验、逐步查看、自动播放只通过 @joplo/core 的 applyStep / stateAt 推进状态
- * （PRD 8.4）；本文件只负责动画编排（鼠标、波纹、逐字输入、系统事件停留）和提示。
+ * 演示控制器（看板与发布站共用）。手动体验、逐步查看、自动播放只通过 @joplo/core 的
+ * applyStep / stateAt / explainClick 推进状态；本文件只负责动画编排（鼠标、波纹、逐字输入、系统事件停留）和提示。
  *
  * 不变量：
- * - 业务状态 state 只有三种来源：initialState / stateAt / applyStep。动画中的“示例输入”是 preview，
- *   不写入 state；被取消的动画不会推进状态。
+ * - 业务状态 state 只有三种来源：initialState / stateAt / applyStep（浏览视图的静态画面除外，它不能推进）。
+ *   动画中的“示例输入”是 preview，不写入 state；被取消的动画不会推进状态。
  * - 点击的含义只由 core 的 explainClick 决定。
  * - 时长使用固定逻辑时钟（暂停时不流逝），不依赖网络或随机延迟。
- * - 界面显示的“第 k 步”与上一步/下一步一致：动画进行中（含暂停）显示的是尚未提交的第 k 步，
- *   此时“上一步”取消这一步、回到已提交位置 k-1；“下一步”立即提交这一步，到达位置 k。
- * - .joplo/selection.json 始终反映画板当前的选中（取消选中写 null）；“已写入”只在写接口成功后显示。
+ * - 界面显示的“第 k 步”与上一步/下一步一致：动画进行中（含暂停）显示的是尚未提交的第 k 步。
+ * - 选中：每次写接口返回后，界面显示的选中 = .joplo/selection.json 的内容。写入被拒绝时以服务端返回的
+ *   current（被拒绝时为 null）为准并明确提示；网络失败时回滚到上一次确认的选中。
+ * - 热更新（setProject）保持功能、方案、场景、位置（越界夹到合法范围）、视图与选中。
  */
 import { animate, type AnimationPlaybackControls } from 'motion';
-import { explainClick, applyStep, getScenario, nodeLabel, findNode, replay, stateAt, type PlayState, type Project, type Scenario, type Step } from '@joplo/core';
-import { putSelection, type Selection } from '../api';
+import { explainClick, applyStep, getScenario, nodeLabel, findNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo/core';
+import { browseSceneId, browseState, elementLabel, optionsOf, scenariosOf } from './views';
 
 export type Mode = 'review' | 'demo';
+/** stage = 播放场景；compare = 功能页比较方案；browse = 发布视图按路径浏览。 */
+export type View = 'stage' | 'compare' | 'browse';
 
 export type Notice =
   | { kind: 'disabled'; nodeId: string; text: string }
@@ -28,11 +31,21 @@ export type Notice =
 
 export type SelectionSync = { status: 'idle' | 'pending' | 'ok' } | { status: 'error'; message: string };
 
+/** 浏览器提交给服务端的选中（服务端补全 at / label / route）。 */
+export type SelectionInput = { optionId: string | null; scenarioId: string | null; position: number; sceneId: string; nodeId: string | null; stepId?: string | null };
+export type SelectionWriteResult = { ok: true; selection: Selection | null } | { ok: false; message: string; current?: Selection | null };
+export type SelectionWriter = (input: SelectionInput | null) => Promise<SelectionWriteResult>;
+
 export type Snapshot = {
   project: Project | null;
-  revision: number | null;
+  version: number | null;
+  home: string | null;
+  featureId: string | null;
   optionId: string | null;
   scenarioId: string | null;
+  view: View;
+  /** 浏览视图的画面（`@<路径>`）。 */
+  browseSceneId: string | null;
   state: PlayState | null;
   mode: Mode;
   playing: boolean;
@@ -45,12 +58,11 @@ export type Snapshot = {
   systemEvent: string | null;
   notice: Notice | null;
   selection: Selection | null;
-  /** 回放失败（项目被改坏等）时的说明。 */
+  /** 回放失败时的说明。 */
   playbackError: string | null;
   cursorVisible: boolean;
-  /** 选中写回 .joplo/selection.json 的状态。 */
   selectionSync: SelectionSync;
-  /** 状态被“跳转”（重置、上一步、切换场景/方案）时递增：舞台据此直接移除旧 Toast，不播放退出动画。 */
+  /** 状态被“跳转”时递增：舞台据此直接移除旧 Toast，不播放退出动画。 */
   epoch: number;
 };
 
@@ -58,7 +70,7 @@ export const TIMING = {
   cursorMove: 0.55, // 秒（Motion）
   ripple: 260,
   typeChar: 45,
-  selectHold: 360,
+  selectHold: 420,
   toggleHold: 200,
   systemHold: 900,
   afterStep: 300,
@@ -71,9 +83,13 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export class DemoController {
   private snap: Snapshot = {
     project: null,
-    revision: null,
+    version: null,
+    home: null,
+    featureId: null,
     optionId: null,
     scenarioId: null,
+    view: 'stage',
+    browseSceneId: null,
     state: null,
     mode: 'demo',
     playing: false,
@@ -103,7 +119,11 @@ export class DemoController {
   private rippleKey = 0;
   private syncSeq = 0;
   private syncChain: Promise<void> = Promise.resolve();
+  /** 最近一次服务端确认的选中（写入失败时回滚到它）。 */
+  private confirmed: Selection | null = null;
   reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
+  constructor(private readonly writer: SelectionWriter | null = null) {}
 
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
@@ -115,8 +135,19 @@ export class DemoController {
     this.snap = { ...this.snap, ...patch };
     if (typeof window !== 'undefined') {
       const w = window as unknown as Record<string, unknown>;
-      w.__JOPLO_STATE__ = this.snap.state;
-      w.__JOPLO_UI__ = { playing: this.snap.playing, paused: this.snap.paused, busy: this.snap.busy, mode: this.snap.mode, scenarioId: this.snap.scenarioId, activeStep: this.snap.activeStep };
+      w.__JOPLO_STATE__ = this.snap.view === 'stage' ? this.snap.state : null;
+      w.__JOPLO_UI__ = {
+        playing: this.snap.playing,
+        paused: this.snap.paused,
+        busy: this.snap.busy,
+        mode: this.snap.mode,
+        view: this.snap.view,
+        featureId: this.snap.featureId,
+        optionId: this.snap.optionId,
+        scenarioId: this.snap.scenarioId,
+        activeStep: this.snap.activeStep,
+        version: this.snap.version,
+      };
     }
     for (const l of this.listeners) l();
   }
@@ -135,39 +166,66 @@ export class DemoController {
     const { project, scenarioId } = this.snap;
     return project && scenarioId ? (project.scenarios[scenarioId] ?? null) : null;
   }
-  scenariosOf(optionId: string | null): Scenario[] {
-    const p = this.snap.project;
-    if (!p || !optionId) return [];
-    return Object.values(p.scenarios).filter((s) => s.optionId === optionId);
-  }
   /** 当前位置的下一步（尚未执行）。 */
   nextStep(): Step | null {
     const sc = this.scenario();
     const st = this.snap.state;
-    if (!sc || !st || st.completed) return null;
+    if (this.snap.view !== 'stage' || !sc || !st || st.completed) return null;
     return sc.steps[st.position] ?? null;
   }
 
-  // ---------- 项目加载与刷新 ----------
-  /** 载入（或刷新）项目：场景与位置仍有效时保持，越界夹到合法范围；选中保留。 */
-  setProject(project: Project, revision: number) {
+  // ---------- 项目加载与热更新 ----------
+  /** 载入（或热更新）项目：保持功能、方案、场景、位置（越界夹到合法范围）、视图与选中。 */
+  setProject(project: Project, version: number, home: string | null = null) {
     this.stop();
     const prev = this.snap;
-    const options = Object.values(project.options).filter((o) => !o.archived);
-    let optionId = prev.optionId && project.options[prev.optionId] ? prev.optionId : (options[0]?.id ?? null);
-    let scenarioId = prev.scenarioId && project.scenarios[prev.scenarioId] ? prev.scenarioId : null;
-    if (scenarioId) optionId = project.scenarios[scenarioId]!.optionId;
-    if (!scenarioId && optionId) scenarioId = Object.values(project.scenarios).find((s) => s.optionId === optionId)?.id ?? null;
+    const features = Object.keys(project.features).sort();
+    let featureId = prev.featureId && project.features[prev.featureId] ? prev.featureId : null;
+    let optionId = prev.optionId && project.options[prev.optionId] ? prev.optionId : null;
+    if (optionId && featureId && project.options[optionId]!.featureId !== featureId) optionId = null;
+    if (!featureId) featureId = optionId ? project.options[optionId]!.featureId : (features.find((f) => optionsOf(project, f).length > 0) ?? features[0] ?? null);
+    if (!optionId && featureId) {
+      const f = project.features[featureId]!;
+      optionId = f.pick && project.options[f.pick] ? f.pick : (optionsOf(project, featureId)[0]?.id ?? null);
+    }
+    let scenarioId = prev.scenarioId && project.scenarios[prev.scenarioId]?.optionId === optionId ? prev.scenarioId : null;
+    if (!scenarioId && optionId) scenarioId = scenariosOf(project, optionId)[0]?.id ?? null;
+
+    const homeRoute = home && project.routes[home] ? home : (Object.keys(project.routes).sort()[0] ?? null);
+    let browse = prev.browseSceneId && project.scenes[prev.browseSceneId] ? prev.browseSceneId : null;
+    if (!browse && homeRoute) browse = browseSceneId(project, homeRoute);
+    let view: View = prev.version === null ? 'stage' : prev.view;
+    if (view === 'stage' && !scenarioId) view = 'browse';
+
     let state: PlayState | null = null;
     let playbackError: string | null = null;
-    if (scenarioId) {
+    if (view === 'browse' && browse) state = browseState(project, browse);
+    else if (scenarioId) {
       const sc = project.scenarios[scenarioId]!;
-      const want = Math.max(0, Math.min(prev.scenarioId === scenarioId && prev.state ? prev.state.position : 0, sc.steps.length));
+      const want = Math.max(0, Math.min(prev.scenarioId === scenarioId && prev.state && prev.view === 'stage' ? prev.state.position : 0, sc.steps.length));
       const r = this.safeStateAt(project, scenarioId, want);
       state = r.state;
       playbackError = r.error;
     }
-    this.set({ project, revision, optionId, scenarioId, state, playbackError, preview: null, ripple: null, systemEvent: null, activeStep: null });
+    this.set({ project, version, home: homeRoute, featureId, optionId, scenarioId, view, browseSceneId: browse, state, playbackError, preview: null, ripple: null, systemEvent: null, activeStep: null });
+    this.revalidateSelection();
+  }
+
+  /** 热更新后：选中的元素仍在当前画面则保留（位置变化时重新写入）；否则取消选中并说明。 */
+  private revalidateSelection() {
+    const sel = this.snap.selection;
+    const p = this.snap.project;
+    const st = this.snap.state;
+    if (!sel || !p || !st) return;
+    const scene = p.scenes[st.sceneId];
+    const hit = sel.nodeId && scene && sel.sceneId === st.sceneId ? findNode(scene, sel.nodeId) : null;
+    const stepOk = !sel.nodeId && sel.stepId && sel.scenarioId && p.scenarios[sel.scenarioId]?.steps.some((s) => s.id === sel.stepId);
+    if (hit || stepOk) {
+      const at = hit ? (hit.node.source ?? null) : (p.scenarios[sel.scenarioId!]!.steps.find((s) => s.id === sel.stepId)?.source ?? null);
+      if (at !== sel.at || (hit && scene && elementLabel(scene, hit.node) !== sel.label)) void this.writeSelection(this.inputOf(sel), '选中元素的位置已更新', '选中未能同步给 Agent');
+      return;
+    }
+    void this.writeSelection(null, '选中的元素已不在当前画面中，已取消选中', '取消选中未能同步给 Agent', true);
   }
 
   private safeStateAt(project: Project, scenarioId: string, position: number): { state: PlayState | null; error: string | null } {
@@ -184,31 +242,83 @@ export class DemoController {
     }
   }
 
-  // ---------- 模式、方案、场景 ----------
+  // ---------- 模式、视图、功能、方案、场景 ----------
   setMode(mode: Mode) {
     if (mode === this.snap.mode) return;
     this.stop();
-    this.set({ mode, notice: { kind: 'info', text: mode === 'review' ? '已切换到审阅模式：点击元素只选中，不触发演示' : '已切换到演示模式：点击会执行原型交互' } });
+    this.set({ mode, notice: { kind: 'info', text: mode === 'review' ? '审阅模式：点击元素只选中，不触发演示' : '演示模式：点击会执行原型交互' } });
     this.autoClear();
   }
 
-  setOption(optionId: string) {
+  setView(view: View) {
+    const p = this.snap.project;
+    if (!p || view === this.snap.view) return;
+    this.stop();
+    if (view === 'browse') {
+      const id = this.snap.browseSceneId ?? (this.snap.home ? browseSceneId(p, this.snap.home) : null);
+      if (!id) return this.info('项目还没有任何路径');
+      this.set({ view, browseSceneId: id, state: browseState(p, id), playbackError: null, epoch: this.snap.epoch + 1 });
+    } else if (view === 'stage') {
+      const sc = this.scenario();
+      if (!sc) return this.info('这个方案还没有演示场景');
+      const r = this.safeStateAt(p, sc.id, 0);
+      this.set({ view, state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1 });
+    } else this.set({ view });
+  }
+
+  /** 浏览某个路径（发布视图 `@<路径>`）。 */
+  browse(route: string) {
+    const p = this.snap.project;
+    if (!p) return;
+    const id = browseSceneId(p, route);
+    if (!id) return this.info(`路径 ${route} 没有可浏览的画面`);
+    this.stop();
+    this.set({ view: 'browse', browseSceneId: id, state: browseState(p, id), playbackError: null, epoch: this.snap.epoch + 1, notice: null });
+  }
+
+  setFeature(featureId: string) {
+    const p = this.snap.project;
+    if (!p || !p.features[featureId]) return;
+    const f = p.features[featureId]!;
+    const opt = f.pick && p.options[f.pick] ? f.pick : (optionsOf(p, featureId)[0]?.id ?? null);
+    this.stop();
+    this.set({ featureId });
+    if (opt) this.setOption(opt);
+    else this.set({ optionId: null, scenarioId: null, view: this.snap.view === 'stage' ? 'compare' : this.snap.view });
+  }
+
+  setOption(optionId: string, view: View = this.snap.view === 'compare' ? 'compare' : 'stage') {
     const p = this.snap.project;
     if (!p || !p.options[optionId]) return;
     this.stop();
-    const first = this.scenariosOf(optionId)[0] ?? null;
-    const state = first ? this.safeStateAt(p, first.id, 0) : { state: null, error: null };
-    this.set({ optionId, scenarioId: first?.id ?? null, state: state.state, playbackError: state.error, epoch: this.snap.epoch + 1, notice: { kind: 'switched', text: `已切换到方案「${p.options[optionId]!.name}」` } });
+    const first = scenariosOf(p, optionId)[0] ?? null;
+    const st = first ? this.safeStateAt(p, first.id, 0) : { state: null, error: null };
+    const featureId = p.options[optionId]!.featureId;
+    if (view === 'stage' && !first) {
+      this.set({ featureId, optionId, scenarioId: null, view: 'compare', notice: { kind: 'info', text: `方案「${p.options[optionId]!.name}」还没有演示场景` } });
+      return this.autoClear();
+    }
+    this.set({
+      featureId,
+      optionId,
+      scenarioId: first?.id ?? null,
+      view,
+      state: view === 'stage' ? st.state : this.snap.state,
+      playbackError: view === 'stage' ? st.error : this.snap.playbackError,
+      epoch: this.snap.epoch + 1,
+      notice: { kind: 'switched', text: `已切换到方案「${p.options[optionId]!.name}」` },
+    });
     this.autoClear();
   }
 
-  setScenario(scenarioId: string) {
+  setScenario(scenarioId: string, position = 0) {
     const p = this.snap.project;
     if (!p || !p.scenarios[scenarioId]) return;
     this.stop();
-    const r = this.safeStateAt(p, scenarioId, 0);
     const sc = p.scenarios[scenarioId]!;
-    this.set({ scenarioId, optionId: sc.optionId, state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: { kind: 'switched', text: `已切换到「${sc.name}」，数据已重置` } });
+    const r = this.safeStateAt(p, scenarioId, Math.max(0, Math.min(position, sc.steps.length)));
+    const featureId = p.options[sc.optionId]?.featureId ?? this.snap.featureId;
+    this.set({ featureId, scenarioId, optionId: sc.optionId, view: 'stage', state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: { kind: 'switched', text: `已切换到「${sc.name}」，数据已重置` } });
     this.autoClear();
   }
 
@@ -219,7 +329,7 @@ export class DemoController {
 
   prev() {
     const st = this.snap.state;
-    if (!st) return;
+    if (!st || this.snap.view !== 'stage') return;
     if (this.inflight) {
       // 界面正显示尚未提交的第 k 步（position = k-1）：取消它即回到第 k-1 步，字幕同步回退。
       this.stop();
@@ -234,7 +344,7 @@ export class DemoController {
   goto(position: number, message?: string) {
     const p = this.snap.project;
     const sc = this.scenario();
-    if (!p || !sc) return;
+    if (!p || !sc || this.snap.view !== 'stage') return;
     this.stop();
     const r = this.safeStateAt(p, sc.id, Math.max(0, Math.min(position, sc.steps.length)));
     this.set({ state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: message ? { kind: 'info', text: message } : null });
@@ -244,7 +354,7 @@ export class DemoController {
   async next() {
     const sc = this.scenario();
     const st = this.snap.state;
-    if (!sc || !st) return;
+    if (!sc || !st || this.snap.view !== 'stage') return;
     if (this.inflight) {
       // 正在播放某一步的动画：立即完成这一步。
       this.finishInflight(sc);
@@ -268,7 +378,7 @@ export class DemoController {
   async play() {
     const p = this.snap.project;
     const sc = this.scenario();
-    if (!p || !sc || !this.snap.state) return;
+    if (!p || !sc || !this.snap.state || this.snap.view !== 'stage') return;
     this.stop();
     if (sc.steps.length === 0) return this.info('这个场景没有步骤：只展示初始状态');
     if (this.snap.state.completed || this.snap.state.position >= sc.steps.length) {
@@ -316,9 +426,10 @@ export class DemoController {
   async clickNode(nodeId: string, point: { x: number; y: number }) {
     const p = this.snap.project;
     const st = this.snap.state;
-    const sc = this.scenario();
-    if (!p || !st || !sc) return;
+    if (!p || !st) return;
     if (this.snap.mode === 'review') return this.select(nodeId);
+    const sc = this.scenario();
+    if (this.snap.view !== 'stage' || !sc) return this.info('浏览视图只展示整体布局；要体验交互，请在顶栏选择功能场景');
 
     if (this.snap.playing && !this.snap.paused) return this.info('正在自动播放：先暂停，再手动操作');
     if (this.snap.playing) this.stop(); // 暂停中手动接管
@@ -380,52 +491,103 @@ export class DemoController {
   }
 
   // ---------- 审阅：选中 ----------
-  async select(nodeId: string | null, stepId?: string | null) {
+  /** 当前画面上下文中的选中请求。 */
+  private currentInput(nodeId: string | null, stepId?: string | null): SelectionInput | null {
     const p = this.snap.project;
     const st = this.snap.state;
-    const sc = this.scenario();
-    if (!p || !st || !sc) return;
-    const sel: Selection = {
-      optionId: sc.optionId,
-      scenarioId: sc.id,
-      position: st.position,
-      stepId: stepId !== undefined ? stepId : (sc.steps[st.position - 1]?.id ?? null),
-      sceneId: st.sceneId,
-      nodeId,
-      at: new Date().toISOString(),
+    if (!p || !st) return null;
+    if (this.snap.view === 'stage') {
+      const sc = this.scenario();
+      if (!sc) return null;
+      return { optionId: sc.optionId, scenarioId: sc.id, position: st.position, sceneId: st.sceneId, nodeId, ...(stepId ? { stepId } : {}) };
+    }
+    return { optionId: p.scenes[st.sceneId]?.optionId ?? null, scenarioId: null, position: 0, sceneId: st.sceneId, nodeId };
+  }
+
+  private inputOf(sel: Selection): SelectionInput {
+    return { optionId: sel.optionId, scenarioId: sel.scenarioId, position: sel.position, sceneId: sel.sceneId, nodeId: sel.nodeId, ...(sel.nodeId ? {} : { stepId: sel.stepId }) };
+  }
+
+  /** 界面立即显示的选中（服务端确认后以服务端结果为准）。 */
+  private localSelection(input: SelectionInput): Selection | null {
+    const p = this.snap.project;
+    if (!p) return null;
+    const scene = p.scenes[input.sceneId];
+    const hit = input.nodeId && scene ? findNode(scene, input.nodeId) : null;
+    const step = !input.nodeId && input.stepId && input.scenarioId ? p.scenarios[input.scenarioId]?.steps.find((s) => s.id === input.stepId) : undefined;
+    if (!hit && !step) return null;
+    return {
+      featureId: input.optionId ? (p.options[input.optionId]?.featureId ?? null) : null,
+      optionId: input.optionId,
+      scenarioId: input.scenarioId,
+      position: input.position,
+      stepId: input.stepId ?? (input.scenarioId ? (p.scenarios[input.scenarioId]?.steps[input.position - 1]?.id ?? null) : null),
+      sceneId: input.sceneId,
+      route: scene?.route ?? '',
+      nodeId: input.nodeId,
+      at: hit ? (hit.node.source ?? null) : (step?.source ?? null),
+      label: hit && scene ? elementLabel(scene, hit.node) : (step?.caption ?? null),
+      selectedAt: new Date().toISOString(),
     };
-    const scene = p.scenes[st.sceneId];
-    const hit = nodeId && scene ? findNode(scene, nodeId) : null;
-    const what = hit ? `「${nodeLabel(hit.node)}」` : stepId ? `步骤 ${stepId}` : '';
-    this.set({ selection: sel, notice: { kind: 'selected', text: `已选中${what}，正在同步给 Agent…` } });
-    await this.syncSelection(sel, `已选中${what}，可以在 Agent 会话里说要改什么`, '选中未能同步给 Agent');
+  }
+
+  async select(nodeId: string | null, stepId?: string | null) {
+    const input = this.currentInput(nodeId, stepId);
+    if (!input) return;
+    const local = this.localSelection(input);
+    if (!local) return;
+    const what = local.label ? `「${local.label}」` : '';
+    await this.writeSelection(input, `已选中${what}，可以在 Agent 会话里说要改什么`, '选中未能同步给 Agent');
   }
 
   /** 取消选中，并同步给 Agent（selection.json 写为 null）。 */
   async clearSelection() {
-    this.set({ selection: null });
-    await this.syncSelection(null, '已取消选中，已同步给 Agent', '取消选中未能同步给 Agent');
+    await this.writeSelection(null, '已取消选中，已同步给 Agent', '取消选中未能同步给 Agent');
   }
 
-  /** 串行写回选中；只有最后一次请求的结果会反映到界面上。 */
-  private syncSelection(sel: Selection | null, okText: string, failText: string): Promise<void> {
+  /**
+   * 串行写回选中；只有最后一次请求的结果会反映到界面上。
+   * 不变量：返回后界面选中 = 文件内容。被拒绝时以服务端返回的 current 为准；网络失败回滚到上次确认的选中。
+   */
+  private writeSelection(input: SelectionInput | null, okText: string, failText: string, quietOk = false): Promise<void> {
     const seq = ++this.syncSeq;
-    this.set({ selectionSync: { status: 'pending' } });
+    const optimistic = input ? this.localSelection(input) : null;
+    this.set({ selection: optimistic, selectionSync: { status: 'pending' } });
+    const writer = this.writer;
     this.syncChain = this.syncChain.then(async () => {
-      const r = await putSelection(sel);
+      const r: SelectionWriteResult = writer ? await writer(input).catch((e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) })) : { ok: false, message: '当前页面不能写入选中（只读）' };
+      if (r.ok) this.confirmed = r.selection;
+      else if (r.current !== undefined) this.confirmed = r.current;
       if (seq !== this.syncSeq) return;
       if (r.ok) {
-        this.set({ selectionSync: { status: 'ok' }, notice: { kind: 'selected', text: okText } });
-        this.autoClear(5000);
-      } else this.set({ selectionSync: { status: 'error', message: r.message }, notice: { kind: 'error', text: `${failText}：${r.message}` } });
+        this.set({ selection: r.selection, selectionSync: { status: 'ok' }, notice: { kind: 'selected', text: okText } });
+        this.autoClear(quietOk ? 3000 : 5000);
+      } else {
+        const rolledBack = this.confirmed;
+        const tail = rolledBack ? `，仍保持上一次的选中「${rolledBack.label ?? rolledBack.nodeId ?? ''}」` : '，已取消选中';
+        this.set({ selection: rolledBack, selectionSync: { status: 'error', message: r.message }, notice: { kind: 'error', text: `${failText}：${r.message}${tail}` } });
+      }
     });
     return this.syncChain;
+  }
+
+  /** 页面载入时恢复文件里的选中（与当前项目不符时清除）。 */
+  async restoreSelection(sel: Selection | null) {
+    const p = this.snap.project;
+    if (!sel || !p) return;
+    if (sel.scenarioId && p.scenarios[sel.scenarioId]) this.setScenario(sel.scenarioId, sel.position);
+    else if (!sel.scenarioId && p.scenes[sel.sceneId]) {
+      this.stop();
+      this.set({ view: 'browse', browseSceneId: sel.sceneId, state: browseState(p, sel.sceneId), epoch: this.snap.epoch + 1 });
+    }
+    this.set({ notice: null });
+    await this.writeSelection(this.inputOf(sel), '已恢复上次的选中', '上次的选中已失效', true);
   }
 
   /** 点击步骤芯片：跳到该步骤执行之后；审阅模式下同时选中该步骤。 */
   clickStepChip(index: number) {
     const sc = this.scenario();
-    if (!sc) return;
+    if (!sc || this.snap.view !== 'stage') return;
     this.goto(index + 1);
     if (this.snap.mode === 'review' && index >= 0) void this.select(null, sc.steps[index]?.id ?? null);
   }

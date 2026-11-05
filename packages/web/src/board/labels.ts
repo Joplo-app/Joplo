@@ -1,4 +1,4 @@
-/** 界面上的中文标签与芯片样式。 */
+/** 看板（创作侧）专用的中文标签与芯片样式。不进入发布站。 */
 import type { Coverage, Rule } from '@joplo/core';
 
 export const COVERAGE_LABEL: Record<Coverage['status'], { text: string; cls: string; hint: string }> = {
@@ -24,17 +24,6 @@ export const CONFIRM_LABEL: Record<Rule['confirmation'], { text: string; cls: st
   out_of_scope: { text: '不在范围', cls: 'border-[#9a9a9a] bg-white text-[#6b6b6b]' },
 };
 
-export const OUTCOME_LABEL: Record<'success' | 'failure' | 'cancelled', string> = { success: '成功', failure: '失败', cancelled: '已取消' };
-
-export const MOCK_CLS: Record<'success' | 'failure' | 'denied' | 'other', string> = {
-  success: 'border-[#2b8a3e] text-[#2b8a3e] bg-[#effaf1]',
-  failure: 'border-[#c92a2a] text-[#c92a2a] bg-[#fff0f0]',
-  denied: 'border-[#5a5a5a] text-[#3a3a3a] bg-[#f4f4f4]',
-  other: 'border-[#5a5a5a] text-[#3a3a3a] bg-[#f4f4f4]',
-};
-
-export const ACTION_LABEL: Record<string, string> = { click: '点击', type: '输入', select: '选择', toggle: '切换', back: '返回', event: '系统事件' };
-
 export const DIMENSION_LABEL: Record<string, string> = {
   main: '主流程',
   input: '输入',
@@ -48,37 +37,34 @@ export const DIMENSION_LABEL: Record<string, string> = {
 
 export const SEVERITY_LABEL: Record<string, string> = { blocker: '阻断', major: '重要', minor: '次要' };
 
-export const TYPE_LABEL: Record<string, string> = {
-  Page: '页面',
-  Header: '标题栏',
-  Sidebar: '侧边导航',
-  Stack: '布局',
-  Card: '卡片',
-  Section: '区块',
-  Tabs: '标签页',
-  Divider: '分隔线',
-  Heading: '标题',
-  Text: '文本',
-  Image: '占位图',
-  List: '列表',
-  Table: '表格',
-  Badge: '标签',
-  Avatar: '头像',
+/** 检查器里的类型名：shadcn 名称原样显示，附中文说明。 */
+const TYPE_ZH: Record<string, string> = {
   Button: '按钮',
-  Link: '链接',
   Input: '输入框',
   Textarea: '文本域',
   Select: '选择器',
   Checkbox: '复选框',
-  Radio: '单选',
+  RadioGroup: '单选组',
   Switch: '开关',
+  Tabs: '标签页',
+  TabsTrigger: '标签',
+  SidebarMenuButton: '导航项',
+  Link: '链接',
+  a: '链接',
   Dialog: '弹窗',
+  Sheet: '侧滑面板',
+  AlertDialog: '确认弹窗',
   Alert: '行内提示',
-  Spinner: '加载状态',
-  EmptyState: '空状态',
-  Progress: '进度条',
-  ChatMessage: '对话消息',
-  ToolCall: '工具调用',
-  PromptInput: '提示词输入',
+  Card: '卡片',
+  DataTable: '数据表',
+  Table: '表格',
+  Label: '标签文字',
+  Badge: '徽标',
+  Loader: '加载状态',
+  Placeholder: '占位',
   Custom: '自定义组件',
+  PromptInputTextarea: '提示词输入',
+  PromptInputSubmit: '发送按钮',
+  '#text': '文本',
 };
+export const typeLabel = (t: string) => (TYPE_ZH[t] ? `${t}（${TYPE_ZH[t]}）` : t);
