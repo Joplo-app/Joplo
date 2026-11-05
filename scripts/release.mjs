@@ -397,6 +397,39 @@ async function smoke() {
   }
 }
 
+// ---------------------------------------------------------------- publish
+
+/** registry 上是否已有这个版本（直接查 registry，绕过本地缓存）。网络错误时直接失败，不猜。 */
+async function isPublished(name, version) {
+  const url = `https://registry.npmjs.org/${name.replace('/', '%2f')}?t=${Date.now()}`;
+  const res = await fetch(url, { headers: { 'cache-control': 'no-cache', accept: 'application/json' } });
+  if (res.status === 404) return false;
+  if (!res.ok) die(`查询 ${name} 失败：HTTP ${res.status}`);
+  const doc = await res.json();
+  return Boolean(doc.versions?.[version]);
+}
+
+/**
+ * 可续跑的发布：按依赖顺序（PACKAGES）逐个检查，只发布 registry 上还没有的版本。
+ * 中途失败后重新运行同一条命令即可从断点继续。dist-tag 用 --tag（默认 beta）。
+ */
+async function publish(tag) {
+  const pkgs = PACKAGES.map((p) => ({ dir: path.join(REPO, 'packages', p), pkg: readJson(path.join(REPO, 'packages', p, 'package.json')) }));
+  const versions = new Set(pkgs.map((p) => p.pkg.version));
+  if (versions.size !== 1) die(`各包版本不一致：${[...versions].join('、')}；先运行 release:version`);
+  let published = 0;
+  for (const { dir, pkg } of pkgs) {
+    if (await isPublished(pkg.name, pkg.version)) {
+      log(`跳过 ${pkg.name}@${pkg.version}：registry 上已存在`);
+      continue;
+    }
+    log(`发布 ${pkg.name}@${pkg.version}（--tag ${tag}）`);
+    run('pnpm', ['publish', '--access', 'public', '--tag', tag], { cwd: dir });
+    published++;
+  }
+  log(published ? `✓ 本次发布 ${published} 个包` : '✓ 所有包都已在 registry 上，无需发布');
+}
+
 // ---------------------------------------------------------------- main
 
 const cmd = args.shift();
@@ -405,4 +438,5 @@ if (cmd === 'version') {
   version(root, args[0]);
 } else if (cmd === 'pack') pack();
 else if (cmd === 'smoke') await smoke();
-else die('用法：node scripts/release.mjs version <版本> | pack | smoke [--keep]');
+else if (cmd === 'publish') await publish(flag('--tag') ?? 'beta');
+else die('用法：node scripts/release.mjs version <版本> | pack | smoke [--keep] | publish [--tag beta]');

@@ -18,7 +18,7 @@
     "release:version": "node scripts/release.mjs version",
     "release:pack": "node scripts/release.mjs pack",
     "release:smoke": "node scripts/release.mjs smoke",
-    "release:publish": "pnpm -r publish --access public --tag beta"
+    "release:publish": "node scripts/release.mjs publish"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
