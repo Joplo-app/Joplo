@@ -23,6 +23,34 @@ async function launch(): Promise<Browser> {
   }
 }
 
+/** 解析符号链接后的绝对路径；不存在的部分按原样拼接（以最近的已存在祖先为基准）。 */
+function realish(p: string): string {
+  const abs = path.resolve(p);
+  const rest: string[] = [];
+  let cur = abs;
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync(cur), ...rest);
+    } catch {
+      const parent = path.dirname(cur);
+      if (parent === cur) return abs;
+      rest.unshift(path.basename(cur));
+      cur = parent;
+    }
+  }
+}
+
+/** 截图不得写到项目数据上：project.joplo.json 与 .joplo/（即使传了 overwrite）。 */
+function assertNotProjectData(projectDir: string, out: string) {
+  const fold = (p: string) => (process.platform === 'darwin' || process.platform === 'win32' ? p.toLowerCase() : p);
+  const o = fold(realish(out));
+  const dir = fold(realish(projectDir));
+  const projectFile = path.join(dir, 'project.joplo.json');
+  const dataDir = path.join(dir, '.joplo');
+  if (o === projectFile || o === dataDir || o.startsWith(dataDir + path.sep))
+    throw new JoploError('USAGE', `不能写入项目数据：${out}（project.joplo.json 与 .joplo/ 由 Joplo 管理）`);
+}
+
 type PageReport = { elements: RenderedElement[]; warnings: string[] };
 
 export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
@@ -39,6 +67,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
   const theme = opts.theme ?? 'sketch';
 
   const out = path.resolve(opts.out);
+  assertNotProjectData(projectDir, out);
   if (fs.existsSync(out) && !opts.overwrite) throw new JoploError('USAGE', `目标文件已存在：${out}。如需覆盖请传 overwrite: true（CLI：--overwrite）`);
   fs.mkdirSync(path.dirname(out), { recursive: true });
 
@@ -47,7 +76,8 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
   const stage = STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];
   const viewport = opts.viewport ?? stage;
 
-  const server = await startServer({ projectDir, port: 0, log: () => undefined });
+  // 页面读取的是同一份已解析的项目快照：元素索引、告警与截图来自同一次读取（无 TOCTOU）
+  const server = await startServer({ projectDir, port: 0, log: () => undefined, projectSnapshot: project });
   let browser: Browser | null = null;
   try {
     browser = await launch();
@@ -82,7 +112,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     // 对照播放器：下一步目标必须可见（热点与元素位置匹配）
     const warnings = [...report.warnings];
     if (nextTargetId && findNode(scene, nextTargetId) && !elements.find((e) => e.id === nextTargetId && e.visible)) warnings.push(`下一步操作的目标 ${nextTargetId} 没有显示在画面中`);
-    return { path: out, sceneId: state.sceneId, position, elements, warnings };
+    return { path: out, sceneId: state.sceneId, position, elements, warnings, scale: opts.scale ?? 1 };
   } finally {
     await browser?.close().catch(() => undefined);
     await server.close();

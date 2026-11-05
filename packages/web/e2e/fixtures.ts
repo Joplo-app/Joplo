@@ -61,3 +61,20 @@ export async function demoClick(page: Page, id: string) {
   await node(page, id).click();
   await waitIdle(page);
 }
+
+/** 用真实鼠标按元素中心坐标点击（不经 Playwright 的可操作性检查，等同用户点击禁用按钮）。 */
+export async function mouseClickNode(page: Page, id: string) {
+  const box = await node(page, id).boundingBox();
+  if (!box) throw new Error(`元素 ${id} 不可见`);
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+/** 步骤栏显示的“第 k / n 步”中的 k。 */
+export async function shownStep(page: Page): Promise<number> {
+  const t = await page.getByTestId('caption').innerText();
+  const m = /第\s*(\d+)\s*\/\s*\d+\s*步/.exec(t);
+  if (!m) throw new Error(`字幕中没有步数：${t}`);
+  return Number(m[1]);
+}
+
+export const toastCount = (page: Page) => page.evaluate(() => document.querySelectorAll('[data-jtoast]').length);

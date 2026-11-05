@@ -12,8 +12,9 @@ pnpm web:serve path/to/project --port 4800 --open
 
 - 服务启动时会检查 `packages/web/dist`。产物缺失、或比 `packages/web/src` / `packages/core/src` 旧时，自动执行 `vite build`（约 1 秒）。构建失败会给出明确报错和手动命令 `pnpm --filter @joplo/web build`。
 - CLI（`joplo serve`、`joplo render`）直接调用 `@joplo/server` 导出的 `startServer` / `renderStep`，签名与脚手架桩保持兼容，只追加了可选字段：
-  - `ServeOptions`：`skipBuild`、`log`；
-  - `RenderOptions`：`overwrite`、`scale`。
+  - `ServeOptions`：`skipBuild`、`log`、`projectSnapshot`（固定返回给定项目，renderStep 内部使用）；
+  - `RenderOptions`：`overwrite`、`scale`；
+  - `RenderResult`：`scale`。`elements[].box` 始终是相对舞台左上角的 CSS 像素，截图像素 = CSS 像素 × `scale`。
 - 开发界面时可用 `pnpm web:dev`。Vite 会把 `/api` 代理到 `JOPLO_API`（缺省 `http://127.0.0.1:4790`）。dev 页面拿不到本地令牌，所以“选中”无法写回，会显示提示。
 
 ## 界面与交互
@@ -40,6 +41,9 @@ pnpm web:serve path/to/project --port 4800 --open
 
 `stepId` 是产生当前画面的步骤（`steps[position-1]`），初始状态为 `null`。它与 `renderStep({ stepId })` 的语义一致，Agent 可以据此复现用户看到的画面。
 
+- `.joplo/selection.json` 始终反映画板当前的选中：点检查器的“取消选中”后，文件内容为 `null`（`PUT /api/selection` 的请求体为 `null`）。CLI 读取时要处理 `null` 和文件不存在两种情况。
+- 写回是串行的，只有最后一次请求的结果会显示。检查器里的“选中已写入 .joplo/selection.json”只在写接口成功后出现；失败时显示原因（例如项目已变、选中与当前修订不符）。
+
 **演示模式**
 
 点击的含义完全由 core 的 `explainClick` 决定：
@@ -58,13 +62,20 @@ pnpm web:serve path/to/project --port 4800 --open
 
 **快捷键**：`←` / `→` 逐步，空格键播放或暂停（焦点在舞台内时不生效）。
 
-**状态来源唯一**：手动、逐步、自动三种方式都只通过 `initialState` / `stateAt` / `applyStep` 推进（`runtime/demo.ts` 中只有 `commit()` 一处调用 `applyStep`）。“上一步”使用 `stateAt(position-1)`。动画被取消时不会推进状态；动画还没结束时如果再次操作，会先把那一步提交完。
+**状态来源唯一**：手动、逐步、自动三种方式都只通过 `initialState` / `stateAt` / `applyStep` 推进（`runtime/demo.ts` 中只有 `commit()` 一处调用 `applyStep`）。“上一步”使用 `stateAt(position-1)`。动画被取消时不会推进状态。
+
+**步数显示一致**：某一步的动画进行中（包括自动播放暂停在这一步中途），步骤栏显示的是这一步“第 k 步”，此时它还没提交（位置为 k-1）：
+- “上一步”取消这一步的动画，回到第 k-1 步，字幕同步回退；
+- “下一步”或在画面上点击，会立即提交这一步，到达第 k 步。
+
+推进步骤、重置、切换场景时，就地提示气泡会关闭。重置、上一步、切换场景时，旧 Toast 直接从 DOM 移除，不播放退出动画。
 
 **切换场景**会重置到该场景的初始数据，并提示“已切换到「X」，数据已重置”。
 
 **实时刷新**
 
-- 收到 SSE 推送的修订后重新拉取项目。场景仍然存在时保留场景和位置，越界时夹到合法范围；选中保留，元素不存在时检查器会说明。
+- 收到 SSE 推送的修订后重新拉取项目。每次拉取都有序号，晚到的旧响应直接丢弃，界面上的修订号不会倒退。场景仍然存在时保留场景和位置，越界时夹到合法范围；选中保留，元素不存在时检查器会说明。
+- SSE 事件里带的 `error`（服务端发现文件不合法）会立即显示在错误横幅里，随后的拉取会补上具体的 schema 问题。
 - 项目文件不合法时，显示红色横幅和前 5 条 schema 问题，同时继续显示上一个有效修订，不会白屏。
 - 回放失败时显示橙色横幅，并停在能到达的最后位置。
 
@@ -88,14 +99,16 @@ pnpm web:serve path/to/project --port 4800 --open
   1. 用 `positionAfterStep` 换算位置，用 `stateAt` 校验回放；
   2. 在临时端口启动服务，用 Playwright chromium 截取 `[data-joplo-stage]`；chromium 不可用时退回系统 Chrome；
   3. 返回元素索引：DOM 中的元素都有 box；场景树中没有渲染的节点也会列出，`visible: false`。
+  4. 页面读取的是 renderStep 已解析的同一份项目快照，元素索引、告警与截图来自同一次读取。
 - 渲染告警：
   - 可见的可交互元素中心点被其他元素覆盖（弹窗遮罩覆盖背景属于预期层次，不报）；
   - 超出画框；
+  - 不在视口内：传入的 `viewport` 小于舞台时，视口外的元素汇总成一条告警，不报遮挡；
   - 标签文字溢出（`scrollWidth > clientWidth`）；
-  - Toast 与下一步目标重叠；
+  - Toast（`pointer-events:none`，`elementFromPoint` 看不到）按几何相交检测：覆盖下一步目标、或覆盖其他可交互元素（弹窗打开时被遮罩盖住的背景除外）；
   - 手写字体未加载或字体文件加载失败；
   - 下一步目标没有显示。
-- 目标文件已存在且没有传 `overwrite: true` 时拒绝写入。
+- 目标文件已存在且没有传 `overwrite: true` 时拒绝写入。`out` 指向项目目录内的 `project.joplo.json` 或 `.joplo/` 时，即使传了 `overwrite` 也拒绝（解析符号链接，macOS/Windows 上不区分大小写）。
 
 ## 本地服务安全
 
@@ -103,19 +116,21 @@ pnpm web:serve path/to/project --port 4800 --open
 - 每个请求都校验 `Host`（`127.0.0.1:端口` 或 `localhost:端口`），防止 DNS 重绑定。
 - 写接口 `PUT /api/selection` 要求：
   - 带 Origin 时，Origin 必须是本服务；
-  - `Content-Type: application/json`；
+  - `Content-Type` 必须是 `application/json`，只允许附带 `charset=utf-8`，否则返回 415；
   - `x-joplo-token` 与启动时生成的令牌一致（以 `<meta name="joplo-token">` 注入 index.html，用常量时间比较）；
-  - 请求体不超过 64KB，并通过 zod 严格校验。
+  - 请求体不超过 64KB，超过返回 413（排空请求体后再响应，不重置连接）；
+  - 通过 zod 严格校验（选中对象或 `null`），并对照当前项目校验：方案存在、场景属于该方案、位置在范围内、`stepId` 等于 `steps[position-1]`、`sceneId` 等于回放到该位置时的画面、`nodeId` 在该画面中。不符返回 409，不改动已有选中。
 - 写入方式是临时文件 + rename。
 - 服务**不写** `project.joplo.json`：`PUT /api/project` 返回 405。
-- 静态文件限制在 `dist` 目录内（会解析 realpath）。响应带 CSP（`script-src 'self'`）、`nosniff`、`X-Frame-Options: DENY`。
+- 静态文件限制在 `dist` 目录内（会解析 realpath）；解码后跳出 `dist` 的路径（如 `..%2fpackage.json`）返回 404。
+- `startServer` 先监听端口，成功后才创建文件监听和心跳定时器；端口被占用等失败时不留下任何句柄。响应带 CSP（`script-src 'self'`）、`nosniff`、`X-Frame-Options: DENY`。
 
 API：`GET /api/project` → `{ revision, project }`（不合法时 422，包含 `issues`）；`GET /api/events`（SSE，监听项目目录，120ms 防抖，事件 `revision`）；`GET` / `PUT /api/selection`。
 
 ## 测试
 
 ```bash
-pnpm test         # vitest：core 播放器 + server 单元测试（loadProjectFile / SelectionSchema / 原子写入）
+pnpm test         # vitest：core 播放器 + server 单元测试（loadProjectFile / SelectionSchema / checkSelection / Content-Type / 原子写入）
 pnpm test:e2e     # Playwright：全部浏览器测试，每个测试都使用 examples/invite 的临时副本
 pnpm docs:screenshots   # 重新生成 docs/screenshots/
 ```
@@ -133,7 +148,12 @@ pnpm docs:screenshots   # 重新生成 docs/screenshots/
 - 文字溢出告警；
 - 拒绝覆盖已有文件；
 - 安全：错误 Host、无令牌、错误令牌、跨源请求、非法请求体、路径穿越、不写项目文件；
-- 只监听 127.0.0.1。
+- 只监听 127.0.0.1；端口被占用时不泄漏句柄；
+- 暂停在动画中途时“上一步”/“下一步”与显示的步数一致；重置和切换场景后没有 DOM 残留；就地提示的关闭；
+- 取消选中写 null、写回失败不显示“已写入”；SSE 乱序；刷新后步骤变少；
+- selection 写接口的 413、Content-Type、对照项目校验；renderStep 的视口、scale、Toast 几何相交、拒绝写项目数据、项目快照。
+
+浏览器测试的截图输出到临时目录，不会覆盖仓库中的 `docs/screenshots/`；文档截图只由 `pnpm docs:screenshots` 更新。
 
 ## 截图清单（docs/screenshots/）
 

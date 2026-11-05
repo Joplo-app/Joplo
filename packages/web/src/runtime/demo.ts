@@ -7,9 +7,12 @@
  *   不写入 state；被取消的动画不会推进状态。
  * - 点击的含义只由 core 的 explainClick 决定。
  * - 时长使用固定逻辑时钟（暂停时不流逝），不依赖网络或随机延迟。
+ * - 界面显示的“第 k 步”与上一步/下一步一致：动画进行中（含暂停）显示的是尚未提交的第 k 步，
+ *   此时“上一步”取消这一步、回到已提交位置 k-1；“下一步”立即提交这一步，到达位置 k。
+ * - .joplo/selection.json 始终反映画板当前的选中（取消选中写 null）；“已写入”只在写接口成功后显示。
  */
 import { animate, type AnimationPlaybackControls } from 'motion';
-import { explainClick, applyStep, getScenario, initialState, nodeLabel, findNode, replay, stateAt, type PlayState, type Project, type Scenario, type Step } from '@joplo/core';
+import { explainClick, applyStep, getScenario, nodeLabel, findNode, replay, stateAt, type PlayState, type Project, type Scenario, type Step } from '@joplo/core';
 import { putSelection, type Selection } from '../api';
 
 export type Mode = 'review' | 'demo';
@@ -22,6 +25,8 @@ export type Notice =
   | { kind: 'switched'; text: string }
   | { kind: 'selected'; text: string }
   | { kind: 'error'; text: string };
+
+export type SelectionSync = { status: 'idle' | 'pending' | 'ok' } | { status: 'error'; message: string };
 
 export type Snapshot = {
   project: Project | null;
@@ -43,6 +48,10 @@ export type Snapshot = {
   /** 回放失败（项目被改坏等）时的说明。 */
   playbackError: string | null;
   cursorVisible: boolean;
+  /** 选中写回 .joplo/selection.json 的状态。 */
+  selectionSync: SelectionSync;
+  /** 状态被“跳转”（重置、上一步、切换场景/方案）时递增：舞台据此直接移除旧 Toast，不播放退出动画。 */
+  epoch: number;
 };
 
 export const TIMING = {
@@ -78,17 +87,22 @@ export class DemoController {
     selection: null,
     playbackError: null,
     cursorVisible: false,
+    selectionSync: { status: 'idle' },
+    epoch: 0,
   };
   private listeners = new Set<() => void>();
   private gen = 0;
   private cancelWaiters: (() => void)[] = [];
   private anim: AnimationPlaybackControls | null = null;
-  private inflight: { gen: number; index: number } | null = null;
+  /** 已开始动画、尚未提交的步骤下标。 */
+  private inflight: { index: number } | null = null;
   private stageEl: HTMLElement | null = null;
   private cursorEl: HTMLElement | null = null;
   private cursorPos = { x: 760, y: 560 };
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
   private rippleKey = 0;
+  private syncSeq = 0;
+  private syncChain: Promise<void> = Promise.resolve();
   reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
   subscribe = (fn: () => void) => {
@@ -102,7 +116,7 @@ export class DemoController {
     if (typeof window !== 'undefined') {
       const w = window as unknown as Record<string, unknown>;
       w.__JOPLO_STATE__ = this.snap.state;
-      w.__JOPLO_UI__ = { playing: this.snap.playing, paused: this.snap.paused, busy: this.snap.busy, mode: this.snap.mode, scenarioId: this.snap.scenarioId };
+      w.__JOPLO_UI__ = { playing: this.snap.playing, paused: this.snap.paused, busy: this.snap.busy, mode: this.snap.mode, scenarioId: this.snap.scenarioId, activeStep: this.snap.activeStep };
     }
     for (const l of this.listeners) l();
   }
@@ -184,7 +198,7 @@ export class DemoController {
     this.stop();
     const first = this.scenariosOf(optionId)[0] ?? null;
     const state = first ? this.safeStateAt(p, first.id, 0) : { state: null, error: null };
-    this.set({ optionId, scenarioId: first?.id ?? null, state: state.state, playbackError: state.error, notice: { kind: 'switched', text: `已切换到方案「${p.options[optionId]!.name}」` } });
+    this.set({ optionId, scenarioId: first?.id ?? null, state: state.state, playbackError: state.error, epoch: this.snap.epoch + 1, notice: { kind: 'switched', text: `已切换到方案「${p.options[optionId]!.name}」` } });
     this.autoClear();
   }
 
@@ -194,7 +208,7 @@ export class DemoController {
     this.stop();
     const r = this.safeStateAt(p, scenarioId, 0);
     const sc = p.scenarios[scenarioId]!;
-    this.set({ scenarioId, optionId: sc.optionId, state: r.state, playbackError: r.error, notice: { kind: 'switched', text: `已切换到「${sc.name}」，数据已重置` } });
+    this.set({ scenarioId, optionId: sc.optionId, state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: { kind: 'switched', text: `已切换到「${sc.name}」，数据已重置` } });
     this.autoClear();
   }
 
@@ -206,6 +220,12 @@ export class DemoController {
   prev() {
     const st = this.snap.state;
     if (!st) return;
+    if (this.inflight) {
+      // 界面正显示尚未提交的第 k 步（position = k-1）：取消它即回到第 k-1 步，字幕同步回退。
+      this.stop();
+      this.set({ notice: null });
+      return;
+    }
     this.stop();
     if (st.position === 0) return this.info('已经是初始状态');
     this.goto(st.position - 1);
@@ -217,7 +237,7 @@ export class DemoController {
     if (!p || !sc) return;
     this.stop();
     const r = this.safeStateAt(p, sc.id, Math.max(0, Math.min(position, sc.steps.length)));
-    this.set({ state: r.state, playbackError: r.error, notice: message ? { kind: 'info', text: message } : null });
+    this.set({ state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: message ? { kind: 'info', text: message } : null });
     if (message) this.autoClear();
   }
 
@@ -377,14 +397,29 @@ export class DemoController {
     const scene = p.scenes[st.sceneId];
     const hit = nodeId && scene ? findNode(scene, nodeId) : null;
     const what = hit ? `「${nodeLabel(hit.node)}」` : stepId ? `步骤 ${stepId}` : '';
-    this.set({ selection: sel, notice: { kind: 'selected', text: `已选中${what}，可以在 Agent 会话里说要改什么` } });
-    this.autoClear(5000);
-    const r = await putSelection(sel);
-    if (!r.ok) this.set({ notice: { kind: 'error', text: `选中未能同步给 Agent：${r.message}` } });
+    this.set({ selection: sel, notice: { kind: 'selected', text: `已选中${what}，正在同步给 Agent…` } });
+    await this.syncSelection(sel, `已选中${what}，可以在 Agent 会话里说要改什么`, '选中未能同步给 Agent');
   }
 
-  clearSelection() {
+  /** 取消选中，并同步给 Agent（selection.json 写为 null）。 */
+  async clearSelection() {
     this.set({ selection: null });
+    await this.syncSelection(null, '已取消选中，已同步给 Agent', '取消选中未能同步给 Agent');
+  }
+
+  /** 串行写回选中；只有最后一次请求的结果会反映到界面上。 */
+  private syncSelection(sel: Selection | null, okText: string, failText: string): Promise<void> {
+    const seq = ++this.syncSeq;
+    this.set({ selectionSync: { status: 'pending' } });
+    this.syncChain = this.syncChain.then(async () => {
+      const r = await putSelection(sel);
+      if (seq !== this.syncSeq) return;
+      if (r.ok) {
+        this.set({ selectionSync: { status: 'ok' }, notice: { kind: 'selected', text: okText } });
+        this.autoClear(5000);
+      } else this.set({ selectionSync: { status: 'error', message: r.message }, notice: { kind: 'error', text: `${failText}：${r.message}` } });
+    });
+    return this.syncChain;
   }
 
   /** 点击步骤芯片：跳到该步骤执行之后；审阅模式下同时选中该步骤。 */
@@ -409,7 +444,7 @@ export class DemoController {
     const index = st.position;
     const step = sc.steps[index];
     if (!step) return false;
-    this.inflight = { gen, index };
+    this.inflight = { index };
     this.set({ activeStep: index });
     const a = step.action;
     const reduced = this.reducedMotion;
@@ -458,7 +493,9 @@ export class DemoController {
     if (!p || !st) return false;
     try {
       const next = applyStep(p, getScenario(p, sc.id), st);
-      this.set({ state: next, preview: null, playbackError: null });
+      const n = this.snap.notice;
+      // 推进后，锚定在元素上的就地提示（禁用原因、未覆盖、越序）已过时，关闭它。
+      this.set({ state: next, preview: null, playbackError: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
       return true;
     } catch (e) {
       this.stop();
@@ -518,8 +555,4 @@ export class DemoController {
     }, ms);
   }
 
-  /** 首次载入时调用：保证状态从场景初始状态开始。 */
-  static initial(project: Project, scenarioId: string): PlayState {
-    return initialState(project, scenarioId);
-  }
 }

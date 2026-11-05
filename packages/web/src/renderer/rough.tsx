@@ -21,25 +21,17 @@ export function seedOf(id: string): number {
 /** 记录尚未完成首次绘制的 rough 图形数量，供渲染路由判断就绪。 */
 export class RoughRegistry {
   private pending = new Set<object>();
-  private listeners = new Set<() => void>();
   add(k: object) {
     this.pending.add(k);
   }
   done(k: object) {
-    if (this.pending.delete(k)) this.emit();
+    this.pending.delete(k);
   }
   remove(k: object) {
-    if (this.pending.delete(k)) this.emit();
+    this.pending.delete(k);
   }
   get size() {
     return this.pending.size;
-  }
-  onChange(fn: () => void) {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
-  }
-  private emit() {
-    for (const l of this.listeners) l();
   }
 }
 

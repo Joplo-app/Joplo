@@ -34,7 +34,8 @@ export async function fetchProject(): Promise<ProjectLoad> {
   }
 }
 
-export async function putSelection(sel: Selection): Promise<{ ok: true } | { ok: false; message: string }> {
+/** 写回当前选中；传 null 表示取消选中（selection.json 写为 null）。 */
+export async function putSelection(sel: Selection | null): Promise<{ ok: true } | { ok: false; message: string }> {
   const token = localToken();
   if (!token) return { ok: false, message: '页面没有本地令牌（请通过 joplo serve 打开）' };
   try {
@@ -48,14 +49,14 @@ export async function putSelection(sel: Selection): Promise<{ ok: true } | { ok:
 }
 
 /** 订阅项目修订事件（SSE）。返回取消函数。 */
-export function subscribeRevisions(onRevision: (revision: number | null) => void, onConnection?: (connected: boolean) => void): () => void {
+export function subscribeRevisions(onRevision: (revision: number | null, error: string | null) => void, onConnection?: (connected: boolean) => void): () => void {
   const es = new EventSource('/api/events');
   es.addEventListener('revision', (e) => {
     try {
       const d = JSON.parse((e as MessageEvent).data);
-      onRevision(typeof d.revision === 'number' ? d.revision : null);
+      onRevision(typeof d.revision === 'number' ? d.revision : null, typeof d.error === 'string' ? d.error : null);
     } catch {
-      onRevision(null);
+      onRevision(null, null);
     }
   });
   es.onopen = () => onConnection?.(true);

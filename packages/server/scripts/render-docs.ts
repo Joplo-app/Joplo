@@ -67,7 +67,11 @@ for (const theme of ['sketch', 'clean'] as const) {
   await page.mouse.move(5, 5);
   await shot('demo-failure-error');
   await page.getByTestId('scenario-sc_a_denied').click();
-  await n('btn_invite').click({ force: true });
+  {
+    // 真实鼠标坐标点击禁用按钮（不用 force）
+    const b = (await n('btn_invite').boundingBox())!;
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+  }
   await page.waitForTimeout(200);
   await shot('demo-denied-disabled-reason');
   await n('nav_settings').click();

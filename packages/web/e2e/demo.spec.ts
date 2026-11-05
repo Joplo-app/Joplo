@@ -4,8 +4,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { initialState, stateAt } from '@joplo/core';
-import { demoClick, expect, loadExample, node, playState, test, uiState, waitIdle } from './fixtures';
+import { Project, initialState, stateAt } from '@joplo/core';
+import { demoClick, expect, loadExample, mouseClickNode, node, playState, shownStep, test, toastCount, uiState, waitIdle } from './fixtures';
 
 const project = loadExample();
 
@@ -92,8 +92,8 @@ test('AC-05 / AC-19 无权限场景：禁用原因就地显示；未建模操作
   await expect(node(page, 'alert_denied')).toContainText('你是普通成员');
   await expect(node(page, 'btn_invite')).toHaveAttribute('aria-disabled', 'true');
 
-  // Playwright 把 aria-disabled 视为不可操作；真实用户仍可点击禁用按钮看到原因，这里强制点击
-  await node(page, 'btn_invite').click({ force: true });
+  // 用真实鼠标坐标点击禁用按钮（Playwright 的 click() 会因 aria-disabled 一直等待）
+  await mouseClickNode(page, 'btn_invite');
   const bubble = page.locator('[data-joverlay="notice"]');
   await expect(bubble).toHaveAttribute('data-notice-kind', 'disabled');
   await expect(bubble).toContainText('只有空间管理员可以邀请成员');
@@ -124,34 +124,83 @@ test('演示模式：点击本场景其他步骤的目标，提示“按当前�
   expect((await playState(page)).position).toBe(1);
 });
 
-test('AC-20 自动播放中途：上一步、重置、切换场景都恢复正确状态，无数据残留', async ({ app: page }) => {
+test('AC-20 自动播放中途暂停后“上一步”：回到界面所示第 k 步的前一步，字幕同步', async ({ app: page }) => {
   await page.getByTestId('ctl-play').click();
-  await expect.poll(async () => (await playState(page)).position, { timeout: 15000 }).toBeGreaterThanOrEqual(3);
-  await page.getByTestId('ctl-play').click(); // 暂停
+  // 等到第 2 步（输入邮箱）的逐字输入动画进行中再暂停
+  await page.waitForSelector('[data-joverlay="sample"]');
+  await page.getByTestId('ctl-play').click();
   await expect.poll(async () => (await uiState(page)).paused).toBe(true);
+  const k = await shownStep(page);
   const pos = (await playState(page)).position;
   await page.waitForTimeout(600);
   expect((await playState(page)).position, '暂停期间不推进').toBe(pos);
+  expect(await shownStep(page), '暂停期间字幕不变').toBe(k);
 
   await page.getByTestId('ctl-prev').click();
   await waitIdle(page);
-  expect(await playState(page)).toEqual(stateAt(project, 'sc_a_success', pos - 1));
+  expect((await playState(page)).position).toBe(k - 1);
+  expect(await playState(page)).toEqual(stateAt(project, 'sc_a_success', k - 1));
+  expect(await shownStep(page)).toBe(k - 1);
+  await expect(page.locator('[data-joverlay="sample"]')).toHaveCount(0);
+});
 
+test('自动播放中途暂停后“下一步”：完成界面所示的第 k 步', async ({ app: page }) => {
+  await page.getByTestId('ctl-play').click();
+  await page.waitForSelector('[data-joverlay="sample"]');
+  await page.getByTestId('ctl-play').click();
+  await expect.poll(async () => (await uiState(page)).paused).toBe(true);
+  const k = await shownStep(page);
+  await page.getByTestId('ctl-next').click();
+  await waitIdle(page);
+  expect(await playState(page)).toEqual(stateAt(project, 'sc_a_success', k));
+  expect(await shownStep(page)).toBe(k);
+});
+
+test('AC-20 重置、切换场景：状态复原，旧 Toast 与弹窗不在 DOM 中残留', async ({ app: page }) => {
+  for (const id of ['btn_invite', 'in_email', 'sel_role', 'btn_send']) await demoClick(page, id);
+  expect(await toastCount(page)).toBe(1);
   await page.getByTestId('ctl-reset').click();
+  expect(await toastCount(page), '重置后 Toast 立即移除').toBe(0);
   expect(await playState(page)).toEqual(stateAt(project, 'sc_a_success', 0));
   await expect(node(page, 'dlg_invite')).toHaveCount(0);
 
-  // 再次播放到中途后切换场景
+  for (const id of ['btn_invite', 'in_email', 'sel_role', 'btn_send']) await demoClick(page, id);
+  expect(await toastCount(page)).toBe(1);
+  await page.getByTestId('scenario-sc_a_failure').click();
+  expect(await toastCount(page), '切换场景后 Toast 立即移除').toBe(0);
+  await expect(page.getByTestId('notice')).toContainText('已切换到「发送失败后重试」，数据已重置');
+
+  // 播放到中途再切换：被取消的动画不会推进状态
+  await page.getByTestId('scenario-sc_a_success').click();
   await page.getByTestId('ctl-play').click();
   await expect.poll(async () => (await playState(page)).position, { timeout: 15000 }).toBeGreaterThanOrEqual(2);
   await page.getByTestId('scenario-sc_a_failure').click();
-  await expect(page.getByTestId('notice')).toContainText('已切换到「发送失败后重试」，数据已重置');
-  await page.waitForTimeout(800); // 确认被取消的动画不会再推进状态
+  await page.waitForTimeout(800);
   const st = await playState(page);
   expect(st).toEqual(initialState(project, 'sc_a_failure'));
   expect(st.inputs).toEqual({});
   await expect(node(page, 'dlg_invite')).toHaveCount(0);
+  await expect(page.locator('[data-joverlay="sample"]')).toHaveCount(0);
   await expect(node(page, 'tbl_pending').locator('tbody tr')).toHaveCount(1);
+});
+
+test('就地提示气泡在推进步骤、重置、切换场景时关闭', async ({ app: page }) => {
+  const bubble = page.locator('[data-joverlay="notice"]');
+  await node(page, 'nav_settings').click();
+  await expect(bubble).toHaveCount(1);
+  await page.getByTestId('ctl-next').click();
+  await waitIdle(page);
+  await expect(bubble).toHaveCount(0);
+
+  await node(page, 'btn_send').click(); // 越序
+  await expect(bubble).toHaveAttribute('data-notice-kind', 'out_of_order');
+  await page.getByTestId('ctl-reset').click();
+  await expect(bubble).toHaveCount(0);
+
+  await node(page, 'nav_settings').click();
+  await expect(bubble).toHaveCount(1);
+  await page.getByTestId('scenario-sc_a_failure').click();
+  await expect(bubble).toHaveCount(0);
 });
 
 test('审阅模式：点击元素只选中，不推进步骤；写入 .joplo/selection.json', async ({ app: page, projectDir }) => {
@@ -183,9 +232,24 @@ test('审阅模式：点击元素只选中，不推进步骤；写入 .joplo/sel
   await expect.poll(() => JSON.parse(fs.readFileSync(file, 'utf8')).nodeId).toBe('sel_role');
   expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toMatchObject({ position: 1, stepId: 'a_s1_open' });
   await expect(inspector).toContainText('受邀者获得的权限不能高于邀请时设定的权限');
-  // AI 假设一眼可辨
+  await expect(inspector.getByTestId('sel-sync')).toContainText('已写入 .joplo/selection.json');
+  // 取消选中：同步给 Agent，selection.json 变为 null
   await inspector.getByRole('button', { name: '取消选中' }).click();
+  await expect.poll(() => JSON.parse(fs.readFileSync(file, 'utf8'))).toBeNull();
+  await expect(node(page, 'sel_role')).not.toHaveAttribute('data-jselected', '');
+  // AI 假设一眼可辨
   await expect(inspector.locator('[data-origin="ai_assumption"]').first()).toContainText('AI 假设');
+});
+
+test('选中同步失败时显示失败原因，不显示“已写入”', async ({ app: page }) => {
+  await page.route('**/api/selection', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: { code: 'INTERNAL', message: '磁盘已满（模拟）' } }) }));
+  await page.getByTestId('mode-review').click();
+  await node(page, 'btn_invite').click();
+  await expect(page.getByTestId('notice')).toContainText('选中未能同步给 Agent：磁盘已满（模拟）');
+  const inspector = page.getByTestId('inspector');
+  await expect(inspector.getByTestId('sel-sync')).toContainText('未能写入');
+  await expect(inspector).not.toContainText('选中已写入');
+  await expect(inspector).not.toContainText('已写入 .joplo/selection.json');
 });
 
 test('实时刷新：修订更新后保持场景与位置；文件不合法时显示错误横幅且不白屏', async ({ app: page, projectDir }) => {
@@ -214,6 +278,48 @@ test('实时刷新：修订更新后保持场景与位置；文件不合法时�
   fs.writeFileSync(file, JSON.stringify(json));
   await expect(page.getByTestId('load-error')).toHaveCount(0);
   await expect(page.getByTestId('revision')).toContainText('rev_3');
+});
+
+test('SSE 乱序：旧修订的响应晚到时不会覆盖新修订', async ({ app: page, projectDir }) => {
+  const file = path.join(projectDir, 'project.joplo.json');
+  const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+  await page.route('**/api/project', async (route) => {
+    const resp = await route.fetch();
+    const body = await resp.text();
+    if (JSON.parse(body).revision === 2) await new Promise((r) => setTimeout(r, 1500)); // rev_2 的响应故意晚到
+    await route.fulfill({ response: resp, body });
+  });
+  json.revision = 2;
+  json.name = '修订二';
+  fs.writeFileSync(file, JSON.stringify(json));
+  await page.waitForTimeout(500);
+  json.revision = 3;
+  json.name = '修订三';
+  fs.writeFileSync(file, JSON.stringify(json));
+  await expect(page.getByTestId('revision')).toContainText('rev_3');
+  const seen: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    seen.push(await page.getByTestId('revision').innerText());
+    await page.waitForTimeout(200);
+  }
+  expect(seen.every((r) => r.includes('rev_3')), `修订号应单调不减：${seen.join(',')}`).toBe(true);
+  await expect(page.locator('header')).toContainText('修订三');
+});
+
+test('SSE 刷新后步骤变少：位置夹到合法范围，状态与 core 一致', async ({ app: page, projectDir }) => {
+  for (const id of ['btn_invite', 'in_email', 'sel_role', 'btn_send']) await demoClick(page, id);
+  expect((await playState(page)).position).toBe(5);
+  const file = path.join(projectDir, 'project.joplo.json');
+  const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+  json.revision = 2;
+  json.scenarios.sc_a_success.steps = json.scenarios.sc_a_success.steps.slice(0, 3);
+  fs.writeFileSync(file, JSON.stringify(json));
+  await expect(page.getByTestId('revision')).toContainText('rev_2');
+  const next = Project.parse(json);
+  await expect.poll(async () => (await playState(page)).position).toBe(3);
+  expect(await playState(page)).toEqual(stateAt(next, 'sc_a_success', 3));
+  await expect(page.getByTestId('complete-banner')).toHaveCount(0);
+  expect(await shownStep(page)).toBe(3);
 });
 
 test('项目里没有任何方案时显示空状态', async ({ page, projectDir, server }) => {

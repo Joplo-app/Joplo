@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { Check, Copy, X } from 'lucide-react';
 import { findNode, isNodeDisabled, isNodeVisible, nodeLabel, resolveProps, type PlayState, type Project, type Rule } from '@joplo/core';
 import type { Selection } from '../api';
+import type { SelectionSync } from '../runtime/demo';
 import { cn } from '@/lib/utils';
 import { CONFIRM_LABEL, COVERAGE_LABEL, ORIGIN_LABEL, SEVERITY_LABEL, TYPE_LABEL } from './labels';
 
-export function Inspector({ project, optionId, state, selection, onClear, onScenario }: { project: Project; optionId: string | null; state: PlayState | null; selection: Selection | null; onClear: () => void; onScenario: (id: string) => void }) {
+export function Inspector({ project, optionId, state, selection, sync, onClear, onScenario }: { project: Project; optionId: string | null; state: PlayState | null; selection: Selection | null; sync: SelectionSync; onClear: () => void; onScenario: (id: string) => void }) {
   return (
     <aside className="flex w-[330px] shrink-0 flex-col overflow-y-auto border-l bg-white" aria-label="检查器" data-testid="inspector">
       {selection && (selection.nodeId || selection.stepId) ? (
-        <SelectionView project={project} state={state} selection={selection} onClear={onClear} onScenario={onScenario} />
+        <SelectionView project={project} state={state} selection={selection} sync={sync} onClear={onClear} onScenario={onScenario} />
       ) : (
         <OverviewView project={project} optionId={optionId} />
       )}
@@ -122,7 +123,7 @@ function OverviewView({ project, optionId }: { project: Project; optionId: strin
   );
 }
 
-function SelectionView({ project, state, selection, onClear, onScenario }: { project: Project; state: PlayState | null; selection: Selection; onClear: () => void; onScenario: (id: string) => void }) {
+function SelectionView({ project, state, selection, sync, onClear, onScenario }: { project: Project; state: PlayState | null; selection: Selection; sync: SelectionSync; onClear: () => void; onScenario: (id: string) => void }) {
   const [copied, setCopied] = useState(false);
   const scene = project.scenes[selection.sceneId];
   const hit = selection.nodeId && scene ? findNode(scene, selection.nodeId) : null;
@@ -257,7 +258,28 @@ function SelectionView({ project, state, selection, onClear, onScenario }: { pro
           );
         })}
       </ul>
-      <p className="mt-5 rounded border border-dashed border-[var(--sel)] bg-[#f6f3ff] p-2 text-[12px] leading-snug text-[#5f3dc4]">选中已写入 .joplo/selection.json。在 Agent 会话里直接说要改什么，Agent 读取当前选中后只改这一处。</p>
+      <SyncNote sync={sync} />
     </div>
+  );
+}
+
+/** 选中写回状态：只有写接口成功后才说“已写入”。 */
+function SyncNote({ sync }: { sync: SelectionSync }) {
+  if (sync.status === 'error')
+    return (
+      <p className="mt-5 rounded border border-[#c92a2a] bg-[#fff0f0] p-2 text-[12px] leading-snug text-[#a51d1d]" data-testid="sel-sync" role="alert">
+        未能写入 .joplo/selection.json：{sync.message}。Agent 读不到这次选中。
+      </p>
+    );
+  if (sync.status === 'ok')
+    return (
+      <p className="mt-5 rounded border border-dashed border-[var(--sel)] bg-[#f6f3ff] p-2 text-[12px] leading-snug text-[#5f3dc4]" data-testid="sel-sync">
+        选中已写入 .joplo/selection.json。在 Agent 会话里直接说要改什么，Agent 读取当前选中后只改这一处。
+      </p>
+    );
+  return (
+    <p className="mt-5 rounded border border-dashed border-[#d0d0d0] p-2 text-[12px] leading-snug text-[#6b6b6b]" data-testid="sel-sync">
+      正在同步选中给 Agent…
+    </p>
   );
 }

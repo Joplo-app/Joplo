@@ -18,6 +18,12 @@
     return { id: el.dataset.jid, type: el.dataset.jtype, label: el.dataset.jlabel ?? '', visible, disabled: el.hasAttribute('data-jdisabled'), box };
   });
 
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const offViewport = [];
+  const dialogOpen = !!stage.querySelector('[data-jbackdrop]');
+  const overlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
+
   // 1. 可见的可交互元素：中心点必须命中它自身
   els.forEach((el, i) => {
     const e = elements[i];
@@ -29,6 +35,11 @@
       warnings.push(`超出画框：「${e.label}」(${e.id}) 的中心点不在画框内`);
       return;
     }
+    // 视口小于舞台时，视口外的点 elementFromPoint 返回 null——那不是遮挡，单独汇总
+    if (cx < 0 || cy < 0 || cx >= vw || cy >= vh) {
+      offViewport.push(e.id);
+      return;
+    }
     const hit = document.elementFromPoint(cx, cy);
     if (hit && (hit === el || el.contains(hit))) return;
     // 弹窗打开时，背景被遮罩覆盖是预期的层次，不算遮挡
@@ -36,21 +47,25 @@
     warnings.push(`被遮挡：「${e.label}」(${e.id}) 的中心点被 ${hit ? name(hit) : '画框外内容'} 覆盖`);
   });
 
+  if (offViewport.length)
+    warnings.push(`不在视口内：视口 ${vw}×${vh} 小于舞台，${offViewport.length} 个可交互元素的中心点在视口外，未做遮挡检查（${offViewport.join(', ')}）`);
+
   // 2. 标签文字溢出
   stage.querySelectorAll('[data-jtext], .jtrunc').forEach((t) => {
     if (t.scrollWidth > t.clientWidth + 1) warnings.push(`标签文字溢出：${name(t)} 的文字「${(t.textContent ?? '').slice(0, 40)}」显示不全`);
   });
 
-  // 3. Toast 与下一步目标重叠
-  if (args.nextTargetId) {
-    const target = stage.querySelector(`[data-jid="${CSS.escape(args.nextTargetId)}"]`);
-    if (target) {
-      const t = target.getBoundingClientRect();
-      stage.querySelectorAll('[data-jtoast]').forEach((toast) => {
-        const b = toast.getBoundingClientRect();
-        if (!(b.right <= t.left || t.right <= b.left || b.bottom <= t.top || t.bottom <= b.top)) warnings.push(`Toast 遮挡了下一步操作的目标：${name(target)}`);
-      });
-    }
+  // 3. Toast 等浮层（pointer-events:none，elementFromPoint 看不到）与可交互元素按几何相交检测
+  const toasts = Array.from(stage.querySelectorAll('[data-jtoast]')).map((t) => t.getBoundingClientRect());
+  if (toasts.length) {
+    els.forEach((el, i) => {
+      const e = elements[i];
+      if (!el.hasAttribute('data-jinteractive') || !e.visible) return;
+      if (dialogOpen && !el.closest('[role="dialog"]')) return; // 被弹窗遮罩盖住的背景本来就不可操作
+      const r = el.getBoundingClientRect();
+      if (!toasts.some((b) => overlap(b, r))) return;
+      warnings.push(e.id === args.nextTargetId ? `Toast 遮挡了下一步操作的目标：${name(el)}` : `Toast 覆盖了可交互元素：${name(el)}`);
+    });
   }
 
   // 4. 字体

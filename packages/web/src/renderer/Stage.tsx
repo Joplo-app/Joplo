@@ -26,12 +26,14 @@ export type StageProps = {
   registry?: RoughRegistry | null;
   /** 下一步操作的目标：Toast 会避开它（PRD 8.8）。 */
   nextTargetId?: string | null;
+  /** 跳转（重置、上一步、切换场景）时递增：旧 Toast 直接移除，不播放退出动画。 */
+  epoch?: number;
   onNodeClick?: (nodeId: string, point: { x: number; y: number }) => void;
   stageRef?: (el: HTMLDivElement | null) => void;
   overlay?: ReactNode;
 };
 
-export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, onNodeClick, stageRef, overlay }: StageProps) {
+export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay }: StageProps) {
   const scene = project.scenes[state.sceneId];
   const vp = VIEWPORTS[viewportOf(project, state)];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
@@ -89,7 +91,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
           <div className="flex h-full items-center justify-center text-[#c92a2a]">画面不存在：{state.sceneId}</div>
         )}
         <div ref={setDialogLayer} className="pointer-events-none absolute inset-0 z-20 [&>*]:pointer-events-auto" data-jlayer="dialog" />
-        <ToastLayer toasts={state.toasts} nextTargetId={nextTargetId} animate={animate} rootRef={rootRef} />
+        <ToastLayer key={epoch} toasts={state.toasts} nextTargetId={nextTargetId} animate={animate} rootRef={rootRef} />
         {overlay ? <div className="pointer-events-none absolute inset-0 z-40" data-jlayer="overlay">{overlay}</div> : null}
       </div>
     </ThemeContext.Provider>

@@ -23,13 +23,18 @@ export function WorkspaceApp() {
     localStorage.setItem(THEME_KEY, t);
   };
 
-  // 首次载入 + SSE 实时刷新
+  // 首次载入 + SSE 实时刷新。
+  // 不变量：只应用最新一次请求的响应——晚到的旧响应（序号小于已应用序号）直接丢弃，界面修订号不会倒退。
   useEffect(() => {
     let alive = true;
     let last = '';
+    let requested = 0;
+    let applied = 0;
     const load = async () => {
+      const seq = ++requested;
       const r = await fetchProject();
-      if (!alive) return;
+      if (!alive || seq < applied) return;
+      applied = seq;
       if (r.ok) {
         setLoadError(null);
         const sig = JSON.stringify(r.project);
@@ -40,7 +45,11 @@ export function WorkspaceApp() {
       } else setLoadError({ message: r.error.message, issues: r.error.issues });
     };
     void load();
-    const off = subscribeRevisions(() => void load(), setLive);
+    const off = subscribeRevisions((_rev, error) => {
+      // 服务端已知文件不合法时先显示原因；随后的读取会补充具体的 schema 问题。
+      if (error) setLoadError((prev) => (prev?.message === error ? prev : { message: error }));
+      void load();
+    }, setLive);
     return () => {
       alive = false;
       off();
@@ -109,7 +118,7 @@ export function WorkspaceApp() {
           <main className="flex min-w-0 flex-1 flex-col bg-[#f1f1ef]">
             {scenario && state ? (
               <>
-                <StageViewport project={project} viewport={viewportOf(project, state)} mode={snap.mode} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
+                <StageViewport viewport={viewportOf(project, state)} mode={snap.mode} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
                   <Stage
                     project={project}
                     state={state}
@@ -117,6 +126,7 @@ export function WorkspaceApp() {
                     mode={snap.mode}
                     selectedId={snap.mode === 'review' && snap.selection?.sceneId === state.sceneId ? snap.selection.nodeId : null}
                     preview={snap.preview}
+                    epoch={snap.epoch}
                     animate={!ctl.reducedMotion}
                     nextTargetId={nextTargetId}
                     onNodeClick={(id, pt) => void ctl.clickNode(id, pt)}
@@ -133,7 +143,7 @@ export function WorkspaceApp() {
               <Center>这个方案还没有演示场景。</Center>
             )}
           </main>
-          <Inspector project={project} optionId={snap.optionId} state={state} selection={snap.selection} onClear={() => ctl.clearSelection()} onScenario={(id) => ctl.setScenario(id)} />
+          <Inspector project={project} optionId={snap.optionId} state={state} selection={snap.selection} sync={snap.selectionSync} onClear={() => void ctl.clearSelection()} onScenario={(id) => ctl.setScenario(id)} />
         </div>
       )}
     </div>
@@ -145,7 +155,7 @@ function Center({ children }: { children: ReactNode }) {
 }
 
 /** 把固定尺寸的画框按比例缩放到可用区域；mobile 加手机外框。 */
-function StageViewport({ viewport, mode, notice, onDismiss, children }: { project: unknown; viewport: 'desktop' | 'mobile'; mode: string; notice: ReturnType<DemoController['getSnapshot']>['notice']; onDismiss: () => void; children: ReactNode }) {
+function StageViewport({ viewport, mode, notice, onDismiss, children }: { viewport: 'desktop' | 'mobile'; mode: string; notice: ReturnType<DemoController['getSnapshot']>['notice']; onDismiss: () => void; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const [avail, setAvail] = useState({ w: 800, h: 500 });
   useLayoutEffect(() => {

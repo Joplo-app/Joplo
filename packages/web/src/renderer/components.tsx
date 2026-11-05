@@ -671,11 +671,3 @@ export function RenderNode({ node }: { node: SceneNode }) {
   const el = <Impl node={node} p={p} disabled={disabled}>{children}</Impl>;
   return el;
 }
-
-/** 行内布局提示：包一层以便父 Stack 识别哪些子元素应伸展。 */
-export function isGrowType(t: string) {
-  return GROW.has(t);
-}
-export function isInlineType(t: string) {
-  return INLINE.has(t);
-}
