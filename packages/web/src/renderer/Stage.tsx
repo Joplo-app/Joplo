@@ -20,6 +20,13 @@ export function viewportOf(project: Project, state: PlayState): Viewport {
  * （点到按钮里的文字或图标也算点按钮），检查（⌥+单击）时取最内层的元素，便于精确选中。
  */
 export function pickTarget(el: HTMLElement, mode: RenderMode, inspect = false): HTMLElement | null {
+  // 架构图连线的标签画在单独一层：点标签等于点这条连线
+  const edgeLabel = el.closest<HTMLElement>('[data-jedge-for]');
+  if (edgeLabel) {
+    const stage = el.closest('[data-joplo-stage]');
+    const edge = stage?.querySelector<HTMLElement>(`[data-jid="${CSS.escape(edgeLabel.dataset.jedgeFor ?? '')}"]`);
+    if (edge) return edge;
+  }
   if (mode === 'demo' && !inspect) {
     const inter = el.closest<HTMLElement>('[data-jinteractive]');
     if (inter) return inter;

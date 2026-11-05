@@ -124,3 +124,108 @@ describe('Diagram 布局', () => {
     expect(Object.keys(layoutDiagram(bad).edges)).toEqual([]);
   });
 });
+
+// ---------- 可读性与紧凑（examples/agent-arch 的真实结构，D41 复审） ----------
+import { diagramScale, MIN_SCALE, NODE_FONT, DESC_FONT, EDGE_FONT, type DLayout } from '../src/renderer/diagram-layout';
+
+/** 与 examples/agent-arch/shared/arch.tsx 相同的结构（v = a：混合的手；v = b：全云端）。 */
+function agentArch(v: 'a' | 'b', direction: 'right' | 'down'): SceneNode {
+  const n = (id: string, label: string, kind: string, description: string) => N(id, label, { kind, description, state: `$ui.n_${id}` });
+  return {
+    id: 'arch',
+    type: 'Diagram',
+    props: { direction, h: 640 },
+    children: [
+      G('g_device', '用户设备', [n('app', '客户端界面', 'client', '对话、确认弹窗'), ...(v === 'a' ? [n('local', '端侧执行器', 'tool', '手：read_files、delete_files')] : [])]),
+      G('g_aws', 'AWS', [
+        G('g_ctrl', '控制面', [n('biz', 'Biz Server', 'service', '鉴权 · 会话 · 审计 · 转发'), n('registry', 'Tool Registry', 'database', '工具定义：名称 · schema · 危险级别 · 单价'), n('db', 'DynamoDB', 'database', '会话与审计日志')]),
+        G('g_brain', '大脑', [n('brain', 'Agent 大脑', 'service', 'ECS：规划，只产出工具调用'), n('llm', 'Bedrock', 'model', 'Claude 模型')]),
+        G('g_hands', '云端的手', [n('sandbox', '云端沙箱', 'tool', v === 'a' ? 'Fargate：make_sheet 等云端工具' : 'Fargate：所有工具'), ...(v === 'b' ? [n('s3', 'S3 上传区', 'storage', '用户上传的本机文件')] : [])]),
+        G('g_bill', '计费', [n('queue', 'SQS', 'queue', '用量事件'), n('billing', 'Billing', 'service', '额度 · 计量 · 扣费')]),
+      ]),
+      E('app', 'biz', { id: 'e_app_biz', label: '消息 ⇄ 回答' }),
+      E('biz', 'billing', { id: 'e_biz_billing', label: '① 额度预检' }),
+      E('biz', 'registry', { id: 'e_biz_registry', label: '② 取工具定义' }),
+      E('biz', 'db', { id: 'e_biz_db', label: '会话 · 审计', async: true }),
+      E('biz', 'brain', { id: 'e_biz_brain', label: '③ 任务 + 工具定义' }),
+      E('brain', 'llm', { id: 'e_brain_llm', label: '④ 推理' }),
+      E('brain', 'biz', { id: 'e_brain_biz', label: '⑤ 工具调用（只发出）' }),
+      ...(v === 'a'
+        ? [E('biz', 'local', { id: 'e_biz_local', label: '下发端侧工具' })]
+        : [E('app', 's3', { id: 'e_app_s3', label: '上传本机文件' }), E('sandbox', 's3', { id: 'e_sandbox_s3', label: '读取' })]),
+      E('biz', 'sandbox', { id: 'e_biz_sandbox', label: '下发云端工具' }),
+      E('brain', 'queue', { id: 'e_brain_queue', label: '用量事件', async: true }),
+      E('queue', 'billing', { id: 'e_queue_billing', label: '入账（幂等）', async: true }),
+    ],
+  };
+}
+
+const area = (a: Box, b: Box) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+const distToPolyline = (p: Point, pts: Point[]) => {
+  let best = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i]!;
+    const b = pts[i + 1]!;
+    const L2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2 || 1;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / L2));
+    best = Math.min(best, Math.hypot(p.x - (a.x + t * (b.x - a.x)), p.y - (a.y + t * (b.y - a.y))));
+  }
+  return best;
+};
+
+describe('可读性与紧凑：examples/agent-arch 的结构', () => {
+  for (const v of ['a', 'b'] as const)
+    for (const dir of ['right', 'down'] as const) {
+      const s = diagramStructure(agentArch(v, dir));
+      const l: DLayout = layoutDiagram(s);
+      it(`${v}/${dir}：约 1000px 宽的容器里，节点主标签 ≥ 12px、description ≥ 10px（放不下时滚动而不是继续缩小）`, () => {
+        const { scale, scroll } = diagramScale(l, 1000, 640);
+        expect(scale * NODE_FONT).toBeGreaterThanOrEqual(12);
+        expect(scale * DESC_FONT).toBeGreaterThanOrEqual(10);
+        expect(scale * EDGE_FONT).toBeGreaterThanOrEqual(10);
+        if (scroll) expect(scale).toBe(MIN_SCALE);
+        // 很窄的容器也不低于下限
+        expect(diagramScale(l, 300, 200).scale).toBe(MIN_SCALE);
+      });
+      it(`${v}/${dir}：连线标签互不重叠，也不压住节点和分组标题`, () => {
+        const labels = Object.entries(l.edges).filter(([, e]) => e.label).map(([id, e]) => [id, e.label!] as const);
+        expect(labels.length).toBe(s.edges.filter((e) => e.label).length);
+        for (let i = 0; i < labels.length; i++) {
+          for (let j = i + 1; j < labels.length; j++) expect(area(labels[i]![1], labels[j]![1]), `${labels[i]![0]} 与 ${labels[j]![0]}`).toBe(0);
+          for (const [id, b] of Object.entries(l.nodes)) expect(area(labels[i]![1], b), `${labels[i]![0]} 压住节点 ${id}`).toBe(0);
+          for (const [id, b] of Object.entries(l.titles)) expect(area(labels[i]![1], b), `${labels[i]![0]} 压住分组标题 ${id}`).toBe(0);
+        }
+      });
+      it(`${v}/${dir}：连线不穿过节点和分组标题；往返连线 biz⇄brain 分开`, () => {
+        for (const e of s.edges) {
+          const route = l.edges[e.id]!.points;
+          for (const [id, box] of Object.entries(l.nodes)) {
+            if (id === e.from || id === e.to) continue;
+            expect(samples(route).find((pt) => inside(pt, box)), `${e.id} 穿过节点 ${id}`).toBeUndefined();
+          }
+          for (const [id, box] of Object.entries(l.titles)) expect(samples(route).find((pt) => inside(pt, box, 0)), `${e.id} 压住分组标题 ${id}`).toBeUndefined();
+        }
+        const go = l.edges.e_biz_brain!.points;
+        const back = l.edges.e_brain_biz!.points;
+        // 叠在一起 = 两条线相距不到 4px（通道之间至少 8px，只有在同一节点的出入口附近会靠近）
+        const close = samples(go).filter((pt) => distToPolyline(pt, back) < 4).length / samples(go).length;
+        expect(close, "往返连线叠在一起").toBeLessThan(0.05);
+      });
+      it(`${v}/${dir}：分组框包住成员，不压住组外节点；分组之间不交叠（嵌套除外）`, () => {
+        const parentOf = (id: string) => s.nodes.find((n) => n.id === id)?.parent ?? null;
+        const ancestors = (gid: string | null): string[] => (gid ? [gid, ...ancestors(s.groups.find((g) => g.id === gid)!.parent)] : []);
+        for (const gr of s.groups) {
+          const gb = l.groups[gr.id]!;
+          for (const [id, b] of Object.entries(l.nodes)) {
+            const mine = ancestors(parentOf(id)).includes(gr.id);
+            if (mine) expect(b.x >= gb.x && b.y >= gb.y && b.x + b.w <= gb.x + gb.w && b.y + b.h <= gb.y + gb.h, `${id} 应在 ${gr.id} 内`).toBe(true);
+            else expect(area(b, gb), `组外节点 ${id} 压在 ${gr.id} 上`).toBe(0);
+          }
+          for (const other of s.groups) {
+            if (other.id === gr.id || ancestors(other.id).includes(gr.id) || ancestors(gr.id).includes(other.id)) continue;
+            expect(area(gb, l.groups[other.id]!), `${gr.id} 与 ${other.id} 交叠`).toBe(0);
+          }
+        }
+      });
+    }
+});

@@ -5,7 +5,7 @@
  *      首页、演示页（电脑 / 手机）、缺口、检查抽屉、「…」菜单、导出视频进度、编译错误；
  *   3. 调用 buildSite，用 file:// 打开发布站截图；
  *   4. 把 examples/joplo-board 原型里对应的场景也渲染出来（prototype-*），与新界面放在一起对照；
- *   5. 架构图（Diagram）测试夹具的调用链截图（stage-diagram-*）。
+ *   5. 架构图（Diagram）测试夹具的调用链截图（stage-diagram-*），以及 examples/agent-arch 的两步（stage-agent-arch-*，1600×1000）。
  * 用法：pnpm docs:screenshots [输出目录]
  */
 import fs from 'node:fs';
@@ -56,6 +56,14 @@ for (const theme of ['sketch', 'clean'] as const) {
     for (const w of r.warnings) console.log(`  ⚠ ${w}`);
     bad += r.warnings.length;
   }
+}
+
+// 真实演示 examples/agent-arch：1600×1000 下架构图的可读性（节点主标签实际 ≥ 12px，放不下时图内滚动）
+for (const [name, scenarioId, step] of [['stage-agent-arch-happy-7', 'agent.a-hybrid.happy', 'agent.a-hybrid.happy#7'], ['stage-agent-arch-quota-3', 'agent.a-hybrid.quota', 'agent.a-hybrid.quota#3']] as const) {
+  const r = await renderStep({ projectDir: path.join(root, 'examples/agent-arch'), scenarioId, stepId: step, theme: 'sketch', viewport: { width: 1600, height: 1000 }, out: path.join(outDir, `${name}.sketch.png`), overwrite: true });
+  console.log(`${path.relative(root, r.path)}  position=${r.position} 告警=${r.warnings.length}`);
+  for (const w of r.warnings) console.log(`  ⚠ ${w}`);
+  bad += r.warnings.length;
 }
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-docs-home-'));
