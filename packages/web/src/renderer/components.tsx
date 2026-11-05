@@ -35,7 +35,7 @@ import {
 } from '@tokenroll/joplo-core';
 import { cn } from '@/lib/utils';
 import { Rough, RoughPath, roundRectPath, useStageTheme } from './rough';
-import { arrowHead, diagramStructure, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
+import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramScale, diagramStructure, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
 import { DIMMED, FONT, INK, SOFT, SPACING, TITLE_SIZE, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf } from './style';
 
 export type RenderMode = 'review' | 'demo' | 'render';
@@ -1688,7 +1688,17 @@ function Phone({ node, p, children }: NodeProps) {
 
 // ============ 架构图（D41） ============
 
-type DiagramCtxValue = { layout: DLayout; origin: { x: number; y: number }; width: number; height: number };
+type DiagramCtxValue = { layout: DLayout; origin: { x: number; y: number }; width: number; height: number; mountedAt: number; key: string };
+
+/**
+ * 逐段出现：架构图挂载之后才出现的元素（when 由假变真）播放出现动画；首次显示、回放、renderStep 静态截图都直接是最终状态。
+ * 布局始终按全部元素计算（when 不参与），所以出现时已有元素不移动。
+ */
+function useAppear(d: DiagramCtxValue | null): boolean {
+  const { animate } = useCtx();
+  const [appear] = useState(() => !!d && animate && typeof performance !== 'undefined' && performance.now() - d.mountedAt > 300);
+  return appear;
+}
 const DiagramContext = createContext<DiagramCtxValue | null>(null);
 
 const D_TONE: Record<string, { stroke: string; fill: string; text: string }> = {
@@ -1753,6 +1763,8 @@ function Diagram({ node, p, children }: NodeProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const layout = useMemo(() => layoutDiagram(structure), [key]);
   const ref = useRef<HTMLDivElement | null>(null);
+  const [mountedAt] = useState(() => (typeof performance !== 'undefined' ? performance.now() : 0));
+  const drag = useRef<{ x: number; y: number; left: number; top: number; moved: boolean } | null>(null);
   const [avail, setAvail] = useState(0);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -1765,8 +1777,11 @@ function Diagram({ node, p, children }: NodeProps) {
   const hv = Number(r('h'));
   const H = Number.isFinite(hv) && hv > 0 ? hv : 420;
   const { h: _h, ...rest } = p;
-  const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: H, overflow: 'hidden' } });
-  const scale = layout.width && avail ? Math.min(1, (avail - 8) / layout.width, (H - 8) / layout.height) : 1;
+  // 缩放不低于 12/14：放不下时在图内部滚动 / 拖动平移，而不是继续缩小到看不清
+  const { scale, scroll } = diagramScale(layout, avail, H);
+  const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: H, overflow: scroll ? 'auto' : 'hidden', cursor: scroll ? 'grab' : undefined, overscrollBehavior: 'contain' } });
+  const W = layout.width * scale;
+  const HH = layout.height * scale;
   return (
     <div
       {...root}
@@ -1774,15 +1789,53 @@ function Diagram({ node, p, children }: NodeProps) {
         ref.current = el;
       }}
       data-direction={structure.direction}
+      data-scale={String(scale)}
+      data-scroll={scroll ? '' : undefined}
+      onPointerDown={(e) => {
+        if (!scroll || e.button !== 0 || e.altKey) return;
+        const el = ref.current!;
+        drag.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop, moved: false };
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d || !(e.buttons & 1)) return;
+        const dx = e.clientX - d.x;
+        const dy = e.clientY - d.y;
+        if (!d.moved && Math.hypot(dx, dy) < 4) return;
+        d.moved = true;
+        const el = ref.current!;
+        el.scrollLeft = d.left - dx;
+        el.scrollTop = d.top - dy;
+      }}
+      onPointerUp={() => {
+        // 拖动之后的 click 不当作点击元素（见 onClickCapture）
+        setTimeout(() => (drag.current = null), 0);
+      }}
+      onClickCapture={(e) => {
+        if (drag.current?.moved) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      }}
     >
       {layout.width === 0 ? (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: DIMMED, fontSize: 13 }}>架构图还没有节点</div>
       ) : (
-        <div
-          data-jdiagram-canvas=""
-          style={{ position: 'absolute', left: Math.max(0, (avail - layout.width * scale) / 2), top: Math.max(0, (H - layout.height * scale) / 2), width: layout.width, height: layout.height, transform: `scale(${scale})`, transformOrigin: '0 0' }}
-        >
-          <DiagramContext.Provider value={{ layout, origin: { x: 0, y: 0 }, width: layout.width, height: layout.height }}>{children}</DiagramContext.Provider>
+        <div style={{ position: 'relative', width: scroll ? W : '100%', height: scroll ? HH : '100%' }}>
+          <div
+            data-jdiagram-canvas=""
+            style={{
+              position: 'absolute',
+              left: scroll ? 0 : Math.max(0, (avail - W) / 2),
+              top: scroll ? 0 : Math.max(0, (H - HH) / 2),
+              width: layout.width,
+              height: layout.height,
+              transform: `scale(${scale})`,
+              transformOrigin: '0 0',
+            }}
+          >
+            <DiagramContext.Provider value={{ layout, origin: { x: 0, y: 0 }, width: layout.width, height: layout.height, mountedAt, key: node.id }}>{children}</DiagramContext.Provider>
+          </div>
         </div>
       )}
     </div>
@@ -1792,17 +1845,26 @@ function Diagram({ node, p, children }: NodeProps) {
 function DiagramGroup({ node, p, children }: NodeProps) {
   const d = useContext(DiagramContext);
   const box = d?.layout.groups[node.id];
+  const title = d?.layout.titles[node.id];
+  const appear = useAppear(d);
   const root = useRoot(node, p, {
     className: 'jbox [.jstage[data-theme=clean]_&]:rounded-[14px]',
     style: box ? { position: 'absolute', left: box.x - d!.origin.x, top: box.y - d!.origin.y, width: box.w, height: box.h, background: 'rgba(248,249,250,0.7)' } : { display: 'none' },
   });
   if (!d || !box) return null;
   return (
-    <div {...root} data-soft="" data-dashed="">
+    <motion.div {...root} data-soft="" data-dashed="" data-appear={appear ? '' : undefined} initial={appear ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       <Rough seedKey={node.id} shape="roundrect" radius={14} stroke="#868e96" dashed strokeWidth={1.2} />
-      <div style={{ position: 'absolute', left: 12, top: 5, fontSize: 13, fontWeight: 600, color: '#5a5a5a', whiteSpace: 'nowrap' }}>{str(p.label)}</div>
+      {title ? (
+        <div
+          data-jgroup-title=""
+          style={{ position: 'absolute', left: title.x - box.x, top: title.y - box.y, width: title.w, height: title.h, zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, background: 'rgba(248,249,250,0.95)', fontSize: GROUP_FONT, fontWeight: 600, color: '#5a5a5a', whiteSpace: 'nowrap' }}
+        >
+          {str(p.label)}
+        </div>
+      ) : null}
       <DiagramContext.Provider value={{ ...d, origin: { x: box.x, y: box.y } }}>{children}</DiagramContext.Provider>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1814,6 +1876,7 @@ function DiagramNode({ node, p }: NodeProps) {
   const tone = D_TONE[state]!;
   const kind = typeof p.kind === 'string' ? p.kind : 'service';
   const shape = shapeOf(kind);
+  const appear = useAppear(d);
   const root = useRoot(node, p, {
     style: box
       ? { position: 'absolute', left: box.x - d!.origin.x, top: box.y - d!.origin.y, width: box.w, height: box.h, zIndex: 2, opacity: state === 'dim' ? 0.45 : 1, transition: 'opacity .25s' }
@@ -1823,7 +1886,9 @@ function DiagramNode({ node, p }: NodeProps) {
   const desc = str(p.description);
   const sw = state === 'idle' || state === 'dim' ? 1.4 : 2.2;
   return (
-    <div {...root} data-state={state} data-kind={kind}>
+    <div {...root} data-state={state} data-kind={kind} data-appear={appear ? '' : undefined}>
+      {/* 出现动画：淡入并轻微放大（只在挂载后出现的节点上播放） */}
+      <motion.div style={{ position: 'absolute', inset: 0 }} initial={appear ? { opacity: 0, scale: 0.88 } : false} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
       {theme === 'sketch' ? (
         <div style={{ position: 'absolute', inset: 0 }}>
           <Rough seedKey={node.id} shape="custom" pathOf={SHAPE[shape]} stroke={tone.stroke} strokeWidth={sw} fill={tone.fill} fillStyle="solid" dashed={kind === 'external'} inset={1.5} />
@@ -1849,12 +1914,13 @@ function DiagramNode({ node, p }: NodeProps) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <KindIcon kind={kind} />
-          <span className="jtrunc" style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>
+          <span className="jtrunc" style={{ fontSize: NODE_FONT, fontWeight: 600, lineHeight: 1.3 }}>
             {str(p.label, node.id)}
           </span>
         </div>
-        {desc ? <div style={{ fontSize: 12, lineHeight: '16px', color: state === 'idle' ? DIMMED : tone.text, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{desc}</div> : null}
+        {desc ? <div data-jdesc="" style={{ fontSize: DESC_FONT, lineHeight: '16px', color: state === 'idle' ? DIMMED : tone.text, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{desc}</div> : null}
       </div>
+      </motion.div>
     </div>
   );
 }
@@ -1894,8 +1960,11 @@ function DiagramEdge({ node, p }: NodeProps) {
   const { animate, selectedId } = useCtx();
   const theme = useStageTheme();
   const attrs = useRootAttrs(node);
+  const appear = useAppear(dctx);
   const route = dctx?.layout.edges[node.id];
   if (!dctx || !route || route.points.length < 2) return null;
+  // 出现动画：用一条沿路径伸长的遮罩把连线（含手绘线、虚线、箭头）从 from 画到 to
+  const maskId = `jdraw-${dctx.key}-${node.id}`.replace(/[^\w-]/g, '_');
   const state = dState(p.state);
   const color = selectedId === node.id ? 'var(--sel)' : EDGE_TONE[state]!;
   const dashed = p.async === true || state === 'error';
@@ -1905,13 +1974,21 @@ function DiagramEdge({ node, p }: NodeProps) {
   const label = str(p.label);
   const lb = route.label;
   return (
-    <svg
+    <>
+      <svg
       aria-hidden={false}
       width={dctx.width}
       height={dctx.height}
       style={{ position: 'absolute', left: -dctx.origin.x, top: -dctx.origin.y, overflow: 'visible', pointerEvents: 'none', zIndex: 1 }}
     >
-      <g {...attrs} data-state={state} data-async={p.async === true ? '' : undefined} style={{ opacity: state === 'dim' ? 0.5 : 1, transition: 'opacity .25s' }}>
+      {appear ? (
+        <defs>
+          <mask id={maskId} maskUnits="userSpaceOnUse" x={-50} y={-50} width={dctx.width + 100} height={dctx.height + 100}>
+            <motion.path d={d} fill="none" stroke="#fff" strokeWidth={28} strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7, ease: 'easeInOut' }} />
+          </mask>
+        </defs>
+      ) : null}
+      <g {...attrs} data-state={state} data-async={p.async === true ? '' : undefined} data-appear={appear ? '' : undefined} style={{ opacity: state === 'dim' ? 0.5 : 1, transition: 'opacity .25s' }} mask={appear ? `url(#${maskId})` : undefined}>
         {/* 透明的粗线：⌥+单击检查连线时好点中 */}
         <path d={d} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: 'stroke' }} />
         {theme === 'sketch' ? (
@@ -1925,17 +2002,21 @@ function DiagramEdge({ node, p }: NodeProps) {
             <path d={head} fill={color} stroke="none" />
           </>
         )}
-        {label && lb ? (
-          <g style={{ pointerEvents: 'all' }}>
-            <rect x={lb.x} y={lb.y} width={lb.w} height={lb.h} rx={4} fill="#ffffff" fillOpacity={0.92} />
-            <text x={lb.x + lb.w / 2} y={lb.y + lb.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={12} fill={state === 'idle' ? '#3a3a3a' : color}>
-              {label}
-            </text>
-          </g>
-        ) : null}
         {state === 'active' ? <MovingDot d={d} color={color} animate={animate} /> : null}
       </g>
-    </svg>
+      </svg>
+      {/* 标签单独一层，在所有连线之上（不会被别的连线的点击区盖住）；点它等于点这条连线 */}
+      {label && lb ? (
+        <svg width={dctx.width} height={dctx.height} style={{ position: 'absolute', left: -dctx.origin.x, top: -dctx.origin.y, overflow: 'visible', pointerEvents: 'none', zIndex: 3 }}>
+          <motion.g style={{ pointerEvents: 'all', opacity: state === 'dim' ? 0.5 : 1 }} data-jedge-label="" data-jedge-for={node.id} initial={appear ? { opacity: 0 } : false} animate={{ opacity: state === 'dim' ? 0.5 : 1 }} transition={{ duration: 0.3, delay: appear ? 0.45 : 0 }}>
+            <rect x={lb.x} y={lb.y} width={lb.w} height={lb.h} rx={4} fill="#ffffff" fillOpacity={0.92} />
+            <text x={lb.x + lb.w / 2} y={lb.y + lb.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={EDGE_FONT} fill={state === 'idle' ? '#3a3a3a' : color}>
+              {label}
+            </text>
+          </motion.g>
+        </svg>
+      ) : null}
+    </>
   );
 }
 
