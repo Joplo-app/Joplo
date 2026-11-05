@@ -1,0 +1,17 @@
+{
+  "expectRevision": "rev_1",
+  "idempotencyKey": "invite_label_v1",
+  "summary": "邀请按钮文案增加加号",
+  "operations": [
+    {
+      "op": "updateNode",
+      "sceneId": "scene_a_members",
+      "nodeId": "btn_invite",
+      "patch": {
+        "props": {
+          "label": "+ 邀请成员"
+        }
+      }
+    }
+  ]
+}

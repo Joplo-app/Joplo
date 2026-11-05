@@ -3,9 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "bin": { "joplo": "./src/bin.ts" },
+  "bin": {
+    "joplo": "./src/bin.ts"
+  },
   "dependencies": {
     "@joplo/core": "workspace:*",
-    "@joplo/server": "workspace:*"
+    "@joplo/server": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "commander": "^15.0.0",
+    "zod": "^4.6.7"
   }
 }
