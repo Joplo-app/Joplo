@@ -98,7 +98,8 @@ check / dev / build / render 运行前比较项目里的 `@tokenroll/joplo-kit`�
 
 这三个入口在实际调用时才动态 import `@tokenroll/joplo-server`，分别使用 `startDev` / `buildSite` / `renderStep`，参数签名以 `packages/server/src/contract.ts` 为准。模块加载失败或对应函数缺失时，说明包名、函数名和原因，退出 1；check/selection/init/skill/guide 不受其影响。
 
-- dev 默认端口 4790；占用时由服务端明确报错，不静默换端口。log 回调写 stderr；stdout 返回 URL。
+- dev 默认端口 4790；占用时由服务端明确报错，不静默换端口。log 回调写 stderr；stdout 返回项目在看板中的链接（`http://127.0.0.1:<端口>/#/<项目>`）。
+- 一台机器（同一个 `JOPLO_HOME`，缺省 `~/.joplo`）只运行一个看板进程：`<JOPLO_HOME>/server.json` 记录存活的看板时，dev 用其中的令牌把项目注册进去，打印链接和“已加入正在运行的看板”，退出码 0，不启动第二个进程。打开过的项目记在 `<JOPLO_HOME>/projects.json`。
 - build 默认输出项目 dist；显式 out-dir 相对 CLI 当前目录解析。非空输出目录需主动传 overwrite；由服务端执行覆盖检查。输出诊断与构建位置。
 - render 需要可选依赖 Playwright 与 Chromium：没装时在启动编译服务之前就以 RENDER_FAILED 退出 1，提示 `npm i -D playwright && npx playwright install chromium`，并说明 dev、check、build 不需要它。render 缺省截图初始状态；step-id 表示该步骤执行之后的状态。width/height 必须同时提供且为正整数；scale 为有限正数。路径相对当前目录解析。默认不覆盖文件；stdout 返回图片路径，告警写 stderr。
 

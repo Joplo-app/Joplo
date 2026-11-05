@@ -1,4 +1,4 @@
-# Joplo 看板、发布站与截图（T-board）
+# Joplo 看板、发布站与截图
 
 本文说明 `packages/web`（看板界面、发布站界面、低保真渲染器、演示运行时）和 `packages/server`（`startDev`、`buildSite`、`renderStep`）。接口定义见 `packages/server/src/contract.ts`，CLI 只依赖这三个函数。
 
@@ -6,37 +6,45 @@
 
 ```bash
 pnpm install
-pnpm web:serve                          # 用 startDev 打开 examples/invite：http://127.0.0.1:4790/
+pnpm web:serve                          # 用 startDev 打开 examples/invite：http://127.0.0.1:4790/#/<项目>
 pnpm web:serve path/to/project --port 4800 --open
 ```
 
 `joplo dev` / `joplo build` / `joplo render` 由 CLI 调用同一组函数。
 
-## `startDev`：一个进程
+## `startDev`：一个进程，多个项目（D39）
 
-一个 Vite 开发服务同时承担三件事：
+同一台机器（同一个 `JOPLO_HOME`）只运行一个看板进程。
 
-| 职责 | 做法 |
-| --- | --- |
-| 看板界面 | Vite root 是 `packages/web`，React + Tailwind，界面本身也支持 HMR。 |
-| 项目编译 | 项目源文件用 `server.ssrLoadModule` 载入。插件 `joplo:project` 用 automatic JSX、`jsxImportSource: '@tokenroll/joplo-kit'`、development 模式转译，因此 jsxDEV 能拿到 `文件:行:列`。随后交给 core 的 `loadAuthoring` + `compile(…, 'dev')`。项目里的 `@tokenroll/joplo-kit` 指向本仓库的 kit 源码，所以项目可以放在任何目录。 |
-| 热更新 | 项目目录下任何文件变化（`.joplo/`、`dist/`、`node_modules/`、`.git/` 除外）都会使项目模块失效、重新编译，并通过 HMR 自定义事件 `joplo:ir` 把新 IR 推给看板。页面不刷新，保持功能、方案、场景、位置（越界时夹到合法范围）和选中。编译是串行的，编译过程中又有变化时，结束后再编一次。 |
+- **再次 `joplo dev`**：读 `<JOPLO_HOME>/server.json`（`{ port, pid, token }`，权限 0600）。pid 存活且 `GET /__joplo/ping` 返回同一个 pid 时，用令牌调用 `POST /__joplo/projects` 注册项目，打印项目链接后退出，退出码 0，不启动第二个进程。pid 已死或 ping 不通时清掉 server.json，按原来的方式启动；两个 `joplo dev` 同时启动、端口被抢时，后者改为加入前者。
+- **记住项目**：`<JOPLO_HOME>/projects.json`（`{ version: 1, projects: [{ dir, name, lastOpened }] }`，临时文件 + rename 原子写入），首页按最近打开排序。编译成功后用 config 的名称更新 `name`。移除只删记录，不碰项目目录。`JOPLO_HOME` 缺省为 `~/.joplo`；vitest、Playwright 与 `release:smoke` 都把它指向临时目录。
+- **看板界面**：一个 Vite 开发服务，root 是 `packages/web`（或 `@tokenroll/joplo-web` 的 dist），React + Tailwind，界面本身也支持 HMR。
+- **项目编译（按需）**：每个项目一个不监听端口的 Vite 加载器（middlewareMode，不开 HMR / WebSocket）。首页选中、打开演示页或注册时才启动。项目源文件用 `ssrLoadModule` 载入，插件 `joplo:project` 用 automatic JSX、`jsxImportSource: '@tokenroll/joplo-kit'`、development 模式转译，因此 jsxDEV 能拿到 `文件:行:列`，随后交给 core 的 `loadAuthoring` + `compile(…, 'dev')`。
+- **热更新**：界面服务的文件监听覆盖所有已启动的项目目录（`.joplo/`、`dist/`、`node_modules/`、`.git/` 除外）。某个项目的文件变化只重新编译这个项目，并通过 HMR 自定义事件 `joplo:ir`（带 `projectId`）推送，看板只接收当前项目的事件。页面不刷新，保持方案、场景、位置（越界时夹到合法范围）和选中。编译是串行的，编译过程中又有变化时，结束后再编一次。项目列表变化通过 `joplo:projects` 推送。
 
-- **Tailwind**：项目目录会追加为 `index.css` 的 `@source`，项目源文件里出现的 `className` 能被编译，并随文件变化热更新。build 同样如此。
-- **编译出错**：看板顶部显示错误列表，每条格式为 `文件:行:列 + 说明`。语法错误的位置来自转译器，指向真正出错的文件，可以是被 import 的模块。舞台继续显示上一次成功的画面和当前位置，不会白屏。修好并保存后自动恢复。
+- **Tailwind**：所有已启动的项目目录都追加为 `index.css` 的 `@source`，项目源文件里出现的 `className` 能被编译，并随文件变化热更新。build 同样如此。
+- **编译出错**：首页显示错误数和 `文件:行:列 + 说明` 列表；演示页顶部显示错误列表，画面继续显示上一次成功的结果和当前位置，不会白屏。修好并保存后自动恢复。
 - **安全**（沿用 M0）：
   - 只监听 `127.0.0.1`；
   - 每个 HTTP 请求校验 Host（`127.0.0.1:端口` / `localhost:端口`），否则返回 403；
-  - 写接口 `PUT /__joplo/selection` 校验 Origin（存在时必须是本服务）、`Content-Type: application/json`、本地令牌 `x-joplo-token`（注入在看板 HTML 的 meta 里），并限制请求体大小。
-- **端口**：缺省 4790，被占用时直接报错 `端口 N 已被占用`（strictPort），不静默换端口。传 `port: 0` 使用随机端口（测试用）。
+  - 写接口校验 Origin（存在时必须是本服务）、`Content-Type: application/json`、本地令牌 `x-joplo-token`（注入在看板 HTML 的 meta 里，与 server.json 中的相同），并限制请求体大小。令牌错误时注册、移除、导出、打开编辑器返回 403，选中返回 401（沿用）。
+  - Vite 自带的 `/__open-in-editor` 只能经由 `POST /__joplo/p/<id>/open`（校验令牌，且只接受项目内的源文件）进入，直接访问返回 403。
+- **端口**：缺省 4790，被占用（且不是 Joplo 看板）时直接报错 `端口 N 已被占用`（strictPort），不静默换端口。传 `port: 0` 使用随机端口（测试用）。
 
-接口：
+接口（`<id>` 是项目标识：目录名 + 绝对路径的短哈希）：
 
 | 接口 | 说明 |
 | --- | --- |
-| `GET /__joplo/ir` | `{ version, ok, project, diagnostics, home }`。`project` 始终是最近一次成功的 IR；`ok=false` 表示最近一次编译失败。 |
-| `GET /__joplo/selection` | 当前 `.joplo/selection.json`，看板载入时据此恢复选中。 |
-| `PUT /__joplo/selection` | 请求体为 `{ selection: { optionId, scenarioId, position, sceneId, nodeId, stepId? } \| null }`。 |
+| `GET /__joplo/ping` | `{ joplo: true, pid }`，供再次 `joplo dev` 判断看板是否存活。 |
+| `GET /__joplo/projects` | 首页列表：`[{ id, dir, name, lastOpened, status: idle\|compiling\|ok\|error\|missing, errors, version }]`。 |
+| `POST /__joplo/projects` | 注册项目 `{ dir }`（绝对路径）→ `{ id, url }`，并开始编译。 |
+| `DELETE /__joplo/projects/<id>` | 从列表移除（只删记录）。 |
+| `GET /__joplo/p/<id>/ir` | `{ projectId, version, ok, project, diagnostics, home }`。`project` 始终是最近一次成功的 IR。 |
+| `GET` / `PUT /__joplo/p/<id>/selection` | 读 / 写该项目的 `.joplo/selection.json`；PUT 请求体为 `{ selection: { optionId, scenarioId, position, sceneId, nodeId, stepId? } \| null }`。 |
+| `POST /__joplo/p/<id>/open` | `{ at }`：在编辑器中打开项目内的 `文件:行:列`。 |
+| `POST /__joplo/p/<id>/export/image` | `{ scenarioId, position, device, theme }` → PNG（见“导出”）。 |
+| `POST /__joplo/p/<id>/export/video` | `{ scenarioId, device, theme }` → 202 `{ jobId }`；同一项目已有任务时 409。 |
+| `GET /__joplo/p/<id>/export/video` / `…/events` | 当前任务状态 / SSE 进度（带令牌）。 |
 
 ### 选中：`.joplo/selection.json`
 
@@ -54,34 +62,38 @@ pnpm web:serve path/to/project --port 4800 --open
 - 网络失败或令牌错误时，服务端没有写入，看板回滚到上一次确认的选中。
 - 热更新后：选中的元素仍在画面里时保留选中；行号或标签变了会重新写入新的 `at`。元素被删除时取消选中并写入 `null`。
 
-## 看板界面（D32 方案 B：模式决定信息量）
+## 看板界面（D39，原型见 `examples/joplo-board`）
 
-**演示模式（默认）**
+取代 D32 的“演示 / 审阅”双模式和拥挤的顶栏。所有界面状态都在 URL 的 hash 里（`runtime/route.ts`），复制链接就能回到同一个项目 / 功能 / 方案 / 情况 / 场景 / 步骤 / 设备：
 
-- **顶栏**：项目名、当前路径（绿点表示热更新已连接）、功能 / 方案 / 场景切换（选定方案带 ✓）、视图切换（演示场景 / 比较方案 / 浏览产品）、缺口胶囊“缺失 N · 待决定 M”、演示 / 审阅模式切换、桌面 / 手机宽度预览、手绘 / 线框主题、“概念原型”标识。点击缺口胶囊会切到审阅模式，并展开、滚动到情况列表。
-- **中间**：大舞台，按比例缩放以尽量占满主体（1600×1000 窗口下约 1.07 倍）。
-- **底部**：一行紧凑步骤条，包括重置、上一步、播放 / 暂停、下一步、字幕（或“场景完成 · 结果”）、步骤点、模拟标签。
-- 没有侧栏。
+- `#/`、`#/<项目>`：首页；
+- `#/<项目>/f/<功能>?o=<方案>&c=<情况>&s=<场景>&step=<位置>&d=mobile|desktop`：演示页。
 
-**审阅模式**
+**首页**（`board/Home.tsx`）
 
-- **左栏 · 路径树（产品地图）**：列出每个路径上堆叠了哪些功能，每个功能显示涉及的方案。✓ 表示选定，紫色表示正在查看。由方案新增的路径标“由 B 新增”。
-  - 点路径会进入浏览视图；
-  - 点方案会进入该方案的演示。
-- **左栏 · 情况列表**：当前方案的情况与覆盖芯片（缺失、待决定、已表达、不适用、已排除），列出原因，并链接到对应场景。
-- **右栏 · 检查器**：
-  - 选中元素时：标签、类型、`at`（可一键复制）、来源（布局、页面，或方案 X 的堆叠 / 新增页面）、当前可见与禁用状态、禁用原因、设计说明、关联规则（来源与确认状态）、以它为目标的步骤（点击跳到该步之前）。
-  - 选中步骤（点步骤点）时：字幕、`at` 和关联规则。
-  - 未选中时：功能目标、约束、方案思路与取舍、规则、待决问题。
+- 左栏“最近打开”：项目名和路径；编译出错显示“N 个错误”，目录不存在显示“找不到目录”。
+- 右侧：所选项目的功能行（名称、目标、方案数、选定方案、“缺失 N · 待决定 M”、「查看」）。编译出错时列出 `文件:行` 与说明；目录不存在时可以“从列表移除”（只删记录）。
+- 没有任何项目时显示三条开始命令。
 
-**比较方案**：功能页为每个方案列一张卡片，包含舞台缩略图（第一个场景的初始画面）、场景列表（分支）和覆盖芯片。在“按情况比较”里选一个情况，每张卡片会显示这个方案对它的覆盖状态和原因，可以一键“进入场景”。没有场景时按钮禁用。并排双舞台的成本较高，暂未实现（D12）。
+**演示页**（`player/PlayerPage.tsx`，发布站共用）
 
-**浏览产品**：用发布视图 `@<路径>` 按路径浏览产品现在的样子：每个功能取选定方案，数据合并各方案第一个场景的初始数据。只由未选定方案新增的路径，会退回到该方案的画面，并在标签上说明。浏览视图是静态的，不能播放。
+- **顶栏**只有：Joplo、面包屑（项目 / 功能 / 方案 / 场景，前两段回到首页）、右侧电脑 / 手机切换。
+- **左栏**（`board/CaseNav.tsx`，方案 B“按情况分组”）：顶部切换当前方案（情况保持不变）；每条情况标出各方案的状态（✓ / 缺失 / 待决定 / 不适用）。点一条情况就播放当前方案里覆盖它的场景；当前方案没有表达它时，画面上方说明这是缺口，并给出 `npx joplo check --option <方案>`，画面静态展示方案的页面。没有关联情况的场景列在“其他场景”。底部是当前方案的缺口总数。
+- **中间**是画面，按比例缩放尽量占满；手机时自动套上手机外框（与 `Phone` 组件同一个 `PhoneFrame`）。右下角有低调的提示“⌥ + 单击：检查元素”。
+- **画面下方一行**：⟲、上一步、播放 / 暂停、下一步；右侧「…」菜单：导出图片、导出视频、线框风格、复制当前步骤链接、在编辑器中打开（当前步骤的源位置）。
+- **最底下是步骤条**：当前步高亮（点任一步跳过去），下面是本步说明和下一步说明，右侧是模拟标签。
 
-**推进状态**：手动、逐步、自动播放都只通过 core 的 `applyStep` / `stateAt` / `explainClick` 推进，M0 的 `runtime/demo.ts` 继续复用。
+**检查元素**（`board/InspectDrawer.tsx`）：普通单击保持原来的手动推进；**⌥+单击**只检查，不操作原型：写入 selection（服务端计算 at / label，409 时清空并提示），右侧弹出抽屉，显示规则（来源与确认状态）、覆盖的情况、`文件:行`（可复制、可在编辑器中打开）和“Agent 运行 npx joplo selection”的提示。按住 ⌥ 时悬停的元素显示虚线框。
+
+**导出**（`server/src/export.ts`）
+
+- 图片：本机看板调用服务端，Playwright 打开本看板的渲染路由（与 `renderStep` 同一渲染路径），截取当前步骤和当前设备（手机带外框）。发布站在浏览器里用 `modern-screenshot`（web 的 devDependency）截取舞台。
+- 视频（只在本机）：Playwright `recordVideo` 录制渲染路由的自动播放（与看板同一个演示控制器：鼠标、波纹、逐字输入、系统事件、字幕），保存为 `<项目>/exports/<场景>-<时间>.webm`；SSE 报告进度；同一项目同时只有一个任务；没有 Playwright / Chromium 时错误里带 `npx playwright install chromium`。`joplo init` 生成的 `.gitignore` 包含 `exports/`。
+
+**推进状态**：手动、逐步、自动播放都只通过 core 的 `applyStep` / `stateAt` / `explainClick` 推进（`runtime/demo.ts`）。
 
 - 点击的含义由 `explainClick` 决定：推进、禁用原因、“演示未覆盖”、越序提示。
-- 演示模式下，点到按钮里的文字也算点按钮。
+- 点到按钮里的文字也算点按钮；⌥+单击取最内层的元素。
 - 快捷键：`←` / `→` 逐步，空格播放或暂停。
 
 ## 渲染器（`packages/web/src/renderer`）
@@ -97,7 +109,7 @@ pnpm web:serve path/to/project --port 4800 --open
   - `visibleFrom` / `hiddenFrom` 在 `isSelfVisible` 里判断；
   - `AppShell` 的 `navbar` / `aside` 在窄于 `breakpoint` 时默认收起（`collapsed.mobile` 写 false 或绑定为假时以覆盖层展开），没有 `Burger` 时在顶栏补一个示意图标。
   - `Phone` 组件内部的宽度固定为手机宽度 390（`childWidth`），断点、`visibleFrom` / `hiddenFrom`、`AppShell` 收起都按它算；`isNodeVisible` 沿祖先链同样切换宽度，回放与渲染一致。外框由 `PhoneFrame` 绘制（大圆角机身、侧键、听筒，不显示文字），舞台在手机宽度时自动套上同一个 `PhoneFrame`。
-  - `Terminal`：标题栏 + 深色内容区，`Terminal.Output` 的 `tone`（plain / ok / warn / error）决定颜色，超出 `h` / `mah` 时内容区内部滚动；`Terminal.Input` 是值类型（`type` 写入）。
+  - `Terminal`：低保真线框，左上角是 `title` 的圆角窗口；`Terminal.Command`、`Terminal.Output`、`Terminal.Input` 各是一个带边框的圆角块，`tone`（plain / ok / warn / error）只改输出文字的颜色；超出 `h` / `mah` 时窗口内部滚动并停在最新输出；`Terminal.Input` 是值类型（`type` 写入）。
   - 回放与点击解释按**页面自身的 viewport**计算同样的规则：步骤目标在该宽度下被隐藏或导航被收起时报 `TARGET_HIDDEN`。看板的宽度切换只是预览，不改变回放结果。
 - 样式属性（`m/p/w/h/c/bg/fz/fw/ta/ff…`）在 `renderer/style.ts` 转成内联样式；间距、字号、圆角用 Mantine 默认刻度，颜色映射到一组柔和的调色板。
 - 浮层渲染在舞台内部的弹窗层（不 portal 到 body），截图和遮挡检查只看舞台本身。
@@ -115,21 +127,20 @@ pnpm web:serve path/to/project --port 4800 --open
    这样直接双击 `index.html`（`file://`）也能完全离线运行。CSS 和字体是相对路径的静态文件。
 4. 目标目录（缺省 `<项目>/dist`）非空且没有 `overwrite` 时拒绝写入。以下情况永远拒绝：目标是项目目录本身或它的上级、目标在 `.joplo/` 里、目标目录里含有 `joplo.config.ts`。编译失败时不写任何文件，并抛出带诊断的 `EXPORT_FAILED`。
 
-**发布站内容**：
+**发布站内容**（D39：与本机看板同一套布局）：
 
-- 左侧是“整体布局”（各路径）和“功能”（功能名，以及选定方案的场景）；
-- 右侧是舞台和步骤条，支持手动、逐步、自动播放；
-- 功能页显示目标和方案思路；
-- 常驻“概念原型 · 非正式实现”；
-- 只读，没有审阅和选中。
+- 首页：只有一个项目，左栏列功能，右侧是功能行和「查看」；
+- 演示页：同 `PlayerPage`，左栏是选定方案的场景列表；「…」只有导出图片（浏览器内生成）、线框风格、复制链接；
+- 没有缺口、规则、源码位置、检查抽屉和“在编辑器中打开”；⌥+单击按普通单击处理；
+- 常驻“概念原型 · 非正式实现”。
 
-hash 路由：`#/p/<路径>`、`#/f/<功能>`、`#/s/<场景>`。
+hash 路由：`#/`、`#/f/<功能>?s=&step=&d=`；旧链接 `#/s/<场景>` 自动换成演示页链接。
 
 **部署**：`npx wrangler deploy --assets ./dist --name <名称> --compatibility-date 2026-11-01`，或上传到任何静态托管。
 
 ## `renderStep`：截图
 
-`renderStep` 用随机端口启动一次性的 dev 服务（`watch: false`，只编译一次），Playwright 打开渲染路由 `/?render=1&scenario=…&position=…&theme=…`，然后截取舞台。页面和元素索引来自同一份 IR。
+`renderStep` 用随机端口启动一次性的看板进程（不持久化、`watch: false`、只编译一次），Playwright 打开渲染路由 `/?render=1&project=…&scenario=…&position=…&theme=…`，然后截取舞台。页面和元素索引来自同一份 IR。
 
 - `scenarioId` / `stepId` 使用 IR 的限定 ID，例如 `invite.a-modal.success` / `invite.a-modal.success#1`；
 - `elements[]` 带 `at`；没有渲染出来的节点也会列出，`visible: false`；文本节点不列入；
@@ -140,20 +151,21 @@ hash 路由：`#/p/<路径>`、`#/f/<功能>`、`#/s/<场景>`。
 
 - `pnpm vitest run packages/server/test`：
   - dev：编译、Host / Origin / 令牌 / Content-Type 校验、选中写入与 409 时写 null、热更新与语法错误定位、`.joplo/` 变化不触发重新编译、端口占用、非项目目录、空项目；
-  - build：缺省输出、拒绝覆盖、危险目标、编译失败、没有 pick；
-  - HTML 后处理；
-  - renderStep。
+  - hub：projects.json 原子写入与排序、server.json 0600、连续两次 `joplo dev` 只有一个端口且两个项目都在首页、注册接口没有令牌 403、按项目的 IR 与选中、删除记录不删文件、目录消失标为 missing、打开编辑器的路径限制、导出图片 / 视频（409、SSE、没有 Chromium 时的安装命令）；
+  - build：缺省输出、拒绝覆盖、危险目标、编译失败、没有 pick；HTML 后处理；renderStep。
 - `pnpm test:e2e`（Playwright）：
-  - 看板：演示、手动与自动播放的最终状态深度相等、禁用原因、演示未覆盖、方案 B 跨路径跳转；
-  - 审阅：selection.json 的 `at`、取消选中写 null；
-  - 路径树、缺口胶囊、比较方案、浏览产品；
+  - 首页：最近打开、功能行与缺口、编译错误列表、找不到目录与移除、新项目实时出现、空状态；
+  - 演示页：顶栏只有面包屑与设备切换（没有功能 / 方案 / 场景下拉和模式切换），每个控件只出现一次；手动与自动播放的最终状态深度相等；禁用原因、演示未覆盖；切方案时情况不变；URL 还原全部状态；
+  - 检查：⌥+单击写入 selection.json 的 `at`、抽屉显示规则与情况、取消选中写 null、409 提示；缺口说明与 check 命令；
   - 热更新：不刷新页面、语法错误定位与恢复、选中跟随行号或被清除；
-  - 发布站：file:// 和静态服务器都能播放；产物不含 `rules`、`a-modal.tsx`、`b-batch`、`B · 独立页面`、`features/invite`，也没有绝对路径。
-- 所有测试都在 `examples/invite` 的临时副本上运行，端口随机。
-- `pnpm docs:screenshots` 重新生成 `docs/screenshots/*.png`，这是写入该目录的唯一途径。
+  - 发布站：file:// 和静态服务器都能播放，布局与看板相同、没有创作侧控件，浏览器内导出图片；产物不含 `"rules"`、规则文字、`projects.json`、`.joplo`、`/__joplo/`、缺口字样、未选定方案和绝对路径。
+- 所有测试都在示例的临时副本上运行，端口随机，`JOPLO_HOME` 指向临时目录。
+- `pnpm docs:screenshots` 重新生成 `docs/screenshots/*.png`，这是写入该目录的唯一途径；其中 `prototype-*.png` 是 `examples/joplo-board` 原型里对应场景的渲染，用来与新界面对照。
 
 ## 已知限制
 
 - 发布站约 0.55 MB HTML（内联 JS + IR）加上按需加载的字体子集，字体全部打包在 `assets/`，共约 12 MB。
-- 选中恢复只在看板载入时进行一次；多个看板标签页同时打开时，以最后一次写入为准。
-- 浏览视图的数据是各选定方案第一个场景初始数据的合并，只用于看整体外观，不代表任何具体场景。
+- 看板载入时不再根据 selection.json 自动跳转（URL 决定位置）；多个看板标签页同时打开时，以最后一次写入为准。
+- 缺口时展示的静态画面是方案第一个场景的初始画面，只用于看方案长什么样。
+- 编译从未成功过的项目，首页显示目录名（还读不到 config 的 name）。
+- 发布站浏览器内导出的图片只有舞台，不带手机外框；本机导出带外框。

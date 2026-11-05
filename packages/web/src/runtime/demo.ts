@@ -16,9 +16,8 @@ import { animate, type AnimationPlaybackControls } from 'motion';
 import { explainClick, applyStep, getScenario, nodeLabel, findNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@tokenroll/joplo-core';
 import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 
-export type Mode = 'review' | 'demo';
-/** stage = 播放场景；compare = 功能页比较方案；browse = 发布视图按路径浏览。 */
-export type View = 'stage' | 'compare' | 'browse';
+/** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */
+export type View = 'stage' | 'browse';
 
 export type Notice =
   | { kind: 'disabled'; nodeId: string; text: string }
@@ -47,7 +46,6 @@ export type Snapshot = {
   /** 浏览视图的画面（`@<路径>`）。 */
   browseSceneId: string | null;
   state: PlayState | null;
-  mode: Mode;
   playing: boolean;
   paused: boolean;
   busy: boolean;
@@ -91,7 +89,6 @@ export class DemoController {
     view: 'stage',
     browseSceneId: null,
     state: null,
-    mode: 'demo',
     playing: false,
     paused: false,
     busy: false,
@@ -140,7 +137,6 @@ export class DemoController {
         playing: this.snap.playing,
         paused: this.snap.paused,
         busy: this.snap.busy,
-        mode: this.snap.mode,
         view: this.snap.view,
         featureId: this.snap.featureId,
         optionId: this.snap.optionId,
@@ -243,13 +239,6 @@ export class DemoController {
   }
 
   // ---------- 模式、视图、功能、方案、场景 ----------
-  setMode(mode: Mode) {
-    if (mode === this.snap.mode) return;
-    this.stop();
-    this.set({ mode, notice: { kind: 'info', text: mode === 'review' ? '审阅模式：点击元素只选中，不触发演示' : '演示模式：点击会执行原型交互' } });
-    this.autoClear();
-  }
-
   setView(view: View) {
     const p = this.snap.project;
     if (!p || view === this.snap.view) return;
@@ -258,12 +247,20 @@ export class DemoController {
       const id = this.snap.browseSceneId ?? (this.snap.home ? browseSceneId(p, this.snap.home) : null);
       if (!id) return this.info('项目还没有任何路径');
       this.set({ view, browseSceneId: id, state: browseState(p, id), playbackError: null, epoch: this.snap.epoch + 1 });
-    } else if (view === 'stage') {
+    } else {
       const sc = this.scenario();
       if (!sc) return this.info('这个方案还没有演示场景');
       const r = this.safeStateAt(p, sc.id, 0);
       this.set({ view, state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1 });
-    } else this.set({ view });
+    }
+  }
+
+  /** 静态展示某个画面（方案没有覆盖当前情况时展示方案的页面）；不能推进，也不改变当前方案。 */
+  preview(sceneId: string) {
+    const p = this.snap.project;
+    if (!p || !p.scenes[sceneId]) return;
+    this.stop();
+    this.set({ view: 'browse', browseSceneId: sceneId, scenarioId: null, state: browseState(p, sceneId), playbackError: null, epoch: this.snap.epoch + 1, notice: null });
   }
 
   /** 浏览某个路径（发布视图 `@<路径>`）。 */
@@ -284,42 +281,36 @@ export class DemoController {
     this.stop();
     this.set({ featureId });
     if (opt) this.setOption(opt);
-    else this.set({ optionId: null, scenarioId: null, view: this.snap.view === 'stage' ? 'compare' : this.snap.view });
+    else this.set({ optionId: null, scenarioId: null });
   }
 
-  setOption(optionId: string, view: View = this.snap.view === 'compare' ? 'compare' : 'stage') {
+  /** 切换方案：播放它的第一个场景；没有场景时静态展示它的页面。 */
+  setOption(optionId: string) {
     const p = this.snap.project;
     if (!p || !p.options[optionId]) return;
     this.stop();
     const first = scenariosOf(p, optionId)[0] ?? null;
-    const st = first ? this.safeStateAt(p, first.id, 0) : { state: null, error: null };
     const featureId = p.options[optionId]!.featureId;
-    if (view === 'stage' && !first) {
-      this.set({ featureId, optionId, scenarioId: null, view: 'compare', notice: { kind: 'info', text: `方案「${p.options[optionId]!.name}」还没有演示场景` } });
-      return this.autoClear();
+    if (!first) {
+      this.set({ featureId, optionId, scenarioId: null });
+      const scene = Object.values(p.scenes).find((s) => s.optionId === optionId);
+      if (scene) this.preview(scene.id);
+      return;
     }
-    this.set({
-      featureId,
-      optionId,
-      scenarioId: first?.id ?? null,
-      view,
-      state: view === 'stage' ? st.state : this.snap.state,
-      playbackError: view === 'stage' ? st.error : this.snap.playbackError,
-      epoch: this.snap.epoch + 1,
-      notice: { kind: 'switched', text: `已切换到方案「${p.options[optionId]!.name}」` },
-    });
-    this.autoClear();
+    const st = this.safeStateAt(p, first.id, 0);
+    this.set({ featureId, optionId, scenarioId: first.id, view: 'stage', state: st.state, playbackError: st.error, epoch: this.snap.epoch + 1, notice: null });
   }
 
-  setScenario(scenarioId: string, position = 0) {
+  /** 播放某个场景的某个位置。quiet：由链接 / 左栏直接定位时不弹“已切换”提示。 */
+  setScenario(scenarioId: string, position = 0, opts: { quiet?: boolean } = {}) {
     const p = this.snap.project;
     if (!p || !p.scenarios[scenarioId]) return;
     this.stop();
     const sc = p.scenarios[scenarioId]!;
     const r = this.safeStateAt(p, scenarioId, Math.max(0, Math.min(position, sc.steps.length)));
     const featureId = p.options[sc.optionId]?.featureId ?? this.snap.featureId;
-    this.set({ featureId, scenarioId, optionId: sc.optionId, view: 'stage', state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: { kind: 'switched', text: `已切换到「${sc.name}」，数据已重置` } });
-    this.autoClear();
+    this.set({ featureId, scenarioId, optionId: sc.optionId, view: 'stage', state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: opts.quiet ? null : { kind: 'switched', text: `已切换到「${sc.name}」，数据已重置` } });
+    if (!opts.quiet) this.autoClear();
   }
 
   // ---------- 逐步查看 ----------
@@ -423,13 +414,17 @@ export class DemoController {
   }
 
   // ---------- 点击 ----------
-  async clickNode(nodeId: string, point: { x: number; y: number }) {
+  /**
+   * 单击画面元素：按当前场景解释（推进、禁用原因、演示范围外、不是当前步骤）。
+   * inspect（⌥+单击）：只检查 —— 写入选中，不操作原型。
+   */
+  async clickNode(nodeId: string, point: { x: number; y: number }, opts: { inspect?: boolean } = {}) {
     const p = this.snap.project;
     const st = this.snap.state;
     if (!p || !st) return;
-    if (this.snap.mode === 'review') return this.select(nodeId);
+    if (opts.inspect) return this.select(nodeId);
     const sc = this.scenario();
-    if (this.snap.view !== 'stage' || !sc) return this.info('浏览视图只展示整体布局；要体验交互，请在顶栏选择功能场景');
+    if (this.snap.view !== 'stage' || !sc) return this.info('这是静态画面：当前方案还没有演示这个情况');
 
     if (this.snap.playing && !this.snap.paused) return this.info('正在自动播放：先暂停，再手动操作');
     if (this.snap.playing) this.stop(); // 暂停中手动接管
@@ -584,12 +579,11 @@ export class DemoController {
     await this.writeSelection(this.inputOf(sel), '已恢复上次的选中', '上次的选中已失效', true);
   }
 
-  /** 点击步骤芯片：跳到该步骤执行之后；审阅模式下同时选中该步骤。 */
+  /** 点击步骤条上的一步：跳到该步骤执行之后（-1 = 初始状态）。 */
   clickStepChip(index: number) {
     const sc = this.scenario();
     if (!sc || this.snap.view !== 'stage') return;
     this.goto(index + 1);
-    if (this.snap.mode === 'review' && index >= 0) void this.select(null, sc.steps[index]?.id ?? null);
   }
 
   /** 取消动画；若有尚未提交的步骤，立即提交它（不跳过业务状态）。 */

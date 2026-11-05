@@ -282,7 +282,9 @@ async function smoke() {
     // 8. dev：随机端口，GET / 返回看板 HTML；选中一个元素，随后 selection 读出 文件:行
     const port = await freePort();
     const served = [];
-    const dev = spawn(joplo, ['dev', '--port', String(port)], { cwd: project, env: cleanEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+    // 看板进程的注册表与 server.json 放在临时目录（不读写真实的 ~/.joplo）
+    const joploHome = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-smoke-home-'));
+    const dev = spawn(joplo, ['dev', '--port', String(port)], { cwd: project, env: cleanEnv({ JOPLO_HOME: joploHome }), stdio: ['ignore', 'pipe', 'pipe'] });
     let devOut = '';
     dev.stdout.on('data', (c) => (devOut += c));
     dev.stderr.on('data', (c) => (devOut += c));
@@ -309,7 +311,13 @@ async function smoke() {
       const projectCss = await request(port, { path: cssPath });
       assert(projectCss.status === 200 && projectCss.text.includes('.137em'), `project.css 应包含作者 className（${projectCss.status}）`);
       served.push(projectCss.text);
-      const irRes = await request(port, { path: '/__joplo/ir' });
+      const listed = JSON.parse((await request(port, { path: '/__joplo/projects' })).text).projects;
+      assert(listed.length === 1 && listed[0].dir === fs.realpathSync(project), `首页项目列表：${JSON.stringify(listed)}`);
+      const pid = listed[0].id;
+      assert(devOut.includes(`#/${pid}`), 'joplo dev 应输出项目的看板链接');
+      const info = JSON.parse(fs.readFileSync(path.join(joploHome, 'server.json'), 'utf8'));
+      assert(info.port === port && (fs.statSync(path.join(joploHome, 'server.json')).mode & 0o777) === 0o600, 'server.json 应记录端口且权限为 0600');
+      const irRes = await request(port, { path: `/__joplo/p/${pid}/ir` });
       served.push(irRes.text);
       const ir = JSON.parse(irRes.text);
       assert(ir.ok === true && ir.project, `IR：${irRes.text.slice(0, 300)}`);
@@ -317,7 +325,7 @@ async function smoke() {
       const optionId = Object.keys(ir.project.options)[0];
       assert(sceneId && optionId, '找不到包含按钮 start 的画面');
       const body = JSON.stringify({ selection: { optionId, scenarioId: null, position: 0, sceneId, nodeId: 'start' } });
-      const put = await request(port, { method: 'PUT', path: '/__joplo/selection', body, headers: { origin: `http://127.0.0.1:${port}`, 'content-type': 'application/json', 'x-joplo-token': token, 'content-length': Buffer.byteLength(body) } });
+      const put = await request(port, { method: 'PUT', path: `/__joplo/p/${pid}/selection`, body, headers: { origin: `http://127.0.0.1:${port}`, 'content-type': 'application/json', 'x-joplo-token': token, 'content-length': Buffer.byteLength(body) } });
       assert(put.status === 200, `PUT selection 返回 ${put.status}：${put.text}`);
       const at = JSON.parse(put.text).selection?.at;
       assert(/^features\/example\/options\/a\.tsx:\d+:\d+$/.test(at ?? ''), `selection.at 应为项目相对的 文件:行:列，实际 ${at}`);
@@ -327,7 +335,7 @@ async function smoke() {
       fs.writeFileSync(pageFile, fs.readFileSync(pageFile, 'utf8').replace('tracking-[0.137em]', 'tracking-[0.211em]'));
       const tHot = Date.now();
       for (;;) {
-        const now = JSON.parse((await request(port, { path: '/__joplo/ir' })).text);
+        const now = JSON.parse((await request(port, { path: `/__joplo/p/${pid}/ir` })).text);
         if (now.version > ir.version) break;
         if (Date.now() - tHot > 15000) die('改动作者文件后 IR 没有重新编译');
         await new Promise((r) => setTimeout(r, 100));
@@ -335,6 +343,17 @@ async function smoke() {
       const hotCss = await request(port, { path: cssPath });
       assert(hotCss.text.includes('.211em'), '热更新后 project.css 应包含新的 className');
       log(`  ✓ 热更新：IR 重新编译，新 className 已编译（${Date.now() - tHot} ms）`);
+
+      // 一个进程、多个项目（D39）：在另一个目录再运行 joplo dev → 注册到已运行的看板并退出（不启动第二个进程）
+      const second = path.join(base, 'second');
+      sh(joplo, ['init', 'second'], base);
+      const t2 = Date.now();
+      const again = sh(joplo, ['dev', '--port', String(await freePort())], second, { env: { JOPLO_HOME: joploHome }, timeout: 30000 });
+      assert(again.stdout.includes(`http://127.0.0.1:${port}/#/`), `第二次 joplo dev 应输出已运行看板的链接：${again.out}`);
+      assert(again.out.includes('已加入正在运行的看板'), `第二次 joplo dev 应说明已加入：${again.out}`);
+      const both = JSON.parse((await request(port, { path: '/__joplo/projects' })).text).projects.map((p) => p.dir).sort();
+      assert(both.length === 2 && both.includes(fs.realpathSync(second)), `首页应有两个项目：${JSON.stringify(both)}`);
+      log(`  ✓ 再次 joplo dev：加入同一个看板（端口 ${port}）后退出，首页有 2 个项目（${Date.now() - t2} ms）`);
     } finally {
       dev.kill('SIGTERM');
       await Promise.race([exited, new Promise((r) => setTimeout(r, 5000))]);

@@ -16,11 +16,11 @@ export function viewportOf(project: Project, state: PlayState): Viewport {
 }
 
 /**
- * 点击命中的元素：文本节点（#text）不单独响应；演示模式优先取最近的可操作祖先
- * （点到按钮里的文字或图标也算点按钮），审阅模式取最内层的元素，便于精确选中。
+ * 点击命中的元素：文本节点（#text）不单独响应；操作时优先取最近的可操作祖先
+ * （点到按钮里的文字或图标也算点按钮），检查（⌥+单击）时取最内层的元素，便于精确选中。
  */
-export function pickTarget(el: HTMLElement, mode: RenderMode): HTMLElement | null {
-  if (mode === 'demo') {
+export function pickTarget(el: HTMLElement, mode: RenderMode, inspect = false): HTMLElement | null {
+  if (mode === 'demo' && !inspect) {
     const inter = el.closest<HTMLElement>('[data-jinteractive]');
     if (inter) return inter;
   }
@@ -40,7 +40,8 @@ export type StageProps = {
   nextTargetId?: string | null;
   /** 跳转（重置、上一步、切换场景）时递增：旧 Toast 直接移除，不播放退出动画。 */
   epoch?: number;
-  onNodeClick?: (nodeId: string, point: { x: number; y: number }) => void;
+  /** inspect = 按住 ⌥（Alt）单击：检查元素，不操作原型。 */
+  onNodeClick?: (nodeId: string, point: { x: number; y: number }, opts: { inspect: boolean }) => void;
   stageRef?: (el: HTMLDivElement | null) => void;
   overlay?: ReactNode;
   /** 预览宽度：覆盖页面自身的 viewport（看板的“桌面 / 手机”切换、renderStep 的 viewport）。 */
@@ -63,20 +64,21 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
 
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     if (!onNodeClick) return;
-    const hit = pickTarget(e.target as HTMLElement, mode);
+    const inspect = e.altKey;
+    const hit = pickTarget(e.target as HTMLElement, mode, inspect);
     if (!hit || !rootRef.current?.contains(hit)) return;
     e.preventDefault();
-    onNodeClick(hit.dataset.jid!, toFramePoint(e.clientX, e.clientY));
+    onNodeClick(hit.dataset.jid!, toFramePoint(e.clientX, e.clientY), { inspect });
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!onNodeClick || (e.key !== 'Enter' && e.key !== ' ')) return;
     const t = e.target as HTMLElement;
     if (t.tagName === 'BUTTON') return; // 原生按钮会自己触发 click
-    const hit = pickTarget(t, mode);
+    const hit = pickTarget(t, mode, e.altKey);
     if (!hit) return;
     e.preventDefault();
     const r = hit.getBoundingClientRect();
-    onNodeClick(hit.dataset.jid!, toFramePoint(r.left + r.width / 2, r.top + r.height / 2));
+    onNodeClick(hit.dataset.jid!, toFramePoint(r.left + r.width / 2, r.top + r.height / 2), { inspect: e.altKey });
   };
 
   return (

@@ -53,6 +53,20 @@ export function parseErrorLoc(message: string, file: string): { line: number; co
   return m ? { line: Number(m[1]), column: Number(m[2]) } : null;
 }
 
+/** 作者 className 的 CSS 入口：追加每个项目目录为 Tailwind @source（看板进程同时服务多个项目）。 */
+export function cssSourcePlugin(dirs: () => string[], web: WebAssets = locateWebAssets()): Plugin {
+  const entry = cssEntry(web);
+  return {
+    name: 'joplo:css-sources',
+    enforce: 'pre',
+    transform(code, id) {
+      if (id.split('?')[0] !== entry) return;
+      const css = web.mode === 'dist' ? code.replace(/@import\s+["']tailwindcss["']/, `@import ${JSON.stringify(tailwindIndexCss())}`) : code;
+      return { code: `${css}\n${dirs().map((d) => `@source ${JSON.stringify(d)};`).join('\n')}\n`, map: null };
+    },
+  };
+}
+
 /**
  * 转译项目源文件（TSX → 收集数据的 JS）；把 Tailwind @source 指向项目目录。
  * dist 形态下 CSS 入口是 @tokenroll/joplo-web/dist/project.css，其中的 `@import "tailwindcss"` 改为从 server 的依赖解析。

@@ -135,12 +135,15 @@
     outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
+  /* 按住 ⌥ 时（[data-inspecting]）悬停的元素显示虚线框：⌥+单击检查它 */
+  [data-inspecting] .jstage [data-jid]:hover:not(:has([data-jid]:hover)),
   .jstage[data-mode="review"] [data-jid]:hover:not(:has([data-jid]:hover)) {
     outline: 1px dashed color-mix(in oklab, var(--sel) 60%, transparent);
     outline-offset: 2px;
   }
-  .jstage[data-mode="review"] [data-jid] {
-    cursor: default;
+  .jstage[data-mode="review"] [data-jid],
+  [data-inspecting] .jstage [data-jid] {
+    cursor: help !important;
   }
   .jstage[data-mode="demo"] [data-jinteractive] {
     cursor: pointer;

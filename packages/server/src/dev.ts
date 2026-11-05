@@ -1,15 +1,16 @@
 /**
- * `joplo dev`：一个进程、一个 Vite 开发服务，同时承担
- *   1. 看板界面（packages/web，React + Tailwind，HMR）；
- *   2. 项目编译（ssrLoadModule 载入作者的 TSX → core.loadAuthoring → core.compile(…, 'dev')）；
- *   3. 热更新（项目目录任何文件变化 → 使模块失效 → 重新编译 → HMR 自定义事件 `joplo:ir` 推送新 IR，不整页刷新）。
+ * `joplo dev`：本机只运行一个看板进程（D39），同时服务多个项目。
  *
- * 安全（沿用 M0）：只监听 127.0.0.1；每个 HTTP 请求校验 Host；写接口校验 Origin、Content-Type 与本地令牌。
+ * - 界面：一个 Vite 开发服务（packages/web 源码或 @tokenroll/joplo-web 的 dist），HMR。
+ * - 项目：每个项目一个不监听端口的 Vite 加载器（middlewareMode），ssrLoadModule 载入作者 TSX →
+ *   core.loadAuthoring → core.compile(…, 'dev')。项目按需编译：首页选中、打开演示页或注册时才启动。
+ * - 热更新：界面服务的文件监听覆盖所有已启动的项目目录；某个项目的文件变化 → 只重新编译这个项目 →
+ *   HMR 自定义事件 `joplo:ir`（带 projectId）推送，看板只接收当前项目的事件。
+ * - 记住项目：`<JOPLO_HOME>/projects.json`；运行中的看板：`<JOPLO_HOME>/server.json`（见 home.ts）。
+ *   createDev 缺省不持久化（renderStep、测试）；startDev（CLI）持久化，并在已有存活看板时只注册、不启动第二个进程。
+ *
+ * 安全（沿用 M0）：只监听 127.0.0.1；每个请求校验 Host；写接口校验 Origin、Content-Type 与本地令牌。
  * 端口被占用时直接报错（strictPort），不静默换端口。
- *
- * 看板界面有两种来源（web-assets.ts）：仓库里直接编译 packages/web/src（界面本身也热更新）；从 npm 安装时用
- * @tokenroll/joplo-web 预构建的 dist/app。后者的 `import.meta.hot` 在构建时改成了 `globalThis.__JOPLO_HOT__`，这里在页面里
- * 先用 Vite 客户端的 createHotContext 创建它，并以 JS 导入 project.css（作者 className，随项目文件热更新）。
  */
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -20,9 +21,11 @@ import tailwindcss from '@tailwindcss/vite';
 import { createLogger, createServer, type Logger, type Plugin, type PluginOption, type ViteDevServer } from 'vite';
 import { JoploError, type Diagnostic, type Project } from '@tokenroll/joplo-core';
 import type { DevHandle, DevOptions } from './contract.ts';
+import { ExportHub, type ExportDeps } from './export.ts';
+import { Registry, clearServerInfo, joploHome, pidAlive, projectIdOf, readServerInfo, writeServerInfo, type ProjectRecord } from './home.ts';
 import { compileProject, invalidateProjectModules } from './project.ts';
 import { SelectionBody, readSelection, resolveSelection, writeSelection } from './selection.ts';
-import { IGNORED_DIRS, isProjectSource, joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
+import { IGNORED_DIRS, cssSourcePlugin, isProjectSource, joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
 import type { DistWeb, WebAssets } from './web-assets.ts';
 
 /** 推给看板的编译结果。`project` 始终是最近一次成功的 IR；`ok=false` 时看板显示错误列表、保留画面。 */
@@ -34,7 +37,19 @@ export type DevPayload = {
   home: string | null;
 };
 
+/** 首页项目列表的一行。status：idle 未编译、compiling 首次编译中、ok、error（编译出错）、missing（目录不存在）。 */
+export type ProjectSummary = {
+  id: string;
+  dir: string;
+  name: string;
+  lastOpened: string;
+  status: 'idle' | 'compiling' | 'ok' | 'error' | 'missing';
+  errors: number;
+  version: number;
+};
+
 export const IR_EVENT = 'joplo:ir';
+export const PROJECTS_EVENT = 'joplo:projects';
 const MAX_BODY = 64 * 1024;
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -43,7 +58,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'cache-control': 'no-store',
 };
 
-function sendJson(res: http.ServerResponse, status: number, body: unknown) {
+export function sendJson(res: http.ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { ...SECURITY_HEADERS, 'content-type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(body));
 }
@@ -131,72 +146,358 @@ async function webPlugins(web: WebAssets): Promise<PluginOption[]> {
   return [react(), tailwindcss()];
 }
 
-export type InternalDevOptions = DevOptions & {
-  /** false：只编译一次、不监听文件（renderStep 用它保证截图与元素索引来自同一份 IR）。 */
-  watch?: boolean;
+/** 不持久化时的项目记录（只在内存里，进程结束即消失）。 */
+class MemoryRegistry {
+  private items: ProjectRecord[] = [];
+  list() {
+    return [...this.items].sort((a, b) => b.lastOpened.localeCompare(a.lastOpened));
+  }
+  touch(dir: string, name?: string) {
+    const prev = this.items.find((p) => p.dir === dir);
+    const rec = { dir, name: name ?? prev?.name ?? path.basename(dir), lastOpened: new Date().toISOString() };
+    this.items = [rec, ...this.items.filter((p) => p.dir !== dir)];
+    return rec;
+  }
+  rename(dir: string, name: string) {
+    const rec = this.items.find((p) => p.dir === dir);
+    if (rec) rec.name = name;
+  }
+  remove(dir: string) {
+    const n = this.items.length;
+    this.items = this.items.filter((p) => p.dir !== dir);
+    return this.items.length !== n;
+  }
+}
+type RegistryLike = Pick<Registry, 'list' | 'touch' | 'rename' | 'remove'>;
+
+/** 一个已启动的项目：加载器、编译结果、串行化的重新编译。 */
+export type ProjectSlot = {
+  id: string;
+  dir: string;
+  loader: ViteDevServer | null;
+  ready: Promise<void>;
+  payload: DevPayload;
+  compiling: boolean;
+  closed: boolean;
+  running: Promise<void> | null;
+  dirty: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
 };
 
-export type InternalDevHandle = DevHandle & { token: string; port: number; payload(): DevPayload; server: ViteDevServer };
+export type HubOptions = {
+  /** 缺省 4790；被占用时报错，不静默换端口。0 = 随机端口。 */
+  port?: number;
+  log?: (line: string) => void;
+  /** false：只编译一次、不监听文件（renderStep 用它保证截图与元素索引来自同一份 IR）。 */
+  watch?: boolean;
+  /** 持久化目录（projects.json、server.json）；缺省 null：只在内存里记项目，不写 server.json。 */
+  home?: string | null;
+  /** 测试注入：导出用的 Playwright 载入、视频录制。 */
+  exportDeps?: Partial<ExportDeps>;
+};
 
-export async function createDev(opts: InternalDevOptions): Promise<InternalDevHandle> {
+export type Hub = {
+  url: string;
+  port: number;
+  token: string;
+  server: ViteDevServer;
+  /** 登记并（可选）开始编译一个项目；返回它的 id 与看板链接。 */
+  addProject(dir: string, opts?: { compile?: boolean }): { id: string; url: string; slot: ProjectSlot | null };
+  /** 已启动的项目；未启动时启动它（目录不存在时抛 NOT_FOUND）。 */
+  ensure(id: string): Promise<ProjectSlot>;
+  projects(): ProjectSummary[];
+  close(): Promise<void>;
+};
+
+const projectUrl = (base: string, id: string) => `${base}#/${encodeURIComponent(id)}`;
+
+export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   const log = opts.log ?? ((m: string) => process.stderr.write(m + '\n'));
-  const projectDir = realProjectDir(opts.projectDir);
   const watch = opts.watch !== false;
   const port = opts.port ?? 4790;
   const token = crypto.randomBytes(24).toString('hex');
   const web = locateWebAssets();
+  const registry: RegistryLike = opts.home ? new Registry(opts.home) : new MemoryRegistry();
+  const slots = new Map<string, ProjectSlot>();
   let actualPort = port;
-  let payload: DevPayload = { version: 0, ok: false, project: null, diagnostics: [], home: null };
+  let closed = false;
+  let server: ViteDevServer;
 
   const allowedHosts = () => new Set([`127.0.0.1:${actualPort}`, `localhost:${actualPort}`]);
   const allowedOrigins = () => new Set([`http://127.0.0.1:${actualPort}`, `http://localhost:${actualPort}`]);
+  const baseUrl = () => `http://127.0.0.1:${actualPort}/`;
+
+  const activeDirs = () => [...slots.values()].filter((s) => !s.closed).map((s) => s.dir);
+  const slotOfFile = (file: string) => [...slots.values()].find((s) => !s.closed && isProjectSource(s.dir, file)) ?? null;
+  const recordOf = (id: string) => registry.list().find((r) => projectIdOf(r.dir) === id) ?? null;
+
+  const summaries = (): ProjectSummary[] =>
+    registry.list().map((r) => {
+      const id = projectIdOf(r.dir);
+      const s = slots.get(id);
+      const exists = fs.existsSync(r.dir);
+      const errors = s ? s.payload.diagnostics.filter((d) => d.severity === 'error').length : 0;
+      const status: ProjectSummary['status'] = !exists ? 'missing' : !s ? 'idle' : s.compiling && s.payload.version === 0 ? 'compiling' : errors > 0 || !s.payload.ok ? 'error' : 'ok';
+      return { id, dir: r.dir, name: r.name, lastOpened: r.lastOpened, status, errors: status === 'error' ? Math.max(errors, 1) : errors, version: s?.payload.version ?? 0 };
+    });
+  const broadcastProjects = () => {
+    if (!closed) server?.ws.send({ type: 'custom', event: PROJECTS_EVENT, data: { projects: summaries() } });
+  };
+
+  // ---------- 项目：加载器与编译 ----------
+  async function startLoader(slot: ProjectSlot) {
+    slot.loader = await createServer({
+      configFile: false,
+      envDir: false,
+      root: slot.dir,
+      appType: 'custom',
+      customLogger: makeLogger(log),
+      resolve: { alias: kitAliases(web, slot.dir) },
+      plugins: [joploProjectPlugin(slot.dir, web)],
+      // 只在服务端载入模块：不开 HMR、不开 WebSocket（多个项目同时运行时不能争用端口）、不监听
+      server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+      optimizeDeps: { noDiscovery: true, include: [] },
+      cacheDir: path.join(slot.dir, '.joplo/vite'),
+    });
+  }
+
+  async function recompile(slot: ProjectSlot) {
+    const loader = slot.loader!;
+    invalidateProjectModules(loader, slot.dir);
+    const out = await compileProject(loader, slot.dir, 'dev');
+    const prev = slot.payload;
+    slot.payload = { version: prev.version + 1, ok: out.project !== null, project: out.project ?? prev.project, diagnostics: out.diagnostics, home: out.home ?? prev.home };
+    const errors = out.diagnostics.filter((d) => d.severity === 'error');
+    if (errors.length) log(`[joplo] ${path.basename(slot.dir)} 编译出错（${errors.length}）：${errors.map((d) => `${d.at ?? ''} ${d.message}`).join('；').slice(0, 400)}`);
+    if (out.project && out.project.name) registry.rename(slot.dir, out.project.name);
+    if (!closed) server?.ws.send({ type: 'custom', event: IR_EVENT, data: { projectId: slot.id, ...slot.payload } });
+    broadcastProjects();
+  }
+
+  /** 串行化：编译进行中又有变化时，结束后再编一次。 */
+  function run(slot: ProjectSlot): Promise<void> {
+    if (slot.closed || closed) return Promise.resolve();
+    if (slot.running) {
+      slot.dirty = true;
+      return slot.running;
+    }
+    slot.compiling = true;
+    slot.running = (async () => {
+      do {
+        slot.dirty = false;
+        try {
+          await recompile(slot);
+        } catch (e) {
+          log(`[joplo] 编译异常：${e instanceof Error ? e.message : String(e)}`);
+        }
+      } while (slot.dirty && !slot.closed);
+    })().finally(() => {
+      slot.running = null;
+      slot.compiling = false;
+    });
+    return slot.running;
+  }
+
+  function activate(dir: string): ProjectSlot {
+    const id = projectIdOf(dir);
+    const existing = slots.get(id);
+    if (existing && !existing.closed) return existing;
+    const slot: ProjectSlot = {
+      id,
+      dir,
+      loader: null,
+      ready: Promise.resolve(),
+      payload: { version: 0, ok: false, project: null, diagnostics: [], home: null },
+      compiling: true,
+      closed: false,
+      running: null,
+      dirty: false,
+      timer: null,
+    };
+    slots.set(id, slot);
+    slot.ready = (async () => {
+      await startLoader(slot);
+      if (watch && server) server.watcher.add(dir);
+      await run(slot);
+    })().catch((e) => log(`[joplo] 项目启动失败：${e instanceof Error ? e.message : String(e)}`));
+    invalidateCss();
+    return slot;
+  }
+
+  async function deactivate(slot: ProjectSlot) {
+    slot.closed = true;
+    if (slot.timer) clearTimeout(slot.timer);
+    await slot.running?.catch(() => undefined);
+    await slot.loader?.close().catch(() => undefined);
+    if (watch && server) server.watcher.unwatch(slot.dir);
+    slots.delete(slot.id);
+  }
+
+  /** 新项目的目录加入 Tailwind @source：让 CSS 入口重新转换。 */
+  function invalidateCss() {
+    if (!server) return;
+    const entry = web.mode === 'source' ? web.indexCss : web.projectCss;
+    const env = server.environments.client;
+    const mods = env.moduleGraph.getModulesByFile(entry);
+    if (!mods) return;
+    for (const m of mods) void env.reloadModule(m).catch(() => undefined);
+  }
+
+  async function ensure(id: string): Promise<ProjectSlot> {
+    let slot = slots.get(id);
+    if (!slot) {
+      const rec = recordOf(id);
+      if (!rec) throw new JoploError('NOT_FOUND', `没有这个项目：${id}`);
+      if (!fs.existsSync(rec.dir)) throw new JoploError('NOT_FOUND', `找不到项目目录：${rec.dir}`);
+      slot = activate(rec.dir);
+    }
+    await slot.ready;
+    return slot;
+  }
+
+  function addProject(dirIn: string, o: { compile?: boolean } = {}) {
+    const dir = realProjectDir(dirIn);
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new JoploError('NOT_FOUND', `项目目录不存在：${dir}`);
+    const id = projectIdOf(dir);
+    const prev = registry.list().find((r) => r.dir === dir);
+    registry.touch(dir, prev?.name);
+    const slot = o.compile === false ? (slots.get(id) ?? null) : activate(dir);
+    broadcastProjects();
+    return { id, url: projectUrl(baseUrl(), id), slot };
+  }
+
+  const exportsHub = new ExportHub({
+    baseUrl,
+    log,
+    deps: opts.exportDeps,
+    onEvent: () => undefined,
+  });
+
+  // ---------- HTTP ----------
+  const deny = (res: http.ServerResponse, status: number, message: string) => sendJson(res, status, { error: { code: 'PERMISSION_DENIED', message } });
+  /** 写接口：Origin（有则必须是看板自己）、令牌、Content-Type。返回 false 表示已拒绝。 */
+  const guardWrite = (req: http.IncomingMessage, res: http.ServerResponse, tokenStatus = 403, needJson = true): boolean => {
+    const origin = req.headers.origin;
+    if (origin !== undefined && !allowedOrigins().has(origin)) return deny(res, 403, `Origin 不被允许：${origin}`), false;
+    const t = req.headers['x-joplo-token'];
+    if (typeof t !== 'string' || !safeEqual(t, token)) return deny(res, tokenStatus, '缺少或错误的本地令牌（x-joplo-token）'), false;
+    if (needJson && !isJsonContentType(req.headers['content-type'])) return sendJson(res, 415, { error: { code: 'USAGE', message: 'Content-Type 必须是 application/json' } }), false;
+    return true;
+  };
+  const jsonBody = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<{ ok: true; body: unknown } | { ok: false }> => {
+    const raw = await readBody(req);
+    if (raw.tooLarge) return sendJson(res, 413, { error: { code: 'USAGE', message: `请求体过大（上限 ${MAX_BODY} 字节）` } }), { ok: false };
+    try {
+      return { ok: true, body: JSON.parse(raw.text) };
+    } catch (e) {
+      return sendJson(res, 400, { error: { code: 'USAGE', message: `请求体不是合法 JSON：${e instanceof Error ? e.message : String(e)}` } }), { ok: false };
+    }
+  };
+  const fail = (res: http.ServerResponse, e: unknown) => {
+    const code = e instanceof JoploError ? e.code : 'INTERNAL';
+    const status = code === 'NOT_FOUND' ? 404 : code === 'USAGE' ? 400 : code === 'RENDER_FAILED' ? 503 : 500;
+    sendJson(res, status, { error: { code, message: e instanceof Error ? e.message : String(e) } });
+  };
+
+  async function handleProject(id: string, rest: string, req: http.IncomingMessage, res: http.ServerResponse) {
+    const method = req.method ?? 'GET';
+    if (rest === 'ir' && method === 'GET') {
+      const slot = await ensure(id);
+      return sendJson(res, 200, { projectId: id, ...slot.payload });
+    }
+    if (rest === 'selection' && method === 'GET') {
+      const slot = await ensure(id);
+      return sendJson(res, 200, { selection: readSelection(slot.dir) });
+    }
+    if (rest === 'selection' && method === 'PUT') {
+      if (!guardWrite(req, res, 401)) return;
+      const b = await jsonBody(req, res);
+      if (!b.ok) return;
+      const parsed = SelectionBody.safeParse(b.body);
+      if (!parsed.success) return sendJson(res, 400, { error: { code: 'USAGE', message: '选中内容格式不正确', issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) } });
+      const slot = await ensure(id);
+      if (parsed.data.selection === null) {
+        writeSelection(slot.dir, null);
+        return sendJson(res, 200, { ok: true, selection: null });
+      }
+      const project = slot.payload.project;
+      const r = project ? resolveSelection(project, parsed.data.selection) : { ok: false as const, problem: '项目还没有成功编译过' };
+      if (!r.ok) {
+        // 不变量：被拒绝时文件写为 null（不能保留旧选中而界面显示新选中）
+        writeSelection(slot.dir, null);
+        return sendJson(res, 409, { error: { code: 'INVALID_REFERENCE', message: `选中与当前项目不符：${r.problem}` }, current: null });
+      }
+      writeSelection(slot.dir, r.selection);
+      return sendJson(res, 200, { ok: true, selection: r.selection });
+    }
+    if (rest === 'open' && method === 'POST') {
+      if (!guardWrite(req, res)) return;
+      const b = await jsonBody(req, res);
+      if (!b.ok) return;
+      const slot = await ensure(id);
+      const at = (b.body as { at?: unknown })?.at;
+      const m = typeof at === 'string' ? /^(.+?):(\d+)(?::(\d+))?$/.exec(at) : null;
+      if (!m) return sendJson(res, 400, { error: { code: 'USAGE', message: 'at 应为 文件:行[:列]' } });
+      const file = path.resolve(slot.dir, m[1]!);
+      if (!isProjectSource(slot.dir, file) || !fs.existsSync(file)) return sendJson(res, 400, { error: { code: 'USAGE', message: `不是项目里的源文件：${m[1]}` } });
+      // 交给 Vite 自带的 launch-editor（按 LAUNCH_EDITOR / EDITOR 或正在运行的编辑器打开）
+      (req as { __joploOpen?: boolean }).__joploOpen = true;
+      req.url = `/__open-in-editor?file=${encodeURIComponent(`${file}:${m[2]}:${m[3] ?? 1}`)}`;
+      req.method = 'GET';
+      return 'next' as const;
+    }
+    if (rest.startsWith('export/')) {
+      const slot = await ensure(id);
+      return exportsHub.handle(rest.slice('export/'.length), req, res, { projectId: id, dir: slot.dir, project: slot.payload.project, guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), fail: (e) => fail(res, e) });
+    }
+    return sendJson(res, 404, { error: { code: 'NOT_FOUND', message: `没有这个接口：${method} /__joplo/p/${id}/${rest}` } });
+  }
 
   const boardPlugin: Plugin = {
     name: 'joplo:board',
-    configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
+    configureServer(srv) {
+      srv.middlewares.use(async (req, res, next) => {
         try {
           const host = req.headers.host ?? '';
-          if (!allowedHosts().has(host)) return sendJson(res, 403, { error: { code: 'PERMISSION_DENIED', message: `Host 头不被允许：${host || '(空)'}` } });
+          if (!allowedHosts().has(host)) return deny(res, 403, `Host 头不被允许：${host || '(空)'}`);
           const url = new URL(req.url ?? '/', `http://127.0.0.1:${actualPort}`);
           if (web.mode === 'dist' && (req.method === 'GET' || req.method === 'HEAD') && serveDistAsset(web, url.pathname, res)) return;
+          // Vite 的打开编辑器中间件只能经由 /__joplo/p/<id>/open（校验令牌与路径）进入
+          if (url.pathname === '/__open-in-editor') return (req as { __joploOpen?: boolean }).__joploOpen ? next() : deny(res, 403, '请通过看板的“在编辑器中打开”');
           if (!url.pathname.startsWith('/__joplo/')) return next();
           const method = req.method ?? 'GET';
-          if (url.pathname === '/__joplo/ir' && method === 'GET') return sendJson(res, 200, payload);
-          if (url.pathname === '/__joplo/selection' && method === 'GET') return sendJson(res, 200, { selection: readSelection(projectDir) });
-          if (url.pathname === '/__joplo/selection' && method === 'PUT') {
-            const origin = req.headers.origin;
-            if (origin !== undefined && !allowedOrigins().has(origin)) return sendJson(res, 403, { error: { code: 'PERMISSION_DENIED', message: `Origin 不被允许：${origin}` } });
-            const t = req.headers['x-joplo-token'];
-            if (typeof t !== 'string' || !safeEqual(t, token)) return sendJson(res, 401, { error: { code: 'PERMISSION_DENIED', message: '缺少或错误的本地令牌（x-joplo-token）' } });
-            if (!isJsonContentType(req.headers['content-type'])) return sendJson(res, 415, { error: { code: 'USAGE', message: 'Content-Type 必须是 application/json' } });
-            const raw = await readBody(req);
-            if (raw.tooLarge) return sendJson(res, 413, { error: { code: 'USAGE', message: `请求体过大（上限 ${MAX_BODY} 字节）` } });
-            let body: unknown;
-            try {
-              body = JSON.parse(raw.text);
-            } catch (e) {
-              return sendJson(res, 400, { error: { code: 'USAGE', message: `请求体不是合法 JSON：${e instanceof Error ? e.message : String(e)}` } });
-            }
-            const parsed = SelectionBody.safeParse(body);
-            if (!parsed.success) return sendJson(res, 400, { error: { code: 'USAGE', message: '选中内容格式不正确', issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) } });
-            if (parsed.data.selection === null) {
-              writeSelection(projectDir, null);
-              return sendJson(res, 200, { ok: true, selection: null });
-            }
-            const project = payload.project;
-            const r = project ? resolveSelection(project, parsed.data.selection) : { ok: false as const, problem: '项目还没有成功编译过' };
-            if (!r.ok) {
-              // 不变量：被拒绝时文件写为 null（不能保留旧选中而界面显示新选中）
-              writeSelection(projectDir, null);
-              return sendJson(res, 409, { error: { code: 'INVALID_REFERENCE', message: `选中与当前项目不符：${r.problem}` }, current: null });
-            }
-            writeSelection(projectDir, r.selection);
-            return sendJson(res, 200, { ok: true, selection: r.selection });
+          if (url.pathname === '/__joplo/ping' && method === 'GET') return sendJson(res, 200, { joplo: true, pid: process.pid });
+          if (url.pathname === '/__joplo/projects' && method === 'GET') return sendJson(res, 200, { projects: summaries() });
+          if (url.pathname === '/__joplo/projects' && method === 'POST') {
+            if (!guardWrite(req, res)) return;
+            const b = await jsonBody(req, res);
+            if (!b.ok) return;
+            const dir = (b.body as { dir?: unknown })?.dir;
+            if (typeof dir !== 'string' || !path.isAbsolute(dir)) return sendJson(res, 400, { error: { code: 'USAGE', message: 'dir 必须是项目目录的绝对路径' } });
+            const r = addProject(dir);
+            return sendJson(res, 200, { id: r.id, url: r.url });
+          }
+          const del = /^\/__joplo\/projects\/([^/]+)$/.exec(url.pathname);
+          if (del && method === 'DELETE') {
+            if (!guardWrite(req, res, 403, false)) return;
+            const id = decodeURIComponent(del[1]!);
+            const rec = recordOf(id);
+            if (!rec) return sendJson(res, 404, { error: { code: 'NOT_FOUND', message: `没有这个项目：${id}` } });
+            const slot = slots.get(id);
+            if (slot) await deactivate(slot);
+            registry.remove(rec.dir); // 只删记录，不碰项目目录
+            broadcastProjects();
+            return sendJson(res, 200, { ok: true });
+          }
+          const pm = /^\/__joplo\/p\/([^/]+)\/(.+)$/.exec(url.pathname);
+          if (pm) {
+            const r = await handleProject(decodeURIComponent(pm[1]!), pm[2]!, req, res);
+            if (r === 'next') return next();
+            return;
           }
           return sendJson(res, 404, { error: { code: 'NOT_FOUND', message: `没有这个接口：${method} ${url.pathname}` } });
         } catch (e) {
-          if (!res.headersSent) sendJson(res, 500, { error: { code: 'INTERNAL', message: e instanceof Error ? e.message : String(e) } });
+          if (!res.headersSent) fail(res, e);
           else res.end();
         }
       });
@@ -205,16 +506,16 @@ export async function createDev(opts: InternalDevOptions): Promise<InternalDevHa
       const out = html.replace('__JOPLO_TOKEN__', token);
       return web.mode === 'dist' ? injectDistBoot(out, web) : out;
     },
-    // 项目源文件只在服务端（ssr 环境）使用：它们的变化由下面的重新编译处理，不交给 Vite 的默认 HMR。
+    // 项目源文件只在项目加载器里使用：它们的变化由下面的重新编译处理，不交给 Vite 的默认 HMR。
     // client 环境里只保留非项目模块（例如以项目目录为 @source 的 index.css），新 className 照常热更新。
     hotUpdate(ctx) {
-      if (!isProjectSource(projectDir, ctx.file)) return;
+      if (!slotOfFile(ctx.file)) return;
       if (this.environment.name !== 'client') return [];
-      return ctx.modules.filter((m) => !m.file || !isProjectSource(projectDir, m.file));
+      return ctx.modules.filter((m) => !m.file || !slotOfFile(m.file));
     },
   };
 
-  const server = await createServer({
+  server = await createServer({
     configFile: false,
     envDir: false,
     root: web.mode === 'dist' ? web.appDir : web.webDir,
@@ -222,115 +523,174 @@ export async function createDev(opts: InternalDevOptions): Promise<InternalDevHa
     appType: 'spa',
     clearScreen: false,
     customLogger: makeLogger(log),
-    resolve: { alias: kitAliases(web, projectDir) },
-    plugins: [joploProjectPlugin(projectDir, web), boardPlugin, ...(await webPlugins(web))],
+    resolve: { alias: web.mode === 'source' ? kitAliases(web, web.webDir) : [] },
+    plugins: [cssSourcePlugin(activeDirs, web), boardPlugin, ...(await webPlugins(web))],
     // dist 形态不往 node_modules 里写缓存（可能只读，或被多个项目共享）
-    cacheDir: web.mode === 'dist' ? path.join(projectDir, '.joplo/vite') : path.join(web.webDir, 'node_modules/.vite-joplo'),
+    cacheDir: web.mode === 'dist' ? path.join(opts.home ?? path.join(process.cwd(), '.joplo'), 'vite') : path.join(web.webDir, 'node_modules/.vite-joplo'),
     optimizeDeps:
       web.mode === 'dist'
         ? { noDiscovery: true, include: [] }
         : {
-            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'radix-ui', 'clsx', 'tailwind-merge', 'class-variance-authority', '@tokenroll/joplo-core > zod'],
+            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'clsx', 'tailwind-merge', '@tokenroll/joplo-core > zod'],
           },
     server: {
       host: '127.0.0.1',
       port,
       strictPort: true,
       open: false,
-      ...(web.mode === 'dist' ? { fs: { allow: [web.webDir, projectDir] } } : {}),
-      ...(watch ? { watch: { ignored: IGNORED_DIRS.map((d) => path.join(projectDir, d) + '/**') } } : { watch: null }),
+      ...(web.mode === 'dist' ? { fs: { allow: [web.webDir] } } : {}),
+      ...(watch ? { watch: { ignored: (p: string) => { const s = slotOfFile(p) ?? [...slots.values()].find((x) => p.startsWith(x.dir + path.sep)); return !!s && IGNORED_DIRS.includes(p.slice(s.dir.length + 1).split(path.sep)[0] ?? ''); } } } : { watch: null }),
     },
   });
 
-  const recompile = async () => {
-    invalidateProjectModules(server, projectDir);
-    const out = await compileProject(server, projectDir, 'dev');
-    payload = {
-      version: payload.version + 1,
-      ok: out.project !== null,
-      project: out.project ?? payload.project,
-      diagnostics: out.diagnostics,
-      home: out.home ?? payload.home,
-    };
-    const errors = out.diagnostics.filter((d) => d.severity === 'error');
-    if (errors.length) log(`[joplo] 编译出错（${errors.length}）：${errors.map((d) => `${d.at ?? ''} ${d.message}`).join('；').slice(0, 400)}`);
-    server.ws.send({ type: 'custom', event: IR_EVENT, data: payload });
-  };
-
-  // 串行化：编译进行中又有变化时，结束后再编一次。
-  let running: Promise<void> | null = null;
-  let dirty = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let closed = false;
-  const run = async () => {
-    if (closed) return;
-    if (running) {
-      dirty = true;
-      return running;
-    }
-    running = (async () => {
-      do {
-        dirty = false;
-        try {
-          await recompile();
-        } catch (e) {
-          log(`[joplo] 编译异常：${e instanceof Error ? e.message : String(e)}`);
-        }
-      } while (dirty);
-    })().finally(() => {
-      running = null;
-    });
-    return running;
-  };
-
   try {
-    await run();
     await server.listen();
   } catch (e) {
     await server.close().catch(() => undefined);
     const err = e as NodeJS.ErrnoException;
-    if (err.code === 'EADDRINUSE' || /already in use/i.test(err.message ?? '')) throw new JoploError('USAGE', `端口 ${port} 已被占用，请换一个端口（--port），或先关闭占用它的进程`);
+    if (err.code === 'EADDRINUSE' || /already in use/i.test(err.message ?? '')) throw new JoploError('USAGE', `端口 ${port} 已被占用，请换一个端口（--port），或先关闭占用它的进程`, { details: { code: 'EADDRINUSE' } });
     throw e;
   }
   const addr = server.httpServer?.address();
   actualPort = typeof addr === 'object' && addr ? addr.port : port;
+  if (opts.home) writeServerInfo(opts.home, { port: actualPort, pid: process.pid, token });
 
   if (watch) {
-    server.watcher.add(projectDir);
     server.watcher.on('all', (_ev, file) => {
-      if (!isProjectSource(projectDir, path.resolve(file))) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void run(), 60);
+      const slot = slotOfFile(path.resolve(file));
+      if (!slot) return;
+      if (slot.timer) clearTimeout(slot.timer);
+      slot.timer = setTimeout(() => void run(slot), 60);
     });
   }
 
-  const url = `http://127.0.0.1:${actualPort}/`;
-  if (opts.open) {
-    const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
-    const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
-    try {
-      spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
-    } catch {
-      log(`[joplo] 无法自动打开浏览器，请手动访问 ${url}`);
-    }
-  }
-
   return {
-    url,
+    get url() {
+      return baseUrl();
+    },
+    get port() {
+      return actualPort;
+    },
     token,
-    port: actualPort,
     server,
-    payload: () => payload,
+    addProject,
+    ensure,
+    projects: summaries,
     close: async () => {
       closed = true;
-      if (timer) clearTimeout(timer);
-      await running?.catch(() => undefined);
+      await exportsHub.close();
+      for (const s of [...slots.values()]) await deactivate(s);
       await server.close();
+      if (opts.home) clearServerInfo(opts.home, process.pid);
     },
   };
 }
 
-export async function startDev(opts: DevOptions): Promise<DevHandle> {
-  const h = await createDev(opts);
-  return { url: h.url, close: h.close };
+// ---------- 单项目句柄（renderStep、测试、文档截图） ----------
+
+export type InternalDevOptions = DevOptions & Pick<HubOptions, 'watch' | 'home' | 'exportDeps'>;
+
+export type InternalDevHandle = DevHandle & {
+  token: string;
+  port: number;
+  /** 首个项目的 id 与看板链接（演示页）。 */
+  projectId: string;
+  projectUrl: string;
+  payload(): DevPayload;
+  server: ViteDevServer;
+  hub: Hub;
+};
+
+/** 启动一个看板进程并打开一个项目（等首次编译完成）。缺省不持久化。 */
+export async function createDev(opts: InternalDevOptions): Promise<InternalDevHandle> {
+  const hub = await createHub({ port: opts.port, log: opts.log, watch: opts.watch, home: opts.home ?? null, exportDeps: opts.exportDeps });
+  try {
+    const { id, url, slot } = hub.addProject(opts.projectDir);
+    await slot!.ready;
+    return { url: hub.url, projectUrl: url, projectId: id, token: hub.token, port: hub.port, server: hub.server, hub, payload: () => slot!.payload, close: () => hub.close() };
+  } catch (e) {
+    await hub.close();
+    throw e;
+  }
+}
+
+/** 已有存活的看板：用令牌注册项目，返回项目链接；没有或不可用时返回 null。 */
+export async function attachToRunning(home: string, projectDir: string, log: (s: string) => void): Promise<{ url: string; port: number } | null> {
+  const info = readServerInfo(home);
+  if (!info) return null;
+  if (!pidAlive(info.pid)) {
+    clearServerInfo(home, info.pid);
+    return null;
+  }
+  const base = `http://127.0.0.1:${info.port}`;
+  try {
+    const ping = await fetch(`${base}/__joplo/ping`, { signal: AbortSignal.timeout(1500) });
+    const body = (await ping.json()) as { joplo?: boolean; pid?: number };
+    if (!ping.ok || body.joplo !== true || body.pid !== info.pid) return null;
+  } catch {
+    return null;
+  }
+  const res = await fetch(`${base}/__joplo/projects`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-joplo-token': info.token },
+    body: JSON.stringify({ dir: realProjectDir(projectDir) }),
+    signal: AbortSignal.timeout(10000),
+  });
+  const body = (await res.json().catch(() => null)) as { url?: string; error?: { message?: string } } | null;
+  if (!res.ok || !body?.url) throw new JoploError('UNSUPPORTED_ACTION', `无法把项目加入正在运行的看板（${base}，pid ${info.pid}）：${body?.error?.message ?? `HTTP ${res.status}`}`);
+  log(`[joplo] 已加入正在运行的看板（pid ${info.pid}）`);
+  return { url: body.url, port: info.port };
+}
+
+function openBrowser(url: string, log: (s: string) => void) {
+  const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
+  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+  try {
+    spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
+  } catch {
+    log(`[joplo] 无法自动打开浏览器，请手动访问 ${url}`);
+  }
+}
+
+/**
+ * CLI 的 `joplo dev`：同一个 JOPLO_HOME 下只运行一个看板进程。
+ * 已有存活的看板 → 注册项目、（--open 时）打开浏览器，返回 attached；否则启动新的看板并登记项目。
+ */
+export async function startDev(opts: DevOptions & { home?: string; exportDeps?: Partial<ExportDeps> }): Promise<DevHandle> {
+  const log = opts.log ?? ((m: string) => process.stderr.write(m + '\n'));
+  const home = opts.home ?? joploHome();
+  const projectDir = realProjectDir(opts.projectDir);
+  if (!fs.existsSync(projectDir)) throw new JoploError('NOT_FOUND', `项目目录不存在：${projectDir}`);
+  const attach = async () => {
+    const a = await attachToRunning(home, projectDir, log);
+    if (!a) return null;
+    if (opts.open) openBrowser(a.url, log);
+    return { url: a.url, attached: true, close: async () => undefined } satisfies DevHandle;
+  };
+  const existing = await attach();
+  if (existing) return existing;
+  let hub: Hub;
+  try {
+    hub = await createHub({ port: opts.port, log, home, exportDeps: opts.exportDeps });
+  } catch (e) {
+    // 另一个 joplo dev 恰好同时启动：端口被它占了，改为加入它
+    if (e instanceof JoploError && (e.details as { code?: string } | undefined)?.code === 'EADDRINUSE') {
+      await new Promise((r) => setTimeout(r, 300));
+      const again = await attach();
+      if (again) return again;
+    }
+    throw e;
+  }
+  const { url } = hub.addProject(projectDir);
+  const cleanup = () => clearServerInfo(home, process.pid);
+  process.once('exit', cleanup);
+  if (opts.open) openBrowser(url, log);
+  return {
+    url,
+    attached: false,
+    close: async () => {
+      process.off('exit', cleanup);
+      await hub.close();
+    },
+  };
 }

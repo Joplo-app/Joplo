@@ -15,7 +15,7 @@ import { realProjectDir } from './vite-shared.ts';
 
 const STAGE_SIZE = VIEWPORT_SIZE;
 
-type PlaywrightModule = typeof import('playwright');
+export type PlaywrightModule = typeof import('playwright');
 const NOT_NEEDED = 'dev、check、build 不需要它。';
 
 const isMissingModule = (e: unknown) => {
@@ -39,7 +39,7 @@ export function launchHint(e: unknown): string {
   return `截图需要 Chromium，无法启动浏览器（${first}）。运行：npx playwright install chromium（约 150 MB）。${NOT_NEEDED}`;
 }
 
-async function launch({ chromium }: PlaywrightModule): Promise<Browser> {
+export async function launch({ chromium }: PlaywrightModule): Promise<Browser> {
   try {
     return await chromium.launch({ headless: true });
   } catch (first) {
@@ -111,7 +111,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     browser = await launch(playwright);
     const page = await browser.newPage({ viewport, deviceScaleFactor: opts.scale ?? 1, reducedMotion: 'reduce' });
     // 指定 viewport 时舞台按该尺寸渲染（响应式属性、visibleFrom/hiddenFrom、AppShell 收起随之变化）
-    const q = new URLSearchParams({ render: '1', scenario: sc.id, position: String(position), theme, ...(opts.viewport ? { w: String(opts.viewport.width), h: String(opts.viewport.height) } : {}) });
+    const q = new URLSearchParams({ render: '1', project: server.projectId, scenario: sc.id, position: String(position), theme, ...(opts.viewport ? { w: String(opts.viewport.width), h: String(opts.viewport.height) } : {}) });
     await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => (window as unknown as { __JOPLO_READY__?: boolean }).__JOPLO_READY__ === true, null, { timeout: 60000 });
     const err = await page.evaluate(() => (window as unknown as { __JOPLO_ERROR__?: string | null }).__JOPLO_ERROR__ ?? null);

@@ -70,7 +70,7 @@ export async function initProject(dir: string, name?: string, opts: { keep?: boo
     'features/example/feature.ts': `import { feature } from '@tokenroll/joplo-kit';\nexport default feature({ name: '示例功能', goal: '点击按钮完成演示', cases: { happy: '正常完成' }, pick: 'a' });\n`,
     'features/example/options/a.tsx': `import { option, flow, done } from '@tokenroll/joplo-kit';\nimport { Button } from '@tokenroll/joplo-kit/ui';\nexport default option({\n  name: '方案 A', idea: '一个按钮完成操作',\n  on: { '/': { actions: <Button id="start">开始</Button> } },\n  scenarios: { happy: flow('正常完成', { cases: ['happy'], start: '/' }).click('start', done('已完成')) },\n});\n`,
     'tsconfig.json': projectTsconfig(),
-    '.gitignore': 'node_modules/\n.joplo/\ndist/\n',
+    '.gitignore': 'node_modules/\n.joplo/\ndist/\nexports/\n',
   };
   await mkdir(root, { recursive: true });
   const written: string[] = [];

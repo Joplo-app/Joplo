@@ -204,12 +204,12 @@ flow 和 rule 的具体写法读 authoring；怎样定位覆盖诊断读 check�
 - 输出 at（项目相对 文件:行:列）、标签，以及该行前后各三行带行号的源码。
 - 按位置打开对应文件，只改用户指向的那一处；结合标签确认修改对象。
 - 行内容已变化时，先核对当前位置；源文件或该行不存在时回到看板重新选中。
-- 没有文件或内容为 null 时输出“当前没有选中”，退出 0。请用户先在看板选中对象。
+- 没有文件或内容为 null 时输出“当前没有选中”，退出 0。请用户先在看板里按住 ⌥（Alt）单击要改的元素。
 - 没有 at 的对象不能靠猜测定位；在看板中选中具体元素或步骤。
 - --format json 的 data.selection 保留 Selection，data.lines 给出 number/text。
 
 ## 完整工作流
-改文件 → npx joplo check → npx joplo dev 在看板上看 → 用户选中 → npx joplo selection → 只改那一处。
+改文件 → npx joplo check → npx joplo dev 在看板上看（看板已在运行时只会把项目加进去） → 用户 ⌥+单击选中 → npx joplo selection → 只改那一处。
 改后再 check，保留其他方案、页面和已有用户决定。
 .joplo/ 是本地运行状态，不作为设计权威源，也不提交 Git。`,
   publish: `# Joplo 发布：publish

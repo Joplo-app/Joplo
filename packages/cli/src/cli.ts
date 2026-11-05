@@ -87,6 +87,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const startDev = await serverFunction('startDev');
     const handle = await startDev({ projectDir: resolve(dir), port: opts.port, open: opts.open, log: s => stderr(oneLine(s) + '\n') });
     line(handle.url);
+    // 已有存活的看板：项目已注册进去，本进程直接退出（不启动第二个看板进程）
+    if (handle.attached) stderr(`已加入正在运行的看板。打开 ${handle.url}\n`);
   });
   program.command('build').argument('[dir]', '项目目录', '.').option('--out-dir <dir>', '输出目录（默认项目 dist）').option('--overwrite', '允许清空非空输出目录').action(async (dir, opts) => {
     const buildSite = await serverFunction('buildSite');

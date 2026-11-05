@@ -1,19 +1,20 @@
 /**
- * 发布站（`joplo build` 的产物）：只读，观众用。D22 / D23 / D33：
- * - 按路径浏览整体布局；功能列表和目标；每个场景都能手动、逐步、自动播放；常驻“概念原型”标识；
- * - 只消费 publish 模式的 IR（只含选定方案，已去掉创作侧信息）；没有选中、审阅、写接口。
- * - hash 路由（#/p/<路径>、#/f/<功能>、#/s/<场景>），file:// 直接打开也能工作。
+ * 发布站（`joplo build` 的产物，D39 / D33）：与本机看板同一套布局，只有一个项目。
+ * - 首页 `#/`：左栏列功能，右侧是功能行和「查看」；
+ * - 演示页 `#/f/<功能>?s=&step=&d=`：PlayerPage；左栏是选定方案的场景列表；「…」只有导出图片（浏览器内生成）、线框风格、复制链接。
+ * - 没有缺口、规则、源码位置、抽屉和“在编辑器中打开”；只消费 publish 模式的 IR；没有写接口。hash 路由，file:// 可直接打开。
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { domToBlob } from 'modern-screenshot';
 import type { Project } from '@tokenroll/joplo-core';
 import { DemoController } from '../runtime/demo';
-import { routeTree, scenariosOf } from '../runtime/views';
-import { Stage, viewportOf } from '../renderer/Stage';
+import { parseSiteHash, siteHash, type Device, type PlayRoute, type SiteRoute } from '../runtime/route';
+import { scenariosOf } from '../runtime/views';
+import { viewportOf } from '../renderer/Stage';
 import type { StageTheme } from '../renderer/rough';
-import { StepBar } from '../player/StepBar';
-import { Overlay } from '../player/Overlay';
-import { StageViewport } from '../player/StageViewport';
-import { MOCK_CLS } from '../player/labels';
+import { Brand, PlayerPage, TopBar, type MenuItem } from '../player/PlayerPage';
+import { usePlaySync } from '../player/playRoute';
+import { copyText, downloadBlob, useFlash, useHash } from '../player/util';
 import { cn } from '@/lib/utils';
 
 export type SiteData = { project: Project; home: string | null };
@@ -28,198 +29,179 @@ export function readInlineIR(): SiteData | null {
   }
 }
 
-type Route = { kind: 'page'; path: string } | { kind: 'feature'; id: string } | { kind: 'scenario'; id: string };
-
-function parseHash(hash: string): Route | null {
-  const h = decodeURIComponent(hash.replace(/^#/, ''));
-  if (h.startsWith('/s/')) return { kind: 'scenario', id: h.slice(3) };
-  if (h.startsWith('/f/')) return { kind: 'feature', id: h.slice(3) };
-  if (h.startsWith('/p/')) return { kind: 'page', path: h.slice(2) || '/' };
-  return null;
-}
-export const hrefOf = (r: Route) => (r.kind === 'page' ? `#/p${r.path}` : r.kind === 'feature' ? `#/f/${encodeURIComponent(r.id)}` : `#/s/${encodeURIComponent(r.id)}`);
-
 export function SiteApp({ data }: { data: SiteData | null }) {
   if (!data) return <div className="p-8 text-[#c92a2a]">页面缺少原型数据。请重新运行 joplo build。</div>;
-  return <Site project={data.project} home={data.home} />;
+  return <Site project={data.project} />;
 }
 
-function Site({ project, home }: { project: Project; home: string | null }) {
-  const ctl = useMemo(() => new DemoController(null), []);
-  const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
-  const [route, setRoute] = useState<Route | null>(() => parseHash(location.hash));
-  const [theme, setTheme] = useState<StageTheme>(project.theme);
-  const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
-
+function Site({ project }: { project: Project }) {
+  const [hash, go] = useHash();
+  const route = parseSiteHash(hash);
+  const navigate = (r: SiteRoute, replace = false) => go(siteHash(r), replace);
+  // 旧链接 #/s/<场景>：换成演示页链接
   useEffect(() => {
-    ctl.setProject(project, 1, home);
-  }, [ctl, project, home]);
-  useEffect(() => {
-    const on = () => setRoute(parseHash(location.hash));
-    window.addEventListener('hashchange', on);
-    return () => window.removeEventListener('hashchange', on);
-  }, []);
-  // hash → 控制器
-  useEffect(() => {
-    if (!snap.project) return;
-    if (route?.kind === 'scenario' && project.scenarios[route.id]) {
-      if (snap.scenarioId !== route.id || snap.view !== 'stage') ctl.setScenario(route.id);
-    } else if (route?.kind === 'page') ctl.browse(route.path);
-    else if (route?.kind === 'feature' && project.features[route.id]) ctl.setFeature(route.id);
-    else if (!route && snap.home) ctl.browse(snap.home);
+    if (route.kind !== 'scenario') return;
+    const sc = project.scenarios[route.scenarioId];
+    const f = sc ? project.options[sc.optionId]?.featureId : null;
+    navigate(f ? { kind: 'play', play: { featureId: f, scenarioId: sc!.id } } : { kind: 'home' }, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route, snap.project]);
+  }, [hash]);
+  if (route.kind === 'play') return <SitePlayer project={project} play={route.play} navigate={navigate} />;
+  return <SiteHome project={project} onView={(f) => navigate({ kind: 'play', play: { featureId: f } })} />;
+}
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t.closest('input,textarea,select,[data-joplo-stage]')) return;
-      if (e.key === 'ArrowRight') void ctl.next();
-      else if (e.key === 'ArrowLeft') ctl.prev();
-      else if (e.key === ' ' && t.tagName !== 'BUTTON') {
-        e.preventDefault();
-        ctl.togglePlay();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [ctl]);
-
+function SiteHome({ project, onView }: { project: Project; onView: (featureId: string) => void }) {
   const features = Object.values(project.features);
-  const pages = routeTree(project);
-  const state = snap.state;
-  const scenario = snap.view === 'stage' ? ctl.scenario() : null;
-  const next = ctl.nextStep();
-  const nextTargetId = next && 'target' in next.action ? next.action.target : null;
-  const shownStep = scenario && snap.activeStep !== null ? scenario.steps[snap.activeStep] : null;
-  const currentPath = state ? project.scenes[state.sceneId]?.route : null;
-  const featurePage = route?.kind === 'feature' ? project.features[route.id] : null;
-
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex h-[52px] shrink-0 items-center gap-3 border-b bg-white px-4">
-        <span className="text-[16px] font-semibold" data-testid="site-name">
-          {project.name}
-        </span>
-        {project.description ? <span className="hidden truncate text-[13px] text-[#6b6b6b] lg:block">{project.description}</span> : null}
-        <div className="ml-auto flex items-center gap-2">
-          <div role="radiogroup" aria-label="原型主题" className="flex rounded-md border p-0.5 text-[12px]">
-            {(['sketch', 'clean'] as const).map((t) => (
-              <button key={t} type="button" role="radio" aria-checked={theme === t} onClick={() => setTheme(t)} className={cn('rounded px-1.5 py-0.5', theme === t ? 'bg-[#1e1e1e] text-white' : 'hover:bg-black/5')}>
-                {t === 'sketch' ? '手绘' : '线框'}
-              </button>
-            ))}
-          </div>
-          <span className="rounded border border-dashed border-[#b35c00] bg-[#fff8ee] px-2 py-1 text-[12px] font-medium text-[#8a4700]" data-testid="concept-badge">
-            概念原型 · 非正式实现
-          </span>
-        </div>
-      </header>
+    <div className="flex h-full flex-col bg-[#f8f9fa]" data-testid="site-home">
+      <TopBar right={<ConceptBadge />}>
+        <Brand />
+      </TopBar>
       <div className="flex min-h-0 flex-1">
-        <nav className="flex w-[260px] shrink-0 flex-col gap-4 overflow-y-auto border-r bg-white p-3 text-[14px]" aria-label="目录">
-          <section>
-            <h3 className="mb-1 text-[12px] font-semibold text-[#6b6b6b]">整体布局</h3>
-            <ul className="flex flex-col gap-0.5">
-              {pages.map((p) => (
-                <li key={p.path} style={{ paddingLeft: p.depth * 12 }}>
-                  <a href={hrefOf({ kind: 'page', path: p.path })} data-testid={`site-page-${p.path}`} className={cn('flex gap-2 rounded px-2 py-1 hover:bg-black/5', snap.view === 'browse' && currentPath === p.path && 'bg-[#ececec] font-semibold')}>
-                    <span className="font-mono text-[13px]">{p.path}</span>
-                    <span className="truncate text-[#6b6b6b]">{p.title}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section>
-            <h3 className="mb-1 text-[12px] font-semibold text-[#6b6b6b]">功能</h3>
-            {features.length === 0 ? <p className="text-[13px] text-[#6b6b6b]">还没有发布任何功能。</p> : null}
-            <ul className="flex flex-col gap-2">
-              {features.map((f) => (
-                <li key={f.id}>
-                  <a href={hrefOf({ kind: 'feature', id: f.id })} className="block rounded px-2 py-1 font-semibold hover:bg-black/5" data-testid={`site-feature-${f.id}`}>
-                    {f.name}
-                  </a>
-                  <ul className="ml-2 flex flex-col border-l pl-2">
-                    {scenariosOf(project, f.pick).map((s) => (
-                      <li key={s.id}>
-                        <a href={hrefOf({ kind: 'scenario', id: s.id })} data-testid={`site-scenario-${s.id}`} className={cn('block truncate rounded px-1.5 py-0.5 text-[13px] hover:bg-black/5', snap.view === 'stage' && snap.scenarioId === s.id && 'bg-[#ececec] font-semibold')}>
-                          {s.name}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </nav>
-        <main className="flex min-w-0 flex-1 flex-col bg-[#f1f1ef]">
-          {featurePage ? (
-            <FeaturePage project={project} featureId={featurePage.id} />
-          ) : state && project.scenes[state.sceneId] ? (
-            <>
-              <StageViewport
-                viewport={viewportOf(project, state)}
-                theme={theme}
-                mode="demo"
-                notice={snap.notice}
-                onDismiss={() => ctl.dismissNotice()}
-                tag={snap.view === 'browse' ? <span className="rounded bg-[#1c5fb8] px-2 py-0.5 font-semibold text-white">整体布局 · {currentPath}</span> : null}
-              >
-                <Stage
-                  project={project}
-                  state={state}
-                  theme={theme}
-                  mode="demo"
-                  preview={snap.preview}
-                  epoch={snap.epoch}
-                  animate={!ctl.reducedMotion}
-                  nextTargetId={nextTargetId}
-                  onNodeClick={(id, pt) => void ctl.clickNode(id, pt)}
-                  stageRef={(el) => {
-                    ctl.setStageEl(el);
-                    setStageEl(el);
-                  }}
-                  overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} caption={shownStep?.caption ?? null} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />}
-                />
-              </StageViewport>
-              {scenario ? <StepBar snap={snap} scenario={scenario} onReset={() => ctl.reset()} onPrev={() => ctl.prev()} onNext={() => void ctl.next()} onPlay={() => ctl.togglePlay()} onChip={(i) => ctl.goto(i + 1)} /> : null}
-            </>
-          ) : (
-            <div className="flex flex-1 items-center justify-center text-[14px] text-[#6b6b6b]">没有可显示的页面。</div>
-          )}
+        <aside className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r bg-white p-3">
+          <div className="px-2 text-[12px] text-[#6b6b6b]" data-testid="site-name">
+            {project.name}
+          </div>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {features.map((f) => (
+              <li key={f.id}>
+                <button type="button" onClick={() => onView(f.id)} className="w-full truncate rounded-md px-3 py-2 text-left text-[14px] hover:bg-[#f1f3f5]" data-testid={`site-feature-${f.id}`}>
+                  {f.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
+        <main className="min-w-0 flex-1 overflow-y-auto p-8">
+          <div className="flex max-w-[960px] flex-col gap-3">
+            <h1 className="text-[24px] font-semibold">{project.name}</h1>
+            {project.description ? <p className="text-[14px] text-[#6b6b6b]">{project.description}</p> : null}
+            <h2 className="mt-3 text-[17px] font-semibold">功能</h2>
+            {features.length === 0 ? <p className="text-[14px] text-[#6b6b6b]">还没有发布任何功能。</p> : null}
+            {features.map((f) => {
+              const pick = f.pick ? project.options[f.pick] : null;
+              return (
+                <div key={f.id} className="flex items-center justify-between gap-4 rounded-lg border bg-white p-4" data-testid={`site-feature-row-${f.id}`}>
+                  <div className="min-w-0">
+                    <div className="text-[15px] font-semibold">{f.name}</div>
+                    <div className="mt-0.5 text-[13px] text-[#6b6b6b]">{f.goal}</div>
+                    {pick ? <div className="mt-2 text-[12px] text-[#5a5a5a]">{pick.name} · {scenariosOf(project, pick.id).length} 个场景</div> : null}
+                  </div>
+                  <button type="button" onClick={() => onView(f.id)} className="shrink-0 rounded-md border bg-white px-4 py-2 text-[14px] hover:bg-[#f8f9fa]" data-testid={`site-view-${f.id}`}>
+                    查看
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </main>
       </div>
     </div>
   );
 }
 
-function FeaturePage({ project, featureId }: { project: Project; featureId: string }) {
-  const f = project.features[featureId]!;
-  const option = f.pick ? project.options[f.pick] : null;
-  const scs = scenariosOf(project, f.pick);
+function ConceptBadge() {
   return (
-    <div className="mx-auto w-full max-w-[760px] overflow-y-auto p-8" data-testid="site-feature-page">
-      <h1 className="text-[24px] font-bold">{f.name}</h1>
-      <p className="mt-1 text-[15px] text-[#3a3a3a]">{f.goal}</p>
-      {option ? (
-        <div className="mt-4 rounded-lg border bg-white p-4">
-          <div className="text-[15px] font-semibold">{option.name}</div>
-          <p className="mt-1 text-[14px] text-[#3a3a3a]">{option.idea}</p>
+    <span className="rounded border border-dashed border-[#b35c00] bg-[#fff8ee] px-2 py-1 text-[12px] font-medium text-[#8a4700]" data-testid="concept-badge">
+      概念原型 · 非正式实现
+    </span>
+  );
+}
+
+function SitePlayer({ project, play, navigate }: { project: Project; play: PlayRoute; navigate: (r: SiteRoute, replace?: boolean) => void }) {
+  const ctl = useMemo(() => new DemoController(null), []);
+  const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
+  const [theme, setTheme] = useState<StageTheme>(project.theme);
+  const [flash, setFlash] = useFlash();
+  useEffect(() => {
+    ctl.setProject(project, 1, null);
+  }, [ctl, project]);
+  const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', play: next }, replace);
+  const resolved = usePlaySync(ctl, snap, snap.project, play, (next) => toPlay(next, true));
+  const feature = project.features[play.featureId];
+  if (!snap.project) return null;
+  if (!feature || !resolved?.ok)
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-[14px]">
+        <span>没有这个功能。</span>
+        <button type="button" className="text-[#1c5fb8] underline" onClick={() => navigate({ kind: 'home' })}>
+          回到首页
+        </button>
+      </div>
+    );
+  const option = resolved.optionId ? project.options[resolved.optionId] : null;
+  const scenario = snap.view === 'stage' ? ctl.scenario() : null;
+  const device: Device = play.device ?? (snap.state ? viewportOf(project, snap.state) : 'desktop');
+  const home = () => navigate({ kind: 'home' });
+  const menu: MenuItem[] = [
+    {
+      id: 'image',
+      label: '导出图片（当前步骤）',
+      disabled: !scenario,
+      onClick: () => {
+        const el = document.querySelector<HTMLElement>('[data-joplo-stage]');
+        if (!el || !scenario || !snap.state) return;
+        const name = `${scenario.id.replace(/[^\w.-]+/g, '_')}-${snap.state.position}.png`;
+        void domToBlob(el, { scale: 2, type: 'image/png' }).then(
+          (blob) => {
+            downloadBlob(blob, name);
+            setFlash(`已下载 ${name}`);
+          },
+          (e: unknown) => setFlash(`导出图片失败：${e instanceof Error ? e.message : String(e)}`),
+        );
+      },
+    },
+    { id: 'theme', label: '线框风格', checked: theme === 'clean', onClick: () => setTheme(theme === 'clean' ? 'sketch' : 'clean') },
+    { id: 'link', label: '复制当前步骤的链接', onClick: () => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制')) },
+  ];
+  const scs = scenariosOf(project, resolved.optionId);
+  return (
+    <PlayerPage
+      ctl={ctl}
+      snap={snap}
+      project={project}
+      onBrand={home}
+      crumbs={[
+        { label: project.name, testid: 'crumb-project', onClick: home },
+        { label: feature.name, testid: 'crumb-feature', onClick: home },
+        { label: option?.name ?? '', testid: 'crumb-option' },
+        { label: scenario?.name ?? '', testid: 'crumb-scenario' },
+      ]}
+      device={device}
+      onDevice={(d) => toPlay({ ...play, device: d }, true)}
+      theme={theme}
+      nav={
+        <div className="flex flex-1 flex-col gap-1" data-testid="scenario-nav">
+          <div className="truncate px-2 text-[12px] text-[#6b6b6b]">{feature.name}</div>
+          {option ? <div className="truncate rounded-lg bg-[#f1f3f5] px-3 py-1.5 text-[13px] font-semibold">{option.name}</div> : null}
+          <div className="mt-3 flex items-center gap-2 px-2 text-[12px] text-[#6b6b6b]">
+            场景
+            <span className="h-px flex-1 bg-[#e9ecef]" />
+          </div>
+          <ul className="flex flex-col gap-0.5">
+            {scs.map((s) => (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => toPlay({ featureId: feature.id, scenarioId: s.id, ...(play.device ? { device: play.device } : {}) })}
+                  data-testid={`site-scenario-${s.id}`}
+                  className={cn('w-full rounded-md px-3 py-2 text-left text-[14px] hover:bg-[#f1f3f5]', snap.scenarioId === s.id && 'bg-[#e7f0ff] font-semibold hover:bg-[#e7f0ff]')}
+                >
+                  <div className="truncate">{s.name}</div>
+                  <div className="text-[12px] font-normal text-[#868e96]">
+                    {s.mock.label} · {s.steps.length} 步
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-auto pt-4">
+            <ConceptBadge />
+          </div>
         </div>
-      ) : null}
-      <h2 className="mt-6 mb-2 text-[15px] font-semibold">演示场景</h2>
-      <ul className="flex flex-col gap-2">
-        {scs.map((s) => (
-          <li key={s.id}>
-            <a href={hrefOf({ kind: 'scenario', id: s.id })} className="flex items-center gap-2 rounded-md border bg-white px-3 py-2 hover:bg-[#fafafa]">
-              <span className={cn('rounded border px-1.5 text-[12px]', MOCK_CLS[s.mock.outcome])}>{s.mock.label}</span>
-              <span className="font-medium">{s.name}</span>
-              <span className="ml-auto text-[12px] text-[#8a8a8a]">{s.steps.length} 步 · 播放 ›</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
+      }
+      menu={menu}
+      flash={flash}
+    />
   );
 }

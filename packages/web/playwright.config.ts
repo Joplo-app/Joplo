@@ -1,4 +1,10 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { defineConfig } from '@playwright/test';
+
+// e2e 一律不读写真实的 ~/.joplo
+process.env.JOPLO_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-home-e2e-'));
 
 export default defineConfig({
   testDir: './e2e',

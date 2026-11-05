@@ -54,7 +54,7 @@ export type RenderCtx = {
 export const RenderContext = createContext<RenderCtx | null>(null);
 const useCtx = () => {
   const c = useContext(RenderContext);
-  if (!c) throw new Error('RenderContext 缺失');
+  if (!c) throw new Error('缺少 RenderContext');
   return c;
 };
 

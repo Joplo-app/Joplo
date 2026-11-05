@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { COMPONENT_TYPES } from '@tokenroll/joplo-core';
 import { createDev, type InternalDevHandle } from '../../server/src/dev.ts';
-import { copyExample, expect, node, test } from './fixtures';
+import { copyExample, expect, node, playUrl, test } from './fixtures';
 
 const GALLERY = fs.readFileSync(path.join(import.meta.dirname, 'gallery.page.tsx.txt'), 'utf8');
 
@@ -17,6 +17,10 @@ test.describe('组件目录画廊', () => {
     dir = copyExample();
     fs.mkdirSync(path.join(dir, 'routes/gallery'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'routes/gallery/page.tsx'), GALLERY);
+    // 演示页按功能进入：给画廊一个只有初始状态的场景
+    fs.mkdirSync(path.join(dir, 'features/gallery/options'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'features/gallery/feature.ts'), "import { feature } from '@tokenroll/joplo-kit';\nexport default feature({ name: '组件画廊', goal: '每个组件都能渲染', cases: { see: '看全部组件' }, pick: 'a' });\n");
+    fs.writeFileSync(path.join(dir, 'features/gallery/options/a.tsx'), "import { flow, option } from '@tokenroll/joplo-kit';\nexport default option({ name: 'A · 画廊', idea: '逐个渲染', on: {}, scenarios: { view: flow('看画廊', { cases: ['see'], start: '/gallery' }) } });\n");
     dev = await createDev({ projectDir: dir, port: 0, watch: false, log: () => undefined });
   });
   test.afterAll(async () => {
@@ -31,10 +35,7 @@ test.describe('组件目录画廊', () => {
       if (m.type() === 'error') errors.push(m.text());
     });
     expect(dev.payload().ok, JSON.stringify(dev.payload().diagnostics)).toBe(true);
-    await page.goto(dev.url);
-    await node(page, 'btn_invite').waitFor();
-    await page.getByTestId('view-browse').click();
-    await page.getByTestId('browse-route-/gallery').click();
+    await page.goto(playUrl(dev, '', 'gallery'));
     await node(page, 'g_btn').waitFor();
     const rendered = new Set(await page.locator('[data-joplo-stage] [data-jtype]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.jtype!)));
     const missing = COMPONENT_TYPES.filter((t) => !rendered.has(t));
@@ -65,17 +66,14 @@ test.describe('组件目录画廊', () => {
   });
 
   test('桌面与手机宽度：SimpleGrid 列数、visibleFrom/hiddenFrom、AppShell 收起导航', async ({ page }) => {
-    await page.goto(dev.url);
-    await node(page, 'btn_invite').waitFor();
-    await page.getByTestId('view-browse').click();
-    await page.getByTestId('browse-route-/gallery').click();
+    await page.goto(playUrl(dev, '', 'gallery'));
     await node(page, 'g_btn').waitFor();
     await expect(page.locator('[data-joplo-stage]')).toHaveAttribute('data-width', '1280');
     await expect(node(page, 'g_grid')).toHaveAttribute('data-cols', '4');
     await expect(node(page, 'g_nav')).toBeVisible();
     await expect(page.locator('[data-joplo-stage] [data-jid="g_burger"]')).toHaveCount(0);
 
-    await page.getByTestId('width-mobile').click();
+    await page.getByTestId('device-mobile').click();
     await expect(page.locator('[data-joplo-stage]')).toHaveAttribute('data-width', '390');
     await expect(node(page, 'g_grid')).toHaveAttribute('data-cols', '1');
     await expect(page.locator('[data-joplo-stage] [data-jid="g_nav"]')).toHaveCount(0);
@@ -84,7 +82,7 @@ test.describe('组件目录画廊', () => {
     await expect(page.getByTestId('device-phone').locator('[data-jphone-screen] [data-joplo-stage]')).toHaveCount(1);
 
     // 回到页面自身的宽度
-    await page.getByTestId('width-desktop').click();
+    await page.getByTestId('device-desktop').click();
     await expect(node(page, 'g_grid')).toHaveAttribute('data-cols', '4');
   });
 });

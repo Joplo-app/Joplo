@@ -44,7 +44,7 @@ function req(h: InternalDevHandle, opts: { method?: string; path: string; header
 }
 
 const put = (h: InternalDevHandle, selection: unknown, headers: Record<string, string> = {}) =>
-  req(h, { method: 'PUT', path: '/__joplo/selection', headers: { 'content-type': 'application/json', 'x-joplo-token': h.token, ...headers }, body: JSON.stringify({ selection }) });
+  req(h, { method: 'PUT', path: `/__joplo/p/${h.projectId}/selection`, headers: { 'content-type': 'application/json', 'x-joplo-token': h.token, ...headers }, body: JSON.stringify({ selection }) });
 
 const selFile = (dir: string) => JSON.parse(fs.readFileSync(path.join(dir, '.joplo/selection.json'), 'utf8'));
 
@@ -67,13 +67,13 @@ describe('startDev', () => {
     expect(p.home).toBe('/members');
     expect(Object.keys(p.project!.scenes)).toContain('invite.a-modal@/members');
     expect(p.project!.scenarios['invite.a-modal.success']!.steps[0]!.source).toMatch(/^features\/invite\/options\/a-modal\.tsx:\d+:\d+$/);
-    const r = await req(h, { path: '/__joplo/ir' });
+    const r = await req(h, { path: `/__joplo/p/${h.projectId}/ir` });
     expect(r.status).toBe(200);
     expect(r.body.version).toBe(p.version);
   });
 
   it('校验 Host（防 DNS 重绑定），页面与接口都适用', async () => {
-    expect((await req(h, { path: '/__joplo/ir', headers: { host: 'evil.example:80' } })).status).toBe(403);
+    expect((await req(h, { path: `/__joplo/p/${h.projectId}/ir`, headers: { host: 'evil.example:80' } })).status).toBe(403);
     expect((await req(h, { path: '/', headers: { host: 'evil.example' } })).status).toBe(403);
     expect((await req(h, { path: '/', headers: { host: `localhost:${h.port}` } })).status).toBe(200);
   });
@@ -88,7 +88,7 @@ describe('startDev', () => {
     expect((await put(h, good, { 'x-joplo-token': 'nope' })).status).toBe(401);
     expect((await put(h, good, { origin: 'http://evil.example' })).status).toBe(403);
     expect((await put(h, good, { 'content-type': 'text/plain' })).status).toBe(415);
-    const bad = await req(h, { method: 'PUT', path: '/__joplo/selection', headers: { 'content-type': 'application/json', 'x-joplo-token': h.token }, body: '{nope' });
+    const bad = await req(h, { method: 'PUT', path: `/__joplo/p/${h.projectId}/selection`, headers: { 'content-type': 'application/json', 'x-joplo-token': h.token }, body: '{nope' });
     expect(bad.status).toBe(400);
     expect((await put(h, { ...good, extra: 1 })).status).toBe(400);
     expect(isJsonContentType('application/json; charset=utf-8')).toBe(true);

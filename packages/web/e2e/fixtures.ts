@@ -38,7 +38,7 @@ export const test = base.extend<Fixtures>({
   app: async ({ page, dev }, use) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto(dev.url);
+    await page.goto(playUrl(dev));
     await node(page, 'btn_invite').waitFor();
     await use(page);
     expect(errors, `页面不应有未捕获异常：${errors.join('\n')}`).toEqual([]);
@@ -46,9 +46,12 @@ export const test = base.extend<Fixtures>({
 });
 export { expect };
 
+/** 演示页链接：#/<项目>/f/<功能>?<查询>。 */
+export const playUrl = (dev: InternalDevHandle, query = '', featureId = 'invite') => `${dev.url}#/${dev.projectId}/f/${featureId}${query ? `?${query}` : ''}`;
+
 export const playState = (page: Page) => page.evaluate(() => (window as unknown as { __JOPLO_STATE__: PlayState | null }).__JOPLO_STATE__);
 export const uiState = (page: Page) =>
-  page.evaluate(() => (window as unknown as { __JOPLO_UI__: { playing: boolean; busy: boolean; mode: string; view: string; scenarioId: string | null; optionId: string | null; version: number } }).__JOPLO_UI__);
+  page.evaluate(() => (window as unknown as { __JOPLO_UI__: { playing: boolean; busy: boolean; view: string; scenarioId: string | null; optionId: string | null; version: number } }).__JOPLO_UI__);
 
 /** 等待演示动画与自动播放结束。 */
 export async function waitIdle(page: Page) {
@@ -60,7 +63,7 @@ export async function waitIdle(page: Page) {
 
 export const node = (page: Page, id: string) => page.locator(`[data-joplo-stage] [data-jid="${id}"]`).first();
 
-/** 演示模式下点击舞台元素并等待动画结束。 */
+/** 点击舞台元素（按场景操作）并等待动画结束。 */
 export async function demoClick(page: Page, id: string) {
   await node(page, id).click();
   await waitIdle(page);

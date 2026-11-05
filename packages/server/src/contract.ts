@@ -10,8 +10,11 @@ export type DevOptions = {
   open?: boolean;
   log?: (line: string) => void;
 };
-/** 单进程：一个 Vite 开发服务同时提供看板、编译（ssrLoadModule + core.compile）与热更新。 */
-export type DevHandle = { url: string; close(): Promise<void> };
+/** 单进程：同一个 JOPLO_HOME 下只有一个看板进程，同时服务多个项目（编译、热更新、选中、导出）。 */
+/**
+ * url：项目在看板中的链接。attached = true 表示本机已有存活的看板，项目只是注册进去（没有启动第二个进程，close 不做事）。
+ */
+export type DevHandle = { url: string; attached?: boolean; close(): Promise<void> };
 export declare function startDev(opts: DevOptions): Promise<DevHandle>;
 
 export type BuildOptions = {

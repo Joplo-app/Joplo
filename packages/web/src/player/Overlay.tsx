@@ -61,7 +61,7 @@ export function Overlay({
 }) {
   const n = snap.notice;
   const anchorId = n && 'nodeId' in n ? n.nodeId : null;
-  const showFocus = snap.mode === 'demo' && !snap.busy && nextTargetId;
+  const showFocus = !snap.busy && nextTargetId;
   const boxes = useBoxes(stage, [showFocus ? nextTargetId : null, anchorId, snap.preview?.nodeId]);
   const W = stage?.offsetWidth ?? 1280;
   const H = stage?.offsetHeight ?? 800;
@@ -104,7 +104,7 @@ export function Overlay({
         ) : null}
       </AnimatePresence>
 
-      <div ref={setCursorEl} className="absolute left-0 top-0 will-change-transform" style={{ opacity: snap.cursorVisible && snap.mode === 'demo' ? 1 : 0 }} aria-hidden data-joverlay="cursor">
+      <div ref={setCursorEl} className="absolute left-0 top-0 will-change-transform" style={{ opacity: snap.cursorVisible ? 1 : 0 }} aria-hidden data-joverlay="cursor">
         <MousePointer2 className="-ml-[3px] -mt-[2px] size-7 fill-white text-[#1e1e1e] drop-shadow" strokeWidth={1.6} />
       </div>
 

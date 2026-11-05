@@ -82,6 +82,7 @@ test('init 后立即 check 通过，非空目录拒绝且保留内容', async ()
   expect(JSON.parse(await readFile(join(target, 'tsconfig.json'), 'utf8')).compilerOptions).toMatchObject({ jsx: 'react-jsxdev', jsxImportSource: '@tokenroll/joplo-kit', allowImportingTsExtensions: true });
   expect((await cli(['init', target])).code).toBe(1);
   expect(await readFile(join(target, '.gitignore'), 'utf8')).toContain('.joplo/');
+  expect(await readFile(join(target, '.gitignore'), 'utf8')).toContain('exports/');
 });
 test('init 缺省名称，guide 不超过 150 行，help 主输出走 stdout', async () => {
   const d = await temp(false); expect((await cli(['init', d])).code).toBe(0);

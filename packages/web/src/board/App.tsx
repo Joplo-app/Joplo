@@ -1,230 +1,46 @@
 /**
- * 本地看板（`joplo dev`）。D32 方案 B“模式决定信息量”：
- * - 演示模式（默认）：顶栏 + 大舞台 + 紧凑步骤条，没有侧栏；
- * - 审阅模式：左栏路径树与情况，右栏检查器。
- * IR 首次通过 /__joplo/ir 载入，之后由 HMR 自定义事件推送；编译出错时显示错误列表并保留上一次成功的画面。
+ * 本地看板（`joplo dev`，D39）：一个进程、多个项目。
+ * - 首页 `#/`、`#/<项目>`：最近打开的项目与所选项目的功能（Home.tsx）。
+ * - 演示页 `#/<项目>/f/<功能>?o=&c=&s=&step=&d=`：同发布站的布局（PlayerPage），另有按情况分组的左栏与缺口、
+ *   ⌥+单击检查抽屉、导出图片 / 视频、在编辑器中打开。所有状态都在 hash 里。
+ * IR 首次通过 /__joplo/p/<id>/ir 载入，之后由 HMR 推送；编译出错时显示错误并保留上一次成功的画面。
  */
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { Diagnostic } from '@tokenroll/joplo-core';
 import { DemoController } from '../runtime/demo';
-import { fetchIR, fetchSelection, putSelection, subscribeIR, type DevPayload } from '../runtime/dev-client';
-import { Stage, viewportOf, type Viewport } from '../renderer/Stage';
+import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
+import { boardHash, parseBoardHash, type BoardRoute, type Device, type PlayRoute } from '../runtime/route';
 import type { StageTheme } from '../renderer/rough';
-import { StepBar } from '../player/StepBar';
-import { Overlay } from '../player/Overlay';
-import { StageViewport } from '../player/StageViewport';
-import { routeTree } from '../runtime/views';
-import { cn } from '@/lib/utils';
-import { TopBar } from './TopBar';
-import { LeftPanel } from './LeftPanel';
-import { Inspector } from './Inspector';
-import { FeatureView } from './FeatureView';
+import { viewportOf } from '../renderer/Stage';
+import { PlayerPage, type MenuItem } from '../player/PlayerPage';
+import { usePlaySync } from '../player/playRoute';
+import { copyText, downloadBlob, useFlash, useHash } from '../player/util';
+import { CaseNav } from './CaseNav';
+import { Home } from './Home';
+import { InspectDrawer } from './InspectDrawer';
+import { VideoDialog } from './VideoDialog';
+import { COVERAGE_LABEL } from './labels';
+import { useProjectIR, useProjects } from './hooks';
 
 const THEME_KEY = 'joplo.theme';
 
 export function BoardApp() {
-  const ctl = useMemo(() => new DemoController(putSelection), []);
-  const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
-  const [diagnostics, setDiagnostics] = useState<{ ok: boolean; list: Diagnostic[] }>({ ok: true, list: [] });
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [live, setLive] = useState(false);
-  const [casesOpen, setCasesOpen] = useState(true);
-  const [casesFlash, setCasesFlash] = useState(0);
-  const [theme, setThemeState] = useState<StageTheme>(() => (localStorage.getItem(THEME_KEY) === 'clean' ? 'clean' : 'sketch'));
-  const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState<Viewport | null>(null);
-  const setTheme = (t: StageTheme) => {
-    setThemeState(t);
-    localStorage.setItem(THEME_KEY, t);
-  };
+  const [hash, go] = useHash();
+  const route = parseBoardHash(hash);
+  const { list, error } = useProjects();
+  const navigate = (r: BoardRoute, replace = false) => go(boardHash(r), replace);
 
-  // 首次载入 + 热更新。不变量：只应用版本号更大的结果（晚到的旧结果直接丢弃）。
-  useEffect(() => {
-    let alive = true;
-    let applied = -1;
-    let restored = false;
-    const apply = (p: DevPayload) => {
-      if (!alive || p.version <= applied) return;
-      applied = p.version;
-      setLoadError(null);
-      setDiagnostics({ ok: p.ok, list: p.diagnostics });
-      if (p.project && p.ok) ctl.setProject(p.project, p.version, p.home);
-      else if (p.project && !ctl.getSnapshot().project) ctl.setProject(p.project, p.version, p.home);
-      if (!restored && p.project) {
-        restored = true;
-        void fetchSelection().then((sel) => {
-          if (alive) void ctl.restoreSelection(sel);
-        });
-      }
-      (window as unknown as { __JOPLO_VERSION__?: number }).__JOPLO_VERSION__ = p.version;
-    };
-    const off = subscribeIR(apply, setLive);
-    void fetchIR().then((r) => ('error' in r ? alive && setLoadError(r.error) : apply(r)));
-    return () => {
-      alive = false;
-      off();
-    };
-  }, [ctl]);
-
-  // 键盘：← → 逐步，空格播放/暂停
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t.closest('input,textarea,select,[contenteditable],[data-joplo-stage]')) return;
-      if (e.key === 'ArrowRight') void ctl.next();
-      else if (e.key === 'ArrowLeft') ctl.prev();
-      else if (e.key === ' ' && t.tagName !== 'BUTTON') {
-        e.preventDefault();
-        ctl.togglePlay();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [ctl]);
-
-  const { project, state } = snap;
-  const scenario = snap.view === 'stage' ? ctl.scenario() : null;
-  const next = ctl.nextStep();
-  const nextTargetId = next && 'target' in next.action ? next.action.target : null;
-  const shownStep = scenario && snap.activeStep !== null ? scenario.steps[snap.activeStep] : null;
-  const caption = snap.mode === 'demo' && shownStep ? shownStep.caption : null;
-  const review = snap.mode === 'review';
-  const errors = diagnostics.list.filter((d) => d.severity === 'error');
-
-  return (
-    <div className="flex h-full flex-col" data-mode={snap.mode} data-view={snap.view}>
-      <TopBar
-        snap={snap}
-        theme={theme}
-        live={live}
-        onFeature={(id) => ctl.setFeature(id)}
-        onOption={(id) => ctl.setOption(id)}
-        onScenario={(id) => ctl.setScenario(id)}
-        onView={(v) => ctl.setView(v)}
-        onMode={(m) => ctl.setMode(m)}
-        onTheme={setTheme}
-        width={width}
-        pageWidth={project && state ? viewportOf(project, state) : 'desktop'}
-        onWidth={setWidth}
-        onGaps={() => {
-          ctl.setMode('review');
-          setCasesOpen(true);
-          setCasesFlash((n) => n + 1);
-        }}
-      />
-      {loadError ? (
-        <div role="alert" className="border-b border-[#c92a2a] bg-[#fff0f0] px-4 py-2 text-[13px] text-[#a51d1d]" data-testid="load-error">
-          {loadError}
-        </div>
-      ) : null}
-      {!diagnostics.ok || errors.length ? <DiagnosticsPanel list={diagnostics.list} hasProject={!!project} /> : null}
-      {snap.playbackError ? (
-        <div role="alert" className="border-b border-[#b35c00] bg-[#fff8ee] px-4 py-1.5 text-[13px] text-[#8a4700]" data-testid="playback-error">
-          <strong>演示回放出错：</strong>
-          {snap.playbackError}
-        </div>
-      ) : null}
-
-      {!project ? (
-        <Center>{loadError || !diagnostics.ok ? '还没有成功编译过的画面。修好上面的错误后会自动刷新。' : '正在编译项目…'}</Center>
-      ) : (
-        <div className="flex min-h-0 flex-1">
-          {review ? (
-            <LeftPanel
-              project={project}
-              snap={snap}
-              casesOpen={casesOpen}
-              casesFlash={casesFlash}
-              onToggleCases={() => setCasesOpen((o) => !o)}
-              onBrowse={(r) => ctl.browse(r)}
-              onOption={(id) => ctl.setOption(id, 'stage')}
-              onScenario={(id) => ctl.setScenario(id)}
-            />
-          ) : null}
-          <main className="flex min-w-0 flex-1 flex-col bg-[#f1f1ef]">
-            {snap.view === 'compare' ? (
-              <FeatureView project={project} featureId={snap.featureId} optionId={snap.optionId} theme={theme} onEnter={(id) => ctl.setScenario(id)} onOption={(id) => ctl.setOption(id, 'stage')} />
-            ) : state && project.scenes[state.sceneId] ? (
-              <>
-                <StageViewport
-                  viewport={width ?? viewportOf(project, state)}
-                  theme={theme}
-                  mode={snap.mode}
-                  notice={snap.notice}
-                  onDismiss={() => ctl.dismissNotice()}
-                  tag={
-                    snap.view === 'browse' ? (
-                      <span className="rounded bg-[#1c5fb8] px-2 py-0.5 font-semibold text-white" data-testid="browse-tag">
-                        浏览 · {project.scenes[state.sceneId]!.optionId ? '该路径只在未选定方案中存在' : '发布视图（各功能取选定方案）'}
-                      </span>
-                    ) : review ? (
-                      <span className="rounded bg-[#6741d9] px-2 py-0.5 font-semibold text-white" data-testid="stage-mode">
-                        审阅中：点击只选中
-                      </span>
-                    ) : null
-                  }
-                >
-                  <Stage
-                    project={project}
-                    state={state}
-                    theme={theme}
-                    viewportOverride={width}
-                    mode={snap.mode}
-                    selectedId={review && snap.selection?.sceneId === state.sceneId ? snap.selection.nodeId : null}
-                    preview={snap.preview}
-                    epoch={snap.epoch}
-                    animate={!ctl.reducedMotion}
-                    nextTargetId={nextTargetId}
-                    onNodeClick={(id, pt) => void ctl.clickNode(id, pt)}
-                    stageRef={(el) => {
-                      ctl.setStageEl(el);
-                      setStageEl(el);
-                    }}
-                    overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} caption={caption} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />}
-                  />
-                </StageViewport>
-                {scenario ? (
-                  <StepBar snap={snap} scenario={scenario} onReset={() => ctl.reset()} onPrev={() => ctl.prev()} onNext={() => void ctl.next()} onPlay={() => ctl.togglePlay()} onChip={(i) => ctl.clickStepChip(i)} />
-                ) : (
-                  <BrowseBar routes={routeTree(project).map((r) => r.path)} current={project.scenes[state.sceneId]!.route} onBrowse={(r) => ctl.browse(r)} />
-                )}
-              </>
-            ) : (
-              <Center>{Object.keys(project.routes).length === 0 ? '项目还没有任何页面：在 routes/<路径>/page.tsx 里创建第一个页面。' : '没有可显示的画面。'}</Center>
-            )}
-          </main>
-          {review ? <Inspector project={project} optionId={snap.optionId} state={state} selection={snap.selection} sync={snap.selectionSync} onClear={() => void ctl.clearSelection()} onJump={(sc, i) => ctl.setScenario(sc, i)} /> : null}
-        </div>
-      )}
-    </div>
-  );
+  if (route.kind === 'play') return <BoardPlayer key={route.projectId} projectId={route.projectId} play={route.play} navigate={navigate} projectName={list?.find((p) => p.id === route.projectId)?.name ?? null} />;
+  const selected = route.projectId && list?.some((p) => p.id === route.projectId) ? route.projectId : (list?.[0]?.id ?? null);
+  return <Home projects={list} error={error} selectedId={selected} onSelect={(id) => navigate({ kind: 'home', projectId: id })} onView={(projectId, featureId) => navigate({ kind: 'play', projectId, play: { featureId } })} />;
 }
 
-function Center({ children }: { children: ReactNode }) {
-  return <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-[14px] text-[#3a3a3a]">{children}</div>;
-}
-
-function BrowseBar({ routes, current, onBrowse }: { routes: string[]; current: string; onBrowse: (r: string) => void }) {
-  return (
-    <div className="flex h-[52px] shrink-0 items-center gap-2 overflow-x-auto border-t bg-white px-3 text-[13px]" data-testid="browse-bar">
-      <span className="shrink-0 text-[#6b6b6b]">按路径浏览：</span>
-      {routes.map((r) => (
-        <button key={r} type="button" onClick={() => onBrowse(r)} data-testid={`browse-route-${r}`} className={cn('shrink-0 rounded border px-2 py-0.5 font-mono', r === current ? 'border-[#1e1e1e] bg-[#1e1e1e] text-white' : 'hover:bg-black/5')}>
-          {r}
-        </button>
-      ))}
-      <span className="ml-auto shrink-0 text-[12px] text-[#8a8a8a]">静态画面，不能播放；体验交互请切到“演示场景”</span>
-    </div>
-  );
-}
-
-/** 编译错误列表：`文件:行:列` + 说明；仍显示上一次成功的画面。 */
-function DiagnosticsPanel({ list, hasProject }: { list: Diagnostic[]; hasProject: boolean }) {
+function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
   const errors = list.filter((d) => d.severity === 'error');
   return (
-    <div role="alert" className="max-h-[30%] shrink-0 overflow-y-auto border-b border-[#c92a2a] bg-[#fff0f0] px-4 py-2 text-[13px] text-[#a51d1d]" data-testid="diagnostics">
+    <div role="alert" className="max-h-[30%] shrink-0 overflow-y-auto rounded-lg border border-[#ffc9c9] bg-[#fff5f5] px-4 py-2 text-[13px] text-[#a51d1d]" data-testid="diagnostics">
       <strong>编译出错（{errors.length}）</strong>
-      {hasProject ? <span className="ml-2 text-[#6b3a3a]">仍显示上一次成功的画面；保存修复后自动恢复。</span> : null}
+      <span className="ml-2 text-[#6b3a3a]">仍显示上一次成功的画面；保存修复后自动恢复。</span>
       <ul className="mt-1 flex flex-col gap-0.5">
         {errors.slice(0, 20).map((d, i) => (
           <li key={i} className="flex gap-2" data-testid="diag-item">
@@ -236,3 +52,169 @@ function DiagnosticsPanel({ list, hasProject }: { list: Diagnostic[]; hasProject
     </div>
   );
 }
+
+function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: string; play: PlayRoute; navigate: (r: BoardRoute, replace?: boolean) => void; projectName: string | null }) {
+  const ir = useProjectIR(projectId);
+  const ctl = useMemo(() => new DemoController(selectionWriter(projectId)), [projectId]);
+  const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
+  const [theme, setThemeState] = useState<StageTheme>(() => (localStorage.getItem(THEME_KEY) === 'clean' ? 'clean' : 'sketch'));
+  const [drawer, setDrawer] = useState(false);
+  const [video, setVideo] = useState(false);
+  const [flash, setFlash] = useFlash();
+
+  // 只应用成功的 IR；出错时保留上一次成功的画面（第一次就失败时也先显示它带的旧 IR）
+  useEffect(() => {
+    const p = ir.payload;
+    if (!p?.project) return;
+    if (p.ok || !ctl.getSnapshot().project) ctl.setProject(p.project, p.version, p.home);
+  }, [ir.payload, ctl]);
+
+  const project = snap.project;
+  const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', projectId, play: next }, replace);
+  const resolved = usePlaySync(ctl, snap, project, play, (next) => toPlay(next, true));
+
+  if (!project) {
+    const msg = ir.status === 404 ? `${ir.error}。` : (ir.error ?? (ir.payload && !ir.payload.ok ? null : '正在编译项目…'));
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-[14px] text-[#3a3a3a]" data-testid="player-loading">
+        {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : <span>{msg}</span>}
+        <button type="button" className="text-[#1c5fb8] underline" onClick={() => navigate({ kind: 'home', projectId })}>
+          回到首页
+        </button>
+      </div>
+    );
+  }
+  const feature = project.features[play.featureId];
+  if (!feature || !resolved?.ok)
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-[14px]" data-testid="feature-missing">
+        <span>功能「{play.featureId}」不存在（可能已改名或删除）。</span>
+        <button type="button" className="text-[#1c5fb8] underline" onClick={() => navigate({ kind: 'home', projectId })}>
+          回到首页
+        </button>
+      </div>
+    );
+
+  const option = resolved.optionId ? project.options[resolved.optionId] : null;
+  const scenario = snap.view === 'stage' ? ctl.scenario() : null;
+  const state = snap.state;
+  const device: Device = play.device ?? (state ? viewportOf(project, state) : 'desktop');
+  const setTheme = (t: StageTheme) => {
+    setThemeState(t);
+    localStorage.setItem(THEME_KEY, t);
+  };
+  const home = () => navigate({ kind: 'home', projectId });
+  const gap = resolved.gap;
+  const caseTitle = resolved.caseId ? (project.cases[resolved.caseId]?.title ?? resolved.caseId) : null;
+
+  const nextStep = ctl.nextStep();
+  const lastStep = scenario && state && state.position > 0 ? scenario.steps[state.position - 1] : null;
+  const editorAt = nextStep?.source ?? lastStep?.source ?? scenario?.steps[0]?.source ?? option?.source ?? null;
+
+  const menu: MenuItem[] = [
+    {
+      id: 'image',
+      label: '导出图片（当前步骤）',
+      disabled: !scenario,
+      onClick: () => {
+        if (!scenario || !state) return;
+        setFlash('正在生成图片…');
+        void exportImage(projectId, { scenarioId: scenario.id, position: state.position, device, theme }).then((r) => {
+          if (r.ok) {
+            downloadBlob(r.blob, r.name);
+            setFlash(`已下载 ${r.name}`);
+          } else setFlash(`导出图片失败：${r.message}`);
+        });
+      },
+    },
+    { id: 'video', label: '导出视频（整个场景）', disabled: !scenario, onClick: () => setVideo(true) },
+    { id: 'theme', label: '线框风格', checked: theme === 'clean', onClick: () => setTheme(theme === 'clean' ? 'sketch' : 'clean') },
+    { id: 'link', label: '复制当前步骤的链接', onClick: () => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制')) },
+    {
+      id: 'editor',
+      label: '在编辑器中打开',
+      disabled: !editorAt,
+      onClick: () => editorAt && void openInEditor(projectId, editorAt).then((r) => setFlash(r.ok ? `已在编辑器中打开 ${editorAt}` : `无法打开编辑器：${r.message}`)),
+    },
+  ];
+
+  const banner = (
+    <>
+      {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : null}
+      {gap && option ? (
+        <div role="status" className="shrink-0 rounded-lg border border-[#ffd8a8] bg-[#fff9db] px-4 py-3" data-testid="gap-notice" data-status={gap.status}>
+          <div className="text-[15px] font-semibold text-[#8a4700]">
+            方案 {option.name} 还没有表达「{caseTitle}」{gap.status !== 'none' && gap.status !== 'missing' ? `（${COVERAGE_LABEL[gap.status].text}）` : ''}
+          </div>
+          <div className="mt-1 text-[13px] text-[#5c3d00]">
+            这是缺口，不是演示{gap.reason ? `：${gap.reason}` : ''}。可以在 Agent 会话里说“给这个方案补上这个情况的场景”，或先查看：
+          </div>
+          <code className="mt-1.5 inline-block rounded bg-white/70 px-2 py-0.5 font-mono text-[13px]" data-testid="gap-command">
+            npx joplo check --option {option.id}
+          </code>
+        </div>
+      ) : null}
+    </>
+  );
+
+  const selection = snap.selection;
+  return (
+    <>
+      <PlayerPage
+        ctl={ctl}
+        snap={snap}
+        project={project}
+        onBrand={() => navigate({ kind: 'home' })}
+        crumbs={[
+          { label: projectName ?? project.name, testid: 'crumb-project', onClick: home },
+          { label: feature.name, testid: 'crumb-feature', onClick: home },
+          { label: option?.name ?? '（没有方案）', testid: 'crumb-option' },
+          { label: gap ? '（缺口）' : (scenario?.name ?? '静态画面'), testid: 'crumb-scenario' },
+        ]}
+        device={device}
+        onDevice={(d) => toPlay({ ...play, device: d }, true)}
+        theme={theme}
+        nav={
+          <CaseNav
+            project={project}
+            featureId={feature.id}
+            optionId={resolved.optionId}
+            caseId={resolved.caseId}
+            scenarioId={snap.scenarioId}
+            onOption={(id) => toPlay({ featureId: feature.id, optionId: id, ...(resolved.caseId ? { caseId: resolved.caseId } : {}), ...(play.device ? { device: play.device } : {}) })}
+            onCase={(cid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), caseId: cid, ...(play.device ? { device: play.device } : {}) })}
+            onScenario={(sid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), scenarioId: sid, ...(play.device ? { device: play.device } : {}) })}
+          />
+        }
+        banner={banner}
+        menu={menu}
+        onInspect={(id) => {
+          void ctl.clickNode(id, { x: 0, y: 0 }, { inspect: true });
+          setDrawer(true);
+        }}
+        stageHint={<span>⌥ + 单击：检查元素</span>}
+        selectedId={drawer && selection && state && selection.sceneId === state.sceneId ? selection.nodeId : null}
+        flash={flash}
+        drawer={
+          <>
+            {drawer && selection ? (
+              <InspectDrawer
+                project={project}
+                selection={selection}
+                sync={snap.selectionSync}
+                onClose={() => setDrawer(false)}
+                onClear={() => {
+                  void ctl.clearSelection();
+                  setDrawer(false);
+                }}
+                onOpenEditor={(at) => void openInEditor(projectId, at).then((r) => setFlash(r.ok ? `已在编辑器中打开 ${at}` : `无法打开编辑器：${r.message}`))}
+              />
+            ) : null}
+            {video && scenario ? <VideoDialog projectId={projectId} scenarioId={scenario.id} scenarioName={scenario.name} device={device} theme={theme} onClose={() => setVideo(false)} /> : null}
+          </>
+        }
+      />
+    </>
+  );
+}
+

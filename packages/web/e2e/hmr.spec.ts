@@ -48,8 +48,7 @@ test('写入语法错误：显示 文件:行号 并保留画面；修好后自�
 });
 
 test('热更新保持选中：元素行号变化时重写 at；元素被删时取消选中并写 null', async ({ app, projectDir }) => {
-  await app.getByTestId('mode-review').click();
-  await node(app, 'btn_invite').click();
+  await node(app, 'btn_invite').click({ modifiers: ['Alt'] });
   await expect(app.getByTestId('selection-sync')).toHaveAttribute('data-status', 'ok');
   const file = path.join(projectDir, A);
   const src = fs.readFileSync(file, 'utf8');
@@ -63,16 +62,14 @@ test('热更新保持选中：元素行号变化时重写 at；元素被删时�
   const now = fs.readFileSync(file, 'utf8');
   fs.writeFileSync(file, now.replace(/<Button id="btn_invite"[\s\S]*?<\/Button>/, '<Button id="btn_invite2" unmodeled>其他</Button>'));
   await expect.poll(() => readSelection(projectDir)).toBeNull();
-  await expect(app.getByTestId('overview')).toBeVisible();
+  await expect(app.getByTestId('inspect-drawer')).toHaveCount(0);
 });
 
 test('Tailwind 以项目目录为 @source：新写的 className 热更新后生效', async ({ app, projectDir }) => {
-  const file = path.join(projectDir, 'routes/settings/page.tsx');
-  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('<Title order={2}>空间设置</Title>', '<Title order={2} id="h_settings" className="tracking-[0.37em] text-[#a51d1d]">空间设置</Title>'));
-  await app.getByTestId('view-browse').click();
-  await app.getByTestId('browse-route-/settings').click();
-  const h1 = app.locator('[data-joplo-stage] [data-jid="h_settings"]');
-  await expect(h1).toHaveText('空间设置');
+  const file = path.join(projectDir, 'routes/members/page.tsx');
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('<Title order={2}>成员</Title>', '<Title order={2} id="h_members" className="tracking-[0.37em] text-[#a51d1d]">成员</Title>'));
+  const h1 = app.locator('[data-joplo-stage] [data-jid="h_members"]');
+  await expect(h1).toHaveText('成员');
   await expect.poll(() => h1.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(165, 29, 29)');
   expect(await h1.evaluate((el) => getComputedStyle(el).letterSpacing)).not.toBe('normal');
 });
