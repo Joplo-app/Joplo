@@ -32,11 +32,8 @@ function axis(view: number, k: number, b0: number, bs: number, c0: number | null
   return clamp(t, CAMERA_PAD - k * b0, view - CAMERA_PAD - k * (b0 + bs));
 }
 
-export function fitCamera(input: { W: number; H: number; mode: CameraMode; bbox: Box; nodeScales?: number[]; bounds?: Box | null; reserve?: { right?: number; bottom?: number } }): CameraFit {
-  const { mode, bbox } = input;
-  // reserve：聚焦时给解说卡留出的右侧 / 底部（T-director2），焦点放进剩下的区域
-  const W = mode === 'focus' ? Math.max(200, input.W - (input.reserve?.right ?? 0)) : input.W;
-  const H = mode === 'focus' ? Math.max(160, input.H - (input.reserve?.bottom ?? 0)) : input.H;
+export function fitCamera(input: { W: number; H: number; mode: CameraMode; bbox: Box; nodeScales?: number[]; bounds?: Box | null }): CameraFit {
+  const { W, H, mode, bbox } = input;
   if (mode === 'overview') {
     const k = Math.min(1, W / bbox.w, H / bbox.h);
     if (k === 1) return { k: 1, tx: 0, ty: 0 };

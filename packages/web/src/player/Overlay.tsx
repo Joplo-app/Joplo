@@ -1,5 +1,5 @@
 /**
- * 舞台覆盖层：鼠标指针、点击波纹、聚焦高亮、步骤字幕、就地提示。
+ * 舞台覆盖层：鼠标指针、点击波纹、聚焦高亮、就地提示。说明与 explain 在画面下方的字幕区（Subtitle），不叠在画面上。
  * 位于画框内部（坐标即画框坐标），pointer-events 默认关闭，不影响元素命中与遮挡检查。
  */
 import { useEffect, useState } from 'react';
@@ -46,8 +46,6 @@ export function Overlay({
   snap,
   stage,
   nextTargetId,
-  caption,
-  hideSystem = false,
   setCursorEl,
   onBackToDemo,
   onDismiss,
@@ -55,9 +53,6 @@ export function Overlay({
   snap: Snapshot;
   stage: HTMLElement | null;
   nextTargetId: string | null;
-  caption: string | null;
-  /** 导演模式有解说卡时不显示顶部的“系统事件”标签（与解说卡重复）。 */
-  hideSystem?: boolean;
   setCursorEl: (el: HTMLElement | null) => void;
   onBackToDemo: () => void;
   onDismiss: () => void;
@@ -68,15 +63,9 @@ export function Overlay({
   const boxes = useBoxes(stage, [showFocus ? nextTargetId : null, anchorId, snap.preview?.nodeId]);
   const W = stage?.offsetWidth ?? 1280;
   const H = stage?.offsetHeight ?? 800;
-  // 舞台按可用区域缩放：字幕字号按缩放补偿，屏幕上至少 18px（T-director2）
-  const outer = stage ? stage.getBoundingClientRect().width / (stage.offsetWidth || 1) || 1 : 1;
-  const captionPx = Math.max(20, 19 / outer);
   const focus = showFocus && nextTargetId ? boxes[nextTargetId] : undefined;
   const anchor = anchorId ? boxes[anchorId] : undefined;
   const prevBox = snap.preview ? boxes[snap.preview.nodeId] : undefined;
-  // 字幕避开目标：目标在下方时放到顶部
-  const target = focus ?? anchor;
-  const captionTop = target ? target.y + target.h > H - 110 : false;
 
   return (
     <>
@@ -114,22 +103,11 @@ export function Overlay({
         <MousePointer2 className="-ml-[3px] -mt-[2px] size-7 fill-white text-[#1e1e1e] drop-shadow" strokeWidth={1.6} />
       </div>
 
-      {snap.systemEvent && !hideSystem ? (
-        <div className="absolute left-1/2 top-14 -translate-x-1/2 rounded-full border border-[#1c5fb8] bg-[#eef4ff] px-4 py-1.5 text-[17px] text-[#1c5fb8] shadow" data-joverlay="system">
-          <span className="mr-2 rounded bg-[#1c5fb8] px-1.5 py-0.5 text-[11px] font-semibold text-white">系统事件</span>
-          {snap.systemEvent}
-        </div>
-      ) : null}
 
       {n && anchor && (n.kind === 'disabled' || n.kind === 'uncovered' || n.kind === 'out_of_order') ? (
         <NoticeBubble anchor={anchor} W={W} H={H} kind={n.kind} text={n.text} onBack={onBackToDemo} onDismiss={onDismiss} />
       ) : null}
 
-      {caption ? (
-        <div className={`absolute left-1/2 max-w-[86%] -translate-x-1/2 rounded-md bg-[rgba(30,30,30,0.86)] px-5 py-2.5 text-center leading-snug text-white ${captionTop ? 'top-12' : 'bottom-4'}`} style={{ fontSize: captionPx }} data-joverlay="caption">
-          {caption}
-        </div>
-      ) : null}
     </>
   );
 }

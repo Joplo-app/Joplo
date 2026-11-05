@@ -1,5 +1,5 @@
 import { Project, type SceneNode } from './schema.ts';
-import { INTERACTIVE_TYPES } from './catalog.ts';
+import { CAPTION_MAX, EXPLAIN_MAX, INTERACTIVE_TYPES, captionLength } from './catalog.ts';
 import { walkNodes, findNode, replay } from './player.ts';
 import { JoploError, type Diagnostic } from './result.ts';
 
@@ -135,6 +135,15 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         ref(!stepIds.has(st.id), `步骤 ID 重复：${st.id}`, value, 'step'); stepIds.add(st.id);
         for (const id of st.ruleIds) { const rule = p.rules[id]; ref(rule && rule.featureId === o?.featureId && (!rule.optionId || rule.optionId === sc.optionId), `步骤规则不存在或跨范围：${id}`, value, 'step'); }
         for (const e of st.effects) if (e.type === 'navigate') ref(p.scenes[e.sceneId]?.optionId === sc.optionId, `跳转画面不存在或跨方案：${e.sceneId}`, value, 'step');
+        // 字幕只用来点一句（只提示，不截断、不改写作者的文字）；长内容放进单独的说明层，由导演切过去讲
+        const r = { kind: 'step' as const, id: st.id, optionId: sc.optionId, stepId: st.id };
+        const at = st.source ?? sc.source;
+        const cl = captionLength(st.caption);
+        if (cl > CAPTION_MAX) emit('warning', 'CAPTION_TOO_LONG', `说明有 ${cl} 个字（建议不超过 ${CAPTION_MAX}，英文按半个字算）：「${st.caption}」。字幕只点一句；详细内容移到单独的说明层，例如 layers: { why: layer('设计理由', <Why />) }，再在这一步 shot('why_xxx') 切过去讲`, at, r);
+        if (st.explain) {
+          const el = captionLength(st.explain);
+          if (el > EXPLAIN_MAX) emit('warning', 'EXPLAIN_TOO_LONG', `explain 有 ${el} 个字（建议不超过 ${EXPLAIN_MAX}）。信息很多时放进单独的说明层，例如 layers: { why: layer('设计理由', <Why />) }，再用 shot 切过去`, at, r);
+        }
       }
     }
     for (const o of options) if (!diagnostics.some(d => d.severity === 'error' && (!d.ref?.optionId || d.ref.optionId === o.id))) verification[o.id] = 'structure_ok';

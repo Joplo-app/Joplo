@@ -15,18 +15,18 @@ import fs from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright';
-import { JoploError, displaySceneId, type Project } from '@tokenroll/joplo-core';
+import { JoploError, SUBTITLE_HEIGHT, displaySceneId, type Project } from '@tokenroll/joplo-core';
 import { launch, loadPlaywright, type PlaywrightModule } from './render.ts';
 
 export type Device = 'desktop' | 'mobile';
 
 /**
  * 导出画面的尺寸：电脑 = 舞台 1280×800；手机 = 外框（renderer 的 phoneFrameSize(390, 844) = 446×934）
- * 四周再留 16px（RenderApp 的 frame 模式）。
+ * 四周再留 16px（RenderApp 的 frame 模式）。舞台正下方是字幕区（SUBTITLE_HEIGHT），一起导出。
  */
 export const EXPORT_SIZE: Record<Device, { width: number; height: number }> = {
-  desktop: { width: 1280, height: 800 },
-  mobile: { width: 446 + 32, height: 934 + 32 },
+  desktop: { width: 1280, height: 800 + SUBTITLE_HEIGHT },
+  mobile: { width: 446 + 32, height: 934 + 32 + SUBTITLE_HEIGHT },
 };
 
 export type VideoJob = {

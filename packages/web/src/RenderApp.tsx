@@ -10,7 +10,7 @@
  *   .progress = { step, done, error } 供服务端读取进度。
  */
 import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { displaySceneId, stateAt, type PlayState, type Project } from '@tokenroll/joplo-core';
+import { SUBTITLE_HEIGHT, displaySceneId, stateAt, type PlayState, type Project } from '@tokenroll/joplo-core';
 import { fetchIR } from './runtime/dev-client';
 import { DemoController } from './runtime/demo';
 import { Stage, VIEWPORTS, type Viewport } from './renderer/Stage';
@@ -18,8 +18,9 @@ import { PhoneFrame, phoneFrameSize } from './renderer/components';
 import { cameraFor } from './player/cameraFor';
 import { RoughRegistry, ThemeContext, type StageTheme } from './renderer/rough';
 import { Overlay } from './player/Overlay';
-import { ExplainCard } from './player/ExplainCard';
-import { cameraPosition, cardPlan } from './player/cameraFor';
+import { cameraPosition } from './player/cameraFor';
+import { Subtitle } from './player/Subtitle';
+import { subtitleFor, type SubtitleContent } from './player/subtitle-content';
 
 type W = {
   __JOPLO_READY__?: boolean;
@@ -112,32 +113,41 @@ export function RenderApp() {
     ) : (
       stageNode
     );
-  const wrap = (stageNode: ReactNode) => {
+  // 字幕区放在舞台（手机含外框）正下方，宽度相同：截图、导出图片与视频都带上它
+  const fw = viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).width : vp.width;
+  const fh = (viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).height : vp.height) + SUBTITLE_HEIGHT;
+  const withSub = (node: ReactNode, sub: SubtitleContent | null, w: number) => (
+    <div style={{ display: 'flex', flexDirection: 'column', width: w }}>
+      {node}
+      <Subtitle content={sub} theme={theme} width={w} framed />
+    </div>
+  );
+  const wrap = (stageNode: ReactNode, sub: SubtitleContent | null) => {
     if (frame)
       return (
         <div data-jexport="" style={{ position: 'absolute', left: 0, top: 0, display: 'inline-block', ...(viewport === 'mobile' ? { background: '#ffffff', padding: 16 } : {}) }}>
-          {framed(stageNode)}
+          {withSub(framed(stageNode), sub, fw)}
         </div>
       );
     if (shot) {
-      // 截图画布：舞台（手机页面带外框）按比例放进 w×h，居中
-      const fw = viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).width : vp.width;
-      const fh = viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).height : vp.height;
+      // 截图画布：舞台（手机页面带外框）加字幕区按比例放进 w×h，居中
       const k = Math.min(shot.width / fw, shot.height / fh);
       return (
         <div data-jshot="" style={{ position: 'absolute', left: 0, top: 0, width: shot.width, height: shot.height, overflow: 'hidden', background: '#f8f9fa' }}>
-          <div style={{ position: 'absolute', left: (shot.width - fw * k) / 2, top: (shot.height - fh * k) / 2, width: fw, height: fh, transform: `scale(${k})`, transformOrigin: '0 0' }}>{framed(stageNode)}</div>
+          <div style={{ position: 'absolute', left: (shot.width - fw * k) / 2, top: (shot.height - fh * k) / 2, width: fw, height: fh, transform: `scale(${k})`, transformOrigin: '0 0' }}>{withSub(framed(stageNode), sub, fw)}</div>
         </div>
       );
     }
-    return <div style={{ position: 'absolute', left: 0, top: 0 }}>{stageNode}</div>;
+    return (
+      <div data-jrender="" style={{ position: 'absolute', left: 0, top: 0 }}>
+        {withSub(stageNode, sub, vp.width)}
+      </div>
+    );
   };
   if (record) return <RecordStage project={data.project} scenarioId={scenarioId} theme={theme} registry={registry} setStage={setStage} wrap={wrap} />;
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
   const plan = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null);
-  // 导演跟随：解说卡与镜头给它留的位置，与演示页一致
-  const card = cardPlan(data.project, sc ? scenarioId : null, plan, true, data.state.position - 1, vp.width);
   return wrap(
     <Stage
       project={data.project}
@@ -148,15 +158,15 @@ export function RenderApp() {
       registry={registry}
       nextTargetId={next && 'target' in next.action ? next.action.target : null}
       stageRef={setStage}
-      camera={plan.spec && card ? { ...plan.spec, reserve: card.reserve } : plan.spec}
+      camera={plan.spec}
       sceneId={plan.sceneId}
-      overlay={card ? <ExplainCard stage={stage} stepKey={card.step.id} caption={card.step.caption} explain={card.step.explain ?? null} anchors={card.anchors} animate={false} /> : null}
     />,
+    subtitleFor(sc, data.state.position, null),
   );
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
-function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode) => ReactNode }) {
+function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null) => ReactNode }) {
   const ctl = useMemo(() => {
     const c = new DemoController(null);
     c.reducedMotion = false;
@@ -189,13 +199,9 @@ function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: {
   const next = ctl.nextStep();
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
   const sc = ctl.scenario();
-  const shown = sc && snap.activeStep !== null ? sc.steps[snap.activeStep] : null;
   // 与演示页一致：导演跟随；下一步的操作目标不在当前层时先切到它所在的层（leadLayer）
   const plan = cameraFor(project, scenarioId, cameraPosition(ctl.scenario(), snap.state?.position ?? 0, snap.activeStep), snap.leadLayer);
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, true), [ctl, plan.sceneId]);
-  const W = VIEWPORTS[project.scenes[plan.sceneId ?? snap.state?.sceneId ?? '']?.viewport === 'mobile' ? 'mobile' : 'desktop'].width;
-  const pos = snap.state?.position ?? 0;
-  const card = cardPlan(project, scenarioId, plan, true, snap.activeStep ?? pos - 1, W);
   if (!snap.state) return null;
   return wrap(
     <Stage
@@ -208,19 +214,15 @@ function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: {
       epoch={snap.epoch}
       animate
       nextTargetId={nextTargetId}
-      camera={plan.spec && card ? { ...plan.spec, reserve: card.reserve } : plan.spec}
+      camera={plan.spec}
       sceneId={plan.sceneId}
       stageRef={(el) => {
         ctl.setStageEl(el);
         setStageEl(el);
         setStage(el);
       }}
-      overlay={
-        <>
-          <Overlay snap={snap} stage={stageEl} nextTargetId={null} hideSystem={!!card} caption={card ? null : (shown?.caption ?? (snap.playing && pos > 0 ? (sc?.steps[pos - 1]?.caption ?? null) : null))} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />
-          {card ? <ExplainCard stage={stageEl} stepKey={card.step.id} caption={card.step.caption} explain={card.step.explain ?? null} anchors={card.anchors} animate /> : null}
-        </>
-      }
+      overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={null} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />}
     />,
+    subtitleFor(sc, snap.state.position, snap.activeStep),
   );
 }

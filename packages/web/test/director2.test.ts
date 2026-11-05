@@ -1,12 +1,11 @@
 /**
- * T-director2 中能抽成纯函数的部分：停留时长（stepDwell）、解说卡定位避让（placeCallout / cardReserve）、
- * 自由缩放与平移夹紧（zoomAt / clampPan / wheelFactor）、速度写进 URL、解说卡预留下的镜头拟合。
+ * T-director2 中能抽成纯函数的部分：停留时长（stepDwell）、
+ * 自由缩放与平移夹紧（zoomAt / clampPan / wheelFactor）、速度写进 URL。
  * 界面（分段控件不高亮、拖动、解说卡外观）由用户在浏览器里检查。
  */
 import { describe, expect, it } from 'vitest';
 import { CAMERA_MS, MIN_DWELL, MS_PER_CHAR, asSpeed, readChars, stepDwell } from '../src/runtime/pace';
-import { CARD_MARGIN, cardReserve, placeCallout, type Box } from '../src/player/callout';
-import { CAMERA_PAD, PAN_KEEP, ZOOM_MAX, ZOOM_MIN, clampPan, fitCamera, project, wheelFactor, zoomAt } from '../src/renderer/camera-math';
+import { PAN_KEEP, ZOOM_MAX, ZOOM_MIN, clampPan, wheelFactor, zoomAt } from '../src/renderer/camera-math';
 import { boardHash, parseBoardHash, parseSiteHash, siteHash } from '../src/runtime/route';
 
 describe('stepDwell（每一步的停留时长）', () => {
@@ -31,60 +30,6 @@ describe('stepDwell（每一步的停留时长）', () => {
   });
   it('只接受 0.5 / 1 / 1.5', () => {
     expect([asSpeed('0.5'), asSpeed(1.5), asSpeed(2), asSpeed(undefined), asSpeed('x')]).toEqual([0.5, 1.5, 1, 1, 1]);
-  });
-});
-
-describe('placeCallout（解说卡：焦点旁边、带箭头、避开画面边缘）', () => {
-  const frame = { W: 1280, H: 800 };
-  const card = { w: 400, h: 160 };
-  const inFrame = (x: number, y: number) => x >= CARD_MARGIN - 1e-6 && y >= CARD_MARGIN - 1e-6 && x + card.w <= frame.W - CARD_MARGIN + 1e-6 && y + card.h <= frame.H - CARD_MARGIN + 1e-6;
-  const overlap = (a: Box, b: Box) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
-  it('优先放在右侧；右侧放不下换左侧、下方、上方；卡片总在画面内、不压住焦点', () => {
-    const cases: [Box, string][] = [
-      [{ x: 100, y: 300, w: 200, h: 80 }, 'right'],
-      [{ x: 900, y: 300, w: 300, h: 80 }, 'left'],
-      [{ x: 100, y: 40, w: 1080, h: 200 }, 'bottom'],
-      [{ x: 100, y: 560, w: 1080, h: 200 }, 'top'],
-    ];
-    for (const [a, side] of cases) {
-      const p = placeCallout(a, card, frame);
-      expect(p.side, JSON.stringify(a)).toBe(side);
-      expect(inFrame(p.x, p.y)).toBe(true);
-      expect(overlap(a, { x: p.x, y: p.y, w: card.w, h: card.h })).toBe(0);
-      // 箭头尖端贴着焦点的边
-      const t = p.arrow!;
-      const near = Math.min(Math.abs(t.x - a.x), Math.abs(t.x - (a.x + a.w)), Math.abs(t.y - a.y), Math.abs(t.y - (a.y + a.h)));
-      expect(near).toBeLessThanOrEqual(3);
-    }
-  });
-  it('焦点贴着画面边缘时卡片被夹进画面；焦点占满画面时放在空间最大的一侧并仍在画面内', () => {
-    const edge = placeCallout({ x: 0, y: 760, w: 120, h: 40 }, card, frame);
-    expect(inFrame(edge.x, edge.y)).toBe(true);
-    const full = placeCallout({ x: 10, y: 10, w: 1260, h: 780 }, card, frame);
-    expect(inFrame(full.x, full.y)).toBe(true);
-  });
-  it('没有焦点：画面底部居中，没有箭头', () => {
-    const p = placeCallout(null, card, frame);
-    expect(p.side).toBe('none');
-    expect(p.arrow).toBeNull();
-    expect(Math.abs(p.x + card.w / 2 - frame.W / 2)).toBeLessThan(1e-6);
-    expect(inFrame(p.x, p.y)).toBe(true);
-  });
-  it('导演模式的镜头给解说卡留位置：聚焦后焦点在剩余区域内，卡片放在右侧不压住焦点', () => {
-    const r = cardReserve(1280, card);
-    expect(r.right).toBeGreaterThanOrEqual(400);
-    for (const bbox of [{ x: 40, y: 60, w: 120, h: 36 }, { x: 700, y: 120, w: 540, h: 620 }, { x: 0, y: 300, w: 1280, h: 40 }]) {
-      const f = fitCamera({ W: 1280, H: 800, mode: 'focus', bbox, reserve: r });
-      const b = project(bbox, f);
-      expect(b.x + b.w).toBeLessThanOrEqual(1280 - r.right - CAMERA_PAD + 1e-6);
-      expect(b.x).toBeGreaterThanOrEqual(CAMERA_PAD - 1e-6);
-      const p = placeCallout(b, card, frame);
-      expect(p.side).toBe('right');
-      expect(overlap(b, { x: p.x, y: p.y, w: card.w, h: card.h })).toBe(0);
-    }
-    // 窄屏（手机）或宽卡片：留底部
-    expect(cardReserve(390, { w: 366, h: 180 })).toEqual({ right: 0, bottom: 180 + 44 });
-    expect(cardReserve(1280, { w: 700, h: 150 }).bottom).toBe(150 + 44);
   });
 });
 

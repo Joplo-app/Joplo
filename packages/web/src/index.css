@@ -195,6 +195,14 @@
   transition: filter 0.35s ease;
 }
 
+/* 字幕区：字体跟随舞台主题 */
+.jsubtitle[data-theme="sketch"] {
+  font-family: "Joplo Excalifont", "Joplo Xiaolai", "PingFang SC", sans-serif;
+}
+.jsubtitle[data-theme="clean"] {
+  font-family: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
 /* rough 描边层：不进图层并加 !important，避免被组件库的 [&_svg]:size-* 等工具类改尺寸 */
 .jstage svg.jrough,
 [data-jphone-frame] svg.jrough {

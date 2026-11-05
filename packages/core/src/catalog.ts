@@ -194,6 +194,24 @@ const BP_KEYS = ['base', 'xs', 'sm', 'md', 'lg', 'xl'] as const;
 
 /** 页面 viewport 对应的舞台尺寸。 */
 export const VIEWPORT_SIZE = { desktop: { width: 1280, height: 800 }, mobile: { width: 390, height: 844 } } as const;
+/**
+ * 字幕区：画面下方、播放控制上方的一块固定高度区域，最多两行：一行本步说明（大字），一行 explain（小一号）。
+ * 演示页、发布站、renderStep 截图、导出图片与视频都把它放在舞台正下方，宽度与舞台（手机含外框）相同。
+ */
+export const SUBTITLE_HEIGHT = 84;
+
+/** 字幕的“字数”：中文（及其他全角字符）一个算 1，英文、数字、标点按 0.5 算；空白不算。check 用它提示说明与 explain 过长。 */
+export function captionLength(s: string): number {
+  let n = 0;
+  for (const ch of s) {
+    if (/\s/.test(ch)) continue;
+    n += (ch.codePointAt(0) ?? 0) > 0x2e80 ? 1 : 0.5;
+  }
+  return n;
+}
+/** 说明 / explain 的建议上限（超过时 check 报 CAPTION_TOO_LONG / EXPLAIN_TOO_LONG）。 */
+export const CAPTION_MAX = 24;
+export const EXPLAIN_MAX = 48;
 
 /** 没有声明 layers 的方案：镜头作用在路径页面上，记为这个伪层级（不出现在层级栏）。作者的层级键不能以 @ 开头。 */
 export const PAGE_LAYER = '@page';

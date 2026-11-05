@@ -128,7 +128,7 @@ export const Step = z.strictObject({
   shots: z.array(Shot).default([]),
   /** 这一步导演切到哪一层（第一个 shot 决定；没有 shot 的操作步骤取操作目标所在层）；null = 沿用上一步。 */
   directorLayer: z.string().nullable().default(null),
-  /** 较长的解说（来自 explain()，多个按换行连接）：导演模式的解说卡显示在说明下方；发布站保留。 */
+  /** 较长的解说（来自 explain()，多个按换行连接）：字幕区第二行显示（说明下方、小一号）；发布站保留。 */
   explain: z.string().min(1).optional(),
   source: Source,
 });

@@ -127,7 +127,7 @@ export const uses = (...rules: string[]): EffectDef => ({ kind: 'effect', type: 
 export const shot = (...targets: string[]): EffectDef => ({ kind: 'effect', type: 'shot', targets });
 
 /**
- * 解说（T-director2）：这一步较长的说明。导演模式下显示在焦点旁的解说卡里、步骤说明的下方；
+ * 解说：这一步补充的一句话，显示在画面下方字幕区的第二行（说明下方、小一号）；建议不超过 48 个字（check 会提示）。
  * 自动播放时这一步停留的时长也按说明加解说的字数计算。不改变状态。
  *   .system('额度预检', '调用模型之前先预检额度', shot('billing'), explain('额度不足时在这里就拦下，不会产生模型费用'))
  */
