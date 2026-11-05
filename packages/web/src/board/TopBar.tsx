@@ -2,11 +2,12 @@
  * 顶栏（演示与审阅模式共用）：项目名、当前路径、功能/方案/场景切换、视图（比较方案 / 浏览）、
  * 缺口胶囊（点击切到审阅模式并展开情况列表）、模式切换、主题、“概念原型”标识。
  */
-import { Columns3, Eye, Hand, Map as MapIcon, PenTool, Play, Square } from 'lucide-react';
+import { Columns3, Eye, Hand, Map as MapIcon, Monitor, PenTool, Play, Smartphone, Square } from 'lucide-react';
 import type { Project } from '@joplo/core';
 import type { Mode, Snapshot } from '../runtime/demo';
 import { gapCounts, optionsOf, scenariosOf } from '../runtime/views';
 import type { StageTheme } from '../renderer/rough';
+import type { Viewport } from '../renderer/Stage';
 import { cn } from '@/lib/utils';
 
 export function TopBar({
@@ -20,6 +21,9 @@ export function TopBar({
   onMode,
   onTheme,
   onGaps,
+  width,
+  pageWidth,
+  onWidth,
 }: {
   snap: Snapshot;
   theme: StageTheme;
@@ -31,6 +35,10 @@ export function TopBar({
   onMode: (m: Mode) => void;
   onTheme: (t: StageTheme) => void;
   onGaps: () => void;
+  /** 预览宽度：null 表示按页面自身的 viewport。 */
+  width: Viewport | null;
+  pageWidth: Viewport;
+  onWidth: (w: Viewport | null) => void;
 }) {
   const project: Project | null = snap.project;
   const features = project ? Object.values(project.features) : [];
@@ -93,6 +101,10 @@ export function TopBar({
           <ModeButton active={mode === 'demo'} onClick={() => onMode('demo')} icon={<Hand className="size-4" />} label="演示" color="#e8590c" testid="mode-demo" />
           <ModeButton active={mode === 'review'} onClick={() => onMode('review')} icon={<Eye className="size-4" />} label="审阅" color="#6741d9" testid="mode-review" />
         </div>
+        <div role="radiogroup" aria-label="预览宽度" className="flex rounded-md border p-0.5 text-[12px]" data-testid="width-switch" title="按桌面或手机宽度预览：响应式属性、visibleFrom/hiddenFrom、AppShell 导航收起随之变化">
+          <ThemeButton active={(width ?? pageWidth) === 'desktop'} onClick={() => onWidth(pageWidth === 'desktop' ? null : 'desktop')} icon={<Monitor className="size-3.5" />} label="桌面宽度" testid="width-desktop" iconOnly />
+          <ThemeButton active={(width ?? pageWidth) === 'mobile'} onClick={() => onWidth(pageWidth === 'mobile' ? null : 'mobile')} icon={<Smartphone className="size-3.5" />} label="手机宽度" testid="width-mobile" iconOnly />
+        </div>
         <div role="radiogroup" aria-label="原型主题" className="flex rounded-md border p-0.5 text-[12px]">
           <ThemeButton active={theme === 'sketch'} onClick={() => onTheme('sketch')} icon={<PenTool className="size-3.5" />} label="手绘" />
           <ThemeButton active={theme === 'clean'} onClick={() => onTheme('clean')} icon={<Square className="size-3.5" />} label="线框" />
@@ -108,7 +120,7 @@ export function TopBar({
 function Picker({ label, testid, value, onChange, items, empty, width }: { label: string; testid: string; value: string; onChange: (v: string) => void; items: { value: string; label: string }[]; empty: string; width: string }) {
   return (
     <label className="flex items-center gap-1 whitespace-nowrap text-[12px] text-[#6b6b6b]">
-      <span className="shrink-0 max-[1500px]:sr-only">{label}</span>
+      <span className="shrink-0 max-[1700px]:sr-only">{label}</span>
       <select data-testid={testid} className={cn('h-8 truncate rounded-md border bg-white px-1.5 text-[13px] text-[#1e1e1e]', width)} value={value} onChange={(e) => onChange(e.target.value)} disabled={items.length === 0}>
         {items.length === 0 ? <option value="">{empty}</option> : null}
         {items.map((i) => (
@@ -125,7 +137,7 @@ function ViewButton({ active, onClick, icon, label, testid }: { active: boolean;
   return (
     <button type="button" role="tab" aria-selected={active} data-testid={testid} onClick={onClick} title={label} className={cn('flex items-center gap-1 whitespace-nowrap rounded px-2 py-1', active ? 'bg-[#1e1e1e] text-white' : 'text-[#3a3a3a] hover:bg-black/5')}>
       {icon}
-      <span className="max-[1500px]:hidden">{label}</span>
+      <span className="max-[1700px]:hidden">{label}</span>
     </button>
   );
 }
@@ -147,11 +159,11 @@ function ModeButton({ active, onClick, icon, label, color, testid }: { active: b
   );
 }
 
-function ThemeButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+function ThemeButton({ active, onClick, icon, label, testid, iconOnly = false }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; testid?: string; iconOnly?: boolean }) {
   return (
-    <button type="button" role="radio" aria-checked={active} onClick={onClick} className={cn('flex items-center gap-1 rounded px-1.5 py-0.5', active ? 'bg-[#1e1e1e] text-white' : 'text-[#3a3a3a] hover:bg-black/5')}>
+    <button type="button" role="radio" aria-checked={active} aria-label={label} title={label} onClick={onClick} data-testid={testid} className={cn('flex items-center gap-1 rounded px-1.5 py-0.5', active ? 'bg-[#1e1e1e] text-white' : 'text-[#3a3a3a] hover:bg-black/5')}>
       {icon}
-      {label}
+      {iconOnly ? null : label}
     </button>
   );
 }

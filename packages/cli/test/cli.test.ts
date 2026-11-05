@@ -45,7 +45,7 @@ test.each([
   ['FUNCTION_PROP', option, (s: string) => s.replace('<Button id="btn_invite"', '<Button onClick={() => {}} id="btn_invite"'), '<Button onClick=', 1],
   ['UNKNOWN_CASE', option, (s: string) => s.replace("cases: ['no_permission']", "cases: ['absent']"), "denied: flow(", 1],
   ['ASSUMPTION_CONFIRMED', feature, (s: string) => s.replace("origin: 'user', status: 'confirmed'", "status: 'confirmed'"), "admin_only: rule(", 1],
-  ['UNBOUND_INTERACTIVE', option, (s: string) => s.replace('<DialogFooter>', '<DialogFooter>\n              <Button id="loose">新按钮</Button>'), '<Button id="loose"', 0],
+  ['UNBOUND_INTERACTIVE', option, (s: string) => s.replace('<Group justify="flex-end" gap="sm">', '<Group justify="flex-end" gap="sm">\n              <Button id="loose">新按钮</Button>'), '<Button id="loose"', 0],
   ['UNKNOWN_SLOT', option, (s: string) => s.replace("'header.actions':", "'absent':"), 'export default option(', 1],
   ['CASE_NOT_COVERED', feature, (s: string) => s.replace('cases: {', "cases: {\n    new_case: '新增情况',"), 'export default feature(', 0],
 ] as const)('%s 包含正确文件及行号', async (code, file, change, needle, exit) => {

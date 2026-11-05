@@ -41,7 +41,7 @@ describe('buildSite', () => {
 
   it('Tailwind 以项目目录为 @source：项目里独有的 className 被编译进 CSS', async () => {
     const f = path.join(dir, 'routes/settings/page.tsx');
-    fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('<h1>空间设置</h1>', '<h1 className="tracking-[0.37em]">空间设置</h1>'));
+    fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('<Title order={2}>空间设置</Title>', '<Title order={2} className="tracking-[0.37em]">空间设置</Title>'));
     const r = await buildSite({ projectDir: dir, outDir: path.join(dir, 'dist-tw') });
     const css = r.files.filter((x) => x.endsWith('.css')).map((x) => fs.readFileSync(path.join(r.outDir, x), 'utf8')).join('');
     expect(css).toContain('.37em');

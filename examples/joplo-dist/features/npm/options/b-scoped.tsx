@@ -1,5 +1,5 @@
 import { $, done, flow, notApplicable, option, rule, undecided, uses } from '@joplo/kit';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, DataTable } from '@joplo/kit/ui';
+import { Card, DataTable, Stack, Text, Title } from '@joplo/kit/ui';
 
 import { Cmd } from '../../../shared/term.tsx';
 import { run } from '../../../shared/steps.ts';
@@ -55,17 +55,15 @@ export default option({
     },
     '/npm': {
       package: (
-        <Card id="b_pkgs">
-          <CardHeader>
-            <CardTitle>@joplo（6 个包，版本同步）</CardTitle>
-            <CardDescription>用户只需要记住 npx joplo；作者项目依赖 @joplo/kit</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card id="b_pkgs" withBorder>
+          <Stack gap="sm">
+            <Title order={3}>@joplo（6 个包，版本同步）</Title>
+            <Text c="dimmed">用户只需要记住 npx joplo；作者项目依赖 @joplo/kit</Text>
             <DataTable
               id="tbl_pkgs"
               note="体积为估算"
-              columns={[{ accessorKey: 'name', header: '包' }, { accessorKey: 'role', header: '作用' }, { accessorKey: 'size', header: '体积' }]}
-              data={[
+              columns={[{ accessor: 'name', title: '包' }, { accessor: 'role', title: '作用' }, { accessor: 'size', title: '体积' }]}
+              records={[
                 { name: 'joplo', role: '命令入口，转发到 @joplo/cli', size: '约 5 KB' },
                 { name: '@joplo/kit', role: '创作 SDK 与 JSX 运行时（作者项目依赖）', size: '约 40 KB' },
                 { name: '@joplo/cli', role: '命令实现', size: '约 60 KB' },
@@ -74,7 +72,7 @@ export default option({
                 { name: '@joplo/web', role: '看板与发布站资源、手绘字体', size: '约 14 MB' },
               ]}
             />
-          </CardContent>
+          </Stack>
         </Card>
       ),
     },

@@ -1,7 +1,7 @@
 /**
  * 生成文档截图（唯一写入 docs/screenshots 的途径）：对 examples/invite 的临时副本
- *   1. 调用 renderStep 输出舞台截图（手绘 / 线框）；
- *   2. 启动 startDev，截取看板（演示 / 审阅 / 路径树 / 比较方案 / 编译错误）；
+ *   1. 调用 renderStep 输出舞台截图（手绘 / 线框；桌面与手机宽度）；
+ *   2. 启动 startDev，截取看板（演示 / 审阅 / 路径树 / 手机宽度 / 比较方案 / 编译错误）；
  *   3. 调用 buildSite，用 file:// 打开发布站截图。
  * 用法：pnpm docs:screenshots [输出目录]
  */
@@ -21,7 +21,8 @@ fs.mkdirSync(outDir, { recursive: true });
 for (const f of fs.readdirSync(outDir)) if (f.endsWith('.png')) fs.rmSync(path.join(outDir, f));
 
 const A = 'invite.a-modal';
-const shots: { name: string; scenarioId: string; stepId?: string }[] = [
+const MOBILE = { width: 390, height: 844 };
+const shots: { name: string; scenarioId: string; stepId?: string; viewport?: { width: number; height: number } }[] = [
   { name: 'stage-a-success-0-initial', scenarioId: `${A}.success` },
   { name: 'stage-a-success-1-dialog', scenarioId: `${A}.success`, stepId: `${A}.success#1` },
   { name: 'stage-a-success-3-filled', scenarioId: `${A}.success`, stepId: `${A}.success#3` },
@@ -29,11 +30,14 @@ const shots: { name: string; scenarioId: string; stepId?: string }[] = [
   { name: 'stage-a-failure-5-error', scenarioId: `${A}.failure`, stepId: `${A}.failure#5` },
   { name: 'stage-a-denied', scenarioId: `${A}.denied` },
   { name: 'stage-b-partial-5-results', scenarioId: 'invite.b-batch.partial', stepId: 'invite.b-batch.partial#5' },
+  // 同一画面按手机宽度渲染：AppShell 收起导航、显示 Burger，响应式属性取 base
+  { name: 'stage-a-success-0-initial-mobile', scenarioId: `${A}.success`, viewport: MOBILE },
+  { name: 'stage-a-success-3-filled-mobile', scenarioId: `${A}.success`, stepId: `${A}.success#3`, viewport: MOBILE },
 ];
 let bad = 0;
 for (const theme of ['sketch', 'clean'] as const) {
   for (const s of shots) {
-    const r = await renderStep({ projectDir: tmp, scenarioId: s.scenarioId, stepId: s.stepId, theme, out: path.join(outDir, `${s.name}.${theme}.png`), overwrite: true });
+    const r = await renderStep({ projectDir: tmp, scenarioId: s.scenarioId, stepId: s.stepId, theme, out: path.join(outDir, `${s.name}.${theme}.png`), overwrite: true, ...(s.viewport ? { viewport: s.viewport } : {}) });
     console.log(`${path.relative(root, r.path)}  position=${r.position} 可见元素=${r.elements.filter((e) => e.visible).length} 告警=${r.warnings.length}`);
     for (const w of r.warnings) console.log(`  ⚠ ${w}`);
     bad += r.warnings.length;
@@ -85,6 +89,11 @@ try {
   await shot(page, 'board-review-selected');
   await page.getByTestId('route-tree').locator('[data-route="/members/invite"] > button').click();
   await shot(page, 'board-review-route-tree-browse');
+  // 手机宽度预览：浏览 /settings（SimpleGrid 变成单列，导航收起）
+  await page.getByTestId('width-mobile').click();
+  await page.getByTestId('route-tree').locator('[data-route="/settings"] > button').click();
+  await shot(page, 'board-review-mobile-width');
+  await page.getByTestId('width-desktop').click();
   await page.getByTestId('mode-demo').click();
   await page.getByTestId('view-compare').click();
   await page.getByTestId('compare-case-invite.request_failed').click();

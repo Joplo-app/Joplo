@@ -23,7 +23,8 @@ function useBoxes(stage: HTMLElement | null, ids: (string | null | undefined)[])
       const s = rr.width / stage.offsetWidth || 1;
       const out: Record<string, Box> = {};
       for (const id of list) {
-        const el = stage.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`);
+        // 输入组件的根包含 label 等，光标与高亮对准真正的控件
+        const el = stage.querySelector<HTMLElement>(`[data-jcontrol="${CSS.escape(id)}"]`) ?? stage.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`);
         if (!el) continue;
         const r = el.getBoundingClientRect();
         out[id] = { x: (r.left - rr.left) / s, y: (r.top - rr.top) / s, w: r.width / s, h: r.height / s };

@@ -1,6 +1,6 @@
 import { $, done, flow, go, missing, not, option, page, push, rule, set, toast, uses } from '@joplo/kit';
 import { members, pending } from '../sample.ts';
-import { Alert, AlertDescription, Button, Card, CardContent, CardHeader, CardTitle, DataTable, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '@joplo/kit/ui';
+import { Alert, Button, Card, DataTable, Select, Stack, Textarea, Title } from '@joplo/kit/ui';
 
 export default option({
   name: 'B · 独立页面批量邀请',
@@ -21,34 +21,26 @@ export default option({
   routes: {
     '/members/invite': page(
       { title: '批量邀请' },
-      <>
-          <h1>批量邀请成员</h1>
-          <Card>
-            <CardHeader><CardTitle>填写邮箱</CardTitle></CardHeader>
-            <CardContent>
-              <Label htmlFor="in_emails">邮箱（每行一个）</Label>
-              <Textarea id="in_emails" placeholder={'a@company.com\nb@company.com'} />
-              <Label htmlFor="sel_batch_role">统一权限</Label>
-              <Select id="sel_batch_role">
-                <SelectTrigger><SelectValue placeholder="选择权限" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="查看者">查看者</SelectItem>
-                  <SelectItem value="编辑者">编辑者</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button id="btn_batch_send">发送全部邀请</Button>
-            </CardContent>
-          </Card>
-          <Alert id="alert_partial" when={$.ui.partial}>
-            <AlertDescription>3 个邀请中 2 个成功，1 个失败。失败项可以单独重试。</AlertDescription>
-          </Alert>
-          <DataTable
-            id="tbl_results"
-            columns={[{ accessorKey: 'email', header: '邮箱' }, { accessorKey: 'result', header: '结果' }]}
-            data={$.data.results}
-            empty="提交后在这里显示每个邮箱的结果"
-          />
-      </>,
+      <Stack gap="md">
+        <Title order={2}>批量邀请成员</Title>
+        <Card withBorder>
+          <Stack gap="sm">
+            <Title order={4}>填写邮箱</Title>
+            <Textarea id="in_emails" label="邮箱（每行一个）" placeholder={'a@company.com\nb@company.com'} minRows={3} />
+            <Select id="sel_batch_role" label="统一权限" placeholder="选择权限" data={['查看者', '编辑者']} />
+            <Button id="btn_batch_send">发送全部邀请</Button>
+          </Stack>
+        </Card>
+        <Alert id="alert_partial" color="yellow" when={$.ui.partial}>
+          3 个邀请中 2 个成功，1 个失败。失败项可以单独重试。
+        </Alert>
+        <DataTable
+          id="tbl_results"
+          columns={[{ accessor: 'email', title: '邮箱' }, { accessor: 'result', title: '结果' }]}
+          records={$.data.results}
+          noRecordsText="提交后在这里显示每个邮箱的结果"
+        />
+      </Stack>,
     ),
   },
 

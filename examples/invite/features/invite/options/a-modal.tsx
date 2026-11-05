@@ -1,8 +1,5 @@
 import { $, done, flow, not, notEmpty, option, rule, set, push, toast, undecided, uses } from '@joplo/kit';
-import {
-  Alert, AlertDescription, AlertTitle, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-  Input, Label, Loader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@joplo/kit/ui';
+import { Alert, Button, Group, Loader, Modal, Select, Stack, Text, TextInput } from '@joplo/kit/ui';
 
 import { members, pending } from '../sample.ts';
 
@@ -35,39 +32,35 @@ export default option({
         </Button>
       ),
       notice: (
-        <Alert id="alert_denied" when={not($.ui.isAdmin)}>
-          <AlertDescription>你是普通成员，邀请新成员需要联系空间管理员。</AlertDescription>
+        <Alert id="alert_denied" color="gray" when={not($.ui.isAdmin)}>
+          你是普通成员，邀请新成员需要联系空间管理员。
         </Alert>
       ),
       overlay: (
-        <Dialog id="dlg_invite" open={$.ui.inviteOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>邀请成员</DialogTitle>
-              <DialogDescription>被邀请人会收到一封邮件，接受后加入本空间。</DialogDescription>
-            </DialogHeader>
-            <Label htmlFor="in_email">邮箱</Label>
-            <Input id="in_email" type="email" placeholder="name@company.com" />
-            <Label htmlFor="sel_role">权限</Label>
-            <Select id="sel_role" note="受邀者获得的权限不会高于这里选择的权限">
-              <SelectTrigger><SelectValue placeholder="选择权限" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="查看者">查看者</SelectItem>
-                <SelectItem value="编辑者">编辑者</SelectItem>
-                <SelectItem value="管理员">管理员</SelectItem>
-              </SelectContent>
-            </Select>
-            <Alert id="alert_send_error" variant="destructive" when={notEmpty($.ui.error)}>
-              <AlertTitle>发送失败</AlertTitle>
-              <AlertDescription>{$.ui.error}</AlertDescription>
+        <Modal id="dlg_invite" opened={$.ui.inviteOpen} title="邀请成员">
+          <Stack gap="md">
+            <Text size="sm" c="dimmed">被邀请人会收到一封邮件，接受后加入本空间。</Text>
+            <TextInput id="in_email" label="邮箱" type="email" placeholder="name@company.com" />
+            <Select
+              id="sel_role"
+              label="权限"
+              placeholder="选择权限"
+              data={['查看者', '编辑者', '管理员']}
+              note="受邀者获得的权限不会高于这里选择的权限"
+            />
+            <Alert id="alert_send_error" color="red" title="发送失败" when={notEmpty($.ui.error)}>
+              {$.ui.error}
             </Alert>
-            <Loader id="spin_send" when={$.ui.sending}>正在发送邀请…</Loader>
-            <DialogFooter>
-              <Button id="btn_cancel" variant="outline" unmodeled note="取消并关闭：本版未建模，是否保留已填内容待决定">取消</Button>
+            <Group id="spin_send" gap="xs" when={$.ui.sending}>
+              <Loader size="sm" />
+              <Text size="sm">正在发送邀请…</Text>
+            </Group>
+            <Group justify="flex-end" gap="sm">
+              <Button id="btn_cancel" variant="default" unmodeled note="取消并关闭：本版未建模，是否保留已填内容待决定">取消</Button>
               <Button id="btn_send" disabled={$.ui.sending} disabledReason="正在发送，防止重复提交">发送邀请</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </Group>
+          </Stack>
+        </Modal>
       ),
     },
   },

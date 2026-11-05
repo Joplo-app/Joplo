@@ -1,0 +1,88 @@
+import { page } from '@joplo/kit';
+import {
+  Accordion, ActionIcon, Alert, Anchor, AppShell, Avatar, Badge, Blockquote, Box, Breadcrumbs, Burger, Button, Card, Center, ChatMessage,
+  Checkbox, CloseButton, Code, Container, Custom, DataTable, Divider, Drawer, FileInput, Flex, Grid, Group, Image, Indicator, Kbd, List,
+  Loader, Modal, MultiSelect, NavLink, Notification, NumberInput, Pagination, Paper, PasswordInput, Placeholder, Progress, PromptInput, Radio,
+  RingProgress, ScrollArea, SegmentedControl, Select, SimpleGrid, Skeleton, Space, Stack, Stepper, Switch, Table, Tabs, Text, Textarea,
+  TextInput, ThemeIcon, Timeline, Title, ToolCall,
+} from '@joplo/kit/ui';
+
+/** e2e 目录画廊：目录中的每个组件至少出现一次（由 gallery.spec.ts 写入临时项目）。 */
+export default page(
+  { title: '组件画廊', layout: false },
+  <Stack gap="md" p="md">
+    <AppShell header={{ height: 40 }} navbar={{ width: 160, breakpoint: 'sm' }} aside={{ width: 120, breakpoint: 'md' }} footer={{ height: 30 }} h={220}>
+      <AppShell.Header><Group h="100%" px="sm"><Burger id="g_burger" hiddenFrom="sm" unmodeled /><Text>头部</Text></Group></AppShell.Header>
+      <AppShell.Navbar p="xs"><NavLink id="g_nav" label="导航" href="/gallery" unmodeled /></AppShell.Navbar>
+      <AppShell.Main><Text>主体</Text></AppShell.Main>
+      <AppShell.Aside p="xs"><Text>侧栏</Text></AppShell.Aside>
+      <AppShell.Footer><Text size="xs">底部</Text></AppShell.Footer>
+    </AppShell>
+    <Container size="sm"><Center><Box p="xs">居中</Box></Center></Container>
+    <Flex gap="sm" direction={{ base: 'column', md: 'row' }}><Text>甲</Text><Space w="md" /><Text>乙</Text></Flex>
+    <Grid><Grid.Col span={{ base: 12, md: 6 }}><Paper withBorder p="sm">左</Paper></Grid.Col><Grid.Col span={6}><Paper p="sm" shadow="sm">右</Paper></Grid.Col></Grid>
+    <SimpleGrid id="g_grid" cols={{ base: 1, sm: 2, lg: 4 }}>
+      <Card withBorder><Card.Section withBorder><Text>分区</Text></Card.Section><Text>卡片</Text></Card>
+      <Divider label="分隔" labelPosition="center" />
+      <ScrollArea h={60}><Text>滚动区域</Text></ScrollArea>
+      <Title order={3}>标题</Title>
+    </SimpleGrid>
+    <Group>
+      <Code>code</Code><Kbd>⌘K</Kbd><Badge color="green">徽标</Badge><Avatar name="Li Lei" /><ThemeIcon color="blue">★</ThemeIcon>
+      <Indicator label="3"><Avatar name="王" /></Indicator><Anchor id="g_anchor" href="/x" unmodeled>链接</Anchor>
+    </Group>
+    <Blockquote cite="某人">引用</Blockquote>
+    <List><List.Item>一</List.Item><List.Item>二</List.Item></List>
+    <Image alt="示意图" h={60} />
+    <Timeline active={1}><Timeline.Item title="创建">已创建</Timeline.Item><Timeline.Item title="发送">已发送</Timeline.Item></Timeline>
+    <Table striped>
+      <Table.Thead><Table.Tr><Table.Th>列</Table.Th></Table.Tr></Table.Thead>
+      <Table.Tbody><Table.Tr><Table.Td>值</Table.Td></Table.Tr></Table.Tbody>
+    </Table>
+    <DataTable id="g_dt" columns={[{ accessor: 'name', title: '姓名' }, { accessor: 'team.name' }]} records={[{ name: '甲', team: { name: '设计' } }]} />
+    <DataTable id="g_dt_empty" columns={[{ accessor: 'name', title: '姓名' }]} records={[]} noRecordsText="空空如也" />
+    <Accordion defaultValue="a">
+      <Accordion.Item value="a"><Accordion.Control id="g_acc" unmodeled>问题</Accordion.Control><Accordion.Panel>答案</Accordion.Panel></Accordion.Item>
+    </Accordion>
+    <Group>
+      <Button id="g_btn" variant="light" leftSection="+" unmodeled>按钮</Button>
+      <Button id="g_btn_load" loading unmodeled>加载</Button>
+      <ActionIcon id="g_icon" aria-label="添加" unmodeled>+</ActionIcon>
+      <CloseButton id="g_close" unmodeled />
+      <Burger id="g_burger2" opened unmodeled />
+    </Group>
+    <TextInput id="g_text" label="文本" placeholder="请输入" description="说明" error="出错了" withAsterisk unmodeled />
+    <PasswordInput id="g_pwd" label="密码" defaultValue="secret" unmodeled />
+    <NumberInput id="g_num" label="数量" defaultValue={3} unmodeled />
+    <Textarea id="g_area" label="多行" minRows={2} unmodeled />
+    <Select id="g_sel" label="单选" data={['甲', '乙']} defaultValue="乙" unmodeled />
+    <MultiSelect id="g_multi" label="多选" data={['甲', '乙']} defaultValue={['甲']} unmodeled />
+    <Checkbox id="g_check" label="勾选" defaultChecked unmodeled />
+    <Radio.Group id="g_radio" label="单选组" defaultValue="b" unmodeled><Radio value="a" label="A" /><Radio value="b" label="B" /></Radio.Group>
+    <Switch id="g_switch" label="开关" checked unmodeled />
+    <SegmentedControl id="g_seg" data={['日', '周', '月']} unmodeled />
+    <FileInput id="g_file" label="文件" placeholder="选择文件" unmodeled />
+    <Tabs id="g_tabs" defaultValue="one" unmodeled>
+      <Tabs.List><Tabs.Tab id="g_tab1" value="one" unmodeled>一</Tabs.Tab><Tabs.Tab id="g_tab2" value="two" unmodeled>二</Tabs.Tab></Tabs.List>
+      <Tabs.Panel value="one">第一页</Tabs.Panel>
+    </Tabs>
+    <Breadcrumbs><Anchor id="g_bc1" unmodeled>首页</Anchor><Text>当前</Text></Breadcrumbs>
+    <Pagination id="g_page" total={9} defaultValue={5} unmodeled />
+    <Stepper active={1}><Stepper.Step label="第一步">一</Stepper.Step><Stepper.Step label="第二步" description="说明">二</Stepper.Step></Stepper>
+    <Alert title="提示" color="blue">内容</Alert>
+    <Notification title="通知" color="green">消息</Notification>
+    <Group><Loader size="sm" /><Loader type="dots" /><Progress value={40} w={120} /><RingProgress sections={[{ value: 40, color: 'blue' }]} label="40%" size={60} /></Group>
+    <Skeleton h={12} />
+    <ChatMessage from="user">你好</ChatMessage>
+    <ChatMessage from="assistant"><ToolCall title="Bash" state="running">ls</ToolCall></ChatMessage>
+    <Group wrap="nowrap"><PromptInput id="g_prompt" placeholder="说点什么" unmodeled /></Group>
+    <Placeholder label="图表" h={40} />
+    <Custom kind="地图" />
+    <div><span>span</span><p>p</p><h1>h1</h1><h2>h2</h2><h3>h3</h3><h4>h4</h4><strong>b</strong><em>i</em><small>s</small><code>c</code></div>
+    <main><section><header>hd</header><nav>nv</nav><aside>as</aside><footer>ft</footer></section></main>
+    <ul><li>li</li></ul><ol><li>li2</li></ol>
+    <a id="g_a" unmodeled>a</a>
+    <Modal id="g_modal" opened title="弹窗"><Text>弹窗内容</Text></Modal>
+    <Drawer id="g_drawer" opened title="抽屉" position="right"><Text>抽屉内容</Text></Drawer>
+  </Stack>,
+);

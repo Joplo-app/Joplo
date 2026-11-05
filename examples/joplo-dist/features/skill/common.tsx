@@ -1,5 +1,5 @@
 import { $, done, flow, uses, type Bind, type CondExpr } from '@joplo/kit';
-import { Message, MessageContent, Response, Tool, ToolContent, ToolHeader } from '@joplo/kit/ui';
+import { ChatMessage, ToolCall } from '@joplo/kit/ui';
 
 import { Cmd } from '../../shared/term.tsx';
 import { ask, run } from '../../shared/steps.ts';
@@ -53,28 +53,23 @@ export const typoScenario = () =>
 
 /** Claude Code 会话里的消息：用户一句话 + 若干工具调用 + 回复。 */
 export const UserMsg = (p: { id: string; text: string }) => (
-  <Message id={p.id} from="user" when={$.ui.asked}>
-    <MessageContent>
-      <Response>{p.text}</Response>
-    </MessageContent>
-  </Message>
+  <ChatMessage id={p.id} from="user" when={$.ui.asked}>
+    {p.text}
+  </ChatMessage>
 );
 
-export const ToolMsg = (p: { id: string; when: Bind | CondExpr; title: string; body: string; state?: string }) => (
-  <Message id={p.id} from="assistant" when={p.when}>
-    <Tool>
-      <ToolHeader title={p.title} state={p.state ?? 'output-available'} />
-      <ToolContent>{p.body}</ToolContent>
-    </Tool>
-  </Message>
+export const ToolMsg = (p: { id: string; when: Bind | CondExpr; title: string; body: string; state?: 'running' | 'done' | 'error' }) => (
+  <ChatMessage id={p.id} from="assistant" when={p.when}>
+    <ToolCall title={p.title} state={p.state ?? 'done'}>
+      {p.body}
+    </ToolCall>
+  </ChatMessage>
 );
 
 export const ReplyMsg = (p: { id: string; text: string }) => (
-  <Message id={p.id} from="assistant" when={$.ui.reply}>
-    <MessageContent>
-      <Response>{p.text}</Response>
-    </MessageContent>
-  </Message>
+  <ChatMessage id={p.id} from="assistant" when={$.ui.reply}>
+    {p.text}
+  </ChatMessage>
 );
 
 export const LOGIN_ASK = '用 Joplo 帮我设计一个登录功能，要考虑密码错误和账号锁定';

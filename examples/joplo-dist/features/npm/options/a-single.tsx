@@ -1,5 +1,5 @@
 import { $, done, flow, notApplicable, option, undecided, uses } from '@joplo/kit';
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@joplo/kit/ui';
+import { Badge, Card, Code, Group, Stack, Text, Title } from '@joplo/kit/ui';
 
 import { Cmd } from '../../../shared/term.tsx';
 import { run } from '../../../shared/steps.ts';
@@ -45,21 +45,19 @@ export default option({
     },
     '/npm': {
       package: (
-        <Card id="a_pkg">
-          <CardHeader>
-            <CardTitle>joplo</CardTitle>
-            <CardDescription>面向编码 Agent 的功能设计与演示工具</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2 text-[14px]">
-            <div className="flex gap-2">
+        <Card id="a_pkg" withBorder>
+          <Stack gap="sm">
+            <Title order={3}>joplo</Title>
+            <Text c="dimmed">面向编码 Agent 的功能设计与演示工具</Text>
+            <Group gap="xs">
               <Badge>0.1.0</Badge>
               <Badge variant="outline">bin: joplo</Badge>
               <Badge variant="outline">约 14 MB</Badge>
-            </div>
-            <code>npm i -D joplo</code>
-            <p>入口：joplo（创作 API）、joplo/ui（组件）、joplo/jsx-runtime、命令 joplo</p>
-            <p note="体积为估算：字体约 12 MB">内含：CLI、编译器与校验器、看板与发布站资源、手绘字体</p>
-          </CardContent>
+            </Group>
+            <Code>npm i -D joplo</Code>
+            <Text size="sm">入口：joplo（创作 API）、joplo/ui（组件）、joplo/jsx-runtime、命令 joplo</Text>
+            <Text size="sm" note="体积为估算：字体约 12 MB">内含：CLI、编译器与校验器、看板与发布站资源、手绘字体</Text>
+          </Stack>
         </Card>
       ),
     },

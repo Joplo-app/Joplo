@@ -54,7 +54,7 @@ export type SceneNode = {
   /** 可操作元素必须由作者给出；其余由编译器按位置生成（以 `_` 开头）。 */
   id: string;
   type: (typeof COMPONENT_TYPES)[number];
-  /** shadcn 属性原样保留；值可以是字面量或 `$ui.x` / `$data.x` / `$inputs.x` 整值绑定。 */
+  /** Mantine 属性原样保留（可含响应式对象 { base, md }）；值可以是字面量或 `$ui.x` / `$data.x` / `$inputs.x` 整值绑定。 */
   props?: Record<string, unknown>;
   children?: SceneNode[];
   when?: Condition;

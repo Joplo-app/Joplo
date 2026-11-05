@@ -4,11 +4,11 @@
  */
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import type { PlayState, Project, Toast } from '@joplo/core';
+import { VIEWPORT_SIZE, type PlayState, type Project, type Toast } from '@joplo/core';
 import { RenderContext, RenderNode, type RenderMode } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 
-export const VIEWPORTS = { desktop: { width: 1280, height: 800 }, mobile: { width: 390, height: 844 } } as const;
+export const VIEWPORTS = VIEWPORT_SIZE;
 export type Viewport = keyof typeof VIEWPORTS;
 
 export function viewportOf(project: Project, state: PlayState): Viewport {
@@ -43,11 +43,13 @@ export type StageProps = {
   onNodeClick?: (nodeId: string, point: { x: number; y: number }) => void;
   stageRef?: (el: HTMLDivElement | null) => void;
   overlay?: ReactNode;
+  /** 预览宽度：覆盖页面自身的 viewport（看板的“桌面 / 手机”切换、renderStep 的 viewport）。 */
+  viewportOverride?: Viewport | { width: number; height: number } | null;
 };
 
-export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay }: StageProps) {
+export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null }: StageProps) {
   const scene = project.scenes[state.sceneId];
-  const vp = VIEWPORTS[viewportOf(project, state)];
+  const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[viewportOf(project, state)];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -88,13 +90,14 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         data-theme={theme}
         data-mode={mode}
         data-scene={state.sceneId}
+        data-width={vp.width}
         className="jstage relative overflow-hidden"
         style={{ width: vp.width, height: vp.height }}
         onClick={onClick}
         onKeyDown={onKeyDown}
       >
         {scene ? (
-          <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate }}>
+          <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width }}>
             <div className="absolute inset-0">
               <RenderNode node={scene.root} />
             </div>

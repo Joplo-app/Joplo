@@ -14,7 +14,7 @@
  */
 import { animate, type AnimationPlaybackControls } from 'motion';
 import { explainClick, applyStep, getScenario, nodeLabel, findNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo/core';
-import { browseSceneId, browseState, elementLabel, optionsOf, scenariosOf } from './views';
+import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 
 export type Mode = 'review' | 'demo';
 /** stage = 播放场景；compare = 功能页比较方案；browse = 发布视图按路径浏览。 */
@@ -222,7 +222,7 @@ export class DemoController {
     const stepOk = !sel.nodeId && sel.stepId && sel.scenarioId && p.scenarios[sel.scenarioId]?.steps.some((s) => s.id === sel.stepId);
     if (hit || stepOk) {
       const at = hit ? (hit.node.source ?? null) : (p.scenarios[sel.scenarioId!]!.steps.find((s) => s.id === sel.stepId)?.source ?? null);
-      if (at !== sel.at || (hit && scene && elementLabel(scene, hit.node) !== sel.label)) void this.writeSelection(this.inputOf(sel), '选中元素的位置已更新', '选中未能同步给 Agent');
+      if (at !== sel.at || (hit && scene && nodeLabel(hit.node) !== sel.label)) void this.writeSelection(this.inputOf(sel), '选中元素的位置已更新', '选中未能同步给 Agent');
       return;
     }
     void this.writeSelection(null, '选中的元素已不在当前画面中，已取消选中', '取消选中未能同步给 Agent', true);
@@ -526,7 +526,7 @@ export class DemoController {
       route: scene?.route ?? '',
       nodeId: input.nodeId,
       at: hit ? (hit.node.source ?? null) : (step?.source ?? null),
-      label: hit && scene ? elementLabel(scene, hit.node) : (step?.caption ?? null),
+      label: hit ? nodeLabel(hit.node) : (step?.caption ?? null),
       selectedAt: new Date().toISOString(),
     };
   }
@@ -669,7 +669,7 @@ export class DemoController {
   private measureCenter(nodeId: string): { x: number; y: number } | null {
     const root = this.stageEl;
     if (!root) return null;
-    const el = root.querySelector<HTMLElement>(`[data-jid="${CSS.escape(nodeId)}"]`);
+    const el = root.querySelector<HTMLElement>(`[data-jcontrol="${CSS.escape(nodeId)}"]`) ?? root.querySelector<HTMLElement>(`[data-jid="${CSS.escape(nodeId)}"]`);
     if (!el) return null;
     const rr = root.getBoundingClientRect();
     const s = rr.width / root.offsetWidth || 1;

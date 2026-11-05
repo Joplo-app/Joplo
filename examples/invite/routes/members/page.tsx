@@ -1,28 +1,28 @@
 import { $, page, Slot } from '@joplo/kit';
-import { DataTable } from '@joplo/kit/ui';
+import { DataTable, Group, Stack, Text, Title } from '@joplo/kit/ui';
 
 export default page(
   { title: '成员' },
-  <>
-    <div className="flex items-center justify-between">
-      <h1>成员</h1>
-      <div className="flex gap-2">
+  <Stack gap="md">
+    <Group justify="space-between">
+      <Title order={2}>成员</Title>
+      <Group gap="xs">
         <Slot name="header.actions" />
-      </div>
-    </div>
+      </Group>
+    </Group>
     <Slot name="notice" />
-    <p className="text-muted-foreground">成员 3 人</p>
+    <Text c="dimmed">成员 3 人</Text>
     <DataTable
       id="tbl_members"
-      columns={[{ accessorKey: 'name', header: '姓名' }, { accessorKey: 'email', header: '邮箱' }, { accessorKey: 'role', header: '权限' }]}
-      data={$.data.members}
+      columns={[{ accessor: 'name', title: '姓名' }, { accessor: 'email', title: '邮箱' }, { accessor: 'role', title: '权限' }]}
+      records={$.data.members}
     />
-    <h3>待接受的邀请</h3>
+    <Title order={4}>待接受的邀请</Title>
     <DataTable
       id="tbl_pending"
-      columns={[{ accessorKey: 'email', header: '邮箱' }, { accessorKey: 'role', header: '权限' }, { accessorKey: 'status', header: '状态' }]}
-      data={$.data.pending}
-      empty="暂无待接受的邀请"
+      columns={[{ accessor: 'email', title: '邮箱' }, { accessor: 'role', title: '权限' }, { accessor: 'status', title: '状态' }]}
+      records={$.data.pending}
+      noRecordsText="暂无待接受的邀请"
     />
-  </>,
+  </Stack>,
 );

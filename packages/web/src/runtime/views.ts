@@ -85,14 +85,6 @@ export function gapCounts(option: Option | null | undefined): { missing: number;
   return { missing: cov.filter((c) => c.status === 'missing').length, undecided: cov.filter((c) => c.status === 'undecided').length };
 }
 
-/** 元素的人类可读标签：优先关联它的 <Label htmlFor>（与服务端 selection 一致），其次元素自身的文字或属性。 */
-export function elementLabel(scene: Scene, node: SceneNode): string {
-  let via: string | null = null;
-  walkNodes(scene.root, (n) => {
-    if (!via && n.type === 'Label' && n.props?.htmlFor === node.id) via = nodeLabel(n);
-  });
-  return via ?? nodeLabel(node);
-}
 
 /** 元素来自哪个方案：堆叠节点自带 from；其后代按源文件对应到方案文件。 */
 export function optionOfNode(project: Project, node: SceneNode): Option | null {

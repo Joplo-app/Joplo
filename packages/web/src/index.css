@@ -162,8 +162,14 @@
   .jstage .jh-em { font-style: italic; }
   .jstage .jh-small { font-size: 13px; }
   .jstage .jh-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: #f1f1f1; padding: 0 4px; border-radius: 3px; }
-  /* 标签紧贴它说明的输入框 */
-  .jstage [data-jtype="Label"]:has(+ [data-jinteractive]) { margin-bottom: -4px; }
+  /* Mantine 组件的基础样式（内联样式之外的部分） */
+  .jstage .jgrow > * { flex: 1 1 0; min-width: 0; }
+  .jstage .jcard > .jcard-sec:first-of-type { margin-top: calc(-1 * var(--jcard-p, 16px)); }
+  .jstage .jcard > .jcard-sec:last-child { margin-bottom: calc(-1 * var(--jcard-p, 16px)); }
+  .jstage .jtable th { text-align: left; font-weight: 650; padding: 8px 12px; border-bottom: 1px solid #d0d0d0; white-space: nowrap; }
+  .jstage .jtable td { padding: 8px 12px; border-bottom: 1px solid #ececec; vertical-align: top; }
+  .jstage .jtable tbody tr:last-child td { border-bottom: none; }
+  .jstage .jtable-striped tbody tr:nth-child(odd) td { background: #f8f9fa; }
 
   .jtrunc {
     overflow: hidden;

@@ -1,21 +1,19 @@
 import { page, Slot } from '@joplo/kit';
-import { Card, CardContent, CardHeader, CardTitle, Conversation, PromptInput, PromptInputSubmit, PromptInputTextarea } from '@joplo/kit/ui';
+import { ActionIcon, Card, Group, PromptInput, Stack, Title } from '@joplo/kit/ui';
 
 /** Claude Code 会话：方案把消息和工具调用堆叠到 conversation 插槽。 */
 export default page(
   { title: 'Claude Code 会话' },
-  <Card>
-    <CardHeader>
-      <CardTitle>Claude Code · ~/work/my-demo</CardTitle>
-    </CardHeader>
-    <CardContent className="flex flex-col gap-4">
-      <Conversation>
+  <Card withBorder>
+    <Stack gap="md">
+      <Title order={4}>Claude Code · ~/work/my-demo</Title>
+      <Stack gap="md">
         <Slot name="conversation" />
-      </Conversation>
-      <PromptInput>
-        <PromptInputTextarea id="agent_prompt" placeholder="和 Claude 说点什么…" />
-        <PromptInputSubmit id="agent_send" />
-      </PromptInput>
-    </CardContent>
+      </Stack>
+      <Group align="flex-end" gap="xs" wrap="nowrap">
+        <PromptInput id="agent_prompt" placeholder="和 Claude 说点什么…" />
+        <ActionIcon id="agent_send" aria-label="发送" size="lg" radius="xl">↑</ActionIcon>
+      </Group>
+    </Stack>
   </Card>,
 );

@@ -1,24 +1,23 @@
 import { layout, Outlet, Slot } from '@joplo/kit';
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@joplo/kit/ui';
+import { AppShell, Burger, Group, NavLink, Title } from '@joplo/kit/ui';
 
+/** 应用外壳：顶栏 + 左侧导航；窄于 sm 时导航收起，显示 Burger。 */
 export default layout(
-  <div className="flex h-full">
-    <Sidebar>
-      <SidebarHeader>设计团队空间</SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>空间</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem><SidebarMenuButton id="nav_overview" unmodeled>概览</SidebarMenuButton></SidebarMenuItem>
-            <SidebarMenuItem><SidebarMenuButton id="nav_members" href="/members" unmodeled>成员</SidebarMenuButton></SidebarMenuItem>
-            <SidebarMenuItem><SidebarMenuButton id="nav_settings" href="/settings" unmodeled>空间设置</SidebarMenuButton></SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
-    <main className="flex flex-1 flex-col gap-4 p-6">
+  <AppShell header={{ height: 56 }} navbar={{ width: 220, breakpoint: 'sm' }} padding="lg">
+    <AppShell.Header>
+      <Group h="100%" px="md" gap="sm">
+        <Burger id="nav_burger" hiddenFrom="sm" aria-label="打开导航" unmodeled />
+        <Title order={4}>设计团队空间</Title>
+      </Group>
+    </AppShell.Header>
+    <AppShell.Navbar p="sm">
+      <NavLink id="nav_overview" label="概览" unmodeled />
+      <NavLink id="nav_members" label="成员" href="/members" unmodeled />
+      <NavLink id="nav_settings" label="空间设置" href="/settings" unmodeled />
+    </AppShell.Navbar>
+    <AppShell.Main>
       <Outlet />
-    </main>
+    </AppShell.Main>
     <Slot name="overlay" />
-  </div>,
+  </AppShell>,
 );

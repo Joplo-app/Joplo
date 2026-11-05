@@ -65,7 +65,7 @@ export function resolveSelection(project: Project, input: SelectionInput, now = 
     const hit = findNode(scene, input.nodeId);
     if (!hit) return { ok: false, problem: `元素 ${input.nodeId} 不在画面 ${sceneId} 中` };
     at = hit.node.source ?? null;
-    label = elementLabel(scene, hit.node);
+    label = nodeLabel(hit.node); // Mantine 输入组件直接带 label 属性
   } else if (input.stepId && input.scenarioId) {
     const st = project.scenarios[input.scenarioId]!.steps.find((s) => s.id === input.stepId)!;
     at = st.source ?? null;
@@ -90,14 +90,6 @@ export function resolveSelection(project: Project, input: SelectionInput, now = 
   };
 }
 
-/** 元素的人类可读标签：优先关联它的 <Label htmlFor>，其次元素自身的文字或属性。 */
-export function elementLabel(scene: Scene, node: SceneNode): string {
-  let via: string | null = null;
-  walkNodes(scene.root, (n) => {
-    if (!via && n.type === 'Label' && n.props?.htmlFor === node.id) via = nodeLabel(n);
-  });
-  return via ?? nodeLabel(node);
-}
 
 /** 临时文件 + rename 的原子写入。 */
 export function writeFileAtomic(file: string, data: string): void {

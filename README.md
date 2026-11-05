@@ -153,7 +153,7 @@ pnpm joplo check examples/invite --format json
 
 ## 路线图
 
-- **进行中**：组件词汇从 shadcn 改为对齐 Mantine（D35）。布局用 `Stack`/`Group`/`AppShell` 属性表达，响应式写成 `{ base, sm, md }`，Agent 写得更短，也不用写 className。
+- **已完成**：组件词汇从 shadcn 改为对齐 Mantine（D35）。布局用 `Stack`/`Group`/`AppShell` 属性表达，响应式写成 `{ base, sm, md }` 或 `visibleFrom`/`hiddenFrom`，按舞台宽度取值；看板顶栏可切换桌面 / 手机宽度预览。Agent 写得更短，也不用写 className。
 - **下一步**：后端设计扩展（D34），用 D2 画架构图、状态机和数据模型，flow 步骤里用 `trace()` 让调用链与前端演示同步播放。
 - **V2**：MCP、团队协作、评论同步、云端能力。
 

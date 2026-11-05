@@ -1,5 +1,5 @@
 /**
- * 编译：作者的源文件（经 @joplo/kit 收集成数据）→ IR v2。
+ * 编译：作者的源文件（经 @joplo/kit 收集成数据）→ IR v2。组件词汇对齐 Mantine（D35），见 catalog.ts。
  *
  * 路径优先的堆叠（D28）：画面 = 布局 + 页面 + 各功能方案填入插槽的元素。
  * - dev 模式：每个方案在每个路径上各有一个画面 `<方案>@<路径>`，其中其他功能取选定方案，本功能取该方案；
@@ -8,7 +8,8 @@
  */
 import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo/kit/node';
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@joplo/kit';
-import { COMPONENT_TYPES, INTERACTIVE_TYPES, nodeLabel } from './catalog.ts';
+import { COMPONENT_TYPES, INTERACTIVE_TYPES, matchChoice, nodeLabel } from './catalog.ts';
+import { choicesOf } from './player.ts';
 import { Project, SCHEMA_VERSION, type SceneNode, type Scene, type Scenario, type Step, type Coverage } from './schema.ts';
 import type { Diagnostic } from './result.ts';
 
@@ -379,7 +380,7 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
 
   const { id: rawId, when, disabled, disabledReason, unmodeled, note, __from, ...rest } = n.props as Record<string, unknown>;
   const at = n.source;
-  if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `组件 <${n.type}> 不在目录中（请使用 shadcn 同名组件，或用 <Custom kind="…"> 占位）`, at);
+  if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `组件 <${n.type}> 不在目录中（请使用 Mantine 同名组件，运行 joplo skill components 查看目录；目录没有的用 <Custom kind="…"> 占位）`, at);
   const interactive = INTERACTIVE_TYPES.has(n.type);
   if (interactive && typeof rawId !== 'string') err('MISSING_ID', `可操作组件 <${n.type}>「${labelOf(n)}」必须有 id，步骤和选中都靠它定位`, at);
   const id = typeof rawId === 'string' ? rawId : `_${fallbackId}`;
@@ -390,6 +391,10 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   for (const [k, v] of Object.entries(rest)) {
     if (typeof v === 'function' && !isBind(v)) {
       err('FUNCTION_PROP', `<${n.type}> 的属性 ${k} 是函数。行为请写在 option 的 flow 步骤里，而不是事件回调`, at);
+      continue;
+    }
+    if (isNode(v)) {
+      err('ELEMENT_PROP', `<${n.type}> 的属性 ${k} 是一个元素。属性只支持字符串、数字、布尔和对象；图标请写成字符（例如 leftSection="+"），内容请写成子节点`, at);
       continue;
     }
     props[k] = toPropValue(v);
@@ -455,31 +460,24 @@ function findIn(node: SceneNode, id: string): SceneNode | null {
   return null;
 }
 
-/** 元素标签：优先 <Label htmlFor=id>，其次元素自身的文字或属性。 */
-function labelFor(root: SceneNode, id: string): string {
-  let viaLabel: string | null = null;
-  const walk = (n: SceneNode) => {
-    if (!viaLabel && n.type === 'Label' && n.props?.htmlFor === id) viaLabel = nodeLabel(n);
-    (n.children ?? []).forEach(walk);
-  };
-  walk(root);
-  if (viaLabel) return viaLabel;
-  const n = findIn(root, id);
-  return n ? nodeLabel(n) : id;
-}
+const NO_STATE = { ui: {}, data: {}, inputs: {} };
 
+/** 自动字幕：元素名取 Mantine 的 label 属性（其次 title / aria-label / placeholder / 文字）；select 显示选项的 label。 */
 function autoCaption(st: StepDef, scene: Scene | undefined): string {
   const a = st.action;
-  const label = 'target' in a && scene ? labelFor(scene.root, a.target) : '';
+  const node = 'target' in a && scene ? findIn(scene.root, a.target) : null;
+  const label = node ? nodeLabel(node) : 'target' in a ? a.target : '';
   switch (a.type) {
     case 'click':
       return `点击「${label}」`;
     case 'type':
       return `在「${label}」中输入“${a.value}”`;
-    case 'select':
-      return `在「${label}」中选择“${a.value}”`;
+    case 'select': {
+      const choices = node ? choicesOf(node, NO_STATE) : null;
+      return `在「${label}」中选择“${(choices && matchChoice(choices, a.value)?.label) ?? a.value}”`;
+    }
     case 'toggle':
-      return `${a.value ? '打开' : '关闭'}「${label}」`;
+      return node?.type === 'Checkbox' ? `${a.value ? '勾选' : '取消勾选'}「${label}」` : `${a.value ? '打开' : '关闭'}「${label}」`;
     case 'back':
       return '返回上一页';
     case 'event':

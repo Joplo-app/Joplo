@@ -6,12 +6,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type Browser } from 'playwright';
-import { JoploError, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@joplo/core';
+import { JoploError, VIEWPORT_SIZE, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@joplo/core';
 import type { RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';
 
-const STAGE_SIZE = { desktop: { width: 1280, height: 800 }, mobile: { width: 390, height: 844 } };
+const STAGE_SIZE = VIEWPORT_SIZE;
 
 async function launch(): Promise<Browser> {
   try {
@@ -82,7 +82,8 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
 
     browser = await launch();
     const page = await browser.newPage({ viewport, deviceScaleFactor: opts.scale ?? 1, reducedMotion: 'reduce' });
-    const q = new URLSearchParams({ render: '1', scenario: sc.id, position: String(position), theme });
+    // 指定 viewport 时舞台按该尺寸渲染（响应式属性、visibleFrom/hiddenFrom、AppShell 收起随之变化）
+    const q = new URLSearchParams({ render: '1', scenario: sc.id, position: String(position), theme, ...(opts.viewport ? { w: String(opts.viewport.width), h: String(opts.viewport.height) } : {}) });
     await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => (window as unknown as { __JOPLO_READY__?: boolean }).__JOPLO_READY__ === true, null, { timeout: 60000 });
     const err = await page.evaluate(() => (window as unknown as { __JOPLO_ERROR__?: string | null }).__JOPLO_ERROR__ ?? null);

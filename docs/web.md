@@ -45,7 +45,7 @@ pnpm web:serve path/to/project --port 4800 --open
 1. kit 的 jsxDEV / callsite 写入绝对源位置；
 2. `compile` 转成相对路径，写到 IR 节点、步骤、规则的 `source`；
 3. 渲染器把它写到每个节点根 DOM 的 `data-jat`（同时还有 `data-jid`、`data-jtype`）；
-4. 浏览器只提交“选中了谁”。服务端对照当前 IR 校验，并**重新计算** `at`、`label`（优先取 `<Label htmlFor>` 的文字）、`route`、`featureId`、`stepId`，然后原子写入 `.joplo/selection.json`；
+4. 浏览器只提交“选中了谁”。服务端对照当前 IR 校验，并**重新计算** `at`、`label`（取 Mantine 组件的 `label` / `title` / `aria-label` 等属性，其次是文字）、`route`、`featureId`、`stepId`，然后原子写入 `.joplo/selection.json`；
 5. `joplo selection`（T-cli）读取文件，输出 `文件:行号` 和源码片段。
 
 不变量：每次写接口返回后，界面显示的选中与文件内容一致。
@@ -58,7 +58,7 @@ pnpm web:serve path/to/project --port 4800 --open
 
 **演示模式（默认）**
 
-- **顶栏**：项目名、当前路径（绿点表示热更新已连接）、功能 / 方案 / 场景切换（选定方案带 ✓）、视图切换（演示场景 / 比较方案 / 浏览产品）、缺口胶囊“缺失 N · 待决定 M”、演示 / 审阅模式切换、手绘 / 线框主题、“概念原型”标识。点击缺口胶囊会切到审阅模式，并展开、滚动到情况列表。
+- **顶栏**：项目名、当前路径（绿点表示热更新已连接）、功能 / 方案 / 场景切换（选定方案带 ✓）、视图切换（演示场景 / 比较方案 / 浏览产品）、缺口胶囊“缺失 N · 待决定 M”、演示 / 审阅模式切换、桌面 / 手机宽度预览、手绘 / 线框主题、“概念原型”标识。点击缺口胶囊会切到审阅模式，并展开、滚动到情况列表。
 - **中间**：大舞台，按比例缩放以尽量占满主体（1600×1000 窗口下约 1.07 倍）。
 - **底部**：一行紧凑步骤条，包括重置、上一步、播放 / 暂停、下一步、字幕（或“场景完成 · 结果”）、步骤点、模拟标签。
 - 没有侧栏。
@@ -86,14 +86,20 @@ pnpm web:serve path/to/project --port 4800 --open
 
 ## 渲染器（`packages/web/src/renderer`）
 
-- 每个目录类型都有一个低保真实现。注册表的类型是 `Record<ComponentType, …>`，漏掉任何类型都会导致类型检查失败。
-- 底座用真实的 shadcn 组件。手绘主题叠加 Rough 描边和 Excalifont / 小赖字体，线框主题使用 1px 边框。
-- 每个节点的根 DOM 都带 `data-jid` / `data-jtype` / `data-jat`。可操作的节点另带 `data-jinteractive`、`data-jdisabled`、`data-junmodeled`。
-- 绑定、可见性、禁用全部由 core 计算：`resolveProps` / `isSelfVisible` / `isNodeDisabled`。Dialog / Sheet / AlertDialog 的门控来自 `GATED_CONTAINERS`。
-- 浮层渲染在舞台内部的弹窗层（不 portal 到 body），截图和遮挡检查只看舞台本身。
-- 作者的 `className` 原样加到根 DOM，其他属性不透传，链接也不生成真实 href。
+组件词汇对齐 Mantine（D35），但运行时不引入 Mantine：每个目录类型都有一个 Joplo 自己的低保真实现。
 
-> 注意：协调者正在把组件 API 从 shadcn 改为 Mantine。届时 `components.tsx` 的注册表要改成新的目录映射，并按舞台视口宽度解析响应式属性（`base`/`xs`/`sm`/`md`/`lg`/`xl`）和 `visibleFrom` / `hiddenFrom`；AppShell 在 mobile 视口下收起 navbar。见 handoff。
+- 注册表 `IMPL` 的类型是 `Record<ComponentType, …>`，漏掉任何类型都会导致类型检查失败；e2e 目录画廊（`e2e/gallery.spec.ts`）逐个渲染所有组件，确认都出现在舞台上且没有 React 报错。目录、kit 导出与 `COMPONENT_DOCS` 的一致性由 `core/test/catalog.test.ts` 检查。
+- 手绘主题用 Rough 描边和 Excalifont / 小赖字体，线框主题使用 1px 边框。
+- 每个节点的根 DOM 都带 `data-jid` / `data-jtype` / `data-jat`。可操作的节点另带 `data-jinteractive`、`data-jdisabled`、`data-junmodeled`。输入组件的根包含 label / description / error，真正的控件另带 `data-jcontrol=<id>`，演示光标与高亮对准它。
+- 绑定、可见性、禁用全部由 core 计算：`resolveProps` / `isSelfVisible` / `isNodeDisabled` / `appShellLayout` / `choicesOf`。`Modal` / `Drawer` 用 `opened` 门控（兼容旧写法 `open`）。
+- **响应式**：`Stage` 把舞台宽度放进 `RenderCtx.width`（页面 viewport：桌面 1280、手机 390；看板顶栏可切换“桌面 / 手机宽度”预览；`renderStep` 的 `viewport` 也会改变舞台宽度）。
+  - 所有布局与样式属性都接受 `{ base, xs, sm, md, lg, xl }`，按 Mantine 默认断点 36/48/62/75/88em 取值（`atWidth`）；
+  - `visibleFrom` / `hiddenFrom` 在 `isSelfVisible` 里判断；
+  - `AppShell` 的 `navbar` / `aside` 在窄于 `breakpoint` 时默认收起（`collapsed.mobile` 写 false 或绑定为假时以覆盖层展开），没有 `Burger` 时在顶栏补一个示意图标。
+  - 回放与点击解释按**页面自身的 viewport**计算同样的规则：步骤目标在该宽度下被隐藏或导航被收起时报 `TARGET_HIDDEN`。看板的宽度切换只是预览，不改变回放结果。
+- 样式属性（`m/p/w/h/c/bg/fz/fw/ta/ff…`）在 `renderer/style.ts` 转成内联样式；间距、字号、圆角用 Mantine 默认刻度，颜色映射到一组柔和的调色板。
+- 浮层渲染在舞台内部的弹窗层（不 portal 到 body），截图和遮挡检查只看舞台本身。
+- 作者的 `className` / `style` 原样加到根 DOM（逃生口，示例里不使用），其他属性不透传，链接不生成真实 href，图片渲染为带 alt 的占位。
 
 ## `buildSite`：静态发布站
 

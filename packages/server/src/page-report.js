@@ -43,8 +43,8 @@
     }
     const hit = document.elementFromPoint(cx, cy);
     if (hit && (hit === el || el.contains(hit))) return;
-    // 弹窗打开时，背景被遮罩覆盖是预期的层次，不算遮挡
-    if (hit?.closest('[data-jbackdrop]') && !el.closest('[role="dialog"]')) return;
+    // 弹窗打开时，背景被遮罩或弹窗面板覆盖是预期的层次，不算遮挡（窄屏下面板常盖住背景按钮）
+    if ((hit?.closest('[data-jbackdrop]') || (dialogOpen && hit?.closest('[role="dialog"]'))) && !el.closest('[role="dialog"]')) return;
     warnings.push(`被遮挡：「${e.label}」(${e.id}) 的中心点被 ${hit ? name(hit) : '画框外内容'} 覆盖`);
   });
 

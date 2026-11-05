@@ -1,22 +1,20 @@
 import { page, Slot } from '@joplo/kit';
-import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@joplo/kit/ui';
+import { Button, Card, Group, Stack, Text, TextInput, Title } from '@joplo/kit/ui';
 
 /** 终端窗口：方案把命令输出堆叠到 lines 插槽，输入行所有方案共用。 */
 export default page(
   { title: '终端' },
-  <Card className="font-mono">
-    <CardHeader>
-      <CardTitle>~/work — zsh</CardTitle>
-    </CardHeader>
-    <CardContent className="flex flex-col gap-4 font-mono text-[14px]">
-      <Slot name="lines" />
-      <div className="flex items-center gap-2">
-        <span>$</span>
-        <div className="flex-1">
-          <Input id="term_cmd" className="font-mono" placeholder="输入命令" />
-        </div>
-        <Button id="term_enter" variant="outline">⏎ 回车</Button>
-      </div>
-    </CardContent>
+  <Card withBorder ff="monospace">
+    <Stack gap="md">
+      <Title order={4} ff="monospace">~/work — zsh</Title>
+      <Stack gap="md" fz={14}>
+        <Slot name="lines" />
+      </Stack>
+      <Group gap="xs" wrap="nowrap">
+        <Text>$</Text>
+        <TextInput id="term_cmd" ff="monospace" placeholder="输入命令" flex={1} />
+        <Button id="term_enter" variant="default">⏎ 回车</Button>
+      </Group>
+    </Stack>
   </Card>,
 );

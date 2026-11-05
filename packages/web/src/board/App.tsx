@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } fr
 import type { Diagnostic } from '@joplo/core';
 import { DemoController } from '../runtime/demo';
 import { fetchIR, fetchSelection, putSelection, subscribeIR, type DevPayload } from '../runtime/dev-client';
-import { Stage, viewportOf } from '../renderer/Stage';
+import { Stage, viewportOf, type Viewport } from '../renderer/Stage';
 import type { StageTheme } from '../renderer/rough';
 import { StepBar } from '../player/StepBar';
 import { Overlay } from '../player/Overlay';
@@ -32,6 +32,7 @@ export function BoardApp() {
   const [casesFlash, setCasesFlash] = useState(0);
   const [theme, setThemeState] = useState<StageTheme>(() => (localStorage.getItem(THEME_KEY) === 'clean' ? 'clean' : 'sketch'));
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState<Viewport | null>(null);
   const setTheme = (t: StageTheme) => {
     setThemeState(t);
     localStorage.setItem(THEME_KEY, t);
@@ -102,6 +103,9 @@ export function BoardApp() {
         onView={(v) => ctl.setView(v)}
         onMode={(m) => ctl.setMode(m)}
         onTheme={setTheme}
+        width={width}
+        pageWidth={project && state ? viewportOf(project, state) : 'desktop'}
+        onWidth={setWidth}
         onGaps={() => {
           ctl.setMode('review');
           setCasesOpen(true);
@@ -143,7 +147,7 @@ export function BoardApp() {
             ) : state && project.scenes[state.sceneId] ? (
               <>
                 <StageViewport
-                  viewport={viewportOf(project, state)}
+                  viewport={width ?? viewportOf(project, state)}
                   mode={snap.mode}
                   notice={snap.notice}
                   onDismiss={() => ctl.dismissNotice()}
@@ -163,6 +167,7 @@ export function BoardApp() {
                     project={project}
                     state={state}
                     theme={theme}
+                    viewportOverride={width}
                     mode={snap.mode}
                     selectedId={review && snap.selection?.sceneId === state.sceneId ? snap.selection.nodeId : null}
                     preview={snap.preview}

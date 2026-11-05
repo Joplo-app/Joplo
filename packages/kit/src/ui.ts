@@ -1,101 +1,126 @@
 /**
- * 原型组件：名称与属性对齐 shadcn/ui（含 AI Elements）。用法与 shadcn 一致，另可加 Joplo 属性：
- *   id（可操作元素必填）、when（可见条件）、disabled（布尔或条件）、disabledReason、unmodeled、note。
- * 行为（点击后发生什么）不写在组件上，写在 option 的 flow 步骤里。
+ * 原型组件：名称与属性对齐 Mantine（数据表对齐 mantine-datatable），复合组件用点语法（AppShell.Header、Tabs.Tab）。
+ * 布局写成属性：<Stack gap="md">、<Group justify="space-between">、<SimpleGrid cols={{ base: 1, md: 3 }}>，
+ * 不需要 className；响应式对象与 visibleFrom / hiddenFrom 按舞台宽度生效。
+ *
+ * 另可加 Joplo 属性：id（可操作元素必填）、when（可见条件）、disabled（布尔或条件）、disabledReason、unmodeled、note。
+ * 行为（点击后发生什么）不写在组件上，写在 option 的 flow 步骤里。浮层用 Modal / Drawer 的 opened={$.ui.x} 控制。
+ *
+ * 组件清单与 @joplo/core 的 COMPONENT_TYPES 一一对应（core/test/catalog.test.ts 检查）。
  */
 import { component, type Bind, type CondExpr, type JChild } from './node.ts';
 
+type Responsive<T> = T | { base?: T; xs?: T; sm?: T; md?: T; lg?: T; xl?: T };
+type Size = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+
 export type JoploProps = {
   id?: string;
-  className?: string;
   when?: Bind | CondExpr;
   disabled?: boolean | Bind | CondExpr;
   disabledReason?: string;
   unmodeled?: boolean;
   note?: string;
+  visibleFrom?: Size;
+  hiddenFrom?: Size;
+  /** 逃生口：Tailwind 类名。优先使用布局组件与样式属性。 */
+  className?: string;
   children?: JChild;
   [prop: string]: unknown;
 };
+export type { Responsive };
 type C = (props: JoploProps) => any;
 
-export const Card = component('Card') as unknown as C;
-export const CardHeader = component('CardHeader') as unknown as C;
-export const CardTitle = component('CardTitle') as unknown as C;
-export const CardDescription = component('CardDescription') as unknown as C;
-export const CardContent = component('CardContent') as unknown as C;
-export const CardFooter = component('CardFooter') as unknown as C;
-export const Dialog = component('Dialog') as unknown as C;
-export const DialogContent = component('DialogContent') as unknown as C;
-export const DialogHeader = component('DialogHeader') as unknown as C;
-export const DialogTitle = component('DialogTitle') as unknown as C;
-export const DialogDescription = component('DialogDescription') as unknown as C;
-export const DialogFooter = component('DialogFooter') as unknown as C;
-export const Sheet = component('Sheet') as unknown as C;
-export const SheetContent = component('SheetContent') as unknown as C;
-export const SheetHeader = component('SheetHeader') as unknown as C;
-export const SheetTitle = component('SheetTitle') as unknown as C;
-export const SheetDescription = component('SheetDescription') as unknown as C;
-export const SheetFooter = component('SheetFooter') as unknown as C;
-export const AlertDialog = component('AlertDialog') as unknown as C;
-export const AlertDialogContent = component('AlertDialogContent') as unknown as C;
-export const AlertDialogHeader = component('AlertDialogHeader') as unknown as C;
-export const AlertDialogTitle = component('AlertDialogTitle') as unknown as C;
-export const AlertDialogDescription = component('AlertDialogDescription') as unknown as C;
-export const AlertDialogFooter = component('AlertDialogFooter') as unknown as C;
-export const Tabs = component('Tabs') as unknown as C;
-export const TabsList = component('TabsList') as unknown as C;
-export const TabsTrigger = component('TabsTrigger') as unknown as C;
-export const TabsContent = component('TabsContent') as unknown as C;
-export const Table = component('Table') as unknown as C;
-export const TableHeader = component('TableHeader') as unknown as C;
-export const TableBody = component('TableBody') as unknown as C;
-export const TableRow = component('TableRow') as unknown as C;
-export const TableHead = component('TableHead') as unknown as C;
-export const TableCell = component('TableCell') as unknown as C;
-export const DataTable = component('DataTable') as unknown as C;
-export const Alert = component('Alert') as unknown as C;
-export const AlertTitle = component('AlertTitle') as unknown as C;
-export const AlertDescription = component('AlertDescription') as unknown as C;
-export const Badge = component('Badge') as unknown as C;
-export const Avatar = component('Avatar') as unknown as C;
-export const Separator = component('Separator') as unknown as C;
-export const Skeleton = component('Skeleton') as unknown as C;
-export const Progress = component('Progress') as unknown as C;
-export const Label = component('Label') as unknown as C;
-export const ScrollArea = component('ScrollArea') as unknown as C;
-export const Button = component('Button') as unknown as C;
-export const Input = component('Input') as unknown as C;
-export const Textarea = component('Textarea') as unknown as C;
-export const Checkbox = component('Checkbox') as unknown as C;
-export const Switch = component('Switch') as unknown as C;
-export const Link = component('Link') as unknown as C;
-export const Select = component('Select') as unknown as C;
-export const SelectTrigger = component('SelectTrigger') as unknown as C;
-export const SelectValue = component('SelectValue') as unknown as C;
-export const SelectContent = component('SelectContent') as unknown as C;
-export const SelectItem = component('SelectItem') as unknown as C;
-export const RadioGroup = component('RadioGroup') as unknown as C;
-export const RadioGroupItem = component('RadioGroupItem') as unknown as C;
-export const Sidebar = component('Sidebar') as unknown as C;
-export const SidebarHeader = component('SidebarHeader') as unknown as C;
-export const SidebarContent = component('SidebarContent') as unknown as C;
-export const SidebarFooter = component('SidebarFooter') as unknown as C;
-export const SidebarGroup = component('SidebarGroup') as unknown as C;
-export const SidebarGroupLabel = component('SidebarGroupLabel') as unknown as C;
-export const SidebarMenu = component('SidebarMenu') as unknown as C;
-export const SidebarMenuItem = component('SidebarMenuItem') as unknown as C;
-export const SidebarMenuButton = component('SidebarMenuButton') as unknown as C;
-export const Conversation = component('Conversation') as unknown as C;
-export const Message = component('Message') as unknown as C;
-export const MessageContent = component('MessageContent') as unknown as C;
-export const Response = component('Response') as unknown as C;
-export const Reasoning = component('Reasoning') as unknown as C;
-export const Tool = component('Tool') as unknown as C;
-export const ToolHeader = component('ToolHeader') as unknown as C;
-export const ToolContent = component('ToolContent') as unknown as C;
-export const Loader = component('Loader') as unknown as C;
-export const PromptInput = component('PromptInput') as unknown as C;
-export const PromptInputTextarea = component('PromptInputTextarea') as unknown as C;
-export const PromptInputSubmit = component('PromptInputSubmit') as unknown as C;
-export const Placeholder = component('Placeholder') as unknown as C;
-export const Custom = component('Custom') as unknown as C;
+const c = (name: string): C => component(name) as unknown as C;
+
+// ---------- 布局 ----------
+export const AppShell = Object.assign(c('AppShell'), {
+  Header: c('AppShell.Header'),
+  Navbar: c('AppShell.Navbar'),
+  Main: c('AppShell.Main'),
+  Aside: c('AppShell.Aside'),
+  Footer: c('AppShell.Footer'),
+});
+export const Container = c('Container');
+export const Stack = c('Stack');
+export const Group = c('Group');
+export const Flex = c('Flex');
+export const Grid = Object.assign(c('Grid'), { Col: c('Grid.Col') });
+export const SimpleGrid = c('SimpleGrid');
+export const Center = c('Center');
+export const Box = c('Box');
+export const Space = c('Space');
+export const Paper = c('Paper');
+export const Card = Object.assign(c('Card'), { Section: c('Card.Section') });
+export const Divider = c('Divider');
+export const ScrollArea = c('ScrollArea');
+
+// ---------- 文字与展示 ----------
+export const Title = c('Title');
+export const Text = c('Text');
+export const Code = c('Code');
+export const Kbd = c('Kbd');
+export const Blockquote = c('Blockquote');
+export const List = Object.assign(c('List'), { Item: c('List.Item') });
+export const Badge = c('Badge');
+export const Avatar = c('Avatar');
+export const Image = c('Image');
+export const ThemeIcon = c('ThemeIcon');
+export const Indicator = c('Indicator');
+export const Timeline = Object.assign(c('Timeline'), { Item: c('Timeline.Item') });
+export const Table = Object.assign(c('Table'), {
+  Thead: c('Table.Thead'),
+  Tbody: c('Table.Tbody'),
+  Tr: c('Table.Tr'),
+  Th: c('Table.Th'),
+  Td: c('Table.Td'),
+});
+export const DataTable = c('DataTable');
+export const Accordion = Object.assign(c('Accordion'), {
+  Item: c('Accordion.Item'),
+  Control: c('Accordion.Control'),
+  Panel: c('Accordion.Panel'),
+});
+
+// ---------- 输入 ----------
+export const Button = c('Button');
+export const ActionIcon = c('ActionIcon');
+export const CloseButton = c('CloseButton');
+export const TextInput = c('TextInput');
+export const PasswordInput = c('PasswordInput');
+export const NumberInput = c('NumberInput');
+export const Textarea = c('Textarea');
+export const Select = c('Select');
+export const MultiSelect = c('MultiSelect');
+export const Checkbox = c('Checkbox');
+export const Radio = Object.assign(c('Radio'), { Group: c('Radio.Group') });
+export const Switch = c('Switch');
+export const SegmentedControl = c('SegmentedControl');
+export const FileInput = c('FileInput');
+
+// ---------- 导航 ----------
+export const Anchor = c('Anchor');
+export const NavLink = c('NavLink');
+export const Tabs = Object.assign(c('Tabs'), { List: c('Tabs.List'), Tab: c('Tabs.Tab'), Panel: c('Tabs.Panel') });
+export const Breadcrumbs = c('Breadcrumbs');
+export const Pagination = c('Pagination');
+export const Stepper = Object.assign(c('Stepper'), { Step: c('Stepper.Step') });
+export const Burger = c('Burger');
+
+// ---------- 反馈与浮层 ----------
+export const Alert = c('Alert');
+export const Loader = c('Loader');
+export const Progress = c('Progress');
+export const RingProgress = c('RingProgress');
+export const Skeleton = c('Skeleton');
+export const Notification = c('Notification');
+export const Modal = c('Modal');
+export const Drawer = c('Drawer');
+
+// ---------- AI 交互（Joplo 自有） ----------
+export const ChatMessage = c('ChatMessage');
+export const ToolCall = c('ToolCall');
+export const PromptInput = c('PromptInput');
+
+// ---------- Joplo ----------
+export const Placeholder = c('Placeholder');
+export const Custom = c('Custom');

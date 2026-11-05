@@ -68,10 +68,10 @@ test('热更新保持选中：元素行号变化时重写 at；元素被删时�
 
 test('Tailwind 以项目目录为 @source：新写的 className 热更新后生效', async ({ app, projectDir }) => {
   const file = path.join(projectDir, 'routes/settings/page.tsx');
-  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('<h1>空间设置</h1>', '<h1 id="h_settings" className="tracking-[0.37em] text-[#a51d1d]">空间设置</h1>'));
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('<Title order={2}>空间设置</Title>', '<Title order={2} id="h_settings" className="tracking-[0.37em] text-[#a51d1d]">空间设置</Title>'));
   await app.getByTestId('view-browse').click();
   await app.getByTestId('browse-route-/settings').click();
-  const h1 = app.locator('[data-joplo-stage] h1').first();
+  const h1 = app.locator('[data-joplo-stage] [data-jid="h_settings"]');
   await expect(h1).toHaveText('空间设置');
   await expect.poll(() => h1.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(165, 29, 29)');
   expect(await h1.evaluate((el) => getComputedStyle(el).letterSpacing)).not.toBe('normal');
