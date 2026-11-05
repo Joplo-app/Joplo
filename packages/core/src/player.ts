@@ -546,3 +546,45 @@ export function stepTouchesLayer(project: Project, scenarioId: string, index: nu
   // 操作目标在这一层的步骤也算（要看着它被点）
   return 'target' in st.action && layersWithNode(project, scenarioId, st.action.target).includes(layer);
 }
+
+// ---------- 调用链（D48）：Diagram 节点与连线的 state 由每一步的 trace 推算 ----------
+export type DiagramState = 'idle' | 'active' | 'ok' | 'error' | 'dim';
+/** 元素 id → 推算的 state；reverse = 这条连线本步逆向走（流动的小点从 to 走向 from）。没出现的 id 是 idle。 */
+export type DiagramStates = Record<string, { state: DiagramState; reverse?: boolean }>;
+
+/**
+ * 第 position 步之后 Diagram 的状态（纯函数，与 cameraAt 同级；回放、renderStep、视频、发布站都用它）：
+ * - 本步 trace 到的：active；之前 trace 过、本步没再 trace 的：ok；
+ * - trace.fail：路径上的连线与终点节点 error（起点等其余节点 active），保持到之后又被 trace 成功；
+ * - trace.skip：路径上的节点与连线 dim（保持到之后又被 trace）；
+ * - 从未涉及的：idle（不在结果里）。
+ * 节点或连线上显式写的 state 优先于推算结果（由渲染器处理）。
+ */
+export function diagramStateAt(project: Project, scenarioId: string | null | undefined, position: number): DiagramStates {
+  const sc = scenarioId ? project.scenarios[scenarioId] : undefined;
+  const out: DiagramStates = {};
+  if (!sc) return out;
+  const n = Math.max(0, Math.min(position, sc.steps.length));
+  for (let i = 0; i < n; i++) {
+    for (const v of Object.values(out)) {
+      if (v.state === 'active') {
+        v.state = 'ok';
+        delete v.reverse;
+      }
+    }
+    for (const t of sc.steps[i]!.traces ?? []) {
+      if (t.mode === 'skip') {
+        for (const id of t.nodes) out[id] = { state: 'dim' };
+        for (const e of t.edges) out[e.id] = { state: 'dim' };
+      } else if (t.mode === 'fail') {
+        const last = t.nodes[t.nodes.length - 1];
+        for (const id of t.nodes) out[id] = { state: id === last ? 'error' : 'active' };
+        for (const e of t.edges) out[e.id] = { state: 'error' };
+      } else {
+        for (const id of t.nodes) out[id] = { state: 'active' };
+        for (const e of t.edges) out[e.id] = e.reverse ? { state: 'active', reverse: true } : { state: 'active' };
+      }
+    }
+  }
+  return out;
+}

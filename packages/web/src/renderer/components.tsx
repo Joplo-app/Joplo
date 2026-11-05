@@ -28,6 +28,7 @@ import {
   resolveValue,
   walkNodes,
   type ComponentType,
+  type DiagramStates,
   type PlayState,
   type Scene,
   type SceneNode,
@@ -35,7 +36,7 @@ import {
 } from '@tokenroll/joplo-core';
 import { cn } from '@/lib/utils';
 import { Rough, RoughPath, roundRectPath, useStageTheme } from './rough';
-import { DESC_FONT, EDGE_FONT, FOCUS_EDGE_FONT, FOCUS_MOVE_MS, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, diagramStructure, edgeEmphasized, focusLayout, focusMembers, type FocusLayout, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
+import { DESC_FONT, EDGE_FONT, FOCUS_EDGE_FONT, FOCUS_MOVE_MS, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, diagramStructure, edgeEmphasized, effectiveState, focusLayout, focusMembers, type FocusLayout, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
 import { DIMMED, FONT, INK, SOFT, SPACING, TITLE_SIZE, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf } from './style';
 
 export type RenderMode = 'review' | 'demo' | 'render';
@@ -53,6 +54,8 @@ export type RenderCtx = {
   width: number;
   /** 镜头此刻对准的元素（T-director3）：架构图据此突出相关连线；null = 没有聚焦。 */
   focus?: string[] | null;
+  /** 由 trace 推算的 Diagram 状态（D48，core 的 diagramStateAt）；节点 / 连线没写 state 时用它。 */
+  traced?: DiagramStates;
 };
 
 export const RenderContext = createContext<RenderCtx | null>(null);
@@ -1723,7 +1726,6 @@ const D_TONE: Record<string, { stroke: string; fill: string; text: string }> = {
   dim: { stroke: '#adb5bd', fill: '#ffffff', text: '#868e96' },
 };
 const EDGE_TONE: Record<string, string> = { idle: '#495057', active: '#1c7ed6', ok: '#2b8a3e', error: DANGER, dim: '#ced4da' };
-const dState = (v: unknown) => (typeof v === 'string' && v in D_TONE ? v : 'idle');
 
 /** 节点外形（坐标系：盒子左上角 x,y，宽 w 高 h）。模块级常量，Rough 据此缓存。 */
 const SHAPE: Record<string, (x: number, y: number, w: number, h: number) => string> = {
@@ -1894,7 +1896,8 @@ function DiagramNode({ node, p }: NodeProps) {
   const member = !!d?.fl?.nodes[node.id];
   const bg = !!d?.fl && !member;
   const box = (member ? d!.fl!.nodes[node.id] : undefined) ?? d?.layout.nodes[node.id];
-  const state = dState(p.state);
+  // 显式写的 state 优先；没写时用 trace 推算的状态（D48）
+  const state = effectiveState(p.state, useCtx().traced, node.id).state;
   const tone = D_TONE[state]!;
   const kind = typeof p.kind === 'string' ? p.kind : 'service';
   const shape = shapeOf(kind);
@@ -1961,7 +1964,7 @@ function DiagramNode({ node, p }: NodeProps) {
 }
 
 /** state 为 active 时沿连线从 from 移到 to 的小点（Motion）；不做动画时停在 3/4 处，截图也看得出“正在调用”的方向。 */
-function MovingDot({ d, color, animate: anim }: { d: string; color: string; animate: boolean }) {
+function MovingDot({ d, color, animate: anim, reverse = false }: { d: string; color: string; animate: boolean; reverse?: boolean }) {
   const pathRef = useRef<SVGPathElement>(null);
   const dotRef = useRef<SVGCircleElement>(null);
   useEffect(() => {
@@ -1975,16 +1978,16 @@ function MovingDot({ d, color, animate: anim }: { d: string; color: string; anim
       dot.setAttribute('cy', String(pt.y));
     };
     if (!anim) {
-      place(0.75); // 中点通常是连线标签，停在标签与箭头之间
+      place(reverse ? 0.25 : 0.75); // 中点通常是连线标签，停在标签与（行进方向上的）终点之间
       return;
     }
-    place(0);
+    place(reverse ? 1 : 0);
     const dur = Math.max(0.9, len / 260);
     // 一圈的时长写在元素上：自动播放会等本步 active 连线上的小点至少跑完一圈（T-director2）
     dot.setAttribute('data-jdot-ms', String(Math.round(dur * 1000)));
-    const ctl = animateValue(0, 1, { duration: dur, ease: 'linear', repeat: Infinity, onUpdate: place });
+    const ctl = animateValue(0, 1, { duration: dur, ease: 'linear', repeat: Infinity, onUpdate: (t) => place(reverse ? 1 - t : t) });
     return () => ctl.stop();
-  }, [d, anim]);
+  }, [d, anim, reverse]);
   return (
     <>
       <path ref={pathRef} d={d} fill="none" stroke="none" />
@@ -2010,7 +2013,10 @@ function DiagramEdge({ node, p }: NodeProps) {
   if (!dctx || !route || route.points.length < 2 || hidden) return null;
   // 出现动画：用一条沿路径伸长的遮罩把连线（含手绘线、虚线、箭头）从 from 画到 to
   const maskId = `jdraw-${dctx.key}-${node.id}`.replace(/[^\w-]/g, '_');
-  const state = dState(p.state);
+  // 显式写的 state 优先；没写时用 trace 推算的状态（D48）；trace 逆着连线方向走时小点逆向流动
+  const eff = effectiveState(p.state, useCtx().traced, node.id);
+  const state = eff.state;
+  const reverseDot = eff.reverse;
   const color = selectedId === node.id ? 'var(--sel)' : EDGE_TONE[state]!;
   const dashed = p.async === true || state === 'error';
   const d = edgePath(route.points);
@@ -2061,7 +2067,7 @@ function DiagramEdge({ node, p }: NodeProps) {
             <path d={head} fill={color} stroke="none" />
           </>
         )}
-        {state === 'active' ? <MovingDot d={d} color={color} animate={animate} /> : null}
+        {state === 'active' ? <MovingDot d={d} color={color} animate={animate} reverse={reverseDot} /> : null}
       </g>
       </motion.svg>
       {/* 标签单独一层，在所有连线之上（不会被别的连线的点击区盖住）；点它等于点这条连线 */}

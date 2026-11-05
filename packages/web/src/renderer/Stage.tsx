@@ -2,11 +2,11 @@
  * 舞台：在固定尺寸的画框里渲染当前画面。弹窗、Toast、演示覆盖层都在画框内部分层，
  * 不 portal 到 document.body，因此截图、元素索引与遮挡检查都只看舞台本身。
  */
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { CameraLayer, contentBounds, useCamera, type CameraSpec } from './camera';
 import { clampPan, wheelFactor, zoomAt, type View } from './camera-math';
 import { AnimatePresence, motion } from 'motion/react';
-import { VIEWPORT_SIZE, type PlayState, type Project, type Toast } from '@tokenroll/joplo-core';
+import { VIEWPORT_SIZE, diagramStateAt, type PlayState, type Project, type Toast } from '@tokenroll/joplo-core';
 import { RenderContext, RenderNode, type RenderMode } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 
@@ -88,6 +88,8 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   const scene = project.scenes[shownId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
+  // 调用链（D48）：Diagram 节点与连线的 state 由每一步的 trace 推算（没写 state 时使用）
+  const traced = useMemo(() => diagramStateAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   // 用户的缩放平移（T-director2）：resetKey 变化时丢弃，镜头重新接管
   const [user, setUserState] = useState<View | null>(null);
@@ -244,7 +246,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
           {scene ? (
-            <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null }}>
+            <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, traced }}>
               {/* 换层（换画面）时淡入 */}
               <motion.div key={shownId} className="absolute inset-0" ref={cam.contentRef} initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
                 <RenderNode node={scene.root} />
