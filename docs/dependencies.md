@@ -28,3 +28,10 @@
 | proper-lockfile | 4.1.2 | MIT | T-core：跨进程排他锁、心跳与陈旧锁恢复 |
 | @types/proper-lockfile | 4.1.4 | MIT | T-core：锁库 TypeScript 类型（开发依赖） |
 | fs-native-extensions | 1.5.3 | Apache-2.0 | T-core 评审修复：内核文件锁保护租约命名空间与同步提交/恢复，含平台预构建二进制 |
+
+## IR v2 CLI 迁移（T-cli）
+
+- `@joplo/cli` 保留 commander 15，新增显式 tsx 4.23.15 运行时依赖，使用 `tsx/esm/api` 的 `tsImport` 载入作者项目并应用项目 tsconfig。
+- CLI 移除 `@modelcontextprotocol/sdk` 和直接 zod 依赖；上表 MCP SDK 为历史记录，当前 MCP 命令退役，留到产品 V2。core 仍通过 zod 校验 IR。
+- guide 使用 core catalog 生成组件清单，不增加依赖；dev/build/render 仅在调用时动态加载工作区 `@joplo/server`。
+- 此 worker 的文件所有权不含根 `pnpm-lock.yaml`；协调者合并 package.json 后需重新执行 `pnpm install` 更新锁文件，移除旧 SDK 依赖图。
