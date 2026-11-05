@@ -52,6 +52,14 @@ test.describe('组件目录画廊', () => {
     await expect(node(page, 'g_term_in')).toContainText('输入命令');
     await expect(node(page, 'g_phone').locator('[data-jphone-button]')).toHaveCount(4);
     await expect(node(page, 'g_phone_grid')).toHaveAttribute('data-cols', '1');
+    // 安全区：内容区离屏幕顶部至少 30px（避开听筒与圆角），左右也留边
+    const scr = (await node(page, 'g_phone').locator('[data-jphone-screen]').boundingBox())!;
+    const box = (await node(page, 'g_phone').locator('[data-jphone-content-box]').boundingBox())!;
+    expect(box.y - scr.y).toBeGreaterThan(30 * 0.8);
+    expect(box.x - scr.x).toBeGreaterThan(8 * 0.8);
+    expect(scr.y + scr.height - (box.y + box.height)).toBeGreaterThan(20 * 0.8);
+    // Terminal：命令、输出、输入都是带边框的圆角块（不是深色终端）
+    expect(await node(page, 'g_term').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(255, 255, 255)');
     await expect(page.locator('[data-joplo-stage] [data-jid="g_phone_wide"]')).toHaveCount(0);
     expect(errors, errors.join('\n')).toEqual([]);
   });

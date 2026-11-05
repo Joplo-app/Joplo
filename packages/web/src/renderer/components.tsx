@@ -10,7 +10,7 @@
  * - 作者的 className 与 style 原样加到根 DOM（逃生口）。其他属性不透传到 DOM。
  * - 只用 React 文本节点渲染内容，不使用 dangerouslySetInnerHTML；链接不生成真实 href；图片不加载外部地址。
  */
-import { createContext, useContext, useState, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import {
@@ -1516,27 +1516,31 @@ function PromptInput({ node, p, disabled }: NodeProps) {
 
 // ============ 设备外框：终端与手机 ============
 
-const TERM_BG = '#1f2125';
-const TERM_TONE: Record<string, string> = { plain: '#e9ecef', ok: '#8ce99a', warn: '#ffd43b', error: '#ff8787' };
+const TERM_TONE: Record<string, string> = { plain: INK, ok: '#2b8a3e', warn: '#e67700', error: DANGER };
+const TERM_MONO = '[.jstage[data-theme=clean]_&]:font-mono';
 
-/** 终端窗口：标题栏（三个圆点 + title）+ 深色内容区；内容超出 h / mah 时在内容区内部滚动。 */
+/**
+ * 终端（低保真线框，与其他组件同一风格）：圆角窗口，左上角是 title；里面每条命令、每段输出各是一个带边框的圆角块。
+ * 内容超出 h / mah 时在窗口内部滚动。tone 只改输出文字的颜色。
+ */
 function Terminal({ node, p, children }: NodeProps) {
+  // 像真实终端一样停在最新的输出（输入行可见）
+  const body = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = body.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  });
   const root = useRoot(node, p, {
-    className: 'jbox [.jstage[data-theme=clean]_&]:rounded-lg',
-    style: { display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, background: TERM_BG, color: TERM_TONE.plain, fontFamily: MONO, fontSize: 13, overflow: 'hidden' },
+    className: 'jbox [.jstage[data-theme=clean]_&]:rounded-[18px]',
+    style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', minHeight: 0, background: '#fff', padding: '12px 16px 16px' },
   });
   return (
-    <div {...root} data-fill="ink">
-      <Rough seedKey={node.id} roughness={0.9} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderBottom: '1px solid #3a3d42', flexShrink: 0 }}>
-        {['#ff6b6b', '#fcc419', '#51cf66'].map((c) => (
-          <span key={c} aria-hidden style={{ width: 10, height: 10, borderRadius: 5, background: c, flexShrink: 0 }} />
-        ))}
-        <span className="jtrunc" style={{ flex: 1, textAlign: 'center', color: '#adb5bd', fontSize: 12, marginRight: 46 }}>
-          {str(p.title, '终端')}
-        </span>
+    <div {...root}>
+      <Rough seedKey={node.id} shape="roundrect" radius={18} strokeWidth={1.5} />
+      <div className="jtrunc" style={{ flexShrink: 0, fontSize: 15 }}>
+        {str(p.title, 'Terminal')}
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }} data-jterm-body="">
+      <div ref={body} style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12, padding: 2 }} data-jterm-body="">
         {children}
       </div>
     </div>
@@ -1544,10 +1548,14 @@ function Terminal({ node, p, children }: NodeProps) {
 }
 
 function TerminalCommand({ node, p, children }: NodeProps) {
-  const root = useRoot(node, p, { style: { display: 'flex', gap: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#f8f9fa' } });
+  const root = useRoot(node, p, {
+    className: cn('jbox [.jstage[data-theme=clean]_&]:rounded-[10px]', TERM_MONO),
+    style: { display: 'flex', gap: 8, padding: '10px 16px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#fff', flexShrink: 0 },
+  });
   return (
     <div {...root}>
-      <span aria-hidden style={{ color: '#74c0fc', flexShrink: 0 }}>{str(p.prompt, '$')}</span>
+      <Rough seedKey={node.id} shape="roundrect" radius={10} />
+      <span aria-hidden style={{ flexShrink: 0 }}>{str(p.prompt, '$')}</span>
       <span style={{ minWidth: 0 }}>{children}</span>
     </div>
   );
@@ -1555,32 +1563,42 @@ function TerminalCommand({ node, p, children }: NodeProps) {
 
 function TerminalOutput({ node, p, children }: NodeProps) {
   const tone = str(p.tone, 'plain');
-  const root = useRoot(node, p, { style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: TERM_TONE[tone] ?? TERM_TONE.plain, lineHeight: 1.55 } });
+  const root = useRoot(node, p, {
+    className: cn('jbox [.jstage[data-theme=clean]_&]:rounded-[14px]', TERM_MONO),
+    style: { padding: '10px 16px', minHeight: 56, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.55, background: '#fff', color: TERM_TONE[tone] ?? INK, flexShrink: 0 },
+  });
   return (
     <div {...root} data-tone={tone in TERM_TONE ? tone : 'plain'}>
-      {children}
+      <Rough seedKey={node.id} shape="roundrect" radius={14} />
+      <div>{children}</div>
     </div>
   );
 }
 
-/** 终端里的输入行（值类型）：type 动作写入；没有值时显示 placeholder。 */
+/** 终端里的输入行（值类型）：与命令块同样的圆角块，type 动作写入；没有值时显示 placeholder 与光标。 */
 function TerminalInput({ node, p, disabled }: NodeProps) {
   const v = useInputValue(node, p);
   const has = v !== undefined && v !== null && v !== '';
-  const root = useRoot(node, p, { disabled, style: { display: 'flex', gap: 8, alignItems: 'baseline', color: '#f8f9fa' } });
+  const root = useRoot(node, p, {
+    disabled,
+    className: cn('jbox [.jstage[data-theme=clean]_&]:rounded-[10px]', TERM_MONO),
+    style: { display: 'flex', gap: 8, alignItems: 'baseline', padding: '10px 16px', background: '#fff', flexShrink: 0 },
+  });
   return (
-    <div {...root}>
-      <span aria-hidden style={{ color: '#74c0fc', flexShrink: 0 }}>{str(p.prompt, '$')}</span>
-      <span role="textbox" aria-readonly="true" tabIndex={0} data-jcontrol={node.id} style={{ minWidth: 0, flex: 1, whiteSpace: 'pre-wrap', color: has ? '#f8f9fa' : '#868e96' }}>
+    <div {...root} data-soft="" data-dashed="">
+      <Rough seedKey={node.id} shape="roundrect" radius={10} stroke={SOFT} dashed />
+      <span aria-hidden style={{ flexShrink: 0 }}>{str(p.prompt, '$')}</span>
+      <span role="textbox" aria-readonly="true" tabIndex={0} data-jcontrol={node.id} style={{ minWidth: 0, flex: 1, whiteSpace: 'pre-wrap', color: has ? INK : '#9a9a9a' }}>
         <span data-jtext="">{has ? str(v) : str(p.placeholder)}</span>
-        <span aria-hidden style={{ display: 'inline-block', width: 8, height: '1.05em', marginLeft: 2, verticalAlign: 'text-bottom', background: '#adb5bd' }} />
+        <span aria-hidden style={{ display: 'inline-block', width: 2, height: '1.1em', marginLeft: 2, verticalAlign: 'text-bottom', background: INK }} />
       </span>
     </div>
   );
 }
 
-/** 手机外框的几何尺寸（屏幕之外）。 */
-export const PHONE_BEZEL = 14;
+/** 手机外框的几何尺寸：机身边框，以及屏幕内的安全区（顶部避开听筒与圆角、底部避开圆角与横条、左右避开圆角）。 */
+export const PHONE_BEZEL = 12;
+export const PHONE_SAFE = { top: 40, bottom: 26, x: 12 } as const;
 const PHONE_RADIUS = 54;
 const PHONE_BUTTONS: { side: 'left' | 'right'; top: number; h: number }[] = [
   { side: 'left', top: 118, h: 30 },
@@ -1589,37 +1607,52 @@ const PHONE_BUTTONS: { side: 'left' | 'right'; top: number; h: number }[] = [
   { side: 'right', top: 196, h: 90 },
 ];
 
+/** 外框占用的总尺寸（含侧键余量），内容区为 width × height。 */
+export function phoneFrameSize(width: number, height: number) {
+  return { width: width + (PHONE_BEZEL + PHONE_SAFE.x) * 2 + 8, height: height + PHONE_BEZEL * 2 + PHONE_SAFE.top + PHONE_SAFE.bottom };
+}
+
 /**
- * 手机外框（Phone 组件与舞台的自动外框共用）：大圆角机身、侧边按键、顶部听筒，不显示任何文字。
- * children 是屏幕内容，按 width × height 排版；scale 只做视觉缩放。主题取外层 ThemeContext（sketch 用手绘描边）。
+ * 手机外框（Phone 组件与舞台的自动外框共用）：大圆角机身、侧边按键、顶部听筒、底部横条，不显示任何文字。
+ * children 放在屏幕安全区以内的内容区，内容区正好是 width × height（断点按 width 计算，不被圆角和听筒遮挡）；
+ * scale 只做视觉缩放。主题取外层 ThemeContext（sketch 用手绘描边）。
  */
 export function PhoneFrame({ width, height, scale = 1, children, seed = 'phone' }: { width: number; height: number; scale?: number; children: ReactNode; seed?: string }) {
   const theme = useStageTheme();
   const sketch = theme === 'sketch';
-  const W = width + PHONE_BEZEL * 2;
-  const H = height + PHONE_BEZEL * 2;
+  const screenW = width + PHONE_SAFE.x * 2;
+  const screenH = height + PHONE_SAFE.top + PHONE_SAFE.bottom;
+  const W = screenW + PHONE_BEZEL * 2;
+  const H = screenH + PHONE_BEZEL * 2;
   const ink = '#1e1e1e';
+  const size = phoneFrameSize(width, height);
   return (
-    <div style={{ width: (W + 8) * scale, height: H * scale, position: 'relative', flexShrink: 0 }} data-jphone-frame="" data-theme={theme}>
+    <div style={{ width: size.width * scale, height: size.height * scale, position: 'relative', flexShrink: 0 }} data-jphone-frame="" data-theme={theme}>
       <div style={{ position: 'absolute', left: 4, top: 0, width: W, height: H, transform: scale === 1 ? undefined : `scale(${scale})`, transformOrigin: '0 0' }}>
         {PHONE_BUTTONS.map((b, i) => (
           <div
             key={i}
             aria-hidden
             data-jphone-button={b.side}
-            style={{ position: 'absolute', top: b.top, height: b.h, width: 4, [b.side]: -4, background: sketch ? 'transparent' : ink, borderRadius: b.side === 'left' ? '3px 0 0 3px' : '0 3px 3px 0' }}
+            style={{ position: 'absolute', top: b.top, height: b.h, width: 5, [b.side]: -5, background: sketch ? 'transparent' : ink, borderRadius: b.side === 'left' ? '3px 0 0 3px' : '0 3px 3px 0' }}
           >
-            {sketch ? <Rough seedKey={`${seed}:btn${i}`} strokeWidth={1.4} inset={0.5} fill={ink} fillStyle="solid" /> : null}
+            {sketch ? <Rough seedKey={`${seed}:btn${i}`} strokeWidth={1.4} inset={0.5} /> : null}
           </div>
         ))}
-        <div style={{ position: 'absolute', inset: 0, borderRadius: PHONE_RADIUS, background: sketch ? 'var(--stage-paper, #fffdf8)' : ink, boxShadow: sketch ? 'none' : '0 18px 40px rgba(0,0,0,0.18)' }}>
-          {sketch ? <Rough seedKey={`${seed}:body`} shape="roundrect" radius={PHONE_RADIUS} strokeWidth={2.2} roughness={0.8} inset={1.5} /> : null}
+        <div style={{ position: 'absolute', inset: 0, borderRadius: PHONE_RADIUS, background: sketch ? '#fff' : ink, boxShadow: sketch ? 'none' : '0 18px 40px rgba(0,0,0,0.18)' }}>
+          {sketch ? <Rough seedKey={`${seed}:body`} shape="roundrect" radius={PHONE_RADIUS} strokeWidth={2} roughness={0.8} inset={1.5} /> : null}
         </div>
-        <div aria-hidden style={{ position: 'absolute', top: Math.round(PHONE_BEZEL / 2) - 2, left: '50%', width: 64, height: 4, marginLeft: -32, borderRadius: 2, background: sketch ? '#5a5a5a' : '#3a3a3a' }} />
-        <div style={{ position: 'absolute', left: PHONE_BEZEL, top: PHONE_BEZEL, width, height, borderRadius: PHONE_RADIUS - PHONE_BEZEL, overflow: 'hidden', background: '#fff', isolation: 'isolate' }} data-jphone-screen="">
-          {sketch ? <Rough seedKey={`${seed}:screen`} shape="roundrect" radius={PHONE_RADIUS - PHONE_BEZEL} strokeWidth={1.3} roughness={0.7} inset={1} /> : null}
-          {children}
+        <div
+          style={{ position: 'absolute', left: PHONE_BEZEL, top: PHONE_BEZEL, width: screenW, height: screenH, borderRadius: PHONE_RADIUS - PHONE_BEZEL, overflow: 'hidden', background: '#fff', isolation: 'isolate' }}
+          data-jphone-screen=""
+        >
+          {sketch ? null : <div aria-hidden style={{ position: 'absolute', top: 12, left: '50%', width: 96, height: 24, marginLeft: -48, borderRadius: 12, background: ink }} />}
+          <div aria-hidden style={{ position: 'absolute', bottom: 9, left: '50%', width: 120, height: 4, marginLeft: -60, borderRadius: 2, background: sketch ? '#5a5a5a' : '#c8c8c8' }} />
+          <div style={{ position: 'absolute', left: PHONE_SAFE.x, top: PHONE_SAFE.top, width, height, overflow: 'hidden' }} data-jphone-content-box="">
+            {children}
+          </div>
         </div>
+        {sketch ? <div aria-hidden style={{ position: 'absolute', top: PHONE_BEZEL + 14, left: '50%', width: 64, height: 6, marginLeft: -32, borderRadius: 3, border: '1.5px solid #5a5a5a' }} /> : null}
       </div>
     </div>
   );

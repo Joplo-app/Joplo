@@ -5,7 +5,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Notice } from '../runtime/demo';
 import { VIEWPORTS, type Viewport } from '../renderer/Stage';
-import { PHONE_BEZEL, PhoneFrame } from '../renderer/components';
+import { PhoneFrame, phoneFrameSize } from '../renderer/components';
 import { ThemeContext, type StageTheme } from '../renderer/rough';
 
 export function StageViewport({ viewport, mode, notice, onDismiss, children, tag, theme = 'sketch' }: { viewport: Viewport; mode: 'demo' | 'review'; notice: Notice | null; onDismiss: () => void; children: ReactNode; tag?: ReactNode; theme?: StageTheme }) {
@@ -22,8 +22,9 @@ export function StageViewport({ viewport, mode, notice, onDismiss, children, tag
   const vp = VIEWPORTS[viewport];
   const phone = viewport === 'mobile';
   // 手机外框：两侧机身 + 侧键余量
-  const frameW = phone ? vp.width + PHONE_BEZEL * 2 + 8 : vp.width;
-  const frameH = phone ? vp.height + PHONE_BEZEL * 2 : vp.height;
+  const frame = phone ? phoneFrameSize(vp.width, vp.height) : vp;
+  const frameW = frame.width;
+  const frameH = frame.height;
   const pad = 14;
   const scale = Math.max(0.2, Math.min((avail.w - pad * 2) / frameW, (avail.h - pad * 2) / frameH, 1.5));
   const floating = notice && !('nodeId' in notice) ? notice : null;
