@@ -9,19 +9,20 @@ export const COVERAGE_LABEL: Record<Coverage['status'], { text: string; cls: str
   excluded: { text: '已排除', cls: 'border-[#9a9a9a] bg-white text-[#6b6b6b] line-through decoration-1', hint: '明确排除在本次范围之外' },
 };
 
+/** 规则来源与确认状态的芯片（D55：看板 Token；AI 假设用虚线，颜色不单独表意）。 */
 export const ORIGIN_LABEL: Record<Rule['origin'], { text: string; cls: string }> = {
-  user: { text: '用户', cls: 'border-[#3a3a3a] bg-white text-[#1e1e1e]' },
-  ai_assumption: { text: 'AI 假设', cls: 'border-dashed border-[#b35c00] bg-[#fff4e0] text-[#8a4700] font-semibold' },
-  project_material: { text: '项目材料', cls: 'border-[#5a5a5a] bg-[#f4f4f4] text-[#3a3a3a]' },
-  code_observed: { text: '代码观察', cls: 'border-[#5a5a5a] bg-[#f4f4f4] text-[#3a3a3a]' },
-  feedback: { text: '人工反馈', cls: 'border-[#6741d9] bg-[#f3f0ff] text-[#5f3dc4]' },
+  user: { text: '用户', cls: 'border-jb-ink bg-jb-surface text-jb-fg' },
+  ai_assumption: { text: 'AI 假设', cls: 'border-dashed border-jb-ink bg-jb-selected text-jb-fg font-semibold' },
+  project_material: { text: '项目材料', cls: 'border-jb-line bg-jb-sunken text-jb-fg' },
+  code_observed: { text: '代码观察', cls: 'border-jb-line bg-jb-sunken text-jb-fg' },
+  feedback: { text: '人工反馈', cls: 'border-jb-line bg-jb-surface text-jb-fg' },
 };
 
 export const CONFIRM_LABEL: Record<Rule['confirmation'], { text: string; cls: string }> = {
-  confirmed: { text: '已确认', cls: 'border-[#2b8a3e] bg-[#effaf1] text-[#2b8a3e]' },
-  pending: { text: '待确认', cls: 'border-[#b35c00] bg-white text-[#8a4700]' },
-  conflict: { text: '冲突', cls: 'border-[#c92a2a] bg-[#fff0f0] text-[#c92a2a] font-semibold' },
-  out_of_scope: { text: '不在范围', cls: 'border-[#9a9a9a] bg-white text-[#6b6b6b]' },
+  confirmed: { text: '已确认', cls: 'border-jb-ok bg-jb-ok-bg text-jb-ok' },
+  pending: { text: '待确认', cls: 'border-jb-line bg-jb-surface text-jb-muted' },
+  conflict: { text: '冲突', cls: 'border-jb-danger bg-jb-danger-bg text-jb-danger font-semibold' },
+  out_of_scope: { text: '不在范围', cls: 'border-jb-line bg-jb-surface text-jb-faint' },
 };
 
 export const DIMENSION_LABEL: Record<string, string> = {

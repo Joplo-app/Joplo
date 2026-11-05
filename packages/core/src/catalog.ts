@@ -208,6 +208,17 @@ export const BUILTIN_THEMES = ['sketch', 'clean', 'blueprint', 'nord', 'dracula'
 /** 主题名：字母开头，字母、数字、连字符、下划线（也是 themes/ 下的文件名）。 */
 export const THEME_NAME = /^[A-Za-z][\w-]*$/;
 
+/**
+ * 看板外观（D55）：配色仍是主题名；字体与线条可以单独选，null = 跟随主题。
+ * 只在本机看板与导出的图片 / 视频里生效，发布站（joplo.config.ts）暂不支持。只用本机字体（手写体是已打包的 Excalifont + 小赖）。
+ */
+export const APPEARANCE_FONTS = ['hand', 'sans', 'serif', 'kai', 'mono'] as const;
+export type AppearanceFont = (typeof APPEARANCE_FONTS)[number];
+export const APPEARANCE_STROKES = ['rough', 'clean'] as const;
+export type AppearanceStroke = (typeof APPEARANCE_STROKES)[number];
+export const isAppearanceFont = (v: unknown): v is AppearanceFont => typeof v === 'string' && (APPEARANCE_FONTS as readonly string[]).includes(v);
+export const isAppearanceStroke = (v: unknown): v is AppearanceStroke => typeof v === 'string' && (APPEARANCE_STROKES as readonly string[]).includes(v);
+
 /** 字幕的“字数”：中文（及其他全角字符）一个算 1，英文、数字、标点按 0.5 算；空白不算。check 用它提示说明与 explain 过长。 */
 export function captionLength(s: string): number {
   let n = 0;

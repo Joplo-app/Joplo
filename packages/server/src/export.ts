@@ -1,12 +1,15 @@
 /**
  * 看板「…」菜单的导出（D39）：
  *
- * - 图片：`POST /__joplo/p/<id>/export/image` `{ scenarioId, position, theme }` → PNG（当前步骤；尺寸跟随页面自己的 viewport，
+ * - 图片：`POST /__joplo/p/<id>/export/image` `{ scenarioId, position, theme, font?, stroke? }` → PNG（当前步骤；尺寸跟随页面自己的 viewport，
  *   手机页面带外框；D44 起不再选择设备；镜头用这一步的导演镜头）。Playwright 打开本看板的渲染路由（与 renderStep 同一条渲染路径），截取 `[data-jexport]`。
- * - 视频（只在本机）：`POST …/export/video` `{ scenarioId, theme }` → 202 `{ jobId }`（尺寸跟随场景起始页面的 viewport）；
+ * - 视频（只在本机）：`POST …/export/video` `{ scenarioId, theme, font?, stroke? }` → 202 `{ jobId }`（尺寸跟随场景起始页面的 viewport）；
  *   Playwright `recordVideo` 录下渲染路由的自动播放（含鼠标与字幕），保存为 `<项目>/exports/<场景>-<时间>.webm`。
  *   进度：`GET …/export/video/events`（SSE，先发当前状态，之后每次变化一条，结束后关闭）；`GET …/export/video` 取当前状态。
- *   同一项目同时只能有一个视频任务（再提交返回 409）。没有 Playwright / Chromium 时任务失败，错误里带安装命令。
+ *   同一项目同时只能有一个视频任务（再提交返回 409）；`DELETE …/export/video` 取消正在进行的任务（D55）。没有 Playwright / Chromium 时任务失败，错误里带安装命令。
+ *
+ * 外观（D55）：font / stroke 由 exportAppearance 校验（未知值 = null = 跟随主题），非 null 时作为渲染路由的 URL 参数，
+ * RenderApp 读出后交给舞台、字幕与手机外框（与看板里看到的一致）。
  *
  * 字段流向：job（写入点：这里的 runJob）→ jobs Map（存储）→ SSE / GET（读取点）→ 看板的导出视频弹窗（消费者）。
  */
@@ -15,7 +18,7 @@ import fs from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright';
-import { JoploError, SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, type Project } from '@joplo-app/core';
+import { JoploError, SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, type Project } from '@joplo-app/core';
 import { launch, loadPlaywright, type PlaywrightModule } from './render.ts';
 
 export type Device = 'desktop' | 'mobile';
@@ -68,6 +71,17 @@ const send = (res: http.ServerResponse, status: number, body: unknown) => {
   res.end(JSON.stringify(body));
 };
 
+/** 导出请求里的字体与线条（D55）：合法值保留，缺省、null 与未知值都是 null（跟随主题）。任何输入都不抛错。 */
+export function exportAppearance(body: unknown): { font: AppearanceFont | null; stroke: AppearanceStroke | null } {
+  const b = (body && typeof body === 'object' ? body : {}) as { font?: unknown; stroke?: unknown };
+  return { font: isAppearanceFont(b.font) ? b.font : null, stroke: isAppearanceStroke(b.stroke) ? b.stroke : null };
+}
+
+/** 渲染路由上的外观参数（null 不写）。 */
+const appearanceParams = (a: { font: AppearanceFont | null; stroke: AppearanceStroke | null }): Record<string, string> => ({ ...(a.font ? { font: a.font } : {}), ...(a.stroke ? { stroke: a.stroke } : {}) });
+
+type Look = { theme: string; font: AppearanceFont | null; stroke: AppearanceStroke | null };
+
 function parseRequest(project: Project | null, body: unknown, needPosition: boolean) {
   if (!project) throw new JoploError('INVALID_SCHEMA', '项目还没有成功编译过，无法导出');
   const b = (body ?? {}) as { scenarioId?: unknown; position?: unknown; theme?: unknown };
@@ -80,7 +94,7 @@ function parseRequest(project: Project | null, body: unknown, needPosition: bool
   const device: Device = project.scenes[sceneId]?.viewport === 'mobile' ? 'mobile' : 'desktop';
   // 主题（D51）：请求里的主题名，没有或不合法时用项目配置的主题
   const theme = typeof b.theme === 'string' && THEME_NAME.test(b.theme) ? b.theme : project.theme;
-  return { sc, position, device, theme };
+  return { sc, position, device, look: { theme, ...exportAppearance(body) } satisfies Look };
 }
 
 const fileSafe = (s: string) => s.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'scenario';
@@ -143,6 +157,16 @@ export class ExportHub {
     return `${this.opts.baseUrl()}?${new URLSearchParams({ render: '1', project: projectId, ...q })}`;
   }
 
+  /** 取消正在进行的视频任务（D55 导出进度里的「取消」）：立即标为“已取消”并中止录制；没有任务时返回 null。 */
+  cancel(projectId: string): VideoJob | null {
+    const job = this.jobs.get(projectId);
+    if (!job || job.status !== 'running') return null;
+    this.update(job, { status: 'error', phase: 'error', error: '已取消' });
+    this.aborts.get(projectId)?.abort();
+    this.aborts.delete(projectId);
+    return { ...job };
+  }
+
   job(projectId: string): VideoJob | null {
     return this.jobs.get(projectId) ?? null;
   }
@@ -161,8 +185,8 @@ export class ExportHub {
         if (!ctx.guardWrite()) return;
         const b = await ctx.jsonBody();
         if (!b.ok) return;
-        const { sc, position, device, theme } = parseRequest(ctx.project, b.body, true);
-        const png = await this.image(ctx.projectId, sc.id, position, device, theme);
+        const { sc, position, device, look } = parseRequest(ctx.project, b.body, true);
+        const png = await this.image(ctx.projectId, sc.id, position, device, look);
         res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-store', 'content-disposition': `attachment; filename="${fileSafe(sc.id)}-${position}.png"` });
         res.end(png);
         return;
@@ -171,13 +195,18 @@ export class ExportHub {
         if (!ctx.guardWrite()) return;
         const b = await ctx.jsonBody();
         if (!b.ok) return;
-        const { sc, device, theme } = parseRequest(ctx.project, b.body, false);
+        const { sc, device, look } = parseRequest(ctx.project, b.body, false);
         const cur = this.jobs.get(ctx.projectId);
         if (cur?.status === 'running') return send(res, 409, { error: { code: 'UNSUPPORTED_ACTION', message: '这个项目已有一个视频正在导出，请等它完成' }, job: cur });
-        const job = this.startVideo(ctx.projectId, ctx.dir, sc.id, sc.steps.length, device, theme);
+        const job = this.startVideo(ctx.projectId, ctx.dir, sc.id, sc.steps.length, device, look);
         return send(res, 202, { jobId: job.id, job });
       }
       if (sub === 'video' && method === 'GET') return send(res, 200, { job: this.job(ctx.projectId) });
+      if (sub === 'video' && method === 'DELETE') {
+        if (!ctx.guardWrite(false)) return;
+        const job = this.cancel(ctx.projectId);
+        return job ? send(res, 200, { job }) : send(res, 404, { error: { code: 'NOT_FOUND', message: '这个项目没有正在导出的视频' } });
+      }
       if (sub === 'video/events' && method === 'GET') {
         if (!ctx.guardWrite(false)) return;
         return this.sse(ctx.projectId, res);
@@ -189,12 +218,12 @@ export class ExportHub {
     }
   }
 
-  private async image(projectId: string, scenarioId: string, position: number, device: Device, theme: string): Promise<Buffer> {
+  private async image(projectId: string, scenarioId: string, position: number, device: Device, look: Look): Promise<Buffer> {
     const pw = await this.deps.loadPlaywright();
     const browser = await launch(pw);
     try {
       const page = await browser.newPage({ viewport: EXPORT_SIZE[device], deviceScaleFactor: 2, reducedMotion: 'reduce' });
-      await page.goto(this.renderUrl(projectId, { scenario: scenarioId, position: String(position), theme, frame: '1' }), { waitUntil: 'domcontentloaded' });
+      await page.goto(this.renderUrl(projectId, { scenario: scenarioId, position: String(position), theme: look.theme, ...appearanceParams(look), frame: '1' }), { waitUntil: 'domcontentloaded' });
       await waitReady(page);
       return await page.locator('[data-jexport]').screenshot({ type: 'png', animations: 'disabled' });
     } finally {
@@ -202,7 +231,7 @@ export class ExportHub {
     }
   }
 
-  private startVideo(projectId: string, dir: string, scenarioId: string, total: number, device: Device, theme: string): VideoJob {
+  private startVideo(projectId: string, dir: string, scenarioId: string, total: number, device: Device, look: Look): VideoJob {
     const job: VideoJob = { id: crypto.randomBytes(6).toString('hex'), projectId, scenarioId, status: 'running', phase: 'starting', step: 0, total, percent: 0, file: null, error: null };
     this.jobs.set(projectId, job);
     const ac = new AbortController();
@@ -214,25 +243,28 @@ export class ExportHub {
         fs.mkdirSync(path.dirname(out), { recursive: true });
         this.update(job, { phase: 'starting', percent: 2 });
         await this.deps.recordVideo({
-          url: this.renderUrl(projectId, { scenario: scenarioId, position: '0', theme, frame: '1', record: '1' }),
+          url: this.renderUrl(projectId, { scenario: scenarioId, position: '0', theme: look.theme, ...appearanceParams(look), frame: '1', record: '1' }),
           size: EXPORT_SIZE[device],
           out,
           total,
           signal: ac.signal,
           progress: (step) => {
+            if (job.status !== 'running') return; // 已取消
             const s = Math.max(0, Math.min(step, total));
             const percent = Math.round(5 + (total ? s / total : 1) * 85);
             if (job.phase !== 'recording' || s !== job.step) this.update(job, { phase: 'recording', step: s, percent });
           },
         });
+        if (job.status !== 'running') return; // 已取消：录制器之后才返回，不改回完成
         this.update(job, { phase: 'saving', percent: 95 });
         if (!fs.existsSync(out)) throw new JoploError('EXPORT_FAILED', '录制完成，但没有生成视频文件');
         this.update(job, { status: 'done', phase: 'done', percent: 100, step: total, file: rel });
         this.opts.log(`[joplo] 已导出视频：${out}`);
       } catch (e) {
-        this.update(job, { status: 'error', phase: 'error', error: e instanceof Error ? e.message : String(e) });
+        if (job.status === 'running') this.update(job, { status: 'error', phase: 'error', error: e instanceof Error ? e.message : String(e) });
       } finally {
-        this.aborts.delete(projectId);
+        // 只删自己的（取消后可能已经开始了新任务）
+        if (this.aborts.get(projectId) === ac) this.aborts.delete(projectId);
       }
     })();
     this.running.add(p);

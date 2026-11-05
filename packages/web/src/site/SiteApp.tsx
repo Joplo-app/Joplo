@@ -1,20 +1,27 @@
 /**
- * 发布站（`joplo build` 的产物，D39 / D33）：与本机看板同一套布局，只有一个项目。
- * - 首页 `#/`：左栏列功能，右侧是功能行和「查看」；
- * - 演示页 `#/f/<功能>?s=&step=&d=`：PlayerPage；左栏是选定方案的场景列表；「…」只有导出图片（浏览器内生成）、线框风格、复制链接。
- * - 没有缺口、规则、源码位置、抽屉和“在编辑器中打开”；只消费 publish 模式的 IR；没有写接口。hash 路由，file:// 可直接打开。
+ * 发布站（`joplo build` 的产物，D39 / D33 / D55「发布站 · 观众看到的」）：与本机看板同一套布局、时间线、字幕、全屏和快捷键，只有一个项目。
+ * - 首页 `#/`：左栏列功能；右侧是项目名、说明和功能卡片（整张可点，带缩略图）；
+ * - 演示页 `#/f/<功能>?s=&step=&l=`：PlayerPage；顶栏 项目 / 功能 ▾，右侧只有「复制链接」和全屏；左栏是功能名、目标和选定方案的场景
+ *   （按场景排列，没有方案切换）；底部标明“用 Joplo 制作的概念原型 · 非正式实现”。
+ * - 没有缺口、待决定、规则来源、AI 假设、检查、外观、导出（D33 / D55 不变量 5）；外观固定用 joplo.config.ts 的 theme
+ *   （字体、线条暂不发布）。只消费 publish 模式的 IR；没有写接口。hash 路由，file:// 可直接打开。
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { domToBlob } from 'modern-screenshot';
 import type { Project } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { parseSiteHash, siteHash, type PlayRoute, type SiteRoute } from '../runtime/route';
 import { scenariosOf } from '../runtime/views';
 import type { StageTheme } from '../renderer/rough';
-import { Brand, PlayerPage, TopBar, type MenuItem } from '../player/PlayerPage';
+import { Brand, PlayerPage, TopBar } from '../player/PlayerPage';
+import { ArrowRight, CirclePlay, Link } from 'lucide-react';
+import { Btn } from '../player/controls';
+import { JoploMark } from '../player/JoploMark';
+import { StageThumb } from '../player/StageThumb';
+import { displaySceneId } from '@joplo-app/core';
+import { siteScenarioRows } from './site-model';
 import { ThemeStyles } from '../renderer/ThemeStyles';
 import { usePlaySync } from '../player/playRoute';
-import { copyText, downloadBlob, useFlash, useHash } from '../player/util';
+import { copyText, useFlash, useHash } from '../player/util';
 import { cn } from '@/lib/utils';
 
 export type SiteData = { project: Project; home: string | null };
@@ -52,47 +59,66 @@ function Site({ project }: { project: Project }) {
 
 function SiteHome({ project, onView }: { project: Project; onView: (featureId: string) => void }) {
   const features = Object.values(project.features);
+  const look = { theme: project.theme, font: null, stroke: null };
   return (
-    <div className="flex h-full flex-col bg-[#f8f9fa]" data-testid="site-home">
-      <TopBar right={<ConceptBadge />}>
+    <div className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="site-home">
+      <ThemeStyles themes={project.themes} />
+      <TopBar>
         <Brand />
+        <span aria-hidden className="h-5 w-px shrink-0 bg-jb-line" />
+        <span className="truncate px-2 text-[14px] font-medium" data-testid="site-name">
+          {project.name}
+        </span>
       </TopBar>
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r bg-white p-3">
-          <div className="px-2 text-[12px] text-[#6b6b6b]" data-testid="site-name">
-            {project.name}
+        <aside className="flex w-[276px] shrink-0 flex-col overflow-y-auto border-r border-jb-line bg-jb-surface px-3 py-4">
+          <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
+            <span className="font-semibold tracking-[1px] text-jb-muted">功能</span>
+            <span className="text-jb-faint">{features.length} 个</span>
           </div>
-          <ul className="mt-1 flex flex-col gap-0.5">
+          <ul className="flex flex-col gap-1">
             {features.map((f) => (
               <li key={f.id}>
-                <button type="button" onClick={() => onView(f.id)} className="w-full truncate rounded-md px-3 py-2 text-left text-[14px] hover:bg-[#f1f3f5]" data-testid={`site-feature-${f.id}`}>
+                <button type="button" onClick={() => onView(f.id)} className="jb-focus w-full truncate rounded-[8px] px-2.5 py-2 text-left text-[14px] hover:bg-jb-hover" data-testid={`site-feature-${f.id}`}>
                   {f.name}
                 </button>
               </li>
             ))}
           </ul>
+          <div className="flex-1" />
+          <SiteFooter />
         </aside>
-        <main className="min-w-0 flex-1 overflow-y-auto p-8">
-          <div className="flex max-w-[960px] flex-col gap-3">
-            <h1 className="text-[24px] font-semibold">{project.name}</h1>
-            {project.description ? <p className="text-[14px] text-[#6b6b6b]">{project.description}</p> : null}
-            <h2 className="mt-3 text-[17px] font-semibold">功能</h2>
-            {features.length === 0 ? <p className="text-[14px] text-[#6b6b6b]">还没有发布任何功能。</p> : null}
-            {features.map((f) => {
-              const pick = f.pick ? project.options[f.pick] : null;
-              return (
-                <div key={f.id} className="flex items-center justify-between gap-4 rounded-lg border bg-white p-4" data-testid={`site-feature-row-${f.id}`}>
-                  <div className="min-w-0">
-                    <div className="text-[15px] font-semibold">{f.name}</div>
-                    <div className="mt-0.5 text-[13px] text-[#6b6b6b]">{f.goal}</div>
-                    {pick ? <div className="mt-2 text-[12px] text-[#5a5a5a]">{pick.name} · {scenariosOf(project, pick.id).length} 个场景</div> : null}
+        <main className="min-w-0 flex-1 overflow-y-auto px-10 py-8">
+          <div className="flex max-w-[1120px] flex-col gap-5">
+            <div>
+              <h1 className="text-[24px] font-bold leading-8">{project.name}</h1>
+              {project.description ? <p className="mt-1.5 max-w-[860px] text-[14px] leading-[22px] text-jb-muted">{project.description}</p> : null}
+            </div>
+            {features.length === 0 ? <p className="text-[14px] text-jb-muted">还没有发布任何功能。</p> : null}
+            <section className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2">
+              {features.map((f) => {
+                const pick = f.pick ? project.options[f.pick] : null;
+                const scs = pick ? scenariosOf(project, pick.id) : [];
+                const sc = scs[0];
+                return (
+                  <div key={f.id} className="group relative flex flex-col overflow-hidden rounded-[10px] border border-jb-line bg-jb-surface hover:border-jb-ink hover:shadow-[var(--jb-e1)]" data-testid={`site-feature-row-${f.id}`}>
+                    <button type="button" onClick={() => onView(f.id)} aria-label={`打开「${f.name}」的演示`} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" data-testid={`site-view-${f.id}`} />
+                    <StageThumb project={project} scenarioId={sc?.id ?? null} sceneId={sc ? displaySceneId(project, sc.id, 0) : null} look={look} />
+                    <div className="flex flex-col gap-1.5 border-t border-jb-line px-4 pb-4 pt-3">
+                      <div className="flex items-center gap-3">
+                        <span className="min-w-0 flex-1 truncate text-[17px] font-bold">{f.name}</span>
+                        <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold opacity-0 transition-opacity group-hover:opacity-100">
+                          打开演示
+                          <ArrowRight className="size-4" aria-hidden />
+                        </span>
+                      </div>
+                      <p className="line-clamp-2 text-[13px] leading-5 text-jb-muted">{f.goal}</p>
+                      <span className="text-[12px] text-jb-muted">{scs.length} 个场景</span>
+                    </div>
                   </div>
-                  <button type="button" onClick={() => onView(f.id)} className="shrink-0 rounded-md border bg-white px-4 py-2 text-[14px] hover:bg-[#f8f9fa]" data-testid={`site-view-${f.id}`}>
-                    查看
-                  </button>
-                </div>
-              );
-            })}
+                );
+              })}
+            </section>
           </div>
         </main>
       </div>
@@ -100,11 +126,13 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
   );
 }
 
-function ConceptBadge() {
+/** 发布站底部的署名：标明是概念原型（PRD：标明“概念原型 / 尚非正式实现”）。 */
+function SiteFooter() {
   return (
-    <span className="rounded border border-dashed border-[#b35c00] bg-[#fff8ee] px-2 py-1 text-[12px] font-medium text-[#8a4700]" data-testid="concept-badge">
-      概念原型 · 非正式实现
-    </span>
+    <div className="flex items-center gap-2 px-2 pt-3 text-[12px] text-jb-faint" data-testid="concept-badge">
+      <JoploMark size={16} />
+      用 Joplo 制作的概念原型 · 非正式实现
+    </div>
   );
 }
 
@@ -134,26 +162,6 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
   const option = resolved.optionId ? project.options[resolved.optionId] : null;
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
   const home = () => navigate({ kind: 'home' });
-  const menu: MenuItem[] = [
-    {
-      id: 'image',
-      label: '导出图片（当前步骤）',
-      disabled: !scenario,
-      onClick: () => {
-        const el = document.querySelector<HTMLElement>('[data-joplo-stage]');
-        if (!el || !scenario || !snap.state) return;
-        const name = `${scenario.id.replace(/[^\w.-]+/g, '_')}-${snap.state.position}.png`;
-        void domToBlob(el, { scale: 2, type: 'image/png' }).then(
-          (blob) => {
-            downloadBlob(blob, name);
-            setFlash(`已下载 ${name}`);
-          },
-          (e: unknown) => setFlash(`导出图片失败：${e instanceof Error ? e.message : String(e)}`),
-        );
-      },
-    },
-    { id: 'link', label: '复制当前步骤的链接', onClick: () => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制')) },
-  ];
   const scs = scenariosOf(project, resolved.optionId);
   return (
     <>
@@ -165,10 +173,14 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
       onBrand={home}
       crumbs={[
         { label: project.name, testid: 'crumb-project', onClick: home },
-        { label: feature.name, testid: 'crumb-feature', onClick: home },
-        { label: option?.name ?? '', testid: 'crumb-option' },
-        { label: scenario?.name ?? '', testid: 'crumb-scenario' },
+        {
+          label: feature.name,
+          testid: 'crumb-feature',
+          menuLabel: '切换功能',
+          items: Object.values(project.features).map((f) => ({ id: `feature-${f.id}`, label: f.name, checked: f.id === feature.id, onClick: () => navigate({ kind: 'play', play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
+        },
       ]}
+      actions={<Btn icon={<Link className="size-4" />} label="复制链接" title="复制当前步骤的链接" onClick={() => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制'))} data-testid="copy-link" />}
       layer={play.layer ?? null}
       speed={play.speed ?? 1}
       onSpeed={(v) => {
@@ -181,36 +193,37 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
       }}
       theme={theme}
       nav={
-        <div className="flex flex-1 flex-col gap-1" data-testid="scenario-nav">
-          <div className="truncate px-2 text-[12px] text-[#6b6b6b]">{feature.name}</div>
-          {option ? <div className="truncate rounded-lg bg-[#f1f3f5] px-3 py-2 text-[14px] font-semibold">{option.name}</div> : null}
-          <div className="mt-3 flex items-center gap-2 px-2 text-[12px] text-[#6b6b6b]">
-            场景
-            <span className="h-px flex-1 bg-[#e9ecef]" />
+        <div className="flex min-h-full flex-1 flex-col gap-1 font-jb" data-testid="scenario-nav">
+          <div className="px-2 pb-2 pt-1">
+            <h2 className="text-[17px] font-bold leading-6">{feature.name}</h2>
+            <p className="mt-1 text-[12px] leading-[18px] text-jb-muted">{feature.goal}</p>
           </div>
-          <ul className="flex flex-col gap-0.5">
-            {scs.map((s) => (
-              <li key={s.id}>
+          <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
+            <span className="font-semibold tracking-[1px] text-jb-muted">场景</span>
+            <span className="text-jb-faint">{scs.length} 个</span>
+          </div>
+          <ul className="flex flex-col gap-1">
+            {siteScenarioRows(project, resolved.optionId, snap.scenarioId).map((r) => (
+              <li key={r.id}>
                 <button
                   type="button"
-                  onClick={() => toPlay({ featureId: feature.id, scenarioId: s.id })}
-                  data-testid={`site-scenario-${s.id}`}
-                  className={cn('w-full rounded-md px-3 py-2 text-left text-[14px] hover:bg-[#f1f3f5]', snap.scenarioId === s.id && 'bg-[#e7f0ff] font-semibold hover:bg-[#e7f0ff]')}
+                  onClick={() => toPlay({ featureId: feature.id, scenarioId: r.id })}
+                  data-testid={`site-scenario-${r.id}`}
+                  aria-current={r.current ? 'true' : undefined}
+                  className={cn('jb-focus flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left text-[14px]', r.current ? 'bg-jb-selected font-semibold' : 'hover:bg-jb-hover')}
                 >
-                  <div className="truncate">{s.name}</div>
-                  <div className="text-[12px] font-normal text-[#868e96]">
-                    {s.mock.label} · {s.steps.length} 步
-                  </div>
+                  <CirclePlay className={cn('size-4 shrink-0', r.current ? 'text-jb-fg' : 'text-jb-muted')} aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                  <span className="shrink-0 text-[11px] font-normal text-jb-faint">{r.steps}</span>
                 </button>
               </li>
             ))}
           </ul>
-          <div className="mt-auto pt-4">
-            <ConceptBadge />
-          </div>
+          <div className="flex-1" />
+          <SiteFooter />
         </div>
       }
-      menu={menu}
+      menu={[]}
       flash={flash}
     />
     </>

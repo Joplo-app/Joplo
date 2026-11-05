@@ -1,5 +1,5 @@
 /** 看板与发布站共用的小工具：hash 路由、轻提示、下载、复制。 */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 export function useHash(): [string, (h: string, replace?: boolean) => void] {
   const [hash, setHash] = useState(() => location.hash);
@@ -17,15 +17,16 @@ export function useHash(): [string, (h: string, replace?: boolean) => void] {
   return [hash, go];
 }
 
-/** 页面级轻提示：几秒后自动消失。 */
-export function useFlash(): [string | null, (m: string) => void] {
-  const [msg, setMsg] = useState<string | null>(null);
+/** 页面级轻提示：几秒后自动消失（默认 2.6 秒；带操作按钮的提示可以留久一点）。 */
+export function useFlash(): [ReactNode | null, (m: ReactNode, ms?: number) => void] {
+  const [msg, setMsg] = useState<{ m: ReactNode; ms: number } | null>(null);
   useEffect(() => {
     if (!msg) return;
-    const t = setTimeout(() => setMsg(null), 2600);
+    const t = setTimeout(() => setMsg(null), msg.ms);
     return () => clearTimeout(t);
   }, [msg]);
-  return [msg, setMsg];
+  const set = useCallback((m: ReactNode, ms = 2600) => setMsg({ m, ms }), []);
+  return [msg?.m ?? null, set];
 }
 
 export function downloadBlob(blob: Blob, name: string) {

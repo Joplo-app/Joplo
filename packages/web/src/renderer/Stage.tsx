@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { VIEWPORT_SIZE, diagramStateAt, type PlayState, type Project, type Toast } from '@joplo-app/core';
 import { RenderContext, RenderNode, type RenderMode } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
-import { strokeOfTheme } from './themes';
+import { resolveLook, type AppearanceFont, type AppearanceStroke } from './appearance';
 
 export const VIEWPORTS = VIEWPORT_SIZE;
 export type Viewport = keyof typeof VIEWPORTS;
@@ -62,6 +62,12 @@ export type StageProps = {
   sceneId?: string | null;
   /** 自由缩放与平移（T-director2）：滚轮 / 触控板捏合缩放、拖动平移；null = 不允许（静态截图、视频）。 */
   zoom?: ZoomProps | null;
+  /** 检查模式（看板的「检查」开关，D55）：单击 = 检查元素（与按住 ⌥ 单击相同），不执行步骤。 */
+  inspect?: boolean;
+  /** 字体（D55）：null / 缺省 = 跟随主题；否则用 --jp-font 覆盖主题的字体。 */
+  font?: AppearanceFont | null;
+  /** 线条（D55）：null / 缺省 = 跟随主题的 --jp-stroke。 */
+  stroke?: AppearanceStroke | null;
 };
 
 export type ZoomApi = { zoomBy: (factor: number) => void; fit: () => void };
@@ -84,13 +90,14 @@ function scrollsItself(target: EventTarget | null, root: HTMLElement, dy: number
   return false;
 }
 
-export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null }: StageProps) {
+export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false, font = null, stroke: strokeOverride = null }: StageProps) {
   const shownId = sceneId ?? state.sceneId;
   const scene = project.scenes[shownId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
-  // 主题（D51）：描边方式由主题的 --jp-stroke 决定（内置主题或项目 themes/<name>.css）
-  const stroke = useMemo(() => strokeOfTheme(theme, project.themes ?? {}), [theme, project.themes]);
+  // 外观（D51 / D55）：线条缺省由主题的 --jp-stroke 决定（内置主题或项目 themes/<name>.css），可以单独覆盖；字体覆盖写成 --jp-font
+  const look = useMemo(() => resolveLook({ theme, font, stroke: strokeOverride }, project.themes ?? {}), [theme, font, strokeOverride, project.themes]);
+  const stroke = look.stroke;
   // 调用链（D48）：Diagram 节点与连线的 state 由每一步的 trace 推算（没写 state 时使用）
   const traced = useMemo(() => diagramStateAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -168,7 +175,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   const drag = useRef<{ x: number; y: number; v: View; moved: boolean; id: number } | null>(null);
   const suppressClick = useRef(false);
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (!zoomOn || e.button !== 0 || e.altKey) return;
+    if (!zoomOn || e.button !== 0 || e.altKey || inspectMode) return;
     drag.current = { x: e.clientX, y: e.clientY, v: nowView(), moved: false, id: e.pointerId };
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
@@ -200,7 +207,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
 
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     if (!onNodeClick) return;
-    const inspect = e.altKey;
+    const inspect = e.altKey || inspectMode;
     const hit = pickTarget(e.target as HTMLElement, mode, inspect);
     if (!hit || !rootRef.current?.contains(hit)) return;
     e.preventDefault();
@@ -210,15 +217,15 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     if (!onNodeClick || (e.key !== 'Enter' && e.key !== ' ')) return;
     const t = e.target as HTMLElement;
     if (t.tagName === 'BUTTON') return; // 原生按钮会自己触发 click
-    const hit = pickTarget(t, mode, e.altKey);
+    const hit = pickTarget(t, mode, e.altKey || inspectMode);
     if (!hit) return;
     e.preventDefault();
     const r = hit.getBoundingClientRect();
-    onNodeClick(hit.dataset.jid!, toFramePoint(r.left + r.width / 2, r.top + r.height / 2), { inspect: e.altKey });
+    onNodeClick(hit.dataset.jid!, toFramePoint(r.left + r.width / 2, r.top + r.height / 2), { inspect: e.altKey || inspectMode });
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, stroke, registry }}>
+    <ThemeContext.Provider value={{ theme, stroke, font: look.font, registry }}>
       <div
         ref={(el) => {
           rootRef.current = el;
@@ -227,6 +234,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         data-joplo-stage=""
         data-theme={theme}
         data-stroke={stroke}
+        data-font={look.font ?? undefined}
         data-mode={mode}
         data-scene={shownId}
         data-width={vp.width}
@@ -245,7 +253,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         }}
         data-zoomable={zoomOn ? '' : undefined}
         data-user-zoom={user ? String(Math.round(user.k * 100) / 100) : undefined}
-        style={{ width: vp.width, height: vp.height, touchAction: zoomOn ? 'none' : undefined, cursor: drag.current?.moved ? 'grabbing' : undefined }}
+        style={{ ...look.style, width: vp.width, height: vp.height, touchAction: zoomOn ? 'none' : undefined, cursor: drag.current?.moved ? 'grabbing' : undefined }}
       >
         {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>

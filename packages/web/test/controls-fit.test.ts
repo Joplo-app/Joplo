@@ -1,16 +1,16 @@
 /**
- * 控件区按宽度收起（T-polish）：1280×800、1440×900、1920×1080 三种宽度，全屏与非全屏，控件区不换行、不重叠、不溢出；
+ * 全屏控制条按宽度收起（T-polish）：1280×800、1440×900、1920×1080 三种宽度，控件区不换行、不重叠、不溢出；
+ * （非全屏的演示页布局见 board-page.test.ts）
  * 宽度不够时按优先级收起：① 上一步 / 播放 / 下一步 → 图标，② 速度 → 「…」，③ 层级切换 → 下拉菜单。
  * （不换行由 white-space: nowrap 保证；这里检查收起之后的总宽度放得下。）
  */
 import { describe, expect, it } from 'vitest';
 import { SPEEDS } from '../src/runtime/pace';
-import { CTRL, buttonW, collapseToFit, controlsRowCollapse, fullscreenBarCollapse, layerBarCollapse, navGroup, rowWidth, segmentedW, speedGroup, layersGroup, directorW, textW } from '../src/player/controls-fit';
+import { CTRL, buttonW, collapseToFit, fullscreenBarCollapse, navGroup, rowWidth, segmentedW, speedGroup, layersGroup, directorW, textW } from '../src/player/controls-fit';
 
 const layers = ['客户端视角', '后端流转', '核心块说明'];
 const playLabels = ['播放', '暂停', '继续', '重新播放'];
-/** 演示页（非全屏）主体宽度 = 视口 − 左栏 280 − 左右内边距 24；全屏控制条可用宽度 = 视口 − 48。 */
-const mainW = (vw: number) => vw - 280 - 24;
+/** 全屏控制条可用宽度 = 视口 − 48。 */
 const barW = (vw: number) => vw - 48;
 
 describe('尺寸估算', () => {
@@ -23,13 +23,11 @@ describe('尺寸估算', () => {
   });
 });
 
-describe('三种宽度：非全屏与全屏都放得下、不收起', () => {
+describe('三种宽度：全屏控制条放得下、不收起', () => {
   for (const vw of [1280, 1440, 1920])
     for (const pl of playLabels)
       for (const director of [true, false])
         it(`${vw}px · ${pl} · 导演${director ? '跟随' : '暂停'}`, () => {
-          expect([...controlsRowCollapse(mainW(vw), pl, SPEEDS)]).toEqual([]);
-          expect([...layerBarCollapse(mainW(vw), layers, director, '后端流转')]).toEqual([]);
           expect([...fullscreenBarCollapse(barW(vw), pl, SPEEDS, layers, director, '核心块说明')]).toEqual([]);
         });
 });
@@ -46,15 +44,6 @@ describe('窄的时候按优先级收起，收起后放得下；任何宽度都�
       prev = c;
     }
     expect(order).toEqual(['nav', 'speed', 'layers']);
-  });
-  it('非全屏：播放控制行先收三件套再把速度收进「…」；层级栏先收“只重放这一层”再收层级切换', () => {
-    const seen = (f: (w: number) => Set<string>) => {
-      const order: string[] = [];
-      for (let w = 1200; w >= 200; w -= 10) for (const id of f(w)) if (!order.includes(id)) order.push(id);
-      return order;
-    };
-    expect(seen((w) => controlsRowCollapse(w, '重新播放', SPEEDS))).toEqual(['nav', 'speed']);
-    expect(seen((w) => layerBarCollapse(w, layers, true, '后端流转'))).toEqual(['replay', 'layers']);
   });
   it('从 320 到 2400 的每个宽度：收起之后总宽度 ≤ 可用宽度，或者已经全部收起（容器横向裁切，不换行）', () => {
     const groups = [navGroup(CTRL.sm, '重新播放'), speedGroup(SPEEDS, CTRL.sm), layersGroup(layers, CTRL.sm)];

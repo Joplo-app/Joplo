@@ -1,6 +1,7 @@
 /**
  * 渲染专用路由（renderStep 与看板导出使用）：
- *   /?render=1&project=<id>&scenario=..&position=..&theme=..[&w=..&h=..][&frame=1][&record=1]
+ *   /?render=1&project=<id>&scenario=..&position=..&theme=..[&font=..][&stroke=..][&w=..&h=..][&frame=1][&record=1]
+ * - font / stroke（D55，看板外观）：缺省 = 跟随主题；导出图片、视频与 renderStep 透传，和看板里看到的一致。
  * - 只渲染舞台，尺寸跟随页面自己的 viewport（D44：不再覆盖设备），关闭入场动画。字体、rough 绘制与镜头都稳定后
  *   设置 window.__JOPLO_READY__ = true，并暴露 window.__JOPLO_STATE__（当前 PlayState）。
  * - 镜头（D43）：用这一步的导演镜头（cameraAt），静态截图没有动画。
@@ -10,7 +11,7 @@
  *   .progress = { step, done, error } 供服务端读取进度。
  */
 import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, stateAt, type PlayState, type Project } from '@joplo-app/core';
+import { SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, stateAt, type AppearanceFont, type AppearanceStroke, type PlayState, type Project } from '@joplo-app/core';
 import { fetchIR } from './runtime/dev-client';
 import { DemoController } from './runtime/demo';
 import { Stage, VIEWPORTS, type Viewport } from './renderer/Stage';
@@ -18,7 +19,7 @@ import { PhoneFrame, phoneFrameSize } from './renderer/components';
 import { cameraFor } from './player/cameraFor';
 import { RoughRegistry, ThemeContext, type StageTheme } from './renderer/rough';
 import { Overlay } from './player/Overlay';
-import { strokeOfTheme } from './renderer/themes';
+import { appearanceFromParams, resolveLook } from './renderer/appearance';
 import { ThemeStyles } from './renderer/ThemeStyles';
 import { cameraPosition } from './player/cameraFor';
 import { Subtitle } from './player/Subtitle';
@@ -50,6 +51,7 @@ export function RenderApp() {
   const [data, setData] = useState<{ project: Project; state: PlayState } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const theme: StageTheme = themeParam && THEME_NAME.test(themeParam) ? themeParam : (data?.project.theme ?? 'sketch');
+  const { font, stroke } = appearanceFromParams(params);
   const [stage, setStage] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -110,7 +112,7 @@ export function RenderApp() {
   const vp = VIEWPORTS[viewport];
   const framed = (stageNode: ReactNode) =>
     viewport === 'mobile' ? (
-      <ThemeContext.Provider value={{ theme, stroke: strokeOfTheme(theme, data.project.themes ?? {}), registry }}>
+      <ThemeContext.Provider value={{ theme, stroke: resolveLook({ theme, font, stroke }, data.project.themes ?? {}).stroke, font, registry }}>
         <PhoneFrame width={vp.width} height={vp.height} seed="stage-phone">
           {stageNode}
         </PhoneFrame>
@@ -126,7 +128,7 @@ export function RenderApp() {
   const withSub = (node: ReactNode, sub: SubtitleContent | null, w: number) => (
     <div style={{ display: 'flex', flexDirection: 'column', width: w }}>
       {node}
-      <Subtitle content={sub} theme={theme} width={w} framed fixedHeight={fixedSub ? SUBTITLE_HEIGHT : undefined} />
+      <Subtitle content={sub} theme={theme} font={font} width={w} framed fixedHeight={fixedSub ? SUBTITLE_HEIGHT : undefined} />
     </div>
   );
   const wrap = (stageNode: ReactNode, sub: SubtitleContent | null) => (
@@ -157,7 +159,7 @@ export function RenderApp() {
       </div>
     );
   };
-  if (record) return <RecordStage project={data.project} scenarioId={scenarioId} theme={theme} registry={registry} setStage={setStage} wrap={wrap} />;
+  if (record) return <RecordStage project={data.project} scenarioId={scenarioId} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} />;
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
   const plan = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null);
@@ -166,6 +168,8 @@ export function RenderApp() {
       project={data.project}
       state={data.state}
       theme={theme}
+      font={font}
+      stroke={stroke}
       mode="render"
       animate={false}
       registry={registry}
@@ -179,7 +183,7 @@ export function RenderApp() {
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
-function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null) => ReactNode }) {
+function RecordStage({ project, scenarioId, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null) => ReactNode }) {
   const ctl = useMemo(() => {
     const c = new DemoController(null);
     c.reducedMotion = false;
@@ -221,6 +225,8 @@ function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: {
       project={project}
       state={snap.state}
       theme={theme}
+      font={font}
+      stroke={stroke}
       mode="demo"
       registry={registry}
       preview={snap.preview}

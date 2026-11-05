@@ -180,6 +180,15 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 云端代码放在单独的私有仓库 `Joplo-app/joplo-cloud`（本地 `~/.paradev/projects/joplo-cloud`），它有自己的决策记录 `docs/decisions.md`。
 - D53 仓库迁到 Joplo-app 组织（2026-11-05，用户要求）：开源的 `Joplo-app/Joplo` 和私有的 `Joplo-app/joplo-cloud` 都从 TokenRollAI 迁到 `Joplo-app`；TokenRollAI 只保留纯开源项目。npm 包仍在 `@tokenroll` 作用域下（D38），各包的 repository 字段改为新地址，下次发布时生效。
 - D54 npm 作用域改为 `@joplo-app`（2026-11-05，用户决定；取代 D38 的 `@tokenroll/joplo-*`）：包名为 `@joplo-app/kit`、`/core`、`/cli`、`/server`、`/web`，入口包仍是 `joplo`。作者项目写 `import … from '@joplo-app/kit'`，tsconfig 写 `jsxImportSource: "@joplo-app/kit"`。版本统一为 0.1.1。npm 组织 `joplo-app` 由用户创建；已发布的 `@tokenroll/joplo-*@0.1.0` 之后标记为 deprecated，指向新包名。
+- D55 看板视觉与交互重组（2026-11-05，用户在 Pen 设计稿 `design/joplo-board.pen` 上确认；设计阶段，尚未实现）：
+  - 设计 Token（「设计 Token v1」）：暖灰中性色（`#F4F1EA` 底）；黄色只标“当前 / 正在发生 / 主操作”；墨黑负责结构；页面内不用阴影，只有浮层用 1.5px 墨线 + 3px 实色偏移阴影；不用渐变、模糊阴影、毛玻璃和发光。设计稿统一用一套标准字体（Noto Sans SC，实现为系统黑体），不混用手写体。
+  - 品牌（「品牌素材 v1」）：标志几何不变；字标定为 Nunito ExtraBold 并转成曲线（`assets/brand/joplo-logo*.svg`、`joplo-og.png` 已重新导出），看板顶栏用同一个 `JoploLogo` 组件。
+  - 外观用浮层，不用停靠面板（用户：调主题很轻量、耗时很短，压缩布局再关掉没有必要）：配色 / 字体 / 线条分开选，点一下立即生效并保存，点外面或 Esc 关闭。检查元素仍是右侧抽屉。
+  - 播放时间线：当前这一步展开成宽块并写说明，其余步骤只给序号（用户明确喜欢这个方案）。
+  - 发布站暂不支持 `font` / `stroke`（用户：后续统计支持的字体等再定）：`joplo.config.ts` 仍只有 `theme`；看板里选的字体、线条只影响本机看板和导出的图片、视频。外观浮层底部写明这一点，并提供“复制 theme”。
+  - 补充设计（用户同意加）：「细节与状态 v1」（悬停说明、播放进度、点错位置、场景完成、缺口横幅、检查、导出进度、快捷键、标签页状态等）；1280×800 窄屏与收起规则；手机页面的演示页；发布站观众版。
+  - 层级栏（用户确认，取代 D46 中“导演跟随时不高亮任何一项”）：层级做成贴在舞台框上沿的标签，正在看的那层与舞台连成一片；导演跟随时这一层带摄像机图标并随步骤自动换；手动点一层 = 停在这层，摄像机消失、「跟随导演」开关关闭。
+  - 实现交接见 `design/IMPLEMENTATION.md`（由新的 worker 实现）。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

@@ -68,6 +68,11 @@ export type Snapshot = {
    * 再移动鼠标；这一步提交后清空，之后由 cameraAt 决定导演层。
    */
   leadLayer: string | null;
+  /**
+   * 自动播放停在第 position 步（D55）：总共停 ms，开始公布时已过去 elapsed；时间线据此画进度（暂停时停住）。
+   * 不在停留中（手动、执行动画中、停止后）为 null。
+   */
+  dwell: { position: number; ms: number; elapsed: number } | null;
 };
 
 export const TIMING = {
@@ -99,6 +104,7 @@ export class DemoController {
     state: null,
     playing: false,
     paused: false,
+    dwell: null,
     busy: false,
     activeStep: null,
     ripple: null,
@@ -423,11 +429,15 @@ export class DemoController {
         const dwell = this.reducedMotion
           ? TIMING.reducedStep
           : stepDwell({ texts: [step.caption, step.explain], speed: this.speed, cameraMoved: step.shots.length > 0 || !!step.directorLayer, dotMs: this.activeDotMs() });
-        if (!(await this.wait(dwell - (performance.now() - this.committedAt), gen, true))) return;
+        const elapsed = Math.max(0, Math.round(performance.now() - this.committedAt));
+        this.set({ dwell: { position: index + 1, ms: Math.max(dwell, elapsed), elapsed } });
+        const ok2 = await this.wait(dwell - (performance.now() - this.committedAt), gen, true);
+        if (this.snap.dwell) this.set({ dwell: null });
+        if (!ok2) return;
       }
     }
     this.fast = null;
-    if (gen === this.gen) this.set({ playing: false, paused: false, busy: false });
+    if (gen === this.gen) this.set({ playing: false, paused: false, busy: false, dwell: null });
   }
 
   private fast: ((index: number) => boolean) | null = null;
@@ -475,7 +485,7 @@ export class DemoController {
     this.cancelWaiters = [];
     ws.forEach((w) => w());
     if (this.snap.playing || this.snap.busy || this.snap.preview || this.snap.systemEvent || this.snap.ripple || this.snap.activeStep !== null || this.snap.leadLayer)
-      this.set({ playing: false, paused: false, busy: false, preview: null, systemEvent: null, ripple: null, activeStep: null, leadLayer: null });
+      this.set({ playing: false, paused: false, busy: false, dwell: null, preview: null, systemEvent: null, ripple: null, activeStep: null, leadLayer: null });
   }
 
   // ---------- 点击 ----------
@@ -523,15 +533,19 @@ export class DemoController {
         if (gen === this.gen) this.set({ busy: false });
         return;
       }
+      // 点错位置（D55）：画面顶部一条轻提示 + 目标闪一下，3 秒后消失，不打断
       case 'disabled':
         this.set({ notice: { kind: 'disabled', nodeId, text: verdict.reason } });
+        this.autoClear(3000);
         return;
       case 'unmodeled':
       case 'not_covered':
         this.set({ notice: { kind: 'uncovered', nodeId, text: `当前演示未覆盖此操作：「${verdict.label || label}」` } });
+        this.autoClear(3000);
         return;
       case 'out_of_order':
         this.set({ notice: { kind: 'out_of_order', nodeId, text: verdict.expectedCaption ? `按当前场景，下一步是：${verdict.expectedCaption}` : '按当前场景，演示已经结束' } });
+        this.autoClear(3000);
         return;
       case 'static':
         return;

@@ -1,10 +1,12 @@
 /**
- * 检查抽屉（看板，D39）：⌥+单击画面元素后从右侧弹出，取代原来的审阅模式与右栏。
+ * 检查抽屉（看板，D39 / D55「检查抽屉：给 Agent 指路」）：检查模式下单击、或 ⌥+单击画面元素后在右侧浮出（e1，没有遮罩，
+ * 可以接着点别的元素）；Esc 或 × 关闭。标题是元素名，第一块就是 文件:行（复制、在编辑器中打开）；规则区分“已确认”和
+ * “AI 假设”（虚线框）；底部是同步状态。
  * 显示：元素名与类型、关联规则（来源与确认状态）、覆盖的情况、`文件:行`（可复制、可在编辑器中打开）、
  * 写入状态，以及“Agent 运行 npx joplo selection”的提示。选中本身由控制器写入 `.joplo/selection.json`
  * （服务端计算 at / label，409 时清空并提示）。
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, X } from 'lucide-react';
 import { findNode, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@joplo-app/core';
 import type { SelectionSync } from '../runtime/demo';
@@ -13,14 +15,14 @@ import { cn } from '@/lib/utils';
 import { CONFIRM_LABEL, ORIGIN_LABEL, typeLabel } from './labels';
 
 function Chip({ cls, children }: { cls: string; children: React.ReactNode }) {
-  return <span className={cn('inline-block shrink-0 rounded border px-1.5 py-px text-[11px] leading-[16px]', cls)}>{children}</span>;
+  return <span className={cn('inline-block shrink-0 rounded-[4px] border px-1.5 py-px text-[11px] leading-[16px]', cls)}>{children}</span>;
 }
 
 function RuleItem({ rule }: { rule: Rule }) {
   const o = ORIGIN_LABEL[rule.origin];
   const c = CONFIRM_LABEL[rule.confirmation];
   return (
-    <li className={cn('rounded-md border px-2.5 py-2', rule.origin === 'ai_assumption' ? 'border-dashed border-[#d9a35f] bg-[#fffaf2]' : 'border-[#e4e4e4]')} data-testid={`rule-${rule.id}`} data-origin={rule.origin}>
+    <li className={cn('rounded-[8px] border px-2.5 py-2', rule.origin === 'ai_assumption' ? 'border-[1.5px] border-dashed border-jb-ink bg-jb-subtle' : 'border-jb-line bg-jb-surface')} data-testid={`rule-${rule.id}`} data-origin={rule.origin}>
       <div className="mb-1 flex flex-wrap items-center gap-1">
         <Chip cls={o.cls}>{o.text}</Chip>
         <Chip cls={c.cls}>{c.text}</Chip>
@@ -30,7 +32,7 @@ function RuleItem({ rule }: { rule: Rule }) {
   );
 }
 
-const H = ({ children }: { children: React.ReactNode }) => <h3 className="mb-1.5 mt-5 text-[13px] font-semibold text-[#3a3a3a] first:mt-0">{children}</h3>;
+const H = ({ children }: { children: React.ReactNode }) => <h3 className="mb-1.5 mt-4 text-[12px] font-semibold tracking-[1px] text-jb-muted first:mt-0">{children}</h3>;
 
 const DIAGRAM_STATE: Record<string, string> = { idle: '空闲（idle）', active: '调用中（active）', ok: '成功（ok）', error: '出错（error）', dim: '淡出（dim）' };
 
@@ -62,103 +64,41 @@ export function InspectDrawer({
   const caseIds = [...new Set((targeting.length ? targeting : scs.filter((s) => s.id === selection.scenarioId)).flatMap((s) => s.caseIds))];
   const from = node ? optionOfNode(project, node) : null;
   const at = selection.at;
+  // 当前场景里以它为目标的第一步（“第 1 步的目标”）
+  const curSteps = selection.scenarioId ? (project.scenarios[selection.scenarioId]?.steps ?? []) : [];
+  const stepIdx = node ? curSteps.findIndex((s) => 'target' in s.action && s.action.target === node.id) : -1;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && !(e.target as HTMLElement).closest?.('[data-jb-pop]:not([data-testid="inspect-drawer"])') && onClose();
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [onClose]);
   return (
-    <div className="fixed inset-0 z-40 flex justify-end" data-testid="inspect-drawer-root">
-      <button type="button" aria-label="关闭抽屉" className="absolute inset-0 bg-black/10" onClick={onClose} />
-      <aside role="dialog" aria-label="检查元素" className="relative flex h-full w-[380px] max-w-[92vw] flex-col overflow-y-auto border-l bg-white p-5 shadow-xl" data-testid="inspect-drawer">
+    <div data-testid="inspect-drawer-root">
+      <aside role="dialog" aria-label="检查元素" data-jb-pop="" className="jb-pop fixed bottom-3 right-3 top-[64px] z-40 flex w-[360px] max-w-[92vw] flex-col overflow-y-auto p-4 text-[13px]" data-testid="inspect-drawer">
         <div className="mb-3 flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="text-[12px] text-[#6b6b6b]">检查</div>
-            <div className="truncate text-[18px] font-semibold" data-testid="sel-label">
+            <div className="truncate text-[17px] font-bold" data-testid="sel-label">
               {selection.label ?? selection.nodeId}
             </div>
             {node ? (
-              <div className="mt-0.5 text-[12px] text-[#6b6b6b]" data-testid="sel-type">
+              <div className="mt-0.5 text-[12px] text-jb-muted" data-testid="sel-type">
                 {typeLabel(node.type)} · {from ? `方案 ${shortName(from.name)}` : node.source?.startsWith('layouts/') ? '布局' : node.source?.startsWith('routes/') ? '页面' : '—'}
+                {stepIdx >= 0 ? ` · 第 ${stepIdx + 1} 步的目标` : ''}
               </div>
             ) : null}
           </div>
-          <button type="button" onClick={onClose} aria-label="关闭" data-testid="drawer-close" className="rounded p-1 hover:bg-black/5">
+          <button type="button" onClick={onClose} aria-label="关闭" data-testid="drawer-close" className="jb-focus flex size-7 items-center justify-center rounded-[6px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg">
             <X className="size-4" />
           </button>
         </div>
-
-        {node && node.type.startsWith('Diagram.') ? (
-          <dl className="mb-2 grid grid-cols-[64px_1fr] gap-x-2 gap-y-1 rounded-md bg-[#f8f9fa] px-3 py-2 text-[13px]" data-testid="sel-diagram">
-            {(() => {
-              const p = state && state.sceneId === selection.sceneId ? resolveProps(node, state) : (node.props ?? {});
-              const st = typeof p.state === 'string' ? p.state : 'idle';
-              return (
-                <>
-                  {typeof p.description === 'string' && p.description ? (
-                    <>
-                      <dt className="text-[#6b6b6b]">说明</dt>
-                      <dd data-testid="sel-description">{p.description}</dd>
-                    </>
-                  ) : null}
-                  {node.type === 'Diagram.Edge' ? (
-                    <>
-                      <dt className="text-[#6b6b6b]">连线</dt>
-                      <dd data-testid="sel-endpoints">
-                        {String(p.from)} → {String(p.to)}
-                        {p.async === true ? '（异步）' : ''}
-                      </dd>
-                    </>
-                  ) : null}
-                  {node.type !== 'Diagram.Group' ? (
-                    <>
-                      <dt className="text-[#6b6b6b]">状态</dt>
-                      <dd data-testid="sel-state" data-state={st}>
-                        {DIAGRAM_STATE[st] ?? st}
-                        {typeof node.props?.state === 'string' && node.props.state.startsWith('$') ? <span className="ml-1 font-mono text-[11px] text-[#868e96]">{node.props.state}</span> : null}
-                      </dd>
-                    </>
-                  ) : null}
-                </>
-              );
-            })()}
-          </dl>
-        ) : null}
-        {node?.note ? (
-          <p className="rounded bg-[#fff8ee] px-2 py-1 text-[13px]" data-testid="sel-note">
-            <span className="text-[#8a4700]">设计说明：</span>
-            {node.note}
-          </p>
-        ) : null}
-        {node?.disabledReason ? (
-          <p className="mt-2 rounded bg-[#f4f4f4] px-2 py-1 text-[13px]">
-            <span className="text-[#6b6b6b]">禁用原因：</span>
-            {node.disabledReason}
-          </p>
-        ) : null}
-
-        <H>规则（{rules.length}）</H>
-        {rules.length === 0 ? <p className="text-[13px] text-[#6b6b6b]">没有规则直接关联它。</p> : null}
-        <ul className="flex flex-col gap-1.5" data-testid="sel-rules">
-          {rules.map((r) => (
-            <RuleItem key={r.id} rule={r} />
-          ))}
-        </ul>
-
-        <H>覆盖的情况（{caseIds.length}）</H>
-        <div className="flex flex-wrap gap-1.5" data-testid="sel-cases">
-          {caseIds.length === 0 ? <span className="text-[13px] text-[#6b6b6b]">没有关联的情况。</span> : null}
-          {caseIds.map((c) => (
-            <span key={c} className="rounded-full bg-[#e7f0ff] px-2.5 py-0.5 text-[12px] text-[#1c5fb8]">
-              {project.cases[c]?.title ?? c}
-            </span>
-          ))}
-        </div>
-
-        <H>源码</H>
         {at ? (
-          <div className="flex items-center gap-1 rounded-md border bg-[#fafafa] px-2 py-1">
-            <code className="min-w-0 flex-1 break-all font-mono text-[12px]" data-testid="sel-at">
+          <div className="mb-1 flex items-center gap-1 rounded-[6px] bg-jb-sunken px-2 py-1">
+            <code className="min-w-0 flex-1 break-all font-jb-mono text-[12px]" data-testid="sel-at">
               {at}
             </code>
             <button
               type="button"
-              className="shrink-0 rounded p-1 hover:bg-black/5"
+              className="jb-focus shrink-0 rounded-[4px] p-1 hover:bg-jb-press"
               aria-label="复制位置"
               title="复制 文件:行:列"
               data-testid="copy-at"
@@ -172,28 +112,97 @@ export function InspectDrawer({
                 )
               }
             >
-              {copied ? <Check className="size-3.5 text-[#2b8a3e]" /> : <Copy className="size-3.5" />}
+              {copied ? <Check className="size-3.5 text-jb-ok" /> : <Copy className="size-3.5" />}
             </button>
-            <button type="button" className="shrink-0 rounded p-1 hover:bg-black/5" aria-label="在编辑器中打开" title="在编辑器中打开" data-testid="open-at" onClick={() => onOpenEditor(at)}>
+            <button type="button" className="jb-focus shrink-0 rounded-[4px] p-1 hover:bg-jb-press" aria-label="在编辑器中打开" title="在编辑器中打开" data-testid="open-at" onClick={() => onOpenEditor(at)}>
               <ExternalLink className="size-3.5" />
             </button>
           </div>
         ) : (
-          <p className="text-[12px] text-[#8a8a8a]">（这个元素没有源位置）</p>
+          <p className="mb-1 text-[12px] text-jb-faint">（这个元素没有源位置）</p>
         )}
-        <p className={cn('mt-2 text-[12px] leading-relaxed', sync.status === 'error' ? 'text-[#c92a2a]' : 'text-[#6b6b6b]')} data-testid="selection-sync" data-status={sync.status}>
+
+        {node && node.type.startsWith('Diagram.') ? (
+          <dl className="mb-2 grid grid-cols-[64px_1fr] gap-x-2 gap-y-1 rounded-[8px] bg-jb-subtle px-3 py-2 text-[13px]" data-testid="sel-diagram">
+            {(() => {
+              const p = state && state.sceneId === selection.sceneId ? resolveProps(node, state) : (node.props ?? {});
+              const st = typeof p.state === 'string' ? p.state : 'idle';
+              return (
+                <>
+                  {typeof p.description === 'string' && p.description ? (
+                    <>
+                      <dt className="text-jb-muted">说明</dt>
+                      <dd data-testid="sel-description">{p.description}</dd>
+                    </>
+                  ) : null}
+                  {node.type === 'Diagram.Edge' ? (
+                    <>
+                      <dt className="text-jb-muted">连线</dt>
+                      <dd data-testid="sel-endpoints">
+                        {String(p.from)} → {String(p.to)}
+                        {p.async === true ? '（异步）' : ''}
+                      </dd>
+                    </>
+                  ) : null}
+                  {node.type !== 'Diagram.Group' ? (
+                    <>
+                      <dt className="text-jb-muted">状态</dt>
+                      <dd data-testid="sel-state" data-state={st}>
+                        {DIAGRAM_STATE[st] ?? st}
+                        {typeof node.props?.state === 'string' && node.props.state.startsWith('$') ? <span className="ml-1 font-mono text-[11px] text-jb-faint">{node.props.state}</span> : null}
+                      </dd>
+                    </>
+                  ) : null}
+                </>
+              );
+            })()}
+          </dl>
+        ) : null}
+        {node?.note ? (
+          <p className="rounded bg-jb-selected px-2 py-1 text-[13px]" data-testid="sel-note">
+            <span className="text-jb-fg font-semibold">设计说明：</span>
+            {node.note}
+          </p>
+        ) : null}
+        {node?.disabledReason ? (
+          <p className="mt-2 rounded bg-jb-sunken px-2 py-1 text-[13px]">
+            <span className="text-jb-muted">禁用原因：</span>
+            {node.disabledReason}
+          </p>
+        ) : null}
+
+        <H>规则（{rules.length}）</H>
+        {rules.length === 0 ? <p className="text-[13px] text-jb-muted">没有规则直接关联它。</p> : null}
+        <ul className="flex flex-col gap-1.5" data-testid="sel-rules">
+          {rules.map((r) => (
+            <RuleItem key={r.id} rule={r} />
+          ))}
+        </ul>
+
+        <H>覆盖的情况（{caseIds.length}）</H>
+        <div className="flex flex-wrap gap-1.5" data-testid="sel-cases">
+          {caseIds.length === 0 ? <span className="text-[13px] text-jb-muted">没有关联的情况。</span> : null}
+          {caseIds.map((c) => (
+            <span key={c} className="rounded-full bg-jb-sunken px-2.5 py-0.5 text-[12px] text-jb-fg">
+              {project.cases[c]?.title ?? c}
+            </span>
+          ))}
+        </div>
+
+        <p className={cn('mt-4 flex items-start gap-1.5 text-[12px] leading-relaxed', sync.status === 'error' ? 'text-jb-danger' : 'text-jb-muted')} data-testid="selection-sync" data-status={sync.status}>
+          <span aria-hidden className={cn('mt-[5px] size-2 shrink-0 rounded-full', sync.status === 'error' ? 'bg-jb-danger' : sync.status === 'pending' ? 'bg-jb-accent-press' : 'bg-jb-ok')} />
           {sync.status === 'error'
             ? `写入失败：${sync.message}`
             : sync.status === 'pending'
               ? '正在写入 .joplo/selection.json…'
-              : '已写入 .joplo/selection.json：在 Agent 会话里说要改什么，Agent 运行 npx joplo selection 就只改这一处。'}
+              : '已写入 .joplo/selection.json · Agent 运行 npx joplo selection 即可读取，只改这一处'}
         </p>
 
-        <div className="mt-auto flex justify-between pt-6">
-          <button type="button" onClick={onClear} className="rounded-md border px-3 py-1.5 text-[13px] hover:bg-black/5" data-testid="clear-selection">
+        <div className="mt-auto flex justify-between pt-5">
+          <button type="button" onClick={onClear} className="jb-focus h-8 rounded-[6px] border border-jb-line bg-jb-surface px-3 text-[13px] hover:bg-jb-hover" data-testid="clear-selection">
             取消选中
           </button>
-          <button type="button" onClick={onClose} className="rounded-md bg-[#1e1e1e] px-3 py-1.5 text-[13px] text-white">
+          <button type="button" onClick={onClose} className="jb-focus h-8 rounded-[6px] bg-jb-inverse px-3 text-[13px] text-jb-on-inverse hover:bg-jb-inverse-hover">
             继续演示
           </button>
         </div>

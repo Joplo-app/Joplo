@@ -1,7 +1,7 @@
 /**
  * v2 接口（ADR-0002）：CLI 只依赖这里导出的三个函数。由 T-board 实现，届时 index.ts 改为导出它们。
  */
-import type { Diagnostic } from '@joplo-app/core';
+import type { AppearanceFont, AppearanceStroke, Diagnostic } from '@joplo-app/core';
 
 export type DevOptions = {
   projectDir: string;
@@ -35,6 +35,10 @@ export type RenderOptions = {
   stepId?: string;
   /** 主题名（D51）：内置主题或项目 themes/<name>.css；缺省用项目配置的主题。 */
   theme?: string;
+  /** 字体（D55）：hand / sans / serif / kai / mono；缺省跟随主题。 */
+  font?: AppearanceFont | null;
+  /** 线条（D55）：rough / clean；缺省跟随主题。 */
+  stroke?: AppearanceStroke | null;
   out: string;
   overwrite?: boolean;
   /** 截图尺寸（D44）：舞台宽度仍是页面自己的 viewport，按比例放进这个尺寸。缺省为舞台尺寸。 */

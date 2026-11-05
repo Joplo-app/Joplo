@@ -1,46 +1,87 @@
 /**
- * 看板首页（D39，home 方案 A“记住打开过的项目”）：
- * - 左栏：最近打开的项目（~/.joplo/projects.json，按最近打开排序）；编译出错显示错误数，目录不存在显示“找不到目录”。
- * - 右侧：所选项目的功能行（名称、目标、方案数、选定方案、缺口数、「查看」）；
+ * 看板首页（D39 home 方案 A“记住打开过的项目”，D55「首页」）：
+ * - 左栏：最近打开的项目（~/.joplo/projects.json，按最近打开排序），名字 + 缩写的路径；编译出错写错误数，目录不存在写“找不到”；
+ *   ↑↓ 移动选中；底部“添加项目：在项目目录里运行 npx joplo dev”（可复制）。
+ * - 右侧：项目名、说明、路径与“N 个功能 · 已选定 a / n”、右上角编译状态；功能卡片整张可点（Enter 也可以），带缩略图
+ *   （Stage 的 render 模式渲染选定方案第一个场景的初始画面，进入视口才渲染）、选定方案、方案数和覆盖小结。
  *   编译出错时列出 `文件:行` 与说明（修好后自动刷新）；目录不存在时可以从列表移除（只删记录，不删文件）。
- * - 没有任何项目时：三条开始命令。
+ * - 没有任何项目时：标志、一句话、三条可复制的开始命令。
+ * 视图计算在 home-model.ts。
  */
-import { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { ArrowRight, Copy, FolderX } from 'lucide-react';
 import type { Diagnostic, Project } from '@joplo-app/core';
 import { removeProject, type ProjectSummary } from '../runtime/dev-client';
-import { optionsOf } from '../runtime/views';
 import { Brand, TopBar } from '../player/PlayerPage';
+import { JoploMark } from '../player/JoploMark';
+import { Btn } from '../player/controls';
+import { StatusIcon } from '../player/StatusIcon';
+import { copyText } from '../player/util';
+import { StageThumb } from '../player/StageThumb';
+import { ThemeStyles } from '../renderer/ThemeStyles';
+import { themeCatalog } from '../renderer/themes';
 import { cn } from '@/lib/utils';
-import { gapsOf } from './CaseNav';
 import { useProjectIR } from './hooks';
+import { useBoardSettings } from './useSettings';
+import { effectiveAppearance } from './appearance-model';
+import { featureCard, moveSelection, projectBadge, projectMeta, shortPath, type FeatureCard } from './home-model';
 
-const tilde = (dir: string) => dir.replace(/^\/(Users|home)\/[^/]+/, '~');
-
-function describe(p: ProjectSummary): { text: string; tone: 'muted' | 'error' | 'gone' } {
-  if (p.status === 'missing') return { text: `找不到目录 · ${tilde(p.dir)}`, tone: 'gone' };
-  if (p.status === 'error') return { text: `${p.errors} 个错误 · ${tilde(p.dir)}`, tone: 'error' };
-  return { text: tilde(p.dir), tone: 'muted' };
-}
-
-export function Home({ projects, error, selectedId, onSelect, onView, onSettings }: { projects: ProjectSummary[] | null; error: string | null; selectedId: string | null; onSelect: (id: string) => void; onView: (projectId: string, featureId: string) => void; onSettings?: () => void }) {
+export function Home({
+  projects,
+  error,
+  selectedId,
+  onSelect,
+  onView,
+  right,
+  flash,
+  onFlash,
+}: {
+  projects: ProjectSummary[] | null;
+  error: string | null;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onView: (projectId: string, featureId: string, optionId?: string) => void;
+  /** 顶栏右侧（外观按钮，D55）。 */
+  right?: ReactNode;
+  flash?: ReactNode | null;
+  onFlash?: (msg: string) => void;
+}) {
   const selected = projects?.find((p) => p.id === selectedId) ?? null;
+  const listRef = useRef<HTMLUListElement>(null);
+  const copy = (text: string) => void copyText(text).then((ok) => onFlash?.(ok ? `已复制 ${text}` : '无法访问剪贴板'));
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const next = moveSelection(projects ?? [], selectedId, e.key === 'ArrowDown' ? 1 : -1);
+    if (!next) return;
+    onSelect(next);
+    requestAnimationFrame(() => listRef.current?.querySelector<HTMLElement>(`[data-testid="home-project-${CSS.escape(next)}"]`)?.focus());
+  };
   return (
-    <div className="flex h-full flex-col bg-[#f8f9fa]" data-testid="home">
-      <TopBar>
+    <div className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="home">
+      <TopBar right={right}>
         <Brand />
       </TopBar>
       {error ? (
-        <div role="alert" className="border-b border-[#c92a2a] bg-[#fff0f0] px-4 py-2 text-[13px] text-[#a51d1d]" data-testid="load-error">
+        <div role="alert" className="border-b border-jb-danger bg-jb-danger-bg px-4 py-2 text-[13px] text-jb-danger" data-testid="load-error">
           {error}
         </div>
       ) : null}
+      {flash ? (
+        <div role="status" className="jb-tip fixed left-1/2 top-16 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-2 text-[13px]" data-testid="flash">
+          {flash}
+        </div>
+      ) : null}
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r bg-white p-3" data-testid="project-list">
-          <div className="px-2 text-[12px] text-[#6b6b6b]">最近打开</div>
-          <ul className="mt-1 flex flex-col gap-0.5">
+        <aside className="flex w-[276px] shrink-0 flex-col border-r border-jb-line bg-jb-surface px-3 py-4" data-testid="project-list">
+          <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
+            <span className="font-semibold tracking-[1px] text-jb-muted">项目</span>
+            <span className="text-jb-faint">最近打开</span>
+          </div>
+          <ul ref={listRef} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto" onKeyDown={onKey} aria-label="最近打开的项目">
             {(projects ?? []).map((p) => {
-              const d = describe(p);
+              const badge = projectBadge(p);
+              const on = p.id === selectedId;
               return (
                 <li key={p.id}>
                   <button
@@ -48,41 +89,57 @@ export function Home({ projects, error, selectedId, onSelect, onView, onSettings
                     onClick={() => onSelect(p.id)}
                     data-testid={`home-project-${p.id}`}
                     data-status={p.status}
-                    className={cn('w-full rounded-md px-3 py-2 text-left hover:bg-[#f1f3f5]', p.id === selectedId && 'bg-[#e7f0ff] hover:bg-[#e7f0ff]')}
+                    aria-current={on ? 'true' : undefined}
+                    className={cn('jb-focus flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-left', on ? 'bg-jb-selected' : 'hover:bg-jb-hover active:bg-jb-press')}
                   >
-                    <div className={cn('truncate text-[14px]', p.id === selectedId && 'font-semibold', p.status === 'missing' && 'text-[#868e96]')}>{p.name}</div>
-                    <div className={cn('truncate text-[12px]', d.tone === 'error' ? 'text-[#c92a2a]' : 'text-[#868e96]')} title={p.dir}>
-                      {d.text}
-                    </div>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className={cn('truncate text-[14px]', on && 'font-semibold', p.status === 'missing' && 'text-jb-faint')}>{p.name}</span>
+                      <span className="truncate font-jb-mono text-[11px] text-jb-faint" title={p.dir}>
+                        {shortPath(p.dir)}
+                      </span>
+                    </span>
+                    {badge ? <span className={cn('shrink-0 rounded-[4px] px-1.5 py-px text-[11px] font-medium', badge.tone === 'danger' ? 'bg-jb-danger-bg text-jb-danger' : 'bg-jb-sunken text-jb-faint')}>{badge.text}</span> : null}
                   </button>
                 </li>
               );
             })}
           </ul>
-          <div className="mx-2 mt-3 border-t pt-3 text-[12px] leading-relaxed text-[#868e96]">在任意项目目录运行 npx joplo dev，它就会出现在这里。</div>
-          {onSettings ? (
-            // 设置入口（D51）：主题等看板设置
-            <button type="button" onClick={onSettings} data-testid="home-settings" className="mt-auto flex h-9 items-center gap-2 whitespace-nowrap rounded-md px-3 text-left text-[14px] text-[#495057] hover:bg-[#f1f3f5]">
-              <Settings className="size-4" aria-hidden />
-              设置 · 主题
-            </button>
-          ) : null}
+          <div className="mt-3 flex flex-col gap-2 rounded-[10px] bg-jb-app p-3" data-testid="home-add">
+            <span className="text-[12px] text-jb-muted">添加项目：在项目目录里运行</span>
+            <CopyLine text="npx joplo dev" onCopy={copy} />
+          </div>
         </aside>
-        <main className="min-w-0 flex-1 overflow-y-auto p-8">
-          {projects && projects.length === 0 ? <Empty /> : selected ? <ProjectPanel key={selected.id} summary={selected} onView={onView} /> : null}
+        <main className="min-w-0 flex-1 overflow-y-auto px-10 py-8">
+          {projects && projects.length === 0 ? <Empty onCopy={copy} /> : selected ? <ProjectPanel key={selected.id} summary={selected} onView={onView} /> : null}
         </main>
       </div>
     </div>
   );
 }
 
-function Empty() {
+function CopyLine({ text, onCopy }: { text: string; onCopy: (text: string) => void }) {
   return (
-    <div className="mx-auto mt-[12vh] flex max-w-[520px] flex-col items-center gap-3 text-center" data-testid="home-empty">
-      <h2 className="text-[22px] font-semibold">还没有打开过项目</h2>
-      <p className="text-[14px] text-[#6b6b6b]">在一个空目录里运行：</p>
-      <pre className="w-full rounded-lg bg-[#f1f3f5] px-4 py-3 text-left font-mono text-[13px] leading-relaxed">{'npx joplo init my-demo\ncd my-demo && npm install\nnpx joplo dev'}</pre>
-      <p className="text-[13px] text-[#868e96]">打开过的项目会记在 ~/.joplo/projects.json，下次直接出现在左栏。</p>
+    <div className="flex h-8 items-center gap-2 rounded-[6px] border border-jb-line bg-jb-surface pl-2.5 pr-1">
+      <code className="min-w-0 flex-1 truncate font-jb-mono text-[12px]">{text}</code>
+      <button type="button" className="jb-focus flex size-6 shrink-0 items-center justify-center rounded-[4px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg" aria-label={`复制 ${text}`} onClick={() => onCopy(text)}>
+        <Copy className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
+/** 首页空状态：标志、一句话、三条可复制的命令；不放插画。 */
+function Empty({ onCopy }: { onCopy: (text: string) => void }) {
+  return (
+    <div className="mx-auto mt-[12vh] flex max-w-[440px] flex-col items-center gap-4 text-center" data-testid="home-empty">
+      <JoploMark size={56} />
+      <h2 className="text-[20px] font-bold">还没有打开过项目</h2>
+      <div className="flex w-full flex-col gap-1.5 rounded-[10px] border border-jb-line bg-jb-surface p-3">
+        {['npx joplo init my-demo', 'cd my-demo && npm install', 'npx joplo dev'].map((c) => (
+          <CopyLine key={c} text={c} onCopy={onCopy} />
+        ))}
+      </div>
+      <p className="text-[12px] text-jb-faint">打开过的项目会记在 ~/.joplo/projects.json，下次直接出现在左栏。</p>
     </div>
   );
 }
@@ -90,13 +147,15 @@ function Empty() {
 function Errors({ list, note }: { list: Diagnostic[]; note: string }) {
   const errors = list.filter((d) => d.severity === 'error');
   return (
-    <div role="alert" className="rounded-lg border border-[#ffc9c9] bg-[#fff5f5] p-4" data-testid="home-errors">
-      <div className="text-[15px] font-semibold text-[#c92a2a]">编译失败（{errors.length}），{note}</div>
+    <div role="alert" className="rounded-[8px] border-l-4 border-jb-danger bg-jb-danger-bg px-4 py-3" data-testid="home-errors">
+      <div className="text-[14px] font-semibold text-jb-danger">
+        编译出错 {errors.length} 处 · {note}
+      </div>
       <ul className="mt-2 flex flex-col gap-1 text-[13px]">
         {errors.slice(0, 30).map((d, i) => (
           <li key={i} className="flex gap-3" data-testid="home-error-item">
-            <code className="shrink-0 font-mono font-semibold text-[#a51d1d]">{d.at ?? '（无位置）'}</code>
-            <span className="whitespace-pre-wrap break-all text-[#3a3a3a]">{d.message}</span>
+            <code className="shrink-0 font-jb-mono text-[12px] font-semibold">{d.at ?? '（无位置）'}</code>
+            <span className="whitespace-pre-wrap break-all text-jb-muted">{d.message}</span>
           </li>
         ))}
       </ul>
@@ -104,80 +163,123 @@ function Errors({ list, note }: { list: Diagnostic[]; note: string }) {
   );
 }
 
-function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (projectId: string, featureId: string) => void }) {
+function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (projectId: string, featureId: string, optionId?: string) => void }) {
   const ir = useProjectIR(summary.status === 'missing' ? null : summary.id);
   const [removeError, setRemoveError] = useState<string | null>(null);
-  if (summary.status === 'missing')
-    return (
-      <div className="max-w-[720px] rounded-lg border bg-white p-5" data-testid="home-missing">
-        <h2 className="text-[17px] font-semibold">找不到项目目录</h2>
-        <p className="mt-2 text-[14px] text-[#3a3a3a]">
-          <code className="font-mono">{tilde(summary.dir)}</code> 已不存在。目录移动过的话，在新位置运行 npx joplo dev 就会重新加入。
-        </p>
-        <button
-          type="button"
-          className="mt-4 rounded-md border px-3 py-1.5 text-[13px] hover:bg-black/5"
-          data-testid="remove-project"
-          onClick={() => void removeProject(summary.id).then((r) => setRemoveError(r.ok ? null : r.message))}
-        >
-          从列表移除
-        </button>
-        <p className="mt-2 text-[12px] text-[#868e96]">只删除这条记录，不会删除任何文件。</p>
-        {removeError ? <p className="mt-2 text-[13px] text-[#c92a2a]">{removeError}</p> : null}
-      </div>
-    );
+  const { settings } = useBoardSettings();
   const p = ir.payload;
   const project = p?.project ?? null;
-  if (!p) return <div className="text-[14px] text-[#6b6b6b]">{ir.error ?? '正在编译项目…'}</div>;
-  return (
-    <div className="flex max-w-[960px] flex-col gap-5" data-testid="home-project">
-      <div>
-        <h1 className="text-[24px] font-semibold" data-testid="project-name">
-          {project?.name ?? summary.name}
-        </h1>
-        {project?.description ? <p className="mt-1 text-[14px] text-[#6b6b6b]">{project.description}</p> : null}
+  const key = JSON.stringify(project?.themes ?? {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const names = useMemo(() => themeCatalog(project?.themes ?? {}).map((t) => t.name), [key]);
+  if (summary.status === 'missing')
+    return (
+      <div className="flex max-w-[640px] flex-col gap-3 rounded-[10px] border border-jb-line bg-jb-surface p-5" data-testid="home-missing">
+        <h2 className="flex items-center gap-2 text-[17px] font-bold">
+          <FolderX className="size-5 text-jb-muted" aria-hidden />
+          找不到这个项目的目录
+        </h2>
+        <p className="text-[14px]">
+          <code className="font-jb-mono text-[13px]">{summary.dir}</code> 已不存在。目录移动过的话，在新位置运行 npx joplo dev 就会重新加入。
+        </p>
+        <div>
+          <Btn label="从列表移除" onClick={() => void removeProject(summary.id).then((r) => setRemoveError(r.ok ? null : r.message))} data-testid="remove-project" />
+        </div>
+        <p className="text-[12px] text-jb-faint">只删除这条记录，不会删除任何文件。</p>
+        {removeError ? <p className="text-[13px] text-jb-danger">{removeError}</p> : null}
       </div>
+    );
+  if (!p) return <div className="text-[14px] text-jb-muted">{ir.error ?? '正在编译项目…'}</div>;
+  // 缩略图用这个项目自己的外观（D55：本项目 > 所有项目 > 项目 config）
+  const look = project ? effectiveAppearance(settings, summary.id, project.theme ?? 'sketch', names) : null;
+  const status = !p.ok ? { dot: 'bg-jb-danger', text: `编译出错 ${p.diagnostics.filter((d) => d.severity === 'error').length} 处` } : ir.live ? { dot: 'bg-jb-ok', text: '已编译 · 热更新中' } : { dot: 'bg-jb-ok', text: '已编译' };
+  return (
+    <div className="flex max-w-[1120px] flex-col gap-5" data-testid="home-project">
+      {project ? <ThemeStyles themes={project.themes} /> : null}
+      <header className="flex items-start gap-6">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[24px] font-bold leading-8" data-testid="project-name">
+            {project?.name ?? summary.name}
+          </h1>
+          {project?.description ? <p className="mt-1.5 max-w-[860px] text-[14px] leading-[22px] text-jb-muted">{project.description}</p> : null}
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]">
+            <code className="font-jb-mono text-jb-faint">{summary.dir.replace(/^\/(Users|home)\/[^/]+/, '~')}</code>
+            {project ? <span className="text-jb-muted">{projectMeta(project)}</span> : null}
+          </div>
+        </div>
+        <span className="flex shrink-0 items-center gap-1.5 pt-2 text-[12px] text-jb-muted" data-testid="project-status">
+          <span aria-hidden className={cn('size-2 rounded-full', status.dot)} />
+          {status.text}
+        </span>
+      </header>
       {!p.ok ? <Errors list={p.diagnostics} note={project ? '下面仍是上一次成功的结果；修复后自动刷新' : '修复后自动刷新'} /> : null}
-      {project ? <Features project={project} onView={(f) => onView(summary.id, f)} /> : null}
+      {project && look ? <Features project={project} look={look} onView={(f, o) => onView(summary.id, f, o)} /> : null}
     </div>
   );
 }
 
-function Features({ project, onView }: { project: Project; onView: (featureId: string) => void }) {
-  const features = Object.values(project.features);
-  const picked = features.filter((f) => f.pick).length;
+function Features({ project, look, onView }: { project: Project; look: ReturnType<typeof effectiveAppearance>; onView: (featureId: string, optionId?: string) => void }) {
+  const cards = Object.keys(project.features)
+    .map((id) => featureCard(project, id))
+    .filter((c): c is FeatureCard => !!c);
+  if (!cards.length) return <p className="text-[14px] text-jb-muted">还没有功能。在 features/&lt;名称&gt;/feature.ts 里写第一个功能。</p>;
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-[17px] font-semibold">功能</h2>
-        <span className="text-[13px] text-[#868e96]">
-          {location.host} · 已选定 {picked} / {features.length}
-        </span>
-      </div>
-      {features.length === 0 ? <p className="text-[14px] text-[#6b6b6b]">还没有功能。在 features/&lt;名称&gt;/feature.ts 里写第一个功能。</p> : null}
-      {features.map((f) => {
-        const options = optionsOf(project, f.id);
-        const pick = f.pick ? project.options[f.pick] : null;
-        const gaps = gapsOf(project, pick?.id ?? options[0]?.id ?? null);
-        return (
-          <div key={f.id} className="flex items-center justify-between gap-4 rounded-lg border bg-white p-4" data-testid={`feature-${f.id}`}>
-            <div className="min-w-0">
-              <div className="text-[15px] font-semibold">{f.name}</div>
-              <div className="mt-0.5 text-[13px] text-[#6b6b6b]">{f.goal}</div>
-              <div className="mt-2 flex flex-wrap gap-1.5 text-[12px]">
-                <span className="rounded-full bg-[#f1f3f5] px-2.5 py-0.5">{options.length} 个方案</span>
-                <span className="rounded-full bg-[#e7f0ff] px-2.5 py-0.5 text-[#1c5fb8]">{pick ? `已选 ${pick.name}` : '还没有选定方案'}</span>
-                <span className={cn('rounded-full px-2.5 py-0.5', gaps.missing + gaps.undecided ? 'bg-[#fff0f0] text-[#c92a2a]' : 'bg-[#effaf1] text-[#2b8a3e]')} data-testid={`feature-gaps-${f.id}`}>
-                  缺失 {gaps.missing} · 待决定 {gaps.undecided}
-                </span>
-              </div>
-            </div>
-            <button type="button" onClick={() => onView(f.id)} disabled={options.length === 0} className="shrink-0 rounded-md border bg-white px-4 py-2 text-[14px] hover:bg-[#f8f9fa] disabled:opacity-40" data-testid={`view-${f.id}`}>
-              查看
-            </button>
-          </div>
-        );
-      })}
+    <section className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2" data-testid="home-features">
+      {cards.map((c) => (
+        <FeatureCardView key={c.id} project={project} card={c} look={look} onOpen={() => c.open && onView(c.open.featureId, c.open.optionId)} />
+      ))}
     </section>
+  );
+}
+
+/** 功能卡片（整张可点）：缩略图 + 名字 + 目标 + 选定方案、方案数、覆盖小结。 */
+function FeatureCardView({ project, card, look, onOpen }: { project: Project; card: FeatureCard; look: ReturnType<typeof effectiveAppearance>; onOpen: () => void }) {
+  const disabled = !card.open;
+  return (
+    // 整张可点：一个盖住整张卡片的按钮（缩略图里的舞台也有按钮，不能把卡片本身做成 button）
+    <div data-testid={`feature-${card.id}`} className={cn('group relative flex flex-col overflow-hidden rounded-[10px] border bg-jb-surface text-left has-[[data-card-open]:focus-visible]:border-jb-ink', disabled ? 'border-dashed border-jb-line' : 'border-jb-line hover:border-jb-ink hover:shadow-[var(--jb-e1)]')}>
+      {!disabled ? <button type="button" data-card-open="" onClick={onOpen} aria-label={`打开「${card.name}」的演示`} data-testid={`open-${card.id}`} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" /> : null}
+      <StageThumb project={project} scenarioId={card.thumb?.scenarioId ?? null} sceneId={card.thumb?.sceneId ?? null} look={look} testid={`thumb-${card.id}`} />
+      <div className="flex flex-col gap-1.5 border-t border-jb-line px-4 pb-4 pt-3">
+        <div className="flex items-center gap-3">
+          <span className="min-w-0 flex-1 truncate text-[17px] font-bold">{card.name}</span>
+          {!disabled ? (
+            <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold opacity-0 transition-opacity group-hover:opacity-100 group-has-[[data-card-open]:focus-visible]:opacity-100" data-testid={`view-${card.id}`}>
+              打开演示
+              <ArrowRight className="size-4" aria-hidden />
+            </span>
+          ) : null}
+        </div>
+        <p className="line-clamp-2 text-[13px] leading-5 text-jb-muted">{card.goal}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px]" data-testid={`feature-gaps-${card.id}`}>
+          {card.pick ? (
+            <span className="rounded-[4px] bg-jb-inverse px-1.5 py-px text-[11px] font-medium text-jb-on-inverse">
+              ✓ {card.pick.letter} · {card.pick.title}
+            </span>
+          ) : (
+            <span className="rounded-[4px] border border-jb-line px-1.5 py-px text-[11px] text-jb-muted">还没选定方案</span>
+          )}
+          <span className="text-jb-muted">{card.optionCount} 个方案</span>
+          {card.coverage.allExpressed ? (
+            <span className="inline-flex items-center gap-1 text-jb-ok">
+              <StatusIcon status="expressed" size={13} />
+              情况都已表达
+            </span>
+          ) : null}
+          {card.coverage.missing ? (
+            <span className="inline-flex items-center gap-1 text-jb-danger">
+              <StatusIcon status="missing" size={13} />
+              缺失 {card.coverage.missing}
+            </span>
+          ) : null}
+          {card.coverage.undecided ? (
+            <span className="inline-flex items-center gap-1 text-jb-muted">
+              <StatusIcon status="undecided" size={13} />
+              待决定 {card.coverage.undecided}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }

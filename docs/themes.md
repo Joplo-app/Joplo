@@ -16,9 +16,27 @@
 | kraft | 牛皮纸 | rough |
 | contrast | 高对比 | clean |
 
-在看板首页「设置 · 主题」中预览缩略图，并选择用于当前项目或所有项目。当前项目可恢复为 config 默认；本机选择保存到 `~/.joplo/settings.json`（或 JOPLO_HOME 下），不改作者文件。
+## 看板外观：配色、字体、线条（D55）
 
-看板优先级是：项目覆盖 > 全局选择 > config 默认。项目覆盖为 null 表示明确使用 config 默认，即使存在全局选择也如此。发布站使用 config 默认；CLI render 的 theme 参数优先于 config。
+看板顶栏的「外观」（或按 `T`）打开外观浮层，配色、字体和线条分开选：
+
+| 组 | 选项 | 说明 |
+| --- | --- | --- |
+| 配色 | 主题名（上表 + 作者主题） | sketch 与 clean 配色相同，合并为一格「纸白」，从别的配色点它时写 sketch；作者主题标 `*`；最后一格「+ 自定义」复制一份主题模板 |
+| 字体 | 跟随主题 / 手写 / 黑体 / 宋体 / 楷体 / 等宽 | 画面和字幕一起换。手写是已打包的 Excalifont + 小赖，其余用本机字体，不额外下载 |
+| 线条 | 手绘（rough）/ 直线（clean）/ 跟随主题 | 跟随主题时由主题的 `--jp-stroke` 决定 |
+
+点一下立即应用并保存；悬停 150ms 临时预览，移开恢复；方向键移动、Enter 应用、Esc 关闭并撤掉预览。演示页里的选择只改当前项目；首页的「外观」改所有项目的默认。「恢复项目默认」回到 joplo.config.ts 的主题（字体、线条跟随主题）；「设为所有项目的默认」把当前这套外观写成默认，单独设置过的其他项目不受影响。
+
+选择保存在本机 `~/.joplo/settings.json`（或 `JOPLO_HOME` 下），不改作者文件：
+
+```json
+{ "version": 1, "theme": "nord", "font": "hand", "projects": { "<项目 id>": { "theme": null, "stroke": "clean" } } }
+```
+
+每个字段分别按“本项目 > 所有项目 > 项目 config”取值。值为 null 也算写过：`theme: null` 表示用 config 的主题，`font` / `stroke` 为 null 表示跟随主题，即使“所有项目”另有选择也如此。只有 `theme` 的旧文件照常读取；看板进程会丢弃不认识的字体、线条和不合法的主题名，主题文件被删掉时回到 config 的主题。
+
+字体和线条只影响本机看板和导出的图片、视频（导出请求带上 `font`、`stroke`，渲染路由同样应用）。**发布站不支持字体和线条**：joplo.config.ts 仍只有 `theme`，发布站只用它的配色。浮层底部的「复制 theme」复制一行 `theme: 'nord',`，粘进 config 后发布站也用这套配色。CLI `render` 的 `--theme` 参数优先于 config；`renderStep` 的 `font` / `stroke` 缺省时跟随主题。
 
 ## 作者主题
 
@@ -44,7 +62,7 @@ import { config } from '@joplo-app/kit';
 export default config({ name: 'My demo', layout: 'app', theme: 'brand' });
 ```
 
-保存 CSS 后看板预览与演示热更新；build 将作者 CSS 写入发布 IR。load 读取文件 → IR 的 themes/name→CSS → 渲染器限定选择器范围 → 舞台与字幕消费变量；默认选择由 config.theme 保存，设置页的本机覆盖另存 settings.json。
+保存 CSS 后看板预览与演示热更新；build 将作者 CSS 写入发布 IR。load 读取文件 → IR 的 themes/name→CSS → 渲染器限定选择器范围 → 舞台与字幕消费变量；默认选择由 config.theme 保存，看板外观浮层的本机覆盖另存 settings.json。
 
 ## 全部 CSS 变量
 

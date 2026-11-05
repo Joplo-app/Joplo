@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { THEME_NAME, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke } from '@joplo-app/core';
 
 export type ProjectRecord = { dir: string; name: string; lastOpened: string };
 export type ServerInfo = { port: number; pid: number; token: string };
@@ -137,27 +138,40 @@ export function pidAlive(pid: number): boolean {
   }
 }
 
-// ---------- 看板设置（D51）：<JOPLO_HOME>/settings.json ----------
+// ---------- 看板设置（D51 / D55）：<JOPLO_HOME>/settings.json ----------
 /**
- * `{ version: 1, theme?: string | null, projects?: { [项目 id]: { theme: string | null } } }`
- * theme：所有项目的主题选择；projects[id].theme：按项目覆盖，null 表示“恢复为项目默认”（使用项目 config 里的主题）。
- * 写入点：看板设置页（PUT /__joplo/settings）；读取点：看板演示页与设置页（GET /__joplo/settings）。原子写入。
+ * `{ version: 1, theme?, font?, stroke?, projects?: { [项目 id]: { theme?, font?, stroke? } } }`
+ * - theme：主题名（内置或作者 themes/<name>.css）；font：hand | sans | serif | kai | mono；stroke：rough | clean。
+ * - 顶层是“所有项目”的选择；projects[id] 按项目覆盖。值为 null：theme = 恢复为项目 config 的主题，font / stroke = 跟随主题。
+ * - 字段不存在 = 没有设置（项目条目里没有就看顶层，顶层没有就看项目 config / 主题）。
+ * 写入点：看板外观浮层（PUT /__joplo/settings）；存储：这里（校验后原子写入）；读取点：看板（GET /__joplo/settings →
+ * useBoardSettings → effectiveAppearance）；消费者：舞台、字幕、手机外框、导出图片与视频。
+ * 只有 theme 的旧文件照常读取。发布站不读它（joplo.config.ts 只有 theme）。
  */
-export type BoardSettings = { version: 1; theme?: string | null; projects?: Record<string, { theme: string | null }> };
-const NAME = /^[A-Za-z][\w-]*$/;
+export type AppearanceOverride = { theme?: string | null; font?: AppearanceFont | null; stroke?: AppearanceStroke | null };
+export type BoardSettings = { version: 1 } & AppearanceOverride & { projects?: Record<string, AppearanceOverride> };
 
-/** 校验并规范化设置（未知字段丢弃，主题名不合法的条目丢弃）。 */
+/** 一组外观字段：只留合法值（null 合法），其余丢弃。 */
+function normalizeAppearance(o: Record<string, unknown>): AppearanceOverride {
+  const out: AppearanceOverride = {};
+  if (o.theme === null || (typeof o.theme === 'string' && THEME_NAME.test(o.theme))) out.theme = o.theme as string | null;
+  if (o.font === null || isAppearanceFont(o.font)) out.font = o.font as AppearanceFont | null;
+  if (o.stroke === null || isAppearanceStroke(o.stroke)) out.stroke = o.stroke as AppearanceStroke | null;
+  return out;
+}
+
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** 校验并规范化设置（未知字段丢弃，不合法的值丢弃，没有合法字段的项目条目丢弃）。任何输入都不抛错。 */
 export function normalizeSettings(v: unknown): BoardSettings {
-  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
-  const out: BoardSettings = { version: 1 };
-  if (typeof o.theme === 'string' && NAME.test(o.theme)) out.theme = o.theme;
-  else if (o.theme === null) out.theme = null;
-  const projects = o.projects && typeof o.projects === 'object' ? (o.projects as Record<string, unknown>) : {};
-  const p: Record<string, { theme: string | null }> = {};
+  const o: Record<string, unknown> = isObj(v) ? v : {};
+  const out: BoardSettings = { version: 1, ...normalizeAppearance(o) };
+  const projects = isObj(o.projects) ? o.projects : {};
+  const p: Record<string, AppearanceOverride> = {};
   for (const [id, x] of Object.entries(projects)) {
-    if (!/^[\w-]{1,64}$/.test(id) || !x || typeof x !== 'object') continue;
-    const t = (x as { theme?: unknown }).theme;
-    if (t === null || (typeof t === 'string' && NAME.test(t))) p[id] = { theme: t };
+    if (!/^[\w-]{1,64}$/.test(id) || !isObj(x)) continue;
+    const a = normalizeAppearance(x);
+    if (Object.keys(a).length) p[id] = a;
   }
   if (Object.keys(p).length) out.projects = p;
   return out;

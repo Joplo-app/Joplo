@@ -1,38 +1,125 @@
 /**
- * 演示页左栏（看板，D39 方案 B“按情况分组”）：
- * - 顶部：功能名 · 当前方案，SegmentedControl 切换方案（情况保持不变）；
- * - 情况列表：每条标出各方案的状态（✓ / 缺失 / 待决定 / 不适用）；点一条就播放当前方案里覆盖它的场景，
- *   同一个场景覆盖多个情况时会出现在多行；
- * - 没有关联情况的场景单独列出；
- * - 底部：当前方案的缺口总数。
+ * 演示页左栏（看板，D55「演示页 · 默认」）：
+ * - 方案：字母块 + 名字 + “✓ 已选定 · 缺失 3 · 待决定 1”；点一下切换方案（情况保持）。悬停卡片写思路和取舍。
+ * - 情况：当前方案的状态图标 + 标题（最多两行）+ 其他方案的小标（字母 + 状态图标，悬停写“B：缺失”，点一下切到 B 看同一个情况）。
+ *   悬停卡片列出每个方案的状态和原因，点方案名直接切过去。
+ * - 没有关联情况的场景单独列出；底部是当前方案的缺口汇总，点一下复制 `npx joplo check --option <方案>`。
+ * 视图计算在 nav-model.ts（纯函数）。创作侧信息，只由看板传给 PlayerPage 的 nav，不进发布站。
  */
-import type { Coverage, Project } from '@joplo-app/core';
-import { optionsOf, scenariosOf, shortName } from '../runtime/views';
-import { Segmented } from '../player/PlayerPage';
+import type { Project } from '@joplo-app/core';
+import { optionsOf, scenariosOf } from '../runtime/views';
+import { Popover, useHoverCard, useTip } from '../player/popover';
+import { StatusIcon } from '../player/StatusIcon';
 import { cn } from '@/lib/utils';
+import { caseCard, gapCommand, gapsOf, letterOf, optionLabel, optionMeta, otherOptionTags, statusOf } from './nav-model';
 
-const MARK: Record<Coverage['status'] | 'none', { text: string; cls: string }> = {
-  expressed: { text: '✓', cls: 'text-[#2b8a3e]' },
-  missing: { text: '缺失', cls: 'text-[#c92a2a]' },
-  undecided: { text: '待决定', cls: 'text-[#b35c00]' },
-  not_applicable: { text: '不适用', cls: 'text-[#868e96]' },
-  excluded: { text: '不适用', cls: 'text-[#868e96]' },
-  none: { text: '缺失', cls: 'text-[#c92a2a]' },
-};
+export { gapsOf, statusOf } from './nav-model';
 
-export const statusOf = (project: Project, optionId: string, caseId: string): Coverage['status'] | 'none' => project.options[optionId]?.coverage[caseId]?.status ?? 'none';
+function GroupHead({ title, right }: { title: string; right?: string }) {
+  return (
+    <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 font-jb text-[12px]">
+      <span className="font-semibold tracking-[1px] text-jb-muted">{title}</span>
+      {right ? <span className="text-jb-faint">{right}</span> : null}
+    </div>
+  );
+}
 
-export function gapsOf(project: Project, optionId: string | null): { missing: number; undecided: number } {
-  const f = optionId ? project.features[project.options[optionId]?.featureId ?? ''] : null;
-  if (!f || !optionId) return { missing: 0, undecided: 0 };
-  let missing = 0;
-  let undecided = 0;
-  for (const c of f.caseIds) {
-    const s = statusOf(project, optionId, c);
-    if (s === 'missing' || s === 'none') missing++;
-    else if (s === 'undecided') undecided++;
-  }
-  return { missing, undecided };
+function Letter({ letter, on }: { letter: string; on: boolean }) {
+  return <span className={cn('flex size-6 shrink-0 items-center justify-center rounded-[6px] border-[1.5px] font-jb text-[13px] font-bold text-jb-fg', on ? 'border-jb-ink bg-jb-accent' : 'border-jb-line bg-jb-surface')}>{letter}</span>;
+}
+
+function OptionRow({ project, optionId, index, active, onPick }: { project: Project; optionId: string; index: number; active: boolean; onPick: () => void }) {
+  const o = project.options[optionId]!;
+  const { letter, title } = optionLabel(o, index);
+  const meta = optionMeta(project, optionId);
+  const hc = useHoverCard();
+  return (
+    <li>
+      <button type="button" onClick={onPick} {...hc.trigger} data-testid={`option-${optionId}`} aria-current={active ? 'true' : undefined} className={cn('jb-focus flex w-full items-start gap-2.5 rounded-[8px] px-2 py-2.5 text-left font-jb', active ? 'bg-jb-selected' : 'hover:bg-jb-hover active:bg-jb-press')}>
+        <Letter letter={letter} on={active} />
+        <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+          <span className={cn('truncate text-[14px] leading-[19px] text-jb-fg', active && 'font-semibold')}>{title}</span>
+          {meta.picked || meta.text ? (
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-[12px] text-jb-muted">
+              {meta.picked ? <span className="rounded-[4px] bg-jb-inverse px-1.5 py-px text-[11px] font-medium text-jb-on-inverse">✓ 已选定</span> : null}
+              <span className="truncate">{meta.text || '全部已表达'}</span>
+            </span>
+          ) : null}
+        </span>
+      </button>
+      <Popover open={!!hc.anchor} anchor={hc.anchor} onClose={hc.close} placement="right-start" width={280} label={o.name} testid={`option-card-${optionId}`} onMouseEnter={hc.card.onMouseEnter} onMouseLeave={hc.card.onMouseLeave}>
+        <div className="flex flex-col gap-2 p-3 font-jb">
+          <div className="text-[13px] font-semibold text-jb-fg">
+            {letter} · {title}
+          </div>
+          <p className="text-[12px] leading-[18px] text-jb-muted">{o.idea}</p>
+          {o.tradeoffs.length ? (
+            <ul className="flex flex-col gap-1 text-[12px] leading-[18px] text-jb-fg">
+              {o.tradeoffs.map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      </Popover>
+    </li>
+  );
+}
+
+function OtherTag({ letter, status, tip, onClick, testid }: { letter: string; status: Parameters<typeof StatusIcon>[0]['status']; tip: string; onClick: () => void; testid: string }) {
+  const [tp, tipNode] = useTip(`${tip}（点一下切过去）`);
+  return (
+    <>
+      <button type="button" onClick={onClick} aria-label={tip} data-testid={testid} {...tp} className="jb-focus flex h-[18px] shrink-0 items-center gap-0.5 rounded-[4px] border border-jb-line bg-jb-surface px-[5px] font-jb text-[11px] font-semibold text-jb-muted hover:bg-jb-hover">
+        {letter}
+        <StatusIcon status={status} size={11} labelPrefix={`${letter}：`} />
+      </button>
+      {tipNode}
+    </>
+  );
+}
+
+function CaseRow({ project, featureId, optionId, caseId, active, onCase, onOptionCase }: { project: Project; featureId: string; optionId: string | null; caseId: string; active: boolean; onCase: () => void; onOptionCase: (optionId: string) => void }) {
+  const c = project.cases[caseId]!;
+  const own = optionId ? statusOf(project, optionId, caseId) : 'none';
+  const tags = otherOptionTags(project, featureId, optionId, caseId);
+  const hc = useHoverCard();
+  const card = caseCard(project, featureId, caseId);
+  return (
+    <li className={cn('flex items-center gap-1.5 rounded-[8px] pr-2', active ? 'bg-jb-selected' : 'hover:bg-jb-hover')} data-testid={`case-${caseId}`} data-status={own} data-active={active ? '' : undefined} {...hc.trigger}>
+      <button type="button" onClick={onCase} aria-current={active ? 'true' : undefined} className="jb-focus flex min-w-0 flex-1 items-start gap-2.5 rounded-[8px] py-2 pl-2 text-left font-jb">
+        <span className="flex h-[18px] items-center">
+          <StatusIcon status={own} size={16} labelPrefix={optionId ? `${letterOf(project, optionId)}：` : ''} />
+        </span>
+        <span className={cn('line-clamp-2 min-w-0 flex-1 text-[13.5px] leading-[18px] text-jb-fg', active && 'font-semibold')}>{c.title}</span>
+      </button>
+      {tags.map((t) => (
+        <OtherTag key={t.optionId} letter={t.letter} status={t.status} tip={t.tip} onClick={() => onOptionCase(t.optionId)} testid={`case-${caseId}-${t.optionId}`} />
+      ))}
+      <Popover open={!!hc.anchor} anchor={hc.anchor} onClose={hc.close} placement="right-start" width={300} label={c.title} testid={`case-card-${caseId}`} onMouseEnter={hc.card.onMouseEnter} onMouseLeave={hc.card.onMouseLeave}>
+        <div className="flex flex-col gap-1 p-2 font-jb">
+          <div className="px-1.5 pb-1 pt-0.5 text-[12px] font-semibold text-jb-muted">{c.title}</div>
+          {card.map((r) => (
+            <button
+              key={r.optionId}
+              type="button"
+              onClick={() => {
+                hc.close();
+                if (r.optionId !== optionId) onOptionCase(r.optionId);
+              }}
+              className={cn('jb-focus flex items-start gap-2 rounded-[6px] px-1.5 py-1.5 text-left', r.optionId === optionId ? 'bg-jb-selected' : 'hover:bg-jb-hover')}
+            >
+              <Letter letter={r.letter} on={r.optionId === optionId} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <StatusIcon status={r.status} size={13} withLabel className="text-[12px]" />
+                <span className="line-clamp-2 text-[12px] leading-[17px] text-jb-muted">{r.detail}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </Popover>
+    </li>
+  );
 }
 
 export function CaseNav({
@@ -44,6 +131,8 @@ export function CaseNav({
   onOption,
   onCase,
   onScenario,
+  onOptionCase,
+  onCopy,
 }: {
   project: Project;
   featureId: string;
@@ -53,79 +142,42 @@ export function CaseNav({
   onOption: (id: string) => void;
   onCase: (id: string) => void;
   onScenario: (id: string) => void;
+  /** 切到另一个方案看同一个情况（?o=&c=）。 */
+  onOptionCase: (optionId: string, caseId: string) => void;
+  /** 复制缺口汇总的命令。 */
+  onCopy: (text: string) => void;
 }) {
   const f = project.features[featureId]!;
   const options = optionsOf(project, featureId);
   const gaps = gapsOf(project, optionId);
+  const letter = optionId ? letterOf(project, optionId) : null;
   const covered = new Set(f.caseIds.flatMap((c) => (optionId ? (project.options[optionId]?.coverage[c]?.scenarioIds ?? []) : [])));
   const loose = scenariosOf(project, optionId).filter((s) => !covered.has(s.id) && !s.caseIds.some((c) => f.caseIds.includes(c)));
   return (
-    <div className="flex flex-1 flex-col gap-1" data-testid="case-nav">
-      <div className="truncate text-[12px] text-[#6b6b6b]">{f.name} · 当前方案</div>
-      {options.length > 1 ? (
-        <Segmented
-          full
-          label="当前方案"
-          testid="option-switch"
-          value={optionId ?? ''}
-          onChange={onOption}
-          items={options.map((o) => ({ value: o.id, label: <span className="truncate">{o.name}{f.pick === o.id ? ' ✓' : ''}</span>, title: o.name, testid: `option-${o.id}` }))}
-        />
-      ) : options[0] ? (
-        <div className="truncate rounded-lg bg-[#f1f3f5] px-3 py-2 text-[14px] font-semibold" title={options[0].name}>
-          {options[0].name}
-        </div>
-      ) : (
-        <div className="text-[14px] text-[#6b6b6b]">这个功能还没有方案。</div>
-      )}
-      <div className="mt-3 flex items-center gap-2 text-[12px] text-[#6b6b6b]">
-        情况
-        <span className="h-px flex-1 bg-[#e9ecef]" />
-      </div>
-      {f.caseIds.length === 0 ? <p className="px-2 text-[14px] text-[#6b6b6b]">功能还没有列出情况。</p> : null}
-      <ul className="flex flex-col gap-0.5">
-        {f.caseIds.map((cid) => {
-          const c = project.cases[cid];
-          if (!c) return null;
-          const active = caseId === cid;
-          const own = optionId ? statusOf(project, optionId, cid) : 'none';
-          return (
-            <li key={cid}>
-              <button
-                type="button"
-                onClick={() => onCase(cid)}
-                data-testid={`case-${cid}`}
-                data-status={own}
-                data-active={active ? '' : undefined}
-                className={cn('w-full rounded-md px-3 py-2 text-left hover:bg-[#f1f3f5]', active && 'bg-[#e7f0ff] hover:bg-[#e7f0ff]')}
-              >
-                <div className={cn('text-[14px] leading-snug', active && 'font-semibold')}>{c.title}</div>
-                <div className="mt-0.5 flex flex-wrap gap-x-1.5 text-[12px] text-[#868e96]">
-                  {options.map((o, i) => {
-                    const m = MARK[statusOf(project, o.id, cid)];
-                    return (
-                      <span key={o.id} data-testid={`case-${cid}-${o.id}`}>
-                        {i > 0 ? '· ' : ''}
-                        {shortName(o.name)} <span className={m.cls}>{m.text}</span>
-                      </span>
-                    );
-                  })}
-                </div>
-              </button>
-            </li>
-          );
-        })}
+    <div className="flex min-h-full flex-1 flex-col gap-1 font-jb" data-testid="case-nav">
+      <GroupHead title="方案" right={`${options.length} 个`} />
+      {options.length === 0 ? <p className="px-2 text-[13px] text-jb-muted">这个功能还没有方案。</p> : null}
+      <ul className="flex flex-col gap-1" data-testid="option-switch">
+        {options.map((o, i) => (
+          <OptionRow key={o.id} project={project} optionId={o.id} index={i} active={o.id === optionId} onPick={() => onOption(o.id)} />
+        ))}
+      </ul>
+      <div className="h-2.5 shrink-0" />
+      <GroupHead title="情况" right={letter ? `${letter} 的覆盖` : undefined} />
+      {f.caseIds.length === 0 ? <p className="px-2 text-[13px] text-jb-muted">功能还没有列出情况。</p> : null}
+      <ul className="flex flex-col gap-1">
+        {f.caseIds.map((cid) =>
+          project.cases[cid] ? <CaseRow key={cid} project={project} featureId={featureId} optionId={optionId} caseId={cid} active={caseId === cid} onCase={() => onCase(cid)} onOptionCase={(oid) => onOptionCase(oid, cid)} /> : null,
+        )}
       </ul>
       {loose.length ? (
         <>
-          <div className="mt-3 flex items-center gap-2 text-[12px] text-[#6b6b6b]">
-            其他场景
-            <span className="h-px flex-1 bg-[#e9ecef]" />
-          </div>
-          <ul className="flex flex-col gap-0.5">
+          <div className="h-2.5 shrink-0" />
+          <GroupHead title="其他场景" />
+          <ul className="flex flex-col gap-1">
             {loose.map((s) => (
               <li key={s.id}>
-                <button type="button" onClick={() => onScenario(s.id)} data-testid={`scenario-${s.id}`} className={cn('w-full truncate rounded-md px-3 py-2 text-left text-[14px] hover:bg-[#f1f3f5]', !caseId && scenarioId === s.id && 'bg-[#e7f0ff] font-semibold')}>
+                <button type="button" onClick={() => onScenario(s.id)} data-testid={`scenario-${s.id}`} className={cn('jb-focus w-full truncate rounded-[8px] px-2 py-2 text-left text-[13.5px] text-jb-fg', !caseId && scenarioId === s.id ? 'bg-jb-selected font-semibold' : 'hover:bg-jb-hover')}>
                   {s.name}
                 </button>
               </li>
@@ -133,10 +185,48 @@ export function CaseNav({
           </ul>
         </>
       ) : null}
-      <div className="mt-auto flex gap-2 pt-4" data-testid="gap-count">
-        <span className={cn('rounded-full px-2.5 py-0.5 text-[12px]', gaps.missing ? 'bg-[#fff0f0] text-[#c92a2a]' : 'bg-[#effaf1] text-[#2b8a3e]')}>缺失 {gaps.missing}</span>
-        <span className={cn('rounded-full px-2.5 py-0.5 text-[12px]', gaps.undecided ? 'bg-[#fff4e0] text-[#b35c00]' : 'bg-[#f1f3f5] text-[#6b6b6b]')}>待决定 {gaps.undecided}</span>
-      </div>
+      <div className="min-h-4 flex-1" />
+      {optionId ? (
+        <button type="button" onClick={() => onCopy(gapCommand(optionId))} data-testid="gap-count" title={`复制 ${gapCommand(optionId)}`} className="jb-focus sticky bottom-0 flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] bg-jb-app p-2.5 text-left text-[12px] hover:bg-jb-press">
+          <span className="font-semibold text-jb-fg">方案 {letter}</span>
+          <span className={cn(gaps.missing ? 'font-semibold text-jb-danger' : 'text-jb-muted')}>缺失 {gaps.missing}</span>
+          <span className="text-jb-muted">待决定 {gaps.undecided}</span>
+          <span className="flex-1" />
+          <span className="hidden font-jb-mono text-[11px] text-jb-faint min-[1440px]:inline">joplo check</span>
+        </button>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * 窄屏（< 1100）左栏收成的竖条：方案只剩字母，情况只剩当前方案的状态图标（悬停写全称）。
+ * 竖条整体是一个“展开左栏”的按钮（PlayerPage），这里只放图形，不放按钮。
+ */
+export function CaseRail({ project, featureId, optionId, caseId }: { project: Project; featureId: string; optionId: string | null; caseId: string | null }) {
+  const f = project.features[featureId];
+  if (!f) return null;
+  return (
+    <span className="flex flex-col items-center gap-1 font-jb" data-testid="case-rail">
+      {optionsOf(project, featureId).map((o, i) => {
+        const { letter, title } = optionLabel(o, i);
+        return (
+          <span key={o.id} title={`方案 ${letter} · ${title}`} className="flex size-9 items-center justify-center">
+            <Letter letter={letter} on={o.id === optionId} />
+          </span>
+        );
+      })}
+      <span aria-hidden className="my-1 h-px w-6 bg-jb-line" />
+      {f.caseIds.map((cid) => {
+        const c = project.cases[cid];
+        if (!c) return null;
+        const own = optionId ? statusOf(project, optionId, cid) : 'none';
+        return (
+          <span key={cid} title={c.title} className={cn('flex size-8 items-center justify-center rounded-[8px]', caseId === cid && 'bg-jb-selected')}>
+            <StatusIcon status={own} size={16} labelPrefix={`${c.title}：`} />
+          </span>
+        );
+      })}
+    </span>
   );
 }

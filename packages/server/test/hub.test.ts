@@ -267,6 +267,43 @@ describe('导出', () => {
     release();
   });
 
+  it('外观（D55）：导出视频的请求体带 font / stroke 时透传到渲染路由；非法值不透传', async () => {
+    release();
+    await until(async () => (await req(hub.port, { path: `/__joplo/p/${id}/export/video` })).body.job?.status !== 'running');
+    const n = calls.length;
+    const r = await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/video`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'invite.a-modal.success', theme: 'nord', font: 'serif', stroke: 'clean' }) });
+    expect(r.status).toBe(202);
+    const url = new URL(calls[n]!.url);
+    expect(url.searchParams.get('theme')).toBe('nord');
+    expect(url.searchParams.get('font')).toBe('serif');
+    expect(url.searchParams.get('stroke')).toBe('clean');
+    release();
+    await until(async () => (await req(hub.port, { path: `/__joplo/p/${id}/export/video` })).body.job?.status !== 'running');
+    await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/video`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'invite.a-modal.success', font: 'wingdings', stroke: 7 }) });
+    const bad = new URL(calls[n + 1]!.url);
+    expect(bad.searchParams.has('font')).toBe(false);
+    expect(bad.searchParams.has('stroke')).toBe(false);
+    release();
+  });
+
+  it('视频：DELETE 取消正在进行的任务（要令牌）；任务变成“已取消”，之后可以再导出；没有任务时 404', async () => {
+    release();
+    await until(async () => (await req(hub.port, { path: `/__joplo/p/${id}/export/video` })).body.job?.status !== 'running');
+    const r = await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/video`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'invite.a-modal.success' }) });
+    expect(r.status).toBe(202);
+    expect((await req(hub.port, { method: 'DELETE', path: `/__joplo/p/${id}/export/video` })).status).toBe(403);
+    const del = await req(hub.port, { method: 'DELETE', path: `/__joplo/p/${id}/export/video`, headers: { 'x-joplo-token': hub.token } });
+    expect(del.status).toBe(200);
+    expect(del.body.job).toMatchObject({ status: 'error', phase: 'error', error: '已取消' });
+    // 录制器之后才返回：不会把已取消的任务改回完成
+    release();
+    await new Promise((x) => setTimeout(x, 100));
+    expect((await req(hub.port, { path: `/__joplo/p/${id}/export/video` })).body.job).toMatchObject({ status: 'error', error: '已取消' });
+    expect((await req(hub.port, { method: 'DELETE', path: `/__joplo/p/${id}/export/video`, headers: { 'x-joplo-token': hub.token } })).status).toBe(404);
+    expect((await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/video`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'invite.a-modal.success' }) })).status).toBe(202);
+    release();
+  });
+
   it('视频：没有 Chromium 时任务失败，错误里带 npx playwright install chromium', async () => {
     const h2 = await createHub({ port: 0, log: () => undefined, watch: false, exportDeps: { loadPlaywright: missingPw } });
     try {

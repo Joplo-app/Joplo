@@ -4,9 +4,10 @@
  * 尺寸规范：控件高度 32 / 36，圆角 6（分段控件外框 8，全屏控制条为胶囊），间距 4 的倍数，
  * 字号 12 / 14 / 16 / 20，图标 16。所有控件文字不换行（white-space: nowrap）。
  *
- * 宽度不够时按优先级收起（数组顺序即优先级）：
- *   ① 上一步 / 播放 / 下一步 → 只有图标（带 tooltip）；② 速度 → 收进「…」；③ 层级切换 → 下拉菜单；
- *   层级栏里还有 ④ “只重放这一层” → 只有图标。任何宽度下都不会出现竖排文字：收到最后仍放不下时，控件区横向裁切而不是换行。
+ * 全屏控制条宽度不够时按优先级收起（数组顺序即优先级）：
+ *   ① 上一步 / 播放 / 下一步 → 只有图标（带悬停提示）；② 速度 → 下拉菜单；③ 层级切换 → 下拉菜单。
+ *   任何宽度下都不会出现竖排文字：收到最后仍放不下时，控件区横向裁切而不是换行。
+ * 非全屏的演示页布局（D55：播放坞、时间线、顶栏按断点收起）见 layout.ts。
  */
 export const CTRL = { sm: 32, md: 36, gap: 8, padX: 12, icon: 16, iconGap: 4, font: 14, small: 12 } as const;
 
@@ -57,14 +58,6 @@ export const layersGroup = (titles: string[], h: number): Group => ({
 });
 export const directorW = (on: boolean, layerTitle: string) => buttonW(on ? `导演 · ${layerTitle}` : '导演已暂停', CTRL.sm);
 
-/** 非全屏：播放控制行（⟲、三件套、速度 …… 右侧「…」）。 */
-export function controlsRowCollapse(avail: number, playLabel: string, speeds: readonly number[]): Set<string> {
-  return collapseToFit(avail, 2 * CTRL.md, [navGroup(CTRL.md, playLabel), speedGroup(speeds, 0)], CTRL.gap, 2);
-}
-/** 非全屏：层级栏（层级切换、导演标签、只重放这一层）。 */
-export function layerBarCollapse(avail: number, titles: string[], director: boolean, layerTitle: string): Set<string> {
-  return collapseToFit(avail, directorW(director, layerTitle), [{ id: 'replay', full: buttonW('只重放这一层', CTRL.sm), collapsed: CTRL.sm }, layersGroup(titles, CTRL.sm)], CTRL.gap, 1);
-}
 /** 全屏控制条（胶囊，内边距 8）：三件套、速度、层级切换、导演标签、退出全屏。 */
 export function fullscreenBarCollapse(avail: number, playLabel: string, speeds: readonly number[], titles: string[], director: boolean, layerTitle: string): Set<string> {
   // 胶囊左右内边距 8 + 退出全屏按钮 + 分隔线（每条 1px + 左右 4px） + 导演标签
