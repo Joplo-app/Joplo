@@ -129,7 +129,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   ChatMessage: "from: 'user'|'assistant', name；子节点是消息内容（保留换行）",
   ToolCall: "title, state: 'running'|'done'|'error'；子节点是调用详情",
   Terminal: 'title —— 终端窗口（命令行原型），子节点是 Terminal.Command / Terminal.Output / Terminal.Input；内容超出 h 或 mah 时内部滚动',
-  Diagram: "direction: 'right'|'down'（默认 right）, h（高度，默认 420）—— 架构图，子节点是 Diagram.Group / Diagram.Node / Diagram.Edge；布局自动生成且确定（state 变化不移动节点）；缩放到放得下但不小于 12/14（节点字仍 ≥ 12px），放不下时图内滚动、可拖动平移；节点多、宽度有限时用 direction='down'",
+  Diagram: "direction: 'right'|'down'（默认 right）, h（高度，默认 420）—— 架构图，子节点是 Diagram.Group / Diagram.Node / Diagram.Edge；布局自动生成且确定（state 变化不移动节点）；缩放到放得下但不小于 12/14（节点字仍 ≥ 12px），放不下时图内滚动、可拖动平移；节点多、宽度有限时用 direction='down'。逐段出现：给 Group / Node / Edge 写 when={$.ui.x}，flow 里 set 为真时出现（布局按全部元素预先算好，已有元素不动）",
   'Diagram.Group': 'label —— 带标题的分组框，子节点是 Diagram.Node 或嵌套的 Diagram.Group',
   'Diagram.Node': "id（必填，连线靠它）, label, description（第二行小字）, kind: 'client'|'service'|'model'|'database'|'queue'|'storage'|'external'|'tool'|'user', state: 'idle'|'active'|'ok'|'error'|'dim'（常写 state={$.ui.n_x}）",
   'Diagram.Edge': "from, to（同一个 Diagram 里的 Node id）, label, async（虚线）, state: 'idle'|'active'|'ok'|'error'|'dim'；id 缺省为 \"from->to\"。演示调用链：flow 步骤里 set($.ui.e1, 'active') 再 set($.ui.e1, 'ok')",

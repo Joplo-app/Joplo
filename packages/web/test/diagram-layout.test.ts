@@ -74,6 +74,11 @@ describe('Diagram 布局', () => {
     const withWhen = fixture();
     withWhen.children![0] = { ...withWhen.children![0]!, when: { eq: ['$ui.x', 1] } as never };
     expect(structureKey(diagramStructure(withWhen))).toBe(structureKey(idle));
+    // 分组与连线上的 when 同样不参与：逐段出现时已有元素不移动
+    const grouped = fixture();
+    grouped.children = grouped.children!.map((c) => (c.type === 'Diagram.Group' || c.type === 'Diagram.Edge' ? { ...c, when: { not: '$ui.hide' } as never } : c));
+    expect(structureKey(diagramStructure(grouped))).toBe(structureKey(idle));
+    expect(layoutDiagram(diagramStructure(grouped))).toEqual(layoutDiagram(idle));
   });
 
   it('结构变化（增删节点或连线）才重新布局', () => {

@@ -36,6 +36,8 @@ test.describe('Diagram', () => {
     await expect(page.locator('[data-joplo-stage] [data-jtype="Diagram.Node"]')).toHaveCount(9);
     await expect(page.locator('[data-joplo-stage] [data-jtype="Diagram.Group"]')).toHaveCount(2);
     await expect(page.locator('[data-joplo-stage] [data-jtype="Diagram.Edge"]')).toHaveCount(8);
+    // 首次显示不播放出现动画
+    expect(await page.locator('[data-joplo-stage] [data-appear]').count()).toBe(0);
     await expect(node(page, 'biz')).toHaveAttribute('data-state', 'dim');
     const before = await boxes(page);
     expect(Object.keys(before)).toHaveLength(11);
@@ -57,12 +59,19 @@ test.describe('Diagram', () => {
       await waitIdle(page);
     }
     expect((await playState(page))!.completed?.outcome).toBe('success');
+    // 逐段出现：审计分组、节点、连线在最后一步出现，带出现动画；已有元素不移动
+    await expect(node(page, 'audit')).toHaveAttribute('data-appear', '');
+    await expect(node(page, 'audit_grp')).toHaveAttribute('data-appear', '');
+    await expect(node(page, 'brain->audit')).toHaveAttribute('data-appear', '');
+    await expect(node(page, 'client')).not.toHaveAttribute('data-appear', '');
     await expect(node(page, 'client->brain')).toHaveAttribute('data-state', 'ok');
     await expect(node(page, 'client->brain').locator('[data-jdot]')).toHaveCount(0);
     await expect(node(page, 'impl->biz')).toHaveAttribute('data-state', 'error');
     await expect(node(page, 'biz')).toHaveAttribute('data-state', 'error');
     await expect(node(page, 'brain->queue')).toHaveAttribute('data-async', '');
-    expect(await boxes(page)).toEqual(before);
+    const after = await boxes(page);
+    expect(Object.fromEntries(Object.keys(before).map((k) => [k, after[k]]))).toEqual(before);
+    expect(Object.keys(after)).toEqual(expect.arrayContaining(['audit', 'audit_grp']));
   });
 
   test('⌥+单击节点与连线：抽屉显示 label、description、state 与源码位置；连线 id 缺省为 from->to', async ({ page }) => {
@@ -94,6 +103,15 @@ test.describe('Diagram', () => {
     await drawer.getByTestId('drawer-close').click();
     await node(page, 'brain').click();
     expect((await playState(page))!.position).toBe(2);
+  });
+
+  test('静态渲染（renderStep 的渲染路由）直接是最终状态：出现的元素在位、没有出现动画', async ({ page }) => {
+    await page.goto(`${dev.url}?render=1&project=${dev.projectId}&scenario=arch.a.call&position=4&theme=clean`);
+    await page.waitForFunction(() => (window as any).__JOPLO_READY__ === true);
+    await expect(page.locator('[data-jid="audit"]')).toBeVisible();
+    await expect(page.locator('[data-jid="brain->audit"]')).toHaveCount(1);
+    expect(await page.locator('[data-appear]').count()).toBe(0);
+    expect(await page.locator('[data-jid="audit"] > div').first().evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
   });
 
   test('发布站（file://）同样显示架构图与连线', async ({ page }) => {

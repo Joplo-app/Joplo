@@ -124,6 +124,8 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - <Diagram>里放 <Diagram.Group label>、<Diagram.Node id label kind state={$.ui.n_x}/>、<Diagram.Edge from to label async state={$.ui.e1}/>；布局自动生成，播放时不移动。
 - 演示调用链就是改 state：.system('客户端发出消息', set($.ui.e1, 'active'))，下一步 set($.ui.e1, 'ok')、set($.ui.n_brain, 'active')；出错用 'error'，无关部分用 'dim'。
 - 常与前端画面放在同一个页面（如 SimpleGrid 两列），同一个 flow 一步步同时推进两边；Node / Edge 不需要 flow 也不用 unmodeled，⌥+单击可检查。
+- 逐段出现（像幻灯片一样一段一段加内容）：给 Group / Node / Edge 写 when={$.ui.show_billing}，步骤里 set($.ui.show_billing, true)；布局一开始就按全部元素算好，出现时已有元素不移动。
+- 节点多、容器不宽时用 direction="down"；放不下时图内可以滚动，不会缩到看不清。
 
 ## 规则与边界
 - rule('约束', { origin?, status?, cases?: ['happy'], elements?: ['invite'] })。
