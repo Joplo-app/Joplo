@@ -1,12 +1,8 @@
 import type { Bind, CondExpr } from '@tokenroll/joplo-kit';
-import { Code, Stack, Text } from '@tokenroll/joplo-kit/ui';
+import { Terminal } from '@tokenroll/joplo-kit/ui';
 
-const TONE = { plain: 'dark.4', ok: 'green.8', warn: 'orange.8', error: 'red.8' } as const;
-
-/** 终端里的一条命令及其输出；when 为真时出现。 */
-export const Cmd = (p: { id: string; when: Bind | CondExpr; cmd: string; out: string; tone?: keyof typeof TONE }) => (
-  <Stack id={p.id} when={p.when} gap={4}>
-    <Code>$ {p.cmd}</Code>
-    <Text c={TONE[p.tone ?? 'plain']}>{p.out}</Text>
-  </Stack>
-);
+/** 终端里的一条命令及其输出（放在 <Terminal> 里）；when 为真时出现。id 落在输出块上，规则用它引用。 */
+export const Cmd = (p: { id: string; when: Bind | CondExpr; cmd: string; out: string; tone?: 'plain' | 'ok' | 'warn' | 'error' }) => [
+  <Terminal.Command when={p.when}>{p.cmd}</Terminal.Command>,
+  <Terminal.Output id={p.id} when={p.when} tone={p.tone ?? 'plain'}>{p.out}</Terminal.Output>,
+];

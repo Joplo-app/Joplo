@@ -5,7 +5,7 @@
 import { $, done, eq, flow, not, set, toast, uses, type JNode } from '@tokenroll/joplo-kit';
 import {
   ActionIcon, Alert, Anchor, Badge, Box, Breadcrumbs, Button, Center, CloseButton, Code, DataTable, Drawer, Group, List, Modal,
-  Paper, Progress, SegmentedControl, Select, Stack, Stepper, Switch, Text, Title,
+  Paper, Phone, Progress, SegmentedControl, Select, Stack, Stepper, Switch, Text, Title,
 } from '@tokenroll/joplo-kit/ui';
 
 const members = [
@@ -52,12 +52,9 @@ export const main = (p: string): JNode => (
         <Prototype id={`${p}_pc`} />
       </Box>
       <Center when={eq($.inputs[`${p}_device`], '手机')}>
-        <Paper withBorder radius={36} p="md" w={300} mih={520} note="手机外框：由 viewport 或顶栏切换自动套上">
-          <Stack gap="sm">
-            <Center><Box w={80} h={6} bg="gray.3" /></Center>
-            <Prototype id={`${p}_phone`} compact />
-          </Stack>
-        </Paper>
+        <Phone scale={0.7} h={760}>
+          <Prototype id={`${p}_phone`} compact />
+        </Phone>
       </Center>
     </Paper>
     <Group justify="space-between">

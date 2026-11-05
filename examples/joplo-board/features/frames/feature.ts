@@ -10,7 +10,7 @@ export default feature({
     long_output: { title: '命令输出很长', dimension: 'input', expected: '终端内部滚动，不把页面撑开' },
   },
   rules: {
-    frame_is_component: rule('终端是目录里的组件（Terminal、Terminal.Command、Terminal.Output），手机外框由舞台自动加，不需要作者写', { cases: ['terminal', 'phone'] }),
+    frame_is_component: rule('终端和手机是目录里的组件（Terminal、Phone）；页面写 viewport: "mobile" 时舞台自动套上 Phone', { origin: 'user', status: 'confirmed', cases: ['terminal', 'phone'] }),
   },
   questions: {
     more_frames: question('还要别的外框吗？例如浏览器窗口（带地址栏）、平板、桌面应用窗口', { severity: 'minor', refs: ['phone'] }),
