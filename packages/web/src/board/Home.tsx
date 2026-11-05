@@ -6,6 +6,7 @@
  * - 没有任何项目时：三条开始命令。
  */
 import { useState } from 'react';
+import { Settings } from 'lucide-react';
 import type { Diagnostic, Project } from '@tokenroll/joplo-core';
 import { removeProject, type ProjectSummary } from '../runtime/dev-client';
 import { optionsOf } from '../runtime/views';
@@ -22,7 +23,7 @@ function describe(p: ProjectSummary): { text: string; tone: 'muted' | 'error' | 
   return { text: tilde(p.dir), tone: 'muted' };
 }
 
-export function Home({ projects, error, selectedId, onSelect, onView }: { projects: ProjectSummary[] | null; error: string | null; selectedId: string | null; onSelect: (id: string) => void; onView: (projectId: string, featureId: string) => void }) {
+export function Home({ projects, error, selectedId, onSelect, onView, onSettings }: { projects: ProjectSummary[] | null; error: string | null; selectedId: string | null; onSelect: (id: string) => void; onView: (projectId: string, featureId: string) => void; onSettings?: () => void }) {
   const selected = projects?.find((p) => p.id === selectedId) ?? null;
   return (
     <div className="flex h-full flex-col bg-[#f8f9fa]" data-testid="home">
@@ -59,6 +60,13 @@ export function Home({ projects, error, selectedId, onSelect, onView }: { projec
             })}
           </ul>
           <div className="mx-2 mt-3 border-t pt-3 text-[12px] leading-relaxed text-[#868e96]">在任意项目目录运行 npx joplo dev，它就会出现在这里。</div>
+          {onSettings ? (
+            // 设置入口（D51）：主题等看板设置
+            <button type="button" onClick={onSettings} data-testid="home-settings" className="mt-auto flex h-9 items-center gap-2 whitespace-nowrap rounded-md px-3 text-left text-[14px] text-[#495057] hover:bg-[#f1f3f5]">
+              <Settings className="size-4" aria-hidden />
+              设置 · 主题
+            </button>
+          ) : null}
         </aside>
         <main className="min-w-0 flex-1 overflow-y-auto p-8">
           {projects && projects.length === 0 ? <Empty /> : selected ? <ProjectPanel key={selected.id} summary={selected} onView={onView} /> : null}

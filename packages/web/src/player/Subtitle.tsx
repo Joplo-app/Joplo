@@ -14,7 +14,7 @@ export function Subtitle({ content, theme, width, framed = false, fixedHeight, d
   const badge = content?.badge;
   return (
     <div
-      className={cn('jsubtitle flex shrink-0 items-center gap-4 overflow-hidden px-4', dark ? 'bg-black/70 text-white' : 'bg-white', !framed && !dark && 'rounded-lg border')}
+      className={cn('jsubtitle jtheme flex shrink-0 items-center gap-4 overflow-hidden px-4 text-[var(--jp-ink)]', dark ? 'bg-[var(--jp-bg)]' : 'bg-[var(--jp-surface)]', !framed && !dark && 'rounded-lg border border-[var(--jp-line)]')}
       style={{ height: fixedHeight ?? subtitleHeight(content), width: width ?? '100%', paddingTop: SUBTITLE_PAD_Y, paddingBottom: SUBTITLE_PAD_Y }}
       data-theme={theme}
       data-testid="subtitle"
@@ -25,12 +25,12 @@ export function Subtitle({ content, theme, width, framed = false, fixedHeight, d
       {content ? (
         <>
           <div className="flex min-w-0 flex-1 flex-col justify-center">
-            <div className={dark ? 'text-white' : 'text-[#1e1e1e]'} style={{ fontSize: SUBTITLE_CAPTION_PX, lineHeight: 1.35, ...clamp(content.captionLines) }} data-jsubtitle-caption="">
-              {content.kind === 'system' ? <span className="mr-2 inline-block whitespace-nowrap rounded bg-[#1c5fb8] px-1.5 align-[2px] text-[12px] leading-[20px] text-white">系统</span> : null}
+            <div className="text-[var(--jp-ink)]" style={{ fontSize: SUBTITLE_CAPTION_PX, lineHeight: 1.35, ...clamp(content.captionLines) }} data-jsubtitle-caption="">
+              {content.kind === 'system' ? <span className="mr-2 inline-block whitespace-nowrap rounded bg-[var(--jp-info)] px-1.5 align-[2px] text-[12px] leading-[20px] text-white">系统</span> : null}
               {content.caption}
             </div>
             {content.explain ? (
-              <div className={dark ? 'text-white/80' : 'text-[#495057]'} style={{ marginTop: 2, fontSize: SUBTITLE_EXPLAIN_PX, lineHeight: 1.5, ...clamp(content.explainLines) }} data-jsubtitle-explain="">
+              <div className="text-[var(--jp-muted)]" style={{ marginTop: 2, fontSize: SUBTITLE_EXPLAIN_PX, lineHeight: 1.5, ...clamp(content.explainLines) }} data-jsubtitle-explain="">
                 {content.explain}
               </div>
             ) : null}
@@ -41,7 +41,7 @@ export function Subtitle({ content, theme, width, framed = false, fixedHeight, d
                 {badge.text}
               </span>
             ) : (
-              <span data-testid="step-index" className={cn('shrink-0 whitespace-nowrap text-[12px]', dark ? 'text-white/70' : 'text-[#868e96]')}>
+              <span data-testid="step-index" className={cn('shrink-0 whitespace-nowrap text-[12px]', 'text-[var(--jp-muted)]')}>
                 {badge.text}
               </span>
             )

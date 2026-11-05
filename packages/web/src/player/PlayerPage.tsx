@@ -23,6 +23,7 @@ import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
 import { Overlay } from './Overlay';
 import { StageViewport } from './StageViewport';
+import { strokeOfTheme } from '../renderer/themes';
 import { Btn, DirectorTag, MenuButton, Segmented, useWidth, type MenuItem, type Tone } from './controls';
 import { controlsRowCollapse, fullscreenBarCollapse, layerBarCollapse } from './controls-fit';
 
@@ -311,7 +312,7 @@ export function PlayerPage(p: PlayerPageProps) {
   const stageBlock = (
     <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white', !full && 'rounded-xl border')} data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
       {state && shownScene ? (
-        <StageViewport viewport={device} theme={p.theme} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
+        <StageViewport viewport={device} theme={p.theme} stroke={strokeOfTheme(p.theme, project.themes ?? {})} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
           {(size) => (
             <Stage
               viewportOverride={device === 'mobile' ? null : size}

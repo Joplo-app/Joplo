@@ -80,45 +80,69 @@
 
 /* 舞台规则放在 components 层，Tailwind 工具类（utilities 层）可以覆盖。 */
 @layer components {
-  /* ---------- 舞台主题 ---------- */
+  /* ---------- 舞台主题（D51）：只读 --jp-* 变量；默认值是手绘主题，具体主题由 renderer/themes.ts 注入 ---------- */
+  .jstage,
+  .jtheme {
+    --jp-font: "Joplo Excalifont", "Joplo Xiaolai", "PingFang SC", sans-serif;
+    --jp-font-mono: ui-monospace, SFMono-Regular, Menlo, "Joplo Xiaolai", monospace;
+    --jp-font-size: 16px;
+    --jp-ink: #1e1e1e;
+    --jp-bg: #ffffff;
+    --jp-surface: #ffffff;
+    --jp-subtle: #f1f3f5;
+    --jp-muted: #868e96;
+    --jp-faint: #9a9a9a;
+    --jp-line: #dee2e6;
+    --jp-line-strong: #adb5bd;
+    --jp-border: #3a3a3a;
+    --jp-accent: #e8590c;
+    --jp-select: #6741d9;
+    --jp-info: #1c7ed6;
+    --jp-ok: #2b8a3e;
+    --jp-warn: #e67700;
+    --jp-danger: #e03131;
+    --jp-radius: 4px;
+    --jp-shadow: 4px 4px 0 rgba(30, 30, 30, 0.12);
+    --jp-stroke: rough;
+    /* 舞台里沿用的旧变量名，指向主题变量 */
+    --focus: var(--jp-accent);
+    --sel: var(--jp-select);
+    --stage-ink: var(--jp-ink);
+    --stage-paper: var(--jp-bg);
+    --stage-danger: var(--jp-danger);
+  }
   .jstage {
-    color: var(--stage-ink);
-    background: var(--stage-paper);
-    font-size: 15px;
+    color: var(--jp-ink);
+    background-color: var(--jp-bg);
+    font-family: var(--jp-font);
+    font-size: var(--jp-font-size);
     line-height: 1.5;
   }
-  .jstage[data-theme="sketch"] {
-    font-family: "Joplo Excalifont", "Joplo Xiaolai", "PingFang SC", sans-serif;
-    font-size: 16px;
-  }
-  .jstage[data-theme="clean"] {
-    font-family: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  }
 
-  /* 线框主题：1px 边框；手绘主题：边框交给 rough 描边 */
+  /* 线框描边（--jp-stroke: clean）：1px 边框；手绘描边（rough）：边框交给 rough */
   .jstage .jbox {
     position: relative;
     border: 1px solid transparent;
   }
-  .jstage[data-theme="clean"] .jbox {
-    border-color: #3a3a3a;
+  .jstage[data-stroke="clean"] .jbox {
+    border-color: var(--jp-border);
   }
-  .jstage[data-theme="clean"] .jbox[data-soft] {
-    border-color: #c8c8c8;
+  .jstage[data-stroke="clean"] .jbox[data-soft] {
+    border-color: var(--jp-line-strong);
   }
-  .jstage[data-theme="clean"] .jbox[data-dashed] {
+  .jstage[data-stroke="clean"] .jbox[data-dashed] {
     border-style: dashed;
   }
-  .jstage[data-theme="clean"] .jbox[data-tone="danger"] {
-    border-color: var(--stage-danger);
+  .jstage[data-stroke="clean"] .jbox[data-tone="danger"] {
+    border-color: var(--jp-danger);
   }
-  .jstage[data-theme="clean"] .jbox[data-fill="ink"] {
-    background: var(--stage-ink);
+  .jstage[data-stroke="clean"] .jbox[data-fill="ink"] {
+    background: var(--jp-ink);
   }
-  .jstage[data-theme="clean"] .jbox[data-noborder] {
+  .jstage[data-stroke="clean"] .jbox[data-noborder] {
     border-color: transparent;
   }
-  .jstage[data-theme="sketch"] .jbox {
+  .jstage[data-stroke="rough"] .jbox {
     border-radius: 0 !important;
     box-shadow: none !important;
   }
@@ -164,15 +188,15 @@
   .jstage .jh-strong { font-weight: 700; }
   .jstage .jh-em { font-style: italic; }
   .jstage .jh-small { font-size: 13px; }
-  .jstage .jh-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: #f1f1f1; padding: 0 4px; border-radius: 3px; }
+  .jstage .jh-code { font-family: var(--jp-font-mono); font-size: 0.9em; background: var(--jp-subtle); padding: 0 4px; border-radius: 3px; }
   /* Mantine 组件的基础样式（内联样式之外的部分） */
   .jstage .jgrow > * { flex: 1 1 0; min-width: 0; }
   .jstage .jcard > .jcard-sec:first-of-type { margin-top: calc(-1 * var(--jcard-p, 16px)); }
   .jstage .jcard > .jcard-sec:last-child { margin-bottom: calc(-1 * var(--jcard-p, 16px)); }
-  .jstage .jtable th { text-align: left; font-weight: 650; padding: 8px 12px; border-bottom: 1px solid #d0d0d0; white-space: nowrap; }
-  .jstage .jtable td { padding: 8px 12px; border-bottom: 1px solid #ececec; vertical-align: top; }
+  .jstage .jtable th { text-align: left; font-weight: 650; padding: 8px 12px; border-bottom: 1px solid var(--jp-line-strong); white-space: nowrap; }
+  .jstage .jtable td { padding: 8px 12px; border-bottom: 1px solid var(--jp-line); vertical-align: top; }
   .jstage .jtable tbody tr:last-child td { border-bottom: none; }
-  .jstage .jtable-striped tbody tr:nth-child(odd) td { background: #f8f9fa; }
+  .jstage .jtable-striped tbody tr:nth-child(odd) td { background: var(--jp-subtle); }
 
   .jtrunc {
     overflow: hidden;
@@ -182,8 +206,8 @@
   }
 }
 
-/* 手绘主题：边框交给 rough 描边（覆盖 shadcn 组件自带的 border 工具类） */
-.jstage[data-theme="sketch"] .jbox {
+/* 手绘描边：边框交给 rough 描边（覆盖 shadcn 组件自带的 border 工具类） */
+.jstage[data-stroke="rough"] .jbox {
   border-color: transparent !important;
 }
 
@@ -195,12 +219,9 @@
   transition: filter 0.35s ease;
 }
 
-/* 字幕区：字体跟随舞台主题 */
-.jsubtitle[data-theme="sketch"] {
-  font-family: "Joplo Excalifont", "Joplo Xiaolai", "PingFang SC", sans-serif;
-}
-.jsubtitle[data-theme="clean"] {
-  font-family: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+/* 字幕区：字体与颜色跟随舞台主题（.jtheme 在主题的作用范围里） */
+.jsubtitle {
+  font-family: var(--jp-font);
 }
 
 /* rough 描边层：不进图层并加 !important，避免被组件库的 [&_svg]:size-* 等工具类改尺寸 */

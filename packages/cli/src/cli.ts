@@ -98,7 +98,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (data.diagnostics.some(d => d.severity === 'error')) exitCode = 1;
   });
   program.command('render').argument('[dir]', '项目目录', '.').requiredOption('--scenario-id <qid>', '场景 ID').option('--step-id <qid>', '步骤执行后的位置；默认初始状态')
-    .addOption(new Option('--theme <theme>').choices(['sketch', 'clean'])).requiredOption('--out <file>', '截图文件')
+    .option('--theme <theme>', '主题名：内置主题（sketch、clean、blueprint、nord、dracula、solarized-light、terminal、kraft、contrast）或项目 themes/<name>.css；默认用项目配置的主题').requiredOption('--out <file>', '截图文件')
     .option('--width <pixels>', '截图宽度（舞台宽度跟随页面自己的 viewport），需同时提供 height', integer('width')).option('--height <pixels>', '截图高度，需同时提供 width', integer('height'))
     .option('--scale <scale>', '像素倍率', scale).option('--overwrite', '允许覆盖截图').action(async (dir, opts) => {
       if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'width 与 height 必须同时提供');

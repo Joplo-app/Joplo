@@ -2,6 +2,7 @@
  * 看板与发布站的 URL（hash）：所有界面状态都在 hash 里，复制链接就能回到同一个项目 / 功能 / 方案 / 情况 / 场景 / 步骤 / 层级。
  *
  * 看板：  #/                         首页（选中最近打开的项目）
+ *        #/settings[/<项目>]          设置（主题；带项目时可以按项目覆盖，D51）
  *        #/<项目>                    首页，选中该项目
  *        #/<项目>/f/<功能>?o=&c=&s=&step=&l=   演示页
  * 发布站：#/                         首页（功能列表）
@@ -14,7 +15,7 @@
  */
 export type PlayRoute = { featureId: string; optionId?: string; caseId?: string; scenarioId?: string; step?: number; layer?: string; speed?: number };
 
-export type BoardRoute = { kind: 'home'; projectId?: string } | { kind: 'play'; projectId: string; play: PlayRoute };
+export type BoardRoute = { kind: 'home'; projectId?: string } | { kind: 'play'; projectId: string; play: PlayRoute } | { kind: 'settings'; projectId?: string };
 export type SiteRoute = { kind: 'home' } | { kind: 'play'; play: PlayRoute } | { kind: 'scenario'; scenarioId: string };
 
 const dec = (s: string) => {
@@ -63,12 +64,14 @@ export function parseBoardHash(hash: string): BoardRoute {
   const { path, query } = split(hash);
   const parts = path.split('/').filter(Boolean).map(dec);
   if (parts.length === 0) return { kind: 'home' };
+  if (parts[0] === 'settings') return parts[1] ? { kind: 'settings', projectId: parts[1] } : { kind: 'settings' };
   if (parts.length >= 3 && parts[1] === 'f') return { kind: 'play', projectId: parts[0]!, play: parsePlay(parts[2]!, query) };
   return { kind: 'home', projectId: parts[0]! };
 }
 
 export function boardHash(r: BoardRoute): string {
   if (r.kind === 'home') return r.projectId ? `#/${enc(r.projectId)}` : '#/';
+  if (r.kind === 'settings') return r.projectId ? `#/settings/${enc(r.projectId)}` : '#/settings';
   return `#/${enc(r.projectId)}/f/${enc(r.play.featureId)}${playQuery(r.play)}`;
 }
 

@@ -33,7 +33,8 @@ export type RenderOptions = {
   scenarioId: string;
   /** 渲染该步骤执行之后的状态；缺省为初始状态。 */
   stepId?: string;
-  theme?: 'sketch' | 'clean';
+  /** 主题名（D51）：内置主题或项目 themes/<name>.css；缺省用项目配置的主题。 */
+  theme?: string;
   out: string;
   overwrite?: boolean;
   /** 截图尺寸（D44）：舞台宽度仍是页面自己的 viewport，按比例放进这个尺寸。缺省为舞台尺寸。 */

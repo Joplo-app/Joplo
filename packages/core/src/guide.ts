@@ -171,6 +171,23 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 每个页面只有一种设备，默认电脑；page({ viewport: 'mobile' }, tree) 固定用 Phone 外框和 390 宽显示。
 - 层级需要手机画面时用 layer('手机版', <MobileView/>, { viewport: 'mobile' })；需要手机版就单独做页面或演示（D44）。
 
+## 写主题
+- 主题就是一个 CSS 文件：项目根目录 themes/<name>.css，在 joplo.config.ts 写 theme: '<name>' 作为默认主题；与内置主题同名时用你的。
+- 内置主题：sketch（手绘，默认）、clean、blueprint、nord、dracula、solarized-light、terminal、kraft、contrast；看板「设置 · 主题」里可以切换预览。
+- 只写变量即可，自动限定在舞台里，不影响看板：--jp-font、--jp-font-mono、--jp-font-size、--jp-ink、--jp-bg、--jp-surface、--jp-subtle、--jp-muted、--jp-faint、--jp-line、--jp-line-strong、--jp-border、--jp-accent（高光）、--jp-select、--jp-info（Diagram active）、--jp-ok、--jp-warn、--jp-danger、--jp-radius、--jp-shadow、--jp-stroke（rough 手绘描边 / clean 细线）。
+- 也可以写普通选择器细调（.jbox、h1 等，同样只作用于舞台）。深色主题注意 --jp-info / --jp-ok / --jp-danger / --jp-accent 与底色的对比度。
+- 示例 themes/brand.css：
+    :root {
+      --jp-font: "Inter", system-ui, sans-serif;
+      --jp-ink: #14213d;
+      --jp-bg: #f7f7fb;
+      --jp-surface: #ffffff;
+      --jp-accent: #fca311;
+      --jp-info: #2563eb;
+      --jp-radius: 10px;
+      --jp-stroke: clean;
+    }
+
 ## 完整示例：examples/agent-arch
 看 shared/arch.tsx 的 layersFor/Diagram，与 features/agent/options/a-hybrid.tsx 的 flow。
 下面摘出 plan 的关键片段，省略业务规则关联；start 已在同一文件中组织用户输入与发送：
@@ -282,6 +299,7 @@ flow 和 rule 的具体写法读 authoring；怎样定位覆盖诊断读 check�
 - LAYER_UNKNOWN：层级键不合法或 layer 缺少内容；键用字母/数字/下划线/连字符且不以 @ 开头，并提供非空 JSX。
 - TRACE_UNKNOWN：调用链为空、id 不存在、跨 Diagram 或路径不连通；使用同一张 Diagram 中已连接的节点/连线 id。
 - TRACE_AMBIGUOUS：两个节点间有多条候选连线；在 trace 中改写为具体的连线 id。
+- THEME_UNKNOWN：config({ theme }) 写的主题既不是内置主题也没有 themes/<name>.css；改成内置主题名，或补上这个 CSS 文件，见 demo 的“写主题”。
 - UNKNOWN_DIAGRAM_NODE：Diagram.Edge 的 from/to 不指向本图节点；修正端点为该 Diagram 内的节点 id。
 - ELEMENT_PROP：组件属性传入了 JSX 元素；图标改成字符串如 leftSection="+"，内容放到子节点。
 - ASSUMPTION_CONFIRMED：AI 假设保留 pending；用户确认后如实填写来源，不能只改状态。

@@ -12,7 +12,7 @@
  */
 import { useLayoutEffect, useRef, useState } from 'react';
 import { animate as animateEl, motion } from 'motion/react';
-import { Rough, useStageTheme } from './rough';
+import { Rough, useStroke } from './rough';
 import { fitCamera, highlightRect, revealScroll, union, visibleRect, type Box, type View } from './camera-math';
 import { CAMERA_MS } from '../runtime/pace';
 
@@ -216,11 +216,12 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
   return { wrapRef, contentRef, view, current };
 }
 
-const ACCENT = '#e8590c';
+/** 高光颜色：主题的 --jp-accent（D51）。 */
+const ACCENT = 'var(--jp-accent)';
 
 /** 高光：画在镜头容器里（内容坐标），贴着焦点的可见矩形，随镜头一起平移缩放。 */
 export function CameraLayer({ view, animate, pulseKey }: { view: CameraView | null; animate: boolean; pulseKey: string }) {
-  const theme = useStageTheme();
+  const mode = useStroke();
   if (!view || view.mode !== 'focus') return null;
   return (
     <div className="pointer-events-none absolute inset-0" style={{ zIndex: 25 }} data-jcamera-layer="focus">
@@ -231,12 +232,12 @@ export function CameraLayer({ view, animate, pulseKey }: { view: CameraView | nu
           <div key={`${pulseKey}:${id}`} data-jhighlight={id} data-box={`${round(box.x)},${round(box.y)},${round(box.w)},${round(box.h)}`}>
             <motion.div
               data-jhighlight-box=""
-              style={{ ...style, ...(theme === 'clean' ? { boxShadow: `0 0 0 ${2.5 / view.k}px ${ACCENT}, 0 0 ${16 / view.k}px ${5 / view.k}px rgba(232,89,12,0.32)` } : {}) }}
+              style={{ ...style, ...(mode === 'clean' ? { boxShadow: `0 0 0 ${2.5 / view.k}px ${ACCENT}, 0 0 ${16 / view.k}px ${5 / view.k}px color-mix(in srgb, ${ACCENT} 32%, transparent)` } : {}) }}
               initial={animate ? { opacity: 0 } : false}
               animate={{ opacity: 1 }}
               transition={animate ? { duration: 0.35, delay: 0.3 } : { duration: 0 }}
             >
-              {theme === 'sketch' ? (
+              {mode === 'rough' ? (
                 // 手绘描边：宿主比目标大 3px，描边落在目标外沿 1–2px 处
                 <div style={{ position: 'absolute', left: -3 / view.k, top: -3 / view.k, right: -3 / view.k, bottom: -3 / view.k }}>
                   <Rough seedKey={`hl:${id}`} shape="roundrect" radius={r + 3 / view.k} stroke={ACCENT} strokeWidth={2.4 / view.k} inset={1.5 / view.k} />

@@ -7,8 +7,9 @@
  *   routes/**\/page.tsx              routes/page.tsx → /，routes/members/page.tsx → /members
  *   features/<f>/feature.ts
  *   features/<f>/options/<o>.tsx
+ *   themes/<name>.css               作者主题（D51），按原文读取
  */
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { AuthoringProject } from './compile.ts';
 import type { Diagnostic } from './result.ts';
@@ -43,7 +44,19 @@ export function discoverFiles(root: string): string[] {
     if (ff) files.push(ff);
     for (const o of list(join(fd, 'options'))) if (/\.(tsx|ts)$/.test(o)) files.push(join(fd, 'options', o));
   }
+  for (const f of list(join(r, 'themes'))) if (/\.css$/.test(f)) files.push(join(r, 'themes', f));
   return files;
+}
+
+/** 作者主题：themes/<name>.css（文件名就是主题名）。 */
+export function loadThemes(root: string): Record<string, string> {
+  const r = resolve(root);
+  const out: Record<string, string> = {};
+  for (const f of list(join(r, 'themes'))) {
+    const m = /^([A-Za-z][\w-]*)\.css$/.exec(f);
+    if (m) out[m[1]!] = readFileSync(join(r, 'themes', f), 'utf8');
+  }
+  return out;
 }
 
 export async function loadAuthoring(root: string, importer: Importer): Promise<{ authoring: AuthoringProject | null; diagnostics: Diagnostic[] }> {
@@ -119,5 +132,5 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
   }
 
   if (!config) return { authoring: null, diagnostics: diags };
-  return { authoring: { root: r, config, layouts, routes, features }, diagnostics: diags };
+  return { authoring: { root: r, config, layouts, routes, features, themes: loadThemes(r) }, diagnostics: diags };
 }

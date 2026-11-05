@@ -1,6 +1,7 @@
 /**
  * 本地看板（`joplo dev`，D39）：一个进程、多个项目。
- * - 首页 `#/`、`#/<项目>`：最近打开的项目与所选项目的功能（Home.tsx）。
+ * - 首页 `#/`、`#/<项目>`：最近打开的项目与所选项目的功能（Home.tsx）；左栏底部是设置入口。
+ * - 设置 `#/settings[/<项目>]`：主题（Settings.tsx，D51），选择记在 <JOPLO_HOME>/settings.json。
  * - 演示页 `#/<项目>/f/<功能>?o=&c=&s=&step=&d=`：同发布站的布局（PlayerPage），另有按情况分组的左栏与缺口、
  *   ⌥+单击检查抽屉、导出图片 / 视频、在编辑器中打开。所有状态都在 hash 里。
  * IR 首次通过 /__joplo/p/<id>/ir 载入，之后由 HMR 推送；编译出错时显示错误并保留上一次成功的画面。
@@ -20,8 +21,10 @@ import { InspectDrawer } from './InspectDrawer';
 import { VideoDialog } from './VideoDialog';
 import { COVERAGE_LABEL } from './labels';
 import { useProjectIR, useProjects } from './hooks';
-
-const THEME_KEY = 'joplo.theme';
+import { SettingsPage } from './Settings';
+import { useBoardSettings } from './useSettings';
+import { effectiveTheme } from '../renderer/themes';
+import { ThemeStyles } from '../renderer/ThemeStyles';
 
 export function BoardApp() {
   const [hash, go] = useHash();
@@ -30,8 +33,19 @@ export function BoardApp() {
   const navigate = (r: BoardRoute, replace = false) => go(boardHash(r), replace);
 
   if (route.kind === 'play') return <BoardPlayer key={route.projectId} projectId={route.projectId} play={route.play} navigate={navigate} projectName={list?.find((p) => p.id === route.projectId)?.name ?? null} />;
+  if (route.kind === 'settings')
+    return <SettingsPage projectId={route.projectId ?? null} projects={list} onBack={() => (history.length > 1 ? history.back() : navigate({ kind: 'home', ...(route.projectId ? { projectId: route.projectId } : {}) }))} />;
   const selected = route.projectId && list?.some((p) => p.id === route.projectId) ? route.projectId : (list?.[0]?.id ?? null);
-  return <Home projects={list} error={error} selectedId={selected} onSelect={(id) => navigate({ kind: 'home', projectId: id })} onView={(projectId, featureId) => navigate({ kind: 'play', projectId, play: { featureId } })} />;
+  return (
+    <Home
+      projects={list}
+      error={error}
+      selectedId={selected}
+      onSelect={(id) => navigate({ kind: 'home', projectId: id })}
+      onView={(projectId, featureId) => navigate({ kind: 'play', projectId, play: { featureId } })}
+      onSettings={() => navigate({ kind: 'settings', ...(selected ? { projectId: selected } : {}) })}
+    />
+  );
 }
 
 function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
@@ -56,7 +70,9 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
   const ir = useProjectIR(projectId);
   const ctl = useMemo(() => new DemoController(selectionWriter(projectId)), [projectId]);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
-  const [theme, setThemeState] = useState<StageTheme>(() => (localStorage.getItem(THEME_KEY) === 'clean' ? 'clean' : 'sketch'));
+  // 主题（D51）：本项目的覆盖 > 所有项目的选择 > 项目 config 的默认主题；在设置页改，立即生效
+  const { settings } = useBoardSettings();
+  const theme: StageTheme = effectiveTheme(settings, projectId, ir.payload?.project?.theme ?? 'sketch');
   const [drawer, setDrawer] = useState(false);
   const [video, setVideo] = useState(false);
   const [flash, setFlash] = useFlash();
@@ -98,10 +114,6 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
   const option = resolved.optionId ? project.options[resolved.optionId] : null;
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
   const state = snap.state;
-  const setTheme = (t: StageTheme) => {
-    setThemeState(t);
-    localStorage.setItem(THEME_KEY, t);
-  };
   const home = () => navigate({ kind: 'home', projectId });
   const gap = resolved.gap;
   const caseTitle = resolved.caseId ? (project.cases[resolved.caseId]?.title ?? resolved.caseId) : null;
@@ -127,7 +139,7 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
       },
     },
     { id: 'video', label: '导出视频（整个场景）', disabled: !scenario, onClick: () => setVideo(true) },
-    { id: 'theme', label: '线框风格', checked: theme === 'clean', onClick: () => setTheme(theme === 'clean' ? 'sketch' : 'clean') },
+    { id: 'theme', label: `主题：${theme}…`, onClick: () => navigate({ kind: 'settings', projectId }) },
     { id: 'link', label: '复制当前步骤的链接', onClick: () => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制')) },
     {
       id: 'editor',
@@ -159,6 +171,7 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
   const selection = snap.selection;
   return (
     <>
+      <ThemeStyles themes={project.themes} />
       <PlayerPage
         ctl={ctl}
         snap={snap}

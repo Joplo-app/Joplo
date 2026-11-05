@@ -1,12 +1,16 @@
 /**
  * Rough.js 手绘描边。种子由 node.id 哈希得到，同一画面每次绘制一致（截图可复现）。
- * 线框主题下不绘制，由 CSS 的 1px 边框代替。
+ * 只在主题的 --jp-stroke 为 rough 时绘制；clean 时由 CSS 的 1px 边框代替（D51）。
+ * 颜色可以是 var(--jp-*) / color-mix(...)：绘制后改写成路径的 CSS 样式，跟随当前主题（切换主题不必重画）。
  */
 import { createContext, useContext, useLayoutEffect, useRef } from 'react';
 import rough from 'roughjs';
 import type { Options } from 'roughjs/bin/core';
 
-export type StageTheme = 'sketch' | 'clean';
+/** 主题名（D51）：内置主题或作者主题 themes/<name>.css。 */
+export type StageTheme = string;
+export type { StrokeMode } from './themes';
+import type { StrokeMode } from './themes';
 
 /** FNV-1a 32 位哈希，映射为正整数种子。 */
 export function seedOf(id: string): number {
@@ -35,8 +39,23 @@ export class RoughRegistry {
   }
 }
 
-export const ThemeContext = createContext<{ theme: StageTheme; registry: RoughRegistry | null }>({ theme: 'sketch', registry: null });
+export const ThemeContext = createContext<{ theme: StageTheme; stroke?: StrokeMode; registry: RoughRegistry | null }>({ theme: 'sketch', stroke: 'rough', registry: null });
 export const useStageTheme = () => useContext(ThemeContext).theme;
+/** 描边方式：rough = 手绘描边；clean = 细线边框（由主题的 --jp-stroke 决定）。 */
+export const useStroke = (): StrokeMode => useContext(ThemeContext).stroke ?? 'rough';
+
+/** Rough 输出的路径里，var(--jp-*) / color-mix(...) 这类颜色写成 CSS 样式（SVG 属性不支持 CSS 变量）。 */
+function themeColors(el: Element) {
+  for (const n of [el, ...el.querySelectorAll('*')]) {
+    for (const a of ['stroke', 'fill']) {
+      const v = n.getAttribute(a);
+      if (v && /var\(|color-mix\(/.test(v)) {
+        (n as SVGElement).style.setProperty(a, v);
+        n.removeAttribute(a);
+      }
+    }
+  }
+}
 
 type Shape = 'rect' | 'ellipse' | 'underline' | 'line' | 'roundrect' | 'custom';
 
@@ -65,12 +84,12 @@ export function roundRectPath(x: number, y: number, w: number, h: number, r: num
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** 放在 position:relative 的盒子里，覆盖整个盒子绘制手绘边框。 */
-export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth = 1.3, fill, fillStyle = 'hachure', dashed, roughness = 1.1, inset = 2, radius = 0, pathOf }: RoughProps) {
-  const { theme, registry } = useContext(ThemeContext);
+export function Rough({ seedKey, shape = 'rect', stroke = 'var(--jp-ink)', strokeWidth = 1.3, fill, fillStyle = 'hachure', dashed, roughness = 1.1, inset = 2, radius = 0, pathOf }: RoughProps) {
+  const { stroke: mode = 'rough', registry } = useContext(ThemeContext);
   const ref = useRef<SVGSVGElement>(null);
 
   useLayoutEffect(() => {
-    if (theme !== 'sketch') return;
+    if (mode !== 'rough') return;
     const svg = ref.current;
     const host = svg?.parentElement;
     if (!svg || !host) return;
@@ -106,6 +125,7 @@ export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth
       else if (shape === 'custom' && pathOf) el = rc.path(pathOf(inset, inset, W - inset * 2, H - inset * 2), opts);
       else if (shape === 'roundrect') el = rc.path(roundRectPath(inset, inset, W - inset * 2, H - inset * 2, radius), opts);
       else el = rc.rectangle(inset, inset, W - inset * 2, H - inset * 2, opts);
+      themeColors(el);
       svg.appendChild(el);
       registry?.done(token);
     };
@@ -116,21 +136,21 @@ export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth
       ro.disconnect();
       registry?.remove(token);
     };
-  }, [theme, registry, seedKey, shape, stroke, strokeWidth, fill, fillStyle, dashed, roughness, inset, radius, pathOf]);
+  }, [mode, registry, seedKey, shape, stroke, strokeWidth, fill, fillStyle, dashed, roughness, inset, radius, pathOf]);
 
-  if (theme !== 'sketch') return null;
+  if (mode !== 'rough') return null;
   return <svg ref={ref} className="jrough" aria-hidden="true" xmlns={SVG_NS} preserveAspectRatio="none" />;
 }
 
 /**
- * 在一个已有的 <svg> 里按绝对坐标画手绘路径（架构图连线、箭头）。只在 sketch 主题下渲染；
+ * 在一个已有的 <svg> 里按绝对坐标画手绘路径（架构图连线、箭头）。只在手绘描边（--jp-stroke: rough）时渲染；
  * 绘制期间登记到 RoughRegistry，渲染路由据此等绘制完成再截图。
  */
-export function RoughPath({ seedKey, d, stroke = '#1e1e1e', strokeWidth = 1.4, fill, dashed, roughness = 0.9 }: { seedKey: string; d: string; stroke?: string; strokeWidth?: number; fill?: string; dashed?: boolean; roughness?: number }) {
-  const { theme, registry } = useContext(ThemeContext);
+export function RoughPath({ seedKey, d, stroke = 'var(--jp-ink)', strokeWidth = 1.4, fill, dashed, roughness = 0.9 }: { seedKey: string; d: string; stroke?: string; strokeWidth?: number; fill?: string; dashed?: boolean; roughness?: number }) {
+  const { stroke: mode = 'rough', registry } = useContext(ThemeContext);
   const ref = useRef<SVGGElement>(null);
   useLayoutEffect(() => {
-    if (theme !== 'sketch') return;
+    if (mode !== 'rough') return;
     const g = ref.current;
     const svg = g?.ownerSVGElement;
     if (!g || !svg || !d) return;
@@ -147,10 +167,12 @@ export function RoughPath({ seedKey, d, stroke = '#1e1e1e', strokeWidth = 1.4, f
       ...(dashed ? { strokeLineDash: [7, 6] } : {}),
       ...(fill ? { fill, fillStyle: 'solid' } : {}),
     };
-    g.appendChild(rough.svg(svg).path(d, opts));
+    const el = rough.svg(svg).path(d, opts);
+    themeColors(el);
+    g.appendChild(el);
     registry?.done(token);
     return () => registry?.remove(token);
-  }, [theme, registry, seedKey, d, stroke, strokeWidth, fill, dashed, roughness]);
-  if (theme !== 'sketch') return null;
+  }, [mode, registry, seedKey, d, stroke, strokeWidth, fill, dashed, roughness]);
+  if (mode !== 'rough') return null;
   return <g ref={ref} className="jrough-path" aria-hidden="true" />;
 }

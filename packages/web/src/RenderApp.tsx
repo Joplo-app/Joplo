@@ -10,7 +10,7 @@
  *   .progress = { step, done, error } 供服务端读取进度。
  */
 import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { SUBTITLE_HEIGHT, displaySceneId, stateAt, type PlayState, type Project } from '@tokenroll/joplo-core';
+import { SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, stateAt, type PlayState, type Project } from '@tokenroll/joplo-core';
 import { fetchIR } from './runtime/dev-client';
 import { DemoController } from './runtime/demo';
 import { Stage, VIEWPORTS, type Viewport } from './renderer/Stage';
@@ -18,6 +18,8 @@ import { PhoneFrame, phoneFrameSize } from './renderer/components';
 import { cameraFor } from './player/cameraFor';
 import { RoughRegistry, ThemeContext, type StageTheme } from './renderer/rough';
 import { Overlay } from './player/Overlay';
+import { strokeOfTheme } from './renderer/themes';
+import { ThemeStyles } from './renderer/ThemeStyles';
 import { cameraPosition } from './player/cameraFor';
 import { Subtitle } from './player/Subtitle';
 import { subtitleFor, type SubtitleContent } from './player/subtitle-content';
@@ -36,7 +38,8 @@ export function RenderApp() {
   const projectId = params.get('project') ?? '';
   const scenarioId = params.get('scenario') ?? '';
   const position = Number(params.get('position') ?? '0');
-  const theme: StageTheme = params.get('theme') === 'clean' ? 'clean' : 'sketch';
+  // 主题（D51）：URL 指定的主题名，没有时用项目配置的默认主题（数据载入后）
+  const themeParam = params.get('theme');
   const frame = params.get('frame') === '1';
   const record = params.get('record') === '1';
   // 可选的截图尺寸（renderStep 的 viewport）：只决定画布大小，舞台宽度仍是页面自己的 viewport（D44）
@@ -46,6 +49,7 @@ export function RenderApp() {
   const registry = useMemo(() => new RoughRegistry(), []);
   const [data, setData] = useState<{ project: Project; state: PlayState } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const theme: StageTheme = themeParam && THEME_NAME.test(themeParam) ? themeParam : (data?.project.theme ?? 'sketch');
   const [stage, setStage] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -75,7 +79,8 @@ export function RenderApp() {
       const w = window as unknown as W;
       if (!record) w.__JOPLO_STATE__ = data.state;
       await raf();
-      if (theme === 'sketch') {
+      {
+        // 手绘字体按需加载（主题可能用到）；等它们就绪再截图
         const text = stage.innerText || '中文';
         await Promise.all([document.fonts.load('16px "Joplo Excalifont"', text), document.fonts.load('16px "Joplo Xiaolai"', text)]).catch(() => undefined);
       }
@@ -105,7 +110,7 @@ export function RenderApp() {
   const vp = VIEWPORTS[viewport];
   const framed = (stageNode: ReactNode) =>
     viewport === 'mobile' ? (
-      <ThemeContext.Provider value={{ theme, registry }}>
+      <ThemeContext.Provider value={{ theme, stroke: strokeOfTheme(theme, data.project.themes ?? {}), registry }}>
         <PhoneFrame width={vp.width} height={vp.height} seed="stage-phone">
           {stageNode}
         </PhoneFrame>
@@ -124,7 +129,13 @@ export function RenderApp() {
       <Subtitle content={sub} theme={theme} width={w} framed fixedHeight={fixedSub ? SUBTITLE_HEIGHT : undefined} />
     </div>
   );
-  const wrap = (stageNode: ReactNode, sub: SubtitleContent | null) => {
+  const wrap = (stageNode: ReactNode, sub: SubtitleContent | null) => (
+    <>
+      <ThemeStyles themes={data.project.themes} />
+      {wrapInner(stageNode, sub)}
+    </>
+  );
+  const wrapInner = (stageNode: ReactNode, sub: SubtitleContent | null) => {
     if (frame)
       return (
         <div data-jexport="" style={{ position: 'absolute', left: 0, top: 0, display: 'inline-block', ...(viewport === 'mobile' ? { background: '#ffffff', padding: 16 } : {}) }}>

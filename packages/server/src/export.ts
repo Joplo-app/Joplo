@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright';
-import { JoploError, SUBTITLE_HEIGHT, displaySceneId, type Project } from '@tokenroll/joplo-core';
+import { JoploError, SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, type Project } from '@tokenroll/joplo-core';
 import { launch, loadPlaywright, type PlaywrightModule } from './render.ts';
 
 export type Device = 'desktop' | 'mobile';
@@ -78,7 +78,8 @@ function parseRequest(project: Project | null, body: unknown, needPosition: bool
   // 设备跟随页面自己的 viewport（D44）
   const sceneId = displaySceneId(project, sc.id, position);
   const device: Device = project.scenes[sceneId]?.viewport === 'mobile' ? 'mobile' : 'desktop';
-  const theme = b.theme === 'clean' ? 'clean' : 'sketch';
+  // 主题（D51）：请求里的主题名，没有或不合法时用项目配置的主题
+  const theme = typeof b.theme === 'string' && THEME_NAME.test(b.theme) ? b.theme : project.theme;
   return { sc, position, device, theme };
 }
 

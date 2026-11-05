@@ -9,22 +9,40 @@ export const SPACING: Record<string, number> = { xs: 10, sm: 12, md: 16, lg: 20,
 export const FONT: Record<string, number> = { xs: 12, sm: 14, md: 16, lg: 18, xl: 20 };
 export const RADIUS: Record<string, number> = { xs: 2, sm: 4, md: 8, lg: 16, xl: 32 };
 
-export const INK = '#1e1e1e';
-export const SOFT = '#9a9a9a';
-export const DIMMED = '#868e96';
+// 主题色（D51）：全部读主题的 CSS 变量（renderer/themes.ts），不写死颜色
+export const INK = 'var(--jp-ink)';
+/** 次一级的文字与线条：正文色与底色混合。 */
+export const INK2 = 'color-mix(in srgb, var(--jp-ink) 78%, var(--jp-bg))';
+export const SOFT = 'var(--jp-faint)';
+export const DIMMED = 'var(--jp-muted)';
+export const BG = 'var(--jp-bg)';
+export const SURFACE = 'var(--jp-surface)';
+export const SUBTLE = 'var(--jp-subtle)';
+export const LINE = 'var(--jp-line)';
+export const LINE_STRONG = 'var(--jp-line-strong)';
+export const ACCENT = 'var(--jp-accent)';
+export const INFO = 'var(--jp-info)';
+export const OK = 'var(--jp-ok)';
+export const WARN = 'var(--jp-warn)';
+export const DANGER = 'var(--jp-danger)';
+export const MONO = 'var(--jp-font-mono)';
+/** 实心底上的文字：底是正文色（例如 color="dark"）时用舞台底色，其余用白色。 */
+export const onFill = (c: string) => (c === INK || c === 'var(--jp-ink)' ? BG : '#fff');
+/** 某个颜色的浅色底（混入卡片底色，深色主题里也是“浅一点”的那一档）。 */
+export const tint = (c: string, pct = 12) => `color-mix(in srgb, ${c} ${pct}%, var(--jp-surface))`;
 
 const PALETTE: Record<string, string> = {
-  dark: '#2e2e2e',
-  gray: '#868e96',
-  red: '#e03131',
+  dark: 'var(--jp-ink)',
+  gray: 'var(--jp-muted)',
+  red: 'var(--jp-danger)',
   pink: '#c2255c',
   grape: '#9c36b5',
   violet: '#7048e8',
   indigo: '#4263eb',
-  blue: '#1c7ed6',
+  blue: 'var(--jp-info)',
   cyan: '#1098ad',
   teal: '#0ca678',
-  green: '#2f9e44',
+  green: 'var(--jp-ok)',
   lime: '#66a80f',
   yellow: '#f08c00',
   orange: '#e8590c',
@@ -42,16 +60,16 @@ export function color(v: unknown): string | undefined {
     const base = PALETTE[m[1]!]!;
     if (m[2] === undefined) return base;
     const n = Number(m[2]);
-    if (n < 6) return `color-mix(in srgb, ${base} ${100 - (6 - n) * 15}%, white)`;
-    if (n > 6) return `color-mix(in srgb, ${base} ${100 - (n - 6) * 12}%, black)`;
+    if (n < 6) return `color-mix(in srgb, ${base} ${100 - (6 - n) * 15}%, var(--jp-surface))`;
+    if (n > 6) return `color-mix(in srgb, ${base} ${100 - (n - 6) * 12}%, var(--jp-ink))`;
     return base;
   }
   if (/^(#|rgb|hsl|oklch|var\()/.test(v)) return v;
   return undefined;
 }
 
-/** 浅色底（light 变体、Alert 背景）。 */
-export const light = (c: string) => `color-mix(in srgb, ${c} 11%, white)`;
+/** 浅色底（light 变体、Alert 背景）：混入主题的卡片底色。 */
+export const light = (c: string) => `color-mix(in srgb, ${c} 11%, var(--jp-surface))`;
 
 /** 间距：刻度名 → px；数字 → px；其余字符串原样（如 'auto'、'1rem'）。 */
 export function space(v: unknown): string | undefined {
@@ -86,8 +104,8 @@ export function radius(v: unknown): string | undefined {
 export const TITLE_SIZE = [30, 24, 20, 17, 15, 14];
 
 const FAMILY: Record<string, string> = {
-  monospace: 'ui-monospace, SFMono-Regular, Menlo, "Joplo Xiaolai", monospace',
-  mono: 'ui-monospace, SFMono-Regular, Menlo, "Joplo Xiaolai", monospace',
+  monospace: 'var(--jp-font-mono)',
+  mono: 'var(--jp-font-mono)',
 };
 
 const ALIGN: Record<string, string> = { left: 'left', center: 'center', right: 'right', justify: 'justify', start: 'start', end: 'end' };

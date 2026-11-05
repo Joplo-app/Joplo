@@ -136,3 +136,43 @@ export function pidAlive(pid: number): boolean {
     return (e as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
+
+// ---------- 看板设置（D51）：<JOPLO_HOME>/settings.json ----------
+/**
+ * `{ version: 1, theme?: string | null, projects?: { [项目 id]: { theme: string | null } } }`
+ * theme：所有项目的主题选择；projects[id].theme：按项目覆盖，null 表示“恢复为项目默认”（使用项目 config 里的主题）。
+ * 写入点：看板设置页（PUT /__joplo/settings）；读取点：看板演示页与设置页（GET /__joplo/settings）。原子写入。
+ */
+export type BoardSettings = { version: 1; theme?: string | null; projects?: Record<string, { theme: string | null }> };
+const NAME = /^[A-Za-z][\w-]*$/;
+
+/** 校验并规范化设置（未知字段丢弃，主题名不合法的条目丢弃）。 */
+export function normalizeSettings(v: unknown): BoardSettings {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const out: BoardSettings = { version: 1 };
+  if (typeof o.theme === 'string' && NAME.test(o.theme)) out.theme = o.theme;
+  else if (o.theme === null) out.theme = null;
+  const projects = o.projects && typeof o.projects === 'object' ? (o.projects as Record<string, unknown>) : {};
+  const p: Record<string, { theme: string | null }> = {};
+  for (const [id, x] of Object.entries(projects)) {
+    if (!/^[\w-]{1,64}$/.test(id) || !x || typeof x !== 'object') continue;
+    const t = (x as { theme?: unknown }).theme;
+    if (t === null || (typeof t === 'string' && NAME.test(t))) p[id] = { theme: t };
+  }
+  if (Object.keys(p).length) out.projects = p;
+  return out;
+}
+
+export function readSettings(home: string): BoardSettings {
+  try {
+    return normalizeSettings(JSON.parse(fs.readFileSync(path.join(home, 'settings.json'), 'utf8')));
+  } catch {
+    return { version: 1 };
+  }
+}
+
+export function writeSettings(home: string, s: unknown): BoardSettings {
+  const n = normalizeSettings(s);
+  atomicWrite(path.join(home, 'settings.json'), JSON.stringify(n, null, 2) + '\n');
+  return n;
+}
