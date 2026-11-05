@@ -2,13 +2,20 @@
  * 两个方案共用的部分：架构图、客户端画面、核心块说明、步骤辅助函数。
  * v = 'a'：混合的手（端侧执行器 + 云端沙箱）；v = 'b'：所有工具都在云端沙箱。
  */
-import { $, eq, set, type Bind, type JNode } from '@tokenroll/joplo-kit';
+import { $, eq, layer, set, type Bind, type JNode } from '@tokenroll/joplo-kit';
 import {
   ActionIcon, Alert, Badge, Button, Card, ChatMessage, Diagram, Group, Modal, Paper, PromptInput, SimpleGrid, Stack, Text, ToolCall,
 } from '@tokenroll/joplo-kit/ui';
 
 type V = 'a' | 'b';
 const ui = $.ui as unknown as Record<string, Bind>;
+
+/** 三个层级：客户端视角、后端流转、核心块说明；另有自动的全景。 */
+export const layers = {
+  client: layer('客户端视角', ['client_panel']),
+  backend: layer('后端流转', ['arch']),
+  blocks: layer('核心块说明', ['blocks']),
+};
 
 export const ASK = '帮我把桌面「报销」文件夹里的发票整理成一张汇总表';
 
@@ -18,54 +25,54 @@ export const arch = (v: V): JNode => (
     <Diagram.Group id="g_device" label="用户设备">
       {[
         <Diagram.Node id="app" label="客户端界面" kind="client" description="对话、确认弹窗" state={ui.n_app} />,
-        ...(v === 'a' ? [<Diagram.Node id="local" label="端侧执行器" kind="tool" description="手：read_files、delete_files" state={ui.n_local} />] : []),
+        ...(v === 'a' ? [<Diagram.Node id="local" when={ui.r_hands} label="端侧执行器" kind="tool" description="手：read_files、delete_files" state={ui.n_local} />] : []),
       ]}
     </Diagram.Group>
-    <Diagram.Group id="g_aws" label="AWS">
-      <Diagram.Group id="g_ctrl" label="控制面">
-        <Diagram.Node id="biz" label="Biz Server" kind="service" description="鉴权 · 会话 · 审计 · 转发" state={ui.n_biz} />
-        <Diagram.Node id="registry" label="Tool Registry" kind="database" description="工具定义：名称 · schema · 危险级别 · 单价" state={ui.n_registry} />
-        <Diagram.Node id="db" label="DynamoDB" kind="database" description="会话与审计日志" state={ui.n_db} />
+    <Diagram.Group id="g_aws" when={ui.r_biz} label="AWS">
+      <Diagram.Group id="g_ctrl" when={ui.r_biz} label="控制面">
+        <Diagram.Node id="biz" when={ui.r_biz} label="Biz Server" kind="service" description="鉴权 · 会话 · 审计 · 转发" state={ui.n_biz} />
+        <Diagram.Node id="registry" when={ui.r_registry} label="Tool Registry" kind="database" description="工具定义：名称 · schema · 危险级别 · 单价" state={ui.n_registry} />
+        <Diagram.Node id="db" when={ui.r_biz} label="DynamoDB" kind="database" description="会话与审计日志" state={ui.n_db} />
       </Diagram.Group>
-      <Diagram.Group id="g_brain" label="大脑">
-        <Diagram.Node id="brain" label="Agent 大脑" kind="service" description="ECS：规划，只产出工具调用" state={ui.n_brain} />
-        <Diagram.Node id="llm" label="Bedrock" kind="model" description="Claude 模型" state={ui.n_llm} />
+      <Diagram.Group id="g_brain" when={ui.r_brain} label="大脑">
+        <Diagram.Node id="brain" when={ui.r_brain} label="Agent 大脑" kind="service" description="ECS：规划，只产出工具调用" state={ui.n_brain} />
+        <Diagram.Node id="llm" when={ui.r_brain} label="Bedrock" kind="model" description="Claude 模型" state={ui.n_llm} />
       </Diagram.Group>
-      <Diagram.Group id="g_hands" label="云端的手">
+      <Diagram.Group id="g_hands" when={ui.r_hands} label="云端的手">
         {[
-          <Diagram.Node id="sandbox" label="云端沙箱" kind="tool" description={v === 'a' ? 'Fargate：make_sheet 等云端工具' : 'Fargate：所有工具'} state={ui.n_sandbox} />,
-          ...(v === 'b' ? [<Diagram.Node id="s3" label="S3 上传区" kind="storage" description="用户上传的本机文件" state={ui.n_s3} />] : []),
+          <Diagram.Node id="sandbox" when={ui.r_hands} label="云端沙箱" kind="tool" description={v === 'a' ? 'Fargate：make_sheet 等云端工具' : 'Fargate：所有工具'} state={ui.n_sandbox} />,
+          ...(v === 'b' ? [<Diagram.Node id="s3" when={ui.r_hands} label="S3 上传区" kind="storage" description="用户上传的本机文件" state={ui.n_s3} />] : []),
         ]}
       </Diagram.Group>
-      <Diagram.Group id="g_bill" label="计费">
-        <Diagram.Node id="queue" label="SQS" kind="queue" description="用量事件" state={ui.n_queue} />
-        <Diagram.Node id="billing" label="Billing" kind="service" description="额度 · 计量 · 扣费" state={ui.n_billing} />
+      <Diagram.Group id="g_bill" when={ui.r_bill} label="计费">
+        <Diagram.Node id="queue" when={ui.r_bill} label="SQS" kind="queue" description="用量事件" state={ui.n_queue} />
+        <Diagram.Node id="billing" when={ui.r_bill} label="Billing" kind="service" description="额度 · 计量 · 扣费" state={ui.n_billing} />
       </Diagram.Group>
     </Diagram.Group>
 
-    <Diagram.Edge id="e_app_biz" from="app" to="biz" label="消息 ⇄ 回答" state={ui.e_app_biz} />
-    <Diagram.Edge id="e_biz_billing" from="biz" to="billing" label="① 额度预检" state={ui.e_biz_billing} />
-    <Diagram.Edge id="e_biz_registry" from="biz" to="registry" label="② 取工具定义" state={ui.e_biz_registry} />
-    <Diagram.Edge id="e_biz_db" from="biz" to="db" label="会话 · 审计" async state={ui.e_biz_db} />
-    <Diagram.Edge id="e_biz_brain" from="biz" to="brain" label="③ 任务 + 工具定义" state={ui.e_biz_brain} />
-    <Diagram.Edge id="e_brain_llm" from="brain" to="llm" label="④ 推理" state={ui.e_brain_llm} />
-    <Diagram.Edge id="e_brain_biz" from="brain" to="biz" label="⑤ 工具调用（只发出）" state={ui.e_brain_biz} />
+    <Diagram.Edge id="e_app_biz" when={ui.r_biz} from="app" to="biz" label="消息 ⇄ 回答" state={ui.e_app_biz} />
+    <Diagram.Edge id="e_biz_billing" when={ui.r_bill} from="biz" to="billing" label="① 额度预检" state={ui.e_biz_billing} />
+    <Diagram.Edge id="e_biz_registry" when={ui.r_registry} from="biz" to="registry" label="② 取工具定义" state={ui.e_biz_registry} />
+    <Diagram.Edge id="e_biz_db" when={ui.r_biz} from="biz" to="db" label="会话 · 审计" async state={ui.e_biz_db} />
+    <Diagram.Edge id="e_biz_brain" when={ui.r_brain} from="biz" to="brain" label="③ 任务 + 工具定义" state={ui.e_biz_brain} />
+    <Diagram.Edge id="e_brain_llm" when={ui.r_brain} from="brain" to="llm" label="④ 推理" state={ui.e_brain_llm} />
+    <Diagram.Edge id="e_brain_biz" when={ui.r_brain} from="brain" to="biz" label="⑤ 工具调用（只发出）" state={ui.e_brain_biz} />
     {[
-      ...(v === 'a' ? [<Diagram.Edge id="e_biz_local" from="biz" to="local" label="下发端侧工具" state={ui.e_biz_local} />] : []),
+      ...(v === 'a' ? [<Diagram.Edge id="e_biz_local" when={ui.r_hands} from="biz" to="local" label="下发端侧工具" state={ui.e_biz_local} />] : []),
       ...(v === 'b' ? [
-        <Diagram.Edge id="e_app_s3" from="app" to="s3" label="上传本机文件" state={ui.e_app_s3} />,
-        <Diagram.Edge id="e_sandbox_s3" from="sandbox" to="s3" label="读取" state={ui.e_sandbox_s3} />,
+        <Diagram.Edge id="e_app_s3" when={ui.r_hands} from="app" to="s3" label="上传本机文件" state={ui.e_app_s3} />,
+        <Diagram.Edge id="e_sandbox_s3" when={ui.r_hands} from="sandbox" to="s3" label="读取" state={ui.e_sandbox_s3} />,
       ] : []),
     ]}
-    <Diagram.Edge id="e_biz_sandbox" from="biz" to="sandbox" label="下发云端工具" state={ui.e_biz_sandbox} />
-    <Diagram.Edge id="e_brain_queue" from="brain" to="queue" label="用量事件" async state={ui.e_brain_queue} />
-    <Diagram.Edge id="e_queue_billing" from="queue" to="billing" label="入账（幂等）" async state={ui.e_queue_billing} />
+    <Diagram.Edge id="e_biz_sandbox" when={ui.r_hands} from="biz" to="sandbox" label="下发云端工具" state={ui.e_biz_sandbox} />
+    <Diagram.Edge id="e_brain_queue" when={ui.r_bill} from="brain" to="queue" label="用量事件" async state={ui.e_brain_queue} />
+    <Diagram.Edge id="e_queue_billing" when={ui.r_bill} from="queue" to="billing" label="入账（幂等）" async state={ui.e_queue_billing} />
   </Diagram>
 );
 
 // ---------- 客户端画面 ----------
 export const client = (v: V): JNode => (
-  <Paper withBorder radius="md" p="md">
+  <Paper id="client_panel" withBorder radius="md" p="md">
     <Stack gap="sm">
       <Text fw={600}>客户端</Text>
       <ChatMessage id="msg_user" from="user" when={ui.asked}>{ui.ask}</ChatMessage>
@@ -104,7 +111,7 @@ export const approvalModal = (): JNode => (
 
 // ---------- 核心块说明 ----------
 const Block = (p: { k: string; title: string; does: string; not: string }) => (
-  <Card withBorder radius="md" padding="md">
+  <Card id={`blk_${p.k}`} withBorder radius="md" padding="md">
     <Stack gap={6}>
       <Group justify="space-between">
         <Text fw={700}>{p.title}</Text>
@@ -117,7 +124,7 @@ const Block = (p: { k: string; title: string; does: string; not: string }) => (
 );
 
 export const blocks = (v: V): JNode => (
-  <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="md">
+  <SimpleGrid id="blocks" cols={3} spacing="md">
     <Block k="client" title={v === 'a' ? '客户端（端侧的手）' : '客户端（只是界面）'}
       does={v === 'a' ? '对话界面；在用户电脑上执行本机工具（读写本地文件）；危险操作先弹窗确认。' : '对话界面；需要本机文件时先上传到 S3；危险操作弹窗确认。'}
       not="不推理，不保存任何密钥。" />
@@ -139,6 +146,7 @@ export const initialUi = () => ({
   readShown: false, deleteShown: false, sheetShown: false, uploading: false, needUpload: false,
   t_read: 'running', t_delete: 'running', t_sheet: 'running', t_upload: 'running',
   quotaErr: false, approveOpen: false,
+  r_biz: true, r_registry: true, r_brain: true, r_hands: true, r_bill: true,
 });
 
 const to = (state: string) => (...keys: string[]) => keys.map((k) => set(ui[k]!, state));
