@@ -23,7 +23,7 @@ const temp = () => { const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdi
 function fakeCli(root: string, version: string, kit?: string) {
   const dir = path.join(root, 'node_modules/@joplo/cli');
   fs.mkdirSync(path.join(dir, 'dist'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: '@joplo/cli', version, type: 'module', bin: { joplo: './dist/bin.js' } }));
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: '@joplo/cli', version, type: 'module', bin: { 'joplo-cli': './dist/bin.js' } }));
   fs.writeFileSync(path.join(dir, 'dist/bin.js'), `console.log('fake-cli ${version} ' + JSON.stringify(process.argv.slice(2))); process.exitCode = 7;\n`);
   if (kit) {
     fs.mkdirSync(path.join(root, 'node_modules/@joplo/kit'), { recursive: true });

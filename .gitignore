@@ -38,3 +38,6 @@ test-results/
 
 # 本地草稿、临时截图、构建试验
 scratch/
+
+# 发布打包产物（pnpm release:pack）
+release/

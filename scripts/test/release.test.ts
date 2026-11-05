@@ -64,7 +64,7 @@ describe('各包的发布配置', () => {
     expect(server.peerDependenciesMeta?.playwright?.optional).toBe(true);
     const cli = pkgs.find((p) => p.dir === 'cli')!.pkg;
     for (const d of ['tsx', 'commander', '@joplo/server', '@joplo/core']) expect(cli.dependencies[d], d).toBeDefined();
-    expect(cli.publishConfig.bin.joplo).toBe('./dist/bin.js');
+    expect(cli.publishConfig.bin).toEqual({ 'joplo-cli': './dist/bin.js' }); // 不能叫 joplo：会占掉入口包的 .bin/joplo
     const web = pkgs.find((p) => p.dir === 'web')!.pkg;
     expect(web.dependencies ?? {}).toEqual({});
     const joplo = pkgs.find((p) => p.dir === 'joplo')!.pkg;

@@ -3,6 +3,7 @@
  * 把一个 TS 包构建到 dist/（在包目录里运行：`pnpm --filter @joplo/core build`）。
  *
  * - tsc -p tsconfig.build.json：输出 JS 与 .d.ts，`./x.ts` 导入改写为 `./x.js`（rewriteRelativeImportExtensions）。
+ * - .d.ts 里的 `./x.ts` 导入同样改写为 `./x.js`（tsc 只改写 JS）。
  * - src 里的非 TS 文件（例如 server 的 page-report.js）原样复制。
  * - publishConfig.bin 指向的文件：shebang 改为 `#!/usr/bin/env node` 并设为可执行（源码里是 tsx）。
  * - 校验：publishConfig.exports / bin 指向的文件都存在；dist 里没有残留的 .ts 相对导入、跨包相对导入。
@@ -35,6 +36,13 @@ for (const f of walk(src)) {
   const to = path.join(dist, path.relative(src, f));
   fs.mkdirSync(path.dirname(to), { recursive: true });
   fs.copyFileSync(f, to);
+}
+
+// tsc 不改写 .d.ts 里的 `./x.ts` 导入（rewriteRelativeImportExtensions 只作用于 JS）
+for (const f of walk(dist).filter((x) => x.endsWith('.d.ts'))) {
+  const code = fs.readFileSync(f, 'utf8');
+  const fixed = code.replace(/((?:from|import)\s*\(?\s*["'])(\.{1,2}\/[^"']*?)\.tsx?(["'])/g, '$1$2.js$3');
+  if (fixed !== code) fs.writeFileSync(f, fixed);
 }
 
 const pub = pkg.publishConfig ?? {};

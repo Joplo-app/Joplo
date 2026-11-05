@@ -3,7 +3,8 @@ import { resolve } from 'node:path';
 import { guide, JoploError, skillIndex, skillTopic } from '@joplo/core';
 import type * as Server from '@joplo/server';
 import { check } from './check.ts';
-import { initProject } from './init.ts';
+import { initProject, initSummary } from './init.ts';
+import { projectNotes } from './startup.ts';
 import { readSelection } from './selection.ts';
 import { installSkill, readCliVersion } from './skill.ts';
 import { diagnosticLine, failure, oneLine, result } from './common.ts';
@@ -12,6 +13,8 @@ type Dependencies = {
   stdout?: (s: string) => void;
   stderr?: (s: string) => void;
   loadServer?: () => Promise<Record<string, unknown>>;
+  /** 测试用：覆盖 CLI 自己的版本（缺省读 package.json）。 */
+  cliVersion?: string;
 };
 const integer = (name: string, max = Number.MAX_SAFE_INTEGER) => (text: string) => {
   const n = Number(text);
@@ -42,6 +45,10 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   }
   const program = new Command().name('joplo').description('Joplo：用 TSX 创作、演示和发布功能设计').exitOverride()
     .configureOutput({ writeOut: stdout, writeErr: stderr, outputError: () => {} });
+  // 读取项目的命令先检查项目里的 @joplo/kit 与 CLI 是否同一版本（只提示，不阻止）
+  program.hook('preAction', (_root, action) => {
+    for (const note of projectNotes(resolve(String(action.args[0] ?? '.')), action.name(), { cli: deps.cliVersion })) stderr(note + '\n');
+  });
   const format = () => new Option('--format <format>', '输出格式').choices(['text', 'json']).default('text');
   program.command('check').argument('[dir]', '项目目录', '.').addOption(format()).option('--option <qid>', '仅校验指定方案').action(async (dir, opts) => {
     const report = await check(dir, opts.option);
@@ -58,7 +65,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (opts.format === 'json') json(result(resolve(dir), summary, data));
     else { line(summary); for (const l of data.lines) line(`${l.number} | ${l.text}`); if (data.note) line(data.note); }
   });
-  program.command('init').argument('<dir>').option('--name <name>', '项目名（默认目录名）').action(async (dir, opts) => { line(`已创建 ${await initProject(dir, opts.name)}`); });
+  program.command('init').argument('<dir>').option('--name <name>', '项目名（默认目录名）').option('--keep', '目录非空时只补缺失的文件，已有文件不改动')
+    .action(async (dir, opts) => { for (const l of initSummary(await initProject(dir, opts.name, { keep: opts.keep }))) line(l); });
   program.command('skill').description('按需读取 Agent 用法，或安装用法入口')
     .argument('[topic]', 'authoring/components/cases/check/selection/publish，或 install')
     .argument('[dir]', 'install 的目标项目目录')

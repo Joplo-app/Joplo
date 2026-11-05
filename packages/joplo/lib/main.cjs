@@ -5,7 +5,8 @@
  *   2. 否则用本包自己依赖的 @joplo/cli。
  * 例外：init 总是用本包的版本——用户用 `npx joplo@<版本> init` 明确指定了要生成哪个版本的项目。
  *
- * 转发方式：读取所选 @joplo/cli 的 package.json 的 bin.joplo，用 import() 运行它（参数沿用 process.argv）。
+ * 转发方式：读取所选 @joplo/cli 的 package.json 的 bin['joplo-cli']，用 import() 运行它（参数沿用 process.argv）。
+ * @joplo/cli 的命令名故意不叫 joplo：否则 npm 安装时它会占掉 node_modules/.bin/joplo，绕过本入口。
  */
 'use strict';
 
@@ -33,12 +34,12 @@ function findUp(dir, name) {
   }
 }
 
-/** 读取一份 @joplo/cli；package.json 坏掉或没有 bin.joplo 时返回 null。 */
+/** 读取一份 @joplo/cli；package.json 坏掉或没有 bin['joplo-cli'] 时返回 null。 */
 function describeCli(pkgFile) {
   if (!pkgFile) return null;
   const pkg = readJson(pkgFile);
   if (!pkg || typeof pkg.version !== 'string') return null;
-  const bin = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin && typeof pkg.bin.joplo === 'string' ? pkg.bin.joplo : null;
+  const bin = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin && typeof pkg.bin['joplo-cli'] === 'string' ? pkg.bin['joplo-cli'] : null;
   if (!bin) return null;
   const dir = fs.realpathSync(path.dirname(pkgFile));
   const file = path.resolve(dir, bin);

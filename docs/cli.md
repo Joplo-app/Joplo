@@ -83,7 +83,16 @@ JSON 的 `data.selection` 保留原 Selection，`data.lines` 是 `{ number, text
 
 ## init
 
-init 只接受不存在或空目录，非空目录拒绝且不覆盖。生成 config、布局、首页、一个功能/方案/场景、ESM package.json、tsconfig 和 .gitignore；tsconfig 使用 react-jsxdev、@joplo/kit、allowImportingTsExtensions。仓库内生成后可立即 check。仓库外须先为项目安装/链接本地 `@joplo/kit`，当前限制及方法见根 README。
+init 只接受不存在或空目录；非空目录时不写入任何文件，说明已有几个文件，并提示 `init . --keep`（只补缺失的文件，已有文件一字不改）。生成 config、布局、首页、一个功能/方案/场景、package.json、tsconfig 和 .gitignore：
+
+- package.json：ESM，`devDependencies` 锁定 `"joplo"` 与 `"@joplo/kit"` 为当前 CLI 的精确版本（读自 `@joplo/cli` 的 package.json，所有包同一版本），并带 `dev` / `check` / `build` 脚本；
+- tsconfig：react-jsxdev、jsxImportSource `@joplo/kit`、allowImportingTsExtensions、skipLibCheck。
+
+输出最后一行是下一步命令，按 `npm_config_user_agent`（npx、pnpm、yarn、bunx 都会设置）选择 npm / pnpm / yarn / bun 的写法，例如 `下一步：cd my-demo && npm install && npx joplo dev`。仓库内生成后可立即 check。
+
+check / dev / build / render 运行前比较项目里的 `@joplo/kit`（从项目目录向上找 node_modules）与 CLI 版本；不同则在 stderr 打印一行警告和对齐命令（如 `npm i -D joplo@0.1.0 @joplo/kit@0.1.0`），声明了依赖却没安装则提示先安装。只提示，不阻止命令。
+
+命令入口：`joplo` 包（packages/joplo）先检查 Node ≥ 22，再优先转发给项目内安装的 `@joplo/cli`（init 除外，总用 npx 指定的版本）。`@joplo/cli` 自己的命令名是 `joplo-cli`，避免安装时占掉入口包的 `joplo`。
 
 ## dev / build / render
 
@@ -91,7 +100,7 @@ init 只接受不存在或空目录，非空目录拒绝且不覆盖。生成 co
 
 - dev 默认端口 4790；占用时由服务端明确报错，不静默换端口。log 回调写 stderr；stdout 返回 URL。
 - build 默认输出项目 dist；显式 out-dir 相对 CLI 当前目录解析。非空输出目录需主动传 overwrite；由服务端执行覆盖检查。输出诊断与构建位置。
-- render 缺省截图初始状态；step-id 表示该步骤执行之后的状态。width/height 必须同时提供且为正整数；scale 为有限正数。路径相对当前目录解析。默认不覆盖文件；stdout 返回图片路径，告警写 stderr。
+- render 需要可选依赖 Playwright 与 Chromium：没装时在启动编译服务之前就以 RENDER_FAILED 退出 1，提示 `npm i -D playwright && npx playwright install chromium`，并说明 dev、check、build 不需要它。render 缺省截图初始状态；step-id 表示该步骤执行之后的状态。width/height 必须同时提供且为正整数；scale 为有限正数。路径相对当前目录解析。默认不覆盖文件；stdout 返回图片路径，告警写 stderr。
 
 apply、get、history、restore、mcp、validate、serve 旧入口已移除。用 check 代替 validate，用 dev 代替 serve。MCP SDK 依赖已从 CLI 移除；MCP 属于产品 V2。
 

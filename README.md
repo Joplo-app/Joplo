@@ -36,26 +36,25 @@ Joplo 的做法：
 
 ## 安装
 
-当前是源码工作区版本，需要 Node.js 22+ 和 pnpm（仓库指定版本见 `package.json`）：
+需要 Node.js 22+。发布到 npm 后（首个版本计划以 `beta` 标签发布 0.1.0，见 [docs/release.md](docs/release.md)），在任意目录：
+
+```sh
+npx joplo@0.1.0 init my-demo          # 生成项目，package.json 锁定 "joplo" 与 "@joplo/kit" 的同一精确版本
+cd my-demo && npm install
+npx joplo dev                          # 看板：http://127.0.0.1:4790/
+```
+
+`init` 结尾会按你用的包管理器（npm、pnpm、yarn、bun）打印这三条命令。之后 `npx joplo check`、`npx joplo build`、`npx joplo selection` 都使用项目里安装的版本；`npx joplo@latest …` 拉到的版本与项目不同时，也改用项目内的版本并提示怎样升级。截图命令 `joplo render` 另需 `npm i -D playwright && npx playwright install chromium`，其他命令不需要浏览器。
+
+在本仓库里开发 Joplo 本身：
 
 ```sh
 pnpm install
-pnpm joplo guide
+pnpm joplo guide                       # 直接运行 TS 源码，不需要构建
+pnpm release:smoke                     # 打包所有包，在仓库外只用 tarball 跑通 init → install → check → build → dev → selection
 ```
 
-`@joplo/cli`、`@joplo/kit` 尚未作为独立的包发布。下文命令都在仓库根目录执行，`pnpm joplo` 调用工作区里的 CLI。仓库外的项目必须能从自己的目录解析到本仓库的 `@joplo/kit`（包括 `@joplo/kit/ui` 和 JSX runtime）。例如，在外部项目的 `package.json` 中添加本地依赖后安装：
-
-```json
-{
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@joplo/kit": "link:/绝对路径/Joplo/packages/kit"
-  }
-}
-```
-
-`init` 生成 ESM 项目和创作文件，但不自动安装依赖，所以在仓库外使用时先完成上述链接。CLI 仍从仓库运行，如 `pnpm joplo check /绝对路径/my-demo`。不要改用 React 的 JSX runtime，否则会丢失 Joplo 数据和源位置。
+仓库内的 `pnpm joplo` 把 `@joplo/kit` 解析到工作区源码，下文示例都在仓库根目录执行。不要改用 React 的 JSX runtime，否则会丢失 Joplo 数据和源位置。
 
 ## Agent 按需读取用法
 
