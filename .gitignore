@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+# 示例项目的运行时产物（修订快照、回执、选择状态、缓存）不入库
+examples/*/.joplo/
+examples/*/exports/
+packages/web/test-results/
+.done
+.blocked

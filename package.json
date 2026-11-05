@@ -1,0 +1,20 @@
+{
+  "name": "joplo-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.16.1",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "joplo": "tsx packages/cli/src/bin.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "web:dev": "pnpm --filter @joplo/web dev",
+    "web:build": "pnpm --filter @joplo/web build"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
+  }
+}

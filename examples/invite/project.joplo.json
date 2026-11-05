@@ -1,0 +1,985 @@
+{
+  "schemaVersion": 1,
+  "id": "prj_invite",
+  "name": "团队邀请功能",
+  "description": "Joplo 黄金案例：空间管理员邀请成员并指定协作权限。方案与条件仅用于测试设计能力，不是对真实产品的推荐。",
+  "revision": 1,
+  "updatedAt": "2026-11-05T00:00:00.000Z",
+  "features": {
+    "feat_invite": {
+      "id": "feat_invite",
+      "name": "团队成员邀请",
+      "goal": "空间管理员邀请成员加入空间，并指定其协作权限",
+      "roles": [
+        "空间管理员",
+        "普通成员",
+        "受邀者"
+      ],
+      "constraints": [
+        {
+          "id": "con_admin_only",
+          "text": "非管理员不能邀请",
+          "hard": true
+        },
+        {
+          "id": "con_revocable",
+          "text": "邀请应可撤销",
+          "hard": true
+        },
+        {
+          "id": "con_role_cap",
+          "text": "受邀者不能获得高于设定的权限",
+          "hard": true
+        }
+      ],
+      "caseIds": [
+        "case_happy",
+        "case_no_permission",
+        "case_invalid_input",
+        "case_revoked",
+        "case_expired",
+        "case_already_member",
+        "case_duplicate_submit",
+        "case_request_failed"
+      ],
+      "optionIds": [
+        "opt_a"
+      ],
+      "dependsOn": []
+    }
+  },
+  "cases": {
+    "case_happy": {
+      "id": "case_happy",
+      "featureId": "feat_invite",
+      "title": "正常发出邀请并被接受",
+      "dimension": "main",
+      "expected": "管理员发出邀请，受邀者接受后成为成员",
+      "priority": "high"
+    },
+    "case_no_permission": {
+      "id": "case_no_permission",
+      "featureId": "feat_invite",
+      "title": "非管理员尝试邀请",
+      "dimension": "permission",
+      "expected": "不能发起邀请，并看到原因",
+      "priority": "high"
+    },
+    "case_invalid_input": {
+      "id": "case_invalid_input",
+      "featureId": "feat_invite",
+      "title": "邮箱为空或格式无效",
+      "dimension": "input",
+      "expected": "阻止提交并就地提示",
+      "priority": "high"
+    },
+    "case_revoked": {
+      "id": "case_revoked",
+      "featureId": "feat_invite",
+      "title": "邀请被撤销后再次打开链接",
+      "dimension": "lifecycle",
+      "expected": "受邀者看到邀请已失效，不能加入",
+      "priority": "high"
+    },
+    "case_expired": {
+      "id": "case_expired",
+      "featureId": "feat_invite",
+      "title": "邀请过期后访问",
+      "dimension": "lifecycle",
+      "expected": "受邀者看到已过期，并知道如何重新获取邀请",
+      "priority": "medium"
+    },
+    "case_already_member": {
+      "id": "case_already_member",
+      "featureId": "feat_invite",
+      "title": "被邀请人已经是成员",
+      "dimension": "conflict",
+      "expected": "不重复创建邀请，并给出说明",
+      "priority": "medium"
+    },
+    "case_duplicate_submit": {
+      "id": "case_duplicate_submit",
+      "featureId": "feat_invite",
+      "title": "连续点击发送",
+      "dimension": "conflict",
+      "expected": "只创建一次邀请",
+      "priority": "medium"
+    },
+    "case_request_failed": {
+      "id": "case_request_failed",
+      "featureId": "feat_invite",
+      "title": "发送请求失败",
+      "dimension": "async",
+      "expected": "明确失败，保留输入，可以重试",
+      "priority": "high"
+    }
+  },
+  "options": {
+    "opt_a": {
+      "id": "opt_a",
+      "featureId": "feat_invite",
+      "name": "A · 单人邮件邀请弹窗",
+      "idea": "在成员页点一个按钮，弹窗里填写一个邮箱和权限后发送邮件邀请",
+      "decisionFocus": "操作入口与步骤组织：就地弹窗、一次一人",
+      "tradeoffs": [
+        "路径最短，适合偶尔邀请一两个人",
+        "一次只能邀请一人，批量邀请效率低",
+        "依赖邮件送达"
+      ],
+      "derivedFrom": [],
+      "archived": false,
+      "coverage": {
+        "case_happy": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_a_success"
+          ],
+          "reason": "只演示了管理员发出邀请；受邀者接受的一侧尚未画出"
+        },
+        "case_no_permission": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_a_denied"
+          ]
+        },
+        "case_invalid_input": {
+          "status": "missing",
+          "scenarioIds": []
+        },
+        "case_revoked": {
+          "status": "missing",
+          "scenarioIds": []
+        },
+        "case_expired": {
+          "status": "missing",
+          "scenarioIds": []
+        },
+        "case_already_member": {
+          "status": "undecided",
+          "scenarioIds": [],
+          "reason": "已是成员时提示错误还是静默跳过，尚未决定"
+        },
+        "case_duplicate_submit": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_a_success"
+          ],
+          "reason": "发送中禁用按钮"
+        },
+        "case_request_failed": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_a_failure"
+          ]
+        }
+      }
+    }
+  },
+  "rules": {
+    "rule_admin_only": {
+      "id": "rule_admin_only",
+      "featureId": "feat_invite",
+      "text": "只有空间管理员可以发起邀请",
+      "origin": "user",
+      "confirmation": "confirmed",
+      "caseIds": [
+        "case_no_permission"
+      ],
+      "elementRefs": [
+        "scene_a_members#btn_invite"
+      ],
+      "stepIds": [
+        "a_s1_open"
+      ]
+    },
+    "rule_role_cap": {
+      "id": "rule_role_cap",
+      "featureId": "feat_invite",
+      "text": "受邀者获得的权限不能高于邀请时设定的权限",
+      "origin": "user",
+      "confirmation": "confirmed",
+      "caseIds": [
+        "case_happy"
+      ],
+      "elementRefs": [
+        "scene_a_members#sel_role"
+      ],
+      "stepIds": [
+        "a_s3_role"
+      ]
+    },
+    "rule_revocable": {
+      "id": "rule_revocable",
+      "featureId": "feat_invite",
+      "text": "已发出的邀请可以撤销",
+      "origin": "user",
+      "confirmation": "confirmed",
+      "caseIds": [
+        "case_revoked"
+      ],
+      "elementRefs": [],
+      "stepIds": []
+    },
+    "rule_keep_input_on_fail": {
+      "id": "rule_keep_input_on_fail",
+      "featureId": "feat_invite",
+      "optionId": "opt_a",
+      "text": "发送失败后保留已填写的邮箱和权限，允许直接重试",
+      "origin": "ai_assumption",
+      "confirmation": "pending",
+      "caseIds": [
+        "case_request_failed"
+      ],
+      "elementRefs": [
+        "scene_a_members#alert_send_error"
+      ],
+      "stepIds": [
+        "af_s5_fail",
+        "af_s6_retry"
+      ]
+    },
+    "rule_disable_while_sending": {
+      "id": "rule_disable_while_sending",
+      "featureId": "feat_invite",
+      "optionId": "opt_a",
+      "text": "发送中禁用「发送邀请」按钮，防止重复提交",
+      "origin": "ai_assumption",
+      "confirmation": "pending",
+      "caseIds": [
+        "case_duplicate_submit"
+      ],
+      "elementRefs": [
+        "scene_a_members#btn_send"
+      ],
+      "stepIds": [
+        "a_s4_send"
+      ]
+    }
+  },
+  "scenes": {
+    "scene_a_members": {
+      "id": "scene_a_members",
+      "optionId": "opt_a",
+      "name": "成员管理页（含邀请弹窗）",
+      "kind": "proposed",
+      "viewport": "desktop",
+      "root": {
+        "id": "page",
+        "type": "Page",
+        "props": {
+          "title": "设计团队空间"
+        },
+        "children": [
+          {
+            "id": "layout",
+            "type": "Stack",
+            "props": {
+              "direction": "row",
+              "gap": 16
+            },
+            "children": [
+              {
+                "id": "nav",
+                "type": "Sidebar",
+                "props": {
+                  "title": "设计团队空间"
+                },
+                "children": [
+                  {
+                    "id": "nav_overview",
+                    "type": "Link",
+                    "props": {
+                      "label": "概览"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "nav_members",
+                    "type": "Link",
+                    "props": {
+                      "label": "成员",
+                      "active": true
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "nav_settings",
+                    "type": "Link",
+                    "props": {
+                      "label": "空间设置"
+                    },
+                    "unmodeled": true
+                  }
+                ]
+              },
+              {
+                "id": "main",
+                "type": "Stack",
+                "props": {
+                  "direction": "col",
+                  "gap": 12
+                },
+                "children": [
+                  {
+                    "id": "hdr",
+                    "type": "Stack",
+                    "props": {
+                      "direction": "row",
+                      "justify": "between",
+                      "align": "center"
+                    },
+                    "children": [
+                      {
+                        "id": "title",
+                        "type": "Heading",
+                        "props": {
+                          "text": "成员",
+                          "level": 1
+                        }
+                      },
+                      {
+                        "id": "btn_invite",
+                        "type": "Button",
+                        "props": {
+                          "label": "邀请成员",
+                          "variant": "primary"
+                        },
+                        "disabled": {
+                          "falsy": "ui.isAdmin"
+                        },
+                        "disabledReason": "只有空间管理员可以邀请成员",
+                        "note": "入口：成员页右上角，只对管理员可用"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "alert_denied",
+                    "type": "Alert",
+                    "props": {
+                      "text": "你是普通成员，邀请新成员需要联系空间管理员。",
+                      "tone": "info"
+                    },
+                    "when": {
+                      "falsy": "ui.isAdmin"
+                    }
+                  },
+                  {
+                    "id": "summary",
+                    "type": "Text",
+                    "props": {
+                      "text": "成员 3 人",
+                      "tone": "muted"
+                    }
+                  },
+                  {
+                    "id": "tbl_members",
+                    "type": "Table",
+                    "props": {
+                      "columns": [
+                        {
+                          "key": "name",
+                          "label": "姓名"
+                        },
+                        {
+                          "key": "email",
+                          "label": "邮箱"
+                        },
+                        {
+                          "key": "role",
+                          "label": "权限"
+                        },
+                        {
+                          "key": "status",
+                          "label": "状态"
+                        }
+                      ],
+                      "rows": "$data.members"
+                    }
+                  },
+                  {
+                    "id": "sec_pending",
+                    "type": "Section",
+                    "props": {
+                      "title": "待接受的邀请"
+                    },
+                    "children": [
+                      {
+                        "id": "tbl_pending",
+                        "type": "Table",
+                        "props": {
+                          "columns": [
+                            {
+                              "key": "email",
+                              "label": "邮箱"
+                            },
+                            {
+                              "key": "role",
+                              "label": "权限"
+                            },
+                            {
+                              "key": "status",
+                              "label": "状态"
+                            }
+                          ],
+                          "rows": "$data.pending",
+                          "empty": "暂无待接受的邀请"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "dlg_invite",
+            "type": "Dialog",
+            "props": {
+              "title": "邀请成员",
+              "open": "$ui.inviteOpen"
+            },
+            "children": [
+              {
+                "id": "dlg_hint",
+                "type": "Text",
+                "props": {
+                  "text": "被邀请人会收到一封邮件，接受后加入本空间。",
+                  "tone": "muted"
+                }
+              },
+              {
+                "id": "in_email",
+                "type": "Input",
+                "props": {
+                  "label": "邮箱",
+                  "placeholder": "name@company.com",
+                  "inputType": "email"
+                }
+              },
+              {
+                "id": "sel_role",
+                "type": "Select",
+                "props": {
+                  "label": "权限",
+                  "options": [
+                    "查看者",
+                    "编辑者",
+                    "管理员"
+                  ],
+                  "placeholder": "选择权限"
+                },
+                "note": "受邀者获得的权限不会高于这里选择的权限"
+              },
+              {
+                "id": "alert_send_error",
+                "type": "Alert",
+                "props": {
+                  "text": "$ui.error",
+                  "tone": "error"
+                },
+                "when": {
+                  "notEmpty": "ui.error"
+                }
+              },
+              {
+                "id": "spin_send",
+                "type": "Spinner",
+                "props": {
+                  "label": "正在发送邀请…"
+                },
+                "when": {
+                  "truthy": "ui.sending"
+                }
+              },
+              {
+                "id": "dlg_actions",
+                "type": "Stack",
+                "props": {
+                  "direction": "row",
+                  "justify": "end",
+                  "gap": 8
+                },
+                "children": [
+                  {
+                    "id": "btn_cancel",
+                    "type": "Button",
+                    "props": {
+                      "label": "取消",
+                      "variant": "secondary"
+                    },
+                    "unmodeled": true,
+                    "note": "取消并关闭弹窗：本版演示未建模，是否保留已填内容待决定"
+                  },
+                  {
+                    "id": "btn_send",
+                    "type": "Button",
+                    "props": {
+                      "label": "发送邀请",
+                      "variant": "primary"
+                    },
+                    "disabled": {
+                      "truthy": "ui.sending"
+                    },
+                    "disabledReason": "正在发送，防止重复提交"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "scenarios": {
+    "sc_a_success": {
+      "id": "sc_a_success",
+      "optionId": "opt_a",
+      "name": "管理员成功发出邀请",
+      "description": "主流程：打开弹窗 → 填写邮箱和权限 → 发送成功",
+      "caseIds": [
+        "case_happy",
+        "case_duplicate_submit"
+      ],
+      "mock": {
+        "label": "模拟成功",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "scene_a_members",
+        "ui": {
+          "isAdmin": true,
+          "inviteOpen": false,
+          "sending": false,
+          "error": ""
+        },
+        "data": {
+          "members": [
+            {
+              "name": "王芳",
+              "email": "wang.fang@example.com",
+              "role": "管理员",
+              "status": "已加入"
+            },
+            {
+              "name": "陈晨",
+              "email": "chen.chen@example.com",
+              "role": "编辑者",
+              "status": "已加入"
+            },
+            {
+              "name": "刘洋",
+              "email": "liu.yang@example.com",
+              "role": "查看者",
+              "status": "已加入"
+            }
+          ],
+          "pending": [
+            {
+              "email": "zhao.lei@example.com",
+              "role": "查看者",
+              "status": "待接受"
+            }
+          ]
+        },
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "a_s1_open",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "btn_invite"
+          },
+          "caption": "管理员点击右上角「邀请成员」，打开邀请弹窗",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.inviteOpen",
+              "value": true
+            }
+          ],
+          "ruleIds": [
+            "rule_admin_only"
+          ]
+        },
+        {
+          "id": "a_s2_email",
+          "kind": "user",
+          "action": {
+            "type": "type",
+            "target": "in_email",
+            "value": "li.lei@example.com"
+          },
+          "caption": "输入被邀请人的邮箱",
+          "effects": [],
+          "ruleIds": []
+        },
+        {
+          "id": "a_s3_role",
+          "kind": "user",
+          "action": {
+            "type": "select",
+            "target": "sel_role",
+            "value": "编辑者"
+          },
+          "caption": "选择权限「编辑者」",
+          "effects": [],
+          "ruleIds": [
+            "rule_role_cap"
+          ]
+        },
+        {
+          "id": "a_s4_send",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "btn_send"
+          },
+          "caption": "点击「发送邀请」，按钮进入发送中状态",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.sending",
+              "value": true
+            }
+          ],
+          "ruleIds": [
+            "rule_disable_while_sending"
+          ]
+        },
+        {
+          "id": "a_s5_ok",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "邀请请求成功（模拟）"
+          },
+          "caption": "系统返回成功：关闭弹窗，新邀请出现在「待接受的邀请」中",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.sending",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "ui.error",
+              "value": ""
+            },
+            {
+              "type": "set",
+              "path": "ui.inviteOpen",
+              "value": false
+            },
+            {
+              "type": "append",
+              "path": "data.pending",
+              "value": {
+                "email": "li.lei@example.com",
+                "role": "编辑者",
+                "status": "待接受"
+              }
+            },
+            {
+              "type": "toast",
+              "text": "已向 li.lei@example.com 发送邀请",
+              "tone": "success"
+            },
+            {
+              "type": "complete",
+              "text": "邀请已发出，等待对方接受",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": []
+        }
+      ],
+      "expected": "弹窗关闭，出现成功提示，新邀请进入待接受列表"
+    },
+    "sc_a_failure": {
+      "id": "sc_a_failure",
+      "optionId": "opt_a",
+      "name": "发送失败后重试",
+      "description": "异常：第一次请求失败，保留输入后重试成功",
+      "caseIds": [
+        "case_request_failed"
+      ],
+      "mock": {
+        "label": "模拟失败后重试成功",
+        "outcome": "failure"
+      },
+      "initial": {
+        "sceneId": "scene_a_members",
+        "ui": {
+          "isAdmin": true,
+          "inviteOpen": false,
+          "sending": false,
+          "error": ""
+        },
+        "data": {
+          "members": [
+            {
+              "name": "王芳",
+              "email": "wang.fang@example.com",
+              "role": "管理员",
+              "status": "已加入"
+            },
+            {
+              "name": "陈晨",
+              "email": "chen.chen@example.com",
+              "role": "编辑者",
+              "status": "已加入"
+            },
+            {
+              "name": "刘洋",
+              "email": "liu.yang@example.com",
+              "role": "查看者",
+              "status": "已加入"
+            }
+          ],
+          "pending": [
+            {
+              "email": "zhao.lei@example.com",
+              "role": "查看者",
+              "status": "待接受"
+            }
+          ]
+        },
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "af_s1_open",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "btn_invite"
+          },
+          "caption": "管理员点击右上角「邀请成员」，打开邀请弹窗",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.inviteOpen",
+              "value": true
+            }
+          ],
+          "ruleIds": [
+            "rule_admin_only"
+          ]
+        },
+        {
+          "id": "af_s2_email",
+          "kind": "user",
+          "action": {
+            "type": "type",
+            "target": "in_email",
+            "value": "li.lei@example.com"
+          },
+          "caption": "输入被邀请人的邮箱",
+          "effects": [],
+          "ruleIds": []
+        },
+        {
+          "id": "af_s3_role",
+          "kind": "user",
+          "action": {
+            "type": "select",
+            "target": "sel_role",
+            "value": "编辑者"
+          },
+          "caption": "选择权限「编辑者」",
+          "effects": [],
+          "ruleIds": [
+            "rule_role_cap"
+          ]
+        },
+        {
+          "id": "af_s4_send",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "btn_send"
+          },
+          "caption": "点击「发送邀请」，按钮进入发送中状态",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.sending",
+              "value": true
+            }
+          ],
+          "ruleIds": [
+            "rule_disable_while_sending"
+          ]
+        },
+        {
+          "id": "af_s5_fail",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "邀请请求失败（模拟网络超时）"
+          },
+          "caption": "系统返回失败：弹窗保持打开，显示错误并保留已填写的内容",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.sending",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "ui.error",
+              "value": "发送失败：网络超时。已保留你填写的内容，可以重试。"
+            }
+          ],
+          "ruleIds": [
+            "rule_keep_input_on_fail"
+          ]
+        },
+        {
+          "id": "af_s6_retry",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "btn_send"
+          },
+          "caption": "点击「发送邀请」重试",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.sending",
+              "value": true
+            },
+            {
+              "type": "set",
+              "path": "ui.error",
+              "value": ""
+            }
+          ],
+          "ruleIds": [
+            "rule_keep_input_on_fail",
+            "rule_disable_while_sending"
+          ]
+        },
+        {
+          "id": "af_s7_ok",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "邀请请求成功（模拟）"
+          },
+          "caption": "系统返回成功：关闭弹窗，新邀请出现在「待接受的邀请」中",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.sending",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "ui.error",
+              "value": ""
+            },
+            {
+              "type": "set",
+              "path": "ui.inviteOpen",
+              "value": false
+            },
+            {
+              "type": "append",
+              "path": "data.pending",
+              "value": {
+                "email": "li.lei@example.com",
+                "role": "编辑者",
+                "status": "待接受"
+              }
+            },
+            {
+              "type": "toast",
+              "text": "已向 li.lei@example.com 发送邀请",
+              "tone": "success"
+            },
+            {
+              "type": "complete",
+              "text": "邀请已发出，等待对方接受",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": []
+        }
+      ],
+      "expected": "失败时看到明确错误与已保留的输入；重试后成功"
+    },
+    "sc_a_denied": {
+      "id": "sc_a_denied",
+      "optionId": "opt_a",
+      "name": "普通成员无权邀请",
+      "description": "权限：非管理员看到禁用的入口和说明",
+      "caseIds": [
+        "case_no_permission"
+      ],
+      "mock": {
+        "label": "模拟普通成员身份",
+        "outcome": "denied"
+      },
+      "initial": {
+        "sceneId": "scene_a_members",
+        "ui": {
+          "isAdmin": false,
+          "inviteOpen": false,
+          "sending": false,
+          "error": ""
+        },
+        "data": {
+          "members": [
+            {
+              "name": "王芳",
+              "email": "wang.fang@example.com",
+              "role": "管理员",
+              "status": "已加入"
+            },
+            {
+              "name": "陈晨",
+              "email": "chen.chen@example.com",
+              "role": "编辑者",
+              "status": "已加入"
+            },
+            {
+              "name": "刘洋",
+              "email": "liu.yang@example.com",
+              "role": "查看者",
+              "status": "已加入"
+            }
+          ],
+          "pending": [
+            {
+              "email": "zhao.lei@example.com",
+              "role": "查看者",
+              "status": "待接受"
+            }
+          ]
+        },
+        "inputs": {}
+      },
+      "steps": [],
+      "expected": "「邀请成员」按钮禁用，点击时说明只有管理员可以邀请；页面显示联系管理员的提示"
+    }
+  },
+  "comments": {},
+  "issues": {
+    "iss_already_member": {
+      "id": "iss_already_member",
+      "featureId": "feat_invite",
+      "optionId": "opt_a",
+      "text": "被邀请人已经是成员时，应该报错还是静默跳过？",
+      "severity": "major",
+      "source": "ai",
+      "status": "open",
+      "refs": [
+        "case_already_member"
+      ]
+    }
+  },
+  "decisions": {}
+}

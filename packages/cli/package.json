@@ -1,0 +1,11 @@
+{
+  "name": "@joplo/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "joplo": "./src/bin.ts" },
+  "dependencies": {
+    "@joplo/core": "workspace:*",
+    "@joplo/server": "workspace:*"
+  }
+}
