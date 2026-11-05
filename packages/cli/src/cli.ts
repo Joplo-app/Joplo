@@ -68,7 +68,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   program.command('init').argument('<dir>').option('--name <name>', '项目名（默认目录名）').option('--keep', '目录非空时只补缺失的文件，已有文件不改动')
     .action(async (dir, opts) => { for (const l of initSummary(await initProject(dir, opts.name, { keep: opts.keep }))) line(l); });
   program.command('skill').description('按需读取 Agent 用法，或安装用法入口')
-    .argument('[topic]', 'authoring/components/cases/check/selection/publish，或 install')
+    .argument('[topic]', 'authoring/demo/components/cases/check/selection/publish，或 install')
     .argument('[dir]', 'install 的目标项目目录')
     .option('--force', '覆盖被修改过的 SKILL.md')
     .option('--diff', '只显示 unified diff，不写入')
