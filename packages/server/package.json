@@ -51,11 +51,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TokenRollAI/Joplo.git",
+    "url": "git+https://github.com/Joplo-app/Joplo.git",
     "directory": "packages/server"
   },
-  "homepage": "https://github.com/TokenRollAI/Joplo#readme",
+  "homepage": "https://github.com/Joplo-app/Joplo#readme",
   "bugs": {
-    "url": "https://github.com/TokenRollAI/Joplo/issues"
+    "url": "https://github.com/Joplo-app/Joplo/issues"
   }
 }
