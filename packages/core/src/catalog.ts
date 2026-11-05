@@ -27,6 +27,8 @@ const STRUCTURE = [
   'ChatMessage', 'ToolCall',
   // 设备外框（Joplo 自有）：终端与手机
   'Terminal', 'Terminal.Command', 'Terminal.Output', 'Phone',
+  // 架构图（Joplo 自有，D41）：节点与连线的 state 绑定 $.ui，由 flow 步骤驱动
+  'Diagram', 'Diagram.Group', 'Diagram.Node', 'Diagram.Edge',
   // HTML 兜底
   'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'main', 'section', 'header', 'footer', 'nav', 'aside', 'ul', 'ol', 'li', 'strong', 'em', 'small', 'code',
   // Joplo
@@ -127,6 +129,10 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   ChatMessage: "from: 'user'|'assistant', name；子节点是消息内容（保留换行）",
   ToolCall: "title, state: 'running'|'done'|'error'；子节点是调用详情",
   Terminal: 'title —— 终端窗口（命令行原型），子节点是 Terminal.Command / Terminal.Output / Terminal.Input；内容超出 h 或 mah 时内部滚动',
+  Diagram: "direction: 'right'|'down'（默认 right）, h（高度，默认 420）—— 架构图，子节点是 Diagram.Group / Diagram.Node / Diagram.Edge；布局自动生成且确定（state 变化不移动节点），内容缩放到放得下",
+  'Diagram.Group': 'label —— 带标题的分组框，子节点是 Diagram.Node 或嵌套的 Diagram.Group',
+  'Diagram.Node': "id（必填，连线靠它）, label, description（第二行小字）, kind: 'client'|'service'|'model'|'database'|'queue'|'storage'|'external'|'tool'|'user', state: 'idle'|'active'|'ok'|'error'|'dim'（常写 state={$.ui.n_x}）",
+  'Diagram.Edge': "from, to（同一个 Diagram 里的 Node id）, label, async（虚线）, state: 'idle'|'active'|'ok'|'error'|'dim'；id 缺省为 \"from->to\"。演示调用链：flow 步骤里 set($.ui.e1, 'active') 再 set($.ui.e1, 'ok')",
   'Terminal.Command': 'prompt（默认 "$"）；子节点是命令文字',
   'Terminal.Output': "tone: 'plain'|'ok'|'warn'|'error'（默认 plain）；子节点是输出文字（保留换行）",
   Phone: 'scale（视觉缩放，默认 1）, h（屏幕高度，默认 844）—— 手机外框，子节点按手机宽度 390 排版，响应式断点按这个宽度计算；页面写 viewport: "mobile" 时舞台自动套上，不用写它',
@@ -188,6 +194,10 @@ const BP_KEYS = ['base', 'xs', 'sm', 'md', 'lg', 'xl'] as const;
 
 /** 页面 viewport 对应的舞台尺寸。 */
 export const VIEWPORT_SIZE = { desktop: { width: 1280, height: 800 }, mobile: { width: 390, height: 844 } } as const;
+
+/** Diagram.Node 的 kind 与 Node / Edge 的 state（D41）。 */
+export const DIAGRAM_NODE_KINDS = ['client', 'service', 'model', 'database', 'queue', 'storage', 'external', 'tool', 'user'] as const;
+export const DIAGRAM_STATES = ['idle', 'active', 'ok', 'error', 'dim'] as const;
 
 /** 子节点排版用的宽度：Phone 内部按手机宽度（响应式取值、visibleFrom / hiddenFrom、AppShell 收起都按它算），其余节点沿用外部宽度。 */
 export function childWidth(type: string, width: number): number {
@@ -270,6 +280,8 @@ export function nodeLabel(node: LabelNode): string {
     const v = p[k];
     if (typeof v === 'string' && v && !IS_BINDING.test(v)) return v;
   }
+  // 没有 label 的连线：「from → to」
+  if (node.type === 'Diagram.Edge' && typeof p.from === 'string' && typeof p.to === 'string') return `${p.from} → ${p.to}`;
   const text = collectText(node).trim();
   return text || node.type;
 }

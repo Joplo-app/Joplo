@@ -200,6 +200,7 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
             {drawer && selection ? (
               <InspectDrawer
                 project={project}
+                state={state}
                 selection={selection}
                 sync={snap.selectionSync}
                 onClose={() => setDrawer(false)}

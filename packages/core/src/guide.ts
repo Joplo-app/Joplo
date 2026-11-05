@@ -120,6 +120,11 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 响应式写成对象 { base, xs, sm, md, lg, xl }，或 visibleFrom="sm" / hiddenFrom="sm"；AppShell 在窄于 navbar.breakpoint 时自动收起导航。
 - 输入组件直接写 label：<TextInput id="email" label="邮箱"/>，自动字幕会用它。
 
+## 架构图：用 flow 驱动调用链
+- <Diagram>里放 <Diagram.Group label>、<Diagram.Node id label kind state={$.ui.n_x}/>、<Diagram.Edge from to label async state={$.ui.e1}/>；布局自动生成，播放时不移动。
+- 演示调用链就是改 state：.system('客户端发出消息', set($.ui.e1, 'active'))，下一步 set($.ui.e1, 'ok')、set($.ui.n_brain, 'active')；出错用 'error'，无关部分用 'dim'。
+- 常与前端画面放在同一个页面（如 SimpleGrid 两列），同一个 flow 一步步同时推进两边；Node / Edge 不需要 flow 也不用 unmodeled，⌥+单击可检查。
+
 ## 规则与边界
 - rule('约束', { origin?, status?, cases?: ['happy'], elements?: ['invite'] })。
 - origin: user/project_material/ai_assumption/code_observed/feedback，默认 ai_assumption。

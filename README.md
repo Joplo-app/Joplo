@@ -167,7 +167,8 @@ pnpm joplo check examples/invite --format json
 
 - **已完成**：组件词汇从 shadcn 改为对齐 Mantine（D35）。布局用 `Stack`/`Group`/`AppShell` 属性表达，响应式写成 `{ base, sm, md }` 或 `visibleFrom`/`hiddenFrom`，按舞台宽度取值。Agent 写得更短，也不用写 className。
 - **已完成**：新界面（D39）：一个进程多个项目的首页、按情况分组的演示页、⌥+单击检查抽屉、导出图片 / 视频；目录新增 `Terminal` 与 `Phone`（D40 自举：新界面先用这两个组件在 `examples/joplo-board` 里画出原型）。
-- **下一步**：后端设计扩展（D34），用 D2 画架构图、状态机和数据模型，flow 步骤里用 `trace()` 让调用链与前端演示同步播放。
+- **已完成**：架构图组件 `Diagram`（D41）：分组、节点、连线自动布局，节点与连线的 state 绑定 `$.ui`，由 flow 步骤驱动，调用链与前端画面同步播放。
+- **下一步**：后端设计扩展的其余部分（D34）：时序图、状态机、数据模型，按同样方式做成组件。
 - **V2**：MCP、团队协作、评论同步、云端能力。
 
 ## 已知限制

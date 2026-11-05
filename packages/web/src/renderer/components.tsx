@@ -10,9 +10,10 @@
  * - 作者的 className 与 style 原样加到根 DOM（逃生口）。其他属性不透传到 DOM。
  * - 只用 React 文本节点渲染内容，不使用 dangerouslySetInnerHTML；链接不生成真实 href；图片不加载外部地址。
  */
-import { createContext, useContext, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
+import { animate as animateValue } from 'motion';
 import {
   INTERACTIVE_TYPES,
   appShellLayout,
@@ -33,7 +34,8 @@ import {
   type ShellLayout,
 } from '@tokenroll/joplo-core';
 import { cn } from '@/lib/utils';
-import { Rough, useStageTheme } from './rough';
+import { Rough, RoughPath, roundRectPath, useStageTheme } from './rough';
+import { arrowHead, diagramStructure, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
 import { DIMMED, FONT, INK, SOFT, SPACING, TITLE_SIZE, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf } from './style';
 
 export type RenderMode = 'review' | 'demo' | 'render';
@@ -1684,6 +1686,259 @@ function Phone({ node, p, children }: NodeProps) {
   );
 }
 
+// ============ 架构图（D41） ============
+
+type DiagramCtxValue = { layout: DLayout; origin: { x: number; y: number }; width: number; height: number };
+const DiagramContext = createContext<DiagramCtxValue | null>(null);
+
+const D_TONE: Record<string, { stroke: string; fill: string; text: string }> = {
+  idle: { stroke: INK, fill: '#ffffff', text: INK },
+  active: { stroke: '#1c7ed6', fill: '#e7f5ff', text: '#1864ab' },
+  ok: { stroke: '#2b8a3e', fill: '#ebfbee', text: '#2b8a3e' },
+  error: { stroke: DANGER, fill: '#fff5f5', text: DANGER },
+  dim: { stroke: '#adb5bd', fill: '#ffffff', text: '#868e96' },
+};
+const EDGE_TONE: Record<string, string> = { idle: '#495057', active: '#1c7ed6', ok: '#2b8a3e', error: DANGER, dim: '#ced4da' };
+const dState = (v: unknown) => (typeof v === 'string' && v in D_TONE ? v : 'idle');
+
+/** 节点外形（坐标系：盒子左上角 x,y，宽 w 高 h）。模块级常量，Rough 据此缓存。 */
+const SHAPE: Record<string, (x: number, y: number, w: number, h: number) => string> = {
+  rect: (x, y, w, h) => roundRectPath(x, y, w, h, 10),
+  pill: (x, y, w, h) => roundRectPath(x, y, w, h, h / 2),
+  database: (x, y, w, h) => {
+    const rx = w / 2;
+    const ry = 7;
+    return `M${x},${y + ry} A${rx},${ry} 0 0 1 ${x + w},${y + ry} V${y + h - ry} A${rx},${ry} 0 0 1 ${x},${y + h - ry} Z M${x},${y + ry} A${rx},${ry} 0 0 0 ${x + w},${y + ry}`;
+  },
+  queue: (x, y, w, h) => {
+    const rx = 10;
+    const ry = h / 2;
+    return `M${x + rx},${y} H${x + w - rx} A${rx},${ry} 0 0 1 ${x + w - rx},${y + h} H${x + rx} A${rx},${ry} 0 0 1 ${x + rx},${y} Z M${x + w - rx},${y} A${rx},${ry} 0 0 0 ${x + w - rx},${y + h}`;
+  },
+};
+const shapeOf = (kind: string) => (kind === 'database' ? 'database' : kind === 'queue' ? 'queue' : kind === 'user' ? 'pill' : 'rect');
+
+/** 每种 kind 一个低保真小图标（16×16，描边用 currentColor）。数据库与队列由外形表达，不画图标。 */
+function KindIcon({ kind }: { kind: string }) {
+  const common = { width: 18, height: 18, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true, style: { flexShrink: 0 } };
+  switch (kind) {
+    case 'client':
+      return <svg {...common}><rect x="2" y="3" width="12" height="8" rx="1" /><path d="M6 14h4M8 11v3" /></svg>;
+    case 'model':
+      return <svg {...common}><path d="M8 1.5l1.6 4.2 4.4.8-3.3 3 .9 4.5L8 11.8 4.4 14l.9-4.5-3.3-3 4.4-.8z" /></svg>;
+    case 'storage':
+      return <svg {...common}><path d="M2 5l1 9h10l1-9zM2 5h12M5 5V3h6v2" /></svg>;
+    case 'external':
+      return <svg {...common}><path d="M4.5 12.5h7a3 3 0 0 0 .3-6A4 4 0 0 0 4 6.3a3.1 3.1 0 0 0 .5 6.2z" /></svg>;
+    case 'tool':
+      return <svg {...common}><path d="M10.5 2.5a3 3 0 0 0-3.4 4L2.5 11.1l2.4 2.4 4.6-4.6a3 3 0 0 0 4-3.4l-1.9 1.9-1.6-.4-.4-1.6z" /></svg>;
+    case 'user':
+      return <svg {...common}><circle cx="8" cy="5" r="2.6" /><path d="M3 14a5 5 0 0 1 10 0" /></svg>;
+    case 'database':
+    case 'queue':
+      return null;
+    default: // service
+      return <svg {...common}><rect x="2" y="2.5" width="12" height="4.5" rx="1" /><rect x="2" y="9" width="12" height="4.5" rx="1" /><path d="M4.5 4.75h.01M4.5 11.25h.01" /></svg>;
+  }
+}
+
+/**
+ * Diagram：自动布局（diagram-layout.ts，结构不变就不重新布局），整体缩放到放得下容器宽度与 h。
+ * 子节点照常经 RenderNode 渲染（可见性、绑定由 core 计算），位置从 DiagramContext 取。
+ */
+function Diagram({ node, p, children }: NodeProps) {
+  const r = useR(p);
+  const structure = useMemo(() => diagramStructure(node), [node]);
+  const key = structureKey(structure);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const layout = useMemo(() => layoutDiagram(structure), [key]);
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [avail, setAvail] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setAvail(el.clientWidth);
+    const ro = new ResizeObserver(() => setAvail(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const hv = Number(r('h'));
+  const H = Number.isFinite(hv) && hv > 0 ? hv : 420;
+  const { h: _h, ...rest } = p;
+  const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: H, overflow: 'hidden' } });
+  const scale = layout.width && avail ? Math.min(1, (avail - 8) / layout.width, (H - 8) / layout.height) : 1;
+  return (
+    <div
+      {...root}
+      ref={(el) => {
+        ref.current = el;
+      }}
+      data-direction={structure.direction}
+    >
+      {layout.width === 0 ? (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: DIMMED, fontSize: 13 }}>架构图还没有节点</div>
+      ) : (
+        <div
+          data-jdiagram-canvas=""
+          style={{ position: 'absolute', left: Math.max(0, (avail - layout.width * scale) / 2), top: Math.max(0, (H - layout.height * scale) / 2), width: layout.width, height: layout.height, transform: `scale(${scale})`, transformOrigin: '0 0' }}
+        >
+          <DiagramContext.Provider value={{ layout, origin: { x: 0, y: 0 }, width: layout.width, height: layout.height }}>{children}</DiagramContext.Provider>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiagramGroup({ node, p, children }: NodeProps) {
+  const d = useContext(DiagramContext);
+  const box = d?.layout.groups[node.id];
+  const root = useRoot(node, p, {
+    className: 'jbox [.jstage[data-theme=clean]_&]:rounded-[14px]',
+    style: box ? { position: 'absolute', left: box.x - d!.origin.x, top: box.y - d!.origin.y, width: box.w, height: box.h, background: 'rgba(248,249,250,0.7)' } : { display: 'none' },
+  });
+  if (!d || !box) return null;
+  return (
+    <div {...root} data-soft="" data-dashed="">
+      <Rough seedKey={node.id} shape="roundrect" radius={14} stroke="#868e96" dashed strokeWidth={1.2} />
+      <div style={{ position: 'absolute', left: 12, top: 5, fontSize: 13, fontWeight: 600, color: '#5a5a5a', whiteSpace: 'nowrap' }}>{str(p.label)}</div>
+      <DiagramContext.Provider value={{ ...d, origin: { x: box.x, y: box.y } }}>{children}</DiagramContext.Provider>
+    </div>
+  );
+}
+
+function DiagramNode({ node, p }: NodeProps) {
+  const d = useContext(DiagramContext);
+  const { theme, selectedId } = { theme: useStageTheme(), selectedId: useCtx().selectedId };
+  const box = d?.layout.nodes[node.id];
+  const state = dState(p.state);
+  const tone = D_TONE[state]!;
+  const kind = typeof p.kind === 'string' ? p.kind : 'service';
+  const shape = shapeOf(kind);
+  const root = useRoot(node, p, {
+    style: box
+      ? { position: 'absolute', left: box.x - d!.origin.x, top: box.y - d!.origin.y, width: box.w, height: box.h, zIndex: 2, opacity: state === 'dim' ? 0.45 : 1, transition: 'opacity .25s' }
+      : { display: 'none' },
+  });
+  if (!d || !box) return null;
+  const desc = str(p.description);
+  const sw = state === 'idle' || state === 'dim' ? 1.4 : 2.2;
+  return (
+    <div {...root} data-state={state} data-kind={kind}>
+      {theme === 'sketch' ? (
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <Rough seedKey={node.id} shape="custom" pathOf={SHAPE[shape]} stroke={tone.stroke} strokeWidth={sw} fill={tone.fill} fillStyle="solid" dashed={kind === 'external'} inset={1.5} />
+        </div>
+      ) : (
+        <svg aria-hidden width={box.w} height={box.h} style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
+          <path d={SHAPE[shape]!(sw / 2, sw / 2, box.w - sw, box.h - sw)} fill={tone.fill} stroke={tone.stroke} strokeWidth={sw} strokeDasharray={kind === 'external' ? '6 4' : undefined} style={{ transition: 'fill .25s, stroke .25s' }} />
+        </svg>
+      )}
+      {selectedId === node.id ? <div aria-hidden style={{ position: 'absolute', inset: -5, border: '2.5px solid var(--sel)', borderRadius: 12 }} /> : null}
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          gap: 2,
+          padding: `${kind === 'database' ? 14 : 6}px ${kind === 'queue' ? 24 : 12}px 6px`,
+          color: tone.text,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <KindIcon kind={kind} />
+          <span className="jtrunc" style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>
+            {str(p.label, node.id)}
+          </span>
+        </div>
+        {desc ? <div style={{ fontSize: 12, lineHeight: '16px', color: state === 'idle' ? DIMMED : tone.text, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{desc}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+/** state 为 active 时沿连线从 from 移到 to 的小点（Motion）；不做动画时停在 3/4 处，截图也看得出“正在调用”的方向。 */
+function MovingDot({ d, color, animate: anim }: { d: string; color: string; animate: boolean }) {
+  const pathRef = useRef<SVGPathElement>(null);
+  const dotRef = useRef<SVGCircleElement>(null);
+  useEffect(() => {
+    const path = pathRef.current;
+    const dot = dotRef.current;
+    if (!path || !dot) return;
+    const len = path.getTotalLength();
+    const place = (t: number) => {
+      const pt = path.getPointAtLength(t * len);
+      dot.setAttribute('cx', String(pt.x));
+      dot.setAttribute('cy', String(pt.y));
+    };
+    if (!anim) {
+      place(0.75); // 中点通常是连线标签，停在标签与箭头之间
+      return;
+    }
+    place(0);
+    const ctl = animateValue(0, 1, { duration: Math.max(0.9, len / 260), ease: 'linear', repeat: Infinity, onUpdate: place });
+    return () => ctl.stop();
+  }, [d, anim]);
+  return (
+    <>
+      <path ref={pathRef} d={d} fill="none" stroke="none" />
+      <circle ref={dotRef} r={5.5} fill={color} stroke="#fff" strokeWidth={1.5} data-jdot="" />
+    </>
+  );
+}
+
+function DiagramEdge({ node, p }: NodeProps) {
+  const dctx = useContext(DiagramContext);
+  const { animate, selectedId } = useCtx();
+  const theme = useStageTheme();
+  const attrs = useRootAttrs(node);
+  const route = dctx?.layout.edges[node.id];
+  if (!dctx || !route || route.points.length < 2) return null;
+  const state = dState(p.state);
+  const color = selectedId === node.id ? 'var(--sel)' : EDGE_TONE[state]!;
+  const dashed = p.async === true || state === 'error';
+  const d = edgePath(route.points);
+  const head = arrowHead(route.points);
+  const sw = state === 'idle' || state === 'dim' ? 1.5 : 2.4;
+  const label = str(p.label);
+  const lb = route.label;
+  return (
+    <svg
+      aria-hidden={false}
+      width={dctx.width}
+      height={dctx.height}
+      style={{ position: 'absolute', left: -dctx.origin.x, top: -dctx.origin.y, overflow: 'visible', pointerEvents: 'none', zIndex: 1 }}
+    >
+      <g {...attrs} data-state={state} data-async={p.async === true ? '' : undefined} style={{ opacity: state === 'dim' ? 0.5 : 1, transition: 'opacity .25s' }}>
+        {/* 透明的粗线：⌥+单击检查连线时好点中 */}
+        <path d={d} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: 'stroke' }} />
+        {theme === 'sketch' ? (
+          <>
+            <RoughPath seedKey={`${node.id}:line`} d={d} stroke={color} strokeWidth={sw} dashed={dashed} />
+            <RoughPath seedKey={`${node.id}:head`} d={head} stroke={color} strokeWidth={1.2} fill={color} roughness={0.5} />
+          </>
+        ) : (
+          <>
+            <path d={d} fill="none" stroke={color} strokeWidth={sw} strokeDasharray={dashed ? '7 5' : undefined} style={{ transition: 'stroke .25s' }} />
+            <path d={head} fill={color} stroke="none" />
+          </>
+        )}
+        {label && lb ? (
+          <g style={{ pointerEvents: 'all' }}>
+            <rect x={lb.x} y={lb.y} width={lb.w} height={lb.h} rx={4} fill="#ffffff" fillOpacity={0.92} />
+            <text x={lb.x + lb.w / 2} y={lb.y + lb.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={12} fill={state === 'idle' ? '#3a3a3a' : color}>
+              {label}
+            </text>
+          </g>
+        ) : null}
+        {state === 'active' ? <MovingDot d={d} color={color} animate={animate} /> : null}
+      </g>
+    </svg>
+  );
+}
+
 // ============ Joplo ============
 
 function Placeholder({ node, p }: NodeProps) {
@@ -1776,6 +2031,10 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   'Terminal.Command': TerminalCommand,
   'Terminal.Output': TerminalOutput,
   Phone,
+  Diagram,
+  'Diagram.Group': DiagramGroup,
+  'Diagram.Node': DiagramNode,
+  'Diagram.Edge': DiagramEdge,
   ...(Object.fromEntries(HTML_TAGS.map((t) => [t, htmlImpl(t)])) as Record<HtmlTag, (props: NodeProps) => ReactNode>),
   Placeholder,
   Custom,

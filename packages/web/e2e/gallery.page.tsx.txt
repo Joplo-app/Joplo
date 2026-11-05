@@ -1,7 +1,7 @@
 import { page } from '@tokenroll/joplo-kit';
 import {
   Accordion, ActionIcon, Alert, Anchor, AppShell, Avatar, Badge, Blockquote, Box, Breadcrumbs, Burger, Button, Card, Center, ChatMessage,
-  Checkbox, CloseButton, Code, Container, Custom, DataTable, Divider, Drawer, FileInput, Flex, Grid, Group, Image, Indicator, Kbd, List,
+  Checkbox, CloseButton, Code, Container, Custom, DataTable, Diagram, Divider, Drawer, FileInput, Flex, Grid, Group, Image, Indicator, Kbd, List,
   Loader, Modal, MultiSelect, NavLink, Notification, NumberInput, Pagination, Paper, PasswordInput, Placeholder, Progress, PromptInput, Radio,
   Phone, RingProgress, ScrollArea, SegmentedControl, Select, SimpleGrid, Skeleton, Space, Stack, Stepper, Switch, Table, Tabs, Terminal, Text, Textarea,
   TextInput, ThemeIcon, Timeline, Title, ToolCall,
@@ -93,6 +93,15 @@ export default page(
         </Stack>
       </Phone>
     </Group>
+    <Diagram id="g_diagram" h={220}>
+      <Diagram.Group id="g_dgroup" label="后端">
+        <Diagram.Node id="g_dn_api" label="API" kind="service" state="active" />
+        <Diagram.Node id="g_dn_db" label="数据库" kind="database" />
+      </Diagram.Group>
+      <Diagram.Node id="g_dn_web" label="网页" kind="client" />
+      <Diagram.Edge from="g_dn_web" to="g_dn_api" label="请求" state="active" />
+      <Diagram.Edge from="g_dn_api" to="g_dn_db" async />
+    </Diagram>
     <Placeholder label="图表" h={40} />
     <Custom kind="地图" />
     <div><span>span</span><p>p</p><h1>h1</h1><h2>h2</h2><h3>h3</h3><h4>h4</h4><strong>b</strong><em>i</em><small>s</small><code>c</code></div>

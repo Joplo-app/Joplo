@@ -38,7 +38,7 @@ export class RoughRegistry {
 export const ThemeContext = createContext<{ theme: StageTheme; registry: RoughRegistry | null }>({ theme: 'sketch', registry: null });
 export const useStageTheme = () => useContext(ThemeContext).theme;
 
-type Shape = 'rect' | 'ellipse' | 'underline' | 'line' | 'roundrect';
+type Shape = 'rect' | 'ellipse' | 'underline' | 'line' | 'roundrect' | 'custom';
 
 export type RoughProps = {
   seedKey: string;
@@ -52,6 +52,8 @@ export type RoughProps = {
   inset?: number;
   /** shape 为 roundrect 时的圆角半径（px）。 */
   radius?: number;
+  /** shape 为 custom 时：给定盒子尺寸（含 inset 的坐标系）返回 SVG 路径。请传模块级常量，避免每次渲染重画。 */
+  pathOf?: (x: number, y: number, w: number, h: number) => string;
 };
 
 /** 圆角矩形的 SVG 路径（Rough 的 path 会把它画成手绘线条）。 */
@@ -63,7 +65,7 @@ export function roundRectPath(x: number, y: number, w: number, h: number, r: num
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** 放在 position:relative 的盒子里，覆盖整个盒子绘制手绘边框。 */
-export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth = 1.3, fill, fillStyle = 'hachure', dashed, roughness = 1.1, inset = 2, radius = 0 }: RoughProps) {
+export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth = 1.3, fill, fillStyle = 'hachure', dashed, roughness = 1.1, inset = 2, radius = 0, pathOf }: RoughProps) {
   const { theme, registry } = useContext(ThemeContext);
   const ref = useRef<SVGSVGElement>(null);
 
@@ -101,6 +103,7 @@ export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth
       if (shape === 'ellipse') el = rc.ellipse(W / 2, H / 2, W - inset * 2, H - inset * 2, opts);
       else if (shape === 'underline') el = rc.line(inset, H - inset, W - inset, H - inset, opts);
       else if (shape === 'line') el = rc.line(inset, H / 2, W - inset, H / 2, opts);
+      else if (shape === 'custom' && pathOf) el = rc.path(pathOf(inset, inset, W - inset * 2, H - inset * 2), opts);
       else if (shape === 'roundrect') el = rc.path(roundRectPath(inset, inset, W - inset * 2, H - inset * 2, radius), opts);
       else el = rc.rectangle(inset, inset, W - inset * 2, H - inset * 2, opts);
       svg.appendChild(el);
@@ -113,8 +116,41 @@ export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth
       ro.disconnect();
       registry?.remove(token);
     };
-  }, [theme, registry, seedKey, shape, stroke, strokeWidth, fill, fillStyle, dashed, roughness, inset, radius]);
+  }, [theme, registry, seedKey, shape, stroke, strokeWidth, fill, fillStyle, dashed, roughness, inset, radius, pathOf]);
 
   if (theme !== 'sketch') return null;
   return <svg ref={ref} className="jrough" aria-hidden="true" xmlns={SVG_NS} preserveAspectRatio="none" />;
+}
+
+/**
+ * 在一个已有的 <svg> 里按绝对坐标画手绘路径（架构图连线、箭头）。只在 sketch 主题下渲染；
+ * 绘制期间登记到 RoughRegistry，渲染路由据此等绘制完成再截图。
+ */
+export function RoughPath({ seedKey, d, stroke = '#1e1e1e', strokeWidth = 1.4, fill, dashed, roughness = 0.9 }: { seedKey: string; d: string; stroke?: string; strokeWidth?: number; fill?: string; dashed?: boolean; roughness?: number }) {
+  const { theme, registry } = useContext(ThemeContext);
+  const ref = useRef<SVGGElement>(null);
+  useLayoutEffect(() => {
+    if (theme !== 'sketch') return;
+    const g = ref.current;
+    const svg = g?.ownerSVGElement;
+    if (!g || !svg || !d) return;
+    const token = {};
+    registry?.add(token);
+    while (g.firstChild) g.removeChild(g.firstChild);
+    const opts: Options = {
+      seed: seedOf(seedKey),
+      stroke,
+      strokeWidth,
+      roughness,
+      bowing: 0.6,
+      preserveVertices: true,
+      ...(dashed ? { strokeLineDash: [7, 6] } : {}),
+      ...(fill ? { fill, fillStyle: 'solid' } : {}),
+    };
+    g.appendChild(rough.svg(svg).path(d, opts));
+    registry?.done(token);
+    return () => registry?.remove(token);
+  }, [theme, registry, seedKey, d, stroke, strokeWidth, fill, dashed, roughness]);
+  if (theme !== 'sketch') return null;
+  return <g ref={ref} className="jrough-path" aria-hidden="true" />;
 }

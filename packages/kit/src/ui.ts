@@ -127,6 +127,13 @@ export const Terminal = Object.assign(c('Terminal'), { Command: c('Terminal.Comm
 /** 手机外框：子节点按手机宽度排版。页面写 viewport: 'mobile' 时舞台会自动套上，不用写它。 */
 export const Phone = c('Phone');
 
+// ---------- 架构图（Joplo 自有，D41） ----------
+/**
+ * 架构图：`<Diagram direction="right"><Diagram.Group label="AWS"><Diagram.Node id="brain" label="Agent 大脑" kind="service" state={$.ui.n_brain} /></Diagram.Group>
+ * <Diagram.Edge from="client" to="brain" label="发送消息" state={$.ui.e1} /></Diagram>`。state 由 flow 步骤里的 set() 驱动。
+ */
+export const Diagram = Object.assign(c('Diagram'), { Group: c('Diagram.Group'), Node: c('Diagram.Node'), Edge: c('Diagram.Edge') });
+
 // ---------- Joplo ----------
 export const Placeholder = c('Placeholder');
 export const Custom = c('Custom');

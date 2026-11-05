@@ -4,7 +4,8 @@
  *   2. 启动看板进程（临时 JOPLO_HOME，登记 invite、joplo-dist、一个编译出错的项目和一个已删除的目录），截取新界面（D39）：
  *      首页、演示页（电脑 / 手机）、缺口、检查抽屉、「…」菜单、导出视频进度、编译错误；
  *   3. 调用 buildSite，用 file:// 打开发布站截图；
- *   4. 把 examples/joplo-board 原型里对应的场景也渲染出来（prototype-*），与新界面放在一起对照。
+ *   4. 把 examples/joplo-board 原型里对应的场景也渲染出来（prototype-*），与新界面放在一起对照；
+ *   5. 架构图（Diagram）测试夹具的调用链截图（stage-diagram-*）。
  * 用法：pnpm docs:screenshots [输出目录]
  */
 import fs from 'node:fs';
@@ -41,6 +42,17 @@ for (const theme of ['sketch', 'clean'] as const) {
   for (const s of shots) {
     const r = await renderStep({ projectDir: tmp, scenarioId: s.scenarioId, stepId: s.stepId, theme, out: path.join(outDir, `${s.name}.${theme}.png`), overwrite: true, ...(s.viewport ? { viewport: s.viewport } : {}) });
     console.log(`${path.relative(root, r.path)}  position=${r.position} 可见元素=${r.elements.filter((e) => e.visible).length} 告警=${r.warnings.length}`);
+    for (const w of r.warnings) console.log(`  ⚠ ${w}`);
+    bad += r.warnings.length;
+  }
+}
+
+// 架构图（Diagram，D41）：测试夹具 packages/web/e2e/fixtures/diagram 的调用链，sketch / clean 各两步
+const diagramFixture = path.join(root, 'packages/web/e2e/fixtures/diagram');
+for (const theme of ['sketch', 'clean'] as const) {
+  for (const [name, step] of [['stage-diagram-1-active', 'arch.a.call#1'], ['stage-diagram-3-error', 'arch.a.call#3']] as const) {
+    const r = await renderStep({ projectDir: diagramFixture, scenarioId: 'arch.a.call', stepId: step, theme, out: path.join(outDir, `${name}.${theme}.png`), overwrite: true });
+    console.log(`${path.relative(root, r.path)}  position=${r.position} 告警=${r.warnings.length}`);
     for (const w of r.warnings) console.log(`  ⚠ ${w}`);
     bad += r.warnings.length;
   }

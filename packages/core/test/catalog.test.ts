@@ -19,6 +19,8 @@ import {
   hiddenAtWidth,
   initialState,
   isNodeVisible,
+  nodeLabel,
+  findNode,
   replay,
   stateAt,
   type AuthoringProject,
@@ -285,5 +287,81 @@ describe('设备外框：Terminal 与 Phone', () => {
     // 页面本身是手机宽度时，Phone 内外都按 390
     expect(isNodeVisible(scene, 'outside_wide', s, 390)).toBe(false);
     expect(isNodeVisible(scene, 'p_narrow', s, 390)).toBe(true);
+  });
+});
+
+describe('架构图：Diagram / Diagram.Group / Diagram.Node / Diagram.Edge（D41）', () => {
+  const D = ui.Diagram;
+  function buildDiagram(edges: unknown[], extraNodes: unknown[] = []): ReturnType<typeof compile> {
+    const home = page(
+      { title: '架构' },
+      h(D, { id: 'arch', direction: 'right', h: 480 },
+        h(D.Group, { id: 'aws', label: 'AWS' },
+          h(D.Node, { id: 'brain', label: 'Agent 大脑', description: '推理循环', kind: 'service', state: $.ui.n_brain }),
+          h(D.Node, { id: 'llm', label: 'Bedrock', kind: 'model' }),
+        ),
+        h(D.Node, { id: 'client', label: '客户端', kind: 'client' }),
+        h(D.Node, { id: 'billing', label: 'Billing', kind: 'database' }),
+        ...extraNodes,
+        ...edges,
+      ),
+    );
+    const opt = option({
+      name: 'A',
+      idea: 'i',
+      on: {},
+      state: { ui: { n_brain: 'idle', e1: 'idle' } },
+      scenarios: { call: flow('一次调用', { start: '/' }).system('客户端发出消息', set($.ui.e1, 'active'), set($.ui.n_brain, 'active')).system('大脑回复', set($.ui.e1, 'ok'), set($.ui.n_brain, 'ok')) },
+    });
+    const src: AuthoringProject = {
+      root: '/p',
+      config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
+      layouts: {},
+      routes: { '/': { ...home, ...F('routes/page.tsx') } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    };
+    return compile(src, 'dev');
+  }
+  const edge = (props: Record<string, unknown>) => ({ ...h(ui.Diagram.Edge, props), source: '/p/routes/page.tsx:9:7' });
+
+  it('四个组件都在目录里且不是可操作元素（不需要 flow）', () => {
+    for (const t of ['Diagram', 'Diagram.Group', 'Diagram.Node', 'Diagram.Edge']) {
+      expect(COMPONENT_TYPES as readonly string[]).toContain(t);
+      expect(INTERACTIVE_TYPES.has(t)).toBe(false);
+    }
+  });
+
+  it('连线 id 缺省为 from->to，可以显式写 id；状态由 flow 的 set() 驱动', () => {
+    const r = buildDiagram([edge({ from: 'client', to: 'brain', label: '发送消息', state: $.ui.e1 }), edge({ id: 'usage', from: 'brain', to: 'billing', label: '用量事件', async: true })]);
+    expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    const p = r.project!;
+    const scene = p.scenes['f.a@/']!;
+    const arch = findNode(scene, 'arch')!.node;
+    expect(arch.children!.map((c) => c.id)).toEqual(['aws', 'client', 'billing', 'client->brain', 'usage']);
+    expect(replay(p, 'f.a.call').diagnostics).toEqual([]);
+    expect(stateAt(p, 'f.a.call', 1).ui).toMatchObject({ e1: 'active', n_brain: 'active' });
+    expect(stateAt(p, 'f.a.call', 2).ui).toMatchObject({ e1: 'ok', n_brain: 'ok' });
+    // 检查元素的名字：有 label 用 label，没有时是「from → to」
+    expect(nodeLabel(arch.children![3]!)).toBe('发送消息');
+    expect(nodeLabel({ type: 'Diagram.Edge', props: { from: 'a', to: 'b' } })).toBe('a → b');
+    // Node / Edge 单击是静态的，不影响演示
+    expect(explainClick(p, initialState(p, 'f.a.call'), 'brain').kind).toBe('static');
+    expect(explainClick(p, initialState(p, 'f.a.call'), 'client->brain').kind).toBe('static');
+  });
+
+  it('from / to 不是同一个 Diagram 里的节点：报 UNKNOWN_DIAGRAM_NODE（带 at）', () => {
+    const r = buildDiagram([edge({ from: 'client', to: 'nope' }), edge({ from: 'ghost', to: 'brain' })]);
+    const d = r.diagnostics.filter((x) => x.code === 'UNKNOWN_DIAGRAM_NODE');
+    expect(d.length).toBeGreaterThanOrEqual(2);
+    expect(d.every((x) => x.severity === 'error' && x.at === 'routes/page.tsx:9:7')).toBe(true);
+    expect(d.map((x) => x.message).join('\n')).toContain('「nope」');
+    expect(d.map((x) => x.message).join('\n')).toContain('「ghost」');
+  });
+
+  it('节点 id 在同一画面唯一（DUPLICATE_ID）；节点必须有 id', () => {
+    const dup = buildDiagram([], [h(ui.Diagram.Node, { id: 'client', label: '又一个客户端' })]);
+    expect(dup.diagnostics.map((d) => d.code)).toContain('DUPLICATE_ID');
+    const noId = buildDiagram([], [h(ui.Diagram.Node, { label: '无名' })]);
+    expect(noId.diagnostics.find((d) => d.code === 'MISSING_ID')?.message).toContain('Diagram.Node');
   });
 });

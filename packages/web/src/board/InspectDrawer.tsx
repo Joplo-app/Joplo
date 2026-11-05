@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { Check, Copy, ExternalLink, X } from 'lucide-react';
-import { findNode, type Project, type Rule, type Selection } from '@tokenroll/joplo-core';
+import { findNode, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@tokenroll/joplo-core';
 import type { SelectionSync } from '../runtime/demo';
 import { optionOfNode, scenariosOf, shortName } from '../runtime/views';
 import { cn } from '@/lib/utils';
@@ -32,8 +32,11 @@ function RuleItem({ rule }: { rule: Rule }) {
 
 const H = ({ children }: { children: React.ReactNode }) => <h3 className="mb-1.5 mt-5 text-[13px] font-semibold text-[#3a3a3a] first:mt-0">{children}</h3>;
 
+const DIAGRAM_STATE: Record<string, string> = { idle: '空闲（idle）', active: '调用中（active）', ok: '成功（ok）', error: '出错（error）', dim: '淡出（dim）' };
+
 export function InspectDrawer({
   project,
+  state,
   selection,
   sync,
   onClose,
@@ -41,6 +44,8 @@ export function InspectDrawer({
   onOpenEditor,
 }: {
   project: Project;
+  /** 当前画面状态：架构图节点 / 连线的 state 绑定按它解析。 */
+  state: PlayState | null;
   selection: Selection;
   sync: SelectionSync;
   onClose: () => void;
@@ -78,6 +83,42 @@ export function InspectDrawer({
           </button>
         </div>
 
+        {node && node.type.startsWith('Diagram.') ? (
+          <dl className="mb-2 grid grid-cols-[64px_1fr] gap-x-2 gap-y-1 rounded-md bg-[#f8f9fa] px-3 py-2 text-[13px]" data-testid="sel-diagram">
+            {(() => {
+              const p = state && state.sceneId === selection.sceneId ? resolveProps(node, state) : (node.props ?? {});
+              const st = typeof p.state === 'string' ? p.state : 'idle';
+              return (
+                <>
+                  {typeof p.description === 'string' && p.description ? (
+                    <>
+                      <dt className="text-[#6b6b6b]">说明</dt>
+                      <dd data-testid="sel-description">{p.description}</dd>
+                    </>
+                  ) : null}
+                  {node.type === 'Diagram.Edge' ? (
+                    <>
+                      <dt className="text-[#6b6b6b]">连线</dt>
+                      <dd data-testid="sel-endpoints">
+                        {String(p.from)} → {String(p.to)}
+                        {p.async === true ? '（异步）' : ''}
+                      </dd>
+                    </>
+                  ) : null}
+                  {node.type !== 'Diagram.Group' ? (
+                    <>
+                      <dt className="text-[#6b6b6b]">状态</dt>
+                      <dd data-testid="sel-state" data-state={st}>
+                        {DIAGRAM_STATE[st] ?? st}
+                        {typeof node.props?.state === 'string' && node.props.state.startsWith('$') ? <span className="ml-1 font-mono text-[11px] text-[#868e96]">{node.props.state}</span> : null}
+                      </dd>
+                    </>
+                  ) : null}
+                </>
+              );
+            })()}
+          </dl>
+        ) : null}
         {node?.note ? (
           <p className="rounded bg-[#fff8ee] px-2 py-1 text-[13px]" data-testid="sel-note">
             <span className="text-[#8a4700]">设计说明：</span>

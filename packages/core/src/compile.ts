@@ -383,7 +383,11 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `组件 <${n.type}> 不在目录中（请使用 Mantine 同名组件，运行 joplo skill components 查看目录；目录没有的用 <Custom kind="…"> 占位）`, at);
   const interactive = INTERACTIVE_TYPES.has(n.type);
   if (interactive && typeof rawId !== 'string') err('MISSING_ID', `可操作组件 <${n.type}>「${labelOf(n)}」必须有 id，步骤和选中都靠它定位`, at);
-  const id = typeof rawId === 'string' ? rawId : `_${fallbackId}`;
+  if (n.type === 'Diagram.Node' && typeof rawId !== 'string') err('MISSING_ID', `架构图节点 <Diagram.Node>「${labelOf(n)}」必须有 id，连线的 from / to 靠它`, at);
+  if (n.type === 'Diagram') checkDiagram(n, err);
+  // 连线没写 id 时用「from->to」：⌥+单击检查与 rules 的 elements 都能引用它
+  const edgeId = n.type === 'Diagram.Edge' && typeof rest.from === 'string' && typeof rest.to === 'string' ? `${rest.from}->${rest.to}` : null;
+  const id = typeof rawId === 'string' ? rawId : (edgeId ?? `_${fallbackId}`);
   if (ids.has(id)) err('DUPLICATE_ID', `同一画面中 id「${id}」重复（另一处：${rel(ids.get(id)) ?? '未知'}）`, at);
   ids.set(id, at);
 
@@ -411,6 +415,32 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   const s = rel(at);
   if (s) node.source = s;
   return node;
+}
+
+/**
+ * 架构图校验：Diagram.Edge 的 from / to 必须是同一个 Diagram 里（含嵌套分组）存在的 Diagram.Node id。
+ * 嵌套的另一个 Diagram 自成一体，不参与本图的校验。
+ */
+function checkDiagram(d: JNode, err: ErrFn): void {
+  const nodes = new Set<string>();
+  const edges: JNode[] = [];
+  const walk = (cs: JChild[]) => {
+    for (const c of flatten(cs)) {
+      if (!isNode(c) || c.type === 'Diagram') continue;
+      if (c.type === 'Diagram.Node' && typeof c.props.id === 'string') nodes.add(c.props.id);
+      if (c.type === 'Diagram.Edge') edges.push(c);
+      walk(c.children);
+    }
+  };
+  walk(d.children);
+  const known = [...nodes].join('、') || '（没有节点）';
+  for (const e of edges) {
+    for (const k of ['from', 'to'] as const) {
+      const v = e.props[k];
+      if (typeof v !== 'string' || !nodes.has(v))
+        err('UNKNOWN_DIAGRAM_NODE', `<Diagram.Edge> 的 ${k}「${typeof v === 'string' ? v : String(v)}」不是这个 Diagram 里的节点 id（可用：${known}）`, e.source);
+    }
+  }
 }
 
 /** 展开数组与 Fragment（含插槽展开后的 Fragment），丢弃 null/布尔。 */
