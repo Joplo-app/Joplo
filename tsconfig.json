@@ -1,4 +1,10 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["packages/core/src", "packages/core/test", "packages/cli/src", "packages/server/src"]
+  "include": [
+    "packages/cli/src",
+    "packages/core/src",
+    "packages/core/test",
+    "packages/kit/src",
+    "packages/server/src"
+  ]
 }
