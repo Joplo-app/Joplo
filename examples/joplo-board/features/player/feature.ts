@@ -23,4 +23,5 @@ export default feature({
     inspect_gesture: question('不再有审阅模式后，“操作原型”和“检查元素”怎么区分？原型里暂定：单击 = 按场景操作，按住 ⌥ 单击 = 检查', { severity: 'blocker', refs: ['review'] }),
     site_export: question('发布站上要不要提供导出？图片可以在浏览器里生成；视频需要本机 Playwright，发布站上做不了', { severity: 'major', refs: ['export_video', 'publish_play'] }),
   },
+  pick: 'b-by-case',
 });
