@@ -21,4 +21,5 @@ export default feature({
   questions: {
     skip_idle: question('只重放某一层时，这一层没有变化的步骤是快速带过、直接跳过，还是照常停留？', { severity: 'major', refs: ['replay_layer'] }),
   },
+  pick: 'a-switch',
 });
