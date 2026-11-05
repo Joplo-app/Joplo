@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/brand/joplo-logo.svg" alt="Joplo" width="320"></p>
+
 # Joplo
 
 Joplo 是面向编码 Agent 的功能设计与演示工具：**动手实现之前，先和 AI 一起把功能做成低保真、可点击、可演示的原型，把每一种情况都看清楚。**
