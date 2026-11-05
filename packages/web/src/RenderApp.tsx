@@ -116,10 +116,12 @@ export function RenderApp() {
   // 字幕区放在舞台（手机含外框）正下方，宽度相同：截图、导出图片与视频都带上它
   const fw = viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).width : vp.width;
   const fh = (viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).height : vp.height) + SUBTITLE_HEIGHT;
+  // 视频与固定尺寸的截图画布用固定高度（画面尺寸不随字幕行数变化）；单张截图与导出图片按内容自适应
+  const fixedSub = record || !!shot;
   const withSub = (node: ReactNode, sub: SubtitleContent | null, w: number) => (
     <div style={{ display: 'flex', flexDirection: 'column', width: w }}>
       {node}
-      <Subtitle content={sub} theme={theme} width={w} framed />
+      <Subtitle content={sub} theme={theme} width={w} framed fixedHeight={fixedSub ? SUBTITLE_HEIGHT : undefined} />
     </div>
   );
   const wrap = (stageNode: ReactNode, sub: SubtitleContent | null) => {
@@ -161,7 +163,7 @@ export function RenderApp() {
       camera={plan.spec}
       sceneId={plan.sceneId}
     />,
-    subtitleFor(sc, data.state.position, null),
+    subtitleFor(sc, data.state.position, null, data.state.completed),
   );
 }
 
@@ -223,6 +225,6 @@ function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: {
       }}
       overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={null} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />}
     />,
-    subtitleFor(sc, snap.state.position, snap.activeStep),
+    subtitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed),
   );
 }

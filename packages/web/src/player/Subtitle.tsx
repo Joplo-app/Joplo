@@ -1,18 +1,21 @@
 /**
- * 字幕区（画面下方、播放控制上方）：固定高度 SUBTITLE_HEIGHT，宽度占满；字体跟随舞台主题
- * （sketch：Excalifont + 小赖；clean：系统字体）。演示页、发布站、renderStep 截图、导出图片与视频共用。
+ * 字幕区（画面下方、播放控制上方）：高度按内容自适应（subtitleHeight），宽度占满；字体跟随舞台主题
+ * （sketch：Excalifont + 小赖；clean：系统字体）。右侧小标记是步数或“场景完成 · 模拟成功”。
+ * 演示页、发布站、全屏、renderStep 截图、导出图片与视频共用；视频用固定高度（fixedHeight），画面尺寸不变。
  */
-import { SUBTITLE_HEIGHT } from '@tokenroll/joplo-core';
+import { cn } from '@/lib/utils';
 import type { StageTheme } from '../renderer/rough';
-import { SUBTITLE_CAPTION_PX, SUBTITLE_EXPLAIN_PX, type SubtitleContent } from './subtitle-content';
+import { MOCK_CLS } from './labels';
+import { SUBTITLE_CAPTION_PX, SUBTITLE_EXPLAIN_PX, SUBTITLE_PAD_Y, subtitleHeight, type SubtitleContent } from './subtitle-content';
 
 const clamp = (lines: number) => ({ display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' });
 
-export function Subtitle({ content, theme, width, framed = false }: { content: SubtitleContent | null; theme: StageTheme; width?: number | string; framed?: boolean }) {
+export function Subtitle({ content, theme, width, framed = false, fixedHeight, dark = false }: { content: SubtitleContent | null; theme: StageTheme; width?: number | string; framed?: boolean; fixedHeight?: number; dark?: boolean }) {
+  const badge = content?.badge;
   return (
     <div
-      className={`jsubtitle flex shrink-0 flex-col justify-center overflow-hidden bg-white px-5 ${framed ? '' : 'rounded-lg border'}`}
-      style={{ height: SUBTITLE_HEIGHT, width: width ?? '100%' }}
+      className={cn('jsubtitle flex shrink-0 items-center gap-4 overflow-hidden px-5', dark ? 'bg-black/70 text-white' : 'bg-white', !framed && !dark && 'rounded-lg border')}
+      style={{ height: fixedHeight ?? subtitleHeight(content), width: width ?? '100%', paddingTop: SUBTITLE_PAD_Y, paddingBottom: SUBTITLE_PAD_Y }}
       data-theme={theme}
       data-testid="subtitle"
       data-jsubtitle=""
@@ -21,18 +24,27 @@ export function Subtitle({ content, theme, width, framed = false }: { content: S
     >
       {content ? (
         <>
-          <div className="text-[#1e1e1e]" style={{ fontSize: SUBTITLE_CAPTION_PX, lineHeight: 1.35, ...clamp(content.captionLines) }} data-jsubtitle-caption="">
-            {content.kind === 'system' ? (
-              <span className="mr-2 inline-block rounded bg-[#1c5fb8] px-1.5 align-middle text-[12px] leading-[20px] text-white" style={{ fontFamily: 'inherit' }}>
-                系统
-              </span>
-            ) : null}
-            {content.caption}
-          </div>
-          {content.explain ? (
-            <div className="mt-1 text-[#495057]" style={{ fontSize: SUBTITLE_EXPLAIN_PX, lineHeight: 1.5, ...clamp(content.explainLines) }} data-jsubtitle-explain="">
-              {content.explain}
+          <div className="flex min-w-0 flex-1 flex-col justify-center">
+            <div className={dark ? 'text-white' : 'text-[#1e1e1e]'} style={{ fontSize: SUBTITLE_CAPTION_PX, lineHeight: 1.35, ...clamp(content.captionLines) }} data-jsubtitle-caption="">
+              {content.kind === 'system' ? <span className="mr-2 inline-block rounded bg-[#1c5fb8] px-1.5 align-middle text-[12px] leading-[20px] text-white">系统</span> : null}
+              {content.caption}
             </div>
+            {content.explain ? (
+              <div className={dark ? 'text-white/80' : 'text-[#495057]'} style={{ marginTop: 2, fontSize: SUBTITLE_EXPLAIN_PX, lineHeight: 1.5, ...clamp(content.explainLines) }} data-jsubtitle-explain="">
+                {content.explain}
+              </div>
+            ) : null}
+          </div>
+          {badge ? (
+            badge.kind === 'done' ? (
+              <span role="status" title={badge.title} data-testid="complete-badge" className={cn('shrink-0 rounded border px-2 py-0.5 text-[13px]', MOCK_CLS[badge.outcome])}>
+                {badge.text}
+              </span>
+            ) : (
+              <span data-testid="step-index" className={cn('shrink-0 text-[13px]', dark ? 'text-white/70' : 'text-[#868e96]')}>
+                {badge.text}
+              </span>
+            )
           ) : null}
         </>
       ) : null}
