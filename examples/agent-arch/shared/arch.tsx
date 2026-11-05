@@ -14,7 +14,7 @@ export const ASK = '帮我把桌面「报销」文件夹里的发票整理成一
 
 // ---------- 架构图 ----------
 export const arch = (v: V): JNode => (
-  <Diagram id="arch" direction="right" h={640}>
+  <Diagram id="arch" direction="down" h={980}>
     <Diagram.Group id="g_device" label="用户设备">
       {[
         <Diagram.Node id="app" label="客户端界面" kind="client" description="对话、确认弹窗" state={ui.n_app} />,
