@@ -47,6 +47,7 @@ export function Overlay({
   stage,
   nextTargetId,
   caption,
+  hideSystem = false,
   setCursorEl,
   onBackToDemo,
   onDismiss,
@@ -55,6 +56,8 @@ export function Overlay({
   stage: HTMLElement | null;
   nextTargetId: string | null;
   caption: string | null;
+  /** 导演模式有解说卡时不显示顶部的“系统事件”标签（与解说卡重复）。 */
+  hideSystem?: boolean;
   setCursorEl: (el: HTMLElement | null) => void;
   onBackToDemo: () => void;
   onDismiss: () => void;
@@ -111,7 +114,7 @@ export function Overlay({
         <MousePointer2 className="-ml-[3px] -mt-[2px] size-7 fill-white text-[#1e1e1e] drop-shadow" strokeWidth={1.6} />
       </div>
 
-      {snap.systemEvent ? (
+      {snap.systemEvent && !hideSystem ? (
         <div className="absolute left-1/2 top-14 -translate-x-1/2 rounded-full border border-[#1c5fb8] bg-[#eef4ff] px-4 py-1.5 text-[17px] text-[#1c5fb8] shadow" data-joverlay="system">
           <span className="mr-2 rounded bg-[#1c5fb8] px-1.5 py-0.5 text-[11px] font-semibold text-white">系统事件</span>
           {snap.systemEvent}
@@ -143,7 +146,7 @@ function NoticeBubble({ anchor, W, H, kind, text, onBack, onDismiss }: { anchor:
       data-joverlay="notice"
       data-notice-kind={kind}
       className="pointer-events-auto absolute rounded-md border-2 px-4 py-3 text-[17px] shadow-lg"
-      style={{ left, top, width, borderColor: tone.border, background: tone.bg, fontFamily: 'system-ui, "PingFang SC", sans-serif' }}
+      style={{ left, top, width, borderColor: tone.border, background: tone.bg }}
     >
       <div className="mb-1 text-[14px] font-semibold" style={{ color: tone.border }}>
         {tone.title}

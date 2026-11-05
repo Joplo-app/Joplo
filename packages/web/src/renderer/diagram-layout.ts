@@ -3,11 +3,13 @@
  *
  * - diagramStructure：从 IR 节点取出结构（分组、节点、连线、方向、节点尺寸）。只读**原始属性**：state 等绑定在 IR 里是
  *   "$ui.x" 这样的字符串，when 也不参与，所以播放中 state / 可见性变化不会改变结构，节点不会移动。
- * - layoutDiagram：@dagrejs/dagre（MIT，复合图支持分组）计算坐标；连线用 dagre 给出的折线点（绕开节点）。
+ * - layoutDiagram：@dagrejs/dagre（MIT，复合图支持分组）计算节点坐标；连线由 diagram-route.ts 正交走线
+ *   （出入口分配、通道与轨道间距 ≥ 10px、不同连线不共线；放不下时加大层间距重排）。
  *   同一结构总是得到同一结果（dagre 对相同的插入顺序是确定的；这里按源码顺序插入）。
  * - structureKey：结构的稳定键，渲染器只在它变化时重新布局。
  */
 import dagre from '@dagrejs/dagre';
+import { routeOrthogonal } from './diagram-route';
 import type { SceneNode } from '@tokenroll/joplo-core';
 
 export type Point = { x: number; y: number };
@@ -93,6 +95,29 @@ export function diagramStructure(node: SceneNode): DStructure {
 export const structureKey = (s: DStructure) => JSON.stringify(s);
 
 /**
+ * 镜头聚焦时架构图里的焦点（T-director3）：targets 里的节点、分组（展开成它的全部后代节点）与连线。
+ * 返回 null 表示焦点不在这张图里（或焦点就是整张图），连线照常画。
+ */
+export function diagramFocus(s: DStructure, targets: readonly string[] | null | undefined, diagramId?: string): { nodes: Set<string>; edges: Set<string> } | null {
+  if (!targets?.length || (diagramId && targets.includes(diagramId))) return null;
+  const parentOf = new Map(s.groups.map((g) => [g.id, g.parent]));
+  const inGroup = (gid: string | null, target: string): boolean => (gid ? gid === target || inGroup(parentOf.get(gid) ?? null, target) : false);
+  const nodes = new Set<string>();
+  const edges = new Set<string>();
+  for (const t of targets) {
+    if (s.nodes.some((n) => n.id === t)) nodes.add(t);
+    else if (s.edges.some((e) => e.id === t)) edges.add(t);
+    else if (s.groups.some((g) => g.id === t)) for (const n of s.nodes) if (inGroup(n.parent, t)) nodes.add(n.id);
+  }
+  return nodes.size || edges.size ? { nodes, edges } : null;
+}
+
+/** 聚焦时这条连线是否突出：连着焦点节点、本身是焦点，或 state 是 active / ok / error。 */
+export function edgeEmphasized(focus: { nodes: Set<string>; edges: Set<string> }, e: { id: string; from: string; to: string }, state: string): boolean {
+  return focus.edges.has(e.id) || focus.nodes.has(e.from) || focus.nodes.has(e.to) || state === 'active' || state === 'ok' || state === 'error';
+}
+
+/**
  * 指回“上游所在分组”的连线：u → v，v 所在的、不包含 u 的最外层分组里，有别的成员能走到 u（它在 u 的上游）。
  * 这样的连线若照常参与分层，会把这个分组拉成横跨整张图的长条（例如 app → biz → local，app 与 local 同属“用户设备”）。
  * 布局时把它当成反向连线分层（类似 Graphviz 的 constraint=false），画的时候方向不变。
@@ -129,9 +154,28 @@ export function backEdges(s: DStructure): Set<string> {
   return res;
 }
 
-export function layoutDiagram(s: DStructure): DLayout {
+export function layoutDiagram(s: DStructure, opts: { minRanksep?: number } = {}): DLayout {
   const empty: DLayout = { width: 0, height: 0, nodes: {}, groups: {}, edges: {}, titles: {} };
   if (s.nodes.length === 0) return empty;
+  // 走线放不下所需的通道时加大层间距重新布局（最多几次，结果仍确定）
+  // 连线多的节点：出入口那一侧加长到放得下全部出入口（间距 ≥ 10px）
+  let extra = 0;
+  const sizes: Record<string, number> = {};
+  const run = () => {
+    const placed = placeNodes(s, extra, sizes, opts.minRanksep ?? 0);
+    return { placed, routed: routeOrthogonal(s.edges.filter((e) => placed.known.has(e.from) && placed.known.has(e.to)), placed.nodes, s.direction === 'down', Object.values(placed.groups), GROUP_LABEL_H) };
+  };
+  let { placed, routed } = run();
+  for (let i = 0; i < 5 && (routed.deficit > 0 || Object.keys(routed.grow).length); i++) {
+    extra += routed.deficit;
+    for (const [id, v] of Object.entries(routed.grow)) sizes[id] = Math.max(sizes[id] ?? 0, Math.ceil(v));
+    ({ placed, routed } = run());
+  }
+  return finish(s, placed.nodes, placed.groups, routed.routes);
+}
+
+/** dagre 排节点（连线只用于分层，不用它的折线），算出分组框。 */
+function placeNodes(s: DStructure, extraRanksep: number, minSide: Record<string, number> = {}, minRanksep = 0): { nodes: Record<string, Box>; groups: Record<string, Box>; known: Set<string> } {
   const g = new dagre.graphlib.Graph({ compound: true, multigraph: true });
   // 紧凑：连线标签不进 dagre（不单独占一层），布局后贴在线上（placeLabels）
   const maxLabel = Math.max(0, ...s.edges.map((e) => (s.direction === 'down' ? e.lh : e.lw)));
@@ -143,7 +187,7 @@ export function layoutDiagram(s: DStructure): DLayout {
   const pad = depth * GROUP_PAD;
   const down = s.direction === 'down';
   // 标签贴在线上，不再需要为标签留出整层；只在标签很长时略微放宽
-  const ranksep = Math.min(64, Math.max(32, maxLabel * 0.35)) + (down ? head + pad : 2 * pad);
+  const ranksep = Math.max(minRanksep, Math.min(64, Math.max(32, maxLabel * 0.35)) + (down ? head + pad : 2 * pad)) + extraRanksep;
   const nodesep = 20 + (down ? 2 * pad : head + pad);
   g.setGraph({ rankdir: down ? 'TB' : 'LR', nodesep, ranksep, edgesep: 14, marginx: 0, marginy: 0 });
   g.setDefaultEdgeLabel(() => ({}));
@@ -151,7 +195,9 @@ export function layoutDiagram(s: DStructure): DLayout {
   for (const gr of s.groups) g.setNode(gr.id, { label: gr.label, paddingTop: GROUP_LABEL_H });
   for (const gr of s.groups) if (gr.parent) g.setParent(gr.id, gr.parent);
   for (const n of s.nodes) {
-    g.setNode(n.id, { width: n.w, height: n.h });
+    // minSide：出入口那一侧的最小长度（right 方向是高度，down 方向是宽度）
+    const m = minSide[n.id] ?? 0;
+    g.setNode(n.id, down ? { width: Math.max(n.w, m), height: n.h } : { width: n.w, height: Math.max(n.h, m) });
     if (n.parent) g.setParent(n.id, n.parent);
   }
   const reversed = backEdges(s);
@@ -183,18 +229,11 @@ export function layoutDiagram(s: DStructure): DLayout {
     return groups[gid]!;
   };
   for (const gr of s.groups) boxOf(gr.id);
+  return { nodes, groups, known };
+}
 
+function finish(s: DStructure, nodes: Record<string, Box>, groups: Record<string, Box>, routed: Map<string, Point[]>): DLayout {
   const edges: DLayout['edges'] = {};
-  const flip = s.direction === 'down';
-  const raws = new Map<string, Point[]>();
-  for (const e of s.edges) {
-    if (!known.has(e.from) || !known.has(e.to)) continue;
-    const rev = reversed.has(e.id);
-    const v = g.edge({ v: rev ? e.to : e.from, w: rev ? e.from : e.to, name: e.id }) as { points?: Point[] } | undefined;
-    const pts = (v?.points ?? []).map((pt) => ({ x: pt.x, y: pt.y }));
-    raws.set(e.id, rev ? pts.reverse() : pts);
-  }
-  const routed = routeEdges(s.edges.filter((e) => raws.has(e.id)), raws, nodes, flip, Object.values(groups));
   // 分组标题：在分组顶部那条留白里，从左往右找一个没有连线经过的位置
   const titles: Record<string, Box> = {};
   const allRoutes = [...routed.values()];
@@ -246,140 +285,6 @@ export function layoutDiagram(s: DStructure): DLayout {
     edges: Object.fromEntries(Object.entries(edges).map(([k, e]) => [k, { points: e.points.map((pt) => ({ x: r(pt.x + dx), y: r(pt.y + dy) })), label: e.label ? move(e.label) : null }])),
     titles: Object.fromEntries(Object.entries(titles).map(([k, b]) => [k, move(b)])),
   };
-}
-
-const T = (p: Point, flip: boolean): Point => (flip ? { x: p.y, y: p.x } : p);
-const TB = (b: Box, flip: boolean): Box => (flip ? { x: b.y, y: b.x, w: b.h, h: b.w } : b);
-
-/**
- * 连线的首末两段。dagre 给出的是从节点中心指向第一个 / 最后一个中间点的斜线，可能擦过同一列的其他节点，
- * 多条线还会挤在同一个出口上。这里改成“横出横进”（down 方向交换坐标轴处理）：
- * - 每个节点的每一侧，按另一端的位置排序，把出入口均匀分布在这一侧（只有一条线时取最近的点）；
- * - 需要转弯的线在列间空隙里转弯，每条线占一条通道：从列外缘向外找第一个与其他通道相距 ≥ 8px、且不穿过节点的位置；
- * - dagre 的中间点（绕开节点的路由）原样保留。
- */
-export function routeEdges(list: DEdge[], raws: Map<string, Point[]>, nodeBoxes: Record<string, Box>, flip: boolean, groupBoxes: Box[] = []): Map<string, Point[]> {
-  const boxes: Record<string, Box> = Object.fromEntries(Object.entries(nodeBoxes).map(([k, b]) => [k, TB(b, flip)]));
-  const all = Object.values(boxes);
-  const cx = (b: Box) => b.x + b.w / 2;
-  const cy = (b: Box) => b.y + b.h / 2;
-  const column = (b: Box) => all.filter((o) => Math.abs(cx(o) - cx(b)) < 1);
-  const clampY = (y: number, b: Box) => Math.max(b.y + 10, Math.min(b.y + b.h - 10, y));
-  type R = { e: DEdge; S: Box; D: Box; mid: Point[]; forward: boolean; wantS: number; wantT: number; sy: number; ty: number };
-  const rs: R[] = [];
-  const out = new Map<string, Point[]>();
-  for (const e of list) {
-    const raw = raws.get(e.id)!;
-    if (e.from === e.to || raw.length < 2) {
-      out.set(e.id, raw);
-      continue;
-    }
-    const S = boxes[e.from]!;
-    const D = boxes[e.to]!;
-    const mid = raw.slice(1, -1).map((p) => T(p, flip));
-    const forward = cx(D) >= cx(S);
-    const wantS = mid[0]?.y ?? cy(D);
-    const wantT = mid[mid.length - 1]?.y ?? cy(S);
-    rs.push({ e, S, D, mid, forward, wantS, wantT, sy: 0, ty: 0 });
-  }
-  // 出入口：同一节点同一侧的线按另一端排序后均匀分布
-  const ports = new Map<string, { r: R; end: 's' | 't' }[]>();
-  for (const r of rs) {
-    const sk = `${r.e.from}:${r.forward ? 'R' : 'L'}`;
-    const tk = `${r.e.to}:${r.forward ? 'L' : 'R'}`;
-    ports.set(sk, [...(ports.get(sk) ?? []), { r, end: 's' }]);
-    ports.set(tk, [...(ports.get(tk) ?? []), { r, end: 't' }]);
-  }
-  for (const list2 of ports.values()) {
-    const want = (x: { r: R; end: 's' | 't' }) => (x.end === 's' ? x.r.wantS : x.r.wantT);
-    list2.sort((a, b) => want(a) - want(b));
-    list2.forEach((x, i) => {
-      const box = x.end === 's' ? x.r.S : x.r.D;
-      const y = list2.length === 1 ? clampY(want(x), box) : box.y + (box.h * (i + 1)) / (list2.length + 1);
-      if (x.end === 's') x.r.sy = y;
-      else x.r.ty = y;
-    });
-  }
-  // 转弯通道：同一列同一侧需要转弯的线各占一条竖直通道（往返连线因此分开）。
-  type L = { r: R; end: 's' | 't'; y: number; near: number };
-  const lanes = new Map<string, { edge: number; dir: 1 | -1; list: L[] }>();
-  // 列的外缘：节点外缘；紧贴着的分组边框（含标题留白）也算进去，线先出分组再转弯，不在分组标题那条留白里走
-  const gbs = groupBoxes.map((b) => TB(b, flip));
-  const colRight = (b: Box) => {
-    let e = Math.max(...column(b).map((o) => o.x + o.w));
-    for (const g of [...gbs].sort((a, c) => a.x + a.w - (c.x + c.w))) if (g.x + g.w >= e && g.x + g.w - e < 48 && column(b).some((o) => o.x >= g.x && o.x + o.w <= g.x + g.w && o.y >= g.y && o.y + o.h <= g.y + g.h)) e = g.x + g.w;
-    return e;
-  };
-  const colLeft = (b: Box) => {
-    let e = Math.min(...column(b).map((o) => o.x));
-    for (const g of [...gbs].sort((a, c) => c.x - a.x)) if (g.x <= e && e - g.x < 48 && column(b).some((o) => o.x >= g.x && o.x + o.w <= g.x + g.w && o.y >= g.y && o.y + o.h <= g.y + g.h)) e = g.x;
-    return e;
-  };
-  const addLane = (box: Box, side: 'R' | 'L', l: L) => {
-    const k = `${cx(box)}:${side}`;
-    const cur = lanes.get(k) ?? { edge: side === 'R' ? colRight(box) : colLeft(box), dir: side === 'R' ? (1 as const) : (-1 as const), list: [] };
-    cur.list.push(l);
-    lanes.set(k, cur);
-  };
-  for (const r of rs) {
-    const first = r.mid[0];
-    const last = r.mid[r.mid.length - 1];
-    const sideS = r.forward ? 'R' : 'L';
-    const sideD = r.forward ? 'L' : 'R';
-    if (first && last) {
-      if (Math.abs(r.sy - first.y) > 0.5) addLane(r.S, sideS, { r, end: 's', y: r.sy, near: first.x });
-      if (Math.abs(r.ty - last.y) > 0.5) addLane(r.D, sideD, { r, end: 't', y: r.ty, near: last.x });
-    } else if (Math.abs(r.sy - r.ty) > 0.5) addLane(r.D, sideD, { r, end: 't', y: r.ty, near: r.forward ? colRight(r.S) : colLeft(r.S) });
-  }
-  // 每个缺口里按出入口的位置依次找通道：从列外缘 + 6px 起每次外移 9px，取第一个
-  // ① 与本缺口里已占用、竖直范围有重叠的通道相距 ≥ 8px，② 竖直段和连到路由点的那一小段都不穿过节点。
-  const laneX = new Map<string, number>(); // `${edge id}:s|t` → x
-  const hitsNode = (x0: number, y0: number, x1: number, y1: number) =>
-    all.some((b) => Math.max(x0, x1) > b.x - 2 && Math.min(x0, x1) < b.x + b.w + 2 && Math.max(y0, y1) > b.y - 2 && Math.min(y0, y1) < b.y + b.h + 2);
-  for (const { edge, dir, list } of lanes.values()) {
-    list.sort((a, b) => a.y - b.y);
-    const used: { x: number; y0: number; y1: number }[] = [];
-    for (const l of list) {
-      const other = l.end === 's' ? (l.r.mid[0]?.y ?? l.r.ty) : (l.r.mid[l.r.mid.length - 1]?.y ?? l.r.sy);
-      const y0 = Math.min(l.y, other);
-      const y1 = Math.max(l.y, other);
-      let chosen = edge + dir * 6;
-      for (let k = 0; k < 40; k++) {
-        const x = edge + dir * (6 + k * 9);
-        if (used.some((u) => Math.abs(u.x - x) < 8 && u.y1 > y0 - 3 && u.y0 < y1 + 3)) continue;
-        if (hitsNode(x, y0 + 1, x, y1 - 1)) continue;
-        if (l.r.mid.length && hitsNode(x, other, l.near, other)) continue;
-        chosen = x;
-        break;
-      }
-      used.push({ x: chosen, y0, y1 });
-      laneX.set(`${l.r.e.id}:${l.end}`, chosen);
-    }
-  }
-  for (const r of rs) {
-    const { S, D, mid, forward } = r;
-    const sx = forward ? S.x + S.w : S.x;
-    const dx = forward ? D.x : D.x + D.w;
-    const sGap = laneX.get(`${r.e.id}:s`) ?? 0;
-    const dGap = laneX.get(`${r.e.id}:t`) ?? 0;
-    const pts: Point[] = [{ x: sx, y: r.sy }];
-    const first = mid[0];
-    const last = mid[mid.length - 1];
-    if (!first || !last) {
-      if (Math.abs(r.sy - r.ty) > 0.5) pts.push({ x: dGap, y: r.sy }, { x: dGap, y: r.ty });
-    } else {
-      if (Math.abs(r.sy - first.y) > 0.5) {
-        pts.push({ x: sGap, y: r.sy }, { x: sGap, y: first.y });
-      }
-      pts.push(...mid);
-      if (Math.abs(r.ty - last.y) > 0.5) {
-        pts.push({ x: dGap, y: last.y }, { x: dGap, y: r.ty });
-      }
-    }
-    pts.push({ x: dx, y: r.ty });
-    out.set(r.e.id, pts.map((p) => T(p, flip)));
-  }
-  return out;
 }
 
 /** 沿折线每 4px 取一个点。 */
@@ -464,19 +369,28 @@ export function diagramFit(layout: Pick<DLayout, 'width' | 'height'>, availW: nu
   return { scale: Math.max(0.05, Math.min(1, (availW - 8) / layout.width, (availH - 8) / layout.height)) };
 }
 
-/** 折线点 → 平滑路径（经过首尾点，中间点作为二次贝塞尔的控制点）。 */
-export function edgePath(points: Point[]): string {
+/** 折线点 → 路径：直线段，转角处用半径 ≤ 8px 的圆角（不会切到相邻通道，平行段间距保持不变）。 */
+export function edgePath(points: Point[], radius = 8): string {
   if (points.length < 2) return '';
   const f = (n: number) => Math.round(n * 10) / 10;
-  if (points.length === 2) return `M${f(points[0]!.x)},${f(points[0]!.y)} L${f(points[1]!.x)},${f(points[1]!.y)}`;
   let d = `M${f(points[0]!.x)},${f(points[0]!.y)}`;
   for (let i = 1; i < points.length - 1; i++) {
+    const a = points[i - 1]!;
     const p = points[i]!;
-    const n = points[i + 1]!;
-    const mid = i === points.length - 2 ? n : { x: (p.x + n.x) / 2, y: (p.y + n.y) / 2 };
-    d += ` Q${f(p.x)},${f(p.y)} ${f(mid.x)},${f(mid.y)}`;
+    const b = points[i + 1]!;
+    const la = Math.hypot(p.x - a.x, p.y - a.y);
+    const lb = Math.hypot(b.x - p.x, b.y - p.y);
+    const r = Math.min(radius, la / 2, lb / 2);
+    if (r < 0.5) {
+      d += ` L${f(p.x)},${f(p.y)}`;
+      continue;
+    }
+    const p1 = { x: p.x + ((a.x - p.x) / la) * r, y: p.y + ((a.y - p.y) / la) * r };
+    const p2 = { x: p.x + ((b.x - p.x) / lb) * r, y: p.y + ((b.y - p.y) / lb) * r };
+    d += ` L${f(p1.x)},${f(p1.y)} Q${f(p.x)},${f(p.y)} ${f(p2.x)},${f(p2.y)}`;
   }
-  return d;
+  const last = points[points.length - 1]!;
+  return d + ` L${f(last.x)},${f(last.y)}`;
 }
 
 /** 箭头：终点处的实心三角形。 */
@@ -491,4 +405,83 @@ export function arrowHead(points: Point[], size = 9): string {
   const by = p.y - uy * size;
   const f = (n: number) => Math.round(n * 10) / 10;
   return `M${f(p.x)},${f(p.y)} L${f(bx - uy * size * 0.55)},${f(by + ux * size * 0.55)} L${f(bx + uy * size * 0.55)},${f(by - ux * size * 0.55)} Z`;
+}
+
+// ---------- 聚焦布局（T-director3） ----------
+/** 聚焦小图里连线标签的字号（全图是 EDGE_FONT）。 */
+export const FOCUS_EDGE_FONT = 14;
+/** 节点从全图位置移到小图（以及移回去）的时长。 */
+export const FOCUS_MOVE_MS = 800;
+
+/**
+ * 这一步要不要用聚焦布局：镜头对准这张图里的 2 个及以上节点（对准连线时取它两端的节点）。
+ * 只对准一个节点、对准分组或整张图、焦点不在这张图里：返回 null（保持全图，只推近镜头）。
+ */
+export function focusMembers(s: DStructure, targets: readonly string[] | null | undefined, diagramId?: string): string[] | null {
+  if (!targets?.length || (diagramId && targets.includes(diagramId))) return null;
+  if (targets.some((t) => s.groups.some((g) => g.id === t))) return null;
+  const ids = new Set(s.nodes.map((n) => n.id));
+  const out: string[] = [];
+  const add = (id: string) => {
+    if (ids.has(id) && !out.includes(id)) out.push(id);
+  };
+  for (const t of targets) {
+    if (ids.has(t)) add(t);
+    const e = s.edges.find((x) => x.id === t);
+    if (e) {
+      add(e.from);
+      add(e.to);
+    }
+  }
+  // 按结构里的顺序，结果与 targets 的书写顺序无关
+  const order = s.nodes.map((n) => n.id);
+  out.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  return out.length >= 2 ? out : null;
+}
+
+export type FocusLayout = {
+  /** 小图里节点的位置（与全图同一坐标系，小图放在全图中央）。 */
+  nodes: Record<string, Box>;
+  edges: Record<string, { points: Point[]; label: Box | null }>;
+  /** 小图的范围（含连线与标签），背后画一块浅色底。 */
+  box: Box;
+  members: string[];
+  /** 结构 + 聚焦集合的稳定键（缓存、动画都按它）。 */
+  key: string;
+};
+
+/**
+ * 聚焦布局：只用聚焦的节点和它们之间的连线（两端都在集合里），用同一套 dagre + 正交走线排一张紧凑的小图，
+ * 连线标签按 FOCUS_EDGE_FONT 估算尺寸，层间距放宽，放在全图的中央。只由结构 + 聚焦集合决定，结果确定。
+ */
+export function focusLayout(s: DStructure, full: Pick<DLayout, 'width' | 'height'>, members: string[]): FocusLayout {
+  const set = new Set(members);
+  const sub: DStructure = {
+    direction: s.direction,
+    groups: [],
+    nodes: s.nodes.filter((n) => set.has(n.id)).map((n) => ({ ...n, parent: null })),
+    edges: s.edges.filter((e) => set.has(e.from) && set.has(e.to)).map((e) => ({ ...e, lw: e.label ? textWidth(e.label, FOCUS_EDGE_FONT) + 12 : 0, lh: e.label ? 22 : 0 })),
+  };
+  const l = layoutDiagram(sub, { minRanksep: 84 });
+  const dx = Math.round((full.width - l.width) / 2);
+  const dy = Math.round((full.height - l.height) / 2);
+  const mv = (b: Box): Box => ({ x: b.x + dx, y: b.y + dy, w: b.w, h: b.h });
+  return {
+    nodes: Object.fromEntries(Object.entries(l.nodes).map(([k, b]) => [k, mv(b)])),
+    edges: Object.fromEntries(Object.entries(l.edges).map(([k, e]) => [k, { points: e.points.map((p) => ({ x: p.x + dx, y: p.y + dy })), label: e.label ? mv(e.label) : null }])),
+    box: { x: dx, y: dy, w: l.width, h: l.height },
+    members: [...members],
+    key: JSON.stringify([structureKey(s), members]),
+  };
+}
+
+/** 全图位置与小图位置之间的插值（t = 0 全图，1 小图），渲染用 Motion 做同样的过渡。 */
+export function lerpBox(a: Box, b: Box, t: number): Box {
+  const k = Math.max(0, Math.min(1, t));
+  return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, w: a.w + (b.w - a.w) * k, h: a.h + (b.h - a.h) * k };
+}
+
+export function interpolateNodes(full: Record<string, Box>, focus: FocusLayout | null, t: number): Record<string, Box> {
+  if (!focus) return full;
+  return Object.fromEntries(Object.entries(full).map(([id, b]) => [id, focus.nodes[id] ? lerpBox(b, focus.nodes[id]!, t) : b]));
 }

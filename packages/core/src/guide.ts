@@ -134,6 +134,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 常与前端画面分成两个层级（客户端 / 后端），同一个 flow 一步步同时推进两边；Node / Edge 不需要 flow 也不用 unmodeled，⌥+单击可检查。
 - 逐段出现（像幻灯片一样一段一段加内容）：给 Group / Node / Edge 写 when={$.ui.show_billing}，步骤里 set($.ui.show_billing, true)；布局一开始就按全部元素算好，出现时已有元素不移动。
 - 节点多、容器不宽时用 direction="down"；整图总是放进容器，看细节靠 shot 推近，观众也可以滚轮 / 捏合缩放、拖动平移。
+- 讲两个节点之间的流动时，一步里 shot 这几个节点（或 shot 它们之间的连线 id）：播放时这些节点会移到画面中央排成一张紧凑的小图，只显示它们之间的连线，其余内容变淡；只 shot 一个节点时只推近、不重新布局。
 
 ## 规则与边界
 - rule('约束', { origin?, status?, cases?: ['happy'], elements?: ['invite'] })。

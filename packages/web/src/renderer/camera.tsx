@@ -25,6 +25,20 @@ export type CameraSpec = {
   reserve?: { right: number; bottom: number } | null;
 };
 
+/**
+ * 元素的屏幕矩形；架构图里正在移向聚焦布局的节点（data-jfinal）取它的最终位置（画布坐标 × 画布此刻的屏幕缩放），
+ * 镜头与高光不用等节点移动结束，也不会对准移动途中的位置（T-director3）。
+ */
+export function finalRect(el: Element): { left: number; top: number; width: number; height: number } {
+  const f = el.getAttribute('data-jfinal');
+  const canvas = f ? el.closest<HTMLElement>('[data-jdiagram-canvas]') : null;
+  if (!f || !canvas) return el.getBoundingClientRect();
+  const [x, y, w, h] = f.split(',').map(Number) as [number, number, number, number];
+  const cr = canvas.getBoundingClientRect();
+  const sc = cr.width / (canvas.offsetWidth || 1) || 1;
+  return { left: cr.left + x * sc, top: cr.top + y * sc, width: w * sc, height: h * sc };
+}
+
 /** 镜头容器里内容的范围（内容坐标，至少是整个画面）：整层缩放与平移夹紧都用它。 */
 export function contentBounds(wrap: HTMLElement, content: HTMLElement | null, W: number, H: number): Box {
   const wr = wrap.getBoundingClientRect();
@@ -48,6 +62,9 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
   const current = useRef<View>({ k: 1, tx: 0, ty: 0 });
   /** 镜头（导演 / 这一层的焦点）算出的视图。 */
   const base = useRef<View>({ k: 1, tx: 0, ty: 0 });
+  /** 镜头对准过焦点（之后目标暂时不在画面上时保持不动，而不是先退到整层）。 */
+  const hadFocus = useRef(false);
+  const lastLayer = useRef('');
   const user = opts.user ?? null;
   const userRef = useRef<View | null>(user);
   userRef.current = user;
@@ -90,6 +107,10 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     }
     const W = opts.width;
     const H = opts.height;
+    // 换层（换画面）后重新开始：新画面里的目标还没出现时退到整层，而不是保持上一层的镜头
+    const layerOf = spec.key.split('|')[0] ?? '';
+    if (lastLayer.current !== layerOf) hadFocus.current = false;
+    lastLayer.current = layerOf;
     /** 滚动区里的目标：把每个可滚动的祖先滚到目标可见（镜头只平移缩放，不会替页面滚动）。 */
     const reveal = () => {
       for (const id of spec.targets) {
@@ -113,7 +134,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       // 舞台外层缩放（看板按可用区域缩放舞台）：从没有镜头变换的舞台根量，过渡中途也稳定
       const host = wrap.parentElement;
       const outer = host ? host.getBoundingClientRect().width / (host.offsetWidth || 1) || 1 : S / (current.current.k || 1);
-      const toBox = (r: DOMRect): Box => ({ x: (r.left - wr.left) / S, y: (r.top - wr.top) / S, w: r.width / S, h: r.height / S });
+      const toBox = (r: { left: number; top: number; width: number; height: number }): Box => ({ x: (r.left - wr.left) / S, y: (r.top - wr.top) / S, w: r.width / S, h: r.height / S });
       /** 元素实际可见的矩形：与裁切它的祖先（直到镜头容器）求交。 */
       const visibleOf = (el: Element): Box | null => {
         const clips: Box[] = [];
@@ -121,19 +142,28 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
           const cs = getComputedStyle(p);
           if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') clips.push(toBox(p.getBoundingClientRect()));
         }
-        return visibleRect(toBox(el.getBoundingClientRect()), clips);
+        return visibleRect(toBox(finalRect(el)), clips);
       };
       const found = spec.targets
         .map((id) => ({ id, el: wrap.querySelector(`[data-jid="${CSS.escape(id)}"]`) }))
         .filter((x): x is { id: string; el: Element } => !!x.el)
         .map((x) => ({ ...x, box: visibleOf(x.el) }))
         .filter((x): x is { id: string; el: Element; box: Box } => !!x.box);
+      // 写了目标但它们还不在画面上（例如这一步才出现的元素，状态尚未提交）：镜头先不动，等它们出现再对准
+      if (spec.targets.length && !found.length && hadFocus.current) return { ...base.current, mode: 'focus', rects: [], els: [] };
       let mode: CameraView['mode'] = found.length ? 'focus' : 'overview';
       // 这一层内容的范围（至少是整个画面）：整层时整体缩进来；聚焦时尽量不露出它以外的空白
       const root = content?.firstElementChild;
       const c = root ? toBox(root.getBoundingClientRect()) : null;
       const bounds = union([{ x: 0, y: 0, w: W, h: H }, ...(c && c.h > 0 ? [c] : [])])!;
-      let bbox = mode === 'focus' ? union(found.map((f) => f.box)) : bounds;
+      // 架构图的聚焦布局：镜头框住整张小图（含连线标签），不只是被点名的节点
+      const backdrops = new Set<Element>();
+      for (const f of found) {
+        const b = f.el.closest('[data-jdiagram-canvas]')?.querySelector('[data-jfocus-backdrop]');
+        if (b) backdrops.add(b);
+      }
+      const extra = [...backdrops].map((b) => visibleRect(toBox(b.getBoundingClientRect()), [])).filter((b): b is Box => !!b);
+      let bbox = mode === 'focus' ? union([...found.map((f) => f.box), ...extra]) : bounds;
       if (!bbox || bbox.w <= 0 || bbox.h <= 0) {
         mode = 'overview';
         bbox = { x: 0, y: 0, w: W, h: H };
@@ -143,6 +173,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
         .filter((f) => f.el.getAttribute('data-jtype') === 'Diagram.Node')
         .map((f) => (Number(f.el.closest('[data-jtype="Diagram"]')?.getAttribute('data-scale') ?? 1) || 1) * outer);
       const { k, tx, ty } = fitCamera({ W, H, mode, bbox, nodeScales, bounds, reserve: spec.reserve ?? undefined });
+      if (mode === 'focus') hadFocus.current = true;
       return { k, tx, ty, mode, rects: found.map((f) => ({ id: f.id, box: highlightRect(f.box) })), els: found.map((f) => f.el) };
     };
     /** 焦点外调暗：标记焦点与它的祖先链；CSS 把祖先链上每一层的其他兄弟元素调暗（index.css）。 */
@@ -150,7 +181,8 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       clearFocus();
       if (!content || !els.length) return;
       content.setAttribute('data-jfocus-dim', '');
-      for (const el of els) {
+      // 架构图聚焦布局里的小图节点（例如镜头对准连线时它的两端）同样是焦点，不被调暗
+      for (const el of [...els, ...content.querySelectorAll('[data-jfocus-member]')]) {
         el.setAttribute('data-jfocus', '');
         for (let p = el.parentElement; p && p !== content; p = p.parentElement) p.setAttribute('data-jfocus-path', '');
       }

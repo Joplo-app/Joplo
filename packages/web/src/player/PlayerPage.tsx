@@ -12,11 +12,10 @@ import { ChevronLeft, ChevronRight, Clapperboard, Ellipsis, Maximize, Minus, Pau
 import { stepTouchesLayer, type Project, type Scenario } from '@tokenroll/joplo-core';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
-import { ExplainCard, cardWidth } from './ExplainCard';
-import { cardReserve } from './callout';
+import { ExplainCard } from './ExplainCard';
 import { SPEEDS, asSpeed } from '../runtime/pace';
 import { VIEWPORTS } from '../renderer/Stage';
-import { cameraFor } from './cameraFor';
+import { cameraFor, cameraPosition, cardPlan } from './cameraFor';
 import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
 import { MOCK_CLS, OUTCOME_LABEL } from './labels';
@@ -291,7 +290,9 @@ export function PlayerPage(p: PlayerPageProps) {
   // 视角层级与导演镜头（D43 / T-layers）：每层是独立画面，镜头只由步骤推导（cameraAt），切层级不改变步骤和产品状态。
   // 导演跟随时，下一步的操作目标不在当前层里，控制器会先请求切到它所在的层（leadLayer），再移动鼠标。
   const lead = p.layer === null ? snap.leadLayer : null;
-  const plan = cameraFor(project, scenario?.id ?? null, state?.position ?? 0, p.layer ?? lead);
+  // 系统步骤一开始就用这一步的镜头（与解说卡一致）；用户操作在提交之后才切
+  const camPos = cameraPosition(scenario, state?.position ?? 0, snap.activeStep);
+  const plan = cameraFor(project, scenario?.id ?? null, camPos, p.layer ?? lead);
   const director = p.layer === null || plan.director;
   const { layers, viewLayer } = plan;
   const useCam = plan.enabled;
@@ -300,11 +301,11 @@ export function PlayerPage(p: PlayerPageProps) {
   const device = shownScene?.viewport === 'mobile' ? 'mobile' : 'desktop';
   // 解说卡（T-director2）：用镜头的方案、导演跟随时在焦点旁弹出；镜头给它留出位置。手动选层时只显示底部字幕
   const cardOn = useCam && director;
-  const cardStep = cardOn && scenario ? (snap.activeStep !== null ? scenario.steps[snap.activeStep] : lastStep) : null;
   const stageW = VIEWPORTS[device].width;
-  const spec = camera && cardOn ? { ...camera, reserve: cardReserve(stageW, cardWidth(stageW)) } : camera;
+  const card = cardOn ? cardPlan(project, scenario?.id ?? null, plan, director, snap.activeStep ?? pos - 1, stageW) : null;
+  const spec = camera && card ? { ...camera, reserve: card.reserve } : camera;
   // 自由缩放：导演跟随时每一步由镜头重新接管；手动时保持，直到换层或点「适应画面」
-  const zoomReset = director ? `d|${pos}|${viewLayer}|${plan.sceneId ?? state?.sceneId ?? ''}` : `m|${viewLayer}|${plan.sceneId ?? state?.sceneId ?? ''}`;
+  const zoomReset = director ? `d|${camPos}|${viewLayer}|${plan.sceneId ?? state?.sceneId ?? ''}` : `m|${viewLayer}|${plan.sceneId ?? state?.sceneId ?? ''}`;
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, director), [ctl, plan.sceneId, director]);
   const replayLayer = () => {
     if (!scenario) return;
@@ -408,8 +409,8 @@ export function PlayerPage(p: PlayerPageProps) {
                   }}
                   overlay={
                     <>
-                      <Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} caption={cardOn ? null : (shownStep?.caption ?? null)} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />
-                      {cardStep ? <ExplainCard stage={stageEl} stepKey={cardStep.id} caption={cardStep.caption} explain={cardStep.explain ?? null} animate={!ctl.reducedMotion} /> : null}
+                      <Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} caption={cardOn ? null : (shownStep?.caption ?? null)} hideSystem={cardOn} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />
+                      {card ? <ExplainCard stage={stageEl} stepKey={card.step.id} caption={card.step.caption} explain={card.step.explain ?? null} anchors={card.anchors} animate={!ctl.reducedMotion} /> : null}
                     </>
                   }
                 />

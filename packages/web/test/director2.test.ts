@@ -71,7 +71,7 @@ describe('placeCallout（解说卡：焦点旁边、带箭头、避开画面边�
     expect(inFrame(p.x, p.y)).toBe(true);
   });
   it('导演模式的镜头给解说卡留位置：聚焦后焦点在剩余区域内，卡片放在右侧不压住焦点', () => {
-    const r = cardReserve(1280, 400);
+    const r = cardReserve(1280, card);
     expect(r.right).toBeGreaterThanOrEqual(400);
     for (const bbox of [{ x: 40, y: 60, w: 120, h: 36 }, { x: 700, y: 120, w: 540, h: 620 }, { x: 0, y: 300, w: 1280, h: 40 }]) {
       const f = fitCamera({ W: 1280, H: 800, mode: 'focus', bbox, reserve: r });
@@ -82,8 +82,9 @@ describe('placeCallout（解说卡：焦点旁边、带箭头、避开画面边�
       expect(p.side).toBe('right');
       expect(overlap(b, { x: p.x, y: p.y, w: card.w, h: card.h })).toBe(0);
     }
-    // 窄屏（手机）：留底部
-    expect(cardReserve(390, 366)).toEqual({ right: 0, bottom: 220 });
+    // 窄屏（手机）或宽卡片：留底部
+    expect(cardReserve(390, { w: 366, h: 180 })).toEqual({ right: 0, bottom: 180 + 44 });
+    expect(cardReserve(1280, { w: 700, h: 150 }).bottom).toBe(150 + 44);
   });
 });
 
