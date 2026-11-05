@@ -21,7 +21,7 @@ import { SPEEDS, asSpeed } from '../runtime/pace';
 import { cameraFor, cameraPosition } from './cameraFor';
 import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
-import { JoploMark } from './JoploMark';
+import { JoploLogo } from './JoploMark';
 import { Overlay } from './Overlay';
 import { StageViewport } from './StageViewport';
 import { strokeOfTheme } from '../renderer/themes';
@@ -35,9 +35,8 @@ export type Crumb = { label: string; testid: string; onClick?: () => void };
 
 export function Brand({ onClick }: { onClick?: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex shrink-0 items-center gap-2 text-[20px] font-bold tracking-tight text-[#1e1e1e]" data-testid="brand">
-      <JoploMark size={26} />
-      Joplo
+    <button type="button" onClick={onClick} aria-label="Joplo" className="flex shrink-0 items-center" data-testid="brand">
+      <JoploLogo height={28} />
     </button>
   );
 }
