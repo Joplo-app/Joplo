@@ -26,9 +26,11 @@ import { JoploLogo } from './JoploMark';
 import { Overlay } from './Overlay';
 import { StageViewport } from './StageViewport';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from '../renderer/appearance';
-import { Btn, DirectorTag, MenuButton, Segmented, Switch, useWidth, type MenuEntry } from './controls';
+import { PanelLeftOpen } from 'lucide-react';
+import { Btn, DirectorTag, Kbd, MenuButton, Segmented, Switch, useWidth, type MenuEntry } from './controls';
+import { SHORTCUTS } from './states';
 import { fullscreenBarCollapse } from './controls-fit';
-import { useTip } from './popover';
+import { CenterPanel, useTip } from './popover';
 import { boardLayout, layerTabs, timelineChips, type BoardLayout, type TimelineChip } from './layout';
 
 export { Segmented } from './controls';
@@ -139,16 +141,26 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
         {...tip}
         style={cur ? { width } : undefined}
         className={cn(
-          'jb-focus flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[6px] font-jb-mono text-[11px] font-bold',
+          'jb-focus relative flex h-7 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[6px] font-jb-mono text-[11px] font-bold',
           cur ? 'justify-start border-[1.5px] border-jb-ink bg-jb-accent px-2.5 text-jb-on-accent' : 'min-w-[34px] justify-center px-1.5',
           chip.state === 'done' && 'border border-jb-ink bg-jb-inverse text-jb-accent hover:bg-jb-inverse-hover',
           chip.state === 'todo' && 'border border-jb-line bg-jb-surface text-jb-faint hover:bg-jb-hover hover:text-jb-fg',
         )}
       >
-        <span>{chip.index}</span>
-        {chip.system && !cur ? <Cog className="size-3" aria-label="系统" /> : null}
+        {/* 播放中的停留进度：从左往右填深黄，暂停时停住（D55） */}
+        {chip.dwell ? (
+          <span
+            key={`${chip.index}|${chip.dwell.ms}|${chip.dwell.elapsed}`}
+            aria-hidden
+            className="jb-dwell absolute inset-0 bg-jb-accent-press"
+            data-testid="dwell"
+            style={{ animationDuration: `${chip.dwell.ms}ms`, animationDelay: `${-chip.dwell.elapsed}ms`, animationPlayState: chip.dwell.paused ? 'paused' : 'running' }}
+          />
+        ) : null}
+        <span className="relative">{chip.index}</span>
+        {chip.system && !cur ? <Cog className="relative size-3" aria-label="系统" /> : null}
         {cur ? (
-          <span className="min-w-0 truncate font-jb text-[12px] font-semibold">
+          <span className="relative min-w-0 truncate font-jb text-[12px] font-semibold">
             {chip.system ? '系统 · ' : ''}
             {chip.label}
           </span>
@@ -160,7 +172,7 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
 }
 
 function Timeline({ snap, scenario, ctl, currentW }: { snap: Snapshot; scenario: Scenario; ctl: DemoController; currentW: number }) {
-  const chips = timelineChips(scenario.steps, snap.state?.position ?? 0, snap.activeStep);
+  const chips = timelineChips(scenario.steps, snap.state?.position ?? 0, snap.activeStep, snap.dwell, snap.paused);
   const cur = chips.findIndex((c) => c.state === 'current');
   const ref = useRef<HTMLOListElement>(null);
   // 当前步滚到可见（只滚时间线自己，不用 scrollIntoView，避免带动外层）
@@ -181,6 +193,27 @@ function Timeline({ snap, scenario, ctl, currentW }: { snap: Snapshot; scenario:
   );
 }
 
+/** 窄屏（< 900）的时间线：只剩“当前步 / 总数”，点一下弹出全部步骤。 */
+function CompactTimeline({ snap, scenario, ctl }: { snap: Snapshot; scenario: Scenario; ctl: DemoController }) {
+  const chips = timelineChips(scenario.steps, snap.state?.position ?? 0, snap.activeStep, snap.dwell, snap.paused);
+  const cur = chips.find((c) => c.state === 'current') ?? chips[0]!;
+  return (
+    <div className="flex min-w-0 flex-1 items-center px-1.5" data-testid="step-bar" data-compact="">
+      <MenuButton
+        trigger={{ label: `${cur.index} / ${scenario.steps.length}`, iconOnly: false }}
+        label={`第 ${cur.index} 步：${cur.label}（点一下看全部步骤）`}
+        testid="step-compact"
+        placement="top-start"
+        variant="ghost"
+        size={34}
+        width={300}
+        className="rounded-[8px] font-jb-mono text-[13px] font-semibold"
+        items={chips.map((c) => ({ id: `step-${c.index}`, label: c.tip, checked: c.state === 'current', onClick: () => ctl.clickStepChip(c.stepIndex) }))}
+      />
+    </div>
+  );
+}
+
 /** 播放坞：⟲ ‹ 播放 › │ 时间线 │ 速度 ▾ · 缩放 − 适应 +。 */
 function Dock({ snap, scenario, ctl, speed, onSpeed, L, zoom }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; speed: number; onSpeed?: (v: number) => void; L: BoardLayout; zoom: ReactNode }) {
   const off = !scenario || snap.view !== 'stage';
@@ -189,7 +222,7 @@ function Dock({ snap, scenario, ctl, speed, onSpeed, L, zoom }: { snap: Snapshot
       <Btn icon={<RotateCcw className="size-4" />} label="回到开头" kbd="Home" iconOnly variant="ghost" size={34} className="rounded-[8px]" onClick={() => ctl.reset()} disabled={off} data-testid="ctl-reset" />
       <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={false} size={34} ids={{ prev: 'ctl-prev', play: 'ctl-play', next: 'ctl-next' }} />
       <Divider />
-      {scenario ? <Timeline snap={snap} scenario={scenario} ctl={ctl} currentW={L.currentStepW} /> : <div className="flex-1" />}
+      {scenario ? L.compactTimeline ? <CompactTimeline snap={snap} scenario={scenario} ctl={ctl} /> : <Timeline snap={snap} scenario={scenario} ctl={ctl} currentW={L.currentStepW} /> : <div className="flex-1" />}
       <Divider />
       {onSpeed ? <MenuButton trigger={{ label: `${speed}×`, iconOnly: false }} label={`自动播放速度（${speed}×）`} testid="speed" items={speedItems(speed, onSpeed)} placement="top-end" variant="ghost" size={34} width={120} className="rounded-[8px] px-2.5 font-jb-mono text-[13px] font-semibold" /> : null}
       {zoom}
@@ -300,7 +333,13 @@ export type PlayerPageProps = {
   stageHint?: ReactNode;
   selectedId?: string | null;
   /** 页面级的轻提示（复制链接、导出完成等）。 */
-  flash?: string | null;
+  flash?: ReactNode | null;
+  /** 场景完成后，字幕区右侧「重新播放」旁边的操作（看板：“下一个情况 →”）。 */
+  completeAction?: ReactNode;
+  /** 窄屏（< 1100）左栏收成竖条时显示的内容；不传时竖条只有一个展开按钮。 */
+  navRail?: ReactNode;
+  /** 「导出」按钮上的小标记（看板：视频导出的进度环）。 */
+  exportBadge?: ReactNode;
 };
 
 export function PlayerPage(p: PlayerPageProps) {
@@ -308,6 +347,29 @@ export function PlayerPage(p: PlayerPageProps) {
   const L = useBoardLayout();
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
   const [altDown, setAltDown] = useState(false);
+  // 快捷键面板（?）、窄屏浮出的完整左栏（[）：只在本页，不写进网址
+  const [keysOpen, setKeysOpen] = useState(false);
+  const [railOpen, setRailOpen] = useState(false);
+  useEffect(() => {
+    if (!L.rail) setRailOpen(false);
+  }, [L.rail]);
+  // 浮出的左栏：点外面或 Esc 收回
+  useEffect(() => {
+    if (!railOpen) return;
+    const down = (e: PointerEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest?.('[data-testid="left-nav-float"],[data-rail],[data-jb-pop]')) setRailOpen(false);
+    };
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setRailOpen(false);
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('keydown', key);
+    return () => {
+      window.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('keydown', key);
+    };
+  }, [railOpen]);
+  // 检查模式：悬停的元素画墨色虚线框 + 左上角“类型 · 名字”
+  const [hoverBox, setHoverBox] = useState<{ x: number; y: number; w: number; h: number; label: string } | null>(null);
   const inspecting = altDown || !!p.inspectMode;
   const state = snap.state;
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
@@ -360,7 +422,13 @@ export function PlayerPage(p: PlayerPageProps) {
       const t = e.target as HTMLElement;
       if (t.closest('input,textarea,select,[contenteditable],[data-joplo-stage],[role="menu"],[role="dialog"],[role="tablist"],[role="radiogroup"]')) return;
       if (e.metaKey || e.ctrlKey) return;
-      if (isFullscreenKey(e, t)) {
+      if (e.key === '?') {
+        e.preventDefault();
+        setKeysOpen((v) => !v);
+      } else if (e.key === '[' && L.rail && !full) {
+        e.preventDefault();
+        setRailOpen((v) => !v);
+      } else if (isFullscreenKey(e, t)) {
         e.preventDefault();
         toggleFull();
       } else if (e.key === 'ArrowRight') void ctl.next();
@@ -384,7 +452,20 @@ export function PlayerPage(p: PlayerPageProps) {
       window.removeEventListener('keyup', onKey);
       window.removeEventListener('blur', blur);
     };
-  }, [ctl, p.onInspect, toggleFull, full]);
+  }, [ctl, p.onInspect, toggleFull, full, L.rail]);
+  useEffect(() => {
+    if (!inspecting) setHoverBox(null);
+  }, [inspecting]);
+  const onInspectHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!inspecting || !stageEl) return;
+    const t = e.target as HTMLElement;
+    const el = stageEl.contains(t) ? t.closest<HTMLElement>('[data-jid]:not([data-jtype="#text"])') : null;
+    if (!el) return setHoverBox(null);
+    const box = e.currentTarget.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const name = (el.getAttribute('aria-label') || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 18);
+    setHoverBox({ x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height, label: `${el.dataset.jtype ?? '元素'}${name ? ` · ${name}` : ''}` });
+  };
 
   const currentLayer = layers.find((l) => l.id === viewLayer)?.title ?? viewLayer;
   const toggleDirector = () => p.onLayer(director ? viewLayer : null);
@@ -411,10 +492,11 @@ export function PlayerPage(p: PlayerPageProps) {
     </div>
   ) : null;
 
+  const completed = !!(scenario && state?.completed && !snap.playing);
   const stageArea = (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col" onMouseMove={inspecting ? onInspectHover : undefined} onMouseLeave={() => setHoverBox(null)}>
       {hasStage ? (
-        <StageViewport viewport={device} theme={p.theme} stroke={look.stroke} font={look.font} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
+        <StageViewport viewport={device} theme={p.theme} stroke={look.stroke} font={look.font} notice={snap.notice} onDismiss={() => ctl.dismissNotice()} onBack={() => ctl.backToDemo()}>
           {(size) => (
             <Stage
               viewportOverride={device === 'mobile' ? null : size}
@@ -447,7 +529,21 @@ export function PlayerPage(p: PlayerPageProps) {
           这个方案还没有可显示的画面。
         </div>
       )}
-      {p.stageHint && !full && !p.inspectMode ? <div className="pointer-events-none absolute bottom-3 right-3 whitespace-nowrap font-jb text-[12px] text-jb-faint" data-testid="stage-hint">{p.stageHint}</div> : null}
+      {hoverBox ? (
+        <div className="pointer-events-none absolute z-10 border-[1.5px] border-dashed border-jb-ink" style={{ left: hoverBox.x - 3, top: hoverBox.y - 3, width: hoverBox.w + 6, height: hoverBox.h + 6 }} data-testid="inspect-hover">
+          <span className="absolute -top-[22px] left-[-1.5px] whitespace-nowrap rounded-[4px] bg-jb-inverse px-1.5 py-0.5 font-jb text-[11px] font-medium text-jb-on-inverse">
+            {hoverBox.label}
+            <span className="ml-1.5 opacity-60">单击选中</span>
+          </span>
+        </div>
+      ) : null}
+      {completed && !full ? (
+        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-2" data-testid="complete-actions">
+          <Btn icon={<RotateCcw className="size-4" />} label="重新播放" onClick={() => ctl.togglePlay()} data-testid="replay" />
+          {p.completeAction}
+        </div>
+      ) : null}
+      {p.stageHint && !full && !p.inspectMode && !completed ? <div className="pointer-events-none absolute bottom-3 right-3 whitespace-nowrap font-jb text-[12px] text-jb-faint" data-testid="stage-hint">{p.stageHint}</div> : null}
       {p.flash ? (
         <div role="status" className="jb-tip absolute left-1/2 top-3 z-20 -translate-x-1/2 whitespace-nowrap px-3 py-2 text-[13px]" data-testid="flash">
           {p.flash}
@@ -485,12 +581,12 @@ export function PlayerPage(p: PlayerPageProps) {
     );
 
   return (
-    <div ref={rootRef} className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-view={snap.view} data-layout={L.wide ? 'wide' : 'narrow'}>
+    <div ref={rootRef} className="relative flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-view={snap.view} data-layout={L.wide ? 'wide' : L.rail ? 'rail' : 'narrow'}>
       <TopBar
         right={
           <>
             {p.actions}
-            <MenuButton trigger={{ icon: p.menuLabel ? <Ellipsis className="size-4" /> : <Share className="size-4" />, label: p.menuLabel ?? '导出', iconOnly: !L.topLabels }} label={p.menuLabel ?? '导出'} testid="more-menu" items={p.menu} placement="bottom-end" width={240} />
+            <MenuButton trigger={{ icon: p.exportBadge && !L.topLabels ? p.exportBadge : p.menuLabel ? <Ellipsis className="size-4" /> : <Share className="size-4" />, label: p.menuLabel ?? '导出', iconOnly: !L.topLabels, extra: L.topLabels ? p.exportBadge : null }} label={p.menuLabel ?? '导出'} testid="more-menu" items={p.menu} placement="bottom-end" width={240} />
             <Btn
               icon={<Expand className="size-4" />}
               label="全屏"
@@ -510,9 +606,31 @@ export function PlayerPage(p: PlayerPageProps) {
         <Breadcrumbs crumbs={p.crumbs} />
       </TopBar>
       <div className="flex min-h-0 flex-1">
-        <aside className="flex shrink-0 flex-col overflow-y-auto border-r border-jb-line bg-jb-surface px-3 py-4" style={{ width: L.navWidth }} data-testid="left-nav">
-          {p.nav}
-        </aside>
+        {L.rail ? (
+          // 窄屏（< 1100）：左栏收成 56px 竖条；点竖条或按 [ 浮出完整左栏，选完自动收回
+          <aside className="flex w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-jb-line bg-jb-surface py-3" data-testid="left-nav" data-rail="">
+            <Btn icon={<PanelLeftOpen className="size-4" />} label="展开左栏" kbd="[" iconOnly variant="ghost" size={32} selected={railOpen} onClick={() => setRailOpen((v) => !v)} data-testid="rail-open" tipPlacement="bottom-start" />
+            <button type="button" className="flex w-full flex-1 flex-col items-center gap-1 pt-1" onClick={() => setRailOpen(true)} aria-label="展开左栏">
+              {p.navRail}
+            </button>
+          </aside>
+        ) : (
+          <aside className="flex shrink-0 flex-col overflow-y-auto border-r border-jb-line bg-jb-surface px-3 py-4" style={{ width: L.navWidth }} data-testid="left-nav">
+            {p.nav}
+          </aside>
+        )}
+        {L.rail && railOpen ? (
+          <aside
+            className="jb-pop absolute bottom-3 left-[64px] top-[60px] z-30 flex w-[276px] flex-col overflow-y-auto px-3 py-4"
+            data-testid="left-nav-float"
+            onClickCapture={(e) => {
+              // 选完自动收回（点到了按钮）
+              if ((e.target as HTMLElement).closest('button')) setTimeout(() => setRailOpen(false), 0);
+            }}
+          >
+            {p.nav}
+          </aside>
+        ) : null}
         <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden px-4 py-3" data-inspecting={inspecting ? '' : undefined}>
           {p.banner}
           {snap.playbackError ? (
@@ -526,13 +644,54 @@ export function PlayerPage(p: PlayerPageProps) {
             {/* 舞台框：画面和字幕合成一体（1.5px 墨线，圆角 10）；字幕区跟随舞台主题 */}
             <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface', hasLayerBar && 'rounded-tl-none')} data-testid="stage-frame" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
               {stageArea}
-              {scenario ? <Subtitle content={subtitle} theme={p.theme} font={look.font} framed divider /> : null}
+              {scenario ? <SubtitleSlot content={subtitle} theme={p.theme} font={look.font} explainInTip={L.explainInTip} /> : null}
             </div>
           </div>
           <Dock snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} L={L} zoom={dockZoom} />
         </main>
       </div>
       {p.drawer}
+      <ShortcutsPanel open={keysOpen} onClose={() => setKeysOpen(false)} board={!!p.onInspect} />
     </div>
+  );
+}
+
+/** 字幕区：< 900 时 explain 收进悬停（字幕区仍只读 --jp-*）。 */
+function SubtitleSlot({ content, theme, font, explainInTip }: { content: ReturnType<typeof subtitleFor>; theme: StageTheme; font: AppearanceFont | null; explainInTip: boolean }) {
+  const hidden = explainInTip && content?.explain ? content.explain : null;
+  const [tip, tipNode] = useTip(hidden, { placement: 'top-start' });
+  return (
+    <div {...tip} className="shrink-0" data-testid="subtitle-slot">
+      <Subtitle content={hidden && content ? { ...content, explain: null, explainLines: 0 } : content} theme={theme} font={font} framed divider />
+      {tipNode}
+    </div>
+  );
+}
+
+/** 快捷键面板（按 ?）：所有快捷键在一处。发布站没有检查、外观、竖条，不列出。 */
+function ShortcutsPanel({ open, onClose, board }: { open: boolean; onClose: () => void; board: boolean }) {
+  const groups = SHORTCUTS.map((g) => ({ ...g, items: g.items.filter((i) => board || !['按住 ⌥', 'T', '[', 'Enter'].includes(i.keys)) })).filter((g) => g.items.length);
+  return (
+    <CenterPanel open={open} onClose={onClose} label="快捷键" testid="shortcuts" width={340}>
+      <div className="flex items-center justify-between px-4 pb-1 pt-3.5 font-jb">
+        <h2 className="text-[15px] font-bold">快捷键</h2>
+        <Kbd>?</Kbd>
+      </div>
+      <div className="flex flex-col gap-3 px-4 pb-4 pt-1 font-jb">
+        {groups.map((g) => (
+          <section key={g.group}>
+            <div className="pb-1 text-[12px] font-semibold tracking-[1px] text-jb-muted">{g.group}</div>
+            <ul className="flex flex-col">
+              {g.items.map((i) => (
+                <li key={i.label} className="flex h-7 items-center justify-between gap-3 text-[13px]">
+                  <span>{i.label}</span>
+                  <Kbd>{i.keys}</Kbd>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </CenterPanel>
   );
 }

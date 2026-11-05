@@ -236,3 +236,37 @@ export function useHoverCard(delay = 350) {
     card: { onMouseEnter: clear, onMouseLeave: leave },
   };
 }
+
+/** 居中的浮层（e1，portal）：快捷键面板等。点外面或 Esc 关闭。 */
+export function CenterPanel({ open, onClose, label, testid, width, children }: { open: boolean; onClose: () => void; label: string; testid?: string; width: number; children: ReactNode }) {
+  const host = usePortalHost();
+  const el = useRef<HTMLDivElement | null>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const down = (e: PointerEvent) => {
+      if (!el.current?.contains(e.target as Node)) closeRef.current();
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        closeRef.current();
+      }
+    };
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('keydown', key);
+    el.current?.focus();
+    return () => {
+      window.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('keydown', key);
+    };
+  }, [open]);
+  if (!open || !host) return null;
+  return createPortal(
+    <div ref={el} role="dialog" aria-label={label} tabIndex={-1} data-testid={testid} data-jb-pop="" className="jb-pop fixed left-1/2 top-1/2 z-[1000] max-h-[86vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto outline-none" style={{ width }}>
+      {children}
+    </div>,
+    host,
+  );
+}

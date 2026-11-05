@@ -22,7 +22,7 @@ function describe(p: ProjectSummary): { text: string; tone: 'muted' | 'error' | 
   return { text: tilde(p.dir), tone: 'muted' };
 }
 
-export function Home({ projects, error, selectedId, onSelect, onView, right, flash }: { projects: ProjectSummary[] | null; error: string | null; selectedId: string | null; onSelect: (id: string) => void; onView: (projectId: string, featureId: string) => void; /** 顶栏右侧（外观按钮，D55）。 */ right?: ReactNode; flash?: string | null }) {
+export function Home({ projects, error, selectedId, onSelect, onView, right, flash }: { projects: ProjectSummary[] | null; error: string | null; selectedId: string | null; onSelect: (id: string) => void; onView: (projectId: string, featureId: string) => void; /** 顶栏右侧（外观按钮，D55）。 */ right?: ReactNode; flash?: ReactNode | null }) {
   const selected = projects?.find((p) => p.id === selectedId) ?? null;
   return (
     <div className="flex h-full flex-col bg-[#f8f9fa]" data-testid="home">

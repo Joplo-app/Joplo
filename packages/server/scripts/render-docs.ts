@@ -140,22 +140,22 @@ try {
   await page.screenshot({ path: path.join(outDir, 'board-inspect-drawer.png') });
   console.log('docs/screenshots/board-inspect-drawer.png');
   await page.getByTestId('drawer-close').click();
-  // 「…」菜单
+  // 「导出 ▾」菜单（D55：顶栏）
   await page.getByTestId('more-menu').click();
   await page.waitForTimeout(200);
   await page.screenshot({ path: path.join(outDir, 'board-more-menu.png') });
   console.log('docs/screenshots/board-more-menu.png');
-  // 导出视频：进度与完成
+  // 导出视频：点菜单项直接开始；重新打开「导出 ▾」看进度卡；完成后是带“再导出一次”的轻提示
   await page.getByTestId('menu-video').click();
-  await page.getByTestId('video-start').click();
+  await page.getByTestId('more-menu').click();
   await page.waitForFunction(() => /正在录制第 [2-9]/.test(document.querySelector('[data-testid="video-progress"]')?.textContent ?? ''), null, { timeout: 60000 });
   await page.screenshot({ path: path.join(outDir, 'board-video-progress.png') });
   console.log('docs/screenshots/board-video-progress.png');
+  await page.keyboard.press('Escape');
   await page.getByTestId('video-done').or(page.getByTestId('video-error')).first().waitFor({ timeout: 120000 });
   await page.screenshot({ path: path.join(outDir, 'board-video-done.png') });
   console.log('docs/screenshots/board-video-done.png');
   if (await page.getByTestId('video-error').count()) bad++;
-  await page.getByTestId('video-close').click();
 
   // 编译错误：保留上一次成功的画面，显示 文件:行号
   const file = path.join(tmp, 'features/invite/options/a-modal.tsx');

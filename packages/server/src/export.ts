@@ -6,7 +6,7 @@
  * - 视频（只在本机）：`POST …/export/video` `{ scenarioId, theme, font?, stroke? }` → 202 `{ jobId }`（尺寸跟随场景起始页面的 viewport）；
  *   Playwright `recordVideo` 录下渲染路由的自动播放（含鼠标与字幕），保存为 `<项目>/exports/<场景>-<时间>.webm`。
  *   进度：`GET …/export/video/events`（SSE，先发当前状态，之后每次变化一条，结束后关闭）；`GET …/export/video` 取当前状态。
- *   同一项目同时只能有一个视频任务（再提交返回 409）。没有 Playwright / Chromium 时任务失败，错误里带安装命令。
+ *   同一项目同时只能有一个视频任务（再提交返回 409）；`DELETE …/export/video` 取消正在进行的任务（D55）。没有 Playwright / Chromium 时任务失败，错误里带安装命令。
  *
  * 外观（D55）：font / stroke 由 exportAppearance 校验（未知值 = null = 跟随主题），非 null 时作为渲染路由的 URL 参数，
  * RenderApp 读出后交给舞台、字幕与手机外框（与看板里看到的一致）。
@@ -157,6 +157,16 @@ export class ExportHub {
     return `${this.opts.baseUrl()}?${new URLSearchParams({ render: '1', project: projectId, ...q })}`;
   }
 
+  /** 取消正在进行的视频任务（D55 导出进度里的「取消」）：立即标为“已取消”并中止录制；没有任务时返回 null。 */
+  cancel(projectId: string): VideoJob | null {
+    const job = this.jobs.get(projectId);
+    if (!job || job.status !== 'running') return null;
+    this.update(job, { status: 'error', phase: 'error', error: '已取消' });
+    this.aborts.get(projectId)?.abort();
+    this.aborts.delete(projectId);
+    return { ...job };
+  }
+
   job(projectId: string): VideoJob | null {
     return this.jobs.get(projectId) ?? null;
   }
@@ -192,6 +202,11 @@ export class ExportHub {
         return send(res, 202, { jobId: job.id, job });
       }
       if (sub === 'video' && method === 'GET') return send(res, 200, { job: this.job(ctx.projectId) });
+      if (sub === 'video' && method === 'DELETE') {
+        if (!ctx.guardWrite(false)) return;
+        const job = this.cancel(ctx.projectId);
+        return job ? send(res, 200, { job }) : send(res, 404, { error: { code: 'NOT_FOUND', message: '这个项目没有正在导出的视频' } });
+      }
       if (sub === 'video/events' && method === 'GET') {
         if (!ctx.guardWrite(false)) return;
         return this.sse(ctx.projectId, res);
@@ -234,19 +249,22 @@ export class ExportHub {
           total,
           signal: ac.signal,
           progress: (step) => {
+            if (job.status !== 'running') return; // 已取消
             const s = Math.max(0, Math.min(step, total));
             const percent = Math.round(5 + (total ? s / total : 1) * 85);
             if (job.phase !== 'recording' || s !== job.step) this.update(job, { phase: 'recording', step: s, percent });
           },
         });
+        if (job.status !== 'running') return; // 已取消：录制器之后才返回，不改回完成
         this.update(job, { phase: 'saving', percent: 95 });
         if (!fs.existsSync(out)) throw new JoploError('EXPORT_FAILED', '录制完成，但没有生成视频文件');
         this.update(job, { status: 'done', phase: 'done', percent: 100, step: total, file: rel });
         this.opts.log(`[joplo] 已导出视频：${out}`);
       } catch (e) {
-        this.update(job, { status: 'error', phase: 'error', error: e instanceof Error ? e.message : String(e) });
+        if (job.status === 'running') this.update(job, { status: 'error', phase: 'error', error: e instanceof Error ? e.message : String(e) });
       } finally {
-        this.aborts.delete(projectId);
+        // 只删自己的（取消后可能已经开始了新任务）
+        if (this.aborts.get(projectId) === ac) this.aborts.delete(projectId);
       }
     })();
     this.running.add(p);

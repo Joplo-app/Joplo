@@ -7,22 +7,37 @@
  *   ⌥+单击检查抽屉、导出图片 / 视频、在编辑器中打开。所有状态都在 hash 里。
  * IR 首次通过 /__joplo/p/<id>/ir 载入，之后由 HMR 推送；编译出错时显示错误并保留上一次成功的画面。
  */
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+
+/** 换 favicon（D55 标签页状态点）。 */
+function setFavicon(href: string) {
+  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+  if (link.href !== href) link.href = href;
+}
 import type { Diagnostic } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
 import { boardHash, parseBoardHash, type BoardRoute, type PlayRoute } from '../runtime/route';
-import { Code, Film, ImageDown, LayoutGrid, Link, ScanSearch } from 'lucide-react';
+import { ArrowRight, CircleCheck, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch } from 'lucide-react';
 import { PlayerPage, useBoardLayout, type MenuEntry } from '../player/PlayerPage';
 import { Btn, Kbd } from '../player/controls';
 import type { ProjectSummary } from '../runtime/dev-client';
 import { featureMenu } from './nav-model';
 import { usePlaySync } from '../player/playRoute';
 import { copyText, downloadBlob, useFlash, useHash } from '../player/util';
-import { CaseNav } from './CaseNav';
+import { CaseNav, CaseRail } from './CaseNav';
 import { Home } from './Home';
 import { InspectDrawer } from './InspectDrawer';
-import { VideoDialog } from './VideoDialog';
+import { ProgressRing, VideoProgressCard, useVideoExport } from './VideoExport';
+import { diagnosticsSummary, gapBanner, nextCase } from './states-model';
+import { faviconHref, tabTitle } from '../player/states';
+import { StatusIcon } from '../player/StatusIcon';
+import { cn } from '@/lib/utils';
 import { COVERAGE_LABEL } from './labels';
 import { useProjectIR, useProjects } from './hooks';
 import { useBoardSettings } from './useSettings';
@@ -106,17 +121,28 @@ function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpen
   );
 }
 
+/** 编译出错横幅（D55）：舞台上沿的红边横幅，写错误数和第一条 文件:行；可展开全部；修好保存后自动消失。 */
 function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
+  const [open, setOpen] = useState(false);
+  const sum = diagnosticsSummary(list);
+  if (!sum) return null;
   const errors = list.filter((d) => d.severity === 'error');
   return (
-    <div role="alert" className="max-h-[30%] shrink-0 overflow-y-auto rounded-lg border border-[#ffc9c9] bg-[#fff5f5] px-4 py-2 text-[13px] text-[#a51d1d]" data-testid="diagnostics">
-      <strong>编译出错（{errors.length}）</strong>
-      <span className="ml-2 text-[#6b3a3a]">仍显示上一次成功的画面；保存修复后自动恢复。</span>
-      <ul className="mt-1 flex flex-col gap-0.5">
-        {errors.slice(0, 20).map((d, i) => (
+    <div role="alert" className="max-h-[40%] w-full shrink-0 overflow-y-auto rounded-[8px] border-l-4 border-jb-danger bg-jb-danger-bg px-3 py-2 text-left font-jb text-[13px]" data-testid="diagnostics">
+      <div className="flex items-center gap-2">
+        <CircleX className="size-4 shrink-0 text-jb-danger" aria-hidden />
+        <strong className="text-jb-danger">编译出错 {sum.count} 处</strong>
+        <span className="text-jb-danger">· 仍显示上一次成功的画面</span>
+        <span className="flex-1" />
+        <button type="button" className="jb-focus shrink-0 rounded-[4px] px-1.5 text-[12px] font-medium text-jb-fg hover:underline" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-testid="diag-toggle">
+          {open ? '收起' : '展开'}
+        </button>
+      </div>
+      <ul className="mt-1 flex flex-col gap-0.5 pl-6">
+        {(open ? errors.slice(0, 50) : errors.slice(0, 1)).map((d, i) => (
           <li key={i} className="flex gap-2" data-testid="diag-item">
-            <code className="shrink-0 font-mono text-[12px] font-semibold">{d.at ?? '（无位置）'}</code>
-            <span className="whitespace-pre-wrap break-all">{d.message}</span>
+            <code className="shrink-0 font-jb-mono text-[12px] font-semibold text-jb-fg">{d.at ?? '（无位置）'}</code>
+            <span className={cn('text-jb-muted', open ? 'whitespace-pre-wrap break-all' : 'truncate')}>{d.message}</span>
           </li>
         ))}
       </ul>
@@ -136,8 +162,34 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   const a = useAppearance(projectId, ir.payload?.project?.theme ?? 'sketch', ir.payload?.project?.themes ?? {});
   const theme = a.look.theme;
   const [drawer, setDrawer] = useState(false);
-  const [video, setVideo] = useState(false);
   const [flash, setFlash] = useFlash();
+  // 导出视频（D55）：进度在「导出」按钮的进度环和菜单顶部；完成 / 失败是带操作的轻提示
+  const videoName = useRef('');
+  const retry = useRef<() => void>(() => undefined);
+  const vid = useVideoExport(projectId, (job) => {
+    if (job.status === 'done')
+      setFlash(
+        <span className="inline-flex items-center gap-2" data-testid="video-done">
+          <CircleCheck className="size-4 text-jb-accent" aria-hidden />
+          已导出 {job.file}
+          <button type="button" className="font-semibold text-jb-accent underline-offset-2 hover:underline" onClick={() => retry.current()}>
+            再导出一次
+          </button>
+        </span>,
+        8000,
+      );
+    else if (job.error !== '已取消')
+      setFlash(
+        <span className="inline-flex max-w-[640px] items-center gap-2 whitespace-normal" data-testid="video-error">
+          导出视频失败：{job.error}
+          <button type="button" className="shrink-0 font-semibold text-jb-accent underline-offset-2 hover:underline" onClick={() => retry.current()}>
+            重试
+          </button>
+        </span>,
+        10000,
+      );
+    else setFlash('已取消导出');
+  });
 
   // 只应用成功的 IR；出错时保留上一次成功的画面（第一次就失败时也先显示它带的旧 IR）
   useEffect(() => {
@@ -147,6 +199,34 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   }, [ir.payload, ctl]);
 
   const project = snap.project;
+  // 标签页标题与 favicon 状态点（D55）：“功能 · 项目”；编译出错加 ✕ 和红点；导出中写进度、黄点
+  const compileError = !!(ir.payload && !ir.payload.ok);
+  const featureName = project?.features[play.featureId]?.name ?? null;
+  const exporting = vid.running && vid.job ? `${vid.job.step}/${vid.job.total}` : null;
+  useEffect(() => {
+    document.title = tabTitle({ feature: featureName, project: projectName ?? project?.name ?? null, error: compileError, exporting });
+    setFavicon(faviconHref(compileError ? 'error' : exporting ? 'busy' : null));
+  }, [featureName, projectName, project?.name, compileError, exporting]);
+  useEffect(
+    () => () => {
+      document.title = 'Joplo · 看板';
+      setFavicon(faviconHref(null));
+    },
+    [],
+  );
+  // 场景完成后 Enter = 下一个情况
+  const nextRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || !nextRef.current) return;
+      const t = e.target as HTMLElement;
+      if (t.closest?.('input,textarea,select,button,[contenteditable],[role="menu"],[role="dialog"]')) return;
+      e.preventDefault();
+      nextRef.current();
+    };
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  }, []);
   // 播放速度在切换方案 / 情况 / 场景时保留
   const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', projectId, play: { ...(play.speed ? { speed: play.speed } : {}), ...next } }, replace);
   const resolved = usePlaySync(ctl, snap, project, play, (next) => toPlay(next, true));
@@ -201,7 +281,8 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         });
       },
     },
-    { id: 'video', icon: <Film />, label: '导出整个场景视频', disabled: !scenario, onClick: () => setVideo(true) },
+    ...(vid.running && vid.job ? [{ id: 'video-progress', custom: <VideoProgressCard job={vid.job} scenarioName={videoName.current} onCancel={() => void vid.cancel()} /> }, { id: 'video-divider', divider: true as const }] : []),
+    { id: 'video', icon: <Film />, label: vid.running ? '正在导出视频…' : '导出整个场景视频', disabled: !scenario || vid.running, onClick: () => retry.current() },
     { id: 'link', icon: <Link />, label: '复制当前步骤链接', onClick: () => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制')) },
     {
       id: 'editor',
@@ -212,24 +293,40 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
     },
   ];
 
+  // 视频：从菜单开始；完成提示里的“再导出一次”、失败提示里的“重试”也走这里
+  retry.current = () => {
+    if (!scenario) return;
+    videoName.current = scenario.name;
+    void vid.start(scenario.id, a.saved).then((ok) => !ok && setFlash(`导出视频失败：${vid.error ?? '无法开始'}`));
+  };
+  // 缺口横幅（D55）：说清楚，再给下一步：复制给 Agent 的话；看已表达这个情况的方案怎么处理
+  const gb = gap && option ? gapBanner(project, feature.id, option.id, resolved.caseId) : null;
   const banner = (
     <>
       {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : null}
-      {gap && option ? (
-        <div role="status" className="shrink-0 rounded-lg border border-[#ffd8a8] bg-[#fff9db] px-4 py-3" data-testid="gap-notice" data-status={gap.status}>
-          <div className="text-[15px] font-semibold text-[#8a4700]">
-            方案 {option.name} 还没有表达「{caseTitle}」{gap.status !== 'none' && gap.status !== 'missing' ? `（${COVERAGE_LABEL[gap.status].text}）` : ''}
+      {gap && option && gb ? (
+        <div role="status" className="flex shrink-0 flex-col gap-2 rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface px-4 py-3 font-jb" data-testid="gap-notice" data-status={gap.status}>
+          <div className="flex items-center gap-2 text-[14px] font-semibold">
+            <StatusIcon status={gap.status} size={16} />
+            方案 {gb.letter} 还没有表达「{caseTitle}」{gap.status !== 'none' && gap.status !== 'missing' ? `（${COVERAGE_LABEL[gap.status].text}）` : ''}
           </div>
-          <div className="mt-1 text-[13px] text-[#5c3d00]">
-            这是缺口，不是演示{gap.reason ? `：${gap.reason}` : ''}。可以在 Agent 会话里说“给这个方案补上这个情况的场景”，或先查看：
+          <div className="text-[13px] text-jb-muted">这是缺口，不是演示{gap.reason ? `：${gap.reason}` : ''}。画面先静态显示方案 {gb.letter} 的页面。</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Btn icon={<Copy className="size-3.5" />} label="复制给 Agent 的话" size={28} onClick={() => void copyText(gb.agentText).then((ok) => setFlash(ok ? '已复制给 Agent 的话' : '无法访问剪贴板'))} data-testid="gap-copy" />
+            {gb.alt ? <Btn icon={<ArrowRight className="size-3.5" />} label={`看方案 ${gb.alt.letter} 怎么处理`} variant="primary" size={28} onClick={() => toPlay({ featureId: feature.id, optionId: gb.alt!.optionId, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })} data-testid="gap-alt" /> : null}
           </div>
-          <code className="mt-1.5 inline-block rounded bg-white/70 px-2 py-0.5 font-mono text-[13px]" data-testid="gap-command">
-            npx joplo check --option {option.id}
-          </code>
+          <div className="truncate text-[12px] text-jb-faint" data-testid="gap-command" title={gb.agentText}>
+            复制内容：{gb.agentText}
+          </div>
         </div>
       ) : null}
     </>
   );
+  // 场景完成后的“下一个情况”（左栏顺序里当前方案已表达的下一个；没有就不显示）
+  // 没有选情况（直接打开了某个场景）时，从这个场景覆盖的最后一个情况往后找
+  const curCase = resolved.caseId ?? (scenario ? ([...feature.caseIds].reverse().find((c) => scenario.caseIds.includes(c)) ?? null) : null);
+  const nc = state?.completed && !snap.playing ? nextCase(project, feature.id, resolved.optionId, curCase) : null;
+  nextRef.current = nc ? () => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), caseId: nc.caseId }) : null;
 
   const selection = snap.selection;
   return (
@@ -282,6 +379,9 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           </>
         }
         inspectMode={inspectMode}
+        completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={`下一个情况：${nc.title}`} kbd="Enter" variant="primary" className="max-w-[360px] [&>span]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
+        navRail={<CaseRail project={project} featureId={feature.id} optionId={resolved.optionId} caseId={resolved.caseId} />}
+        exportBadge={vid.running && vid.job ? <ProgressRing percent={vid.job.percent} /> : null}
         layer={play.layer ?? null}
         speed={play.speed ?? 1}
         onSpeed={(v) => {
@@ -334,7 +434,6 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
                 onOpenEditor={(at) => void openInEditor(projectId, at).then((r) => setFlash(r.ok ? `已在编辑器中打开 ${at}` : `无法打开编辑器：${r.message}`))}
               />
             ) : null}
-            {video && scenario ? <VideoDialog projectId={projectId} scenarioId={scenario.id} scenarioName={scenario.name} look={a.saved} onClose={() => setVideo(false)} /> : null}
             <AppearancePopover open={a.open} anchor={a.anchor} onClose={() => a.setOpen(false)} scope="project" projectId={projectId} configTheme={project.theme ?? 'sketch'} catalog={a.catalog} settings={a.settings} look={a.saved} save={a.save} onPreview={a.setPreview} onFlash={setFlash} copy={copyText} />
           </>
         }

@@ -1,5 +1,5 @@
 /**
- * 舞台覆盖层：鼠标指针、点击波纹、聚焦高亮、就地提示。说明与 explain 在画面下方的字幕区（Subtitle），不叠在画面上。
+ * 舞台覆盖层：鼠标指针、点击波纹、聚焦高亮、点错位置时目标闪两下（提示文字在 StageViewport 顶部居中）。说明与 explain 在画面下方的字幕区（Subtitle），不叠在画面上。
  * 位于画框内部（坐标即画框坐标），pointer-events 默认关闭，不影响元素命中与遮挡检查。
  */
 import { useEffect, useState } from 'react';
@@ -61,8 +61,6 @@ export function Overlay({
   const anchorId = n && 'nodeId' in n ? n.nodeId : null;
   const showFocus = !snap.busy && nextTargetId;
   const boxes = useBoxes(stage, [showFocus ? nextTargetId : null, anchorId, snap.preview?.nodeId]);
-  const W = stage?.offsetWidth ?? 1280;
-  const H = stage?.offsetHeight ?? 800;
   const focus = showFocus && nextTargetId ? boxes[nextTargetId] : undefined;
   const anchor = anchorId ? boxes[anchorId] : undefined;
   const prevBox = snap.preview ? boxes[snap.preview.nodeId] : undefined;
@@ -104,43 +102,10 @@ export function Overlay({
       </div>
 
 
+      {/* 点错位置（D55）：目标闪两下；说明在画面顶部居中的轻提示（StageViewport） */}
       {n && anchor && (n.kind === 'disabled' || n.kind === 'uncovered' || n.kind === 'out_of_order') ? (
-        <NoticeBubble anchor={anchor} W={W} H={H} kind={n.kind} text={n.text} onBack={onBackToDemo} onDismiss={onDismiss} />
+        <div key={`${anchorId}|${n.text}`} className="jflash absolute rounded-md border-2 border-[var(--focus)]" style={{ left: anchor.x - 5, top: anchor.y - 5, width: anchor.w + 10, height: anchor.h + 10 }} data-joverlay="notice-target" aria-hidden />
       ) : null}
-
     </>
-  );
-}
-
-function NoticeBubble({ anchor, W, H, kind, text, onBack, onDismiss }: { anchor: Box; W: number; H: number; kind: 'disabled' | 'uncovered' | 'out_of_order'; text: string; onBack: () => void; onDismiss: () => void }) {
-  const width = 360;
-  const below = anchor.y + anchor.h + 140 < H;
-  const left = Math.max(8, Math.min(W - width - 8, anchor.x + anchor.w / 2 - width / 2));
-  const top = below ? anchor.y + anchor.h + 10 : Math.max(8, anchor.y - 10 - 120);
-  const mix = (c: string) => `color-mix(in srgb, ${c} 8%, var(--jp-surface))`;
-  const tone = kind === 'disabled' ? { border: 'var(--jp-muted)', bg: 'var(--jp-surface)', title: '不可用' } : kind === 'uncovered' ? { border: 'var(--jp-warn)', bg: mix('var(--jp-warn)'), title: '演示范围外' } : { border: 'var(--jp-info)', bg: mix('var(--jp-info)'), title: '不是当前步骤' };
-  return (
-    <div
-      role="alert"
-      data-joverlay="notice"
-      data-notice-kind={kind}
-      className="pointer-events-auto absolute rounded-md border-2 px-4 py-3 text-[17px] shadow-lg"
-      style={{ left, top, width, borderColor: tone.border, background: tone.bg }}
-    >
-      <div className="mb-1 text-[14px] font-semibold" style={{ color: tone.border }}>
-        {tone.title}
-      </div>
-      <div className="leading-snug text-[var(--jp-ink)]">{text}</div>
-      <div className="mt-2 flex justify-end gap-2">
-        {kind === 'uncovered' ? (
-          <button type="button" className="whitespace-nowrap rounded border border-[var(--jp-warn)] bg-[var(--jp-surface)] px-2.5 py-1 text-[15px] text-[var(--jp-warn)] hover:opacity-80" onClick={onBack}>
-            回到演示
-          </button>
-        ) : null}
-        <button type="button" className="whitespace-nowrap rounded px-2.5 py-1 text-[15px] text-[var(--jp-muted)] hover:bg-black/5" onClick={onDismiss}>
-          知道了
-        </button>
-      </div>
-    </div>
   );
 }

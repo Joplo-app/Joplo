@@ -12,7 +12,7 @@ import { Popover, useTip } from './popover';
 import type { Placement } from './popover-place';
 
 export type MenuItem = { id: string; label: string; onClick: () => void; checked?: boolean; disabled?: boolean; icon?: ReactNode; hint?: ReactNode; /** 第二行小字（例如功能的选定方案与缺口数）。 */ description?: string };
-export type MenuEntry = MenuItem | { id: string; divider: true };
+export type MenuEntry = MenuItem | { id: string; divider: true } | { id: string; custom: ReactNode };
 
 /** 元素的可用宽度（ResizeObserver）。返回回调 ref：元素晚出现（例如进入全屏后才渲染）也能测到。 */
 export function useWidth(fallback = 1000): [(el: HTMLElement | null) => void, number] {
@@ -167,6 +167,8 @@ export function MenuList({ items, onPick, testid }: { items: MenuEntry[]; onPick
       {items.map((it) =>
         'divider' in it ? (
           <div key={it.id} role="separator" className="mx-1 my-1 h-px bg-jb-line" />
+        ) : 'custom' in it ? (
+          <div key={it.id}>{it.custom}</div>
         ) : (
           <button
             key={it.id}

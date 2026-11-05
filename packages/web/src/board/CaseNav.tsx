@@ -198,3 +198,35 @@ export function CaseNav({
     </div>
   );
 }
+
+/**
+ * 窄屏（< 1100）左栏收成的竖条：方案只剩字母，情况只剩当前方案的状态图标（悬停写全称）。
+ * 竖条整体是一个“展开左栏”的按钮（PlayerPage），这里只放图形，不放按钮。
+ */
+export function CaseRail({ project, featureId, optionId, caseId }: { project: Project; featureId: string; optionId: string | null; caseId: string | null }) {
+  const f = project.features[featureId];
+  if (!f) return null;
+  return (
+    <span className="flex flex-col items-center gap-1 font-jb" data-testid="case-rail">
+      {optionsOf(project, featureId).map((o, i) => {
+        const { letter, title } = optionLabel(o, i);
+        return (
+          <span key={o.id} title={`方案 ${letter} · ${title}`} className="flex size-9 items-center justify-center">
+            <Letter letter={letter} on={o.id === optionId} />
+          </span>
+        );
+      })}
+      <span aria-hidden className="my-1 h-px w-6 bg-jb-line" />
+      {f.caseIds.map((cid) => {
+        const c = project.cases[cid];
+        if (!c) return null;
+        const own = optionId ? statusOf(project, optionId, cid) : 'none';
+        return (
+          <span key={cid} title={c.title} className={cn('flex size-8 items-center justify-center rounded-[8px]', caseId === cid && 'bg-jb-selected')}>
+            <StatusIcon status={own} size={16} labelPrefix={`${c.title}：`} />
+          </span>
+        );
+      })}
+    </span>
+  );
+}

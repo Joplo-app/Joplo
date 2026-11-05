@@ -14,9 +14,9 @@ import { caseCard, featureMenu, gapCommand, optionLabel, optionMeta, otherOption
 
 describe('布局断点（34-窄屏收起规则 ①–④）', () => {
   it('≥ 1440 全部展开；< 1440 顶栏只剩图标、左栏 240、当前步 200、缩放只剩 − +', () => {
-    expect(boardLayout(1440)).toEqual({ wide: true, navWidth: 276, topLabels: true, currentStepW: 280, zoomLabel: true });
+    expect(boardLayout(1440)).toEqual({ wide: true, navWidth: 276, topLabels: true, currentStepW: 280, zoomLabel: true, rail: false, compactTimeline: false, explainInTip: false });
     expect(boardLayout(1920).wide).toBe(true);
-    expect(boardLayout(1439)).toEqual({ wide: false, navWidth: 240, topLabels: false, currentStepW: 200, zoomLabel: false });
+    expect(boardLayout(1439)).toEqual({ wide: false, navWidth: 240, topLabels: false, currentStepW: 200, zoomLabel: false, rail: false, compactTimeline: false, explainInTip: false });
     expect(boardLayout(1280).navWidth).toBe(240);
     expect(BOARD_WIDE).toBe(1440);
   });

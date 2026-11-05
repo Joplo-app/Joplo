@@ -1,20 +1,28 @@
 /**
  * 演示页布局（D55，纯函数）：断点、播放坞宽度、时间线格子、层级标签。
  *
- * 断点（design/png/34-窄屏收起规则.png 的 ①–④；⑤–⑦ 在阶段 4）：
+ * 断点（design/png/34-窄屏收起规则.png）：
  *   ≥ 1440：全部展开（顶栏按钮带文字、左栏 276、当前步宽 280、缩放带“适应”）；
- *   < 1440：顶栏「检查 / 外观 / 导出」只剩图标、左栏 240（情况标题最多两行）、当前步宽 200、缩放只剩 − +。
+ *   < 1440：① 顶栏「检查 / 外观 / 导出」只剩图标、② 左栏 240（情况标题最多两行）、③ 当前步宽 200、④ 缩放只剩 − +；
+ *   < 1100：⑤ 左栏收成 56px 的竖条（方案只剩字母、情况只剩状态图标）；点竖条或按 [ 浮出完整左栏，选完自动收回；
+ *   < 900：⑥ 时间线只剩当前步和总数（“1 / 5”），点一下弹出全部步骤；⑦ 字幕的 explain 收进悬停。
  * 任何宽度都不出现页面滚动：时间线放不下时在自己的一行里横向滚动（隐藏滚动条，当前步自动滚到可见）。
  */
 import { textW } from './controls-fit';
 
 export const BOARD_WIDE = 1440;
 
-export type BoardLayout = { wide: boolean; navWidth: number; topLabels: boolean; currentStepW: number; zoomLabel: boolean };
+export const BOARD_RAIL = 1100;
+export const BOARD_COMPACT = 900;
+
+export type BoardLayout = { wide: boolean; navWidth: number; topLabels: boolean; currentStepW: number; zoomLabel: boolean; rail: boolean; compactTimeline: boolean; explainInTip: boolean };
 
 export function boardLayout(viewportW: number): BoardLayout {
-  const wide = Number.isFinite(viewportW) && viewportW >= BOARD_WIDE;
-  return { wide, navWidth: wide ? 276 : 240, topLabels: wide, currentStepW: wide ? 280 : 200, zoomLabel: wide };
+  const w = Number.isFinite(viewportW) ? viewportW : 0;
+  const wide = w >= BOARD_WIDE;
+  const rail = w < BOARD_RAIL;
+  const compact = w < BOARD_COMPACT;
+  return { wide, navWidth: wide ? 276 : rail ? 56 : 240, topLabels: wide, currentStepW: wide ? 280 : 200, zoomLabel: wide, rail, compactTimeline: compact, explainInTip: compact };
 }
 
 /** 播放坞的尺寸（与 PlayerPage 的 Dock 一致）。 */
@@ -43,10 +51,14 @@ export type TimelineChip = {
   tip: string;
   /** 自动播放正在执行这一步。 */
   playing: boolean;
+  /** 自动播放停留在这一步（离下一步还有多久）：从左往右填深黄；暂停时停住。 */
+  dwell?: { ms: number; elapsed: number; paused: boolean };
 };
 
+export type Dwell = { position: number; ms: number; elapsed: number };
+
 /** 时间线格子。shownIndex = 当前位置（0 = 初始）；activeStep = 正在执行的步骤（播放中），优先。 */
-export function timelineChips(steps: readonly { caption: string; kind: 'user' | 'system' }[], position: number, activeStep: number | null): TimelineChip[] {
+export function timelineChips(steps: readonly { caption: string; kind: 'user' | 'system' }[], position: number, activeStep: number | null, dwell: Dwell | null = null, paused = false): TimelineChip[] {
   const shown = activeStep !== null ? activeStep + 1 : position;
   const chip = (index: number, label: string, system: boolean, tip: string): TimelineChip => ({
     index,
@@ -56,6 +68,7 @@ export function timelineChips(steps: readonly { caption: string; kind: 'user' | 
     label,
     tip,
     playing: activeStep !== null && activeStep === index - 1,
+    ...(dwell && activeStep === null && dwell.position === index && index === shown ? { dwell: { ms: dwell.ms, elapsed: dwell.elapsed, paused } } : {}),
   });
   return [chip(0, '初始', false, '0 · 初始状态'), ...steps.map((s, i) => chip(i + 1, s.caption, s.kind === 'system', `${i + 1} · ${s.kind === 'system' ? '系统 · ' : ''}${s.caption}`))];
 }

@@ -181,6 +181,19 @@ export async function startVideo(projectId: string, body: Omit<ExportRequest, 'p
   }
 }
 
+/** 取消正在进行的视频导出（D55）：DELETE …/export/video。 */
+export async function cancelVideo(projectId: string): Promise<{ ok: true; job: VideoJob } | { ok: false; message: string }> {
+  try {
+    const headers = writeHeaders(false);
+    if (!headers) return { ok: false, message: '页面没有本地令牌' };
+    const res = await fetch(`/__joplo/p/${enc(projectId)}/export/video`, { method: 'DELETE', headers, cache: 'no-store' });
+    const b = (await res.json().catch(() => null)) as { job?: VideoJob; error?: { message?: string } } | null;
+    return res.ok && b?.job ? { ok: true, job: b.job } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, message: errMsg(e) };
+  }
+}
+
 /** 视频导出进度（SSE，用 fetch 读流以便带令牌）。返回取消函数。 */
 export function watchVideo(projectId: string, cb: (job: VideoJob | null) => void, onError: (message: string) => void): () => void {
   const ac = new AbortController();
