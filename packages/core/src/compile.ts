@@ -255,6 +255,14 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       const addNode = (n: string) => {
         if (!nodes.includes(n)) nodes.push(n);
       };
+      // trace.skip 标记“这次没被调用”的一组元素，不是路径：节点和连线各自 dim，不要求彼此相连
+      if (tmode === 'skip') {
+        for (const t of ids) {
+          if (d.nodes.has(t)) addNode(t);
+          else edges.push({ id: t, reverse: false });
+        }
+        return { mode: tmode, nodes, edges };
+      }
       let prev: string | null = null;
       for (const t of ids) {
         const edge = d.edges.find((e) => e.id === t);

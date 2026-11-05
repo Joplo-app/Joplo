@@ -128,6 +128,15 @@ describe('diagramStateAt（推算规则）', () => {
     expect(s5.queue).toEqual({ state: 'dim' });
     expect(at(99)).toEqual(s5);
   });
+  it('trace.skip 的参数是一组节点，不是路径：彼此没有连线也不报错，全部标为 dim', () => {
+    const r = build((f) => f.system('拦下', trace.fail('biz', 'billing'), trace.skip('brain', 'llm', 'queue')).system('结束'));
+    expect(r.dev.diagnostics.filter((d) => d.code === 'TRACE_UNKNOWN')).toEqual([]);
+    const s = diagramStateAt(r.dev.project!, sid, 1);
+    expect(s.brain).toEqual({ state: 'dim' });
+    expect(s.llm).toEqual({ state: 'dim' });
+    expect(s.queue).toEqual({ state: 'dim' });
+    expect(s['brain->llm']).toBeUndefined(); // skip 不点亮任何连线
+  });
   it('error 之后又被 trace 成功：回到 active（之后 ok）；逆向走的连线带 reverse', () => {
     const q = build((f) => f.system('失败', trace.fail('biz', 'billing')).system('没事').system('重试', trace('billing', 'biz')).system('结束')).dev.project!;
     expect(diagramStateAt(q, sid, 2).billing).toEqual({ state: 'error' });
