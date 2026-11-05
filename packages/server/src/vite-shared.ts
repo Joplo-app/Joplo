@@ -3,7 +3,7 @@
  *
  * - 看板与发布站的界面源码在 packages/web（Vite root）。
  * - 项目源文件（作者的 TSX）只在服务端经 ssrLoadModule 载入：用 automatic JSX、
- *   jsxImportSource '@tokenroll/joplo-kit'、development=true 转译，jsxDEV 因此拿到 文件:行:列。
+ *   jsxImportSource '@joplo-app/kit'、development=true 转译，jsxDEV 因此拿到 文件:行:列。
  * - Tailwind 需要编译项目源文件里出现的 className：把项目目录追加为 index.css 的 @source。
  */
 import fs from 'node:fs';
@@ -69,7 +69,7 @@ export function cssSourcePlugin(dirs: () => string[], web: WebAssets = locateWeb
 
 /**
  * 转译项目源文件（TSX → 收集数据的 JS）；把 Tailwind @source 指向项目目录。
- * dist 形态下 CSS 入口是 @tokenroll/joplo-web/dist/project.css，其中的 `@import "tailwindcss"` 改为从 server 的依赖解析。
+ * dist 形态下 CSS 入口是 @joplo-app/web/dist/project.css，其中的 `@import "tailwindcss"` 改为从 server 的依赖解析。
  */
 export function joploProjectPlugin(projectDir: string, web: WebAssets = locateWebAssets()): Plugin {
   const entry = cssEntry(web);
@@ -88,7 +88,7 @@ export function joploProjectPlugin(projectDir: string, web: WebAssets = locateWe
       try {
         const r = await transformWithOxc(code, file, {
           lang,
-          jsx: { runtime: 'automatic', importSource: '@tokenroll/joplo-kit', development: true },
+          jsx: { runtime: 'automatic', importSource: '@joplo-app/kit', development: true },
           sourcemap: true,
         });
         return { code: r.code, map: r.map ?? null };

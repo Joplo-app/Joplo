@@ -1,4 +1,4 @@
-import { feature, question, rule } from '@tokenroll/joplo-kit';
+import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
   name: '设备外框：终端与手机',

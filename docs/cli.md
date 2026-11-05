@@ -22,7 +22,7 @@ joplo render [dir] --scenario-id <qid> --out <file> \
 
 ## skill：按需读取 Agent 用法
 
-`joplo skill` 第一行是 `Joplo <当前 CLI 版本> · Agent 用法（按需读取）`，接着列出主题名、一句说明和实际行数，最后提示读取与安装命令。版本来自 `@tokenroll/joplo-cli` 的 package.json。
+`joplo skill` 第一行是 `Joplo <当前 CLI 版本> · Agent 用法（按需读取）`，接着列出主题名、一句说明和实际行数，最后提示读取与安装命令。版本来自 `@joplo-app/cli` 的 package.json。
 
 | 主题 | 何时读取 |
 | --- | --- |
@@ -38,7 +38,7 @@ joplo render [dir] --scenario-id <qid> --out <file> \
 
 demo 以 examples/agent-arch 为完整示例；check 的诊断代码覆盖由读取 compile.ts/validate.ts 源码的测试约束，避免新增代码遗漏说明。publish 主题说明本地/发布站同布局、层级与导演、全屏快捷键，以及图片两端可导出、视频仅本地的边界。
 
-这些命令只向 stdout 写无颜色文本，不加载 `@tokenroll/joplo-server`，也不加载或执行作者项目。组件清单与行为分类直接从 core catalog 生成；详细属性提示可由目录通过可选 docs 参数提供。
+这些命令只向 stdout 写无颜色文本，不加载 `@joplo-app/server`，也不加载或执行作者项目。组件清单与行为分类直接从 core catalog 生成；详细属性提示可由目录通过可选 docs 参数提供。
 
 ### 安装短指针
 
@@ -88,18 +88,18 @@ JSON 的 `data.selection` 保留原 Selection，`data.lines` 是 `{ number, text
 
 init 只接受不存在或空目录；非空目录时不写入任何文件，说明已有几个文件，并提示 `init . --keep`（只补缺失的文件，已有文件一字不改）。生成 config、布局、首页、一个功能/方案/场景、package.json、tsconfig 和 .gitignore：
 
-- package.json：ESM，`devDependencies` 锁定 `"joplo"` 与 `"@tokenroll/joplo-kit"` 为当前 CLI 的精确版本（读自 `@tokenroll/joplo-cli` 的 package.json，所有包同一版本），并带 `dev` / `check` / `build` 脚本；
-- tsconfig：react-jsxdev、jsxImportSource `@tokenroll/joplo-kit`、allowImportingTsExtensions、skipLibCheck。
+- package.json：ESM，`devDependencies` 锁定 `"joplo"` 与 `"@joplo-app/kit"` 为当前 CLI 的精确版本（读自 `@joplo-app/cli` 的 package.json，所有包同一版本），并带 `dev` / `check` / `build` 脚本；
+- tsconfig：react-jsxdev、jsxImportSource `@joplo-app/kit`、allowImportingTsExtensions、skipLibCheck。
 
 输出最后一行是下一步命令，按 `npm_config_user_agent`（npx、pnpm、yarn、bunx 都会设置）选择 npm / pnpm / yarn / bun 的写法，例如 `下一步：cd my-demo && npm install && npx joplo dev`。仓库内生成后可立即 check。
 
-check / dev / build / render 运行前比较项目里的 `@tokenroll/joplo-kit`（从项目目录向上找 node_modules）与 CLI 版本；不同则在 stderr 打印一行警告和对齐命令（如 `npm i -D joplo@0.1.0 @tokenroll/joplo-kit@0.1.0`），声明了依赖却没安装则提示先安装。只提示，不阻止命令。
+check / dev / build / render 运行前比较项目里的 `@joplo-app/kit`（从项目目录向上找 node_modules）与 CLI 版本；不同则在 stderr 打印一行警告和对齐命令（如 `npm i -D joplo@0.1.0 @joplo-app/kit@0.1.0`），声明了依赖却没安装则提示先安装。只提示，不阻止命令。
 
-命令入口：`joplo` 包（packages/joplo）先检查 Node ≥ 22，再优先转发给项目内安装的 `@tokenroll/joplo-cli`（init 除外，总用 npx 指定的版本）。`@tokenroll/joplo-cli` 自己的命令名是 `joplo-cli`，避免安装时占掉入口包的 `joplo`。
+命令入口：`joplo` 包（packages/joplo）先检查 Node ≥ 22，再优先转发给项目内安装的 `@joplo-app/cli`（init 除外，总用 npx 指定的版本）。`@joplo-app/cli` 自己的命令名是 `joplo-cli`，避免安装时占掉入口包的 `joplo`。
 
 ## dev / build / render
 
-这三个入口在实际调用时才动态 import `@tokenroll/joplo-server`，分别使用 `startDev` / `buildSite` / `renderStep`，参数签名以 `packages/server/src/contract.ts` 为准。模块加载失败或对应函数缺失时，说明包名、函数名和原因，退出 1；check/selection/init/skill/guide 不受其影响。
+这三个入口在实际调用时才动态 import `@joplo-app/server`，分别使用 `startDev` / `buildSite` / `renderStep`，参数签名以 `packages/server/src/contract.ts` 为准。模块加载失败或对应函数缺失时，说明包名、函数名和原因，退出 1；check/selection/init/skill/guide 不受其影响。
 
 - dev 默认端口 4790；占用时由服务端明确报错，不静默换端口。log 回调写 stderr；stdout 返回项目在看板中的链接（`http://127.0.0.1:<端口>/#/<项目>`）。
 - 一台机器（同一个 `JOPLO_HOME`，缺省 `~/.joplo`）只运行一个看板进程：`<JOPLO_HOME>/server.json` 记录存活的看板时，dev 用其中的令牌把项目注册进去，打印链接和“已加入正在运行的看板”，退出码 0，不启动第二个进程。打开过的项目记在 `<JOPLO_HOME>/projects.json`。

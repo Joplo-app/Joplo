@@ -1,4 +1,4 @@
-import { $, done, flow, notApplicable, option, set, uses } from '@tokenroll/joplo-kit';
+import { $, done, flow, notApplicable, option, set, uses } from '@joplo-app/kit';
 
 import { ask } from '../../../shared/steps.ts';
 import { askLogin, browseScenario, LOGIN_ASK, ReplyMsg, skillLines, skillState, ToolMsg, typoScenario, UserMsg } from '../common.tsx';

@@ -9,7 +9,7 @@
  *
  * 目标目录非空且没有 overwrite 时拒绝写入；永远不清空项目目录本身或它的上级目录。
  *
- * 从 npm 安装时（web-assets.ts 的 dist 形态）第 2 步不编译界面源码：复制 @tokenroll/joplo-web 预构建的发布站，
+ * 从 npm 安装时（web-assets.ts 的 dist 形态）第 2 步不编译界面源码：复制 @joplo-app/web 预构建的发布站，
  * 只用 Tailwind 编译作者 className 用到的工具类（project.css → assets/project-*.css），再做第 3 步。
  */
 import fs from 'node:fs';
@@ -17,7 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { build as viteBuild, createServer, type Rollup } from 'vite';
-import { JoploError, type Project } from '@tokenroll/joplo-core';
+import { JoploError, type Project } from '@joplo-app/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
@@ -165,7 +165,7 @@ async function buildSourceSite(web: SourceWeb, projectDir: string, staging: stri
     base: './',
     mode: 'production',
     logLevel: 'error',
-    resolve: { alias: [{ find: /^@tokenroll\/joplo-core$/, replacement: path.join(web.webDir, 'src/site/core-lite.ts') }, ...kitAliases(web, projectDir)] },
+    resolve: { alias: [{ find: /^@joplo-app\/core$/, replacement: path.join(web.webDir, 'src/site/core-lite.ts') }, ...kitAliases(web, projectDir)] },
     define: { 'process.env.NODE_ENV': '"production"' },
     plugins: [joploProjectPlugin(projectDir, web), react(), tailwindcss()],
     build: {

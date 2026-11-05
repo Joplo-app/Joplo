@@ -1,4 +1,4 @@
-import { feature, question, rule } from '@tokenroll/joplo-kit';
+import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
   name: '视角（层级）与分镜',

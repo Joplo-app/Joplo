@@ -1,4 +1,4 @@
-import { config } from '@tokenroll/joplo-kit';
+import { config } from '@joplo-app/kit';
 
 export default config({
   name: 'Agent 脑手分离：后端架构说明',

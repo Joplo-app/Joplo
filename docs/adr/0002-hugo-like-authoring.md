@@ -27,13 +27,13 @@ M0 的创作方式存在三个问题：
 
    功能目录里的其他 TS 模块（如共用的示例数据、复用组件）可以被自由 import。
 3. **TSX 只当数据收集，不当 React 执行**。
-   - `@tokenroll/joplo-kit` 提供自己的 JSX 运行时：`jsxImportSource: "@tokenroll/joplo-kit"`，开发模式用 `react-jsxdev`，以便拿到源位置。
-   - 组件从 `@tokenroll/joplo-kit/ui` 导入，名称和属性与 Mantine 一致（D35，取代原来的 shadcn/ui）：复合组件用点语法（`AppShell.Header`、`Tabs.Tab`），布局写成属性（`Stack gap`、`SimpleGrid cols={{ base: 1, md: 3 }}`），浮层用 `Modal`/`Drawer` 的 `opened`，数据表对齐 mantine-datatable。另有少量 AI 交互组件（`ChatMessage`、`ToolCall`、`PromptInput`）和设备外框组件（`Terminal` 及其 `Command`/`Output`/`Input`、`Phone`；`Phone` 内部按手机宽度计算断点，舞台对 `viewport: 'mobile'` 的页面自动套上同一个外框，D39）、架构图组件（`Diagram` 及其 `Group`/`Node`/`Edge`，自动布局，state 由 flow 驱动，D41）。运行时不引入 Mantine。
+   - `@joplo-app/kit` 提供自己的 JSX 运行时：`jsxImportSource: "@joplo-app/kit"`，开发模式用 `react-jsxdev`，以便拿到源位置。
+   - 组件从 `@joplo-app/kit/ui` 导入，名称和属性与 Mantine 一致（D35，取代原来的 shadcn/ui）：复合组件用点语法（`AppShell.Header`、`Tabs.Tab`），布局写成属性（`Stack gap`、`SimpleGrid cols={{ base: 1, md: 3 }}`），浮层用 `Modal`/`Drawer` 的 `opened`，数据表对齐 mantine-datatable。另有少量 AI 交互组件（`ChatMessage`、`ToolCall`、`PromptInput`）和设备外框组件（`Terminal` 及其 `Command`/`Output`/`Input`、`Phone`；`Phone` 内部按手机宽度计算断点，舞台对 `viewport: 'mobile'` 的页面自动套上同一个外框，D39）、架构图组件（`Diagram` 及其 `Group`/`Node`/`Edge`，自动布局，state 由 flow 驱动，D41）。运行时不引入 Mantine。
    - Joplo 只追加 `id`、`when`、`disabledReason`、`unmodeled`、`note` 这几个属性。
    - 作者写的函数组件在收集时直接展开。
    - 状态绑定写 `$.ui.x` / `$.data.x` / `$.inputs.x`；条件写 `not / eq / empty / and …`，不允许 eval。
    - 行为写在 `flow(...).click(...).type(...).system(...)` 步骤里。函数类型的属性（如 `onClick`）在编译时报错。
-4. **编译**：`@tokenroll/joplo-core` 的 `loadAuthoring(dir, importer)` 加 `compile(authoring, 'dev' | 'publish')`，产出 IR v2（`schema.ts`）。
+4. **编译**：`@joplo-app/core` 的 `loadAuthoring(dir, importer)` 加 `compile(authoring, 'dev' | 'publish')`，产出 IR v2（`schema.ts`）。
    - 画面 = 布局 + 页面 + 各方案往插槽里堆叠的元素。dev 模式下，每个方案在每个路径上各有一个画面 `<方案>@<路径>`：同一功能的其他方案不出现，其他功能取各自选定的方案。另有发布视图 `@<路径>`。
    - 情况覆盖自动推导：有场景覆盖即为“已表达”；源文件中的声明优先；其余标为“缺失”。新增情况会自动出现缺口（AC-08）。
    - 字幕省略时自动生成，元素名取 Mantine 输入组件的 `label` 属性；select 显示选项的 label。

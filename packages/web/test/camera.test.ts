@@ -4,10 +4,10 @@
  * 界面效果（页面不滚动、⌥+单击命中、动画）由用户在浏览器里检查，见交付说明里的清单。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@tokenroll/joplo-kit/ui';
-import { config, feature, flow, layer, option, page, set, shot, $ } from '@tokenroll/joplo-kit';
-import { jsx } from '@tokenroll/joplo-kit/jsx-runtime';
-import { PAGE_LAYER, compile, displaySceneId, type AuthoringProject } from '@tokenroll/joplo-core';
+import * as ui from '@joplo-app/kit/ui';
+import { config, feature, flow, layer, option, page, set, shot, $ } from '@joplo-app/kit';
+import { jsx } from '@joplo-app/kit/jsx-runtime';
+import { PAGE_LAYER, compile, displaySceneId, type AuthoringProject } from '@joplo-app/core';
 import { CAMERA_PAD, MAX_ZOOM, MIN_NODE_PX, NODE_FONT_PX, fitCamera, highlightRect, project, revealScroll, union, visibleRect, type Box } from '../src/renderer/camera-math';
 import { fitStage } from '../src/player/fit';
 import { cameraFor } from '../src/player/cameraFor';

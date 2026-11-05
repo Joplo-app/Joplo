@@ -1,5 +1,5 @@
 /** 看板（创作侧）专用的中文标签与芯片样式。不进入发布站。 */
-import type { Coverage, Rule } from '@tokenroll/joplo-core';
+import type { Coverage, Rule } from '@joplo-app/core';
 
 export const COVERAGE_LABEL: Record<Coverage['status'], { text: string; cls: string; hint: string }> = {
   expressed: { text: '已表达', cls: 'border-[#1c5fb8] bg-[#eef4ff] text-[#1c5fb8]', hint: '方案中有演示场景表达了这个情况（不代表业务已确认正确）' },

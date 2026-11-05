@@ -10,8 +10,8 @@
     "joplo": "tsx packages/cli/src/bin.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "web:dev": "pnpm --filter @tokenroll/joplo-web dev",
-    "web:build": "pnpm --filter @tokenroll/joplo-web build",
+    "web:dev": "pnpm --filter @joplo-app/web dev",
+    "web:build": "pnpm --filter @joplo-app/web build",
     "web:serve": "tsx packages/server/scripts/serve.ts",
     "docs:screenshots": "tsx packages/server/scripts/render-docs.ts",
     "build:packages": "pnpm -r --filter \"./packages/*\" run build",
@@ -25,7 +25,7 @@
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vitest": "5.1.0",
-    "@tokenroll/joplo-kit": "workspace:*",
-    "@tokenroll/joplo-core": "workspace:*"
+    "@joplo-app/kit": "workspace:*",
+    "@joplo-app/core": "workspace:*"
   }
 }

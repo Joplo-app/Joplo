@@ -3,10 +3,10 @@
  * select 动作接受 value 或 label、自动字幕读 label —— 都由 core 计算，渲染器与回放共用。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@tokenroll/joplo-kit/ui';
-import { config, feature, flow, layout, option, page, set, $, Outlet, Slot } from '@tokenroll/joplo-kit';
-import { jsx } from '@tokenroll/joplo-kit/jsx-runtime';
-import { COMPONENT } from '@tokenroll/joplo-kit/node';
+import * as ui from '@joplo-app/kit/ui';
+import { config, feature, flow, layout, option, page, set, $, Outlet, Slot } from '@joplo-app/kit';
+import { jsx } from '@joplo-app/kit/jsx-runtime';
+import { COMPONENT } from '@joplo-app/kit/node';
 import {
   COMPONENT_DOCS,
   COMPONENT_TYPES,
@@ -33,7 +33,7 @@ const HTML = new Set(['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'main', 'secti
 const kitExport = (name: string): unknown => name.split('.').reduce<any>((o, k) => (o == null ? undefined : o[k]), ui);
 
 describe('目录是唯一来源', () => {
-  it('COMPONENT_TYPES 与 @tokenroll/joplo-kit/ui 的导出一一对应（复合组件用点语法）', () => {
+  it('COMPONENT_TYPES 与 @joplo-app/kit/ui 的导出一一对应（复合组件用点语法）', () => {
     for (const t of COMPONENT_TYPES) {
       if (t === '#text' || HTML.has(t)) continue;
       const fn = kitExport(t) as Record<symbol, unknown> | undefined;

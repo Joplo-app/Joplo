@@ -1,4 +1,4 @@
-import { feature, question, rule } from '@tokenroll/joplo-kit';
+import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
   name: '团队成员邀请',

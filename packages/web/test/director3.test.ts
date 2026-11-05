@@ -3,10 +3,10 @@
  * 解说卡已改为画面下方的字幕区（见 subtitle.test.ts）。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@tokenroll/joplo-kit/ui';
-import { config, feature, flow, layer, option, page, set, shot, $ } from '@tokenroll/joplo-kit';
-import { jsx } from '@tokenroll/joplo-kit/jsx-runtime';
-import { cameraAt, compile, type AuthoringProject } from '@tokenroll/joplo-core';
+import * as ui from '@joplo-app/kit/ui';
+import { config, feature, flow, layer, option, page, set, shot, $ } from '@joplo-app/kit';
+import { jsx } from '@joplo-app/kit/jsx-runtime';
+import { cameraAt, compile, type AuthoringProject } from '@joplo-app/core';
 import { cameraFor, cameraPosition } from '../src/player/cameraFor';
 
 

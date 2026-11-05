@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { config } from '@tokenroll/joplo-kit';
+import { config } from '@joplo-app/kit';
 import { BUILTIN_THEMES, compile, type AuthoringProject } from '../src/index.ts';
 import { discoverFiles, loadThemes } from '../src/load.ts';
 

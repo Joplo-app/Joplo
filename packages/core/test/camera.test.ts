@@ -4,9 +4,9 @@
  * 各层共享同一份状态；没有 layers 的方案行为不变；属性值为 undefined 时当作没写。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@tokenroll/joplo-kit/ui';
-import { config, explain, feature, flow, layer, option, page, set, shot, Slot, $ } from '@tokenroll/joplo-kit';
-import { jsx } from '@tokenroll/joplo-kit/jsx-runtime';
+import * as ui from '@joplo-app/kit/ui';
+import { config, explain, feature, flow, layer, option, page, set, shot, Slot, $ } from '@joplo-app/kit';
+import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { DIRECTOR_LAYER, PAGE_LAYER, cameraAt, compile, displaySceneId, explainClick, findNode, isNodeVisible, layersOf, layersWithNode, replay, stateAt, stepTouchesLayer, validate, type AuthoringProject } from '../src/index.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });

@@ -1,5 +1,5 @@
 /**
- * @tokenroll/joplo-kit：Agent 创作 Joplo 项目时调用的 SDK。
+ * @joplo-app/kit：Agent 创作 Joplo 项目时调用的 SDK。
  *
  *   joplo.config.ts            config({...})
  *   layouts/<id>.tsx           layout(<div>…<Outlet/>…</div>)

@@ -1,5 +1,5 @@
-import { $, done, eq, flow, option, set, uses } from '@tokenroll/joplo-kit';
-import { Box, Button, Group, Paper, SegmentedControl, SimpleGrid, Stack, Text } from '@tokenroll/joplo-kit/ui';
+import { $, done, eq, flow, option, set, uses } from '@joplo-app/kit';
+import { Box, Button, Group, Paper, SegmentedControl, SimpleGrid, Stack, Text } from '@joplo-app/kit/ui';
 
 import { authorCode, backendLayer, clientLayer, header, step, stepBar, viewsState } from '../../../shared/views.tsx';
 

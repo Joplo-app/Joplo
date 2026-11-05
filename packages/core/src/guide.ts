@@ -54,7 +54,7 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
   return [
     '# Joplo 组件：components',
     '',
-    '从 @tokenroll/joplo-kit/ui 导入组件；下面的名称取自当前编译器目录，不能任意添加组件。',
+    '从 @joplo-app/kit/ui 导入组件；下面的名称取自当前编译器目录，不能任意添加组件。',
     '有属性提示时附在名称后；没有提示时仅列名称。HTML 标签直接写 JSX，不从 ui 导入。',
     '',
     '## 组件目录',
@@ -85,8 +85,8 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - features/<f>/feature.ts：功能目标、情况、共享规则、待决问题、pick。
 - features/<f>/options/<o>.tsx：一个方案、路径堆叠、初始状态和场景。
 - 功能目录内可自由组织复用数据或模块，供上述文件 import。
-- 数据 API 从 @tokenroll/joplo-kit 导入，组件从 @tokenroll/joplo-kit/ui 导入。
-- tsconfig 使用 jsx: 'react-jsxdev'、jsxImportSource: '@tokenroll/joplo-kit'、allowImportingTsExtensions: true。
+- 数据 API 从 @joplo-app/kit 导入，组件从 @joplo-app/kit/ui 导入。
+- tsconfig 使用 jsx: 'react-jsxdev'、jsxImportSource: '@joplo-app/kit'、allowImportingTsExtensions: true。
 
 ## 数据 API
 - config({ name, description?, theme?: 'sketch'|'clean', layout?, home? })。
@@ -136,7 +136,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
   demo: `# Joplo 好演示：demo
 
 一步只讲一件事：用独立的层级分开视角，用镜头放大细节，用短字幕点出本步发生了什么。
-基础目录、状态与 flow 语法读 authoring；这里的 layer、shot、trace、explain 从 @tokenroll/joplo-kit 导入。
+基础目录、状态与 flow 语法读 authoring；这里的 layer、shot、trace、explain 从 @joplo-app/kit 导入。
 
 ## 层级是独立页面
 - 在 option 中声明 layers: { client: layer('客户端视角', <ClientView/>), backend: layer('后端流转', <Diagram>…</Diagram>) }。

@@ -1,5 +1,5 @@
-import { $, done, eq, flow, not, option, set, toast, uses } from '@tokenroll/joplo-kit';
-import { Alert, Badge, Button, Center, Code, Divider, Group, NavLink, Paper, Stack, Text, Title } from '@tokenroll/joplo-kit/ui';
+import { $, done, eq, flow, not, option, set, toast, uses } from '@joplo-app/kit';
+import { Alert, Badge, Button, Center, Code, Divider, Group, NavLink, Paper, Stack, Text, Title } from '@joplo-app/kit/ui';
 
 /** 一行功能：名称、目标、方案数、选定方案、缺口，右侧「查看」。 */
 const FeatureRow = (p: { id: string; name: string; goal: string; options: string; pick: string; gaps: string; unmodeled?: boolean }) => (

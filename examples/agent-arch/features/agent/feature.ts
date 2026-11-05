@@ -1,4 +1,4 @@
-import { feature, question, rule } from '@tokenroll/joplo-kit';
+import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
   name: '一次 Agent 任务的完整链路',

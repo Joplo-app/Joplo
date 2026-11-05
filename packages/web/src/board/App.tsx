@@ -7,7 +7,7 @@
  * IR 首次通过 /__joplo/p/<id>/ir 载入，之后由 HMR 推送；编译出错时显示错误并保留上一次成功的画面。
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import type { Diagnostic } from '@tokenroll/joplo-core';
+import type { Diagnostic } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
 import { boardHash, parseBoardHash, type BoardRoute, type PlayRoute } from '../runtime/route';

@@ -1,5 +1,5 @@
 /**
- * 组件目录 v3（@tokenroll/joplo-core catalog，名称与属性对齐 Mantine，D35）中每个类型的低保真实现。
+ * 组件目录 v3（@joplo-app/core catalog，名称与属性对齐 Mantine，D35）中每个类型的低保真实现。
  * 运行时不引入 Mantine：手绘主题用 Rough 描边与手写字体，线框主题用 1px 边框。
  *
  * - 每个节点的根 DOM 带 data-jid / data-jtype / data-jat（= node.source，用于“选中 → 文件:行号”）。
@@ -33,7 +33,7 @@ import {
   type Scene,
   type SceneNode,
   type ShellLayout,
-} from '@tokenroll/joplo-core';
+} from '@joplo-app/core';
 import { cn } from '@/lib/utils';
 import { Rough, RoughPath, roundRectPath, useStageTheme, useStroke } from './rough';
 import { DESC_FONT, EDGE_FONT, FOCUS_EDGE_FONT, FOCUS_MOVE_MS, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, diagramStructure, edgeEmphasized, effectiveState, focusLayout, focusMembers, type FocusLayout, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';

@@ -179,6 +179,7 @@
   - 本地 CLI 保持开源、完整、免费；收费点放在只有云端才能提供的能力上（托管、永久链接、观看数据、评论回流、方案确认、分享页一键导出）。
   - 云端代码放在单独的私有仓库 `Joplo-app/joplo-cloud`（本地 `~/.paradev/projects/joplo-cloud`），它有自己的决策记录 `docs/decisions.md`。
 - D53 仓库迁到 Joplo-app 组织（2026-11-05，用户要求）：开源的 `Joplo-app/Joplo` 和私有的 `Joplo-app/joplo-cloud` 都从 TokenRollAI 迁到 `Joplo-app`；TokenRollAI 只保留纯开源项目。npm 包仍在 `@tokenroll` 作用域下（D38），各包的 repository 字段改为新地址，下次发布时生效。
+- D54 npm 作用域改为 `@joplo-app`（2026-11-05，用户决定；取代 D38 的 `@tokenroll/joplo-*`）：包名为 `@joplo-app/kit`、`/core`、`/cli`、`/server`、`/web`，入口包仍是 `joplo`。作者项目写 `import … from '@joplo-app/kit'`，tsconfig 写 `jsxImportSource: "@joplo-app/kit"`。版本统一为 0.1.1。npm 组织 `joplo-app` 由用户创建；已发布的 `@tokenroll/joplo-*@0.1.0` 之后标记为 deprecated，指向新包名。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

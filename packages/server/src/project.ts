@@ -3,8 +3,8 @@
  * dev（看板、截图）与 build（发布站）共用这一条路径。
  */
 import path from 'node:path';
-import { compile, type Diagnostic, type Project } from '@tokenroll/joplo-core';
-import { discoverFiles, loadAuthoring } from '@tokenroll/joplo-core/node';
+import { compile, type Diagnostic, type Project } from '@joplo-app/core';
+import { discoverFiles, loadAuthoring } from '@joplo-app/core/node';
 import type { ViteDevServer } from 'vite';
 import { isProjectSource } from './vite-shared.ts';
 

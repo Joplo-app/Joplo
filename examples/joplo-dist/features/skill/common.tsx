@@ -1,5 +1,5 @@
-import { $, done, flow, uses, type Bind, type CondExpr } from '@tokenroll/joplo-kit';
-import { ChatMessage, ToolCall } from '@tokenroll/joplo-kit/ui';
+import { $, done, flow, uses, type Bind, type CondExpr } from '@joplo-app/kit';
+import { ChatMessage, ToolCall } from '@joplo-app/kit/ui';
 
 import { Cmd } from '../../shared/term.tsx';
 import { ask, run } from '../../shared/steps.ts';

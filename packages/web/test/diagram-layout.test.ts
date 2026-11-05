@@ -3,7 +3,7 @@
  * 连线不穿过节点；分组框包住它的节点、不压到别的节点。
  */
 import { describe, expect, it } from 'vitest';
-import type { SceneNode } from '@tokenroll/joplo-core';
+import type { SceneNode } from '@joplo-app/core';
 import { diagramStructure, edgePath, layoutDiagram, structureKey, type Box, type Point } from '../src/renderer/diagram-layout';
 
 const N = (id: string, label: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'Diagram.Node', props: { label, ...extra } });

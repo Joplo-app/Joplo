@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { CameraLayer, contentBounds, useCamera, type CameraSpec } from './camera';
 import { clampPan, wheelFactor, zoomAt, type View } from './camera-math';
 import { AnimatePresence, motion } from 'motion/react';
-import { VIEWPORT_SIZE, diagramStateAt, type PlayState, type Project, type Toast } from '@tokenroll/joplo-core';
+import { VIEWPORT_SIZE, diagramStateAt, type PlayState, type Project, type Toast } from '@joplo-app/core';
 import { RenderContext, RenderNode, type RenderMode } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 import { strokeOfTheme } from './themes';

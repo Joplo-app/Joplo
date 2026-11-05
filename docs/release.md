@@ -4,18 +4,18 @@
 
 | 包 | 作用 | 发布内容 |
 | --- | --- | --- |
-| `joplo` | 命令入口：检查 Node ≥ 22，优先转发给项目内的 `@tokenroll/joplo-cli` | `bin/joplo.cjs`、`lib/*.cjs` |
-| `@tokenroll/joplo-kit` | 创作 SDK 与 JSX 运行时（作者项目依赖它） | `dist/*.js` + `.d.ts` |
-| `@tokenroll/joplo-core` | 编译、校验、播放器 | `dist/*.js` + `.d.ts` |
-| `@tokenroll/joplo-server` | dev / build / render（Vite、Tailwind 是运行时依赖；Playwright 是可选 peer） | `dist/*.js` + `.d.ts` |
-| `@tokenroll/joplo-cli` | 命令实现（命令名 `joplo-cli`） | `dist/*.js` + `.d.ts` |
-| `@tokenroll/joplo-web` | 预构建的看板与发布站、手绘字体及其 OFL 许可证 | `dist/`（约 13 MB） |
+| `joplo` | 命令入口：检查 Node ≥ 22，优先转发给项目内的 `@joplo-app/cli` | `bin/joplo.cjs`、`lib/*.cjs` |
+| `@joplo-app/kit` | 创作 SDK 与 JSX 运行时（作者项目依赖它） | `dist/*.js` + `.d.ts` |
+| `@joplo-app/core` | 编译、校验、播放器 | `dist/*.js` + `.d.ts` |
+| `@joplo-app/server` | dev / build / render（Vite、Tailwind 是运行时依赖；Playwright 是可选 peer） | `dist/*.js` + `.d.ts` |
+| `@joplo-app/cli` | 命令实现（命令名 `joplo-cli`） | `dist/*.js` + `.d.ts` |
+| `@joplo-app/web` | 预构建的看板与发布站、手绘字体及其 OFL 许可证 | `dist/`（约 13 MB） |
 
 仓库里各包的 `exports` 指向 `src/*.ts`（`pnpm joplo` 直接运行源码）；打包时 pnpm 用 `publishConfig` 覆盖为 `dist`，并把 `workspace:*` 替换成精确版本。
 
 ## 发布前需要用户决定
 
-- **许可证**：Apache-2.0（2026-11-05 用户决定）。根目录 `LICENSE`，每个包目录里各有一份副本，随 tarball 发布。字体（Excalifont、Xiaolai）是 SIL OFL 1.1，许可证随 `@tokenroll/joplo-web` 发布在 `dist/fonts/OFL.txt`。
+- **许可证**：Apache-2.0（2026-11-05 用户决定）。根目录 `LICENSE`，每个包目录里各有一份副本，随 tarball 发布。字体（Excalifont、Xiaolai）是 SIL OFL 1.1，许可证随 `@joplo-app/web` 发布在 `dist/fonts/OFL.txt`。
 - **发布时机**：A3 工作假设是先完成 Mantine 词汇切换（D35），再以 `beta` 标签发布 0.1.0。执行 `release:publish` 前向用户确认。
 
 ## 步骤
@@ -29,7 +29,7 @@ npm whoami                      # 应为有 joplo 组织发布权限的账号（
 pnpm release:publish            # = pnpm -r publish --access public --tag beta
 ```
 
-- `release:pack`：`pnpm -r build`（按依赖顺序：kit → core → web → server → cli）后逐包 `pnpm pack` 到 `release/`（已在 .gitignore），并检查每个 tarball：版本一致、内部依赖锁定为同一精确版本、没有 `workspace:`、exports/bin 指向的文件存在、不带源码与测试、`@tokenroll/joplo-web` 带字体许可证，最后列出文件数与体积。
+- `release:pack`：`pnpm -r build`（按依赖顺序：kit → core → web → server → cli）后逐包 `pnpm pack` 到 `release/`（已在 .gitignore），并检查每个 tarball：版本一致、内部依赖锁定为同一精确版本、没有 `workspace:`、exports/bin 指向的文件存在、不带源码与测试、`@joplo-app/web` 带字体许可证，最后列出文件数与体积。
 - `release:smoke`：先执行 `release:pack`，然后在系统临时目录（仓库外）：
   1. 只用 tarball 安装 `joplo`（相当于 `npx joplo@<版本>`），确认 `.bin/joplo` 指向入口包；模拟 Node 20 时只打印要求并退出 1；
   2. `joplo init my-demo`：最后一行是 npm 的下一步命令，package.json 锁定精确版本；再次 init 非空目录被拒绝；
@@ -46,10 +46,10 @@ pnpm release:publish            # = pnpm -r publish --access public --tag beta
 
 ## 运行时如何找到资源
 
-- `@tokenroll/joplo-server` 在 dist 形态下通过 `@tokenroll/joplo-web/package.json` 定位 `dist/manifest.json`，看板用 `dist/app/index.html` 作 Vite root，`/assets/*` 原样返回；构建时把看板源码里的 `import.meta.hot` 改写为 `globalThis.__JOPLO_HOT__`，dev 在页面里先用 `/@vite/client` 的 `createHotContext` 创建它，IR 推送（`joplo:ir`）因此照常工作。
+- `@joplo-app/server` 在 dist 形态下通过 `@joplo-app/web/package.json` 定位 `dist/manifest.json`，看板用 `dist/app/index.html` 作 Vite root，`/assets/*` 原样返回；构建时把看板源码里的 `import.meta.hot` 改写为 `globalThis.__JOPLO_HOT__`，dev 在页面里先用 `/@vite/client` 的 `createHotContext` 创建它，IR 推送（`joplo:ir`）因此照常工作。
 - 作者 className：`dist/project.css`（由 `src/index.css` 生成，`source(none)`）在运行时追加 `@source <项目目录>` 后由 Tailwind 编译；dev 里随项目文件热更新，build 里编译成 `assets/project-*.css` 并在 site.html 中引用。
-- 作者的 `@tokenroll/joplo-kit` 按项目依赖解析（与 check 用的 tsx 一致）；项目没装时退回 CLI 自带的 kit。
-- 在仓库里可用 `JOPLO_WEB=dist pnpm joplo dev …` 强制使用预构建资源（需先 `pnpm --filter @tokenroll/joplo-web build`）。
+- 作者的 `@joplo-app/kit` 按项目依赖解析（与 check 用的 tsx 一致）；项目没装时退回 CLI 自带的 kit。
+- 在仓库里可用 `JOPLO_WEB=dist pnpm joplo dev …` 强制使用预构建资源（需先 `pnpm --filter @joplo-app/web build`）。
 
 ## 以后：GitHub Actions + provenance
 

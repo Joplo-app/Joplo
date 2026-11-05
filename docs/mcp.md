@@ -75,7 +75,7 @@ apply 示例：
 
 所有写入调用同一个 core 内核，与 CLI 共享锁、幂等、引用检查和人工边界。不能确认规则、修改 decisions、关闭评论或修改项目元数据；评论作者只能是 agent，不能替人将 issue 标成 accepted/resolved；冲突要先重新读取，不自动覆盖。校验通过只表示结构/模拟回放状态。
 
-render 调用 `@tokenroll/joplo-server.renderStep`，将临时 PNG 编为 image content，返回元素索引后清理文件；不会返回失效的临时文件路径。当前分支 server 仍是桩，返回 RENDER_FAILED；成功图像接线已用 mock 验证，真实渲染由 T-web 接入。不注册 compare/export。
+render 调用 `@joplo-app/server.renderStep`，将临时 PNG 编为 image content，返回元素索引后清理文件；不会返回失效的临时文件路径。当前分支 server 仍是桩，返回 RENDER_FAILED；成功图像接线已用 mock 验证，真实渲染由 T-web 接入。不注册 compare/export。
 
 集成测试使用 SDK Client + StdioClientTransport，捕获原始 stdout，逐行断言 JSON-RPC 2.0，且没有 stderr/transport 错误。两个独立临时项目分别从 CLI 和 MCP 应用同一 patch，断言 changedIds、修订变化和场景内容相同；并比较 REVISION_CONFLICT、IDEMPOTENCY_MISMATCH、INVALID_SCHEMA、PERMISSION_DENIED。
 

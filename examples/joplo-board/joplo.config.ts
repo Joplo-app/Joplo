@@ -1,4 +1,4 @@
-import { config } from '@tokenroll/joplo-kit';
+import { config } from '@joplo-app/kit';
 
 export default config({
   name: 'Joplo 新界面：首页、演示页、设备外框',

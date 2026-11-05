@@ -1,5 +1,5 @@
 /**
- * 演示控制器（看板与发布站共用）。手动体验、逐步查看、自动播放只通过 @tokenroll/joplo-core 的
+ * 演示控制器（看板与发布站共用）。手动体验、逐步查看、自动播放只通过 @joplo-app/core 的
  * applyStep / stateAt / explainClick 推进状态；本文件只负责动画编排（鼠标、波纹、逐字输入、系统事件停留）和提示。
  *
  * 不变量：
@@ -14,7 +14,7 @@
  */
 import { animate, type AnimationPlaybackControls } from 'motion';
 import { stepDwell, CAMERA_MS } from './pace';
-import { explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@tokenroll/joplo-core';
+import { explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core';
 import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 
 /** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */

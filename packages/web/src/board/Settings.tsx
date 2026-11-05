@@ -5,7 +5,7 @@
  */
 import { useMemo, useState } from 'react';
 import { ArrowLeft, Check } from 'lucide-react';
-import { SCHEMA_VERSION, type PlayState, type Project, type Scene, type SceneNode } from '@tokenroll/joplo-core';
+import { SCHEMA_VERSION, type PlayState, type Project, type Scene, type SceneNode } from '@joplo-app/core';
 import { Stage } from '../renderer/Stage';
 import { ThemeStyles } from '../renderer/ThemeStyles';
 import { effectiveTheme, themeCatalog, type ThemeInfo } from '../renderer/themes';

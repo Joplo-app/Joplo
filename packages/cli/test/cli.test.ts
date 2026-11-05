@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { cp, mkdtemp, readFile, writeFile, mkdir, rm, symlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Selection } from '@tokenroll/joplo-core';
+import type { Selection } from '@joplo-app/core';
 const dirs: string[] = [];
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 async function temp(copy = true) {
@@ -79,7 +79,7 @@ test('init 后立即 check 通过，非空目录拒绝且保留内容', async ()
   const d = await temp(false); const target = join(d, 'new');
   expect((await cli(['init', target, '--name', '最小项目'])).code).toBe(0);
   expect((await cli(['check', target])).code).toBe(0);
-  expect(JSON.parse(await readFile(join(target, 'tsconfig.json'), 'utf8')).compilerOptions).toMatchObject({ jsx: 'react-jsxdev', jsxImportSource: '@tokenroll/joplo-kit', allowImportingTsExtensions: true });
+  expect(JSON.parse(await readFile(join(target, 'tsconfig.json'), 'utf8')).compilerOptions).toMatchObject({ jsx: 'react-jsxdev', jsxImportSource: '@joplo-app/kit', allowImportingTsExtensions: true });
   expect((await cli(['init', target])).code).toBe(1);
   expect(await readFile(join(target, '.gitignore'), 'utf8')).toContain('.joplo/');
   expect(await readFile(join(target, '.gitignore'), 'utf8')).toContain('exports/');

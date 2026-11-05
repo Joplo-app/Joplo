@@ -2,10 +2,10 @@
  * 两个方案共用的部分：架构图、客户端画面、核心块说明、步骤辅助函数。
  * v = 'a'：混合的手（端侧执行器 + 云端沙箱）；v = 'b'：所有工具都在云端沙箱。
  */
-import { $, layer, set, type Bind, type JNode } from '@tokenroll/joplo-kit';
+import { $, layer, set, type Bind, type JNode } from '@joplo-app/kit';
 import {
   ActionIcon, Alert, Box, Button, Card, Center, ChatMessage, Diagram, Group, Modal, Paper, PromptInput, SimpleGrid, Stack, Text, ToolCall,
-} from '@tokenroll/joplo-kit/ui';
+} from '@joplo-app/kit/ui';
 
 type V = 'a' | 'b';
 const ui = $.ui as unknown as Record<string, Bind>;

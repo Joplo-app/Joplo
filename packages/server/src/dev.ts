@@ -1,7 +1,7 @@
 /**
  * `joplo dev`：本机只运行一个看板进程（D39），同时服务多个项目。
  *
- * - 界面：一个 Vite 开发服务（packages/web 源码或 @tokenroll/joplo-web 的 dist），HMR。
+ * - 界面：一个 Vite 开发服务（packages/web 源码或 @joplo-app/web 的 dist），HMR。
  * - 项目：每个项目一个不监听端口的 Vite 加载器（middlewareMode），ssrLoadModule 载入作者 TSX →
  *   core.loadAuthoring → core.compile(…, 'dev')。项目按需编译：首页选中、打开演示页或注册时才启动。
  * - 热更新：界面服务的文件监听覆盖所有已启动的项目目录；某个项目的文件变化 → 只重新编译这个项目 →
@@ -19,7 +19,7 @@ import type http from 'node:http';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { createLogger, createServer, type Logger, type Plugin, type PluginOption, type ViteDevServer } from 'vite';
-import { JoploError, type Diagnostic, type Project } from '@tokenroll/joplo-core';
+import { JoploError, type Diagnostic, type Project } from '@joplo-app/core';
 import type { DevHandle, DevOptions } from './contract.ts';
 import { ExportHub, type ExportDeps } from './export.ts';
 import { Registry, clearServerInfo, joploHome, normalizeSettings, pidAlive, projectIdOf, readServerInfo, readSettings, writeServerInfo, writeSettings, type BoardSettings, type ProjectRecord } from './home.ts';
@@ -134,7 +134,7 @@ function serveDistAsset(web: DistWeb, pathname: string, res: http.ServerResponse
 /** dist 形态：在看板入口脚本之前创建 HMR 句柄、导入作者 className 的 CSS。 */
 export function injectDistBoot(html: string, web: DistWeb): string {
   const css = '/@fs/' + web.projectCss.split(path.sep).join('/').replace(/^\/+/, '');
-  const boot = `<script type="module">import { createHotContext } from '/@vite/client';\nimport ${JSON.stringify(css)};\nglobalThis.__JOPLO_HOT__ = createHotContext('/@tokenroll/joplo-board');</script>`;
+  const boot = `<script type="module">import { createHotContext } from '/@vite/client';\nimport ${JSON.stringify(css)};\nglobalThis.__JOPLO_HOT__ = createHotContext('/@joplo-app/board');</script>`;
   const at = html.search(/<script\b/i);
   return at < 0 ? html.replace('</head>', `${boot}\n</head>`) : html.slice(0, at) + boot + '\n    ' + html.slice(at);
 }
@@ -542,7 +542,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       web.mode === 'dist'
         ? { noDiscovery: true, include: [] }
         : {
-            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'clsx', 'tailwind-merge', '@dagrejs/dagre', 'modern-screenshot', '@tokenroll/joplo-core > zod'],
+            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'clsx', 'tailwind-merge', '@dagrejs/dagre', 'modern-screenshot', '@joplo-app/core > zod'],
           },
     server: {
       host: '127.0.0.1',

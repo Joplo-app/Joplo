@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright';
-import { JoploError, SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, type Project } from '@tokenroll/joplo-core';
+import { JoploError, SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, type Project } from '@joplo-app/core';
 import { launch, loadPlaywright, type PlaywrightModule } from './render.ts';
 
 export type Device = 'desktop' | 'mobile';

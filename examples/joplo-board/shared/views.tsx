@@ -2,10 +2,10 @@
  * 「视角与分镜」两个方案共用的部分：客户端层、后端层（用 Diagram 画）、步骤条、作者写法。
  * 样例场景取自 examples/agent-arch 的“整理本机的报销发票”，缩成 5 步。
  */
-import { $, set, type Bind, type JNode } from '@tokenroll/joplo-kit';
+import { $, set, type Bind, type JNode } from '@joplo-app/kit';
 import {
   Badge, Breadcrumbs, Anchor, ChatMessage, Code, Diagram, Group, Paper, Stack, Stepper, Text, ToolCall,
-} from '@tokenroll/joplo-kit/ui';
+} from '@joplo-app/kit/ui';
 
 const ui = $.ui as unknown as Record<string, Bind>;
 

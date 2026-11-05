@@ -9,8 +9,8 @@
 import { resolve } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { compile, type SceneNode } from '@tokenroll/joplo-core';
-import { loadAuthoring } from '@tokenroll/joplo-core/node';
+import { compile, type SceneNode } from '@joplo-app/core';
+import { loadAuthoring } from '@joplo-app/core/node';
 import { FOCUS_EDGE_FONT, diagramFocus, diagramStructure, edgeEmphasized, edgePath, focusLayout, focusMembers, interpolateNodes, layoutDiagram, lerpBox, textWidth, type Box, type DLayout, type DStructure, type Point } from '../src/renderer/diagram-layout';
 import { SP } from '../src/renderer/diagram-route';
 

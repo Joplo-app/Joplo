@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { Settings } from 'lucide-react';
-import type { Diagnostic, Project } from '@tokenroll/joplo-core';
+import type { Diagnostic, Project } from '@joplo-app/core';
 import { removeProject, type ProjectSummary } from '../runtime/dev-client';
 import { optionsOf } from '../runtime/views';
 import { Brand, TopBar } from '../player/PlayerPage';

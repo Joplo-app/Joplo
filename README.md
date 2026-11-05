@@ -41,7 +41,7 @@ Joplo 的做法：
 需要 Node.js 22+。发布到 npm 后（首个版本计划以 `beta` 标签发布 0.1.0，见 [docs/release.md](docs/release.md)），在任意目录：
 
 ```sh
-npx joplo@0.1.0 init my-demo          # 生成项目，package.json 锁定 "joplo" 与 "@tokenroll/joplo-kit" 的同一精确版本
+npx joplo@0.1.0 init my-demo          # 生成项目，package.json 锁定 "joplo" 与 "@joplo-app/kit" 的同一精确版本
 cd my-demo && npm install
 npx joplo dev                          # 看板：http://127.0.0.1:4790/
 ```
@@ -56,7 +56,7 @@ pnpm joplo guide                       # 直接运行 TS 源码，不需要构�
 pnpm release:smoke                     # 打包所有包，在仓库外只用 tarball 跑通 init → install → check → build → dev → selection
 ```
 
-仓库内的 `pnpm joplo` 把 `@tokenroll/joplo-kit` 解析到工作区源码，下文示例都在仓库根目录执行。不要改用 React 的 JSX runtime，否则会丢失 Joplo 数据和源位置。
+仓库内的 `pnpm joplo` 把 `@joplo-app/kit` 解析到工作区源码，下文示例都在仓库根目录执行。不要改用 React 的 JSX runtime，否则会丢失 Joplo 数据和源位置。
 
 ## Agent 按需读取用法
 
@@ -132,11 +132,11 @@ dist/                              构建产物（不进 Git）
 ## 仓库结构
 
 ```text
-packages/kit       @tokenroll/joplo-kit    创作 SDK：JSX 运行时、组件标记、builder（config/layout/page/feature/option/flow）
-packages/core      @tokenroll/joplo-core   加载与编译（TSX → IR v2）、schema、播放器状态机、校验器、guide
-packages/server    @tokenroll/joplo-server joplo dev（单进程 Vite 看板 + 热更新）、build（静态站）、render（截图）
-packages/web       @tokenroll/joplo-web    看板与发布站界面、低保真手绘渲染器（Rough.js + Excalifont/小赖字体 + Motion）
-packages/cli       @tokenroll/joplo-cli    joplo init / dev / check / selection / guide / build / render
+packages/kit       @joplo-app/kit    创作 SDK：JSX 运行时、组件标记、builder（config/layout/page/feature/option/flow）
+packages/core      @joplo-app/core   加载与编译（TSX → IR v2）、schema、播放器状态机、校验器、guide
+packages/server    @joplo-app/server joplo dev（单进程 Vite 看板 + 热更新）、build（静态站）、render（截图）
+packages/web       @joplo-app/web    看板与发布站界面、低保真手绘渲染器（Rough.js + Excalifont/小赖字体 + Motion）
+packages/cli       @joplo-app/cli    joplo init / dev / check / selection / guide / build / render
 examples/invite    当前格式的完整示例
 examples/_v1       M0 阶段 JSON 格式的归档（含“用 Joplo 设计 Joplo”的自迭代项目）
 docs/              CLI、看板、依赖许可证、ADR、截图

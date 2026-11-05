@@ -1,4 +1,4 @@
-import { feature, question, rule } from '@tokenroll/joplo-kit';
+import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
   name: '首页：项目与功能',

@@ -2,7 +2,7 @@
  * 组件目录 v3（D35）：名称与属性对齐 Mantine（数据表对齐 mantine-datatable），另加少量 AI 交互组件、
  * HTML 兜底标签和 Joplo 专用组件。复合组件用点语法：`<AppShell.Header>` 编译出的节点 type 就是 'AppShell.Header'。
  *
- * 目录是唯一来源：@tokenroll/joplo-kit/ui 的导出、渲染器（@tokenroll/joplo-web）的实现、COMPONENT_DOCS 都必须与 COMPONENT_TYPES 一致
+ * 目录是唯一来源：@joplo-app/kit/ui 的导出、渲染器（@joplo-app/web）的实现、COMPONENT_DOCS 都必须与 COMPONENT_TYPES 一致
  * （packages/core/test/catalog.test.ts 与渲染器的类型检查保证）。目录之外的名称在编译时报错，不会被静默渲染。
  * 只换词汇，不换渲染：运行时不引入 Mantine，仍由 Joplo 渲染成低保真风格。
  */

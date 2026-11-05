@@ -1,5 +1,5 @@
-import { $, done, explain, flow, layer, option, set, shot } from '@tokenroll/joplo-kit';
-import { Button, ChatMessage, Diagram, Paper, Placeholder, SimpleGrid, Stack, Text, ToolCall } from '@tokenroll/joplo-kit/ui';
+import { $, done, explain, flow, layer, option, set, shot } from '@joplo-app/kit';
+import { Button, ChatMessage, Diagram, Paper, Placeholder, SimpleGrid, Stack, Text, ToolCall } from '@joplo-app/kit/ui';
 
 /**
  * 每层是完全独立的画面（T-layers）：layer(title, <JSX/>) 自己的树、自己的布局，占满整个舞台；

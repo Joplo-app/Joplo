@@ -2,7 +2,7 @@
  * 看板与发布站资源在哪里（D36）。两种形态：
  *
  * - source：在仓库里从 TS 源码运行（`pnpm joplo …`、测试）。Vite 直接编译 packages/web/src，界面本身也能热更新。
- * - dist：从 npm 安装的包运行。资源是 @tokenroll/joplo-web 发包前预构建的 dist/（见 packages/web/scripts/build-dist.mjs），
+ * - dist：从 npm 安装的包运行。资源是 @joplo-app/web 发包前预构建的 dist/（见 packages/web/scripts/build-dist.mjs），
  *   运行时不读取 packages/web/src。作者的 className 用 dist/project.css 现场编译（Tailwind，@source 指向项目目录）。
  *
  * 选择规则：本文件以 .ts 运行且 packages/web/src 存在 → source；否则 dist。`JOPLO_WEB=dist` 可在仓库里强制 dist
@@ -13,7 +13,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Alias } from 'vite';
-import { JoploError } from '@tokenroll/joplo-core';
+import { JoploError } from '@joplo-app/core';
 
 export type SourceWeb = { mode: 'source'; webDir: string; indexCss: string; kitSrc: string };
 export type DistWeb = {
@@ -35,9 +35,9 @@ const REPO_WEB = path.resolve(import.meta.dirname, '../../web');
 const REPO_KIT = path.resolve(import.meta.dirname, '../../kit/src');
 
 const broken = (webDir: string, what: string) =>
-  new JoploError('NOT_FOUND', `@tokenroll/joplo-web（${webDir}）缺少预构建资源：${what}。请重新安装 joplo（npm install），或在 Joplo 仓库里运行 pnpm --filter @tokenroll/joplo-web build`);
+  new JoploError('NOT_FOUND', `@joplo-app/web（${webDir}）缺少预构建资源：${what}。请重新安装 joplo（npm install），或在 Joplo 仓库里运行 pnpm --filter @joplo-app/web build`);
 
-/** 读取并校验 @tokenroll/joplo-web 的 dist/manifest.json。 */
+/** 读取并校验 @joplo-app/web 的 dist/manifest.json。 */
 export function readWebDist(webDir: string): DistWeb {
   const dist = path.join(webDir, 'dist');
   const manifestFile = path.join(dist, 'manifest.json');
@@ -82,9 +82,9 @@ export function locateWebAssets(env?: Record<string, string | undefined>): WebAs
   else {
     let pkg: string;
     try {
-      pkg = require.resolve('@tokenroll/joplo-web/package.json');
+      pkg = require.resolve('@joplo-app/web/package.json');
     } catch {
-      throw new JoploError('NOT_FOUND', '找不到 @tokenroll/joplo-web（看板与发布站资源）。请重新安装 joplo（npm install）');
+      throw new JoploError('NOT_FOUND', '找不到 @joplo-app/web（看板与发布站资源）。请重新安装 joplo（npm install）');
     }
     out = readWebDist(path.dirname(fs.realpathSync(pkg)));
   }
@@ -92,10 +92,10 @@ export function locateWebAssets(env?: Record<string, string | undefined>): WebAs
   return out;
 }
 
-/** 作者 className 的 CSS 入口（source：packages/web/src/index.css；dist：@tokenroll/joplo-web/dist/project.css）。 */
+/** 作者 className 的 CSS 入口（source：packages/web/src/index.css；dist：@joplo-app/web/dist/project.css）。 */
 export const cssEntry = (web: WebAssets) => (web.mode === 'source' ? web.indexCss : web.projectCss);
 
-/** Tailwind 的 index.css，从 server 自己的依赖解析（pnpm 严格布局下 @tokenroll/joplo-web 没有 tailwindcss 依赖）。 */
+/** Tailwind 的 index.css，从 server 自己的依赖解析（pnpm 严格布局下 @joplo-app/web 没有 tailwindcss 依赖）。 */
 export function tailwindIndexCss(): string {
   return require.resolve('tailwindcss/index.css');
 }
@@ -115,24 +115,24 @@ export function findPackageJson(dir: string, name: string): string | null {
 const KIT_SUBPATHS = ['ui', 'node', 'jsx-runtime', 'jsx-dev-runtime'] as const;
 
 /**
- * 项目源文件里的 `@tokenroll/joplo-kit` 怎样解析：
+ * 项目源文件里的 `@joplo-app/kit` 怎样解析：
  * - source：指向仓库里的 kit 源码（项目可在任意目录，不需要自己的 node_modules）；`@/` 指向 web 源码。
- * - dist：项目装了 @tokenroll/joplo-kit 就按项目依赖解析（与 `joplo check` 用的 tsx 一致）；没装则退回 CLI 自带的 kit。
+ * - dist：项目装了 @joplo-app/kit 就按项目依赖解析（与 `joplo check` 用的 tsx 一致）；没装则退回 CLI 自带的 kit。
  */
 export function kitAliases(web: WebAssets, projectDir: string): Alias[] {
   if (web.mode === 'source')
     return [
-      { find: /^@tokenroll\/joplo-kit$/, replacement: path.join(web.kitSrc, 'index.ts') },
-      { find: /^@tokenroll\/joplo-kit\/(ui|node|jsx-runtime|jsx-dev-runtime)$/, replacement: path.join(web.kitSrc, '$1.ts') },
+      { find: /^@joplo-app\/kit$/, replacement: path.join(web.kitSrc, 'index.ts') },
+      { find: /^@joplo-app\/kit\/(ui|node|jsx-runtime|jsx-dev-runtime)$/, replacement: path.join(web.kitSrc, '$1.ts') },
       { find: /^@\//, replacement: path.join(web.webDir, 'src') + '/' },
     ];
-  if (findPackageJson(projectDir, '@tokenroll/joplo-kit')) return [];
-  const main = fileURLToPath(import.meta.resolve('@tokenroll/joplo-kit'));
-  const sub = fileURLToPath(import.meta.resolve(`@tokenroll/joplo-kit/${KIT_SUBPATHS[0]}`));
-  if (path.dirname(main) !== path.dirname(sub)) throw new JoploError('NOT_FOUND', `@tokenroll/joplo-kit 的入口不在同一目录：${main}、${sub}`);
+  if (findPackageJson(projectDir, '@joplo-app/kit')) return [];
+  const main = fileURLToPath(import.meta.resolve('@joplo-app/kit'));
+  const sub = fileURLToPath(import.meta.resolve(`@joplo-app/kit/${KIT_SUBPATHS[0]}`));
+  if (path.dirname(main) !== path.dirname(sub)) throw new JoploError('NOT_FOUND', `@joplo-app/kit 的入口不在同一目录：${main}、${sub}`);
   const ext = path.extname(main);
   return [
-    { find: /^@tokenroll\/joplo-kit$/, replacement: main },
-    { find: /^@tokenroll\/joplo-kit\/(ui|node|jsx-runtime|jsx-dev-runtime)$/, replacement: path.join(path.dirname(main), `$1${ext}`) },
+    { find: /^@joplo-app\/kit$/, replacement: main },
+    { find: /^@joplo-app\/kit\/(ui|node|jsx-runtime|jsx-dev-runtime)$/, replacement: path.join(path.dirname(main), `$1${ext}`) },
   ];
 }

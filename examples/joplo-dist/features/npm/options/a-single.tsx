@@ -1,5 +1,5 @@
-import { $, done, flow, notApplicable, option, undecided, uses } from '@tokenroll/joplo-kit';
-import { Badge, Card, Code, Group, Stack, Text, Title } from '@tokenroll/joplo-kit/ui';
+import { $, done, flow, notApplicable, option, undecided, uses } from '@joplo-app/kit';
+import { Badge, Card, Code, Group, Stack, Text, Title } from '@joplo-app/kit/ui';
 
 import { Cmd } from '../../../shared/term.tsx';
 import { run } from '../../../shared/steps.ts';
@@ -13,7 +13,7 @@ export default option({
   tradeoffs: [
     '用户只需要记住一个名字，项目里不会出现 CLI 与 SDK 版本错配',
     '包体积约 14 MB（大部分是中文手写字体），作者项目安装时一并下载',
-    '现有示例要把 @tokenroll/joplo-kit 改成 joplo、jsxImportSource 改成 "joplo"',
+    '现有示例要把 @joplo-app/kit 改成 joplo、jsxImportSource 改成 "joplo"',
   ],
 
   on: {

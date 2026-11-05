@@ -1,6 +1,6 @@
-import { $, done, flow, go, missing, not, option, page, push, rule, set, toast, uses } from '@tokenroll/joplo-kit';
+import { $, done, flow, go, missing, not, option, page, push, rule, set, toast, uses } from '@joplo-app/kit';
 import { members, pending } from '../sample.ts';
-import { Alert, Button, Card, DataTable, Select, Stack, Textarea, Title } from '@tokenroll/joplo-kit/ui';
+import { Alert, Button, Card, DataTable, Select, Stack, Textarea, Title } from '@joplo-app/kit/ui';
 
 export default option({
   name: 'B · 独立页面批量邀请',

@@ -2,7 +2,7 @@
  * 主题（D51）的纯计算：变量映射、作用范围前缀、主题解析（内置 + 作者，同名用作者的）、看板实际使用的主题。
  */
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_THEMES } from '@tokenroll/joplo-core';
+import { BUILTIN_THEMES } from '@joplo-app/core';
 import { BUILTIN, THEME_VARS, allThemesCss, builtinCss, effectiveTheme, isDark, parseThemeVars, scopeThemeCss, strokeOf, strokeOfTheme, themeCatalog, themeScope } from '../src/renderer/themes';
 
 describe('内置主题', () => {

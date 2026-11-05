@@ -1,6 +1,6 @@
 {
-  "name": "@tokenroll/joplo-core",
-  "version": "0.1.0",
+  "name": "@joplo-app/core",
+  "version": "0.1.1",
   "description": "Joplo 编译器、校验器与播放器（IR v2）",
   "license": "Apache-2.0",
   "type": "module",
@@ -17,7 +17,7 @@
     "prepublishOnly": "node ../../scripts/build-package.mjs"
   },
   "dependencies": {
-    "@tokenroll/joplo-kit": "workspace:*",
+    "@joplo-app/kit": "workspace:*",
     "zod": "4.6.7"
   },
   "engines": {

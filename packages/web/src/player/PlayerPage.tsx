@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Expand, Gauge, Maximize, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Shrink } from 'lucide-react';
-import { stepTouchesLayer, type Project, type Scenario } from '@tokenroll/joplo-core';
+import { stepTouchesLayer, type Project, type Scenario } from '@joplo-app/core';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
 import { Subtitle } from './Subtitle';

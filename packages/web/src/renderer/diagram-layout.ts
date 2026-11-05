@@ -10,7 +10,7 @@
  */
 import dagre from '@dagrejs/dagre';
 import { routeOrthogonal } from './diagram-route';
-import type { DiagramStates, SceneNode } from '@tokenroll/joplo-core';
+import type { DiagramStates, SceneNode } from '@joplo-app/core';
 
 export type Point = { x: number; y: number };
 export type Box = { x: number; y: number; w: number; h: number };

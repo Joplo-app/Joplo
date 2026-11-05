@@ -1,5 +1,5 @@
 /**
- * 启动时的版本一致性检查（D36）：CLI 发现项目里的 @tokenroll/joplo-kit 与自己版本不同、或项目声明了依赖却没安装时，
+ * 启动时的版本一致性检查（D36）：CLI 发现项目里的 @joplo-app/kit 与自己版本不同、或项目声明了依赖却没安装时，
  * 在 stderr 打印一行提示和对齐命令。只对读取项目源文件的命令（check / dev / build / render）检查；任何读取错误都不阻止命令运行。
  *
  * 版本来源：CLI 自己的 package.json（与 skill.ts 的 readCliVersion 同一位置：src/ 与 dist/ 都在包根下一层）。
@@ -52,14 +52,14 @@ export function projectNotes(dir: string, command: string | undefined, opts: { c
   const env = opts.env ?? process.env;
   const root = findPackageRoot(dir);
   const pm = detectPackageManager(env, root ?? undefined);
-  const kitFile = findUp(dir, '@tokenroll/joplo-kit');
+  const kitFile = findUp(dir, '@joplo-app/kit');
   if (kitFile) {
     const kit = readJson(kitFile)?.version;
     if (typeof kit !== 'string' || kit === cli) return [];
-    return [`! 项目里的 @tokenroll/joplo-kit 是 ${kit}，当前 CLI 是 ${cli}，两者需要同一版本。要对齐：${alignCommand(pm, cli)}`];
+    return [`! 项目里的 @joplo-app/kit 是 ${kit}，当前 CLI 是 ${cli}，两者需要同一版本。要对齐：${alignCommand(pm, cli)}`];
   }
   const pkg = root ? readJson(join(root, 'package.json')) : null;
   const deps = { ...(pkg?.dependencies as object | undefined), ...(pkg?.devDependencies as object | undefined) };
-  if (pkg && ('@tokenroll/joplo-kit' in deps || 'joplo' in deps)) return [`! 项目声明了 @tokenroll/joplo-kit，但还没有安装依赖，先运行：${pmCommands(pm).install}`];
+  if (pkg && ('@joplo-app/kit' in deps || 'joplo' in deps)) return [`! 项目声明了 @joplo-app/kit，但还没有安装依赖，先运行：${pmCommands(pm).install}`];
   return [];
 }

@@ -3,7 +3,7 @@
  * 全屏快捷键（isFullscreenKey）。界面（全屏、浮动控制淡出）由用户在浏览器里检查。
  */
 import { describe, expect, it } from 'vitest';
-import { SUBTITLE_HEIGHT, VIEWPORT_SIZE, type Scenario } from '@tokenroll/joplo-core';
+import { SUBTITLE_HEIGHT, VIEWPORT_SIZE, type Scenario } from '@joplo-app/core';
 import { fillStage } from '../src/player/fit';
 import { subtitleFor, subtitleHeight } from '../src/player/subtitle-content';
 import { isFullscreenKey } from '../src/player/fullscreen';

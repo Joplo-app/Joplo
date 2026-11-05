@@ -3,10 +3,10 @@
  * check 的 CAPTION_TOO_LONG / EXPLAIN_TOO_LONG 只提示、不改写作者的文字。界面由用户检查。
  */
 import { describe, expect, it } from 'vitest';
-import { CAPTION_MAX, EXPLAIN_MAX, SUBTITLE_HEIGHT, captionLength, compile, validate, type AuthoringProject, type Scenario } from '@tokenroll/joplo-core';
-import * as ui from '@tokenroll/joplo-kit/ui';
-import { config, explain, feature, flow, option, page, Slot } from '@tokenroll/joplo-kit';
-import { jsx } from '@tokenroll/joplo-kit/jsx-runtime';
+import { CAPTION_MAX, EXPLAIN_MAX, SUBTITLE_HEIGHT, captionLength, compile, validate, type AuthoringProject, type Scenario } from '@joplo-app/core';
+import * as ui from '@joplo-app/kit/ui';
+import { config, explain, feature, flow, option, page, Slot } from '@joplo-app/kit';
+import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { SUBTITLE_CAPTION_PX, SUBTITLE_EXPLAIN_PX, subtitleFor } from '../src/player/subtitle-content';
 
 const sc = {

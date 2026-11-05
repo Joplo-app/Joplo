@@ -1,5 +1,5 @@
-import { page, Slot } from '@tokenroll/joplo-kit';
-import { Terminal } from '@tokenroll/joplo-kit/ui';
+import { page, Slot } from '@joplo-app/kit';
+import { Terminal } from '@joplo-app/kit/ui';
 
 /** 终端窗口：方案把命令和输出堆叠到 lines 插槽，输入行所有方案共用。 */
 export default page(

@@ -7,7 +7,7 @@
  *   两个方向都只在不一致时动作，所以不会来回触发。
  */
 import { useEffect, useMemo } from 'react';
-import type { Coverage, Project } from '@tokenroll/joplo-core';
+import type { Coverage, Project } from '@joplo-app/core';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import type { PlayRoute } from '../runtime/route';
 import { optionsOf, scenariosOf } from '../runtime/views';

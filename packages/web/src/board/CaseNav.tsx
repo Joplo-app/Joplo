@@ -6,7 +6,7 @@
  * - 没有关联情况的场景单独列出；
  * - 底部：当前方案的缺口总数。
  */
-import type { Coverage, Project } from '@tokenroll/joplo-core';
+import type { Coverage, Project } from '@joplo-app/core';
 import { optionsOf, scenariosOf, shortName } from '../runtime/views';
 import { Segmented } from '../player/PlayerPage';
 import { cn } from '@/lib/utils';

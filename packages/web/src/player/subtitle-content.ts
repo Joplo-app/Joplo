@@ -7,7 +7,7 @@
  *   第二行没有 explain 时显示结果说明。步骤条不再有重复的说明与结果行。
  * - 高度按内容自适应（T-stage）：没有 explain 时只占一行，留出的空间还给舞台。
  */
-import type { PlayState, Scenario } from '@tokenroll/joplo-core';
+import type { PlayState, Scenario } from '@joplo-app/core';
 
 export const SUBTITLE_CAPTION_PX = 20;
 export const SUBTITLE_EXPLAIN_PX = 16;

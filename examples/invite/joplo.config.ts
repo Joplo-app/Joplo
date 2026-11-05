@@ -1,4 +1,4 @@
-import { config } from '@tokenroll/joplo-kit';
+import { config } from '@joplo-app/kit';
 
 export default config({
   name: '团队邀请功能',

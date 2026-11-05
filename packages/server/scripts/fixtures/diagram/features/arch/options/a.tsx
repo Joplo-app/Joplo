@@ -1,5 +1,5 @@
-import { $, done, flow, option, set } from '@tokenroll/joplo-kit';
-import { Diagram } from '@tokenroll/joplo-kit/ui';
+import { $, done, flow, option, set } from '@joplo-app/kit';
+import { Diagram } from '@joplo-app/kit/ui';
 
 export default option({
   name: 'A · 脑手分离',

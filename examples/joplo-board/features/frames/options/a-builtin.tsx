@@ -1,5 +1,5 @@
-import { $, done, flow, option, set, uses } from '@tokenroll/joplo-kit';
-import { Center, Code, Phone, SimpleGrid, Stack, Terminal, Text, Title } from '@tokenroll/joplo-kit/ui';
+import { $, done, flow, option, set, uses } from '@joplo-app/kit';
+import { Center, Code, Phone, SimpleGrid, Stack, Terminal, Text, Title } from '@joplo-app/kit/ui';
 
 const API =
   '<Terminal title="~/work">\n' +

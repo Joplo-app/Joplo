@@ -1,5 +1,5 @@
-import { layout, Outlet, Slot } from '@tokenroll/joplo-kit';
-import { AppShell, Burger, Group, NavLink, Title } from '@tokenroll/joplo-kit/ui';
+import { layout, Outlet, Slot } from '@joplo-app/kit';
+import { AppShell, Burger, Group, NavLink, Title } from '@joplo-app/kit/ui';
 
 /** 应用外壳：顶栏 + 左侧导航；窄于 sm 时导航收起，显示 Burger。 */
 export default layout(

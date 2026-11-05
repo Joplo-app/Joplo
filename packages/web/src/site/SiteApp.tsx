@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { domToBlob } from 'modern-screenshot';
-import type { Project } from '@tokenroll/joplo-core';
+import type { Project } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { parseSiteHash, siteHash, type PlayRoute, type SiteRoute } from '../runtime/route';
 import { scenariosOf } from '../runtime/views';

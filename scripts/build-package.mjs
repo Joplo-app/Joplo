@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 把一个 TS 包构建到 dist/（在包目录里运行：`pnpm --filter @tokenroll/joplo-core build`）。
+ * 把一个 TS 包构建到 dist/（在包目录里运行：`pnpm --filter @joplo-app/core build`）。
  *
  * - tsc -p tsconfig.build.json：输出 JS 与 .d.ts，`./x.ts` 导入改写为 `./x.js`（rewriteRelativeImportExtensions）。
  * - .d.ts 里的 `./x.ts` 导入同样改写为 `./x.js`（tsc 只改写 JS）。

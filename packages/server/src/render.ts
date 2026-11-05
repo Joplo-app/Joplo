@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Browser } from 'playwright';
-import { JoploError, SUBTITLE_HEIGHT, VIEWPORT_SIZE, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@tokenroll/joplo-core';
+import { JoploError, SUBTITLE_HEIGHT, VIEWPORT_SIZE, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
 import type { RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';

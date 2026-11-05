@@ -1,4 +1,4 @@
-import { $, done, flow, missing, option, rule, set, uses } from '@tokenroll/joplo-kit';
+import { $, done, flow, missing, option, rule, set, uses } from '@joplo-app/kit';
 
 import { Cmd } from '../../../shared/term.tsx';
 import { run } from '../../../shared/steps.ts';

@@ -9,7 +9,7 @@ import { runCli } from '../src/cli.ts';
 import { readCliVersion } from '../src/skill.ts';
 
 const serverImports = vi.hoisted(() => vi.fn());
-vi.mock('@tokenroll/joplo-server', () => { serverImports(); throw Error('读取主题时不应导入服务端模块'); });
+vi.mock('@joplo-app/server', () => { serverImports(); throw Error('读取主题时不应导入服务端模块'); });
 const dirs: string[] = [];
 afterEach(async () => { await Promise.all(dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
 async function temp(project = true) {

@@ -59,16 +59,16 @@ describe('各包的发布配置', () => {
 
   test('运行时依赖都在 dependencies；Playwright 是可选 peer；web 不带运行时依赖', () => {
     const server = pkgs.find((p) => p.dir === 'server')!.pkg;
-    for (const d of ['vite', 'tailwindcss', '@tailwindcss/vite', '@tokenroll/joplo-web', '@tokenroll/joplo-core', '@tokenroll/joplo-kit', 'zod']) expect(server.dependencies[d], d).toBeDefined();
+    for (const d of ['vite', 'tailwindcss', '@tailwindcss/vite', '@joplo-app/web', '@joplo-app/core', '@joplo-app/kit', 'zod']) expect(server.dependencies[d], d).toBeDefined();
     expect(server.dependencies.playwright).toBeUndefined();
     expect(server.peerDependenciesMeta?.playwright?.optional).toBe(true);
     const cli = pkgs.find((p) => p.dir === 'cli')!.pkg;
-    for (const d of ['tsx', 'commander', '@tokenroll/joplo-server', '@tokenroll/joplo-core']) expect(cli.dependencies[d], d).toBeDefined();
+    for (const d of ['tsx', 'commander', '@joplo-app/server', '@joplo-app/core']) expect(cli.dependencies[d], d).toBeDefined();
     expect(cli.publishConfig.bin).toEqual({ 'joplo-cli': './dist/bin.js' }); // 不能叫 joplo：会占掉入口包的 .bin/joplo
     const web = pkgs.find((p) => p.dir === 'web')!.pkg;
     expect(web.dependencies ?? {}).toEqual({});
     const joplo = pkgs.find((p) => p.dir === 'joplo')!.pkg;
-    expect(joplo.dependencies).toEqual({ '@tokenroll/joplo-cli': 'workspace:*' });
+    expect(joplo.dependencies).toEqual({ '@joplo-app/cli': 'workspace:*' });
     expect(joplo.bin).toEqual({ joplo: './bin/joplo.cjs' });
   });
 });

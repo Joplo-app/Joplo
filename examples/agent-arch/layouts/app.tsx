@@ -1,5 +1,5 @@
-import { layout, Outlet, Slot } from '@tokenroll/joplo-kit';
-import { AppShell, Group, Text, Title } from '@tokenroll/joplo-kit/ui';
+import { layout, Outlet, Slot } from '@joplo-app/kit';
+import { AppShell, Group, Text, Title } from '@joplo-app/kit/ui';
 
 export default layout(
   <AppShell header={{ height: 52 }} padding="md">

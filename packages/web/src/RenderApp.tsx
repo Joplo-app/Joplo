@@ -10,7 +10,7 @@
  *   .progress = { step, done, error } 供服务端读取进度。
  */
 import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, stateAt, type PlayState, type Project } from '@tokenroll/joplo-core';
+import { SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, stateAt, type PlayState, type Project } from '@joplo-app/core';
 import { fetchIR } from './runtime/dev-client';
 import { DemoController } from './runtime/demo';
 import { Stage, VIEWPORTS, type Viewport } from './renderer/Stage';

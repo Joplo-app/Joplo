@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { JoploError } from '@tokenroll/joplo-core';
+import { JoploError } from '@joplo-app/core';
 
 const SKILL_PATH = '.claude/skills/joplo/SKILL.md';
 const START = '<!-- joplo:start -->';
@@ -11,7 +11,7 @@ export type InstallSkillOptions = { force?: boolean; diff?: boolean; agentsMd?: 
 /** 每次运行从当前 CLI 的包元数据读取，不另存一份版本常量。 */
 export async function readCliVersion(file = new URL('../package.json', import.meta.url)): Promise<string> {
   const metadata: unknown = JSON.parse(await readFile(file, 'utf8'));
-  if (!metadata || typeof metadata !== 'object' || !('version' in metadata) || typeof metadata.version !== 'string' || !metadata.version.trim()) throw new JoploError('INVALID_SCHEMA', '无法从 @tokenroll/joplo-cli package.json 读取版本');
+  if (!metadata || typeof metadata !== 'object' || !('version' in metadata) || typeof metadata.version !== 'string' || !metadata.version.trim()) throw new JoploError('INVALID_SCHEMA', '无法从 @joplo-app/cli package.json 读取版本');
   return metadata.version;
 }
 

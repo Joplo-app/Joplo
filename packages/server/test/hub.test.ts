@@ -8,7 +8,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { JoploError } from '@tokenroll/joplo-core';
+import { JoploError } from '@joplo-app/core';
 import { createHub, startDev, type Hub } from '../src/dev.ts';
 import { Registry, projectIdOf, readServerInfo, serverInfoFile, writeServerInfo } from '../src/home.ts';
 import { loadPlaywright } from '../src/render.ts';
@@ -22,7 +22,7 @@ const copy = () => {
 };
 const minimal = (name: string) => {
   const d = tmp('joplo-min-');
-  fs.writeFileSync(path.join(d, 'joplo.config.ts'), `import { config } from '@tokenroll/joplo-kit';\nexport default config({ name: ${JSON.stringify(name)} });\n`);
+  fs.writeFileSync(path.join(d, 'joplo.config.ts'), `import { config } from '@joplo-app/kit';\nexport default config({ name: ${JSON.stringify(name)} });\n`);
   return d;
 };
 

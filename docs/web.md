@@ -18,8 +18,8 @@ pnpm web:serve path/to/project --port 4800 --open
 
 - **再次 `joplo dev`**：读 `<JOPLO_HOME>/server.json`（`{ port, pid, token }`，权限 0600）。pid 存活且 `GET /__joplo/ping` 返回同一个 pid 时，用令牌调用 `POST /__joplo/projects` 注册项目，打印项目链接后退出，退出码 0，不启动第二个进程。pid 已死或 ping 不通时清掉 server.json，按原来的方式启动；两个 `joplo dev` 同时启动、端口被抢时，后者改为加入前者。
 - **记住项目**：`<JOPLO_HOME>/projects.json`（`{ version: 1, projects: [{ dir, name, lastOpened }] }`，临时文件 + rename 原子写入），首页按最近打开排序。编译成功后用 config 的名称更新 `name`。移除只删记录，不碰项目目录。`JOPLO_HOME` 缺省为 `~/.joplo`；vitest、Playwright 与 `release:smoke` 都把它指向临时目录。
-- **看板界面**：一个 Vite 开发服务，root 是 `packages/web`（或 `@tokenroll/joplo-web` 的 dist），React + Tailwind，界面本身也支持 HMR。
-- **项目编译（按需）**：每个项目一个不监听端口的 Vite 加载器（middlewareMode，不开 HMR / WebSocket）。首页选中、打开演示页或注册时才启动。项目源文件用 `ssrLoadModule` 载入，插件 `joplo:project` 用 automatic JSX、`jsxImportSource: '@tokenroll/joplo-kit'`、development 模式转译，因此 jsxDEV 能拿到 `文件:行:列`，随后交给 core 的 `loadAuthoring` + `compile(…, 'dev')`。
+- **看板界面**：一个 Vite 开发服务，root 是 `packages/web`（或 `@joplo-app/web` 的 dist），React + Tailwind，界面本身也支持 HMR。
+- **项目编译（按需）**：每个项目一个不监听端口的 Vite 加载器（middlewareMode，不开 HMR / WebSocket）。首页选中、打开演示页或注册时才启动。项目源文件用 `ssrLoadModule` 载入，插件 `joplo:project` 用 automatic JSX、`jsxImportSource: '@joplo-app/kit'`、development 模式转译，因此 jsxDEV 能拿到 `文件:行:列`，随后交给 core 的 `loadAuthoring` + `compile(…, 'dev')`。
 - **热更新**：界面服务的文件监听覆盖所有已启动的项目目录（`.joplo/`、`dist/`、`node_modules/`、`.git/` 除外）。某个项目的文件变化只重新编译这个项目，并通过 HMR 自定义事件 `joplo:ir`（带 `projectId`）推送，看板只接收当前项目的事件。页面不刷新，保持方案、场景、位置（越界时夹到合法范围）和选中。编译是串行的，编译过程中又有变化时，结束后再编一次。项目列表变化通过 `joplo:projects` 推送。
 
 - **Tailwind**：所有已启动的项目目录都追加为 `index.css` 的 `@source`，项目源文件里出现的 `className` 能被编译，并随文件变化热更新。build 同样如此。
