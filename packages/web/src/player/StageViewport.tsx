@@ -10,8 +10,9 @@ import { VIEWPORTS, type Viewport } from '../renderer/Stage';
 import { PhoneFrame, phoneFrameSize } from '../renderer/components';
 import { ThemeContext, type StageTheme, type StrokeMode } from '../renderer/rough';
 import { fillStage, fitStage } from './fit';
+import type { AppearanceFont } from '../renderer/appearance';
 
-export function StageViewport({ viewport, notice, onDismiss, children, tag, theme = 'sketch', stroke = 'rough' }: { viewport: Viewport; notice: Notice | null; onDismiss: () => void; children: (size: { width: number; height: number }) => ReactNode; tag?: ReactNode; theme?: StageTheme; stroke?: StrokeMode }) {
+export function StageViewport({ viewport, notice, onDismiss, children, tag, theme = 'sketch', stroke = 'rough', font = null }: { viewport: Viewport; notice: Notice | null; onDismiss: () => void; children: (size: { width: number; height: number }) => ReactNode; tag?: ReactNode; theme?: StageTheme; stroke?: StrokeMode; font?: AppearanceFont | null }) {
   const box = useRef<HTMLDivElement>(null);
   const [avail, setAvail] = useState({ w: 800, h: 500 });
   useLayoutEffect(() => {
@@ -47,7 +48,7 @@ export function StageViewport({ viewport, notice, onDismiss, children, tag, them
       ) : null}
       <div className="absolute inset-0 flex items-center justify-center">
         {phone ? (
-          <ThemeContext.Provider value={{ theme, stroke, registry: null }}>
+          <ThemeContext.Provider value={{ theme, stroke, font, registry: null }}>
             <div data-testid="device-phone">
               <PhoneFrame width={vp.width} height={vp.height} scale={scale} seed="stage-phone">
                 {children(size)}

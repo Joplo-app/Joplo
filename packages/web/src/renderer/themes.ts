@@ -306,12 +306,19 @@ export function allThemesCss(authorThemes: Record<string, string> = {}): string 
 }
 
 /**
- * 看板里实际使用的主题（纯函数）：本项目的覆盖 > 全局选择 > 项目配置的默认主题。
- * 项目覆盖写 null 表示“恢复为项目默认”（即使有全局选择也用项目配置的主题）。
+ * 看板设置里某个外观字段的取值（纯函数，D51 / D55）：本项目的覆盖 > 全局选择；都没有写时 set = false。
+ * 项目覆盖里写了 null 也算“写了”（主题：恢复为项目默认；字体、线条：跟随主题），即使有全局选择也不用它。
  */
-export type ThemeSettings = { theme?: string | null; projects?: Record<string, { theme?: string | null }> };
-export function effectiveTheme(settings: ThemeSettings | null | undefined, projectId: string | null, configTheme: string): string {
+export type ThemeSettings = { theme?: string | null; font?: unknown; stroke?: unknown; projects?: Record<string, { theme?: string | null; font?: unknown; stroke?: unknown }> };
+export function settingValue(settings: ThemeSettings | null | undefined, projectId: string | null, key: 'theme' | 'font' | 'stroke'): { set: boolean; value: unknown } {
   const p = projectId ? settings?.projects?.[projectId] : undefined;
-  if (p && 'theme' in p) return p.theme ?? configTheme;
-  return settings?.theme ?? configTheme;
+  if (p && typeof p === 'object' && key in p) return { set: true, value: (p as Record<string, unknown>)[key] ?? null };
+  if (settings && typeof settings === 'object' && key in settings) return { set: true, value: (settings as Record<string, unknown>)[key] ?? null };
+  return { set: false, value: null };
+}
+
+/** 看板里实际使用的主题：本项目的覆盖 > 全局选择 > 项目配置的默认主题（null = 恢复为项目默认）。 */
+export function effectiveTheme(settings: ThemeSettings | null | undefined, projectId: string | null, configTheme: string): string {
+  const v = settingValue(settings, projectId, 'theme').value;
+  return typeof v === 'string' ? v : configTheme;
 }

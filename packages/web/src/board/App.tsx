@@ -1,7 +1,8 @@
 /**
  * 本地看板（`joplo dev`，D39）：一个进程、多个项目。
- * - 首页 `#/`、`#/<项目>`：最近打开的项目与所选项目的功能（Home.tsx）；左栏底部是设置入口。
- * - 设置 `#/settings[/<项目>]`：主题（Settings.tsx，D51），选择记在 <JOPLO_HOME>/settings.json。
+ * - 首页 `#/`、`#/<项目>`：最近打开的项目与所选项目的功能（Home.tsx）；顶栏的「外观」改所有项目的默认外观。
+ * - 旧的设置页 `#/settings[/<项目>]`（D51）：跳转到首页并打开外观浮层（所有项目范围，D55）。
+ * - 外观（D55）：配色 / 字体 / 线条，记在 <JOPLO_HOME>/settings.json；读取见 appearance-model.ts 的 effectiveAppearance。
  * - 演示页 `#/<项目>/f/<功能>?o=&c=&s=&step=&d=`：同发布站的布局（PlayerPage），另有按情况分组的左栏与缺口、
  *   ⌥+单击检查抽屉、导出图片 / 视频、在编辑器中打开。所有状态都在 hash 里。
  * IR 首次通过 /__joplo/p/<id>/ir 载入，之后由 HMR 推送；编译出错时显示错误并保留上一次成功的画面。
@@ -11,8 +12,7 @@ import type { Diagnostic } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
 import { boardHash, parseBoardHash, type BoardRoute, type PlayRoute } from '../runtime/route';
-import type { StageTheme } from '../renderer/rough';
-import { Code, Film, ImageDown, LayoutGrid, Link, Palette, ScanSearch } from 'lucide-react';
+import { Code, Film, ImageDown, LayoutGrid, Link, ScanSearch } from 'lucide-react';
 import { PlayerPage, useBoardLayout, type MenuEntry } from '../player/PlayerPage';
 import { Btn, Kbd } from '../player/controls';
 import type { ProjectSummary } from '../runtime/dev-client';
@@ -25,10 +25,28 @@ import { InspectDrawer } from './InspectDrawer';
 import { VideoDialog } from './VideoDialog';
 import { COVERAGE_LABEL } from './labels';
 import { useProjectIR, useProjects } from './hooks';
-import { SettingsPage } from './Settings';
 import { useBoardSettings } from './useSettings';
-import { effectiveTheme } from '../renderer/themes';
+import { themeCatalog } from '../renderer/themes';
 import { ThemeStyles } from '../renderer/ThemeStyles';
+import type { Look } from '../renderer/appearance';
+import { AppearanceButton, AppearancePopover } from './Appearance';
+import { effectiveAppearance } from './appearance-model';
+
+/**
+ * 外观状态（D55）：已保存的外观（读取点）+ 悬停预览（不保存）。消费者拿到的是 look（预览优先）；
+ * 导出用 saved（预览只是临时看一眼）。
+ */
+function useAppearance(projectId: string | null, configTheme: string, authorThemes: Record<string, string>) {
+  const { settings, save } = useBoardSettings();
+  const key = JSON.stringify(authorThemes);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const catalog = useMemo(() => themeCatalog(authorThemes), [key]);
+  const saved = effectiveAppearance(settings, projectId, configTheme, catalog.map((t) => t.name));
+  const [preview, setPreview] = useState<Look | null>(null);
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
+  return { settings, save, catalog, saved, look: preview ?? saved, setPreview, open, setOpen, anchor, setAnchor };
+}
 
 export function BoardApp() {
   const [hash, go] = useHash();
@@ -36,19 +54,55 @@ export function BoardApp() {
   const { list, error } = useProjects();
   const navigate = (r: BoardRoute, replace = false) => go(boardHash(r), replace);
 
+  // 旧的设置页：跳到首页并打开外观浮层（所有项目范围）
+  const [openAppearance, setOpenAppearance] = useState(false);
+  useEffect(() => {
+    if (route.kind !== 'settings') return;
+    setOpenAppearance(true);
+    navigate({ kind: 'home', ...(route.projectId ? { projectId: route.projectId } : {}) }, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.kind]);
+
   if (route.kind === 'play') return <BoardPlayer key={route.projectId} projectId={route.projectId} play={route.play} navigate={navigate} projects={list} />;
-  if (route.kind === 'settings')
-    return <SettingsPage projectId={route.projectId ?? null} projects={list} onBack={() => (history.length > 1 ? history.back() : navigate({ kind: 'home', ...(route.projectId ? { projectId: route.projectId } : {}) }))} />;
-  const selected = route.projectId && list?.some((p) => p.id === route.projectId) ? route.projectId : (list?.[0]?.id ?? null);
+  const homeProject = route.kind === 'home' ? route.projectId : route.projectId;
+  const selected = homeProject && list?.some((p) => p.id === homeProject) ? homeProject : (list?.[0]?.id ?? null);
   return (
-    <Home
+    <BoardHome
       projects={list}
       error={error}
-      selectedId={selected}
+      selected={selected}
+      openAppearance={openAppearance}
+      onAppearanceOpened={() => setOpenAppearance(false)}
       onSelect={(id) => navigate({ kind: 'home', projectId: id })}
       onView={(projectId, featureId) => navigate({ kind: 'play', projectId, play: { featureId } })}
-      onSettings={() => navigate({ kind: 'settings', ...(selected ? { projectId: selected } : {}) })}
     />
+  );
+}
+
+/** 首页 + 外观（所有项目范围）。 */
+function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpened, onSelect, onView }: { projects: ProjectSummary[] | null; error: string | null; selected: string | null; openAppearance: boolean; onAppearanceOpened: () => void; onSelect: (id: string) => void; onView: (projectId: string, featureId: string) => void }) {
+  const a = useAppearance(null, 'sketch', {});
+  const L = useBoardLayout();
+  const [flash, setFlash] = useFlash();
+  useEffect(() => {
+    if (openAppearance && a.anchor) {
+      a.setOpen(true);
+      onAppearanceOpened();
+    }
+  }, [openAppearance, a.anchor]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <Home
+        projects={projects}
+        error={error}
+        selectedId={selected}
+        onSelect={onSelect}
+        onView={onView}
+        flash={flash}
+        right={<AppearanceButton look={a.saved} catalog={a.catalog} wide={L.topLabels} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} />}
+      />
+      <AppearancePopover open={a.open} anchor={a.anchor} onClose={() => a.setOpen(false)} scope="all" projectId={null} configTheme="sketch" catalog={a.catalog} settings={a.settings} look={a.saved} save={a.save} onPreview={() => undefined} onFlash={setFlash} copy={copyText} />
+    </>
   );
 }
 
@@ -78,9 +132,9 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   const ir = useProjectIR(projectId);
   const ctl = useMemo(() => new DemoController(selectionWriter(projectId)), [projectId]);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
-  // 主题（D51）：本项目的覆盖 > 所有项目的选择 > 项目 config 的默认主题；在设置页改，立即生效
-  const { settings } = useBoardSettings();
-  const theme: StageTheme = effectiveTheme(settings, projectId, ir.payload?.project?.theme ?? 'sketch');
+  // 外观（D51 / D55）：本项目 > 所有项目 > 项目 config；在外观浮层里改，立即生效；悬停时临时预览
+  const a = useAppearance(projectId, ir.payload?.project?.theme ?? 'sketch', ir.payload?.project?.themes ?? {});
+  const theme = a.look.theme;
   const [drawer, setDrawer] = useState(false);
   const [video, setVideo] = useState(false);
   const [flash, setFlash] = useFlash();
@@ -139,7 +193,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
       onClick: () => {
         if (!scenario || !state) return;
         setFlash('正在生成图片…');
-        void exportImage(projectId, { scenarioId: scenario.id, position: state.position, theme }).then((r) => {
+        void exportImage(projectId, { scenarioId: scenario.id, position: state.position, ...a.saved }).then((r) => {
           if (r.ok) {
             downloadBlob(r.blob, r.name);
             setFlash(`已下载 ${r.name}`);
@@ -224,7 +278,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             >
               {L.topLabels ? <Kbd>⌥</Kbd> : null}
             </Btn>
-            <Btn icon={<Palette className="size-4" />} label={`外观 · ${theme}`} iconOnly={!L.topLabels} title="外观" kbd="T" onClick={() => navigate({ kind: 'settings', projectId })} data-testid="appearance" />
+            <AppearanceButton look={a.saved} catalog={a.catalog} wide={L.topLabels} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} />
           </>
         }
         inspectMode={inspectMode}
@@ -239,6 +293,8 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           toPlay(l ? { ...rest, layer: l } : rest, true);
         }}
         theme={theme}
+        font={a.look.font}
+        stroke={a.look.stroke}
         nav={
           <CaseNav
             project={project}
@@ -278,7 +334,8 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
                 onOpenEditor={(at) => void openInEditor(projectId, at).then((r) => setFlash(r.ok ? `已在编辑器中打开 ${at}` : `无法打开编辑器：${r.message}`))}
               />
             ) : null}
-            {video && scenario ? <VideoDialog projectId={projectId} scenarioId={scenario.id} scenarioName={scenario.name} theme={theme} onClose={() => setVideo(false)} /> : null}
+            {video && scenario ? <VideoDialog projectId={projectId} scenarioId={scenario.id} scenarioName={scenario.name} look={a.saved} onClose={() => setVideo(false)} /> : null}
+            <AppearancePopover open={a.open} anchor={a.anchor} onClose={() => a.setOpen(false)} scope="project" projectId={projectId} configTheme={project.theme ?? 'sketch'} catalog={a.catalog} settings={a.settings} look={a.saved} save={a.save} onPreview={a.setPreview} onFlash={setFlash} copy={copyText} />
           </>
         }
       />

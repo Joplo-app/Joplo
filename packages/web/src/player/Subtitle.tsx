@@ -5,18 +5,20 @@
  */
 import { cn } from '@/lib/utils';
 import type { StageTheme } from '../renderer/rough';
+import { fontStyle, type AppearanceFont } from '../renderer/appearance';
 import { MOCK_CLS } from './labels';
 import { SUBTITLE_CAPTION_PX, SUBTITLE_EXPLAIN_PX, SUBTITLE_PAD_Y, subtitleHeight, type SubtitleContent } from './subtitle-content';
 
 const clamp = (lines: number) => ({ display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' });
 
-export function Subtitle({ content, theme, width, framed = false, fixedHeight, dark = false, divider = false }: { content: SubtitleContent | null; theme: StageTheme; width?: number | string; framed?: boolean; fixedHeight?: number; dark?: boolean; /** 上沿一条细线（看板的舞台框里，画面和字幕之间）。 */ divider?: boolean }) {
+export function Subtitle({ content, theme, width, framed = false, fixedHeight, dark = false, divider = false, font = null }: { content: SubtitleContent | null; theme: StageTheme; /** 字体（D55）：null = 跟随主题。 */ font?: AppearanceFont | null; width?: number | string; framed?: boolean; fixedHeight?: number; dark?: boolean; /** 上沿一条细线（看板的舞台框里，画面和字幕之间）。 */ divider?: boolean }) {
   const badge = content?.badge;
   return (
     <div
       className={cn('jsubtitle jtheme flex shrink-0 items-center gap-4 overflow-hidden px-4 text-[var(--jp-ink)]', dark ? 'bg-[var(--jp-bg)]' : 'bg-[var(--jp-surface)]', !framed && !dark && 'rounded-lg border border-[var(--jp-line)]', divider && 'border-t border-[var(--jp-line)]')}
-      style={{ height: fixedHeight ?? subtitleHeight(content), width: width ?? '100%', paddingTop: SUBTITLE_PAD_Y, paddingBottom: SUBTITLE_PAD_Y }}
+      style={{ ...fontStyle(font), height: fixedHeight ?? subtitleHeight(content), width: width ?? '100%', paddingTop: SUBTITLE_PAD_Y, paddingBottom: SUBTITLE_PAD_Y }}
       data-theme={theme}
+      data-font={font ?? undefined}
       data-testid="subtitle"
       data-jsubtitle=""
       title={content?.title}

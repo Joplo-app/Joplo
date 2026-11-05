@@ -35,7 +35,8 @@ import {
   type ShellLayout,
 } from '@joplo-app/core';
 import { cn } from '@/lib/utils';
-import { Rough, RoughPath, roundRectPath, useStageTheme, useStroke } from './rough';
+import { Rough, RoughPath, ThemeContext, roundRectPath, useStageTheme, useStroke } from './rough';
+import { fontStyle } from './appearance';
 import { DESC_FONT, EDGE_FONT, FOCUS_EDGE_FONT, FOCUS_MOVE_MS, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, diagramStructure, edgeEmphasized, effectiveState, focusLayout, focusMembers, type FocusLayout, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
 import { ACCENT, BG, DANGER, onFill, DIMMED, FONT, INFO, INK, INK2, LINE, LINE_STRONG, MONO, OK, SOFT, SPACING, SUBTLE, SURFACE, TITLE_SIZE, WARN, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf, tint } from './style';
 
@@ -1625,6 +1626,7 @@ export function phoneFrameSize(width: number, height: number) {
 export function PhoneFrame({ width, height, scale = 1, children, seed = 'phone' }: { width: number; height: number; scale?: number; children: ReactNode; seed?: string }) {
   const mode = useStroke();
   const theme = useStageTheme();
+  const font = useContext(ThemeContext).font;
   const sketch = mode === 'rough';
   const screenW = width + PHONE_SAFE.x * 2;
   const screenH = height + PHONE_SAFE.top + PHONE_SAFE.bottom;
@@ -1634,7 +1636,7 @@ export function PhoneFrame({ width, height, scale = 1, children, seed = 'phone' 
   const size = phoneFrameSize(width, height);
   return (
     // 舞台外的手机外框也跟随主题（.jtheme 在主题的作用范围里）
-    <div className="jtheme" style={{ width: size.width * scale, height: size.height * scale, position: 'relative', flexShrink: 0 }} data-jphone-frame="" data-theme={theme} data-stroke={mode}>
+    <div className="jtheme" style={{ width: size.width * scale, height: size.height * scale, position: 'relative', flexShrink: 0, ...fontStyle(font) }} data-jphone-frame="" data-theme={theme} data-stroke={mode} data-font={font ?? undefined}>
       <div style={{ position: 'absolute', left: 4, top: 0, width: W, height: H, transform: scale === 1 ? undefined : `scale(${scale})`, transformOrigin: '0 0' }}>
         {PHONE_BUTTONS.map((b, i) => (
           <div

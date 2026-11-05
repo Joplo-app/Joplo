@@ -11,6 +11,7 @@ import type { Options } from 'roughjs/bin/core';
 export type StageTheme = string;
 export type { StrokeMode } from './themes';
 import type { StrokeMode } from './themes';
+import type { AppearanceFont } from '@joplo-app/core';
 
 /** FNV-1a 32 位哈希，映射为正整数种子。 */
 export function seedOf(id: string): number {
@@ -39,7 +40,8 @@ export class RoughRegistry {
   }
 }
 
-export const ThemeContext = createContext<{ theme: StageTheme; stroke?: StrokeMode; registry: RoughRegistry | null }>({ theme: 'sketch', stroke: 'rough', registry: null });
+/** 舞台外观（D51 / D55）：主题、实际线条、字体覆盖（null = 跟随主题）。舞台外的 .jtheme 部件（手机外框）也读它。 */
+export const ThemeContext = createContext<{ theme: StageTheme; stroke?: StrokeMode; font?: AppearanceFont | null; registry: RoughRegistry | null }>({ theme: 'sketch', stroke: 'rough', font: null, registry: null });
 export const useStageTheme = () => useContext(ThemeContext).theme;
 /** 描边方式：rough = 手绘描边；clean = 细线边框（由主题的 --jp-stroke 决定）。 */
 export const useStroke = (): StrokeMode => useContext(ThemeContext).stroke ?? 'rough';

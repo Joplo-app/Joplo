@@ -5,7 +5,7 @@
  * - 推送：Vite HMR 自定义事件 `joplo:ir`（带 projectId，只接收当前项目的）与 `joplo:projects`（列表变化）。
  * - 写：选中、移除项目、打开编辑器、导出 —— 都带本地令牌（页面 meta），服务端另校验 Origin。
  */
-import type { Diagnostic, Project, Selection } from '@joplo-app/core';
+import type { AppearanceFont, AppearanceStroke, Diagnostic, Project, Selection } from '@joplo-app/core';
 import type { SelectionInput, SelectionWriteResult } from './demo';
 
 export type DevPayload = { projectId?: string; version: number; ok: boolean; project: Project | null; diagnostics: Diagnostic[]; home: string | null };
@@ -156,7 +156,7 @@ export async function openInEditor(projectId: string, at: string): Promise<{ ok:
 }
 
 /** 导出跟随页面自己的 viewport（D44：不再选择设备）。 */
-export type ExportRequest = { scenarioId: string; position: number; theme: string };
+export type ExportRequest = { scenarioId: string; position: number; theme: string; /** D55：null = 跟随主题。 */ font?: AppearanceFont | null; stroke?: AppearanceStroke | null };
 
 /** 本机导出图片：服务端用 Playwright 渲染当前步骤（与 joplo render 同一渲染路径）。 */
 export async function exportImage(projectId: string, body: ExportRequest): Promise<{ ok: true; blob: Blob; name: string } | { ok: false; message: string }> {
@@ -211,8 +211,10 @@ export function watchVideo(projectId: string, cb: (job: VideoJob | null) => void
   return () => ac.abort();
 }
 
-// ---------- 看板设置（D51）：主题选择，存于 <JOPLO_HOME>/settings.json ----------
-export type BoardSettings = { version: 1; theme?: string | null; projects?: Record<string, { theme: string | null }> };
+// ---------- 看板设置（D51 / D55）：外观（配色 / 字体 / 线条），存于 <JOPLO_HOME>/settings.json ----------
+/** 与服务端 home.ts 的 BoardSettings 一致；字段不存在 = 没有设置，null 见 appearance-model.ts。 */
+export type AppearanceOverride = { theme?: string | null; font?: AppearanceFont | null; stroke?: AppearanceStroke | null };
+export type BoardSettings = { version: 1 } & AppearanceOverride & { projects?: Record<string, AppearanceOverride> };
 
 export async function fetchSettings(): Promise<BoardSettings> {
   try {

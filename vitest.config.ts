@@ -7,6 +7,8 @@ import { defineConfig } from 'vitest/config';
 const JOPLO_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-home-vitest-'));
 
 export default defineConfig({
+  // web 包的 `@/` 别名（与 packages/web/vite.config.ts 一致）：组件的渲染测试需要
+  resolve: { alias: { '@': path.resolve(import.meta.dirname, 'packages/web/src') } },
   test: {
     include: ['packages/*/test/**/*.test.ts', 'scripts/test/**/*.test.ts'],
     env: { JOPLO_HOME },

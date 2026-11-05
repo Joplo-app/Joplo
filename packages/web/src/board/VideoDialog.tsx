@@ -5,11 +5,11 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { startVideo, watchVideo, type VideoJob } from '../runtime/dev-client';
-import type { StageTheme } from '../renderer/rough';
+import type { Look } from '../renderer/appearance';
 
 const PHASE: Record<VideoJob['phase'], string> = { starting: '正在启动浏览器…', recording: '正在录制', saving: '正在保存…', done: '已完成', error: '失败' };
 
-export function VideoDialog({ projectId, scenarioId, scenarioName, theme, onClose }: { projectId: string; scenarioId: string; scenarioName: string; theme: StageTheme; onClose: () => void }) {
+export function VideoDialog({ projectId, scenarioId, scenarioName, look, onClose }: { projectId: string; scenarioId: string; scenarioName: string; /** 外观（D55）：主题、字体、线条，透传给导出。 */ look: Look; onClose: () => void }) {
   const [job, setJob] = useState<VideoJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [watching, setWatching] = useState(0);
@@ -26,7 +26,7 @@ export function VideoDialog({ projectId, scenarioId, scenarioName, theme, onClos
   const running = job?.status === 'running';
   const start = async () => {
     setError(null);
-    const r = await startVideo(projectId, { scenarioId, theme });
+    const r = await startVideo(projectId, { scenarioId, ...look });
     if (r.ok) setJob(r.job);
     else if (r.job) setJob(r.job);
     else return setError(r.message);

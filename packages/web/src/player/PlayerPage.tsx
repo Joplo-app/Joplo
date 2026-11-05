@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 import { JoploLogo } from './JoploMark';
 import { Overlay } from './Overlay';
 import { StageViewport } from './StageViewport';
-import { strokeOfTheme } from '../renderer/themes';
+import { resolveLook, type AppearanceFont, type AppearanceStroke } from '../renderer/appearance';
 import { Btn, DirectorTag, MenuButton, Segmented, Switch, useWidth, type MenuEntry } from './controls';
 import { fullscreenBarCollapse } from './controls-fit';
 import { useTip } from './popover';
@@ -269,6 +269,10 @@ export type PlayerPageProps = {
   crumbs: Crumb[];
   onBrand: () => void;
   theme: StageTheme;
+  /** 字体（D55，看板外观）：null / 缺省 = 跟随主题。发布站不传。 */
+  font?: AppearanceFont | null;
+  /** 线条（D55，看板外观）：null / 缺省 = 跟随主题。发布站不传。 */
+  stroke?: AppearanceStroke | null;
   /** 手动选的层级（D43）；null = 导演跟随每一步的导演层。 */
   layer: string | null;
   /** 切换层级：传层级 id 表示手动看这一层（导演关闭）；传 null 表示打开导演。 */
@@ -388,6 +392,8 @@ export function PlayerPage(p: PlayerPageProps) {
   // 全屏控制条所在的一行（宽度决定收起哪些控件）
   const [barRowRef, barRowW] = useWidth(1200);
   const hasStage = !!(state && shownScene);
+  // 外观（D55）：舞台、字幕、手机外框用同一套（线条落到 rough / clean，字体覆盖 --jp-font）
+  const look = resolveLook({ theme: p.theme, font: p.font ?? null, stroke: p.stroke ?? null }, project.themes ?? {});
 
   const zoomIn = () => zoomApi.current?.zoomBy(1.25);
   const zoomOut = () => zoomApi.current?.zoomBy(1 / 1.25);
@@ -408,13 +414,15 @@ export function PlayerPage(p: PlayerPageProps) {
   const stageArea = (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {hasStage ? (
-        <StageViewport viewport={device} theme={p.theme} stroke={strokeOfTheme(p.theme, project.themes ?? {})} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
+        <StageViewport viewport={device} theme={p.theme} stroke={look.stroke} font={look.font} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
           {(size) => (
             <Stage
               viewportOverride={device === 'mobile' ? null : size}
               project={project}
               state={state!}
               theme={p.theme}
+              font={p.font ?? null}
+              stroke={p.stroke ?? null}
               camera={camera}
               sceneId={plan.sceneId}
               zoom={{ resetKey: zoomReset, onApi: onZoomApi, onChange: (v) => setUserZoom(v ? v.k : null) }}
@@ -464,7 +472,7 @@ export function PlayerPage(p: PlayerPageProps) {
             </div>
           ) : null}
         </main>
-        {scenario ? <Subtitle content={subtitle} theme={p.theme} framed dark /> : null}
+        {scenario ? <Subtitle content={subtitle} theme={p.theme} font={look.font} framed dark /> : null}
         <div ref={barRowRef} className="flex h-16 shrink-0 items-center justify-center px-6">
           {scenario ? (
             <div className={cn('flex max-w-full justify-center transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')} data-visible={idle.visible ? '' : undefined} onMouseMove={idle.poke}>
@@ -518,7 +526,7 @@ export function PlayerPage(p: PlayerPageProps) {
             {/* 舞台框：画面和字幕合成一体（1.5px 墨线，圆角 10）；字幕区跟随舞台主题 */}
             <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface', hasLayerBar && 'rounded-tl-none')} data-testid="stage-frame" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
               {stageArea}
-              {scenario ? <Subtitle content={subtitle} theme={p.theme} framed divider /> : null}
+              {scenario ? <Subtitle content={subtitle} theme={p.theme} font={look.font} framed divider /> : null}
             </div>
           </div>
           <Dock snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} L={L} zoom={dockZoom} />
