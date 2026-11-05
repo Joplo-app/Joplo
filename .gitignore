@@ -8,3 +8,4 @@ examples/*/exports/
 packages/web/test-results/
 .done
 .blocked
+scratch/

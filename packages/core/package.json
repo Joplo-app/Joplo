@@ -4,14 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts"
   },
   "dependencies": {
-    "fs-native-extensions": "^1.5.3",
-    "proper-lockfile": "^4.1.2",
-    "zod": "4.6.7"
-  },
-  "devDependencies": {
-    "@types/proper-lockfile": "^4.1.4"
+    "zod": "4.6.7",
+    "@joplo/kit": "workspace:*"
   }
 }

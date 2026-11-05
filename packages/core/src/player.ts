@@ -170,6 +170,12 @@ function setPath(state: PlayState, path: string, value: unknown, mode: 'set' | '
  * 手动体验时，UI 也用它判断用户点击的是不是“当前步骤的目标”。
  */
 export function checkStep(project: Project, scenario: Scenario, state: PlayState, step: Step): Diagnostic | null {
+  const d = checkStepInner(project, scenario, state, step);
+  if (d && step.source) d.at = step.source;
+  return d;
+}
+
+function checkStepInner(project: Project, scenario: Scenario, state: PlayState, step: Step): Diagnostic | null {
   const ref = { kind: 'step', id: step.id, optionId: scenario.optionId, scenarioId: scenario.id, stepId: step.id };
   if (state.completed) return { severity: 'error', code: 'ALREADY_COMPLETED', message: `场景已结束，不能继续执行步骤 ${step.id}`, source: 'replay', ref };
   const a = step.action;
