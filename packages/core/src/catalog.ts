@@ -25,6 +25,8 @@ const STRUCTURE = [
   'Alert', 'Loader', 'Progress', 'RingProgress', 'Skeleton', 'Notification', 'Modal', 'Drawer',
   // AI 交互（Joplo 自有）
   'ChatMessage', 'ToolCall',
+  // 设备外框（Joplo 自有）：终端与手机
+  'Terminal', 'Terminal.Command', 'Terminal.Output', 'Phone',
   // HTML 兜底
   'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'main', 'section', 'header', 'footer', 'nav', 'aside', 'ul', 'ol', 'li', 'strong', 'em', 'small', 'code',
   // Joplo
@@ -37,7 +39,7 @@ const STRUCTURE = [
 const INTERACTIVE = [
   'Button', 'ActionIcon', 'CloseButton', 'Anchor', 'a', 'NavLink', 'Burger',
   'TextInput', 'PasswordInput', 'NumberInput', 'Textarea', 'Select', 'MultiSelect', 'Checkbox', 'Radio.Group', 'Switch',
-  'SegmentedControl', 'FileInput', 'Tabs', 'Tabs.Tab', 'Accordion.Control', 'Pagination', 'PromptInput',
+  'SegmentedControl', 'FileInput', 'Tabs', 'Tabs.Tab', 'Accordion.Control', 'Pagination', 'PromptInput', 'Terminal.Input',
 ] as const;
 
 export const COMPONENT_TYPES = [...STRUCTURE, ...INTERACTIVE] as const;
@@ -48,7 +50,7 @@ export const INTERACTIVE_TYPES: ReadonlySet<string> = new Set<string>(INTERACTIV
 /** 可接收输入值；type/select/toggle 动作写入 state.inputs[nodeId]。 */
 export const VALUE_TYPES: ReadonlySet<string> = new Set<string>([
   'TextInput', 'PasswordInput', 'NumberInput', 'Textarea', 'Select', 'MultiSelect', 'Checkbox', 'Radio.Group', 'Switch',
-  'SegmentedControl', 'FileInput', 'Tabs', 'Accordion', 'Pagination', 'PromptInput',
+  'SegmentedControl', 'FileInput', 'Tabs', 'Accordion', 'Pagination', 'PromptInput', 'Terminal.Input',
 ]);
 
 /** 只有 opened（兼容旧写法 open）为真时自身和子节点才可见的浮层。 */
@@ -124,6 +126,10 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Drawer: 'opened（门控）, title, position: left|right|top|bottom（默认 left）, size',
   ChatMessage: "from: 'user'|'assistant', name；子节点是消息内容（保留换行）",
   ToolCall: "title, state: 'running'|'done'|'error'；子节点是调用详情",
+  Terminal: 'title —— 终端窗口（命令行原型），子节点是 Terminal.Command / Terminal.Output / Terminal.Input；内容超出 h 或 mah 时内部滚动',
+  'Terminal.Command': 'prompt（默认 "$"）；子节点是命令文字',
+  'Terminal.Output': "tone: 'plain'|'ok'|'warn'|'error'（默认 plain）；子节点是输出文字（保留换行）",
+  Phone: 'scale（视觉缩放，默认 1）, h（屏幕高度，默认 844）—— 手机外框，子节点按手机宽度 390 排版，响应式断点按这个宽度计算；页面写 viewport: "mobile" 时舞台自动套上，不用写它',
   div: 'HTML 兜底，建议改用 Box/Stack/Group',
   span: 'HTML 兜底，建议改用 Text span',
   p: 'HTML 兜底，建议改用 Text',
@@ -170,6 +176,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'Accordion.Control': '可点击的标题（需要 id）',
   Pagination: 'total, value / defaultValue —— select 动作写入页码',
   PromptInput: 'placeholder —— AI 输入框，type 动作写入；发送按钮用 ActionIcon 或 Button',
+  'Terminal.Input': 'prompt（默认 "$"）, placeholder —— 终端里的输入行（需要 id），type 动作写入',
 };
 
 // ---------- 响应式（Mantine 默认断点，按舞台宽度取值） ----------
@@ -181,6 +188,11 @@ const BP_KEYS = ['base', 'xs', 'sm', 'md', 'lg', 'xl'] as const;
 
 /** 页面 viewport 对应的舞台尺寸。 */
 export const VIEWPORT_SIZE = { desktop: { width: 1280, height: 800 }, mobile: { width: 390, height: 844 } } as const;
+
+/** 子节点排版用的宽度：Phone 内部按手机宽度（响应式取值、visibleFrom / hiddenFrom、AppShell 收起都按它算），其余节点沿用外部宽度。 */
+export function childWidth(type: string, width: number): number {
+  return type === 'Phone' ? VIEWPORT_SIZE.mobile.width : width;
+}
 
 /** 是否为响应式对象 `{ base, sm, md }`：普通对象，至少一个键，且全部键都是断点名。 */
 export function isResponsive(v: unknown): v is Partial<Record<(typeof BP_KEYS)[number], unknown>> {

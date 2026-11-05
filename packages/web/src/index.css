@@ -185,7 +185,8 @@
 }
 
 /* rough 描边层：不进图层并加 !important，避免被组件库的 [&_svg]:size-* 等工具类改尺寸 */
-.jstage svg.jrough {
+.jstage svg.jrough,
+[data-jphone-frame] svg.jrough {
   position: absolute !important;
   inset: -1px !important;
   width: calc(100% + 2px) !important;

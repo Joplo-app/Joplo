@@ -121,6 +121,12 @@ export const ChatMessage = c('ChatMessage');
 export const ToolCall = c('ToolCall');
 export const PromptInput = c('PromptInput');
 
+// ---------- 设备外框（Joplo 自有） ----------
+/** 终端窗口：`<Terminal title="~/work"><Terminal.Command>npx joplo skill</Terminal.Command><Terminal.Output tone="ok">…</Terminal.Output></Terminal>`。 */
+export const Terminal = Object.assign(c('Terminal'), { Command: c('Terminal.Command'), Output: c('Terminal.Output'), Input: c('Terminal.Input') });
+/** 手机外框：子节点按手机宽度排版。页面写 viewport: 'mobile' 时舞台会自动套上，不用写它。 */
+export const Phone = c('Phone');
+
 // ---------- Joplo ----------
 export const Placeholder = c('Placeholder');
 export const Custom = c('Custom');

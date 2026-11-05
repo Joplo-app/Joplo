@@ -216,3 +216,74 @@ describe('Mantine 语义（编译 + 播放器）', () => {
     expect(compile(src, 'dev').diagnostics.map((d) => d.code)).toContain('ELEMENT_PROP');
   });
 });
+
+describe('设备外框：Terminal 与 Phone', () => {
+  /** 桌面页面里放一部 Phone（内部有 AppShell）和一个 Terminal（带输入行）。 */
+  function buildDevices(): Project {
+    const home = page(
+      { title: '外框' },
+      h(ui.Group, null,
+        h(ui.Text, { id: 'outside_wide', visibleFrom: 'md' }, '桌面才显示'),
+        h(ui.Phone, { id: 'phone', h: 600 },
+          h(ui.AppShell, { header: { height: 48 }, navbar: { width: 200, breakpoint: 'sm' } },
+            h(ui.AppShell.Header, null, h(ui.Burger, { id: 'p_burger', hiddenFrom: 'sm', unmodeled: true })),
+            h(ui.AppShell.Navbar, null, h(ui.NavLink, { id: 'p_nav', label: '导航', unmodeled: true })),
+            h(ui.AppShell.Main, null, h(ui.Text, { id: 'p_wide', visibleFrom: 'md' }, '手机里不显示'), h(ui.Text, { id: 'p_narrow', hiddenFrom: 'sm' }, '手机里显示')),
+          ),
+        ),
+        h(ui.Terminal, { id: 'term', title: '~/work' },
+          h(ui.Terminal.Command, { id: 'cmd' }, 'npx joplo skill'),
+          h(ui.Terminal.Output, { id: 'out', tone: 'ok', when: $.ui.ran }, '完成'),
+          h(ui.Terminal.Input, { id: 'cmd_in', placeholder: '输入命令' }),
+        ),
+      ),
+    );
+    const opt = option({
+      name: 'A',
+      idea: 'i',
+      on: {},
+      state: { ui: { ran: false } },
+      scenarios: { run: flow('运行命令', { start: '/' }).type('cmd_in', 'npx joplo skill').system('回车', set($.ui.ran, true)) },
+    });
+    const src: AuthoringProject = {
+      root: '/p',
+      config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
+      layouts: {},
+      routes: { '/': { ...home, ...F('routes/page.tsx') } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    };
+    const r = compile(src, 'dev');
+    expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    return r.project!;
+  }
+
+  it('复合组件编译为 Terminal.Command / Terminal.Output / Terminal.Input；Terminal.Input 是可操作的值类型', () => {
+    expect(INTERACTIVE_TYPES.has('Terminal.Input')).toBe(true);
+    expect(VALUE_TYPES.has('Terminal.Input')).toBe(true);
+    expect(INTERACTIVE_TYPES.has('Phone') || INTERACTIVE_TYPES.has('Terminal')).toBe(false);
+    const p = buildDevices();
+    const term = p.scenes['f.a@/']!.root.children!.find((c) => c.id === 'term')!;
+    expect(term.children!.map((c) => c.type)).toEqual(['Terminal.Command', 'Terminal.Output', 'Terminal.Input']);
+  });
+
+  it('type 动作写入 Terminal.Input；自动字幕读 placeholder', () => {
+    const p = buildDevices();
+    expect(replay(p, 'f.a.run').diagnostics).toEqual([]);
+    expect(p.scenarios['f.a.run']!.steps[0]!.caption).toBe('在「输入命令」中输入“npx joplo skill”');
+    expect(stateAt(p, 'f.a.run', 2).inputs).toEqual({ cmd_in: 'npx joplo skill' });
+  });
+
+  it('Phone 内部按手机宽度计算断点：visibleFrom / hiddenFrom 与 AppShell 收起；外部仍按页面宽度', () => {
+    const p = buildDevices();
+    const scene = p.scenes['f.a@/']!;
+    const s = initialState(p, 'f.a.run');
+    expect(isNodeVisible(scene, 'outside_wide', s)).toBe(true);
+    expect(isNodeVisible(scene, 'p_wide', s)).toBe(false);
+    expect(isNodeVisible(scene, 'p_narrow', s)).toBe(true);
+    expect(isNodeVisible(scene, 'p_burger', s)).toBe(true);
+    expect(isNodeVisible(scene, 'p_nav', s)).toBe(false);
+    // 页面本身是手机宽度时，Phone 内外都按 390
+    expect(isNodeVisible(scene, 'outside_wide', s, 390)).toBe(false);
+    expect(isNodeVisible(scene, 'p_narrow', s, 390)).toBe(true);
+  });
+});

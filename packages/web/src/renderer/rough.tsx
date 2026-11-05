@@ -38,7 +38,7 @@ export class RoughRegistry {
 export const ThemeContext = createContext<{ theme: StageTheme; registry: RoughRegistry | null }>({ theme: 'sketch', registry: null });
 export const useStageTheme = () => useContext(ThemeContext).theme;
 
-type Shape = 'rect' | 'ellipse' | 'underline' | 'line';
+type Shape = 'rect' | 'ellipse' | 'underline' | 'line' | 'roundrect';
 
 export type RoughProps = {
   seedKey: string;
@@ -50,12 +50,20 @@ export type RoughProps = {
   dashed?: boolean;
   roughness?: number;
   inset?: number;
+  /** shape 为 roundrect 时的圆角半径（px）。 */
+  radius?: number;
 };
+
+/** 圆角矩形的 SVG 路径（Rough 的 path 会把它画成手绘线条）。 */
+export function roundRectPath(x: number, y: number, w: number, h: number, r: number): string {
+  const k = Math.max(0, Math.min(r, w / 2, h / 2));
+  return `M${x + k},${y} H${x + w - k} A${k},${k} 0 0 1 ${x + w},${y + k} V${y + h - k} A${k},${k} 0 0 1 ${x + w - k},${y + h} H${x + k} A${k},${k} 0 0 1 ${x},${y + h - k} V${y + k} A${k},${k} 0 0 1 ${x + k},${y} Z`;
+}
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** 放在 position:relative 的盒子里，覆盖整个盒子绘制手绘边框。 */
-export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth = 1.3, fill, fillStyle = 'hachure', dashed, roughness = 1.1, inset = 2 }: RoughProps) {
+export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth = 1.3, fill, fillStyle = 'hachure', dashed, roughness = 1.1, inset = 2, radius = 0 }: RoughProps) {
   const { theme, registry } = useContext(ThemeContext);
   const ref = useRef<SVGSVGElement>(null);
 
@@ -93,6 +101,7 @@ export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth
       if (shape === 'ellipse') el = rc.ellipse(W / 2, H / 2, W - inset * 2, H - inset * 2, opts);
       else if (shape === 'underline') el = rc.line(inset, H - inset, W - inset, H - inset, opts);
       else if (shape === 'line') el = rc.line(inset, H / 2, W - inset, H / 2, opts);
+      else if (shape === 'roundrect') el = rc.path(roundRectPath(inset, inset, W - inset * 2, H - inset * 2, radius), opts);
       else el = rc.rectangle(inset, inset, W - inset * 2, H - inset * 2, opts);
       svg.appendChild(el);
       registry?.done(token);
@@ -104,7 +113,7 @@ export function Rough({ seedKey, shape = 'rect', stroke = '#1e1e1e', strokeWidth
       ro.disconnect();
       registry?.remove(token);
     };
-  }, [theme, registry, seedKey, shape, stroke, strokeWidth, fill, fillStyle, dashed, roughness, inset]);
+  }, [theme, registry, seedKey, shape, stroke, strokeWidth, fill, fillStyle, dashed, roughness, inset, radius]);
 
   if (theme !== 'sketch') return null;
   return <svg ref={ref} className="jrough" aria-hidden="true" xmlns={SVG_NS} preserveAspectRatio="none" />;
