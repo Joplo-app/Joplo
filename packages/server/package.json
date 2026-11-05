@@ -2,7 +2,7 @@
   "name": "@joplo/server",
   "version": "0.1.0",
   "description": "Joplo 本地服务：dev 看板、build 发布站、render 截图",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",

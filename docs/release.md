@@ -15,7 +15,7 @@
 
 ## 发布前需要用户决定
 
-- **许可证**：仓库还没有 LICENSE。各包 `license` 暂为统一占位 `"UNLICENSED"`（即保留所有权利，npm 上显示为不可使用）。决定后同时改：根目录 LICENSE 文件、六个 package.json 的 `license`、`scripts/release.mjs` 的 `LICENSE_PLACEHOLDER` 检查与 `scripts/test/release.test.ts`。字体（Excalifont、Xiaolai）是 SIL OFL 1.1，许可证随 `@joplo/web` 发布在 `dist/fonts/OFL.txt`，不受此影响。
+- **许可证**：Apache-2.0（2026-11-05 用户决定）。根目录 `LICENSE`，每个包目录里各有一份副本，随 tarball 发布。字体（Excalifont、Xiaolai）是 SIL OFL 1.1，许可证随 `@joplo/web` 发布在 `dist/fonts/OFL.txt`。
 - **发布时机**：A3 工作假设是先完成 Mantine 词汇切换（D35），再以 `beta` 标签发布 0.1.0。执行 `release:publish` 前向用户确认。
 
 ## 步骤

@@ -176,3 +176,7 @@ pnpm joplo check examples/invite --format json
 - AI 假设不能标为已确认。行为只写在 flow 中，不能写 `onClick` 或其他函数属性。
 - 作者的源文件会在本机加载、检查和构建时执行，所以导入别人的项目等同于运行别人的代码仓库。看板和发布站只消费编译后的 IR。
 - 旧的 apply/get/history/restore/mcp 命令已退役。首版直接编辑文件，用 Git 保存版本。
+
+## 许可证
+
+[Apache-2.0](LICENSE)。随看板发布的手绘字体 Excalifont 和小赖字体使用 SIL OFL 1.1 许可证。

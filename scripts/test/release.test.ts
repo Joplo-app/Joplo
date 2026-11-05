@@ -41,7 +41,7 @@ describe('各包的发布配置', () => {
 
   test('许可证是统一的占位（待用户决定）', () => {
     const licenses = new Set(pkgs.map((p) => p.pkg.license));
-    expect([...licenses]).toEqual(['UNLICENSED']);
+    expect([...licenses]).toEqual(['Apache-2.0']);
   });
 
   test('发布后的 exports 指向 dist 的 JS 与 .d.ts；仓库内仍指向源码', () => {

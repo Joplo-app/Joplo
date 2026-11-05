@@ -2,7 +2,7 @@
   "name": "@joplo/kit",
   "version": "0.1.0",
   "description": "Joplo 创作 SDK：组件、feature/option/flow 与 JSX 运行时（收集成数据，不作为 React 执行）",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",

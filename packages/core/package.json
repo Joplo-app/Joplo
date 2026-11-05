@@ -2,7 +2,7 @@
   "name": "@joplo/core",
   "version": "0.1.0",
   "description": "Joplo 编译器、校验器与播放器（IR v2）",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
