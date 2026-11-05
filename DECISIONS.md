@@ -109,6 +109,17 @@
   - 组件名与属性和 Mantine 一致：复合组件用点语法（`AppShell.Header`、`Tabs.Tab`），浮层用 `Modal`/`Drawer` 的 `opened`，数据表对齐 `mantine-datatable` 的 `records`/`columns`。AI 交互部分保留 Joplo 自己的少量组件。
   - 只换词汇，不换渲染：仍由 Joplo 渲染成低保真手绘风格，不在运行时引入 Mantine。行为是数据、不执行作者代码的原则不变。
   - 状态：已决定，尚未实现。第一个已推送版本仍是 shadcn 词汇。
+- D36 npm 分发（2026-11-05，用户在 `examples/joplo-dist` 看板中选定方案 B）：
+  - `joplo` 是很小的命令入口，转发到 `@joplo/cli`；作者项目依赖轻量的 `@joplo/kit`，现有写法不变。
+  - `@joplo/*` 与 `joplo` 用同一版本号一起发布；init 写入精确版本。
+  - 在项目里运行 `npx joplo` 时使用项目内安装的版本；版本不一致时提示怎样对齐。
+  - 入口先检查 Node ≥ 22；Playwright 是可选依赖，只有 render 需要。
+  - npm 账号 `disdjj` 是 `joplo` 组织的 owner，包名 `joplo` 尚未被占用。
+- D37 Agent 用法（2026-11-05，用户选定方案 B）：
+  - `joplo skill` 列出主题，`joplo skill <主题>` 输出该主题，每个主题少于 150 行；现有的 `joplo guide` 拆进这些主题。
+  - `joplo skill install` 只写一个约 10 行的“指针” `.claude/skills/joplo/SKILL.md`，告诉 Agent 运行哪条命令；正文每次由项目安装的 CLI 输出，不会过期。
+  - 已存在且被修改过的文件不覆盖，`--diff` 查看差异，`--force` 覆盖。
+- A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions
 
