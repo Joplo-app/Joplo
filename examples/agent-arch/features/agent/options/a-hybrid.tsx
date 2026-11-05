@@ -1,4 +1,4 @@
-import { $, done, flow, option, set, shot, undecided, uses } from '@tokenroll/joplo-kit';
+import { $, done, explain, flow, option, set, shot, undecided, uses } from '@tokenroll/joplo-kit';
 
 import { active, ASK, dim, error, focus, initialUi, layersFor, ok, show } from '../../../shared/arch.tsx';
 
@@ -6,15 +6,15 @@ import { active, ASK, dim, error, focus, initialUi, layersFor, ok, show } from '
 const start = (name: string, opts: Parameters<typeof flow>[1], ask = ASK) =>
   flow(name, { start: '/', ...opts })
     .type('app_prompt', ask)
-    .click('app_send', '用户发出任务：客户端把消息交给 Biz Server，鉴权并写入会话', shot('msg_user'), shot('app', 'biz'), shot('blk_biz'),
+    .click('app_send', '用户发出任务：客户端把消息交给 Biz Server，鉴权并写入会话', shot('msg_user'), shot('app', 'biz'), shot('blk_biz'), explain('客户端从不直接找大脑：所有请求先过 Biz Server，它负责鉴权、写会话、留审计。'),
       show('asked'), set($.inputs.app_prompt, ''), set($.ui.ask, ask), ...active('e_app_biz', 'n_app', 'n_biz', 'e_biz_db'), focus('biz'), uses('biz_gate'));
 
 const plan = (f: ReturnType<typeof start>) =>
   f
-    .system('Billing 额度预检', '调用模型之前，先向 Billing 预检额度：够用', shot('biz', 'billing'), shot('blk_billing'), ...ok('e_app_biz', 'e_biz_db'), ...active('e_biz_billing', 'n_billing'), focus('billing'), uses('billing_precheck'))
-    .system('取工具定义', '客户端上报它实现了 read_files@1、delete_files@1；Biz Server 从 Registry 取这两个定义，再加上云端工具 make_sheet@2', shot('biz', 'registry'), shot('blk_tools'),
+    .system('Billing 额度预检', '调用模型之前，先向 Billing 预检额度：够用', shot('biz', 'billing'), shot('blk_billing'), explain('为什么在调模型之前查：模型调用是最贵的一步。额度不够就在这里拦下，后面的大脑、模型和手都不会动，也不会产生费用。'), ...ok('e_app_biz', 'e_biz_db'), ...active('e_biz_billing', 'n_billing'), focus('billing'), uses('billing_precheck'))
+    .system('取工具定义', '客户端上报它实现了 read_files@1、delete_files@1；Biz Server 从 Registry 取这两个定义，再加上云端工具 make_sheet@2', shot('biz', 'registry'), shot('blk_tools'), explain('这就是“定义与实现分离”：Registry 只存定义。Biz Server 按客户端实际实现的版本挑出能用的工具，大脑永远不会拿到一个没有实现的工具。'),
       ...ok('e_biz_billing', 'n_billing'), ...active('e_biz_registry', 'n_registry'), focus('tools'), uses('def_impl_split'))
-    .system('任务交给大脑', '任务和工具定义一起交给大脑。大脑只看到“定义”，不知道工具在哪里实现', shot('biz', 'brain'), shot('blk_brain'),
+    .system('任务交给大脑', '任务和工具定义一起交给大脑。大脑只看到“定义”，不知道工具在哪里实现', shot('biz', 'brain'), shot('blk_brain'), explain('大脑拿到的是“任务 + 一组工具定义”。它不知道 read_files 在用户电脑上执行，也不需要知道。'),
       ...ok('e_biz_registry', 'n_registry'), ...active('e_biz_brain', 'n_brain'), focus('brain'))
     .system('大脑推理', '大脑调用 Bedrock 规划下一步', shot('brain', 'llm'), ...active('e_brain_llm', 'n_llm'));
 
@@ -34,16 +34,16 @@ export default option({
 
   scenarios: {
     happy: plan(start('整理本机的报销发票', { cases: ['happy', 'local_files'], expected: '端侧读文件、云端生成表格、回答后异步入账' }))
-      .system('工具调用 read_files（端侧）', '大脑只发出 read_files(~/Desktop/报销)；Biz Server 审计后下发给用户电脑上的端侧执行器', shot('brain', 'biz', 'local'), shot('tc_read'), shot('blk_client'),
+      .system('工具调用 read_files（端侧）', '大脑只发出 read_files(~/Desktop/报销)；Biz Server 审计后下发给用户电脑上的端侧执行器', shot('brain', 'biz', 'local'), shot('tc_read'), shot('blk_client'), explain('脑手分离的关键一步：大脑只发出“调用 read_files”这条消息，真正读文件的是用户电脑上的端侧执行器。'),
         ...ok('e_brain_llm', 'n_llm', 'e_biz_brain'), ...active('e_brain_biz', 'e_biz_local', 'n_local'), show('readShown'), focus('client'), uses('brain_no_exec'))
       .system('端侧执行完成', '端侧执行器在用户电脑上读了 12 个文件，结果经 Biz Server 回到大脑；文件不用先上传', shot('tc_read'), shot('local'),
         ...ok('e_biz_local', 'n_local'), set($.ui.t_read, 'done'))
-      .system('工具调用 make_sheet（云端）', '生成表格不需要本机，Biz Server 把它下发给云端沙箱（Fargate，按任务隔离）', shot('biz', 'sandbox'), shot('tc_sheet'), shot('blk_aws'),
+      .system('工具调用 make_sheet（云端）', '生成表格不需要本机，Biz Server 把它下发给云端沙箱（Fargate，按任务隔离）', shot('biz', 'sandbox'), shot('tc_sheet'), shot('blk_aws'), explain('同一个大脑，另一只手：不需要本机的工具交给云端沙箱，每个任务一个隔离环境，用完即销毁。'),
         ...active('e_biz_sandbox', 'n_sandbox'), show('sheetShown'), focus('aws'))
       .system('沙箱执行完成', shot('tc_sheet'), shot('sandbox'), ...ok('e_biz_sandbox', 'n_sandbox', 'e_brain_biz'), set($.ui.t_sheet, 'done'))
       .system('返回回答', '大脑汇总结果，回答经 Biz Server 回到客户端', shot('msg_reply'), shot('app', 'biz'),
         show('replied'), set($.ui.reply, '已整理 12 张发票，合计 ¥3,280。表格已生成：报销汇总.xlsx'), ...active('e_app_biz'), focus('brain'))
-      .system('用量异步入账', 'token 用量和 2 次工具调用作为事件写入 SQS；Billing 按幂等键扣费，不阻塞回答', shot('brain', 'queue', 'billing'), shot('blk_billing'),
+      .system('用量异步入账', 'token 用量和 2 次工具调用作为事件写入 SQS；Billing 按幂等键扣费，不阻塞回答', shot('brain', 'queue', 'billing'), shot('blk_billing'), explain('扣费不在主链路上：用量写成事件进 SQS，Billing 慢慢消费。即使 Billing 暂时不可用，用户也已经拿到回答。'),
         ...ok('e_app_biz', 'n_app', 'n_biz', 'n_brain'), ...active('e_brain_queue', 'e_queue_billing', 'n_queue', 'n_billing'), focus('billing'), uses('usage_async'))
       .system('结束', shot(), ...ok('e_brain_queue', 'e_queue_billing', 'n_queue', 'n_billing'), done('大脑规划，两只手各自执行，用量异步入账')),
 
@@ -53,7 +53,7 @@ export default option({
       .system('结束', shot('al_quota'), done('不产生任何费用，用户看到升级提示', 'failure')),
 
     approval: plan(start('删除文件前要用户确认', { cases: ['approval'], outcome: 'other' }, '把「报销」文件夹里重复的发票删掉'))
-      .system('工具调用 delete_files', 'delete_files 在定义里标为 dangerous：端侧执行器先在客户端弹出确认，确认前什么都不做', shot('dlg_approve'), shot('biz', 'local'),
+      .system('工具调用 delete_files', 'delete_files 在定义里标为 dangerous：端侧执行器先在客户端弹出确认，确认前什么都不做', shot('dlg_approve'), shot('biz', 'local'), explain('危险级别写在工具定义里，而不是写在大脑的提示词里：确认由客户端强制执行，大脑绕不过去。'),
         ...ok('e_brain_llm', 'n_llm', 'e_biz_brain'), ...active('e_brain_biz', 'e_biz_local', 'n_local'), show('deleteShown'), show('approveOpen'), focus('client'), uses('approval_rule'))
       .click('ap_deny', '用户拒绝：执行器把“已拒绝”作为工具结果交回大脑，这次调用不计费', shot('local', 'brain', 'biz'), shot('tc_delete'),
         show('approveOpen', false), set($.ui.t_delete, 'error'), ...error('e_biz_local'), ...dim('n_local'), uses('failed_not_billed'))
@@ -63,7 +63,7 @@ export default option({
 
     client_offline: plan(start('端侧执行时客户端掉线', { cases: ['client_offline'], outcome: 'failure', mock: '模拟客户端断网' }))
       .system('工具调用 read_files（端侧）', shot('biz', 'local'), ...ok('e_brain_llm', 'n_llm', 'e_biz_brain'), ...active('e_brain_biz', 'e_biz_local', 'n_local'), show('readShown'), focus('client'))
-      .system('客户端 30 秒没有响应', 'Biz Server 等端侧执行器超时，把“超时”作为工具结果交回大脑', shot('local', 'biz'), shot('tc_read'),
+      .system('客户端 30 秒没有响应', 'Biz Server 等端侧执行器超时，把“超时”作为工具结果交回大脑', shot('local', 'biz'), shot('tc_read'), explain('手失联时，大脑不会自己去找替代方案执行：它只收到一个“超时”结果，再决定怎么告诉用户。'),
         ...error('e_biz_local', 'n_local'), set($.ui.t_read, 'error'))
       .system('大脑告诉用户', '大脑不会自己去读文件，只能如实告诉用户；失败的工具调用不计费，只记模型 token', shot('msg_reply'), shot('blk_billing'),
         ...ok('e_brain_biz'), show('replied'), set($.ui.reply, '没能读取你电脑上的文件：客户端离线了。请保持客户端打开后再试一次。'), focus('billing'), uses('failed_not_billed', 'brain_no_exec'))

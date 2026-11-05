@@ -1,4 +1,4 @@
-import { $, done, flow, missing, notApplicable, option, set, shot, undecided, uses } from '@tokenroll/joplo-kit';
+import { $, done, explain, flow, missing, notApplicable, option, set, shot, undecided, uses } from '@tokenroll/joplo-kit';
 
 import { active, ASK, dim, error, focus, initialUi, layersFor, ok, show } from '../../../shared/arch.tsx';
 
@@ -30,10 +30,10 @@ export default option({
       .system('Billing 额度预检', shot('biz', 'billing'), shot('blk_billing'), ...ok('e_app_biz', 'e_biz_db'), ...active('e_biz_billing', 'n_billing'), focus('billing'), uses('billing_precheck'))
       .system('取工具定义', '所有工具的实现都在云端沙箱，Biz Server 直接下发全部定义', shot('biz', 'registry'), shot('blk_tools'),
         ...ok('e_biz_billing', 'n_billing'), ...active('e_biz_registry', 'n_registry'), focus('tools'), uses('def_impl_split'))
-      .system('大脑推理', '大脑发现需要本机文件，但手都在云端：只能请用户先上传', shot('brain', 'llm'), shot('blk_brain'),
+      .system('大脑推理', '大脑发现需要本机文件，但手都在云端：只能请用户先上传', shot('brain', 'llm'), shot('blk_brain'), explain('这是“手都在云端”的代价：云端沙箱读不到用户电脑上的文件，只能让用户先把文件交出来。'),
         ...ok('e_biz_registry', 'n_registry'), ...active('e_biz_brain', 'n_brain', 'e_brain_llm', 'n_llm'), focus('brain'))
       .system('请用户上传', shot('msg_reply'), show('replied'), set($.ui.reply, '我读不到你电脑上的文件，请先上传「报销」文件夹。'), show('needUpload'), ...ok('e_brain_llm', 'n_llm', 'e_biz_brain'))
-      .click('app_upload', '用户上传 12 个文件到 S3：多了一步，文件也离开了用户设备', shot('app', 's3'), shot('tc_upload'), shot('blk_client'),
+      .click('app_upload', '用户上传 12 个文件到 S3：多了一步，文件也离开了用户设备', shot('app', 's3'), shot('tc_upload'), shot('blk_client'), explain('多了一次操作，文件也离开了用户设备。对比方案 A：端侧执行器直接在本机读取，不需要这一步。'),
         show('needUpload', false), show('uploading'), ...active('e_app_s3', 'n_s3'), focus('client'))
       .system('上传完成', shot('tc_upload'), shot('s3'), ...ok('e_app_s3', 'n_s3'), set($.ui.t_upload, 'done'))
       .system('工具调用 read_files（云端）', '大脑发出 read_files，Biz Server 下发给云端沙箱，沙箱从 S3 读取', shot('biz', 'sandbox', 's3'), shot('tc_read'), shot('blk_aws'),
