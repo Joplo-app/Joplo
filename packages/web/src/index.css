@@ -187,6 +187,14 @@
   border-color: transparent !important;
 }
 
+/* 镜头聚焦（T-layers）：沿焦点的祖先链，把每一层的其他兄弟元素调暗；不遮挡任何内容 */
+.jstage [data-jfocus-dim] > :not([data-jfocus-path]):not([data-jfocus]),
+.jstage [data-jfocus-dim] [data-jfocus-path] > :not([data-jfocus-path]):not([data-jfocus]) {
+  /* 用 filter 而不是 opacity：不覆盖元素自身的出现动画（逐段出现的 opacity 0 仍然是 0） */
+  filter: opacity(0.32);
+  transition: filter 0.35s ease;
+}
+
 /* rough 描边层：不进图层并加 !important，避免被组件库的 [&_svg]:size-* 等工具类改尺寸 */
 .jstage svg.jrough,
 [data-jphone-frame] svg.jrough {

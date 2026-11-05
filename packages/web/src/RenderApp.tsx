@@ -9,11 +9,11 @@
  * - record=1：导出视频用，带鼠标、点击波纹与字幕；window.__JOPLO_RECORD__.play() 开始自动播放，
  *   .progress = { step, done, error } 供服务端读取进度。
  */
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { stateAt, type PlayState, type Project } from '@tokenroll/joplo-core';
+import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { displaySceneId, stateAt, type PlayState, type Project } from '@tokenroll/joplo-core';
 import { fetchIR } from './runtime/dev-client';
 import { DemoController } from './runtime/demo';
-import { Stage, VIEWPORTS, viewportOf, type Viewport } from './renderer/Stage';
+import { Stage, VIEWPORTS, type Viewport } from './renderer/Stage';
 import { PhoneFrame, phoneFrameSize } from './renderer/components';
 import { cameraFor } from './player/cameraFor';
 import { RoughRegistry, ThemeContext, type StageTheme } from './renderer/rough';
@@ -96,7 +96,9 @@ export function RenderApp() {
 
   if (error) return <div style={{ padding: 24, color: '#c92a2a', fontFamily: 'system-ui' }} data-render-error="">渲染失败：{error}</div>;
   if (!data) return null;
-  const viewport: Viewport = viewportOf(data.project, data.state);
+  // 有层级的方案：显示这一步导演层的画面（每层是独立画面），设备取这个画面的设置
+  const shownId = data.project.scenarios[scenarioId] ? displaySceneId(data.project, scenarioId, data.state.position) : data.state.sceneId;
+  const viewport: Viewport = data.project.scenes[shownId]?.viewport === 'mobile' ? 'mobile' : 'desktop';
   const vp = VIEWPORTS[viewport];
   const framed = (stageNode: ReactNode) =>
     viewport === 'mobile' ? (
@@ -131,9 +133,9 @@ export function RenderApp() {
   if (record) return <RecordStage project={data.project} scenarioId={scenarioId} theme={theme} registry={registry} setStage={setStage} wrap={wrap} />;
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
-  const camera = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null).spec;
+  const plan = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null);
   return wrap(
-    <Stage project={data.project} state={data.state} theme={theme} mode="render" animate={false} registry={registry} nextTargetId={next && 'target' in next.action ? next.action.target : null} stageRef={setStage} camera={camera} />,
+    <Stage project={data.project} state={data.state} theme={theme} mode="render" animate={false} registry={registry} nextTargetId={next && 'target' in next.action ? next.action.target : null} stageRef={setStage} camera={plan.spec} sceneId={plan.sceneId} />,
   );
 }
 
@@ -172,6 +174,9 @@ function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: {
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
   const sc = ctl.scenario();
   const shown = sc && snap.activeStep !== null ? sc.steps[snap.activeStep] : null;
+  // 与演示页一致：导演跟随；下一步的操作目标不在当前层时先切到它所在的层（leadLayer）
+  const plan = cameraFor(project, scenarioId, snap.state?.position ?? 0, snap.leadLayer);
+  useLayoutEffect(() => ctl.setStageView(plan.sceneId, true), [ctl, plan.sceneId]);
   if (!snap.state) return null;
   return wrap(
     <Stage
@@ -184,7 +189,8 @@ function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: {
       epoch={snap.epoch}
       animate
       nextTargetId={nextTargetId}
-      camera={cameraFor(project, scenarioId, snap.state.position, null).spec}
+      camera={plan.spec}
+      sceneId={plan.sceneId}
       stageRef={(el) => {
         ctl.setStageEl(el);
         setStageEl(el);

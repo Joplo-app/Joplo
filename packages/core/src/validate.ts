@@ -98,10 +98,13 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     for (const sc of Object.values(p.scenarios)) {
       let sceneId = sc.initial.sceneId;
       const stack: string[] = [];
+      // 有层级的方案（T-layers）：步骤目标在各层自己的画面里（多层有同一个元素时都算绑定）
+      const layerScenes = Object.values(p.options[sc.optionId]?.layers ?? {}).map((l) => p.scenes[l.sceneId]).filter((x): x is NonNullable<typeof x> => !!x);
       for (const step of sc.steps) {
         const s = p.scenes[sceneId];
         const hit = s && 'target' in step.action ? findNode(s, step.action.target)?.node : undefined;
         if (hit && (!hit.from || hit.from === sc.optionId)) bound.add(identity(hit));
+        if ('target' in step.action) for (const ls of layerScenes) { const h = findNode(ls, step.action.target)?.node; if (h) bound.add(identity(h)); }
         if (step.action.type === 'back') sceneId = stack.pop() ?? sceneId;
         for (const e of step.effects) if (e.type === 'navigate') { stack.push(sceneId); sceneId = e.sceneId; }
       }

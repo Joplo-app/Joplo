@@ -54,13 +54,16 @@ export type StageProps = {
   overlay?: ReactNode;
   /** 预览宽度：覆盖页面自身的 viewport（目录画廊等测试用；D44 起看板不再切换设备）。 */
   viewportOverride?: Viewport | { width: number; height: number } | null;
-  /** 镜头（D43）：对准某一层 / 某些元素；null = 不用镜头（整页按舞台显示）。 */
+  /** 镜头（D43）：对准这个画面里的某些元素；null = 不用镜头（整页按舞台显示）。 */
   camera?: CameraSpec | null;
+  /** 要显示的画面（有层级的方案是某一层自己的画面）；缺省为状态里的路径画面。各层共享同一份状态。 */
+  sceneId?: string | null;
 };
 
-export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null }: StageProps) {
-  const scene = project.scenes[state.sceneId];
-  const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[viewportOf(project, state)];
+export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null }: StageProps) {
+  const shownId = sceneId ?? state.sceneId;
+  const scene = project.scenes[shownId];
+  const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const cam = useCamera(camera, { width: vp.width, height: vp.height, animate, deps: [state, scene] });
@@ -102,7 +105,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         data-joplo-stage=""
         data-theme={theme}
         data-mode={mode}
-        data-scene={state.sceneId}
+        data-scene={shownId}
         data-width={vp.width}
         className="jstage relative overflow-hidden"
         style={{ width: vp.width, height: vp.height }}
@@ -113,12 +116,13 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
           {scene ? (
             <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, camera: !!camera }}>
-              <div className="absolute inset-0" ref={cam.contentRef}>
+              {/* 换层（换画面）时淡入 */}
+              <motion.div key={shownId} className="absolute inset-0" ref={cam.contentRef} initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
                 <RenderNode node={scene.root} />
-              </div>
+              </motion.div>
             </RenderContext.Provider>
           ) : (
-            <div className="flex h-full items-center justify-center text-[#c92a2a]">画面不存在：{state.sceneId}</div>
+            <div className="flex h-full items-center justify-center text-[#c92a2a]">画面不存在：{shownId}</div>
           )}
           <div ref={setDialogLayer} className="pointer-events-none absolute inset-0 z-20 [&>*]:pointer-events-auto" data-jlayer="dialog" />
           {camera ? <CameraLayer view={cam.view} animate={animate} pulseKey={camera.key} /> : null}

@@ -8,7 +8,7 @@
  */
 import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@tokenroll/joplo-kit/node';
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@tokenroll/joplo-kit';
-import { COMPONENT_TYPES, INTERACTIVE_TYPES, OVERVIEW_LAYER, matchChoice, nodeLabel } from './catalog.ts';
+import { COMPONENT_TYPES, DIRECTOR_LAYER, INTERACTIVE_TYPES, PAGE_LAYER, matchChoice, nodeLabel } from './catalog.ts';
 import { choicesOf } from './player.ts';
 import { Project, SCHEMA_VERSION, type SceneNode, type Scene, type Scenario, type Step, type Coverage } from './schema.ts';
 import type { Diagnostic } from './result.ts';
@@ -205,30 +205,35 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       return null;
     };
 
-    // ---------- 层级（D43）：根元素必须存在于本方案的某个画面 ----------
-    const layers: Record<string, { title: string; roots: string[] }> = {};
-    const optionScenes = routesIn(o).map((r) => sceneFor.get(sceneOf(r.path))).filter((x): x is Scene => !!x);
+    // ---------- 层级（T-layers）：每层一个完全独立的画面，单独编译、单独渲染 ----------
+    const layers: Record<string, { title: string; sceneId: string }> = {};
+    const layerScenes: { key: string; scene: Scene }[] = [];
+    const layerRoute = touched.find((r) => ctxRoutes.has(r)) ?? src.config.home ?? [...ctxRoutes][0] ?? '/';
     for (const [lk, ld] of Object.entries(def.layers ?? {})) {
       const at = ld.source ?? def.source;
       if (!/^[A-Za-z_][\w-]*$/.test(lk)) {
         err('LAYER_UNKNOWN', `层级键「${lk}」只能用字母、数字、下划线和连字符，且不能以 @ 开头`, at);
         continue;
       }
-      const roots = (ld.roots ?? []).filter((id) => {
-        if (optionScenes.some((sc) => findIn(sc.root, id))) return true;
-        err('LAYER_UNKNOWN', `层级「${ld.title}」引用的根元素 id「${id}」不在方案 ${qid} 的任何画面里`, at);
-        return false;
-      });
-      if (roots.length) layers[lk] = { title: ld.title, roots };
+      const tree = flatten(Array.isArray(ld.tree) ? ld.tree : [ld.tree]);
+      const nodes = tree.filter(isNode);
+      if (!nodes.length) {
+        err('LAYER_UNKNOWN', `层级「${ld.title}」没有内容：layer(title, <页面 JSX />)`, at);
+        continue;
+      }
+      const rootJ: JNode = nodes.length === 1 ? nodes[0]! : { ...nodes[0]!, type: 'div', props: {}, children: nodes };
+      const ids = new Map<string, string | undefined>();
+      const root = toSceneNode(rootJ, `layer_${lk}`, ids, (code, msg, where) => err(code, msg, where), rel);
+      const sceneId = `${qid}~${lk}`;
+      const scene: Scene = { id: sceneId, optionId: qid, route: layerRoute, name: `${ld.title} · ${def.name}`, viewport: ld.viewport ?? 'desktop', root, layer: lk };
+      addScene(scene);
+      layerScenes.push({ key: lk, scene });
+      layers[lk] = { title: ld.title, sceneId };
     }
-    /** 元素属于哪些层级：沿祖先找到层级的根；都不属于时归到全景层。 */
-    const layersOfNode = (scene: Scene, id: string): string[] => {
-      const chain = pathTo(scene.root, id);
-      if (!chain) return [];
-      const ids = new Set(chain.map((n) => n.id));
-      const hit = Object.entries(layers).filter(([, l]) => l.roots.some((r) => ids.has(r))).map(([k]) => k);
-      return hit.length ? hit : [OVERVIEW_LAYER];
-    };
+    const hasLayers = layerScenes.length > 0;
+    /** 元素在哪些层级里（多层都有同名 id 时都算）。 */
+    const layersWith = (id: string): string[] => layerScenes.filter((l) => findIn(l.scene.root, id)).map((l) => l.key);
+    const layerSceneWith = (id: string): Scene | undefined => layerScenes.find((l) => findIn(l.scene.root, id))?.scene;
 
     const scenarioIds: Record<string, string[]> = {};
     for (const [skey, fl] of Object.entries(def.scenarios ?? {})) {
@@ -261,22 +266,25 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         }
         const sceneBefore = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i, start)));
         const sceneAfter = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i + 1, start)));
-        // 镜头：按层级归类；第一个 shot 的第一个元素所在层级就是这一步的导演层
+        const actionTarget = 'target' in st.action ? st.action.target : null;
+        // 镜头：每个 id 在包含它的层级里解析；第一个 shot 的第一个元素所在层级就是这一步的导演层。
+        // 没有声明 layers 的方案：在路径页面里聚焦（伪层级 @page）。
         const perLayer = new Map<string, string[]>();
         let directorLayer: string | null = null;
         for (const e of st.effects as EffectDef[]) {
           if (e.type !== 'shot') continue;
           if (e.targets.length === 0) {
-            if (!perLayer.has(OVERVIEW_LAYER)) perLayer.set(OVERVIEW_LAYER, []);
-            directorLayer ??= OVERVIEW_LAYER;
+            // shot()：导演所在层回到整体（不推近）
+            const lk = hasLayers ? DIRECTOR_LAYER : PAGE_LAYER;
+            if (!perLayer.has(lk)) perLayer.set(lk, []);
           }
           for (const id of e.targets) {
-            const scene = [sceneAfter, sceneBefore].find((sc) => sc && findIn(sc.root, id));
-            if (!scene) {
-              err('SHOT_UNKNOWN', `shot("${id}") 引用的元素不在这一步的画面里（${sceneAfter?.route ?? sceneBefore?.route ?? '?'}）`, st.source);
+            const where = hasLayers ? layersWith(id) : [sceneAfter, sceneBefore].some((sc) => sc && findIn(sc.root, id)) ? [PAGE_LAYER] : [];
+            if (!where.length) {
+              err('SHOT_UNKNOWN', hasLayers ? `shot("${id}") 引用的元素不在任何层级里（层级：${Object.keys(layers).join('、')}）` : `shot("${id}") 引用的元素不在这一步的画面里（${sceneAfter?.route ?? sceneBefore?.route ?? '?'}）`, st.source);
               continue;
             }
-            for (const lk of layersOfNode(scene, id)) {
+            for (const lk of where) {
               const list = perLayer.get(lk) ?? [];
               if (!list.includes(id)) list.push(id);
               perLayer.set(lk, list);
@@ -284,12 +292,14 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
             }
           }
         }
+        // 没写 shot 的操作步骤：导演切到操作目标所在的层（播放时观众看得到要点的东西）
+        if (hasLayers && !directorLayer && actionTarget) directorLayer = layersWith(actionTarget)[0] ?? null;
         const shots = [...perLayer].map(([layer, targets]) => ({ layer, targets }));
         return {
           id: `${sid}#${i + 1}`,
           kind: st.kind,
           action: st.action,
-          caption: st.caption ?? autoCaption(st, sceneBefore),
+          caption: st.caption ?? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore),
           effects,
           ruleIds: mode === 'publish' ? [] : ruleIds,
           shots,
@@ -534,16 +544,6 @@ function stepRouteBefore(steps: StepDef[], i: number, start: string): string {
   let route = start;
   for (let k = 0; k < i; k++) for (const e of steps[k]!.effects) if (e.type === 'go') route = e.route;
   return route;
-}
-
-/** 从根到 id 的节点链（含自身）；找不到为 null。 */
-function pathTo(node: SceneNode, id: string): SceneNode[] | null {
-  if (node.id === id) return [node];
-  for (const c of node.children ?? []) {
-    const p = pathTo(c, id);
-    if (p) return [node, ...p];
-  }
-  return null;
 }
 
 function findIn(node: SceneNode, id: string): SceneNode | null {

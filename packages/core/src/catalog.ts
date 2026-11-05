@@ -195,8 +195,10 @@ const BP_KEYS = ['base', 'xs', 'sm', 'md', 'lg', 'xl'] as const;
 /** 页面 viewport 对应的舞台尺寸。 */
 export const VIEWPORT_SIZE = { desktop: { width: 1280, height: 800 }, mobile: { width: 390, height: 844 } } as const;
 
-/** 层级（D43）：自动的“全景”层 = 整个画面。作者的层级键不能以 @ 开头。 */
-export const OVERVIEW_LAYER = '@all';
+/** 没有声明 layers 的方案：镜头作用在路径页面上，记为这个伪层级（不出现在层级栏）。作者的层级键不能以 @ 开头。 */
+export const PAGE_LAYER = '@page';
+/** shot()（不带 id）在有层级的方案里：作用于“当时导演所在的层”，让它回到整体。 */
+export const DIRECTOR_LAYER = '@director';
 
 /** Diagram.Node 的 kind 与 Node / Edge 的 state（D41）。 */
 export const DIAGRAM_NODE_KINDS = ['client', 'service', 'model', 'database', 'queue', 'storage', 'external', 'tool', 'user'] as const;

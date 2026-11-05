@@ -119,14 +119,19 @@ export const done = (text: string, outcome: 'success' | 'failure' | 'cancelled' 
 export const uses = (...rules: string[]): EffectDef => ({ kind: 'effect', type: 'uses', rules });
 
 /**
- * 镜头（D43）：这一步要看哪些元素。每个 id 归到包含它的层级（沿祖先找层级的根），只影响那些层级的镜头；
- * 不在任何层级里的归到“全景”。一步里的第一个 shot 决定导演切到哪一层。shot() 不带参数 = 回到全景。
+ * 镜头（D43）：这一步要看哪些元素。每个 id 在包含它的层级里解析（多层都有同名 id 时各层都生效），只影响那些层级的镜头；
+ * 一步里的第一个 shot 决定导演切到哪一层。shot() 不带参数 = 导演所在层回到整体（不推近）。
+ * 没有声明 layers 的方案：shot 在路径页面里聚焦。
  */
 export const shot = (...targets: string[]): EffectDef => ({ kind: 'effect', type: 'shot', targets });
 
-/** 层级（视角）：画面里的一组根元素，例如 layer('客户端视角', ['client_panel'])。另有自动的“全景”层 = 整个画面。 */
-export type LayerDef = { kind: 'layer'; title: string; roots: string[]; source?: string };
-export const layer = (title: string, roots: string[]): LayerDef => ({ kind: 'layer', title, roots, source: callsite() });
+/**
+ * 层级（视角，D43 / T-layers）：一个完全独立的画面，有自己的 JSX 树，单独渲染、按自己的布局占满舞台。
+ * 各层共享同一份场景状态（ui / data / inputs），切层时步骤不变。需要全景就自己声明一个 overview 层。
+ *   layers: { client: layer('客户端视角', <ClientView />), backend: layer('后端流转', <Arch />) }
+ */
+export type LayerDef = { kind: 'layer'; title: string; tree: JNode | JNode[]; viewport?: 'desktop' | 'mobile'; source?: string };
+export const layer = (title: string, tree: JNode | JNode[], opts: { viewport?: 'desktop' | 'mobile' } = {}): LayerDef => ({ kind: 'layer', title, tree, ...opts, source: callsite() });
 
 /** 步骤参数：字符串是字幕（可省略，省略时自动生成），其余是效果。 */
 export type StepArg = string | EffectDef;
@@ -214,7 +219,7 @@ export type OptionDef = {
   rules?: Record<string, RuleDef>;
   questions?: Record<string, QuestionDef>;
   coverage?: Record<string, CoverageDecl>;
-  /** 层级（视角）：{ client: layer('客户端视角', ['client_panel']), backend: layer('后端流转', ['arch']) }。 */
+  /** 层级（视角）：每层一个独立画面 { client: layer('客户端视角', <ClientView />), backend: layer('后端流转', <Arch />) }。 */
   layers?: Record<string, LayerDef>;
   scenarios: Record<string, Flow>;
   source?: string;
