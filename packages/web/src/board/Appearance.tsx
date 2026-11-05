@@ -273,9 +273,9 @@ export function AppearancePopover(p: AppearanceProps) {
 }
 
 /** 外观按钮：三个小色块 + “外观 · 名字”（窄屏只剩色块）；按 T 开关浮层。 */
-export function AppearanceButton({ look, catalog, wide, open, onToggle, btnRef }: { look: Look; catalog: ThemeInfo[]; wide: boolean; open: boolean; onToggle: () => void; btnRef: (el: HTMLButtonElement | null) => void }) {
+export function AppearanceButton({ look, catalog, wide, open, onToggle, btnRef, scopeLabel, variant = 'default' }: { look: Look; catalog: ThemeInfo[]; wide: boolean; open: boolean; onToggle: () => void; btnRef: (el: HTMLButtonElement | null) => void; /** 首页写“所有项目”（D55「首页」顶栏：外观 · 所有项目）。 */ scopeLabel?: string; /** 全屏控制胶囊里用 ghost。 */ variant?: 'default' | 'ghost' }) {
   const css = catalog.find((t) => t.name === look.theme)?.css ?? '';
-  const name = appearanceLabel(look, catalog);
+  const name = scopeLabel ?? appearanceLabel(look, catalog);
   // T 开关（输入框、修饰键、菜单里不触发）
   const toggle = useRef(onToggle);
   toggle.current = onToggle;
@@ -291,7 +291,7 @@ export function AppearanceButton({ look, catalog, wide, open, onToggle, btnRef }
     return () => window.removeEventListener('keydown', on);
   }, []);
   return (
-    <Btn ref={btnRef} icon={<Swatch css={css} />} label={wide ? `外观 · ${name}` : '外观'} iconOnly={!wide} title={wide ? undefined : `外观 · ${name}`} kbd="T" selected={open} aria-haspopup="dialog" aria-expanded={open} onClick={onToggle} data-testid="appearance" data-appearance={`${look.theme}|${look.font ?? ''}|${look.stroke ?? ''}`} />
+    <Btn ref={btnRef} variant={variant} icon={<Swatch css={css} />} label={wide ? `外观 · ${name}` : '外观'} iconOnly={!wide} title={wide ? undefined : `外观 · ${name}`} kbd="T" selected={open} aria-haspopup="dialog" aria-expanded={open} onClick={onToggle} data-testid="appearance" data-appearance={`${look.theme}|${look.font ?? ''}|${look.stroke ?? ''}`} />
   );
 }
 

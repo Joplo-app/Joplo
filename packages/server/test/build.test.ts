@@ -37,6 +37,8 @@ describe('buildSite', () => {
     expect(ir.project.mode).toBe('publish');
     expect(Object.keys(ir.project.options)).toEqual(['invite.a-modal']);
     expect(ir.project.features.invite.constraints).toBeUndefined();
+    // D55 不变量 5：创作侧的界面（缺口横幅、检查、外观浮层、作者用的设备标注）只在看板里，不进发布站的产物
+    for (const s of ['复制给 Agent', 'joplo check --option', '恢复项目默认', '设为所有项目的默认', 'selection.json', '手机页面 ·', '外观浮层']) expect(html, s).not.toContain(s);
   }, 120_000);
 
   it('Tailwind 以项目目录为 @source：项目里独有的 className 被编译进 CSS', async () => {

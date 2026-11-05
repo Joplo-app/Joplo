@@ -231,19 +231,22 @@ function Dock({ snap, scenario, ctl, speed, onSpeed, L, zoom }: { snap: Snapshot
 }
 
 /** 全屏控制条：居中的深色胶囊，高 48，内边距 8；宽度不够时依次收起三件套、速度、层级切换。 */
-function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer, director, onLayer, onDirector, onExit, avail }: { snap: Snapshot; scenario: Scenario; ctl: DemoController; speed: number; onSpeed?: (v: number) => void; layers: { id: string; title: string }[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; onDirector: () => void; onExit: () => void; avail: number }) {
+function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer, director, onLayer, onDirector, onExit, avail, actions }: { snap: Snapshot; scenario: Scenario; ctl: DemoController; speed: number; onSpeed?: (v: number) => void; layers: { id: string; title: string }[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; onDirector: () => void; onExit: () => void; avail: number; actions?: ReactNode }) {
   const current = layers.find((l) => l.id === viewLayer)?.title ?? viewLayer;
   const c = fullscreenBarCollapse(avail, playLabelOf(snap), onSpeed ? SPEEDS : [], layers.map((l) => l.title), director, current);
   const sep = <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-jb-line" />;
   return (
-    <div className="jb-dark flex h-12 max-w-full shrink-0 items-center gap-2 overflow-hidden rounded-full border border-jb-line bg-jb-surface px-2" role="toolbar" aria-label="全屏播放控制" data-testid="fullscreen-controls" data-collapsed={[...c].join(' ') || undefined}>
+    <div className="jb-dark flex h-12 max-w-full shrink-0 items-center gap-1.5 overflow-hidden rounded-full border border-jb-line bg-jb-surface px-2 [&_[data-testid=fs-play]]:rounded-full" role="toolbar" aria-label="全屏播放控制" data-testid="fullscreen-controls" data-collapsed={[...c].join(' ') || undefined}>
       <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={c.has('nav')} size={32} ids={{ prev: 'fs-prev', play: 'fs-play', next: 'fs-next' }} />
       {onSpeed ? (
-        c.has('speed') ? (
-          <MenuButton trigger={{ icon: <Gauge className="size-4" /> }} label={`播放速度（${speed}×）`} testid="fs-speed" variant="ghost" size={32} width={120} items={speedItems(speed, onSpeed)} placement="top-center" />
-        ) : (
-          <Segmented label="播放速度" testid="fs-speed" value={String(speed)} onChange={(v) => onSpeed(Number(v))} items={SPEEDS.map((v) => ({ value: String(v), label: `${v}×`, testid: `fs-speed-${v}`, title: `自动播放速度 ${v}×` }))} />
-        )
+        <>
+          {sep}
+          {c.has('speed') ? (
+            <MenuButton trigger={{ icon: <Gauge className="size-4" /> }} label={`播放速度（${speed}×）`} testid="fs-speed" variant="ghost" size={32} width={120} items={speedItems(speed, onSpeed)} placement="top-center" />
+          ) : (
+            <MenuButton trigger={{ label: `${speed}×`, iconOnly: false }} label={`自动播放速度（${speed}×）`} testid="fs-speed" variant="ghost" size={32} width={120} items={speedItems(speed, onSpeed)} placement="top-center" className="px-2 font-jb-mono text-[13px] font-semibold" />
+          )}
+        </>
       ) : null}
       {layers.length > 1 ? (
         <>
@@ -254,6 +257,12 @@ function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer,
             <Segmented label="层级" testid="layer-switch" value={viewLayer} onChange={onLayer} items={layers.map((l) => ({ value: l.id, label: l.title, testid: `layer-${l.id}`, title: `手动查看「${l.title}」（导演暂停）` }))} />
           )}
           <DirectorTag on={director} layerTitle={current} onToggle={onDirector} />
+        </>
+      ) : null}
+      {actions ? (
+        <>
+          {sep}
+          {actions}
         </>
       ) : null}
       {sep}
@@ -340,6 +349,10 @@ export type PlayerPageProps = {
   navRail?: ReactNode;
   /** 「导出」按钮上的小标记（看板：视频导出的进度环）。 */
   exportBadge?: ReactNode;
+  /** 全屏控制胶囊里、退出按钮之前的操作（看板：外观）。 */
+  fullscreenActions?: ReactNode;
+  /** 手机页面时画面左上角的标注（看板传入“手机页面 · 390 宽 · 外框由画面自动加上”，给作者看；发布站不传）。 */
+  deviceTag?: ReactNode;
 };
 
 export function PlayerPage(p: PlayerPageProps) {
@@ -496,7 +509,16 @@ export function PlayerPage(p: PlayerPageProps) {
   const stageArea = (
     <div className="relative flex min-h-0 flex-1 flex-col" onMouseMove={inspecting ? onInspectHover : undefined} onMouseLeave={() => setHoverBox(null)}>
       {hasStage ? (
-        <StageViewport viewport={device} theme={p.theme} stroke={look.stroke} font={look.font} notice={snap.notice} onDismiss={() => ctl.dismissNotice()} onBack={() => ctl.backToDemo()}>
+        <StageViewport
+          viewport={device}
+          theme={p.theme}
+          stroke={look.stroke}
+          font={look.font}
+          notice={snap.notice}
+          onDismiss={() => ctl.dismissNotice()}
+          onBack={() => ctl.backToDemo()}
+          tag={p.deviceTag && device === 'mobile' && !full ? p.deviceTag : undefined}
+        >
           {(size) => (
             <Stage
               viewportOverride={device === 'mobile' ? null : size}
@@ -556,7 +578,7 @@ export function PlayerPage(p: PlayerPageProps) {
     return (
       // 全屏：画面 / 字幕 / 控制条三段，上下排列。控制条那一行（64px）始终保留：淡出时只是变透明，画面与镜头尺寸不变、不跳动
       <div ref={rootRef} className="jb-dark flex h-screen w-screen flex-col bg-jb-app" data-view={snap.view} data-fullscreen="" onMouseMove={idle.poke} style={idle.visible ? undefined : { cursor: 'none' }}>
-        <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden" data-inspecting={inspecting ? '' : undefined} data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
+        <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-[6%] pb-6 pt-8" data-inspecting={inspecting ? '' : undefined} data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
           {stageArea}
           {hasStage ? (
             <div className={cn('absolute right-3 top-3 z-10 transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')}>
@@ -569,10 +591,26 @@ export function PlayerPage(p: PlayerPageProps) {
           ) : null}
         </main>
         {scenario ? <Subtitle content={subtitle} theme={p.theme} font={look.font} framed dark /> : null}
-        <div ref={barRowRef} className="flex h-16 shrink-0 items-center justify-center px-6">
+        <div ref={barRowRef} className="relative flex h-16 shrink-0 items-center justify-center px-6">
           {scenario ? (
             <div className={cn('flex max-w-full justify-center transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')} data-visible={idle.visible ? '' : undefined} onMouseMove={idle.poke}>
-              <FullscreenBar snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} layers={useCam ? layers : []} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} onDirector={toggleDirector} onExit={toggleFull} avail={barRowW - 48} />
+              <FullscreenBar snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} layers={useCam ? layers : []} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} onDirector={toggleDirector} onExit={toggleFull} avail={barRowW - 48 - (barRowW >= 1280 ? 2 * 300 : 0)} actions={p.fullscreenActions} />
+            </div>
+          ) : null}
+          {/* 快捷键提示（宽屏时在右侧，随控制条一起淡出） */}
+          {barRowW >= 1280 ? (
+            <div className={cn('absolute right-6 top-1/2 flex -translate-y-1/2 items-center gap-3 font-jb text-[11px] text-jb-faint transition-opacity duration-300', idle.visible ? 'opacity-100' : 'opacity-0')} aria-hidden data-testid="fs-hints">
+              {[
+                ['空格', '播放'],
+                ['← →', '逐步'],
+                ...(p.fullscreenActions ? [['T', '外观']] : []),
+                ['Esc', '退出'],
+              ].map(([k, t]) => (
+                <span key={k} className="inline-flex items-center gap-1">
+                  <Kbd className="h-4 min-w-4 px-1 text-[10px]">{k}</Kbd>
+                  {t}
+                </span>
+              ))}
             </div>
           ) : null}
         </div>
@@ -586,7 +624,7 @@ export function PlayerPage(p: PlayerPageProps) {
         right={
           <>
             {p.actions}
-            <MenuButton trigger={{ icon: p.exportBadge && !L.topLabels ? p.exportBadge : p.menuLabel ? <Ellipsis className="size-4" /> : <Share className="size-4" />, label: p.menuLabel ?? '导出', iconOnly: !L.topLabels, extra: L.topLabels ? p.exportBadge : null }} label={p.menuLabel ?? '导出'} testid="more-menu" items={p.menu} placement="bottom-end" width={240} />
+            {p.menu.length ? <MenuButton trigger={{ icon: p.exportBadge && !L.topLabels ? p.exportBadge : p.menuLabel ? <Ellipsis className="size-4" /> : <Share className="size-4" />, label: p.menuLabel ?? '导出', iconOnly: !L.topLabels, extra: L.topLabels ? p.exportBadge : null }} label={p.menuLabel ?? '导出'} testid="more-menu" items={p.menu} placement="bottom-end" width={240} /> : null}
             <Btn
               icon={<Expand className="size-4" />}
               label="全屏"

@@ -19,11 +19,11 @@ function setFavicon(href: string) {
   }
   if (link.href !== href) link.href = href;
 }
-import type { Diagnostic } from '@joplo-app/core';
+import { VIEWPORT_SIZE, type Diagnostic } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
 import { boardHash, parseBoardHash, type BoardRoute, type PlayRoute } from '../runtime/route';
-import { ArrowRight, CircleCheck, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch } from 'lucide-react';
+import { ArrowRight, BookOpen, CircleCheck, Smartphone, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch } from 'lucide-react';
 import { PlayerPage, useBoardLayout, type MenuEntry } from '../player/PlayerPage';
 import { Btn, Kbd } from '../player/controls';
 import type { ProjectSummary } from '../runtime/dev-client';
@@ -89,13 +89,13 @@ export function BoardApp() {
       openAppearance={openAppearance}
       onAppearanceOpened={() => setOpenAppearance(false)}
       onSelect={(id) => navigate({ kind: 'home', projectId: id })}
-      onView={(projectId, featureId) => navigate({ kind: 'play', projectId, play: { featureId } })}
+      onView={(projectId, featureId, optionId) => navigate({ kind: 'play', projectId, play: { featureId, ...(optionId ? { optionId } : {}) } })}
     />
   );
 }
 
 /** 首页 + 外观（所有项目范围）。 */
-function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpened, onSelect, onView }: { projects: ProjectSummary[] | null; error: string | null; selected: string | null; openAppearance: boolean; onAppearanceOpened: () => void; onSelect: (id: string) => void; onView: (projectId: string, featureId: string) => void }) {
+function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpened, onSelect, onView }: { projects: ProjectSummary[] | null; error: string | null; selected: string | null; openAppearance: boolean; onAppearanceOpened: () => void; onSelect: (id: string) => void; onView: (projectId: string, featureId: string, optionId?: string) => void }) {
   const a = useAppearance(null, 'sketch', {});
   const L = useBoardLayout();
   const [flash, setFlash] = useFlash();
@@ -114,7 +114,16 @@ function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpen
         onSelect={onSelect}
         onView={onView}
         flash={flash}
-        right={<AppearanceButton look={a.saved} catalog={a.catalog} wide={L.topLabels} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} />}
+        onFlash={setFlash}
+        right={
+          <>
+            <AppearanceButton look={a.saved} catalog={a.catalog} wide={L.topLabels} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} scopeLabel="所有项目" />
+            <a href="https://github.com/Joplo-app/Joplo/tree/main/docs" target="_blank" rel="noreferrer" className="jb-focus inline-flex h-8 items-center gap-1.5 rounded-[6px] px-2.5 text-[13px] font-medium text-jb-muted hover:bg-jb-hover hover:text-jb-fg" data-testid="home-docs">
+              <BookOpen className="size-4" aria-hidden />
+              文档
+            </a>
+          </>
+        }
       />
       <AppearancePopover open={a.open} anchor={a.anchor} onClose={() => a.setOpen(false)} scope="all" projectId={null} configTheme="sketch" catalog={a.catalog} settings={a.settings} look={a.saved} save={a.save} onPreview={() => undefined} onFlash={setFlash} copy={copyText} />
     </>
@@ -382,6 +391,13 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={`下一个情况：${nc.title}`} kbd="Enter" variant="primary" className="max-w-[360px] [&>span]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
         navRail={<CaseRail project={project} featureId={feature.id} optionId={resolved.optionId} caseId={resolved.caseId} />}
         exportBadge={vid.running && vid.job ? <ProgressRing percent={vid.job.percent} /> : null}
+        deviceTag={
+          <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[6px] border border-jb-line bg-jb-surface px-2.5 font-jb text-[12px] text-jb-muted" data-testid="device-tag">
+            <Smartphone className="size-3.5" aria-hidden />
+            手机页面 · {VIEWPORT_SIZE.mobile.width} 宽 · 外框由画面自动加上
+          </span>
+        }
+        fullscreenActions={<AppearanceButton look={a.saved} catalog={a.catalog} wide={false} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} variant="ghost" />}
         layer={play.layer ?? null}
         speed={play.speed ?? 1}
         onSpeed={(v) => {

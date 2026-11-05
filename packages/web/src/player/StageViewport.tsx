@@ -45,8 +45,8 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   // 所有提示（含点错位置的三种）都在画面顶部居中，一条轻提示（D55）
   const view = noticeView(notice);
   return (
-    <div ref={box} className="relative min-h-0 flex-1 overflow-hidden" data-testid="stage-viewport" data-scale={scale.toFixed(3)} data-device={viewport}>
-      {tag ? <div className="absolute left-3 top-2 z-10 flex items-center gap-2 text-[12px]">{tag}</div> : null}
+    <div ref={box} className={cn('relative min-h-0 flex-1 overflow-hidden', phone && 'bg-jb-app')} data-testid="stage-viewport" data-scale={scale.toFixed(3)} data-device={viewport}>
+      {tag ? <div className="absolute left-3 top-3 z-10 flex items-center gap-2 text-[12px]">{tag}</div> : null}
       {view ? (
         <div
           role="status"
