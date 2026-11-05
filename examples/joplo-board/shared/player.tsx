@@ -4,8 +4,8 @@
  */
 import { $, done, eq, flow, not, set, toast, uses, type JNode } from '@tokenroll/joplo-kit';
 import {
-  ActionIcon, Alert, Anchor, Badge, Box, Breadcrumbs, Button, Center, CloseButton, Code, DataTable, Drawer, Group, List, Modal,
-  Paper, Phone, Progress, SegmentedControl, Select, Stack, Stepper, Switch, Text, Title,
+  ActionIcon, Alert, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, DataTable, Drawer, Group, List, Modal,
+  Paper, Progress, Select, Stack, Stepper, Switch, Text, Title,
 } from '@tokenroll/joplo-kit/ui';
 
 const members = [
@@ -40,22 +40,12 @@ export const header = (p: string): JNode[] => [
     <Text size="sm">{$.ui.optionName}</Text>
     <Text size="sm" fw={600}>{$.ui.scenarioName}</Text>
   </Breadcrumbs>,
-  <Box ml="auto">
-    <SegmentedControl id={`${p}_device`} data={['电脑', '手机']} />
-  </Box>,
 ];
 
 export const main = (p: string): JNode => (
   <Stack gap="sm">
     <Paper withBorder radius="lg" p="lg" mih={440}>
-      <Box when={eq($.inputs[`${p}_device`], '电脑')}>
-        <Prototype id={`${p}_pc`} />
-      </Box>
-      <Center when={eq($.inputs[`${p}_device`], '手机')}>
-        <Phone scale={0.7} h={760}>
-          <Prototype id={`${p}_phone`} compact />
-        </Phone>
-      </Center>
+      <Prototype id={`${p}_pc`} />
     </Paper>
     <Group justify="space-between">
       <Group gap="xs">
@@ -147,7 +137,6 @@ export const playerState = (p: string) => ({
     menu: false, videoOpen: false, exporting: false, progress: 0, progressText: '', exported: false, exportErr: false, videoButton: '开始导出',
     drawer: false, publish: false,
   },
-  inputs: { [`${p}_device`]: '电脑' },
 });
 
 const stepTo = (n: number, caption: string, next: string, ...extra: ReturnType<typeof set>[]) => [
@@ -164,11 +153,10 @@ export const sharedScenarios = (p: string) => ({
     .system('自动播放：发送', ...stepTo(4, '发送邀请', '下一步：完成'))
     .system('自动播放：完成', ...stepTo(5, '邀请已发出', '场景结束', set($.ui.sent, true), set($.ui.playLabel, '▶ 重新播放')), done('播放完整个场景')),
 
-  device: flow('切换到手机', { cases: ['device'], start: '/play' })
-    .select(`${p}_device`, '手机', '顶栏切到「手机」：画面放进手机外框，按手机宽度排版')
-    .click(`${p}_next`, '照常一步步看', ...stepTo(1, '打开邀请弹窗', '下一步：填写邮箱', set($.ui.dlg, true)))
+  step_back: flow('逐步前进与后退', { cases: ['play'], start: '/play' })
+    .click(`${p}_next`, ...stepTo(1, '打开邀请弹窗', '下一步：填写邮箱', set($.ui.dlg, true)))
     .click(`${p}_prev`, '「上一步」回到第 0 步', ...stepTo(0, '初始状态', '下一步：管理员点击右上角「邀请成员」，打开邀请弹窗', set($.ui.dlg, false)))
-    .click(`${p}_reset`, '「⟲」随时回到开头', ...stepTo(0, '初始状态', '下一步：管理员点击右上角「邀请成员」，打开邀请弹窗'), done('手机上的演示')),
+    .click(`${p}_reset`, '「⟲」随时回到开头', ...stepTo(0, '初始状态', '下一步：管理员点击右上角「邀请成员」，打开邀请弹窗'), done('前进、后退、回到开头')),
 
   export_image: flow('导出当前步骤的图片', { cases: ['export_image'], start: '/play' })
     .click(`${p}_more`, '点画面右下角「…」', set($.ui.menu, true))

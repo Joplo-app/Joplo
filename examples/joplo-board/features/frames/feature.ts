@@ -6,7 +6,7 @@ export default feature({
   roles: ['作者'],
   cases: {
     terminal: { title: 'CLI 原型：输入命令，出现输出', dimension: 'main', priority: 'high', expected: '命令一块、输出一块；输出可以有成功 / 警告 / 错误三种颜色' },
-    phone: { title: '移动端页面放进手机外框', dimension: 'main', priority: 'high', expected: 'page 写 viewport: "mobile" 或顶栏切到手机时自动套上外框' },
+    phone: { title: '移动端页面放进手机外框', dimension: 'main', priority: 'high', expected: 'page 写 viewport: "mobile" 时自动套上外框；同一个原型不再同时适配电脑和手机，需要手机版就单独做一个演示' },
     long_output: { title: '命令输出很长', dimension: 'input', expected: '终端内部滚动，不把页面撑开' },
   },
   rules: {
