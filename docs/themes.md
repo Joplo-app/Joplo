@@ -1,0 +1,81 @@
+# 主题
+
+主题是 CSS，作用于演示画面，以及跟随它的字幕、手机外框、高光和提示；看板首页、侧栏与普通控制不随主题换色。定义与变量以 [themes.ts](../packages/web/src/renderer/themes.ts) 为准。
+
+## 九个内置主题
+
+| 名称 | 显示名 | 描边 |
+| --- | --- | --- |
+| sketch | 手绘（默认） | rough |
+| clean | 线框 | clean |
+| blueprint | 蓝图 | clean |
+| nord | Nord | clean |
+| dracula | Dracula | clean |
+| solarized-light | Solarized Light | clean |
+| terminal | 复古终端 | clean |
+| kraft | 牛皮纸 | rough |
+| contrast | 高对比 | clean |
+
+在看板首页「设置 · 主题」中预览缩略图，并选择用于当前项目或所有项目。当前项目可恢复为 config 默认；本机选择保存到 `~/.joplo/settings.json`（或 JOPLO_HOME 下），不改作者文件。
+
+看板优先级是：项目覆盖 > 全局选择 > config 默认。项目覆盖为 null 表示明确使用 config 默认，即使存在全局选择也如此。发布站使用 config 默认；CLI render 的 theme 参数优先于 config。
+
+## 作者主题
+
+项目根目录写 `themes/brand.css`，文件名就是主题名。名称以字母开头，其余可用字母、数字、下划线或连字符；同名作者主题覆盖内置定义。
+
+```css
+:root {
+  --jp-font: system-ui, sans-serif;
+  --jp-ink: #14213d;
+  --jp-bg: #f7f7fb;
+  --jp-surface: #ffffff;
+  --jp-accent: #fca311;
+  --jp-info: #2563eb;
+  --jp-radius: 10px;
+  --jp-stroke: clean;
+}
+```
+
+在 joplo.config.ts 指定默认主题：
+
+```ts
+import { config } from '@joplo-app/kit';
+export default config({ name: 'My demo', layout: 'app', theme: 'brand' });
+```
+
+保存 CSS 后看板预览与演示热更新；build 将作者 CSS 写入发布 IR。load 读取文件 → IR 的 themes/name→CSS → 渲染器限定选择器范围 → 舞台与字幕消费变量；默认选择由 config.theme 保存，设置页的本机覆盖另存 settings.json。
+
+## 全部 CSS 变量
+
+| 变量 | 含义 |
+| --- | --- |
+| `--jp-font` | 正文字体 |
+| `--jp-font-mono` | 等宽字体 |
+| `--jp-font-size` | 正文字号 |
+| `--jp-ink` | 主要文字与线条 |
+| `--jp-bg` | 舞台底色 |
+| `--jp-surface` | 卡片、输入框、节点背景 |
+| `--jp-subtle` | 次级底色，如气泡、分段控件与进度条底 |
+| `--jp-muted` | 次要文字 |
+| `--jp-faint` | 占位与禁用文字 |
+| `--jp-line` | 分隔线与浅边框 |
+| `--jp-line-strong` | 较深边框、未完成步骤及 dim 状态 |
+| `--jp-border` | clean 描边的组件边框 |
+| `--jp-accent` | 高光、镜头焦点与示例输入 |
+| `--jp-select` | 选中元素的颜色 |
+| `--jp-info` | Diagram active 调用状态 |
+| `--jp-ok` | 成功状态 |
+| `--jp-warn` | 警告状态 |
+| `--jp-danger` | 错误状态 |
+| `--jp-radius` | 圆角 |
+| `--jp-shadow` | 卡片阴影 |
+| `--jp-stroke` | rough 为手绘描边，clean 为细线边框 |
+
+可只覆盖需要的变量；省略 stroke 时使用 rough。也可写 `.jbox`、`h1` 等普通选择器细调。选择器会限定到带 data-theme 的 `.jstage` 和 `.jtheme`；`:root`、html、body 等根选择器指向演示根。@media 等嵌套选择器同样处理；@font-face、@keyframes、@import 按 CSS 原样保留。
+
+深色主题应保证 info/ok/danger/accent 与底色的对比度。主题影响 Diagram、Terminal、Phone 和字幕，不改变产品行为。
+
+## THEME_UNKNOWN
+
+config.theme 既不是内置名称、又没有对应的 themes/name.css 时，check 报 THEME_UNKNOWN 并定位到配置。修复名称或补齐 CSS 文件；确认文件名符合上述规则。主题用法也可运行 `npx joplo skill demo` 查看。

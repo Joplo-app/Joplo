@@ -1,18 +1,34 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Joplo-app/Joplo/main/assets/brand/joplo-logo.svg" alt="Joplo" width="300"></p>
 
-# joplo
+[English](https://github.com/Joplo-app/Joplo/blob/main/README.md) | [简体中文](https://github.com/Joplo-app/Joplo/blob/main/README.zh-CN.md)
 
-先把功能做成低保真、可点击、可演示的原型，再让编码 Agent 去写代码。
+# Joplo
+
+**Design the behavior before you build the feature.** Turn ideas into low-fidelity, interactive demos with your coding agent. Explore edge cases, compare options, and keep the rules behind each decision.
+
+Requires Node.js 22 or later.
 
 ```sh
 npx joplo@latest init my-demo
-cd my-demo && npm install
-npx joplo dev            # 本地看板：http://127.0.0.1:4790/
-npx joplo skill install  # 让 Claude Code / Codex 按需读取 Joplo 的用法
+cd my-demo
+npm install
+npx joplo dev --open
 ```
 
-- 用 TSX 描述页面、方案、情况、规则和演示步骤；看板里按情况比较方案，⌥+单击元素拿到 `文件:行`。
-- 层级、导演镜头、架构图（`Diagram` + `trace()`）、终端和手机外框、自定义主题。
-- `npx joplo build` 生成可直接部署的静态演示站。
+- Author pages, options, cases, rules, and flows in TSX with `@joplo-app/kit`.
+- Review multiple projects in one local Board. Option/Alt-click an element to inspect its rules and exact source location.
+- Use Layers, Director, and Shots to guide the demo. Model architecture with `Diagram` and `trace()`; use `Terminal`, `Phone`, and custom Themes for the right presentation.
+- Export images or record scenarios locally. Build a static Published site with Layers, Director, and fullscreen playback.
 
-文档与示例：<https://github.com/Joplo-app/Joplo>。许可证：Apache-2.0。
+Read only the authoring guidance your agent needs:
+
+```sh
+npx joplo skill
+npx joplo skill demo
+npx joplo skill install --agents-md
+npx joplo check
+npx joplo selection
+npx joplo build
+```
+
+Documentation and examples: [Joplo-app/Joplo](https://github.com/Joplo-app/Joplo). License: [Apache-2.0](https://github.com/Joplo-app/Joplo/blob/main/LICENSE).

@@ -1,0 +1,139 @@
+<p align="center"><img src="assets/brand/joplo-logo.svg" alt="Joplo" width="320"></p>
+
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+# Joplo
+
+**先把功能想清楚、演示清楚，再动手实现。** Joplo 帮你和编码 Agent 把想法变成低保真、可点击的演示，探索边界情况、比较方案，并保留每个决定背后的规则。
+
+用 TSX 创作页面和流程，在本地看板（Board）查看，选定方案后构建静态发布站（Published site）。源文件是权威源，版本交给 Git。按住 ⌥（Option/Alt）单击元素，就能把精确的文件和行号交给 Agent。
+
+![Joplo 看板](docs/screenshots/board-play-initial.png)
+
+## 快速开始
+
+需要 Node.js 22 或更新版本，以及 npm。
+
+```sh
+npx joplo@latest init my-demo
+cd my-demo
+npm install
+npx joplo dev --open
+```
+
+保持看板进程运行，编辑生成的 TSX 文件，演示会自动更新。在另一个项目中运行 `npx joplo dev`，会把项目加入同一个看板进程。默认端口为 4790；启动新看板时可用 `--port <port>` 指定端口。
+
+## 能演示什么
+
+- **看板 Board**：首页列出最近打开的项目及其功能，一个本地进程服务多个项目。
+- **交互演示**：面包屑、按情况分组的左栏、播放控制、步骤条和独立字幕区。
+- **层级 Layers、导演 Director、镜头 Shots**：每种视角有独立页面。导演按流程切换层级、移动镜头；观众可以接管、只重放一层、缩放、平移或全屏观看。
+- **架构演示**：`Diagram` 声明节点与连线，`trace()` 播放调用链并推算状态，`when` 控制内容逐段出现。
+- **检查元素**：按住 Option/Alt 单击，打开规则与源码抽屉；Agent 读取选中位置后只改那一处。
+- **Terminal 与 Phone**：用 `Terminal` 表达命令行交互；手机页面使用 `Phone` 外框。每个页面只面向一种设备。
+- **主题 Themes**：九个内置主题，也可添加 `themes/<name>.css`；看板设置可对当前项目或所有项目应用主题。
+- **导出**：导出当前步骤图片，或在本地录制整个场景。发布站支持图片导出、层级、导演与全屏播放。
+
+## 与 Agent 配合
+
+只读取当前任务需要的用法：
+
+```sh
+npx joplo skill
+npx joplo skill authoring
+npx joplo skill cases
+npx joplo skill demo
+npx joplo skill install --agents-md
+```
+
+七个主题为 `authoring`、`demo`、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。安装命令为 Agent 写入短指针，并保护用户改过的技能文件。`guide` 是 `skill authoring` 的别名。
+
+看板运行时，在另一个终端执行：
+
+```sh
+npx joplo check
+npx joplo selection
+```
+
+`check` 每个问题输出一行，包含文件、行、列、级别与代码。error 退出 1，用法错误退出 2，只有 warning/info 时退出 0。在看板中按住 Option/Alt 单击后，`selection` 返回标签、定位和目标行前后各三行源码。
+
+## 项目结构
+
+```text
+joplo.config.ts
+layouts/app.tsx
+routes/page.tsx
+routes/members/page.tsx
+features/invite/feature.ts
+features/invite/options/a.tsx
+shared/
+themes/brand.css
+.joplo/selection.json
+dist/
+```
+
+文件夹定义页面路径；布局提供外壳与命名插槽；方案往插槽里堆叠内容，也可新增路径。功能记录目标、情况、规则和 `pick`，场景用 `flow()` 表达行为。创作 API 从 `@joplo-app/kit` 导入，组件从 `@joplo-app/kit/ui` 导入，名称与属性对齐 Mantine。
+
+项目内可用 `shared/` 复用模块；本地运行状态 `.joplo/` 和构建产物 `dist/` 不进入 Git。具体 API 见 authoring 主题，CSS 变量见[主题文档](docs/themes.md)。
+
+## 构建和发布
+
+在每个功能的 `pick` 中写选定方案的文件名，再执行：
+
+```sh
+npx joplo check
+npx joplo build
+npx wrangler deploy --assets dist
+```
+
+build 只发布选定方案。发布站与看板共用演示页布局，保留演示、字幕、层级和主题；规则、假设、覆盖缺口和源码位置留在创作侧。图片可在浏览器导出，视频仅本地导出。
+
+部署使用你自己的 Wrangler 账号，并配置站点名与兼容日期；产物也能交给其他静态托管服务。输出目录、覆盖选项与截图用法见 [CLI 文档](docs/cli.md)。
+
+## 示例
+
+| 示例 | 可以看什么 |
+| --- | --- |
+| [examples/invite](examples/invite) | 比较邀请弹窗与批量邀请流程 |
+| [examples/agent-arch](examples/agent-arch) | 用层级、导演、`Diagram` 与 `trace()` 演示 Agent 架构 |
+| [examples/joplo-board](examples/joplo-board) | 多项目看板与演示页的交互设计 |
+| [examples/joplo-dist](examples/joplo-dist) | npm 安装与 Agent 用法流程 |
+
+## 仓库内开发
+
+```sh
+pnpm install
+pnpm joplo dev examples/invite --open
+pnpm typecheck
+pnpm test
+```
+
+工作区用 `joplo` 作为命令入口，内部包为 `@joplo-app/kit`、`@joplo-app/core`、`@joplo-app/cli`、`@joplo-app/server`、`@joplo-app/web`。CLI 只在 dev/build/render 时加载服务端。使用 npm 安装的作者项目需要本地截图与导出时，在该项目中添加可选浏览器依赖：
+
+```sh
+npm install -D playwright
+npx playwright install chromium
+```
+
+详见[依赖与许可证](docs/dependencies.md)和 [npm 发布流程](docs/release.md)。
+
+## 文档
+
+- [CLI 文档](docs/cli.md)
+- [看板与发布站](docs/web.md)
+- [主题](docs/themes.md)
+- [创作模型](docs/adr/0002-hugo-like-authoring.md)
+- [演示模型与架构](docs/adr/0003-demo-model.md)
+- [产品决策](DECISIONS.md)
+
+运行 `npx joplo skill`，按需获取与项目安装版本一致的创作说明。
+
+## 范围与执行边界
+
+Joplo 表达设计行为，不运行真实业务后端；只支持静态路径，手机版需要单独的页面或演示。AI 假设未经用户决定不能标为已确认，交互写在 `flow()` 中，不写 `onClick`。
+
+作者模块在本机加载、检查和构建时执行，只运行可信项目。看板和发布站只消费编译后的 IR。本地发行版不包含 MCP、协作与评论同步。
+
+## 许可证
+
+[Apache-2.0](LICENSE)。随包字体使用 [SIL OFL 1.1](packages/web/src/fonts/OFL.txt)。

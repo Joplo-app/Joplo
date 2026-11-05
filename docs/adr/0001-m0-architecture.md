@@ -1,5 +1,7 @@
 # ADR-0001：M0 架构、项目契约与模块边界
 
+> 历史 ADR，已被 [0002](0002-hugo-like-authoring.md) / [0003](0003-demo-model.md) 取代；仅供查阅，不作为当前用法。
+
 - 状态：已采纳（2026-11-05）
 - 依据：`Joplo-PRD-v0.1.md`、`DECISIONS.md`（D10–D20）
 

@@ -1,42 +1,48 @@
 # 依赖与许可证
 
+Joplo 六个发行包使用 Apache-2.0，包名为 `joplo`、`@joplo-app/kit`、`@joplo-app/core`、`@joplo-app/cli`、`@joplo-app/server`、`@joplo-app/web`。下表覆盖根目录及各包 package.json 的外部直接依赖、开发依赖与可选 peer；版本是当前锁文件安装结果，括号内标明非精确声明。
+
+## 运行与构建
+
+| 包 | 版本 | 许可证 | 用途与安装位置 |
+| --- | --- | --- | --- |
+| zod | 4.6.7 | MIT | core/server：IR 和接口校验 |
+| tsx | 4.23.15 | MIT | CLI：加载作者 TS/TSX；仓库运行脚本 |
+| commander | 15.0.0（^15.0.0） | MIT | CLI 参数与帮助 |
+| vite | 8.3.5 | MIT | server 运行时：看板服务和站点构建；web 构建 |
+| tailwindcss | 4.3.4 | MIT | server 运行时与 web 构建：编译界面和作者 className |
+| @tailwindcss/vite | 4.3.4 | MIT | server/web：Tailwind 集成 |
+| @vitejs/plugin-react | 6.2.1 | MIT | server/web 开发依赖：React 转译与界面构建 |
+| playwright | 1.64.1（可选 peer ^1.64.1） | Apache-2.0 | server 开发依赖；用户截图与本地导出时按需安装 |
+
+## 界面资源
+
+这些包在 web 中作为开发依赖构建进发行资源；用户不需要安装 Mantine，组件词汇由 kit 提供、渲染由 Joplo 实现。
+
 | 包 | 版本 | 许可证 | 用途 |
 | --- | --- | --- | --- |
-| zod | 4.6.7 | MIT | schema |
-| tsx | 4.23.15 | MIT | 运行 TS |
-| typescript | 6.0.3 | Apache-2.0 | 类型检查 |
-| vitest | 5.1.0 | MIT | 测试 |
-| react / react-dom | 19.3.1 | MIT | @joplo-app/web：界面 |
-| vite | 8.3.5 | MIT | @joplo-app/web：构建（server 在产物缺失/过期时自动调用） |
-| @vitejs/plugin-react | 6.2.1 | MIT | @joplo-app/web：构建 |
-| tailwindcss / @tailwindcss/vite | 4.3.4 | MIT | @joplo-app/web：样式 |
-| shadcn（CLI，未作为依赖安装） | 4.23.0 | MIT | 用 `pnpm dlx shadcn@4.23.0 add …` 生成 `packages/web/src/components/ui/*` |
-| radix-ui | 1.8.1 | MIT | shadcn 组件的底层原语（Checkbox、Switch、Progress、Avatar 等） |
-| class-variance-authority | 0.7.1 | Apache-2.0 | shadcn 组件变体 |
-| clsx | 2.1.1 | MIT | 类名拼接 |
-| tailwind-merge | 3.7.0 | MIT | 类名合并 |
-| lucide-react | 1.66.0 | ISC | 图标（固定在已过 pnpm minimumReleaseAge 的版本） |
-| motion | 14.9.1 | MIT | 演示动画（指针移动、弹窗、Toast） |
-| roughjs | 4.6.6 | MIT | 手绘描边（种子由 node.id 哈希） |
-| Excalifont（字体，woff2 子集） | 1.000（取自 @excalidraw/excalidraw 0.18.1） | OFL-1.1 | 手绘主题拉丁字体，打包在 `packages/web/src/fonts/`，许可见同目录 OFL.txt |
-| Xiaolai SC 小赖字体（字体，woff2 子集） | 3.11（取自 @excalidraw/excalidraw 0.18.1） | OFL-1.1 | 手绘主题中文字体，同上 |
-| playwright | 1.64.1 | Apache-2.0 | @joplo-app/server：renderStep 截图（chromium 修订 1248） |
-| @types/react / @types/react-dom | 19.3.0 | MIT | 类型 |
-| commander | 15.0.0 | MIT | T-core：CLI 命令与参数解析 |
-| @modelcontextprotocol/sdk | 1.32.2 | MIT | T-core：官方 MCP stdio server/client；协议 2025-11-25 |
-| proper-lockfile | 4.1.2 | MIT | T-core：跨进程排他锁、心跳与陈旧锁恢复 |
-| @types/proper-lockfile | 4.1.4 | MIT | T-core：锁库 TypeScript 类型（开发依赖） |
-| fs-native-extensions | 1.5.3 | Apache-2.0 | T-core 评审修复：内核文件锁保护租约命名空间与同步提交/恢复，含平台预构建二进制 |
+| react | 19.3.1 | MIT | 看板和发布站 |
+| react-dom | 19.3.1 | MIT | DOM 渲染 |
+| @dagrejs/dagre | 3.1.3 | MIT | Diagram 自动布局 |
+| modern-screenshot | 4.7.0（^4.7.0） | MIT | 发布站浏览器内图片导出 |
+| motion | 14.9.1 | MIT | 镜头、鼠标与步骤动画 |
+| roughjs | 4.6.6 | MIT | 手绘描边 |
+| lucide-react | 1.66.0 | ISC | 界面图标 |
+| clsx | 2.1.1 | MIT | 条件 className 组合 |
+| tailwind-merge | 3.7.0 | MIT | 合并 Tailwind 类名 |
 
-### T-board（v2 看板）追加
+## 开发与测试
 
-| vite | 8.3.5 | MIT | @joplo-app/server 运行时依赖：startDev 单进程开发服务（看板 + ssrLoadModule 编译 + HMR）、buildSite 的 vite build（与 @joplo-app/web 同一版本） |
-| @vitejs/plugin-react | 6.2.1 | MIT | @joplo-app/server 运行时依赖：看板与发布站的 React 转译 |
-| tailwindcss / @tailwindcss/vite | 4.3.4 | MIT | @joplo-app/server 运行时依赖：以项目目录为 @source 编译 className |
-| @joplo-app/kit | workspace | — | @joplo-app/server：项目里的 `@joplo-app/kit` 别名到本仓库 kit 源码 |
-## IR v2 CLI 迁移（T-cli）
+| 包 | 版本 | 许可证 | 用途 |
+| --- | --- | --- | --- |
+| typescript | 6.0.3 | Apache-2.0 | 类型检查与构建 |
+| vitest | 5.1.0 | MIT | 单元与服务集成测试 |
+| @types/node | 24.19.2（^24.0.0） | MIT | Node 类型 |
+| @types/react | 19.3.0（^19.3.0） | MIT | React 类型 |
+| @types/react-dom | 19.3.0（^19.3.0） | MIT | React DOM 类型 |
 
-- `@joplo-app/cli` 保留 commander 15，新增显式 tsx 4.23.15 运行时依赖，使用 `tsx/esm/api` 的 `tsImport` 载入作者项目并应用项目 tsconfig。
-- CLI 移除 `@modelcontextprotocol/sdk` 和直接 zod 依赖；上表 MCP SDK 为历史记录，当前 MCP 命令退役，留到产品 V2。core 仍通过 zod 校验 IR。
-- guide 使用 core catalog 生成组件清单，不增加依赖；dev/build/render 仅在调用时动态加载工作区 `@joplo-app/server`。
-- 此 worker 的文件所有权不含根 `pnpm-lock.yaml`；协调者合并 package.json 后需重新执行 `pnpm install` 更新锁文件，移除旧 SDK 依赖图。
+## 字体
+
+Excalifont 与 Xiaolai SC（小赖字体）使用 SIL OFL 1.1。woff2 子集来自 Excalidraw 0.18.1，版权与许可证在 [OFL.txt](../packages/web/src/fonts/OFL.txt)；构建后随 `@joplo-app/web` 的 dist/fonts/OFL.txt 分发。
+
+依赖声明以根 [package.json](../package.json) 及 [kit](../packages/kit/package.json)、[core](../packages/core/package.json)、[cli](../packages/cli/package.json)、[server](../packages/server/package.json)、[web](../packages/web/package.json)、[入口包](../packages/joplo/package.json) 为准。许可证已核对本地安装包的元数据；升级时重新核对 package.json、锁文件和随包 LICENSE。
