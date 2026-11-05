@@ -198,3 +198,16 @@ describe('聚焦布局（镜头对准同一张图里的多个节点时，排一�
     expect(diagramFocus(s, ['msg_user'], 'arch')).toBeNull();
   });
 });
+
+describe('effectiveState（D48：显式 state 优先，否则用 trace 推算）', () => {
+  it('显式字面量或绑定解析出的值优先；没写时用推算值；都没有是 idle；非法值按 idle', async () => {
+    const { effectiveState } = await import('../src/renderer/diagram-layout');
+    const traced = { biz: { state: 'active' as const }, e1: { state: 'active' as const, reverse: true } };
+    expect(effectiveState('ok', traced, 'biz')).toEqual({ state: 'ok', reverse: false });
+    expect(effectiveState(undefined, traced, 'biz')).toEqual({ state: 'active', reverse: false });
+    expect(effectiveState(null, traced, 'e1')).toEqual({ state: 'active', reverse: true });
+    expect(effectiveState(undefined, traced, 'llm')).toEqual({ state: 'idle', reverse: false });
+    expect(effectiveState('weird', traced, 'biz')).toEqual({ state: 'idle', reverse: false });
+    expect(effectiveState('idle', traced, 'biz')).toEqual({ state: 'idle', reverse: false }); // 旧项目绑定到 'idle' 时结果不变
+  });
+});

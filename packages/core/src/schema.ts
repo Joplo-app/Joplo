@@ -114,6 +114,16 @@ export const Effect = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('complete'), text: z.string().min(1), outcome: z.enum(['success', 'failure', 'cancelled']) }),
 ]);
 
+/**
+ * 调用链（D48）：这一步 trace 的一条路径。nodes 按路径顺序；edges 是路径上的连线，reverse = 沿连线的 to→from 方向走。
+ * mode：ok = 正常调用（本步 active，之后 ok）；fail = 失败（连线与终点节点 error）；skip = 没被调用（dim）。
+ */
+export const Trace = z.strictObject({
+  mode: z.enum(['ok', 'fail', 'skip']),
+  nodes: z.array(z.string().min(1)),
+  edges: z.array(z.strictObject({ id: z.string().min(1), reverse: z.boolean().default(false) })),
+});
+
 /** 镜头（D43）：这一步在某个层级里对准哪些元素；targets 为空 = 这一层的整体。 */
 export const Shot = z.strictObject({ layer: z.string().min(1), targets: z.array(z.string().min(1)) });
 
@@ -130,6 +140,8 @@ export const Step = z.strictObject({
   directorLayer: z.string().nullable().default(null),
   /** 较长的解说（来自 explain()，多个按换行连接）：字幕区第二行显示（说明下方、小一号）；发布站保留。 */
   explain: z.string().min(1).optional(),
+  /** 这一步的调用链（来自 trace()）：Diagram 节点与连线的 state 由 diagramStateAt 从它推算；发布站保留。 */
+  traces: z.array(Trace).default([]),
   source: Source,
 });
 
@@ -271,4 +283,5 @@ export type Scenario = z.infer<typeof Scenario>;
 export type Step = z.infer<typeof Step>;
 export type Action = z.infer<typeof Action>;
 export type Effect = z.infer<typeof Effect>;
+export type Trace = z.infer<typeof Trace>;
 export type Shot = z.infer<typeof Shot>;

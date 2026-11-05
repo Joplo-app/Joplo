@@ -10,7 +10,7 @@ import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@tokenroll/joplo-kit';
 import { COMPONENT_TYPES, DIRECTOR_LAYER, INTERACTIVE_TYPES, PAGE_LAYER, matchChoice, nodeLabel } from './catalog.ts';
 import { choicesOf } from './player.ts';
-import { Project, SCHEMA_VERSION, type SceneNode, type Scene, type Scenario, type Step, type Coverage } from './schema.ts';
+import { Project, SCHEMA_VERSION, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
 import type { Diagnostic } from './result.ts';
 
 export type AuthoringProject = {
@@ -235,6 +235,63 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     const layersWith = (id: string): string[] => layerScenes.filter((l) => findIn(l.scene.root, id)).map((l) => l.key);
     const layerSceneWith = (id: string): Scene | undefined => layerScenes.find((l) => findIn(l.scene.root, id))?.scene;
 
+    // ---------- 调用链（D48）：trace 在这个方案能看到的 Diagram 里解析 ----------
+    const diagrams = [...layerScenes.map((l) => l.scene), ...[...sceneFor.values()].filter((x) => x.optionId === qid || x.optionId === null || x.optionId === undefined)].flatMap((x) => diagramsIn(x.root));
+    const resolveTrace = (ids: string[], tmode: Trace['mode'], at: string | undefined): Trace | null => {
+      const shown = `trace(${ids.map((x) => JSON.stringify(x)).join(', ')})`;
+      if (!ids.length) {
+        err('TRACE_UNKNOWN', `${shown} 至少要写一个节点或连线 id`, at);
+        return null;
+      }
+      const has = (d: DiagramIndex, t: string) => d.nodes.has(t) || d.edges.some((e) => e.id === t);
+      const d = diagrams.find((x) => ids.every((t) => has(x, t)));
+      if (!d) {
+        const missing = ids.find((t) => !diagrams.some((x) => has(x, t)));
+        err('TRACE_UNKNOWN', missing ? `${shown} 里的「${missing}」不是任何 Diagram 的节点或连线 id` : `${shown} 的节点不在同一个 Diagram 里`, at);
+        return null;
+      }
+      const nodes: string[] = [];
+      const edges: Trace['edges'] = [];
+      const addNode = (n: string) => {
+        if (!nodes.includes(n)) nodes.push(n);
+      };
+      let prev: string | null = null;
+      for (const t of ids) {
+        const edge = d.edges.find((e) => e.id === t);
+        if (edge) {
+          // 写连线 id：方向由上一个节点决定（从 to 端接上时逆向走）
+          const reverse: boolean = prev !== null && prev === edge.to && prev !== edge.from;
+          if (prev !== null && prev !== edge.from && prev !== edge.to) {
+            err('TRACE_UNKNOWN', `${shown}：连线「${t}」（${edge.from} → ${edge.to}）没有连着上一个节点「${prev}」`, at);
+            return null;
+          }
+          edges.push({ id: edge.id, reverse });
+          addNode(reverse ? edge.to : edge.from);
+          addNode(reverse ? edge.from : edge.to);
+          prev = reverse ? edge.from : edge.to;
+          continue;
+        }
+        if (prev !== null && prev !== t) {
+          // 一段：先找同向的连线，没有再找反向的；同一方向有多条时要写连线 id
+          const fwd = d.edges.filter((e) => e.from === prev && e.to === t);
+          const back = d.edges.filter((e) => e.from === t && e.to === prev);
+          const pick = fwd.length ? fwd : back;
+          if (pick.length > 1) {
+            err('TRACE_AMBIGUOUS', `${shown}：「${prev}」与「${t}」之间有 ${pick.length} 条连线（${pick.map((e) => e.id).join('、')}），请改写成连线 id，例如 trace('${pick[0]!.id}')`, at);
+            return null;
+          }
+          if (!pick.length) {
+            err('TRACE_UNKNOWN', `${shown}：「${prev}」与「${t}」之间没有连线（这一段要能在同一个 Diagram 里找到对应的 Diagram.Edge，方向不限）`, at);
+            return null;
+          }
+          edges.push({ id: pick[0]!.id, reverse: !fwd.length });
+        }
+        addNode(t);
+        prev = t;
+      }
+      return { mode: tmode, nodes, edges };
+    };
+
     const scenarioIds: Record<string, string[]> = {};
     for (const [skey, fl] of Object.entries(def.scenarios ?? {})) {
       const sid = `${qid}.${skey}`;
@@ -251,6 +308,9 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         const effects: Step['effects'] = [];
         const ruleIds: string[] = [];
         const explains: string[] = [];
+        const traces: Trace[] = [];
+        /** 每个 trace 效果解析出的节点（作为镜头目标，与 shot 合并）。 */
+        const traceTargets = new Map<EffectDef, string[]>();
         for (const e of st.effects as EffectDef[]) {
           if (e.type === 'go') {
             if (!ctxRoutes.has(e.route)) err('UNKNOWN_ROUTE', `go("${e.route}") 跳转到不存在的路径`, st.source);
@@ -265,6 +325,13 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           else if (e.type === 'shot') continue; // 镜头不是状态变化，下面单独归类
           else if (e.type === 'explain') {
             if (e.text.trim()) explains.push(e.text.trim());
+          } else if (e.type === 'trace') {
+            const t = resolveTrace(e.ids, e.mode, st.source);
+            if (t) {
+              traces.push(t);
+              // trace 相当于一个 shot（trace.skip 只标记没被调用，不移动镜头）
+              if (t.mode !== 'skip') traceTargets.set(e, t.nodes);
+            }
           }
           else effects.push({ type: 'complete', text: e.text, outcome: e.outcome });
         }
@@ -276,15 +343,18 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         const perLayer = new Map<string, string[]>();
         let directorLayer: string | null = null;
         for (const e of st.effects as EffectDef[]) {
-          if (e.type !== 'shot') continue;
-          if (e.targets.length === 0) {
+          if (e.type !== 'shot' && !traceTargets.has(e)) continue;
+          const fromTrace = e.type !== 'shot';
+          const targets = e.type === 'shot' ? e.targets : traceTargets.get(e)!;
+          if (targets.length === 0) {
             // shot()：导演所在层回到整体（不推近）
             const lk = hasLayers ? DIRECTOR_LAYER : PAGE_LAYER;
             if (!perLayer.has(lk)) perLayer.set(lk, []);
           }
-          for (const id of e.targets) {
+          for (const id of targets) {
             const where = hasLayers ? layersWith(id) : [sceneAfter, sceneBefore].some((sc) => sc && findIn(sc.root, id)) ? [PAGE_LAYER] : [];
             if (!where.length) {
+              if (fromTrace) continue; // trace 的节点已在 Diagram 里校验过；不在这一步的画面里时不移动镜头
               err('SHOT_UNKNOWN', hasLayers ? `shot("${id}") 引用的元素不在任何层级里（层级：${Object.keys(layers).join('、')}）` : `shot("${id}") 引用的元素不在这一步的画面里（${sceneAfter?.route ?? sceneBefore?.route ?? '?'}）`, st.source);
               continue;
             }
@@ -309,6 +379,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           shots,
           directorLayer,
           ...(explains.length ? { explain: explains.join('\n') } : {}),
+          traces,
           ...(st.source ? { source: rel(st.source) } : {}),
         };
       });
@@ -597,4 +668,26 @@ function stripNotes(n: SceneNode): void {
   delete n.note;
   delete n.source;
   for (const c of n.children ?? []) stripNotes(c);
+}
+
+/** 一张 Diagram 里的节点与连线（trace 解析用）。连线 id 已在 toSceneNode 里补成缺省的「from->to」。 */
+type DiagramIndex = { id: string; nodes: Set<string>; edges: { id: string; from: string; to: string }[] };
+function diagramsIn(root: SceneNode): DiagramIndex[] {
+  const out: DiagramIndex[] = [];
+  const visit = (n: SceneNode) => {
+    if (n.type === 'Diagram') {
+      const d: DiagramIndex = { id: n.id, nodes: new Set(), edges: [] };
+      const walk = (c: SceneNode) => {
+        if (c.type === 'Diagram') return; // 嵌套的 Diagram 自成一图
+        if (c.type === 'Diagram.Node') d.nodes.add(c.id);
+        if (c.type === 'Diagram.Edge') d.edges.push({ id: c.id, from: String(c.props?.from ?? ''), to: String(c.props?.to ?? '') });
+        for (const k of c.children ?? []) walk(k);
+      };
+      for (const k of n.children ?? []) walk(k);
+      out.push(d);
+    }
+    for (const c of n.children ?? []) visit(c);
+  };
+  visit(root);
+  return out;
 }

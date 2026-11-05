@@ -132,9 +132,18 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 镜头可以对准任何带 id 的元素（组件、卡片、按钮、Diagram 节点 / 分组 / 连线）。播放时导演自动切层并推近焦点，观众也能手动切层或“只重放这一层”。
 - 不要为了“看得清”写很长的层：整层会缩进画面，细节靠 shot 推近。shot 的 id 不在任何层里时 check 报 SHOT_UNKNOWN；layer 的树为空时报 LAYER_UNKNOWN。
 
-## 架构图：用 flow 驱动调用链
-- <Diagram>里放 <Diagram.Group label>、<Diagram.Node id label kind state={$.ui.n_x}/>、<Diagram.Edge from to label async state={$.ui.e1}/>；布局自动生成，播放时不移动。
-- 演示调用链就是改 state：.system('客户端发出消息', set($.ui.e1, 'active'))，下一步 set($.ui.e1, 'ok')、set($.ui.n_brain, 'active')；出错用 'error'，无关部分用 'dim'。
+## 架构图：用 trace 描述调用链
+- <Diagram>里放 <Diagram.Group label>、<Diagram.Node id label kind/>、<Diagram.Edge from to label async/>；布局自动生成，播放时不移动。节点和连线不用写 state。
+- 每一步写 trace(...) 说明这一步走了哪条路径，节点与连线的状态自动推算：本步走到的是 active（连线上有流动的小点），之前走过的是 ok，trace.fail 的是 error（保持到之后又走通），trace.skip 的是 dim，没涉及的是 idle。
+- 参数是节点 id：trace('brain', 'biz', 'local') 是 brain→biz、biz→local 两段；每段要有对应的 Diagram.Edge，反方向也算（小点逆向走）。同一方向有多条连线时写连线 id：trace('e_brain_biz')。找不到连线报 TRACE_UNKNOWN，多条连线报 TRACE_AMBIGUOUS。
+- trace 同时就是这一步的镜头：节点作为镜头目标（顺序有意义），决定导演切到哪一层；走到 2 个及以上节点时自动排成聚焦小图。同一步再写 shot 时两者合并；trace.skip 不移动镜头。
+- 五步示例：
+    .click('app_send', '用户发出任务', trace('app', 'biz'))
+    .system('额度预检', '调用模型前先预检额度', trace('biz', 'billing'))
+    .system('交给大脑', trace('biz', 'brain', 'llm'), trace.skip('local'))
+    .system('工具调用', '大脑只发出调用', trace('e_brain_biz'))
+    .system('扣费失败', trace.fail('biz', 'billing'), done('额度不足', 'failure'))
+- 节点或连线上显式写的 state 优先于推算结果；旧写法（state={$.ui.x} 绑定 + set）仍然支持。
 - 常与前端画面分成两个层级（客户端 / 后端），同一个 flow 一步步同时推进两边；Node / Edge 不需要 flow 也不用 unmodeled，⌥+单击可检查。
 - 逐段出现（像幻灯片一样一段一段加内容）：给 Group / Node / Edge 写 when={$.ui.show_billing}，步骤里 set($.ui.show_billing, true)；布局一开始就按全部元素算好，出现时已有元素不移动。
 - 节点多、容器不宽时用 direction="down"；整图总是放进容器，看细节靠 shot 推近，观众也可以滚轮 / 捏合缩放、拖动平移。

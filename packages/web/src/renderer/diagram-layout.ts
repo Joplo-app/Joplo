@@ -10,7 +10,7 @@
  */
 import dagre from '@dagrejs/dagre';
 import { routeOrthogonal } from './diagram-route';
-import type { SceneNode } from '@tokenroll/joplo-core';
+import type { DiagramStates, SceneNode } from '@tokenroll/joplo-core';
 
 export type Point = { x: number; y: number };
 export type Box = { x: number; y: number; w: number; h: number };
@@ -484,4 +484,16 @@ export function lerpBox(a: Box, b: Box, t: number): Box {
 export function interpolateNodes(full: Record<string, Box>, focus: FocusLayout | null, t: number): Record<string, Box> {
   if (!focus) return full;
   return Object.fromEntries(Object.entries(full).map(([id, b]) => [id, focus.nodes[id] ? lerpBox(b, focus.nodes[id]!, t) : b]));
+}
+
+// ---------- 调用链（D48） ----------
+const D_STATES = new Set(['idle', 'active', 'ok', 'error', 'dim']);
+/**
+ * 节点 / 连线实际显示的 state：作者显式写的 state（字面量或绑定解析后的值）优先；没写（undefined / null）时用 trace 推算的值；
+ * 都没有是 idle。reverse 只在使用推算值时有意义（逆着连线方向走，小点逆向流动）。
+ */
+export function effectiveState(explicit: unknown, traced: DiagramStates | undefined, id: string): { state: string; reverse: boolean } {
+  if (explicit !== undefined && explicit !== null) return { state: typeof explicit === 'string' && D_STATES.has(explicit) ? explicit : 'idle', reverse: false };
+  const t = traced?.[id];
+  return t ? { state: t.state, reverse: !!t.reverse } : { state: 'idle', reverse: false };
 }
