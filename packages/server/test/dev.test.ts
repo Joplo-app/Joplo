@@ -126,7 +126,8 @@ describe('startDev', () => {
     const ln = lines.findIndex((l) => l.includes('id="btn_send"'));
     lines[ln] = lines[ln]!.replace('<Button', '<Button ={');
     fs.writeFileSync(file, lines.join('\n'));
-    await until(() => h.payload().version > v1);
+    // 只等版本号会被上一次改动残留的重新编译抢先满足（并发时约 1/7 失败）：同时等这次的语法错误出现在结果里
+    await until(() => h.payload().version > v1 && !h.payload().ok && h.payload().diagnostics.some((x) => x.severity === 'error' && x.at?.startsWith('features/invite/options/a-modal.tsx:')));
     const bad = h.payload();
     expect(bad.ok).toBe(false);
     expect(bad.project).not.toBeNull();
@@ -136,7 +137,13 @@ describe('startDev', () => {
     const v2 = h.payload().version;
     fs.writeFileSync(file, good);
     await until(() => h.payload().version > v2 && h.payload().ok);
-    // .joplo/ 下的变化不触发重新编译
+    // .joplo/ 下的变化不触发重新编译。先等版本号稳定：同一次写入在高负载下可能产生两个文件事件，
+    // 迟到的那次重新编译不能算到 .joplo/ 头上
+    let last = -1;
+    while (h.payload().version !== last) {
+      last = h.payload().version;
+      await new Promise((r) => setTimeout(r, 300));
+    }
     const v3 = h.payload().version;
     fs.writeFileSync(path.join(dir, '.joplo/selection.json'), 'null\n');
     await new Promise((r) => setTimeout(r, 400));

@@ -14,7 +14,12 @@
     "web:build": "pnpm --filter @joplo/web build",
     "test:e2e": "pnpm --filter @joplo/web test:e2e",
     "web:serve": "tsx packages/server/scripts/serve.ts",
-    "docs:screenshots": "tsx packages/server/scripts/render-docs.ts"
+    "docs:screenshots": "tsx packages/server/scripts/render-docs.ts",
+    "build:packages": "pnpm -r --filter \"./packages/*\" run build",
+    "release:version": "node scripts/release.mjs version",
+    "release:pack": "node scripts/release.mjs pack",
+    "release:smoke": "node scripts/release.mjs smoke",
+    "release:publish": "pnpm -r publish --access public --tag beta"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

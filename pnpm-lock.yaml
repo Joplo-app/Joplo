@@ -209,6 +209,12 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
+  packages/joplo:
+    dependencies:
+      '@joplo/cli':
+        specifier: workspace:*
+        version: link:../cli
+
   packages/kit: {}
 
   packages/server:
@@ -219,15 +225,12 @@ importers:
       '@joplo/kit':
         specifier: workspace:*
         version: link:../kit
+      '@joplo/web':
+        specifier: workspace:*
+        version: link:../web
       '@tailwindcss/vite':
         specifier: 4.3.4
         version: 4.3.4(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
-      '@vitejs/plugin-react':
-        specifier: 6.2.1
-        version: 6.2.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
-      playwright:
-        specifier: 1.64.1
-        version: 1.64.1
       tailwindcss:
         specifier: 4.3.4
         version: 4.3.4
@@ -237,12 +240,34 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: 6.2.1
+        version: 6.2.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+      playwright:
+        specifier: 1.64.1
+        version: 1.64.1
 
   packages/web:
-    dependencies:
+    devDependencies:
       '@joplo/core':
         specifier: workspace:*
         version: link:../core
+      '@playwright/test':
+        specifier: 1.64.1
+        version: 1.64.1
+      '@tailwindcss/vite':
+        specifier: 4.3.4
+        version: 4.3.4(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: 6.2.1
+        version: 6.2.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
@@ -270,22 +295,6 @@ importers:
       tailwind-merge:
         specifier: 3.7.0
         version: 3.7.0
-    devDependencies:
-      '@playwright/test':
-        specifier: 1.64.1
-        version: 1.64.1
-      '@tailwindcss/vite':
-        specifier: 4.3.4
-        version: 4.3.4(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
-      '@types/react':
-        specifier: ^19.3.0
-        version: 19.3.0
-      '@types/react-dom':
-        specifier: ^19.3.0
-        version: 19.3.0(@types/react@19.3.0)
-      '@vitejs/plugin-react':
-        specifier: 6.2.1
-        version: 6.2.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
       tailwindcss:
         specifier: 4.3.4
         version: 4.3.4

@@ -8,17 +8,20 @@
  *    这样直接双击 index.html（file://）也能离线运行。产物是普通静态目录，可 `wrangler deploy --assets` 或任何静态托管发布。
  *
  * 目标目录非空且没有 overwrite 时拒绝写入；永远不清空项目目录本身或它的上级目录。
+ *
+ * 从 npm 安装时（web-assets.ts 的 dist 形态）第 2 步不编译界面源码：复制 @joplo/web 预构建的发布站，
+ * 只用 Tailwind 编译作者 className 用到的工具类（project.css → assets/project-*.css），再做第 3 步。
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { build as viteBuild, createServer } from 'vite';
+import { build as viteBuild, createServer, type Rollup } from 'vite';
 import { JoploError, type Project } from '@joplo/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
-import { WEB_DIR, joploProjectPlugin, kitAliases, realProjectDir } from './vite-shared.ts';
+import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
+import type { DistWeb, SourceWeb } from './web-assets.ts';
 
 /** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。 */
 export function publishPayload(project: Project, home: string | null): { project: Record<string, unknown>; home: string | null } {
@@ -91,6 +94,8 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   if (nonEmpty && !opts.overwrite) throw new JoploError('USAGE', `目标目录非空：${outDir}。确认可以清空后请传 overwrite: true（CLI：--overwrite）`);
   if (nonEmpty && fs.existsSync(path.join(outDir, 'joplo.config.ts'))) throw new JoploError('USAGE', `目标目录看起来是一个 Joplo 项目（含 joplo.config.ts），拒绝清空：${outDir}`);
 
+  const web = locateWebAssets();
+
   // 1. 编译（publish）
   const loader = await createServer({
     configFile: false,
@@ -98,8 +103,8 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     root: projectDir,
     logLevel: 'error',
     appType: 'custom',
-    resolve: { alias: kitAliases() },
-    plugins: [joploProjectPlugin(projectDir)],
+    resolve: { alias: kitAliases(web, projectDir) },
+    plugins: [joploProjectPlugin(projectDir, web)],
     server: { middlewareMode: true, hmr: false, watch: null },
     optimizeDeps: { noDiscovery: true, include: [] },
   });
@@ -122,28 +127,8 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   const prevEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   try {
-    await viteBuild({
-      configFile: false,
-      envDir: false,
-      root: WEB_DIR,
-      base: './',
-      mode: 'production',
-      logLevel: 'error',
-      resolve: { alias: [{ find: /^@joplo\/core$/, replacement: path.join(WEB_DIR, 'src/site/core-lite.ts') }, ...kitAliases()] },
-      define: { 'process.env.NODE_ENV': '"production"' },
-      plugins: [joploProjectPlugin(projectDir), react(), tailwindcss()],
-      build: {
-        minify: true,
-        sourcemap: false,
-        outDir: staging,
-        emptyOutDir: true,
-        assetsInlineLimit: 0,
-        chunkSizeWarningLimit: 4000,
-        modulePreload: false,
-        reportCompressedSize: false,
-        rolldownOptions: { input: path.join(WEB_DIR, 'site.html'), output: { codeSplitting: false } },
-      },
-    });
+    if (web.mode === 'dist') await stageDistSite(web, projectDir, staging);
+    else await buildSourceSite(web, projectDir, staging);
 
     // 3. 后处理
     const siteHtml = path.join(staging, 'site.html');
@@ -168,6 +153,66 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     scenarios: Object.keys(project.scenarios),
     diagnostics: compiled.diagnostics,
   };
+}
+
+/** 仓库里：直接编译 packages/web 的发布站入口。 */
+async function buildSourceSite(web: SourceWeb, projectDir: string, staging: string) {
+  const { default: react } = await import('@vitejs/plugin-react');
+  await viteBuild({
+    configFile: false,
+    envDir: false,
+    root: web.webDir,
+    base: './',
+    mode: 'production',
+    logLevel: 'error',
+    resolve: { alias: [{ find: /^@joplo\/core$/, replacement: path.join(web.webDir, 'src/site/core-lite.ts') }, ...kitAliases(web, projectDir)] },
+    define: { 'process.env.NODE_ENV': '"production"' },
+    plugins: [joploProjectPlugin(projectDir, web), react(), tailwindcss()],
+    build: {
+      minify: true,
+      sourcemap: false,
+      outDir: staging,
+      emptyOutDir: true,
+      assetsInlineLimit: 0,
+      chunkSizeWarningLimit: 4000,
+      modulePreload: false,
+      reportCompressedSize: false,
+      rolldownOptions: { input: path.join(web.webDir, 'site.html'), output: { codeSplitting: false } },
+    },
+  });
+}
+
+/** 从 npm 安装时：复制预构建的发布站，单独编译作者 className 的 CSS 并在 site.html 里引用。 */
+export async function stageDistSite(web: DistWeb, projectDir: string, staging: string) {
+  for (const rel of web.siteFiles) {
+    const to = path.join(staging, rel);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.copyFileSync(path.join(web.appDir, rel), to);
+  }
+  const cssOut = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-css-'));
+  try {
+    const out = (await viteBuild({
+      configFile: false,
+      envDir: false,
+      root: path.dirname(web.projectCss),
+      base: './',
+      mode: 'production',
+      logLevel: 'error',
+      plugins: [joploProjectPlugin(projectDir, web), tailwindcss()],
+      build: { outDir: cssOut, emptyOutDir: true, minify: true, sourcemap: false, reportCompressedSize: false, write: true, rolldownOptions: { input: { project: web.projectCss } } },
+    })) as Rollup.RollupOutput | Rollup.RollupOutput[];
+    const files = (Array.isArray(out) ? out : [out]).flatMap((o) => o.output.map((x) => x.fileName)).filter((f) => f.endsWith('.css'));
+    if (files.length !== 1) throw new JoploError('EXPORT_FAILED', `作者 className 的样式编译结果异常：${files.join(', ') || '没有 CSS'}`);
+    const rel = `assets/${path.basename(files[0]!)}`;
+    fs.mkdirSync(path.join(staging, 'assets'), { recursive: true });
+    fs.copyFileSync(path.join(cssOut, files[0]!), path.join(staging, rel));
+    const siteHtml = path.join(staging, 'site.html');
+    const html = fs.readFileSync(siteHtml, 'utf8');
+    if (!html.includes('</head>')) throw new JoploError('EXPORT_FAILED', '预构建的 site.html 缺少 </head>');
+    fs.writeFileSync(siteHtml, html.replace('</head>', `  <link rel="stylesheet" href="./${rel}">\n  </head>`));
+  } finally {
+    fs.rmSync(cssOut, { recursive: true, force: true });
+  }
 }
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

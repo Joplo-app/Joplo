@@ -1,15 +1,43 @@
 {
   "name": "@joplo/cli",
   "version": "0.1.0",
-  "private": true,
+  "description": "Joplo 命令实现（init / dev / check / build / render / selection）；通常经由 joplo 命令入口使用",
+  "license": "UNLICENSED",
   "type": "module",
   "bin": {
-    "joplo": "./src/bin.ts"
+    "joplo-cli": "./src/bin.ts"
+  },
+  "exports": {
+    ".": "./src/cli.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs",
+    "prepublishOnly": "node ../../scripts/build-package.mjs"
   },
   "dependencies": {
     "@joplo/core": "workspace:*",
     "@joplo/server": "workspace:*",
     "commander": "^15.0.0",
     "tsx": "4.23.15"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "bin": {
+      "joplo-cli": "./dist/bin.js"
+    },
+    "exports": {
+      ".": {
+        "types": "./dist/cli.d.ts",
+        "default": "./dist/cli.js"
+      },
+      "./package.json": "./package.json"
+    }
   }
 }

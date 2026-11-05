@@ -36,26 +36,39 @@ Joplo 的做法：
 
 ## 安装
 
-当前是源码工作区版本，需要 Node.js 22+ 和 pnpm（仓库指定版本见 `package.json`）：
+需要 Node.js 22+。发布到 npm 后（首个版本计划以 `beta` 标签发布 0.1.0，见 [docs/release.md](docs/release.md)），在任意目录：
+
+```sh
+npx joplo@0.1.0 init my-demo          # 生成项目，package.json 锁定 "joplo" 与 "@joplo/kit" 的同一精确版本
+cd my-demo && npm install
+npx joplo dev                          # 看板：http://127.0.0.1:4790/
+```
+
+`init` 结尾会按你用的包管理器（npm、pnpm、yarn、bun）打印这三条命令。之后 `npx joplo check`、`npx joplo build`、`npx joplo selection` 都使用项目里安装的版本；`npx joplo@latest …` 拉到的版本与项目不同时，也改用项目内的版本并提示怎样升级。截图命令 `joplo render` 另需 `npm i -D playwright && npx playwright install chromium`，其他命令不需要浏览器。
+
+在本仓库里开发 Joplo 本身：
 
 ```sh
 pnpm install
-pnpm joplo guide
+pnpm joplo guide                       # 直接运行 TS 源码，不需要构建
+pnpm release:smoke                     # 打包所有包，在仓库外只用 tarball 跑通 init → install → check → build → dev → selection
 ```
 
-`@joplo/cli`、`@joplo/kit` 尚未作为独立的包发布。下文命令都在仓库根目录执行，`pnpm joplo` 调用工作区里的 CLI。仓库外的项目必须能从自己的目录解析到本仓库的 `@joplo/kit`（包括 `@joplo/kit/ui` 和 JSX runtime）。例如，在外部项目的 `package.json` 中添加本地依赖后安装：
+仓库内的 `pnpm joplo` 把 `@joplo/kit` 解析到工作区源码，下文示例都在仓库根目录执行。不要改用 React 的 JSX runtime，否则会丢失 Joplo 数据和源位置。
 
-```json
-{
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@joplo/kit": "link:/绝对路径/Joplo/packages/kit"
-  }
-}
+## Agent 按需读取用法
+
+运行 `pnpm joplo skill` 查看主题和实际行数，再读取这次需要的一两个主题，例如 `pnpm joplo skill authoring`、`pnpm joplo skill cases`。每个主题少于 150 行；`guide` 保留为 `skill authoring` 的别名。
+
+在项目里安装一个短入口，让 Claude Code 或 Codex 等 Agent 发现用法：
+
+```sh
+pnpm joplo skill install examples/my-demo
+# 没有 AGENTS.md 时也要为 Codex 创建入口：
+pnpm joplo skill install examples/my-demo --agents-md
 ```
 
-`init` 生成 ESM 项目和创作文件，但不自动安装依赖，所以在仓库外使用时先完成上述链接。CLI 仍从仓库运行，如 `pnpm joplo check /绝对路径/my-demo`。不要改用 React 的 JSX runtime，否则会丢失 Joplo 数据和源位置。
+安装只写 `.claude/skills/joplo/SKILL.md` 指针；详细用法每次由当前 CLI 输出。已有 AGENTS.md 会更新其中的 Joplo 托管段。用户改过的 SKILL.md 不自动覆盖，用 `--diff` 预览，明确需要覆盖时用 `--force`。发布安装后的命令写法是 `npx joplo skill`，选中元素后用 `npx joplo selection` 精确定位。
 
 ## 快速开始
 

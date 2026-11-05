@@ -2,10 +2,12 @@
  * renderStep：用随机端口启动一次性的 dev 服务（只编译一次、不监听），Playwright 打开渲染路由，
  * 截取舞台并返回元素索引（带 at）与渲染告警：遮挡、溢出、Toast 重叠、字体（PRD 8.8 / AC-22）。
  * 页面读取的 IR 与这里用来计算位置、隐藏元素的 IR 是同一份（无 TOCTOU）。
+ *
+ * Playwright 是可选依赖（D36）：只在这里按需载入；没装或没有浏览器时给出安装命令，dev/check/build 不受影响。
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { chromium, type Browser } from 'playwright';
+import type { Browser } from 'playwright';
 import { JoploError, VIEWPORT_SIZE, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@joplo/core';
 import type { RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 import { createDev } from './dev.ts';
@@ -13,14 +15,38 @@ import { realProjectDir } from './vite-shared.ts';
 
 const STAGE_SIZE = VIEWPORT_SIZE;
 
-async function launch(): Promise<Browser> {
+type PlaywrightModule = typeof import('playwright');
+const NOT_NEEDED = 'dev、check、build 不需要它。';
+
+const isMissingModule = (e: unknown) => {
+  const code = (e as NodeJS.ErrnoException | null)?.code;
+  return (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') && /playwright/.test(e instanceof Error ? e.message : String(e));
+};
+
+/** 按需载入 Playwright；没有安装时抛出带安装命令的 RENDER_FAILED。 */
+export async function loadPlaywright(importer: () => Promise<PlaywrightModule> = () => import('playwright')): Promise<PlaywrightModule> {
+  try {
+    return await importer();
+  } catch (e) {
+    if (!isMissingModule(e)) throw e;
+    throw new JoploError('RENDER_FAILED', `截图需要 Playwright 和 Chromium，当前没有安装。运行：npm i -D playwright && npx playwright install chromium（约 150 MB）。${NOT_NEEDED}`);
+  }
+}
+
+/** 浏览器启动失败时的一行提示。 */
+export function launchHint(e: unknown): string {
+  const first = (e instanceof Error ? e.message : String(e)).split('\n')[0]!.trim();
+  return `截图需要 Chromium，无法启动浏览器（${first}）。运行：npx playwright install chromium（约 150 MB）。${NOT_NEEDED}`;
+}
+
+async function launch({ chromium }: PlaywrightModule): Promise<Browser> {
   try {
     return await chromium.launch({ headless: true });
   } catch (first) {
     try {
       return await chromium.launch({ headless: true, channel: 'chrome' });
     } catch {
-      throw new JoploError('RENDER_FAILED', `无法启动浏览器：${first instanceof Error ? first.message.split('\n')[0] : String(first)}。可运行 pnpm exec playwright install chromium`);
+      throw new JoploError('RENDER_FAILED', launchHint(first));
     }
   }
 }
@@ -60,6 +86,8 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
   assertNotProjectData(projectDir, out);
   if (fs.existsSync(out) && !opts.overwrite) throw new JoploError('USAGE', `目标文件已存在：${out}。如需覆盖请传 overwrite: true（CLI：--overwrite）`);
 
+  // 先确认 Playwright 可用，再启动编译服务（缺失时尽快失败）
+  const playwright = await loadPlaywright();
   const server = await createDev({ projectDir, port: 0, watch: false, log: () => undefined });
   let browser: Browser | null = null;
   try {
@@ -80,7 +108,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     const stage = STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];
     const viewport = opts.viewport ?? stage;
 
-    browser = await launch();
+    browser = await launch(playwright);
     const page = await browser.newPage({ viewport, deviceScaleFactor: opts.scale ?? 1, reducedMotion: 'reduce' });
     // 指定 viewport 时舞台按该尺寸渲染（响应式属性、visibleFrom/hiddenFrom、AppShell 收起随之变化）
     const q = new URLSearchParams({ render: '1', scenario: sc.id, position: String(position), theme, ...(opts.viewport ? { w: String(opts.viewport.width), h: String(opts.viewport.height) } : {}) });
