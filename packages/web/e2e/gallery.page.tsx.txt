@@ -3,7 +3,7 @@ import {
   Accordion, ActionIcon, Alert, Anchor, AppShell, Avatar, Badge, Blockquote, Box, Breadcrumbs, Burger, Button, Card, Center, ChatMessage,
   Checkbox, CloseButton, Code, Container, Custom, DataTable, Divider, Drawer, FileInput, Flex, Grid, Group, Image, Indicator, Kbd, List,
   Loader, Modal, MultiSelect, NavLink, Notification, NumberInput, Pagination, Paper, PasswordInput, Placeholder, Progress, PromptInput, Radio,
-  RingProgress, ScrollArea, SegmentedControl, Select, SimpleGrid, Skeleton, Space, Stack, Stepper, Switch, Table, Tabs, Text, Textarea,
+  Phone, RingProgress, ScrollArea, SegmentedControl, Select, SimpleGrid, Skeleton, Space, Stack, Stepper, Switch, Table, Tabs, Terminal, Text, Textarea,
   TextInput, ThemeIcon, Timeline, Title, ToolCall,
 } from '@tokenroll/joplo-kit/ui';
 
@@ -76,6 +76,23 @@ export default page(
     <ChatMessage from="user">你好</ChatMessage>
     <ChatMessage from="assistant"><ToolCall title="Bash" state="running">ls</ToolCall></ChatMessage>
     <Group wrap="nowrap"><PromptInput id="g_prompt" placeholder="说点什么" unmodeled /></Group>
+    <Group align="flex-start" wrap="nowrap">
+      <Terminal id="g_term" title="~/work" mah={180}>
+        <Terminal.Command>npx joplo skill</Terminal.Command>
+        <Terminal.Output>{'Joplo 0.1.0 · Agent 用法\n  authoring   写页面、方案、场景'}</Terminal.Output>
+        <Terminal.Output tone="ok">✓ 已完成</Terminal.Output>
+        <Terminal.Output tone="warn">! 有 2 个警告</Terminal.Output>
+        <Terminal.Output tone="error">✗ 找不到 joplo.config.ts</Terminal.Output>
+        <Terminal.Input id="g_term_in" placeholder="输入命令" unmodeled />
+      </Terminal>
+      <Phone id="g_phone" h={420} scale={0.8}>
+        <Stack p="md" gap="sm">
+          <Title order={4}>手机里</Title>
+          <SimpleGrid id="g_phone_grid" cols={{ base: 1, sm: 2 }}><Text>一</Text><Text>二</Text></SimpleGrid>
+          <Text id="g_phone_wide" visibleFrom="sm">宽屏才显示</Text>
+        </Stack>
+      </Phone>
+    </Group>
     <Placeholder label="图表" h={40} />
     <Custom kind="地图" />
     <div><span>span</span><p>p</p><h1>h1</h1><h2>h2</h2><h3>h3</h3><h4>h4</h4><strong>b</strong><em>i</em><small>s</small><code>c</code></div>

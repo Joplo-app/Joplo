@@ -47,6 +47,12 @@ test.describe('组件目录画廊', () => {
     await expect(node(page, 'g_dt_empty')).toContainText('空空如也');
     await expect(node(page, 'g_sel')).toContainText('乙');
     await expect(node(page, 'g_text')).toContainText('出错了');
+    // Terminal：输出四种色调、输入行显示 placeholder；Phone：内部按手机宽度排版
+    await expect(node(page, 'g_term').locator('[data-tone="error"]')).toContainText('找不到');
+    await expect(node(page, 'g_term_in')).toContainText('输入命令');
+    await expect(node(page, 'g_phone').locator('[data-jphone-button]')).toHaveCount(4);
+    await expect(node(page, 'g_phone_grid')).toHaveAttribute('data-cols', '1');
+    await expect(page.locator('[data-joplo-stage] [data-jid="g_phone_wide"]')).toHaveCount(0);
     expect(errors, errors.join('\n')).toEqual([]);
   });
 
@@ -66,6 +72,8 @@ test.describe('组件目录画廊', () => {
     await expect(node(page, 'g_grid')).toHaveAttribute('data-cols', '1');
     await expect(page.locator('[data-joplo-stage] [data-jid="g_nav"]')).toHaveCount(0);
     await expect(node(page, 'g_burger')).toBeVisible();
+    // 手机宽度：舞台自动套上手机外框（与 Phone 组件同一份渲染）
+    await expect(page.getByTestId('device-phone').locator('[data-jphone-screen] [data-joplo-stage]')).toHaveCount(1);
 
     // 回到页面自身的宽度
     await page.getByTestId('width-desktop').click();

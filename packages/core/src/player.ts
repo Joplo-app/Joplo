@@ -5,7 +5,7 @@
  * 位置（position）语义：0 = 场景初始状态；k = 已执行前 k 个步骤之后的状态。
  * “上一步”通过从初始状态重放到 k-1 实现，因此恢复的是业务可见状态，而不是撤销动画。
  */
-import { GATED_CONTAINERS, INTERACTIVE_TYPES, VALUE_TYPES, VIEWPORT_SIZE, atWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
+import { GATED_CONTAINERS, INTERACTIVE_TYPES, VALUE_TYPES, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
 import type { Condition, Project, Scenario, Scene, SceneNode, Step } from './schema.ts';
 import { JoploError, type Diagnostic } from './result.ts';
 
@@ -182,14 +182,20 @@ export function isNodeVisible(scene: Scene, nodeId: string, state: PlayState, wi
   const hit = findNode(scene, nodeId);
   if (!hit) return false;
   let shell: SceneNode | null = null;
+  let shellWidth = width;
+  let w = width;
   for (const n of [...hit.ancestors, hit.node]) {
-    if (!isSelfVisible(n, state, width)) return false;
-    if (n.type === 'AppShell') shell = n;
+    if (!isSelfVisible(n, state, w)) return false;
+    if (n.type === 'AppShell') {
+      shell = n;
+      shellWidth = w;
+    }
     if (shell && (n.type === 'AppShell.Navbar' || n.type === 'AppShell.Aside')) {
-      const l = appShellLayout(shell.props, state, width);
+      const l = appShellLayout(shell.props, state, shellWidth);
       const r = n.type === 'AppShell.Navbar' ? l.navbar : l.aside;
       if (r?.collapsed) return false;
     }
+    w = childWidth(n.type, w);
   }
   return true;
 }

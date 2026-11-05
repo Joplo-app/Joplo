@@ -160,6 +160,7 @@ function Site({ project, home }: { project: Project; home: string | null }) {
             <>
               <StageViewport
                 viewport={viewportOf(project, state)}
+                theme={theme}
                 mode="demo"
                 notice={snap.notice}
                 onDismiss={() => ctl.dismissNotice()}

@@ -16,7 +16,9 @@ import { motion } from 'motion/react';
 import {
   INTERACTIVE_TYPES,
   appShellLayout,
+  VIEWPORT_SIZE,
   atWidth,
+  childWidth,
   choicesOf,
   isNodeDisabled,
   isSelfVisible,
@@ -1512,6 +1514,143 @@ function PromptInput({ node, p, disabled }: NodeProps) {
   );
 }
 
+// ============ 设备外框：终端与手机 ============
+
+const TERM_BG = '#1f2125';
+const TERM_TONE: Record<string, string> = { plain: '#e9ecef', ok: '#8ce99a', warn: '#ffd43b', error: '#ff8787' };
+
+/** 终端窗口：标题栏（三个圆点 + title）+ 深色内容区；内容超出 h / mah 时在内容区内部滚动。 */
+function Terminal({ node, p, children }: NodeProps) {
+  const root = useRoot(node, p, {
+    className: 'jbox [.jstage[data-theme=clean]_&]:rounded-lg',
+    style: { display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, background: TERM_BG, color: TERM_TONE.plain, fontFamily: MONO, fontSize: 13, overflow: 'hidden' },
+  });
+  return (
+    <div {...root} data-fill="ink">
+      <Rough seedKey={node.id} roughness={0.9} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderBottom: '1px solid #3a3d42', flexShrink: 0 }}>
+        {['#ff6b6b', '#fcc419', '#51cf66'].map((c) => (
+          <span key={c} aria-hidden style={{ width: 10, height: 10, borderRadius: 5, background: c, flexShrink: 0 }} />
+        ))}
+        <span className="jtrunc" style={{ flex: 1, textAlign: 'center', color: '#adb5bd', fontSize: 12, marginRight: 46 }}>
+          {str(p.title, '终端')}
+        </span>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }} data-jterm-body="">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function TerminalCommand({ node, p, children }: NodeProps) {
+  const root = useRoot(node, p, { style: { display: 'flex', gap: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#f8f9fa' } });
+  return (
+    <div {...root}>
+      <span aria-hidden style={{ color: '#74c0fc', flexShrink: 0 }}>{str(p.prompt, '$')}</span>
+      <span style={{ minWidth: 0 }}>{children}</span>
+    </div>
+  );
+}
+
+function TerminalOutput({ node, p, children }: NodeProps) {
+  const tone = str(p.tone, 'plain');
+  const root = useRoot(node, p, { style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: TERM_TONE[tone] ?? TERM_TONE.plain, lineHeight: 1.55 } });
+  return (
+    <div {...root} data-tone={tone in TERM_TONE ? tone : 'plain'}>
+      {children}
+    </div>
+  );
+}
+
+/** 终端里的输入行（值类型）：type 动作写入；没有值时显示 placeholder。 */
+function TerminalInput({ node, p, disabled }: NodeProps) {
+  const v = useInputValue(node, p);
+  const has = v !== undefined && v !== null && v !== '';
+  const root = useRoot(node, p, { disabled, style: { display: 'flex', gap: 8, alignItems: 'baseline', color: '#f8f9fa' } });
+  return (
+    <div {...root}>
+      <span aria-hidden style={{ color: '#74c0fc', flexShrink: 0 }}>{str(p.prompt, '$')}</span>
+      <span role="textbox" aria-readonly="true" tabIndex={0} data-jcontrol={node.id} style={{ minWidth: 0, flex: 1, whiteSpace: 'pre-wrap', color: has ? '#f8f9fa' : '#868e96' }}>
+        <span data-jtext="">{has ? str(v) : str(p.placeholder)}</span>
+        <span aria-hidden style={{ display: 'inline-block', width: 8, height: '1.05em', marginLeft: 2, verticalAlign: 'text-bottom', background: '#adb5bd' }} />
+      </span>
+    </div>
+  );
+}
+
+/** 手机外框的几何尺寸（屏幕之外）。 */
+export const PHONE_BEZEL = 14;
+const PHONE_RADIUS = 54;
+const PHONE_BUTTONS: { side: 'left' | 'right'; top: number; h: number }[] = [
+  { side: 'left', top: 118, h: 30 },
+  { side: 'left', top: 176, h: 58 },
+  { side: 'left', top: 246, h: 58 },
+  { side: 'right', top: 196, h: 90 },
+];
+
+/**
+ * 手机外框（Phone 组件与舞台的自动外框共用）：大圆角机身、侧边按键、顶部听筒，不显示任何文字。
+ * children 是屏幕内容，按 width × height 排版；scale 只做视觉缩放。主题取外层 ThemeContext（sketch 用手绘描边）。
+ */
+export function PhoneFrame({ width, height, scale = 1, children, seed = 'phone' }: { width: number; height: number; scale?: number; children: ReactNode; seed?: string }) {
+  const theme = useStageTheme();
+  const sketch = theme === 'sketch';
+  const W = width + PHONE_BEZEL * 2;
+  const H = height + PHONE_BEZEL * 2;
+  const ink = '#1e1e1e';
+  return (
+    <div style={{ width: (W + 8) * scale, height: H * scale, position: 'relative', flexShrink: 0 }} data-jphone-frame="" data-theme={theme}>
+      <div style={{ position: 'absolute', left: 4, top: 0, width: W, height: H, transform: scale === 1 ? undefined : `scale(${scale})`, transformOrigin: '0 0' }}>
+        {PHONE_BUTTONS.map((b, i) => (
+          <div
+            key={i}
+            aria-hidden
+            data-jphone-button={b.side}
+            style={{ position: 'absolute', top: b.top, height: b.h, width: 4, [b.side]: -4, background: sketch ? 'transparent' : ink, borderRadius: b.side === 'left' ? '3px 0 0 3px' : '0 3px 3px 0' }}
+          >
+            {sketch ? <Rough seedKey={`${seed}:btn${i}`} strokeWidth={1.4} inset={0.5} fill={ink} fillStyle="solid" /> : null}
+          </div>
+        ))}
+        <div style={{ position: 'absolute', inset: 0, borderRadius: PHONE_RADIUS, background: sketch ? 'var(--stage-paper, #fffdf8)' : ink, boxShadow: sketch ? 'none' : '0 18px 40px rgba(0,0,0,0.18)' }}>
+          {sketch ? <Rough seedKey={`${seed}:body`} shape="roundrect" radius={PHONE_RADIUS} strokeWidth={2.2} roughness={0.8} inset={1.5} /> : null}
+        </div>
+        <div aria-hidden style={{ position: 'absolute', top: Math.round(PHONE_BEZEL / 2) - 2, left: '50%', width: 64, height: 4, marginLeft: -32, borderRadius: 2, background: sketch ? '#5a5a5a' : '#3a3a3a' }} />
+        <div style={{ position: 'absolute', left: PHONE_BEZEL, top: PHONE_BEZEL, width, height, borderRadius: PHONE_RADIUS - PHONE_BEZEL, overflow: 'hidden', background: '#fff', isolation: 'isolate' }} data-jphone-screen="">
+          {sketch ? <Rough seedKey={`${seed}:screen`} shape="roundrect" radius={PHONE_RADIUS - PHONE_BEZEL} strokeWidth={1.3} roughness={0.7} inset={1} /> : null}
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Phone 组件：子节点放进手机屏幕，按手机宽度排版（响应式断点按这个宽度计算）；弹窗渲染在屏幕内。 */
+function Phone({ node, p, children }: NodeProps) {
+  const ctx = useCtx();
+  const [layer, setLayer] = useState<HTMLDivElement | null>(null);
+  const r = useR(p);
+  const width = childWidth('Phone', ctx.width);
+  const hv = Number(r('h'));
+  const height = Number.isFinite(hv) && hv > 0 ? hv : VIEWPORT_SIZE.mobile.height;
+  const sv = Number(r('scale'));
+  const scale = Number.isFinite(sv) && sv > 0 ? sv : 1;
+  const { h: _h, w: _w, ...rest } = p;
+  const root = useRoot(node, rest, { style: { display: 'inline-block', flexShrink: 0 } });
+  return (
+    <div {...root}>
+      <PhoneFrame width={width} height={height} scale={scale} seed={node.id}>
+        <RenderContext.Provider value={{ ...ctx, width, dialogLayer: layer }}>
+          <div style={{ position: 'absolute', inset: 0, overflow: 'auto' }} data-jphone-content="">
+            {children}
+          </div>
+        </RenderContext.Provider>
+        <div ref={setLayer} className="pointer-events-none absolute inset-0 z-20 [&>*]:pointer-events-auto" data-jlayer="dialog" />
+      </PhoneFrame>
+    </div>
+  );
+}
+
 // ============ Joplo ============
 
 function Placeholder({ node, p }: NodeProps) {
@@ -1600,6 +1739,10 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   Drawer: Overlay,
   ChatMessage,
   ToolCall,
+  Terminal,
+  'Terminal.Command': TerminalCommand,
+  'Terminal.Output': TerminalOutput,
+  Phone,
   ...(Object.fromEntries(HTML_TAGS.map((t) => [t, htmlImpl(t)])) as Record<HtmlTag, (props: NodeProps) => ReactNode>),
   Placeholder,
   Custom,
@@ -1627,6 +1770,7 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   'Accordion.Control': AccordionControl,
   Pagination,
   PromptInput,
+  'Terminal.Input': TerminalInput,
 };
 
 /** 渲染器实现的类型清单（e2e 目录画廊据此检查与 COMPONENT_TYPES 一致）。 */

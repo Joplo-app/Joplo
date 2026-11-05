@@ -96,6 +96,8 @@ pnpm web:serve path/to/project --port 4800 --open
   - 所有布局与样式属性都接受 `{ base, xs, sm, md, lg, xl }`，按 Mantine 默认断点 36/48/62/75/88em 取值（`atWidth`）；
   - `visibleFrom` / `hiddenFrom` 在 `isSelfVisible` 里判断；
   - `AppShell` 的 `navbar` / `aside` 在窄于 `breakpoint` 时默认收起（`collapsed.mobile` 写 false 或绑定为假时以覆盖层展开），没有 `Burger` 时在顶栏补一个示意图标。
+  - `Phone` 组件内部的宽度固定为手机宽度 390（`childWidth`），断点、`visibleFrom` / `hiddenFrom`、`AppShell` 收起都按它算；`isNodeVisible` 沿祖先链同样切换宽度，回放与渲染一致。外框由 `PhoneFrame` 绘制（大圆角机身、侧键、听筒，不显示文字），舞台在手机宽度时自动套上同一个 `PhoneFrame`。
+  - `Terminal`：标题栏 + 深色内容区，`Terminal.Output` 的 `tone`（plain / ok / warn / error）决定颜色，超出 `h` / `mah` 时内容区内部滚动；`Terminal.Input` 是值类型（`type` 写入）。
   - 回放与点击解释按**页面自身的 viewport**计算同样的规则：步骤目标在该宽度下被隐藏或导航被收起时报 `TARGET_HIDDEN`。看板的宽度切换只是预览，不改变回放结果。
 - 样式属性（`m/p/w/h/c/bg/fz/fw/ta/ff…`）在 `renderer/style.ts` 转成内联样式；间距、字号、圆角用 Mantine 默认刻度，颜色映射到一组柔和的调色板。
 - 浮层渲染在舞台内部的弹窗层（不 portal 到 body），截图和遮挡检查只看舞台本身。

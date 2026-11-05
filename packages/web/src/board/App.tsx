@@ -148,6 +148,7 @@ export function BoardApp() {
               <>
                 <StageViewport
                   viewport={width ?? viewportOf(project, state)}
+                  theme={theme}
                   mode={snap.mode}
                   notice={snap.notice}
                   onDismiss={() => ctl.dismissNotice()}
