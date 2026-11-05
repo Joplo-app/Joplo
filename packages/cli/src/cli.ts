@@ -1,10 +1,11 @@
 import { Command, CommanderError, Option } from 'commander';
 import { resolve } from 'node:path';
-import { guide, JoploError } from '@joplo/core';
+import { guide, JoploError, skillIndex, skillTopic } from '@joplo/core';
 import type * as Server from '../../server/src/contract.ts';
 import { check } from './check.ts';
 import { initProject } from './init.ts';
 import { readSelection } from './selection.ts';
+import { installSkill, readCliVersion } from './skill.ts';
 import { diagnosticLine, failure, oneLine, result } from './common.ts';
 
 type Dependencies = {
@@ -58,7 +59,22 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     else { line(summary); for (const l of data.lines) line(`${l.number} | ${l.text}`); if (data.note) line(data.note); }
   });
   program.command('init').argument('<dir>').option('--name <name>', '项目名（默认目录名）').action(async (dir, opts) => { line(`已创建 ${await initProject(dir, opts.name)}`); });
-  program.command('guide').action(() => { stdout(guide()); });
+  program.command('skill').description('按需读取 Agent 用法，或安装用法入口')
+    .argument('[topic]', 'authoring/components/cases/check/selection/publish，或 install')
+    .argument('[dir]', 'install 的目标项目目录')
+    .option('--force', '覆盖被修改过的 SKILL.md')
+    .option('--diff', '只显示 unified diff，不写入')
+    .option('--agents-md', '即使 AGENTS.md 不存在也创建托管段')
+    .action(async (topic, dir, opts) => {
+      if (topic === 'install') {
+        const installed = await installSkill(dir ?? '.', await readCliVersion(), opts);
+        stdout(installed.output); exitCode = installed.code;
+      } else {
+        if (dir !== undefined || opts.force || opts.diff || opts.agentsMd) throw new JoploError('USAGE', 'dir、--force、--diff、--agents-md 只适用于 joplo skill install');
+        stdout(topic === undefined ? skillIndex(await readCliVersion()) : skillTopic(topic));
+      }
+    });
+  program.command('guide').description('joplo skill authoring 的兼容别名').action(() => { stdout(guide()); });
   program.command('dev').argument('[dir]', '项目目录', '.').option('--port <port>', '端口（默认 4790）', integer('port', 65535)).option('--open', '打开浏览器').action(async (dir, opts) => {
     const startDev = await serverFunction('startDev');
     const handle = await startDev({ projectDir: resolve(dir), port: opts.port, open: opts.open, log: s => stderr(oneLine(s) + '\n') });

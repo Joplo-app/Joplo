@@ -57,6 +57,20 @@ pnpm joplo guide
 
 `init` 生成 ESM 项目和创作文件，但不自动安装依赖，所以在仓库外使用时先完成上述链接。CLI 仍从仓库运行，如 `pnpm joplo check /绝对路径/my-demo`。不要改用 React 的 JSX runtime，否则会丢失 Joplo 数据和源位置。
 
+## Agent 按需读取用法
+
+运行 `pnpm joplo skill` 查看主题和实际行数，再读取这次需要的一两个主题，例如 `pnpm joplo skill authoring`、`pnpm joplo skill cases`。每个主题少于 150 行；`guide` 保留为 `skill authoring` 的别名。
+
+在项目里安装一个短入口，让 Claude Code 或 Codex 等 Agent 发现用法：
+
+```sh
+pnpm joplo skill install examples/my-demo
+# 没有 AGENTS.md 时也要为 Codex 创建入口：
+pnpm joplo skill install examples/my-demo --agents-md
+```
+
+安装只写 `.claude/skills/joplo/SKILL.md` 指针；详细用法每次由当前 CLI 输出。已有 AGENTS.md 会更新其中的 Joplo 托管段。用户改过的 SKILL.md 不自动覆盖，用 `--diff` 预览，明确需要覆盖时用 `--force`。发布安装后的命令写法是 `npx joplo skill`，选中元素后用 `npx joplo selection` 精确定位。
+
 ## 快速开始
 
 ```sh
