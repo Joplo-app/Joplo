@@ -1,0 +1,19 @@
+/* 作者主题示例：仿 AWS 控制台配色（深蓝顶栏色 + 橙色强调）。写 CSS 变量即可，Joplo 自动限定在演示画面里。 */
+:root {
+  --jp-font: "Amazon Ember", "Helvetica Neue", "PingFang SC", system-ui, sans-serif;
+  --jp-ink: #16191f;
+  --jp-bg: #f2f3f3;
+  --jp-surface: #ffffff;
+  --jp-subtle: #fafafa;
+  --jp-muted: #545b64;
+  --jp-line: #d5dbdb;
+  --jp-line-strong: #879596;
+  --jp-accent: #ff9900;
+  --jp-select: #ec7211;
+  --jp-info: #0073bb;
+  --jp-ok: #1d8102;
+  --jp-warn: #ff9900;
+  --jp-danger: #d13212;
+  --jp-radius: 2px;
+  --jp-stroke: clean;
+}
