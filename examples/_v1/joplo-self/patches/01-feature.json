@@ -1,0 +1,172 @@
+{
+  "expectRevision": 0,
+  "idempotencyKey": "self_feature_v1",
+  "summary": "建立 Joplo 自迭代功能：方案工作区减负",
+  "operations": [
+    {
+      "op": "upsertFeature",
+      "value": {
+        "id": "feat_focus",
+        "name": "方案工作区减负：让原型成为主角",
+        "goal": "打开一个方案时，被演示的原型占据画面主体；场景、情况、规则和检查器按需出现，但可追溯性不能丢",
+        "roles": [
+          "驱动 Agent 的开发者（审阅者本人）",
+          "会议旁听者"
+        ],
+        "constraints": [
+          {
+            "id": "con_trace",
+            "text": "从任一元素，一步之内仍能看到它关联的规则与情况（PRD 1.2）",
+            "hard": true
+          },
+          {
+            "id": "con_mode",
+            "text": "审阅 / 演示模式始终清楚可辨（PRD 4.4）",
+            "hard": true
+          },
+          {
+            "id": "con_concept",
+            "text": "“概念原型 · 非正式实现”标识常驻",
+            "hard": true
+          },
+          {
+            "id": "con_gaps",
+            "text": "缺失与待决定的情况不能被藏到无法发现（PRD 6.2）",
+            "hard": true
+          }
+        ],
+        "caseIds": [
+          "case_first_look",
+          "case_find_gap",
+          "case_point",
+          "case_rule_of_step",
+          "case_meeting",
+          "case_small_window"
+        ],
+        "optionIds": [],
+        "dependsOn": []
+      }
+    },
+    {
+      "op": "upsertCase",
+      "value": {
+        "id": "case_first_look",
+        "featureId": "feat_focus",
+        "title": "第一次打开方案，先看懂原型",
+        "dimension": "main",
+        "expected": "原型占据画面主体，不用滚动就能看到完整页面；其他信息不抢注意力",
+        "priority": "high"
+      }
+    },
+    {
+      "op": "upsertCase",
+      "value": {
+        "id": "case_find_gap",
+        "featureId": "feat_focus",
+        "title": "找出还没设计的情况",
+        "dimension": "main",
+        "expected": "缺失和待决定的数量常驻可见，最多一次点击就能看到清单并定位",
+        "priority": "high"
+      }
+    },
+    {
+      "op": "upsertCase",
+      "value": {
+        "id": "case_point",
+        "featureId": "feat_focus",
+        "title": "选中一个元素，告诉 Agent 改什么",
+        "dimension": "main",
+        "expected": "选中后能看到元素引用和关联规则，并同步给 Agent（D15）",
+        "priority": "high"
+      }
+    },
+    {
+      "op": "upsertCase",
+      "value": {
+        "id": "case_rule_of_step",
+        "featureId": "feat_focus",
+        "title": "看某个元素或步骤背后的规则",
+        "dimension": "consistency",
+        "expected": "能分辨规则是用户确认的还是 AI 假设",
+        "priority": "high"
+      }
+    },
+    {
+      "op": "upsertCase",
+      "value": {
+        "id": "case_meeting",
+        "featureId": "feat_focus",
+        "title": "会议上共享屏幕演示",
+        "dimension": "main",
+        "expected": "旁听者只看到原型和步骤字幕，不被内部信息分散注意力（D8）",
+        "priority": "medium"
+      }
+    },
+    {
+      "op": "upsertCase",
+      "value": {
+        "id": "case_small_window",
+        "featureId": "feat_focus",
+        "title": "在笔记本小窗口里使用",
+        "dimension": "input",
+        "expected": "1280 宽的窗口里原型仍清晰可读",
+        "priority": "medium"
+      }
+    },
+    {
+      "op": "upsertRule",
+      "value": {
+        "id": "rule_less_by_default",
+        "featureId": "feat_focus",
+        "text": "默认界面的信息要少，原型是主角（用户反馈：“看着东西太多了”）",
+        "origin": "feedback",
+        "confirmation": "pending",
+        "caseIds": [
+          "case_first_look",
+          "case_meeting"
+        ]
+      }
+    },
+    {
+      "op": "upsertRule",
+      "value": {
+        "id": "rule_stage_70",
+        "featureId": "feat_focus",
+        "text": "默认状态下，原型舞台宽度不少于工作区宽度的 70%",
+        "origin": "ai_assumption",
+        "confirmation": "pending",
+        "caseIds": [
+          "case_first_look",
+          "case_small_window"
+        ]
+      }
+    },
+    {
+      "op": "upsertRule",
+      "value": {
+        "id": "rule_gaps_visible",
+        "featureId": "feat_focus",
+        "text": "缺失与待决定的情况数量始终可见，不能只藏在收起的面板里",
+        "origin": "project_material",
+        "confirmation": "pending",
+        "caseIds": [
+          "case_find_gap"
+        ]
+      }
+    },
+    {
+      "op": "upsertRule",
+      "value": {
+        "id": "rule_trace_one_step",
+        "featureId": "feat_focus",
+        "text": "从原型中的元素出发，一步就能看到关联规则与情况",
+        "origin": "project_material",
+        "confirmation": "pending",
+        "caseIds": [
+          "case_point",
+          "case_rule_of_step"
+        ]
+      }
+    }
+  ]
+}

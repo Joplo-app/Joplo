@@ -1,0 +1,9 @@
+{
+  "expectRevision": 4,
+  "idempotencyKey": "self_anno_unmodeled_v1",
+  "summary": "方案 C：原型按钮的审阅选中本版未画出，如实标记为未建模",
+  "operations": [
+    { "op": "updateNode", "sceneId": "scene_anno", "nodeId": "an_stage_invite",
+      "patch": { "unmodeled": true, "note": "方案 C 只画了“通过标注复制引用”；没有标注的元素如何选中，本版未建模" } }
+  ]
+}

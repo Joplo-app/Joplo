@@ -1,0 +1,2100 @@
+{
+  "schemaVersion": 1,
+  "id": "prj_844398494fcf4f03aa97c7611f9bb0b0",
+  "name": "Joplo 自迭代：方案工作区减负",
+  "description": "",
+  "revision": 6,
+  "updatedAt": "2026-11-05T10:29:57.736Z",
+  "features": {
+    "feat_focus": {
+      "id": "feat_focus",
+      "name": "方案工作区减负：让原型成为主角",
+      "goal": "打开一个方案时，被演示的原型占据画面主体；场景、情况、规则和检查器按需出现，但可追溯性不能丢",
+      "roles": [
+        "驱动 Agent 的开发者（审阅者本人）",
+        "会议旁听者"
+      ],
+      "constraints": [
+        {
+          "id": "con_trace",
+          "text": "从任一元素，一步之内仍能看到它关联的规则与情况（PRD 1.2）",
+          "hard": true
+        },
+        {
+          "id": "con_mode",
+          "text": "审阅 / 演示模式始终清楚可辨（PRD 4.4）",
+          "hard": true
+        },
+        {
+          "id": "con_concept",
+          "text": "“概念原型 · 非正式实现”标识常驻",
+          "hard": true
+        },
+        {
+          "id": "con_gaps",
+          "text": "缺失与待决定的情况不能被藏到无法发现（PRD 6.2）",
+          "hard": true
+        }
+      ],
+      "caseIds": [
+        "case_first_look",
+        "case_find_gap",
+        "case_point",
+        "case_rule_of_step",
+        "case_meeting",
+        "case_small_window"
+      ],
+      "optionIds": [
+        "opt_fold",
+        "opt_mode",
+        "opt_anno"
+      ],
+      "dependsOn": []
+    }
+  },
+  "cases": {
+    "case_first_look": {
+      "id": "case_first_look",
+      "featureId": "feat_focus",
+      "title": "第一次打开方案，先看懂原型",
+      "dimension": "main",
+      "expected": "原型占据画面主体，不用滚动就能看到完整页面；其他信息不抢注意力",
+      "priority": "high"
+    },
+    "case_find_gap": {
+      "id": "case_find_gap",
+      "featureId": "feat_focus",
+      "title": "找出还没设计的情况",
+      "dimension": "main",
+      "expected": "缺失和待决定的数量常驻可见，最多一次点击就能看到清单并定位",
+      "priority": "high"
+    },
+    "case_point": {
+      "id": "case_point",
+      "featureId": "feat_focus",
+      "title": "选中一个元素，告诉 Agent 改什么",
+      "dimension": "main",
+      "expected": "选中后能看到元素引用和关联规则，并同步给 Agent（D15）",
+      "priority": "high"
+    },
+    "case_rule_of_step": {
+      "id": "case_rule_of_step",
+      "featureId": "feat_focus",
+      "title": "看某个元素或步骤背后的规则",
+      "dimension": "consistency",
+      "expected": "能分辨规则是用户确认的还是 AI 假设",
+      "priority": "high"
+    },
+    "case_meeting": {
+      "id": "case_meeting",
+      "featureId": "feat_focus",
+      "title": "会议上共享屏幕演示",
+      "dimension": "main",
+      "expected": "旁听者只看到原型和步骤字幕，不被内部信息分散注意力（D8）",
+      "priority": "medium"
+    },
+    "case_small_window": {
+      "id": "case_small_window",
+      "featureId": "feat_focus",
+      "title": "在笔记本小窗口里使用",
+      "dimension": "input",
+      "expected": "1280 宽的窗口里原型仍清晰可读",
+      "priority": "medium"
+    }
+  },
+  "options": {
+    "opt_fold": {
+      "id": "opt_fold",
+      "featureId": "feat_focus",
+      "name": "A · 保留三栏，默认收起",
+      "idea": "保留现在的三栏结构，两侧默认收起；工具条上常驻场景数和缺口数，点击后展开对应侧栏",
+      "decisionFocus": "信息呈现方式：结构不变，只改默认显示状态",
+      "tradeoffs": [
+        "改动最小，现有功能都在原位",
+        "要靠用户记得展开；两侧都展开时又回到拥挤",
+        "缺口数量在工具条上常驻"
+      ],
+      "derivedFrom": [],
+      "archived": false,
+      "coverage": {
+        "case_first_look": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_fa_first"
+          ]
+        },
+        "case_find_gap": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_fa_gap"
+          ]
+        },
+        "case_point": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_fa_point"
+          ]
+        },
+        "case_rule_of_step": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_fa_point"
+          ],
+          "reason": "需要先选中元素；演示过程中看不到当前步骤的规则"
+        },
+        "case_meeting": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_fa_first"
+          ]
+        },
+        "case_small_window": {
+          "status": "undecided",
+          "scenarioIds": [],
+          "reason": "两侧同时展开时，小窗口里的原型仍会被挤到一半宽度；改成浮层还是挤压，待决定"
+        }
+      }
+    },
+    "opt_mode": {
+      "id": "opt_mode",
+      "featureId": "feat_focus",
+      "name": "B · 模式决定信息量",
+      "idea": "演示模式只有原型、步骤条和顶栏的缺口数量；切到审阅模式，两侧栏才出现",
+      "decisionFocus": "信息密度绑定模式：看演示与做审阅是两种界面",
+      "tradeoffs": [
+        "演示和会议最干净",
+        "审阅模式仍是三栏，原问题只解决了一半",
+        "切换模式时整个布局跳动"
+      ],
+      "derivedFrom": [],
+      "archived": false,
+      "coverage": {
+        "case_first_look": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_mb_first"
+          ]
+        },
+        "case_find_gap": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_mb_gap"
+          ]
+        },
+        "case_point": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_mb_point"
+          ]
+        },
+        "case_rule_of_step": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_mb_point"
+          ],
+          "reason": "只有在审阅模式下能看到；演示时看不到当前步骤的规则"
+        },
+        "case_meeting": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_mb_first"
+          ]
+        },
+        "case_small_window": {
+          "status": "undecided",
+          "scenarioIds": [],
+          "reason": "演示模式没有问题；审阅模式仍是三栏，小窗口会回到现在的拥挤"
+        }
+      }
+    },
+    "opt_anno": {
+      "id": "opt_anno",
+      "featureId": "feat_focus",
+      "name": "C · 规则就地标注，情况即场景",
+      "idea": "取消右侧检查器：规则以编号标注贴在原型元素旁边；左侧只保留一列“情况”，点已表达的情况直接播放场景，点缺失的情况直接看到缺口",
+      "decisionFocus": "信息组织位置：从“侧栏里的列表”改为“画面上的标注”",
+      "tradeoffs": [
+        "规则离画面最近，可追溯性最强",
+        "只有一列侧栏，小窗口友好",
+        "改动最大；标注多时可能遮挡原型，需要密度控制"
+      ],
+      "derivedFrom": [],
+      "archived": false,
+      "coverage": {
+        "case_first_look": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_an_first"
+          ]
+        },
+        "case_find_gap": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_an_gap"
+          ]
+        },
+        "case_point": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_an_rule"
+          ],
+          "reason": "通过标注复制引用；没有标注的元素仍需要审阅模式选中，本方案未画出"
+        },
+        "case_rule_of_step": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_an_rule"
+          ]
+        },
+        "case_meeting": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_an_first"
+          ],
+          "reason": "依赖“隐藏标注”开关，本版未建模"
+        },
+        "case_small_window": {
+          "status": "expressed",
+          "scenarioIds": [
+            "sc_an_first"
+          ],
+          "reason": "只有一列 200px 侧栏"
+        }
+      }
+    }
+  },
+  "rules": {
+    "rule_less_by_default": {
+      "id": "rule_less_by_default",
+      "featureId": "feat_focus",
+      "text": "默认界面的信息要少，原型是主角（用户反馈：“看着东西太多了”）",
+      "origin": "feedback",
+      "confirmation": "pending",
+      "caseIds": [
+        "case_first_look",
+        "case_meeting"
+      ],
+      "elementRefs": [],
+      "stepIds": []
+    },
+    "rule_stage_70": {
+      "id": "rule_stage_70",
+      "featureId": "feat_focus",
+      "text": "默认状态下，原型舞台宽度不少于工作区宽度的 70%",
+      "origin": "ai_assumption",
+      "confirmation": "pending",
+      "caseIds": [
+        "case_first_look",
+        "case_small_window"
+      ],
+      "elementRefs": [],
+      "stepIds": []
+    },
+    "rule_gaps_visible": {
+      "id": "rule_gaps_visible",
+      "featureId": "feat_focus",
+      "text": "缺失与待决定的情况数量始终可见，不能只藏在收起的面板里",
+      "origin": "project_material",
+      "confirmation": "pending",
+      "caseIds": [
+        "case_find_gap"
+      ],
+      "elementRefs": [],
+      "stepIds": []
+    },
+    "rule_trace_one_step": {
+      "id": "rule_trace_one_step",
+      "featureId": "feat_focus",
+      "text": "从原型中的元素出发，一步就能看到关联规则与情况",
+      "origin": "project_material",
+      "confirmation": "pending",
+      "caseIds": [
+        "case_point",
+        "case_rule_of_step"
+      ],
+      "elementRefs": [],
+      "stepIds": []
+    },
+    "rule_fa_remember": {
+      "id": "rule_fa_remember",
+      "featureId": "feat_focus",
+      "optionId": "opt_fold",
+      "text": "侧栏的展开 / 收起状态按项目记住",
+      "origin": "ai_assumption",
+      "confirmation": "pending",
+      "caseIds": [
+        "case_first_look"
+      ],
+      "elementRefs": [
+        "scene_fold#fa_btn_cases"
+      ],
+      "stepIds": []
+    },
+    "rule_mb_mode_layout": {
+      "id": "rule_mb_mode_layout",
+      "featureId": "feat_focus",
+      "optionId": "opt_mode",
+      "text": "侧栏是否显示完全由模式决定：演示模式隐藏，审阅模式显示",
+      "origin": "ai_assumption",
+      "confirmation": "pending",
+      "caseIds": [
+        "case_first_look",
+        "case_meeting"
+      ],
+      "elementRefs": [
+        "scene_mode#mb_btn_mode"
+      ],
+      "stepIds": []
+    },
+    "rule_an_density": {
+      "id": "rule_an_density",
+      "featureId": "feat_focus",
+      "optionId": "opt_anno",
+      "text": "每个画面同时显示的标注不超过 5 个，超出时合并为“+N”",
+      "origin": "ai_assumption",
+      "confirmation": "pending",
+      "caseIds": [
+        "case_first_look"
+      ],
+      "elementRefs": [
+        "scene_anno#an_anno_rule"
+      ],
+      "stepIds": []
+    }
+  },
+  "scenes": {
+    "scene_fold": {
+      "id": "scene_fold",
+      "optionId": "opt_fold",
+      "name": "A · 工作区（侧栏默认收起）",
+      "kind": "proposed",
+      "viewport": "desktop",
+      "root": {
+        "id": "fa_page",
+        "type": "Page",
+        "children": [
+          {
+            "id": "fa_hdr",
+            "type": "Header",
+            "props": {
+              "title": "Joplo · 团队邀请功能 / A · 单人邮件邀请弹窗"
+            },
+            "children": [
+              {
+                "id": "fa_badge_concept",
+                "type": "Badge",
+                "props": {
+                  "text": "概念原型 · 非正式实现",
+                  "tone": "warning"
+                }
+              },
+              {
+                "id": "fa_badge_mode",
+                "type": "Badge",
+                "props": {
+                  "text": "$ui.modeText"
+                }
+              },
+              {
+                "id": "fa_btn_review",
+                "type": "Button",
+                "props": {
+                  "label": "切到审阅",
+                  "variant": "secondary"
+                }
+              }
+            ]
+          },
+          {
+            "id": "fa_toolbar",
+            "type": "Stack",
+            "props": {
+              "direction": "row",
+              "gap": 10,
+              "align": "center",
+              "justify": "between"
+            },
+            "children": [
+              {
+                "id": "fa_tb_left",
+                "type": "Stack",
+                "props": {
+                  "direction": "row",
+                  "gap": 10,
+                  "align": "center"
+                },
+                "children": [
+                  {
+                    "id": "fa_btn_scenes",
+                    "type": "Button",
+                    "props": {
+                      "label": "☰ 场景 · 3",
+                      "variant": "secondary"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "fa_btn_cases",
+                    "type": "Button",
+                    "props": {
+                      "label": "情况 · 缺失 3 · 待决定 1",
+                      "variant": "secondary"
+                    },
+                    "note": "收起状态下仍常驻缺口数量（rule_gaps_visible）"
+                  }
+                ]
+              },
+              {
+                "id": "fa_btn_rules",
+                "type": "Button",
+                "props": {
+                  "label": "规则 · 5 ▸",
+                  "variant": "secondary"
+                },
+                "unmodeled": true
+              }
+            ]
+          },
+          {
+            "id": "fa_body",
+            "type": "Stack",
+            "props": {
+              "direction": "row",
+              "gap": 12,
+              "align": "stretch"
+            },
+            "children": [
+              {
+                "id": "fa_left",
+                "type": "Sidebar",
+                "props": {
+                  "title": "情况覆盖（8）"
+                },
+                "children": [
+                  {
+                    "id": "fa_case_gap",
+                    "type": "Link",
+                    "props": {
+                      "label": "缺失 · 邮箱无效"
+                    }
+                  },
+                  {
+                    "id": "fa_case_revoked",
+                    "type": "Link",
+                    "props": {
+                      "label": "缺失 · 撤销后打开"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "fa_case_expired",
+                    "type": "Link",
+                    "props": {
+                      "label": "缺失 · 过期后访问"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "fa_case_member",
+                    "type": "Link",
+                    "props": {
+                      "label": "待决定 · 已是成员"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "fa_case_happy",
+                    "type": "Link",
+                    "props": {
+                      "label": "已表达 · 正常邀请"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "fa_btn_fold_left",
+                    "type": "Button",
+                    "props": {
+                      "label": "◂ 收起",
+                      "variant": "ghost"
+                    },
+                    "unmodeled": true
+                  }
+                ],
+                "when": {
+                  "truthy": "ui.leftOpen"
+                }
+              },
+              {
+                "id": "fa_stage",
+                "type": "Card",
+                "props": {
+                  "title": "原型舞台 · 成员管理页"
+                },
+                "children": [
+                  {
+                    "id": "fa_stage_hdr",
+                    "type": "Stack",
+                    "props": {
+                      "direction": "row",
+                      "gap": 10,
+                      "align": "center",
+                      "justify": "between"
+                    },
+                    "children": [
+                      {
+                        "id": "fa_stage_title",
+                        "type": "Heading",
+                        "props": {
+                          "text": "成员",
+                          "level": 2
+                        }
+                      },
+                      {
+                        "id": "fa_stage_actions",
+                        "type": "Stack",
+                        "props": {
+                          "direction": "row",
+                          "gap": 6,
+                          "align": "center"
+                        },
+                        "children": [
+                          {
+                            "id": "fa_stage_invite",
+                            "type": "Button",
+                            "props": {
+                              "label": "邀请成员",
+                              "variant": "primary"
+                            },
+                            "note": "被演示原型里的业务按钮；审阅模式下点击是“选中”，演示模式下是“执行”"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "fa_stage_tbl",
+                    "type": "Table",
+                    "props": {
+                      "columns": [
+                        {
+                          "key": "n",
+                          "label": "姓名"
+                        },
+                        {
+                          "key": "e",
+                          "label": "邮箱"
+                        },
+                        {
+                          "key": "r",
+                          "label": "权限"
+                        }
+                      ],
+                      "rows": [
+                        {
+                          "n": "王芳",
+                          "e": "wang.fang@example.com",
+                          "r": "管理员"
+                        },
+                        {
+                          "n": "陈晨",
+                          "e": "chen.chen@example.com",
+                          "r": "编辑者"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "fa_stage_hint",
+                    "type": "Text",
+                    "props": {
+                      "text": "（这一块就是被演示的原型，默认应占工作区的大部分宽度）",
+                      "tone": "muted"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "fa_right",
+                "type": "Sidebar",
+                "props": {
+                  "title": "检查器"
+                },
+                "children": [
+                  {
+                    "id": "fa_ins_type",
+                    "type": "Text",
+                    "props": {
+                      "text": "按钮「邀请成员」",
+                      "tone": "default"
+                    }
+                  },
+                  {
+                    "id": "fa_ins_ref",
+                    "type": "Text",
+                    "props": {
+                      "text": "引用：btn_invite",
+                      "tone": "muted"
+                    }
+                  },
+                  {
+                    "id": "fa_ins_rule1",
+                    "type": "Badge",
+                    "props": {
+                      "text": "用户 · 已确认",
+                      "tone": "success"
+                    }
+                  },
+                  {
+                    "id": "fa_ins_rule1_t",
+                    "type": "Text",
+                    "props": {
+                      "text": "只有空间管理员可以发起邀请",
+                      "tone": "default"
+                    }
+                  },
+                  {
+                    "id": "fa_ins_rule2",
+                    "type": "Badge",
+                    "props": {
+                      "text": "AI 假设 · 待确认",
+                      "tone": "warning"
+                    }
+                  },
+                  {
+                    "id": "fa_ins_rule2_t",
+                    "type": "Text",
+                    "props": {
+                      "text": "发送中禁用按钮，防止重复提交",
+                      "tone": "default"
+                    }
+                  }
+                ],
+                "when": {
+                  "truthy": "ui.rightOpen"
+                }
+              }
+            ]
+          },
+          {
+            "id": "fa_stepbar",
+            "type": "Stack",
+            "props": {
+              "direction": "row",
+              "gap": 10,
+              "align": "center"
+            },
+            "children": [
+              {
+                "id": "fa_btn_play",
+                "type": "Button",
+                "props": {
+                  "label": "▶ 自动播放",
+                  "variant": "primary"
+                }
+              },
+              {
+                "id": "fa_btn_next",
+                "type": "Button",
+                "props": {
+                  "label": "下一步",
+                  "variant": "secondary"
+                },
+                "unmodeled": true
+              },
+              {
+                "id": "fa_caption",
+                "type": "Text",
+                "props": {
+                  "text": "$ui.caption",
+                  "tone": "muted"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "scene_mode": {
+      "id": "scene_mode",
+      "optionId": "opt_mode",
+      "name": "B · 工作区（演示纯净 / 审阅完整）",
+      "kind": "proposed",
+      "viewport": "desktop",
+      "root": {
+        "id": "mb_page",
+        "type": "Page",
+        "children": [
+          {
+            "id": "mb_hdr",
+            "type": "Header",
+            "props": {
+              "title": "Joplo · 团队邀请功能 / A · 单人邮件邀请弹窗"
+            },
+            "children": [
+              {
+                "id": "mb_badge_concept",
+                "type": "Badge",
+                "props": {
+                  "text": "概念原型 · 非正式实现",
+                  "tone": "warning"
+                }
+              },
+              {
+                "id": "mb_badge_mode",
+                "type": "Badge",
+                "props": {
+                  "text": "$ui.modeText"
+                }
+              },
+              {
+                "id": "mb_btn_gaps",
+                "type": "Button",
+                "props": {
+                  "label": "缺失 3 · 待决定 1",
+                  "variant": "ghost"
+                },
+                "note": "演示模式下唯一常驻的设计信息"
+              },
+              {
+                "id": "mb_btn_mode",
+                "type": "Button",
+                "props": {
+                  "label": "$ui.modeBtn",
+                  "variant": "secondary"
+                }
+              }
+            ]
+          },
+          {
+            "id": "mb_body",
+            "type": "Stack",
+            "props": {
+              "direction": "row",
+              "gap": 12,
+              "align": "stretch"
+            },
+            "children": [
+              {
+                "id": "mb_left",
+                "type": "Sidebar",
+                "props": {
+                  "title": "情况覆盖（8）"
+                },
+                "children": [
+                  {
+                    "id": "mb_case_gap",
+                    "type": "Link",
+                    "props": {
+                      "label": "缺失 · 邮箱无效"
+                    }
+                  },
+                  {
+                    "id": "mb_case_revoked",
+                    "type": "Link",
+                    "props": {
+                      "label": "缺失 · 撤销后打开"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "mb_case_expired",
+                    "type": "Link",
+                    "props": {
+                      "label": "缺失 · 过期后访问"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "mb_case_member",
+                    "type": "Link",
+                    "props": {
+                      "label": "待决定 · 已是成员"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "mb_case_happy",
+                    "type": "Link",
+                    "props": {
+                      "label": "已表达 · 正常邀请"
+                    },
+                    "unmodeled": true
+                  }
+                ],
+                "when": {
+                  "eq": [
+                    "ui.mode",
+                    "review"
+                  ]
+                }
+              },
+              {
+                "id": "mb_stage",
+                "type": "Card",
+                "props": {
+                  "title": "原型舞台 · 成员管理页"
+                },
+                "children": [
+                  {
+                    "id": "mb_stage_hdr",
+                    "type": "Stack",
+                    "props": {
+                      "direction": "row",
+                      "gap": 10,
+                      "align": "center",
+                      "justify": "between"
+                    },
+                    "children": [
+                      {
+                        "id": "mb_stage_title",
+                        "type": "Heading",
+                        "props": {
+                          "text": "成员",
+                          "level": 2
+                        }
+                      },
+                      {
+                        "id": "mb_stage_actions",
+                        "type": "Stack",
+                        "props": {
+                          "direction": "row",
+                          "gap": 6,
+                          "align": "center"
+                        },
+                        "children": [
+                          {
+                            "id": "mb_stage_invite",
+                            "type": "Button",
+                            "props": {
+                              "label": "邀请成员",
+                              "variant": "primary"
+                            },
+                            "note": "被演示原型里的业务按钮；审阅模式下点击是“选中”，演示模式下是“执行”"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "mb_stage_tbl",
+                    "type": "Table",
+                    "props": {
+                      "columns": [
+                        {
+                          "key": "n",
+                          "label": "姓名"
+                        },
+                        {
+                          "key": "e",
+                          "label": "邮箱"
+                        },
+                        {
+                          "key": "r",
+                          "label": "权限"
+                        }
+                      ],
+                      "rows": [
+                        {
+                          "n": "王芳",
+                          "e": "wang.fang@example.com",
+                          "r": "管理员"
+                        },
+                        {
+                          "n": "陈晨",
+                          "e": "chen.chen@example.com",
+                          "r": "编辑者"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "mb_stage_hint",
+                    "type": "Text",
+                    "props": {
+                      "text": "（这一块就是被演示的原型，默认应占工作区的大部分宽度）",
+                      "tone": "muted"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "mb_right",
+                "type": "Sidebar",
+                "props": {
+                  "title": "检查器"
+                },
+                "children": [
+                  {
+                    "id": "mb_ins_empty",
+                    "type": "Text",
+                    "props": {
+                      "text": "点击原型中的元素查看规则",
+                      "tone": "muted"
+                    },
+                    "when": {
+                      "falsy": "ui.selected"
+                    }
+                  },
+                  {
+                    "id": "mb_ins",
+                    "type": "Stack",
+                    "props": {
+                      "direction": "col",
+                      "gap": 10
+                    },
+                    "children": [
+                      {
+                        "id": "mb_ins_type",
+                        "type": "Text",
+                        "props": {
+                          "text": "按钮「邀请成员」",
+                          "tone": "default"
+                        }
+                      },
+                      {
+                        "id": "mb_ins_ref",
+                        "type": "Text",
+                        "props": {
+                          "text": "引用：btn_invite",
+                          "tone": "muted"
+                        }
+                      },
+                      {
+                        "id": "mb_ins_rule1",
+                        "type": "Badge",
+                        "props": {
+                          "text": "用户 · 已确认",
+                          "tone": "success"
+                        }
+                      },
+                      {
+                        "id": "mb_ins_rule1_t",
+                        "type": "Text",
+                        "props": {
+                          "text": "只有空间管理员可以发起邀请",
+                          "tone": "default"
+                        }
+                      },
+                      {
+                        "id": "mb_ins_rule2",
+                        "type": "Badge",
+                        "props": {
+                          "text": "AI 假设 · 待确认",
+                          "tone": "warning"
+                        }
+                      },
+                      {
+                        "id": "mb_ins_rule2_t",
+                        "type": "Text",
+                        "props": {
+                          "text": "发送中禁用按钮，防止重复提交",
+                          "tone": "default"
+                        }
+                      }
+                    ],
+                    "when": {
+                      "truthy": "ui.selected"
+                    }
+                  }
+                ],
+                "when": {
+                  "eq": [
+                    "ui.mode",
+                    "review"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "mb_stepbar",
+            "type": "Stack",
+            "props": {
+              "direction": "row",
+              "gap": 10,
+              "align": "center"
+            },
+            "children": [
+              {
+                "id": "mb_btn_play",
+                "type": "Button",
+                "props": {
+                  "label": "▶ 自动播放",
+                  "variant": "primary"
+                }
+              },
+              {
+                "id": "mb_btn_next",
+                "type": "Button",
+                "props": {
+                  "label": "下一步",
+                  "variant": "secondary"
+                },
+                "unmodeled": true
+              },
+              {
+                "id": "mb_caption",
+                "type": "Text",
+                "props": {
+                  "text": "$ui.caption",
+                  "tone": "muted"
+                }
+              }
+            ],
+            "when": {
+              "eq": [
+                "ui.mode",
+                "demo"
+              ]
+            }
+          },
+          {
+            "id": "mb_review_hint",
+            "type": "Alert",
+            "props": {
+              "text": "审阅模式：点击原型元素只会选中，并同步给 Agent；回到演示模式时侧栏自动隐藏",
+              "tone": "info"
+            },
+            "when": {
+              "eq": [
+                "ui.mode",
+                "review"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "scene_anno": {
+      "id": "scene_anno",
+      "optionId": "opt_anno",
+      "name": "C · 工作区（规则就地标注，情况即场景）",
+      "kind": "proposed",
+      "viewport": "desktop",
+      "root": {
+        "id": "an_page",
+        "type": "Page",
+        "children": [
+          {
+            "id": "an_hdr",
+            "type": "Header",
+            "props": {
+              "title": "Joplo · 团队邀请功能 / A · 单人邮件邀请弹窗"
+            },
+            "children": [
+              {
+                "id": "an_badge_concept",
+                "type": "Badge",
+                "props": {
+                  "text": "概念原型 · 非正式实现",
+                  "tone": "warning"
+                }
+              },
+              {
+                "id": "an_badge_mode",
+                "type": "Badge",
+                "props": {
+                  "text": "$ui.modeText"
+                }
+              },
+              {
+                "id": "an_btn_hide_anno",
+                "type": "Button",
+                "props": {
+                  "label": "隐藏标注",
+                  "variant": "secondary"
+                },
+                "unmodeled": true,
+                "note": "会议时一键隐藏所有标注"
+              }
+            ]
+          },
+          {
+            "id": "an_body",
+            "type": "Stack",
+            "props": {
+              "direction": "row",
+              "gap": 12,
+              "align": "stretch"
+            },
+            "children": [
+              {
+                "id": "an_cases",
+                "type": "Sidebar",
+                "props": {
+                  "title": "情况（8）· 缺失 3"
+                },
+                "children": [
+                  {
+                    "id": "an_case_happy",
+                    "type": "Link",
+                    "props": {
+                      "label": "▶ 正常发出邀请"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "an_case_denied",
+                    "type": "Link",
+                    "props": {
+                      "label": "▶ 非管理员尝试邀请"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "an_case_fail",
+                    "type": "Link",
+                    "props": {
+                      "label": "▶ 发送失败后重试"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "an_case_gap",
+                    "type": "Link",
+                    "props": {
+                      "label": "○ 缺失 · 邮箱无效"
+                    }
+                  },
+                  {
+                    "id": "an_case_revoked",
+                    "type": "Link",
+                    "props": {
+                      "label": "○ 缺失 · 撤销后打开"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "an_case_member",
+                    "type": "Link",
+                    "props": {
+                      "label": "◐ 待决定 · 已是成员"
+                    },
+                    "unmodeled": true
+                  }
+                ],
+                "note": "情况与场景合并成一列：点“▶”播放对应场景，点“○”查看缺口"
+              },
+              {
+                "id": "an_main",
+                "type": "Stack",
+                "props": {
+                  "direction": "col",
+                  "gap": 12
+                },
+                "children": [
+                  {
+                    "id": "an_stage_wrap",
+                    "type": "Stack",
+                    "props": {
+                      "direction": "col"
+                    },
+                    "children": [
+                      {
+                        "id": "an_stage",
+                        "type": "Card",
+                        "props": {
+                          "title": "原型舞台 · 成员管理页"
+                        },
+                        "children": [
+                          {
+                            "id": "an_stage_hdr",
+                            "type": "Stack",
+                            "props": {
+                              "direction": "row",
+                              "gap": 10,
+                              "align": "center",
+                              "justify": "between"
+                            },
+                            "children": [
+                              {
+                                "id": "an_stage_title",
+                                "type": "Heading",
+                                "props": {
+                                  "text": "成员",
+                                  "level": 2
+                                }
+                              },
+                              {
+                                "id": "an_stage_actions",
+                                "type": "Stack",
+                                "props": {
+                                  "direction": "row",
+                                  "gap": 6,
+                                  "align": "center"
+                                },
+                                "children": [
+                                  {
+                                    "id": "an_anno_rule",
+                                    "type": "Button",
+                                    "props": {
+                                      "label": "① 仅管理员可邀请",
+                                      "variant": "ghost"
+                                    },
+                                    "note": "规则标注贴在对应元素旁边"
+                                  },
+                                  {
+                                    "id": "an_stage_invite",
+                                    "type": "Button",
+                                    "props": {
+                                      "label": "邀请成员",
+                                      "variant": "primary"
+                                    },
+                                    "unmodeled": true,
+                                    "note": "方案 C 只画了“通过标注复制引用”；没有标注的元素如何选中，本版未建模"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "id": "an_stage_tbl",
+                            "type": "Table",
+                            "props": {
+                              "columns": [
+                                {
+                                  "key": "n",
+                                  "label": "姓名"
+                                },
+                                {
+                                  "key": "e",
+                                  "label": "邮箱"
+                                },
+                                {
+                                  "key": "r",
+                                  "label": "权限"
+                                }
+                              ],
+                              "rows": [
+                                {
+                                  "n": "王芳",
+                                  "e": "wang.fang@example.com",
+                                  "r": "管理员"
+                                },
+                                {
+                                  "n": "陈晨",
+                                  "e": "chen.chen@example.com",
+                                  "r": "编辑者"
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "id": "an_stage_hint",
+                            "type": "Text",
+                            "props": {
+                              "text": "（这一块就是被演示的原型，默认应占工作区的大部分宽度）",
+                              "tone": "muted"
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "when": {
+                      "falsy": "ui.gapView"
+                    }
+                  },
+                  {
+                    "id": "an_note",
+                    "type": "Card",
+                    "props": {
+                      "title": "① 规则详情"
+                    },
+                    "children": [
+                      {
+                        "id": "an_note_t",
+                        "type": "Text",
+                        "props": {
+                          "text": "规则：只有空间管理员可以发起邀请",
+                          "tone": "default"
+                        }
+                      },
+                      {
+                        "id": "an_note_badge",
+                        "type": "Badge",
+                        "props": {
+                          "text": "用户 · 已确认",
+                          "tone": "success"
+                        }
+                      },
+                      {
+                        "id": "an_note_case",
+                        "type": "Text",
+                        "props": {
+                          "text": "关联情况：非管理员尝试邀请",
+                          "tone": "muted"
+                        }
+                      },
+                      {
+                        "id": "an_btn_copy",
+                        "type": "Button",
+                        "props": {
+                          "label": "复制引用给 Agent",
+                          "variant": "secondary"
+                        }
+                      }
+                    ],
+                    "when": {
+                      "truthy": "ui.noteOpen"
+                    }
+                  },
+                  {
+                    "id": "an_gap_empty",
+                    "type": "EmptyState",
+                    "props": {
+                      "title": "这个情况还没有设计",
+                      "text": "邮箱为空或格式无效 · 当前方案还没有对应场景"
+                    },
+                    "when": {
+                      "truthy": "ui.gapView"
+                    }
+                  },
+                  {
+                    "id": "an_btn_ask",
+                    "type": "Button",
+                    "props": {
+                      "label": "选中这个缺口，让 Agent 补上",
+                      "variant": "primary"
+                    },
+                    "when": {
+                      "truthy": "ui.gapView"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "an_stepbar",
+            "type": "Stack",
+            "props": {
+              "direction": "row",
+              "gap": 10,
+              "align": "center"
+            },
+            "children": [
+              {
+                "id": "an_btn_play",
+                "type": "Button",
+                "props": {
+                  "label": "▶ 自动播放",
+                  "variant": "primary"
+                }
+              },
+              {
+                "id": "an_btn_next",
+                "type": "Button",
+                "props": {
+                  "label": "下一步",
+                  "variant": "secondary"
+                },
+                "unmodeled": true
+              },
+              {
+                "id": "an_caption",
+                "type": "Text",
+                "props": {
+                  "text": "$ui.caption",
+                  "tone": "muted"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "scenarios": {
+    "sc_fa_first": {
+      "id": "sc_fa_first",
+      "optionId": "opt_fold",
+      "name": "第一次打开，然后自动播放",
+      "description": "默认两侧都收起，原型占满宽度",
+      "caseIds": [
+        "case_first_look",
+        "case_meeting"
+      ],
+      "mock": {
+        "label": "模拟演示",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "scene_fold",
+        "ui": {
+          "modeText": "当前：演示模式",
+          "caption": "第 0 / 5 步 · 准备开始"
+        },
+        "data": {},
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "fa1_play",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "fa_btn_play"
+          },
+          "caption": "点「自动播放」：原型开始演示，两侧栏保持收起",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.caption",
+              "value": "第 1 / 5 步 · 管理员点击「邀请成员」，打开邀请弹窗"
+            }
+          ],
+          "ruleIds": [
+            "rule_less_by_default"
+          ]
+        },
+        {
+          "id": "fa1_sys",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "自动播放进行中（模拟）"
+          },
+          "caption": "演示持续推进；旁听者只看到原型和字幕",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.caption",
+              "value": "第 5 / 5 步 · 系统返回成功，出现 Toast"
+            },
+            {
+              "type": "complete",
+              "text": "看完主流程，界面上没有多余信息",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": []
+        }
+      ],
+      "expected": "两侧收起，原型宽度接近整个工作区"
+    },
+    "sc_fa_gap": {
+      "id": "sc_fa_gap",
+      "optionId": "opt_fold",
+      "name": "找出还没设计的情况",
+      "description": "从工具条上的缺口数量展开情况清单",
+      "caseIds": [
+        "case_find_gap"
+      ],
+      "mock": {
+        "label": "模拟查找缺口",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "scene_fold",
+        "ui": {
+          "modeText": "当前：演示模式",
+          "caption": "第 0 / 5 步 · 准备开始"
+        },
+        "data": {},
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "fa2_open",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "fa_btn_cases"
+          },
+          "caption": "点工具条上的「情况 · 缺失 3 · 待决定 1」，左侧展开情况清单（原型被挤窄）",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.leftOpen",
+              "value": true
+            }
+          ],
+          "ruleIds": [
+            "rule_gaps_visible"
+          ]
+        },
+        {
+          "id": "fa2_pick",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "fa_case_gap"
+          },
+          "caption": "点「缺失 · 邮箱为空或格式无效」定位到缺口",
+          "effects": [
+            {
+              "type": "toast",
+              "text": "方案 A 还没有这个情况的场景，可以让 Agent 补上",
+              "tone": "info"
+            },
+            {
+              "type": "complete",
+              "text": "找到缺口，用了两次点击",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": []
+        }
+      ],
+      "expected": "缺口一直可见；展开后原型变窄"
+    },
+    "sc_fa_point": {
+      "id": "sc_fa_point",
+      "optionId": "opt_fold",
+      "name": "选中元素并同步给 Agent",
+      "description": "切到审阅模式后点原型中的按钮，右侧展开检查器",
+      "caseIds": [
+        "case_point",
+        "case_rule_of_step"
+      ],
+      "mock": {
+        "label": "模拟审阅",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "scene_fold",
+        "ui": {
+          "modeText": "当前：演示模式",
+          "caption": "第 0 / 5 步 · 准备开始"
+        },
+        "data": {},
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "fa3_review",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "fa_btn_review"
+          },
+          "caption": "点「切到审阅」：点击原型只会选中，不会执行",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.modeText",
+              "value": "当前：审阅模式"
+            }
+          ],
+          "ruleIds": []
+        },
+        {
+          "id": "fa3_pick",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "fa_stage_invite"
+          },
+          "caption": "点原型里的「邀请成员」：右侧展开检查器，显示引用与规则",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.rightOpen",
+              "value": true
+            },
+            {
+              "type": "toast",
+              "text": "已选中 btn_invite，可在 Agent 会话里说要改什么",
+              "tone": "info"
+            },
+            {
+              "type": "complete",
+              "text": "一步看到规则，并已同步给 Agent",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": [
+            "rule_trace_one_step"
+          ]
+        }
+      ],
+      "expected": "检查器只在选中时出现"
+    },
+    "sc_mb_first": {
+      "id": "sc_mb_first",
+      "optionId": "opt_mode",
+      "name": "第一次打开，然后自动播放",
+      "description": "演示模式只有原型、步骤条和缺口数量",
+      "caseIds": [
+        "case_first_look",
+        "case_meeting"
+      ],
+      "mock": {
+        "label": "模拟演示",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "scene_mode",
+        "ui": {
+          "modeText": "当前：演示模式",
+          "caption": "第 0 / 5 步 · 准备开始",
+          "mode": "demo",
+          "modeBtn": "切到审阅",
+          "selected": false
+        },
+        "data": {},
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "mb1_play",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "mb_btn_play"
+          },
+          "caption": "点「自动播放」：画面上只有原型和字幕",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.caption",
+              "value": "第 1 / 5 步 · 管理员点击「邀请成员」，打开邀请弹窗"
+            }
+          ],
+          "ruleIds": [
+            "rule_less_by_default"
+          ]
+        },
+        {
+          "id": "mb1_sys",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "自动播放进行中（模拟）"
+          },
+          "caption": "演示持续推进；适合会议共享屏幕",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.caption",
+              "value": "第 5 / 5 步 · 系统返回成功，出现 Toast"
+            },
+            {
+              "type": "complete",
+              "text": "会议演示时画面最干净",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": []
+        }
+      ],
+      "expected": "演示模式下没有侧栏"
+    },
+    "sc_mb_gap": {
+      "id": "sc_mb_gap",
+      "optionId": "opt_mode",
+      "name": "找出还没设计的情况",
+      "description": "点顶栏的缺口数量，直接进入审阅模式并打开情况清单",
+      "caseIds": [
+        "case_find_gap"
+      ],
+      "mock": {
+        "label": "模拟查找缺口",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "scene_mode",
+        "ui": {
+          "modeText": "当前：演示模式",
+          "caption": "第 0 / 5 步 · 准备开始",
+          "mode": "demo",
+          "modeBtn": "切到审阅",
+          "selected": false
+        },
+        "data": {},
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "mb2_open",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "mb_btn_gaps"
+          },
+          "caption": "点顶栏「缺失 3 · 待决定 1」：切到审阅模式，两侧栏同时出现",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.mode",
+              "value": "review"
+            },
+            {
+              "type": "set",
+              "path": "ui.modeBtn",
+              "value": "切到演示"
+            },
+            {
+              "type": "set",
+              "path": "ui.modeText",
+              "value": "当前：审阅模式"
+            }
+          ],
+          "ruleIds": [
+            "rule_gaps_visible"
+          ]
+        },
+        {
+          "id": "mb2_pick",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "mb_case_gap"
+          },
+          "caption": "点「缺失 · 邮箱为空或格式无效」定位到缺口",
+          "effects": [
+            {
+              "type": "toast",
+              "text": "方案 A 还没有这个情况的场景，可以让 Agent 补上",
+              "tone": "info"
+            },
+            {
+              "type": "complete",
+              "text": "找到缺口；但整个界面随之切换成三栏",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": []
+        }
+      ],
+      "expected": "进入审阅后布局整体变化"
+    },
+    "sc_mb_point": {
+      "id": "sc_mb_point",
+      "optionId": "opt_mode",
+      "name": "选中元素并同步给 Agent",
+      "description": "审阅模式下点原型按钮，检查器显示规则",
+      "caseIds": [
+        "case_point",
+        "case_rule_of_step"
+      ],
+      "mock": {
+        "label": "模拟审阅",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "scene_mode",
+        "ui": {
+          "modeText": "当前：演示模式",
+          "caption": "第 0 / 5 步 · 准备开始",
+          "mode": "demo",
+          "modeBtn": "切到审阅",
+          "selected": false
+        },
+        "data": {},
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "mb3_review",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "mb_btn_mode"
+          },
+          "caption": "点「切到审阅」：两侧栏出现，原型变窄",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.mode",
+              "value": "review"
+            },
+            {
+              "type": "set",
+              "path": "ui.modeBtn",
+              "value": "切到演示"
+            },
+            {
+              "type": "set",
+              "path": "ui.modeText",
+              "value": "当前：审阅模式"
+            }
+          ],
+          "ruleIds": []
+        },
+        {
+          "id": "mb3_pick",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "mb_stage_invite"
+          },
+          "caption": "点原型里的「邀请成员」：检查器显示引用与规则",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.selected",
+              "value": true
+            },
+            {
+              "type": "toast",
+              "text": "已选中 btn_invite，可在 Agent 会话里说要改什么",
+              "tone": "info"
+            },
+            {
+              "type": "complete",
+              "text": "一步看到规则，并已同步给 Agent",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": [
+            "rule_trace_one_step"
+          ]
+        }
+      ],
+      "expected": "审阅模式信息完整"
+    },
+    "sc_an_first": {
+      "id": "sc_an_first",
+      "optionId": "opt_anno",
+      "name": "第一次打开，然后自动播放",
+      "description": "只有左侧一列情况；规则以编号标注贴在原型上",
+      "caseIds": [
+        "case_first_look",
+        "case_meeting",
+        "case_small_window"
+      ],
+      "mock": {
+        "label": "模拟演示",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "scene_anno",
+        "ui": {
+          "modeText": "当前：演示模式",
+          "caption": "第 0 / 5 步 · 准备开始",
+          "noteOpen": false,
+          "gapView": false
+        },
+        "data": {},
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "an1_play",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "an_btn_play"
+          },
+          "caption": "点「自动播放」：原型演示，标注留在对应元素旁边",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.caption",
+              "value": "第 1 / 5 步 · 管理员点击「邀请成员」，打开邀请弹窗"
+            }
+          ],
+          "ruleIds": [
+            "rule_less_by_default"
+          ]
+        },
+        {
+          "id": "an1_sys",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "自动播放进行中（模拟）"
+          },
+          "caption": "演示持续推进；会议时可以一键隐藏标注",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.caption",
+              "value": "第 5 / 5 步 · 系统返回成功，出现 Toast"
+            },
+            {
+              "type": "complete",
+              "text": "原型占主体；没有右栏",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": []
+        }
+      ],
+      "expected": "只有一列侧栏"
+    },
+    "sc_an_rule": {
+      "id": "sc_an_rule",
+      "optionId": "opt_anno",
+      "name": "看按钮背后的规则",
+      "description": "点原型旁边的编号标注，就地看到规则并复制引用",
+      "caseIds": [
+        "case_rule_of_step",
+        "case_point"
+      ],
+      "mock": {
+        "label": "模拟查看规则",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "scene_anno",
+        "ui": {
+          "modeText": "当前：演示模式",
+          "caption": "第 0 / 5 步 · 准备开始",
+          "noteOpen": false,
+          "gapView": false
+        },
+        "data": {},
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "an2_anno",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "an_anno_rule"
+          },
+          "caption": "点原型旁的「① 仅管理员可邀请」，就地展开规则详情",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.noteOpen",
+              "value": true
+            }
+          ],
+          "ruleIds": [
+            "rule_trace_one_step"
+          ]
+        },
+        {
+          "id": "an2_copy",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "an_btn_copy"
+          },
+          "caption": "点「复制引用给 Agent」",
+          "effects": [
+            {
+              "type": "toast",
+              "text": "已选中 scene_a_members#btn_invite，可在 Agent 会话里说要改什么",
+              "tone": "info"
+            },
+            {
+              "type": "complete",
+              "text": "不用切换模式，也不用打开右栏",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": []
+        }
+      ],
+      "expected": "规则离画面最近"
+    },
+    "sc_an_gap": {
+      "id": "sc_an_gap",
+      "optionId": "opt_anno",
+      "name": "找出还没设计的情况",
+      "description": "情况列表常驻；点缺失项，舞台直接显示“还没有设计”",
+      "caseIds": [
+        "case_find_gap"
+      ],
+      "mock": {
+        "label": "模拟查找缺口",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "scene_anno",
+        "ui": {
+          "modeText": "当前：演示模式",
+          "caption": "第 0 / 5 步 · 准备开始",
+          "noteOpen": false,
+          "gapView": false
+        },
+        "data": {},
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "id": "an3_pick",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "an_case_gap"
+          },
+          "caption": "点左侧「○ 缺失 · 邮箱为空或格式无效」：舞台显示这个缺口",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.gapView",
+              "value": true
+            },
+            {
+              "type": "set",
+              "path": "ui.noteOpen",
+              "value": false
+            }
+          ],
+          "ruleIds": [
+            "rule_gaps_visible"
+          ]
+        },
+        {
+          "id": "an3_ask",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "an_btn_ask"
+          },
+          "caption": "点「选中这个缺口，让 Agent 补上」",
+          "effects": [
+            {
+              "type": "toast",
+              "text": "已选中这个情况，可以在 Agent 会话里说「补上它」",
+              "tone": "info"
+            },
+            {
+              "type": "complete",
+              "text": "一次点击定位缺口",
+              "outcome": "success"
+            }
+          ],
+          "ruleIds": []
+        }
+      ],
+      "expected": "缺口与场景在同一列表"
+    }
+  },
+  "comments": {},
+  "issues": {
+    "iss_fa_overlay": {
+      "id": "iss_fa_overlay",
+      "featureId": "feat_focus",
+      "optionId": "opt_fold",
+      "text": "侧栏展开时是挤压原型，还是以浮层盖在原型上？",
+      "severity": "major",
+      "source": "ai",
+      "status": "open",
+      "refs": [
+        "case_small_window"
+      ]
+    },
+    "iss_mb_jump": {
+      "id": "iss_mb_jump",
+      "featureId": "feat_focus",
+      "optionId": "opt_mode",
+      "text": "切换模式时整个布局跳动，会不会让人找不到刚才看的位置？",
+      "severity": "minor",
+      "source": "ai",
+      "status": "open",
+      "refs": [
+        "case_point"
+      ]
+    },
+    "iss_an_cover": {
+      "id": "iss_an_cover",
+      "featureId": "feat_focus",
+      "optionId": "opt_anno",
+      "text": "标注多了会不会遮住原型本身？场景和情况合成一列后，一个情况对应多个场景怎么办？",
+      "severity": "major",
+      "source": "ai",
+      "status": "open",
+      "refs": [
+        "case_first_look"
+      ]
+    }
+  },
+  "decisions": {}
+}

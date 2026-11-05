@@ -1,11 +1,40 @@
+# 依赖与构建产物
 node_modules/
 dist/
+*.tsbuildinfo
+.vite/
+coverage/
+
+# 系统与编辑器
 .DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# 日志与本地环境
 *.log
-# 示例项目的运行时产物（修订快照、回执、选择状态、缓存）不入库
-examples/*/.joplo/
+.env
+.env.*
+!.env.example
+
+# Cloudflare / Wrangler 本地状态
+.wrangler/
+.dev.vars
+
+# Joplo 本地运行时：看板选中、缓存、v1 修订快照与回执（任意层级）
+**/.joplo/
 examples/*/exports/
+
+# 测试产物
 packages/web/test-results/
+packages/web/playwright-report/
+playwright-report/
+test-results/
+
+# Superset worker 完成信号
 .done
 .blocked
+
+# 本地草稿、临时截图、构建试验
 scratch/

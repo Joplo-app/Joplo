@@ -1,3 +1,5 @@
+> **已退役（v1）**：MCP 服务随 JSON/apply 写入模型一起退役，计划在 V2 重新设计（见 `DECISIONS.md` D29）。本文只作历史记录，当前 CLI 已没有 `joplo mcp` 命令。
+
 # Joplo MCP（M0/M1）
 
 使用官方 `@modelcontextprotocol/sdk` **1.32.2**，stdio 传输。安装版本的 `LATEST_PROTOCOL_VERSION` 为 **2025-11-25**；还支持协商 2025-06-18、2025-03-26、2024-11-05、2024-10-07。本分支使用同版本 SDK Client 通过真实子进程验证 initialize、tools/list 与 tools/call。未声称已在 Claude Code GUI 中实测。SDK 的 stdio 与工具结果用法参考[官方 v1 文档](https://ts.sdk.modelcontextprotocol.io/server)。
