@@ -35,7 +35,7 @@ import {
 } from '@tokenroll/joplo-core';
 import { cn } from '@/lib/utils';
 import { Rough, RoughPath, roundRectPath, useStageTheme } from './rough';
-import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramStructure, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
+import { DESC_FONT, EDGE_FONT, FOCUS_EDGE_FONT, FOCUS_MOVE_MS, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, diagramStructure, edgeEmphasized, focusLayout, focusMembers, type FocusLayout, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
 import { DIMMED, FONT, INK, SOFT, SPACING, TITLE_SIZE, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf } from './style';
 
 export type RenderMode = 'review' | 'demo' | 'render';
@@ -51,6 +51,8 @@ export type RenderCtx = {
   animate: boolean;
   /** 舞台宽度（px）：响应式属性、visibleFrom / hiddenFrom、AppShell 收起都按它计算。 */
   width: number;
+  /** 镜头此刻对准的元素（T-director3）：架构图据此突出相关连线；null = 没有聚焦。 */
+  focus?: string[] | null;
 };
 
 export const RenderContext = createContext<RenderCtx | null>(null);
@@ -1688,7 +1690,19 @@ function Phone({ node, p, children }: NodeProps) {
 
 // ============ 架构图（D41） ============
 
-type DiagramCtxValue = { layout: DLayout; origin: { x: number; y: number }; width: number; height: number; mountedAt: number; key: string };
+type DiagramCtxValue = {
+  layout: DLayout;
+  origin: { x: number; y: number };
+  width: number;
+  height: number;
+  mountedAt: number;
+  key: string;
+  focus: { nodes: Set<string>; edges: Set<string> } | null;
+  /** 聚焦布局（T-director3）：镜头对准 2 个及以上节点时的小图；null = 全图。 */
+  fl: FocusLayout | null;
+  /** 挂载之后聚焦布局切换过（之后的切换都播放移动动画；首次显示、renderStep 直接到位）。 */
+  switched: boolean;
+};
 
 /**
  * 逐段出现：架构图挂载之后才出现的元素（when 由假变真）播放出现动画；首次显示、回放、renderStep 静态截图都直接是最终状态。
@@ -1776,6 +1790,22 @@ function Diagram({ node, p, children }: NodeProps) {
   const hv = Number(r('h'));
   const H = Number.isFinite(hv) && hv > 0 ? hv : 420;
   const { h: _h, ...rest } = p;
+  // 镜头聚焦时（T-director3）：连着焦点的连线与 active / ok / error 的连线突出，其余变淡
+  const { focus } = useCtx();
+  const focusKey = focus?.join(',') ?? '';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const dfocus = useMemo(() => diagramFocus(structure, focus, node.id), [key, focusKey, node.id]);
+  // 聚焦布局：只由结构 + 聚焦集合决定（缓存）；只对准一个节点时保持全图
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fl = useMemo(() => {
+    const m = focusMembers(structure, focus, node.id);
+    return m ? focusLayout(structure, layout, m) : null;
+  }, [key, focusKey, node.id, layout]);
+  const flKey = fl?.key ?? '';
+  const firstFl = useRef(flKey);
+  const switchedRef = useRef(false);
+  if (firstFl.current !== flKey) switchedRef.current = true;
+  const { animate: anim } = useCtx();
   // 整图放进容器（T-director2）：不在图内部滚动 / 拖动；看细节用舞台统一的缩放平移，或由镜头推近
   const { scale } = diagramFit(layout, avail, H);
   const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: H, overflow: 'hidden' } });
@@ -1806,7 +1836,18 @@ function Diagram({ node, p, children }: NodeProps) {
               transformOrigin: '0 0',
             }}
           >
-            <DiagramContext.Provider value={{ layout, origin: { x: 0, y: 0 }, width: layout.width, height: layout.height, mountedAt, key: node.id }}>{children}</DiagramContext.Provider>
+            {fl ? (
+              // 小图背后的浅色底：把背景里变淡的全图隔开
+              <motion.div
+                key={fl.key}
+                data-jfocus-backdrop=""
+                style={{ position: 'absolute', left: fl.box.x - 18, top: fl.box.y - 18, width: fl.box.w + 36, height: fl.box.h + 36, borderRadius: 18, background: 'rgba(255,255,255,0.9)', boxShadow: '0 0 0 1px rgba(0,0,0,0.04)', zIndex: 3, pointerEvents: 'none' }}
+                initial={anim && switchedRef.current ? { opacity: 0 } : false}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4 }}
+              />
+            ) : null}
+            <DiagramContext.Provider value={{ layout, origin: { x: 0, y: 0 }, width: layout.width, height: layout.height, mountedAt, key: node.id, focus: dfocus, fl, switched: switchedRef.current }}>{children}</DiagramContext.Provider>
           </div>
         </div>
       )}
@@ -1821,16 +1862,22 @@ function DiagramGroup({ node, p, children }: NodeProps) {
   const appear = useAppear(d);
   const root = useRoot(node, p, {
     className: 'jbox [.jstage[data-theme=clean]_&]:rounded-[14px]',
-    style: box ? { position: 'absolute', left: box.x - d!.origin.x, top: box.y - d!.origin.y, width: box.w, height: box.h, background: 'rgba(248,249,250,0.7)' } : { display: 'none' },
+    style: box
+      ? { position: 'absolute', left: box.x - d!.origin.x, top: box.y - d!.origin.y, width: box.w, height: box.h, background: d!.fl ? 'transparent' : 'rgba(248,249,250,0.7)', ...(d!.fl ? { pointerEvents: 'none' as const } : {}) }
+      : { display: 'none' },
   });
   if (!d || !box) return null;
+  // 聚焦布局时分组留在原位作背景：边框与标题变淡、不参与交互（组内被聚焦的节点照常显示）
+  const bgOpacity = d.fl ? 0.25 : 1;
   return (
     <motion.div {...root} data-soft="" data-dashed="" data-appear={appear ? '' : undefined} initial={appear ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-      <Rough seedKey={node.id} shape="roundrect" radius={14} stroke="#868e96" dashed strokeWidth={1.2} />
+      <div style={{ position: 'absolute', inset: 0, opacity: bgOpacity, transition: 'opacity .4s' }}>
+        <Rough seedKey={node.id} shape="roundrect" radius={14} stroke="#868e96" dashed strokeWidth={1.2} />
+      </div>
       {title ? (
         <div
           data-jgroup-title=""
-          style={{ position: 'absolute', left: title.x - box.x, top: title.y - box.y, width: title.w, height: title.h, zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, background: 'rgba(248,249,250,0.95)', fontSize: GROUP_FONT, fontWeight: 600, color: '#5a5a5a', whiteSpace: 'nowrap' }}
+          style={{ position: 'absolute', left: title.x - box.x, top: title.y - box.y, width: title.w, height: title.h, zIndex: d.fl ? 1 : 3, opacity: bgOpacity, transition: 'opacity .4s', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, background: 'rgba(248,249,250,0.95)', fontSize: GROUP_FONT, fontWeight: 600, color: '#5a5a5a', whiteSpace: 'nowrap' }}
         >
           {str(p.label)}
         </div>
@@ -1843,22 +1890,38 @@ function DiagramGroup({ node, p, children }: NodeProps) {
 function DiagramNode({ node, p }: NodeProps) {
   const d = useContext(DiagramContext);
   const { theme, selectedId } = { theme: useStageTheme(), selectedId: useCtx().selectedId };
-  const box = d?.layout.nodes[node.id];
+  // 聚焦布局（T-director3）：小图里的节点移到小图位置；其余节点留在原位作背景（很淡、不参与交互）
+  const member = !!d?.fl?.nodes[node.id];
+  const bg = !!d?.fl && !member;
+  const box = (member ? d!.fl!.nodes[node.id] : undefined) ?? d?.layout.nodes[node.id];
   const state = dState(p.state);
   const tone = D_TONE[state]!;
   const kind = typeof p.kind === 'string' ? p.kind : 'service';
   const shape = shapeOf(kind);
   const appear = useAppear(d);
+  const { animate: anim } = useCtx();
   const root = useRoot(node, p, {
     style: box
-      ? { position: 'absolute', left: box.x - d!.origin.x, top: box.y - d!.origin.y, width: box.w, height: box.h, zIndex: 2, opacity: state === 'dim' ? 0.45 : 1, transition: 'opacity .25s' }
+      ? { position: 'absolute', zIndex: member ? 4 : 2, opacity: bg ? 0.3 : state === 'dim' ? 0.45 : 1, transition: 'opacity .3s', ...(bg ? { pointerEvents: 'none' as const } : {}) }
       : { display: 'none' },
   });
   if (!d || !box) return null;
+  const at = { left: box.x - d.origin.x, top: box.y - d.origin.y, width: box.w, height: box.h };
   const desc = str(p.description);
   const sw = state === 'idle' || state === 'dim' ? 1.4 : 2.2;
   return (
-    <div {...root} data-state={state} data-kind={kind} data-appear={appear ? '' : undefined}>
+    <motion.div
+      {...root}
+      data-state={state}
+      data-kind={kind}
+      data-appear={appear ? '' : undefined}
+      // 最终位置（架构图画布坐标）：镜头与高光按它对准，不必等节点移动结束
+      data-jfinal={`${box.x},${box.y},${box.w},${box.h}`}
+      data-jfocus-member={member ? '' : undefined}
+      initial={false}
+      animate={at}
+      transition={{ duration: anim && d.switched ? FOCUS_MOVE_MS / 1000 : 0, ease: [0.4, 0, 0.2, 1] }}
+    >
       {/* 出现动画：淡入并轻微放大（只在挂载后出现的节点上播放） */}
       <motion.div style={{ position: 'absolute', inset: 0 }} initial={appear ? { opacity: 0, scale: 0.88 } : false} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
       {theme === 'sketch' ? (
@@ -1893,7 +1956,7 @@ function DiagramNode({ node, p }: NodeProps) {
         {desc ? <div data-jdesc="" style={{ fontSize: DESC_FONT, lineHeight: '16px', color: state === 'idle' ? DIMMED : tone.text, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{desc}</div> : null}
       </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1936,8 +1999,15 @@ function DiagramEdge({ node, p }: NodeProps) {
   const theme = useStageTheme();
   const attrs = useRootAttrs(node);
   const appear = useAppear(dctx);
-  const route = dctx?.layout.edges[node.id];
-  if (!dctx || !route || route.points.length < 2) return null;
+  // 聚焦布局（T-director3）：小图里的连线用小图的走线；连向小图外部的线隐藏；其余留在原位作背景
+  const fl = dctx?.fl ?? null;
+  const sub = fl?.edges[node.id];
+  const from = str(p.from);
+  const to = str(p.to);
+  const hidden = !!fl && !sub && (fl.members.includes(from) || fl.members.includes(to));
+  const bg = !!fl && !sub && !hidden;
+  const route = sub ?? dctx?.layout.edges[node.id];
+  if (!dctx || !route || route.points.length < 2 || hidden) return null;
   // 出现动画：用一条沿路径伸长的遮罩把连线（含手绘线、虚线、箭头）从 from 画到 to
   const maskId = `jdraw-${dctx.key}-${node.id}`.replace(/[^\w-]/g, '_');
   const state = dState(p.state);
@@ -1945,16 +2015,30 @@ function DiagramEdge({ node, p }: NodeProps) {
   const dashed = p.async === true || state === 'error';
   const d = edgePath(route.points);
   const head = arrowHead(route.points);
-  const sw = state === 'idle' || state === 'dim' ? 1.5 : 2.4;
+  // 聚焦时：突出的连线保持原色、加粗、画在节点之上；其余连线由舞台的调暗规则变淡（data-jfocus-keep 让突出的不被调暗）
+  const emph = !!sub || (!bg && dctx.focus ? edgeEmphasized(dctx.focus, { id: node.id, from, to }, state) : false);
+  const labelFont = sub ? FOCUS_EDGE_FONT : EDGE_FONT;
+  // 切换布局后连线等节点移到位再出现
+  const modeKey = fl?.key ?? 'full';
+  const fadeIn = animate && dctx.switched;
+  const svgOpacity = bg ? 0.2 : 1;
+  const sw = (state === 'idle' || state === 'dim' ? 1.5 : 2.4) + (emph ? 1.4 : 0);
   const label = str(p.label);
   const lb = route.label;
+  const keep = emph ? '' : undefined;
   return (
     <>
-      <svg
+      <motion.svg
+      key={`line:${modeKey}`}
       aria-hidden={false}
       width={dctx.width}
       height={dctx.height}
-      style={{ position: 'absolute', left: -dctx.origin.x, top: -dctx.origin.y, overflow: 'visible', pointerEvents: 'none', zIndex: 1 }}
+      style={{ position: 'absolute', left: -dctx.origin.x, top: -dctx.origin.y, overflow: 'visible', pointerEvents: 'none', zIndex: emph ? 5 : 1 }}
+      data-jfocus-keep={keep}
+      data-jedge-svg={node.id}
+      initial={fadeIn ? { opacity: 0 } : false}
+      animate={{ opacity: svgOpacity }}
+      transition={{ duration: 0.3, delay: fadeIn && !bg ? (FOCUS_MOVE_MS / 1000) * 0.8 : 0 }}
     >
       {appear ? (
         <defs>
@@ -1965,7 +2049,7 @@ function DiagramEdge({ node, p }: NodeProps) {
       ) : null}
       <g {...attrs} data-state={state} data-async={p.async === true ? '' : undefined} data-appear={appear ? '' : undefined} style={{ opacity: state === 'dim' ? 0.5 : 1, transition: 'opacity .25s' }} mask={appear ? `url(#${maskId})` : undefined}>
         {/* 透明的粗线：⌥+单击检查连线时好点中 */}
-        <path d={d} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: 'stroke' }} />
+        <path d={d} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: bg ? 'none' : 'stroke' }} />
         {theme === 'sketch' ? (
           <>
             <RoughPath seedKey={`${node.id}:line`} d={d} stroke={color} strokeWidth={sw} dashed={dashed} />
@@ -1979,17 +2063,26 @@ function DiagramEdge({ node, p }: NodeProps) {
         )}
         {state === 'active' ? <MovingDot d={d} color={color} animate={animate} /> : null}
       </g>
-      </svg>
+      </motion.svg>
       {/* 标签单独一层，在所有连线之上（不会被别的连线的点击区盖住）；点它等于点这条连线 */}
       {label && lb ? (
-        <svg width={dctx.width} height={dctx.height} style={{ position: 'absolute', left: -dctx.origin.x, top: -dctx.origin.y, overflow: 'visible', pointerEvents: 'none', zIndex: 3 }}>
-          <motion.g style={{ pointerEvents: 'all', opacity: state === 'dim' ? 0.5 : 1 }} data-jedge-label="" data-jedge-for={node.id} initial={appear ? { opacity: 0 } : false} animate={{ opacity: state === 'dim' ? 0.5 : 1 }} transition={{ duration: 0.3, delay: appear ? 0.45 : 0 }}>
+        <motion.svg
+          key={`label:${modeKey}`}
+          width={dctx.width}
+          height={dctx.height}
+          style={{ position: 'absolute', left: -dctx.origin.x, top: -dctx.origin.y, overflow: 'visible', pointerEvents: 'none', zIndex: emph ? 6 : bg ? 1 : 3 }}
+          data-jfocus-keep={keep}
+          initial={fadeIn ? { opacity: 0 } : false}
+          animate={{ opacity: svgOpacity }}
+          transition={{ duration: 0.3, delay: fadeIn && !bg ? (FOCUS_MOVE_MS / 1000) * 0.8 : 0 }}
+        >
+          <motion.g style={{ pointerEvents: bg ? 'none' : 'all', opacity: state === 'dim' ? 0.5 : 1 }} data-jedge-label="" data-jedge-for={node.id} initial={appear ? { opacity: 0 } : false} animate={{ opacity: state === 'dim' ? 0.5 : 1 }} transition={{ duration: 0.3, delay: appear ? 0.45 : 0 }}>
             <rect x={lb.x} y={lb.y} width={lb.w} height={lb.h} rx={4} fill="#ffffff" fillOpacity={0.92} />
-            <text x={lb.x + lb.w / 2} y={lb.y + lb.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={EDGE_FONT} fill={state === 'idle' ? '#3a3a3a' : color}>
+            <text x={lb.x + lb.w / 2} y={lb.y + lb.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={labelFont} fontWeight={sub ? 600 : undefined} fill={state === 'idle' ? '#3a3a3a' : color}>
               {label}
             </text>
           </motion.g>
-        </svg>
+        </motion.svg>
       ) : null}
     </>
   );

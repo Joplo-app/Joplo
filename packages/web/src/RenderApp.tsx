@@ -18,16 +18,8 @@ import { PhoneFrame, phoneFrameSize } from './renderer/components';
 import { cameraFor } from './player/cameraFor';
 import { RoughRegistry, ThemeContext, type StageTheme } from './renderer/rough';
 import { Overlay } from './player/Overlay';
-import { ExplainCard, cardWidth } from './player/ExplainCard';
-import { cardReserve } from './player/callout';
-import type { CameraPlan } from './player/cameraFor';
-import type { Scenario } from '@tokenroll/joplo-core';
-
-/** 用镜头的方案（导演跟随）：解说卡与镜头给它留的位置，与演示页一致（T-director2）。 */
-function withCard(plan: CameraPlan, W: number) {
-  return plan.spec && plan.enabled ? { ...plan.spec, reserve: cardReserve(W, cardWidth(W)) } : plan.spec;
-}
-const cardStepOf = (plan: CameraPlan, sc: Scenario | undefined | null, index: number | null) => (plan.enabled && sc && index !== null && index >= 0 ? (sc.steps[index] ?? null) : null);
+import { ExplainCard } from './player/ExplainCard';
+import { cameraPosition, cardPlan } from './player/cameraFor';
 
 type W = {
   __JOPLO_READY__?: boolean;
@@ -144,7 +136,8 @@ export function RenderApp() {
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
   const plan = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null);
-  const card = cardStepOf(plan, sc, data.state.position - 1);
+  // 导演跟随：解说卡与镜头给它留的位置，与演示页一致
+  const card = cardPlan(data.project, sc ? scenarioId : null, plan, true, data.state.position - 1, vp.width);
   return wrap(
     <Stage
       project={data.project}
@@ -155,9 +148,9 @@ export function RenderApp() {
       registry={registry}
       nextTargetId={next && 'target' in next.action ? next.action.target : null}
       stageRef={setStage}
-      camera={withCard(plan, vp.width)}
+      camera={plan.spec && card ? { ...plan.spec, reserve: card.reserve } : plan.spec}
       sceneId={plan.sceneId}
-      overlay={card ? <ExplainCard stage={stage} stepKey={card.id} caption={card.caption} explain={card.explain ?? null} animate={false} /> : null}
+      overlay={card ? <ExplainCard stage={stage} stepKey={card.step.id} caption={card.step.caption} explain={card.step.explain ?? null} anchors={card.anchors} animate={false} /> : null}
     />,
   );
 }
@@ -198,11 +191,11 @@ function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: {
   const sc = ctl.scenario();
   const shown = sc && snap.activeStep !== null ? sc.steps[snap.activeStep] : null;
   // 与演示页一致：导演跟随；下一步的操作目标不在当前层时先切到它所在的层（leadLayer）
-  const plan = cameraFor(project, scenarioId, snap.state?.position ?? 0, snap.leadLayer);
+  const plan = cameraFor(project, scenarioId, cameraPosition(ctl.scenario(), snap.state?.position ?? 0, snap.activeStep), snap.leadLayer);
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, true), [ctl, plan.sceneId]);
   const W = VIEWPORTS[project.scenes[plan.sceneId ?? snap.state?.sceneId ?? '']?.viewport === 'mobile' ? 'mobile' : 'desktop'].width;
   const pos = snap.state?.position ?? 0;
-  const card = cardStepOf(plan, sc, snap.activeStep ?? pos - 1);
+  const card = cardPlan(project, scenarioId, plan, true, snap.activeStep ?? pos - 1, W);
   if (!snap.state) return null;
   return wrap(
     <Stage
@@ -215,7 +208,7 @@ function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: {
       epoch={snap.epoch}
       animate
       nextTargetId={nextTargetId}
-      camera={withCard(plan, W)}
+      camera={plan.spec && card ? { ...plan.spec, reserve: card.reserve } : plan.spec}
       sceneId={plan.sceneId}
       stageRef={(el) => {
         ctl.setStageEl(el);
@@ -224,8 +217,8 @@ function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: {
       }}
       overlay={
         <>
-          <Overlay snap={snap} stage={stageEl} nextTargetId={null} caption={card ? null : (shown?.caption ?? (snap.playing && pos > 0 ? (sc?.steps[pos - 1]?.caption ?? null) : null))} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />
-          {card ? <ExplainCard stage={stageEl} stepKey={card.id} caption={card.caption} explain={card.explain ?? null} animate /> : null}
+          <Overlay snap={snap} stage={stageEl} nextTargetId={null} hideSystem={!!card} caption={card ? null : (shown?.caption ?? (snap.playing && pos > 0 ? (sc?.steps[pos - 1]?.caption ?? null) : null))} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />
+          {card ? <ExplainCard stage={stageEl} stepKey={card.step.id} caption={card.step.caption} explain={card.step.explain ?? null} anchors={card.anchors} animate /> : null}
         </>
       }
     />,
