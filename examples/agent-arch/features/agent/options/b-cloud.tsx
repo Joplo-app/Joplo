@@ -4,8 +4,8 @@ import { active, ASK, dim, error, focus, initialUi, layersFor, ok, show } from '
 
 const start = (name: string, opts: Parameters<typeof flow>[1]) =>
   flow(name, { start: '/', ...opts })
-    .type('app_prompt', ASK)
-    .click('app_send', '用户发出任务：客户端把消息交给 Biz Server，鉴权并写入会话', shot('msg_user'), shot('app', 'biz'), shot('blk_biz'),
+    .type('app_prompt', ASK, '用户输入任务')
+    .click('app_send', '消息先到 Biz Server：鉴权、写会话', shot('msg_user'), shot('app', 'biz'), shot('blk_biz'),
       show('asked'), set($.inputs.app_prompt, ''), ...active('e_app_biz', 'n_app', 'n_biz', 'e_biz_db'), focus('biz'), uses('biz_gate'));
 
 export default option({
@@ -28,15 +28,15 @@ export default option({
   scenarios: {
     happy: start('整理报销发票（需要先上传）', { cases: ['happy', 'local_files'], expected: '多一步上传，其余都在云端完成' })
       .system('Billing 额度预检', shot('biz', 'billing'), shot('blk_billing'), ...ok('e_app_biz', 'e_biz_db'), ...active('e_biz_billing', 'n_billing'), focus('billing'), uses('billing_precheck'))
-      .system('取工具定义', '所有工具的实现都在云端沙箱，Biz Server 直接下发全部定义', shot('biz', 'registry'), shot('blk_tools'),
+      .system('取工具定义', '实现都在云端，下发全部定义', shot('biz', 'registry'), shot('blk_tools'),
         ...ok('e_biz_billing', 'n_billing'), ...active('e_biz_registry', 'n_registry'), focus('tools'), uses('def_impl_split'))
-      .system('大脑推理', '大脑发现需要本机文件，但手都在云端：只能请用户先上传', shot('brain', 'llm'), shot('blk_brain'), explain('这是“手都在云端”的代价：云端沙箱读不到用户电脑上的文件，只能让用户先把文件交出来。'),
+      .system('大脑推理', '手都在云端：只能请用户上传', shot('brain', 'llm'), shot('blk_brain'), explain('这是“手都在云端”的代价：云端沙箱读不到用户电脑上的文件，只能让用户先把文件交出来。'),
         ...ok('e_biz_registry', 'n_registry'), ...active('e_biz_brain', 'n_brain', 'e_brain_llm', 'n_llm'), focus('brain'))
       .system('请用户上传', shot('msg_reply'), show('replied'), set($.ui.reply, '我读不到你电脑上的文件，请先上传「报销」文件夹。'), show('needUpload'), ...ok('e_brain_llm', 'n_llm', 'e_biz_brain'))
-      .click('app_upload', '用户上传 12 个文件到 S3：多了一步，文件也离开了用户设备', shot('app', 's3'), shot('tc_upload'), shot('blk_client'), explain('多了一次操作，文件也离开了用户设备。对比方案 A：端侧执行器直接在本机读取，不需要这一步。'),
+      .click('app_upload', '多一步上传，文件离开了设备', shot('app', 's3'), shot('tc_upload'), shot('blk_client'), explain('多了一次操作，文件也离开了用户设备。对比方案 A：端侧执行器直接在本机读取，不需要这一步。'),
         show('needUpload', false), show('uploading'), ...active('e_app_s3', 'n_s3'), focus('client'))
       .system('上传完成', shot('tc_upload'), shot('s3'), ...ok('e_app_s3', 'n_s3'), set($.ui.t_upload, 'done'))
-      .system('工具调用 read_files（云端）', '大脑发出 read_files，Biz Server 下发给云端沙箱，沙箱从 S3 读取', shot('biz', 'sandbox', 's3'), shot('tc_read'), shot('blk_aws'),
+      .system('工具调用 read_files（云端）', '云端沙箱从 S3 读取文件', shot('biz', 'sandbox', 's3'), shot('tc_read'), shot('blk_aws'),
         ...active('e_brain_biz', 'e_biz_sandbox', 'n_sandbox', 'e_sandbox_s3'), show('readShown'), focus('aws'), uses('brain_no_exec'))
       .system('工具调用 make_sheet（云端）', shot('sandbox'), shot('tc_sheet'), ...ok('e_sandbox_s3'), set($.ui.t_read, 'done'), show('sheetShown'))
       .system('返回回答', shot('msg_reply'), shot('app', 'biz'), ...ok('e_biz_sandbox', 'n_sandbox', 'e_brain_biz'), set($.ui.t_sheet, 'done'),
@@ -50,8 +50,8 @@ export default option({
       .system('Biz Server', '所有请求先到 Biz Server：鉴权、会话、审计', show('r_biz'), shot('app', 'biz'), shot('blk_biz'), focus('biz'), uses('biz_gate'))
       .system('Tool Registry', '工具的“定义”集中放在 Registry', show('r_registry'), shot('biz', 'registry'), shot('blk_tools'), focus('tools'), uses('def_impl_split'))
       .system('大脑', '大脑调用 Bedrock 规划，只产出工具调用', show('r_brain'), shot('g_brain'), shot('blk_brain'), focus('brain'), uses('brain_no_exec'))
-      .system('手都在云端', '所有工具都在云端沙箱执行；需要本机文件时，先上传到 S3', show('r_hands'), shot('sandbox', 's3'), shot('blk_aws'), focus('aws'))
-      .system('计费', '调用模型前先找 Billing 预检额度；用量事件走 SQS 异步入账', show('r_bill'), shot('g_bill', 'biz'), shot('blk_billing'), focus('billing'), uses('billing_precheck', 'usage_async'))
+      .system('手都在云端', '手都在云端：本机文件要先上传', show('r_hands'), shot('sandbox', 's3'), shot('blk_aws'), focus('aws'))
+      .system('计费', 'Billing：先预检，后异步计量', show('r_bill'), shot('g_bill', 'biz'), shot('blk_billing'), focus('billing'), uses('billing_precheck', 'usage_async'))
       .system('全景', '这就是“手都在云端”的版本', shot(), focus(''), done('看完全部核心块')),
 
     quota: start('额度不足', { cases: ['quota'], outcome: 'denied', mock: '模拟本月额度已用完' })
