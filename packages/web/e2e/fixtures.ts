@@ -2,24 +2,27 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test as base, expect, type Page } from '@playwright/test';
-import { startServer, type ServeHandle } from '@joplo/server';
-import { Project, type PlayState } from '@joplo/core';
+import type { PlayState } from '@joplo/core';
+import { createDev, type InternalDevHandle } from '../../server/src/dev.ts';
 
 export const ROOT = path.resolve(import.meta.dirname, '../../..');
-export const EXAMPLE = path.join(ROOT, 'examples/invite/project.joplo.json');
+export const EXAMPLE = path.join(ROOT, 'examples/invite');
 
-/** 把 examples/invite 复制到临时目录。 */
+/** 把 examples/invite 复制到临时目录（测试只改副本）。 */
 export function copyExample(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-e2e-'));
-  fs.copyFileSync(EXAMPLE, path.join(dir, 'project.joplo.json'));
-  return dir;
+  fs.cpSync(EXAMPLE, dir, { recursive: true, filter: (src) => !/[/\\](\.joplo|dist|node_modules)([/\\]|$)/.test(src.slice(EXAMPLE.length)) });
+  return fs.realpathSync(dir);
 }
 
-export function loadExample(): Project {
-  return Project.parse(JSON.parse(fs.readFileSync(EXAMPLE, 'utf8')));
+/** 源文件中某段文字所在的行号（1 起）。 */
+export function lineOf(file: string, needle: string): number {
+  const i = fs.readFileSync(file, 'utf8').split('\n').findIndex((l) => l.includes(needle));
+  if (i < 0) throw new Error(`${file} 中找不到 ${needle}`);
+  return i + 1;
 }
 
-type Fixtures = { projectDir: string; server: ServeHandle; app: Page };
+type Fixtures = { projectDir: string; dev: InternalDevHandle; app: Page };
 
 export const test = base.extend<Fixtures>({
   projectDir: async ({}, use) => {
@@ -27,24 +30,25 @@ export const test = base.extend<Fixtures>({
     await use(dir);
     fs.rmSync(dir, { recursive: true, force: true });
   },
-  server: async ({ projectDir }, use) => {
-    const s = await startServer({ projectDir, port: 0, skipBuild: true, log: () => undefined });
-    await use(s);
-    await s.close();
+  dev: async ({ projectDir }, use) => {
+    const d = await createDev({ projectDir, port: 0, log: () => undefined });
+    await use(d);
+    await d.close();
   },
-  app: async ({ page, server }, use) => {
+  app: async ({ page, dev }, use) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto(server.url);
-    await page.locator('[data-joplo-stage]').waitFor();
+    await page.goto(dev.url);
+    await node(page, 'btn_invite').waitFor();
     await use(page);
     expect(errors, `页面不应有未捕获异常：${errors.join('\n')}`).toEqual([]);
   },
 });
 export { expect };
 
-export const playState = (page: Page) => page.evaluate(() => (window as unknown as { __JOPLO_STATE__: PlayState }).__JOPLO_STATE__);
-export const uiState = (page: Page) => page.evaluate(() => (window as unknown as { __JOPLO_UI__: { playing: boolean; paused: boolean; busy: boolean; mode: string } }).__JOPLO_UI__);
+export const playState = (page: Page) => page.evaluate(() => (window as unknown as { __JOPLO_STATE__: PlayState | null }).__JOPLO_STATE__);
+export const uiState = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __JOPLO_UI__: { playing: boolean; busy: boolean; mode: string; view: string; scenarioId: string | null; optionId: string | null; version: number } }).__JOPLO_UI__);
 
 /** 等待演示动画与自动播放结束。 */
 export async function waitIdle(page: Page) {
@@ -54,7 +58,7 @@ export async function waitIdle(page: Page) {
   });
 }
 
-export const node = (page: Page, id: string) => page.locator(`[data-joplo-stage] [data-jid="${id}"]`);
+export const node = (page: Page, id: string) => page.locator(`[data-joplo-stage] [data-jid="${id}"]`).first();
 
 /** 演示模式下点击舞台元素并等待动画结束。 */
 export async function demoClick(page: Page, id: string) {
@@ -62,19 +66,17 @@ export async function demoClick(page: Page, id: string) {
   await waitIdle(page);
 }
 
-/** 用真实鼠标按元素中心坐标点击（不经 Playwright 的可操作性检查，等同用户点击禁用按钮）。 */
+/** 用真实鼠标按元素中心坐标点击（等同用户点击禁用按钮）。 */
 export async function mouseClickNode(page: Page, id: string) {
   const box = await node(page, id).boundingBox();
   if (!box) throw new Error(`元素 ${id} 不可见`);
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 }
 
-/** 步骤栏显示的“第 k / n 步”中的 k。 */
-export async function shownStep(page: Page): Promise<number> {
-  const t = await page.getByTestId('caption').innerText();
-  const m = /第\s*(\d+)\s*\/\s*\d+\s*步/.exec(t);
-  if (!m) throw new Error(`字幕中没有步数：${t}`);
-  return Number(m[1]);
-}
-
-export const toastCount = (page: Page) => page.evaluate(() => document.querySelectorAll('[data-jtoast]').length);
+export const readSelection = (dir: string) => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, '.joplo/selection.json'), 'utf8'));
+  } catch {
+    return undefined;
+  }
+};

@@ -28,3 +28,12 @@
 | proper-lockfile | 4.1.2 | MIT | T-core：跨进程排他锁、心跳与陈旧锁恢复 |
 | @types/proper-lockfile | 4.1.4 | MIT | T-core：锁库 TypeScript 类型（开发依赖） |
 | fs-native-extensions | 1.5.3 | Apache-2.0 | T-core 评审修复：内核文件锁保护租约命名空间与同步提交/恢复，含平台预构建二进制 |
+
+### T-board（v2 看板）追加
+
+| 包 | 版本 | 许可证 | 用途 |
+| --- | --- | --- | --- |
+| vite | 8.3.5 | MIT | @joplo/server 运行时依赖：startDev 单进程开发服务（看板 + ssrLoadModule 编译 + HMR）、buildSite 的 vite build（与 @joplo/web 同一版本） |
+| @vitejs/plugin-react | 6.2.1 | MIT | @joplo/server 运行时依赖：看板与发布站的 React 转译 |
+| tailwindcss / @tailwindcss/vite | 4.3.4 | MIT | @joplo/server 运行时依赖：以项目目录为 @source 编译 className |
+| @joplo/kit | workspace | — | @joplo/server：项目里的 `@joplo/kit` 别名到本仓库 kit 源码 |

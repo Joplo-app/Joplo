@@ -38,7 +38,7 @@ export function TopBar({
   const scenarios = project ? scenariosOf(project, snap.optionId) : [];
   const option = project && snap.optionId ? project.options[snap.optionId] : null;
   const gaps = gapCounts(option);
-  const route = project && snap.state ? project.scenes[snap.state.sceneId]?.route : null;
+  const route = project && snap.state && snap.view !== 'compare' ? project.scenes[snap.state.sceneId]?.route : null;
   const mode = snap.mode;
 
   return (

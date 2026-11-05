@@ -1,3 +1,7 @@
+/**
+ * 独立的 Vite 配置只用于开发看板界面本身（`pnpm web:dev`，没有项目数据时只显示载入提示）。
+ * 真正的看板由 `joplo dev`（@joplo/server 的 startDev）以内联配置启动：同一个 Vite 服务还负责编译项目与热更新。
+ */
 import path from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -6,7 +10,6 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
-  // 开发模式：/api 代理到已运行的本地服务（JOPLO_API，缺省 http://127.0.0.1:4790）。写接口需要令牌，请优先用 joplo serve。
-  server: { host: '127.0.0.1', proxy: { '/api': { target: process.env.JOPLO_API ?? 'http://127.0.0.1:4790', changeOrigin: true } } },
+  server: { host: '127.0.0.1' },
   build: { outDir: 'dist', emptyOutDir: true, assetsInlineLimit: 0, chunkSizeWarningLimit: 2000 },
 });

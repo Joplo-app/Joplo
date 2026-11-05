@@ -1,186 +1,151 @@
-# Joplo 方案工作区（M0）：web 与本地服务
+# Joplo 看板、发布站与截图（T-board）
 
-本文说明 `packages/web`（方案工作区、低保真渲染、演示运行时）和 `packages/server`（本地服务、渲染截图）。
+本文说明 `packages/web`（看板界面、发布站界面、低保真渲染器、演示运行时）和 `packages/server`（`startDev`、`buildSite`、`renderStep`）。接口定义见 `packages/server/src/contract.ts`，CLI 只依赖这三个函数。
 
 ## 启动
 
 ```bash
 pnpm install
-pnpm web:serve                       # 打开 examples/invite，地址 http://127.0.0.1:4790/
+pnpm web:serve                          # 用 startDev 打开 examples/invite：http://127.0.0.1:4790/
 pnpm web:serve path/to/project --port 4800 --open
 ```
 
-- 服务启动时会检查 `packages/web/dist`。产物缺失、或比 `packages/web/src` / `packages/core/src` 旧时，自动执行 `vite build`（约 1 秒）。构建失败会给出明确报错和手动命令 `pnpm --filter @joplo/web build`。
-- CLI（`joplo serve`、`joplo render`）直接调用 `@joplo/server` 导出的 `startServer` / `renderStep`，签名与脚手架桩保持兼容，只追加了可选字段：
-  - `ServeOptions`：`skipBuild`、`log`、`projectSnapshot`（固定返回给定项目，renderStep 内部使用）；
-  - `RenderOptions`：`overwrite`、`scale`；
-  - `RenderResult`：`scale`。`elements[].box` 始终是相对舞台左上角的 CSS 像素，截图像素 = CSS 像素 × `scale`。
-- 开发界面时可用 `pnpm web:dev`。Vite 会把 `/api` 代理到 `JOPLO_API`（缺省 `http://127.0.0.1:4790`）。dev 页面拿不到本地令牌，所以“选中”无法写回，会显示提示。
+`joplo dev` / `joplo build` / `joplo render` 由 CLI 调用同一组函数。
 
-## 界面与交互
+## `startDev`：一个进程
 
-| 区域 | 内容 |
+一个 Vite 开发服务同时承担三件事：
+
+| 职责 | 做法 |
 | --- | --- |
-| 顶栏 | 项目名 / 功能名 / 方案选择 / `rev_N`（绿点表示实时刷新已连接）；**审阅 / 演示**模式切换，旁边文字说明点击的含义；手绘 / 线框主题；常驻“概念原型 · 非正式实现”。 |
-| 左栏 | 场景列表，每个场景带模拟标签（“模拟成功”“模拟失败后重试成功”……）和步数。情况覆盖分五种芯片：已表达、待决定、缺失、不适用、已排除。缺失和待决定的情况用色块标出并显示原因（没写原因时也会明说）；点“已表达”的情况会跳到对应场景。说明文字强调“已表达 ≠ 业务已确认”。 |
-| 舞台 | desktop 画框 1280×800、mobile 手机外框 390×844，都按比例缩放。覆盖层包含：鼠标指针、点击波纹、下一步目标的橙色虚线聚焦框、步骤字幕、“系统事件”标记、“示例输入”标记，以及就地提示气泡。审阅模式下画框外圈为紫色。 |
-| 步骤栏 | 重置 / 上一步 / 自动播放·暂停·继续 / 下一步；当前步骤字幕与“下一步：…”；模拟结果标签。步骤芯片中，圆角实线是用户动作，虚线方角是系统事件，橙色表示下一步。场景完成后显示完成横幅（结果 + 文案 + “这是模拟结果”）。 |
-| 检查器 | **未选中**：功能目标、角色、硬约束、方案核心思路、设计决策和取舍、规则（来源 + 确认状态；AI 假设用虚线琥珀色框和 ⚠ 标出）、未关闭的问题。**审阅模式选中元素后**：类型、标签、`scene#node` 引用（可复制）、当前可见或禁用、是否未建模、设计说明、禁用原因、关联规则（`rule.elementRefs`）、以它为目标的步骤（本方案所有场景）、关联情况。 |
+| 看板界面 | Vite root 是 `packages/web`，React + Tailwind，界面本身也支持 HMR。 |
+| 项目编译 | 项目源文件用 `server.ssrLoadModule` 载入。插件 `joplo:project` 用 automatic JSX、`jsxImportSource: '@joplo/kit'`、development 模式转译，因此 jsxDEV 能拿到 `文件:行:列`。随后交给 core 的 `loadAuthoring` + `compile(…, 'dev')`。项目里的 `@joplo/kit` 指向本仓库的 kit 源码，所以项目可以放在任何目录。 |
+| 热更新 | 项目目录下任何文件变化（`.joplo/`、`dist/`、`node_modules/`、`.git/` 除外）都会使项目模块失效、重新编译，并通过 HMR 自定义事件 `joplo:ir` 把新 IR 推给看板。页面不刷新，保持功能、方案、场景、位置（越界时夹到合法范围）和选中。编译是串行的，编译过程中又有变化时，结束后再编一次。 |
+
+- **Tailwind**：项目目录会追加为 `index.css` 的 `@source`，项目源文件里出现的 `className` 能被编译，并随文件变化热更新。build 同样如此。
+- **编译出错**：看板顶部显示错误列表，每条格式为 `文件:行:列 + 说明`。语法错误的位置来自转译器，指向真正出错的文件，可以是被 import 的模块。舞台继续显示上一次成功的画面和当前位置，不会白屏。修好并保存后自动恢复。
+- **安全**（沿用 M0）：
+  - 只监听 `127.0.0.1`；
+  - 每个 HTTP 请求校验 Host（`127.0.0.1:端口` / `localhost:端口`），否则返回 403；
+  - 写接口 `PUT /__joplo/selection` 校验 Origin（存在时必须是本服务）、`Content-Type: application/json`、本地令牌 `x-joplo-token`（注入在看板 HTML 的 meta 里），并限制请求体大小。
+- **端口**：缺省 4790，被占用时直接报错 `端口 N 已被占用`（strictPort），不静默换端口。传 `port: 0` 使用随机端口（测试用）。
+
+接口：
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /__joplo/ir` | `{ version, ok, project, diagnostics, home }`。`project` 始终是最近一次成功的 IR；`ok=false` 表示最近一次编译失败。 |
+| `GET /__joplo/selection` | 当前 `.joplo/selection.json`，看板载入时据此恢复选中。 |
+| `PUT /__joplo/selection` | 请求体为 `{ selection: { optionId, scenarioId, position, sceneId, nodeId, stepId? } \| null }`。 |
+
+### 选中：`.joplo/selection.json`
+
+内容为 core 的 `Selection` 类型，取消选中时为 `null`。`source` / `at` 的端到端流向：
+
+1. kit 的 jsxDEV / callsite 写入绝对源位置；
+2. `compile` 转成相对路径，写到 IR 节点、步骤、规则的 `source`；
+3. 渲染器把它写到每个节点根 DOM 的 `data-jat`（同时还有 `data-jid`、`data-jtype`）；
+4. 浏览器只提交“选中了谁”。服务端对照当前 IR 校验，并**重新计算** `at`、`label`（优先取 `<Label htmlFor>` 的文字）、`route`、`featureId`、`stepId`，然后原子写入 `.joplo/selection.json`；
+5. `joplo selection`（T-cli）读取文件，输出 `文件:行号` 和源码片段。
+
+不变量：每次写接口返回后，界面显示的选中与文件内容一致。
+
+- 写入被拒绝（409，例如场景已变、元素已不存在）时，服务端把文件写成 `null`，并在响应里返回 `current: null`。看板随之清除选中，并提示“选中未能同步给 Agent：…，已取消选中”。这修复了上一轮复审的问题：之前文件保留旧选中，界面却显示新选中。
+- 网络失败或令牌错误时，服务端没有写入，看板回滚到上一次确认的选中。
+- 热更新后：选中的元素仍在画面里时保留选中；行号或标签变了会重新写入新的 `at`。元素被删除时取消选中并写入 `null`。
+
+## 看板界面（D32 方案 B：模式决定信息量）
+
+**演示模式（默认）**
+
+- **顶栏**：项目名、当前路径（绿点表示热更新已连接）、功能 / 方案 / 场景切换（选定方案带 ✓）、视图切换（演示场景 / 比较方案 / 浏览产品）、缺口胶囊“缺失 N · 待决定 M”、演示 / 审阅模式切换、手绘 / 线框主题、“概念原型”标识。点击缺口胶囊会切到审阅模式，并展开、滚动到情况列表。
+- **中间**：大舞台，按比例缩放以尽量占满主体（1600×1000 窗口下约 1.07 倍）。
+- **底部**：一行紧凑步骤条，包括重置、上一步、播放 / 暂停、下一步、字幕（或“场景完成 · 结果”）、步骤点、模拟标签。
+- 没有侧栏。
 
 **审阅模式**
 
-- 点击元素只选中，同时 `PUT /api/selection` 写入 `.joplo/selection.json`，并提示“已选中「X」，可以在 Agent 会话里说要改什么”（D15）。
-- 点击步骤芯片会跳到该步之后，并选中这个步骤（`nodeId: null`）。
+- **左栏 · 路径树（产品地图）**：列出每个路径上堆叠了哪些功能，每个功能显示涉及的方案。✓ 表示选定，紫色表示正在查看。由方案新增的路径标“由 B 新增”。
+  - 点路径会进入浏览视图；
+  - 点方案会进入该方案的演示。
+- **左栏 · 情况列表**：当前方案的情况与覆盖芯片（缺失、待决定、已表达、不适用、已排除），列出原因，并链接到对应场景。
+- **右栏 · 检查器**：
+  - 选中元素时：标签、类型、`at`（可一键复制）、来源（布局、页面，或方案 X 的堆叠 / 新增页面）、当前可见与禁用状态、禁用原因、设计说明、关联规则（来源与确认状态）、以它为目标的步骤（点击跳到该步之前）。
+  - 选中步骤（点步骤点）时：字幕、`at` 和关联规则。
+  - 未选中时：功能目标、约束、方案思路与取舍、规则、待决问题。
 
-选中内容格式如下：
+**比较方案**：功能页为每个方案列一张卡片，包含舞台缩略图（第一个场景的初始画面）、场景列表（分支）和覆盖芯片。在“按情况比较”里选一个情况，每张卡片会显示这个方案对它的覆盖状态和原因，可以一键“进入场景”。没有场景时按钮禁用。并排双舞台的成本较高，暂未实现（D12）。
 
-```json
-{ "optionId": "opt_a", "scenarioId": "sc_a_success", "position": 1, "stepId": "a_s1_open",
-  "sceneId": "scene_a_members", "nodeId": "sel_role", "at": "2026-11-05T…Z" }
-```
+**浏览产品**：用发布视图 `@<路径>` 按路径浏览产品现在的样子：每个功能取选定方案，数据合并各方案第一个场景的初始数据。只由未选定方案新增的路径，会退回到该方案的画面，并在标签上说明。浏览视图是静态的，不能播放。
 
-`stepId` 是产生当前画面的步骤（`steps[position-1]`），初始状态为 `null`。它与 `renderStep({ stepId })` 的语义一致，Agent 可以据此复现用户看到的画面。
+**推进状态**：手动、逐步、自动播放都只通过 core 的 `applyStep` / `stateAt` / `explainClick` 推进，M0 的 `runtime/demo.ts` 继续复用。
 
-- `.joplo/selection.json` 始终反映画板当前的选中：点检查器的“取消选中”后，文件内容为 `null`（`PUT /api/selection` 的请求体为 `null`）。CLI 读取时要处理 `null` 和文件不存在两种情况。
-- 写回是串行的，只有最后一次请求的结果会显示。检查器里的“选中已写入 .joplo/selection.json”只在写接口成功后出现；失败时显示原因（例如项目已变、选中与当前修订不符）。
+- 点击的含义由 `explainClick` 决定：推进、禁用原因、“演示未覆盖”、越序提示。
+- 演示模式下，点到按钮里的文字也算点按钮。
+- 快捷键：`←` / `→` 逐步，空格播放或暂停。
 
-**演示模式**
+## 渲染器（`packages/web/src/renderer`）
 
-点击的含义完全由 core 的 `explainClick` 决定：
+- 每个目录类型都有一个低保真实现。注册表的类型是 `Record<ComponentType, …>`，漏掉任何类型都会导致类型检查失败。
+- 底座用真实的 shadcn 组件。手绘主题叠加 Rough 描边和 Excalifont / 小赖字体，线框主题使用 1px 边框。
+- 每个节点的根 DOM 都带 `data-jid` / `data-jtype` / `data-jat`。可操作的节点另带 `data-jinteractive`、`data-jdisabled`、`data-junmodeled`。
+- 绑定、可见性、禁用全部由 core 计算：`resolveProps` / `isSelfVisible` / `isNodeDisabled`。Dialog / Sheet / AlertDialog 的门控来自 `GATED_CONTAINERS`。
+- 浮层渲染在舞台内部的弹窗层（不 portal 到 body），截图和遮挡检查只看舞台本身。
+- 作者的 `className` 原样加到根 DOM，其他属性不透传，链接也不生成真实 href。
 
-- `advance`：执行这一步，带波纹和动画。type/select 步骤会把步骤里的示例值逐字填入，并标“示例输入”。紧跟在用户动作后面的系统事件会自动执行（停留约 0.9 秒，显示“系统事件”标记）。
-- `disabled`：就地气泡显示 `disabledReason`。
-- `unmodeled` / `not_covered`：提示“当前演示未覆盖此操作：「X」”，并提供“回到演示”按钮。
-- `out_of_order`：提示“按当前场景，下一步是：…”。
-- `static`：不响应。
+> 注意：协调者正在把组件 API 从 shadcn 改为 Mantine。届时 `components.tsx` 的注册表要改成新的目录映射，并按舞台视口宽度解析响应式属性（`base`/`xs`/`sm`/`md`/`lg`/`xl`）和 `visibleFrom` / `hiddenFrom`；AppShell 在 mobile 视口下收起 navbar。见 handoff。
 
-**自动播放**
+## `buildSite`：静态发布站
 
-- 每步先用 Motion 把指针移到目标中心（按 `data-jid` 测量），再出现波纹，输入动作逐字出现，然后调用 `applyStep`。
-- 时长来自固定逻辑时钟（`runtime/demo.ts` 的 `TIMING`），暂停期间不计时。
-- 在 `prefers-reduced-motion` 下不移动指针、不逐字输入，直接切换状态。
+1. Vite 以中间件模式（不监听端口）载入项目，执行 `compile(…, 'publish')`，只保留选定方案。这一步已经去掉规则、情况、问题、备注和源路径；`publishPayload` 再去掉约束、角色、取舍、覆盖等创作侧字段（D33）。
+2. 对 `packages/web/site.html` 执行 `vite build`（强制 production）。构建时 `@joplo/core` 指向 `site/core-lite.ts`，只打包播放器和目录，不带 zod schema 与编译器。
+3. 后处理 HTML：
+   - IR 内联为 `<script type="application/json" id="joplo-ir">`（已转义 `<`）；
+   - 入口脚本内联为 `<script type="module">`；
+   - 去掉 `crossorigin` 和 `modulepreload`。
 
-**快捷键**：`←` / `→` 逐步，空格键播放或暂停（焦点在舞台内时不生效）。
+   这样直接双击 `index.html`（`file://`）也能完全离线运行。CSS 和字体是相对路径的静态文件。
+4. 目标目录（缺省 `<项目>/dist`）非空且没有 `overwrite` 时拒绝写入。以下情况永远拒绝：目标是项目目录本身或它的上级、目标在 `.joplo/` 里、目标目录里含有 `joplo.config.ts`。编译失败时不写任何文件，并抛出带诊断的 `EXPORT_FAILED`。
 
-**状态来源唯一**：手动、逐步、自动三种方式都只通过 `initialState` / `stateAt` / `applyStep` 推进（`runtime/demo.ts` 中只有 `commit()` 一处调用 `applyStep`）。“上一步”使用 `stateAt(position-1)`。动画被取消时不会推进状态。
+**发布站内容**：
 
-**步数显示一致**：某一步的动画进行中（包括自动播放暂停在这一步中途），步骤栏显示的是这一步“第 k 步”，此时它还没提交（位置为 k-1）：
-- “上一步”取消这一步的动画，回到第 k-1 步，字幕同步回退；
-- “下一步”或在画面上点击，会立即提交这一步，到达第 k 步。
+- 左侧是“整体布局”（各路径）和“功能”（功能名，以及选定方案的场景）；
+- 右侧是舞台和步骤条，支持手动、逐步、自动播放；
+- 功能页显示目标和方案思路；
+- 常驻“概念原型 · 非正式实现”；
+- 只读，没有审阅和选中。
 
-推进步骤、重置、切换场景时，就地提示气泡会关闭。重置、上一步、切换场景时，旧 Toast 直接从 DOM 移除，不播放退出动画。
+hash 路由：`#/p/<路径>`、`#/f/<功能>`、`#/s/<场景>`。
 
-**切换场景**会重置到该场景的初始数据，并提示“已切换到「X」，数据已重置”。
+**部署**：`npx wrangler deploy --assets ./dist --name <名称> --compatibility-date 2026-11-01`，或上传到任何静态托管。
 
-**实时刷新**
+## `renderStep`：截图
 
-- 收到 SSE 推送的修订后重新拉取项目。每次拉取都有序号，晚到的旧响应直接丢弃，界面上的修订号不会倒退。场景仍然存在时保留场景和位置，越界时夹到合法范围；选中保留，元素不存在时检查器会说明。
-- SSE 事件里带的 `error`（服务端发现文件不合法）会立即显示在错误横幅里，随后的拉取会补上具体的 schema 问题。
-- 项目文件不合法时，显示红色横幅和前 5 条 schema 问题，同时继续显示上一个有效修订，不会白屏。
-- 回放失败时显示橙色横幅，并停在能到达的最后位置。
+`renderStep` 用随机端口启动一次性的 dev 服务（`watch: false`，只编译一次），Playwright 打开渲染路由 `/?render=1&scenario=…&position=…&theme=…`，然后截取舞台。页面和元素索引来自同一份 IR。
 
-## 渲染器
-
-`src/renderer/components.tsx` 为目录中 32 个组件各提供一个实现：
-
-- 根 DOM 带 `data-jid`、`data-jtype`、`data-jlabel`；可交互组件还带 `data-jinteractive`，禁用时带 `data-jdisabled` 和 `aria-disabled`。
-- 属性用 `resolveProps` 解析，可见性用 `isSelfVisible`，禁用用 `isNodeDisabled`。输入类组件显示 `state.inputs[id]`。
-- Button、Badge、Input、Textarea、Checkbox、Switch、Progress、Avatar、Table 基于 shadcn/ui；Select 只画出闭合状态，并列出可选值，不弹出下拉。
-- Dialog 通过 React portal 渲染到**舞台内**的弹窗层，带遮罩，不挂到 `document.body`。
-- Toast 放在舞台内的 Toast 层；如果与下一步目标重叠，会依次换到右上、底部居中、左下、左上。
-- Custom 渲染成虚线占位框：“自定义组件：{kind}（演示占位）”。
-- 手绘主题：Rough.js 描边，种子为 `FNV-1a(node.id)`；字体为 Excalifont + 小赖（本地 woff2 子集，按 unicode-range 按需加载，不访问 CDN）。线框主题：1px 边框和系统字体。
-- 所有文本都通过 React 文本节点渲染，不使用 `dangerouslySetInnerHTML`。
-
-## 渲染专用路由与 renderStep
-
-- `/?render=1&scenario=…&position=…&theme=sketch|clean`：只渲染舞台，固定尺寸，不播放动画。等 `document.fonts.load/ready` 完成、所有 rough 图形首次绘制完成后，才设置 `window.__JOPLO_READY__ = true`，同时暴露 `window.__JOPLO_STATE__`。出错时设置 `__JOPLO_ERROR__`。工作区页面也会暴露 `__JOPLO_STATE__` 和 `__JOPLO_UI__`，供测试使用。
-- `renderStep(opts)` 的流程：
-  1. 用 `positionAfterStep` 换算位置，用 `stateAt` 校验回放；
-  2. 在临时端口启动服务，用 Playwright chromium 截取 `[data-joplo-stage]`；chromium 不可用时退回系统 Chrome；
-  3. 返回元素索引：DOM 中的元素都有 box；场景树中没有渲染的节点也会列出，`visible: false`。
-  4. 页面读取的是 renderStep 已解析的同一份项目快照，元素索引、告警与截图来自同一次读取。
-- 渲染告警：
-  - 可见的可交互元素中心点被其他元素覆盖（弹窗遮罩覆盖背景属于预期层次，不报）；
-  - 超出画框；
-  - 不在视口内：传入的 `viewport` 小于舞台时，视口外的元素汇总成一条告警，不报遮挡；
-  - 标签文字溢出（`scrollWidth > clientWidth`）；
-  - Toast（`pointer-events:none`，`elementFromPoint` 看不到）按几何相交检测：覆盖下一步目标、或覆盖其他可交互元素（弹窗打开时被遮罩盖住的背景除外）；
-  - 手写字体未加载或字体文件加载失败；
-  - 下一步目标没有显示。
-- 目标文件已存在且没有传 `overwrite: true` 时拒绝写入。`out` 指向项目目录内的 `project.joplo.json` 或 `.joplo/` 时，即使传了 `overwrite` 也拒绝（解析符号链接，macOS/Windows 上不区分大小写）。
-
-## 本地服务安全
-
-- 只绑定 `127.0.0.1`，传其他 host 会直接报错。
-- 每个请求都校验 `Host`（`127.0.0.1:端口` 或 `localhost:端口`），防止 DNS 重绑定。
-- 写接口 `PUT /api/selection` 要求：
-  - 带 Origin 时，Origin 必须是本服务；
-  - `Content-Type` 必须是 `application/json`，只允许附带 `charset=utf-8`，否则返回 415；
-  - `x-joplo-token` 与启动时生成的令牌一致（以 `<meta name="joplo-token">` 注入 index.html，用常量时间比较）；
-  - 请求体不超过 64KB，超过返回 413（排空请求体后再响应，不重置连接）；
-  - 通过 zod 严格校验（选中对象或 `null`），并对照当前项目校验：方案存在、场景属于该方案、位置在范围内、`stepId` 等于 `steps[position-1]`、`sceneId` 等于回放到该位置时的画面、`nodeId` 在该画面中。不符返回 409，不改动已有选中。
-- 写入方式是临时文件 + rename。
-- 服务**不写** `project.joplo.json`：`PUT /api/project` 返回 405。
-- 静态文件限制在 `dist` 目录内（会解析 realpath）；解码后跳出 `dist` 的路径（如 `..%2fpackage.json`）返回 404。
-- `startServer` 先监听端口，成功后才创建文件监听和心跳定时器；端口被占用等失败时不留下任何句柄。响应带 CSP（`script-src 'self'`）、`nosniff`、`X-Frame-Options: DENY`。
-
-API：`GET /api/project` → `{ revision, project }`（不合法时 422，包含 `issues`）；`GET /api/events`（SSE，监听项目目录，120ms 防抖，事件 `revision`）；`GET` / `PUT /api/selection`。
+- `scenarioId` / `stepId` 使用 IR 的限定 ID，例如 `invite.a-modal.success` / `invite.a-modal.success#1`；
+- `elements[]` 带 `at`；没有渲染出来的节点也会列出，`visible: false`；文本节点不列入；
+- 保留 M0 的渲染告警：遮挡、超出画框、文字溢出、Toast 覆盖可交互元素、字体未加载；
+- 不覆盖已有文件（需要传 `overwrite`），不能写到项目源文件或 `.joplo/`。
 
 ## 测试
 
-```bash
-pnpm test         # vitest：core 播放器 + server 单元测试（loadProjectFile / SelectionSchema / checkSelection / Content-Type / 原子写入）
-pnpm test:e2e     # Playwright：全部浏览器测试，每个测试都使用 examples/invite 的临时副本
-pnpm docs:screenshots   # 重新生成 docs/screenshots/
-```
-
-浏览器测试覆盖：
-
-- AC-02、03、04、05/19、20；
-- 越序点击、静态元素；
-- 审阅选中写入 selection.json；
-- 实时刷新与不合法文件；
-- 没有方案时的空状态；
-- 主题切换；
-- reduced-motion；
-- AC-22 渲染告警为空（3 个位置 × 2 种主题）；
-- 文字溢出告警；
-- 拒绝覆盖已有文件；
-- 安全：错误 Host、无令牌、错误令牌、跨源请求、非法请求体、路径穿越、不写项目文件；
-- 只监听 127.0.0.1；端口被占用时不泄漏句柄；
-- 暂停在动画中途时“上一步”/“下一步”与显示的步数一致；重置和切换场景后没有 DOM 残留；就地提示的关闭；
-- 取消选中写 null、写回失败不显示“已写入”；SSE 乱序；刷新后步骤变少；
-- selection 写接口的 413、Content-Type、对照项目校验；renderStep 的视口、scale、Toast 几何相交、拒绝写项目数据、项目快照。
-
-浏览器测试的截图输出到临时目录，不会覆盖仓库中的 `docs/screenshots/`；文档截图只由 `pnpm docs:screenshots` 更新。
-
-## 截图清单（docs/screenshots/）
-
-| 文件 | 内容 |
-| --- | --- |
-| `success-0-initial.{sketch,clean}.png` | 成员页初始状态（AC-22） |
-| `success-1-dialog-open.{sketch,clean}.png` | 邀请弹窗打开，背景有遮罩（AC-22） |
-| `success-3-filled.{sketch,clean}.png` | 邮箱和权限已填 |
-| `success-5-toast.{sketch,clean}.png` | 成功 Toast，待接受列表多一行（AC-22） |
-| `failure-5-error.{sketch,clean}.png` | 发送失败，显示行内错误，输入保留 |
-| `denied-initial.{sketch,clean}.png` | 普通成员：禁用入口和说明 |
-| `workspace-demo-initial.png` | 工作区全貌（演示模式） |
-| `workspace-demo-autoplay-typing.png` | 自动播放中：指针、字幕、“示例输入”逐字填入 |
-| `workspace-demo-success-complete.png` | 场景完成横幅 + Toast |
-| `workspace-demo-failure-error.png` | 失败场景中的系统事件结果 |
-| `workspace-demo-denied-disabled-reason.png` | 点击禁用按钮，就地显示原因（AC-05） |
-| `workspace-demo-uncovered.png` | 点击未建模的“空间设置”：当前演示未覆盖 + 回到演示（AC-19） |
-| `workspace-review-selected.png` | 审阅模式选中“发送邀请”，检查器显示引用、规则、步骤、情况 |
+- `pnpm vitest run packages/server/test`：
+  - dev：编译、Host / Origin / 令牌 / Content-Type 校验、选中写入与 409 时写 null、热更新与语法错误定位、`.joplo/` 变化不触发重新编译、端口占用、非项目目录、空项目；
+  - build：缺省输出、拒绝覆盖、危险目标、编译失败、没有 pick；
+  - HTML 后处理；
+  - renderStep。
+- `pnpm test:e2e`（Playwright）：
+  - 看板：演示、手动与自动播放的最终状态深度相等、禁用原因、演示未覆盖、方案 B 跨路径跳转；
+  - 审阅：selection.json 的 `at`、取消选中写 null；
+  - 路径树、缺口胶囊、比较方案、浏览产品；
+  - 热更新：不刷新页面、语法错误定位与恢复、选中跟随行号或被清除；
+  - 发布站：file:// 和静态服务器都能播放；产物不含 `rules`、`a-modal.tsx`、`b-batch`、`B · 独立页面`、`features/invite`，也没有绝对路径。
+- 所有测试都在 `examples/invite` 的临时副本上运行，端口随机。
+- `pnpm docs:screenshots` 重新生成 `docs/screenshots/*.png`，这是写入该目录的唯一途径。
 
 ## 已知限制
 
-- 舞台是固定尺寸的画框，内容超出画框高度时会被裁掉，并在渲染时报“超出画框”告警（只针对可交互元素），不支持滚动。
-- Select 只显示闭合状态和可选值，不弹出下拉；Tabs、Radio、Checkbox、Switch 的值只由步骤写入，手动点击它们时按 `explainClick` 的结果处理。
-- 弹窗打开时，背景被遮罩挡住，不能点击：审阅模式下要选背景元素，需要先回到弹窗打开前的步骤。
-- 演示模式下，用户动作后面紧跟的系统事件会自动执行，用来模拟请求返回。场景以系统事件开头时，需要按“下一步”或“自动播放”。
-- Switch 和 Spinner 在手绘主题下仍使用 shadcn 或 CSS 的外观，没有 rough 描边。
-- 字体文件约 12MB（205 个 Xiaolai 子集 + 7 个 Excalifont 子集），直接提交在 `packages/web/src/fonts/`，运行时只加载用到的子集。重新生成方法：`node packages/web/scripts/extract-fonts.mjs <@excalidraw/excalidraw 0.18.1 解包后的 package 目录>`。
-- 渲染专用路由每次截图都会启动一个临时服务和一个浏览器（约 0.3 秒/张），还没有做复用。
-- 服务端对项目只做 zod schema 校验，不做引用完整性校验（那是 core validate 的职责）；回放失败会在界面上提示。
-- 产品地图、多方案比较、评论线程、导出、Decision 本轮都没有实现，也没有放假入口。
+- 发布站约 0.55 MB HTML（内联 JS + IR）加上按需加载的字体子集，字体全部打包在 `assets/`，共约 12 MB。
+- 选中恢复只在看板载入时进行一次；多个看板标签页同时打开时，以最后一次写入为准。
+- 浏览视图的数据是各选定方案第一个场景初始数据的合并，只用于看整体外观，不代表任何具体场景。
