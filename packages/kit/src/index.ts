@@ -99,7 +99,8 @@ export type EffectDef =
   | { kind: 'effect'; type: 'toast'; text: string; tone: 'success' | 'error' | 'info' }
   | { kind: 'effect'; type: 'go'; route: string }
   | { kind: 'effect'; type: 'complete'; text: string; outcome: 'success' | 'failure' | 'cancelled' }
-  | { kind: 'effect'; type: 'uses'; rules: string[] };
+  | { kind: 'effect'; type: 'uses'; rules: string[] }
+  | { kind: 'effect'; type: 'shot'; targets: string[] };
 
 const pathOf = (b: Bind | string): string => (isBind(b) ? bindPath(b) : b);
 export const set = (target: Bind, value: Json): EffectDef => ({ kind: 'effect', type: 'set', path: pathOf(target), value });
@@ -116,6 +117,16 @@ export const go = (route: string): EffectDef => ({ kind: 'effect', type: 'go', r
 export const done = (text: string, outcome: 'success' | 'failure' | 'cancelled' = 'success'): EffectDef => ({ kind: 'effect', type: 'complete', text, outcome });
 /** 这一步依据哪些规则（option 或 feature 中的规则键）。 */
 export const uses = (...rules: string[]): EffectDef => ({ kind: 'effect', type: 'uses', rules });
+
+/**
+ * 镜头（D43）：这一步要看哪些元素。每个 id 归到包含它的层级（沿祖先找层级的根），只影响那些层级的镜头；
+ * 不在任何层级里的归到“全景”。一步里的第一个 shot 决定导演切到哪一层。shot() 不带参数 = 回到全景。
+ */
+export const shot = (...targets: string[]): EffectDef => ({ kind: 'effect', type: 'shot', targets });
+
+/** 层级（视角）：画面里的一组根元素，例如 layer('客户端视角', ['client_panel'])。另有自动的“全景”层 = 整个画面。 */
+export type LayerDef = { kind: 'layer'; title: string; roots: string[]; source?: string };
+export const layer = (title: string, roots: string[]): LayerDef => ({ kind: 'layer', title, roots, source: callsite() });
 
 /** 步骤参数：字符串是字幕（可省略，省略时自动生成），其余是效果。 */
 export type StepArg = string | EffectDef;
@@ -203,6 +214,8 @@ export type OptionDef = {
   rules?: Record<string, RuleDef>;
   questions?: Record<string, QuestionDef>;
   coverage?: Record<string, CoverageDecl>;
+  /** 层级（视角）：{ client: layer('客户端视角', ['client_panel']), backend: layer('后端流转', ['arch']) }。 */
+  layers?: Record<string, LayerDef>;
   scenarios: Record<string, Flow>;
   source?: string;
 };

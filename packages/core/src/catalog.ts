@@ -195,6 +195,9 @@ const BP_KEYS = ['base', 'xs', 'sm', 'md', 'lg', 'xl'] as const;
 /** 页面 viewport 对应的舞台尺寸。 */
 export const VIEWPORT_SIZE = { desktop: { width: 1280, height: 800 }, mobile: { width: 390, height: 844 } } as const;
 
+/** 层级（D43）：自动的“全景”层 = 整个画面。作者的层级键不能以 @ 开头。 */
+export const OVERVIEW_LAYER = '@all';
+
 /** Diagram.Node 的 kind 与 Node / Edge 的 state（D41）。 */
 export const DIAGRAM_NODE_KINDS = ['client', 'service', 'model', 'database', 'queue', 'storage', 'external', 'tool', 'user'] as const;
 export const DIAGRAM_STATES = ['idle', 'active', 'ok', 'error', 'dim'] as const;

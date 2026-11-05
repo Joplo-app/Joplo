@@ -1,8 +1,10 @@
 /**
  * 渲染专用路由（renderStep 与看板导出使用）：
- *   /?render=1&project=<id>&scenario=..&position=..&theme=..[&w=..&h=..][&device=mobile|desktop][&frame=1][&record=1]
- * - 只渲染舞台，固定尺寸，关闭入场动画。字体与 rough 绘制都完成后设置 window.__JOPLO_READY__ = true，
- *   并暴露 window.__JOPLO_STATE__（当前 PlayState）。
+ *   /?render=1&project=<id>&scenario=..&position=..&theme=..[&w=..&h=..][&frame=1][&record=1]
+ * - 只渲染舞台，尺寸跟随页面自己的 viewport（D44：不再覆盖设备），关闭入场动画。字体、rough 绘制与镜头都稳定后
+ *   设置 window.__JOPLO_READY__ = true，并暴露 window.__JOPLO_STATE__（当前 PlayState）。
+ * - 镜头（D43）：用这一步的导演镜头（cameraAt），静态截图没有动画。
+ * - w/h：截图尺寸。`[data-jshot]` 是 w×h 的画布，舞台（手机页面带外框）按比例放进去。
  * - frame=1：导出图片 / 视频用，`[data-jexport]` 包住画面；手机时套上与看板相同的手机外框（PhoneFrame）。
  * - record=1：导出视频用，带鼠标、点击波纹与字幕；window.__JOPLO_RECORD__.play() 开始自动播放，
  *   .progress = { step, done, error } 供服务端读取进度。
@@ -12,7 +14,8 @@ import { stateAt, type PlayState, type Project } from '@tokenroll/joplo-core';
 import { fetchIR } from './runtime/dev-client';
 import { DemoController } from './runtime/demo';
 import { Stage, VIEWPORTS, viewportOf, type Viewport } from './renderer/Stage';
-import { PhoneFrame } from './renderer/components';
+import { PhoneFrame, phoneFrameSize } from './renderer/components';
+import { cameraFor } from './player/cameraFor';
 import { RoughRegistry, ThemeContext, type StageTheme } from './renderer/rough';
 import { Overlay } from './player/Overlay';
 
@@ -31,13 +34,12 @@ export function RenderApp() {
   const scenarioId = params.get('scenario') ?? '';
   const position = Number(params.get('position') ?? '0');
   const theme: StageTheme = params.get('theme') === 'clean' ? 'clean' : 'sketch';
-  const deviceParam = params.get('device');
   const frame = params.get('frame') === '1';
   const record = params.get('record') === '1';
-  // 可选的舞台尺寸（renderStep 的 viewport）：覆盖页面自身的 viewport，响应式属性按它取值
+  // 可选的截图尺寸（renderStep 的 viewport）：只决定画布大小，舞台宽度仍是页面自己的 viewport（D44）
   const w = Number(params.get('w'));
   const h = Number(params.get('h'));
-  const override = w > 0 && h > 0 ? { width: w, height: h } : deviceParam === 'mobile' || deviceParam === 'desktop' ? (deviceParam as Viewport) : null;
+  const shot = w > 0 && h > 0 ? { width: w, height: h } : null;
   const registry = useMemo(() => new RoughRegistry(), []);
   const [data, setData] = useState<{ project: Project; state: PlayState } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +78,13 @@ export function RenderApp() {
       }
       await document.fonts.ready;
       while (registry.size > 0 && !cancelled) await new Promise<void>((r) => setTimeout(r, 20));
+      // 镜头稳定（测量了若干帧）后再截图
+      for (let i = 0; i < 100 && !cancelled; i++) {
+        const cam = stage.querySelector<HTMLElement>('[data-jcamera]');
+        if (!cam || cam.dataset.cameraSettled === '1') break;
+        await raf();
+      }
+      while (registry.size > 0 && !cancelled) await new Promise<void>((r) => setTimeout(r, 20));
       await raf();
       await raf();
       if (!cancelled) w.__JOPLO_READY__ = true;
@@ -87,34 +96,49 @@ export function RenderApp() {
 
   if (error) return <div style={{ padding: 24, color: '#c92a2a', fontFamily: 'system-ui' }} data-render-error="">渲染失败：{error}</div>;
   if (!data) return null;
-  const viewport: Viewport = override && typeof override === 'string' ? override : override ? (override.width < 600 ? 'mobile' : 'desktop') : viewportOf(data.project, data.state);
-  const wrap = (stageNode: ReactNode) => {
-    if (!frame) return <div style={{ position: 'absolute', left: 0, top: 0 }}>{stageNode}</div>;
-    const vp = typeof override === 'object' && override ? override : VIEWPORTS[viewport];
-    return (
-      <div data-jexport="" style={{ position: 'absolute', left: 0, top: 0, display: 'inline-block', ...(viewport === 'mobile' ? { background: '#ffffff', padding: 16 } : {}) }}>
-        {viewport === 'mobile' ? (
-          <ThemeContext.Provider value={{ theme, registry }}>
-            <PhoneFrame width={vp.width} height={vp.height} seed="stage-phone">
-              {stageNode}
-            </PhoneFrame>
-          </ThemeContext.Provider>
-        ) : (
-          stageNode
-        )}
-      </div>
+  const viewport: Viewport = viewportOf(data.project, data.state);
+  const vp = VIEWPORTS[viewport];
+  const framed = (stageNode: ReactNode) =>
+    viewport === 'mobile' ? (
+      <ThemeContext.Provider value={{ theme, registry }}>
+        <PhoneFrame width={vp.width} height={vp.height} seed="stage-phone">
+          {stageNode}
+        </PhoneFrame>
+      </ThemeContext.Provider>
+    ) : (
+      stageNode
     );
+  const wrap = (stageNode: ReactNode) => {
+    if (frame)
+      return (
+        <div data-jexport="" style={{ position: 'absolute', left: 0, top: 0, display: 'inline-block', ...(viewport === 'mobile' ? { background: '#ffffff', padding: 16 } : {}) }}>
+          {framed(stageNode)}
+        </div>
+      );
+    if (shot) {
+      // 截图画布：舞台（手机页面带外框）按比例放进 w×h，居中
+      const fw = viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).width : vp.width;
+      const fh = viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).height : vp.height;
+      const k = Math.min(shot.width / fw, shot.height / fh);
+      return (
+        <div data-jshot="" style={{ position: 'absolute', left: 0, top: 0, width: shot.width, height: shot.height, overflow: 'hidden', background: '#f8f9fa' }}>
+          <div style={{ position: 'absolute', left: (shot.width - fw * k) / 2, top: (shot.height - fh * k) / 2, width: fw, height: fh, transform: `scale(${k})`, transformOrigin: '0 0' }}>{framed(stageNode)}</div>
+        </div>
+      );
+    }
+    return <div style={{ position: 'absolute', left: 0, top: 0 }}>{stageNode}</div>;
   };
-  if (record) return <RecordStage project={data.project} scenarioId={scenarioId} theme={theme} override={override} registry={registry} setStage={setStage} wrap={wrap} />;
+  if (record) return <RecordStage project={data.project} scenarioId={scenarioId} theme={theme} registry={registry} setStage={setStage} wrap={wrap} />;
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
+  const camera = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null).spec;
   return wrap(
-    <Stage project={data.project} state={data.state} theme={theme} mode="render" animate={false} registry={registry} nextTargetId={next && 'target' in next.action ? next.action.target : null} stageRef={setStage} viewportOverride={override} />,
+    <Stage project={data.project} state={data.state} theme={theme} mode="render" animate={false} registry={registry} nextTargetId={next && 'target' in next.action ? next.action.target : null} stageRef={setStage} camera={camera} />,
   );
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
-function RecordStage({ project, scenarioId, theme, override, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; override: Viewport | { width: number; height: number } | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode) => ReactNode }) {
+function RecordStage({ project, scenarioId, theme, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode) => ReactNode }) {
   const ctl = useMemo(() => {
     const c = new DemoController(null);
     c.reducedMotion = false;
@@ -160,7 +184,7 @@ function RecordStage({ project, scenarioId, theme, override, registry, setStage,
       epoch={snap.epoch}
       animate
       nextTargetId={nextTargetId}
-      viewportOverride={override}
+      camera={cameraFor(project, scenarioId, snap.state.position, null).spec}
       stageRef={(el) => {
         ctl.setStageEl(el);
         setStageEl(el);

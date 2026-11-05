@@ -110,7 +110,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
 
     browser = await launch(playwright);
     const page = await browser.newPage({ viewport, deviceScaleFactor: opts.scale ?? 1, reducedMotion: 'reduce' });
-    // 指定 viewport 时舞台按该尺寸渲染（响应式属性、visibleFrom/hiddenFrom、AppShell 收起随之变化）
+    // D44：舞台宽度固定为页面自己的 viewport；指定 viewport 时它只是截图尺寸（舞台按比例放进去）
     const q = new URLSearchParams({ render: '1', project: server.projectId, scenario: sc.id, position: String(position), theme, ...(opts.viewport ? { w: String(opts.viewport.width), h: String(opts.viewport.height) } : {}) });
     await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => (window as unknown as { __JOPLO_READY__?: boolean }).__JOPLO_READY__ === true, null, { timeout: 60000 });
@@ -118,7 +118,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     if (err) throw new JoploError('RENDER_FAILED', `渲染路由报告错误：${err}`);
 
     const report = (await page.evaluate(`(${COLLECT_REPORT})(${JSON.stringify({ nextTargetId, theme })})`)) as PageReport;
-    const png = await page.locator('[data-joplo-stage]').screenshot({ type: 'png', animations: 'disabled' });
+    const png = await page.locator(opts.viewport ? '[data-jshot]' : '[data-joplo-stage]').screenshot({ type: 'png', animations: 'disabled' });
     fs.mkdirSync(path.dirname(out), { recursive: true });
     if (opts.overwrite) fs.writeFileSync(out, png);
     else fs.writeFileSync(out, png, { flag: 'wx' });

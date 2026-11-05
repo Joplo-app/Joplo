@@ -112,6 +112,9 @@ export const Effect = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('complete'), text: z.string().min(1), outcome: z.enum(['success', 'failure', 'cancelled']) }),
 ]);
 
+/** 镜头（D43）：这一步在某个层级里对准哪些元素；targets 为空 = 这一层的整体。 */
+export const Shot = z.strictObject({ layer: z.string().min(1), targets: z.array(z.string().min(1)) });
+
 export const Step = z.strictObject({
   id: Qid,
   kind: z.enum(['user', 'system']),
@@ -119,6 +122,10 @@ export const Step = z.strictObject({
   caption: z.string().min(1),
   effects: z.array(Effect).default([]),
   ruleIds: z.array(Qid).default([]),
+  /** 这一步的镜头（来自 shot()，按层级归类）。没有 shot 的步骤为空，镜头沿用上一步。 */
+  shots: z.array(Shot).default([]),
+  /** 这一步导演切到哪一层（第一个 shot 决定）；null = 沿用上一步。 */
+  directorLayer: z.string().nullable().default(null),
   source: Source,
 });
 
@@ -198,6 +205,8 @@ export const Option = z.strictObject({
   /** 该方案触及的路径（堆叠或新增）。 */
   routes: z.array(z.string()).default([]),
   coverage: z.record(Qid, Coverage).default({}),
+  /** 层级（视角，D43）：键 → 标题与根元素 id。演示信息，发布站保留。 */
+  layers: z.record(Id, z.strictObject({ title: z.string().min(1), roots: z.array(z.string().min(1)).min(1) })).default({}),
   source: Source,
 });
 
@@ -258,3 +267,4 @@ export type Scenario = z.infer<typeof Scenario>;
 export type Step = z.infer<typeof Step>;
 export type Action = z.infer<typeof Action>;
 export type Effect = z.infer<typeof Effect>;
+export type Shot = z.infer<typeof Shot>;

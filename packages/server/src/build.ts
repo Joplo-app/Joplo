@@ -23,11 +23,11 @@ import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
 import type { DistWeb, SourceWeb } from './web-assets.ts';
 
-/** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。 */
+/** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。层级与镜头属于演示，保留（D43）。 */
 export function publishPayload(project: Project, home: string | null): { project: Record<string, unknown>; home: string | null } {
   const { rules: _r, cases: _c, issues: _i, ...rest } = project;
   const features = Object.fromEntries(Object.entries(project.features).map(([id, f]) => [id, { id: f.id, name: f.name, goal: f.goal, optionIds: f.optionIds, pick: f.pick }]));
-  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {} }]));
+  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {} }]));
   const scenarios = Object.fromEntries(
     Object.entries(project.scenarios).map(([id, s]) => {
       const { caseIds: _ci, ...sr } = s;

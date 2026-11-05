@@ -466,6 +466,12 @@ export function diagramScale(layout: Pick<DLayout, 'width' | 'height'>, availW: 
   return fit >= MIN_SCALE ? { scale: fit, scroll: false } : { scale: MIN_SCALE, scroll: true };
 }
 
+/** 镜头之下（D43）：整图放进容器，不设下限、不滚动；细节由镜头推近。 */
+export function diagramFit(layout: Pick<DLayout, 'width' | 'height'>, availW: number, availH: number): { scale: number; scroll: boolean } {
+  if (!layout.width || !availW) return { scale: 1, scroll: false };
+  return { scale: Math.min(1, (availW - 8) / layout.width, (availH - 8) / layout.height), scroll: false };
+}
+
 /** 折线点 → 平滑路径（经过首尾点，中间点作为二次贝塞尔的控制点）。 */
 export function edgePath(points: Point[]): string {
   if (points.length < 2) return '';

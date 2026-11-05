@@ -8,9 +8,8 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { domToBlob } from 'modern-screenshot';
 import type { Project } from '@tokenroll/joplo-core';
 import { DemoController } from '../runtime/demo';
-import { parseSiteHash, siteHash, type Device, type PlayRoute, type SiteRoute } from '../runtime/route';
+import { parseSiteHash, siteHash, type PlayRoute, type SiteRoute } from '../runtime/route';
 import { scenariosOf } from '../runtime/views';
-import { viewportOf } from '../renderer/Stage';
 import type { StageTheme } from '../renderer/rough';
 import { Brand, PlayerPage, TopBar, type MenuItem } from '../player/PlayerPage';
 import { usePlaySync } from '../player/playRoute';
@@ -131,7 +130,6 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
     );
   const option = resolved.optionId ? project.options[resolved.optionId] : null;
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
-  const device: Device = play.device ?? (snap.state ? viewportOf(project, snap.state) : 'desktop');
   const home = () => navigate({ kind: 'home' });
   const menu: MenuItem[] = [
     {
@@ -167,8 +165,11 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
         { label: option?.name ?? '', testid: 'crumb-option' },
         { label: scenario?.name ?? '', testid: 'crumb-scenario' },
       ]}
-      device={device}
-      onDevice={(d) => toPlay({ ...play, device: d }, true)}
+      layer={play.layer ?? null}
+      onLayer={(l) => {
+        const { layer: _l, ...rest } = play;
+        toPlay(l ? { ...rest, layer: l } : rest, true);
+      }}
       theme={theme}
       nav={
         <div className="flex flex-1 flex-col gap-1" data-testid="scenario-nav">
@@ -183,7 +184,7 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
               <li key={s.id}>
                 <button
                   type="button"
-                  onClick={() => toPlay({ featureId: feature.id, scenarioId: s.id, ...(play.device ? { device: play.device } : {}) })}
+                  onClick={() => toPlay({ featureId: feature.id, scenarioId: s.id })}
                   data-testid={`site-scenario-${s.id}`}
                   className={cn('w-full rounded-md px-3 py-2 text-left text-[14px] hover:bg-[#f1f3f5]', snap.scenarioId === s.id && 'bg-[#e7f0ff] font-semibold hover:bg-[#e7f0ff]')}
                 >

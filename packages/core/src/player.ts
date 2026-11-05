@@ -5,7 +5,7 @@
  * 位置（position）语义：0 = 场景初始状态；k = 已执行前 k 个步骤之后的状态。
  * “上一步”通过从初始状态重放到 k-1 实现，因此恢复的是业务可见状态，而不是撤销动画。
  */
-import { GATED_CONTAINERS, INTERACTIVE_TYPES, VALUE_TYPES, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
+import { GATED_CONTAINERS, INTERACTIVE_TYPES, OVERVIEW_LAYER, VALUE_TYPES, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
 import type { Condition, Project, Scenario, Scene, SceneNode, Step } from './schema.ts';
 import { JoploError, type Diagnostic } from './result.ts';
 
@@ -475,4 +475,41 @@ export function explainClick(project: Project, state: PlayState, nodeId: string)
   if (node.unmodeled) return { kind: 'unmodeled', label };
   if (sc.steps.some((s) => targetOf(s) === nodeId)) return { kind: 'out_of_order', label, expectedCaption: current && !state.completed ? current.caption : null };
   return { kind: 'not_covered', label };
+}
+
+// ---------- 视角层级与导演镜头（D43） ----------
+
+/** 某一步的镜头：导演层与每个层级当前对准的元素（空数组 = 这一层的整体）。 */
+export type Camera = { directorLayer: string; perLayer: Record<string, string[]> };
+
+/**
+ * 第 position 步之后的镜头。纯函数：只由步骤上的 shots / directorLayer 推导，不进入 ui / data / inputs。
+ * 没有 shot 的步骤：导演层与各层镜头都沿用上一步；初始为全景、各层整体。
+ * 手动、逐步、自动播放、回放、renderStep、视频录制和发布站都用它。
+ */
+export function cameraAt(project: Project, scenarioId: string, position: number): Camera {
+  const sc = project.scenarios[scenarioId];
+  const perLayer: Record<string, string[]> = {};
+  let directorLayer = OVERVIEW_LAYER;
+  if (!sc) return { directorLayer, perLayer };
+  const n = Math.max(0, Math.min(position, sc.steps.length));
+  for (let i = 0; i < n; i++) {
+    const st = sc.steps[i]!;
+    for (const s of st.shots ?? []) perLayer[s.layer] = [...s.targets];
+    if (st.directorLayer) directorLayer = st.directorLayer;
+  }
+  return { directorLayer, perLayer };
+}
+
+/** 场景所属方案的层级列表：全景在前，其后是作者声明的层级（源码顺序）。 */
+export function layersOf(project: Project, scenarioId: string | null): { id: string; title: string; roots: string[] }[] {
+  const sc = scenarioId ? project.scenarios[scenarioId] : null;
+  const opt = sc ? project.options[sc.optionId] : null;
+  return [{ id: OVERVIEW_LAYER, title: '全景', roots: [] }, ...Object.entries(opt?.layers ?? {}).map(([id, l]) => ({ id, title: l.title, roots: l.roots }))];
+}
+
+/** 第 index 步（0 起）的镜头是否改变了某一层（“只重放这一层”时，不变的步骤快速带过）。 */
+export function stepTouchesLayer(project: Project, scenarioId: string, index: number, layer: string): boolean {
+  const st = project.scenarios[scenarioId]?.steps[index];
+  return !!st && (st.shots ?? []).some((s) => s.layer === layer);
 }

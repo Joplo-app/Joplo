@@ -1,9 +1,9 @@
 /**
  * 看板「…」菜单的导出（D39）：
  *
- * - 图片：`POST /__joplo/p/<id>/export/image` `{ scenarioId, position, device, theme }` → PNG（当前步骤、当前设备；
- *   手机带外框）。Playwright 打开本看板的渲染路由（与 renderStep 同一条渲染路径），截取 `[data-jexport]`。
- * - 视频（只在本机）：`POST …/export/video` `{ scenarioId, device, theme }` → 202 `{ jobId }`；
+ * - 图片：`POST /__joplo/p/<id>/export/image` `{ scenarioId, position, theme }` → PNG（当前步骤；尺寸跟随页面自己的 viewport，
+ *   手机页面带外框；D44 起不再选择设备；镜头用这一步的导演镜头）。Playwright 打开本看板的渲染路由（与 renderStep 同一条渲染路径），截取 `[data-jexport]`。
+ * - 视频（只在本机）：`POST …/export/video` `{ scenarioId, theme }` → 202 `{ jobId }`（尺寸跟随场景起始页面的 viewport）；
  *   Playwright `recordVideo` 录下渲染路由的自动播放（含鼠标与字幕），保存为 `<项目>/exports/<场景>-<时间>.webm`。
  *   进度：`GET …/export/video/events`（SSE，先发当前状态，之后每次变化一条，结束后关闭）；`GET …/export/video` 取当前状态。
  *   同一项目同时只能有一个视频任务（再提交返回 409）。没有 Playwright / Chromium 时任务失败，错误里带安装命令。
@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright';
-import { JoploError, type Project } from '@tokenroll/joplo-core';
+import { JoploError, stateAt, type Project } from '@tokenroll/joplo-core';
 import { launch, loadPlaywright, type PlaywrightModule } from './render.ts';
 
 export type Device = 'desktop' | 'mobile';
@@ -70,12 +70,14 @@ const send = (res: http.ServerResponse, status: number, body: unknown) => {
 
 function parseRequest(project: Project | null, body: unknown, needPosition: boolean) {
   if (!project) throw new JoploError('INVALID_SCHEMA', '项目还没有成功编译过，无法导出');
-  const b = (body ?? {}) as { scenarioId?: unknown; position?: unknown; device?: unknown; theme?: unknown };
+  const b = (body ?? {}) as { scenarioId?: unknown; position?: unknown; theme?: unknown };
   if (typeof b.scenarioId !== 'string' || !project.scenarios[b.scenarioId]) throw new JoploError('USAGE', `场景不存在：${String(b.scenarioId)}`);
   const sc = project.scenarios[b.scenarioId]!;
   const position = needPosition ? Number(b.position ?? 0) : 0;
   if (!Number.isInteger(position) || position < 0 || position > sc.steps.length) throw new JoploError('USAGE', `位置应为 0–${sc.steps.length} 的整数`);
-  const device: Device = b.device === 'mobile' ? 'mobile' : 'desktop';
+  // 设备跟随页面自己的 viewport（D44）
+  const sceneId = stateAt(project, sc.id, position).sceneId;
+  const device: Device = project.scenes[sceneId]?.viewport === 'mobile' ? 'mobile' : 'desktop';
   const theme = b.theme === 'clean' ? 'clean' : 'sketch';
   return { sc, position, device, theme };
 }
@@ -191,7 +193,7 @@ export class ExportHub {
     const browser = await launch(pw);
     try {
       const page = await browser.newPage({ viewport: EXPORT_SIZE[device], deviceScaleFactor: 2, reducedMotion: 'reduce' });
-      await page.goto(this.renderUrl(projectId, { scenario: scenarioId, position: String(position), theme, device, frame: '1' }), { waitUntil: 'domcontentloaded' });
+      await page.goto(this.renderUrl(projectId, { scenario: scenarioId, position: String(position), theme, frame: '1' }), { waitUntil: 'domcontentloaded' });
       await waitReady(page);
       return await page.locator('[data-jexport]').screenshot({ type: 'png', animations: 'disabled' });
     } finally {
@@ -211,7 +213,7 @@ export class ExportHub {
         fs.mkdirSync(path.dirname(out), { recursive: true });
         this.update(job, { phase: 'starting', percent: 2 });
         await this.deps.recordVideo({
-          url: this.renderUrl(projectId, { scenario: scenarioId, position: '0', theme, device, frame: '1', record: '1' }),
+          url: this.renderUrl(projectId, { scenario: scenarioId, position: '0', theme, frame: '1', record: '1' }),
           size: EXPORT_SIZE[device],
           out,
           total,

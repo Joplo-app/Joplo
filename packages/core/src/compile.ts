@@ -8,7 +8,7 @@
  */
 import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@tokenroll/joplo-kit/node';
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@tokenroll/joplo-kit';
-import { COMPONENT_TYPES, INTERACTIVE_TYPES, matchChoice, nodeLabel } from './catalog.ts';
+import { COMPONENT_TYPES, INTERACTIVE_TYPES, OVERVIEW_LAYER, matchChoice, nodeLabel } from './catalog.ts';
 import { choicesOf } from './player.ts';
 import { Project, SCHEMA_VERSION, type SceneNode, type Scene, type Scenario, type Step, type Coverage } from './schema.ts';
 import type { Diagnostic } from './result.ts';
@@ -205,6 +205,31 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       return null;
     };
 
+    // ---------- 层级（D43）：根元素必须存在于本方案的某个画面 ----------
+    const layers: Record<string, { title: string; roots: string[] }> = {};
+    const optionScenes = routesIn(o).map((r) => sceneFor.get(sceneOf(r.path))).filter((x): x is Scene => !!x);
+    for (const [lk, ld] of Object.entries(def.layers ?? {})) {
+      const at = ld.source ?? def.source;
+      if (!/^[A-Za-z_][\w-]*$/.test(lk)) {
+        err('LAYER_UNKNOWN', `层级键「${lk}」只能用字母、数字、下划线和连字符，且不能以 @ 开头`, at);
+        continue;
+      }
+      const roots = (ld.roots ?? []).filter((id) => {
+        if (optionScenes.some((sc) => findIn(sc.root, id))) return true;
+        err('LAYER_UNKNOWN', `层级「${ld.title}」引用的根元素 id「${id}」不在方案 ${qid} 的任何画面里`, at);
+        return false;
+      });
+      if (roots.length) layers[lk] = { title: ld.title, roots };
+    }
+    /** 元素属于哪些层级：沿祖先找到层级的根；都不属于时归到全景层。 */
+    const layersOfNode = (scene: Scene, id: string): string[] => {
+      const chain = pathTo(scene.root, id);
+      if (!chain) return [];
+      const ids = new Set(chain.map((n) => n.id));
+      const hit = Object.entries(layers).filter(([, l]) => l.roots.some((r) => ids.has(r))).map(([k]) => k);
+      return hit.length ? hit : [OVERVIEW_LAYER];
+    };
+
     const scenarioIds: Record<string, string[]> = {};
     for (const [skey, fl] of Object.entries(def.scenarios ?? {})) {
       const sid = `${qid}.${skey}`;
@@ -231,9 +256,35 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
             }
           } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
           else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
+          else if (e.type === 'shot') continue; // 镜头不是状态变化，下面单独归类
           else effects.push({ type: 'complete', text: e.text, outcome: e.outcome });
         }
         const sceneBefore = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i, start)));
+        const sceneAfter = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i + 1, start)));
+        // 镜头：按层级归类；第一个 shot 的第一个元素所在层级就是这一步的导演层
+        const perLayer = new Map<string, string[]>();
+        let directorLayer: string | null = null;
+        for (const e of st.effects as EffectDef[]) {
+          if (e.type !== 'shot') continue;
+          if (e.targets.length === 0) {
+            if (!perLayer.has(OVERVIEW_LAYER)) perLayer.set(OVERVIEW_LAYER, []);
+            directorLayer ??= OVERVIEW_LAYER;
+          }
+          for (const id of e.targets) {
+            const scene = [sceneAfter, sceneBefore].find((sc) => sc && findIn(sc.root, id));
+            if (!scene) {
+              err('SHOT_UNKNOWN', `shot("${id}") 引用的元素不在这一步的画面里（${sceneAfter?.route ?? sceneBefore?.route ?? '?'}）`, st.source);
+              continue;
+            }
+            for (const lk of layersOfNode(scene, id)) {
+              const list = perLayer.get(lk) ?? [];
+              if (!list.includes(id)) list.push(id);
+              perLayer.set(lk, list);
+              directorLayer ??= lk;
+            }
+          }
+        }
+        const shots = [...perLayer].map(([layer, targets]) => ({ layer, targets }));
         return {
           id: `${sid}#${i + 1}`,
           kind: st.kind,
@@ -241,6 +292,8 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           caption: st.caption ?? autoCaption(st, sceneBefore),
           effects,
           ruleIds: mode === 'publish' ? [] : ruleIds,
+          shots,
+          directorLayer,
           ...(st.source ? { source: rel(st.source) } : {}),
         };
       });
@@ -282,6 +335,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       tradeoffs: mode === 'publish' ? [] : (def.tradeoffs ?? []),
       routes: touched,
       coverage,
+      layers,
       ...(def.source ? { source: rel(def.source) } : {}),
     };
   }
@@ -393,6 +447,7 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
 
   const props: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(rest)) {
+    if (v === undefined) continue; // 写了属性但值是 undefined（如 description={cond ? '…' : undefined}）= 没写
     if (typeof v === 'function' && !isBind(v)) {
       err('FUNCTION_PROP', `<${n.type}> 的属性 ${k} 是函数。行为请写在 option 的 flow 步骤里，而不是事件回调`, at);
       continue;
@@ -463,8 +518,8 @@ function textNode(c: JChild, id: string): SceneNode {
 
 function toPropValue(v: unknown): unknown {
   if (isBind(v)) return `$${bindPath(v)}`;
-  if (Array.isArray(v)) return v.map(toPropValue);
-  if (v && typeof v === 'object' && !isNode(v)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, toPropValue(x)]));
+  if (Array.isArray(v)) return v.map((x) => (x === undefined ? null : toPropValue(x)));
+  if (v && typeof v === 'object' && !isNode(v)) return Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).map(([k, x]) => [k, toPropValue(x)]));
   return v;
 }
 
@@ -479,6 +534,16 @@ function stepRouteBefore(steps: StepDef[], i: number, start: string): string {
   let route = start;
   for (let k = 0; k < i; k++) for (const e of steps[k]!.effects) if (e.type === 'go') route = e.route;
   return route;
+}
+
+/** 从根到 id 的节点链（含自身）；找不到为 null。 */
+function pathTo(node: SceneNode, id: string): SceneNode[] | null {
+  if (node.id === id) return [node];
+  for (const c of node.children ?? []) {
+    const p = pathTo(c, id);
+    if (p) return [node, ...p];
+  }
+  return null;
 }
 
 function findIn(node: SceneNode, id: string): SceneNode | null {

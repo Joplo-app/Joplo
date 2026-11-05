@@ -89,7 +89,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 ## 数据 API
 - config({ name, description?, theme?: 'sketch'|'clean', layout?, home? })。
 - layout(tree)；Outlet 放当前页面，<Slot name="actions"/> 声明可堆叠的插槽。
-- page({ title, layout?: string|false, viewport?: 'desktop'|'mobile' }, tree)。
+- page({ title, layout?: string|false, viewport?: 'desktop'|'mobile' }, tree)。每个页面只有一种设备：缺省电脑；写 viewport: 'mobile' 时固定用手机外框和 390 宽显示。需要手机版就单独做一个手机版的页面或演示，不要让一个页面同时兼容电脑和手机。
 - feature({ name, goal, cases, roles?, constraints?, rules?, questions?, pick? })。
 - option({ name, idea, on?, routes?, state?, rules?, questions?, coverage?, scenarios })。
 - on: { '/members': { actions: <Button id="invite">邀请</Button> } }：往已有路径的插槽加元素。
@@ -119,6 +119,12 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 用 Stack / Group / SimpleGrid / Grid 的属性排版：<Group justify="space-between">、<SimpleGrid cols={{ base: 1, md: 3 }}>。
 - 响应式写成对象 { base, xs, sm, md, lg, xl }，或 visibleFrom="sm" / hiddenFrom="sm"；AppShell 在窄于 navbar.breakpoint 时自动收起导航。
 - 输入组件直接写 label：<TextInput id="email" label="邮箱"/>，自动字幕会用它。
+
+## 视角层级与导演镜头：一屏讲清客户端与后端
+- 方案里声明层级：layers: { client: layer('客户端视角', ['client_panel']), backend: layer('后端流转', ['arch']) }；根 id 是画面里的元素，另有自动的“全景”层。
+- 步骤里写镜头：.click('app_send', shot('msg_user'), shot('app', 'biz'))；一步可以有多个 shot，每个 id 只影响包含它的层级；第一个 shot 决定导演切到哪一层；shot() 回到全景；没写 shot 的步骤沿用上一步。
+- 镜头可以对准任何带 id 的元素（组件、卡片、按钮、Diagram 节点 / 分组 / 连线）。播放时导演自动切层并推近焦点，观众也能手动切层或“只重放这一层”。
+- 不要为了“看得清”把页面拆成很多块或写很长的页面：整页会缩进画面，细节靠 shot 推近。shot / layer 引用的 id 不存在时 check 报 SHOT_UNKNOWN / LAYER_UNKNOWN。
 
 ## 架构图：用 flow 驱动调用链
 - <Diagram>里放 <Diagram.Group label>、<Diagram.Node id label kind state={$.ui.n_x}/>、<Diagram.Edge from to label async state={$.ui.e1}/>；布局自动生成，播放时不移动。
