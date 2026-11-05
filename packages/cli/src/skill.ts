@@ -23,6 +23,7 @@ function pointer(version: string): Buffer {
     '---',
     '这个项目用 Joplo 描述功能原型。不要凭记忆写，先按需读取用法：',
     '- npx joplo skill authoring   写页面、方案、场景',
+    '- npx joplo skill demo        层级、镜头、调用链与短字幕',
     '- npx joplo skill components  可用组件和属性',
     '- npx joplo skill cases       开工前用情况清单主动提问',
     '其他任务运行 npx joplo skill，选择 check、selection 或 publish 主题。',
@@ -46,7 +47,7 @@ async function optionalFile(path: string): Promise<Buffer | null> {
 }
 
 function agentsContent(current: Buffer | null): Buffer {
-  const block = Buffer.from(`${START}\n## Joplo\n在有 joplo.config.ts 的项目中设计功能原型时，先运行 npx joplo skill 查看主题，再按需读取。\n写页面/方案/场景读 npx joplo skill authoring；组件查 components，开工前的情况提问查 cases。\n改完运行 npx joplo check；用户在看板选中后运行 npx joplo selection，只改指向的那一处。\n${END}`);
+  const block = Buffer.from(`${START}\n## Joplo\n在有 joplo.config.ts 的项目中设计功能原型时，先运行 npx joplo skill 查看主题，再按需读取。\n写页面/方案/场景读 npx joplo skill authoring；组件查 components，开工前的情况提问查 cases。\n组织层级、镜头、调用链与字幕读 npx joplo skill demo。\n改完运行 npx joplo check；用户在看板选中后运行 npx joplo selection，只改指向的那一处。\n${END}`);
   if (current === null) return Buffer.concat([block, Buffer.from('\n')]);
   const start = current.indexOf(START), end = current.indexOf(END);
   if (start === -1 && end === -1) return Buffer.concat([current, Buffer.from(current.length ? current.at(-1) === 10 ? '\n' : '\n\n' : ''), block, Buffer.from('\n')]);

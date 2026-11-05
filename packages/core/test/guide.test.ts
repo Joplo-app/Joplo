@@ -1,9 +1,11 @@
 import { expect, test } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import ts from 'typescript';
 import { COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../src/catalog.ts';
 import { guide, skillIndex, skillTopic, SKILL_TOPICS } from '../src/guide.ts';
 
-const topics = ['authoring', 'components', 'cases', 'check', 'selection', 'publish'] as const;
-test('六个主题均少于 150 行，结尾的相关主题均存在', () => {
+const topics = ['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'publish'] as const;
+test('七个主题均少于 150 行，结尾的相关主题均存在', () => {
   expect(SKILL_TOPICS.map(t => t.name)).toEqual(topics);
   for (const topic of topics) {
     const body = skillTopic(topic);
@@ -50,4 +52,58 @@ test('未知和 null 主题受控，缺省或 null 属性提示均不额外产�
   expect(() => skillTopic('absent')).toThrow('npx joplo skill');
   expect(() => skillTopic(null as unknown as string)).toThrow('没有主题');
   expect(skillTopic('components', null)).toBe(skillTopic('components'));
+});
+
+test('demo 集中解释层级、镜头和调用链，authoring 只指向它', () => {
+  const demo = skillTopic('demo');
+  for (const text of ['layer(', 'layers:', 'shot(...ids)', 'shot()', '导演层', 'trace(', 'trace.fail', 'trace.skip', 'when', '24', '48', 'explain(', '说明层', 'examples/agent-arch', '390']) expect(demo).toContain(text);
+  const snippets = [...demo.matchAll(/```tsx\n([\s\S]*?)\n```/g)];
+  expect(snippets).toHaveLength(1);
+  expect(snippets[0]![1]!.split('\n').length).toBeGreaterThanOrEqual(5);
+  expect(snippets[0]![1]!.split('\n').length).toBeLessThanOrEqual(8);
+  const authoring = skillTopic('authoring');
+  expect(authoring).toContain('demo');
+  for (const text of ['shot(', 'trace(', 'explain(', '<Diagram', 'CAPTION_TOO_LONG', '视角层级与导演镜头']) expect(authoring).not.toContain(text);
+});
+test('check 覆盖 compile.ts / validate.ts 中全部静态诊断代码，避免新增诊断未同步说明', async () => {
+  const files = ['compile.ts', 'validate.ts'];
+  const codes = new Set<string>();
+  for (const file of files) {
+    const content = await readFile(new URL(`../src/${file}`, import.meta.url), 'utf8');
+    const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true);
+    const visit = (node: ts.Node) => {
+      let code: ts.Node | undefined;
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+        if (['err', 'warn'].includes(node.expression.text)) code = node.arguments[0];
+        else if (node.expression.text === 'emit') code = node.arguments[1];
+      } else if (ts.isPropertyAssignment(node) && (ts.isIdentifier(node.name) || ts.isStringLiteralLike(node.name)) && node.name.text === 'code') code = node.initializer;
+      if (code && ts.isStringLiteralLike(code) && /^[A-Z][A-Z0-9_]+$/.test(code.text)) codes.add(code.text);
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  expect(codes).toContain('SHOT_UNKNOWN');
+  expect(codes).toContain('INVALID_SCHEMA');
+  expect(codes).toContain('CAPTION_TOO_LONG');
+  const documented = new Set(skillTopic('check').match(/\b[A-Z]+(?:_[A-Z]+)+\b/g));
+  expect([...codes].filter(code => !documented.has(code)).sort()).toEqual([]);
+});
+test('cases 按产品类型给出可筛选的预设键、维度和来源示例', () => {
+  const body = skillTopic('cases');
+  const groups = [
+    { example: 'examples/invite', cases: { no_permission: 'permission', invalid_input: 'input', revoked: 'lifecycle', expired: 'lifecycle', already_exists: 'conflict', duplicate_submit: 'conflict', request_failed: 'async' } },
+    { example: 'examples/agent-arch', cases: { quota: 'permission', dangerous_tool: 'permission', hand_offline: 'async', local_data: 'main', tool_version: 'consistency', usage_retry: 'async', model_failed: 'async' } },
+    { example: 'examples/joplo-dist', cases: { first_run: 'main', env_old: 'input', version_skew: 'consistency', optional_dep: 'async', dir_not_empty: 'conflict', typo: 'input', user_modified: 'conflict', offline: 'async' } },
+    { example: 'examples/joplo-board', cases: { first_open: 'main', single_instance: 'conflict', stale_resource: 'lifecycle', one_broken: 'consistency', public_view: 'consistency', recent: 'main' } },
+  ];
+  for (const group of groups) {
+    expect(body).toContain(group.example);
+    for (const [key, dimension] of Object.entries(group.cases)) expect(body).toMatch(new RegExp(`^- ${key} · ${dimension} · .+`, 'm'));
+  }
+  expect(body).toContain('不要照单全收');
+  expect(body.trimEnd().split('\n').at(-3)).toMatch(/移动端暂无示例.*单独.*D44/);
+});
+test('publish 说明同布局、导演、发布端快捷键以及图片/视频边界', () => {
+  const body = skillTopic('publish');
+  for (const text of ['布局相同', '层级', '导演', '全屏', 'F', '空格', '←/→', 'Esc', '导出图片', '导出视频只在本地']) expect(body).toContain(text);
 });

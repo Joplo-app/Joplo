@@ -3,6 +3,7 @@ import { JoploError } from './result.ts';
 
 export const SKILL_TOPICS = [
   { name: 'authoring', description: '目录约定；page / layout / option / flow 的写法' },
+  { name: 'demo', description: '层级、镜头、调用链与字幕：怎样做一个好演示' },
   { name: 'components', description: '当前版本的组件目录与属性' },
   { name: 'cases', description: '情况维度清单：开工前主动向用户提问' },
   { name: 'check', description: '读懂诊断，按文件和行号局部修改' },
@@ -12,12 +13,13 @@ export const SKILL_TOPICS = [
 export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
 
 const related: Record<SkillTopic, readonly SkillTopic[]> = {
-  authoring: ['components', 'cases', 'check', 'selection', 'publish'],
-  components: ['authoring', 'check'],
+  authoring: ['demo', 'components', 'cases', 'check', 'selection', 'publish'],
+  demo: ['authoring', 'components', 'check', 'publish'],
+  components: ['authoring', 'demo', 'check'],
   cases: ['authoring', 'check'],
   check: ['authoring', 'selection'],
   selection: ['check', 'authoring'],
-  publish: ['authoring', 'check'],
+  publish: ['demo', 'authoring', 'check'],
 };
 
 /** CLI 传入其 package.json 版本；行数来自同一次生成的主题正文。 */
@@ -74,7 +76,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
   authoring: `# Joplo 创作：authoring
 
 用 TS/TSX 描述设计，源文件是权威源，Git 管理版本；看板和发布站消费编译后的 IR。
-先读需要的主题，通常一次只需一两个。组件与属性读 components，开工前的提问读 cases。
+先读需要的主题，通常一次只需一两个。组件查 components，开工前的提问查 cases，演示的组织与讲法读 demo。
 
 ## 目录约定
 - joplo.config.ts：export default config({ name, layout: 'app', home: '/' })。
@@ -89,7 +91,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 ## 数据 API
 - config({ name, description?, theme?: 'sketch'|'clean', layout?, home? })。
 - layout(tree)；Outlet 放当前页面，<Slot name="actions"/> 声明可堆叠的插槽。
-- page({ title, layout?: string|false, viewport?: 'desktop'|'mobile' }, tree)。每个页面只有一种设备：缺省电脑；写 viewport: 'mobile' 时固定用手机外框和 390 宽显示。需要手机版就单独做一个手机版的页面或演示，不要让一个页面同时兼容电脑和手机。
+- page({ title, layout?: string|false, viewport?: 'desktop'|'mobile' }, tree)。设备与演示画面的安排读 demo。
 - feature({ name, goal, cases, roles?, constraints?, rules?, questions?, pick? })。
 - option({ name, idea, on?, routes?, state?, rules?, questions?, coverage?, scenarios })。
 - on: { '/members': { actions: <Button id="invite">邀请</Button> } }：往已有路径的插槽加元素。
@@ -120,35 +122,6 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 响应式写成对象 { base, xs, sm, md, lg, xl }，或 visibleFrom="sm" / hiddenFrom="sm"；AppShell 在窄于 navbar.breakpoint 时自动收起导航。
 - 输入组件直接写 label：<TextInput id="email" label="邮箱"/>，自动字幕会用它。
 
-## 视角层级与导演镜头：一屏讲清客户端与后端
-- 每个层级是一个完全独立的画面：layers: { client: layer('客户端视角', <ClientView/>), backend: layer('后端流转', <Arch/>) }；layer 的第二个参数是这一层自己的 JSX 树，按自己的布局占满整个舞台，不从路径页面里裁切。
-- 各层共享同一份状态（ui / data / inputs），切层不改变步骤；声明了 layers 的方案在演示页只显示各层画面。没有自动“全景”层：需要全景就自己声明一个，如 overview: layer('全景', <Overview/>)。
-- 字幕只用来点一句：画面下方的字幕区最多两行，一行说明、一行 explain('…')（小一号）。说明建议不超过 24 个字、explain 不超过 48 个字（英文按半个字算），超过时 check 报 CAPTION_TOO_LONG / EXPLAIN_TOO_LONG（只提示，不改你的文字）。自动播放每一步停留约 60ms/字，至少 3 秒。
-- 内容真的很多时，放进独立的说明层，由导演切过去讲，而不是把字幕写长：
-    layers: { arch: layer('后端流转', <Arch />), why: layer('设计理由', <Why />) },
-    .system('定义与实现分离', explain('大脑只看到工具定义'), shot('why_split'))   // why_split 是 <Why /> 里的一张卡片
-    .system('回到调用链', shot('biz', 'brain'))
-- 步骤里写镜头：.click('app_send', shot('msg_user'), shot('app', 'biz'))；每个 id 在包含它的层里解析，多层有同名 id 时各层都生效；第一个 shot 所在的层是导演层；shot() 让当时的导演层回到整层；没写 shot 的步骤沿用上一步，没写 shot 的点击会切到按钮所在的层。
-- 镜头可以对准任何带 id 的元素（组件、卡片、按钮、Diagram 节点 / 分组 / 连线）。播放时导演自动切层并推近焦点，观众也能手动切层或“只重放这一层”。
-- 不要为了“看得清”写很长的层：整层会缩进画面，细节靠 shot 推近。shot 的 id 不在任何层里时 check 报 SHOT_UNKNOWN；layer 的树为空时报 LAYER_UNKNOWN。
-
-## 架构图：用 trace 描述调用链
-- <Diagram>里放 <Diagram.Group label>、<Diagram.Node id label kind/>、<Diagram.Edge from to label async/>；布局自动生成，播放时不移动。节点和连线不用写 state。
-- 每一步写 trace(...) 说明这一步走了哪条路径，节点与连线的状态自动推算：本步走到的是 active（连线上有流动的小点），之前走过的是 ok，trace.fail 的是 error（保持到之后又走通），trace.skip 的是 dim，没涉及的是 idle。
-- 参数是节点 id：trace('brain', 'biz', 'local') 是 brain→biz、biz→local 两段；每段要有对应的 Diagram.Edge，反方向也算（小点逆向走）。同一方向有多条连线时写连线 id：trace('e_brain_biz')。找不到连线报 TRACE_UNKNOWN，多条连线报 TRACE_AMBIGUOUS。
-- trace 同时就是这一步的镜头：节点作为镜头目标（顺序有意义），决定导演切到哪一层；走到 2 个及以上节点时自动排成聚焦小图。同一步再写 shot 时两者合并；trace.skip 不移动镜头。
-- 五步示例：
-    .click('app_send', '用户发出任务', trace('app', 'biz'))
-    .system('额度预检', '调用模型前先预检额度', trace('biz', 'billing'))
-    .system('交给大脑', trace('biz', 'brain', 'llm'), trace.skip('local'))
-    .system('工具调用', '大脑只发出调用', trace('e_brain_biz'))
-    .system('扣费失败', trace.fail('biz', 'billing'), done('额度不足', 'failure'))
-- 节点或连线上显式写的 state 优先于推算结果；旧写法（state={$.ui.x} 绑定 + set）仍然支持。
-- 常与前端画面分成两个层级（客户端 / 后端），同一个 flow 一步步同时推进两边；Node / Edge 不需要 flow 也不用 unmodeled，⌥+单击可检查。
-- 逐段出现（像幻灯片一样一段一段加内容）：给 Group / Node / Edge 写 when={$.ui.show_billing}，步骤里 set($.ui.show_billing, true)；布局一开始就按全部元素算好，出现时已有元素不移动。
-- 节点多、容器不宽时用 direction="down"；整图总是放进容器，看细节靠 shot 推近，观众也可以滚轮 / 捏合缩放、拖动平移。
-- 讲两个节点之间的流动时，一步里 shot 这几个节点（或 shot 它们之间的连线 id）：播放时这些节点会移到画面中央排成一张紧凑的小图，只显示它们之间的连线，其余内容变淡；只 shot 一个节点时只推近、不重新布局。
-
 ## 规则与边界
 - rule('约束', { origin?, status?, cases?: ['happy'], elements?: ['invite'] })。
 - origin: user/project_material/ai_assumption/code_observed/feedback，默认 ai_assumption。
@@ -160,6 +133,56 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 
 改文件后运行 npx joplo check；在看板上看，用 npx joplo selection 读取用户指向的位置。
 诊断的修复流程读 check；只改选中位置的流程读 selection。`,
+  demo: `# Joplo 好演示：demo
+
+一步只讲一件事：用独立的层级分开视角，用镜头放大细节，用短字幕点出本步发生了什么。
+基础目录、状态与 flow 语法读 authoring；这里的 layer、shot、trace、explain 从 @tokenroll/joplo-kit 导入。
+
+## 层级是独立页面
+- 在 option 中声明 layers: { client: layer('客户端视角', <ClientView/>), backend: layer('后端流转', <Diagram>…</Diagram>) }。
+- layer(title, <tree/>) 带自己的 JSX 树，单独渲染并占满画面，不从同一张大页面里裁切。
+- 各层共享 ui / data / inputs，切层不改变步骤；声明 layers 后演示显示这些独立页面。
+- 没有自动的全景层；需要全景时自己声明 overview: layer('全景', <Overview/>)。
+- 长说明放进单独的说明层，如 why: layer('设计理由', <Why/>)，再用镜头切过去讲。
+
+## 镜头与导演
+- 在步骤里写 shot(...ids)；目标可为组件、卡片、按钮或 Diagram 的节点、分组、连线。
+- 每个 id 在包含它的层里解析，同名 id 可影响多个层；第一个 shot 所在的层就是导演层。
+- 例：.click('app_send', shot('msg_user'), shot('app', 'biz')) 先跟随客户端视角，再给后端设置镜头。
+- shot() 让当前导演层回到整层；没写镜头时沿用上一步，普通点击可跟到按钮所在层。
+- 导演播放时自动切层、推近并高亮；手动切层会暂停跟随，可恢复导演或只重放某一层。
+- 观众可滚轮/捏合缩放、拖动平移，用适应画面回到整体；下一步导演镜头会重新接管。
+
+## Diagram 与调用链
+- 在 <Diagram> 中用 <Diagram.Group label>、<Diagram.Node id label kind/>、<Diagram.Edge id from to label async/> 声明结构。
+- Diagram.Edge 的 from/to 必须是同一张 Diagram 内的节点 id；布局自动生成，逐段出现时已有元素不移动。
+- 用 trace('a','b','c') 表达 a→b→c 的调用链；不要手写节点/连线的 state 和 set 来模拟调用状态。
+- 本步经过的是 active，先前经过的自动变为 ok；trace.fail('a','b') 标记失败，之后走通可恢复。
+- trace.skip('a','b') 标记本次未调用的部分为 dim，不要求相连，也不移动镜头。
+- trace 参数可用节点或连线 id；每段都需有对应的边，允许反向经过；同向多条边时直接写连线 id。
+- trace 同时充当镜头目标，可与同一步的 shot 合并；在同一 Diagram 聚焦两个及以上节点时，自动排成紧凑的小图。
+- 逐段出现用 when={$.ui.show_billing}；步骤 set($.ui.show_billing, true) 只控制出现，不替代 trace 的调用状态。
+
+## 字幕与一屏放下
+- 说明建议约 24 字以内，explain('补充说明') 约 48 字以内（英文按半个字算），超出时 check 会警告。
+- 说明与 explain 显示在画面下方的字幕区，不叠在画面上；每一步只讲一件事，长内容移到说明层。
+- 自动播放按文字长度停留，至少 3 秒，等镜头与连线动画完成；可选 0.5× / 1× / 1.5×。
+- 不要写很长的页面再让观众滚动阅读；一屏放下，靠镜头推近看细节。
+- 每个页面只有一种设备，默认电脑；page({ viewport: 'mobile' }, tree) 固定用 Phone 外框和 390 宽显示。
+- 层级需要手机画面时用 layer('手机版', <MobileView/>, { viewport: 'mobile' })；需要手机版就单独做页面或演示（D44）。
+
+## 完整示例：examples/agent-arch
+看 shared/arch.tsx 的 layersFor/Diagram，与 features/agent/options/a-hybrid.tsx 的 flow。
+下面摘出 plan 的关键片段，省略业务规则关联；start 已在同一文件中组织用户输入与发送：
+\`\`\`tsx
+const plan = (f: ReturnType<typeof start>) =>
+  f
+    .system('Billing 额度预检', '调用模型之前，先预检额度', trace('biz', 'billing'), shot('blk_billing'))
+    .system('取工具定义', '按客户端实现的版本取工具定义', trace('biz', 'registry'), shot('blk_tools'), explain('定义与实现分离'))
+    .system('任务交给大脑', '任务 + 工具定义交给大脑', trace('biz', 'brain'), shot('blk_brain'))
+    .system('大脑推理', '大脑调用 Bedrock 规划下一步', trace('brain', 'llm'));
+\`\`\`
+同一示例还包含额度不足、危险工具确认、端侧掉线与计费重试；按需求选场景，不只演示顺利路径。`,
   cases: `# Joplo 情况清单：cases
 
 开工前先读用户需求和项目材料，再用下面的维度寻找遗漏；只问会改变设计的关键问题。
@@ -175,6 +198,45 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - \`conflict\` 冲突：重复点击或多人同时修改时怎么办？如何避免重复提交？
 - \`consistency\` 一致性：一个路径改完，其他路径何时更新？部分成功时如何保持结果可解释？
 
+## 按产品类型的预设
+开工前先按产品类型挑出相关情况来问用户，不要照单全收；下面是提问种子，不是已经确认的产品规则。
+
+### 表单 / CRUD / 权限（来源：examples/invite）
+- no_permission · permission · 非管理员操作时怎样阻止并解释。
+- invalid_input · input · 输入为空或格式无效时就地提示。
+- revoked · lifecycle · 撤销后再次打开时如何处理。
+- expired · lifecycle · 过期后访问时展示什么。
+- already_exists · conflict · 对象已存在时如何反馈。
+- duplicate_submit · conflict · 连续点击提交时避免重复创建。
+- request_failed · async · 请求失败后保留输入并允许重试。
+
+### Agent / AI 产品（来源：examples/agent-arch）
+- quota · permission · 额度不足时在调模型之前拦下。
+- dangerous_tool · permission · 危险工具执行前由用户确认。
+- hand_offline · async · 执行工具的一端掉线或超时时如实处理失败。
+- local_data · main · 需要访问用户本机数据时如何执行。
+- tool_version · consistency · 工具定义升级但实现仍为旧版本时怎么办。
+- usage_retry · async · 计费事件投递失败后重试并保证幂等。
+- model_failed · async · 模型调用失败或超时时怎样反馈和恢复。
+
+### CLI / 开发者工具（来源：examples/joplo-dist）
+- first_run · main · 从零开始，三条命令内跑通。
+- env_old · input · 运行环境版本过低时给出修复方法。
+- version_skew · consistency · 全局与项目内版本不一致时提示对齐。
+- optional_dep · async · 可选依赖缺失时只影响相关命令。
+- dir_not_empty · conflict · 目标目录已有文件时不直接覆盖。
+- typo · input · 子命令或参数拼错时提示最接近的那个。
+- user_modified · conflict · 不覆盖用户改过的文件。
+- offline · async · 没有网络时如何说明限制和恢复。
+
+### 本地工具 / 多项目（来源：examples/joplo-board）
+- first_open · main · 第一次打开且没有任何数据时给出开始入口。
+- single_instance · conflict · 已有实例在运行时不再起第二个。
+- stale_resource · lifecycle · 记住的目录或资源已不存在时如何清理记录。
+- one_broken · consistency · 某个项目出错时其他项目照常使用。
+- public_view · consistency · 公开视图隐藏私有路径、缺口和错误。
+- recent · main · 打开过多个项目时能在首页切换。
+
 ## 从回答落到情况与场景
 - feature.cases: { happy: '正常完成', denied: { title: '没有权限', dimension: 'permission', priority: 'high', expected: '解释原因' } }。
 - dimension 用上面的键；priority 为 high/medium/low；expected 说明预期结果。
@@ -189,7 +251,8 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 显式声明优先于自动推导；确实需要演示的情况用场景表达。
 - 不为“全部覆盖”编造业务规则。开工时没决定的行为继续提问。
 
-flow 和 rule 的具体写法读 authoring；怎样定位覆盖诊断读 check。`,
+flow 和 rule 的具体写法读 authoring；怎样定位覆盖诊断读 check。
+移动端暂无示例；需要手机版时单独做演示（D44）。`,
   check: `# Joplo 检查：check
 
 运行 npx joplo check [dir]；用 --option feature.option 缩小结构和回放范围，用 --format json 取得机器结果。
@@ -209,6 +272,18 @@ flow 和 rule 的具体写法读 authoring；怎样定位覆盖诊断读 check�
 - UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE：核对情况、规则和引用对象的键与所属方案。
 - UNKNOWN_SLOT / UNKNOWN_ROUTE / UNKNOWN_LAYOUT：核对路径、布局和 Slot 声明，堆叠到确实存在的位置。
 - UNKNOWN_PICK：pick 必须是本功能 options/ 下的方案文件名。
+- NOT_PICKED：功能未选方案所以不会发布；比较后为 feature.pick 填写选定方案文件名。
+- ROUTE_EXISTS：方案 routes 与已有路径重复；改用 on 堆叠或选择新路径。
+- BAD_ROUTE：路径没有以 / 开头；改为绝对的静态产品路径。
+- DUPLICATE_ELEMENT：同一画面内元素 id 重复；只改冲突 id 并同步相关引用。
+- CAPTION_TOO_LONG：本步说明过长；缩到约 24 字以内，一步一件事，长内容放说明层，见 demo。
+- EXPLAIN_TOO_LONG：explain 过长；缩到约 48 字以内，详细理由放独立说明层，见 demo。
+- SHOT_UNKNOWN：镜头目标不在本步画面或任何层级里；核对目标 id 和所属层，见 demo。
+- LAYER_UNKNOWN：层级键不合法或 layer 缺少内容；键用字母/数字/下划线/连字符且不以 @ 开头，并提供非空 JSX。
+- TRACE_UNKNOWN：调用链为空、id 不存在、跨 Diagram 或路径不连通；使用同一张 Diagram 中已连接的节点/连线 id。
+- TRACE_AMBIGUOUS：两个节点间有多条候选连线；在 trace 中改写为具体的连线 id。
+- UNKNOWN_DIAGRAM_NODE：Diagram.Edge 的 from/to 不指向本图节点；修正端点为该 Diagram 内的节点 id。
+- ELEMENT_PROP：组件属性传入了 JSX 元素；图标改成字符串如 leftSection="+"，内容放到子节点。
 - ASSUMPTION_CONFIRMED：AI 假设保留 pending；用户确认后如实填写来源，不能只改状态。
 - UNBOUND_INTERACTIVE：增加相关场景的步骤，或明确禁用并说明原因，或标记 unmodeled。
 - DISABLED_WITHOUT_REASON：补充 disabledReason，说明为何不可操作。
@@ -257,6 +332,13 @@ flow 和 rule 的具体写法读 authoring；怎样定位覆盖诊断读 check�
 - 发布站只含功能名、目标、场景演示、步骤字幕与整体布局。
 - 规则来源、AI 假设、缺口、待决问题和源文件位置只属于本地创作侧。
 - 这是纯静态只读演示，没有真实业务数据或后端。
+
+## 发布站怎样演示
+- 发布站和本地看板布局相同，只去掉规则、缺口、源码位置等创作侧信息。
+- 层级切换、导演跟随、只重放某一层、镜头聚焦与字幕在发布站都可用；具体写法读 demo。
+- 发布站也支持全屏：F 进入/切换全屏，空格播放/暂停，←/→ 上一步/下一步，Esc 退出。
+- 全屏只保留画面和字幕，播放控制浮在下方并自动隐藏。
+- 本地和发布站均可导出图片；导出视频只在本地，依赖本机 Playwright/Chromium。
 
 ## 部署
 在项目目录使用自己的 Wrangler 环境和账号：

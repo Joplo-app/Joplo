@@ -6,7 +6,7 @@
 
 ```sh
 joplo init <dir> [--name <name>]
-joplo skill [authoring|components|cases|check|selection|publish]
+joplo skill [authoring|demo|components|cases|check|selection|publish]
 joplo skill install [dir] [--force] [--diff] [--agents-md]
 joplo guide                         # skill authoring 的兼容别名
 joplo check [dir] [--format text|json] [--option <feature.option>]
@@ -27,13 +27,16 @@ joplo render [dir] --scenario-id <qid> --out <file> \
 | 主题 | 何时读取 |
 | --- | --- |
 | authoring | 写目录、页面、布局、方案、flow 和规则 |
+| demo | 用独立层级、镜头、trace 和短字幕组织一屏演示 |
 | components | 查当前编译器支持的组件；有目录属性提示时一并显示 |
-| cases | 开工前按八个情况维度主动向用户提问，声明情况与覆盖 |
+| cases | 按八个维度和产品类型预设挑出相关问题，再声明情况与覆盖 |
 | check | 读诊断代码，按文件和行号局部修复 |
 | selection | 用户在看板选中元素后读取源码，只改指向的位置 |
 | publish | 选定 pick、构建、用 `npx wrangler deploy --assets dist` 部署 |
 
 `joplo skill <主题>` 输出该主题的 Markdown，末尾指向相关主题。每个主题少于 150 行，不把全部用法塞进一次读取。未知主题会提示编辑距离最近的主题名，退出 2；如 `joplo skill authring` 提示 authoring。`joplo guide` 与 `joplo skill authoring` 的输出完全相同。
+
+demo 以 examples/agent-arch 为完整示例；check 的诊断代码覆盖由读取 compile.ts/validate.ts 源码的测试约束，避免新增代码遗漏说明。publish 主题说明本地/发布站同布局、层级与导演、全屏快捷键，以及图片两端可导出、视频仅本地的边界。
 
 这些命令只向 stdout 写无颜色文本，不加载 `@tokenroll/joplo-server`，也不加载或执行作者项目。组件清单与行为分类直接从 core catalog 生成；详细属性提示可由目录通过可选 docs 参数提供。
 
@@ -46,7 +49,7 @@ joplo skill install [dir] --force     # 明确覆盖用户改过的 SKILL.md
 joplo skill install [dir] --agents-md # AGENTS.md 不存在时也创建
 ```
 
-写入 `<dir>/.claude/skills/joplo/SKILL.md`，含 name/description frontmatter、按需读取主题的命令、改完 check 和选中后 selection 的提示，连标记不超过 20 行。不拷贝主题正文；详细用法跟随项目安装的 CLI 版本。
+写入 `<dir>/.claude/skills/joplo/SKILL.md`，含 name/description frontmatter、按需读取主题的命令、改完 check 和选中后 selection 的提示，连标记不超过 20 行。其中包括 `npx joplo skill demo` 的演示入口。不拷贝主题正文；详细用法跟随项目安装的 CLI 版本。
 
 末行 `<!-- joplo-skill <版本> sha256:<哈希> -->` 由安装器写入。哈希覆盖标记前的全部原始字节（包括 frontmatter 与换行）；重装时重新计算并比对。文件不存在时创建；原生成内容未修改时允许更新；字节完全相同则输出“已是最新”，不重写文件。
 
