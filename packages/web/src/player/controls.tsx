@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { Popover, useTip } from './popover';
 import type { Placement } from './popover-place';
 
-export type MenuItem = { id: string; label: string; onClick: () => void; checked?: boolean; disabled?: boolean; icon?: ReactNode; hint?: ReactNode };
+export type MenuItem = { id: string; label: string; onClick: () => void; checked?: boolean; disabled?: boolean; icon?: ReactNode; hint?: ReactNode; /** 第二行小字（例如功能的选定方案与缺口数）。 */ description?: string };
 export type MenuEntry = MenuItem | { id: string; divider: true };
 
 /** 元素的可用宽度（ResizeObserver）。返回回调 ref：元素晚出现（例如进入全屏后才渲染）也能测到。 */
@@ -177,10 +177,17 @@ export function MenuList({ items, onPick, testid }: { items: MenuEntry[]; onPick
             data-menu-item=""
             data-testid={`menu-${it.id}`}
             onClick={() => onPick(it)}
-            className="jb-focus flex h-8 w-full shrink-0 items-center gap-2.5 whitespace-nowrap rounded-[6px] px-2.5 text-left font-jb text-[13px] text-jb-fg hover:bg-jb-hover focus-visible:bg-jb-hover disabled:pointer-events-none disabled:opacity-40"
+            className={cn('jb-focus flex w-full shrink-0 items-center gap-2.5 whitespace-nowrap rounded-[6px] px-2.5 text-left font-jb text-[13px] text-jb-fg hover:bg-jb-hover focus-visible:bg-jb-hover disabled:pointer-events-none disabled:opacity-40', it.description ? 'py-1.5' : 'h-8', it.checked && it.description && 'bg-jb-selected hover:bg-jb-selected')}
           >
             {it.icon ? <span className="flex size-4 shrink-0 items-center justify-center [&_svg]:size-4">{it.icon}</span> : null}
-            <span className="min-w-0 flex-1 truncate">{it.label}</span>
+            {it.description ? (
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className={cn('truncate', it.checked && 'font-semibold')}>{it.label}</span>
+                <span className="truncate text-[12px] text-jb-muted">{it.description}</span>
+              </span>
+            ) : (
+              <span className="min-w-0 flex-1 truncate">{it.label}</span>
+            )}
             {it.hint ? <span className="shrink-0 font-jb-mono text-[11px] text-jb-faint">{it.hint}</span> : null}
             {it.checked ? <Check className="size-4 shrink-0" aria-hidden /> : null}
           </button>
@@ -203,6 +210,7 @@ export function MenuButton({
   kbd,
   className,
   tipPlacement,
+  chevron,
 }: {
   trigger: { icon?: ReactNode; label?: string; iconOnly?: boolean; extra?: ReactNode };
   items: MenuEntry[];
@@ -215,6 +223,8 @@ export function MenuButton({
   kbd?: string;
   className?: string;
   tipPlacement?: Placement;
+  /** 展开标记（缺省 ▾）。 */
+  chevron?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [byKey, setByKey] = useState(false);
@@ -244,7 +254,7 @@ export function MenuButton({
         tipPlacement={tipPlacement}
       >
         {trigger.extra}
-        {!iconOnly ? <ChevronDown className="size-3.5 text-jb-muted" aria-hidden /> : null}
+        {!iconOnly ? (chevron ?? <ChevronDown className="size-3.5 text-jb-muted" aria-hidden />) : null}
       </Btn>
       <Popover open={open} anchor={btn.current} onClose={() => setOpen(false)} placement={placement} role="menu" label={label} width={width} testid={testid ? `${testid}-list` : 'menu'} autoFocus={byKey}>
         <MenuList

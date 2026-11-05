@@ -62,6 +62,8 @@ export type StageProps = {
   sceneId?: string | null;
   /** 自由缩放与平移（T-director2）：滚轮 / 触控板捏合缩放、拖动平移；null = 不允许（静态截图、视频）。 */
   zoom?: ZoomProps | null;
+  /** 检查模式（看板的「检查」开关，D55）：单击 = 检查元素（与按住 ⌥ 单击相同），不执行步骤。 */
+  inspect?: boolean;
 };
 
 export type ZoomApi = { zoomBy: (factor: number) => void; fit: () => void };
@@ -84,7 +86,7 @@ function scrollsItself(target: EventTarget | null, root: HTMLElement, dy: number
   return false;
 }
 
-export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null }: StageProps) {
+export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false }: StageProps) {
   const shownId = sceneId ?? state.sceneId;
   const scene = project.scenes[shownId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
@@ -168,7 +170,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   const drag = useRef<{ x: number; y: number; v: View; moved: boolean; id: number } | null>(null);
   const suppressClick = useRef(false);
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (!zoomOn || e.button !== 0 || e.altKey) return;
+    if (!zoomOn || e.button !== 0 || e.altKey || inspectMode) return;
     drag.current = { x: e.clientX, y: e.clientY, v: nowView(), moved: false, id: e.pointerId };
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
@@ -200,7 +202,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
 
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     if (!onNodeClick) return;
-    const inspect = e.altKey;
+    const inspect = e.altKey || inspectMode;
     const hit = pickTarget(e.target as HTMLElement, mode, inspect);
     if (!hit || !rootRef.current?.contains(hit)) return;
     e.preventDefault();
@@ -210,11 +212,11 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     if (!onNodeClick || (e.key !== 'Enter' && e.key !== ' ')) return;
     const t = e.target as HTMLElement;
     if (t.tagName === 'BUTTON') return; // 原生按钮会自己触发 click
-    const hit = pickTarget(t, mode, e.altKey);
+    const hit = pickTarget(t, mode, e.altKey || inspectMode);
     if (!hit) return;
     e.preventDefault();
     const r = hit.getBoundingClientRect();
-    onNodeClick(hit.dataset.jid!, toFramePoint(r.left + r.width / 2, r.top + r.height / 2), { inspect: e.altKey });
+    onNodeClick(hit.dataset.jid!, toFramePoint(r.left + r.width / 2, r.top + r.height / 2), { inspect: e.altKey || inspectMode });
   };
 
   return (

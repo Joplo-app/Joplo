@@ -23,7 +23,7 @@ function usePortalHost(): Element | null {
 function Floating({ anchor, placement, children, className, style, onEl, ...rest }: { anchor: HTMLElement; placement: Placement; children: ReactNode; className?: string; style?: CSSProperties; onEl?: (el: HTMLDivElement | null) => void } & Omit<React.HTMLAttributes<HTMLDivElement>, 'style' | 'className' | 'children'>) {
   const host = usePortalHost();
   const ref = useRef<HTMLDivElement | null>(null);
-  const [pos, setPos] = useState<{ x: number; y: number; side: 'top' | 'bottom' } | null>(null);
+  const [pos, setPos] = useState<ReturnType<typeof placePopover> | null>(null);
   const update = useCallback(() => {
     const el = ref.current;
     if (!el) return;
@@ -77,11 +77,12 @@ export type PopoverProps = {
   /** 点击这些元素不算“点外面”（例如锚点本身，由锚点自己切换开关）。 */
   ignore?: (HTMLElement | null)[];
   onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  onMouseEnter?: () => void;
   onMouseLeave?: () => void;
 };
 
 /** 浮层 e1：1.5px 墨线 + 3px 实色偏移阴影，圆角 10。 */
-export function Popover({ open, anchor, onClose, placement = 'bottom-end', children, className, width, role = 'dialog', label, testid, autoFocus = false, ignore = [], onKeyDown, onMouseLeave }: PopoverProps) {
+export function Popover({ open, anchor, onClose, placement = 'bottom-end', children, className, width, role = 'dialog', label, testid, autoFocus = false, ignore = [], onKeyDown, onMouseEnter, onMouseLeave }: PopoverProps) {
   const el = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -134,6 +135,7 @@ export function Popover({ open, anchor, onClose, placement = 'bottom-end', child
       className={cn('jb-pop outline-none', className)}
       style={width ? { width } : undefined}
       onKeyDown={onKeyDown}
+      onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onFocusCapture={() => (focused.current = true)}
       onBlurCapture={(e) => {
@@ -198,4 +200,39 @@ export function Tip({ content, children, placement, className }: { content: Reac
       {node}
     </span>
   );
+}
+
+/**
+ * 悬停卡片（左栏的情况行、方案行）：悬停 350ms 打开，移到卡片上保持打开，离开锚点和卡片 150ms 后关闭。
+ * 卡片本身是 Popover（e1，portal）。
+ */
+export function useHoverCard(delay = 350) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clear = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  useEffect(() => clear, []);
+  const leave = () => {
+    clear();
+    timer.current = setTimeout(() => setAnchor(null), 150);
+  };
+  const close = () => {
+    clear();
+    setAnchor(null);
+  };
+  return {
+    anchor,
+    close,
+    trigger: {
+      onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
+        const el = e.currentTarget;
+        clear();
+        timer.current = setTimeout(() => setAnchor(el), anchor ? 0 : delay);
+      },
+      onMouseLeave: leave,
+    },
+    card: { onMouseEnter: clear, onMouseLeave: leave },
+  };
 }

@@ -41,6 +41,12 @@ describe('placePopover：浮层贴着锚点、放不下时翻转、不超出视�
   it('center：水平居中对齐锚点', () => {
     expect(placePopover({ left: 500, top: 100, right: 540, bottom: 132 }, { width: 100, height: 30 }, vp, 'top-center')).toEqual({ x: 470, y: 64, side: 'top' });
   });
+  it('right-start：贴在锚点右侧、顶边对齐（左栏的悬停卡片）；右侧放不下时翻到左侧；纵向夹回视口', () => {
+    const row = { left: 12, top: 300, right: 264, bottom: 334 };
+    expect(placePopover(row, { width: 260, height: 120 }, vp, 'right-start')).toEqual({ x: 270, y: 300, side: 'right' });
+    expect(placePopover({ left: 1100, top: 300, right: 1200, bottom: 334 }, { width: 260, height: 120 }, vp, 'right-start')).toEqual({ x: 1100 - 6 - 260, y: 300, side: 'left' });
+    expect(placePopover({ left: 12, top: 760, right: 264, bottom: 794 }, { width: 260, height: 120 }, vp, 'right-start').y).toBe(800 - 8 - 120);
+  });
   it('边界输入：锚点或尺寸是 0、视口很小也不产生负坐标', () => {
     const r = placePopover({ left: 0, top: 0, right: 0, bottom: 0 }, { width: 0, height: 0 }, { width: 0, height: 0 }, 'bottom-end');
     expect(r.x).toBeGreaterThanOrEqual(0);

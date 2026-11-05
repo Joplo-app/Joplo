@@ -12,7 +12,7 @@ import { removeProject, type ProjectSummary } from '../runtime/dev-client';
 import { optionsOf } from '../runtime/views';
 import { Brand, TopBar } from '../player/PlayerPage';
 import { cn } from '@/lib/utils';
-import { gapsOf } from './CaseNav';
+import { gapsOf } from './nav-model';
 import { useProjectIR } from './hooks';
 
 const tilde = (dir: string) => dir.replace(/^\/(Users|home)\/[^/]+/, '~');

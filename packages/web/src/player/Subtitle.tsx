@@ -10,11 +10,11 @@ import { SUBTITLE_CAPTION_PX, SUBTITLE_EXPLAIN_PX, SUBTITLE_PAD_Y, subtitleHeigh
 
 const clamp = (lines: number) => ({ display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' });
 
-export function Subtitle({ content, theme, width, framed = false, fixedHeight, dark = false }: { content: SubtitleContent | null; theme: StageTheme; width?: number | string; framed?: boolean; fixedHeight?: number; dark?: boolean }) {
+export function Subtitle({ content, theme, width, framed = false, fixedHeight, dark = false, divider = false }: { content: SubtitleContent | null; theme: StageTheme; width?: number | string; framed?: boolean; fixedHeight?: number; dark?: boolean; /** 上沿一条细线（看板的舞台框里，画面和字幕之间）。 */ divider?: boolean }) {
   const badge = content?.badge;
   return (
     <div
-      className={cn('jsubtitle jtheme flex shrink-0 items-center gap-4 overflow-hidden px-4 text-[var(--jp-ink)]', dark ? 'bg-[var(--jp-bg)]' : 'bg-[var(--jp-surface)]', !framed && !dark && 'rounded-lg border border-[var(--jp-line)]')}
+      className={cn('jsubtitle jtheme flex shrink-0 items-center gap-4 overflow-hidden px-4 text-[var(--jp-ink)]', dark ? 'bg-[var(--jp-bg)]' : 'bg-[var(--jp-surface)]', !framed && !dark && 'rounded-lg border border-[var(--jp-line)]', divider && 'border-t border-[var(--jp-line)]')}
       style={{ height: fixedHeight ?? subtitleHeight(content), width: width ?? '100%', paddingTop: SUBTITLE_PAD_Y, paddingBottom: SUBTITLE_PAD_Y }}
       data-theme={theme}
       data-testid="subtitle"

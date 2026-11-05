@@ -2,14 +2,22 @@
  * 浮层定位（纯函数，D55 不变量 8）：浮层用 portal 渲染、position: fixed，坐标只由锚点和视口决定，
  * 因此不会被任何父级的 overflow 裁掉。放不下时翻到另一侧；两侧都放不下时选空间大的一侧，最后夹回视口。
  */
-export type Placement = 'bottom-start' | 'bottom-end' | 'bottom-center' | 'top-start' | 'top-end' | 'top-center';
+export type Placement = 'bottom-start' | 'bottom-end' | 'bottom-center' | 'top-start' | 'top-end' | 'top-center' | 'right-start';
 export type AnchorRect = { left: number; top: number; right: number; bottom: number };
 
 /** 浮层与锚点的间距、与视口边缘的最小距离。 */
 export const POP_GAP = 6;
 export const POP_MARGIN = 8;
 
-export function placePopover(anchor: AnchorRect, size: { width: number; height: number }, viewport: { width: number; height: number }, placement: Placement, gap = POP_GAP, margin = POP_MARGIN): { x: number; y: number; side: 'top' | 'bottom' } {
+export function placePopover(anchor: AnchorRect, size: { width: number; height: number }, viewport: { width: number; height: number }, placement: Placement, gap = POP_GAP, margin = POP_MARGIN): { x: number; y: number; side: 'top' | 'bottom' | 'left' | 'right' } {
+  if (placement === 'right-start') {
+    const right = viewport.width - anchor.right - gap - margin;
+    const left = anchor.left - gap - margin;
+    const side = size.width > right && left > right ? 'left' : 'right';
+    const x = side === 'right' ? anchor.right + gap : anchor.left - gap - size.width;
+    const y = Math.max(margin, Math.min(anchor.top, viewport.height - margin - size.height));
+    return { x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), side };
+  }
   const [want, align] = placement.split('-') as ['top' | 'bottom', 'start' | 'end' | 'center'];
   const below = viewport.height - anchor.bottom - gap - margin;
   const above = anchor.top - gap - margin;

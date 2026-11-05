@@ -166,8 +166,6 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
       crumbs={[
         { label: project.name, testid: 'crumb-project', onClick: home },
         { label: feature.name, testid: 'crumb-feature', onClick: home },
-        { label: option?.name ?? '', testid: 'crumb-option' },
-        { label: scenario?.name ?? '', testid: 'crumb-scenario' },
       ]}
       layer={play.layer ?? null}
       speed={play.speed ?? 1}

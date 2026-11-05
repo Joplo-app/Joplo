@@ -12,7 +12,11 @@ import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
 import { boardHash, parseBoardHash, type BoardRoute, type PlayRoute } from '../runtime/route';
 import type { StageTheme } from '../renderer/rough';
-import { PlayerPage, type MenuItem } from '../player/PlayerPage';
+import { Code, Film, ImageDown, LayoutGrid, Link, Palette, ScanSearch } from 'lucide-react';
+import { PlayerPage, useBoardLayout, type MenuEntry } from '../player/PlayerPage';
+import { Btn, Kbd } from '../player/controls';
+import type { ProjectSummary } from '../runtime/dev-client';
+import { featureMenu } from './nav-model';
 import { usePlaySync } from '../player/playRoute';
 import { copyText, downloadBlob, useFlash, useHash } from '../player/util';
 import { CaseNav } from './CaseNav';
@@ -32,7 +36,7 @@ export function BoardApp() {
   const { list, error } = useProjects();
   const navigate = (r: BoardRoute, replace = false) => go(boardHash(r), replace);
 
-  if (route.kind === 'play') return <BoardPlayer key={route.projectId} projectId={route.projectId} play={route.play} navigate={navigate} projectName={list?.find((p) => p.id === route.projectId)?.name ?? null} />;
+  if (route.kind === 'play') return <BoardPlayer key={route.projectId} projectId={route.projectId} play={route.play} navigate={navigate} projects={list} />;
   if (route.kind === 'settings')
     return <SettingsPage projectId={route.projectId ?? null} projects={list} onBack={() => (history.length > 1 ? history.back() : navigate({ kind: 'home', ...(route.projectId ? { projectId: route.projectId } : {}) }))} />;
   const selected = route.projectId && list?.some((p) => p.id === route.projectId) ? route.projectId : (list?.[0]?.id ?? null);
@@ -66,7 +70,11 @@ function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
   );
 }
 
-function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: string; play: PlayRoute; navigate: (r: BoardRoute, replace?: boolean) => void; projectName: string | null }) {
+function BoardPlayer({ projectId, play, navigate, projects }: { projectId: string; play: PlayRoute; navigate: (r: BoardRoute, replace?: boolean) => void; projects: ProjectSummary[] | null }) {
+  const projectName = projects?.find((p) => p.id === projectId)?.name ?? null;
+  const L = useBoardLayout();
+  // 检查模式（D55 顶栏「检查」开关）：只在本页，不写进网址（不变量 2）
+  const [inspectMode, setInspectMode] = useState(false);
   const ir = useProjectIR(projectId);
   const ctl = useMemo(() => new DemoController(selectionWriter(projectId)), [projectId]);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
@@ -122,10 +130,11 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
   const lastStep = scenario && state && state.position > 0 ? scenario.steps[state.position - 1] : null;
   const editorAt = nextStep?.source ?? lastStep?.source ?? scenario?.steps[0]?.source ?? option?.source ?? null;
 
-  const menu: MenuItem[] = [
+  const menu: MenuEntry[] = [
     {
       id: 'image',
-      label: '导出图片（当前步骤）',
+      icon: <ImageDown />,
+      label: '导出当前步骤图片',
       disabled: !scenario,
       onClick: () => {
         if (!scenario || !state) return;
@@ -138,11 +147,11 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
         });
       },
     },
-    { id: 'video', label: '导出视频（整个场景）', disabled: !scenario, onClick: () => setVideo(true) },
-    { id: 'theme', label: `主题：${theme}…`, onClick: () => navigate({ kind: 'settings', projectId }) },
-    { id: 'link', label: '复制当前步骤的链接', onClick: () => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制')) },
+    { id: 'video', icon: <Film />, label: '导出整个场景视频', disabled: !scenario, onClick: () => setVideo(true) },
+    { id: 'link', icon: <Link />, label: '复制当前步骤链接', onClick: () => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制')) },
     {
       id: 'editor',
+      icon: <Code />,
       label: '在编辑器中打开',
       disabled: !editorAt,
       onClick: () => editorAt && void openInEditor(projectId, editorAt).then((r) => setFlash(r.ok ? `已在编辑器中打开 ${editorAt}` : `无法打开编辑器：${r.message}`)),
@@ -178,11 +187,47 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
         project={project}
         onBrand={() => navigate({ kind: 'home' })}
         crumbs={[
-          { label: projectName ?? project.name, testid: 'crumb-project', onClick: home },
-          { label: feature.name, testid: 'crumb-feature', onClick: home },
-          { label: option?.name ?? '（没有方案）', testid: 'crumb-option' },
-          { label: gap ? '（缺口）' : (scenario?.name ?? '静态画面'), testid: 'crumb-scenario' },
+          {
+            label: projectName ?? project.name,
+            testid: 'crumb-project',
+            menuLabel: '切换项目',
+            // 项目 ▾：最近的项目；选一个 → 打开它的首页（功能列表）
+            items: [
+              ...(projects ?? []).map((x) => ({ id: `project-${x.id}`, label: x.name, description: x.status === 'missing' ? '找不到目录' : x.status === 'error' ? `${x.errors} 个错误` : undefined, checked: x.id === projectId, onClick: () => navigate({ kind: 'home', projectId: x.id }) })),
+              { id: 'project-divider', divider: true as const },
+              { id: 'project-home', icon: <LayoutGrid />, label: '查看项目首页', onClick: home },
+            ],
+          },
+          {
+            label: feature.name,
+            testid: 'crumb-feature',
+            menuLabel: '切换功能',
+            // 功能 ▾：本项目的功能和缺口数；选一个 → 打开它的演示，停在第 0 步
+            items: [
+              ...featureMenu(project, feature.id).map((f) => ({ id: `feature-${f.id}`, label: f.name, description: f.hint, checked: f.current, onClick: () => navigate({ kind: 'play', projectId, play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
+              { id: 'feature-divider', divider: true as const },
+              { id: 'feature-home', icon: <LayoutGrid />, label: '查看项目首页', onClick: home },
+            ],
+          },
         ]}
+        actions={
+          <>
+            <Btn
+              icon={<ScanSearch className="size-4" />}
+              label="检查"
+              iconOnly={!L.topLabels}
+              selected={inspectMode}
+              title={inspectMode ? '关闭检查模式' : '检查模式：单击画面元素 = 选中它（不执行步骤）；也可以按住 ⌥ 临时检查'}
+              kbd={L.topLabels ? undefined : '按住 ⌥'}
+              onClick={() => setInspectMode((v) => !v)}
+              data-testid="inspect-toggle"
+            >
+              {L.topLabels ? <Kbd>⌥</Kbd> : null}
+            </Btn>
+            <Btn icon={<Palette className="size-4" />} label={`外观 · ${theme}`} iconOnly={!L.topLabels} title="外观" kbd="T" onClick={() => navigate({ kind: 'settings', projectId })} data-testid="appearance" />
+          </>
+        }
+        inspectMode={inspectMode}
         layer={play.layer ?? null}
         speed={play.speed ?? 1}
         onSpeed={(v) => {
@@ -204,6 +249,8 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
             onOption={(id) => toPlay({ featureId: feature.id, optionId: id, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })}
             onCase={(cid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), caseId: cid })}
             onScenario={(sid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), scenarioId: sid })}
+            onOptionCase={(oid, cid) => toPlay({ featureId: feature.id, optionId: oid, caseId: cid })}
+            onCopy={(text) => void copyText(text).then((ok) => setFlash(ok ? `已复制：${text}` : '无法访问剪贴板'))}
           />
         }
         banner={banner}
@@ -212,7 +259,7 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
           void ctl.clickNode(id, { x: 0, y: 0 }, { inspect: true });
           setDrawer(true);
         }}
-        stageHint={<span>⌥ + 单击：检查元素</span>}
+        stageHint={<span>按住 ⌥ 单击：检查元素</span>}
         selectedId={drawer && selection && state && selection.sceneId === state.sceneId ? selection.nodeId : null}
         flash={flash}
         drawer={
