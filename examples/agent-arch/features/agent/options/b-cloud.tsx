@@ -1,6 +1,6 @@
 import { $, done, flow, missing, notApplicable, option, set, shot, undecided, uses } from '@tokenroll/joplo-kit';
 
-import { active, arch, ASK, blocks, client, dim, error, focus, initialUi, layers, ok, show } from '../../../shared/arch.tsx';
+import { active, ASK, dim, error, focus, initialUi, layersFor, ok, show } from '../../../shared/arch.tsx';
 
 const start = (name: string, opts: Parameters<typeof flow>[1]) =>
   flow(name, { start: '/', ...opts })
@@ -14,11 +14,7 @@ export default option({
   focus: '手放在哪里：全部放在云端，客户端最薄',
   tradeoffs: ['客户端简单，不用随工具发版；不存在端侧掉线', '本机文件要先上传：多一步操作，文件离开用户设备', '删除、移动这类“改本机”的工具做不了'],
 
-  on: {
-    '/': { client: client('b'), diagram: arch('b'), blocks: blocks('b') },
-  },
-
-  layers,
+  layers: layersFor('b'),
 
   state: { ui: initialUi() },
 

@@ -4,18 +4,24 @@
  */
 import { $, eq, layer, set, type Bind, type JNode } from '@tokenroll/joplo-kit';
 import {
-  ActionIcon, Alert, Badge, Button, Card, ChatMessage, Diagram, Group, Modal, Paper, PromptInput, SimpleGrid, Stack, Text, ToolCall,
+  ActionIcon, Alert, Badge, Box, Button, Card, Center, ChatMessage, Diagram, Group, Modal, Paper, PromptInput, SimpleGrid, Stack, Text, ToolCall,
 } from '@tokenroll/joplo-kit/ui';
 
 type V = 'a' | 'b';
 const ui = $.ui as unknown as Record<string, Bind>;
 
-/** 三个层级：客户端视角、后端流转、核心块说明；另有自动的全景。 */
-export const layers = {
-  client: layer('客户端视角', ['client_panel']),
-  backend: layer('后端流转', ['arch']),
-  blocks: layer('核心块说明', ['blocks']),
-};
+/** 三个层级，各自是独立的画面：客户端视角、后端流转、核心块说明。 */
+export const layersFor = (v: V) => ({
+  client: layer('客户端视角', (
+    <Center h="100%">
+      <Box w={560}>
+        {[client(v), ...(v === 'a' ? [approvalModal()] : [])]}
+      </Box>
+    </Center>
+  )),
+  backend: layer('后端流转', arch(v)),
+  blocks: layer('核心块说明', blocks(v)),
+});
 
 export const ASK = '帮我把桌面「报销」文件夹里的发票整理成一张汇总表';
 

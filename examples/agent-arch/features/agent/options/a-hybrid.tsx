@@ -1,6 +1,6 @@
 import { $, done, flow, option, set, shot, undecided, uses } from '@tokenroll/joplo-kit';
 
-import { active, approvalModal, arch, ASK, blocks, client, dim, error, focus, initialUi, layers, ok, show } from '../../../shared/arch.tsx';
+import { active, ASK, dim, error, focus, initialUi, layersFor, ok, show } from '../../../shared/arch.tsx';
 
 /** 前三步（发消息 → 预检 → 取定义 → 交给大脑 → 推理）在多个场景里相同。 */
 const start = (name: string, opts: Parameters<typeof flow>[1], ask = ASK) =>
@@ -24,11 +24,7 @@ export default option({
   focus: '手放在哪里：离数据最近的地方',
   tradeoffs: ['本机文件不用上传，隐私和速度都更好', '客户端掉线时端侧工具会失败，需要超时和重试策略', '端侧执行器要随客户端发版，工具定义升级后会有新旧版本并存'],
 
-  on: {
-    '/': { client: client('a'), diagram: arch('a'), blocks: blocks('a'), overlay: approvalModal() },
-  },
-
-  layers,
+  layers: layersFor('a'),
 
   state: { ui: initialUi() },
 
