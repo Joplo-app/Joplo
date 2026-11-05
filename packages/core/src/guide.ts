@@ -123,6 +123,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 ## 视角层级与导演镜头：一屏讲清客户端与后端
 - 每个层级是一个完全独立的画面：layers: { client: layer('客户端视角', <ClientView/>), backend: layer('后端流转', <Arch/>) }；layer 的第二个参数是这一层自己的 JSX 树，按自己的布局占满整个舞台，不从路径页面里裁切。
 - 各层共享同一份状态（ui / data / inputs），切层不改变步骤；声明了 layers 的方案在演示页只显示各层画面。没有自动“全景”层：需要全景就自己声明一个，如 overview: layer('全景', <Overview/>)。
+- 较长的讲解写 explain('…')：.system('额度预检', '调用模型之前先预检额度', shot('billing'), explain('额度不足时在这里就拦下，不会产生模型费用'))。导演模式下焦点旁会弹出解说卡，大字显示这一步的说明，explain 显示在说明下方；手动选层时只显示底部字幕。自动播放每一步停留约 60ms/字（说明加解说，至少 3 秒），所以说明写完整的一句话即可，不必拆成很多步。
 - 步骤里写镜头：.click('app_send', shot('msg_user'), shot('app', 'biz'))；每个 id 在包含它的层里解析，多层有同名 id 时各层都生效；第一个 shot 所在的层是导演层；shot() 让当时的导演层回到整层；没写 shot 的步骤沿用上一步，没写 shot 的点击会切到按钮所在的层。
 - 镜头可以对准任何带 id 的元素（组件、卡片、按钮、Diagram 节点 / 分组 / 连线）。播放时导演自动切层并推近焦点，观众也能手动切层或“只重放这一层”。
 - 不要为了“看得清”写很长的层：整层会缩进画面，细节靠 shot 推近。shot 的 id 不在任何层里时 check 报 SHOT_UNKNOWN；layer 的树为空时报 LAYER_UNKNOWN。
@@ -132,7 +133,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 演示调用链就是改 state：.system('客户端发出消息', set($.ui.e1, 'active'))，下一步 set($.ui.e1, 'ok')、set($.ui.n_brain, 'active')；出错用 'error'，无关部分用 'dim'。
 - 常与前端画面分成两个层级（客户端 / 后端），同一个 flow 一步步同时推进两边；Node / Edge 不需要 flow 也不用 unmodeled，⌥+单击可检查。
 - 逐段出现（像幻灯片一样一段一段加内容）：给 Group / Node / Edge 写 when={$.ui.show_billing}，步骤里 set($.ui.show_billing, true)；布局一开始就按全部元素算好，出现时已有元素不移动。
-- 节点多、容器不宽时用 direction="down"；放不下时图内可以滚动，不会缩到看不清。
+- 节点多、容器不宽时用 direction="down"；整图总是放进容器，看细节靠 shot 推近，观众也可以滚轮 / 捏合缩放、拖动平移。
 
 ## 规则与边界
 - rule('约束', { origin?, status?, cases?: ['happy'], elements?: ['invite'] })。

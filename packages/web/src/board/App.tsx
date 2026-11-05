@@ -69,7 +69,8 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
   }, [ir.payload, ctl]);
 
   const project = snap.project;
-  const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', projectId, play: next }, replace);
+  // 播放速度在切换方案 / 情况 / 场景时保留
+  const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', projectId, play: { ...(play.speed ? { speed: play.speed } : {}), ...next } }, replace);
   const resolved = usePlaySync(ctl, snap, project, play, (next) => toPlay(next, true));
 
   if (!project) {
@@ -170,6 +171,11 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
           { label: gap ? '（缺口）' : (scenario?.name ?? '静态画面'), testid: 'crumb-scenario' },
         ]}
         layer={play.layer ?? null}
+        speed={play.speed ?? 1}
+        onSpeed={(v) => {
+          const { speed: _s, ...rest } = play;
+          navigate({ kind: 'play', projectId, play: v === 1 ? rest : { ...rest, speed: v } }, true);
+        }}
         onLayer={(l) => {
           const { layer: _l, ...rest } = play;
           toPlay(l ? { ...rest, layer: l } : rest, true);

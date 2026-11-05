@@ -250,6 +250,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       const steps: Step[] = fl.steps.map((st: StepDef, i: number): Step => {
         const effects: Step['effects'] = [];
         const ruleIds: string[] = [];
+        const explains: string[] = [];
         for (const e of st.effects as EffectDef[]) {
           if (e.type === 'go') {
             if (!ctxRoutes.has(e.route)) err('UNKNOWN_ROUTE', `go("${e.route}") 跳转到不存在的路径`, st.source);
@@ -262,6 +263,9 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
           else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
           else if (e.type === 'shot') continue; // 镜头不是状态变化，下面单独归类
+          else if (e.type === 'explain') {
+            if (e.text.trim()) explains.push(e.text.trim());
+          }
           else effects.push({ type: 'complete', text: e.text, outcome: e.outcome });
         }
         const sceneBefore = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i, start)));
@@ -304,6 +308,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           ruleIds: mode === 'publish' ? [] : ruleIds,
           shots,
           directorLayer,
+          ...(explains.length ? { explain: explains.join('\n') } : {}),
           ...(st.source ? { source: rel(st.source) } : {}),
         };
       });

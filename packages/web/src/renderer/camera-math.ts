@@ -32,8 +32,11 @@ function axis(view: number, k: number, b0: number, bs: number, c0: number | null
   return clamp(t, CAMERA_PAD - k * b0, view - CAMERA_PAD - k * (b0 + bs));
 }
 
-export function fitCamera(input: { W: number; H: number; mode: CameraMode; bbox: Box; nodeScales?: number[]; bounds?: Box | null }): CameraFit {
-  const { W, H, mode, bbox } = input;
+export function fitCamera(input: { W: number; H: number; mode: CameraMode; bbox: Box; nodeScales?: number[]; bounds?: Box | null; reserve?: { right?: number; bottom?: number } }): CameraFit {
+  const { mode, bbox } = input;
+  // reserve：聚焦时给解说卡留出的右侧 / 底部（T-director2），焦点放进剩下的区域
+  const W = mode === 'focus' ? Math.max(200, input.W - (input.reserve?.right ?? 0)) : input.W;
+  const H = mode === 'focus' ? Math.max(160, input.H - (input.reserve?.bottom ?? 0)) : input.H;
   if (mode === 'overview') {
     const k = Math.min(1, W / bbox.w, H / bbox.h);
     if (k === 1) return { k: 1, tx: 0, ty: 0 };
@@ -82,3 +85,35 @@ export function visibleRect(el: Box, clips: Box[]): Box | null {
 
 /** 高光框：贴着目标的可见包围盒（描边画在框外侧，内沿与目标对齐）。 */
 export const highlightRect = (target: Box): Box => ({ ...target });
+
+// ---------- 自由缩放与平移（T-director2） ----------
+export const ZOOM_MIN = 0.25;
+export const ZOOM_MAX = 4;
+/** 平移时至少留在画面里的内容宽度 / 高度（像素）。 */
+export const PAN_KEEP = 80;
+export type View = { k: number; tx: number; ty: number };
+
+/** 以画面上的点 pt 为中心缩放 factor 倍（总缩放夹在 ZOOM_MIN–ZOOM_MAX）：pt 下面的内容点保持不动。 */
+export function zoomAt(v: View, factor: number, pt: { x: number; y: number }): View {
+  const k = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v.k * factor));
+  const r = k / v.k;
+  return { k, tx: pt.x - (pt.x - v.tx) * r, ty: pt.y - (pt.y - v.ty) * r };
+}
+
+/** 平移夹紧：内容（bounds，内容坐标）在画面里至少露出 PAN_KEEP（内容很小时露出全部），不会被拖到看不见。 */
+export function clampPan(v: View, W: number, H: number, bounds: Box): View {
+  const ax = (t: number, view: number, c0: number, cs: number) => {
+    const keep = Math.min(PAN_KEEP, v.k * cs);
+    const lo = keep - v.k * (c0 + cs);
+    const hi = view - keep - v.k * c0;
+    return Math.min(hi, Math.max(lo, t));
+  };
+  return { k: v.k, tx: ax(v.tx, W, bounds.x, bounds.w), ty: ax(v.ty, H, bounds.y, bounds.h) };
+}
+
+/** 滚轮的缩放倍数：触控板捏合（ctrlKey）更灵敏；按行滚动的鼠标按 16px 一行换算。 */
+export function wheelFactor(deltaY: number, opts: { ctrlKey?: boolean; deltaMode?: number } = {}): number {
+  const dy = opts.deltaMode === 1 ? deltaY * 16 : opts.deltaMode === 2 ? deltaY * 400 : deltaY;
+  const f = Math.exp(-dy * (opts.ctrlKey ? 0.01 : 0.0015));
+  return Math.min(2, Math.max(0.5, f));
+}

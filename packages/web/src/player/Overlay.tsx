@@ -65,6 +65,9 @@ export function Overlay({
   const boxes = useBoxes(stage, [showFocus ? nextTargetId : null, anchorId, snap.preview?.nodeId]);
   const W = stage?.offsetWidth ?? 1280;
   const H = stage?.offsetHeight ?? 800;
+  // 舞台按可用区域缩放：字幕字号按缩放补偿，屏幕上至少 18px（T-director2）
+  const outer = stage ? stage.getBoundingClientRect().width / (stage.offsetWidth || 1) || 1 : 1;
+  const captionPx = Math.max(20, 19 / outer);
   const focus = showFocus && nextTargetId ? boxes[nextTargetId] : undefined;
   const anchor = anchorId ? boxes[anchorId] : undefined;
   const prevBox = snap.preview ? boxes[snap.preview.nodeId] : undefined;
@@ -120,7 +123,7 @@ export function Overlay({
       ) : null}
 
       {caption ? (
-        <div className={`absolute left-1/2 max-w-[86%] -translate-x-1/2 rounded-md bg-[rgba(30,30,30,0.86)] px-5 py-2.5 text-center text-[18px] leading-snug text-white ${captionTop ? 'top-12' : 'bottom-4'}`} data-joverlay="caption">
+        <div className={`absolute left-1/2 max-w-[86%] -translate-x-1/2 rounded-md bg-[rgba(30,30,30,0.86)] px-5 py-2.5 text-center leading-snug text-white ${captionTop ? 'top-12' : 'bottom-4'}`} style={{ fontSize: captionPx }} data-joverlay="caption">
           {caption}
         </div>
       ) : null}

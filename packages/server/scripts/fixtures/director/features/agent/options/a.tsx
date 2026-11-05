@@ -1,4 +1,4 @@
-import { $, done, flow, layer, option, set, shot } from '@tokenroll/joplo-kit';
+import { $, done, explain, flow, layer, option, set, shot } from '@tokenroll/joplo-kit';
 import { Button, ChatMessage, Diagram, Paper, Placeholder, SimpleGrid, Stack, Text, ToolCall } from '@tokenroll/joplo-kit/ui';
 
 /**
@@ -58,7 +58,7 @@ export default option({
   scenarios: {
     happy: flow('整理发票', { cases: ['happy'], start: '/' })
       .click('app_send', set($.ui.sent, true), set($.ui.n_biz, 'active'), shot('msg_user'), shot('app', 'biz'))
-      .system('额度预检', set($.ui.n_billing, 'active'), shot('biz', 'billing'))
+      .system('额度预检', '调用模型之前，Biz Server 先向 Billing 预检额度', set($.ui.n_billing, 'active'), shot('biz', 'billing'), explain('额度不足时在这里就拦下：不会调用模型，也不会产生任何费用。预检只读余额，扣费在用量异步入账时发生。'))
       .system('只看 Billing', shot('billing'))
       .system('端侧执行', set($.ui.tool, true), shot('card_tool'), shot('local'))
       .system('没有镜头的一步')

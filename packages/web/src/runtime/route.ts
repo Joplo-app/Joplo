@@ -8,10 +8,11 @@
  *        #/f/<功能>?s=&step=&l=       演示页
  *        #/s/<场景>                   旧链接：直接进入该场景
  *
- * o = 方案、c = 情况、s = 场景、step = 位置（0 = 初始状态）、l = 手动选的层级（有 l 表示导演关闭；没有 = 导演跟随）。
+ * o = 方案、c = 情况、s = 场景、step = 位置（0 = 初始状态）、l = 手动选的层级（有 l 表示导演关闭；没有 = 导演跟随）、
+ * speed = 自动播放速度（0.5 / 1.5；1× 不写）。
  * 设备不在 URL 里（D44）：每个页面只有一种设备，由 page 的 viewport 决定。
  */
-export type PlayRoute = { featureId: string; optionId?: string; caseId?: string; scenarioId?: string; step?: number; layer?: string };
+export type PlayRoute = { featureId: string; optionId?: string; caseId?: string; scenarioId?: string; step?: number; layer?: string; speed?: number };
 
 export type BoardRoute = { kind: 'home'; projectId?: string } | { kind: 'play'; projectId: string; play: PlayRoute };
 export type SiteRoute = { kind: 'home' } | { kind: 'play'; play: PlayRoute } | { kind: 'scenario'; scenarioId: string };
@@ -36,6 +37,7 @@ function parsePlay(featureId: string, query: string): PlayRoute {
     ...(q.get('s') ? { scenarioId: q.get('s')! } : {}),
     ...(Number.isInteger(n) && n >= 0 ? { step: n } : {}),
     ...(q.get('l') ? { layer: q.get('l')! } : {}),
+    ...(q.get('speed') === '0.5' || q.get('speed') === '1.5' ? { speed: Number(q.get('speed')) } : {}),
   };
 }
 
@@ -46,6 +48,7 @@ function playQuery(p: PlayRoute): string {
   if (p.scenarioId) q.set('s', p.scenarioId);
   if (p.step !== undefined) q.set('step', String(p.step));
   if (p.layer) q.set('l', p.layer);
+  if (p.speed === 0.5 || p.speed === 1.5) q.set('speed', String(p.speed));
   const s = q.toString();
   return s ? `?${s}` : '';
 }

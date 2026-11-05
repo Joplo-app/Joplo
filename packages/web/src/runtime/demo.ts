@@ -13,6 +13,7 @@
  * - 热更新（setProject）保持功能、方案、场景、位置（越界夹到合法范围）、视图与选中。
  */
 import { animate, type AnimationPlaybackControls } from 'motion';
+import { stepDwell, CAMERA_MS } from './pace';
 import { explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@tokenroll/joplo-core';
 import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 
@@ -80,7 +81,7 @@ export const TIMING = {
   gap: 350,
   reducedStep: 450,
   quickStep: 300,
-  layerSwitch: 650, // 先切层再移动鼠标：等新画面淡入、镜头到位
+  layerSwitch: CAMERA_MS + 150, // 先切层再移动鼠标：等新画面淡入、镜头到位（不随速度缩放）
 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -126,6 +127,10 @@ export class DemoController {
   private syncChain: Promise<void> = Promise.resolve();
   /** 最近一次服务端确认的选中（写入失败时回滚到它）。 */
   private confirmed: Selection | null = null;
+  /** 播放速度（0.5 / 1 / 1.5，T-director2）：缩放动画与停留时长；镜头过渡与连线小点一圈不缩放。 */
+  speed = 1;
+  /** 最近一次提交的时刻：停留时长从这里算起。 */
+  private committedAt = 0;
   reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
   constructor(private readonly writer: SelectionWriter | null = null) {}
@@ -408,16 +413,33 @@ export class DemoController {
     while (gen === this.gen) {
       const st = this.snap.state;
       if (!st || st.completed || st.position >= sc.steps.length) break;
-      const quick = !!this.fast?.(st.position);
+      const index = st.position;
+      const quick = !!this.fast?.(index);
       const ok = quick ? await this.runQuick(sc, gen) : await this.runStep(sc, gen, { moveCursor: true });
       if (!ok || gen !== this.gen) return;
-      await this.wait(quick ? 0 : TIMING.gap, gen);
+      if (!quick) {
+        // 停留（T-director2）：按说明与解说的字数，至少 3 秒；并等镜头过渡结束、本步 active 连线上的小点跑完一圈
+        const step = sc.steps[index]!;
+        const dwell = this.reducedMotion
+          ? TIMING.reducedStep
+          : stepDwell({ texts: [step.caption, step.explain], speed: this.speed, cameraMoved: step.shots.length > 0 || !!step.directorLayer, dotMs: this.activeDotMs() });
+        if (!(await this.wait(dwell - (performance.now() - this.committedAt), gen, true))) return;
+      }
     }
     this.fast = null;
     if (gen === this.gen) this.set({ playing: false, paused: false, busy: false });
   }
 
   private fast: ((index: number) => boolean) | null = null;
+
+  /** 画面上 active 连线的小点跑一圈的最长时间（毫秒；没有为 0）。 */
+  private activeDotMs(): number {
+    let ms = 0;
+    this.stageEl?.querySelectorAll<SVGElement>('[data-state="active"] [data-jdot-ms]').forEach((d) => {
+      ms = Math.max(ms, Number(d.getAttribute('data-jdot-ms')) || 0);
+    });
+    return ms;
+  }
 
   /** 快速带过一步（约 300ms）：不移动鼠标、不逐字输入。 */
   private async runQuick(sc: Scenario, gen: number): Promise<boolean> {
@@ -695,6 +717,7 @@ export class DemoController {
       const next = applyStep(p, getScenario(p, sc.id), st);
       const n = this.snap.notice;
       // 推进后，锚定在元素上的就地提示（禁用原因、未覆盖、越序）已过时，关闭它。
+      this.committedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
       this.set({ state: next, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
       return true;
     } catch (e) {
@@ -717,7 +740,7 @@ export class DemoController {
     const to = layersWithNode(p, sc.id, target)[0];
     if (!to || to === this.snap.leadLayer) return true;
     this.set({ leadLayer: to });
-    return this.wait(this.reducedMotion ? 0 : TIMING.layerSwitch, gen);
+    return this.wait(this.reducedMotion ? 0 : TIMING.layerSwitch, gen, true);
   }
 
   private measureCenter(nodeId: string): { x: number; y: number } | null {
@@ -736,7 +759,7 @@ export class DemoController {
     const from = this.cursorPos;
     this.cursorPos = to;
     if (!el) return true;
-    const controls = animate(el, { transform: [`translate(${from.x}px, ${from.y}px)`, `translate(${to.x}px, ${to.y}px)`] }, { duration: TIMING.cursorMove, ease: [0.4, 0, 0.2, 1] });
+    const controls = animate(el, { transform: [`translate(${from.x}px, ${from.y}px)`, `translate(${to.x}px, ${to.y}px)`] }, { duration: TIMING.cursorMove / this.speed, ease: [0.4, 0, 0.2, 1] });
     this.anim = controls;
     if (this.snap.paused) controls.pause();
     await Promise.race([controls.finished ?? controls, new Promise<void>((r) => this.cancelWaiters.push(r))]);
@@ -745,8 +768,9 @@ export class DemoController {
   }
 
   /** 逻辑时钟等待：暂停期间不计时；被取消时返回 false。 */
-  private async wait(ms: number, gen: number): Promise<boolean> {
-    let remaining = ms;
+  /** 等待 ms 毫秒（按速度缩放；raw = 不缩放）；暂停时不计时，被取消时返回 false。 */
+  private async wait(ms: number, gen: number, raw = false): Promise<boolean> {
+    let remaining = raw ? ms : ms / (this.speed > 0 ? this.speed : 1);
     let last = performance.now();
     while (remaining > 0) {
       await sleep(Math.min(remaining, 25));

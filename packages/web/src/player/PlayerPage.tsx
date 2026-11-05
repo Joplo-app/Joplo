@@ -7,11 +7,15 @@
  * 创作侧信息（缺口、规则、源码位置、抽屉）只由看板通过 nav / banner / drawer / menu 传入，本文件不引用它们，
  * 因此发布站的产物里不会出现。
  */
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Clapperboard, Ellipsis, Pause, Play, RotateCcw } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, Clapperboard, Ellipsis, Maximize, Minus, Pause, Play, Plus, RotateCcw } from 'lucide-react';
 import { stepTouchesLayer, type Project, type Scenario } from '@tokenroll/joplo-core';
 import type { DemoController, Snapshot } from '../runtime/demo';
-import { Stage } from '../renderer/Stage';
+import { Stage, type ZoomApi } from '../renderer/Stage';
+import { ExplainCard, cardWidth } from './ExplainCard';
+import { cardReserve } from './callout';
+import { SPEEDS, asSpeed } from '../runtime/pace';
+import { VIEWPORTS } from '../renderer/Stage';
 import { cameraFor } from './cameraFor';
 import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
@@ -60,7 +64,7 @@ function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
   );
 }
 
-export function Segmented<T extends string>({ value, items, onChange, label, testid, full }: { value: T; items: { value: T; label: ReactNode; testid?: string; title?: string }[]; onChange: (v: T) => void; label: string; testid?: string; full?: boolean }) {
+export function Segmented<T extends string>({ value, items, onChange, label, testid, full }: { value: T | null; items: { value: T; label: ReactNode; testid?: string; title?: string }[]; onChange: (v: T) => void; label: string; testid?: string; full?: boolean }) {
   return (
     <div role="radiogroup" aria-label={label} className={cn('flex gap-0.5 rounded-lg bg-[#f1f3f5] p-1', full && 'w-full')} data-testid={testid}>
       {items.map((it) => (
@@ -128,7 +132,7 @@ function MoreMenu({ items }: { items: MenuItem[] }) {
   );
 }
 
-function Controls({ snap, scenario, ctl, menu }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; menu: MenuItem[] }) {
+function Controls({ snap, scenario, ctl, menu, speed, onSpeed }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; menu: MenuItem[]; speed: number; onSpeed?: (v: number) => void }) {
   const pos = snap.state?.position ?? 0;
   const total = scenario?.steps.length ?? 0;
   const playing = snap.playing && !snap.paused;
@@ -151,6 +155,17 @@ function Controls({ snap, scenario, ctl, menu }: { snap: Snapshot; scenario: Sce
         下一步
         <ChevronRight className="size-4" />
       </button>
+      {onSpeed ? (
+        <div className="w-[150px]">
+          <Segmented
+            label="播放速度"
+            testid="speed"
+            value={String(speed)}
+            onChange={(v) => onSpeed(Number(v))}
+            items={SPEEDS.map((v) => ({ value: String(v), label: `${v}×`, testid: `speed-${v}`, title: `自动播放速度 ${v}×` }))}
+          />
+        </div>
+      ) : null}
       <div className="ml-auto">
         <MoreMenu items={menu} />
       </div>
@@ -232,6 +247,9 @@ export type PlayerPageProps = {
   layer: string | null;
   /** 切换层级：传层级 id 表示手动看这一层（导演关闭）；传 null 表示打开导演。 */
   onLayer: (layer: string | null) => void;
+  /** 自动播放速度（0.5 / 1 / 1.5，记在 URL 里）。 */
+  speed?: number;
+  onSpeed?: (speed: number) => void;
   /** 左栏内容。 */
   nav: ReactNode;
   /** 画面上方（缺口说明、编译错误等）。 */
@@ -256,7 +274,19 @@ export function PlayerPage(p: PlayerPageProps) {
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
   const next = ctl.nextStep();
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
-  const shownStep = scenario && snap.activeStep !== null ? scenario.steps[snap.activeStep] : null;
+  // 字幕 / 解说卡显示的步骤：正在播放的一步；自动播放停留期间是刚执行的一步
+  const pos = state?.position ?? 0;
+  const lastStep = scenario && pos > 0 ? scenario.steps[pos - 1] : null;
+  const shownStep = scenario && snap.activeStep !== null ? scenario.steps[snap.activeStep] : snap.playing ? lastStep : null;
+  const speed = asSpeed(p.speed ?? 1);
+  useEffect(() => {
+    ctl.speed = speed;
+  }, [ctl, speed]);
+  const zoomApi = useRef<ZoomApi | null>(null);
+  const [userZoom, setUserZoom] = useState<number | null>(null);
+  const onZoomApi = useCallback((api: ZoomApi | null) => {
+    zoomApi.current = api;
+  }, []);
 
   // 视角层级与导演镜头（D43 / T-layers）：每层是独立画面，镜头只由步骤推导（cameraAt），切层级不改变步骤和产品状态。
   // 导演跟随时，下一步的操作目标不在当前层里，控制器会先请求切到它所在的层（leadLayer），再移动鼠标。
@@ -268,6 +298,13 @@ export function PlayerPage(p: PlayerPageProps) {
   const camera = plan.spec;
   const shownScene = state ? project.scenes[plan.sceneId ?? state.sceneId] : undefined;
   const device = shownScene?.viewport === 'mobile' ? 'mobile' : 'desktop';
+  // 解说卡（T-director2）：用镜头的方案、导演跟随时在焦点旁弹出；镜头给它留出位置。手动选层时只显示底部字幕
+  const cardOn = useCam && director;
+  const cardStep = cardOn && scenario ? (snap.activeStep !== null ? scenario.steps[snap.activeStep] : lastStep) : null;
+  const stageW = VIEWPORTS[device].width;
+  const spec = camera && cardOn ? { ...camera, reserve: cardReserve(stageW, cardWidth(stageW)) } : camera;
+  // 自由缩放：导演跟随时每一步由镜头重新接管；手动时保持，直到换层或点「适应画面」
+  const zoomReset = director ? `d|${pos}|${viewLayer}|${plan.sceneId ?? state?.sceneId ?? ''}` : `m|${viewLayer}|${plan.sceneId ?? state?.sceneId ?? ''}`;
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, director), [ctl, plan.sceneId, director]);
   const replayLayer = () => {
     if (!scenario) return;
@@ -323,10 +360,15 @@ export function PlayerPage(p: PlayerPageProps) {
               <Segmented
                 label="层级"
                 testid="layer-switch"
-                value={viewLayer}
+                value={director ? null : viewLayer}
                 onChange={(id) => p.onLayer(id)}
-                items={layers.map((l) => ({ value: l.id, label: l.title, testid: `layer-${l.id}` }))}
+                items={layers.map((l) => ({ value: l.id, label: l.title, testid: `layer-${l.id}`, title: `手动查看「${l.title}」（导演暂停）` }))}
               />
+              {director ? (
+                <span className="text-[12px] text-[#6b6b6b]" data-testid="director-layer">
+                  导演：{layers.find((l) => l.id === viewLayer)?.title ?? viewLayer}
+                </span>
+              ) : null}
               <button
                 type="button"
                 aria-pressed={director}
@@ -350,8 +392,9 @@ export function PlayerPage(p: PlayerPageProps) {
                   project={project}
                   state={state}
                   theme={p.theme}
-                  camera={camera}
+                  camera={spec}
                   sceneId={plan.sceneId}
+                  zoom={{ resetKey: zoomReset, onApi: onZoomApi, onChange: (v) => setUserZoom(v ? v.k : null) }}
                   mode="demo"
                   selectedId={p.selectedId ?? null}
                   preview={snap.preview}
@@ -363,7 +406,12 @@ export function PlayerPage(p: PlayerPageProps) {
                     ctl.setStageEl(el);
                     setStageEl(el);
                   }}
-                  overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} caption={shownStep?.caption ?? null} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />}
+                  overlay={
+                    <>
+                      <Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} caption={cardOn ? null : (shownStep?.caption ?? null)} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />
+                      {cardStep ? <ExplainCard stage={stageEl} stepKey={cardStep.id} caption={cardStep.caption} explain={cardStep.explain ?? null} animate={!ctl.reducedMotion} /> : null}
+                    </>
+                  }
                 />
               </StageViewport>
             ) : (
@@ -371,6 +419,20 @@ export function PlayerPage(p: PlayerPageProps) {
                 这个方案还没有可显示的画面。
               </div>
             )}
+            {state && shownScene ? (
+              <div className="absolute right-3 top-2 z-10 flex items-center gap-1" role="toolbar" aria-label="缩放" data-testid="zoom-bar" data-zoom={userZoom === null ? 'camera' : userZoom.toFixed(2)}>
+                <button type="button" aria-label="缩小" title="缩小（滚轮 / 捏合也可以）" onClick={() => zoomApi.current?.zoomBy(1 / 1.25)} data-testid="zoom-out" className="flex size-7 items-center justify-center rounded-md border bg-white text-[#3a3a3a] hover:bg-[#f8f9fa]">
+                  <Minus className="size-3.5" />
+                </button>
+                <button type="button" aria-label="放大" title="放大（滚轮 / 捏合也可以）" onClick={() => zoomApi.current?.zoomBy(1.25)} data-testid="zoom-in" className="flex size-7 items-center justify-center rounded-md border bg-white text-[#3a3a3a] hover:bg-[#f8f9fa]">
+                  <Plus className="size-3.5" />
+                </button>
+                <button type="button" title="回到镜头的画面（取消手动缩放与平移）" onClick={() => zoomApi.current?.fit()} data-testid="zoom-fit" disabled={userZoom === null} className="flex h-7 items-center gap-1 rounded-md border bg-white px-2 text-[12px] text-[#3a3a3a] hover:bg-[#f8f9fa] disabled:opacity-40">
+                  <Maximize className="size-3.5" />
+                  适应画面
+                </button>
+              </div>
+            ) : null}
             {p.stageHint ? <div className="pointer-events-none absolute bottom-2 right-3 text-[12px] text-[#9a9a9a]" data-testid="stage-hint">{p.stageHint}</div> : null}
             {p.flash ? (
               <div role="status" className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-md bg-[#1e1e1e] px-3 py-1.5 text-[13px] text-white shadow" data-testid="flash">
@@ -378,7 +440,7 @@ export function PlayerPage(p: PlayerPageProps) {
               </div>
             ) : null}
           </div>
-          <Controls snap={snap} scenario={scenario} ctl={ctl} menu={p.menu} />
+          <Controls snap={snap} scenario={scenario} ctl={ctl} menu={p.menu} speed={speed} onSpeed={p.onSpeed} />
           {scenario ? <StepStrip snap={snap} scenario={scenario} ctl={ctl} /> : null}
         </main>
       </div>

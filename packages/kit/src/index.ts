@@ -100,7 +100,8 @@ export type EffectDef =
   | { kind: 'effect'; type: 'go'; route: string }
   | { kind: 'effect'; type: 'complete'; text: string; outcome: 'success' | 'failure' | 'cancelled' }
   | { kind: 'effect'; type: 'uses'; rules: string[] }
-  | { kind: 'effect'; type: 'shot'; targets: string[] };
+  | { kind: 'effect'; type: 'shot'; targets: string[] }
+  | { kind: 'effect'; type: 'explain'; text: string };
 
 const pathOf = (b: Bind | string): string => (isBind(b) ? bindPath(b) : b);
 export const set = (target: Bind, value: Json): EffectDef => ({ kind: 'effect', type: 'set', path: pathOf(target), value });
@@ -124,6 +125,13 @@ export const uses = (...rules: string[]): EffectDef => ({ kind: 'effect', type: 
  * 没有声明 layers 的方案：shot 在路径页面里聚焦。
  */
 export const shot = (...targets: string[]): EffectDef => ({ kind: 'effect', type: 'shot', targets });
+
+/**
+ * 解说（T-director2）：这一步较长的说明。导演模式下显示在焦点旁的解说卡里、步骤说明的下方；
+ * 自动播放时这一步停留的时长也按说明加解说的字数计算。不改变状态。
+ *   .system('额度预检', '调用模型之前先预检额度', shot('billing'), explain('额度不足时在这里就拦下，不会产生模型费用'))
+ */
+export const explain = (text: string): EffectDef => ({ kind: 'effect', type: 'explain', text });
 
 /**
  * 层级（视角，D43 / T-layers）：一个完全独立的画面，有自己的 JSX 树，单独渲染、按自己的布局占满舞台。

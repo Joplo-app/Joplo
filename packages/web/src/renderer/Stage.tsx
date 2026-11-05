@@ -2,8 +2,9 @@
  * 舞台：在固定尺寸的画框里渲染当前画面。弹窗、Toast、演示覆盖层都在画框内部分层，
  * 不 portal 到 document.body，因此截图、元素索引与遮挡检查都只看舞台本身。
  */
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
-import { CameraLayer, useCamera, type CameraSpec } from './camera';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { CameraLayer, contentBounds, useCamera, type CameraSpec } from './camera';
+import { clampPan, wheelFactor, zoomAt, type View } from './camera-math';
 import { AnimatePresence, motion } from 'motion/react';
 import { VIEWPORT_SIZE, type PlayState, type Project, type Toast } from '@tokenroll/joplo-core';
 import { RenderContext, RenderNode, type RenderMode } from './components';
@@ -58,15 +59,131 @@ export type StageProps = {
   camera?: CameraSpec | null;
   /** 要显示的画面（有层级的方案是某一层自己的画面）；缺省为状态里的路径画面。各层共享同一份状态。 */
   sceneId?: string | null;
+  /** 自由缩放与平移（T-director2）：滚轮 / 触控板捏合缩放、拖动平移；null = 不允许（静态截图、视频）。 */
+  zoom?: ZoomProps | null;
 };
 
-export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null }: StageProps) {
+export type ZoomApi = { zoomBy: (factor: number) => void; fit: () => void };
+export type ZoomProps = {
+  /** 变化时丢弃用户的缩放，镜头重新接管（导演跟随：每一步；手动：换层）。 */
+  resetKey: string;
+  onApi?: (api: ZoomApi | null) => void;
+  /** 用户视图变化：null = 跟随镜头。 */
+  onChange?: (user: View | null) => void;
+};
+
+/** 滚轮落在还能继续滚动的区域（聊天记录、滚动区）里时，让它自己滚动，不缩放。 */
+function scrollsItself(target: EventTarget | null, root: HTMLElement, dy: number): boolean {
+  for (let el = target instanceof HTMLElement ? target : null; el && el !== root; el = el.parentElement) {
+    const oy = getComputedStyle(el).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
+      if (dy < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1) return true;
+    }
+  }
+  return false;
+}
+
+export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null }: StageProps) {
   const shownId = sceneId ?? state.sceneId;
   const scene = project.scenes[shownId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const cam = useCamera(camera, { width: vp.width, height: vp.height, animate, deps: [state, scene] });
+  // 用户的缩放平移（T-director2）：resetKey 变化时丢弃，镜头重新接管
+  const [user, setUserState] = useState<View | null>(null);
+  const userRef = useRef<View | null>(null);
+  const onChangeRef = useRef(zoom?.onChange);
+  onChangeRef.current = zoom?.onChange;
+  const setUser = (v: View | null) => {
+    userRef.current = v;
+    setUserState(v);
+    onChangeRef.current?.(v);
+  };
+  const resetKey = zoom?.resetKey ?? '';
+  useEffect(() => {
+    if (userRef.current) setUser(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
+  const cam = useCamera(camera, { width: vp.width, height: vp.height, animate, deps: [state, scene], user });
+  const zoomOn = !!zoom;
+  /** 当前视图（用户的，或镜头此刻的目标视图），在它上面继续缩放平移，并把内容夹在画面里。 */
+  const setClamped = (v: View) => {
+    const wrap = cam.wrapRef.current;
+    const b = wrap ? contentBounds(wrap, cam.contentRef.current, vp.width, vp.height) : { x: 0, y: 0, w: vp.width, h: vp.height };
+    setUser(clampPan(v, vp.width, vp.height, b));
+  };
+  const nowView = () => userRef.current ?? cam.current.current;
+  const zoomAround = (factor: number, pt: { x: number; y: number }) => setClamped(zoomAt(nowView(), factor, pt));
+  const apiRef = useRef<ZoomApi>({ zoomBy: () => undefined, fit: () => undefined });
+  apiRef.current.zoomBy = (f) => zoomAround(f, { x: vp.width / 2, y: vp.height / 2 });
+  apiRef.current.fit = () => setUser(null);
+  const onApi = zoom?.onApi;
+  useEffect(() => {
+    if (!onApi) return;
+    onApi(apiRef.current);
+    return () => onApi(null);
+  }, [onApi]);
+  // 滚轮 / 触控板捏合（Chrome、Firefox 以 ctrl+wheel 表示捏合；Safari 用 gesture 事件），以鼠标位置为中心
+  const zoomFns = useRef({ zoomAround, setClamped, nowView });
+  zoomFns.current = { zoomAround, setClamped, nowView };
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || !zoomOn) return;
+    const pt = (cx: number, cy: number) => {
+      const r = el.getBoundingClientRect();
+      const s = r.width / el.offsetWidth || 1;
+      return { x: (cx - r.left) / s, y: (cy - r.top) / s };
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && scrollsItself(e.target, el, e.deltaY)) return;
+      e.preventDefault();
+      zoomFns.current.zoomAround(wheelFactor(e.deltaY, { ctrlKey: e.ctrlKey, deltaMode: e.deltaMode }), pt(e.clientX, e.clientY));
+    };
+    let g: { v: View; p: { x: number; y: number } } | null = null;
+    type GE = Event & { scale: number; clientX: number; clientY: number };
+    const gStart = (e: Event) => {
+      e.preventDefault();
+      const ge = e as GE;
+      g = { v: zoomFns.current.nowView(), p: pt(ge.clientX, ge.clientY) };
+    };
+    const gChange = (e: Event) => {
+      e.preventDefault();
+      if (g) zoomFns.current.setClamped(zoomAt(g.v, (e as GE).scale, g.p));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('gesturestart', gStart);
+    el.addEventListener('gesturechange', gChange);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('gesturestart', gStart);
+      el.removeEventListener('gesturechange', gChange);
+    };
+  }, [zoomOn]);
+  // 拖动平移：移动超过 4px 才算拖动，之后的 click 不当作点击元素
+  const drag = useRef<{ x: number; y: number; v: View; moved: boolean; id: number } | null>(null);
+  const suppressClick = useRef(false);
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (!zoomOn || e.button !== 0 || e.altKey) return;
+    drag.current = { x: e.clientX, y: e.clientY, v: nowView(), moved: false, id: e.pointerId };
+  };
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || !(e.buttons & 1)) return;
+    const el = rootRef.current!;
+    const s = el.getBoundingClientRect().width / el.offsetWidth || 1;
+    const dx = (e.clientX - d.x) / s;
+    const dy = (e.clientY - d.y) / s;
+    if (!d.moved && Math.hypot(dx, dy) < 4) return;
+    if (!d.moved) {
+      d.moved = true;
+      el.setPointerCapture?.(d.id);
+    }
+    setClamped({ k: d.v.k, tx: d.v.tx + dx, ty: d.v.ty + dy });
+  };
+  const onPointerUp = () => {
+    if (drag.current?.moved) suppressClick.current = true;
+    drag.current = null;
+  };
 
   const toFramePoint = (clientX: number, clientY: number) => {
     const el = rootRef.current;
@@ -108,14 +225,26 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         data-scene={shownId}
         data-width={vp.width}
         className="jstage relative overflow-hidden"
-        style={{ width: vp.width, height: vp.height }}
         onClick={onClick}
         onKeyDown={onKeyDown}
+        onPointerDown={zoomOn ? onPointerDown : undefined}
+        onPointerMove={zoomOn ? onPointerMove : undefined}
+        onPointerUp={zoomOn ? onPointerUp : undefined}
+        onPointerCancel={zoomOn ? onPointerUp : undefined}
+        onClickCapture={(e) => {
+          if (!suppressClick.current) return;
+          suppressClick.current = false;
+          e.stopPropagation();
+          e.preventDefault();
+        }}
+        data-zoomable={zoomOn ? '' : undefined}
+        data-user-zoom={user ? String(Math.round(user.k * 100) / 100) : undefined}
+        style={{ width: vp.width, height: vp.height, touchAction: zoomOn ? 'none' : undefined, cursor: drag.current?.moved ? 'grabbing' : undefined }}
       >
         {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
           {scene ? (
-            <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, camera: !!camera }}>
+            <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width }}>
               {/* 换层（换画面）时淡入 */}
               <motion.div key={shownId} className="absolute inset-0" ref={cam.contentRef} initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
                 <RenderNode node={scene.root} />

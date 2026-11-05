@@ -131,7 +131,7 @@ describe('Diagram 布局', () => {
 });
 
 // ---------- 可读性与紧凑（examples/agent-arch 的真实结构，D41 复审） ----------
-import { diagramScale, MIN_SCALE, NODE_FONT, DESC_FONT, EDGE_FONT, type DLayout } from '../src/renderer/diagram-layout';
+import { diagramFit, type DLayout } from '../src/renderer/diagram-layout';
 
 /** 与 examples/agent-arch/shared/arch.tsx 相同的结构（v = a：混合的手；v = b：全云端）。 */
 function agentArch(v: 'a' | 'b', direction: 'right' | 'down'): SceneNode {
@@ -183,14 +183,13 @@ describe('可读性与紧凑：examples/agent-arch 的结构', () => {
     for (const dir of ['right', 'down'] as const) {
       const s = diagramStructure(agentArch(v, dir));
       const l: DLayout = layoutDiagram(s);
-      it(`${v}/${dir}：约 1000px 宽的容器里，节点主标签 ≥ 12px、description ≥ 10px（放不下时滚动而不是继续缩小）`, () => {
-        const { scale, scroll } = diagramScale(l, 1000, 640);
-        expect(scale * NODE_FONT).toBeGreaterThanOrEqual(12);
-        expect(scale * DESC_FONT).toBeGreaterThanOrEqual(10);
-        expect(scale * EDGE_FONT).toBeGreaterThanOrEqual(10);
-        if (scroll) expect(scale).toBe(MIN_SCALE);
-        // 很窄的容器也不低于下限
-        expect(diagramScale(l, 300, 200).scale).toBe(MIN_SCALE);
+      it(`${v}/${dir}：整图放进容器、不放大、不滚动（细节交给舞台统一的缩放平移与镜头推近）`, () => {
+        for (const [w, h] of [[1000, 640], [300, 200], [4000, 3000]] as const) {
+          const { scale } = diagramFit(l, w, h);
+          expect(scale).toBeLessThanOrEqual(1);
+          expect(l.width * scale).toBeLessThanOrEqual(w);
+          expect(l.height * scale).toBeLessThanOrEqual(h);
+        }
       });
       it(`${v}/${dir}：连线标签互不重叠，也不压住节点和分组标题`, () => {
         const labels = Object.entries(l.edges).filter(([, e]) => e.label).map(([id, e]) => [id, e.label!] as const);

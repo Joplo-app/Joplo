@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@tokenroll/joplo-kit/ui';
-import { config, feature, flow, layer, option, page, set, shot, Slot, $ } from '@tokenroll/joplo-kit';
+import { config, explain, feature, flow, layer, option, page, set, shot, Slot, $ } from '@tokenroll/joplo-kit';
 import { jsx } from '@tokenroll/joplo-kit/jsx-runtime';
 import { DIRECTOR_LAYER, PAGE_LAYER, cameraAt, compile, displaySceneId, explainClick, findNode, isNodeVisible, layersOf, layersWithNode, replay, stateAt, stepTouchesLayer, validate, type AuthoringProject } from '../src/index.ts';
 
@@ -44,6 +44,22 @@ function build(o: { layers?: Record<string, unknown> | null; steps?: (f: ReturnT
   return { dev: compile(src, 'dev'), publish: compile(src, 'publish') };
 }
 const sid = 'f.a.happy';
+
+describe('explain()：较长的解说写进 IR（T-director2）', () => {
+  it('写进 Step.explain，多个按换行连接；发布模式保留；不是状态变化；没有 explain 的步骤没有这个字段', () => {
+    const { dev, publish } = build({
+      steps: (f) => f.click('app_send', '发出消息', shot('msg_user'), explain('客户端把消息交给 Biz Server'), explain('  鉴权并写入会话 ')).system('额度预检', shot('billing')),
+    });
+    for (const r of [dev, publish]) {
+      expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      const steps = r.project!.scenarios[sid]!.steps;
+      expect(steps[0]!.explain).toBe('客户端把消息交给 Biz Server\n鉴权并写入会话');
+      expect(steps[0]!.caption).toBe('发出消息');
+      expect(steps[0]!.effects.map((e) => e.type)).toEqual([]);
+      expect('explain' in steps[1]!).toBe(false);
+    }
+  });
+});
 
 describe('layer(title, tree)：每层一个独立画面', () => {
   it('每层单独编译成画面（带 layer 键），不从路径页面里裁切；option.layers 指向这些画面', () => {

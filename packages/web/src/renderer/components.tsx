@@ -35,7 +35,7 @@ import {
 } from '@tokenroll/joplo-core';
 import { cn } from '@/lib/utils';
 import { Rough, RoughPath, roundRectPath, useStageTheme } from './rough';
-import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramScale, diagramStructure, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
+import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramStructure, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
 import { DIMMED, FONT, INK, SOFT, SPACING, TITLE_SIZE, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf } from './style';
 
 export type RenderMode = 'review' | 'demo' | 'render';
@@ -51,8 +51,6 @@ export type RenderCtx = {
   animate: boolean;
   /** 舞台宽度（px）：响应式属性、visibleFrom / hiddenFrom、AppShell 收起都按它计算。 */
   width: number;
-  /** 在镜头之下（D43）：Diagram 不再用最小缩放与图内滚动，整体放进容器，细节靠镜头推近。 */
-  camera?: boolean;
 };
 
 export const RenderContext = createContext<RenderCtx | null>(null);
@@ -1766,7 +1764,6 @@ function Diagram({ node, p, children }: NodeProps) {
   const layout = useMemo(() => layoutDiagram(structure), [key]);
   const ref = useRef<HTMLDivElement | null>(null);
   const [mountedAt] = useState(() => (typeof performance !== 'undefined' ? performance.now() : 0));
-  const drag = useRef<{ x: number; y: number; left: number; top: number; moved: boolean } | null>(null);
   const [avail, setAvail] = useState(0);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -1779,11 +1776,9 @@ function Diagram({ node, p, children }: NodeProps) {
   const hv = Number(r('h'));
   const H = Number.isFinite(hv) && hv > 0 ? hv : 420;
   const { h: _h, ...rest } = p;
-  // 缩放不低于 12/14：放不下时在图内部滚动 / 拖动平移，而不是继续缩小到看不清。
-  // 在镜头之下（D43）让位给镜头：整体放进容器，细节靠镜头推近
-  const { camera: underCamera } = useCtx();
-  const { scale, scroll } = underCamera ? diagramFit(layout, avail, H) : diagramScale(layout, avail, H);
-  const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: H, overflow: scroll ? 'auto' : 'hidden', cursor: scroll ? 'grab' : undefined, overscrollBehavior: 'contain' } });
+  // 整图放进容器（T-director2）：不在图内部滚动 / 拖动；看细节用舞台统一的缩放平移，或由镜头推近
+  const { scale } = diagramFit(layout, avail, H);
+  const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: H, overflow: 'hidden' } });
   const W = layout.width * scale;
   const HH = layout.height * scale;
   return (
@@ -1794,44 +1789,17 @@ function Diagram({ node, p, children }: NodeProps) {
       }}
       data-direction={structure.direction}
       data-scale={String(scale)}
-      data-scroll={scroll ? '' : undefined}
-      onPointerDown={(e) => {
-        if (!scroll || e.button !== 0 || e.altKey) return;
-        const el = ref.current!;
-        drag.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop, moved: false };
-      }}
-      onPointerMove={(e) => {
-        const d = drag.current;
-        if (!d || !(e.buttons & 1)) return;
-        const dx = e.clientX - d.x;
-        const dy = e.clientY - d.y;
-        if (!d.moved && Math.hypot(dx, dy) < 4) return;
-        d.moved = true;
-        const el = ref.current!;
-        el.scrollLeft = d.left - dx;
-        el.scrollTop = d.top - dy;
-      }}
-      onPointerUp={() => {
-        // 拖动之后的 click 不当作点击元素（见 onClickCapture）
-        setTimeout(() => (drag.current = null), 0);
-      }}
-      onClickCapture={(e) => {
-        if (drag.current?.moved) {
-          e.stopPropagation();
-          e.preventDefault();
-        }
-      }}
     >
       {layout.width === 0 ? (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: DIMMED, fontSize: 13 }}>架构图还没有节点</div>
       ) : (
-        <div style={{ position: 'relative', width: scroll ? W : '100%', height: scroll ? HH : '100%' }}>
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
           <div
             data-jdiagram-canvas=""
             style={{
               position: 'absolute',
-              left: scroll ? 0 : Math.max(0, (avail - W) / 2),
-              top: scroll ? 0 : Math.max(0, (H - HH) / 2),
+              left: Math.max(0, (avail - W) / 2),
+              top: Math.max(0, (H - HH) / 2),
               width: layout.width,
               height: layout.height,
               transform: `scale(${scale})`,
@@ -1948,7 +1916,10 @@ function MovingDot({ d, color, animate: anim }: { d: string; color: string; anim
       return;
     }
     place(0);
-    const ctl = animateValue(0, 1, { duration: Math.max(0.9, len / 260), ease: 'linear', repeat: Infinity, onUpdate: place });
+    const dur = Math.max(0.9, len / 260);
+    // 一圈的时长写在元素上：自动播放会等本步 active 连线上的小点至少跑完一圈（T-director2）
+    dot.setAttribute('data-jdot-ms', String(Math.round(dur * 1000)));
+    const ctl = animateValue(0, 1, { duration: dur, ease: 'linear', repeat: Infinity, onUpdate: place });
     return () => ctl.stop();
   }, [d, anim]);
   return (

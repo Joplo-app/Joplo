@@ -7,18 +7,32 @@
  * - 不再用覆盖舞台的遮罩：焦点外的内容降低不透明度（沿焦点的祖先链，把每一层的兄弟元素调暗），不遮挡任何东西。
  * - 高光框画在镜头容器里、贴着焦点的可见矩形，随镜头动画一起移动；出现时脉冲一次。
  * - animate=false（renderStep 静态截图、减少动态效果）时直接到位，没有过渡与脉冲。
+ * - 自由缩放（T-director2）：opts.user 是用户用滚轮 / 捏合 / 拖动得到的视图；有它时用它，镜头算出的视图（base）照常更新但不应用；
+ *   user 变回 null（下一步导演接管、点「适应画面」）时平滑回到 base。
  */
 import { useLayoutEffect, useRef, useState } from 'react';
 import { animate as animateEl, motion } from 'motion/react';
 import { Rough, useStageTheme } from './rough';
-import { fitCamera, highlightRect, revealScroll, union, visibleRect, type Box } from './camera-math';
+import { fitCamera, highlightRect, revealScroll, union, visibleRect, type Box, type View } from './camera-math';
+import { CAMERA_MS } from '../runtime/pace';
 
 export type CameraSpec = {
   /** 对准的元素 id；空 = 这一层（这个画面）整体。 */
   targets: string[];
   /** 镜头标识（层级 + 目标）：变化时高光脉冲一次。 */
   key: string;
+  /** 聚焦时给解说卡留出的右侧 / 底部（画面像素）。 */
+  reserve?: { right: number; bottom: number } | null;
 };
+
+/** 镜头容器里内容的范围（内容坐标，至少是整个画面）：整层缩放与平移夹紧都用它。 */
+export function contentBounds(wrap: HTMLElement, content: HTMLElement | null, W: number, H: number): Box {
+  const wr = wrap.getBoundingClientRect();
+  const S = wr.width / (wrap.offsetWidth || 1) || 1;
+  const r = content?.firstElementChild?.getBoundingClientRect();
+  const c = r && r.height > 0 ? { x: (r.left - wr.left) / S, y: (r.top - wr.top) / S, w: r.width / S, h: r.height / S } : null;
+  return union([{ x: 0, y: 0, w: W, h: H }, ...(c ? [c] : [])])!;
+}
 
 export type CameraView = { k: number; tx: number; ty: number; mode: 'focus' | 'overview'; rects: { id: string; box: Box }[] };
 
@@ -26,12 +40,34 @@ const round = (n: number) => Math.round(n * 100) / 100;
 const FOCUS_ATTRS = ['data-jfocus', 'data-jfocus-path'] as const;
 
 /** 镜头的计算与应用。wrapRef 挂在镜头容器上，contentRef 挂在画面内容上。 */
-export function useCamera(spec: CameraSpec | null, opts: { width: number; height: number; animate: boolean; deps: unknown[] }) {
+export function useCamera(spec: CameraSpec | null, opts: { width: number; height: number; animate: boolean; deps: unknown[]; user?: View | null }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState<CameraView | null>(null);
-  const current = useRef({ k: 1, tx: 0, ty: 0 });
-  const specKey = spec ? `${spec.key}|${spec.targets.join(',')}` : '';
+  /** 最近一次应用到镜头容器上的视图（目标值）。 */
+  const current = useRef<View>({ k: 1, tx: 0, ty: 0 });
+  /** 镜头（导演 / 这一层的焦点）算出的视图。 */
+  const base = useRef<View>({ k: 1, tx: 0, ty: 0 });
+  const user = opts.user ?? null;
+  const userRef = useRef<View | null>(user);
+  userRef.current = user;
+  const specKey = spec ? `${spec.key}|${spec.targets.join(',')}|${spec.reserve ? `${spec.reserve.right},${spec.reserve.bottom}` : ''}` : '';
+
+  const applyTo = (wrap: HTMLElement, v: View, smooth: boolean) => {
+    current.current = v;
+    wrap.dataset.cameraView = JSON.stringify({ k: round(v.k), tx: round(v.tx), ty: round(v.ty) });
+    wrap.dataset.zoom = userRef.current ? 'user' : 'camera';
+    void animateEl(wrap, { x: v.tx, y: v.ty, scale: v.k }, smooth ? { duration: CAMERA_MS / 1000, ease: [0.4, 0, 0.2, 1] } : { duration: 0 });
+  };
+
+  // 用户缩放 / 平移：立即应用；回到镜头（null）时平滑过渡
+  const userSig = user ? `${user.k},${user.tx},${user.ty}` : '';
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    applyTo(wrap, user ?? base.current, !user && opts.animate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userSig]);
 
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
@@ -41,10 +77,10 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       for (const a of FOCUS_ATTRS) wrap.querySelectorAll(`[${a}]`).forEach((el) => el.removeAttribute(a));
       content?.removeAttribute('data-jfocus-dim');
     };
+    // 镜头算出的视图：记为 base；用户正在自由缩放时不应用（等导演接管或「适应画面」）
     const apply = (k: number, tx: number, ty: number, smooth: boolean) => {
-      current.current = { k, tx, ty };
-      wrap.dataset.cameraView = JSON.stringify({ k: round(k), tx: round(tx), ty: round(ty) });
-      void animateEl(wrap, { x: tx, y: ty, scale: k }, smooth ? { duration: 0.6, ease: [0.4, 0, 0.2, 1] } : { duration: 0 });
+      base.current = { k, tx, ty };
+      if (!userRef.current) applyTo(wrap, base.current, smooth);
     };
     if (!spec) {
       clearFocus();
@@ -106,7 +142,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       const nodeScales = found
         .filter((f) => f.el.getAttribute('data-jtype') === 'Diagram.Node')
         .map((f) => (Number(f.el.closest('[data-jtype="Diagram"]')?.getAttribute('data-scale') ?? 1) || 1) * outer);
-      const { k, tx, ty } = fitCamera({ W, H, mode, bbox, nodeScales, bounds });
+      const { k, tx, ty } = fitCamera({ W, H, mode, bbox, nodeScales, bounds, reserve: spec.reserve ?? undefined });
       return { k, tx, ty, mode, rects: found.map((f) => ({ id: f.id, box: highlightRect(f.box) })), els: found.map((f) => f.el) };
     };
     /** 焦点外调暗：标记焦点与它的祖先链；CSS 把祖先链上每一层的其他兄弟元素调暗（index.css）。 */
@@ -147,7 +183,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [specKey, opts.width, opts.height, opts.animate, ...opts.deps]);
 
-  return { wrapRef, contentRef, view };
+  return { wrapRef, contentRef, view, current };
 }
 
 const ACCENT = '#e8590c';
@@ -164,6 +200,7 @@ export function CameraLayer({ view, animate, pulseKey }: { view: CameraView | nu
         return (
           <div key={`${pulseKey}:${id}`} data-jhighlight={id} data-box={`${round(box.x)},${round(box.y)},${round(box.w)},${round(box.h)}`}>
             <motion.div
+              data-jhighlight-box=""
               style={{ ...style, ...(theme === 'clean' ? { boxShadow: `0 0 0 ${2.5 / view.k}px ${ACCENT}, 0 0 ${16 / view.k}px ${5 / view.k}px rgba(232,89,12,0.32)` } : {}) }}
               initial={animate ? { opacity: 0 } : false}
               animate={{ opacity: 1 }}

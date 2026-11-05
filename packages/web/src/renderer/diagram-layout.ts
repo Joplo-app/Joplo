@@ -31,11 +31,10 @@ export const GROUP_LABEL_H = 18;
 const GROUP_PAD = 8;
 /** 分组标题字号。 */
 export const GROUP_FONT = 12;
-/** 节点主标签与 description 的字号；整图缩放不低于 MIN_SCALE，保证实际字号不小于 12px / 10px。 */
+/** 节点主标签与 description 的字号（整图缩放后的实际字号由镜头推近 / 用户缩放保证可读）。 */
 export const NODE_FONT = 14;
 export const DESC_FONT = 12;
 export const EDGE_FONT = 12;
-export const MIN_SCALE = 12 / NODE_FONT;
 
 const isBinding = (v: unknown) => typeof v === 'string' && /^\$(ui|data|inputs)\b/.test(v);
 const staticText = (v: unknown) => (typeof v === 'string' && !isBinding(v) ? v : typeof v === 'number' ? String(v) : '');
@@ -457,19 +456,12 @@ export function placeLabels(list: DEdge[], routes: Map<string, Point[]>, obstacl
 }
 
 /**
- * 整图缩放：放进容器宽度与高度 h，但不小于 MIN_SCALE（节点主标签实际 ≥ 12px、description ≥ 10px）；
- * 也不放大。放不下时 scroll = true，Diagram 内部可以滚动或拖动平移。
+ * 整图缩放（T-director2）：整图放进容器宽度与高度 h，不放大、不滚动。
+ * 看不清的细节交给舞台统一的缩放平移（滚轮 / 捏合 / 拖动）和镜头推近，Diagram 内部不再有第二套滚动与拖动。
  */
-export function diagramScale(layout: Pick<DLayout, 'width' | 'height'>, availW: number, availH: number): { scale: number; scroll: boolean } {
-  if (!layout.width || !availW) return { scale: 1, scroll: false };
-  const fit = Math.min(1, (availW - 8) / layout.width, (availH - 8) / layout.height);
-  return fit >= MIN_SCALE ? { scale: fit, scroll: false } : { scale: MIN_SCALE, scroll: true };
-}
-
-/** 镜头之下（D43）：整图放进容器，不设下限、不滚动；细节由镜头推近。 */
-export function diagramFit(layout: Pick<DLayout, 'width' | 'height'>, availW: number, availH: number): { scale: number; scroll: boolean } {
-  if (!layout.width || !availW) return { scale: 1, scroll: false };
-  return { scale: Math.min(1, (availW - 8) / layout.width, (availH - 8) / layout.height), scroll: false };
+export function diagramFit(layout: Pick<DLayout, 'width' | 'height'>, availW: number, availH: number): { scale: number } {
+  if (!layout.width || !availW) return { scale: 1 };
+  return { scale: Math.max(0.05, Math.min(1, (availW - 8) / layout.width, (availH - 8) / layout.height)) };
 }
 
 /** 折线点 → 平滑路径（经过首尾点，中间点作为二次贝塞尔的控制点）。 */

@@ -115,7 +115,8 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
   useEffect(() => {
     ctl.setProject(project, 1, null);
   }, [ctl, project]);
-  const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', play: next }, replace);
+  // 播放速度在切换场景时保留
+  const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', play: { ...(play.speed ? { speed: play.speed } : {}), ...next } }, replace);
   const resolved = usePlaySync(ctl, snap, snap.project, play, (next) => toPlay(next, true));
   const feature = project.features[play.featureId];
   if (!snap.project) return null;
@@ -166,6 +167,11 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
         { label: scenario?.name ?? '', testid: 'crumb-scenario' },
       ]}
       layer={play.layer ?? null}
+      speed={play.speed ?? 1}
+      onSpeed={(v) => {
+        const { speed: _s, ...rest } = play;
+        navigate({ kind: 'play', play: v === 1 ? rest : { ...rest, speed: v } }, true);
+      }}
       onLayer={(l) => {
         const { layer: _l, ...rest } = play;
         toPlay(l ? { ...rest, layer: l } : rest, true);
