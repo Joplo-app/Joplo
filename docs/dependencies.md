@@ -31,9 +31,13 @@
 
 ### T-board（v2 看板）追加
 
-| 包 | 版本 | 许可证 | 用途 |
-| --- | --- | --- | --- |
 | vite | 8.3.5 | MIT | @joplo/server 运行时依赖：startDev 单进程开发服务（看板 + ssrLoadModule 编译 + HMR）、buildSite 的 vite build（与 @joplo/web 同一版本） |
 | @vitejs/plugin-react | 6.2.1 | MIT | @joplo/server 运行时依赖：看板与发布站的 React 转译 |
 | tailwindcss / @tailwindcss/vite | 4.3.4 | MIT | @joplo/server 运行时依赖：以项目目录为 @source 编译 className |
 | @joplo/kit | workspace | — | @joplo/server：项目里的 `@joplo/kit` 别名到本仓库 kit 源码 |
+## IR v2 CLI 迁移（T-cli）
+
+- `@joplo/cli` 保留 commander 15，新增显式 tsx 4.23.15 运行时依赖，使用 `tsx/esm/api` 的 `tsImport` 载入作者项目并应用项目 tsconfig。
+- CLI 移除 `@modelcontextprotocol/sdk` 和直接 zod 依赖；上表 MCP SDK 为历史记录，当前 MCP 命令退役，留到产品 V2。core 仍通过 zod 校验 IR。
+- guide 使用 core catalog 生成组件清单，不增加依赖；dev/build/render 仅在调用时动态加载工作区 `@joplo/server`。
+- 此 worker 的文件所有权不含根 `pnpm-lock.yaml`；协调者合并 package.json 后需重新执行 `pnpm install` 更新锁文件，移除旧 SDK 依赖图。
