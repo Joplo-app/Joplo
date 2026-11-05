@@ -37,7 +37,7 @@ export function StageViewport({ viewport, notice, onDismiss, children, tag, them
           role="status"
           data-testid="notice"
           data-notice-kind={floating.kind}
-          className={`absolute left-1/2 top-2 z-10 flex max-w-[70%] -translate-x-1/2 items-center gap-2 rounded-md border px-3 py-1.5 text-[13px] shadow ${floating.kind === 'error' ? 'border-[#c92a2a] bg-[#fff0f0] text-[#a51d1d]' : floating.kind === 'selected' ? 'border-[var(--sel)] bg-[#f6f3ff] text-[#5f3dc4]' : 'border-[#d0d0d0] bg-white text-[#1e1e1e]'}`}
+          className={`absolute left-1/2 top-2 z-10 flex max-w-[70%] -translate-x-1/2 items-center gap-2 rounded-md border px-3 py-2 text-[14px] shadow ${floating.kind === 'error' ? 'border-[#c92a2a] bg-[#fff0f0] text-[#a51d1d]' : floating.kind === 'selected' ? 'border-[var(--sel)] bg-[#f6f3ff] text-[#5f3dc4]' : 'border-[#d0d0d0] bg-white text-[#1e1e1e]'}`}
         >
           <span>{floating.text}</span>
           <button type="button" className="text-[#8a8a8a] hover:text-black" aria-label="关闭提示" onClick={onDismiss}>

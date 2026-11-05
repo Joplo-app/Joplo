@@ -14,7 +14,7 @@ export function Subtitle({ content, theme, width, framed = false, fixedHeight, d
   const badge = content?.badge;
   return (
     <div
-      className={cn('jsubtitle flex shrink-0 items-center gap-4 overflow-hidden px-5', dark ? 'bg-black/70 text-white' : 'bg-white', !framed && !dark && 'rounded-lg border')}
+      className={cn('jsubtitle flex shrink-0 items-center gap-4 overflow-hidden px-4', dark ? 'bg-black/70 text-white' : 'bg-white', !framed && !dark && 'rounded-lg border')}
       style={{ height: fixedHeight ?? subtitleHeight(content), width: width ?? '100%', paddingTop: SUBTITLE_PAD_Y, paddingBottom: SUBTITLE_PAD_Y }}
       data-theme={theme}
       data-testid="subtitle"
@@ -26,7 +26,7 @@ export function Subtitle({ content, theme, width, framed = false, fixedHeight, d
         <>
           <div className="flex min-w-0 flex-1 flex-col justify-center">
             <div className={dark ? 'text-white' : 'text-[#1e1e1e]'} style={{ fontSize: SUBTITLE_CAPTION_PX, lineHeight: 1.35, ...clamp(content.captionLines) }} data-jsubtitle-caption="">
-              {content.kind === 'system' ? <span className="mr-2 inline-block rounded bg-[#1c5fb8] px-1.5 align-middle text-[12px] leading-[20px] text-white">系统</span> : null}
+              {content.kind === 'system' ? <span className="mr-2 inline-block whitespace-nowrap rounded bg-[#1c5fb8] px-1.5 align-[2px] text-[12px] leading-[20px] text-white">系统</span> : null}
               {content.caption}
             </div>
             {content.explain ? (
@@ -37,11 +37,11 @@ export function Subtitle({ content, theme, width, framed = false, fixedHeight, d
           </div>
           {badge ? (
             badge.kind === 'done' ? (
-              <span role="status" title={badge.title} data-testid="complete-badge" className={cn('shrink-0 rounded border px-2 py-0.5 text-[13px]', MOCK_CLS[badge.outcome])}>
+              <span role="status" title={badge.title} data-testid="complete-badge" className={cn('shrink-0 whitespace-nowrap rounded-full border px-2 py-1 text-[12px] leading-none', MOCK_CLS[badge.outcome])}>
                 {badge.text}
               </span>
             ) : (
-              <span data-testid="step-index" className={cn('shrink-0 text-[13px]', dark ? 'text-white/70' : 'text-[#868e96]')}>
+              <span data-testid="step-index" className={cn('shrink-0 whitespace-nowrap text-[12px]', dark ? 'text-white/70' : 'text-[#868e96]')}>
                 {badge.text}
               </span>
             )

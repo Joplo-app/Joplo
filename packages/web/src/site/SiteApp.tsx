@@ -180,7 +180,7 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
       nav={
         <div className="flex flex-1 flex-col gap-1" data-testid="scenario-nav">
           <div className="truncate px-2 text-[12px] text-[#6b6b6b]">{feature.name}</div>
-          {option ? <div className="truncate rounded-lg bg-[#f1f3f5] px-3 py-1.5 text-[13px] font-semibold">{option.name}</div> : null}
+          {option ? <div className="truncate rounded-lg bg-[#f1f3f5] px-3 py-2 text-[14px] font-semibold">{option.name}</div> : null}
           <div className="mt-3 flex items-center gap-2 px-2 text-[12px] text-[#6b6b6b]">
             场景
             <span className="h-px flex-1 bg-[#e9ecef]" />

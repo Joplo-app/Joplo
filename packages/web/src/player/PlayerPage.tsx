@@ -1,14 +1,16 @@
 /**
  * 演示页（D39，看板与发布站同一套布局）：
- *   顶栏：Joplo · 面包屑（项目 / 功能 / 方案 / 场景，前两段可点击返回）· 右侧电脑 / 手机切换；
+ *   顶栏：Joplo · 面包屑（项目 / 功能 / 方案 / 场景，前两段可点击返回）；
  *   左栏：由调用方提供（看板：按情况分组 + 缺口；发布站：场景列表）；
- *   中间：画面；画面下方一行：⟲ 上一步 播放/暂停 下一步 …… 右侧「…」菜单；
- *   最底下：步骤条（当前步高亮，下面是本步说明与下一步说明）。
+ *   中间：层级栏（层级切换、导演标签、只重放这一层）、画面（铺满，右上角缩放与全屏）、字幕区、
+ *   播放控制一行（⟲ 上一步 播放/暂停 下一步 速度 …… 「…」）、步骤条。
+ *   全屏：只有画面、字幕区与底部居中的深色胶囊控制条（鼠标静止后淡出，空间保留，画面不跳动）。
+ * 控件样式与尺寸规范见 controls.tsx / controls-fit.ts：文字一律不换行，宽度不够时按优先级收起。
  * 创作侧信息（缺口、规则、源码位置、抽屉）只由看板通过 nav / banner / drawer / menu 传入，本文件不引用它们，
  * 因此发布站的产物里不会出现。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Clapperboard, Ellipsis, Expand, Maximize, Minus, Pause, Play, Plus, RotateCcw, Shrink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Expand, Gauge, Maximize, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Shrink } from 'lucide-react';
 import { stepTouchesLayer, type Project, type Scenario } from '@tokenroll/joplo-core';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
@@ -21,13 +23,17 @@ import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
 import { Overlay } from './Overlay';
 import { StageViewport } from './StageViewport';
+import { Btn, DirectorTag, MenuButton, Segmented, useWidth, type MenuItem, type Tone } from './controls';
+import { controlsRowCollapse, fullscreenBarCollapse, layerBarCollapse } from './controls-fit';
+
+export { Segmented } from './controls';
+export type { MenuItem } from './controls';
 
 export type Crumb = { label: string; testid: string; onClick?: () => void };
-export type MenuItem = { id: string; label: string; onClick: () => void; checked?: boolean; disabled?: boolean };
 
 export function Brand({ onClick }: { onClick?: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="shrink-0 text-[19px] font-bold tracking-tight text-[#1e1e1e]" data-testid="brand">
+    <button type="button" onClick={onClick} className="shrink-0 text-[20px] font-bold tracking-tight text-[#1e1e1e]" data-testid="brand">
       Joplo
     </button>
   );
@@ -63,142 +69,87 @@ function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
   );
 }
 
-export function Segmented<T extends string>({ value, items, onChange, label, testid, full }: { value: T | null; items: { value: T; label: ReactNode; testid?: string; title?: string }[]; onChange: (v: T) => void; label: string; testid?: string; full?: boolean }) {
-  return (
-    <div role="radiogroup" aria-label={label} className={cn('flex gap-0.5 rounded-lg bg-[#f1f3f5] p-1', full && 'w-full')} data-testid={testid}>
-      {items.map((it) => (
-        <button
-          key={it.value}
-          type="button"
-          role="radio"
-          aria-checked={value === it.value}
-          title={it.title}
-          data-testid={it.testid}
-          onClick={() => onChange(it.value)}
-          className={cn('flex min-w-0 flex-1 items-center justify-center gap-1.5 truncate rounded-md px-3 py-1 text-[13px]', value === it.value ? 'bg-white font-semibold text-[#1e1e1e] shadow-sm' : 'text-[#5a5a5a] hover:text-[#1e1e1e]')}
-        >
-          {it.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+const playLabelOf = (snap: Snapshot) => (!snap.playing ? (snap.state?.completed ? '重新播放' : '播放') : snap.paused ? '继续' : '暂停');
+const speedItems = (speed: number, onSpeed: (v: number) => void): MenuItem[] => SPEEDS.map((v) => ({ id: `speed-${v}`, label: `速度 ${v}×`, checked: speed === v, onClick: () => onSpeed(v) }));
 
-function MoreMenu({ items }: { items: MenuItem[] }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    window.addEventListener('mousedown', close);
-    window.addEventListener('keydown', esc);
-    return () => {
-      window.removeEventListener('mousedown', close);
-      window.removeEventListener('keydown', esc);
-    };
-  }, [open]);
-  return (
-    <div ref={ref} className="relative">
-      <button type="button" aria-label="更多操作" aria-expanded={open} onClick={() => setOpen((o) => !o)} data-testid="more-menu" className="flex size-9 items-center justify-center rounded-md border bg-white hover:bg-[#f8f9fa]">
-        <Ellipsis className="size-4" />
-      </button>
-      {open ? (
-        <div role="menu" className="absolute bottom-11 right-0 z-30 w-[220px] rounded-lg border bg-white p-1 shadow-lg" data-testid="menu">
-          {items.map((it) => (
-            <button
-              key={it.id}
-              type="button"
-              role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
-              aria-checked={it.checked}
-              disabled={it.disabled}
-              data-testid={`menu-${it.id}`}
-              onClick={() => {
-                setOpen(false);
-                it.onClick();
-              }}
-              className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-[14px] hover:bg-[#f1f3f5] disabled:opacity-40"
-            >
-              <span>{it.label}</span>
-              {it.checked ? <span aria-hidden>✓</span> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function Controls({ snap, scenario, ctl, menu, speed, onSpeed }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; menu: MenuItem[]; speed: number; onSpeed?: (v: number) => void }) {
+/** 上一步 / 播放 / 下一步：宽度不够时只剩图标（tooltip 写明快捷键）。 */
+function NavButtons({ snap, scenario, ctl, iconOnly, size, tone, ids }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; iconOnly: boolean; size: 32 | 36; tone: Tone; ids: { prev: string; play: string; next: string } }) {
   const pos = snap.state?.position ?? 0;
   const total = scenario?.steps.length ?? 0;
-  const playing = snap.playing && !snap.paused;
-  const playLabel = !snap.playing ? (snap.state?.completed ? '重新播放' : '播放') : snap.paused ? '继续' : '暂停';
   const off = !scenario || snap.view !== 'stage';
+  const playing = snap.playing && !snap.paused;
+  const playLabel = playLabelOf(snap);
   return (
-    <div className="flex shrink-0 items-center gap-2" role="toolbar" aria-label="播放控制" data-testid="controls">
-      <button type="button" aria-label="回到第 0 步" title="回到第 0 步" onClick={() => ctl.reset()} disabled={off} data-testid="ctl-reset" className="flex size-9 items-center justify-center rounded-md border bg-white hover:bg-[#f8f9fa] disabled:opacity-40">
-        <RotateCcw className="size-4" />
-      </button>
-      <button type="button" onClick={() => ctl.prev()} disabled={off || (pos === 0 && !snap.busy)} data-testid="ctl-prev" className="flex h-9 items-center gap-1 rounded-md border bg-white px-3 text-[14px] hover:bg-[#f8f9fa] disabled:opacity-40">
-        <ChevronLeft className="size-4" />
-        上一步
-      </button>
-      <button type="button" onClick={() => ctl.togglePlay()} disabled={off || total === 0} aria-label={playLabel} title={`${playLabel}（空格）`} data-testid="ctl-play" className="flex h-9 min-w-[96px] items-center justify-center gap-1.5 rounded-md bg-[#1e1e1e] px-4 text-[14px] font-medium text-white hover:bg-[#333] disabled:opacity-40">
-        {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-        {playLabel}
-      </button>
-      <button type="button" onClick={() => void ctl.next()} disabled={off || total === 0} data-testid="ctl-next" className="flex h-9 items-center gap-1 rounded-md border bg-white px-3 text-[14px] hover:bg-[#f8f9fa] disabled:opacity-40">
-        下一步
-        <ChevronRight className="size-4" />
-      </button>
-      {onSpeed ? (
-        <div className="w-[150px]">
-          <Segmented
-            label="播放速度"
-            testid="speed"
-            value={String(speed)}
-            onChange={(v) => onSpeed(Number(v))}
-            items={SPEEDS.map((v) => ({ value: String(v), label: `${v}×`, testid: `speed-${v}`, title: `自动播放速度 ${v}×` }))}
-          />
-        </div>
-      ) : null}
-      <div className="ml-auto">
-        <MoreMenu items={menu} />
+    <>
+      <Btn icon={<ChevronLeft className="size-4" />} label="上一步" title="上一步（←）" iconOnly={iconOnly} size={size} tone={tone} onClick={() => ctl.prev()} disabled={off || (pos === 0 && !snap.busy)} data-testid={ids.prev} />
+      <Btn icon={playing ? <Pause className="size-4" /> : <Play className="size-4" />} label={playLabel} title={`${playLabel}（空格）`} aria-label={playLabel} iconOnly={iconOnly} size={size} tone={tone} variant="primary" className={iconOnly ? undefined : 'min-w-[96px]'} onClick={() => ctl.togglePlay()} disabled={off || total === 0} data-testid={ids.play} />
+      <Btn icon={<ChevronRight className="size-4" />} iconAfter label="下一步" title="下一步（→）" iconOnly={iconOnly} size={size} tone={tone} onClick={() => void ctl.next()} disabled={off || total === 0} data-testid={ids.next} />
+    </>
+  );
+}
+
+function SpeedSegmented({ speed, onSpeed, tone, testid }: { speed: number; onSpeed: (v: number) => void; tone: Tone; testid: string }) {
+  return <Segmented label="播放速度" testid={testid} tone={tone} value={String(speed)} onChange={(v) => onSpeed(Number(v))} items={SPEEDS.map((v) => ({ value: String(v), label: `${v}×`, testid: `${testid}-${v}`, title: `自动播放速度 ${v}×` }))} />;
+}
+
+type LayerDef = { id: string; title: string };
+/** 层级切换：分段控件；收起时变成“层级：当前层 ▾”的下拉菜单。导演跟随时不高亮任何一项。 */
+function LayerSwitch({ layers, viewLayer, director, onLayer, collapsed, tone }: { layers: LayerDef[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; collapsed: boolean; tone: Tone }) {
+  const current = layers.find((l) => l.id === viewLayer)?.title ?? viewLayer;
+  if (collapsed)
+    return (
+      <MenuButton
+        trigger={{ icon: undefined, label: director ? '层级' : `层级：${current}` }}
+        label="切换层级"
+        testid="layer-switch"
+        tone={tone}
+        size={32}
+        align="left"
+        placement={tone === 'dark' ? 'up' : 'down'}
+        items={layers.map((l) => ({ id: `layer-${l.id}`, label: l.title, checked: !director && l.id === viewLayer, onClick: () => onLayer(l.id) }))}
+      />
+    );
+  return <Segmented label="层级" testid="layer-switch" tone={tone} value={director ? null : viewLayer} onChange={onLayer} items={layers.map((l) => ({ value: l.id, label: l.title, testid: `layer-${l.id}`, title: `手动查看「${l.title}」（导演暂停）` }))} />;
+}
+
+/** 非全屏的播放控制行：⟲ 上一步 播放 下一步 速度 …… 「…」。宽度不够：先收三件套为图标，再把速度收进「…」。 */
+function Controls({ snap, scenario, ctl, menu, speed, onSpeed }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; menu: MenuItem[]; speed: number; onSpeed?: (v: number) => void }) {
+  const [ref, width] = useWidth();
+  const c = controlsRowCollapse(width, playLabelOf(snap), onSpeed ? SPEEDS : []);
+  const off = !scenario || snap.view !== 'stage';
+  const speedInMenu = !!onSpeed && c.has('speed');
+  const items = speedInMenu ? [...speedItems(speed, onSpeed!), { id: 'speed-divider', divider: true as const }, ...menu] : menu;
+  return (
+    <div ref={ref} className="flex h-9 shrink-0 items-center gap-2 overflow-hidden" role="toolbar" aria-label="播放控制" data-testid="controls" data-collapsed={[...c].join(' ') || undefined}>
+      <Btn icon={<RotateCcw className="size-4" />} label="回到第 0 步" iconOnly onClick={() => ctl.reset()} disabled={off} data-testid="ctl-reset" />
+      <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={c.has('nav')} size={36} tone="light" ids={{ prev: 'ctl-prev', play: 'ctl-play', next: 'ctl-next' }} />
+      {onSpeed && !speedInMenu ? <SpeedSegmented speed={speed} onSpeed={onSpeed} tone="light" testid="speed" /> : null}
+      <div className="ml-auto shrink-0">
+        <MenuButton trigger={{}} label="更多操作" testid="more-menu" items={items} />
       </div>
     </div>
   );
 }
 
-/** 全屏时浮在画面下方的播放控制：上一步、播放 / 暂停、下一步、速度（层级切换与导演开关由调用方放在旁边）。 */
-function FloatingControls({ snap, scenario, ctl, speed, onSpeed }: { snap: Snapshot; scenario: Scenario; ctl: DemoController; speed: number; onSpeed?: (v: number) => void }) {
-  const pos = snap.state?.position ?? 0;
-  const total = scenario.steps.length;
-  const playing = snap.playing && !snap.paused;
-  const playLabel = !snap.playing ? (snap.state?.completed ? '重新播放' : '播放') : snap.paused ? '继续' : '暂停';
-  const btn = 'flex h-8 items-center gap-1 rounded-md px-2.5 text-[13px] text-white hover:bg-white/15 disabled:opacity-40';
+/** 全屏控制条：居中的半透明深色胶囊，高 48，内边距 8；宽度不够时依次收起三件套、速度、层级切换。 */
+function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer, director, onLayer, onDirector, onExit, avail }: { snap: Snapshot; scenario: Scenario; ctl: DemoController; speed: number; onSpeed?: (v: number) => void; layers: LayerDef[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; onDirector: () => void; onExit: () => void; avail: number }) {
+  const current = layers.find((l) => l.id === viewLayer)?.title ?? viewLayer;
+  const c = fullscreenBarCollapse(avail, playLabelOf(snap), onSpeed ? SPEEDS : [], layers.map((l) => l.title), director, current);
+  const sep = <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-white/20" />;
   return (
-    <>
-      <button type="button" onClick={() => ctl.prev()} disabled={pos === 0 && !snap.busy} className={btn} data-testid="fs-prev" title="上一步（←）">
-        <ChevronLeft className="size-4" />
-        上一步
-      </button>
-      <button type="button" onClick={() => ctl.togglePlay()} disabled={total === 0} className={cn(btn, 'bg-white/15 font-medium')} data-testid="fs-play" title={`${playLabel}（空格）`} aria-label={playLabel}>
-        {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-        {playLabel}
-      </button>
-      <button type="button" onClick={() => void ctl.next()} disabled={total === 0} className={btn} data-testid="fs-next" title="下一步（→）">
-        下一步
-        <ChevronRight className="size-4" />
-      </button>
-      {onSpeed ? (
-        <div className="w-[150px]">
-          <Segmented label="播放速度" testid="fs-speed" value={String(speed)} onChange={(v) => onSpeed(Number(v))} items={SPEEDS.map((v) => ({ value: String(v), label: `${v}×`, testid: `fs-speed-${v}` }))} />
-        </div>
+    <div className="flex h-12 max-w-full shrink-0 items-center gap-2 overflow-hidden rounded-full bg-[rgba(24,24,24,0.86)] px-2 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur" role="toolbar" aria-label="全屏播放控制" data-testid="fullscreen-controls" data-collapsed={[...c].join(' ') || undefined}>
+      <NavButtons snap={snap} scenario={scenario} ctl={ctl} iconOnly={c.has('nav')} size={32} tone="dark" ids={{ prev: 'fs-prev', play: 'fs-play', next: 'fs-next' }} />
+      {onSpeed ? (c.has('speed') ? <MenuButton trigger={{ icon: <Gauge className="size-4" /> }} label={`播放速度（${speed}×）`} testid="fs-speed" tone="dark" size={32} width={160} items={speedItems(speed, onSpeed)} /> : <SpeedSegmented speed={speed} onSpeed={onSpeed} tone="dark" testid="fs-speed" />) : null}
+      {layers.length > 1 ? (
+        <>
+          {sep}
+          <LayerSwitch layers={layers} viewLayer={viewLayer} director={director} onLayer={onLayer} collapsed={c.has('layers')} tone="dark" />
+          <DirectorTag on={director} layerTitle={current} onToggle={onDirector} tone="dark" />
+        </>
       ) : null}
-    </>
+      {sep}
+      <Btn icon={<Shrink className="size-4" />} label="退出全屏（Esc）" iconOnly size={32} tone="dark" onClick={onExit} data-testid="fs-exit" />
+    </div>
   );
 }
 
@@ -215,11 +166,11 @@ function StepStrip({ snap, scenario, ctl }: { snap: Snapshot; scenario: Scenario
   const chip = (i: number, label: string, testid: string, kind?: string) => {
     const state = i === shownIndex ? 'current' : i < shownIndex ? 'done' : 'todo';
     return (
-      <li key={testid} className="flex min-w-[80px] max-w-[170px] flex-1 items-center gap-1.5">
-        <button type="button" onClick={() => ctl.clickStepChip(i - 1)} data-testid={testid} data-state={state} data-step-kind={kind} title={label} aria-label={`第 ${i} 步：${label}`} className="flex min-w-0 items-center gap-1.5 text-left">
+      <li key={testid} className="flex min-w-[80px] max-w-[168px] flex-1 items-center">
+        <button type="button" onClick={() => ctl.clickStepChip(i - 1)} data-testid={testid} data-state={state} data-step-kind={kind} title={label} aria-label={`第 ${i} 步：${label}`} className="flex h-8 min-w-0 items-center gap-2 whitespace-nowrap text-left">
           <span
             className={cn(
-              'flex size-6 shrink-0 items-center justify-center border text-[11px]',
+              'flex size-6 shrink-0 items-center justify-center border text-[12px] leading-none',
               kind === 'system' ? 'rounded-[6px] border-dashed' : 'rounded-full',
               state === 'current' ? 'border-[#1e1e1e] bg-[#1e1e1e] text-white' : state === 'done' ? 'border-[#1e1e1e] bg-white text-[#1e1e1e]' : 'border-[#ced4da] text-[#868e96]',
               active === i - 1 && 'ring-2 ring-[var(--focus)] ring-offset-1',
@@ -232,10 +183,9 @@ function StepStrip({ snap, scenario, ctl }: { snap: Snapshot; scenario: Scenario
       </li>
     );
   };
-  // 一行步骤 + 一行说明（D43“一屏放下”）
   return (
-    <section className="shrink-0 rounded-lg border bg-white px-3 py-1.5" data-testid="step-bar">
-      <ol ref={listRef} className="flex items-center gap-1.5 overflow-x-auto" aria-label="步骤">
+    <section className="shrink-0 rounded-lg border bg-white px-3 py-1" data-testid="step-bar">
+      <ol ref={listRef} className="flex items-center gap-2 overflow-x-auto" aria-label="步骤">
         {chip(0, '初始', 'chip-initial')}
         {scenario.steps.map((s, i) => chip(i + 1, s.caption, `chip-${s.id}`, s.kind))}
       </ol>
@@ -349,141 +299,125 @@ export function PlayerPage(p: PlayerPageProps) {
     };
   }, [ctl, p.onInspect, toggleFull, full]);
 
-  const layerSwitch = (
-    <>
-      <Segmented
-        label="层级"
-        testid="layer-switch"
-        value={director ? null : viewLayer}
-        onChange={(id) => p.onLayer(id)}
-        items={layers.map((l) => ({ value: l.id, label: l.title, testid: `layer-${l.id}`, title: `手动查看「${l.title}」（导演暂停）` }))}
-      />
-      {director ? (
-        <span className={cn('text-[12px]', full ? 'text-white/80' : 'text-[#6b6b6b]')} data-testid="director-layer">
-          导演：{layers.find((l) => l.id === viewLayer)?.title ?? viewLayer}
-        </span>
+  const currentLayer = layers.find((l) => l.id === viewLayer)?.title ?? viewLayer;
+  const toggleDirector = () => p.onLayer(director ? viewLayer : null);
+  const hasLayerBar = useCam && layers.length > 1;
+  // 层级栏（非全屏）：宽度不够时先把“只重放这一层”收成图标，再把层级切换收成下拉菜单
+  const [layerBarRef, layerBarW] = useWidth();
+  const lc = layerBarCollapse(layerBarW, layers.map((l) => l.title), director, currentLayer);
+  // 全屏控制条所在的一行（宽度决定收起哪些控件）
+  const [barRowRef, barRowW] = useWidth(1200);
+
+  const stageBlock = (
+    <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white', !full && 'rounded-xl border')} data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
+      {state && shownScene ? (
+        <StageViewport viewport={device} theme={p.theme} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
+          {(size) => (
+            <Stage
+              viewportOverride={device === 'mobile' ? null : size}
+              project={project}
+              state={state}
+              theme={p.theme}
+              camera={camera}
+              sceneId={plan.sceneId}
+              zoom={{ resetKey: zoomReset, onApi: onZoomApi, onChange: (v) => setUserZoom(v ? v.k : null) }}
+              mode="demo"
+              selectedId={p.selectedId ?? null}
+              preview={snap.preview}
+              epoch={snap.epoch}
+              animate={!ctl.reducedMotion}
+              nextTargetId={nextTargetId}
+              onNodeClick={(id, pt, o) => (o.inspect && p.onInspect ? p.onInspect(id) : void ctl.clickNode(id, pt))}
+              stageRef={(el) => {
+                ctl.setStageEl(el);
+                setStageEl(el);
+              }}
+              overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />}
+            />
+          )}
+        </StageViewport>
+      ) : (
+        <div className="flex flex-1 items-center justify-center p-8 text-center text-[14px] text-[#6b6b6b]" data-testid="no-scene">
+          这个方案还没有可显示的画面。
+        </div>
+      )}
+      {state && shownScene ? (
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-lg bg-white/90 p-1 shadow-sm ring-1 ring-black/5" role="toolbar" aria-label="缩放" data-testid="zoom-bar" data-zoom={userZoom === null ? 'camera' : userZoom.toFixed(2)}>
+          <Btn icon={<Minus className="size-4" />} label="缩小（滚轮 / 捏合也可以）" iconOnly size={32} variant="ghost" onClick={() => zoomApi.current?.zoomBy(1 / 1.25)} data-testid="zoom-out" />
+          <Btn icon={<Plus className="size-4" />} label="放大（滚轮 / 捏合也可以）" iconOnly size={32} variant="ghost" onClick={() => zoomApi.current?.zoomBy(1.25)} data-testid="zoom-in" />
+          <Btn icon={<Maximize className="size-4" />} label="适应画面" title="回到镜头的画面（取消手动缩放与平移）" size={32} variant="ghost" onClick={() => zoomApi.current?.fit()} disabled={userZoom === null} data-testid="zoom-fit" />
+          <Btn
+            icon={full ? <Shrink className="size-4" /> : <Expand className="size-4" />}
+            label={full ? '退出全屏（Esc）' : '全屏（F）'}
+            iconOnly
+            size={32}
+            variant="ghost"
+            onClick={(e) => {
+              e.currentTarget.blur();
+              toggleFull();
+            }}
+            data-testid="fullscreen"
+          />
+        </div>
       ) : null}
-      <button
-        type="button"
-        aria-pressed={director}
-        onClick={() => p.onLayer(director ? viewLayer : null)}
-        data-testid="director"
-        title={director ? '导演跟随每一步切换层级与镜头；点一下改为手动' : '恢复导演：回到这一步的导演层'}
-        className={cn('flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[13px]', director ? 'border-[#1e1e1e] bg-[#1e1e1e] text-white' : 'bg-white text-[#3a3a3a] hover:bg-[#f8f9fa]')}
-      >
-        <Clapperboard className="size-3.5" />
-        导演{director ? '跟随' : '已暂停'}
-      </button>
-    </>
+      {p.stageHint && !full ? <div className="pointer-events-none absolute bottom-3 right-3 whitespace-nowrap text-[12px] text-[#868e96]" data-testid="stage-hint">{p.stageHint}</div> : null}
+      {p.flash ? (
+        <div role="status" className="absolute left-1/2 top-3 z-20 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#1e1e1e] px-3 py-2 text-[14px] text-white shadow" data-testid="flash">
+          {p.flash}
+        </div>
+      ) : null}
+    </div>
   );
 
+  if (full)
+    return (
+      // 全屏：画面 / 字幕 / 控制条三段，上下排列。控制条那一行（64px）始终保留：淡出时只是变透明，画面与镜头尺寸不变、不跳动
+      <div ref={rootRef} className="flex h-screen w-screen flex-col bg-[#111]" data-view={snap.view} data-fullscreen="" onMouseMove={idle.poke} style={idle.visible ? undefined : { cursor: 'none' }}>
+        <main className="flex min-h-0 flex-1 flex-col" data-inspecting={inspecting ? '' : undefined}>
+          {stageBlock}
+        </main>
+        {scenario ? <Subtitle content={subtitle} theme={p.theme} framed dark /> : null}
+        <div ref={barRowRef} className="flex h-16 shrink-0 items-center justify-center px-6">
+          {scenario ? (
+            <div className={cn('flex max-w-full justify-center transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')} data-visible={idle.visible ? '' : undefined} onMouseMove={idle.poke}>
+              <FullscreenBar snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} layers={useCam ? layers : []} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} onDirector={toggleDirector} onExit={toggleFull} avail={barRowW - 48} />
+            </div>
+          ) : null}
+        </div>
+        {p.drawer}
+      </div>
+    );
+
   return (
-    <div ref={rootRef} className={cn('flex h-full flex-col', full ? 'bg-black' : 'bg-[#f8f9fa]')} data-view={snap.view} data-fullscreen={full ? '' : undefined} onMouseMove={full ? idle.poke : undefined} style={full && !idle.visible ? { cursor: 'none' } : undefined}>
-      {full ? null : (
-        <TopBar>
-          <Brand onClick={p.onBrand} />
-          <Breadcrumbs crumbs={p.crumbs} />
-        </TopBar>
-      )}
+    <div ref={rootRef} className="flex h-full flex-col bg-[#f8f9fa]" data-view={snap.view}>
+      <TopBar>
+        <Brand onClick={p.onBrand} />
+        <Breadcrumbs crumbs={p.crumbs} />
+      </TopBar>
       <div className="flex min-h-0 flex-1">
-        {full ? null : (
-          <aside className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r bg-white p-3" data-testid="left-nav">
-            {p.nav}
-          </aside>
-        )}
-        <main className={cn('flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden', full ? 'gap-0 p-0' : 'gap-2 p-3')} data-inspecting={inspecting ? '' : undefined}>
-          {full ? null : p.banner}
+        <aside className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r bg-white p-3" data-testid="left-nav">
+          {p.nav}
+        </aside>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden p-3" data-inspecting={inspecting ? '' : undefined}>
+          {p.banner}
           {snap.playbackError ? (
-            <div role="alert" className="rounded-md border border-[#b35c00] bg-[#fff8ee] px-3 py-1.5 text-[13px] text-[#8a4700]" data-testid="playback-error">
+            <div role="alert" className="rounded-md border border-[#b35c00] bg-[#fff8ee] px-3 py-2 text-[14px] text-[#8a4700]" data-testid="playback-error">
               <strong>演示回放出错：</strong>
               {snap.playbackError}
             </div>
           ) : null}
-          {useCam && layers.length > 1 && !full ? (
-            <div className="flex shrink-0 items-center gap-2" data-testid="layer-bar">
-              {layerSwitch}
-              <button type="button" onClick={replayLayer} data-testid="replay-layer" className="flex h-8 items-center gap-1 rounded-md border bg-white px-2.5 text-[13px] hover:bg-[#f8f9fa]" title="从第 0 步开始，只用这一层的镜头播放；这一层没有变化的步骤快速带过">
-                ↻ 只重放这一层
-              </button>
+          {hasLayerBar ? (
+            <div ref={layerBarRef} className="flex h-8 shrink-0 items-center gap-2 overflow-hidden" data-testid="layer-bar" data-collapsed={[...lc].join(' ') || undefined}>
+              <LayerSwitch layers={layers} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} collapsed={lc.has('layers')} tone="light" />
+              <DirectorTag on={director} layerTitle={currentLayer} onToggle={toggleDirector} />
+              <Btn icon={<RotateCw className="size-4" />} label="只重放这一层" title="从第 0 步开始，只用这一层的镜头播放；这一层没有变化的步骤快速带过" iconOnly={lc.has('replay')} size={32} onClick={replayLayer} data-testid="replay-layer" />
             </div>
           ) : null}
-          <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white', !full && 'rounded-xl border')} data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
-            {state && shownScene ? (
-              <StageViewport viewport={device} theme={p.theme} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
-                {(size) => (
-                <Stage
-                  viewportOverride={device === 'mobile' ? null : size}
-                  project={project}
-                  state={state}
-                  theme={p.theme}
-                  camera={camera}
-                  sceneId={plan.sceneId}
-                  zoom={{ resetKey: zoomReset, onApi: onZoomApi, onChange: (v) => setUserZoom(v ? v.k : null) }}
-                  mode="demo"
-                  selectedId={p.selectedId ?? null}
-                  preview={snap.preview}
-                  epoch={snap.epoch}
-                  animate={!ctl.reducedMotion}
-                  nextTargetId={nextTargetId}
-                  onNodeClick={(id, pt, o) => (o.inspect && p.onInspect ? p.onInspect(id) : void ctl.clickNode(id, pt))}
-                  stageRef={(el) => {
-                    ctl.setStageEl(el);
-                    setStageEl(el);
-                  }}
-                  overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={nextTargetId} setCursorEl={ctl.setCursorEl} onBackToDemo={() => ctl.backToDemo()} onDismiss={() => ctl.dismissNotice()} />}
-                />
-                )}
-              </StageViewport>
-            ) : (
-              <div className="flex flex-1 items-center justify-center p-8 text-center text-[14px] text-[#6b6b6b]" data-testid="no-scene">
-                这个方案还没有可显示的画面。
-              </div>
-            )}
-            {state && shownScene ? (
-              <div className="absolute right-3 top-2 z-10 flex items-center gap-1" role="toolbar" aria-label="缩放" data-testid="zoom-bar" data-zoom={userZoom === null ? 'camera' : userZoom.toFixed(2)}>
-                <button type="button" aria-label="缩小" title="缩小（滚轮 / 捏合也可以）" onClick={() => zoomApi.current?.zoomBy(1 / 1.25)} data-testid="zoom-out" className="flex size-7 items-center justify-center rounded-md border bg-white text-[#3a3a3a] hover:bg-[#f8f9fa]">
-                  <Minus className="size-3.5" />
-                </button>
-                <button type="button" aria-label="放大" title="放大（滚轮 / 捏合也可以）" onClick={() => zoomApi.current?.zoomBy(1.25)} data-testid="zoom-in" className="flex size-7 items-center justify-center rounded-md border bg-white text-[#3a3a3a] hover:bg-[#f8f9fa]">
-                  <Plus className="size-3.5" />
-                </button>
-                <button type="button" title="回到镜头的画面（取消手动缩放与平移）" onClick={() => zoomApi.current?.fit()} data-testid="zoom-fit" disabled={userZoom === null} className="flex h-7 items-center gap-1 rounded-md border bg-white px-2 text-[12px] text-[#3a3a3a] hover:bg-[#f8f9fa] disabled:opacity-40">
-                  <Maximize className="size-3.5" />
-                  适应画面
-                </button>
-                <button type="button" aria-label={full ? '退出全屏' : '全屏'} title={full ? '退出全屏（Esc）' : '全屏（F）'} onClick={(e) => {
-                    e.currentTarget.blur();
-                    toggleFull();
-                  }} data-testid="fullscreen" className="flex size-7 items-center justify-center rounded-md border bg-white text-[#3a3a3a] hover:bg-[#f8f9fa]">
-                  {full ? <Shrink className="size-3.5" /> : <Expand className="size-3.5" />}
-                </button>
-              </div>
-            ) : null}
-            {p.stageHint && !full ? <div className="pointer-events-none absolute bottom-2 right-3 text-[12px] text-[#9a9a9a]" data-testid="stage-hint">{p.stageHint}</div> : null}
-            {full && scenario ? (
-              // 全屏：播放控制浮在画面下方；鼠标静止约 2.5 秒后淡出，移动鼠标重新出现
-              <div
-                className={cn('absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-[rgba(30,30,30,0.82)] px-3 py-2 shadow-lg transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')}
-                role="toolbar"
-                aria-label="全屏播放控制"
-                data-testid="fullscreen-controls"
-                data-visible={idle.visible ? '' : undefined}
-                onMouseMove={idle.poke}
-              >
-                <FloatingControls snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} />
-                {useCam && layers.length > 1 ? <div className="ml-2 flex items-center gap-2 border-l border-white/20 pl-3">{layerSwitch}</div> : null}
-              </div>
-            ) : null}
-            {p.flash ? (
-              <div role="status" className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-md bg-[#1e1e1e] px-3 py-1.5 text-[13px] text-white shadow" data-testid="flash">
-                {p.flash}
-              </div>
-            ) : null}
-          </div>
+          {stageBlock}
           {/* 字幕区：画面下方、播放控制上方，不叠在画面上 */}
-          {scenario ? <Subtitle content={subtitle} theme={p.theme} framed={full} dark={full} /> : null}
-          {full ? null : <Controls snap={snap} scenario={scenario} ctl={ctl} menu={p.menu} speed={speed} onSpeed={p.onSpeed} />}
-          {scenario && !full ? <StepStrip snap={snap} scenario={scenario} ctl={ctl} /> : null}
+          {scenario ? <Subtitle content={subtitle} theme={p.theme} /> : null}
+          <Controls snap={snap} scenario={scenario} ctl={ctl} menu={p.menu} speed={speed} onSpeed={p.onSpeed} />
+          {scenario ? <StepStrip snap={snap} scenario={scenario} ctl={ctl} /> : null}
         </main>
       </div>
       {p.drawer}

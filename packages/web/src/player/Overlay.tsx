@@ -79,7 +79,7 @@ export function Overlay({
       ) : null}
 
       {snap.preview && prevBox ? (
-        <div className="absolute rounded bg-[var(--focus)] px-2 py-0.5 text-[13px] font-medium text-white" style={{ left: prevBox.x + prevBox.w - 76, top: prevBox.y - 6 }} data-joverlay="sample">
+        <div className="absolute whitespace-nowrap rounded bg-[var(--focus)] px-2 py-0.5 text-[13px] font-medium text-white" style={{ left: prevBox.x + prevBox.w - 76, top: prevBox.y - 6 }} data-joverlay="sample">
           示例输入
         </div>
       ) : null}
@@ -132,11 +132,11 @@ function NoticeBubble({ anchor, W, H, kind, text, onBack, onDismiss }: { anchor:
       <div className="leading-snug text-[#1e1e1e]">{text}</div>
       <div className="mt-2 flex justify-end gap-2">
         {kind === 'uncovered' ? (
-          <button type="button" className="rounded border border-[#b35c00] bg-white px-2.5 py-1 text-[15px] text-[#b35c00] hover:bg-[#fff1dd]" onClick={onBack}>
+          <button type="button" className="whitespace-nowrap rounded border border-[#b35c00] bg-white px-2.5 py-1 text-[15px] text-[#b35c00] hover:bg-[#fff1dd]" onClick={onBack}>
             回到演示
           </button>
         ) : null}
-        <button type="button" className="rounded px-2.5 py-1 text-[15px] text-[#6b6b6b] hover:bg-black/5" onClick={onDismiss}>
+        <button type="button" className="whitespace-nowrap rounded px-2.5 py-1 text-[15px] text-[#6b6b6b] hover:bg-black/5" onClick={onDismiss}>
           知道了
         </button>
       </div>

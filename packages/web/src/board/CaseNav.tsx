@@ -72,17 +72,17 @@ export function CaseNav({
           items={options.map((o) => ({ value: o.id, label: <span className="truncate">{o.name}{f.pick === o.id ? ' ✓' : ''}</span>, title: o.name, testid: `option-${o.id}` }))}
         />
       ) : options[0] ? (
-        <div className="truncate rounded-lg bg-[#f1f3f5] px-3 py-1.5 text-[13px] font-semibold" title={options[0].name}>
+        <div className="truncate rounded-lg bg-[#f1f3f5] px-3 py-2 text-[14px] font-semibold" title={options[0].name}>
           {options[0].name}
         </div>
       ) : (
-        <div className="text-[13px] text-[#6b6b6b]">这个功能还没有方案。</div>
+        <div className="text-[14px] text-[#6b6b6b]">这个功能还没有方案。</div>
       )}
       <div className="mt-3 flex items-center gap-2 text-[12px] text-[#6b6b6b]">
         情况
         <span className="h-px flex-1 bg-[#e9ecef]" />
       </div>
-      {f.caseIds.length === 0 ? <p className="px-2 text-[13px] text-[#6b6b6b]">功能还没有列出情况。</p> : null}
+      {f.caseIds.length === 0 ? <p className="px-2 text-[14px] text-[#6b6b6b]">功能还没有列出情况。</p> : null}
       <ul className="flex flex-col gap-0.5">
         {f.caseIds.map((cid) => {
           const c = project.cases[cid];

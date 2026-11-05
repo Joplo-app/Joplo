@@ -9,9 +9,9 @@
  */
 import type { PlayState, Scenario } from '@tokenroll/joplo-core';
 
-export const SUBTITLE_CAPTION_PX = 22;
+export const SUBTITLE_CAPTION_PX = 20;
 export const SUBTITLE_EXPLAIN_PX = 16;
-export const SUBTITLE_PAD_Y = 10;
+export const SUBTITLE_PAD_Y = 12;
 const CAPTION_LINE = Math.ceil(SUBTITLE_CAPTION_PX * 1.35);
 const EXPLAIN_LINE = Math.ceil(SUBTITLE_EXPLAIN_PX * 1.5);
 const GAP = 2;
