@@ -1,6 +1,6 @@
 {
   "name": "joplo",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Joplo 命令入口：npx joplo init / dev / check / build。转发到项目内安装的 @joplo-app/cli",
   "license": "Apache-2.0",
   "bin": {
