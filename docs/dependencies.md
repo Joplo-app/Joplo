@@ -23,3 +23,8 @@
 | playwright | 1.64.1 | Apache-2.0 | @joplo/server：renderStep 截图（chromium 修订 1248） |
 | @playwright/test | 1.64.1 | Apache-2.0 | @joplo/web：浏览器测试 |
 | @types/react / @types/react-dom | 19.3.0 | MIT | 类型 |
+| commander | 15.0.0 | MIT | T-core：CLI 命令与参数解析 |
+| @modelcontextprotocol/sdk | 1.32.2 | MIT | T-core：官方 MCP stdio server/client；协议 2025-11-25 |
+| proper-lockfile | 4.1.2 | MIT | T-core：跨进程排他锁、心跳与陈旧锁恢复 |
+| @types/proper-lockfile | 4.1.4 | MIT | T-core：锁库 TypeScript 类型（开发依赖） |
+| fs-native-extensions | 1.5.3 | Apache-2.0 | T-core 评审修复：内核文件锁保护租约命名空间与同步提交/恢复，含平台预构建二进制 |

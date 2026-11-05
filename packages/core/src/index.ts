@@ -2,3 +2,8 @@ export * from './catalog.ts';
 export * from './schema.ts';
 export * from './result.ts';
 export * from './player.ts';
+export * from './ops.ts';
+export * from './store.ts';
+export * from './validate.ts';
+export * from './scope.ts';
+export * from './guide.ts';

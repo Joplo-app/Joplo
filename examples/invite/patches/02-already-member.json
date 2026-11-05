@@ -1,0 +1,177 @@
+{
+  "expectRevision": 2,
+  "idempotencyKey": "invite_already_member_v1",
+  "summary": "补充已是成员的待确认演示",
+  "operations": [
+    {
+      "op": "upsertRule",
+      "value": {
+        "id": "rule_already_member",
+        "featureId": "feat_invite",
+        "optionId": "opt_a",
+        "text": "被邀请人已是成员时不创建重复邀请，保留输入并就地说明",
+        "origin": "ai_assumption",
+        "confirmation": "pending",
+        "caseIds": ["case_already_member"],
+        "elementRefs": ["scene_a_members#alert_send_error"],
+        "stepIds": ["am_5"]
+      }
+    },
+    {
+      "op": "upsertScenario",
+      "value": {
+        "id": "sc_a_already_member",
+        "optionId": "opt_a",
+        "name": "被邀请人已经是成员",
+        "description": "AI 假设：提示已是成员，不重复创建邀请，等待用户确认",
+        "caseIds": ["case_already_member"],
+        "mock": {
+          "label": "模拟已是成员",
+          "outcome": "other"
+        },
+        "initial": {
+          "sceneId": "scene_a_members",
+          "ui": {
+            "isAdmin": true,
+            "inviteOpen": false,
+            "sending": false,
+            "error": ""
+          },
+          "data": {
+            "members": [
+              {
+                "name": "王芳",
+                "email": "wang.fang@example.com",
+                "role": "管理员",
+                "status": "已加入"
+              },
+              {
+                "name": "陈晨",
+                "email": "chen.chen@example.com",
+                "role": "编辑者",
+                "status": "已加入"
+              },
+              {
+                "name": "刘洋",
+                "email": "liu.yang@example.com",
+                "role": "查看者",
+                "status": "已加入"
+              }
+            ],
+            "pending": [
+              {
+                "email": "zhao.lei@example.com",
+                "role": "查看者",
+                "status": "待接受"
+              }
+            ]
+          },
+          "inputs": {}
+        },
+        "steps": [
+          {
+            "id": "am_1",
+            "kind": "user",
+            "action": {
+              "type": "click",
+              "target": "btn_invite"
+            },
+            "caption": "管理员点击右上角「邀请成员」，打开邀请弹窗",
+            "effects": [
+              {
+                "type": "set",
+                "path": "ui.inviteOpen",
+                "value": true
+              }
+            ],
+            "ruleIds": ["rule_already_member"]
+          },
+          {
+            "id": "am_2",
+            "kind": "user",
+            "action": {
+              "type": "type",
+              "target": "in_email",
+              "value": "wang.fang@example.com"
+            },
+            "caption": "输入被邀请人的邮箱",
+            "effects": [],
+            "ruleIds": ["rule_already_member"]
+          },
+          {
+            "id": "am_3",
+            "kind": "user",
+            "action": {
+              "type": "select",
+              "target": "sel_role",
+              "value": "编辑者"
+            },
+            "caption": "选择权限「编辑者」",
+            "effects": [],
+            "ruleIds": ["rule_already_member"]
+          },
+          {
+            "id": "am_4",
+            "kind": "user",
+            "action": {
+              "type": "click",
+              "target": "btn_send"
+            },
+            "caption": "点击「发送邀请」，按钮进入发送中状态",
+            "effects": [
+              {
+                "type": "set",
+                "path": "ui.sending",
+                "value": true
+              }
+            ],
+            "ruleIds": ["rule_already_member"]
+          },
+          {
+            "id": "am_5",
+            "kind": "system",
+            "action": {
+              "type": "event",
+              "name": "already_member"
+            },
+            "caption": "已是成员，保留输入并提示",
+            "effects": [
+              {
+                "type": "set",
+                "path": "ui.sending",
+                "value": false
+              },
+              {
+                "type": "set",
+                "path": "ui.error",
+                "value": "此邮箱已经是空间成员，无需再次邀请"
+              },
+              {
+                "type": "toast",
+                "text": "此邮箱已经是成员",
+                "tone": "info"
+              },
+              {
+                "type": "complete",
+                "text": "没有重复创建邀请",
+                "outcome": "cancelled"
+              }
+            ],
+            "ruleIds": ["rule_already_member"]
+          }
+        ],
+        "expected": "显示已是成员，不添加邀请，保留输入以便更换邮箱"
+      }
+    },
+    {
+      "op": "setCoverage",
+      "optionId": "opt_a",
+      "caseId": "case_already_member",
+      "value": {
+        "status": "expressed",
+        "scenarioIds": ["sc_a_already_member"],
+        "reason": "行为为 AI 待确认假设；原问题保留 open"
+      }
+    }
+  ]
+}
