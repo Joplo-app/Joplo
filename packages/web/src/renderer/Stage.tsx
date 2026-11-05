@@ -3,6 +3,7 @@
  * 不 portal 到 document.body，因此截图、元素索引与遮挡检查都只看舞台本身。
  */
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { CameraLayer, useCamera, type CameraSpec } from './camera';
 import { AnimatePresence, motion } from 'motion/react';
 import { VIEWPORT_SIZE, type PlayState, type Project, type Toast } from '@tokenroll/joplo-core';
 import { RenderContext, RenderNode, type RenderMode } from './components';
@@ -51,15 +52,18 @@ export type StageProps = {
   onNodeClick?: (nodeId: string, point: { x: number; y: number }, opts: { inspect: boolean }) => void;
   stageRef?: (el: HTMLDivElement | null) => void;
   overlay?: ReactNode;
-  /** 预览宽度：覆盖页面自身的 viewport（看板的“桌面 / 手机”切换、renderStep 的 viewport）。 */
+  /** 预览宽度：覆盖页面自身的 viewport（目录画廊等测试用；D44 起看板不再切换设备）。 */
   viewportOverride?: Viewport | { width: number; height: number } | null;
+  /** 镜头（D43）：对准某一层 / 某些元素；null = 不用镜头（整页按舞台显示）。 */
+  camera?: CameraSpec | null;
 };
 
-export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null }: StageProps) {
+export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null }: StageProps) {
   const scene = project.scenes[state.sceneId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[viewportOf(project, state)];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const cam = useCamera(camera, { width: vp.width, height: vp.height, animate, deps: [state, scene] });
 
   const toFramePoint = (clientX: number, clientY: number) => {
     const el = rootRef.current;
@@ -105,16 +109,20 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         onClick={onClick}
         onKeyDown={onKeyDown}
       >
-        {scene ? (
-          <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width }}>
-            <div className="absolute inset-0">
-              <RenderNode node={scene.root} />
-            </div>
-          </RenderContext.Provider>
-        ) : (
-          <div className="flex h-full items-center justify-center text-[#c92a2a]">画面不存在：{state.sceneId}</div>
-        )}
-        <div ref={setDialogLayer} className="pointer-events-none absolute inset-0 z-20 [&>*]:pointer-events-auto" data-jlayer="dialog" />
+        {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
+        <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
+          {scene ? (
+            <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, camera: !!camera }}>
+              <div className="absolute inset-0" ref={cam.contentRef}>
+                <RenderNode node={scene.root} />
+              </div>
+            </RenderContext.Provider>
+          ) : (
+            <div className="flex h-full items-center justify-center text-[#c92a2a]">画面不存在：{state.sceneId}</div>
+          )}
+          <div ref={setDialogLayer} className="pointer-events-none absolute inset-0 z-20 [&>*]:pointer-events-auto" data-jlayer="dialog" />
+          {camera ? <CameraLayer view={cam.view} animate={animate} pulseKey={camera.key} /> : null}
+        </div>
         <ToastLayer key={epoch} toasts={state.toasts} nextTargetId={nextTargetId} animate={animate} rootRef={rootRef} />
         {overlay ? <div className="pointer-events-none absolute inset-0 z-40" data-jlayer="overlay">{overlay}</div> : null}
       </div>

@@ -36,6 +36,7 @@ export type RenderOptions = {
   theme?: 'sketch' | 'clean';
   out: string;
   overwrite?: boolean;
+  /** 截图尺寸（D44）：舞台宽度仍是页面自己的 viewport，按比例放进这个尺寸。缺省为舞台尺寸。 */
   viewport?: { width: number; height: number };
   scale?: number;
 };

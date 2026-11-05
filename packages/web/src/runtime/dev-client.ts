@@ -155,7 +155,8 @@ export async function openInEditor(projectId: string, at: string): Promise<{ ok:
   }
 }
 
-export type ExportRequest = { scenarioId: string; position: number; device: 'desktop' | 'mobile'; theme: 'sketch' | 'clean' };
+/** 导出跟随页面自己的 viewport（D44：不再选择设备）。 */
+export type ExportRequest = { scenarioId: string; position: number; theme: 'sketch' | 'clean' };
 
 /** 本机导出图片：服务端用 Playwright 渲染当前步骤（与 joplo render 同一渲染路径）。 */
 export async function exportImage(projectId: string, body: ExportRequest): Promise<{ ok: true; blob: Blob; name: string } | { ok: false; message: string }> {

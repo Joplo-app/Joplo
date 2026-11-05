@@ -12,7 +12,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "web:dev": "pnpm --filter @tokenroll/joplo-web dev",
     "web:build": "pnpm --filter @tokenroll/joplo-web build",
-    "test:e2e": "pnpm --filter @tokenroll/joplo-web test:e2e",
     "web:serve": "tsx packages/server/scripts/serve.ts",
     "docs:screenshots": "tsx packages/server/scripts/render-docs.ts",
     "build:packages": "pnpm -r --filter \"./packages/*\" run build",

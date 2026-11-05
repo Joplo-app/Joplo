@@ -19,12 +19,7 @@
   },
   "include": [
     "src",
-    "e2e",
     "test",
-    "vite.config.ts",
-    "playwright.config.ts"
-  ],
-  "exclude": [
-    "e2e/fixtures"
+    "vite.config.ts"
   ]
 }

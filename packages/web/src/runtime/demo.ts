@@ -74,6 +74,7 @@ export const TIMING = {
   afterStep: 300,
   gap: 350,
   reducedStep: 450,
+  quickStep: 300,
 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -366,26 +367,47 @@ export class DemoController {
     else this.pause();
   }
 
-  async play() {
+  /**
+   * 自动播放。opts.fromStart：从第 0 步开始；opts.fast(i)：第 i 步快速带过（约 300ms，不移动鼠标、不逐字输入），
+   * 用于“只重放这一层”时跳过这一层没有变化的步骤。
+   */
+  async play(opts: { fromStart?: boolean; fast?: (index: number) => boolean } = {}) {
     const p = this.snap.project;
     const sc = this.scenario();
     if (!p || !sc || !this.snap.state || this.snap.view !== 'stage') return;
     this.stop();
     if (sc.steps.length === 0) return this.info('这个场景没有步骤：只展示初始状态');
-    if (this.snap.state.completed || this.snap.state.position >= sc.steps.length) {
+    if (opts.fromStart || this.snap.state.completed || this.snap.state.position >= sc.steps.length) {
       const r = this.safeStateAt(p, sc.id, 0);
-      this.set({ state: r.state, playbackError: r.error });
+      this.set({ state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1 });
     }
+    this.fast = opts.fast ?? null;
     const gen = this.gen;
     this.set({ playing: true, paused: false, busy: true, cursorVisible: !this.reducedMotion, notice: null });
     while (gen === this.gen) {
       const st = this.snap.state;
       if (!st || st.completed || st.position >= sc.steps.length) break;
-      const ok = await this.runStep(sc, gen, { moveCursor: true });
+      const quick = !!this.fast?.(st.position);
+      const ok = quick ? await this.runQuick(sc, gen) : await this.runStep(sc, gen, { moveCursor: true });
       if (!ok || gen !== this.gen) return;
-      await this.wait(TIMING.gap, gen);
+      await this.wait(quick ? 0 : TIMING.gap, gen);
     }
+    this.fast = null;
     if (gen === this.gen) this.set({ playing: false, paused: false, busy: false });
+  }
+
+  private fast: ((index: number) => boolean) | null = null;
+
+  /** 快速带过一步（约 300ms）：不移动鼠标、不逐字输入。 */
+  private async runQuick(sc: Scenario, gen: number): Promise<boolean> {
+    const st = this.snap.state;
+    if (!st) return false;
+    this.inflight = { index: st.position };
+    this.set({ activeStep: st.position });
+    if (!(await this.wait(TIMING.quickStep, gen))) return false;
+    if (gen !== this.gen || !this.commit(sc)) return false;
+    if (gen === this.gen) this.set({ systemEvent: null, activeStep: null, ripple: null });
+    return true;
   }
 
   pause() {

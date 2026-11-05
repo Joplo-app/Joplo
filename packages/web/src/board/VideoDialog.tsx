@@ -1,18 +1,15 @@
 /**
- * 导出视频（只在本机看板）：选尺寸 → 开始 → SSE 进度 → 完成后给出文件位置；失败说明原因（含安装命令）并可重试。
- * 同一项目已有任务时，服务端返回 409，这里接上那个任务的进度。
+ * 导出视频（只在本机看板）：开始 → SSE 进度 → 完成后给出文件位置；失败说明原因（含安装命令）并可重试。
+ * 尺寸跟随页面自己的 viewport（D44：不再选择设备）。同一项目已有任务时，服务端返回 409，这里接上那个任务的进度。
  */
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { startVideo, watchVideo, type VideoJob } from '../runtime/dev-client';
-import type { Device } from '../runtime/route';
 import type { StageTheme } from '../renderer/rough';
-import { Segmented } from '../player/PlayerPage';
 
 const PHASE: Record<VideoJob['phase'], string> = { starting: '正在启动浏览器…', recording: '正在录制', saving: '正在保存…', done: '已完成', error: '失败' };
 
-export function VideoDialog({ projectId, scenarioId, scenarioName, device: initial, theme, onClose }: { projectId: string; scenarioId: string; scenarioName: string; device: Device; theme: StageTheme; onClose: () => void }) {
-  const [device, setDevice] = useState<Device>(initial);
+export function VideoDialog({ projectId, scenarioId, scenarioName, theme, onClose }: { projectId: string; scenarioId: string; scenarioName: string; theme: StageTheme; onClose: () => void }) {
   const [job, setJob] = useState<VideoJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [watching, setWatching] = useState(0);
@@ -29,7 +26,7 @@ export function VideoDialog({ projectId, scenarioId, scenarioName, device: initi
   const running = job?.status === 'running';
   const start = async () => {
     setError(null);
-    const r = await startVideo(projectId, { scenarioId, device, theme });
+    const r = await startVideo(projectId, { scenarioId, theme });
     if (r.ok) setJob(r.job);
     else if (r.job) setJob(r.job);
     else return setError(r.message);
@@ -45,28 +42,13 @@ export function VideoDialog({ projectId, scenarioId, scenarioName, device: initi
             <X className="size-4" />
           </button>
         </div>
-        <p className="mb-3 text-[13px] text-[#6b6b6b]">录制「{scenarioName}」的自动播放（含鼠标与字幕），保存到项目的 exports/ 目录。</p>
-        <div className="mb-4">
-          <div className="mb-1 text-[13px] font-medium">尺寸</div>
-          <Segmented<Device>
-            full
-            label="尺寸"
-            value={device}
-            onChange={(d) => !running && setDevice(d)}
-            items={[
-              { value: 'desktop', label: '电脑 1280×800', testid: 'video-desktop' },
-              { value: 'mobile', label: '手机 390×844', testid: 'video-mobile' },
-            ]}
-          />
-        </div>
+        <p className="mb-4 text-[13px] text-[#6b6b6b]">录制「{scenarioName}」的自动播放（含鼠标、字幕、层级切换与聚焦），尺寸跟随页面，保存到项目的 exports/ 目录。</p>
         {job && (job.status === 'running' || job.status === 'done') ? (
           <div className="mb-4" data-testid="video-progress" data-status={job.status}>
             <div className="h-2 overflow-hidden rounded-full bg-[#f1f3f5]">
               <div className="h-full rounded-full bg-[#1e1e1e] transition-[width]" style={{ width: `${job.percent}%` }} />
             </div>
-            <div className="mt-1 text-[13px] text-[#6b6b6b]">
-              {job.phase === 'recording' ? `正在录制第 ${job.step} / ${job.total} 步…` : PHASE[job.phase]}
-            </div>
+            <div className="mt-1 text-[13px] text-[#6b6b6b]">{job.phase === 'recording' ? `正在录制第 ${job.step} / ${job.total} 步…` : PHASE[job.phase]}</div>
           </div>
         ) : null}
         {job?.status === 'done' && job.file ? (

@@ -231,7 +231,7 @@ describe('导出', () => {
   });
 
   it('图片：没有 Playwright 时 503，错误里带安装命令；参数不对 400；没令牌 403', async () => {
-    const body = JSON.stringify({ scenarioId: 'invite.a-modal.success', position: 1, device: 'mobile' });
+    const body = JSON.stringify({ scenarioId: 'invite.a-modal.success', position: 1 });
     expect((await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/image`, headers: { 'content-type': 'application/json' }, body })).status).toBe(403);
     expect((await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/image`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'nope' }) })).status).toBe(400);
     expect((await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/image`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'invite.a-modal.success', position: 99 }) })).status).toBe(400);
@@ -241,7 +241,7 @@ describe('导出', () => {
   });
 
   it('视频：202 → SSE 进度 → 写入 <项目>/exports/*.webm；同一项目同时只有一个任务（409）', async () => {
-    const body = JSON.stringify({ scenarioId: 'invite.a-modal.success', device: 'desktop' });
+    const body = JSON.stringify({ scenarioId: 'invite.a-modal.success' });
     const r = await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/video`, headers: json(hub.token), body });
     expect(r.status).toBe(202);
     expect(calls[0]!.url).toContain(`project=${id}`);

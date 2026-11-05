@@ -7,6 +7,7 @@ import type { Notice } from '../runtime/demo';
 import { VIEWPORTS, type Viewport } from '../renderer/Stage';
 import { PhoneFrame, phoneFrameSize } from '../renderer/components';
 import { ThemeContext, type StageTheme } from '../renderer/rough';
+import { fitStage } from './fit';
 
 export function StageViewport({ viewport, notice, onDismiss, children, tag, theme = 'sketch' }: { viewport: Viewport; notice: Notice | null; onDismiss: () => void; children: ReactNode; tag?: ReactNode; theme?: StageTheme }) {
   const box = useRef<HTMLDivElement>(null);
@@ -22,8 +23,7 @@ export function StageViewport({ viewport, notice, onDismiss, children, tag, them
   const vp = VIEWPORTS[viewport];
   const phone = viewport === 'mobile';
   const frame = phone ? phoneFrameSize(vp.width, vp.height) : vp;
-  const pad = 12;
-  const scale = Math.max(0.2, Math.min((avail.w - pad * 2) / frame.width, (avail.h - pad * 2) / frame.height, 1.5));
+  const scale = fitStage(avail, frame);
   const floating = notice && !('nodeId' in notice) ? notice : null;
   return (
     <div ref={box} className="relative min-h-0 flex-1 overflow-hidden" data-testid="stage-viewport" data-scale={scale.toFixed(3)} data-device={viewport}>

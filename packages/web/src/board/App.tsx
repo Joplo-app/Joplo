@@ -9,9 +9,8 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { Diagnostic } from '@tokenroll/joplo-core';
 import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
-import { boardHash, parseBoardHash, type BoardRoute, type Device, type PlayRoute } from '../runtime/route';
+import { boardHash, parseBoardHash, type BoardRoute, type PlayRoute } from '../runtime/route';
 import type { StageTheme } from '../renderer/rough';
-import { viewportOf } from '../renderer/Stage';
 import { PlayerPage, type MenuItem } from '../player/PlayerPage';
 import { usePlaySync } from '../player/playRoute';
 import { copyText, downloadBlob, useFlash, useHash } from '../player/util';
@@ -98,7 +97,6 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
   const option = resolved.optionId ? project.options[resolved.optionId] : null;
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
   const state = snap.state;
-  const device: Device = play.device ?? (state ? viewportOf(project, state) : 'desktop');
   const setTheme = (t: StageTheme) => {
     setThemeState(t);
     localStorage.setItem(THEME_KEY, t);
@@ -119,7 +117,7 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
       onClick: () => {
         if (!scenario || !state) return;
         setFlash('正在生成图片…');
-        void exportImage(projectId, { scenarioId: scenario.id, position: state.position, device, theme }).then((r) => {
+        void exportImage(projectId, { scenarioId: scenario.id, position: state.position, theme }).then((r) => {
           if (r.ok) {
             downloadBlob(r.blob, r.name);
             setFlash(`已下载 ${r.name}`);
@@ -171,8 +169,11 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
           { label: option?.name ?? '（没有方案）', testid: 'crumb-option' },
           { label: gap ? '（缺口）' : (scenario?.name ?? '静态画面'), testid: 'crumb-scenario' },
         ]}
-        device={device}
-        onDevice={(d) => toPlay({ ...play, device: d }, true)}
+        layer={play.layer ?? null}
+        onLayer={(l) => {
+          const { layer: _l, ...rest } = play;
+          toPlay(l ? { ...rest, layer: l } : rest, true);
+        }}
         theme={theme}
         nav={
           <CaseNav
@@ -181,9 +182,9 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
             optionId={resolved.optionId}
             caseId={resolved.caseId}
             scenarioId={snap.scenarioId}
-            onOption={(id) => toPlay({ featureId: feature.id, optionId: id, ...(resolved.caseId ? { caseId: resolved.caseId } : {}), ...(play.device ? { device: play.device } : {}) })}
-            onCase={(cid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), caseId: cid, ...(play.device ? { device: play.device } : {}) })}
-            onScenario={(sid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), scenarioId: sid, ...(play.device ? { device: play.device } : {}) })}
+            onOption={(id) => toPlay({ featureId: feature.id, optionId: id, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })}
+            onCase={(cid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), caseId: cid })}
+            onScenario={(sid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), scenarioId: sid })}
           />
         }
         banner={banner}
@@ -211,7 +212,7 @@ function BoardPlayer({ projectId, play, navigate, projectName }: { projectId: st
                 onOpenEditor={(at) => void openInEditor(projectId, at).then((r) => setFlash(r.ok ? `已在编辑器中打开 ${at}` : `无法打开编辑器：${r.message}`))}
               />
             ) : null}
-            {video && scenario ? <VideoDialog projectId={projectId} scenarioId={scenario.id} scenarioName={scenario.name} device={device} theme={theme} onClose={() => setVideo(false)} /> : null}
+            {video && scenario ? <VideoDialog projectId={projectId} scenarioId={scenario.id} scenarioName={scenario.name} theme={theme} onClose={() => setVideo(false)} /> : null}
           </>
         }
       />

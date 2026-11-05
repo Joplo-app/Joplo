@@ -47,8 +47,8 @@ for (const theme of ['sketch', 'clean'] as const) {
   }
 }
 
-// 架构图（Diagram，D41）：测试夹具 packages/web/e2e/fixtures/diagram 的调用链，sketch / clean 各两步
-const diagramFixture = path.join(root, 'packages/web/e2e/fixtures/diagram');
+// 架构图（Diagram，D41）：测试夹具 packages/server/scripts/fixtures/diagram 的调用链，sketch / clean 各两步
+const diagramFixture = path.join(root, 'packages/server/scripts/fixtures/diagram');
 for (const theme of ['sketch', 'clean'] as const) {
   for (const [name, step] of [['stage-diagram-1-active', 'arch.a.call#1'], ['stage-diagram-3-error', 'arch.a.call#3']] as const) {
     const r = await renderStep({ projectDir: diagramFixture, scenarioId: 'arch.a.call', stepId: step, theme, out: path.join(outDir, `${name}.${theme}.png`), overwrite: true });

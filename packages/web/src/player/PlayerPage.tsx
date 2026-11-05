@@ -8,11 +8,11 @@
  * 因此发布站的产物里不会出现。
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Ellipsis, Monitor, Pause, Play, RotateCcw, Smartphone } from 'lucide-react';
-import type { Project, Scenario } from '@tokenroll/joplo-core';
+import { ChevronLeft, ChevronRight, Clapperboard, Ellipsis, Pause, Play, RotateCcw } from 'lucide-react';
+import { stepTouchesLayer, type Project, type Scenario } from '@tokenroll/joplo-core';
 import type { DemoController, Snapshot } from '../runtime/demo';
-import type { Device } from '../runtime/route';
-import { Stage } from '../renderer/Stage';
+import { Stage, viewportOf } from '../renderer/Stage';
+import { cameraFor } from './cameraFor';
 import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
 import { MOCK_CLS, OUTCOME_LABEL } from './labels';
@@ -174,11 +174,11 @@ function StepStrip({ snap, scenario, ctl }: { snap: Snapshot; scenario: Scenario
   const chip = (i: number, label: string, testid: string, kind?: string) => {
     const state = i === shownIndex ? 'current' : i < shownIndex ? 'done' : 'todo';
     return (
-      <li key={testid} className="flex min-w-[96px] max-w-[180px] flex-1 items-center gap-2">
-        <button type="button" onClick={() => ctl.clickStepChip(i - 1)} data-testid={testid} data-state={state} data-step-kind={kind} title={label} aria-label={`第 ${i} 步：${label}`} className="flex min-w-0 items-center gap-2 text-left">
+      <li key={testid} className="flex min-w-[80px] max-w-[170px] flex-1 items-center gap-1.5">
+        <button type="button" onClick={() => ctl.clickStepChip(i - 1)} data-testid={testid} data-state={state} data-step-kind={kind} title={label} aria-label={`第 ${i} 步：${label}`} className="flex min-w-0 items-center gap-1.5 text-left">
           <span
             className={cn(
-              'flex size-7 shrink-0 items-center justify-center border text-[12px]',
+              'flex size-6 shrink-0 items-center justify-center border text-[11px]',
               kind === 'system' ? 'rounded-[6px] border-dashed' : 'rounded-full',
               state === 'current' ? 'border-[#1e1e1e] bg-[#1e1e1e] text-white' : state === 'done' ? 'border-[#1e1e1e] bg-white text-[#1e1e1e]' : 'border-[#ced4da] text-[#868e96]',
               active === i - 1 && 'ring-2 ring-[var(--focus)] ring-offset-1',
@@ -186,32 +186,32 @@ function StepStrip({ snap, scenario, ctl }: { snap: Snapshot; scenario: Scenario
           >
             {i}
           </span>
-          <span className={cn('truncate text-[13px]', state === 'current' ? 'font-semibold' : 'text-[#5a5a5a]')}>{label}</span>
+          <span className={cn('truncate text-[12px]', state === 'current' ? 'font-semibold' : 'text-[#5a5a5a]')}>{label}</span>
         </button>
       </li>
     );
   };
+  // 一行步骤 + 一行说明（D43“一屏放下”）
   return (
-    <section className="shrink-0 rounded-lg border bg-white px-4 py-3" data-testid="step-bar">
-      <ol ref={listRef} className="flex items-center gap-2 overflow-x-auto pb-1" aria-label="步骤">
+    <section className="shrink-0 rounded-lg border bg-white px-3 py-1.5" data-testid="step-bar">
+      <ol ref={listRef} className="flex items-center gap-1.5 overflow-x-auto" aria-label="步骤">
         {chip(0, '初始', 'chip-initial')}
         {scenario.steps.map((s, i) => chip(i + 1, s.caption, `chip-${s.id}`, s.kind))}
       </ol>
-      <div className="mt-2 flex items-start gap-3">
-        <div className="min-w-0 flex-1" data-testid="caption">
+      <div className="mt-1 flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-baseline gap-2 truncate" data-testid="caption">
           {done && active === null ? (
-            <div data-testid="complete-banner" role="status" className={cn('flex min-w-0 items-center gap-2 text-[15px]', done.outcome === 'success' ? 'text-[#1f6e30]' : done.outcome === 'failure' ? 'text-[#a51d1d]' : 'text-[#3a3a3a]')}>
-              <strong className="shrink-0">场景完成 · {OUTCOME_LABEL[done.outcome]}</strong>
-              <span className="truncate">{done.text}</span>
-            </div>
+            <span data-testid="complete-banner" role="status" className={cn('shrink-0 text-[14px]', done.outcome === 'success' ? 'text-[#1f6e30]' : done.outcome === 'failure' ? 'text-[#a51d1d]' : 'text-[#3a3a3a]')}>
+              <strong>场景完成 · {OUTCOME_LABEL[done.outcome]}</strong> {done.text}
+            </span>
           ) : (
-            <div className="truncate text-[15px] font-semibold">
+            <span className="shrink-0 truncate text-[14px] font-semibold">
               第 {shownIndex} 步 · {shown ? (shown.kind === 'system' ? `系统：${shown.caption}` : shown.caption) : `初始状态${scenario.description ? `：${scenario.description}` : ''}`}
-            </div>
+            </span>
           )}
-          <div className="truncate text-[13px] text-[#6b6b6b]" data-testid="next-hint">
+          <span className="min-w-0 truncate text-[12px] text-[#6b6b6b]" data-testid="next-hint">
             {total === 0 ? `这个场景没有步骤，只展示初始状态。${scenario.expected ? `预期：${scenario.expected}` : ''}` : next ? `下一步：${next.caption}` : done ? `这是${scenario.mock.label}的演示结果，不代表真实服务的返回` : '已到最后一步'}
-          </div>
+          </span>
         </div>
         <span className={cn('shrink-0 rounded border px-1.5 py-px text-[12px]', MOCK_CLS[scenario.mock.outcome])} data-testid="mock-label" title="演示中的结果是模拟的">
           {scenario.mock.label}
@@ -227,9 +227,11 @@ export type PlayerPageProps = {
   project: Project;
   crumbs: Crumb[];
   onBrand: () => void;
-  device: Device;
-  onDevice: (d: Device) => void;
   theme: StageTheme;
+  /** 手动选的层级（D43）；null = 导演跟随每一步的导演层。 */
+  layer: string | null;
+  /** 切换层级：传层级 id 表示手动看这一层（导演关闭）；传 null 表示打开导演。 */
+  onLayer: (layer: string | null) => void;
   /** 左栏内容。 */
   nav: ReactNode;
   /** 画面上方（缺口说明、编译错误等）。 */
@@ -255,6 +257,18 @@ export function PlayerPage(p: PlayerPageProps) {
   const next = ctl.nextStep();
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
   const shownStep = scenario && snap.activeStep !== null ? scenario.steps[snap.activeStep] : null;
+  const device = state ? viewportOf(project, state) : 'desktop';
+
+  // 视角层级与导演镜头（D43）：镜头只由步骤推导（cameraAt），切层级不改变步骤和产品状态
+  const plan = cameraFor(project, scenario?.id ?? null, state?.position ?? 0, p.layer);
+  const { layers, director, viewLayer } = plan;
+  const useCam = plan.enabled;
+  const camera = plan.spec;
+  const replayLayer = () => {
+    if (!scenario) return;
+    p.onLayer(viewLayer);
+    void ctl.play({ fromStart: true, fast: (i) => !stepTouchesLayer(project, scenario.id, i, viewLayer) });
+  };
 
   // 键盘：← → 逐步，空格播放/暂停；按住 ⌥ 时标出可检查的元素
   useEffect(() => {
@@ -283,20 +297,7 @@ export function PlayerPage(p: PlayerPageProps) {
 
   return (
     <div className="flex h-full flex-col bg-[#f8f9fa]" data-view={snap.view}>
-      <TopBar
-        right={
-          <Segmented<Device>
-            label="设备"
-            testid="device-switch"
-            value={p.device}
-            onChange={p.onDevice}
-            items={[
-              { value: 'desktop', label: <><Monitor className="size-3.5" />电脑</>, testid: 'device-desktop' },
-              { value: 'mobile', label: <><Smartphone className="size-3.5" />手机</>, testid: 'device-mobile' },
-            ]}
-          />
-        }
-      >
+      <TopBar>
         <Brand onClick={p.onBrand} />
         <Breadcrumbs crumbs={p.crumbs} />
       </TopBar>
@@ -304,7 +305,7 @@ export function PlayerPage(p: PlayerPageProps) {
         <aside className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r bg-white p-3" data-testid="left-nav">
           {p.nav}
         </aside>
-        <main className="flex min-w-0 flex-1 flex-col gap-3 p-4" data-inspecting={inspecting ? '' : undefined}>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden p-3" data-inspecting={inspecting ? '' : undefined}>
           {p.banner}
           {snap.playbackError ? (
             <div role="alert" className="rounded-md border border-[#b35c00] bg-[#fff8ee] px-3 py-1.5 text-[13px] text-[#8a4700]" data-testid="playback-error">
@@ -312,14 +313,39 @@ export function PlayerPage(p: PlayerPageProps) {
               {snap.playbackError}
             </div>
           ) : null}
-          <div className="relative flex min-h-0 flex-1 flex-col rounded-xl border bg-white">
+          {useCam && layers.length > 1 ? (
+            <div className="flex shrink-0 items-center gap-2" data-testid="layer-bar">
+              <Segmented
+                label="层级"
+                testid="layer-switch"
+                value={viewLayer}
+                onChange={(id) => p.onLayer(id)}
+                items={layers.map((l) => ({ value: l.id, label: l.title, testid: `layer-${l.id}` }))}
+              />
+              <button
+                type="button"
+                aria-pressed={director}
+                onClick={() => p.onLayer(director ? viewLayer : null)}
+                data-testid="director"
+                title={director ? '导演跟随每一步切换层级与镜头；点一下改为手动' : '恢复导演：回到这一步的导演层'}
+                className={cn('flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[13px]', director ? 'border-[#1e1e1e] bg-[#1e1e1e] text-white' : 'bg-white text-[#3a3a3a] hover:bg-[#f8f9fa]')}
+              >
+                <Clapperboard className="size-3.5" />
+                导演{director ? '跟随' : '已暂停'}
+              </button>
+              <button type="button" onClick={replayLayer} data-testid="replay-layer" className="flex h-8 items-center gap-1 rounded-md border bg-white px-2.5 text-[13px] hover:bg-[#f8f9fa]" title="从第 0 步开始，只用这一层的镜头播放；这一层没有变化的步骤快速带过">
+                ↻ 只重放这一层
+              </button>
+            </div>
+          ) : null}
+          <div className="relative flex min-h-0 flex-1 flex-col rounded-xl border bg-white" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
             {state && project.scenes[state.sceneId] ? (
-              <StageViewport viewport={p.device} theme={p.theme} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
+              <StageViewport viewport={device} theme={p.theme} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
                 <Stage
                   project={project}
                   state={state}
                   theme={p.theme}
-                  viewportOverride={p.device}
+                  camera={camera}
                   mode="demo"
                   selectedId={p.selectedId ?? null}
                   preview={snap.preview}

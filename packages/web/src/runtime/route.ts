@@ -1,17 +1,17 @@
 /**
- * 看板与发布站的 URL（hash）：所有界面状态都在 hash 里，复制链接就能回到同一个项目 / 功能 / 方案 / 情况 / 场景 / 步骤 / 设备。
+ * 看板与发布站的 URL（hash）：所有界面状态都在 hash 里，复制链接就能回到同一个项目 / 功能 / 方案 / 情况 / 场景 / 步骤 / 层级。
  *
  * 看板：  #/                         首页（选中最近打开的项目）
  *        #/<项目>                    首页，选中该项目
- *        #/<项目>/f/<功能>?o=&c=&s=&step=&d=   演示页
+ *        #/<项目>/f/<功能>?o=&c=&s=&step=&l=   演示页
  * 发布站：#/                         首页（功能列表）
- *        #/f/<功能>?s=&step=&d=       演示页
+ *        #/f/<功能>?s=&step=&l=       演示页
  *        #/s/<场景>                   旧链接：直接进入该场景
  *
- * o = 方案、c = 情况、s = 场景、step = 位置（0 = 初始状态）、d = 设备（mobile / desktop；缺省按页面自身的 viewport）。
+ * o = 方案、c = 情况、s = 场景、step = 位置（0 = 初始状态）、l = 手动选的层级（有 l 表示导演关闭；没有 = 导演跟随）。
+ * 设备不在 URL 里（D44）：每个页面只有一种设备，由 page 的 viewport 决定。
  */
-export type Device = 'desktop' | 'mobile';
-export type PlayRoute = { featureId: string; optionId?: string; caseId?: string; scenarioId?: string; step?: number; device?: Device };
+export type PlayRoute = { featureId: string; optionId?: string; caseId?: string; scenarioId?: string; step?: number; layer?: string };
 
 export type BoardRoute = { kind: 'home'; projectId?: string } | { kind: 'play'; projectId: string; play: PlayRoute };
 export type SiteRoute = { kind: 'home' } | { kind: 'play'; play: PlayRoute } | { kind: 'scenario'; scenarioId: string };
@@ -29,14 +29,13 @@ function parsePlay(featureId: string, query: string): PlayRoute {
   const q = new URLSearchParams(query);
   const step = q.get('step');
   const n = step === null ? NaN : Number(step);
-  const d = q.get('d');
   return {
     featureId,
     ...(q.get('o') ? { optionId: q.get('o')! } : {}),
     ...(q.get('c') ? { caseId: q.get('c')! } : {}),
     ...(q.get('s') ? { scenarioId: q.get('s')! } : {}),
     ...(Number.isInteger(n) && n >= 0 ? { step: n } : {}),
-    ...(d === 'mobile' || d === 'desktop' ? { device: d } : {}),
+    ...(q.get('l') ? { layer: q.get('l')! } : {}),
   };
 }
 
@@ -46,7 +45,7 @@ function playQuery(p: PlayRoute): string {
   if (p.caseId) q.set('c', p.caseId);
   if (p.scenarioId) q.set('s', p.scenarioId);
   if (p.step !== undefined) q.set('step', String(p.step));
-  if (p.device) q.set('d', p.device);
+  if (p.layer) q.set('l', p.layer);
   const s = q.toString();
   return s ? `?${s}` : '';
 }

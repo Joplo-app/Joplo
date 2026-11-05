@@ -21,7 +21,6 @@
 | Excalifont（字体，woff2 子集） | 1.000（取自 @excalidraw/excalidraw 0.18.1） | OFL-1.1 | 手绘主题拉丁字体，打包在 `packages/web/src/fonts/`，许可见同目录 OFL.txt |
 | Xiaolai SC 小赖字体（字体，woff2 子集） | 3.11（取自 @excalidraw/excalidraw 0.18.1） | OFL-1.1 | 手绘主题中文字体，同上 |
 | playwright | 1.64.1 | Apache-2.0 | @tokenroll/joplo-server：renderStep 截图（chromium 修订 1248） |
-| @playwright/test | 1.64.1 | Apache-2.0 | @tokenroll/joplo-web：浏览器测试 |
 | @types/react / @types/react-dom | 19.3.0 | MIT | 类型 |
 | commander | 15.0.0 | MIT | T-core：CLI 命令与参数解析 |
 | @modelcontextprotocol/sdk | 1.32.2 | MIT | T-core：官方 MCP stdio server/client；协议 2025-11-25 |

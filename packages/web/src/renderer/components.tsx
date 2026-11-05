@@ -35,7 +35,7 @@ import {
 } from '@tokenroll/joplo-core';
 import { cn } from '@/lib/utils';
 import { Rough, RoughPath, roundRectPath, useStageTheme } from './rough';
-import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramScale, diagramStructure, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
+import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramScale, diagramStructure, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
 import { DIMMED, FONT, INK, SOFT, SPACING, TITLE_SIZE, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf } from './style';
 
 export type RenderMode = 'review' | 'demo' | 'render';
@@ -51,6 +51,8 @@ export type RenderCtx = {
   animate: boolean;
   /** 舞台宽度（px）：响应式属性、visibleFrom / hiddenFrom、AppShell 收起都按它计算。 */
   width: number;
+  /** 在镜头之下（D43）：Diagram 不再用最小缩放与图内滚动，整体放进容器，细节靠镜头推近。 */
+  camera?: boolean;
 };
 
 export const RenderContext = createContext<RenderCtx | null>(null);
@@ -1777,8 +1779,10 @@ function Diagram({ node, p, children }: NodeProps) {
   const hv = Number(r('h'));
   const H = Number.isFinite(hv) && hv > 0 ? hv : 420;
   const { h: _h, ...rest } = p;
-  // 缩放不低于 12/14：放不下时在图内部滚动 / 拖动平移，而不是继续缩小到看不清
-  const { scale, scroll } = diagramScale(layout, avail, H);
+  // 缩放不低于 12/14：放不下时在图内部滚动 / 拖动平移，而不是继续缩小到看不清。
+  // 在镜头之下（D43）让位给镜头：整体放进容器，细节靠镜头推近
+  const { camera: underCamera } = useCtx();
+  const { scale, scroll } = underCamera ? diagramFit(layout, avail, H) : diagramScale(layout, avail, H);
   const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: H, overflow: scroll ? 'auto' : 'hidden', cursor: scroll ? 'grab' : undefined, overscrollBehavior: 'contain' } });
   const W = layout.width * scale;
   const HH = layout.height * scale;
@@ -2044,7 +2048,7 @@ function Custom({ node, p }: NodeProps) {
   );
 }
 
-// ============ 注册表：目录中每个类型都必须有实现（类型检查保证；e2e 目录画廊逐个渲染） ============
+// ============ 注册表：目录中每个类型都必须有实现（Record<ComponentType, …> 由类型检查保证） ============
 
 const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   AppShell,
@@ -2146,7 +2150,7 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   'Terminal.Input': TerminalInput,
 };
 
-/** 渲染器实现的类型清单（e2e 目录画廊据此检查与 COMPONENT_TYPES 一致）。 */
+/** 渲染器实现的类型清单（与 COMPONENT_TYPES 一致，由类型检查保证）。 */
 export const IMPLEMENTED_TYPES: readonly string[] = Object.keys(IMPL);
 
 /** 渲染一个场景节点（及其可见的子节点）。 */
