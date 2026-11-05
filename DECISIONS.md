@@ -164,6 +164,7 @@
   - Diagram 的节点和连线状态由 trace 自动推算，不必再手写 `state={$.ui.x}` 和一串 set()；手写的 state 仍然有效且优先。
   - trace 同时充当镜头目标；路径写错时 check 报 TRACE_UNKNOWN / TRACE_AMBIGUOUS。
   - 目标是让 agent-arch 这类演示的场景代码减少约一半。
+- D49 解说改为字幕（2026-11-05，用户：“这里已经完全遮挡了，不如就用字幕吧”；取代 D46 中的解说卡）：去掉浮在画面上的解说卡；画面下方单独留出字幕区，大字写本步说明，小字写 explain，不叠在画面上。焦点高光保留。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions
