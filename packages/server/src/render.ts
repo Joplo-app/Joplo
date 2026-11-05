@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Browser } from 'playwright';
-import { JoploError, VIEWPORT_SIZE, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@tokenroll/joplo-core';
+import { JoploError, VIEWPORT_SIZE, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@tokenroll/joplo-core';
 import type { RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';
@@ -101,7 +101,8 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     if (!sc) throw new JoploError('NOT_FOUND', `场景不存在：${opts.scenarioId}（可用：${Object.keys(project.scenarios).join('、') || '无'}）`);
     const position = opts.stepId ? positionAfterStep(project, sc.id, opts.stepId) : 0;
     const state: PlayState = stateAt(project, sc.id, position); // 回放失败会抛出 PLAYBACK_FAILED
-    const scene = project.scenes[state.sceneId]!;
+    // 有层级的方案：截图与元素索引用这一步导演层的画面（每层一个独立画面）
+    const scene = project.scenes[displaySceneId(project, sc.id, position)]!;
     const theme = opts.theme ?? 'sketch';
     const next = state.completed ? undefined : sc.steps[position];
     const nextTargetId = next && 'target' in next.action ? next.action.target : null;
@@ -141,7 +142,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     const elements = [...report.elements, ...hidden];
     const warnings = [...report.warnings];
     if (nextTargetId && findNode(scene, nextTargetId) && !elements.find((e) => e.id === nextTargetId && e.visible)) warnings.push(`下一步操作的目标 ${nextTargetId} 没有显示在画面中`);
-    return { path: out, sceneId: state.sceneId, position, elements, warnings, scale: opts.scale ?? 1 };
+    return { path: out, sceneId: scene.id, position, elements, warnings, scale: opts.scale ?? 1 };
   } finally {
     await browser?.close().catch(() => undefined);
     await server.close();

@@ -13,7 +13,7 @@
  * - 热更新（setProject）保持功能、方案、场景、位置（越界夹到合法范围）、视图与选中。
  */
 import { animate, type AnimationPlaybackControls } from 'motion';
-import { explainClick, applyStep, getScenario, nodeLabel, findNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@tokenroll/joplo-core';
+import { explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@tokenroll/joplo-core';
 import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 
 /** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */
@@ -62,6 +62,11 @@ export type Snapshot = {
   selectionSync: SelectionSync;
   /** 状态被“跳转”时递增：舞台据此直接移除旧 Toast，不播放退出动画。 */
   epoch: number;
+  /**
+   * 有层级的方案（T-layers）：下一步的操作目标不在当前显示的层里时，先切到包含它的层（导演跟随时），
+   * 再移动鼠标；这一步提交后清空，之后由 cameraAt 决定导演层。
+   */
+  leadLayer: string | null;
 };
 
 export const TIMING = {
@@ -75,6 +80,7 @@ export const TIMING = {
   gap: 350,
   reducedStep: 450,
   quickStep: 300,
+  layerSwitch: 650, // 先切层再移动鼠标：等新画面淡入、镜头到位
 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -103,6 +109,7 @@ export class DemoController {
     cursorVisible: false,
     selectionSync: { status: 'idle' },
     epoch: 0,
+    leadLayer: null,
   };
   private listeners = new Set<() => void>();
   private gen = 0;
@@ -153,6 +160,19 @@ export class DemoController {
   setStageEl = (el: HTMLElement | null) => {
     this.stageEl = el;
   };
+  /** 演示页 / 录制页报告当前显示的画面（有层级时是某一层的画面）与是否导演跟随。 */
+  setStageView = (sceneId: string | null, director: boolean) => {
+    this.stageView = { sceneId, director };
+  };
+  private stageView: { sceneId: string | null; director: boolean } = { sceneId: null, director: true };
+  /** 用户正在看的画面：报告的层级画面（存在时），否则是状态里的路径画面。 */
+  private shownSceneId(): string | null {
+    const p = this.snap.project;
+    const st = this.snap.state;
+    if (!p || !st) return null;
+    const v = this.stageView.sceneId;
+    return v && p.scenes[v] && this.snap.view === 'stage' ? v : st.sceneId;
+  }
   setCursorEl = (el: HTMLElement | null) => {
     this.cursorEl = el;
     if (el) el.style.transform = `translate(${this.cursorPos.x}px, ${this.cursorPos.y}px)`;
@@ -214,8 +234,9 @@ export class DemoController {
     const p = this.snap.project;
     const st = this.snap.state;
     if (!sel || !p || !st) return;
-    const scene = p.scenes[st.sceneId];
-    const hit = sel.nodeId && scene && sel.sceneId === st.sceneId ? findNode(scene, sel.nodeId) : null;
+    const shown = this.shownSceneId() ?? st.sceneId;
+    const scene = p.scenes[sel.sceneId];
+    const hit = sel.nodeId && scene && (sel.sceneId === shown || sel.sceneId === st.sceneId) ? findNode(scene, sel.nodeId) : null;
     const stepOk = !sel.nodeId && sel.stepId && sel.scenarioId && p.scenarios[sel.scenarioId]?.steps.some((s) => s.id === sel.stepId);
     if (hit || stepOk) {
       const at = hit ? (hit.node.source ?? null) : (p.scenarios[sel.scenarioId!]!.steps.find((s) => s.id === sel.stepId)?.source ?? null);
@@ -431,8 +452,8 @@ export class DemoController {
     const ws = this.cancelWaiters;
     this.cancelWaiters = [];
     ws.forEach((w) => w());
-    if (this.snap.playing || this.snap.busy || this.snap.preview || this.snap.systemEvent || this.snap.ripple || this.snap.activeStep !== null)
-      this.set({ playing: false, paused: false, busy: false, preview: null, systemEvent: null, ripple: null, activeStep: null });
+    if (this.snap.playing || this.snap.busy || this.snap.preview || this.snap.systemEvent || this.snap.ripple || this.snap.activeStep !== null || this.snap.leadLayer)
+      this.set({ playing: false, paused: false, busy: false, preview: null, systemEvent: null, ripple: null, activeStep: null, leadLayer: null });
   }
 
   // ---------- 点击 ----------
@@ -456,12 +477,12 @@ export class DemoController {
     if (!cur) return;
     let verdict: ReturnType<typeof explainClick>;
     try {
-      verdict = explainClick(p, cur, nodeId);
+      verdict = explainClick(p, cur, nodeId, this.shownSceneId() ?? undefined);
     } catch (e) {
       this.set({ notice: { kind: 'error', text: `无法解释这次点击：${e instanceof Error ? e.message : String(e)}` } });
       return;
     }
-    const scene = p.scenes[cur.sceneId];
+    const scene = p.scenes[this.shownSceneId() ?? cur.sceneId];
     const label = scene ? nodeLabel(findNode(scene, nodeId)?.node ?? { type: '元素' }) : nodeId;
     switch (verdict.kind) {
       case 'advance': {
@@ -516,7 +537,7 @@ export class DemoController {
     if (this.snap.view === 'stage') {
       const sc = this.scenario();
       if (!sc) return null;
-      return { optionId: sc.optionId, scenarioId: sc.id, position: st.position, sceneId: st.sceneId, nodeId, ...(stepId ? { stepId } : {}) };
+      return { optionId: sc.optionId, scenarioId: sc.id, position: st.position, sceneId: this.shownSceneId() ?? st.sceneId, nodeId, ...(stepId ? { stepId } : {}) };
     }
     return { optionId: p.scenes[st.sceneId]?.optionId ?? null, scenarioId: null, position: 0, sceneId: st.sceneId, nodeId };
   }
@@ -631,6 +652,7 @@ export class DemoController {
       this.set({ systemEvent: a.type === 'event' ? a.name : step.caption });
       if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.systemHold, gen))) return false;
     } else if ('target' in a) {
+      if (!(await this.leadTo(sc, a.target, gen))) return false;
       if (reduced) {
         if (!(await this.wait(TIMING.reducedStep, gen))) return false;
       } else {
@@ -673,13 +695,29 @@ export class DemoController {
       const next = applyStep(p, getScenario(p, sc.id), st);
       const n = this.snap.notice;
       // 推进后，锚定在元素上的就地提示（禁用原因、未覆盖、越序）已过时，关闭它。
-      this.set({ state: next, preview: null, playbackError: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
+      this.set({ state: next, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
       return true;
     } catch (e) {
       this.stop();
       this.set({ playbackError: e instanceof Error ? e.message : String(e), notice: { kind: 'error', text: `无法执行这一步：${e instanceof Error ? e.message : String(e)}` } });
       return false;
     }
+  }
+
+  /**
+   * 有层级的方案：操作目标不在当前显示的层里时（导演跟随），先切到包含它的第一个层并等画面到位，鼠标才能对准它。
+   * 手动选层时不切（尊重用户的选择；目标不在这一层时鼠标不移动）。
+   */
+  private async leadTo(sc: Scenario, target: string, gen: number): Promise<boolean> {
+    const p = this.snap.project;
+    if (!p || !this.stageView.director || !layersOf(p, sc.id).length) return true;
+    const shown = this.shownSceneId();
+    const scene = shown ? p.scenes[shown] : undefined;
+    if (scene && findNode(scene, target)) return true;
+    const to = layersWithNode(p, sc.id, target)[0];
+    if (!to || to === this.snap.leadLayer) return true;
+    this.set({ leadLayer: to });
+    return this.wait(this.reducedMotion ? 0 : TIMING.layerSwitch, gen);
   }
 
   private measureCenter(nodeId: string): { x: number; y: number } | null {

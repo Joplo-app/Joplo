@@ -5,7 +5,7 @@
  * 位置（position）语义：0 = 场景初始状态；k = 已执行前 k 个步骤之后的状态。
  * “上一步”通过从初始状态重放到 k-1 实现，因此恢复的是业务可见状态，而不是撤销动画。
  */
-import { GATED_CONTAINERS, INTERACTIVE_TYPES, OVERVIEW_LAYER, VALUE_TYPES, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
+import { DIRECTOR_LAYER, GATED_CONTAINERS, INTERACTIVE_TYPES, PAGE_LAYER, VALUE_TYPES, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
 import type { Condition, Project, Scenario, Scene, SceneNode, Step } from './schema.ts';
 import { JoploError, type Diagnostic } from './result.ts';
 
@@ -313,7 +313,7 @@ function checkStepInner(project: Project, scenario: Scenario, state: PlayState, 
       ? { severity: 'error', code: 'NOTHING_TO_GO_BACK', message: `步骤 ${step.id} 要返回，但没有上一个画面`, source: 'replay', ref }
       : null;
   }
-  const scene = project.scenes[state.sceneId];
+  const scene = sceneOfTarget(project, scenario, state, a.target);
   if (!scene) return { severity: 'error', code: 'MISSING_SCENE', message: `当前画面 ${state.sceneId} 不存在`, source: 'replay', ref };
   const hit = findNode(scene, a.target);
   if (!hit)
@@ -343,7 +343,8 @@ function checkStepInner(project: Project, scenario: Scenario, state: PlayState, 
 
 /** select 动作写入的值：匹配到选项时存 value（动作可写 value 或 label）；MultiSelect 切换数组中的一项。 */
 function selectedValue(project: Project, state: PlayState, target: string, raw: string): unknown {
-  const scene = project.scenes[state.sceneId];
+  const sc = project.scenarios[state.scenarioId];
+  const scene = sc ? sceneOfTarget(project, sc, state, target) : project.scenes[state.sceneId];
   const node = scene ? findNode(scene, target)?.node : undefined;
   if (!node) return raw;
   const choices = choicesOf(node, state);
@@ -460,9 +461,10 @@ export type ClickVerdict =
  * 演示模式下用户点击了某个元素：判断应推进步骤，还是提示“当前演示未覆盖”（PRD 8.2、AC-19）。
  * 流程外点击绝不能被解释为成功。
  */
-export function explainClick(project: Project, state: PlayState, nodeId: string): ClickVerdict {
+export function explainClick(project: Project, state: PlayState, nodeId: string, sceneId?: string): ClickVerdict {
   const sc = getScenario(project, state.scenarioId);
-  const scene = getScene(project, state.sceneId);
+  // sceneId：用户正在看的画面（有层级的方案是某一层的画面）；缺省为状态里的路径画面
+  const scene = getScene(project, sceneId ?? state.sceneId);
   const hit = findNode(scene, nodeId);
   if (!hit) return { kind: 'static' };
   const { node } = hit;
@@ -477,39 +479,70 @@ export function explainClick(project: Project, state: PlayState, nodeId: string)
   return { kind: 'not_covered', label };
 }
 
-// ---------- 视角层级与导演镜头（D43） ----------
+// ---------- 视角层级与导演镜头（D43 / T-layers：每层一个独立画面） ----------
+
+/** 方案的层级（源码顺序）：每层一个完全独立的画面。没有声明时为空，演示照常显示路径页面。 */
+export function layersOf(project: Project, scenarioId: string | null): { id: string; title: string; sceneId: string }[] {
+  const sc = scenarioId ? project.scenarios[scenarioId] : null;
+  const opt = sc ? project.options[sc.optionId] : null;
+  return Object.entries(opt?.layers ?? {}).map(([id, l]) => ({ id, title: l.title, sceneId: l.sceneId }));
+}
+
+/** 包含某个元素的层级（多层都有同名 id 时都返回）。 */
+export function layersWithNode(project: Project, scenarioId: string, nodeId: string): string[] {
+  return layersOf(project, scenarioId)
+    .filter((l) => { const sc = project.scenes[l.sceneId]; return !!sc && !!findNode(sc, nodeId); })
+    .map((l) => l.id);
+}
+
+/**
+ * 步骤目标所在的画面：有层级的方案在各层画面里找（优先当前可见的那一层），否则是状态里的路径画面。
+ * 回放校验、select 取值都用它。
+ */
+export function sceneOfTarget(project: Project, scenario: Scenario, state: PlayState, target: string): Scene | undefined {
+  const layers = layersOf(project, scenario.id);
+  if (!layers.length) return project.scenes[state.sceneId];
+  const scenes = layers.map((l) => project.scenes[l.sceneId]).filter((x): x is Scene => !!x && !!findNode(x, target));
+  return scenes.find((x) => isNodeVisible(x, target, state)) ?? scenes[0] ?? project.scenes[state.sceneId];
+}
 
 /** 某一步的镜头：导演层与每个层级当前对准的元素（空数组 = 这一层的整体）。 */
 export type Camera = { directorLayer: string; perLayer: Record<string, string[]> };
 
 /**
  * 第 position 步之后的镜头。纯函数：只由步骤上的 shots / directorLayer 推导，不进入 ui / data / inputs。
- * 没有 shot 的步骤：导演层与各层镜头都沿用上一步；初始为全景、各层整体。
+ * 初始导演层 = 第一个声明的层级（没有层级时是路径页面 @page），各层都是整体。
+ * 没有 shot 的步骤沿用上一步；shot()（@director）让当时的导演层回到整体。
  * 手动、逐步、自动播放、回放、renderStep、视频录制和发布站都用它。
  */
 export function cameraAt(project: Project, scenarioId: string, position: number): Camera {
   const sc = project.scenarios[scenarioId];
   const perLayer: Record<string, string[]> = {};
-  let directorLayer = OVERVIEW_LAYER;
+  let directorLayer = layersOf(project, scenarioId)[0]?.id ?? PAGE_LAYER;
   if (!sc) return { directorLayer, perLayer };
   const n = Math.max(0, Math.min(position, sc.steps.length));
   for (let i = 0; i < n; i++) {
     const st = sc.steps[i]!;
-    for (const s of st.shots ?? []) perLayer[s.layer] = [...s.targets];
     if (st.directorLayer) directorLayer = st.directorLayer;
+    for (const s of st.shots ?? []) perLayer[s.layer === DIRECTOR_LAYER ? directorLayer : s.layer] = [...s.targets];
   }
   return { directorLayer, perLayer };
 }
 
-/** 场景所属方案的层级列表：全景在前，其后是作者声明的层级（源码顺序）。 */
-export function layersOf(project: Project, scenarioId: string | null): { id: string; title: string; roots: string[] }[] {
-  const sc = scenarioId ? project.scenarios[scenarioId] : null;
-  const opt = sc ? project.options[sc.optionId] : null;
-  return [{ id: OVERVIEW_LAYER, title: '全景', roots: [] }, ...Object.entries(opt?.layers ?? {}).map(([id, l]) => ({ id, title: l.title, roots: l.roots }))];
+/** 第 position 步之后用户看到的画面：有层级时是导演层（或手动选的层）的画面，否则是状态里的路径画面。 */
+export function displaySceneId(project: Project, scenarioId: string, position: number, layer?: string | null): string {
+  const layers = layersOf(project, scenarioId);
+  const state = stateAt(project, scenarioId, position);
+  if (!layers.length) return state.sceneId;
+  const want = layer && layers.some((l) => l.id === layer) ? layer : cameraAt(project, scenarioId, position).directorLayer;
+  return (layers.find((l) => l.id === want) ?? layers[0]!).sceneId;
 }
 
 /** 第 index 步（0 起）的镜头是否改变了某一层（“只重放这一层”时，不变的步骤快速带过）。 */
 export function stepTouchesLayer(project: Project, scenarioId: string, index: number, layer: string): boolean {
   const st = project.scenarios[scenarioId]?.steps[index];
-  return !!st && (st.shots ?? []).some((s) => s.layer === layer);
+  if (!st) return false;
+  if ((st.shots ?? []).some((s) => s.layer === layer || (s.layer === DIRECTOR_LAYER && cameraAt(project, scenarioId, index + 1).directorLayer === layer))) return true;
+  // 操作目标在这一层的步骤也算（要看着它被点）
+  return 'target' in st.action && layersWithNode(project, scenarioId, st.action.target).includes(layer);
 }

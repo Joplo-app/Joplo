@@ -1,45 +1,59 @@
 import { $, done, flow, layer, option, set, shot } from '@tokenroll/joplo-kit';
 import { Button, ChatMessage, Diagram, Paper, Placeholder, SimpleGrid, Stack, Text, ToolCall } from '@tokenroll/joplo-kit/ui';
 
+/**
+ * 每层是完全独立的画面（T-layers）：layer(title, <JSX/>) 自己的树、自己的布局，占满整个舞台；
+ * 各层共享同一份状态。shot 的 id 在包含它的层里解析，多层有同名 id 时各层都生效（这里 overview 也有 biz / billing）。
+ */
+const Client = () => (
+  <Paper id="client_panel" withBorder p="md" m="md">
+    <Stack gap="sm">
+      <Text fw={600}>客户端</Text>
+      <ChatMessage id="msg_user" from="user" when={$.ui.sent}>帮我整理发票</ChatMessage>
+      <ToolCall id="card_tool" title="read_files" state="running" when={$.ui.tool}>~/Desktop/报销</ToolCall>
+      <Button id="app_send">发送</Button>
+    </Stack>
+  </Paper>
+);
+
+const Arch = ({ id, h }: { id: string; h: number }) => (
+  <Diagram id={id} direction="down" h={h}>
+    <Diagram.Group id="g_dev" label="用户设备">
+      <Diagram.Node id="app" label="客户端界面" kind="client" />
+      <Diagram.Node id="local" label="端侧执行器" kind="tool" />
+    </Diagram.Group>
+    <Diagram.Group id="g_aws" label="AWS">
+      <Diagram.Node id="biz" label="Biz Server" kind="service" state={$.ui.n_biz} />
+      <Diagram.Node id="brain" label="Agent 大脑" kind="service" />
+      <Diagram.Node id="billing" label="Billing" kind="service" state={$.ui.n_billing} />
+    </Diagram.Group>
+    <Diagram.Edge from="app" to="biz" label="消息" />
+    <Diagram.Edge from="biz" to="billing" label="额度预检" />
+    <Diagram.Edge from="biz" to="brain" label="任务" />
+    <Diagram.Edge from="biz" to="local" label="下发端侧工具" />
+  </Diagram>
+);
+
 export default option({
   name: 'A · 混合',
   idea: '端侧执行器 + 云端大脑',
   on: {
-    '/': {
-      main: [
-        <SimpleGrid cols={2} spacing="md">
-          <Paper id="client_panel" withBorder p="md">
-            <Stack gap="sm">
-              <Text fw={600}>客户端</Text>
-              <ChatMessage id="msg_user" from="user" when={$.ui.sent}>帮我整理发票</ChatMessage>
-              <ToolCall id="card_tool" title="read_files" state="running" when={$.ui.tool}>~/Desktop/报销</ToolCall>
-              <Button id="app_send">发送</Button>
-            </Stack>
-          </Paper>
-          <Diagram id="arch" direction="down" h={460}>
-            <Diagram.Group id="g_dev" label="用户设备">
-              <Diagram.Node id="app" label="客户端界面" kind="client" />
-              <Diagram.Node id="local" label="端侧执行器" kind="tool" />
-            </Diagram.Group>
-            <Diagram.Group id="g_aws" label="AWS">
-              <Diagram.Node id="biz" label="Biz Server" kind="service" state={$.ui.n_biz} />
-              <Diagram.Node id="brain" label="Agent 大脑" kind="service" />
-              <Diagram.Node id="billing" label="Billing" kind="service" state={$.ui.n_billing} />
-            </Diagram.Group>
-            <Diagram.Edge from="app" to="biz" label="消息" />
-            <Diagram.Edge from="biz" to="billing" label="额度预检" />
-            <Diagram.Edge from="biz" to="brain" label="任务" />
-            <Diagram.Edge from="biz" to="local" label="下发端侧工具" />
-          </Diagram>
-        </SimpleGrid>,
-        <Placeholder id="long_notes" label="很长的说明区（检验一屏放下）" h={900} />,
-      ],
-    },
+    '/': { main: [<Text id="route_note">路径页面（声明了 layers 的方案在演示页显示各层自己的画面）</Text>] },
   },
   state: { ui: { sent: false, tool: false, n_biz: 'idle', n_billing: 'idle' } },
   layers: {
-    client: layer('客户端视角', ['client_panel']),
-    backend: layer('后端流转', ['arch']),
+    client: layer('客户端视角', <Client />),
+    backend: layer('后端流转', <Arch id="arch" h={720} />),
+    overview: layer(
+      '全景',
+      <Stack p="md" gap="md">
+        <SimpleGrid cols={2} spacing="md">
+          <Client />
+          <Arch id="arch_all" h={460} />
+        </SimpleGrid>
+        <Placeholder id="long_notes" label="很长的说明区（检验整层缩进画面）" h={900} />
+      </Stack>,
+    ),
   },
   scenarios: {
     happy: flow('整理发票', { cases: ['happy'], start: '/' })

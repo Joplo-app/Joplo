@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright';
-import { JoploError, stateAt, type Project } from '@tokenroll/joplo-core';
+import { JoploError, displaySceneId, type Project } from '@tokenroll/joplo-core';
 import { launch, loadPlaywright, type PlaywrightModule } from './render.ts';
 
 export type Device = 'desktop' | 'mobile';
@@ -76,7 +76,7 @@ function parseRequest(project: Project | null, body: unknown, needPosition: bool
   const position = needPosition ? Number(b.position ?? 0) : 0;
   if (!Number.isInteger(position) || position < 0 || position > sc.steps.length) throw new JoploError('USAGE', `位置应为 0–${sc.steps.length} 的整数`);
   // 设备跟随页面自己的 viewport（D44）
-  const sceneId = stateAt(project, sc.id, position).sceneId;
+  const sceneId = displaySceneId(project, sc.id, position);
   const device: Device = project.scenes[sceneId]?.viewport === 'mobile' ? 'mobile' : 'desktop';
   const theme = b.theme === 'clean' ? 'clean' : 'sketch';
   return { sc, position, device, theme };

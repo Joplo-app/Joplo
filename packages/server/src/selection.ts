@@ -47,6 +47,9 @@ export function resolveSelection(project: Project, input: SelectionInput, now = 
     } catch (e) {
       return { ok: false, problem: `场景 ${sc.id} 无法回放到位置 ${input.position}：${e instanceof Error ? e.message : String(e)}` };
     }
+    // 有层级的方案：用户看的是某一层的画面（各层共享同一份状态），也接受
+    const layerScenes = Object.values(project.options[sc.optionId]?.layers ?? {}).map((l) => l.sceneId);
+    if (layerScenes.includes(input.sceneId)) sceneId = input.sceneId;
     if (input.sceneId !== sceneId) return { ok: false, problem: `位置 ${input.position} 的画面是 ${sceneId}，不是 ${input.sceneId}` };
     stepId = sc.steps[input.position - 1]?.id ?? null;
     if (input.stepId) {

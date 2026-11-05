@@ -7,11 +7,11 @@
  * 创作侧信息（缺口、规则、源码位置、抽屉）只由看板通过 nav / banner / drawer / menu 传入，本文件不引用它们，
  * 因此发布站的产物里不会出现。
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Clapperboard, Ellipsis, Pause, Play, RotateCcw } from 'lucide-react';
 import { stepTouchesLayer, type Project, type Scenario } from '@tokenroll/joplo-core';
 import type { DemoController, Snapshot } from '../runtime/demo';
-import { Stage, viewportOf } from '../renderer/Stage';
+import { Stage } from '../renderer/Stage';
 import { cameraFor } from './cameraFor';
 import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
@@ -257,13 +257,18 @@ export function PlayerPage(p: PlayerPageProps) {
   const next = ctl.nextStep();
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
   const shownStep = scenario && snap.activeStep !== null ? scenario.steps[snap.activeStep] : null;
-  const device = state ? viewportOf(project, state) : 'desktop';
 
-  // 视角层级与导演镜头（D43）：镜头只由步骤推导（cameraAt），切层级不改变步骤和产品状态
-  const plan = cameraFor(project, scenario?.id ?? null, state?.position ?? 0, p.layer);
-  const { layers, director, viewLayer } = plan;
+  // 视角层级与导演镜头（D43 / T-layers）：每层是独立画面，镜头只由步骤推导（cameraAt），切层级不改变步骤和产品状态。
+  // 导演跟随时，下一步的操作目标不在当前层里，控制器会先请求切到它所在的层（leadLayer），再移动鼠标。
+  const lead = p.layer === null ? snap.leadLayer : null;
+  const plan = cameraFor(project, scenario?.id ?? null, state?.position ?? 0, p.layer ?? lead);
+  const director = p.layer === null || plan.director;
+  const { layers, viewLayer } = plan;
   const useCam = plan.enabled;
   const camera = plan.spec;
+  const shownScene = state ? project.scenes[plan.sceneId ?? state.sceneId] : undefined;
+  const device = shownScene?.viewport === 'mobile' ? 'mobile' : 'desktop';
+  useLayoutEffect(() => ctl.setStageView(plan.sceneId, director), [ctl, plan.sceneId, director]);
   const replayLayer = () => {
     if (!scenario) return;
     p.onLayer(viewLayer);
@@ -339,13 +344,14 @@ export function PlayerPage(p: PlayerPageProps) {
             </div>
           ) : null}
           <div className="relative flex min-h-0 flex-1 flex-col rounded-xl border bg-white" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
-            {state && project.scenes[state.sceneId] ? (
+            {state && shownScene ? (
               <StageViewport viewport={device} theme={p.theme} notice={snap.notice} onDismiss={() => ctl.dismissNotice()}>
                 <Stage
                   project={project}
                   state={state}
                   theme={p.theme}
                   camera={camera}
+                  sceneId={plan.sceneId}
                   mode="demo"
                   selectedId={p.selectedId ?? null}
                   preview={snap.preview}

@@ -92,6 +92,8 @@ export const Scene = z.strictObject({
   name: z.string().min(1),
   viewport: z.enum(['desktop', 'mobile']).default('desktop'),
   root: SceneNode,
+  /** 层级画面（T-layers）：所属层级的键；路径页面没有。 */
+  layer: z.string().optional(),
 });
 
 // ---------- 步骤与场景 ----------
@@ -124,7 +126,7 @@ export const Step = z.strictObject({
   ruleIds: z.array(Qid).default([]),
   /** 这一步的镜头（来自 shot()，按层级归类）。没有 shot 的步骤为空，镜头沿用上一步。 */
   shots: z.array(Shot).default([]),
-  /** 这一步导演切到哪一层（第一个 shot 决定）；null = 沿用上一步。 */
+  /** 这一步导演切到哪一层（第一个 shot 决定；没有 shot 的操作步骤取操作目标所在层）；null = 沿用上一步。 */
   directorLayer: z.string().nullable().default(null),
   source: Source,
 });
@@ -205,8 +207,8 @@ export const Option = z.strictObject({
   /** 该方案触及的路径（堆叠或新增）。 */
   routes: z.array(z.string()).default([]),
   coverage: z.record(Qid, Coverage).default({}),
-  /** 层级（视角，D43）：键 → 标题与根元素 id。演示信息，发布站保留。 */
-  layers: z.record(Id, z.strictObject({ title: z.string().min(1), roots: z.array(z.string().min(1)).min(1) })).default({}),
+  /** 层级（视角）：键 → 标题与这一层自己的画面（完全独立的页面）。演示信息，发布站保留。 */
+  layers: z.record(Id, z.strictObject({ title: z.string().min(1), sceneId: Qid })).default({}),
   source: Source,
 });
 

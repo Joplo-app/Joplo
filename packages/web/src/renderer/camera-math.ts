@@ -1,12 +1,13 @@
 /**
- * 镜头的纯计算（D43）：给定画面尺寸与焦点包围盒（内容坐标），算出平移缩放与遮罩洞。由 camera.tsx 使用，单测覆盖。
- * - 聚焦 / 层级：焦点放进画面并四周留 CAMERA_PAD；最多推近 MAX_ZOOM 倍，但对准架构图节点时，
+ * 镜头的纯计算（D43 / T-layers）：给定画面尺寸与焦点包围盒（这一层自己的内容坐标），算出平移缩放。由 camera.tsx 使用，单测覆盖。
+ * - 聚焦：焦点放进画面并四周留 CAMERA_PAD，居中；最多推近 MAX_ZOOM 倍，但对准架构图节点时，
  *   至少推近到节点主标签在屏幕上 ≥ MIN_NODE_PX（nodeScales = 每个节点“内容像素 → 屏幕像素”的比例，含架构图缩放与舞台外层缩放）。
- * - 全景：只缩小不放大，内容比画面大时整体缩进来、水平居中、垂直居中。
+ *   给了 bounds（这一层内容的范围）时，在不破坏内边距的前提下尽量不露出内容以外的空白。
+ * - 整层：只缩小不放大，内容比画面大时整体缩进来、居中。
  */
 export type Box = { x: number; y: number; w: number; h: number };
-export type CameraMode = 'focus' | 'layer' | 'overview';
-export type CameraFit = { k: number; tx: number; ty: number; hole: Box | null };
+export type CameraMode = 'focus' | 'overview';
+export type CameraFit = { k: number; tx: number; ty: number };
 
 export const CAMERA_PAD = 28;
 export const MAX_ZOOM = 2;
@@ -22,22 +23,62 @@ export function union(bs: Box[]): Box | null {
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
-export function fitCamera(input: { W: number; H: number; mode: CameraMode; bbox: Box; nodeScales?: number[] }): CameraFit {
+const clamp = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v)));
+
+/** 一个方向上的平移：先居中，再收进内容范围（不露空白），最后保证焦点四周的内边距（优先级最高）。 */
+function axis(view: number, k: number, b0: number, bs: number, c0: number | null, cs: number | null): number {
+  let t = view / 2 - k * (b0 + bs / 2);
+  if (c0 !== null && cs !== null && k * cs >= view) t = clamp(t, view - k * (c0 + cs), -k * c0);
+  return clamp(t, CAMERA_PAD - k * b0, view - CAMERA_PAD - k * (b0 + bs));
+}
+
+export function fitCamera(input: { W: number; H: number; mode: CameraMode; bbox: Box; nodeScales?: number[]; bounds?: Box | null }): CameraFit {
   const { W, H, mode, bbox } = input;
   if (mode === 'overview') {
     const k = Math.min(1, W / bbox.w, H / bbox.h);
-    if (k === 1) return { k: 1, tx: 0, ty: 0, hole: null };
-    return { k, tx: W / 2 - k * (bbox.x + bbox.w / 2), ty: H / 2 - k * (bbox.y + bbox.h / 2), hole: null };
+    if (k === 1) return { k: 1, tx: 0, ty: 0 };
+    return { k, tx: W / 2 - k * (bbox.x + bbox.w / 2), ty: H / 2 - k * (bbox.y + bbox.h / 2) };
   }
   const fit = Math.min((W - 2 * CAMERA_PAD) / bbox.w, (H - 2 * CAMERA_PAD) / bbox.h);
   let cap = MAX_ZOOM;
   for (const s of input.nodeScales ?? []) if (s > 0) cap = Math.max(cap, MIN_NODE_PX / (NODE_FONT_PX * s));
   const k = Math.max(0.05, Math.min(fit, cap));
-  const tx = W / 2 - k * (bbox.x + bbox.w / 2);
-  const ty = H / 2 - k * (bbox.y + bbox.h / 2);
-  const m = CAMERA_PAD * 0.5 / k;
-  return { k, tx, ty, hole: { x: bbox.x - m, y: bbox.y - m, w: bbox.w + 2 * m, h: bbox.h + 2 * m } };
+  const c = input.bounds ?? null;
+  return { k, tx: axis(W, k, bbox.x, bbox.w, c?.x ?? null, c?.w ?? null), ty: axis(H, k, bbox.y, bbox.h, c?.y ?? null, c?.h ?? null) };
+}
+
+/**
+ * 滚动容器里的目标：返回让目标（含 pad）进入可视区的新 scrollTop / scrollLeft（一个方向）。
+ * start/size：目标相对容器可视区的位置与大小；view：可视区大小；scroll：当前滚动量；max：最大滚动量。
+ */
+export function revealScroll(start: number, size: number, view: number, scroll: number, max: number, pad = 12): number {
+  let next = scroll;
+  if (size + 2 * pad >= view) next = scroll + start - pad;
+  else if (start < pad) next = scroll + start - pad;
+  else if (start + size > view - pad) next = scroll + start + size - view + pad;
+  return Math.max(0, Math.min(max, next));
 }
 
 /** 内容坐标的盒子经镜头变换后在画面里的位置。 */
 export const project = (b: Box, f: Pick<CameraFit, 'k' | 'tx' | 'ty'>): Box => ({ x: f.tx + f.k * b.x, y: f.ty + f.k * b.y, w: f.k * b.w, h: f.k * b.h });
+
+/**
+ * 元素实际可见的部分：与所有会裁切它的祖先（overflow 不是 visible 的容器，如固定高度的架构图、滚动区）求交。
+ * 镜头与高光都用它——此前直接用元素自己的矩形，元素被容器裁掉时，高光框和推近位置会落在空白处。
+ */
+export function visibleRect(el: Box, clips: Box[]): Box | null {
+  let x0 = el.x;
+  let y0 = el.y;
+  let x1 = el.x + el.w;
+  let y1 = el.y + el.h;
+  for (const c of clips) {
+    x0 = Math.max(x0, c.x);
+    y0 = Math.max(y0, c.y);
+    x1 = Math.min(x1, c.x + c.w);
+    y1 = Math.min(y1, c.y + c.h);
+  }
+  return x1 - x0 > 0.5 && y1 - y0 > 0.5 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+}
+
+/** 高光框：贴着目标的可见包围盒（描边画在框外侧，内沿与目标对齐）。 */
+export const highlightRect = (target: Box): Box => ({ ...target });
