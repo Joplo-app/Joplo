@@ -1,0 +1,29 @@
+{
+  "name": "joplo",
+  "version": "0.1.0",
+  "description": "Joplo 命令入口：npx joplo init / dev / check / build。转发到项目内安装的 @joplo/cli",
+  "license": "UNLICENSED",
+  "bin": {
+    "joplo": "./bin/joplo.cjs"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "keywords": [
+    "joplo",
+    "prototype",
+    "design",
+    "tsx",
+    "agent"
+  ],
+  "dependencies": {
+    "@joplo/cli": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

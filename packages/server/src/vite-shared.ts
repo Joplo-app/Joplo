@@ -8,11 +8,10 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { transformWithOxc, type Alias, type Plugin } from 'vite';
+import { transformWithOxc, type Plugin } from 'vite';
+import { cssEntry, locateWebAssets, tailwindIndexCss, type WebAssets } from './web-assets.ts';
 
-export const WEB_DIR = path.resolve(import.meta.dirname, '../../web');
-export const KIT_SRC = path.resolve(import.meta.dirname, '../../kit/src');
-const INDEX_CSS = path.join(WEB_DIR, 'src/index.css');
+export { kitAliases, locateWebAssets } from './web-assets.ts';
 
 /** 项目目录统一用真实路径（macOS 的 /tmp → /private/tmp），保证 jsxDEV 与调用栈给出的路径能被 relSource 转成相对路径。 */
 export function realProjectDir(dir: string): string {
@@ -22,15 +21,6 @@ export function realProjectDir(dir: string): string {
   } catch {
     return abs;
   }
-}
-
-/** 项目里的 `@joplo/kit` 指向本仓库的 kit 源码（项目可以在任意目录，不依赖它自己的 node_modules）。 */
-export function kitAliases(): Alias[] {
-  return [
-    { find: /^@joplo\/kit$/, replacement: path.join(KIT_SRC, 'index.ts') },
-    { find: /^@joplo\/kit\/(ui|node|jsx-runtime|jsx-dev-runtime)$/, replacement: path.join(KIT_SRC, '$1.ts') },
-    { find: /^@\//, replacement: path.join(WEB_DIR, 'src') + '/' },
-  ];
 }
 
 /** 不参与编译的项目子目录。 */
@@ -63,16 +53,21 @@ export function parseErrorLoc(message: string, file: string): { line: number; co
   return m ? { line: Number(m[1]), column: Number(m[2]) } : null;
 }
 
-/** 转译项目源文件（TSX → 收集数据的 JS）；把 Tailwind @source 指向项目目录。 */
-export function joploProjectPlugin(projectDir: string): Plugin {
+/**
+ * 转译项目源文件（TSX → 收集数据的 JS）；把 Tailwind @source 指向项目目录。
+ * dist 形态下 CSS 入口是 @joplo/web/dist/project.css，其中的 `@import "tailwindcss"` 改为从 server 的依赖解析。
+ */
+export function joploProjectPlugin(projectDir: string, web: WebAssets = locateWebAssets()): Plugin {
+  const entry = cssEntry(web);
   return {
     name: 'joplo:project',
     enforce: 'pre',
     async transform(code, id) {
       const file = id.split('?')[0]!;
-      if (file === INDEX_CSS) {
+      if (file === entry) {
         // Tailwind v4：@source 绝对路径；JSON.stringify 负责转义引号与反斜杠
-        return { code: `${code}\n@source ${JSON.stringify(projectDir)};\n`, map: null };
+        const css = web.mode === 'dist' ? code.replace(/@import\s+["']tailwindcss["']/, `@import ${JSON.stringify(tailwindIndexCss())}`) : code;
+        return { code: `${css}\n@source ${JSON.stringify(projectDir)};\n`, map: null };
       }
       if (!isProjectSource(projectDir, file) || !/\.(tsx|ts|jsx|js|mts)$/.test(file)) return;
       const lang = file.endsWith('.tsx') ? 'tsx' : file.endsWith('.jsx') ? 'jsx' : file.endsWith('.js') ? 'js' : 'ts';

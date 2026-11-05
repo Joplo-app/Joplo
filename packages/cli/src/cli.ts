@@ -1,7 +1,7 @@
 import { Command, CommanderError, Option } from 'commander';
 import { resolve } from 'node:path';
 import { guide, JoploError } from '@joplo/core';
-import type * as Server from '../../server/src/contract.ts';
+import type * as Server from '@joplo/server';
 import { check } from './check.ts';
 import { initProject } from './init.ts';
 import { readSelection } from './selection.ts';

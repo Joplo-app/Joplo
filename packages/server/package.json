@@ -1,19 +1,52 @@
 {
   "name": "@joplo/server",
   "version": "0.1.0",
-  "private": true,
+  "description": "Joplo 本地服务：dev 看板、build 发布站、render 截图",
+  "license": "UNLICENSED",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs",
+    "prepublishOnly": "node ../../scripts/build-package.mjs"
   },
   "dependencies": {
     "@joplo/core": "workspace:*",
     "@joplo/kit": "workspace:*",
+    "@joplo/web": "workspace:*",
     "@tailwindcss/vite": "4.3.4",
-    "@vitejs/plugin-react": "6.2.1",
-    "playwright": "1.64.1",
     "tailwindcss": "4.3.4",
     "vite": "8.3.5",
     "zod": "4.6.7"
+  },
+  "peerDependencies": {
+    "playwright": "^1.64.1"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.2.1",
+    "playwright": "1.64.1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
   }
 }

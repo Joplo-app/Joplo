@@ -6,19 +6,24 @@
  *
  * 安全（沿用 M0）：只监听 127.0.0.1；每个 HTTP 请求校验 Host；写接口校验 Origin、Content-Type 与本地令牌。
  * 端口被占用时直接报错（strictPort），不静默换端口。
+ *
+ * 看板界面有两种来源（web-assets.ts）：仓库里直接编译 packages/web/src（界面本身也热更新）；从 npm 安装时用
+ * @joplo/web 预构建的 dist/app。后者的 `import.meta.hot` 在构建时改成了 `globalThis.__JOPLO_HOT__`，这里在页面里
+ * 先用 Vite 客户端的 createHotContext 创建它，并以 JS 导入 project.css（作者 className，随项目文件热更新）。
  */
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
-import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { createLogger, createServer, type Logger, type Plugin, type ViteDevServer } from 'vite';
+import { createLogger, createServer, type Logger, type Plugin, type PluginOption, type ViteDevServer } from 'vite';
 import { JoploError, type Diagnostic, type Project } from '@joplo/core';
 import type { DevHandle, DevOptions } from './contract.ts';
 import { compileProject, invalidateProjectModules } from './project.ts';
 import { SelectionBody, readSelection, resolveSelection, writeSelection } from './selection.ts';
-import { IGNORED_DIRS, WEB_DIR, isProjectSource, joploProjectPlugin, kitAliases, realProjectDir } from './vite-shared.ts';
+import { IGNORED_DIRS, isProjectSource, joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
+import type { DistWeb, WebAssets } from './web-assets.ts';
 
 /** 推给看板的编译结果。`project` 始终是最近一次成功的 IR；`ok=false` 时看板显示错误列表、保留画面。 */
 export type DevPayload = {
@@ -84,6 +89,48 @@ function makeLogger(log: (line: string) => void): Logger {
   };
 }
 
+const MIME: Record<string, string> = {
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.json': 'application/json; charset=utf-8',
+};
+
+/** dist 形态：/assets/* 原样返回预构建文件（不经过 Vite 的模块转换）。返回 true 表示已处理。 */
+function serveDistAsset(web: DistWeb, pathname: string, res: http.ServerResponse): boolean {
+  if (!pathname.startsWith('/assets/')) return false;
+  const assets = path.join(web.appDir, 'assets');
+  let rel: string;
+  try {
+    rel = decodeURIComponent(pathname.slice('/assets/'.length));
+  } catch {
+    return false;
+  }
+  const file = path.resolve(assets, rel);
+  if (!file.startsWith(assets + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return false;
+  res.writeHead(200, { 'content-type': MIME[path.extname(file)] ?? 'application/octet-stream', 'x-content-type-options': 'nosniff', 'cache-control': 'public, max-age=31536000, immutable' });
+  fs.createReadStream(file).pipe(res);
+  return true;
+}
+
+/** dist 形态：在看板入口脚本之前创建 HMR 句柄、导入作者 className 的 CSS。 */
+export function injectDistBoot(html: string, web: DistWeb): string {
+  const css = '/@fs/' + web.projectCss.split(path.sep).join('/').replace(/^\/+/, '');
+  const boot = `<script type="module">import { createHotContext } from '/@vite/client';\nimport ${JSON.stringify(css)};\nglobalThis.__JOPLO_HOT__ = createHotContext('/@joplo/board');</script>`;
+  const at = html.search(/<script\b/i);
+  return at < 0 ? html.replace('</head>', `${boot}\n</head>`) : html.slice(0, at) + boot + '\n    ' + html.slice(at);
+}
+
+async function webPlugins(web: WebAssets): Promise<PluginOption[]> {
+  if (web.mode === 'dist') return [tailwindcss()];
+  // 只有在仓库里编译看板源码时才需要 React 插件（devDependency）
+  const { default: react } = await import('@vitejs/plugin-react');
+  return [react(), tailwindcss()];
+}
+
 export type InternalDevOptions = DevOptions & {
   /** false：只编译一次、不监听文件（renderStep 用它保证截图与元素索引来自同一份 IR）。 */
   watch?: boolean;
@@ -97,6 +144,7 @@ export async function createDev(opts: InternalDevOptions): Promise<InternalDevHa
   const watch = opts.watch !== false;
   const port = opts.port ?? 4790;
   const token = crypto.randomBytes(24).toString('hex');
+  const web = locateWebAssets();
   let actualPort = port;
   let payload: DevPayload = { version: 0, ok: false, project: null, diagnostics: [], home: null };
 
@@ -111,6 +159,7 @@ export async function createDev(opts: InternalDevOptions): Promise<InternalDevHa
           const host = req.headers.host ?? '';
           if (!allowedHosts().has(host)) return sendJson(res, 403, { error: { code: 'PERMISSION_DENIED', message: `Host 头不被允许：${host || '(空)'}` } });
           const url = new URL(req.url ?? '/', `http://127.0.0.1:${actualPort}`);
+          if (web.mode === 'dist' && (req.method === 'GET' || req.method === 'HEAD') && serveDistAsset(web, url.pathname, res)) return;
           if (!url.pathname.startsWith('/__joplo/')) return next();
           const method = req.method ?? 'GET';
           if (url.pathname === '/__joplo/ir' && method === 'GET') return sendJson(res, 200, payload);
@@ -153,7 +202,8 @@ export async function createDev(opts: InternalDevOptions): Promise<InternalDevHa
       });
     },
     transformIndexHtml(html) {
-      return html.replace('__JOPLO_TOKEN__', token);
+      const out = html.replace('__JOPLO_TOKEN__', token);
+      return web.mode === 'dist' ? injectDistBoot(out, web) : out;
     },
     // 项目源文件只在服务端（ssr 环境）使用：它们的变化由下面的重新编译处理，不交给 Vite 的默认 HMR。
     // client 环境里只保留非项目模块（例如以项目目录为 @source 的 index.css），新 className 照常热更新。
@@ -167,22 +217,27 @@ export async function createDev(opts: InternalDevOptions): Promise<InternalDevHa
   const server = await createServer({
     configFile: false,
     envDir: false,
-    root: WEB_DIR,
+    root: web.mode === 'dist' ? web.appDir : web.webDir,
     mode: 'development',
     appType: 'spa',
     clearScreen: false,
     customLogger: makeLogger(log),
-    resolve: { alias: kitAliases() },
-    plugins: [joploProjectPlugin(projectDir), boardPlugin, react(), tailwindcss()],
-    cacheDir: path.join(WEB_DIR, 'node_modules/.vite-joplo'),
-    optimizeDeps: {
-      include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'radix-ui', 'clsx', 'tailwind-merge', 'class-variance-authority', '@joplo/core > zod'],
-    },
+    resolve: { alias: kitAliases(web, projectDir) },
+    plugins: [joploProjectPlugin(projectDir, web), boardPlugin, ...(await webPlugins(web))],
+    // dist 形态不往 node_modules 里写缓存（可能只读，或被多个项目共享）
+    cacheDir: web.mode === 'dist' ? path.join(projectDir, '.joplo/vite') : path.join(web.webDir, 'node_modules/.vite-joplo'),
+    optimizeDeps:
+      web.mode === 'dist'
+        ? { noDiscovery: true, include: [] }
+        : {
+            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'radix-ui', 'clsx', 'tailwind-merge', 'class-variance-authority', '@joplo/core > zod'],
+          },
     server: {
       host: '127.0.0.1',
       port,
       strictPort: true,
       open: false,
+      ...(web.mode === 'dist' ? { fs: { allow: [web.webDir, projectDir] } } : {}),
       ...(watch ? { watch: { ignored: IGNORED_DIRS.map((d) => path.join(projectDir, d) + '/**') } } : { watch: null }),
     },
   });
