@@ -177,6 +177,7 @@
   - 支付使用 Waffo Pancake（MoR）。
   - **默认分享免费，但链接只有 1 小时有效**；过期后需要重新发布，或者升级会员获得永久链接。
   - 本地 CLI 保持开源、完整、免费；收费点放在只有云端才能提供的能力上（托管、永久链接、观看数据、评论回流、方案确认、分享页一键导出）。
+  - 云端代码放在单独的私有仓库 `TokenRollAI/joplo-cloud`（本地 `~/.paradev/projects/joplo-cloud`），它有自己的决策记录 `docs/decisions.md`。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions
