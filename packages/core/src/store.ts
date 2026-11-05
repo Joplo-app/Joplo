@@ -10,6 +10,13 @@ import {
   access,
 } from 'node:fs/promises';
 import { join } from 'node:path';
+import {
+  readFileSync,
+  writeFileSync,
+  linkSync,
+  renameSync,
+  existsSync,
+} from 'node:fs';
 import { randomUUID, createHash } from 'node:crypto';
 import { Project, parseRevision } from './schema.ts';
 import {
@@ -23,7 +30,7 @@ import {
 import { validate } from './validate.ts';
 import { JoploError } from './result.ts';
 import type { DomainResult } from './result.ts';
-import { safePath, withProjectLock } from './lock.ts';
+import { safePath, withProjectLock, withCommitGuard } from './lock.ts';
 export const canonicalJSON = (v: unknown): string =>
   JSON.stringify(sortJSON(v));
 function sortJSON(v: unknown): unknown {
@@ -138,8 +145,13 @@ async function findReceipt(
   try {
     receipt = JSON.parse(await readFile(path, 'utf8'));
   } catch (e) {
-    if (missing(e)) return;
-    throw e;
+    if (!missing(e)) throw e;
+    const p = await readProject(dir);
+    const staged = (await committedStaging(dir, p)).find(
+      (f) => f.target === `.joplo/receipts/${hash(key)}.json`,
+    );
+    if (!staged) return;
+    receipt = JSON.parse(staged.bytes);
   }
   // 读者可能撞上另一个进程尚未替换 project 的阶段；该回执还不算提交。
   if (receipt.result.revision > (await readProject(dir)).revision) return;
@@ -147,60 +159,164 @@ async function findReceipt(
     throw new JoploError('IDEMPOTENCY_MISMATCH', '幂等键已用于不同内容');
   return receipt.result;
 }
-/** journal 在 project rename 前已持久化。崩溃后依权威项目恢复提交或清理半成品。 */
-type Journal = {
-  revision: number;
-  projectHash: string;
-  created: string[];
-  tempDir: string;
-};
-async function cleanupTemps(dir: string) {
-  const meta = await safePath(dir, '.joplo');
-  for (const name of await readdir(meta))
-    if (/^tmp-[a-f0-9-]+$/.test(name))
-      await rm(await safePath(dir, '.joplo', name), {
-        recursive: true,
-        force: true,
-      });
-}
-async function recover(dir: string) {
-  const journalPath = await safePath(dir, '.joplo', 'transaction.json');
-  let j: Journal;
-  try {
-    j = JSON.parse(await readFile(journalPath, 'utf8'));
-  } catch (e) {
-    if (missing(e)) {
-      await cleanupTemps(dir);
-      return;
-    }
-    throw e;
-  }
-  const journalSchema = z.strictObject({
-    revision: z.number().int().nonnegative(),
-    projectHash: z.string().regex(/^[a-f0-9]{64}$/),
-    created: z.array(
-      z
+/** 每个事务的 journal 只位于自己的临时目录，不共享可覆盖的 journal 路径。 */
+const JournalSchema = z.strictObject({
+  pid: z.number().int().positive(),
+  revision: z.number().int().nonnegative(),
+  projectHash: z.string().regex(/^[a-f0-9]{64}$/),
+  files: z.array(
+    z.strictObject({
+      temp: z.string().regex(/^file_\d+$/),
+      target: z
         .string()
         .regex(/^\.joplo\/(revisions\/rev_\d+|receipts\/[a-f0-9]{64})\.json$/),
-    ),
-    tempDir: z.string().regex(/^\.joplo\/tmp-[a-f0-9-]+$/),
-  });
-  j = parseInput(journalSchema, j);
-  let committed = false;
+      hash: z.string().regex(/^[a-f0-9]{64}$/),
+    }),
+  ),
+});
+type Journal = z.infer<typeof JournalSchema>;
+async function committedStaging(
+  dir: string,
+  p: Project,
+): Promise<{ target: string; bytes: string }[]> {
+  const meta = await safePath(dir, '.joplo');
+  let names: string[];
   try {
-    committed =
-      hash(
-        await readFile(await safePath(dir, 'project.joplo.json'), 'utf8'),
-      ) === j.projectHash;
+    names = await readdir(meta);
   } catch (e) {
-    if (!missing(e)) throw e;
+    if (missing(e)) return [];
+    throw e;
   }
-  if (!committed)
-    for (const path of j.created)
-      await rm(await safePath(dir, path), { force: true });
-  await rm(await safePath(dir, j.tempDir), { recursive: true, force: true });
-  await rm(journalPath, { force: true });
-  await cleanupTemps(dir);
+  const currentHash = hash(
+    await readFile(await safePath(dir, 'project.joplo.json'), 'utf8'),
+  );
+  const found: { target: string; bytes: string }[] = [];
+  for (const name of names) {
+    const match = /^tmp-(\d+)-[a-f0-9-]+$/.exec(name);
+    if (!match) continue;
+    const temp = await safePath(dir, '.joplo', name);
+    let journal: Journal;
+    try {
+      journal = parseInput(
+        JournalSchema,
+        JSON.parse(await readFile(join(temp, 'journal.json'), 'utf8')),
+      );
+    } catch (e) {
+      if (missing(e)) continue;
+      throw e;
+    }
+    if (journal.pid !== Number(match[1]))
+      throw new JoploError('INVALID_SCHEMA', '事务持有者与暂存目录不一致');
+    if (journal.revision !== p.revision || journal.projectHash !== currentHash)
+      continue;
+    for (const f of journal.files) {
+      let bytes: string;
+      try {
+        bytes = await readFile(join(temp, f.temp), 'utf8');
+      } catch (e) {
+        if (!missing(e)) throw e;
+        bytes = await readFile(await safePath(dir, f.target), 'utf8');
+      }
+      if (hash(bytes) !== f.hash)
+        throw new JoploError('INVALID_SCHEMA', '暂存快照完整性校验失败');
+      found.push({ target: f.target, bytes });
+    }
+  }
+  return found;
+}
+function alive(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code !== 'ESRCH';
+  }
+}
+function promote(dir: string, temp: string, journal: Journal) {
+  for (const file of journal.files) {
+    const source = join(temp, file.temp);
+    const target = join(dir, file.target);
+    if (existsSync(target)) {
+      if (hash(readFileSync(target, 'utf8')) !== file.hash)
+        throw new JoploError('INVALID_REFERENCE', '不可覆盖不可变快照或回执');
+      continue;
+    }
+    // hard link 的 EEXIST 语义禁止覆盖；永远不删除/回滚已发布文件。
+    if (hash(readFileSync(source, 'utf8')) !== file.hash)
+      throw new JoploError('INVALID_SCHEMA', '暂存文件完整性校验失败');
+    linkSync(source, target);
+  }
+}
+async function recover(dir: string, assertOwned: () => void) {
+  const meta = await safePath(dir, '.joplo');
+  for (const name of await readdir(meta)) {
+    const match = /^tmp-(\d+)-[a-f0-9-]+$/.exec(name);
+    if (!match) continue;
+    const pid = Number(match[1]);
+    if (alive(pid)) {
+      const temp = await safePath(dir, '.joplo', name);
+      try {
+        const j = parseInput(
+          JournalSchema,
+          JSON.parse(await readFile(join(temp, 'journal.json'), 'utf8')),
+        );
+        const current = await readFile(
+          await safePath(dir, 'project.joplo.json'),
+          'utf8',
+        );
+        if (hash(current) === j.projectHash)
+          throw new JoploError(
+            'REVISION_CONFLICT',
+            '已提交事务等待原持有者完成持久化',
+            { details: { reason: 'LOCK_BUSY' } },
+          );
+      } catch (e) {
+        if (!missing(e)) throw e;
+      }
+      continue;
+    } // 活着的旧持有者只能清理自己的暂存目录。
+    const temp = await safePath(dir, '.joplo', name);
+    const journalPath = join(temp, 'journal.json');
+    let journal: Journal | undefined;
+    try {
+      journal = parseInput(
+        JournalSchema,
+        JSON.parse(await readFile(journalPath, 'utf8')),
+      );
+    } catch (e) {
+      if (!missing(e)) throw e;
+    }
+    if (journal) {
+      if (journal.pid !== pid)
+        throw new JoploError('INVALID_SCHEMA', '事务持有者与暂存目录不一致');
+      for (const file of journal.files) await safePath(dir, file.target);
+      await withCommitGuard(dir, () => {
+        assertOwned();
+        if (alive(pid)) return;
+        const projectPath = join(dir, 'project.joplo.json');
+        if (existsSync(projectPath)) {
+          const bytes = readFileSync(projectPath, 'utf8');
+          const current = parseProject(JSON.parse(bytes));
+          const snapshotPath = join(
+            dir,
+            '.joplo',
+            'revisions',
+            `rev_${journal.revision}.json`,
+          );
+          const committedCurrent =
+            current.revision === journal.revision &&
+            hash(bytes) === journal.projectHash;
+          const committedPast =
+            current.revision >= journal.revision &&
+            existsSync(snapshotPath) &&
+            hash(readFileSync(snapshotPath, 'utf8')) === journal.projectHash;
+          if (committedCurrent || committedPast) promote(dir, temp, journal);
+          // 相同 revision 的快照属于另一个事务，说明本 journal 从未提交；只清理它自己的暂存文件。
+        }
+      });
+    }
+    await rm(temp, { recursive: true, force: true });
+  }
 }
 async function commit(
   dir: string,
@@ -211,77 +327,86 @@ async function commit(
   receipt: DomainResult,
   assertOwned: () => void,
 ) {
+  const root = await safePath(dir);
   await mkdir(await safePath(dir, '.joplo', 'revisions'), { recursive: true });
   await mkdir(await safePath(dir, '.joplo', 'receipts'), { recursive: true });
-  const tempRel = `.joplo/tmp-${randomUUID()}`;
-  const temp = await safePath(dir, tempRel);
+  const temp = await safePath(
+    dir,
+    '.joplo',
+    `tmp-${process.pid}-${randomUUID()}`,
+  );
   await mkdir(temp);
-  const created: string[] = [];
-  const moves: { from: string; to: string }[] = [];
-  let projectCommitted = false;
-  const journalPath = await safePath(dir, '.joplo', 'transaction.json');
+  const files: Journal['files'] = [];
+  let committed = false;
+  let complete = false;
   const projectBytes = encode(after);
-  async function stage(rel: string, bytes: string) {
-    const to = await safePath(dir, rel);
-    try {
-      await access(to);
-      throw new JoploError('INVALID_SCHEMA', `不可变文件已存在：${rel}`);
-    } catch (e) {
-      if (!missing(e)) throw e;
-    }
-    const from = join(temp, String(moves.length));
-    await writeFile(from, bytes, { flag: 'wx', flush: true });
-    moves.push({ from, to });
-    created.push(rel);
+  async function stage(target: string, bytes: string) {
+    await safePath(dir, target);
+    const name = `file_${files.length}`;
+    await writeFile(join(temp, name), bytes, { flag: 'wx', flush: true });
+    files.push({ temp: name, target, hash: hash(bytes) });
   }
   try {
-    if (before) {
-      const path = await safePath(
-        dir,
-        '.joplo',
-        'revisions',
-        `rev_${before.revision}.json`,
+    if (before)
+      await stage(
+        `.joplo/revisions/rev_${before.revision}.json`,
+        encode(before),
       );
-      try {
-        await access(path);
-      } catch (e) {
-        if (!missing(e)) throw e;
-        await stage(
-          `.joplo/revisions/rev_${before.revision}.json`,
-          encode(before),
-        );
-      }
-    }
     await stage(`.joplo/revisions/rev_${after.revision}.json`, projectBytes);
-    const receiptRel = `.joplo/receipts/${hash(key)}.json`;
-    await stage(receiptRel, encode({ fingerprint, result: receipt }));
-    const stagedProject = join(temp, 'project.json');
-    await writeFile(stagedProject, projectBytes, { flag: 'wx', flush: true });
-    const stagedJournal = join(temp, 'journal.json');
-    await writeFile(
-      stagedJournal,
-      encode({
-        revision: after.revision,
-        projectHash: hash(projectBytes),
-        created,
-        tempDir: tempRel,
-      }),
-      { flag: 'wx', flush: true },
+    await stage(
+      `.joplo/receipts/${hash(key)}.json`,
+      encode({ fingerprint, result: receipt }),
     );
-    await rename(stagedJournal, journalPath);
+    const journal: Journal = {
+      pid: process.pid,
+      revision: after.revision,
+      projectHash: hash(projectBytes),
+      files,
+    };
+    await writeFile(join(temp, 'journal.tmp'), encode(journal), {
+      flag: 'wx',
+      flush: true,
+    });
     assertOwned();
-    for (const m of moves) await rename(m.from, m.to);
+    await rename(join(temp, 'journal.tmp'), join(temp, 'journal.json'));
+    await writeFile(join(temp, 'project.tmp'), projectBytes, {
+      flag: 'wx',
+      flush: true,
+    });
     assertOwned();
-    await rename(stagedProject, await safePath(dir, 'project.joplo.json'));
-    projectCommitted = true;
+    await rename(join(temp, 'project.tmp'), join(temp, 'project.ready'));
+    await withCommitGuard(dir, () => {
+      assertOwned();
+      const projectPath = join(root, 'project.joplo.json');
+      if (before) {
+        const current = parseProject(
+          JSON.parse(readFileSync(projectPath, 'utf8')),
+        );
+        checkRevision(current, before.revision);
+        if (canonicalJSON(current) !== canonicalJSON(before))
+          throw new JoploError('REVISION_CONFLICT', '项目内容已变化');
+      } else if (existsSync(projectPath))
+        throw new JoploError('PERMISSION_DENIED', '项目已存在');
+      for (const f of files) {
+        const target = join(root, f.target);
+        if (existsSync(target) && hash(readFileSync(target, 'utf8')) !== f.hash)
+          throw new JoploError('INVALID_REFERENCE', '不可覆盖不可变文件');
+      }
+      assertOwned();
+      renameSync(join(temp, 'project.ready'), projectPath);
+      committed = true;
+      promote(root, temp, journal);
+      complete = true;
+    });
   } catch (e) {
-    if (!projectCommitted)
-      for (const rel of created)
-        await rm(await safePath(dir, rel), { force: true });
-    throw e;
+    if (!committed) throw e; // 项目已替换：提交成功，保留自己的 journal 供进程退出后的恢复。
   } finally {
-    await rm(temp, { recursive: true, force: true });
-    await rm(journalPath, { force: true });
+    if (!committed || complete)
+      try {
+        await rm(temp, { recursive: true, force: true });
+      } catch {
+        /* 清理不能把已经提交成功的结果改成失败。 */
+      }
   }
 }
 export async function applyPatch(
@@ -297,12 +422,29 @@ export async function applyPatch(
   };
   const fingerprint = hash(canonicalJSON({ type: 'apply', ...normalized }));
   const execute = async (assertOwned: () => void) => {
-    if (!options.dryRun) await recover(dir);
+    if (!options.dryRun) await recover(dir, assertOwned);
     const prior = await findReceipt(dir, patch.idempotencyKey, fingerprint);
-    if (prior) return prior;
+    if (prior)
+      return options.dryRun
+        ? {
+            ...prior,
+            data: {
+              ...(prior.data as object),
+              dryRun: true,
+              replayedReceipt: true,
+            },
+          }
+        : prior;
     const before = await readProject(dir);
     checkRevision(before, patch.expectRevision);
     const applied = applyOperations(before, patch.operations);
+    if (canonicalJSON(applied.project) === canonicalJSON(before))
+      return result(
+        before,
+        '变更无实际变化',
+        { dryRun: Boolean(options.dryRun), unchanged: true },
+        { diagnostics: checkReferences(before) },
+      );
     const after = parseProject({
       ...applied.project,
       revision: before.revision + 1,
@@ -357,6 +499,16 @@ export async function history(
         current: snapshot.revision === p.revision,
       });
   }
+  for (const file of await committedStaging(dir, p))
+    if (/^\.joplo\/revisions\/rev_\d+\.json$/.test(file.target)) {
+      const snapshot = parseProject(JSON.parse(file.bytes));
+      if (!revisions.has(snapshot.revision))
+        revisions.set(snapshot.revision, {
+          revision: snapshot.revision,
+          updatedAt: snapshot.updatedAt,
+          current: snapshot.revision === p.revision,
+        });
+    }
   revisions.set(p.revision, {
     revision: p.revision,
     updatedAt: p.updatedAt,
@@ -377,16 +529,17 @@ export async function readRevision(
   if (p.revision === parseRevision(n)) return p;
   if (parseRevision(n)! > p.revision)
     throw new JoploError('NOT_FOUND', '修订尚未提交或不存在');
-  return parseProject(
-    await readJSON(
-      await safePath(
-        dir,
-        '.joplo',
-        'revisions',
-        `rev_${parseRevision(n)}.json`,
-      ),
-    ),
-  );
+  const target = `.joplo/revisions/rev_${parseRevision(n)}.json`;
+  try {
+    return parseProject(await readJSON(await safePath(dir, target)));
+  } catch (e) {
+    if (!(e instanceof JoploError && e.code === 'NOT_FOUND')) throw e;
+    const staged = (await committedStaging(dir, p)).find(
+      (f) => f.target === target,
+    );
+    if (staged) return parseProject(JSON.parse(staged.bytes));
+    throw e;
+  }
 }
 const Restore = z.strictObject({
   revision: RevisionInput,
@@ -397,7 +550,12 @@ export async function restore(
   dir: string,
   raw: z.input<typeof Restore>,
 ): Promise<DomainResult> {
-  const opts = parseInput(Restore, raw);
+  const parsed = Restore.safeParse(raw);
+  if (!parsed.success)
+    throw new JoploError('USAGE', '恢复参数无效', {
+      details: parsed.error.issues,
+    });
+  const opts = parsed.data;
   const fingerprint = hash(
     canonicalJSON({
       type: 'restore',
@@ -407,7 +565,7 @@ export async function restore(
     }),
   );
   return withProjectLock(dir, async (assertOwned) => {
-    await recover(dir);
+    await recover(dir, assertOwned);
     const prior = await findReceipt(dir, opts.idempotencyKey, fingerprint);
     if (prior) return prior;
     const p = await readProject(dir);
@@ -468,7 +626,7 @@ export async function initProject(
     throw new JoploError('INVALID_SCHEMA', '项目名称不能为空');
   await mkdir(dir, { recursive: true });
   return withProjectLock(dir, async (assertOwned) => {
-    await recover(dir);
+    await recover(dir, assertOwned);
     const file = await safePath(dir, 'project.joplo.json');
     try {
       await access(file);
@@ -488,7 +646,7 @@ export async function initProject(
       dir,
       undefined,
       p,
-      'init',
+      '\0joplo:internal:init',
       hash(canonicalJSON({ name })),
       receipt,
       assertOwned,

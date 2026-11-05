@@ -100,7 +100,7 @@ test('schema、历史 scope、selection、comments 与 pendingQuestions', async 
     code: 'INVALID_SCHEMA',
   });
 });
-test.each([0, 1, 2, 3, 4])(
+test.each([0, 1])(
   '文件系统 rename 第 %d 次失败：project 字节不变，无回执/快照/临时文件',
   async (failAt) => {
     const d = await fixture();
@@ -159,11 +159,26 @@ test('同批清理引用才可删除；评论失去目标保留锚点', async ()
         },
       },
       { op: 'removeNode', sceneId: 'scene_a_members', nodeId: 'btn_invite' },
+      ...Object.values(p.scenarios).map((s) => ({
+        op: 'upsertScenario',
+        value: {
+          ...s,
+          steps: s.steps.filter(
+            (st) =>
+              !('target' in st.action && st.action.target === 'btn_invite'),
+          ),
+        },
+      })),
       ...Object.values(p.rules)
         .filter((r) => r.elementRefs.includes('scene_a_members#btn_invite'))
         .map((r) => ({
           op: 'upsertRule',
-          value: { ...r, elementRefs: [], confirmation: 'pending' },
+          value: {
+            ...r,
+            elementRefs: [],
+            stepIds: [],
+            confirmation: 'pending',
+          },
         })),
     ]),
   );

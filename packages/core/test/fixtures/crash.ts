@@ -1,11 +1,11 @@
-import fs from 'node:fs/promises';
+import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
-const rename = fs.rename;
-fs.rename = async (from, to) => {
+const rename = fs.renameSync;
+fs.renameSync = (from, to) => {
   const project = String(to).endsWith('/project.joplo.json');
   if (project && process.argv[4] === 'before')
     process.kill(process.pid, 'SIGKILL');
-  await rename(from, to);
+  rename(from, to);
   if (project && process.argv[4] === 'after')
     process.kill(process.pid, 'SIGKILL');
 };

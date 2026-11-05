@@ -350,6 +350,18 @@ export function validate(
         s.id,
         s.optionId,
       );
+    for (const target of scenarioTargets(s))
+      ref(
+        Boolean(
+          p.scenes[target.sceneId] &&
+          p.scenes[target.sceneId]?.optionId === s.optionId &&
+          findNode(p.scenes[target.sceneId]!, target.nodeId),
+        ),
+        `步骤目标不存在于当前画面：${target.sceneId}#${target.nodeId}`,
+        'step',
+        target.step.id,
+        s.optionId,
+      );
     for (const step of s.steps) {
       for (const id of step.ruleIds) {
         const r = p.rules[id];

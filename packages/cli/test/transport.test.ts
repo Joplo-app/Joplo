@@ -121,6 +121,41 @@ test('CLI/MCP 同 patch、修订、changedIds 和错误码一致；stdout 只有
   ).toEqual(
     JSON.parse(await readFile(join(b, 'project.joplo.json'), 'utf8')).scenes,
   );
+  const dryCli = await cli(
+    ['apply', a, '--patch', '-', '--dry-run'],
+    JSON.stringify(patch),
+  );
+  const dryMcp = (
+    await m.client.callTool({
+      name: 'joplo_apply',
+      arguments: { patch, dryRun: true },
+    })
+  ).structuredContent as any;
+  expect(dryCli.result.data).toMatchObject({
+    dryRun: true,
+    replayedReceipt: true,
+  });
+  expect(dryMcp.data).toEqual(dryCli.result.data);
+  expect(dryMcp.revision).toBe(2);
+  const unchangedPatch = {
+    ...patch,
+    expectRevision: 2,
+    idempotencyKey: 'unchanged',
+  };
+  const sameCli = await cli(
+    ['apply', a, '--patch', '-'],
+    JSON.stringify(unchangedPatch),
+  );
+  const sameMcp = (
+    await m.client.callTool({
+      name: 'joplo_apply',
+      arguments: { patch: unchangedPatch },
+    })
+  ).structuredContent as any;
+  expect(sameCli.result.data.unchanged).toBe(true);
+  expect(sameMcp.data).toEqual(sameCli.result.data);
+  expect(sameMcp.revision).toBe(2);
+  expect(sameMcp.changedIds).toEqual([]);
   for (const bad of [
     { ...patch, idempotencyKey: 'conflict' },
     { ...patch, summary: '重复键不同内容' },

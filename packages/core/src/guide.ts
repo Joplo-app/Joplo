@@ -62,8 +62,8 @@ const dimensions = [
   ['consistency', '跨步骤一致性', '前面的输入、权限和选择在后续是否仍成立？'],
 ].map(([id, name, question]) => ({ id, name, question }));
 const boundaries = [
-  '不能确认规则。已有 confirmed 规则仅在 text 和 caseIds 不变时可保持；更改后回到 pending。',
-  '不能创建或修改 decisions，不能把评论设为 resolved。',
+  '不能确认规则。已有 confirmed 规则仅在 confirmation 以外所有字段不变时可保持；更改后回到 pending。',
+  '不能创建或修改 decisions，不能把评论设为 resolved。评论作者只能是 agent；不能将 issue 标为 accepted/resolved，除非保持已有状态。恢复不能删除评论或重新打开已解决评论。',
   '不能修改 schemaVersion、项目 id 或 revision；revision 只由存储提交递增。',
   '不调用真实业务 API、发送邮件或付款；所有步骤只做模拟。',
   '不声称情况已穷尽；不适用或排除要说明原因，新 Case 需要重新检查旧方案。',

@@ -28,7 +28,11 @@ export const RevisionInput = z
     const n = parseRevision(v);
     return n !== null && Number.isSafeInteger(n);
   }, '无效修订号');
-export const IdempotencyKey = z.string().min(1).max(256);
+export const IdempotencyKey = z
+  .string()
+  .min(1)
+  .max(256)
+  .refine((key) => !key.includes('\0'), '幂等键不可包含 NUL');
 const json = z.json();
 export const NodePatch = z
   .strictObject({
@@ -210,18 +214,53 @@ export function applyOperations(
       >;
       const table = upserts[op.op as keyof typeof upserts];
       const value = structuredClone(u.value);
+      const ownership = (project: Project) =>
+        (
+          project[table] as Record<
+            string,
+            { featureId?: string; optionId?: string }
+          >
+        )[value.id];
+      const existing = ownership(original) ?? ownership(p);
+      if (existing)
+        for (const field of ['featureId', 'optionId'] as const) {
+          if (
+            existing[field] !==
+            (value as { featureId?: string; optionId?: string })[field]
+          )
+            throw new JoploError(
+              'INVALID_REFERENCE',
+              `已有对象不可改变 ${field}：${value.id}`,
+            );
+        }
+      if (op.op === 'upsertIssue') {
+        const next = value as Issue;
+        if (next.status !== 'open' && next.status !== p.issues[next.id]?.status)
+          deny('接受或解决问题只能由人完成');
+      }
       if (op.op === 'upsertRule') {
         const next = value as Rule;
         const old = p.rules[next.id];
         const unchanged =
-          old?.text === next.text &&
-          JSON.stringify(old.caseIds) === JSON.stringify(next.caseIds);
+          old !== undefined &&
+          JSON.stringify({ ...old, confirmation: undefined }) ===
+            JSON.stringify({ ...next, confirmation: undefined });
         if (
           next.confirmation === 'confirmed' &&
           !(old?.confirmation === 'confirmed' && unchanged)
         )
           deny('规则确认只能由人完成');
-        if (old?.confirmation === 'confirmed' && !unchanged)
+        const confirmed =
+          original.rules[next.id]?.confirmation === 'confirmed'
+            ? original.rules[next.id]
+            : old?.confirmation === 'confirmed'
+              ? old
+              : undefined;
+        if (
+          confirmed &&
+          JSON.stringify({ ...confirmed, confirmation: undefined }) !==
+            JSON.stringify({ ...next, confirmation: undefined })
+        )
           next.confirmation = 'pending';
       }
       // schema 各自验证了 value，动态表写入不改变其他表。
@@ -241,16 +280,18 @@ export function applyOperations(
         const { props, ...fields } = op.patch;
         Object.assign(n, fields);
         if (props) {
-          n.props ??= {};
           for (const [key, v] of Object.entries(props)) {
-            if (v === null) delete n.props[key];
-            else
+            if (v === null) {
+              if (n.props) delete n.props[key];
+            } else {
+              n.props ??= {};
               Object.defineProperty(n.props, key, {
                 value: structuredClone(v),
                 enumerable: true,
                 writable: true,
                 configurable: true,
               });
+            }
           }
         }
         changed.add(op.sceneId);
@@ -298,6 +339,7 @@ export function applyOperations(
       }
       case 'addComment':
         if (op.value.status === 'resolved') deny('评论只能由人关闭');
+        if (op.value.author !== 'agent') deny('Agent 不能冒充用户发表评论');
         if (p.comments[op.value.id])
           throw new JoploError(
             'INVALID_SCHEMA',
@@ -338,11 +380,23 @@ export function protectRestore(current: Project, target: Project): void {
       if (
         !old ||
         old.confirmation !== 'confirmed' ||
-        old.text !== r.text ||
-        JSON.stringify(old.caseIds) !== JSON.stringify(r.caseIds)
+        JSON.stringify({ ...old, confirmation: undefined }) !==
+          JSON.stringify({ ...r, confirmation: undefined })
       )
         deny('恢复不能重新确认规则');
     }
+  for (const c of Object.values(current.comments)) {
+    const restored = target.comments[c.id];
+    if (!restored) deny('恢复不能删除现有评论');
+    if (c.status === 'resolved' && restored!.status !== 'resolved')
+      deny('恢复不能重新打开已解决评论');
+  }
+  for (const issue of Object.values(target.issues))
+    if (
+      issue.status !== 'open' &&
+      issue.status !== current.issues[issue.id]?.status
+    )
+      deny('恢复不能接受或解决问题');
   for (const c of Object.values(target.comments))
     if (
       c.status === 'resolved' &&

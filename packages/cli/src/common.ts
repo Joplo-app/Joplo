@@ -3,13 +3,27 @@ import { z } from 'zod';
 import { ERROR_CODES, JoploError } from '@joplo/core';
 import type { DomainFailure, DomainResult } from '@joplo/core';
 export function failure(e: unknown): DomainFailure {
+  const systemCode = (e as NodeJS.ErrnoException | null)?.code;
+  const message = e instanceof Error ? e.message : String(e);
   const error =
     e instanceof JoploError
       ? e
-      : new JoploError(
-          'INVALID_SCHEMA',
-          e instanceof Error ? e.message : String(e),
-        );
+      : ['ENOENT', 'ENOTDIR'].includes(systemCode ?? '')
+        ? new JoploError('NOT_FOUND', message)
+        : ['EACCES', 'EPERM'].includes(systemCode ?? '')
+          ? new JoploError('PERMISSION_DENIED', message)
+          : systemCode === 'ELOCKED'
+            ? new JoploError('REVISION_CONFLICT', message, {
+                details: { reason: 'LOCK_BUSY' },
+              })
+            : e instanceof SyntaxError || e instanceof z.ZodError
+              ? new JoploError('INVALID_SCHEMA', message)
+              : new JoploError('UNSUPPORTED_ACTION', message, {
+                  details: {
+                    reason: 'INTERNAL_ERROR',
+                    ...(systemCode ? { systemCode } : {}),
+                  },
+                });
   return {
     ok: false,
     requestId: randomUUID(),
@@ -91,7 +105,13 @@ export const GetOutput = domainOutput(
     }),
   }),
 );
-export const ApplyOutput = domainOutput(z.object({ dryRun: z.boolean() }));
+export const ApplyOutput = domainOutput(
+  z.object({
+    dryRun: z.boolean(),
+    replayedReceipt: z.boolean().optional(),
+    unchanged: z.boolean().optional(),
+  }),
+);
 export const ValidateOutput = domainOutput(
   z.object({
     diagnostics: z.array(diagnostic),

@@ -41,7 +41,7 @@ pnpm joplo mcp --project /absolute/path/to/project --transport stdio
 | 工具             | 输入                                                                                            | 成功 data                                                                                           |
 | ---------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `joplo_get`      | `scope`，可选 `id`、`revision`、`status`                                                        | `content`、`pendingQuestions: {issues, aiAssumptions}`；顶层带 revision                             |
-| `joplo_apply`    | `patch: {expectRevision,idempotencyKey,summary,operations[]}`，可选 `dryRun`                    | `dryRun`；顶层带 revision、changedIds 和 diagnostics                                                |
+| `joplo_apply`    | `patch: {expectRevision,idempotencyKey,summary,operations[]}`，可选 `dryRun`                    | `dryRun`，可选 `unchanged` / `replayedReceipt`；顶层带 revision、changedIds 和 diagnostics          |
 | `joplo_validate` | `mode: structure/replay/all`（默认 all），可选 `optionId`                                       | diagnostics、summary（error/warning/info 计数）、verification（按方案）                             |
 | `joplo_render`   | 必填 `scenarioId`，可选 `optionId`、`stepId`、`theme: sketch/clean`、`viewport: {width,height}` | sceneId、position、elements（id/type/label/visible/disabled/box）、warnings；content 另含 PNG image |
 
@@ -71,8 +71,10 @@ apply 示例：
 }
 ```
 
-所有写入调用同一个 core 内核，与 CLI 共享锁、幂等、引用检查和人工边界。不能确认规则、修改 decisions、关闭评论或修改项目元数据；冲突要先重新读取，不自动覆盖。校验通过只表示结构/模拟回放状态。
+所有写入调用同一个 core 内核，与 CLI 共享锁、幂等、引用检查和人工边界。不能确认规则、修改 decisions、关闭评论或修改项目元数据；评论作者只能是 agent，不能替人将 issue 标成 accepted/resolved；冲突要先重新读取，不自动覆盖。校验通过只表示结构/模拟回放状态。
 
 render 调用 `@joplo/server.renderStep`，将临时 PNG 编为 image content，返回元素索引后清理文件；不会返回失效的临时文件路径。当前分支 server 仍是桩，返回 RENDER_FAILED；成功图像接线已用 mock 验证，真实渲染由 T-web 接入。不注册 compare/export。
 
 集成测试使用 SDK Client + StdioClientTransport，捕获原始 stdout，逐行断言 JSON-RPC 2.0，且没有 stderr/transport 错误。两个独立临时项目分别从 CLI 和 MCP 应用同一 patch，断言 changedIds、修订变化和场景内容相同；并比较 REVISION_CONFLICT、IDEMPOTENCY_MISMATCH、INVALID_SCHEMA、PERMISSION_DENIED。
+
+无变化返回当前修订和 data.unchanged=true。dry-run 命中已提交回执时带 data.dryRun=true、data.replayedReceipt=true。锁忙/失锁分别以 REVISION_CONFLICT 加 details.reason=LOCK_BUSY/LOCK_LOST 返回；调用方应重新读取或稍后重试。存储恢复与内核锁细节见 [CLI 文档](cli.md#存储与恢复)。

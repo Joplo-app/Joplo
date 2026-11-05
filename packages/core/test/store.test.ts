@@ -91,7 +91,13 @@ describe('受控存储不变量', () => {
       expect(await readFile(join(d, 'project.joplo.json'))).toEqual(before);
       expect(
         (await files(d)).filter(
-          (x) => !['project.joplo.json', '.joplo'].includes(x),
+          (x) =>
+            ![
+              'project.joplo.json',
+              '.joplo',
+              '.joplo/commit.guard',
+              '.joplo/lease.token',
+            ].includes(x),
         ),
       ).toEqual([]);
     }
@@ -191,9 +197,13 @@ describe('受控存储不变量', () => {
     const confirmed = { ...rule, confirmation: 'confirmed' as const };
     p.rules[rule.id] = confirmed;
     await writeFile(join(d, 'project.joplo.json'), JSON.stringify(p));
-    await applyPatch(
+    const same = await applyPatch(
       d,
       patch('same', [{ op: 'upsertRule', value: confirmed }]),
+    );
+    expect(same.revision).toBe(1);
+    expect((await readProject(d)).rules[rule.id]!.confirmation).toBe(
+      'confirmed',
     );
     await applyPatch(d, {
       ...patch('edit', [
@@ -202,7 +212,7 @@ describe('受控存储不变量', () => {
           value: { ...confirmed, text: '已变更', confirmation: 'pending' },
         },
       ]),
-      expectRevision: 2,
+      expectRevision: 1,
     });
     expect((await readProject(d)).rules[rule.id]?.confirmation).toBe('pending');
   });

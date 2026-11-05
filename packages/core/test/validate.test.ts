@@ -156,7 +156,7 @@ test('回放失败可定位，unchecked 不谎报成功', async () => {
   const p = await fixture();
   p.scenarios.sc_a_success!.steps[0]!.action = {
     type: 'click',
-    target: 'absent',
+    target: 'in_email',
   };
   const r = validate(p, { mode: 'replay' });
   expect(
