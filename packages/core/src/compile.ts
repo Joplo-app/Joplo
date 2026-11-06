@@ -5,7 +5,7 @@
  * - dev 模式：每个方案在每个路径上各有一个画面 `<方案>@<路径>`，其中其他功能取选定方案，本功能取该方案；
  *   另有发布视图 `@<路径>`（全部取选定方案）。
  * - publish 模式：只有发布视图；只含选定方案的场景；去掉规则、情况、问题等创作侧信息（D33）。
- * - review 模式（评审版，D62）：画面与场景同 dev（所有功能的所有方案），创作侧信息按 publish 的规则去掉。
+ * - review 模式（评审版，D63）：画面与场景同 dev（所有功能的所有方案），创作侧信息按 publish 的规则去掉。
  */
 import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo-app/kit/node';
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@joplo-app/kit';

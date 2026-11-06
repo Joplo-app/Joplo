@@ -7,7 +7,7 @@
  * 3. 后处理：IR 内联到 index.html；入口脚本内联为 <script type="module">、去掉 crossorigin，
  *    这样直接双击 index.html（file://）也能离线运行。产物是普通静态目录，可 `wrangler deploy --assets` 或任何静态托管发布。
  *
- * `review: true`（评审版，D62）时第 1 步用 compile 的 review 模式：含所有功能的所有方案，同样去掉创作侧信息；其余步骤相同。
+ * `review: true`（评审版，D63）时第 1 步用 compile 的 review 模式：含所有功能的所有方案，同样去掉创作侧信息；其余步骤相同。
  *
  * 目标目录非空且没有 overwrite 时拒绝写入；永远不清空项目目录本身或它的上级目录。
  *

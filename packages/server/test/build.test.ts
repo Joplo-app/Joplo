@@ -95,7 +95,7 @@ describe('buildSite', () => {
   }, 120_000);
 });
 
-/** 创作侧文字（规则含 AI 假设、待决问题、设计备注、取舍、决策重点）：dev IR 里有，任何构建产物里都不能出现（D33 / D62）。 */
+/** 创作侧文字（规则含 AI 假设、待决问题、设计备注、取舍、决策重点）：dev IR 里有，任何构建产物里都不能出现（D33 / D63）。 */
 async function authoringStrings(dir: string): Promise<string[]> {
   // 与 buildSite 同一条载入路径（Vite ssrLoadModule + kit 别名），只是编译成 dev IR
   const web = locateWebAssets();
@@ -122,7 +122,7 @@ function siteText(outDir: string, files: string[]): string {
   return files.filter((f) => TEXT.test(f)).map((f) => fs.readFileSync(path.join(outDir, f), 'utf8')).join('\n');
 }
 
-describe('评审版构建（review: true，D62）', () => {
+describe('评审版构建（review: true，D63）', () => {
   let dir: string;
   beforeAll(() => {
     dir = copy();
