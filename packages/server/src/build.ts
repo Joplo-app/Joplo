@@ -7,6 +7,8 @@
  * 3. 后处理：IR 内联到 index.html；入口脚本内联为 <script type="module">、去掉 crossorigin，
  *    这样直接双击 index.html（file://）也能离线运行。产物是普通静态目录，可 `wrangler deploy --assets` 或任何静态托管发布。
  *
+ * `review: true`（评审版，D62）时第 1 步用 compile 的 review 模式：含所有功能的所有方案，同样去掉创作侧信息；其余步骤相同。
+ *
  * 目标目录非空且没有 overwrite 时拒绝写入；永远不清空项目目录本身或它的上级目录。
  *
  * 从 npm 安装时（web-assets.ts 的 dist 形态）第 2 步不编译界面源码：复制 @joplo-app/web 预构建的发布站，
@@ -97,7 +99,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
 
   const web = locateWebAssets();
 
-  // 1. 编译（publish）
+  // 1. 编译（publish；评审版用 review）
   const loader = await createServer({
     configFile: false,
     envDir: false,
@@ -111,7 +113,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   });
   let compiled: Awaited<ReturnType<typeof compileProject>>;
   try {
-    compiled = await compileProject(loader, projectDir, 'publish');
+    compiled = await compileProject(loader, projectDir, opts.review === true ? 'review' : 'publish');
   } finally {
     await loader.close();
   }

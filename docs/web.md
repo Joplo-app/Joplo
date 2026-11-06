@@ -125,9 +125,9 @@ trace 同时提供镜头目标；聚焦同一 Diagram 的多个节点时，相�
 
 发布站字体按内容裁剪：在 source 与 npm dist 两种模式下，先完成 IR/入口 JS 内联和作者 CSS 编译，再扫描 staging 目录里全部 UTF-8 文本产物（含全部语言词典、HTML、CSS content 与 Unicode 转义），保留有交集的 Excalifont / 霞鹜漫黑 `@font-face` 和对应 woff2。无法解析的规则保守保留；许可证随实际分发字体保留。裁剪后的 CSS 重新计算文件名哈希并更新 HTML 引用，避免静态托管缓存旧规则。目录仍自包含，默认字体不引用外部 URL，不加载文楷，不带小赖。观众在输入框中新输入、且产物未出现过的字可能退回系统字体；罕用汉字与韩文也使用系统字体。
 
-发布站与本地看板共用首页和演示页布局，只呈现选定方案、功能目标、场景、步骤字幕及整体布局。没有本机项目目录、缺口、待决问题、规则来源或源码检查抽屉。
+发布站与本地看板共用首页和演示页布局，只呈现选定方案、功能目标、场景、步骤字幕及整体布局。没有本机项目目录、缺口、待决问题、规则来源或源码检查抽屉。`joplo share --review` 构建的评审版（`buildSite({ review: true })`，D62）另含所有功能的所有方案，供云端评审页按场景切换比较；规则、问题、情况、AI 假设、备注、取舍和源位置同样不进产物。
 
-层级、导演、只重放一层、缩放平移、播放速度、时间线、字幕、全屏和快捷键与看板一致。带 `?embed=1` 时是给 iframe 用的嵌入模式，见[嵌入模式](#嵌入模式)。首页是项目名、说明和功能卡片（带缩略图）；演示页的顶栏只有「复制链接」和全屏，左栏是功能名、目标和选定方案的场景（按场景排列，没有方案切换），底部标明“用 Joplo 制作的概念原型 · 非正式实现”。没有检查、外观和导出（D55）。发布站的配色固定用 config 的 theme，字体和线条暂不发布；作者 CSS 随产物打包。
+层级、导演、只重放一层、缩放平移、播放速度、时间线、字幕、全屏和快捷键与看板一致。带 `?embed=1` 时是给 iframe 用的嵌入模式，见[嵌入模式](#嵌入模式)；再加 `review=1` 是给云端评审页用的评审模式，见[评审模式](#评审模式embed1review1)。首页是项目名、说明和功能卡片（带缩略图）；演示页的顶栏只有「复制链接」和全屏，左栏是功能名、目标和选定方案的场景（按场景排列，没有方案切换），底部标明“用 Joplo 制作的概念原型 · 非正式实现”。没有检查、外观和导出（D55）。发布站的配色固定用 config 的 theme，字体和线条暂不发布；作者 CSS 随产物打包。
 
 ## 嵌入模式
 
@@ -150,6 +150,42 @@ trace 同时提供镜头目标；聚焦同一 Diagram 的多个节点时，相�
 - 嵌入代码写 `allow="fullscreen *" allowfullscreen`（`share --format json` 的 `data.embed.iframe` 和云端控制台都是这个写法）：按钮和 F 都能进入 / 退出 Fullscreen API 全屏，进度保持，不开新标签页。
 - 为什么必须是 `fullscreen *`：CSP sandbox 让分享文档变成 opaque origin，而 `allow="fullscreen"` 的默认授权源是 iframe 的 src 源，两者不匹配，Chromium、Firefox、WebKit 里 `fullscreenEnabled` 都是 false（`allow` 优先于 `allowfullscreen`）；只写 `allowfullscreen` 或写 `allow="fullscreen *"` 时可用。嵌入方如果改回 `allow="fullscreen"` 或删掉授权，全屏退回为「在新标签页打开」（已验证：新标签页是去掉 embed=1 的同一个分享页，停在当前场景与步骤）。
 - Tab 聚焦封面时焦点框可见，Enter 开始播放。
+
+### 评审模式（`?embed=1&review=1`）
+
+云端评审页（`cloud.joplo.app/review/<id>`）用 iframe 嵌入分享页并加 `review=1`，在嵌入播放器上多一条 postMessage 通道（云端契约第 8.2 节，实现见 [review-bridge.ts](../packages/web/src/site/review-bridge.ts)）。画面和控件与普通嵌入相同；`review` 必须恰好是 `1`，且页面确实在 iframe 里（`window.parent !== window`），否则不注册 `message` 监听、不发任何消息，与普通嵌入完全一样。评审版（`joplo share --review`）的发布站含所有方案，评审页靠 `joplo:goto` 指定场景来切换方案；评审模式下 `scenario=` 参数也可以指向任何方案的场景。
+
+| 方向 | 消息 | 时机 |
+| --- | --- | --- |
+| 演示 → 外层 | `{ type: "joplo:ready", protocol: 1, scenarios: [{ id, optionId, steps }] }` | 加载完成，一次 |
+| 演示 → 外层 | `{ type: "joplo:position", protocol: 1, scenario, step, stepId, layer }` | ready 后立即一次；之后场景、步骤、层级任一项变化时各一次 |
+| 演示 → 外层 | `{ type: "joplo:pick-result", protocol: 1, element: { id, label } \| null }` | 选元素结束（null = Esc 或取消按钮） |
+| 外层 → 演示 | `{ type: "joplo:goto", protocol: 1, scenario, step, highlight: <元素 id> \| null }` | 定位到某条评论 |
+| 外层 → 演示 | `{ type: "joplo:pick", protocol: 1, active: boolean }` | 进入 / 退出选择元素 |
+
+- 发送一律 `window.parent.postMessage(msg, "*")`，内容只有场景、步骤和元素 id，不含秘密。
+- `scenarios`：IR 里的所有场景，按功能顺序 → 方案在 `feature.optionIds` 里的顺序 → 场景在 IR 里的顺序；`steps` 是步骤数。
+- `step` 是播放器位置：0 = 初始状态（封面），k = 已执行 k 步，范围 0..steps；`stepId` 是第 k 步（`steps[k-1]`）的 id，step 为 0 时是 null。评审清单 `steps[].index` 从 0 开始，所以 `index = step - 1`。`layer` 是有层级的方案里当前显示的层级键，没有层级时 null。相同的 (scenario, step, stepId, layer) 不重复发，自动播放的中间帧也不会刷屏。
+- 入站只处理 `event.source === window.parent` 且校验通过的消息：`protocol` 必须是数字 1；`goto.scenario` 必须是 IR 里有的场景（不认原型链上的键），`step` 必须是非负整数（超过步数时夹到步数），`highlight` 是 null、缺省或作者元素 id（`^[A-Za-z][A-Za-z0-9_-]{0,63}$`，编译器生成的 `_` 开头 id 不行）；`pick.active` 必须是布尔值。多余字段忽略，其余一律丢弃。处理出错不影响之后的消息。
+- `goto`：去掉嵌入封面、停止播放，跳到那个场景和步骤；`highlight` 的元素画红色描边（随镜头一起移动，换层后仍在）。观众自己切到别的场景或步骤，或者下一次 goto 时清除。
+- `pick`：进入选择元素模式时去掉封面、暂停播放，并尝试把焦点交给演示；顶部出现“点画面里的元素来选中 · Esc 取消”和「取消」。悬停时可选元素画墨色虚线框，写“类型 · 名字”（与看板检查元素同一套样式）；单击发出 pick-result 并退出，这次点击不执行演示步骤；Esc 或「取消」发出 `element: null`。外层发 `active: false` 时直接退出，不再回发消息。
+- 可选元素与看板检查元素复用同一个命中规则（`pickTarget`），再向上找最近的作者 id，所以 `element.id` 一定是 IR 元素 Id，和规则的 `elementIds` 同一套；`label` 是 IR 节点的 `nodeLabel`（最多 200 个码点），与评审清单 `elements[].label` 一致。
+- 评审页仍要自己按 `event.source === iframe.contentWindow` 校验来源。浏览器不允许 iframe 抢焦点时，Esc 会落在外层页面，评审页应自己处理 Esc 并发 `pick active: false`。
+
+#### 实测（2026-11-06）
+
+方法同上一节：分享源 `127.0.0.1` 返回 `joplo build examples/invite` 的产物，HTML 带 CSP `sandbox allow-scripts allow-popups allow-downloads; connect-src 'none'; form-action 'none'; base-uri 'none'`（另加 `Access-Control-Allow-Origin: *` 让字体能加载）；外层页面在另一个源，嵌入三个 iframe：`?embed=1&review=1`、不带 review 的 `?embed=1`，以及一个和外层同源、冒充外层给演示发消息的 iframe。产物有两份：普通发布（只含选定方案），以及 `buildSite({ review: true })`（即 `joplo share --review` 用的构建）产出的真实评审版（invite 的 a-modal、b-batch 两个方案共 5 个场景）。Playwright 在 Chromium、Firefox、WebKit 上，普通发布各 28 项、评审版各 29 项全部通过：
+
+- 收到 ready，场景列表与内联 IR 一致（id、optionId、步数、protocol 1）；沙箱里 `origin` 是 `null`、`localStorage` 抛 SecurityError。
+- ready 后立即收到一次 step 0 / stepId null 的 position。
+- 来自别的窗口的 goto、`protocol: 2`、`highlight: "_gen"`、不存在的场景都被忽略，没有新的 position。
+- 外层 goto（场景 + 第 3 步 + `in_email`）后收到一次字段正确的 position，`in_email` 有实线描边，封面已去掉；重复同一个 goto 不再发 position。
+- pick：出现提示条，悬停 `btn_send` 出现虚线框；单击收到 `{ id: "btn_send", label: "发送邀请" }`，演示没有前进一步，退出选择模式；点到 TextInput 内部的 `<input>` 时取到最近的作者 id `in_email`。
+- Esc 收到 `element: null`；焦点原本在外层页面的输入框时，进入选择模式后 Esc 也能取消；外层 `active: false` 退出且不回发消息。
+- 观众自己点下一步：发且只发一次 position（step 4），描边清除。
+- 评审版：goto 到另一个方案（b-batch）的场景，收到一次该场景的 position，即切换了方案。
+- 不带 review=1 的嵌入：不发任何消息，收到 goto 也不响应（仍是封面）；外层没有收到其他来源的消息。
+- 没有 fetch / XHR 等网络请求，没有失败的资源请求，控制台没有 CSP 违规或错误。
 
 ## 实现入口
 

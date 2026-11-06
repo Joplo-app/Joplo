@@ -232,6 +232,9 @@ export function createEs(locale: Locale = 'es') {
       embedOpenInNewTab: "Abrir en una pestaña nueva",
       embedPlayer: "Reproductor de la demo",
       embedNoScenario: "Esta demo aún no tiene escenarios para reproducir.",
+      // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
+      reviewPickHint: "Haz clic en un elemento de la escena para seleccionarlo · Esc para cancelar",
+      reviewPickCancel: "Cancelar",
     },
   });
 }

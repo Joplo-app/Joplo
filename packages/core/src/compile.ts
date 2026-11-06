@@ -5,6 +5,7 @@
  * - dev 模式：每个方案在每个路径上各有一个画面 `<方案>@<路径>`，其中其他功能取选定方案，本功能取该方案；
  *   另有发布视图 `@<路径>`（全部取选定方案）。
  * - publish 模式：只有发布视图；只含选定方案的场景；去掉规则、情况、问题等创作侧信息（D33）。
+ * - review 模式（评审版，D62）：画面与场景同 dev（所有功能的所有方案），创作侧信息按 publish 的规则去掉。
  */
 import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo-app/kit/node';
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@joplo-app/kit';
@@ -30,7 +31,12 @@ const KNOWN = new Set<string>(COMPONENT_TYPES);
 const OVERLAY = 'overlay';
 const MOCK_LABEL = { success: 'Mock success', failure: 'Mock failure', denied: 'Mock permission denied', other: 'Mock' } as const;
 
-export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): CompileResult {
+export type CompileMode = 'dev' | 'publish' | 'review';
+
+export function compile(src: AuthoringProject, mode: CompileMode): CompileResult {
+  /** 所有方案都参与（dev、review）；创作侧信息要去掉（publish、review）。 */
+  const allOpts = mode !== 'publish';
+  const strip = mode !== 'dev';
   const diags: Diagnostic[] = [];
   const rel = (s?: string) => (s ? relSource(src.root, s) : undefined);
   const err = (code: string, message: string, at?: string, ref?: Diagnostic['ref']) =>
@@ -80,7 +86,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       else err('UNKNOWN_PICK', `Feature ${fid} pick "${pick}" is not an option under options/`, f.def.source);
     } else if (mode === 'publish') warn('NOT_PICKED', `Feature "${f.def.name}" has no picked option and will not be published`, f.def.source);
   }
-  const included = mode === 'dev' ? allOptions : [...picked.values()];
+  const included = allOpts ? allOptions : [...picked.values()];
 
   // ---------- 2. 路径表 ----------
   type RouteEntry = { path: string; page: PageDef & { file: string }; addedBy?: Opt };
@@ -135,12 +141,12 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       goal: fdef.goal,
       roles: rolesOf(fdef.roles),
       constraints: Object.entries(fdef.constraints ?? {}).map(([id, c]) => (typeof c === 'string' ? { id, text: c, hard: true } : { id, text: c.text, hard: c.hard ?? true })),
-      caseIds: mode === 'publish' ? [] : caseIds,
+      caseIds: strip ? [] : caseIds,
       optionIds: included.filter((o) => o.fid === fid).map((o) => o.qid),
       pick: picked.get(fid)?.qid ?? null,
       ...(fdef.source ? { source: rel(fdef.source) } : {}),
     };
-    if (mode === 'publish') continue;
+    if (strip) continue;
     for (const [k, c] of Object.entries(fdef.cases ?? {})) out.cases[`${fid}.${k}`] = caseOf(`${fid}.${k}`, fid, c, rel(fdef.source));
     for (const [k, r] of Object.entries(fdef.rules ?? {})) out.rules[`${fid}.${k}`] = ruleOf(`${fid}.${k}`, fid, undefined, r, rel);
     for (const [k, q] of Object.entries(fdef.questions ?? {})) out.issues[`${fid}.${k}`] = { id: `${fid}.${k}`, featureId: fid, text: q.text, severity: q.severity, refs: q.refs, ...(q.source ? { source: rel(q.source) } : {}) };
@@ -205,7 +211,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     out.scenes[s.id] = s;
   };
   for (const r of routesIn(null)) addScene(composeScene(r, null));
-  if (mode === 'dev') for (const o of included) for (const r of routesIn(o)) addScene(composeScene(r, o));
+  if (allOpts) for (const o of included) for (const r of routesIn(o)) addScene(composeScene(r, o));
 
   // ---------- 5. 方案、场景、覆盖 ----------
   for (const o of included) {
@@ -214,7 +220,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     const ctxRoutes = new Set(routesIn(o).map((r) => r.path));
     const touched = [...Object.keys(def.on ?? {}), ...Object.keys(def.routes ?? {})];
     for (const p of Object.keys(def.on ?? {})) if (!ctxRoutes.has(p)) err('UNKNOWN_ROUTE', `Option ${qid} adds elements to an unknown route ${p}`, def.source);
-    const sceneOf = (path: string) => (mode === 'dev' ? `${qid}@${path}` : `@${path}`);
+    const sceneOf = (path: string) => (allOpts ? `${qid}@${path}` : `@${path}`);
 
     if (mode === 'dev') {
       for (const [k, r] of Object.entries(def.rules ?? {})) out.rules[`${qid}.${k}`] = ruleOf(`${qid}.${k}`, fid, qid, r, rel);
@@ -436,7 +442,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           caption: st.caption ?? generated!.caption,
           ...(generated?.captionAuto ? { captionAuto: generated.captionAuto } : {}),
           effects,
-          ruleIds: mode === 'publish' ? [] : ruleIds,
+          ruleIds: strip ? [] : ruleIds,
           shots,
           directorLayer,
           ...(explains.length ? { explain: explains.join('\n') } : {}),
@@ -453,7 +459,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         optionId: qid,
         name: fl.name,
         description: fl.opts.description ?? '',
-        caseIds: mode === 'publish' ? [] : (fl.opts.cases ?? []).filter((c) => fdef.cases?.[c]).map((c) => `${fid}.${c}`),
+        caseIds: strip ? [] : (fl.opts.cases ?? []).filter((c) => fdef.cases?.[c]).map((c) => `${fid}.${c}`),
         mock: { label: fl.opts.mock ?? MOCK_LABEL[outcome], outcome, ...(fl.opts.mock === undefined ? { auto: true as const } : {}) },
         initial: { sceneId: sceneOf(start), ui: state.ui, data: state.data, inputs: state.inputs },
         steps,
@@ -489,8 +495,8 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       key: o.key,
       name: def.name,
       idea: def.idea,
-      decisionFocus: mode === 'publish' ? '' : (def.focus ?? ''),
-      tradeoffs: mode === 'publish' ? [] : (def.tradeoffs ?? []),
+      decisionFocus: strip ? '' : (def.focus ?? ''),
+      tradeoffs: strip ? [] : (def.tradeoffs ?? []),
       routes: touched,
       coverage,
       layers,
@@ -507,8 +513,8 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     }
   }
 
-  // ---------- 7. 发布视图：去掉设计备注 ----------
-  if (mode === 'publish') {
+  // ---------- 7. 发布视图与评审版：去掉设计备注与源位置 ----------
+  if (strip) {
     for (const s of Object.values(out.scenes) as Scene[]) stripNotes(s.root);
     stripSources(out);
   }

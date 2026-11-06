@@ -9,6 +9,9 @@
  * - 键盘：空格 播放 / 暂停，← → 切步，F 全屏；控件都有可见焦点。
  * - 在 CSP `sandbox allow-scripts allow-popups allow-downloads; connect-src 'none'` 下运行：不发网络请求、不依赖存储（语言记忆读写失败已容错），
  *   链接一律在新标签页打开（sandbox 有 allow-popups），不在 iframe 里跳转。
+ * - 评审模式（`review=1`，云端契约 8.2，见 review-bridge.ts）：向外层发 ready / position / pick-result，
+ *   处理外层的 goto（跳到场景和步骤、给元素描边）和 pick（选择元素：悬停虚线框，点击选中，Esc 取消）。
+ *   不是评审模式时不注册 message 监听、不发任何消息。
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ChevronLeft, ChevronRight, Expand, ExternalLink, ListVideo, Pause, Play, Shrink } from 'lucide-react';
@@ -25,10 +28,12 @@ import { coverFor, coverShown } from '../player/cover-content';
 import { Curtain, curtainUp } from '../player/Curtain';
 import { cameraFor, cameraPosition, withLeadFrame } from '../player/cameraFor';
 import { Btn, MenuButton, useWidth } from '../player/controls';
+import { pickTarget } from '../renderer/Stage';
 import { JoploMark } from '../player/JoploMark';
 import { translate } from '../i18n/messages';
 import { useI18n } from '../i18n/context';
 import { cn } from '@/lib/utils';
+import { authorElement, createReviewBridge, elementLabel, type ReviewBridge, type ReviewGoto } from './review-bridge';
 import { embedInitial, embedKey, embedProgress, embedScenarioItems, fullscreenAvailable, standaloneUrl, type EmbedParams } from './embed-model';
 
 const BRAND_URL = 'https://joplo.app/';
@@ -56,6 +61,12 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
   const [rowRef, rowW] = useWidth(800);
   const L = barLayout(rowW);
   const canFull = typeof document !== 'undefined' && fullscreenAvailable(document);
+  // 评审模式（review=1）：选择元素模式、悬停框、外层 goto 指定的描边元素（anchor = 描边时的场景与步骤，离开后清除）
+  const [picking, setPicking] = useState(false);
+  const [pickBox, setPickBox] = useState<{ x: number; y: number; w: number; h: number; type: string | null; name: string } | null>(null);
+  const [highlight, setHighlight] = useState<{ id: string; scenario: string; step: number } | null>(null);
+  const bridgeRef = useRef<ReviewBridge | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     document.title = i18n.site.prototypeTitle(project.name);
@@ -92,6 +103,8 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
   // 控制条的步骤与字幕右侧一致：播放中是正在播的那一步，否则是当前位置
   const shown = subtitle?.index ?? pos;
   const items = embedScenarioItems(project, snap.scenarioId);
+  const reviewLayer = plan.layers.length ? plan.viewLayer : null;
+  const stepId = scenario && pos > 0 ? (scenario.steps[pos - 1]?.id ?? null) : null;
   const playing = snap.playing && !snap.paused;
   const playLabel = !snap.playing ? (state?.completed ? i18n.player.replay : i18n.player.play) : snap.paused ? i18n.player.resume : i18n.player.pause;
 
@@ -99,6 +112,96 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
     setCovered(false);
     void ctl.play();
   };
+
+  // ---------- 评审模式（review=1） ----------
+  const reviewHandlers = useRef<{ goto: (g: ReviewGoto) => void; pick: (active: boolean) => void }>({ goto: () => undefined, pick: () => undefined });
+  reviewHandlers.current = {
+    goto: (g) => {
+      setCovered(false);
+      ctl.setScenario(g.scenario, g.step, { quiet: true });
+      setHighlight(g.highlight ? { id: g.highlight, scenario: g.scenario, step: g.step } : null);
+    },
+    pick: (active) => {
+      setPickBox(null);
+      if (!active) return setPicking(false);
+      setCovered(false);
+      const s = ctl.getSnapshot();
+      if (s.playing && !s.paused) ctl.pause();
+      setPicking(true);
+      // 让 Esc 落到演示里（浏览器可能不允许 iframe 抢焦点；那时外层自己处理 Esc，发 pick active:false）
+      try {
+        window.focus();
+        rootRef.current?.focus({ preventScroll: true });
+      } catch {
+        /* 忽略 */
+      }
+    },
+  };
+  useEffect(() => {
+    const bridge = createReviewBridge({
+      enabled: params.review,
+      win: window as unknown as Parameters<typeof createReviewBridge>[0]['win'],
+      project,
+      onGoto: (g) => reviewHandlers.current.goto(g),
+      onPick: (a) => reviewHandlers.current.pick(a),
+    });
+    bridgeRef.current = bridge;
+    bridge?.ready();
+    return () => {
+      bridge?.dispose();
+      bridgeRef.current = null;
+    };
+  }, [project, params.review]);
+  // 位置：场景、步骤、层级任何一项变化时发一次（桥里去重）
+  useEffect(() => {
+    if (snap.scenarioId && state) bridgeRef.current?.position({ scenario: snap.scenarioId, step: pos, stepId, layer: reviewLayer });
+  });
+  // 描边：观众自己切到别的场景或步骤时清除
+  useEffect(() => {
+    if (highlight && (highlight.scenario !== snap.scenarioId || highlight.step !== pos)) setHighlight(null);
+  }, [highlight, snap.scenarioId, pos]);
+  // 每次渲染后重新给描边元素打标记（换层、重新挂载后仍然在）
+  useEffect(() => {
+    if (!stageEl) return;
+    for (const el of stageEl.querySelectorAll('[data-review-highlight]')) if (!highlight || (el as HTMLElement).dataset.jid !== highlight.id) el.removeAttribute('data-review-highlight');
+    if (highlight) for (const el of stageEl.querySelectorAll(`[data-jid="${CSS.escape(highlight.id)}"]`)) el.setAttribute('data-review-highlight', '');
+  });
+  const endPick = (element: { id: string; label: string } | null) => {
+    setPicking(false);
+    setPickBox(null);
+    bridgeRef.current?.pickResult(element);
+  };
+  const pickableAt = (target: EventTarget | null): HTMLElement | null => {
+    if (!stageEl || !(target instanceof HTMLElement) || !stageEl.contains(target)) return null;
+    return authorElement(pickTarget(target, 'demo', true), stageEl);
+  };
+  const onPickMove = (e: React.MouseEvent<HTMLElement>) => {
+    const el = pickableAt(e.target);
+    if (!el || !mainRef.current) return setPickBox(null);
+    const box = mainRef.current.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    setPickBox({ x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height, type: el.dataset.jtype ?? null, name: elementLabel(project, plan.sceneId ?? state?.sceneId ?? null, el.dataset.jid!, el.dataset.jtype ?? null).replace(/\s+/g, ' ').trim().slice(0, 24) });
+  };
+  const onPickClick = (e: React.MouseEvent<HTMLElement>) => {
+    // 捕获阶段拦下：选元素时点击不执行演示步骤
+    if ((e.target as HTMLElement).closest?.('[data-review-ui]')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = pickableAt(e.target);
+    if (!el) return;
+    endPick({ id: el.dataset.jid!, label: elementLabel(project, plan.sceneId ?? state?.sceneId ?? null, el.dataset.jid!, el.dataset.jtype ?? null) });
+  };
+  useEffect(() => {
+    if (!picking) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      endPick(null);
+    };
+    window.addEventListener('keydown', onEsc, true);
+    return () => window.removeEventListener('keydown', onEsc, true);
+  });
   // 用户点了封面之后，焦点落到播放 / 暂停（键盘用户接着用空格）；autoplay 时不抢嵌入方页面的焦点
   const focusAfterStart = useRef(false);
   useEffect(() => {
@@ -123,6 +226,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (picking) return;
       const action = embedKey(e, e.target as HTMLElement | null, covered);
       if (!action) return;
       e.preventDefault();
@@ -156,9 +260,17 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
   );
 
   return (
-    <div ref={rootRef} className="relative flex h-full w-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="embed" data-covered={covered ? '' : undefined} data-fullscreen={full ? '' : undefined}>
+    <div ref={rootRef} tabIndex={-1} className="relative flex h-full w-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg outline-none" data-testid="embed" data-covered={covered ? '' : undefined} data-fullscreen={full ? '' : undefined}>
       <ThemeStyles themes={project.themes} />
-      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <main
+        ref={mainRef}
+        className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden', picking && 'cursor-crosshair')}
+        data-review-picking={picking ? '' : undefined}
+        onMouseMove={picking ? onPickMove : undefined}
+        onMouseLeave={picking ? () => setPickBox(null) : undefined}
+        onClickCapture={picking ? onPickClick : undefined}
+        onPointerDownCapture={picking ? (e) => { if (!(e.target as HTMLElement).closest?.('[data-review-ui]')) e.preventDefault(); } : undefined}
+      >
         {scenario && state && shownScene ? (
           // 封面显示时画面只是背景：inert，Tab 不会落到被遮住的原型元素上
           <div className="flex min-h-0 flex-1 flex-col" inert={covered || undefined} data-testid="embed-stage">
@@ -197,6 +309,21 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
           <div role="alert" className="absolute inset-x-3 top-3 z-30 rounded-[8px] border border-jb-danger bg-jb-danger-bg px-3 py-2 text-[13px] text-jb-danger" data-testid="playback-error">
             <strong>{i18n.player.demoReplayFailed}</strong>
             {translate(snap.playbackError, i18n)}
+          </div>
+        ) : null}
+        {picking ? (
+          <div data-review-ui="" className="absolute left-1/2 top-3 z-40 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 rounded-full border border-jb-ink bg-jb-inverse py-1 pl-3.5 pr-1 text-[13px] font-medium text-jb-on-inverse shadow-[2px_2px_0_rgba(30,30,30,0.18)]" role="status" data-testid="review-pick-hint">
+            <span className="min-w-0 truncate">{i18n.site.reviewPickHint}</span>
+            <button type="button" onClick={() => endPick(null)} className="jb-focus shrink-0 rounded-full px-2.5 py-0.5 text-[12px] hover:bg-white/15" data-testid="review-pick-cancel">
+              {i18n.site.reviewPickCancel}
+            </button>
+          </div>
+        ) : null}
+        {picking && pickBox ? (
+          <div className="pointer-events-none absolute z-30 border-[1.5px] border-dashed border-jb-ink" style={{ left: pickBox.x - 3, top: pickBox.y - 3, width: pickBox.w + 6, height: pickBox.h + 6 }} data-testid="review-pick-hover">
+            <span className="absolute -top-[22px] left-[-1.5px] whitespace-nowrap rounded-[4px] bg-jb-inverse px-1.5 py-0.5 font-jb text-[11px] font-medium text-jb-on-inverse">
+              {pickBox.type ?? i18n.player.element}{pickBox.name ? ` · ${pickBox.name}` : ''}
+            </span>
           </div>
         ) : null}
         {covered && scenario ? (

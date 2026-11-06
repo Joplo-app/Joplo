@@ -60,33 +60,67 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     return new CloudClient(server, deps.cliVersion ?? await readCliVersion(), s => stderr(s + '\n'), s => secrets.add(s), { ...deps.cloud, format });
   };
   const cloudCommand = (name: string) => program.command(name).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)');
+  const apiKeyNotice = 'JOPLO_API_KEY is set: cloud commands use the API key and ignore the saved login. Unset JOPLO_API_KEY to sign in with the browser';
   cloudCommand('login').description('Authorize the CLI in your browser').addOption(format()).option('--no-browser', 'Open the login URL manually').action(async opts => {
-    const c = await (await cloudClient(opts.server, opts.format)).login(opts.browser === false);
+    const client = await cloudClient(opts.server, opts.format);
+    // 契约 8.4：有 API Key 时不进入设备登录、不读写 credentials.json、不打开浏览器
+    if (client.apiKey()) {
+      if (opts.format === 'json') json(result(client.server, apiKeyNotice, { server: client.server, apiKey: true }));
+      else line(apiKeyNotice);
+      return;
+    }
+    const c = await client.login(opts.browser === false);
     if (opts.format === 'json') json(result(c.server, 'Signed in', { server: c.server, user: c.user, createdAt: c.createdAt }));
     else line(`Signed in as ${terminalText(c.user.email)}`);
   });
   cloudCommand('logout').description('Revoke the session and remove local credentials').action(async opts => {
     const client = await cloudClient(opts.server, opts.format);
+    if (client.apiKey()) { line(`JOPLO_API_KEY is set; local credentials were not touched. Unset it, or revoke the key in Settings → API keys: ${client.server}/settings/api-keys`); return; }
     await client.logout();
     line('Signed out');
   });
   cloudCommand('whoami').description('Show the cloud account, plan, and limits').addOption(format()).action(async opts => {
-    const client = await cloudClient(opts.server, opts.format), credentials = await client.requireCredentials();
-    const data = await client.me(credentials.accessToken);
+    const client = await cloudClient(opts.server, opts.format), auth = await client.requireAuth();
+    const data = await client.me(auth.token);
+    const key = data.apiKey ? `API key ${data.apiKey.name ? `"${data.apiKey.name}" ` : ''}${data.apiKey.prefix ?? ''}…${data.apiKey.scopes ? ` · scopes: ${data.apiKey.scopes.join(', ') || 'none'}` : ''}${data.apiKey.expiresAt ? ` · expires ${data.apiKey.expiresAt}` : ''} (JOPLO_API_KEY)` : null;
     if (opts.format === 'json') json(result(client.server, `${terminalText(data.user.email)} (${data.plan})`, data));
-    else line(`${terminalText(data.user.email)} (${data.plan})\nNew upload limit: ${data.limits.maxUploadBytes} bytes\nManifest total limit: ${data.limits.maxTotalBytes} bytes, ${data.limits.maxFiles} files\nPublications per hour: ${data.limits.publishesPerHour ?? 'Not provided by the server'}`);
+    else line(`${terminalText(data.user.email)} (${data.plan})${key ? `\n${key}` : ''}\nNew upload limit: ${data.limits.maxUploadBytes} bytes\nManifest total limit: ${data.limits.maxTotalBytes} bytes, ${data.limits.maxFiles} files\nPublications per hour: ${data.limits.publishesPerHour ?? 'Not provided by the server'}`);
   });
   cloudCommand('share').description('Check, build, and publish to the cloud').argument('[dir]', 'Project directory', '.').addOption(format())
-    .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)').action(async (dir, opts) => {
+    .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)')
+    .option('--review', 'Publish the review version: every option of every feature (rules and questions still stay out of the uploaded files)')
+    .option('--pr <number>', 'Attach a GitHub pull request (PR preview); repo, commit, and run URL come from GitHub Actions', integer('pr', 2147483647))
+    .option('--repo <owner/name>', 'Repository for --pr outside GitHub Actions').option('--sha <commit>', 'Commit for --pr (defaults to the PR head or git HEAD)').action(async (dir, opts) => {
       const client = await cloudClient(opts.server, opts.format);
       const { share } = await import('./cloud-share.ts');
       const published = await share(client, dir, opts, async options => (await serverFunction('buildSite'))(options), () => serverFunction('renderStep'));
       if (opts.format === 'json') json(result(resolve(dir), 'Published', published.result));
       else {
-        line(`Published ${published.result.url}\n${published.result.expiresAt ? `Expires at: ${terminalText(published.result.expiresAt)}` : 'Permanent link'}`);
+        line(`Published ${published.result.mode === 'review' ? 'the review version ' : ''}${published.result.url}\n${published.result.expiresAt ? `Expires at: ${terminalText(published.result.expiresAt)}` : 'Permanent link'}`);
+        if (published.result.pr) { const { prCommentLine } = await import('./cloud-pr.ts'); const note = prCommentLine(published.result.pr, client.server); if (note) line(note); }
         if (published.plan === 'free') line(`Free shares expire after 1 hour. Upgrade for permanent links: ${client.server}/billing`);
         line(`Add to README: ${terminalText(published.result.embed.markdown)}\nMore embed options: ${client.server}/shares/${published.result.shareId}`);
       }
+    });
+  cloudCommand('feedback').description('Read review decisions and unresolved comments, or mark decisions as applied').argument('[dir]', 'Project directory', '.').addOption(format())
+    .option('--share <id>', 'Share id (defaults to .joplo/cloud.json)').option('--applied <ids>', 'Mark comma-separated decision ids as applied to the source').option('--ref <ref>', 'Source version for --applied (for example a commit SHA)')
+    .action(async (dir, opts) => {
+      if (opts.ref !== undefined && opts.applied === undefined) throw new JoploError('USAGE', '--ref applies only with --applied <ids>');
+      const f = await import('./cloud-feedback.ts');
+      const client = await cloudClient(opts.server, opts.format);
+      const ids = opts.applied === undefined ? null : f.decisionIds(opts.applied);
+      const shareId = await f.feedbackShareId(client, dir, opts.share);
+      if (ids) {
+        const data = await f.markApplied(client, shareId, ids, opts.ref);
+        const summary = `Marked ${data.applied.length} decision(s) as applied`;
+        if (opts.format === 'json') json(result(resolve(dir), summary, { shareId, ...data }));
+        else line(`${summary}: ${data.applied.join(', ') || 'none'}`);
+        return;
+      }
+      const data = await f.fetchFeedback(client, shareId);
+      const summary = `${data.decisions.length} decision(s), ${data.comments.length} unresolved comment(s)`;
+      if (opts.format === 'json') json(result(resolve(dir), summary, data));
+      else for (const l of f.feedbackText(data)) line(l);
     });
   program.command('check').argument('[dir]', 'Project directory', '.').addOption(format()).option('--option <qid>', 'Validate only the specified option').action(async (dir, opts) => {
     const report = await check(dir, opts.option);

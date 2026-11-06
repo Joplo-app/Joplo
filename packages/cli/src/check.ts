@@ -2,10 +2,19 @@ import { existsSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
-import { compile, validate, type Diagnostic, type ValidationReport } from '@joplo-app/core';
+import { compile, validate, type Diagnostic, type Project, type ValidationReport } from '@joplo-app/core';
 import { loadAuthoring } from '@joplo-app/core/node';
 
-export async function check(dir: string, optionId?: string): Promise<ValidationReport & { name: string }> {
+export type CheckReport = ValidationReport & { name: string };
+
+/** `joplo check` 的输出（不含 IR，`check --format json` 保持不变）。 */
+export async function check(dir: string, optionId?: string): Promise<CheckReport> {
+  const { project: _project, ...report } = await checkWithProject(dir, optionId);
+  return report;
+}
+
+/** check 加上本次编译的 dev IR（share 用它生成评审清单，不再编译第二次）；编译失败时 project 为 null。 */
+export async function checkWithProject(dir: string, optionId?: string): Promise<CheckReport & { project: Project | null }> {
   const root = await realpath(resolve(dir));
   const tsconfig = join(root, 'tsconfig.json');
   const loaded = await loadAuthoring(root, p => tsImport(p, { parentURL: import.meta.url, tsconfig: existsSync(tsconfig) ? tsconfig : false }));
@@ -23,5 +32,6 @@ export async function check(dir: string, optionId?: string): Promise<ValidationR
     diagnostics,
     summary: { error: diagnostics.filter(d => d.severity === 'error').length, warning: diagnostics.filter(d => d.severity === 'warning').length, info: diagnostics.filter(d => d.severity === 'info').length },
     verification: validated?.verification ?? {},
+    project: compiled?.project ?? null,
   };
 }

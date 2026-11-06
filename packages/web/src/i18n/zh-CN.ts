@@ -255,6 +255,9 @@ ${value(p2, locale)}`,
       embedOpenInNewTab: "在新标签页打开",
       embedPlayer: "演示播放器",
       embedNoScenario: "这个演示还没有可以播放的场景。",
+      // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
+      reviewPickHint: "点画面里的元素来选中 · Esc 取消",
+      reviewPickCancel: "取消",
     },
   });
 }

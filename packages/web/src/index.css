@@ -450,3 +450,10 @@
 :root:lang(ja) { --jb-font: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif; }
 :root:lang(ko) { --jb-font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; }
 :root:lang(zh-TW) { --jb-font: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif; }
+/* Review mode (?embed=1&review=1): the element the review page points at (joplo:goto highlight). */
+.jstage [data-review-highlight] {
+  outline: 3px solid #e03131;
+  outline-offset: 3px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, #e03131 18%, transparent);
+}

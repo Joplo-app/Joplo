@@ -4,13 +4,15 @@
  * 不变量：
  * - 只有查询参数 `embed` 恰好是 `1` 才进入嵌入模式；否则发布站行为完全不变（parseEmbedParams 返回 null）；
  * - 默认显示封面、不自动播放；只有 `autoplay` 恰好是 `1` 才跳过封面直接播放；
- * - `scenario` 写错（不存在、为空）时从默认场景开始，访客看不到报错；未知参数忽略。
+ * - `scenario` 写错（不存在、为空）时从默认场景开始，访客看不到报错；未知参数忽略；
+ * - 只有 `review` 恰好是 `1` 才是评审模式（review-bridge.ts）。
  */
 import { embedScenarioIds, embedStartScenario, type Project } from '@joplo-app/core';
 import { siteHash } from '../runtime/route';
 import { isFullscreenKey } from '../player/fullscreen';
 
-export type EmbedParams = { scenario: string | null; autoplay: boolean };
+/** review：评审模式（`review=1`，云端契约 8.2），见 review-bridge.ts。 */
+export type EmbedParams = { scenario: string | null; autoplay: boolean; review: boolean };
 
 /** location.search → 嵌入参数；不是嵌入模式时为 null。 */
 export function parseEmbedParams(search: string | null | undefined): EmbedParams | null {
@@ -22,12 +24,14 @@ export function parseEmbedParams(search: string | null | undefined): EmbedParams
   }
   if (q.get('embed') !== '1') return null;
   const scenario = q.get('scenario');
-  return { scenario: scenario ? scenario : null, autoplay: q.get('autoplay') === '1' };
+  return { scenario: scenario ? scenario : null, autoplay: q.get('autoplay') === '1', review: q.get('review') === '1' };
 }
 
 /** 嵌入打开时的状态：从哪个场景开始、是否先显示封面。 */
 export function embedInitial(project: Project, params: EmbedParams): { scenarioId: string | null; covered: boolean } {
-  return { scenarioId: embedStartScenario(project, params.scenario), covered: !params.autoplay };
+  // 评审模式（评审版含所有方案）：scenario 可以指向任何方案的场景；普通嵌入只认可播放列表里的场景
+  const any = params.review && params.scenario && Object.prototype.hasOwnProperty.call(project.scenarios ?? {}, params.scenario) ? params.scenario : null;
+  return { scenarioId: any ?? embedStartScenario(project, params.scenario), covered: !params.autoplay };
 }
 
 /** 场景切换菜单：多个功能时写“功能 · 场景”，只有一个功能时只写场景名。 */
@@ -48,12 +52,12 @@ export function embedProgress(position: number, total: number): number {
 }
 
 /**
- * 全屏不可用时“在新标签页打开”的地址：同一个分享页，去掉嵌入参数（embed / scenario / autoplay），
+ * 全屏不可用时“在新标签页打开”的地址：同一个分享页，去掉嵌入参数（embed / scenario / autoplay / review），
  * 用发布站的 hash 路由停在当前场景和步骤。其他查询参数保留。
  */
 export function standaloneUrl(href: string, play: { featureId: string; scenarioId: string; step: number } | null): string {
   const u = new URL(href);
-  for (const k of ['embed', 'scenario', 'autoplay']) u.searchParams.delete(k);
+  for (const k of ['embed', 'scenario', 'autoplay', 'review']) u.searchParams.delete(k);
   u.hash = play ? siteHash({ kind: 'play', play: { featureId: play.featureId, scenarioId: play.scenarioId, ...(play.step > 0 ? { step: play.step } : {}) } }) : '';
   return u.href;
 }

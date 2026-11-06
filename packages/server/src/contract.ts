@@ -23,6 +23,11 @@ export type BuildOptions = {
   outDir?: string;
   /** 目标目录非空时，必须显式允许才清空重建。 */
   overwrite?: boolean;
+  /**
+   * 评审版（D62，`joplo share --review`）：含所有功能的所有方案（compile 的 review 模式），创作侧信息与普通发布一样去掉。
+   * 缺省 false：只含选定方案，与原来完全一致。
+   */
+  review?: boolean;
 };
 /** 静态发布站：只含选定方案（compile 的 publish 模式），离线可打开，可直接 `wrangler deploy`。 */
 export type BuildResult = { outDir: string; files: string[]; routes: string[]; scenarios: string[]; diagnostics: Diagnostic[] };

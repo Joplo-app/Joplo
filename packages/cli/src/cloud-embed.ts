@@ -58,6 +58,18 @@ export function inlineProject(html: string): Parameters<typeof embedStartScenari
   }
 }
 
+/** 发布 IR 的 mode（publish / review）；读不到时为 null。 */
+export function inlineProjectMode(html: string): string | null {
+  const m = /<script type="application\/json" id="joplo-ir">([\s\S]*?)<\/script>/.exec(html);
+  if (!m) return null;
+  try {
+    const mode = (JSON.parse(m[1]!) as { project?: { mode?: unknown } }).project?.mode;
+    return typeof mode === 'string' ? mode : null;
+  } catch {
+    return null;
+  }
+}
+
 /** PNG 签名 + IHDR 宽高。 */
 function pngSize(data: Uint8Array): { width: number; height: number } | null {
   const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];

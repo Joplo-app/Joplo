@@ -232,6 +232,9 @@ export function createRu(locale: Locale = 'ru') {
       embedOpenInNewTab: "Открыть в новой вкладке",
       embedPlayer: "Демо-плеер",
       embedNoScenario: "В этом демо пока нет сценариев для воспроизведения.",
+      // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
+      reviewPickHint: "Нажмите на элемент сцены, чтобы выбрать его · Esc — отмена",
+      reviewPickCancel: "Отмена",
     },
   });
 }

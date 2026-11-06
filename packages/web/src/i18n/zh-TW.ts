@@ -232,6 +232,9 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       embedOpenInNewTab: "在新分頁開啟",
       embedPlayer: "示範播放器",
       embedNoScenario: "這個示範還沒有可以播放的情境。",
+      // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
+      reviewPickHint: "點畫面裡的元素來選取 · Esc 取消",
+      reviewPickCancel: "取消",
     },
   });
 }

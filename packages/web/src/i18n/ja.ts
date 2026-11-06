@@ -232,6 +232,9 @@ export function createJa(locale: Locale = 'ja') {
       embedOpenInNewTab: "新しいタブで開く",
       embedPlayer: "デモプレーヤー",
       embedNoScenario: "このデモには再生できるシナリオがまだありません。",
+      // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
+      reviewPickHint: "画面の要素をクリックして選択 · Esc でキャンセル",
+      reviewPickCancel: "キャンセル",
     },
   });
 }

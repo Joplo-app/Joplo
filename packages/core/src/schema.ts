@@ -286,8 +286,8 @@ export const Project = z.strictObject({
   theme: z.string().min(1).default('sketch'),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),
-  /** dev = 含全部方案（本地看板）；publish = 只含选定方案，且去掉创作侧信息（D33）。 */
-  mode: z.enum(['dev', 'publish']),
+  /** dev = 含全部方案（本地看板）；publish = 只含选定方案，且去掉创作侧信息（D33）；review = 评审版：全部方案，同样去掉创作侧信息（D62）。 */
+  mode: z.enum(['dev', 'publish', 'review']),
   routes: z.record(z.string(), Route).default({}),
   features: z.record(Id, Feature).default({}),
   /** 编译器决定的演示顺序，发布时保留。旧 IR 可省略，读取时沿用其已有顺序。 */

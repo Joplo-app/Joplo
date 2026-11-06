@@ -3,7 +3,7 @@
  * dev（看板、截图）与 build（发布站）共用这一条路径。
  */
 import path from 'node:path';
-import { compile, type Diagnostic, type Project } from '@joplo-app/core';
+import { compile, type CompileMode, type Diagnostic, type Project } from '@joplo-app/core';
 import { discoverFiles, loadAuthoring } from '@joplo-app/core/node';
 import type { ViteDevServer } from 'vite';
 import { isProjectSource } from './vite-shared.ts';
@@ -30,7 +30,7 @@ function stackLoc(projectDir: string, e: unknown): string | null {
   return null;
 }
 
-export async function compileProject(server: ViteDevServer, projectDir: string, mode: 'dev' | 'publish'): Promise<CompileOutcome> {
+export async function compileProject(server: ViteDevServer, projectDir: string, mode: CompileMode): Promise<CompileOutcome> {
   const errorAt = new Map<string, string>(); // 载入失败的文件（绝对路径）→ 精确位置
   const importer = async (abs: string) => {
     try {

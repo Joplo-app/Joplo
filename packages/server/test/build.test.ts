@@ -5,6 +5,9 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildSite, finalizeHtml, jsonForHtml } from '../src/build.ts';
 import { renderStep } from '../src/render.ts';
+import { compileProject } from '../src/project.ts';
+import { joploProjectPlugin, kitAliases, locateWebAssets } from '../src/vite-shared.ts';
+import { createServer } from 'vite';
 
 const EXAMPLE = path.resolve(import.meta.dirname, '../../../examples/invite');
 const copy = () => {
@@ -89,6 +92,63 @@ describe('buildSite', () => {
     } finally {
       fs.rmSync(np, { recursive: true, force: true });
     }
+  }, 120_000);
+});
+
+/** 创作侧文字（规则含 AI 假设、待决问题、设计备注、取舍、决策重点）：dev IR 里有，任何构建产物里都不能出现（D33 / D62）。 */
+async function authoringStrings(dir: string): Promise<string[]> {
+  // 与 buildSite 同一条载入路径（Vite ssrLoadModule + kit 别名），只是编译成 dev IR
+  const web = locateWebAssets();
+  const loader = await createServer({ configFile: false, envDir: false, root: dir, logLevel: 'error', appType: 'custom', resolve: { alias: kitAliases(web, dir) }, plugins: [joploProjectPlugin(dir, web)], server: { middlewareMode: true, hmr: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] } });
+  let dev;
+  try {
+    dev = (await compileProject(loader, dir, 'dev')).project!;
+  } finally {
+    await loader.close();
+  }
+  const notes: string[] = [];
+  const walk = (n: { note?: string; children?: unknown[] }) => {
+    if (n.note) notes.push(n.note);
+    for (const c of (n.children ?? []) as (typeof n)[]) walk(c);
+  };
+  for (const s of Object.values(dev.scenes)) walk(s.root);
+  const out = [...Object.values(dev.rules).map((r) => r.text), ...Object.values(dev.issues).map((q) => q.text), ...notes, ...Object.values(dev.options).flatMap((o) => [...o.tradeoffs, o.decisionFocus].filter(Boolean))];
+  expect(Object.values(dev.rules).some((r) => r.origin === 'ai_assumption')).toBe(true);
+  expect(Object.keys(dev.issues).length).toBeGreaterThan(0);
+  return out;
+}
+const TEXT = /\.(html|css|js|mjs|json|svg|txt)$/;
+function siteText(outDir: string, files: string[]): string {
+  return files.filter((f) => TEXT.test(f)).map((f) => fs.readFileSync(path.join(outDir, f), 'utf8')).join('\n');
+}
+
+describe('评审版构建（review: true，D62）', () => {
+  let dir: string;
+  beforeAll(() => {
+    dir = copy();
+  });
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it('含所有方案的场景，可按场景切换方案；IR mode 为 review', async () => {
+    const r = await buildSite({ projectDir: dir, outDir: path.join(dir, 'review-site'), review: true });
+    expect(r.scenarios.sort()).toEqual(expect.arrayContaining(['invite.a-modal.success', 'invite.b-batch.partial']));
+    const html = fs.readFileSync(path.join(r.outDir, 'index.html'), 'utf8');
+    const ir = JSON.parse(/<script type="application\/json" id="joplo-ir">([\s\S]*?)<\/script>/.exec(html)![1]!);
+    expect(ir.project.mode).toBe('review');
+    expect(Object.keys(ir.project.options).sort()).toEqual(['invite.a-modal', 'invite.b-batch']);
+    expect(ir.project.features.invite.pick).toBe('invite.a-modal');
+    for (const s of Object.values(ir.project.scenarios) as { optionId: string; initial: { sceneId: string } }[]) expect(ir.project.scenes[s.initial.sceneId].optionId).toBe(s.optionId);
+    expect(ir.project.rules).toBeUndefined();
+    expect(ir.project.issues).toBeUndefined();
+  }, 120_000);
+
+  it.each([false, true])('review=%s：上传文件全文搜不到规则、问题、备注、取舍', async (review) => {
+    const secrets = await authoringStrings(dir);
+    expect(secrets.length).toBeGreaterThan(5);
+    const r = await buildSite({ projectDir: dir, outDir: path.join(dir, review ? 'scan-review' : 'scan-publish'), review });
+    const text = siteText(r.outDir, r.files);
+    expect(text).toContain('joplo-ir');
+    for (const s of secrets) expect(text, s).not.toContain(s);
   }, 120_000);
 });
 

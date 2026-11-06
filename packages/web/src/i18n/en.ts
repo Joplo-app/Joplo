@@ -252,6 +252,9 @@ export function createEn(locale: Locale = 'en') {
       embedOpenInNewTab: "Open in new tab",
       embedPlayer: "Demo player",
       embedNoScenario: "This demo has no scenario to play yet.",
+      // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
+      reviewPickHint: "Click an element on the stage to select it · Esc to cancel",
+      reviewPickCancel: "Cancel",
     },
   };
 }

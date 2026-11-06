@@ -9,7 +9,7 @@ export const SKILL_TOPICS = [
   { name: 'cases', description: 'Case dimensions: ask the user before starting' },
   { name: 'check', description: 'Read diagnostics and fix the indicated file and line' },
   { name: 'selection', description: 'Edit only the element selected by the user in the board' },
-  { name: 'publish', description: 'pick, build, and static site deployment' },
+  { name: 'publish', description: 'pick, build, cloud sharing, review feedback, and static site deployment' },
 ] as const;
 export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
 
@@ -423,7 +423,20 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - maxUploadBytes limits only newly uploaded cloud blobs. The CLI prechecks maxTotalBytes and maxFiles. TOO_LARGE details.kind distinguishes upload / total / files.
 - Credentials are stored only in JOPLO_HOME/credentials.json (default ~/.joplo). Never copy them into a project, print them, or commit them.
 - Cloud commands accept --server <url>, overriding JOPLO_CLOUD_URL; the default is https://cloud.joplo.app.
-- Local check / build / dev remain free and do not connect to the cloud.`,
+- Local check / build / dev remain free and do not connect to the cloud.
+- CI: set JOPLO_API_KEY (jpk_..., created in Settings → API keys) instead of logging in. Every cloud command then uses it; credentials.json and browser login are never touched. An invalid or revoked key returns AUTH_EXPIRED: ask the user for a new key.
+- PR previews: in GitHub Actions run npx joplo share --new --pr <number> --format json; repo, commit, and run URL come from the Actions environment. Outside Actions pass --repo owner/name. data.pr.comment "skipped" means the Joplo GitHub App is not installed; tell the user, the share itself succeeded.
+
+## Review and feedback
+- npx joplo share --review publishes the review version: every option of every feature, so reviewers can compare A/B. Rules, questions, cases, and AI assumptions still never appear in uploaded files; they go only to the review page through the request body. Plain share publishes only picked options.
+- After reviewers comment and the owner decides on the review page, run npx joplo feedback --format json (uses the share in .joplo/cloud.json, or --share <id>). data.decisions are decisions not yet applied; data.comments are unresolved viewer comments with scenario, step, stepId, and element.
+- Apply each decision to the source, then run npx joplo check:
+  - pick: set feature.pick in features/<f>/feature.ts to the option file name (the part after "<feature>.").
+  - confirm_rule: set that rule to origin: 'user', status: 'confirmed'.
+  - reject_rule: rewrite the rule as the note (reason) says. If the reason does not say what to do instead, mark it status: 'conflict' and ask the user; do not guess.
+  - answer: delete the question and add a rule with origin: 'user' (status: 'confirmed') stating the answer.
+  - Comments are input for discussion only; do not change the source from a comment unless the user asks.
+- When check passes, mark what you applied: npx joplo feedback --applied <decision ids, comma-separated> [--ref <commit or source version>]. Mark only decisions you actually wrote back.`,
 };
 
 function distance(a: string, b: string): number {

@@ -16,7 +16,10 @@ npx joplo build [dir] [--out-dir <dir>] [--overwrite]
 npx joplo login [--no-browser] [--format text|json] [--server <url>]
 npx joplo logout [--server <url>]
 npx joplo whoami [--format text|json] [--server <url>]
-npx joplo share [dir] [--format text|json] [--new] [--title <title>] [--server <url>]
+npx joplo share [dir] [--format text|json] [--new] [--title <title>] [--review] \
+  [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
+npx joplo feedback [dir] [--share <id>] [--format text|json] [--server <url>]
+npx joplo feedback [dir] --applied <决定 id,…> [--ref <源码版本>] [--share <id>] [--format text|json]
 npx joplo render [dir] --scenario-id <qid> --out <file> \
   [--step-id <qid>] [--theme <theme>] \
   [--width <pixels> --height <pixels>] [--scale <scale>] [--overwrite]
@@ -90,7 +93,7 @@ JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }
 | cases | 八个维度及按产品类型筛选的情况预设 |
 | check | 诊断代码与局部修复 |
 | selection | 用户选中后只改指向的位置 |
-| publish | pick、build、云端登录与分享、静态站部署与演示能力 |
+| publish | pick、build、云端登录与分享、评审版与 feedback 回流、静态站部署与演示能力 |
 
 `guide` 与 `skill authoring` 完全相同。读取主题不加载服务端，也不执行作者项目，输出无颜色文本。
 
@@ -148,7 +151,7 @@ npx playwright install chromium
 
 CLI 和 skill 输出遵循 D57，统一使用英文；本文保留中文说明。云端命令的产品决策见 D58。
 
-只有 `login`、`logout`、`whoami`、`share` 连接云端；本地命令继续完整、免费。
+只有 `login`、`logout`、`whoami`、`share`、`feedback` 连接云端；本地命令继续完整、免费。评审版、反馈回流、API Key 与 PR 预览的决定见 D62，接口以云端契约（评审、API Key 与 PR 预览）为准。
 地址优先级：`--server <url>` → 非空 `JOPLO_CLOUD_URL` → `https://cloud.joplo.app`。空字符串等同未设置；协议/主机名及默认端口规范化后匹配凭证。地址必须是 HTTP(S) 源（不带路径、查询参数或用户名密码）。
 每个云端 API 请求携带 `X-Joplo-Client: joplo-cli/<版本>`；预签名文件 PUT 严格使用服务端返回的 headers，不附加账号令牌或版本头。
 凭证只适用于其记录的 server；切换服务器需要重新登录，不会把另一个服务器的令牌发送过去。
@@ -156,6 +159,16 @@ CLI 和 skill 输出遵循 D57，统一使用英文；本文保留中文说明�
 `JOPLO_HOME` 与看板 settings.json 使用相同解析规则：非空环境变量按当前目录解析，默认 `~/.joplo`，新建目录权限为 0700。
 `credentials.json` 权限为 0600，读取已有凭证时，只有 group/other 权限开放才尝试收紧；只读挂载等导致 chmod 失败时只警告，不影响请求；先写同目录临时文件再原子 rename；损坏或缺字段时视为未登录并提示重登。
 不要把凭证文件复制到项目中、输出或提交 Git。`.joplo/cloud.json` 只保存服务器、分享 ID 和链接。
+
+### JOPLO_API_KEY（CI 与 Agent）
+
+在云端控制台“设置 → API Key”创建 Key（`jpk_` 开头，完整值只显示一次），存进 CI 的 secrets，以环境变量 `JOPLO_API_KEY` 提供：
+
+- 设置后**所有**云端命令（share、whoami、feedback）都用 `Authorization: Bearer <key>`，不读写 `credentials.json`，不触发设备登录，也不打开浏览器；非交互环境照常可用。
+- 值必须是 `jpk_` + 至少 32 位字母或数字，否则 USAGE（退出 2），不发请求。完整 Key 只出现在 Authorization 头里，输出中一律替换为 `[REDACTED]`，只显示前 8 位前缀。
+- `login` 只打印 “JOPLO_API_KEY is set: …” 并退出 0（不联网、不写凭证）；`logout` 不动本地凭证，提示取消环境变量或到控制台吊销。
+- Key 无效、过期或已吊销：AUTH_EXPIRED（退出 3），message 写前缀并指向 `<server>/settings/api-keys`（`details.fix`）。Key 缺少某个权限范围时服务端返回 403 FORBIDDEN，CLI 报 FORBIDDEN（退出 1），message 写前缀并说明是 Key 的权限范围不够（不报“账号不可用”），`details.fix` 指向 API Key 页。
+- 权限范围：`shares:publish`（whoami、share）、`shares:read`、`feedback:read`（feedback）、`feedback:write`（feedback --applied）。
 
 ## login
 
@@ -187,6 +200,8 @@ npx joplo whoami --format json
 
 读取云端当前账号、套餐及限额，不以本地缓存推断套餐。JSON 沿用结果信封，`data` 为 `{user: {id, email, name}, plan, limits: {maxUploadBytes, maxTotalBytes, maxFiles, publishesPerHour}}`；服务端 publishesPerHour 返回数字（Pro 为 120）。CLI 兼容旧服务返回 null，显示“Not provided by the server”，不据此推断额度。
 
+使用 `JOPLO_API_KEY` 时 `data` 另有 `apiKey: {name, prefix, scopes, expiresAt}`：取自 `/api/v1/me` 响应的 `credential`（只认 `kind: "api_key"`；设备会话的 `{kind: "device"}` 不显示），服务端没给或格式不对的字段为 null（不让 whoami 失败）；`prefix` 缺省时用本地 Key 的前 8 位。文本输出多一行 `API key "<名字>" jpk_xxxx… · scopes: … · expires … (JOPLO_API_KEY)`。用登录凭证时没有 `apiKey` 字段，输出与原来相同。
+
 ## share
 
 ```sh
@@ -206,8 +221,14 @@ npx joplo share --new
 - finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/billing`。
 - 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的 Playwright + Chromium）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有 Playwright、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”，share 照常成功；分享页此时用通用预览图。
 - 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 只用英文，D57）。
+- **评审清单**：每次 share 都在 `POST /api/v1/shares` 请求体里附上 `review`（契约字段 `{v: 1, mode, features, scenarios, elements}`），由 check 编译的 dev IR 经 core 的 `reviewManifest` 生成。它**不是分享文件**：不进上传清单、不进 R2，分享页拿不到；SaaS 只把它存进数据库给评审页用。`mode: "publish"` 只含选定方案（与发布站同一范围，没有选定方案的功能不出现），`--review` 时为 `"review"`，含所有功能的所有方案。id 全部沿用 IR，步骤 `index` 从 0 开始，`elements` 是画面里所有作者元素 id（与 `Rule.elementIds` 同一套）及 `nodeLabel` 标签。
+- **清单上限**：字符串按码点截断（末尾 “…”）——名字 200、目标/思路/规则/问题/explain 2000、取舍 500、字幕 500、元素标签 200；数组超出部分丢弃——每个功能 20 个方案、300 条规则、100 个问题，每个方案 20 条取舍，每条规则 50 个元素，最多 100 个功能、500 个场景、每个场景 200 步、每步 50 条规则、2000 个元素；id 永不截断。截断后序列化仍超过 512 KiB（524288 字节）时：`--review` 报 EXPORT_FAILED（`details: {maxBytes, actualBytes}`），在构建和上传之前失败，不静默丢内容；普通 share 不因清单失败，stderr 提示一行 “Skipped the review manifest (…)”，请求体省略 `review`（契约里它是可选字段），评审页此时看不到规则和问题。
+- **`--review`（评审版，D62）**：构建时 `buildSite({ review: true })`，发布站包含所有功能的所有方案（未选定的功能也在），评审页通过 `joplo:goto` 指定任一场景即切换方案；规则、问题、情况、AI 假设、备注、取舍、源位置与普通发布一样不进任何上传文件。CLI 会核对产物里内联 IR 的 `mode` 是 `review`，旧版 `@joplo-app/server` 忽略该选项时报 UNSUPPORTED_ACTION，不上传。成功的 `data` 多一个 `mode: "review"`，文本写 “Published the review version …”。不带 `--review` 时构建参数、上传文件、输出与原来完全一致。
+- **`--pr <number>`（PR 预览）**：请求体加 `pr: {provider: "github", repo, number, headSha, runUrl}`。在 GitHub Actions（`GITHUB_ACTIONS=true`）里：repo 取 `--repo` 或 `GITHUB_REPOSITORY`；headSha 取 `--sha`，否则读 `GITHUB_EVENT_PATH` 事件 JSON 的 `pull_request.head.sha`（PR 事件的 `GITHUB_SHA` 是合并提交），没有时用 `GITHUB_SHA`；runUrl 为 `GITHUB_SERVER_URL/GITHUB_REPOSITORY/actions/runs/GITHUB_RUN_ID`（重试的运行加 `/attempts/N`），只在 github.com 上生成，否则为 null。不在 Actions 里必须 `--repo owner/name`，headSha 取 `--sha` 或 `git rev-parse HEAD`。缺少或格式不对时在登录、检查、构建和任何请求之前报 USAGE（退出 2）。`--repo`、`--sha` 只能和 `--pr` 一起用。
+- PR 预览是独立链接：不发送 replaceShareId，也不写 `.joplo/cloud.json`（不覆盖本项目的主链接，之后的普通 share 与 feedback 仍指向主链接）。CI 推荐 `npx joplo share --new --pr <number> --format json`；fork 来的 PR 拿不到 secrets，工作流应跳过发布，不推荐 `pull_request_target`。
+- finalize 响应里的 `pr: {comment, reason?, installUrl?}` 原样（白名单字段）放进 `data.pr`；`comment: "skipped"` 时文本输出一行 “PR comment skipped: <原因>. Install the Joplo GitHub App to comment on pull requests: <installUrl 或 <server>/settings/github>”，`failed` 时说明评论失败但已发布。服务端没返回时 `data.pr` 为 null。
 
-JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, embed}`，`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
+JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, embed}`（`--review` 时另有 `mode: "review"`，`--pr` 时另有 `pr`），`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
 
 `data.embed` 与云端控制台、分享页 Worker 用同一套格式（`<分享页>` 为 `data.url`，规范成以 `/` 结尾）：
 
@@ -239,6 +260,23 @@ Agent 可以把 `data.embed.markdown` 直接写进 README；免费链接要同�
 
 Ctrl+C（SIGINT）会清理本进程登记的 joplo-share-* 目录及原子写入临时文件，并退出 130；不会删除其他运行中的分享目录。
 
+## feedback
+
+```sh
+npx joplo feedback --format json
+npx joplo feedback --share Abc1234567
+npx joplo feedback --applied d1,d2 --ref "$(git rev-parse HEAD)" --format json
+```
+
+读取评审页（`cloud.joplo.app/review/<id>`）上分享主人的决定和观众的未解决评论，供作者和 Agent 按决定改源码：
+
+- shareId：`--share <id>`，否则读项目 `.joplo/cloud.json`（必须属于当前 server，否则 USAGE 并提示 `--server` / `--share`）；没有记录时 USAGE。
+- `GET /api/v1/shares/{id}/feedback` → `data = {share: {id, version}, decisions: [{id, kind, featureId, targetId, note, decidedAt, version}], comments: [{id, version, scenario, step, stepId, element: {id, label} | null, body, author: {name}, createdAt}]}`；只含未撤回、未写回的决定与未解决的评论。`kind` 是 `pick`（targetId = 方案 id）、`confirm_rule`、`reject_rule`（note = 理由）、`answer`（targetId = 问题 id，note = 回答）。`step` 是播放位置（0 = 初始状态，k = 已执行 k 步），`stepId` 是第 k 步的 id。
+- 文本输出决定在前，每条一行：“Pick option invite.b-batch for feature invite”“Reject rule <id>: <理由>”“Answer to question <id>: <回答>”“Confirm rule <id>”；再是未解决评论（场景 · 第几步（stepId） · 元素 id "标签" — 作者、版本、时间，下一行是正文）；有决定时最后提示 check 与 `--applied` 的完整命令。
+- `--applied <id,…> [--ref <源码版本>]`：`POST /api/v1/shares/{id}/feedback/applied {decisionIds, ref?}` → `data = {shareId, applied}`，重复标记幂等。id 去重，1–200 个，每个只含字母、数字、`_`、`-`；`--ref` 1–200 个可打印字符，只能和 `--applied` 一起用。只有分享的主人能调用。
+- 错误：未登录 AUTH_REQUIRED（退出 3）；用登录凭证但不是分享主人时 403 为 FORBIDDEN “Only the owner of the share …”；API Key 缺少 feedback:read / feedback:write 时为 FORBIDDEN 权限说明；404 为 NOT_FOUND “The share does not exist or has no review data”；响应结构不对为 INVALID_RESPONSE；其余同 share。
+- Agent 按决定改源码的规则写在 `npx joplo skill publish`：pick → `feature.pick`；确认规则 → `origin: 'user'` + `status: 'confirmed'`；否决 → 按理由改写，理由没说怎么做时标 conflict 并问用户；回答问题 → 删掉 question、加一条 `origin: 'user'` 的规则；评论只作参考。改完运行 check，再 `--applied`。
+
 ### 云端数据流
 
 | 字段 / 文件 / 参数 | 写入点 → 存储 → 读取点 → 消费者 |
@@ -258,6 +296,11 @@ Ctrl+C（SIGINT）会清理本进程登记的 joplo-share-* 目录及原子写�
 | cloud.json.server / shareId / url | 目标服务器及 finalize 响应 → 项目 .joplo/cloud.json（原子写） → 下次 share → 来源比对与 Pro 更新；url 供用户/工具读取 |
 | shareId / url / expiresAt / version | finalize 响应 → text/JSON 结果 → 用户/Agent → 分享链接及有效期 |
 | embed.iframe / markdown / badge / preview | finalize 的 url + 本次 title → `embedSnippets`（cli/src/cloud-embed.ts，只在内存） → text 输出（markdown）与 JSON `data.embed` → 用户/Agent 写进 README 或博客；分享页 Worker 提供 badge.svg / preview.png |
+| review（评审清单） | check 的 dev IR → core `reviewManifest(ir, publish \| review)`（截断、512 KiB 上限） → `POST /api/v1/shares` 请求体（不进上传清单） → SaaS 在 finalize 时按 (shareId, version) 存 Postgres → 评审页的方案、规则、问题、每一步的规则 |
+| --review | 参数 → `buildSite({ review: true })` → compile 的 review 模式（所有方案，去掉创作侧信息）→ 发布站内联 IR（`mode: "review"`，CLI 核对）→ R2 → 评审页 iframe 的 `?embed=1&review=1` 按场景切换方案 |
+| JOPLO_API_KEY | 环境变量 → 进程内（加入输出脱敏）→ 所有云端请求的 Authorization → SaaS 按 `jpk_` 前缀鉴权与权限范围；whoami 的 `apiKey` 从 me 响应读取 |
+| --pr / --repo / --sha 与 GITHUB_* | 参数与 Actions 环境变量、事件 JSON → 进程内校验 → 创建请求的 `pr` → SaaS 存在分享上 → GitHub App 评论与 PR 关闭后过期；finalize 响应 `pr` → `data.pr` / 文本提示 |
+| feedback 的 decisions / comments | 评审页的决定与评论（Postgres）→ `GET …/feedback` → 文本或 JSON 结果 → Agent 按 skill publish 改源码 → `POST …/feedback/applied` 的 decisionIds / ref → SaaS 标记已写回 |
 | _joplo/preview.png | share 构建后 renderStep 截图（默认场景初始画面，1200×630） → 临时 build 目录 → manifest / 创建请求 / PUT → 云端 R2 → 分享页 Worker 的 preview.png 与 Open Graph 卡片；失败时不进清单 |
 | user / plan / limits | me 响应 → 进程内与 whoami 结果 → share 或用户/Agent → 套餐展示、更新资格、maxTotalBytes/maxFiles 本地预检、maxUploadBytes 上传限额展示、publishesPerHour 频率诊断 |
 | AUTH_REQUIRED 的 details.fix / credentialServer | 当前 server 与旧凭证 server → 跨服务器 share 错误信封 → Agent 请用户在自己的终端确认登录；不自动 logout |

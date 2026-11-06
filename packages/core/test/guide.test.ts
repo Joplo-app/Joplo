@@ -142,3 +142,8 @@ test('P1 authoring rules, components, and annotation theme variable remain docum
   const demo = skillTopic('demo');
   for (const text of ['fork(label, scenarioKey)', 'mark(id,', '<Email', '<StateFlow', '<DataCard', '--jp-annot', 'Empty labels are omitted; targets are still validated', 'Autoplay stays on the main flow']) expect(demo).toContain(text);
 });
+
+test('publish 说明评审版、feedback 与按决定改源码的规则、API Key 与 PR 预览', () => {
+  const body = skillTopic('publish');
+  for (const s of ['npx joplo share --review', 'npx joplo feedback --format json', 'feedback --applied', 'feature.pick', "origin: 'user', status: 'confirmed'", "status: 'conflict' and ask the user", 'delete the question', 'JOPLO_API_KEY', '--pr <number>', 'run npx joplo check']) expect(body, s).toContain(s);
+});

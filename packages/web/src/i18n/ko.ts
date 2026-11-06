@@ -232,6 +232,9 @@ export function createKo(locale: Locale = 'ko') {
       embedOpenInNewTab: "새 탭에서 열기",
       embedPlayer: "데모 플레이어",
       embedNoScenario: "이 데모에는 아직 재생할 시나리오가 없습니다.",
+      // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
+      reviewPickHint: "화면의 요소를 클릭해 선택 · Esc로 취소",
+      reviewPickCancel: "취소",
     },
   });
 }

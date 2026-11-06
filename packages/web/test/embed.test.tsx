@@ -55,8 +55,8 @@ afterEach(() => {
 describe('参数', () => {
   it('只有 embed 恰好是 1 才进入嵌入模式', () => {
     for (const search of ['', '?', '?embed=0', '?embed=', '?embed=true', '?embed=1x', '?EMBED=1', '?embed', '#embed=1', null, undefined]) expect(parseEmbedParams(search), String(search)).toBeNull();
-    expect(parseEmbedParams('?embed=1')).toEqual({ scenario: null, autoplay: false });
-    expect(parseEmbedParams('embed=1&scenario=f.a.other&autoplay=1&x=y')).toEqual({ scenario: 'f.a.other', autoplay: true });
+    expect(parseEmbedParams('?embed=1')).toEqual({ scenario: null, autoplay: false, review: false });
+    expect(parseEmbedParams('embed=1&scenario=f.a.other&autoplay=1&x=y')).toEqual({ scenario: 'f.a.other', autoplay: true, review: false });
   });
   it('autoplay 只有 1 才自动播放；默认显示封面', () => {
     const p = published();

@@ -8,15 +8,37 @@ import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { createInterface } from 'node:readline/promises';
 import { JoploError } from '@joplo-app/core';
-import type { check } from './check.ts';
+import type { checkWithProject } from './check.ts';
+import type { PrDependencies } from './cloud-pr.ts';
 import { CloudError, sizeError, terminalText, type CloudCode, type SizeDetails } from './cloud-error.ts';
 
 export type Credentials = { server: string; accessToken: string; user: { id: string; email: string }; createdAt: string };
-export type Account = { user: { id: string; email: string; name: string }; plan: 'free' | 'pro'; limits: { maxUploadBytes: number; maxTotalBytes: number; maxFiles: number; publishesPerHour: number | null } };
+/** 一次云端调用用的令牌：设备会话（credentials.json）或环境变量 JOPLO_API_KEY（契约 8.4）。 */
+export type Auth = { token: string; source: 'session' | 'api_key' };
+/** whoami 里 API Key 的展示信息：服务端返回什么就显示什么，缺字段为 null。 */
+export type ApiKeyInfo = { name: string | null; prefix: string | null; scopes: string[] | null; expiresAt: string | null };
+export type Account = { user: { id: string; email: string; name: string }; plan: 'free' | 'pro'; limits: { maxUploadBytes: number; maxTotalBytes: number; maxFiles: number; publishesPerHour: number | null }; apiKey?: ApiKeyInfo };
+/** 契约 8.4：jpk_ + 至少 32 位 base62。 */
+export const API_KEY_PATTERN = /^jpk_[0-9A-Za-z]{32,}$/;
+export const API_KEY_FIX = 'Create a new key in Settings → API keys';
+/** 只显示前缀（库里也只存前 8 位），不显示完整 Key。 */
+export const apiKeyPrefix = (key: string) => key.slice(0, 8);
+const shortText = (v: unknown, max: number): string | null => typeof v === 'string' && v.trim() ? terminalText(v).trim().slice(0, max) : null;
+/** me 响应的 `credential`（kind = api_key 时才有 Key 信息）；只取已知字段并做长度限制，结构不对时全部为 null，不让 whoami 失败。 */
+export function readApiKeyInfo(value: unknown): ApiKeyInfo {
+  const k = object(value).kind === 'api_key' ? object(value) : {};
+  const scopes = Array.isArray(k.scopes) ? k.scopes.filter((x): x is string => typeof x === 'string' && /^[a-z]+:[a-z]+$/.test(x)).slice(0, 20) : null;
+  const expiresAt = typeof k.expiresAt === 'string' && Number.isFinite(Date.parse(k.expiresAt)) ? new Date(k.expiresAt).toISOString() : null;
+  const prefix = shortText(k.prefix, 32);
+  return { name: shortText(k.name, 200), prefix: prefix && /^[\w-]+$/.test(prefix) ? prefix : null, scopes, expiresAt };
+}
 /** 可替换时钟与系统边界；只有交互式跨服务器替换凭证时才读取确认输入。 */
 export type CloudDependencies = {
   env?: NodeJS.ProcessEnv; format?: string; interactive?: boolean; confirm?: (question: string) => Promise<boolean>; openBrowser?: (url: string) => Promise<boolean>;
-  sleep?: (ms: number, signal?: AbortSignal) => Promise<unknown>; now?: () => number; check?: typeof check;
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<unknown>; now?: () => number;
+  /** 测试替身：share 的检查（返回 project 时生成评审清单）。 */
+  check?: (dir: string) => Promise<Omit<Awaited<ReturnType<typeof checkWithProject>>, 'project'> & { project?: Awaited<ReturnType<typeof checkWithProject>>['project'] }>;
+  pr?: PrDependencies;
 };
 export const object = (v: unknown): Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 export const nonempty = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
@@ -175,6 +197,24 @@ export class CloudClient {
     } catch { this.warn('Could not restrict credential permissions. Set them to 0600 manually; continuing with the credentials already read.'); }
     return { server: c.server as string, accessToken: c.accessToken, user: { id: u.id, email: u.email }, createdAt: c.createdAt };
   }
+  /** 设置了 JOPLO_API_KEY 时返回它（不读 credentials.json）；格式不对时报 USAGE，不发请求。 */
+  apiKey(): string | null {
+    const key = this.env.JOPLO_API_KEY?.trim();
+    if (!key) return null;
+    if (!API_KEY_PATTERN.test(key)) throw new JoploError('USAGE', 'JOPLO_API_KEY must be a Joplo API key (jpk_ followed by at least 32 letters or digits). Unset it to use npx joplo login');
+    this.rememberSecret(key);
+    return key;
+  }
+  /** 云端命令的令牌：JOPLO_API_KEY 优先，不读 credentials.json、不触发设备登录；否则用已保存的登录。 */
+  async auth(forShare = false): Promise<Auth | null> {
+    const key = this.apiKey();
+    if (key) return { token: key, source: 'api_key' };
+    const c = await this.credentials(forShare);
+    return c ? { token: c.accessToken, source: 'session' } : null;
+  }
+  async requireAuth(): Promise<Auth> {
+    const a = await this.auth(); if (!a) throw new CloudError('AUTH_REQUIRED', undefined, { fix: 'npx joplo login' }); return a;
+  }
   async credentials(forShare = false): Promise<Credentials | null> {
     const c = await this.storedCredentials();
     if (c && c.server !== this.server) {
@@ -196,6 +236,7 @@ export class CloudClient {
     if (data.success !== true) throw new CloudError('INVALID_RESPONSE');
   }
   async logout(): Promise<void> {
+    if (this.apiKey()) throw new JoploError('USAGE', `JOPLO_API_KEY is set; local credentials were not touched. To stop using the key, unset JOPLO_API_KEY or revoke it in Settings → API keys: ${this.server}/settings/api-keys`);
     const credentials = await this.storedCredentials();
     if (credentials && credentials.server !== this.server) throw new JoploError('USAGE', 'Credentials belong to another server and were preserved. Use its --server <url> to sign out');
     const entries = await readdir(this.home, { withFileTypes: true }).catch(e => { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []; throw e; });
@@ -232,11 +273,16 @@ export class CloudClient {
     const { response, data } = await this.response(path, token, body);
     if (!response.ok) {
       if (path === '/api/auth/device/code' && response.status === 429) throw new CloudError('RATE_LIMITED');
+      // API Key 缺少权限范围时 SaaS 返回 403 FORBIDDEN；不能被映射成“账号不可用”
+      if (token?.startsWith('jpk_') && response.status === 403 && data.code !== 'PLAN_REQUIRED')
+        throw new CloudError('FORBIDDEN', `The API key ${apiKeyPrefix(token)}… does not have permission for this action. ${API_KEY_FIX} with the required scope: ${this.server}/settings/api-keys`, { fix: `${this.server}/settings/api-keys` });
       const code = responseCode(response.status, data.code, Boolean(token));
       if (code === 'NETWORK') {
         const afterMs = response.status === 503 ? retryAfterMillis(response.headers.get('retry-after'), this.now()) : undefined;
         throw new CloudError(code, undefined, undefined, { afterMs, createSafe: response.status === 503 && data.code === 'SERVICE_UNAVAILABLE' && afterMs !== undefined });
       }
+      const apiKey = !!token && token.startsWith('jpk_');
+      if (apiKey && code === 'AUTH_EXPIRED') throw new CloudError(code, `The API key ${apiKeyPrefix(token)}… is invalid, expired, or revoked. ${API_KEY_FIX}: ${this.server}/settings/api-keys`, { fix: `${this.server}/settings/api-keys` });
       if (code === 'PLAN_REQUIRED') throw new CloudError(code, `This action requires Pro: ${this.server}/billing`);
       if (code === 'QUOTA_EXCEEDED') throw quotaError(data.data ?? data.details);
       if (code === 'TOO_LARGE') {
@@ -250,9 +296,16 @@ export class CloudClient {
   async me(token: string): Promise<Account> {
     const d = await this.request('/api/v1/me', token), u = object(d.user), l = object(d.limits);
     if (!nonempty(u.id) || !nonempty(u.email) || typeof u.name !== 'string' || !['free', 'pro'].includes(String(d.plan)) || !Number.isSafeInteger(l.maxUploadBytes) || Number(l.maxUploadBytes) < 0 || !Number.isSafeInteger(l.maxTotalBytes) || Number(l.maxTotalBytes) < 0 || !Number.isSafeInteger(l.maxFiles) || Number(l.maxFiles) < 1 || !(l.publishesPerHour === null || Number.isSafeInteger(l.publishesPerHour) && Number(l.publishesPerHour) >= 0)) throw new CloudError('INVALID_RESPONSE');
-    return { user: { id: u.id, email: u.email, name: u.name }, plan: d.plan as Account['plan'], limits: { maxUploadBytes: l.maxUploadBytes as number, maxTotalBytes: l.maxTotalBytes as number, maxFiles: l.maxFiles as number, publishesPerHour: l.publishesPerHour as number | null } };
+    const account: Account = { user: { id: u.id, email: u.email, name: u.name }, plan: d.plan as Account['plan'], limits: { maxUploadBytes: l.maxUploadBytes as number, maxTotalBytes: l.maxTotalBytes as number, maxFiles: l.maxFiles as number, publishesPerHour: l.publishesPerHour as number | null } };
+    // 用 API Key 调用时附上 Key 的展示信息（服务端没给的字段为 null；前缀缺省时用本地 Key 的前 8 位）
+    if (token.startsWith('jpk_')) {
+      const info = readApiKeyInfo(d.credential);
+      account.apiKey = { ...info, prefix: info.prefix ?? apiKeyPrefix(token) };
+    }
+    return account;
   }
   async login(noBrowser = false): Promise<Credentials> {
+    if (this.apiKey()) throw new JoploError('USAGE', 'JOPLO_API_KEY is set, so cloud commands already use the API key; nothing was changed. Unset JOPLO_API_KEY to sign in with the browser');
     const previous = await this.storedCredentials();
     if (previous && previous.server !== this.server) {
       if (!this.interactive) this.refuseServerSwitch(previous.server);
