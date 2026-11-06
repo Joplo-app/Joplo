@@ -194,7 +194,22 @@ export type HubOptions = {
   home?: string | null;
   /** 测试注入：导出用的 Playwright 载入、视频录制。 */
   exportDeps?: Partial<ExportDeps>;
+  /** 启动这个看板的项目目录（写进 server.json，后来加入的 joplo dev 会说明）。 */
+  startedIn?: string;
 };
+
+/** 本包（与 CLI 同一版本）的版本号：看板 ping 与 server.json 都带上，加入时比较。 */
+let cachedVersion: string | null = null;
+export function serverVersion(): string {
+  if (cachedVersion !== null) return cachedVersion;
+  try {
+    const v = (JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version?: unknown }).version;
+    cachedVersion = typeof v === 'string' ? v : '0.0.0';
+  } catch {
+    cachedVersion = '0.0.0';
+  }
+  return cachedVersion;
+}
 
 export type Hub = {
   url: string;
@@ -467,7 +482,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
           if (url.pathname === '/__open-in-editor') return (req as { __joploOpen?: boolean }).__joploOpen ? next() : deny(res, 403, 'Use Open in editor in the board');
           if (!url.pathname.startsWith('/__joplo/')) return next();
           const method = req.method ?? 'GET';
-          if (url.pathname === '/__joplo/ping' && method === 'GET') return sendJson(res, 200, { joplo: true, pid: process.pid });
+          if (url.pathname === '/__joplo/ping' && method === 'GET') return sendJson(res, 200, { joplo: true, pid: process.pid, version: serverVersion() });
           if (url.pathname === '/__joplo/projects' && method === 'GET') return sendJson(res, 200, { projects: summaries() });
           // 看板设置（D51）：主题选择，存于 <JOPLO_HOME>/settings.json（没有 home 时只在内存里）
           if (url.pathname === '/__joplo/settings' && method === 'GET') return sendJson(res, 200, { settings: opts.home ? readSettings(opts.home) : memSettings });
@@ -564,7 +579,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   }
   const addr = server.httpServer?.address();
   actualPort = typeof addr === 'object' && addr ? addr.port : port;
-  if (opts.home) writeServerInfo(opts.home, { port: actualPort, pid: process.pid, token });
+  if (opts.home) writeServerInfo(opts.home, { port: actualPort, pid: process.pid, token, version: serverVersion(), dir: opts.startedIn ?? process.cwd() });
 
   if (watch) {
     server.watcher.on('all', (_ev, file) => {
@@ -625,8 +640,11 @@ export async function createDev(opts: InternalDevOptions): Promise<InternalDevHa
   }
 }
 
-/** 已有存活的看板：用令牌注册项目，返回项目链接；没有或不可用时返回 null。 */
-export async function attachToRunning(home: string, projectDir: string, log: (s: string) => void): Promise<{ url: string; port: number } | null> {
+/**
+ * 已有存活的看板：用令牌注册项目，返回项目链接；没有或不可用时返回 null。
+ * 提示里写出那个看板的 Joplo 版本与启动目录；和 ownVersion（当前项目用的 Joplo）不一致时再给一行警告和处理办法（D65）。
+ */
+export async function attachToRunning(home: string, projectDir: string, log: (s: string) => void, ownVersion = serverVersion()): Promise<{ url: string; port: number; pid: number; version: string | null; dir: string | null } | null> {
   const info = readServerInfo(home);
   if (!info) return null;
   if (!pidAlive(info.pid)) {
@@ -634,10 +652,12 @@ export async function attachToRunning(home: string, projectDir: string, log: (s:
     return null;
   }
   const base = `http://127.0.0.1:${info.port}`;
+  let boardVersion: string | null = null;
   try {
     const ping = await fetch(`${base}/__joplo/ping`, { signal: AbortSignal.timeout(1500) });
-    const body = (await ping.json()) as { joplo?: boolean; pid?: number };
+    const body = (await ping.json()) as { joplo?: boolean; pid?: number; version?: unknown };
     if (!ping.ok || body.joplo !== true || body.pid !== info.pid) return null;
+    boardVersion = typeof body.version === 'string' ? body.version : typeof info.version === 'string' ? info.version : null;
   } catch {
     return null;
   }
@@ -649,8 +669,11 @@ export async function attachToRunning(home: string, projectDir: string, log: (s:
   });
   const body = (await res.json().catch(() => null)) as { url?: string; error?: { message?: string } } | null;
   if (!res.ok || !body?.url) throw new JoploError('UNSUPPORTED_ACTION', `Cannot add the project to the running board (${base}, pid ${info.pid}): ${body?.error?.message ?? `HTTP ${res.status}`}`);
-  log(`[joplo] Joined the running board (pid ${info.pid})`);
-  return { url: body.url, port: info.port };
+  const dir = typeof info.dir === 'string' ? info.dir : null;
+  log(`[joplo] Joined the running board: Joplo ${boardVersion ?? 'version unknown (0.2.6 or earlier)'}, started in ${dir ?? 'an unknown directory'} (pid ${info.pid})`);
+  if (boardVersion !== ownVersion)
+    log(`[joplo] ! That board runs Joplo ${boardVersion ?? '0.2.6 or earlier'}, this project uses ${ownVersion}; the board may behave differently. To use ${ownVersion}, stop it (Ctrl+C in its terminal, or kill ${info.pid}), then run joplo dev here again.`);
+  return { url: body.url, port: info.port, pid: info.pid, version: boardVersion, dir };
 }
 
 function openBrowser(url: string, log: (s: string) => void) {
@@ -667,13 +690,13 @@ function openBrowser(url: string, log: (s: string) => void) {
  * CLI 的 `joplo dev`：同一个 JOPLO_HOME 下只运行一个看板进程。
  * 已有存活的看板 → 注册项目、（--open 时）打开浏览器，返回 attached；否则启动新的看板并登记项目。
  */
-export async function startDev(opts: DevOptions & { home?: string; exportDeps?: Partial<ExportDeps> }): Promise<DevHandle> {
+export async function startDev(opts: DevOptions & { home?: string; exportDeps?: Partial<ExportDeps>; /** 测试注入：当前项目的 Joplo 版本。 */ version?: string }): Promise<DevHandle> {
   const log = opts.log ?? ((m: string) => process.stderr.write(m + '\n'));
   const home = opts.home ?? joploHome();
   const projectDir = realProjectDir(opts.projectDir);
   if (!fs.existsSync(projectDir)) throw new JoploError('NOT_FOUND', `Project directory does not exist: ${projectDir}`);
   const attach = async () => {
-    const a = await attachToRunning(home, projectDir, log);
+    const a = await attachToRunning(home, projectDir, log, opts.version);
     if (!a) return null;
     if (opts.open) openBrowser(a.url, log);
     return { url: a.url, attached: true, close: async () => undefined } satisfies DevHandle;
@@ -682,7 +705,7 @@ export async function startDev(opts: DevOptions & { home?: string; exportDeps?: 
   if (existing) return existing;
   let hub: Hub;
   try {
-    hub = await createHub({ port: opts.port, log, home, exportDeps: opts.exportDeps });
+    hub = await createHub({ port: opts.port, log, home, exportDeps: opts.exportDeps, startedIn: projectDir });
   } catch (e) {
     // 另一个 joplo dev 恰好同时启动：端口被它占了，改为加入它
     if (e instanceof JoploError && (e.details as { code?: string } | undefined)?.code === 'EADDRINUSE') {

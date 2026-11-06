@@ -160,3 +160,51 @@ describe('release:verify（发布之后必跑；registry 与 npx 用替身）', 
     expect(missingFromInstallOutput('npm error network ETIMEDOUT', names)).toEqual([]);
   });
 });
+
+describe('release:publish（先构建打包全部，再按依赖顺序发布 tarball；registry / npm publish / verify 用替身）', () => {
+  const names = ['@joplo-app/kit', '@joplo-app/core', '@joplo-app/web', '@joplo-app/server', '@joplo-app/cli', 'joplo'];
+  const tarballs = names.map((name) => ({ name, file: `/release/${name.replace('/', '-')}-0.2.7.tgz` }));
+  async function publish(opts: Record<string, unknown>) {
+    // @ts-expect-error release script is an untyped ESM module
+    const { publishRelease } = await import('../release.mjs');
+    const logs: string[] = [], errors: string[] = [];
+    const prepare = vi.fn(async () => ({ version: '0.2.7', tarballs }));
+    const r = await publishRelease({ tag: 'latest', prepare, log: (m: string) => logs.push(m), error: (m: string) => errors.push(m), ...opts });
+    return { r, logs, errors, prepare };
+  }
+  test('中途一个包失败：立刻停止，不发后面的包、不运行 verify，非 0，列出已发布与未发布的包', async () => {
+    const order: string[] = [];
+    const publishTarball = vi.fn(async (t: { name: string; file: string }, tag: string) => { order.push(`${t.name}@${tag}`); return t.name !== '@joplo-app/web'; });
+    const verify = vi.fn(async () => ({ ok: true }));
+    const { r, errors, prepare } = await publish({ isPublished: async () => false, publishTarball, verify });
+    expect(prepare).toHaveBeenCalledOnce();
+    expect(order).toEqual(['@joplo-app/kit@latest', '@joplo-app/core@latest', '@joplo-app/web@latest']);
+    expect(publishTarball.mock.calls[0]![0].file).toBe(tarballs[0]!.file); // 发布的是已打好的 tarball
+    expect(verify).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ ok: false, published: ['@joplo-app/kit', '@joplo-app/core'], unpublished: ['@joplo-app/web', '@joplo-app/server', '@joplo-app/cli', 'joplo'] });
+    const text = errors.join('\n');
+    expect(text).toContain('@joplo-app/web');
+    expect(text).toContain('@joplo-app/server、@joplo-app/cli、joplo');
+    expect(text).toContain('pnpm release:publish --tag latest');
+  });
+  test('查询 registry 失败也立刻停止并列出未发布的包', async () => {
+    const publishTarball = vi.fn(async () => true);
+    const isPublished = vi.fn(async (name: string) => { if (name === '@joplo-app/server') throw new Error('HTTP 503'); return false; });
+    const { r } = await publish({ isPublished, publishTarball, verify: vi.fn() });
+    expect(publishTarball).toHaveBeenCalledTimes(3);
+    expect(r).toMatchObject({ ok: false, unpublished: ['@joplo-app/server', '@joplo-app/cli', 'joplo'] });
+  });
+  test('全部成功（已发布的跳过）：最后运行 verify，用它的结果作为整体结果', async () => {
+    const publishTarball = vi.fn(async () => true);
+    const isPublished = async (name: string) => name === '@joplo-app/kit';
+    const ok = await publish({ isPublished, publishTarball, verify: vi.fn(async () => ({ ok: true })) });
+    expect(publishTarball.mock.calls.map((c) => c[0].name)).toEqual(names.slice(1));
+    expect(ok.r).toMatchObject({ ok: true, published: names.slice(1), skipped: ['@joplo-app/kit'], unpublished: [] });
+    expect(ok.logs.join('\n')).toContain('git tag v0.2.7');
+    const verify = vi.fn(async () => ({ ok: false }));
+    const bad = await publish({ isPublished: async () => true, publishTarball: vi.fn(), verify });
+    expect(verify).toHaveBeenCalledExactlyOnceWith('0.2.7');
+    expect(bad.r.ok).toBe(false);
+    expect(bad.logs.join('\n')).not.toContain('git tag v0.2.7');
+  });
+});

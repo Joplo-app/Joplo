@@ -3,7 +3,7 @@
  * 下一步命令、不覆盖已有文件、项目内 @joplo-app/kit 与 CLI 版本不一致时的提示。
  */
 import { afterEach, describe, expect, test } from 'vitest';
-import { mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { detectPackageManager, pmCommands } from '../src/pm.ts';
@@ -78,6 +78,33 @@ describe('init', () => {
     expect(e.message).toContain('Nothing was written');
     expect(e.message).toContain('init . --keep');
     expect((await readdir(d)).sort()).toEqual(['a.txt', 'b.txt', 'c']);
+  });
+
+  test('只有 Agent / 版本控制文件（先 npx skills add 再 init .）：视为空目录，不要求 --keep，已有文件一字不改', async () => {
+    const d = await temp();
+    await mkdir(join(d, '.git')); await writeFile(join(d, '.git/HEAD'), 'ref: refs/heads/main\n');
+    await mkdir(join(d, '.agents/skills/other'), { recursive: true }); await writeFile(join(d, '.agents/skills/other/SKILL.md'), '# other\n');
+    await mkdir(join(d, '.claude')); await writeFile(join(d, 'AGENTS.md'), '# Team\n'); await writeFile(join(d, 'skills-lock.json'), '{"version":1}\n');
+    await writeFile(join(d, '.gitignore'), '.env\n');
+    const r = await initProject(d, undefined, { env: {} });
+    expect(r.written).toContain('joplo.config.ts');
+    expect(r.skipped).toEqual(['.gitignore']);
+    expect(await readFile(join(d, '.gitignore'), 'utf8')).toBe('.env\n');
+    expect(await readFile(join(d, 'skills-lock.json'), 'utf8')).toBe('{"version":1}\n');
+    expect(await readFile(join(d, '.agents/skills/other/SKILL.md'), 'utf8')).toBe('# other\n');
+    expect((await readFile(join(d, 'AGENTS.md'), 'utf8')).startsWith('# Team\n\n<!-- joplo:start -->')).toBe(true);
+    // 已有的 .gitignore 保留，但提示缺少的条目
+    expect(initSummary(r, {}).find(l => l.includes('.gitignore'))).toContain('node_modules/');
+  });
+
+  test('Agent 文件之外还有别的文件：仍要求 --keep，什么都不写', async () => {
+    const d = await temp();
+    await mkdir(join(d, '.claude')); await writeFile(join(d, 'AGENTS.md'), '# Team\n'); await writeFile(join(d, 'notes.md'), 'x');
+    const e = await initProject(d, undefined, { env: {} }).catch(x => x);
+    expect(e.message).toContain('is not empty (contains 1 files');
+    expect(e.message).toContain('notes.md');
+    expect(e.message).toContain('init . --keep');
+    expect((await readdir(d)).sort()).toEqual(['.claude', 'AGENTS.md', 'notes.md']);
   });
 
   test('--keep 只补缺失的文件，已有文件一字不改', async () => {
@@ -172,6 +199,32 @@ describe('init 安装 Agent 技能（等同于对新项目运行 skill install -
     const agents = await readFile(join(d, 'AGENTS.md'), 'utf8');
     expect(agents.startsWith('# Team rules\n\n<!-- joplo:start -->')).toBe(true);
     expect(r.skill!.modified).toEqual([]);
+  });
+  test('已装好同版本、未修改的技能（npx skills add 的软链接安装）：跳过并说明，不改动技能文件', async () => {
+    const d = await temp();
+    for (const f of skillFiles(VERSION)) {
+      await mkdir(join(d, '.agents/skills', f.name), { recursive: true });
+      await writeFile(join(d, '.agents/skills', f.name, 'SKILL.md'), f.content);
+      await mkdir(join(d, '.claude/skills'), { recursive: true });
+      await symlink(`../../.agents/skills/${f.name}`, join(d, '.claude/skills', f.name));
+    }
+    await writeFile(join(d, 'skills-lock.json'), '{}\n');
+    const before = await stat(join(d, '.agents/skills/joplo/SKILL.md'));
+    const r = await initProject(d, undefined, { env: {} });
+    expect(r.skill).toMatchObject({ written: ['AGENTS.md'], modified: [], unchanged: ['.claude/skills/joplo/SKILL.md', '.claude/skills/joplo-feedback/SKILL.md'] });
+    expect((await stat(join(d, '.agents/skills/joplo/SKILL.md'))).mtimeMs).toBe(before.mtimeMs);
+    const line = initSummary(r, {}).find(l => l.includes('Agent skills'))!;
+    expect(line).toContain(`already installed (Joplo ${VERSION}, unchanged)`);
+    expect(line).toContain('AGENTS.md');
+  });
+  test('init（不带 --keep）遇到用户改过的技能：保留，提示 --force', async () => {
+    const d = await temp();
+    await mkdir(join(d, '.claude/skills/joplo'), { recursive: true });
+    await writeFile(skill(d, 'joplo'), '# mine\n');
+    const r = await initProject(d, undefined, { env: {} });
+    expect(await readFile(skill(d, 'joplo'), 'utf8')).toBe('# mine\n');
+    expect(r.skill!.modified).toEqual(['.claude/skills/joplo/SKILL.md']);
+    expect(initSummary(r, {}).find(l => l.includes('Agent skills'))).toContain('--force');
   });
   test('AGENTS.md 标记损坏时项目文件照常写入，技能一个都不写，并说明原因', async () => {
     const d = await temp();

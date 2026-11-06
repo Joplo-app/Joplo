@@ -250,6 +250,16 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 薄技能 + 按需读取主题：技能只写心智模型（预设场景的播放器，不是自由输入的应用原型）、起步顺序（先做一条正常流程 + 一条错误恢复流程并在看板里确认，再扩展）和最常见的坑；具体 API 一律以 `npx joplo skill <主题>` 为准，和项目安装的版本一致，不会过期。
   - 同一测试带来的 CLI 改进：结构校验错误定位到作者元素、同一根因合并成一条并附 “affects N views”；`when` 收到普通值报 `INVALID_CONDITION`；深链接里不认识的参数在看板（以及本机预览的发布站）控制台提示一次。
   - 不做（待办）：主题的稳定颜色变量（例如主按钮颜色 `--jp-primary` 或稳定的 variant 属性）。目前主按钮背景是 `--jp-ink`，只能逐个按钮写 `color`；见下方 Q8。
+  - 更正（2026-11-06，见 D65）：固定版本的写法 `npx skills add Joplo-app/Joplo@v<版本>` 不能用（skills CLI 把 `@` 后面当成技能名，报 No matching skills found）；改为 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<版本>`（实测可用）。上面两处 `@v<版本>` 保留原文作为历史。
+- D65 0.2.5 复测修复（2026-11-06，来源：用户 2026-11-06，依据 0.2.5 新 Agent 复测，两个装了官方技能的 Agent 做“重置密码”演示）：
+  - 发布不再漏包（0.2.4 漏了 core、0.2.6 漏了 web；原因是每个包 publish 前各自跑 prepublishOnly 构建，web 最慢，用户输入 OTP 后中间的包容易失败）：`release:publish` 先一次性构建并打包全部包（即 release:pack，含全部检查），再按依赖顺序 `npm publish <tarball>`（不运行生命周期脚本，不再逐包构建）；registry 上已有的跳过；任何一个包失败立刻停止，列出已发布 / 未发布的包，提示重跑；全部完成后自动运行 release:verify，用它的结果作为退出码。tag 只在 publish（含 verify）以 0 退出后再推。
+  - 固定技能版本：一律写 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<版本>`（D64 的更正），README（中英文）、docs/release.md、技能文字同步。
+  - `init` 与已有的 Agent 配置：目录里只有 Agent / 版本控制文件（`.git`、`.gitignore`、`.gitattributes`、`.agents`、`.claude`、`.codex`、`.cursor`、`AGENTS.md`、`CLAUDE.md`、`skills-lock.json`、`.DS_Store`）时视为空目录，不要求 `--keep`，按 `--keep` 的方式写入（已有文件一字不改，保留的 .gitignore 缺少 Joplo 条目时只提示）；还有别的文件时仍要求 `--keep` 并列出文件名。装技能时已有同版本、未修改的技能跳过并说明，有用户修改的保留并提示 `--force`。
+  - `.back()` 之后的当前画面：编译器推算每一步所在路径时忽略了 back，返回后的 `mark()` 报 MARK_UNKNOWN，shot 与自动字幕也按返回前的页面解析；改为与播放器相同的页面栈。
+  - 失败结局：选择“让 `done` 的第二个参数生效”。flow 没写 `outcome` 时，结局取最后一个 `done(…, outcome)`：failure → failure，cancelled → other，success → success；flow 写了 `outcome` 时以它为准，与 done 不一致时 check 给 OUTCOME_MISMATCH 警告。IR 结构不变（仍是 scenario.mock），旧项目不受影响（没写第二个参数时仍是 success）。技能文字补上 option 的 `focus`、`tradeoffs` 与 flow 的 `mock`、`outcome`。
+  - `disabledReason` 可以绑定状态（和 `disabled` 一样）：编译成 `$ui.x` 形式的整值绑定，点击被禁用的元素时按当前状态读出，空值时退回默认说明；不是字符串也不是绑定时报 INVALID_DISABLED_REASON（error）并给出写法；DISABLED_WITHOUT_REASON 的提示写明两种写法。没有架构原因阻止绑定：IR 字段仍是字符串，与其他属性的绑定同一种表示。
+  - `joplo dev` 加入已运行的看板时，写出那个看板的 Joplo 版本和启动目录（看板 ping 返回版本；server.json 增加 version、dir，旧看板没有）；与当前项目的版本不一致（含旧看板报不出版本）时多一行警告和处理办法（停掉那个看板再运行）。
+  - 文档 / 技能说明（核对过实现）：`uses(...)` 是传给步骤的效果，不是链式方法；`l=` 或点层级标签会固定层级，之后的步骤不再自动切层，打开「跟随导演」或去掉 `l=` 恢复；routes 与 layers 可以同时用，声明 layers 后演示只显示层，路径页面不画出来（仍提供起点和 go/back 状态）；过渡卡那一步舞台不可点击，要点「下一步」。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

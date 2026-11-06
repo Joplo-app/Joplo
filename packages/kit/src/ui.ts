@@ -17,7 +17,8 @@ export type JoploProps = {
   id?: string;
   when?: Bind | CondExpr;
   disabled?: boolean | Bind | CondExpr;
-  disabledReason?: string;
+  /** 字面量，或绑定状态（disabledReason={$.ui.sendHint}），和 disabled 一样跟着状态变。 */
+  disabledReason?: string | Bind;
   unmodeled?: boolean;
   note?: string;
   visibleFrom?: Size;

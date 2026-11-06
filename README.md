@@ -42,12 +42,12 @@ Two ways to give a coding agent (Claude Code, Codex, …) the Joplo skills `jopl
 
 ```sh
 npx skills add Joplo-app/Joplo           # official skills from this repo; any repo, even before Joplo is installed
-npx skills add Joplo-app/Joplo@v0.2.4    # pin to a release tag
+npx skills add https://github.com/Joplo-app/Joplo/tree/v0.2.6   # pin to a release tag (Joplo-app/Joplo@v… does not work: the skills CLI reads @… as a skill name)
 npx joplo skill install                  # inside a Joplo project: skills matching the project's installed version
 ```
 
 - Use `npx skills add` when you want agents to discover Joplo in any repository, for example to start a new prototype. The [skills CLI](https://github.com/vercel-labs/skills) installs to `.claude/skills/` for Claude Code and `.agents/skills/` for Codex.
-- `npx joplo init` installs the same skills (and an `AGENTS.md` block) into new projects; pass `--no-skill` to skip.
+- `npx joplo init` installs the same skills (and an `AGENTS.md` block) into new projects; pass `--no-skill` to skip. Installing skills first and then running `npx joplo init .` works: agent and Git files (`.git`, `.gitignore`, `.agents/`, `.claude/`, `AGENTS.md`, `skills-lock.json`, …) do not make the directory non-empty, skills already installed at the same version are skipped, and skills you edited are kept (`npx joplo skill install --force` replaces them). Other existing files still need `init . --keep`.
 - Use `npx joplo skill install` inside a project that already has `joplo.config.ts`. It writes `.claude/skills/joplo*/SKILL.md`, updates untouched files when Joplo is upgraded, never overwrites files you edited (`--diff` to compare, `--force` to replace), and with `--agents-md` also writes a managed block into `AGENTS.md`.
 - The skills are thin on purpose: a mental model, the start order, and common pitfalls. The detailed API always comes from `npx joplo skill <topic>`, which matches the installed version.
 

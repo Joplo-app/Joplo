@@ -27,9 +27,8 @@ pnpm release:smoke
 git add packages/*/package.json pnpm-lock.yaml skills
 git commit -m "release: 0.1.3"
 git push origin main
-pnpm release:publish --tag latest
-pnpm release:verify        # 发布之后必跑
-git tag v0.1.3
+pnpm release:publish --tag latest   # 先构建打包全部，再逐个发布 tarball，最后自动运行 release:verify
+git tag v0.1.3                      # 只在上一步以 0 退出（verify 通过）之后
 git push origin v0.1.3
 ```
 
@@ -37,9 +36,9 @@ git push origin v0.1.3
 
 1. `pnpm release:version <v>`：改六个包的版本，并重新生成 `skills/*/SKILL.md`（带新版本标记）。
 2. 跑完检查后，把 `packages/*/package.json`、`pnpm-lock.yaml`、`skills/` 一起提交，推送 main。
-3. `pnpm release:publish --tag <标签>`：发布到 npm（可续跑）。
-4. `pnpm release:verify`：确认六个包都在 registry 上并能实际 `npx -y joplo@<v>` 安装；不通过就回到第 3 步补发。
-5. 通过后在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`。用户用 `npx skills add Joplo-app/Joplo@v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。tag 要等 verify 通过再推，避免指向一个装不上的版本。
+3. `pnpm release:publish --tag <标签>`：先一次性构建并打包全部包（与 `release:pack` 相同，含全部 tarball 检查），再按依赖顺序发布打好的 tarball（可续跑，见下），最后自动运行 `release:verify`，整体退出码就是 verify 的结果。
+4. 第 3 步失败（中途某个包没发出去，或 verify 不通过）：按提示处理后重跑同一条命令，已发布的包会跳过。也可以单独运行 `pnpm release:verify` 复查。
+5. 第 3 步以 0 退出后，才在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`（脚本最后一行会打印这条命令）。用户用 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。注意 `npx skills add Joplo-app/Joplo@v<v>` 不能用：skills CLI 把 `@` 后面当成技能名，报 No matching skills found（2026-11-06 实测）。tag 要等 verify 通过再推，避免指向一个装不上的版本。
 
 `release:version` 会同时重新生成仓库根目录的官方 Agent 技能 `skills/*/SKILL.md`（带版本标记，D64），要和版本号一起提交；`scripts/test/skills.test.ts` 会在不一致时失败（单独重新生成：`pnpm skills:build`）。
 
@@ -50,7 +49,7 @@ git push origin v0.1.3
 - `pnpm release:pack`：按依赖顺序构建，清空并重建 release/，逐包打 tarball，检查版本、内部依赖、导出入口、源码泄漏与字体许可证；`@joplo-app/web` tarball 超过 6,000,000 字节（6 MB）立即失败，并列出解包后最大的 5 个目录。
 - `pnpm release:smoke`：包含 pack，再在仓库外的临时目录只用 tarball 安装并运行 init、check、skill、build、dev、selection；验证版本锁定、热更新、源码定位和无工作区路径泄漏，并检查缺少可选 Playwright 时 render 的提示。init 示例 build 后，dist 字体总量不得超过 1,500,000 字节（1.5 MB），总文件数不得超过 150；任一超标即失败。
 - `pnpm release:smoke --keep`：保留临时目录，便于排查。冒烟安装第三方依赖需要网络或本地缓存，测试服务使用随机端口与独立 JOPLO_HOME。
-- 每个包的 prepublishOnly 会构建该包；发布前仍应完成整套 smoke，不能只凭单包构建成功判断可分发。
+- 每个包的 prepublishOnly 仍会构建该包（只在有人直接对包目录运行 `pnpm publish` 时生效）；`release:publish` 发布的是打好的 tarball，`npm publish <tarball>` 不运行生命周期脚本，不会再逐包构建。发布前仍应完成整套 smoke，不能只凭单包构建成功判断可分发。
 
 2026-11-06 字体瘦身实测：web tarball 约 2.60 MB（原 27.22 MB），解包约 4.19 MB（原 29.06 MB）；init 示例发布站字体 1,068,596 字节、120 个文件。预算保留少量内容增长空间；新增语言或字体时仍须通过上述检查。
 
@@ -58,7 +57,13 @@ git push origin v0.1.3
 
 ## 可续跑发布
 
-`pnpm release:publish --tag latest` 每次先直接查询 registry，绕过本地缓存；按依赖顺序只发布尚不存在的包版本。中途失败后，处理登录、网络或 2FA 问题，再重跑同一条命令即可；已存在的版本会跳过，不必重发，也不必仅为重试增加版本号。
+0.2.4 漏发了 core、0.2.6 漏发了 web：以前每个包 publish 前各自运行 prepublishOnly 构建，web 构建最慢，排在中间的包常在用户输入 OTP 之后失败。现在 `pnpm release:publish --tag latest` 分三步：
+
+1. 一次性构建并打包全部包到 `release/`（构建或任何 tarball 检查失败时一个包都不发）。
+2. 按依赖顺序（kit → core → web → server → cli → joplo）逐个处理：先直接查询 registry（绕过本地缓存），已有这个版本就跳过；否则 `npm publish release/<包>.tgz --access public --tag <标签>`。任何一个包失败（包括查询 registry 失败）立刻停止，不再发后面的包，列出本次已发布、registry 上原本就有、还没发布的包，以非 0 退出。
+3. 全部处理完后运行 `release:verify`，用它的结果作为整体退出码；通过时最后一行打印打 tag 的命令。
+
+中途失败后，处理登录、网络或 2FA 问题，再重跑同一条命令即可；已存在的版本会跳过，不必重发，也不必仅为重试增加版本号。实现见 [release.mjs](../scripts/release.mjs) 的 `publishRelease`，测试用替身注入打包、registry、npm publish 与 verify（scripts/test/release.test.ts）。
 
 跳过已有版本不会修改其 dist-tag；发布到其他标签的既有版本若需转为 latest，应单独维护标签。
 
@@ -66,7 +71,7 @@ git push origin v0.1.3
 
 ## 发布之后必跑：release:verify
 
-0.2.4 发布时 `pnpm -r publish` 中途失败，`@joplo-app/core` 漏发、其余 5 个包发上去了；`joplo` 精确依赖同版本的 `@joplo-app/cli`，cli 又精确依赖 core，于是所有人的 `npx joplo` 都装不上，直到补发。所以 publish 之后必须运行：
+0.2.4 发布时 `pnpm -r publish` 中途失败，`@joplo-app/core` 漏发、其余 5 个包发上去了；`joplo` 精确依赖同版本的 `@joplo-app/cli`，cli 又精确依赖 core，于是所有人的 `npx joplo` 都装不上，直到补发。所以 publish 最后会自动运行它；也可以单独运行：
 
 ```sh
 pnpm release:verify            # 默认取各包 package.json 的统一版本

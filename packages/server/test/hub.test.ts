@@ -122,6 +122,21 @@ describe('一个进程，多个项目', () => {
     expect((await req(port, { path: '/__joplo/ping' })).body).toMatchObject({ joplo: true, pid: process.pid });
   }, 60_000);
 
+  it('加入已运行的看板：提示写出它的 Joplo 版本和启动目录；版本不一致时多一行警告和处理办法', async () => {
+    const version = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8')).version as string;
+    expect((await req(port, { path: '/__joplo/ping' })).body).toMatchObject({ joplo: true, pid: process.pid, version });
+    expect(readServerInfo(home)).toMatchObject({ version, dir: a });
+    const same: string[] = [];
+    await startDev({ projectDir: b, port: 0, home, log: (s) => same.push(s) });
+    expect(same.join('\n')).toContain(`Joined the running board: Joplo ${version}, started in ${a} (pid ${process.pid})`);
+    expect(same.join('\n')).not.toContain('!');
+    const skew: string[] = [];
+    await startDev({ projectDir: b, port: 0, home, log: (s) => skew.push(s), version: '9.9.9' } as Parameters<typeof startDev>[0]);
+    const warn = skew.find((s) => s.includes('!'));
+    expect(warn).toContain(`runs Joplo ${version}, this project uses 9.9.9`);
+    expect(warn).toContain(`kill ${process.pid}`);
+  }, 60_000);
+
   it('注册接口：没有或错误令牌 403、错误 Origin 403、错误 Content-Type 415、目录不存在 404', async () => {
     const body = JSON.stringify({ dir: b });
     expect((await req(port, { method: 'POST', path: '/__joplo/projects', headers: { 'content-type': 'application/json' }, body })).status).toBe(403);

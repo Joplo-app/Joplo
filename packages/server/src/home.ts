@@ -17,7 +17,8 @@ import path from 'node:path';
 import { THEME_NAME, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke } from '@joplo-app/core';
 
 export type ProjectRecord = { dir: string; name: string; lastOpened: string };
-export type ServerInfo = { port: number; pid: number; token: string };
+/** version / dir（D65，0.2.7 起）：看板进程的 Joplo 版本与启动它的项目目录，供后来的 joplo dev 在加入时说明；旧看板没有。 */
+export type ServerInfo = { port: number; pid: number; token: string; version?: string; dir?: string };
 
 export function joploHome(env: Record<string, string | undefined> = process.env): string {
   const v = env.JOPLO_HOME;

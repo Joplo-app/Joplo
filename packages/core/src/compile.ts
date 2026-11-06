@@ -453,7 +453,12 @@ export function compile(src: AuthoringProject, mode: CompileMode): CompileResult
           ...(st.source ? { source: rel(st.source) } : {}),
         };
       });
-      const outcome = fl.opts.outcome ?? 'success';
+      // 结局（D65）：flow 的 outcome 优先；没写时取 done(…, outcome) 的第二个参数（cancelled 记为 other）
+      const doneOutcome = [...fl.steps].reverse().flatMap((st) => [...st.effects].reverse()).find((e): e is Extract<EffectDef, { type: 'complete' }> => e.type === 'complete')?.outcome;
+      const fromDone = doneOutcome === undefined ? undefined : doneOutcome === 'cancelled' ? 'other' : doneOutcome;
+      if (fl.opts.outcome !== undefined && fromDone !== undefined && fl.opts.outcome !== fromDone)
+        warn('OUTCOME_MISMATCH', `Scenario ${sid} has flow outcome '${fl.opts.outcome}' but ends with done(…, '${doneOutcome}'); the board shows '${fl.opts.outcome}'. Make them agree: change done's second argument, or write flow(…, { outcome: '${fromDone}' })`, fl.source);
+      const outcome = fl.opts.outcome ?? fromDone ?? 'success';
       const state = mergeState(def.state, fl.opts.state);
       const sc: Scenario = {
         id: sid,
@@ -638,7 +643,11 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   if (children.length) node.children = children;
   if (when !== undefined) node.when = toCondition(when) as SceneNode['when'];
   if (disabled !== undefined) node.disabled = (typeof disabled === 'boolean' ? disabled : toCondition(disabled)) as SceneNode['disabled'];
+  // disabledReason：字面量，或整值绑定（和 disabled 一样跟着状态变，D65）；其他值不会被显示，直接报错并给出写法
   if (typeof disabledReason === 'string') node.disabledReason = disabledReason;
+  else if (isBind(disabledReason)) node.disabledReason = `$${bindPath(disabledReason)}`;
+  else if (disabledReason !== undefined && disabledReason !== null)
+    err('INVALID_DISABLED_REASON', `<${n.type}> "${labelOf(n)}" disabledReason must be a string or a state binding, got ${typeof disabledReason === 'object' ? 'an object' : typeof disabledReason}. Write disabledReason="Only admins can invite" or disabledReason={$.ui.sendHint}; for text that changes during the demo, set() it into state and bind it`, at);
   if (unmodeled === true) node.unmodeled = true;
   if (typeof note === 'string') node.note = note;
   if (typeof __from === 'string') node.from = __from;
@@ -705,9 +714,18 @@ function labelOf(n: JNode): string {
   return t || n.type;
 }
 
+/**
+ * 第 i 步执行之前所在的路径。与播放器（player.applyStep）同一个顺序：back 动作先回到上一页，
+ * 再按效果顺序处理 go（当前页入栈）。0.2.6 之前忽略了 back，返回后的 mark / shot / 自动字幕都按返回前的页面解析。
+ */
 function stepRouteBefore(steps: StepDef[], i: number, start: string): string {
   let route = start;
-  for (let k = 0; k < i; k++) for (const e of steps[k]!.effects) if (e.type === 'go') route = e.route;
+  const stack: string[] = [];
+  for (let k = 0; k < i; k++) {
+    const st = steps[k]!;
+    if (st.action.type === 'back') route = stack.pop() ?? route;
+    for (const e of st.effects) if (e.type === 'go') { stack.push(route); route = e.route; }
+  }
   return route;
 }
 
