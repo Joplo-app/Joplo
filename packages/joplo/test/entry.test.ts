@@ -46,7 +46,7 @@ describe('Node 版本检查', () => {
     const m = checkNode(v);
     if (!rejected) expect(m).toBeNull();
     else {
-      expect(m).toContain(`Joplo 需要 Node.js 22 或更高版本，当前是 ${v}`);
+      expect(m).toContain(`Joplo requires Node.js 22 or later; current version is ${v}`);
       expect(m).toContain('nvm install 22');
       expect(m).toContain('https://nodejs.org');
     }
@@ -66,7 +66,7 @@ describe('Node 版本检查', () => {
     fs.writeFileSync(shim, "Object.defineProperty(process.versions, 'node', { value: '20.11.0', configurable: true, enumerable: true });\n");
     const r = spawnSync(process.execPath, ['-r', shim, BIN, 'dev'], { cwd: temp(), encoding: 'utf8' });
     expect(r.status).toBe(1);
-    expect(r.stderr).toContain('Joplo 需要 Node.js 22 或更高版本，当前是 20.11.0');
+    expect(r.stderr).toContain('Joplo requires Node.js 22 or later; current version is 20.11.0');
     expect(r.stderr).not.toMatch(/at .*\(/);
     expect(r.stdout).toBe('');
   });
@@ -77,8 +77,8 @@ describe('选择 CLI', () => {
     const self = fakeSelf('0.2.0'); const project = temp(); const local = fakeCli(project, '0.1.0', '0.1.0');
     const c = pickCli({ cwd: project, selfDir: self, argv: ['check'], env: {} })!;
     expect(c).toMatchObject({ dir: local, version: '0.1.0', local: true });
-    expect(c.notes.join('\n')).toContain('已改用项目内的 joplo 0.1.0 执行（npx 拉到的是 0.2.0）');
-    expect(c.notes.join('\n')).toContain('要升级：npm i -D joplo@0.2.0 @joplo-app/kit@0.2.0');
+    expect(c.notes.join('\n')).toContain('Using project joplo 0.1.0 (npx fetched 0.2.0)');
+    expect(c.notes.join('\n')).toContain('Upgrade: npm i -D joplo@0.2.0 @joplo-app/kit@0.2.0');
   });
 
   test('子目录里运行也能找到项目内的版本；版本相同则不提示', () => {
@@ -114,7 +114,7 @@ describe('选择 CLI', () => {
   test('dev 时说明使用的版本', () => {
     const self = fakeSelf('0.1.0'); const project = temp(); fakeCli(project, '0.1.0', '0.1.0');
     const c = pickCli({ cwd: project, selfDir: self, argv: ['dev', '--port', '1'], env: {} })!;
-    expect(c.notes).toEqual(['[joplo] 使用项目内的 joplo 0.1.0（@joplo-app/kit 0.1.0）']);
+    expect(c.notes).toEqual(['[joplo] Using project joplo 0.1.0 (@joplo-app/kit 0.1.0)']);
   });
 
   test('坏的 package.json、缺 bin 字段：跳过这份，退回下一份', () => {
@@ -145,6 +145,6 @@ describe('真实入口转发', () => {
     for (const f of ['bin/joplo.cjs', 'lib/node-check.cjs', 'lib/main.cjs', 'package.json']) fs.copyFileSync(path.join(PKG, f), path.join(lonely, f));
     const r = spawnSync(process.execPath, [path.join(lonely, 'bin/joplo.cjs'), 'check'], { cwd: temp(), encoding: 'utf8' });
     expect(r.status).toBe(1);
-    expect(r.stderr).toContain('找不到 @joplo-app/cli');
+    expect(r.stderr).toContain('Cannot find @joplo-app/cli');
   });
 });

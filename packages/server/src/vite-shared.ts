@@ -99,7 +99,7 @@ export function joploProjectPlugin(projectDir: string, web: WebAssets = locateWe
         const loc = parseErrorLoc(first, file) ?? { line: 1, column: 1 };
         const rel = path.relative(projectDir, file).split(path.sep).join('/');
         const brief = (first.split('\n')[0] ?? '').replace(/^\s*\[[A-Z_]+\]\s*/, '').trim();
-        throw new ProjectSyntaxError(`${rel}:${loc.line}:${loc.column} 语法错误：${brief || '无法解析'}`, { file, ...loc });
+        throw new ProjectSyntaxError(`${rel}:${loc.line}:${loc.column} syntax error: ${brief || 'Cannot parse'}`, { file, ...loc });
       }
     },
   };

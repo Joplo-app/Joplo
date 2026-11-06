@@ -1,6 +1,9 @@
+import { m } from './i18n/board/messages';
+import { translate, type Text } from './i18n/messages';
+import { useBoardI18n } from './i18n/board/context';
 /**
  * 渲染专用路由（renderStep 与看板导出使用）：
- *   /?render=1&project=<id>&scenario=..&position=..&theme=..[&font=..][&stroke=..][&w=..&h=..][&frame=1][&record=1]
+ *   /?render=1&project=<id>&scenario=..&position=..&theme=..[&font=..][&stroke=..][&w=..&h=..][&frame=1][&record=1][&locale=en]
  * - font / stroke（D55，看板外观）：缺省 = 跟随主题；导出图片、视频与 renderStep 透传，和看板里看到的一致。
  * - 只渲染舞台，尺寸跟随页面自己的 viewport（D44：不再覆盖设备），关闭入场动画。字体、rough 绘制与镜头都稳定后
  *   设置 window.__JOPLO_READY__ = true，并暴露 window.__JOPLO_STATE__（当前 PlayState）。
@@ -35,6 +38,9 @@ type W = {
 const raf = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
 export function RenderApp() {
+  const { t: i18n } = useBoardI18n();
+
+  useEffect(() => { document.title = i18n.board.joploBoard; }, [i18n]);
   const params = new URLSearchParams(location.search);
   const projectId = params.get('project') ?? '';
   const scenarioId = params.get('scenario') ?? '';
@@ -49,7 +55,7 @@ export function RenderApp() {
   const shot = w > 0 && h > 0 ? { width: w, height: h } : null;
   const registry = useMemo(() => new RoughRegistry(), []);
   const [data, setData] = useState<{ project: Project; state: PlayState } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Text | null>(null);
   const theme: StageTheme = themeParam && THEME_NAME.test(themeParam) ? themeParam : (data?.project.theme ?? 'sketch');
   const { font, stroke } = appearanceFromParams(params);
   const [stage, setStage] = useState<HTMLDivElement | null>(null);
@@ -58,17 +64,17 @@ export function RenderApp() {
     (async () => {
       const r = await fetchIR(projectId);
       if ('error' in r) return fail(r.error);
-      if (!r.project) return fail(r.diagnostics.map((d) => `${d.at ?? ''} ${d.message}`).join('；') || '项目没有成功编译');
+      if (!r.project) return fail(r.diagnostics.map((d) => `${d.at ?? ''} ${d.message}`).join(i18n.board.diagnosticSeparator) || m.board.projectDidNotCompileSuccessfully);
       try {
         setData({ project: r.project, state: stateAt(r.project, scenarioId, position) });
       } catch (e) {
         fail(e instanceof Error ? e.message : String(e));
       }
     })();
-    function fail(msg: string) {
+    function fail(msg: Text) {
       setError(msg);
       const w = window as unknown as W;
-      w.__JOPLO_ERROR__ = msg;
+      w.__JOPLO_ERROR__ = translate(msg, i18n);
       w.__JOPLO_STATE__ = null;
       w.__JOPLO_READY__ = true;
     }
@@ -83,7 +89,7 @@ export function RenderApp() {
       await raf();
       {
         // 手绘字体按需加载（主题可能用到）；等它们就绪再截图
-        const text = stage.innerText || '中文';
+        const text = stage.innerText || i18n.board.english;
         await Promise.all([document.fonts.load('16px "Joplo Excalifont"', text), document.fonts.load('16px "Joplo Xiaolai"', text)]).catch(() => undefined);
       }
       await document.fonts.ready;
@@ -104,7 +110,7 @@ export function RenderApp() {
     };
   }, [data, stage, registry, theme, record]);
 
-  if (error) return <div style={{ padding: 24, color: '#c92a2a', fontFamily: 'system-ui' }} data-render-error="">渲染失败：{error}</div>;
+  if (error) return <div style={{ padding: 24, color: '#c92a2a', fontFamily: 'system-ui' }} data-render-error="">{i18n.board.renderFailed}{translate(error, i18n)}</div>;
   if (!data) return null;
   // 有层级的方案：显示这一步导演层的画面（每层是独立画面），设备取这个画面的设置
   const shownId = data.project.scenarios[scenarioId] ? displaySceneId(data.project, scenarioId, data.state.position) : data.state.sceneId;
@@ -112,7 +118,7 @@ export function RenderApp() {
   const vp = VIEWPORTS[viewport];
   const framed = (stageNode: ReactNode) =>
     viewport === 'mobile' ? (
-      <ThemeContext.Provider value={{ theme, stroke: resolveLook({ theme, font, stroke }, data.project.themes ?? {}).stroke, font, registry }}>
+      <ThemeContext.Provider value={{ theme, stroke: resolveLook({ theme, font, stroke }, data.project.themes ?? {}, i18n).stroke, font, registry }}>
         <PhoneFrame width={vp.width} height={vp.height} seed="stage-phone">
           {stageNode}
         </PhoneFrame>
@@ -163,8 +169,7 @@ export function RenderApp() {
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
   const plan = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null);
-  return wrap(
-    <Stage
+  return wrap(<Stage
       project={data.project}
       state={data.state}
       theme={theme}
@@ -177,13 +182,14 @@ export function RenderApp() {
       stageRef={setStage}
       camera={plan.spec}
       sceneId={plan.sceneId}
-    />,
-    subtitleFor(sc, data.state.position, null, data.state.completed),
+    />, subtitleFor(sc, data.state.position, null, data.state.completed, i18n)
   );
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
 function RecordStage({ project, scenarioId, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null) => ReactNode }) {
+  const { t: i18n } = useBoardI18n();
+
   const ctl = useMemo(() => {
     const c = new DemoController(null);
     c.reducedMotion = false;
@@ -191,6 +197,7 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
     c.setScenario(scenarioId, 0, { quiet: true });
     return c;
   }, [project, scenarioId]);
+  ctl.i18n = i18n;
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
   const [started, setStarted] = useState(false);
@@ -208,7 +215,7 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
       progress: {
         step: snap.state?.position ?? 0,
         done: started && !snap.playing && (total === 0 || !!snap.state?.completed || (snap.state?.position ?? 0) >= total || !!snap.playbackError),
-        error: snap.playbackError,
+        error: snap.playbackError ? translate(snap.playbackError, i18n) : null,
       },
     };
   }, [snap, started, ctl, project, scenarioId]);
@@ -242,6 +249,6 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
       }}
       overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={null} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />}
     />,
-    subtitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed),
+    subtitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n),
   );
 }

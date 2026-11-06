@@ -53,7 +53,7 @@ npx joplo dev --open
 - `--option <qid>`：仅校验指定方案的结构和回放，例如 `invite.a-modal`；整个项目仍须编译。
 
 ```text
-features/invite/options/a-modal.tsx:24:16  warning  CASE_NOT_COVERED  情况尚未表达
+features/invite/options/a-modal.tsx:24:16  warning  CASE_NOT_COVERED  Case is not yet Covered: invite.happy 正常发出邀请并被接受
 0 error, 1 warning, 0 info
 ```
 
@@ -70,7 +70,7 @@ npx joplo selection
 npx joplo selection --format json
 ```
 
-text 输出 at、标签和目标行前后各三行带行号源码。文件不存在或内容为 null 时输出“当前没有选中”，退出 0；无源位置、文件已删除或行已不存在时解释状态。无效 JSON/at 或项目外路径退出 1。
+text 输出 at、标签和目标行前后各三行带行号源码。文件不存在或内容为 null 时输出“Nothing selected”，退出 0；无源位置、文件已删除或行已不存在时解释状态。无效 JSON/at 或项目外路径退出 1。
 
 JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }[]`，note 说明定位不可用的原因。看板写选中 → 服务端对照 IR 计算 at → 本地文件 → CLI 读源码 → Agent 局部修改；详见[选中定位链路](web.md#选中与源码定位)。
 
@@ -98,7 +98,7 @@ JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }
 - `--force`：允许覆盖被用户修改过的 SKILL.md。
 - `--agents-md`：即使 AGENTS.md 不存在也创建指针段。
 
-SKILL.md 末尾保存版本与 sha256，覆盖标记前全部原始字节。重装时：未改动的生成内容允许更新；字节相同输出“已是最新”且不重写；用户改过或缺少有效标记时拒绝覆盖，提示 diff/force，退出 1。目录没有 joplo.config.ts 时警告但仍安装。
+SKILL.md 末尾保存版本与 sha256，覆盖标记前全部原始字节。重装时：未改动的生成内容允许更新；字节相同输出“Already up to date”且不重写；用户改过或缺少有效标记时拒绝覆盖，提示 diff/force，退出 1。目录没有 joplo.config.ts 时警告但仍安装。
 
 AGENTS.md 仅替换 `<!-- joplo:start -->` 与 `<!-- joplo:end -->` 之间的段落，段外字节不变；标记损坏或重复时拒绝写入。指针文件可提交 Git，安装器下次读取哈希/标记决定是否更新，Agent 读取指针后再调用 CLI。
 

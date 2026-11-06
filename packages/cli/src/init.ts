@@ -46,7 +46,7 @@ const shellArg = (s: string) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(
 export function nextStepLine(pm: PackageManager, relDir: string): string {
   const c = pmCommands(pm);
   const steps = [...(relDir && relDir !== '.' ? [`cd ${shellArg(relDir)}`] : []), c.install, `${c.run} dev`];
-  return `下一步：${steps.join(' && ')}`;
+  return `Next: ${steps.join(' && ')}`;
 }
 
 export async function initProject(dir: string, name?: string, opts: { keep?: boolean; env?: Record<string, string | undefined> } = {}): Promise<InitResult> {
@@ -59,16 +59,16 @@ export async function initProject(dir: string, name?: string, opts: { keep?: boo
     if (entries.length) {
       const rel = relative(process.cwd(), root) || '.';
       const run = pmCommands(detectPackageManager(opts.env ?? process.env)).run;
-      throw new JoploError('UNSUPPORTED_ACTION', `${rel}/ 不是空目录（已有 ${entries.length} 个文件），没有写入任何内容。换一个目录名，或进入它后运行 ${run} init . --keep 只补缺失的文件。`);
+      throw new JoploError('UNSUPPORTED_ACTION', `${rel}/ is not empty (contains ${entries.length} files). Nothing was written. Choose another directory, or enter it and run ${run} init . --keep to add missing files only.`);
     }
   }
   const files: Record<string, string> = {
     'package.json': projectPackageJson(basename(root), version),
     'joplo.config.ts': `import { config } from '@joplo-app/kit';\nexport default config({ name: ${JSON.stringify(name ?? (basename(root) || 'Joplo'))}, layout: 'app', home: '/' });\n`,
     'layouts/app.tsx': `import { layout, Outlet, Slot } from '@joplo-app/kit';\nimport { AppShell } from '@joplo-app/kit/ui';\nexport default layout(\n  <AppShell padding="lg">\n    <AppShell.Main>\n      <Outlet />\n    </AppShell.Main>\n    <Slot name="overlay" />\n  </AppShell>,\n);\n`,
-    'routes/page.tsx': `import { page, Slot } from '@joplo-app/kit';\nimport { Group, Stack, Title } from '@joplo-app/kit/ui';\nexport default page(\n  { title: '首页' },\n  <Stack gap="md">\n    <Title order={2}>开始设计</Title>\n    <Group gap="sm">\n      <Slot name="actions" />\n    </Group>\n  </Stack>,\n);\n`,
-    'features/example/feature.ts': `import { feature } from '@joplo-app/kit';\nexport default feature({ name: '示例功能', goal: '点击按钮完成演示', cases: { happy: '正常完成' }, pick: 'a' });\n`,
-    'features/example/options/a.tsx': `import { option, flow, done } from '@joplo-app/kit';\nimport { Button } from '@joplo-app/kit/ui';\nexport default option({\n  name: '方案 A', idea: '一个按钮完成操作',\n  on: { '/': { actions: <Button id="start">开始</Button> } },\n  scenarios: { happy: flow('正常完成', { cases: ['happy'], start: '/' }).click('start', done('已完成')) },\n});\n`,
+    'routes/page.tsx': `import { page, Slot } from '@joplo-app/kit';\nimport { Group, Stack, Title } from '@joplo-app/kit/ui';\nexport default page(\n  { title: 'Home' },\n  <Stack gap="md">\n    <Title id="welcome" order={2}>Start designing</Title>\n    <Group gap="sm">\n      <Slot name="actions" />\n    </Group>\n  </Stack>,\n);\n`,
+    'features/example/feature.ts': `import { feature } from '@joplo-app/kit';\nexport default feature({ name: 'Example feature', goal: 'Click the button to complete the demo', cases: { happy: 'Complete successfully' }, pick: 'a' });\n`,
+    'features/example/options/a.tsx': `import { option, flow, done } from '@joplo-app/kit';\nimport { Button } from '@joplo-app/kit/ui';\nexport default option({\n  name: 'Option A', idea: 'Complete the action with one button',\n  on: { '/': { actions: <Button id="start">Start</Button> } },\n  scenarios: { happy: flow('Complete successfully', { cases: ['happy'], start: '/' }).click('start', 'Click Start', done('Completed')) },\n});\n`,
     'tsconfig.json': projectTsconfig(),
     '.gitignore': 'node_modules/\n.joplo/\ndist/\nexports/\n',
   };
@@ -92,10 +92,10 @@ export async function initProject(dir: string, name?: string, opts: { keep?: boo
 export function initSummary(r: InitResult, env: Record<string, string | undefined> = process.env): string[] {
   const rel = relative(process.cwd(), r.root) || '.';
   const top = [...new Set(r.written.map((f) => (f.includes('/') ? `${f.split('/')[0]}/` : f)))].filter((f) => !['package.json', 'tsconfig.json', '.gitignore'].includes(f));
-  const lines = [`✓ 已创建 ${rel === '.' ? './' : `${rel}/`}${top.length ? `：${top.join('、')}` : ''}`];
-  if (r.written.includes('package.json')) lines.push(`✓ package.json  devDependencies: { "joplo": "${r.version}", "@joplo-app/kit": "${r.version}" }（锁定同一版本）`);
+  const lines = [`✓ Created ${rel === '.' ? './' : `${rel}/`}${top.length ? `: ${top.join(', ')}` : ''}`];
+  if (r.written.includes('package.json')) lines.push(`✓ package.json  devDependencies: { "joplo": "${r.version}", "@joplo-app/kit": "${r.version}" } (pinned to the same version)`);
   if (r.written.includes('tsconfig.json')) lines.push('✓ tsconfig.json jsxImportSource: "@joplo-app/kit"');
-  if (r.skipped.length) lines.push(`! 已存在、未改动：${r.skipped.join('、')}${r.skipped.includes('package.json') ? `（请确认 devDependencies 含 "joplo": "${r.version}" 与 "@joplo-app/kit": "${r.version}"）` : ''}`);
+  if (r.skipped.length) lines.push(`! Existing files preserved: ${r.skipped.join(', ')}${r.skipped.includes('package.json') ? ` (check that devDependencies includes "joplo": "${r.version}" and "@joplo-app/kit": "${r.version}")` : ''}`);
   lines.push(nextStepLine(detectPackageManager(env), rel));
   return lines;
 }

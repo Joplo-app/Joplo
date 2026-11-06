@@ -1,3 +1,6 @@
+import { createZhCN } from '../src/i18n/zh-CN';
+import { createBoardZhCN } from '../src/i18n/board/zh-CN';
+const zh = { ...createZhCN(), ...createBoardZhCN() };
 /**
  * 看板 UI v1（D55）阶段 2：演示页结构的纯计算。
  * - 布局（不变量 1：一屏放下）：≥ 1440 全部展开（左栏 276、当前步 280）；< 1440 顶栏按钮只剩图标、左栏 240、当前步 200、缩放只剩 − +；
@@ -14,24 +17,24 @@ import { caseCard, featureMenu, gapCommand, optionLabel, optionMeta, otherOption
 
 describe('布局断点（34-窄屏收起规则 ①–④）', () => {
   it('≥ 1440 全部展开；< 1440 顶栏只剩图标、左栏 240、当前步 200、缩放只剩 − +', () => {
-    expect(boardLayout(1440)).toEqual({ wide: true, navWidth: 276, topLabels: true, currentStepW: 280, zoomLabel: true, rail: false, compactTimeline: false, explainInTip: false });
-    expect(boardLayout(1920).wide).toBe(true);
-    expect(boardLayout(1439)).toEqual({ wide: false, navWidth: 240, topLabels: false, currentStepW: 200, zoomLabel: false, rail: false, compactTimeline: false, explainInTip: false });
-    expect(boardLayout(1280).navWidth).toBe(240);
+    expect(boardLayout(1440, zh)).toEqual({ wide: true, navWidth: 276, topLabels: true, currentStepW: 280, zoomLabel: true, rail: false, compactTimeline: false, explainInTip: false, languageIconOnly: false });
+    expect(boardLayout(1920, zh).wide).toBe(true);
+    expect(boardLayout(1439, zh)).toEqual({ wide: false, navWidth: 240, topLabels: false, currentStepW: 200, zoomLabel: false, rail: false, compactTimeline: false, explainInTip: false, languageIconOnly: true });
+    expect(boardLayout(1280, zh).navWidth).toBe(240);
     expect(BOARD_WIDE).toBe(1440);
   });
   it('边界输入：0、负数、NaN 都按窄屏处理', () => {
-    for (const w of [0, -1, Number.NaN]) expect(boardLayout(w).wide).toBe(false);
+    for (const w of [0, -1, Number.NaN]) expect(boardLayout(w, zh).wide).toBe(false);
   });
   for (const [vw, vh] of [
     [1280, 800],
     [1440, 900],
   ] as const)
     it(`${vw}×${vh}：播放坞放得下当前步 + 5 格（不出现页面滚动）`, () => {
-      const L = boardLayout(vw);
+      const L = boardLayout(vw, zh);
       // 中间列 = 视口 − 左栏 − 左右内边距 16×2
       const main = vw - L.navWidth - 32;
-      for (const label of ['播放', '暂停', '继续', '重新播放']) expect(dockWidth(L, label, SPEEDS, 6), `${label}`).toBeLessThanOrEqual(main);
+      for (const label of ['播放', '暂停', '继续', '重新播放']) expect(dockWidth(L, label, SPEEDS, 6, zh), `${label}`).toBeLessThanOrEqual(main);
     });
 });
 
@@ -42,25 +45,25 @@ describe('时间线', () => {
     { caption: '服务端发送邮件', kind: 'system' as const },
   ];
   it('第 0 步：初始是当前，其余都是待做；点格子传 序号 − 1', () => {
-    const c = timelineChips(steps, 0, null);
+    const c = timelineChips(steps, 0, null, undefined, undefined, zh);
     expect(c.map((x) => x.state)).toEqual(['current', 'todo', 'todo', 'todo']);
     expect(c.map((x) => x.stepIndex)).toEqual([-1, 0, 1, 2]);
     expect(c[0]).toMatchObject({ index: 0, label: '初始', tip: '0 · 初始状态', system: false });
   });
   it('第 2 步：前面是已完成，当前步写说明；系统步骤的悬停提示带“系统”', () => {
-    const c = timelineChips(steps, 2, null);
+    const c = timelineChips(steps, 2, null, undefined, undefined, zh);
     expect(c.map((x) => x.state)).toEqual(['done', 'done', 'current', 'todo']);
     expect(c[2]).toMatchObject({ label: '填写邮箱', tip: '2 · 填写邮箱' });
     expect(c[3]).toMatchObject({ system: true, tip: '3 · 系统 · 服务端发送邮件' });
   });
   it('播放中：正在执行的一步算当前（activeStep 优先于 position）', () => {
-    const c = timelineChips(steps, 1, 2);
+    const c = timelineChips(steps, 1, 2, undefined, undefined, zh);
     expect(c.map((x) => x.state)).toEqual(['done', 'done', 'done', 'current']);
     expect(c[3]!.playing).toBe(true);
   });
   it('边界输入：没有步骤、位置越界', () => {
-    expect(timelineChips([], 0, null).map((x) => x.state)).toEqual(['current']);
-    expect(timelineChips(steps, 99, null).at(-1)!.state).toBe('done');
+    expect(timelineChips([], 0, null, undefined, undefined, zh).map((x) => x.state)).toEqual(['current']);
+    expect(timelineChips(steps, 99, null, undefined, undefined, zh).at(-1)!.state).toBe('done');
   });
 });
 
@@ -99,25 +102,25 @@ describe('左栏：方案行', () => {
     expect(optionLabel({ name: '很长很长的前缀 · 名字' } as never, 2)).toEqual({ letter: 'C', title: '很长很长的前缀 · 名字' });
   });
   it('元信息：是否选定、缺失与待决定的数量（没有覆盖记录算缺失）', () => {
-    expect(optionMeta(project, 'invite.a')).toEqual({ picked: true, missing: 1, undecided: 1, text: '缺失 1 · 待决定 1' });
-    expect(optionMeta(project, 'invite.b')).toEqual({ picked: false, missing: 1, undecided: 0, text: '缺失 1' });
-    expect(optionMeta(project, 'nope')).toEqual({ picked: false, missing: 0, undecided: 0, text: '' });
+    expect(optionMeta(project, 'invite.a', zh)).toEqual({ picked: true, missing: 1, undecided: 1, text: '缺失 1 · 待决定 1' });
+    expect(optionMeta(project, 'invite.b', zh)).toEqual({ picked: false, missing: 1, undecided: 0, text: '缺失 1' });
+    expect(optionMeta(project, 'nope', zh)).toEqual({ picked: false, missing: 0, undecided: 0, text: '' });
   });
 });
 
 describe('左栏：情况行', () => {
   it('其他方案的小标：字母 + 状态，悬停写全称“B：缺失”', () => {
-    expect(otherOptionTags(project, 'invite', 'invite.a', 'invite.dup')).toEqual([{ optionId: 'invite.b', letter: 'B', status: 'none', tip: 'B：缺失' }]);
-    expect(otherOptionTags(project, 'invite', 'invite.a', 'invite.ok')[0]!.tip).toBe('B：已表达');
-    expect(otherOptionTags(project, 'invite', null, 'invite.ok').map((t) => t.letter)).toEqual(['A', 'B']);
+    expect(otherOptionTags(project, 'invite', 'invite.a', 'invite.dup', zh)).toEqual([{ optionId: 'invite.b', letter: 'B', status: 'none', tip: 'B：缺失' }]);
+    expect(otherOptionTags(project, 'invite', 'invite.a', 'invite.ok', zh)[0]!.tip).toBe('B：已表达');
+    expect(otherOptionTags(project, 'invite', null, 'invite.ok', zh).map((t) => t.letter)).toEqual(['A', 'B']);
   });
   it('悬停卡片：每个方案的状态与原因（原因 > 场景名 > 缺省说明）', () => {
-    expect(caseCard(project, 'invite', 'invite.empty')).toEqual([
+    expect(caseCard(project, 'invite', 'invite.empty', zh)).toEqual([
       { optionId: 'invite.a', letter: 'A', title: '单人邮件邀请弹窗', status: 'missing', label: '缺失', detail: '还没有场景' },
       { optionId: 'invite.b', letter: 'B', title: '独立页面批量邀请', status: 'expressed', label: '已表达', detail: '场景：邮箱校验失败' },
     ]);
-    expect(caseCard(project, 'invite', 'invite.dup')[1]).toMatchObject({ status: 'none', label: '缺失', detail: '还没有表达这个情况' });
-    expect(caseCard(project, 'missing-feature', 'x')).toEqual([]);
+    expect(caseCard(project, 'invite', 'invite.dup', zh)[1]).toMatchObject({ status: 'none', label: '缺失', detail: '还没有表达这个情况' });
+    expect(caseCard(project, 'missing-feature', 'x', zh)).toEqual([]);
   });
   it('缺口汇总的命令', () => {
     expect(gapCommand('invite.a')).toBe('npx joplo check --option invite.a');
@@ -126,7 +129,7 @@ describe('左栏：情况行', () => {
 
 describe('顶栏：功能下拉', () => {
   it('列出本项目的功能和缺口数；当前功能打勾', () => {
-    expect(featureMenu(project, 'invite')).toEqual([
+    expect(featureMenu(project, 'invite', zh)).toEqual([
       { id: 'invite', name: '团队成员邀请', hint: '已选 A · 缺失 1 · 待决定 1', current: true },
       { id: 'other', name: '空间设置', hint: '未选定', current: false },
     ]);

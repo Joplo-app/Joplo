@@ -35,6 +35,8 @@ export type RenderOptions = {
   stepId?: string;
   /** 主题名（D51）：内置主题或项目 themes/<name>.css；缺省用项目配置的主题。 */
   theme?: string;
+  /** UI language for the standalone render route. Unsupported values are ignored. */
+  locale?: string;
   /** 字体（D55）：hand / sans / serif / kai / mono；缺省跟随主题。 */
   font?: AppearanceFont | null;
   /** 线条（D55）：rough / clean；缺省跟随主题。 */

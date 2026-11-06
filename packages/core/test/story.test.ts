@@ -101,6 +101,7 @@ describe('角色 role()', () => {
   it('旧写法（名字数组）仍可编译，但不能被引用：引用时报 ROLE_UNKNOWN', () => {
     const { dev } = build({ roles: ['小雨', '阿杰'] });
     expect(errors(dev).map((d) => d.code)).toContain('ROLE_UNKNOWN');
+    expect(errors(dev)[0]?.message).toContain("feature.roles must use { key: role('Name') }");
     const ok = build({ roles: ['小雨'], steps: (f) => f.card('开场') });
     // 层级仍引用了 role，所以照样报错；名字数组本身合法
     expect(errors(ok.dev).every((d) => d.code === 'ROLE_UNKNOWN')).toBe(true);
@@ -108,10 +109,11 @@ describe('角色 role()', () => {
 
   it('层级或卡片引用不存在的角色时报 ROLE_UNKNOWN，并指向源码', () => {
     const a = build({ layerRole: 'ajay' });
-    expect(errors(a.dev).find((d) => d.code === 'ROLE_UNKNOWN')?.message).toContain('ajay');
+    expect(errors(a.dev).find((d) => d.code === 'ROLE_UNKNOWN')?.message).toContain('Layer "阿杰的手机" role "ajay" is not in feature.roles');
     const b = build({ steps: (f) => f.card('换人', { role: 'nobody' }) });
     const d = errors(b.dev).find((x) => x.code === 'ROLE_UNKNOWN');
-    expect(d?.message).toContain('nobody');
+    expect(d?.message).toContain('card("换人") role "nobody" is not in feature.roles');
+    expect(d?.message).toContain('available: xiaoyu, ajie');
     expect(d?.at).toMatch(/story\.test\.ts:\d+:\d+$/);
   });
 

@@ -1,3 +1,6 @@
+import { m as commonMessages, type Text } from '../i18n/messages';
+import { m } from '../i18n/board/messages';
+import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 外观浮层的模型（D55，纯函数，创作侧）：
  * - 读取点 effectiveAppearance：本项目 > 所有项目 > 项目 config（字段分别计算）；字体、线条为 null 时跟随主题；
@@ -56,11 +59,11 @@ export function setAsDefault(settings: BoardSettings | null | undefined, project
 // ---------- 配色格 ----------
 
 /** 格子里显示的短名（内置主题）。 */
-const SHORT: Record<string, string> = { sketch: '纸白', clean: '纸白', 'solarized-light': 'Solarized' };
+const SHORT = (i18n: BoardMessages = boardEnglish): Record<string, string> => ({ sketch: i18n.board.paperWhite, clean: i18n.board.paperWhite, 'solarized-light': 'Solarized' });
 
 export type PaletteCell = { id: string; names: string[]; title: string; builtin: boolean; css: string };
 
-export function paletteCells(catalog: ThemeInfo[]): PaletteCell[] {
+export function paletteCells(catalog: ThemeInfo[], i18n: BoardMessages = boardEnglish): PaletteCell[] {
   const out: PaletteCell[] = [];
   const byName = new Map(catalog.map((t) => [t.name, t]));
   const BUILTIN_CELLS = [['sketch', 'clean'], ['blueprint'], ['nord'], ['dracula'], ['solarized-light'], ['terminal'], ['kraft'], ['contrast']];
@@ -68,7 +71,7 @@ export function paletteCells(catalog: ThemeInfo[]): PaletteCell[] {
     const first = byName.get(names[0]!);
     if (!first) continue;
     const author = names.some((n) => byName.get(n) && !byName.get(n)!.builtin);
-    out.push({ id: names[0]!, names, title: `${SHORT[first.name] ?? first.title}${author ? '*' : ''}`, builtin: true, css: first.css });
+    out.push({ id: names[0]!, names, title: `${SHORT(i18n)[first.name] ?? first.title}${author ? '*' : ''}`, builtin: true, css: first.css });
   }
   const used = new Set(BUILTIN_CELLS.flat());
   for (const t of catalog) if (!used.has(t.name)) out.push({ id: t.name, names: [t.name], title: `${t.title}*`, builtin: false, css: t.css });
@@ -85,25 +88,25 @@ export function themeSwatch(css: string): { bg: string; ink: string; accent: str
   return { bg: v['--jp-bg'] ?? '#ffffff', ink: v['--jp-ink'] ?? '#1e1e1e', accent: v['--jp-accent'] ?? '#e8590c', line: v['--jp-line'] ?? '#dee2e6' };
 }
 
-export const FONT_CHOICES: { value: AppearanceFont | null; name: string; sample: string }[] = [
-  { value: null, name: '跟随主题', sample: '自动' },
-  { value: 'hand', name: '漫黑', sample: '永 Aa' },
-  { value: 'sans', name: '黑体', sample: '永 Aa' },
-  { value: 'serif', name: '宋体', sample: '永 Aa' },
-  { value: 'kai', name: '文楷', sample: '永 Aa' },
-  { value: 'mono', name: '等宽', sample: 'Aa 01' },
-];
-export const STROKE_CHOICES: { value: AppearanceStroke | null; name: string }[] = [
-  { value: 'rough', name: '手绘' },
-  { value: 'clean', name: '直线' },
-  { value: null, name: '跟随主题' },
-];
+export const FONT_CHOICES = (i18n: BoardMessages = boardEnglish): { value: AppearanceFont | null; name: string; sample: string }[] => ([
+  { value: null, name: i18n.board.followTheme, sample: i18n.board.auto },
+  { value: 'hand', name: i18n.board.markerGothic, sample: i18n.board.fontSample },
+  { value: 'sans', name: i18n.board.sansSerif, sample: i18n.board.fontSample },
+  { value: 'serif', name: i18n.board.serif, sample: i18n.board.fontSample },
+  { value: 'kai', name: i18n.board.wenKai, sample: i18n.board.fontSample },
+  { value: 'mono', name: i18n.board.monospace, sample: 'Aa 01' },
+]);
+export const STROKE_CHOICES = (i18n: BoardMessages = boardEnglish): { value: AppearanceStroke | null; name: string }[] => ([
+  { value: 'rough', name: i18n.board.handDrawn },
+  { value: 'clean', name: i18n.board.straight },
+  { value: null, name: i18n.board.followTheme },
+]);
 
 /** 外观按钮上的名字：配色（· 字体，有单独选字体时）。 */
-export function appearanceLabel(look: Look, catalog: ThemeInfo[]): string {
-  const cell = paletteCells(catalog).find((c) => isCellSelected(c, look.theme));
+export function appearanceLabel(look: Look, catalog: ThemeInfo[], i18n: BoardMessages = boardEnglish): string {
+  const cell = paletteCells(catalog, i18n).find((c) => isCellSelected(c, look.theme));
   const name = cell ? cell.title.replace(/\*$/, '') : look.theme;
-  const font = look.font ? FONT_CHOICES.find((f) => f.value === look.font)?.name : null;
+  const font = look.font ? FONT_CHOICES(i18n).find((f) => f.value === look.font)?.name : null;
   return font ? `${name} · ${font}` : name;
 }
 
@@ -111,19 +114,12 @@ export function appearanceLabel(look: Look, catalog: ThemeInfo[]): string {
 export const themeLine = (theme: string) => `theme: '${theme}',`;
 
 /** “+ 自定义”复制的主题模板。 */
-export const THEME_TEMPLATE = `/* themes/<名字>.css：只写 --jp-* 变量（也可以加普通选择器细调），再在 joplo.config.ts 里写 theme: '<名字>' */
-:root {
-  --jp-font: system-ui, -apple-system, "PingFang SC", sans-serif;
-  --jp-ink: #1e1e1e;
-  --jp-bg: #ffffff;
-  --jp-surface: #ffffff;
-  --jp-subtle: #f1f3f5;
-  --jp-muted: #868e96;
-  --jp-line: #dee2e6;
-  --jp-line-strong: #adb5bd;
-  --jp-border: #3a3a3a;
-  --jp-accent: #e8590c;
-  --jp-radius: 6px;
-  --jp-stroke: clean;
+export const THEME_TEMPLATE = (i18n: BoardMessages = boardEnglish) => (i18n.board.themesNameCssDefineJpVariablesThenSetTheme);
+
+/** Deferred appearance names keep an existing confirmation flash in sync with later language changes. */
+export function appearanceMessage(look: Look, catalog: ThemeInfo[]): Text {
+  const builtins: Record<string, Text> = { sketch: m.board.paperWhite, clean: m.board.paperWhite, blueprint: commonMessages.stage.blueprint, nord: 'Nord', dracula: 'Dracula', 'solarized-light': 'Solarized', terminal: commonMessages.stage.retroTerminal, kraft: commonMessages.stage.kraft, contrast: commonMessages.stage.highContrast };
+  const fonts: Record<AppearanceFont, Text> = { hand: m.board.markerGothic, sans: m.board.sansSerif, serif: m.board.serif, kai: m.board.wenKai, mono: m.board.monospace };
+  const name = builtins[look.theme] ?? catalog.find((t) => t.name === look.theme)?.title ?? look.theme;
+  return look.font ? m.board.appearanceName(name, fonts[look.font]) : name;
 }
-`;

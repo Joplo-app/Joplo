@@ -56,10 +56,10 @@ export function projectNotes(dir: string, command: string | undefined, opts: { c
   if (kitFile) {
     const kit = readJson(kitFile)?.version;
     if (typeof kit !== 'string' || kit === cli) return [];
-    return [`! 项目里的 @joplo-app/kit 是 ${kit}，当前 CLI 是 ${cli}，两者需要同一版本。要对齐：${alignCommand(pm, cli)}`];
+    return [`! Project @joplo-app/kit is ${kit}, current CLI is ${cli}; both must use the same version. Align with: ${alignCommand(pm, cli)}`];
   }
   const pkg = root ? readJson(join(root, 'package.json')) : null;
   const deps = { ...(pkg?.dependencies as object | undefined), ...(pkg?.devDependencies as object | undefined) };
-  if (pkg && ('@joplo-app/kit' in deps || 'joplo' in deps)) return [`! 项目声明了 @joplo-app/kit，但还没有安装依赖，先运行：${pmCommands(pm).install}`];
+  if (pkg && ('@joplo-app/kit' in deps || 'joplo' in deps)) return [`! Project declares @joplo-app/kit, but dependencies are not installed. Run first: ${pmCommands(pm).install}`];
   return [];
 }

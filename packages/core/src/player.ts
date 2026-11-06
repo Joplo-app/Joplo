@@ -30,13 +30,13 @@ export type PlayState = {
 
 export function getScenario(project: Project, scenarioId: string): Scenario {
   const sc = project.scenarios[scenarioId];
-  if (!sc) throw new JoploError('NOT_FOUND', `场景不存在：${scenarioId}`);
+  if (!sc) throw new JoploError('NOT_FOUND', `Scenario does not exist: ${scenarioId}`);
   return sc;
 }
 
 export function getScene(project: Project, sceneId: string): Scene {
   const s = project.scenes[sceneId];
-  if (!s) throw new JoploError('NOT_FOUND', `画面不存在：${sceneId}`);
+  if (!s) throw new JoploError('NOT_FOUND', `Stage does not exist: ${sceneId}`);
   return s;
 }
 
@@ -278,7 +278,7 @@ export class PlaybackError extends JoploError {
 function setPath(state: PlayState, path: string, value: unknown, mode: 'set' | 'append'): void {
   const [root, ...rest] = path.split('.');
   const base = (root === 'ui' ? state.ui : root === 'data' ? state.data : state.inputs) as Record<string, unknown>;
-  if (rest.length === 0) throw new Error(`不能整体覆盖状态根：${path}`);
+  if (rest.length === 0) throw new Error(`Cannot replace an entire state root: ${path}`);
   let cur = base;
   for (const key of rest.slice(0, -1)) {
     const next = cur[key];
@@ -305,35 +305,35 @@ export function checkStep(project: Project, scenario: Scenario, state: PlayState
 
 function checkStepInner(project: Project, scenario: Scenario, state: PlayState, step: Step): Diagnostic | null {
   const ref = { kind: 'step', id: step.id, optionId: scenario.optionId, scenarioId: scenario.id, stepId: step.id };
-  if (state.completed) return { severity: 'error', code: 'ALREADY_COMPLETED', message: `场景已结束，不能继续执行步骤 ${step.id}`, source: 'replay', ref };
+  if (state.completed) return { severity: 'error', code: 'ALREADY_COMPLETED', message: `Scenario has ended; cannot execute step ${step.id}`, source: 'replay', ref };
   const a = step.action;
   if (a.type === 'event' || a.type === 'card' || a.type === 'press') return null;
   if (a.type === 'back') {
     return state.sceneStack.length === 0
-      ? { severity: 'error', code: 'NOTHING_TO_GO_BACK', message: `步骤 ${step.id} 要返回，但没有上一个画面`, source: 'replay', ref }
+      ? { severity: 'error', code: 'NOTHING_TO_GO_BACK', message: `Step ${step.id} goes back, but there is no previous stage`, source: 'replay', ref }
       : null;
   }
   const scene = sceneOfTarget(project, scenario, state, a.target);
-  if (!scene) return { severity: 'error', code: 'MISSING_SCENE', message: `当前画面 ${state.sceneId} 不存在`, source: 'replay', ref };
+  if (!scene) return { severity: 'error', code: 'MISSING_SCENE', message: `Current stage ${state.sceneId} does not exist`, source: 'replay', ref };
   const hit = findNode(scene, a.target);
   if (!hit)
-    return { severity: 'error', code: 'MISSING_TARGET', message: `步骤 ${step.id} 的目标 ${a.target} 不在当前画面 ${scene.id} 中`, source: 'replay', ref };
+    return { severity: 'error', code: 'MISSING_TARGET', message: `Step ${step.id} target ${a.target} is not in the current stage ${scene.id}`, source: 'replay', ref };
   const { node } = hit;
   if (!isNodeVisible(scene, a.target, state))
-    return { severity: 'error', code: 'TARGET_HIDDEN', message: `步骤 ${step.id} 的目标「${nodeLabel(node)}」当前不可见`, source: 'replay', ref };
+    return { severity: 'error', code: 'TARGET_HIDDEN', message: `Step ${step.id} target "${nodeLabel(node)}" is currently hidden`, source: 'replay', ref };
   if (isNodeDisabled(node, state))
-    return { severity: 'error', code: 'TARGET_DISABLED', message: `步骤 ${step.id} 的目标「${nodeLabel(node)}」当前处于禁用状态`, source: 'replay', ref };
+    return { severity: 'error', code: 'TARGET_DISABLED', message: `Step ${step.id} target "${nodeLabel(node)}" is currently disabled`, source: 'replay', ref };
   if (a.type === 'click' && !INTERACTIVE_TYPES.has(node.type))
-    return { severity: 'error', code: 'NOT_INTERACTIVE', message: `步骤 ${step.id} 点击的 ${node.type}「${nodeLabel(node)}」不是可操作组件`, source: 'replay', ref };
+    return { severity: 'error', code: 'NOT_INTERACTIVE', message: `Step ${step.id} clicks ${node.type} "${nodeLabel(node)}", which is not interactive`, source: 'replay', ref };
   if (a.type !== 'click' && !VALUE_TYPES.has(node.type))
-    return { severity: 'error', code: 'NOT_A_FIELD', message: `步骤 ${step.id} 的 ${a.type} 动作目标 ${node.type} 不能接收输入`, source: 'replay', ref };
+    return { severity: 'error', code: 'NOT_A_FIELD', message: `Step ${step.id} ${a.type} action target ${node.type} cannot accept input`, source: 'replay', ref };
   if (a.type === 'select') {
     const choices = choicesOf(node, state);
     if (choices && !matchChoice(choices, a.value))
       return {
         severity: 'error',
         code: 'UNKNOWN_CHOICE',
-        message: `步骤 ${step.id} 在「${nodeLabel(node)}」中选择“${a.value}”，但它不是可选项（可选：${choices.map((c) => (c.label === c.value ? c.value : `${c.label}/${c.value}`)).join('、')}）`,
+        message: `Step ${step.id} field "${nodeLabel(node)}" cannot select "${a.value}"; it is not an available option (available: ${choices.map((c) => (c.label === c.value ? c.value : `${c.label}/${c.value}`)).join(', ')})`,
         source: 'replay',
         ref,
       };
@@ -358,7 +358,7 @@ function selectedValue(project: Project, state: PlayState, target: string, raw: 
 /** 执行 scenario.steps[state.position]，返回新状态（不修改入参）。 */
 export function applyStep(project: Project, scenario: Scenario, state: PlayState): PlayState {
   const step = scenario.steps[state.position];
-  if (!step) throw new JoploError('PLAYBACK_FAILED', `场景 ${scenario.id} 没有第 ${state.position + 1} 步`);
+  if (!step) throw new JoploError('PLAYBACK_FAILED', `Scenario ${scenario.id} has no step ${state.position + 1}`);
   const problem = checkStep(project, scenario, state, step);
   if (problem) throw new PlaybackError(problem.message, problem);
 
@@ -387,10 +387,10 @@ export function applyStep(project: Project, scenario: Scenario, state: PlayState
       case 'navigate': {
         const target = project.scenes[e.sceneId];
         if (!target || target.optionId !== scenario.optionId)
-          throw new PlaybackError(`步骤 ${step.id} 跳转到不存在或不属于本方案的画面 ${e.sceneId}`, {
+          throw new PlaybackError(`Step ${step.id} navigates to a stage that is missing or outside this option: ${e.sceneId}`, {
             severity: 'error',
             code: 'MISSING_SCENE',
-            message: `跳转目标画面 ${e.sceneId} 不存在或不属于方案 ${scenario.optionId}`,
+            message: `Navigation target stage ${e.sceneId} is missing or outside option ${scenario.optionId}`,
             source: 'replay',
             ref,
           });
@@ -411,7 +411,7 @@ export function applyStep(project: Project, scenario: Scenario, state: PlayState
 export function stateAt(project: Project, scenarioId: string, position: number): PlayState {
   const sc = getScenario(project, scenarioId);
   if (!Number.isInteger(position) || position < 0 || position > sc.steps.length)
-    throw new JoploError('NOT_FOUND', `位置 ${position} 超出场景 ${scenarioId} 的范围 0..${sc.steps.length}`);
+    throw new JoploError('NOT_FOUND', `Position ${position} is outside scenario ${scenarioId} range 0..${sc.steps.length}`);
   let s = initialState(project, scenarioId);
   while (s.position < position) s = applyStep(project, sc, s);
   return s;
@@ -421,7 +421,7 @@ export function stateAt(project: Project, scenarioId: string, position: number):
 export function positionAfterStep(project: Project, scenarioId: string, stepId: string): number {
   const sc = getScenario(project, scenarioId);
   const i = sc.steps.findIndex((s) => s.id === stepId);
-  if (i < 0) throw new JoploError('NOT_FOUND', `步骤 ${stepId} 不在场景 ${scenarioId} 中`);
+  if (i < 0) throw new JoploError('NOT_FOUND', `Step ${stepId} is not in scenario ${scenarioId}`);
   return i + 1;
 }
 
@@ -454,7 +454,7 @@ function toDiagnostic(e: unknown, ref: Diagnostic['ref']): Diagnostic {
 
 export type ClickVerdict =
   | { kind: 'advance' } // 正是当前步骤的目标
-  | { kind: 'disabled'; reason: string }
+  | { kind: 'disabled'; reason: string | null }
   | { kind: 'unmodeled'; label: string } // 明确标记为未建模
   | { kind: 'out_of_order'; label: string; expectedCaption: string | null } // 是本场景其他步骤的目标
   | { kind: 'not_covered'; label: string } // 没有任何已定义行为
@@ -472,7 +472,7 @@ export function explainClick(project: Project, state: PlayState, nodeId: string,
   if (!hit) return { kind: 'static' };
   const { node } = hit;
   const label = nodeLabel(node);
-  if (isNodeDisabled(node, state)) return { kind: 'disabled', reason: node.disabledReason ?? '该操作当前不可用（未说明原因）' };
+  if (isNodeDisabled(node, state)) return { kind: 'disabled', reason: node.disabledReason ?? null };
   const current = sc.steps[state.position];
   const targetOf = (s: Step) => ('target' in s.action ? s.action.target : null);
   if (current && !state.completed && targetOf(current) === nodeId && checkStep(project, sc, state, current) === null) return { kind: 'advance' };

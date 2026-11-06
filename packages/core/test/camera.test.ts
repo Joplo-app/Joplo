@@ -110,7 +110,7 @@ describe('layer(title, tree)：每层一个独立画面', () => {
     expect(bad.diagnostics.find((d) => d.code === 'SHOT_UNKNOWN')?.message).toContain('page_only');
     expect(bad.diagnostics.find((d) => d.code === 'SHOT_UNKNOWN')?.at).toMatch(/camera\.test\.ts:\d+:\d+$/);
     const empty = build({ layers: { client: layer('空', []), backend: layer('后端流转', backendTree()) } }).dev;
-    expect(empty.diagnostics.find((d) => d.code === 'LAYER_UNKNOWN')?.message).toContain('没有内容');
+    expect(empty.diagnostics.find((d) => d.code === 'LAYER_UNKNOWN')?.message).toContain('has no content');
     const key = build({ layers: { '@x': layer('坏键', clientTree()) } }).dev;
     expect(key.diagnostics.find((d) => d.code === 'LAYER_UNKNOWN')).toBeTruthy();
   });

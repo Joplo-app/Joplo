@@ -10,7 +10,7 @@ import { COMPONENT_TYPES } from './catalog.ts';
 export const SCHEMA_VERSION = 2 as const;
 
 /** 作者可写的 ID（对象键、元素 id）。 */
-export const Id = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/, 'ID 只能包含字母、数字、下划线和连字符，并以字母开头');
+export const Id = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/, 'ID must start with a letter and contain only letters, digits, underscores, and hyphens');
 /** 编译器生成的限定 ID，例如 `invite.happy`、`invite.a-modal@/members`。 */
 export const Qid = z.string().min(1).max(256);
 export const Source = z.string().optional();
@@ -20,7 +20,7 @@ const Json: z.ZodType<unknown> = z.lazy(() =>
 );
 
 // ---------- 受控条件 ----------
-export const StatePath = z.string().regex(/^(ui|data|inputs)(\.[A-Za-z0-9_-]+)*$/, '路径根必须是 ui、data 或 inputs');
+export const StatePath = z.string().regex(/^(ui|data|inputs)(\.[A-Za-z0-9_-]+)*$/, 'Path root must be ui, data, or inputs');
 
 export type Condition =
   | { truthy: string }
@@ -140,6 +140,13 @@ export const Step = z.strictObject({
   kind: z.enum(['user', 'system', 'card']),
   action: Action,
   caption: z.string().min(1),
+  /** Generated caption metadata; caption remains the English fallback for tools. */
+  captionAuto: z.strictObject({
+    kind: z.enum(['click', 'type', 'select', 'check', 'uncheck', 'switch_on', 'switch_off', 'back', 'press']),
+    label: z.string(),
+    value: z.string().optional(),
+    keys: z.string().optional(),
+  }).optional(),
   effects: z.array(Effect).default([]),
   ruleIds: z.array(Qid).default([]),
   /** 这一步的镜头（来自 shot()，按层级归类）。没有 shot 的步骤为空，镜头沿用上一步。 */
@@ -163,7 +170,7 @@ export const Scenario = z.strictObject({
   name: z.string().min(1),
   description: z.string().default(''),
   caseIds: z.array(Qid).default([]),
-  mock: z.strictObject({ label: z.string().min(1), outcome: z.enum(['success', 'failure', 'denied', 'other']) }),
+  mock: z.strictObject({ label: z.string().min(1), outcome: z.enum(['success', 'failure', 'denied', 'other']), auto: z.literal(true).optional() }),
   initial: z.strictObject({
     sceneId: Qid,
     ui: z.record(z.string(), Json).default({}),

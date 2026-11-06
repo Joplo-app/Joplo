@@ -155,7 +155,7 @@ describe('startDev', () => {
     await new Promise<void>((r) => blocker.listen(0, '127.0.0.1', () => r()));
     const port = (blocker.address() as net.AddressInfo).port;
     try {
-      await expect(createDev({ projectDir: dir, port, log: () => undefined })).rejects.toThrow(/端口 \d+ 已被占用/);
+      await expect(createDev({ projectDir: dir, port, log: () => undefined })).rejects.toThrow(/Port \d+ is already in use/);
     } finally {
       blocker.close();
     }

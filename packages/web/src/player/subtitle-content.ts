@@ -1,3 +1,5 @@
+import { stepCaption, mockLabel } from '../i18n/step-caption';
+import { en, type Dictionary } from '../i18n/en';
 /**
  * 字幕区的内容与高度（纯函数）：画面下方单独一块，不叠在画面上。
  * - 最多两行：第一行大字（≥ 20px）是本步说明，第二行小一号是 explain（没有就不显示）；各一行，超出省略，悬停看全文。
@@ -35,18 +37,18 @@ export type SubtitleContent = {
   forks: Scenario['steps'][number]['forks'];
 };
 
-export function subtitleFor(scenario: Scenario | null | undefined, position: number, activeStep: number | null, completed: PlayState['completed'] = null): SubtitleContent | null {
+export function subtitleFor(scenario: Scenario | null | undefined, position: number, activeStep: number | null, completed: PlayState['completed'] = null, i18n: Dictionary = en): SubtitleContent | null {
   if (!scenario) return null;
   const total = scenario.steps.length;
   const index = activeStep !== null ? activeStep + 1 : Math.max(0, Math.min(position, total));
   const step = index > 0 ? scenario.steps[index - 1] : undefined;
-  const caption = step ? step.caption : '初始状态';
+  const caption = step ? stepCaption(step, i18n) : i18n.player.initialState;
   const done = activeStep === null && completed ? completed : null;
-  const own = (step ? step.explain : (scenario.description ?? (total === 0 ? '这个场景没有步骤，只展示初始状态' : undefined)))?.trim() || null;
+  const own = (step ? step.explain : (scenario.description ?? (total === 0 ? i18n.player.thisScenarioHasNoStepsAndOnlyShowsIts : undefined)))?.trim() || null;
   const explain = own ?? (done?.text.trim() || null);
   const badge: SubtitleBadge = done
-    ? { kind: 'done', text: `场景完成 · ${scenario.mock.label}`, outcome: scenario.mock.outcome, title: `${done.text}（这是${scenario.mock.label}的演示结果，不代表真实服务的返回）` }
-    : { kind: 'progress', text: `第 ${index} / ${total} 步` };
+    ? { kind: 'done', text: i18n.player.scenarioComplete(mockLabel(scenario.mock, i18n)), outcome: scenario.mock.outcome, title: i18n.player.demoResultDisclaimer(done.text, mockLabel(scenario.mock, i18n)) }
+    : { kind: 'progress', text: i18n.player.stepProgress(index, total) };
   return { forks: forksOf(step), index, kind: step ? step.kind : 'initial', caption, explain, captionLines: 1, explainLines: explain ? 1 : 0, title: explain ? `${caption}\n${explain}` : caption, badge };
 }
 

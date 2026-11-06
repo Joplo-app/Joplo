@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Browser } from 'playwright';
 import { JoploError, SUBTITLE_HEIGHT, VIEWPORT_SIZE, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
+import { exportLocale } from './locale.ts';
 import type { RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';
@@ -16,7 +17,7 @@ import { realProjectDir } from './vite-shared.ts';
 const STAGE_SIZE = VIEWPORT_SIZE;
 
 export type PlaywrightModule = typeof import('playwright');
-const NOT_NEEDED = 'dev、check、build 不需要它。';
+const NOT_NEEDED = 'dev, check, and build do not require it.';
 
 const isMissingModule = (e: unknown) => {
   const code = (e as NodeJS.ErrnoException | null)?.code;
@@ -29,14 +30,14 @@ export async function loadPlaywright(importer: () => Promise<PlaywrightModule> =
     return await importer();
   } catch (e) {
     if (!isMissingModule(e)) throw e;
-    throw new JoploError('RENDER_FAILED', `截图需要 Playwright 和 Chromium，当前没有安装。运行：npm i -D playwright && npx playwright install chromium（约 150 MB）。${NOT_NEEDED}`);
+    throw new JoploError('RENDER_FAILED', `Screenshots require Playwright and Chromium, which are not installed. Run: npm i -D playwright && npx playwright install chromium (about 150 MB). ${NOT_NEEDED}`);
   }
 }
 
 /** 浏览器启动失败时的一行提示。 */
 export function launchHint(e: unknown): string {
   const first = (e instanceof Error ? e.message : String(e)).split('\n')[0]!.trim();
-  return `截图需要 Chromium，无法启动浏览器（${first}）。运行：npx playwright install chromium（约 150 MB）。${NOT_NEEDED}`;
+  return `Screenshots require Chromium; browser launch failed (${first}). Run: npx playwright install chromium (about 150 MB). ${NOT_NEEDED}`;
 }
 
 export async function launch({ chromium }: PlaywrightModule): Promise<Browser> {
@@ -74,8 +75,8 @@ function assertNotProjectData(projectDir: string, out: string) {
   const o = fold(realish(out));
   const dir = fold(realish(projectDir));
   const dataDir = path.join(dir, '.joplo');
-  if (o === dataDir || o.startsWith(dataDir + path.sep)) throw new JoploError('USAGE', `不能写入项目数据：${out}（.joplo/ 由 Joplo 管理）`);
-  if (/\.(tsx?|jsx?|mts)$/.test(o) && o.startsWith(dir + path.sep)) throw new JoploError('USAGE', `不能用截图覆盖项目源文件：${out}`);
+  if (o === dataDir || o.startsWith(dataDir + path.sep)) throw new JoploError('USAGE', `Cannot write to project data: ${out} (.joplo/ is managed by Joplo)`);
+  if (/\.(tsx?|jsx?|mts)$/.test(o) && o.startsWith(dir + path.sep)) throw new JoploError('USAGE', `Cannot overwrite a project source file with a screenshot: ${out}`);
 }
 
 type PageReport = { elements: RenderedElement[]; warnings: string[] };
@@ -84,13 +85,14 @@ type PageReport = { elements: RenderedElement[]; warnings: string[] };
  * 渲染路由的参数（纯函数）：主题必填（调用方缺省时传项目主题）；字体与线条（D55）只在指定且合法时带上，
  * 缺省 = 跟随主题，与 D55 之前的截图一致。
  */
-export function renderQuery(q: { projectId: string; scenarioId: string; position: number; theme: string; font?: AppearanceFont | null; stroke?: AppearanceStroke | null; viewport?: { width: number; height: number } }): string {
+export function renderQuery(q: { projectId: string; scenarioId: string; position: number; theme: string; locale?: string; font?: AppearanceFont | null; stroke?: AppearanceStroke | null; viewport?: { width: number; height: number } }): string {
   return new URLSearchParams({
     render: '1',
     project: q.projectId,
     scenario: q.scenarioId,
     position: String(q.position),
     theme: q.theme,
+    ...(exportLocale(q.locale) ? { locale: exportLocale(q.locale)! } : {}),
     ...(isAppearanceFont(q.font) ? { font: q.font } : {}),
     ...(isAppearanceStroke(q.stroke) ? { stroke: q.stroke } : {}),
     ...(q.viewport ? { w: String(q.viewport.width), h: String(q.viewport.height) } : {}),
@@ -101,7 +103,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
   const projectDir = realProjectDir(opts.projectDir);
   const out = path.resolve(opts.out);
   assertNotProjectData(projectDir, out);
-  if (fs.existsSync(out) && !opts.overwrite) throw new JoploError('USAGE', `目标文件已存在：${out}。如需覆盖请传 overwrite: true（CLI：--overwrite）`);
+  if (fs.existsSync(out) && !opts.overwrite) throw new JoploError('USAGE', `Output file already exists: ${out}. To overwrite, pass overwrite: true (CLI: --overwrite)`);
 
   // 先确认 Playwright 可用，再启动编译服务（缺失时尽快失败）
   const playwright = await loadPlaywright();
@@ -112,10 +114,10 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     const project = payload.project;
     if (!project) {
       const errs = payload.diagnostics.filter((d) => d.severity === 'error');
-      throw new JoploError('INVALID_SCHEMA', `项目编译失败：${errs.map((d) => `${d.at ?? ''} ${d.message}`).join('；')}`, { diagnostics: payload.diagnostics });
+      throw new JoploError('INVALID_SCHEMA', `Project compilation failed: ${errs.map((d) => `${d.at ?? ''} ${d.message}`).join('; ')}`, { diagnostics: payload.diagnostics });
     }
     const sc = project.scenarios[opts.scenarioId];
-    if (!sc) throw new JoploError('NOT_FOUND', `场景不存在：${opts.scenarioId}（可用：${Object.keys(project.scenarios).join('、') || '无'}）`);
+    if (!sc) throw new JoploError('NOT_FOUND', `Scenario does not exist: ${opts.scenarioId} (available: ${Object.keys(project.scenarios).join(', ') || 'none'})`);
     const position = opts.stepId ? positionAfterStep(project, sc.id, opts.stepId) : 0;
     const state: PlayState = stateAt(project, sc.id, position); // 回放失败会抛出 PLAYBACK_FAILED
     // 有层级的方案：截图与元素索引用这一步导演层的画面（每层一个独立画面）
@@ -130,11 +132,11 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     browser = await launch(playwright);
     const page = await browser.newPage({ viewport, deviceScaleFactor: opts.scale ?? 1, reducedMotion: 'reduce' });
     // D44：舞台宽度固定为页面自己的 viewport；指定 viewport 时它只是截图尺寸（舞台按比例放进去）
-    const q = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, font: opts.font, stroke: opts.stroke, ...(opts.viewport ? { viewport: opts.viewport } : {}) });
+    const q = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, locale: opts.locale, font: opts.font, stroke: opts.stroke, ...(opts.viewport ? { viewport: opts.viewport } : {}) });
     await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => (window as unknown as { __JOPLO_READY__?: boolean }).__JOPLO_READY__ === true, null, { timeout: 60000 });
     const err = await page.evaluate(() => (window as unknown as { __JOPLO_ERROR__?: string | null }).__JOPLO_ERROR__ ?? null);
-    if (err) throw new JoploError('RENDER_FAILED', `渲染路由报告错误：${err}`);
+    if (err) throw new JoploError('RENDER_FAILED', `Render route reported an error: ${err}`);
 
     const report = (await page.evaluate(`(${COLLECT_REPORT})(${JSON.stringify({ nextTargetId, theme })})`)) as PageReport;
     const png = await page.locator(opts.viewport ? '[data-jshot]' : '[data-jrender]').screenshot({ type: 'png', animations: 'disabled' });
@@ -159,7 +161,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     });
     const elements = [...report.elements, ...hidden];
     const warnings = [...report.warnings];
-    if (nextTargetId && findNode(scene, nextTargetId) && !elements.find((e) => e.id === nextTargetId && e.visible)) warnings.push(`下一步操作的目标 ${nextTargetId} 没有显示在画面中`);
+    if (nextTargetId && findNode(scene, nextTargetId) && !elements.find((e) => e.id === nextTargetId && e.visible)) warnings.push(`Next action target ${nextTargetId} is not visible in the stage`);
     return { path: out, sceneId: scene.id, position, elements, warnings, scale: opts.scale ?? 1 };
   } finally {
     await browser?.close().catch(() => undefined);

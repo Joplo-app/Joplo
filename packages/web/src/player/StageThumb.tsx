@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/context';
 /**
  * 缩略图（D55「首页」，看板首页与发布站首页共用）：Stage 的 render 模式渲染某个场景的初始画面，进入视口才渲染（懒加载）。
  * 电脑页面按宽度铺满、从顶部裁出上半部分；手机页面按高度放进去。不可交互（inert）。
@@ -8,6 +9,8 @@ import { Stage } from '../renderer/Stage';
 import type { Look } from '../renderer/appearance';
 
 export function StageThumb({ project, scenarioId, sceneId, look, height = 200, testid }: { project: Project; scenarioId: string | null; sceneId: string | null; look: Look; height?: number; testid?: string }) {
+  const { t: i18n } = useI18n();
+
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [w, setW] = useState(520);
@@ -45,7 +48,7 @@ export function StageThumb({ project, scenarioId, sceneId, look, height = 200, t
           </div>
         </div>
       ) : (
-        <div className="flex h-full items-center justify-center text-[12px] text-jb-faint">{sceneId ? '' : '还没有画面'}</div>
+        <div className="flex h-full items-center justify-center text-[12px] text-jb-faint">{sceneId ? '' : i18n.player.noStageYet}</div>
       )}
     </div>
   );

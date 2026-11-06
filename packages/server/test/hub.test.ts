@@ -292,16 +292,33 @@ describe('导出', () => {
     const r = await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/video`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'invite.a-modal.success' }) });
     expect(r.status).toBe(202);
     expect((await req(hub.port, { method: 'DELETE', path: `/__joplo/p/${id}/export/video` })).status).toBe(403);
+    const sse = req(hub.port, { path: `/__joplo/p/${id}/export/video/events`, headers: { 'x-joplo-token': hub.token } });
+    await new Promise((r) => setTimeout(r, 100));
     const del = await req(hub.port, { method: 'DELETE', path: `/__joplo/p/${id}/export/video`, headers: { 'x-joplo-token': hub.token } });
     expect(del.status).toBe(200);
-    expect(del.body.job).toMatchObject({ status: 'error', phase: 'error', error: '已取消' });
+    expect(del.body.job).toMatchObject({ status: 'cancelled', phase: 'cancelled', error: 'Cancelled' });
+    const events = String((await sse).body).split('\n\n').filter(x => x.startsWith('data: ')).map(x => JSON.parse(x.slice(6)));
+    expect(events[0].status).toBe('running');
+    expect(events.at(-1)).toMatchObject({ status: 'cancelled', phase: 'cancelled', error: 'Cancelled' });
     // 录制器之后才返回：不会把已取消的任务改回完成
     release();
     await new Promise((x) => setTimeout(x, 100));
-    expect((await req(hub.port, { path: `/__joplo/p/${id}/export/video` })).body.job).toMatchObject({ status: 'error', error: '已取消' });
+    expect((await req(hub.port, { path: `/__joplo/p/${id}/export/video` })).body.job).toMatchObject({ status: 'cancelled', error: 'Cancelled' });
     expect((await req(hub.port, { method: 'DELETE', path: `/__joplo/p/${id}/export/video`, headers: { 'x-joplo-token': hub.token } })).status).toBe(404);
     expect((await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/video`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'invite.a-modal.success' }) })).status).toBe(202);
     release();
+  });
+
+  it('a recorder error named Cancelled is still a failure, not user cancellation', async () => {
+    const h2 = await createHub({ port: 0, log: () => undefined, watch: false, exportDeps: { recordVideo: async () => { throw new Error('Cancelled'); } } });
+    try {
+      const r = h2.addProject(dir);
+      await r.slot!.ready;
+      await req(h2.port, { method: 'POST', path: `/__joplo/p/${r.id}/export/video`, headers: json(h2.token), body: JSON.stringify({ scenarioId: 'invite.a-modal.success' }) });
+      await until(async () => (await req(h2.port, { path: `/__joplo/p/${r.id}/export/video` })).body.job?.status !== 'running');
+      const job = (await req(h2.port, { path: `/__joplo/p/${r.id}/export/video` })).body.job;
+      expect(job).toMatchObject({ status: 'error', phase: 'error', error: 'Cancelled' });
+    } finally { await h2.close(); }
   });
 
   it('视频：没有 Chromium 时任务失败，错误里带 npx playwright install chromium', async () => {

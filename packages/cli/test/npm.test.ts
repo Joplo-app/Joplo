@@ -72,8 +72,8 @@ describe('init', () => {
     const d = await temp();
     await writeFile(join(d, 'a.txt'), 'x'); await writeFile(join(d, 'b.txt'), 'y'); await mkdir(join(d, 'c'));
     const e = await initProject(d).catch(x => x);
-    expect(e.message).toContain('不是空目录（已有 3 个文件）');
-    expect(e.message).toContain('没有写入任何内容');
+    expect(e.message).toContain('is not empty (contains 3 files)');
+    expect(e.message).toContain('Nothing was written');
     expect(e.message).toContain('init . --keep');
     expect((await readdir(d)).sort()).toEqual(['a.txt', 'b.txt', 'c']);
   });
@@ -89,12 +89,12 @@ describe('init', () => {
   });
 
   test.each([
-    ['npm', 'my-demo', '下一步：cd my-demo && npm install && npx joplo dev'],
-    ['pnpm', 'my-demo', '下一步：cd my-demo && pnpm install && pnpm joplo dev'],
-    ['yarn', 'my-demo', '下一步：cd my-demo && yarn && yarn joplo dev'],
-    ['bun', 'my-demo', '下一步：cd my-demo && bun install && bunx joplo dev'],
-    ['npm', '.', '下一步：npm install && npx joplo dev'],
-    ['npm', 'my demo', "下一步：cd 'my demo' && npm install && npx joplo dev"],
+    ['npm', 'my-demo', 'Next: cd my-demo && npm install && npx joplo dev'],
+    ['pnpm', 'my-demo', 'Next: cd my-demo && pnpm install && pnpm joplo dev'],
+    ['yarn', 'my-demo', 'Next: cd my-demo && yarn && yarn joplo dev'],
+    ['bun', 'my-demo', 'Next: cd my-demo && bun install && bunx joplo dev'],
+    ['npm', '.', 'Next: npm install && npx joplo dev'],
+    ['npm', 'my demo', "Next: cd 'my demo' && npm install && npx joplo dev"],
   ] as const)('%s 在 %j 下的下一步命令', (pm, rel, expected) => {
     expect(nextStepLine(pm, rel)).toBe(expected);
   });
@@ -106,10 +106,10 @@ describe('init', () => {
       process.chdir(base); process.env.npm_config_user_agent = 'pnpm/10.0.0 npm/? node/v22.12.0';
       expect(await runCli(['init', 'my-demo'], { stdout: s => { out += s; }, stderr: () => {} })).toBe(0);
     } finally { process.chdir(prev); if (ua === undefined) delete process.env.npm_config_user_agent; else process.env.npm_config_user_agent = ua; }
-    expect(out).toContain('✓ 已创建 my-demo/');
+    expect(out).toContain('✓ Created my-demo/');
     expect(out).toContain(`"joplo": "${VERSION}", "@joplo-app/kit": "${VERSION}"`);
     expect(out).toContain('jsxImportSource: "@joplo-app/kit"');
-    expect(out.trim().split('\n').at(-1)).toBe('下一步：cd my-demo && pnpm install && pnpm joplo dev');
+    expect(out.trim().split('\n').at(-1)).toBe('Next: cd my-demo && pnpm install && pnpm joplo dev');
   });
 });
 
@@ -125,7 +125,7 @@ describe('版本一致性', () => {
     const d = await temp(); await fakeKit(d, '0.0.9');
     const [n, ...rest] = projectNotes(d, 'check', { cli: '0.1.0', env: {} });
     expect(rest).toEqual([]);
-    expect(n).toContain('项目里的 @joplo-app/kit 是 0.0.9，当前 CLI 是 0.1.0');
+    expect(n).toContain('Project @joplo-app/kit is 0.0.9, current CLI is 0.1.0');
     expect(n).toContain('npm i -D joplo@0.1.0 @joplo-app/kit@0.1.0');
     const [p] = projectNotes(d, 'build', { cli: '0.1.0', env: { npm_config_user_agent: 'pnpm/10 npm/?' } });
     expect(p).toContain('pnpm add -D joplo@0.1.0 @joplo-app/kit@0.1.0');
@@ -140,7 +140,7 @@ describe('版本一致性', () => {
     const d = await temp();
     expect(projectNotes(d, 'check', { cli: '0.1.0', env: {} })).toEqual([]);
     await writeFile(join(d, 'package.json'), JSON.stringify({ devDependencies: { '@joplo-app/kit': '0.1.0' } }));
-    expect(projectNotes(d, 'check', { cli: '0.1.0', env: {} })[0]).toContain('还没有安装依赖，先运行：npm install');
+    expect(projectNotes(d, 'check', { cli: '0.1.0', env: {} })[0]).toContain('dependencies are not installed. Run first: npm install');
   });
 
   test('不读项目的命令（init、selection、guide）不检查', async () => {
@@ -163,7 +163,7 @@ describe('版本一致性', () => {
     const startDev = async () => ({ url: 'http://127.0.0.1:1/', close: async () => {} });
     out = ''; err = '';
     expect(await runCli(['dev', d], { stdout: s => { out += s; }, stderr: s => { err += s; }, loadServer: async () => ({ startDev }), cliVersion: '0.1.0' })).toBe(0);
-    expect(err).toContain('! 项目里的 @joplo-app/kit 是 0.0.9，当前 CLI 是 0.1.0');
+    expect(err).toContain('! Project @joplo-app/kit is 0.0.9, current CLI is 0.1.0');
     expect(out).toBe('http://127.0.0.1:1/\n');
   });
 });

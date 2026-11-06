@@ -72,19 +72,19 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
       const mod = await importer(file);
       const v = (mod.default ?? null) as { kind?: string } | null;
       if (!v || v.kind !== kind) {
-        fail(file, `默认导出应为 ${kind}(...)，实际为 ${v?.kind ?? typeof v}`, 'WRONG_EXPORT');
+        fail(file, `Default export must be ${kind}(...); got ${v?.kind ?? typeof v}`, 'WRONG_EXPORT');
         return null;
       }
       return { ...v, file: relp(file) };
     } catch (e) {
-      fail(file, `载入失败：${e instanceof Error ? e.message : String(e)}`);
+      fail(file, `Load failed: ${e instanceof Error ? e.message : String(e)}`);
       return null;
     }
   };
 
   const cfgFile = findFile(join(r, 'joplo.config'));
   if (!cfgFile) {
-    diags.push({ severity: 'error', code: 'NOT_A_PROJECT', message: '缺少 joplo.config.ts', source: 'schema', at: 'joplo.config.ts:1:1' });
+    diags.push({ severity: 'error', code: 'NOT_A_PROJECT', message: 'Missing joplo.config.ts', source: 'schema', at: 'joplo.config.ts:1:1' });
     return { authoring: null, diagnostics: diags };
   }
   const config = await load(cfgFile, 'config');
@@ -101,7 +101,7 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
     for (const f of list(d)) {
       const p = join(d, f);
       if (isDir(p)) {
-        if (/[\[\]]/.test(f)) fail(p, `暂不支持动态路径段「${f}」；请用具体路径，例如 /members/li-lei`, 'UNSUPPORTED_ROUTE');
+        if (/[\[\]]/.test(f)) fail(p, `Dynamic route segment "${f}" is not supported; use a concrete route such as /members/li-lei`, 'UNSUPPORTED_ROUTE');
         else await walk(p, `${prefix}/${f}`);
       } else if (/^page\.(tsx|ts)$/.test(f)) {
         const v = await load(p, 'page');
@@ -117,7 +117,7 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
     if (!isDir(fd)) continue;
     const ff = findFile(join(fd, 'feature'));
     if (!ff) {
-      fail(fd, `功能目录 ${fid} 缺少 feature.ts`, 'MISSING_FEATURE');
+      fail(fd, `Feature directory ${fid} is missing feature.ts`, 'MISSING_FEATURE');
       continue;
     }
     const def = await load(ff, 'feature');

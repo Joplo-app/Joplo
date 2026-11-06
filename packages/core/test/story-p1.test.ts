@@ -16,7 +16,7 @@ describe('D56 P1 编译与纯函数', () => {
     const p = build().dev.project!;
     expect(p).not.toBeNull();
     const sc = p.scenarios[sid]!;
-    expect(sc.steps[0]).toMatchObject({ kind: 'user', action: { type: 'press', keys: '⌘K' }, caption: '按下 ⌘K' });
+    expect(sc.steps[0]).toMatchObject({ kind: 'user', action: { type: 'press', keys: '⌘K' }, caption: 'Press ⌘K' });
     expect(replay(p, sid).diagnostics).toEqual([]);
     expect(keyboardActionOf(sc.steps[0])).toEqual({ type: 'press', keys: '⌘K' });
     expect(keyboardActionOf(sc.steps[1])).toBeNull();
@@ -50,7 +50,7 @@ describe('D56 P1 编译与纯函数', () => {
   });
   it('空按键有确定字幕、不影响状态；流式值变化照常计入 changedAt', () => {
     const p = build(f => f.press('').press('Enter', stream($.ui.reply, ''))).dev.project!;
-    expect(p.scenarios[sid]!.steps[0]!.caption).toBe('按下按键');
+    expect(p.scenarios[sid]!.steps[0]!.caption).toBe('Press a key');
     expect(changedAt(p, sid, 1)).toEqual([]);
     expect(changedAt(p, sid, 2)).toEqual([{ path: 'ui.reply', before: undefined, after: '' }]);
   });
@@ -66,10 +66,12 @@ describe('D56 P1 编译与纯函数', () => {
 describe('引用诊断带源码位置', () => {
   for (const target of ['absent', 'happy', '']) it(`错误分叉 ${target || '空'} → FORK_UNKNOWN`, () => {
     const d = build(f => f.press('Enter', fork('如果', target))).dev.diagnostics.find(d => d.code === 'FORK_UNKNOWN');
+    expect(d?.message).toContain(`Fork target "${target}" must be another scenario key in the same option`);
     expect(d?.at).toMatch(/story-p1.test.ts:\d+:\d+$/);
   });
   for (const target of ['absent', '']) it(`错误标注 ${target || '空'} → MARK_UNKNOWN`, () => {
     const d = build(f => f.press('Enter', mark(target))).dev.diagnostics.find(d => d.code === 'MARK_UNKNOWN');
+    expect(d?.message).toContain(`mark("${target}") target is not in any layer`);
     expect(d?.at).toMatch(/story-p1.test.ts:\d+:\d+$/);
   });
   it('空分叉标签省略；无层级时只在这一步的路径页面解析标注', () => {

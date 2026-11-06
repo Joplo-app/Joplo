@@ -180,10 +180,10 @@ describe('Mantine 语义（编译 + 播放器）', () => {
 
   it('自动字幕读 Mantine 的 label；select 显示选项的 label；Checkbox 用“勾选”', () => {
     const steps = build().scenarios['f.a.main']!.steps;
-    expect(steps[1]!.caption).toBe('在「名称」中输入“设计组”');
-    expect(steps[2]!.caption).toBe('在「权限」中选择“编辑者”');
-    expect(steps[7]!.caption).toBe('勾选「同意条款」');
-    expect(steps[8]!.caption).toBe('在「套餐」中选择“专业”');
+    expect(steps[1]!.caption).toBe('Type “设计组” in “名称”');
+    expect(steps[2]!.caption).toBe('Select “编辑者” in “权限”');
+    expect(steps[7]!.caption).toBe('Check “同意条款”');
+    expect(steps[8]!.caption).toBe('Select “专业” in “套餐”');
   });
 
   it('按画面宽度判断可见：visibleFrom / hiddenFrom；AppShell 窄于断点时收起导航（回放据此报 TARGET_HIDDEN）', () => {
@@ -271,7 +271,7 @@ describe('设备外框：Terminal 与 Phone', () => {
   it('type 动作写入 Terminal.Input；自动字幕读 placeholder', () => {
     const p = buildDevices();
     expect(replay(p, 'f.a.run').diagnostics).toEqual([]);
-    expect(p.scenarios['f.a.run']!.steps[0]!.caption).toBe('在「输入命令」中输入“npx joplo skill”');
+    expect(p.scenarios['f.a.run']!.steps[0]!.caption).toBe('Type “npx joplo skill” in “输入命令”');
     expect(stateAt(p, 'f.a.run', 2).inputs).toEqual({ cmd_in: 'npx joplo skill' });
   });
 
@@ -354,8 +354,8 @@ describe('架构图：Diagram / Diagram.Group / Diagram.Node / Diagram.Edge（D4
     const d = r.diagnostics.filter((x) => x.code === 'UNKNOWN_DIAGRAM_NODE');
     expect(d.length).toBeGreaterThanOrEqual(2);
     expect(d.every((x) => x.severity === 'error' && x.at === 'routes/page.tsx:9:7')).toBe(true);
-    expect(d.map((x) => x.message).join('\n')).toContain('「nope」');
-    expect(d.map((x) => x.message).join('\n')).toContain('「ghost」');
+    expect(d.map((x) => x.message).join('\n')).toContain('to "nope" is not a node id in this Diagram');
+    expect(d.map((x) => x.message).join('\n')).toContain('from "ghost" is not a node id in this Diagram');
   });
 
   it('节点 id 在同一画面唯一（DUPLICATE_ID）；节点必须有 id', () => {

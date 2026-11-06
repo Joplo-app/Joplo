@@ -77,6 +77,14 @@ const outputs = (Array.isArray(siteOut) ? siteOut : [siteOut]).flatMap((o) => o.
 const siteFiles = [...new Set(outputs)].sort();
 if (!siteFiles.includes('site.html')) throw new Error(`发布站构建缺少 site.html：${siteFiles.join(', ')}`);
 fs.writeFileSync(path.join(DIST, 'site-files.json'), JSON.stringify(siteFiles, null, 2) + '\n');
+// D33 / I4: shared runtime may hold board message keys, but never board prose or dictionaries.
+for (const file of siteFiles.filter((f) => /\.(?:js|html)$/.test(f))) {
+  const text = fs.readFileSync(path.join(APP, file), 'utf8');
+  for (const sentinel of ['Joplo · Board', 'AI assumption', 'Add a scenario for', 'Saved .joplo/selection.json', 'Could not sync selection to Agent']) {
+    if (text.includes(sentinel)) throw new Error(`Published site includes board text: ${file}: ${sentinel}`);
+  }
+}
+
 
 // 3. 作者 className 的 Tailwind 入口
 const indexCss = fs.readFileSync(path.join(SRC, 'index.css'), 'utf8');

@@ -1,3 +1,4 @@
+import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 看板（创作侧）的状态与细节（D55「细节与状态 v1」，纯函数）：场景完成后的“下一个情况”、缺口横幅、编译出错横幅、
  * 导出视频的进度。不进发布站。
@@ -18,7 +19,7 @@ export function nextCase(project: Project, featureId: string, optionId: string |
 }
 
 /** 缺口横幅：给 Agent 的话；“看方案 X 怎么处理”取第一个已表达这个情况的其他方案，没有就是 null。 */
-export function gapBanner(project: Project, featureId: string, optionId: string | null, caseId: string | null): { letter: string; caseTitle: string; agentText: string; alt: { optionId: string; letter: string } | null } | null {
+export function gapBanner(project: Project, featureId: string, optionId: string | null, caseId: string | null, i18n: BoardMessages = boardEnglish): { letter: string; caseTitle: string; agentText: string; alt: { optionId: string; letter: string } | null } | null {
   if (!optionId || !caseId) return null;
   const letter = letterOf(project, optionId);
   const caseTitle = project.cases[caseId]?.title ?? caseId;
@@ -26,7 +27,7 @@ export function gapBanner(project: Project, featureId: string, optionId: string 
   return {
     letter,
     caseTitle,
-    agentText: `给方案 ${letter} 补上「${caseTitle}」的场景（${gapCommand(optionId)}）`,
+    agentText: i18n.board.addAScenarioForToOption(letter, caseTitle, gapCommand(optionId)),
     alt: other ? { optionId: other.id, letter: letterOf(project, other.id) } : null,
   };
 }
@@ -38,19 +39,19 @@ export function diagnosticsSummary(list: readonly Diagnostic[]): { count: number
   return { count: errors.length, first: { at: errors[0]!.at ?? null, message: errors[0]!.message } };
 }
 
-const PHASE: Record<VideoJob['phase'], string> = { starting: '正在启动浏览器…', recording: '', saving: '正在保存…', done: '已完成', error: '失败' };
+const PHASE = (i18n: BoardMessages = boardEnglish): Record<VideoJob['phase'], string> => ({ starting: i18n.board.startingBrowser, recording: '', saving: i18n.board.saving, done: i18n.board.done, error: i18n.board.failure, cancelled: i18n.board.cancelled });
 
 /** 导出视频的进度（「导出」按钮上的进度环、菜单里的进度卡、完成 / 失败提示）。 */
-export function exportProgress(job: VideoJob | null | undefined, scenarioName: string): { running: boolean; percent: number; text: string; step: string; done: boolean; error: string | null } | null {
+export function exportProgress(job: VideoJob | null | undefined, scenarioName: string, i18n: BoardMessages = boardEnglish): { running: boolean; percent: number; text: string; step: string; done: boolean; error: string | null } | null {
   if (!job) return null;
   const running = job.status === 'running';
   const done = job.status === 'done';
   return {
     running,
     percent: Math.max(0, Math.min(100, job.percent)),
-    text: done ? `已导出 ${job.file ?? ''}`.trim() : `正在录制「${scenarioName}」`,
-    step: job.phase === 'recording' ? `第 ${job.step} / ${job.total} 步` : PHASE[job.phase],
+    text: job.status === 'cancelled' ? i18n.board.exportCancelled : done ? i18n.board.exportedFile(job.file ?? '').trim() : i18n.board.recording(scenarioName),
+    step: job.phase === 'recording' ? i18n.board.step(job.step, job.total) : PHASE(i18n)[job.phase],
     done,
-    error: job.status === 'error' ? (job.error ?? '导出失败') : null,
+    error: job.status === 'error' ? (job.error ?? i18n.board.exportFailed) : null,
   };
 }

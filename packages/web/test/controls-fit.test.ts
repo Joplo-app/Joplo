@@ -1,3 +1,6 @@
+import { createZhCN } from '../src/i18n/zh-CN';
+import { createBoardZhCN } from '../src/i18n/board/zh-CN';
+const zh = { ...createZhCN(), ...createBoardZhCN() };
 /**
  * 全屏控制条按宽度收起（T-polish）：1280×800、1440×900、1920×1080 三种宽度，控件区不换行、不重叠、不溢出；
  * （非全屏的演示页布局见 board-page.test.ts）
@@ -28,26 +31,26 @@ describe('三种宽度：全屏控制条放得下、不收起', () => {
     for (const pl of playLabels)
       for (const director of [true, false])
         it(`${vw}px · ${pl} · 导演${director ? '跟随' : '暂停'}`, () => {
-          expect([...fullscreenBarCollapse(barW(vw), pl, SPEEDS, layers, director, '核心块说明')]).toEqual([]);
+          expect([...fullscreenBarCollapse(barW(vw), pl, SPEEDS, layers, director, '核心块说明', zh)]).toEqual([]);
         });
 });
 
 describe('窄的时候按优先级收起，收起后放得下；任何宽度都不会“放不下又不收”', () => {
   it('全屏控制条：先收三件套，再收速度，最后收层级切换', () => {
-    const full = fullscreenBarCollapse(2000, '重新播放', SPEEDS, layers, true, '后端流转');
+    const full = fullscreenBarCollapse(2000, '重新播放', SPEEDS, layers, true, '后端流转', zh);
     expect(full.size).toBe(0);
     const order: string[] = [];
     let prev = new Set<string>();
     for (let w = 1400; w >= 300; w -= 10) {
-      const c = fullscreenBarCollapse(w, '重新播放', SPEEDS, layers, true, '后端流转');
+      const c = fullscreenBarCollapse(w, '重新播放', SPEEDS, layers, true, '后端流转', zh);
       for (const id of c) if (!prev.has(id)) order.push(id);
       prev = c;
     }
     expect(order).toEqual(['nav', 'speed', 'layers']);
   });
   it('从 320 到 2400 的每个宽度：收起之后总宽度 ≤ 可用宽度，或者已经全部收起（容器横向裁切，不换行）', () => {
-    const groups = [navGroup(CTRL.sm, '重新播放'), speedGroup(SPEEDS, CTRL.sm), layersGroup(layers, CTRL.sm)];
-    const fixed = 16 + CTRL.sm + 2 * 9 + directorW(true, '后端流转');
+    const groups = [navGroup(CTRL.sm, '重新播放', zh), speedGroup(SPEEDS, CTRL.sm), layersGroup(layers, CTRL.sm, zh)];
+    const fixed = 16 + CTRL.sm + 2 * 9 + directorW(true, '后端流转', zh);
     for (let w = 320; w <= 2400; w += 8) {
       const c = collapseToFit(w, fixed, groups, CTRL.gap, 2);
       expect(rowWidth(fixed, groups, c, CTRL.gap, 2) <= w || c.size === groups.length, `宽度 ${w}`).toBe(true);
