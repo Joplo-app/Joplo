@@ -48,3 +48,25 @@ test('R8 真 SIGINT 清理已写入未 rename 的凭证 tmp，保留旧凭证', 
   `, dir);
   expect(await readdir(home)).toEqual(['credentials.json']); expect(await readFile(join(home, 'credentials.json'), 'utf8')).toBe('old credentials'); expect(result.code).toBe(130);
 }, 15000);
+
+test.each(['EOF', 'SIGINT'])('F4 确认提示收到 %s 时取消登录，退出 2 而非 13', async mode => {
+  const dir = await mkdtemp(join(tmpdir(), 'joplo-confirm-')); dirs.push(dir);
+  const home = join(dir, 'home'); await mkdir(home);
+  const credentials = JSON.stringify({ server: 'http://127.0.0.1:8', accessToken: 'old-test-token', user: { id: '1', email: 'a@example.com' }, createdAt: new Date().toISOString() });
+  await writeFile(join(home, 'credentials.json'), credentials, { mode: 0o600 });
+  const script = join(dir, 'confirm.mjs');
+  await writeFile(script, `import { runCli } from ${moduleUrl('cli.ts')}; process.exitCode = await runCli(['login'], { cloud: { env: { JOPLO_HOME: ${JSON.stringify(home)}, JOPLO_CLOUD_URL: 'http://127.0.0.1:9' }, interactive: true } });`);
+  const child = spawn(process.execPath, ['--import', 'tsx', script], { stdio: ['pipe', 'pipe', 'pipe'] });
+  let stdout = '', stderr = '', answered = false;
+  child.stdout.on('data', chunk => stdout += chunk);
+  child.stderr.on('data', chunk => {
+    stderr += chunk;
+    if (!answered && stderr.includes('继续吗？')) { answered = true; if (mode === 'EOF') child.stdin.end(); else child.kill('SIGINT'); }
+  });
+  const timeout = setTimeout(() => child.kill('SIGKILL'), 5000);
+  try {
+    const code = await new Promise<number | null>((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
+    expect(answered, stderr).toBe(true); expect(code, stdout + stderr).toBe(2); expect(stdout).toContain('已取消登录'); expect(stderr).not.toMatch(/unsettled top-level await/i);
+    expect(await readFile(join(home, 'credentials.json'), 'utf8')).toBe(credentials);
+  } finally { clearTimeout(timeout); if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); }
+}, 10000);

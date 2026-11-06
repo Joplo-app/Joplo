@@ -13,13 +13,16 @@ const user = { id: 'user-1', email: 'user@example.com', name: 'User' };
 import * as fs from 'node:fs/promises';
 vi.mock('node:fs/promises', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
-  return { ...actual, rename: vi.fn(actual.rename), chmod: vi.fn(actual.chmod) };
+  return { ...actual, rename: vi.fn(actual.rename), rm: vi.fn(actual.rm), chmod: vi.fn(actual.chmod) };
 });
 
 let root: string, home: string, project: string, base: string;
-let server: ReturnType<typeof createServer>;
+let server: ReturnType<typeof createServer>, previousServer: ReturnType<typeof createServer>;
+let previousBase: string, previousCalls: Call[], previousStatus: number;
+let raceUploads: boolean, firstUploadFailure: number | undefined;
+let raceFailureHash: string;
 type Call = { path: string; method: string; headers: IncomingMessage['headers']; body: any };
-let calls: Call[], plan: 'free' | 'pro', deviceErrors: string[], fail: { path: string; status?: number; code?: string; disconnect?: number; details?: unknown; remaining?: number; retryAfter?: string; until?: number } | undefined;
+let calls: Call[], plan: 'free' | 'pro', deviceErrors: string[], fail: { path: string; status?: number; code?: string; disconnect?: number; details?: unknown; remaining?: number; retryAfter?: string; xRetryAfter?: string; until?: number } | undefined;
 let limits: { maxUploadBytes: number; maxTotalBytes: number; maxFiles: number; publishesPerHour: number | null };
 let seedRuntime: boolean;
 let revokedAfterReplacement = false;
@@ -39,6 +42,7 @@ const checkProject = vi.fn(async () => ({ name: 'Invite', diagnostics: [], summa
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'joplo-cloud-test-')); home = join(root, 'home'); project = join(root, 'project');
   await mkdir(project); calls = []; plan = 'free'; deviceErrors = []; fail = undefined; putStatus = 200; expires = 600; clock = 0; waits = []; missingCount = 1;
+  raceUploads = false; firstUploadFailure = undefined; previousCalls = []; previousStatus = 200;
   revokedAfterReplacement = false; putHold = 0; activePuts = 0; maxActivePuts = 0; stalledPut = false; confirm.mockClear();
   truncatedPut = false; putDelay = 0; responses = new Map(); seedRuntime = false; limits = { maxUploadBytes: 20 * 1024 * 1024, maxTotalBytes: 256 * 1024 * 1024, maxFiles: 2000, publishesPerHour: 30 };
   files = { 'index.html': '<html>demo</html>', 'assets/site.css': 'body{}' }; browser.mockClear(); build.mockClear(); checkProject.mockClear();
@@ -59,7 +63,7 @@ beforeEach(async () => {
     if (fail && path === fail.path && fail.remaining !== 0 && (fail.until === undefined || clock < fail.until)) {
       if (fail.remaining !== undefined) fail.remaining--;
       if (fail.disconnect) { fail.disconnect--; req.socket.destroy(); return; }
-      if (fail.status) { res.statusCode = fail.status; if (fail.retryAfter) res.setHeader('Retry-After', fail.retryAfter); send({ code: fail.code, message: token, data: fail.details ?? { token } }); return; }
+      if (fail.status) { res.statusCode = fail.status; if (fail.retryAfter) res.setHeader('Retry-After', fail.retryAfter); if (fail.xRetryAfter) res.setHeader('X-Retry-After', fail.xRetryAfter); send({ code: fail.code, message: token, data: fail.details ?? { token } }); return; }
     }
     if (path === '/api/auth/device/code') { send({ device_code: 'device-secret', user_code: 'ABCD-EFGH', verification_uri: base + '/device', verification_uri_complete: base + '/device?user_code=ABCD-EFGH', interval: 1, expires_in: expires }); return; }
     if (path === '/api/auth/device/token') { const error = deviceErrors.shift(); if (error) { res.statusCode = 400; send({ error, error_description: token }); } else send({ access_token: token, token_type: 'Bearer', expires_in: 3600 }); return; }
@@ -78,6 +82,11 @@ beforeEach(async () => {
       send({ shareId: 'Abc1234567', uploadId: 'upload-1', missing: missing.map((f: any) => ({ sha256: f.sha256, uploadUrl: base + '/blob/' + f.sha256, headers: { 'content-type': 'application/octet-stream', 'content-length': String(f.size), 'if-none-match': '*', 'x-amz-checksum-sha256': Buffer.from(f.sha256, 'hex').toString('base64') } })) }); return;
     }
     if (path.startsWith('/blob/')) {
+      if (raceUploads) {
+        if (path.endsWith(raceFailureHash)) { const timer = setTimeout(() => { timers.delete(timer); firstUploadFailure = calls.filter(c => c.method === 'PUT').length; res.statusCode = 403; res.end(); }, 100); timers.add(timer); }
+        else { res.statusCode = 503; res.setHeader('Retry-After', '30'); send({ code: 'SERVICE_UNAVAILABLE' }); }
+        return;
+      }
       if (stalledPut) return;
       if (truncatedPut) { res.writeHead(400, { 'content-length': '100' }); res.flushHeaders(); const timer = setTimeout(() => { timers.delete(timer); res.destroy(); }, 30); timers.add(timer); return; }
       res.statusCode = putStatus; res.end(); return;
@@ -90,12 +99,20 @@ beforeEach(async () => {
   });
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  previousServer = createServer(async (req, res) => {
+    const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(chunk);
+    previousCalls.push({ path: req.url!, method: req.method!, headers: req.headers, body: JSON.parse(Buffer.concat(chunks).toString() || '{}') });
+    revokedAfterReplacement = JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).server === base;
+    res.setHeader('Content-Type', 'application/json'); res.statusCode = previousStatus; res.end(JSON.stringify({ success: previousStatus === 200 }));
+  });
+  await new Promise<void>(r => previousServer.listen(0, '127.0.0.1', r));
+  previousBase = `http://127.0.0.1:${(previousServer.address() as { port: number }).port}`;
 });
-afterEach(async () => { for (const timer of timers) clearTimeout(timer); timers.clear(); server.closeAllConnections(); await new Promise<void>(r => server.close(() => r())); await rm(root, { recursive: true, force: true }); vi.restoreAllMocks(); });
+afterEach(async () => { for (const timer of timers) clearTimeout(timer); timers.clear(); server.closeAllConnections(); await new Promise<void>(r => server.close(() => r())); previousServer.closeAllConnections(); await new Promise<void>(r => previousServer.close(() => r())); await rm(root, { recursive: true, force: true }); vi.restoreAllMocks(); });
 async function credentials(serverUrl = base, accessToken = token) {
   await writeCredentials(home, { server: serverUrl, accessToken, user: { id: user.id, email: user.email }, createdAt: new Date().toISOString() });
 }
-async function cli(args: string[], options: { interactive?: boolean; ssh?: string; realBuild?: boolean; env?: NodeJS.ProcessEnv; sleep?: (ms: number) => Promise<unknown> } = {}) {
+async function cli(args: string[], options: { interactive?: boolean; ssh?: string; realBuild?: boolean; env?: NodeJS.ProcessEnv; sleep?: (ms: number, signal?: AbortSignal) => Promise<unknown> } = {}) {
   let stdout = '', stderr = '';
   const code = await runCli(args, { stdout: s => stdout += s, stderr: s => stderr += s, cliVersion: '0.1.3',
     ...(options.realBuild ? {} : { loadServer: async () => ({ buildSite: build, startDev: async () => ({ url: 'http://localhost:4790', attached: true }) }) }),
@@ -367,10 +384,10 @@ test('R6 已收到 PUT 400 后正文断流，也绝不重试', async () => {
 test.each(['CI', 'JOPLO_NONINTERACTIVE'])('B7 显式 login 遇到 %s 仍设备授权但不打开浏览器', async mode => {
   const r = await cli(['login'], { interactive: true, env: { [mode]: '1' } }); expect(r.code).toBe(0); expect(r.stderr).toContain('ABCD-EFGH'); expect(browser).not.toHaveBeenCalled();
 });
-test('B1 轮询间隔和退避统一封顶 30 秒', async () => {
+test('F2 协议间隔 60 秒不被错误退避上限截断', async () => {
   responses.set('/api/auth/device/code', { device_code: 'device-secret', user_code: 'ABCD-EFGH', verification_uri: base + '/device', verification_uri_complete: base + '/device?user_code=ABCD-EFGH', interval: 60, expires_in: 600 });
   fail = { path: '/api/auth/device/token', status: 503, remaining: 1 };
-  expect((await cli(['login'])).code).toBe(0); expect(waits).toEqual([30000, 30000]);
+  expect((await cli(['login'])).code).toBe(0); expect(waits).toEqual([60000, 60000]);
 });
 
 test('A1 服务端 files 变体保留统一字节字段与文件数，文案区分文件数超限', async () => {
@@ -410,8 +427,8 @@ test.each(['login', 'share'])('B2 %s 交互切换服务器必须确认，拒绝�
   await credentials('https://other.example', oldToken); confirm.mockResolvedValueOnce(false);
   const r = await cli([command, ...(command === 'share' ? [project] : [])], { interactive: true }); expect(r.code).not.toBe(0); expect(confirm).toHaveBeenCalledWith('将替换 https://other.example 的登录，继续吗？'); expect(calls).toEqual([]); expect(JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).accessToken).toBe(oldToken);
 });
-test.each(['login', 'share'])('B2 %s 非交互切换服务器返回 USAGE/2，提示先 logout', async command => {
-  await credentials('https://other.example', oldToken); const r = await cli([command, ...(command === 'share' ? [project] : [])]); expect(r.code).toBe(2); expect(r.stdout).toContain('joplo logout'); expect(calls).toEqual([]); expect(confirm).not.toHaveBeenCalled();
+test.each(['login', 'share'])('F1 %s 非交互切换服务器引导用户确认登录，不提示 logout', async command => {
+  await credentials('https://other.example', oldToken); const r = await cli([command, ...(command === 'share' ? [project] : [])]); expect(r.code).toBe(command === 'share' ? 3 : 2); expect(r.stdout).toContain('joplo login --server ' + base); expect(r.stdout).not.toContain('logout'); expect(calls).toEqual([]); expect(confirm).not.toHaveBeenCalled();
 });
 test('B3 0600 不 chmod；宽权限 chmod EROFS 只警告仍可 whoami/share', async () => {
   await credentials(); const chmod = vi.mocked(fs.chmod).mockClear(); expect((await cli(['whoami'])).code).toBe(0); expect(chmod).not.toHaveBeenCalled();
@@ -421,7 +438,7 @@ test('B3 0600 不 chmod；宽权限 chmod EROFS 只警告仍可 whoami/share', a
 });
 test('B4 finalize 成功后 cloud.json 写入失败仍输出链接和成功信封', async () => {
   await credentials(); const rename = vi.mocked(fs.rename); rename.mockRejectedValueOnce(Object.assign(new Error('read only'), { code: 'EROFS' }));
-  const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(0); expect(r.json().ok).toBe(true); expect(r.json().data.url).toContain('/s/Abc1234567/'); expect(r.stderr).toContain('cloud.json');
+  const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(0); expect(r.json().ok).toBe(true); expect(r.json().data.url).toContain('/s/Abc1234567/'); expect(r.stderr).toContain('未能保存分享记录');
 });
 test('B5 PUT 最多四路并发；B11 显式携带 content-length 且完成后无 SIGINT 监听器', async () => {
   await credentials(); for (let i = 0; i < 9; i++) files[`assets/${i}.css`] = 'body' + i; missingCount = 99; putHold = 35;
@@ -454,8 +471,8 @@ test('B11 卡住的上传最终被实际 AbortSignal 中止，清理 SIGINT 监�
 });
 
 test('B2 确认跨服务器后才开始设备授权并替换凭证', async () => {
-  await credentials('https://other.example', oldToken);
-  confirm.mockImplementationOnce(async question => { expect(question).toContain('https://other.example'); expect(calls).toEqual([]); return true; });
+  await credentials(previousBase, oldToken);
+  confirm.mockImplementationOnce(async question => { expect(question).toContain(previousBase); expect(calls).toEqual([]); return true; });
   const r = await cli(['login'], { interactive: true }); expect(r.code).toBe(0); expect(confirm).toHaveBeenCalledOnce(); expect(JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8'))).toMatchObject({ server: base, accessToken: token });
 });
 test('B2 旧会话撤销失败只警告，新凭证仍有效', async () => {
@@ -478,4 +495,60 @@ test('A5 兼容旧 me 的 null，但不把它显示为不限', async () => {
 test('B2 旧 sign-out 未确认 success 时警告，但新登录保持成功', async () => {
   await credentials(base, oldToken); responses.set('/api/auth/sign-out', { success: false });
   const r = await cli(['login']); expect(r.code).toBe(0); expect(r.stderr).toContain('旧会话'); expect(JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).accessToken).toBe(token);
+});
+
+test('F1 跨服务器非交互 share 返回带目标登录命令及 credentialServer 的 AUTH_REQUIRED', async () => {
+  await credentials(previousBase, oldToken); const before = await readFile(join(home, 'credentials.json'), 'utf8');
+  const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(3);
+  expect(r.json().error).toMatchObject({ code: 'AUTH_REQUIRED', details: { fix: `npx joplo login --server ${base}`, credentialServer: previousBase } });
+  expect(r.stdout).not.toContain('logout'); expect(calls).toEqual([]); expect(previousCalls).toEqual([]); expect(await readFile(join(home, 'credentials.json'), 'utf8')).toBe(before);
+  expect((await cli(['skill', 'publish'])).stdout).toContain('不要替用户运行');
+});
+test('F2 slow_down 增加的协议间隔超过 30 秒仍完整等待', async () => {
+  responses.set('/api/auth/device/code', { device_code: 'device-secret', user_code: 'ABCD-EFGH', verification_uri: base + '/device', verification_uri_complete: base + '/device?user_code=ABCD-EFGH', interval: 30, expires_in: 600 });
+  deviceErrors = ['slow_down']; expect((await cli(['login'])).code).toBe(0); expect(waits).toEqual([30000, 35000]);
+});
+test('F3 一路 403 中止其他 503 的 30 秒等待，2 秒内返回且不再 PUT', async () => {
+  await credentials(); files = { 'index.html': 'index', 'a.css': 'a', 'b.css': 'b', 'c.css': 'c', 'd.css': 'd' }; missingCount = 99; raceUploads = true; raceFailureHash = createHash('sha256').update('a').digest('hex');
+  const { setTimeout: delay } = await import('node:timers/promises'); const stop = new AbortController(); const sleeps: number[] = [];
+  const start = performance.now(); let expired = false; const timer = setTimeout(() => { expired = true; stop.abort(); }, 1800);
+  const r = await cli(['share', project, '--format=json'], { sleep: async (ms, signal) => { sleeps.push(ms); await delay(ms, undefined, { signal: signal ? AbortSignal.any([signal, stop.signal]) : stop.signal }); } }).finally(() => clearTimeout(timer));
+  expect(expired).toBe(false); expect(performance.now() - start).toBeLessThan(2000); expect(r.json().error.code).toBe('UPLOAD_EXPIRED'); expect(sleeps).toContain(30000);
+  expect(calls.filter(c => c.method === 'PUT')).toHaveLength(firstUploadFailure!); expect(calls.filter(c => c.method === 'PUT')).toHaveLength(4);
+}, 5000);
+test('F4 确认替换时 AbortError 转成 USAGE 已取消登录', async () => {
+  await credentials(previousBase, oldToken); confirm.mockRejectedValueOnce(new DOMException('cancelled', 'AbortError'));
+  const r = await cli(['login'], { interactive: true }); expect(r.code).toBe(2); expect(r.stdout).toContain('USAGE'); expect(r.stdout).toContain('已取消登录'); expect(calls).toEqual([]);
+});
+test.each([200, 503])('F5 跨服务器登录后只向旧服务器撤销旧令牌（status=%s）', async status => {
+  await credentials(previousBase, oldToken); previousStatus = status;
+  const r = await cli(['login'], { interactive: true }); expect(r.code).toBe(0); expect(revokedAfterReplacement).toBe(true);
+  expect(previousCalls).toHaveLength(1); expect(previousCalls[0]).toMatchObject({ path: '/api/auth/sign-out', method: 'POST', body: {}, headers: { authorization: `Bearer ${oldToken}` } });
+  for (const call of calls) expect(call.headers.authorization).not.toBe(`Bearer ${oldToken}`);
+  if (status === 503) expect(r.stderr).toContain('旧会话');
+});
+test.each([[undefined, '9', 9000], ['3', '9', 3000]] as const)('F6 设备 429 Retry-After=%s X-Retry-After=%s 前者优先', async (retryAfter, xRetryAfter, expected) => {
+  fail = { path: '/api/auth/device/token', status: 429, remaining: 1, retryAfter, xRetryAfter }; expect((await cli(['login'])).code).toBe(0); expect(waits).toEqual([1000, expected]);
+});
+test('F7 Pro --new 成功但记录写入失败时清除旧 cloud.json，仍返回新链接', async () => {
+  await credentials(); plan = 'pro'; await mkdir(join(project, '.joplo')); await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, shareId: 'Old1234567', url: base + '/s/Old1234567/' }));
+  vi.mocked(fs.rename).mockRejectedValueOnce(Object.assign(new Error('read only'), { code: 'EROFS' }));
+  const r = await cli(['share', project, '--new', '--format=json']); expect(r.code).toBe(0); expect(r.json().data.shareId).toBe('Abc1234567'); expect(r.stderr).toContain('未能保存分享记录，下次发布不会更新这次的链接'); await expect(stat(join(project, '.joplo/cloud.json'))).rejects.toThrow();
+  expect(calls.find(c => c.path === '/api/v1/shares')!.body.replaceShareId).toBeUndefined();
+});
+test('F7 删除旧 cloud.json 也失败时仅警告，仍返回成功', async () => {
+  await credentials(); plan = 'pro'; const record = join(project, '.joplo/cloud.json'); await mkdir(join(project, '.joplo')); await writeFile(record, '{}');
+  vi.mocked(fs.rename).mockRejectedValueOnce(new Error('write failed')); const original = (await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')).rm;
+  vi.mocked(fs.rm).mockImplementation(async (path, options) => { if (path === record) throw Object.assign(new Error('cannot remove'), { code: 'EACCES' }); return original(path, options); });
+  try { const r = await cli(['share', project, '--new']); expect(r.code).toBe(0); expect(r.stderr).toContain('旧分享记录'); expect(r.stderr).toContain('未能保存分享记录，下次发布不会更新这次的链接'); }
+  finally { vi.mocked(fs.rm).mockImplementation(original); }
+});
+test('F8 新登录凭证写入失败保留旧凭证，只撤销新 token，退出 1', async () => {
+  await credentials(base, oldToken); const before = await readFile(join(home, 'credentials.json'), 'utf8'); vi.mocked(fs.rename).mockRejectedValueOnce(Object.assign(new Error('read only'), { code: 'EROFS' }));
+  const r = await cli(['login']); expect(r.code).toBe(1); expect(await readFile(join(home, 'credentials.json'), 'utf8')).toBe(before);
+  const revokes = calls.filter(c => c.path === '/api/auth/sign-out'); expect(revokes).toHaveLength(1); expect(revokes[0]!.headers.authorization).toBe(`Bearer ${token}`); expect(await readdir(home)).toEqual(['credentials.json']);
+});
+test('F8 create 503 NETWORK 即使有 Retry-After 也不重放', async () => {
+  await credentials(); fail = { path: '/api/v1/shares', status: 503, code: 'NETWORK', retryAfter: '1' };
+  const r = await cli(['share', project]); expect(r.code).toBe(1); expect(calls.filter(c => c.path === fail!.path)).toHaveLength(1); expect(waits).toEqual([]);
 });

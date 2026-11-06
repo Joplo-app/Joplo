@@ -163,10 +163,12 @@ npx joplo login --no-browser
 ```
 
 终端显示网址和验证码，请在浏览器核对并允许授权。默认打开含验证码的网址；非交互终端、SSH、`--no-browser` 或系统没有打开命令时，请手动访问网址。
-CLI 按服务器指定间隔轮询（缺省 5 秒，最小 1 秒，实际等待封顶 30 秒）；要求降速时每次增加 5 秒。轮询期间网络错误、5xx、429 会退避后继续，等待为 min(max(interval, 当前退避), 30 秒)；429 优先读取 Retry-After，至 expires_in 截止；拿到 token 后若账号查询或凭证保存失败，尽力 sign-out 回收会话。拒绝授权或验证码过期会退出并提示重新登录。显式 login 在 CI、JOPLO_NONINTERACTIVE=1、--format json 或非 TTY 下也打印验证码和网址并轮询，但不自动打开浏览器。只有交互式跨服务器替换登录时才读取确认输入。Windows 使用 rundll32 打开网址，不经过命令解释器。
+CLI 按服务器指定间隔轮询（缺省 5 秒，最小 1 秒；协议间隔不受错误退避上限截断）；要求降速时每次增加 5 秒。轮询期间网络错误、5xx、429 会退避后继续，等待为 min(max(interval, min(当前退避, 30 秒)), 剩余时间)，只有错误退避封顶 30 秒；interval 包含 slow_down 累加部分。429 读取 Retry-After 或 X-Retry-After，前者优先，至 expires_in 截止；拿到 token 后若账号查询或凭证保存失败，尽力 sign-out 回收会话。拒绝授权或验证码过期会退出并提示重新登录。显式 login 在 CI、JOPLO_NONINTERACTIVE=1、--format json 或非 TTY 下也打印验证码和网址并轮询，但不自动打开浏览器。只有交互式跨服务器替换登录时才读取确认输入。Windows 使用 rundll32 打开网址，不经过命令解释器。
 登录成功后保存 `{server, accessToken, user: {id, email}, createdAt}`；text 标准输出只显示账号；JSON 的 data 为 `{server, user: {id, email}, createdAt}`，不包含令牌，验证码和进度仍写 stderr。
 
-同服务器重新登录：先保存新凭证，再尽力 sign-out 旧 token，失败只警告。跨服务器替换：交互终端先询问“将替换 <旧服务器> 的登录，继续吗？”；非交互环境返回 USAGE（退出 2），提示先 `joplo logout --server <旧服务器>`。share 的自动登录遵守相同规则。
+重新登录：先保存新凭证，再向旧凭证自己的服务器尽力 sign-out 旧 token，失败只警告，绝不把旧 token 发给新服务器。新凭证写入失败时保留原文件，只撤销新签发的 token。
+跨服务器替换：交互终端先询问“将替换 <旧服务器> 的登录，继续吗？”；EOF 按“否”处理，Ctrl+C 取消登录并退出 2，不留下未完成的 question。显式 login 在非交互环境返回 USAGE（退出 2），提示“请在自己的终端里运行 joplo login --server <目标服务器> 并确认替换”，不要求先 logout。
+非交互 share 若凭证属于其他服务器，返回 AUTH_REQUIRED（退出 3），details 为 `{fix: "npx joplo login --server <目标服务器>", credentialServer: "<旧服务器>"}`；Agent 应请用户自己登录，不要替用户运行 logout。
 
 CI 只有值非空且不是 `0` / `false`（不区分大小写）时才生效；JOPLO_NONINTERACTIVE=1 始终生效。
 
@@ -198,8 +200,8 @@ npx joplo share --new
 - `maxUploadBytes` 限制本次缺失对象的新上传量（免费 20 MiB、Pro 100 MiB）；`maxTotalBytes` 限制清单总量（256 MiB），`maxFiles` 限制文件数（2000）。实际数值以 me 为准。
 - CLI 本地只预检清单总量和文件数；新上传量由服务端按已有 blob 去重后判断，不能拿清单总量与新上传限额比较。共用字体和运行时资源可由运维预置。
 - Pro 且 `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接；`--new` 新建。免费账号每次新建。
-- 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
-- finalize 成功后尽力写 `.joplo/cloud.json`，写入失败只警告，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/billing`。
+- 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；一个对象失败会取消其他在途 PUT 和重试等待；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
+- finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“未能保存分享记录，下次发布不会更新这次的链接”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/billing`。
 
 JSON 成功的 `data` 为 `{shareId, url, expiresAt, version}`，`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
 
@@ -231,7 +233,7 @@ Ctrl+C（SIGINT）会清理本进程登记的 joplo-share-* 目录及原子写�
 | --format json / CI / JOPLO_NONINTERACTIVE | 参数/环境 → 真实交互判定 → share 禁止自动登录；显式 login 保留设备授权，禁止打开浏览器和跨服务器确认输入 |
 | --no-browser | 命令参数 → 进程内 → login → 决定是否调用系统打开命令 |
 | device_code、user_code、verification_uri(_complete)、interval、expires_in | 设备授权响应 → 进程内 → login → 轮询、终端验证码、浏览器地址与截止时间；不写磁盘 |
-| credentials.json.server / accessToken | 登录响应及目标地址 → JOPLO_HOME 的 0600 原子文件 → 云端命令 → 同服务器 bearer 鉴权；logout 以空请求体 sign-out 吊销当前会话后删除文件 |
+| credentials.json.server / accessToken | 登录响应及目标地址 → JOPLO_HOME 的 0600 原子文件 → 云端命令 → 同服务器 bearer 鉴权；登录轮换时旧 token 只向旧 server 撤销；logout 以空请求体 sign-out 吊销当前会话后删除文件 |
 | credentials.json.user.id / email / createdAt | me 响应及登录时刻 → 同一凭证文件 → 凭证校验与登录成功提示 → 用户；套餐仍实时查询 |
 | --title / title | 用户参数或 check 的项目名 → 创建请求 → 云端 → 分享标题 |
 | path / sha256 / size / contentType | 临时 build 文件 → 内存清单及创建请求 → 云端 → 去重、配额和资源类型校验 |
@@ -241,6 +243,7 @@ Ctrl+C（SIGINT）会清理本进程登记的 joplo-share-* 目录及原子写�
 | cloud.json.server / shareId / url | 目标服务器及 finalize 响应 → 项目 .joplo/cloud.json（原子写） → 下次 share → 来源比对与 Pro 更新；url 供用户/工具读取 |
 | shareId / url / expiresAt / version | finalize 响应 → text/JSON 结果 → 用户/Agent → 分享链接及有效期 |
 | user / plan / limits | me 响应 → 进程内与 whoami 结果 → share 或用户/Agent → 套餐展示、更新资格、maxTotalBytes/maxFiles 本地预检、maxUploadBytes 上传限额展示、publishesPerHour 频率诊断 |
+| AUTH_REQUIRED 的 details.fix / credentialServer | 当前 server 与旧凭证 server → 跨服务器 share 错误信封 → Agent 请用户在自己的终端确认登录；不自动 logout |
 | error.details | 本地校验、manifest 和 me 限额 → 结果信封 → 用户/Agent → fix 登录命令、超限的 kind/maxBytes/actualBytes/maxFiles/actualFiles/largestFiles ；429 的 kind/limit/actual/retryAt → 额度类型、上限与重试时间 |
 
 
@@ -250,4 +253,4 @@ Ctrl+C（SIGINT）会清理本进程登记的 joplo-share-* 目录及原子写�
 429 诊断读取 `kind: "publishes" | "reserved_bytes"`、非负整数 `limit/actual` 及有效时间 `retryAt`；其他 kind 使用通用额度说明，仍显示合法 retryAt。不从 me.publishesPerHour 猜测限流原因。设备轮询中的 429 是协议特例，可在授权期限内退避继续；这不改变分享接口 4xx 不重试的规则。
 
 
-并发上传会等待已启动的任务结束，再清理临时目录和 SIGINT 监听器；发生失败后不再启动后续对象。上传 headers（含 content-length）完全来自服务端，不由 CLI 增删。
+并发上传共享 AbortController；发生失败后取消其他请求和可中止的退避等待，每次重试前检查取消状态，不再发新 PUT。仍会等待所有任务结束，再清理临时目录和 SIGINT 监听器。上传 headers（含 content-length）完全来自服务端，不由 CLI 增删。

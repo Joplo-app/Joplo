@@ -16,7 +16,7 @@ export type Account = { user: { id: string; email: string; name: string }; plan:
 /** 可替换时钟与系统边界；只有交互式跨服务器替换凭证时才读取确认输入。 */
 export type CloudDependencies = {
   env?: NodeJS.ProcessEnv; format?: string; interactive?: boolean; confirm?: (question: string) => Promise<boolean>; openBrowser?: (url: string) => Promise<boolean>;
-  sleep?: (ms: number) => Promise<unknown>; now?: () => number; check?: typeof check;
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<unknown>; now?: () => number; check?: typeof check;
 };
 export const object = (v: unknown): Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 export const nonempty = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
@@ -96,8 +96,24 @@ export function isInteractive(env: NodeJS.ProcessEnv, format = 'text', stdinTTY 
 
 async function confirmServerSwitch(question: string): Promise<boolean> {
   const input = createInterface({ input: process.stdin, output: process.stderr });
-  try { return /^(y|yes|是)$/i.test((await input.question(`${terminalText(question)} [y/N] `)).trim()); }
-  finally { input.close(); }
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  let onClose = () => {};
+  // readline 的 question 在 EOF 时可能永不 settle，必须显式把 close 转为“否”。
+  const eof = new Promise<null>(resolve => { onClose = () => resolve(null); input.once('close', onClose); });
+  input.once('SIGINT', cancel);
+  process.once('SIGINT', cancel);
+  try {
+    const answer = await Promise.race([input.question(`${terminalText(question)} [y/N] `, { signal: controller.signal }), eof]);
+    return answer !== null && /^(y|yes|是)$/i.test(answer.trim());
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw new JoploError('USAGE', '已取消登录');
+    if ((e as NodeJS.ErrnoException).code === 'ERR_USE_AFTER_CLOSE') return false;
+    throw e;
+  } finally {
+    process.off('SIGINT', cancel); input.off('SIGINT', cancel); input.off('close', onClose);
+    controller.abort(); input.close();
+  }
 }
 
 /** Retry-After 可以是秒数或 HTTP 日期，客户端最多等待 30 秒。 */
@@ -134,14 +150,14 @@ export class CloudClient {
   readonly home: string;
   readonly env: NodeJS.ProcessEnv;
   readonly interactive: boolean;
-  readonly sleep: (ms: number) => Promise<unknown>;
+  readonly sleep: (ms: number, signal?: AbortSignal) => Promise<unknown>;
   readonly now: () => number;
   constructor(server: string | undefined, readonly version: string, readonly warn: (text: string) => void, readonly rememberSecret: (token: string) => void, readonly deps: CloudDependencies = {}) {
     this.env = deps.env ?? process.env;
     this.server = serverUrl(server ?? (this.env.JOPLO_CLOUD_URL?.trim() || 'https://app.joplo.app'));
     this.home = credentialsHome(this.env);
     this.interactive = isInteractive(this.env, deps.format, deps.interactive ?? process.stdin.isTTY, deps.interactive ?? process.stdout.isTTY);
-    this.sleep = deps.sleep ?? sleep; this.now = deps.now ?? Date.now;
+    this.sleep = deps.sleep ?? ((ms, signal) => sleep(ms, undefined, { signal })); this.now = deps.now ?? Date.now;
   }
   private async storedCredentials(): Promise<Credentials | null> {
     let data: unknown;
@@ -162,17 +178,21 @@ export class CloudClient {
   async credentials(forShare = false): Promise<Credentials | null> {
     const c = await this.storedCredentials();
     if (c && c.server !== this.server) {
-      if (forShare && !this.interactive) this.refuseServerSwitch(c.server);
-      if (!forShare) this.warn('当前服务器没有登录凭证，请运行 npx joplo login --server <url>');
+      if (!forShare || !this.interactive) {
+        const fix = `npx joplo login --server ${this.server}`;
+        throw new CloudError('AUTH_REQUIRED', `当前服务器没有登录凭证，请在自己的终端里运行 ${fix} 并确认替换`, { fix, credentialServer: c.server });
+      }
       return null;
     }
     return c;
   }
   private refuseServerSwitch(server: string): never {
-    throw new JoploError('USAGE', `凭证属于 ${server}，请先运行 joplo logout --server ${server}，再登录当前服务器`);
+    throw new JoploError('USAGE', `凭证属于 ${server}，请在自己的终端里运行 joplo login --server ${this.server} 并确认替换`);
   }
-  private async revoke(token: string): Promise<void> {
-    const data = await this.request('/api/auth/sign-out', token, {});
+  private async revoke(token: string, server = this.server): Promise<void> {
+    // 撤销旧会话必须使用它原来的源，不能让新服务器看到旧 token。
+    const target = server === this.server ? this : new CloudClient(server, this.version, this.warn, this.rememberSecret, this.deps);
+    const data = await target.request('/api/auth/sign-out', token, {});
     if (data.success !== true) throw new CloudError('INVALID_RESPONSE');
   }
   async logout(): Promise<void> {
@@ -236,7 +256,9 @@ export class CloudClient {
     const previous = await this.storedCredentials();
     if (previous && previous.server !== this.server) {
       if (!this.interactive) this.refuseServerSwitch(previous.server);
-      const confirmed = await (this.deps.confirm ?? confirmServerSwitch)(`将替换 ${previous.server} 的登录，继续吗？`);
+      let confirmed: boolean;
+      try { confirmed = await (this.deps.confirm ?? confirmServerSwitch)(`将替换 ${previous.server} 的登录，继续吗？`); }
+      catch (e) { if ((e as Error).name === 'AbortError') throw new JoploError('USAGE', '已取消登录'); throw e; }
       if (!confirmed) throw new JoploError('USAGE', '已取消登录，原凭证保持不变');
     }
     this.warn('正在申请浏览器登录…');
@@ -255,7 +277,7 @@ export class CloudClient {
     let delay = interval;
     const backoff = () => { delay = Math.min(Math.max(interval, delay * 2), 30000); };
     while (this.now() < deadline) {
-      await this.sleep(Math.min(Math.max(interval, delay), 30000, deadline - this.now()));
+      await this.sleep(Math.min(Math.max(interval, Math.min(delay, 30000)), deadline - this.now()));
       if (this.now() >= deadline) break;
       let polled: Awaited<ReturnType<CloudClient['response']>>;
       try {
@@ -264,7 +286,7 @@ export class CloudClient {
       const { response, data } = polled;
       // 设备协议的 429 是暂停轮询信号，与普通分享请求的 4xx 不重试规则分开。
       if (response.status >= 500 || response.status === 429) {
-        const afterMs = response.status === 429 ? retryAfterMillis(response.headers.get('retry-after'), this.now()) : undefined;
+        const afterMs = response.status === 429 ? retryAfterMillis(response.headers.get('retry-after') ?? response.headers.get('x-retry-after'), this.now()) : undefined;
         if (afterMs === undefined) backoff(); else delay = afterMs;
         continue;
       }
@@ -278,8 +300,8 @@ export class CloudClient {
         const account = await this.me(data.access_token);
         const credentials = { server: this.server, accessToken: data.access_token, user: { id: account.user.id, email: account.user.email }, createdAt: new Date().toISOString() };
         await writeCredentials(this.home, credentials);
-        if (previous?.server === this.server && previous.accessToken !== credentials.accessToken) {
-          try { await this.revoke(previous.accessToken); }
+        if (previous && (previous.server !== this.server || previous.accessToken !== credentials.accessToken)) {
+          try { await this.revoke(previous.accessToken, previous.server); }
           catch { this.warn('新登录已保存，但未能确认旧会话已撤销，可在网页设备管理中撤销。'); }
         }
         return credentials;
@@ -291,10 +313,18 @@ export class CloudClient {
     }
     throw new CloudError('AUTH_EXPIRED', '验证码已过期，请重新运行 npx joplo login');
   }
-  async retry<T>(action: () => Promise<T>, options: { create?: boolean } = {}): Promise<T> {
+  async retry<T>(action: () => Promise<T>, options: { create?: boolean; signal?: AbortSignal } = {}): Promise<T> {
     for (let attempt = 0; ; attempt++) {
+      options.signal?.throwIfAborted();
       try { return await action(); }
-      catch (e) { if (!(e instanceof CloudError) || e.code !== 'NETWORK' || options.create && !e.retry?.createSafe || attempt >= 3) throw e; await this.sleep(e.retry?.afterMs ?? 1000 * 2 ** attempt); }
+      catch (e) {
+        options.signal?.throwIfAborted();
+        if (!(e instanceof CloudError) || e.code !== 'NETWORK' || options.create && !e.retry?.createSafe || attempt >= 3) throw e;
+        // 上传共享 signal 同时中止在途 fetch 和重试等待；睡醒后再次检查才可发请求。
+        options.signal?.throwIfAborted();
+        await this.sleep(e.retry?.afterMs ?? 1000 * 2 ** attempt, options.signal);
+        options.signal?.throwIfAborted();
+      }
     }
   }
 }

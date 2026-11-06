@@ -405,6 +405,7 @@ Provide the site name and compatibility date through Wrangler project configurat
 - 用户运行 npx joplo login，在浏览器核对验证码并确认授权；SSH / 无浏览器时用 --no-browser 手动打开网址。
 - Agent 发布用 npx joplo share --format json；share 自动 check、build，只上传发布产物。
 - AUTH_REQUIRED 退出 3：请用户在自己的终端运行 npx joplo login，完成后再重试 share；Agent 不代替用户授权。
+- Agent 遇到 AUTH_REQUIRED 时请用户自己登录，不要替用户运行 \`joplo logout\`。
 - AUTH_EXPIRED 也退出 3：同样请用户重新 login。其他错误读取 error.code / message / details。
 - 免费链接 1 小时有效，具体时刻读取 data.expiresAt；Pro 永久链接的 expiresAt 为 null。
 - Pro 再次 share 自动更新 .joplo/cloud.json 记录的同服务器链接；--new 新建，--title 设置标题。

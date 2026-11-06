@@ -78,13 +78,14 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
       return { sha256: m.sha256, uploadUrl: url, headers: headers as Record<string, string> };
     });
     client.warn(`构建完成：${files.length} 个文件（${actualBytes} 字节），上传 ${missing.length} 个新对象…`);
+    const uploads = new AbortController();
     const upload = async (item: (typeof missing)[number]) => {
       const body = new Uint8Array(await readFile(blobs.get(item.sha256)!));
       await client.retry(async () => {
         let response: Response;
         try {
           // 预签名 PUT 是协议例外：只使用服务端返回的 headers，不添加 bearer 或版本头。
-          response = await fetch(item.uploadUrl, { method: 'PUT', headers: item.headers, body, redirect: 'error', signal: AbortSignal.timeout(Math.ceil(30000 + body.byteLength / (100 * 1024) * 1000)) });
+          response = await fetch(item.uploadUrl, { method: 'PUT', headers: item.headers, body, redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(Math.ceil(30000 + body.byteLength / (100 * 1024) * 1000)), uploads.signal]) });
         } catch { throw new CloudError('NETWORK'); }
         if (!response.ok) {
           // 已知 HTTP 状态优先于正文读取；4xx 的响应中断不能触发重试。
@@ -93,14 +94,14 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
           throw new CloudError(response.status >= 500 ? 'NETWORK' : response.status === 403 ? 'UPLOAD_EXPIRED' : response.status === 413 ? 'TOO_LARGE' : 'BAD_REQUEST', undefined, undefined, { afterMs: response.status === 503 ? retryAfterMillis(response.headers.get('retry-after'), client.now()) : undefined });
         }
         try { await response.arrayBuffer(); } catch { throw new CloudError('NETWORK'); }
-      });
+      }, { signal: uploads.signal });
     };
-    // 失败后不再启动新对象；等待已启动的请求结束后再清理目录和 SIGINT 监听器。
+    // 失败后取消所有在途请求和退避等待；仍等所有 worker 结束再清理目录及 SIGINT 监听器。
     let cursor = 0, failed = false, failure: unknown;
     await Promise.all(Array.from({ length: Math.min(4, missing.length) }, async () => {
       while (!failed && cursor < missing.length) {
         const item = missing[cursor++]!;
-        try { await upload(item); } catch (e) { if (!failed) { failed = true; failure = e; } }
+        try { await upload(item); } catch (e) { if (!failed) { failed = true; failure = e; uploads.abort(e); } }
       }
     }));
     if (failed) throw failure;
@@ -111,7 +112,11 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
     const published = { shareId: final.shareId, url, expiresAt: final.expiresAt as string | null, version: final.version as number };
     if (JSON.stringify(published).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
     try { await atomicJson(join(project, '.joplo/cloud.json'), { server: client.server, shareId: published.shareId, url }); }
-    catch { client.warn('分享已发布，但无法保存 .joplo/cloud.json；请保留输出链接，下次发布可能创建新链接。'); }
+    catch {
+      client.warn('未能保存分享记录，下次发布不会更新这次的链接');
+      try { await rm(join(project, '.joplo/cloud.json'), { force: true }); }
+      catch { client.warn('旧分享记录也未能删除，请手动清理 .joplo/cloud.json。'); }
+    }
     return { result: published, plan: account.plan };
   } finally { try { await rm(staging, { recursive: true, force: true }); } finally { temporary.release(); } }
 }
