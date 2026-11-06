@@ -8,6 +8,7 @@ export const SKILL_TOPICS = [
   { name: 'authoring', description: 'Mental model, first steps, page / option / flow syntax, when conditions, a form example' },
   { name: 'story', description: 'Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions' },
   { name: 'demo', description: 'Layers, shots, captions, full-height layout, deep links, and screenshots' },
+  { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
   { name: 'diagram', description: 'Architecture, sequence and state diagrams: domain groups, automatic layout, traces, shot framing' },
   { name: 'components', description: 'Component catalog, supported HTML tags, line breaks, and props' },
   { name: 'cases', description: 'Case dimensions: ask the user before starting' },
@@ -18,11 +19,12 @@ export const SKILL_TOPICS = [
 export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
 
 const related: Record<SkillTopic, readonly SkillTopic[]> = {
-  authoring: ['story', 'demo', 'diagram', 'components', 'cases', 'check', 'selection', 'publish'],
-  story: ['authoring', 'cases', 'demo', 'check'],
-  demo: ['story', 'authoring', 'diagram', 'components', 'check', 'publish'],
-  diagram: ['demo', 'components', 'check'],
-  components: ['authoring', 'demo', 'diagram', 'check'],
+  authoring: ['story', 'demo', 'focus', 'diagram', 'components', 'cases', 'check', 'selection', 'publish'],
+  story: ['authoring', 'cases', 'demo', 'focus', 'check'],
+  demo: ['story', 'focus', 'authoring', 'diagram', 'components', 'check', 'publish'],
+  focus: ['demo', 'diagram', 'check', 'authoring'],
+  diagram: ['demo', 'focus', 'components', 'check'],
+  components: ['authoring', 'demo', 'focus', 'diagram', 'check'],
   cases: ['story', 'authoring', 'check'],
   check: ['authoring', 'selection'],
   selection: ['check', 'authoring'],
@@ -39,7 +41,7 @@ export function skillIndex(version: string, docs?: Readonly<Record<string, strin
     'Start here:',
     ...START_ORDER.map((s, i) => `  ${i + 1}. ${s}`),
     '',
-    'Topics (suggested order: authoring, story, cases, components, demo, check; diagram for backend / architecture / logic; selection and publish when needed):',
+    'Topics (suggested order: authoring, story, cases, components, demo, focus, check; diagram for backend / architecture / logic; selection and publish when needed):',
     ...SKILL_TOPICS.map(t => `  ${t.name.padEnd(11)} ${t.description}  ${skillTopic(t.name, docs).trimEnd().split('\n').length} lines`),
     'Usage: npx joplo skill <topic>    Install for agents: npx joplo skill install',
     '',
@@ -123,6 +125,7 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
     '- Empty list, 404, expired link, no access, or a result page: EmptyState with action Buttons in children. Confirm a destructive action: Modal with opened={$.ui.confirm} and two Buttons.',
     '- Rows with avatar, text, and actions: ListRow (tappable rows: NavLink). Row actions: Menu with opened={$.ui.menu} on an ActionIcon target. Status cells, sorting, selection, loading: DataTable columns badge / avatar, sortStatus, selectedRecords, fetching.',
     '- Dashboards: Stat, KeyValue, BarChart / LineChart (data can bind $.data.x; set a new array to animate). Mobile: TabBar at the bottom of a full-height Stack. Undo bar or banner: Notification position="bottom" with when.',
+    '- Point viewers at any component without zooming: spotlight / highlight / numbered / callout / hold in a step (functions from @joplo-app/kit, not components): npx joplo skill focus. Architecture, sequence, and state diagrams: npx joplo skill diagram.',
     '',
     '## Behavior groups (from the catalog)',
     `- Interactive; require id and declared behavior: ${listed(INTERACTIVE_TYPES)}.`,
@@ -130,7 +133,7 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
     `- Containers whose expanded state controls child visibility: ${listed(GATED_CONTAINERS)}.`,
     '',
     `Joplo props: ${JOPLO_PROPS.join(', ')}; disabled is the component disable prop.`,
-    'when controls visibility; disabledReason explains disabling; unmodeled marks behavior not modeled by this prototype; note is an authoring note.',
+    'when controls visibility; disabledReason explains disabling; unmodeled marks behavior not modeled by this prototype; note is an authoring note; redact blurs secrets or private data (true or a condition; see focus).',
     'Interactive elements need a flow step, disabled={true} with a disabledReason, or explicit unmodeled (see check: UNBOUND_INTERACTIVE).',
     'Value components are read-only on stage: they show inputs[id] written by .type/.select/.toggle steps, or a bound value prop. Viewers cannot type their own text.',
     'See authoring for bindings, conditions, and steps; check for component error fixes.',
@@ -171,7 +174,7 @@ Joplo already has the parts of a user story; fill them in that spirit.
   A screen that changes with no trigger reads as a screensaver. Mock results come from steps: set(), toast(), go().
 - Ending: pick one strategy, either stop on the result (done('…') with the result on screen) or a closing .card with points: at most 3–4 short points.
 - Transitions: keep something on screen across a change (the same list, the same person); cards only for time jumps, role switches, opening, and ending.
-- Where the viewer looks each moment is the demo topic's attention guidance (shots, marks, and the focus helpers): npx joplo skill demo.
+- Where the viewer looks each moment (one focus per step, spotlight, highlight, callout, numbered, hold): npx joplo skill focus; layers and shots: npx joplo skill demo.
 
 ## 4. Captions and explain
 - One idea per caption, about 24 units (CJK 1, other characters 0.5). Subject + verb, active voice, the visible action first: 'Ana sends the invite', 'The link expires after 7 days'.
@@ -298,6 +301,7 @@ See check for diagnostic fixes and selection for editing only the selected locat
 
 Tell one thing per step: separate viewpoints with independent layers, zoom into details with shots, and describe what happened with short captions.
 See authoring for directories, state, and flow syntax. Import layer, shot, trace, explain from @joplo-app/kit.
+What viewers look at in each step, and the lighter forms (spotlight, highlight, callout, numbered, hold, redact): npx joplo skill focus.
 
 ## Layers are independent pages
 - Declare layers in an option: layers: { client: layer('Client view', <ClientView/>), backend: layer('Backend flow', <Diagram>…</Diagram>) }.
@@ -490,12 +494,70 @@ Choose by the question: "what is where" → Diagram; "what happens in what order
 - UI cards and panels zoom at most 1.25× and keep their framed container (Card, Paper, Modal, Table, AppShell side…) in view, so neighbours stay visible.
 - Want more context? shot the container or group. Want the reader to compare two places? shot both ids in one step.
 - Do not use zoom to read tiny text: if a diagram needs heavy zoom, split it into layers.
+- Point at a part without zooming: spotlight / highlight / callout (see focus). A callout on the framed node's group or a message's participant stays in the shot.
 
 ## Other diagram types
 - C4 context / container: use Diagram with kind="user" for people, Diagram.Group icon="box" for each system boundary, kind="external" for outside systems.
 - Data models: show records with DataCard and Table in their own layer (see demo); an ER diagram component is not available yet.
 
 Diagnostics for diagrams are listed in check (UNKNOWN_DIAGRAM_NODE, UNKNOWN_DIAGRAM_GROUP, TRACE_UNKNOWN…). See examples/agent-arch.`,
+  focus: `# Joplo focus: focus
+
+A demo is a story told over time. In every step the viewer should know where to look and why.
+Decide each step's focus before writing it: one subject, one form. The caption says what happened, the focus shows where, a callout (optional) says why.
+Import spotlight, highlight, numbered, callout, hold from @joplo-app/kit; shot, trace, mark are in demo.
+
+## Defaults: what you get without writing anything
+- Step 0 is the scenario cover; a .card() step is its own focus.
+- User actions: the cursor moves to the element and clicks; the camera brings it into frame if needed. Do not add shot() just to show what is clicked.
+- trace() frames the call path in a Diagram.
+- Result reveal: after a step, an element that newly appears or changes (an alert, a badge, a new message, a menu) pulses once and fades. It never moves the camera.
+  Skipped on purpose: modals and drawers (their backdrop already says it), DataCard / StateFlow (they show their own change), more than 3 changes at once, a new page or layer, the same element changing again or another line appended to the same log, and any step where you wrote a focus yourself.
+- When the director enters another layer that has a shot, the stage starts on the whole layer, then pushes in (context first, then detail).
+- config({ autoFocus: false }) turns off the reveal pulse and the layer-entry push-in. Your shots and cues still play.
+
+## Choose the form by intent
+- Look closer at a small or dense area: shot('id', …). The camera zooms; the rest fades. What the frame keeps (a node's group title, a card's container): diagram.
+- One block on a busy screen, keep the layout visible: spotlight('id'). No zoom; everything else is washed out.
+- "Notice this changed / this matters": highlight('id'). No zoom; a ring that pulses once.
+- One short reason next to an element: callout('id', 'Share after generation', { side? }). A note with a leader line; side is top / right / bottom / left, or omitted to pick the free side.
+- What a screen is made of, or an order of parts: numbered('input', 'preview', 'send'). Badges 1, 2, 3 (keep it to 5 or fewer).
+- Give viewers time to look (a chart, a comparison, a long result): hold(5). Autoplay stays at least 5 seconds (0.5–30, scaled by speed).
+- Secrets and private data: <Code redact>sk-live-…</Code>, or redact={not($.ui.revealed)} to unblur after a step. Blurred, layout unchanged, on every step.
+- Hand-drawn circle / underline / box / arrow: mark('id', { kind }) (see demo).
+
+All cues apply to this step only, render in the stage theme, and never block clicks; spotlight keeps the next click target lit.
+Cues do not zoom. If a cue's target is outside the current shot, the camera first returns to the whole layer.
+In diagrams the frame always keeps the target's group (title at least) and a message's two participants: a cue on them stays in the shot; spotlight keeps the group title lit. Diagrams show their own changes (fade-in, traces), so the reveal pulse skips them.
+With layers, a cue switches the director to its target's layer when the step has no shot.
+
+## Pacing rules
+1. One subject per step. If the caption needs "and", split the step.
+2. Context first: when a new screen appears, show the whole of it (or number its parts) before zooming into a corner.
+3. Same subject, same frame: when several steps talk about the same block, keep one shot; do not re-aim the camera every step.
+4. Zoom only when the detail is too small to read. Otherwise spotlight or highlight.
+5. One primary form per step (shot or spotlight), plus at most one callout or one numbered set.
+6. A callout explains why, in a few words. Never repeat the caption in it.
+7. If three steps in a row change nothing on stage, merge them or show something.
+
+## Anti-patterns → fixes
+- shot() on every click → remove it; the cursor and the result reveal already guide the eye.
+- shot('a') with spotlight('b') elsewhere → FOCUS_CONFLICT; aim both at the same thing or split the step.
+- A callout / mark / highlight on another layer → FOCUS_OFF_LAYER; add shot('<id>') to switch there.
+- Several system steps with only captions → FOCUS_IDLE; set() visible state, or merge.
+- A paragraph in a callout → CALLOUT_TOO_LONG; keep it to about 24 units like captions, put the rest in explain().
+- Rings everywhere: if everything is highlighted, nothing is.
+
+## Example
+\`\`\`tsx
+flow('Plan a weekend trip', { start: '/' })
+  .card('Weekend camping', { sub: 'Xiaoyu asks the assistant to plan it' })
+  .system('Meet the assistant', 'Chat on the left, plan on the right', numbered('chat_col', 'plan_col'), hold(4))
+  .type('prompt', 'Camping this Saturday for two', 'Xiaoyu describes the trip')
+  .system('Reply', 'Conclusion first: Baihe campsite', stream($.ui.reply, '…'), spotlight('msg_reply'), callout('msg_reply', 'Answer first, details in the plan'))
+  .system('Plan ready', 'Budget done, the plan is ready', set($.ui.planStatus, 'ready'), shot('plan', 'share'), callout('share', 'Share after generation'))
+\`\`\`
+Full example: examples/camping.`,
   cases: `# Joplo case checklist: cases
 
 Before starting, read user requirements and project material. Use these dimensions to find gaps; ask only key questions that change the design.
@@ -606,6 +668,12 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - FORK_UNKNOWN: fork must target another scenario key in the same option; it cannot reference itself.
 - MARK_UNKNOWN: The mark target is absent from this step's route stage (after go() and back() in earlier steps) or, with layers, from every layer. Check the element id; currently hidden targets are valid references.
 - SHOT_UNKNOWN: The shot target is absent from this step's stage and all layers. Check its id and layer; see demo.
+- FOCUS_UNKNOWN / CALLOUT_EMPTY / CALLOUT_SIDE_INVALID / HOLD_INVALID: spotlight, highlight, numbered, callout need existing element ids (in a layer, or on this step's route stage); callout needs one short sentence and side top/right/bottom/left; hold takes 0.5–30 seconds. See focus.
+- FOCUS_OFF_LAYER (warning): a spotlight / highlight / numbered / callout / mark target is not in the layer the director shows after this step, so nobody sees it. Add shot('<id>') to switch there, or point at an element in the shown layer. See focus.
+- FOCUS_CONFLICT (warning): the step's shot frames one thing while a cue points outside it. Point both at the same thing, add the id to the shot, or split the step.
+- CALLOUT_TOO_LONG (warning): callout text over about 24 units (same count as captions). Say the reason in a few words; move the rest to explain().
+- FOCUS_IDLE (info): three or more system steps in a row change nothing on stage. Merge them, or show what happens (set() visible state, highlight, callout, shot).
+- INVALID_REDACT / AUTOFOCUS_INVALID: redact takes true/false or a condition (redact={not($.ui.revealed)}); config({ autoFocus }) takes true or false.
 - LAYER_UNKNOWN: Invalid layer key or missing content. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
 - TRACE_UNKNOWN: Empty trace, unknown id, ids from different diagrams, or a disconnected path. Use connected ids in one Diagram / StateMachine / Sequence.
 - TRACE_AMBIGUOUS: Multiple candidate edges or messages between two nodes. Use the specific edge / message id in trace.

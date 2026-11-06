@@ -3,7 +3,8 @@
  * 布局写成属性：<Stack gap="md">、<Group justify="space-between">、<SimpleGrid cols={{ base: 1, md: 3 }}>，
  * 不需要 className；响应式对象与 visibleFrom / hiddenFrom 按舞台宽度生效。
  *
- * 另可加 Joplo 属性：id（可操作元素必填）、when（可见条件）、disabled（布尔或条件）、disabledReason、unmodeled、note。
+ * 另可加 Joplo 属性：id（可操作元素必填）、when（可见条件）、disabled（布尔或条件）、disabledReason、unmodeled、note、
+ * redact（布尔或条件：内容模糊显示，用于密钥、隐私信息，D70）。
  * 行为（点击后发生什么）不写在组件上，写在 option 的 flow 步骤里。浮层用 Modal / Drawer 的 opened={$.ui.x} 控制。
  *
  * 组件清单与 @joplo-app/core 的 COMPONENT_TYPES 一一对应（core/test/catalog.test.ts 检查）。
@@ -21,6 +22,8 @@ export type JoploProps = {
   disabledReason?: string | Bind;
   unmodeled?: boolean;
   note?: string;
+  /** 敏感信息（D70）：内容模糊显示、布局不变；可以写条件（redact={not($.ui.revealed)}），点“显示”后再看清。 */
+  redact?: boolean | Bind | CondExpr;
   visibleFrom?: Size;
   hiddenFrom?: Size;
   /** 逃生口：Tailwind 类名。优先使用布局组件与样式属性。 */

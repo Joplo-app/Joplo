@@ -96,7 +96,7 @@ const xiaoyuApp = () => (
     <AppShell.Main>
       {/* 高度跟着舞台走（层级铺满整个舞台，大小随看板窗口变化）：两栏都占满主区域，输入框和分享按钮固定在底部 */}
       <Grid gutter="lg" h="100%">
-        <Grid.Col span={6}>
+        <Grid.Col id="chat_col" span={6}>
           <Stack h="100%" gap="md">
             <ScrollArea style={{ flex: 1, minHeight: 0 }}>
               <Stack gap="lg">
@@ -122,11 +122,11 @@ const xiaoyuApp = () => (
             </Group>
           </Stack>
         </Grid.Col>
-        <Grid.Col span={6}>
+        <Grid.Col id="plan_col" span={6}>
           <Stack h="100%" gap="md">
             <Box style={{ flex: 1, minHeight: 0 }}>
               <Artifact id="plan" title="周末露营行程.md" kind="doc" status={ui.planStatus} version={ui.planVersion} when={ui.planShown}>
-                <Title order={3}>{ui.planTitle}</Title>
+                <Title id="plan_title" order={3}>{ui.planTitle}</Title>
                 <Text>{ui.planD1}</Text>
                 <Text>{ui.planD2}</Text>
                 <Text c="dimmed">{ui.planBudget}</Text>

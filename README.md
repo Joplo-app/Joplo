@@ -64,7 +64,7 @@ npx joplo skill demo
 npx joplo skill install --agents-md
 ```
 
-The nine topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, and `publish`. `npx joplo components <Name>` prints the props and an example for one component. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
+The ten topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, and `publish`. `npx joplo components <Name>` prints the props and an example for one component. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
 
 Use a second terminal while the Board is running:
 

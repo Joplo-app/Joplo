@@ -21,7 +21,7 @@ import { m } from '../i18n/messages';
 import { animate, type AnimationPlaybackControls } from 'motion';
 import { stepDwell, CAMERA_MS } from './pace';
 import { dwellTexts } from '../player/cover-content';
-import { orderedFeatures, streamsOf, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core';
+import { holdMsOf, orderedFeatures, streamsOf, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core';
 import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 
 /** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */
@@ -464,7 +464,8 @@ export class DemoController {
       if (!quick) {
         // 停留（T-director2）：按说明与解说的字数，至少 3 秒；并等镜头过渡结束、本步 active 连线上的小点跑完一圈
         const step = sc.steps[index]!;
-        const dwell = this.reducedMotion
+        // hold（D70）：作者要求的最短停留（按速度缩放）；减少动态效果时同样保留，它是看的时间，不是动画
+        const dwell = Math.max(holdMsOf(step, this.speed), this.reducedMotion
           ? TIMING.reducedStep
           : stepDwell({
               texts: dwellTexts(step, this.i18n),
@@ -472,7 +473,7 @@ export class DemoController {
               cameraMoved: step.shots.length > 0 || !!step.directorLayer,
               dotMs: this.activeDotMs(),
               streams: streamsOf(step).map((x) => x.value),
-            });
+            }));
         const elapsed = Math.max(0, Math.round(performance.now() - this.committedAt));
         this.set({ dwell: { position: index + 1, ms: Math.max(dwell, elapsed), elapsed } });
         const ok2 = await this.wait(dwell - (performance.now() - this.committedAt), gen, true);

@@ -356,6 +356,16 @@
   transition: filter 0.35s ease;
 }
 
+/* 敏感信息（D70，redact）：内容模糊、布局不变；被镜头调暗时两个滤镜叠加，不能因为调暗而露出原文 */
+.jstage [data-jredact] {
+  filter: blur(5px);
+  user-select: none;
+}
+.jstage [data-jfocus-dim] > [data-jredact]:not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]),
+.jstage [data-jfocus-dim] [data-jfocus-path] > [data-jredact]:not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]) {
+  filter: opacity(0.32) blur(5px);
+}
+
 /* 字幕区：字体与颜色跟随舞台主题（.jtheme 在主题的作用范围里） */
 .jsubtitle {
   font-family: var(--jp-font);

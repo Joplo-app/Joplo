@@ -64,7 +64,7 @@ npx joplo skill demo
 npx joplo skill install --agents-md
 ```
 
-九个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`diagram`（分组的架构图、时序图、状态机与镜头取景）、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
+十个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`focus`（每一步看哪里：默认焦点、聚光、强调、标注、编号、停留、遮挡）、`diagram`（分组的架构图、时序图、状态机与镜头取景）、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
 
 看板运行时，在另一个终端执行：
 

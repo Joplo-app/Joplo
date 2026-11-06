@@ -5,11 +5,12 @@ import { useI18n } from '../i18n/context';
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { Marks } from './Marks';
+import { Cues } from './Cues';
 import { keyboardAt } from './story-data';
 import { CameraLayer, contentBounds, useCamera, type CameraSpec } from './camera';
 import { clampPan, wheelFactor, zoomAt, type View } from './camera-math';
 import { AnimatePresence, motion } from 'motion/react';
-import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, diagramStateAt, streamsOf, type PlayState, type Project, type Toast } from '@joplo-app/core';
+import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, diagramStateAt, focusAt, streamsOf, type PlayState, type Project, type Toast } from '@joplo-app/core';
 import { RenderContext, RenderNode, type RenderMode, type StreamingCtx } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from './appearance';
@@ -120,6 +121,8 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   );
   const changed = useMemo(() => changedAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
   const marks = useMemo(() => marksAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
+  // 焦点（D70）：这一步的提示与默认的结果揭晓，只由 IR 与当前位置推导（core 的 focusAt）
+  const focus = useMemo(() => focusAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
   const keyboard = keyboardAt(scenario, state.position, activeStep, preview);
   const rootRef = useRef<HTMLDivElement | null>(null);
   // 用户的缩放平移（T-director2）：resetKey 变化时丢弃，镜头重新接管
@@ -137,7 +140,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     if (userRef.current) setUser(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
-  const cam = useCamera(camera, { width: vp.width, height: vp.height, animate, deps: [state, scene], user });
+  const cam = useCamera(camera, { width: vp.width, height: vp.height, animate, deps: [state, scene], user, establish: project.autoFocus !== false });
   const zoomOn = !!zoom;
   /** 当前视图（用户的，或镜头此刻的目标视图），在它上面继续缩放平移，并把内容夹在画面里。 */
   const setClamped = (v: View) => {
@@ -291,6 +294,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
           <div ref={setDialogLayer} className="pointer-events-none absolute inset-0 z-20 [&>*]:pointer-events-auto" data-jlayer="dialog" />
           <Marks key={shownId} marks={marks} wrapRef={cam.wrapRef} contentRef={cam.contentRef} width={vp.width} height={vp.height} animate={animate} pulseKey={`${state.scenarioId}:${state.position}:${shownId}`} />
           {camera ? <CameraLayer view={cam.view} animate={animate} pulseKey={camera.key} /> : null}
+          {card ? null : <Cues focus={focus} wrapRef={cam.wrapRef} contentRef={cam.contentRef} width={vp.width} height={vp.height} view={cam.view} nextTargetId={nextTargetId} cameraTargets={cam.view?.mode === 'focus' ? (camera?.targets ?? []) : []} animate={animate} pulseKey={`${state.scenarioId}:${state.position}:${shownId}`} />}
         </div>
         <ToastLayer key={epoch} toasts={state.toasts} nextTargetId={nextTargetId} animate={animate} rootRef={rootRef} />
         {keyboard && !card ? <div className="pointer-events-none absolute left-1/2 z-30 flex max-w-[70%] -translate-x-1/2 items-center gap-1.5 rounded border border-[var(--jp-line)] bg-[var(--jp-surface)] px-3 py-1.5 text-[14px] text-[var(--jp-ink)]" style={{ bottom: Math.max(60, state.toasts.length ? state.toasts.length * 64 + 40 : 0) }} data-jlayer="keyboard">

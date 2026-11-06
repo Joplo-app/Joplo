@@ -5,6 +5,7 @@ import { scenarioEstimateMs } from './outline.ts';
 import { walkNodes, findNode, replay } from './player.ts';
 import { JoploError, type Diagnostic } from './result.ts';
 import { schemaDiagnostics } from './schema-issues.ts';
+import { focusReplayDiagnostics, focusStructureDiagnostics } from './focus-check.ts';
 
 export type ValidationOptions = { optionId?: string; mode: 'structure' | 'replay' | 'all' };
 export type ValidationReport = {
@@ -165,12 +166,14 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         }
       }
     }
+    focusStructureDiagnostics(p, scenarios, emit); // 焦点提示（D70）
     for (const o of options) if (!diagnostics.some(d => d.severity === 'error' && (!d.ref?.optionId || d.ref.optionId === o.id))) verification[o.id] = 'structure_ok';
   }
   if (opts.mode !== 'structure') {
     const failed = new Set<string>();
     for (const sc of scenarios) {
       const result = replay(p, sc.id);
+      if (!result.diagnostics.length) focusReplayDiagnostics(p, sc, emit); // 焦点提示（D70）
       for (const d of result.diagnostics) {
         failed.add(sc.optionId);
         const step = sc.steps.find(st => st.id === (d.ref?.stepId ?? d.ref?.id)) ?? (result.finalState ? sc.steps[result.reached] : undefined);

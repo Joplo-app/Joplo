@@ -42,6 +42,23 @@ const FRAME_SEL = ['Card', 'Paper', 'Modal', 'Drawer', 'Alert', 'Notification', 
   .map((t) => `[data-jtype="${t}"]`)
   .join(',');
 
+/**
+ * 图表元素一定要带上的归属信息（D69）：节点 / 分组 / 状态是最内层父分组的标题，时序图的消息是两端参与者的头部。
+ * 镜头取景把它们放进画面；聚光（D70 spotlight）对图表元素同样留出它们（集成 0.2.8 的组合规则：焦点决定看哪个对象，
+ * 归属信息不因取景或压暗而丢失）。不是图表元素时为空。
+ */
+export function ownershipEls(el: Element): Element[] {
+  const type = el.getAttribute('data-jtype') ?? '';
+  if (!DIAGRAM_EL.test(type)) return [];
+  if (type === 'Sequence.Message') {
+    const canvas = el.closest('[data-jdiagram-canvas]');
+    const ends = (el.getAttribute('data-jends') ?? '').split(' ').filter(Boolean);
+    return ends.map((id) => canvas?.querySelector(`[data-jid="${CSS.escape(id)}"]`)).filter((x): x is Element => !!x);
+  }
+  const title = el.parentElement?.closest(GROUP_SEL)?.querySelector(':scope > [data-jgroup-title]');
+  return title ? [title] : [];
+}
+
 /** 镜头容器里内容的范围（内容坐标，至少是整个画面）：整层缩放与平移夹紧都用它。 */
 export function contentBounds(wrap: HTMLElement, content: HTMLElement | null, W: number, H: number): Box {
   const wr = wrap.getBoundingClientRect();
@@ -57,7 +74,15 @@ const round = (n: number) => Math.round(n * 100) / 100;
 const FOCUS_ATTRS = ['data-jfocus', 'data-jfocus-path'] as const;
 
 /** 镜头的计算与应用。wrapRef 挂在镜头容器上，contentRef 挂在画面内容上。 */
-export function useCamera(spec: CameraSpec | null, opts: { width: number; height: number; animate: boolean; deps: unknown[]; user?: View | null }) {
+/** 换层时先在整层停留多久再推近（D70，先全景再放大）。 */
+export const ESTABLISH_MS = 400;
+
+/**
+ * opts.establish（D70，默认焦点行为，config({ autoFocus: false }) 关闭）：导演换到另一层、且这一层要推近时，
+ * 新画面淡入时先停在整层（不做动画），ESTABLISH_MS 后再平滑推近。没有它时镜头从上一层的视图直接过渡过去（方向随意）。
+ * 首次挂载（打开深链接、截图）与静态截图不做。
+ */
+export function useCamera(spec: CameraSpec | null, opts: { width: number; height: number; animate: boolean; deps: unknown[]; user?: View | null; establish?: boolean }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState<CameraView | null>(null);
@@ -112,6 +137,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     const H = opts.height;
     // 换层（换画面）后重新开始：新画面里的目标还没出现时退到整层，而不是保持上一层的镜头
     const layerOf = spec.key.split('|')[0] ?? '';
+    const cut = lastLayer.current !== '' && lastLayer.current !== layerOf;
     if (lastLayer.current !== layerOf) hadFocus.current = false;
     lastLayer.current = layerOf;
     /** 滚动区里的目标：把每个可滚动的祖先滚到目标可见（镜头只平移缩放，不会替页面滚动）。 */
@@ -237,12 +263,23 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     };
     delete wrap.dataset.cameraSettled;
     reveal();
-    tick();
+    // 先全景再推近（D70）：换层时先停在新画面的整层（被淡入盖住，不做动画），停一下再推近到焦点
+    let establishTimer: ReturnType<typeof setTimeout> | 0 = 0;
+    if (cut && opts.establish && opts.animate && spec.targets.length && !userRef.current) {
+      const o = fitCamera({ W, H, mode: 'overview', bbox: contentBounds(wrap, content, W, H) });
+      apply(o.k, o.tx, o.ty, false);
+      // 上一层的高光与调暗不能留在新画面上
+      clearFocus();
+      setView({ k: o.k, tx: o.tx, ty: o.ty, mode: 'overview', rects: [] });
+      wrap.dataset.establish = '1';
+      establishTimer = setTimeout(() => { establishTimer = 0; delete wrap.dataset.establish; tick(); }, ESTABLISH_MS);
+    } else tick();
     // 内容在停稳之后还会变（流式输出逐字变长、元素随后出现，D56）：每次变化后的下一帧重新测量，
     // 镜头与高光始终套住目标的最终大小。只听文字与子节点变化，不听属性（markFocus 自己会改属性）。
     let pending = 0;
     const remeasure = () => {
       pending = 0;
+      if (establishTimer) return; // 正在整层停留：到时间再推近
       reveal();
       const v = measure();
       if (!v) return;
@@ -259,6 +296,8 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     }) : null;
     mo?.observe(content!, { childList: true, characterData: true, subtree: true });
     return () => {
+      if (establishTimer) clearTimeout(establishTimer);
+      delete wrap.dataset.establish;
       cancelAnimationFrame(raf);
       cancelAnimationFrame(pending);
       mo?.disconnect();

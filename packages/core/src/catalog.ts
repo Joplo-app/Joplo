@@ -74,7 +74,7 @@ export const VALUE_TYPES: ReadonlySet<string> = new Set<string>([
 export const GATED_CONTAINERS: ReadonlySet<string> = new Set<string>(['Modal', 'Drawer', 'Menu.Dropdown']);
 
 /** Joplo 在 Mantine 属性之外追加的属性，编译器会从 props 中取出，放到节点字段上。 */
-export const JOPLO_PROPS = ['id', 'when', 'disabledReason', 'unmodeled', 'note'] as const;
+export const JOPLO_PROPS = ['id', 'when', 'disabledReason', 'unmodeled', 'note', 'redact'] as const;
 
 /**
  * 每个组件一行常用属性提示（`joplo skill components` 由此生成）。所有组件另外都接受：

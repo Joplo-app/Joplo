@@ -10,6 +10,7 @@ import { compileProject } from '../src/project.ts';
 import { Project as ProjectSchema } from '@joplo-app/core';
 import { joploProjectPlugin, kitAliases, locateWebAssets } from '../src/vite-shared.ts';
 import { createServer } from 'vite';
+import { pickedExample } from './picked-example.ts';
 
 const EXAMPLE = path.resolve(import.meta.dirname, '../../../examples/invite');
 const copy = () => {
@@ -195,7 +196,8 @@ function missingPaths(full: unknown, partial: unknown, at = ''): string[] {
 describe('发布产物是完整的 IR（只缺有意去掉的创作侧字段）', () => {
   for (const name of ['camping', 'agent-arch', 'invite']) {
     it(`examples/${name}`, async () => {
-      const dir = path.resolve(import.meta.dirname, '../../../examples', name);
+      // camping / agent-arch 没有 pick，直接发布时没有任何场景：用补了 pick 的副本（集成 0.2.8）
+      const dir = pickedExample(name);
       const web = locateWebAssets();
       const loader = await createServer({ configFile: false, envDir: false, root: dir, logLevel: 'error', appType: 'custom', resolve: { alias: kitAliases(web, dir) }, plugins: [joploProjectPlugin(dir, web)], server: { middlewareMode: true, hmr: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] } });
       let compiled;
@@ -203,13 +205,54 @@ describe('发布产物是完整的 IR（只缺有意去掉的创作侧字段）'
         compiled = (await compileProject(loader, dir, 'publish')).project!;
       } finally {
         await loader.close();
+        fs.rmSync(dir, { recursive: true, force: true });
       }
+      expect(Object.keys(compiled.scenarios).length, '发布视图里有场景').toBeGreaterThan(0);
       const payload = JSON.parse(JSON.stringify(publishPayload(compiled, null).project));
       const reparsed = ProjectSchema.parse(payload);
       const missing = missingPaths(reparsed, payload).filter((p) => !STRIPPED_FOR_PUBLISH.has(p.split('.').pop()!));
       expect(missing).toEqual([]);
+      // 集成 0.2.8：可选字段被裁掉时上面查不出来（schema 不会补回可选字段）。编译出的发布 IR 里有的每条路径，
+      // 发布产物里都要有（只允许有意去掉的创作侧字段）
+      const dropped = missingPaths(JSON.parse(JSON.stringify(compiled)), payload).filter((p) => !STRIPPED_FOR_PUBLISH.has(p.split('.').pop()!));
+      expect(dropped).toEqual([]);
+      // 三方新增的演示字段确实在发布产物里
+      const steps = Object.values(payload.scenarios as Record<string, { steps: Record<string, unknown>[] }>).flatMap((sc) => sc.steps);
+      const nodes: Record<string, unknown>[] = [];
+      const walk = (n: Record<string, unknown>) => { nodes.push(n); for (const c of (n.children as Record<string, unknown>[] | undefined) ?? []) walk(c); };
+      for (const sc of Object.values(payload.scenes as Record<string, { root: Record<string, unknown> }>)) walk(sc.root);
+      if (name === 'camping') {
+        // 叙事焦点（D70）
+        expect(steps.some((st) => Array.isArray(st.cues) && st.cues.length)).toBe(true);
+        expect(steps.some((st) => Array.isArray(st.callouts) && st.callouts.length)).toBe(true);
+        expect(steps.some((st) => typeof st.hold === 'number')).toBe(true);
+      }
+      if (name === 'agent-arch') {
+        // 关系类图表 v2（D69）：编译期布局、trace 经过的分组、时序图的镜头目标
+        const kinds = new Set(nodes.flatMap((n) => (n.layout ? [(n.layout as { kind: string }).kind] : [])));
+        expect([...kinds].sort()).toEqual(['graph', 'sequence']);
+        const traces = steps.flatMap((st) => (st.traces as Record<string, unknown>[] | undefined) ?? []);
+        expect(traces.some((t) => Array.isArray(t.groups) && t.groups.length)).toBe(true);
+        expect(traces.some((t) => Array.isArray(t.targets) && t.targets.length)).toBe(true);
+      }
+      if (name === 'invite') {
+        // 讲好一个演示（D67）：发布站与封面的“给谁、解决什么”读 features 的 roles / goal
+        const features = Object.values(payload.features as Record<string, { goal?: string; roles?: unknown }>);
+        expect(features.some((f) => !!f.goal && f.roles !== undefined)).toBe(true);
+        // 产品界面组件（D68）：Menu 的 opened 抄到 Menu.Dropdown
+        expect(nodes.some((n) => n.type === 'Menu.Dropdown' && (n.props as Record<string, unknown> | undefined)?.opened !== undefined)).toBe(true);
+      }
     }, 120_000);
   }
+
+  it('样板没用到的演示字段（redact、autoFocus）同样原样保留', () => {
+    const scene = { id: 'o~v', optionId: 'f.a', route: '/', name: 'v', viewport: 'desktop', layer: 'v', root: { id: 'root', type: 'Stack', props: {}, children: [{ id: 'key', type: 'Code', props: {}, redact: { op: 'not', path: 'ui.shown' }, children: [] }] } };
+    const p = { name: 'T', autoFocus: false, routes: {}, scenes: { 'o~v': scene }, features: {}, options: {}, scenarios: {}, rules: {}, cases: {}, issues: [] } as unknown as Parameters<typeof publishPayload>[0];
+    const out = JSON.parse(JSON.stringify(publishPayload(p, null).project));
+    expect(out.autoFocus).toBe(false);
+    expect(out.scenes['o~v'].root.children[0].redact).toEqual({ op: 'not', path: 'ui.shown' });
+    expect(out.rules).toBeUndefined();
+  });
 });
 
 describe('finalizeHtml', () => {

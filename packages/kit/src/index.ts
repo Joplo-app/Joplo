@@ -19,7 +19,11 @@ export type StateInit = { ui?: Record<string, Json>; data?: Record<string, Json>
 
 // ---------- 项目、布局、页面 ----------
 /** theme：默认主题名——内置主题（sketch、clean、blueprint、nord、dracula、solarized-light、terminal、kraft、contrast）或项目 themes/<name>.css（D51）。 */
-export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; source?: string };
+/**
+ * autoFocus（D70）：默认焦点行为（结果揭晓：本步新出现或变化的元素轻轻脉冲一次；进入新的一层时先全景再推近）。
+ * 缺省开启；写 false 整体关掉，演示只按作者写的 shot / trace / spotlight 等呈现。
+ */
+export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; autoFocus?: boolean; source?: string };
 export const config = (c: Omit<ConfigDef, 'kind' | 'source'>): ConfigDef => ({ kind: 'config', ...c, source: callsite() });
 
 export type LayoutDef = { kind: 'layout'; tree: JNode; source?: string };
@@ -117,7 +121,13 @@ export type EffectDef =
   | { kind: 'effect'; type: 'trace'; ids: string[]; mode: 'ok' | 'fail' | 'skip' }
   | { kind: 'effect'; type: 'stream'; path: string; value: string }
   | { kind: 'effect'; type: 'fork'; label: string; scenario: string }
-  | { kind: 'effect'; type: 'mark'; target: string; kindOf: 'circle' | 'underline' | 'box' | 'arrow'; note?: string };
+  | { kind: 'effect'; type: 'mark'; target: string; kindOf: 'circle' | 'underline' | 'box' | 'arrow'; note?: string }
+  | { kind: 'effect'; type: 'cue'; cue: 'spotlight' | 'highlight' | 'number'; targets: string[] }
+  | { kind: 'effect'; type: 'callout'; target: string; text: string; side?: CalloutSide }
+  | { kind: 'effect'; type: 'hold'; seconds: number };
+
+/** 标注气泡放在目标的哪一侧；不写时自动选画面里放得下的一侧（右、左、下、上）。 */
+export type CalloutSide = 'top' | 'right' | 'bottom' | 'left';
 
 const pathOf = (b: Bind | string): string => (isBind(b) ? bindPath(b) : b);
 export const set = (target: Bind, value: Json): EffectDef => ({ kind: 'effect', type: 'set', path: pathOf(target), value });
@@ -158,6 +168,39 @@ export const shot = (...targets: string[]): EffectDef => ({ kind: 'effect', type
  *   .system('额度预检', '调用模型之前先预检额度', shot('billing'), explain('额度不足时在这里就拦下，不会产生模型费用'))
  */
 export const explain = (text: string): EffectDef => ({ kind: 'effect', type: 'explain', text });
+
+// ---------- 焦点与呈现形式（D70）：这一步观众看哪里、用什么形式看 ----------
+// 镜头（shot）负责“取景”：推近、跟随。下面这些只负责“强调”：都不推近镜头；目标不在当前镜头里时，镜头先退回整层。
+// 都只作用于这一步（下一步消失），跳到任意一步、前后翻、回放结果一致。
+
+/**
+ * 聚光：这一步只照亮这些元素，画面其余部分压暗（不遮挡、不拦截点击，下一步要点的元素也保持明亮）。
+ * 用于“这一屏信息很多，此刻只看这一块”。
+ *   .system('额度不足', '额度不足，先拦下', spotlight('quota_alert'))
+ */
+export const spotlight = (...targets: string[]): EffectDef => ({ kind: 'effect', type: 'cue', cue: 'spotlight', targets });
+/**
+ * 强调：给元素加一圈强调框并脉冲一次，画面其他部分不变。比 spotlight 轻，适合“注意这里变了 / 这里是关键”。
+ *   .system('席位更新', '席位变成 12 / 15', highlight('seat_card'))
+ */
+export const highlight = (...targets: string[]): EffectDef => ({ kind: 'effect', type: 'cue', cue: 'highlight', targets });
+/**
+ * 编号：按参数顺序给元素标 1、2、3…，讲“这一屏由几部分组成 / 先后顺序”。建议一步不超过 5 个。
+ *   .system('页面结构', '先看三块：输入、预览、发送', numbered('in_emails', 'mail_preview', 'btn_send'))
+ */
+export const numbered = (...targets: string[]): EffectDef => ({ kind: 'effect', type: 'cue', cue: 'number', targets });
+/**
+ * 标注气泡：指向元素的一句话（便签式说明），建议和字幕一样不超过 24 个字。字幕讲“发生了什么”，气泡讲“为什么在这里”。
+ *   .system('行程单完成', '行程单生成完毕', callout('share', '生成完才能分享'))
+ *   callout('btn_pay', '按比例只收 18 天', { side: 'left' })
+ */
+export const callout = (target: string, text: string, opts: { side?: CalloutSide } = {}): EffectDef => ({ kind: 'effect', type: 'callout', target, text, ...(opts.side ? { side: opts.side } : {}) });
+/**
+ * 停留：自动播放时这一步至少停 seconds 秒（0.5–30，按播放速度缩放），给观众时间看画面（图表、对比、一大段结果）。
+ * 不写时按字幕字数自动计算。
+ *   .system('对比两种结果', '左边是旧流程，右边是新流程', hold(5))
+ */
+export const hold = (seconds: number): EffectDef => ({ kind: 'effect', type: 'hold', seconds });
 
 /**
  * 调用链（D48）：这一步沿 Diagram 的连线走了哪条路径。节点与连线的 state 由每一步的 trace 自动推算，不用再手写 set / state 绑定：
