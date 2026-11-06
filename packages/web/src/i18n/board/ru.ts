@@ -85,7 +85,6 @@ export function createBoardRu(locale: Locale = 'ru') {
       hold: "Удерживать ⌥",
       nextCase: (p0: Value) => `Следующий случай: ${value(p0, locale)}`,
       copied: (p0: Value) => `Скопировано: ${value(p0, locale)}`,
-      holdAndClickToInspect: "Удерживайте ⌥ и нажмите для проверки",
       couldNotSave: (p0: Value) => `Не удалось сохранить: ${value(p0, locale)}`,
       thisProjectOnly: "Только этот проект",
       defaultForAllProjects: "По умолчанию для всех",

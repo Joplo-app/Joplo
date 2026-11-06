@@ -21,6 +21,8 @@ import { StageViewport } from '../player/StageViewport';
 import { Overlay } from '../player/Overlay';
 import { Subtitle } from '../player/Subtitle';
 import { subtitleFor } from '../player/subtitle-content';
+import { coverFor, coverShown } from '../player/cover-content';
+import { Curtain, curtainUp } from '../player/Curtain';
 import { cameraFor, cameraPosition, withLeadFrame } from '../player/cameraFor';
 import { Btn, MenuButton, useWidth } from '../player/controls';
 import { JoploMark } from '../player/JoploMark';
@@ -83,7 +85,10 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
   const device = shownScene?.viewport === 'mobile' ? 'mobile' : 'desktop';
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, true), [ctl, plan.sceneId]);
   const look = resolveLook({ theme: project.theme, font: null, stroke: null }, project.themes ?? {}, i18n);
-  const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n);
+  const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n, project);
+  // 场景封面（D61）：嵌入自己的封面（covered）显示时不叠第二层；之后回到第 0 步时与发布站一样是场景封面
+  const cover = !covered && coverShown(scenario, pos, snap.playing, snap.activeStep) ? coverFor(project, scenario?.id, i18n) : null;
+  const curtainOn = !!scenario && curtainUp(project, scenario.id, pos, cover);
   // 控制条的步骤与字幕右侧一致：播放中是正在播的那一步，否则是当前位置
   const shown = subtitle?.index ?? pos;
   const items = embedScenarioItems(project, snap.scenarioId);
@@ -157,7 +162,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
         {scenario && state && shownScene ? (
           // 封面显示时画面只是背景：inert，Tab 不会落到被遮住的原型元素上
           <div className="flex min-h-0 flex-1 flex-col" inert={covered || undefined} data-testid="embed-stage">
-          <StageViewport viewport={device} theme={project.theme} stroke={look.stroke} font={look.font} notice={covered ? null : snap.notice} onDismiss={() => ctl.dismissNotice()} onBack={() => ctl.backToDemo()}>
+          <StageViewport viewport={device} theme={project.theme} stroke={look.stroke} font={look.font} notice={covered ? null : snap.notice} onDismiss={() => ctl.dismissNotice()} onBack={() => ctl.backToDemo()} curtainUp={curtainOn} curtain={(size) => <Curtain project={project} scenarioId={scenario.id} position={pos} cover={cover} onStart={() => void ctl.play({ fromStart: true })} theme={project.theme} font={look.font} width={size.width} height={size.height} animate={!ctl.reducedMotion} />}>
             {(size) => (
               <Stage
                 viewportOverride={device === 'mobile' ? null : size}

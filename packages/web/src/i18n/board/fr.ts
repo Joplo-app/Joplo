@@ -85,7 +85,6 @@ export function createBoardFr(locale: Locale = 'fr') {
       hold: "Maintenir ⌥",
       nextCase: (p0: Value) => `Cas suivant : ${value(p0, locale)}`,
       copied: (p0: Value) => `Copié : ${value(p0, locale)}`,
-      holdAndClickToInspect: "Maintenir ⌥ et cliquer pour inspecter",
       couldNotSave: (p0: Value) => `Impossible d’enregistrer : ${value(p0, locale)}`,
       thisProjectOnly: "Ce projet uniquement",
       defaultForAllProjects: "Valeur par défaut globale",

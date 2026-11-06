@@ -85,7 +85,6 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       hold: "按住 ⌥",
       nextCase: (p0: Value) => `下一個情況：${value(p0, locale)}`,
       copied: (p0: Value) => `已複製：${value(p0, locale)}`,
-      holdAndClickToInspect: "按住 ⌥ 並點選以檢查",
       couldNotSave: (p0: Value) => `無法儲存：${value(p0, locale)}`,
       thisProjectOnly: "僅此專案",
       defaultForAllProjects: "所有專案的預設值",

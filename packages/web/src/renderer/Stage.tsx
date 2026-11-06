@@ -9,7 +9,7 @@ import { keyboardAt } from './story-data';
 import { CameraLayer, contentBounds, useCamera, type CameraSpec } from './camera';
 import { clampPan, wheelFactor, zoomAt, type View } from './camera-math';
 import { AnimatePresence, motion } from 'motion/react';
-import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, diagramStateAt, roleOf, roleOfScene, streamsOf, type CardAction, type PlayState, type Project, type RoleInfo, type Toast } from '@joplo-app/core';
+import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, diagramStateAt, streamsOf, type PlayState, type Project, type Toast } from '@joplo-app/core';
 import { RenderContext, RenderNode, type RenderMode, type StreamingCtx } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from './appearance';
@@ -108,11 +108,11 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   const stroke = look.stroke;
   // 调用链（D48）：Diagram 节点与连线的 state 由每一步的 trace 推算（没写 state 时使用）
   const traced = useMemo(() => diagramStateAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
-  // 过渡卡、角色名牌、流式输出（D56）：都只由 IR 与当前位置推导，截图、视频、发布站一致
+  // 流式输出（D56）：只由 IR 与当前位置推导，截图、视频、发布站一致。
+  // 过渡卡与场景封面（D61）不在舞台里画：由调用方用幕布（Curtain）盖在整个舞台区域上，不进设备外框；
+  // 舞台只在停在过渡卡上时收起按键记录。角色名牌已删除（会遮挡内容），说话人改在字幕里。
   const scenario = project.scenarios[state.scenarioId];
   const card = cardAt(project, state.scenarioId, state.position);
-  const cardRole = card?.role ? roleOf(project, scenario?.optionId, card.role) : null;
-  const sceneRole = roleOfScene(project, shownId);
   const streamPaths = stream && stream.position === state.position && scenario ? streamsOf(scenario.steps[state.position - 1]).map((x) => x.path).join('|') : '';
   const streaming = useMemo<StreamingCtx | null>(
     () => (streamPaths && stream ? { paths: new Set(streamPaths.split('|')), key: `${state.scenarioId}#${state.position}`, paused: stream.paused, speed: stream.speed } : null),
@@ -293,88 +293,12 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
           {camera ? <CameraLayer view={cam.view} animate={animate} pulseKey={camera.key} /> : null}
         </div>
         <ToastLayer key={epoch} toasts={state.toasts} nextTargetId={nextTargetId} animate={animate} rootRef={rootRef} />
-        {sceneRole && !card ? <RoleTag role={sceneRole} /> : null}
         {keyboard && !card ? <div className="pointer-events-none absolute left-1/2 z-30 flex max-w-[70%] -translate-x-1/2 items-center gap-1.5 rounded border border-[var(--jp-line)] bg-[var(--jp-surface)] px-3 py-1.5 text-[14px] text-[var(--jp-ink)]" style={{ bottom: Math.max(60, state.toasts.length ? state.toasts.length * 64 + 40 : 0) }} data-jlayer="keyboard">
           {keyboard.kind === 'type' ? <><span className="shrink-0 text-[var(--jp-muted)]">{i18n.stage.keyboardType}</span><span className="truncate">{keyboard.text || '…'}</span></> : keyboard.keys.map((key, i) => <kbd key={i} className="rounded border border-[var(--jp-line-strong)] bg-[var(--jp-subtle)] px-1.5 py-0.5 font-[var(--jp-font-mono)]">{key}</kbd>)}
         </div> : null}
         {overlay ? <div className="pointer-events-none absolute inset-0 z-40" data-jlayer="overlay">{overlay}</div> : null}
-        <AnimatePresence>
-          {card ? (
-            <motion.div
-              key={`${state.scenarioId}#${state.position}`}
-              className="absolute inset-0 z-50"
-              initial={animate ? { opacity: 0 } : false}
-              animate={{ opacity: 1 }}
-              exit={animate ? { opacity: 0 } : undefined}
-              transition={{ duration: 0.45 }}
-              data-jlayer="card"
-            >
-              <TransitionCard card={card} role={cardRole} width={vp.width} />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
       </div>
     </ThemeContext.Provider>
-  );
-}
-
-const initial = (name: string) => [...name.trim()][0] ?? '?';
-
-function Avatar({ role, size }: { role: RoleInfo; size: number }) {
-  return (
-    <span aria-hidden className="inline-flex shrink-0 items-center justify-center rounded-full font-bold text-white" style={{ width: size, height: size, background: role.color, fontSize: Math.round(size * 0.46) }}>
-      {initial(role.name)}
-    </span>
-  );
-}
-
-/** 角色名牌（D56）：这一层是谁的画面，放在舞台左下角，不随镜头缩放。 */
-function RoleTag({ role }: { role: RoleInfo }) {
-  return (
-    <div className="pointer-events-none absolute bottom-4 left-4 z-30 flex max-w-[60%] items-center gap-2 rounded-full border border-[var(--jp-line)] bg-[var(--jp-surface)] py-1 pl-1 pr-3 text-[13px] text-[var(--jp-ink)]" style={{ boxShadow: `0 0 0 2px color-mix(in srgb, ${role.color} 35%, transparent)` }} data-jlayer="role" data-role={role.id}>
-      <Avatar role={role} size={24} />
-      <span className="shrink-0 font-semibold">{role.name}</span>
-      {role.desc ? <span className="truncate text-[var(--jp-muted)]">{role.desc}</span> : null}
-    </div>
-  );
-}
-
-/**
- * 过渡卡（D56）：整屏一句大字，用于开场、收尾、时间跳跃和换人。字号随舞台宽度（电脑 1280 → 56px，手机 390 → 30px）。
- * 换人时上方是这个人的头像、名字和说明；收尾的要点逐条列在下方。
- */
-function TransitionCard({ card, role, width }: { card: CardAction; role: RoleInfo | null; width: number }) {
-  const { t: i18n } = useI18n();
-  const title = Math.round(Math.max(30, Math.min(56, width / 23)));
-  return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-[var(--jp-bg)] px-[8%] text-center text-[var(--jp-ink)]" data-testid="transition-card" data-role={role?.id}>
-      {role ? (
-        <div className="flex flex-col items-center gap-2">
-          <Avatar role={role} size={Math.round(title * 1.5)} />
-          <span className="text-[15px] text-[var(--jp-muted)]">{role.desc ? `${role.name} · ${role.desc}` : role.name}</span>
-        </div>
-      ) : null}
-      <div className="font-bold" style={{ fontSize: title, lineHeight: 1.25 }}>
-        {card.title}
-      </div>
-      {card.sub ? (
-        <div className="max-w-[760px] text-[var(--jp-muted)]" style={{ fontSize: Math.round(title * 0.38), lineHeight: 1.5 }}>
-          {card.sub}
-        </div>
-      ) : null}
-      {card.points?.length ? (
-        <ul className="mt-2 flex max-w-[680px] flex-col gap-2.5 text-left" style={{ fontSize: Math.round(title * 0.36) }}>
-          {card.points.map((pt, i) => (
-            <li key={i} className="flex items-start gap-3">
-              <span aria-hidden className="mt-[0.15em] inline-flex size-[1.3em] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[var(--jp-ink)] text-[0.75em] font-bold">
-                {i18n.player.number(i + 1)}
-              </span>
-              <span style={{ lineHeight: 1.5 }}>{pt}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
   );
 }
 

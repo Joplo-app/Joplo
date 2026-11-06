@@ -141,6 +141,10 @@ export function createEn(locale: Locale = 'en') {
       scenarioComplete: (p0: Value) => `Scenario complete · ${value(p0, locale)}`,
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)} (this is a demo result for ${value(p1, locale)}, not a response from a live service)`,
       stepProgress: (p0: Value, p1: Value) => `Step ${value(p0, locale)} / ${value(p1, locale)}`,
+      coverStart: "Start",
+      coverStartTitle: "Play from the beginning",
+      coverSteps: (n: number) => plural(n, { one: 'About # step', other: 'About # steps' }, locale),
+      coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `About ${number(d.value, locale)} sec` : plural(d.value, { one: 'About # min', other: 'About # min' }, locale),
       // runtime/demo.ts: Joplo interface text; author content is never translated.
       replayFailedAtStep: (p0: Value, p1: Value) => `Replay failed at step ${value(p0, locale)}: ${value(p1, locale)}`,
       couldNotStartScenario: (p0: Value) => `Could not start scenario: ${value(p0, locale)}`,

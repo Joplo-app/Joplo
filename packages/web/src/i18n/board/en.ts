@@ -89,7 +89,6 @@ export function createBoardEn(locale: Locale = 'en') {
       hold: "Hold ⌥",
       nextCase: (p0: Value) => `Next case: ${value(p0, locale)}`,
       copied: (p0: Value) => `Copied: ${value(p0, locale)}`,
-      holdAndClickToInspect: "Hold ⌥ and click to inspect",
       // board/Appearance.tsx: Joplo interface text; author content is never translated.
       couldNotSave: (p0: Value) => `Could not save: ${value(p0, locale)}`,
       thisProjectOnly: "This project only",

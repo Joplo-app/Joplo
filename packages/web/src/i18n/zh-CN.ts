@@ -143,6 +143,10 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       scenarioComplete: (p0: Value) => `场景完成 · ${value(p0, locale)}`,
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)}（这是${value(p1, locale)}的演示结果，不代表真实服务的返回）`,
       stepProgress: (p0: Value, p1: Value) => `第 ${value(p0, locale)} / ${value(p1, locale)} 步`,
+      coverStart: "开始",
+      coverStartTitle: "从头开始播放",
+      coverSteps: (n: number) => `约 ${number(n, locale)} 步`,
+      coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `约 ${number(d.value, locale)} 秒` : `约 ${number(d.value, locale)} 分钟`,
       // runtime/demo.ts: Joplo interface text; author content is never translated.
       replayFailedAtStep: (p0: Value, p1: Value) => `回放在第 ${value(p0, locale)} 步失败：${value(p1, locale)}`,
       couldNotStartScenario: (p0: Value) => `场景无法开始：${value(p0, locale)}`,

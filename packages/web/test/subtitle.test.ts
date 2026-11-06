@@ -22,8 +22,8 @@ const sc = {
 } as unknown as Scenario;
 
 describe('subtitleFor（字幕区显示的内容）', () => {
-  it('第 0 步：初始状态 + 场景描述；之后是刚执行完的一步；播放中是正在播放的一步', () => {
-    expect(subtitleFor(sc, 0, null, undefined, zh)).toMatchObject({ index: 0, kind: 'initial', caption: '初始状态', explain: '演示一次完整的调用' });
+  it('第 0 步是场景封面（D61：字幕只留进度，场景描述在封面上）；之后是刚执行完的一步；播放中是正在播放的一步', () => {
+    expect(subtitleFor(sc, 0, null, undefined, zh)).toMatchObject({ index: 0, kind: 'cover', caption: '', explain: null });
     expect(subtitleFor(sc, 1, null, undefined, zh)).toMatchObject({ index: 1, kind: 'user', caption: '点击发送', explain: null });
     expect(subtitleFor(sc, 1, 1, undefined, zh)).toMatchObject({ index: 2, kind: 'system', caption: '额度预检', explain: '额度不足时在这里就拦下' });
     expect(subtitleFor(sc, 99, null, undefined, zh)!.index).toBe(2);

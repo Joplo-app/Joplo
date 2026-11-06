@@ -85,7 +85,6 @@ export function createBoardKo(locale: Locale = 'ko') {
       hold: "⌥ 누르기",
       nextCase: (p0: Value) => `다음 케이스: ${value(p0, locale)}`,
       copied: (p0: Value) => `복사됨: ${value(p0, locale)}`,
-      holdAndClickToInspect: "⌥를 누른 채 클릭하여 검사",
       couldNotSave: (p0: Value) => `저장할 수 없음: ${value(p0, locale)}`,
       thisProjectOnly: "이 프로젝트만",
       defaultForAllProjects: "모든 프로젝트 기본값",
