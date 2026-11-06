@@ -48,6 +48,7 @@ export type TimelineChip = {
   system: boolean;
   /** 过渡卡（D56）。 */
   card?: boolean;
+  fork?: boolean;
   label: string;
   /** 悬停提示：“序号 · 说明”，系统步骤“序号 · 系统 · 说明”。 */
   tip: string;
@@ -60,7 +61,7 @@ export type TimelineChip = {
 export type Dwell = { position: number; ms: number; elapsed: number };
 
 /** 时间线格子。shownIndex = 当前位置（0 = 初始）；activeStep = 正在执行的步骤（播放中），优先。 */
-export function timelineChips(steps: readonly { caption: string; kind: 'user' | 'system' | 'card' }[], position: number, activeStep: number | null, dwell: Dwell | null = null, paused = false): TimelineChip[] {
+export function timelineChips(steps: readonly { caption: string; kind: 'user' | 'system' | 'card'; forks?: readonly { label: string }[] }[], position: number, activeStep: number | null, dwell: Dwell | null = null, paused = false): TimelineChip[] {
   const shown = activeStep !== null ? activeStep + 1 : position;
   const chip = (index: number, label: string, system: boolean, tip: string): TimelineChip => ({
     index,
@@ -72,7 +73,7 @@ export function timelineChips(steps: readonly { caption: string; kind: 'user' | 
     playing: activeStep !== null && activeStep === index - 1,
     ...(dwell && activeStep === null && dwell.position === index && index === shown ? { dwell: { ms: dwell.ms, elapsed: dwell.elapsed, paused } } : {}),
   });
-  return [chip(0, '初始', false, '0 · 初始状态'), ...steps.map((s, i) => ({ ...chip(i + 1, s.caption, s.kind === 'system', `${i + 1} · ${s.kind === 'system' ? '系统 · ' : s.kind === 'card' ? '过渡 · ' : ''}${s.caption}`), ...(s.kind === 'card' ? { card: true } : {}) }))];
+  return [chip(0, '初始', false, '0 · 初始状态'), ...steps.map((s, i) => ({ ...chip(i + 1, s.caption, s.kind === 'system', `${i + 1} · ${s.kind === 'system' ? '系统 · ' : s.kind === 'card' ? '过渡 · ' : ''}${s.caption}${s.forks?.length ? ` · 分叉：${s.forks.map(f => f.label).join('、')}` : ''}`), ...(s.forks?.length ? { fork: true } : {}), ...(s.kind === 'card' ? { card: true } : {}) }))];
 }
 
 export type LayerTab = { id: string; title: string; active: boolean; camera: boolean; /** 这一层是谁的画面（D56）。 */ role?: { id: string; name: string; color: string } | null };

@@ -29,12 +29,14 @@ import {
   walkNodes,
   type ComponentType,
   type DiagramStates,
+  type StateChange,
   type PlayState,
   type Scene,
   type SceneNode,
   type ShellLayout,
 } from '@joplo-app/core';
 import { cn } from '@/lib/utils';
+import { changeFor, dataRows, displayData, stateFlowItems } from './story-data';
 import { streamMs } from '../runtime/pace';
 import { Rough, RoughPath, ThemeContext, roundRectPath, useStageTheme, useStroke } from './rough';
 import { fontStyle } from './appearance';
@@ -60,6 +62,8 @@ export type RenderCtx = {
   traced?: DiagramStates;
   /** 流式输出（D56）：正在逐字出现的状态路径（如 ui.reply）；null = 全部直接显示全文。 */
   streaming?: StreamingCtx | null;
+  /** 相邻步骤的业务状态差异（只由 DataCard / StateFlow 消费）。 */
+  changed?: readonly StateChange[];
 };
 
 /** key 变化时重新开始逐字输出；paused 时停住；speed 与自动播放的速度一致。 */
@@ -1574,6 +1578,57 @@ function Thinking({ node, p, children }: NodeProps) {
   );
 }
 
+/** 简单外部邮件：自身不可操作，正文里的按钮仍走普通步骤。 */
+function Email({ node, p, children }: NodeProps) {
+  const root = useRoot(node, p, { className: 'jbox', style: { background: SURFACE, padding: 16, display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 } });
+  const from = str(p.from, '发件人');
+  return <article {...root}>
+    <Rough seedKey={node.id} />
+    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+      <span aria-hidden style={{ width: 34, height: 34, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', background: SUBTLE, color: INK, fontWeight: 600 }}>{[...from.trim()][0] ?? '?'}</span>
+      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600 }}>{from}</div><div style={{ color: DIMMED, fontSize: 12 }}>收件人：{str(p.to, '未指定')}</div></div>
+      {p.time ? <time style={{ color: DIMMED, fontSize: 12 }}>{str(p.time)}</time> : null}
+    </div>
+    <strong style={{ fontSize: 18 }}>{str(p.subject, '无主题')}</strong>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{children}</div>
+  </article>;
+}
+
+function DataCard({ node, p }: NodeProps) {
+  const { changed = [] } = useCtx();
+  const rows = dataRows(p.value, p.fields, node.props?.value, changed);
+  const root = useRoot(node, p, { className: 'jbox', style: { background: SURFACE, padding: 20, minWidth: 0, width: '100%' } });
+  return <section {...root}>
+    <Rough seedKey={node.id} />
+    <div style={{ fontWeight: 600, fontSize: 20, marginBottom: 14 }}>{str(p.title, '数据记录')}</div>
+    {rows.length ? <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>{rows.map((row, i) => <div key={`${row.key}:${i}`} data-changed={row.change ? '' : undefined} style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 12, padding: '10px 12px', background: row.change ? 'color-mix(in srgb, var(--jp-accent) 15%, var(--jp-surface))' : undefined, borderLeft: row.change ? `3px solid ${ACCENT}` : '3px solid transparent' }}>
+      <dt style={{ color: DIMMED, minWidth: 80 }}>{row.label}</dt>
+      <dd style={{ margin: 0, overflowWrap: 'anywhere', flex: 1 }}>{displayData(row.value)}{row.change ? <div style={{ color: INK2, fontSize: 13, marginTop: 4 }}><span>{displayData(row.change.before)}</span> → <span>{displayData(row.change.after)}</span></div> : null}</dd>
+    </div>)}</dl> : <div style={{ color: DIMMED }}>暂无数据</div>}
+  </section>;
+}
+
+function StateFlow({ node, p }: NodeProps) {
+  const { changed = [] } = useCtx();
+  const items = stateFlowItems(p.value, p.states, p.labels);
+  const change = changeFor(node.props?.value, changed);
+  const label = (v: unknown) => items.find(item => item.value === v)?.label ?? displayData(v);
+  const root = useRoot(node, p, { style: { display: 'flex', flexDirection: 'column', gap: 10 } });
+  return <div {...root}>
+    <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+      {items.map((item, i) => <li key={`${item.value}:${i}`} aria-current={item.state === 'current' ? 'step' : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        {i ? <span aria-hidden style={{ color: DIMMED }}>→</span> : null}
+        <span className="jbox" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '8px 14px', color: item.state === 'todo' ? DIMMED : INK, background: item.state === 'current' ? 'color-mix(in srgb, var(--jp-accent) 20%, var(--jp-surface))' : SURFACE, fontWeight: item.state === 'current' ? 600 : 400 }}>
+          <Rough seedKey={`${node.id}:${i}`} stroke={item.state === 'current' ? ACCENT : item.state === 'done' ? OK : LINE} />
+          {item.state === 'done' ? <span aria-label="已完成" style={{ color: OK }}>✓</span> : null}{item.label}
+        </span>
+      </li>)}
+    </ol>
+    {change ? <div data-state-change="" style={{ color: INK2, fontSize: 14 }}>状态变化：{label(change.before)} → {label(change.after)}</div> : null}
+    {!items.length ? <span style={{ color: DIMMED }}>暂无状态</span> : null}
+  </div>;
+}
+
 const ARTIFACT_ICON: Record<string, string> = { doc: '▤', code: '</>', sheet: '▦', web: '◎', image: '▣' };
 const ARTIFACT_KIND: Record<string, string> = { doc: '文档', code: '代码', sheet: '表格', web: '网页', image: '图片' };
 function ArtifactStatus({ status }: { status: string }) {
@@ -2302,6 +2357,9 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   ChatMessage,
   ToolCall,
   Thinking,
+  Email,
+  DataCard,
+  StateFlow,
   Artifact,
   Terminal,
   'Terminal.Command': TerminalCommand,

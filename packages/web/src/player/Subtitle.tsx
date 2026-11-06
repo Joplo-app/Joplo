@@ -4,6 +4,7 @@
  * 演示页、发布站、全屏、renderStep 截图、导出图片与视频共用；视频用固定高度（fixedHeight），画面尺寸不变。
  */
 import { cn } from '@/lib/utils';
+import type { Fork } from '@joplo-app/core';
 import type { StageTheme } from '../renderer/rough';
 import { fontStyle, type AppearanceFont } from '../renderer/appearance';
 import { MOCK_CLS } from './labels';
@@ -11,7 +12,7 @@ import { SUBTITLE_CAPTION_PX, SUBTITLE_EXPLAIN_PX, SUBTITLE_PAD_Y, subtitleHeigh
 
 const clamp = (lines: number) => ({ display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' });
 
-export function Subtitle({ content, theme, width, framed = false, fixedHeight, dark = false, divider = false, font = null }: { content: SubtitleContent | null; theme: StageTheme; /** 字体（D55）：null = 跟随主题。 */ font?: AppearanceFont | null; width?: number | string; framed?: boolean; fixedHeight?: number; dark?: boolean; /** 上沿一条细线（看板的舞台框里，画面和字幕之间）。 */ divider?: boolean }) {
+export function Subtitle({ content, theme, width, framed = false, fixedHeight, dark = false, divider = false, font = null, onFork }: { content: SubtitleContent | null; onFork?: (fork: Fork) => void; theme: StageTheme; /** 字体（D55）：null = 跟随主题。 */ font?: AppearanceFont | null; width?: number | string; framed?: boolean; fixedHeight?: number; dark?: boolean; /** 上沿一条细线（看板的舞台框里，画面和字幕之间）。 */ divider?: boolean }) {
   const badge = content?.badge;
   return (
     <div
@@ -38,6 +39,9 @@ export function Subtitle({ content, theme, width, framed = false, fixedHeight, d
               </div>
             ) : null}
           </div>
+          {content.forks?.length ? <div className="flex max-w-[36%] shrink-0 items-center gap-1.5 overflow-x-auto" aria-label="其他故事路线">
+            {content.forks.map((fork, i) => onFork ? <button type="button" key={i} onClick={() => onFork(fork)} title={`切换场景：${fork.label}`} className="shrink-0 rounded-full border border-[var(--jp-line-strong)] px-2 py-1 text-[12px] hover:bg-[var(--jp-subtle)] focus-visible:outline-2 focus-visible:outline-[var(--jp-accent)]">↳ {fork.label}</button> : <span key={i} className="shrink-0 rounded-full border border-[var(--jp-line-strong)] px-2 py-1 text-[12px]">↳ {fork.label}</span>)}
+          </div> : null}
           {badge ? (
             badge.kind === 'done' ? (
               <span role="status" title={badge.title} data-testid="complete-badge" className={cn('shrink-0 whitespace-nowrap rounded-full border px-2 py-1 text-[12px] leading-none', MOCK_CLS[badge.outcome])}>

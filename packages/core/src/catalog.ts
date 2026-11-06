@@ -24,7 +24,7 @@ const STRUCTURE = [
   // 反馈与浮层
   'Alert', 'Loader', 'Progress', 'RingProgress', 'Skeleton', 'Notification', 'Modal', 'Drawer',
   // AI 交互（Joplo 自有）
-  'ChatMessage', 'ToolCall', 'Thinking', 'Artifact',
+  'ChatMessage', 'ToolCall', 'Thinking', 'Artifact', 'Email', 'DataCard', 'StateFlow',
   // 设备外框（Joplo 自有）：终端与手机
   'Terminal', 'Terminal.Command', 'Terminal.Output', 'Phone',
   // 架构图（Joplo 自有，D41）：节点与连线的 state 绑定 $.ui，由 flow 步骤驱动
@@ -129,6 +129,9 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Drawer: 'opened（门控）, title, position: left|right|top|bottom（默认 left）, size',
   ChatMessage: "from: 'user'|'assistant', name；子节点是消息内容（保留换行）",
   ToolCall: "title, state: 'running'|'done'|'error'；子节点是调用详情",
+  Email: 'from, to, subject, time —— 简单邮件卡片；正文写在子节点，可含 Button',
+  DataCard: 'title, value（对象或状态绑定）, fields?: [{ key, label }]；缺省列出全部键，本步变化行显示旧值 → 新值',
+  StateFlow: 'value（当前状态绑定）, states: string[], labels?: { 状态: 名称 }；顺序在前的为已完成，当前高亮',
   Thinking: 'title（此刻在想什么，可绑定 $.ui.x）, active（思考中：标题闪动）, duration（结束后显示“思考了 …”）, opened（展开过程）；子节点是思考过程',
   Artifact: "title, kind: 'doc'|'code'|'sheet'|'web'|'image', status: 'generating'|'ready'|'error', version —— Agent 的侧边产物面板，子节点是内容",
   Terminal: 'title —— 终端窗口（命令行原型），子节点是 Terminal.Command / Terminal.Output / Terminal.Input；内容超出 h 或 mah 时内部滚动',

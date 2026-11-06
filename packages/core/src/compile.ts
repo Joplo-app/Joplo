@@ -9,7 +9,7 @@
 import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo-app/kit/node';
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@joplo-app/kit';
 import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, INTERACTIVE_TYPES, PAGE_LAYER, matchChoice, nodeLabel } from './catalog.ts';
-import { choicesOf } from './player.ts';
+import { choicesOf, commonPrefix } from './player.ts';
 import { Project, SCHEMA_VERSION, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
 import type { Diagnostic } from './result.ts';
 
@@ -331,6 +331,8 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         const ruleIds: string[] = [];
         const explains: string[] = [];
         const traces: Trace[] = [];
+        const forks: Step['forks'] = [];
+        const marks: Step['marks'] = [];
         /** 每个 trace 效果解析出的节点（作为镜头目标，与 shot 合并）。 */
         const traceTargets = new Map<EffectDef, string[]>();
         for (const e of st.effects as EffectDef[]) {
@@ -345,7 +347,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
           else if (e.type === 'stream') effects.push({ type: 'stream', path: e.path, value: e.value });
           else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
-          else if (e.type === 'shot') continue; // 镜头不是状态变化，下面单独归类
+          else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork') continue; // 镜头不是状态变化，下面单独归类
           else if (e.type === 'explain') {
             if (e.text.trim()) explains.push(e.text.trim());
           } else if (e.type === 'trace') {
@@ -361,6 +363,18 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         const sceneBefore = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i, start)));
         const sceneAfter = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i + 1, start)));
         const actionTarget = 'target' in st.action ? st.action.target : null;
+        for (const e of st.effects) {
+          if (e.type === 'fork') {
+            if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `fork 的目标「${e.scenario}」必须是同一方案的另一个场景键`, st.source);
+            else if (e.label.trim()) forks.push({ label: e.label.trim(), scenarioId: `${qid}.${e.scenario}`, at: 0 });
+          }
+          if (e.type === 'mark') {
+            const exists = hasLayers ? layersWith(e.target).length > 0 : !!sceneAfter && !!findIn(sceneAfter.root, e.target);
+            if (!exists) err('MARK_UNKNOWN', `mark("${e.target}") 的目标不在${hasLayers ? '任何层级' : '这一步的画面'}里`, st.source);
+            else marks.push({ target: e.target, kind: e.kindOf, ...(e.note ? { note: e.note } : {}) });
+          }
+        }
+
         // 镜头：每个 id 在包含它的层级里解析；第一个 shot 的第一个元素所在层级就是这一步的导演层。
         // 没有声明 layers 的方案：在路径页面里聚焦（伪层级 @page）。
         const perLayer = new Map<string, string[]>();
@@ -409,6 +423,8 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           directorLayer,
           ...(explains.length ? { explain: explains.join('\n') } : {}),
           traces,
+          forks,
+          marks,
           ...(st.source ? { source: rel(st.source) } : {}),
         };
       });
@@ -427,6 +443,15 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         ...(fl.source ? { source: rel(fl.source) } : {}),
       };
       out.scenarios[sid] = sc;
+    }
+
+    // 所有场景完成后再解析分叉（允许向后声明的场景），不把创作信息参与前缀比较。
+    for (const sc of Object.values(out.scenarios) as Scenario[]) {
+      if (sc.optionId !== qid) continue;
+      for (const st of sc.steps) for (const f of st.forks) {
+        const target = out.scenarios[f.scenarioId] as Scenario | undefined;
+        if (target) f.at = commonPrefix(sc.steps, target.steps);
+      }
     }
 
     const coverage: Record<string, Coverage> = {};
@@ -688,6 +713,8 @@ function autoCaption(st: StepDef, scene: Scene | undefined): string {
     }
     case 'toggle':
       return node?.type === 'Checkbox' ? `${a.value ? '勾选' : '取消勾选'}「${label}」` : `${a.value ? '打开' : '关闭'}「${label}」`;
+    case 'press':
+      return a.keys.trim() ? `按下 ${a.keys}` : '按下按键';
     case 'back':
       return '返回上一页';
     case 'event':

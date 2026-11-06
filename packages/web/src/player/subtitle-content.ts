@@ -7,7 +7,7 @@
  *   第二行没有 explain 时显示结果说明。步骤条不再有重复的说明与结果行。
  * - 高度按内容自适应（T-stage）：没有 explain 时只占一行，留出的空间还给舞台。
  */
-import type { PlayState, Scenario } from '@joplo-app/core';
+import { forksOf, type PlayState, type Scenario } from '@joplo-app/core';
 
 export const SUBTITLE_CAPTION_PX = 20;
 export const SUBTITLE_EXPLAIN_PX = 16;
@@ -32,6 +32,7 @@ export type SubtitleContent = {
   /** 悬停显示的全文。 */
   title: string;
   badge: SubtitleBadge;
+  forks: Scenario['steps'][number]['forks'];
 };
 
 export function subtitleFor(scenario: Scenario | null | undefined, position: number, activeStep: number | null, completed: PlayState['completed'] = null): SubtitleContent | null {
@@ -46,7 +47,7 @@ export function subtitleFor(scenario: Scenario | null | undefined, position: num
   const badge: SubtitleBadge = done
     ? { kind: 'done', text: `场景完成 · ${scenario.mock.label}`, outcome: scenario.mock.outcome, title: `${done.text}（这是${scenario.mock.label}的演示结果，不代表真实服务的返回）` }
     : { kind: 'progress', text: `第 ${index} / ${total} 步` };
-  return { index, kind: step ? step.kind : 'initial', caption, explain, captionLines: 1, explainLines: explain ? 1 : 0, title: explain ? `${caption}\n${explain}` : caption, badge };
+  return { forks: forksOf(step), index, kind: step ? step.kind : 'initial', caption, explain, captionLines: 1, explainLines: explain ? 1 : 0, title: explain ? `${caption}\n${explain}` : caption, badge };
 }
 
 /** 字幕区的高度：没有 explain 时一行，有时两行；没有内容时与一行相同（版面不跳）。 */

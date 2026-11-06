@@ -104,6 +104,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 ## flow：行为只写在步骤里
 - .click(id, ...args)；.type(id, value, ...args)；.select(id, value, ...args)。
 - .toggle(id, boolean, ...args)；.back(...args)；.system('模拟事件', ...args)。
+- .press('⌘K', ...args) / .press('Enter')：无目标的用户键盘步骤，字幕默认「按下 ⌘K」，效果与普通步骤相同。
 - args 的字符串是字幕，可省略；其余参数是效果。所有方法可链式调用。
 - set($.ui.ready, true)：替换状态；push($.data.rows, row)：追加数组项。
 - toast('提示') / toast.success/error/info('提示')：当前步骤提示。
@@ -190,10 +191,22 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - Agent 界面：<Thinking title={$.ui.thought} active={$.ui.thinking} duration="6 秒">过程</Thinking> 表示思考；
   <Artifact title="行程.md" kind="doc" status={$.ui.planStatus}>内容</Artifact> 是侧边产物，对话里用 <Artifact.Ref id="…"/> 指向它。
 
+## 分叉、标注、邮件、数据与按键（D56 P1）
+- fork(label, 场景键)：本步字幕右侧可切到同方案的另一场景，跳过动作与业务效果相同的公共前缀；自动播放仍走主线。
+  例：.click('can_go', fork('如果阿杰去不了', 'cant_go'))；空标签省略，目标仍会校验。
+- mark(id, { kind?, note? })：circle（默认）/ underline / box / arrow，只在本步画手绘标注；隐藏、其他层或画面外目标不画。
+  例：.system('行程完成', mark('share', { kind: 'arrow', note: '生成完才能分享' }))。
+- Email：简单外部邮件卡片；自身不可操作，正文里的按钮照常走步骤。
+  例：<Email from="营地助手" to="阿杰" subject="行程有更新" time="周五 20:05">正文</Email>。
+- DataCard / StateFlow：放在单独 layer，用 shot 切过去；只这两个组件展示本步变化与前后值。StateFlow 按 states 的顺序标记已完成。
+  例：layer('行程数据', <Stack><StateFlow value={$.data.trip.status} states={['draft','shared']} labels={{ draft: '草稿', shared: '已分享' }}/><DataCard title="行程" value={$.data.trip} fields={[{ key: 'status', label: '状态' }]}/></Stack>)。
+- 按键记录：type 播放时复用逐字预览，press 显示键帽；静态只显示刚执行的输入/按键，其他步骤清空；空按键不显示。
+  例：.type('prompt', '周末想去露营').press('Enter', set($.ui.asked, true))；组合键 '⌘K' 自动拆为两个键帽。
+
 ## 写主题
 - 主题就是一个 CSS 文件：项目根目录 themes/<name>.css，在 joplo.config.ts 写 theme: '<name>' 作为默认主题；与内置主题同名时用你的。
 - 内置主题：sketch（手绘，默认）、clean、blueprint、nord、dracula、solarized-light、terminal、kraft、contrast；看板「设置 · 主题」里可以切换预览。
-- 只写变量即可，自动限定在舞台里，不影响看板：--jp-font、--jp-font-mono、--jp-font-size、--jp-ink、--jp-bg、--jp-surface、--jp-subtle、--jp-muted、--jp-faint、--jp-line、--jp-line-strong、--jp-border、--jp-accent（高光）、--jp-select、--jp-info（Diagram active）、--jp-ok、--jp-warn、--jp-danger、--jp-radius、--jp-shadow、--jp-stroke（rough 手绘描边 / clean 细线）。
+- 只写变量即可，自动限定在舞台里，不影响看板：--jp-font、--jp-font-mono、--jp-font-size、--jp-ink、--jp-bg、--jp-surface、--jp-subtle、--jp-muted、--jp-faint、--jp-line、--jp-line-strong、--jp-border、--jp-accent（高光）、--jp-select、--jp-info（Diagram active）、--jp-ok、--jp-warn、--jp-danger、--jp-annot（标注，缺省回落到 danger）、--jp-radius、--jp-shadow、--jp-stroke（rough 手绘描边 / clean 细线）。
 - 也可以写普通选择器细调（.jbox、h1 等，同样只作用于舞台）。深色主题注意 --jp-info / --jp-ok / --jp-danger / --jp-accent 与底色的对比度。
 - 示例 themes/brand.css：
     :root {
@@ -315,6 +328,8 @@ flow 和 rule 的具体写法读 authoring；怎样定位覆盖诊断读 check�
 - CAPTION_TOO_LONG：本步说明过长；缩到约 24 字以内，一步一件事，长内容放说明层，见 demo。
 - EXPLAIN_TOO_LONG：explain 过长；缩到约 48 字以内，详细理由放独立说明层，见 demo。
 - ROLE_UNKNOWN：layer 或 card 的 role 不在 feature.roles 里；roles 要写成 { 键: role('名字') }，见 demo。
+- FORK_UNKNOWN：fork 的目标必须是同一方案里的另一个场景键，不能引用自己。
+- MARK_UNKNOWN：mark 的目标不在本步路径画面或任何层级里，核对元素 id；当前隐藏不算引用错误。
 - SHOT_UNKNOWN：镜头目标不在本步画面或任何层级里；核对目标 id 和所属层，见 demo。
 - LAYER_UNKNOWN：层级键不合法或 layer 缺少内容；键用字母/数字/下划线/连字符且不以 @ 开头，并提供非空 JSX。
 - TRACE_UNKNOWN：调用链为空、id 不存在、跨 Diagram 或路径不连通；使用同一张 Diagram 中已连接的节点/连线 id。

@@ -307,7 +307,7 @@ function checkStepInner(project: Project, scenario: Scenario, state: PlayState, 
   const ref = { kind: 'step', id: step.id, optionId: scenario.optionId, scenarioId: scenario.id, stepId: step.id };
   if (state.completed) return { severity: 'error', code: 'ALREADY_COMPLETED', message: `场景已结束，不能继续执行步骤 ${step.id}`, source: 'replay', ref };
   const a = step.action;
-  if (a.type === 'event' || a.type === 'card') return null;
+  if (a.type === 'event' || a.type === 'card' || a.type === 'press') return null;
   if (a.type === 'back') {
     return state.sceneStack.length === 0
       ? { severity: 'error', code: 'NOTHING_TO_GO_BACK', message: `步骤 ${step.id} 要返回，但没有上一个画面`, source: 'replay', ref }
@@ -621,4 +621,61 @@ export function roleOfScene(project: Project, sceneId: string | null | undefined
 /** 第 index 步（0 起）流式输出的状态路径与文字。 */
 export function streamsOf(step: Step | undefined): { path: string; value: string }[] {
   return (step?.effects ?? []).flatMap((e) => (e.type === 'stream' ? [{ path: e.path, value: e.value }] : []));
+}
+
+
+// ---------- 分叉、标注与变化（D56 P1） ----------
+
+/** 动作和业务效果完全相同的公共前缀步数；字幕、镜头、分叉等展示信息不参与。 */
+export function commonPrefix(a: readonly Pick<Step, 'action' | 'effects'>[], b: readonly Pick<Step, 'action' | 'effects'>[]): number {
+  let n = 0;
+  while (n < Math.min(a.length, b.length) && sameValue(a[n]!.action, b[n]!.action) && sameValue(a[n]!.effects, b[n]!.effects)) n++;
+  return n;
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => sameValue(v, b[i]));
+  const ak = Object.keys(a), bk = Object.keys(b);
+  return ak.length === bk.length && ak.every(k => Object.hasOwn(b, k) && sameValue((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}
+
+export function forksAt(project: Project, scenarioId: string | null | undefined, position: number): Step['forks'] {
+  return forksOf(scenarioId ? project.scenarios[scenarioId]?.steps[position - 1] : undefined);
+}
+
+/** 与 Toast 一样只显示最近一步，目标是否可见由当前显示画面决定。 */
+export function marksAt(project: Project, scenarioId: string | null | undefined, position: number): Step['marks'] {
+  return (scenarioId ? project.scenarios[scenarioId]?.steps[position - 1]?.marks : undefined) ?? [];
+}
+
+export type StateChange = { path: string; before: unknown; after: unknown };
+/** 对比 core 回放产生的相邻状态：对象按叶子展开，数组作为一个值；不包含动画、Toast 等展示状态。 */
+export function changedAt(project: Project, scenarioId: string | null | undefined, position: number): StateChange[] {
+  const sc = scenarioId ? project.scenarios[scenarioId] : undefined;
+  if (!sc || !Number.isInteger(position) || position <= 0 || position > sc.steps.length) return [];
+  const before = stateAt(project, sc.id, position - 1);
+  const after = applyStep(project, sc, before);
+  const out: StateChange[] = [];
+  const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+  const diff = (path: string, a: unknown, b: unknown) => {
+    if (sameValue(a, b)) return;
+    if ((object(a) || a === undefined) && (object(b) || b === undefined) && (object(a) || object(b))) {
+      const keys = [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])].sort();
+      if (keys.length) { for (const k of keys) diff(`${path}.${k}`, a?.[k], b?.[k]); return; }
+    }
+    out.push({ path, before: structuredClone(a), after: structuredClone(b) });
+  };
+  for (const root of ['ui', 'data', 'inputs'] as const) diff(root, before[root], after[root]);
+  return out;
+}
+
+/** 已定位的一步的路线；字幕也用这一个投影入口。 */
+export function forksOf(step: Step | undefined): Step['forks'] { return step?.forks ?? []; }
+
+/** 按键记录的 IR 入口：静态取最近一步，动画预览与键帽分词由 web 负责。 */
+export function keyboardActionOf(step: Step | undefined): Extract<Step['action'], { type: 'type' | 'press' }> | null {
+  const a = step?.action;
+  return a?.type === 'type' || a?.type === 'press' ? a : null;
 }

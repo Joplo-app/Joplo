@@ -439,3 +439,11 @@
 @media (prefers-reduced-motion: reduce) {
   .jstage .jshimmer, .jstage .jcaret { animation: none; }
 }
+
+@keyframes jmark-draw {
+  from { stroke-dasharray: 1; stroke-dashoffset: 1; }
+  to { stroke-dasharray: 1; stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jstage [data-jlayer="marks"] path { animation: none !important; }
+}

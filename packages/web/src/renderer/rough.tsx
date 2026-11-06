@@ -148,9 +148,10 @@ export function Rough({ seedKey, shape = 'rect', stroke = 'var(--jp-ink)', strok
  * 在一个已有的 <svg> 里按绝对坐标画手绘路径（架构图连线、箭头）。只在手绘描边（--jp-stroke: rough）时渲染；
  * 绘制期间登记到 RoughRegistry，渲染路由据此等绘制完成再截图。
  */
-export function RoughPath({ seedKey, d, stroke = 'var(--jp-ink)', strokeWidth = 1.4, fill, dashed, roughness = 0.9 }: { seedKey: string; d: string; stroke?: string; strokeWidth?: number; fill?: string; dashed?: boolean; roughness?: number }) {
+export function RoughPath({ seedKey, d, stroke = 'var(--jp-ink)', strokeWidth = 1.4, fill, dashed, roughness = 0.9, draw = false }: { draw?: boolean; seedKey: string; d: string; stroke?: string; strokeWidth?: number; fill?: string; dashed?: boolean; roughness?: number }) {
   const { stroke: mode = 'rough', registry } = useContext(ThemeContext);
   const ref = useRef<SVGGElement>(null);
+  const drawn = useRef('');
   useLayoutEffect(() => {
     if (mode !== 'rough') return;
     const g = ref.current;
@@ -171,10 +172,14 @@ export function RoughPath({ seedKey, d, stroke = 'var(--jp-ink)', strokeWidth = 
     };
     const el = rough.svg(svg).path(d, opts);
     themeColors(el);
+    if (draw && drawn.current !== seedKey) {
+      for (const p of el.querySelectorAll('path')) { p.setAttribute('pathLength', '1'); p.style.animation = 'jmark-draw 0.6s ease-out both'; }
+      drawn.current = seedKey;
+    }
     g.appendChild(el);
     registry?.done(token);
     return () => registry?.remove(token);
-  }, [mode, registry, seedKey, d, stroke, strokeWidth, fill, dashed, roughness]);
+  }, [mode, registry, seedKey, d, stroke, strokeWidth, fill, dashed, roughness, draw]);
   if (mode !== 'rough') return null;
   return <g ref={ref} className="jrough-path" aria-hidden="true" />;
 }

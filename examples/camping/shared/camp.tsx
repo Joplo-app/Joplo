@@ -4,10 +4,13 @@
  */
 import { $, and, eq, layer, neq, not, notEmpty, type Bind } from '@joplo-app/kit';
 import {
-  Alert, AppShell, Artifact, Avatar, Badge, Box, Button, Card, ChatMessage, Grid, Group, Notification, Placeholder, PromptInput, ScrollArea, Stack, Text, Thinking, Title,
+  Alert, AppShell, Artifact, Avatar, Badge, Box, Button, Card, ChatMessage, Grid, Group, Notification, Email, DataCard, StateFlow, Placeholder, PromptInput, ScrollArea, Stack, Text, Thinking, Title,
 } from '@joplo-app/kit/ui';
 
 const ui = $.ui as unknown as Record<string, Bind>;
+
+export const initialTrip = () => ({ status: 'draft', date: '周六至周日', camp: '待选营地', budget: 500, reply: '等待阿杰回复' });
+export const sharedTrip = () => ({ status: 'shared', date: '周六至周日', camp: '白河营地', budget: 460, reply: '等待阿杰回复' });
 
 export const ASK = '这周六想和阿杰去露营，两个人，预算 500 以内，帮我安排一下';
 
@@ -115,7 +118,7 @@ const xiaoyuApp = () => (
             </ScrollArea>
             <Group gap="sm" wrap="nowrap">
               <PromptInput id="prompt" placeholder="说说你想怎么玩…" />
-              <Button id="send">发送</Button>
+              <Button id="send" unmodeled>发送</Button>
             </Group>
           </Stack>
         </Grid.Col>
@@ -148,16 +151,20 @@ const ajiePhone = () => (
       <Text size="sm" c="dimmed">周五 20:05</Text>
     </Group>
     <Text id="no_msg" c="dimmed" ta="center" mt="xl" when={not(ui.shared)}>还没有新消息</Text>
-    <Notification id="notif" title="小雨 · 来自营地助手" withCloseButton={false} when={and(ui.shared, not(ui.ajieOpened))}>
+    <Notification id="notif" title="小雨 · 来自营地助手" withCloseButton={false} when={and(ui.shared, not(ui.ajieOpened), eq(ui.planVersion, 'v1'))}>
       {ui.notifText}
       <Group mt="xs">
         <Button id="open_trip" size="xs" variant="light">查看行程</Button>
       </Group>
     </Notification>
+    <Email id="update_email" from="营地助手" to="阿杰" subject="行程有更新" time="周五 20:05" when={and(ui.shared, not(ui.ajieOpened), eq(ui.planVersion, 'v2'))}>
+      <Text>{ui.notifText}</Text>
+      <Button id="email_open" size="xs" variant="light">查看更新后的行程</Button>
+    </Email>
     <Stack id="trip" gap="sm" when={ui.ajieOpened}>
       <Group justify="space-between">
         <Title order={3}>{ui.planTitle}</Title>
-        <Badge>{ui.planVersion}</Badge>
+        <Badge id="trip_version">{ui.planVersion}</Badge>
       </Group>
       <Text size="sm" c="dimmed">小雨邀请你一起去 · 不用装 App 也能回复</Text>
       <Card withBorder>
@@ -177,8 +184,13 @@ const ajiePhone = () => (
   </Stack>
 );
 
-/** 两个层级：每层是一个人的画面（D56：一次只看一个人，换人用过渡卡）。 */
+/** 角色层级与行程数据层：每层独立展示（D56：一次只看一个人，换人用过渡卡）。 */
 export const layers = () => ({
   xiaoyu: layer('小雨的电脑', xiaoyuApp(), { role: 'xiaoyu' }),
   ajie: layer('阿杰的手机', ajiePhone(), { role: 'ajie', viewport: 'mobile' }),
+  data: layer('行程数据', <Stack p="xl" gap="lg" maw={860} mx="auto">
+    <Title order={2}>行程数据</Title>
+    <StateFlow id="trip_states" value={$.data.trip.status} states={['draft', 'shared', 'confirmed', 'rescheduled']} labels={{ draft: '草稿', shared: '已分享', confirmed: '已确认', rescheduled: '已改期' }} />
+    <DataCard id="trip_data" title="周末露营" value={$.data.trip} fields={[{ key: 'date', label: '日期' }, { key: 'camp', label: '营地' }, { key: 'budget', label: '预算（元）' }, { key: 'reply', label: '阿杰的回复' }]} />
+  </Stack>),
 });

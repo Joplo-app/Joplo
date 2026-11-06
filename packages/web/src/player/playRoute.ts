@@ -7,7 +7,7 @@
  *   两个方向都只在不一致时动作，所以不会来回触发。
  */
 import { useEffect, useMemo } from 'react';
-import type { Coverage, Project } from '@joplo-app/core';
+import type { Coverage, Project, Scenario } from '@joplo-app/core';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import type { PlayRoute } from '../runtime/route';
 import { optionsOf, scenariosOf } from '../runtime/views';
@@ -54,6 +54,13 @@ export function optionSceneId(project: Project, optionId: string | null): string
   return Object.values(project.scenes).find((s) => s.optionId === optionId)?.id ?? null;
 }
 
+/** 场景变化时同步情况键；否则旧情况会在 resolvePlay 中把分叉目标重新解析回原场景。 */
+export function playForScenario(play: PlayRoute, scenario: Scenario, step: number): PlayRoute {
+  const { caseId: previousCase, ...rest } = play;
+  const caseId = previousCase && scenario.caseIds.includes(previousCase) ? previousCase : scenario.caseIds[0];
+  return { ...rest, optionId: scenario.optionId, scenarioId: scenario.id, step, ...(caseId ? { caseId } : {}) };
+}
+
 export function usePlaySync(ctl: DemoController, snap: Snapshot, project: Project | null, play: PlayRoute, write: (next: PlayRoute) => void): Resolved | null {
   const resolved = useMemo(() => (project ? resolvePlay(project, play) : null), [project, play]);
 
@@ -79,7 +86,7 @@ export function usePlaySync(ctl: DemoController, snap: Snapshot, project: Projec
     if (s.scenarioId === resolved.scenarioId && s.state.position === resolved.step) return;
     const sc = project?.scenarios[s.scenarioId];
     if (!sc) return;
-    write({ ...play, optionId: sc.optionId, scenarioId: sc.id, step: s.state.position });
+    write(playForScenario(play, sc, s.state.position));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap.scenarioId, snap.state?.position, snap.view]);
 
