@@ -37,4 +37,4 @@ Options (A/B) and cases (edge cases) are compared in the local board; only the p
 Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, focus, diagram, components, cases, check, selection, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.
 After the user Alt+clicks a board element, run npx joplo selection and edit only that location.
 Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.7 sha256:bc285878ec7d543b6149074d7db68209ac96428a0eb0205ae140040ad34b0f81 -->
+<!-- joplo-skill 0.2.8 sha256:bc285878ec7d543b6149074d7db68209ac96428a0eb0205ae140040ad34b0f81 -->

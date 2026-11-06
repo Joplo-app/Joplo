@@ -24,4 +24,4 @@ Reviewers open the review link from npx joplo share --review, compare every opti
 
 AUTH_REQUIRED or AUTH_EXPIRED (exit 3): ask the user to run npx joplo login in their own terminal; never log in or out for them.
 Details: npx joplo skill publish (Review and feedback).
-<!-- joplo-skill 0.2.7 sha256:6d6fe572364889328c53ff2b0278ec3be92dce48f8b964fc221acced0122d6bd -->
+<!-- joplo-skill 0.2.8 sha256:6d6fe572364889328c53ff2b0278ec3be92dce48f8b964fc221acced0122d6bd -->
