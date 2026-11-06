@@ -365,12 +365,12 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         const actionTarget = 'target' in st.action ? st.action.target : null;
         for (const e of st.effects) {
           if (e.type === 'fork') {
-            if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `fork 的目标「${e.scenario}」必须是同一方案的另一个场景键`, st.source);
+            if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `Fork target "${e.scenario}" must be another scenario key in the same option`, st.source);
             else if (e.label.trim()) forks.push({ label: e.label.trim(), scenarioId: `${qid}.${e.scenario}`, at: 0 });
           }
           if (e.type === 'mark') {
             const exists = hasLayers ? layersWith(e.target).length > 0 : !!sceneAfter && !!findIn(sceneAfter.root, e.target);
-            if (!exists) err('MARK_UNKNOWN', `mark("${e.target}") 的目标不在${hasLayers ? '任何层级' : '这一步的画面'}里`, st.source);
+            if (!exists) err('MARK_UNKNOWN', `mark("${e.target}") target is not in ${hasLayers ? 'any layer' : 'the stage for this step'}`, st.source);
             else marks.push({ target: e.target, kind: e.kindOf, ...(e.note ? { note: e.note } : {}) });
           }
         }

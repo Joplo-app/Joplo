@@ -136,3 +136,9 @@ test('component guidance describes navigation, automatic phone frames, and curre
   expect(skillTopic('demo')).not.toContain('Settings · Theme');
   expect(skillTopic('selection')).toContain('Open in editor');
 });
+
+test('P1 authoring rules, components, and annotation theme variable remain documented', () => {
+  expect(skillTopic('authoring')).toContain(".press('⌘K'");
+  const demo = skillTopic('demo');
+  for (const text of ['fork(label, scenarioKey)', 'mark(id,', '<Email', '<StateFlow', '<DataCard', '--jp-annot', 'Empty labels are omitted; targets are still validated', 'Autoplay stays on the main flow']) expect(demo).toContain(text);
+});

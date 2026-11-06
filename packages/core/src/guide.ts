@@ -104,7 +104,7 @@ Read only the topics needed, usually one or two at a time. See components for co
 ## flow: Put behavior in steps
 - .click(id, ...args); .type(id, value, ...args); .select(id, value, ...args).
 - .toggle(id, boolean, ...args); .back(...args); .system('Mock event', ...args).
-- .press('⌘K', ...args) / .press('Enter')：无目标的用户键盘步骤，字幕默认「按下 ⌘K」，效果与普通步骤相同。
+- .press('⌘K', ...args) / .press('Enter'): a targetless user keyboard step. The default caption describes pressing ⌘K; effects work like ordinary steps.
 - String args are optional captions; other args are effects. All methods are chainable.
 - set($.ui.ready, true): replace state; push($.data.rows, row): append an array item.
 - toast('Message') / toast.success/error/info('Message'): a message for the current step.
@@ -191,17 +191,17 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 - Agent UI: <Thinking title={$.ui.thought} active={$.ui.thinking} duration="6 seconds">Process</Thinking> shows thinking;
   <Artifact title="itinerary.md" kind="doc" status={$.ui.planStatus}>Content</Artifact> is a side artifact; reference it in the conversation with <Artifact.Ref id="…"/>.
 
-## 分叉、标注、邮件、数据与按键（D56 P1）
-- fork(label, 场景键)：本步字幕右侧可切到同方案的另一场景，跳过动作与业务效果相同的公共前缀；自动播放仍走主线。
-  例：.click('can_go', fork('如果阿杰去不了', 'cant_go'))；空标签省略，目标仍会校验。
-- mark(id, { kind?, note? })：circle（默认）/ underline / box / arrow，只在本步画手绘标注；隐藏、其他层或画面外目标不画。
-  例：.system('行程完成', mark('share', { kind: 'arrow', note: '生成完才能分享' }))。
-- Email：简单外部邮件卡片；自身不可操作，正文里的按钮照常走步骤。
-  例：<Email from="营地助手" to="阿杰" subject="行程有更新" time="周五 20:05">正文</Email>。
-- DataCard / StateFlow：放在单独 layer，用 shot 切过去；只这两个组件展示本步变化与前后值。StateFlow 按 states 的顺序标记已完成。
-  例：layer('行程数据', <Stack><StateFlow value={$.data.trip.status} states={['draft','shared']} labels={{ draft: '草稿', shared: '已分享' }}/><DataCard title="行程" value={$.data.trip} fields={[{ key: 'status', label: '状态' }]}/></Stack>)。
-- 按键记录：type 播放时复用逐字预览，press 显示键帽；静态只显示刚执行的输入/按键，其他步骤清空；空按键不显示。
-  例：.type('prompt', '周末想去露营').press('Enter', set($.ui.asked, true))；组合键 '⌘K' 自动拆为两个键帽。
+## Forks, marks, email, data, and keys (D56 P1)
+- fork(label, scenarioKey): switch to another scenario in the same option from the right of this step's caption, skipping the common prefix with identical actions and business effects. Autoplay stays on the main flow.
+  Example: .click('can_go', fork('What if Ajie cannot go?', 'cant_go')). Empty labels are omitted; targets are still validated.
+- mark(id, { kind?, note? }): circle (default) / underline / box / arrow; hand-drawn marks appear only in this step. Hidden targets, targets in other layers, and targets outside the stage are not drawn.
+  Example: .system('Itinerary ready', mark('share', { kind: 'arrow', note: 'Share after generation' })).
+- Email: a simple external email card. The card is not interactive; buttons in its body use ordinary steps.
+  Example: <Email from="Camping assistant" to="Ajie" subject="Itinerary updated" time="Friday 20:05">Body</Email>.
+- DataCard / StateFlow: place in a separate layer and switch to it with shot. Only these two components show this step's changes and before/after values. StateFlow marks earlier states completed according to states order.
+  Example: layer('Itinerary data', <Stack><StateFlow value={$.data.trip.status} states={['draft','shared']} labels={{ draft: 'Draft', shared: 'Shared' }}/><DataCard title="Itinerary" value={$.data.trip} fields={[{ key: 'status', label: 'Status' }]}/></Stack>).
+- Keyboard history: type reuses character-by-character preview during playback; press shows keycaps. Static views show only the latest input/keypress; other steps clear it. Empty keys are hidden.
+  Example: .type('prompt', 'Plan a weekend camping trip').press('Enter', set($.ui.asked, true)). Chords such as '⌘K' split into two keycaps automatically.
 
 ## Write a theme
 - A theme is a CSS file at themes/<name>.css in the project root. Set theme: '<name>' in joplo.config.ts as the default. A custom theme overrides a built-in with the same name.
@@ -329,8 +329,8 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - CAPTION_TOO_LONG: Shorten the caption to about 24 units: CJK characters count as 1 each, all others as 0.5; whitespace is ignored. One thing per step; move long content to an explanation layer. See demo.
 - EXPLAIN_TOO_LONG: Shorten the explain note to about 48 units, using the same CJK 1 / other 0.5 calculation. Put detailed rationale in a separate explanation layer. See demo.
 - ROLE_UNKNOWN: A layer or card role is not in feature.roles. Declare roles as { key: role('Name') }; see demo.
-- FORK_UNKNOWN：fork 的目标必须是同一方案里的另一个场景键，不能引用自己。
-- MARK_UNKNOWN：mark 的目标不在本步路径画面或任何层级里，核对元素 id；当前隐藏不算引用错误。
+- FORK_UNKNOWN: fork must target another scenario key in the same option; it cannot reference itself.
+- MARK_UNKNOWN: The mark target is absent from this step's route stage and all layers. Check the element id; currently hidden targets are valid references.
 - SHOT_UNKNOWN: The shot target is absent from this step's stage and all layers. Check its id and layer; see demo.
 - LAYER_UNKNOWN: Invalid layer key or missing content. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
 - TRACE_UNKNOWN: Empty trace, unknown id, multiple Diagrams, or disconnected path. Use connected node/edge ids in one Diagram.

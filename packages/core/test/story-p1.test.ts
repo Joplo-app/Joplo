@@ -66,10 +66,12 @@ describe('D56 P1 编译与纯函数', () => {
 describe('引用诊断带源码位置', () => {
   for (const target of ['absent', 'happy', '']) it(`错误分叉 ${target || '空'} → FORK_UNKNOWN`, () => {
     const d = build(f => f.press('Enter', fork('如果', target))).dev.diagnostics.find(d => d.code === 'FORK_UNKNOWN');
+    expect(d?.message).toContain(`Fork target "${target}" must be another scenario key in the same option`);
     expect(d?.at).toMatch(/story-p1.test.ts:\d+:\d+$/);
   });
   for (const target of ['absent', '']) it(`错误标注 ${target || '空'} → MARK_UNKNOWN`, () => {
     const d = build(f => f.press('Enter', mark(target))).dev.diagnostics.find(d => d.code === 'MARK_UNKNOWN');
+    expect(d?.message).toContain(`mark("${target}") target is not in any layer`);
     expect(d?.at).toMatch(/story-p1.test.ts:\d+:\d+$/);
   });
   it('空分叉标签省略；无层级时只在这一步的路径页面解析标注', () => {

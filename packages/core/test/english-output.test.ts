@@ -23,6 +23,9 @@ const whitelist = [
   ['packages/core/src/compile.ts', "'关闭'", 'Generated toggle-off caption'],
   ['packages/core/src/compile.ts', '}「${label}」`', 'Generated toggle caption punctuation'],
   ['packages/core/src/compile.ts', "'返回上一页'", 'Generated back caption'],
+  // I2: P1 keyboard captions are shown below the stage in both views.
+  ['packages/core/src/compile.ts', '`按下 ${a.keys}`', 'Generated keyboard caption; T4 owns UI localization'],
+  ['packages/core/src/compile.ts', "'按下按键'", 'Generated empty-key caption; T4 owns UI localization'],
   // I2: the player explains a disabled action directly in the board.
   ['packages/core/src/player.ts', "'该操作当前不可用（未说明原因）'", 'Default disabled-action explanation'],
   // I2: the browser tab title is part of the published site, not build diagnostics.
