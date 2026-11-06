@@ -47,6 +47,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     mode,
     routes: {},
     features: {},
+    featureIds: [],
     cases: {},
     options: {},
     rules: {},
@@ -56,10 +57,21 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
   };
 
   // ---------- 1. 选出参与的方案 ----------
+  // 排序只在编译时决定；显式列表不依赖对象键的枚举顺序，发布模式也保留这份演示内容。
+  for (const [fid, f] of Object.entries(src.features)) {
+    if (f.def.order !== undefined && (typeof f.def.order !== 'number' || !Number.isFinite(f.def.order)))
+      err('FEATURE_ORDER_INVALID', `Feature ${fid} order must be a finite number; omit it for folder-name order`, f.def.source ?? `${f.def.file}:1:1`, { kind: 'feature', id: fid });
+  }
+  if (diags.some(d => d.severity === 'error')) return { project: null, diagnostics: diags };
+  const natural = new Intl.Collator('en', { numeric: true });
+  const features = Object.entries(src.features).sort(([a, af], [b, bf]) => {
+    const ao = af.def.order ?? Infinity, bo = bf.def.order ?? Infinity;
+    return ao !== bo ? ao - bo : natural.compare(a, b);
+  });
   type Opt = { fid: string; key: string; qid: string; def: OptionDef & { file: string } };
   const allOptions: Opt[] = [];
   const picked = new Map<string, Opt>(); // fid -> 选定方案
-  for (const [fid, f] of sortedEntries(src.features)) {
+  for (const [fid, f] of features) {
     for (const [key, def] of sortedEntries(f.options)) allOptions.push({ fid, key, qid: `${fid}.${key}`, def });
     const pick = f.def.pick ?? null;
     if (pick) {
@@ -112,9 +124,10 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
   }
 
   // ---------- 3. 功能、情况、规则、问题 ----------
-  for (const [fid, f] of sortedEntries(src.features)) {
+  for (const [fid, f] of features) {
     const fdef = f.def;
     if (mode === 'publish' && !picked.has(fid)) continue;
+    out.featureIds.push(fid);
     const caseIds = Object.keys(fdef.cases ?? {}).map((k) => `${fid}.${k}`);
     out.features[fid] = {
       id: fid,

@@ -8,3 +8,4 @@ export type { Selection } from './selection.ts';
 export * from './validate.ts';
 export * from './guide.ts';
 export * from './embed.ts';
+export * from './features.ts';

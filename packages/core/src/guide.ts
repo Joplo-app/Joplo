@@ -93,7 +93,8 @@ Read only the topics needed, usually one or two at a time. See components for co
 - config({ name, description?, theme?: theme name (9 built-ins or themes/<name>.css; see demo), layout?, home? }).
 - layout(tree); Outlet places the current page; <Slot name="actions"/> declares a slot for additions.
 - page({ title, layout?: string|false, viewport?: 'desktop'|'mobile' }, tree). See demo for devices and stages.
-- feature({ name, goal, cases, roles?, constraints?, rules?, questions?, pick? }).
+- feature({ name, goal, cases, order?, roles?, constraints?, rules?, questions?, pick? }).
+- Do not number feature names by hand; use finite numeric order. The compiler writes featureIds into IR (including publish): ascending order first, then natural folder-name order for ties or omitted values. All views read that list.
 - option({ name, idea, on?, routes?, state?, rules?, questions?, coverage?, scenarios }).
 - on: { '/members': { actions: <Button id="invite">Invite</Button> } }: add elements to a slot on an existing route.
 - routes: { '/members/new': page({ title: 'New member' }, <Stack>…</Stack>) }: add a route for this option.
@@ -169,7 +170,7 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 ## Captions and fitting one screen
 - Keep captions within about 24 units and explain('Additional note') within about 48. CJK characters count as 1 each; all others count as 0.5; whitespace is ignored. check warns when exceeded.
 - Captions and explain notes appear below the stage, never over it. Tell one thing per step; move long content to an explanation layer.
-- Autoplay waits according to text length, at least 3 seconds, and waits for shot and edge animations. Speeds: 0.5× / 1× / 1.5×.
+- Autoplay reading time: CJK 8 chars/s (125ms each), Latin 15 non-whitespace chars/s; clamp to 3–7 seconds before 0.5× / 1× / 1.5× scaling. Streams, shots and edge waits can exceed 7 seconds. Shots use 700ms ease-out without overshoot.
 - Do not make viewers scroll through a long page. Fit one screen and zoom into details with shots.
 - Each page has one device, desktop by default. page({ viewport: 'mobile' }, tree) uses a Phone frame at a fixed width of 390.
 - For a mobile layer, use layer('Mobile', <MobileView/>, { viewport: 'mobile' }). Make a separate page or demo when mobile is needed (D44).
@@ -325,6 +326,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - FUNCTION_PROP: Replace onClick and other callbacks with flow steps and state effects.
 - UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE: Check case, rule, and reference keys and their owning option.
 - UNKNOWN_SLOT / UNKNOWN_ROUTE / UNKNOWN_LAYOUT: Check routes, layouts, and Slot declarations; add elements only to existing locations.
+- FEATURE_ORDER_INVALID: feature({ order }) must be a finite number; omit it for natural folder-name order. NaN, Infinity and strings are invalid.
 - UNKNOWN_PICK: pick must be an option filename under this feature's options/.
 - NOT_PICKED: The feature has no picked option and will not publish. Compare options, then set feature.pick to the chosen filename.
 - ROUTE_EXISTS: An option route duplicates an existing route. Use on to add elements, or choose a new route.

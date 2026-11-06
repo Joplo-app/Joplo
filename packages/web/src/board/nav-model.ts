@@ -1,3 +1,4 @@
+import { orderedFeatures } from '@joplo-app/core';
 import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 看板左栏与顶栏下拉的视图模型（纯函数，创作侧，不进发布站）：方案字母与名字、缺口统计、其他方案的小标、
@@ -75,7 +76,7 @@ export const gapCommand = (optionId: string) => `npx joplo check --option ${opti
 
 /** 顶栏「功能 ▾」：本项目的功能、选定方案与缺口数。 */
 export function featureMenu(project: Project, currentFeatureId: string | null, i18n: BoardMessages = boardEnglish): { id: string; name: string; hint: string; current: boolean }[] {
-  return Object.values(project.features).map((f) => {
+  return orderedFeatures(project).map((f) => {
     const pick = f.pick ? project.options[f.pick] : null;
     const g = gapsOf(project, f.pick);
     const hint = pick ? [i18n.board.picked2(letterOf(project, pick.id)), gapText(g, i18n)].filter(Boolean).join(' · ') : i18n.board.notPicked;

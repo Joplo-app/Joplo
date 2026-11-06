@@ -2,7 +2,7 @@ import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 看板首页的视图模型（D55「首页」，纯函数）：项目路径缩写、项目徽标、↑↓ 移动选中、项目摘要、功能卡片。
  */
-import { displaySceneId, type Project } from '@joplo-app/core';
+import { displaySceneId, orderedFeatures, type Project } from '@joplo-app/core';
 import type { ProjectSummary } from '../runtime/dev-client';
 import { optionsOf, scenariosOf } from '../runtime/views';
 import { gapsOf, optionLabel } from './nav-model';
@@ -32,7 +32,7 @@ export function moveSelection(list: readonly { id: string }[], selectedId: strin
 }
 
 export function projectMeta(project: Project, i18n: BoardMessages = boardEnglish): string {
-  const fs = Object.values(project.features);
+  const fs = orderedFeatures(project);
   return i18n.board.featuresPicked(fs.length, fs.filter((f) => f.pick).length, fs.length);
 }
 
@@ -69,4 +69,9 @@ export function featureCard(project: Project, featureId: string): FeatureCard | 
     open: target ? { featureId: f.id, optionId: target.id } : null,
     thumb: sc && sceneId && project.scenes[sceneId] ? { scenarioId: sc.id, sceneId } : null,
   };
+}
+
+/** 首页卡片按编译器写入的顺序展示。 */
+export function featureCards(project: Project): FeatureCard[] {
+  return orderedFeatures(project).map(f => featureCard(project, f.id)).filter((c): c is FeatureCard => !!c);
 }

@@ -1,6 +1,7 @@
 import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
+  order: 2,
   name: 'Agent 用法：npx joplo skill',
   goal: '编码 Agent 在任何 Joplo 项目里都能按需拿到正确的写法，只读需要的那一段，内容始终与项目安装的版本一致',
   roles: ['用户', '编码 Agent（Claude Code、Codex 等）'],

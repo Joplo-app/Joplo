@@ -17,17 +17,17 @@ import os from 'node:os';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { build as viteBuild, createServer, type Rollup } from 'vite';
-import { JoploError, type Project } from '@joplo-app/core';
+import { JoploError, orderedFeatures, type Project } from '@joplo-app/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
 import type { DistWeb, SourceWeb } from './web-assets.ts';
 import { subsetSiteFonts } from './site-fonts.ts';
 
-/** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。层级与镜头属于演示，保留（D43）。 */
+/** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。层级、镜头与 featureIds 顺序属于演示，保留（D43 / D61）。 */
 export function publishPayload(project: Project, home: string | null): { project: Record<string, unknown>; home: string | null } {
   const { rules: _r, cases: _c, issues: _i, ...rest } = project;
-  const features = Object.fromEntries(Object.entries(project.features).map(([id, f]) => [id, { id: f.id, name: f.name, goal: f.goal, optionIds: f.optionIds, pick: f.pick }]));
+  const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, { id: f.id, name: f.name, goal: f.goal, optionIds: f.optionIds, pick: f.pick }]));
   const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {} }]));
   const scenarios = Object.fromEntries(
     Object.entries(project.scenarios).map(([id, s]) => {

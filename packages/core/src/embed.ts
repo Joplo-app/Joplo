@@ -7,7 +7,10 @@
  * 只读 features / options / scenarios 的少量字段，所以既能用于完整 IR，也能用于发布站内联的发布 IR。
  */
 
+import { orderedFeatures } from './features.ts';
+
 type EmbedProject = {
+  featureIds?: readonly string[];
   features: Record<string, { id: string; optionIds: readonly string[]; pick?: string | null }>;
   options: Record<string, { id: string }>;
   scenarios: Record<string, { id: string; optionId: string }>;
@@ -17,7 +20,7 @@ type EmbedProject = {
 export function embedScenarioIds(project: EmbedProject): string[] {
   const ids: string[] = [];
   const scenarios = Object.values(project.scenarios ?? {});
-  for (const f of Object.values(project.features ?? {})) {
+  for (const f of orderedFeatures(project)) {
     const optionIds = (f.optionIds ?? []).filter((id) => project.options?.[id]);
     const optionId = f.pick && project.options?.[f.pick] ? f.pick : optionIds[0];
     if (!optionId) continue;
