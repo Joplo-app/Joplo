@@ -294,11 +294,11 @@ describe('导出', () => {
     expect((await req(hub.port, { method: 'DELETE', path: `/__joplo/p/${id}/export/video` })).status).toBe(403);
     const del = await req(hub.port, { method: 'DELETE', path: `/__joplo/p/${id}/export/video`, headers: { 'x-joplo-token': hub.token } });
     expect(del.status).toBe(200);
-    expect(del.body.job).toMatchObject({ status: 'error', phase: 'error', error: '已取消' });
+    expect(del.body.job).toMatchObject({ status: 'error', phase: 'error', error: 'Cancelled' });
     // 录制器之后才返回：不会把已取消的任务改回完成
     release();
     await new Promise((x) => setTimeout(x, 100));
-    expect((await req(hub.port, { path: `/__joplo/p/${id}/export/video` })).body.job).toMatchObject({ status: 'error', error: '已取消' });
+    expect((await req(hub.port, { path: `/__joplo/p/${id}/export/video` })).body.job).toMatchObject({ status: 'error', error: 'Cancelled' });
     expect((await req(hub.port, { method: 'DELETE', path: `/__joplo/p/${id}/export/video`, headers: { 'x-joplo-token': hub.token } })).status).toBe(404);
     expect((await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/video`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'invite.a-modal.success' }) })).status).toBe(202);
     release();

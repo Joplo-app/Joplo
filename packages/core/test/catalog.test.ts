@@ -354,8 +354,8 @@ describe('架构图：Diagram / Diagram.Group / Diagram.Node / Diagram.Edge（D4
     const d = r.diagnostics.filter((x) => x.code === 'UNKNOWN_DIAGRAM_NODE');
     expect(d.length).toBeGreaterThanOrEqual(2);
     expect(d.every((x) => x.severity === 'error' && x.at === 'routes/page.tsx:9:7')).toBe(true);
-    expect(d.map((x) => x.message).join('\n')).toContain('「nope」');
-    expect(d.map((x) => x.message).join('\n')).toContain('「ghost」');
+    expect(d.map((x) => x.message).join('\n')).toContain('to "nope" is not a node id in this Diagram');
+    expect(d.map((x) => x.message).join('\n')).toContain('from "ghost" is not a node id in this Diagram');
   });
 
   it('节点 id 在同一画面唯一（DUPLICATE_ID）；节点必须有 id', () => {

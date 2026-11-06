@@ -2,13 +2,13 @@ import { COMPONENT_TYPES, GATED_CONTAINERS, INTERACTIVE_TYPES, JOPLO_PROPS, VALU
 import { JoploError } from './result.ts';
 
 export const SKILL_TOPICS = [
-  { name: 'authoring', description: '目录约定；page / layout / option / flow 的写法' },
-  { name: 'demo', description: '层级、镜头、调用链与字幕：怎样做一个好演示' },
-  { name: 'components', description: '当前版本的组件目录与属性' },
-  { name: 'cases', description: '情况维度清单：开工前主动向用户提问' },
-  { name: 'check', description: '读懂诊断，按文件和行号局部修改' },
-  { name: 'selection', description: '用户在看板选中元素后，只改那一处' },
-  { name: 'publish', description: 'pick、build、静态站部署' },
+  { name: 'authoring', description: 'Directory conventions; page / layout / option / flow syntax' },
+  { name: 'demo', description: 'Layers, shots, traces, and captions for clear demos' },
+  { name: 'components', description: 'Component catalog and props for this version' },
+  { name: 'cases', description: 'Case dimensions: ask the user before starting' },
+  { name: 'check', description: 'Read diagnostics and fix the indicated file and line' },
+  { name: 'selection', description: 'Edit only the element selected by the user in the board' },
+  { name: 'publish', description: 'pick, build, and static site deployment' },
 ] as const;
 export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
 
@@ -25,9 +25,9 @@ const related: Record<SkillTopic, readonly SkillTopic[]> = {
 /** CLI 传入其 package.json 版本；行数来自同一次生成的主题正文。 */
 export function skillIndex(version: string, docs?: Readonly<Record<string, string>> | null): string {
   return [
-    `Joplo ${version} · Agent 用法（按需读取）`,
-    ...SKILL_TOPICS.map(t => `  ${t.name.padEnd(11)} ${t.description}  ${skillTopic(t.name, docs).trimEnd().split('\n').length} 行`),
-    '用法：npx joplo skill <主题>    安装到 Agent：npx joplo skill install',
+    `Joplo ${version} · Agent usage (read on demand)`,
+    ...SKILL_TOPICS.map(t => `  ${t.name.padEnd(11)} ${t.description}  ${skillTopic(t.name, docs).trimEnd().split('\n').length} lines`),
+    'Usage: npx joplo skill <topic>    Install for agents: npx joplo skill install',
     '',
   ].join('\n');
 }
@@ -39,10 +39,10 @@ export function nearestSkillTopic(input: string): SkillTopic {
 
 /** docs 是组件目录提供的可选一行提示，不在这里维护另一份组件或属性清单。 */
 export function skillTopic(topic: string, docs?: Readonly<Record<string, string>> | null): string {
-  if (!SKILL_TOPICS.some(t => t.name === topic)) throw new JoploError('USAGE', `没有主题「${topic}」。你是不是要找 ${nearestSkillTopic(String(topic))}？\n运行 npx joplo skill 查看全部主题。`);
+  if (!SKILL_TOPICS.some(t => t.name === topic)) throw new JoploError('USAGE', `Unknown topic "${topic}". Did you mean ${nearestSkillTopic(String(topic))}?\nRun npx joplo skill to list all topics.`);
   const name = topic as SkillTopic;
   const body = name === 'components' ? componentTopic(docs ?? undefined) : CONTENT[name];
-  return `${body.trimEnd()}\n\n相关主题：${related[name].join('、')}\n`;
+  return `${body.trimEnd()}\n\nRelated topics: ${related[name].join(', ')}\n`;
 }
 
 /** 兼容旧入口：与 joplo skill authoring 输出完全相同。 */
@@ -50,128 +50,128 @@ export function guide(): string { return skillTopic('authoring'); }
 
 function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
   const names = COMPONENT_TYPES.filter(name => !name.startsWith('#'));
-  const listed = (set: ReadonlySet<string>) => names.filter(name => set.has(name)).join('、');
+  const listed = (set: ReadonlySet<string>) => names.filter(name => set.has(name)).join(', ');
   return [
-    '# Joplo 组件：components',
+    '# Joplo components: components',
     '',
-    '从 @joplo-app/kit/ui 导入组件；下面的名称取自当前编译器目录，不能任意添加组件。',
-    '有属性提示时附在名称后；没有提示时仅列名称。HTML 标签直接写 JSX，不从 ui 导入。',
+    'Import components from @joplo-app/kit/ui. Names below come from the current compiler catalog; do not invent components.',
+    'Prop hints follow names when available; otherwise only names are listed. Write HTML tags directly in JSX; do not import them from ui.',
     '',
-    '## 组件目录',
-    ...names.map(name => `- ${name}${Object.hasOwn(docs, name) && docs[name]?.trim() ? `：${docs[name]!.replace(/\s+/g, ' ').trim()}` : ''}`),
+    '## Component catalog',
+    ...names.map(name => `- ${name}${Object.hasOwn(docs, name) && docs[name]?.trim() ? `: ${docs[name]!.replace(/\s+/g, ' ').trim()}` : ''}`),
     '',
-    '## 行为分类（由目录生成）',
-    `- 可操作，必须给 id 并声明行为：${listed(INTERACTIVE_TYPES)}。`,
-    `- 接收输入，type/select/toggle 写入 inputs：${listed(VALUE_TYPES)}。`,
-    `- 展开状态控制子元素可见性的容器：${listed(GATED_CONTAINERS)}。`,
+    '## Behavior groups (from the catalog)',
+    `- Interactive; require id and declared behavior: ${listed(INTERACTIVE_TYPES)}.`,
+    `- Accept input; type/select/toggle write to inputs: ${listed(VALUE_TYPES)}.`,
+    `- Containers whose expanded state controls child visibility: ${listed(GATED_CONTAINERS)}.`,
     '',
-    `Joplo 专用属性：${JOPLO_PROPS.join('、')}；disabled 为组件禁用属性。`,
-    'when 控制出现条件；disabledReason 解释禁用；unmodeled 标记本版未建模；note 是创作备注。',
-    '可操作元素应有 flow 步骤，或 disabled=true 且说明原因，或显式 unmodeled。',
-    '绑定、条件和步骤语法见 authoring；组件错误的修复见 check。',
+    `Joplo props: ${JOPLO_PROPS.join(', ')}; disabled is the component disable prop.`,
+    'when controls visibility; disabledReason explains disabling; unmodeled marks behavior outside this version; note is an authoring note.',
+    'Interactive elements need a flow step, disabled=true with a reason, or explicit unmodeled.',
+    'See authoring for bindings, conditions, and steps; check for component error fixes.',
   ].join('\n');
 }
 
 const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
-  authoring: `# Joplo 创作：authoring
+  authoring: `# Joplo authoring: authoring
 
-用 TS/TSX 描述设计，源文件是权威源，Git 管理版本；看板和发布站消费编译后的 IR。
-先读需要的主题，通常一次只需一两个。组件查 components，开工前的提问查 cases，演示的组织与讲法读 demo。
+Describe designs in TS/TSX. Source files are authoritative; Git manages versions. The board and published site consume compiled IR.
+Read only the topics needed, usually one or two at a time. See components for components, cases for questions before starting, and demo for organizing and presenting demos.
 
-## 目录约定
-- joplo.config.ts：export default config({ name, layout: 'app', home: '/' })。
-- layouts/app.tsx：export default layout(<AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: 'sm' }}><AppShell.Navbar>…</AppShell.Navbar><AppShell.Main><Outlet/></AppShell.Main><Slot name="overlay"/></AppShell>)。
-- routes/page.tsx → /；routes/members/page.tsx → /members。只支持静态路径，不支持 [id]。
-- features/<f>/feature.ts：功能目标、情况、共享规则、待决问题、pick。
-- features/<f>/options/<o>.tsx：一个方案、路径堆叠、初始状态和场景。
-- 功能目录内可自由组织复用数据或模块，供上述文件 import。
-- 数据 API 从 @joplo-app/kit 导入，组件从 @joplo-app/kit/ui 导入。
-- tsconfig 使用 jsx: 'react-jsxdev'、jsxImportSource: '@joplo-app/kit'、allowImportingTsExtensions: true。
+## Directory conventions
+- joplo.config.ts: export default config({ name, layout: 'app', home: '/' }).
+- layouts/app.tsx: export default layout(<AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: 'sm' }}><AppShell.Navbar>…</AppShell.Navbar><AppShell.Main><Outlet/></AppShell.Main><Slot name="overlay"/></AppShell>).
+- routes/page.tsx → /; routes/members/page.tsx → /members. Static routes only; no [id].
+- features/<f>/feature.ts: feature goal, cases, shared rules, open questions, pick.
+- features/<f>/options/<o>.tsx: one option, route additions, initial state, and scenarios.
+- Organize reusable data or modules freely inside a feature directory; import them from the files above.
+- Import data APIs from @joplo-app/kit and components from @joplo-app/kit/ui.
+- tsconfig uses jsx: 'react-jsxdev', jsxImportSource: '@joplo-app/kit', allowImportingTsExtensions: true.
 
-## 数据 API
-- config({ name, description?, theme?: 主题名（内置 9 个或 themes/<name>.css，见 demo）, layout?, home? })。
-- layout(tree)；Outlet 放当前页面，<Slot name="actions"/> 声明可堆叠的插槽。
-- page({ title, layout?: string|false, viewport?: 'desktop'|'mobile' }, tree)。设备与演示画面的安排读 demo。
-- feature({ name, goal, cases, roles?, constraints?, rules?, questions?, pick? })。
-- option({ name, idea, on?, routes?, state?, rules?, questions?, coverage?, scenarios })。
-- on: { '/members': { actions: <Button id="invite">邀请</Button> } }：往已有路径的插槽加元素。
-- routes: { '/members/new': page({ title: '新增' }, <Stack>…</Stack>) }：为方案新增路径。
-- state: { ui: { ready: false }, data: {}, inputs: {} }：方案初始状态。
-- scenarios: { happy: flow('成功', { cases: ['happy'], start: '/members' }).click('invite', done('已完成')) }。
-- flow 的选项还可写 state、description、expected、mock、outcome，覆盖初始状态或说明模拟结果。
-- 情况与 coverage 的声明读 cases；选择和发布 pick 读 publish。
+## Data APIs
+- config({ name, description?, theme?: theme name (9 built-ins or themes/<name>.css; see demo), layout?, home? }).
+- layout(tree); Outlet places the current page; <Slot name="actions"/> declares a slot for additions.
+- page({ title, layout?: string|false, viewport?: 'desktop'|'mobile' }, tree). See demo for devices and stages.
+- feature({ name, goal, cases, roles?, constraints?, rules?, questions?, pick? }).
+- option({ name, idea, on?, routes?, state?, rules?, questions?, coverage?, scenarios }).
+- on: { '/members': { actions: <Button id="invite">Invite</Button> } }: add elements to a slot on an existing route.
+- routes: { '/members/new': page({ title: 'New member' }, <Stack>…</Stack>) }: add a route for this option.
+- state: { ui: { ready: false }, data: {}, inputs: {} }: initial option state.
+- scenarios: { happy: flow('Success', { cases: ['happy'], start: '/members' }).click('invite', done('Completed')) }.
+- flow options also accept state, description, expected, mock, outcome to override initial state or describe mock results.
+- See cases for case and coverage declarations; publish for pick and publishing.
 
-## flow：行为只写在步骤里
-- .click(id, ...args)；.type(id, value, ...args)；.select(id, value, ...args)。
-- .toggle(id, boolean, ...args)；.back(...args)；.system('模拟事件', ...args)。
+## flow: Put behavior in steps
+- .click(id, ...args); .type(id, value, ...args); .select(id, value, ...args).
+- .toggle(id, boolean, ...args); .back(...args); .system('Mock event', ...args).
 - .press('⌘K', ...args) / .press('Enter')：无目标的用户键盘步骤，字幕默认「按下 ⌘K」，效果与普通步骤相同。
-- args 的字符串是字幕，可省略；其余参数是效果。所有方法可链式调用。
-- set($.ui.ready, true)：替换状态；push($.data.rows, row)：追加数组项。
-- toast('提示') / toast.success/error/info('提示')：当前步骤提示。
-- go('/members')：在当前方案上下文里切换路径；back 返回前一路径。
-- done('结果', 'success'|'failure'|'cancelled')：结束场景，默认 success。
-- uses('rule_key', ...)：关联本方案或本功能的规则。
+- String args are optional captions; other args are effects. All methods are chainable.
+- set($.ui.ready, true): replace state; push($.data.rows, row): append an array item.
+- toast('Message') / toast.success/error/info('Message'): a message for the current step.
+- go('/members'): change route within the current option; back returns to the previous route.
+- done('Result', 'success'|'failure'|'cancelled'): end the scenario; default is success.
+- uses('rule_key', ...): link rules from this option or feature.
 
-## 绑定与条件
-- $.ui.x / $.data.x / $.inputs.x 是整值绑定，不求值任意表达式。
-- when={$.ui.ready}；disabled={not($.ui.isAdmin)}。
-- not(x)、eq(x, value)、neq(x, value)、empty(x)、notEmpty(x)、oneOf(x, values)、and(...xs)、or(...xs)。
-- 浮层：<Modal id="dlg" opened={$.ui.open} title="…">；Drawer 同理，可见性只看 opened。
+## Bindings and conditions
+- $.ui.x / $.data.x / $.inputs.x bind whole values; arbitrary expressions are not evaluated.
+- when={$.ui.ready}; disabled={not($.ui.isAdmin)}.
+- not(x), eq(x, value), neq(x, value), empty(x), notEmpty(x), oneOf(x, values), and(...xs), or(...xs).
+- Overlays: <Modal id="dlg" opened={$.ui.open} title="…">; Drawer works the same way. Only opened controls visibility.
 
-## 布局与适配（组件与 Mantine 同名同参，不写 className）
-- 用 Stack / Group / SimpleGrid / Grid 的属性排版：<Group justify="space-between">、<SimpleGrid cols={{ base: 1, md: 3 }}>。
-- 响应式写成对象 { base, xs, sm, md, lg, xl }，或 visibleFrom="sm" / hiddenFrom="sm"；AppShell 在窄于 navbar.breakpoint 时自动收起导航。
-- 输入组件直接写 label：<TextInput id="email" label="邮箱"/>，自动字幕会用它。
+## Layout and responsiveness (Mantine names and props; no className)
+- Use Stack / Group / SimpleGrid / Grid props: <Group justify="space-between">, <SimpleGrid cols={{ base: 1, md: 3 }}>.
+- Use responsive objects { base, xs, sm, md, lg, xl }, or visibleFrom="sm" / hiddenFrom="sm". AppShell collapses navigation below navbar.breakpoint.
+- Set input labels directly: <TextInput id="email" label="Email"/>. Auto captions use them.
 - 画面高度不固定（舞台随窗口变化）：整屏布局不写固定像素高度，否则窗口矮时底部的输入框、按钮会被裁掉。写法见 demo 的「整屏布局」。
 
-## 规则与边界
-- rule('约束', { origin?, status?, cases?: ['happy'], elements?: ['invite'] })。
-- origin: user/project_material/ai_assumption/code_observed/feedback，默认 ai_assumption。
-- status: pending/confirmed/conflict/out_of_scope，默认 pending。
-- AI 假设不能标为已确认；用户确认后再如实记录 origin/status。
-- question('待决定的问题', { severity?: 'blocker'|'major'|'minor', refs?: ['happy'] })。
-- 不写 onClick 或其他函数属性。作者复用组件在收集时展开，交互由 flow 驱动。
-- 作者模块会在本机加载/检查/构建时执行，只运行可信项目。
+## Rules and boundaries
+- rule('Constraint', { origin?, status?, cases?: ['happy'], elements?: ['invite'] }).
+- origin: user/project_material/ai_assumption/code_observed/feedback; default ai_assumption.
+- status: pending/confirmed/conflict/out_of_scope; default pending.
+- Never mark an AI assumption Confirmed. Record origin/status truthfully after user confirmation.
+- question('Open question', { severity?: 'blocker'|'major'|'minor', refs?: ['happy'] }).
+- Do not write onClick or other function props. Reusable author components expand during collection; flow drives interaction.
+- Author modules execute locally during loading/checking/building. Run only trusted projects.
 
-改文件后运行 npx joplo check；在看板上看，用 npx joplo selection 读取用户指向的位置。
-诊断的修复流程读 check；只改选中位置的流程读 selection。`,
-  demo: `# Joplo 好演示：demo
+After editing, run npx joplo check. View the board; use npx joplo selection to read the location selected by the user.
+See check for diagnostic fixes and selection for editing only the selected location.`,
+  demo: `# Joplo demos: demo
 
-一步只讲一件事：用独立的层级分开视角，用镜头放大细节，用短字幕点出本步发生了什么。
-基础目录、状态与 flow 语法读 authoring；这里的 layer、shot、trace、explain 从 @joplo-app/kit 导入。
+Tell one thing per step: separate viewpoints with independent layers, zoom into details with shots, and describe what happened with short captions.
+See authoring for directories, state, and flow syntax. Import layer, shot, trace, explain from @joplo-app/kit.
 
-## 层级是独立页面
-- 在 option 中声明 layers: { client: layer('客户端视角', <ClientView/>), backend: layer('后端流转', <Diagram>…</Diagram>) }。
-- layer(title, <tree/>) 带自己的 JSX 树，单独渲染并占满画面，不从同一张大页面里裁切。
-- 各层共享 ui / data / inputs，切层不改变步骤；声明 layers 后演示显示这些独立页面。
-- 没有自动的全景层；需要全景时自己声明 overview: layer('全景', <Overview/>)。
-- 长说明放进单独的说明层，如 why: layer('设计理由', <Why/>)，再用镜头切过去讲。
+## Layers are independent pages
+- Declare layers in an option: layers: { client: layer('Client view', <ClientView/>), backend: layer('Backend flow', <Diagram>…</Diagram>) }.
+- layer(title, <tree/>) owns a JSX tree, renders independently, and fills the stage; it is not a crop of one large page.
+- Layers share ui / data / inputs. Switching layers does not change the step. Declaring layers makes the demo show these independent pages.
+- No automatic overview layer. Declare overview: layer('Overview', <Overview/>) when needed.
+- Put long notes in a separate explanation layer, such as why: layer('Design rationale', <Why/>), then switch to it with a shot.
 
-## 镜头与导演
-- 在步骤里写 shot(...ids)；目标可为组件、卡片、按钮或 Diagram 的节点、分组、连线。
-- 每个 id 在包含它的层里解析，同名 id 可影响多个层；第一个 shot 所在的层就是导演层。
-- 例：.click('app_send', shot('msg_user'), shot('app', 'biz')) 先跟随客户端视角，再给后端设置镜头。
-- shot() 让当前导演层回到整层；没写镜头时沿用上一步，普通点击可跟到按钮所在层。
-- 导演播放时自动切层、推近并高亮；手动切层会暂停跟随，可恢复导演或只重放某一层。
-- 观众可滚轮/捏合缩放、拖动平移，用适应画面回到整体；下一步导演镜头会重新接管。
+## Shots and the director
+- Write shot(...ids) in a step. Targets can be components, cards, buttons, or Diagram nodes, groups, and edges.
+- Each id resolves in the layer containing it. The same id can affect multiple layers; the first shot determines the director layer.
+- Example: .click('app_send', shot('msg_user'), shot('app', 'biz')) follows the client view first, then sets a backend shot.
+- shot() restores the whole director layer. Without a shot, keep the previous one; a plain click can follow the layer containing the button.
+- During playback, the director switches layers, zooms, and highlights. Switching layers manually pauses following; resume Follow director or replay only one layer.
+- Viewers can zoom with wheel/pinch, drag to pan, and fit the stage to see the whole view. The next director shot takes over again.
 
-## Diagram 与调用链
-- 在 <Diagram> 中用 <Diagram.Group label>、<Diagram.Node id label kind/>、<Diagram.Edge id from to label async/> 声明结构。
-- Diagram.Edge 的 from/to 必须是同一张 Diagram 内的节点 id；布局自动生成，逐段出现时已有元素不移动。
-- 用 trace('a','b','c') 表达 a→b→c 的调用链；不要手写节点/连线的 state 和 set 来模拟调用状态。
-- 本步经过的是 active，先前经过的自动变为 ok；trace.fail('a','b') 标记失败，之后走通可恢复。
-- trace.skip('a','b') 标记本次未调用的部分为 dim，不要求相连，也不移动镜头。
-- trace 参数可用节点或连线 id；每段都需有对应的边，允许反向经过；同向多条边时直接写连线 id。
-- trace 同时充当镜头目标，可与同一步的 shot 合并；在同一 Diagram 聚焦两个及以上节点时，自动排成紧凑的小图。
-- 逐段出现用 when={$.ui.show_billing}；步骤 set($.ui.show_billing, true) 只控制出现，不替代 trace 的调用状态。
+## Diagram and traces
+- Declare structure inside <Diagram> with <Diagram.Group label>, <Diagram.Node id label kind/>, <Diagram.Edge id from to label async/>.
+- Diagram.Edge from/to must be node ids within the same Diagram. Layout is automatic; existing elements stay in place as segments appear.
+- Use trace('a','b','c') for the a→b→c trace. Do not manually set node/edge state to simulate calls.
+- Elements visited this step are active; earlier ones become ok. trace.fail('a','b') marks failure; a later successful trace can recover.
+- trace.skip('a','b') marks elements not called this time as dim. They need not be connected; it does not move the shot.
+- trace accepts node or edge ids. Each segment needs a matching edge; reverse traversal is allowed. For multiple edges in the same direction, use the edge id.
+- trace also supplies shot targets and can merge with shot in the same step. Focusing two or more nodes in one Diagram automatically creates a compact subgraph.
+- Reveal segments with when={$.ui.show_billing}; set($.ui.show_billing, true) in a step only controls visibility, not trace call state.
 
-## 字幕与一屏放下
-- 说明建议约 24 字以内，explain('补充说明') 约 48 字以内（英文按半个字算），超出时 check 会警告。
-- 说明与 explain 显示在画面下方的字幕区，不叠在画面上；每一步只讲一件事，长内容移到说明层。
-- 自动播放按文字长度停留，至少 3 秒，等镜头与连线动画完成；可选 0.5× / 1× / 1.5×。
-- 不要写很长的页面再让观众滚动阅读；一屏放下，靠镜头推近看细节。
-- 每个页面只有一种设备，默认电脑；page({ viewport: 'mobile' }, tree) 固定用 Phone 外框和 390 宽显示。
-- 层级需要手机画面时用 layer('手机版', <MobileView/>, { viewport: 'mobile' })；需要手机版就单独做页面或演示（D44）。
+## Captions and fitting one screen
+- Keep captions within about 24 units and explain('Additional note') within about 48. CJK characters count as 1 each; all others count as 0.5; whitespace is ignored. check warns when exceeded.
+- Captions and explain notes appear below the stage, never over it. Tell one thing per step; move long content to an explanation layer.
+- Autoplay waits according to text length, at least 3 seconds, and waits for shot and edge animations. Speeds: 0.5× / 1× / 1.5×.
+- Do not make viewers scroll through a long page. Fit one screen and zoom into details with shots.
+- Each page has one device, desktop by default. page({ viewport: 'mobile' }, tree) uses a Phone frame at a fixed width of 390.
+- For a mobile layer, use layer('Mobile', <MobileView/>, { viewport: 'mobile' }). Make a separate page or demo when mobile is needed (D44).
 
 ## 整屏布局：高度跟着舞台走
 - 层级和电脑页面铺满舞台，舞台大小随看板窗口变化；写死的像素高度（h={690}）在矮窗口里会把底部挤出画面。
@@ -203,12 +203,12 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 按键记录：type 播放时复用逐字预览，press 显示键帽；静态只显示刚执行的输入/按键，其他步骤清空；空按键不显示。
   例：.type('prompt', '周末想去露营').press('Enter', set($.ui.asked, true))；组合键 '⌘K' 自动拆为两个键帽。
 
-## 写主题
-- 主题就是一个 CSS 文件：项目根目录 themes/<name>.css，在 joplo.config.ts 写 theme: '<name>' 作为默认主题；与内置主题同名时用你的。
-- 内置主题：sketch（手绘，默认）、clean、blueprint、nord、dracula、solarized-light、terminal、kraft、contrast；看板「设置 · 主题」里可以切换预览。
-- 只写变量即可，自动限定在舞台里，不影响看板：--jp-font、--jp-font-mono、--jp-font-size、--jp-ink、--jp-bg、--jp-surface、--jp-subtle、--jp-muted、--jp-faint、--jp-line、--jp-line-strong、--jp-border、--jp-accent（高光）、--jp-select、--jp-info（Diagram active）、--jp-ok、--jp-warn、--jp-danger、--jp-annot（标注，缺省回落到 danger）、--jp-radius、--jp-shadow、--jp-stroke（rough 手绘描边 / clean 细线）。
-- 也可以写普通选择器细调（.jbox、h1 等，同样只作用于舞台）。深色主题注意 --jp-info / --jp-ok / --jp-danger / --jp-accent 与底色的对比度。
-- 示例 themes/brand.css：
+## Write a theme
+- A theme is a CSS file at themes/<name>.css in the project root. Set theme: '<name>' in joplo.config.ts as the default. A custom theme overrides a built-in with the same name.
+- Built-ins: sketch (Hand-drawn, default), clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast. Preview them in board Settings · Theme.
+- Variables alone work and are scoped to the stage, leaving the board unaffected: --jp-font, --jp-font-mono, --jp-font-size, --jp-ink, --jp-bg, --jp-surface, --jp-subtle, --jp-muted, --jp-faint, --jp-line, --jp-line-strong, --jp-border, --jp-accent (highlight), --jp-select, --jp-info (Diagram active), --jp-ok, --jp-warn, --jp-danger, --jp-annot (annotations; defaults to danger), --jp-radius, --jp-shadow, --jp-stroke (rough hand-drawn / clean thin lines).
+- Ordinary selectors (.jbox, h1, etc.) also work within the stage. In dark themes, check contrast of --jp-info / --jp-ok / --jp-danger / --jp-accent against the background.
+- Example themes/brand.css:
     :root {
       --jp-font: "Inter", system-ui, sans-serif;
       --jp-ink: #14213d;
@@ -220,184 +220,185 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
       --jp-stroke: clean;
     }
 
-## 完整示例：examples/agent-arch
-看 shared/arch.tsx 的 layersFor/Diagram，与 features/agent/options/a-hybrid.tsx 的 flow。
-下面摘出 plan 的关键片段，省略业务规则关联；start 已在同一文件中组织用户输入与发送：
+## Full example: examples/agent-arch
+See layersFor/Diagram in shared/arch.tsx and flow in features/agent/options/a-hybrid.tsx.
+This excerpt shows the main plan steps, omitting business rule links. start in the same file already handles user input and sending:
 \`\`\`tsx
 const plan = (f: ReturnType<typeof start>) =>
   f
-    .system('Billing 额度预检', '调用模型之前，先预检额度', trace('biz', 'billing'), shot('blk_billing'))
-    .system('取工具定义', '按客户端实现的版本取工具定义', trace('biz', 'registry'), shot('blk_tools'), explain('定义与实现分离'))
-    .system('任务交给大脑', '任务 + 工具定义交给大脑', trace('biz', 'brain'), shot('blk_brain'))
-    .system('大脑推理', '大脑调用 Bedrock 规划下一步', trace('brain', 'llm'));
+    .system('Billing quota precheck', 'Check quota before calling the model', trace('biz', 'billing'), shot('blk_billing'))
+    .system('Fetch tool definitions', 'Fetch definitions for the client version', trace('biz', 'registry'), shot('blk_tools'), explain('Definitions and implementations are separate'))
+    .system('Hand task to brain', 'Send task and tool definitions to brain', trace('biz', 'brain'), shot('blk_brain'))
+    .system('Brain reasoning', 'Brain calls Bedrock to plan the next step', trace('brain', 'llm'));
 \`\`\`
-同一示例还包含额度不足、危险工具确认、端侧掉线与计费重试；按需求选场景，不只演示顺利路径。`,
-  cases: `# Joplo 情况清单：cases
+The example also covers insufficient quota, dangerous tool confirmation, client disconnection, and billing retries. Choose scenarios for the requirements; include more than the main flow.`,
+  cases: `# Joplo case checklist: cases
 
-开工前先读用户需求和项目材料，再用下面的维度寻找遗漏；只问会改变设计的关键问题。
-用户未回答的内容写 question 或保留待确认规则，不替用户把 AI 假设确认为决定。
+Before starting, read user requirements and project material. Use these dimensions to find gaps; ask only key questions that change the design.
+Record unanswered items as question or Pending rules. Do not confirm AI assumptions on the user's behalf.
 
-## 八个维度：每项选一两个与功能相关的问题
-- \`main\` 主流程：谁要完成什么？完成后用户应该看见什么？
-- \`input\` 输入：为空、格式无效或达到上限时怎么办？能否保留输入并就地修正？
-- \`permission\` 权限：谁能看、谁能操作？没有权限时隐藏入口还是禁用并说明原因？
-- \`lifecycle\` 生命周期：过期、撤销、删除后再打开会怎样？是否允许恢复？
-- \`async\` 异步：等待、超时、失败分别显示什么？重试是否保留输入？
-- \`interrupt\` 中断：关闭弹窗、返回或离开页面时保留什么？需不需要确认未保存内容？
-- \`conflict\` 冲突：重复点击或多人同时修改时怎么办？如何避免重复提交？
-- \`consistency\` 一致性：一个路径改完，其他路径何时更新？部分成功时如何保持结果可解释？
+## Eight dimensions: Pick one or two relevant questions each
+- \`main\` Main flow: Who needs to achieve what? What should the user see afterward?
+- \`input\` Input: What happens when empty, invalid, or at a limit? Can input be preserved and corrected in place?
+- \`permission\` Permission: Who can view and act? Without permission, hide the entry or disable it with a reason?
+- \`lifecycle\` Lifecycle: What happens after expiry, revocation, or deletion? Is recovery allowed?
+- \`async\` Async: What appears during waiting, timeout, and failure? Does retry preserve input?
+- \`interrupt\` Interruption: What is preserved when closing a modal, going back, or leaving? Confirm unsaved changes?
+- \`conflict\` Conflict: What happens with repeated clicks or concurrent edits? How are duplicate submissions prevented?
+- \`consistency\` Consistency: When one route changes, when do others update? How are partial results kept understandable?
 
-## 按产品类型的预设
-开工前先按产品类型挑出相关情况来问用户，不要照单全收；下面是提问种子，不是已经确认的产品规则。
+## Presets by product type
+Pick relevant cases to ask the user before starting. Do not include every preset; these are question seeds, not Confirmed product rules.
 
-### 表单 / CRUD / 权限（来源：examples/invite）
-- no_permission · permission · 非管理员操作时怎样阻止并解释。
-- invalid_input · input · 输入为空或格式无效时就地提示。
-- revoked · lifecycle · 撤销后再次打开时如何处理。
-- expired · lifecycle · 过期后访问时展示什么。
-- already_exists · conflict · 对象已存在时如何反馈。
-- duplicate_submit · conflict · 连续点击提交时避免重复创建。
-- request_failed · async · 请求失败后保留输入并允许重试。
+### Forms / CRUD / permission (source: examples/invite)
+- no_permission · permission · Block non-admin actions and explain why.
+- invalid_input · input · Show inline feedback for empty or invalid input.
+- revoked · lifecycle · Handle reopening after revocation.
+- expired · lifecycle · Decide what to show after expiry.
+- already_exists · conflict · Explain that the object already exists.
+- duplicate_submit · conflict · Avoid duplicate creation on repeated submit clicks.
+- request_failed · async · Preserve input and allow retry after failure.
 
-### Agent / AI 产品（来源：examples/agent-arch）
-- quota · permission · 额度不足时在调模型之前拦下。
-- dangerous_tool · permission · 危险工具执行前由用户确认。
-- hand_offline · async · 执行工具的一端掉线或超时时如实处理失败。
-- local_data · main · 需要访问用户本机数据时如何执行。
-- tool_version · consistency · 工具定义升级但实现仍为旧版本时怎么办。
-- usage_retry · async · 计费事件投递失败后重试并保证幂等。
-- model_failed · async · 模型调用失败或超时时怎样反馈和恢复。
+### Agent / AI products (source: examples/agent-arch)
+- quota · permission · Block insufficient quota before calling the model.
+- dangerous_tool · permission · Ask for user confirmation before running a dangerous tool.
+- hand_offline · async · Report failure truthfully when the tool execution client disconnects or times out.
+- local_data · main · Decide how to access data on the user's machine.
+- tool_version · consistency · Handle upgraded definitions with an older tool implementation.
+- usage_retry · async · Retry failed billing event delivery with idempotency.
+- model_failed · async · Give feedback and recovery for model failure or timeout.
 
-### CLI / 开发者工具（来源：examples/joplo-dist）
-- first_run · main · 从零开始，三条命令内跑通。
-- env_old · input · 运行环境版本过低时给出修复方法。
-- version_skew · consistency · 全局与项目内版本不一致时提示对齐。
-- optional_dep · async · 可选依赖缺失时只影响相关命令。
-- dir_not_empty · conflict · 目标目录已有文件时不直接覆盖。
-- typo · input · 子命令或参数拼错时提示最接近的那个。
-- user_modified · conflict · 不覆盖用户改过的文件。
-- offline · async · 没有网络时如何说明限制和恢复。
+### CLI / developer tools (source: examples/joplo-dist)
+- first_run · main · Start from zero and succeed within three commands.
+- env_old · input · Explain how to fix an outdated runtime.
+- version_skew · consistency · Suggest aligning global and project versions.
+- optional_dep · async · Missing optional dependencies affect only related commands.
+- dir_not_empty · conflict · Do not overwrite existing files in the target directory.
+- typo · input · Suggest the closest command or argument for a typo.
+- user_modified · conflict · Do not overwrite user edits.
+- offline · async · Explain limitations and recovery without network access.
 
-### 本地工具 / 多项目（来源：examples/joplo-board）
-- first_open · main · 第一次打开且没有任何数据时给出开始入口。
-- single_instance · conflict · 已有实例在运行时不再起第二个。
-- stale_resource · lifecycle · 记住的目录或资源已不存在时如何清理记录。
-- one_broken · consistency · 某个项目出错时其他项目照常使用。
-- public_view · consistency · 公开视图隐藏私有路径、缺口和错误。
-- recent · main · 打开过多个项目时能在首页切换。
+### Local tools / multiple projects (source: examples/joplo-board)
+- first_open · main · Offer a starting point when no data exists yet.
+- single_instance · conflict · Reuse a running instance.
+- stale_resource · lifecycle · Clean up records for missing directories or resources.
+- one_broken · consistency · Other projects keep working when one fails.
+- public_view · consistency · Hide private paths, gaps, and errors in the public view.
+- recent · main · Switch among previously opened projects on the home page.
 
-## 从回答落到情况与场景
-- feature.cases: { happy: '正常完成', denied: { title: '没有权限', dimension: 'permission', priority: 'high', expected: '解释原因' } }。
-- dimension 用上面的键；priority 为 high/medium/low；expected 说明预期结果。
-- 每个方案的 flow(..., { cases: ['happy'] }) 引用同一份情况清单，便于比较不同方案。
-- 有场景的情况自动标为 expressed；尚无场景、也无声明的情况自动 missing。
-- 新增 case 后再 check：每个方案都应重新审视这个情况。
+## Turn answers into cases and scenarios
+- feature.cases: { happy: 'Complete successfully', denied: { title: 'No permission', dimension: 'permission', priority: 'high', expected: 'Explain why' } }.
+- dimension uses the keys above; priority is high/medium/low; expected describes the expected result.
+- Each option uses flow(..., { cases: ['happy'] }) to reference the shared cases for comparison.
+- A case with a scenario is automatically expressed; one with neither a scenario nor a declaration is missing.
+- After adding a case, run check: reconsider it in every option.
 
-## 没有场景时声明 coverage
-- option.coverage: { case_key: undecided('尚未决定的原因') }。
-- missing('尚缺什么')：明确留着缺口；不能伪装成已表达。
-- notApplicable('不适用的原因') / excluded('本次排除的原因')：必须有非空 reason。
-- 显式声明优先于自动推导；确实需要演示的情况用场景表达。
-- 不为“全部覆盖”编造业务规则。开工时没决定的行为继续提问。
+## Declare coverage without a scenario
+- option.coverage: { case_key: undecided('Why this is undecided') }.
+- missing('What is missing'): leave the gap explicit; do not pretend it is Covered.
+- notApplicable('Why not applicable') / excluded('Why excluded'): require a nonempty reason.
+- Explicit declarations override inference. Use scenarios for cases that need a demo.
+- Do not invent business rules for full coverage. Keep asking about undecided behavior.
 
-flow 和 rule 的具体写法读 authoring；怎样定位覆盖诊断读 check。
-移动端暂无示例；需要手机版时单独做演示（D44）。`,
-  check: `# Joplo 检查：check
+See authoring for flow and rule syntax; check for locating coverage diagnostics.
+No mobile example yet; create a separate demo when mobile is needed (D44).`,
+  check: `# Joplo diagnostics: check
 
-运行 npx joplo check [dir]；用 --option feature.option 缩小结构和回放范围，用 --format json 取得机器结果。
-整个项目仍需编译，方案过滤不会隐藏项目级编译错误。源文件会在本机加载。
+Run npx joplo check [dir]. Use --option feature.option to narrow structure checks and replay; --format json gives machine output.
+The whole project still compiles. Option filtering does not hide project compilation errors. Source files load locally.
 
-## 读输出
-\`文件:行:列  级别  代码  说明\`
-例如：features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  可操作元素没有演示步骤。
-- 文件与行列是修改入口；先读附近源码，只改诊断指向的那一处，不重写整页。
-- error 退出 1；用法错误退出 2；只有 warning/info 时退出 0。
-- 最后一行汇总 error、warning、info。修复后再次 check 验证。
+## Read the output
+\`file:line:column  severity  CODE  message\`
+Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interactive element has no demo step.
+- File and line/column identify the edit location. Read nearby source and fix only that location; do not rewrite the page.
+- error exits 1; usage errors exit 2; warning/info only exits 0.
+- The last line totals error, warning, info. Run check again after fixing.
 
-## 常见代码 → 修复
-- UNKNOWN_COMPONENT：从 components 选当前版本支持的名称，不自行发明组件。
-- MISSING_ID / DUPLICATE_ID：给可操作元素稳定且在画面内唯一的 id，并更新相关步骤引用。
-- FUNCTION_PROP：把 onClick 等回调改为 flow 步骤和状态效果。
-- UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE：核对情况、规则和引用对象的键与所属方案。
-- UNKNOWN_SLOT / UNKNOWN_ROUTE / UNKNOWN_LAYOUT：核对路径、布局和 Slot 声明，堆叠到确实存在的位置。
-- UNKNOWN_PICK：pick 必须是本功能 options/ 下的方案文件名。
-- NOT_PICKED：功能未选方案所以不会发布；比较后为 feature.pick 填写选定方案文件名。
-- ROUTE_EXISTS：方案 routes 与已有路径重复；改用 on 堆叠或选择新路径。
-- BAD_ROUTE：路径没有以 / 开头；改为绝对的静态产品路径。
-- DUPLICATE_ELEMENT：同一画面内元素 id 重复；只改冲突 id 并同步相关引用。
-- CAPTION_TOO_LONG：本步说明过长；缩到约 24 字以内，一步一件事，长内容放说明层，见 demo。
-- EXPLAIN_TOO_LONG：explain 过长；缩到约 48 字以内，详细理由放独立说明层，见 demo。
+## Common codes → fixes
+- UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
+- MISSING_ID / DUPLICATE_ID: Give interactive elements stable ids unique within the stage; update step references.
+- FUNCTION_PROP: Replace onClick and other callbacks with flow steps and state effects.
+- UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE: Check case, rule, and reference keys and their owning option.
+- UNKNOWN_SLOT / UNKNOWN_ROUTE / UNKNOWN_LAYOUT: Check routes, layouts, and Slot declarations; add elements only to existing locations.
+- UNKNOWN_PICK: pick must be an option filename under this feature's options/.
+- NOT_PICKED: The feature has no picked option and will not publish. Compare options, then set feature.pick to the chosen filename.
+- ROUTE_EXISTS: An option route duplicates an existing route. Use on to add elements, or choose a new route.
+- BAD_ROUTE: The route does not start with /. Use an absolute static product route.
+- DUPLICATE_ELEMENT: Duplicate element ids within a stage. Change only conflicting ids and update references.
+- CAPTION_TOO_LONG: Shorten the caption to about 24 units: CJK characters count as 1 each, all others as 0.5; whitespace is ignored. One thing per step; move long content to an explanation layer. See demo.
+- EXPLAIN_TOO_LONG: Shorten the explain note to about 48 units, using the same CJK 1 / other 0.5 calculation. Put detailed rationale in a separate explanation layer. See demo.
 - ROLE_UNKNOWN：layer 或 card 的 role 不在 feature.roles 里；roles 要写成 { 键: role('名字') }，见 demo。
 - FORK_UNKNOWN：fork 的目标必须是同一方案里的另一个场景键，不能引用自己。
 - MARK_UNKNOWN：mark 的目标不在本步路径画面或任何层级里，核对元素 id；当前隐藏不算引用错误。
-- SHOT_UNKNOWN：镜头目标不在本步画面或任何层级里；核对目标 id 和所属层，见 demo。
-- LAYER_UNKNOWN：层级键不合法或 layer 缺少内容；键用字母/数字/下划线/连字符且不以 @ 开头，并提供非空 JSX。
-- TRACE_UNKNOWN：调用链为空、id 不存在、跨 Diagram 或路径不连通；使用同一张 Diagram 中已连接的节点/连线 id。
-- TRACE_AMBIGUOUS：两个节点间有多条候选连线；在 trace 中改写为具体的连线 id。
-- THEME_UNKNOWN：config({ theme }) 写的主题既不是内置主题也没有 themes/<name>.css；改成内置主题名，或补上这个 CSS 文件，见 demo 的“写主题”。
-- UNKNOWN_DIAGRAM_NODE：Diagram.Edge 的 from/to 不指向本图节点；修正端点为该 Diagram 内的节点 id。
-- ELEMENT_PROP：组件属性传入了 JSX 元素；图标改成字符串如 leftSection="+"，内容放到子节点。
-- ASSUMPTION_CONFIRMED：AI 假设保留 pending；用户确认后如实填写来源，不能只改状态。
-- UNBOUND_INTERACTIVE：增加相关场景的步骤，或明确禁用并说明原因，或标记 unmodeled。
-- DISABLED_WITHOUT_REASON：补充 disabledReason，说明为何不可操作。
-- CASE_NOT_COVERED：补场景或如实声明覆盖状态，先问清缺失行为。
-- EXPRESSED_WITHOUT_SCENARIO / COVERAGE_WITHOUT_REASON：补场景或适用/排除原因。
-- RULE_ELEMENT_NOT_FOUND：核对 rule.elements 与相关方案画面里的元素 id。
-- PENDING_AI_ASSUMPTION：向用户确认该假设；没有确认就保留 pending。
-- EMPTY_SCENARIO：确认是否需要演示动作；只展示权限等初始状态时可保留 0 步。
-- MISSING_TARGET / MISSING_SCENE：核对步骤目标及起始路径、go 跳转后的画面。
-- TARGET_HIDDEN / TARGET_DISABLED：检查初始状态与前序 set 效果，确保动作在当前步骤可执行。
-- NOT_INTERACTIVE / NOT_A_FIELD：选择合适组件或动作，输入动作用可接收值的组件。
-- ALREADY_COMPLETED / NOTHING_TO_GO_BACK：修正 done 后的步骤，或补足返回前的路径跳转。
-- LOAD_FAILED / WRONG_EXPORT / INVALID_SCHEMA：按说明修复导入、默认导出或字段结构。
+- SHOT_UNKNOWN: The shot target is absent from this step's stage and all layers. Check its id and layer; see demo.
+- LAYER_UNKNOWN: Invalid layer key or missing content. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
+- TRACE_UNKNOWN: Empty trace, unknown id, multiple Diagrams, or disconnected route. Use connected node/edge ids in one Diagram.
+- TRACE_AMBIGUOUS: Multiple candidate edges between nodes. Use the specific edge id in trace.
+- THEME_UNKNOWN: config({ theme }) names neither a built-in nor themes/<name>.css. Use a built-in or add that CSS file; see Write a theme in demo.
+- UNKNOWN_DIAGRAM_NODE: Diagram.Edge from/to does not reference a node in this Diagram. Correct the endpoint ids.
+- ELEMENT_PROP: A component prop contains JSX. Use strings for icons, such as leftSection="+", and children for content.
+- ASSUMPTION_CONFIRMED: Keep AI assumptions pending. After user confirmation, record the actual origin; do not change only status.
+- UNBOUND_INTERACTIVE: Add a scenario step, explicitly disable with a reason, or mark unmodeled.
+- DISABLED_WITHOUT_REASON: Add disabledReason explaining why the element cannot be used.
+- CASE_NOT_COVERED: Add a scenario or declare coverage truthfully. Ask about missing behavior first.
+- EXPRESSED_WITHOUT_SCENARIO / COVERAGE_WITHOUT_REASON: Add a scenario or a reason for Not applicable/Excluded.
+- RULE_ELEMENT_NOT_FOUND: Check rule.elements against element ids in the related option stages.
+- PENDING_AI_ASSUMPTION: Ask the user to confirm; keep pending until then.
+- EMPTY_SCENARIO: Decide whether actions are needed. Zero steps are valid for showing initial states such as permissions.
+- MISSING_TARGET / MISSING_SCENE: Check step targets, the start route, and the stage after go.
+- TARGET_HIDDEN / TARGET_DISABLED: Check initial state and preceding set effects so the action is executable at that step.
+- NOT_INTERACTIVE / NOT_A_FIELD: Choose the right component or action; input actions require value components.
+- ALREADY_COMPLETED / NOTHING_TO_GO_BACK: Fix steps after done, or add route navigation before back.
+- LOAD_FAILED / WRONG_EXPORT / INVALID_SCHEMA: Follow the message to fix imports, default exports, or field structure.
 
-用户指着某个画面元素时，先读 selection 得到精确位置。`,
-  selection: `# Joplo 选中定位：selection
+When the user points to a stage element, read selection first for its exact location.`,
+  selection: `# Joplo selection: selection
 
-用户在看板指着某个元素或步骤提出修改时，运行 npx joplo selection [dir]。
-它直接读取 .joplo/selection.json，不重新编译项目，省去整页搜索。
+When the user points to a board element or step to request an edit, run npx joplo selection [dir].
+It reads .joplo/selection.json directly without recompiling, avoiding a whole-page search.
 
-## 读结果并局部修改
-- 输出 at（项目相对 文件:行:列）、标签，以及该行前后各三行带行号的源码。
-- 按位置打开对应文件，只改用户指向的那一处；结合标签确认修改对象。
-- 行内容已变化时，先核对当前位置；源文件或该行不存在时回到看板重新选中。
-- 没有文件或内容为 null 时输出“当前没有选中”，退出 0。请用户先在看板里按住 ⌥（Alt）单击要改的元素。
-- 没有 at 的对象不能靠猜测定位；在看板中选中具体元素或步骤。
-- --format json 的 data.selection 保留 Selection，data.lines 给出 number/text。
+## Read the result and edit locally
+- Output includes at (project-relative file:line:column), a label, and numbered source with three lines before and after.
+- Open the file at that location. Edit only what the user pointed to; use the label to confirm the target.
+- If line content changed, verify the current location. If the file or line is gone, select again in the board.
+- A missing file or null content prints "Nothing selected" and exits 0. Ask the user to hold ⌥ (Alt) and click the element in the board.
+- Do not guess a location for an object without at. Select a specific element or step in the board.
+- With --format json, data.selection preserves Selection and data.lines provides number/text.
 
-## 完整工作流
-改文件 → npx joplo check → npx joplo dev 在看板上看（看板已在运行时只会把项目加进去） → 用户 ⌥+单击选中 → npx joplo selection → 只改那一处。
-改后再 check，保留其他方案、页面和已有用户决定。
-.joplo/ 是本地运行状态，不作为设计权威源，也不提交 Git。`,
-  publish: `# Joplo 发布：publish
+## Full workflow
+Edit → npx joplo check → npx joplo dev to view the board (a running board just adds the project) → user ⌥+clicks → npx joplo selection → edit only that location.
+Run check again afterward. Preserve other options, pages, and existing user decisions.
+.joplo/ is local runtime state, not the design authority. Do not commit it to Git.`,
+  publish: `# Joplo publishing: publish
 
-先在看板比较情况与方案，再决定每个功能要发布哪一个。
+Compare cases and options in the board, then decide which option to publish for each feature.
 
 ## pick
-- 在 features/<f>/feature.ts 中设置 pick: 'a'，对应 options/a.tsx；不是带功能前缀的限定 ID。
-- 每个功能只发布选定的一个方案；没有 pick 的功能不发布。
-- 页面与布局组成整体产品，各选定方案往路径上堆叠元素或新增路径。
+- Set pick: 'a' in features/<f>/feature.ts to select options/a.tsx. It is not a qualified ID with a feature prefix.
+- Publish only the picked option for each feature. Features without pick are omitted.
+- Pages and layouts compose the whole product; picked options add elements to routes or add routes.
 
 ## build
-- 在作者项目内运行 npx joplo check，再运行 npx joplo build。
-- 默认输出 dist/；用 --out-dir <dir> 指定输出位置。
-- 非空输出目录会被拒绝。确认可丢弃原产物后，显式加 --overwrite 清空并重建。
-- 发布站只含功能名、目标、场景演示、步骤字幕与整体布局。
-- 规则来源、AI 假设、缺口、待决问题和源文件位置只属于本地创作侧。
-- 这是纯静态只读演示，没有真实业务数据或后端。
+- Run npx joplo check in the author project, then npx joplo build.
+- Default output: dist/. Set --out-dir <dir> to change it.
+- Nonempty output directories are rejected. After confirming the old output can be discarded, pass --overwrite to clear and rebuild.
+- The published site contains only feature names, goals, scenario demos, step captions, and the overall layout.
+- Rule origins, AI assumptions, gaps, open questions, and source locations stay on the local authoring side.
+- This is a static, read-only demo with no real business data or backend.
 
-## 发布站怎样演示
-- 发布站和本地看板布局相同，只去掉规则、缺口、源码位置等创作侧信息。
-- 层级切换、导演跟随、只重放某一层、镜头聚焦与字幕在发布站都可用；具体写法读 demo。
-- 发布站也支持全屏：F 进入/切换全屏，空格播放/暂停，←/→ 上一步/下一步，Esc 退出。
-- 全屏只保留画面和字幕，播放控制浮在下方并自动隐藏。
-- 本地和发布站均可导出图片；导出视频只在本地，依赖本机 Playwright/Chromium。
+## Demos on the published site
+- The published site uses the same layout as the local board, with authoring details such as rules, gaps, and source locations removed.
+- Layer switching, Follow director, replaying one layer, shot focus, and captions all work on the published site. See demo for syntax.
+- Fullscreen works on the published site: F enters/toggles, Space plays/pauses, ←/→ steps back/forward, Esc exits.
+- Fullscreen keeps only the stage and captions. Playback controls float below and hide automatically.
+- Both local and published views can export images. Video export is local only and requires local Playwright/Chromium.
 
-## 部署
-在项目目录使用自己的 Wrangler 环境和账号：
+## Deploy
+Use your own Wrangler environment and account in the project directory:
+
 \`npx wrangler deploy --assets dist\`
-按 Wrangler 的项目配置提供站点名与兼容日期；访问控制由部署侧处理。
-只部署 dist 产物，不上传作者源文件。MCP、评论、协作与云端能力留到产品 V2。`,
+Provide the site name and compatibility date through Wrangler project configuration. Handle access control in deployment.
+Deploy only dist output, not author source files. MCP, comments, collaboration, and cloud features are reserved for product V2.`,
 };
 
 function distance(a: string, b: string): number {

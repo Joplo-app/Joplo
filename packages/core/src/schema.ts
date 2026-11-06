@@ -10,7 +10,7 @@ import { COMPONENT_TYPES } from './catalog.ts';
 export const SCHEMA_VERSION = 2 as const;
 
 /** 作者可写的 ID（对象键、元素 id）。 */
-export const Id = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/, 'ID 只能包含字母、数字、下划线和连字符，并以字母开头');
+export const Id = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/, 'ID must start with a letter and contain only letters, digits, underscores, and hyphens');
 /** 编译器生成的限定 ID，例如 `invite.happy`、`invite.a-modal@/members`。 */
 export const Qid = z.string().min(1).max(256);
 export const Source = z.string().optional();
@@ -20,7 +20,7 @@ const Json: z.ZodType<unknown> = z.lazy(() =>
 );
 
 // ---------- 受控条件 ----------
-export const StatePath = z.string().regex(/^(ui|data|inputs)(\.[A-Za-z0-9_-]+)*$/, '路径根必须是 ui、data 或 inputs');
+export const StatePath = z.string().regex(/^(ui|data|inputs)(\.[A-Za-z0-9_-]+)*$/, 'Path root must be ui, data, or inputs');
 
 export type Condition =
   | { truthy: string }

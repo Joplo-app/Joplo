@@ -18,12 +18,12 @@ type Dependencies = {
 };
 const integer = (name: string, max = Number.MAX_SAFE_INTEGER) => (text: string) => {
   const n = Number(text);
-  if (!/^\d+$/.test(text) || !Number.isSafeInteger(n) || n < 1 || n > max) throw new JoploError('USAGE', `${name} 必须是 1–${max} 的整数`);
+  if (!/^\d+$/.test(text) || !Number.isSafeInteger(n) || n < 1 || n > max) throw new JoploError('USAGE', `${name} must be an integer from 1 to ${max}`);
   return n;
 };
 const scale = (text: string) => {
   const n = Number(text);
-  if (!Number.isFinite(n) || n <= 0) throw new JoploError('USAGE', 'scale 必须为正数');
+  if (!Number.isFinite(n) || n <= 0) throw new JoploError('USAGE', 'scale must be positive');
   return n;
 };
 
@@ -39,18 +39,18 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   async function serverFunction<K extends 'startDev' | 'buildSite' | 'renderStep'>(name: K): Promise<typeof Server[K]> {
     let module: Record<string, unknown>;
     try { module = await loadServer(); }
-    catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server 无法加载 ${name}：${e instanceof Error ? e.message : String(e)}`); }
-    if (typeof module[name] !== 'function') throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server 尚未提供 ${name}；请使用实现 IR v2 服务契约的版本`);
+    catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server cannot load ${name}: ${e instanceof Error ? e.message : String(e)}`); }
+    if (typeof module[name] !== 'function') throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server does not provide ${name}; use a version implementing the IR v2 service contract`);
     return module[name] as typeof Server[K];
   }
-  const program = new Command().name('joplo').description('Joplo：用 TSX 创作、演示和发布功能设计').exitOverride()
+  const program = new Command().name('joplo').description('Joplo: Author, demo, and publish feature designs with TSX').exitOverride()
     .configureOutput({ writeOut: stdout, writeErr: stderr, outputError: () => {} });
   // 读取项目的命令先检查项目里的 @joplo-app/kit 与 CLI 是否同一版本（只提示，不阻止）
   program.hook('preAction', (_root, action) => {
     for (const note of projectNotes(resolve(String(action.args[0] ?? '.')), action.name(), { cli: deps.cliVersion })) stderr(note + '\n');
   });
-  const format = () => new Option('--format <format>', '输出格式').choices(['text', 'json']).default('text');
-  program.command('check').argument('[dir]', '项目目录', '.').addOption(format()).option('--option <qid>', '仅校验指定方案').action(async (dir, opts) => {
+  const format = () => new Option('--format <format>', 'Output format').choices(['text', 'json']).default('text');
+  program.command('check').argument('[dir]', 'Project directory', '.').addOption(format()).option('--option <qid>', 'Validate only the specified option').action(async (dir, opts) => {
     const report = await check(dir, opts.option);
     const summary = `${report.summary.error} error, ${report.summary.warning} warning, ${report.summary.info} info`;
     if (opts.format === 'json') {
@@ -59,49 +59,49 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     } else { for (const d of report.diagnostics) line(diagnosticLine(d)); line(summary); }
     if (report.summary.error) exitCode = 1;
   });
-  program.command('selection').argument('[dir]', '项目目录', '.').addOption(format()).action(async (dir, opts) => {
+  program.command('selection').argument('[dir]', 'Project directory', '.').addOption(format()).action(async (dir, opts) => {
     const data = await readSelection(dir);
-    const summary = data.selection ? `${data.selection.at ?? '无源位置'}  ${oneLine(data.selection.label ?? '')}` : '当前没有选中';
+    const summary = data.selection ? `${data.selection.at ?? 'No source location'}  ${oneLine(data.selection.label ?? '')}` : 'Nothing selected';
     if (opts.format === 'json') json(result(resolve(dir), summary, data));
     else { line(summary); for (const l of data.lines) line(`${l.number} | ${l.text}`); if (data.note) line(data.note); }
   });
-  program.command('init').argument('<dir>').option('--name <name>', '项目名（默认目录名）').option('--keep', '目录非空时只补缺失的文件，已有文件不改动')
+  program.command('init').argument('<dir>').option('--name <name>', 'Project name (defaults to directory name)').option('--keep', 'Add missing files in a nonempty directory; preserve existing files')
     .action(async (dir, opts) => { for (const l of initSummary(await initProject(dir, opts.name, { keep: opts.keep }))) line(l); });
-  program.command('skill').description('按需读取 Agent 用法，或安装用法入口')
-    .argument('[topic]', 'authoring/demo/components/cases/check/selection/publish，或 install')
-    .argument('[dir]', 'install 的目标项目目录')
-    .option('--force', '覆盖被修改过的 SKILL.md')
-    .option('--diff', '只显示 unified diff，不写入')
-    .option('--agents-md', '即使 AGENTS.md 不存在也创建托管段')
+  program.command('skill').description('Read agent usage on demand or install a usage pointer')
+    .argument('[topic]', 'authoring/demo/components/cases/check/selection/publish, or install')
+    .argument('[dir]', 'Target project directory for install')
+    .option('--force', 'Overwrite a modified SKILL.md')
+    .option('--diff', 'Show a unified diff without writing files')
+    .option('--agents-md', 'Create a managed block even if AGENTS.md does not exist')
     .action(async (topic, dir, opts) => {
       if (topic === 'install') {
         const installed = await installSkill(dir ?? '.', await readCliVersion(), opts);
         stdout(installed.output); exitCode = installed.code;
       } else {
-        if (dir !== undefined || opts.force || opts.diff || opts.agentsMd) throw new JoploError('USAGE', 'dir、--force、--diff、--agents-md 只适用于 joplo skill install');
+        if (dir !== undefined || opts.force || opts.diff || opts.agentsMd) throw new JoploError('USAGE', 'dir, --force, --diff, and --agents-md apply only to joplo skill install');
         stdout(topic === undefined ? skillIndex(await readCliVersion(), COMPONENT_DOCS) : skillTopic(topic, COMPONENT_DOCS));
       }
     });
-  program.command('guide').description('joplo skill authoring 的兼容别名').action(() => { stdout(guide()); });
-  program.command('dev').argument('[dir]', '项目目录', '.').option('--port <port>', '端口（默认 4790）', integer('port', 65535)).option('--open', '打开浏览器').action(async (dir, opts) => {
+  program.command('guide').description('Compatibility alias for joplo skill authoring').action(() => { stdout(guide()); });
+  program.command('dev').argument('[dir]', 'Project directory', '.').option('--port <port>', 'Port (default: 4790)', integer('port', 65535)).option('--open', 'Open the browser').action(async (dir, opts) => {
     const startDev = await serverFunction('startDev');
     const handle = await startDev({ projectDir: resolve(dir), port: opts.port, open: opts.open, log: s => stderr(oneLine(s) + '\n') });
     line(handle.url);
     // 已有存活的看板：项目已注册进去，本进程直接退出（不启动第二个看板进程）
-    if (handle.attached) stderr(`已加入正在运行的看板。打开 ${handle.url}\n`);
+    if (handle.attached) stderr(`Joined the running board. Open ${handle.url}\n`);
   });
-  program.command('build').argument('[dir]', '项目目录', '.').option('--out-dir <dir>', '输出目录（默认项目 dist）').option('--overwrite', '允许清空非空输出目录').action(async (dir, opts) => {
+  program.command('build').argument('[dir]', 'Project directory', '.').option('--out-dir <dir>', 'Output directory (default: project dist)').option('--overwrite', 'Allow clearing a nonempty output directory').action(async (dir, opts) => {
     const buildSite = await serverFunction('buildSite');
     const data = await buildSite({ projectDir: resolve(dir), outDir: opts.outDir === undefined ? undefined : resolve(opts.outDir), overwrite: opts.overwrite });
     for (const d of data.diagnostics) line(diagnosticLine(d));
-    line(`已构建 ${data.outDir}（${data.files.length} 文件）`);
+    line(`Built ${data.outDir} (${data.files.length} files)`);
     if (data.diagnostics.some(d => d.severity === 'error')) exitCode = 1;
   });
-  program.command('render').argument('[dir]', '项目目录', '.').requiredOption('--scenario-id <qid>', '场景 ID').option('--step-id <qid>', '步骤执行后的位置；默认初始状态')
-    .option('--theme <theme>', '主题名：内置主题（sketch、clean、blueprint、nord、dracula、solarized-light、terminal、kraft、contrast）或项目 themes/<name>.css；默认用项目配置的主题').requiredOption('--out <file>', '截图文件')
-    .option('--width <pixels>', '截图宽度（舞台宽度跟随页面自己的 viewport），需同时提供 height', integer('width')).option('--height <pixels>', '截图高度，需同时提供 width', integer('height'))
-    .option('--scale <scale>', '像素倍率', scale).option('--overwrite', '允许覆盖截图').action(async (dir, opts) => {
-      if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'width 与 height 必须同时提供');
+  program.command('render').argument('[dir]', 'Project directory', '.').requiredOption('--scenario-id <qid>', 'Scenario ID').option('--step-id <qid>', 'Position after this step; defaults to the initial state')
+    .option('--theme <theme>', 'Theme: built-in (sketch, clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast) or project themes/<name>.css; defaults to the project theme').requiredOption('--out <file>', 'Screenshot file')
+    .option('--width <pixels>', 'Screenshot width (stage width follows the page viewport); requires height', integer('width')).option('--height <pixels>', 'Screenshot height; requires width', integer('height'))
+    .option('--scale <scale>', 'Pixel scale', scale).option('--overwrite', 'Allow overwriting the screenshot').action(async (dir, opts) => {
+      if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'width and height must be provided together');
       const renderStep = await serverFunction('renderStep');
       const data = await renderStep({ projectDir: resolve(dir), scenarioId: opts.scenarioId, stepId: opts.stepId, theme: opts.theme, out: resolve(opts.out),
         viewport: opts.width === undefined ? undefined : { width: opts.width, height: opts.height }, scale: opts.scale, overwrite: opts.overwrite });

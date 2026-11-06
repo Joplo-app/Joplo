@@ -109,8 +109,8 @@ test('仅校验指定方案；未知方案和无效模式是用法错误', () =>
   const r = validate(p, { mode: 'all', optionId: a });
   expect(Object.keys(r.verification)).toEqual([a]);
   expect(r.diagnostics.some(d => d.ref?.optionId === 'invite.b-batch')).toBe(false);
-  expect(() => validate(p, { mode: 'all', optionId: 'absent' })).toThrow('方案不存在');
-  expect(() => validate(p, { mode: 'bad' as any })).toThrow('无效校验模式');
+  expect(() => validate(p, { mode: 'all', optionId: 'absent' })).toThrow('Option does not exist');
+  expect(() => validate(p, { mode: 'bad' as any })).toThrow('Invalid validation mode');
 });
 test('回放缺少初始画面时定位场景，而非第一步', () => {
   const p = fixture(); const sc = p.scenarios[`${a}.success`]!;

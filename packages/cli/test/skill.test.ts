@@ -28,11 +28,11 @@ async function run(args: string[]) {
 test('列表版本取自 CLI package.json；主题、guide 均不加载 server', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const r = await run(['skill']); expect(r.code).toBe(0);
-  expect(r.stdout.split('\n')[0]).toBe(`Joplo ${pkg.version} · Agent 用法（按需读取）`);
+  expect(r.stdout.split('\n')[0]).toBe(`Joplo ${pkg.version} · Agent usage (read on demand)`);
   for (const name of ['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'publish']) {
     const topic = await run(['skill', name]); expect(topic.code).toBe(0);
     expect(topic.stdout.trimEnd().split('\n').length).toBeLessThan(150);
-    expect(topic.stdout.trimEnd().split('\n').at(-1)).toMatch(/^相关主题：/);
+    expect(topic.stdout.trimEnd().split('\n').at(-1)).toMatch(/^Related topics: /);
   }
   expect((await run(['guide'])).stdout).toBe((await run(['skill', 'authoring'])).stdout);
 });
@@ -49,13 +49,13 @@ test('安装短指针、真实哈希，重复运行字节和 mtime 均不变', a
   const content = await readFile(skillPath(dir), 'utf8');
   expect(content.trimEnd().split('\n').length).toBeLessThanOrEqual(20);
   expect(content).toContain('name: joplo');
-  expect(content).toContain('description: 在 Joplo 项目（有 joplo.config.ts）里设计功能原型、方案和演示时使用');
+  expect(content).toContain('description: Use to design feature prototypes, options, and demos in Joplo projects (with joplo.config.ts)');
   expect(content).toContain('npx joplo skill demo'); expect(content).toContain('npx joplo skill authoring'); expect(content).toContain('npx joplo check'); expect(content).toContain('npx joplo selection');
   const match = /<!-- joplo-skill ([^ ]+) sha256:([a-f0-9]{64}) -->\n$/.exec(content)!;
   expect(match).not.toBeNull(); expect(match[1]).toBe(await readCliVersion());
   expect(match[2]).toBe(createHash('sha256').update(content.slice(0, match.index)).digest('hex'));
   const before = await stat(skillPath(dir));
-  const second = await run(['skill', 'install', dir]); expect(second.code).toBe(0); expect(second.stdout).toContain('已是最新');
+  const second = await run(['skill', 'install', dir]); expect(second.code).toBe(0); expect(second.stdout).toContain('Already up to date');
   expect(await readFile(skillPath(dir), 'utf8')).toBe(content); expect((await stat(skillPath(dir))).mtimeMs).toBe(before.mtimeMs);
   await expect(stat(join(dir, 'AGENTS.md'))).rejects.toMatchObject({ code: 'ENOENT' });
 });
@@ -95,7 +95,7 @@ test('AGENTS.md 仅替换托管段；保留段外 BOM、CRLF、非 UTF-8 字节�
   const content = await readFile(join(dir, 'AGENTS.md'));
   expect(content.subarray(0, prefix.length)).toEqual(prefix); expect(content.subarray(-suffix.length)).toEqual(suffix);
   expect(content.toString()).toContain('npx joplo skill demo'); expect(content.toString()).toContain('npx joplo skill'); expect(content.toString().match(/<!-- joplo:start -->/g)).toHaveLength(1);
-  const again = await run(['skill', 'install', dir]); expect(again.stdout).toContain('已是最新'); expect(await readFile(join(dir, 'AGENTS.md'))).toEqual(content);
+  const again = await run(['skill', 'install', dir]); expect(again.stdout).toContain('Already up to date'); expect(await readFile(join(dir, 'AGENTS.md'))).toEqual(content);
 });
 test('已有 AGENTS 无托管段时追加且保留前缀，显式 agents-md 可新建', async () => {
   const dir = await temp(); const original = '用户已有规则（没有尾换行）'; await writeFile(join(dir, 'AGENTS.md'), original);
@@ -112,7 +112,7 @@ test.each(['<!-- joplo:start -->', '<!-- joplo:end -->', '<!-- joplo:start --><!
 });
 test('无项目配置时只警告并成功安装；路径含空格', async () => {
   const parent = await temp(false); const dir = join(parent, '含 空格');
-  const r = await run(['skill', 'install', dir]); expect(r.code).toBe(0); expect(r.stdout).toContain('警告'); expect(r.stdout).toContain('joplo.config.ts');
+  const r = await run(['skill', 'install', dir]); expect(r.code).toBe(0); expect(r.stdout).toContain('Warning'); expect(r.stdout).toContain('joplo.config.ts');
   expect(await readFile(skillPath(dir), 'utf8')).toContain('name: joplo');
 });
 test('install 专用参数不能静默用于主题', async () => {
@@ -153,11 +153,11 @@ test('同版本旧指针无用户修改时可加入 demo，旧哈希更新后再
   await writeFile(join(dir, 'AGENTS.md'), oldAgents);
   const update = await run(['skill', 'install', dir]);
   expect(update.code).toBe(0);
-  expect(update.stdout).toContain('已写入');
+  expect(update.stdout).toContain('Wrote');
   expect(await readFile(skillPath(dir), 'utf8')).toBe(original);
   expect(await readFile(join(dir, 'AGENTS.md'), 'utf8')).toContain('npx joplo skill demo');
   const current = await readFile(skillPath(dir), 'utf8');
   expect(/sha256:([a-f0-9]{64})/.exec(current)![1]).not.toBe(oldHash);
   const again = await run(['skill', 'install', dir]);
-  expect(again.stdout).toContain('已是最新'); expect(await readFile(skillPath(dir), 'utf8')).toBe(current);
+  expect(again.stdout).toContain('Already up to date'); expect(await readFile(skillPath(dir), 'utf8')).toBe(current);
 });

@@ -52,15 +52,15 @@ describe('buildSite', () => {
   it('目标目录非空且没有 overwrite 时拒绝；overwrite 时清空重建', async () => {
     const out = path.join(dir, 'dist');
     fs.writeFileSync(path.join(out, 'keep.txt'), 'x');
-    await expect(buildSite({ projectDir: dir })).rejects.toThrow(/目标目录非空/);
+    await expect(buildSite({ projectDir: dir })).rejects.toThrow(/Output directory is not empty/);
     expect(fs.existsSync(path.join(out, 'keep.txt'))).toBe(true);
     await buildSite({ projectDir: dir, overwrite: true });
     expect(fs.existsSync(path.join(out, 'keep.txt'))).toBe(false);
   }, 120_000);
 
   it('永远不清空项目目录本身或它的上级、也不写 .joplo/', async () => {
-    await expect(buildSite({ projectDir: dir, outDir: dir, overwrite: true })).rejects.toThrow(/项目目录本身或它的上级/);
-    await expect(buildSite({ projectDir: dir, outDir: path.dirname(dir), overwrite: true })).rejects.toThrow(/项目目录本身或它的上级/);
+    await expect(buildSite({ projectDir: dir, outDir: dir, overwrite: true })).rejects.toThrow(/project directory or its parent/);
+    await expect(buildSite({ projectDir: dir, outDir: path.dirname(dir), overwrite: true })).rejects.toThrow(/project directory or its parent/);
     await expect(buildSite({ projectDir: dir, outDir: path.join(dir, '.joplo/x') })).rejects.toThrow(/\.joplo/);
     expect(fs.existsSync(path.join(dir, 'joplo.config.ts'))).toBe(true);
   });
@@ -129,7 +129,7 @@ describe('renderStep', () => {
     expect(alert.at).toMatch(/a-modal\.tsx/);
     expect(r.elements.every((e) => e.type !== '#text')).toBe(true);
     expect(r.warnings).toEqual([]);
-    await expect(renderStep({ projectDir: dir, scenarioId: 'invite.a-modal.success', out })).rejects.toThrow(/已存在/);
+    await expect(renderStep({ projectDir: dir, scenarioId: 'invite.a-modal.success', out })).rejects.toThrow(/already exists/);
   }, 120_000);
 
   it('Toast 场景（线框主题）与跨路径场景都能渲染；未知场景报 NOT_FOUND；不能写到源文件或 .joplo/', async () => {
@@ -139,7 +139,7 @@ describe('renderStep', () => {
     expect(b.sceneId).toBe('invite.b-batch@/members/invite');
     expect(b.elements.find((e) => e.id === 'tbl_results')?.visible).toBe(true);
     await expect(renderStep({ projectDir: dir, scenarioId: 'nope', out: path.join(outDir, 'n.png') })).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    await expect(renderStep({ projectDir: dir, scenarioId: 'invite.a-modal.success', out: path.join(dir, 'joplo.config.ts'), overwrite: true })).rejects.toThrow(/源文件/);
+    await expect(renderStep({ projectDir: dir, scenarioId: 'invite.a-modal.success', out: path.join(dir, 'joplo.config.ts'), overwrite: true })).rejects.toThrow(/source file/);
     await expect(renderStep({ projectDir: dir, scenarioId: 'invite.a-modal.success', out: path.join(dir, '.joplo/x.png') })).rejects.toThrow(/\.joplo/);
   }, 180_000);
 });

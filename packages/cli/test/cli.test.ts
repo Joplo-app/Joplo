@@ -69,9 +69,9 @@ test('selection 返回定位、标签与前后各三行，JSON 保留 Selection'
 });
 test('selection 文件不存在、null、无 at 均受控', async () => {
   const d = await temp();
-  expect((await cli(['selection', d])).stdout).toContain('当前没有选中');
+  expect((await cli(['selection', d])).stdout).toContain('Nothing selected');
   await mkdir(join(d, '.joplo')); await writeFile(join(d, '.joplo/selection.json'), 'null');
-  const r = await cli(['selection', d]); expect(r.code).toBe(0); expect(r.stdout).toContain('当前没有选中');
+  const r = await cli(['selection', d]); expect(r.code).toBe(0); expect(r.stdout).toContain('Nothing selected');
   await writeFile(join(d, '.joplo/selection.json'), '{"at":null,"label":"画面"}');
   expect((await cli(['selection', d])).code).toBe(0);
 });
@@ -79,6 +79,9 @@ test('init 后立即 check 通过，非空目录拒绝且保留内容', async ()
   const d = await temp(false); const target = join(d, 'new');
   expect((await cli(['init', target, '--name', '最小项目'])).code).toBe(0);
   expect((await cli(['check', target])).code).toBe(0);
+  const example = await readFile(join(target, 'features/example/options/a.tsx'), 'utf8');
+  expect(example).toContain(".click('start', 'Click Start', done('Completed'))");
+  expect(example).not.toMatch(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u);
   expect(JSON.parse(await readFile(join(target, 'tsconfig.json'), 'utf8')).compilerOptions).toMatchObject({ jsx: 'react-jsxdev', jsxImportSource: '@joplo-app/kit', allowImportingTsExtensions: true });
   expect((await cli(['init', target])).code).toBe(1);
   expect(await readFile(join(target, '.gitignore'), 'utf8')).toContain('.joplo/');

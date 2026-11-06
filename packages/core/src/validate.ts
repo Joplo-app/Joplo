@@ -12,7 +12,7 @@ export type ValidationReport = {
 
 /** IR v2 的确定性校验。源位置缺失（例如手工构造/发布 IR）时回退到配置文件。 */
 export function validate(project: Project, opts: ValidationOptions = { mode: 'all' }): ValidationReport {
-  if (!['structure', 'replay', 'all'].includes(opts.mode)) throw new JoploError('USAGE', '无效校验模式');
+  if (!['structure', 'replay', 'all'].includes(opts.mode)) throw new JoploError('USAGE', 'Invalid validation mode');
   const diagnostics: Diagnostic[] = [];
   const verification: ValidationReport['verification'] = {};
   const seen = new Set<string>();
@@ -46,7 +46,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     return report();
   }
   const p = parsed.data;
-  if (opts.optionId && !Object.hasOwn(p.options, opts.optionId)) throw new JoploError('USAGE', `方案不存在：${opts.optionId}`);
+  if (opts.optionId && !Object.hasOwn(p.options, opts.optionId)) throw new JoploError('USAGE', `Option does not exist: ${opts.optionId}`);
   const options = Object.values(p.options).filter(o => !opts.optionId || o.id === opts.optionId);
   const included = (optionId?: string | null) => !opts.optionId || !optionId || optionId === opts.optionId;
   const scenarios = Object.values(p.scenarios).filter(s => included(s.optionId));
@@ -58,39 +58,39 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     for (const [kind, table] of Object.entries({ feature: p.features, case: p.cases, option: p.options, rule: p.rules, scenario: p.scenarios, issue: p.issues })) {
       for (const [id, value] of Object.entries(table)) {
         const optionId = 'optionId' in value ? value.optionId : kind === 'option' ? id : undefined;
-        if (included(optionId)) ref(id === value.id, `记录键 ${id} 与对象 ID ${value.id} 不一致`, { ...value, optionId }, kind);
+        if (included(optionId)) ref(id === value.id, `Record key ${id} does not match object ID ${value.id}`, { ...value, optionId }, kind);
       }
     }
     for (const c of Object.values(p.cases).filter(c => !opts.optionId || c.featureId === p.options[opts.optionId]?.featureId)) {
-      ref(p.features[c.featureId]?.caseIds.includes(c.id), `情况的功能不存在或未列出情况：${c.featureId}`, c, 'case');
+      ref(p.features[c.featureId]?.caseIds.includes(c.id), `Case feature does not exist or does not list the case: ${c.featureId}`, c, 'case');
     }
     for (const f of Object.values(p.features).filter(f => !opts.optionId || f.optionIds.includes(opts.optionId))) {
-      for (const id of f.caseIds) ref(p.cases[id]?.featureId === f.id, `功能情况不存在或跨功能：${id}`, f, 'feature');
-      for (const id of f.optionIds) ref(p.options[id]?.featureId === f.id, `功能方案不存在或跨功能：${id}`, f, 'feature');
-      if (f.pick) ref(p.options[f.pick]?.featureId === f.id, `选定方案不存在或跨功能：${f.pick}`, f, 'feature');
+      for (const id of f.caseIds) ref(p.cases[id]?.featureId === f.id, `Feature case is missing or belongs to another feature: ${id}`, f, 'feature');
+      for (const id of f.optionIds) ref(p.options[id]?.featureId === f.id, `Feature option is missing or belongs to another feature: ${id}`, f, 'feature');
+      if (f.pick) ref(p.options[f.pick]?.featureId === f.id, `Picked option is missing or belongs to another feature: ${f.pick}`, f, 'feature');
     }
     for (const o of options) {
       const value = { ...o, optionId: o.id };
-      ref(p.features[o.featureId]?.optionIds.includes(o.id), `方案的功能不存在或未列出方案：${o.featureId}`, value, 'option');
+      ref(p.features[o.featureId]?.optionIds.includes(o.id), `Option feature does not exist or does not list the option: ${o.featureId}`, value, 'option');
       const cases = Object.values(p.cases).filter(c => c.featureId === o.featureId);
-      for (const c of cases) if (!o.coverage[c.id]) emit('warning', 'CASE_NOT_COVERED', `情况缺少覆盖：${c.id} ${c.title}`, o.source, { kind: 'case', id: c.id, optionId: o.id });
+      for (const c of cases) if (!o.coverage[c.id]) emit('warning', 'CASE_NOT_COVERED', `Case has no coverage: ${c.id} ${c.title}`, o.source, { kind: 'case', id: c.id, optionId: o.id });
       for (const [id, c] of Object.entries(o.coverage)) {
         const r = { kind: 'case', id, optionId: o.id };
-        ref(p.cases[id]?.featureId === o.featureId, `coverage 情况不存在或跨功能：${id}`, value, 'option');
-        for (const sid of c.scenarioIds) ref(p.scenarios[sid]?.optionId === o.id, `coverage 场景不存在或跨方案：${sid}`, value, 'option');
-        if (c.status === 'expressed' && !c.scenarioIds.length) emit('warning', 'EXPRESSED_WITHOUT_SCENARIO', `已表达情况没有场景：${id}`, o.source, r);
-        if (['not_applicable', 'excluded'].includes(c.status) && !c.reason?.trim()) emit('warning', 'COVERAGE_WITHOUT_REASON', `不适用或已排除必须说明原因：${id}`, o.source, r);
-        if (c.status === 'missing') emit('warning', 'CASE_NOT_COVERED', `情况尚未表达：${id} ${p.cases[id]?.title ?? ''}`, o.source, r);
+        ref(p.cases[id]?.featureId === o.featureId, `coverage case is missing or belongs to another feature: ${id}`, value, 'option');
+        for (const sid of c.scenarioIds) ref(p.scenarios[sid]?.optionId === o.id, `coverage scenario is missing or belongs to another option: ${sid}`, value, 'option');
+        if (c.status === 'expressed' && !c.scenarioIds.length) emit('warning', 'EXPRESSED_WITHOUT_SCENARIO', `Covered case has no scenario: ${id}`, o.source, r);
+        if (['not_applicable', 'excluded'].includes(c.status) && !c.reason?.trim()) emit('warning', 'COVERAGE_WITHOUT_REASON', `Not applicable or Excluded requires a reason: ${id}`, o.source, r);
+        if (c.status === 'missing') emit('warning', 'CASE_NOT_COVERED', `Case is not yet Covered: ${id} ${p.cases[id]?.title ?? ''}`, o.source, r);
       }
     }
     for (const r of Object.values(p.rules).filter(r => included(r.optionId) && (!opts.optionId || r.featureId === p.options[opts.optionId]?.featureId))) {
-      ref(p.features[r.featureId], `规则的功能不存在：${r.featureId}`, r, 'rule');
-      if (r.optionId) ref(p.options[r.optionId]?.featureId === r.featureId, `规则的方案不存在或跨功能：${r.optionId}`, r, 'rule');
-      for (const id of r.caseIds) ref(p.cases[id]?.featureId === r.featureId, `规则情况不存在或跨功能：${id}`, r, 'rule');
+      ref(p.features[r.featureId], `Rule feature does not exist: ${r.featureId}`, r, 'rule');
+      if (r.optionId) ref(p.options[r.optionId]?.featureId === r.featureId, `Rule option is missing or belongs to another feature: ${r.optionId}`, r, 'rule');
+      for (const id of r.caseIds) ref(p.cases[id]?.featureId === r.featureId, `Rule case is missing or belongs to another feature: ${id}`, r, 'rule');
       const scenes = Object.values(p.scenes).filter(s => s.optionId && (r.optionId ? s.optionId === r.optionId : p.options[s.optionId]?.featureId === r.featureId));
-      for (const id of r.elementIds) if (!scenes.some(s => findNode(s, id))) emit('warning', 'RULE_ELEMENT_NOT_FOUND', `规则关联的元素在相关方案的所有画面中均不存在：${id}`, r.source, { kind: 'rule', id: r.id, optionId: r.optionId });
+      for (const id of r.elementIds) if (!scenes.some(s => findNode(s, id))) emit('warning', 'RULE_ELEMENT_NOT_FOUND', `Rule element is absent from every stage in the related options: ${id}`, r.source, { kind: 'rule', id: r.id, optionId: r.optionId });
       if (r.origin === 'ai_assumption' && r.confirmation === 'pending') emit('info', 'PENDING_AI_ASSUMPTION', r.text, r.source, { kind: 'rule', id: r.id, optionId: r.optionId });
-      if (r.origin === 'ai_assumption' && r.confirmation === 'confirmed') emit('error', 'ASSUMPTION_CONFIRMED', 'AI 假设不能标为已确认', r.source, { kind: 'rule', id: r.id, optionId: r.optionId });
+      if (r.origin === 'ai_assumption' && r.confirmation === 'confirmed') emit('error', 'ASSUMPTION_CONFIRMED', 'An AI assumption cannot be Confirmed', r.source, { kind: 'rule', id: r.id, optionId: r.optionId });
     }
     // 从每个场景的路径和跳转追踪步骤目标；只按 id 全局匹配会误认其他页面的同名元素。
     const identity = (n: SceneNode) => JSON.stringify([n.source ?? '', n.from ?? '', n.id]);
@@ -111,38 +111,38 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     }
     for (const s of Object.values(p.scenes).filter(s => included(s.optionId))) {
       const value = { id: s.id, optionId: s.optionId ?? undefined, source: s.root.source ?? (s.optionId ? p.options[s.optionId]?.source : undefined) };
-      ref(p.scenes[s.id] === s, `画面键与 ID 不一致：${s.id}`, value, 'scene');
-      if (s.optionId) ref(p.options[s.optionId], `画面方案不存在：${s.optionId}`, value, 'scene');
-      ref(p.routes[s.route], `画面路径不存在：${s.route}`, value, 'scene');
+      ref(p.scenes[s.id] === s, `Stage key does not match ID: ${s.id}`, value, 'scene');
+      if (s.optionId) ref(p.options[s.optionId], `Stage option does not exist: ${s.optionId}`, value, 'scene');
+      ref(p.routes[s.route], `Stage route does not exist: ${s.route}`, value, 'scene');
       const ids = new Set<string>();
       walkNodes(s.root, n => {
         const r = { kind: 'element', id: n.id, optionId: n.from ?? s.optionId ?? undefined };
-        if (ids.has(n.id)) emit('error', 'DUPLICATE_ELEMENT', `画面内元素 ID 重复：${n.id}`, n.source, r, 'reference');
+        if (ids.has(n.id)) emit('error', 'DUPLICATE_ELEMENT', `Duplicate element ID in stage: ${n.id}`, n.source, r, 'reference');
         ids.add(n.id);
-        if (n.disabled !== undefined && n.disabled !== false && !n.disabledReason?.trim()) emit('warning', 'DISABLED_WITHOUT_REASON', `禁用元素缺少原因：${n.id}`, n.source, r);
-        if (INTERACTIVE_TYPES.has(n.type) && !bound.has(identity(n)) && !(n.disabled === true && n.disabledReason?.trim()) && !n.unmodeled) emit('warning', 'UNBOUND_INTERACTIVE', `可操作元素没有演示步骤：${n.id}；请绑定步骤、禁用并说明原因或标记 unmodeled`, n.source, r);
+        if (n.disabled !== undefined && n.disabled !== false && !n.disabledReason?.trim()) emit('warning', 'DISABLED_WITHOUT_REASON', `Disabled element has no reason: ${n.id}`, n.source, r);
+        if (INTERACTIVE_TYPES.has(n.type) && !bound.has(identity(n)) && !(n.disabled === true && n.disabledReason?.trim()) && !n.unmodeled) emit('warning', 'UNBOUND_INTERACTIVE', `Interactive element has no demo step: ${n.id}; bind a step, disable with a reason, or mark unmodeled`, n.source, r);
       });
     }
     const stepIds = new Set<string>();
     for (const sc of scenarios) {
       const o = p.options[sc.optionId];
-      ref(o, `场景方案不存在：${sc.optionId}`, sc, 'scenario');
-      ref(p.scenes[sc.initial.sceneId]?.optionId === sc.optionId, `场景初始画面不存在或跨方案：${sc.initial.sceneId}`, sc, 'scenario');
-      for (const id of sc.caseIds) ref(p.cases[id]?.featureId === o?.featureId, `场景情况不存在或跨功能：${id}`, sc, 'scenario');
-      if (!sc.steps.length) emit('info', 'EMPTY_SCENARIO', `场景没有步骤：${sc.name}`, sc.source, { kind: 'scenario', id: sc.id, optionId: sc.optionId });
+      ref(o, `Scenario option does not exist: ${sc.optionId}`, sc, 'scenario');
+      ref(p.scenes[sc.initial.sceneId]?.optionId === sc.optionId, `Scenario initial stage is missing or belongs to another option: ${sc.initial.sceneId}`, sc, 'scenario');
+      for (const id of sc.caseIds) ref(p.cases[id]?.featureId === o?.featureId, `Scenario case is missing or belongs to another feature: ${id}`, sc, 'scenario');
+      if (!sc.steps.length) emit('info', 'EMPTY_SCENARIO', `Scenario has no steps: ${sc.name}`, sc.source, { kind: 'scenario', id: sc.id, optionId: sc.optionId });
       for (const st of sc.steps) {
         const value = { ...st, optionId: sc.optionId };
-        ref(!stepIds.has(st.id), `步骤 ID 重复：${st.id}`, value, 'step'); stepIds.add(st.id);
-        for (const id of st.ruleIds) { const rule = p.rules[id]; ref(rule && rule.featureId === o?.featureId && (!rule.optionId || rule.optionId === sc.optionId), `步骤规则不存在或跨范围：${id}`, value, 'step'); }
-        for (const e of st.effects) if (e.type === 'navigate') ref(p.scenes[e.sceneId]?.optionId === sc.optionId, `跳转画面不存在或跨方案：${e.sceneId}`, value, 'step');
+        ref(!stepIds.has(st.id), `Duplicate step ID: ${st.id}`, value, 'step'); stepIds.add(st.id);
+        for (const id of st.ruleIds) { const rule = p.rules[id]; ref(rule && rule.featureId === o?.featureId && (!rule.optionId || rule.optionId === sc.optionId), `Step rule is missing or outside its scope: ${id}`, value, 'step'); }
+        for (const e of st.effects) if (e.type === 'navigate') ref(p.scenes[e.sceneId]?.optionId === sc.optionId, `Navigation stage is missing or belongs to another option: ${e.sceneId}`, value, 'step');
         // 字幕只用来点一句（只提示，不截断、不改写作者的文字）；长内容放进单独的说明层，由导演切过去讲
         const r = { kind: 'step' as const, id: st.id, optionId: sc.optionId, stepId: st.id };
         const at = st.source ?? sc.source;
         const cl = captionLength(st.caption);
-        if (cl > CAPTION_MAX) emit('warning', 'CAPTION_TOO_LONG', `说明有 ${cl} 个字（建议不超过 ${CAPTION_MAX}，英文按半个字算）：「${st.caption}」。字幕只点一句；详细内容移到单独的说明层，例如 layers: { why: layer('设计理由', <Why />) }，再在这一步 shot('why_xxx') 切过去讲`, at, r);
+        if (cl > CAPTION_MAX) emit('warning', 'CAPTION_TOO_LONG', `Caption length is ${cl} units (recommended maximum: ${CAPTION_MAX}; CJK characters count as 1 each, all others as 0.5): "${st.caption}". Keep the caption to one point; move details to a separate explanation layer, for example layers: { why: layer('Design rationale', <Why />) }, then use shot('why_xxx') in this step to present it`, at, r);
         if (st.explain) {
           const el = captionLength(st.explain);
-          if (el > EXPLAIN_MAX) emit('warning', 'EXPLAIN_TOO_LONG', `explain 有 ${el} 个字（建议不超过 ${EXPLAIN_MAX}）。信息很多时放进单独的说明层，例如 layers: { why: layer('设计理由', <Why />) }，再用 shot 切过去`, at, r);
+          if (el > EXPLAIN_MAX) emit('warning', 'EXPLAIN_TOO_LONG', `explain note length is ${el} units (recommended maximum: ${EXPLAIN_MAX}; CJK characters count as 1 each, all others as 0.5). Move long content to a separate explanation layer, for example layers: { why: layer('Design rationale', <Why />) }, then switch to it with shot`, at, r);
         }
       }
     }

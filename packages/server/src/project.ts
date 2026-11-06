@@ -58,7 +58,7 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
           ...d,
           at: precise,
           // 位置已在 at 里，说明只保留第一行的原因
-          message: d.message.replace(/\x1b\[[0-9;]*m/g, '').split('\n')[0]!.replace(`载入失败：${precise} `, '载入失败：'),
+          message: d.message.replace(/\x1b\[[0-9;]*m/g, '').split('\n')[0]!.replace(`Load failed: ${precise} `, 'Load failed: '),
         };
     }
     const key = `${out.code}|${out.at}|${out.message}`;

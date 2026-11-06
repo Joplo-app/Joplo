@@ -5,7 +5,7 @@
  */
 const major = Number(/^(\d+)\./.exec(process.versions.node)?.[1] ?? 0);
 if (major < 22) {
-  process.stderr.write(`✗ Joplo 需要 Node.js 22 或更高版本，当前是 ${process.versions.node}。\n  升级：nvm install 22，或从 https://nodejs.org 下载。\n`);
+  process.stderr.write(`✗ Joplo requires Node.js 22 or later; current version is ${process.versions.node}.\n  Upgrade: nvm install 22, or download from https://nodejs.org.\n`);
   process.exit(1);
 }
 const { runCli } = await import('./cli.ts');
