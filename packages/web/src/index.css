@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "./fonts/fonts.css";
+@import "./fonts/MarkerGothic.css";
+@import "./fonts/WenKai.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -411,4 +413,29 @@
   .jflash {
     animation: none;
   }
+}
+
+/* 思考中的标题闪动、流式输出的光标（D56） */
+@keyframes jshimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+.jstage .jshimmer {
+  background: linear-gradient(90deg, var(--jp-muted) 0%, var(--jp-muted) 35%, var(--jp-ink) 50%, var(--jp-muted) 65%, var(--jp-muted) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: jshimmer 1.8s linear infinite;
+}
+@keyframes jcaret {
+  50% { opacity: 0; }
+}
+.jstage .jcaret {
+  margin-left: 1px;
+  color: var(--jp-muted);
+  animation: jcaret 0.9s steps(1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jstage .jshimmer, .jstage .jcaret { animation: none; }
 }

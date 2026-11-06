@@ -95,7 +95,7 @@ describe('配色格', () => {
   });
   it('按钮上的名字与“复制 theme”', () => {
     expect(appearanceLabel({ theme: 'nord', font: null, stroke: null }, cat)).toBe('Nord');
-    expect(appearanceLabel({ theme: 'clean', font: 'hand', stroke: null }, cat)).toBe('纸白 · 手写');
+    expect(appearanceLabel({ theme: 'clean', font: 'hand', stroke: null }, cat)).toBe('纸白 · 漫黑');
     expect(appearanceLabel({ theme: 'gone', font: null, stroke: null }, cat)).toBe('gone');
     expect(themeLine('nord')).toBe("theme: 'nord',");
   });

@@ -121,6 +121,7 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 用 Stack / Group / SimpleGrid / Grid 的属性排版：<Group justify="space-between">、<SimpleGrid cols={{ base: 1, md: 3 }}>。
 - 响应式写成对象 { base, xs, sm, md, lg, xl }，或 visibleFrom="sm" / hiddenFrom="sm"；AppShell 在窄于 navbar.breakpoint 时自动收起导航。
 - 输入组件直接写 label：<TextInput id="email" label="邮箱"/>，自动字幕会用它。
+- 画面高度不固定（舞台随窗口变化）：整屏布局不写固定像素高度，否则窗口矮时底部的输入框、按钮会被裁掉。写法见 demo 的「整屏布局」。
 
 ## 规则与边界
 - rule('约束', { origin?, status?, cases?: ['happy'], elements?: ['invite'] })。
@@ -170,6 +171,24 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 - 不要写很长的页面再让观众滚动阅读；一屏放下，靠镜头推近看细节。
 - 每个页面只有一种设备，默认电脑；page({ viewport: 'mobile' }, tree) 固定用 Phone 外框和 390 宽显示。
 - 层级需要手机画面时用 layer('手机版', <MobileView/>, { viewport: 'mobile' })；需要手机版就单独做页面或演示（D44）。
+
+## 整屏布局：高度跟着舞台走
+- 层级和电脑页面铺满舞台，舞台大小随看板窗口变化；写死的像素高度（h={690}）在矮窗口里会把底部挤出画面。
+- 一列从上到下撑满：外层 h="100%"，会变长的那块（聊天记录、列表、产物）写 style={{ flex: 1, minHeight: 0 }}，固定的放在它下面：
+  <Grid h="100%"><Grid.Col span={6}><Stack h="100%"><ScrollArea style={{ flex: 1, minHeight: 0 }}>消息</ScrollArea>
+  <Group><PromptInput id="prompt"/><Button id="send">发送</Button></Group></Stack></Grid.Col></Grid>
+- 占位和产物同理：Placeholder 写 h="100%"，Artifact 默认占满它所在的容器。
+- 固定像素只用在真正定高的东西上（头像、图标、Diagram 的画布高度）。
+
+## 过渡卡、角色与 Agent 输出（D56）
+- .card('标题', { sub?, points?, role? }, ...效果)：整屏一句大字，也是一步。用于开场、收尾、时间跳跃和换人。
+- 开场写「为什么做」，收尾用 points 列出确认了什么；时间跳跃写 .card('3 天后', set($.data.invite, 'expired'))。
+- 角色：feature 里写 roles: { ajie: role('阿杰', { desc: '被邀请的朋友' }) }；层级写 layer('阿杰的手机', <…/>, { role: 'ajie' })。
+- 有角色的层级在画面左下角显示名牌，层级标签带头像；.card('现在是阿杰', { role: 'ajie' }) 之后导演切到阿杰的层。
+- 一次只看一个人；要并排就在同一层里画两块。
+- stream($.ui.reply, '…')：和 set 一样写入状态，播放到这一步时绑定它的文字逐字出现，跳到这一步时直接显示全文。
+- Agent 界面：<Thinking title={$.ui.thought} active={$.ui.thinking} duration="6 秒">过程</Thinking> 表示思考；
+  <Artifact title="行程.md" kind="doc" status={$.ui.planStatus}>内容</Artifact> 是侧边产物，对话里用 <Artifact.Ref id="…"/> 指向它。
 
 ## 写主题
 - 主题就是一个 CSS 文件：项目根目录 themes/<name>.css，在 joplo.config.ts 写 theme: '<name>' 作为默认主题；与内置主题同名时用你的。
@@ -295,6 +314,7 @@ flow 和 rule 的具体写法读 authoring；怎样定位覆盖诊断读 check�
 - DUPLICATE_ELEMENT：同一画面内元素 id 重复；只改冲突 id 并同步相关引用。
 - CAPTION_TOO_LONG：本步说明过长；缩到约 24 字以内，一步一件事，长内容放说明层，见 demo。
 - EXPLAIN_TOO_LONG：explain 过长；缩到约 48 字以内，详细理由放独立说明层，见 demo。
+- ROLE_UNKNOWN：layer 或 card 的 role 不在 feature.roles 里；roles 要写成 { 键: role('名字') }，见 demo。
 - SHOT_UNKNOWN：镜头目标不在本步画面或任何层级里；核对目标 id 和所属层，见 demo。
 - LAYER_UNKNOWN：层级键不合法或 layer 缺少内容；键用字母/数字/下划线/连字符且不以 @ 开头，并提供非空 JSX。
 - TRACE_UNKNOWN：调用链为空、id 不存在、跨 Diagram 或路径不连通；使用同一张 Diagram 中已连接的节点/连线 id。

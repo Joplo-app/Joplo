@@ -35,6 +35,7 @@ import {
   type ShellLayout,
 } from '@joplo-app/core';
 import { cn } from '@/lib/utils';
+import { streamMs } from '../runtime/pace';
 import { Rough, RoughPath, ThemeContext, roundRectPath, useStageTheme, useStroke } from './rough';
 import { fontStyle } from './appearance';
 import { DESC_FONT, EDGE_FONT, FOCUS_EDGE_FONT, FOCUS_MOVE_MS, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, diagramStructure, edgeEmphasized, effectiveState, focusLayout, focusMembers, type FocusLayout, edgePath, layoutDiagram, structureKey, type DLayout } from './diagram-layout';
@@ -57,7 +58,12 @@ export type RenderCtx = {
   focus?: string[] | null;
   /** 由 trace 推算的 Diagram 状态（D48，core 的 diagramStateAt）；节点 / 连线没写 state 时用它。 */
   traced?: DiagramStates;
+  /** 流式输出（D56）：正在逐字出现的状态路径（如 ui.reply）；null = 全部直接显示全文。 */
+  streaming?: StreamingCtx | null;
 };
+
+/** key 变化时重新开始逐字输出；paused 时停住；speed 与自动播放的速度一致。 */
+export type StreamingCtx = { paths: ReadonlySet<string>; key: string; paused: boolean; speed: number };
 
 export const RenderContext = createContext<RenderCtx | null>(null);
 const useCtx = () => {
@@ -136,7 +142,40 @@ function boxStyle(stroke?: string, fill?: string): CSSProperties {
 
 function TextNode({ node, p }: NodeProps) {
   const attrs = useRootAttrs(node);
+  const { streaming } = useCtx();
+  const raw = node.props?.text;
+  const path = typeof raw === 'string' && raw.startsWith('$') ? raw.slice(1) : null;
+  if (streaming && path && streaming.paths.has(path)) return <StreamText key={streaming.key} attrs={attrs} text={str(p.text)} s={streaming} />;
   return <span {...attrs}>{str(p.text)}</span>;
+}
+
+/** 逐字出现的文字（D56）：总时长与自动播放的停留用同一个 streamMs；出完之前末尾有光标。 */
+function StreamText({ attrs, text, s }: { attrs: Record<string, unknown>; text: string; s: StreamingCtx }) {
+  const chars = useMemo(() => [...text], [text]);
+  const [n, setN] = useState(0);
+  const paused = useRef(s.paused);
+  paused.current = s.paused;
+  useEffect(() => {
+    const per = streamMs(text, s.speed) / Math.max(1, chars.length);
+    let elapsed = 0;
+    let last = performance.now();
+    const id = setInterval(() => {
+      const now = performance.now();
+      if (!paused.current) elapsed += now - last;
+      last = now;
+      const k = Math.min(chars.length, Math.floor(elapsed / per));
+      setN(k);
+      if (k >= chars.length) clearInterval(id);
+    }, 30);
+    return () => clearInterval(id);
+  }, [text, chars, s.speed]);
+  const done = n >= chars.length;
+  return (
+    <span {...attrs} data-jstreaming={done ? undefined : ''}>
+      {done ? text : chars.slice(0, n).join('')}
+      {done ? null : <span aria-hidden className="jcaret">▍</span>}
+    </span>
+  );
 }
 
 const HTML_TAGS = ['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'main', 'section', 'header', 'footer', 'nav', 'aside', 'ul', 'ol', 'li', 'strong', 'em', 'small', 'code'] as const;
@@ -1508,6 +1547,84 @@ function ToolCall({ node, p, children }: NodeProps) {
   );
 }
 
+/**
+ * 思考过程（D56）：标题是此刻在想什么；active 时标题闪动、前面转圈；结束后显示“思考了 {duration}”。
+ * opened 时展开子节点（过程），左侧一条细线。
+ */
+function Thinking({ node, p, children }: NodeProps) {
+  const active = p.active === true;
+  const opened = p.opened === true;
+  const title = str(p.title);
+  const duration = str(p.duration);
+  const root = useRoot(node, p, { style: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', fontSize: 14, color: DIMMED } });
+  return (
+    <div {...root} data-active={active ? '' : undefined}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        {active ? <Spinner size={14} c={DIMMED} /> : <span aria-hidden style={{ width: 14, textAlign: 'center', flexShrink: 0 }}>✦</span>}
+        <span className={cn('jtrunc', active && 'jshimmer')} style={{ color: active ? undefined : INK2, fontWeight: 500 }}>
+          {title || (active ? '思考中…' : '思考过程')}
+        </span>
+        {!active && duration ? <span style={{ flexShrink: 0, color: DIMMED }}>· 思考了 {duration}</span> : null}
+        {children ? <span aria-hidden style={{ flexShrink: 0, fontSize: 11 }}>{opened ? '▲' : '▼'}</span> : null}
+      </div>
+      {opened && children ? (
+        <div style={{ marginLeft: 6, paddingLeft: 14, borderLeft: `2px solid ${LINE}`, display: 'flex', flexDirection: 'column', gap: 6, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{children}</div>
+      ) : null}
+    </div>
+  );
+}
+
+const ARTIFACT_ICON: Record<string, string> = { doc: '▤', code: '</>', sheet: '▦', web: '◎', image: '▣' };
+const ARTIFACT_KIND: Record<string, string> = { doc: '文档', code: '代码', sheet: '表格', web: '网页', image: '图片' };
+function ArtifactStatus({ status }: { status: string }) {
+  if (status === 'generating')
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: INFO, flexShrink: 0, fontSize: 13 }}>
+        <Spinner size={13} c={INFO} />
+        生成中
+      </span>
+    );
+  if (status === 'error') return <span style={{ color: DANGER, flexShrink: 0, fontSize: 13 }}>生成失败</span>;
+  return <span style={{ color: OK, flexShrink: 0, fontSize: 13 }}>✓ 已生成</span>;
+}
+
+/** Agent 的侧边产物（D56）：标题栏（类型图标、标题、版本、状态）+ 内容区；默认占满所在容器的高度。 */
+function Artifact({ node, p, children }: NodeProps) {
+  const mode = useStroke();
+  const kind = str(p.kind, 'doc');
+  const root = useRoot(node, p, { className: cn('jbox', mode === 'clean' && 'rounded-xl'), style: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', minHeight: 0, background: SURFACE, overflow: 'hidden' } });
+  return (
+    <div {...root} data-kind={kind}>
+      <Rough seedKey={node.id} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${LINE}`, minWidth: 0 }}>
+        <span aria-hidden style={{ fontFamily: MONO, fontSize: 13, color: INK2, flexShrink: 0 }}>{ARTIFACT_ICON[kind] ?? ARTIFACT_ICON.doc}</span>
+        <span className="jtrunc" style={{ fontWeight: 600, color: INK }}>{str(p.title, '产物')}</span>
+        {p.version !== undefined ? <span style={{ flexShrink: 0, fontSize: 12, color: DIMMED, border: `1px solid ${LINE_STRONG}`, borderRadius: 999, padding: '0 7px', lineHeight: '18px' }}>{str(p.version)}</span> : null}
+        <span style={{ flex: 1 }} />
+        <ArtifactStatus status={str(p.status, 'ready')} />
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{children}</div>
+    </div>
+  );
+}
+
+/** 对话里指向产物的卡片（可点击打开）。 */
+function ArtifactRef({ node, p, disabled }: NodeProps) {
+  const mode = useStroke();
+  const kind = str(p.kind, 'doc');
+  const root = useRoot(node, p, { disabled, className: cn('jbox', mode === 'clean' && 'rounded-lg'), style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', maxWidth: 360, padding: '10px 14px', background: SURFACE, textAlign: 'left' } });
+  return (
+    <button {...root} type="button" data-jcontrol={node.id}>
+      <Rough seedKey={node.id} />
+      <span aria-hidden style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0, borderRadius: 8, background: SUBTLE, fontFamily: MONO, fontSize: 13, color: INK2 }}>{ARTIFACT_ICON[kind] ?? ARTIFACT_ICON.doc}</span>
+      <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+        <span className="jtrunc" style={{ fontWeight: 600, color: INK }}>{str(p.title, '产物')}</span>
+        <span style={{ fontSize: 12, color: DIMMED }}>{ARTIFACT_KIND[kind] ?? '文档'}{p.status === 'generating' ? ' · 生成中' : ' · 点击打开'}</span>
+      </span>
+    </button>
+  );
+}
+
 function PromptInput({ node, p, disabled }: NodeProps) {
   const v = useInputValue(node, p);
   const has = v !== undefined && v !== null && v !== '';
@@ -2184,6 +2301,8 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   Drawer: Overlay,
   ChatMessage,
   ToolCall,
+  Thinking,
+  Artifact,
   Terminal,
   'Terminal.Command': TerminalCommand,
   'Terminal.Output': TerminalOutput,
@@ -2219,6 +2338,7 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   'Accordion.Control': AccordionControl,
   Pagination,
   PromptInput,
+  'Artifact.Ref': ArtifactRef,
   'Terminal.Input': TerminalInput,
 };
 

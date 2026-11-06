@@ -120,6 +120,17 @@ export const Drawer = c('Drawer');
 export const ChatMessage = c('ChatMessage');
 export const ToolCall = c('ToolCall');
 export const PromptInput = c('PromptInput');
+/**
+ * 思考过程（D56）：`<Thinking title={$.ui.thought} active={$.ui.thinking} duration="8 秒" opened>…</Thinking>`。
+ * title 是此刻在想什么（随步骤 set 变化）；active 时标题闪动；结束后显示“思考了 {duration}”；opened 时展开子节点里的过程。
+ */
+export const Thinking = c('Thinking');
+/**
+ * Agent 的侧边产物（D56）：`<Artifact title="露营行程.md" kind="doc" status={$.ui.planStatus} version="v2">…</Artifact>`，
+ * 子节点是产物内容（Text / List / Table / Code 等，文字可以用 stream 逐字生成）。
+ * 对话里引用它用 `<Artifact.Ref id="open_plan" title="露营行程" kind="doc" />`（可点击）。
+ */
+export const Artifact = Object.assign(c('Artifact'), { Ref: c('Artifact.Ref') });
 
 // ---------- 设备外框（Joplo 自有） ----------
 /** 终端窗口：`<Terminal title="~/work"><Terminal.Command>npx joplo skill</Terminal.Command><Terminal.Output tone="ok">…</Terminal.Output></Terminal>`。 */

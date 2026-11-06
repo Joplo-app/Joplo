@@ -11,15 +11,15 @@
  * 本文件不引用它们，因此发布站的产物里不会出现（不变量 5）。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsUpDown, Clapperboard, Cog, Ellipsis, Expand, Gauge, Maximize, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Share, Shrink } from 'lucide-react';
-import { stepTouchesLayer, type Project, type Scenario } from '@joplo-app/core';
+import { ChevronLeft, ChevronRight, ChevronsUpDown, Clapperboard, Cog, Ellipsis, Expand, Film, Gauge, Maximize, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Share, Shrink } from 'lucide-react';
+import { roleOfScene, stepTouchesLayer, type Project, type RoleInfo, type Scenario } from '@joplo-app/core';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
 import { Subtitle } from './Subtitle';
 import { isFullscreenKey, useFullscreen, useIdleVisible } from './fullscreen';
 import { subtitleFor } from './subtitle-content';
 import { SPEEDS, asSpeed } from '../runtime/pace';
-import { cameraFor, cameraPosition } from './cameraFor';
+import { cameraFor, cameraPosition, withLeadFrame } from './cameraFor';
 import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
 import { JoploLogo } from './JoploMark';
@@ -159,9 +159,10 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
         ) : null}
         <span className="relative">{chip.index}</span>
         {chip.system && !cur ? <Cog className="relative size-3" aria-label="系统" /> : null}
+        {chip.card && !cur ? <Film className="relative size-3" aria-label="过渡" /> : null}
         {cur ? (
           <span className="relative min-w-0 truncate font-jb text-[12px] font-semibold">
-            {chip.system ? '系统 · ' : ''}
+            {chip.system ? '系统 · ' : chip.card ? '过渡 · ' : ''}
             {chip.label}
           </span>
         ) : null}
@@ -272,7 +273,7 @@ function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer,
 }
 
 /** 层级标签（D55）：贴在舞台框上沿，正在看的那层与舞台连成一片；导演跟随时它带摄像机。右侧「只重放这一层」与「跟随导演」。 */
-function LayerTabs({ layers, viewLayer, director, onLayer, onDirector, onReplay }: { layers: { id: string; title: string }[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; onDirector: (on: boolean) => void; onReplay: () => void }) {
+function LayerTabs({ layers, viewLayer, director, onLayer, onDirector, onReplay }: { layers: { id: string; title: string; role?: RoleInfo | null }[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; onDirector: (on: boolean) => void; onReplay: () => void }) {
   return (
     <div className="relative z-[1] -mb-[1.5px] flex h-9 shrink-0 items-end gap-1 pl-3" data-testid="layer-bar">
       <div role="tablist" aria-label="层级" className="flex min-w-0 items-end gap-1 overflow-hidden" data-testid="layer-switch">
@@ -292,6 +293,11 @@ function LayerTabs({ layers, viewLayer, director, onLayer, onDirector, onReplay 
             )}
           >
             {t.camera ? <Clapperboard className="size-3.5" aria-label="导演镜头" /> : null}
+            {t.role ? (
+              <span aria-label={t.role.name} className="inline-flex size-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: t.role.color }}>
+                {[...t.role.name][0]}
+              </span>
+            ) : null}
             {t.title}
           </button>
         ))}
@@ -410,7 +416,8 @@ export function PlayerPage(p: PlayerPageProps) {
   const director = p.layer === null || plan.director;
   const { layers, viewLayer } = plan;
   const useCam = plan.enabled;
-  const camera = plan.spec;
+  // 用户操作的目标不在画面里时，控制器请求把它和当前焦点一起框进来（leadFrame），观众才看得到点击和输入
+  const camera = withLeadFrame(plan.spec, snap.leadFrame);
   const shownScene = state ? project.scenes[plan.sceneId ?? state.sceneId] : undefined;
   const device = shownScene?.viewport === 'mobile' ? 'mobile' : 'desktop';
   // 自由缩放：导演跟随时每一步由镜头重新接管；手动时保持，直到换层或点「适应」
@@ -534,6 +541,7 @@ export function PlayerPage(p: PlayerPageProps) {
               inspect={!!p.inspectMode && !!p.onInspect}
               selectedId={p.selectedId ?? null}
               preview={snap.preview}
+              stream={snap.streamAt ? { ...snap.streamAt, paused: snap.paused } : null}
               epoch={snap.epoch}
               animate={!ctl.reducedMotion}
               nextTargetId={nextTargetId}
@@ -678,7 +686,7 @@ export function PlayerPage(p: PlayerPageProps) {
             </div>
           ) : null}
           <div className="flex min-h-0 flex-1 flex-col">
-            {hasLayerBar ? <LayerTabs layers={layers} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} onDirector={(on) => p.onLayer(on ? null : viewLayer)} onReplay={replayLayer} /> : null}
+            {hasLayerBar ? <LayerTabs layers={layers.map((l) => ({ ...l, role: roleOfScene(project, l.sceneId) }))} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} onDirector={(on) => p.onLayer(on ? null : viewLayer)} onReplay={replayLayer} /> : null}
             {/* 舞台框：画面和字幕合成一体（1.5px 墨线，圆角 10）；字幕区跟随舞台主题 */}
             <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface', hasLayerBar && 'rounded-tl-none')} data-testid="stage-frame" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
               {stageArea}

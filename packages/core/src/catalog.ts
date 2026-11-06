@@ -24,7 +24,7 @@ const STRUCTURE = [
   // 反馈与浮层
   'Alert', 'Loader', 'Progress', 'RingProgress', 'Skeleton', 'Notification', 'Modal', 'Drawer',
   // AI 交互（Joplo 自有）
-  'ChatMessage', 'ToolCall',
+  'ChatMessage', 'ToolCall', 'Thinking', 'Artifact',
   // 设备外框（Joplo 自有）：终端与手机
   'Terminal', 'Terminal.Command', 'Terminal.Output', 'Phone',
   // 架构图（Joplo 自有，D41）：节点与连线的 state 绑定 $.ui，由 flow 步骤驱动
@@ -42,6 +42,7 @@ const INTERACTIVE = [
   'Button', 'ActionIcon', 'CloseButton', 'Anchor', 'a', 'NavLink', 'Burger',
   'TextInput', 'PasswordInput', 'NumberInput', 'Textarea', 'Select', 'MultiSelect', 'Checkbox', 'Radio.Group', 'Switch',
   'SegmentedControl', 'FileInput', 'Tabs', 'Tabs.Tab', 'Accordion.Control', 'Pagination', 'PromptInput', 'Terminal.Input',
+  'Artifact.Ref',
 ] as const;
 
 export const COMPONENT_TYPES = [...STRUCTURE, ...INTERACTIVE] as const;
@@ -128,6 +129,8 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Drawer: 'opened（门控）, title, position: left|right|top|bottom（默认 left）, size',
   ChatMessage: "from: 'user'|'assistant', name；子节点是消息内容（保留换行）",
   ToolCall: "title, state: 'running'|'done'|'error'；子节点是调用详情",
+  Thinking: 'title（此刻在想什么，可绑定 $.ui.x）, active（思考中：标题闪动）, duration（结束后显示“思考了 …”）, opened（展开过程）；子节点是思考过程',
+  Artifact: "title, kind: 'doc'|'code'|'sheet'|'web'|'image', status: 'generating'|'ready'|'error', version —— Agent 的侧边产物面板，子节点是内容",
   Terminal: 'title —— 终端窗口（命令行原型），子节点是 Terminal.Command / Terminal.Output / Terminal.Input；内容超出 h 或 mah 时内部滚动',
   Diagram: "direction: 'right'|'down'（默认 right）, h（高度，默认 420）—— 架构图，子节点是 Diagram.Group / Diagram.Node / Diagram.Edge；布局自动生成且确定（state 变化不移动节点）；整图缩放放进容器（不滚动），看细节用演示页统一的缩放平移（滚轮 / 捏合 / 拖动）或镜头推近；连线正交走线、出入口与平行段间距 ≥ 10px；shot 同一张图里 2 个及以上节点（或一条连线）时，这些节点移到中央排成紧凑的聚焦小图；节点多、宽度有限时用 direction='down'。逐段出现：给 Group / Node / Edge 写 when={$.ui.x}，flow 里 set 为真时出现（布局按全部元素预先算好，已有元素不动）；调用链用步骤里的 trace() 描述，节点与连线的 state 自动推算",
   'Diagram.Group': 'label —— 带标题的分组框，子节点是 Diagram.Node 或嵌套的 Diagram.Group',
@@ -182,6 +185,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'Accordion.Control': '可点击的标题（需要 id）',
   Pagination: 'total, value / defaultValue —— select 动作写入页码',
   PromptInput: 'placeholder —— AI 输入框，type 动作写入；发送按钮用 ActionIcon 或 Button',
+  'Artifact.Ref': "title, kind, status —— 对话里指向产物的卡片（需要 id，可点击）",
   'Terminal.Input': 'prompt（默认 "$"）, placeholder —— 终端里的输入行（需要 id），type 动作写入',
 };
 

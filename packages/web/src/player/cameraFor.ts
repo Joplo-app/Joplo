@@ -47,3 +47,12 @@ export function cameraPosition(scenario: Scenario | null | undefined, position: 
   const st = scenario.steps[activeStep];
   return st && st.kind === 'system' && activeStep === position ? position + 1 : position;
 }
+
+/**
+ * 用户操作的目标此刻不在画面里时（演示控制器的 leadFrame），镜头把它和当前焦点一起框进来，观众才看得到点击和输入。
+ * 没有镜头（spec 为 null）或目标已经是焦点时原样返回。
+ */
+export function withLeadFrame(spec: CameraSpec | null, leadFrame: string | null): CameraSpec | null {
+  if (!spec || !leadFrame || spec.targets.includes(leadFrame)) return spec;
+  return { targets: [...spec.targets, leadFrame], key: `${spec.key}+${leadFrame}` };
+}
