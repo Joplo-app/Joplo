@@ -29,8 +29,17 @@ git commit -m "release: 0.1.3"
 git push origin main
 pnpm release:publish --tag latest
 pnpm release:verify        # 发布之后必跑
-git tag v0.1.3 && git push origin v0.1.3   # 官方 Agent 技能按 tag 固定：npx skills add Joplo-app/Joplo@v0.1.3
+git tag v0.1.3
+git push origin v0.1.3
 ```
+
+顺序不能乱：
+
+1. `pnpm release:version <v>`：改六个包的版本，并重新生成 `skills/*/SKILL.md`（带新版本标记）。
+2. 跑完检查后，把 `packages/*/package.json`、`pnpm-lock.yaml`、`skills/` 一起提交，推送 main。
+3. `pnpm release:publish --tag <标签>`：发布到 npm（可续跑）。
+4. `pnpm release:verify`：确认六个包都在 registry 上并能实际 `npx -y joplo@<v>` 安装；不通过就回到第 3 步补发。
+5. 通过后在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`。用户用 `npx skills add Joplo-app/Joplo@v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。tag 要等 verify 通过再推，避免指向一个装不上的版本。
 
 `release:version` 会同时重新生成仓库根目录的官方 Agent 技能 `skills/*/SKILL.md`（带版本标记，D64），要和版本号一起提交；`scripts/test/skills.test.ts` 会在不一致时失败（单独重新生成：`pnpm skills:build`）。
 

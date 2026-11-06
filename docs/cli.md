@@ -5,7 +5,7 @@
 ## 命令与参数
 
 ```sh
-npx joplo init <dir> [--name <name>] [--keep]
+npx joplo init <dir> [--name <name>] [--keep] [--no-skill]
 npx joplo dev [dir] [--port <port>] [--open]
 npx joplo check [dir] [--format text|json] [--option <qid>]
 npx joplo selection [dir] [--format text|json]
@@ -35,6 +35,8 @@ npx joplo render [dir] --scenario-id <qid> --out <file> \
 - `--keep`：目录非空时只补缺失文件，已有文件不改动；不传时拒绝非空目录。
 - package.json 将 `joplo` 与 `@joplo-app/kit` 锁到当前 CLI 的相同精确版本，并提供 dev/check/build 脚本。
 - tsconfig 使用 `react-jsxdev`、`jsxImportSource: '@joplo-app/kit'`、`allowImportingTsExtensions`。
+- 默认同时安装 Agent 技能（D64），等同于对新项目运行 `npx joplo skill install --agents-md`：写入 `.claude/skills/joplo/SKILL.md`、`.claude/skills/joplo-feedback/SKILL.md` 和 AGENTS.md 的 Joplo 托管段，输出一行 “✓ Agent skills: …; skip with --no-skill”。`--keep` 时沿用 skill install 的保护：用户改过的技能不覆盖（两个都不写，提示先 `--diff` 再 `--force`），AGENTS.md 只增改托管段；标记损坏时不写技能并说明原因。这些情况都不影响 init 成功。
+- `--no-skill`：不安装技能，也不写 AGENTS.md。
 - 最后一行提示安装依赖并启动看板；命令写法按 npm/pnpm/yarn/bun 环境选择。
 
 ```sh
@@ -105,7 +107,7 @@ JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }
 - `--force`：允许覆盖被用户修改过的技能文件。
 - `--agents-md`：即使 AGENTS.md 不存在也创建指针段。
 
-SKILL.md 末尾保存 `<!-- joplo-skill <版本> sha256:… -->`，哈希覆盖标记前全部原始字节。重装时：未改动的生成内容（包括旧版本写的短指针、用 `npx skills add` 装的官方技能）自动更新，输出 “Wrote … updated from <旧版本> to <新版本>”；字节相同输出“Already up to date”且不重写；任何一个技能被用户改过或缺少有效标记时，两个技能和 AGENTS.md 都不写，提示先 `--diff` 看差异、再 `--force` 覆盖，退出 1。目录没有 joplo.config.ts 时警告但仍安装。`joplo init` 不安装技能。
+SKILL.md 末尾保存 `<!-- joplo-skill <版本> sha256:… -->`，哈希覆盖标记前全部原始字节。重装时：未改动的生成内容（包括旧版本写的短指针、用 `npx skills add` 装的官方技能）自动更新，输出 “Wrote … updated from <旧版本> to <新版本>”；字节相同输出“Already up to date”且不重写；任何一个技能被用户改过或缺少有效标记时，两个技能和 AGENTS.md 都不写，提示先 `--diff` 看差异、再 `--force` 覆盖，退出 1。目录没有 joplo.config.ts 时警告但仍安装。`joplo init` 默认对新项目做同样的安装（见下）。
 
 AGENTS.md 仅替换 `<!-- joplo:start -->` 与 `<!-- joplo:end -->` 之间的段落，段外字节不变；标记损坏或重复时拒绝写入。指针文件可提交 Git，安装器下次读取哈希/标记决定是否更新，Agent 读取指针后再调用 CLI。
 

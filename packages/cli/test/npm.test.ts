@@ -8,7 +8,9 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { detectPackageManager, pmCommands } from '../src/pm.ts';
 import { cliVersion, projectNotes } from '../src/startup.ts';
-import { initProject, nextStepLine } from '../src/init.ts';
+import { initProject, initSummary, nextStepLine } from '../src/init.ts';
+import { skillFiles } from '../src/skill.ts';
+import { stat } from 'node:fs/promises';
 import { runCli } from '../src/cli.ts';
 
 const dirs: string[] = [];
@@ -110,6 +112,75 @@ describe('init', () => {
     expect(out).toContain(`"joplo": "${VERSION}", "@joplo-app/kit": "${VERSION}"`);
     expect(out).toContain('jsxImportSource: "@joplo-app/kit"');
     expect(out.trim().split('\n').at(-1)).toBe('Next: cd my-demo && pnpm install && pnpm joplo dev');
+  });
+});
+
+describe('init 安装 Agent 技能（等同于对新项目运行 skill install --agents-md）', () => {
+  const skill = (d: string, name: string) => join(d, '.claude/skills', name, 'SKILL.md');
+  test('默认写入 joplo、joplo-feedback 与 AGENTS.md 托管段，内容与 skill install / 官方技能一致；输出说明装了什么、可用 --no-skill 跳过', async () => {
+    const d = join(await temp(), 'my-demo');
+    const r = await initProject(d, undefined, { env: {} });
+    for (const f of skillFiles(VERSION)) expect(await readFile(skill(d, f.name))).toEqual(f.content);
+    const agents = await readFile(join(d, 'AGENTS.md'), 'utf8');
+    expect(agents.startsWith('<!-- joplo:start -->\n## Joplo\n')).toBe(true); expect(agents).toContain('<!-- joplo:end -->');
+    expect(r.skill).toMatchObject({ written: ['.claude/skills/joplo/SKILL.md', '.claude/skills/joplo-feedback/SKILL.md', 'AGENTS.md'], modified: [] });
+    const lines = initSummary(r, {});
+    const line = lines.find(l => l.includes('.claude/skills/joplo'))!;
+    expect(line).toMatch(/^✓ Agent skills: \.claude\/skills\/joplo, \.claude\/skills\/joplo-feedback, AGENTS\.md/);
+    expect(line).toContain('--no-skill');
+    expect(lines.at(-1)).toMatch(/^Next: /);
+    // 之后再运行 skill install：已是最新
+    expect((await runCli(['skill', 'install', d], { stdout: () => {}, stderr: () => {} }))).toBe(0);
+    expect(await readFile(join(d, 'AGENTS.md'), 'utf8')).toBe(agents);
+  });
+  test('--no-skill 不写技能也不写 AGENTS.md，输出里没有技能行', async () => {
+    const d = join(await temp(), 'plain');
+    const r = await initProject(d, undefined, { env: {}, skill: false });
+    await expect(stat(join(d, '.claude'))).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(stat(join(d, 'AGENTS.md'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(r.skill).toBeNull();
+    expect(initSummary(r, {}).some(l => l.includes('Agent skills'))).toBe(false);
+    let out = '';
+    const base = await temp(); const prev = process.cwd();
+    try { process.chdir(base); expect(await runCli(['init', 'x', '--no-skill'], { stdout: s => { out += s; }, stderr: () => {} })).toBe(0); }
+    finally { process.chdir(prev); }
+    await expect(stat(join(base, 'x/.claude'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(out).not.toContain('Agent skills');
+  });
+  test('--keep：用户改过的技能不覆盖（两个技能都不写），说明先 --diff；AGENTS.md 段外内容保留', async () => {
+    const d = await temp();
+    await mkdir(join(d, '.claude/skills/joplo'), { recursive: true });
+    await writeFile(skill(d, 'joplo'), '# my own joplo notes\n');
+    await writeFile(join(d, 'AGENTS.md'), '# Team rules\nBe nice.\n');
+    const r = await initProject(d, undefined, { keep: true, env: {} });
+    expect(await readFile(skill(d, 'joplo'), 'utf8')).toBe('# my own joplo notes\n');
+    await expect(stat(skill(d, 'joplo-feedback'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await readFile(join(d, 'AGENTS.md'), 'utf8')).toBe('# Team rules\nBe nice.\n');
+    expect(r.written).toContain('joplo.config.ts');
+    expect(r.skill).toMatchObject({ written: [], modified: ['.claude/skills/joplo/SKILL.md'] });
+    const line = initSummary(r, {}).find(l => l.includes('Agent skills'))!;
+    expect(line).toMatch(/^! Agent skills not installed: \.claude\/skills\/joplo\/SKILL\.md was modified/);
+    expect(line).toContain('npx joplo skill install --diff');
+  });
+  test('--keep：没改过的旧版技能自动更新，已有 AGENTS.md 只追加托管段', async () => {
+    const d = await temp();
+    await writeFile(join(d, 'AGENTS.md'), '# Team rules\n');
+    const [joplo] = skillFiles('0.0.1');
+    await mkdir(join(d, '.claude/skills/joplo'), { recursive: true }); await writeFile(skill(d, 'joplo'), joplo!.content);
+    const r = await initProject(d, undefined, { keep: true, env: {} });
+    expect(await readFile(skill(d, 'joplo'))).toEqual(skillFiles(VERSION)[0]!.content);
+    const agents = await readFile(join(d, 'AGENTS.md'), 'utf8');
+    expect(agents.startsWith('# Team rules\n\n<!-- joplo:start -->')).toBe(true);
+    expect(r.skill!.modified).toEqual([]);
+  });
+  test('AGENTS.md 标记损坏时项目文件照常写入，技能一个都不写，并说明原因', async () => {
+    const d = await temp();
+    await writeFile(join(d, 'AGENTS.md'), '<!-- joplo:start -->\nbroken\n');
+    const r = await initProject(d, undefined, { keep: true, env: {} });
+    expect(r.written).toContain('joplo.config.ts');
+    await expect(stat(join(d, '.claude'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(r.skill!.error).toContain('AGENTS.md');
+    expect(initSummary(r, {}).find(l => l.includes('Agent skills'))).toContain('AGENTS.md');
   });
 });
 

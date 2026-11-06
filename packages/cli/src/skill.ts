@@ -52,7 +52,10 @@ function agentsContent(current: Buffer | null): Buffer {
   return Buffer.concat([current.subarray(0, start), block, current.subarray(end + Buffer.byteLength(END))]);
 }
 
-export async function installSkill(dir: string, version: string, options: InstallSkillOptions = {}): Promise<{ code: number; output: string }> {
+/** written：本次写入的文件；modified：用户改过、因此没有覆盖的技能文件（此时什么都不写，code 1）。 */
+export type InstallSkillResult = { code: number; output: string; written: string[]; modified: string[] };
+
+export async function installSkill(dir: string, version: string, options: InstallSkillOptions = {}): Promise<InstallSkillResult> {
   const root = resolve(dir);
   const lines: string[] = [];
   try { await access(join(root, 'joplo.config.ts')); }
@@ -68,6 +71,8 @@ export async function installSkill(dir: string, version: string, options: Instal
   const modified = skills.filter(file => file.current !== null && !untouched(file.current));
   if (!options.diff && !options.force && modified.length) return {
     code: 1,
+    written: [],
+    modified: modified.map(file => file.name),
     output: [
       ...lines,
       ...modified.map(file => `${file.name} exists and has been modified${markerVersion(file.current) ? ` since Joplo ${markerVersion(file.current)} wrote it` : ''}; it was not overwritten.`),
@@ -81,6 +86,7 @@ export async function installSkill(dir: string, version: string, options: Instal
   const planned = [...skills];
   if (agents !== null || options.agentsMd) planned.push({ name: 'AGENTS.md', path: agentsPath, current: agents, next: agentsContent(agents), skill: false });
   const changed = planned.filter(file => file.current === null || !file.current.equals(file.next));
+  const written: string[] = [];
   if (options.diff) {
     for (const file of changed) lines.push(unifiedDiff(file.name, file.current, file.next));
     if (!changed.length) lines.push('Already up to date');
@@ -93,6 +99,7 @@ export async function installSkill(dir: string, version: string, options: Instal
     for (const file of changed) {
       await mkdir(dirname(file.path), { recursive: true });
       await writeFile(file.path, file.next, { flag: file.current === null ? 'wx' : 'w' });
+      written.push(file.name);
       const from = file.skill ? markerVersion(file.current) : null;
       const what = file.skill ? 'Joplo skill; details come from npx joplo skill <topic>' : 'Joplo managed block only';
       lines.push(`Wrote ${file.name} (${what})${from && from !== version ? `, updated from ${from} to ${version}` : ''}`);
@@ -100,7 +107,7 @@ export async function installSkill(dir: string, version: string, options: Instal
     if (!changed.length) lines.push('Already up to date');
     else lines.push(`Tip: Commit ${SKILL_DIR}/joplo*/SKILL.md to Git so agents can discover them.`);
   }
-  return { code: 0, output: lines.join('\n') + '\n' };
+  return { code: 0, output: lines.join('\n') + '\n', written, modified: [] };
 }
 function displayDir(dir: string): string {
   return dir === '.' ? '' : "'" + dir.replace(/'/g, "'\\''") + "' ";

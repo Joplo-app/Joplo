@@ -2,9 +2,15 @@ import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { JoploError } from '@joplo-app/core';
 import { detectPackageManager, pmCommands, type PackageManager } from './pm.ts';
+import { installSkill } from './skill.ts';
 import { cliVersion } from './startup.ts';
 
-export type InitResult = { root: string; written: string[]; skipped: string[]; version: string };
+/**
+ * skill：init 同时安装的 Agent 技能（D64，等同 `joplo skill install --agents-md`）；--no-skill 时为 null。
+ * written 是写入的技能文件与 AGENTS.md；modified 是用户改过而保留的技能（此时一个都不写）；error 是 AGENTS.md 标记损坏等原因。
+ */
+export type InitSkill = { written: string[]; modified: string[]; error?: string };
+export type InitResult = { root: string; written: string[]; skipped: string[]; version: string; skill: InitSkill | null };
 
 /** 目录名 → 合法的 npm 包名（小写、无空格；无法推导时用 joplo-demo）。 */
 export function packageName(dirName: string): string {
@@ -49,7 +55,7 @@ export function nextStepLine(pm: PackageManager, relDir: string): string {
   return `Next: ${steps.join(' && ')}`;
 }
 
-export async function initProject(dir: string, name?: string, opts: { keep?: boolean; env?: Record<string, string | undefined> } = {}): Promise<InitResult> {
+export async function initProject(dir: string, name?: string, opts: { keep?: boolean; skill?: boolean; env?: Record<string, string | undefined> } = {}): Promise<InitResult> {
   const root = resolve(dir);
   const version = cliVersion();
   if (!opts.keep) {
@@ -85,7 +91,18 @@ export async function initProject(dir: string, name?: string, opts: { keep?: boo
       skipped.push(path);
     }
   }
-  return { root, written, skipped, version };
+  // 项目文件写完后再装技能；技能装不上（用户改过、AGENTS.md 标记损坏）不影响 init 成功
+  let skill: InitSkill | null = null;
+  if (opts.skill !== false) {
+    try {
+      const r = await installSkill(root, version, { agentsMd: true });
+      skill = { written: r.written, modified: r.modified };
+    } catch (e) {
+      if (!(e instanceof JoploError)) throw e;
+      skill = { written: [], modified: [], error: e.message };
+    }
+  }
+  return { root, written, skipped, version, skill };
 }
 
 /** `joplo init` 的输出（最后一行是下一步命令）。 */
@@ -96,6 +113,11 @@ export function initSummary(r: InitResult, env: Record<string, string | undefine
   if (r.written.includes('package.json')) lines.push(`✓ package.json  devDependencies: { "joplo": "${r.version}", "@joplo-app/kit": "${r.version}" } (pinned to the same version)`);
   if (r.written.includes('tsconfig.json')) lines.push('✓ tsconfig.json jsxImportSource: "@joplo-app/kit"');
   if (r.skipped.length) lines.push(`! Existing files preserved: ${r.skipped.join(', ')}${r.skipped.includes('package.json') ? ` (check that devDependencies includes "joplo": "${r.version}" and "@joplo-app/kit": "${r.version}")` : ''}`);
+  const s = r.skill;
+  const run = pmCommands(detectPackageManager(env)).run;
+  if (s?.error) lines.push(`! Agent skills not installed: ${s.error}`);
+  else if (s?.modified.length) lines.push(`! Agent skills not installed: ${s.modified.join(', ')} ${s.modified.length > 1 ? 'were' : 'was'} modified; compare with ${run} skill install --diff, replace with --force`);
+  else if (s) lines.push(`✓ Agent skills: .claude/skills/joplo, .claude/skills/joplo-feedback, AGENTS.md (Joplo block)${s.written.length ? '' : ', already up to date'}; skip with --no-skill`);
   lines.push(nextStepLine(detectPackageManager(env), rel));
   return lines;
 }

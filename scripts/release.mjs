@@ -270,6 +270,10 @@ async function smoke() {
     const pkg = readJson(path.join(project, 'package.json'));
     assert(pkg.devDependencies?.joplo === v && pkg.devDependencies?.['@joplo-app/kit'] === v, `init 应写入精确版本 ${v}：${JSON.stringify(pkg.devDependencies)}`);
     sh(npxJoplo, ['init', 'my-demo'], base, { env: ua, expect: 1 });
+    // init 默认安装 Agent 技能与 AGENTS.md 托管段（D64），与仓库 skills/ 逐字一致
+    for (const name of ['joplo', 'joplo-feedback']) assert(fs.readFileSync(path.join(base, 'my-demo/.claude/skills', name, 'SKILL.md'), 'utf8') === fs.readFileSync(path.join(REPO, 'skills', name, 'SKILL.md'), 'utf8'), `init 应写入与 skills/${name} 相同的技能`);
+    assert(fs.readFileSync(path.join(base, 'my-demo/AGENTS.md'), 'utf8').includes('<!-- joplo:start -->'), 'init 应写入 AGENTS.md 托管段');
+    assert(init.stdout.includes('Agent skills') && init.stdout.includes('--no-skill'), `init 输出应说明安装的技能：${init.stdout}`);
     log(`  ✓ init 写入 "joplo": "${v}", "@joplo-app/kit": "${v}"；非空目录拒绝`);
 
     // 作者 className：Tailwind 要编译它

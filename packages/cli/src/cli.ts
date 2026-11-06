@@ -138,7 +138,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     else { line(summary); for (const l of data.lines) line(`${l.number} | ${l.text}`); if (data.note) line(data.note); }
   });
   program.command('init').argument('<dir>').option('--name <name>', 'Project name (defaults to directory name)').option('--keep', 'Add missing files in a nonempty directory; preserve existing files')
-    .action(async (dir, opts) => { for (const l of initSummary(await initProject(dir, opts.name, { keep: opts.keep }))) line(l); });
+    .option('--no-skill', 'Do not install the agent skills (.claude/skills/joplo*, AGENTS.md block)')
+    .action(async (dir, opts) => { for (const l of initSummary(await initProject(dir, opts.name, { keep: opts.keep, skill: opts.skill }))) line(l); });
   program.command('skill').description('Read agent usage on demand or install a usage pointer')
     .argument('[topic]', 'authoring/demo/components/cases/check/selection/publish, or install')
     .argument('[dir]', 'Target project directory for install')
