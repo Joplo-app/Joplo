@@ -13,7 +13,7 @@ import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
  */
 import { useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, X } from 'lucide-react';
-import { findNode, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@joplo-app/core';
+import { disabledReasonOf, findNode, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@joplo-app/core';
 import type { SelectionSync } from '../runtime/demo';
 import { optionOfNode, scenariosOf, shortName } from '../runtime/views';
 import { cn } from '@/lib/utils';
@@ -176,7 +176,9 @@ export function InspectDrawer({
         {node?.disabledReason ? (
           <p className="mt-2 rounded bg-jb-sunken px-2 py-1 text-[13px]">
             <span className="text-jb-muted">{i18n.board.disabledReason}</span>
-            {node.disabledReason}
+            {/* 绑定状态的原因（D65）：显示当前状态下的文字，后面附上绑定本身 */}
+            {node.disabledReason.startsWith('$') ? (state ? disabledReasonOf(node, state) ?? '' : '') : node.disabledReason}
+            {node.disabledReason.startsWith('$') ? <span className="ml-1 font-mono text-[11px] text-jb-faint">{node.disabledReason}</span> : null}
           </p>
         ) : null}
 

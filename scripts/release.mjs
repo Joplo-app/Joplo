@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * 发布脚本（只准备，不发布；见 docs/release.md）。
+ * 发布脚本（见 docs/release.md）。
  *
  *   node scripts/release.mjs version <版本> [--root <仓库>]   统一修改所有包的版本（pnpm release:version）
  *   node scripts/release.mjs pack                             构建并打包到 release/（pnpm release:pack）
  *   node scripts/release.mjs smoke [--keep]                   打包后在仓库外的临时目录只用 tarball 安装并跑通全流程（pnpm release:smoke）
- *   node scripts/release.mjs verify [<版本>]                  发布之后必跑：确认每个包都在 registry 上，并实际 npx 安装一次（pnpm release:verify）
+ *   node scripts/release.mjs publish [--tag beta]             先构建打包全部包，再按依赖顺序 npm publish 这些 tarball，最后自动 verify（pnpm release:publish）
+ *   node scripts/release.mjs verify [<版本>]                  确认每个包都在 registry 上，并实际 npx 安装一次（pnpm release:verify；publish 最后会自动运行）
  *
- * 真正发布是 `pnpm release:publish`（pnpm -r publish --access public --tag beta），本脚本从不调用 npm publish。
+ * 只有 publish 会调用 npm publish（由维护者在自己的终端运行）。
  */
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -400,6 +401,7 @@ async function smoke() {
       const again = sh(joplo, ['dev', '--port', String(await freePort())], second, { env: { JOPLO_HOME: joploHome }, timeout: 30000 });
       assert(again.stdout.includes(`http://127.0.0.1:${port}/#/`), `第二次 joplo dev 应输出已运行看板的链接：${again.out}`);
       assert(again.out.includes('Joined the running board'), `第二次 joplo dev 应说明已加入：${again.out}`);
+      assert(again.out.includes(`Joplo ${v}, started in ${fs.realpathSync(project)}`) && !again.out.includes('[joplo] !'), `加入时应写出看板的版本与启动目录、版本一致时不警告：${again.out}`);
       const both = JSON.parse((await request(port, { path: '/__joplo/projects' })).text).projects.map((p) => p.dir).sort();
       assert(both.length === 2 && both.includes(fs.realpathSync(second)), `首页应有两个项目：${JSON.stringify(both)}`);
       log(`  ✓ 再次 joplo dev：加入同一个看板（端口 ${port}）后退出，首页有 2 个项目（${Date.now() - t2} ms）`);
@@ -448,35 +450,74 @@ async function smoke() {
 
 // ---------------------------------------------------------------- publish
 
-/** registry 上是否已有这个版本（直接查 registry，绕过本地缓存）。网络错误时直接失败，不猜。 */
+/** registry 上是否已有这个版本（直接查 registry，绕过本地缓存）。网络错误时抛错，不猜。 */
 async function isPublished(name, version) {
   const url = `https://registry.npmjs.org/${name.replace('/', '%2f')}?t=${Date.now()}`;
   const res = await fetch(url, { headers: { 'cache-control': 'no-cache', accept: 'application/json' } });
   if (res.status === 404) return false;
-  if (!res.ok) die(`查询 ${name} 失败：HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`查询 ${name} 失败：HTTP ${res.status}`);
   const doc = await res.json();
   return Boolean(doc.versions?.[version]);
 }
 
 /**
- * 可续跑的发布：按依赖顺序（PACKAGES）逐个检查，只发布 registry 上还没有的版本。
- * 中途失败后重新运行同一条命令即可从断点继续。dist-tag 用 --tag（默认 beta）。
+ * 发布一个已打好的 tarball。npm publish <tarball> 不运行任何生命周期脚本（不会再逐包构建；2026-11-06 用 --dry-run 实测）。
+ * 必须是绝对路径：npm 会把 release/x.tgz 这种相对路径当成 GitHub 简写（git ls-remote github.com/release/…）。
  */
-async function publish(tag) {
-  const pkgs = PACKAGES.map((p) => ({ dir: path.join(REPO, 'packages', p), pkg: readJson(path.join(REPO, 'packages', p, 'package.json')) }));
-  const versions = new Set(pkgs.map((p) => p.pkg.version));
-  if (versions.size !== 1) die(`各包版本不一致：${[...versions].join('、')}；先运行 release:version`);
-  let published = 0;
-  for (const { dir, pkg } of pkgs) {
-    if (await isPublished(pkg.name, pkg.version)) {
-      log(`跳过 ${pkg.name}@${pkg.version}：registry 上已存在`);
-      continue;
+function npmPublishTarball(t, tag) {
+  const r = spawnSync('npm', ['publish', path.resolve(t.file), '--access', 'public', '--tag', tag], { stdio: 'inherit' });
+  return r.status === 0;
+}
+
+/**
+ * 可续跑的发布（0.2.4 漏了 core、0.2.6 漏了 web：以前每个包 publish 前各自跑 prepublishOnly 构建，
+ * web 构建最慢，输入 OTP 之后中间的包容易失败）。现在：
+ * 1. prepare：先一次性构建并打包全部包（即 release:pack，含全部 tarball 检查），失败时一个都不发；
+ * 2. 按依赖顺序（PACKAGES）逐个发布已打好的 tarball，registry 上已有的版本跳过；
+ *    任何一个包失败（含查询 registry 失败）立刻停止，列出已发布 / 未发布的包，提示重跑；
+ * 3. 全部发完后运行 release:verify，用它的结果作为整体结果（主入口据此决定退出码）。
+ * 依赖（prepare / isPublished / publishTarball / verify / log）可注入替身，测试不触网。
+ */
+export async function publishRelease(opts = {}) {
+  const tag = opts.tag ?? 'beta';
+  const prepare = opts.prepare ?? (async () => pack());
+  const onRegistry = opts.isPublished ?? isPublished;
+  const publishOne = opts.publishTarball ?? npmPublishTarball;
+  const verify = opts.verify ?? ((v) => verifyRelease({ version: v }));
+  const out = opts.log ?? log;
+  const err = opts.error ?? ((m) => console.error(m));
+  const { version: v, tarballs } = await prepare();
+  const published = [], skipped = [];
+  for (let i = 0; i < tarballs.length; i++) {
+    const t = tarballs[i];
+    let reason = null;
+    try {
+      if (await onRegistry(t.name, v)) {
+        out(`跳过 ${t.name}@${v}：registry 上已存在`);
+        skipped.push(t.name);
+        continue;
+      }
+      out(`发布 ${t.name}@${v}（${path.basename(t.file)}，--tag ${tag}）`);
+      if (!(await publishOne(t, tag))) reason = 'npm publish 失败';
+    } catch (e) {
+      reason = e instanceof Error ? e.message : String(e);
     }
-    log(`发布 ${pkg.name}@${pkg.version}（--tag ${tag}）`);
-    run('pnpm', ['publish', '--access', 'public', '--tag', tag], { cwd: dir });
-    published++;
+    if (reason) {
+      const unpublished = tarballs.slice(i).map((x) => x.name);
+      err(`✗ ${t.name}@${v} 没有发布（${reason}），已停止，后面的包都没有发。`);
+      err(`  本次已发布：${published.join('、') || '无'}${skipped.length ? `；registry 上原本就有：${skipped.join('、')}` : ''}`);
+      err(`  还没发布：${unpublished.join('、')}`);
+      err(`修复：处理登录、网络或 OTP 问题后重跑 pnpm release:publish --tag ${tag}（已发布的会跳过，只补发缺的）。`);
+      return { ok: false, version: v, published, skipped, unpublished };
+    }
+    published.push(t.name);
   }
-  log(published ? `✓ 本次发布 ${published} 个包` : '✓ 所有包都已在 registry 上，无需发布');
+  out(published.length ? `✓ 本次发布 ${published.length} 个包：${published.join('、')}` : '✓ 所有包都已在 registry 上，无需发布');
+  out('— 运行 release:verify');
+  const verified = await verify(v);
+  if (verified?.ok) out(`✓ 发布完成。现在打 tag：git tag v${v} && git push origin v${v}`);
+  else err('✗ release:verify 没有通过（见上面的输出）；先不要打 tag。');
+  return { ok: Boolean(verified?.ok), version: v, published, skipped, unpublished: [] };
 }
 
 // ---------------------------------------------------------------- verify
@@ -567,7 +608,7 @@ if (cmd === 'version') {
   version(root, args[0]);
 } else if (cmd === 'pack') pack();
 else if (cmd === 'smoke') await smoke();
-else if (cmd === 'publish') await publish(flag('--tag') ?? 'beta');
+else if (cmd === 'publish') { if (!(await publishRelease({ tag: flag('--tag') ?? 'beta' })).ok) process.exit(1); }
 else if (cmd === 'verify') { if (!(await verifyRelease({ version: args[0] })).ok) process.exit(1); }
 else die('用法：node scripts/release.mjs version <版本> | pack | smoke [--keep] | publish [--tag beta] | verify [<版本>]');
 }

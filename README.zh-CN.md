@@ -42,12 +42,12 @@ npx joplo dev --open
 
 ```sh
 npx skills add Joplo-app/Joplo           # 本仓库的官方技能；任何仓库都能用，装 Joplo 之前也行
-npx skills add Joplo-app/Joplo@v0.2.4    # 固定到某个发布 tag
+npx skills add https://github.com/Joplo-app/Joplo/tree/v0.2.6   # 固定到某个发布 tag（Joplo-app/Joplo@v… 不能用：skills CLI 把 @ 后面当技能名）
 npx joplo skill install                  # 在 Joplo 项目里：与项目安装的版本一致
 ```
 
 - 想让 Agent 在任何仓库里都能发现 Joplo（例如从零开始做一个原型），用 `npx skills add`。[skills CLI](https://github.com/vercel-labs/skills) 会装到 Claude Code 的 `.claude/skills/` 和 Codex 的 `.agents/skills/`。
-- `npx joplo init` 新建项目时默认就装好这两个技能（以及 `AGENTS.md` 托管段），用 `--no-skill` 跳过。
+- `npx joplo init` 新建项目时默认就装好这两个技能（以及 `AGENTS.md` 托管段），用 `--no-skill` 跳过。先装技能再 `npx joplo init .` 也可以：Agent 与 Git 文件（`.git`、`.gitignore`、`.agents/`、`.claude/`、`AGENTS.md`、`skills-lock.json` 等）不算目录非空；已装好的同版本技能会跳过，你改过的技能会保留（`npx joplo skill install --force` 才覆盖）。还有其他文件时仍需 `init . --keep`。
 - 已经有 `joplo.config.ts` 的项目，用 `npx joplo skill install`：写入 `.claude/skills/joplo*/SKILL.md`，升级 Joplo 后自动更新没改过的文件，不覆盖你改过的文件（`--diff` 看差异、`--force` 覆盖），加 `--agents-md` 还会在 `AGENTS.md` 里写一段托管说明。
 - 技能故意很薄：只有心智模型、起步顺序和最常见的坑；具体 API 一律以 `npx joplo skill <主题>` 为准（与安装的版本一致）。
 

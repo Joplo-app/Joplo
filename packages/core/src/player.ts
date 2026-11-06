@@ -460,6 +460,12 @@ export type ClickVerdict =
   | { kind: 'not_covered'; label: string } // 没有任何已定义行为
   | { kind: 'static' }; // 背景元素，不必响应
 
+/** 禁用原因的当前文字：字面量原样返回；绑定（`$ui.x`）读当前状态；空或不是文字时为 null（界面用默认说明）。 */
+export function disabledReasonOf(node: SceneNode, state: Pick<PlayState, 'ui' | 'data' | 'inputs'>): string | null {
+  const v = node.disabledReason === undefined ? undefined : resolveValue(node.disabledReason, state);
+  return typeof v === 'string' && v.trim() ? v : typeof v === 'number' ? String(v) : null;
+}
+
 /**
  * 演示模式下用户点击了某个元素：判断应推进步骤，还是提示“当前演示未覆盖”（PRD 8.2、AC-19）。
  * 流程外点击绝不能被解释为成功。
@@ -472,7 +478,7 @@ export function explainClick(project: Project, state: PlayState, nodeId: string,
   if (!hit) return { kind: 'static' };
   const { node } = hit;
   const label = nodeLabel(node);
-  if (isNodeDisabled(node, state)) return { kind: 'disabled', reason: node.disabledReason ?? null };
+  if (isNodeDisabled(node, state)) return { kind: 'disabled', reason: disabledReasonOf(node, state) };
   const current = sc.steps[state.position];
   const targetOf = (s: Step) => ('target' in s.action ? s.action.target : null);
   if (current && !state.completed && targetOf(current) === nodeId && checkStep(project, sc, state, current) === null) return { kind: 'advance' };

@@ -32,7 +32,7 @@ export const PITFALLS = [
   ['Every interactive element needs a flow step, disabled={true} with disabledReason, or unmodeled; otherwise check warns UNBOUND_INTERACTIVE', 'check'],
   ['No onClick or other function props: behavior lives in flow steps (.click/.type/.select) and effects (set, push, go, done)', 'authoring'],
   ['Full-height layouts squeeze tables and forms: rows exist in the DOM but are cut off on screen; show 5–8 rows or move the table to its own layer', 'demo'],
-  ['Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key; layer= is ignored); wait for rendering before screenshots', 'demo'],
+  ['Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key and pins that layer, so later steps stop switching layers; layer= is ignored); wait for rendering before screenshots', 'demo'],
   ['Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user', 'cases'],
   ['Never share or deploy without the user\'s go-ahead; free share links expire after 1 hour', 'publish'],
 ] as const satisfies readonly (readonly [string, string])[];
@@ -59,7 +59,7 @@ function joploBody(): string {
     '- Not for production UI code, real backends, or demos where viewers type free input.',
     '',
     '## Workflow',
-    '1. No joplo.config.ts yet: npx joplo@latest init <dir>, then npm install in that directory (versions are pinned). In an existing Joplo project, use its installed npx joplo.',
+    '1. No joplo.config.ts yet: npx joplo@latest init <dir>, or npx joplo@latest init . for the current directory, then npm install there (versions are pinned). Agent and Git files (.git, .gitignore, .agents, .claude, AGENTS.md, skills-lock.json) do not count as content; other existing files need init . --keep, which only adds missing files. init skips these skills when the same version is already installed and never overwrites edited ones. In an existing Joplo project, use its installed npx joplo.',
     ...list(START_ORDER).map(line => line.replace(/^(\d+)/, (_, n: string) => String(Number(n) + 1))),
     `${START_ORDER.length + 2}. After the user agrees: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. Apply review results with the joplo-feedback skill.`,
     '',
@@ -68,6 +68,7 @@ function joploBody(): string {
     '',
     'Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, demo, components, cases, check, selection, publish). Run npx joplo skill for the overview.',
     'After the user Alt+clicks a board element, run npx joplo selection and edit only that location.',
+    'Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).',
   ].join('\n');
 }
 

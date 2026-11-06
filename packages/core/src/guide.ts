@@ -117,12 +117,14 @@ Read only the topics needed, usually one or two at a time. See components for co
 - page({ title, layout?: string|false, viewport?: 'desktop'|'mobile' }, tree). See demo for devices and stages.
 - feature({ name, goal, cases, order?, roles?, constraints?, rules?, questions?, pick? }).
 - Do not number feature names by hand; use finite numeric order. The compiler writes featureIds into IR (including publish): ascending order first, then natural folder-name order for ties or omitted values. All views read that list.
-- option({ name, idea, on?, routes?, state?, rules?, questions?, coverage?, scenarios }).
+- option({ name, idea, focus?, tradeoffs?, on?, routes?, layers?, state?, rules?, questions?, coverage?, scenarios }).
+- focus: one sentence naming the design decision this option changes; tradeoffs: ['Faster to scan', 'Needs a second click'], shown in the option's hover card in the board. Both stay out of published and review builds.
 - on: { '/members': { actions: <Button id="invite">Invite</Button> } }: add elements to a slot on an existing route.
 - routes: { '/members/new': page({ title: 'New member' }, <Stack>…</Stack>) }: add a route for this option.
 - state: { ui: { ready: false }, data: {}, inputs: {} }: initial option state.
 - scenarios: { happy: flow('Success', { cases: ['happy'], start: '/members' }).click('invite', done('Completed')) }.
-- flow options also accept state, description, expected, mock, outcome to override initial state or describe mock results.
+- flow(name, { cases?, start?, state?, description?, expected?, mock?, outcome? }): state overrides the option's initial state; description and expected describe the scenario.
+- outcome: 'success' | 'failure' | 'denied' | 'other' is the board's result badge ("Mock failure"). Without it, the badge follows done's second argument, else success. mock: 'Mock: link expired' replaces the badge text.
 - See cases for case and coverage declarations; publish for pick and publishing.
 
 ## flow: Put behavior in steps
@@ -133,8 +135,8 @@ Read only the topics needed, usually one or two at a time. See components for co
 - set($.ui.ready, true): replace state; push($.data.rows, row): append an array item.
 - toast('Message') / toast.success/error/info('Message'): a message for the current step.
 - go('/members'): change route within the current option; back returns to the previous route.
-- done('Result', 'success'|'failure'|'cancelled'): end the scenario; default is success.
-- uses('rule_key', ...): link rules from this option or feature.
+- done('Result', 'success'|'failure'|'cancelled'): end the scenario; default is success. It also sets the result badge (cancelled shows as other) unless flow({ outcome }) is written; if both are written they must agree, otherwise check warns OUTCOME_MISMATCH.
+- uses('rule_key', ...): an effect that links rules from this option or feature, passed like set(): .click('send', uses('admin_only'), done('Sent')). It is not a flow method; .uses(...) is not a function.
 
 ## Bindings and conditions
 - $.ui.x / $.data.x / $.inputs.x bind whole values; arbitrary expressions are not evaluated. $.inputs.<id> is the value typed into element <id>.
@@ -148,6 +150,7 @@ Read only the topics needed, usually one or two at a time. See components for co
 - Value known while writing (a prop of your own component, a loop variable, an option-specific flag): render conditionally in your code instead, {mode === 'code' && <CodeForm/>}. false, null, and undefined children are dropped.
 - Value that changes during the demo: keep it in option state and change it with set() in a step.
 - disabled accepts true/false or a condition: disabled={$.ui.sending} disabledReason="Sending…".
+- disabledReason is a string or a whole-value binding like disabled: disabledReason={$.ui.sendHint} shows the current state value. Anything else (a number, a condition, an expression) is INVALID_DISABLED_REASON.
 
 ## Layout and responsiveness (Mantine names and props; no className)
 - Use Stack / Group / SimpleGrid / Grid props: <Group justify="space-between">, <SimpleGrid cols={{ base: 1, md: 3 }}>.
@@ -202,6 +205,8 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 - Declare layers in an option: layers: { client: layer('Client view', <ClientView/>), backend: layer('Backend flow', <Diagram>…</Diagram>) }.
 - layer(title, <tree/>) owns a JSX tree, renders independently, and fills the stage; it is not a crop of one large page.
 - Layers share ui / data / inputs. Switching layers does not change the step. Declaring layers makes the demo show these independent pages.
+- routes / on and layers work together, but once an option declares layers the stage shows only its layers: route pages are not drawn during the demo. Routes still give flow start, go(), and back() their state, and step targets are found in the layers first (then the route page).
+- To show a route page as well, render the same component in a layer: layers: { app: layer('App', <MembersPage/>), backend: layer('Backend', <Arch/>) }.
 - No automatic overview layer. Declare overview: layer('Overview', <Overview/>) when needed.
 - Put long notes in a separate explanation layer, such as why: layer('Design rationale', <Why/>), then switch to it with a shot.
 
@@ -210,7 +215,7 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 - Each id resolves in the layer containing it. The same id can affect multiple layers; the first shot determines the director layer.
 - Example: .click('app_send', shot('msg_user'), shot('app', 'biz')) follows the client view first, then sets a backend shot.
 - shot() restores the whole director layer. Without a shot, keep the previous one; a plain click can follow the layer containing the button.
-- During playback, the director switches layers, zooms, and highlights. Switching layers manually pauses following; resume Follow director or replay only one layer.
+- During playback, the director switches layers, zooms, and highlights. Clicking a layer tab, or opening a deep link with l=, pins that layer: Follow director turns off and later steps stay on the pinned layer, even when their shot or action is on another layer (the shot still happens there, you just do not see it). Turn Follow director back on (the switch next to the layer tabs) or drop l= from the URL to follow again; you can also replay only one layer.
 - Viewers can zoom with wheel/pinch, drag to pan, and fit the stage to see the whole view. The next director shot takes over again.
 
 ## Diagram and traces
@@ -247,7 +252,7 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 ## Deep links and screenshots
 - Board: http://127.0.0.1:<port>/#/<project>/f/<feature>?o=<option>&c=<case>&s=<scenario>&step=<n>&l=<layer>&speed=<0.5|1.5>. Copy the project part from the board URL.
 - Published site: <site>/#/f/<feature>?s=<scenario>&step=<n>&l=<layer>. Embeds use ?embed=1&scenario=<scenario>&autoplay=1 (see publish).
-- Ids are qualified: option invite.a-modal, case invite.no_permission, scenario invite.a-modal.happy. step=n is the state after n steps (0 = initial). l is the layer key from layers: { … }; it turns Follow director off.
+- Ids are qualified: option invite.a-modal, case invite.no_permission, scenario invite.a-modal.happy. step=n is the state after n steps (0 = initial). l is the layer key from layers: { … }; it pins that layer and turns Follow director off, so later steps do not switch layers. Omit l to follow the director.
 - Other parameters (layer=, option=, scenario= in the hash) are ignored; the board logs a console warning naming them.
 - Screenshot one step: npx joplo render --scenario-id invite.a-modal.happy --step-id 'invite.a-modal.happy#2' --out shot.png. It waits for fonts, layout, and the camera, and needs Playwright (npx playwright install chromium).
 - In a browser, open the deep link, wait for [data-jcamera][data-camera-settled="1"] plus two animation frames, then capture. During autoplay or typing animations the DOM can be ahead of the pixels; pause first.
@@ -255,6 +260,7 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 ## Transition cards, roles, and Agent output (D56)
 - .card('Title', { sub?, points?, role? }, ...effects): one large sentence filling the stage, as a step. Use for openings, endings, time jumps, and role switches.
 - Open with why this matters; end with points listing what was confirmed. For time jumps, use .card('3 days later', set($.data.invite, 'expired')).
+- While a card covers the stage, the stage behind it is inert: nothing on it is clickable. Viewers continue with Next (or the → key), or by autoplay; a card step has no target to click.
 - Roles: declare roles: { ajie: role('Ajie', { desc: 'Invited friend' }) } in the feature; use layer('Ajie mobile', <AjieView/>, { role: 'ajie' }) for the layer.
 - A layer with a role shows a name badge at the bottom left and an avatar in its tab. After .card('Now Ajie', { role: 'ajie' }), the director switches to Ajie's layer.
 - Show one person at a time. For side-by-side views, draw two sections in the same layer.
@@ -410,7 +416,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - ROLE_UNKNOWN: A layer or card role is not in feature.roles. Declare roles as { key: role('Name') }; see demo.
 - ICON_UNKNOWN: A layer icon is not a preset. Use one of ${LAYER_ICONS.join(', ')}; see demo.
 - FORK_UNKNOWN: fork must target another scenario key in the same option; it cannot reference itself.
-- MARK_UNKNOWN: The mark target is absent from this step's route stage and all layers. Check the element id; currently hidden targets are valid references.
+- MARK_UNKNOWN: The mark target is absent from this step's route stage (after go() and back() in earlier steps) or, with layers, from every layer. Check the element id; currently hidden targets are valid references.
 - SHOT_UNKNOWN: The shot target is absent from this step's stage and all layers. Check its id and layer; see demo.
 - LAYER_UNKNOWN: Invalid layer key or missing content. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
 - TRACE_UNKNOWN: Empty trace, unknown id, multiple Diagrams, or disconnected path. Use connected node/edge ids in one Diagram.
@@ -421,7 +427,9 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - ASSUMPTION_CONFIRMED: Keep AI assumptions \`pending\`. After user confirmation, record the actual origin; do not change only status.
 - UNBOUND_INTERACTIVE: see the section below.
 - INVALID_CONDITION: when got a plain boolean, number, or string (when={!x}, when={mode === 'code'}). Use a condition such as when={eq($.ui.mode, 'code')}, or render conditionally in your code: {flag && <X/>}. See authoring.
-- DISABLED_WITHOUT_REASON: Add disabledReason explaining why the element cannot be used.
+- DISABLED_WITHOUT_REASON: Add disabledReason explaining why the element cannot be used: a string, disabledReason="Only admins can invite", or a binding, disabledReason={$.ui.sendHint}.
+- INVALID_DISABLED_REASON: disabledReason got a number, condition, or other value. Use a string or a whole-value binding; for text that changes, set() it into state and bind it.
+- OUTCOME_MISMATCH: flow({ outcome }) and done(…, outcome) disagree; the badge uses flow's. Make them agree (cancelled corresponds to other).
 - CASE_NOT_COVERED: Add a scenario or declare coverage truthfully. Ask about missing behavior first.
 - EXPRESSED_WITHOUT_SCENARIO / COVERAGE_WITHOUT_REASON: Add a scenario or a reason for \`not_applicable\`/\`excluded\`.
 - RULE_ELEMENT_NOT_FOUND: Check rule.elements against element ids in the related option stages.

@@ -32,10 +32,11 @@ npx joplo render [dir] --scenario-id <qid> --out <file> \
 生成可运行的最小项目：config、布局、首页、一个功能/方案/场景，以及 package.json、tsconfig.json、.gitignore。
 
 - `--name <name>`：项目名，默认目录名。
-- `--keep`：目录非空时只补缺失文件，已有文件不改动；不传时拒绝非空目录。
+- `--keep`：目录非空时只补缺失文件，已有文件不改动；不传时拒绝非空目录，并列出前几个文件名。
+- 只含 Agent / 版本控制文件（`.git`、`.gitignore`、`.gitattributes`、`.agents`、`.claude`、`.codex`、`.cursor`、`AGENTS.md`、`CLAUDE.md`、`skills-lock.json`、`.DS_Store`）的目录视为空目录（D65）：不要求 `--keep`，按 `--keep` 的方式写入，已有文件一字不改；保留的 `.gitignore` 缺少 `node_modules/`、`.joplo/`、`dist/`、`exports/` 时在输出里提示。
 - package.json 将 `joplo` 与 `@joplo-app/kit` 锁到当前 CLI 的相同精确版本，并提供 dev/check/build 脚本。
 - tsconfig 使用 `react-jsxdev`、`jsxImportSource: '@joplo-app/kit'`、`allowImportingTsExtensions`。
-- 默认同时安装 Agent 技能（D64），等同于对新项目运行 `npx joplo skill install --agents-md`：写入 `.claude/skills/joplo/SKILL.md`、`.claude/skills/joplo-feedback/SKILL.md` 和 AGENTS.md 的 Joplo 托管段，输出一行 “✓ Agent skills: …; skip with --no-skill”。`--keep` 时沿用 skill install 的保护：用户改过的技能不覆盖（两个都不写，提示先 `--diff` 再 `--force`），AGENTS.md 只增改托管段；标记损坏时不写技能并说明原因。这些情况都不影响 init 成功。
+- 默认同时安装 Agent 技能（D64），等同于对新项目运行 `npx joplo skill install --agents-md`：写入 `.claude/skills/joplo/SKILL.md`、`.claude/skills/joplo-feedback/SKILL.md` 和 AGENTS.md 的 Joplo 托管段，输出一行 “✓ Agent skills: …; skip with --no-skill”。`--keep` 时沿用 skill install 的保护：用户改过的技能不覆盖（两个都不写，提示先 `--diff` 再 `--force`），AGENTS.md 只增改托管段；标记损坏时不写技能并说明原因。这些情况都不影响 init 成功。已经装好的同版本、未修改的技能（例如 `npx skills add` 装的官方技能，含指向 `.agents/skills` 的软链接）跳过不写，输出 “already installed (Joplo <版本>, unchanged)”；用户改过的技能不带 `--keep` 时同样保留，提示 `--force`。
 - `--no-skill`：不安装技能，也不写 AGENTS.md。
 - 最后一行提示安装依赖并启动看板；命令写法按 npm/pnpm/yarn/bun 环境选择。
 
@@ -50,7 +51,7 @@ npx joplo dev --open
 
 首次运行启动本地看板，默认绑定 `127.0.0.1:4790`，打印项目链接。`--open` 打开浏览器；`--port` 接受 1–65535 的整数，启动新看板时指定端口。端口被其他应用占用时明确报错，不静默换端口。
 
-同一个 `JOPLO_HOME` 下已有存活看板时，再次运行只注册当前项目、打印链接并退出，不再启动第二个进程；这时优先加入已有看板。`JOPLO_HOME` 默认 `~/.joplo`：projects.json 记最近项目，server.json 记运行实例，settings.json 记主题选择。
+同一个 `JOPLO_HOME` 下已有存活看板时，再次运行只注册当前项目、打印链接并退出，不再启动第二个进程；这时优先加入已有看板。加入时 stderr 写出那个看板的 Joplo 版本和启动目录（`[joplo] Joined the running board: Joplo 0.2.7, started in /path/to/demo (pid 123)`）；它的版本和当前项目的 Joplo 不一致时（0.2.6 及更早的看板不报版本，也算不一致）多一行 `!` 警告：看板可能表现不同，要用当前版本就在它的终端按 Ctrl+C（或 `kill <pid>`）停掉，再在这里运行 `joplo dev`（D65）。`JOPLO_HOME` 默认 `~/.joplo`：projects.json 记最近项目，server.json 记运行实例，settings.json 记主题选择。
 
 首页可切换项目与功能；源文件变化只重新编译对应项目，保存后热更新。编译出错时显示诊断，并保留上一次成功的画面；修复后恢复。界面和交互见[看板文档](web.md)。
 
