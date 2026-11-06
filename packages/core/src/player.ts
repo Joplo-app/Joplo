@@ -6,7 +6,7 @@
  * “上一步”通过从初始状态重放到 k-1 实现，因此恢复的是业务可见状态，而不是撤销动画。
  */
 import { DIRECTOR_LAYER, GATED_CONTAINERS, INTERACTIVE_TYPES, PAGE_LAYER, VALUE_TYPES, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
-import type { Condition, Project, Scenario, Scene, SceneNode, Step } from './schema.ts';
+import type { Condition, LayerIcon, Project, Scenario, Scene, SceneNode, Step } from './schema.ts';
 import { JoploError, type Diagnostic } from './result.ts';
 
 export type Toast = { id: string; text: string; tone: 'success' | 'error' | 'info' };
@@ -485,10 +485,11 @@ export function explainClick(project: Project, state: PlayState, nodeId: string,
 // ---------- 视角层级与导演镜头（D43 / T-layers：每层一个独立画面） ----------
 
 /** 方案的层级（源码顺序）：每层一个完全独立的画面。没有声明时为空，演示照常显示路径页面。 */
-export function layersOf(project: Project, scenarioId: string | null): { id: string; title: string; sceneId: string }[] {
+export function layersOf(project: Project, scenarioId: string | null): { id: string; title: string; sceneId: string; icon: LayerIcon }[] {
   const sc = scenarioId ? project.scenarios[scenarioId] : null;
   const opt = sc ? project.options[sc.optionId] : null;
-  return Object.entries(opt?.layers ?? {}).map(([id, l]) => ({ id, title: l.title, sceneId: l.sceneId }));
+  // 图标：作者写的优先；没写时手机视口用 mobile，其余用 window
+  return Object.entries(opt?.layers ?? {}).map(([id, l]) => ({ id, title: l.title, sceneId: l.sceneId, icon: l.icon ?? (project.scenes[l.sceneId]?.viewport === 'mobile' ? 'mobile' : 'window') }));
 }
 
 /** 包含某个元素的层级（多层都有同名 id 时都返回）。 */

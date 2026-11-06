@@ -17,8 +17,8 @@ import { en, type Dictionary } from '../i18n/en';
  * 本文件不引用它们，因此发布站的产物里不会出现（不变量 5）。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsUpDown, Clapperboard, GitFork, Cog, Ellipsis, Expand, Film, Gauge, Maximize, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Share, Shrink } from 'lucide-react';
-import { roleOfScene, stepTouchesLayer, type Project, type RoleInfo, type Scenario } from '@joplo-app/core';
+import { AppWindow, Bot, ChevronLeft, ChevronRight, ChevronsUpDown, Clapperboard, Database, FileText, Globe, Mail, MessageSquare, Monitor, Server, Smartphone, SquareTerminal, Workflow, GitFork, Cog, Ellipsis, Expand, Film, Gauge, Maximize, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Share, Shrink } from 'lucide-react';
+import { roleOfScene, stepTouchesLayer, type LayerIcon, type Project, type RoleInfo, type Scenario } from '@joplo-app/core';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
 import { Subtitle } from './Subtitle';
@@ -37,7 +37,7 @@ import { Btn, DirectorTag, Kbd, MenuButton, Segmented, Switch, useWidth, type Me
 import { SHORTCUTS } from './states';
 import { fullscreenBarCollapse } from './controls-fit';
 import { CenterPanel, useTip } from './popover';
-import { boardLayout, layerTabs, timelineChips, type BoardLayout, type TimelineChip } from './layout';
+import { boardLayout, bookmarkTabs, layerTabs, timelineChips, type BoardLayout, type LayerTab, type TimelineChip } from './layout';
 
 export { Segmented } from './controls';
 export type { MenuItem, MenuEntry } from './controls';
@@ -294,36 +294,103 @@ function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer,
   );
 }
 
-/** 层级标签（D55）：贴在舞台框上沿，正在看的那层与舞台连成一片；导演跟随时它带摄像机。右侧「只重放这一层」与「跟随导演」。 */
-function LayerTabs({ layers, viewLayer, director, onLayer, onDirector, onReplay }: { layers: { id: string; title: string; role?: RoleInfo | null }[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; onDirector: (on: boolean) => void; onReplay: () => void }) {
-  const { t: i18n } = useI18n();
+/** 标签的样式与内容（真实标签和看不见的测量标签共用，保证量出来的宽度就是显示的宽度）。 */
+const TAB_BASE = 'flex items-center gap-1.5 whitespace-nowrap rounded-t-[8px] px-3 font-jb text-[13px]';
+const tabLook = (active: boolean) =>
+  active ? 'h-9 border-[1.5px] border-b-0 border-jb-ink bg-jb-surface font-semibold text-jb-fg' : 'h-8 border border-b-0 border-jb-line bg-jb-sunken text-jb-muted';
+/** 层级的预设图标（core 的 LAYER_ICONS）：标签压窄时靠它认出是哪一层。 */
+const LAYER_ICON: Record<LayerIcon, typeof AppWindow> = {
+  window: AppWindow, browser: Globe, mobile: Smartphone, desktop: Monitor, terminal: SquareTerminal, chat: MessageSquare,
+  agent: Bot, server: Server, data: Database, email: Mail, doc: FileText, flow: Workflow,
+};
+function TabFace({ t }: { t: LayerTab }) {
+  const Icon = LAYER_ICON[t.icon ?? 'window'] ?? AppWindow;
   return (
-    <div className="relative z-[1] -mb-[1.5px] flex h-9 shrink-0 items-end gap-1 pl-3" data-testid="layer-bar">
-      <div role="tablist" aria-label={i18n.player.layers} className="flex min-w-0 items-end gap-1 overflow-hidden" data-testid="layer-switch">
-        {layerTabs(layers, viewLayer, director).map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={t.active}
-            data-testid={`layer-${t.id}`}
-            data-camera={t.camera ? '' : undefined}
-            title={t.active ? (t.camera ? i18n.player.directorIsUsing(t.title) : i18n.player.stayingOn(t.title)) : i18n.player.switchToDirectorPaused(t.title)}
-            onClick={() => onLayer(t.id)}
-            className={cn(
-              'jb-focus flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-[8px] px-3 font-jb text-[13px]',
-              t.active ? 'h-9 border-[1.5px] border-b-0 border-jb-ink bg-jb-surface font-semibold text-jb-fg' : 'h-8 border border-b-0 border-jb-line bg-jb-sunken text-jb-muted hover:text-jb-fg',
-            )}
-          >
-            {t.camera ? <Clapperboard className="size-3.5" aria-label={i18n.player.directorShot} /> : null}
-            {t.role ? (
-              <span aria-label={t.role.name} className="inline-flex size-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: t.role.color }}>
-                {[...t.role.name][0]}
-              </span>
-            ) : null}
-            {t.title}
-          </button>
+    <>
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      {t.role ? (
+        <span aria-label={t.role.name} className="inline-flex size-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: t.role.color }}>
+          {[...t.role.name][0]}
+        </span>
+      ) : null}
+      <span className="min-w-0 truncate">{t.title}</span>
+    </>
+  );
+}
+const TAB_GAP = 4;
+
+/**
+ * 层级标签（D55）：贴在舞台框上沿，正在看的那层与舞台连成一片；每个标签带预设图标，导演停在哪层，哪层右上角有摄像机角标。
+ * 右侧「只重放这一层」与「跟随导演」。
+ * 放不下时像书签（bookmarkTabs）：正在看的那层保持完整，其余压窄或叠起来，只露出图标和开头几个字；
+ * 鼠标划过或键盘聚焦的标签浮到最上面、展开成全名，盖住邻居，别的标签不动。悬停提示里始终有全名。
+ */
+function LayerTabs({ layers, viewLayer, director, onLayer, onDirector, onReplay }: { layers: { id: string; title: string; role?: RoleInfo | null; icon?: LayerIcon }[]; viewLayer: string; director: boolean; onLayer: (id: string) => void; onDirector: (on: boolean) => void; onReplay: () => void }) {
+  const { t: i18n } = useI18n();
+  const tabs = layerTabs(layers, viewLayer, director);
+  const [barRef, barWidth] = useWidth(0);
+  const measure = useRef<HTMLDivElement | null>(null);
+  const [widths, setWidths] = useState<number[]>([]);
+  const key = tabs.map((t) => `${t.id}|${t.title}|${t.active}|${t.icon ?? ''}|${t.role?.name ?? ''}`).join('\n');
+  useLayoutEffect(() => {
+    const el = measure.current;
+    if (!el) return;
+    const read = () => {
+      const next = [...el.children].map((c) => Math.ceil(c.getBoundingClientRect().width));
+      setWidths((prev) => (prev.length === next.length && prev.every((w, i) => w === next[i]) ? prev : next));
+    };
+    read();
+    // 字体晚到时测量行会变宽，跟着重算
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [key]);
+  const geometry = widths.length === tabs.length ? bookmarkTabs(widths, tabs.findIndex((t) => t.active), barWidth, TAB_GAP) : [];
+  return (
+    <div className="relative z-[1] -mb-[1.5px] flex h-9 shrink-0 items-end gap-2 pl-3" data-testid="layer-bar">
+      <div ref={measure} aria-hidden inert className="pointer-events-none invisible absolute left-0 top-0 flex w-max items-end">
+        {tabs.map((t) => (
+          <span key={t.id} className={cn(TAB_BASE, tabLook(t.active))}>
+            <TabFace t={t} />
+          </span>
         ))}
+      </div>
+      <div ref={barRef} role="tablist" aria-label={i18n.player.layers} className="relative h-9 min-w-0 flex-1" data-testid="layer-switch">
+        {tabs.map((t, i) => {
+          const g = geometry[i];
+          if (!g) return null;
+          const opens = g.openWidth > g.width;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={t.active}
+              data-testid={`layer-${t.id}`}
+              data-camera={t.camera ? '' : undefined}
+              title={t.active ? (t.camera ? i18n.player.directorIsUsing(t.title) : i18n.player.stayingOn(t.title)) : i18n.player.switchToDirectorPaused(t.title)}
+              onClick={() => onLayer(t.id)}
+              style={{ '--l': `${g.left}px`, '--w': `${g.width}px`, '--ol': `${g.openLeft}px`, '--ow': `${g.openWidth}px`, '--z': g.z } as React.CSSProperties}
+              className={cn(
+                'jb-focus absolute bottom-0 left-(--l) z-(--z) w-(--w)',
+                TAB_BASE,
+                tabLook(t.active),
+                !t.active && 'hover:text-jb-fg',
+                opens && 'transition-[left,width,z-index] duration-200 ease-out hover:transition-[left,width] focus-visible:transition-[left,width] hover:left-(--ol) hover:z-[60] hover:w-(--ow) focus-visible:left-(--ol) focus-visible:z-[60] focus-visible:w-(--ow)',
+              )}
+            >
+              <span className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+                <TabFace t={t} />
+              </span>
+              {/* 导演停在这一层：右上角的小摄像机角标 */}
+              {t.camera ? (
+                <span data-testid="director-badge" aria-label={i18n.player.directorShot} className="pointer-events-none absolute -right-1.5 -top-1.5 inline-flex size-[18px] items-center justify-center rounded-full border-[1.5px] border-jb-ink bg-jb-accent text-jb-ink">
+                  <Clapperboard className="size-2.5" aria-hidden />
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-1 pb-1">
         <Btn icon={<RotateCw className="size-4" />} label={i18n.player.replayThisLayer} title={i18n.player.playFromStep0UsingThisLayerSShots} iconOnly variant="ghost" size={28} onClick={onReplay} data-testid="replay-layer" />

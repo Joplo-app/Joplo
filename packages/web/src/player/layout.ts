@@ -1,5 +1,6 @@
 import { stepCaption } from '../i18n/step-caption';
 import { en, type Dictionary } from '../i18n/en';
+import type { LayerIcon } from '@joplo-app/core';
 /**
  * 演示页布局（D55，纯函数）：断点、播放坞宽度、时间线格子、层级标签。
  *
@@ -85,11 +86,61 @@ export function timelineChips(steps: readonly { captionAuto?: import('@joplo-app
   return [chip(0, i18n.player.initial, false, i18n.player.initialStateTip), ...steps.map((s, i) => ({ ...chip(i + 1, stepCaption(s, i18n), s.kind === 'system', `${i18n.player.number(i + 1)} · ${s.kind === 'system' ? i18n.player.systemPrefix : s.kind === 'card' ? i18n.player.transitionPrefix : ''}${stepCaption(s, i18n)}${s.forks?.length ? i18n.player.forkSummary(i18n.player.list(s.forks.map(f => f.label))) : ''}`), ...(s.forks?.length ? { fork: true } : {}), ...(s.kind === 'card' ? { card: true } : {}) }))];
 }
 
-export type LayerTab = { id: string; title: string; active: boolean; camera: boolean; /** 这一层是谁的画面（D56）。 */ role?: { id: string; name: string; color: string } | null };
+export type LayerTab = { id: string; title: string; active: boolean; camera: boolean; /** 这一层是谁的画面（D56）。 */ role?: { id: string; name: string; color: string } | null; /** 预设图标（layersOf 已补默认）。 */ icon?: LayerIcon };
 
 /** 层级标签（D55，取代 D46 的“导演跟随时不高亮”）：正在看的那层与舞台连成一片；导演跟随时它带摄像机图标。 */
-export function layerTabs(layers: readonly { id: string; title: string; role?: { id: string; name: string; color: string } | null }[], viewLayer: string, director: boolean): LayerTab[] {
-  return layers.map((l) => ({ id: l.id, title: l.title, active: l.id === viewLayer, camera: director && l.id === viewLayer, ...(l.role ? { role: l.role } : {}) }));
+export function layerTabs(layers: readonly { id: string; title: string; role?: { id: string; name: string; color: string } | null; icon?: LayerIcon }[], viewLayer: string, director: boolean): LayerTab[] {
+  return layers.map((l) => ({ id: l.id, title: l.title, active: l.id === viewLayer, camera: director && l.id === viewLayer, ...(l.role ? { role: l.role } : {}), ...(l.icon ? { icon: l.icon } : {}) }));
+}
+
+/** 一个层级标签在标签栏里的位置：平时（left / width）与悬停展开时（openLeft / openWidth），z 为叠放层级。 */
+export type BookmarkTab = { left: number; width: number; openLeft: number; openWidth: number; z: number };
+
+/**
+ * 层级标签放不下时像书签（纯函数）。widths 是各标签的自然宽度，available 是标签栏宽度。
+ * - 放得下：按自然宽度依次排开；
+ * - 放不下：当前层保持完整（最多占六成），其余平分剩余宽度（本来就短的不拉长），每个不窄于 min；
+ * - 还放不下：其余标签叠起来，后一个盖住前一个的右半（当前层之后那一处不叠，免得被当前层盖住）；
+ * - 悬停展开为自然宽度，盖在邻居上面，别的标签不动；靠右的向左展开。任何情况都不越过标签栏。
+ * available ≤ 0（还没测出宽度）时按自然宽度排开。
+ */
+export function bookmarkTabs(widths: readonly number[], active: number, available: number, gap: number, min = 44): BookmarkTab[] {
+  const n = widths.length;
+  if (!n) return [];
+  const a = active >= 0 && active < n ? active : -1;
+  const z = (i: number) => (i === a ? n + 1 : i + 1);
+  const total = widths.reduce((s, w) => s + w, 0) + gap * (n - 1);
+  if (available <= 0 || total <= available) {
+    let x = 0;
+    return widths.map((w, i) => {
+      const t = { left: x, width: w, openLeft: x, openWidth: w, z: z(i) };
+      x += w + gap;
+      return t;
+    });
+  }
+  const slots = [...widths];
+  if (a >= 0) slots[a] = Math.min(widths[a]!, n === 1 ? available : available * 0.6);
+  // 其余标签平分剩余宽度：从短到长，短的拿自然宽度，长的拿均分值
+  const others = widths.map((_, i) => i).filter((i) => i !== a).sort((x, y) => widths[x]! - widths[y]!);
+  let rest = available - (a >= 0 ? slots[a]! : 0) - gap * (n - 1);
+  others.forEach((i, k) => {
+    const share = rest / (others.length - k);
+    slots[i] = Math.max(Math.min(widths[i]!, share), Math.min(min, widths[i]!));
+    rest -= slots[i]!;
+  });
+  // 仍然超出：除了当前层之后那一处，每处接缝平均叠进去一点
+  const used = slots.reduce((s, w) => s + w, 0) + gap * (n - 1);
+  const seams = n - 1 - (a >= 0 && a < n - 1 ? 1 : 0);
+  const overlap = used > available && seams > 0 ? (used - available) / seams : 0;
+  let x = 0;
+  return slots.map((w, i) => {
+    const left = Math.max(0, Math.min(x, available - Math.min(w, available)));
+    const width = Math.min(w, available - left);
+    x = left + width + gap - (i === a ? 0 : overlap);
+    const openWidth = Math.min(widths[i]!, available);
+    const openLeft = openWidth <= width ? left : Math.max(0, Math.min(left, available - openWidth));
+    return { left, width, openLeft, openWidth: Math.max(openWidth, width), z: z(i) };
+  });
 }
 
 /** Geometry comes from the rendered brand, breadcrumbs and full action contents. */

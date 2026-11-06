@@ -7,6 +7,10 @@
 import { z } from 'zod';
 import { COMPONENT_TYPES } from './catalog.ts';
 
+/** 层级标签的预设图标（标签压窄时靠它认出是哪一层）。不写时：手机视口 mobile，其余 window。 */
+export const LAYER_ICONS = ['window', 'browser', 'mobile', 'desktop', 'terminal', 'chat', 'agent', 'server', 'data', 'email', 'doc', 'flow'] as const;
+export type LayerIcon = (typeof LAYER_ICONS)[number];
+
 export const SCHEMA_VERSION = 2 as const;
 
 /** 作者可写的 ID（对象键、元素 id）。 */
@@ -242,7 +246,8 @@ export const Option = z.strictObject({
   routes: z.array(z.string()).default([]),
   coverage: z.record(Qid, Coverage).default({}),
   /** 层级（视角）：键 → 标题与这一层自己的画面（完全独立的页面）。演示信息，发布站保留。 */
-  layers: z.record(Id, z.strictObject({ title: z.string().min(1), sceneId: Qid, role: Id.optional() })).default({}),
+  /** icon：作者显式选的预设图标（层级标签用）；不写时由 layersOf 按视口补默认。 */
+  layers: z.record(Id, z.strictObject({ title: z.string().min(1), sceneId: Qid, role: Id.optional(), icon: z.enum(LAYER_ICONS).optional() })).default({}),
   source: Source,
 });
 
