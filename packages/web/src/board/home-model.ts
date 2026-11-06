@@ -1,3 +1,4 @@
+import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 看板首页的视图模型（D55「首页」，纯函数）：项目路径缩写、项目徽标、↑↓ 移动选中、项目摘要、功能卡片。
  */
@@ -16,9 +17,9 @@ export function shortPath(dir: string): string {
 }
 
 /** 左栏徽标：编译出错写错误数，目录不存在写“找不到”；正常没有。 */
-export function projectBadge(p: Pick<ProjectSummary, 'status' | 'errors'>): { text: string; tone: 'danger' | 'na' } | null {
-  if (p.status === 'error') return { text: p.errors > 0 ? `${p.errors} 错误` : '出错', tone: 'danger' };
-  if (p.status === 'missing') return { text: '找不到', tone: 'na' };
+export function projectBadge(p: Pick<ProjectSummary, 'status' | 'errors'>, i18n: BoardMessages = boardEnglish): { text: string; tone: 'danger' | 'na' } | null {
+  if (p.status === 'error') return { text: p.errors > 0 ? i18n.board.errors4(p.errors) : i18n.board.error, tone: 'danger' };
+  if (p.status === 'missing') return { text: i18n.board.notFound, tone: 'na' };
   return null;
 }
 
@@ -30,9 +31,9 @@ export function moveSelection(list: readonly { id: string }[], selectedId: strin
   return list[Math.max(0, Math.min(list.length - 1, i + delta))]!.id;
 }
 
-export function projectMeta(project: Project): string {
+export function projectMeta(project: Project, i18n: BoardMessages = boardEnglish): string {
   const fs = Object.values(project.features);
-  return `${fs.length} 个功能 · 已选定 ${fs.filter((f) => f.pick).length} / ${fs.length}`;
+  return i18n.board.featuresPicked(fs.length, fs.filter((f) => f.pick).length, fs.length);
 }
 
 export type FeatureCard = {

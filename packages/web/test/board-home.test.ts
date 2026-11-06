@@ -1,3 +1,6 @@
+import { createZhCN } from '../src/i18n/zh-CN';
+import { createBoardZhCN } from '../src/i18n/board/zh-CN';
+const zh = { ...createZhCN(), ...createBoardZhCN() };
 /**
  * 看板 UI v1（D55）阶段 5：首页（design/png/20-首页.png）、发布站（50 / 51）的纯计算。
  * - 首页左栏：项目路径缩写、编译出错 / 找不到目录的徽标、↑↓ 移动选中；
@@ -21,10 +24,10 @@ describe('首页左栏', () => {
     expect(shortPath('')).toBe('');
   });
   it('徽标：编译出错写错误数；目录不存在写“找不到”；正常没有', () => {
-    expect(projectBadge({ status: 'error', errors: 2 } as never)).toEqual({ text: '2 错误', tone: 'danger' });
-    expect(projectBadge({ status: 'error', errors: 0 } as never)).toEqual({ text: '出错', tone: 'danger' });
-    expect(projectBadge({ status: 'missing', errors: 0 } as never)).toEqual({ text: '找不到', tone: 'na' });
-    expect(projectBadge({ status: 'ok', errors: 0 } as never)).toBeNull();
+    expect(projectBadge({ status: 'error', errors: 2 } as never, zh)).toEqual({ text: '2 错误', tone: 'danger' });
+    expect(projectBadge({ status: 'error', errors: 0 } as never, zh)).toEqual({ text: '出错', tone: 'danger' });
+    expect(projectBadge({ status: 'missing', errors: 0 } as never, zh)).toEqual({ text: '找不到', tone: 'na' });
+    expect(projectBadge({ status: 'ok', errors: 0 } as never, zh)).toBeNull();
   });
   it('↑↓ 移动选中：到头停住；没有选中时从第一个开始；空列表返回 null', () => {
     const list = [{ id: 'a' }, { id: 'b' }, { id: 'c' }] as never[];
@@ -62,7 +65,7 @@ function proj(): Project {
 describe('首页右侧', () => {
   const p = proj();
   it('项目摘要：N 个功能 · 已选定 a / n', () => {
-    expect(projectMeta(p)).toBe('2 个功能 · 已选定 1 / 2');
+    expect(projectMeta(p, zh)).toBe('2 个功能 · 已选定 1 / 2');
   });
   it('功能卡片：选定方案的字母与名字、方案数、覆盖小结；整张可点，打开选定方案；缩略图用选定方案第一个场景的初始画面', () => {
     const c = featureCard(p, 'f')!;
@@ -81,7 +84,7 @@ describe('首页右侧', () => {
 describe('发布站左栏：选定方案的场景', () => {
   it('每个场景的名字与步数；当前场景高亮', () => {
     const p = proj();
-    expect(siteScenarioRows(p, 'f.a', 'f.a.s')).toEqual([{ id: 'f.a.s', name: '一次', steps: '1 步', current: true }]);
-    expect(siteScenarioRows(p, null, null)).toEqual([]);
+    expect(siteScenarioRows(p, 'f.a', 'f.a.s', zh)).toEqual([{ id: 'f.a.s', name: '一次', steps: '1 步', current: true }]);
+    expect(siteScenarioRows(p, null, null, zh)).toEqual([]);
   });
 });

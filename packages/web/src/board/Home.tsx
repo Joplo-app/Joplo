@@ -1,3 +1,8 @@
+import { LocalText } from '../i18n/LocalText';
+import { m } from '../i18n/board/messages';
+import { translate, type Text } from '../i18n/messages';
+import { useBoardI18n } from '../i18n/board/context';
+import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 看板首页（D39 home 方案 A“记住打开过的项目”，D55「首页」）：
  * - 左栏：最近打开的项目（~/.joplo/projects.json，按最近打开排序），名字 + 缩写的路径；编译出错写错误数，目录不存在写“找不到”；
@@ -37,18 +42,20 @@ export function Home({
   onFlash,
 }: {
   projects: ProjectSummary[] | null;
-  error: string | null;
+  error: Text | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onView: (projectId: string, featureId: string, optionId?: string) => void;
   /** 顶栏右侧（外观按钮，D55）。 */
   right?: ReactNode;
   flash?: ReactNode | null;
-  onFlash?: (msg: string) => void;
+  onFlash?: (msg: ReactNode) => void;
 }) {
+  const { t: i18n } = useBoardI18n();
+
   const selected = projects?.find((p) => p.id === selectedId) ?? null;
   const listRef = useRef<HTMLUListElement>(null);
-  const copy = (text: string) => void copyText(text).then((ok) => onFlash?.(ok ? `已复制 ${text}` : '无法访问剪贴板'));
+  const copy = (text: string) => void copyText(text).then((ok) => onFlash?.(<LocalText value={ok ? m.board.copied2(text) : m.board.clipboardUnavailable} />));
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
@@ -64,7 +71,7 @@ export function Home({
       </TopBar>
       {error ? (
         <div role="alert" className="border-b border-jb-danger bg-jb-danger-bg px-4 py-2 text-[13px] text-jb-danger" data-testid="load-error">
-          {error}
+          {translate(error, i18n)}
         </div>
       ) : null}
       {flash ? (
@@ -75,12 +82,12 @@ export function Home({
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-[276px] shrink-0 flex-col border-r border-jb-line bg-jb-surface px-3 py-4" data-testid="project-list">
           <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
-            <span className="font-semibold tracking-[1px] text-jb-muted">项目</span>
-            <span className="text-jb-faint">最近打开</span>
+            <span className="font-semibold tracking-[1px] text-jb-muted">{i18n.board.projects}</span>
+            <span className="text-jb-faint">{i18n.board.recentlyOpened}</span>
           </div>
-          <ul ref={listRef} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto" onKeyDown={onKey} aria-label="最近打开的项目">
+          <ul ref={listRef} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto" onKeyDown={onKey} aria-label={i18n.board.recentlyOpenedProjects}>
             {(projects ?? []).map((p) => {
-              const badge = projectBadge(p);
+              const badge = projectBadge(p, i18n);
               const on = p.id === selectedId;
               return (
                 <li key={p.id}>
@@ -105,7 +112,7 @@ export function Home({
             })}
           </ul>
           <div className="mt-3 flex flex-col gap-2 rounded-[10px] bg-jb-app p-3" data-testid="home-add">
-            <span className="text-[12px] text-jb-muted">添加项目：在项目目录里运行</span>
+            <span className="text-[12px] text-jb-muted">{i18n.board.addAProjectRunInItsDirectory}</span>
             <CopyLine text="npx joplo dev" onCopy={copy} />
           </div>
         </aside>
@@ -118,10 +125,12 @@ export function Home({
 }
 
 function CopyLine({ text, onCopy }: { text: string; onCopy: (text: string) => void }) {
+  const { t: i18n } = useBoardI18n();
+
   return (
     <div className="flex h-8 items-center gap-2 rounded-[6px] border border-jb-line bg-jb-surface pl-2.5 pr-1">
       <code className="min-w-0 flex-1 truncate font-jb-mono text-[12px]">{text}</code>
-      <button type="button" className="jb-focus flex size-6 shrink-0 items-center justify-center rounded-[4px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg" aria-label={`复制 ${text}`} onClick={() => onCopy(text)}>
+      <button type="button" className="jb-focus flex size-6 shrink-0 items-center justify-center rounded-[4px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg" aria-label={i18n.board.copy(text)} onClick={() => onCopy(text)}>
         <Copy className="size-3.5" />
       </button>
     </div>
@@ -130,31 +139,35 @@ function CopyLine({ text, onCopy }: { text: string; onCopy: (text: string) => vo
 
 /** 首页空状态：标志、一句话、三条可复制的命令；不放插画。 */
 function Empty({ onCopy }: { onCopy: (text: string) => void }) {
+  const { t: i18n } = useBoardI18n();
+
   return (
     <div className="mx-auto mt-[12vh] flex max-w-[440px] flex-col items-center gap-4 text-center" data-testid="home-empty">
       <JoploMark size={56} />
-      <h2 className="text-[20px] font-bold">还没有打开过项目</h2>
+      <h2 className="text-[20px] font-bold">{i18n.board.noProjectsOpenedYet}</h2>
       <div className="flex w-full flex-col gap-1.5 rounded-[10px] border border-jb-line bg-jb-surface p-3">
         {['npx joplo init my-demo', 'cd my-demo && npm install', 'npx joplo dev'].map((c) => (
           <CopyLine key={c} text={c} onCopy={onCopy} />
         ))}
       </div>
-      <p className="text-[12px] text-jb-faint">打开过的项目会记在 ~/.joplo/projects.json，下次直接出现在左栏。</p>
+      <p className="text-[12px] text-jb-faint">{i18n.board.openedProjectsAreSavedInJoploProjectsJsonAnd}</p>
     </div>
   );
 }
 
 function Errors({ list, note }: { list: Diagnostic[]; note: string }) {
+  const { t: i18n } = useBoardI18n();
+
   const errors = list.filter((d) => d.severity === 'error');
   return (
     <div role="alert" className="rounded-[8px] border-l-4 border-jb-danger bg-jb-danger-bg px-4 py-3" data-testid="home-errors">
       <div className="text-[14px] font-semibold text-jb-danger">
-        编译出错 {errors.length} 处 · {note}
+        {i18n.board.compilationCount(errors.length)} · {note}
       </div>
       <ul className="mt-2 flex flex-col gap-1 text-[13px]">
         {errors.slice(0, 30).map((d, i) => (
           <li key={i} className="flex gap-3" data-testid="home-error-item">
-            <code className="shrink-0 font-jb-mono text-[12px] font-semibold">{d.at ?? '（无位置）'}</code>
+            <code className="shrink-0 font-jb-mono text-[12px] font-semibold">{d.at ?? i18n.board.noLocation}</code>
             <span className="whitespace-pre-wrap break-all text-jb-muted">{d.message}</span>
           </li>
         ))}
@@ -164,35 +177,35 @@ function Errors({ list, note }: { list: Diagnostic[]; note: string }) {
 }
 
 function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (projectId: string, featureId: string, optionId?: string) => void }) {
+  const { t: i18n } = useBoardI18n();
+
   const ir = useProjectIR(summary.status === 'missing' ? null : summary.id);
-  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<Text | null>(null);
   const { settings } = useBoardSettings();
   const p = ir.payload;
   const project = p?.project ?? null;
   const key = JSON.stringify(project?.themes ?? {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const names = useMemo(() => themeCatalog(project?.themes ?? {}).map((t) => t.name), [key]);
+  const names = useMemo(() => themeCatalog(project?.themes ?? {}, i18n).map((t) => t.name), [key, i18n]);
   if (summary.status === 'missing')
     return (
       <div className="flex max-w-[640px] flex-col gap-3 rounded-[10px] border border-jb-line bg-jb-surface p-5" data-testid="home-missing">
         <h2 className="flex items-center gap-2 text-[17px] font-bold">
           <FolderX className="size-5 text-jb-muted" aria-hidden />
-          找不到这个项目的目录
-        </h2>
+          {i18n.board.projectDirectoryNotFound}</h2>
         <p className="text-[14px]">
-          <code className="font-jb-mono text-[13px]">{summary.dir}</code> 已不存在。目录移动过的话，在新位置运行 npx joplo dev 就会重新加入。
-        </p>
+          <code className="font-jb-mono text-[13px]">{summary.dir}</code> {i18n.board.noLongerExistsIfItMovedRunNpxJoplo}</p>
         <div>
-          <Btn label="从列表移除" onClick={() => void removeProject(summary.id).then((r) => setRemoveError(r.ok ? null : r.message))} data-testid="remove-project" />
+          <Btn label={i18n.board.removeFromList} onClick={() => void removeProject(summary.id).then((r) => setRemoveError(r.ok ? null : r.message))} data-testid="remove-project" />
         </div>
-        <p className="text-[12px] text-jb-faint">只删除这条记录，不会删除任何文件。</p>
-        {removeError ? <p className="text-[13px] text-jb-danger">{removeError}</p> : null}
+        <p className="text-[12px] text-jb-faint">{i18n.board.onlyRemovesThisRecordNoFilesWillBeDeleted}</p>
+        {removeError ? <p className="text-[13px] text-jb-danger">{translate(removeError, i18n)}</p> : null}
       </div>
     );
-  if (!p) return <div className="text-[14px] text-jb-muted">{ir.error ?? '正在编译项目…'}</div>;
+  if (!p) return <div className="text-[14px] text-jb-muted">{ir.error ? translate(ir.error, i18n) : i18n.board.compilingProject}</div>;
   // 缩略图用这个项目自己的外观（D55：本项目 > 所有项目 > 项目 config）
   const look = project ? effectiveAppearance(settings, summary.id, project.theme ?? 'sketch', names) : null;
-  const status = !p.ok ? { dot: 'bg-jb-danger', text: `编译出错 ${p.diagnostics.filter((d) => d.severity === 'error').length} 处` } : ir.live ? { dot: 'bg-jb-ok', text: '已编译 · 热更新中' } : { dot: 'bg-jb-ok', text: '已编译' };
+  const status = !p.ok ? { dot: 'bg-jb-danger', text: i18n.board.compilationErrors3(p.diagnostics.filter((d) => d.severity === 'error').length) } : ir.live ? { dot: 'bg-jb-ok', text: i18n.board.compiledLiveReloadOn } : { dot: 'bg-jb-ok', text: i18n.board.compiled };
   return (
     <div className="flex max-w-[1120px] flex-col gap-5" data-testid="home-project">
       {project ? <ThemeStyles themes={project.themes} /> : null}
@@ -204,7 +217,7 @@ function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (p
           {project?.description ? <p className="mt-1.5 max-w-[860px] text-[14px] leading-[22px] text-jb-muted">{project.description}</p> : null}
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]">
             <code className="font-jb-mono text-jb-faint">{summary.dir.replace(/^\/(Users|home)\/[^/]+/, '~')}</code>
-            {project ? <span className="text-jb-muted">{projectMeta(project)}</span> : null}
+            {project ? <span className="text-jb-muted">{projectMeta(project, i18n)}</span> : null}
           </div>
         </div>
         <span className="flex shrink-0 items-center gap-1.5 pt-2 text-[12px] text-jb-muted" data-testid="project-status">
@@ -212,17 +225,19 @@ function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (p
           {status.text}
         </span>
       </header>
-      {!p.ok ? <Errors list={p.diagnostics} note={project ? '下面仍是上一次成功的结果；修复后自动刷新' : '修复后自动刷新'} /> : null}
+      {!p.ok ? <Errors list={p.diagnostics} note={project ? i18n.board.showingTheLastSuccessfulResultUpdatesAfterYouFix : i18n.board.updatesAfterYouFixTheErrors} /> : null}
       {project && look ? <Features project={project} look={look} onView={(f, o) => onView(summary.id, f, o)} /> : null}
     </div>
   );
 }
 
 function Features({ project, look, onView }: { project: Project; look: ReturnType<typeof effectiveAppearance>; onView: (featureId: string, optionId?: string) => void }) {
+  const { t: i18n } = useBoardI18n();
+
   const cards = Object.keys(project.features)
     .map((id) => featureCard(project, id))
     .filter((c): c is FeatureCard => !!c);
-  if (!cards.length) return <p className="text-[14px] text-jb-muted">还没有功能。在 features/&lt;名称&gt;/feature.ts 里写第一个功能。</p>;
+  if (!cards.length) return <p className="text-[14px] text-jb-muted">{i18n.board.noFeaturesYetWriteYourFirstFeatureInFeatures}</p>;
   return (
     <section className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2" data-testid="home-features">
       {cards.map((c) => (
@@ -234,19 +249,20 @@ function Features({ project, look, onView }: { project: Project; look: ReturnTyp
 
 /** 功能卡片（整张可点）：缩略图 + 名字 + 目标 + 选定方案、方案数、覆盖小结。 */
 function FeatureCardView({ project, card, look, onOpen }: { project: Project; card: FeatureCard; look: ReturnType<typeof effectiveAppearance>; onOpen: () => void }) {
+  const { t: i18n } = useBoardI18n();
+
   const disabled = !card.open;
   return (
     // 整张可点：一个盖住整张卡片的按钮（缩略图里的舞台也有按钮，不能把卡片本身做成 button）
     <div data-testid={`feature-${card.id}`} className={cn('group relative flex flex-col overflow-hidden rounded-[10px] border bg-jb-surface text-left has-[[data-card-open]:focus-visible]:border-jb-ink', disabled ? 'border-dashed border-jb-line' : 'border-jb-line hover:border-jb-ink hover:shadow-[var(--jb-e1)]')}>
-      {!disabled ? <button type="button" data-card-open="" onClick={onOpen} aria-label={`打开「${card.name}」的演示`} data-testid={`open-${card.id}`} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" /> : null}
+      {!disabled ? <button type="button" data-card-open="" onClick={onOpen} aria-label={i18n.board.openDemoFor(card.name)} data-testid={`open-${card.id}`} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" /> : null}
       <StageThumb project={project} scenarioId={card.thumb?.scenarioId ?? null} sceneId={card.thumb?.sceneId ?? null} look={look} testid={`thumb-${card.id}`} />
       <div className="flex flex-col gap-1.5 border-t border-jb-line px-4 pb-4 pt-3">
         <div className="flex items-center gap-3">
           <span className="min-w-0 flex-1 truncate text-[17px] font-bold">{card.name}</span>
           {!disabled ? (
             <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold opacity-0 transition-opacity group-hover:opacity-100 group-has-[[data-card-open]:focus-visible]:opacity-100" data-testid={`view-${card.id}`}>
-              打开演示
-              <ArrowRight className="size-4" aria-hidden />
+              {i18n.board.openDemo}<ArrowRight className="size-4" aria-hidden />
             </span>
           ) : null}
         </div>
@@ -257,25 +273,24 @@ function FeatureCardView({ project, card, look, onOpen }: { project: Project; ca
               ✓ {card.pick.letter} · {card.pick.title}
             </span>
           ) : (
-            <span className="rounded-[4px] border border-jb-line px-1.5 py-px text-[11px] text-jb-muted">还没选定方案</span>
+            <span className="rounded-[4px] border border-jb-line px-1.5 py-px text-[11px] text-jb-muted">{i18n.board.noPickedOptionYet}</span>
           )}
-          <span className="text-jb-muted">{card.optionCount} 个方案</span>
+          <span className="text-jb-muted">{card.optionCount} {i18n.board.options2}</span>
           {card.coverage.allExpressed ? (
             <span className="inline-flex items-center gap-1 text-jb-ok">
               <StatusIcon status="expressed" size={13} />
-              情况都已表达
-            </span>
+              {i18n.board.allCasesCovered}</span>
           ) : null}
           {card.coverage.missing ? (
             <span className="inline-flex items-center gap-1 text-jb-danger">
               <StatusIcon status="missing" size={13} />
-              缺失 {card.coverage.missing}
+              {i18n.board.missing3(card.coverage.missing)}
             </span>
           ) : null}
           {card.coverage.undecided ? (
             <span className="inline-flex items-center gap-1 text-jb-muted">
               <StatusIcon status="undecided" size={13} />
-              待决定 {card.coverage.undecided}
+              {i18n.board.undecided3(card.coverage.undecided)}
             </span>
           ) : null}
         </div>

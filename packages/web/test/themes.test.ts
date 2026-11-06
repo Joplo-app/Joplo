@@ -1,3 +1,6 @@
+import { createZhCN } from '../src/i18n/zh-CN';
+import { createBoardZhCN } from '../src/i18n/board/zh-CN';
+const zh = { ...createZhCN(), ...createBoardZhCN() };
 /**
  * 主题（D51）的纯计算：变量映射、作用范围前缀、主题解析（内置 + 作者，同名用作者的）、看板实际使用的主题。
  */
@@ -7,20 +10,20 @@ import { BUILTIN, THEME_VARS, allThemesCss, builtinCss, effectiveTheme, isDark, 
 
 describe('内置主题', () => {
   it('与 core 的 BUILTIN_THEMES 一致；每个主题都写全了约定的变量', () => {
-    expect(BUILTIN.map((b) => b.name)).toEqual([...BUILTIN_THEMES]);
-    for (const b of BUILTIN) {
-      const vars = parseThemeVars(builtinCss(b.name)!);
+    expect(BUILTIN(zh).map((b) => b.name)).toEqual([...BUILTIN_THEMES]);
+    for (const b of BUILTIN(zh)) {
+      const vars = parseThemeVars(builtinCss(b.name, zh)!);
       for (const v of THEME_VARS) expect(vars[v], `${b.name} 缺少 ${v}`).toBeTruthy();
     }
   });
   it('sketch / clean 只有字体、字号、阴影与描边方式不同（颜色与之前一致）', () => {
-    const s = parseThemeVars(builtinCss('sketch')!);
-    const c = parseThemeVars(builtinCss('clean')!);
+    const s = parseThemeVars(builtinCss('sketch', zh)!);
+    const c = parseThemeVars(builtinCss('clean', zh)!);
     expect(s['--jp-ink']).toBe('#1e1e1e');
     expect(s['--jp-accent']).toBe('#e8590c');
     expect(s['--jp-info']).toBe('#1c7ed6');
     for (const k of ['--jp-ink', '--jp-bg', '--jp-surface', '--jp-accent', '--jp-info', '--jp-ok', '--jp-danger']) expect(c[k]).toBe(s[k]);
-    expect([strokeOf(builtinCss('sketch')!), strokeOf(builtinCss('clean')!)]).toEqual(['rough', 'clean']);
+    expect([strokeOf(builtinCss('sketch', zh)!), strokeOf(builtinCss('clean', zh)!)]).toEqual(['rough', 'clean']);
   });
   it('深色主题：连线状态（active / ok / error / dim）、高光与文字和底色有足够对比（WCAG 对比度 ≥ 3）', () => {
     const lum = (hex: string) => {
@@ -33,14 +36,14 @@ describe('内置主题', () => {
       const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p) as [number, number];
       return (x + 0.05) / (y + 0.05);
     };
-    for (const b of BUILTIN) {
-      const v = parseThemeVars(builtinCss(b.name)!);
+    for (const b of BUILTIN(zh)) {
+      const v = parseThemeVars(builtinCss(b.name, zh)!);
       for (const k of ['--jp-ink', '--jp-info', '--jp-ok', '--jp-danger', '--jp-annot', '--jp-accent', '--jp-muted']) {
         for (const bg of ['--jp-bg', '--jp-surface']) expect(ratio(v[k]!, v[bg]!), `${b.name}: ${k} 与 ${bg}`).toBeGreaterThanOrEqual(3);
       }
       // dim 状态要能和 idle 区分（idle 用 ink，dim 用 line-strong）
       expect(v['--jp-line-strong']).not.toBe(v['--jp-ink']);
-      expect(isDark(builtinCss(b.name)!)).toBe(b.dark);
+      expect(isDark(builtinCss(b.name, zh)!)).toBe(b.dark);
     }
   });
 });
@@ -65,7 +68,7 @@ describe('scopeThemeCss（作用范围前缀）', () => {
     expect(out).not.toContain('/* x */');
   });
   it('所有主题注入后，每条规则都在某个主题的作用范围里（不影响看板本身）', () => {
-    const css = allThemesCss({ mine: '.jbox { border-color: hotpink }' });
+    const css = allThemesCss({ mine: '.jbox { border-color: hotpink }' }, zh);
     const rules = css.replace(/\/\*[\s\S]*?\*\//g, '').split('}').map((r) => r.trim()).filter((r) => r.includes('{'));
     for (const r of rules) {
       const sel = r.slice(0, r.indexOf('{')).trim();
@@ -77,14 +80,14 @@ describe('scopeThemeCss（作用范围前缀）', () => {
 
 describe('主题解析与实际使用的主题', () => {
   it('作者主题与内置同名时用作者的；新名字追加在后面；描边方式按 --jp-stroke，没写时与默认（手绘）一致', () => {
-    const cat = themeCatalog({ nord: ':root { --jp-bg: #000; --jp-stroke: rough }', brand: ':root { --jp-accent: #f0f; --jp-stroke: clean }', plain: '.jbox { color: red }' });
+    const cat = themeCatalog({ nord: ':root { --jp-bg: #000; --jp-stroke: rough }', brand: ':root { --jp-accent: #f0f; --jp-stroke: clean }', plain: '.jbox { color: red }' }, zh);
     const nord = cat.find((t) => t.name === 'nord')!;
     expect(nord).toMatchObject({ builtin: false, stroke: 'rough', dark: true });
     expect(cat.map((t) => t.name).slice(-2)).toEqual(['brand', 'plain']);
-    expect(strokeOfTheme('brand', { brand: ':root { --jp-stroke: clean }' })).toBe('clean');
-    expect(strokeOfTheme('plain', { plain: '.jbox { color: red }' })).toBe('rough');
-    expect(strokeOfTheme('nope')).toBe('rough');
-    expect(cat.length).toBe(BUILTIN.length + 2);
+    expect(strokeOfTheme('brand', { brand: ':root { --jp-stroke: clean }' }, zh)).toBe('clean');
+    expect(strokeOfTheme('plain', { plain: '.jbox { color: red }' }, zh)).toBe('rough');
+    expect(strokeOfTheme('nope', undefined, zh)).toBe('rough');
+    expect(cat.length).toBe(BUILTIN(zh).length + 2);
   });
   it('看板实际使用的主题：本项目覆盖 > 全局选择 > 项目默认；“恢复为项目默认”（null）即使有全局选择也用项目默认', () => {
     expect(effectiveTheme(null, 'p1', 'sketch')).toBe('sketch');

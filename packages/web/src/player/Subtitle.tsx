@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/context';
 /**
  * 字幕区（画面下方、播放控制上方）：高度按内容自适应（subtitleHeight），宽度占满；字体跟随舞台主题
  * （sketch：Excalifont + 小赖；clean：系统字体）。右侧小标记是步数或“场景完成 · 模拟成功”。
@@ -13,6 +14,7 @@ import { SUBTITLE_CAPTION_PX, SUBTITLE_EXPLAIN_PX, SUBTITLE_PAD_Y, subtitleHeigh
 const clamp = (lines: number) => ({ display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' });
 
 export function Subtitle({ content, theme, width, framed = false, fixedHeight, dark = false, divider = false, font = null, onFork }: { content: SubtitleContent | null; onFork?: (fork: Fork) => void; theme: StageTheme; /** 字体（D55）：null = 跟随主题。 */ font?: AppearanceFont | null; width?: number | string; framed?: boolean; fixedHeight?: number; dark?: boolean; /** 上沿一条细线（看板的舞台框里，画面和字幕之间）。 */ divider?: boolean }) {
+  const { t: i18n } = useI18n();
   const badge = content?.badge;
   return (
     <div
@@ -29,8 +31,8 @@ export function Subtitle({ content, theme, width, framed = false, fixedHeight, d
         <>
           <div className="flex min-w-0 flex-1 flex-col justify-center">
             <div className="text-[var(--jp-ink)]" style={{ fontSize: SUBTITLE_CAPTION_PX, lineHeight: 1.35, ...clamp(content.captionLines) }} data-jsubtitle-caption="">
-              {content.kind === 'system' ? <span className="mr-2 inline-block whitespace-nowrap rounded bg-[var(--jp-info)] px-1.5 align-[2px] text-[12px] leading-[20px] text-white">系统</span> : null}
-              {content.kind === 'card' ? <span className="mr-2 inline-block whitespace-nowrap rounded border border-[var(--jp-line-strong)] px-1.5 align-[2px] text-[12px] leading-[18px] text-[var(--jp-muted)]">过渡</span> : null}
+              {content.kind === 'system' ? <span className="mr-2 inline-block whitespace-nowrap rounded bg-[var(--jp-info)] px-1.5 align-[2px] text-[12px] leading-[20px] text-white">{i18n.player.system}</span> : null}
+              {content.kind === 'card' ? <span className="mr-2 inline-block whitespace-nowrap rounded border border-[var(--jp-line-strong)] px-1.5 align-[2px] text-[12px] leading-[18px] text-[var(--jp-muted)]">{i18n.player.transition}</span> : null}
               {content.caption}
             </div>
             {content.explain ? (

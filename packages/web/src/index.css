@@ -447,3 +447,7 @@
 @media (prefers-reduced-motion: reduce) {
   .jstage [data-jlayer="marks"] path { animation: none !important; }
 }
+/* Interface fallback fonts follow the viewer's BCP-47 language. */
+:root:lang(ja) { --jb-font: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif; }
+:root:lang(ko) { --jb-font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; }
+:root:lang(zh-TW) { --jb-font: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif; }

@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/context';
 /**
  * 舞台：在固定尺寸的画框里渲染当前画面。弹窗、Toast、演示覆盖层都在画框内部分层，
  * 不 portal 到 document.body，因此截图、元素索引与遮挡检查都只看舞台本身。
@@ -97,12 +98,13 @@ function scrollsItself(target: EventTarget | null, root: HTMLElement, dy: number
 }
 
 export function Stage({ project, state, theme, mode, selectedId = null, preview = null, activeStep = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false, font = null, stroke: strokeOverride = null, stream = null }: StageProps) {
+  const { t: i18n } = useI18n();
   const shownId = sceneId ?? state.sceneId;
   const scene = project.scenes[shownId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
   // 外观（D51 / D55）：线条缺省由主题的 --jp-stroke 决定（内置主题或项目 themes/<name>.css），可以单独覆盖；字体覆盖写成 --jp-font
-  const look = useMemo(() => resolveLook({ theme, font, stroke: strokeOverride }, project.themes ?? {}), [theme, font, strokeOverride, project.themes]);
+  const look = useMemo(() => resolveLook({ theme, font, stroke: strokeOverride }, project.themes ?? {}, i18n), [theme, font, strokeOverride, project.themes]);
   const stroke = look.stroke;
   // 调用链（D48）：Diagram 节点与连线的 state 由每一步的 trace 推算（没写 state 时使用）
   const traced = useMemo(() => diagramStateAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
@@ -284,7 +286,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
               </motion.div>
             </RenderContext.Provider>
           ) : (
-            <div className="flex h-full items-center justify-center text-[var(--jp-danger)]">画面不存在：{shownId}</div>
+            <div className="flex h-full items-center justify-center text-[var(--jp-danger)]">{i18n.stage.stageNotFound}{shownId}</div>
           )}
           <div ref={setDialogLayer} className="pointer-events-none absolute inset-0 z-20 [&>*]:pointer-events-auto" data-jlayer="dialog" />
           <Marks key={shownId} marks={marks} wrapRef={cam.wrapRef} contentRef={cam.contentRef} width={vp.width} height={vp.height} animate={animate} pulseKey={`${state.scenarioId}:${state.position}:${shownId}`} />

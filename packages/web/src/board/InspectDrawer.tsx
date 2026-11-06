@@ -1,3 +1,6 @@
+import { translate, type Text } from '../i18n/messages';
+import { useBoardI18n } from '../i18n/board/context';
+import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 检查抽屉（看板，D39 / D55「检查抽屉：给 Agent 指路」）：检查模式下单击、或 ⌥+单击画面元素后在右侧浮出（e1，没有遮罩，
  * 可以接着点别的元素）；Esc 或 × 关闭。标题是元素名，第一块就是 文件:行（复制、在编辑器中打开）；规则区分“已确认”和
@@ -19,8 +22,10 @@ function Chip({ cls, children }: { cls: string; children: React.ReactNode }) {
 }
 
 function RuleItem({ rule }: { rule: Rule }) {
-  const o = ORIGIN_LABEL[rule.origin];
-  const c = CONFIRM_LABEL[rule.confirmation];
+  const { t: i18n, locale } = useBoardI18n();
+
+  const o = ORIGIN_LABEL(i18n)[rule.origin];
+  const c = CONFIRM_LABEL(i18n)[rule.confirmation];
   return (
     <li className={cn('rounded-[8px] border px-2.5 py-2', rule.origin === 'ai_assumption' ? 'border-[1.5px] border-dashed border-jb-ink bg-jb-subtle' : 'border-jb-line bg-jb-surface')} data-testid={`rule-${rule.id}`} data-origin={rule.origin}>
       <div className="mb-1 flex flex-wrap items-center gap-1">
@@ -34,7 +39,7 @@ function RuleItem({ rule }: { rule: Rule }) {
 
 const H = ({ children }: { children: React.ReactNode }) => <h3 className="mb-1.5 mt-4 text-[12px] font-semibold tracking-[1px] text-jb-muted first:mt-0">{children}</h3>;
 
-const DIAGRAM_STATE: Record<string, string> = { idle: '空闲（idle）', active: '调用中（active）', ok: '成功（ok）', error: '出错（error）', dim: '淡出（dim）' };
+const DIAGRAM_STATE = (i18n: BoardMessages = boardEnglish): Record<string, string> => ({ idle: i18n.board.idleIdle, active: i18n.board.runningActive, ok: i18n.board.successOk, error: i18n.board.errorError, dim: i18n.board.dimmedDim });
 
 export function InspectDrawer({
   project,
@@ -54,6 +59,8 @@ export function InspectDrawer({
   onClear: () => void;
   onOpenEditor: (at: string) => void;
 }) {
+  const { t: i18n, locale } = useBoardI18n();
+
   const [copied, setCopied] = useState(false);
   const scene = project.scenes[selection.sceneId];
   const node = scene && selection.nodeId ? (findNode(scene, selection.nodeId)?.node ?? null) : null;
@@ -74,7 +81,7 @@ export function InspectDrawer({
   }, [onClose]);
   return (
     <div data-testid="inspect-drawer-root">
-      <aside role="dialog" aria-label="检查元素" data-jb-pop="" className="jb-pop fixed bottom-3 right-3 top-[64px] z-40 flex w-[360px] max-w-[92vw] flex-col overflow-y-auto p-4 text-[13px]" data-testid="inspect-drawer">
+      <aside role="dialog" aria-label={i18n.board.inspect2} data-jb-pop="" className="jb-pop fixed bottom-3 right-3 top-[64px] z-40 flex w-[360px] max-w-[92vw] flex-col overflow-y-auto p-4 text-[13px]" data-testid="inspect-drawer">
         <div className="mb-3 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate text-[17px] font-bold" data-testid="sel-label">
@@ -82,12 +89,12 @@ export function InspectDrawer({
             </div>
             {node ? (
               <div className="mt-0.5 text-[12px] text-jb-muted" data-testid="sel-type">
-                {typeLabel(node.type)} · {from ? `方案 ${shortName(from.name)}` : node.source?.startsWith('layouts/') ? '布局' : node.source?.startsWith('routes/') ? '页面' : '—'}
-                {stepIdx >= 0 ? ` · 第 ${stepIdx + 1} 步的目标` : ''}
+                {typeLabel(node.type, i18n, locale)} · {from ? i18n.board.option3(shortName(from.name)) : node.source?.startsWith('layouts/') ? i18n.board.layout : node.source?.startsWith('routes/') ? i18n.board.page : '—'}
+                {stepIdx >= 0 ? i18n.board.targetOfStep(stepIdx + 1) : ''}
               </div>
             ) : null}
           </div>
-          <button type="button" onClick={onClose} aria-label="关闭" data-testid="drawer-close" className="jb-focus flex size-7 items-center justify-center rounded-[6px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg">
+          <button type="button" onClick={onClose} aria-label={i18n.board.close} data-testid="drawer-close" className="jb-focus flex size-7 items-center justify-center rounded-[6px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg">
             <X className="size-4" />
           </button>
         </div>
@@ -99,8 +106,8 @@ export function InspectDrawer({
             <button
               type="button"
               className="jb-focus shrink-0 rounded-[4px] p-1 hover:bg-jb-press"
-              aria-label="复制位置"
-              title="复制 文件:行:列"
+              aria-label={i18n.board.copyLocation}
+              title={i18n.board.copyFileLineColumn}
               data-testid="copy-at"
               onClick={() =>
                 void navigator.clipboard?.writeText(at).then(
@@ -114,12 +121,12 @@ export function InspectDrawer({
             >
               {copied ? <Check className="size-3.5 text-jb-ok" /> : <Copy className="size-3.5" />}
             </button>
-            <button type="button" className="jb-focus shrink-0 rounded-[4px] p-1 hover:bg-jb-press" aria-label="在编辑器中打开" title="在编辑器中打开" data-testid="open-at" onClick={() => onOpenEditor(at)}>
+            <button type="button" className="jb-focus shrink-0 rounded-[4px] p-1 hover:bg-jb-press" aria-label={i18n.board.openInEditor} title={i18n.board.openInEditor} data-testid="open-at" onClick={() => onOpenEditor(at)}>
               <ExternalLink className="size-3.5" />
             </button>
           </div>
         ) : (
-          <p className="mb-1 text-[12px] text-jb-faint">（这个元素没有源位置）</p>
+          <p className="mb-1 text-[12px] text-jb-faint">{i18n.board.thisElementHasNoSourceLocation}</p>
         )}
 
         {node && node.type.startsWith('Diagram.') ? (
@@ -131,24 +138,24 @@ export function InspectDrawer({
                 <>
                   {typeof p.description === 'string' && p.description ? (
                     <>
-                      <dt className="text-jb-muted">说明</dt>
+                      <dt className="text-jb-muted">{i18n.board.note}</dt>
                       <dd data-testid="sel-description">{p.description}</dd>
                     </>
                   ) : null}
                   {node.type === 'Diagram.Edge' ? (
                     <>
-                      <dt className="text-jb-muted">连线</dt>
+                      <dt className="text-jb-muted">{i18n.board.edge}</dt>
                       <dd data-testid="sel-endpoints">
                         {String(p.from)} → {String(p.to)}
-                        {p.async === true ? '（异步）' : ''}
+                        {p.async === true ? i18n.board.async : ''}
                       </dd>
                     </>
                   ) : null}
                   {node.type !== 'Diagram.Group' ? (
                     <>
-                      <dt className="text-jb-muted">状态</dt>
+                      <dt className="text-jb-muted">{i18n.board.state}</dt>
                       <dd data-testid="sel-state" data-state={st}>
-                        {DIAGRAM_STATE[st] ?? st}
+                        {DIAGRAM_STATE(i18n)[st] ?? st}
                         {typeof node.props?.state === 'string' && node.props.state.startsWith('$') ? <span className="ml-1 font-mono text-[11px] text-jb-faint">{node.props.state}</span> : null}
                       </dd>
                     </>
@@ -160,28 +167,28 @@ export function InspectDrawer({
         ) : null}
         {node?.note ? (
           <p className="rounded bg-jb-selected px-2 py-1 text-[13px]" data-testid="sel-note">
-            <span className="text-jb-fg font-semibold">设计说明：</span>
+            <span className="text-jb-fg font-semibold">{i18n.board.designNote}</span>
             {node.note}
           </p>
         ) : null}
         {node?.disabledReason ? (
           <p className="mt-2 rounded bg-jb-sunken px-2 py-1 text-[13px]">
-            <span className="text-jb-muted">禁用原因：</span>
+            <span className="text-jb-muted">{i18n.board.disabledReason}</span>
             {node.disabledReason}
           </p>
         ) : null}
 
-        <H>规则（{rules.length}）</H>
-        {rules.length === 0 ? <p className="text-[13px] text-jb-muted">没有规则直接关联它。</p> : null}
+        <H>{i18n.board.ruleCount(rules.length)}</H>
+        {rules.length === 0 ? <p className="text-[13px] text-jb-muted">{i18n.board.noRulesDirectlyReferenceThisElement}</p> : null}
         <ul className="flex flex-col gap-1.5" data-testid="sel-rules">
           {rules.map((r) => (
             <RuleItem key={r.id} rule={r} />
           ))}
         </ul>
 
-        <H>覆盖的情况（{caseIds.length}）</H>
+        <H>{i18n.board.coveredCases}{caseIds.length}）</H>
         <div className="flex flex-wrap gap-1.5" data-testid="sel-cases">
-          {caseIds.length === 0 ? <span className="text-[13px] text-jb-muted">没有关联的情况。</span> : null}
+          {caseIds.length === 0 ? <span className="text-[13px] text-jb-muted">{i18n.board.noLinkedCases}</span> : null}
           {caseIds.map((c) => (
             <span key={c} className="rounded-full bg-jb-sunken px-2.5 py-0.5 text-[12px] text-jb-fg">
               {project.cases[c]?.title ?? c}
@@ -192,19 +199,17 @@ export function InspectDrawer({
         <p className={cn('mt-4 flex items-start gap-1.5 text-[12px] leading-relaxed', sync.status === 'error' ? 'text-jb-danger' : 'text-jb-muted')} data-testid="selection-sync" data-status={sync.status}>
           <span aria-hidden className={cn('mt-[5px] size-2 shrink-0 rounded-full', sync.status === 'error' ? 'bg-jb-danger' : sync.status === 'pending' ? 'bg-jb-accent-press' : 'bg-jb-ok')} />
           {sync.status === 'error'
-            ? `写入失败：${sync.message}`
+            ? i18n.board.couldNotWrite(translate(sync.message, i18n))
             : sync.status === 'pending'
-              ? '正在写入 .joplo/selection.json…'
-              : '已写入 .joplo/selection.json · Agent 运行 npx joplo selection 即可读取，只改这一处'}
+              ? i18n.board.writingJoploSelectionJson
+              : i18n.board.savedJoploSelectionJsonAgentCanReadItWith}
         </p>
 
         <div className="mt-auto flex justify-between pt-5">
           <button type="button" onClick={onClear} className="jb-focus h-8 rounded-[6px] border border-jb-line bg-jb-surface px-3 text-[13px] hover:bg-jb-hover" data-testid="clear-selection">
-            取消选中
-          </button>
+            {i18n.board.clearSelection}</button>
           <button type="button" onClick={onClose} className="jb-focus h-8 rounded-[6px] bg-jb-inverse px-3 text-[13px] text-jb-on-inverse hover:bg-jb-inverse-hover">
-            继续演示
-          </button>
+            {i18n.board.resumeDemo}</button>
         </div>
       </aside>
     </div>

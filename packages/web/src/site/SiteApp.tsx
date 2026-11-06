@@ -1,3 +1,8 @@
+import { LanguageMenu } from '../player/LanguageMenu';
+import { useBoardLayout } from '../player/PlayerPage';
+import { LocalText } from '../i18n/LocalText';
+import { m } from '../i18n/messages';
+import { useI18n } from '../i18n/context';
 /**
  * 发布站（`joplo build` 的产物，D39 / D33 / D55「发布站 · 观众看到的」）：与本机看板同一套布局、时间线、字幕、全屏和快捷键，只有一个项目。
  * - 首页 `#/`：左栏列功能；右侧是项目名、说明和功能卡片（整张可点，带缩略图）；
@@ -37,7 +42,9 @@ export function readInlineIR(): SiteData | null {
 }
 
 export function SiteApp({ data }: { data: SiteData | null }) {
-  if (!data) return <div className="p-8 text-[#c92a2a]">页面缺少原型数据。请重新运行 joplo build。</div>;
+  const { t: i18n } = useI18n();
+
+  if (!data) return <div className="p-8 text-[#c92a2a]">{i18n.site.prototypeDataIsMissingRunJoploBuildAgain}</div>;
   return <Site project={data.project} />;
 }
 
@@ -58,12 +65,15 @@ function Site({ project }: { project: Project }) {
 }
 
 function SiteHome({ project, onView }: { project: Project; onView: (featureId: string) => void }) {
+  const { t: i18n } = useI18n();
+
+  const L = useBoardLayout();
   const features = Object.values(project.features);
   const look = { theme: project.theme, font: null, stroke: null };
   return (
     <div className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="site-home">
       <ThemeStyles themes={project.themes} />
-      <TopBar>
+      <TopBar right={<LanguageMenu iconOnly={L.languageIconOnly} />}>
         <Brand />
         <span aria-hidden className="h-5 w-px shrink-0 bg-jb-line" />
         <span className="truncate px-2 text-[14px] font-medium" data-testid="site-name">
@@ -73,8 +83,8 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-[276px] shrink-0 flex-col overflow-y-auto border-r border-jb-line bg-jb-surface px-3 py-4">
           <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
-            <span className="font-semibold tracking-[1px] text-jb-muted">功能</span>
-            <span className="text-jb-faint">{features.length} 个</span>
+            <span className="font-semibold tracking-[1px] text-jb-muted">{i18n.site.features}</span>
+            <span className="text-jb-faint">{features.length} {i18n.site.count}</span>
           </div>
           <ul className="flex flex-col gap-1">
             {features.map((f) => (
@@ -94,7 +104,7 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
               <h1 className="text-[24px] font-bold leading-8">{project.name}</h1>
               {project.description ? <p className="mt-1.5 max-w-[860px] text-[14px] leading-[22px] text-jb-muted">{project.description}</p> : null}
             </div>
-            {features.length === 0 ? <p className="text-[14px] text-jb-muted">还没有发布任何功能。</p> : null}
+            {features.length === 0 ? <p className="text-[14px] text-jb-muted">{i18n.site.noFeaturesHaveBeenPublishedYet}</p> : null}
             <section className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2">
               {features.map((f) => {
                 const pick = f.pick ? project.options[f.pick] : null;
@@ -102,18 +112,17 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
                 const sc = scs[0];
                 return (
                   <div key={f.id} className="group relative flex flex-col overflow-hidden rounded-[10px] border border-jb-line bg-jb-surface hover:border-jb-ink hover:shadow-[var(--jb-e1)]" data-testid={`site-feature-row-${f.id}`}>
-                    <button type="button" onClick={() => onView(f.id)} aria-label={`打开「${f.name}」的演示`} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" data-testid={`site-view-${f.id}`} />
+                    <button type="button" onClick={() => onView(f.id)} aria-label={i18n.site.openDemoFor(f.name)} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" data-testid={`site-view-${f.id}`} />
                     <StageThumb project={project} scenarioId={sc?.id ?? null} sceneId={sc ? displaySceneId(project, sc.id, 0) : null} look={look} />
                     <div className="flex flex-col gap-1.5 border-t border-jb-line px-4 pb-4 pt-3">
                       <div className="flex items-center gap-3">
                         <span className="min-w-0 flex-1 truncate text-[17px] font-bold">{f.name}</span>
                         <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold opacity-0 transition-opacity group-hover:opacity-100">
-                          打开演示
-                          <ArrowRight className="size-4" aria-hidden />
+                          {i18n.site.openDemo}<ArrowRight className="size-4" aria-hidden />
                         </span>
                       </div>
                       <p className="line-clamp-2 text-[13px] leading-5 text-jb-muted">{f.goal}</p>
-                      <span className="text-[12px] text-jb-muted">{scs.length} 个场景</span>
+                      <span className="text-[12px] text-jb-muted">{scs.length} {i18n.site.scenarios}</span>
                     </div>
                   </div>
                 );
@@ -128,15 +137,18 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
 
 /** 发布站底部的署名：标明是概念原型（PRD：标明“概念原型 / 尚非正式实现”）。 */
 function SiteFooter() {
+  const { t: i18n } = useI18n();
+
   return (
     <div className="flex items-center gap-2 px-2 pt-3 text-[12px] text-jb-faint" data-testid="concept-badge">
       <JoploMark size={16} />
-      用 Joplo 制作的概念原型 · 非正式实现
-    </div>
+      {i18n.site.conceptPrototypeMadeWithJoploNotAProductionImplementation}</div>
   );
 }
 
 function SitePlayer({ project, play, navigate }: { project: Project; play: PlayRoute; navigate: (r: SiteRoute, replace?: boolean) => void }) {
+  const { t: i18n } = useI18n();
+
   const ctl = useMemo(() => new DemoController(null), []);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
   // 发布站使用项目配置的主题（D51）；作者主题随 IR 一起打包
@@ -153,10 +165,9 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
   if (!feature || !resolved?.ok)
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-[14px]">
-        <span>没有这个功能。</span>
+        <span>{i18n.site.featureNotFound}</span>
         <button type="button" className="text-[#1c5fb8] underline" onClick={() => navigate({ kind: 'home' })}>
-          回到首页
-        </button>
+          {i18n.site.goToHome}</button>
       </div>
     );
   const option = resolved.optionId ? project.options[resolved.optionId] : null;
@@ -176,11 +187,11 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
         {
           label: feature.name,
           testid: 'crumb-feature',
-          menuLabel: '切换功能',
+          menuLabel: i18n.site.switchFeature,
           items: Object.values(project.features).map((f) => ({ id: `feature-${f.id}`, label: f.name, checked: f.id === feature.id, onClick: () => navigate({ kind: 'play', play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
         },
       ]}
-      actions={<Btn icon={<Link className="size-4" />} label="复制链接" title="复制当前步骤的链接" onClick={() => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制'))} data-testid="copy-link" />}
+      actions={<Btn icon={<Link className="size-4" />} label={i18n.site.copyLink} title={i18n.site.copyLinkToCurrentStep} onClick={() => void copyText(location.href).then((ok) => setFlash(<LocalText value={ok ? m.site.linkCopied : m.site.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="copy-link" />}
       layer={play.layer ?? null}
       speed={play.speed ?? 1}
       onSpeed={(v) => {
@@ -199,11 +210,11 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
             <p className="mt-1 text-[12px] leading-[18px] text-jb-muted">{feature.goal}</p>
           </div>
           <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
-            <span className="font-semibold tracking-[1px] text-jb-muted">场景</span>
-            <span className="text-jb-faint">{scs.length} 个</span>
+            <span className="font-semibold tracking-[1px] text-jb-muted">{i18n.site.scenarios2}</span>
+            <span className="text-jb-faint">{scs.length} {i18n.site.count}</span>
           </div>
           <ul className="flex flex-col gap-1">
-            {siteScenarioRows(project, resolved.optionId, snap.scenarioId).map((r) => (
+            {siteScenarioRows(project, resolved.optionId, snap.scenarioId, i18n).map((r) => (
               <li key={r.id}>
                 <button
                   type="button"

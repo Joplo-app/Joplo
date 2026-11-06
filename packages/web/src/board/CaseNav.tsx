@@ -1,3 +1,4 @@
+import { useBoardI18n } from '../i18n/board/context';
 /**
  * 演示页左栏（看板，D55「演示页 · 默认」）：
  * - 方案：字母块 + 名字 + “✓ 已选定 · 缺失 3 · 待决定 1”；点一下切换方案（情况保持）。悬停卡片写思路和取舍。
@@ -29,9 +30,11 @@ function Letter({ letter, on }: { letter: string; on: boolean }) {
 }
 
 function OptionRow({ project, optionId, index, active, onPick }: { project: Project; optionId: string; index: number; active: boolean; onPick: () => void }) {
+  const { t: i18n } = useBoardI18n();
+
   const o = project.options[optionId]!;
   const { letter, title } = optionLabel(o, index);
-  const meta = optionMeta(project, optionId);
+  const meta = optionMeta(project, optionId, i18n);
   const hc = useHoverCard();
   return (
     <li>
@@ -41,8 +44,8 @@ function OptionRow({ project, optionId, index, active, onPick }: { project: Proj
           <span className={cn('truncate text-[14px] leading-[19px] text-jb-fg', active && 'font-semibold')}>{title}</span>
           {meta.picked || meta.text ? (
             <span className="flex items-center gap-1.5 whitespace-nowrap text-[12px] text-jb-muted">
-              {meta.picked ? <span className="rounded-[4px] bg-jb-inverse px-1.5 py-px text-[11px] font-medium text-jb-on-inverse">✓ 已选定</span> : null}
-              <span className="truncate">{meta.text || '全部已表达'}</span>
+              {meta.picked ? <span className="rounded-[4px] bg-jb-inverse px-1.5 py-px text-[11px] font-medium text-jb-on-inverse">{i18n.board.picked}</span> : null}
+              <span className="truncate">{meta.text || i18n.board.allCovered}</span>
             </span>
           ) : null}
         </span>
@@ -67,7 +70,9 @@ function OptionRow({ project, optionId, index, active, onPick }: { project: Proj
 }
 
 function OtherTag({ letter, status, tip, onClick, testid }: { letter: string; status: Parameters<typeof StatusIcon>[0]['status']; tip: string; onClick: () => void; testid: string }) {
-  const [tp, tipNode] = useTip(`${tip}（点一下切过去）`);
+  const { t: i18n } = useBoardI18n();
+
+  const [tp, tipNode] = useTip(i18n.board.clickToSwitch(tip));
   return (
     <>
       <button type="button" onClick={onClick} aria-label={tip} data-testid={testid} {...tp} className="jb-focus flex h-[18px] shrink-0 items-center gap-0.5 rounded-[4px] border border-jb-line bg-jb-surface px-[5px] font-jb text-[11px] font-semibold text-jb-muted hover:bg-jb-hover">
@@ -80,11 +85,13 @@ function OtherTag({ letter, status, tip, onClick, testid }: { letter: string; st
 }
 
 function CaseRow({ project, featureId, optionId, caseId, active, onCase, onOptionCase }: { project: Project; featureId: string; optionId: string | null; caseId: string; active: boolean; onCase: () => void; onOptionCase: (optionId: string) => void }) {
+  const { t: i18n } = useBoardI18n();
+
   const c = project.cases[caseId]!;
   const own = optionId ? statusOf(project, optionId, caseId) : 'none';
-  const tags = otherOptionTags(project, featureId, optionId, caseId);
+  const tags = otherOptionTags(project, featureId, optionId, caseId, i18n);
   const hc = useHoverCard();
-  const card = caseCard(project, featureId, caseId);
+  const card = caseCard(project, featureId, caseId, i18n);
   return (
     <li className={cn('flex items-center gap-1.5 rounded-[8px] pr-2', active ? 'bg-jb-selected' : 'hover:bg-jb-hover')} data-testid={`case-${caseId}`} data-status={own} data-active={active ? '' : undefined} {...hc.trigger}>
       <button type="button" onClick={onCase} aria-current={active ? 'true' : undefined} className="jb-focus flex min-w-0 flex-1 items-start gap-2.5 rounded-[8px] py-2 pl-2 text-left font-jb">
@@ -147,6 +154,8 @@ export function CaseNav({
   /** 复制缺口汇总的命令。 */
   onCopy: (text: string) => void;
 }) {
+  const { t: i18n } = useBoardI18n();
+
   const f = project.features[featureId]!;
   const options = optionsOf(project, featureId);
   const gaps = gapsOf(project, optionId);
@@ -155,16 +164,16 @@ export function CaseNav({
   const loose = scenariosOf(project, optionId).filter((s) => !covered.has(s.id) && !s.caseIds.some((c) => f.caseIds.includes(c)));
   return (
     <div className="flex min-h-full flex-1 flex-col gap-1 font-jb" data-testid="case-nav">
-      <GroupHead title="方案" right={`${options.length} 个`} />
-      {options.length === 0 ? <p className="px-2 text-[13px] text-jb-muted">这个功能还没有方案。</p> : null}
+      <GroupHead title={i18n.board.options} right={i18n.board.count2(options.length)} />
+      {options.length === 0 ? <p className="px-2 text-[13px] text-jb-muted">{i18n.board.thisFeatureHasNoOptionsYet}</p> : null}
       <ul className="flex flex-col gap-1" data-testid="option-switch">
         {options.map((o, i) => (
           <OptionRow key={o.id} project={project} optionId={o.id} index={i} active={o.id === optionId} onPick={() => onOption(o.id)} />
         ))}
       </ul>
       <div className="h-2.5 shrink-0" />
-      <GroupHead title="情况" right={letter ? `${letter} 的覆盖` : undefined} />
-      {f.caseIds.length === 0 ? <p className="px-2 text-[13px] text-jb-muted">功能还没有列出情况。</p> : null}
+      <GroupHead title={i18n.board.cases} right={letter ? i18n.board.coverageFor(letter) : undefined} />
+      {f.caseIds.length === 0 ? <p className="px-2 text-[13px] text-jb-muted">{i18n.board.thisFeatureHasNoCasesYet}</p> : null}
       <ul className="flex flex-col gap-1">
         {f.caseIds.map((cid) =>
           project.cases[cid] ? <CaseRow key={cid} project={project} featureId={featureId} optionId={optionId} caseId={cid} active={caseId === cid} onCase={() => onCase(cid)} onOptionCase={(oid) => onOptionCase(oid, cid)} /> : null,
@@ -173,7 +182,7 @@ export function CaseNav({
       {loose.length ? (
         <>
           <div className="h-2.5 shrink-0" />
-          <GroupHead title="其他场景" />
+          <GroupHead title={i18n.board.otherScenarios} />
           <ul className="flex flex-col gap-1">
             {loose.map((s) => (
               <li key={s.id}>
@@ -187,10 +196,10 @@ export function CaseNav({
       ) : null}
       <div className="min-h-4 flex-1" />
       {optionId ? (
-        <button type="button" onClick={() => onCopy(gapCommand(optionId))} data-testid="gap-count" title={`复制 ${gapCommand(optionId)}`} className="jb-focus sticky bottom-0 flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] bg-jb-app p-2.5 text-left text-[12px] hover:bg-jb-press">
-          <span className="font-semibold text-jb-fg">方案 {letter}</span>
-          <span className={cn(gaps.missing ? 'font-semibold text-jb-danger' : 'text-jb-muted')}>缺失 {gaps.missing}</span>
-          <span className="text-jb-muted">待决定 {gaps.undecided}</span>
+        <button type="button" onClick={() => onCopy(gapCommand(optionId))} data-testid="gap-count" title={i18n.board.copy(gapCommand(optionId))} className="jb-focus sticky bottom-0 flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] bg-jb-app p-2.5 text-left text-[12px] hover:bg-jb-press">
+          <span className="font-semibold text-jb-fg">{i18n.board.options}{letter}</span>
+          <span className={cn(gaps.missing ? 'font-semibold text-jb-danger' : 'text-jb-muted')}>{i18n.board.missing}{gaps.missing}</span>
+          <span className="text-jb-muted">{i18n.board.undecided}{gaps.undecided}</span>
           <span className="flex-1" />
           <span className="hidden font-jb-mono text-[11px] text-jb-faint min-[1440px]:inline">joplo check</span>
         </button>
@@ -204,6 +213,8 @@ export function CaseNav({
  * 竖条整体是一个“展开左栏”的按钮（PlayerPage），这里只放图形，不放按钮。
  */
 export function CaseRail({ project, featureId, optionId, caseId }: { project: Project; featureId: string; optionId: string | null; caseId: string | null }) {
+  const { t: i18n } = useBoardI18n();
+
   const f = project.features[featureId];
   if (!f) return null;
   return (
@@ -211,7 +222,7 @@ export function CaseRail({ project, featureId, optionId, caseId }: { project: Pr
       {optionsOf(project, featureId).map((o, i) => {
         const { letter, title } = optionLabel(o, i);
         return (
-          <span key={o.id} title={`方案 ${letter} · ${title}`} className="flex size-9 items-center justify-center">
+          <span key={o.id} title={i18n.board.option2(letter, title)} className="flex size-9 items-center justify-center">
             <Letter letter={letter} on={o.id === optionId} />
           </span>
         );

@@ -1,3 +1,4 @@
+import { en, type Dictionary } from '../i18n/en';
 /**
  * 演示页控件区的尺寸规范与“按宽度收起”（T-polish，纯函数）。
  *
@@ -44,25 +45,25 @@ export function collapseToFit(avail: number, fixed: number, groups: Group[], gap
 }
 
 export type PlayLabels = { prev: string; play: string; next: string };
-export const PLAY_LABELS = (playLabel: string): PlayLabels => ({ prev: '上一步', play: playLabel, next: '下一步' });
+export const PLAY_LABELS = (playLabel: string, i18n: Dictionary = en): PlayLabels => ({ prev: i18n.player.previousStep, play: playLabel, next: i18n.player.nextStep });
 
 /** 播放控制三件套（上一步、播放、下一步）的展开 / 收起宽度。 */
-export function navGroup(h: number, playLabel: string): Group {
-  return { id: 'nav', full: buttonW('上一步', h) + Math.max(96, buttonW(playLabel, h)) + buttonW('下一步', h) + 2 * CTRL.gap, collapsed: 3 * h + 2 * CTRL.gap };
+export function navGroup(h: number, playLabel: string, i18n: Dictionary = en): Group {
+  return { id: 'nav', full: buttonW(i18n.player.previousStep, h) + Math.max(96, buttonW(playLabel, h)) + buttonW(i18n.player.nextStep, h) + 2 * CTRL.gap, collapsed: 3 * h + 2 * CTRL.gap };
 }
 export const speedGroup = (speeds: readonly number[], menuW: number): Group => ({ id: 'speed', full: segmentedW(speeds.map((v) => `${v}×`)), collapsed: menuW });
-export const layersGroup = (titles: string[], h: number): Group => ({
+export const layersGroup = (titles: string[], h: number, i18n: Dictionary = en): Group => ({
   id: 'layers',
   full: segmentedW(titles),
-  collapsed: CTRL.padX * 2 + textW(`层级：${titles.reduce((a, t) => (textW(t) > textW(a) ? t : a), '')}`) + CTRL.icon + CTRL.iconGap + 0 * h,
+  collapsed: CTRL.padX * 2 + textW(i18n.player.layer(titles.reduce((a, t) => (textW(t) > textW(a) ? t : a), ''))) + CTRL.icon + CTRL.iconGap + 0 * h,
 });
-export const directorW = (on: boolean, layerTitle: string) => buttonW(on ? `导演 · ${layerTitle}` : '导演已暂停', CTRL.sm);
+export const directorW = (on: boolean, layerTitle: string, i18n: Dictionary = en) => buttonW(on ? i18n.player.director(layerTitle) : i18n.player.directorPaused, CTRL.sm);
 
 /** 全屏控制条（胶囊，内边距 8）：三件套、速度、层级切换、导演标签、退出全屏。 */
-export function fullscreenBarCollapse(avail: number, playLabel: string, speeds: readonly number[], titles: string[], director: boolean, layerTitle: string): Set<string> {
+export function fullscreenBarCollapse(avail: number, playLabel: string, speeds: readonly number[], titles: string[], director: boolean, layerTitle: string, i18n: Dictionary = en): Set<string> {
   // 胶囊左右内边距 8 + 退出全屏按钮 + 分隔线（每条 1px + 左右 4px） + 导演标签
   const seps = titles.length > 1 ? 2 : 1;
-  const fixed = 16 + CTRL.sm + seps * 9 + (titles.length > 1 ? directorW(director, layerTitle) : 0);
-  const groups = [navGroup(CTRL.sm, playLabel), speedGroup(speeds, CTRL.sm), ...(titles.length > 1 ? [layersGroup(titles, CTRL.sm)] : [])];
+  const fixed = 16 + CTRL.sm + seps * 9 + (titles.length > 1 ? directorW(director, layerTitle, i18n) : 0);
+  const groups = [navGroup(CTRL.sm, playLabel, i18n), speedGroup(speeds, CTRL.sm), ...(titles.length > 1 ? [layersGroup(titles, CTRL.sm, i18n)] : [])];
   return collapseToFit(avail, fixed, groups, CTRL.gap, titles.length > 1 ? 2 : 1);
 }
