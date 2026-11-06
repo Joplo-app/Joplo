@@ -151,11 +151,17 @@ describe('coverFor / coverShown（场景封面）', () => {
     expect(c.roles.map((r) => r.name)).toEqual(['小雨', '阿杰']);
     expect(c.ms).toBe(scenarioMs(p, p.scenarios[sid]!, zh));
   });
-  it('没有 description 时不显示说明；没有角色时 roles 为空', () => {
+  it('没有 description 时说明退回功能目标（D67：默认就说清“解决什么”）；没有角色时 roles 为空', () => {
     const p = build({ roles: false });
     const c = coverFor(p, sid, zh)!;
-    expect(c.description).toBeNull();
+    expect(c).toMatchObject({ description: 'g', descriptionFrom: 'goal' });
     expect(c.roles).toEqual([]);
+    expect(coverFor(build({ description: '  ' }), sid, zh)).toMatchObject({ description: 'g', descriptionFrom: 'goal' });
+    expect(coverFor(build({ description: '小雨一句话' }), sid, zh)).toMatchObject({ description: '小雨一句话', descriptionFrom: 'flow' });
+    // 手工构造的 IR 里 goal 为空串时（旧数据）不显示说明
+    const blank = build({ roles: false });
+    blank.features.f!.goal = '';
+    expect(coverFor(blank, sid, zh)).toMatchObject({ description: null, descriptionFrom: null });
   });
   it('空场景与不存在的场景没有封面', () => {
     const p = build({ empty: true });

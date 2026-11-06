@@ -130,6 +130,8 @@ export function createPtBR(locale: Locale = 'pt-BR') {
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)} (resultado de demo de ${value(p1, locale)}, não uma resposta de um serviço real)`,
       stepProgress: (p0: Value, p1: Value) => `Etapa ${value(p0, locale)} / ${value(p1, locale)}`,
       coverStart: "Começar",
+      /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
+      forRoles: (names: string[]) => `Para: ${list(names, locale)}`,
       coverStartTitle: "Reproduzir do início",
       coverSteps: (n: number) => plural(n, { one: 'Cerca de # etapa', other: 'Cerca de # etapas' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `Cerca de ${number(d.value, locale)} s` : `Cerca de ${number(d.value, locale)} min`,

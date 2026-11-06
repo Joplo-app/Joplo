@@ -123,6 +123,11 @@ export function createBoardJa(locale: Locale = 'ja') {
       appearanceButtonLabel: (p0: Value) => `外観 · ${value(p0, locale)}`,
       picked: "✓ 採用済み",
       allCovered: "すべて対応済み",
+      // D67：情况的优先级与期望结果（PM 的 Then）
+      highPriority: "優先度：高",
+      expected: "期待される結果",
+      expectedNotWritten: "期待される結果が未記入",
+      missingHighCount: (n: number) => `優先度高 ${value(n, locale)}`,
       clickToSwitch: (p0: Value) => `${value(p0, locale)}（クリックで切り替え）`,
       options: "案",
       itemCount: (p0: Value) => `${value(p0, locale)}`,

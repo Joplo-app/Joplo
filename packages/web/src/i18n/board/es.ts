@@ -123,6 +123,11 @@ export function createBoardEs(locale: Locale = 'es') {
       appearanceButtonLabel: (p0: Value) => `Aspecto · ${value(p0, locale)}`,
       picked: "✓ Elegida",
       allCovered: "Todo cubierto",
+      // D67：情况的优先级与期望结果（PM 的 Then）
+      highPriority: "Prioridad alta",
+      expected: "Resultado esperado",
+      expectedNotWritten: "Sin resultado esperado",
+      missingHighCount: (n: number) => `${value(n, locale)} de prioridad alta`,
       clickToSwitch: (p0: Value) => `${value(p0, locale)} (clic para cambiar)`,
       options: "Opciones",
       itemCount: (p0: Value) => `${value(p0, locale)}`,

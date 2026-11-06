@@ -130,6 +130,8 @@ export function createEs(locale: Locale = 'es') {
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)} (resultado de demo de ${value(p1, locale)}, no una respuesta de un servicio real)`,
       stepProgress: (p0: Value, p1: Value) => `Paso ${value(p0, locale)} / ${value(p1, locale)}`,
       coverStart: "Empezar",
+      /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
+      forRoles: (names: string[]) => `Para: ${list(names, locale)}`,
       coverStartTitle: "Reproducir desde el principio",
       coverSteps: (n: number) => plural(n, { one: 'Unos # paso', other: 'Unos # pasos' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `Unos ${number(d.value, locale)} s` : plural(d.value, { one: 'Un minuto aprox.', other: 'Unos # min' }, locale),

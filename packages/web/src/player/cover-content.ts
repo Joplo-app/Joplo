@@ -17,8 +17,10 @@ export type CoverContent = {
   feature: string | null;
   option: string | null;
   title: string;
-  /** flow 的 description；没写时为 null（封面上不显示）。 */
+  /** flow 的 description；没写时用功能的 goal（D67：封面默认就说清“解决什么”）；两者都没有时为 null。 */
   description: string | null;
+  /** description 从哪来：flow = 作者写的场景说明，goal = 功能目标（缺省）。 */
+  descriptionFrom: 'flow' | 'goal' | null;
   steps: number;
   /** 估算的播放时长（毫秒，1× 速度）。 */
   ms: number;
@@ -77,10 +79,17 @@ export function coverFor(project: Project, scenarioId: string | null | undefined
     feature: feat?.name ?? null,
     option: opt?.name ?? null,
     title: sc.name,
-    description: (sc.description ?? '').trim() || null,
+    ...describe((sc.description ?? '').trim(), (feat?.goal ?? '').trim()),
     steps: sc.steps.length,
     ms,
     duration: approxDuration(ms),
     roles: rolesIn(project, sc),
   };
+}
+
+/** 封面说明：作者写的 flow description 优先，没写时退回功能目标（feature.goal 在发布站也保留）。 */
+function describe(flow: string, goal: string): Pick<CoverContent, 'description' | 'descriptionFrom'> {
+  if (flow) return { description: flow, descriptionFrom: 'flow' };
+  if (goal) return { description: goal, descriptionFrom: 'goal' };
+  return { description: null, descriptionFrom: null };
 }

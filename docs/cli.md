@@ -8,8 +8,10 @@
 npx joplo init <dir> [--name <name>] [--keep] [--no-skill]
 npx joplo dev [dir] [--port <port>] [--open]
 npx joplo check [dir] [--format text|json] [--option <qid>]
+npx joplo outline [dir] [--format text|json] [--option <qid>]
 npx joplo selection [dir] [--format text|json]
 npx joplo skill [topic]
+npx joplo components [name…]
 npx joplo skill install [dir] [--force] [--diff] [--agents-md]
 npx joplo guide
 npx joplo build [dir] [--out-dir <dir>] [--overwrite]
@@ -71,6 +73,35 @@ features/invite/options/a-modal.tsx:24:16  warning  CASE_NOT_COVERED  Case is no
 
 JSON 为 DomainResult 风格：成功含 `ok/projectId/revision/requestId/summary/changedIds/diagnostics/artifacts/data`；检查失败含 `ok: false/error/diagnostics/data`。data 是 name、diagnostics、summary、verification；载入前或用法错误可能没有 data。`revision: 0` 仅兼容结果信封，文件版本交给 Git。
 
+叙事与覆盖的提示（D67）：`DESCRIPTION_TOO_LONG`（warning，flow 的 description 即场景封面说明超过 30 个“字”）、`CARD_TEXT_TOO_LONG`（info，过渡卡副标题 > 48、某条要点 > 24 或多于 4 条）、`SCENARIO_TOO_LONG`（info，单个场景按 1× 估算超过 90 秒）、`HAPPY_PATH_ONLY`（info，功能只声明了 main 情况且所有场景都成功）；`CASE_NOT_COVERED` 的说明末尾带上 `(high priority; expected: …)`。“字”的算法与字幕相同（中文 1、其他 0.5、空白不算）；估算时长与自动播放同一份规则。在仓库 examples/ 上这些新提示为 0 条。
+
+## outline
+
+不打开看板也能检查一个演示“讲给谁、讲什么、讲多久”（D67）。与 check 一样编译 dev IR 并校验，然后输出：
+
+```text
+团队邀请功能 · 1 feature(s), 2 option(s), 6 scenario(s), ≈ 1 min 6 s at 1×
+
+## invite · 团队成员邀请   picked: a-modal
+Goal: 空间管理员邀请同事加入空间并指定权限，让新成员当天就能开始协作
+Roles: 空间管理员, 普通成员, 受邀者
+Cases (A B: ✓ shown ✗ missing ? undecided – not applicable ⊘ excluded):
+  revoked           lifecycle   high   ✓ ✗  邀请被撤销后再次打开链接 → 说明邀请已失效，并告诉对方去找空间管理员
+  already_member    conflict    medium ? ✗  被邀请人已经是成员 → (expected result not written)
+A · a-modal · A · 单人邮件邀请弹窗 (picked): 4 scenario(s) ≈ 51 s · missing 2 · undecided 1
+    revoke   撤销邀请后对方再打开链接  5 steps ≈ 15 s     success · cases: revoked
+check: 0 error, 9 warning, 5 info (warning OUTCOME_MISMATCH ×1, warning CASE_NOT_COVERED ×8, …). Run npx joplo check for file:line.
+```
+
+- 情况一行：键、维度、优先级、每个方案的覆盖、标题 → 期望结果（case.expected，没写时提示）。这是 PM 视角的验收矩阵：标题是 Given，期望结果是 Then。
+- 场景一行：键、名字、步数与估算时长（1×，与自动播放同一份 stepDwell，不含鼠标移动与逐字输入）、结局、是否以过渡卡开场 / 收尾、覆盖的情况。
+- `--option <qid>` 只看一个方案；不存在时 USAGE（退出 2）。有 error 时退出 1：能编译出 IR 时照常输出大纲，编译不出时只写错误数。
+- `--format json`：`data.outline = { name, mode, features: [{ id, name, goal, roles, pick, cases: [{ id, key, title, dimension, priority, expected, coverage: { 方案 id: 状态 } }], options: [{ id, key, name, picked, ms, missing, undecided, scenarios: [{ id, key, name, description, steps, ms, cards, opening, ending, outcome, caseIds }] }] }] }`，`data.summary` 是 check 的汇总；失败时是 `ok: false` 信封，`data.outline` 为 null。
+
+## components
+
+`npx joplo components` 与 `npx joplo skill components` 输出相同（组件目录与一行属性提示）。`npx joplo components Menu DataTable` 输出这些组件及其子组件（Menu → Menu.Item 等）的属性、行为分组（可操作 / 接收输入 / 只在打开时显示）和示例；名字不区分大小写，不认识的名字给出最接近的名字并退出 2。示例来自 core 的 COMPONENT_EXAMPLES（D68）。
+
 ## selection
 
 读取项目 `.joplo/selection.json`，不重新编译。先在看板中按住 ⌥（Option/Alt）单击元素，再运行：
@@ -91,8 +122,9 @@ JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }
 | 主题 | 内容 |
 | --- | --- |
 | authoring | 心智模型、起步顺序、目录、页面、布局、方案、flow、绑定、`when` 只接受条件表达式、带错误重试的表单示例、规则 |
+| story | 先规划再动手（受众、1–3 件事、每个场景一行 Given → When → Then）；PM 视角怎样用 roles / goal / cases / expected / priority / rules 表达需求、怎样拆场景；开场、收尾、字幕与 explain 的写法；交付前的检查（D67） |
 | demo | 独立层级、导演、镜头、Diagram/trace、短字幕、全高布局会压缩什么、深链接参数、截图时机与主题 |
-| components | 当前组件目录和属性提示、支持的 HTML 标签、换行写法 |
+| components | 当前组件目录和属性提示、支持的 HTML 标签、换行写法、常见产品画面用哪些组件（D68）；单个组件的示例用 `npx joplo components <名字>` |
 | cases | 八个维度及按产品类型筛选的情况预设；先做正常流程 + 一条错误恢复 |
 | check | 诊断代码与局部修复、合并诊断、`UNBOUND_INTERACTIVE` 的三种处理 |
 | selection | 用户选中后只改指向的位置 |

@@ -135,7 +135,8 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
                         </span>
                       </div>
                       <p className="line-clamp-2 text-[13px] leading-5 text-jb-muted">{f.goal}</p>
-                      <span className="text-[12px] text-jb-muted">{i18n.site.scenarioCount(scs.length)}</span>
+                      {/* 给谁、解决什么（D67）：角色与目标都是发布内容（feature.roles / goal 本来就在发布 IR 里） */}
+                      <span className="truncate text-[12px] text-jb-muted">{[f.roles.length ? i18n.player.forRoles(f.roles.map((r) => r.name)) : null, i18n.site.scenarioCount(scs.length)].filter(Boolean).join(' · ')}</span>
                     </div>
                   </div>
                 );
@@ -222,6 +223,7 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
           <div className="px-2 pb-2 pt-1">
             <h2 className="text-[17px] font-bold leading-6">{feature.name}</h2>
             <p className="mt-1 text-[12px] leading-[18px] text-jb-muted">{feature.goal}</p>
+            {feature.roles.length ? <p className="mt-1 truncate text-[12px] leading-[18px]" data-testid="site-feature-roles">{i18n.player.forRoles(feature.roles.map((r) => r.name))}</p> : null}
           </div>
           <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
             <span className="font-semibold tracking-[1px] text-jb-muted">{i18n.site.scenarios}</span>

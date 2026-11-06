@@ -19,6 +19,7 @@ export const MENTAL_MODEL = [
 /** 推荐的起步顺序（X2：先做最小的一条正常流程 + 一条错误恢复流程，在看板里确认交互模型后再扩展）。 */
 export const START_ORDER = [
   'Read npx joplo skill authoring; read cases before asking the user about edge cases; demo and components as needed.',
+  'Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case\'s expected is its Then); show the plan to the user. A demo is a story, not a feature tour.',
   'With minimal code, write one happy path and one error-and-recovery scenario.',
   'Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.',
   'Extend to every option and every case agreed with the user; run check until 0 errors.',
@@ -66,7 +67,7 @@ function joploBody(): string {
     '## Common pitfalls',
     ...PITFALLS.map(([text, topic]) => `- ${text}. See npx joplo skill ${topic}.`),
     '',
-    'Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, demo, components, cases, check, selection, publish). Run npx joplo skill for the overview.',
+    'Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, components, cases, check, selection, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.',
     'After the user Alt+clicks a board element, run npx joplo selection and edit only that location.',
     'Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).',
   ].join('\n');
@@ -116,7 +117,7 @@ export function skillMarkdown(skill: AgentSkill): string {
 export function agentsBlock(): string {
   return [
     '## Joplo',
-    'This project designs features as Joplo demos (joplo.config.ts). Read npx joplo skill first, then the relevant topics: authoring for pages/options/scenarios, components, cases before asking about edge cases, demo for layers, shots, traces, and captions.',
+    'This project designs features as Joplo demos (joplo.config.ts). Read npx joplo skill first, then the relevant topics: authoring for pages/options/scenarios, story for planning a demo and writing captions, components, cases before asking about edge cases, demo for layers, shots, traces, and captions.',
     `Mental model: ${MENTAL_MODEL.slice(0, 4).join(' ')}`,
     `Start: ${START_ORDER.map((s, i) => `(${i + 1}) ${s}`).join(' ')}`,
     'Pitfalls:',

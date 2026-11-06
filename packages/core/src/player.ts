@@ -206,10 +206,11 @@ export function isNodeVisible(scene: Scene, nodeId: string, state: PlayState, wi
  */
 export function choicesOf(node: SceneNode, state: Pick<PlayState, 'ui' | 'data' | 'inputs'>): Choice[] | null {
   const text = (n: SceneNode): string => (n.type === '#text' ? String(resolveValue(n.props?.text, state) ?? '') : (n.children ?? []).map(text).join(''));
-  const desc = (type: string): SceneNode[] => {
+  /** 按文档顺序取指定类型的子孙（Radio 与 Radio.Card 混写时保持书写顺序）。 */
+  const desc = (types: readonly string[]): SceneNode[] => {
     const out: SceneNode[] = [];
     walkNodes(node, (n) => {
-      if (n !== node && n.type === type) out.push(n);
+      if (n !== node && types.includes(n.type)) out.push(n);
     });
     return out;
   };
@@ -217,15 +218,16 @@ export function choicesOf(node: SceneNode, state: Pick<PlayState, 'ui' | 'data' 
   switch (node.type) {
     case 'Select':
     case 'MultiSelect':
-    case 'SegmentedControl': {
+    case 'SegmentedControl':
+    case 'TabBar': {
       const c = choicesFromData(resolveValue(p.data, state));
       return c.length ? c : null;
     }
     case 'Radio.Group':
     case 'Tabs':
     case 'Accordion': {
-      const item = node.type === 'Radio.Group' ? 'Radio' : node.type === 'Tabs' ? 'Tabs.Tab' : 'Accordion.Item';
-      const c = desc(item)
+      const items = node.type === 'Radio.Group' ? ['Radio', 'Radio.Card'] : node.type === 'Tabs' ? ['Tabs.Tab'] : ['Accordion.Item'];
+      const c = desc(items)
         .filter((n) => n.props?.value !== undefined)
         .map((n) => {
           const value = String(resolveValue(n.props!.value, state));
@@ -386,7 +388,8 @@ export function applyStep(project: Project, scenario: Scenario, state: PlayState
         break;
       case 'navigate': {
         const target = project.scenes[e.sceneId];
-        if (!target || target.optionId !== scenario.optionId)
+        // 发布 IR 只有发布视图（`@/路径`，optionId 为 null）；dev / review 里跳转目标必须属于同一方案（D68 修复：以前发布站一跳转就报错）
+        if (!target || (target.optionId !== scenario.optionId && !(project.mode === 'publish' && target.optionId === null)))
           throw new PlaybackError(`Step ${step.id} navigates to a stage that is missing or outside this option: ${e.sceneId}`, {
             severity: 'error',
             code: 'MISSING_SCENE',

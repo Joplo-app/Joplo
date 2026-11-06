@@ -130,6 +130,8 @@ export function createKo(locale: Locale = 'ko') {
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)}(“${value(p1, locale)}”의 데모 결과이며 실제 서비스 응답이 아닙니다)`,
       stepProgress: (p0: Value, p1: Value) => `단계 ${value(p0, locale)}/${value(p1, locale)}`,
       coverStart: "시작",
+      /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
+      forRoles: (names: string[]) => `대상: ${list(names, locale)}`,
       coverStartTitle: "처음부터 재생",
       coverSteps: (n: number) => plural(n, { other: '약 #단계' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `약 ${number(d.value, locale)}초` : `약 ${number(d.value, locale)}분`,

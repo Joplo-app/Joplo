@@ -268,6 +268,23 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 不自动下载：`render` 缺组件时，交互终端询问（默认否，写明约 100 MB、不装进项目），非交互（Agent / CI / 管道）直接以 `EXPORT_COMPONENT_MISSING`、退出码 4 结束；`share` 没有组件时跳过预览图并提示一行安装命令，不失败；技能让 Agent 先征得用户同意再运行 setup export。
   - 本地看板：「导出 ▾」菜单顶部在未安装 / 安装中 / 安装失败时显示安装卡（说明、「安装导出组件（约 N MB）」按钮、终端命令）；点导出时轻提示「安装并导出」。只有用户点按钮才开始下载，由看板进程执行安装并用 SSE 推送进度（「导出」按钮上的进度环与卡片），装好后继续刚才的导出，失败给原因与重试。安装接口 `POST /__joplo/export-runtime/install` 与进度流照用看板已有的校验（Host、Origin、本机令牌、`application/json`），网页上的任意请求不能触发下载。
   - 界面方案沿用现有导出进度卡的样式，未单独出设计稿（D40 的原型可在用户检查后补）。
+- D67 讲好一个演示：先规划、PM 视角、节奏与字幕（2026-11-06，来源：用户 2026-11-06；调研与依据见 docs/research/storytelling-and-demos.md）：
+  - 目标（用户原话大意）：给 Agent 足够强大、足够好用的系统来快速构建演示，演示包含 UI/UX、功能、用户故事、后端架构。调研 5 个仓库（onetake、video-production-skills、motion-video-skill、speclip-skills、Product-Manager-Skills），每条结论注明出处与落点。
+  - **不新增“用户故事”概念**（用户当天更正）：不加 story / acceptance 一类的作者 API 与 IR 字段，而是用 PM 写用户故事的视角审视现有能力。对应关系：roles＝As a，goal＝I want + so that，case 标题＝Given，case.expected＝Then，场景步骤＝When，priority＝轻重。差距在“写了看不见”：roles 的名字数组、goal（看板演示页）、case.expected、case.priority 以前都不被任何界面或检查消费。
+  - 默认呈现（只读现有字段；roles 与 goal 本来就在发布 IR 里，expected / priority 只在看板）：看板演示页左栏顶部写功能目标与“面向：角色”，高优先级情况带「!」，情况悬停卡写期望结果（没写时提示），缺口汇总加“高优先级 N”；发布站首页卡片与左栏写“面向：角色”；场景封面的说明在 flow 没写 description 时用功能目标（发布站同样，D61 的封面默认就说清“解决什么”）。
+  - 先规划再动手：新技能主题 `npx joplo skill story`（受众、要讲清的 1–3 件事、每个场景一行 Given → When → Then 与开场 / 收尾；PM 拆分顺序：先一条端到端主线，再按规则、数据、角色、异常各一个场景，不按步骤拆；INVEST 映射；字幕与 explain 的写法）；起步顺序加“先规划并给用户看”。“每段时间看哪里”的写法归 joplo-narrative-focus，story 只指向 demo 主题。
+  - `npx joplo outline [dir] [--option] [--format json]`：每个功能的目标、角色、情况（维度 / 优先级 / 标题 → 期望结果）× 各方案覆盖，每个方案的场景步数、估算时长、是否以过渡卡开场 / 收尾、结局，以及 check 的汇总。有 error 时退出 1（与 check 一致）。估算与自动播放共用同一份 stepDwell：阅读节奏的纯函数从 web 的 runtime/pace.ts 搬到 core（web 原地 re-export，发布站的 core-lite 一并导出），数值不变。
+  - check 新提示（噪音实测：examples/ 全部 0 条；4 个官网示例只有 intelligent-ui 4 条 info）：DESCRIPTION_TOO_LONG（warning，封面说明 > 30）、CARD_TEXT_TOO_LONG（info，过渡卡副标题 > 48、要点 > 24 或多于 4 条）、SCENARIO_TOO_LONG（info，单个场景 1× 估算 > 90 秒）、HAPPY_PATH_ONLY（info，功能只声明 main 情况且所有场景都成功）；CASE_NOT_COVERED 的说明带上高优先级与期望结果。不采纳（噪音）：情况没写 expected、单步场景、字幕多句、停留时长的变异系数。
+  - 界面方案沿用现有左栏与悬停卡的样式，未单独出设计稿（D40 的原型可在用户检查后补）。
+- D68 产品界面组件（2026-11-06，来源：用户 2026-11-06；盘点依据：4 个官网示例里手工拼凑的界面，见 docs/research/storytelling-and-demos.md 第 5 节）：
+  - 新增目录组件（名字能对齐 Mantine 的就对齐）：EmptyState、ListRow、Stat、KeyValue、BarChart / LineChart（@mantine/charts 的 data / dataKey / series，低保真 SVG）、Menu（Target / Dropdown / Item / Label / Divider）、TabBar（手机底部标签栏，select 切换）、Avatar.Group、Radio.Card。
+  - 补齐已有组件：Notification 加 position（浮在当前页面的角或边，用 when 控制）与 icon；DataTable 的列加 badge / avatar / sortable，表格加 sortStatus（只画箭头，排好序的 records 由步骤 set）、selectedRecords + idAccessor（勾选列）、fetching（加载遮罩）；Tabs.Tab 的 rightSection 计数；Skeleton 呼吸动画；目录文档补上已支持的 Alert icon / withCloseButton、Button / NavLink rightSection。
+  - Menu 的 opened 与 Mantine 一样写在 Menu 上，编译器抄给它自己的 Menu.Dropdown（GATED_CONTAINERS 加入 Menu.Dropdown），所以菜单关着时点菜单项回放报 TARGET_HIDDEN；下拉浮到弹窗层（跟镜头一起缩放），不被表格、卡片的 overflow 裁掉。
+  - 修复：Indicator 的 disabled 从来不生效（编译器把 disabled 移出 props，渲染器读 props）——改读计算后的 disabled，可以是条件，且不再要求 disabledReason；手绘描边下圆形元素（头像、图标圈）的底色是方块；发布 IR 里 go() 跳转回放报 MISSING_SCENE（发布视图的画面没有 optionId），选定方案里有跳转的项目在发布站播放到那一步会出错。
+  - 所有状态来自绑定属性与 state.inputs，由步骤驱动，跳到哪一步就渲染哪一步；渲染器不发网络请求、不加载外部资源。发布站在与云端分享页相同的 CSP（sandbox …; connect-src 'none'）下用真实 Chromium 验证（server/test/product-ui-csp.test.ts）。
+  - `npx joplo components [名字…]`：不带名字与 `skill components` 相同；带名字时输出该组件及其子组件的属性、行为分组和示例（COMPONENT_EXAMPLES）。components 主题里 HTML 兜底标签合成一行，给新组件和“常见产品画面怎么拼”腾出位置（主题仍少于 150 行）。
+  - 样板：examples/invite 的成员页用 Stat 与 DataTable 的头像 / 徽章列；方案 A 新增“撤销邀请后对方再打开链接”场景（Menu 行操作 → 确认 Modal → 底部浮层 Notification → 过渡卡“第二天” → 新增路由 /join 的 EmptyState），覆盖 revoked 情况；feature 按 PM 写法补全 goal 与 expected。截图在 docs/screenshots/story-ux/。
+  - 后续候选（证据较弱或需改 IR）：TopBar（手机顶部导航）、Slider、TagsInput、toast 带操作按钮、Modal footer、ToolCall 审批态、Stepper 错误态；Tooltip / Popover 没有需求证据，且与焦点 worker 的标注气泡易混，暂不做。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

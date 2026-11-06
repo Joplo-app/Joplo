@@ -9,3 +9,5 @@ export type * from '../../../core/src/schema.ts';
 export type { Selection } from '../../../core/src/selection.ts';
 export * from '../../../core/src/embed.ts';
 export * from '../../../core/src/features.ts';
+// 阅读节奏（D67 从 web 搬到 core 的纯函数，只有常量与算术）
+export * from '../../../core/src/pace.ts';

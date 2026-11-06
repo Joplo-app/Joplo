@@ -123,6 +123,11 @@ export function createBoardDe(locale: Locale = 'de') {
       appearanceButtonLabel: (p0: Value) => `Aussehen · ${value(p0, locale)}`,
       picked: "✓ Gewählt",
       allCovered: "Alles abgedeckt",
+      // D67：情况的优先级与期望结果（PM 的 Then）
+      highPriority: "Hohe Priorität",
+      expected: "Erwartetes Ergebnis",
+      expectedNotWritten: "Kein erwartetes Ergebnis",
+      missingHighCount: (n: number) => `${value(n, locale)} mit hoher Priorität`,
       clickToSwitch: (p0: Value) => `${value(p0, locale)} (zum Wechseln klicken)`,
       options: "Varianten",
       itemCount: (p0: Value) => `${value(p0, locale)}`,

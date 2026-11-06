@@ -58,21 +58,23 @@ Read only the guidance the current task needs:
 ```sh
 npx joplo skill
 npx joplo skill authoring
+npx joplo skill story
 npx joplo skill cases
 npx joplo skill demo
 npx joplo skill install --agents-md
 ```
 
-The seven topics are `authoring`, `demo`, `components`, `cases`, `check`, `selection`, and `publish`. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
+The eight topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `components`, `cases`, `check`, `selection`, and `publish`. `npx joplo components <Name>` prints the props and an example for one component. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
 
 Use a second terminal while the Board is running:
 
 ```sh
 npx joplo check
+npx joplo outline
 npx joplo selection
 ```
 
-`check` reports one issue per line with a file, line, column, severity, and code. Errors exit with 1; usage errors exit with 2. Warnings and information exit with 0. After Option/Alt-clicking in the Board, `selection` returns the label and three lines of source on either side of the selected line.
+`outline` prints who each feature is for, its goal, each case with its expected result and coverage per option, and every scenario's steps and estimated duration. `check` reports one issue per line with a file, line, column, severity, and code. Errors exit with 1; usage errors exit with 2. Warnings and information exit with 0. After Option/Alt-clicking in the Board, `selection` returns the label and three lines of source on either side of the selected line.
 
 ## Project layout
 

@@ -591,7 +591,7 @@ function Avatar({ node, p, children }: NodeProps) {
   const name = str(p.name ?? p.alt) || textOf(node, state);
   const root = useRoot(node, p, { className: 'jbox', style: { width: size, height: size, borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(10, size * 0.4), color: c, background: light(c), flexShrink: 0, fontWeight: 600 } });
   return (
-    <span {...root}>
+    <span {...root} data-jround="">
       <Rough seedKey={node.id} shape="ellipse" stroke={c} strokeWidth={1.1} />
       <span>{p.name || p.alt || !children ? initials(name) : children}</span>
     </span>
@@ -623,15 +623,16 @@ function ThemeIcon({ node, p, children }: NodeProps) {
   );
 }
 
-function Indicator({ node, p, children }: NodeProps) {
+function Indicator({ node, p, disabled, children }: NodeProps) {
   const c = color(p.color) ?? DANGER;
   const label = p.label !== undefined ? str(p.label) : '';
   const root = useRoot(node, p, { style: { position: 'relative', display: p.inline ? 'inline-block' : 'block', width: 'fit-content' } });
   return (
     <div {...root}>
       {children}
-      {p.disabled === true ? null : (
-        <span style={{ position: 'absolute', top: -4, right: -4, minWidth: label ? 18 : 10, height: label ? 18 : 10, padding: label ? '0 5px' : 0, borderRadius: 999, background: c, color: '#fff', fontSize: 11, lineHeight: '18px', textAlign: 'center', border: '2px solid #fff', zIndex: 2 }}>{label}</span>
+      {/* disabled 由编译器从 props 移到节点上（可以是条件），这里读计算后的值（D68 修复：以前读 p.disabled 永远是 undefined） */}
+      {disabled ? null : (
+        <span data-jindicator="" style={{ position: 'absolute', top: -4, right: -4, minWidth: label ? 18 : 10, height: label ? 18 : 10, padding: label ? '0 5px' : 0, borderRadius: 999, background: c, color: '#fff', fontSize: 11, lineHeight: '18px', textAlign: 'center', border: '2px solid #fff', zIndex: 2 }}>{label}</span>
       )}
     </div>
   );
@@ -730,49 +731,108 @@ function getPath(o: unknown, path: string): unknown {
 }
 const humanize = (s: string) => s.replace(/[_.-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 
-/** DataTable（mantine-datatable）：records（可绑定）+ columns [{ accessor, title, textAlign, width }] + noRecordsText。 */
+/** DataTable 的一列（D68 起支持 sortable、badge、avatar）。 */
+type DtColumn = { accessor: string; title: string; align: CSSProperties['textAlign']; width?: string; sortable: boolean; badge: true | Record<string, unknown> | null; avatar: boolean };
+/** 选中的行：selectedRecords 里的 id（或带 idAccessor 的记录）。 */
+export function selectedIds(selected: unknown, idAccessor: string): Set<string> {
+  return new Set(arr(selected).map((x) => (x && typeof x === 'object' ? str(getPath(x, idAccessor)) : str(x))).filter(Boolean));
+}
+
+/**
+ * DataTable（mantine-datatable）：records（可绑定）+ columns [{ accessor, title, textAlign, width, sortable, badge, avatar }] + noRecordsText。
+ * D68：sortStatus（表头箭头，只是显示，排好序的 records 由步骤 set 进去）、selectedRecords + idAccessor（勾选列、选中行底色）、
+ * fetching（加载遮罩）。单元格仍然只是文字，badge / avatar 让最常见的两种单元格不必改写成 Table.*。
+ */
 function DataTable({ node, p }: NodeProps) {
   const { t: i18n } = useI18n();
 
-  const cols = arr(p.columns)
+  const cols: DtColumn[] = arr(p.columns)
     .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && (c as Record<string, unknown>).hidden !== true)
     .map((c, i) => {
       const accessor = str(c.accessor ?? c.accessorKey ?? `col${i}`);
-      return { accessor, title: c.title !== undefined ? str(c.title) : c.header !== undefined ? str(c.header) : humanize(accessor), align: str(c.textAlign, 'left') as CSSProperties['textAlign'], width: dim(c.width) };
+      const badge = c.badge === true ? true : c.badge && typeof c.badge === 'object' && !Array.isArray(c.badge) ? (c.badge as Record<string, unknown>) : null;
+      return { accessor, title: c.title !== undefined ? str(c.title) : c.header !== undefined ? str(c.header) : humanize(accessor), align: str(c.textAlign, 'left') as CSSProperties['textAlign'], width: dim(c.width), sortable: c.sortable === true, badge, avatar: c.avatar === true };
     });
   const rows = arr(p.records ?? p.data);
+  const sort = p.sortStatus && typeof p.sortStatus === 'object' ? (p.sortStatus as Record<string, unknown>) : null;
+  const sortCol = sort ? str(sort.columnAccessor) : null;
+  const sortDir = sort && str(sort.direction) === 'desc' ? 'desc' : 'asc';
+  const idAccessor = str(p.idAccessor, 'id');
+  const selectable = p.selectedRecords !== undefined;
+  const selected = selectedIds(p.selectedRecords, idAccessor);
+  const allOn = selectable && rows.length > 0 && rows.every((r) => selected.has(r && typeof r === 'object' ? str(getPath(r, idAccessor)) : str(r)));
+  const someOn = selectable && !allOn && selected.size > 0;
+  const fetching = p.fetching === true;
+  // 勾选框不用 jbox（手绘描边会把边框交给 Rough），未勾选时也要看得见
+  const box = (on: boolean, mixed = false) => (
+    <span aria-hidden className="inline-flex items-center justify-center" style={{ width: 16, height: 16, borderRadius: 3, border: `1.5px solid ${on || mixed ? INK : INK2}`, background: on || mixed ? INK : SURFACE, color: BG, fontSize: 11, lineHeight: 1, boxSizing: 'border-box' }} data-jcheck={on ? 'on' : mixed ? 'mixed' : 'off'}>
+      {on ? '✓' : mixed ? '−' : ''}
+    </span>
+  );
+  const cell = (c: DtColumn, r: unknown) => {
+    const v = r && typeof r === 'object' ? str(getPath(r, c.accessor)) : str(r);
+    if (c.badge && v) {
+      const tone = c.badge === true ? undefined : color(c.badge[v]);
+      const base = tone ?? INK2;
+      return <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 9px', borderRadius: 999, fontSize: 12, color: base, background: light(base), whiteSpace: 'nowrap' }} data-jbadge={v}>{v}</span>;
+    }
+    if (c.avatar && v)
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span aria-hidden style={{ width: 26, height: 26, borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: INK2, background: light(INK2), flexShrink: 0 }}>{initials(v)}</span>
+          <span>{v}</span>
+        </span>
+      );
+    return v;
+  };
   return (
     <TableShell node={node} p={p} disabled={false}>
-      <table className={cn('jtable w-full border-collapse text-[14px]', p.striped === true && 'jtable-striped')}>
-        <thead>
-          <tr>
-            {cols.map((c) => (
-              <th key={c.accessor} style={{ textAlign: c.align, width: c.width }}>
-                {c.title}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
+      <div style={{ position: 'relative' }} data-jfetching={fetching ? '' : undefined}>
+        <table className={cn('jtable w-full border-collapse text-[14px]', p.striped === true && 'jtable-striped')}>
+          <thead>
             <tr>
-              <td colSpan={Math.max(cols.length, 1)} style={{ padding: '18px 12px', textAlign: 'center', color: DIMMED }} data-jempty="">
-                {str(p.noRecordsText ?? p.empty, i18n.stage.noRecords)}
-              </td>
+              {selectable ? <th style={{ width: 36 }}>{box(allOn, someOn)}</th> : null}
+              {cols.map((c) => {
+                const sorted = sortCol === c.accessor;
+                return (
+                  <th key={c.accessor} style={{ textAlign: c.align, width: c.width }} aria-sort={sorted ? (sortDir === 'desc' ? 'descending' : 'ascending') : undefined} data-jsort={sorted ? sortDir : undefined}>
+                    {c.title}
+                    {sorted ? <span aria-hidden style={{ marginLeft: 4 }}>{sortDir === 'desc' ? '▼' : '▲'}</span> : c.sortable ? <span aria-hidden style={{ marginLeft: 4, color: SOFT }}>⇅</span> : null}
+                  </th>
+                );
+              })}
             </tr>
-          ) : (
-            rows.map((r, i) => (
-              <tr key={i} data-jrow-index={i}>
-                {cols.map((c) => (
-                  <td key={c.accessor} style={{ textAlign: c.align }}>
-                    {r && typeof r === 'object' ? str(getPath(r, c.accessor)) : str(r)}
-                  </td>
-                ))}
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={Math.max(cols.length + (selectable ? 1 : 0), 1)} style={{ padding: '18px 12px', textAlign: 'center', color: DIMMED }} data-jempty="">
+                  {str(p.noRecordsText ?? p.empty, i18n.stage.noRecords)}
+                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              rows.map((r, i) => {
+                const on = selectable && selected.has(r && typeof r === 'object' ? str(getPath(r, idAccessor)) : str(r));
+                return (
+                  <tr key={i} data-jrow-index={i} data-jselected-row={on ? '' : undefined} aria-selected={selectable ? on : undefined}>
+                    {selectable ? <td>{box(on)}</td> : null}
+                    {cols.map((c) => (
+                      <td key={c.accessor} style={{ textAlign: c.align }}>
+                        {cell(c, r)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+        {fetching ? (
+          <div style={{ position: 'absolute', inset: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--jp-surface) 65%, transparent)' }} role="status">
+            <Spinner size={24} c={INK} />
+          </div>
+        ) : null}
+      </div>
     </TableShell>
   );
 }
@@ -854,14 +914,23 @@ function Alert({ node, p, children }: NodeProps) {
   );
 }
 
+/** Notification 的浮动位置（D68）：没写 position 时内联；写了时浮在当前页面（弹窗层）的那个角或那条边上。 */
+export const NOTIFICATION_POSITIONS = ['top', 'top-left', 'top-right', 'bottom', 'bottom-left', 'bottom-right'] as const;
+export function notificationPlacement(position: unknown): CSSProperties | null {
+  if (typeof position !== 'string' || !(NOTIFICATION_POSITIONS as readonly string[]).includes(position)) return null;
+  const [v, hpos] = position.split('-') as ['top' | 'bottom', 'left' | 'right' | undefined];
+  return { position: 'absolute', [v]: 16, ...(hpos ? { [hpos]: 16 } : { left: '50%', transform: 'translateX(-50%)' }), width: 'min(380px, calc(100% - 32px))', zIndex: 6 };
+}
 function Notification({ node, p, children }: NodeProps) {
+  const { dialogLayer, animate } = useCtx();
   const c = color(p.color) ?? INFO;
-  const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px 12px 20px', background: SURFACE, boxShadow: '3px 3px 0 rgba(30,30,30,.1)', position: 'relative' } });
-  return (
-    <div {...root} role="status" data-soft="">
+  const place = notificationPlacement(p.position);
+  const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px 12px 20px', background: SURFACE, boxShadow: place ? 'var(--jp-shadow)' : '3px 3px 0 rgba(30,30,30,.1)', position: 'relative' } });
+  const body = (
+    <div {...root} role="status" data-soft="" data-jfloating={place ? str(p.position) : undefined}>
       <Rough seedKey={node.id} stroke={SOFT} />
       <span aria-hidden style={{ position: 'absolute', left: 6, top: 10, bottom: 10, width: 4, borderRadius: 2, background: c }} />
-      {p.loading ? <Spinner size={18} c={c} /> : null}
+      {p.loading ? <Spinner size={18} c={c} /> : p.icon !== undefined ? <span aria-hidden style={{ fontSize: 18, lineHeight: '22px' }}>{str(p.icon)}</span> : null}
       <div style={{ flex: 1, minWidth: 0 }}>
         {p.title !== undefined ? <div style={{ fontWeight: 600 }}>{str(p.title)}</div> : null}
         <div style={{ fontSize: 14, color: INK2, whiteSpace: 'pre-line' }}>{children}</div>
@@ -873,6 +942,16 @@ function Notification({ node, p, children }: NodeProps) {
       )}
     </div>
   );
+  if (!place) return body;
+  const float = (
+    <div style={place}>
+      <motion.div initial={animate ? { opacity: 0, y: place.top !== undefined ? -12 : 12 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
+        {body}
+      </motion.div>
+    </div>
+  );
+  // 浮到弹窗层（跟着镜头），没有弹窗层（服务端渲染）时相对最近的定位祖先
+  return dialogLayer ? createPortal(float, dialogLayer) : float;
 }
 
 function Spinner({ size = 18, c = INK, kind = 'oval' }: { size?: number; c?: string; kind?: string }) {
@@ -946,11 +1025,14 @@ function RingProgress({ node, p }: NodeProps) {
 }
 
 function Skeleton({ node, p, children }: NodeProps) {
+  const { animate } = useCtx();
   const r = useR(p);
   const h = dim(r('height') ?? r('h')) ?? (p.circle ? '40px' : '16px');
   const root = useRoot(node, p, { style: { width: p.circle ? h : (dim(r('width') ?? r('w')) ?? '100%'), height: h, borderRadius: p.circle ? 999 : (radius(p.radius) ?? '4px'), background: LINE } });
   if (p.visible === false) return <>{children}</>;
-  return <div {...root} aria-hidden />;
+  // D68：加载中轻轻呼吸（截图、导出与 animate=false 时静止）
+  const pulse = animate && p.animate !== false;
+  return <motion.div {...root} aria-hidden data-jpulse={pulse ? '' : undefined} animate={pulse ? { opacity: [1, 0.45, 1] } : undefined} transition={pulse ? { repeat: Infinity, duration: 1.4, ease: 'easeInOut' } : undefined} />;
 }
 
 // ============ Modal / Drawer ============
@@ -1429,6 +1511,9 @@ function TabsTab({ node, p, disabled, children }: NodeProps) {
       <span className="jtrunc" data-jtext="">
         {children}
       </span>
+      {p.rightSection !== undefined && p.rightSection !== null && p.rightSection !== '' ? (
+        <span style={{ minWidth: 18, height: 18, padding: '0 6px', borderRadius: 999, background: active ? INK : SUBTLE, color: active ? BG : DIMMED, fontSize: 11, lineHeight: '18px', textAlign: 'center', fontWeight: 600 }}>{str(p.rightSection)}</span>
+      ) : null}
     </button>
   );
 }
@@ -2327,6 +2412,329 @@ function Custom({ node, p }: NodeProps) {
   );
 }
 
+// ============ 产品界面（D68）：官网示例里反复手拼的常见界面 ============
+// 都只读主题变量（--jp-*）与 Rough 描边；状态全部来自绑定的属性 / state.inputs，由步骤驱动；不请求网络、不加载外部资源。
+
+const ROW_GAP = 12;
+
+/** Avatar.Group：头像叠在一起（负间距 + 底色描边圈）。 */
+function AvatarGroup({ node, p, children }: NodeProps) {
+  const overlap = typeof p.spacing === 'number' ? p.spacing : (SPACING[str(p.spacing, 'sm')] ?? 12) * 0.7;
+  const root = useRoot(node, p, { className: 'javatar-group', style: { display: 'inline-flex', alignItems: 'center', ['--javatar-overlap' as string]: `${-Math.round(overlap)}px` } });
+  return <div {...root}>{children}</div>;
+}
+
+/** Radio.Card：Radio.Group 里的可选卡片；是否选中读 Radio.Group 的当前值。 */
+function RadioCard({ node, p }: NodeProps) {
+  const ctx = useContext(ValueContext);
+  const on = ctx ? ctx.value !== null && ctx.value === str(p.value) : p.checked === true;
+  const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%', padding: '12px 14px', background: on ? tint(INK, 6) : SURFACE } });
+  return (
+    <div {...root} role="radio" aria-checked={on} data-jchecked={on ? '' : undefined}>
+      <Rough seedKey={node.id} stroke={on ? INK : SOFT} strokeWidth={on ? 1.8 : 1.1} />
+      {p.leftSection !== undefined ? <span aria-hidden style={{ fontSize: 20, lineHeight: '24px' }}>{str(p.leftSection)}</span> : null}
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
+        {p.label !== undefined ? <span style={{ fontWeight: on ? 650 : 500 }}>{str(p.label)}</span> : null}
+        {p.description !== undefined ? <span style={{ fontSize: 13, color: DIMMED, lineHeight: 1.45 }}>{str(p.description)}</span> : null}
+      </span>
+      <span className="jbox inline-flex shrink-0 items-center justify-center rounded-full" style={{ width: 20, height: 20, marginTop: 2 }}>
+        <Rough seedKey={`${node.id}:dot`} shape="ellipse" inset={1} />
+        {on ? <span style={{ width: 9, height: 9, borderRadius: 5, background: INK }} /> : null}
+      </span>
+    </div>
+  );
+}
+
+/** EmptyState：空列表、404 / 过期 / 无权限页、结果页。图标圈 + 标题 + 说明 + 子节点里的操作按钮。 */
+function EmptyState({ node, p, children }: NodeProps) {
+  const c = color(p.color) ?? INK2;
+  const border = p.withBorder === true;
+  const root = useRoot(node, p, { className: border ? 'jbox [.jstage[data-stroke=clean]_&]:rounded-lg' : undefined, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, textAlign: 'center', width: '100%', padding: '32px 24px' } });
+  return (
+    <div {...root} role="status" data-dashed={border ? '' : undefined}>
+      {border ? <Rough seedKey={node.id} dashed stroke={SOFT} /> : null}
+      {p.icon !== undefined ? (
+        <span aria-hidden className="jbox" data-jround="" style={{ width: 56, height: 56, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 999, background: light(c), color: c, fontSize: 24, marginBottom: 4 }}>
+          <Rough seedKey={`${node.id}:icon`} shape="ellipse" stroke={c} strokeWidth={1.1} />
+          <span>{str(p.icon)}</span>
+        </span>
+      ) : null}
+      {p.title !== undefined ? <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1.35 }}>{str(p.title)}</div> : null}
+      {p.description !== undefined ? <div style={{ fontSize: 14, color: DIMMED, lineHeight: 1.55, maxWidth: 420, whiteSpace: 'pre-line' }}>{str(p.description)}</div> : null}
+      {children ? <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>{children}</div> : null}
+    </div>
+  );
+}
+
+/** ListRow：头像 / 图标 + 标题 + 副标题，右侧内容放在子节点。active 时浅色底。 */
+function ListRow({ node, p, children }: NodeProps) {
+  const c = color(p.color) ?? INK2;
+  const active = p.active === true;
+  const border = p.withBorder === true;
+  const root = useRoot(node, p, { className: border ? 'jbox [.jstage[data-stroke=clean]_&]:rounded-md' : 'jlistrow', style: { display: 'flex', alignItems: 'center', gap: ROW_GAP, width: '100%', padding: border ? '10px 12px' : '10px 4px', background: active ? tint(INK, 7) : border ? SURFACE : undefined, borderRadius: border ? undefined : 8 } });
+  return (
+    <div {...root} data-jactive={active ? '' : undefined}>
+      {border ? <Rough seedKey={node.id} stroke={active ? INK : SOFT} strokeWidth={active ? 1.6 : 1.1} /> : null}
+      {p.avatar !== undefined ? (
+        <span className="jbox" data-jround="" aria-hidden style={{ width: 38, height: 38, borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: c, background: light(c), flexShrink: 0, fontWeight: 600 }}>
+          <Rough seedKey={`${node.id}:avatar`} shape="ellipse" stroke={c} strokeWidth={1.1} />
+          <span>{initials(str(p.avatar))}</span>
+        </span>
+      ) : p.icon !== undefined ? (
+        <span aria-hidden style={{ width: 38, height: 38, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: SUBTLE, flexShrink: 0 }}>{str(p.icon)}</span>
+      ) : null}
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
+        {p.title !== undefined ? <span className="jtrunc" style={{ fontWeight: 600, lineHeight: 1.35 }}>{str(p.title)}</span> : null}
+        {p.description !== undefined ? <span className="jtrunc" style={{ fontSize: 13, color: DIMMED, lineHeight: 1.4 }}>{str(p.description)}</span> : null}
+      </span>
+      {children ? <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>{children}</span> : null}
+    </div>
+  );
+}
+
+/** diff 的颜色：以 - / − 开头为红，以 + 开头为绿，其余跟随 color。 */
+export function diffTone(diff: string): 'up' | 'down' | 'flat' {
+  const t = diff.trim();
+  if (/^[-−]/.test(t)) return 'down';
+  if (/^\+/.test(t)) return 'up';
+  return 'flat';
+}
+
+/** Stat：指标卡。 */
+function Stat({ node, p }: NodeProps) {
+  const c = color(p.color) ?? INK;
+  const diff = p.diff !== undefined && p.diff !== null && p.diff !== '' ? str(p.diff) : null;
+  const tone = diff ? diffTone(diff) : 'flat';
+  const progress = typeof p.progress === 'number' && Number.isFinite(p.progress) ? Math.max(0, Math.min(100, p.progress)) : null;
+  const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-lg', style: { display: 'flex', flexDirection: 'column', gap: 6, padding: '14px 16px', background: SURFACE, minWidth: 0 } });
+  return (
+    <div {...root} data-soft="">
+      <Rough seedKey={node.id} stroke={SOFT} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: DIMMED, fontSize: 13 }}>
+        {p.icon !== undefined ? <span aria-hidden>{str(p.icon)}</span> : null}
+        <span className="jtrunc">{str(p.label)}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1, color: c }} data-jvalue="">{str(p.value)}</span>
+        {diff ? <span style={{ fontSize: 13, fontWeight: 600, color: tone === 'down' ? DANGER : tone === 'up' ? OK : DIMMED }} data-jdiff={tone}>{diff}</span> : null}
+      </div>
+      {p.description !== undefined ? <div style={{ fontSize: 12, color: DIMMED }}>{str(p.description)}</div> : null}
+      {progress !== null ? (
+        <div style={{ height: 6, background: SUBTLE, borderRadius: 999, overflow: 'hidden', marginTop: 2 }} role="progressbar" aria-valuenow={progress}>
+          <div style={{ width: `${progress}%`, height: '100%', background: c }} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** KeyValue：一列“名称 …… 值”；total 时最后一行加粗并在上方画分隔线。 */
+function KeyValue({ node, p }: NodeProps) {
+  const items = arr(p.items).filter((x): x is Record<string, unknown> => !!x && typeof x === 'object');
+  const root = useRoot(node, p, { style: { display: 'flex', flexDirection: 'column', width: '100%' } });
+  return (
+    <dl {...root} style={{ ...root.style, margin: 0 }}>
+      {items.map((it, i) => {
+        const last = i === items.length - 1;
+        const total = p.total === true && last && items.length > 1;
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderTop: total || (p.withDivider === true && i > 0) ? `1px solid ${LINE}` : undefined, fontWeight: total ? 700 : undefined, fontSize: total ? 16 : 14 }} data-jtotal={total ? '' : undefined}>
+            <dt style={{ color: total ? INK : DIMMED, minWidth: 0 }}>{str(it.label)}</dt>
+            <dd style={{ margin: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{str(it.value)}</dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
+// ---------- 图表（BarChart / LineChart，对齐 @mantine/charts 的 data / dataKey / series） ----------
+
+const SERIES_COLORS = [INFO, ACCENT, OK, DANGER, '#7048e8', '#0ca678'];
+export type ChartModel = { labels: string[]; series: { name: string; label: string; color: string; values: number[] }[]; max: number; ticks: number[] };
+
+/** 图表的纯数据部分：每个系列取 data[i][name]（不是数字的当作 0），刻度取“好看”的整数步长。 */
+export function chartModel(data: unknown, dataKey: unknown, series: unknown): ChartModel {
+  const rows = arr(data).filter((r): r is Record<string, unknown> => !!r && typeof r === 'object');
+  const key = str(dataKey);
+  const list = arr(series)
+    .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object' && typeof (s as Record<string, unknown>).name === 'string')
+    .map((s, i) => ({ name: String(s.name), label: s.label !== undefined ? str(s.label) : String(s.name), color: color(s.color) ?? SERIES_COLORS[i % SERIES_COLORS.length]!, values: rows.map((r) => (typeof r[String(s.name)] === 'number' && Number.isFinite(r[String(s.name)]) ? (r[String(s.name)] as number) : 0)) }));
+  const peak = Math.max(0, ...list.flatMap((s) => s.values));
+  const step = niceStep(peak / 4);
+  const max = Math.max(step, Math.ceil(peak / step) * step);
+  const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step);
+  return { labels: rows.map((r) => str(r[key])), series: list, max, ticks };
+}
+function niceStep(raw: number): number {
+  if (!(raw > 0)) return 1;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const f = raw / pow;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow;
+}
+
+function Chart({ node, p, kind }: NodeProps & { kind: 'bar' | 'line' }) {
+  const { animate } = useCtx();
+  const r = useR(p);
+  const m = chartModel(p.data, p.dataKey, p.series);
+  const H = typeof r('h') === 'number' ? (r('h') as number) : 220;
+  const W = 600;
+  const pad = { l: 40, r: 12, t: 12, b: 28 };
+  const iw = W - pad.l - pad.r;
+  const legend = (m.series.length > 1 && p.withLegend !== false) || p.withLegend === true;
+  // h 是整张图（含图例）的高度：图例占 22px，其余给 SVG
+  const svgH = Math.max(80, H - (legend ? 22 : 0));
+  const ih = svgH - pad.t - pad.b;
+  const unit = p.unit !== undefined ? str(p.unit) : '';
+  const n = Math.max(1, m.labels.length);
+  const band = iw / n;
+  const y = (v: number) => pad.t + ih - (v / m.max) * ih;
+  const root = useRoot(node, p, { style: { width: '100%', position: 'relative' } });
+  return (
+    <div {...root} style={{ ...root.style, height: 'auto', minHeight: H }} role="img" aria-label={m.series.map((s) => s.label).join(', ')}>
+      <svg viewBox={`0 0 ${W} ${svgH}`} width="100%" height={svgH} preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
+        {m.ticks.map((t) => (
+          <g key={t}>
+            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} style={{ stroke: LINE }} strokeDasharray={t === 0 ? undefined : '3 4'} />
+            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" style={{ fill: DIMMED, fontSize: 11 }}>{`${t}${unit}`}</text>
+          </g>
+        ))}
+        {m.labels.map((l, i) => (
+          <text key={i} x={pad.l + band * (i + 0.5)} y={pad.t + ih + 18} textAnchor="middle" style={{ fill: DIMMED, fontSize: 11 }}>{l}</text>
+        ))}
+        {kind === 'bar'
+          ? m.series.map((s, si) => {
+              const bw = Math.max(4, (band * 0.7) / m.series.length);
+              return s.values.map((v, i) => {
+                const x = pad.l + band * i + band * 0.15 + bw * si;
+                return <motion.rect key={`${si}:${i}`} x={x} width={bw - 2} rx={2} style={{ fill: s.color }} initial={false} animate={{ y: y(v), height: Math.max(0, pad.t + ih - y(v)) }} transition={animate ? { duration: 0.5, ease: [0.16, 1, 0.3, 1] } : { duration: 0 }} data-jbar={`${s.name}:${i}`} />;
+              });
+            })
+          : m.series.map((s, si) => {
+              const pts = s.values.map((v, i) => [pad.l + band * (i + 0.5), y(v)] as const);
+              const d = pts.map(([x, yy], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${yy.toFixed(1)}`).join(' ');
+              return (
+                <g key={si}>
+                  <motion.path d={d} fill="none" style={{ stroke: s.color }} strokeWidth={2.2} strokeLinejoin="round" initial={false} animate={{ d }} transition={animate ? { duration: 0.5 } : { duration: 0 }} />
+                  {pts.map(([x, yy], i) => <motion.circle key={i} r={3.5} cx={x} style={{ fill: SURFACE, stroke: s.color }} strokeWidth={2} initial={false} animate={{ cy: yy }} transition={animate ? { duration: 0.5 } : { duration: 0 }} data-jpoint={`${s.name}:${i}`} />)}
+                </g>
+              );
+            })}
+      </svg>
+      {legend ? (
+        <div style={{ display: 'flex', gap: 14, justifyContent: 'center', alignItems: 'center', height: 22, fontSize: 12, color: DIMMED }}>
+          {m.series.map((s) => (
+            <span key={s.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, background: s.color }} />
+              {s.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+const BarChart = (props: NodeProps) => <Chart {...props} kind="bar" />;
+const LineChart = (props: NodeProps) => <Chart {...props} kind="line" />;
+
+// ---------- Menu（对齐 Mantine）：opened 写在 Menu 上，编译器抄给 Menu.Dropdown（core 门控） ----------
+
+const MenuContext = createContext<{ anchor: { current: HTMLElement | null }; position: string } | null>(null);
+
+function Menu({ node, p, children }: NodeProps) {
+  const anchor = useRef<HTMLDivElement | null>(null);
+  const root = useRoot(node, p, { style: { position: 'relative', display: 'inline-block' } });
+  return (
+    <MenuContext.Provider value={{ anchor, position: str(p.position, 'bottom-start') }}>
+      <div {...root} ref={anchor}>
+        {children}
+      </div>
+    </MenuContext.Provider>
+  );
+}
+function MenuTarget({ node, p, children }: NodeProps) {
+  const root = useRoot(node, p, { style: { display: 'inline-flex' } });
+  return <span {...root}>{children}</span>;
+}
+/** 下拉相对 Menu 的位置：top-* 在上方，*-end 右对齐。 */
+export function menuPlacement(position: string): { top: boolean; end: boolean } {
+  return { top: position.startsWith('top'), end: position.endsWith('end') };
+}
+function MenuDropdown({ node, p, children }: NodeProps) {
+  const { dialogLayer, animate } = useCtx();
+  const menu = useContext(MenuContext);
+  const place = menuPlacement(menu?.position ?? 'bottom-start');
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  // 浮到弹窗层（与 Modal 同一层，跟着镜头一起平移缩放），不被表格、卡片的 overflow 裁掉；坐标按镜头缩放换回画面坐标
+  useLayoutEffect(() => {
+    const a = menu?.anchor.current;
+    if (!a || !dialogLayer) return;
+    const ar = a.getBoundingClientRect();
+    const lr = dialogLayer.getBoundingClientRect();
+    const k = dialogLayer.offsetWidth ? lr.width / dialogLayer.offsetWidth : 1;
+    const next = { left: ((place.end ? ar.right : ar.left) - lr.left) / (k || 1), top: ((place.top ? ar.top - 6 : ar.bottom + 6) - lr.top) / (k || 1) };
+    if (!pos || Math.abs(pos.left - next.left) > 0.5 || Math.abs(pos.top - next.top) > 0.5) setPos(next);
+  });
+  const shift = `${place.end ? 'translateX(-100%)' : ''} ${place.top ? 'translateY(-100%)' : ''}`.trim() || undefined;
+  const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { minWidth: 180, padding: 4, background: SURFACE, boxShadow: 'var(--jp-shadow)', display: 'flex', flexDirection: 'column' } });
+  const panel = (
+    <motion.div {...root} role="menu" initial={animate ? { opacity: 0, y: place.top ? 4 : -4 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.16 }}>
+      <Rough seedKey={node.id} strokeWidth={1.4} />
+      {children}
+    </motion.div>
+  );
+  if (dialogLayer && pos) return createPortal(<div style={{ position: 'absolute', left: pos.left, top: pos.top, transform: shift, zIndex: 5 }}>{panel}</div>, dialogLayer);
+  // 还没测量（首帧、服务端渲染的截图）：先在 Menu 旁边原位浮出
+  return <div style={{ position: 'absolute', zIndex: 30, ...(place.top ? { bottom: '100%', marginBottom: 6 } : { top: '100%', marginTop: 6 }), ...(place.end ? { right: 0 } : { left: 0 }) }}>{panel}</div>;
+}
+function MenuItem({ node, p, disabled, children }: NodeProps) {
+  const c = color(p.color);
+  const root = useRoot(node, p, { disabled, className: '[.jstage[data-stroke=clean]_&]:rounded', style: { display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', fontSize: 14, textAlign: 'left', background: 'transparent', border: 'none', color: disabled ? SOFT : (c ?? INK), cursor: 'inherit' } });
+  return (
+    <button {...root} type="button" role="menuitem" data-jcontrol={node.id}>
+      {p.leftSection !== undefined ? <span aria-hidden style={{ width: 18, textAlign: 'center' }}>{str(p.leftSection)}</span> : null}
+      <span className="jtrunc" style={{ flex: 1 }} data-jtext="">{children}</span>
+      {p.rightSection !== undefined ? <span style={{ fontSize: 12, color: DIMMED }}>{str(p.rightSection)}</span> : null}
+    </button>
+  );
+}
+function MenuLabel({ node, p, children }: NodeProps) {
+  const root = useRoot(node, p, { style: { padding: '6px 10px 4px', fontSize: 12, fontWeight: 600, color: DIMMED } });
+  return <div {...root}>{children}</div>;
+}
+function MenuDivider({ node, p }: NodeProps) {
+  const root = useRoot(node, p, { style: { height: 1, background: LINE, margin: '4px 6px' } });
+  return <div {...root} role="separator" />;
+}
+
+/** TabBar：手机底部标签栏；当前值来自 state.inputs（select 写入）或 value / defaultValue。 */
+function TabBar({ node, p, disabled }: NodeProps) {
+  const { state, preview } = useCtx();
+  const v = useInputValue(node, p);
+  const items = arr(p.data).map((d) => (d && typeof d === 'object' ? (d as Record<string, unknown>) : { value: d, label: d }));
+  const choices = choicesOf(node, state) ?? [];
+  const pv = preview && preview.nodeId === node.id ? preview.text : null;
+  const cur = pv !== null ? (choices.find((c) => c.value === pv || c.label === pv)?.value ?? null) : v !== undefined && v !== null && v !== '' ? str(v) : (choices[0]?.value ?? null);
+  const c = color(p.color) ?? INK;
+  const root = useRoot(node, p, { disabled, style: { display: 'flex', alignItems: 'stretch', width: '100%', marginTop: 'auto', position: 'sticky', bottom: 0, zIndex: 3, background: SURFACE, borderTop: `1.5px solid ${LINE_STRONG}`, padding: '6px 4px 8px' } });
+  return (
+    <nav {...root} role="tablist" aria-label={p['aria-label'] !== undefined ? str(p['aria-label']) : undefined} data-jcontrol={node.id}>
+      {items.map((it, i) => {
+        const value = str(it.value);
+        const on = value === cur;
+        const badge = it.badge !== undefined && it.badge !== null && it.badge !== '' && it.badge !== 0 ? str(it.badge) : null;
+        return (
+          <span key={`${value}:${i}`} role="tab" aria-selected={on} data-jchoice={value} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, fontSize: 11, color: on ? c : DIMMED, fontWeight: on ? 700 : 500, position: 'relative' }}>
+            <span aria-hidden style={{ fontSize: 20, lineHeight: '24px', filter: on ? undefined : 'grayscale(1)', opacity: on ? 1 : 0.7 }}>{it.icon !== undefined ? str(it.icon) : '•'}</span>
+            <span className="jtrunc" style={{ maxWidth: '100%' }}>{str(it.label ?? it.value)}</span>
+            {badge ? <span style={{ position: 'absolute', top: -2, left: '55%', minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: DANGER, color: '#fff', fontSize: 10, lineHeight: '16px', textAlign: 'center' }}>{badge}</span> : null}
+          </span>
+        );
+      })}
+    </nav>
+  );
+}
+
 // ============ 注册表：目录中每个类型都必须有实现（Record<ComponentType, …> 由类型检查保证） ============
 
 const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
@@ -2407,6 +2815,22 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   ...(Object.fromEntries(HTML_TAGS.map((t) => [t, htmlImpl(t)])) as Record<HtmlTag, (props: NodeProps) => ReactNode>),
   Placeholder,
   Custom,
+  // 产品界面（D68）
+  'Avatar.Group': AvatarGroup,
+  'Radio.Card': RadioCard,
+  EmptyState,
+  ListRow,
+  Stat,
+  KeyValue,
+  BarChart,
+  LineChart,
+  Menu,
+  'Menu.Target': MenuTarget,
+  'Menu.Dropdown': MenuDropdown,
+  'Menu.Item': MenuItem,
+  'Menu.Label': MenuLabel,
+  'Menu.Divider': MenuDivider,
+  TabBar,
   '#text': TextNode,
   Button,
   ActionIcon,

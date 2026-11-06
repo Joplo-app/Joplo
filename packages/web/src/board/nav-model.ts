@@ -10,17 +10,32 @@ import { coverageMark, type CoverageStatus } from '../player/status';
 
 export const statusOf = (project: Project, optionId: string, caseId: string): CoverageStatus => project.options[optionId]?.coverage[caseId]?.status ?? 'none';
 
-export function gapsOf(project: Project, optionId: string | null): { missing: number; undecided: number } {
+/** 缺口统计；missingHigh（D67）是缺失里高优先级的情况数（PM 视角：最该先补的验收条件）。 */
+export function gapsOf(project: Project, optionId: string | null): { missing: number; undecided: number; missingHigh: number } {
   const f = optionId ? project.features[project.options[optionId]?.featureId ?? ''] : null;
-  if (!f || !optionId) return { missing: 0, undecided: 0 };
+  if (!f || !optionId) return { missing: 0, undecided: 0, missingHigh: 0 };
   let missing = 0;
   let undecided = 0;
+  let missingHigh = 0;
   for (const c of f.caseIds) {
     const s = statusOf(project, optionId, c);
-    if (s === 'missing' || s === 'none') missing++;
-    else if (s === 'undecided') undecided++;
+    if (s === 'missing' || s === 'none') {
+      missing++;
+      if (project.cases[c]?.priority === 'high') missingHigh++;
+    } else if (s === 'undecided') undecided++;
   }
-  return { missing, undecided };
+  return { missing, undecided, missingHigh };
+}
+
+/** 情况的 PM 视角摘要（D67）：是否高优先级、期望结果（Then；没写时为 null）。只读现有的 case.priority / case.expected。 */
+export function caseBrief(project: Project, caseId: string): { high: boolean; expected: string | null } {
+  const c = project.cases[caseId];
+  return { high: c?.priority === 'high', expected: c?.expected.trim() ? c.expected.trim() : null };
+}
+
+/** 功能是给谁的：feature.roles 的名字（旧的名字数组与 role() 键都算），按声明顺序去重。 */
+export function rolesOfFeature(project: Pick<Project, 'features'>, featureId: string): string[] {
+  return [...new Set((project.features[featureId]?.roles ?? []).map((r) => r.name.trim()).filter(Boolean))];
 }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -45,8 +60,8 @@ const gapText = (g: { missing: number; undecided: number }, i18n: BoardMessages 
 export function optionMeta(project: Project, optionId: string, i18n: BoardMessages = boardEnglish): { picked: boolean; missing: number; undecided: number; text: string } {
   const o = project.options[optionId];
   if (!o) return { picked: false, missing: 0, undecided: 0, text: '' };
-  const g = gapsOf(project, optionId);
-  return { picked: project.features[o.featureId]?.pick === optionId, ...g, text: gapText(g, i18n) };
+  const { missing, undecided } = gapsOf(project, optionId);
+  return { picked: project.features[o.featureId]?.pick === optionId, missing, undecided, text: gapText({ missing, undecided }, i18n) };
 }
 
 /** 情况行右侧：其他方案的小标（字母 + 状态图标），悬停写全称“B：缺失”；点一下 = 切到这个方案看同一个情况。 */

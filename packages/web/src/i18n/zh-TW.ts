@@ -130,6 +130,8 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)}（這是「${value(p1, locale)}」的示範結果，並非真實服務回應）`,
       stepProgress: (p0: Value, p1: Value) => `步驟 ${value(p0, locale)}／${value(p1, locale)}`,
       coverStart: "開始",
+      /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
+      forRoles: (names: string[]) => `對象：${list(names, locale)}`,
       coverStartTitle: "從頭開始播放",
       coverSteps: (n: number) => plural(n, { other: '約 # 個步驟' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `約 ${number(d.value, locale)} 秒` : `約 ${number(d.value, locale)} 分鐘`,

@@ -2,10 +2,10 @@ import { expect, test } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 import { COMPONENT_DOCS, COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../src/catalog.ts';
-import { guide, skillIndex, skillTopic, SKILL_TOPICS } from '../src/guide.ts';
+import { componentDetails, guide, skillIndex, skillTopic, SKILL_TOPICS } from '../src/guide.ts';
 
-const topics = ['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'publish'] as const;
-test('七个主题均少于 150 行，结尾的相关主题均存在', () => {
+const topics = ['authoring', 'story', 'demo', 'components', 'cases', 'check', 'selection', 'publish'] as const;
+test('八个主题均少于 150 行，结尾的相关主题均存在', () => {
   expect(SKILL_TOPICS.map(t => t.name)).toEqual(topics);
   for (const topic of topics) {
     const body = skillTopic(topic);
@@ -29,7 +29,11 @@ test('索引行数来自实际内容，版本由调用方提供', () => {
 });
 test('components 取自真实目录与三种行为集合，未知 docs 不增加组件', () => {
   const output = skillTopic('components');
-  for (const name of COMPONENT_TYPES.filter(name => !name.startsWith('#'))) expect(output).toContain(`- ${name}\n`);
+  // D68：HTML 兜底标签只在 “Supported HTML tags” 一行里列出（一律建议改用组件），其余每个组件单独一行
+  const html = new Set(['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'main', 'section', 'header', 'footer', 'nav', 'aside', 'ul', 'ol', 'li', 'strong', 'em', 'small', 'code', 'a']);
+  for (const name of COMPONENT_TYPES.filter(name => !name.startsWith('#') && !html.has(name))) expect(output).toContain(`- ${name}\n`);
+  const htmlLine = output.split('\n').find(l => l.startsWith('- Supported HTML tags: '))!;
+  for (const tag of html) expect(htmlLine).toMatch(new RegExp(`[ ,]${tag}[ ,(]`));
   for (const set of [INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS]) for (const name of set) expect(output).toContain(name);
   const withDocs = skillTopic('components', { Button: 'variant / size\n下一行', Bogus: '不应输出' });
   expect(withDocs).toContain('- Button: variant / size 下一行');
@@ -150,4 +154,22 @@ test('P1 authoring rules, components, and annotation theme variable remain docum
 test('publish 说明评审版、feedback 与按决定改源码的规则、API Key 与 PR 预览', () => {
   const body = skillTopic('publish');
   for (const s of ['npx joplo share --review', 'npx joplo feedback --format json', 'feedback --applied', 'feature.pick', "origin: 'user', status: 'confirmed'", "status: 'conflict' and ask the user", 'delete the question', 'JOPLO_API_KEY', '--pr <number>', 'run npx joplo check']) expect(body, s).toContain(s);
+});
+
+test('story（D67）：先规划再动手、PM 视角对应现有字段、字幕写法，并指回 cases / demo / check / outline', () => {
+  const story = skillTopic('story');
+  for (const text of ['Plan the demo first', 'Audience', 'One to three points', 'Given', 'When', 'Then', 'roles', 'goal', 'expected', 'priority', 'rules', 'One scenario = one When and one Then', 'Splitting', 'out of order', 'INVEST', 'Opening', 'Ending', 'One idea per caption', 'explain', 'DESCRIPTION_TOO_LONG', 'npx joplo outline', 'npx joplo skill cases', 'npx joplo skill demo'])
+    expect(story, text).toContain(text);
+  // 不引入新的作者概念（用户 2026-11-06 更正）：没有 story() / acceptance 这类 API
+  expect(story).not.toMatch(/\bstory\(|\bacceptance\s*:|\bcriteria\s*:\s*[{[]/);
+  expect(skillTopic('authoring')).toContain('story');
+  expect(skillTopic('cases')).toContain('expected is the visible result');
+});
+test('componentDetails（npx joplo components <名字>）：含子组件、行为分组与示例；名字不分大小写；未知名字给出最接近的', () => {
+  const menu = componentDetails(['menu']);
+  for (const text of ['# Menu', '- Menu: ', '- Menu.Item: ', 'interactive', '- Menu.Dropdown: ', 'shown only while opened', '```tsx', '<Menu opened={$.ui.rowMenu}']) expect(menu, text).toContain(text);
+  expect(componentDetails(['TabBar'])).toContain('value: type / select / toggle write to it');
+  expect(componentDetails(['Text'])).not.toContain('```tsx');
+  expect(() => componentDetails(['Menuu'])).toThrow(/Did you mean Menu\?/);
+  expect(() => componentDetails([''])).toThrow(/Unknown component/);
 });

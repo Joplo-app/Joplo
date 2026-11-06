@@ -33,6 +33,9 @@ const STRUCTURE = [
   'Terminal', 'Terminal.Command', 'Terminal.Output', 'Phone',
   // 架构图（Joplo 自有，D41）：节点与连线的 state 绑定 $.ui，由 flow 步骤驱动
   'Diagram', 'Diagram.Group', 'Diagram.Node', 'Diagram.Edge',
+  // 产品界面（D68）：官网示例里反复手拼的常见界面，名字能对齐 Mantine 的就对齐（Menu、Avatar.Group、Radio.Card、BarChart、LineChart）
+  'Avatar.Group', 'Radio.Card', 'EmptyState', 'ListRow', 'Stat', 'KeyValue', 'BarChart', 'LineChart',
+  'Menu', 'Menu.Target', 'Menu.Dropdown', 'Menu.Label', 'Menu.Divider',
   // HTML 兜底
   ...HTML,
   // Joplo
@@ -47,6 +50,8 @@ const INTERACTIVE = [
   'TextInput', 'PasswordInput', 'NumberInput', 'Textarea', 'Select', 'MultiSelect', 'Checkbox', 'Radio.Group', 'Switch',
   'SegmentedControl', 'FileInput', 'Tabs', 'Tabs.Tab', 'Accordion.Control', 'Pagination', 'PromptInput', 'Terminal.Input',
   'Artifact.Ref',
+  // 产品界面（D68）
+  'Menu.Item', 'TabBar',
 ] as const;
 
 export const COMPONENT_TYPES = [...STRUCTURE, ...INTERACTIVE] as const;
@@ -57,11 +62,14 @@ export const INTERACTIVE_TYPES: ReadonlySet<string> = new Set<string>(INTERACTIV
 /** 可接收输入值；type/select/toggle 动作写入 state.inputs[nodeId]。 */
 export const VALUE_TYPES: ReadonlySet<string> = new Set<string>([
   'TextInput', 'PasswordInput', 'NumberInput', 'Textarea', 'Select', 'MultiSelect', 'Checkbox', 'Radio.Group', 'Switch',
-  'SegmentedControl', 'FileInput', 'Tabs', 'Accordion', 'Pagination', 'PromptInput', 'Terminal.Input',
+  'SegmentedControl', 'FileInput', 'Tabs', 'Accordion', 'Pagination', 'PromptInput', 'Terminal.Input', 'TabBar',
 ]);
 
-/** 只有 opened（兼容旧写法 open）为真时自身和子节点才可见的浮层。 */
-export const GATED_CONTAINERS: ReadonlySet<string> = new Set<string>(['Modal', 'Drawer']);
+/**
+ * 只有 opened（兼容旧写法 open）为真时自身和子节点才可见的浮层。
+ * Menu.Dropdown（D68）：作者把 opened 写在 Menu 上（与 Mantine 一致），编译器把它抄到菜单里的 Menu.Dropdown 上。
+ */
+export const GATED_CONTAINERS: ReadonlySet<string> = new Set<string>(['Modal', 'Drawer', 'Menu.Dropdown']);
 
 /** Joplo 在 Mantine 属性之外追加的属性，编译器会从 props 中取出，放到节点字段上。 */
 export const JOPLO_PROPS = ['id', 'when', 'disabledReason', 'unmodeled', 'note'] as const;
@@ -104,7 +112,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Avatar: 'name (shows first character), src, color, radius, size',
   Image: 'src, alt, h, w, radius; renders a placeholder with alt',
   ThemeIcon: 'color, variant, size, radius; one character as child',
-  Indicator: 'label, color, disabled; wraps one element with a corner badge',
+  Indicator: 'label, color, disabled (hides the badge; can be a condition), processing; wraps one element with a corner badge',
   Timeline: 'active (completed item index), bulletSize; Timeline.Item children',
   'Timeline.Item': 'title, bullet; description in children',
   Table: 'data={{ head: [...], body: [[...]] }} or Table.Thead/Tbody/Tr/Th/Td; striped, withTableBorder',
@@ -113,7 +121,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'Table.Tr': 'Row',
   'Table.Th': 'Header cell',
   'Table.Td': 'Cell',
-  DataTable: 'records (can bind $.data.x), columns: [{ accessor, title }], noRecordsText; matches mantine-datatable',
+  DataTable: 'records (can bind $.data.x), columns: [{ accessor, title, textAlign, width, sortable, badge: true | { value: color }, avatar: true }], sortStatus: { columnAccessor, direction: asc|desc } (arrow only; set sorted records yourself), selectedRecords (ids, checkbox column), idAccessor (default id), fetching (loading overlay), noRecordsText; matches mantine-datatable',
   Accordion: 'value / defaultValue (expanded item); select sets the expanded item; Accordion.Item children',
   'Accordion.Item': 'value; contains Accordion.Control and Accordion.Panel',
   'Accordion.Panel': 'Content shown when expanded',
@@ -123,12 +131,12 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Breadcrumbs: 'separator; Anchor or text children',
   Stepper: 'active (zero-based); Stepper.Step children',
   'Stepper.Step': 'label, description; step content in children (only current step shown)',
-  Alert: 'title, color (default blue), variant; description in children',
+  Alert: 'title, color (default blue), variant, icon (character), withCloseButton; description in children',
   Loader: 'size, color, type; optional child text',
   Progress: 'value 0-100, color, size, striped',
   RingProgress: 'sections: [{ value, color }], label, size, thickness',
-  Skeleton: 'h, w, circle, radius, visible',
-  Notification: 'title, color, loading, withCloseButton; inline notification (use step toast for temporary messages)',
+  Skeleton: 'h, w, circle, radius, visible (false shows children), animate (pulse, default true)',
+  Notification: 'title, color, icon (character), loading, withCloseButton, position: top|top-left|top-right|bottom|bottom-left|bottom-right (floats over the page; show it with when); inline without position; Buttons in children (e.g. Undo)',
   Modal: 'opened (gated, usually opened={$.ui.open}), title, size, centered, fullScreen',
   Drawer: 'opened (gated), title, position: left|right|top|bottom (default left), size',
   ChatMessage: "from: 'user'|'assistant', name; message content in children (preserves newlines)",
@@ -166,15 +174,28 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   em: 'HTML fallback; prefer Text fs="italic" span',
   small: 'HTML fallback; prefer Text size="xs"',
   code: 'HTML fallback; prefer Code',
+  'Avatar.Group': 'spacing (overlap, default sm); Avatar children shown as an overlapping stack',
+  'Radio.Card': 'value, label, description, leftSection (character); selectable card inside Radio.Group (select writes the group value)',
+  EmptyState: 'icon (character), title, description, withBorder, color; empty lists, 404 / expired / no-access pages, result pages; action Buttons in children',
+  ListRow: 'avatar (name) or icon (character), title, description, active, withBorder, color; list row with right-side content (Badge, Button, Text) in children; not clickable itself: use NavLink for a tappable row',
+  Stat: 'label, value, diff (e.g. "+12%", red when it starts with -), description, icon, color, progress (0-100); KPI card',
+  KeyValue: 'items: [{ label, value }] (values can bind $.data.x), total (bold last row), withDivider; order summary / details list',
+  BarChart: 'data: [{ month: "Jan", signups: 40 }] (can bind $.data.x), dataKey (x axis), series: [{ name, label?, color? }], h (default 220), unit, withLegend; low-fi bars, values animate when data changes',
+  LineChart: 'same props as BarChart; low-fi lines with points',
+  Menu: 'opened (usually opened={$.ui.menu}; dropdown shows only when true), position: bottom-start|bottom-end|top-start|top-end; Menu.Target + Menu.Dropdown children',
+  'Menu.Target': 'Wraps the trigger (ActionIcon or Button with its own id)',
+  'Menu.Dropdown': 'Menu items; visible only while the Menu is opened; floats above tables and cards',
+  'Menu.Label': 'Section label inside Menu.Dropdown',
+  'Menu.Divider': 'Divider inside Menu.Dropdown',
   Placeholder: 'label, h; placeholder for images, charts, etc.',
   Custom: 'kind; component absent from the catalog, rendered as a labeled placeholder box',
   '#text': 'Compiler-generated text node (do not use directly)',
-  Button: 'variant: filled|light|outline|subtle|default|white, color, size, fullWidth, loading, leftSection (character)',
+  Button: 'variant: filled|light|outline|subtle|default|white, color, size, fullWidth, loading, leftSection / rightSection (character)',
   ActionIcon: "Icon button: aria-label (required as name), variant, color, size; one character child such as '+'",
   CloseButton: 'aria-label, size',
   Anchor: 'href is display-only; clicking never navigates; use go() in the step; c, underline',
   a: 'HTML fallback; prefer Anchor',
-  NavLink: 'label, description, href (highlighted when equal to current route), active, leftSection (character); nested NavLink allowed',
+  NavLink: 'label, description, href (highlighted when equal to current route), active, leftSection / rightSection (character or short text); nested NavLink allowed',
   Burger: 'opened, aria-label; narrow-screen navigation toggle, usually with hiddenFrom="sm"',
   TextInput: 'label, placeholder, description, error, withAsterisk, type; type action writes the value',
   PasswordInput: 'label, placeholder, description, error; type action writes the value, shown as dots',
@@ -188,12 +209,69 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   SegmentedControl: 'data: string[] | { value, label }[], fullWidth; select accepts value or label',
   FileInput: 'label, placeholder, accept; type action writes the filename',
   Tabs: 'value / defaultValue; Tabs.Tab inside Tabs.List, content in Tabs.Panel; select switches tabs',
-  'Tabs.Tab': 'value, leftSection (character)',
+  'Tabs.Tab': 'value, leftSection (character), rightSection (count or short text, e.g. 3)',
   'Accordion.Control': 'Clickable heading (requires id)',
   Pagination: 'total, value / defaultValue; select action writes the page number',
   PromptInput: 'placeholder; AI input, type action writes the value; use ActionIcon or Button to send',
   'Artifact.Ref': "title, kind, status; card linking to an artifact in the conversation (requires id; clickable)",
   'Terminal.Input': 'prompt (default "$"), placeholder; terminal input line (requires id), type action writes the value',
+  'Menu.Item': 'leftSection (character), rightSection (text), color (red for destructive); clickable menu row (requires id)',
+  TabBar: 'data: string[] | [{ value, label, icon?, badge? }], value / defaultValue, aria-label; mobile bottom tab bar, select switches tabs; place it last in a full-height Stack',
+};
+
+/**
+ * 示例（D68，`npx joplo components <名字>` 输出）：每个都能直接放进页面或层级里用；交互状态写成 $.ui / $.data 绑定，由步骤 set()。
+ * 只给最容易写错、或需要和步骤配合的组件；其余组件看 COMPONENT_DOCS 的一行提示就够。
+ */
+export const COMPONENT_EXAMPLES: Partial<Record<ComponentType, string>> = {
+  EmptyState: `<EmptyState icon="✉" title="No members yet" description="Invite teammates to start working together">
+  <Button id="invite_first">Invite members</Button>
+</EmptyState>`,
+  ListRow: `<Stack gap={0}>
+  <ListRow avatar="Ana Lee" title="Ana Lee" description="ana@example.com"><Badge color="green" variant="light">Admin</Badge></ListRow>
+  <ListRow avatar="Bo Chen" title="Bo Chen" description={$.ui.boStatus} active={$.ui.boNew}><Button id="resend" variant="subtle">Resend</Button></ListRow>
+</Stack>`,
+  Menu: `<Menu opened={$.ui.rowMenu} position="bottom-end">
+  <Menu.Target><ActionIcon id="row_more" aria-label="More actions">⋯</ActionIcon></Menu.Target>
+  <Menu.Dropdown>
+    <Menu.Item id="copy_link" leftSection="🔗">Copy invite link</Menu.Item>
+    <Menu.Divider />
+    <Menu.Item id="revoke" color="red" leftSection="✕">Revoke invite</Menu.Item>
+  </Menu.Dropdown>
+</Menu>
+// steps: .click('row_more', set($.ui.rowMenu, true)).click('revoke', set($.ui.rowMenu, false), set($.ui.confirm, true))`,
+  TabBar: `<Stack h="100%" gap={0}>
+  <ScrollArea style={{ flex: 1, minHeight: 0 }}>…page…</ScrollArea>
+  <TabBar id="tabs" aria-label="Bottom navigation" data={[{ value: 'home', label: 'Home', icon: '⌂' }, { value: 'trips', label: 'Trips', icon: '⛺', badge: 2 }, { value: 'me', label: 'Me', icon: '☺' }]} />
+</Stack>
+// steps: .select('tabs', 'trips', go('/trips'))`,
+  Stat: `<SimpleGrid cols={3}>
+  <Stat label="Signups this week" value={$.data.signups} diff="+12%" icon="↗" />
+  <Stat label="Seats used" value="8 / 10" progress={80} description="2 seats left" />
+  <Stat label="Failed payments" value="3" diff="-2" color="red" />
+</SimpleGrid>`,
+  KeyValue: `<KeyValue withDivider total items={[{ label: 'Seats', value: '5 × $9' }, { label: 'Tax', value: '$4.50' }, { label: 'Total', value: $.data.total }]} />`,
+  BarChart: `<BarChart h={220} dataKey="week" unit="" data={$.data.weeks} series={[{ name: 'signups', label: 'Signups' }, { name: 'churn', label: 'Churn', color: 'red' }]} />
+// state: data: { weeks: [{ week: 'W1', signups: 40, churn: 4 }, { week: 'W2', signups: 52, churn: 6 }] }; set() a new array to animate`,
+  LineChart: `<LineChart h={200} dataKey="day" data={[{ day: 'Mon', p95: 320 }, { day: 'Tue', p95: 280 }]} series={[{ name: 'p95', label: 'p95 latency' }]} unit="ms" />`,
+  DataTable: `<DataTable idAccessor="id" records={$.data.members} selectedRecords={$.ui.selected} fetching={$.ui.loading}
+  sortStatus={{ columnAccessor: 'joined', direction: 'desc' }}
+  columns={[{ accessor: 'name', title: 'Name', avatar: true }, { accessor: 'status', title: 'Status', badge: { Active: 'green', Pending: 'yellow', Expired: 'gray' } }, { accessor: 'joined', title: 'Joined', sortable: true }]} />`,
+  Notification: `<Notification when={$.ui.deleted} position="bottom" title="Invite revoked" icon="↺" withCloseButton={false}>
+  <Group justify="space-between">Ana can no longer join<Button id="undo" variant="subtle" size="xs">Undo</Button></Group>
+</Notification>`,
+  'Radio.Card': `<Radio.Group id="plan" label="Plan">
+  <Stack gap="xs">
+    <Radio.Card value="team" label="Team" description="Up to 10 seats" leftSection="👥" />
+    <Radio.Card value="pro" label="Pro" description="Unlimited seats" leftSection="★" />
+  </Stack>
+</Radio.Group>
+// steps: .select('plan', 'pro')`,
+  'Avatar.Group': `<Avatar.Group><Avatar name="Ana Lee" /><Avatar name="Bo Chen" /><Avatar name="+3" /></Avatar.Group>`,
+  Modal: `<Modal id="confirm" opened={$.ui.confirm} title="Revoke this invite?" size="sm">
+  <Text>Ana's link stops working right away. You can invite her again later.</Text>
+  <Group justify="flex-end"><Button id="cancel_revoke" variant="default">Cancel</Button><Button id="do_revoke" color="red">Revoke</Button></Group>
+</Modal>`,
 };
 
 // ---------- 响应式（Mantine 默认断点，按舞台宽度取值） ----------
@@ -242,6 +320,15 @@ export function captionLength(s: string): number {
 /** 说明 / explain 的建议上限（超过时 check 报 CAPTION_TOO_LONG / EXPLAIN_TOO_LONG）。 */
 export const CAPTION_MAX = 24;
 export const EXPLAIN_MAX = 48;
+/**
+ * 叙事提示（D67，见 docs/research/storytelling-and-demos.md）：
+ * - 封面说明（flow 的 description）：D61 定为 30 字以内，超过时 DESCRIPTION_TOO_LONG；
+ * - 过渡卡：副标题与 explain 同上限、每条要点与说明同上限、最多 4 条要点，超过时 CARD_TEXT_TOO_LONG（info）；
+ * - 单个场景按 1× 估算超过 90 秒时 SCENARIO_TOO_LONG（info）：一个场景讲一件事，长流程拆成几个场景或用 fork。
+ */
+export const DESCRIPTION_MAX = 30;
+export const CARD_POINTS_MAX = 4;
+export const SCENARIO_MS_MAX = 90_000;
 
 /** 没有声明 layers 的方案：镜头作用在路径页面上，记为这个伪层级（不出现在层级栏）。作者的层级键不能以 @ 开头。 */
 export const PAGE_LAYER = '@page';

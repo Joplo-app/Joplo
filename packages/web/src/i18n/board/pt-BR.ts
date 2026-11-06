@@ -123,6 +123,11 @@ export function createBoardPtBR(locale: Locale = 'pt-BR') {
       appearanceButtonLabel: (p0: Value) => `Aparência · ${value(p0, locale)}`,
       picked: "✓ Escolhida",
       allCovered: "Tudo coberto",
+      // D67：情况的优先级与期望结果（PM 的 Then）
+      highPriority: "Prioridade alta",
+      expected: "Resultado esperado",
+      expectedNotWritten: "Sem resultado esperado",
+      missingHighCount: (n: number) => `${value(n, locale)} de prioridade alta`,
       clickToSwitch: (p0: Value) => `${value(p0, locale)} (clique para trocar)`,
       options: "Opções",
       itemCount: (p0: Value) => `${value(p0, locale)}`,

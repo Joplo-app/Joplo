@@ -1,6 +1,7 @@
 import { orderedFeatures } from './features.ts';
 import { Project, type SceneNode } from './schema.ts';
-import { CAPTION_MAX, EXPLAIN_MAX, INTERACTIVE_TYPES, captionLength } from './catalog.ts';
+import { CAPTION_MAX, CARD_POINTS_MAX, DESCRIPTION_MAX, EXPLAIN_MAX, INTERACTIVE_TYPES, SCENARIO_MS_MAX, captionLength } from './catalog.ts';
+import { scenarioEstimateMs } from './outline.ts';
 import { walkNodes, findNode, replay } from './player.ts';
 import { JoploError, type Diagnostic } from './result.ts';
 import { schemaDiagnostics } from './schema-issues.ts';
@@ -73,8 +74,15 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         for (const sid of c.scenarioIds) ref(p.scenarios[sid]?.optionId === o.id, `coverage scenario is missing or belongs to another option: ${sid}`, value, 'option');
         if (c.status === 'expressed' && !c.scenarioIds.length) emit('warning', 'EXPRESSED_WITHOUT_SCENARIO', `Covered case has no scenario: ${id}`, o.source, r);
         if (['not_applicable', 'excluded'].includes(c.status) && !c.reason?.trim()) emit('warning', 'COVERAGE_WITHOUT_REASON', `Not applicable or Excluded requires a reason: ${id}`, o.source, r);
-        if (c.status === 'missing') emit('warning', 'CASE_NOT_COVERED', `Case is not yet Covered: ${id} ${p.cases[id]?.title ?? ''}`, o.source, r);
+        if (c.status === 'missing') emit('warning', 'CASE_NOT_COVERED', `Case is not yet Covered: ${id} ${p.cases[id]?.title ?? ''}${caseHint(p.cases[id])}`, o.source, r);
       }
+    }
+    // 只有顺利路径（D67，Joplo 要解决的“看不全”）：功能只声明了 main 情况，而且参与的方案里每个场景都成功
+    for (const f of orderedFeatures(p).filter(f => !opts.optionId || f.optionIds.includes(opts.optionId))) {
+      const own = scenarios.filter(s => p.options[s.optionId]?.featureId === f.id);
+      const edge = f.caseIds.some(id => p.cases[id] && p.cases[id]!.dimension !== 'main');
+      if (p.mode === 'dev' && own.length && !edge && own.every(s => s.mock.outcome === 'success'))
+        emit('info', 'HAPPY_PATH_ONLY', `Feature "${f.name}" only shows the happy path: every case is a main-flow case and every scenario succeeds. Ask the user about input, permission, async, and lifecycle cases (npx joplo skill cases), then add at least one error-and-recovery scenario`, f.source, { kind: 'feature', id: f.id });
     }
     for (const r of Object.values(p.rules).filter(r => included(r.optionId) && (!opts.optionId || r.featureId === p.options[opts.optionId]?.featureId))) {
       ref(p.features[r.featureId], `Rule feature does not exist: ${r.featureId}`, r, 'rule');
@@ -112,7 +120,8 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         const r = { kind: 'element', id: n.id, optionId: n.from ?? s.optionId ?? undefined };
         if (ids.has(n.id)) emit('error', 'DUPLICATE_ELEMENT', `Duplicate element ID in stage: ${n.id}`, n.source, r, 'reference');
         ids.add(n.id);
-        if (n.disabled !== undefined && n.disabled !== false && !n.disabledReason?.trim()) emit('warning', 'DISABLED_WITHOUT_REASON', `Disabled element has no reason: ${n.id}. Add disabledReason="…" (for example disabledReason="Only admins can invite"), or bind it to state like disabled: disabledReason={$.ui.sendHint}`, n.source, r);
+        // Indicator 的 disabled 只是隐藏角标（Mantine 的含义），不是“不能用”，不要求原因
+        if (n.disabled !== undefined && n.disabled !== false && !n.disabledReason?.trim() && n.type !== 'Indicator') emit('warning', 'DISABLED_WITHOUT_REASON', `Disabled element has no reason: ${n.id}. Add disabledReason="…" (for example disabledReason="Only admins can invite"), or bind it to state like disabled: disabledReason={$.ui.sendHint}`, n.source, r);
         if (INTERACTIVE_TYPES.has(n.type) && !bound.has(identity(n)) && !(n.disabled === true && n.disabledReason?.trim()) && !n.unmodeled) emit('warning', 'UNBOUND_INTERACTIVE', `Interactive element has no demo step: ${n.id}; bind a step, disable with a reason, or mark unmodeled`, n.source, r);
       });
     }
@@ -122,7 +131,13 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
       ref(o, `Scenario option does not exist: ${sc.optionId}`, sc, 'scenario');
       ref(p.scenes[sc.initial.sceneId]?.optionId === sc.optionId, `Scenario initial stage is missing or belongs to another option: ${sc.initial.sceneId}`, sc, 'scenario');
       for (const id of sc.caseIds) ref(p.cases[id]?.featureId === o?.featureId, `Scenario case is missing or belongs to another feature: ${id}`, sc, 'scenario');
-      if (!sc.steps.length) emit('info', 'EMPTY_SCENARIO', `Scenario has no steps: ${sc.name}`, sc.source, { kind: 'scenario', id: sc.id, optionId: sc.optionId });
+      const sr = { kind: 'scenario', id: sc.id, optionId: sc.optionId };
+      if (!sc.steps.length) emit('info', 'EMPTY_SCENARIO', `Scenario has no steps: ${sc.name}`, sc.source, sr);
+      // 叙事（D67）：封面说明 30 字以内（D61）；一个场景讲一件事，太长时拆开
+      const dl = captionLength(sc.description);
+      if (dl > DESCRIPTION_MAX) emit('warning', 'DESCRIPTION_TOO_LONG', `flow description (the scenario cover text) is ${dl} units (recommended maximum: ${DESCRIPTION_MAX}; CJK characters count as 1 each, all others as 0.5): "${sc.description}". Say in one sentence what this scenario shows; the cover clips longer text`, sc.source, sr);
+      const ms = scenarioEstimateMs(sc);
+      if (ms > SCENARIO_MS_MAX) emit('info', 'SCENARIO_TOO_LONG', `Scenario "${sc.name}" plays about ${Math.round(ms / 1000)} s at 1× (${sc.steps.length} steps; recommended maximum: ${SCENARIO_MS_MAX / 1000} s). One scenario tells one thing: split it into scenarios (for example the happy path and each recovery), or branch with fork(); run npx joplo outline to see the pacing`, sc.source, sr);
       for (const st of sc.steps) {
         const value = { ...st, optionId: sc.optionId };
         ref(!stepIds.has(st.id), `Duplicate step ID: ${st.id}`, value, 'step'); stepIds.add(st.id);
@@ -133,6 +148,17 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         const at = st.source ?? sc.source;
         const cl = captionLength(st.caption);
         if (cl > CAPTION_MAX) emit('warning', 'CAPTION_TOO_LONG', `Caption length is ${cl} units (recommended maximum: ${CAPTION_MAX}; CJK characters count as 1 each, all others as 0.5; whitespace is not counted): "${st.caption}". Keep the caption to one point; move details to a separate explanation layer, for example layers: { why: layer('Design rationale', <Why />) }, then use shot('why_xxx') in this step to present it`, at, r);
+        if (st.action.type === 'card') {
+          const sub = st.action.sub ? captionLength(st.action.sub) : 0;
+          const points = st.action.points ?? [];
+          const longPoint = points.map(captionLength).find((n) => n > CAPTION_MAX);
+          const issues = [
+            ...(sub > EXPLAIN_MAX ? [`sub is ${sub} units (maximum ${EXPLAIN_MAX})`] : []),
+            ...(longPoint !== undefined ? [`a point is ${longPoint} units (maximum ${CAPTION_MAX})`] : []),
+            ...(points.length > CARD_POINTS_MAX ? [`${points.length} points (maximum ${CARD_POINTS_MAX})`] : []),
+          ];
+          if (issues.length) emit('info', 'CARD_TEXT_TOO_LONG', `Transition card "${st.action.title}": ${issues.join('; ')}. A card is read in a few seconds: keep one sentence and at most ${CARD_POINTS_MAX} short points, and move details into the scenario steps`, at, r);
+        }
         if (st.explain) {
           const el = captionLength(st.explain);
           if (el > EXPLAIN_MAX) emit('warning', 'EXPLAIN_TOO_LONG', `explain note length is ${el} units (recommended maximum: ${EXPLAIN_MAX}; CJK characters count as 1 each, all others as 0.5; whitespace is not counted). Move long content to a separate explanation layer, for example layers: { why: layer('Design rationale', <Why />) }, then switch to it with shot`, at, r);
@@ -154,4 +180,11 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     for (const o of options) if (!failed.has(o.id) && scenarios.some(s => s.optionId === o.id) && (opts.mode === 'replay' || verification[o.id] === 'structure_ok')) verification[o.id] = 'replay_ok';
   }
   return report();
+}
+
+/** CASE_NOT_COVERED 的补充：高优先级与期望结果（PM 的 Then），帮 Agent 知道该补什么场景。 */
+function caseHint(c: { priority: string; expected: string } | undefined): string {
+  if (!c) return '';
+  const parts = [...(c.priority === 'high' ? ['high priority'] : []), ...(c.expected.trim() ? [`expected: ${c.expected.trim()}`] : [])];
+  return parts.length ? ` (${parts.join('; ')})` : '';
 }

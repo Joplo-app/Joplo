@@ -129,6 +129,11 @@ export function createBoardEn(locale: Locale = 'en') {
       // board/CaseNav.tsx: Joplo interface text; author content is never translated.
       picked: "✓ Picked",
       allCovered: "All covered",
+      // D67：情况的优先级与期望结果（PM 的 Then）
+      highPriority: "High priority",
+      expected: "Expected",
+      expectedNotWritten: "No expected result yet",
+      missingHighCount: (n: number) => `${value(n, locale)} high priority`,
       clickToSwitch: (p0: Value) => `${value(p0, locale)} (click to switch)`,
       options: "Options",
       itemCount: (p0: Value) => `${value(p0, locale)}`,

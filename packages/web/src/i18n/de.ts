@@ -130,6 +130,8 @@ export function createDe(locale: Locale = 'de') {
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)} (Demo-Ergebnis für ${value(p1, locale)}, keine Antwort eines echten Dienstes)`,
       stepProgress: (p0: Value, p1: Value) => `Schritt ${value(p0, locale)} / ${value(p1, locale)}`,
       coverStart: "Starten",
+      /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
+      forRoles: (names: string[]) => `Für: ${list(names, locale)}`,
       coverStartTitle: "Von vorn abspielen",
       coverSteps: (n: number) => plural(n, { one: 'Etwa # Schritt', other: 'Etwa # Schritte' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `Etwa ${number(d.value, locale)} Sek.` : `Etwa ${number(d.value, locale)} Min.`,

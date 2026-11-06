@@ -608,6 +608,7 @@ type ErrFn = (code: string, message: string, at?: string) => void;
 
 /** JNode → IR 节点：展开 Fragment、文本变 #text、分离 Joplo 属性、生成非交互元素的 ID、检查 ID 唯一。 */
 function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | undefined>, err: ErrFn, rel: (s?: string) => string | undefined): SceneNode {
+  if (n.type === 'Menu') n = menuWithOpened(n);
   const children: SceneNode[] = flatten(n.children).map((c, i) =>
     isNode(c) ? toSceneNode(c, `${fallbackId}_${i}`, ids, err, rel) : textNode(c, `${fallbackId}_${i}`),
   );
@@ -654,6 +655,23 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   const s = rel(at);
   if (s) node.source = s;
   return node;
+}
+
+/**
+ * Menu（D68）：opened 写在 Menu 上（与 Mantine 一致），可见性由 Menu.Dropdown 门控（GATED_CONTAINERS）。
+ * 把 Menu 的 opened 抄到它自己的 Menu.Dropdown 上（不进嵌套的另一个 Menu；Dropdown 自己写了 opened 时不覆盖）。
+ * Menu 没写 opened 时下拉保持关闭。
+ */
+function menuWithOpened(menu: JNode): JNode {
+  const opened = menu.props.opened;
+  if (opened === undefined) return menu;
+  const visit = (c: JChild): JChild => {
+    if (Array.isArray(c)) return c.map(visit);
+    if (!isNode(c) || c.type === 'Menu') return c;
+    if (c.type === 'Menu.Dropdown') return c.props.opened === undefined ? { ...c, props: { ...c.props, opened } } : c;
+    return { ...c, children: c.children.map(visit) };
+  };
+  return { ...menu, children: menu.children.map(visit) };
 }
 
 /**
