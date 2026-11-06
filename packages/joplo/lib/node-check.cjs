@@ -11,8 +11,8 @@ function checkNode(version) {
   var match = /^v?(\d+)\./.exec(String(version || ''));
   var major = match ? parseInt(match[1], 10) : 0;
   if (major >= REQUIRED_MAJOR) return null;
-  return '✗ Joplo 需要 Node.js ' + REQUIRED_MAJOR + ' 或更高版本，当前是 ' + (version || '未知') + '。\n' +
-    '  升级：nvm install ' + REQUIRED_MAJOR + '，或从 https://nodejs.org 下载。';
+  return '✗ Joplo requires Node.js ' + REQUIRED_MAJOR + ' or later; current version is ' + (version || 'unknown') + '.\n' +
+    '  Upgrade: nvm install ' + REQUIRED_MAJOR + ', or download from https://nodejs.org.';
 }
 
 module.exports = { checkNode: checkNode, REQUIRED_MAJOR: REQUIRED_MAJOR };

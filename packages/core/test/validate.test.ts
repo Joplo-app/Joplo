@@ -109,8 +109,8 @@ test('仅校验指定方案；未知方案和无效模式是用法错误', () =>
   const r = validate(p, { mode: 'all', optionId: a });
   expect(Object.keys(r.verification)).toEqual([a]);
   expect(r.diagnostics.some(d => d.ref?.optionId === 'invite.b-batch')).toBe(false);
-  expect(() => validate(p, { mode: 'all', optionId: 'absent' })).toThrow('方案不存在');
-  expect(() => validate(p, { mode: 'bad' as any })).toThrow('无效校验模式');
+  expect(() => validate(p, { mode: 'all', optionId: 'absent' })).toThrow('Option does not exist');
+  expect(() => validate(p, { mode: 'bad' as any })).toThrow('Invalid validation mode');
 });
 test('回放缺少初始画面时定位场景，而非第一步', () => {
   const p = fixture(); const sc = p.scenarios[`${a}.success`]!;
@@ -138,4 +138,17 @@ test.each([
 ] as const)('IR v2 引用错误：%s，定位引用者源位置', (_name, change, source) => {
   const p = fixture(); change(p);
   expect(validate(p, { mode: 'structure' }).diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ severity: 'error', source: 'reference', at: source(p) })]));
+});
+
+test('caption diagnostics describe whitespace and retain the weighted length calculation', () => {
+  const p = fixture();
+  const step = p.scenarios[`${a}.success`]!.steps[0]!;
+  step.caption = '中'.repeat(25) + ' \n\t';
+  step.explain = 'a'.repeat(98) + ' \n\t';
+  const ds = validate(p, { mode: 'structure' }).diagnostics;
+  expect(ds.find(d => d.code === 'CAPTION_TOO_LONG')?.message).toContain('Caption length is 25 units');
+  expect(ds.find(d => d.code === 'EXPLAIN_TOO_LONG')?.message).toContain('explain note length is 49 units');
+  for (const code of ['CAPTION_TOO_LONG', 'EXPLAIN_TOO_LONG']) {
+    expect(ds.find(d => d.code === code)?.message).toContain('whitespace is not counted');
+  }
 });

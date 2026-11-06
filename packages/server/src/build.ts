@@ -83,16 +83,16 @@ function realish(p: string): string {
 
 export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   const projectDir = realProjectDir(opts.projectDir);
-  if (!fs.existsSync(projectDir)) throw new JoploError('NOT_FOUND', `项目目录不存在：${projectDir}`);
+  if (!fs.existsSync(projectDir)) throw new JoploError('NOT_FOUND', `Project directory does not exist: ${projectDir}`);
   const outDir = realish(opts.outDir ?? path.join(projectDir, 'dist'));
 
   // 目标目录安全检查（先于任何耗时工作）
   if (outDir === projectDir || projectDir.startsWith(outDir + path.sep) || outDir === os.homedir() || outDir === path.parse(outDir).root)
-    throw new JoploError('USAGE', `不能把发布站写到 ${outDir}：它是项目目录本身或它的上级目录`);
-  if (outDir === path.join(projectDir, '.joplo') || outDir.startsWith(path.join(projectDir, '.joplo') + path.sep)) throw new JoploError('USAGE', `不能写入 .joplo/：${outDir}`);
+    throw new JoploError('USAGE', `Cannot write the published site to ${outDir}: it is the project directory or its parent`);
+  if (outDir === path.join(projectDir, '.joplo') || outDir.startsWith(path.join(projectDir, '.joplo') + path.sep)) throw new JoploError('USAGE', `Cannot write to .joplo/: ${outDir}`);
   const nonEmpty = fs.existsSync(outDir) && (!fs.statSync(outDir).isDirectory() || fs.readdirSync(outDir).length > 0);
-  if (nonEmpty && !opts.overwrite) throw new JoploError('USAGE', `目标目录非空：${outDir}。确认可以清空后请传 overwrite: true（CLI：--overwrite）`);
-  if (nonEmpty && fs.existsSync(path.join(outDir, 'joplo.config.ts'))) throw new JoploError('USAGE', `目标目录看起来是一个 Joplo 项目（含 joplo.config.ts），拒绝清空：${outDir}`);
+  if (nonEmpty && !opts.overwrite) throw new JoploError('USAGE', `Output directory is not empty: ${outDir}. After confirming it can be cleared, pass overwrite: true (CLI: --overwrite)`);
+  if (nonEmpty && fs.existsSync(path.join(outDir, 'joplo.config.ts'))) throw new JoploError('USAGE', `Output directory appears to be a Joplo project (contains joplo.config.ts); refusing to clear: ${outDir}`);
 
   const web = locateWebAssets();
 
@@ -116,7 +116,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   }
   if (!compiled.project) {
     const errs = compiled.diagnostics.filter((d) => d.severity === 'error');
-    throw new JoploError('EXPORT_FAILED', `项目编译失败，未生成发布站：\n${errs.map((d) => `${d.at ?? ''}  ${d.message}`).join('\n')}`, { diagnostics: compiled.diagnostics });
+    throw new JoploError('EXPORT_FAILED', `Project compilation failed; no published site was generated: \n${errs.map((d) => `${d.at ?? ''}  ${d.message}`).join('\n')}`, { diagnostics: compiled.diagnostics });
   }
   const project = compiled.project;
   const inline = publishPayload(project, compiled.home);
@@ -202,13 +202,13 @@ export async function stageDistSite(web: DistWeb, projectDir: string, staging: s
       build: { outDir: cssOut, emptyOutDir: true, minify: true, sourcemap: false, reportCompressedSize: false, write: true, rolldownOptions: { input: { project: web.projectCss } } },
     })) as Rollup.RollupOutput | Rollup.RollupOutput[];
     const files = (Array.isArray(out) ? out : [out]).flatMap((o) => o.output.map((x) => x.fileName)).filter((f) => f.endsWith('.css'));
-    if (files.length !== 1) throw new JoploError('EXPORT_FAILED', `作者 className 的样式编译结果异常：${files.join(', ') || '没有 CSS'}`);
+    if (files.length !== 1) throw new JoploError('EXPORT_FAILED', `Unexpected stylesheet compilation result for author className: ${files.join(', ') || 'No CSS'}`);
     const rel = `assets/${path.basename(files[0]!)}`;
     fs.mkdirSync(path.join(staging, 'assets'), { recursive: true });
     fs.copyFileSync(path.join(cssOut, files[0]!), path.join(staging, rel));
     const siteHtml = path.join(staging, 'site.html');
     const html = fs.readFileSync(siteHtml, 'utf8');
-    if (!html.includes('</head>')) throw new JoploError('EXPORT_FAILED', '预构建的 site.html 缺少 </head>');
+    if (!html.includes('</head>')) throw new JoploError('EXPORT_FAILED', 'Prebuilt site.html is missing </head>');
     fs.writeFileSync(siteHtml, html.replace('</head>', `  <link rel="stylesheet" href="./${rel}">\n  </head>`));
   } finally {
     fs.rmSync(cssOut, { recursive: true, force: true });

@@ -34,46 +34,46 @@ export function resolveSelection(project: Project, input: SelectionInput, now = 
   const optionId = input.optionId;
   if (optionId !== null) {
     const opt = project.options[optionId];
-    if (!opt) return { ok: false, problem: `方案 ${optionId} 不存在` };
+    if (!opt) return { ok: false, problem: `Option ${optionId} does not exist` };
     featureId = opt.featureId;
   }
   if (input.scenarioId !== null) {
     const sc = project.scenarios[input.scenarioId];
-    if (!sc) return { ok: false, problem: `场景 ${input.scenarioId} 不存在` };
-    if (optionId !== sc.optionId) return { ok: false, problem: `场景 ${sc.id} 不属于方案 ${optionId ?? '(无)'}` };
-    if (input.position > sc.steps.length) return { ok: false, problem: `位置 ${input.position} 超出场景 ${sc.id} 的范围 0..${sc.steps.length}` };
+    if (!sc) return { ok: false, problem: `Scenario ${input.scenarioId} does not exist` };
+    if (optionId !== sc.optionId) return { ok: false, problem: `Scenario ${sc.id} does not belong to option ${optionId ?? '(none)'}` };
+    if (input.position > sc.steps.length) return { ok: false, problem: `Position ${input.position} is outside scenario ${sc.id} range 0..${sc.steps.length}` };
     try {
       sceneId = stateAt(project, sc.id, input.position).sceneId;
     } catch (e) {
-      return { ok: false, problem: `场景 ${sc.id} 无法回放到位置 ${input.position}：${e instanceof Error ? e.message : String(e)}` };
+      return { ok: false, problem: `Scenario ${sc.id} cannot replay to position ${input.position}: ${e instanceof Error ? e.message : String(e)}` };
     }
     // 有层级的方案：用户看的是某一层的画面（各层共享同一份状态），也接受
     const layerScenes = Object.values(project.options[sc.optionId]?.layers ?? {}).map((l) => l.sceneId);
     if (layerScenes.includes(input.sceneId)) sceneId = input.sceneId;
-    if (input.sceneId !== sceneId) return { ok: false, problem: `位置 ${input.position} 的画面是 ${sceneId}，不是 ${input.sceneId}` };
+    if (input.sceneId !== sceneId) return { ok: false, problem: `Position ${input.position} has stage ${sceneId}, not ${input.sceneId}` };
     stepId = sc.steps[input.position - 1]?.id ?? null;
     if (input.stepId) {
-      if (!sc.steps.some((s) => s.id === input.stepId)) return { ok: false, problem: `步骤 ${input.stepId} 不在场景 ${sc.id} 中` };
+      if (!sc.steps.some((s) => s.id === input.stepId)) return { ok: false, problem: `Step ${input.stepId} is not in scenario ${sc.id}` };
       stepId = input.stepId;
     }
-  } else if (input.position !== 0 || input.stepId) return { ok: false, problem: '没有场景时位置必须为 0，且不能选中步骤' };
+  } else if (input.position !== 0 || input.stepId) return { ok: false, problem: 'Without a scenario, position must be 0 and no step may be selected' };
   const scene = project.scenes[sceneId];
-  if (!scene) return { ok: false, problem: `画面 ${sceneId} 不存在` };
+  if (!scene) return { ok: false, problem: `Stage ${sceneId} does not exist` };
   if (input.scenarioId === null && optionId !== null && scene.optionId !== optionId && scene.optionId !== null)
-    return { ok: false, problem: `画面 ${sceneId} 不属于方案 ${optionId}` };
+    return { ok: false, problem: `Stage ${sceneId} does not belong to option ${optionId}` };
 
   let at: string | null = null;
   let label: string | null = null;
   if (input.nodeId) {
     const hit = findNode(scene, input.nodeId);
-    if (!hit) return { ok: false, problem: `元素 ${input.nodeId} 不在画面 ${sceneId} 中` };
+    if (!hit) return { ok: false, problem: `Element ${input.nodeId} is not in stage ${sceneId}` };
     at = hit.node.source ?? null;
     label = nodeLabel(hit.node); // Mantine 输入组件直接带 label 属性
   } else if (input.stepId && input.scenarioId) {
     const st = project.scenarios[input.scenarioId]!.steps.find((s) => s.id === input.stepId)!;
     at = st.source ?? null;
     label = st.caption;
-  } else return { ok: false, problem: '选中必须指向一个元素或一个步骤' };
+  } else return { ok: false, problem: 'Selection must point to an element or a step' };
 
   return {
     ok: true,

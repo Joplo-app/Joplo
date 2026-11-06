@@ -65,8 +65,8 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     if (pick) {
       const o = allOptions.find((x) => x.fid === fid && x.key === pick);
       if (o) picked.set(fid, o);
-      else err('UNKNOWN_PICK', `功能 ${fid} 的 pick「${pick}」不是 options/ 下的方案`, f.def.source);
-    } else if (mode === 'publish') warn('NOT_PICKED', `功能「${f.def.name}」还没有选定方案，不会发布`, f.def.source);
+      else err('UNKNOWN_PICK', `Feature ${fid} pick "${pick}" is not an option under options/`, f.def.source);
+    } else if (mode === 'publish') warn('NOT_PICKED', `Feature "${f.def.name}" has no picked option and will not be published`, f.def.source);
   }
   const included = mode === 'dev' ? allOptions : [...picked.values()];
 
@@ -77,8 +77,8 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
   const addedRoutes = new Map<string, RouteEntry>(); // `${qid}|${path}`
   for (const o of allOptions) {
     for (const [path, p] of Object.entries(o.def.routes ?? {})) {
-      if (!path.startsWith('/')) err('BAD_ROUTE', `路径必须以 / 开头：${path}`, o.def.source);
-      if (baseRoutes.has(path)) err('ROUTE_EXISTS', `方案 ${o.qid} 新增的路径 ${path} 已存在于 routes/，请改为堆叠（on）`, p.source ?? o.def.source);
+      if (!path.startsWith('/')) err('BAD_ROUTE', `Route must start with /: ${path}`, o.def.source);
+      if (baseRoutes.has(path)) err('ROUTE_EXISTS', `Option ${o.qid} adds route ${path} which already exists in routes/; use on to add elements instead`, p.source ?? o.def.source);
       addedRoutes.set(`${o.qid}|${path}`, { path, page: { ...p, file: o.def.file }, addedBy: o });
     }
   }
@@ -96,7 +96,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
   const layoutOf = (page: PageDef): string | null => (page.layout === false ? null : (page.layout ?? src.config.layout ?? null));
   for (const r of [...baseRoutes.values(), ...[...addedRoutes.values()].filter((r) => included.some((o) => o.qid === r.addedBy!.qid))]) {
     const lid = layoutOf(r.page);
-    if (lid && !src.layouts[lid]) err('UNKNOWN_LAYOUT', `页面 ${r.path} 使用了不存在的布局「${lid}」`, r.page.source);
+    if (lid && !src.layouts[lid]) err('UNKNOWN_LAYOUT', `Page ${r.path} uses an unknown layout "${lid}"`, r.page.source);
     if (out.routes[r.path]) continue;
     const slots = new Set<string>();
     collectSlots(r.page.tree, slots);
@@ -166,7 +166,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       if (!used.has(slot)) {
         const from = contribs.get(slot)![0]!.from;
         const o = allOptions.find((x) => x.qid === from);
-        err('UNKNOWN_SLOT', `方案 ${from} 往路径 ${route.path} 的插槽「${slot}」堆叠元素，但该页面和布局中没有 <Slot name="${slot}" />`, o?.def.source, {
+        err('UNKNOWN_SLOT', `Option ${from} adds elements to route ${route.path} slot "${slot}", but the page and layout have no <Slot name="${slot}" />`, o?.def.source, {
           kind: 'option',
           id: from,
         });
@@ -184,7 +184,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     const t = src.config.theme ?? 'sketch';
     const authorThemes = Object.keys(src.themes ?? {});
     if (!(BUILTIN_THEMES as readonly string[]).includes(t) && !authorThemes.includes(t))
-      err('THEME_UNKNOWN', `config({ theme: '${t}' }) 不是内置主题（${BUILTIN_THEMES.join('、')}），项目里也没有 themes/${t}.css${authorThemes.length ? `（作者主题：${authorThemes.join('、')}）` : ''}`, src.config.source ?? `${src.config.file}:1:1`);
+      err('THEME_UNKNOWN', `config({ theme: '${t}' }) is not a built-in theme (${BUILTIN_THEMES.join(', ')}), and the project has no themes/${t}.css${authorThemes.length ? ` (author themes: ${authorThemes.join(', ')})` : ''}`, src.config.source ?? `${src.config.file}:1:1`);
   }
   const sceneFor = new Map<string, Scene>();
   const addScene = (s: Scene) => {
@@ -200,7 +200,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     const fdef = src.features[fid]!.def;
     const ctxRoutes = new Set(routesIn(o).map((r) => r.path));
     const touched = [...Object.keys(def.on ?? {}), ...Object.keys(def.routes ?? {})];
-    for (const p of Object.keys(def.on ?? {})) if (!ctxRoutes.has(p)) err('UNKNOWN_ROUTE', `方案 ${qid} 堆叠到不存在的路径 ${p}`, def.source);
+    for (const p of Object.keys(def.on ?? {})) if (!ctxRoutes.has(p)) err('UNKNOWN_ROUTE', `Option ${qid} adds elements to an unknown route ${p}`, def.source);
     const sceneOf = (path: string) => (mode === 'dev' ? `${qid}@${path}` : `@${path}`);
 
     if (mode === 'dev') {
@@ -211,7 +211,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     const ruleQid = (key: string, at?: string): string | null => {
       if (def.rules?.[key]) return `${qid}.${key}`;
       if (fdef.rules?.[key]) return `${fid}.${key}`;
-      err('UNKNOWN_RULE', `uses("${key}") 引用了不存在的规则（应为 option.rules 或 feature.rules 的键）`, at);
+      err('UNKNOWN_RULE', `uses("${key}") references an unknown rule (use a key from option.rules or feature.rules)`, at);
       return null;
     };
 
@@ -224,13 +224,13 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     for (const [lk, ld] of Object.entries(def.layers ?? {})) {
       const at = ld.source ?? def.source;
       if (!/^[A-Za-z_][\w-]*$/.test(lk)) {
-        err('LAYER_UNKNOWN', `层级键「${lk}」只能用字母、数字、下划线和连字符，且不能以 @ 开头`, at);
+        err('LAYER_UNKNOWN', `Layer key "${lk}" must use letters, digits, underscores, and hyphens and must not start with @`, at);
         continue;
       }
       const tree = flatten(Array.isArray(ld.tree) ? ld.tree : [ld.tree]);
       const nodes = tree.filter(isNode);
       if (!nodes.length) {
-        err('LAYER_UNKNOWN', `层级「${ld.title}」没有内容：layer(title, <页面 JSX />)`, at);
+        err('LAYER_UNKNOWN', `Layer "${ld.title}" has no content: layer(title, <Page />)`, at);
         continue;
       }
       const rootJ: JNode = nodes.length === 1 ? nodes[0]! : { ...nodes[0]!, type: 'div', props: {}, children: nodes };
@@ -241,7 +241,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       addScene(scene);
       layerScenes.push({ key: lk, scene });
       if (ld.role !== undefined && !roleKeys.has(ld.role))
-        err('ROLE_UNKNOWN', `层级「${ld.title}」的 role「${ld.role}」不在 feature.roles 里${roleKeys.size ? `（可用：${[...roleKeys].join('、')}）` : '（feature.roles 要写成 { 键: role(\'名字\') }）'}`, at);
+        err('ROLE_UNKNOWN', `Layer "${ld.title}" role "${ld.role}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ' (feature.roles must use { key: role(\'Name\') })'}`, at);
       layers[lk] = { title: ld.title, sceneId, ...(ld.role !== undefined && roleKeys.has(ld.role) ? { role: ld.role } : {}) };
     }
     const hasLayers = layerScenes.length > 0;
@@ -254,14 +254,14 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     const resolveTrace = (ids: string[], tmode: Trace['mode'], at: string | undefined): Trace | null => {
       const shown = `trace(${ids.map((x) => JSON.stringify(x)).join(', ')})`;
       if (!ids.length) {
-        err('TRACE_UNKNOWN', `${shown} 至少要写一个节点或连线 id`, at);
+        err('TRACE_UNKNOWN', `${shown} requires at least one node or edge id`, at);
         return null;
       }
       const has = (d: DiagramIndex, t: string) => d.nodes.has(t) || d.edges.some((e) => e.id === t);
       const d = diagrams.find((x) => ids.every((t) => has(x, t)));
       if (!d) {
         const missing = ids.find((t) => !diagrams.some((x) => has(x, t)));
-        err('TRACE_UNKNOWN', missing ? `${shown} 里的「${missing}」不是任何 Diagram 的节点或连线 id` : `${shown} 的节点不在同一个 Diagram 里`, at);
+        err('TRACE_UNKNOWN', missing ? `${shown} contains "${missing}", which is not a node or edge id in any Diagram` : `${shown} has nodes from different Diagrams`, at);
         return null;
       }
       const nodes: string[] = [];
@@ -284,7 +284,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           // 写连线 id：方向由上一个节点决定（从 to 端接上时逆向走）
           const reverse: boolean = prev !== null && prev === edge.to && prev !== edge.from;
           if (prev !== null && prev !== edge.from && prev !== edge.to) {
-            err('TRACE_UNKNOWN', `${shown}：连线「${t}」（${edge.from} → ${edge.to}）没有连着上一个节点「${prev}」`, at);
+            err('TRACE_UNKNOWN', `${shown}: edge "${t}"(${edge.from} → ${edge.to}) is not connected to the previous node "${prev}"`, at);
             return null;
           }
           edges.push({ id: edge.id, reverse });
@@ -299,11 +299,11 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           const back = d.edges.filter((e) => e.from === t && e.to === prev);
           const pick = fwd.length ? fwd : back;
           if (pick.length > 1) {
-            err('TRACE_AMBIGUOUS', `${shown}：「${prev}」与「${t}」之间有 ${pick.length} 条连线（${pick.map((e) => e.id).join('、')}），请改写成连线 id，例如 trace('${pick[0]!.id}')`, at);
+            err('TRACE_AMBIGUOUS', `${shown}: "${prev}" and "${t}" have ${pick.length} edges (${pick.map((e) => e.id).join(', ')}), use an edge id instead, for example trace('${pick[0]!.id}')`, at);
             return null;
           }
           if (!pick.length) {
-            err('TRACE_UNKNOWN', `${shown}：「${prev}」与「${t}」之间没有连线（这一段要能在同一个 Diagram 里找到对应的 Diagram.Edge，方向不限）`, at);
+            err('TRACE_UNKNOWN', `${shown}: "${prev}" and "${t}" have no connecting edge (each segment needs a Diagram.Edge in the same Diagram; either direction is allowed)`, at);
             return null;
           }
           edges.push({ id: pick[0]!.id, reverse: !fwd.length });
@@ -319,11 +319,11 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       const sid = `${qid}.${skey}`;
       const start = fl.opts.start ?? touched[0] ?? src.config.home ?? [...ctxRoutes][0];
       if (!start || !ctxRoutes.has(start)) {
-        err('UNKNOWN_ROUTE', `场景 ${sid} 的起始路径 ${start ?? '(无)'} 不存在`, fl.source);
+        err('UNKNOWN_ROUTE', `Scenario ${sid} starts at unknown route ${start ?? '(none)'}`, fl.source);
         continue;
       }
       for (const c of fl.opts.cases ?? []) {
-        if (!fdef.cases?.[c]) err('UNKNOWN_CASE', `场景 ${sid} 覆盖的情况「${c}」不在 feature.cases 中`, fl.source);
+        if (!fdef.cases?.[c]) err('UNKNOWN_CASE', `Scenario ${sid} covers case "${c}", which is not in feature.cases`, fl.source);
         else (scenarioIds[c] ??= []).push(sid);
       }
       const steps: Step[] = fl.steps.map((st: StepDef, i: number): Step => {
@@ -337,7 +337,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         const traceTargets = new Map<EffectDef, string[]>();
         for (const e of st.effects as EffectDef[]) {
           if (e.type === 'go') {
-            if (!ctxRoutes.has(e.route)) err('UNKNOWN_ROUTE', `go("${e.route}") 跳转到不存在的路径`, st.source);
+            if (!ctxRoutes.has(e.route)) err('UNKNOWN_ROUTE', `go("${e.route}") navigates to an unknown route`, st.source);
             effects.push({ type: 'navigate', sceneId: sceneOf(e.route) });
           } else if (e.type === 'uses') {
             for (const r of e.rules) {
@@ -365,12 +365,12 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         const actionTarget = 'target' in st.action ? st.action.target : null;
         for (const e of st.effects) {
           if (e.type === 'fork') {
-            if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `fork 的目标「${e.scenario}」必须是同一方案的另一个场景键`, st.source);
+            if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `Fork target "${e.scenario}" must be another scenario key in the same option`, st.source);
             else if (e.label.trim()) forks.push({ label: e.label.trim(), scenarioId: `${qid}.${e.scenario}`, at: 0 });
           }
           if (e.type === 'mark') {
             const exists = hasLayers ? layersWith(e.target).length > 0 : !!sceneAfter && !!findIn(sceneAfter.root, e.target);
-            if (!exists) err('MARK_UNKNOWN', `mark("${e.target}") 的目标不在${hasLayers ? '任何层级' : '这一步的画面'}里`, st.source);
+            if (!exists) err('MARK_UNKNOWN', `mark("${e.target}") target is not in ${hasLayers ? 'any layer' : 'the stage for this step'}`, st.source);
             else marks.push({ target: e.target, kind: e.kindOf, ...(e.note ? { note: e.note } : {}) });
           }
         }
@@ -392,7 +392,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
             const where = hasLayers ? layersWith(id) : [sceneAfter, sceneBefore].some((sc) => sc && findIn(sc.root, id)) ? [PAGE_LAYER] : [];
             if (!where.length) {
               if (fromTrace) continue; // trace 的节点已在 Diagram 里校验过；不在这一步的画面里时不移动镜头
-              err('SHOT_UNKNOWN', hasLayers ? `shot("${id}") 引用的元素不在任何层级里（层级：${Object.keys(layers).join('、')}）` : `shot("${id}") 引用的元素不在这一步的画面里（${sceneAfter?.route ?? sceneBefore?.route ?? '?'}）`, st.source);
+              err('SHOT_UNKNOWN', hasLayers ? `shot("${id}") references an element absent from all layers (layers: ${Object.keys(layers).join(', ')})` : `shot("${id}") references an element absent from this step's stage (${sceneAfter?.route ?? sceneBefore?.route ?? '?'})`, st.source);
               continue;
             }
             for (const lk of where) {
@@ -408,7 +408,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         // 换人的过渡卡（D56）：卡片后面导演切到这个人的层级（卡片淡出时已经是 TA 的画面）
         if (st.action.type === 'card' && st.action.role !== undefined) {
           const r = st.action.role;
-          if (!roleKeys.has(r)) err('ROLE_UNKNOWN', `card("${st.action.title}") 的 role「${r}」不在 feature.roles 里${roleKeys.size ? `（可用：${[...roleKeys].join('、')}）` : ''}`, st.source);
+          if (!roleKeys.has(r)) err('ROLE_UNKNOWN', `card("${st.action.title}") role "${r}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ''}`, st.source);
           else if (hasLayers && !directorLayer) directorLayer = Object.entries(layers).find(([, l]) => l.role === r)?.[0] ?? null;
         }
         const shots = [...perLayer].map(([layer, targets]) => ({ layer, targets }));
@@ -463,7 +463,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         else if (sids.length) coverage[`${fid}.${ck}`] = { status: 'expressed', scenarioIds: sids, basis: 'derived' };
         else coverage[`${fid}.${ck}`] = { status: 'missing', scenarioIds: [], reason: '尚无场景，也没有说明', basis: 'derived' };
       }
-      for (const ck of Object.keys(def.coverage ?? {})) if (!fdef.cases?.[ck]) err('UNKNOWN_CASE', `方案 ${qid} 的 coverage 声明了不存在的情况「${ck}」`, def.source);
+      for (const ck of Object.keys(def.coverage ?? {})) if (!fdef.cases?.[ck]) err('UNKNOWN_CASE', `Option ${qid} coverage declares unknown case "${ck}"`, def.source);
     }
     out.options[qid] = {
       id: qid,
@@ -484,8 +484,8 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
   if (mode === 'dev') {
     for (const r of Object.values(out.rules) as any[]) {
       if (r.origin === 'ai_assumption' && r.confirmation === 'confirmed')
-        err('ASSUMPTION_CONFIRMED', `规则「${r.text}」是 AI 假设，不能标为已确认；请改为 pending，或在用户确认后把 origin 改为 user`, r.source);
-      for (const c of r.caseIds) if (!out.cases[c]) err('UNKNOWN_CASE', `规则「${r.text}」关联了不存在的情况 ${c}`, r.source);
+        err('ASSUMPTION_CONFIRMED', `Rule "${r.text}" is an AI assumption and cannot be Confirmed; use pending, or set origin to user after user confirmation`, r.source);
+      for (const c of r.caseIds) if (!out.cases[c]) err('UNKNOWN_CASE', `Rule "${r.text}" links unknown case ${c}`, r.source);
     }
   }
 
@@ -584,26 +584,26 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
 
   const { id: rawId, when, disabled, disabledReason, unmodeled, note, __from, ...rest } = n.props as Record<string, unknown>;
   const at = n.source;
-  if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `组件 <${n.type}> 不在目录中（请使用 Mantine 同名组件，运行 joplo skill components 查看目录；目录没有的用 <Custom kind="…"> 占位）`, at);
+  if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `Component <${n.type}> is not in the catalog (use Mantine component names; run joplo skill components to list them; use <Custom kind="…"> as a placeholder for missing components)`, at);
   const interactive = INTERACTIVE_TYPES.has(n.type);
-  if (interactive && typeof rawId !== 'string') err('MISSING_ID', `可操作组件 <${n.type}>「${labelOf(n)}」必须有 id，步骤和选中都靠它定位`, at);
-  if (n.type === 'Diagram.Node' && typeof rawId !== 'string') err('MISSING_ID', `架构图节点 <Diagram.Node>「${labelOf(n)}」必须有 id，连线的 from / to 靠它`, at);
+  if (interactive && typeof rawId !== 'string') err('MISSING_ID', `Interactive component <${n.type}> "${labelOf(n)}" requires an id for steps and selection`, at);
+  if (n.type === 'Diagram.Node' && typeof rawId !== 'string') err('MISSING_ID', `Diagram node <Diagram.Node> "${labelOf(n)}" requires an id for edge from / to`, at);
   if (n.type === 'Diagram') checkDiagram(n, err);
   // 连线没写 id 时用「from->to」：⌥+单击检查与 rules 的 elements 都能引用它
   const edgeId = n.type === 'Diagram.Edge' && typeof rest.from === 'string' && typeof rest.to === 'string' ? `${rest.from}->${rest.to}` : null;
   const id = typeof rawId === 'string' ? rawId : (edgeId ?? `_${fallbackId}`);
-  if (ids.has(id)) err('DUPLICATE_ID', `同一画面中 id「${id}」重复（另一处：${rel(ids.get(id)) ?? '未知'}）`, at);
+  if (ids.has(id)) err('DUPLICATE_ID', `Duplicate id "${id}" in the same stage (other location: ${rel(ids.get(id)) ?? 'unknown'})`, at);
   ids.set(id, at);
 
   const props: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(rest)) {
     if (v === undefined) continue; // 写了属性但值是 undefined（如 description={cond ? '…' : undefined}）= 没写
     if (typeof v === 'function' && !isBind(v)) {
-      err('FUNCTION_PROP', `<${n.type}> 的属性 ${k} 是函数。行为请写在 option 的 flow 步骤里，而不是事件回调`, at);
+      err('FUNCTION_PROP', `<${n.type}> prop ${k} is a function. Put behavior in the option's flow steps instead of event callbacks`, at);
       continue;
     }
     if (isNode(v)) {
-      err('ELEMENT_PROP', `<${n.type}> 的属性 ${k} 是一个元素。属性只支持字符串、数字、布尔和对象；图标请写成字符（例如 leftSection="+"），内容请写成子节点`, at);
+      err('ELEMENT_PROP', `<${n.type}> prop ${k} is an element. Props accept only strings, numbers, booleans, and objects; use characters for icons (for example leftSection="+") and children for content`, at);
       continue;
     }
     props[k] = toPropValue(v);
@@ -638,12 +638,12 @@ function checkDiagram(d: JNode, err: ErrFn): void {
     }
   };
   walk(d.children);
-  const known = [...nodes].join('、') || '（没有节点）';
+  const known = [...nodes].join(', ') || '(no nodes)';
   for (const e of edges) {
     for (const k of ['from', 'to'] as const) {
       const v = e.props[k];
       if (typeof v !== 'string' || !nodes.has(v))
-        err('UNKNOWN_DIAGRAM_NODE', `<Diagram.Edge> 的 ${k}「${typeof v === 'string' ? v : String(v)}」不是这个 Diagram 里的节点 id（可用：${known}）`, e.source);
+        err('UNKNOWN_DIAGRAM_NODE', `<Diagram.Edge> ${k} "${typeof v === 'string' ? v : String(v)}" is not a node id in this Diagram (available: ${known})`, e.source);
     }
   }
 }

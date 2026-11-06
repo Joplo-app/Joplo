@@ -8,7 +8,7 @@
   const els = Array.from(stage.querySelectorAll('[data-jid]:not([data-jtype="#text"])'));
   const name = (el) => {
     const owner = el.closest('[data-jid]:not([data-jtype="#text"])');
-    return owner ? `「${owner.dataset.jlabel ?? ''}」(${owner.dataset.jid})` : el.closest('[data-jtoast]') ? 'Toast' : el.closest('[data-jbackdrop]') ? '弹窗遮罩' : el.tagName.toLowerCase();
+    return owner ? `"${owner.dataset.jlabel ?? ''}"(${owner.dataset.jid})` : el.closest('[data-jtoast]') ? 'Toast' : el.closest('[data-jbackdrop]') ? 'Modal backdrop' : el.tagName.toLowerCase();
   };
   const elements = els.map((el) => {
     const r = el.getBoundingClientRect();
@@ -33,7 +33,7 @@
     const cx = r.left + r.width / 2;
     const cy = r.top + r.height / 2;
     if (cx < sr.left || cx > sr.right || cy < sr.top || cy > sr.bottom) {
-      warnings.push(`超出画框：「${e.label}」(${e.id}) 的中心点不在画框内`);
+      warnings.push(`Outside frame: "${e.label}"(${e.id}) has its center outside the frame`);
       return;
     }
     // 视口小于舞台时，视口外的点 elementFromPoint 返回 null——那不是遮挡，单独汇总
@@ -45,15 +45,15 @@
     if (hit && (hit === el || el.contains(hit))) return;
     // 弹窗打开时，背景被遮罩或弹窗面板覆盖是预期的层次，不算遮挡（窄屏下面板常盖住背景按钮）
     if ((hit?.closest('[data-jbackdrop]') || (dialogOpen && hit?.closest('[role="dialog"]'))) && !el.closest('[role="dialog"]')) return;
-    warnings.push(`被遮挡：「${e.label}」(${e.id}) 的中心点被 ${hit ? name(hit) : '画框外内容'} 覆盖`);
+    warnings.push(`Occluded: "${e.label}"(${e.id}) has its center covered by ${hit ? name(hit) : 'content outside the frame'}`);
   });
 
   if (offViewport.length)
-    warnings.push(`不在视口内：视口 ${vw}×${vh} 小于舞台，${offViewport.length} 个可交互元素的中心点在视口外，未做遮挡检查（${offViewport.join(', ')}）`);
+    warnings.push(`Outside viewport: viewport ${vw}×${vh} is smaller than the stage; ${offViewport.length} interactive elements have centers outside the viewport; occlusion checks skipped (${offViewport.join(', ')})`);
 
   // 2. 标签文字溢出
   stage.querySelectorAll('[data-jtext], .jtrunc').forEach((t) => {
-    if (t.scrollWidth > t.clientWidth + 1) warnings.push(`标签文字溢出：${name(t)} 的文字「${(t.textContent ?? '').slice(0, 40)}」显示不全`);
+    if (t.scrollWidth > t.clientWidth + 1) warnings.push(`Label text overflow: ${name(t)} text "${(t.textContent ?? '').slice(0, 40)}" is clipped`);
   });
 
   // 3. Toast 等浮层（pointer-events:none，elementFromPoint 看不到）与可交互元素按几何相交检测
@@ -65,7 +65,7 @@
       if (dialogOpen && !el.closest('[role="dialog"]')) return; // 被弹窗遮罩盖住的背景本来就不可操作
       const r = el.getBoundingClientRect();
       if (!toasts.some((b) => overlap(b, r))) return;
-      warnings.push(e.id === args.nextTargetId ? `Toast 遮挡了下一步操作的目标：${name(el)}` : `Toast 覆盖了可交互元素：${name(el)}`);
+      warnings.push(e.id === args.nextTargetId ? `Toast obscures the next action target: ${name(el)}` : `Toast covers an interactive element: ${name(el)}`);
     });
   }
 
@@ -73,10 +73,10 @@
   // 主题用到手写字体时（--jp-font 含 Excalifont）检查它们已加载
   if (/Excalifont|Xiaolai/.test(getComputedStyle(stage).fontFamily)) {
     const text = stage.innerText || '中文';
-    if (!document.fonts.check('16px "Joplo Excalifont"', text) || !document.fonts.check('16px "Joplo Xiaolai"', text)) warnings.push('字体未加载：手写字体（Excalifont / Xiaolai）尚未就绪，截图可能使用了后备字体');
+    if (!document.fonts.check('16px "Joplo Excalifont"', text) || !document.fonts.check('16px "Joplo Xiaolai"', text)) warnings.push('Fonts not loaded: Hand-drawn fonts (Excalifont / Xiaolai) are not ready; the screenshot may use fallback fonts');
   }
   const failed = Array.from(document.fonts).filter((f) => f.status === 'error');
-  if (failed.length) warnings.push(`字体未加载：${failed.length} 个字体文件加载失败（${failed[0].family}）`);
+  if (failed.length) warnings.push(`Fonts not loaded: ${failed.length} font files failed to load (${failed[0].family})`);
 
   return { elements, warnings };
 }

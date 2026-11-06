@@ -14,6 +14,7 @@ import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
@@ -196,6 +197,12 @@ function textFiles(dir) {
   return out;
 }
 
+export function addSmokeClassName(source) {
+  const anchor = /<Title\b(?=[^>]*\bid="welcome")([^>]*)>/g;
+  if ([...source.matchAll(anchor)].length !== 1) throw new Error('Expected one Title with id="welcome"');
+  return source.replace(anchor, '<Title$1 className="tracking-[0.137em]">');
+}
+
 async function smoke() {
   const t0 = Date.now();
   const { version: v, tarballs } = pack();
@@ -203,7 +210,7 @@ async function smoke() {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-smoke-')));
   assert(!base.startsWith(REPO), '临时目录必须在仓库之外');
   const npm = 'npm';
-  const npmFlags = ['--no-audit', '--no-fund', '--prefer-offline', '--loglevel=error'];
+  const npmFlags = ['--no-audit', '--no-fund', has('--offline') ? '--offline' : '--prefer-offline', '--loglevel=error'];
   const overrides = Object.fromEntries(Object.entries(tgz).filter(([n]) => n !== 'joplo'));
   log(`\n— 冒烟：${base}`);
 
@@ -221,13 +228,13 @@ async function smoke() {
     const oldNode = path.join(base, 'old-node.cjs');
     fs.writeFileSync(oldNode, "Object.defineProperty(process.versions, 'node', { value: '20.11.0', configurable: true, enumerable: true });\n");
     const old = sh(process.execPath, ['-r', oldNode, fs.realpathSync(npxJoplo), 'init', 'x'], base, { expect: 1 });
-    assert(old.stderr.includes('Joplo 需要 Node.js 22 或更高版本，当前是 20.11.0'), `Node 版本提示：${old.stderr}`);
+    assert(old.stderr.includes('Joplo requires Node.js 22 or later; current version is 20.11.0'), `Node 版本提示：${old.stderr}`);
 
     // 2. init
     const ua = { npm_config_user_agent: `npm/11.0.0 node/${process.version} ${process.platform} ${process.arch} workspaces/false` };
     const init = sh(npxJoplo, ['init', 'my-demo'], base, { env: ua });
     const lastLine = init.stdout.trim().split('\n').at(-1);
-    assert(lastLine === '下一步：cd my-demo && npm install && npx joplo dev', `init 最后一行：${lastLine}`);
+    assert(lastLine === 'Next: cd my-demo && npm install && npx joplo dev', `init 最后一行：${lastLine}`);
     const project = path.join(base, 'my-demo');
     const pkg = readJson(path.join(project, 'package.json'));
     assert(pkg.devDependencies?.joplo === v && pkg.devDependencies?.['@joplo-app/kit'] === v, `init 应写入精确版本 ${v}：${JSON.stringify(pkg.devDependencies)}`);
@@ -236,7 +243,7 @@ async function smoke() {
 
     // 作者 className：Tailwind 要编译它
     const pageFile = path.join(project, 'routes/page.tsx');
-    fs.writeFileSync(pageFile, fs.readFileSync(pageFile, 'utf8').replace('<Title order={2}>开始设计</Title>', '<Title order={2} className="tracking-[0.137em]">开始设计</Title>'));
+    fs.writeFileSync(pageFile, addSmokeClassName(fs.readFileSync(pageFile, 'utf8')));
 
     // 3. npm install：registry 上还没有这些版本，改用 tarball（版本号已在上面断言）
     pkg.devDependencies = { joplo: tgz.joplo, '@joplo-app/kit': tgz['@joplo-app/kit'] };
@@ -272,12 +279,12 @@ async function smoke() {
     const html = fs.readFileSync(index, 'utf8');
     assert(html.includes('id="joplo-ir"') && html.includes('<script type="module">'), '发布站应内联 IR 与入口脚本');
     const css = fs.readdirSync(path.join(project, 'dist/assets')).filter((f) => f.endsWith('.css')).map((f) => fs.readFileSync(path.join(project, 'dist/assets', f), 'utf8')).join('\n');
-    assert(css.includes('.137em'), '发布站 CSS 应包含作者 className（tracking-[0.137em]）');
+    assert(/letter-spacing:\s*0?\.137em(?:[;}])/.test(css), '发布站 CSS 应包含作者 className（tracking-[0.137em]）');
     assert(fs.readdirSync(path.join(project, 'dist/assets')).some((f) => f.endsWith('.woff2')), '发布站应带手绘字体');
 
     // 7. render：没有 Playwright 时只有 render 失败，并给出安装命令
     const render = sh(joplo, ['render', '--scenario-id', 'example.a.happy', '--out', 'shot.png'], project, { expect: 1 });
-    assert(render.out.includes('npx playwright install chromium') && render.out.includes('dev、check、build 不需要它'), `render 提示：${render.out}`);
+    assert(render.out.includes('npx playwright install chromium') && render.out.includes('dev, check, and build do not require it'), `render 提示：${render.out}`);
 
     // 8. dev：随机端口，GET / 返回看板 HTML；选中一个元素，随后 selection 读出 文件:行
     const port = await freePort();
@@ -298,7 +305,7 @@ async function smoke() {
       const home = await request(port, { path: '/' });
       served.push(home.text);
       assert(home.status === 200, `GET / 返回 ${home.status}`);
-      assert(home.text.includes('<title>Joplo · 看板</title>') && home.text.includes('<div id="root">'), 'GET / 应是看板 HTML');
+      assert(/<title>Joplo[^<]*<\/title>/.test(home.text) && home.text.includes('<div id="root">'), 'GET / 应是看板 HTML');
       assert(!home.text.includes('__JOPLO_TOKEN__'), '看板 HTML 应注入本地令牌');
       assert(home.text.includes('createHotContext'), 'dist 看板应注入 HMR 句柄');
       const token = /name="joplo-token" content="([^"]+)"/.exec(home.text)?.[1];
@@ -309,7 +316,7 @@ async function smoke() {
       const cssPath = /import "(\/@fs\/[^"]+project\.css)"/.exec(home.text)?.[1];
       assert(cssPath, '看板 HTML 应导入 project.css');
       const projectCss = await request(port, { path: cssPath });
-      assert(projectCss.status === 200 && projectCss.text.includes('.137em'), `project.css 应包含作者 className（${projectCss.status}）`);
+      assert(projectCss.status === 200 && /letter-spacing:\s*0?\.137em(?:[;}])/.test(projectCss.text), `project.css 应包含作者 className（${projectCss.status}）`);
       served.push(projectCss.text);
       const listed = JSON.parse((await request(port, { path: '/__joplo/projects' })).text).projects;
       assert(listed.length === 1 && listed[0].dir === fs.realpathSync(project), `首页项目列表：${JSON.stringify(listed)}`);
@@ -341,7 +348,7 @@ async function smoke() {
         await new Promise((r) => setTimeout(r, 100));
       }
       const hotCss = await request(port, { path: cssPath });
-      assert(hotCss.text.includes('.211em'), '热更新后 project.css 应包含新的 className');
+      assert(/letter-spacing:\s*0?\.211em(?:[;}])/.test(hotCss.text), '热更新后 project.css 应包含新的 className');
       log(`  ✓ 热更新：IR 重新编译，新 className 已编译（${Date.now() - tHot} ms）`);
 
       // 一个进程、多个项目（D39）：在另一个目录再运行 joplo dev → 注册到已运行的看板并退出（不启动第二个进程）
@@ -350,7 +357,7 @@ async function smoke() {
       const t2 = Date.now();
       const again = sh(joplo, ['dev', '--port', String(await freePort())], second, { env: { JOPLO_HOME: joploHome }, timeout: 30000 });
       assert(again.stdout.includes(`http://127.0.0.1:${port}/#/`), `第二次 joplo dev 应输出已运行看板的链接：${again.out}`);
-      assert(again.out.includes('已加入正在运行的看板'), `第二次 joplo dev 应说明已加入：${again.out}`);
+      assert(again.out.includes('Joined the running board'), `第二次 joplo dev 应说明已加入：${again.out}`);
       const both = JSON.parse((await request(port, { path: '/__joplo/projects' })).text).projects.map((p) => p.dir).sort();
       assert(both.length === 2 && both.includes(fs.realpathSync(second)), `首页应有两个项目：${JSON.stringify(both)}`);
       log(`  ✓ 再次 joplo dev：加入同一个看板（端口 ${port}）后退出，首页有 2 个项目（${Date.now() - t2} ms）`);
@@ -432,6 +439,7 @@ async function publish(tag) {
 
 // ---------------------------------------------------------------- main
 
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
 const cmd = args.shift();
 if (cmd === 'version') {
   const root = path.resolve(flag('--root') ?? REPO);
@@ -440,3 +448,4 @@ if (cmd === 'version') {
 else if (cmd === 'smoke') await smoke();
 else if (cmd === 'publish') await publish(flag('--tag') ?? 'beta');
 else die('用法：node scripts/release.mjs version <版本> | pack | smoke [--keep] | publish [--tag beta]');
+}

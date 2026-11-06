@@ -50,7 +50,7 @@ describe('locateWebAssets / readWebDist', () => {
   it('缺少预构建资源时明确失败，并说明怎么修复', () => {
     const web = fakeWebPackage(false);
     expect(() => readWebDist(web)).toThrow(JoploError);
-    expect(() => readWebDist(web)).toThrow(/预构建资源.*重新安装/);
+    expect(() => readWebDist(web)).toThrow(/prebuilt assets.*Reinstall/);
   });
 
   it('清单里的文件缺失、或清单路径越出包目录时拒绝', () => {
@@ -96,7 +96,7 @@ describe('Playwright 可选', () => {
     expect(e.code).toBe('RENDER_FAILED');
     expect(e.message).toContain('npm i -D playwright');
     expect(e.message).toContain('npx playwright install chromium');
-    expect(e.message).toContain('dev、check、build 不需要它');
+    expect(e.message).toContain('dev, check, and build do not require it');
   });
 
   it('其他载入错误原样抛出（不误报为“未安装”）', async () => {
@@ -109,7 +109,7 @@ describe('Playwright 可选', () => {
   it('浏览器启动失败的提示包含 npx playwright install chromium', () => {
     const m = launchHint(new Error("Executable doesn't exist at /x/chrome\nmore"));
     expect(m).toContain('npx playwright install chromium');
-    expect(m).toContain('dev、check、build 不需要它');
+    expect(m).toContain('dev, check, and build do not require it');
     expect(m).not.toContain('\n');
   });
 });

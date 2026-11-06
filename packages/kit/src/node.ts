@@ -25,7 +25,7 @@ export type ComponentMarker = ((props: Record<string, unknown>) => never) & { re
 
 export function component(name: string): ComponentMarker {
   const fn = (() => {
-    throw new Error(`${name} 是 Joplo 组件标记，只能在 JSX 中使用`);
+    throw new Error(`${name} is a Joplo component marker and can only be used in JSX`);
   }) as unknown as ComponentMarker;
   Object.defineProperty(fn, COMPONENT, { value: name });
   Object.defineProperty(fn, 'displayName', { value: name });
@@ -62,7 +62,7 @@ export function createNode(type: unknown, rawProps: Record<string, unknown> | nu
     }
     return mk('#fragment', {}, out as JChild, src);
   }
-  throw new Error(`不支持的 JSX 类型：${String(type)}`);
+  throw new Error(`Unsupported JSX type: ${String(type)}`);
 }
 
 function mk(type: string, props: Record<string, unknown>, children: JChild | undefined, source: string | undefined): JNode {

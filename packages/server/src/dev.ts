@@ -84,7 +84,7 @@ function readBody(req: http.IncomingMessage): Promise<{ tooLarge: true } | { too
       size += c.length;
       if (size > MAX_BODY * 16) {
         req.destroy();
-        reject(new Error('请求体过大'));
+        reject(new Error('Request body is too large'));
       } else if (size <= MAX_BODY) chunks.push(c);
     });
     req.on('end', () => resolve(size > MAX_BODY ? { tooLarge: true } : { tooLarge: false, text: Buffer.concat(chunks).toString('utf8') }));
@@ -269,7 +269,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     const prev = slot.payload;
     slot.payload = { version: prev.version + 1, ok: out.project !== null, project: out.project ?? prev.project, diagnostics: out.diagnostics, home: out.home ?? prev.home };
     const errors = out.diagnostics.filter((d) => d.severity === 'error');
-    if (errors.length) log(`[joplo] ${path.basename(slot.dir)} 编译出错（${errors.length}）：${errors.map((d) => `${d.at ?? ''} ${d.message}`).join('；').slice(0, 400)}`);
+    if (errors.length) log(`[joplo] ${path.basename(slot.dir)} compilation failed (${errors.length}): ${errors.map((d) => `${d.at ?? ''} ${d.message}`).join('; ').slice(0, 400)}`);
     if (out.project && out.project.name) registry.rename(slot.dir, out.project.name);
     if (!closed) server?.ws.send({ type: 'custom', event: IR_EVENT, data: { projectId: slot.id, ...slot.payload } });
     broadcastProjects();
@@ -289,7 +289,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
         try {
           await recompile(slot);
         } catch (e) {
-          log(`[joplo] 编译异常：${e instanceof Error ? e.message : String(e)}`);
+          log(`[joplo] Compilation exception: ${e instanceof Error ? e.message : String(e)}`);
         }
       } while (slot.dirty && !slot.closed);
     })().finally(() => {
@@ -320,7 +320,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       await startLoader(slot);
       if (watch && server) server.watcher.add(dir);
       await run(slot);
-    })().catch((e) => log(`[joplo] 项目启动失败：${e instanceof Error ? e.message : String(e)}`));
+    })().catch((e) => log(`[joplo] Project startup failed: ${e instanceof Error ? e.message : String(e)}`));
     invalidateCss();
     return slot;
   }
@@ -348,8 +348,8 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     let slot = slots.get(id);
     if (!slot) {
       const rec = recordOf(id);
-      if (!rec) throw new JoploError('NOT_FOUND', `没有这个项目：${id}`);
-      if (!fs.existsSync(rec.dir)) throw new JoploError('NOT_FOUND', `找不到项目目录：${rec.dir}`);
+      if (!rec) throw new JoploError('NOT_FOUND', `Unknown project: ${id}`);
+      if (!fs.existsSync(rec.dir)) throw new JoploError('NOT_FOUND', `Project directory not found: ${rec.dir}`);
       slot = activate(rec.dir);
     }
     await slot.ready;
@@ -358,7 +358,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
 
   function addProject(dirIn: string, o: { compile?: boolean } = {}) {
     const dir = realProjectDir(dirIn);
-    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new JoploError('NOT_FOUND', `项目目录不存在：${dir}`);
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new JoploError('NOT_FOUND', `Project directory does not exist: ${dir}`);
     const id = projectIdOf(dir);
     const prev = registry.list().find((r) => r.dir === dir);
     registry.touch(dir, prev?.name);
@@ -379,19 +379,19 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   /** 写接口：Origin（有则必须是看板自己）、令牌、Content-Type。返回 false 表示已拒绝。 */
   const guardWrite = (req: http.IncomingMessage, res: http.ServerResponse, tokenStatus = 403, needJson = true): boolean => {
     const origin = req.headers.origin;
-    if (origin !== undefined && !allowedOrigins().has(origin)) return deny(res, 403, `Origin 不被允许：${origin}`), false;
+    if (origin !== undefined && !allowedOrigins().has(origin)) return deny(res, 403, `Origin is not allowed: ${origin}`), false;
     const t = req.headers['x-joplo-token'];
-    if (typeof t !== 'string' || !safeEqual(t, token)) return deny(res, tokenStatus, '缺少或错误的本地令牌（x-joplo-token）'), false;
-    if (needJson && !isJsonContentType(req.headers['content-type'])) return sendJson(res, 415, { error: { code: 'USAGE', message: 'Content-Type 必须是 application/json' } }), false;
+    if (typeof t !== 'string' || !safeEqual(t, token)) return deny(res, tokenStatus, 'Missing or invalid local token (x-joplo-token)'), false;
+    if (needJson && !isJsonContentType(req.headers['content-type'])) return sendJson(res, 415, { error: { code: 'USAGE', message: 'Content-Type must be application/json' } }), false;
     return true;
   };
   const jsonBody = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<{ ok: true; body: unknown } | { ok: false }> => {
     const raw = await readBody(req);
-    if (raw.tooLarge) return sendJson(res, 413, { error: { code: 'USAGE', message: `请求体过大（上限 ${MAX_BODY} 字节）` } }), { ok: false };
+    if (raw.tooLarge) return sendJson(res, 413, { error: { code: 'USAGE', message: `Request body is too large (limit: ${MAX_BODY} bytes)` } }), { ok: false };
     try {
       return { ok: true, body: JSON.parse(raw.text) };
     } catch (e) {
-      return sendJson(res, 400, { error: { code: 'USAGE', message: `请求体不是合法 JSON：${e instanceof Error ? e.message : String(e)}` } }), { ok: false };
+      return sendJson(res, 400, { error: { code: 'USAGE', message: `Request body is not valid JSON: ${e instanceof Error ? e.message : String(e)}` } }), { ok: false };
     }
   };
   const fail = (res: http.ServerResponse, e: unknown) => {
@@ -415,18 +415,18 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       const b = await jsonBody(req, res);
       if (!b.ok) return;
       const parsed = SelectionBody.safeParse(b.body);
-      if (!parsed.success) return sendJson(res, 400, { error: { code: 'USAGE', message: '选中内容格式不正确', issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) } });
+      if (!parsed.success) return sendJson(res, 400, { error: { code: 'USAGE', message: 'Invalid selection format', issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) } });
       const slot = await ensure(id);
       if (parsed.data.selection === null) {
         writeSelection(slot.dir, null);
         return sendJson(res, 200, { ok: true, selection: null });
       }
       const project = slot.payload.project;
-      const r = project ? resolveSelection(project, parsed.data.selection) : { ok: false as const, problem: '项目还没有成功编译过' };
+      const r = project ? resolveSelection(project, parsed.data.selection) : { ok: false as const, problem: 'The project has not compiled successfully yet' };
       if (!r.ok) {
         // 不变量：被拒绝时文件写为 null（不能保留旧选中而界面显示新选中）
         writeSelection(slot.dir, null);
-        return sendJson(res, 409, { error: { code: 'INVALID_REFERENCE', message: `选中与当前项目不符：${r.problem}` }, current: null });
+        return sendJson(res, 409, { error: { code: 'INVALID_REFERENCE', message: `Selection does not match the current project: ${r.problem}` }, current: null });
       }
       writeSelection(slot.dir, r.selection);
       return sendJson(res, 200, { ok: true, selection: r.selection });
@@ -438,9 +438,9 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       const slot = await ensure(id);
       const at = (b.body as { at?: unknown })?.at;
       const m = typeof at === 'string' ? /^(.+?):(\d+)(?::(\d+))?$/.exec(at) : null;
-      if (!m) return sendJson(res, 400, { error: { code: 'USAGE', message: 'at 应为 文件:行[:列]' } });
+      if (!m) return sendJson(res, 400, { error: { code: 'USAGE', message: 'at must be file:line[:column]' } });
       const file = path.resolve(slot.dir, m[1]!);
-      if (!isProjectSource(slot.dir, file) || !fs.existsSync(file)) return sendJson(res, 400, { error: { code: 'USAGE', message: `不是项目里的源文件：${m[1]}` } });
+      if (!isProjectSource(slot.dir, file) || !fs.existsSync(file)) return sendJson(res, 400, { error: { code: 'USAGE', message: `Not a project source file: ${m[1]}` } });
       // 交给 Vite 自带的 launch-editor（按 LAUNCH_EDITOR / EDITOR 或正在运行的编辑器打开）
       (req as { __joploOpen?: boolean }).__joploOpen = true;
       req.url = `/__open-in-editor?file=${encodeURIComponent(`${file}:${m[2]}:${m[3] ?? 1}`)}`;
@@ -451,7 +451,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       const slot = await ensure(id);
       return exportsHub.handle(rest.slice('export/'.length), req, res, { projectId: id, dir: slot.dir, project: slot.payload.project, guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), fail: (e) => fail(res, e) });
     }
-    return sendJson(res, 404, { error: { code: 'NOT_FOUND', message: `没有这个接口：${method} /__joplo/p/${id}/${rest}` } });
+    return sendJson(res, 404, { error: { code: 'NOT_FOUND', message: `Unknown endpoint: ${method} /__joplo/p/${id}/${rest}` } });
   }
 
   const boardPlugin: Plugin = {
@@ -460,11 +460,11 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       srv.middlewares.use(async (req, res, next) => {
         try {
           const host = req.headers.host ?? '';
-          if (!allowedHosts().has(host)) return deny(res, 403, `Host 头不被允许：${host || '(空)'}`);
+          if (!allowedHosts().has(host)) return deny(res, 403, `Host header is not allowed: ${host || '(empty)'}`);
           const url = new URL(req.url ?? '/', `http://127.0.0.1:${actualPort}`);
           if (web.mode === 'dist' && (req.method === 'GET' || req.method === 'HEAD') && serveDistAsset(web, url.pathname, res)) return;
           // Vite 的打开编辑器中间件只能经由 /__joplo/p/<id>/open（校验令牌与路径）进入
-          if (url.pathname === '/__open-in-editor') return (req as { __joploOpen?: boolean }).__joploOpen ? next() : deny(res, 403, '请通过看板的“在编辑器中打开”');
+          if (url.pathname === '/__open-in-editor') return (req as { __joploOpen?: boolean }).__joploOpen ? next() : deny(res, 403, 'Use Open in editor in the board');
           if (!url.pathname.startsWith('/__joplo/')) return next();
           const method = req.method ?? 'GET';
           if (url.pathname === '/__joplo/ping' && method === 'GET') return sendJson(res, 200, { joplo: true, pid: process.pid });
@@ -484,7 +484,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
             const b = await jsonBody(req, res);
             if (!b.ok) return;
             const dir = (b.body as { dir?: unknown })?.dir;
-            if (typeof dir !== 'string' || !path.isAbsolute(dir)) return sendJson(res, 400, { error: { code: 'USAGE', message: 'dir 必须是项目目录的绝对路径' } });
+            if (typeof dir !== 'string' || !path.isAbsolute(dir)) return sendJson(res, 400, { error: { code: 'USAGE', message: 'dir must be an absolute path to the project directory' } });
             const r = addProject(dir);
             return sendJson(res, 200, { id: r.id, url: r.url });
           }
@@ -493,7 +493,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
             if (!guardWrite(req, res, 403, false)) return;
             const id = decodeURIComponent(del[1]!);
             const rec = recordOf(id);
-            if (!rec) return sendJson(res, 404, { error: { code: 'NOT_FOUND', message: `没有这个项目：${id}` } });
+            if (!rec) return sendJson(res, 404, { error: { code: 'NOT_FOUND', message: `Unknown project: ${id}` } });
             const slot = slots.get(id);
             if (slot) await deactivate(slot);
             registry.remove(rec.dir); // 只删记录，不碰项目目录
@@ -506,7 +506,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
             if (r === 'next') return next();
             return;
           }
-          return sendJson(res, 404, { error: { code: 'NOT_FOUND', message: `没有这个接口：${method} ${url.pathname}` } });
+          return sendJson(res, 404, { error: { code: 'NOT_FOUND', message: `Unknown endpoint: ${method} ${url.pathname}` } });
         } catch (e) {
           if (!res.headersSent) fail(res, e);
           else res.end();
@@ -559,7 +559,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   } catch (e) {
     await server.close().catch(() => undefined);
     const err = e as NodeJS.ErrnoException;
-    if (err.code === 'EADDRINUSE' || /already in use/i.test(err.message ?? '')) throw new JoploError('USAGE', `端口 ${port} 已被占用，请换一个端口（--port），或先关闭占用它的进程`, { details: { code: 'EADDRINUSE' } });
+    if (err.code === 'EADDRINUSE' || /already in use/i.test(err.message ?? '')) throw new JoploError('USAGE', `Port ${port} is already in use; choose another port (--port), or stop the process using it`, { details: { code: 'EADDRINUSE' } });
     throw e;
   }
   const addr = server.httpServer?.address();
@@ -648,8 +648,8 @@ export async function attachToRunning(home: string, projectDir: string, log: (s:
     signal: AbortSignal.timeout(10000),
   });
   const body = (await res.json().catch(() => null)) as { url?: string; error?: { message?: string } } | null;
-  if (!res.ok || !body?.url) throw new JoploError('UNSUPPORTED_ACTION', `无法把项目加入正在运行的看板（${base}，pid ${info.pid}）：${body?.error?.message ?? `HTTP ${res.status}`}`);
-  log(`[joplo] 已加入正在运行的看板（pid ${info.pid}）`);
+  if (!res.ok || !body?.url) throw new JoploError('UNSUPPORTED_ACTION', `Cannot add the project to the running board (${base}, pid ${info.pid}): ${body?.error?.message ?? `HTTP ${res.status}`}`);
+  log(`[joplo] Joined the running board (pid ${info.pid})`);
   return { url: body.url, port: info.port };
 }
 
@@ -659,7 +659,7 @@ function openBrowser(url: string, log: (s: string) => void) {
   try {
     spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
   } catch {
-    log(`[joplo] 无法自动打开浏览器，请手动访问 ${url}`);
+    log(`[joplo] Cannot open the browser automatically; visit ${url}`);
   }
 }
 
@@ -671,7 +671,7 @@ export async function startDev(opts: DevOptions & { home?: string; exportDeps?: 
   const log = opts.log ?? ((m: string) => process.stderr.write(m + '\n'));
   const home = opts.home ?? joploHome();
   const projectDir = realProjectDir(opts.projectDir);
-  if (!fs.existsSync(projectDir)) throw new JoploError('NOT_FOUND', `项目目录不存在：${projectDir}`);
+  if (!fs.existsSync(projectDir)) throw new JoploError('NOT_FOUND', `Project directory does not exist: ${projectDir}`);
   const attach = async () => {
     const a = await attachToRunning(home, projectDir, log);
     if (!a) return null;

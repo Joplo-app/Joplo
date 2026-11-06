@@ -35,7 +35,7 @@ const REPO_WEB = path.resolve(import.meta.dirname, '../../web');
 const REPO_KIT = path.resolve(import.meta.dirname, '../../kit/src');
 
 const broken = (webDir: string, what: string) =>
-  new JoploError('NOT_FOUND', `@joplo-app/web（${webDir}）缺少预构建资源：${what}。请重新安装 joplo（npm install），或在 Joplo 仓库里运行 pnpm --filter @joplo-app/web build`);
+  new JoploError('NOT_FOUND', `@joplo-app/web (${webDir}) is missing prebuilt assets: ${what}. Reinstall joplo (npm install), or run pnpm --filter @joplo-app/web build in the Joplo repository`);
 
 /** 读取并校验 @joplo-app/web 的 dist/manifest.json。 */
 export function readWebDist(webDir: string): DistWeb {
@@ -47,11 +47,11 @@ export function readWebDist(webDir: string): DistWeb {
   } catch {
     throw broken(webDir, 'dist/manifest.json');
   }
-  if (manifest.format !== 1) throw broken(webDir, `不认识的清单格式 ${String(manifest.format)}`);
+  if (manifest.format !== 1) throw broken(webDir, `Unknown manifest format ${String(manifest.format)}`);
   const inside = (rel: unknown, label: string) => {
     if (typeof rel !== 'string' || !rel) throw broken(webDir, label);
     const abs = path.resolve(dist, rel);
-    if (abs !== dist && !abs.startsWith(dist + path.sep)) throw broken(webDir, `${label} 越出了 dist/`);
+    if (abs !== dist && !abs.startsWith(dist + path.sep)) throw broken(webDir, `${label} escapes dist/`);
     if (!fs.existsSync(abs)) throw broken(webDir, `dist/${rel}`);
     return abs;
   };
@@ -64,10 +64,10 @@ export function readWebDist(webDir: string): DistWeb {
     siteFiles = JSON.parse(fs.readFileSync(inside(manifest.siteFiles, 'siteFiles'), 'utf8'));
   } catch (e) {
     if (e instanceof JoploError) throw e;
-    throw broken(webDir, 'site-files.json 不是合法 JSON');
+    throw broken(webDir, 'site-files.json is not valid JSON');
   }
   if (!Array.isArray(siteFiles) || !siteFiles.every((f) => typeof f === 'string' && f && !path.isAbsolute(f) && !f.split(/[\\/]/).includes('..')))
-    throw broken(webDir, 'site-files.json 应为 appDir 内的相对路径列表');
+    throw broken(webDir, 'site-files.json must be a list of relative paths within appDir');
   return { mode: 'dist', webDir, appDir, siteFiles, projectCss, version: typeof manifest.version === 'string' ? manifest.version : '' };
 }
 
@@ -84,7 +84,7 @@ export function locateWebAssets(env?: Record<string, string | undefined>): WebAs
     try {
       pkg = require.resolve('@joplo-app/web/package.json');
     } catch {
-      throw new JoploError('NOT_FOUND', '找不到 @joplo-app/web（看板与发布站资源）。请重新安装 joplo（npm install）');
+      throw new JoploError('NOT_FOUND', 'Cannot find @joplo-app/web (board and published site assets). Reinstall joplo (npm install)');
     }
     out = readWebDist(path.dirname(fs.realpathSync(pkg)));
   }
@@ -129,7 +129,7 @@ export function kitAliases(web: WebAssets, projectDir: string): Alias[] {
   if (findPackageJson(projectDir, '@joplo-app/kit')) return [];
   const main = fileURLToPath(import.meta.resolve('@joplo-app/kit'));
   const sub = fileURLToPath(import.meta.resolve(`@joplo-app/kit/${KIT_SUBPATHS[0]}`));
-  if (path.dirname(main) !== path.dirname(sub)) throw new JoploError('NOT_FOUND', `@joplo-app/kit 的入口不在同一目录：${main}、${sub}`);
+  if (path.dirname(main) !== path.dirname(sub)) throw new JoploError('NOT_FOUND', `@joplo-app/kit entry points are not in the same directory: ${main}, ${sub}`);
   const ext = path.extname(main);
   return [
     { find: /^@joplo-app\/kit$/, replacement: main },
