@@ -98,6 +98,14 @@ describe('角色 role()', () => {
     expect(roleOf(p, 'f.a', 'nobody')).toBeNull();
   });
 
+  it('发布站 IR 缺 feature.roles 时（0.2.4/0.2.5 的发布产物）roleOf 不崩，返回 null', () => {
+    const p = structuredClone(build().dev.project!);
+    delete (p.features.f as { roles?: unknown }).roles;
+    expect(() => roleOf(p, 'f.a', 'ajie')).not.toThrow();
+    expect(roleOf(p, 'f.a', 'ajie')).toBeNull();
+    expect(roleOfScene(p, p.options['f.a']!.layers.ajie!.sceneId)).toBeNull();
+  });
+
   it('旧写法（名字数组）仍可编译，但不能被引用：引用时报 ROLE_UNKNOWN', () => {
     const { dev } = build({ roles: ['小雨', '阿杰'] });
     expect(errors(dev).map((d) => d.code)).toContain('ROLE_UNKNOWN');

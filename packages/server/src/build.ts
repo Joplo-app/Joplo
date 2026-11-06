@@ -26,10 +26,10 @@ import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from 
 import type { DistWeb, SourceWeb } from './web-assets.ts';
 import { subsetSiteFonts } from './site-fonts.ts';
 
-/** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。层级、镜头与 featureIds 顺序属于演示，保留（D43 / D61）。 */
+/** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。层级、镜头、角色（说话人、过渡卡、层级的 role）与 featureIds 顺序属于演示，保留（D43 / D56 / D61）。 */
 export function publishPayload(project: Project, home: string | null): { project: Record<string, unknown>; home: string | null } {
   const { rules: _r, cases: _c, issues: _i, ...rest } = project;
-  const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, { id: f.id, name: f.name, goal: f.goal, optionIds: f.optionIds, pick: f.pick }]));
+  const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, { id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick }]));
   const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {} }]));
   const scenarios = Object.fromEntries(
     Object.entries(project.scenarios).map(([id, s]) => {

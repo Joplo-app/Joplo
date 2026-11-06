@@ -3,9 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildSite, finalizeHtml, jsonForHtml } from '../src/build.ts';
+import { buildSite, finalizeHtml, jsonForHtml, publishPayload } from '../src/build.ts';
 import { renderStep } from '../src/render.ts';
 import { compileProject } from '../src/project.ts';
+import { Project as ProjectSchema } from '@joplo-app/core';
 import { joploProjectPlugin, kitAliases, locateWebAssets } from '../src/vite-shared.ts';
 import { createServer } from 'vite';
 
@@ -150,6 +151,63 @@ describe('评审版构建（review: true，D63）', () => {
     expect(text).toContain('joplo-ir');
     for (const s of secrets) expect(text, s).not.toContain(s);
   }, 120_000);
+});
+
+describe('publishPayload', () => {
+  it('保留 feature.roles：角色属于演示（说话人、过渡卡、层级角色），播放器按层级的 role 查找它', () => {
+    const roles = [{ id: 'xiaoyu', name: '小雨', desc: '发起人', color: '#e8a33d' }];
+    const project = {
+      features: { f: { id: 'f', name: 'F', goal: 'G', roles, constraints: [{ id: 'c', text: '创作侧', hard: false }], caseIds: ['f.x'], optionIds: ['f.a'], pick: 'f.a' } },
+      featureIds: ['f'],
+      options: { 'f.a': { id: 'f.a', featureId: 'f', key: 'a', name: 'A', idea: 'I', routes: [], coverage: {}, layers: { me: { title: '我', sceneId: 'f.a~me', role: 'xiaoyu' } } } },
+      scenarios: {},
+      routes: {},
+      rules: {},
+      cases: {},
+      issues: {},
+    } as unknown as Parameters<typeof publishPayload>[0];
+    const out = publishPayload(project, null).project as { features: Record<string, Record<string, unknown>> };
+    expect(out.features.f!.roles).toEqual(roles);
+    expect(out.features.f).not.toHaveProperty('constraints');
+    expect(out.features.f).not.toHaveProperty('caseIds');
+  });
+});
+
+/**
+ * 发布产物必须是完整的 IR：用 schema 重新解析后，只允许缺“有意去掉的创作侧字段”。
+ * 播放器读的是发布站内联的原始 JSON（不经 schema 补默认值），任何被顺手裁掉的演示字段都会让它在线上崩溃，
+ * 而本地看板读完整的 dev IR 看不出来（2026-11-06：feature.roles 被裁掉，所有带角色的分享一播放就白屏）。
+ */
+// 顶层的 rules / cases / issues 与 feature / option 上的这些字段是创作侧信息，有意不进发布站（D33）。
+const STRIPPED_FOR_PUBLISH = new Set(['rules', 'cases', 'issues', 'constraints', 'caseIds', 'decisionFocus', 'tradeoffs']);
+function missingPaths(full: unknown, partial: unknown, at = ''): string[] {
+  if (!full || typeof full !== 'object' || Array.isArray(full)) return [];
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(full as Record<string, unknown>)) {
+    const p = partial as Record<string, unknown> | undefined;
+    if (!p || !(k in p)) out.push(`${at}.${k}`);
+    else out.push(...missingPaths(v, p[k], `${at}.${k}`));
+  }
+  return out;
+}
+describe('发布产物是完整的 IR（只缺有意去掉的创作侧字段）', () => {
+  for (const name of ['camping', 'agent-arch', 'invite']) {
+    it(`examples/${name}`, async () => {
+      const dir = path.resolve(import.meta.dirname, '../../../examples', name);
+      const web = locateWebAssets();
+      const loader = await createServer({ configFile: false, envDir: false, root: dir, logLevel: 'error', appType: 'custom', resolve: { alias: kitAliases(web, dir) }, plugins: [joploProjectPlugin(dir, web)], server: { middlewareMode: true, hmr: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] } });
+      let compiled;
+      try {
+        compiled = (await compileProject(loader, dir, 'publish')).project!;
+      } finally {
+        await loader.close();
+      }
+      const payload = JSON.parse(JSON.stringify(publishPayload(compiled, null).project));
+      const reparsed = ProjectSchema.parse(payload);
+      const missing = missingPaths(reparsed, payload).filter((p) => !STRIPPED_FOR_PUBLISH.has(p.split('.').pop()!));
+      expect(missing).toEqual([]);
+    }, 120_000);
+  }
 });
 
 describe('finalizeHtml', () => {

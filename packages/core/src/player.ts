@@ -608,7 +608,7 @@ export function cardAt(project: Project, scenarioId: string | null | undefined, 
 export function roleOf(project: Project, optionId: string | null | undefined, roleId: string | null | undefined): RoleInfo | null {
   if (!optionId || !roleId) return null;
   const opt = project.options[optionId];
-  const r = opt ? project.features[opt.featureId]?.roles.find((x) => x.id === roleId) : undefined;
+  const r = opt ? project.features[opt.featureId]?.roles?.find((x) => x.id === roleId) : undefined;
   return r && r.id ? { id: r.id, name: r.name, desc: r.desc, color: r.color } : null;
 }
 
