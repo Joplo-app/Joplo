@@ -89,9 +89,9 @@ const TYPE_ZH = (i18n: BoardMessages = boardEnglish): Record<string, string> => 
   Loader: i18n.board.loader,
   ChatMessage: i18n.board.chatMessage,
   ToolCall: i18n.board.toolCall,
-  Email: '邮件',
-  DataCard: '数据卡片',
-  StateFlow: '状态流程',
+  Email: i18n.board.email,
+  DataCard: i18n.board.dataCard,
+  StateFlow: i18n.board.stateFlow,
   Thinking: i18n.board.thinking,
   Artifact: i18n.board.artifact,
   'Artifact.Ref': i18n.board.artifactRef,
@@ -109,4 +109,4 @@ const TYPE_ZH = (i18n: BoardMessages = boardEnglish): Record<string, string> => 
   Custom: i18n.board.customComponent,
   '#text': i18n.board.text2,
 });
-export const typeLabel = (t: string, i18n: BoardMessages = boardEnglish, locale: Locale = 'en') => (locale !== 'en' && TYPE_ZH(i18n)[t] ? `${t}（${TYPE_ZH(i18n)[t]}）` : t);
+export const typeLabel = (t: string, i18n: BoardMessages = boardEnglish, locale: Locale = 'en') => (locale !== 'en' && TYPE_ZH(i18n)[t] ? i18n.board.componentTypeName(t, TYPE_ZH(i18n)[t]!) : t);

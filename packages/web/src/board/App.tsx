@@ -1,4 +1,3 @@
-import { boardDictionary, boardEnglish } from '../i18n/board/dictionaries';
 import { LanguageMenu } from '../player/LanguageMenu';
 import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/board/messages';
@@ -201,7 +200,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         </span>,
         8000,
       );
-    else if (job.error !== boardEnglish.board.cancelled && job.error !== boardDictionary('zh-CN').board.cancelled)
+    else if (job.status === 'error')
       setFlash(
         <span className="inline-flex max-w-[640px] items-center gap-2 whitespace-normal" data-testid="video-error">
           <LocalText value={m.board.videoExportFailed(job.error ?? '')} />
@@ -210,7 +209,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         </span>,
         10000,
       );
-    else setFlash(<LocalText value={m.board.exportCancelled} />);
+    else if (job.status === 'cancelled') setFlash(<LocalText value={m.board.exportCancelled} />);
   });
 
   // 只应用成功的 IR；出错时保留上一次成功的画面（第一次就失败时也先显示它带的旧 IR）
@@ -393,7 +392,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
               onClick={() => setInspectMode((v) => !v)}
               data-testid="inspect-toggle"
             >
-              {L.topLabels ? <Kbd>⌥</Kbd> : null}
+              <Kbd className={L.topLabels ? undefined : 'hidden'}>⌥</Kbd>
             </Btn>
             <AppearanceButton look={a.saved} catalog={a.catalog} wide={L.topLabels} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} />
           </>

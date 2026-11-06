@@ -4,6 +4,12 @@ import { value, number, plural, type Value } from '../format';
 export function createBoardEn(locale: Locale = 'en') {
   return {
     board: {
+      email: 'Email',
+      dataCard: 'Data card',
+      stateFlow: 'State flow',
+      diagnosticSeparator: '; ',
+      labelPrefix: (label: string) => `${label}: `,
+      componentTypeName: (component: string, description: string) => `${component} (${description})`,
       // Render route fallback messages and its font-loading sample.
       projectDidNotCompileSuccessfully: "Project did not compile successfully",
       english: "English",
@@ -16,14 +22,13 @@ export function createBoardEn(locale: Locale = 'en') {
       couldNotSyncSelectionToAgent: "Could not sync selection to Agent",
       theSelectedElementIsNoLongerInThisStage: "The selected element is no longer in this stage. Selection cleared.",
       couldNotSyncClearedSelectionToAgent: "Could not sync cleared selection to Agent",
-      selectedTellAgentWhatYouWantToChange: (p0: Value) => `Selected ${value(p0, locale)}. Tell Agent what you want to change.`,
+      selectedTellAgentWhatYouWantToChange: (p0: Value) => `${p0 ? `Selected “${value(p0, locale)}”.` : 'Selection saved.'} Tell Agent what you want to change.`,
       selectionClearedAndSyncedToAgent: "Selection cleared and synced to Agent",
       thisPageCannotWriteASelectionReadOnly: "This page cannot write a selection (read-only)",
       keepingThePreviousSelection: (p0: Value) => `. Keeping the previous selection “${value(p0, locale)}”`,
       selectionCleared: ". Selection cleared",
       previousSelectionRestored: "Previous selection restored",
       previousSelectionIsNoLongerValid: "Previous selection is no longer valid",
-      staticStageThisOptionDoesNotDemonstrateThisCase: "Static stage: this option does not demonstrate this case yet",
 
       thinking: "Thinking",
       artifact: "Artifact",
@@ -35,7 +40,7 @@ export function createBoardEn(locale: Locale = 'en') {
       coveredCaseCount: (n: number) => `Covered cases (${number(n, locale)})`,
       coverageTip: (letter: string, status: string) => `${letter}: ${status}`,
       gapTitle: (letter: string, title: string, status: string) => `Option ${letter} has not covered “${title}”${status ? ` (${status})` : ''}`,
-      gapBody: (letter: string, reason: string) => `This is a gap in the demo${reason ? `: ${reason}` : ''}. Showing a static page from option ${letter}.`,
+      gapBody: (letter: string, reason: string) => `This is a gap, not a demo${reason ? `: ${reason}` : ''}. Showing a static page from option ${letter}.`,
       mobilePageDetails: (width: number) => `Mobile page · ${number(width, locale)} wide · Frame added by the stage`,
 
       couldNotStart: "Could not start",
@@ -80,7 +85,7 @@ export function createBoardEn(locale: Locale = 'en') {
       switchFeature: "Switch feature",
       inspect: "Inspect",
       exitInspectMode: "Exit inspect mode",
-      inspectModeClickAStageElementToSelectIt: "Inspect mode: click a stage element to select it. Hold ⌥ to inspect temporarily.",
+      inspectModeClickAStageElementToSelectIt: "Inspect mode: clicking a stage element only selects it; it does not execute a step. Hold ⌥ to inspect temporarily.",
       hold: "Hold ⌥",
       nextCase: (p0: Value) => `Next case: ${value(p0, locale)}`,
       copied: (p0: Value) => `Copied: ${value(p0, locale)}`,

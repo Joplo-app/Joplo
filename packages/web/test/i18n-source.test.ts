@@ -28,7 +28,7 @@ it('contains no CJK outside comments and locale dictionaries', () => {
     for (const [a,b] of [...comments].sort((a,b)=>b[0]-a[0])) clean = clean.slice(0,a) + clean.slice(a,b).replace(/[^\n]/g,' ') + clean.slice(b);
     if (file.endsWith('.css')) clean = clean.replace(/\/\*[\s\S]*?\*\//g, (s) => s.replace(/[^\n]/g,' '));
     clean.split('\n').forEach((line,i) => {
-      if (/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(line)) {
+      if (/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef]/u.test(line)) {
         const key = `${path.relative(root,file)}:${i+1}`;
         if (!allowlist[key]) errors.push(`${key}: ${line.trim()}`);
       }

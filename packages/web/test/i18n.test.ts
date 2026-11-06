@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { resolveLocale, readLocale, saveLocale } from '../src/i18n/locale';
 import { en } from '../src/i18n/en';
-import { boardLayout, dockWidth, topbarCollapse } from '../src/player/layout';
-import { fullscreenBarCollapse, navGroup, speedGroup, layersGroup, directorW, rowWidth, CTRL } from '../src/player/controls-fit';
+import { boardLayout, dockWidth, topbarCollapse, topbarMeasurements } from '../src/player/layout';
+import { fullscreenBarCollapse, navGroup, speedGroup, layersGroup, directorW, rowWidth, CTRL, textW } from '../src/player/controls-fit';
 import { SPEEDS } from '../src/runtime/pace';
+
+const topbarFor = (t: typeof en, native: string) => topbarMeasurements({
+  brand:74.375,breadcrumbs:[260,260],fullscreen:32,
+  language:{full:42+textW(native,13),collapsed:32},
+  inspect:{full:67+textW(t.player.inspect,13),collapsed:32},
+  appearance:{full:50+textW(`${t.player.appearance} · Paper white · Marker Gothic`,13),collapsed:32},
+  export:{full:64+textW(t.player.export,13),collapsed:32},
+});
 
 describe('locale resolution', () => {
   it.each([['zh-Hant','zh-TW'],['zh-TW','zh-TW'],['zh-HK','zh-TW'],['zh-MO','zh-TW'],['zh-SG','zh-CN'],['pt-PT','pt-BR'],['es-419','es'],['de-AT','de'],['ja-JP','ja'],['xx','en']] as const)('%s → %s', (tag, expected) => expect(resolveLocale({ languages: [tag] })).toBe(expected));
@@ -33,7 +41,7 @@ describe('long localized controls', () => {
   it.each([1280, 1440])('fits a %spx viewport with a pseudo dictionary', (width) => {
     const layout = boardLayout(width, t);
     expect(dockWidth(layout, t.player.play, SPEEDS, 0, t)).toBeLessThanOrEqual(width - layout.navWidth - 32);
-    const top = topbarCollapse(width, t, 'Português (Brasil)');
+    const top = topbarCollapse(width, topbarFor(t, 'Português (Brasil)'));
     expect(top.width).toBeLessThanOrEqual(width);
     expect([...top.collapsed][0]).toBe('language');
     const titles = ['Client view', 'Server processing'];
@@ -67,6 +75,6 @@ it('keeps every registered locale within desktop control budgets', async () => {
     for (const label of [t.player.play,t.player.pause,t.player.resume,t.player.replay]) {
       expect(dockWidth(L,label,SPEEDS,0,t)).toBeLessThanOrEqual(width-L.navWidth-32);
     }
-    expect(topbarCollapse(width,t,localeNames[locale]).width).toBeLessThanOrEqual(width);
+    expect(topbarCollapse(width,topbarFor(t,localeNames[locale])).width).toBeLessThanOrEqual(width);
   }
 });

@@ -39,7 +39,7 @@ export function diagnosticsSummary(list: readonly Diagnostic[]): { count: number
   return { count: errors.length, first: { at: errors[0]!.at ?? null, message: errors[0]!.message } };
 }
 
-const PHASE = (i18n: BoardMessages = boardEnglish): Record<VideoJob['phase'], string> => ({ starting: i18n.board.startingBrowser, recording: '', saving: i18n.board.saving, done: i18n.board.done, error: i18n.board.failure });
+const PHASE = (i18n: BoardMessages = boardEnglish): Record<VideoJob['phase'], string> => ({ starting: i18n.board.startingBrowser, recording: '', saving: i18n.board.saving, done: i18n.board.done, error: i18n.board.failure, cancelled: i18n.board.cancelled });
 
 /** 导出视频的进度（「导出」按钮上的进度环、菜单里的进度卡、完成 / 失败提示）。 */
 export function exportProgress(job: VideoJob | null | undefined, scenarioName: string, i18n: BoardMessages = boardEnglish): { running: boolean; percent: number; text: string; step: string; done: boolean; error: string | null } | null {
@@ -49,7 +49,7 @@ export function exportProgress(job: VideoJob | null | undefined, scenarioName: s
   return {
     running,
     percent: Math.max(0, Math.min(100, job.percent)),
-    text: done ? i18n.board.exportedFile(job.file ?? '').trim() : i18n.board.recording(scenarioName),
+    text: job.status === 'cancelled' ? i18n.board.exportCancelled : done ? i18n.board.exportedFile(job.file ?? '').trim() : i18n.board.recording(scenarioName),
     step: job.phase === 'recording' ? i18n.board.step(job.step, job.total) : PHASE(i18n)[job.phase],
     done,
     error: job.status === 'error' ? (job.error ?? i18n.board.exportFailed) : null,

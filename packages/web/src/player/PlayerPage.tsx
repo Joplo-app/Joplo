@@ -1,3 +1,4 @@
+import { useTopbarMeasurements } from './topbar-fit';
 import { LanguageMenu } from './LanguageMenu';
 import { localeNames } from '../i18n/locale';
 import { translate } from '../i18n/messages';
@@ -54,7 +55,7 @@ export function useViewportWidth(): number {
   }, []);
   return w;
 }
-export const useBoardLayout = (): BoardLayout => { const { t, locale } = useI18n(); return boardLayout(useViewportWidth(), t, localeNames[locale]); };
+export const useBoardLayout = (): BoardLayout => { const { t, locale } = useI18n(); return boardLayout(useViewportWidth(), t, localeNames[locale], useTopbarMeasurements()); };
 
 export function Brand({ onClick }: { onClick?: () => void }) {
   const { t: i18n } = useI18n();
@@ -70,7 +71,7 @@ export function TopBar({ children, right }: { children?: ReactNode; right?: Reac
   return (
     <header className="flex h-[52px] shrink-0 items-center gap-3 border-b border-jb-line bg-jb-surface px-4 font-jb text-jb-fg" data-testid="topbar">
       {children}
-      {right ? <div className="ml-auto flex shrink-0 items-center gap-3">{right}</div> : null}
+      {right ? <div data-topbar-actions="" className="ml-auto flex shrink-0 items-center gap-3">{right}</div> : null}
     </header>
   );
 }
@@ -170,7 +171,7 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
           />
         ) : null}
         <span className="relative">{i18n.player.number(chip.index)}</span>
-        {chip.fork ? <GitFork className="relative size-3 shrink-0" aria-label="分叉" /> : null}
+        {chip.fork ? <GitFork className="relative size-3 shrink-0" aria-label={i18n.player.fork} /> : null}
         {chip.system && !cur ? <Cog className="relative size-3" aria-label={i18n.player.system} /> : null}
         {chip.card && !cur ? <Film className="relative size-3" aria-label={i18n.player.transition} /> : null}
         {cur ? (

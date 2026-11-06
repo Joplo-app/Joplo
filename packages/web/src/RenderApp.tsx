@@ -64,7 +64,7 @@ export function RenderApp() {
     (async () => {
       const r = await fetchIR(projectId);
       if ('error' in r) return fail(r.error);
-      if (!r.project) return fail(r.diagnostics.map((d) => `${d.at ?? ''} ${d.message}`).join('；') || m.board.projectDidNotCompileSuccessfully);
+      if (!r.project) return fail(r.diagnostics.map((d) => `${d.at ?? ''} ${d.message}`).join(i18n.board.diagnosticSeparator) || m.board.projectDidNotCompileSuccessfully);
       try {
         setData({ project: r.project, state: stateAt(r.project, scenarioId, position) });
       } catch (e) {

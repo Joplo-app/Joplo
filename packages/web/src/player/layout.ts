@@ -9,7 +9,7 @@ import { en, type Dictionary } from '../i18n/en';
  *   < 900：⑥ 时间线只剩当前步和总数（“1 / 5”），点一下弹出全部步骤；⑦ 字幕的 explain 收进悬停。
  * 任何宽度都不出现页面滚动：时间线放不下时在自己的一行里横向滚动（隐藏滚动条，当前步自动滚到可见）。
  */
-import { textW, buttonW, collapseToFit, rowWidth, type Group } from './controls-fit';
+import { textW, collapseToFit, rowWidth, type Group } from './controls-fit';
 
 export const BOARD_WIDE = 1440;
 
@@ -18,13 +18,13 @@ export const BOARD_COMPACT = 900;
 
 export type BoardLayout = { wide: boolean; navWidth: number; topLabels: boolean; currentStepW: number; zoomLabel: boolean; rail: boolean; compactTimeline: boolean; explainInTip: boolean; languageIconOnly: boolean };
 
-export function boardLayout(viewportW: number, i18n: Dictionary = en, nativeName = 'English'): BoardLayout {
+export function boardLayout(viewportW: number, i18n: Dictionary = en, nativeName = 'English', measurements?: TopbarMeasurements): BoardLayout {
   const w = Number.isFinite(viewportW) ? viewportW : 0;
   const wide = w >= BOARD_WIDE;
   const rail = w < BOARD_RAIL;
   const compact = w < BOARD_COMPACT;
-  const top = topbarCollapse(w, i18n, nativeName);
-  const layout: BoardLayout = { wide, navWidth: wide ? 276 : rail ? 56 : 240, topLabels: wide && top.collapsed.size <= 1, currentStepW: wide ? 280 : 200, zoomLabel: wide, rail, compactTimeline: compact, explainInTip: compact, languageIconOnly: top.collapsed.has('language') };
+  const top = measurements ? topbarCollapse(w, measurements) : null;
+  const layout: BoardLayout = { wide, navWidth: wide ? 276 : rail ? 56 : 240, topLabels: wide && (!top || [...top.collapsed].every((id) => id === 'language')), currentStepW: wide ? 280 : 200, zoomLabel: wide, rail, compactTimeline: compact, explainInTip: compact, languageIconOnly: !wide || !!top?.collapsed.has('language') };
   const longest = [i18n.player.play, i18n.player.pause, i18n.player.resume, i18n.player.replay].sort((a,b) => textW(b) - textW(a))[0]!;
   const available = w - layout.navWidth - 32;
   if (dockWidth(layout, longest, [0.5,1,1.5,2], 0, i18n) > available) layout.zoomLabel = false;
@@ -81,7 +81,7 @@ export function timelineChips(steps: readonly { caption: string; kind: 'user' | 
     playing: activeStep !== null && activeStep === index - 1,
     ...(dwell && activeStep === null && dwell.position === index && index === shown ? { dwell: { ms: dwell.ms, elapsed: dwell.elapsed, paused } } : {}),
   });
-  return [chip(0, i18n.player.initial, false, i18n.player.initialStateTip), ...steps.map((s, i) => ({ ...chip(i + 1, s.caption, s.kind === 'system', `${i18n.player.number(i + 1)} · ${s.kind === 'system' ? i18n.player.systemPrefix : s.kind === 'card' ? i18n.player.transitionPrefix : ''}${s.caption}${s.forks?.length ? ` · 分叉：${s.forks.map(f => f.label).join('、')}` : ''}`), ...(s.forks?.length ? { fork: true } : {}), ...(s.kind === 'card' ? { card: true } : {}) }))];
+  return [chip(0, i18n.player.initial, false, i18n.player.initialStateTip), ...steps.map((s, i) => ({ ...chip(i + 1, s.caption, s.kind === 'system', `${i18n.player.number(i + 1)} · ${s.kind === 'system' ? i18n.player.systemPrefix : s.kind === 'card' ? i18n.player.transitionPrefix : ''}${s.caption}${s.forks?.length ? i18n.player.forkSummary(i18n.player.list(s.forks.map(f => f.label))) : ''}`), ...(s.forks?.length ? { fork: true } : {}), ...(s.kind === 'card' ? { card: true } : {}) }))];
 }
 
 export type LayerTab = { id: string; title: string; active: boolean; camera: boolean; /** 这一层是谁的画面（D56）。 */ role?: { id: string; name: string; color: string } | null };
@@ -91,15 +91,27 @@ export function layerTabs(layers: readonly { id: string; title: string; role?: {
   return layers.map((l) => ({ id: l.id, title: l.title, active: l.id === viewLayer, camera: director && l.id === viewLayer, ...(l.role ? { role: l.role } : {}) }));
 }
 
-/** Text is measured from the active dictionary. Language collapses before existing actions. */
-export function topbarCollapse(viewportW: number, i18n: Dictionary = en, nativeName = 'English'): { collapsed: Set<string>; width: number } {
-  const fixed = Math.min(840, Math.max(100, viewportW - 4 * 32 - 48));
-  const groups: Group[] = [
-    { id: 'language', full: buttonW(nativeName), collapsed: 32 },
-    { id: 'inspect', full: buttonW(i18n.player.inspect), collapsed: 32 },
-    { id: 'appearance', full: buttonW(i18n.player.appearance) + 100, collapsed: 32 },
-    { id: 'export', full: buttonW(i18n.player.export), collapsed: 32 },
-  ];
-  const collapsed = viewportW < BOARD_WIDE ? new Set(groups.map((g) => g.id)) : collapseToFit(viewportW, fixed, groups);
-  return { collapsed, width: rowWidth(fixed, groups, collapsed) };
+/** Geometry comes from the rendered brand, breadcrumbs and full action contents. */
+export type TopbarMeasurements = { fixed: number; groups: Group[] };
+type ActionWidth = { full: number; collapsed: number };
+export type TopbarContents = {
+  brand: number; breadcrumbs: readonly number[]; language?: ActionWidth; inspect?: ActionWidth; appearance?: ActionWidth; export?: ActionWidth; copyLink?: ActionWidth;
+  fullscreen?: number; otherActions?: readonly number[]; gap?: number; padding?: number; divider?: number;
+};
+export function topbarMeasurements(content: TopbarContents): TopbarMeasurements {
+  const groups: Group[] = [];
+  for (const id of ['language','inspect','appearance','export','copyLink'] as const) if (content[id]) groups.push({ id, ...content[id] });
+  const gap = content.gap ?? 12;
+  const other = [...(content.otherActions ?? []), ...(content.fullscreen ? [content.fullscreen] : [])];
+  const leftCount = (content.brand ? 1 : 0) + (content.breadcrumbs.length ? 2 : 0);
+  const rightCount = groups.length + other.length;
+  const fixed = 2 * (content.padding ?? 16) + content.brand + content.breadcrumbs.reduce((a,w) => a+w,0)
+    + (content.breadcrumbs.length ? content.divider ?? 1 : 0) + other.reduce((a,w) => a+w,0)
+    + gap * (Math.max(0,leftCount + (rightCount ? 1 : 0) - 1) + Math.max(0,rightCount-1));
+  return { fixed, groups };
+}
+export function topbarCollapse(viewportW: number, measurements: TopbarMeasurements): { collapsed: Set<string>; width: number } {
+  const { fixed, groups } = measurements;
+  const collapsed = viewportW < BOARD_WIDE ? new Set(groups.map((g) => g.id)) : collapseToFit(viewportW, fixed, groups, 0);
+  return { collapsed, width: rowWidth(fixed, groups, collapsed, 0) };
 }

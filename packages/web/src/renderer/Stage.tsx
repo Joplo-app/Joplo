@@ -295,7 +295,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         <ToastLayer key={epoch} toasts={state.toasts} nextTargetId={nextTargetId} animate={animate} rootRef={rootRef} />
         {sceneRole && !card ? <RoleTag role={sceneRole} /> : null}
         {keyboard && !card ? <div className="pointer-events-none absolute left-1/2 z-30 flex max-w-[70%] -translate-x-1/2 items-center gap-1.5 rounded border border-[var(--jp-line)] bg-[var(--jp-surface)] px-3 py-1.5 text-[14px] text-[var(--jp-ink)]" style={{ bottom: Math.max(60, state.toasts.length ? state.toasts.length * 64 + 40 : 0) }} data-jlayer="keyboard">
-          {keyboard.kind === 'type' ? <><span className="shrink-0 text-[var(--jp-muted)]">输入</span><span className="truncate">{keyboard.text || '…'}</span></> : keyboard.keys.map((key, i) => <kbd key={i} className="rounded border border-[var(--jp-line-strong)] bg-[var(--jp-subtle)] px-1.5 py-0.5 font-[var(--jp-font-mono)]">{key}</kbd>)}
+          {keyboard.kind === 'type' ? <><span className="shrink-0 text-[var(--jp-muted)]">{i18n.stage.keyboardType}</span><span className="truncate">{keyboard.text || '…'}</span></> : keyboard.keys.map((key, i) => <kbd key={i} className="rounded border border-[var(--jp-line-strong)] bg-[var(--jp-subtle)] px-1.5 py-0.5 font-[var(--jp-font-mono)]">{key}</kbd>)}
         </div> : null}
         {overlay ? <div className="pointer-events-none absolute inset-0 z-40" data-jlayer="overlay">{overlay}</div> : null}
         <AnimatePresence>

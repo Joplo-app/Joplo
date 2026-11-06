@@ -27,8 +27,8 @@ export type VideoJob = {
   id: string;
   projectId: string;
   scenarioId: string;
-  status: 'running' | 'done' | 'error';
-  phase: 'starting' | 'recording' | 'saving' | 'done' | 'error';
+  status: 'running' | 'done' | 'error' | 'cancelled';
+  phase: 'starting' | 'recording' | 'saving' | 'done' | 'error' | 'cancelled';
   step: number;
   total: number;
   percent: number;

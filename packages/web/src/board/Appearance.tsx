@@ -298,7 +298,7 @@ export function AppearanceButton({ look, catalog, wide, open, onToggle, btnRef, 
     return () => window.removeEventListener('keydown', on);
   }, []);
   return (
-    <Btn ref={btnRef} variant={variant} icon={<Swatch css={css} />} label={wide ? i18n.board.appearanceButtonLabel(name) : i18n.board.appearance} iconOnly={!wide} title={wide ? undefined : i18n.board.appearanceButtonLabel(name)} kbd="T" selected={open} aria-haspopup="dialog" aria-expanded={open} onClick={onToggle} data-testid="appearance" data-appearance={`${look.theme}|${look.font ?? ''}|${look.stroke ?? ''}`} />
+    <Btn data-full-label={i18n.board.appearanceButtonLabel(name)} ref={btnRef} variant={variant} icon={<Swatch css={css} />} label={wide ? i18n.board.appearanceButtonLabel(name) : i18n.board.appearance} iconOnly={!wide} title={wide ? undefined : i18n.board.appearanceButtonLabel(name)} kbd="T" selected={open} aria-haspopup="dialog" aria-expanded={open} onClick={onToggle} data-testid="appearance" data-appearance={`${look.theme}|${look.font ?? ''}|${look.stroke ?? ''}`} />
   );
 }
 

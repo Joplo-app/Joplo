@@ -6,6 +6,12 @@ import type { BoardDictionary } from './en';
 export function createBoardZhCN(locale: Locale = 'zh-CN') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      email: '邮件',
+      dataCard: '数据卡片',
+      stateFlow: '状态流程',
+      diagnosticSeparator: '；',
+      labelPrefix: (label: string) => `${label}：`,
+      componentTypeName: (component: string, description: string) => `${component}（${description}）`,
       // Render route fallback messages and its font-loading sample.
       projectDidNotCompileSuccessfully: "项目没有成功编译",
       english: "中文",
@@ -18,14 +24,13 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       couldNotSyncSelectionToAgent: "选中未能同步给 Agent",
       theSelectedElementIsNoLongerInThisStage: "选中的元素已不在当前画面中，已取消选中",
       couldNotSyncClearedSelectionToAgent: "取消选中未能同步给 Agent",
-      selectedTellAgentWhatYouWantToChange: (p0: Value) => `已选中${value(p0, locale)}，可以在 Agent 会话里说要改什么`,
+      selectedTellAgentWhatYouWantToChange: (p0: Value) => `已选中${p0 ? `「${value(p0, locale)}」` : ''}，可以在 Agent 会话里说要改什么`,
       selectionClearedAndSyncedToAgent: "已取消选中，已同步给 Agent",
       thisPageCannotWriteASelectionReadOnly: "当前页面不能写入选中（只读）",
       keepingThePreviousSelection: (p0: Value) => `，仍保持上一次的选中「${value(p0, locale)}」`,
       selectionCleared: "，已取消选中",
       previousSelectionRestored: "已恢复上次的选中",
       previousSelectionIsNoLongerValid: "上次的选中已失效",
-      staticStageThisOptionDoesNotDemonstrateThisCase: "这是静态画面：当前方案还没有演示这个情况",
 
       thinking: "思考过程",
       artifact: "产物",
@@ -37,7 +42,7 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       coveredCaseCount: (n: number) => `覆盖的情况（${number(n, locale)}）`,
       coverageTip: (letter: string, status: string) => `${letter}：${status}`,
       gapTitle: (letter: string, title: string, status: string) => `方案 ${letter} 还没有表达「${title}」${status ? `（${status}）` : ''}`,
-      gapBody: (letter: string, reason: string) => `这是缺口，不是演示${reason ? `：${reason}` : ''}。画面先静态显示方案${letter} 的页面。`,
+      gapBody: (letter: string, reason: string) => `这是缺口，不是演示${reason ? `：${reason}` : ''}。画面先静态显示方案 ${letter} 的页面。`,
       mobilePageDetails: (width: number) => `手机页面 · ${number(width, locale)} 宽 · 外框由画面自动加上`,
 
       couldNotStart: "无法开始",
@@ -142,7 +147,7 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       compiled: "已编译",
       showingTheLastSuccessfulResultUpdatesAfterYouFix: "下面仍是上一次成功的结果；修复后自动刷新",
       updatesAfterYouFixTheErrors: "修复后自动刷新",
-      noFeaturesYetWriteYourFirstFeatureInFeatures: "还没有功能。在 features/&lt;名称&gt;/feature.ts 里写第一个功能。",
+      noFeaturesYetWriteYourFirstFeatureInFeatures: "还没有功能。在 features/<名称>/feature.ts 里写第一个功能。",
       openDemoFor: (p0: Value) => `打开「${value(p0, locale)}」的演示`,
       openDemo: "打开演示",
       noPickedOptionYet: "还没选定方案",

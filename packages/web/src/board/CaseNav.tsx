@@ -77,7 +77,7 @@ function OtherTag({ letter, status, tip, onClick, testid }: { letter: string; st
     <>
       <button type="button" onClick={onClick} aria-label={tip} data-testid={testid} {...tp} className="jb-focus flex h-[18px] shrink-0 items-center gap-0.5 rounded-[4px] border border-jb-line bg-jb-surface px-[5px] font-jb text-[11px] font-semibold text-jb-muted hover:bg-jb-hover">
         {letter}
-        <StatusIcon status={status} size={11} labelPrefix={`${letter}：`} />
+        <StatusIcon status={status} size={11} labelPrefix={i18n.board.labelPrefix(letter)} />
       </button>
       {tipNode}
     </>
@@ -96,7 +96,7 @@ function CaseRow({ project, featureId, optionId, caseId, active, onCase, onOptio
     <li className={cn('flex items-center gap-1.5 rounded-[8px] pr-2', active ? 'bg-jb-selected' : 'hover:bg-jb-hover')} data-testid={`case-${caseId}`} data-status={own} data-active={active ? '' : undefined} {...hc.trigger}>
       <button type="button" onClick={onCase} aria-current={active ? 'true' : undefined} className="jb-focus flex min-w-0 flex-1 items-start gap-2.5 rounded-[8px] py-2 pl-2 text-left font-jb">
         <span className="flex h-[18px] items-center">
-          <StatusIcon status={own} size={16} labelPrefix={optionId ? `${letterOf(project, optionId)}：` : ''} />
+          <StatusIcon status={own} size={16} labelPrefix={optionId ? i18n.board.labelPrefix(letterOf(project, optionId)) : ''} />
         </span>
         <span className={cn('line-clamp-2 min-w-0 flex-1 text-[13.5px] leading-[18px] text-jb-fg', active && 'font-semibold')}>{c.title}</span>
       </button>
@@ -196,7 +196,7 @@ export function CaseNav({
       ) : null}
       <div className="min-h-4 flex-1" />
       {optionId ? (
-        <button type="button" onClick={() => onCopy(gapCommand(optionId))} data-testid="gap-count" title={i18n.board.copy(gapCommand(optionId))} className="jb-focus sticky bottom-0 flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] bg-jb-app p-2.5 text-left text-[12px] hover:bg-jb-press">
+        <button type="button" onClick={() => onCopy(gapCommand(optionId))} data-testid="gap-count" title={i18n.board.copy(gapCommand(optionId))} className="jb-focus sticky bottom-0 flex max-w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1 whitespace-nowrap rounded-[8px] bg-jb-app p-2.5 text-left text-[12px] hover:bg-jb-press">
           <span className="font-semibold text-jb-fg">{i18n.board.optionLabel(letter ?? '')}</span>
           <span className={cn(gaps.missing ? 'font-semibold text-jb-danger' : 'text-jb-muted')}>{i18n.board.missingCount(gaps.missing)}</span>
           <span className="text-jb-muted">{i18n.board.undecidedCount(gaps.undecided)}</span>
@@ -234,7 +234,7 @@ export function CaseRail({ project, featureId, optionId, caseId }: { project: Pr
         const own = optionId ? statusOf(project, optionId, cid) : 'none';
         return (
           <span key={cid} title={c.title} className={cn('flex size-8 items-center justify-center rounded-[8px]', caseId === cid && 'bg-jb-selected')}>
-            <StatusIcon status={own} size={16} labelPrefix={`${c.title}：`} />
+            <StatusIcon status={own} size={16} labelPrefix={i18n.board.labelPrefix(c.title)} />
           </span>
         );
       })}

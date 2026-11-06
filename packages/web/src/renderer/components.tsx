@@ -1601,35 +1601,38 @@ function Thinking({ node, p, children }: NodeProps) {
 
 /** 简单外部邮件：自身不可操作，正文里的按钮仍走普通步骤。 */
 function Email({ node, p, children }: NodeProps) {
+  const { t: i18n } = useI18n();
   const root = useRoot(node, p, { className: 'jbox', style: { background: SURFACE, padding: 16, display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 } });
-  const from = str(p.from, '发件人');
+  const from = str(p.from, i18n.stage.sender);
   return <article {...root}>
     <Rough seedKey={node.id} />
     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
       <span aria-hidden style={{ width: 34, height: 34, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', background: SUBTLE, color: INK, fontWeight: 600 }}>{[...from.trim()][0] ?? '?'}</span>
-      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600 }}>{from}</div><div style={{ color: DIMMED, fontSize: 12 }}>收件人：{str(p.to, '未指定')}</div></div>
+      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600 }}>{from}</div><div style={{ color: DIMMED, fontSize: 12 }}>{i18n.stage.recipient(str(p.to, i18n.stage.unspecified))}</div></div>
       {p.time ? <time style={{ color: DIMMED, fontSize: 12 }}>{str(p.time)}</time> : null}
     </div>
-    <strong style={{ fontSize: 18 }}>{str(p.subject, '无主题')}</strong>
+    <strong style={{ fontSize: 18 }}>{str(p.subject, i18n.stage.noSubject)}</strong>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{children}</div>
   </article>;
 }
 
 function DataCard({ node, p }: NodeProps) {
+  const { t: i18n } = useI18n();
   const { changed = [] } = useCtx();
   const rows = dataRows(p.value, p.fields, node.props?.value, changed);
   const root = useRoot(node, p, { className: 'jbox', style: { background: SURFACE, padding: 20, minWidth: 0, width: '100%' } });
   return <section {...root}>
     <Rough seedKey={node.id} />
-    <div style={{ fontWeight: 600, fontSize: 20, marginBottom: 14 }}>{str(p.title, '数据记录')}</div>
+    <div style={{ fontWeight: 600, fontSize: 20, marginBottom: 14 }}>{str(p.title, i18n.stage.dataRecords)}</div>
     {rows.length ? <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>{rows.map((row, i) => <div key={`${row.key}:${i}`} data-changed={row.change ? '' : undefined} style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 12, padding: '10px 12px', background: row.change ? 'color-mix(in srgb, var(--jp-accent) 15%, var(--jp-surface))' : undefined, borderLeft: row.change ? `3px solid ${ACCENT}` : '3px solid transparent' }}>
       <dt style={{ color: DIMMED, minWidth: 80 }}>{row.label}</dt>
       <dd style={{ margin: 0, overflowWrap: 'anywhere', flex: 1 }}>{displayData(row.value)}{row.change ? <div style={{ color: INK2, fontSize: 13, marginTop: 4 }}><span>{displayData(row.change.before)}</span> → <span>{displayData(row.change.after)}</span></div> : null}</dd>
-    </div>)}</dl> : <div style={{ color: DIMMED }}>暂无数据</div>}
+    </div>)}</dl> : <div style={{ color: DIMMED }}>{i18n.stage.noData}</div>}
   </section>;
 }
 
 function StateFlow({ node, p }: NodeProps) {
+  const { t: i18n } = useI18n();
   const { changed = [] } = useCtx();
   const items = stateFlowItems(p.value, p.states, p.labels);
   const change = changeFor(node.props?.value, changed);
@@ -1641,12 +1644,12 @@ function StateFlow({ node, p }: NodeProps) {
         {i ? <span aria-hidden style={{ color: DIMMED }}>→</span> : null}
         <span className="jbox" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '8px 14px', color: item.state === 'todo' ? DIMMED : INK, background: item.state === 'current' ? 'color-mix(in srgb, var(--jp-accent) 20%, var(--jp-surface))' : SURFACE, fontWeight: item.state === 'current' ? 600 : 400 }}>
           <Rough seedKey={`${node.id}:${i}`} stroke={item.state === 'current' ? ACCENT : item.state === 'done' ? OK : LINE} />
-          {item.state === 'done' ? <span aria-label="已完成" style={{ color: OK }}>✓</span> : null}{item.label}
+          {item.state === 'done' ? <span aria-label={i18n.stage.done} style={{ color: OK }}>✓</span> : null}{item.label}
         </span>
       </li>)}
     </ol>
-    {change ? <div data-state-change="" style={{ color: INK2, fontSize: 14 }}>状态变化：{label(change.before)} → {label(change.after)}</div> : null}
-    {!items.length ? <span style={{ color: DIMMED }}>暂无状态</span> : null}
+    {change ? <div data-state-change="" style={{ color: INK2, fontSize: 14 }}>{i18n.stage.stateChange(label(change.before), label(change.after))}</div> : null}
+    {!items.length ? <span style={{ color: DIMMED }}>{i18n.stage.noStates}</span> : null}
   </div>;
 }
 

@@ -538,7 +538,7 @@ export class DemoController {
     if (!p || !st) return;
     if (opts.inspect) return this.select(nodeId);
     const sc = this.scenario();
-    if (this.snap.view !== 'stage' || !sc) return this.info(boardRef('board', 'staticStageThisOptionDoesNotDemonstrateThisCase'));
+    if (this.snap.view !== 'stage' || !sc) return this.info(m.player.staticStageThisOptionDoesNotDemonstrateThisCase);
 
     if (this.snap.playing && !this.snap.paused) return this.info(m.player.autoplayIsRunningPauseBeforeInteractingManually);
     if (this.snap.playing) this.stop(); // 暂停中手动接管
@@ -650,8 +650,7 @@ export class DemoController {
     if (!input) return;
     const local = this.localSelection(input);
     if (!local) return;
-    const what = local.label ? `「${local.label}」` : '';
-    await this.writeSelection(input, boardRef('board', 'selectedTellAgentWhatYouWantToChange', what), boardRef('board', 'couldNotSyncSelectionToAgent'));
+    await this.writeSelection(input, boardRef('board', 'selectedTellAgentWhatYouWantToChange', local.label ?? ''), boardRef('board', 'couldNotSyncSelectionToAgent'));
   }
 
   /** 取消选中，并同步给 Agent（selection.json 写为 null）。 */

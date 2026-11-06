@@ -6,6 +6,11 @@ import type { Dictionary } from './en';
 export function createZhCN(locale: Locale = 'zh-CN') {
   return defineDictionary<Dictionary>()({
     player: {
+      fork: '分叉',
+      otherStoryRoutes: '其他故事路线',
+      staticStageThisOptionDoesNotDemonstrateThisCase: '这是静态画面：当前方案还没有演示这个情况',
+      forkSummary: (labels: string) => ` · 分叉：${labels}`,
+      switchScenario: (label: string) => `切换场景：${label}`,
       speedValue: (n: number) => `${number(n, locale)}×`,
       transition: "过渡",
       transitionPrefix: "过渡 · ",
@@ -143,6 +148,15 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       couldNotExecuteThisStep: (p0: Value) => `无法执行这一步：${value(p0, locale)}`,
     },
     stage: {
+      keyboardType: '输入',
+      sender: '发件人',
+      unspecified: '未指定',
+      noSubject: '无主题',
+      dataRecords: '数据记录',
+      noData: '暂无数据',
+      noStates: '暂无状态',
+      recipient: (name: string) => `收件人：${name}`,
+      stateChange: (before: string, after: string) => `状态变化：${before} → ${after}`,
       // D56: default component chrome only; author titles, role names, durations, and artifact contents stay verbatim.
       thinking: '思考过程',
       thinkingActive: '思考中…',

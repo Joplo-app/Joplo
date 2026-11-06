@@ -41,8 +41,8 @@ export function Subtitle({ content, theme, width, framed = false, fixedHeight, d
               </div>
             ) : null}
           </div>
-          {content.forks?.length ? <div className="flex max-w-[36%] shrink-0 items-center gap-1.5 overflow-x-auto" aria-label="其他故事路线">
-            {content.forks.map((fork, i) => onFork ? <button type="button" key={i} onClick={() => onFork(fork)} title={`切换场景：${fork.label}`} className="shrink-0 rounded-full border border-[var(--jp-line-strong)] px-2 py-1 text-[12px] hover:bg-[var(--jp-subtle)] focus-visible:outline-2 focus-visible:outline-[var(--jp-accent)]">↳ {fork.label}</button> : <span key={i} className="shrink-0 rounded-full border border-[var(--jp-line-strong)] px-2 py-1 text-[12px]">↳ {fork.label}</span>)}
+          {content.forks?.length ? <div className="flex max-w-[36%] shrink-0 items-center gap-1.5 overflow-x-auto" aria-label={i18n.player.otherStoryRoutes}>
+            {content.forks.map((fork, i) => onFork ? <button type="button" key={i} onClick={() => onFork(fork)} title={i18n.player.switchScenario(fork.label)} className="shrink-0 rounded-full border border-[var(--jp-line-strong)] px-2 py-1 text-[12px] hover:bg-[var(--jp-subtle)] focus-visible:outline-2 focus-visible:outline-[var(--jp-accent)]">↳ {fork.label}</button> : <span key={i} className="shrink-0 rounded-full border border-[var(--jp-line-strong)] px-2 py-1 text-[12px]">↳ {fork.label}</span>)}
           </div> : null}
           {badge ? (
             badge.kind === 'done' ? (

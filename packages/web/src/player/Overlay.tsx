@@ -80,7 +80,7 @@ export function Overlay({
       ) : null}
 
       {snap.preview && prevBox ? (
-        <div className="absolute whitespace-nowrap rounded bg-[var(--focus)] px-2 py-0.5 text-[13px] font-medium text-white" style={{ left: prevBox.x + prevBox.w - 76, top: prevBox.y - 6 }} data-joverlay="sample">
+        <div className="absolute whitespace-nowrap rounded bg-[var(--focus)] px-2 py-0.5 text-[13px] font-medium text-white" style={{ left: prevBox.x + prevBox.w, top: prevBox.y - 6, transform: 'translateX(-100%)' }} data-joverlay="sample">
           {i18n.player.sampleInput}</div>
       ) : null}
 

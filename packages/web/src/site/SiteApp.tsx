@@ -151,6 +151,7 @@ function SiteFooter() {
 }
 
 function SitePlayer({ project, play, navigate }: { project: Project; play: PlayRoute; navigate: (r: SiteRoute, replace?: boolean) => void }) {
+  const L = useBoardLayout();
   const { t: i18n } = useI18n();
 
   const ctl = useMemo(() => new DemoController(null), []);
@@ -195,7 +196,7 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
           items: Object.values(project.features).map((f) => ({ id: `feature-${f.id}`, label: f.name, checked: f.id === feature.id, onClick: () => navigate({ kind: 'play', play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
         },
       ]}
-      actions={<Btn icon={<Link className="size-4" />} label={i18n.site.copyLink} title={i18n.site.copyLinkToCurrentStep} onClick={() => void copyText(location.href).then((ok) => setFlash(<LocalText value={ok ? m.site.linkCopied : m.site.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="copy-link" />}
+      actions={<Btn iconOnly={!L.topLabels} icon={<Link className="size-4" />} label={i18n.site.copyLink} title={i18n.site.copyLinkToCurrentStep} onClick={() => void copyText(location.href).then((ok) => setFlash(<LocalText value={ok ? m.site.linkCopied : m.site.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="copy-link" />}
       layer={play.layer ?? null}
       speed={play.speed ?? 1}
       onSpeed={(v) => {

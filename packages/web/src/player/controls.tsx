@@ -82,6 +82,8 @@ export function Btn({ icon, label, iconOnly = false, iconAfter = false, size = 3
       <button
         ref={ref}
         type="button"
+        data-full-label={label}
+        data-full-padding={size >= 34 ? 24 : 20}
         aria-label={iconOnly ? label : rest['aria-label']}
         aria-pressed={selected === undefined ? rest['aria-pressed'] : selected}
         {...rest}
@@ -94,7 +96,7 @@ export function Btn({ icon, label, iconOnly = false, iconAfter = false, size = 3
         className={cn(base, selected ? v.on : v.off, H[size], iconOnly ? W[size] : size >= 34 ? 'px-3' : 'px-2.5', className)}
       >
         {!iconAfter ? icon : null}
-        {iconOnly ? null : <span>{label}</span>}
+        <span data-jb-label="" className={iconOnly ? 'hidden' : undefined}>{label}</span>
         {children}
         {iconAfter ? icon : null}
       </button>
@@ -244,6 +246,7 @@ export function MenuButton({
         kbd={kbd}
         iconOnly={iconOnly}
         aria-label={label}
+        data-full-chevron={chevron === undefined ? 14 : 0}
         aria-haspopup="menu"
         aria-expanded={open}
         selected={open || undefined}
@@ -258,7 +261,7 @@ export function MenuButton({
         tipPlacement={tipPlacement}
       >
         {trigger.extra}
-        {!iconOnly ? (chevron ?? <ChevronDown className="size-3.5 text-jb-muted" aria-hidden />) : null}
+        {!iconOnly ? (chevron ?? <ChevronDown data-jb-chevron="" className="size-3.5 text-jb-muted" aria-hidden />) : null}
       </Btn>
       <Popover open={open} anchor={btn.current} onClose={() => setOpen(false)} placement={placement} role="menu" label={label} width={width} testid={testid ? `${testid}-list` : 'menu'} autoFocus={byKey}>
         <MenuList

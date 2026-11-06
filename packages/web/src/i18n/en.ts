@@ -4,6 +4,11 @@ import { value, number, list, plural, type Value } from './format';
 export function createEn(locale: Locale = 'en') {
   return {
     player: {
+      fork: 'Fork',
+      otherStoryRoutes: 'Other story routes',
+      staticStageThisOptionDoesNotDemonstrateThisCase: 'Static stage: this option does not demonstrate this case yet',
+      forkSummary: (labels: string) => ` · Fork: ${labels}`,
+      switchScenario: (label: string) => `Switch scenario: ${label}`,
       speedValue: (n: number) => `${number(n, locale)}×`,
       transition: "Transition",
       transitionPrefix: "Transition · ",
@@ -141,6 +146,15 @@ export function createEn(locale: Locale = 'en') {
       couldNotExecuteThisStep: (p0: Value) => `Could not execute this step: ${value(p0, locale)}`,
     },
     stage: {
+      keyboardType: 'Type',
+      sender: 'Sender',
+      unspecified: 'Not specified',
+      noSubject: 'No subject',
+      dataRecords: 'Data records',
+      noData: 'No data',
+      noStates: 'No states',
+      recipient: (name: string) => `To: ${name}`,
+      stateChange: (before: string, after: string) => `State change: ${before} → ${after}`,
       // D56: default component chrome only; author titles, role names, durations, and artifact contents stay verbatim.
       thinking: 'Thinking',
       thinkingActive: 'Thinking…',
