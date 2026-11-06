@@ -1,3 +1,6 @@
+import { createZhCN } from '../src/i18n/zh-CN';
+import { createBoardZhCN } from '../src/i18n/board/zh-CN';
+const zh = { ...createZhCN(), ...createBoardZhCN() };
 /**
  * T-stage 中能抽成纯函数的部分：舞台铺满可用区域（fillStage）、字幕区自适应高度（subtitleHeight）与结果小标记、
  * 全屏快捷键（isFullscreenKey）。界面（全屏、浮动控制淡出）由用户在浏览器里检查。
@@ -47,20 +50,20 @@ const sc = {
 
 describe('字幕区：自适应高度与结果小标记', () => {
   it('没有 explain 时只占一行；有 explain 时两行；都不超过导出用的固定高度', () => {
-    const one = subtitleFor(sc, 1, null)!;
-    const two = subtitleFor({ ...sc, steps: [{ ...sc.steps[0]!, explain: '补充一句' }] } as Scenario, 1, null)!;
+    const one = subtitleFor(sc, 1, null, undefined, zh)!;
+    const two = subtitleFor({ ...sc, steps: [{ ...sc.steps[0]!, explain: '补充一句' }] } as Scenario, 1, null, undefined, zh)!;
     expect(subtitleHeight(one)).toBeLessThan(subtitleHeight(two));
     expect(subtitleHeight(one)).toBeLessThanOrEqual(56);
     expect(subtitleHeight(two)).toBeLessThanOrEqual(SUBTITLE_HEIGHT);
     expect(subtitleHeight(null)).toBe(subtitleHeight(one));
   });
   it('平时右侧是“第 n / 共 m 步”；场景完成后是“场景完成 · 模拟成功”，第二行没有 explain 时显示结果说明（不再在步骤条里重复）', () => {
-    expect(subtitleFor(sc, 1, null)!.badge).toEqual({ kind: 'progress', text: '第 1 / 2 步' });
-    const done = subtitleFor(sc, 2, null, { text: '大脑规划，两只手各自执行', outcome: 'success' })!;
+    expect(subtitleFor(sc, 1, null, undefined, zh)!.badge).toEqual({ kind: 'progress', text: '第 1 / 2 步' });
+    const done = subtitleFor(sc, 2, null, { text: '大脑规划，两只手各自执行', outcome: 'success' }, zh)!;
     expect(done.badge).toMatchObject({ kind: 'done', text: '场景完成 · 模拟成功', outcome: 'success' });
     expect(done.explain).toBe('大脑规划，两只手各自执行');
     // 正在播放（还没提交）时不显示完成
-    expect(subtitleFor(sc, 2, 1, { text: 'x', outcome: 'success' })!.badge.kind).toBe('progress');
+    expect(subtitleFor(sc, 2, 1, { text: 'x', outcome: 'success' }, zh)!.badge.kind).toBe('progress');
   });
 });
 

@@ -1,3 +1,4 @@
+import { en, type Dictionary } from '../i18n/en';
 /**
  * 舞台外观（D55）：配色（主题名）、字体、线条。字体与线条为 null 时用主题自己的值。
  * 消费者：Stage 根节点（data-theme / data-stroke / data-font，字体用 --jp-font 覆盖）、字幕区与手机外框（.jtheme）、
@@ -25,11 +26,11 @@ export function fontStack(font: AppearanceFont | null | undefined): string | nul
 }
 
 /** 消费者实际用的值：线条落到 rough / clean，字体覆盖写成内联的 --jp-font（优先于主题 CSS）。 */
-export function resolveLook(look: Look, authorThemes: Record<string, string> = {}): { theme: string; stroke: StrokeMode; font: AppearanceFont | null; style: Record<string, string> } {
+export function resolveLook(look: Look, authorThemes: Record<string, string> = {}, i18n: Dictionary = en): { theme: string; stroke: StrokeMode; font: AppearanceFont | null; style: Record<string, string> } {
   const stack = fontStack(look.font);
   return {
     theme: look.theme,
-    stroke: isAppearanceStroke(look.stroke) ? look.stroke : strokeOfTheme(look.theme, authorThemes),
+    stroke: isAppearanceStroke(look.stroke) ? look.stroke : strokeOfTheme(look.theme, authorThemes, i18n),
     font: stack ? look.font : null,
     style: stack ? { '--jp-font': stack } : {},
   };

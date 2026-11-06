@@ -1,3 +1,6 @@
+import { createZhCN } from '../src/i18n/zh-CN';
+import { createBoardZhCN } from '../src/i18n/board/zh-CN';
+const zh = { ...createZhCN(), ...createBoardZhCN() };
 /**
  * 看板 UI v1（D55）阶段 1：看板 Token 与控件原语。
  * - 浮层定位（placePopover）：贴着锚点、放不下时翻到另一侧、夹在视口里（浮层用 portal + position: fixed，不受父级 overflow 裁切）；
@@ -65,16 +68,16 @@ describe('portalHostOf：浮层挂在全屏元素里（全屏时 body 下的内�
 
 describe('coverageMark：图标 + 文字（颜色不单独表意）', () => {
   it('四种状态各有图标与中文名；没有覆盖记录（none）按缺失；已排除用不适用的图标', () => {
-    expect(coverageMark('expressed')).toEqual({ icon: 'circle-check', tone: 'ok', label: '已表达' });
-    expect(coverageMark('missing')).toEqual({ icon: 'circle-x', tone: 'danger', label: '缺失' });
-    expect(coverageMark('none')).toEqual({ icon: 'circle-x', tone: 'danger', label: '缺失' });
-    expect(coverageMark('undecided')).toEqual({ icon: 'circle-dashed', tone: 'pending', label: '待决定' });
-    expect(coverageMark('not_applicable')).toEqual({ icon: 'circle-minus', tone: 'na', label: '不适用' });
-    expect(coverageMark('excluded')).toMatchObject({ icon: 'circle-minus', tone: 'na', label: '已排除' });
+    expect(coverageMark('expressed', zh)).toEqual({ icon: 'circle-check', tone: 'ok', label: '已表达' });
+    expect(coverageMark('missing', zh)).toEqual({ icon: 'circle-x', tone: 'danger', label: '缺失' });
+    expect(coverageMark('none', zh)).toEqual({ icon: 'circle-x', tone: 'danger', label: '缺失' });
+    expect(coverageMark('undecided', zh)).toEqual({ icon: 'circle-dashed', tone: 'pending', label: '待决定' });
+    expect(coverageMark('not_applicable', zh)).toEqual({ icon: 'circle-minus', tone: 'na', label: '不适用' });
+    expect(coverageMark('excluded', zh)).toMatchObject({ icon: 'circle-minus', tone: 'na', label: '已排除' });
   });
   it('未知或空的状态按缺失处理（不崩溃）', () => {
-    expect(coverageMark(undefined as never)).toEqual(COVERAGE_MARK.missing);
-    expect(coverageMark('weird' as never)).toEqual(COVERAGE_MARK.missing);
+    expect(coverageMark(undefined as never, zh)).toEqual(COVERAGE_MARK(zh).missing);
+    expect(coverageMark('weird' as never, zh)).toEqual(COVERAGE_MARK(zh).missing);
   });
 });
 

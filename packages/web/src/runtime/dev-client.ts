@@ -1,3 +1,6 @@
+import { MessageError, type Text } from '../i18n/messages';
+import type { Locale } from '../i18n/locale';
+import { m } from '../i18n/board/messages';
 /**
  * 看板与 `joplo dev` 看板进程通信（一个进程、多个项目，D39）。
  *
@@ -24,8 +27,8 @@ export type VideoJob = {
   id: string;
   projectId: string;
   scenarioId: string;
-  status: 'running' | 'done' | 'error';
-  phase: 'starting' | 'recording' | 'saving' | 'done' | 'error';
+  status: 'running' | 'done' | 'error' | 'cancelled';
+  phase: 'starting' | 'recording' | 'saving' | 'done' | 'error' | 'cancelled';
   step: number;
   total: number;
   percent: number;
@@ -39,7 +42,7 @@ export function localToken(): string | null {
 }
 
 const enc = encodeURIComponent;
-const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const errMsg = (e: unknown): Text => e instanceof MessageError ? e.text : e instanceof Error ? e.message : String(e);
 
 async function readError(res: Response): Promise<string> {
   const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
@@ -52,23 +55,23 @@ function writeHeaders(json = true): Record<string, string> | null {
   return { 'x-joplo-token': token, ...(json ? { 'content-type': 'application/json' } : {}) };
 }
 
-export async function fetchProjects(): Promise<ProjectSummary[] | { error: string }> {
+export async function fetchProjects(): Promise<ProjectSummary[] | { error: Text }> {
   try {
     const res = await fetch('/__joplo/projects', { cache: 'no-store' });
-    if (!res.ok) return { error: `读取项目列表失败（${await readError(res)}）` };
+    if (!res.ok) return { error: m.board.couldNotReadProjectList(await readError(res)) };
     return ((await res.json()) as { projects: ProjectSummary[] }).projects;
   } catch (e) {
-    return { error: `无法连接 joplo dev：${errMsg(e)}` };
+    return { error: m.board.couldNotConnectToJoploDev(errMsg(e)) };
   }
 }
 
-export async function fetchIR(projectId: string): Promise<DevPayload | { error: string; status?: number }> {
+export async function fetchIR(projectId: string): Promise<DevPayload | { error: Text; status?: number }> {
   try {
     const res = await fetch(`/__joplo/p/${enc(projectId)}/ir`, { cache: 'no-store' });
     if (!res.ok) return { error: await readError(res), status: res.status };
     return (await res.json()) as DevPayload;
   } catch (e) {
-    return { error: `无法连接 joplo dev：${errMsg(e)}` };
+    return { error: m.board.couldNotConnectToJoploDev(errMsg(e)) };
   }
 }
 
@@ -118,7 +121,7 @@ export async function fetchSelection(projectId: string): Promise<Selection | nul
 export function selectionWriter(projectId: string) {
   return async (input: SelectionInput | null): Promise<SelectionWriteResult> => {
     const headers = writeHeaders();
-    if (!headers) return { ok: false, message: '页面没有本地令牌（请通过 joplo dev 打开）' };
+    if (!headers) return { ok: false, message: m.board.thisPageHasNoLocalTokenOpenItThrough };
     try {
       const res = await fetch(`/__joplo/p/${enc(projectId)}/selection`, { method: 'PUT', headers, body: JSON.stringify({ selection: input }) });
       const body = (await res.json().catch(() => null)) as { selection?: Selection | null; current?: Selection | null; error?: { message?: string } } | null;
@@ -132,12 +135,12 @@ export function selectionWriter(projectId: string) {
 
 async function post(url: string, body: unknown, method = 'POST'): Promise<Response> {
   const headers = writeHeaders(body !== undefined);
-  if (!headers) throw new Error('页面没有本地令牌（请通过 joplo dev 打开）');
+  if (!headers) throw new MessageError(m.board.thisPageHasNoLocalTokenOpenItThrough);
   return fetch(url, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
 }
 
 /** 从列表移除（只删记录，不删项目文件）。 */
-export async function removeProject(projectId: string): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function removeProject(projectId: string): Promise<{ ok: true } | { ok: false; message: Text }> {
   try {
     const res = await post(`/__joplo/projects/${enc(projectId)}`, undefined, 'DELETE');
     return res.ok ? { ok: true } : { ok: false, message: await readError(res) };
@@ -146,7 +149,7 @@ export async function removeProject(projectId: string): Promise<{ ok: true } | {
   }
 }
 
-export async function openInEditor(projectId: string, at: string): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function openInEditor(projectId: string, at: string): Promise<{ ok: true } | { ok: false; message: Text }> {
   try {
     const res = await post(`/__joplo/p/${enc(projectId)}/open`, { at });
     return res.ok ? { ok: true } : { ok: false, message: await readError(res) };
@@ -156,10 +159,10 @@ export async function openInEditor(projectId: string, at: string): Promise<{ ok:
 }
 
 /** 导出跟随页面自己的 viewport（D44：不再选择设备）。 */
-export type ExportRequest = { scenarioId: string; position: number; theme: string; /** D55：null = 跟随主题。 */ font?: AppearanceFont | null; stroke?: AppearanceStroke | null };
+export type ExportRequest = { locale: Locale; scenarioId: string; position: number; theme: string; /** D55：null = 跟随主题。 */ font?: AppearanceFont | null; stroke?: AppearanceStroke | null };
 
 /** 本机导出图片：服务端用 Playwright 渲染当前步骤（与 joplo render 同一渲染路径）。 */
-export async function exportImage(projectId: string, body: ExportRequest): Promise<{ ok: true; blob: Blob; name: string } | { ok: false; message: string }> {
+export async function exportImage(projectId: string, body: ExportRequest): Promise<{ ok: true; blob: Blob; name: string } | { ok: false; message: Text }> {
   try {
     const res = await post(`/__joplo/p/${enc(projectId)}/export/image`, body);
     if (!res.ok) return { ok: false, message: await readError(res) };
@@ -170,7 +173,7 @@ export async function exportImage(projectId: string, body: ExportRequest): Promi
   }
 }
 
-export async function startVideo(projectId: string, body: Omit<ExportRequest, 'position'>): Promise<{ ok: true; job: VideoJob } | { ok: false; message: string; job?: VideoJob }> {
+export async function startVideo(projectId: string, body: Omit<ExportRequest, 'position'>): Promise<{ ok: true; job: VideoJob } | { ok: false; message: Text; job?: VideoJob }> {
   try {
     const res = await post(`/__joplo/p/${enc(projectId)}/export/video`, body);
     const b = (await res.json().catch(() => null)) as { job?: VideoJob; error?: { message?: string } } | null;
@@ -182,10 +185,10 @@ export async function startVideo(projectId: string, body: Omit<ExportRequest, 'p
 }
 
 /** 取消正在进行的视频导出（D55）：DELETE …/export/video。 */
-export async function cancelVideo(projectId: string): Promise<{ ok: true; job: VideoJob } | { ok: false; message: string }> {
+export async function cancelVideo(projectId: string): Promise<{ ok: true; job: VideoJob } | { ok: false; message: Text }> {
   try {
     const headers = writeHeaders(false);
-    if (!headers) return { ok: false, message: '页面没有本地令牌' };
+    if (!headers) return { ok: false, message: m.board.thisPageHasNoLocalToken };
     const res = await fetch(`/__joplo/p/${enc(projectId)}/export/video`, { method: 'DELETE', headers, cache: 'no-store' });
     const b = (await res.json().catch(() => null)) as { job?: VideoJob; error?: { message?: string } } | null;
     return res.ok && b?.job ? { ok: true, job: b.job } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
@@ -195,12 +198,12 @@ export async function cancelVideo(projectId: string): Promise<{ ok: true; job: V
 }
 
 /** 视频导出进度（SSE，用 fetch 读流以便带令牌）。返回取消函数。 */
-export function watchVideo(projectId: string, cb: (job: VideoJob | null) => void, onError: (message: string) => void): () => void {
+export function watchVideo(projectId: string, cb: (job: VideoJob | null) => void, onError: (message: Text) => void): () => void {
   const ac = new AbortController();
   void (async () => {
     try {
       const headers = writeHeaders(false);
-      if (!headers) throw new Error('页面没有本地令牌');
+      if (!headers) throw new MessageError(m.board.thisPageHasNoLocalToken);
       const res = await fetch(`/__joplo/p/${enc(projectId)}/export/video/events`, { headers, signal: ac.signal, cache: 'no-store' });
       if (!res.ok || !res.body) throw new Error(await readError(res));
       const reader = res.body.getReader();
@@ -239,7 +242,7 @@ export async function fetchSettings(): Promise<BoardSettings> {
   }
 }
 
-export async function saveSettings(settings: BoardSettings): Promise<{ ok: true; settings: BoardSettings } | { ok: false; message: string }> {
+export async function saveSettings(settings: BoardSettings): Promise<{ ok: true; settings: BoardSettings } | { ok: false; message: Text }> {
   try {
     const res = await post('/__joplo/settings', { settings }, 'PUT');
     if (!res.ok) return { ok: false, message: await readError(res) };

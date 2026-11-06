@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/context';
 /**
  * 舞台覆盖层：鼠标指针、点击波纹、聚焦高亮、点错位置时目标闪两下（提示文字在 StageViewport 顶部居中）。说明与 explain 在画面下方的字幕区（Subtitle），不叠在画面上。
  * 位于画框内部（坐标即画框坐标），pointer-events 默认关闭，不影响元素命中与遮挡检查。
@@ -57,6 +58,8 @@ export function Overlay({
   onBackToDemo: () => void;
   onDismiss: () => void;
 }) {
+  const { t: i18n } = useI18n();
+
   const n = snap.notice;
   const anchorId = n && 'nodeId' in n ? n.nodeId : null;
   const showFocus = !snap.busy && nextTargetId;
@@ -77,9 +80,8 @@ export function Overlay({
       ) : null}
 
       {snap.preview && prevBox ? (
-        <div className="absolute whitespace-nowrap rounded bg-[var(--focus)] px-2 py-0.5 text-[13px] font-medium text-white" style={{ left: prevBox.x + prevBox.w - 76, top: prevBox.y - 6 }} data-joverlay="sample">
-          示例输入
-        </div>
+        <div className="absolute whitespace-nowrap rounded bg-[var(--focus)] px-2 py-0.5 text-[13px] font-medium text-white" style={{ left: prevBox.x + prevBox.w, top: prevBox.y - 6, transform: 'translateX(-100%)' }} data-joverlay="sample">
+          {i18n.player.sampleInput}</div>
       ) : null}
 
       <AnimatePresence>
@@ -104,7 +106,7 @@ export function Overlay({
 
       {/* 点错位置（D55）：目标闪两下；说明在画面顶部居中的轻提示（StageViewport） */}
       {n && anchor && (n.kind === 'disabled' || n.kind === 'uncovered' || n.kind === 'out_of_order') ? (
-        <div key={`${anchorId}|${n.text}`} className="jflash absolute rounded-md border-2 border-[var(--focus)]" style={{ left: anchor.x - 5, top: anchor.y - 5, width: anchor.w + 10, height: anchor.h + 10 }} data-joverlay="notice-target" aria-hidden />
+        <div key={`${anchorId}|${JSON.stringify(n.text)}`} className="jflash absolute rounded-md border-2 border-[var(--focus)]" style={{ left: anchor.x - 5, top: anchor.y - 5, width: anchor.w + 10, height: anchor.h + 10 }} data-joverlay="notice-target" aria-hidden />
       ) : null}
     </>
   );

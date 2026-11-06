@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/context';
 /**
  * 舞台的显示区域（看板与发布站共用）：
  * - 电脑页面：舞台铺满可用区域（fillStage），逻辑尺寸随区域的宽高比变化，只在舞台边缘裁切；
@@ -15,17 +16,21 @@ import { cn } from '@/lib/utils';
 import { noticeView, type NoticeView } from './states';
 
 function NoticeIcon({ icon }: { icon: NoticeView['icon'] }) {
+  const { t: i18n } = useI18n();
+
   const cls = 'size-4 shrink-0';
-  if (icon === 'next') return <CircleArrowRight className={cls} aria-label="下一步不是这里" />;
-  if (icon === 'uncovered') return <CircleDashed className={cn(cls, 'text-jb-muted')} aria-label="演示没有覆盖" />;
-  if (icon === 'disabled') return <Ban className={cn(cls, 'text-jb-danger')} aria-label="现在不可用" />;
-  if (icon === 'error') return <CircleX className={cn(cls, 'text-jb-danger')} aria-label="出错" />;
-  if (icon === 'ok') return <CircleCheck className={cn(cls, 'text-jb-ok')} aria-label="完成" />;
+  if (icon === 'next') return <CircleArrowRight className={cls} aria-label={i18n.player.thatIsNotTheNextStep} />;
+  if (icon === 'uncovered') return <CircleDashed className={cn(cls, 'text-jb-muted')} aria-label={i18n.player.notCoveredByThisDemo} />;
+  if (icon === 'disabled') return <Ban className={cn(cls, 'text-jb-danger')} aria-label={i18n.player.unavailableNow} />;
+  if (icon === 'error') return <CircleX className={cn(cls, 'text-jb-danger')} aria-label={i18n.player.error} />;
+  if (icon === 'ok') return <CircleCheck className={cn(cls, 'text-jb-ok')} aria-label={i18n.player.done} />;
   return <Info className={cn(cls, 'text-jb-muted')} aria-hidden />;
 }
 import type { AppearanceFont } from '../renderer/appearance';
 
 export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null }: { viewport: Viewport; notice: Notice | null; onDismiss: () => void; /** 「回到演示」（顺序不对的提示）。 */ onBack?: () => void; children: (size: { width: number; height: number }) => ReactNode; tag?: ReactNode; theme?: StageTheme; stroke?: StrokeMode; font?: AppearanceFont | null }) {
+  const { t: i18n } = useI18n();
+
   const box = useRef<HTMLDivElement>(null);
   const [avail, setAvail] = useState({ w: 800, h: 500 });
   useLayoutEffect(() => {
@@ -43,7 +48,7 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   const scale = phone ? fitStage(avail, frame) : fill.scale;
   const size = phone ? { width: vp.width, height: vp.height } : { width: fill.width, height: fill.height };
   // 所有提示（含点错位置的三种）都在画面顶部居中，一条轻提示（D55）
-  const view = noticeView(notice);
+  const view = noticeView(notice, i18n);
   return (
     <div ref={box} className={cn('relative min-h-0 flex-1 overflow-hidden', phone && 'bg-jb-app')} data-testid="stage-viewport" data-scale={scale.toFixed(3)} data-device={viewport}>
       {tag ? <div className="absolute left-3 top-3 z-10 flex items-center gap-2 text-[12px]">{tag}</div> : null}
@@ -60,10 +65,9 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
           </span>
           {view.back ? (
             <button type="button" className="jb-focus shrink-0 whitespace-nowrap rounded-[6px] bg-jb-inverse px-2 py-1 text-[12px] font-medium text-jb-on-inverse hover:bg-jb-inverse-hover" onClick={onBack ?? onDismiss} data-testid="notice-back">
-              回到演示
-            </button>
+              {i18n.player.backToDemo}</button>
           ) : null}
-          <button type="button" className="jb-focus flex size-6 shrink-0 items-center justify-center rounded-[6px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg" aria-label="关闭提示" onClick={onDismiss}>
+          <button type="button" className="jb-focus flex size-6 shrink-0 items-center justify-center rounded-[6px] text-jb-muted hover:bg-jb-hover hover:text-jb-fg" aria-label={i18n.player.dismissNotice} onClick={onDismiss}>
             <X className="size-3.5" />
           </button>
         </div>

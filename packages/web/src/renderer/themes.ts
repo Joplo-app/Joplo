@@ -1,3 +1,4 @@
+import { en, type Dictionary } from '../i18n/en';
 /**
  * 主题（D51）：一个主题就是一段 CSS。Joplo 约定一组 CSS 变量（--jp-*），渲染器、Diagram、Terminal、Phone、高光与字幕
  * 都只读这些变量；主题也可以写普通选择器做细调。主题 CSS 自动限定在舞台范围内（scopeThemeCss），不影响看板本身。
@@ -76,17 +77,17 @@ const SKETCH: Vars = {
   '--jp-stroke': 'rough',
 };
 
-export const BUILTIN: { name: string; title: string; dark: boolean; vars: Vars; extra?: string }[] = [
-  { name: 'sketch', title: '手绘', dark: false, vars: SKETCH },
+export const BUILTIN = (i18n: Dictionary = en): { name: string; title: string; dark: boolean; vars: Vars; extra?: string }[] => ([
+  { name: 'sketch', title: i18n.stage.handDrawn, dark: false, vars: SKETCH },
   {
     name: 'clean',
-    title: '线框',
+    title: i18n.stage.wireframe,
     dark: false,
     vars: { ...SKETCH, '--jp-font': SYSTEM, '--jp-font-size': '15px', '--jp-shadow': '0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.06)', '--jp-stroke': 'clean' },
   },
   {
     name: 'blueprint',
-    title: '蓝图',
+    title: i18n.stage.blueprint,
     dark: true,
     vars: {
       '--jp-font': SYSTEM, '--jp-font-mono': MONO, '--jp-font-size': '15px',
@@ -136,7 +137,7 @@ export const BUILTIN: { name: string; title: string; dark: boolean; vars: Vars; 
   },
   {
     name: 'terminal',
-    title: '复古终端',
+    title: i18n.stage.retroTerminal,
     dark: true,
     vars: {
       '--jp-font': 'SFMono-Regular, Menlo, ui-monospace, "Joplo Marker Gothic", monospace', '--jp-font-mono': 'SFMono-Regular, Menlo, ui-monospace, "Joplo Marker Gothic", monospace', '--jp-font-size': '14px',
@@ -149,7 +150,7 @@ export const BUILTIN: { name: string; title: string; dark: boolean; vars: Vars; 
   },
   {
     name: 'kraft',
-    title: '牛皮纸',
+    title: i18n.stage.kraft,
     dark: false,
     vars: {
       ...SKETCH,
@@ -161,7 +162,7 @@ export const BUILTIN: { name: string; title: string; dark: boolean; vars: Vars; 
   },
   {
     name: 'contrast',
-    title: '高对比',
+    title: i18n.stage.highContrast,
     dark: false,
     vars: {
       '--jp-font': SYSTEM, '--jp-font-mono': MONO, '--jp-font-size': '16px',
@@ -172,10 +173,10 @@ export const BUILTIN: { name: string; title: string; dark: boolean; vars: Vars; 
     },
     extra: `.jbox { border-width: 2px; }\n`,
   },
-];
+]);
 
-export const builtinCss = (name: string): string | null => {
-  const t = BUILTIN.find((b) => b.name === name);
+export const builtinCss = (name: string, i18n: Dictionary = en): string | null => {
+  const t = BUILTIN(i18n).find((b) => b.name === name);
   return t ? block(t.vars, t.extra ?? '') : null;
 };
 
@@ -286,24 +287,24 @@ export function scopeThemeCss(css: string, name: string): string {
 }
 
 /** 可用的主题：内置 + 作者主题（themes/<name>.css；与内置同名时用作者的）。 */
-export function themeCatalog(authorThemes: Record<string, string> = {}): ThemeInfo[] {
-  const list: ThemeInfo[] = BUILTIN.map((b) => {
+export function themeCatalog(authorThemes: Record<string, string> = {}, i18n: Dictionary = en): ThemeInfo[] {
+  const list: ThemeInfo[] = BUILTIN(i18n).map((b) => {
     const css = authorThemes[b.name] ?? block(b.vars, b.extra ?? '');
     return { name: b.name, title: b.title, css, builtin: !(b.name in authorThemes), stroke: strokeOf(css), dark: authorThemes[b.name] ? isDark(css) : b.dark };
   });
-  for (const [name, css] of Object.entries(authorThemes)) if (!BUILTIN.some((b) => b.name === name)) list.push({ name, title: name, css, builtin: false, stroke: strokeOf(css), dark: isDark(css) });
+  for (const [name, css] of Object.entries(authorThemes)) if (!BUILTIN(i18n).some((b) => b.name === name)) list.push({ name, title: name, css, builtin: false, stroke: strokeOf(css), dark: isDark(css) });
   return list;
 }
 
 /** 主题名 → 描边方式（未知主题按默认：手绘）。 */
-export function strokeOfTheme(name: string, authorThemes: Record<string, string> = {}): StrokeMode {
-  return themeCatalog(authorThemes).find((t) => t.name === name)?.stroke ?? 'rough';
+export function strokeOfTheme(name: string, authorThemes: Record<string, string> = {}, i18n: Dictionary = en): StrokeMode {
+  return themeCatalog(authorThemes, i18n).find((t) => t.name === name)?.stroke ?? 'rough';
 }
 
 /** 所有主题限定作用范围后的 CSS（注入到页面里一次）。 */
-export function allThemesCss(authorThemes: Record<string, string> = {}): string {
-  return themeCatalog(authorThemes)
-    .map((t) => `/* 主题 ${t.name}${t.builtin ? '' : '（作者）'} */\n${scopeThemeCss(t.css, t.name)}`)
+export function allThemesCss(authorThemes: Record<string, string> = {}, i18n: Dictionary = en): string {
+  return themeCatalog(authorThemes, i18n)
+    .map((t) => i18n.stage.themeCssComment(t.name, t.builtin ? '' : i18n.stage.authorMarker, scopeThemeCss(t.css, t.name)))
     .join('\n');
 }
 

@@ -1,3 +1,6 @@
+import { createZhCN } from '../src/i18n/zh-CN';
+import { createBoardZhCN } from '../src/i18n/board/zh-CN';
+const zh = { ...createZhCN(), ...createBoardZhCN() };
 /**
  * 看板 UI v1（D55）阶段 4：状态与细节（design/png/41-细节与状态.png、34-窄屏收起规则.png）。
  * - 播放中的停留进度：控制器在每一步停留时公布 dwell，时间线的当前步据此从左往右填深黄，暂停时停住；
@@ -55,13 +58,13 @@ describe('播放中的停留进度', () => {
       { caption: 'a', kind: 'user' as const },
       { caption: 'b', kind: 'user' as const },
     ];
-    const chips = timelineChips(steps, 1, null, { position: 1, ms: 3000, elapsed: 500 }, false);
+    const chips = timelineChips(steps, 1, null, { position: 1, ms: 3000, elapsed: 500 }, false, zh);
     expect(chips[1]!.dwell).toEqual({ ms: 3000, elapsed: 500, paused: false });
     expect(chips.filter((c) => c.dwell).length).toBe(1);
-    expect(timelineChips(steps, 1, null, { position: 1, ms: 3000, elapsed: 0 }, true)[1]!.dwell!.paused).toBe(true);
+    expect(timelineChips(steps, 1, null, { position: 1, ms: 3000, elapsed: 0 }, true, zh)[1]!.dwell!.paused).toBe(true);
     // dwell 属于别的位置（例如刚跳了步）：不显示
-    expect(timelineChips(steps, 2, null, { position: 1, ms: 3000, elapsed: 0 }, false).some((c) => c.dwell)).toBe(false);
-    expect(timelineChips(steps, 1, null, null, false).some((c) => c.dwell)).toBe(false);
+    expect(timelineChips(steps, 2, null, { position: 1, ms: 3000, elapsed: 0 }, false, zh).some((c) => c.dwell)).toBe(false);
+    expect(timelineChips(steps, 1, null, null, false, zh).some((c) => c.dwell)).toBe(false);
   });
 });
 
@@ -85,12 +88,12 @@ describe('点错位置：就地说明，不打断（三种写法）', () => {
     }
   });
   it('下一步不是它 / 没有覆盖 / 现在不可用，各有图标；“回到演示”只在顺序不对时出现', () => {
-    expect(noticeView({ kind: 'out_of_order', nodeId: 'x', text: '按当前场景，下一步是：点击「邀请成员」' })).toEqual({ icon: 'next', text: '按当前场景，下一步是：点击「邀请成员」', back: true, flashTarget: true });
-    expect(noticeView({ kind: 'uncovered', nodeId: 'x', text: '当前演示未覆盖此操作：「空间设置」' })).toMatchObject({ icon: 'uncovered', back: false, flashTarget: true });
-    expect(noticeView({ kind: 'disabled', nodeId: 'x', text: '邮箱格式不对' })).toMatchObject({ icon: 'disabled', back: false, flashTarget: true });
-    expect(noticeView({ kind: 'info', text: '提示' })).toMatchObject({ icon: 'info', flashTarget: false });
-    expect(noticeView({ kind: 'error', text: '坏了' })).toMatchObject({ icon: 'error' });
-    expect(noticeView(null)).toBeNull();
+    expect(noticeView({ kind: 'out_of_order', nodeId: 'x', text: '按当前场景，下一步是：点击「邀请成员」' }, zh)).toEqual({ icon: 'next', text: '按当前场景，下一步是：点击「邀请成员」', back: true, flashTarget: true });
+    expect(noticeView({ kind: 'uncovered', nodeId: 'x', text: '当前演示未覆盖此操作：「空间设置」' }, zh)).toMatchObject({ icon: 'uncovered', back: false, flashTarget: true });
+    expect(noticeView({ kind: 'disabled', nodeId: 'x', text: '邮箱格式不对' }, zh)).toMatchObject({ icon: 'disabled', back: false, flashTarget: true });
+    expect(noticeView({ kind: 'info', text: '提示' }, zh)).toMatchObject({ icon: 'info', flashTarget: false });
+    expect(noticeView({ kind: 'error', text: '坏了' }, zh)).toMatchObject({ icon: 'error' });
+    expect(noticeView(null, zh)).toBeNull();
   });
 });
 
@@ -122,18 +125,18 @@ describe('场景完成后的“下一个情况”', () => {
 
 describe('缺口横幅', () => {
   it('给 Agent 的话；“看方案 X 怎么处理”取第一个已表达这个情况的其他方案，没有就不显示', () => {
-    expect(gapBanner(project, 'invite', 'o.a', 'c2')).toEqual({
+    expect(gapBanner(project, 'invite', 'o.a', 'c2', zh)).toEqual({
       letter: 'A',
       caseTitle: '邮箱为空',
       agentText: '给方案 A 补上「邮箱为空」的场景（npx joplo check --option o.a）',
       alt: { optionId: 'o.c', letter: 'C' },
     });
     // C 缺“已经是成员”：A 是待决定、B 没有记录，都不算已表达 → 不显示“看方案 X”
-    expect(gapBanner(project, 'invite', 'o.c', 'c3')!.alt).toBeNull();
+    expect(gapBanner(project, 'invite', 'o.c', 'c3', zh)!.alt).toBeNull();
   });
   it('边界输入：没有方案或情况时返回 null', () => {
-    expect(gapBanner(project, 'invite', null, 'c2')).toBeNull();
-    expect(gapBanner(project, 'invite', 'o.a', null)).toBeNull();
+    expect(gapBanner(project, 'invite', null, 'c2', zh)).toBeNull();
+    expect(gapBanner(project, 'invite', 'o.a', null, zh)).toBeNull();
   });
 });
 
@@ -153,28 +156,28 @@ describe('编译出错横幅', () => {
 describe('导出视频的进度', () => {
   const job = (patch: Record<string, unknown>) => ({ id: 'j', projectId: 'p', scenarioId: 's', status: 'running', phase: 'recording', step: 3, total: 5, percent: 56, file: null, error: null, ...patch }) as never;
   it('录制中写“第 3 / 5 步”；启动、保存、完成、失败、取消各有说明；没有任务时为 null', () => {
-    expect(exportProgress(job({}), '管理员成功发出邀请')).toEqual({ running: true, percent: 56, text: '正在录制「管理员成功发出邀请」', step: '第 3 / 5 步', done: false, error: null });
-    expect(exportProgress(job({ phase: 'starting', step: 0, percent: 2 }), 'x')).toMatchObject({ running: true, step: '正在启动浏览器…' });
-    expect(exportProgress(job({ status: 'done', phase: 'done', percent: 100, file: 'exports/a.webm' }), 'x')).toMatchObject({ running: false, done: true, text: '已导出 exports/a.webm' });
-    expect(exportProgress(job({ status: 'error', phase: 'error', error: '已取消' }), 'x')).toMatchObject({ running: false, error: '已取消' });
-    expect(exportProgress(null, 'x')).toBeNull();
+    expect(exportProgress(job({}), '管理员成功发出邀请', zh)).toEqual({ running: true, percent: 56, text: '正在录制「管理员成功发出邀请」', step: '第 3 / 5 步', done: false, error: null });
+    expect(exportProgress(job({ phase: 'starting', step: 0, percent: 2 }), 'x', zh)).toMatchObject({ running: true, step: '正在启动浏览器…' });
+    expect(exportProgress(job({ status: 'done', phase: 'done', percent: 100, file: 'exports/a.webm' }), 'x', zh)).toMatchObject({ running: false, done: true, text: '已导出 exports/a.webm' });
+    expect(exportProgress(job({ status: 'error', phase: 'error', error: '已取消' }), 'x', zh)).toMatchObject({ running: false, error: '已取消' });
+    expect(exportProgress(null, 'x', zh)).toBeNull();
   });
 });
 
 describe('快捷键面板（?）', () => {
   it('列出全部快捷键，按播放 / 画面 / 其他分组', () => {
-    expect(SHORTCUTS.map((g) => g.group)).toEqual(['播放', '画面', '其他']);
-    const keys = SHORTCUTS.flatMap((g) => g.items.map((i) => i.keys));
+    expect(SHORTCUTS(zh).map((g) => g.group)).toEqual(['播放', '画面', '其他']);
+    const keys = SHORTCUTS(zh).flatMap((g) => g.items.map((i) => i.keys));
     for (const k of ['空格', '← →', 'Home', 'F', '按住 ⌥', 'T', '?', '[']) expect(keys).toContain(k);
   });
 });
 
 describe('标签页标题与 favicon 状态点', () => {
   it('标题“功能 · 项目”；出错加 ✕；导出中写进度', () => {
-    expect(tabTitle({ feature: '团队成员邀请', project: '团队邀请功能' })).toBe('团队成员邀请 · 团队邀请功能');
-    expect(tabTitle({ feature: '团队成员邀请', project: '团队邀请功能', error: true })).toBe('✕ 团队成员邀请 · 团队邀请功能');
-    expect(tabTitle({ feature: '团队成员邀请', project: '团队邀请功能', exporting: '3/5' })).toBe('团队成员邀请 · 导出中 3/5');
-    expect(tabTitle({ feature: null, project: null })).toBe('Joplo · 看板');
+    expect(tabTitle({ feature: '团队成员邀请', project: '团队邀请功能' }, zh)).toBe('团队成员邀请 · 团队邀请功能');
+    expect(tabTitle({ feature: '团队成员邀请', project: '团队邀请功能', error: true }, zh)).toBe('✕ 团队成员邀请 · 团队邀请功能');
+    expect(tabTitle({ feature: '团队成员邀请', project: '团队邀请功能', exporting: '3/5' }, zh)).toBe('团队成员邀请 · 导出中 3/5');
+    expect(tabTitle({ feature: null, project: null }, zh, zh.board.joploBoard)).toBe('Joplo · 看板');
   });
   it('favicon：标志；出错右下角红点，导出中黄点', () => {
     const plain = decodeURIComponent(faviconHref(null));
@@ -187,8 +190,8 @@ describe('标签页标题与 favicon 状态点', () => {
 
 describe('窄屏收起（34 ⑤–⑦）', () => {
   it('< 1100 左栏收成 56px 竖条；< 900 时间线只剩当前步和总数、字幕 explain 收进悬停', () => {
-    expect(boardLayout(1280)).toMatchObject({ rail: false, compactTimeline: false, explainInTip: false });
-    expect(boardLayout(1099)).toMatchObject({ rail: true, navWidth: 56, compactTimeline: false });
-    expect(boardLayout(899)).toMatchObject({ rail: true, compactTimeline: true, explainInTip: true });
+    expect(boardLayout(1280, zh)).toMatchObject({ rail: false, compactTimeline: false, explainInTip: false });
+    expect(boardLayout(1099, zh)).toMatchObject({ rail: true, navWidth: 56, compactTimeline: false });
+    expect(boardLayout(899, zh)).toMatchObject({ rail: true, compactTimeline: true, explainInTip: true });
   });
 });

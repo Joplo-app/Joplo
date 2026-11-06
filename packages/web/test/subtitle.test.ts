@@ -1,3 +1,6 @@
+import { createZhCN } from '../src/i18n/zh-CN';
+import { createBoardZhCN } from '../src/i18n/board/zh-CN';
+const zh = { ...createZhCN(), ...createBoardZhCN() };
 /**
  * 字幕区（画面下方、播放控制上方）：显示哪一步、最多两行（一行说明、一行 explain）、悬停全文；
  * check 的 CAPTION_TOO_LONG / EXPLAIN_TOO_LONG 只提示、不改写作者的文字。界面由用户检查。
@@ -20,17 +23,17 @@ const sc = {
 
 describe('subtitleFor（字幕区显示的内容）', () => {
   it('第 0 步：初始状态 + 场景描述；之后是刚执行完的一步；播放中是正在播放的一步', () => {
-    expect(subtitleFor(sc, 0, null)).toMatchObject({ index: 0, kind: 'initial', caption: '初始状态', explain: '演示一次完整的调用' });
-    expect(subtitleFor(sc, 1, null)).toMatchObject({ index: 1, kind: 'user', caption: '点击发送', explain: null });
-    expect(subtitleFor(sc, 1, 1)).toMatchObject({ index: 2, kind: 'system', caption: '额度预检', explain: '额度不足时在这里就拦下' });
-    expect(subtitleFor(sc, 99, null)!.index).toBe(2);
-    expect(subtitleFor(null, 0, null)).toBeNull();
+    expect(subtitleFor(sc, 0, null, undefined, zh)).toMatchObject({ index: 0, kind: 'initial', caption: '初始状态', explain: '演示一次完整的调用' });
+    expect(subtitleFor(sc, 1, null, undefined, zh)).toMatchObject({ index: 1, kind: 'user', caption: '点击发送', explain: null });
+    expect(subtitleFor(sc, 1, 1, undefined, zh)).toMatchObject({ index: 2, kind: 'system', caption: '额度预检', explain: '额度不足时在这里就拦下' });
+    expect(subtitleFor(sc, 99, null, undefined, zh)!.index).toBe(2);
+    expect(subtitleFor(null, 0, null, undefined, zh)).toBeNull();
   });
   it('最多两行：说明一行、explain 一行；没有 explain 时只有一行；悬停显示全文（不截断原文）', () => {
-    const a = subtitleFor(sc, 2, null)!;
+    const a = subtitleFor(sc, 2, null, undefined, zh)!;
     expect([a.captionLines, a.explainLines]).toEqual([1, 1]);
     expect(a.title).toBe('额度预检\n额度不足时在这里就拦下');
-    const b = subtitleFor(sc, 1, null)!;
+    const b = subtitleFor(sc, 1, null, undefined, zh)!;
     expect([b.captionLines, b.explainLines]).toEqual([1, 0]);
     expect(b.title).toBe('点击发送');
   });

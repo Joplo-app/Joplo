@@ -1,3 +1,7 @@
+import type { BoardDictionary } from '../i18n/board/en';
+import { reference } from '../i18n/messages';
+import { type Text } from '../i18n/messages';
+import { m } from '../i18n/messages';
 /**
  * 演示控制器（看板与发布站共用）。手动体验、逐步查看、自动播放只通过 @joplo-app/core 的
  * applyStep / stateAt / explainClick 推进状态；本文件只负责动画编排（鼠标、波纹、逐字输入、系统事件停留）和提示。
@@ -21,19 +25,19 @@ import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 export type View = 'stage' | 'browse';
 
 export type Notice =
-  | { kind: 'disabled'; nodeId: string; text: string }
-  | { kind: 'uncovered'; nodeId: string; text: string }
-  | { kind: 'out_of_order'; nodeId: string; text: string }
-  | { kind: 'info'; text: string }
-  | { kind: 'switched'; text: string }
-  | { kind: 'selected'; text: string }
-  | { kind: 'error'; text: string };
+  | { kind: 'disabled'; nodeId: string; text: Text }
+  | { kind: 'uncovered'; nodeId: string; text: Text }
+  | { kind: 'out_of_order'; nodeId: string; text: Text }
+  | { kind: 'info'; text: Text }
+  | { kind: 'switched'; text: Text }
+  | { kind: 'selected'; text: Text }
+  | { kind: 'error'; text: Text };
 
-export type SelectionSync = { status: 'idle' | 'pending' | 'ok' } | { status: 'error'; message: string };
+export type SelectionSync = { status: 'idle' | 'pending' | 'ok' } | { status: 'error'; message: Text };
 
 /** 浏览器提交给服务端的选中（服务端补全 at / label / route）。 */
 export type SelectionInput = { optionId: string | null; scenarioId: string | null; position: number; sceneId: string; nodeId: string | null; stepId?: string | null };
-export type SelectionWriteResult = { ok: true; selection: Selection | null } | { ok: false; message: string; current?: Selection | null };
+export type SelectionWriteResult = { ok: true; selection: Selection | null } | { ok: false; message: Text; current?: Selection | null };
 export type SelectionWriter = (input: SelectionInput | null) => Promise<SelectionWriteResult>;
 
 export type Snapshot = {
@@ -58,7 +62,7 @@ export type Snapshot = {
   notice: Notice | null;
   selection: Selection | null;
   /** 回放失败时的说明。 */
-  playbackError: string | null;
+  playbackError: Text | null;
   cursorVisible: boolean;
   selectionSync: SelectionSync;
   /** 状态被“跳转”时递增：舞台据此直接移除旧 Toast，不播放退出动画。 */
@@ -113,6 +117,8 @@ function fullyVisible(el: HTMLElement, root: HTMLElement): boolean {
   }
   return true;
 }
+
+const boardRef = reference<BoardDictionary>();
 
 export class DemoController {
   private snap: Snapshot = {
@@ -253,7 +259,7 @@ export class DemoController {
     if (view === 'stage' && !scenarioId) view = 'browse';
 
     let state: PlayState | null = null;
-    let playbackError: string | null = null;
+    let playbackError: Text | null = null;
     if (view === 'browse' && browse) state = browseState(project, browse);
     else if (scenarioId) {
       const sc = project.scenarios[scenarioId]!;
@@ -278,22 +284,22 @@ export class DemoController {
     const stepOk = !sel.nodeId && sel.stepId && sel.scenarioId && p.scenarios[sel.scenarioId]?.steps.some((s) => s.id === sel.stepId);
     if (hit || stepOk) {
       const at = hit ? (hit.node.source ?? null) : (p.scenarios[sel.scenarioId!]!.steps.find((s) => s.id === sel.stepId)?.source ?? null);
-      if (at !== sel.at || (hit && scene && nodeLabel(hit.node) !== sel.label)) void this.writeSelection(this.inputOf(sel), '选中元素的位置已更新', '选中未能同步给 Agent');
+      if (at !== sel.at || (hit && scene && nodeLabel(hit.node) !== sel.label)) void this.writeSelection(this.inputOf(sel), boardRef('board', 'selectedElementLocationUpdated'), boardRef('board', 'couldNotSyncSelectionToAgent'));
       return;
     }
-    void this.writeSelection(null, '选中的元素已不在当前画面中，已取消选中', '取消选中未能同步给 Agent', true);
+    void this.writeSelection(null, boardRef('board', 'theSelectedElementIsNoLongerInThisStage'), boardRef('board', 'couldNotSyncClearedSelectionToAgent'), true);
   }
 
-  private safeStateAt(project: Project, scenarioId: string, position: number): { state: PlayState | null; error: string | null } {
+  private safeStateAt(project: Project, scenarioId: string, position: number): { state: PlayState | null; error: Text | null } {
     try {
       return { state: stateAt(project, scenarioId, position), error: null };
     } catch (e) {
       const r = replay(project, scenarioId);
       const msg = r.diagnostics[0]?.message ?? (e instanceof Error ? e.message : String(e));
       try {
-        return { state: stateAt(project, scenarioId, Math.min(position, r.reached)), error: `回放在第 ${r.reached + 1} 步失败：${msg}` };
+        return { state: stateAt(project, scenarioId, Math.min(position, r.reached)), error: m.player.replayFailedAtStep(r.reached + 1, msg) };
       } catch {
-        return { state: null, error: `场景无法开始：${msg}` };
+        return { state: null, error: m.player.couldNotStartScenario(msg) };
       }
     }
   }
@@ -305,11 +311,11 @@ export class DemoController {
     this.stop();
     if (view === 'browse') {
       const id = this.snap.browseSceneId ?? (this.snap.home ? browseSceneId(p, this.snap.home) : null);
-      if (!id) return this.info('项目还没有任何路径');
+      if (!id) return this.info(m.player.thisProjectHasNoRoutesYet);
       this.set({ view, browseSceneId: id, state: browseState(p, id), playbackError: null, epoch: this.snap.epoch + 1 });
     } else {
       const sc = this.scenario();
-      if (!sc) return this.info('这个方案还没有演示场景');
+      if (!sc) return this.info(m.player.thisOptionHasNoDemoScenariosYet);
       const r = this.safeStateAt(p, sc.id, 0);
       this.set({ view, state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1 });
     }
@@ -328,7 +334,7 @@ export class DemoController {
     const p = this.snap.project;
     if (!p) return;
     const id = browseSceneId(p, route);
-    if (!id) return this.info(`路径 ${route} 没有可浏览的画面`);
+    if (!id) return this.info(m.player.routeHasNoStageToBrowse(route));
     this.stop();
     this.set({ view: 'browse', browseSceneId: id, state: browseState(p, id), playbackError: null, epoch: this.snap.epoch + 1, notice: null });
   }
@@ -369,13 +375,13 @@ export class DemoController {
     const sc = p.scenarios[scenarioId]!;
     const r = this.safeStateAt(p, scenarioId, Math.max(0, Math.min(position, sc.steps.length)));
     const featureId = p.options[sc.optionId]?.featureId ?? this.snap.featureId;
-    this.set({ featureId, scenarioId, optionId: sc.optionId, view: 'stage', state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: opts.quiet ? null : { kind: 'switched', text: `已切换到「${sc.name}」，数据已重置` } });
+    this.set({ featureId, scenarioId, optionId: sc.optionId, view: 'stage', state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: opts.quiet ? null : { kind: 'switched', text: m.player.switchedToDataReset(sc.name) } });
     if (!opts.quiet) this.autoClear();
   }
 
   // ---------- 逐步查看 ----------
   reset() {
-    this.goto(0, '已重置到场景初始状态');
+    this.goto(0, m.player.resetToScenarioInitialState);
   }
 
   prev() {
@@ -388,11 +394,11 @@ export class DemoController {
       return;
     }
     this.stop();
-    if (st.position === 0) return this.info('已经是初始状态');
+    if (st.position === 0) return this.info(m.player.alreadyAtInitialState);
     this.goto(st.position - 1);
   }
 
-  goto(position: number, message?: string) {
+  goto(position: number, message?: Text) {
     const p = this.snap.project;
     const sc = this.scenario();
     if (!p || !sc || this.snap.view !== 'stage') return;
@@ -412,7 +418,7 @@ export class DemoController {
       return;
     }
     this.stop();
-    if (st.completed || st.position >= sc.steps.length) return this.info(sc.steps.length === 0 ? '这个场景没有步骤：只展示初始状态' : '场景已完成，可以重置或切换场景');
+    if (st.completed || st.position >= sc.steps.length) return this.info(sc.steps.length === 0 ? m.player.thisScenarioHasNoStepsAndOnlyShowsIts2 : m.player.scenarioCompleteResetOrSwitchScenarios);
     const gen = this.gen;
     this.set({ busy: true });
     await this.runStep(sc, gen, { moveCursor: true });
@@ -435,7 +441,7 @@ export class DemoController {
     const sc = this.scenario();
     if (!p || !sc || !this.snap.state || this.snap.view !== 'stage') return;
     this.stop();
-    if (sc.steps.length === 0) return this.info('这个场景没有步骤：只展示初始状态');
+    if (sc.steps.length === 0) return this.info(m.player.thisScenarioHasNoStepsAndOnlyShowsIts2);
     if (opts.fromStart || this.snap.state.completed || this.snap.state.position >= sc.steps.length) {
       const r = this.safeStateAt(p, sc.id, 0);
       this.set({ state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1 });
@@ -532,9 +538,9 @@ export class DemoController {
     if (!p || !st) return;
     if (opts.inspect) return this.select(nodeId);
     const sc = this.scenario();
-    if (this.snap.view !== 'stage' || !sc) return this.info('这是静态画面：当前方案还没有演示这个情况');
+    if (this.snap.view !== 'stage' || !sc) return this.info(m.player.staticStageThisOptionDoesNotDemonstrateThisCase);
 
-    if (this.snap.playing && !this.snap.paused) return this.info('正在自动播放：先暂停，再手动操作');
+    if (this.snap.playing && !this.snap.paused) return this.info(m.player.autoplayIsRunningPauseBeforeInteractingManually);
     if (this.snap.playing) this.stop(); // 暂停中手动接管
     else if (this.snap.busy) this.finishInflight(sc); // 上一步动画未完：先快进完成它
 
@@ -544,11 +550,12 @@ export class DemoController {
     try {
       verdict = explainClick(p, cur, nodeId, this.shownSceneId() ?? undefined);
     } catch (e) {
-      this.set({ notice: { kind: 'error', text: `无法解释这次点击：${e instanceof Error ? e.message : String(e)}` } });
+      this.set({ notice: { kind: 'error', text: m.player.couldNotInterpretThisClick(e instanceof Error ? e.message : String(e)) } });
       return;
     }
     const scene = p.scenes[this.shownSceneId() ?? cur.sceneId];
-    const label = scene ? nodeLabel(findNode(scene, nodeId)?.node ?? { type: '元素' }) : nodeId;
+    const node = scene ? findNode(scene, nodeId)?.node : null;
+    const label = node ? nodeLabel(node) : m.player.element;
     switch (verdict.kind) {
       case 'advance': {
         this.set({ notice: null });
@@ -573,11 +580,11 @@ export class DemoController {
         return;
       case 'unmodeled':
       case 'not_covered':
-        this.set({ notice: { kind: 'uncovered', nodeId, text: `当前演示未覆盖此操作：「${verdict.label || label}」` } });
+        this.set({ notice: { kind: 'uncovered', nodeId, text: m.player.thisDemoDoesNotCover(verdict.label || label) } });
         this.autoClear(3000);
         return;
       case 'out_of_order':
-        this.set({ notice: { kind: 'out_of_order', nodeId, text: verdict.expectedCaption ? `按当前场景，下一步是：${verdict.expectedCaption}` : '按当前场景，演示已经结束' } });
+        this.set({ notice: { kind: 'out_of_order', nodeId, text: verdict.expectedCaption ? m.player.inThisScenarioTheNextStepIs(verdict.expectedCaption) : m.player.inThisScenarioTheDemoHasEnded } });
         this.autoClear(3000);
         return;
       case 'static':
@@ -589,7 +596,7 @@ export class DemoController {
   backToDemo() {
     const st = this.snap.state;
     const sc = this.scenario();
-    if (st && sc && (st.completed || st.position >= sc.steps.length)) return this.info(sc.steps.length === 0 ? '这个场景没有步骤：只展示初始状态' : '场景已结束，可以重置或切换场景');
+    if (st && sc && (st.completed || st.position >= sc.steps.length)) return this.info(sc.steps.length === 0 ? m.player.thisScenarioHasNoStepsAndOnlyShowsIts2 : m.player.scenarioEndedResetOrSwitchScenarios);
     this.set({ notice: null });
   }
 
@@ -643,26 +650,25 @@ export class DemoController {
     if (!input) return;
     const local = this.localSelection(input);
     if (!local) return;
-    const what = local.label ? `「${local.label}」` : '';
-    await this.writeSelection(input, `已选中${what}，可以在 Agent 会话里说要改什么`, '选中未能同步给 Agent');
+    await this.writeSelection(input, boardRef('board', 'selectedTellAgentWhatYouWantToChange', local.label ?? ''), boardRef('board', 'couldNotSyncSelectionToAgent'));
   }
 
   /** 取消选中，并同步给 Agent（selection.json 写为 null）。 */
   async clearSelection() {
-    await this.writeSelection(null, '已取消选中，已同步给 Agent', '取消选中未能同步给 Agent');
+    await this.writeSelection(null, boardRef('board', 'selectionClearedAndSyncedToAgent'), boardRef('board', 'couldNotSyncClearedSelectionToAgent'));
   }
 
   /**
    * 串行写回选中；只有最后一次请求的结果会反映到界面上。
    * 不变量：返回后界面选中 = 文件内容。被拒绝时以服务端返回的 current 为准；网络失败回滚到上次确认的选中。
    */
-  private writeSelection(input: SelectionInput | null, okText: string, failText: string, quietOk = false): Promise<void> {
+  private writeSelection(input: SelectionInput | null, okText: Text, failText: Text, quietOk = false): Promise<void> {
     const seq = ++this.syncSeq;
     const optimistic = input ? this.localSelection(input) : null;
     this.set({ selection: optimistic, selectionSync: { status: 'pending' } });
     const writer = this.writer;
     this.syncChain = this.syncChain.then(async () => {
-      const r: SelectionWriteResult = writer ? await writer(input).catch((e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) })) : { ok: false, message: '当前页面不能写入选中（只读）' };
+      const r: SelectionWriteResult = writer ? await writer(input).catch((e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) })) : { ok: false, message: boardRef('board', 'thisPageCannotWriteASelectionReadOnly') };
       if (r.ok) this.confirmed = r.selection;
       else if (r.current !== undefined) this.confirmed = r.current;
       if (seq !== this.syncSeq) return;
@@ -671,8 +677,8 @@ export class DemoController {
         this.autoClear(quietOk ? 3000 : 5000);
       } else {
         const rolledBack = this.confirmed;
-        const tail = rolledBack ? `，仍保持上一次的选中「${rolledBack.label ?? rolledBack.nodeId ?? ''}」` : '，已取消选中';
-        this.set({ selection: rolledBack, selectionSync: { status: 'error', message: r.message }, notice: { kind: 'error', text: `${failText}：${r.message}${tail}` } });
+        const tail = rolledBack ? boardRef('board', 'keepingThePreviousSelection', rolledBack.label ?? rolledBack.nodeId ?? '') : boardRef('board', 'selectionCleared');
+        this.set({ selection: rolledBack, selectionSync: { status: 'error', message: r.message }, notice: { kind: 'error', text: boardRef('board', 'selectionSyncFailed', failText, r.message, tail) } });
       }
     });
     return this.syncChain;
@@ -688,7 +694,7 @@ export class DemoController {
       this.set({ view: 'browse', browseSceneId: sel.sceneId, state: browseState(p, sel.sceneId), epoch: this.snap.epoch + 1 });
     }
     this.set({ notice: null });
-    await this.writeSelection(this.inputOf(sel), '已恢复上次的选中', '上次的选中已失效', true);
+    await this.writeSelection(this.inputOf(sel), boardRef('board', 'previousSelectionRestored'), boardRef('board', 'previousSelectionIsNoLongerValid'), true);
   }
 
   /** 点击步骤条上的一步：跳到该步骤执行之后（-1 = 初始状态）。 */
@@ -775,7 +781,7 @@ export class DemoController {
       return true;
     } catch (e) {
       this.stop();
-      this.set({ playbackError: e instanceof Error ? e.message : String(e), notice: { kind: 'error', text: `无法执行这一步：${e instanceof Error ? e.message : String(e)}` } });
+      this.set({ playbackError: e instanceof Error ? e.message : String(e), notice: { kind: 'error', text: m.player.couldNotExecuteThisStep(e instanceof Error ? e.message : String(e)) } });
       return false;
     }
   }
@@ -848,7 +854,7 @@ export class DemoController {
     return gen === this.gen;
   }
 
-  private info(text: string) {
+  private info(text: Text) {
     this.set({ notice: { kind: 'info', text } });
     this.autoClear();
   }

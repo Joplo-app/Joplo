@@ -1,3 +1,5 @@
+import { createZhCN } from '../src/i18n/zh-CN';
+import { I18nProvider } from '../src/i18n/context';
 import { describe, expect, it } from 'vitest';
 import type { Scenario } from '@joplo-app/core';
 import { keyboardAt, splitKeys, dataRows, stateFlowItems, changeFor } from '../src/renderer/story-data';
@@ -34,7 +36,7 @@ describe('分叉与字幕/时间线', () => {
   it('press 是用户步骤；字幕本步与时间线都有分叉，下一步消失', () => {
     expect(subtitleFor(sc, 2, null)).toMatchObject({ kind: 'user', forks: sc.steps[1]!.forks });
     expect(subtitleFor(sc, 3, null)!.forks).toEqual([]);
-    expect(timelineChips(sc.steps, 2, null)[2]).toMatchObject({ fork: true, system: false, tip: '2 · 按下 ⌘K · 分叉：另一条路' });
+    expect(timelineChips(sc.steps, 2, null, null, false, createZhCN())[2]).toMatchObject({ fork: true, system: false, tip: '2 · 按下 ⌘K · 分叉：另一条路' });
   });
 });
 describe('数据组件展示纯函数', () => {
@@ -75,9 +77,9 @@ const p = Project.parse({ schemaVersion: 2, name: '原型', mode: 'publish', sce
 ] }, alt: { id: 'alt', optionId: 'f.a', name: '另一条路', mock: { label: '模拟', outcome: 'other' }, initial: { sceneId: 's' }, steps: [] } } });
 describe('IR → 静态组件与控制器（无浏览器）', () => {
   it('邮件头部与正文按钮、数据行变化和状态前后值、键帽都由同一 IR 渲染', () => {
-    const html = renderToStaticMarkup(createElement(Stage, { project: p, state: stateAt(p, 's', 1), theme: 'sketch', mode: 'render', animate: false }));
+    const html = renderToStaticMarkup(createElement(I18nProvider, {explicit:'zh-CN', children:createElement(Stage, { project: p, state: stateAt(p, 's', 1), theme: 'sketch', mode: 'render', animate: false })}));
     for (const text of ['营地助手', '收件人：', '阿杰', '行程有更新', '周五 20:05', 'data-jid="open"', 'data-changed=""', '500', '280', '状态变化：', '草稿', '已分享', 'data-jlayer="keyboard"', '<kbd']) expect(html).toContain(text);
-    const after = renderToStaticMarkup(createElement(Stage, { project: p, state: stateAt(p, 's', 2), theme: 'sketch', mode: 'render', animate: false }));
+    const after = renderToStaticMarkup(createElement(I18nProvider, {explicit:'zh-CN', children:createElement(Stage, { project: p, state: stateAt(p, 's', 2), theme: 'sketch', mode: 'render', animate: false })}));
     expect(after).not.toContain('data-changed=""');
     expect(after).not.toContain('data-state-change=""');
     expect(after).not.toContain('data-jlayer="keyboard"');

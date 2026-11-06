@@ -1,10 +1,11 @@
+import { type Text } from '../i18n/messages';
 /** 看板的数据钩子：项目列表、某个项目的 IR（首次载入 + 热更新，只应用版本号更大的结果）。 */
 import { useCallback, useEffect, useState } from 'react';
 import { fetchIR, fetchProjects, subscribeIR, subscribeProjects, type DevPayload, type ProjectSummary } from '../runtime/dev-client';
 
-export function useProjects(): { list: ProjectSummary[] | null; error: string | null; refresh: () => void } {
+export function useProjects(): { list: ProjectSummary[] | null; error: Text | null; refresh: () => void } {
   const [list, setList] = useState<ProjectSummary[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Text | null>(null);
   const refresh = useCallback(() => {
     void fetchProjects().then((r) => {
       if ('error' in r) setError(r.error);
@@ -21,7 +22,7 @@ export function useProjects(): { list: ProjectSummary[] | null; error: string | 
   return { list, error, refresh };
 }
 
-export type IRState = { payload: DevPayload | null; error: string | null; status?: number; live: boolean };
+export type IRState = { payload: DevPayload | null; error: Text | null; status?: number; live: boolean };
 
 export function useProjectIR(projectId: string | null): IRState {
   const [s, setS] = useState<IRState>({ payload: null, error: null, live: false });

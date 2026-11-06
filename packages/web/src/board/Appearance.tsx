@@ -1,3 +1,7 @@
+import type { Text } from '../i18n/messages';
+import { LocalText } from '../i18n/LocalText';
+import { m } from '../i18n/board/messages';
+import { useBoardI18n } from '../i18n/board/context';
 /**
  * 外观按钮与外观浮层（D55「演示页 · 外观已打开」「交互约定」）：配色 / 字体 / 线条分开选。
  * - 打开：按钮或 T；关闭：点外面或 Esc（Esc 同时撤掉预览，恢复预览前的外观）。浮层是 e1（portal），盖在画面右上方，不压缩布局。
@@ -14,7 +18,7 @@ import { Popover } from '../player/popover';
 import { FONT_STACKS, type Look } from '../renderer/appearance';
 import type { ThemeInfo } from '../renderer/themes';
 import type { BoardSettings } from '../runtime/dev-client';
-import { FONT_CHOICES, STROKE_CHOICES, THEME_TEMPLATE, appearanceLabel, applyAppearance, isCellSelected, paletteCells, resetAppearance, setAsDefault, themeLine, themeSwatch, themeToWrite, type LookPatch, type Scope } from './appearance-model';
+import { FONT_CHOICES, STROKE_CHOICES, THEME_TEMPLATE, appearanceLabel, appearanceMessage, applyAppearance, isCellSelected, paletteCells, resetAppearance, setAsDefault, themeLine, themeSwatch, themeToWrite, type LookPatch, type Scope } from './appearance-model';
 
 const PREVIEW_DELAY = 150;
 
@@ -71,14 +75,16 @@ export type AppearanceProps = {
   settings: BoardSettings | null;
   /** 当前（已保存的）外观。 */
   look: Look;
-  save: (next: BoardSettings) => Promise<{ ok: true } | { ok: false; message: string }>;
+  save: (next: BoardSettings) => Promise<{ ok: true } | { ok: false; message: Text }>;
   /** 临时预览（null = 撤掉预览）。 */
   onPreview: (look: Look | null) => void;
-  onFlash: (msg: string) => void;
+  onFlash: (msg: ReactNode) => void;
   copy: (text: string) => Promise<boolean>;
 };
 
 export function AppearancePopover(p: AppearanceProps) {
+  const { t: i18n } = useBoardI18n();
+
   const { look } = p;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearTimer = () => {
@@ -100,7 +106,7 @@ export function AppearancePopover(p: AppearanceProps) {
     const id = requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="appearance-popover"] [data-cell][aria-checked="true"]')?.focus({ preventScroll: true }));
     return () => cancelAnimationFrame(id);
   }, [p.open]);
-  const cells = paletteCells(p.catalog);
+  const cells = paletteCells(p.catalog, i18n);
   const authorFiles = cells.filter((c) => c.title.endsWith('*')).map((c) => `themes/${c.id}.css`);
 
   const preview = (patch: LookPatch, now = false) => {
@@ -117,8 +123,8 @@ export function AppearancePopover(p: AppearanceProps) {
     clearTimer();
     const r = await p.save(applyAppearance(p.settings, p.scope, p.projectId, patch));
     p.onPreview(null);
-    if (!r.ok) p.onFlash(`保存失败：${r.message}`);
-    else if (msg) p.onFlash(msg);
+    if (!r.ok) p.onFlash(<LocalText value={m.board.couldNotSave(r.message)} />);
+    else if (msg) p.onFlash(<LocalText value={msg} />);
   };
   // 一格的公共属性：悬停 150ms 预览、聚焦（键盘）立即预览、点击应用
   const cellProps = (patch: LookPatch, onPick: () => void) => ({
@@ -129,13 +135,13 @@ export function AppearancePopover(p: AppearanceProps) {
     onClick: onPick,
   });
 
-  const scopeText = p.scope === 'project' && p.projectId ? '只改这个项目' : '所有项目的默认';
+  const scopeText = p.scope === 'project' && p.projectId ? i18n.board.thisProjectOnly : i18n.board.defaultForAllProjects;
   return (
-    <Popover open={p.open} anchor={p.anchor} onClose={p.onClose} placement="bottom-end" width={392} label="外观" testid="appearance-popover" onKeyDown={onGridKey} onMouseLeave={unpreview}>
+    <Popover open={p.open} anchor={p.anchor} onClose={p.onClose} placement="bottom-end" width={392} label={i18n.board.appearance} testid="appearance-popover" onKeyDown={onGridKey} onMouseLeave={unpreview}>
       <div className="flex flex-col font-jb text-jb-fg">
         <header className="flex items-center justify-between px-4 pb-2.5 pt-3.5">
           <div className="flex items-baseline gap-2">
-            <h2 className="text-[17px] font-bold">外观</h2>
+            <h2 className="text-[17px] font-bold">{i18n.board.appearance}</h2>
             <span className="text-[12px] text-jb-muted" data-testid="appearance-scope">
               {scopeText}
             </span>
@@ -143,8 +149,8 @@ export function AppearancePopover(p: AppearanceProps) {
           <Kbd>T</Kbd>
         </header>
 
-        <Section first title="配色" right={authorFiles.length ? `* 作者主题 ${authorFiles.join('、')}` : undefined}>
-          <div role="radiogroup" aria-label="配色" className="grid grid-cols-5 gap-[7px]" data-cell-group="" data-cols="5">
+        <Section first title={i18n.board.colors} right={authorFiles.length ? i18n.board.authorTheme(i18n.player.list(authorFiles)) : undefined}>
+          <div role="radiogroup" aria-label={i18n.board.colors} className="grid grid-cols-5 gap-[7px]" data-cell-group="" data-cols="5">
             {cells.map((c) => {
               const on = isCellSelected(c, look.theme);
               const sw = themeSwatch(c.css);
@@ -183,21 +189,21 @@ export function AppearancePopover(p: AppearanceProps) {
               type="button"
               data-cell=""
               data-testid="theme-custom"
-              title="复制主题模板：保存为项目里的 themes/<名字>.css，再在 joplo.config.ts 写 theme: '<名字>'（说明见 docs/themes.md）"
-              onClick={() => void p.copy(THEME_TEMPLATE).then((ok) => p.onFlash(ok ? '已复制主题模板：保存为 themes/<名字>.css（说明见 docs/themes.md）' : '无法访问剪贴板'))}
+              title={i18n.board.copyThemeTemplateSaveAsThemesNameCssIn}
+              onClick={() => void p.copy(THEME_TEMPLATE(i18n)).then((ok) => p.onFlash(<LocalText value={ok ? m.board.themeTemplateCopiedSaveAsThemesNameCssSee : m.board.clipboardUnavailable} />))}
               className="jb-focus group flex min-w-0 flex-col gap-[5px] rounded-[8px] text-left"
             >
               <span className="flex h-[42px] w-full items-center justify-center rounded-[7px] bg-jb-subtle text-jb-muted outline-1 outline-jb-line group-hover:outline-jb-ink" style={{ outlineStyle: 'solid' }}>
                 <Plus className="size-4" aria-hidden />
               </span>
-              <span className="text-[12px] text-jb-muted">自定义</span>
+              <span className="text-[12px] text-jb-muted">{i18n.board.custom}</span>
             </button>
           </div>
         </Section>
 
-        <Section title="字体" right="画面、字幕一起换">
-          <div role="radiogroup" aria-label="字体" className="grid grid-cols-3 gap-2" data-cell-group="" data-cols="3">
-            {FONT_CHOICES.map((f) => {
+        <Section title={i18n.board.font} right={i18n.board.appliesToTheStageAndCaptions}>
+          <div role="radiogroup" aria-label={i18n.board.font} className="grid grid-cols-3 gap-2" data-cell-group="" data-cols="3">
+            {FONT_CHOICES(i18n).map((f) => {
               const on = look.font === f.value;
               return (
                 <button
@@ -220,9 +226,9 @@ export function AppearancePopover(p: AppearanceProps) {
           </div>
         </Section>
 
-        <Section title="线条">
-          <div role="radiogroup" aria-label="线条" className="flex h-9 items-center gap-[3px] rounded-[8px] bg-jb-sunken p-[3px]" data-cell-group="" data-cols="3">
-            {STROKE_CHOICES.map((k) => {
+        <Section title={i18n.board.strokes}>
+          <div role="radiogroup" aria-label={i18n.board.strokes} className="flex h-9 items-center gap-[3px] rounded-[8px] bg-jb-sunken p-[3px]" data-cell-group="" data-cols="3">
+            {STROKE_CHOICES(i18n).map((k) => {
               const on = look.stroke === k.value;
               const Icon = k.value === 'rough' ? PenLine : k.value === 'clean' ? Square : Wand2;
               return (
@@ -244,27 +250,26 @@ export function AppearancePopover(p: AppearanceProps) {
         </Section>
 
         <footer className="flex flex-col gap-2.5 rounded-b-[9px] border-t border-jb-line bg-jb-subtle px-4 pb-3.5 pt-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <Btn
               icon={<RotateCcw className="size-3.5" />}
-              label={p.scope === 'project' && p.projectId ? `恢复项目默认（${p.configTheme}）` : '清除所有项目的选择'}
+              label={p.scope === 'project' && p.projectId ? i18n.board.resetToProjectDefault(p.configTheme) : i18n.board.clearChoicesForAllProjects}
               variant="ghost"
               size={28}
-              className="font-normal text-jb-muted"
-              onClick={() => void p.save(resetAppearance(p.settings, p.scope, p.projectId)).then((r) => p.onFlash(r.ok ? (p.scope === 'project' ? `已恢复项目默认（${p.configTheme}）` : '已清除所有项目的外观选择') : `保存失败：${r.message}`))}
+              className="max-w-full font-normal text-jb-muted [&>span]:truncate"
+              onClick={() => void p.save(resetAppearance(p.settings, p.scope, p.projectId)).then((r) => p.onFlash(<LocalText value={r.ok ? (p.scope === 'project' ? m.board.projectDefaultRestored(p.configTheme) : m.board.appearanceChoicesClearedForAllProjects) : m.board.couldNotSave(r.message)} />))}
               data-testid="appearance-reset"
             />
             {p.scope === 'project' && p.projectId ? (
-              <Btn label="设为所有项目的默认" size={28} onClick={() => void p.save(setAsDefault(p.settings, p.projectId, look)).then((r) => p.onFlash(r.ok ? `所有项目改用 ${appearanceLabel(look, p.catalog)}（单独设置过的项目除外）` : `保存失败：${r.message}`))} data-testid="appearance-default" />
+              <Btn label={i18n.board.setAsDefaultForAllProjects} className="max-w-full [&>span]:truncate" size={28} onClick={() => void p.save(setAsDefault(p.settings, p.projectId, look)).then((r) => p.onFlash(<LocalText value={r.ok ? m.board.allProjectsNowUseExceptProjectsWithTheirOwn(appearanceMessage(look, p.catalog)) : m.board.couldNotSave(r.message)} />))} data-testid="appearance-default" />
             ) : null}
           </div>
           <div className="flex items-center gap-1.5 text-[12px]">
             <Info className="size-3.5 shrink-0 text-jb-faint" aria-hidden />
-            <span className="min-w-0 flex-1 text-jb-faint">发布站只用 joplo.config.ts 的 theme，字体和线条暂不发布</span>
-            <button type="button" className="jb-focus inline-flex shrink-0 items-center gap-1 rounded-[4px] font-medium text-jb-fg underline-offset-2 hover:underline" onClick={() => void p.copy(themeLine(look.theme)).then((ok) => p.onFlash(ok ? `已复制 ${themeLine(look.theme)}（粘进 joplo.config.ts）` : '无法访问剪贴板'))} data-testid="appearance-copy-theme">
+            <span className="min-w-0 flex-1 text-jb-faint">{i18n.board.thePublishedSiteUsesThemeFromJoploConfigTs}</span>
+            <button type="button" className="jb-focus inline-flex shrink-0 items-center gap-1 rounded-[4px] font-medium text-jb-fg underline-offset-2 hover:underline" onClick={() => void p.copy(themeLine(look.theme)).then((ok) => p.onFlash(<LocalText value={ok ? m.board.copiedPasteIntoJoploConfigTs(themeLine(look.theme)) : m.board.clipboardUnavailable} />))} data-testid="appearance-copy-theme">
               <Copy className="size-3" aria-hidden />
-              复制 theme
-            </button>
+              {i18n.board.copyTheme}</button>
           </div>
         </footer>
       </div>
@@ -274,8 +279,10 @@ export function AppearancePopover(p: AppearanceProps) {
 
 /** 外观按钮：三个小色块 + “外观 · 名字”（窄屏只剩色块）；按 T 开关浮层。 */
 export function AppearanceButton({ look, catalog, wide, open, onToggle, btnRef, scopeLabel, variant = 'default' }: { look: Look; catalog: ThemeInfo[]; wide: boolean; open: boolean; onToggle: () => void; btnRef: (el: HTMLButtonElement | null) => void; /** 首页写“所有项目”（D55「首页」顶栏：外观 · 所有项目）。 */ scopeLabel?: string; /** 全屏控制胶囊里用 ghost。 */ variant?: 'default' | 'ghost' }) {
+  const { t: i18n } = useBoardI18n();
+
   const css = catalog.find((t) => t.name === look.theme)?.css ?? '';
-  const name = scopeLabel ?? appearanceLabel(look, catalog);
+  const name = scopeLabel ?? appearanceLabel(look, catalog, i18n);
   // T 开关（输入框、修饰键、菜单里不触发）
   const toggle = useRef(onToggle);
   toggle.current = onToggle;
@@ -291,7 +298,7 @@ export function AppearanceButton({ look, catalog, wide, open, onToggle, btnRef, 
     return () => window.removeEventListener('keydown', on);
   }, []);
   return (
-    <Btn ref={btnRef} variant={variant} icon={<Swatch css={css} />} label={wide ? `外观 · ${name}` : '外观'} iconOnly={!wide} title={wide ? undefined : `外观 · ${name}`} kbd="T" selected={open} aria-haspopup="dialog" aria-expanded={open} onClick={onToggle} data-testid="appearance" data-appearance={`${look.theme}|${look.font ?? ''}|${look.stroke ?? ''}`} />
+    <Btn data-full-label={i18n.board.appearanceButtonLabel(name)} ref={btnRef} variant={variant} icon={<Swatch css={css} />} label={wide ? i18n.board.appearanceButtonLabel(name) : i18n.board.appearance} iconOnly={!wide} title={wide ? undefined : i18n.board.appearanceButtonLabel(name)} kbd="T" selected={open} aria-haspopup="dialog" aria-expanded={open} onClick={onToggle} data-testid="appearance" data-appearance={`${look.theme}|${look.font ?? ''}|${look.stroke ?? ''}`} />
   );
 }
 

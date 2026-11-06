@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/context';
 /**
  * 看板控件原语（D55「设计 Token v1」的“控件与状态”）：按钮、分段控件、下拉菜单、快捷键标记、开关。看板与发布站共用。
  * - 只用看板 Token（bg-jb-* / text-jb-* / border-jb-*）；全屏的深色控制条在 .jb-dark 里，Token 自动换成深色。
@@ -11,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { Popover, useTip } from './popover';
 import type { Placement } from './popover-place';
 
-export type MenuItem = { id: string; label: string; onClick: () => void; checked?: boolean; disabled?: boolean; icon?: ReactNode; hint?: ReactNode; /** 第二行小字（例如功能的选定方案与缺口数）。 */ description?: string };
+export type MenuItem = { lang?: string; highlight?: boolean; radio?: boolean; id: string; label: string; onClick: () => void; checked?: boolean; disabled?: boolean; icon?: ReactNode; hint?: ReactNode; /** 第二行小字（例如功能的选定方案与缺口数）。 */ description?: string };
 export type MenuEntry = MenuItem | { id: string; divider: true } | { id: string; custom: ReactNode };
 
 /** 元素的可用宽度（ResizeObserver）。返回回调 ref：元素晚出现（例如进入全屏后才渲染）也能测到。 */
@@ -81,6 +82,8 @@ export function Btn({ icon, label, iconOnly = false, iconAfter = false, size = 3
       <button
         ref={ref}
         type="button"
+        data-full-label={label}
+        data-full-padding={size >= 34 ? 24 : 20}
         aria-label={iconOnly ? label : rest['aria-label']}
         aria-pressed={selected === undefined ? rest['aria-pressed'] : selected}
         {...rest}
@@ -93,7 +96,7 @@ export function Btn({ icon, label, iconOnly = false, iconAfter = false, size = 3
         className={cn(base, selected ? v.on : v.off, H[size], iconOnly ? W[size] : size >= 34 ? 'px-3' : 'px-2.5', className)}
       >
         {!iconAfter ? icon : null}
-        {iconOnly ? null : <span>{label}</span>}
+        <span data-jb-label="" className={iconOnly ? 'hidden' : undefined}>{label}</span>
         {children}
         {iconAfter ? icon : null}
       </button>
@@ -173,13 +176,14 @@ export function MenuList({ items, onPick, testid }: { items: MenuEntry[]; onPick
           <button
             key={it.id}
             type="button"
-            role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+            role={it.radio ? 'menuitemradio' : it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+            lang={it.lang}
             aria-checked={it.checked}
             disabled={it.disabled}
             data-menu-item=""
             data-testid={`menu-${it.id}`}
             onClick={() => onPick(it)}
-            className={cn('jb-focus flex w-full shrink-0 items-center gap-2.5 whitespace-nowrap rounded-[6px] px-2.5 text-left font-jb text-[13px] text-jb-fg hover:bg-jb-hover focus-visible:bg-jb-hover disabled:pointer-events-none disabled:opacity-40', it.description ? 'py-1.5' : 'h-8', it.checked && it.description && 'bg-jb-selected hover:bg-jb-selected')}
+            className={cn('jb-focus flex w-full shrink-0 items-center gap-2.5 whitespace-nowrap rounded-[6px] px-2.5 text-left font-jb text-[13px] text-jb-fg hover:bg-jb-hover focus-visible:bg-jb-hover disabled:pointer-events-none disabled:opacity-40', it.description ? 'py-1.5' : 'h-8', it.checked && (it.description || it.highlight) && 'bg-jb-selected hover:bg-jb-selected')}
           >
             {it.icon ? <span className="flex size-4 shrink-0 items-center justify-center [&_svg]:size-4">{it.icon}</span> : null}
             {it.description ? (
@@ -242,6 +246,7 @@ export function MenuButton({
         kbd={kbd}
         iconOnly={iconOnly}
         aria-label={label}
+        data-full-chevron={chevron === undefined ? 14 : 0}
         aria-haspopup="menu"
         aria-expanded={open}
         selected={open || undefined}
@@ -256,7 +261,7 @@ export function MenuButton({
         tipPlacement={tipPlacement}
       >
         {trigger.extra}
-        {!iconOnly ? (chevron ?? <ChevronDown className="size-3.5 text-jb-muted" aria-hidden />) : null}
+        {!iconOnly ? (chevron ?? <ChevronDown data-jb-chevron="" className="size-3.5 text-jb-muted" aria-hidden />) : null}
       </Btn>
       <Popover open={open} anchor={btn.current} onClose={() => setOpen(false)} placement={placement} role="menu" label={label} width={width} testid={testid ? `${testid}-list` : 'menu'} autoFocus={byKey}>
         <MenuList
@@ -264,6 +269,7 @@ export function MenuButton({
           onPick={(it) => {
             setOpen(false);
             it.onClick();
+            btn.current?.focus();
           }}
         />
       </Popover>
@@ -289,7 +295,9 @@ export function Switch({ on, onChange, label, testid, title, className }: { on: 
 
 /** 导演状态（全屏控制条用）：开启时“🎬 导演 · 后端流转”，点一下转为手动；暂停时“🎬 导演已暂停”，点一下恢复。 */
 export function DirectorTag({ on, layerTitle, onToggle }: { on: boolean; layerTitle: string; onToggle: () => void }) {
+  const { t: i18n } = useI18n();
+
   return (
-    <Btn icon={<Clapperboard className="size-4" aria-hidden />} label={on ? `导演 · ${layerTitle}` : '导演已暂停'} size={32} variant="ghost" selected={on} onClick={onToggle} data-testid="director" title={on ? '导演跟随每一步切换层级与镜头；点一下改为手动' : '恢复导演：回到这一步的导演层'} />
+    <Btn icon={<Clapperboard className="size-4" aria-hidden />} label={on ? i18n.player.director(layerTitle) : i18n.player.directorPaused} size={32} variant="ghost" selected={on} onClick={onToggle} data-testid="director" title={on ? i18n.player.directorSwitchesLayersAndShotsWithEachStepClick : i18n.player.resumeDirectorReturnToThisStepSDirectorLayer} />
   );
 }

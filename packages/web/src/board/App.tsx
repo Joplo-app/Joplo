@@ -1,3 +1,8 @@
+import { LanguageMenu } from '../player/LanguageMenu';
+import { LocalText } from '../i18n/LocalText';
+import { m } from '../i18n/board/messages';
+import { translate, type Text } from '../i18n/messages';
+import { useBoardI18n } from '../i18n/board/context';
 /**
  * 本地看板（`joplo dev`，D39）：一个进程、多个项目。
  * - 首页 `#/`、`#/<项目>`：最近打开的项目与所选项目的功能（Home.tsx）；顶栏的「外观」改所有项目的默认外观。
@@ -52,10 +57,12 @@ import { effectiveAppearance } from './appearance-model';
  * 导出用 saved（预览只是临时看一眼）。
  */
 function useAppearance(projectId: string | null, configTheme: string, authorThemes: Record<string, string>) {
+  const { t: i18n, locale } = useBoardI18n();
+
   const { settings, save } = useBoardSettings();
   const key = JSON.stringify(authorThemes);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const catalog = useMemo(() => themeCatalog(authorThemes), [key]);
+  const catalog = useMemo(() => themeCatalog(authorThemes, i18n), [key, i18n]);
   const saved = effectiveAppearance(settings, projectId, configTheme, catalog.map((t) => t.name));
   const [preview, setPreview] = useState<Look | null>(null);
   const [open, setOpen] = useState(false);
@@ -95,7 +102,10 @@ export function BoardApp() {
 }
 
 /** 首页 + 外观（所有项目范围）。 */
-function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpened, onSelect, onView }: { projects: ProjectSummary[] | null; error: string | null; selected: string | null; openAppearance: boolean; onAppearanceOpened: () => void; onSelect: (id: string) => void; onView: (projectId: string, featureId: string, optionId?: string) => void }) {
+function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpened, onSelect, onView }: { projects: ProjectSummary[] | null; error: Text | null; selected: string | null; openAppearance: boolean; onAppearanceOpened: () => void; onSelect: (id: string) => void; onView: (projectId: string, featureId: string, optionId?: string) => void }) {
+  const { t: i18n, locale } = useBoardI18n();
+
+  useEffect(() => { document.title = i18n.board.joploBoard; }, [i18n]);
   const a = useAppearance(null, 'sketch', {});
   const L = useBoardLayout();
   const [flash, setFlash] = useFlash();
@@ -117,11 +127,11 @@ function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpen
         onFlash={setFlash}
         right={
           <>
-            <AppearanceButton look={a.saved} catalog={a.catalog} wide={L.topLabels} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} scopeLabel="所有项目" />
+            <AppearanceButton look={a.saved} catalog={a.catalog} wide={L.topLabels} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} scopeLabel={i18n.board.allProjects} />
+            <LanguageMenu iconOnly={L.languageIconOnly} />
             <a href="https://github.com/Joplo-app/Joplo/tree/main/docs" target="_blank" rel="noreferrer" className="jb-focus inline-flex h-8 items-center gap-1.5 rounded-[6px] px-2.5 text-[13px] font-medium text-jb-muted hover:bg-jb-hover hover:text-jb-fg" data-testid="home-docs">
               <BookOpen className="size-4" aria-hidden />
-              文档
-            </a>
+              {i18n.board.docs}</a>
           </>
         }
       />
@@ -132,6 +142,8 @@ function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpen
 
 /** 编译出错横幅（D55）：舞台上沿的红边横幅，写错误数和第一条 文件:行；可展开全部；修好保存后自动消失。 */
 function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
+  const { t: i18n, locale } = useBoardI18n();
+
   const [open, setOpen] = useState(false);
   const sum = diagnosticsSummary(list);
   if (!sum) return null;
@@ -140,17 +152,17 @@ function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
     <div role="alert" className="max-h-[40%] w-full shrink-0 overflow-y-auto rounded-[8px] border-l-4 border-jb-danger bg-jb-danger-bg px-3 py-2 text-left font-jb text-[13px]" data-testid="diagnostics">
       <div className="flex items-center gap-2">
         <CircleX className="size-4 shrink-0 text-jb-danger" aria-hidden />
-        <strong className="text-jb-danger">编译出错 {sum.count} 处</strong>
-        <span className="text-jb-danger">· 仍显示上一次成功的画面</span>
+        <strong className="text-jb-danger">{i18n.board.compilationCount(sum.count)}</strong>
+        <span className="text-jb-danger">{i18n.board.showingTheLastSuccessfulStage}</span>
         <span className="flex-1" />
         <button type="button" className="jb-focus shrink-0 rounded-[4px] px-1.5 text-[12px] font-medium text-jb-fg hover:underline" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-testid="diag-toggle">
-          {open ? '收起' : '展开'}
+          {open ? i18n.board.collapse : i18n.board.expand}
         </button>
       </div>
       <ul className="mt-1 flex flex-col gap-0.5 pl-6">
         {(open ? errors.slice(0, 50) : errors.slice(0, 1)).map((d, i) => (
           <li key={i} className="flex gap-2" data-testid="diag-item">
-            <code className="shrink-0 font-jb-mono text-[12px] font-semibold text-jb-fg">{d.at ?? '（无位置）'}</code>
+            <code className="shrink-0 font-jb-mono text-[12px] font-semibold text-jb-fg">{d.at ?? i18n.board.noLocation}</code>
             <span className={cn('text-jb-muted', open ? 'whitespace-pre-wrap break-all' : 'truncate')}>{d.message}</span>
           </li>
         ))}
@@ -160,6 +172,8 @@ function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
 }
 
 function BoardPlayer({ projectId, play, navigate, projects }: { projectId: string; play: PlayRoute; navigate: (r: BoardRoute, replace?: boolean) => void; projects: ProjectSummary[] | null }) {
+  const { t: i18n, locale } = useBoardI18n();
+
   const projectName = projects?.find((p) => p.id === projectId)?.name ?? null;
   const L = useBoardLayout();
   // 检查模式（D55 顶栏「检查」开关）：只在本页，不写进网址（不变量 2）
@@ -180,24 +194,22 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
       setFlash(
         <span className="inline-flex items-center gap-2" data-testid="video-done">
           <CircleCheck className="size-4 text-jb-accent" aria-hidden />
-          已导出 {job.file}
+          <LocalText value={m.board.exportedFile(job.file ?? '')} />
           <button type="button" className="font-semibold text-jb-accent underline-offset-2 hover:underline" onClick={() => retry.current()}>
-            再导出一次
-          </button>
+            {<LocalText value={m.board.exportAgain} />}</button>
         </span>,
         8000,
       );
-    else if (job.error !== '已取消')
+    else if (job.status === 'error')
       setFlash(
         <span className="inline-flex max-w-[640px] items-center gap-2 whitespace-normal" data-testid="video-error">
-          导出视频失败：{job.error}
+          <LocalText value={m.board.videoExportFailed(job.error ?? '')} />
           <button type="button" className="shrink-0 font-semibold text-jb-accent underline-offset-2 hover:underline" onClick={() => retry.current()}>
-            重试
-          </button>
+            {<LocalText value={m.board.retry} />}</button>
         </span>,
         10000,
       );
-    else setFlash('已取消导出');
+    else if (job.status === 'cancelled') setFlash(<LocalText value={m.board.exportCancelled} />);
   });
 
   // 只应用成功的 IR；出错时保留上一次成功的画面（第一次就失败时也先显示它带的旧 IR）
@@ -211,14 +223,14 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   // 标签页标题与 favicon 状态点（D55）：“功能 · 项目”；编译出错加 ✕ 和红点；导出中写进度、黄点
   const compileError = !!(ir.payload && !ir.payload.ok);
   const featureName = project?.features[play.featureId]?.name ?? null;
-  const exporting = vid.running && vid.job ? `${vid.job.step}/${vid.job.total}` : null;
+  const exporting = vid.running && vid.job ? `${i18n.player.number(vid.job.step)}/${i18n.player.number(vid.job.total)}` : null;
   useEffect(() => {
-    document.title = tabTitle({ feature: featureName, project: projectName ?? project?.name ?? null, error: compileError, exporting });
+    document.title = tabTitle({ feature: featureName, project: projectName ?? project?.name ?? null, error: compileError, exporting }, i18n, i18n.board.joploBoard);
     setFavicon(faviconHref(compileError ? 'error' : exporting ? 'busy' : null));
-  }, [featureName, projectName, project?.name, compileError, exporting]);
+  }, [featureName, projectName, project?.name, compileError, exporting, i18n]);
   useEffect(
     () => () => {
-      document.title = 'Joplo · 看板';
+      document.title = i18n.board.joploBoard;
       setFavicon(faviconHref(null));
     },
     [],
@@ -241,13 +253,12 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   const resolved = usePlaySync(ctl, snap, project, play, (next) => toPlay(next, true));
 
   if (!project) {
-    const msg = ir.status === 404 ? `${ir.error}。` : (ir.error ?? (ir.payload && !ir.payload.ok ? null : '正在编译项目…'));
+    const msg = ir.status === 404 ? translate(ir.error ?? '', i18n) : (ir.error ?? (ir.payload && !ir.payload.ok ? null : i18n.board.compilingProject));
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-[14px] text-[#3a3a3a]" data-testid="player-loading">
-        {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : <span>{msg}</span>}
+        {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : <span>{msg ? translate(msg, i18n) : null}</span>}
         <button type="button" className="text-[#1c5fb8] underline" onClick={() => navigate({ kind: 'home', projectId })}>
-          回到首页
-        </button>
+          {i18n.board.goToHome}</button>
       </div>
     );
   }
@@ -255,10 +266,9 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   if (!feature || !resolved?.ok)
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-[14px]" data-testid="feature-missing">
-        <span>功能「{play.featureId}」不存在（可能已改名或删除）。</span>
+        <span>{i18n.board.featureNotFound(play.featureId)}</span>
         <button type="button" className="text-[#1c5fb8] underline" onClick={() => navigate({ kind: 'home', projectId })}>
-          回到首页
-        </button>
+          {i18n.board.goToHome}</button>
       </div>
     );
 
@@ -277,28 +287,28 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
     {
       id: 'image',
       icon: <ImageDown />,
-      label: '导出当前步骤图片',
+      label: i18n.board.exportCurrentStepAsImage,
       disabled: !scenario,
       onClick: () => {
         if (!scenario || !state) return;
-        setFlash('正在生成图片…');
-        void exportImage(projectId, { scenarioId: scenario.id, position: state.position, ...a.saved }).then((r) => {
+        setFlash(<LocalText value={m.board.generatingImage} />);
+        void exportImage(projectId, { scenarioId: scenario.id, position: state.position, ...a.saved, locale }).then((r) => {
           if (r.ok) {
             downloadBlob(r.blob, r.name);
-            setFlash(`已下载 ${r.name}`);
-          } else setFlash(`导出图片失败：${r.message}`);
+            setFlash(<LocalText value={m.board.downloaded(r.name)} />);
+          } else setFlash(<LocalText value={m.board.imageExportFailed(r.message)} />);
         });
       },
     },
     ...(vid.running && vid.job ? [{ id: 'video-progress', custom: <VideoProgressCard job={vid.job} scenarioName={videoName.current} onCancel={() => void vid.cancel()} /> }, { id: 'video-divider', divider: true as const }] : []),
-    { id: 'video', icon: <Film />, label: vid.running ? '正在导出视频…' : '导出整个场景视频', disabled: !scenario || vid.running, onClick: () => retry.current() },
-    { id: 'link', icon: <Link />, label: '复制当前步骤链接', onClick: () => void copyText(location.href).then((ok) => setFlash(ok ? '已复制链接' : '无法访问剪贴板，请从地址栏复制')) },
+    { id: 'video', icon: <Film />, label: vid.running ? i18n.board.exportingVideo : i18n.board.exportEntireScenarioAsVideo, disabled: !scenario || vid.running, onClick: () => retry.current() },
+    { id: 'link', icon: <Link />, label: i18n.board.copyLinkToCurrentStep, onClick: () => void copyText(location.href).then((ok) => setFlash(<LocalText value={ok ? m.board.linkCopied : m.board.clipboardUnavailableCopyFromTheAddressBar} />)) },
     {
       id: 'editor',
       icon: <Code />,
-      label: '在编辑器中打开',
+      label: i18n.board.openInEditor,
       disabled: !editorAt,
-      onClick: () => editorAt && void openInEditor(projectId, editorAt).then((r) => setFlash(r.ok ? `已在编辑器中打开 ${editorAt}` : `无法打开编辑器：${r.message}`)),
+      onClick: () => editorAt && void openInEditor(projectId, editorAt).then((r) => setFlash(<LocalText value={r.ok ? m.board.openedInEditor(editorAt) : m.board.couldNotOpenEditor(r.message)} />)),
     },
   ];
 
@@ -306,10 +316,10 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   retry.current = () => {
     if (!scenario) return;
     videoName.current = scenario.name;
-    void vid.start(scenario.id, a.saved).then((ok) => !ok && setFlash(`导出视频失败：${vid.error ?? '无法开始'}`));
+    void vid.start(scenario.id, a.saved, locale).then((ok) => !ok && setFlash(<LocalText value={m.board.videoExportFailed(vid.error ?? m.board.couldNotStart)} />));
   };
   // 缺口横幅（D55）：说清楚，再给下一步：复制给 Agent 的话；看已表达这个情况的方案怎么处理
-  const gb = gap && option ? gapBanner(project, feature.id, option.id, resolved.caseId) : null;
+  const gb = gap && option ? gapBanner(project, feature.id, option.id, resolved.caseId, i18n) : null;
   const banner = (
     <>
       {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : null}
@@ -317,15 +327,15 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         <div role="status" className="flex shrink-0 flex-col gap-2 rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface px-4 py-3 font-jb" data-testid="gap-notice" data-status={gap.status}>
           <div className="flex items-center gap-2 text-[14px] font-semibold">
             <StatusIcon status={gap.status} size={16} />
-            方案 {gb.letter} 还没有表达「{caseTitle}」{gap.status !== 'none' && gap.status !== 'missing' ? `（${COVERAGE_LABEL[gap.status].text}）` : ''}
+            {i18n.board.gapTitle(gb.letter, caseTitle ?? '', gap.status !== 'none' && gap.status !== 'missing' ? COVERAGE_LABEL(i18n)[gap.status].text : '')}
           </div>
-          <div className="text-[13px] text-jb-muted">这是缺口，不是演示{gap.reason ? `：${gap.reason}` : ''}。画面先静态显示方案 {gb.letter} 的页面。</div>
+          <div className="text-[13px] text-jb-muted">{i18n.board.gapBody(gb.letter, gap.reason ?? '')}</div>
           <div className="flex flex-wrap items-center gap-2">
-            <Btn icon={<Copy className="size-3.5" />} label="复制给 Agent 的话" size={28} onClick={() => void copyText(gb.agentText).then((ok) => setFlash(ok ? '已复制给 Agent 的话' : '无法访问剪贴板'))} data-testid="gap-copy" />
-            {gb.alt ? <Btn icon={<ArrowRight className="size-3.5" />} label={`看方案 ${gb.alt.letter} 怎么处理`} variant="primary" size={28} onClick={() => toPlay({ featureId: feature.id, optionId: gb.alt!.optionId, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })} data-testid="gap-alt" /> : null}
+            <Btn icon={<Copy className="size-3.5" />} label={i18n.board.copyRequestForAgent} size={28} onClick={() => void copyText(gb.agentText).then((ok) => setFlash(<LocalText value={ok ? m.board.requestForAgentCopied : m.board.clipboardUnavailable} />))} data-testid="gap-copy" />
+            {gb.alt ? <Btn icon={<ArrowRight className="size-3.5" />} label={i18n.board.seeHowOptionHandlesThis(gb.alt.letter)} variant="primary" size={28} onClick={() => toPlay({ featureId: feature.id, optionId: gb.alt!.optionId, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })} data-testid="gap-alt" /> : null}
           </div>
           <div className="truncate text-[12px] text-jb-faint" data-testid="gap-command" title={gb.agentText}>
-            复制内容：{gb.agentText}
+            {i18n.board.copiedText}{gb.agentText}
           </div>
         </div>
       ) : null}
@@ -350,23 +360,23 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           {
             label: projectName ?? project.name,
             testid: 'crumb-project',
-            menuLabel: '切换项目',
+            menuLabel: i18n.board.switchProject,
             // 项目 ▾：最近的项目；选一个 → 打开它的首页（功能列表）
             items: [
-              ...(projects ?? []).map((x) => ({ id: `project-${x.id}`, label: x.name, description: x.status === 'missing' ? '找不到目录' : x.status === 'error' ? `${x.errors} 个错误` : undefined, checked: x.id === projectId, onClick: () => navigate({ kind: 'home', projectId: x.id }) })),
+              ...(projects ?? []).map((x) => ({ id: `project-${x.id}`, label: x.name, description: x.status === 'missing' ? i18n.board.directoryNotFound : x.status === 'error' ? i18n.board.projectErrorCount(x.errors) : undefined, checked: x.id === projectId, onClick: () => navigate({ kind: 'home', projectId: x.id }) })),
               { id: 'project-divider', divider: true as const },
-              { id: 'project-home', icon: <LayoutGrid />, label: '查看项目首页', onClick: home },
+              { id: 'project-home', icon: <LayoutGrid />, label: i18n.board.viewProjectHome, onClick: home },
             ],
           },
           {
             label: feature.name,
             testid: 'crumb-feature',
-            menuLabel: '切换功能',
+            menuLabel: i18n.board.switchFeature,
             // 功能 ▾：本项目的功能和缺口数；选一个 → 打开它的演示，停在第 0 步
             items: [
-              ...featureMenu(project, feature.id).map((f) => ({ id: `feature-${f.id}`, label: f.name, description: f.hint, checked: f.current, onClick: () => navigate({ kind: 'play', projectId, play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
+              ...featureMenu(project, feature.id, i18n).map((f) => ({ id: `feature-${f.id}`, label: f.name, description: f.hint, checked: f.current, onClick: () => navigate({ kind: 'play', projectId, play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
               { id: 'feature-divider', divider: true as const },
-              { id: 'feature-home', icon: <LayoutGrid />, label: '查看项目首页', onClick: home },
+              { id: 'feature-home', icon: <LayoutGrid />, label: i18n.board.viewProjectHome, onClick: home },
             ],
           },
         ]}
@@ -374,28 +384,27 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           <>
             <Btn
               icon={<ScanSearch className="size-4" />}
-              label="检查"
+              label={i18n.board.inspect}
               iconOnly={!L.topLabels}
               selected={inspectMode}
-              title={inspectMode ? '关闭检查模式' : '检查模式：单击画面元素 = 选中它（不执行步骤）；也可以按住 ⌥ 临时检查'}
-              kbd={L.topLabels ? undefined : '按住 ⌥'}
+              title={inspectMode ? i18n.board.exitInspectMode : i18n.board.inspectModeClickAStageElementToSelectIt}
+              kbd={L.topLabels ? undefined : i18n.board.hold}
               onClick={() => setInspectMode((v) => !v)}
               data-testid="inspect-toggle"
             >
-              {L.topLabels ? <Kbd>⌥</Kbd> : null}
+              <Kbd className={L.topLabels ? undefined : 'hidden'}>⌥</Kbd>
             </Btn>
             <AppearanceButton look={a.saved} catalog={a.catalog} wide={L.topLabels} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} />
           </>
         }
         inspectMode={inspectMode}
-        completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={`下一个情况：${nc.title}`} kbd="Enter" variant="primary" className="max-w-[360px] [&>span]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
+        completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={i18n.board.nextCase(nc.title)} kbd="Enter" variant="primary" className="max-w-[360px] [&>span]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
         navRail={<CaseRail project={project} featureId={feature.id} optionId={resolved.optionId} caseId={resolved.caseId} />}
         exportBadge={vid.running && vid.job ? <ProgressRing percent={vid.job.percent} /> : null}
         deviceTag={
           <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[6px] border border-jb-line bg-jb-surface px-2.5 font-jb text-[12px] text-jb-muted" data-testid="device-tag">
             <Smartphone className="size-3.5" aria-hidden />
-            手机页面 · {VIEWPORT_SIZE.mobile.width} 宽 · 外框由画面自动加上
-          </span>
+            {i18n.board.mobilePageDetails(VIEWPORT_SIZE.mobile.width)}</span>
         }
         fullscreenActions={<AppearanceButton look={a.saved} catalog={a.catalog} wide={false} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} variant="ghost" />}
         layer={play.layer ?? null}
@@ -422,7 +431,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             onCase={(cid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), caseId: cid })}
             onScenario={(sid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), scenarioId: sid })}
             onOptionCase={(oid, cid) => toPlay({ featureId: feature.id, optionId: oid, caseId: cid })}
-            onCopy={(text) => void copyText(text).then((ok) => setFlash(ok ? `已复制：${text}` : '无法访问剪贴板'))}
+            onCopy={(text) => void copyText(text).then((ok) => setFlash(<LocalText value={ok ? m.board.copied(text) : m.board.clipboardUnavailable} />))}
           />
         }
         banner={banner}
@@ -431,7 +440,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           void ctl.clickNode(id, { x: 0, y: 0 }, { inspect: true });
           setDrawer(true);
         }}
-        stageHint={<span>按住 ⌥ 单击：检查元素</span>}
+        stageHint={<span>{i18n.board.holdAndClickToInspect}</span>}
         selectedId={drawer && selection && state && selection.sceneId === state.sceneId ? selection.nodeId : null}
         flash={flash}
         drawer={
@@ -447,7 +456,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
                   void ctl.clearSelection();
                   setDrawer(false);
                 }}
-                onOpenEditor={(at) => void openInEditor(projectId, at).then((r) => setFlash(r.ok ? `已在编辑器中打开 ${at}` : `无法打开编辑器：${r.message}`))}
+                onOpenEditor={(at) => void openInEditor(projectId, at).then((r) => setFlash(<LocalText value={r.ok ? m.board.openedInEditor(at) : m.board.couldNotOpenEditor(r.message)} />))}
               />
             ) : null}
             <AppearancePopover open={a.open} anchor={a.anchor} onClose={() => a.setOpen(false)} scope="project" projectId={projectId} configTheme={project.theme ?? 'sketch'} catalog={a.catalog} settings={a.settings} look={a.saved} save={a.save} onPreview={a.setPreview} onFlash={setFlash} copy={copyText} />

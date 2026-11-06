@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/context';
 /**
  * 舞台：在固定尺寸的画框里渲染当前画面。弹窗、Toast、演示覆盖层都在画框内部分层，
  * 不 portal 到 document.body，因此截图、元素索引与遮挡检查都只看舞台本身。
@@ -97,12 +98,13 @@ function scrollsItself(target: EventTarget | null, root: HTMLElement, dy: number
 }
 
 export function Stage({ project, state, theme, mode, selectedId = null, preview = null, activeStep = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false, font = null, stroke: strokeOverride = null, stream = null }: StageProps) {
+  const { t: i18n } = useI18n();
   const shownId = sceneId ?? state.sceneId;
   const scene = project.scenes[shownId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
   // 外观（D51 / D55）：线条缺省由主题的 --jp-stroke 决定（内置主题或项目 themes/<name>.css），可以单独覆盖；字体覆盖写成 --jp-font
-  const look = useMemo(() => resolveLook({ theme, font, stroke: strokeOverride }, project.themes ?? {}), [theme, font, strokeOverride, project.themes]);
+  const look = useMemo(() => resolveLook({ theme, font, stroke: strokeOverride }, project.themes ?? {}, i18n), [theme, font, strokeOverride, project.themes]);
   const stroke = look.stroke;
   // 调用链（D48）：Diagram 节点与连线的 state 由每一步的 trace 推算（没写 state 时使用）
   const traced = useMemo(() => diagramStateAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
@@ -284,7 +286,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
               </motion.div>
             </RenderContext.Provider>
           ) : (
-            <div className="flex h-full items-center justify-center text-[var(--jp-danger)]">画面不存在：{shownId}</div>
+            <div className="flex h-full items-center justify-center text-[var(--jp-danger)]">{i18n.stage.stageNotFound}{shownId}</div>
           )}
           <div ref={setDialogLayer} className="pointer-events-none absolute inset-0 z-20 [&>*]:pointer-events-auto" data-jlayer="dialog" />
           <Marks key={shownId} marks={marks} wrapRef={cam.wrapRef} contentRef={cam.contentRef} width={vp.width} height={vp.height} animate={animate} pulseKey={`${state.scenarioId}:${state.position}:${shownId}`} />
@@ -293,7 +295,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         <ToastLayer key={epoch} toasts={state.toasts} nextTargetId={nextTargetId} animate={animate} rootRef={rootRef} />
         {sceneRole && !card ? <RoleTag role={sceneRole} /> : null}
         {keyboard && !card ? <div className="pointer-events-none absolute left-1/2 z-30 flex max-w-[70%] -translate-x-1/2 items-center gap-1.5 rounded border border-[var(--jp-line)] bg-[var(--jp-surface)] px-3 py-1.5 text-[14px] text-[var(--jp-ink)]" style={{ bottom: Math.max(60, state.toasts.length ? state.toasts.length * 64 + 40 : 0) }} data-jlayer="keyboard">
-          {keyboard.kind === 'type' ? <><span className="shrink-0 text-[var(--jp-muted)]">输入</span><span className="truncate">{keyboard.text || '…'}</span></> : keyboard.keys.map((key, i) => <kbd key={i} className="rounded border border-[var(--jp-line-strong)] bg-[var(--jp-subtle)] px-1.5 py-0.5 font-[var(--jp-font-mono)]">{key}</kbd>)}
+          {keyboard.kind === 'type' ? <><span className="shrink-0 text-[var(--jp-muted)]">{i18n.stage.keyboardType}</span><span className="truncate">{keyboard.text || '…'}</span></> : keyboard.keys.map((key, i) => <kbd key={i} className="rounded border border-[var(--jp-line-strong)] bg-[var(--jp-subtle)] px-1.5 py-0.5 font-[var(--jp-font-mono)]">{key}</kbd>)}
         </div> : null}
         {overlay ? <div className="pointer-events-none absolute inset-0 z-40" data-jlayer="overlay">{overlay}</div> : null}
         <AnimatePresence>
@@ -342,6 +344,7 @@ function RoleTag({ role }: { role: RoleInfo }) {
  * 换人时上方是这个人的头像、名字和说明；收尾的要点逐条列在下方。
  */
 function TransitionCard({ card, role, width }: { card: CardAction; role: RoleInfo | null; width: number }) {
+  const { t: i18n } = useI18n();
   const title = Math.round(Math.max(30, Math.min(56, width / 23)));
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-[var(--jp-bg)] px-[8%] text-center text-[var(--jp-ink)]" data-testid="transition-card" data-role={role?.id}>
@@ -364,7 +367,7 @@ function TransitionCard({ card, role, width }: { card: CardAction; role: RoleInf
           {card.points.map((pt, i) => (
             <li key={i} className="flex items-start gap-3">
               <span aria-hidden className="mt-[0.15em] inline-flex size-[1.3em] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[var(--jp-ink)] text-[0.75em] font-bold">
-                {i + 1}
+                {i18n.player.number(i + 1)}
               </span>
               <span style={{ lineHeight: 1.5 }}>{pt}</span>
             </li>

@@ -1,3 +1,6 @@
+import { createZhCN } from '../src/i18n/zh-CN';
+import { createBoardZhCN } from '../src/i18n/board/zh-CN';
+const zh = { ...createZhCN(), ...createBoardZhCN() };
 /**
  * 外观（D55）：配色 / 字体 / 线条拆开。端到端流向的每一段：
  *   写入点  外观浮层 → applyAppearance / resetAppearance / setAsDefault → PUT /__joplo/settings（服务端测试见 server/test/settings.test.ts）
@@ -17,7 +20,7 @@ import { ThemeContext } from '../src/renderer/rough';
 import { Subtitle } from '../src/player/Subtitle';
 import { appearanceLabel, applyAppearance, effectiveAppearance, isCellSelected, paletteCells, resetAppearance, setAsDefault, themeLine, themeSwatch, themeToWrite } from '../src/board/appearance-model';
 
-const available = themeCatalog({ brand: ':root { --jp-bg: #FFFBEA; --jp-ink: #1E1E1E; --jp-accent: #FFD23F; --jp-stroke: clean }' }).map((t) => t.name);
+const available = themeCatalog({ brand: ':root { --jp-bg: #FFFBEA; --jp-ink: #1E1E1E; --jp-accent: #FFD23F; --jp-stroke: clean }' }, zh).map((t) => t.name);
 
 describe('读取点：effectiveAppearance', () => {
   it('没有任何设置：项目 config 的主题，字体线条跟随主题（null）', () => {
@@ -72,8 +75,8 @@ describe('写入点：浮层的三种操作', () => {
 });
 
 describe('配色格', () => {
-  const cat = themeCatalog({ brand: ':root { --jp-bg: #FFFBEA }', nord: ':root { --jp-bg: #000000 }' });
-  const cells = paletteCells(cat);
+  const cat = themeCatalog({ brand: ':root { --jp-bg: #FFFBEA }', nord: ':root { --jp-bg: #000000 }' }, zh);
+  const cells = paletteCells(cat, zh);
   it('sketch 与 clean 合并为一个「纸白」；8 格内置 + 作者主题（标 *）；与内置同名的作者主题也标 *', () => {
     expect(cells.map((c) => c.title)).toEqual(['纸白', '蓝图', 'Nord*', 'Dracula', 'Solarized', '复古终端', '牛皮纸', '高对比', 'brand*']);
     expect(cells.filter((c) => c.builtin).length).toBe(8);
@@ -94,9 +97,9 @@ describe('配色格', () => {
     expect(themeSwatch('')).toEqual({ bg: '#ffffff', ink: '#1e1e1e', accent: '#e8590c', line: '#dee2e6' });
   });
   it('按钮上的名字与“复制 theme”', () => {
-    expect(appearanceLabel({ theme: 'nord', font: null, stroke: null }, cat)).toBe('Nord');
-    expect(appearanceLabel({ theme: 'clean', font: 'hand', stroke: null }, cat)).toBe('纸白 · 漫黑');
-    expect(appearanceLabel({ theme: 'gone', font: null, stroke: null }, cat)).toBe('gone');
+    expect(appearanceLabel({ theme: 'nord', font: null, stroke: null }, cat, zh)).toBe('Nord');
+    expect(appearanceLabel({ theme: 'clean', font: 'hand', stroke: null }, cat, zh)).toBe('纸白 · 漫黑');
+    expect(appearanceLabel({ theme: 'gone', font: null, stroke: null }, cat, zh)).toBe('gone');
     expect(themeLine('nord')).toBe("theme: 'nord',");
   });
 });
@@ -109,13 +112,13 @@ describe('消费者', () => {
     expect(fontStack('comic' as never)).toBeNull();
   });
   it('resolveLook：线条为 null 时取主题自己的（sketch = rough，clean = clean）；字体覆盖写成 --jp-font', () => {
-    expect(resolveLook({ theme: 'sketch', font: null, stroke: null })).toEqual({ theme: 'sketch', stroke: 'rough', font: null, style: {} });
-    expect(resolveLook({ theme: 'clean', font: null, stroke: null }).stroke).toBe('clean');
-    expect(resolveLook({ theme: 'sketch', font: null, stroke: 'clean' }).stroke).toBe('clean');
-    const r = resolveLook({ theme: 'nord', font: 'serif', stroke: 'rough' });
+    expect(resolveLook({ theme: 'sketch', font: null, stroke: null }, undefined, zh)).toEqual({ theme: 'sketch', stroke: 'rough', font: null, style: {} });
+    expect(resolveLook({ theme: 'clean', font: null, stroke: null }, undefined, zh).stroke).toBe('clean');
+    expect(resolveLook({ theme: 'sketch', font: null, stroke: 'clean' }, undefined, zh).stroke).toBe('clean');
+    const r = resolveLook({ theme: 'nord', font: 'serif', stroke: 'rough' }, undefined, zh);
     expect(r.stroke).toBe('rough');
     expect(r.style['--jp-font']).toBe(FONT_STACKS.serif);
-    expect(resolveLook({ theme: 'brand', font: null, stroke: null }, { brand: ':root { --jp-stroke: clean }' }).stroke).toBe('clean');
+    expect(resolveLook({ theme: 'brand', font: null, stroke: null }, { brand: ':root { --jp-stroke: clean }' }, zh).stroke).toBe('clean');
   });
   it('appearanceFromParams：渲染路由读 font / stroke 参数；未知值忽略', () => {
     expect(appearanceFromParams(new URLSearchParams('font=kai&stroke=clean'))).toEqual({ font: 'kai', stroke: 'clean' });

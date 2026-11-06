@@ -1,3 +1,5 @@
+import { useI18n } from '../i18n/context';
+import { en, type Dictionary } from '../i18n/en';
 /**
  * 组件目录 v3（@joplo-app/core catalog，名称与属性对齐 Mantine，D35）中每个类型的低保真实现。
  * 运行时不引入 Mantine：手绘主题用 Rough 描边与手写字体，线框主题用 1px 边框。
@@ -71,8 +73,10 @@ export type StreamingCtx = { paths: ReadonlySet<string>; key: string; paused: bo
 
 export const RenderContext = createContext<RenderCtx | null>(null);
 const useCtx = () => {
+  const { t: i18n } = useI18n();
+
   const c = useContext(RenderContext);
-  if (!c) throw new Error('缺少 RenderContext');
+  if (!c) throw new Error(i18n.stage.missingRendercontext);
   return c;
 };
 
@@ -533,9 +537,11 @@ function BurgerIcon({ opened, size = 18 }: { opened: boolean; size?: number }) {
 }
 
 function Burger({ node, p, disabled }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const root = useRoot(node, p, { disabled, style: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0 } });
   return (
-    <button {...root} type="button" aria-label={str(p['aria-label'], '导航')} aria-expanded={p.opened === true}>
+    <button {...root} type="button" aria-label={str(p['aria-label'], i18n.stage.navigation)} aria-expanded={p.opened === true}>
       <BurgerIcon opened={p.opened === true} size={p.size === 'sm' ? 16 : p.size === 'lg' ? 22 : 18} />
     </button>
   );
@@ -593,12 +599,14 @@ function Avatar({ node, p, children }: NodeProps) {
 }
 
 function ImageBox({ node, p }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const r = useR(p);
   const root = useRoot(node, p, { className: 'jbox', style: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: dim(r('w')) ?? '100%', height: dim(r('h')) ?? 160, background: SUBTLE, color: DIMMED, fontSize: 13, borderRadius: radius(p.radius) } });
   return (
-    <div {...root} role="img" aria-label={str(p.alt, '图片')} data-soft="">
+    <div {...root} role="img" aria-label={str(p.alt, i18n.stage.image)} data-soft="">
       <Rough seedKey={node.id} stroke={SOFT} fill={LINE} fillStyle="cross-hatch" />
-      <span style={{ background: 'rgba(255,255,255,.9)', padding: '0 8px', borderRadius: 4 }}>🖼 {str(p.alt, '图片')}</span>
+      <span style={{ background: 'rgba(255,255,255,.9)', padding: '0 8px', borderRadius: 4 }}>🖼 {str(p.alt, i18n.stage.image)}</span>
     </div>
   );
 }
@@ -724,6 +732,8 @@ const humanize = (s: string) => s.replace(/[_.-]+/g, ' ').replace(/([a-z])([A-Z]
 
 /** DataTable（mantine-datatable）：records（可绑定）+ columns [{ accessor, title, textAlign, width }] + noRecordsText。 */
 function DataTable({ node, p }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const cols = arr(p.columns)
     .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && (c as Record<string, unknown>).hidden !== true)
     .map((c, i) => {
@@ -747,7 +757,7 @@ function DataTable({ node, p }: NodeProps) {
           {rows.length === 0 ? (
             <tr>
               <td colSpan={Math.max(cols.length, 1)} style={{ padding: '18px 12px', textAlign: 'center', color: DIMMED }} data-jempty="">
-                {str(p.noRecordsText ?? p.empty, '没有记录')}
+                {str(p.noRecordsText ?? p.empty, i18n.stage.noRecords)}
               </td>
             </tr>
           ) : (
@@ -954,6 +964,8 @@ function sizeOf(v: unknown, d: number): string {
 
 /** Modal / Drawer：渲染到舞台内的弹窗层（不 portal 到 body），带遮罩。门控（opened）已由 isSelfVisible 判断。 */
 function Overlay({ node, p, children }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const { dialogLayer, animate } = useCtx();
   const drawer = node.type === 'Drawer';
   const position = str(p.position, 'left');
@@ -981,7 +993,7 @@ function Overlay({ node, p, children }: NodeProps) {
       {p.withOverlay === false ? null : (
         <motion.div data-jbackdrop="" className="absolute inset-0 bg-[rgba(30,30,30,0.38)]" initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.18 }} />
       )}
-      <motion.div {...root} role="dialog" aria-modal="true" aria-label={title || '弹窗'} initial={animate ? initial : false} animate={{ opacity: 1, x: 0, y: 0, scale: 1 }} transition={{ duration: 0.22 }}>
+      <motion.div {...root} role="dialog" aria-modal="true" aria-label={title || i18n.stage.modal} initial={animate ? initial : false} animate={{ opacity: 1, x: 0, y: 0, scale: 1 }} transition={{ duration: 0.22 }}>
         <Rough seedKey={node.id} strokeWidth={1.8} />
         {title || p.withCloseButton !== false ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px 8px' }}>
@@ -1085,9 +1097,11 @@ function ActionIcon({ node, p, disabled, children }: NodeProps) {
 }
 
 function CloseButton({ node, p, disabled }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const root = useRoot(node, p, { disabled, style: { width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: DIMMED, fontSize: 20, lineHeight: 1, flexShrink: 0 } });
   return (
-    <button {...root} type="button" aria-label={str(p['aria-label'], '关闭')}>
+    <button {...root} type="button" aria-label={str(p['aria-label'], i18n.stage.close)}>
       ×
     </button>
   );
@@ -1232,6 +1246,8 @@ function Textarea({ node, p, disabled }: NodeProps) {
 
 /** Select / MultiSelect：选项来自 data；显示 inputs[id]；选择动画期间展开下拉。 */
 function Select({ node, p, disabled }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const { state, preview } = useCtx();
   const v = useInputValue(node, p);
   const choices = choicesOf(node, state) ?? [];
@@ -1259,7 +1275,7 @@ function Select({ node, p, disabled }: NodeProps) {
               </span>
             ) : (
               <span className={cn('jtrunc min-w-0 flex-1', values.length ? '' : 'text-[var(--jp-faint)]')} data-jtext="">
-                {values.length ? labelOf(values[0]!) : str(p.placeholder, '请选择')}
+                {values.length ? labelOf(values[0]!) : str(p.placeholder, i18n.stage.selectAnOption)}
               </span>
             )}
             <span aria-hidden style={{ color: DIMMED }}>
@@ -1428,11 +1444,13 @@ function TabsPanel({ node, p, children }: NodeProps) {
 }
 
 function Breadcrumbs({ node, p, children }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const sep = p.separator !== undefined ? str(p.separator) : '/';
   const items = (Array.isArray(children) ? children : [children]).filter(Boolean);
   const root = useRoot(node, p, { style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 14 } });
   return (
-    <nav {...root} aria-label="面包屑">
+    <nav {...root} aria-label={i18n.stage.breadcrumbs}>
       {items.map((c, i) => (
         <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           {i > 0 ? (
@@ -1527,23 +1545,25 @@ function ChatMessage({ node, p, children }: NodeProps) {
   );
 }
 
-const TOOL_STATE: Record<string, { text: string; c: string }> = {
-  running: { text: '运行中', c: INFO },
-  done: { text: '已完成', c: OK },
-  error: { text: '出错', c: DANGER },
-  'input-streaming': { text: '准备中', c: DIMMED },
-  'input-available': { text: '运行中', c: INFO },
-  'output-available': { text: '已完成', c: OK },
-  'output-error': { text: '出错', c: DANGER },
-};
+const TOOL_STATE = (i18n: Dictionary = en): Record<string, { text: string; c: string }> => ({
+  running: { text: i18n.stage.running, c: INFO },
+  done: { text: i18n.stage.done, c: OK },
+  error: { text: i18n.stage.error, c: DANGER },
+  'input-streaming': { text: i18n.stage.preparing, c: DIMMED },
+  'input-available': { text: i18n.stage.running, c: INFO },
+  'output-available': { text: i18n.stage.done, c: OK },
+  'output-error': { text: i18n.stage.error, c: DANGER },
+});
 function ToolCall({ node, p, children }: NodeProps) {
-  const s = TOOL_STATE[str(p.state, 'done')] ?? TOOL_STATE.done!;
+  const { t: i18n } = useI18n();
+
+  const s = TOOL_STATE(i18n)[str(p.state, 'done')] ?? TOOL_STATE(i18n).done!;
   const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { display: 'flex', flexDirection: 'column', gap: 4, width: '100%', background: SUBTLE, padding: '8px 12px', fontFamily: MONO, fontSize: 13 } });
   return (
     <div {...root} data-soft="">
       <Rough seedKey={node.id} stroke={SOFT} />
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-        <span className="jtrunc">⚙ {str(p.title, '工具调用')}</span>
+        <span className="jtrunc">⚙ {str(p.title, i18n.stage.toolCall)}</span>
         <span style={{ color: s.c, flexShrink: 0 }}>{s.text}</span>
       </div>
       <div style={{ whiteSpace: 'pre-wrap', color: INK2 }}>{children}</div>
@@ -1556,6 +1576,7 @@ function ToolCall({ node, p, children }: NodeProps) {
  * opened 时展开子节点（过程），左侧一条细线。
  */
 function Thinking({ node, p, children }: NodeProps) {
+  const { t: i18n } = useI18n();
   const active = p.active === true;
   const opened = p.opened === true;
   const title = str(p.title);
@@ -1566,9 +1587,9 @@ function Thinking({ node, p, children }: NodeProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
         {active ? <Spinner size={14} c={DIMMED} /> : <span aria-hidden style={{ width: 14, textAlign: 'center', flexShrink: 0 }}>✦</span>}
         <span className={cn('jtrunc', active && 'jshimmer')} style={{ color: active ? undefined : INK2, fontWeight: 500 }}>
-          {title || (active ? '思考中…' : '思考过程')}
+          {title || (active ? i18n.stage.thinkingActive : i18n.stage.thinking)}
         </span>
-        {!active && duration ? <span style={{ flexShrink: 0, color: DIMMED }}>· 思考了 {duration}</span> : null}
+        {!active && duration ? <span style={{ flexShrink: 0, color: DIMMED }}>{i18n.stage.thoughtFor(duration)}</span> : null}
         {children ? <span aria-hidden style={{ flexShrink: 0, fontSize: 11 }}>{opened ? '▲' : '▼'}</span> : null}
       </div>
       {opened && children ? (
@@ -1580,35 +1601,38 @@ function Thinking({ node, p, children }: NodeProps) {
 
 /** 简单外部邮件：自身不可操作，正文里的按钮仍走普通步骤。 */
 function Email({ node, p, children }: NodeProps) {
+  const { t: i18n } = useI18n();
   const root = useRoot(node, p, { className: 'jbox', style: { background: SURFACE, padding: 16, display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 } });
-  const from = str(p.from, '发件人');
+  const from = str(p.from, i18n.stage.sender);
   return <article {...root}>
     <Rough seedKey={node.id} />
     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
       <span aria-hidden style={{ width: 34, height: 34, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', background: SUBTLE, color: INK, fontWeight: 600 }}>{[...from.trim()][0] ?? '?'}</span>
-      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600 }}>{from}</div><div style={{ color: DIMMED, fontSize: 12 }}>收件人：{str(p.to, '未指定')}</div></div>
+      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600 }}>{from}</div><div style={{ color: DIMMED, fontSize: 12 }}>{i18n.stage.recipient(str(p.to, i18n.stage.unspecified))}</div></div>
       {p.time ? <time style={{ color: DIMMED, fontSize: 12 }}>{str(p.time)}</time> : null}
     </div>
-    <strong style={{ fontSize: 18 }}>{str(p.subject, '无主题')}</strong>
+    <strong style={{ fontSize: 18 }}>{str(p.subject, i18n.stage.noSubject)}</strong>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{children}</div>
   </article>;
 }
 
 function DataCard({ node, p }: NodeProps) {
+  const { t: i18n } = useI18n();
   const { changed = [] } = useCtx();
   const rows = dataRows(p.value, p.fields, node.props?.value, changed);
   const root = useRoot(node, p, { className: 'jbox', style: { background: SURFACE, padding: 20, minWidth: 0, width: '100%' } });
   return <section {...root}>
     <Rough seedKey={node.id} />
-    <div style={{ fontWeight: 600, fontSize: 20, marginBottom: 14 }}>{str(p.title, '数据记录')}</div>
+    <div style={{ fontWeight: 600, fontSize: 20, marginBottom: 14 }}>{str(p.title, i18n.stage.dataRecords)}</div>
     {rows.length ? <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>{rows.map((row, i) => <div key={`${row.key}:${i}`} data-changed={row.change ? '' : undefined} style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 12, padding: '10px 12px', background: row.change ? 'color-mix(in srgb, var(--jp-accent) 15%, var(--jp-surface))' : undefined, borderLeft: row.change ? `3px solid ${ACCENT}` : '3px solid transparent' }}>
       <dt style={{ color: DIMMED, minWidth: 80 }}>{row.label}</dt>
       <dd style={{ margin: 0, overflowWrap: 'anywhere', flex: 1 }}>{displayData(row.value)}{row.change ? <div style={{ color: INK2, fontSize: 13, marginTop: 4 }}><span>{displayData(row.change.before)}</span> → <span>{displayData(row.change.after)}</span></div> : null}</dd>
-    </div>)}</dl> : <div style={{ color: DIMMED }}>暂无数据</div>}
+    </div>)}</dl> : <div style={{ color: DIMMED }}>{i18n.stage.noData}</div>}
   </section>;
 }
 
 function StateFlow({ node, p }: NodeProps) {
+  const { t: i18n } = useI18n();
   const { changed = [] } = useCtx();
   const items = stateFlowItems(p.value, p.states, p.labels);
   const change = changeFor(node.props?.value, changed);
@@ -1620,31 +1644,33 @@ function StateFlow({ node, p }: NodeProps) {
         {i ? <span aria-hidden style={{ color: DIMMED }}>→</span> : null}
         <span className="jbox" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '8px 14px', color: item.state === 'todo' ? DIMMED : INK, background: item.state === 'current' ? 'color-mix(in srgb, var(--jp-accent) 20%, var(--jp-surface))' : SURFACE, fontWeight: item.state === 'current' ? 600 : 400 }}>
           <Rough seedKey={`${node.id}:${i}`} stroke={item.state === 'current' ? ACCENT : item.state === 'done' ? OK : LINE} />
-          {item.state === 'done' ? <span aria-label="已完成" style={{ color: OK }}>✓</span> : null}{item.label}
+          {item.state === 'done' ? <span aria-label={i18n.stage.done} style={{ color: OK }}>✓</span> : null}{item.label}
         </span>
       </li>)}
     </ol>
-    {change ? <div data-state-change="" style={{ color: INK2, fontSize: 14 }}>状态变化：{label(change.before)} → {label(change.after)}</div> : null}
-    {!items.length ? <span style={{ color: DIMMED }}>暂无状态</span> : null}
+    {change ? <div data-state-change="" style={{ color: INK2, fontSize: 14 }}>{i18n.stage.stateChange(label(change.before), label(change.after))}</div> : null}
+    {!items.length ? <span style={{ color: DIMMED }}>{i18n.stage.noStates}</span> : null}
   </div>;
 }
 
 const ARTIFACT_ICON: Record<string, string> = { doc: '▤', code: '</>', sheet: '▦', web: '◎', image: '▣' };
-const ARTIFACT_KIND: Record<string, string> = { doc: '文档', code: '代码', sheet: '表格', web: '网页', image: '图片' };
+const ARTIFACT_KIND = (i18n: Dictionary): Record<string, string> => ({ doc: i18n.stage.document, code: i18n.stage.code, sheet: i18n.stage.sheet, web: i18n.stage.webPage, image: i18n.stage.image });
 function ArtifactStatus({ status }: { status: string }) {
+  const { t: i18n } = useI18n();
   if (status === 'generating')
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: INFO, flexShrink: 0, fontSize: 13 }}>
         <Spinner size={13} c={INFO} />
-        生成中
+        {i18n.stage.generating}
       </span>
     );
-  if (status === 'error') return <span style={{ color: DANGER, flexShrink: 0, fontSize: 13 }}>生成失败</span>;
-  return <span style={{ color: OK, flexShrink: 0, fontSize: 13 }}>✓ 已生成</span>;
+  if (status === 'error') return <span style={{ color: DANGER, flexShrink: 0, fontSize: 13 }}>{i18n.stage.generationFailed}</span>;
+  return <span style={{ color: OK, flexShrink: 0, fontSize: 13 }}>{i18n.stage.generated}</span>;
 }
 
 /** Agent 的侧边产物（D56）：标题栏（类型图标、标题、版本、状态）+ 内容区；默认占满所在容器的高度。 */
 function Artifact({ node, p, children }: NodeProps) {
+  const { t: i18n } = useI18n();
   const mode = useStroke();
   const kind = str(p.kind, 'doc');
   const root = useRoot(node, p, { className: cn('jbox', mode === 'clean' && 'rounded-xl'), style: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', minHeight: 0, background: SURFACE, overflow: 'hidden' } });
@@ -1653,7 +1679,7 @@ function Artifact({ node, p, children }: NodeProps) {
       <Rough seedKey={node.id} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${LINE}`, minWidth: 0 }}>
         <span aria-hidden style={{ fontFamily: MONO, fontSize: 13, color: INK2, flexShrink: 0 }}>{ARTIFACT_ICON[kind] ?? ARTIFACT_ICON.doc}</span>
-        <span className="jtrunc" style={{ fontWeight: 600, color: INK }}>{str(p.title, '产物')}</span>
+        <span className="jtrunc" style={{ fontWeight: 600, color: INK }}>{str(p.title, i18n.stage.artifact)}</span>
         {p.version !== undefined ? <span style={{ flexShrink: 0, fontSize: 12, color: DIMMED, border: `1px solid ${LINE_STRONG}`, borderRadius: 999, padding: '0 7px', lineHeight: '18px' }}>{str(p.version)}</span> : null}
         <span style={{ flex: 1 }} />
         <ArtifactStatus status={str(p.status, 'ready')} />
@@ -1665,6 +1691,7 @@ function Artifact({ node, p, children }: NodeProps) {
 
 /** 对话里指向产物的卡片（可点击打开）。 */
 function ArtifactRef({ node, p, disabled }: NodeProps) {
+  const { t: i18n } = useI18n();
   const mode = useStroke();
   const kind = str(p.kind, 'doc');
   const root = useRoot(node, p, { disabled, className: cn('jbox', mode === 'clean' && 'rounded-lg'), style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', maxWidth: 360, padding: '10px 14px', background: SURFACE, textAlign: 'left' } });
@@ -1673,21 +1700,23 @@ function ArtifactRef({ node, p, disabled }: NodeProps) {
       <Rough seedKey={node.id} />
       <span aria-hidden style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0, borderRadius: 8, background: SUBTLE, fontFamily: MONO, fontSize: 13, color: INK2 }}>{ARTIFACT_ICON[kind] ?? ARTIFACT_ICON.doc}</span>
       <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-        <span className="jtrunc" style={{ fontWeight: 600, color: INK }}>{str(p.title, '产物')}</span>
-        <span style={{ fontSize: 12, color: DIMMED }}>{ARTIFACT_KIND[kind] ?? '文档'}{p.status === 'generating' ? ' · 生成中' : ' · 点击打开'}</span>
+        <span className="jtrunc" style={{ fontWeight: 600, color: INK }}>{str(p.title, i18n.stage.artifact)}</span>
+        <span style={{ fontSize: 12, color: DIMMED }}>{i18n.stage.artifactSummary(ARTIFACT_KIND(i18n)[kind] ?? i18n.stage.document, p.status === 'generating')}</span>
       </span>
     </button>
   );
 }
 
 function PromptInput({ node, p, disabled }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const v = useInputValue(node, p);
   const has = v !== undefined && v !== null && v !== '';
   const root = useRoot(node, p, { disabled, className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-xl', style: { flex: 1, minWidth: 0, width: '100%', minHeight: 44, padding: '10px 14px', whiteSpace: 'pre-wrap', color: has ? INK : SOFT, background: SURFACE } });
   return (
     <div {...root} role="textbox" aria-readonly="true" tabIndex={0} data-jcontrol={node.id}>
       <Rough seedKey={node.id} />
-      <span data-jtext="">{has ? str(v) : str(p.placeholder, '输入消息…')}</span>
+      <span data-jtext="">{has ? str(v) : str(p.placeholder, i18n.stage.typeAMessage)}</span>
     </div>
   );
 }
@@ -1947,6 +1976,8 @@ function KindIcon({ kind }: { kind: string }) {
  * 子节点照常经 RenderNode 渲染（可见性、绑定由 core 计算），位置从 DiagramContext 取。
  */
 function Diagram({ node, p, children }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const r = useR(p);
   const structure = useMemo(() => diagramStructure(node), [node]);
   const key = structureKey(structure);
@@ -1997,7 +2028,7 @@ function Diagram({ node, p, children }: NodeProps) {
       data-scale={String(scale)}
     >
       {layout.width === 0 ? (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: DIMMED, fontSize: 13 }}>架构图还没有节点</div>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: DIMMED, fontSize: 13 }}>{i18n.stage.thisDiagramHasNoNodesYet}</div>
       ) : (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
           <div
@@ -2271,23 +2302,27 @@ function DiagramEdge({ node, p }: NodeProps) {
 // ============ Joplo ============
 
 function Placeholder({ node, p }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const h = dim(p.h ?? p.height) ?? '120px';
   const root = useRoot(node, p, { className: 'jbox', style: { display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', background: SUBTLE, fontSize: 14, color: DIMMED, height: h } });
   return (
     <div {...root} data-soft="">
       <Rough seedKey={node.id} stroke={SOFT} fill={LINE} fillStyle="cross-hatch" />
-      <span className="rounded bg-[color-mix(in_srgb,var(--jp-surface)_90%,transparent)] px-2">{str(p.label, '占位')}</span>
+      <span className="rounded bg-[color-mix(in_srgb,var(--jp-surface)_90%,transparent)] px-2">{str(p.label, i18n.stage.placeholder)}</span>
     </div>
   );
 }
 
 function Custom({ node, p }: NodeProps) {
+  const { t: i18n } = useI18n();
+
   const root = useRoot(node, p, { className: 'jbox flex min-h-24 w-full flex-col items-center justify-center gap-1 bg-[repeating-linear-gradient(45deg,var(--jp-subtle),var(--jp-subtle)_8px,var(--jp-surface)_8px,var(--jp-surface)_16px)] p-4 text-center' });
   return (
     <div {...root} data-dashed="">
       <Rough seedKey={node.id} dashed stroke={INK2} />
-      <div className="font-semibold">自定义组件：{str(p.kind, '未命名')}（占位）</div>
-      <div className="text-[12px] text-[var(--jp-muted)]">目录中没有的组件，按声明的元素 ID 与状态演示</div>
+      <div className="font-semibold">{i18n.stage.customComponent}{str(p.kind, i18n.stage.unnamed)}{i18n.stage.placeholderSuffix}</div>
+      <div className="text-[12px] text-[var(--jp-muted)]">{i18n.stage.aComponentOutsideTheCatalogTheDemoFollowsIts}</div>
     </div>
   );
 }
