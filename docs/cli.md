@@ -13,12 +13,16 @@ npx joplo skill [topic]
 npx joplo skill install [dir] [--force] [--diff] [--agents-md]
 npx joplo guide
 npx joplo build [dir] [--out-dir <dir>] [--overwrite]
+npx joplo login [--no-browser] [--server <url>]
+npx joplo logout [--server <url>]
+npx joplo whoami [--format text|json] [--server <url>]
+npx joplo share [dir] [--format text|json] [--new] [--title <title>] [--server <url>]
 npx joplo render [dir] --scenario-id <qid> --out <file> \
   [--step-id <qid>] [--theme <theme>] \
   [--width <pixels> --height <pixels>] [--scale <scale>] [--overwrite]
 ```
 
-可省略的 dir 默认为当前目录。`render` 的 scenario-id、out 必填。主输出和帮助写 stdout，服务日志、截图告警和项目依赖版本提示写 stderr；用法错误退出 2，领域或执行失败退出 1，成功退出 0。
+可省略的 dir 默认为当前目录。`render` 的 scenario-id、out 必填。主输出和帮助写 stdout，服务日志、截图告警和项目依赖版本提示写 stderr；用法错误退出 2，领域或执行失败退出 1，云端未登录 AUTH_REQUIRED 退出 3，成功退出 0。
 
 ## init
 
@@ -86,7 +90,7 @@ JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }
 | cases | 八个维度及按产品类型筛选的情况预设 |
 | check | 诊断代码与局部修复 |
 | selection | 用户选中后只改指向的位置 |
-| publish | pick、build、静态站部署与演示能力 |
+| publish | pick、build、云端登录与分享、静态站部署与演示能力 |
 
 `guide` 与 `skill authoring` 完全相同。读取主题不加载服务端，也不执行作者项目，输出无颜色文本。
 
@@ -138,3 +142,94 @@ npx playwright install chromium
 ```
 
 服务契约见 [contract.ts](../packages/server/src/contract.ts)。所有主题和选项以当前 `--help` 为准；需要创作细节时优先读取对应 skill 主题。
+
+
+## 云端地址与凭证
+
+只有 `login`、`logout`、`whoami`、`share` 连接云端；本地命令继续完整、免费。
+地址优先级：`--server <url>` → `JOPLO_CLOUD_URL` → `https://app.joplo.app`。地址必须是 HTTP(S) 源（不带路径、查询参数或用户名密码）。
+每个云端 API 请求携带 `X-Joplo-Client: joplo-cli/<版本>`；预签名文件 PUT 严格使用服务端返回的 headers，不附加账号令牌或版本头。
+凭证只适用于其记录的 server；切换服务器需要重新登录，不会把另一个服务器的令牌发送过去。
+
+`JOPLO_HOME` 与看板 settings.json 使用相同解析规则：非空环境变量按当前目录解析，默认 `~/.joplo`。
+`credentials.json` 权限为 0600，先写同目录临时文件再原子 rename；损坏或缺字段时视为未登录并提示重登。
+不要把凭证文件复制到项目中、输出或提交 Git。`.joplo/cloud.json` 只保存服务器、分享 ID 和链接。
+
+## login
+
+```sh
+npx joplo login
+npx joplo login --no-browser
+```
+
+终端显示网址和验证码，请在浏览器核对并允许授权。默认打开含验证码的网址；非交互终端、SSH、`--no-browser` 或系统没有打开命令时，请手动访问网址。
+CLI 按服务器指定间隔轮询；要求降速时每次增加 5 秒。拒绝授权或验证码过期会退出并提示重新登录。命令从不等待 stdin 输入。
+登录成功后保存 `{server, accessToken, user: {id, email}, createdAt}`；标准输出只显示账号。
+
+## logout
+
+用 bearer 调用 `POST /api/auth/sign-out`（请求体 `{}`）吊销当前 CLI 会话，然后删除本地凭证。令牌只在 Authorization 头里。远端失败只在 stderr 警告，本地仍退出；必要时在网页的设备管理中撤销会话。
+没有凭证时可重复执行。指定其他 server 时不会吊销或删除原服务器的凭证。
+
+## whoami
+
+```sh
+npx joplo whoami --format json
+```
+
+读取云端当前账号、套餐及限额，不以本地缓存推断套餐。JSON 沿用结果信封，`data` 为 `{user: {id, email, name}, plan, limits: {maxUploadBytes, maxTotalBytes, maxFiles, publishesPerHour}}`；`publishesPerHour: null` 表示不限。
+
+## share
+
+```sh
+npx joplo share
+npx joplo share examples/invite --title '邀请流程' --format json
+npx joplo share --new
+```
+
+- 未登录：交互终端显示“分享需要登录 Joplo 账号（免费）”，直接进入浏览器登录，完成后继续发布；非交互环境立即返回 AUTH_REQUIRED（退出 3），提示用户运行 `npx joplo login`。
+- 先 check，再复用 build 构建到临时目录；结束时清理临时产物，不改项目 dist。检查或构建有 error 时不上传。
+- 只接受 HTML、CSS、JS/MJS、JSON、PNG/JPEG/GIF/WebP/SVG、WOFF/WOFF2/TTF；路径必须安全。其他类型会在上传前列出并拒绝。
+- 默认标题是项目名；`--title` 接受 1–200 个字符。套餐和限额实时读取服务器。
+- `maxUploadBytes` 限制本次缺失对象的新上传量（免费 20 MiB、Pro 100 MiB）；`maxTotalBytes` 限制清单总量（256 MiB），`maxFiles` 限制文件数（2000）。实际数值以 me 为准。
+- CLI 本地只预检清单总量和文件数；新上传量由服务端按已有 blob 去重后判断，不能拿清单总量与新上传限额比较。共用字体和运行时资源可由运维预置。
+- Pro 且 `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接；`--new` 新建。免费账号每次新建。
+- 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误最多重试 3 次，按 1、2、4 秒退避。finalize 重试沿用同一个 uploadId。
+- 成功后写 `.joplo/cloud.json`，显示链接和到期时刻；免费链接 1 小时有效，升级入口为 https://app.joplo.app/billing。
+
+JSON 成功的 `data` 为 `{shareId, url, expiresAt, version}`，`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
+
+| 错误码 | 恢复方式 |
+| --- | --- |
+| AUTH_REQUIRED（退出 3） | 请用户运行 npx joplo login，再重试 |
+| AUTH_EXPIRED（401） | 重新运行 npx joplo login |
+| PLAN_REQUIRED | 此操作需要 Pro，或用 --new 创建新分享 |
+| QUOTA_EXCEEDED | 达到发布频率上限，稍后重试 |
+| TOO_LARGE | `details.kind=upload` 表示新增上传超限，`total` 表示清单总量/文件数超限；查看上限、实际值及最大五个文件 |
+| CLIENT_OUTDATED | 使用 npx joplo@latest share |
+| NETWORK | 检查网络后重试；命令内部重试 finalize 时复用 uploadId |
+
+其他云端错误及本地校验失败退出 1，用法错误退出 2。错误正文不回显远端响应或访问令牌。
+
+### 云端数据流
+
+| 字段 / 文件 / 参数 | 写入点 → 存储 → 读取点 → 消费者 |
+| --- | --- |
+| --server / JOPLO_CLOUD_URL | 用户配置 → 进程内规范化源地址 → 四个云端命令 → API 请求与凭证/分享来源比对 |
+| X-Joplo-Client | CLI package.json 版本 → API 请求头 → 云端 → 客户端版本检查；不修改预签名 PUT headers |
+| --no-browser | 命令参数 → 进程内 → login → 决定是否调用系统打开命令 |
+| device_code、user_code、verification_uri(_complete)、interval、expires_in | 设备授权响应 → 进程内 → login → 轮询、终端验证码、浏览器地址与截止时间；不写磁盘 |
+| credentials.json.server / accessToken | 登录响应及目标地址 → JOPLO_HOME 的 0600 原子文件 → 云端命令 → 同服务器 bearer 鉴权；logout 以空请求体 sign-out 吊销当前会话后删除文件 |
+| credentials.json.user.id / email / createdAt | me 响应及登录时刻 → 同一凭证文件 → 凭证校验与登录成功提示 → 用户；套餐仍实时查询 |
+| --title / title | 用户参数或 check 的项目名 → 创建请求 → 云端 → 分享标题 |
+| path / sha256 / size / contentType | 临时 build 文件 → 内存清单及创建请求 → 云端 → 去重、配额和资源类型校验 |
+| missing[].sha256 / uploadUrl / headers | 创建响应 → 内存 → PUT → 只上传缺失对象并保留签名头 |
+| uploadId | 创建响应 → 内存 → finalize 及其重试 → 幂等确认发布 |
+| --new / replaceShareId | 参数及同服务器 cloud.json.shareId + 实时 Pro 套餐 → 创建请求 → 云端 → 新建或更新链接；免费账号从不发送 replaceShareId |
+| cloud.json.server / shareId / url | 目标服务器及 finalize 响应 → 项目 .joplo/cloud.json（原子写） → 下次 share → 来源比对与 Pro 更新；url 供用户/工具读取 |
+| shareId / url / expiresAt / version | finalize 响应 → text/JSON 结果 → 用户/Agent → 分享链接及有效期 |
+| user / plan / limits | me 响应 → 进程内与 whoami 结果 → share 或用户/Agent → 套餐展示、更新资格、maxTotalBytes/maxFiles 本地预检、maxUploadBytes 上传限额展示、publishesPerHour 频率诊断 |
+| error.details | 本地校验、manifest 和 me 限额 → 结果信封 → 用户/Agent → fix 登录命令、超限的 kind/maxBytes/actualBytes/maxFiles/actualFiles/largestFiles 或 publishesPerHour |
+
+
+`TOO_LARGE` 的 CLI `error.details` 采用 `{kind, maxBytes, actualBytes, largestFiles: [{path, size}]}`；本地总量预检另外包含 `maxFiles/actualFiles`。远端限额值与文件列表按白名单读取（兼容上限字段 `limitBytes`，统一输出 `maxBytes`），不会回显响应中其他字段。服务端没有有效诊断时只报告错误码，不推测新增上传量。
