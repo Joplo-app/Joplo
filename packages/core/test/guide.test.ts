@@ -4,8 +4,8 @@ import ts from 'typescript';
 import { COMPONENT_DOCS, COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../src/catalog.ts';
 import { guide, skillIndex, skillTopic, SKILL_TOPICS } from '../src/guide.ts';
 
-const topics = ['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'publish'] as const;
-test('七个主题均少于 150 行，结尾的相关主题均存在', () => {
+const topics = ['authoring', 'demo', 'focus', 'components', 'cases', 'check', 'selection', 'publish'] as const;
+test('八个主题均少于 150 行，结尾的相关主题均存在', () => {
   expect(SKILL_TOPICS.map(t => t.name)).toEqual(topics);
   for (const topic of topics) {
     const body = skillTopic(topic);
@@ -65,8 +65,8 @@ test('demo 集中解释层级、镜头和调用链，authoring 只指向它', ()
   expect(authoring).toContain('demo');
   for (const text of ['shot(', 'trace(', 'explain(', '<Diagram', 'CAPTION_TOO_LONG', 'Viewpoint layers and director shots']) expect(authoring).not.toContain(text);
 });
-test('check 覆盖 compile.ts / validate.ts / schema-issues.ts 中全部静态诊断代码，避免新增诊断未同步说明', async () => {
-  const files = ['compile.ts', 'validate.ts', 'schema-issues.ts'];
+test('check 覆盖 compile.ts / validate.ts / schema-issues.ts / focus-check.ts 中全部静态诊断代码，避免新增诊断未同步说明', async () => {
+  const files = ['compile.ts', 'validate.ts', 'schema-issues.ts', 'focus-check.ts'];
   const codes = new Set<string>();
   for (const file of files) {
     const content = await readFile(new URL(`../src/${file}`, import.meta.url), 'utf8');

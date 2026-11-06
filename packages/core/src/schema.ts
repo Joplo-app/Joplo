@@ -66,6 +66,8 @@ export type SceneNode = {
   disabledReason?: string;
   unmodeled?: boolean;
   note?: string;
+  /** 敏感信息（D67）：内容模糊显示；可以是条件（为真时模糊）。演示内容，发布站保留。 */
+  redact?: boolean | Condition;
   /** 来自哪个功能方案（堆叠到路径上的元素）；页面和布局自身的元素没有此字段。 */
   from?: string;
   source?: string;
@@ -82,6 +84,7 @@ export const SceneNode: z.ZodType<SceneNode> = z.lazy(() =>
     disabledReason: z.string().optional(),
     unmodeled: z.boolean().optional(),
     note: z.string().optional(),
+    redact: z.union([z.boolean(), Condition]).optional(),
     from: z.string().optional(),
     source: Source,
   }),
@@ -139,6 +142,16 @@ export const Shot = z.strictObject({ layer: z.string().min(1), targets: z.array(
 export const Fork = z.strictObject({ label: z.string().min(1), scenarioId: Qid, at: z.number().int().nonnegative() });
 export const Mark = z.strictObject({ target: z.string().min(1), kind: z.enum(['circle', 'underline', 'box', 'arrow']), note: z.string().min(1).optional() });
 
+/**
+ * 焦点提示（D67）：这一步的强调形式，只作用于这一步。spotlight = 只照亮这些元素、其余压暗；highlight = 强调框并脉冲一次；
+ * number = 按 targets 的顺序标 1、2、3。都不推近镜头（目标不在当前镜头里时，编译器给这一步补一个整层镜头）。
+ */
+export const CUE_KINDS = ['spotlight', 'highlight', 'number'] as const;
+export const Cue = z.strictObject({ kind: z.enum(CUE_KINDS), targets: z.array(z.string().min(1)).min(1) });
+/** 标注气泡（D67）：指向元素的一句话；side 不写时由渲染器选放得下的一侧。 */
+export const CALLOUT_SIDES = ['top', 'right', 'bottom', 'left'] as const;
+export const Callout = z.strictObject({ target: z.string().min(1), text: z.string().min(1), side: z.enum(CALLOUT_SIDES).optional() });
+
 export const Step = z.strictObject({
   id: Qid,
   kind: z.enum(['user', 'system', 'card']),
@@ -165,6 +178,12 @@ export const Step = z.strictObject({
   forks: z.array(Fork).default([]),
   /** 本步标注，不累积，不参与状态转换。 */
   marks: z.array(Mark).default([]),
+  /** 本步的焦点提示（D67，来自 spotlight / highlight / numbered）；没有时省略。演示内容，发布站保留。 */
+  cues: z.array(Cue).optional(),
+  /** 本步的标注气泡（D67，来自 callout）；没有时省略。 */
+  callouts: z.array(Callout).optional(),
+  /** 自动播放时这一步至少停留的毫秒数（D67，来自 hold；未按速度缩放）；没有时省略。 */
+  hold: z.number().int().positive().max(30_000).optional(),
   source: Source,
 });
 
@@ -284,6 +303,8 @@ export const Project = z.strictObject({
   description: z.string().default(''),
   /** 默认主题名（D51）：内置主题或 themes 里的作者主题。 */
   theme: z.string().min(1).default('sketch'),
+  /** 默认焦点行为（D67）：缺省 = 开启；false = 只按作者写的镜头与提示呈现（config({ autoFocus: false })）。发布站保留。 */
+  autoFocus: z.boolean().optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),
   /** dev = 含全部方案（本地看板）；publish = 只含选定方案，且去掉创作侧信息（D33）；review = 评审版：全部方案，同样去掉创作侧信息（D63）。 */
@@ -323,3 +344,5 @@ export type Shot = z.infer<typeof Shot>;
 
 export type Fork = z.infer<typeof Fork>;
 export type Mark = z.infer<typeof Mark>;
+export type Cue = z.infer<typeof Cue>;
+export type Callout = z.infer<typeof Callout>;

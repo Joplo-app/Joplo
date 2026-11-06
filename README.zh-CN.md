@@ -63,7 +63,7 @@ npx joplo skill demo
 npx joplo skill install --agents-md
 ```
 
-七个主题为 `authoring`、`demo`、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
+八个主题为 `authoring`、`demo`、`focus`、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
 
 看板运行时，在另一个终端执行：
 

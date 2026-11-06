@@ -66,7 +66,7 @@ function joploBody(): string {
     '## Common pitfalls',
     ...PITFALLS.map(([text, topic]) => `- ${text}. See npx joplo skill ${topic}.`),
     '',
-    'Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, demo, components, cases, check, selection, publish). Run npx joplo skill for the overview.',
+    'Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, demo, focus, components, cases, check, selection, publish). Run npx joplo skill for the overview.',
     'After the user Alt+clicks a board element, run npx joplo selection and edit only that location.',
     'Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).',
   ].join('\n');

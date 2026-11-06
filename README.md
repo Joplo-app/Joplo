@@ -63,7 +63,7 @@ npx joplo skill demo
 npx joplo skill install --agents-md
 ```
 
-The seven topics are `authoring`, `demo`, `components`, `cases`, `check`, `selection`, and `publish`. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
+The eight topics are `authoring`, `demo`, `focus`, `components`, `cases`, `check`, `selection`, and `publish`. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
 
 Use a second terminal while the Board is running:
 

@@ -268,6 +268,17 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 不自动下载：`render` 缺组件时，交互终端询问（默认否，写明约 100 MB、不装进项目），非交互（Agent / CI / 管道）直接以 `EXPORT_COMPONENT_MISSING`、退出码 4 结束；`share` 没有组件时跳过预览图并提示一行安装命令，不失败；技能让 Agent 先征得用户同意再运行 setup export。
   - 本地看板：「导出 ▾」菜单顶部在未安装 / 安装中 / 安装失败时显示安装卡（说明、「安装导出组件（约 N MB）」按钮、终端命令）；点导出时轻提示「安装并导出」。只有用户点按钮才开始下载，由看板进程执行安装并用 SSE 推送进度（「导出」按钮上的进度环与卡片），装好后继续刚才的导出，失败给原因与重试。安装接口 `POST /__joplo/export-runtime/install` 与进度流照用看板已有的校验（Host、Origin、本机令牌、`application/json`），网页上的任意请求不能触发下载。
   - 界面方案沿用现有导出进度卡的样式，未单独出设计稿（D40 的原型可在用户检查后补）。
+- D67 叙事焦点：每一步看哪里、用什么形式呈现（2026-11-06，来源：用户 2026-11-06：“演示是一种叙事，一定有某一段时间关注的重点，以及这个重点呈现的形式”；调研见 docs/research/narrative-focus.md）：
+  - **焦点模型**：每一步有一个焦点对象，由 core 的 `focusAt(project, 场景, 位置)` 推导，是步骤的纯函数（与 cameraAt 同级，看板、发布站、嵌入、评审模式、截图、视频共用）。优先级：第 0 步封面 → 过渡卡本身 → 作者写的（shot、trace、mark 与下面的提示）→ 默认推导（换页或导演换层 = 整个新画面；用户操作 = 被操作的元素；系统步骤 = 本步新出现或变化的元素；只弹了 Toast = Toast）→ 只有字幕。
+  - **默认行为**（不写代码就有；`config({ autoFocus: false })` 整体关掉，作者写的照常）：
+    - 用户操作的呈现就是鼠标与点击波纹，不额外放大（与 0.2.7 相同）；
+    - **结果揭晓**：没写焦点的步骤里，新出现或内容变化的元素外沿亮一下再淡出（约 1.6 秒），不移动镜头、不压暗、不拦截点击，静态截图不画。克制规则：弹窗 / 抽屉、DataCard / StateFlow 不提示；一次超过 3 处不提示；换页、换层不提示；同一个元素连续变化、往同一个容器里连续追加只在第一次提示；作者写了任何焦点时不提示；
+    - **换层先全景再推近**：导演换到另一层且这一层要推近时，新画面淡入时停在整层，0.4 秒后推近（原来从上一层的视图直接过渡，方向随意）。首次打开、静态截图、减少动态效果时不做。
+  - **作者原语**（只作用于这一步、跟随主题、整层 `pointer-events: none`）：`spotlight(...ids)` 聚光（不推近，其余区域用背景色冲淡，洞口让出下一步要点的元素）、`highlight(...ids)` 强调框并脉冲一次、`callout(id, 一句话, { side })` 便签式说明（自动选边、引线）、`numbered(...ids)` 编号 1、2、3、`hold(秒)` 自动播放的最短停留（0.5–30，按速度缩放，封面时长计入）；元素属性 `redact`（布尔或条件）模糊敏感信息、布局不变。提示不推近镜头：目标不在这一层当前镜头里时，编译器给这一步补一个整层镜头（写进 shots）；没有 shot 的步骤由第一个提示目标所在的层决定导演层。放大取景仍用 shot（取景规则由 joplo-diagram-v2 负责，不重复实现）。
+  - **check**：目标不存在 FOCUS_UNKNOWN、气泡空 CALLOUT_EMPTY、选边写错 CALLOUT_SIDE_INVALID、hold 越界 HOLD_INVALID、redact / autoFocus 写错 INVALID_REDACT / AUTOFOCUS_INVALID（error）；提示 / 标注的目标不在这一步导演所在的层 FOCUS_OFF_LAYER、提示指向这一步 shot 之外 FOCUS_CONFLICT、气泡超过 24 字 CALLOUT_TOO_LONG（warning）；连续 3 个系统步骤画面没有任何变化 FOCUS_IDLE（info）。在 examples/ 与官网 4 个示例上新提示为 0。
+  - **IR**：`Step.cues`、`Step.callouts`、`Step.hold`（毫秒）、`SceneNode.redact`、`Project.autoFocus`，只在用到时出现：不用新功能的项目 IR 不变；发布站、评审版保留（publishPayload 不裁这些字段）；旧发布产物没有这些字段时照常播放。
+  - **不做**：每次点击自动放大、弹簧物理镜头、聚光洞口跨步骤形变、自动识别敏感信息、并排前后对比（D56 已否定并排）、热点门控、章节、motion blur 与光标装饰（理由见调研文档第 6 节）。
+  - 技能新增主题 `npx joplo skill focus`（一步一个主体、先上下文后细节、同一主体保持取景、只在看不清时推近、便签讲为什么且不重复字幕、反例与对应提示）；官方技能“常见的坑”加一条；样板为 examples/camping，前后对比截图在 docs/screenshots/narrative-focus/。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

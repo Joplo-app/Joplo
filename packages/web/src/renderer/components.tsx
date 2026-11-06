@@ -23,6 +23,7 @@ import {
   atWidth,
   childWidth,
   choicesOf,
+  evaluateCondition,
   isNodeDisabled,
   isSelfVisible,
   nodeLabel,
@@ -108,6 +109,8 @@ function useRootAttrs(node: SceneNode, disabled = false) {
     ...(interactive ? { 'data-jinteractive': '' } : {}),
     ...(disabled ? { 'data-jdisabled': '', 'aria-disabled': true as const } : {}),
     ...(node.unmodeled ? { 'data-junmodeled': '' } : {}),
+    // 敏感信息（D67）：内容模糊显示，布局不变（index.css）
+    ...(node.redact === true || (node.redact && typeof node.redact === 'object' && evaluateCondition(node.redact, ctx.state)) ? { 'data-jredact': '' } : {}),
     ...(ctx.selectedId === node.id ? { 'data-jselected': '' } : {}),
   };
 }

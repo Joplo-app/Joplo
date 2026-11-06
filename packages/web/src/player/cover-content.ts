@@ -1,6 +1,7 @@
 import { stepCaption } from '../i18n/step-caption';
 import { en, type Dictionary } from '../i18n/en';
 import { stepDwell } from '../runtime/pace';
+import { holdMsOf } from '@joplo-app/core';
 /**
  * 场景封面（D61，纯函数）：第 0 步不再是“初始状态”，而是一张封面。内容只由 IR 推导：
  * 所属功能名 · 方案名、flow 的标题与 description、「约 N 步 · 约 M 秒」、出场角色。
@@ -39,7 +40,8 @@ export function dwellTexts(step: Step, i18n: Dictionary = en): (string | null | 
 
 /** 整个场景按 1× 速度播放大约多久（毫秒）：每一步的 stepDwell 之和。 */
 export function scenarioMs(_project: Project, scenario: Scenario, i18n: Dictionary = en): number {
-  return scenario.steps.reduce((sum, step) => sum + stepDwell({ texts: dwellTexts(step, i18n), cameraMoved: step.shots.length > 0 || !!step.directorLayer, streams: streamsOf(step).map((x) => x.value) }), 0);
+  // hold（D67）：作者要求这一步至少停这么久
+  return scenario.steps.reduce((sum, step) => sum + Math.max(holdMsOf(step), stepDwell({ texts: dwellTexts(step, i18n), cameraMoved: step.shots.length > 0 || !!step.directorLayer, streams: streamsOf(step).map((x) => x.value) })), 0);
 }
 
 /** 取整成好读的数：10 秒以内按秒向上取整，一分钟以内按 5 秒取整，再长按分钟四舍五入。 */

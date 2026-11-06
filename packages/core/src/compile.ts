@@ -10,8 +10,9 @@
 import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo-app/kit/node';
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@joplo-app/kit';
 import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, INTERACTIVE_TYPES, PAGE_LAYER, matchChoice, nodeLabel } from './catalog.ts';
+import { HOLD_MAX_SECONDS, HOLD_MIN_SECONDS } from './focus.ts';
 import { choicesOf, commonPrefix } from './player.ts';
-import { LAYER_ICONS, Project, SCHEMA_VERSION, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
+import { CALLOUT_SIDES, LAYER_ICONS, Project, SCHEMA_VERSION, type Callout, type Cue, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
 import type { Diagnostic } from './result.ts';
 import { schemaDiagnostics } from './schema-issues.ts';
 
@@ -50,6 +51,8 @@ export function compile(src: AuthoringProject, mode: CompileMode): CompileResult
     name: src.config.name,
     description: src.config.description ?? '',
     theme: src.config.theme ?? 'sketch',
+    // 默认焦点行为（D67）：只有作者写了才进 IR（缺省 = 开启），不用这个开关的项目 IR 不变
+    ...(typeof src.config.autoFocus === 'boolean' ? { autoFocus: src.config.autoFocus } : {}),
     themes: { ...(src.themes ?? {}) },
     mode,
     routes: {},
@@ -199,6 +202,8 @@ export function compile(src: AuthoringProject, mode: CompileMode): CompileResult
     return { id: sceneId, optionId: ctx?.qid ?? null, route: route.path, name: `${page.title}${ctx ? ` · ${ctx.def.name}` : ''}`, viewport: page.viewport ?? 'desktop', root };
   };
 
+  if (src.config.autoFocus !== undefined && typeof src.config.autoFocus !== 'boolean')
+    err('AUTOFOCUS_INVALID', `config({ autoFocus }) must be true or false (default true); got ${JSON.stringify(src.config.autoFocus)}`, src.config.source ?? `${src.config.file}:1:1`);
   // 主题（D51）：config.theme 必须是内置主题或 themes/<name>.css
   {
     const t = src.config.theme ?? 'sketch';
@@ -349,6 +354,9 @@ export function compile(src: AuthoringProject, mode: CompileMode): CompileResult
         if (!fdef.cases?.[c]) err('UNKNOWN_CASE', `Scenario ${sid} covers case "${c}", which is not in feature.cases`, fl.source);
         else (scenarioIds[c] ??= []).push(sid);
       }
+      // 镜头状态（与 player.cameraAt 同一规则，逐步累积）：判断焦点提示的目标在不在当前镜头里（D67）
+      const frame = new Map<string, string[]>();
+      let director = hasLayers ? Object.keys(layers)[0]! : PAGE_LAYER;
       const steps: Step[] = fl.steps.map((st: StepDef, i: number): Step => {
         const effects: Step['effects'] = [];
         const ruleIds: string[] = [];
@@ -370,7 +378,7 @@ export function compile(src: AuthoringProject, mode: CompileMode): CompileResult
           } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
           else if (e.type === 'stream') effects.push({ type: 'stream', path: e.path, value: e.value });
           else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
-          else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork') continue; // 镜头不是状态变化，下面单独归类
+          else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold') continue; // 镜头与焦点提示不是状态变化，下面单独归类
           else if (e.type === 'explain') {
             if (e.text.trim()) explains.push(e.text.trim());
           } else if (e.type === 'trace') {
@@ -397,6 +405,44 @@ export function compile(src: AuthoringProject, mode: CompileMode): CompileResult
             else marks.push({ target: e.target, kind: e.kindOf, ...(e.note ? { note: e.note } : {}) });
           }
         }
+
+        // 焦点提示（D67）：spotlight / highlight / numbered / callout / hold。目标与 mark 同样解析：有层级时在任一层，否则在这一步的路径页面
+        const focusLayers = (id: string): string[] => (hasLayers ? layersWith(id) : sceneAfter && findIn(sceneAfter.root, id) ? [PAGE_LAYER] : []);
+        const where = hasLayers ? 'any layer' : 'the stage for this step';
+        const cueMap = new Map<Cue['kind'], string[]>();
+        const callouts: Callout[] = [];
+        /** 焦点提示的目标（按效果顺序）：决定导演层，并判断要不要退回整层镜头。 */
+        const focusTargets: string[] = [];
+        let holdMs: number | undefined;
+        const CUE_FN = { spotlight: 'spotlight', highlight: 'highlight', number: 'numbered' } as const;
+        for (const e of st.effects as EffectDef[]) {
+          if (e.type === 'cue') {
+            const fn = CUE_FN[e.cue] ?? e.cue;
+            if (!e.targets.length) err('FOCUS_UNKNOWN', `${fn}() requires at least one element id, for example ${fn}('quota_alert')`, st.source);
+            for (const id of e.targets) {
+              if (!focusLayers(id).length) { err('FOCUS_UNKNOWN', `${fn}("${id}") target is not in ${where}`, st.source); continue; }
+              const list = cueMap.get(e.cue) ?? [];
+              if (!list.includes(id)) list.push(id);
+              cueMap.set(e.cue, list);
+              if (!focusTargets.includes(id)) focusTargets.push(id);
+            }
+          } else if (e.type === 'callout') {
+            const text = typeof e.text === 'string' ? e.text.trim() : '';
+            if (!focusLayers(e.target).length) err('FOCUS_UNKNOWN', `callout("${e.target}", …) target is not in ${where}`, st.source);
+            else if (!text) err('CALLOUT_EMPTY', `callout("${e.target}", …) needs one short sentence, for example callout('${e.target}', 'Share after generation')`, st.source);
+            else if (e.side !== undefined && !(CALLOUT_SIDES as readonly string[]).includes(e.side)) err('CALLOUT_SIDE_INVALID', `callout("${e.target}", …, { side: ${JSON.stringify(e.side)} }) must be one of ${CALLOUT_SIDES.join(', ')}, or omitted to pick automatically`, st.source);
+            else {
+              callouts.push({ target: e.target, text, ...(e.side ? { side: e.side } : {}) });
+              if (!focusTargets.includes(e.target)) focusTargets.push(e.target);
+            }
+          } else if (e.type === 'hold') {
+            const sec = e.seconds;
+            if (typeof sec !== 'number' || !Number.isFinite(sec) || sec < HOLD_MIN_SECONDS || sec > HOLD_MAX_SECONDS)
+              err('HOLD_INVALID', `hold(${String(sec)}) must be between ${HOLD_MIN_SECONDS} and ${HOLD_MAX_SECONDS} seconds`, st.source);
+            else holdMs = Math.max(holdMs ?? 0, Math.round(sec * 1000));
+          }
+        }
+        const cues: Cue[] = [...cueMap].map(([kind, targets]) => ({ kind, targets }));
 
         // 镜头：每个 id 在包含它的层级里解析；第一个 shot 的第一个元素所在层级就是这一步的导演层。
         // 没有声明 layers 的方案：在路径页面里聚焦（伪层级 @page）。
@@ -426,6 +472,8 @@ export function compile(src: AuthoringProject, mode: CompileMode): CompileResult
             }
           }
         }
+        // 没写 shot、写了焦点提示（D67）：导演切到第一个提示目标所在的层（提示要被看见）
+        if (hasLayers && !directorLayer && focusTargets.length) directorLayer = layersWith(focusTargets[0]!)[0] ?? null;
         // 没写 shot 的操作步骤：导演切到操作目标所在的层（播放时观众看得到要点的东西）
         if (hasLayers && !directorLayer && actionTarget) directorLayer = layersWith(actionTarget)[0] ?? null;
         // 换人的过渡卡（D56）：卡片后面导演切到这个人的层级（卡片淡出时已经是 TA 的画面）
@@ -434,7 +482,20 @@ export function compile(src: AuthoringProject, mode: CompileMode): CompileResult
           if (!roleKeys.has(r)) err('ROLE_UNKNOWN', `card("${st.action.title}") role "${r}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ''}`, st.source);
           else if (hasLayers && !directorLayer) directorLayer = Object.entries(layers).find(([, l]) => l.role === r)?.[0] ?? null;
         }
+        // 焦点提示不推近镜头（D67）：目标不在这一层当前镜头里（不是镜头目标本身或它的子元素）时，这一步补一个整层镜头，
+        // 免得提示落在画面外；这一步自己写了这一层的 shot 时以 shot 为准（目标在 shot 外由 check 的 FOCUS_CONFLICT 提示）
+        const dirAfter = directorLayer ?? director;
+        for (const id of focusTargets) {
+          const ls = focusLayers(id);
+          const lk = ls.includes(dirAfter) ? dirAfter : ls[0];
+          if (!lk || perLayer.has(lk) || (perLayer.has(DIRECTOR_LAYER) && lk === dirAfter)) continue;
+          const now = frame.get(lk) ?? [];
+          const scene = hasLayers ? layerScenes.find((l) => l.key === lk)?.scene : sceneAfter;
+          if (now.length && !(scene && now.some((f) => within(scene.root, id, f)))) perLayer.set(lk, []);
+        }
         const shots = [...perLayer].map(([layer, targets]) => ({ layer, targets }));
+        if (directorLayer) director = directorLayer;
+        for (const s of shots) frame.set(s.layer === DIRECTOR_LAYER ? director : s.layer, [...s.targets]);
         const generated = st.caption === undefined ? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore) : null;
         return {
           id: `${sid}#${i + 1}`,
@@ -450,6 +511,9 @@ export function compile(src: AuthoringProject, mode: CompileMode): CompileResult
           traces,
           forks,
           marks,
+          ...(cues.length ? { cues } : {}),
+          ...(callouts.length ? { callouts } : {}),
+          ...(holdMs !== undefined ? { hold: holdMs } : {}),
           ...(st.source ? { source: rel(st.source) } : {}),
         };
       });
@@ -612,7 +676,7 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
     isNode(c) ? toSceneNode(c, `${fallbackId}_${i}`, ids, err, rel) : textNode(c, `${fallbackId}_${i}`),
   );
 
-  const { id: rawId, when, disabled, disabledReason, unmodeled, note, __from, ...rest } = n.props as Record<string, unknown>;
+  const { id: rawId, when, disabled, disabledReason, unmodeled, note, redact, __from, ...rest } = n.props as Record<string, unknown>;
   const at = n.source;
   if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `Component <${n.type}> is not in the catalog (use Mantine component names; run joplo skill components to list them; use <Custom kind="…"> as a placeholder for missing components)`, at);
   const interactive = INTERACTIVE_TYPES.has(n.type);
@@ -649,6 +713,11 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   else if (disabledReason !== undefined && disabledReason !== null)
     err('INVALID_DISABLED_REASON', `<${n.type}> "${labelOf(n)}" disabledReason must be a string or a state binding, got ${typeof disabledReason === 'object' ? 'an object' : typeof disabledReason}. Write disabledReason="Only admins can invite" or disabledReason={$.ui.sendHint}; for text that changes during the demo, set() it into state and bind it`, at);
   if (unmodeled === true) node.unmodeled = true;
+  // 敏感信息（D67）：布尔或条件（和 disabled 一样），渲染时模糊；其他值报错并给出写法
+  if (typeof redact === 'boolean') node.redact = redact;
+  else if (isBind(redact) || (redact && typeof redact === 'object' && '$cond' in (redact as object))) node.redact = toCondition(redact) as SceneNode['redact'];
+  else if (redact !== undefined && redact !== null)
+    err('INVALID_REDACT', `<${n.type}> "${labelOf(n)}" redact must be true / false or a condition, for example redact or redact={not($.ui.revealed)}; got ${typeof redact}`, at);
   if (typeof note === 'string') node.note = note;
   if (typeof __from === 'string') node.from = __from;
   const s = rel(at);
@@ -727,6 +796,12 @@ function stepRouteBefore(steps: StepDef[], i: number, start: string): string {
     for (const e of st.effects) if (e.type === 'go') { stack.push(route); route = e.route; }
   }
   return route;
+}
+
+/** id 是 frameId 本身或它的子孙（在同一棵树里）。 */
+function within(root: SceneNode, id: string, frameId: string): boolean {
+  const f = findIn(root, frameId);
+  return !!f && !!findIn(f, id);
 }
 
 function findIn(node: SceneNode, id: string): SceneNode | null {
