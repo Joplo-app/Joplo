@@ -1,6 +1,7 @@
 import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
+  order: 1,
   name: 'npm 包发布',
   goal: '仓库外的用户和他们的 Agent 用一条 npx 命令就能开始，不需要克隆 Joplo 仓库或链接本地包',
   roles: ['新用户', '作者的编码 Agent', 'Joplo 维护者'],

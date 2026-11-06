@@ -1,6 +1,7 @@
 import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
+  order: 2,
   name: '演示页',
   goal: '打开一个功能后，画面占主要位置：顶栏只有面包屑，左栏放方案、场景和缺口，画面下方是播放控制和步骤条',
   roles: ['作者', '观众'],

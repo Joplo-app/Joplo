@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 import { useProjectIR } from './hooks';
 import { useBoardSettings } from './useSettings';
 import { effectiveAppearance } from './appearance-model';
-import { featureCard, moveSelection, projectBadge, projectMeta, shortPath, type FeatureCard } from './home-model';
+import { featureCards, moveSelection, projectBadge, projectMeta, shortPath, type FeatureCard } from './home-model';
 
 export function Home({
   projects,
@@ -233,9 +233,7 @@ function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (p
 function Features({ project, look, onView }: { project: Project; look: ReturnType<typeof effectiveAppearance>; onView: (featureId: string, optionId?: string) => void }) {
   const { t: i18n } = useBoardI18n();
 
-  const cards = Object.keys(project.features)
-    .map((id) => featureCard(project, id))
-    .filter((c): c is FeatureCard => !!c);
+  const cards = featureCards(project);
   if (!cards.length) return <p className="text-[14px] text-jb-muted">{i18n.board.noFeaturesYetWriteYourFirstFeatureInFeatures}</p>;
   return (
     <section className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2" data-testid="home-features">

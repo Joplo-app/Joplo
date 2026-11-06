@@ -1,6 +1,7 @@
 import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
+  order: 1,
   name: '首页：项目与功能',
   goal: '一个本地看板进程记住并列出打开过的所有项目；选中项目后看到它的功能，点「查看」进入演示',
   roles: ['作者（驱动 Agent 的用户）', '观众（打开发布站的人）'],

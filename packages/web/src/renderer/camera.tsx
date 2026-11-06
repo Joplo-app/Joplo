@@ -14,7 +14,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { animate as animateEl, motion } from 'motion/react';
 import { Rough, useStroke } from './rough';
 import { fitCamera, highlightRect, revealScroll, union, visibleRect, type Box, type View } from './camera-math';
-import { CAMERA_MS } from '../runtime/pace';
+import { CAMERA_EASE, CAMERA_MS } from '../runtime/pace';
 
 export type CameraSpec = {
   /** 对准的元素 id；空 = 这一层（这个画面）整体。 */
@@ -72,7 +72,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     current.current = v;
     wrap.dataset.cameraView = JSON.stringify({ k: round(v.k), tx: round(v.tx), ty: round(v.ty) });
     wrap.dataset.zoom = userRef.current ? 'user' : 'camera';
-    void animateEl(wrap, { x: v.tx, y: v.ty, scale: v.k }, smooth ? { duration: CAMERA_MS / 1000, ease: [0.4, 0, 0.2, 1] } : { duration: 0 });
+    void animateEl(wrap, { x: v.tx, y: v.ty, scale: v.k }, smooth ? { duration: CAMERA_MS / 1000, ease: CAMERA_EASE } : { duration: 0 });
   };
 
   // 用户缩放 / 平移：立即应用；回到镜头（null）时平滑过渡

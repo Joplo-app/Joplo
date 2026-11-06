@@ -1,6 +1,7 @@
 import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
+  order: 4,
   name: '设备外框：终端与手机',
   goal: '写命令行和移动端原型时，作者直接用现成的终端组件和手机外框，不用自己拼',
   roles: ['作者'],

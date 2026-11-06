@@ -13,7 +13,7 @@ import { useI18n } from '../i18n/context';
  *   （字体、线条暂不发布）。只消费 publish 模式的 IR；没有写接口。hash 路由，file:// 可直接打开。
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import type { Project } from '@joplo-app/core';
+import { orderedFeatures, type Project } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { parseSiteHash, siteHash, type PlayRoute, type SiteRoute } from '../runtime/route';
 import { scenariosOf } from '../runtime/views';
@@ -79,7 +79,7 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
   const { t: i18n } = useI18n();
 
   const L = useBoardLayout();
-  const features = Object.values(project.features);
+  const features = orderedFeatures(project);
   const look = { theme: project.theme, font: null, stroke: null };
   return (
     <div className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="site-home">
@@ -200,7 +200,7 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
           label: feature.name,
           testid: 'crumb-feature',
           menuLabel: i18n.site.switchFeature,
-          items: Object.values(project.features).map((f) => ({ id: `feature-${f.id}`, label: f.name, checked: f.id === feature.id, onClick: () => navigate({ kind: 'play', play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
+          items: orderedFeatures(project).map((f) => ({ id: `feature-${f.id}`, label: f.name, checked: f.id === feature.id, onClick: () => navigate({ kind: 'play', play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
         },
       ]}
       actions={<Btn iconOnly={!L.topLabels} icon={<Link className="size-4" />} label={i18n.site.copyLink} title={i18n.site.copyLinkToCurrentStep} onClick={() => void copyText(location.href).then((ok) => setFlash(<LocalText value={ok ? m.site.linkCopied : m.site.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="copy-link" />}

@@ -4,29 +4,38 @@
  * 界面（分段控件不高亮、拖动、解说卡外观）由用户在浏览器里检查。
  */
 import { describe, expect, it } from 'vitest';
-import { CAMERA_MS, MIN_DWELL, MS_PER_CHAR, asSpeed, readChars, stepDwell } from '../src/runtime/pace';
+import { CAMERA_MS, MIN_DWELL, asSpeed, readChars, stepDwell } from '../src/runtime/pace';
+import * as pace from '../src/runtime/pace';
+import { TIMING } from '../src/runtime/demo';
 import { PAN_KEEP, ZOOM_MAX, ZOOM_MIN, clampPan, wheelFactor, zoomAt } from '../src/renderer/camera-math';
 import { boardHash, parseBoardHash, parseSiteHash, siteHash } from '../src/runtime/route';
 
 describe('stepDwell（每一步的停留时长）', () => {
-  it('约 60ms/字（去掉空白），下限 3 秒', () => {
+  it('空文字至少 3 秒；中文每秒 8 字，拉丁文字每秒 15 个非空白字符', () => {
     expect(readChars('调用 模型\n之前', 'ab c')).toBe(9);
-    expect(stepDwell({ texts: ['短'] })).toBe(MIN_DWELL);
-    const long = '调'.repeat(100);
-    expect(stepDwell({ texts: [long] })).toBe(100 * MS_PER_CHAR);
-    // 说明与解说一起算
-    expect(stepDwell({ texts: ['调'.repeat(40), '解'.repeat(60)] })).toBe(100 * MS_PER_CHAR);
-    expect(stepDwell({ texts: [null, undefined, ''] })).toBe(MIN_DWELL);
+    expect(stepDwell({ texts: [null, undefined, '', ' \n'] })).toBe(3000);
+    expect(stepDwell({ texts: ['调'.repeat(32)] })).toBe(4000);
+    expect(stepDwell({ texts: ['a'.repeat(60)] })).toBe(4000);
+    expect(stepDwell({ texts: ['调'.repeat(16), 'a'.repeat(30)] })).toBe(4000);
+    expect(stepDwell({ texts: ['é'.repeat(60)] })).toBe(4000);
   });
-  it('速度缩放阅读时间；镜头过渡与连线小点一圈不随速度缩短', () => {
-    const t = ['调'.repeat(100)];
-    expect(stepDwell({ texts: t, speed: 0.5 })).toBe(12000);
-    expect(stepDwell({ texts: t, speed: 1.5 })).toBe(4000);
-    expect(stepDwell({ texts: ['短'], speed: 1.5 })).toBe(2000);
-    // 小点一圈 3.8 秒：至少等它跑完（加一点余量）
-    expect(stepDwell({ texts: ['短'], speed: 1.5, dotMs: 3800 })).toBeGreaterThanOrEqual(3800);
-    expect(stepDwell({ texts: ['短'], speed: 1.5, cameraMoved: true })).toBeGreaterThanOrEqual(CAMERA_MS);
-    expect(stepDwell({ texts: ['短'], speed: 0 })).toBe(MIN_DWELL); // 非法速度按 1×
+  it('阅读时间最多 7 秒；先截断再应用 0.5× / 1.5× 倍速', () => {
+    const t = ['调'.repeat(1000)];
+    expect(stepDwell({ texts: t })).toBe(7000);
+    expect(stepDwell({ texts: t, speed: 0.5 })).toBe(14000);
+    expect(stepDwell({ texts: t, speed: 1.5 })).toBe(Math.round(7000 / 1.5));
+    expect(stepDwell({ texts: ['调'.repeat(32)], speed: 0.5 })).toBe(8000);
+    expect(stepDwell({ texts: ['调'.repeat(32)], speed: 1.5 })).toBe(Math.round(4000 / 1.5));
+    expect(stepDwell({ texts: ['短'], speed: 1.5 })).toBe(MIN_DWELL / 1.5);
+    expect(stepDwell({ texts: ['短'], speed: 0 })).toBe(MIN_DWELL);
+  });
+  it('7 秒只限制阅读，镜头、小点、流式输出的等待互不截断', () => {
+    expect(CAMERA_MS).toBe(700);
+    expect(pace.CAMERA_EASE).toEqual([0.16, 1, 0.3, 1]);
+    expect(TIMING.layerSwitch).toBe(CAMERA_MS + 150);
+    expect(stepDwell({ texts: [], speed: 10, cameraMoved: true })).toBe(CAMERA_MS + 200);
+    expect(stepDwell({ texts: ['短'], speed: 1.5, dotMs: 9000 })).toBe(9200);
+    expect(stepDwell({ texts: ['调'.repeat(1000)], streams: ['字'.repeat(1000)] })).toBe(12500);
   });
   it('只接受 0.5 / 1 / 1.5', () => {
     expect([asSpeed('0.5'), asSpeed(1.5), asSpeed(2), asSpeed(undefined), asSpeed('x')]).toEqual([0.5, 1.5, 1, 1, 1]);

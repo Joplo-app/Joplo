@@ -1,3 +1,4 @@
+import { orderedFeatures } from './features.ts';
 import { Project, type SceneNode } from './schema.ts';
 import { CAPTION_MAX, EXPLAIN_MAX, INTERACTIVE_TYPES, captionLength } from './catalog.ts';
 import { walkNodes, findNode, replay } from './player.ts';
@@ -64,7 +65,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     for (const c of Object.values(p.cases).filter(c => !opts.optionId || c.featureId === p.options[opts.optionId]?.featureId)) {
       ref(p.features[c.featureId]?.caseIds.includes(c.id), `Case feature does not exist or does not list the case: ${c.featureId}`, c, 'case');
     }
-    for (const f of Object.values(p.features).filter(f => !opts.optionId || f.optionIds.includes(opts.optionId))) {
+    for (const f of orderedFeatures(p).filter(f => !opts.optionId || f.optionIds.includes(opts.optionId))) {
       for (const id of f.caseIds) ref(p.cases[id]?.featureId === f.id, `Feature case is missing or belongs to another feature: ${id}`, f, 'feature');
       for (const id of f.optionIds) ref(p.options[id]?.featureId === f.id, `Feature option is missing or belongs to another feature: ${id}`, f, 'feature');
       if (f.pick) ref(p.options[f.pick]?.featureId === f.id, `Picked option is missing or belongs to another feature: ${f.pick}`, f, 'feature');

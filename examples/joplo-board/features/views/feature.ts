@@ -1,6 +1,7 @@
 import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
+  order: 3,
   name: '视角（层级）与分镜',
   goal: '同一个场景、同一步，可以从不同层级去看（客户端视角、后端流转、全景）；每层有自己的镜头，可以切换层级，也可以只重放某一层',
   roles: ['作者', '观众'],

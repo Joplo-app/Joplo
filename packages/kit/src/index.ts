@@ -83,6 +83,8 @@ export type FeatureDef = {
   kind: 'feature';
   name: string;
   goal: string;
+  /** 演示顺序：有限数字从小到大，未写的在后；同值按功能文件夹名自然排序。名字里不用手写编号。 */
+  order?: number;
   /** 角色：旧写法是名字数组（只作说明）；写成 { 键: role('名字') } 才能被层级和过渡卡引用。 */
   roles?: string[] | Record<string, RoleDef>;
   constraints?: Record<string, string | { text: string; hard?: boolean }>;

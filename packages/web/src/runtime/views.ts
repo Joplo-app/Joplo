@@ -2,7 +2,7 @@
  * 看板与发布站共用的只读视图计算：路径树（产品地图）、浏览视图的画面与状态、缺口统计。
  * 不推进业务状态；推进只在 demo.ts 里通过 core 的 applyStep / stateAt 完成。
  */
-import { nodeLabel, walkNodes, type Coverage, type Option, type PlayState, type Project, type Scenario, type Scene, type SceneNode } from '@joplo-app/core';
+import { orderedFeatures, nodeLabel, walkNodes, type Coverage, type Option, type PlayState, type Project, type Scenario, type Scene, type SceneNode } from '@joplo-app/core';
 
 export const optionsOf = (project: Project, featureId: string | null): Option[] =>
   featureId && project.features[featureId] ? project.features[featureId]!.optionIds.map((id) => project.options[id]).filter((o): o is Option => !!o) : [];
@@ -32,7 +32,7 @@ export function browseState(project: Project, sceneId: string): PlayState {
   const data: Record<string, unknown> = {};
   const inputs: Record<string, unknown> = {};
   const optionIds = new Set<string>();
-  for (const f of Object.values(project.features)) if (f.pick) optionIds.add(f.pick);
+  for (const f of orderedFeatures(project)) if (f.pick) optionIds.add(f.pick);
   if (scene?.optionId) {
     const own = project.options[scene.optionId];
     if (own) for (const id of [...optionIds]) if (project.options[id]?.featureId === own.featureId) optionIds.delete(id);
@@ -63,19 +63,16 @@ export function routeTree(project: Project): RouteTreeEntry[] {
   const paths = Object.keys(project.routes).sort((a, b) => a.localeCompare(b));
   return paths.map((path) => {
     const r = project.routes[path]!;
-    const byFeature = new Map<string, Option[]>();
-    for (const o of Object.values(project.options)) {
-      if (!o.routes.includes(path)) continue;
-      const list = byFeature.get(o.featureId) ?? [];
-      list.push(o);
-      byFeature.set(o.featureId, list);
-    }
+    const features = orderedFeatures(project).flatMap(f => {
+      const options = optionsOf(project, f.id).filter(o => o.routes.includes(path));
+      return options.length ? [{ featureId: f.id, name: f.name, options }] : [];
+    });
     return {
       path,
       title: r.title,
       depth: path === '/' ? 0 : path.split('/').length - 2,
       addedBy: r.addedBy ? (project.options[r.addedBy] ?? null) : null,
-      features: [...byFeature].map(([featureId, options]) => ({ featureId, name: project.features[featureId]?.name ?? featureId, options })),
+      features,
     };
   });
 }

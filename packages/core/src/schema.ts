@@ -290,12 +290,19 @@ export const Project = z.strictObject({
   mode: z.enum(['dev', 'publish']),
   routes: z.record(z.string(), Route).default({}),
   features: z.record(Id, Feature).default({}),
+  /** 编译器决定的演示顺序，发布时保留。旧 IR 可省略，读取时沿用其已有顺序。 */
+  featureIds: z.array(Id).optional(),
   cases: z.record(Qid, Case).default({}),
   options: z.record(Qid, Option).default({}),
   rules: z.record(Qid, Rule).default({}),
   scenes: z.record(Qid, Scene).default({}),
   scenarios: z.record(Qid, Scenario).default({}),
   issues: z.record(Qid, Issue).default({}),
+}).superRefine((p, ctx) => {
+  if (!p.featureIds) return;
+  const ids = new Set(p.featureIds);
+  if (ids.size !== p.featureIds.length || ids.size !== Object.keys(p.features).length || p.featureIds.some(id => !p.features[id]))
+    ctx.addIssue({ code: 'custom', path: ['featureIds'], message: 'featureIds must list every feature exactly once' });
 });
 
 export type Project = z.infer<typeof Project>;

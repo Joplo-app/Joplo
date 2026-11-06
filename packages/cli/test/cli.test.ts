@@ -57,6 +57,16 @@ test.each([
   const line = code === 'CASE_NOT_COVERED' ? at(await readFile(join(d, option), 'utf8'), 'export default option(') : at(text, needle);
   expect(ds, r.stdout).toEqual(expect.arrayContaining([expect.objectContaining({ code, at: expect.stringMatching(new RegExp(`^${expectedFile}:${line}:`)) })]));
 });
+test.each(['NaN', 'Infinity', "'1'"])('check 拒绝非法 order %s 并定位到 feature.ts', async (value) => {
+  const d = await temp();
+  const text = await edit(d, feature, s => s.replace('export default feature({', `export default feature({ order: ${value},`));
+  const r = await cli(['check', d, '--format', 'json']);
+  expect(r.code, r.stdout + r.stderr).toBe(1);
+  expect(JSON.parse(r.stdout).diagnostics).toContainEqual(expect.objectContaining({
+    code: 'FEATURE_ORDER_INVALID', severity: 'error',
+    at: expect.stringMatching(new RegExp(`^${feature}:${at(text, 'export default feature(')}:`)),
+  }));
+});
 test('selection 返回定位、标签与前后各三行，JSON 保留 Selection', async () => {
   const d = await temp(); const text = await readFile(join(d, option), 'utf8'); const line = at(text, '<Button id="btn_invite"');
   const selection: Selection = { featureId: 'invite', optionId: 'invite.a-modal', scenarioId: null, position: 0, stepId: null, sceneId: 'invite.a-modal@/members', route: '/members', nodeId: 'btn_invite', at: `${option}:${line}:9`, label: '邀请成员', selectedAt: new Date().toISOString() };
