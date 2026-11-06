@@ -2,19 +2,20 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { openSync, closeSync } from 'node:fs';
 import { trackTemporary } from './cloud-cleanup.ts';
-import { chmod, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
+import { chmod, mkdir, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { createInterface } from 'node:readline/promises';
 import { JoploError } from '@joplo-app/core';
 import type { check } from './check.ts';
-import { CloudError, sizeError, type CloudCode, type SizeDetails } from './cloud-error.ts';
+import { CloudError, sizeError, terminalText, type CloudCode, type SizeDetails } from './cloud-error.ts';
 
 export type Credentials = { server: string; accessToken: string; user: { id: string; email: string }; createdAt: string };
 export type Account = { user: { id: string; email: string; name: string }; plan: 'free' | 'pro'; limits: { maxUploadBytes: number; maxTotalBytes: number; maxFiles: number; publishesPerHour: number | null } };
-/** 可替换时钟与系统边界供测试使用；生产默认不读 stdin、不提示输入。 */
+/** 可替换时钟与系统边界；只有交互式跨服务器替换凭证时才读取确认输入。 */
 export type CloudDependencies = {
-  env?: NodeJS.ProcessEnv; format?: string; interactive?: boolean; openBrowser?: (url: string) => Promise<boolean>;
+  env?: NodeJS.ProcessEnv; format?: string; interactive?: boolean; confirm?: (question: string) => Promise<boolean>; openBrowser?: (url: string) => Promise<boolean>;
   sleep?: (ms: number) => Promise<unknown>; now?: () => number; check?: typeof check;
 };
 export const object = (v: unknown): Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
@@ -50,7 +51,10 @@ export async function atomicJson(file: string, value: unknown): Promise<void> {
     await rename(temp, file);
   } finally { try { await rm(temp, { force: true }); } finally { release(); } }
 }
-export const writeCredentials = (home: string, credentials: Credentials) => atomicJson(join(home, 'credentials.json'), credentials);
+export async function writeCredentials(home: string, credentials: Credentials): Promise<void> {
+  await mkdir(home, { recursive: true, mode: 0o700 });
+  await atomicJson(join(home, 'credentials.json'), credentials);
+}
 
 /** 原型方案 A/B 的唯一切换点：目前打开预填验证码的方案 A。 */
 export const browserLoginUrl = (code: { verification_uri: string; verification_uri_complete: string }) => code.verification_uri_complete;
@@ -69,12 +73,16 @@ function readSizeDetails(value: unknown, token?: string): SizeDetails | undefine
   const d = object(value);
   const maxBytes = d.maxBytes ?? d.limitBytes;
   const bytes = (n: unknown): n is number => Number.isSafeInteger(n) && Number(n) >= 0;
-  if ((d.kind !== 'upload' && d.kind !== 'total') || !bytes(maxBytes) || !bytes(d.actualBytes) || !Array.isArray(d.largestFiles)) return;
+  if ((d.kind !== 'upload' && d.kind !== 'total' && d.kind !== 'files') || !bytes(maxBytes) || !bytes(d.actualBytes) || !Array.isArray(d.largestFiles)) return;
   const largestFiles: SizeDetails['largestFiles'] = [];
   for (const raw of d.largestFiles.slice(0, 5)) {
     const f = object(raw);
     if (!nonempty(f.path) || f.path.length > 512 || !bytes(f.size) || token && f.path.includes(token)) return;
     largestFiles.push({ path: f.path, size: f.size });
+  }
+  if (d.kind === 'files') {
+    if (!bytes(d.maxFiles) || !bytes(d.actualFiles)) return;
+    return { kind: 'files', maxBytes, actualBytes: d.actualBytes, largestFiles, maxFiles: d.maxFiles, actualFiles: d.actualFiles };
   }
   return { kind: d.kind, maxBytes, actualBytes: d.actualBytes, largestFiles,
     ...(bytes(d.maxFiles) ? { maxFiles: d.maxFiles } : {}), ...(bytes(d.actualFiles) ? { actualFiles: d.actualFiles } : {}) };
@@ -82,7 +90,22 @@ function readSizeDetails(value: unknown, token?: string): SizeDetails | undefine
 
 /** 显式自动化标记优先于 TTY，也优先于测试中的 TTY 替身。 */
 export function isInteractive(env: NodeJS.ProcessEnv, format = 'text', stdinTTY = process.stdin.isTTY, stdoutTTY = process.stdout.isTTY): boolean {
-  return format !== 'json' && env.CI === undefined && env.JOPLO_NONINTERACTIVE !== '1' && Boolean(stdinTTY && stdoutTTY);
+  const ci = env.CI?.trim().toLowerCase();
+  return format !== 'json' && (!ci || ci === '0' || ci === 'false') && env.JOPLO_NONINTERACTIVE !== '1' && Boolean(stdinTTY && stdoutTTY);
+}
+
+async function confirmServerSwitch(question: string): Promise<boolean> {
+  const input = createInterface({ input: process.stdin, output: process.stderr });
+  try { return /^(y|yes|是)$/i.test((await input.question(`${terminalText(question)} [y/N] `)).trim()); }
+  finally { input.close(); }
+}
+
+/** Retry-After 可以是秒数或 HTTP 日期，客户端最多等待 30 秒。 */
+export function retryAfterMillis(value: string | null, now: number): number | undefined {
+  if (!value?.trim()) return;
+  const text = value.trim();
+  const ms = /^\d+(?:\.\d+)?$/.test(text) ? Number(text) * 1000 : /^[A-Za-z]{3},/.test(text) ? Date.parse(text) - now : NaN;
+  return Number.isFinite(ms) ? Math.min(30000, Math.max(0, Math.ceil(ms))) : undefined;
 }
 
 function quotaError(value: unknown): CloudError {
@@ -100,6 +123,7 @@ function quotaError(value: unknown): CloudError {
 function responseCode(status: number, supplied: unknown, authenticated: boolean): CloudCode {
   if (status >= 500 && status <= 599) return 'NETWORK';
   if (status === 401) return authenticated ? 'AUTH_EXPIRED' : 'AUTH_REQUIRED';
+  if (status === 403) return supplied === 'PLAN_REQUIRED' ? 'PLAN_REQUIRED' : supplied === 'FORBIDDEN' ? 'ACCOUNT_UNAVAILABLE' : 'FORBIDDEN';
   const expected: Record<string, number> = { PLAN_REQUIRED: 403, QUOTA_EXCEEDED: 429, TOO_LARGE: 413, CLIENT_OUTDATED: 426, BAD_REQUEST: 400, NOT_FOUND: 404, CONFLICT: 409 };
   if (typeof supplied === 'string' && Object.hasOwn(expected, supplied) && expected[supplied] === status) return supplied as CloudCode;
   return (Object.entries(expected).find(([, value]) => value === status)?.[0] as CloudCode | undefined) ?? 'BAD_REQUEST';
@@ -130,13 +154,26 @@ export class CloudClient {
     if (!validServer || !nonempty(c.accessToken) || /\s/.test(c.accessToken) || !nonempty(u.id) || !nonempty(u.email) || !nonempty(c.createdAt) || !Number.isFinite(Date.parse(c.createdAt))) {
       this.warn('凭证已损坏，请重新运行 npx joplo login'); return null;
     }
-    await chmod(join(this.home, 'credentials.json'), 0o600);
+    try {
+      if ((await stat(join(this.home, 'credentials.json'))).mode & 0o077) await chmod(join(this.home, 'credentials.json'), 0o600);
+    } catch { this.warn('无法收紧凭证文件权限，请手动设为 0600；本次仍使用已读取的凭证。'); }
     return { server: c.server as string, accessToken: c.accessToken, user: { id: u.id, email: u.email }, createdAt: c.createdAt };
   }
-  async credentials(): Promise<Credentials | null> {
+  async credentials(forShare = false): Promise<Credentials | null> {
     const c = await this.storedCredentials();
-    if (c && c.server !== this.server) { this.warn('当前服务器没有登录凭证，请运行 npx joplo login --server <url>'); return null; }
+    if (c && c.server !== this.server) {
+      if (forShare && !this.interactive) this.refuseServerSwitch(c.server);
+      if (!forShare) this.warn('当前服务器没有登录凭证，请运行 npx joplo login --server <url>');
+      return null;
+    }
     return c;
+  }
+  private refuseServerSwitch(server: string): never {
+    throw new JoploError('USAGE', `凭证属于 ${server}，请先运行 joplo logout --server ${server}，再登录当前服务器`);
+  }
+  private async revoke(token: string): Promise<void> {
+    const data = await this.request('/api/auth/sign-out', token, {});
+    if (data.success !== true) throw new CloudError('INVALID_RESPONSE');
   }
   async logout(): Promise<void> {
     const credentials = await this.storedCredentials();
@@ -146,8 +183,7 @@ export class CloudClient {
     if (credentials) {
       try {
         // 退出当前 CLI 会话；token 只在 Authorization 中，不进入请求体。
-        const data = await this.request('/api/auth/sign-out', credentials.accessToken, {});
-        if (data.success !== true) throw new CloudError('INVALID_RESPONSE');
+        await this.revoke(credentials.accessToken);
       } catch { this.warn('未能确认云端会话已吊销，将删除本地凭证；可在网页设备管理中撤销会话。'); }
     }
     await rm(join(this.home, 'credentials.json'), { force: true });
@@ -175,7 +211,13 @@ export class CloudClient {
   async request(path: string, token?: string, body?: unknown): Promise<Record<string, unknown>> {
     const { response, data } = await this.response(path, token, body);
     if (!response.ok) {
+      if (path === '/api/auth/device/code' && response.status === 429) throw new CloudError('RATE_LIMITED');
       const code = responseCode(response.status, data.code, Boolean(token));
+      if (code === 'NETWORK') {
+        const afterMs = response.status === 503 ? retryAfterMillis(response.headers.get('retry-after'), this.now()) : undefined;
+        throw new CloudError(code, undefined, undefined, { afterMs, createSafe: response.status === 503 && data.code === 'SERVICE_UNAVAILABLE' && afterMs !== undefined });
+      }
+      if (code === 'PLAN_REQUIRED') throw new CloudError(code, `此操作需要 Pro：${this.server}/billing`);
       if (code === 'QUOTA_EXCEEDED') throw quotaError(data.data ?? data.details);
       if (code === 'TOO_LARGE') {
         const details = readSizeDetails(data.data ?? data.details, token);
@@ -191,7 +233,12 @@ export class CloudClient {
     return { user: { id: u.id, email: u.email, name: u.name }, plan: d.plan as Account['plan'], limits: { maxUploadBytes: l.maxUploadBytes as number, maxTotalBytes: l.maxTotalBytes as number, maxFiles: l.maxFiles as number, publishesPerHour: l.publishesPerHour as number | null } };
   }
   async login(noBrowser = false): Promise<Credentials> {
-    if (this.deps.format === 'json' || this.env.CI !== undefined || this.env.JOPLO_NONINTERACTIVE === '1') throw new CloudError('AUTH_REQUIRED');
+    const previous = await this.storedCredentials();
+    if (previous && previous.server !== this.server) {
+      if (!this.interactive) this.refuseServerSwitch(previous.server);
+      const confirmed = await (this.deps.confirm ?? confirmServerSwitch)(`将替换 ${previous.server} 的登录，继续吗？`);
+      if (!confirmed) throw new JoploError('USAGE', '已取消登录，原凭证保持不变');
+    }
     this.warn('正在申请浏览器登录…');
     const d = await this.request('/api/auth/device/code', undefined, { client_id: 'joplo-cli' });
     if (!nonempty(d.device_code) || typeof d.user_code !== 'string' || !/^[A-Z0-9-]{4,16}$/.test(d.user_code) || typeof d.expires_in !== 'number' || !Number.isFinite(d.expires_in) || d.expires_in <= 0 || d.interval != null && (typeof d.interval !== 'number' || !Number.isFinite(d.interval))) throw new CloudError('INVALID_RESPONSE');
@@ -206,9 +253,9 @@ export class CloudClient {
     } else this.warn('请手动访问上面的网址。等待浏览器确认…');
     let interval = Math.max((d.interval as number | undefined) ?? 5, 1) * 1000;
     let delay = interval;
-    const backoff = () => { delay = Math.max(interval, delay * 2); };
+    const backoff = () => { delay = Math.min(Math.max(interval, delay * 2), 30000); };
     while (this.now() < deadline) {
-      await this.sleep(Math.min(delay, deadline - this.now()));
+      await this.sleep(Math.min(Math.max(interval, delay), 30000, deadline - this.now()));
       if (this.now() >= deadline) break;
       let polled: Awaited<ReturnType<CloudClient['response']>>;
       try {
@@ -216,7 +263,11 @@ export class CloudClient {
       } catch (e) { if (!(e instanceof CloudError) || e.code !== 'NETWORK') throw e; backoff(); continue; }
       const { response, data } = polled;
       // 设备协议的 429 是暂停轮询信号，与普通分享请求的 4xx 不重试规则分开。
-      if (response.status >= 500 || response.status === 429) { backoff(); continue; }
+      if (response.status >= 500 || response.status === 429) {
+        const afterMs = response.status === 429 ? retryAfterMillis(response.headers.get('retry-after'), this.now()) : undefined;
+        if (afterMs === undefined) backoff(); else delay = afterMs;
+        continue;
+      }
       if (data.error === 'authorization_pending' && response.status === 400) { delay = interval; continue; }
       if (data.error === 'slow_down' && response.status === 400) { interval += 5000; delay = interval; continue; }
       if (data.error === 'access_denied') throw new CloudError('AUTH_DENIED');
@@ -227,19 +278,23 @@ export class CloudClient {
         const account = await this.me(data.access_token);
         const credentials = { server: this.server, accessToken: data.access_token, user: { id: account.user.id, email: account.user.email }, createdAt: new Date().toISOString() };
         await writeCredentials(this.home, credentials);
+        if (previous?.server === this.server && previous.accessToken !== credentials.accessToken) {
+          try { await this.revoke(previous.accessToken); }
+          catch { this.warn('新登录已保存，但未能确认旧会话已撤销，可在网页设备管理中撤销。'); }
+        }
         return credentials;
       } catch (e) {
         // token 已签发但登录尚未落盘；尽力回收会话，保留原始失败原因。
-        try { await this.request('/api/auth/sign-out', data.access_token, {}); } catch { this.warn('登录未完成，未能确认会话已撤销，可在网页设备管理中撤销。'); }
+        try { await this.revoke(data.access_token); } catch { this.warn('登录未完成，未能确认会话已撤销，可在网页设备管理中撤销。'); }
         throw e;
       }
     }
     throw new CloudError('AUTH_EXPIRED', '验证码已过期，请重新运行 npx joplo login');
   }
-  async retry<T>(action: () => Promise<T>): Promise<T> {
+  async retry<T>(action: () => Promise<T>, options: { create?: boolean } = {}): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try { return await action(); }
-      catch (e) { if (!(e instanceof CloudError) || e.code !== 'NETWORK' || attempt >= 3) throw e; await this.sleep(1000 * 2 ** attempt); }
+      catch (e) { if (!(e instanceof CloudError) || e.code !== 'NETWORK' || options.create && !e.retry?.createSafe || attempt >= 3) throw e; await this.sleep(e.retry?.afterMs ?? 1000 * 2 ** attempt); }
     }
   }
 }

@@ -405,11 +405,11 @@ Provide the site name and compatibility date through Wrangler project configurat
 - 用户运行 npx joplo login，在浏览器核对验证码并确认授权；SSH / 无浏览器时用 --no-browser 手动打开网址。
 - Agent 发布用 npx joplo share --format json；share 自动 check、build，只上传发布产物。
 - AUTH_REQUIRED 退出 3：请用户在自己的终端运行 npx joplo login，完成后再重试 share；Agent 不代替用户授权。
-- AUTH_EXPIRED：同样请用户重新 login。其他错误读取 error.code / message / details。
+- AUTH_EXPIRED 也退出 3：同样请用户重新 login。其他错误读取 error.code / message / details。
 - 免费链接 1 小时有效，具体时刻读取 data.expiresAt；Pro 永久链接的 expiresAt 为 null。
 - Pro 再次 share 自动更新 .joplo/cloud.json 记录的同服务器链接；--new 新建，--title 设置标题。
 - npx joplo whoami --format json 查看账号、套餐和限额；npx joplo logout 退出登录。
-- maxUploadBytes 只限制云端缺失对象的新上传量；CLI 只预检 maxTotalBytes 和 maxFiles。TOO_LARGE 的 details.kind 区分 upload / total。
+- maxUploadBytes 只限制云端缺失对象的新上传量；CLI 只预检 maxTotalBytes 和 maxFiles。TOO_LARGE 的 details.kind 区分 upload / total / files（新增上传量 / 清单总量 / 文件数）。
 - 凭证只保存在 JOPLO_HOME/credentials.json（默认 ~/.joplo），不得复制进项目、输出或提交 Git。
 - 云端命令支持 --server <url>，覆盖 JOPLO_CLOUD_URL；默认 https://app.joplo.app。
 - 本地 check / build / dev 保持免费，不连接云端。`,

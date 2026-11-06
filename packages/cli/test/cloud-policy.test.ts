@@ -7,14 +7,15 @@ vi.mock('node:child_process', async importOriginal => {
   return { ...original, spawn: vi.fn(original.spawn) };
 });
 afterEach(() => { vi.mocked(spawn).mockReset(); });
-test('R2 真实交互判定函数优先遵守 JSON、CI、JOPLO_NONINTERACTIVE 与双 TTY', () => {
+test('B7/R2 真实交互判定函数优先遵守 JSON、CI、JOPLO_NONINTERACTIVE 与双 TTY', () => {
   // 不通过 CloudDependencies.interactive 绕过生产判断。
   const decide = (cloud as unknown as { isInteractive: (env: NodeJS.ProcessEnv, format?: string, stdinTTY?: boolean, stdoutTTY?: boolean) => boolean }).isInteractive;
   expect(typeof decide).toBe('function');
   expect(decide({}, 'text', true, true)).toBe(true);
   expect(decide({}, 'json', true, true)).toBe(false);
   expect(decide({ CI: '1' }, 'text', true, true)).toBe(false);
-  expect(decide({ CI: '' }, 'text', true, true)).toBe(false);
+  expect(decide({ CI: '' }, 'text', true, true)).toBe(true);
+  for (const CI of ['0', 'false', 'FALSE']) expect(decide({ CI }, 'text', true, true)).toBe(true);
   expect(decide({ JOPLO_NONINTERACTIVE: '1' }, 'text', true, true)).toBe(false);
   expect(decide({}, 'text', false, true)).toBe(false);
   expect(decide({}, 'text', true, false)).toBe(false);

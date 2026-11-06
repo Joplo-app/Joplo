@@ -60,9 +60,10 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     return new CloudClient(server, deps.cliVersion ?? await readCliVersion(), s => stderr(s + '\n'), s => secrets.add(s), { ...deps.cloud, format });
   };
   const cloudCommand = (name: string) => program.command(name).option('--server <url>', '云端服务器（覆盖 JOPLO_CLOUD_URL）');
-  cloudCommand('login').description('在浏览器中授权 CLI').option('--no-browser', '手动打开登录网址').action(async opts => {
+  cloudCommand('login').description('在浏览器中授权 CLI').addOption(format()).option('--no-browser', '手动打开登录网址').action(async opts => {
     const c = await (await cloudClient(opts.server, opts.format)).login(opts.browser === false);
-    line(`已登录为 ${terminalText(c.user.email)}`);
+    if (opts.format === 'json') json(result(c.server, '已登录', { server: c.server, user: c.user, createdAt: c.createdAt }));
+    else line(`已登录为 ${terminalText(c.user.email)}`);
   });
   cloudCommand('logout').description('吊销会话并移除本地凭证').action(async opts => {
     const client = await cloudClient(opts.server, opts.format);
@@ -73,7 +74,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const client = await cloudClient(opts.server, opts.format), credentials = await client.requireCredentials();
     const data = await client.me(credentials.accessToken);
     if (opts.format === 'json') json(result(client.server, `${terminalText(data.user.email)}（${data.plan}）`, data));
-    else line(`${terminalText(data.user.email)}（${data.plan}）\n本次新增上传上限：${data.limits.maxUploadBytes} 字节\n清单总量上限：${data.limits.maxTotalBytes} 字节，${data.limits.maxFiles} 文件\n每小时发布：${data.limits.publishesPerHour ?? '不限'} 次`);
+    else line(`${terminalText(data.user.email)}（${data.plan}）\n本次新增上传上限：${data.limits.maxUploadBytes} 字节\n清单总量上限：${data.limits.maxTotalBytes} 字节，${data.limits.maxFiles} 文件\n每小时发布：${data.limits.publishesPerHour ?? '服务器未提供'} 次`);
   });
   cloudCommand('share').description('检查、构建并发布到云端').argument('[dir]', '项目目录', '.').addOption(format())
     .option('--new', '新建分享链接').option('--title <title>', '分享标题（默认项目名）').action(async (dir, opts) => {
@@ -83,7 +84,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       if (opts.format === 'json') json(result(resolve(dir), '已发布', published.result));
       else {
         line(`已发布 ${published.result.url}\n${published.result.expiresAt ? `到期时间：${terminalText(published.result.expiresAt)}` : '永久链接'}`);
-        if (published.plan === 'free') line('免费分享 1 小时有效；升级获得永久链接：https://app.joplo.app/billing');
+        if (published.plan === 'free') line(`免费分享 1 小时有效；升级获得永久链接：${client.server}/billing`);
       }
     });
   program.command('check').argument('[dir]', 'Project directory', '.').addOption(format()).option('--option <qid>', 'Validate only the specified option').action(async (dir, opts) => {
@@ -150,7 +151,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const f = failure(e instanceof CommanderError ? new JoploError('USAGE', e.message) : e);
     const wantsJson = args.some((arg, i) => arg === '--format=json' || arg === '--format' && args[i + 1] === 'json');
     if (wantsJson) json(f); else line(`${f.error.code}  ${oneLine(terminalText(f.error.message))}`);
-    return f.error.code === 'USAGE' ? 2 : f.error.code === 'AUTH_REQUIRED' ? 3 : 1;
+    return f.error.code === 'USAGE' ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : 1;
   }
   return exitCode;
 }

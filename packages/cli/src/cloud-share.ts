@@ -7,7 +7,7 @@ import type { buildSite } from '@joplo-app/server';
 import { check } from './check.ts';
 import { CloudError, sizeError, terminalText } from './cloud-error.ts';
 import { temporaryDirectory } from './cloud-cleanup.ts';
-import { atomicJson, CloudClient, httpUrl, nonempty, object } from './cloud.ts';
+import { atomicJson, CloudClient, httpUrl, nonempty, object, retryAfterMillis } from './cloud.ts';
 
 /** 客户端 MIME 映射；值与云端公开上传契约一致，不从私有包导入实现。 */
 export const CONTENT_TYPES: Record<string, string> = {
@@ -39,11 +39,12 @@ export async function manifest(dir: string): Promise<{ files: File[]; blobs: Map
 export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number };
 export async function share(client: CloudClient, dir: string, opts: { new?: boolean; title?: string }, build: typeof buildSite): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
   if (opts.title !== undefined && (!opts.title.trim() || opts.title.trim().length > 200)) throw new JoploError('USAGE', '--title 必须是 1–200 个字符');
-  let credentials = await client.credentials();
+  let credentials = await client.credentials(true);
   if (!credentials) {
     if (!client.interactive) throw new CloudError('AUTH_REQUIRED', undefined, { fix: 'npx joplo login' });
     client.warn('分享需要登录 Joplo 账号（免费）'); credentials = await client.login(); client.warn(`已登录为 ${terminalText(credentials.user.email)}，继续发布…`);
   }
+  const accessToken = credentials.accessToken;
   const project = resolve(dir);
   client.warn('正在检查项目…');
   const checked = await (client.deps.check ?? check)(project);
@@ -55,29 +56,29 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
     const built = await build({ projectDir: project, outDir: join(staging, 'site') });
     if (built.diagnostics.some(d => d.severity === 'error')) throw new JoploError('EXPORT_FAILED', '构建包含错误，尚未上传', { diagnostics: built.diagnostics });
     const { files, blobs } = await manifest(built.outDir);
-    const account = await client.me(credentials.accessToken);
+    const account = await client.me(accessToken);
     const actualBytes = files.reduce((n, f) => n + f.size, 0), largestFiles = [...files].sort((a, b) => b.size - a.size).slice(0, 5).map(({ path, size }) => ({ path, size }));
     // 只有服务器知道哪些 blob 已存在；maxUploadBytes 不能用于预检清单总量。
     if (actualBytes > account.limits.maxTotalBytes || files.length > account.limits.maxFiles) {
-      throw sizeError({ kind: 'total', maxBytes: account.limits.maxTotalBytes, actualBytes, maxFiles: account.limits.maxFiles, actualFiles: files.length, largestFiles });
+      throw sizeError({ kind: actualBytes > account.limits.maxTotalBytes ? 'total' : 'files', maxBytes: account.limits.maxTotalBytes, actualBytes, maxFiles: account.limits.maxFiles, actualFiles: files.length, largestFiles });
     }
     let replaceShareId: string | undefined;
     if (account.plan === 'pro' && !opts.new) {
       try { const previous = object(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'))); if (previous.server === client.server && shareId(previous.shareId)) replaceShareId = previous.shareId; } catch { /* 缺失或损坏元数据时新建 */ }
     }
     const title = (opts.title ?? checked.name).trim().slice(0, 200);
-    const prepared = await client.request('/api/v1/shares', credentials.accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}) });
-    if (!shareId(prepared.shareId) || !nonempty(prepared.uploadId) || prepared.uploadId.length > 128 || prepared.uploadId.includes(credentials.accessToken) || !Array.isArray(prepared.missing)) throw new CloudError('INVALID_RESPONSE');
+    const prepared = await client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}) }), { create: true });
+    if (!shareId(prepared.shareId) || !nonempty(prepared.uploadId) || prepared.uploadId.length > 128 || prepared.uploadId.includes(accessToken) || !Array.isArray(prepared.missing)) throw new CloudError('INVALID_RESPONSE');
     // 完整校验所有上传项后才执行第一个 PUT；不允许服务端请求本地清单之外的文件。
     const missing = prepared.missing.map(raw => {
       const m = object(raw), headers = object(m.headers);
       if (!nonempty(m.sha256) || !blobs.has(m.sha256) || !m.headers || Object.values(headers).some(v => typeof v !== 'string') || Object.keys(headers).some(k => /^(authorization|cookie)$/i.test(k))) throw new CloudError('INVALID_RESPONSE');
       const url = httpUrl(m.uploadUrl);
-      if (JSON.stringify({ url, headers }).includes(credentials.accessToken)) throw new CloudError('INVALID_RESPONSE');
+      if (JSON.stringify({ url, headers }).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
       return { sha256: m.sha256, uploadUrl: url, headers: headers as Record<string, string> };
     });
     client.warn(`构建完成：${files.length} 个文件（${actualBytes} 字节），上传 ${missing.length} 个新对象…`);
-    for (const item of missing) {
+    const upload = async (item: (typeof missing)[number]) => {
       const body = new Uint8Array(await readFile(blobs.get(item.sha256)!));
       await client.retry(async () => {
         let response: Response;
@@ -89,18 +90,28 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
           // 已知 HTTP 状态优先于正文读取；4xx 的响应中断不能触发重试。
           await response.body?.cancel().catch(() => {});
           if (response.status === 412) return;
-          throw new CloudError(response.status >= 500 ? 'NETWORK' : response.status === 413 ? 'TOO_LARGE' : 'BAD_REQUEST');
+          throw new CloudError(response.status >= 500 ? 'NETWORK' : response.status === 403 ? 'UPLOAD_EXPIRED' : response.status === 413 ? 'TOO_LARGE' : 'BAD_REQUEST', undefined, undefined, { afterMs: response.status === 503 ? retryAfterMillis(response.headers.get('retry-after'), client.now()) : undefined });
         }
         try { await response.arrayBuffer(); } catch { throw new CloudError('NETWORK'); }
       });
-    }
+    };
+    // 失败后不再启动新对象；等待已启动的请求结束后再清理目录和 SIGINT 监听器。
+    let cursor = 0, failed = false, failure: unknown;
+    await Promise.all(Array.from({ length: Math.min(4, missing.length) }, async () => {
+      while (!failed && cursor < missing.length) {
+        const item = missing[cursor++]!;
+        try { await upload(item); } catch (e) { if (!failed) { failed = true; failure = e; } }
+      }
+    }));
+    if (failed) throw failure;
     client.warn('上传完成，正在确认发布…');
-    const final = await client.retry(() => client.request(`/api/v1/shares/${prepared.shareId}/finalize`, credentials.accessToken, { uploadId: prepared.uploadId }));
+    const final = await client.retry(() => client.request(`/api/v1/shares/${prepared.shareId}/finalize`, accessToken, { uploadId: prepared.uploadId }));
     if (!shareId(final.shareId) || final.shareId !== prepared.shareId || !Number.isSafeInteger(final.version) || Number(final.version) < 1 || !(final.expiresAt === null || typeof final.expiresAt === 'string' && Number.isFinite(Date.parse(final.expiresAt)))) throw new CloudError('INVALID_RESPONSE');
     const url = httpUrl(final.url);
     const published = { shareId: final.shareId, url, expiresAt: final.expiresAt as string | null, version: final.version as number };
-    if (JSON.stringify(published).includes(credentials.accessToken)) throw new CloudError('INVALID_RESPONSE');
-    await atomicJson(join(project, '.joplo/cloud.json'), { server: client.server, shareId: published.shareId, url });
+    if (JSON.stringify(published).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
+    try { await atomicJson(join(project, '.joplo/cloud.json'), { server: client.server, shareId: published.shareId, url }); }
+    catch { client.warn('分享已发布，但无法保存 .joplo/cloud.json；请保留输出链接，下次发布可能创建新链接。'); }
     return { result: published, plan: account.plan };
   } finally { try { await rm(staging, { recursive: true, force: true }); } finally { temporary.release(); } }
 }
