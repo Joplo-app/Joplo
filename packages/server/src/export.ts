@@ -36,9 +36,9 @@ export type VideoJob = {
   id: string;
   projectId: string;
   scenarioId: string;
-  status: 'running' | 'done' | 'error';
+  status: 'running' | 'done' | 'error' | 'cancelled';
   /** starting 启动浏览器 → recording 录制中 → saving 写文件。 */
-  phase: 'starting' | 'recording' | 'saving' | 'done' | 'error';
+  phase: 'starting' | 'recording' | 'saving' | 'done' | 'error' | 'cancelled';
   step: number;
   total: number;
   /** 0–100。 */
@@ -161,7 +161,7 @@ export class ExportHub {
   cancel(projectId: string): VideoJob | null {
     const job = this.jobs.get(projectId);
     if (!job || job.status !== 'running') return null;
-    this.update(job, { status: 'error', phase: 'error', error: 'Cancelled' });
+    this.update(job, { status: 'cancelled', phase: 'cancelled', error: 'Cancelled' });
     this.aborts.get(projectId)?.abort();
     this.aborts.delete(projectId);
     return { ...job };

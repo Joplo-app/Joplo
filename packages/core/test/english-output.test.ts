@@ -64,11 +64,11 @@ test('comment removal preserves executable CJK and source line numbers', () => {
   expect(cjk.test(stripped)).toBe(true);
 });
 
-test('CLI, core, server, and kit source output is English except explicit UI and CJK handling', async () => {
+test('CLI, core, server, kit, and joplo entry output is English except explicit UI and CJK handling', async () => {
   const violations: string[] = [];
   const used = new Set<readonly string[]>();
-  for (const pkg of ['cli', 'core', 'server', 'kit']) {
-    for (const file of await sourceFiles(resolve(root, 'packages', pkg, 'src'))) {
+  for (const dir of ['cli/src', 'core/src', 'server/src', 'kit/src', 'joplo/bin', 'joplo/lib']) {
+    for (const file of await sourceFiles(resolve(root, 'packages', dir))) {
       const name = relative(root, file).replaceAll('\\', '/');
       let text = withoutComments(file, await readFile(file, 'utf8'));
       for (const entry of whitelist.filter(([path]) => path === name)) {

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
-import { COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../src/catalog.ts';
+import { COMPONENT_DOCS, COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../src/catalog.ts';
 import { guide, skillIndex, skillTopic, SKILL_TOPICS } from '../src/guide.ts';
 
 const topics = ['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'publish'] as const;
@@ -106,4 +106,33 @@ test('cases 按产品类型给出可筛选的预设键、维度和来源示例',
 test('publish 说明同布局、导演、发布端快捷键以及图片/视频边界', () => {
   const body = skillTopic('publish');
   for (const text of ['same layout', 'Layer', 'director', 'Fullscreen', 'F', 'Space', '←/→', 'Esc', 'export images', 'Video export is local only']) expect(body).toContain(text);
+});
+
+test('authoring guidance preserves prohibitions and prototype scope', () => {
+  const demo = skillTopic('demo');
+  expect(demo).toContain('Do not manually write node/edge state props or use set() to simulate calls; use trace()');
+  expect(skillTopic('authoring')).toContain('Do not use fixed pixel heights for full-height layouts');
+  expect(skillTopic('components')).toContain('unmodeled marks behavior not modeled by this prototype');
+});
+test('case presets remain questions rather than product decisions', () => {
+  const presets = skillTopic('cases').split('\n').filter(line => /^- \w+ · \w+ · /.test(line));
+  expect(presets).toHaveLength(28);
+  for (const line of presets) expect(line).toMatch(/ · How should .+\?$/);
+});
+test('API status values use their actual spelling and trace paths are distinct from routes', () => {
+  const cases = skillTopic('cases');
+  for (const status of ['expressed', 'undecided', 'missing', 'not_applicable', 'excluded', 'confirmed', 'pending']) expect(cases).toContain(`\`${status}\``);
+  expect(skillTopic('authoring')).toContain('Never mark an AI assumption `confirmed`');
+  expect(skillTopic('check')).toContain('disconnected path');
+  expect(skillTopic('check')).not.toContain('disconnected route');
+});
+test('component guidance describes navigation, automatic phone frames, and current UI labels', () => {
+  const output = skillTopic('components', { Anchor: COMPONENT_DOCS.Anchor, Phone: COMPONENT_DOCS.Phone, Thinking: COMPONENT_DOCS.Thinking });
+  expect(output).toContain('href is display-only; clicking never navigates; use go() in the step');
+  expect(output).toContain('do not add Phone explicitly');
+  expect(output).toContain('Thought for …');
+  expect(skillTopic('demo')).toContain('Appearance');
+  expect(skillTopic('demo')).toContain('Follow director');
+  expect(skillTopic('demo')).not.toContain('Settings · Theme');
+  expect(skillTopic('selection')).toContain('Open in editor');
 });

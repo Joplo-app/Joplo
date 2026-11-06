@@ -139,10 +139,10 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         const r = { kind: 'step' as const, id: st.id, optionId: sc.optionId, stepId: st.id };
         const at = st.source ?? sc.source;
         const cl = captionLength(st.caption);
-        if (cl > CAPTION_MAX) emit('warning', 'CAPTION_TOO_LONG', `Caption length is ${cl} units (recommended maximum: ${CAPTION_MAX}; CJK characters count as 1 each, all others as 0.5): "${st.caption}". Keep the caption to one point; move details to a separate explanation layer, for example layers: { why: layer('Design rationale', <Why />) }, then use shot('why_xxx') in this step to present it`, at, r);
+        if (cl > CAPTION_MAX) emit('warning', 'CAPTION_TOO_LONG', `Caption length is ${cl} units (recommended maximum: ${CAPTION_MAX}; CJK characters count as 1 each, all others as 0.5; whitespace is not counted): "${st.caption}". Keep the caption to one point; move details to a separate explanation layer, for example layers: { why: layer('Design rationale', <Why />) }, then use shot('why_xxx') in this step to present it`, at, r);
         if (st.explain) {
           const el = captionLength(st.explain);
-          if (el > EXPLAIN_MAX) emit('warning', 'EXPLAIN_TOO_LONG', `explain note length is ${el} units (recommended maximum: ${EXPLAIN_MAX}; CJK characters count as 1 each, all others as 0.5). Move long content to a separate explanation layer, for example layers: { why: layer('Design rationale', <Why />) }, then switch to it with shot`, at, r);
+          if (el > EXPLAIN_MAX) emit('warning', 'EXPLAIN_TOO_LONG', `explain note length is ${el} units (recommended maximum: ${EXPLAIN_MAX}; CJK characters count as 1 each, all others as 0.5; whitespace is not counted). Move long content to a separate explanation layer, for example layers: { why: layer('Design rationale', <Why />) }, then switch to it with shot`, at, r);
         }
       }
     }

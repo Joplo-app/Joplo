@@ -139,3 +139,16 @@ test.each([
   const p = fixture(); change(p);
   expect(validate(p, { mode: 'structure' }).diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ severity: 'error', source: 'reference', at: source(p) })]));
 });
+
+test('caption diagnostics describe whitespace and retain the weighted length calculation', () => {
+  const p = fixture();
+  const step = p.scenarios[`${a}.success`]!.steps[0]!;
+  step.caption = '中'.repeat(25) + ' \n\t';
+  step.explain = 'a'.repeat(98) + ' \n\t';
+  const ds = validate(p, { mode: 'structure' }).diagnostics;
+  expect(ds.find(d => d.code === 'CAPTION_TOO_LONG')?.message).toContain('Caption length is 25 units');
+  expect(ds.find(d => d.code === 'EXPLAIN_TOO_LONG')?.message).toContain('explain note length is 49 units');
+  for (const code of ['CAPTION_TOO_LONG', 'EXPLAIN_TOO_LONG']) {
+    expect(ds.find(d => d.code === code)?.message).toContain('whitespace is not counted');
+  }
+});

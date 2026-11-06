@@ -66,7 +66,7 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
     `- Containers whose expanded state controls child visibility: ${listed(GATED_CONTAINERS)}.`,
     '',
     `Joplo props: ${JOPLO_PROPS.join(', ')}; disabled is the component disable prop.`,
-    'when controls visibility; disabledReason explains disabling; unmodeled marks behavior outside this version; note is an authoring note.',
+    'when controls visibility; disabledReason explains disabling; unmodeled marks behavior not modeled by this prototype; note is an authoring note.',
     'Interactive elements need a flow step, disabled=true with a reason, or explicit unmodeled.',
     'See authoring for bindings, conditions, and steps; check for component error fixes.',
   ].join('\n');
@@ -122,13 +122,13 @@ Read only the topics needed, usually one or two at a time. See components for co
 - Use Stack / Group / SimpleGrid / Grid props: <Group justify="space-between">, <SimpleGrid cols={{ base: 1, md: 3 }}>.
 - Use responsive objects { base, xs, sm, md, lg, xl }, or visibleFrom="sm" / hiddenFrom="sm". AppShell collapses navigation below navbar.breakpoint.
 - Set input labels directly: <TextInput id="email" label="Email"/>. Auto captions use them.
-- Stage height follows the window. Avoid fixed pixel heights for full-height layouts, which clip bottom inputs and buttons in short windows. See Full-height layout in demo.
+- Stage height follows the window. Do not use fixed pixel heights for full-height layouts, which clip bottom inputs and buttons in short windows. See Full-height layout in demo.
 
 ## Rules and boundaries
 - rule('Constraint', { origin?, status?, cases?: ['happy'], elements?: ['invite'] }).
 - origin: user/project_material/ai_assumption/code_observed/feedback; default ai_assumption.
-- status: pending/confirmed/conflict/out_of_scope; default pending.
-- Never mark an AI assumption Confirmed. Record origin/status truthfully after user confirmation.
+- status: \`pending\`/\`confirmed\`/\`conflict\`/\`out_of_scope\`; default \`pending\`.
+- Never mark an AI assumption \`confirmed\`. Record origin/status truthfully after user confirmation.
 - question('Open question', { severity?: 'blocker'|'major'|'minor', refs?: ['happy'] }).
 - Do not write onClick or other function props. Reusable author components expand during collection; flow drives interaction.
 - Author modules execute locally during loading/checking/building. Run only trusted projects.
@@ -158,7 +158,7 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 ## Diagram and traces
 - Declare structure inside <Diagram> with <Diagram.Group label>, <Diagram.Node id label kind/>, <Diagram.Edge id from to label async/>.
 - Diagram.Edge from/to must be node ids within the same Diagram. Layout is automatic; existing elements stay in place as segments appear.
-- Use trace('a','b','c') for the a→b→c trace. Do not manually set node/edge state to simulate calls.
+- Use trace('a','b','c') for the a→b→c trace. Do not manually write node/edge state props or use set() to simulate calls; use trace().
 - Elements visited this step are active; earlier ones become ok. trace.fail('a','b') marks failure; a later successful trace can recover.
 - trace.skip('a','b') marks elements not called this time as dim. They need not be connected; it does not move the shot.
 - trace accepts node or edge ids. Each segment needs a matching edge; reverse traversal is allowed. For multiple edges in the same direction, use the edge id.
@@ -205,7 +205,7 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 
 ## Write a theme
 - A theme is a CSS file at themes/<name>.css in the project root. Set theme: '<name>' in joplo.config.ts as the default. A custom theme overrides a built-in with the same name.
-- Built-ins: sketch (Hand-drawn, default), clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast. Preview them in board Settings · Theme.
+- Built-ins: sketch (Hand-drawn, default), clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast. Preview them in the board Appearance popover.
 - Variables alone work and are scoped to the stage, leaving the board unaffected: --jp-font, --jp-font-mono, --jp-font-size, --jp-ink, --jp-bg, --jp-surface, --jp-subtle, --jp-muted, --jp-faint, --jp-line, --jp-line-strong, --jp-border, --jp-accent (highlight), --jp-select, --jp-info (Diagram active), --jp-ok, --jp-warn, --jp-danger, --jp-annot (annotations; defaults to danger), --jp-radius, --jp-shadow, --jp-stroke (rough hand-drawn / clean thin lines).
 - Ordinary selectors (.jbox, h1, etc.) also work within the stage. In dark themes, check contrast of --jp-info / --jp-ok / --jp-danger / --jp-accent against the background.
 - Example themes/brand.css:
@@ -235,7 +235,7 @@ The example also covers insufficient quota, dangerous tool confirmation, client 
   cases: `# Joplo case checklist: cases
 
 Before starting, read user requirements and project material. Use these dimensions to find gaps; ask only key questions that change the design.
-Record unanswered items as question or Pending rules. Do not confirm AI assumptions on the user's behalf.
+Record unanswered items as question or rules with status \`pending\`. Do not confirm AI assumptions on the user's behalf.
 
 ## Eight dimensions: Pick one or two relevant questions each
 - \`main\` Main flow: Who needs to achieve what? What should the user see afterward?
@@ -248,54 +248,55 @@ Record unanswered items as question or Pending rules. Do not confirm AI assumpti
 - \`consistency\` Consistency: When one route changes, when do others update? How are partial results kept understandable?
 
 ## Presets by product type
-Pick relevant cases to ask the user before starting. Do not include every preset; these are question seeds, not Confirmed product rules.
+Pick relevant cases to ask the user before starting. Do not include every preset; these are question seeds, not \`confirmed\` product rules.
 
 ### Forms / CRUD / permission (source: examples/invite)
-- no_permission · permission · Block non-admin actions and explain why.
-- invalid_input · input · Show inline feedback for empty or invalid input.
-- revoked · lifecycle · Handle reopening after revocation.
-- expired · lifecycle · Decide what to show after expiry.
-- already_exists · conflict · Explain that the object already exists.
-- duplicate_submit · conflict · Avoid duplicate creation on repeated submit clicks.
-- request_failed · async · Preserve input and allow retry after failure.
+- no_permission · permission · How should non-admin actions be blocked and explained?
+- invalid_input · input · How should empty or invalid input be explained inline?
+- revoked · lifecycle · How should reopening after revocation work?
+- expired · lifecycle · How should access after expiry be presented?
+- already_exists · conflict · How should an existing object be reported?
+- duplicate_submit · conflict · How should repeated submit clicks avoid duplicate creation?
+- request_failed · async · How should input be preserved and retry allowed after failure?
 
 ### Agent / AI products (source: examples/agent-arch)
-- quota · permission · Block insufficient quota before calling the model.
-- dangerous_tool · permission · Ask for user confirmation before running a dangerous tool.
-- hand_offline · async · Report failure truthfully when the tool execution client disconnects or times out.
-- local_data · main · Decide how to access data on the user's machine.
-- tool_version · consistency · Handle upgraded definitions with an older tool implementation.
-- usage_retry · async · Retry failed billing event delivery with idempotency.
-- model_failed · async · Give feedback and recovery for model failure or timeout.
+- quota · permission · How should insufficient quota be blocked before calling the model?
+- dangerous_tool · permission · How should the user confirm a dangerous tool before execution?
+- hand_offline · async · How should failure be reported when the tool execution client disconnects or times out?
+- local_data · main · How should data on the user's machine be accessed?
+- tool_version · consistency · How should upgraded definitions work with an older tool implementation?
+- usage_retry · async · How should failed billing event delivery retry with idempotency?
+- model_failed · async · How should model failure or timeout be explained and recovered from?
 
 ### CLI / developer tools (source: examples/joplo-dist)
-- first_run · main · Start from zero and succeed within three commands.
-- env_old · input · Explain how to fix an outdated runtime.
-- version_skew · consistency · Suggest aligning global and project versions.
-- optional_dep · async · Missing optional dependencies affect only related commands.
-- dir_not_empty · conflict · Do not overwrite existing files in the target directory.
-- typo · input · Suggest the closest command or argument for a typo.
-- user_modified · conflict · Do not overwrite user edits.
-- offline · async · Explain limitations and recovery without network access.
+- first_run · main · How should a new user succeed within three commands?
+- env_old · input · How should an outdated runtime be explained and fixed?
+- version_skew · consistency · How should global and project version mismatches prompt alignment?
+- optional_dep · async · How should missing optional dependencies affect only related commands?
+- dir_not_empty · conflict · How should existing files in the target directory be protected from overwriting?
+- typo · input · How should a command or argument typo suggest the closest match?
+- user_modified · conflict · How should user edits be protected from overwriting?
+- offline · async · How should offline limitations and recovery be explained?
 
 ### Local tools / multiple projects (source: examples/joplo-board)
-- first_open · main · Offer a starting point when no data exists yet.
-- single_instance · conflict · Reuse a running instance.
-- stale_resource · lifecycle · Clean up records for missing directories or resources.
-- one_broken · consistency · Other projects keep working when one fails.
-- public_view · consistency · Hide private paths, gaps, and errors in the public view.
-- recent · main · Switch among previously opened projects on the home page.
+- first_open · main · How should a first visit with no data offer a starting point?
+- single_instance · conflict · How should an existing instance be reused instead of starting another?
+- stale_resource · lifecycle · How should records for missing directories or resources be cleaned up?
+- one_broken · consistency · How should other projects keep working when one fails?
+- public_view · consistency · How should the public view hide private paths, gaps, and errors?
+- recent · main · How should the home page switch among previously opened projects?
 
 ## Turn answers into cases and scenarios
 - feature.cases: { happy: 'Complete successfully', denied: { title: 'No permission', dimension: 'permission', priority: 'high', expected: 'Explain why' } }.
 - dimension uses the keys above; priority is high/medium/low; expected describes the expected result.
 - Each option uses flow(..., { cases: ['happy'] }) to reference the shared cases for comparison.
-- A case with a scenario is automatically expressed; one with neither a scenario nor a declaration is missing.
+- A case with a scenario is automatically \`expressed\`; one with neither a scenario nor a declaration is \`missing\`.
 - After adding a case, run check: reconsider it in every option.
 
 ## Declare coverage without a scenario
+Coverage status values: \`expressed\`, \`undecided\`, \`missing\`, \`not_applicable\`, \`excluded\`.
 - option.coverage: { case_key: undecided('Why this is undecided') }.
-- missing('What is missing'): leave the gap explicit; do not pretend it is Covered.
+- missing('What is missing'): leave the gap explicit; do not pretend it is \`expressed\`.
 - notApplicable('Why not applicable') / excluded('Why excluded'): require a nonempty reason.
 - Explicit declarations override inference. Use scenarios for cases that need a demo.
 - Do not invent business rules for full coverage. Keep asking about undecided behavior.
@@ -332,18 +333,18 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - MARK_UNKNOWN：mark 的目标不在本步路径画面或任何层级里，核对元素 id；当前隐藏不算引用错误。
 - SHOT_UNKNOWN: The shot target is absent from this step's stage and all layers. Check its id and layer; see demo.
 - LAYER_UNKNOWN: Invalid layer key or missing content. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
-- TRACE_UNKNOWN: Empty trace, unknown id, multiple Diagrams, or disconnected route. Use connected node/edge ids in one Diagram.
+- TRACE_UNKNOWN: Empty trace, unknown id, multiple Diagrams, or disconnected path. Use connected node/edge ids in one Diagram.
 - TRACE_AMBIGUOUS: Multiple candidate edges between nodes. Use the specific edge id in trace.
 - THEME_UNKNOWN: config({ theme }) names neither a built-in nor themes/<name>.css. Use a built-in or add that CSS file; see Write a theme in demo.
 - UNKNOWN_DIAGRAM_NODE: Diagram.Edge from/to does not reference a node in this Diagram. Correct the endpoint ids.
 - ELEMENT_PROP: A component prop contains JSX. Use strings for icons, such as leftSection="+", and children for content.
-- ASSUMPTION_CONFIRMED: Keep AI assumptions pending. After user confirmation, record the actual origin; do not change only status.
+- ASSUMPTION_CONFIRMED: Keep AI assumptions \`pending\`. After user confirmation, record the actual origin; do not change only status.
 - UNBOUND_INTERACTIVE: Add a scenario step, explicitly disable with a reason, or mark unmodeled.
 - DISABLED_WITHOUT_REASON: Add disabledReason explaining why the element cannot be used.
 - CASE_NOT_COVERED: Add a scenario or declare coverage truthfully. Ask about missing behavior first.
-- EXPRESSED_WITHOUT_SCENARIO / COVERAGE_WITHOUT_REASON: Add a scenario or a reason for Not applicable/Excluded.
+- EXPRESSED_WITHOUT_SCENARIO / COVERAGE_WITHOUT_REASON: Add a scenario or a reason for \`not_applicable\`/\`excluded\`.
 - RULE_ELEMENT_NOT_FOUND: Check rule.elements against element ids in the related option stages.
-- PENDING_AI_ASSUMPTION: Ask the user to confirm; keep pending until then.
+- PENDING_AI_ASSUMPTION: Ask the user to confirm; keep \`pending\` until then.
 - EMPTY_SCENARIO: Decide whether actions are needed. Zero steps are valid for showing initial states such as permissions.
 - MISSING_TARGET / MISSING_SCENE: Check step targets, the start route, and the stage after go.
 - TARGET_HIDDEN / TARGET_DISABLED: Check initial state and preceding set effects so the action is executable at that step.
@@ -359,7 +360,7 @@ It reads .joplo/selection.json directly without recompiling, avoiding a whole-pa
 
 ## Read the result and edit locally
 - Output includes at (project-relative file:line:column), a label, and numbered source with three lines before and after.
-- Open the file at that location. Edit only what the user pointed to; use the label to confirm the target.
+- Open the file at that location (Open in editor in the board). Edit only what the user pointed to; use the label to confirm the target.
 - If line content changed, verify the current location. If the file or line is gone, select again in the board.
 - A missing file or null content prints "Nothing selected" and exits 0. Ask the user to hold ⌥ (Alt) and click the element in the board.
 - Do not guess a location for an object without at. Select a specific element or step in the board.

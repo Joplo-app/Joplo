@@ -75,12 +75,12 @@ function pickCli({ cwd, selfDir, argv, env }) {
     const same = own && own.dir === local.dir;
     if (!same && own && own.version !== local.version)
       notes.push(
-        `! 已改用项目内的 joplo ${local.version} 执行（npx 拉到的是 ${own.version}）。` +
-          `要升级：${ADD_DEV[packageManager(env)]} joplo@${own.version} @joplo-app/kit@${own.version}`,
+        `! Using project joplo ${local.version} (npx fetched ${own.version}). ` +
+          `Upgrade: ${ADD_DEV[packageManager(env)]} joplo@${own.version} @joplo-app/kit@${own.version}`,
       );
     if (command === 'dev') {
       const kit = readJson(findUp(cwd, '@joplo-app/kit') || '');
-      notes.push(`[joplo] 使用项目内的 joplo ${local.version}（@joplo-app/kit ${kit && kit.version ? kit.version : '未安装'}）`);
+      notes.push(`[joplo] Using project joplo ${local.version} (@joplo-app/kit ${kit && kit.version ? kit.version : 'not installed'})`);
     }
     return { ...local, local: true, notes };
   }
@@ -91,7 +91,7 @@ function pickCli({ cwd, selfDir, argv, env }) {
 async function main() {
   const choice = pickCli({ cwd: process.cwd(), selfDir: path.resolve(__dirname, '..'), argv: process.argv.slice(2), env: process.env });
   if (!choice) {
-    process.stderr.write('✗ 找不到 @joplo-app/cli。请重新安装：npm i -D joplo，或运行 npx joplo@latest\n');
+    process.stderr.write('✗ Cannot find @joplo-app/cli. Reinstall: npm i -D joplo, or run npx joplo@latest\n');
     process.exitCode = 1;
     return;
   }
