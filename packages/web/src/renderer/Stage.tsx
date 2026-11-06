@@ -3,10 +3,12 @@
  * 不 portal 到 document.body，因此截图、元素索引与遮挡检查都只看舞台本身。
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { Marks } from './Marks';
+import { keyboardAt } from './story-data';
 import { CameraLayer, contentBounds, useCamera, type CameraSpec } from './camera';
 import { clampPan, wheelFactor, zoomAt, type View } from './camera-math';
 import { AnimatePresence, motion } from 'motion/react';
-import { VIEWPORT_SIZE, cardAt, diagramStateAt, roleOf, roleOfScene, streamsOf, type CardAction, type PlayState, type Project, type RoleInfo, type Toast } from '@joplo-app/core';
+import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, diagramStateAt, roleOf, roleOfScene, streamsOf, type CardAction, type PlayState, type Project, type RoleInfo, type Toast } from '@joplo-app/core';
 import { RenderContext, RenderNode, type RenderMode, type StreamingCtx } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from './appearance';
@@ -45,6 +47,8 @@ export type StageProps = {
   selectedId?: string | null;
   preview?: { nodeId: string; text: string } | null;
   animate?: boolean;
+  /** 控制器正在预演的步骤（尚未提交），按键记录与输入预览使用。 */
+  activeStep?: number | null;
   registry?: RoughRegistry | null;
   /** 下一步操作的目标：Toast 会避开它（PRD 8.8）。 */
   nextTargetId?: string | null;
@@ -92,7 +96,7 @@ function scrollsItself(target: EventTarget | null, root: HTMLElement, dy: number
   return false;
 }
 
-export function Stage({ project, state, theme, mode, selectedId = null, preview = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false, font = null, stroke: strokeOverride = null, stream = null }: StageProps) {
+export function Stage({ project, state, theme, mode, selectedId = null, preview = null, activeStep = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false, font = null, stroke: strokeOverride = null, stream = null }: StageProps) {
   const shownId = sceneId ?? state.sceneId;
   const scene = project.scenes[shownId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
@@ -112,6 +116,9 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     () => (streamPaths && stream ? { paths: new Set(streamPaths.split('|')), key: `${state.scenarioId}#${state.position}`, paused: stream.paused, speed: stream.speed } : null),
     [streamPaths, stream?.paused, stream?.speed, state.scenarioId, state.position],
   );
+  const changed = useMemo(() => changedAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
+  const marks = useMemo(() => marksAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
+  const keyboard = keyboardAt(scenario, state.position, activeStep, preview);
   const rootRef = useRef<HTMLDivElement | null>(null);
   // 用户的缩放平移（T-director2）：resetKey 变化时丢弃，镜头重新接管
   const [user, setUserState] = useState<View | null>(null);
@@ -270,7 +277,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
           {scene ? (
-            <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, traced, streaming }}>
+            <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, traced, streaming, changed }}>
               {/* 换层（换画面）时淡入 */}
               <motion.div key={shownId} className="absolute inset-0" ref={cam.contentRef} initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
                 <RenderNode node={scene.root} />
@@ -280,10 +287,14 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
             <div className="flex h-full items-center justify-center text-[var(--jp-danger)]">画面不存在：{shownId}</div>
           )}
           <div ref={setDialogLayer} className="pointer-events-none absolute inset-0 z-20 [&>*]:pointer-events-auto" data-jlayer="dialog" />
+          <Marks key={shownId} marks={marks} wrapRef={cam.wrapRef} contentRef={cam.contentRef} width={vp.width} height={vp.height} animate={animate} pulseKey={`${state.scenarioId}:${state.position}:${shownId}`} />
           {camera ? <CameraLayer view={cam.view} animate={animate} pulseKey={camera.key} /> : null}
         </div>
         <ToastLayer key={epoch} toasts={state.toasts} nextTargetId={nextTargetId} animate={animate} rootRef={rootRef} />
         {sceneRole && !card ? <RoleTag role={sceneRole} /> : null}
+        {keyboard && !card ? <div className="pointer-events-none absolute left-1/2 z-30 flex max-w-[70%] -translate-x-1/2 items-center gap-1.5 rounded border border-[var(--jp-line)] bg-[var(--jp-surface)] px-3 py-1.5 text-[14px] text-[var(--jp-ink)]" style={{ bottom: Math.max(60, state.toasts.length ? state.toasts.length * 64 + 40 : 0) }} data-jlayer="keyboard">
+          {keyboard.kind === 'type' ? <><span className="shrink-0 text-[var(--jp-muted)]">输入</span><span className="truncate">{keyboard.text || '…'}</span></> : keyboard.keys.map((key, i) => <kbd key={i} className="rounded border border-[var(--jp-line-strong)] bg-[var(--jp-subtle)] px-1.5 py-0.5 font-[var(--jp-font-mono)]">{key}</kbd>)}
+        </div> : null}
         {overlay ? <div className="pointer-events-none absolute inset-0 z-40" data-jlayer="overlay">{overlay}</div> : null}
         <AnimatePresence>
           {card ? (

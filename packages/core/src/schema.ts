@@ -103,6 +103,7 @@ export const Action = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('select'), target: Id, value: z.string() }),
   z.strictObject({ type: z.literal('toggle'), target: Id, value: z.boolean() }),
   z.strictObject({ type: z.literal('back') }),
+  z.strictObject({ type: z.literal('press'), keys: z.string() }),
   z.strictObject({ type: z.literal('event'), name: z.string().min(1) }),
   /** 过渡卡（D56）：整屏一句大字；role = 换到这个人（feature.roles 的键）。 */
   z.strictObject({ type: z.literal('card'), title: z.string().min(1), sub: z.string().min(1).optional(), points: z.array(z.string().min(1)).optional(), role: Id.optional() }),
@@ -131,6 +132,9 @@ export const Trace = z.strictObject({
 /** 镜头（D43）：这一步在某个层级里对准哪些元素；targets 为空 = 这一层的整体。 */
 export const Shot = z.strictObject({ layer: z.string().min(1), targets: z.array(z.string().min(1)) });
 
+export const Fork = z.strictObject({ label: z.string().min(1), scenarioId: Qid, at: z.number().int().nonnegative() });
+export const Mark = z.strictObject({ target: z.string().min(1), kind: z.enum(['circle', 'underline', 'box', 'arrow']), note: z.string().min(1).optional() });
+
 export const Step = z.strictObject({
   id: Qid,
   kind: z.enum(['user', 'system', 'card']),
@@ -146,6 +150,10 @@ export const Step = z.strictObject({
   explain: z.string().min(1).optional(),
   /** 这一步的调用链（来自 trace()）：Diagram 节点与连线的 state 由 diagramStateAt 从它推算；发布站保留。 */
   traces: z.array(Trace).default([]),
+  /** 分叉是演示信息，发布保留；at 在编译时比较动作与业务效果的公共前缀。 */
+  forks: z.array(Fork).default([]),
+  /** 本步标注，不累积，不参与状态转换。 */
+  marks: z.array(Mark).default([]),
   source: Source,
 });
 
@@ -293,3 +301,6 @@ export type Action = z.infer<typeof Action>;
 export type Effect = z.infer<typeof Effect>;
 export type Trace = z.infer<typeof Trace>;
 export type Shot = z.infer<typeof Shot>;
+
+export type Fork = z.infer<typeof Fork>;
+export type Mark = z.infer<typeof Mark>;

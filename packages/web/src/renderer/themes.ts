@@ -37,6 +37,7 @@ export const THEME_VARS = [
   '--jp-ok',
   '--jp-warn',
   '--jp-danger',
+  '--jp-annot',
   '--jp-radius',
   '--jp-shadow',
   '--jp-stroke',
@@ -48,7 +49,7 @@ const SYSTEM = 'system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Mi
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, "Joplo Marker Gothic", monospace';
 
 type Vars = Partial<Record<(typeof THEME_VARS)[number], string>>;
-const block = (v: Vars, extra = '') => `:root {\n${Object.entries(v).map(([k, x]) => `  ${k}: ${x};`).join('\n')}\n}\n${extra}`;
+const block = (v: Vars, extra = '') => `:root {\n${Object.entries({ '--jp-annot': v['--jp-danger'], ...v }).map(([k, x]) => `  ${k}: ${x};`).join('\n')}\n}\n${extra}`;
 
 /** 手绘（默认）：与 T-theme 之前的 sketch 主题视觉一致。 */
 const SKETCH: Vars = {

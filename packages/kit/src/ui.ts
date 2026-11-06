@@ -113,6 +113,12 @@ export const Progress = c('Progress');
 export const RingProgress = c('RingProgress');
 export const Skeleton = c('Skeleton');
 export const Notification = c('Notification');
+/** 简单邮件卡片，正文可放 Button。 */
+export const Email = c('Email');
+/** 键值记录；fields 缺省时展示 value 的全部键，绑定的变化行显示前后对比。 */
+export const DataCard = c('DataCard');
+/** 按 states 顺序展示完成/当前/待完成状态，labels 可替换显示文字。 */
+export const StateFlow = c('StateFlow');
 export const Modal = c('Modal');
 export const Drawer = c('Drawer');
 

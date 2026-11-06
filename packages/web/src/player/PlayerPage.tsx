@@ -11,7 +11,7 @@
  * 本文件不引用它们，因此发布站的产物里不会出现（不变量 5）。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsUpDown, Clapperboard, Cog, Ellipsis, Expand, Film, Gauge, Maximize, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Share, Shrink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsUpDown, Clapperboard, GitFork, Cog, Ellipsis, Expand, Film, Gauge, Maximize, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Share, Shrink } from 'lucide-react';
 import { roleOfScene, stepTouchesLayer, type Project, type RoleInfo, type Scenario } from '@joplo-app/core';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
@@ -125,7 +125,7 @@ const Divider = () => <span aria-hidden className="h-5 w-px shrink-0 bg-jb-line"
 
 /** 时间线的一格：当前步是宽块并写说明；其余只有序号，悬停写“序号 · 说明”。 */
 function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; width: number; onClick: () => void; testid: string; kind?: string }) {
-  const [tip, tipNode] = useTip(chip.state === 'current' ? null : chip.tip, { placement: 'top-center', delay: 200 });
+  const [tip, tipNode] = useTip(chip.state === 'current' && !chip.fork ? null : chip.tip, { placement: 'top-center', delay: 200 });
   const cur = chip.state === 'current';
   return (
     <li className="flex shrink-0">
@@ -158,6 +158,7 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
           />
         ) : null}
         <span className="relative">{chip.index}</span>
+        {chip.fork ? <GitFork className="relative size-3 shrink-0" aria-label="分叉" /> : null}
         {chip.system && !cur ? <Cog className="relative size-3" aria-label="系统" /> : null}
         {chip.card && !cur ? <Film className="relative size-3" aria-label="过渡" /> : null}
         {cur ? (
@@ -541,6 +542,7 @@ export function PlayerPage(p: PlayerPageProps) {
               inspect={!!p.inspectMode && !!p.onInspect}
               selectedId={p.selectedId ?? null}
               preview={snap.preview}
+              activeStep={snap.activeStep}
               stream={snap.streamAt ? { ...snap.streamAt, paused: snap.paused } : null}
               epoch={snap.epoch}
               animate={!ctl.reducedMotion}
@@ -598,7 +600,7 @@ export function PlayerPage(p: PlayerPageProps) {
             </div>
           ) : null}
         </main>
-        {scenario ? <Subtitle content={subtitle} theme={p.theme} font={look.font} framed dark /> : null}
+        {scenario ? <Subtitle content={subtitle} theme={p.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} framed dark /> : null}
         <div ref={barRowRef} className="relative flex h-16 shrink-0 items-center justify-center px-6">
           {scenario ? (
             <div className={cn('flex max-w-full justify-center transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')} data-visible={idle.visible ? '' : undefined} onMouseMove={idle.poke}>
@@ -690,7 +692,7 @@ export function PlayerPage(p: PlayerPageProps) {
             {/* 舞台框：画面和字幕合成一体（1.5px 墨线，圆角 10）；字幕区跟随舞台主题 */}
             <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface', hasLayerBar && 'rounded-tl-none')} data-testid="stage-frame" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
               {stageArea}
-              {scenario ? <SubtitleSlot content={subtitle} theme={p.theme} font={look.font} explainInTip={L.explainInTip} /> : null}
+              {scenario ? <SubtitleSlot content={subtitle} theme={p.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} explainInTip={L.explainInTip} /> : null}
             </div>
           </div>
           <Dock snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} L={L} zoom={dockZoom} />
@@ -703,12 +705,12 @@ export function PlayerPage(p: PlayerPageProps) {
 }
 
 /** 字幕区：< 900 时 explain 收进悬停（字幕区仍只读 --jp-*）。 */
-function SubtitleSlot({ content, theme, font, explainInTip }: { content: ReturnType<typeof subtitleFor>; theme: StageTheme; font: AppearanceFont | null; explainInTip: boolean }) {
+function SubtitleSlot({ content, theme, font, explainInTip, onFork }: { content: ReturnType<typeof subtitleFor>; theme: StageTheme; font: AppearanceFont | null; explainInTip: boolean; onFork: (fork: import('@joplo-app/core').Fork) => void }) {
   const hidden = explainInTip && content?.explain ? content.explain : null;
   const [tip, tipNode] = useTip(hidden, { placement: 'top-start' });
   return (
     <div {...tip} className="shrink-0" data-testid="subtitle-slot">
-      <Subtitle content={hidden && content ? { ...content, explain: null, explainLines: 0 } : content} theme={theme} font={font} framed divider />
+      <Subtitle content={hidden && content ? { ...content, explain: null, explainLines: 0 } : content} theme={theme} font={font} onFork={onFork} framed divider />
       {tipNode}
     </div>
   );

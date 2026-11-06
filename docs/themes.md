@@ -1,6 +1,6 @@
 # 主题
 
-主题是 CSS，作用于演示画面，以及跟随它的字幕、手机外框、高光和提示；看板首页、侧栏与普通控制不随主题换色。定义与变量以 [themes.ts](../packages/web/src/renderer/themes.ts) 为准。
+主题是 CSS，作用于演示画面，以及跟随它的字幕、手机外框、高光和提示；看板首页、侧栏与普通控制不随主题换色。圈注与箭头始终使用 Rough 手绘路径，颜色由主题控制。定义与变量以 [themes.ts](../packages/web/src/renderer/themes.ts) 为准。
 
 ## 九个内置主题
 
@@ -85,6 +85,7 @@ export default config({ name: 'My demo', layout: 'app', theme: 'brand' });
 | `--jp-info` | Diagram active 调用状态 |
 | `--jp-ok` | 成功状态 |
 | `--jp-warn` | 警告状态 |
+| `--jp-annot` | 手绘圈注与箭头；未设置时回落到 --jp-danger，内置主题沿用该主题的 danger 色 |
 | `--jp-danger` | 错误状态 |
 | `--jp-radius` | 圆角 |
 | `--jp-shadow` | 卡片阴影 |

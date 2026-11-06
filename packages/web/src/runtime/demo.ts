@@ -719,6 +719,9 @@ export class DemoController {
 
     if (a.type === 'card') {
       // 过渡卡（D56）：直接提交，卡片淡入；停留由 play 的 dwell 负责
+    } else if (a.type === 'press') {
+      // 无目标用户操作：activeStep 投影为键帽，不移动鼠标，状态仍统一在 commit 推进。
+      if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.selectHold, gen))) return false;
     } else if (step.kind === 'system' || a.type === 'event') {
       this.set({ systemEvent: a.type === 'event' ? a.name : step.caption });
       if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.systemHold, gen))) return false;

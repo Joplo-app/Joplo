@@ -113,7 +113,9 @@ export type EffectDef =
   | { kind: 'effect'; type: 'shot'; targets: string[] }
   | { kind: 'effect'; type: 'explain'; text: string }
   | { kind: 'effect'; type: 'trace'; ids: string[]; mode: 'ok' | 'fail' | 'skip' }
-  | { kind: 'effect'; type: 'stream'; path: string; value: string };
+  | { kind: 'effect'; type: 'stream'; path: string; value: string }
+  | { kind: 'effect'; type: 'fork'; label: string; scenario: string }
+  | { kind: 'effect'; type: 'mark'; target: string; kindOf: 'circle' | 'underline' | 'box' | 'arrow'; note?: string };
 
 const pathOf = (b: Bind | string): string => (isBind(b) ? bindPath(b) : b);
 export const set = (target: Bind, value: Json): EffectDef => ({ kind: 'effect', type: 'set', path: pathOf(target), value });
@@ -130,6 +132,10 @@ export const toast = Object.assign((text: string): EffectDef => ({ kind: 'effect
  *   .system('助手回复', stream($.ui.reply, '周六晴，推荐去白河营地……'))
  */
 export const stream = (target: Bind, text: string): EffectDef => ({ kind: 'effect', type: 'stream', path: pathOf(target), value: text });
+/** 本步的另一条故事路线；目标是同一方案的场景键，自动播放仍走主线。 */
+export const fork = (label: string, scenario: string): EffectDef => ({ kind: 'effect', type: 'fork', label, scenario });
+/** 本步手绘标注（下一步消失）；目标隐藏或不在当前层时不画。 */
+export const mark = (target: string, opts: { kind?: 'circle' | 'underline' | 'box' | 'arrow'; note?: string } = {}): EffectDef => ({ kind: 'effect', type: 'mark', target, kindOf: opts.kind ?? 'circle', ...(opts.note?.trim() ? { note: opts.note.trim() } : {}) });
 /** 跳转到另一个路径。 */
 export const go = (route: string): EffectDef => ({ kind: 'effect', type: 'go', route });
 /** 场景结束。 */
@@ -192,6 +198,7 @@ export type StepDef = {
     | { type: 'type'; target: string; value: string }
     | { type: 'select'; target: string; value: string }
     | { type: 'toggle'; target: string; value: boolean }
+    | { type: 'press'; keys: string }
     | { type: 'back' }
     | { type: 'event'; name: string }
     | ({ type: 'card'; title: string } & CardOpts);
@@ -241,6 +248,10 @@ export class Flow {
   }
   toggle(target: string, value: boolean, ...args: StepArg[]): this {
     return this.add('user', { type: 'toggle', target, value }, args);
+  }
+  /** 无目标的键盘操作，例如 .press('⌘K')、.press('Enter', set(...))。 */
+  press(keys: string, ...args: StepArg[]): this {
+    return this.add('user', { type: 'press', keys }, args);
   }
   back(...args: StepArg[]): this {
     return this.add('user', { type: 'back' }, args);

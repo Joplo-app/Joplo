@@ -35,7 +35,7 @@ describe('内置主题', () => {
     };
     for (const b of BUILTIN) {
       const v = parseThemeVars(builtinCss(b.name)!);
-      for (const k of ['--jp-ink', '--jp-info', '--jp-ok', '--jp-danger', '--jp-accent', '--jp-muted']) {
+      for (const k of ['--jp-ink', '--jp-info', '--jp-ok', '--jp-danger', '--jp-annot', '--jp-accent', '--jp-muted']) {
         for (const bg of ['--jp-bg', '--jp-surface']) expect(ratio(v[k]!, v[bg]!), `${b.name}: ${k} 与 ${bg}`).toBeGreaterThanOrEqual(3);
       }
       // dim 状态要能和 idle 区分（idle 用 ink，dim 用 line-strong）
