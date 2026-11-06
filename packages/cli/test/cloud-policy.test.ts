@@ -24,7 +24,7 @@ test('R3 win32 实际 spawn rundll32，不经过 cmd，允许百分号 URL', asy
   vi.mocked(spawn).mockImplementation((() => {
     const child = new EventEmitter(); process.nextTick(() => child.emit('close', 0)); return child;
   }) as typeof spawn);
-  const url = 'https://app.joplo.app/device?user_code=ABCD%2DEFGH';
+  const url = 'https://cloud.joplo.app/device?user_code=ABCD%2DEFGH';
   expect(await cloud.openBrowser(url, 'win32')).toBe(true);
   expect(spawn).toHaveBeenCalledWith('rundll32', ['url.dll,FileProtocolHandler', url], expect.objectContaining({ stdio: 'ignore', windowsHide: true }));
 });

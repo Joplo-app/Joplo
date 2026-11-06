@@ -364,7 +364,7 @@ test('R8 logout 清理遗留 credentials.json.*.tmp，保留其他文件', async
   expect((await cli(['logout'])).code).toBe(0); expect(await readdir(home)).toEqual(['settings.json.tmp']);
 });
 test('R9 空 JOPLO_CLOUD_URL 等同未设置', () => {
-  const client = new CloudClient(undefined, 'test', () => {}, () => {}, { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: '' } }); expect(client.server).toBe('https://app.joplo.app');
+  const client = new CloudClient(undefined, 'test', () => {}, () => {}, { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: '' } }); expect(client.server).toBe('https://cloud.joplo.app');
 });
 test('R10 文档记录新重试、配额语义和公开决策来源', async () => {
   const doc = await readFile('docs/cli.md', 'utf8'), decisions = await readFile('DECISIONS.md', 'utf8');
@@ -372,9 +372,9 @@ test('R10 文档记录新重试、配额语义和公开决策来源', async () =
   expect(decisions.match(/- D58[^\n]*/)?.[0]).not.toMatch(/C9|C10|joplo-cloud/);
 });
 test('R11 读取已有 0644 凭证时收紧到 0600，并匹配规范化 --server', async () => {
-  await credentials('https://app.joplo.app'); await fs.chmod(join(home, 'credentials.json'), 0o644);
-  const client = new CloudClient('https://APP.joplo.app:443/', 'test', () => {}, () => {}, { env: { JOPLO_HOME: home } });
-  expect((await client.credentials())?.server).toBe('https://app.joplo.app'); expect((await stat(join(home, 'credentials.json'))).mode & 0o777).toBe(0o600);
+  await credentials('https://cloud.joplo.app'); await fs.chmod(join(home, 'credentials.json'), 0o644);
+  const client = new CloudClient('https://CLOUD.joplo.app:443/', 'test', () => {}, () => {}, { env: { JOPLO_HOME: home } });
+  expect((await client.credentials())?.server).toBe('https://cloud.joplo.app'); expect((await stat(join(home, 'credentials.json'))).mode & 0o777).toBe(0o600);
 });
 
 test('R6 已收到 PUT 400 后正文断流，也绝不重试', async () => {
@@ -461,7 +461,7 @@ test('B9 新建 JOPLO_HOME 目录权限为 0700', async () => {
 });
 test('B10 免费提示和 PLAN_REQUIRED 的 billing 使用当前 server', async () => {
   await credentials(); const r = await cli(['share', project]); expect(r.stdout).toContain(base + '/billing');
-  fail = { path: '/api/v1/shares', status: 403, code: 'PLAN_REQUIRED' }; const e = await cli(['share', project]); expect(e.stdout).toContain(base + '/billing'); expect(e.stdout).not.toContain('https://app.joplo.app/billing');
+  fail = { path: '/api/v1/shares', status: 403, code: 'PLAN_REQUIRED' }; const e = await cli(['share', project]); expect(e.stdout).toContain(base + '/billing'); expect(e.stdout).not.toContain('https://cloud.joplo.app/billing');
 });
 test('B11 卡住的上传最终被实际 AbortSignal 中止，清理 SIGINT 监听器', async () => {
   await credentials(); stalledPut = true; const original = AbortSignal.timeout; const timeouts: number[] = [];

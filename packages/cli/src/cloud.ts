@@ -154,7 +154,7 @@ export class CloudClient {
   readonly now: () => number;
   constructor(server: string | undefined, readonly version: string, readonly warn: (text: string) => void, readonly rememberSecret: (token: string) => void, readonly deps: CloudDependencies = {}) {
     this.env = deps.env ?? process.env;
-    this.server = serverUrl(server ?? (this.env.JOPLO_CLOUD_URL?.trim() || 'https://app.joplo.app'));
+    this.server = serverUrl(server ?? (this.env.JOPLO_CLOUD_URL?.trim() || 'https://cloud.joplo.app'));
     this.home = credentialsHome(this.env);
     this.interactive = isInteractive(this.env, deps.format, deps.interactive ?? process.stdin.isTTY, deps.interactive ?? process.stdout.isTTY);
     this.sleep = deps.sleep ?? ((ms, signal) => sleep(ms, undefined, { signal })); this.now = deps.now ?? Date.now;

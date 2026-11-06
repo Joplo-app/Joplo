@@ -21,7 +21,7 @@ async function interruptAtReady(source: string, dir: string) {
 const moduleUrl = (file: string) => JSON.stringify(pathToFileURL(resolve('packages/cli/src', file)).href);
 test('R8 真 SIGINT 清理当前 share 临时目录并退出 130', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'joplo-signal-')); dirs.push(dir); const home = join(dir, 'home'); await mkdir(home);
-  await writeFile(join(home, 'credentials.json'), JSON.stringify({ server: 'https://app.joplo.app', accessToken: 'test-secret', user: { id: '1', email: 'a@example.com' }, createdAt: new Date().toISOString() }), { mode: 0o600 });
+  await writeFile(join(home, 'credentials.json'), JSON.stringify({ server: 'https://cloud.joplo.app', accessToken: 'test-secret', user: { id: '1', email: 'a@example.com' }, createdAt: new Date().toISOString() }), { mode: 0o600 });
   const result = await interruptAtReady(`
     import { runCli } from ${moduleUrl('cli.ts')};
     const keepAlive = setInterval(() => {}, 1000);
@@ -43,7 +43,7 @@ test('R8 真 SIGINT 清理已写入未 rename 的凭证 tmp，保留旧凭证', 
     syncBuiltinESMExports();
     const {writeCredentials} = await import(${moduleUrl('cloud.ts')});
     const keepAlive = setInterval(() => {}, 1000);
-    await writeCredentials(${JSON.stringify(home)}, {server:'https://app.joplo.app',accessToken:'test-secret',user:{id:'1',email:'a@example.com'},createdAt:new Date().toISOString()});
+    await writeCredentials(${JSON.stringify(home)}, {server:'https://cloud.joplo.app',accessToken:'test-secret',user:{id:'1',email:'a@example.com'},createdAt:new Date().toISOString()});
     clearInterval(keepAlive);
   `, dir);
   expect(await readdir(home)).toEqual(['credentials.json']); expect(await readFile(join(home, 'credentials.json'), 'utf8')).toBe('old credentials'); expect(result.code).toBe(130);

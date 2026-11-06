@@ -412,7 +412,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - npx joplo whoami --format json shows the account, plan, and limits; npx joplo logout signs out.
 - maxUploadBytes limits only newly uploaded cloud blobs. The CLI prechecks maxTotalBytes and maxFiles. TOO_LARGE details.kind distinguishes upload / total / files.
 - Credentials are stored only in JOPLO_HOME/credentials.json (default ~/.joplo). Never copy them into a project, print them, or commit them.
-- Cloud commands accept --server <url>, overriding JOPLO_CLOUD_URL; the default is https://app.joplo.app.
+- Cloud commands accept --server <url>, overriding JOPLO_CLOUD_URL; the default is https://cloud.joplo.app.
 - Local check / build / dev remain free and do not connect to the cloud.`,
 };
 

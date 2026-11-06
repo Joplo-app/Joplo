@@ -149,7 +149,7 @@ npx playwright install chromium
 CLI 和 skill 输出遵循 D57，统一使用英文；本文保留中文说明。云端命令的产品决策见 D58。
 
 只有 `login`、`logout`、`whoami`、`share` 连接云端；本地命令继续完整、免费。
-地址优先级：`--server <url>` → 非空 `JOPLO_CLOUD_URL` → `https://app.joplo.app`。空字符串等同未设置；协议/主机名及默认端口规范化后匹配凭证。地址必须是 HTTP(S) 源（不带路径、查询参数或用户名密码）。
+地址优先级：`--server <url>` → 非空 `JOPLO_CLOUD_URL` → `https://cloud.joplo.app`。空字符串等同未设置；协议/主机名及默认端口规范化后匹配凭证。地址必须是 HTTP(S) 源（不带路径、查询参数或用户名密码）。
 每个云端 API 请求携带 `X-Joplo-Client: joplo-cli/<版本>`；预签名文件 PUT 严格使用服务端返回的 headers，不附加账号令牌或版本头。
 凭证只适用于其记录的 server；切换服务器需要重新登录，不会把另一个服务器的令牌发送过去。
 
