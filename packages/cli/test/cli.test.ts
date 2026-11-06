@@ -11,7 +11,8 @@ async function temp(copy = true) {
   await symlink(resolve('node_modules'), join(base, 'node_modules'));
   await writeFile(join(base, 'package.json'), JSON.stringify({ type: 'module' }));
   const d = join(base, 'project');
-  if (copy) await cp('examples/invite', d, { recursive: true });
+  // 样板可能已在本地看板或云端使用过；测试副本不继承运行时状态、依赖或构建产物。
+  if (copy) await cp('examples/invite', d, { recursive: true, filter: (src) => !/[/\\](dist|node_modules|\.joplo)([/\\]|$)/.test(src) });
   else await mkdir(d);
   return d;
 }
