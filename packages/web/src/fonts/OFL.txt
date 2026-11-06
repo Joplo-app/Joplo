@@ -1,6 +1,5 @@
 Excalifont — Copyright (c) 2024 by Excalidraw (Your Own Font Foundry (Virgil); Ján Filípek / DizajnDesign (Excalifont, modifications)).
-Xiaolai SC（小赖字体）— Copyright © 2020 LXGW; designer: Nozomi Seto 瀬戸のぞみ.
-两者均以 SIL Open Font License 1.1 发布（依据：上游字体 name 表 license 字段，记录于 excalidraw/excalidraw 仓库 packages/excalidraw/fonts/{Excalifont,Xiaolai}/index.ts）。
+以 SIL Open Font License 1.1 发布（依据：上游字体 name 表 license 字段，记录于 excalidraw/excalidraw 仓库 packages/excalidraw/fonts/Excalifont/index.ts）。
 本仓库中的 woff2 为 Excalidraw 0.18.1 npm 包分发的子集版本，未再修改。
 
 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007

@@ -43,8 +43,10 @@ Joplo 六个发行包使用 Apache-2.0，包名为 `joplo`、`@joplo-app/kit`、
 
 ## 字体
 
-Excalifont 与 Xiaolai SC（小赖字体）使用 SIL OFL 1.1。woff2 子集来自 Excalidraw 0.18.1，版权与许可证在 [OFL.txt](../packages/web/src/fonts/OFL.txt)；构建后随 `@joplo-app/web` 的 dist/fonts/OFL.txt 分发。
+Excalifont 使用 SIL OFL 1.1，woff2 子集来自 Excalidraw 0.18.1，版权与许可证在 [OFL.txt](../packages/web/src/fonts/OFL.txt)。霞鹜漫黑（LXGW Marker Gothic v1.011）同样使用 SIL OFL 1.1，来自 lxgw GitHub Release，许可证在 [OFL-MarkerGothic.txt](../packages/web/src/fonts/OFL-MarkerGothic.txt)。这两种字体随 npm 包离线分发，约 80 KB + 2.1 MB；许可证在 dist/fonts/，发布站只带实际保留字体的许可证。
 
-霞鹜漫黑（LXGW Marker Gothic v1.011）与霞鹜文楷 GB 屏幕阅读版（LXGW WenKai GB Screen v1.530）使用 SIL OFL 1.1，来自 lxgw 的 GitHub Release；用 `packages/web/scripts/split-cjk-fonts.py` 按小赖的分片范围切成 woff2 子集（文楷的附加许可允许为网页使用而切分和转换）。许可证在 [OFL-MarkerGothic.txt](../packages/web/src/fonts/OFL-MarkerGothic.txt)、[OFL-WenKai.txt](../packages/web/src/fonts/OFL-WenKai.txt)，随 dist/fonts/ 分发。
+小赖字体与本地文楷子集已移除；罕用汉字、韩文由系统字体显示。`packages/web/scripts/split-cjk-fonts.py` 从 [cjk-ranges.json](../packages/web/scripts/cjk-ranges.json) 读取原来小赖的 205 条范围，顺序与内容原样保存，重切漫黑时分片及哈希不变。
+
+看板选中“文楷”后才通过 jsDelivr 加载官方 npm 包 [lxgw-wenkai-webfont@1.7.0/style.css](https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css)，实际字体名为 `LXGW WenKai`，许可证为 SIL OFL 1.1（由上游分发）。本包与发布站不再分发文楷字体或其许可证。离线或 CDN 失败时使用系统楷体；默认手写字体仍完全离线。
 
 依赖声明以根 [package.json](../package.json) 及 [kit](../packages/kit/package.json)、[core](../packages/core/package.json)、[cli](../packages/cli/package.json)、[server](../packages/server/package.json)、[web](../packages/web/package.json)、[入口包](../packages/joplo/package.json) 为准。许可证已核对本地安装包的元数据；升级时重新核对 package.json、锁文件和随包 LICENSE。

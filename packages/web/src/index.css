@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "./fonts/fonts.css";
 @import "./fonts/MarkerGothic.css";
-@import "./fonts/WenKai.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -183,8 +182,8 @@
   /* ---------- 舞台主题（D51）：只读 --jp-* 变量；默认值是手绘主题，具体主题由 renderer/themes.ts 注入 ---------- */
   .jstage,
   .jtheme {
-    --jp-font: "Joplo Excalifont", "Joplo Xiaolai", "PingFang SC", sans-serif;
-    --jp-font-mono: ui-monospace, SFMono-Regular, Menlo, "Joplo Xiaolai", monospace;
+    --jp-font: "Joplo Excalifont", "Joplo Marker Gothic", "PingFang SC", sans-serif;
+    --jp-font-mono: ui-monospace, SFMono-Regular, Menlo, "Joplo Marker Gothic", monospace;
     --jp-font-size: 16px;
     --jp-ink: #1e1e1e;
     --jp-bg: #ffffff;

@@ -181,7 +181,7 @@ export function createBoardPtBR(locale: Locale = 'pt-BR') {
       sansSerif: "Sem serifa",
       fontSample: "Aa 01",
       serif: "Com serifa",
-      wenKai: "WenKai",
+      wenKai: "WenKai (on-line)",
       monospace: "Monoespaçada",
       handDrawn: "À mão livre",
       straight: "Reto",

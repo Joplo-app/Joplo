@@ -1,6 +1,6 @@
 """
 把中文字体切成按需加载的 woff2 子集，并生成 @font-face（含 unicode-range）。
-沿用小赖（src/fonts/fonts.css 里 'Joplo Xiaolai'）现有的分片范围：页面只下载用到的那几片。
+使用 scripts/cjk-ranges.json 保存的原始分片范围（源自小赖）：保持顺序与范围不变。
 
 用法（fonttools 与 brotli 用 uv 临时提供）：
   uv run --with fonttools --with brotli python -I packages/web/scripts/split-cjk-fonts.py \
@@ -9,7 +9,7 @@
 """
 import hashlib
 import io
-import re
+import json
 import sys
 from pathlib import Path
 
@@ -18,9 +18,9 @@ from fontTools.ttLib import TTFont
 
 ttf, dirname, family = sys.argv[1], sys.argv[2], sys.argv[3]
 fonts_dir = Path(__file__).resolve().parent.parent / "src" / "fonts"
-ranges = re.findall(r"font-family:'Joplo Xiaolai';[^}]*?unicode-range:([^;}]+)", (fonts_dir / "fonts.css").read_text())
+ranges = json.loads((Path(__file__).resolve().parent / "cjk-ranges.json").read_text())
 if not ranges:
-    raise SystemExit("fonts.css 里没有找到小赖的 unicode-range")
+    raise SystemExit("cjk-ranges.json contains no unicode ranges")
 
 
 def codepoints(spec: str) -> list[int]:

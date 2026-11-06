@@ -6,12 +6,22 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+// @ts-expect-error release script is an untyped ESM module
+import { checkWebBudget, checkSiteBudget } from '../release.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const SCRIPT = path.join(ROOT, 'scripts/release.mjs');
 const PACKAGES = ['kit', 'core', 'server', 'web', 'cli', 'joplo'];
 const read = (f: string) => JSON.parse(fs.readFileSync(f, 'utf8'));
 const dirs: string[] = [];
+
+test('font size budgets fail with actionable size details', () => {
+  expect(() => checkWebBudget(6_000_000, [])).not.toThrow();
+  expect(() => checkWebBudget(6_000_001, [{ file: 'dist/app/assets/a.woff2', size: 6_000_001 }])).toThrow(/dist\/app\/assets/);
+  expect(() => checkSiteBudget([{ file: 'a.woff2', size: 1_500_000 }])).not.toThrow();
+  expect(() => checkSiteBudget([{ file: 'a.woff2', size: 1_500_001 }])).toThrow(/font/);
+  expect(() => checkSiteBudget(Array.from({ length: 151 }, (_, i) => ({ file: `${i}.txt`, size: 0 })))).toThrow(/151/);
+});
 afterEach(() => { for (const d of dirs.splice(0)) fs.rmSync(d, { recursive: true, force: true }); });
 
 function copyManifests() {

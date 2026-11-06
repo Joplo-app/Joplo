@@ -181,7 +181,7 @@ export function createBoardRu(locale: Locale = 'ru') {
       sansSerif: "Без засечек",
       fontSample: "Aa 01",
       serif: "С засечками",
-      wenKai: "WenKai",
+      wenKai: "WenKai (онлайн)",
       monospace: "Моноширинный",
       handDrawn: "От руки",
       straight: "Прямые",

@@ -181,7 +181,7 @@ export function createBoardJa(locale: Locale = 'ja') {
       sansSerif: "ゴシック体",
       fontSample: "Aa 01",
       serif: "明朝体",
-      wenKai: "WenKai",
+      wenKai: "WenKai（オンライン）",
       monospace: "等幅",
       handDrawn: "手描き",
       straight: "直線",

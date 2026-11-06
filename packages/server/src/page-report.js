@@ -70,10 +70,10 @@
   }
 
   // 4. 字体
-  // 主题用到手写字体时（--jp-font 含 Excalifont）检查它们已加载
-  if (/Excalifont|Xiaolai/.test(getComputedStyle(stage).fontFamily)) {
-    const text = stage.innerText || '中文';
-    if (!document.fonts.check('16px "Joplo Excalifont"', text) || !document.fonts.check('16px "Joplo Xiaolai"', text)) warnings.push('Fonts not loaded: Hand-drawn fonts (Excalifont / Xiaolai) are not ready; the screenshot may use fallback fonts');
+  // Check the selected stack, including author themes and system fallbacks.
+  const family = getComputedStyle(stage).fontFamily;
+  if (!document.fonts.check(`16px ${family}`, stage.innerText || 'Aa')) {
+    warnings.push('Fonts not loaded: The selected font is not ready; the screenshot may use fallback fonts');
   }
   const failed = Array.from(document.fonts).filter((f) => f.status === 'error');
   if (failed.length) warnings.push(`Fonts not loaded: ${failed.length} font files failed to load (${failed[0].family})`);

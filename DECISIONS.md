@@ -215,6 +215,12 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - `share` 必须登录，免费链接 1 小时有效；Pro 可获得永久链接，再次发布默认更新本项目记录的链接，`--new` 新建。
   - 使用浏览器设备授权登录，终端显示验证码供用户核对；SSH、非交互终端及 `--no-browser` 手动打开网址。
   - Agent 使用 `share --format json`；未登录的非交互调用返回 `AUTH_REQUIRED`、退出码 3，提示用户运行 `npx joplo login`。
+- D59 字体瘦身（2026-11-06，来源：用户 2026-11-06）：
+  - 发布站不再带文楷，不支持观众换字体（沿用 D55）；字体由 config 主题决定。默认仍是离线可用的 Excalifont + 霞鹜漫黑，静态目录保持自包含。
+  - source 与 npm dist 构建均在公共 staging 阶段扫描全部文本产物的码点（IR、全部语言的界面词典、HTML、作者 CSS content 等），只保留实际需要的字体分片和规则；解析不了一律保留。规则与文件一一对应，许可证随实际分发的字体保留。
+  - npm 包移除小赖和本地文楷；文楷仅在看板选中后通过 jsDelivr 加载官方 lxgw-wenkai-webfont@1.7.0/style.css（字体名 LXGW WenKai）。默认、打开字体菜单及悬停均不请求 CDN，发布站永远不加载。
+  - 退化：小赖去掉后，罕用汉字和韩文交给系统字体；发布站观众现打且产物没出现过的字也可退回系统字体；文楷离线或 CDN 失败时回退到 Kaiti SC / STKaiti / KaiTi / BiauKai / serif。图片、视频导出等待实际字体栈，最多 3 秒后使用回退字体继续。
+  - 原小赖的 205 条分片范围原样独立保存到 cjk-ranges.json，保证以后重切漫黑的分片与哈希不变。pack 预算：web tarball ≤ 6 MB；smoke 的 init 示例发布站字体 ≤ 1.5 MB、文件 ≤ 150（均按十进制字节计）。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

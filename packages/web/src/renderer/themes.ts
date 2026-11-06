@@ -44,8 +44,8 @@ export const THEME_VARS = [
   '--jp-stroke',
 ] as const;
 
-/** 手写：英文 Excalifont，中文霞鹜漫黑（D56 后续：小赖太细、小字不清楚）；漫黑缺的字再用小赖。 */
-const HAND = '"Joplo Excalifont", "Joplo Marker Gothic", "Joplo Xiaolai", "PingFang SC", sans-serif';
+/** 手写：英文 Excalifont，中文霞鹜漫黑；罕用汉字与韩文回退到系统字体（D59）。 */
+const HAND = '"Joplo Excalifont", "Joplo Marker Gothic", "PingFang SC", sans-serif';
 const SYSTEM = 'system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, "Joplo Marker Gothic", monospace';
 

@@ -206,6 +206,8 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 ## Write a theme
 - A theme is a CSS file at themes/<name>.css in the project root. Set theme: '<name>' in joplo.config.ts as the default. A custom theme overrides a built-in with the same name.
 - Built-ins: sketch (Hand-drawn, default), clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast. Preview them in the board Appearance popover.
+- Default handwriting uses offline Excalifont + Marker Gothic; rare Han and Korean use system fonts. Board WenKai loads online only when selected, falling back to system Kai offline. Exports wait up to 3 seconds.
+- Published sites use the config theme, subset fonts against all built text, and never load WenKai. Newly typed characters absent from the build may use system fonts.
 - Variables alone work and are scoped to the stage, leaving the board unaffected: --jp-font, --jp-font-mono, --jp-font-size, --jp-ink, --jp-bg, --jp-surface, --jp-subtle, --jp-muted, --jp-faint, --jp-line, --jp-line-strong, --jp-border, --jp-accent (highlight), --jp-select, --jp-info (Diagram active), --jp-ok, --jp-warn, --jp-danger, --jp-annot (annotations; defaults to danger), --jp-radius, --jp-shadow, --jp-stroke (rough hand-drawn / clean thin lines).
 - Ordinary selectors (.jbox, h1, etc.) also work within the stage. In dark themes, check contrast of --jp-info / --jp-ok / --jp-danger / --jp-accent against the background.
 - Example themes/brand.css:

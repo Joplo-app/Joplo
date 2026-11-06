@@ -24,9 +24,9 @@ test('dev 参数与日志输出', async () => {
   expect(r.code).toBe(0); expect(startDev).toHaveBeenCalledWith({ projectDir: resolve('project'), port: 12345, open: true, log: expect.any(Function) });
   expect(r.stdout).toContain('http://127.0.0.1:12345'); expect(r.stderr).toBe('服务日志\n');
 });
-test('build 参数', async () => {
+test.each(['--out-dir', '--out'])('build 参数 %s', async (flag) => {
   const buildSite = vi.fn(async () => ({ outDir: resolve('output'), files: ['index.html'], routes: ['/'], scenarios: [], diagnostics: [] }));
-  const r = await run(['build', 'project', '--out-dir', 'output', '--overwrite'], { buildSite });
+  const r = await run(['build', 'project', flag, 'output', '--overwrite'], { buildSite });
   expect(r.code).toBe(0); expect(buildSite).toHaveBeenCalledWith({ projectDir: resolve('project'), outDir: resolve('output'), overwrite: true });
 });
 test('render 参数', async () => {

@@ -16,7 +16,7 @@ const unchanged: Record<string, { locales: readonly Locale[]; reason: string; va
   "board.itemCount": { locales: ["zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Author value or numeric count only." },
   "board.markerGothic": { locales: ["zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Font family brand name." },
   "board.fontSample": { locales: ["zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Font sample glyphs, not interface copy." },
-  "board.wenKai": { locales: ["zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Font family brand name." },
+  "board.wenKai": { locales: ["de"], reason: "Font brand name with online, also the German word." },
   "board.diagnosticSeparator": { locales: ["ko", "es", "de", "pt-BR", "ru"], reason: "Semicolon is normal punctuation in these locales." },
   "board.labelPrefix": { locales: ["ko", "es", "de", "pt-BR", "ru"], reason: "Author label plus locale-appropriate punctuation." },
   "board.selectionSyncFailed": { locales: ["ko", "es", "de", "pt-BR", "ru"], reason: "Nested localized messages and author values, joined by punctuation." },
