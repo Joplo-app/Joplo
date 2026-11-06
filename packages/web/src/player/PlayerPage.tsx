@@ -19,7 +19,7 @@ import { Subtitle } from './Subtitle';
 import { isFullscreenKey, useFullscreen, useIdleVisible } from './fullscreen';
 import { subtitleFor } from './subtitle-content';
 import { SPEEDS, asSpeed } from '../runtime/pace';
-import { cameraFor, cameraPosition } from './cameraFor';
+import { cameraFor, cameraPosition, withLeadFrame } from './cameraFor';
 import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
 import { JoploLogo } from './JoploMark';
@@ -416,7 +416,8 @@ export function PlayerPage(p: PlayerPageProps) {
   const director = p.layer === null || plan.director;
   const { layers, viewLayer } = plan;
   const useCam = plan.enabled;
-  const camera = plan.spec;
+  // 用户操作的目标不在画面里时，控制器请求把它和当前焦点一起框进来（leadFrame），观众才看得到点击和输入
+  const camera = withLeadFrame(plan.spec, snap.leadFrame);
   const shownScene = state ? project.scenes[plan.sceneId ?? state.sceneId] : undefined;
   const device = shownScene?.viewport === 'mobile' ? 'mobile' : 'desktop';
   // 自由缩放：导演跟随时每一步由镜头重新接管；手动时保持，直到换层或点「适应」

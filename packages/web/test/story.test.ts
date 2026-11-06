@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { MIN_DWELL, STREAM_MAX, STREAM_MIN, STREAM_MS_PER_CHAR, stepDwell, streamMs } from '../src/runtime/pace';
 import { timelineChips } from '../src/player/layout';
+import { withLeadFrame } from '../src/player/cameraFor';
 
 describe('streamMs / stepDwell 的流式输出', () => {
   it('按字数计时，有上下限，随速度缩放；空文字为 0', () => {
@@ -26,5 +27,16 @@ describe('时间线：过渡卡的格子', () => {
     const chips = timelineChips([{ caption: '3 天后', kind: 'card' }, { caption: '点击发送', kind: 'user' }], 0, null);
     expect(chips[1]).toMatchObject({ card: true, system: false, tip: '1 · 过渡 · 3 天后' });
     expect('card' in chips[2]!).toBe(false);
+  });
+});
+
+describe('withLeadFrame：操作目标不在画面里时一起框进来', () => {
+  it('加到当前焦点之后并换 key（镜头重新测量）；目标已是焦点、没有镜头或没有请求时原样返回', () => {
+    const spec = { targets: ['plan'], key: 'xiaoyu|plan' };
+    expect(withLeadFrame(spec, 'share')).toEqual({ targets: ['plan', 'share'], key: 'xiaoyu|plan+share' });
+    expect(withLeadFrame({ targets: [], key: 'xiaoyu|' }, 'share')).toEqual({ targets: ['share'], key: 'xiaoyu|+share' });
+    expect(withLeadFrame(spec, 'plan')).toBe(spec);
+    expect(withLeadFrame(spec, null)).toBe(spec);
+    expect(withLeadFrame(null, 'share')).toBeNull();
   });
 });

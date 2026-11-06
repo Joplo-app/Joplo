@@ -69,6 +69,11 @@ export type Snapshot = {
    */
   leadLayer: string | null;
   /**
+   * 用户操作的目标此刻不在画面里（镜头推近在别处、在画面外或被滚动区遮住）时，先让镜头把它一起框进来，
+   * 再移动鼠标，保证观众看得到点击和输入；这一步提交后清空，之后由这一步自己的镜头决定。
+   */
+  leadFrame: string | null;
+  /**
    * 自动播放停在第 position 步（D55）：总共停 ms，开始公布时已过去 elapsed；时间线据此画进度（暂停时停住）。
    * 不在停留中（手动、执行动画中、停止后）为 null。
    */
@@ -95,6 +100,19 @@ export const TIMING = {
 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** 元素是否完整地在舞台里看得见：不超出舞台，也不被裁切它的祖先（滚动区等）遮住（留 2px 余量）。 */
+function fullyVisible(el: HTMLElement, root: HTMLElement): boolean {
+  const r = el.getBoundingClientRect();
+  if (r.width === 0 && r.height === 0) return false;
+  const inside = (c: DOMRect) => r.left >= c.left - 2 && r.top >= c.top - 2 && r.right <= c.right + 2 && r.bottom <= c.bottom + 2;
+  if (!inside(root.getBoundingClientRect())) return false;
+  for (let p = el.parentElement; p && p !== root; p = p.parentElement) {
+    const cs = getComputedStyle(p);
+    if ((cs.overflowX !== 'visible' || cs.overflowY !== 'visible') && !inside(p.getBoundingClientRect())) return false;
+  }
+  return true;
+}
 
 export class DemoController {
   private snap: Snapshot = {
@@ -123,6 +141,7 @@ export class DemoController {
     selectionSync: { status: 'idle' },
     epoch: 0,
     leadLayer: null,
+    leadFrame: null,
   };
   private listeners = new Set<() => void>();
   private gen = 0;
@@ -498,8 +517,8 @@ export class DemoController {
     const ws = this.cancelWaiters;
     this.cancelWaiters = [];
     ws.forEach((w) => w());
-    if (this.snap.playing || this.snap.busy || this.snap.preview || this.snap.systemEvent || this.snap.ripple || this.snap.activeStep !== null || this.snap.leadLayer)
-      this.set({ playing: false, paused: false, busy: false, dwell: null, preview: null, systemEvent: null, ripple: null, activeStep: null, leadLayer: null });
+    if (this.snap.playing || this.snap.busy || this.snap.preview || this.snap.systemEvent || this.snap.ripple || this.snap.activeStep !== null || this.snap.leadLayer || this.snap.leadFrame)
+      this.set({ playing: false, paused: false, busy: false, dwell: null, preview: null, systemEvent: null, ripple: null, activeStep: null, leadLayer: null, leadFrame: null });
   }
 
   // ---------- 点击 ----------
@@ -705,6 +724,7 @@ export class DemoController {
       if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.systemHold, gen))) return false;
     } else if ('target' in a) {
       if (!(await this.leadTo(sc, a.target, gen))) return false;
+      if (!(await this.frameTo(a.target, gen))) return false;
       if (reduced) {
         if (!(await this.wait(TIMING.reducedStep, gen))) return false;
       } else {
@@ -748,7 +768,7 @@ export class DemoController {
       const n = this.snap.notice;
       // 推进后，锚定在元素上的就地提示（禁用原因、未覆盖、越序）已过时，关闭它。
       this.committedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      this.set({ state: next, streamAt: stream && streamsOf(sc.steps[st.position]).length ? { position: next.position, speed: this.speed } : null, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
+      this.set({ leadFrame: null, state: next, streamAt: stream && streamsOf(sc.steps[st.position]).length ? { position: next.position, speed: this.speed } : null, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
       return true;
     } catch (e) {
       this.stop();
@@ -770,6 +790,19 @@ export class DemoController {
     const to = layersWithNode(p, sc.id, target)[0];
     if (!to || to === this.snap.leadLayer) return true;
     this.set({ leadLayer: to });
+    return this.wait(this.reducedMotion ? 0 : TIMING.layerSwitch, gen, true);
+  }
+
+  /**
+   * 操作目标不完整地在画面里时（被镜头推到画面外、被滚动区遮住），请求镜头把它一起框进来，等镜头到位。
+   * 用户自己缩放平移时不动（尊重用户的视图）；目标根本不在当前画面里时交给 leadTo / 不处理。
+   */
+  private async frameTo(target: string, gen: number): Promise<boolean> {
+    const root = this.stageEl;
+    if (!root || root.dataset.userZoom) return true;
+    const el = root.querySelector<HTMLElement>(`[data-jcontrol="${CSS.escape(target)}"]`) ?? root.querySelector<HTMLElement>(`[data-jid="${CSS.escape(target)}"]`);
+    if (!el || fullyVisible(el, root)) return true;
+    this.set({ leadFrame: target });
     return this.wait(this.reducedMotion ? 0 : TIMING.layerSwitch, gen, true);
   }
 
