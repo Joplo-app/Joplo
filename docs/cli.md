@@ -146,6 +146,8 @@ npx playwright install chromium
 
 ## 云端地址与凭证
 
+CLI 和 skill 输出遵循 D57，统一使用英文；本文保留中文说明。云端命令的产品决策见 D58。
+
 只有 `login`、`logout`、`whoami`、`share` 连接云端；本地命令继续完整、免费。
 地址优先级：`--server <url>` → 非空 `JOPLO_CLOUD_URL` → `https://app.joplo.app`。空字符串等同未设置；协议/主机名及默认端口规范化后匹配凭证。地址必须是 HTTP(S) 源（不带路径、查询参数或用户名密码）。
 每个云端 API 请求携带 `X-Joplo-Client: joplo-cli/<版本>`；预签名文件 PUT 严格使用服务端返回的 headers，不附加账号令牌或版本头。
@@ -167,7 +169,7 @@ CLI 按服务器指定间隔轮询（缺省 5 秒，最小 1 秒；协议间隔�
 登录成功后保存 `{server, accessToken, user: {id, email}, createdAt}`；text 标准输出只显示账号；JSON 的 data 为 `{server, user: {id, email}, createdAt}`，不包含令牌，验证码和进度仍写 stderr。
 
 重新登录：先保存新凭证，再向旧凭证自己的服务器尽力 sign-out 旧 token，失败只警告，绝不把旧 token 发给新服务器。新凭证写入失败时保留原文件，只撤销新签发的 token。
-跨服务器替换：交互终端先询问“将替换 <旧服务器> 的登录，继续吗？”；EOF 按“否”处理，Ctrl+C 取消登录并退出 2，不留下未完成的 question。显式 login 在非交互环境返回 USAGE（退出 2），提示“请在自己的终端里运行 joplo login --server <目标服务器> 并确认替换”，不要求先 logout。
+跨服务器替换：交互终端先询问“Replace the login for <旧服务器>. Continue?”；EOF 按“否”处理，Ctrl+C 取消登录并退出 2，不留下未完成的 question。显式 login 在非交互环境返回 USAGE（退出 2），提示“Run joplo login --server <目标服务器> in your own terminal and confirm replacement”，不要求先 logout。
 非交互 share 若凭证属于其他服务器，返回 AUTH_REQUIRED（退出 3），details 为 `{fix: "npx joplo login --server <目标服务器>", credentialServer: "<旧服务器>"}`；Agent 应请用户自己登录，不要替用户运行 logout。
 
 CI 只有值非空且不是 `0` / `false`（不区分大小写）时才生效；JOPLO_NONINTERACTIVE=1 始终生效。
@@ -183,7 +185,7 @@ CI 只有值非空且不是 `0` / `false`（不区分大小写）时才生效；
 npx joplo whoami --format json
 ```
 
-读取云端当前账号、套餐及限额，不以本地缓存推断套餐。JSON 沿用结果信封，`data` 为 `{user: {id, email, name}, plan, limits: {maxUploadBytes, maxTotalBytes, maxFiles, publishesPerHour}}`；服务端 publishesPerHour 返回数字（Pro 为 120）。CLI 兼容旧服务返回 null，显示“服务器未提供”，不据此推断额度。
+读取云端当前账号、套餐及限额，不以本地缓存推断套餐。JSON 沿用结果信封，`data` 为 `{user: {id, email, name}, plan, limits: {maxUploadBytes, maxTotalBytes, maxFiles, publishesPerHour}}`；服务端 publishesPerHour 返回数字（Pro 为 120）。CLI 兼容旧服务返回 null，显示“Not provided by the server”，不据此推断额度。
 
 ## share
 
@@ -193,7 +195,7 @@ npx joplo share examples/invite --title '邀请流程' --format json
 npx joplo share --new
 ```
 
-- 未登录：交互终端显示“分享需要登录 Joplo 账号（免费）”，直接进入浏览器登录，完成后继续发布；非交互环境（包含 --format json、有效 CI 环境变量、JOPLO_NONINTERACTIVE=1）立即返回 AUTH_REQUIRED（退出 3），提示用户运行 `npx joplo login`。
+- 未登录：交互终端显示“Sharing requires a free Joplo account”，直接进入浏览器登录，完成后继续发布；非交互环境（包含 --format json、有效 CI 环境变量、JOPLO_NONINTERACTIVE=1）立即返回 AUTH_REQUIRED（退出 3），提示用户运行 `npx joplo login`。
 - 先 check，再复用 build 构建到临时目录；结束时清理临时产物，不改项目 dist。检查或构建有 error 时不上传。
 - 只接受 HTML、CSS、JS/MJS、JSON、PNG/JPEG/GIF/WebP/SVG、WOFF/WOFF2/TTF；路径必须安全。其他类型会在上传前列出并拒绝。
 - 默认标题是项目名；`--title` 接受 1–200 个字符。套餐和限额实时读取服务器。
@@ -201,7 +203,7 @@ npx joplo share --new
 - CLI 本地只预检清单总量和文件数；新上传量由服务端按已有 blob 去重后判断，不能拿清单总量与新上传限额比较。共用字体和运行时资源可由运维预置。
 - Pro 且 `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接；`--new` 新建。免费账号每次新建。
 - 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；一个对象失败会取消其他在途 PUT 和重试等待；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
-- finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“未能保存分享记录，下次发布不会更新这次的链接”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/billing`。
+- finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/billing`。
 
 JSON 成功的 `data` 为 `{shareId, url, expiresAt, version}`，`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
 

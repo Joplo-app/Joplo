@@ -399,21 +399,21 @@ Use your own Wrangler environment and account in the project directory:
 
 \`npx wrangler deploy --assets dist\`
 Provide the site name and compatibility date through Wrangler project configuration. Handle access control in deployment.
-只部署 dist 产物，不上传作者源文件。MCP、评论与协作另行规划。
+Deploy only dist output, not author source files. MCP, comments, and collaboration are planned separately.
 
-## 云端分享
-- 用户运行 npx joplo login，在浏览器核对验证码并确认授权；SSH / 无浏览器时用 --no-browser 手动打开网址。
-- Agent 发布用 npx joplo share --format json；share 自动 check、build，只上传发布产物。
-- AUTH_REQUIRED 退出 3：请用户在自己的终端运行 npx joplo login，完成后再重试 share；Agent 不代替用户授权。
-- Agent 遇到 AUTH_REQUIRED 时请用户自己登录，不要替用户运行 \`joplo logout\`。
-- AUTH_EXPIRED 也退出 3：同样请用户重新 login。其他错误读取 error.code / message / details。
-- 免费链接 1 小时有效，具体时刻读取 data.expiresAt；Pro 永久链接的 expiresAt 为 null。
-- Pro 再次 share 自动更新 .joplo/cloud.json 记录的同服务器链接；--new 新建，--title 设置标题。
-- npx joplo whoami --format json 查看账号、套餐和限额；npx joplo logout 退出登录。
-- maxUploadBytes 只限制云端缺失对象的新上传量；CLI 只预检 maxTotalBytes 和 maxFiles。TOO_LARGE 的 details.kind 区分 upload / total / files（新增上传量 / 清单总量 / 文件数）。
-- 凭证只保存在 JOPLO_HOME/credentials.json（默认 ~/.joplo），不得复制进项目、输出或提交 Git。
-- 云端命令支持 --server <url>，覆盖 JOPLO_CLOUD_URL；默认 https://app.joplo.app。
-- 本地 check / build / dev 保持免费，不连接云端。`,
+## Cloud sharing
+- Run npx joplo login and verify the code in your browser before authorizing. Use --no-browser to open the URL manually over SSH or without a local browser.
+- Agents publish with npx joplo share --format json. It checks, builds, and uploads only the published output.
+- AUTH_REQUIRED exits 3: ask the user to run npx joplo login in their own terminal, then retry share. Agents must not authorize on their behalf.
+- On AUTH_REQUIRED, ask the user to sign in. Do not run \`joplo logout\` on the user's behalf.
+- AUTH_EXPIRED also exits 3: ask the user to sign in again. Read error.code / message / details for other failures.
+- Free links expire after 1 hour; read data.expiresAt for the exact time. Pro permanent links have expiresAt: null.
+- Pro share updates the same-server link in .joplo/cloud.json; --new creates another link and --title sets its title.
+- npx joplo whoami --format json shows the account, plan, and limits; npx joplo logout signs out.
+- maxUploadBytes limits only newly uploaded cloud blobs. The CLI prechecks maxTotalBytes and maxFiles. TOO_LARGE details.kind distinguishes upload / total / files.
+- Credentials are stored only in JOPLO_HOME/credentials.json (default ~/.joplo). Never copy them into a project, print them, or commit them.
+- Cloud commands accept --server <url>, overriding JOPLO_CLOUD_URL; the default is https://app.joplo.app.
+- Local check / build / dev remain free and do not connect to the cloud.`,
 };
 
 function distance(a: string, b: string): number {

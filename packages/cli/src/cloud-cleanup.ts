@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 const pending = new Map<string, boolean>();
 function interrupt() {
   for (const [path, recursive] of pending) {
-    try { rmSync(path, { recursive, force: true }); } catch { process.stderr.write('未能清理云端临时文件，请检查本地文件权限。\n'); }
+    try { rmSync(path, { recursive, force: true }); } catch { process.stderr.write('Could not clean up cloud temporary files. Check local file permissions.\n'); }
   }
   process.exit(130);
 }

@@ -61,12 +61,12 @@ test.each(['EOF', 'SIGINT'])('F4 确认提示收到 %s 时取消登录，退出 
   child.stdout.on('data', chunk => stdout += chunk);
   child.stderr.on('data', chunk => {
     stderr += chunk;
-    if (!answered && stderr.includes('继续吗？')) { answered = true; if (mode === 'EOF') child.stdin.end(); else child.kill('SIGINT'); }
+    if (!answered && stderr.includes('Continue?')) { answered = true; if (mode === 'EOF') child.stdin.end(); else child.kill('SIGINT'); }
   });
   const timeout = setTimeout(() => child.kill('SIGKILL'), 5000);
   try {
     const code = await new Promise<number | null>((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
-    expect(answered, stderr).toBe(true); expect(code, stdout + stderr).toBe(2); expect(stdout).toContain('已取消登录'); expect(stderr).not.toMatch(/unsettled top-level await/i);
+    expect(answered, stderr).toBe(true); expect(code, stdout + stderr).toBe(2); expect(stdout).toContain('Login cancelled'); expect(stderr).not.toMatch(/unsettled top-level await/i);
     expect(await readFile(join(home, 'credentials.json'), 'utf8')).toBe(credentials);
   } finally { clearTimeout(timeout); if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); }
 }, 10000);

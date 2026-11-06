@@ -146,11 +146,11 @@ test.each(['noninteractive', 'ssh', 'no-browser'])('login %s 从不打开浏览�
   expect(r.code).toBe(0); expect(browser).not.toHaveBeenCalled();
 });
 test.each(['expired_token', 'access_denied', 'invalid_grant'])('login %s 受控失败，无凭证', async error => {
-  deviceErrors = [error]; const r = await cli(['login']); expect(r.code).toBe(error === 'access_denied' ? 1 : 3); expect(r.stdout).toMatch(/重新|拒绝/); await expect(stat(join(home, 'credentials.json'))).rejects.toThrow();
+  deviceErrors = [error]; const r = await cli(['login']); expect(r.code).toBe(error === 'access_denied' ? 1 : 3); expect(r.stdout).toMatch(/again|denied/); await expect(stat(join(home, 'credentials.json'))).rejects.toThrow();
 });
 test('本地授权期限耗尽停止轮询', async () => { expires = 1; deviceErrors = ['authorization_pending']; const r = await cli(['login']); expect(r.code).toBe(3); expect(calls.filter(c => c.path.endsWith('/token')).length).toBeLessThanOrEqual(1); });
 test.each(['{bad', '{}', '{"accessToken":"secret-access-token-NEVER-PRINT"}'])('损坏或缺字段凭证视为未登录并提示重登：%s', async data => {
-  await mkdir(home); await writeFile(join(home, 'credentials.json'), data); const r = await cli(['whoami', '--format=json']); expect(r.code).toBe(3); expect(r.stderr).toContain('重新'); expect(calls).toEqual([]);
+  await mkdir(home); await writeFile(join(home, 'credentials.json'), data); const r = await cli(['whoami', '--format=json']); expect(r.code).toBe(3); expect(r.stderr).toContain('again'); expect(calls).toEqual([]);
 });
 test('whoami 仅返回账号、套餐、限额；401 指向重新 login', async () => {
   await credentials(); let r = await cli(['whoami', '--format', 'json']); expect(r.code).toBe(0); expect(r.json().data).toEqual({ user, plan, limits });
@@ -218,7 +218,7 @@ test('原子写凭证：rename 前原文件保持完整，临时文件为 0600�
 });
 test('方案 A URL 集中选择；打开命令不可用时提示手动登录，仍可完成', async () => {
   expect(browserLoginUrl({ verification_uri: base + '/device', verification_uri_complete: base + '/device?user_code=ABCD' })).toBe(base + '/device?user_code=ABCD');
-  browser.mockResolvedValueOnce(false); const r = await cli(['login'], { interactive: true }); expect(r.code).toBe(0); expect(r.stderr).toContain('手动');
+  browser.mockResolvedValueOnce(false); const r = await cli(['login'], { interactive: true }); expect(r.code).toBe(0); expect(r.stderr).toContain('manually');
   const oldPath = process.env.PATH; process.env.PATH = '';
   try { expect(await openBrowser(base + '/device', 'linux')).toBe(false); } finally { process.env.PATH = oldPath; }
 });
@@ -250,13 +250,13 @@ test('无效服务器 URL 不回显 URL 中的秘密，也不联网', async () =
 });
 
 test('logout 仅 bearer + 空对象调用 sign-out，成功后删除凭证', async () => {
-  await credentials(); const r = await cli(['logout']); expect(r.code, r.stdout).toBe(0); expect(r.stdout).toContain('已退出登录');
+  await credentials(); const r = await cli(['logout']); expect(r.code, r.stdout).toBe(0); expect(r.stdout).toContain('Signed out');
   expect(calls).toHaveLength(1); expect(calls[0]).toMatchObject({ method: 'POST', path: '/api/auth/sign-out', body: {}, headers: { authorization: `Bearer ${token}`, 'x-joplo-client': 'joplo-cli/0.1.3' } });
   await expect(stat(join(home, 'credentials.json'))).rejects.toThrow();
 });
 test.each(['network', '401', '503'])('logout %s 失败仅警告，仍删除本地凭证', async failure => {
   await credentials(); fail = { path: '/api/auth/sign-out', ...(failure === 'network' ? { disconnect: 1 } : { status: Number(failure) }) };
-  const r = await cli(['logout']); expect(r.code).toBe(0); expect(r.stderr).toContain('未能'); await expect(stat(join(home, 'credentials.json'))).rejects.toThrow();
+  const r = await cli(['logout']); expect(r.code).toBe(0); expect(r.stderr).toContain('Could not'); await expect(stat(join(home, 'credentials.json'))).rejects.toThrow();
 });
 test('logout 无凭证可重复执行，损坏凭证也可清除，不联网', async () => {
   expect((await cli(['logout'])).code).toBe(0); await mkdir(home); await writeFile(join(home, 'credentials.json'), '{broken');
@@ -264,7 +264,7 @@ test('logout 无凭证可重复执行，损坏凭证也可清除，不联网', a
 });
 test('logout 不向其他服务器发送令牌或删除它的凭证', async () => {
   await credentials('https://other.example'); const previous = await readFile(join(home, 'credentials.json'), 'utf8');
-  const r = await cli(['logout']); expect(r.code).toBe(2); expect(r.stdout).not.toContain('已退出登录'); expect(calls).toEqual([]); expect(await readFile(join(home, 'credentials.json'), 'utf8')).toBe(previous);
+  const r = await cli(['logout']); expect(r.code).toBe(2); expect(r.stdout).not.toContain('Signed out'); expect(calls).toEqual([]); expect(await readFile(join(home, 'credentials.json'), 'utf8')).toBe(previous);
 });
 test('本地只检查总量和文件数；总量大于新上传限额时仍请求创建', async () => {
   await credentials(); limits.maxUploadBytes = 7; missingCount = 1;
@@ -273,20 +273,20 @@ test('本地只检查总量和文件数；总量大于新上传限额时仍请�
 test.each(['bytes', 'files'])('本地预检清单 %s 上限，TOO_LARGE kind=total，不创建分享', async dimension => {
   await credentials(); if (dimension === 'bytes') limits.maxTotalBytes = 22; else limits.maxFiles = 1;
   const r = await cli(['share', project, '--format=json']); expect(r.json().error).toMatchObject({ code: 'TOO_LARGE', details: { kind: dimension === 'files' ? 'files' : 'total', maxBytes: limits.maxTotalBytes, actualBytes: 23, maxFiles: limits.maxFiles, actualFiles: 2 } });
-  expect(r.json().error.message).toContain(dimension === 'files' ? '文件数' : '清单总量'); expect(calls.map(c => c.path)).toEqual(['/api/v1/me']);
+  expect(r.json().error.message).toContain(dimension === 'files' ? 'File count' : 'Manifest total'); expect(calls.map(c => c.path)).toEqual(['/api/v1/me']);
 });
 test('服务端按缺失对象总量拒绝，显示 upload 限额和缺失的大文件', async () => {
   await credentials(); limits.maxUploadBytes = 5;
   const r = await cli(['share', project, '--format=json']); expect(r.json().error).toMatchObject({ code: 'TOO_LARGE', details: { kind: 'upload', maxBytes: 5, actualBytes: 6, largestFiles: [{ path: 'assets/site.css', size: 6 }] } });
-  expect(r.json().error.message).toContain('本次新增上传'); expect(calls.filter(c => c.method === 'PUT')).toHaveLength(0);
+  expect(r.json().error.message).toContain('New upload'); expect(calls.filter(c => c.method === 'PUT')).toHaveLength(0);
 });
 test.each(['upload', 'total'])('服务端 TOO_LARGE kind=%s 只透传安全字段，不覆盖成客户端清单值', async kind => {
   await credentials(); fail = { path: '/api/v1/shares', status: 413, code: 'TOO_LARGE', details: { kind, maxBytes: 10, actualBytes: 12, largestFiles: [{ path: 'assets/demo.png', size: 12, token }], token } };
   const r = await cli(['share', project, '--format=json']); expect(r.json().error.details).toEqual({ kind, maxBytes: 10, actualBytes: 12, largestFiles: [{ path: 'assets/demo.png', size: 12 }] });
-  expect(r.json().error.message).toContain(kind === 'upload' ? '本次新增上传' : '清单总量');
+  expect(r.json().error.message).toContain(kind === 'upload' ? 'New upload' : 'Manifest total');
 });
 test('whoami text 同时显示新上传量与清单总量，Pro 使用新 100 MiB 限额', async () => {
-  plan = 'pro'; await credentials(); const r = await cli(['whoami']); expect(r.stdout).toContain('104857600'); expect(r.stdout).toContain('268435456'); expect(r.stdout).toContain('新增上传'); expect(r.stdout).toContain('清单总量');
+  plan = 'pro'; await credentials(); const r = await cli(['whoami']); expect(r.stdout).toContain('104857600'); expect(r.stdout).toContain('268435456'); expect(r.stdout).toContain('New upload'); expect(r.stdout).toContain('Manifest total');
 });
 
 test('PUT 的显式 headers 与创建响应完全相同，不补充或修改任何字段', async () => {
@@ -355,7 +355,7 @@ test.each([[400, 'NETWORK', 'BAD_REQUEST', 1], [403, 'AUTH_REQUIRED', 'FORBIDDEN
 test.each([400, 401, 403, 413, 429])('R6 PUT %s 永不重试', async status => {
   await credentials(); putStatus = status; const r = await cli(['share', project]); expect(r.code).toBe(1); expect(calls.filter(c => c.method === 'PUT')).toHaveLength(1); expect(waits).toEqual([]);
 });
-test.each([['publishes', '每小时发布次数'], ['reserved_bytes', '每小时预留字节'], ['unknown', '云端额度']] as const)('R7 429 kind=%s 说明限制并显示 retryAt', async (kind, label) => {
+test.each([['publishes', 'Hourly publications'], ['reserved_bytes', 'Hourly reserved bytes'], ['unknown', 'Cloud quota']] as const)('R7 429 kind=%s 说明限制并显示 retryAt', async (kind, label) => {
   await credentials(); fail = { path: '/api/v1/shares', status: 429, details: { kind, retryAt: '2026-11-05T19:00:00.000Z', limit: 30, actual: 31, token } };
   const r = await cli(['share', project, '--format=json']); expect(r.json().error.message).toContain(label); expect(r.json().error.message).toContain('2026-11-05T19:00:00.000Z'); expect(r.json().error.details.retryAt).toBe('2026-11-05T19:00:00.000Z');
 });
@@ -369,7 +369,7 @@ test('R9 空 JOPLO_CLOUD_URL 等同未设置', () => {
 test('R10 文档记录新重试、配额语义和公开决策来源', async () => {
   const doc = await readFile('docs/cli.md', 'utf8'), decisions = await readFile('DECISIONS.md', 'utf8');
   expect(doc).toContain('网络错误和 5xx 最多重试 3 次'); expect(doc).toMatch(/QUOTA_EXCEEDED[^\n]*预留字节[^\n]*重试时间/); expect(doc).not.toMatch(/\b(?:20|100|256) MB\b/);
-  expect(decisions.match(/- D57[^\n]*/)?.[0]).not.toMatch(/C9|C10|joplo-cloud/);
+  expect(decisions.match(/- D58[^\n]*/)?.[0]).not.toMatch(/C9|C10|joplo-cloud/);
 });
 test('R11 读取已有 0644 凭证时收紧到 0600，并匹配规范化 --server', async () => {
   await credentials('https://app.joplo.app'); await fs.chmod(join(home, 'credentials.json'), 0o644);
@@ -392,15 +392,15 @@ test('F2 协议间隔 60 秒不被错误退避上限截断', async () => {
 
 test('A1 服务端 files 变体保留统一字节字段与文件数，文案区分文件数超限', async () => {
   await credentials(); fail = { path: '/api/v1/shares', status: 413, code: 'TOO_LARGE', details: { kind: 'files', maxBytes: 268435456, actualBytes: 23, maxFiles: 1, actualFiles: 2, largestFiles: [{ path: 'index.html', size: 17 }] } };
-  const r = await cli(['share', project, '--format=json']); expect(r.json().error.details).toEqual(fail.details); expect(r.json().error.message).toContain('文件数'); expect(r.json().error.message).toContain('index.html');
+  const r = await cli(['share', project, '--format=json']); expect(r.json().error.details).toEqual(fail.details); expect(r.json().error.message).toContain('File count'); expect(r.json().error.message).toContain('index.html');
   expect(await readFile('docs/cli.md', 'utf8')).toContain('`files`'); expect((await cli(['skill', 'publish'])).stdout).toContain('upload / total / files');
 });
 test.each([['FORBIDDEN', 'ACCOUNT_UNAVAILABLE'], ['OTHER', 'FORBIDDEN'], ['PLAN_REQUIRED', 'PLAN_REQUIRED']] as const)('A2 403 code=%s 区分账号不可用、普通禁止、付费限制', async (code, expected) => {
   await credentials(); fail = { path: '/api/v1/shares', status: 403, code }; const r = await cli(['share', project, '--format=json']); expect(r.json().error.code).toBe(expected);
-  if (code !== 'PLAN_REQUIRED') expect(r.stdout).not.toContain('billing'); if (code === 'FORBIDDEN') expect(r.stdout).toContain('这个账号目前不能发布分享，请登录网页查看账号状态');
+  if (code !== 'PLAN_REQUIRED') expect(r.stdout).not.toContain('billing'); if (code === 'FORBIDDEN') expect(r.stdout).toContain('This account cannot publish shares right now. Sign in on the website to check its status');
 });
 test('A3 409 表示正在发布或准备失败，提示重新 share 且不重试', async () => {
-  await credentials(); fail = { path: '/api/v1/shares', status: 409, code: 'CONFLICT' }; const r = await cli(['share', project]); expect(r.stdout).toContain('有另一个发布正在进行或上传准备失败，请稍后重新运行 joplo share'); expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
+  await credentials(); fail = { path: '/api/v1/shares', status: 409, code: 'CONFLICT' }; const r = await cli(['share', project]); expect(r.stdout).toContain('Another publication is in progress or upload preparation failed. Run joplo share again later'); expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
 });
 test.each(['create', 'finalize', 'put'])('A4 %s 的 503 SERVICE_UNAVAILABLE 按 Retry-After 重试', async phase => {
   await credentials(); const path = phase === 'create' ? '/api/v1/shares' : phase === 'finalize' ? '/api/v1/shares/Abc1234567/finalize' : '/blob/' + createHash('sha256').update(files['assets/site.css']!).digest('hex');
@@ -425,7 +425,7 @@ test('B2 同服务器重新登录先写新凭证再撤销旧 token', async () =>
 });
 test.each(['login', 'share'])('B2 %s 交互切换服务器必须确认，拒绝时保留凭证且不联网', async command => {
   await credentials('https://other.example', oldToken); confirm.mockResolvedValueOnce(false);
-  const r = await cli([command, ...(command === 'share' ? [project] : [])], { interactive: true }); expect(r.code).not.toBe(0); expect(confirm).toHaveBeenCalledWith('将替换 https://other.example 的登录，继续吗？'); expect(calls).toEqual([]); expect(JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).accessToken).toBe(oldToken);
+  const r = await cli([command, ...(command === 'share' ? [project] : [])], { interactive: true }); expect(r.code).not.toBe(0); expect(confirm).toHaveBeenCalledWith('Replace the login for https://other.example. Continue?'); expect(calls).toEqual([]); expect(JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).accessToken).toBe(oldToken);
 });
 test.each(['login', 'share'])('F1 %s 非交互切换服务器引导用户确认登录，不提示 logout', async command => {
   await credentials('https://other.example', oldToken); const r = await cli([command, ...(command === 'share' ? [project] : [])]); expect(r.code).toBe(command === 'share' ? 3 : 2); expect(r.stdout).toContain('joplo login --server ' + base); expect(r.stdout).not.toContain('logout'); expect(calls).toEqual([]); expect(confirm).not.toHaveBeenCalled();
@@ -433,22 +433,22 @@ test.each(['login', 'share'])('F1 %s 非交互切换服务器引导用户确认�
 test('B3 0600 不 chmod；宽权限 chmod EROFS 只警告仍可 whoami/share', async () => {
   await credentials(); const chmod = vi.mocked(fs.chmod).mockClear(); expect((await cli(['whoami'])).code).toBe(0); expect(chmod).not.toHaveBeenCalled();
   await fs.chmod(join(home, 'credentials.json'), 0o644); chmod.mockRejectedValueOnce(Object.assign(new Error('read only'), { code: 'EROFS' }));
-  const r = await cli(['whoami']); expect(r.code).toBe(0); expect(r.stderr).toContain('权限');
+  const r = await cli(['whoami']); expect(r.code).toBe(0); expect(r.stderr).toContain('permissions');
   chmod.mockRejectedValueOnce(Object.assign(new Error('read only'), { code: 'EROFS' })); expect((await cli(['share', project])).code).toBe(0);
 });
 test('B4 finalize 成功后 cloud.json 写入失败仍输出链接和成功信封', async () => {
   await credentials(); const rename = vi.mocked(fs.rename); rename.mockRejectedValueOnce(Object.assign(new Error('read only'), { code: 'EROFS' }));
-  const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(0); expect(r.json().ok).toBe(true); expect(r.json().data.url).toContain('/s/Abc1234567/'); expect(r.stderr).toContain('未能保存分享记录');
+  const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(0); expect(r.json().ok).toBe(true); expect(r.json().data.url).toContain('/s/Abc1234567/'); expect(r.stderr).toContain('Could not save the share record');
 });
 test('B5 PUT 最多四路并发；B11 显式携带 content-length 且完成后无 SIGINT 监听器', async () => {
   await credentials(); for (let i = 0; i < 9; i++) files[`assets/${i}.css`] = 'body' + i; missingCount = 99; putHold = 35;
   expect((await cli(['share', project])).code).toBe(0); expect(maxActivePuts).toBe(4); for (const put of calls.filter(c => c.method === 'PUT')) expect(Number(put.headers['content-length'])).toBe(Buffer.byteLength(put.body));
 });
 test('B5 预签名 PUT 403 提示链接已过期且不重试', async () => {
-  await credentials(); putStatus = 403; const r = await cli(['share', project]); expect(r.stdout).toContain('上传链接已过期，请重新运行 joplo share'); expect(calls.filter(c => c.method === 'PUT')).toHaveLength(1);
+  await credentials(); putStatus = 403; const r = await cli(['share', project]); expect(r.stdout).toContain('The upload URL has expired. Run joplo share again'); expect(calls.filter(c => c.method === 'PUT')).toHaveLength(1);
 });
 test('B6 device/code 429 是 RATE_LIMITED 而非分享配额错误', async () => {
-  fail = { path: '/api/auth/device/code', status: 429 }; const r = await cli(['login']); expect(r.stdout).toContain('RATE_LIMITED'); expect(r.stdout).toContain('登录请求过于频繁，请稍后再试'); expect(r.stdout).not.toContain('QUOTA_EXCEEDED');
+  fail = { path: '/api/auth/device/code', status: 429 }; const r = await cli(['login']); expect(r.stdout).toContain('RATE_LIMITED'); expect(r.stdout).toContain('Too many login requests. Try again later'); expect(r.stdout).not.toContain('QUOTA_EXCEEDED');
 });
 test('B7 login --format json 在非 TTY 仍显示验证码并轮询，JSON 不含 token', async () => {
   const r = await cli(['login', '--format=json']); expect(r.code).toBe(0); expect(r.json()).toMatchObject({ ok: true, data: { user: { id: user.id, email: user.email } } }); expect(r.stderr).toContain('ABCD-EFGH'); expect(browser).not.toHaveBeenCalled();
@@ -477,7 +477,7 @@ test('B2 确认跨服务器后才开始设备授权并替换凭证', async () =>
 });
 test('B2 旧会话撤销失败只警告，新凭证仍有效', async () => {
   await credentials(base, oldToken); fail = { path: '/api/auth/sign-out', status: 503 };
-  const r = await cli(['login']); expect(r.code).toBe(0); expect(r.stderr).toContain('旧会话'); expect(JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).accessToken).toBe(token);
+  const r = await cli(['login']); expect(r.code).toBe(0); expect(r.stderr).toContain('old session'); expect(JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).accessToken).toBe(token);
 });
 test('B5/B11 并发失败等待在途任务结束，停止启动新对象且移除 SIGINT 监听器', async () => {
   await credentials(); for (let i = 0; i < 9; i++) files[`assets/${i}.css`] = 'body' + i; missingCount = 99; putHold = 35; putStatus = 403;
@@ -489,12 +489,12 @@ test('A4 Retry-After 支持 HTTP 日期，不按指数退避覆盖它', async ()
 });
 test('A5 兼容旧 me 的 null，但不把它显示为不限', async () => {
   await credentials(); responses.set('/api/v1/me', { user, plan, limits: { ...limits, publishesPerHour: null } });
-  const r = await cli(['whoami']); expect(r.code).toBe(0); expect(r.stdout).toContain('服务器未提供'); expect(r.stdout).not.toContain('不限');
+  const r = await cli(['whoami']); expect(r.code).toBe(0); expect(r.stdout).toContain('Not provided by the server'); expect(r.stdout).not.toContain('Unlimited');
 });
 
 test('B2 旧 sign-out 未确认 success 时警告，但新登录保持成功', async () => {
   await credentials(base, oldToken); responses.set('/api/auth/sign-out', { success: false });
-  const r = await cli(['login']); expect(r.code).toBe(0); expect(r.stderr).toContain('旧会话'); expect(JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).accessToken).toBe(token);
+  const r = await cli(['login']); expect(r.code).toBe(0); expect(r.stderr).toContain('old session'); expect(JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).accessToken).toBe(token);
 });
 
 test('F1 跨服务器非交互 share 返回带目标登录命令及 credentialServer 的 AUTH_REQUIRED', async () => {
@@ -502,7 +502,7 @@ test('F1 跨服务器非交互 share 返回带目标登录命令及 credentialSe
   const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(3);
   expect(r.json().error).toMatchObject({ code: 'AUTH_REQUIRED', details: { fix: `npx joplo login --server ${base}`, credentialServer: previousBase } });
   expect(r.stdout).not.toContain('logout'); expect(calls).toEqual([]); expect(previousCalls).toEqual([]); expect(await readFile(join(home, 'credentials.json'), 'utf8')).toBe(before);
-  expect((await cli(['skill', 'publish'])).stdout).toContain('不要替用户运行');
+  expect((await cli(['skill', 'publish'])).stdout).toContain('Do not run');
 });
 test('F2 slow_down 增加的协议间隔超过 30 秒仍完整等待', async () => {
   responses.set('/api/auth/device/code', { device_code: 'device-secret', user_code: 'ABCD-EFGH', verification_uri: base + '/device', verification_uri_complete: base + '/device?user_code=ABCD-EFGH', interval: 30, expires_in: 600 });
@@ -516,16 +516,16 @@ test('F3 一路 403 中止其他 503 的 30 秒等待，2 秒内返回且不再 
   expect(expired).toBe(false); expect(performance.now() - start).toBeLessThan(2000); expect(r.json().error.code).toBe('UPLOAD_EXPIRED'); expect(sleeps).toContain(30000);
   expect(calls.filter(c => c.method === 'PUT')).toHaveLength(firstUploadFailure!); expect(calls.filter(c => c.method === 'PUT')).toHaveLength(4);
 }, 5000);
-test('F4 确认替换时 AbortError 转成 USAGE 已取消登录', async () => {
+test('F4 确认替换时 AbortError 转成 USAGE Login cancelled', async () => {
   await credentials(previousBase, oldToken); confirm.mockRejectedValueOnce(new DOMException('cancelled', 'AbortError'));
-  const r = await cli(['login'], { interactive: true }); expect(r.code).toBe(2); expect(r.stdout).toContain('USAGE'); expect(r.stdout).toContain('已取消登录'); expect(calls).toEqual([]);
+  const r = await cli(['login'], { interactive: true }); expect(r.code).toBe(2); expect(r.stdout).toContain('USAGE'); expect(r.stdout).toContain('Login cancelled'); expect(calls).toEqual([]);
 });
 test.each([200, 503])('F5 跨服务器登录后只向旧服务器撤销旧令牌（status=%s）', async status => {
   await credentials(previousBase, oldToken); previousStatus = status;
   const r = await cli(['login'], { interactive: true }); expect(r.code).toBe(0); expect(revokedAfterReplacement).toBe(true);
   expect(previousCalls).toHaveLength(1); expect(previousCalls[0]).toMatchObject({ path: '/api/auth/sign-out', method: 'POST', body: {}, headers: { authorization: `Bearer ${oldToken}` } });
   for (const call of calls) expect(call.headers.authorization).not.toBe(`Bearer ${oldToken}`);
-  if (status === 503) expect(r.stderr).toContain('旧会话');
+  if (status === 503) expect(r.stderr).toContain('old session');
 });
 test.each([[undefined, '9', 9000], ['3', '9', 3000]] as const)('F6 设备 429 Retry-After=%s X-Retry-After=%s 前者优先', async (retryAfter, xRetryAfter, expected) => {
   fail = { path: '/api/auth/device/token', status: 429, remaining: 1, retryAfter, xRetryAfter }; expect((await cli(['login'])).code).toBe(0); expect(waits).toEqual([1000, expected]);
@@ -533,14 +533,14 @@ test.each([[undefined, '9', 9000], ['3', '9', 3000]] as const)('F6 设备 429 Re
 test('F7 Pro --new 成功但记录写入失败时清除旧 cloud.json，仍返回新链接', async () => {
   await credentials(); plan = 'pro'; await mkdir(join(project, '.joplo')); await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, shareId: 'Old1234567', url: base + '/s/Old1234567/' }));
   vi.mocked(fs.rename).mockRejectedValueOnce(Object.assign(new Error('read only'), { code: 'EROFS' }));
-  const r = await cli(['share', project, '--new', '--format=json']); expect(r.code).toBe(0); expect(r.json().data.shareId).toBe('Abc1234567'); expect(r.stderr).toContain('未能保存分享记录，下次发布不会更新这次的链接'); await expect(stat(join(project, '.joplo/cloud.json'))).rejects.toThrow();
+  const r = await cli(['share', project, '--new', '--format=json']); expect(r.code).toBe(0); expect(r.json().data.shareId).toBe('Abc1234567'); expect(r.stderr).toContain('Could not save the share record. The next publication will not update this link'); await expect(stat(join(project, '.joplo/cloud.json'))).rejects.toThrow();
   expect(calls.find(c => c.path === '/api/v1/shares')!.body.replaceShareId).toBeUndefined();
 });
 test('F7 删除旧 cloud.json 也失败时仅警告，仍返回成功', async () => {
   await credentials(); plan = 'pro'; const record = join(project, '.joplo/cloud.json'); await mkdir(join(project, '.joplo')); await writeFile(record, '{}');
   vi.mocked(fs.rename).mockRejectedValueOnce(new Error('write failed')); const original = (await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')).rm;
   vi.mocked(fs.rm).mockImplementation(async (path, options) => { if (path === record) throw Object.assign(new Error('cannot remove'), { code: 'EACCES' }); return original(path, options); });
-  try { const r = await cli(['share', project, '--new']); expect(r.code).toBe(0); expect(r.stderr).toContain('旧分享记录'); expect(r.stderr).toContain('未能保存分享记录，下次发布不会更新这次的链接'); }
+  try { const r = await cli(['share', project, '--new']); expect(r.code).toBe(0); expect(r.stderr).toContain('old share record'); expect(r.stderr).toContain('Could not save the share record. The next publication will not update this link'); }
   finally { vi.mocked(fs.rm).mockImplementation(original); }
 });
 test('F8 新登录凭证写入失败保留旧凭证，只撤销新 token，退出 1', async () => {

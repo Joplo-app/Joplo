@@ -59,32 +59,32 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const { CloudClient } = await import('./cloud.ts');
     return new CloudClient(server, deps.cliVersion ?? await readCliVersion(), s => stderr(s + '\n'), s => secrets.add(s), { ...deps.cloud, format });
   };
-  const cloudCommand = (name: string) => program.command(name).option('--server <url>', '云端服务器（覆盖 JOPLO_CLOUD_URL）');
-  cloudCommand('login').description('在浏览器中授权 CLI').addOption(format()).option('--no-browser', '手动打开登录网址').action(async opts => {
+  const cloudCommand = (name: string) => program.command(name).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)');
+  cloudCommand('login').description('Authorize the CLI in your browser').addOption(format()).option('--no-browser', 'Open the login URL manually').action(async opts => {
     const c = await (await cloudClient(opts.server, opts.format)).login(opts.browser === false);
-    if (opts.format === 'json') json(result(c.server, '已登录', { server: c.server, user: c.user, createdAt: c.createdAt }));
-    else line(`已登录为 ${terminalText(c.user.email)}`);
+    if (opts.format === 'json') json(result(c.server, 'Signed in', { server: c.server, user: c.user, createdAt: c.createdAt }));
+    else line(`Signed in as ${terminalText(c.user.email)}`);
   });
-  cloudCommand('logout').description('吊销会话并移除本地凭证').action(async opts => {
+  cloudCommand('logout').description('Revoke the session and remove local credentials').action(async opts => {
     const client = await cloudClient(opts.server, opts.format);
     await client.logout();
-    line('已退出登录');
+    line('Signed out');
   });
-  cloudCommand('whoami').description('显示云端账号、套餐和限额').addOption(format()).action(async opts => {
+  cloudCommand('whoami').description('Show the cloud account, plan, and limits').addOption(format()).action(async opts => {
     const client = await cloudClient(opts.server, opts.format), credentials = await client.requireCredentials();
     const data = await client.me(credentials.accessToken);
-    if (opts.format === 'json') json(result(client.server, `${terminalText(data.user.email)}（${data.plan}）`, data));
-    else line(`${terminalText(data.user.email)}（${data.plan}）\n本次新增上传上限：${data.limits.maxUploadBytes} 字节\n清单总量上限：${data.limits.maxTotalBytes} 字节，${data.limits.maxFiles} 文件\n每小时发布：${data.limits.publishesPerHour ?? '服务器未提供'} 次`);
+    if (opts.format === 'json') json(result(client.server, `${terminalText(data.user.email)} (${data.plan})`, data));
+    else line(`${terminalText(data.user.email)} (${data.plan})\nNew upload limit: ${data.limits.maxUploadBytes} bytes\nManifest total limit: ${data.limits.maxTotalBytes} bytes, ${data.limits.maxFiles} files\nPublications per hour: ${data.limits.publishesPerHour ?? 'Not provided by the server'}`);
   });
-  cloudCommand('share').description('检查、构建并发布到云端').argument('[dir]', '项目目录', '.').addOption(format())
-    .option('--new', '新建分享链接').option('--title <title>', '分享标题（默认项目名）').action(async (dir, opts) => {
+  cloudCommand('share').description('Check, build, and publish to the cloud').argument('[dir]', 'Project directory', '.').addOption(format())
+    .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)').action(async (dir, opts) => {
       const client = await cloudClient(opts.server, opts.format);
       const { share } = await import('./cloud-share.ts');
       const published = await share(client, dir, opts, async options => (await serverFunction('buildSite'))(options));
-      if (opts.format === 'json') json(result(resolve(dir), '已发布', published.result));
+      if (opts.format === 'json') json(result(resolve(dir), 'Published', published.result));
       else {
-        line(`已发布 ${published.result.url}\n${published.result.expiresAt ? `到期时间：${terminalText(published.result.expiresAt)}` : '永久链接'}`);
-        if (published.plan === 'free') line(`免费分享 1 小时有效；升级获得永久链接：${client.server}/billing`);
+        line(`Published ${published.result.url}\n${published.result.expiresAt ? `Expires at: ${terminalText(published.result.expiresAt)}` : 'Permanent link'}`);
+        if (published.plan === 'free') line(`Free shares expire after 1 hour. Upgrade for permanent links: ${client.server}/billing`);
       }
     });
   program.command('check').argument('[dir]', 'Project directory', '.').addOption(format()).option('--option <qid>', 'Validate only the specified option').action(async (dir, opts) => {

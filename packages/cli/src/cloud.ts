@@ -25,7 +25,7 @@ export function serverUrl(value: string): string {
     const url = new URL(value);
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw new Error();
     return url.origin;
-  } catch { throw new JoploError('USAGE', '--server / JOPLO_CLOUD_URL 必须是完整的 HTTP(S) 源地址（不含用户名、密码、路径或查询参数）'); }
+  } catch { throw new JoploError('USAGE', '--server / JOPLO_CLOUD_URL must be an HTTP(S) origin without credentials, paths, or query parameters'); }
 }
 export function httpUrl(value: unknown): string {
   if (!nonempty(value)) throw new CloudError('INVALID_RESPONSE');
@@ -105,9 +105,9 @@ async function confirmServerSwitch(question: string): Promise<boolean> {
   process.once('SIGINT', cancel);
   try {
     const answer = await Promise.race([input.question(`${terminalText(question)} [y/N] `, { signal: controller.signal }), eof]);
-    return answer !== null && /^(y|yes|是)$/i.test(answer.trim());
+    return answer !== null && /^(y|yes|\u662f)$/i.test(answer.trim());
   } catch (e) {
-    if ((e as Error).name === 'AbortError') throw new JoploError('USAGE', '已取消登录');
+    if ((e as Error).name === 'AbortError') throw new JoploError('USAGE', 'Login cancelled');
     if ((e as NodeJS.ErrnoException).code === 'ERR_USE_AFTER_CLOSE') return false;
     throw e;
   } finally {
@@ -127,12 +127,12 @@ export function retryAfterMillis(value: string | null, now: number): number | un
 function quotaError(value: unknown): CloudError {
   const d = object(value);
   const kind = d.kind === 'publishes' || d.kind === 'reserved_bytes' ? d.kind : undefined;
-  const label = kind === 'publishes' ? '每小时发布次数' : kind === 'reserved_bytes' ? '每小时预留字节' : '云端额度';
+  const label = kind === 'publishes' ? 'Hourly publications' : kind === 'reserved_bytes' ? 'Hourly reserved bytes' : 'Cloud quota';
   const retryAt = typeof d.retryAt === 'string' && Number.isFinite(Date.parse(d.retryAt)) ? new Date(d.retryAt).toISOString() : undefined;
   const limit = Number.isSafeInteger(d.limit) && Number(d.limit) >= 0 ? Number(d.limit) : undefined;
   const actual = Number.isSafeInteger(d.actual) && Number(d.actual) >= 0 ? Number(d.actual) : undefined;
   const details = { ...(kind ? { kind } : {}), ...(retryAt ? { retryAt } : {}), ...(limit === undefined ? {} : { limit }), ...(actual === undefined ? {} : { actual }) };
-  return new CloudError('QUOTA_EXCEEDED', `已达到${label}上限${limit === undefined ? '' : `（上限 ${limit}${actual === undefined ? '' : `，实际 ${actual}`}）`}。${retryAt ? `可以重试的时间：${retryAt}` : '请稍后重试'}`, details);
+  return new CloudError('QUOTA_EXCEEDED', `${label} limit reached${limit === undefined ? '' : ` (limit ${limit}${actual === undefined ? '' : `, actual ${actual}`})`}. ${retryAt ? `Retry at: ${retryAt}` : 'Try again later'}`, details);
 }
 
 /** 只有网络异常和 5xx 归为 NETWORK，不能被远端响应体改写成其他类别。 */
@@ -162,17 +162,17 @@ export class CloudClient {
   private async storedCredentials(): Promise<Credentials | null> {
     let data: unknown;
     try { data = JSON.parse(await readFile(join(this.home, 'credentials.json'), 'utf8')); }
-    catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') this.warn('凭证无法读取，请重新运行 npx joplo login'); return null; }
+    catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') this.warn('Cannot read credentials. Run npx joplo login again'); return null; }
     const c = object(data), u = object(c.user);
     if (nonempty(c.accessToken)) this.rememberSecret(c.accessToken);
     let validServer = false;
     try { validServer = typeof c.server === 'string' && serverUrl(c.server) === c.server; } catch { /* 视为损坏 */ }
     if (!validServer || !nonempty(c.accessToken) || /\s/.test(c.accessToken) || !nonempty(u.id) || !nonempty(u.email) || !nonempty(c.createdAt) || !Number.isFinite(Date.parse(c.createdAt))) {
-      this.warn('凭证已损坏，请重新运行 npx joplo login'); return null;
+      this.warn('Credentials are invalid. Run npx joplo login again'); return null;
     }
     try {
       if ((await stat(join(this.home, 'credentials.json'))).mode & 0o077) await chmod(join(this.home, 'credentials.json'), 0o600);
-    } catch { this.warn('无法收紧凭证文件权限，请手动设为 0600；本次仍使用已读取的凭证。'); }
+    } catch { this.warn('Could not restrict credential permissions. Set them to 0600 manually; continuing with the credentials already read.'); }
     return { server: c.server as string, accessToken: c.accessToken, user: { id: u.id, email: u.email }, createdAt: c.createdAt };
   }
   async credentials(forShare = false): Promise<Credentials | null> {
@@ -180,14 +180,14 @@ export class CloudClient {
     if (c && c.server !== this.server) {
       if (!forShare || !this.interactive) {
         const fix = `npx joplo login --server ${this.server}`;
-        throw new CloudError('AUTH_REQUIRED', `当前服务器没有登录凭证，请在自己的终端里运行 ${fix} 并确认替换`, { fix, credentialServer: c.server });
+        throw new CloudError('AUTH_REQUIRED', `No credentials for this server. Run ${fix} in your own terminal and confirm replacement`, { fix, credentialServer: c.server });
       }
       return null;
     }
     return c;
   }
   private refuseServerSwitch(server: string): never {
-    throw new JoploError('USAGE', `凭证属于 ${server}，请在自己的终端里运行 joplo login --server ${this.server} 并确认替换`);
+    throw new JoploError('USAGE', `Credentials belong to ${server}. Run joplo login --server ${this.server} in your own terminal and confirm replacement`);
   }
   private async revoke(token: string, server = this.server): Promise<void> {
     // 撤销旧会话必须使用它原来的源，不能让新服务器看到旧 token。
@@ -197,14 +197,14 @@ export class CloudClient {
   }
   async logout(): Promise<void> {
     const credentials = await this.storedCredentials();
-    if (credentials && credentials.server !== this.server) throw new JoploError('USAGE', '凭证属于其他服务器，未删除。请使用对应的 --server <url> 退出登录');
+    if (credentials && credentials.server !== this.server) throw new JoploError('USAGE', 'Credentials belong to another server and were preserved. Use its --server <url> to sign out');
     const entries = await readdir(this.home, { withFileTypes: true }).catch(e => { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []; throw e; });
     for (const entry of entries) if (/^credentials\.json\..+\.tmp$/.test(entry.name) && !entry.isDirectory()) await rm(join(this.home, entry.name), { force: true });
     if (credentials) {
       try {
         // 退出当前 CLI 会话；token 只在 Authorization 中，不进入请求体。
         await this.revoke(credentials.accessToken);
-      } catch { this.warn('未能确认云端会话已吊销，将删除本地凭证；可在网页设备管理中撤销会话。'); }
+      } catch { this.warn('Could not confirm session revocation. Removing local credentials; revoke the session on the website if needed.'); }
     }
     await rm(join(this.home, 'credentials.json'), { force: true });
   }
@@ -237,7 +237,7 @@ export class CloudClient {
         const afterMs = response.status === 503 ? retryAfterMillis(response.headers.get('retry-after'), this.now()) : undefined;
         throw new CloudError(code, undefined, undefined, { afterMs, createSafe: response.status === 503 && data.code === 'SERVICE_UNAVAILABLE' && afterMs !== undefined });
       }
-      if (code === 'PLAN_REQUIRED') throw new CloudError(code, `此操作需要 Pro：${this.server}/billing`);
+      if (code === 'PLAN_REQUIRED') throw new CloudError(code, `This action requires Pro: ${this.server}/billing`);
       if (code === 'QUOTA_EXCEEDED') throw quotaError(data.data ?? data.details);
       if (code === 'TOO_LARGE') {
         const details = readSizeDetails(data.data ?? data.details, token);
@@ -257,22 +257,22 @@ export class CloudClient {
     if (previous && previous.server !== this.server) {
       if (!this.interactive) this.refuseServerSwitch(previous.server);
       let confirmed: boolean;
-      try { confirmed = await (this.deps.confirm ?? confirmServerSwitch)(`将替换 ${previous.server} 的登录，继续吗？`); }
-      catch (e) { if ((e as Error).name === 'AbortError') throw new JoploError('USAGE', '已取消登录'); throw e; }
-      if (!confirmed) throw new JoploError('USAGE', '已取消登录，原凭证保持不变');
+      try { confirmed = await (this.deps.confirm ?? confirmServerSwitch)(`Replace the login for ${previous.server}. Continue?`); }
+      catch (e) { if ((e as Error).name === 'AbortError') throw new JoploError('USAGE', 'Login cancelled'); throw e; }
+      if (!confirmed) throw new JoploError('USAGE', 'Login cancelled. The existing credentials were preserved');
     }
-    this.warn('正在申请浏览器登录…');
+    this.warn('Requesting browser authorization...');
     const d = await this.request('/api/auth/device/code', undefined, { client_id: 'joplo-cli' });
     if (!nonempty(d.device_code) || typeof d.user_code !== 'string' || !/^[A-Z0-9-]{4,16}$/.test(d.user_code) || typeof d.expires_in !== 'number' || !Number.isFinite(d.expires_in) || d.expires_in <= 0 || d.interval != null && (typeof d.interval !== 'number' || !Number.isFinite(d.interval))) throw new CloudError('INVALID_RESPONSE');
     const verification_uri = httpUrl(d.verification_uri), verification_uri_complete = httpUrl(d.verification_uri_complete);
     if (new URL(verification_uri).origin !== this.server || new URL(verification_uri_complete).origin !== this.server) throw new CloudError('INVALID_RESPONSE');
     const deadline = this.now() + d.expires_in * 1000;
     const url = browserLoginUrl({ verification_uri, verification_uri_complete });
-    this.warn(`请在浏览器中确认登录，核对验证码：${d.user_code}\n${url}`);
+    this.warn(`Confirm login in your browser and verify this code: ${d.user_code}\n${url}`);
     if (!noBrowser && this.interactive && !this.env.SSH_CONNECTION) {
       const opened = await (this.deps.openBrowser ?? openBrowser)(url).catch(() => false);
-      this.warn(opened ? '已打开浏览器，等待确认…' : '无法自动打开浏览器，请手动访问上面的网址。等待确认…');
-    } else this.warn('请手动访问上面的网址。等待浏览器确认…');
+      this.warn(opened ? 'Browser opened. Waiting for confirmation...' : 'Could not open the browser. Visit the URL above manually. Waiting for confirmation...');
+    } else this.warn('Visit the URL above manually. Waiting for browser confirmation...');
     let interval = Math.max((d.interval as number | undefined) ?? 5, 1) * 1000;
     let delay = interval;
     const backoff = () => { delay = Math.min(Math.max(interval, delay * 2), 30000); };
@@ -302,16 +302,16 @@ export class CloudClient {
         await writeCredentials(this.home, credentials);
         if (previous && (previous.server !== this.server || previous.accessToken !== credentials.accessToken)) {
           try { await this.revoke(previous.accessToken, previous.server); }
-          catch { this.warn('新登录已保存，但未能确认旧会话已撤销，可在网页设备管理中撤销。'); }
+          catch { this.warn('New login saved, but the old session could not be confirmed revoked. Revoke it on the website if needed.'); }
         }
         return credentials;
       } catch (e) {
         // token 已签发但登录尚未落盘；尽力回收会话，保留原始失败原因。
-        try { await this.revoke(data.access_token); } catch { this.warn('登录未完成，未能确认会话已撤销，可在网页设备管理中撤销。'); }
+        try { await this.revoke(data.access_token); } catch { this.warn('Login incomplete; session revocation could not be confirmed. Revoke it on the website if needed.'); }
         throw e;
       }
     }
-    throw new CloudError('AUTH_EXPIRED', '验证码已过期，请重新运行 npx joplo login');
+    throw new CloudError('AUTH_EXPIRED', 'The verification code expired. Run npx joplo login again');
   }
   async retry<T>(action: () => Promise<T>, options: { create?: boolean; signal?: AbortSignal } = {}): Promise<T> {
     for (let attempt = 0; ; attempt++) {

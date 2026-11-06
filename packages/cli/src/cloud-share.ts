@@ -32,29 +32,29 @@ export async function manifest(dir: string): Promise<{ files: File[]; blobs: Map
     }
   }
   await visit('');
-  if (invalid.length) throw new JoploError('EXPORT_FAILED', `以下产物的类型或路径不受云端支持，尚未上传：${invalid.join('、')}`, { details: { files: invalid } });
-  if (!files.some(f => f.path === 'index.html')) throw new JoploError('EXPORT_FAILED', '构建产物缺少 index.html');
+  if (invalid.length) throw new JoploError('EXPORT_FAILED', `Unsupported output types or paths; nothing uploaded: ${invalid.join(', ')}`, { details: { files: invalid } });
+  if (!files.some(f => f.path === 'index.html')) throw new JoploError('EXPORT_FAILED', 'The build is missing index.html');
   return { files, blobs };
 }
 export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number };
 export async function share(client: CloudClient, dir: string, opts: { new?: boolean; title?: string }, build: typeof buildSite): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
-  if (opts.title !== undefined && (!opts.title.trim() || opts.title.trim().length > 200)) throw new JoploError('USAGE', '--title 必须是 1–200 个字符');
+  if (opts.title !== undefined && (!opts.title.trim() || opts.title.trim().length > 200)) throw new JoploError('USAGE', '--title must contain 1-200 characters');
   let credentials = await client.credentials(true);
   if (!credentials) {
     if (!client.interactive) throw new CloudError('AUTH_REQUIRED', undefined, { fix: 'npx joplo login' });
-    client.warn('分享需要登录 Joplo 账号（免费）'); credentials = await client.login(); client.warn(`已登录为 ${terminalText(credentials.user.email)}，继续发布…`);
+    client.warn('Sharing requires a free Joplo account'); credentials = await client.login(); client.warn(`Signed in as ${terminalText(credentials.user.email)}. Continuing publication...`);
   }
   const accessToken = credentials.accessToken;
   const project = resolve(dir);
-  client.warn('正在检查项目…');
+  client.warn('Checking the project...');
   const checked = await (client.deps.check ?? check)(project);
-  if (checked.summary.error) throw new JoploError('INVALID_SCHEMA', `项目检查失败：${checked.summary.error} error`, { diagnostics: checked.diagnostics });
+  if (checked.summary.error) throw new JoploError('INVALID_SCHEMA', `Project validation failed: ${checked.summary.error} error`, { diagnostics: checked.diagnostics });
   const temporary = temporaryDirectory(join(tmpdir(), 'joplo-share-'));
   const staging = temporary.path;
   try {
-    client.warn('检查通过，正在构建发布站…');
+    client.warn('Validation passed. Building the published site...');
     const built = await build({ projectDir: project, outDir: join(staging, 'site') });
-    if (built.diagnostics.some(d => d.severity === 'error')) throw new JoploError('EXPORT_FAILED', '构建包含错误，尚未上传', { diagnostics: built.diagnostics });
+    if (built.diagnostics.some(d => d.severity === 'error')) throw new JoploError('EXPORT_FAILED', 'The build contains errors; nothing uploaded', { diagnostics: built.diagnostics });
     const { files, blobs } = await manifest(built.outDir);
     const account = await client.me(accessToken);
     const actualBytes = files.reduce((n, f) => n + f.size, 0), largestFiles = [...files].sort((a, b) => b.size - a.size).slice(0, 5).map(({ path, size }) => ({ path, size }));
@@ -77,7 +77,7 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
       if (JSON.stringify({ url, headers }).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
       return { sha256: m.sha256, uploadUrl: url, headers: headers as Record<string, string> };
     });
-    client.warn(`构建完成：${files.length} 个文件（${actualBytes} 字节），上传 ${missing.length} 个新对象…`);
+    client.warn(`Built ${files.length} files (${actualBytes} bytes). Uploading ${missing.length} new objects...`);
     const uploads = new AbortController();
     const upload = async (item: (typeof missing)[number]) => {
       const body = new Uint8Array(await readFile(blobs.get(item.sha256)!));
@@ -105,7 +105,7 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
       }
     }));
     if (failed) throw failure;
-    client.warn('上传完成，正在确认发布…');
+    client.warn('Upload complete. Finalizing publication...');
     const final = await client.retry(() => client.request(`/api/v1/shares/${prepared.shareId}/finalize`, accessToken, { uploadId: prepared.uploadId }));
     if (!shareId(final.shareId) || final.shareId !== prepared.shareId || !Number.isSafeInteger(final.version) || Number(final.version) < 1 || !(final.expiresAt === null || typeof final.expiresAt === 'string' && Number.isFinite(Date.parse(final.expiresAt)))) throw new CloudError('INVALID_RESPONSE');
     const url = httpUrl(final.url);
@@ -113,9 +113,9 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
     if (JSON.stringify(published).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
     try { await atomicJson(join(project, '.joplo/cloud.json'), { server: client.server, shareId: published.shareId, url }); }
     catch {
-      client.warn('未能保存分享记录，下次发布不会更新这次的链接');
+      client.warn('Could not save the share record. The next publication will not update this link');
       try { await rm(join(project, '.joplo/cloud.json'), { force: true }); }
-      catch { client.warn('旧分享记录也未能删除，请手动清理 .joplo/cloud.json。'); }
+      catch { client.warn('Could not delete the old share record. Remove .joplo/cloud.json manually.'); }
     }
     return { result: published, plan: account.plan };
   } finally { try { await rm(staging, { recursive: true, force: true }); } finally { temporary.release(); } }
