@@ -24,10 +24,13 @@ beforeAll(async () => {
 
 describe('TSX 邀请示例编译', () => {
   it('路径优先：基础路径 + 方案新增路径；每个方案在每个路径上各有画面', () => {
-    expect(Object.keys(dev.routes).sort()).toEqual(['/members', '/members/invite', '/settings']);
+    // /join 由方案 A 新增（D68 样板：撤销后受邀者看到的失效页），/members/invite 由方案 B 新增
+    expect(Object.keys(dev.routes).sort()).toEqual(['/join', '/members', '/members/invite', '/settings']);
     expect(dev.scenes['invite.a-modal@/members']).toBeDefined();
     expect(dev.scenes['invite.b-batch@/members/invite']).toBeDefined();
     expect(dev.scenes['invite.a-modal@/members/invite']).toBeUndefined();
+    expect(dev.scenes['invite.a-modal@/join']).toBeDefined();
+    expect(dev.scenes['invite.b-batch@/join']).toBeUndefined();
   });
 
   it('同一功能的方案互相隔离，堆叠元素记录来源与 文件:行号', () => {
@@ -60,7 +63,8 @@ describe('TSX 邀请示例编译', () => {
     const cov = dev.options['invite.a-modal']!.coverage;
     expect(cov['invite.happy']).toMatchObject({ status: 'expressed', basis: 'derived' });
     expect(cov['invite.already_member']).toMatchObject({ status: 'undecided', basis: 'declared' });
-    expect(cov['invite.revoked']).toEqual({ status: 'missing', scenarioIds: [], basis: 'derived' });
+    expect(cov['invite.revoked']).toEqual({ status: 'expressed', scenarioIds: ['invite.a-modal.revoke'], basis: 'derived' });
+    expect(cov['invite.expired']).toEqual({ status: 'missing', scenarioIds: [], basis: 'derived' });
   });
 
   it('禁用与未建模的点击解释仍由播放器决定', () => {

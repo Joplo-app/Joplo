@@ -58,7 +58,7 @@ describe('目录是唯一来源', () => {
     expect(Object.keys(COMPONENT_DOCS).sort()).toEqual([...COMPONENT_TYPES].sort());
     for (const v of Object.values(COMPONENT_DOCS)) expect(v.trim().length).toBeGreaterThan(0);
     for (const s of [INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS]) for (const t of s) expect(COMPONENT_TYPES as readonly string[]).toContain(t);
-    expect([...GATED_CONTAINERS].sort()).toEqual(['Drawer', 'Modal']);
+    expect([...GATED_CONTAINERS].sort()).toEqual(['Drawer', 'Menu.Dropdown', 'Modal']); // D68：Menu 的 opened 由编译器抄给 Menu.Dropdown
     expect(new Set(COMPONENT_TYPES).size).toBe(COMPONENT_TYPES.length);
   });
 });

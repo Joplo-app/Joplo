@@ -130,6 +130,8 @@ export function createRu(locale: Locale = 'ru') {
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)} (результат демо для ${value(p1, locale)}, а не ответ реального сервиса)`,
       stepProgress: (p0: Value, p1: Value) => `Шаг ${value(p0, locale)} / ${value(p1, locale)}`,
       coverStart: "Начать",
+      /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
+      forRoles: (names: string[]) => `Для: ${list(names, locale)}`,
       coverStartTitle: "Воспроизвести с начала",
       coverSteps: (n: number) => plural(n, { one: 'Около # шага', few: 'Около # шагов', many: 'Около # шагов', other: 'Около # шага' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `Около ${number(d.value, locale)} с` : `Около ${number(d.value, locale)} мин`,

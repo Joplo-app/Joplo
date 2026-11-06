@@ -123,6 +123,11 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       appearanceButtonLabel: (p0: Value) => `外觀 · ${value(p0, locale)}`,
       picked: "✓ 已選定",
       allCovered: "全部涵蓋",
+      // D67：情况的优先级与期望结果（PM 的 Then）
+      highPriority: "高優先級",
+      expected: "預期結果",
+      expectedNotWritten: "尚未寫預期結果",
+      missingHighCount: (n: number) => `高優先級 ${value(n, locale)}`,
       clickToSwitch: (p0: Value) => `${value(p0, locale)}（點選切換）`,
       options: "方案",
       itemCount: (p0: Value) => `${value(p0, locale)}`,

@@ -131,6 +131,11 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       // board/CaseNav.tsx: Joplo interface text; author content is never translated.
       picked: "✓ 已选定",
       allCovered: "全部已表达",
+      // D67：情况的优先级与期望结果（PM 的 Then）
+      highPriority: "高优先级",
+      expected: "期望结果",
+      expectedNotWritten: "还没写期望结果",
+      missingHighCount: (n: number) => `高优先级 ${value(n, locale)}`,
       clickToSwitch: (p0: Value) => `${value(p0, locale)}（点一下切过去）`,
       options: "方案",
       itemCount: (p0: Value) => `${value(p0, locale)} 个`,

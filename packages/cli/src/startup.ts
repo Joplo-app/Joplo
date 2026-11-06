@@ -9,7 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { alignCommand, detectPackageManager, pmCommands } from './pm.ts';
 
-const PROJECT_COMMANDS = new Set(['check', 'dev', 'build', 'render']);
+const PROJECT_COMMANDS = new Set(['check', 'outline', 'dev', 'build', 'render']);
 
 const readJson = (file: string): Record<string, unknown> | null => {
   try {

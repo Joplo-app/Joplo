@@ -1,10 +1,11 @@
 import { MENTAL_MODEL, START_ORDER } from './agent-skill.ts';
-import { COMPONENT_TYPES, GATED_CONTAINERS, HTML_TAGS, INTERACTIVE_TYPES, JOPLO_PROPS, VALUE_TYPES } from './catalog.ts';
+import { COMPONENT_DOCS, COMPONENT_EXAMPLES, COMPONENT_TYPES, GATED_CONTAINERS, HTML_TAGS, INTERACTIVE_TYPES, JOPLO_PROPS, VALUE_TYPES, type ComponentType } from './catalog.ts';
 import { JoploError } from './result.ts';
 import { LAYER_ICONS } from './schema.ts';
 
 export const SKILL_TOPICS = [
   { name: 'authoring', description: 'Mental model, first steps, page / option / flow syntax, when conditions, a form example' },
+  { name: 'story', description: 'Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions' },
   { name: 'demo', description: 'Layers, shots, captions, full-height layout, deep links, and screenshots' },
   { name: 'components', description: 'Component catalog, supported HTML tags, line breaks, and props' },
   { name: 'cases', description: 'Case dimensions: ask the user before starting' },
@@ -15,10 +16,11 @@ export const SKILL_TOPICS = [
 export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
 
 const related: Record<SkillTopic, readonly SkillTopic[]> = {
-  authoring: ['demo', 'components', 'cases', 'check', 'selection', 'publish'],
-  demo: ['authoring', 'components', 'check', 'publish'],
+  authoring: ['story', 'demo', 'components', 'cases', 'check', 'selection', 'publish'],
+  story: ['authoring', 'cases', 'demo', 'check'],
+  demo: ['story', 'authoring', 'components', 'check', 'publish'],
   components: ['authoring', 'demo', 'check'],
-  cases: ['authoring', 'check'],
+  cases: ['story', 'authoring', 'check'],
   check: ['authoring', 'selection'],
   selection: ['check', 'authoring'],
   publish: ['demo', 'authoring', 'check'],
@@ -34,7 +36,7 @@ export function skillIndex(version: string, docs?: Readonly<Record<string, strin
     'Start here:',
     ...START_ORDER.map((s, i) => `  ${i + 1}. ${s}`),
     '',
-    'Topics (suggested order: authoring, cases, components, demo, check; selection and publish when needed):',
+    'Topics (suggested order: authoring, story, cases, components, demo, check; selection and publish when needed):',
     ...SKILL_TOPICS.map(t => `  ${t.name.padEnd(11)} ${t.description}  ${skillTopic(t.name, docs).trimEnd().split('\n').length} lines`),
     'Usage: npx joplo skill <topic>    Install for agents: npx joplo skill install',
     '',
@@ -57,8 +59,38 @@ export function skillTopic(topic: string, docs?: Readonly<Record<string, string>
 /** 兼容旧入口：与 joplo skill authoring 输出完全相同。 */
 export function guide(): string { return skillTopic('authoring'); }
 
+/** HTML 兜底标签不单独列在目录里（它们在 “HTML tags” 一行里，且一律建议改用组件）。 */
+const HTML_SET: ReadonlySet<string> = new Set(HTML_TAGS);
+
+/**
+ * `npx joplo components <名字…>`（D68）：所列组件（含它的子组件，例如 Menu → Menu.Item）的属性提示、行为分组和示例。
+ * 名字不区分大小写；不认识的名字报 USAGE 并给出最接近的名字。
+ */
+export function componentDetails(names: readonly string[]): string {
+  const all = COMPONENT_TYPES.filter((n) => !n.startsWith('#')) as ComponentType[];
+  const out: string[] = [];
+  for (const raw of names) {
+    const hit = all.find((n) => n.toLowerCase() === String(raw).toLowerCase());
+    if (!hit) {
+      const near = [...all].sort((a, b) => distance(String(raw).toLowerCase(), a.toLowerCase()) - distance(String(raw).toLowerCase(), b.toLowerCase()))[0];
+      throw new JoploError('USAGE', `Unknown component "${raw}". Did you mean ${near}?\nRun npx joplo components to list all components.`);
+    }
+    const family = [hit, ...all.filter((n) => n.startsWith(`${hit}.`))];
+    out.push(`# ${hit}`);
+    for (const n of family) {
+      const groups = [INTERACTIVE_TYPES.has(n) ? 'interactive: requires id and a step, disabled + disabledReason, or unmodeled' : '', VALUE_TYPES.has(n) ? 'value: type / select / toggle write to it' : '', GATED_CONTAINERS.has(n) ? 'shown only while opened' : ''].filter(Boolean);
+      out.push(`- ${n}: ${COMPONENT_DOCS[n].replace(/\s+/g, ' ').trim()}${groups.length ? ` [${groups.join('; ')}]` : ''}`);
+    }
+    const ex = COMPONENT_EXAMPLES[hit];
+    if (ex) out.push('', '```tsx', ex, '```');
+    out.push('');
+  }
+  out.push('Import components from @joplo-app/kit/ui; bindings and conditions: npx joplo skill authoring.');
+  return `${out.join('\n')}\n`;
+}
+
 function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
-  const names = COMPONENT_TYPES.filter(name => !name.startsWith('#'));
+  const names = COMPONENT_TYPES.filter(name => !name.startsWith('#') && !HTML_SET.has(name));
   const listed = (set: ReadonlySet<string>) => names.filter(name => set.has(name)).join(', ');
   return [
     '# Joplo components: components',
@@ -73,7 +105,13 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
     '- Every component accepts style={{ … }} and the Mantine style props (m, p, w, h, c, bg, fz, fw, ta…); className is not needed.',
     '',
     '## Component catalog',
+    'Props and an example for any component: npx joplo components <Name> (for example npx joplo components Menu DataTable).',
     ...names.map(name => `- ${name}${Object.hasOwn(docs, name) && docs[name]?.trim() ? `: ${docs[name]!.replace(/\s+/g, ' ').trim()}` : ''}`),
+    '',
+    '## Common product screens (D68)',
+    '- Empty list, 404, expired link, no access, or a result page: EmptyState with action Buttons in children. Confirm a destructive action: Modal with opened={$.ui.confirm} and two Buttons.',
+    '- Rows with avatar, text, and actions: ListRow (tappable rows: NavLink). Row actions: Menu with opened={$.ui.menu} on an ActionIcon target. Status cells, sorting, selection, loading: DataTable columns badge / avatar, sortStatus, selectedRecords, fetching.',
+    '- Dashboards: Stat, KeyValue, BarChart / LineChart (data can bind $.data.x; set a new array to animate). Mobile: TabBar at the bottom of a full-height Stack. Undo bar or banner: Notification position="bottom" with when.',
     '',
     '## Behavior groups (from the catalog)',
     `- Interactive; require id and declared behavior: ${listed(INTERACTIVE_TYPES)}.`,
@@ -89,6 +127,55 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
 }
 
 const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
+  story: `# Joplo storytelling and planning: story
+
+A demo is a short story a viewer follows without you: who wants what, what gets in the way, what the product does, and the visible result.
+It is not a feature tour. Plan it in a few lines before writing TSX, show the plan to the user, then build. Sources: docs/research/storytelling-and-demos.md.
+
+## 1. Plan the demo first (write it in your reply; ask only questions that change it, each with a default)
+- Audience: who watches (product review, design review, a customer, engineers) and what they must decide afterward.
+- One to three points: what viewers must believe after watching. Each point becomes a scenario or an A/B comparison, never a single step.
+- Scene list, one line per scenario: Given (who, where, starting state) → When (the user's actions) → Then (the visible result), plus how it opens and how it ends.
+- Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate.
+- Unsure how to frame it? Offer two or three one-line framings and let the user pick.
+
+## 2. PM lens: from a need to roles, goal, cases, and scenarios
+Joplo already has the parts of a user story; fill them in that spirit.
+- roles: who it is for, specific ('Space admin', 'Invited teammate'), not 'User'. Use role('Name', { desc }) keys when layers or cards belong to a person; plain names are fine otherwise.
+- goal (the I want + so that): one sentence, who can do what and why, independent of the solution so options A/B are two answers to it.
+  Good: 'Space admins invite teammates by email so the team can start working the same day'. Bad: 'Invite button', 'A better invite experience'.
+- cases are the acceptance criteria: the title is the Given (the situation), expected is the Then (what the viewer must see), priority is how much it matters.
+  Write expected for every high-priority case; it is the line reviewers check the demo against. npx joplo outline lists cases without one.
+- rules are the business constraints a Then depends on ('Only admins can invite'); link them to cases and elements, and to steps with uses().
+- One scenario = one When and one Then. The steps are the When; the last steps show the Then (a visible state plus done('…')). Several Whens: split the scenario.
+- Splitting, in this order: one thin end-to-end happy path (entry → result) first; then one scenario per business-rule variant, data variant, role, and failure.
+  Do not split by step (fill in / review / publish): every scenario goes from its entry to a result. More than 5–6 high-priority cases, or two roles with different goals: split the feature.
+- Edge cases: walk the eight dimensions (npx joplo skill cases), and ask what if the user does steps out of order, skips an optional step, or comes back later. Each adopted answer is a case with its own expected and a scenario.
+- INVEST check per scenario: Independent (its own start state), Valuable (ends on a visible result), Small (fits the length above), Testable (expected says exactly what appears).
+- Direction still open? Build only the main scenario of options A and B first; add every case after the user picks.
+
+## 3. Openings, middles, endings
+- Opening: the first step or an opening .card('…', { sub }) says who is trying to do what and why, in one sentence. No logo, no 'So you open the app'.
+- Middle: each step proves one thing with a visible action and a visible change; the cause must be visible (a click, an incoming message, a time-jump card).
+  A screen that changes with no trigger reads as a screensaver. Mock results come from steps: set(), toast(), go().
+- Ending: pick one strategy, either stop on the result (done('…') with the result on screen) or a closing .card with points: at most 3–4 short points.
+- Transitions: keep something on screen across a change (the same list, the same person); cards only for time jumps, role switches, opening, and ending.
+- Where the viewer looks each moment is the demo topic's attention guidance (shots, marks, and the focus helpers): npx joplo skill demo.
+
+## 4. Captions and explain
+- One idea per caption, about 24 units (CJK 1, other characters 0.5). Subject + verb, active voice, the visible action first: 'Ana sends the invite', 'The link expires after 7 days'.
+- explain (about 48 units) says why it matters or what it means; never repeat the caption.
+- System steps are narration of what happened ('The server rejects the address'), not labels ('System event').
+- Same name for the same person or thing throughout; button and field names exactly as on screen; no internal ids or API names unless the audience is engineers.
+- No filler ('Now let us…', 'a whole new experience'): every sentence does a job. Do not invent numbers or facts; record guesses as ai_assumption rules.
+- Cover text: flow({ description }) is the cover sentence, 30 units at most (DESCRIPTION_TOO_LONG). The cover falls back to the feature goal.
+- Rhythm: every short step waits 3 s, so a run of trivial steps feels like a metronome. Merge trivial steps (type, then click) and give key results an explain.
+
+## 5. Before handing over
+- npx joplo outline: per feature, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
+- npx joplo check: CAPTION_TOO_LONG, EXPLAIN_TOO_LONG, DESCRIPTION_TOO_LONG, CARD_TEXT_TOO_LONG, SCENARIO_TOO_LONG, HAPPY_PATH_ONLY, CASE_NOT_COVERED (names the expected result).
+- Read only the captions from start to end: do they tell the story? Then look only at key frames (npx joplo render --step-id …): does the screen show it without captions?
+- Tell the user which cases have no expected result yet and which options do not cover a high-priority case.`,
   authoring: `# Joplo authoring: authoring
 
 ## Mental model (read first)
@@ -230,7 +317,7 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 
 ## Captions and fitting one screen
 - Keep captions within about 24 units and explain('Additional note') within about 48. CJK characters count as 1 each; all others count as 0.5; whitespace is ignored. check warns when exceeded.
-- Captions and explain notes appear below the stage, never over it. Tell one thing per step; move long content to an explanation layer.
+- Captions and explain notes appear below the stage, never over it. Tell one thing per step; move long content to an explanation layer. How to write them, and how to plan openings and endings: story.
 - Autoplay reading time: CJK 8 chars/s (125ms each), Latin 15 non-whitespace chars/s; clamp to 3–7 seconds before 0.5× / 1× / 1.5× scaling. Streams, shots and edge waits can exceed 7 seconds. Shots use 700ms ease-out without overshoot.
 - Do not make viewers scroll through a long page. Fit one screen and zoom into details with shots.
 - Each page has one device, desktop by default. page({ viewport: 'mobile' }, tree) uses a Phone frame at a fixed width of 390.
@@ -369,7 +456,7 @@ Pick relevant cases to ask the user before starting. Do not include every preset
 
 ## Turn answers into cases and scenarios
 - feature.cases: { happy: 'Complete successfully', denied: { title: 'No permission', dimension: 'permission', priority: 'high', expected: 'Explain why' } }.
-- dimension uses the keys above; priority is high/medium/low; expected describes the expected result.
+- dimension uses the keys above; priority is high/medium/low; expected is the visible result the scenario must end on (the Then of an acceptance criterion; the title is the Given). Write it for every high-priority case; see story for the PM method.
 - Each option uses flow(..., { cases: ['happy'] }) to reference the shared cases for comparison.
 - A case with a scenario is automatically \`expressed\`; one with neither a scenario nor a declaration is \`missing\`.
 - After adding a case, run check: reconsider it in every option.
@@ -414,6 +501,10 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - DUPLICATE_ELEMENT: Duplicate element ids within a stage. Change only conflicting ids and update references.
 - CAPTION_TOO_LONG: Shorten the caption to about 24 units: CJK characters count as 1 each, all others as 0.5; whitespace is ignored. One thing per step; move long content to an explanation layer. See demo.
 - EXPLAIN_TOO_LONG: Shorten the explain note to about 48 units, using the same CJK 1 / other 0.5 calculation. Put detailed rationale in a separate explanation layer. See demo.
+- DESCRIPTION_TOO_LONG: flow({ description }) is the scenario cover sentence; keep it within 30 units, one sentence saying what this scenario shows. See story.
+- CARD_TEXT_TOO_LONG (info): a transition card's sub is over 48 units, a point over 24, or more than 4 points. Keep one sentence and a few short points; move details into steps.
+- SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.
+- HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior.
 - ROLE_UNKNOWN: A layer or card role is not in feature.roles. Declare roles as { key: role('Name') }; see demo.
 - ICON_UNKNOWN: A layer icon is not a preset. Use one of ${LAYER_ICONS.join(', ')}; see demo.
 - FORK_UNKNOWN: fork must target another scenario key in the same option; it cannot reference itself.
@@ -431,7 +522,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - DISABLED_WITHOUT_REASON: Add disabledReason explaining why the element cannot be used: a string, disabledReason="Only admins can invite", or a binding, disabledReason={$.ui.sendHint}.
 - INVALID_DISABLED_REASON: disabledReason got a number, condition, or other value. Use a string or a whole-value binding; for text that changes, set() it into state and bind it.
 - OUTCOME_MISMATCH: flow({ outcome }) and done(…, outcome) disagree; the badge uses flow's. Make them agree (cancelled corresponds to other).
-- CASE_NOT_COVERED: Add a scenario or declare coverage truthfully. Ask about missing behavior first.
+- CASE_NOT_COVERED: Add a scenario or declare coverage truthfully. Ask about missing behavior first. The message names high priority and the case's expected result, which is what the new scenario must end on.
 - EXPRESSED_WITHOUT_SCENARIO / COVERAGE_WITHOUT_REASON: Add a scenario or a reason for \`not_applicable\`/\`excluded\`.
 - RULE_ELEMENT_NOT_FOUND: Check rule.elements against element ids in the related option stages.
 - PENDING_AI_ASSUMPTION: Ask the user to confirm; keep \`pending\` until then.

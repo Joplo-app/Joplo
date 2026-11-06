@@ -123,6 +123,11 @@ export function createBoardFr(locale: Locale = 'fr') {
       appearanceButtonLabel: (p0: Value) => `Apparence · ${value(p0, locale)}`,
       picked: "✓ Retenue",
       allCovered: "Tout est couvert",
+      // D67：情况的优先级与期望结果（PM 的 Then）
+      highPriority: "Priorité haute",
+      expected: "Résultat attendu",
+      expectedNotWritten: "Aucun résultat attendu",
+      missingHighCount: (n: number) => `${value(n, locale)} prioritaires`,
       clickToSwitch: (p0: Value) => `${value(p0, locale)} (cliquer pour changer)`,
       options: "Options",
       itemCount: (p0: Value) => `${value(p0, locale)}`,

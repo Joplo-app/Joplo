@@ -144,6 +144,8 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)}（这是${value(p1, locale)}的演示结果，不代表真实服务的返回）`,
       stepProgress: (p0: Value, p1: Value) => `第 ${value(p0, locale)} / ${value(p1, locale)} 步`,
       coverStart: "开始",
+      /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
+      forRoles: (names: string[]) => `面向：${list(names, locale)}`,
       coverStartTitle: "从头开始播放",
       coverSteps: (n: number) => `约 ${number(n, locale)} 步`,
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `约 ${number(d.value, locale)} 秒` : `约 ${number(d.value, locale)} 分钟`,

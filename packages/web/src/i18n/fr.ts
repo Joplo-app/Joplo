@@ -130,6 +130,8 @@ export function createFr(locale: Locale = 'fr') {
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)} (résultat de démo pour ${value(p1, locale)}, pas une réponse d’un service réel)`,
       stepProgress: (p0: Value, p1: Value) => `Étape ${value(p0, locale)} / ${value(p1, locale)}`,
       coverStart: "Commencer",
+      /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
+      forRoles: (names: string[]) => `Pour : ${list(names, locale)}`,
       coverStartTitle: "Lire depuis le début",
       coverSteps: (n: number) => plural(n, { one: 'Environ # étape', other: 'Environ # étapes' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `Environ ${number(d.value, locale)} s` : `Environ ${number(d.value, locale)} min`,

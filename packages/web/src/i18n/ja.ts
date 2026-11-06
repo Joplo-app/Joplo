@@ -130,6 +130,8 @@ export function createJa(locale: Locale = 'ja') {
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)}（${value(p1, locale)} のデモ結果であり、実際のサービスからの応答ではありません）`,
       stepProgress: (p0: Value, p1: Value) => `ステップ ${value(p0, locale)}／${value(p1, locale)}`,
       coverStart: "開始",
+      /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
+      forRoles: (names: string[]) => `対象：${list(names, locale)}`,
       coverStartTitle: "最初から再生",
       coverSteps: (n: number) => plural(n, { other: '約 # ステップ' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `約 ${number(d.value, locale)} 秒` : `約 ${number(d.value, locale)} 分`,

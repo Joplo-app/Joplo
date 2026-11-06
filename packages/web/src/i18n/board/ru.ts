@@ -123,6 +123,11 @@ export function createBoardRu(locale: Locale = 'ru') {
       appearanceButtonLabel: (p0: Value) => `Вид · ${value(p0, locale)}`,
       picked: "✓ Выбрано",
       allCovered: "Всё охвачено",
+      // D67：情况的优先级与期望结果（PM 的 Then）
+      highPriority: "Высокий приоритет",
+      expected: "Ожидаемый результат",
+      expectedNotWritten: "Ожидаемый результат не указан",
+      missingHighCount: (n: number) => `высокий приоритет: ${value(n, locale)}`,
       clickToSwitch: (p0: Value) => `${value(p0, locale)} (нажмите для смены)`,
       options: "Варианты",
       itemCount: (p0: Value) => `${value(p0, locale)}`,

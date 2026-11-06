@@ -2,7 +2,7 @@ import { feature, question, rule } from '@joplo-app/kit';
 
 export default feature({
   name: '团队成员邀请',
-  goal: '空间管理员邀请成员加入空间，并指定其协作权限',
+  goal: '空间管理员邀请同事加入空间并指定权限，让新成员当天就能开始协作',
   roles: ['空间管理员', '普通成员', '受邀者'],
   constraints: {
     admin_only: '非管理员不能邀请',
@@ -13,8 +13,8 @@ export default feature({
     happy: { title: '正常发出邀请并被接受', priority: 'high', expected: '管理员发出邀请，受邀者接受后成为成员' },
     no_permission: { title: '非管理员尝试邀请', dimension: 'permission', priority: 'high', expected: '不能发起邀请，并看到原因' },
     invalid_input: { title: '邮箱为空或格式无效', dimension: 'input', priority: 'high', expected: '阻止提交并就地提示' },
-    revoked: { title: '邀请被撤销后再次打开链接', dimension: 'lifecycle', priority: 'high' },
-    expired: { title: '邀请过期后访问', dimension: 'lifecycle' },
+    revoked: { title: '邀请被撤销后再次打开链接', dimension: 'lifecycle', priority: 'high', expected: '说明邀请已失效，并告诉对方去找空间管理员' },
+    expired: { title: '邀请过期后访问', dimension: 'lifecycle', expected: '说明邀请已过期，可以请管理员重新邀请' },
     already_member: { title: '被邀请人已经是成员', dimension: 'conflict' },
     duplicate_submit: { title: '连续点击发送', dimension: 'conflict', expected: '只创建一次邀请' },
     request_failed: { title: '发送请求失败', dimension: 'async', priority: 'high', expected: '明确失败，保留输入，可以重试' },

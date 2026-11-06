@@ -63,7 +63,7 @@ export const Kbd = c('Kbd');
 export const Blockquote = c('Blockquote');
 export const List = Object.assign(c('List'), { Item: c('List.Item') });
 export const Badge = c('Badge');
-export const Avatar = c('Avatar');
+export const Avatar = Object.assign(c('Avatar'), { Group: c('Avatar.Group') });
 export const Image = c('Image');
 export const ThemeIcon = c('ThemeIcon');
 export const Indicator = c('Indicator');
@@ -93,7 +93,7 @@ export const Textarea = c('Textarea');
 export const Select = c('Select');
 export const MultiSelect = c('MultiSelect');
 export const Checkbox = c('Checkbox');
-export const Radio = Object.assign(c('Radio'), { Group: c('Radio.Group') });
+export const Radio = Object.assign(c('Radio'), { Group: c('Radio.Group'), Card: c('Radio.Card') });
 export const Switch = c('Switch');
 export const SegmentedControl = c('SegmentedControl');
 export const FileInput = c('FileInput');
@@ -151,6 +151,27 @@ export const Phone = c('Phone');
  * <Diagram.Edge from="client" to="brain" label="发送消息" state={$.ui.e1} /></Diagram>`。state 由 flow 步骤里的 set() 驱动。
  */
 export const Diagram = Object.assign(c('Diagram'), { Group: c('Diagram.Group'), Node: c('Diagram.Node'), Edge: c('Diagram.Edge') });
+
+// ---------- 产品界面（D68） ----------
+/** 空状态 / 结果页：`<EmptyState icon="✉" title="还没有成员" description="邀请同事一起协作"><Button id="invite">邀请成员</Button></EmptyState>`。 */
+export const EmptyState = c('EmptyState');
+/** 列表行：`<ListRow avatar="阿杰" title="阿杰" description="已确认"><Badge>成员</Badge></ListRow>`；右侧内容放在子节点里。 */
+export const ListRow = c('ListRow');
+/** 指标卡：`<Stat label="本月注册" value={$.data.signups} diff="+12%" />`。 */
+export const Stat = c('Stat');
+/** 键值清单：`<KeyValue items={[{ label: '席位', value: '5 个' }, { label: '合计', value: '¥ 450' }]} total />`。 */
+export const KeyValue = c('KeyValue');
+/** 低保真图表（对齐 @mantine/charts）：`<BarChart data={$.data.weeks} dataKey="week" series={[{ name: 'signups', label: '注册' }]} />`。 */
+export const BarChart = c('BarChart');
+export const LineChart = c('LineChart');
+/**
+ * 菜单（对齐 Mantine）：opened 写在 Menu 上，下拉只在为真时出现。
+ * `<Menu opened={$.ui.rowMenu}><Menu.Target><ActionIcon id="row_more" aria-label="更多">⋯</ActionIcon></Menu.Target>
+ *  <Menu.Dropdown><Menu.Item id="revoke" color="red">撤销邀请</Menu.Item></Menu.Dropdown></Menu>`
+ */
+export const Menu = Object.assign(c('Menu'), { Target: c('Menu.Target'), Dropdown: c('Menu.Dropdown'), Item: c('Menu.Item'), Label: c('Menu.Label'), Divider: c('Menu.Divider') });
+/** 手机底部标签栏：`<TabBar id="tabs" aria-label="底部导航" value={$.ui.tab} data={[{ value: 'home', label: '首页', icon: '⌂' }]} />`，select 切换。 */
+export const TabBar = c('TabBar');
 
 // ---------- Joplo ----------
 export const Placeholder = c('Placeholder');

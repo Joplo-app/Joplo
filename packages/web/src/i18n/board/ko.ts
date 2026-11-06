@@ -123,6 +123,11 @@ export function createBoardKo(locale: Locale = 'ko') {
       appearanceButtonLabel: (p0: Value) => `모양 · ${value(p0, locale)}`,
       picked: "✓ 채택됨",
       allCovered: "모두 반영됨",
+      // D67：情况的优先级与期望结果（PM 的 Then）
+      highPriority: "높은 우선순위",
+      expected: "기대 결과",
+      expectedNotWritten: "기대 결과 미작성",
+      missingHighCount: (n: number) => `높음 ${value(n, locale)}`,
       clickToSwitch: (p0: Value) => `${value(p0, locale)}(클릭하여 전환)`,
       options: "안",
       itemCount: (p0: Value) => `${value(p0, locale)}`,

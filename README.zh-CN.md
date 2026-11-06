@@ -58,21 +58,23 @@ npx joplo skill install                  # 在 Joplo 项目里：与项目安装
 ```sh
 npx joplo skill
 npx joplo skill authoring
+npx joplo skill story
 npx joplo skill cases
 npx joplo skill demo
 npx joplo skill install --agents-md
 ```
 
-七个主题为 `authoring`、`demo`、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
+八个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
 
 看板运行时，在另一个终端执行：
 
 ```sh
 npx joplo check
+npx joplo outline
 npx joplo selection
 ```
 
-`check` 每个问题输出一行，包含文件、行、列、级别与代码。error 退出 1，用法错误退出 2，只有 warning/info 时退出 0。在看板中按住 Option/Alt 单击后，`selection` 返回标签、定位和目标行前后各三行源码。
+`outline` 列出每个功能给谁、解决什么，每个情况的期望结果与各方案的覆盖，以及每个场景的步数和估算时长。`check` 每个问题输出一行，包含文件、行、列、级别与代码。error 退出 1，用法错误退出 2，只有 warning/info 时退出 0。在看板中按住 Option/Alt 单击后，`selection` 返回标签、定位和目标行前后各三行源码。
 
 ## 项目结构
 

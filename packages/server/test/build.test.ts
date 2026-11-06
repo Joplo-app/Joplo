@@ -30,8 +30,9 @@ describe('buildSite', () => {
   it('缺省输出到 <项目>/dist，只含选定方案的路径与场景', async () => {
     const r = await buildSite({ projectDir: dir });
     expect(r.outDir).toBe(path.join(dir, 'dist'));
-    expect(r.routes).toEqual(['/members', '/settings']);
-    expect(r.scenarios.sort()).toEqual(['invite.a-modal.denied', 'invite.a-modal.failure', 'invite.a-modal.success']);
+    // /join 由选定方案 A 新增（D68 样板的失效页），随方案发布；B 的 /members/invite 不发布
+    expect(r.routes).toEqual(['/join', '/members', '/settings']);
+    expect(r.scenarios.sort()).toEqual(['invite.a-modal.denied', 'invite.a-modal.failure', 'invite.a-modal.revoke', 'invite.a-modal.success']);
     expect(r.files).toContain('index.html');
     expect(r.files.some((f) => f.endsWith('.css'))).toBe(true);
     expect(r.files.some((f) => f.endsWith('.js'))).toBe(false); // 入口脚本已内联

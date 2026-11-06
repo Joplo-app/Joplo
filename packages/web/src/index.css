@@ -245,6 +245,13 @@
     border-radius: 0 !important;
     box-shadow: none !important;
   }
+  /* D68：圆形的盒子（头像、图标圈）在手绘描边下也保持圆形底色，不再是方块；头像组里加一圈底色描边分开彼此 */
+  .jstage[data-stroke] .jbox[data-jround] {
+    border-radius: 999px !important;
+  }
+  .jstage[data-stroke] .javatar-group > .jbox {
+    box-shadow: 0 0 0 2px var(--jp-surface) !important;
+  }
   .jbox > :not(.jrough) {
     position: relative;
     z-index: 1;
@@ -295,6 +302,9 @@
   .jstage .jtable td { padding: 8px 12px; border-bottom: 1px solid var(--jp-line); vertical-align: top; }
   .jstage .jtable tbody tr:last-child td { border-bottom: none; }
   .jstage .jtable-striped tbody tr:nth-child(odd) td { background: var(--jp-subtle); }
+  /* D68：DataTable 选中行、加载中；Avatar.Group 叠放 */
+  .jstage .jtable tr[data-jselected-row] td { background: color-mix(in srgb, var(--jp-info) 9%, var(--jp-surface)); }
+  .jstage .javatar-group > * + * { margin-left: var(--javatar-overlap, -8px); }
 
   .jtrunc {
     overflow: hidden;

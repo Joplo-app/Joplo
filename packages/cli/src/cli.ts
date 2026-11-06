@@ -2,7 +2,7 @@ import { Command, CommanderError, Option } from 'commander';
 import { terminalText } from './cloud-error.ts';
 import type { CloudDependencies } from './cloud.ts';
 import { resolve } from 'node:path';
-import { COMPONENT_DOCS, guide, JoploError, skillIndex, skillTopic } from '@joplo-app/core';
+import { COMPONENT_DOCS, componentDetails, guide, JoploError, skillIndex, skillTopic } from '@joplo-app/core';
 import type * as Server from '@joplo-app/server';
 import { check } from './check.ts';
 import { initProject, initSummary } from './init.ts';
@@ -135,6 +135,19 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     } else { for (const d of report.diagnostics) line(diagnosticLine(d)); line(summary); }
     if (report.summary.error) exitCode = 1;
   });
+  program.command('outline').description('Print who each feature is for, its cases with expected results and coverage, and every scenario\'s steps and estimated duration')
+    .argument('[dir]', 'Project directory', '.').addOption(format()).option('--option <qid>', 'Only the specified option').action(async (dir, opts) => {
+      const { readOutline, outlineText } = await import('./outline.ts');
+      const r = await readOutline(dir, opts.option);
+      if (opts.format === 'json') json(r.outline ? result(r.name, `${r.outline.features.length} feature(s)`, { outline: r.outline, summary: r.summary }, r.diagnostics) : { ...failure(new JoploError('INVALID_SCHEMA', `${r.summary.error} error`, { diagnostics: r.diagnostics })), data: { outline: null, summary: r.summary } });
+      else for (const l of outlineText(r)) line(l);
+      // 与 check 一致：有 error 时退出 1（大纲照常输出，编译不出 IR 时只写错误数）
+      if (!r.outline || r.summary.error) exitCode = 1;
+    });
+  program.command('components').description('List catalog components, or show props and an example for the named ones (same catalog as joplo skill components)')
+    .argument('[names...]', 'Component names, for example EmptyState Menu').action((names: string[]) => {
+      stdout(names.length ? componentDetails(names) : skillTopic('components', COMPONENT_DOCS));
+    });
   program.command('selection').argument('[dir]', 'Project directory', '.').addOption(format()).action(async (dir, opts) => {
     const data = await readSelection(dir);
     const summary = data.selection ? `${data.selection.at ?? 'No source location'}  ${oneLine(data.selection.label ?? '')}` : 'Nothing selected';

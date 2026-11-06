@@ -1,5 +1,5 @@
-import { $, done, flow, not, notEmpty, option, rule, set, push, toast, undecided, uses } from '@joplo-app/kit';
-import { Alert, Button, Group, Loader, Modal, Select, Stack, Text, TextInput } from '@joplo-app/kit/ui';
+import { $, done, flow, go, not, notEmpty, option, page, rule, set, push, toast, undecided, uses } from '@joplo-app/kit';
+import { ActionIcon, Alert, Button, Center, EmptyState, Group, Loader, Menu, Modal, Notification, Select, Stack, Text, TextInput } from '@joplo-app/kit/ui';
 
 import { members, pending } from '../sample.ts';
 
@@ -31,12 +31,33 @@ export default option({
           邀请成员
         </Button>
       ),
-      notice: (
+      notice: [
         <Alert id="alert_denied" color="gray" when={not($.ui.isAdmin)}>
           你是普通成员，邀请新成员需要联系空间管理员。
-        </Alert>
+        </Alert>,
+        // 撤销之后的撤回条（D68 Notification 浮层）：浮在页面底部
+        <Notification id="note_revoked" when={$.ui.revoked} position="bottom" color="gray" icon="↺" title="已撤销 zhao.lei@example.com 的邀请" withCloseButton={false}>
+          <Group justify="space-between" gap="xs">
+            邀请链接已失效
+            <Button id="btn_undo_revoke" variant="subtle" size="xs" unmodeled note="5 秒内可以撤回，本版未建模撤回流程">撤回</Button>
+          </Group>
+        </Notification>,
+      ],
+      // 待接受邀请的行操作（D68 Menu）：只对管理员显示
+      'pending.actions': (
+        <Menu id="menu_pending" opened={$.ui.pendingMenu} position="bottom-end" when={$.ui.isAdmin}>
+          <Menu.Target>
+            <ActionIcon id="btn_pending_more" variant="subtle" aria-label="管理待接受的邀请">⋯</ActionIcon>
+          </Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Label>zhao.lei@example.com</Menu.Label>
+            <Menu.Item id="mi_copy_link" leftSection="🔗" unmodeled>复制邀请链接</Menu.Item>
+            <Menu.Divider />
+            <Menu.Item id="mi_revoke" leftSection="✕" color="red">撤销邀请</Menu.Item>
+          </Menu.Dropdown>
+        </Menu>
       ),
-      overlay: (
+      overlay: [
         <Modal id="dlg_invite" opened={$.ui.inviteOpen} title="邀请成员">
           <Stack gap="md">
             <Text size="sm" c="dimmed">被邀请人会收到一封邮件，接受后加入本空间。</Text>
@@ -60,12 +81,32 @@ export default option({
               <Button id="btn_send" disabled={$.ui.sending} disabledReason="正在发送，防止重复提交">发送邀请</Button>
             </Group>
           </Stack>
-        </Modal>
-      ),
+        </Modal>,
+        // 危险操作的二次确认：说清后果，取消在左、确认在右
+        <Modal id="dlg_revoke" opened={$.ui.revokeOpen} title="撤销这个邀请？" size="sm">
+          <Text size="sm">zhao.lei@example.com 的邀请链接会立即失效。之后还可以重新邀请。</Text>
+          <Group justify="flex-end" gap="xs">
+            <Button id="btn_revoke_cancel" variant="default" unmodeled>取消</Button>
+            <Button id="btn_revoke_confirm" color="red">撤销邀请</Button>
+          </Group>
+        </Modal>,
+      ],
     },
   },
 
-  state: { ui: { isAdmin: true, inviteOpen: false, sending: false, error: '' }, data: { members, pending } },
+  // 受邀者打开失效的链接（D68 EmptyState）：不进空间外壳
+  routes: {
+    '/join': page(
+      { title: '加入空间', layout: false },
+      <Center h="100%">
+        <EmptyState id="empty_revoked" icon="⌛" title="这个邀请已经失效" description={'邀请人撤销了这个邀请。\n请联系空间管理员重新邀请你。'}>
+          <Button id="btn_contact_admin" variant="default" unmodeled>联系空间管理员</Button>
+        </EmptyState>
+      </Center>,
+    ),
+  },
+
+  state: { ui: { isAdmin: true, inviteOpen: false, sending: false, error: '', pendingMenu: false, revokeOpen: false, revoked: false }, data: { members, pending } },
 
   rules: {
     keep_input: rule('发送失败后保留已填写的邮箱和权限，允许直接重试', { cases: ['request_failed'], elements: ['alert_send_error'] }),
@@ -85,6 +126,16 @@ export default option({
         set($.ui.sending, false), set($.ui.error, '网络超时。已保留你填写的内容，可以重试。'), uses('keep_input'))
       .click('btn_send', '点击「发送邀请」重试', set($.ui.sending, true), set($.ui.error, ''), uses('keep_input'))
       .system('邀请请求成功（模拟）', ...sent),
+
+    // PM 视角：Given 有一个待接受的邀请 → When 管理员撤销、对方再打开链接 → Then 看到“已失效”和下一步（revoked 的 expected）
+    revoke: flow('撤销邀请后对方再打开链接', { cases: ['revoked'], start: '/members', description: '管理员撤销邀请，赵磊再打开链接时看到已失效',
+      expected: '链接页说明邀请已失效，并告诉对方去找空间管理员' })
+      .click('btn_pending_more', '打开待接受邀请的菜单', set($.ui.pendingMenu, true))
+      .click('mi_revoke', '选择「撤销邀请」', set($.ui.pendingMenu, false), set($.ui.revokeOpen, true), uses('revocable'))
+      .click('btn_revoke_confirm', '确认后邀请立即失效', set($.ui.revokeOpen, false), set($.ui.revoked, true),
+        set($.data.pending, [{ email: 'zhao.lei@example.com', role: '查看者', status: '已撤销' }]), uses('revocable'))
+      .card('第二天', { sub: '赵磊打开了邮件里的邀请链接' })
+      .system('打开邀请链接', '链接页说明已失效和下一步', go('/join'), done('赵磊知道邀请已失效、该找谁')),
 
     denied: flow('普通成员无权邀请', { cases: ['no_permission'], outcome: 'denied', mock: '模拟普通成员身份', state: { ui: { isAdmin: false } },
       expected: '「邀请成员」按钮禁用，点击时说明只有管理员可以邀请' }),

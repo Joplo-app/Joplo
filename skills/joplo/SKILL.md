@@ -17,11 +17,12 @@ Options (A/B) and cases (edge cases) are compared in the local board; only the p
 ## Workflow
 1. No joplo.config.ts yet: npx joplo@latest init <dir>, or npx joplo@latest init . for the current directory, then npm install there (versions are pinned). Agent and Git files (.git, .gitignore, .agents, .claude, AGENTS.md, skills-lock.json) do not count as content; other existing files need init . --keep, which only adds missing files. init skips these skills when the same version is already installed and never overwrites edited ones. In an existing Joplo project, use its installed npx joplo.
 2. Read npx joplo skill authoring; read cases before asking the user about edge cases; demo and components as needed.
-3. With minimal code, write one happy path and one error-and-recovery scenario.
-4. Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.
-5. Extend to every option and every case agreed with the user; run check until 0 errors.
-6. Give the user the board URL and a short list of what to check, then wait for their feedback.
-7. After the user agrees: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. Apply review results with the joplo-feedback skill.
+3. Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case's expected is its Then); show the plan to the user. A demo is a story, not a feature tour.
+4. With minimal code, write one happy path and one error-and-recovery scenario.
+5. Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.
+6. Extend to every option and every case agreed with the user; run check until 0 errors.
+7. Give the user the board URL and a short list of what to check, then wait for their feedback.
+8. After the user agrees: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. Apply review results with the joplo-feedback skill.
 
 ## Common pitfalls
 - when takes a condition, not a boolean: when={eq($.ui.mode, 'code')}, never when={mode === 'code'}; for values known while writing use {flag && <X/>}. See npx joplo skill authoring.
@@ -33,7 +34,7 @@ Options (A/B) and cases (edge cases) are compared in the local board; only the p
 - Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user. See npx joplo skill cases.
 - Never share or deploy without the user's go-ahead; free share links expire after 1 hour. See npx joplo skill publish.
 
-Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, demo, components, cases, check, selection, publish). Run npx joplo skill for the overview.
+Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, components, cases, check, selection, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.
 After the user Alt+clicks a board element, run npx joplo selection and edit only that location.
 Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.7 sha256:bd3c8e2cdbaaf778a57de108719c1f443474b94d5658fd381c1d2b981b5f5092 -->
+<!-- joplo-skill 0.2.7 sha256:009f6b8bc78d069841fffa7a825f8febf5574d75074d1beb0ec14f38b4f60edd -->

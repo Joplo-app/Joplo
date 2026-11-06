@@ -142,6 +142,8 @@ export function createEn(locale: Locale = 'en') {
       demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)} (this is a demo result for ${value(p1, locale)}, not a response from a live service)`,
       stepProgress: (p0: Value, p1: Value) => `Step ${value(p0, locale)} / ${value(p1, locale)}`,
       coverStart: "Start",
+      /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
+      forRoles: (names: string[]) => `For: ${list(names, locale)}`,
       coverStartTitle: "Play from the beginning",
       coverSteps: (n: number) => plural(n, { one: 'About # step', other: 'About # steps' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `About ${number(d.value, locale)} sec` : plural(d.value, { one: 'About # min', other: 'About # min' }, locale),

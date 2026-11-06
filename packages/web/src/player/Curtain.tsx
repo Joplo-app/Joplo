@@ -151,7 +151,7 @@ function SceneCover({ cover, k, onStart }: { cover: CoverContent; k: number; onS
           {cover.title}
         </h2>
         {cover.description ? (
-          <p className="m-0 max-w-full" style={{ maxWidth: px(680), fontSize: px(19), lineHeight: 1.5, color: JP_SECONDARY, ...clampLines(2) }} title={cover.description} data-testid="cover-description">
+          <p className="m-0 max-w-full" style={{ maxWidth: px(680), fontSize: px(19), lineHeight: 1.5, color: JP_SECONDARY, ...clampLines(2) }} title={cover.description} data-testid="cover-description" data-from={cover.descriptionFrom ?? undefined}>
             {cover.description}
           </p>
         ) : null}
