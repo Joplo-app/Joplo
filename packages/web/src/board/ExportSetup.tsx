@@ -19,7 +19,7 @@ import { Download, RotateCw } from 'lucide-react';
 import { fetchExportRuntime, installExportRuntime, watchExportRuntime, type ExportRuntimeStatus, type InstallJob } from '../runtime/dev-client';
 
 /** 安装进度的文字与百分比（纯函数）。 */
-export function setupProgress(job: InstallJob, i18n: BoardMessages = boardEnglish): { text: string; percent: number } {
+export function setupProgress(job: InstallJob, i18n: Pick<BoardMessages, 'board'> = boardEnglish): { text: string; percent: number } {
   const percent = Math.max(0, Math.min(100, Math.round(job.percent)));
   const text =
     job.phase === 'package' ? i18n.board.exportSetupInstallingPlaywright
