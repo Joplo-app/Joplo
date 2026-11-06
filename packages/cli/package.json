@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/cli",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Joplo 命令实现（init / dev / check / build / render / selection）；通常经由 joplo 命令入口使用",
   "license": "Apache-2.0",
   "type": "module",
