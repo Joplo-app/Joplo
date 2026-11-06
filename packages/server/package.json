@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/server",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Joplo 本地服务：dev 看板、build 发布站、render 截图",
   "license": "Apache-2.0",
   "type": "module",
