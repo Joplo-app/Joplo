@@ -42,9 +42,10 @@ export const THEME_VARS = [
   '--jp-stroke',
 ] as const;
 
-const HAND = '"Joplo Excalifont", "Joplo Xiaolai", "PingFang SC", sans-serif';
+/** 手写：英文 Excalifont，中文霞鹜漫黑（D56 后续：小赖太细、小字不清楚）；漫黑缺的字再用小赖。 */
+const HAND = '"Joplo Excalifont", "Joplo Marker Gothic", "Joplo Xiaolai", "PingFang SC", sans-serif';
 const SYSTEM = 'system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-const MONO = 'ui-monospace, SFMono-Regular, Menlo, "Joplo Xiaolai", monospace';
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, "Joplo Marker Gothic", monospace';
 
 type Vars = Partial<Record<(typeof THEME_VARS)[number], string>>;
 const block = (v: Vars, extra = '') => `:root {\n${Object.entries(v).map(([k, x]) => `  ${k}: ${x};`).join('\n')}\n}\n${extra}`;
@@ -137,7 +138,7 @@ export const BUILTIN: { name: string; title: string; dark: boolean; vars: Vars; 
     title: '复古终端',
     dark: true,
     vars: {
-      '--jp-font': 'SFMono-Regular, Menlo, ui-monospace, "Joplo Xiaolai", monospace', '--jp-font-mono': 'SFMono-Regular, Menlo, ui-monospace, "Joplo Xiaolai", monospace', '--jp-font-size': '14px',
+      '--jp-font': 'SFMono-Regular, Menlo, ui-monospace, "Joplo Marker Gothic", monospace', '--jp-font-mono': 'SFMono-Regular, Menlo, ui-monospace, "Joplo Marker Gothic", monospace', '--jp-font-size': '14px',
       '--jp-ink': '#3dff6e', '--jp-bg': '#050a06', '--jp-surface': '#0b150d', '--jp-subtle': '#112016',
       '--jp-muted': '#2fbf58', '--jp-faint': '#1f8a3e', '--jp-line': '#1a4a27', '--jp-line-strong': '#2a7a40', '--jp-border': '#3dff6e',
       '--jp-accent': '#ffd000', '--jp-select': '#ff6ad5', '--jp-info': '#5cdcff', '--jp-ok': '#c4ff4d', '--jp-warn': '#ffb000', '--jp-danger': '#ff5f56',

@@ -209,7 +209,31 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     delete wrap.dataset.cameraSettled;
     reveal();
     tick();
-    return () => cancelAnimationFrame(raf);
+    // 内容在停稳之后还会变（流式输出逐字变长、元素随后出现，D56）：每次变化后的下一帧重新测量，
+    // 镜头与高光始终套住目标的最终大小。只听文字与子节点变化，不听属性（markFocus 自己会改属性）。
+    let pending = 0;
+    const remeasure = () => {
+      pending = 0;
+      reveal();
+      const v = measure();
+      if (!v) return;
+      const q = (x: number) => Math.round(x * 2) / 2;
+      const sig = JSON.stringify([Math.round(v.k * 1000), q(v.tx), q(v.ty), v.rects.map((r) => [q(r.box.x), q(r.box.y), q(r.box.w), q(r.box.h)])]);
+      if (sig === last) return;
+      apply(v.k, v.tx, v.ty, opts.animate);
+      markFocus(v.els);
+      setView({ k: v.k, tx: v.tx, ty: v.ty, mode: v.mode, rects: v.rects });
+      last = sig;
+    };
+    const mo = content && spec.targets.length ? new MutationObserver(() => {
+      if (!pending) pending = requestAnimationFrame(remeasure);
+    }) : null;
+    mo?.observe(content!, { childList: true, characterData: true, subtree: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      cancelAnimationFrame(pending);
+      mo?.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [specKey, opts.width, opts.height, opts.animate, ...opts.deps]);
 

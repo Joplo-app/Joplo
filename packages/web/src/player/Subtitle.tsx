@@ -29,6 +29,7 @@ export function Subtitle({ content, theme, width, framed = false, fixedHeight, d
           <div className="flex min-w-0 flex-1 flex-col justify-center">
             <div className="text-[var(--jp-ink)]" style={{ fontSize: SUBTITLE_CAPTION_PX, lineHeight: 1.35, ...clamp(content.captionLines) }} data-jsubtitle-caption="">
               {content.kind === 'system' ? <span className="mr-2 inline-block whitespace-nowrap rounded bg-[var(--jp-info)] px-1.5 align-[2px] text-[12px] leading-[20px] text-white">系统</span> : null}
+              {content.kind === 'card' ? <span className="mr-2 inline-block whitespace-nowrap rounded border border-[var(--jp-line-strong)] px-1.5 align-[2px] text-[12px] leading-[18px] text-[var(--jp-muted)]">过渡</span> : null}
               {content.caption}
             </div>
             {content.explain ? (

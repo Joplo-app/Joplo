@@ -7,7 +7,7 @@
  *   dist/site-files.json       发布站需要复制的文件清单（不含看板专用的 JS）
  *   dist/project.css           作者 className 的 Tailwind 入口：与 index.css 相同的主题，但不扫描任何目录；
  *                              运行时由 @joplo-app/server 追加 `@source <项目目录>` 后编译
- *   dist/fonts/OFL.txt         手绘字体（Excalifont、Xiaolai）的 SIL OFL 1.1 许可证
+ *   dist/fonts/OFL*.txt        手绘字体（Excalifont、Xiaolai、霞鹜漫黑、霞鹜文楷）的 SIL OFL 1.1 许可证
  *   dist/manifest.json         版本与格式号，server 据此确认资源齐全
  *
  * 看板的 IR 推送依赖 `import.meta.hot`（Vite HMR 自定义事件）。预构建产物里没有 HMR 运行时，所以这里把
@@ -83,14 +83,14 @@ const indexCss = fs.readFileSync(path.join(SRC, 'index.css'), 'utf8');
 if (!/^@import "tailwindcss";$/m.test(indexCss)) throw new Error('index.css 缺少 @import "tailwindcss";，无法生成 project.css');
 const projectCss = indexCss
   .replace(/^@import "tailwindcss";$/m, '@import "tailwindcss" source(none);')
-  .replace(/^@import "\.\/fonts\/fonts\.css";\n/m, '')
+  .replace(/^@import "\.\/fonts\/[\w-]+\.css";\n/gm, '')
   .replace(/^@source .*;\n/gm, '');
 if (/^@import "\.\//m.test(projectCss)) throw new Error('index.css 新增了相对 @import；请同步更新 build-dist.mjs');
 fs.writeFileSync(path.join(DIST, 'project.css'), `/* 由 scripts/build-dist.mjs 从 src/index.css 生成：只编译作者 className 用到的工具类。 */\n${projectCss}`);
 
 // 4. 字体许可证
 fs.mkdirSync(path.join(DIST, 'fonts'), { recursive: true });
-fs.copyFileSync(path.join(SRC, 'fonts/OFL.txt'), path.join(DIST, 'fonts/OFL.txt'));
+for (const f of ['OFL.txt', 'OFL-MarkerGothic.txt', 'OFL-WenKai.txt']) fs.copyFileSync(path.join(SRC, 'fonts', f), path.join(DIST, 'fonts', f));
 
 // 5. 清单
 for (const f of ['index.html', 'site.html']) if (!fs.existsSync(path.join(APP, f))) throw new Error(`缺少 ${f}`);

@@ -45,4 +45,6 @@ Joplo 六个发行包使用 Apache-2.0，包名为 `joplo`、`@joplo-app/kit`、
 
 Excalifont 与 Xiaolai SC（小赖字体）使用 SIL OFL 1.1。woff2 子集来自 Excalidraw 0.18.1，版权与许可证在 [OFL.txt](../packages/web/src/fonts/OFL.txt)；构建后随 `@joplo-app/web` 的 dist/fonts/OFL.txt 分发。
 
+霞鹜漫黑（LXGW Marker Gothic v1.011）与霞鹜文楷 GB 屏幕阅读版（LXGW WenKai GB Screen v1.530）使用 SIL OFL 1.1，来自 lxgw 的 GitHub Release；用 `packages/web/scripts/split-cjk-fonts.py` 按小赖的分片范围切成 woff2 子集（文楷的附加许可允许为网页使用而切分和转换）。许可证在 [OFL-MarkerGothic.txt](../packages/web/src/fonts/OFL-MarkerGothic.txt)、[OFL-WenKai.txt](../packages/web/src/fonts/OFL-WenKai.txt)，随 dist/fonts/ 分发。
+
 依赖声明以根 [package.json](../package.json) 及 [kit](../packages/kit/package.json)、[core](../packages/core/package.json)、[cli](../packages/cli/package.json)、[server](../packages/server/package.json)、[web](../packages/web/package.json)、[入口包](../packages/joplo/package.json) 为准。许可证已核对本地安装包的元数据；升级时重新核对 package.json、锁文件和随包 LICENSE。

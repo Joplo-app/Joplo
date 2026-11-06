@@ -14,7 +14,7 @@
  */
 import { animate, type AnimationPlaybackControls } from 'motion';
 import { stepDwell, CAMERA_MS } from './pace';
-import { explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core';
+import { streamsOf, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core';
 import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 
 /** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */
@@ -73,6 +73,11 @@ export type Snapshot = {
    * 不在停留中（手动、执行动画中、停止后）为 null。
    */
   dwell: { position: number; ms: number; elapsed: number } | null;
+  /**
+   * 流式输出（D56）：播放（自动或下一步）刚提交第 position 步时，这一步 stream 的文字逐字出现，speed 是当时的速度。
+   * 任何别的方式改变状态（跳转、上一步、重置、热更新）都清空它，所以跳到某一步时直接显示全文。
+   */
+  streamAt: { position: number; speed: number } | null;
 };
 
 export const TIMING = {
@@ -105,6 +110,7 @@ export class DemoController {
     playing: false,
     paused: false,
     dwell: null,
+    streamAt: null,
     busy: false,
     activeStep: null,
     ripple: null,
@@ -148,6 +154,8 @@ export class DemoController {
   getSnapshot = () => this.snap;
 
   private set(patch: Partial<Snapshot>) {
+    // 状态被替换但不是播放提交的：不再逐字输出（跳到某一步直接显示全文）
+    if (patch.state !== undefined && patch.streamAt === undefined && patch.state !== this.snap.state) patch = { ...patch, streamAt: null };
     this.snap = { ...this.snap, ...patch };
     if (typeof window !== 'undefined') {
       const w = window as unknown as Record<string, unknown>;
@@ -428,7 +436,13 @@ export class DemoController {
         const step = sc.steps[index]!;
         const dwell = this.reducedMotion
           ? TIMING.reducedStep
-          : stepDwell({ texts: [step.caption, step.explain], speed: this.speed, cameraMoved: step.shots.length > 0 || !!step.directorLayer, dotMs: this.activeDotMs() });
+          : stepDwell({
+              texts: [step.caption, step.explain, ...(step.action.type === 'card' ? [step.action.sub, ...(step.action.points ?? [])] : [])],
+              speed: this.speed,
+              cameraMoved: step.shots.length > 0 || !!step.directorLayer,
+              dotMs: this.activeDotMs(),
+              streams: streamsOf(step).map((x) => x.value),
+            });
         const elapsed = Math.max(0, Math.round(performance.now() - this.committedAt));
         this.set({ dwell: { position: index + 1, ms: Math.max(dwell, elapsed), elapsed } });
         const ok2 = await this.wait(dwell - (performance.now() - this.committedAt), gen, true);
@@ -684,7 +698,9 @@ export class DemoController {
     const a = step.action;
     const reduced = this.reducedMotion;
 
-    if (step.kind === 'system' || a.type === 'event') {
+    if (a.type === 'card') {
+      // 过渡卡（D56）：直接提交，卡片淡入；停留由 play 的 dwell 负责
+    } else if (step.kind === 'system' || a.type === 'event') {
       this.set({ systemEvent: a.type === 'event' ? a.name : step.caption });
       if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.systemHold, gen))) return false;
     } else if ('target' in a) {
@@ -715,14 +731,14 @@ export class DemoController {
       if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.ripple, gen))) return false;
     }
     if (gen !== this.gen) return false;
-    if (!this.commit(sc)) return false;
+    if (!this.commit(sc, true)) return false;
     if (opts.moveCursor && !reduced && !(await this.wait(TIMING.afterStep, gen))) return false;
     if (gen === this.gen) this.set({ systemEvent: null, activeStep: null, ripple: null });
     return true;
   }
 
   /** 推进一步：唯一调用 applyStep 的地方。 */
-  private commit(sc: Scenario): boolean {
+  private commit(sc: Scenario, stream = false): boolean {
     const p = this.snap.project;
     const st = this.snap.state;
     this.inflight = null;
@@ -732,7 +748,7 @@ export class DemoController {
       const n = this.snap.notice;
       // 推进后，锚定在元素上的就地提示（禁用原因、未覆盖、越序）已过时，关闭它。
       this.committedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      this.set({ state: next, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
+      this.set({ state: next, streamAt: stream && streamsOf(sc.steps[st.position]).length ? { position: next.position, speed: this.speed } : null, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
       return true;
     } catch (e) {
       this.stop();

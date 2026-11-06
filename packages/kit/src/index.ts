@@ -71,11 +71,20 @@ export const question = (text: string, opts: { severity?: QuestionDef['severity'
   source: callsite(),
 });
 
+/**
+ * 角色（D56）：故事里的一个人。在 feature.roles 里用键声明，层级用 layer(…, { role: '键' }) 标明这是谁的画面，
+ * 过渡卡用 .card('…', { role: '键' }) 切到这个人。color 缺省按声明顺序自动分配。
+ *   roles: { xiaoyu: role('小雨', { desc: '发起露营的人' }), ajie: role('阿杰', { desc: '被拉进来的朋友' }) }
+ */
+export type RoleDef = { kind: 'role'; name: string; desc?: string; color?: string; source?: string };
+export const role = (name: string, opts: { desc?: string; color?: string } = {}): RoleDef => ({ kind: 'role', name, ...opts, source: callsite() });
+
 export type FeatureDef = {
   kind: 'feature';
   name: string;
   goal: string;
-  roles?: string[];
+  /** 角色：旧写法是名字数组（只作说明）；写成 { 键: role('名字') } 才能被层级和过渡卡引用。 */
+  roles?: string[] | Record<string, RoleDef>;
   constraints?: Record<string, string | { text: string; hard?: boolean }>;
   cases: Record<string, CaseDef>;
   rules?: Record<string, RuleDef>;
@@ -103,7 +112,8 @@ export type EffectDef =
   | { kind: 'effect'; type: 'uses'; rules: string[] }
   | { kind: 'effect'; type: 'shot'; targets: string[] }
   | { kind: 'effect'; type: 'explain'; text: string }
-  | { kind: 'effect'; type: 'trace'; ids: string[]; mode: 'ok' | 'fail' | 'skip' };
+  | { kind: 'effect'; type: 'trace'; ids: string[]; mode: 'ok' | 'fail' | 'skip' }
+  | { kind: 'effect'; type: 'stream'; path: string; value: string };
 
 const pathOf = (b: Bind | string): string => (isBind(b) ? bindPath(b) : b);
 export const set = (target: Bind, value: Json): EffectDef => ({ kind: 'effect', type: 'set', path: pathOf(target), value });
@@ -114,6 +124,12 @@ export const toast = Object.assign((text: string): EffectDef => ({ kind: 'effect
   error: (text: string): EffectDef => ({ kind: 'effect', type: 'toast', text, tone: 'error' }),
   info: (text: string): EffectDef => ({ kind: 'effect', type: 'toast', text, tone: 'info' }),
 });
+/**
+ * 流式输出（D56）：和 set 一样把文字写进状态，播放到这一步时绑定它的文字逐字出现（像模型在输出）。
+ * 跳到这一步、截图、发布站静态查看时直接显示全文。自动播放会等输出完再进下一步。
+ *   .system('助手回复', stream($.ui.reply, '周六晴，推荐去白河营地……'))
+ */
+export const stream = (target: Bind, text: string): EffectDef => ({ kind: 'effect', type: 'stream', path: pathOf(target), value: text });
 /** 跳转到另一个路径。 */
 export const go = (route: string): EffectDef => ({ kind: 'effect', type: 'go', route });
 /** 场景结束。 */
@@ -155,21 +171,30 @@ export const trace = Object.assign((...ids: string[]): EffectDef => ({ kind: 'ef
  * 各层共享同一份场景状态（ui / data / inputs），切层时步骤不变。需要全景就自己声明一个 overview 层。
  *   layers: { client: layer('客户端视角', <ClientView />), backend: layer('后端流转', <Arch />) }
  */
-export type LayerDef = { kind: 'layer'; title: string; tree: JNode | JNode[]; viewport?: 'desktop' | 'mobile'; source?: string };
-export const layer = (title: string, tree: JNode | JNode[], opts: { viewport?: 'desktop' | 'mobile' } = {}): LayerDef => ({ kind: 'layer', title, tree, ...opts, source: callsite() });
+export type LayerDef = { kind: 'layer'; title: string; tree: JNode | JNode[]; viewport?: 'desktop' | 'mobile'; role?: string; source?: string };
+/** opts.role：这一层是谁的画面（feature.roles 的键，D56）；画面角落显示这个人的名牌，层级标签带上头像。 */
+export const layer = (title: string, tree: JNode | JNode[], opts: { viewport?: 'desktop' | 'mobile'; role?: string } = {}): LayerDef => ({ kind: 'layer', title, tree, ...opts, source: callsite() });
 
 /** 步骤参数：字符串是字幕（可省略，省略时自动生成），其余是效果。 */
 export type StepArg = string | EffectDef;
 
+/**
+ * 过渡卡（D56）的内容：整屏一句大字，用于开场、收尾、时间跳跃（「3 天后」）和换人。
+ * sub：小一号的补充；points：收尾时列几条要点；role：换到哪个人（feature.roles 的键），卡片显示这个人，
+ * 卡片之后导演切到这个人的层级。
+ */
+export type CardOpts = { sub?: string; points?: string[]; role?: string };
+
 export type StepDef = {
-  kind: 'user' | 'system';
+  kind: 'user' | 'system' | 'card';
   action:
     | { type: 'click'; target: string }
     | { type: 'type'; target: string; value: string }
     | { type: 'select'; target: string; value: string }
     | { type: 'toggle'; target: string; value: boolean }
     | { type: 'back' }
-    | { type: 'event'; name: string };
+    | { type: 'event'; name: string }
+    | ({ type: 'card'; title: string } & CardOpts);
   caption?: string;
   effects: EffectDef[];
   source?: string;
@@ -219,6 +244,21 @@ export class Flow {
   }
   back(...args: StepArg[]): this {
     return this.add('user', { type: 'back' }, args);
+  }
+  /**
+   * 过渡卡（D56）：整屏一句大字，可以带效果（例如时间跳跃时 set 状态）。
+   *   .card('周末一起去露营', { sub: '用营地助手规划一次两个人的露营' })
+   *   .card('现在是阿杰', { role: 'ajie' })
+   *   .card('出发前一天', set($.data.weather, 'rain'))
+   *   .card('这个方案确认了', { points: ['行程单可以分享', '天气变了会主动提醒'] })
+   */
+  card(title: string, ...args: (CardOpts | EffectDef)[]): this {
+    const effects = args.filter((a): a is EffectDef => (a as EffectDef).kind === 'effect');
+    const opts = Object.assign({}, ...args.filter((a) => (a as EffectDef).kind !== 'effect')) as CardOpts;
+    const { sub, points, role } = opts;
+    const action = { type: 'card' as const, title, ...(sub ? { sub } : {}), ...(points?.length ? { points } : {}), ...(role ? { role } : {}) };
+    this.steps.push({ kind: 'card', action, effects, source: callsite(3) });
+    return this;
   }
   /** 系统事件，例如“请求成功（模拟）”。 */
   system(name: string, ...args: StepArg[]): this {

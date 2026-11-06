@@ -87,10 +87,10 @@ export function themeSwatch(css: string): { bg: string; ink: string; accent: str
 
 export const FONT_CHOICES: { value: AppearanceFont | null; name: string; sample: string }[] = [
   { value: null, name: '跟随主题', sample: '自动' },
-  { value: 'hand', name: '手写', sample: 'Aa 01' },
+  { value: 'hand', name: '漫黑', sample: '永 Aa' },
   { value: 'sans', name: '黑体', sample: '永 Aa' },
   { value: 'serif', name: '宋体', sample: '永 Aa' },
-  { value: 'kai', name: '楷体', sample: '永 Aa' },
+  { value: 'kai', name: '文楷', sample: '永 Aa' },
   { value: 'mono', name: '等宽', sample: 'Aa 01' },
 ];
 export const STROKE_CHOICES: { value: AppearanceStroke | null; name: string }[] = [

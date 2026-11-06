@@ -9,6 +9,16 @@ export const MS_PER_CHAR = 60;
 export const MIN_DWELL = 3000;
 /** 镜头过渡时长（camera.tsx 用同一个值）。 */
 export const CAMERA_MS = 1000;
+/** 流式输出（D56）：每个字的时长（1× 速度）；整段至少 STREAM_MIN、至多 STREAM_MAX。 */
+export const STREAM_MS_PER_CHAR = 35;
+export const STREAM_MIN = 600;
+export const STREAM_MAX = 9000;
+/** 一段流式文字逐字出现要多久（毫秒，已按速度缩放）。 */
+export function streamMs(text: string, speed = 1): number {
+  const n = [...text].length;
+  if (!n) return 0;
+  return Math.round(Math.min(STREAM_MAX, Math.max(STREAM_MIN, n * STREAM_MS_PER_CHAR)) / (speed > 0 ? speed : 1));
+}
 /** 镜头结束后再留一点余量，避免刚停稳就切走。 */
 const SETTLE = 200;
 
@@ -25,10 +35,13 @@ export const asSpeed = (v: unknown): Speed => (SPEEDS as readonly number[]).incl
  * 这一步提交之后至少停留多久（毫秒）。
  * text：说明与解说；cameraMoved：这一步镜头有变化（切层或换焦点）；dotMs：本步 active 连线上小点跑一圈的最长时间（没有为 0）。
  */
-export function stepDwell(o: { texts: (string | null | undefined)[]; speed?: number; cameraMoved?: boolean; dotMs?: number }): number {
+export function stepDwell(o: { texts: (string | null | undefined)[]; speed?: number; cameraMoved?: boolean; dotMs?: number; /** 本步流式输出的文字（D56）：等它们出完再加阅读时间。 */ streams?: string[] }): number {
   const speed = o.speed && o.speed > 0 ? o.speed : 1;
   const read = Math.max(MIN_DWELL, readChars(...o.texts) * MS_PER_CHAR) / speed;
   const cam = o.cameraMoved ? CAMERA_MS + SETTLE : 0;
   const dots = o.dotMs && o.dotMs > 0 ? o.dotMs + SETTLE : 0;
-  return Math.round(Math.max(read, cam, dots));
+  // 流式输出：先等最长的一段出完，再留出读完它的时间（按出完之后再读一遍的一半计）
+  const longest = Math.max(0, ...(o.streams ?? []).map((t) => streamMs(t, speed)));
+  const streamed = longest ? longest + Math.max(MIN_DWELL / speed, read / 2) : 0;
+  return Math.round(Math.max(read, cam, dots, streamed));
 }

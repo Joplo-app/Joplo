@@ -104,6 +104,8 @@ export const Action = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('toggle'), target: Id, value: z.boolean() }),
   z.strictObject({ type: z.literal('back') }),
   z.strictObject({ type: z.literal('event'), name: z.string().min(1) }),
+  /** 过渡卡（D56）：整屏一句大字；role = 换到这个人（feature.roles 的键）。 */
+  z.strictObject({ type: z.literal('card'), title: z.string().min(1), sub: z.string().min(1).optional(), points: z.array(z.string().min(1)).optional(), role: Id.optional() }),
 ]);
 
 export const Effect = z.discriminatedUnion('type', [
@@ -112,6 +114,8 @@ export const Effect = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('toast'), text: z.string().min(1), tone: z.enum(['success', 'error', 'info']).default('info') }),
   z.strictObject({ type: z.literal('navigate'), sceneId: Qid }),
   z.strictObject({ type: z.literal('complete'), text: z.string().min(1), outcome: z.enum(['success', 'failure', 'cancelled']) }),
+  /** 流式输出（D56）：状态上等同 set；播放到这一步时绑定它的文字逐字出现。 */
+  z.strictObject({ type: z.literal('stream'), path: StatePath, value: z.string() }),
 ]);
 
 /**
@@ -129,7 +133,7 @@ export const Shot = z.strictObject({ layer: z.string().min(1), targets: z.array(
 
 export const Step = z.strictObject({
   id: Qid,
-  kind: z.enum(['user', 'system']),
+  kind: z.enum(['user', 'system', 'card']),
   action: Action,
   caption: z.string().min(1),
   effects: z.array(Effect).default([]),
@@ -181,7 +185,8 @@ export const Feature = z.strictObject({
   id: Id,
   name: z.string().min(1),
   goal: z.string().min(1),
-  roles: z.array(z.string()).default([]),
+  /** 角色（D56）：id 来自 { 键: role('名字') } 写法，可被层级和过渡卡引用；旧的名字数组没有 id。color 已按顺序补齐。 */
+  roles: z.array(z.strictObject({ id: Id.optional(), name: z.string().min(1), desc: z.string().default(''), color: z.string().min(1) })).default([]),
   constraints: z.array(z.strictObject({ id: Id, text: z.string().min(1), hard: z.boolean().default(false) })).default([]),
   caseIds: z.array(Qid).default([]),
   optionIds: z.array(Qid).default([]),
@@ -222,7 +227,7 @@ export const Option = z.strictObject({
   routes: z.array(z.string()).default([]),
   coverage: z.record(Qid, Coverage).default({}),
   /** 层级（视角）：键 → 标题与这一层自己的画面（完全独立的页面）。演示信息，发布站保留。 */
-  layers: z.record(Id, z.strictObject({ title: z.string().min(1), sceneId: Qid })).default({}),
+  layers: z.record(Id, z.strictObject({ title: z.string().min(1), sceneId: Qid, role: Id.optional() })).default({}),
   source: Source,
 });
 

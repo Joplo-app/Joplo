@@ -23,7 +23,7 @@ export type SubtitleBadge =
 export type SubtitleContent = {
   /** 第几步（0 = 初始状态）。 */
   index: number;
-  kind: 'initial' | 'user' | 'system';
+  kind: 'initial' | 'user' | 'system' | 'card';
   caption: string;
   explain: string | null;
   /** 行数上限：说明一行、explain 一行（合计最多两行）。 */

@@ -120,7 +120,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       id: fid,
       name: fdef.name,
       goal: fdef.goal,
-      roles: fdef.roles ?? [],
+      roles: rolesOf(fdef.roles),
       constraints: Object.entries(fdef.constraints ?? {}).map(([id, c]) => (typeof c === 'string' ? { id, text: c, hard: true } : { id, text: c.text, hard: c.hard ?? true })),
       caseIds: mode === 'publish' ? [] : caseIds,
       optionIds: included.filter((o) => o.fid === fid).map((o) => o.qid),
@@ -215,8 +215,10 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       return null;
     };
 
+    /** 可被引用的角色键（D56）：feature.roles 写成 { 键: role('名字') } 时才有。 */
+    const roleKeys = new Set(fdef.roles && !Array.isArray(fdef.roles) ? Object.keys(fdef.roles) : []);
     // ---------- 层级（T-layers）：每层一个完全独立的画面，单独编译、单独渲染 ----------
-    const layers: Record<string, { title: string; sceneId: string }> = {};
+    const layers: Record<string, { title: string; sceneId: string; role?: string }> = {};
     const layerScenes: { key: string; scene: Scene }[] = [];
     const layerRoute = touched.find((r) => ctxRoutes.has(r)) ?? src.config.home ?? [...ctxRoutes][0] ?? '/';
     for (const [lk, ld] of Object.entries(def.layers ?? {})) {
@@ -238,7 +240,9 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       const scene: Scene = { id: sceneId, optionId: qid, route: layerRoute, name: `${ld.title} · ${def.name}`, viewport: ld.viewport ?? 'desktop', root, layer: lk };
       addScene(scene);
       layerScenes.push({ key: lk, scene });
-      layers[lk] = { title: ld.title, sceneId };
+      if (ld.role !== undefined && !roleKeys.has(ld.role))
+        err('ROLE_UNKNOWN', `层级「${ld.title}」的 role「${ld.role}」不在 feature.roles 里${roleKeys.size ? `（可用：${[...roleKeys].join('、')}）` : '（feature.roles 要写成 { 键: role(\'名字\') }）'}`, at);
+      layers[lk] = { title: ld.title, sceneId, ...(ld.role !== undefined && roleKeys.has(ld.role) ? { role: ld.role } : {}) };
     }
     const hasLayers = layerScenes.length > 0;
     /** 元素在哪些层级里（多层都有同名 id 时都算）。 */
@@ -339,6 +343,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
               if (q) ruleIds.push(q);
             }
           } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
+          else if (e.type === 'stream') effects.push({ type: 'stream', path: e.path, value: e.value });
           else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
           else if (e.type === 'shot') continue; // 镜头不是状态变化，下面单独归类
           else if (e.type === 'explain') {
@@ -386,12 +391,18 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         }
         // 没写 shot 的操作步骤：导演切到操作目标所在的层（播放时观众看得到要点的东西）
         if (hasLayers && !directorLayer && actionTarget) directorLayer = layersWith(actionTarget)[0] ?? null;
+        // 换人的过渡卡（D56）：卡片后面导演切到这个人的层级（卡片淡出时已经是 TA 的画面）
+        if (st.action.type === 'card' && st.action.role !== undefined) {
+          const r = st.action.role;
+          if (!roleKeys.has(r)) err('ROLE_UNKNOWN', `card("${st.action.title}") 的 role「${r}」不在 feature.roles 里${roleKeys.size ? `（可用：${[...roleKeys].join('、')}）` : ''}`, st.source);
+          else if (hasLayers && !directorLayer) directorLayer = Object.entries(layers).find(([, l]) => l.role === r)?.[0] ?? null;
+        }
         const shots = [...perLayer].map(([layer, targets]) => ({ layer, targets }));
         return {
           id: `${sid}#${i + 1}`,
           kind: st.kind,
           action: st.action,
-          caption: st.caption ?? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore),
+          caption: st.caption ?? (st.action.type === 'card' ? st.action.title : null) ?? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore),
           effects,
           ruleIds: mode === 'publish' ? [] : ruleIds,
           shots,
@@ -470,6 +481,16 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
 }
 
 // ---------- 帮助函数 ----------
+
+/** 角色的颜色（D56）：没写 color 时按声明顺序取。 */
+export const ROLE_COLORS = ['#E8590C', '#1971C2', '#2F9E44', '#9C36B5', '#C2255C', '#0C8599'] as const;
+
+function rolesOf(roles: FeatureDef['roles']): { id?: string; name: string; desc: string; color: string }[] {
+  if (!roles) return [];
+  const color = (i: number, c?: string) => c ?? ROLE_COLORS[i % ROLE_COLORS.length]!;
+  if (Array.isArray(roles)) return roles.map((name, i) => ({ name, desc: '', color: color(i) }));
+  return Object.entries(roles).map(([id, r], i) => ({ id, name: r.name, desc: r.desc ?? '', color: color(i, r.color) }));
+}
 
 function sortedEntries<T>(o: Record<string, T>): [string, T][] {
   return Object.entries(o).sort(([a], [b]) => a.localeCompare(b));
@@ -671,6 +692,8 @@ function autoCaption(st: StepDef, scene: Scene | undefined): string {
       return '返回上一页';
     case 'event':
       return a.name;
+    case 'card':
+      return a.title;
   }
 }
 
