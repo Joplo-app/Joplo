@@ -563,7 +563,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         if (failed.has(`${n.source}|${n.id}`)) return;
         failed.add(`${n.source}|${n.id}`);
         warn('DIAGRAM_LAYOUT_FAILED', `<${n.type}> "${n.id}" could not be laid out (${m}); showing a simple grid instead. Check the edges and groups of this diagram`, n.source, { kind: 'element', id: n.id });
-      });
+      }, sc.viewport);
   }
 
   // ---------- 8. 发布视图与评审版：去掉设计备注与源位置 ----------

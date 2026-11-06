@@ -346,6 +346,12 @@
   transition: filter 0.35s ease;
 }
 
+/* 图表里的压暗（D67 补充）：不相关的节点、连线压暗但仍可读（比一般界面元素淡得少） */
+.jstage [data-jfocus-dim] [data-jdiagram-canvas] [data-jfocus-path] > :not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]),
+.jstage [data-jfocus-dim] [data-jdiagram-canvas] > :not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]) {
+  filter: opacity(0.42) saturate(0.6);
+}
+
 /* 字幕区：字体与颜色跟随舞台主题（.jtheme 在主题的作用范围里） */
 .jsubtitle {
   font-family: var(--jp-font);

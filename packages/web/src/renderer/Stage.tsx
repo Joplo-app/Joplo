@@ -119,6 +119,12 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     [streamPaths, stream?.paused, stream?.speed, state.scenarioId, state.position],
   );
   const changed = useMemo(() => changedAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
+  // 本步的调用（D67 补充）：这一步 trace 到的节点与连线（不含 trace.skip）。图里只有它们突出，其余变细变浅
+  const traceNow = useMemo(() => {
+    const st = scenario?.steps[state.position - 1];
+    const ids = (st?.traces ?? []).filter((t) => t.mode !== 'skip').flatMap((t) => [...t.nodes, ...t.edges.map((e) => e.id)]);
+    return ids.length ? new Set(ids) : null;
+  }, [scenario, state.position]);
   const marks = useMemo(() => marksAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
   const keyboard = keyboardAt(scenario, state.position, activeStep, preview);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -279,7 +285,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
           {scene ? (
-            <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, traced, streaming, changed }}>
+            <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, traced, traceNow, streaming, changed }}>
               {/* 换层（换画面）时淡入 */}
               <motion.div key={shownId} className="absolute inset-0" ref={cam.contentRef} initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
                 <RenderNode node={scene.root} />

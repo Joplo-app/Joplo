@@ -44,9 +44,12 @@ export function diagramFocus(s: GraphStructure, targets: readonly string[] | nul
   return nodes.size || edges.size ? { nodes, edges } : null;
 }
 
-/** 聚焦时这条连线是否突出：连着焦点节点、本身是焦点，或 state 是 active / ok / error。 */
-export function edgeEmphasized(focus: { nodes: Set<string>; edges: Set<string> }, e: { id: string; from: string; to: string }, state: string): boolean {
-  return focus.edges.has(e.id) || focus.nodes.has(e.from) || focus.nodes.has(e.to) || state === 'active' || state === 'ok' || state === 'error';
+/**
+ * 本步没有调用线（只有 shot）时，这条连线是否突出：本身是焦点，或两端都是焦点节点（D67 补充：只连着一个焦点节点的
+ * 其他连线不再突出——那正是“分不清谁调用了谁”的来源）。本步有调用线时由渲染器只突出调用线，见 DiagramEdge。
+ */
+export function edgeEmphasized(focus: { nodes: Set<string>; edges: Set<string> }, e: { id: string; from: string; to: string }, _state?: string): boolean {
+  return focus.edges.has(e.id) || (focus.nodes.has(e.from) && focus.nodes.has(e.to));
 }
 
 /** 折线上按长度比例 t 处的点。 */

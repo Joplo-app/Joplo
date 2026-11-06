@@ -156,14 +156,15 @@ type DState = 'idle' | 'active' | 'ok' | 'error' | 'dim';
 type Common = JoploProps;
 /** 布局提示：pin 把元素放到所在分组（或整张图）的第一层 / 最后一层；同层顺序就是源码顺序。 */
 type Hints = { pin?: 'start' | 'end' };
-export type DiagramProps = Common & { id?: string; direction?: 'right' | 'down'; h?: number | string };
+/** direction 不写 = 按舞台比例自动选（D67 补充）；aspect = 想要的外框宽高比（缺省按舞台与 h 推算）。 */
+export type DiagramProps = Common & { id?: string; direction?: 'right' | 'down'; h?: number | string; aspect?: number };
 export type DiagramGroupProps = Common & Hints & { id?: string; label?: string; icon?: DiagramIcon; tone?: DiagramTone; group?: string };
 export type DiagramNodeProps = Common & Hints & { id: string; label?: string | Bind; description?: string | Bind; kind?: DiagramKind; group?: string; state?: DState | Bind };
 export type DiagramEdgeProps = Common & { id?: string; from: string; to: string; label?: string | Bind; async?: boolean; state?: DState | Bind };
 
 /**
  * 架构图（D41 / D67）：布局在编译期算好（ELK 分层 + 分组 + 正交走线），每一步坐标都相同。按业务域分组：
- *   <Diagram id="arch" direction="right">
+ *   <Diagram id="arch" h="100%">                               // 不写 direction：按舞台比例自动选
  *     <Diagram.Group id="gw" label="网关" icon="gateway" tone="blue"><Diagram.Node id="api" label="API" kind="service" /></Diagram.Group>
  *     <Diagram.Group id="data" label="存储" icon="database"><Diagram.Node id="pg" label="PostgreSQL" kind="database" /></Diagram.Group>
  *     <Diagram.Edge from="api" to="pg" label="读写" />            // 连线也可以连到分组：to="data"
@@ -176,7 +177,7 @@ export const Diagram = Object.assign(c('Diagram') as (p: DiagramProps) => any, {
   Edge: c('Diagram.Edge') as (p: DiagramEdgeProps) => any,
 });
 
-export type StateMachineProps = Common & { id?: string; direction?: 'right' | 'down'; h?: number | string; value?: string | Bind };
+export type StateMachineProps = Common & { id?: string; direction?: 'right' | 'down'; h?: number | string; aspect?: number; value?: string | Bind };
 export type StateProps = Common & Hints & { id: string; label?: string | Bind; description?: string | Bind; initial?: boolean; final?: boolean; group?: string; state?: DState | Bind };
 export type TransitionProps = Common & { id?: string; from: string; to: string; label?: string | Bind; state?: DState | Bind };
 /**

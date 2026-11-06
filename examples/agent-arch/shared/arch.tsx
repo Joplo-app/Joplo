@@ -33,7 +33,7 @@ export const ASK = '帮我把桌面「报销」文件夹里的发票整理成一
 
 // ---------- 架构图：每个节点都在业务域分组里（D67） ----------
 export const arch = (v: V): JNode => (
-  <Diagram id="arch" direction="down" h="100%">
+  <Diagram id="arch" h="100%">
     <Diagram.Group id="g_device" label="用户设备" icon="device" tone="gray">
       {[
         <Diagram.Node id="app" label="客户端界面" kind="client" description="对话、确认弹窗" />,
@@ -122,7 +122,7 @@ export const calls = (): JNode => (
 
 // ---------- 任务状态（方案 A）：value 绑定 data.task.status，步骤 set 它时对应的转换自动点亮 ----------
 export const lifecycle = (): JNode => (
-  <StateMachine id="task_sm" direction="right" h="100%" value={$.data.task.status}>
+  <StateMachine id="task_sm" h="100%" value={$.data.task.status}>
     <StateMachine.State id="idle" label="空闲" initial />
     <StateMachine.State id="checking" label="预检与取定义" description="Biz Server" />
     <StateMachine.Group id="sm_run" label="执行中" icon="brain" tone="purple">
