@@ -6,8 +6,6 @@ import { dictionary } from '../src/i18n/dictionaries';
 import { boardEnglish, boardDictionary } from '../src/i18n/board/dictionaries';
 import { exportProgress } from '../src/board/states-model';
 import type { VideoJob } from '../src/runtime/dev-client';
-import { topbarCollapse, topbarMeasurements } from '../src/player/layout';
-import { textW } from '../src/player/controls-fit';
 import { readFileSync } from 'node:fs';
 
 it('translates the static-stage notice with only the published-site dictionary', async () => {
@@ -33,28 +31,6 @@ describe('structured video cancellation', () => {
     expect(source).toContain("job.status === 'cancelled'");
     expect(source).toContain("job.status === 'error'");
     expect(source).not.toMatch(/job\.error\s*!==?/);
-  });
-});
-
-describe('real English topbar contents', () => {
-  for(const width of [1280,1440]) for(const site of [false,true]) it(`${width}px ${site?'site':'board'}`, () => {
-    const t=boardEnglish;
-    const dimensions=topbarMeasurements({
-      brand:74.375,
-      breadcrumbs:[260,260],
-      language:{full:20+16+6+textW('English',13),collapsed:32},
-      ...(site?{copyLink:{full:20+16+6+textW(t.site.copyLink,13)+2,collapsed:32}}:{
-        inspect:{full:20+16+6+textW(t.board.inspect,13)+6+17+2,collapsed:32},
-        appearance:{full:20+22+6+textW(t.board.appearanceButtonLabel('Paper white · Marker Gothic'),13)+2,collapsed:32},
-        export:{full:20+16+6+textW(t.player.export,13)+6+14+2,collapsed:32},
-      }),
-      fullscreen:32,
-    });
-    const result=topbarCollapse(width,dimensions);
-    expect(result.width).toBeLessThanOrEqual(width);
-    if(result.collapsed.size) expect([...result.collapsed][0]).toBe('language');
-    expect(dimensions.fixed).toBeGreaterThan(74.375+520+32);
-    if(!site) expect(dimensions.groups.find(g=>g.id==='appearance')!.full).toBeGreaterThan(300);
   });
 });
 

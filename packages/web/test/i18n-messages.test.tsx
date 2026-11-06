@@ -51,13 +51,13 @@ describe('Intl formatting and locale registration', () => {
     expect(dictionary('en').site.stepCount(1)).toBe('1 step');
     expect(dictionary('en').site.stepCount(2)).toBe('2 steps');
   });
-  it('registers ten complete dictionaries; the eight T3 locales retain English text', () => {
+  it('registers ten complete, translated dictionaries', () => {
     expect(locales).toHaveLength(10);
     for (const locale of locales) {
       const t = dictionary(locale);
       for (const ns of ['player','stage','site'] as const) expect(Object.keys(t[ns]).sort()).toEqual(Object.keys(dictionary('en')[ns]).sort());
       expect(Object.keys(boardDictionary(locale).board).sort()).toEqual(Object.keys(boardEnglish.board).sort());
-      if (locale !== 'zh-CN') expect(t.player.play).toBe('Play');
+      if (locale !== 'en') expect(t.player.play).not.toBe('Play');
     }
   });
 });
