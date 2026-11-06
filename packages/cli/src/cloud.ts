@@ -289,7 +289,7 @@ export class CloudClient {
         const details = readSizeDetails(data.data ?? data.details, token);
         if (details) throw sizeError(details);
       }
-      throw new CloudError(code);
+      throw new CloudError(code, undefined, undefined, undefined, response.status);
     }
     return data;
   }

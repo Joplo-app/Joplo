@@ -419,6 +419,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - data.embed.iframe embeds a player for blogs and docs: it shows a cover first; append &scenario=<scenario id> to pick the start or &autoplay=1 to skip the cover.
 - share also uploads a 1200x630 preview image of the default scenario when local Playwright is installed; without it, share still succeeds and prints one "Skipped the preview image" line.
 - Pro share updates the same-server link in .joplo/cloud.json; --new creates another link and --title sets its title.
+- The review version is a separate share (review: { shareId, url } in .joplo/cloud.json); it never replaces the main link. If the cloud rejects the review manifest, plain share retries once without it and still publishes.
 - npx joplo whoami --format json shows the account, plan, and limits; npx joplo logout signs out.
 - maxUploadBytes limits only newly uploaded cloud blobs. The CLI prechecks maxTotalBytes and maxFiles. TOO_LARGE details.kind distinguishes upload / total / files.
 - Credentials are stored only in JOPLO_HOME/credentials.json (default ~/.joplo). Never copy them into a project, print them, or commit them.
@@ -429,7 +430,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 
 ## Review and feedback
 - npx joplo share --review publishes the review version: every option of every feature, so reviewers can compare A/B. Rules, questions, cases, and AI assumptions still never appear in uploaded files; they go only to the review page through the request body. Plain share publishes only picked options.
-- After reviewers comment and the owner decides on the review page, run npx joplo feedback --format json (uses the share in .joplo/cloud.json, or --share <id>). data.decisions are decisions not yet applied; data.comments are unresolved viewer comments with scenario, step, stepId, and element.
+- After reviewers comment and the owner decides on the review page, run npx joplo feedback --format json (uses the review share in .joplo/cloud.json, else the main share, or --share <id>). data.decisions are decisions not yet applied; data.comments are unresolved viewer comments with scenario, step, stepId, and element.
 - Apply each decision to the source, then run npx joplo check:
   - pick: set feature.pick in features/<f>/feature.ts to the option file name (the part after "<feature>.").
   - confirm_rule: set that rule to origin: 'user', status: 'confirmed'.

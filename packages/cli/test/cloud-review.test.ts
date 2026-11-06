@@ -25,6 +25,7 @@ type Call = { path: string; method: string; headers: IncomingMessage['headers'];
 let root: string, home: string, project: string, base: string, calls: Call[], server: ReturnType<typeof createServer>;
 let responses: Map<string, { status?: number; body: unknown }>;
 let devIr: Project;
+let plan: 'free' | 'pro', rejectReview: number;
 const browser = vi.fn(async () => true);
 const files = { 'index.html': '<html><script type="application/json" id="joplo-ir">{"project":{"mode":"publish","features":{},"options":{},"scenarios":{}}}</script></html>', 'assets/a.css': 'body{}' };
 let built: Record<string, string>;
@@ -49,7 +50,7 @@ const feedback = {
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'joplo-review-cli-')); home = join(root, 'home'); project = join(root, 'project');
-  await mkdir(project); calls = []; responses = new Map(); built = { ...files }; build.mockClear(); checkProject.mockClear(); browser.mockClear();
+  await mkdir(project); calls = []; responses = new Map(); plan = 'free'; rejectReview = 0; built = { ...files }; build.mockClear(); checkProject.mockClear(); browser.mockClear();
   devIr = compile(reviewSource(), 'dev').project!;
   server = createServer(async (req, res) => {
     const chunks: Buffer[] = []; for await (const c of req) chunks.push(c);
@@ -58,8 +59,12 @@ beforeEach(async () => {
     res.setHeader('Content-Type', 'application/json');
     const send = (v: unknown, status = 200) => { res.statusCode = status; res.end(JSON.stringify(v)); };
     const r = responses.get(path); if (r) return send(r.body, r.status);
-    if (path === '/api/v1/me') return send({ user, plan: 'free', limits, credential: req.headers.authorization === `Bearer ${apiKey}` ? { kind: 'api_key', name: 'team-invite CI', prefix: 'jpk_A1b2', scopes: ['shares:publish', 'feedback:read'], expiresAt: '2027-02-04T00:00:00.000Z' } : { kind: 'device' } });
-    if (path === '/api/v1/shares') return send({ shareId: 'Abc1234567', uploadId: 'u1', missing: [] });
+    if (path === '/api/v1/me') return send({ user, plan, limits, credential: req.headers.authorization === `Bearer ${apiKey}` ? { kind: 'api_key', name: 'team-invite CI', prefix: 'jpk_A1b2', scopes: ['shares:publish', 'feedback:read'], expiresAt: '2027-02-04T00:00:00.000Z' } : { kind: 'device' } });
+    if (path === '/api/v1/shares') {
+      // 旧版 SaaS：严格校验，不认识 review 字段时 400（没有创建任何记录）
+      if (rejectReview && body.review !== undefined) return send({ code: 'BAD_REQUEST' }, rejectReview);
+      return send({ shareId: 'Abc1234567', uploadId: 'u1', missing: [] });
+    }
     if (path === '/api/v1/shares/Abc1234567/finalize') return send({ shareId: 'Abc1234567', url: base + '/s/Abc1234567/', expiresAt: '2026-11-06T12:00:00.000Z', version: 1 });
     if (path === '/api/v1/shares/Abc1234567/feedback') return send(feedback);
     if (path === '/api/v1/shares/Abc1234567/feedback/applied') return send({ applied: body.decisionIds });
@@ -298,4 +303,80 @@ test('feedback 错误：没有记录或 --share 不合法、--ref 单独使用 �
   responses.set('/api/v1/shares/Abc1234567/feedback', { body: { share: { id: 'Abc1234567', version: 1 }, decisions: [{ id: 'x' }], comments: [] } });
   r = await cli(['feedback', project, '--share', 'Abc1234567', '--format=json']); expect(r.json().error.code).toBe('INVALID_RESPONSE');
   r = await cli(['feedback', project, '--share', 'Zzz1234567', '--format=json']); expect(r.json().error.code).toBe('NOT_FOUND'); expect(r.json().error.message).toContain('no review data');
+});
+
+// ---------- 评审版是单独的分享（契约 8.1） ----------
+const record = async () => JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'));
+const writeRecord = async (v: unknown) => { await mkdir(join(project, '.joplo'), { recursive: true }); await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify(v)); };
+
+test('Pro share --review 不覆盖主链接：评审版另存 review 记录，只用 review.shareId 作 replaceShareId；普通 share 只用主 shareId', async () => {
+  plan = 'pro'; await login();
+  await writeRecord({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/' });
+  expect((await cli(['share', project, '--review'])).code).toBe(0);
+  expect(createBody().replaceShareId).toBeUndefined();
+  expect(await record()).toEqual({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
+  calls = [];
+  expect((await cli(['share', project, '--review'])).code).toBe(0);
+  expect(createBody().replaceShareId).toBe('Abc1234567');
+  calls = [];
+  responses.set('/api/v1/shares', { body: { shareId: 'Main123456', uploadId: 'u1', missing: [] } });
+  responses.set('/api/v1/shares/Main123456/finalize', { body: { shareId: 'Main123456', url: base + '/s/Main123456/', expiresAt: null, version: 2 } });
+  expect((await cli(['share', project])).code).toBe(0);
+  expect(createBody().replaceShareId).toBe('Main123456');
+  expect(createBody().review.mode).toBe('publish');
+  expect(await record()).toEqual({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
+  // --new 两种都不带 replaceShareId
+  calls = []; responses.clear();
+  expect((await cli(['share', project, '--review', '--new'])).code).toBe(0);
+  expect(createBody().replaceShareId).toBeUndefined();
+});
+
+test('只有评审版记录时普通 share 新建主链接；其他 server 的旧记录被整体替换', async () => {
+  plan = 'pro'; await login();
+  await writeRecord({ server: base, review: { shareId: 'Rev1234567', url: base + '/s/Rev1234567/' } });
+  expect((await cli(['share', project])).code).toBe(0);
+  expect(createBody().replaceShareId).toBeUndefined();
+  expect(await record()).toEqual({ server: base, shareId: 'Abc1234567', url: base + '/s/Abc1234567/', review: { shareId: 'Rev1234567', url: base + '/s/Rev1234567/' } });
+  await writeRecord({ server: 'https://other.example', shareId: 'Old1234567', url: 'https://other.example/s/Old1234567/', review: { shareId: 'Rev1234567', url: 'https://other.example/s/Rev1234567/' } });
+  calls = [];
+  expect((await cli(['share', project, '--review'])).code).toBe(0);
+  expect(createBody().replaceShareId).toBeUndefined();
+  expect(await record()).toEqual({ server: base, review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
+});
+
+test('feedback 默认读评审分享，没有时读主分享；--share 仍可指定', async () => {
+  await login();
+  responses.set('/api/v1/shares/Main123456/feedback', { body: { ...feedback, share: { id: 'Main123456', version: 1 } } });
+  await writeRecord({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
+  expect((await cli(['feedback', project])).code).toBe(0);
+  expect(calls.at(-1)!.path).toBe('/api/v1/shares/Abc1234567/feedback');
+  expect((await cli(['feedback', project, '--share', 'Main123456'])).code).toBe(0);
+  expect(calls.at(-1)!.path).toBe('/api/v1/shares/Main123456/feedback');
+  await writeRecord({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/' });
+  expect((await cli(['feedback', project])).code).toBe(0);
+  expect(calls.at(-1)!.path).toBe('/api/v1/shares/Main123456/feedback');
+  await writeRecord({ server: base, shareId: 'Main123456', review: { shareId: 'bad' } });
+  const r = await cli(['feedback', project, '--format=json']);
+  expect(r.code).toBe(2); expect(r.json().error.code).toBe('USAGE');
+});
+
+test('服务端因 review 字段返回 400：普通 share 去掉 review 重试一次并提示；--review 仍报错；其他状态不重试', async () => {
+  await login(); rejectReview = 400;
+  let r = await cli(['share', project, '--format=json']);
+  expect(r.code, r.stdout).toBe(0);
+  const creates = calls.filter(c => c.path === '/api/v1/shares');
+  expect(creates).toHaveLength(2);
+  expect(creates[0]!.body.review).toBeDefined(); expect(creates[1]!.body.review).toBeUndefined();
+  expect({ ...creates[1]!.body, review: undefined }).toEqual({ ...creates[0]!.body, review: undefined });
+  expect(r.stderr.split('\n').filter(l => /review manifest/i.test(l))).toHaveLength(1);
+  calls = [];
+  r = await cli(['share', project, '--review', '--format=json']);
+  expect(r.code).toBe(1); expect(r.json().error.code).toBe('BAD_REQUEST');
+  expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
+  for (const status of [413, 422, 403]) {
+    calls = []; rejectReview = status;
+    r = await cli(['share', project, '--format=json']);
+    expect(r.code, String(status)).not.toBe(0);
+    expect(calls.filter(c => c.path === '/api/v1/shares'), String(status)).toHaveLength(1);
+  }
 });

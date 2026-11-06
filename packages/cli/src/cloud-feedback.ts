@@ -36,8 +36,15 @@ export async function feedbackShareId(client: CloudClient, dir: string, explicit
   } catch {
     throw new JoploError('USAGE', 'No share record in .joplo/cloud.json. Run npx joplo share first, or pass --share <id>');
   }
-  if (typeof record.shareId !== 'string' || !SHARE_ID.test(record.shareId)) throw new JoploError('USAGE', 'The share record in .joplo/cloud.json is invalid. Run npx joplo share again, or pass --share <id>');
   if (record.server !== client.server) throw new JoploError('USAGE', `The share record belongs to ${typeof record.server === 'string' ? terminalText(record.server).slice(0, 200) : 'another server'}. Pass --server with that address, or --share <id>`);
+  // 评审分享优先（评审链接、评论和决定都在它上面），没有时用主链接（契约 8.1）
+  const invalid = () => new JoploError('USAGE', 'The share record in .joplo/cloud.json is invalid. Run npx joplo share again, or pass --share <id>');
+  if (record.review !== undefined) {
+    const id = object(record.review).shareId;
+    if (typeof id !== 'string' || !SHARE_ID.test(id)) throw invalid();
+    return id;
+  }
+  if (typeof record.shareId !== 'string' || !SHARE_ID.test(record.shareId)) throw invalid();
   return record.shareId;
 }
 

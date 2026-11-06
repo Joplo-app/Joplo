@@ -39,6 +39,22 @@ export async function manifest(dir: string): Promise<{ files: File[]; blobs: Map
   if (!files.some(f => f.path === 'index.html')) throw new JoploError('EXPORT_FAILED', 'The build is missing index.html');
   return { files, blobs };
 }
+/**
+ * 项目的分享记录 `.joplo/cloud.json`（契约 8.1）：主链接 `{ shareId, url }` 与评审版 `review: { shareId, url }` 是两个分享，互不覆盖。
+ * 旧格式（没有 review）照常读取；属于其他 server 的记录视为空，下次写入时整体替换。
+ */
+export type ShareLink = { shareId: string; url: string };
+export type ShareRecord = { main: ShareLink | null; review: ShareLink | null };
+const link = (v: unknown): ShareLink | null => { const o = object(v); return shareId(o.shareId) && typeof o.url === 'string' ? { shareId: o.shareId, url: o.url } : null; };
+export async function readShareRecord(project: string, server: string): Promise<ShareRecord> {
+  try {
+    const r = object(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8')));
+    if (r.server !== server) return { main: null, review: null };
+    return { main: link(r), review: link(r.review) };
+  } catch { return { main: null, review: null }; }
+}
+const recordJson = (server: string, r: ShareRecord) => ({ server, ...(r.main ? { shareId: r.main.shareId, url: r.main.url } : {}), ...(r.review ? { review: { shareId: r.review.shareId, url: r.review.url } } : {}) });
+
 export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null };
 export type ShareOptions = { new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string };
 export async function share(client: CloudClient, dir: string, opts: ShareOptions, build: typeof buildSite, render: () => Promise<RenderPreview> = async () => { throw new Error('this @joplo-app/server cannot render screenshots'); }): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
@@ -88,12 +104,21 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     if (actualBytes > account.limits.maxTotalBytes || files.length > account.limits.maxFiles) {
       throw sizeError({ kind: actualBytes > account.limits.maxTotalBytes ? 'total' : 'files', maxBytes: account.limits.maxTotalBytes, actualBytes, maxFiles: account.limits.maxFiles, actualFiles: files.length, largestFiles });
     }
-    let replaceShareId: string | undefined;
-    if (account.plan === 'pro' && !opts.new && !pr) {
-      try { const previous = object(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'))); if (previous.server === client.server && shareId(previous.shareId)) replaceShareId = previous.shareId; } catch { /* 缺失或损坏元数据时新建 */ }
-    }
+    // 评审版只更新评审分享，普通 share 只更新主链接（契约 8.1：评审版永远不覆盖主链接）；PR 预览两者都不碰
+    const record = await readShareRecord(project, client.server);
+    const slot = reviewMode === 'review' ? 'review' : 'main';
+    const replaceShareId = account.plan === 'pro' && !opts.new && !pr ? record[slot]?.shareId : undefined;
     const title = (opts.title ?? checked.name).trim().slice(0, 200);
-    const prepared = await client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}), ...(review ? { review } : {}), ...(pr ? { pr } : {}) }), { create: true });
+    const create = (withReview: boolean) => client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}), ...(withReview && review ? { review } : {}), ...(pr ? { pr } : {}) }), { create: true });
+    let prepared: Record<string, unknown>;
+    try { prepared = await create(true); }
+    catch (e) {
+      // 发布顺序容错（契约 8.1）：旧版 SaaS 拒绝 review 字段时返回 400，此时没有创建任何记录；普通发布去掉清单重试一次。
+      // 只认真正的 400（413/422 等不重试），--review 没有清单没有意义，照常报错。
+      if (!(e instanceof CloudError && e.code === 'BAD_REQUEST' && e.status === 400 && review && reviewMode === 'publish')) throw e;
+      client.warn('The cloud rejected the review manifest (HTTP 400). Retrying once without it; the review page will not show rules or questions for this version.');
+      prepared = await create(false);
+    }
     if (!shareId(prepared.shareId) || !nonempty(prepared.uploadId) || prepared.uploadId.length > 128 || prepared.uploadId.includes(accessToken) || !Array.isArray(prepared.missing)) throw new CloudError('INVALID_RESPONSE');
     // 完整校验所有上传项后才执行第一个 PUT；不允许服务端请求本地清单之外的文件。
     const missing = prepared.missing.map(raw => {
@@ -137,9 +162,9 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     const url = httpUrl(final.url);
     const published = { shareId: final.shareId, url, expiresAt: final.expiresAt as string | null, version: final.version as number };
     if (JSON.stringify(published).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
-    // PR 预览是独立链接，不覆盖本项目的主链接记录（下次普通 share、feedback 仍指向主链接）
+    // PR 预览是独立链接，不写记录；其余只更新本次的那一项（主链接或评审版），保留另一项
     if (!pr) {
-      try { await atomicJson(join(project, '.joplo/cloud.json'), { server: client.server, shareId: published.shareId, url }); }
+      try { await atomicJson(join(project, '.joplo/cloud.json'), recordJson(client.server, { ...record, [slot]: { shareId: published.shareId, url } })); }
       catch {
         client.warn('Could not save the share record. The next publication will not update this link');
         try { await rm(join(project, '.joplo/cloud.json'), { force: true }); }

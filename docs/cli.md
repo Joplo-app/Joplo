@@ -217,15 +217,17 @@ npx joplo share --new
 - `maxUploadBytes` 限制本次缺失对象的新上传量（免费 20 MiB、Pro 100 MiB）；`maxTotalBytes` 限制清单总量（256 MiB），`maxFiles` 限制文件数（2000）。实际数值以 me 为准。
 - CLI 本地只预检清单总量和文件数；新上传量由服务端按已有 blob 去重后判断，不能拿清单总量与新上传限额比较。共用字体和运行时资源可由运维预置。
 - Pro 且 `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接；`--new` 新建。免费账号每次新建。
+- `.joplo/cloud.json` 的格式为 `{server, shareId?, url?, review?: {shareId, url}}`：主链接和评审版是**两个分享**，互不覆盖（契约 8.1）。普通 share 只用、只写主 `shareId`/`url`；`--review` 只用、只写 `review`（Pro 重新发布评审版时用 `review.shareId` 作 replaceShareId，评审链接和评论保留，版本 +1），评审版永远不会替换 README 里的主链接。写入时保留另一项；记录属于其他 server 时整体替换。没有 `review` 的旧记录照常使用。
 - 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；一个对象失败会取消其他在途 PUT 和重试等待；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
 - finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/billing`。
 - 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的 Playwright + Chromium）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有 Playwright、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”，share 照常成功；分享页此时用通用预览图。
 - 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 只用英文，D57）。
 - **评审清单**：每次 share 都在 `POST /api/v1/shares` 请求体里附上 `review`（契约字段 `{v: 1, mode, features, scenarios, elements}`），由 check 编译的 dev IR 经 core 的 `reviewManifest` 生成。它**不是分享文件**：不进上传清单、不进 R2，分享页拿不到；SaaS 只把它存进数据库给评审页用。`mode: "publish"` 只含选定方案（与发布站同一范围，没有选定方案的功能不出现），`--review` 时为 `"review"`，含所有功能的所有方案。id 全部沿用 IR，步骤 `index` 从 0 开始，`elements` 是画面里所有作者元素 id（与 `Rule.elementIds` 同一套）及 `nodeLabel` 标签。
 - **清单上限**：字符串按码点截断（末尾 “…”）——名字 200、目标/思路/规则/问题/explain 2000、取舍 500、字幕 500、元素标签 200；数组超出部分丢弃——每个功能 20 个方案、300 条规则、100 个问题，每个方案 20 条取舍，每条规则 50 个元素，最多 100 个功能、500 个场景、每个场景 200 步、每步 50 条规则、2000 个元素；id 永不截断。截断后序列化仍超过 512 KiB（524288 字节）时：`--review` 报 EXPORT_FAILED（`details: {maxBytes, actualBytes}`），在构建和上传之前失败，不静默丢内容；普通 share 不因清单失败，stderr 提示一行 “Skipped the review manifest (…)”，请求体省略 `review`（契约里它是可选字段），评审页此时看不到规则和问题。
+- **发布顺序容错**：创建请求带着 `review` 被服务端以 HTTP 400 拒绝时（例如还不认识这个字段的旧版 SaaS；400 表示请求被拒、没有创建任何记录），普通 share 去掉 `review` 原样重试一次，stderr 提示一行 “The cloud rejected the review manifest (HTTP 400). Retrying once without it …”；`--review` 不重试，照常报 BAD_REQUEST（评审版没有清单没有意义）。413、422、429 等其他状态不触发这个重试。
 - **`--review`（评审版，D62）**：构建时 `buildSite({ review: true })`，发布站包含所有功能的所有方案（未选定的功能也在），评审页通过 `joplo:goto` 指定任一场景即切换方案；规则、问题、情况、AI 假设、备注、取舍、源位置与普通发布一样不进任何上传文件。CLI 会核对产物里内联 IR 的 `mode` 是 `review`，旧版 `@joplo-app/server` 忽略该选项时报 UNSUPPORTED_ACTION，不上传。成功的 `data` 多一个 `mode: "review"`，文本写 “Published the review version …”。不带 `--review` 时构建参数、上传文件、输出与原来完全一致。
 - **`--pr <number>`（PR 预览）**：请求体加 `pr: {provider: "github", repo, number, headSha, runUrl}`。在 GitHub Actions（`GITHUB_ACTIONS=true`）里：repo 取 `--repo` 或 `GITHUB_REPOSITORY`；headSha 取 `--sha`，否则读 `GITHUB_EVENT_PATH` 事件 JSON 的 `pull_request.head.sha`（PR 事件的 `GITHUB_SHA` 是合并提交），没有时用 `GITHUB_SHA`；runUrl 为 `GITHUB_SERVER_URL/GITHUB_REPOSITORY/actions/runs/GITHUB_RUN_ID`（重试的运行加 `/attempts/N`），只在 github.com 上生成，否则为 null。不在 Actions 里必须 `--repo owner/name`，headSha 取 `--sha` 或 `git rev-parse HEAD`。缺少或格式不对时在登录、检查、构建和任何请求之前报 USAGE（退出 2）。`--repo`、`--sha` 只能和 `--pr` 一起用。
-- PR 预览是独立链接：不发送 replaceShareId，也不写 `.joplo/cloud.json`（不覆盖本项目的主链接，之后的普通 share 与 feedback 仍指向主链接）。CI 推荐 `npx joplo share --new --pr <number> --format json`；fork 来的 PR 拿不到 secrets，工作流应跳过发布，不推荐 `pull_request_target`。
+- PR 预览是独立链接：不发送 replaceShareId，也不写 `.joplo/cloud.json`（不覆盖本项目的主链接和评审版记录，之后的普通 share、--review 与 feedback 仍用原来的记录）。CI 推荐 `npx joplo share --new --pr <number> --format json`；fork 来的 PR 拿不到 secrets，工作流应跳过发布，不推荐 `pull_request_target`。
 - finalize 响应里的 `pr: {comment, reason?, installUrl?}` 原样（白名单字段）放进 `data.pr`；`comment: "skipped"` 时文本输出一行 “PR comment skipped: <原因>. Install the Joplo GitHub App to comment on pull requests: <installUrl 或 <server>/settings/github>”，`failed` 时说明评论失败但已发布。服务端没返回时 `data.pr` 为 null。
 
 JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, embed}`（`--review` 时另有 `mode: "review"`，`--pr` 时另有 `pr`），`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
@@ -270,7 +272,7 @@ npx joplo feedback --applied d1,d2 --ref "$(git rev-parse HEAD)" --format json
 
 读取评审页（`cloud.joplo.app/review/<id>`）上分享主人的决定和观众的未解决评论，供作者和 Agent 按决定改源码：
 
-- shareId：`--share <id>`，否则读项目 `.joplo/cloud.json`（必须属于当前 server，否则 USAGE 并提示 `--server` / `--share`）；没有记录时 USAGE。
+- shareId：`--share <id>`，否则读项目 `.joplo/cloud.json`：有评审版记录（`review.shareId`）时用它，没有时用主 `shareId`（契约 8.1）。记录必须属于当前 server，否则 USAGE 并提示 `--server` / `--share`；没有记录或记录无效时 USAGE。
 - `GET /api/v1/shares/{id}/feedback` → `data = {share: {id, version}, decisions: [{id, kind, featureId, targetId, note, decidedAt, version}], comments: [{id, version, scenario, step, stepId, element: {id, label} | null, body, author: {name}, createdAt}]}`；只含未撤回、未写回的决定与未解决的评论。`kind` 是 `pick`（targetId = 方案 id）、`confirm_rule`、`reject_rule`（note = 理由）、`answer`（targetId = 问题 id，note = 回答）。`step` 是播放位置（0 = 初始状态，k = 已执行 k 步），`stepId` 是第 k 步的 id。
 - 文本输出决定在前，每条一行：“Pick option invite.b-batch for feature invite”“Reject rule <id>: <理由>”“Answer to question <id>: <回答>”“Confirm rule <id>”；再是未解决评论（场景 · 第几步（stepId） · 元素 id "标签" — 作者、版本、时间，下一行是正文）；有决定时最后提示 check 与 `--applied` 的完整命令。
 - `--applied <id,…> [--ref <源码版本>]`：`POST /api/v1/shares/{id}/feedback/applied {decisionIds, ref?}` → `data = {shareId, applied}`，重复标记幂等。id 去重，1–200 个，每个只含字母、数字、`_`、`-`；`--ref` 1–200 个可打印字符，只能和 `--applied` 一起用。只有分享的主人能调用。
@@ -293,7 +295,8 @@ npx joplo feedback --applied d1,d2 --ref "$(git rev-parse HEAD)" --format json
 | missing[].sha256 / uploadUrl / headers | 创建响应 → 内存 → PUT → 只上传缺失对象并保留签名头 |
 | uploadId | 创建响应 → 内存 → finalize 及其重试 → 幂等确认发布 |
 | --new / replaceShareId | 参数及同服务器 cloud.json.shareId + 实时 Pro 套餐 → 创建请求 → 云端 → 新建或更新链接；免费账号从不发送 replaceShareId |
-| cloud.json.server / shareId / url | 目标服务器及 finalize 响应 → 项目 .joplo/cloud.json（原子写） → 下次 share → 来源比对与 Pro 更新；url 供用户/工具读取 |
+| cloud.json.server / shareId / url | 目标服务器及普通 share 的 finalize 响应 → 项目 .joplo/cloud.json（原子写，保留 review） → 下次普通 share → 来源比对与 Pro 更新主链接；feedback 没有评审记录时用它；url 供用户/工具读取 |
+| cloud.json.review.shareId / url | `--review` 的 finalize 响应 → 同一文件的 review（原子写，保留主链接） → 下次 `--review` 的 Pro replaceShareId（评审链接与评论保留）；feedback 默认读它 |
 | shareId / url / expiresAt / version | finalize 响应 → text/JSON 结果 → 用户/Agent → 分享链接及有效期 |
 | embed.iframe / markdown / badge / preview | finalize 的 url + 本次 title → `embedSnippets`（cli/src/cloud-embed.ts，只在内存） → text 输出（markdown）与 JSON `data.embed` → 用户/Agent 写进 README 或博客；分享页 Worker 提供 badge.svg / preview.png |
 | review（评审清单） | check 的 dev IR → core `reviewManifest(ir, publish \| review)`（截断、512 KiB 上限） → `POST /api/v1/shares` 请求体（不进上传清单） → SaaS 在 finalize 时按 (shareId, version) 存 Postgres → 评审页的方案、规则、问题、每一步的规则 |

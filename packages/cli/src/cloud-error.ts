@@ -24,7 +24,8 @@ export const CLOUD_MESSAGES = {
 } as const;
 export type CloudCode = keyof typeof CLOUD_MESSAGES;
 export class CloudError extends Error {
-  constructor(readonly code: CloudCode, message: string = CLOUD_MESSAGES[code], readonly details?: unknown, readonly retry?: { afterMs?: number; createSafe?: boolean }) { super(terminalText(message)); }
+  /** status：远端 HTTP 状态（只有按状态归类的错误才有），用于区分“请求被拒”的 400 与其他归为 BAD_REQUEST 的状态。 */
+  constructor(readonly code: CloudCode, message: string = CLOUD_MESSAGES[code], readonly details?: unknown, readonly retry?: { afterMs?: number; createSafe?: boolean }, readonly status?: number) { super(terminalText(message)); }
 }
 
 type SizeBase = { maxBytes: number; actualBytes: number; largestFiles: { path: string; size: number }[] };
