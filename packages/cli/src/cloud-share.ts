@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { JoploError } from '@joplo-app/core';
 import type { buildSite } from '@joplo-app/server';
 import { check } from './check.ts';
-import { CloudError, sizeError } from './cloud-error.ts';
+import { CloudError, sizeError, terminalText } from './cloud-error.ts';
+import { temporaryDirectory } from './cloud-cleanup.ts';
 import { atomicJson, CloudClient, httpUrl, nonempty, object } from './cloud.ts';
 
 /** 客户端 MIME 映射；值与云端公开上传契约一致，不从私有包导入实现。 */
@@ -41,13 +42,14 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
   let credentials = await client.credentials();
   if (!credentials) {
     if (!client.interactive) throw new CloudError('AUTH_REQUIRED', undefined, { fix: 'npx joplo login' });
-    client.warn('分享需要登录 Joplo 账号（免费）'); credentials = await client.login(); client.warn(`已登录为 ${credentials.user.email}，继续发布…`);
+    client.warn('分享需要登录 Joplo 账号（免费）'); credentials = await client.login(); client.warn(`已登录为 ${terminalText(credentials.user.email)}，继续发布…`);
   }
   const project = resolve(dir);
   client.warn('正在检查项目…');
   const checked = await (client.deps.check ?? check)(project);
   if (checked.summary.error) throw new JoploError('INVALID_SCHEMA', `项目检查失败：${checked.summary.error} error`, { diagnostics: checked.diagnostics });
-  const staging = await mkdtemp(join(tmpdir(), 'joplo-share-'));
+  const temporary = temporaryDirectory(join(tmpdir(), 'joplo-share-'));
+  const staging = temporary.path;
   try {
     client.warn('检查通过，正在构建发布站…');
     const built = await build({ projectDir: project, outDir: join(staging, 'site') });
@@ -64,12 +66,7 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
       try { const previous = object(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'))); if (previous.server === client.server && shareId(previous.shareId)) replaceShareId = previous.shareId; } catch { /* 缺失或损坏元数据时新建 */ }
     }
     const title = (opts.title ?? checked.name).trim().slice(0, 200);
-    let prepared: Record<string, unknown>;
-    try { prepared = await client.request('/api/v1/shares', credentials.accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}) }); }
-    catch (e) {
-      if (e instanceof CloudError && e.code === 'QUOTA_EXCEEDED') throw new CloudError(e.code, `已达到发布频率上限（每小时 ${account.limits.publishesPerHour ?? '由服务器决定'} 次），请稍后重试`, { publishesPerHour: account.limits.publishesPerHour });
-      throw e;
-    }
+    const prepared = await client.request('/api/v1/shares', credentials.accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}) });
     if (!shareId(prepared.shareId) || !nonempty(prepared.uploadId) || prepared.uploadId.length > 128 || prepared.uploadId.includes(credentials.accessToken) || !Array.isArray(prepared.missing)) throw new CloudError('INVALID_RESPONSE');
     // 完整校验所有上传项后才执行第一个 PUT；不允许服务端请求本地清单之外的文件。
     const missing = prepared.missing.map(raw => {
@@ -86,10 +83,15 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
         let response: Response;
         try {
           // 预签名 PUT 是协议例外：只使用服务端返回的 headers，不添加 bearer 或版本头。
-          response = await fetch(item.uploadUrl, { method: 'PUT', headers: item.headers, body, redirect: 'error', signal: AbortSignal.timeout(30000) });
-          await response.arrayBuffer();
+          response = await fetch(item.uploadUrl, { method: 'PUT', headers: item.headers, body, redirect: 'error', signal: AbortSignal.timeout(Math.ceil(30000 + body.byteLength / (100 * 1024) * 1000)) });
         } catch { throw new CloudError('NETWORK'); }
-        if (!response.ok && response.status !== 412) throw new CloudError(response.status >= 500 ? 'NETWORK' : response.status === 413 ? 'TOO_LARGE' : 'BAD_REQUEST');
+        if (!response.ok) {
+          // 已知 HTTP 状态优先于正文读取；4xx 的响应中断不能触发重试。
+          await response.body?.cancel().catch(() => {});
+          if (response.status === 412) return;
+          throw new CloudError(response.status >= 500 ? 'NETWORK' : response.status === 413 ? 'TOO_LARGE' : 'BAD_REQUEST');
+        }
+        try { await response.arrayBuffer(); } catch { throw new CloudError('NETWORK'); }
       });
     }
     client.warn('上传完成，正在确认发布…');
@@ -100,5 +102,5 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
     if (JSON.stringify(published).includes(credentials.accessToken)) throw new CloudError('INVALID_RESPONSE');
     await atomicJson(join(project, '.joplo/cloud.json'), { server: client.server, shareId: published.shareId, url });
     return { result: published, plan: account.plan };
-  } finally { await rm(staging, { recursive: true, force: true }); }
+  } finally { try { await rm(staging, { recursive: true, force: true }); } finally { temporary.release(); } }
 }
