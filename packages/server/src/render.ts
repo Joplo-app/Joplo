@@ -3,41 +3,28 @@
  * 截取舞台并返回元素索引（带 at）与渲染告警：遮挡、溢出、Toast 重叠、字体（PRD 8.8 / AC-22）。
  * 页面读取的 IR 与这里用来计算位置、隐藏元素的 IR 是同一份（无 TOCTOU）。
  *
- * Playwright 是可选依赖（D36）：只在这里按需载入；没装或没有浏览器时给出安装命令，dev/check/build 不受影响。
+ * Playwright 不装进项目（D66）：由 export-runtime 解析 Joplo 托管的运行时（兼容项目里已有的 playwright）；
+ * 都没有时抛 EXPORT_COMPONENT_MISSING（带安装命令），这里从不下载。dev/check/build 不受影响。
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Browser } from 'playwright';
+import type { Browser } from 'playwright-core';
 import { JoploError, SUBTITLE_HEIGHT, VIEWPORT_SIZE, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
 import { exportLocale } from './locale.ts';
 import type { RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';
+import { joploHome } from './home.ts';
+import { EXPORT_DOWNLOAD_MB, NOT_NEEDED, SETUP_COMMAND, loadPlaywright, type PlaywrightModule } from './export-runtime.ts';
 
 const STAGE_SIZE = VIEWPORT_SIZE;
 
-export type PlaywrightModule = typeof import('playwright');
-const NOT_NEEDED = 'dev, check, and build do not require it.';
+export { loadPlaywright, type PlaywrightModule } from './export-runtime.ts';
 
-const isMissingModule = (e: unknown) => {
-  const code = (e as NodeJS.ErrnoException | null)?.code;
-  return (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') && /playwright/.test(e instanceof Error ? e.message : String(e));
-};
-
-/** 按需载入 Playwright；没有安装时抛出带安装命令的 RENDER_FAILED。 */
-export async function loadPlaywright(importer: () => Promise<PlaywrightModule> = () => import('playwright')): Promise<PlaywrightModule> {
-  try {
-    return await importer();
-  } catch (e) {
-    if (!isMissingModule(e)) throw e;
-    throw new JoploError('RENDER_FAILED', `Screenshots require Playwright and Chromium, which are not installed. Run: npm i -D playwright && npx playwright install chromium (about 150 MB). ${NOT_NEEDED}`);
-  }
-}
-
-/** 浏览器启动失败时的一行提示。 */
+/** 浏览器启动失败时的一行提示（托管运行时与项目里的 Playwright 都适用：重装 Joplo 自己的导出组件）。 */
 export function launchHint(e: unknown): string {
   const first = (e instanceof Error ? e.message : String(e)).split('\n')[0]!.trim();
-  return `Screenshots require Chromium; browser launch failed (${first}). Run: npx playwright install chromium (about 150 MB). ${NOT_NEEDED}`;
+  return `Screenshots need Chromium, but it failed to start (${first}). Run: ${SETUP_COMMAND} --force to reinstall the Joplo export component (about ${EXPORT_DOWNLOAD_MB} MB). ${NOT_NEEDED}`;
 }
 
 export async function launch({ chromium }: PlaywrightModule): Promise<Browser> {
@@ -106,7 +93,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
   if (fs.existsSync(out) && !opts.overwrite) throw new JoploError('USAGE', `Output file already exists: ${out}. To overwrite, pass overwrite: true (CLI: --overwrite)`);
 
   // 先确认 Playwright 可用，再启动编译服务（缺失时尽快失败）
-  const playwright = await loadPlaywright();
+  const playwright = await loadPlaywright({ home: joploHome(), projectDir });
   const server = await createDev({ projectDir, port: 0, watch: false, log: () => undefined });
   let browser: Browser | null = null;
   try {

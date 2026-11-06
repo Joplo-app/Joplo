@@ -385,6 +385,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   const exportsHub = new ExportHub({
     baseUrl,
     log,
+    home: opts.home ?? joploHome(),
     deps: opts.exportDeps,
     onEvent: () => undefined,
   });
@@ -411,7 +412,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   };
   const fail = (res: http.ServerResponse, e: unknown) => {
     const code = e instanceof JoploError ? e.code : 'INTERNAL';
-    const status = code === 'NOT_FOUND' ? 404 : code === 'USAGE' ? 400 : code === 'RENDER_FAILED' ? 503 : 500;
+    const status = code === 'NOT_FOUND' ? 404 : code === 'USAGE' ? 400 : code === 'RENDER_FAILED' || code === 'EXPORT_COMPONENT_MISSING' ? 503 : 500;
     sendJson(res, status, { error: { code, message: e instanceof Error ? e.message : String(e) } });
   };
 
@@ -515,6 +516,8 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
             broadcastProjects();
             return sendJson(res, 200, { ok: true });
           }
+          // 导出组件的安装（D66）：只接受本机看板带令牌的请求（handleRuntime 内校验）
+          if (url.pathname.startsWith('/__joplo/export-runtime/')) return exportsHub.handleRuntime(url.pathname.slice('/__joplo/export-runtime/'.length), req, res, { guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), fail: (e) => fail(res, e) });
           const pm = /^\/__joplo\/p\/([^/]+)\/(.+)$/.exec(url.pathname);
           if (pm) {
             const r = await handleProject(decodeURIComponent(pm[1]!), pm[2]!, req, res);

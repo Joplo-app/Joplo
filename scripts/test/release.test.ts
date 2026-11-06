@@ -67,11 +67,13 @@ describe('各包的发布配置', () => {
     }
   });
 
-  test('运行时依赖都在 dependencies；Playwright 是可选 peer；web 不带运行时依赖', () => {
+  test('运行时依赖都在 dependencies；Playwright 不是 server 的依赖或 peer（D66：由 setup export 装到 JOPLO_HOME）；web 不带运行时依赖', () => {
     const server = pkgs.find((p) => p.dir === 'server')!.pkg;
     for (const d of ['vite', 'tailwindcss', '@tailwindcss/vite', '@joplo-app/web', '@joplo-app/core', '@joplo-app/kit', 'zod']) expect(server.dependencies[d], d).toBeDefined();
-    expect(server.dependencies.playwright).toBeUndefined();
-    expect(server.peerDependenciesMeta?.playwright?.optional).toBe(true);
+    for (const d of ['playwright', 'playwright-core']) {
+      expect(server.dependencies[d], d).toBeUndefined();
+      expect(server.peerDependencies?.[d], d).toBeUndefined();
+    }
     const cli = pkgs.find((p) => p.dir === 'cli')!.pkg;
     for (const d of ['tsx', 'commander', '@joplo-app/server', '@joplo-app/core']) expect(cli.dependencies[d], d).toBeDefined();
     expect(cli.publishConfig.bin).toEqual({ 'joplo-cli': './dist/bin.js' }); // 不能叫 joplo：会占掉入口包的 .bin/joplo

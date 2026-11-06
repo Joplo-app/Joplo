@@ -140,12 +140,29 @@ npx joplo build
 | `--scale <scale>` | 有限正数，像素倍率 |
 | `--overwrite` | 允许覆盖已有截图；仍不得覆盖项目源码或 `.joplo/` |
 
-需要可选依赖 Playwright 和 Chromium；缺失时给出安装命令并退出 1。dev/check/build 不需要它们，本地看板的图片和视频导出需要。
+render 需要**导出组件**（Playwright + Chromium，见下方 `setup export`）。写演示、dev、check、build、share 都不需要它；本地看板的图片和视频导出、share 的预览图需要。没有时：
+
+- 交互终端（stdin 与 stderr 都是 TTY，且没有 `CI`）：询问是否安装（默认否，写明下载大小），回答是则安装后继续截图；
+- 非交互（Agent、CI、管道）：不询问、不下载，打印 `EXPORT_COMPONENT_MISSING  … Run: npx joplo setup export …` 并以**退出码 4** 结束。
+
+已有项目里装过 `playwright`（或 `playwright-core`、`@playwright/test`）的老项目照常使用项目里的那份，不需要安装导出组件；两者都有时优先用导出组件。浏览器启动失败时提示 `npx joplo setup export --force` 重装。
+
+## setup export
 
 ```sh
-npm install -D playwright
-npx playwright install chromium
+npx joplo setup export            # 安装（已装时提示已就绪，可重复运行）
+npx joplo setup export --status   # 只检查，不安装；没装时退出码 4
+npx joplo setup export --force    # 重新安装
+npx joplo setup export --uninstall
 ```
+
+安装 Joplo 自己管理的导出组件（D66）：固定版本的 `playwright-core`（与 `@joplo-app/server` 的版本锁定）加 Chromium headless shell（以及录视频用的 ffmpeg）：下载约 99 MiB 的 Chromium 加几 MB 的 playwright-core 与 ffmpeg，占用磁盘约 220 MB。位置是 `$JOPLO_HOME/runtime/playwright-<版本>/`（`JOPLO_HOME` 缺省 `~/.joplo`），浏览器也在同一目录（`PLAYWRIGHT_BROWSERS_PATH` 指向它的 `browsers/`）。**不写项目的 package.json、lockfile 或 node_modules**：npm 在运行时目录里执行（`--prefix` 也是它），使用用户自己的 npm 源配置；浏览器下载走 Playwright 的 CDN，可以用 Playwright 的 `PLAYWRIGHT_DOWNLOAD_HOST` 换镜像。
+
+- stderr 显示下载大小和进度：终端里同一行刷新，非终端每 10% 一行；stdout 只有一行结果。
+- 装完以 `ready.json` 为准：中途失败（网络、npm、Chromium 起不来）不算已安装，重新运行即可续装；同一时间只有一个进程能安装（CLI 与看板共用一把锁）。
+- 升级 Joplo 后 Playwright 版本变化时需要重新安装；装好新版本会删掉旧版本的目录。
+- `--format json`：`data` 是状态（`ready`、`source: managed | project | null`、`version`、`dir`、`downloadMB`、`command`）；`--status` 没装时为 `ok: false`、`error.code: EXPORT_COMPONENT_MISSING`。
+- 退出码：0 成功；2 用法错误；4 导出组件未安装（render、`setup export --status`）。
 
 服务契约见 [contract.ts](../packages/server/src/contract.ts)。所有主题和选项以当前 `--help` 为准；需要创作细节时优先读取对应 skill 主题。
 
@@ -223,7 +240,7 @@ npx joplo share --new
 - `.joplo/cloud.json` 的格式为 `{server, shareId?, url?, review?: {shareId, url}}`：主链接和评审版是**两个分享**，互不覆盖（契约 8.1）。普通 share 只用、只写主 `shareId`/`url`；`--review` 只用、只写 `review`（Pro 重新发布评审版时用 `review.shareId` 作 replaceShareId，评审链接和评论保留，版本 +1），评审版永远不会替换 README 里的主链接。写入时保留另一项；记录属于其他 server 时整体替换。没有 `review` 的旧记录照常使用。
 - 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；一个对象失败会取消其他在途 PUT 和重试等待；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
 - finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/settings/billing`。
-- 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的 Playwright + Chromium）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有 Playwright、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”，share 照常成功；分享页此时用通用预览图。
+- 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的导出组件，见 `setup export`；项目里已有的 Playwright 也可以）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有导出组件、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”（没有导出组件时括号里给出 `npx joplo setup export`），share 照常成功、从不下载；分享页此时用通用预览图。
 - 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 只用英文，D57）。
 - **评审清单**：每次 share 都在 `POST /api/v1/shares` 请求体里附上 `review`（契约字段 `{v: 1, mode, features, scenarios, elements}`），由 check 编译的 dev IR 经 core 的 `reviewManifest` 生成。它**不是分享文件**：不进上传清单、不进 R2，分享页拿不到；SaaS 只把它存进数据库给评审页用。`mode: "publish"` 只含选定方案（与发布站同一范围，没有选定方案的功能不出现），`--review` 时为 `"review"`，含所有功能的所有方案。id 全部沿用 IR，步骤 `index` 从 0 开始，`elements` 是画面里所有作者元素 id（与 `Rule.elementIds` 同一套）及 `nodeLabel` 标签。
 - **清单上限**：字符串按码点截断（末尾 “…”）——名字 200、目标/思路/规则/问题/explain 2000、取舍 500、字幕 500、元素标签 200；数组超出部分丢弃——每个功能 20 个方案、300 条规则、100 个问题，每个方案 20 条取舍，每条规则 50 个元素，最多 100 个功能、500 个场景、每个场景 200 步、每步 50 条规则、2000 个元素；id 永不截断。截断后序列化仍超过 512 KiB（524288 字节）时：`--review` 报 EXPORT_FAILED（`details: {maxBytes, actualBytes}`），在构建和上传之前失败，不静默丢内容；普通 share 不因清单失败，stderr 提示一行 “Skipped the review manifest (…)”，请求体省略 `review`（契约里它是可选字段），评审页此时看不到规则和问题。

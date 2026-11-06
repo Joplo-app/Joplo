@@ -1,6 +1,6 @@
 /**
  * 发布形态：看板与发布站资源来自 @joplo-app/web 的预构建 dist；作者的 @joplo-app/kit 优先取项目里安装的那份；
- * Playwright 是可选依赖，缺失时只影响 render。
+ * 导出组件（Playwright + Chromium，D66）是可选的，缺失时只影响导出与 render。
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { JoploError } from '@joplo-app/core';
 import { kitAliases, locateWebAssets, readWebDist, type WebAssets } from '../src/web-assets.ts';
 import { loadPlaywright, launchHint } from '../src/render.ts';
+import { fakeManaged } from './runtime-fixtures.ts';
 
 const dirs: string[] = [];
 const temp = () => {
@@ -86,30 +87,28 @@ describe('kitAliases', () => {
   });
 });
 
-describe('Playwright 可选', () => {
-  it('没有安装 playwright：给出安装命令，说明其他命令不受影响', async () => {
-    const missing = Object.assign(new Error("Cannot find package 'playwright'"), { code: 'ERR_MODULE_NOT_FOUND' });
-    const e = await loadPlaywright(async () => {
-      throw missing;
-    }).catch((x) => x);
+describe('导出组件可选（D66）', () => {
+  it('没有导出组件：EXPORT_COMPONENT_MISSING，给出 npx joplo setup export，说明其他命令不需要它', async () => {
+    const home = temp();
+    const e = await loadPlaywright({ home, projectDir: temp() }).catch((x) => x);
     expect(e).toBeInstanceOf(JoploError);
-    expect(e.code).toBe('RENDER_FAILED');
-    expect(e.message).toContain('npm i -D playwright');
-    expect(e.message).toContain('npx playwright install chromium');
-    expect(e.message).toContain('dev, check, and build do not require it');
+    expect(e.code).toBe('EXPORT_COMPONENT_MISSING');
+    expect(e.message).toContain('npx joplo setup export');
+    expect(e.message).toContain('Writing demos, dev, check, build, and share do not need it');
+    expect(e.message).not.toContain('npm i -D playwright');
   });
 
-  it('其他载入错误原样抛出（不误报为“未安装”）', async () => {
-    const e = await loadPlaywright(async () => {
-      throw new Error('boom');
-    }).catch((x) => x);
+  it('托管运行时载入时的其他错误原样抛出（不误报为“未安装”）', async () => {
+    const home = temp();
+    fakeManaged(home);
+    const e = await loadPlaywright({ home, importFile: async () => { throw new Error('boom'); } }).catch((x) => x);
     expect(e.message).toBe('boom');
   });
 
-  it('浏览器启动失败的提示包含 npx playwright install chromium', () => {
+  it('浏览器启动失败的提示给出重装导出组件的命令', () => {
     const m = launchHint(new Error("Executable doesn't exist at /x/chrome\nmore"));
-    expect(m).toContain('npx playwright install chromium');
-    expect(m).toContain('dev, check, and build do not require it');
+    expect(m).toContain('npx joplo setup export --force');
+    expect(m).toContain('Writing demos, dev, check, build, and share do not need it');
     expect(m).not.toContain('\n');
   });
 });

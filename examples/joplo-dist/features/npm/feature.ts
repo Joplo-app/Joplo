@@ -18,7 +18,7 @@ export default feature({
   rules: {
     node_check: rule('命令入口先检查 Node 版本，低于 22 时打印要求与升级方法并退出 1，不加载其他模块', { cases: ['node_old'] }),
     prefer_local: rule('在项目目录里运行 npx joplo 时，使用项目 node_modules 中安装的版本', { cases: ['first_run', 'version_skew'] }),
-    browser_optional: rule('Playwright 不是必需依赖：只有 render 需要，缺失时给出安装命令，dev/check/build 不受影响', { cases: ['no_browser'] }),
+    browser_optional: rule('Playwright 不是必需依赖，也不装进项目：只有导出（render、看板导出、share 预览图）需要，由 npx joplo setup export 装到 ~/.joplo；缺失时给出安装命令，dev/check/build/share 不受影响', { cases: ['no_browser'] }),
     one_command_start: rule('init 结尾打印接下来要运行的命令，从零到看板不超过三条命令', { cases: ['first_run'] }),
     never_overwrite: rule('init 不覆盖已有文件', { cases: ['dir_not_empty'] }),
   },

@@ -125,12 +125,13 @@ pnpm typecheck
 pnpm test
 ```
 
-The workspace uses `joplo` as the command entry point, with `@joplo-app/kit`, `@joplo-app/core`, `@joplo-app/cli`, `@joplo-app/server`, and `@joplo-app/web` behind it. The CLI loads the server only for `dev`, `build`, and `render`. For local screenshots and exports in an npm-installed authoring project, add the optional browser dependencies in that project:
+The workspace uses `joplo` as the command entry point, with `@joplo-app/kit`, `@joplo-app/core`, `@joplo-app/cli`, `@joplo-app/server`, and `@joplo-app/web` behind it. The CLI loads the server only for `dev`, `build`, `render`, and `setup`. Writing demos, `dev`, `check`, `build`, and `share` need no browser. Screenshots (`render`), image and video export in the board, and share preview images use an optional export component (Playwright + Chromium, about 100 MB) that Joplo installs once under `~/.joplo`, never into your project:
 
 ```sh
-npm install -D playwright
-npx playwright install chromium
+npx joplo setup export
 ```
+
+The board's Export menu can also install it with one click.
 
 See [dependencies and licenses](docs/dependencies.md) and the [npm release workflow](docs/release.md).
 

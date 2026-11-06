@@ -161,11 +161,14 @@ export async function openInEditor(projectId: string, at: string): Promise<{ ok:
 /** 导出跟随页面自己的 viewport（D44：不再选择设备）。 */
 export type ExportRequest = { locale: Locale; scenarioId: string; position: number; theme: string; /** D55：null = 跟随主题。 */ font?: AppearanceFont | null; stroke?: AppearanceStroke | null };
 
-/** 本机导出图片：服务端用 Playwright 渲染当前步骤（与 joplo render 同一渲染路径）。 */
-export async function exportImage(projectId: string, body: ExportRequest): Promise<{ ok: true; blob: Blob; name: string } | { ok: false; message: Text }> {
+/** 本机导出图片：服务端用导出组件（Playwright，D66）渲染当前步骤（与 joplo render 同一渲染路径）。code 是服务端错误码（例如 EXPORT_COMPONENT_MISSING）。 */
+export async function exportImage(projectId: string, body: ExportRequest): Promise<{ ok: true; blob: Blob; name: string } | { ok: false; message: Text; code?: string }> {
   try {
     const res = await post(`/__joplo/p/${enc(projectId)}/export/image`, body);
-    if (!res.ok) return { ok: false, message: await readError(res) };
+    if (!res.ok) {
+      const b = (await res.json().catch(() => null)) as { error?: { message?: string; code?: string } } | null;
+      return { ok: false, message: b?.error?.message ?? `HTTP ${res.status}`, ...(b?.error?.code ? { code: b.error.code } : {}) };
+    }
     const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'joplo.png';
     return { ok: true, blob: await res.blob(), name };
   } catch (e) {
@@ -199,12 +202,50 @@ export async function cancelVideo(projectId: string): Promise<{ ok: true; job: V
 
 /** 视频导出进度（SSE，用 fetch 读流以便带令牌）。返回取消函数。 */
 export function watchVideo(projectId: string, cb: (job: VideoJob | null) => void, onError: (message: Text) => void): () => void {
+  return watchSse(`/__joplo/p/${enc(projectId)}/export/video/events`, cb, onError);
+}
+
+// ---------- 导出组件（D66）：Playwright + Chromium 由 Joplo 装在 JOPLO_HOME 下；没装时看板可以一键安装 ----------
+/** 与服务端 export-runtime.ts 的 ExportRuntimeStatus 一致。 */
+export type ExportRuntimeStatus = { ready: boolean; source: 'managed' | 'project' | null; version: string; dir: string; downloadMB: number; installingPid: number | null; command: string };
+/** 与服务端 export.ts 的 InstallJob 一致。 */
+export type InstallJob = { id: string; status: 'running' | 'done' | 'error'; phase: 'package' | 'browser' | 'verify' | 'done' | 'error'; percent: number; totalMB: number | null; message: string; error: string | null };
+
+/** 导出组件状态（含项目里已有的 Playwright）与正在进行的安装任务；读不到（旧服务端）时为 null。 */
+export async function fetchExportRuntime(projectId: string): Promise<{ runtime: ExportRuntimeStatus; install: InstallJob | null } | null> {
+  try {
+    const res = await fetch(`/__joplo/p/${enc(projectId)}/export/runtime`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const b = (await res.json()) as { runtime?: ExportRuntimeStatus; install?: InstallJob | null };
+    return b.runtime ? { runtime: b.runtime, install: b.install ?? null } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 请服务端安装导出组件（带本机令牌）；已有任务时返回那个任务。 */
+export async function installExportRuntime(): Promise<{ ok: true; job: InstallJob } | { ok: false; message: Text }> {
+  try {
+    const res = await post('/__joplo/export-runtime/install', {});
+    const b = (await res.json().catch(() => null)) as { job?: InstallJob; error?: { message?: string } } | null;
+    return res.ok && b?.job ? { ok: true, job: b.job } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, message: errMsg(e) };
+  }
+}
+
+/** 安装进度（SSE，用 fetch 读流以便带令牌）。返回取消函数。 */
+export function watchExportRuntime(cb: (job: InstallJob | null) => void, onError: (message: Text) => void): () => void {
+  return watchSse('/__joplo/export-runtime/install/events', cb, onError);
+}
+
+function watchSse<T>(url: string, cb: (v: T | null) => void, onError: (message: Text) => void): () => void {
   const ac = new AbortController();
   void (async () => {
     try {
       const headers = writeHeaders(false);
       if (!headers) throw new MessageError(m.board.thisPageHasNoLocalToken);
-      const res = await fetch(`/__joplo/p/${enc(projectId)}/export/video/events`, { headers, signal: ac.signal, cache: 'no-store' });
+      const res = await fetch(url, { headers, signal: ac.signal, cache: 'no-store' });
       if (!res.ok || !res.body) throw new Error(await readError(res));
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -217,7 +258,7 @@ export function watchVideo(projectId: string, cb: (job: VideoJob | null) => void
         while ((i = buf.indexOf('\n\n')) >= 0) {
           const chunk = buf.slice(0, i);
           buf = buf.slice(i + 2);
-          if (chunk.startsWith('data: ')) cb(JSON.parse(chunk.slice(6)) as VideoJob | null);
+          if (chunk.startsWith('data: ')) cb(JSON.parse(chunk.slice(6)) as T | null);
         }
       }
     } catch (e) {

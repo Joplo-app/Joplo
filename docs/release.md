@@ -47,7 +47,7 @@ git push origin v0.1.3
 ## 构建、打包与冒烟
 
 - `pnpm release:pack`：按依赖顺序构建，清空并重建 release/，逐包打 tarball，检查版本、内部依赖、导出入口、源码泄漏与字体许可证；`@joplo-app/web` tarball 超过 6,000,000 字节（6 MB）立即失败，并列出解包后最大的 5 个目录。
-- `pnpm release:smoke`：包含 pack，再在仓库外的临时目录只用 tarball 安装并运行 init、check、skill、build、dev、selection；验证版本锁定、热更新、源码定位和无工作区路径泄漏，并检查缺少可选 Playwright 时 render 的提示。init 示例 build 后，dist 字体总量不得超过 1,500,000 字节（1.5 MB），总文件数不得超过 150；任一超标即失败。
+- `pnpm release:smoke`：包含 pack，再在仓库外的临时目录只用 tarball 安装并运行 init、check、skill、build、dev、selection；验证版本锁定、热更新、源码定位和无工作区路径泄漏，并检查没有导出组件时 render 以退出码 4 结束、提示 `npx joplo setup export`，且不改项目的 package.json、lockfile 与 node_modules（D66）。init 示例 build 后，dist 字体总量不得超过 1,500,000 字节（1.5 MB），总文件数不得超过 150；任一超标即失败。
 - `pnpm release:smoke --keep`：保留临时目录，便于排查。冒烟安装第三方依赖需要网络或本地缓存，测试服务使用随机端口与独立 JOPLO_HOME。
 - 每个包的 prepublishOnly 仍会构建该包（只在有人直接对包目录运行 `pnpm publish` 时生效）；`release:publish` 发布的是打好的 tarball，`npm publish <tarball>` 不运行生命周期脚本，不会再逐包构建。发布前仍应完成整套 smoke，不能只凭单包构建成功判断可分发。
 

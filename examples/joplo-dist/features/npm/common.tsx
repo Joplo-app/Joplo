@@ -24,7 +24,7 @@ export const errorLines = (p: string) => [
     when={$.ui.renderErr}
     cmd="npx joplo render --scenario login.a.success --out shot.png"
     tone="warn"
-    out={'! 截图需要 Chromium，当前没有安装。\n  运行：npx playwright install chromium（约 150 MB）\n  dev、check、build 不需要它。'}
+    out={'EXPORT_COMPONENT_MISSING  截图需要导出组件（Playwright + Chromium，约 100 MB），当前没有安装。\n  运行：npx joplo setup export（装在 ~/.joplo，不改项目）\n  写演示、dev、check、build、share 不需要它。'}
   />,
 ];
 

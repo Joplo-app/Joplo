@@ -254,7 +254,8 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 - Published site: <site>/#/f/<feature>?s=<scenario>&step=<n>&l=<layer>. Embeds use ?embed=1&scenario=<scenario>&autoplay=1 (see publish).
 - Ids are qualified: option invite.a-modal, case invite.no_permission, scenario invite.a-modal.happy. step=n is the state after n steps (0 = initial). l is the layer key from layers: { … }; it pins that layer and turns Follow director off, so later steps do not switch layers. Omit l to follow the director.
 - Other parameters (layer=, option=, scenario= in the hash) are ignored; the board logs a console warning naming them.
-- Screenshot one step: npx joplo render --scenario-id invite.a-modal.happy --step-id 'invite.a-modal.happy#2' --out shot.png. It waits for fonts, layout, and the camera, and needs Playwright (npx playwright install chromium).
+- Screenshot one step: npx joplo render --scenario-id invite.a-modal.happy --step-id 'invite.a-modal.happy#2' --out shot.png. It waits for fonts, layout, and the camera.
+- render needs the Joplo export component (Playwright + Chromium, about 100 MB, installed once under ~/.joplo, never into the project). Without it render exits 4 with EXPORT_COMPONENT_MISSING and downloads nothing. It is a large download, so confirm with the user, then run npx joplo setup export (npx joplo setup export --status checks without installing). Writing demos, dev, check, build, and share do not need it.
 - In a browser, open the deep link, wait for [data-jcamera][data-camera-settled="1"] plus two animation frames, then capture. During autoplay or typing animations the DOM can be ahead of the pixels; pause first.
 
 ## Transition cards, roles, and Agent output (D56)
@@ -488,7 +489,8 @@ Compare cases and options in the board, then decide which option to publish for 
 - Layer switching, Follow director, replaying one layer, shot focus, and captions all work on the published site. See demo for syntax.
 - Fullscreen works on the published site: F enters/toggles, Space plays/pauses, ←/→ steps back/forward, Esc exits.
 - Fullscreen keeps only the stage and captions. Playback controls float below and hide automatically.
-- Both local and published views can export images. Video export is local only and requires local Playwright/Chromium.
+- Both local and published views can export images. Video export is local only.
+- Local image and video export use the Joplo export component (Playwright + Chromium, kept under ~/.joplo, not in the project). If it is missing, the board's Export menu offers Install export component (about 100 MB) and continues the export after installing; in a terminal, run npx joplo setup export.
 
 ## Deploy
 Use your own Wrangler environment and account in the project directory:
@@ -506,7 +508,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - Free links expire after 1 hour; read data.expiresAt for the exact time. Pro permanent links have expiresAt: null.
 - Successful share JSON includes data.embed: { iframe, markdown, badge, preview }. To add the demo to a README, write data.embed.markdown as is; do not build badge links yourself. For a free link, tell the user the badge shows "expired" after data.expiresAt.
 - data.embed.iframe embeds a player for blogs and docs: it shows a cover first; append &scenario=<scenario id> to pick the start or &autoplay=1 to skip the cover.
-- share also uploads a 1200x630 preview image of the default scenario when local Playwright is installed; without it, share still succeeds and prints one "Skipped the preview image" line.
+- share also uploads a 1200x630 preview image of the default scenario when the export component is installed (npx joplo setup export, or Playwright already in the project); without it, share still succeeds, prints one "Skipped the preview image" line, and never downloads anything.
 - Pro share updates the same-server link in .joplo/cloud.json; --new creates another link and --title sets its title.
 - The review version is a separate share (review: { shareId, url } in .joplo/cloud.json); it never replaces the main link. If the cloud rejects the review manifest, plain share retries once without it and still publishes.
 - npx joplo whoami --format json shows the account, plan, and limits; npx joplo logout signs out.

@@ -96,8 +96,8 @@ export const overlay = (p: string): JNode[] => [
       <Alert color="green" title="已导出" when={$.ui.exported}>
         invite-success.mp4（12 秒，2.1 MB），保存在项目的 exports/ 目录
       </Alert>
-      <Alert color="red" title="本机没有 Chromium，无法录制" when={$.ui.exportErr}>
-        <Code block>npx playwright install chromium</Code>
+      <Alert color="red" title="还没有安装导出组件，无法录制" when={$.ui.exportErr}>
+        <Code block>npx joplo setup export</Code>
       </Alert>
       <Group justify="flex-end">
         <Button id={`${p}_v_start`} disabled={$.ui.exporting} disabledReason="正在导出">{$.ui.videoButton}</Button>

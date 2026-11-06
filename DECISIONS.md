@@ -260,6 +260,14 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - `disabledReason` 可以绑定状态（和 `disabled` 一样）：编译成 `$ui.x` 形式的整值绑定，点击被禁用的元素时按当前状态读出，空值时退回默认说明；不是字符串也不是绑定时报 INVALID_DISABLED_REASON（error）并给出写法；DISABLED_WITHOUT_REASON 的提示写明两种写法。没有架构原因阻止绑定：IR 字段仍是字符串，与其他属性的绑定同一种表示。
   - `joplo dev` 加入已运行的看板时，写出那个看板的 Joplo 版本和启动目录（看板 ping 返回版本；server.json 增加 version、dir，旧看板没有）；与当前项目的版本不一致（含旧看板报不出版本）时多一行警告和处理办法（停掉那个看板再运行）。
   - 文档 / 技能说明（核对过实现）：`uses(...)` 是传给步骤的效果，不是链式方法；`l=` 或点层级标签会固定层级，之后的步骤不再自动切层，打开「跟随导演」或去掉 `l=` 恢复；routes 与 layers 可以同时用，声明 layers 后演示只显示层，路径页面不画出来（仍提供起点和 go/back 状态）；过渡卡那一步舞台不可点击，要点「下一步」。
+- D66 导出组件由 Joplo 托管，不装进项目（2026-11-06，来源：用户 2026-11-06，依据 0.2.5 复测：`joplo render` 要求把 Playwright 装进项目、改 package.json）：
+  - Playwright 不是必需的：只有真的导出时（`joplo render` 截图、看板导出图片 / 视频、`joplo share` 的预览图）才需要。写演示、dev、check、build、share 都不需要它。取代 D36 中“Playwright 是项目的可选依赖”的做法；`@joplo-app/server` 不再声明 playwright 的 peer 依赖。
+  - **导出组件**：固定版本的 `playwright-core`（与 server 的 devDependencies 一致，测试校验）+ Chromium headless shell（含录视频的 ffmpeg），装在 `$JOPLO_HOME/runtime/playwright-<版本>/`（缺省 `~/.joplo`），浏览器用 `PLAYWRIGHT_BROWSERS_PATH` 指到同目录的 `browsers/`。实测（macOS arm64）下载约 100 MB（Chromium 99 MiB），占用约 220 MB。npm 以运行时目录为 cwd 和 `--prefix`，**绝不写用户项目的 package.json、lockfile 或 node_modules**；以最后写入的 `ready.json` 为“已就绪”，中途失败重来即可；CLI 与看板共用一把安装锁；装好新版本后删除旧版本目录。
+  - 解析顺序：托管运行时 → 项目里已有的 `playwright` / `playwright-core` / `@playwright/test`（老项目兼容，只沿项目目录向上找 node_modules，不走 NODE_PATH）→ 都没有时报 `EXPORT_COMPONENT_MISSING`（新错误码，CLI 退出码 4）并给出安装命令。解析从不下载。
+  - 命名 `npx joplo setup export`（`--status` 只检查、`--force` 重装、`--uninstall` 删除、`--format json`）：`setup` 不与 `init`（建项目）、`skill install`（写项目文件）混淆，表示“给这台电脑装能力”；名词用能力“export”而不是实现“playwright”，以后换引擎命令不变，也能容纳别的可选组件。
+  - 不自动下载：`render` 缺组件时，交互终端询问（默认否，写明约 100 MB、不装进项目），非交互（Agent / CI / 管道）直接以 `EXPORT_COMPONENT_MISSING`、退出码 4 结束；`share` 没有组件时跳过预览图并提示一行安装命令，不失败；技能让 Agent 先征得用户同意再运行 setup export。
+  - 本地看板：「导出 ▾」菜单顶部在未安装 / 安装中 / 安装失败时显示安装卡（说明、「安装导出组件（约 N MB）」按钮、终端命令）；点导出时轻提示「安装并导出」。只有用户点按钮才开始下载，由看板进程执行安装并用 SSE 推送进度（「导出」按钮上的进度环与卡片），装好后继续刚才的导出，失败给原因与重试。安装接口 `POST /__joplo/export-runtime/install` 与进度流照用看板已有的校验（Host、Origin、本机令牌、`application/json`），网页上的任意请求不能触发下载。
+  - 界面方案沿用现有导出进度卡的样式，未单独出设计稿（D40 的原型可在用户检查后补）。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

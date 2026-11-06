@@ -39,6 +39,7 @@ import { CaseNav, CaseRail } from './CaseNav';
 import { Home } from './Home';
 import { InspectDrawer } from './InspectDrawer';
 import { ProgressRing, VideoProgressCard, useVideoExport } from './VideoExport';
+import { ExportSetupCard, SetupNeededFlash, showSetupCard, useExportRuntime } from './ExportSetup';
 import { diagnosticsSummary, gapBanner, nextCase } from './states-model';
 import { faviconHref, tabTitle } from '../player/states';
 import { StatusIcon } from '../player/StatusIcon';
@@ -204,7 +205,8 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         </span>,
         8000,
       );
-    else if (job.status === 'error')
+    else if (job.status === 'error') {
+      void rt.refresh(); // 可能是导出组件被卸载了：刷新安装卡
       setFlash(
         <span className="inline-flex max-w-[640px] items-center gap-2 whitespace-normal" data-testid="video-error">
           <LocalText value={m.board.videoExportFailed(job.error ?? '')} />
@@ -213,8 +215,29 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         </span>,
         10000,
       );
-    else if (job.status === 'cancelled') setFlash(<LocalText value={m.board.exportCancelled} />);
+    } else if (job.status === 'cancelled') setFlash(<LocalText value={m.board.exportCancelled} />);
   });
+
+  // 导出组件（D66）：没装时菜单顶部有安装卡；点导出时提示「安装并导出」；装好后继续刚才的导出
+  const rt = useExportRuntime(projectId, {
+    onReady: () => setFlash(<LocalText value={m.board.exportSetupReady} />),
+    onError: (message) =>
+      setFlash(
+        <span className="inline-flex max-w-[640px] items-center gap-2 whitespace-normal" data-testid="export-setup-failed">
+          <LocalText value={m.board.exportSetupFailed(message)} />
+          <button type="button" className="shrink-0 font-semibold text-jb-accent underline-offset-2 hover:underline" onClick={() => void rt.install()}>
+            {<LocalText value={m.board.retry} />}</button>
+        </span>,
+        12000,
+      ),
+  });
+  /** 导出前确认导出组件可用；不可用时提示安装（用户确认后才下载），装好后执行 run。 */
+  const needsSetup = (run: () => void): boolean => {
+    if (rt.ready && !rt.installing) return false;
+    if (rt.installing) rt.install(run); // 接上正在进行的安装，装好后继续
+    else setFlash(<SetupNeededFlash rt={rt} then={run} />, 12000);
+    return true;
+  };
 
   // 只应用成功的 IR；出错时保留上一次成功的画面（第一次就失败时也先显示它带的旧 IR）
   useEffect(() => {
@@ -288,6 +311,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   const editorAt = nextStep?.source ?? lastStep?.source ?? scenario?.steps[0]?.source ?? option?.source ?? null;
 
   const menu: MenuEntry[] = [
+    ...(showSetupCard(rt.status, rt.job) ? [{ id: 'export-setup', custom: <ExportSetupCard rt={rt} /> }, { id: 'export-setup-divider', divider: true as const }] : []),
     {
       id: 'image',
       icon: <ImageDown />,
@@ -295,13 +319,20 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
       disabled: !scenario,
       onClick: () => {
         if (!scenario || !state) return;
-        setFlash(<LocalText value={m.board.generatingImage} />);
-        void exportImage(projectId, { scenarioId: scenario.id, position: state.position, ...a.saved, locale }).then((r) => {
-          if (r.ok) {
-            downloadBlob(r.blob, r.name);
-            setFlash(<LocalText value={m.board.downloaded(r.name)} />);
-          } else setFlash(<LocalText value={m.board.imageExportFailed(r.message)} />);
-        });
+        const body = { scenarioId: scenario.id, position: state.position, ...a.saved, locale };
+        const run = () => {
+          setFlash(<LocalText value={m.board.generatingImage} />);
+          void exportImage(projectId, body).then((r) => {
+            if (r.ok) {
+              downloadBlob(r.blob, r.name);
+              setFlash(<LocalText value={m.board.downloaded(r.name)} />);
+            } else if (r.code === 'EXPORT_COMPONENT_MISSING') {
+              rt.markMissing();
+              setFlash(<SetupNeededFlash rt={rt} then={run} />, 12000);
+            } else setFlash(<LocalText value={m.board.imageExportFailed(r.message)} />);
+          });
+        };
+        if (!needsSetup(run)) run();
       },
     },
     ...(vid.running && vid.job ? [{ id: 'video-progress', custom: <VideoProgressCard job={vid.job} scenarioName={videoName.current} onCancel={() => void vid.cancel()} /> }, { id: 'video-divider', divider: true as const }] : []),
@@ -319,8 +350,11 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   // 视频：从菜单开始；完成提示里的“再导出一次”、失败提示里的“重试”也走这里
   retry.current = () => {
     if (!scenario) return;
-    videoName.current = scenario.name;
-    void vid.start(scenario.id, a.saved, locale).then((ok) => !ok && setFlash(<LocalText value={m.board.videoExportFailed(vid.error ?? m.board.couldNotStart)} />));
+    const run = () => {
+      videoName.current = scenario.name;
+      void vid.start(scenario.id, a.saved, locale).then((ok) => !ok && setFlash(<LocalText value={m.board.videoExportFailed(vid.error ?? m.board.couldNotStart)} />));
+    };
+    if (!needsSetup(run)) run();
   };
   // 缺口横幅（D55）：说清楚，再给下一步：复制给 Agent 的话；看已表达这个情况的方案怎么处理
   const gb = gap && option ? gapBanner(project, feature.id, option.id, resolved.caseId, i18n) : null;
@@ -404,7 +438,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         inspectMode={inspectMode}
         completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={i18n.board.nextCase(nc.title)} kbd="Enter" variant="primary" className="max-w-[360px] [&>span]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
         navRail={<CaseRail project={project} featureId={feature.id} optionId={resolved.optionId} caseId={resolved.caseId} />}
-        exportBadge={vid.running && vid.job ? <ProgressRing percent={vid.job.percent} /> : null}
+        exportBadge={vid.running && vid.job ? <ProgressRing percent={vid.job.percent} /> : rt.installing && rt.job ? <ProgressRing percent={rt.job.percent} /> : null}
         deviceTag={
           <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[6px] border border-jb-line bg-jb-surface px-2.5 font-jb text-[12px] text-jb-muted" data-testid="device-tag">
             <Smartphone className="size-3.5" aria-hidden />
@@ -469,4 +503,3 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
     </>
   );
 }
-

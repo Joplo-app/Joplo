@@ -17,11 +17,11 @@ export default feature({
     header_minimal: rule('顶栏只放面包屑（项目 / 功能 / 方案 / 场景），其余操作收进画面下方的「…」菜单', { origin: 'user', status: 'confirmed', cases: ['play', 'switch'] }),
     same_layout: rule('本地看板和发布站用同一套布局，发布站只是去掉创作信息', { origin: 'user', status: 'confirmed', cases: ['publish_play'] }),
     review_in_drawer: rule('不再区分演示 / 审阅模式：缺口放在左栏，检查元素时从右侧弹出抽屉', { origin: 'user', status: 'confirmed', cases: ['review'] }),
-    video_local: rule('视频由本机 Playwright 录制（与 joplo render 共用），没有 Chromium 时给出安装命令', { cases: ['export_video'] }),
+    video_local: rule('视频由导出组件录制（Playwright + Chromium，装在 ~/.joplo，与 joplo render 共用），没有时看板一键安装或给出 npx joplo setup export', { cases: ['export_video'] }),
   },
   questions: {
     inspect_gesture: question('不再有审阅模式后，“操作原型”和“检查元素”怎么区分？原型里暂定：单击 = 按场景操作，按住 ⌥ 单击 = 检查', { severity: 'blocker', refs: ['review'] }),
-    site_export: question('发布站上要不要提供导出？图片可以在浏览器里生成；视频需要本机 Playwright，发布站上做不了', { severity: 'major', refs: ['export_video', 'publish_play'] }),
+    site_export: question('发布站上要不要提供导出？图片可以在浏览器里生成；视频需要本机的导出组件，发布站上做不了', { severity: 'major', refs: ['export_video', 'publish_play'] }),
   },
   pick: 'b-by-case',
 });
