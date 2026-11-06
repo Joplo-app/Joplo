@@ -62,7 +62,7 @@ it('keeps literals and punctuation in the dictionaries, including empty selectio
   expect(boardDictionary('zh-CN').board.noFeaturesYetWriteYourFirstFeatureInFeatures).toContain('features/<名称>/feature.ts');
   expect(boardDictionary('zh-CN').board.gapBody('A','')).toContain('方案 A 的页面');
   expect(boardEnglish.board.labelPrefix('A')).toBe('A: ');
-  expect(boardEnglish.board.componentTypeName('Email','Email')).toBe('Email (Email)');
+  expect(boardEnglish.board.componentTypeName('Email','Email')).toBe('Email');
   expect(boardEnglish.board.diagnosticSeparator).toBe('; ');
   expect(boardEnglish.board.noFeaturesYetWriteYourFirstFeatureInFeatures).toContain('features/<name>/feature.ts');
   expect(boardEnglish.board.gapBody('A','')).toContain('gap, not a demo');

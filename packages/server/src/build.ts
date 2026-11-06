@@ -135,7 +135,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     const { html, inlined } = finalizeHtml(fs.readFileSync(siteHtml, 'utf8'), (rel) => fs.readFileSync(path.join(staging, rel), 'utf8'), inline);
     fs.rmSync(siteHtml);
     for (const rel of inlined) fs.rmSync(path.join(staging, rel));
-    fs.writeFileSync(path.join(staging, 'index.html'), html.replace('<title>Joplo · 概念原型</title>', `<title>${escapeHtml(project.name)} · 概念原型</title>`));
+    fs.writeFileSync(path.join(staging, 'index.html'), html.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));
 
     // 4. 写入目标目录
     if (fs.existsSync(outDir)) fs.rmSync(outDir, { recursive: true, force: true });

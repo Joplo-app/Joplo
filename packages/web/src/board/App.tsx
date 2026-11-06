@@ -329,7 +329,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             <StatusIcon status={gap.status} size={16} />
             {i18n.board.gapTitle(gb.letter, caseTitle ?? '', gap.status !== 'none' && gap.status !== 'missing' ? COVERAGE_LABEL(i18n)[gap.status].text : '')}
           </div>
-          <div className="text-[13px] text-jb-muted">{i18n.board.gapBody(gb.letter, gap.reason ?? '')}</div>
+          <div className="text-[13px] text-jb-muted">{i18n.board.gapBody(gb.letter, gap.basis === 'derived' ? i18n.board.thisCaseIsNotCoveredYet : gap.reason ?? '')}</div>
           <div className="flex flex-wrap items-center gap-2">
             <Btn icon={<Copy className="size-3.5" />} label={i18n.board.copyRequestForAgent} size={28} onClick={() => void copyText(gb.agentText).then((ok) => setFlash(<LocalText value={ok ? m.board.requestForAgentCopied : m.board.clipboardUnavailable} />))} data-testid="gap-copy" />
             {gb.alt ? <Btn icon={<ArrowRight className="size-3.5" />} label={i18n.board.seeHowOptionHandlesThis(gb.alt.letter)} variant="primary" size={28} onClick={() => toPlay({ featureId: feature.id, optionId: gb.alt!.optionId, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })} data-testid="gap-alt" /> : null}

@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Browser } from 'playwright';
 import { JoploError, SUBTITLE_HEIGHT, VIEWPORT_SIZE, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
+import { exportLocale } from './locale.ts';
 import type { RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';
@@ -84,13 +85,14 @@ type PageReport = { elements: RenderedElement[]; warnings: string[] };
  * 渲染路由的参数（纯函数）：主题必填（调用方缺省时传项目主题）；字体与线条（D55）只在指定且合法时带上，
  * 缺省 = 跟随主题，与 D55 之前的截图一致。
  */
-export function renderQuery(q: { projectId: string; scenarioId: string; position: number; theme: string; font?: AppearanceFont | null; stroke?: AppearanceStroke | null; viewport?: { width: number; height: number } }): string {
+export function renderQuery(q: { projectId: string; scenarioId: string; position: number; theme: string; locale?: string; font?: AppearanceFont | null; stroke?: AppearanceStroke | null; viewport?: { width: number; height: number } }): string {
   return new URLSearchParams({
     render: '1',
     project: q.projectId,
     scenario: q.scenarioId,
     position: String(q.position),
     theme: q.theme,
+    ...(exportLocale(q.locale) ? { locale: exportLocale(q.locale)! } : {}),
     ...(isAppearanceFont(q.font) ? { font: q.font } : {}),
     ...(isAppearanceStroke(q.stroke) ? { stroke: q.stroke } : {}),
     ...(q.viewport ? { w: String(q.viewport.width), h: String(q.viewport.height) } : {}),
@@ -130,7 +132,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     browser = await launch(playwright);
     const page = await browser.newPage({ viewport, deviceScaleFactor: opts.scale ?? 1, reducedMotion: 'reduce' });
     // D44：舞台宽度固定为页面自己的 viewport；指定 viewport 时它只是截图尺寸（舞台按比例放进去）
-    const q = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, font: opts.font, stroke: opts.stroke, ...(opts.viewport ? { viewport: opts.viewport } : {}) });
+    const q = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, locale: opts.locale, font: opts.font, stroke: opts.stroke, ...(opts.viewport ? { viewport: opts.viewport } : {}) });
     await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => (window as unknown as { __JOPLO_READY__?: boolean }).__JOPLO_READY__ === true, null, { timeout: 60000 });
     const err = await page.evaluate(() => (window as unknown as { __JOPLO_ERROR__?: string | null }).__JOPLO_ERROR__ ?? null);

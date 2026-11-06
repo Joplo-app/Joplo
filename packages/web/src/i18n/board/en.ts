@@ -9,7 +9,7 @@ export function createBoardEn(locale: Locale = 'en') {
       stateFlow: 'State flow',
       diagnosticSeparator: '; ',
       labelPrefix: (label: string) => `${label}: `,
-      componentTypeName: (component: string, description: string) => `${component} (${description})`,
+      componentTypeName: (component: string, _description: string) => component,
       // Render route fallback messages and its font-loading sample.
       projectDidNotCompileSuccessfully: "Project did not compile successfully",
       english: "English",

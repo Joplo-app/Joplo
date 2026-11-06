@@ -28,7 +28,7 @@ export type CompileResult = { project: Project | null; diagnostics: Diagnostic[]
 
 const KNOWN = new Set<string>(COMPONENT_TYPES);
 const OVERLAY = 'overlay';
-const MOCK_LABEL = { success: '模拟成功', failure: '模拟失败', denied: '模拟无权限', other: '模拟' } as const;
+const MOCK_LABEL = { success: 'Mock success', failure: 'Mock failure', denied: 'Mock permission denied', other: 'Mock' } as const;
 
 export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): CompileResult {
   const diags: Diagnostic[] = [];
@@ -412,11 +412,13 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
           else if (hasLayers && !directorLayer) directorLayer = Object.entries(layers).find(([, l]) => l.role === r)?.[0] ?? null;
         }
         const shots = [...perLayer].map(([layer, targets]) => ({ layer, targets }));
+        const generated = st.caption === undefined ? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore) : null;
         return {
           id: `${sid}#${i + 1}`,
           kind: st.kind,
           action: st.action,
-          caption: st.caption ?? (st.action.type === 'card' ? st.action.title : null) ?? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore),
+          caption: st.caption ?? generated!.caption,
+          ...(generated?.captionAuto ? { captionAuto: generated.captionAuto } : {}),
           effects,
           ruleIds: mode === 'publish' ? [] : ruleIds,
           shots,
@@ -436,7 +438,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         name: fl.name,
         description: fl.opts.description ?? '',
         caseIds: mode === 'publish' ? [] : (fl.opts.cases ?? []).filter((c) => fdef.cases?.[c]).map((c) => `${fid}.${c}`),
-        mock: { label: fl.opts.mock ?? MOCK_LABEL[outcome], outcome },
+        mock: { label: fl.opts.mock ?? MOCK_LABEL[outcome], outcome, ...(fl.opts.mock === undefined ? { auto: true as const } : {}) },
         initial: { sceneId: sceneOf(start), ui: state.ui, data: state.data, inputs: state.inputs },
         steps,
         expected: fl.opts.expected ?? '',
@@ -461,7 +463,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         const sids = scenarioIds[ck] ?? [];
         if (decl) coverage[`${fid}.${ck}`] = { status: decl.status, scenarioIds: sids, ...(decl.reason ? { reason: decl.reason } : {}), basis: 'declared' };
         else if (sids.length) coverage[`${fid}.${ck}`] = { status: 'expressed', scenarioIds: sids, basis: 'derived' };
-        else coverage[`${fid}.${ck}`] = { status: 'missing', scenarioIds: [], reason: '尚无场景，也没有说明', basis: 'derived' };
+        else coverage[`${fid}.${ck}`] = { status: 'missing', scenarioIds: [], basis: 'derived' };
       }
       for (const ck of Object.keys(def.coverage ?? {})) if (!fdef.cases?.[ck]) err('UNKNOWN_CASE', `Option ${qid} coverage declares unknown case "${ck}"`, def.source);
     }
@@ -698,29 +700,28 @@ function findIn(node: SceneNode, id: string): SceneNode | null {
 const NO_STATE = { ui: {}, data: {}, inputs: {} };
 
 /** 自动字幕：元素名取 Mantine 的 label 属性（其次 title / aria-label / placeholder / 文字）；select 显示选项的 label。 */
-function autoCaption(st: StepDef, scene: Scene | undefined): string {
+function autoCaption(st: StepDef, scene: Scene | undefined): Pick<Step, 'caption' | 'captionAuto'> {
   const a = st.action;
   const node = 'target' in a && scene ? findIn(scene.root, a.target) : null;
   const label = node ? nodeLabel(node) : 'target' in a ? a.target : '';
+  const result = (kind: NonNullable<Step['captionAuto']>['kind'], caption: string, extra: { value?: string; keys?: string } = {}) => ({ caption, captionAuto: { kind, label, ...extra } });
   switch (a.type) {
-    case 'click':
-      return `点击「${label}」`;
-    case 'type':
-      return `在「${label}」中输入“${a.value}”`;
+    case 'click': return result('click', `Click “${label}”`);
+    case 'type': return result('type', `Type “${a.value}” in “${label}”`, { value: a.value });
     case 'select': {
       const choices = node ? choicesOf(node, NO_STATE) : null;
-      return `在「${label}」中选择“${(choices && matchChoice(choices, a.value)?.label) ?? a.value}”`;
+      const value = (choices && matchChoice(choices, a.value)?.label) ?? a.value;
+      return result('select', `Select “${value}” in “${label}”`, { value });
     }
-    case 'toggle':
-      return node?.type === 'Checkbox' ? `${a.value ? '勾选' : '取消勾选'}「${label}」` : `${a.value ? '打开' : '关闭'}「${label}」`;
-    case 'press':
-      return a.keys.trim() ? `按下 ${a.keys}` : '按下按键';
-    case 'back':
-      return '返回上一页';
-    case 'event':
-      return a.name;
-    case 'card':
-      return a.title;
+    case 'toggle': {
+      const kind = node?.type === 'Checkbox' ? (a.value ? 'check' : 'uncheck') : (a.value ? 'switch_on' : 'switch_off');
+      const verb = { check: 'Check', uncheck: 'Uncheck', switch_on: 'Turn on', switch_off: 'Turn off' }[kind];
+      return result(kind, `${verb} “${label}”`);
+    }
+    case 'press': return result('press', a.keys.trim() ? `Press ${a.keys}` : 'Press a key', { keys: a.keys });
+    case 'back': return result('back', 'Go back');
+    case 'event': return { caption: a.name };
+    case 'card': return { caption: a.title };
   }
 }
 

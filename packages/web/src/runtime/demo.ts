@@ -1,3 +1,5 @@
+import { en, type Dictionary } from '../i18n/en';
+import { stepCaption, selectionLabel } from '../i18n/step-caption';
 import type { BoardDictionary } from '../i18n/board/en';
 import { reference } from '../i18n/messages';
 import { type Text } from '../i18n/messages';
@@ -58,7 +60,7 @@ export type Snapshot = {
   activeStep: number | null;
   ripple: { x: number; y: number; key: number } | null;
   preview: { nodeId: string; text: string } | null;
-  systemEvent: string | null;
+  systemEvent: Text | null;
   notice: Notice | null;
   selection: Selection | null;
   /** 回放失败时的说明。 */
@@ -169,6 +171,8 @@ export class DemoController {
   /** 最近一次提交的时刻：停留时长从这里算起。 */
   private committedAt = 0;
   reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
+  i18n: Dictionary = en;
 
   constructor(private readonly writer: SelectionWriter | null = null) {}
 
@@ -462,7 +466,7 @@ export class DemoController {
         const dwell = this.reducedMotion
           ? TIMING.reducedStep
           : stepDwell({
-              texts: [step.caption, step.explain, ...(step.action.type === 'card' ? [step.action.sub, ...(step.action.points ?? [])] : [])],
+              texts: [stepCaption(step, this.i18n), step.explain, ...(step.action.type === 'card' ? [step.action.sub, ...(step.action.points ?? [])] : [])],
               speed: this.speed,
               cameraMoved: step.shots.length > 0 || !!step.directorLayer,
               dotMs: this.activeDotMs(),
@@ -575,7 +579,7 @@ export class DemoController {
       }
       // 点错位置（D55）：画面顶部一条轻提示 + 目标闪一下，3 秒后消失，不打断
       case 'disabled':
-        this.set({ notice: { kind: 'disabled', nodeId, text: verdict.reason } });
+        this.set({ notice: { kind: 'disabled', nodeId, text: verdict.reason ?? m.player.defaultDisabledReason } });
         this.autoClear(3000);
         return;
       case 'unmodeled':
@@ -584,7 +588,7 @@ export class DemoController {
         this.autoClear(3000);
         return;
       case 'out_of_order':
-        this.set({ notice: { kind: 'out_of_order', nodeId, text: verdict.expectedCaption ? m.player.inThisScenarioTheNextStepIs(verdict.expectedCaption) : m.player.inThisScenarioTheDemoHasEnded } });
+        this.set({ notice: { kind: 'out_of_order', nodeId, text: this.nextStep() && !this.snap.state?.completed ? m.player.inThisScenarioTheNextStepIs(stepCaption(this.nextStep()!, m)) : m.player.inThisScenarioTheDemoHasEnded } });
         this.autoClear(3000);
         return;
       case 'static':
@@ -640,7 +644,7 @@ export class DemoController {
       route: scene?.route ?? '',
       nodeId: input.nodeId,
       at: hit ? (hit.node.source ?? null) : (step?.source ?? null),
-      label: hit ? nodeLabel(hit.node) : (step?.caption ?? null),
+      label: hit ? nodeLabel(hit.node) : (step ? stepCaption(step, en) : null),
       selectedAt: new Date().toISOString(),
     };
   }
@@ -650,7 +654,7 @@ export class DemoController {
     if (!input) return;
     const local = this.localSelection(input);
     if (!local) return;
-    await this.writeSelection(input, boardRef('board', 'selectedTellAgentWhatYouWantToChange', local.label ?? ''), boardRef('board', 'couldNotSyncSelectionToAgent'));
+    await this.writeSelection(input, boardRef('board', 'selectedTellAgentWhatYouWantToChange', selectionLabel(this.snap.project!, local)), boardRef('board', 'couldNotSyncSelectionToAgent'));
   }
 
   /** 取消选中，并同步给 Agent（selection.json 写为 null）。 */
@@ -677,7 +681,7 @@ export class DemoController {
         this.autoClear(quietOk ? 3000 : 5000);
       } else {
         const rolledBack = this.confirmed;
-        const tail = rolledBack ? boardRef('board', 'keepingThePreviousSelection', rolledBack.label ?? rolledBack.nodeId ?? '') : boardRef('board', 'selectionCleared');
+        const tail = rolledBack ? boardRef('board', 'keepingThePreviousSelection', this.snap.project ? selectionLabel(this.snap.project, rolledBack) : rolledBack.label ?? rolledBack.nodeId ?? '') : boardRef('board', 'selectionCleared');
         this.set({ selection: rolledBack, selectionSync: { status: 'error', message: r.message }, notice: { kind: 'error', text: boardRef('board', 'selectionSyncFailed', failText, r.message, tail) } });
       }
     });
@@ -729,7 +733,7 @@ export class DemoController {
       // 无目标用户操作：activeStep 投影为键帽，不移动鼠标，状态仍统一在 commit 推进。
       if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.selectHold, gen))) return false;
     } else if (step.kind === 'system' || a.type === 'event') {
-      this.set({ systemEvent: a.type === 'event' ? a.name : step.caption });
+      this.set({ systemEvent: a.type === 'event' ? a.name : stepCaption(step, m) });
       if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.systemHold, gen))) return false;
     } else if ('target' in a) {
       if (!(await this.leadTo(sc, a.target, gen))) return false;

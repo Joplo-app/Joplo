@@ -66,7 +66,7 @@ export function caseCard(project: Project, featureId: string, caseId: string, i1
     const status: CoverageStatus = cov?.status ?? 'none';
     const scenario = cov?.scenarioIds.map((id) => project.scenarios[id]?.name).find(Boolean);
     const { letter, title } = optionLabel(o, i);
-    return { optionId: o.id, letter, title, status, label: coverageMark(status, i18n).label, detail: cov?.reason ?? (scenario ? i18n.board.scenario(scenario) : i18n.board.thisCaseIsNotCoveredYet) };
+    return { optionId: o.id, letter, title, status, label: coverageMark(status, i18n).label, detail: cov?.basis === 'derived' && cov.status === 'missing' ? i18n.board.thisCaseIsNotCoveredYet : cov?.reason ?? (scenario ? i18n.board.scenario(scenario) : i18n.board.thisCaseIsNotCoveredYet) };
   });
 }
 

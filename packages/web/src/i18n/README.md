@@ -14,13 +14,22 @@
 - 放入状态的通知使用 `m` / `reference` 保存 `{ ns, key, args }`；flash 使用 `<LocalText value={消息引用} />`。不要把 `t.xxx` 的结果存入 state，嵌套参数中的外观名称同样必须是消息引用。
 - T3：保留参数名、顺序和类型，翻译完整句子；不翻译 Joplo、组件名、命令、路径、IR 作者内容。文案长度尽量接近英文；新增语言必须运行长文案布局测试。`systemPrefix` / `transitionPrefix` 的 ` · ` 是时间线修饰；`fontSample` 是字体预览样本；`board.english` 仅用于空舞台时请求字体的样本文字。内置字体 Marker Gothic / WenKai 的中文显示名沿用 D56。
 
-## 语言与导出的数据流（T4）
+## 语言与导出的数据流
 
 1. 用户点 `player/LanguageMenu.tsx` → Provider `setLocale` → 内存状态立即更新，并尝试写 `localStorage['joplo.locale']` → 下次启动 `initialLocale` 通过 `readLocale` 读取 → `resolveLocale` 优先手动选择，再按 `navigator.languages` 匹配，最后 `en` → Provider、纯模型、`html.lang` 和界面字体消费。存储异常只影响记忆，不影响当前使用。
 2. 看板图片：`board/App.tsx` → `exportImage` 的请求体 `{ scenarioId, position, theme, font, stroke, locale }` → `POST /__joplo/p/:id/export/image`。视频：相同当前 locale 经 `useVideoExport.start(..., locale)` → `startVideo` → `POST .../export/video`。前端单测验证两个请求体。
-3. **待 T4 转发**：`packages/server/src/export.ts` 的 `parseRequest` 读取并校验 `body.locale`，传入 `ExportManager.image` / `startVideo`；它们在 `renderUrl` 生成图片页面和录制页面 URL 时增加 `locale`。目前服务端未实现这段；字段已发出但会被旧服务端忽略。
-4. RenderApp URL：`?render=1&...&locale=zh-CN` → `src/main.tsx` 读取 `locale` 参数并传入 Provider `explicit` → `initialLocale` 优先于 storage / 浏览器规则 → RenderApp、RecordStage、Stage、Subtitle、渲染器默认文字消费。空值、不支持的标签回退到 storage / 浏览器 / en；不写回 storage。独立 `renderStep` 路径若支持 locale，T4 还应在 `packages/server/src/render.ts` 的 `renderQuery` 参数类型与 URLSearchParams 中转发。
+3. `packages/server/src/export.ts` 的 `parseRequest` 用服务端 `locale.ts` 的十种精确标签校验 `body.locale`（缺省或非法值忽略），存入本次导出 `look.locale`，传入 `ExportHub.image` / `startVideo`；图片选项与视频任务闭包保留它，`renderUrl` 生成截图和录制 URL 时增加 `locale`。不保存用户偏好到服务端。
+4. RenderApp URL：`?render=1&...&locale=zh-CN` → `src/main.tsx` 读取 `locale` 参数并传入 Provider `explicit` → `initialLocale` 优先于 storage / 浏览器规则 → RenderApp、RecordStage、Stage、Subtitle、渲染器默认文字消费。空值、不支持的标签回退到 storage / 浏览器 / en；不写回 storage。独立截图：`RenderOptions.locale` → `renderStep` → `renderQuery` 校验并转发 → 同一个 RenderApp / Provider。
 
 ## 验证
 
 `pnpm --filter @joplo-app/web typecheck`、`pnpm test`、`pnpm --filter @joplo-app/web build`。I1 守卫扫描源码的 CJK 字符；语言原生名有明确例外，作者 CJK 字宽判断使用数字码点，无需白名单。构建检查发布站产物不包含创作侧英文标记文案。无新增 e2e 测试。
+
+## 自动界面文字的 IR 契约
+
+- `core/compile.ts` 在作者没有字幕时写必填英文 `caption`；click/type/select/toggle/back/press 同时写 `captionAuto: { kind, label, value?, keys? }`（schema 严格校验）。event 名称、card 标题和作者显式字幕保持原文，不写自动元数据。dev 与 publish IR 均保留这些字段 → 编译载荷或发布站内联 JSON → 网页唯一入口 `stepCaption(step, t)` → 字幕区、时间线与步骤菜单、out_of_order 通知、系统提示、播放停留时长。通知用 deferred `m` 保存引用，切换语言后重译；停留时长使用控制器当前词典。CLI / check / selection / Agent 继续使用英文 `caption`（作者内容保留）。
+- `mock: { label, outcome, auto?: true }`：compile 只在未写 mock 时标记 auto 并写英文 label → dev / publish IR → `mockLabel` 按当前语言解析自动结果；作者标签保留。
+- 推导的 missing 覆盖不再有 reason → dev IR coverage.basis → 情况卡片与缺口提示复用 `thisCaseIsNotCoveredYet`；作者 declared reason 保留。
+- `explainClick` 在未写 disabledReason 时返回 null → DemoController 保存默认原因消息引用 → 网页按当前语言解析；作者原因保留。
+- 发布 HTML 的 title 正则替换为转义的 `项目名 · Joplo`；SiteApp 运行时用当前词典补充 Concept prototype 的含义。
+- T2 CJK 白名单仅余 `server/src/page-report.js` 的字体探针（测试空舞台的字形就绪，不显示为界面文字）。

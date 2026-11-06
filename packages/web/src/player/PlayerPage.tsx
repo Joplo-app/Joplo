@@ -388,6 +388,7 @@ export function PlayerPage(p: PlayerPageProps) {
   const { t: i18n } = useI18n();
 
   const { ctl, snap, project } = p;
+  ctl.i18n = i18n;
   const L = useBoardLayout();
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
   const [altDown, setAltDown] = useState(false);

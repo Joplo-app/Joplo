@@ -454,7 +454,7 @@ function toDiagnostic(e: unknown, ref: Diagnostic['ref']): Diagnostic {
 
 export type ClickVerdict =
   | { kind: 'advance' } // 正是当前步骤的目标
-  | { kind: 'disabled'; reason: string }
+  | { kind: 'disabled'; reason: string | null }
   | { kind: 'unmodeled'; label: string } // 明确标记为未建模
   | { kind: 'out_of_order'; label: string; expectedCaption: string | null } // 是本场景其他步骤的目标
   | { kind: 'not_covered'; label: string } // 没有任何已定义行为
@@ -472,7 +472,7 @@ export function explainClick(project: Project, state: PlayState, nodeId: string,
   if (!hit) return { kind: 'static' };
   const { node } = hit;
   const label = nodeLabel(node);
-  if (isNodeDisabled(node, state)) return { kind: 'disabled', reason: node.disabledReason ?? '该操作当前不可用（未说明原因）' };
+  if (isNodeDisabled(node, state)) return { kind: 'disabled', reason: node.disabledReason ?? null };
   const current = sc.steps[state.position];
   const targetOf = (s: Step) => ('target' in s.action ? s.action.target : null);
   if (current && !state.completed && targetOf(current) === nodeId && checkStep(project, sc, state, current) === null) return { kind: 'advance' };

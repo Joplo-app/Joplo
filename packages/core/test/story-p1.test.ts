@@ -16,7 +16,7 @@ describe('D56 P1 编译与纯函数', () => {
     const p = build().dev.project!;
     expect(p).not.toBeNull();
     const sc = p.scenarios[sid]!;
-    expect(sc.steps[0]).toMatchObject({ kind: 'user', action: { type: 'press', keys: '⌘K' }, caption: '按下 ⌘K' });
+    expect(sc.steps[0]).toMatchObject({ kind: 'user', action: { type: 'press', keys: '⌘K' }, caption: 'Press ⌘K' });
     expect(replay(p, sid).diagnostics).toEqual([]);
     expect(keyboardActionOf(sc.steps[0])).toEqual({ type: 'press', keys: '⌘K' });
     expect(keyboardActionOf(sc.steps[1])).toBeNull();
@@ -50,7 +50,7 @@ describe('D56 P1 编译与纯函数', () => {
   });
   it('空按键有确定字幕、不影响状态；流式值变化照常计入 changedAt', () => {
     const p = build(f => f.press('').press('Enter', stream($.ui.reply, ''))).dev.project!;
-    expect(p.scenarios[sid]!.steps[0]!.caption).toBe('按下按键');
+    expect(p.scenarios[sid]!.steps[0]!.caption).toBe('Press a key');
     expect(changedAt(p, sid, 1)).toEqual([]);
     expect(changedAt(p, sid, 2)).toEqual([{ path: 'ui.reply', before: undefined, after: '' }]);
   });

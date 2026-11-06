@@ -17,6 +17,8 @@ describe('buildSite', () => {
   let dir: string;
   beforeAll(() => {
     dir = copy();
+    const config = path.join(dir, 'joplo.config.ts');
+    fs.writeFileSync(config, fs.readFileSync(config, 'utf8').replace("name: '团队邀请功能'", () => `name: '团队 <&\" $&'`));
   });
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 
@@ -30,6 +32,7 @@ describe('buildSite', () => {
     expect(r.files.some((f) => f.endsWith('.js'))).toBe(false); // 入口脚本已内联
     const html = fs.readFileSync(path.join(dir, 'dist/index.html'), 'utf8');
     expect(html).toContain('id="joplo-ir"');
+    expect(html.match(/<title>[^<]*<\/title>/)?.[0]).toBe('<title>团队 &lt;&amp;&quot; $&amp; · Joplo</title>');
     expect(html).not.toMatch(/<(link|script)[^>]*crossorigin/);
     expect(html).not.toMatch(/<script[^>]*\ssrc="\.\//);
     const ir = JSON.parse(/<script type="application\/json" id="joplo-ir">([\s\S]*?)<\/script>/.exec(html)![1]!);

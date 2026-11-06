@@ -6,6 +6,21 @@ import type { Dictionary } from './en';
 export function createZhCN(locale: Locale = 'zh-CN') {
   return defineDictionary<Dictionary>()({
     player: {
+      autoClick: (label: string) => `点击「${label}」`,
+      autoType: (label: string, text: string) => `在「${label}」中输入“${text}”`,
+      autoSelect: (label: string, text: string) => `在「${label}」中选择“${text}”`,
+      autoCheck: (label: string) => `勾选「${label}」`,
+      autoUncheck: (label: string) => `取消勾选「${label}」`,
+      autoSwitchOn: (label: string) => `打开「${label}」`,
+      autoSwitchOff: (label: string) => `关闭「${label}」`,
+      autoBack: '返回上一页',
+      autoPress: (keys: string) => keys.trim() ? `按下 ${keys}` : '按下按键',
+      mockSuccess: '模拟成功',
+      mockFailure: '模拟失败',
+      mockDenied: '模拟无权限',
+      mockOther: '模拟',
+      defaultDisabledReason: '该操作当前不可用（未说明原因）',
+
       fork: '分叉',
       otherStoryRoutes: '其他故事路线',
       staticStageThisOptionDoesNotDemonstrateThisCase: '这是静态画面：当前方案还没有演示这个情况',
@@ -205,6 +220,7 @@ export function createZhCN(locale: Locale = 'zh-CN') {
 ${value(p2, locale)}`,
     },
     site: {
+      prototypeTitle: (name: string) => `${name} · 概念原型`,
       scenarioCount: (n: number) => `${number(n, locale)} 个场景`,
       itemCount: (n: number) => `${number(n, locale)} 个`,
 

@@ -140,6 +140,13 @@ export const Step = z.strictObject({
   kind: z.enum(['user', 'system', 'card']),
   action: Action,
   caption: z.string().min(1),
+  /** Generated caption metadata; caption remains the English fallback for tools. */
+  captionAuto: z.strictObject({
+    kind: z.enum(['click', 'type', 'select', 'check', 'uncheck', 'switch_on', 'switch_off', 'back', 'press']),
+    label: z.string(),
+    value: z.string().optional(),
+    keys: z.string().optional(),
+  }).optional(),
   effects: z.array(Effect).default([]),
   ruleIds: z.array(Qid).default([]),
   /** 这一步的镜头（来自 shot()，按层级归类）。没有 shot 的步骤为空，镜头沿用上一步。 */
@@ -163,7 +170,7 @@ export const Scenario = z.strictObject({
   name: z.string().min(1),
   description: z.string().default(''),
   caseIds: z.array(Qid).default([]),
-  mock: z.strictObject({ label: z.string().min(1), outcome: z.enum(['success', 'failure', 'denied', 'other']) }),
+  mock: z.strictObject({ label: z.string().min(1), outcome: z.enum(['success', 'failure', 'denied', 'other']), auto: z.literal(true).optional() }),
   initial: z.strictObject({
     sceneId: Qid,
     ui: z.record(z.string(), Json).default({}),

@@ -197,6 +197,7 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
     c.setScenario(scenarioId, 0, { quiet: true });
     return c;
   }, [project, scenarioId]);
+  ctl.i18n = i18n;
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
   const [started, setStarted] = useState(false);

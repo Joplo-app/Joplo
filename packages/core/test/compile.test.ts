@@ -43,7 +43,9 @@ describe('TSX 邀请示例编译', () => {
   it('所有场景完整回放；步骤带源位置；字幕可自动生成', () => {
     for (const id of Object.keys(dev.scenarios)) expect(replay(dev, id).diagnostics, id).toEqual([]);
     const s = dev.scenarios['invite.a-modal.success']!;
-    expect(s.steps[1]!.caption).toBe('在「邮箱」中输入“li.lei@example.com”');
+    expect(s.steps[1]!).toMatchObject({ caption: 'Type “li.lei@example.com” in “邮箱”', captionAuto: { kind: 'type', label: '邮箱', value: 'li.lei@example.com' } });
+    expect(s.mock).toEqual({ label: 'Mock success', outcome: 'success', auto: true });
+    expect(pub.scenarios[s.id]!.steps[1]!.captionAuto).toEqual(s.steps[1]!.captionAuto);
     expect(s.steps.map((x) => x.source)).toEqual(s.steps.map(() => expect.stringMatching(/^features\/invite\/options\/a-modal\.tsx:\d+:\d+$/)));
     expect(s.steps[0]!.ruleIds).toEqual(['invite.admin_only']);
   });
@@ -58,7 +60,7 @@ describe('TSX 邀请示例编译', () => {
     const cov = dev.options['invite.a-modal']!.coverage;
     expect(cov['invite.happy']).toMatchObject({ status: 'expressed', basis: 'derived' });
     expect(cov['invite.already_member']).toMatchObject({ status: 'undecided', basis: 'declared' });
-    expect(cov['invite.revoked']).toMatchObject({ status: 'missing', basis: 'derived' });
+    expect(cov['invite.revoked']).toEqual({ status: 'missing', scenarioIds: [], basis: 'derived' });
   });
 
   it('禁用与未建模的点击解释仍由播放器决定', () => {

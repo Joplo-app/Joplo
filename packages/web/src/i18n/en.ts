@@ -4,6 +4,21 @@ import { value, number, list, plural, type Value } from './format';
 export function createEn(locale: Locale = 'en') {
   return {
     player: {
+      autoClick: (label: string) => `Click “${label}”`,
+      autoType: (label: string, text: string) => `Type “${text}” in “${label}”`,
+      autoSelect: (label: string, text: string) => `Select “${text}” in “${label}”`,
+      autoCheck: (label: string) => `Check “${label}”`,
+      autoUncheck: (label: string) => `Uncheck “${label}”`,
+      autoSwitchOn: (label: string) => `Turn on “${label}”`,
+      autoSwitchOff: (label: string) => `Turn off “${label}”`,
+      autoBack: 'Go back',
+      autoPress: (keys: string) => keys.trim() ? `Press ${keys}` : 'Press a key',
+      mockSuccess: 'Mock success',
+      mockFailure: 'Mock failure',
+      mockDenied: 'Mock permission denied',
+      mockOther: 'Mock',
+      defaultDisabledReason: 'This action is unavailable (no reason provided)',
+
       fork: 'Fork',
       otherStoryRoutes: 'Other story routes',
       staticStageThisOptionDoesNotDemonstrateThisCase: 'Static stage: this option does not demonstrate this case yet',
@@ -202,6 +217,7 @@ export function createEn(locale: Locale = 'en') {
       themeCssComment: (p0: Value, p1: Value, p2: Value) => `/* Theme ${value(p0, locale)}${value(p1, locale)} */\n${value(p2, locale)}`,
     },
     site: {
+      prototypeTitle: (name: string) => `${name} · Concept prototype`,
       scenarioCount: (n: number) => `${plural(n, { one: '# scenario', other: '# scenarios' }, locale)}`,
       itemCount: (n: number) => `${number(n, locale)}`,
 

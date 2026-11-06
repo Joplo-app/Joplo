@@ -1,3 +1,5 @@
+import { LocalText } from '../i18n/LocalText';
+import { selectionLabel } from '../i18n/step-caption';
 import { translate } from '../i18n/messages';
 import { useBoardI18n } from '../i18n/board/context';
 import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
@@ -85,7 +87,7 @@ export function InspectDrawer({
         <div className="mb-3 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate text-[17px] font-bold" data-testid="sel-label">
-              {selection.label ?? selection.nodeId}
+              <LocalText value={selectionLabel(project, selection)} />
             </div>
             {node ? (
               <div className="mt-0.5 text-[12px] text-jb-muted" data-testid="sel-type">

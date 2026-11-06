@@ -1,3 +1,4 @@
+import { stepCaption, mockLabel } from '../i18n/step-caption';
 import { en, type Dictionary } from '../i18n/en';
 /**
  * 字幕区的内容与高度（纯函数）：画面下方单独一块，不叠在画面上。
@@ -41,12 +42,12 @@ export function subtitleFor(scenario: Scenario | null | undefined, position: num
   const total = scenario.steps.length;
   const index = activeStep !== null ? activeStep + 1 : Math.max(0, Math.min(position, total));
   const step = index > 0 ? scenario.steps[index - 1] : undefined;
-  const caption = step ? step.caption : i18n.player.initialState;
+  const caption = step ? stepCaption(step, i18n) : i18n.player.initialState;
   const done = activeStep === null && completed ? completed : null;
   const own = (step ? step.explain : (scenario.description ?? (total === 0 ? i18n.player.thisScenarioHasNoStepsAndOnlyShowsIts : undefined)))?.trim() || null;
   const explain = own ?? (done?.text.trim() || null);
   const badge: SubtitleBadge = done
-    ? { kind: 'done', text: i18n.player.scenarioComplete(scenario.mock.label), outcome: scenario.mock.outcome, title: i18n.player.demoResultDisclaimer(done.text, scenario.mock.label) }
+    ? { kind: 'done', text: i18n.player.scenarioComplete(mockLabel(scenario.mock, i18n)), outcome: scenario.mock.outcome, title: i18n.player.demoResultDisclaimer(done.text, mockLabel(scenario.mock, i18n)) }
     : { kind: 'progress', text: i18n.player.stepProgress(index, total) };
   return { forks: forksOf(step), index, kind: step ? step.kind : 'initial', caption, explain, captionLines: 1, explainLines: explain ? 1 : 0, title: explain ? `${caption}\n${explain}` : caption, badge };
 }

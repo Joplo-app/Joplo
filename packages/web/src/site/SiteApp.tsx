@@ -54,7 +54,7 @@ function Site({ project }: { project: Project }) {
   const [hash, go] = useHash();
   const route = parseSiteHash(hash);
   const titleFeature = route.kind === 'play' ? project.features[route.play.featureId]?.name ?? null : null;
-  useEffect(() => { document.title = tabTitle({ feature: titleFeature, project: project.name }, i18n); }, [titleFeature, project.name, i18n]);
+  useEffect(() => { document.title = i18n.site.prototypeTitle(tabTitle({ feature: titleFeature, project: project.name }, i18n)); }, [titleFeature, project.name, i18n]);
   const navigate = (r: SiteRoute, replace = false) => go(siteHash(r), replace);
   // 旧链接 #/s/<场景>：换成演示页链接
   useEffect(() => {

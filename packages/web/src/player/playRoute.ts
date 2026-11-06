@@ -19,7 +19,7 @@ export type Resolved = {
   step: number;
   caseId: string | null;
   /** 当前方案没有表达所选情况（只在有情况数据的看板上出现）。 */
-  gap: { status: Coverage['status'] | 'none'; reason?: string } | null;
+  gap: { status: Coverage['status'] | 'none'; reason?: string; basis?: Coverage['basis'] } | null;
 };
 
 export function resolvePlay(project: Project, play: PlayRoute): Resolved {
@@ -39,7 +39,7 @@ export function resolvePlay(project: Project, play: PlayRoute): Resolved {
     const ids = (cov?.scenarioIds ?? []).filter((id) => scs.some((s) => s.id === id));
     const byCase = ids[0] ?? scs.find((s) => s.caseIds.includes(caseId))?.id ?? null;
     if (cov?.status === 'expressed' && byCase) scenarioId = byCase;
-    else gap = { status: cov?.status ?? 'none', ...(cov?.reason ? { reason: cov.reason } : {}) };
+    else gap = { status: cov?.status ?? 'none', basis: cov?.basis, ...(cov?.reason ? { reason: cov.reason } : {}) };
   } else scenarioId = scs[0]?.id ?? null;
   const total = scenarioId ? project.scenarios[scenarioId]!.steps.length : 0;
   const step = Math.max(0, Math.min(play.step ?? 0, total));

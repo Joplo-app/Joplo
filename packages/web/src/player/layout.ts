@@ -1,3 +1,4 @@
+import { stepCaption } from '../i18n/step-caption';
 import { en, type Dictionary } from '../i18n/en';
 /**
  * 演示页布局（D55，纯函数）：断点、播放坞宽度、时间线格子、层级标签。
@@ -69,7 +70,7 @@ export type TimelineChip = {
 export type Dwell = { position: number; ms: number; elapsed: number };
 
 /** 时间线格子。shownIndex = 当前位置（0 = 初始）；activeStep = 正在执行的步骤（播放中），优先。 */
-export function timelineChips(steps: readonly { caption: string; kind: 'user' | 'system' | 'card'; forks?: readonly { label: string }[] }[], position: number, activeStep: number | null, dwell: Dwell | null = null, paused = false, i18n: Dictionary = en): TimelineChip[] {
+export function timelineChips(steps: readonly { captionAuto?: import('@joplo-app/core').Step['captionAuto']; caption: string; kind: 'user' | 'system' | 'card'; forks?: readonly { label: string }[] }[], position: number, activeStep: number | null, dwell: Dwell | null = null, paused = false, i18n: Dictionary = en): TimelineChip[] {
   const shown = activeStep !== null ? activeStep + 1 : position;
   const chip = (index: number, label: string, system: boolean, tip: string): TimelineChip => ({
     index,
@@ -81,7 +82,7 @@ export function timelineChips(steps: readonly { caption: string; kind: 'user' | 
     playing: activeStep !== null && activeStep === index - 1,
     ...(dwell && activeStep === null && dwell.position === index && index === shown ? { dwell: { ms: dwell.ms, elapsed: dwell.elapsed, paused } } : {}),
   });
-  return [chip(0, i18n.player.initial, false, i18n.player.initialStateTip), ...steps.map((s, i) => ({ ...chip(i + 1, s.caption, s.kind === 'system', `${i18n.player.number(i + 1)} · ${s.kind === 'system' ? i18n.player.systemPrefix : s.kind === 'card' ? i18n.player.transitionPrefix : ''}${s.caption}${s.forks?.length ? i18n.player.forkSummary(i18n.player.list(s.forks.map(f => f.label))) : ''}`), ...(s.forks?.length ? { fork: true } : {}), ...(s.kind === 'card' ? { card: true } : {}) }))];
+  return [chip(0, i18n.player.initial, false, i18n.player.initialStateTip), ...steps.map((s, i) => ({ ...chip(i + 1, stepCaption(s, i18n), s.kind === 'system', `${i18n.player.number(i + 1)} · ${s.kind === 'system' ? i18n.player.systemPrefix : s.kind === 'card' ? i18n.player.transitionPrefix : ''}${stepCaption(s, i18n)}${s.forks?.length ? i18n.player.forkSummary(i18n.player.list(s.forks.map(f => f.label))) : ''}`), ...(s.forks?.length ? { fork: true } : {}), ...(s.kind === 'card' ? { card: true } : {}) }))];
 }
 
 export type LayerTab = { id: string; title: string; active: boolean; camera: boolean; /** 这一层是谁的画面（D56）。 */ role?: { id: string; name: string; color: string } | null };
