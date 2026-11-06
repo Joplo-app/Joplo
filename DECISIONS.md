@@ -250,6 +250,14 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 薄技能 + 按需读取主题：技能只写心智模型（预设场景的播放器，不是自由输入的应用原型）、起步顺序（先做一条正常流程 + 一条错误恢复流程并在看板里确认，再扩展）和最常见的坑；具体 API 一律以 `npx joplo skill <主题>` 为准，和项目安装的版本一致，不会过期。
   - 同一测试带来的 CLI 改进：结构校验错误定位到作者元素、同一根因合并成一条并附 “affects N views”；`when` 收到普通值报 `INVALID_CONDITION`；深链接里不认识的参数在看板（以及本机预览的发布站）控制台提示一次。
   - 不做（待办）：主题的稳定颜色变量（例如主按钮颜色 `--jp-primary` 或稳定的 variant 属性）。目前主按钮背景是 `--jp-ink`，只能逐个按钮写 `color`；见下方 Q8。
+- D65 导出组件由 Joplo 托管，不装进项目（2026-11-06，来源：用户 2026-11-06，依据 0.2.5 复测：`joplo render` 要求把 Playwright 装进项目、改 package.json）：
+  - Playwright 不是必需的：只有真的导出时（`joplo render` 截图、看板导出图片 / 视频、`joplo share` 的预览图）才需要。写演示、dev、check、build、share 都不需要它。取代 D36 中“Playwright 是项目的可选依赖”的做法；`@joplo-app/server` 不再声明 playwright 的 peer 依赖。
+  - **导出组件**：固定版本的 `playwright-core`（与 server 的 devDependencies 一致，测试校验）+ Chromium headless shell（含录视频的 ffmpeg），装在 `$JOPLO_HOME/runtime/playwright-<版本>/`（缺省 `~/.joplo`），浏览器用 `PLAYWRIGHT_BROWSERS_PATH` 指到同目录的 `browsers/`。实测（macOS arm64）下载约 100 MB（Chromium 99 MiB），占用约 220 MB。npm 以运行时目录为 cwd 和 `--prefix`，**绝不写用户项目的 package.json、lockfile 或 node_modules**；以最后写入的 `ready.json` 为“已就绪”，中途失败重来即可；CLI 与看板共用一把安装锁；装好新版本后删除旧版本目录。
+  - 解析顺序：托管运行时 → 项目里已有的 `playwright` / `playwright-core` / `@playwright/test`（老项目兼容，只沿项目目录向上找 node_modules，不走 NODE_PATH）→ 都没有时报 `EXPORT_COMPONENT_MISSING`（新错误码，CLI 退出码 4）并给出安装命令。解析从不下载。
+  - 命名 `npx joplo setup export`（`--status` 只检查、`--force` 重装、`--uninstall` 删除、`--format json`）：`setup` 不与 `init`（建项目）、`skill install`（写项目文件）混淆，表示“给这台电脑装能力”；名词用能力“export”而不是实现“playwright”，以后换引擎命令不变，也能容纳别的可选组件。
+  - 不自动下载：`render` 缺组件时，交互终端询问（默认否，写明约 100 MB、不装进项目），非交互（Agent / CI / 管道）直接以 `EXPORT_COMPONENT_MISSING`、退出码 4 结束；`share` 没有组件时跳过预览图并提示一行安装命令，不失败；技能让 Agent 先征得用户同意再运行 setup export。
+  - 本地看板：「导出 ▾」菜单顶部在未安装 / 安装中 / 安装失败时显示安装卡（说明、「安装导出组件（约 N MB）」按钮、终端命令）；点导出时轻提示「安装并导出」。只有用户点按钮才开始下载，由看板进程执行安装并用 SSE 推送进度（「导出」按钮上的进度环与卡片），装好后继续刚才的导出，失败给原因与重试。安装接口 `POST /__joplo/export-runtime/install` 与进度流照用看板已有的校验（Host、Origin、本机令牌、`application/json`），网页上的任意请求不能触发下载。
+  - 界面方案沿用现有导出进度卡的样式，未单独出设计稿（D40 的原型可在用户检查后补）。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

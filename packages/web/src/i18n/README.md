@@ -2,7 +2,7 @@
 
 `en.ts` 是共用词典唯一源，包含 `player`（播放控件、字幕、通知）、`stage`（渲染器默认文字、内置主题名称）、`site`（观众侧首页、嵌入模式 `?embed=1` 与评审模式 `?embed=1&review=1`）。`board/en.ts` 是创作侧唯一源，包含看板、检查器、外观、导出状态。发布站禁止运行时导入 `board/`；DemoController 的创作侧通知通过 type-only schema + `reference` 保存消息键，发布站不带这些文案。
 
-当前源词典共 **511 个叶子键**：player 144（其中 4 个是 D61 场景封面 `cover*`）、stage 50、site 29（其中 9 个是发布站嵌入模式 `embed*`，2 个是评审模式 `reviewPick*`）、board 288（包括数字／列表格式化函数）。
+当前源词典共 **524 个叶子键**：player 144（其中 4 个是 D61 场景封面 `cover*`）、stage 50、site 29（其中 9 个是发布站嵌入模式 `embed*`，2 个是评审模式 `reviewPick*`）、board 301（包括数字／列表格式化函数；其中 13 个是 D65 导出组件的安装卡 `exportSetup*` 等）。
 
 十种语言均有完整的共用与 board 词典，通过两个 `dictionaries.ts` 注册。没有英文回退或新增运行时依赖，数字、列表和复数按各自 locale 格式化。
 

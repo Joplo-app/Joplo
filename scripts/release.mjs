@@ -324,9 +324,18 @@ async function smoke() {
     const budget = checkSiteBudget(siteFiles(path.join(project, 'dist')));
     log(`  ✓ Published site budget: ${budget.fonts} font bytes / 1500000, ${budget.files} files / 150`);
 
-    // 7. render：没有 Playwright 时只有 render 失败，并给出安装命令
-    const render = sh(joplo, ['render', '--scenario-id', 'example.a.happy', '--out', 'shot.png'], project, { expect: 1 });
-    assert(render.out.includes('npx playwright install chromium') && render.out.includes('dev, check, and build do not require it'), `render 提示：${render.out}`);
+    // 7. render：没有导出组件（D65）时非交互环境以退出码 4 结束，提示 setup export，不下载、不改项目依赖文件
+    const exportHome = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-smoke-export-home-'));
+    const depFiles = () => ['package.json', 'package-lock.json'].map((f) => (fs.existsSync(path.join(project, f)) ? fs.readFileSync(path.join(project, f), 'utf8') : '-')).join('\n') + '\n' + fs.readdirSync(path.join(project, 'node_modules')).sort().join(',');
+    const depsBefore = depFiles();
+    const render = sh(joplo, ['render', '--scenario-id', 'example.a.happy', '--out', 'shot.png'], project, { expect: 4, env: { JOPLO_HOME: exportHome, CI: '1' } });
+    assert(render.out.includes('EXPORT_COMPONENT_MISSING') && render.out.includes('npx joplo setup export') && render.out.includes('Writing demos, dev, check, build, and share do not need it'), `render 提示：${render.out}`);
+    assert(!render.out.includes('npm i -D playwright'), `render 不应再要求把 Playwright 装进项目：${render.out}`);
+    const status = sh(joplo, ['setup', 'export', '--status'], project, { expect: 4, env: { JOPLO_HOME: exportHome } });
+    assert(status.out.includes('not installed'), `setup export --status：${status.out}`);
+    assert(!fs.existsSync(path.join(exportHome, 'runtime')), 'render / setup --status 不应下载导出组件');
+    assert(depFiles() === depsBefore, 'render 不应修改项目的 package.json、lockfile 或 node_modules');
+    fs.rmSync(exportHome, { recursive: true, force: true });
 
     // 8. dev：随机端口，GET / 返回看板 HTML；选中一个元素，随后 selection 读出 文件:行
     const port = await freePort();

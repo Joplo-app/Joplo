@@ -14,6 +14,8 @@ import { embedStartScenario } from '@joplo-app/core';
 /** share 生成的预览图在发布清单里的固定路径。 */
 export const PREVIEW_PATH = '_joplo/preview.png';
 export const PREVIEW_SIZE = { width: 1200, height: 630 } as const;
+/** 与 @joplo-app/server 的 SETUP_COMMAND 相同（这里不为一行提示载入 server）。 */
+export const EXPORT_SETUP_COMMAND = 'npx joplo setup export';
 
 export type EmbedSnippets = { iframe: string; markdown: string; badge: string; preview: string };
 
@@ -81,7 +83,8 @@ function pngSize(data: Uint8Array): { width: number; height: number } | null {
 /**
  * 预览图：渲染默认场景（与嵌入模式同一个）的初始画面为 1200×630 PNG，放到发布目录的 `_joplo/preview.png`。
  * 先渲染到 scratch，校验是 1200×630 的 PNG 后才复制进发布目录，所以任何失败都不会在清单里留下文件。
- * 失败（没有 Playwright、浏览器启动失败、项目没有场景、尺寸不对……）只返回原因，由调用方在 stderr 提示一行，不让 share 失败。
+ * 失败（没有导出组件、浏览器启动失败、项目没有场景、尺寸不对……）只返回原因，由调用方在 stderr 提示一行，不让 share 失败。
+ * 没有导出组件（D65）时只提示安装命令，绝不自动下载。
  */
 export async function writePreview(render: () => Promise<RenderPreview>, projectDir: string, siteDir: string, scratch: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   try {
@@ -104,6 +107,7 @@ export async function writePreview(render: () => Promise<RenderPreview>, project
     }
     return { ok: true };
   } catch (e) {
+    if ((e as { code?: unknown } | null)?.code === 'EXPORT_COMPONENT_MISSING') return { ok: false, reason: `the export component is not installed; to add preview images run: ${EXPORT_SETUP_COMMAND}` };
     return { ok: false, reason: (e instanceof Error ? e.message : String(e)).split('\n')[0]!.trim() || 'render failed' };
   } finally {
     await rm(scratch, { force: true }).catch(() => undefined);

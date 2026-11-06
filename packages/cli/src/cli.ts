@@ -10,6 +10,7 @@ import { projectNotes } from './startup.ts';
 import { readSelection } from './selection.ts';
 import { installSkill, readCliVersion } from './skill.ts';
 import { diagnosticLine, failure, oneLine, result } from './common.ts';
+import type { SetupServer } from './setup.ts';
 
 type Dependencies = {
   stdout?: (s: string) => void;
@@ -18,6 +19,9 @@ type Dependencies = {
   /** 测试用：覆盖 CLI 自己的版本（缺省读 package.json）。 */
   cliVersion?: string;
   cloud?: CloudDependencies;
+  /** 测试用：是否交互终端（缺省看 stdin / stderr 是否 TTY、是否 CI）与是 / 否询问。 */
+  interactive?: boolean;
+  ask?: (question: string) => Promise<boolean>;
 };
 const integer = (name: string, max = Number.MAX_SAFE_INTEGER) => (text: string) => {
   const n = Number(text);
@@ -41,7 +45,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   let exitCode = 0;
   const serverPackage = '@joplo-app/server';
   const loadServer = deps.loadServer ?? (() => import(serverPackage));
-  async function serverFunction<K extends 'startDev' | 'buildSite' | 'renderStep'>(name: K): Promise<typeof Server[K]> {
+  async function serverFunction<K extends 'startDev' | 'buildSite' | 'renderStep' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime'>(name: K): Promise<typeof Server[K]> {
     let module: Record<string, unknown>;
     try { module = await loadServer(); }
     catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server cannot load ${name}: ${e instanceof Error ? e.message : String(e)}`); }
@@ -171,14 +175,34 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     line(`Built ${data.outDir} (${data.files.length} files)`);
     if (data.diagnostics.some(d => d.severity === 'error')) exitCode = 1;
   });
+  // 导出组件（D65）：Playwright + Chromium 装在 JOPLO_HOME 下，不改项目；写演示、dev、check、build、share 都不需要它
+  const setupServer = async (): Promise<SetupServer> => {
+    const [exportRuntimeStatus, installExportRuntime, uninstallExportRuntime] = await Promise.all([serverFunction('exportRuntimeStatus'), serverFunction('installExportRuntime'), serverFunction('uninstallExportRuntime')]);
+    const m = await loadServer();
+    return { exportRuntimeStatus, installExportRuntime, uninstallExportRuntime, EXPORT_DOWNLOAD_MB: Number(m.EXPORT_DOWNLOAD_MB) || 100, PLAYWRIGHT_VERSION: String(m.PLAYWRIGHT_VERSION ?? ''), SETUP_COMMAND: String(m.SETUP_COMMAND ?? 'npx joplo setup export') };
+  };
+  const setupIo = () => ({ err: stderr, tty: deps.stderr ? false : !!process.stderr.isTTY });
+  program.command('setup').description('Install the optional export component (Playwright + Chromium) for render, image/video export, and share preview images')
+    .argument('<component>', 'Component to set up: export').addOption(format())
+    .option('--status', 'Only report whether the export component is installed (exit code 4 if not)').option('--force', 'Reinstall even if already installed').option('--uninstall', 'Remove the export component')
+    .action(async (component, opts) => {
+      if (component !== 'export') throw new JoploError('USAGE', `Unknown component: ${component} (available: export)`);
+      const { setupExport } = await import('./setup.ts');
+      const r = await setupExport(await setupServer(), opts, setupIo());
+      if (opts.format === 'json') json(r.code === 0 ? result('export', r.summary, r.data) : { ...failure(new JoploError('EXPORT_COMPONENT_MISSING', r.summary, { details: r.data })), data: r.data });
+      else line(r.summary);
+      exitCode = r.code;
+    });
   program.command('render').argument('[dir]', 'Project directory', '.').requiredOption('--scenario-id <qid>', 'Scenario ID').option('--step-id <qid>', 'Position after this step; defaults to the initial state')
     .option('--theme <theme>', 'Theme: built-in (sketch, clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast) or project themes/<name>.css; defaults to the project theme').requiredOption('--out <file>', 'Screenshot file')
     .option('--width <pixels>', 'Screenshot width (stage width follows the page viewport); requires height', integer('width')).option('--height <pixels>', 'Screenshot height; requires width', integer('height'))
     .option('--scale <scale>', 'Pixel scale', scale).option('--overwrite', 'Allow overwriting the screenshot').action(async (dir, opts) => {
       if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'width and height must be provided together');
       const renderStep = await serverFunction('renderStep');
-      const data = await renderStep({ projectDir: resolve(dir), scenarioId: opts.scenarioId, stepId: opts.stepId, theme: opts.theme, out: resolve(opts.out),
-        viewport: opts.width === undefined ? undefined : { width: opts.width, height: opts.height }, scale: opts.scale, overwrite: opts.overwrite });
+      const { askYesNo, isInteractive, withExportComponent } = await import('./setup.ts');
+      const data = await withExportComponent(() => renderStep({ projectDir: resolve(dir), scenarioId: opts.scenarioId, stepId: opts.stepId, theme: opts.theme, out: resolve(opts.out),
+        viewport: opts.width === undefined ? undefined : { width: opts.width, height: opts.height }, scale: opts.scale, overwrite: opts.overwrite }),
+        { server: setupServer, interactive: deps.interactive ?? isInteractive(), ask: deps.ask ?? askYesNo, io: setupIo() });
       line(data.path);
       for (const warning of data.warnings) stderr(oneLine(warning) + '\n');
     });
@@ -188,7 +212,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const f = failure(e instanceof CommanderError ? new JoploError('USAGE', e.message) : e);
     const wantsJson = args.some((arg, i) => arg === '--format=json' || arg === '--format' && args[i + 1] === 'json');
     if (wantsJson) json(f); else line(`${f.error.code}  ${oneLine(terminalText(f.error.message))}`);
-    return f.error.code === 'USAGE' ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : 1;
+    return f.error.code === 'USAGE' ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : f.error.code === 'EXPORT_COMPONENT_MISSING' ? 4 : 1;
   }
   return exitCode;
 }

@@ -591,7 +591,8 @@ test('E1 没有 renderStep（旧 server）或项目没有场景时跳过预览�
 test('E1 没有 Playwright / 渲染失败 / 尺寸不对时 share 照常成功，清单里没有 _joplo/preview.png', async () => {
   await credentials(); files['index.html'] = irHtml(irProject);
   const failures: ((opts: any) => Promise<unknown>)[] = [
-    async () => { const { JoploError } = await import('@joplo-app/core'); throw new JoploError('RENDER_FAILED', 'Screenshots require Playwright and Chromium, which are not installed. Run: npm i -D playwright\nsecond line'); },
+    async () => { const { JoploError } = await import('@joplo-app/core'); throw new JoploError('EXPORT_COMPONENT_MISSING', 'Exporting images and video needs the Joplo export component\nsecond line'); },
+    async () => { const { JoploError } = await import('@joplo-app/core'); throw new JoploError('RENDER_FAILED', 'Screenshots need Chromium, but it failed to start\nsecond line'); },
     async (opts) => { await writeFile(opts.out, 'partial'); throw new Error('browser crashed'); },
     async (opts) => { await writeFile(opts.out, png(800, 600)); return { path: opts.out }; },
     async (opts) => { await writeFile(opts.out, 'not a png'); return { path: opts.out }; },
@@ -605,6 +606,26 @@ test('E1 没有 Playwright / 渲染失败 / 尺寸不对时 share 照常成功�
     expect(notes).toHaveLength(1);
     expect(r.json().data.embed.preview).toBe(`${base}/s/Abc1234567/preview.png`);
   }
+});
+test('E1 没有导出组件（D65）：share 照常成功，提示一行安装命令；不下载、不改项目的 package.json / lockfile / node_modules', async () => {
+  await credentials(); files['index.html'] = irHtml(irProject);
+  const pkg = '{"name":"demo","devDependencies":{"joplo":"0.2.6"}}\n';
+  await writeFile(join(project, 'package.json'), pkg); await writeFile(join(project, 'package-lock.json'), '{}\n');
+  await mkdir(join(project, 'node_modules/joplo'), { recursive: true }); await writeFile(join(project, 'node_modules/joplo/package.json'), '{}');
+  const install = vi.fn(async () => { throw new Error('share must not install the export component'); });
+  const { JoploError } = await import('@joplo-app/core');
+  renderStep = vi.fn(async () => { throw new JoploError('EXPORT_COMPONENT_MISSING', 'Exporting images and video needs the Joplo export component'); });
+  let stdout = '', stderr = '';
+  const code = await runCli(['share', project, '--format=json'], { stdout: s => stdout += s, stderr: s => stderr += s, cliVersion: '0.1.3',
+    loadServer: async () => ({ buildSite: build, renderStep, installExportRuntime: install }),
+    cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base }, interactive: false, openBrowser: browser, confirm, sleep: async () => undefined, now: () => clock, check: checkProject } });
+  expect(code, stdout).toBe(0);
+  expect(install).not.toHaveBeenCalled();
+  expect(stderr.split('\n').filter(l => l.startsWith('Skipped the preview image'))).toEqual(['Skipped the preview image (the export component is not installed; to add preview images run: npx joplo setup export). The share page will use a generic image.']);
+  expect(manifestOf().map(f => f.path)).not.toContain('_joplo/preview.png');
+  expect(await readFile(join(project, 'package.json'), 'utf8')).toBe(pkg);
+  expect(await readFile(join(project, 'package-lock.json'), 'utf8')).toBe('{}\n');
+  expect(await readdir(join(project, 'node_modules'))).toEqual(['joplo']);
 });
 test('E1 有渲染能力时上传默认场景第一步的 1200×630 预览图，计入新上传字节和清单总量', async () => {
   await credentials(); files['index.html'] = irHtml(irProject); missingCount = 99;

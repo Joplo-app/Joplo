@@ -5,6 +5,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildSite, finalizeHtml, jsonForHtml, publishPayload } from '../src/build.ts';
 import { renderStep } from '../src/render.ts';
+import { PLAYWRIGHT_VERSION, exportRuntimeStatus, runtimePaths } from '../src/export-runtime.ts';
 import { compileProject } from '../src/project.ts';
 import { Project as ProjectSchema } from '@joplo-app/core';
 import { joploProjectPlugin, kitAliases, locateWebAssets } from '../src/vite-shared.ts';
@@ -224,19 +225,43 @@ describe('finalizeHtml', () => {
   });
 });
 
+/**
+ * 真实 Chromium（D65 不变量 ⑤）：第一组用“项目里已有的 playwright”（老项目），第二组用 Joplo 托管运行时；
+ * 两者都链接到仓库里的 playwright / playwright-core 与本机已下载的浏览器，不访问网络。
+ */
+const SERVER_MODULES = path.resolve(import.meta.dirname, '../node_modules');
+const defaultBrowsers = () =>
+  process.env.PLAYWRIGHT_BROWSERS_PATH ||
+  (process.platform === 'darwin' ? path.join(os.homedir(), 'Library/Caches/ms-playwright')
+  : process.platform === 'win32' ? path.join(process.env.LOCALAPPDATA ?? os.homedir(), 'ms-playwright')
+  : path.join(process.env.XDG_CACHE_HOME ?? path.join(os.homedir(), '.cache'), 'ms-playwright'));
+
 describe('renderStep', () => {
   let dir: string;
   let outDir: string;
+  let home: string;
+  const home0 = process.env.JOPLO_HOME;
+  const browsers0 = process.env.PLAYWRIGHT_BROWSERS_PATH;
   beforeAll(() => {
     dir = copy();
     outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-shot-'));
+    home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-shot-home-')));
+    process.env.JOPLO_HOME = home;
+    // 老项目：项目里装了 playwright
+    fs.mkdirSync(path.join(dir, 'node_modules'), { recursive: true });
+    fs.symlinkSync(fs.realpathSync(path.join(SERVER_MODULES, 'playwright')), path.join(dir, 'node_modules/playwright'), 'junction');
   });
   afterAll(() => {
+    process.env.JOPLO_HOME = home0;
+    if (browsers0 === undefined) delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+    else process.env.PLAYWRIGHT_BROWSERS_PATH = browsers0;
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
   });
 
-  it('弹窗打开后的截图：元素索引带 at，无渲染告警；不覆盖已有文件', async () => {
+  it('弹窗打开后的截图（项目里的 playwright）：元素索引带 at，无渲染告警；不覆盖已有文件', async () => {
+    expect(exportRuntimeStatus({ home, projectDir: dir })).toMatchObject({ ready: true, source: 'project' });
     const out = path.join(outDir, 'a.png');
     const r = await renderStep({ projectDir: dir, scenarioId: 'invite.a-modal.success', stepId: 'invite.a-modal.success#1', out });
     expect(fs.statSync(out).size).toBeGreaterThan(10_000);
@@ -253,7 +278,15 @@ describe('renderStep', () => {
     await expect(renderStep({ projectDir: dir, scenarioId: 'invite.a-modal.success', out })).rejects.toThrow(/already exists/);
   }, 120_000);
 
-  it('Toast 场景（线框主题）与跨路径场景都能渲染；未知场景报 NOT_FOUND；不能写到源文件或 .joplo/', async () => {
+  it('Toast 场景（线框主题）与跨路径场景都能渲染（托管运行时）；未知场景报 NOT_FOUND；不能写到源文件或 .joplo/', async () => {
+    // 托管运行时：<JOPLO_HOME>/runtime/playwright-<版本>/，项目里不再有 playwright
+    fs.rmSync(path.join(dir, 'node_modules'), { recursive: true, force: true });
+    const p = runtimePaths(home);
+    fs.mkdirSync(path.join(p.dir, 'node_modules'), { recursive: true });
+    fs.symlinkSync(fs.realpathSync(path.join(SERVER_MODULES, 'playwright-core')), path.join(p.dir, 'node_modules/playwright-core'), 'junction');
+    fs.symlinkSync(defaultBrowsers(), p.browsers, 'junction');
+    fs.writeFileSync(p.marker, JSON.stringify({ version: PLAYWRIGHT_VERSION, installedAt: new Date().toISOString() }));
+    expect(exportRuntimeStatus({ home, projectDir: dir })).toMatchObject({ ready: true, source: 'managed' });
     const t = await renderStep({ projectDir: dir, scenarioId: 'invite.a-modal.success', stepId: 'invite.a-modal.success#5', theme: 'clean', out: path.join(outDir, 'toast.png') });
     expect(t.warnings).toEqual([]);
     const b = await renderStep({ projectDir: dir, scenarioId: 'invite.b-batch.partial', stepId: 'invite.b-batch.partial#5', out: path.join(outDir, 'b.png') });

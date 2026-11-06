@@ -13,7 +13,9 @@ Joplo 六个发行包使用 Apache-2.0，包名为 `joplo`、`@joplo-app/kit`、
 | tailwindcss | 4.3.4 | MIT | server 运行时与 web 构建：编译界面和作者 className |
 | @tailwindcss/vite | 4.3.4 | MIT | server/web：Tailwind 集成 |
 | @vitejs/plugin-react | 6.2.1 | MIT | server/web 开发依赖：React 转译与界面构建 |
-| playwright | 1.64.1（可选 peer ^1.64.1） | Apache-2.0 | server 开发依赖；用户截图与本地导出时按需安装 |
+| playwright-core | 1.64.1（固定） | Apache-2.0 | 导出组件（D65）：`joplo setup export` 装到 `~/.joplo/runtime/playwright-1.64.1/`，不进用户项目；server 只作为开发依赖取类型 |
+| Chromium headless shell、ffmpeg | 随 playwright-core 1.64.1 | Chromium：BSD-3-Clause 等；ffmpeg：LGPL-2.1 | 由 playwright-core 的安装器下载到导出组件的 `browsers/`，用于截图与录视频 |
+| playwright | 1.64.1 | Apache-2.0 | server 开发依赖（文档截图脚本）；不再是 peer 依赖 |
 
 ## 界面资源
 

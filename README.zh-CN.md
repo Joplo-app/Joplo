@@ -125,12 +125,13 @@ pnpm typecheck
 pnpm test
 ```
 
-工作区用 `joplo` 作为命令入口，内部包为 `@joplo-app/kit`、`@joplo-app/core`、`@joplo-app/cli`、`@joplo-app/server`、`@joplo-app/web`。CLI 只在 dev/build/render 时加载服务端。使用 npm 安装的作者项目需要本地截图与导出时，在该项目中添加可选浏览器依赖：
+工作区用 `joplo` 作为命令入口，内部包为 `@joplo-app/kit`、`@joplo-app/core`、`@joplo-app/cli`、`@joplo-app/server`、`@joplo-app/web`。CLI 只在 dev/build/render/setup 时加载服务端。写演示、dev、check、build、share 都不需要浏览器；截图（render）、看板里导出图片和视频、share 的预览图用可选的导出组件（Playwright + Chromium，约 100 MB），由 Joplo 装在 `~/.joplo` 下，一台电脑装一次，不装进项目：
 
 ```sh
-npm install -D playwright
-npx playwright install chromium
+npx joplo setup export
 ```
+
+也可以在看板的「导出」菜单里一键安装。
 
 详见[依赖与许可证](docs/dependencies.md)和 [npm 发布流程](docs/release.md)。
 

@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { JoploError } from '@joplo-app/core';
 import { createHub, startDev, type Hub } from '../src/dev.ts';
 import { Registry, projectIdOf, readServerInfo, serverInfoFile, writeServerInfo } from '../src/home.ts';
-import { loadPlaywright } from '../src/render.ts';
+import { missingError } from '../src/export-runtime.ts';
 
 const EXAMPLE = path.resolve(import.meta.dirname, '../../../examples/invite');
 const tmp = (p: string) => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), p)));
@@ -200,9 +200,9 @@ describe('导出', () => {
   let id: string;
   let release: () => void = () => undefined;
   const calls: { url: string; out: string }[] = [];
-  const missingPw = () => loadPlaywright(async () => {
-    throw Object.assign(new Error("Cannot find package 'playwright'"), { code: 'ERR_MODULE_NOT_FOUND' });
-  });
+  const missingPw = async () => {
+    throw missingError();
+  };
   beforeAll(async () => {
     dir = copy();
     hub = await createHub({
@@ -230,14 +230,15 @@ describe('导出', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it('图片：没有 Playwright 时 503，错误里带安装命令；参数不对 400；没令牌 403', async () => {
+  it('图片：没有导出组件时 503 EXPORT_COMPONENT_MISSING，错误里带安装命令；参数不对 400；没令牌 403', async () => {
     const body = JSON.stringify({ scenarioId: 'invite.a-modal.success', position: 1 });
     expect((await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/image`, headers: { 'content-type': 'application/json' }, body })).status).toBe(403);
     expect((await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/image`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'nope' }) })).status).toBe(400);
     expect((await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/image`, headers: json(hub.token), body: JSON.stringify({ scenarioId: 'invite.a-modal.success', position: 99 }) })).status).toBe(400);
     const r = await req(hub.port, { method: 'POST', path: `/__joplo/p/${id}/export/image`, headers: json(hub.token), body });
     expect(r.status).toBe(503);
-    expect(r.body.error.message).toContain('npx playwright install chromium');
+    expect(r.body.error.code).toBe('EXPORT_COMPONENT_MISSING');
+    expect(r.body.error.message).toContain('npx joplo setup export');
   });
 
   it('视频：202 → SSE 进度 → 写入 <项目>/exports/*.webm；同一项目同时只有一个任务（409）', async () => {
@@ -321,7 +322,7 @@ describe('导出', () => {
     } finally { await h2.close(); }
   });
 
-  it('视频：没有 Chromium 时任务失败，错误里带 npx playwright install chromium', async () => {
+  it('视频：没有导出组件时任务失败，错误里带 npx joplo setup export', async () => {
     const h2 = await createHub({ port: 0, log: () => undefined, watch: false, exportDeps: { loadPlaywright: missingPw } });
     try {
       const r = h2.addProject(dir);
@@ -330,7 +331,7 @@ describe('导出', () => {
       expect(res.status).toBe(202);
       await until(async () => (await req(h2.port, { path: `/__joplo/p/${r.id}/export/video` })).body.job?.status === 'error');
       const job = (await req(h2.port, { path: `/__joplo/p/${r.id}/export/video` })).body.job;
-      expect(job.error).toContain('npx playwright install chromium');
+      expect(job.error).toContain('npx joplo setup export');
     } finally {
       await h2.close();
     }
