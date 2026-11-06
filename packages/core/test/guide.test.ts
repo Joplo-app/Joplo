@@ -56,7 +56,7 @@ test('未知和 null 主题受控，缺省或 null 属性提示均不额外产�
 
 test('demo 集中解释层级、镜头和调用链，authoring 只指向它', () => {
   const demo = skillTopic('demo');
-  for (const text of ['layer(', 'layers:', 'shot(...ids)', 'shot()', 'director layer', 'trace(', 'trace.fail', 'trace.skip', 'when', '24', '48', 'explain(', 'explanation layer', 'examples/agent-arch', '390']) expect(demo).toContain(text);
+  for (const text of ['layer(', 'layers:', 'shot(...ids)', 'shot()', 'director layer', 'trace(', 'trace.fail', 'trace.skip', 'when', '24', '48', 'explain(', 'explanation layer', 'examples/agent-arch', '390', 'Full-height layout', 'minHeight: 0', '.card(', 'role(', 'stream(', '<Thinking', '<Artifact', '<Artifact.Ref']) expect(demo).toContain(text);
   const snippets = [...demo.matchAll(/```tsx\n([\s\S]*?)\n```/g)];
   expect(snippets).toHaveLength(1);
   expect(snippets[0]![1]!.split('\n').length).toBeGreaterThanOrEqual(5);

@@ -122,7 +122,7 @@ Read only the topics needed, usually one or two at a time. See components for co
 - Use Stack / Group / SimpleGrid / Grid props: <Group justify="space-between">, <SimpleGrid cols={{ base: 1, md: 3 }}>.
 - Use responsive objects { base, xs, sm, md, lg, xl }, or visibleFrom="sm" / hiddenFrom="sm". AppShell collapses navigation below navbar.breakpoint.
 - Set input labels directly: <TextInput id="email" label="Email"/>. Auto captions use them.
-- 画面高度不固定（舞台随窗口变化）：整屏布局不写固定像素高度，否则窗口矮时底部的输入框、按钮会被裁掉。写法见 demo 的「整屏布局」。
+- Stage height follows the window. Avoid fixed pixel heights for full-height layouts, which clip bottom inputs and buttons in short windows. See Full-height layout in demo.
 
 ## Rules and boundaries
 - rule('Constraint', { origin?, status?, cases?: ['happy'], elements?: ['invite'] }).
@@ -173,23 +173,23 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 - Each page has one device, desktop by default. page({ viewport: 'mobile' }, tree) uses a Phone frame at a fixed width of 390.
 - For a mobile layer, use layer('Mobile', <MobileView/>, { viewport: 'mobile' }). Make a separate page or demo when mobile is needed (D44).
 
-## 整屏布局：高度跟着舞台走
-- 层级和电脑页面铺满舞台，舞台大小随看板窗口变化；写死的像素高度（h={690}）在矮窗口里会把底部挤出画面。
-- 一列从上到下撑满：外层 h="100%"，会变长的那块（聊天记录、列表、产物）写 style={{ flex: 1, minHeight: 0 }}，固定的放在它下面：
-  <Grid h="100%"><Grid.Col span={6}><Stack h="100%"><ScrollArea style={{ flex: 1, minHeight: 0 }}>消息</ScrollArea>
-  <Group><PromptInput id="prompt"/><Button id="send">发送</Button></Group></Stack></Grid.Col></Grid>
-- 占位和产物同理：Placeholder 写 h="100%"，Artifact 默认占满它所在的容器。
-- 固定像素只用在真正定高的东西上（头像、图标、Diagram 的画布高度）。
+## Full-height layout: Follow stage height
+- Layers and desktop pages fill the stage, whose size follows the board window. Fixed pixel heights (h={690}) push bottom content outside short windows.
+- To fill a column vertically, set h="100%" on its container. Give growing content (chat history, lists, artifacts) style={{ flex: 1, minHeight: 0 }} and place fixed content below it:
+  <Grid h="100%"><Grid.Col span={6}><Stack h="100%"><ScrollArea style={{ flex: 1, minHeight: 0 }}>Messages</ScrollArea>
+  <Group><PromptInput id="prompt"/><Button id="send">Send</Button></Group></Stack></Grid.Col></Grid>
+- The same applies to placeholders and artifacts: use h="100%" on Placeholder; Artifact fills its container by default.
+- Use fixed pixels only for elements with a fixed height (avatars, icons, Diagram canvas height).
 
-## 过渡卡、角色与 Agent 输出（D56）
-- .card('标题', { sub?, points?, role? }, ...效果)：整屏一句大字，也是一步。用于开场、收尾、时间跳跃和换人。
-- 开场写「为什么做」，收尾用 points 列出确认了什么；时间跳跃写 .card('3 天后', set($.data.invite, 'expired'))。
-- 角色：feature 里写 roles: { ajie: role('阿杰', { desc: '被邀请的朋友' }) }；层级写 layer('阿杰的手机', <…/>, { role: 'ajie' })。
-- 有角色的层级在画面左下角显示名牌，层级标签带头像；.card('现在是阿杰', { role: 'ajie' }) 之后导演切到阿杰的层。
-- 一次只看一个人；要并排就在同一层里画两块。
-- stream($.ui.reply, '…')：和 set 一样写入状态，播放到这一步时绑定它的文字逐字出现，跳到这一步时直接显示全文。
-- Agent 界面：<Thinking title={$.ui.thought} active={$.ui.thinking} duration="6 秒">过程</Thinking> 表示思考；
-  <Artifact title="行程.md" kind="doc" status={$.ui.planStatus}>内容</Artifact> 是侧边产物，对话里用 <Artifact.Ref id="…"/> 指向它。
+## Transition cards, roles, and Agent output (D56)
+- .card('Title', { sub?, points?, role? }, ...effects): one large sentence filling the stage, as a step. Use for openings, endings, time jumps, and role switches.
+- Open with why this matters; end with points listing what was confirmed. For time jumps, use .card('3 days later', set($.data.invite, 'expired')).
+- Roles: declare roles: { ajie: role('Ajie', { desc: 'Invited friend' }) } in the feature; use layer('Ajie mobile', <AjieView/>, { role: 'ajie' }) for the layer.
+- A layer with a role shows a name badge at the bottom left and an avatar in its tab. After .card('Now Ajie', { role: 'ajie' }), the director switches to Ajie's layer.
+- Show one person at a time. For side-by-side views, draw two sections in the same layer.
+- stream($.ui.reply, '…'): writes state like set. During playback, bound text appears character by character; jumping to the step shows the full text immediately.
+- Agent UI: <Thinking title={$.ui.thought} active={$.ui.thinking} duration="6 seconds">Process</Thinking> shows thinking;
+  <Artifact title="itinerary.md" kind="doc" status={$.ui.planStatus}>Content</Artifact> is a side artifact; reference it in the conversation with <Artifact.Ref id="…"/>.
 
 ## 分叉、标注、邮件、数据与按键（D56 P1）
 - fork(label, 场景键)：本步字幕右侧可切到同方案的另一场景，跳过动作与业务效果相同的公共前缀；自动播放仍走主线。
@@ -327,7 +327,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - DUPLICATE_ELEMENT: Duplicate element ids within a stage. Change only conflicting ids and update references.
 - CAPTION_TOO_LONG: Shorten the caption to about 24 units: CJK characters count as 1 each, all others as 0.5; whitespace is ignored. One thing per step; move long content to an explanation layer. See demo.
 - EXPLAIN_TOO_LONG: Shorten the explain note to about 48 units, using the same CJK 1 / other 0.5 calculation. Put detailed rationale in a separate explanation layer. See demo.
-- ROLE_UNKNOWN：layer 或 card 的 role 不在 feature.roles 里；roles 要写成 { 键: role('名字') }，见 demo。
+- ROLE_UNKNOWN: A layer or card role is not in feature.roles. Declare roles as { key: role('Name') }; see demo.
 - FORK_UNKNOWN：fork 的目标必须是同一方案里的另一个场景键，不能引用自己。
 - MARK_UNKNOWN：mark 的目标不在本步路径画面或任何层级里，核对元素 id；当前隐藏不算引用错误。
 - SHOT_UNKNOWN: The shot target is absent from this step's stage and all layers. Check its id and layer; see demo.

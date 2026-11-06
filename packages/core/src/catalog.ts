@@ -132,8 +132,8 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Email: 'from, to, subject, time —— 简单邮件卡片；正文写在子节点，可含 Button',
   DataCard: 'title, value（对象或状态绑定）, fields?: [{ key, label }]；缺省列出全部键，本步变化行显示旧值 → 新值',
   StateFlow: 'value（当前状态绑定）, states: string[], labels?: { 状态: 名称 }；顺序在前的为已完成，当前高亮',
-  Thinking: 'title（此刻在想什么，可绑定 $.ui.x）, active（思考中：标题闪动）, duration（结束后显示“思考了 …”）, opened（展开过程）；子节点是思考过程',
-  Artifact: "title, kind: 'doc'|'code'|'sheet'|'web'|'image', status: 'generating'|'ready'|'error', version —— Agent 的侧边产物面板，子节点是内容",
+  Thinking: 'title (current thought; can bind $.ui.x), active (thinking: title pulses), duration (shows "Thought for …" when finished), opened (expands the process); thinking process in children',
+  Artifact: "title, kind: 'doc'|'code'|'sheet'|'web'|'image', status: 'generating'|'ready'|'error', version; Agent artifact side panel, content in children",
   Terminal: 'title; terminal window (CLI prototype), Terminal.Command / Terminal.Output / Terminal.Input children; scrolls internally when content exceeds h or mah',
   Diagram: "direction: 'right'|'down' (default right), h (height, default 420); architecture diagram with Diagram.Group / Diagram.Node / Diagram.Edge children; automatic deterministic layout (state changes do not move nodes); scales the whole diagram to fit without scrolling; inspect details with shared demo zoom/pan (wheel / pinch / drag) or shots; orthogonal edges with port and parallel segment spacing ≥ 10px; a shot of 2+ nodes (or one edge) in the same diagram centers them in a compact focused subgraph; use direction='down' for many nodes in limited width. Progressive reveal: set when={$.ui.x} on Group / Node / Edge and set true in flow (layout precomputed from all elements, existing elements stay fixed); describe calls with step trace(), which derives node/edge state",
   'Diagram.Group': 'label; titled group box with Diagram.Node or nested Diagram.Group children',
@@ -188,7 +188,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'Accordion.Control': 'Clickable heading (requires id)',
   Pagination: 'total, value / defaultValue; select action writes the page number',
   PromptInput: 'placeholder; AI input, type action writes the value; use ActionIcon or Button to send',
-  'Artifact.Ref': "title, kind, status —— 对话里指向产物的卡片（需要 id，可点击）",
+  'Artifact.Ref': "title, kind, status; card linking to an artifact in the conversation (requires id; clickable)",
   'Terminal.Input': 'prompt (default "$"), placeholder; terminal input line (requires id), type action writes the value',
 };
 

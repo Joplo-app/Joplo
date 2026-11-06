@@ -241,7 +241,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       addScene(scene);
       layerScenes.push({ key: lk, scene });
       if (ld.role !== undefined && !roleKeys.has(ld.role))
-        err('ROLE_UNKNOWN', `层级「${ld.title}」的 role「${ld.role}」不在 feature.roles 里${roleKeys.size ? `（可用：${[...roleKeys].join('、')}）` : '（feature.roles 要写成 { 键: role(\'名字\') }）'}`, at);
+        err('ROLE_UNKNOWN', `Layer "${ld.title}" role "${ld.role}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ' (feature.roles must use { key: role(\'Name\') })'}`, at);
       layers[lk] = { title: ld.title, sceneId, ...(ld.role !== undefined && roleKeys.has(ld.role) ? { role: ld.role } : {}) };
     }
     const hasLayers = layerScenes.length > 0;
@@ -408,7 +408,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
         // 换人的过渡卡（D56）：卡片后面导演切到这个人的层级（卡片淡出时已经是 TA 的画面）
         if (st.action.type === 'card' && st.action.role !== undefined) {
           const r = st.action.role;
-          if (!roleKeys.has(r)) err('ROLE_UNKNOWN', `card("${st.action.title}") 的 role「${r}」不在 feature.roles 里${roleKeys.size ? `（可用：${[...roleKeys].join('、')}）` : ''}`, st.source);
+          if (!roleKeys.has(r)) err('ROLE_UNKNOWN', `card("${st.action.title}") role "${r}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ''}`, st.source);
           else if (hasLayers && !directorLayer) directorLayer = Object.entries(layers).find(([, l]) => l.role === r)?.[0] ?? null;
         }
         const shots = [...perLayer].map(([layer, targets]) => ({ layer, targets }));
