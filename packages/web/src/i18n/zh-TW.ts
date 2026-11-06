@@ -218,6 +218,16 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       clipboardUnavailableCopyFromTheAddressBar: "無法使用剪貼簿，請從網址列複製。",
       scenarios: "情境",
       stepCount: (p0: Value) => plural(Number(p0), { other: "# 個步驟" }, locale),
+      // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
+      embedPlayDemo: "播放示範",
+      embedCoverMeta: (n: number) => `可點擊的原型示範 · ${plural(Number(n), { other: "# 個情境" }, locale)}`,
+      embedMadeWithJoplo: "使用 Joplo 製作",
+      embedCoverHint: "播放後可暫停、逐步、全螢幕",
+      embedStepProgress: (current: number, total: number) => `步驟 ${number(current, locale)} / ${number(total, locale)}`,
+      embedSwitchScenario: "切換情境",
+      embedOpenInNewTab: "在新分頁開啟",
+      embedPlayer: "示範播放器",
+      embedNoScenario: "這個示範還沒有可以播放的情境。",
     },
   });
 }

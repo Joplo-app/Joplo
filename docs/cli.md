@@ -204,8 +204,21 @@ npx joplo share --new
 - Pro 且 `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接；`--new` 新建。免费账号每次新建。
 - 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；一个对象失败会取消其他在途 PUT 和重试等待；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
 - finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/billing`。
+- 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的 Playwright + Chromium）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有 Playwright、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”，share 照常成功；分享页此时用通用预览图。
+- 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 只用英文，D57）。
 
-JSON 成功的 `data` 为 `{shareId, url, expiresAt, version}`，`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
+JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, embed}`，`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
+
+`data.embed` 与云端控制台、分享页 Worker 用同一套格式（`<分享页>` 为 `data.url`，规范成以 `/` 结尾）：
+
+| 字段 | 格式 |
+| --- | --- |
+| `iframe` | `<iframe src="<分享页>?embed=1" title="<标题> · Joplo 演示" style="width:100%;aspect-ratio:16/10;border:0" allow="fullscreen *" allowfullscreen loading="lazy"></iframe>`，属性值转义 `& < > " '` |
+| `markdown` | `[![Joplo 演示 · <标题>](<徽章>)](<分享页>)`，替代文字把连续空白（含换行）合成一个空格，并转义 `\ [ ]` |
+| `badge` | `<分享页>badge.svg` |
+| `preview` | `<分享页>preview.png`（1200×630；有 `_joplo/preview.png` 时由分享页使用它） |
+
+Agent 可以把 `data.embed.markdown` 直接写进 README；免费链接要同时告诉用户 `data.expiresAt`，过期后徽章会显示“已过期”。iframe 地址可以手动加 `&scenario=<场景 id>` 选起始场景、`&autoplay=1` 跳过封面直接播放，见 [发布站的嵌入模式](web.md#嵌入模式)。
 
 | 错误码 | 恢复方式 |
 | --- | --- |
@@ -244,6 +257,8 @@ Ctrl+C（SIGINT）会清理本进程登记的 joplo-share-* 目录及原子写�
 | --new / replaceShareId | 参数及同服务器 cloud.json.shareId + 实时 Pro 套餐 → 创建请求 → 云端 → 新建或更新链接；免费账号从不发送 replaceShareId |
 | cloud.json.server / shareId / url | 目标服务器及 finalize 响应 → 项目 .joplo/cloud.json（原子写） → 下次 share → 来源比对与 Pro 更新；url 供用户/工具读取 |
 | shareId / url / expiresAt / version | finalize 响应 → text/JSON 结果 → 用户/Agent → 分享链接及有效期 |
+| embed.iframe / markdown / badge / preview | finalize 的 url + 本次 title → `embedSnippets`（cli/src/cloud-embed.ts，只在内存） → text 输出（markdown）与 JSON `data.embed` → 用户/Agent 写进 README 或博客；分享页 Worker 提供 badge.svg / preview.png |
+| _joplo/preview.png | share 构建后 renderStep 截图（默认场景初始画面，1200×630） → 临时 build 目录 → manifest / 创建请求 / PUT → 云端 R2 → 分享页 Worker 的 preview.png 与 Open Graph 卡片；失败时不进清单 |
 | user / plan / limits | me 响应 → 进程内与 whoami 结果 → share 或用户/Agent → 套餐展示、更新资格、maxTotalBytes/maxFiles 本地预检、maxUploadBytes 上传限额展示、publishesPerHour 频率诊断 |
 | AUTH_REQUIRED 的 details.fix / credentialServer | 当前 server 与旧凭证 server → 跨服务器 share 错误信封 → Agent 请用户在自己的终端确认登录；不自动 logout |
 | error.details | 本地校验、manifest 和 me 限额 → 结果信封 → 用户/Agent → fix 登录命令、超限的 kind/maxBytes/actualBytes/maxFiles/actualFiles/largestFiles ；429 的 kind/limit/actual/retryAt → 额度类型、上限与重试时间 |

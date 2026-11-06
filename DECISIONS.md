@@ -225,6 +225,12 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 层级多到放不下时不折叠成菜单，而是像书签：正在看的那层保持完整（最多占六成），其余平分剩余宽度，再放不下就叠起来，只露出图标和开头几个字；任何情况都不越过标签栏。位置由纯函数 bookmarkTabs 计算。
   - 鼠标划过或键盘聚焦的标签浮到最上面、展开成全名，盖住邻居，别的标签不动；靠右的向左展开。只动画这一个标签的位置和宽度，不用 flex 收缩（会让所有标签一起重排，显得生硬）。
   - 每个标签带预设图标：layer(title, tree, { icon })，预设见 LAYER_ICONS；不写时手机视口 mobile、其余 window（IR 只存显式写的，由 layersOf 补默认）；写错报 ICON_UNKNOWN。导演停在哪层，哪层右上角有摄像机角标。
+- D61 嵌入（2026-11-06，来源：用户对云端嵌入功能的产品决定（2026-11-06））：
+  - 发布站支持嵌入模式：分享页地址带 `?embed=1` 时是给 iframe 用的精简播放器，不带时发布站行为不变。默认只显示封面（起始场景初始画面压暗、中央大播放按钮、标题、「用 Joplo 制作」），`autoplay=1` 才直接播放，`scenario=<场景 id>` 选起始场景；参数写错时照常封面、从默认场景开始。播放后是精简控制条（上一步 / 播放暂停 / 下一步、步骤进度、场景切换、全屏）。品牌一律显示。所有账号的分享都能嵌入。
+  - 全屏用 Fullscreen API；不可用时退回为在新标签页打开同一个分享页（去掉 `embed=1`）。嵌入模式在分享页的 CSP sandbox（`connect-src 'none'`）下运行，不发网络请求、不依赖存储。
+  - `joplo share` 发布前用本地截图能力渲染默认场景初始画面为 1200×630 PNG，作为 `_joplo/preview.png` 随清单上传（计入总量和新上传字节）；没有 Playwright 或渲染失败时跳过并在 stderr 提示一行，share 不失败。
+  - `share --format json` 的 `data.embed = { iframe, markdown, badge, preview }`，格式与云端控制台、分享页 Worker 一致；文本输出打印 Markdown 徽章和“更多嵌入方式”的云端地址。不做嵌入观看统计；oEmbed、微信卡片放到第 2 期。
+  - 嵌入代码的 iframe 写 `allow="fullscreen *" allowfullscreen`：分享页的 CSP sandbox 让文档变成 opaque origin，`allow="fullscreen"` 默认只授权 iframe 的 src 源，三个浏览器引擎实测都会拒绝全屏；`fullscreen *` 才能在嵌入里真正全屏。嵌入方自己删掉授权时，全屏退回为新标签页。详见 docs/web.md「嵌入模式」。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

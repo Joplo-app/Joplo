@@ -80,11 +80,12 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)').action(async (dir, opts) => {
       const client = await cloudClient(opts.server, opts.format);
       const { share } = await import('./cloud-share.ts');
-      const published = await share(client, dir, opts, async options => (await serverFunction('buildSite'))(options));
+      const published = await share(client, dir, opts, async options => (await serverFunction('buildSite'))(options), () => serverFunction('renderStep'));
       if (opts.format === 'json') json(result(resolve(dir), 'Published', published.result));
       else {
         line(`Published ${published.result.url}\n${published.result.expiresAt ? `Expires at: ${terminalText(published.result.expiresAt)}` : 'Permanent link'}`);
         if (published.plan === 'free') line(`Free shares expire after 1 hour. Upgrade for permanent links: ${client.server}/billing`);
+        line(`Add to README: ${terminalText(published.result.embed.markdown)}\nMore embed options: ${client.server}/shares/${published.result.shareId}`);
       }
     });
   program.command('check').argument('[dir]', 'Project directory', '.').addOption(format()).option('--option <qid>', 'Validate only the specified option').action(async (dir, opts) => {

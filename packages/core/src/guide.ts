@@ -413,6 +413,9 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - On AUTH_REQUIRED, ask the user to sign in. Do not run \`joplo logout\` on the user's behalf.
 - AUTH_EXPIRED also exits 3: ask the user to sign in again. Read error.code / message / details for other failures.
 - Free links expire after 1 hour; read data.expiresAt for the exact time. Pro permanent links have expiresAt: null.
+- Successful share JSON includes data.embed: { iframe, markdown, badge, preview }. To add the demo to a README, write data.embed.markdown as is; do not build badge links yourself. For a free link, tell the user the badge shows "expired" after data.expiresAt.
+- data.embed.iframe embeds a player for blogs and docs: it shows a cover first; append &scenario=<scenario id> to pick the start or &autoplay=1 to skip the cover.
+- share also uploads a 1200x630 preview image of the default scenario when local Playwright is installed; without it, share still succeeds and prints one "Skipped the preview image" line.
 - Pro share updates the same-server link in .joplo/cloud.json; --new creates another link and --title sets its title.
 - npx joplo whoami --format json shows the account, plan, and limits; npx joplo logout signs out.
 - maxUploadBytes limits only newly uploaded cloud blobs. The CLI prechecks maxTotalBytes and maxFiles. TOO_LARGE details.kind distinguishes upload / total / files.

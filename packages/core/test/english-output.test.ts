@@ -5,7 +5,9 @@ import ts from 'typescript';
 
 const root = resolve(import.meta.dirname, '../../..');
 const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef]/u;
-const whitelist: readonly (readonly [string, string, string])[] = [];
+const whitelist: readonly (readonly [string, string, string])[] = [
+  ['packages/cli/src/cloud-embed.ts', "const LABEL = 'Joplo 演示';", 'Fixed label from the cloud embed contract, shared verbatim with the share Worker and console; it is embed content, not CLI interface text.'],
+];
 
 // Read leaf tokens from the parser: comments/JSDoc are omitted, while strings,
 // templates, regular expressions, identifiers, and JSX text retain their positions.

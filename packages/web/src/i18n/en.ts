@@ -238,6 +238,16 @@ export function createEn(locale: Locale = 'en') {
       scenarios: "Scenarios",
       // site/site-model.ts: Joplo interface text; author content is never translated.
       stepCount: (p0: Value) => plural(Number(p0), { one: '# step', other: '# steps' }, locale),
+      // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
+      embedPlayDemo: "Play demo",
+      embedCoverMeta: (n: number) => `Interactive prototype · ${plural(n, { one: '# scenario', other: '# scenarios' }, locale)}`,
+      embedMadeWithJoplo: "Made with Joplo",
+      embedCoverHint: "Pause, step through, or go fullscreen after playing",
+      embedStepProgress: (current: number, total: number) => `Step ${number(current, locale)} / ${number(total, locale)}`,
+      embedSwitchScenario: "Switch scenario",
+      embedOpenInNewTab: "Open in new tab",
+      embedPlayer: "Demo player",
+      embedNoScenario: "This demo has no scenario to play yet.",
     },
   };
 }

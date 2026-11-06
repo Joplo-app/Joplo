@@ -218,6 +218,16 @@ export function createJa(locale: Locale = 'ja') {
       clipboardUnavailableCopyFromTheAddressBar: "クリップボードを使えません。アドレスバーからコピーしてください。",
       scenarios: "シナリオ",
       stepCount: (p0: Value) => plural(Number(p0), { other: "# ステップ" }, locale),
+      // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
+      embedPlayDemo: "デモを再生",
+      embedCoverMeta: (n: number) => `クリックできるプロトタイプ · ${plural(Number(n), { other: "# シナリオ" }, locale)}`,
+      embedMadeWithJoplo: "Joplo で作成",
+      embedCoverHint: "再生後に一時停止・ステップ送り・全画面表示ができます",
+      embedStepProgress: (current: number, total: number) => `ステップ ${number(current, locale)} / ${number(total, locale)}`,
+      embedSwitchScenario: "シナリオを切り替え",
+      embedOpenInNewTab: "新しいタブで開く",
+      embedPlayer: "デモプレーヤー",
+      embedNoScenario: "このデモには再生できるシナリオがまだありません。",
     },
   });
 }

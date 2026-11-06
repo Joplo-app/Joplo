@@ -38,6 +38,7 @@ const build = vi.fn(async ({ outDir }: { outDir?: string }) => {
   for (const [p, content] of Object.entries(files)) { await mkdir(join(outDir!, p, '..'), { recursive: true }); await writeFile(join(outDir!, p), content); }
   return { outDir: outDir!, files: Object.keys(files), diagnostics: [], routes: [], scenarios: [] };
 });
+let renderStep: ((opts: any) => Promise<unknown>) | undefined;
 const checkProject = vi.fn(async () => ({ name: 'Invite', diagnostics: [], summary: { error: 0, warning: 0, info: 0 }, verification: {} }));
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'joplo-cloud-test-')); home = join(root, 'home'); project = join(root, 'project');
@@ -45,7 +46,7 @@ beforeEach(async () => {
   raceUploads = false; firstUploadFailure = undefined; previousCalls = []; previousStatus = 200;
   revokedAfterReplacement = false; putHold = 0; activePuts = 0; maxActivePuts = 0; stalledPut = false; confirm.mockClear();
   truncatedPut = false; putDelay = 0; responses = new Map(); seedRuntime = false; limits = { maxUploadBytes: 20 * 1024 * 1024, maxTotalBytes: 256 * 1024 * 1024, maxFiles: 2000, publishesPerHour: 30 };
-  files = { 'index.html': '<html>demo</html>', 'assets/site.css': 'body{}' }; browser.mockClear(); build.mockClear(); checkProject.mockClear();
+  files = { 'index.html': '<html>demo</html>', 'assets/site.css': 'body{}' }; renderStep = undefined; browser.mockClear(); build.mockClear(); checkProject.mockClear();
   server = createServer(async (req, res) => {
     if (req.method === 'PUT') {
       activePuts++; maxActivePuts = Math.max(maxActivePuts, activePuts); res.once('close', () => activePuts--);
@@ -115,7 +116,7 @@ async function credentials(serverUrl = base, accessToken = token) {
 async function cli(args: string[], options: { interactive?: boolean; ssh?: string; realBuild?: boolean; env?: NodeJS.ProcessEnv; sleep?: (ms: number, signal?: AbortSignal) => Promise<unknown> } = {}) {
   let stdout = '', stderr = '';
   const code = await runCli(args, { stdout: s => stdout += s, stderr: s => stderr += s, cliVersion: '0.1.3',
-    ...(options.realBuild ? {} : { loadServer: async () => ({ buildSite: build, startDev: async () => ({ url: 'http://localhost:4790', attached: true }) }) }),
+    ...(options.realBuild ? {} : { loadServer: async () => ({ buildSite: build, startDev: async () => ({ url: 'http://localhost:4790', attached: true }), ...(renderStep ? { renderStep } : {}) }) }),
     cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base, SSH_CONNECTION: options.ssh, ...options.env }, interactive: options.interactive ?? false,
       openBrowser: browser, confirm, sleep: options.sleep ?? (async ms => { waits.push(ms); clock += ms; }), now: () => clock, ...(options.realBuild ? {} : { check: checkProject }) },
   });
@@ -553,4 +554,73 @@ test('F8 新登录凭证写入失败保留旧凭证，只撤销新 token，退�
 test('F8 create 503 NETWORK 即使有 Retry-After 也不重放', async () => {
   await credentials(); fail = { path: '/api/v1/shares', status: 503, code: 'NETWORK', retryAfter: '1' };
   const r = await cli(['share', project]); expect(r.code).toBe(1); expect(calls.filter(c => c.path === fail!.path)).toHaveLength(1); expect(waits).toEqual([]);
+});
+
+// ---------------------------------------------------------------- 嵌入（预览图 + data.embed）
+const irHtml = (project: unknown) => `<html><head><script type="application/json" id="joplo-ir">${JSON.stringify({ project, home: null })}</script></head><body></body></html>`;
+const irProject = { features: { f: { id: 'f', optionIds: ['f.a'], pick: 'f.a' } }, options: { 'f.a': { id: 'f.a' } }, scenarios: { 'f.a.main': { id: 'f.a.main', optionId: 'f.a' }, 'f.a.other': { id: 'f.a.other', optionId: 'f.a' } } };
+/** 1200×630 的最小 PNG 头（签名 + IHDR）。 */
+const png = (w = 1200, h = 630) => { const b = Buffer.alloc(33); Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b); b.writeUInt32BE(13, 8); b.write('IHDR', 12, 'ascii'); b.writeUInt32BE(w, 16); b.writeUInt32BE(h, 20); return b; };
+const manifestOf = () => calls.find(c => c.path === '/api/v1/shares')!.body.files as { path: string; size: number; contentType: string; sha256: string }[];
+test('E1 share --format json 的 data.embed 与契约逐字一致；文本输出在链接后打印徽章和更多嵌入方式', async () => {
+  await credentials();
+  let r = await cli(['share', project, '--format=json', '--title', 'Say "hi" <now> [x]']); expect(r.code, r.stdout).toBe(0);
+  const page = `${base}/s/Abc1234567/`;
+  expect(r.json().data.embed).toEqual({
+    iframe: `<iframe src="${page}?embed=1" title="Say &quot;hi&quot; &lt;now&gt; [x] · Joplo 演示" style="width:100%;aspect-ratio:16/10;border:0" allow="fullscreen *" allowfullscreen loading="lazy"></iframe>`,
+    markdown: `[![Joplo 演示 · Say "hi" <now> \\[x\\]](${page}badge.svg)](${page})`,
+    badge: `${page}badge.svg`, preview: `${page}preview.png`,
+  });
+  expect(Object.keys(r.json().data).sort()).toEqual(['embed', 'expiresAt', 'shareId', 'url', 'version']);
+  r = await cli(['share', project]); expect(r.code).toBe(0);
+  const lines = r.stdout.trim().split('\n');
+  expect(lines[0]).toBe(`Published ${page}`);
+  expect(lines).toContain(`Add to README: [![Joplo 演示 · Invite](${page}badge.svg)](${page})`);
+  expect(lines.at(-1)).toBe(`More embed options: ${base}/shares/Abc1234567`);
+});
+test('E1 没有 renderStep（旧 server）或项目没有场景时跳过预览图，只在 stderr 提示一行', async () => {
+  await credentials();
+  let r = await cli(['share', project, '--format=json']); expect(r.code).toBe(0);
+  expect(manifestOf().map(f => f.path)).not.toContain('_joplo/preview.png');
+  expect(r.stderr.split('\n').filter(l => l.startsWith('Skipped the preview image'))).toHaveLength(1);
+  renderStep = vi.fn(async () => { throw new Error('should not render without scenarios'); });
+  files['index.html'] = irHtml({ features: {}, options: {}, scenarios: {} });
+  r = await cli(['share', project, '--format=json']); expect(r.code).toBe(0); expect(renderStep).not.toHaveBeenCalled();
+  expect(r.stderr).toMatch(/Skipped the preview image \(no scenario/);
+});
+test('E1 没有 Playwright / 渲染失败 / 尺寸不对时 share 照常成功，清单里没有 _joplo/preview.png', async () => {
+  await credentials(); files['index.html'] = irHtml(irProject);
+  const failures: ((opts: any) => Promise<unknown>)[] = [
+    async () => { const { JoploError } = await import('@joplo-app/core'); throw new JoploError('RENDER_FAILED', 'Screenshots require Playwright and Chromium, which are not installed. Run: npm i -D playwright\nsecond line'); },
+    async (opts) => { await writeFile(opts.out, 'partial'); throw new Error('browser crashed'); },
+    async (opts) => { await writeFile(opts.out, png(800, 600)); return { path: opts.out }; },
+    async (opts) => { await writeFile(opts.out, 'not a png'); return { path: opts.out }; },
+    async () => ({ path: 'nowhere' }),
+  ];
+  for (const failure of failures) {
+    calls = []; renderStep = vi.fn(failure);
+    const r = await cli(['share', project, '--format=json']); expect(r.code, r.stdout).toBe(0);
+    expect(manifestOf().map(f => f.path)).toEqual(['assets/site.css', 'index.html']);
+    const notes = r.stderr.split('\n').filter(l => l.startsWith('Skipped the preview image'));
+    expect(notes).toHaveLength(1);
+    expect(r.json().data.embed.preview).toBe(`${base}/s/Abc1234567/preview.png`);
+  }
+});
+test('E1 有渲染能力时上传默认场景第一步的 1200×630 预览图，计入新上传字节和清单总量', async () => {
+  await credentials(); files['index.html'] = irHtml(irProject); missingCount = 99;
+  const image = Buffer.concat([png(), Buffer.alloc(500, 7)]);
+  renderStep = vi.fn(async (opts: any) => { await writeFile(opts.out, image); return { path: opts.out }; });
+  const r = await cli(['share', project, '--format=json']); expect(r.code, r.stdout + r.stderr).toBe(0);
+  expect(renderStep).toHaveBeenCalledOnce();
+  const opts = vi.mocked(renderStep).mock.calls[0]![0];
+  expect(opts).toMatchObject({ projectDir: resolve(project), scenarioId: 'f.a.main', viewport: { width: 1200, height: 630 } });
+  expect(opts.stepId).toBeUndefined();
+  const entry = manifestOf().find(f => f.path === '_joplo/preview.png')!;
+  expect(entry).toEqual({ path: '_joplo/preview.png', size: image.length, contentType: 'image/png', sha256: createHash('sha256').update(image).digest('hex') });
+  const put = calls.find(c => c.method === 'PUT' && c.path === `/blob/${entry.sha256}`)!; expect(Buffer.byteLength(put.body, 'latin1')).toBeGreaterThan(0);
+  expect(r.stderr).toMatch(new RegExp(`Built 3 files \\(${manifestOf().reduce((n, f) => n + f.size, 0)} bytes\\)`));
+  expect(r.stderr).not.toContain('Skipped the preview image');
+  // 本地清单总量预检也包含预览图
+  limits.maxTotalBytes = manifestOf().reduce((n, f) => n + f.size, 0) - 1; calls = [];
+  const tooLarge = await cli(['share', project, '--format=json']); expect(tooLarge.json().error.code).toBe('TOO_LARGE'); expect(calls.some(c => c.path === '/api/v1/shares')).toBe(false);
 });

@@ -218,6 +218,16 @@ export function createKo(locale: Locale = 'ko') {
       clipboardUnavailableCopyFromTheAddressBar: "클립보드를 사용할 수 없습니다. 주소 표시줄에서 복사하세요.",
       scenarios: "시나리오",
       stepCount: (p0: Value) => plural(Number(p0), { other: "#개 단계" }, locale),
+      // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
+      embedPlayDemo: "데모 재생",
+      embedCoverMeta: (n: number) => `클릭할 수 있는 프로토타입 · ${plural(Number(n), { other: "#개 시나리오" }, locale)}`,
+      embedMadeWithJoplo: "Joplo로 제작",
+      embedCoverHint: "재생 후 일시정지, 단계별 보기, 전체 화면을 사용할 수 있습니다",
+      embedStepProgress: (current: number, total: number) => `단계 ${number(current, locale)} / ${number(total, locale)}`,
+      embedSwitchScenario: "시나리오 전환",
+      embedOpenInNewTab: "새 탭에서 열기",
+      embedPlayer: "데모 플레이어",
+      embedNoScenario: "이 데모에는 아직 재생할 시나리오가 없습니다.",
     },
   });
 }

@@ -127,7 +127,29 @@ trace 同时提供镜头目标；聚焦同一 Diagram 的多个节点时，相�
 
 发布站与本地看板共用首页和演示页布局，只呈现选定方案、功能目标、场景、步骤字幕及整体布局。没有本机项目目录、缺口、待决问题、规则来源或源码检查抽屉。
 
-层级、导演、只重放一层、缩放平移、播放速度、时间线、字幕、全屏和快捷键与看板一致。首页是项目名、说明和功能卡片（带缩略图）；演示页的顶栏只有「复制链接」和全屏，左栏是功能名、目标和选定方案的场景（按场景排列，没有方案切换），底部标明“用 Joplo 制作的概念原型 · 非正式实现”。没有检查、外观和导出（D55）。发布站的配色固定用 config 的 theme，字体和线条暂不发布；作者 CSS 随产物打包。
+层级、导演、只重放一层、缩放平移、播放速度、时间线、字幕、全屏和快捷键与看板一致。带 `?embed=1` 时是给 iframe 用的嵌入模式，见[嵌入模式](#嵌入模式)。首页是项目名、说明和功能卡片（带缩略图）；演示页的顶栏只有「复制链接」和全屏，左栏是功能名、目标和选定方案的场景（按场景排列，没有方案切换），底部标明“用 Joplo 制作的概念原型 · 非正式实现”。没有检查、外观和导出（D55）。发布站的配色固定用 config 的 theme，字体和线条暂不发布；作者 CSS 随产物打包。
+
+## 嵌入模式
+
+分享页地址带 `?embed=1` 时，发布站换成给第三方页面 iframe 用的精简播放器（[EmbedApp.tsx](../packages/web/src/site/EmbedApp.tsx)，方案 A「大播放按钮」）。不带 `embed=1`（包括 `embed=0`、空值）时发布站完全不变。
+
+- 参数：`scenario=<场景 id>` 选起始场景；`autoplay=1` 跳过封面直接播放。写错（场景不存在、autoplay 不是 1）时照常显示封面，从默认场景开始，不报错；其他参数忽略。默认场景是第一个功能的选定方案的第一个场景（与 `joplo share` 的预览图相同）。
+- 封面（默认）：起始场景的初始画面压暗，中央一个大的「播放演示」，下面是项目名和“可点击的原型演示 · N 个场景”；底部一行「用 Joplo 制作」（一律显示）和“播放后可暂停、逐步、全屏”。整块封面都可点，键盘 Tab 聚焦后 Enter / 空格开始；被遮住的画面是 inert，不能聚焦。
+- 播放后：画面 + 字幕 + 一条控制条：上一步 · 播放 / 暂停 · 下一步、“步骤 2 / 5”和进度条、场景切换（多个场景时；多个功能时写“功能 · 场景”）、「Joplo ↗」、全屏。宽度 < 560 时场景切换只剩图标、品牌只剩标志；< 400 去掉进度条。
+- 没有顶栏、左栏、层级标签、复制链接和语言菜单；镜头总是跟随导演。语言跟随观众浏览器（沙箱里读不到 localStorage 时按浏览器语言）。
+- 键盘：空格 播放 / 暂停（封面上 = 开始），← → 切步，F 全屏，Esc 退出全屏；输入框和原型画面里不拦截。
+- 全屏用 Fullscreen API（整个嵌入播放器）。全屏不可用（`document.fullscreenEnabled` 为 false）或被拒绝时，按钮变成「在新标签页打开」：打开同一个分享页，去掉 `embed` / `scenario` / `autoplay`，用 hash 停在当前场景和步骤。「Joplo ↗」也在新标签页打开，不在 iframe 里跳转。
+- 分享页在 CSP `sandbox allow-scripts allow-popups allow-downloads; connect-src 'none'` 下运行：嵌入模式不发网络请求，不依赖 localStorage（读写失败已容错）。
+
+### 实测（2026-11-06）
+
+本地起两个源：分享源 `127.0.0.1` 返回 `joplo build examples/invite` 的产物并加上与云端相同的 CSP sandbox（另加 `Access-Control-Allow-Origin: *`，沙箱文档是 opaque origin，字体要 CORS），第三方博客页 `localhost` 用 iframe 嵌入，Playwright（Chromium）验证 33 项全部通过：
+
+- 默认封面、不自动播放；`autoplay=1` 跳过封面；`scenario` 生效；错误参数照常显示封面。
+- 沙箱里 `origin` 为 `null`、`localStorage` 抛 SecurityError、`fetch` 被 connect-src 拒绝；播放、← →、空格暂停、切换场景都正常，没有 fetch / XHR 请求、没有失败的资源和 CSP 违规。
+- 嵌入代码写 `allow="fullscreen *" allowfullscreen`（`share --format json` 的 `data.embed.iframe` 和云端控制台都是这个写法）：按钮和 F 都能进入 / 退出 Fullscreen API 全屏，进度保持，不开新标签页。
+- 为什么必须是 `fullscreen *`：CSP sandbox 让分享文档变成 opaque origin，而 `allow="fullscreen"` 的默认授权源是 iframe 的 src 源，两者不匹配，Chromium、Firefox、WebKit 里 `fullscreenEnabled` 都是 false（`allow` 优先于 `allowfullscreen`）；只写 `allowfullscreen` 或写 `allow="fullscreen *"` 时可用。嵌入方如果改回 `allow="fullscreen"` 或删掉授权，全屏退回为「在新标签页打开」（已验证：新标签页是去掉 embed=1 的同一个分享页，停在当前场景与步骤）。
+- Tab 聚焦封面时焦点框可见，Enter 开始播放。
 
 ## 实现入口
 

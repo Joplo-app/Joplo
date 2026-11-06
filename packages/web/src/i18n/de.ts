@@ -218,6 +218,16 @@ export function createDe(locale: Locale = 'de') {
       clipboardUnavailableCopyFromTheAddressBar: "Zwischenablage nicht verfügbar. Aus der Adressleiste kopieren.",
       scenarios: "Szenarien",
       stepCount: (p0: Value) => plural(Number(p0), { one: "# Schritt", other: "# Schritte" }, locale),
+      // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
+      embedPlayDemo: "Demo abspielen",
+      embedCoverMeta: (n: number) => `Interaktiver Prototyp · ${plural(Number(n), { one: "# Szenario", other: "# Szenarien" }, locale)}`,
+      embedMadeWithJoplo: "Mit Joplo erstellt",
+      embedCoverHint: "Nach dem Start: Pause, Schritt für Schritt, Vollbild",
+      embedStepProgress: (current: number, total: number) => `Schritt ${number(current, locale)} / ${number(total, locale)}`,
+      embedSwitchScenario: "Szenario wechseln",
+      embedOpenInNewTab: "In neuem Tab öffnen",
+      embedPlayer: "Demo-Wiedergabe",
+      embedNoScenario: "Diese Demo hat noch kein abspielbares Szenario.",
     },
   });
 }

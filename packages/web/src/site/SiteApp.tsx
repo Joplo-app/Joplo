@@ -25,6 +25,8 @@ import { JoploMark } from '../player/JoploMark';
 import { StageThumb } from '../player/StageThumb';
 import { displaySceneId } from '@joplo-app/core';
 import { siteScenarioRows } from './site-model';
+import { EmbedApp } from './EmbedApp';
+import { parseEmbedParams } from './embed-model';
 import { ThemeStyles } from '../renderer/ThemeStyles';
 import { usePlaySync } from '../player/playRoute';
 import { copyText, useFlash, useHash } from '../player/util';
@@ -42,10 +44,15 @@ export function readInlineIR(): SiteData | null {
   }
 }
 
-export function SiteApp({ data }: { data: SiteData | null }) {
+/**
+ * `search` 缺省读 location.search：只有 `?embed=1` 进入嵌入模式（EmbedApp）；其他情况（含 embed=0、空值）与原来的发布站完全一样。
+ */
+export function SiteApp({ data, search = typeof location === 'undefined' ? '' : location.search }: { data: SiteData | null; search?: string }) {
   const { t: i18n } = useI18n();
+  const embed = useMemo(() => parseEmbedParams(search), [search]);
 
   if (!data) return <div className="p-8 text-[#c92a2a]">{i18n.site.prototypeDataIsMissingRunJoploBuildAgain}</div>;
+  if (embed) return <EmbedApp project={data.project} params={embed} />;
   return <Site project={data.project} />;
 }
 

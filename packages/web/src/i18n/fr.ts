@@ -218,6 +218,16 @@ export function createFr(locale: Locale = 'fr') {
       clipboardUnavailableCopyFromTheAddressBar: "Presse-papiers indisponible. Copier depuis la barre d’adresse.",
       scenarios: "Scénarios",
       stepCount: (p0: Value) => plural(Number(p0), { one: "# étape", other: "# étapes" }, locale),
+      // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
+      embedPlayDemo: "Lire la démo",
+      embedCoverMeta: (n: number) => `Prototype interactif · ${plural(Number(n), { one: "# scénario", other: "# scénarios" }, locale)}`,
+      embedMadeWithJoplo: "Créé avec Joplo",
+      embedCoverHint: "Après lecture : pause, étape par étape et plein écran",
+      embedStepProgress: (current: number, total: number) => `Étape ${number(current, locale)} / ${number(total, locale)}`,
+      embedSwitchScenario: "Changer de scénario",
+      embedOpenInNewTab: "Ouvrir dans un nouvel onglet",
+      embedPlayer: "Lecteur de démo",
+      embedNoScenario: "Cette démo n’a pas encore de scénario à lire.",
     },
   });
 }

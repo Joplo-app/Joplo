@@ -241,6 +241,16 @@ ${value(p2, locale)}`,
       scenarios: "场景",
       // site/site-model.ts: Joplo interface text; author content is never translated.
       stepCount: (p0: Value) => `${value(p0, locale)} 步`,
+      // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
+      embedPlayDemo: "播放演示",
+      embedCoverMeta: (n: number) => `可点击的原型演示 · ${number(n, locale)} 个场景`,
+      embedMadeWithJoplo: "用 Joplo 制作",
+      embedCoverHint: "播放后可暂停、逐步、全屏",
+      embedStepProgress: (current: number, total: number) => `步骤 ${number(current, locale)} / ${number(total, locale)}`,
+      embedSwitchScenario: "切换场景",
+      embedOpenInNewTab: "在新标签页打开",
+      embedPlayer: "演示播放器",
+      embedNoScenario: "这个演示还没有可以播放的场景。",
     },
   });
 }

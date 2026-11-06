@@ -7,6 +7,7 @@ import type { buildSite } from '@joplo-app/server';
 import { check } from './check.ts';
 import { CloudError, sizeError, terminalText } from './cloud-error.ts';
 import { temporaryDirectory } from './cloud-cleanup.ts';
+import { embedSnippets, writePreview, type EmbedSnippets, type RenderPreview } from './cloud-embed.ts';
 import { atomicJson, CloudClient, httpUrl, nonempty, object, retryAfterMillis } from './cloud.ts';
 
 /** 客户端 MIME 映射；值与云端公开上传契约一致，不从私有包导入实现。 */
@@ -37,8 +38,8 @@ export async function manifest(dir: string): Promise<{ files: File[]; blobs: Map
   if (!files.some(f => f.path === 'index.html')) throw new JoploError('EXPORT_FAILED', 'The build is missing index.html');
   return { files, blobs };
 }
-export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number };
-export async function share(client: CloudClient, dir: string, opts: { new?: boolean; title?: string }, build: typeof buildSite): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
+export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets };
+export async function share(client: CloudClient, dir: string, opts: { new?: boolean; title?: string }, build: typeof buildSite, render: () => Promise<RenderPreview> = async () => { throw new Error('this @joplo-app/server cannot render screenshots'); }): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
   if (opts.title !== undefined && (!opts.title.trim() || opts.title.trim().length > 200)) throw new JoploError('USAGE', '--title must contain 1-200 characters');
   let credentials = await client.credentials(true);
   if (!credentials) {
@@ -56,6 +57,9 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
     client.warn('Validation passed. Building the published site...');
     const built = await build({ projectDir: project, outDir: join(staging, 'site') });
     if (built.diagnostics.some(d => d.severity === 'error')) throw new JoploError('EXPORT_FAILED', 'The build contains errors; nothing uploaded', { diagnostics: built.diagnostics });
+    // 预览图（嵌入契约 _joplo/preview.png）：作为普通文件进清单，计入总量和新上传字节；失败只提示一行，不让 share 失败
+    const preview = await writePreview(render, project, built.outDir, join(staging, 'preview.png'));
+    if (!preview.ok) client.warn(`Skipped the preview image (${terminalText(preview.reason).replace(/[\r\n\t]+/g, ' ')}). The share page will use a generic image.`);
     const { files, blobs } = await manifest(built.outDir);
     const account = await client.me(accessToken);
     const actualBytes = files.reduce((n, f) => n + f.size, 0), largestFiles = [...files].sort((a, b) => b.size - a.size).slice(0, 5).map(({ path, size }) => ({ path, size }));
@@ -118,6 +122,6 @@ export async function share(client: CloudClient, dir: string, opts: { new?: bool
       try { await rm(join(project, '.joplo/cloud.json'), { force: true }); }
       catch { client.warn('Could not delete the old share record. Remove .joplo/cloud.json manually.'); }
     }
-    return { result: published, plan: account.plan };
+    return { result: { ...published, embed: embedSnippets(published.url, title) }, plan: account.plan };
   } finally { try { await rm(staging, { recursive: true, force: true }); } finally { temporary.release(); } }
 }

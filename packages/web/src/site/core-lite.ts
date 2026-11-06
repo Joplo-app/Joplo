@@ -7,3 +7,4 @@ export * from '../../../core/src/player.ts';
 export * from '../../../core/src/result.ts';
 export type * from '../../../core/src/schema.ts';
 export type { Selection } from '../../../core/src/selection.ts';
+export * from '../../../core/src/embed.ts';

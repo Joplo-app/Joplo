@@ -218,6 +218,16 @@ export function createRu(locale: Locale = 'ru') {
       clipboardUnavailableCopyFromTheAddressBar: "Буфер обмена недоступен. Скопируйте из адресной строки.",
       scenarios: "Сценарии",
       stepCount: (p0: Value) => plural(Number(p0), { one: "# шаг", few: "# шага", many: "# шагов", other: "# шага" }, locale),
+      // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
+      embedPlayDemo: "Запустить демо",
+      embedCoverMeta: (n: number) => `Интерактивный прототип · ${plural(Number(n), { one: "# сценарий", few: "# сценария", many: "# сценариев", other: "# сценария" }, locale)}`,
+      embedMadeWithJoplo: "Сделано в Joplo",
+      embedCoverHint: "После запуска: пауза, пошаговый просмотр и полный экран",
+      embedStepProgress: (current: number, total: number) => `Шаг ${number(current, locale)} / ${number(total, locale)}`,
+      embedSwitchScenario: "Сменить сценарий",
+      embedOpenInNewTab: "Открыть в новой вкладке",
+      embedPlayer: "Демо-плеер",
+      embedNoScenario: "В этом демо пока нет сценариев для воспроизведения.",
     },
   });
 }

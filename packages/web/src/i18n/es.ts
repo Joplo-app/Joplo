@@ -218,6 +218,16 @@ export function createEs(locale: Locale = 'es') {
       clipboardUnavailableCopyFromTheAddressBar: "Portapapeles no disponible. Copia desde la barra de direcciones.",
       scenarios: "Escenarios",
       stepCount: (p0: Value) => plural(Number(p0), { one: "# paso", other: "# pasos" }, locale),
+      // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
+      embedPlayDemo: "Reproducir demo",
+      embedCoverMeta: (n: number) => `Prototipo interactivo · ${plural(Number(n), { one: "# escenario", other: "# escenarios" }, locale)}`,
+      embedMadeWithJoplo: "Hecho con Joplo",
+      embedCoverHint: "Al reproducir: pausa, paso a paso y pantalla completa",
+      embedStepProgress: (current: number, total: number) => `Paso ${number(current, locale)} / ${number(total, locale)}`,
+      embedSwitchScenario: "Cambiar escenario",
+      embedOpenInNewTab: "Abrir en una pestaña nueva",
+      embedPlayer: "Reproductor de la demo",
+      embedNoScenario: "Esta demo aún no tiene escenarios para reproducir.",
     },
   });
 }
