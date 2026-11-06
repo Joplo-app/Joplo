@@ -1,5 +1,6 @@
 import { COMPONENT_TYPES, GATED_CONTAINERS, INTERACTIVE_TYPES, JOPLO_PROPS, VALUE_TYPES } from './catalog.ts';
 import { JoploError } from './result.ts';
+import { LAYER_ICONS } from './schema.ts';
 
 export const SKILL_TOPICS = [
   { name: 'authoring', description: 'Directory conventions; page / layout / option / flow syntax' },
@@ -172,6 +173,7 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 - Do not make viewers scroll through a long page. Fit one screen and zoom into details with shots.
 - Each page has one device, desktop by default. page({ viewport: 'mobile' }, tree) uses a Phone frame at a fixed width of 390.
 - For a mobile layer, use layer('Mobile', <MobileView/>, { viewport: 'mobile' }). Make a separate page or demo when mobile is needed (D44).
+- Each layer tab shows an icon so viewers can tell layers apart when many tabs are squeezed: layer('Terminal', <Cli/>, { icon: 'terminal' }). Presets: ${LAYER_ICONS.join(', ')}. Default: mobile for mobile layers, otherwise window.
 
 ## Full-height layout: Follow stage height
 - Layers and desktop pages fill the stage, whose size follows the board window. Fixed pixel heights (h={690}) push bottom content outside short windows.
@@ -331,6 +333,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - CAPTION_TOO_LONG: Shorten the caption to about 24 units: CJK characters count as 1 each, all others as 0.5; whitespace is ignored. One thing per step; move long content to an explanation layer. See demo.
 - EXPLAIN_TOO_LONG: Shorten the explain note to about 48 units, using the same CJK 1 / other 0.5 calculation. Put detailed rationale in a separate explanation layer. See demo.
 - ROLE_UNKNOWN: A layer or card role is not in feature.roles. Declare roles as { key: role('Name') }; see demo.
+- ICON_UNKNOWN: A layer icon is not a preset. Use one of ${LAYER_ICONS.join(', ')}; see demo.
 - FORK_UNKNOWN: fork must target another scenario key in the same option; it cannot reference itself.
 - MARK_UNKNOWN: The mark target is absent from this step's route stage and all layers. Check the element id; currently hidden targets are valid references.
 - SHOT_UNKNOWN: The shot target is absent from this step's stage and all layers. Check its id and layer; see demo.

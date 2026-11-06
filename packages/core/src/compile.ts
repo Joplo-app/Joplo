@@ -10,7 +10,7 @@ import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@joplo-app/kit';
 import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, INTERACTIVE_TYPES, PAGE_LAYER, matchChoice, nodeLabel } from './catalog.ts';
 import { choicesOf, commonPrefix } from './player.ts';
-import { Project, SCHEMA_VERSION, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
+import { LAYER_ICONS, Project, SCHEMA_VERSION, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
 import type { Diagnostic } from './result.ts';
 
 export type AuthoringProject = {
@@ -218,7 +218,7 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
     /** 可被引用的角色键（D56）：feature.roles 写成 { 键: role('名字') } 时才有。 */
     const roleKeys = new Set(fdef.roles && !Array.isArray(fdef.roles) ? Object.keys(fdef.roles) : []);
     // ---------- 层级（T-layers）：每层一个完全独立的画面，单独编译、单独渲染 ----------
-    const layers: Record<string, { title: string; sceneId: string; role?: string }> = {};
+    const layers: Record<string, { title: string; sceneId: string; role?: string; icon?: LayerIcon }> = {};
     const layerScenes: { key: string; scene: Scene }[] = [];
     const layerRoute = touched.find((r) => ctxRoutes.has(r)) ?? src.config.home ?? [...ctxRoutes][0] ?? '/';
     for (const [lk, ld] of Object.entries(def.layers ?? {})) {
@@ -242,7 +242,10 @@ export function compile(src: AuthoringProject, mode: 'dev' | 'publish'): Compile
       layerScenes.push({ key: lk, scene });
       if (ld.role !== undefined && !roleKeys.has(ld.role))
         err('ROLE_UNKNOWN', `Layer "${ld.title}" role "${ld.role}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ' (feature.roles must use { key: role(\'Name\') })'}`, at);
-      layers[lk] = { title: ld.title, sceneId, ...(ld.role !== undefined && roleKeys.has(ld.role) ? { role: ld.role } : {}) };
+      const icon = ld.icon as string | undefined;
+      const iconOk = icon !== undefined && (LAYER_ICONS as readonly string[]).includes(icon);
+      if (icon !== undefined && !iconOk) err('ICON_UNKNOWN', `Layer "${ld.title}" icon "${icon}" is not a preset icon (available: ${LAYER_ICONS.join(', ')})`, at);
+      layers[lk] = { title: ld.title, sceneId, ...(ld.role !== undefined && roleKeys.has(ld.role) ? { role: ld.role } : {}), ...(iconOk ? { icon: icon as LayerIcon } : {}) };
     }
     const hasLayers = layerScenes.length > 0;
     /** 元素在哪些层级里（多层都有同名 id 时都算）。 */

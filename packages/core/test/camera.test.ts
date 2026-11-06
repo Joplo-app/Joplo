@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/kit/ui';
 import { config, explain, feature, flow, layer, option, page, set, shot, Slot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { DIRECTOR_LAYER, PAGE_LAYER, cameraAt, compile, displaySceneId, explainClick, findNode, isNodeVisible, layersOf, layersWithNode, replay, stateAt, stepTouchesLayer, validate, type AuthoringProject } from '../src/index.ts';
+import { DIRECTOR_LAYER, LAYER_ICONS, PAGE_LAYER, cameraAt, compile, displaySceneId, explainClick, findNode, isNodeVisible, layersOf, layersWithNode, replay, stateAt, stepTouchesLayer, validate, type AuthoringProject } from '../src/index.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
@@ -115,6 +115,23 @@ describe('layer(title, tree)：每层一个独立画面', () => {
     expect(key.diagnostics.find((d) => d.code === 'LAYER_UNKNOWN')).toBeTruthy();
   });
 
+  it('层级图标：作者从预设里选；不写时手机视口是 mobile、其余是 window（IR 只存显式写的）；写错报 ICON_UNKNOWN 并指向源码；发布站保留', () => {
+    const { dev, publish } = build({ layers: { client: layer('客户端视角', clientTree(), { icon: 'terminal' }), backend: layer('后端流转', backendTree()), phone: layer('手机', clientTree(), { viewport: 'mobile' }) } });
+    expect(dev.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    const p = dev.project!;
+    expect(p.options['f.a']!.layers.client!.icon).toBe('terminal');
+    expect(p.options['f.a']!.layers.backend!.icon).toBeUndefined();
+    expect(layersOf(p, sid).map((l) => [l.id, l.icon])).toEqual([['client', 'terminal'], ['backend', 'window'], ['phone', 'mobile']]);
+    expect(publish.project!.options['f.a']!.layers.client!.icon).toBe('terminal');
+    for (const icon of LAYER_ICONS) expect(build({ layers: { client: layer('c', clientTree(), { icon }) } }).dev.diagnostics.some((d) => d.code === 'ICON_UNKNOWN')).toBe(false);
+    const bad = build({ layers: { client: layer('客户端视角', clientTree(), { icon: 'rocket' as never }), backend: layer('后端流转', backendTree()) } }).dev;
+    const d = bad.diagnostics.find((x) => x.code === 'ICON_UNKNOWN');
+    expect(d?.severity).toBe('error');
+    expect(d?.message).toContain('rocket');
+    expect(d?.at).toMatch(/camera\.test\.ts:\d+:\d+$/);
+    expect(bad.project?.options['f.a']?.layers.client?.icon).toBeUndefined();
+  });
+
   it('发布站保留层级画面与镜头', () => {
     const { publish } = build();
     expect(publish.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
@@ -193,3 +210,8 @@ describe('属性值为 undefined', () => {
     expect(findNode(scene, 'seg')!.node.props).toEqual({ data: ['a', null] });
   });
 });
+
+// kit 的 LayerIcon 与 core 的 LAYER_ICONS 必须一致（pnpm typecheck 检查）
+type KitIcon = NonNullable<Parameters<typeof layer>[2]>['icon'];
+const iconsInSync: [NonNullable<KitIcon>] extends [(typeof LAYER_ICONS)[number]] ? ([(typeof LAYER_ICONS)[number]] extends [NonNullable<KitIcon>] ? true : false) : false = true;
+void iconsInSync;

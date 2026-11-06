@@ -2203,7 +2203,7 @@ function MovingDot({ d, color, animate: anim, reverse = false }: { d: string; co
 
 function DiagramEdge({ node, p }: NodeProps) {
   const dctx = useContext(DiagramContext);
-  const { animate, selectedId } = useCtx();
+  const { animate, selectedId, traced } = useCtx();
   const mode = useStroke();
   const attrs = useRootAttrs(node);
   const appear = useAppear(dctx);
@@ -2219,7 +2219,7 @@ function DiagramEdge({ node, p }: NodeProps) {
   // 出现动画：用一条沿路径伸长的遮罩把连线（含手绘线、虚线、箭头）从 from 画到 to
   const maskId = `jdraw-${dctx.key}-${node.id}`.replace(/[^\w-]/g, '_');
   // 显式写的 state 优先；没写时用 trace 推算的状态（D48）；trace 逆着连线方向走时小点逆向流动
-  const eff = effectiveState(p.state, useCtx().traced, node.id);
+  const eff = effectiveState(p.state, traced, node.id);
   const state = eff.state;
   const reverseDot = eff.reverse;
   const color = selectedId === node.id ? 'var(--sel)' : EDGE_TONE[state]!;

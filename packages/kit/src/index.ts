@@ -177,9 +177,11 @@ export const trace = Object.assign((...ids: string[]): EffectDef => ({ kind: 'ef
  * 各层共享同一份场景状态（ui / data / inputs），切层时步骤不变。需要全景就自己声明一个 overview 层。
  *   layers: { client: layer('客户端视角', <ClientView />), backend: layer('后端流转', <Arch />) }
  */
-export type LayerDef = { kind: 'layer'; title: string; tree: JNode | JNode[]; viewport?: 'desktop' | 'mobile'; role?: string; source?: string };
+/** 层级标签的预设图标（与 core 的 LAYER_ICONS 一致）。不写时：手机视口 mobile，其余 window。 */
+export type LayerIcon = 'window' | 'browser' | 'mobile' | 'desktop' | 'terminal' | 'chat' | 'agent' | 'server' | 'data' | 'email' | 'doc' | 'flow';
+export type LayerDef = { kind: 'layer'; title: string; tree: JNode | JNode[]; viewport?: 'desktop' | 'mobile'; role?: string; icon?: LayerIcon; source?: string };
 /** opts.role：这一层是谁的画面（feature.roles 的键，D56）；画面角落显示这个人的名牌，层级标签带上头像。 */
-export const layer = (title: string, tree: JNode | JNode[], opts: { viewport?: 'desktop' | 'mobile'; role?: string } = {}): LayerDef => ({ kind: 'layer', title, tree, ...opts, source: callsite() });
+export const layer = (title: string, tree: JNode | JNode[], opts: { viewport?: 'desktop' | 'mobile'; role?: string; icon?: LayerIcon } = {}): LayerDef => ({ kind: 'layer', title, tree, ...opts, source: callsite() });
 
 /** 步骤参数：字符串是字幕（可省略，省略时自动生成），其余是效果。 */
 export type StepArg = string | EffectDef;

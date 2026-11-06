@@ -186,11 +186,11 @@ const ajiePhone = () => (
 
 /** 角色层级与行程数据层：每层独立展示（D56：一次只看一个人，换人用过渡卡）。 */
 export const layers = () => ({
-  xiaoyu: layer('小雨的电脑', xiaoyuApp(), { role: 'xiaoyu' }),
+  xiaoyu: layer('小雨的电脑', xiaoyuApp(), { role: 'xiaoyu', icon: 'agent' }),
   ajie: layer('阿杰的手机', ajiePhone(), { role: 'ajie', viewport: 'mobile' }),
   data: layer('行程数据', <Stack p="xl" gap="lg" maw={860} mx="auto">
     <Title order={2}>行程数据</Title>
     <StateFlow id="trip_states" value={$.data.trip.status} states={['draft', 'shared', 'confirmed', 'rescheduled']} labels={{ draft: '草稿', shared: '已分享', confirmed: '已确认', rescheduled: '已改期' }} />
     <DataCard id="trip_data" title="周末露营" value={$.data.trip} fields={[{ key: 'date', label: '日期' }, { key: 'camp', label: '营地' }, { key: 'budget', label: '预算（元）' }, { key: 'reply', label: '阿杰的回复' }]} />
-  </Stack>),
+  </Stack>, { icon: 'data' }),
 });

@@ -12,7 +12,7 @@ const zh = { ...createZhCN(), ...createBoardZhCN() };
 import { describe, expect, it } from 'vitest';
 import type { Project } from '@joplo-app/core';
 import { SPEEDS } from '../src/runtime/pace';
-import { BOARD_WIDE, boardLayout, dockWidth, layerTabs, timelineChips } from '../src/player/layout';
+import { BOARD_WIDE, boardLayout, bookmarkTabs, dockWidth, layerTabs, timelineChips } from '../src/player/layout';
 import { caseCard, featureMenu, gapCommand, optionLabel, optionMeta, otherOptionTags } from '../src/board/nav-model';
 
 describe('布局断点（34-窄屏收起规则 ①–④）', () => {
@@ -81,6 +81,53 @@ describe('层级标签（D55）', () => {
       [true, false],
       [false, false],
     ]);
+  });
+});
+
+describe('层级标签放不下时像书签（bookmarkTabs）', () => {
+  const GAP = 4;
+  const inBounds = (r: ReturnType<typeof bookmarkTabs>, w: number) =>
+    r.every((t) => t.left >= -0.01 && t.left + t.width <= w + 0.01 && t.openLeft >= -0.01 && t.openLeft + t.openWidth <= w + 0.01);
+  it('放得下：按自然宽度依次排开，展开后与平时相同', () => {
+    const r = bookmarkTabs([100, 80, 60], 0, 400, GAP);
+    expect(r.map((t) => [t.left, t.width])).toEqual([[0, 100], [104, 80], [188, 60]]);
+    expect(r.every((t) => t.openLeft === t.left && t.openWidth === t.width)).toBe(true);
+  });
+  it('放不下：当前层保持完整，其余平分剩余宽度（短的不被拉长），全部留在标签栏内', () => {
+    const r = bookmarkTabs([200, 150, 150, 40], 1, 400, GAP);
+    expect(r[1]!.width).toBe(150);
+    expect(r[3]!.width).toBe(40);
+    expect(r[0]!.width).toBeCloseTo(r[2]!.width);
+    expect(inBounds(r, 400)).toBe(true);
+    // 被压窄的标签悬停时展开为自然宽度
+    expect(r[0]!.openWidth).toBe(200);
+  });
+  it('太多时叠起来：每个标签不窄于下限，后一个盖住前一个的右半，最后一个的右边贴住标签栏', () => {
+    const r = bookmarkTabs(Array(12).fill(160), 0, 600, GAP, 44);
+    expect(r.slice(1).every((t) => t.width >= 44)).toBe(true);
+    expect(r[2]!.left - r[1]!.left).toBeLessThan(44);
+    expect(r.at(-1)!.left + r.at(-1)!.width).toBeCloseTo(600);
+    expect(inBounds(r, 600)).toBe(true);
+    // 叠放顺序：后面的在上，当前层最上
+    expect(r[0]!.z).toBeGreaterThan(Math.max(...r.slice(1).map((t) => t.z)));
+    expect(r[5]!.z).toBeGreaterThan(r[4]!.z);
+  });
+  it('靠右的标签向左展开，不越过标签栏右边', () => {
+    const r = bookmarkTabs([100, 300, 300, 300], 0, 500, GAP);
+    const last = r.at(-1)!;
+    expect(last.openWidth).toBe(300);
+    expect(last.openLeft + last.openWidth).toBeCloseTo(500);
+  });
+  it('当前层太长时最多占六成；只有一个标签时不超过标签栏', () => {
+    const r = bookmarkTabs([900, 100, 100], 0, 500, GAP);
+    expect(r[0]!.width).toBe(300);
+    expect(r[0]!.openWidth).toBe(500);
+    expect(bookmarkTabs([900], 0, 500, GAP)[0]!.width).toBe(500);
+  });
+  it('边界输入：没有标签、还没测出宽度、没有当前层', () => {
+    expect(bookmarkTabs([], 0, 500, GAP)).toEqual([]);
+    expect(bookmarkTabs([100, 100], 0, 0, GAP).map((t) => t.left)).toEqual([0, 104]);
+    expect(inBounds(bookmarkTabs([300, 300, 300], -1, 500, GAP), 500)).toBe(true);
   });
 });
 
