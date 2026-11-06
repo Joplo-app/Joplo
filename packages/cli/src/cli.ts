@@ -127,9 +127,10 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     // 已有存活的看板：项目已注册进去，本进程直接退出（不启动第二个看板进程）
     if (handle.attached) stderr(`Joined the running board. Open ${handle.url}\n`);
   });
-  program.command('build').argument('[dir]', 'Project directory', '.').option('--out-dir <dir>', 'Output directory (default: project dist)').option('--overwrite', 'Allow clearing a nonempty output directory').action(async (dir, opts) => {
+  program.command('build').argument('[dir]', 'Project directory', '.').option('--out-dir <dir>', 'Output directory (default: project dist)').option('--out <dir>', 'Alias for --out-dir').option('--overwrite', 'Allow clearing a nonempty output directory').action(async (dir, opts) => {
     const buildSite = await serverFunction('buildSite');
-    const data = await buildSite({ projectDir: resolve(dir), outDir: opts.outDir === undefined ? undefined : resolve(opts.outDir), overwrite: opts.overwrite });
+    const output = opts.outDir ?? opts.out;
+    const data = await buildSite({ projectDir: resolve(dir), outDir: output === undefined ? undefined : resolve(output), overwrite: opts.overwrite });
     for (const d of data.diagnostics) line(diagnosticLine(d));
     line(`Built ${data.outDir} (${data.files.length} files)`);
     if (data.diagnostics.some(d => d.severity === 'error')) exitCode = 1;

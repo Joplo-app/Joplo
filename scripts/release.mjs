@@ -78,6 +78,31 @@ function tarList(tgz) {
 
 const kb = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${(n / 1024).toFixed(1)} KB`);
 
+/** Decimal byte limits, matching the documented 6 MB / 1.5 MB budgets. */
+export function checkWebBudget(tarballBytes, files) {
+  if (tarballBytes <= 6_000_000) return;
+  const dirs = new Map();
+  for (const { file, size } of files) {
+    const dir = path.posix.dirname(file);
+    dirs.set(dir, (dirs.get(dir) ?? 0) + size);
+  }
+  const largest = [...dirs].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([dir, size]) => `  ${dir}: ${size} bytes`).join('\n');
+  throw new Error(`@joplo-app/web tarball exceeds 6000000 bytes: ${tarballBytes} bytes. Largest unpacked directories:\n${largest}`);
+}
+
+export function checkSiteBudget(files) {
+  const fonts = files.filter((f) => /\.(?:woff2?|ttf|otf)$/i.test(f.file)).reduce((n, f) => n + f.size, 0);
+  if (fonts > 1_500_000 || files.length > 150) throw new Error(`Published site budget exceeded: ${fonts} font bytes (limit 1500000), ${files.length} files (limit 150)`);
+  return { fonts, files: files.length };
+}
+
+function siteFiles(dir, base = dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const file = path.join(dir, e.name);
+    return e.isDirectory() ? siteFiles(file, base) : [{ file: path.relative(base, file), size: fs.statSync(file).size }];
+  });
+}
+
 function pack() {
   const pkgs = PACKAGES.map((p) => ({ dir: path.join(REPO, 'packages', p), pkg: readJson(path.join(REPO, 'packages', p, 'package.json')) }));
   const versions = new Set(pkgs.map((p) => p.pkg.version));
@@ -117,6 +142,7 @@ function pack() {
       for (const target of [...targets(pkg.exports), ...targets(pkg.bin)]) if (!fs.existsSync(path.join(out, 'package', target))) die(`${t.name} 的 ${target} 不在 tarball 里`);
       if (files.some((f) => /(^|\/)src\/.*\.tsx?$/.test(f.file) || f.file.startsWith('test/'))) die(`${t.name} 带上了源码或测试`);
       if (t.name === '@joplo-app/web' && !files.some((f) => f.file === 'dist/fonts/OFL.txt')) die('@joplo-app/web 缺少字体许可证 dist/fonts/OFL.txt');
+      if (t.name === '@joplo-app/web') checkWebBudget(fs.statSync(t.file).size, files);
       if (pkg.license === LICENSE_PLACEHOLDER) warnLicense = true;
       const total = files.reduce((s, f) => s + f.size, 0);
       log(`  ${t.name.padEnd(14)} ${path.basename(t.file).padEnd(26)} ${String(files.length).padStart(4)} 个文件  解包 ${kb(total).padStart(8)}  tarball ${kb(fs.statSync(t.file).size).padStart(8)}`);
@@ -281,6 +307,8 @@ async function smoke() {
     const css = fs.readdirSync(path.join(project, 'dist/assets')).filter((f) => f.endsWith('.css')).map((f) => fs.readFileSync(path.join(project, 'dist/assets', f), 'utf8')).join('\n');
     assert(/letter-spacing:\s*0?\.137em(?:[;}])/.test(css), '发布站 CSS 应包含作者 className（tracking-[0.137em]）');
     assert(fs.readdirSync(path.join(project, 'dist/assets')).some((f) => f.endsWith('.woff2')), '发布站应带手绘字体');
+    const budget = checkSiteBudget(siteFiles(path.join(project, 'dist')));
+    log(`  ✓ Published site budget: ${budget.fonts} font bytes / 1500000, ${budget.files} files / 150`);
 
     // 7. render：没有 Playwright 时只有 render 失败，并给出安装命令
     const render = sh(joplo, ['render', '--scenario-id', 'example.a.happy', '--out', 'shot.png'], project, { expect: 1 });

@@ -175,8 +175,8 @@ test.each([['free', false, true, false], ['pro', false, true, true], ['pro', tru
 });
 test('交互 share 自动登录后继续发布', async () => { expect((await cli(['share', project], { interactive: true })).code).toBe(0); expect(browser).toHaveBeenCalledOnce(); expect(calls.some(c => c.path.endsWith('/finalize'))).toBe(true); });
 test('白名单外文件与不安全路径在上传前列出并拒绝', async () => {
-  await credentials(); files = { ...files, 'assets/movie.mp4': 'video', 'assets/readme.txt': 'text', 'assets/a%20.png': 'png' };
-  const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(1); for (const name of ['movie.mp4', 'readme.txt', 'a%20.png']) expect(r.stdout).toContain(name); expect(calls).toEqual([]);
+  await credentials(); files = { ...files, 'assets/movie.mp4': 'video', 'assets/readme.bin': 'binary', 'assets/a%20.png': 'png' };
+  const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(1); for (const name of ['movie.mp4', 'readme.bin', 'a%20.png']) expect(r.stdout).toContain(name); expect(calls).toEqual([]);
 });
 test.each([[401, 'AUTH_EXPIRED'], [403, 'PLAN_REQUIRED'], [413, 'TOO_LARGE'], [429, 'QUOTA_EXCEEDED'], [426, 'CLIENT_OUTDATED'], [503, 'NETWORK']] as const)('share %s %s 使用结果信封且不回显服务端正文', async (status, code) => {
   await credentials(); fail = { path: '/api/v1/shares', status, code, ...(code === 'TOO_LARGE' ? { details: { kind: 'upload', maxBytes: 5, actualBytes: 6, largestFiles: [{ path: 'assets/site.css', size: 6 }] } } : {}) }; const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(code === 'AUTH_EXPIRED' ? 3 : 1); expect(r.json().error.code).toBe(code);
@@ -193,13 +193,15 @@ test('本地 check/build/dev/skill 不发云端请求', async () => {
   await cli(['build', project]); await cli(['dev', project]); await cli(['skill', 'publish']); await cli(['check', project]); expect(calls).toEqual([]); expect(fetchSpy).not.toHaveBeenCalled();
 });
 test('真实 examples/invite 免费 share：预置共用运行时后成功，MIME 全部符合白名单', async () => {
+  limits.maxUploadBytes = 1_000_000; // Still distinguish total bytes from newly uploaded bytes after font slimming.
   seedRuntime = true; await credentials(); await cp('examples/invite', project, { recursive: true }); await symlink(resolve('node_modules'), join(root, 'node_modules')); await writeFile(join(root, 'package.json'), '{"type":"module"}');
   missingCount = 9999; const r = await cli(['share', project, '--format=json'], { realBuild: true }); expect(r.code, r.stdout + r.stderr).toBe(0);
   const manifest = calls.find(c => c.path === '/api/v1/shares')!.body.files;
-  const allowed = ['text/html; charset=utf-8', 'text/css; charset=utf-8', 'text/javascript; charset=utf-8', 'application/json', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'font/woff2', 'font/woff', 'font/ttf'];
+  const allowed = ['text/html; charset=utf-8', 'text/css; charset=utf-8', 'text/javascript; charset=utf-8', 'text/plain; charset=utf-8', 'application/json', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'font/woff2', 'font/woff', 'font/ttf'];
   for (const file of manifest) expect(allowed).toContain(file.contentType);
   expect(manifest.reduce((n: number, f: any) => n + f.size, 0)).toBeGreaterThan(limits.maxUploadBytes);
-  expect(calls.filter(c => c.method === 'PUT')).toHaveLength(1);
+  expect(manifest.filter((f: any) => f.path.endsWith('.txt')).map((f: any) => f.path).sort()).toEqual(['fonts/OFL-MarkerGothic.txt', 'fonts/OFL.txt']);
+  expect(calls.filter(c => c.method === 'PUT')).toHaveLength(manifest.filter((f: any) => !f.path.startsWith('assets/')).length);
   expect(r.json().data.expiresAt).not.toBeNull();
 }, 120000);
 

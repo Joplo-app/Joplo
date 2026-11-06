@@ -22,6 +22,7 @@ import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
 import type { DistWeb, SourceWeb } from './web-assets.ts';
+import { subsetSiteFonts } from './site-fonts.ts';
 
 /** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。层级与镜头属于演示，保留（D43）。 */
 export function publishPayload(project: Project, home: string | null): { project: Record<string, unknown>; home: string | null } {
@@ -136,6 +137,9 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     fs.rmSync(siteHtml);
     for (const rel of inlined) fs.rmSync(path.join(staging, rel));
     fs.writeFileSync(path.join(staging, 'index.html'), html.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));
+
+    // D59: scan every staged text artifact, then retain only font subsets its content needs.
+    subsetSiteFonts(staging, web);
 
     // 4. 写入目标目录
     if (fs.existsSync(outDir)) fs.rmSync(outDir, { recursive: true, force: true });

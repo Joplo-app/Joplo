@@ -181,7 +181,7 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       sansSerif: "無襯線",
       fontSample: "Aa 01",
       serif: "襯線",
-      wenKai: "WenKai",
+      wenKai: "文楷（線上）",
       monospace: "等寬",
       handDrawn: "手繪",
       straight: "直線",

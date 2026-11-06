@@ -181,7 +181,7 @@ export function createBoardFr(locale: Locale = 'fr') {
       sansSerif: "Sans empattement",
       fontSample: "Aa 01",
       serif: "Avec empattement",
-      wenKai: "WenKai",
+      wenKai: "WenKai (en ligne)",
       monospace: "Chasse fixe",
       handDrawn: "Dessin à la main",
       straight: "Droit",

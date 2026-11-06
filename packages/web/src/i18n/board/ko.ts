@@ -181,7 +181,7 @@ export function createBoardKo(locale: Locale = 'ko') {
       sansSerif: "산세리프",
       fontSample: "Aa 01",
       serif: "세리프",
-      wenKai: "WenKai",
+      wenKai: "WenKai (온라인)",
       monospace: "고정폭",
       handDrawn: "손그림",
       straight: "직선",

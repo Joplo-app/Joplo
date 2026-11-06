@@ -34,10 +34,12 @@ pnpm release:publish --tag latest
 
 ## 构建、打包与冒烟
 
-- `pnpm release:pack`：按依赖顺序构建，清空并重建 release/，逐包打 tarball，检查版本、内部依赖、导出入口、源码泄漏与字体许可证。
-- `pnpm release:smoke`：包含 pack，再在仓库外的临时目录只用 tarball 安装并运行 init、check、skill、build、dev、selection；验证版本锁定、热更新、源码定位和无工作区路径泄漏，并检查缺少可选 Playwright 时 render 的提示。
+- `pnpm release:pack`：按依赖顺序构建，清空并重建 release/，逐包打 tarball，检查版本、内部依赖、导出入口、源码泄漏与字体许可证；`@joplo-app/web` tarball 超过 6,000,000 字节（6 MB）立即失败，并列出解包后最大的 5 个目录。
+- `pnpm release:smoke`：包含 pack，再在仓库外的临时目录只用 tarball 安装并运行 init、check、skill、build、dev、selection；验证版本锁定、热更新、源码定位和无工作区路径泄漏，并检查缺少可选 Playwright 时 render 的提示。init 示例 build 后，dist 字体总量不得超过 1,500,000 字节（1.5 MB），总文件数不得超过 150；任一超标即失败。
 - `pnpm release:smoke --keep`：保留临时目录，便于排查。冒烟安装第三方依赖需要网络或本地缓存，测试服务使用随机端口与独立 JOPLO_HOME。
 - 每个包的 prepublishOnly 会构建该包；发布前仍应完成整套 smoke，不能只凭单包构建成功判断可分发。
+
+2026-11-06 字体瘦身实测：web tarball 约 2.60 MB（原 27.22 MB），解包约 4.19 MB（原 29.06 MB）；init 示例发布站字体 1,068,596 字节、120 个文件。预算保留少量内容增长空间；新增语言或字体时仍须通过上述检查。
 
 实现以 [release.mjs](../scripts/release.mjs) 为准；根 [package.json](../package.json) 定义上述脚本。
 

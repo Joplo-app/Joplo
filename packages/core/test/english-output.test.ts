@@ -5,10 +5,7 @@ import ts from 'typescript';
 
 const root = resolve(import.meta.dirname, '../../..');
 const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef]/u;
-const whitelist = [
-  // Functional CJK font probe, never displayed or returned as a message.
-  ['packages/server/src/page-report.js', "'中文'", 'Probe Xiaolai glyph readiness when the stage is empty'],
-] as const;
+const whitelist: readonly (readonly [string, string, string])[] = [];
 
 // Read leaf tokens from the parser: comments/JSDoc are omitted, while strings,
 // templates, regular expressions, identifiers, and JSX text retain their positions.
@@ -42,7 +39,7 @@ test('comment removal preserves executable CJK and source line numbers', () => {
   expect(cjk.test(stripped)).toBe(true);
 });
 
-test('CLI, core, server, kit, and joplo entry output is English except the functional font probe', async () => {
+test('CLI, core, server, kit, and joplo entry output is English', async () => {
   const violations: string[] = [];
   const used = new Set<readonly string[]>();
   for (const dir of ['cli/src', 'core/src', 'server/src', 'kit/src', 'joplo/bin', 'joplo/lib']) {

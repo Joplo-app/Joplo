@@ -14,6 +14,7 @@ export const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf',
+  '.txt': 'text/plain; charset=utf-8',
 };
 type File = { path: string; sha256: string; size: number; contentType: string };
 const shareId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9]{10}$/.test(v);

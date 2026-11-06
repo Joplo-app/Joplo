@@ -27,6 +27,7 @@ import { ThemeStyles } from './renderer/ThemeStyles';
 import { cameraPosition } from './player/cameraFor';
 import { Subtitle } from './player/Subtitle';
 import { subtitleFor, type SubtitleContent } from './player/subtitle-content';
+import { waitForFonts } from './board/font-loading';
 
 type W = {
   __JOPLO_READY__?: boolean;
@@ -88,11 +89,14 @@ export function RenderApp() {
       if (!record) w.__JOPLO_STATE__ = data.state;
       await raf();
       {
-        // 手绘字体按需加载（主题可能用到）；等它们就绪再截图
-        const text = stage.innerText || i18n.board.english;
-        await Promise.all([document.fonts.load('16px "Joplo Excalifont"', text), document.fonts.load('16px "Joplo Xiaolai"', text)]).catch(() => undefined);
+        // Include future scenes/subtitles for video; read actual theme/appearance font stacks.
+        const text = JSON.stringify(data.project) + stage.innerText;
+        const fonts = new Set([stage, ...stage.querySelectorAll<HTMLElement>('*')].map((el) => {
+          const css = getComputedStyle(el);
+          return `${css.fontStyle} ${css.fontWeight} 16px ${css.fontFamily}`;
+        }));
+        await waitForFonts(document, font, [...fonts], text);
       }
-      await document.fonts.ready;
       while (registry.size > 0 && !cancelled) await new Promise<void>((r) => setTimeout(r, 20));
       // 镜头稳定（测量了若干帧）后再截图
       for (let i = 0; i < 100 && !cancelled; i++) {
@@ -108,7 +112,7 @@ export function RenderApp() {
     return () => {
       cancelled = true;
     };
-  }, [data, stage, registry, theme, record]);
+  }, [data, stage, registry, theme, font, stroke, record]);
 
   if (error) return <div style={{ padding: 24, color: '#c92a2a', fontFamily: 'system-ui' }} data-render-error="">{i18n.board.renderFailed}{translate(error, i18n)}</div>;
   if (!data) return null;

@@ -51,6 +51,7 @@ import { ThemeStyles } from '../renderer/ThemeStyles';
 import type { Look } from '../renderer/appearance';
 import { AppearanceButton, AppearancePopover } from './Appearance';
 import { effectiveAppearance } from './appearance-model';
+import { loadWenKai } from './font-loading';
 
 /**
  * 外观状态（D55）：已保存的外观（读取点）+ 悬停预览（不保存）。消费者拿到的是 look（预览优先）；
@@ -64,6 +65,7 @@ function useAppearance(projectId: string | null, configTheme: string, authorThem
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const catalog = useMemo(() => themeCatalog(authorThemes, i18n), [key, i18n]);
   const saved = effectiveAppearance(settings, projectId, configTheme, catalog.map((t) => t.name));
+  useEffect(() => { void loadWenKai(saved.font); }, [saved.font]);
   const [preview, setPreview] = useState<Look | null>(null);
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);

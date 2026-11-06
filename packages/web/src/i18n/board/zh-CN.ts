@@ -193,7 +193,7 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       sansSerif: "黑体",
       fontSample: "永 Aa",
       serif: "宋体",
-      wenKai: "文楷",
+      wenKai: "文楷（在线）",
       monospace: "等宽",
       handDrawn: "手绘",
       straight: "直线",

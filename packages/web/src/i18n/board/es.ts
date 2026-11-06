@@ -181,7 +181,7 @@ export function createBoardEs(locale: Locale = 'es') {
       sansSerif: "Sin serifa",
       fontSample: "Aa 01",
       serif: "Con serifa",
-      wenKai: "WenKai",
+      wenKai: "WenKai (en línea)",
       monospace: "Monoespaciada",
       handDrawn: "Dibujado a mano",
       straight: "Recto",

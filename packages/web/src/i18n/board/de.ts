@@ -181,7 +181,7 @@ export function createBoardDe(locale: Locale = 'de') {
       sansSerif: "Serifenlos",
       fontSample: "Aa 01",
       serif: "Mit Serifen",
-      wenKai: "WenKai",
+      wenKai: "WenKai (online)",
       monospace: "Nichtproportional",
       handDrawn: "Handgezeichnet",
       straight: "Gerade",
