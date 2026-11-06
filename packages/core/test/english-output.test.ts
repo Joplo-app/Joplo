@@ -7,6 +7,8 @@ const root = resolve(import.meta.dirname, '../../..');
 const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef]/u;
 const whitelist: readonly (readonly [string, string, string])[] = [
   ['packages/cli/src/cloud-embed.ts', "const LABEL = 'Joplo 演示';", 'Fixed label from the cloud embed contract, shared verbatim with the share Worker and console; it is embed content, not CLI interface text.'],
+  ['packages/core/src/agent-skill.ts', "const ZH_JOPLO = '功能原型、可交互演示、方案对比、给产品 / 设计 / 评审看的演示';", 'Chinese trigger keywords inside the agent skill description (D64); agents match them against Chinese requests, they are not CLI interface text.'],
+  ['packages/core/src/agent-skill.ts', "const ZH_FEEDBACK = '评审有结论了、按评审意见修改演示';", 'Chinese trigger keywords inside the joplo-feedback skill description (D64); matching text, not CLI interface text.'],
 ];
 
 // Read leaf tokens from the parser: comments/JSDoc are omitted, while strings,

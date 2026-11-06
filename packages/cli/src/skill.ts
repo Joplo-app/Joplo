@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { JoploError } from '@joplo-app/core';
+import { agentsBlock, agentSkills, JoploError, skillMarkdown } from '@joplo-app/core';
 
-const SKILL_PATH = '.claude/skills/joplo/SKILL.md';
+const SKILL_DIR = '.claude/skills';
 const START = '<!-- joplo:start -->';
 const END = '<!-- joplo:end -->';
 export type InstallSkillOptions = { force?: boolean; diff?: boolean; agentsMd?: boolean };
@@ -15,39 +15,35 @@ export async function readCliVersion(file = new URL('../package.json', import.me
   return metadata.version;
 }
 
-function pointer(version: string): Buffer {
-  const body = [
-    '---',
-    'name: joplo',
-    'description: Use to design feature prototypes, options, and demos in Joplo projects (with joplo.config.ts)',
-    '---',
-    'This project uses Joplo for feature prototypes. Read the relevant usage before writing:',
-    '- npx joplo skill authoring   Write pages, options, and scenarios',
-    '- npx joplo skill demo        Layers, shots, traces, and short captions',
-    '- npx joplo skill components  Available components and props',
-    '- npx joplo skill cases       Ask about relevant cases before starting',
-    'For other tasks, run npx joplo skill and choose check, selection, or publish.',
-    'After editing, run npx joplo check and fix issues at file:line.',
-    'After the user selects a board element, run npx joplo selection and edit only that location.',
-    '',
-  ].join('\n');
-  return Buffer.from(`${body}<!-- joplo-skill ${version} sha256:${hash(Buffer.from(body))} -->\n`);
+/**
+ * 官方技能（仓库 skills/）与 `skill install` 写进项目的技能共用这一份输出（D64）：
+ * 正文来自 core 的 agent-skill.ts，末尾加 `<!-- joplo-skill <版本> sha256:<正文哈希> -->`。
+ * 哈希让安装器分辨“没改过的旧生成内容”（可自动更新）与“用户改过”（需 --force）。
+ */
+export function skillFiles(version: string): { name: string; path: string; content: Buffer }[] {
+  return agentSkills().map(skill => {
+    const body = Buffer.from(skillMarkdown(skill));
+    return { name: skill.name, path: `${skill.name}/SKILL.md`, content: Buffer.concat([body, Buffer.from(`<!-- joplo-skill ${version} sha256:${hash(body)} -->\n`)]) };
+  });
 }
 const hash = (body: Buffer) => createHash('sha256').update(body).digest('hex');
+const MARKER = /<!-- joplo-skill ([^\s]+) sha256:([a-f0-9]{64}) -->\n$/;
 function untouched(content: Buffer): boolean {
   const text = content.toString('utf8');
-  const marker = /<!-- joplo-skill [^\s]+ sha256:([a-f0-9]{64}) -->\n$/.exec(text);
+  const marker = MARKER.exec(text);
   if (!marker || marker.index === 0 || text[marker.index - 1] !== '\n') return false;
   const offset = content.length - Buffer.byteLength(text.slice(marker.index));
-  return hash(content.subarray(0, offset)) === marker[1];
+  return hash(content.subarray(0, offset)) === marker[2];
 }
+/** 文件末尾版本标记里的版本（没有标记时为 null）。 */
+const markerVersion = (content: Buffer | null) => (content ? MARKER.exec(content.toString('utf8'))?.[1] ?? null : null);
 async function optionalFile(path: string): Promise<Buffer | null> {
   try { return await readFile(path); }
   catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null; throw e; }
 }
 
 function agentsContent(current: Buffer | null): Buffer {
-  const block = Buffer.from(`${START}\n## Joplo\nWhen designing feature prototypes in a project with joplo.config.ts, run npx joplo skill, then read the relevant topics.\nRead npx joplo skill authoring for pages/options/scenarios, components for components, and cases for questions before starting.\nRead npx joplo skill demo for layers, shots, traces, and captions.\nAfter editing, run npx joplo check. After a board selection, run npx joplo selection and edit only that location.\n${END}`);
+  const block = Buffer.from(`${START}\n${agentsBlock()}\n${END}`);
   if (current === null) return Buffer.concat([block, Buffer.from('\n')]);
   const start = current.indexOf(START), end = current.indexOf(END);
   if (start === -1 && end === -1) return Buffer.concat([current, Buffer.from(current.length ? current.at(-1) === 10 ? '\n' : '\n\n' : ''), block, Buffer.from('\n')]);
@@ -62,20 +58,28 @@ export async function installSkill(dir: string, version: string, options: Instal
   try { await access(join(root, 'joplo.config.ts')); }
   catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
-    lines.push('Warning: No joplo.config.ts in this directory; installing the Joplo usage pointer anyway.');
+    lines.push('Warning: No joplo.config.ts in this directory; installing the Joplo skills anyway.');
   }
-  const path = join(root, SKILL_PATH);
-  const current = await optionalFile(path);
-  const next = pointer(version);
-  // 用户修改保护先于所有写入，AGENTS.md 也不会被部分更新。
-  if (!options.diff && !options.force && current !== null && !untouched(current)) return {
+  const skills = await Promise.all(skillFiles(version).map(async file => {
+    const name = `${SKILL_DIR}/${file.path}`, path = join(root, name);
+    return { name, path, current: await optionalFile(path), next: file.content, skill: true };
+  }));
+  // 用户修改保护先于所有写入：任何一个技能被改过都不写任何文件（AGENTS.md 也不会被部分更新）。
+  const modified = skills.filter(file => file.current !== null && !untouched(file.current));
+  if (!options.diff && !options.force && modified.length) return {
     code: 1,
-    output: [...lines, `${SKILL_PATH} exists and has been modified; it was not overwritten.`, `View diff: npx joplo skill install ${displayDir(dir)}--diff`, `Overwrite: npx joplo skill install ${displayDir(dir)}--force`, ''].join('\n'),
+    output: [
+      ...lines,
+      ...modified.map(file => `${file.name} exists and has been modified${markerVersion(file.current) ? ` since Joplo ${markerVersion(file.current)} wrote it` : ''}; it was not overwritten.`),
+      `View the diff first: npx joplo skill install ${displayDir(dir)}--diff`,
+      `Then overwrite: npx joplo skill install ${displayDir(dir)}--force`,
+      '',
+    ].join('\n'),
   };
   const agentsPath = join(root, 'AGENTS.md');
   const agents = await optionalFile(agentsPath);
-  const planned = [{ name: SKILL_PATH, path, current, next }];
-  if (agents !== null || options.agentsMd) planned.push({ name: 'AGENTS.md', path: agentsPath, current: agents, next: agentsContent(agents) });
+  const planned = [...skills];
+  if (agents !== null || options.agentsMd) planned.push({ name: 'AGENTS.md', path: agentsPath, current: agents, next: agentsContent(agents), skill: false });
   const changed = planned.filter(file => file.current === null || !file.current.equals(file.next));
   if (options.diff) {
     for (const file of changed) lines.push(unifiedDiff(file.name, file.current, file.next));
@@ -89,10 +93,12 @@ export async function installSkill(dir: string, version: string, options: Instal
     for (const file of changed) {
       await mkdir(dirname(file.path), { recursive: true });
       await writeFile(file.path, file.next, { flag: file.current === null ? 'wx' : 'w' });
-      lines.push(`Wrote ${file.name}${file.name === SKILL_PATH ? ' (usage pointer only)' : ' (Joplo managed block only)'}`);
+      const from = file.skill ? markerVersion(file.current) : null;
+      const what = file.skill ? 'Joplo skill; details come from npx joplo skill <topic>' : 'Joplo managed block only';
+      lines.push(`Wrote ${file.name} (${what})${from && from !== version ? `, updated from ${from} to ${version}` : ''}`);
     }
     if (!changed.length) lines.push('Already up to date');
-    else lines.push('Tip: Commit the usage pointer to Git so agents can discover it.');
+    else lines.push(`Tip: Commit ${SKILL_DIR}/joplo*/SKILL.md to Git so agents can discover them.`);
   }
   return { code: 0, output: lines.join('\n') + '\n' };
 }

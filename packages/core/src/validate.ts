@@ -3,6 +3,7 @@ import { Project, type SceneNode } from './schema.ts';
 import { CAPTION_MAX, EXPLAIN_MAX, INTERACTIVE_TYPES, captionLength } from './catalog.ts';
 import { walkNodes, findNode, replay } from './player.ts';
 import { JoploError, type Diagnostic } from './result.ts';
+import { schemaDiagnostics } from './schema-issues.ts';
 
 export type ValidationOptions = { optionId?: string; mode: 'structure' | 'replay' | 'all' };
 export type ValidationReport = {
@@ -33,17 +34,8 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
   } });
   const parsed = Project.safeParse(project);
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      let value: unknown = project;
-      let at: string | undefined;
-      for (const key of issue.path) {
-        if (value && typeof value === 'object') {
-          if ('source' in value && typeof value.source === 'string') at = value.source;
-          value = (value as Record<PropertyKey, unknown>)[key];
-        } else break;
-      }
-      emit('error', 'INVALID_SCHEMA', `${issue.path.join('.') || 'project'}: ${issue.message}`, at, undefined, 'schema');
-    }
+    // 与编译器同一套：定位到最近的作者元素，同一根因合并成一条（schema-issues.ts）
+    for (const d of schemaDiagnostics(project, parsed.error.issues)) diagnostics.push({ ...d, at: d.at ?? 'joplo.config.ts:1:1' });
     return report();
   }
   const p = parsed.data;

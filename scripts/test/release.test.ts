@@ -1,7 +1,7 @@
 /**
  * 发布脚本（不触网、不发布）：统一改版本、各包 package.json 的发布配置。
  */
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -90,6 +90,8 @@ describe('release:version', () => {
     expect(r.status, r.stderr).toBe(0);
     for (const p of PACKAGES) expect(read(path.join(d, 'packages', p, 'package.json')).version).toBe('0.3.0-beta.1');
     expect(read(path.join(d, 'package.json')).version).toBeUndefined();
+    // 官方技能随版本重新生成（D64）
+    for (const name of ['joplo', 'joplo-feedback']) expect(fs.readFileSync(path.join(d, 'skills', name, 'SKILL.md'), 'utf8')).toMatch(/<!-- joplo-skill 0\.3\.0-beta\.1 sha256:[a-f0-9]{64} -->\n$/);
   });
 
   test.each([[[]], [['v1']], [['1.2']], [['1.2.3.4']], [['latest']]])('非法版本 %j 被拒绝，不改任何文件', (args) => {
@@ -98,5 +100,63 @@ describe('release:version', () => {
     const r = run(['version', ...args, '--root', d]);
     expect(r.status).not.toBe(0);
     expect(PACKAGES.map((p) => fs.readFileSync(path.join(d, 'packages', p, 'package.json'), 'utf8'))).toEqual(before);
+  });
+});
+
+describe('release:verify（发布之后必跑；registry 与 npx 用替身）', () => {
+  const names = ['@joplo-app/kit', '@joplo-app/core', '@joplo-app/web', '@joplo-app/server', '@joplo-app/cli', 'joplo'];
+  async function verify(opts: Record<string, unknown>) {
+    // @ts-expect-error release script is an untyped ESM module
+    const { verifyRelease } = await import('../release.mjs');
+    const logs: string[] = [], errors: string[] = [];
+    const sleep = vi.fn(async () => {});
+    const r = await verifyRelease({ root: copyManifests(), version: '0.2.4', sleep, attempts: 3, delayMs: 5, log: (m: string) => logs.push(m), error: (m: string) => errors.push(m), ...opts });
+    return { r, logs, errors, sleep };
+  }
+  test('全部都在 registry 上时实际安装一次 joplo@<版本>，通过', async () => {
+    const view = vi.fn(async (_name: string, v: string) => v);
+    const install = vi.fn(async () => ({ ok: true, output: 'Usage: joplo' }));
+    const { r, errors } = await verify({ view, install });
+    expect(r).toMatchObject({ ok: true, version: '0.2.4', missing: [] });
+    expect(view.mock.calls.map(c => c[0])).toEqual(names);
+    expect(install).toHaveBeenCalledExactlyOnceWith('0.2.4');
+    expect(errors).toEqual([]);
+  });
+  test('registry 有延迟：先查不到、重试后出现，算通过', async () => {
+    let n = 0;
+    const view = vi.fn(async (name: string, v: string) => (name === '@joplo-app/core' && n++ < 2 ? null : v));
+    const { r, sleep } = await verify({ view, install: async () => ({ ok: true, output: '' }) });
+    expect(r.ok).toBe(true);
+    expect(sleep).toHaveBeenCalledTimes(2);
+  });
+  test('漏发一个包（0.2.4 的 core）：重试用完后列出缺的包，不安装，提示用 release:publish 重跑', async () => {
+    const view = vi.fn(async (name: string, v: string) => (name === '@joplo-app/core' ? null : v));
+    const install = vi.fn();
+    const { r, errors } = await verify({ view, install });
+    expect(r).toMatchObject({ ok: false, missing: ['@joplo-app/core'] });
+    expect(view.mock.calls.filter(c => c[0] === '@joplo-app/core')).toHaveLength(3);
+    expect(install).not.toHaveBeenCalled();
+    expect(errors.join('\n')).toContain('@joplo-app/core@0.2.4');
+    expect(errors.join('\n')).toContain('pnpm release:publish');
+  });
+  test('registry 都在但 npx 安装失败：从 npm 输出里找出缺的包，非 0', async () => {
+    const output = 'npm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/@joplo-app%2fcore - Not found\nnpm error 404  \'@joplo-app/core@0.2.4\' is not in this registry.';
+    const { r, errors } = await verify({ view: async (_: string, v: string) => v, install: async () => ({ ok: false, output }) });
+    expect(r).toMatchObject({ ok: false, missing: ['@joplo-app/core'] });
+    expect(errors.join('\n')).toContain('npx -y joplo@0.2.4 --help');
+    expect(errors.join('\n')).toContain('pnpm release:publish');
+  });
+  test('命令行入口：缺包时以非 0 退出（不触网的参数错误路径）', () => {
+    const r = run(['verify', 'not-a-version']);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain('release:verify');
+  });
+  test('missingFromInstallOutput 不把 @joplo-app/… 误认成 joplo', async () => {
+    // @ts-expect-error release script is an untyped ESM module
+    const { missingFromInstallOutput } = await import('../release.mjs');
+    expect(missingFromInstallOutput('npm error 404 Not Found - GET https://registry.npmjs.org/@joplo-app%2fcli - Not found', names)).toEqual(['@joplo-app/cli']);
+    expect(missingFromInstallOutput('npm error 404 Not Found - GET https://registry.npmjs.org/joplo - Not found', names)).toEqual(['joplo']);
+    expect(missingFromInstallOutput('npm error notarget No matching version found for @joplo-app/kit@0.2.4.', names)).toEqual(['@joplo-app/kit']);
+    expect(missingFromInstallOutput('npm error network ETIMEDOUT', names)).toEqual([]);
   });
 });

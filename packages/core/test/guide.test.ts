@@ -65,8 +65,8 @@ test('demo 集中解释层级、镜头和调用链，authoring 只指向它', ()
   expect(authoring).toContain('demo');
   for (const text of ['shot(', 'trace(', 'explain(', '<Diagram', 'CAPTION_TOO_LONG', 'Viewpoint layers and director shots']) expect(authoring).not.toContain(text);
 });
-test('check 覆盖 compile.ts / validate.ts 中全部静态诊断代码，避免新增诊断未同步说明', async () => {
-  const files = ['compile.ts', 'validate.ts'];
+test('check 覆盖 compile.ts / validate.ts / schema-issues.ts 中全部静态诊断代码，避免新增诊断未同步说明', async () => {
+  const files = ['compile.ts', 'validate.ts', 'schema-issues.ts'];
   const codes = new Set<string>();
   for (const file of files) {
     const content = await readFile(new URL(`../src/${file}`, import.meta.url), 'utf8');
@@ -77,13 +77,17 @@ test('check 覆盖 compile.ts / validate.ts 中全部静态诊断代码，避免
         if (['err', 'warn'].includes(node.expression.text)) code = node.arguments[0];
         else if (node.expression.text === 'emit') code = node.arguments[1];
       } else if (ts.isPropertyAssignment(node) && (ts.isIdentifier(node.name) || ts.isStringLiteralLike(node.name)) && node.name.text === 'code') code = node.initializer;
-      if (code && ts.isStringLiteralLike(code) && /^[A-Z][A-Z0-9_]+$/.test(code.text)) codes.add(code.text);
+      else if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === 'code') code = node.initializer;
+      // const code = cond ? 'A' : 'B'：两个分支都算
+      const literals = code && ts.isConditionalExpression(code) ? [code.whenTrue, code.whenFalse] : code ? [code] : [];
+      for (const literal of literals) if (ts.isStringLiteralLike(literal) && /^[A-Z][A-Z0-9_]+$/.test(literal.text)) codes.add(literal.text);
       ts.forEachChild(node, visit);
     };
     visit(source);
   }
   expect(codes).toContain('SHOT_UNKNOWN');
   expect(codes).toContain('INVALID_SCHEMA');
+  expect(codes).toContain('INVALID_CONDITION');
   expect(codes).toContain('CAPTION_TOO_LONG');
   const documented = new Set(skillTopic('check').match(/\b[A-Z]+(?:_[A-Z]+)+\b/g));
   expect([...codes].filter(code => !documented.has(code)).sort()).toEqual([]);

@@ -44,20 +44,47 @@ test('版本读取支持升级后的 package.json，不写死', async () => {
 test.each([['authring', 'authoring'], ['componets', 'components'], ['selction', 'selection'], ['publsh', 'publish'], ['CHECK', 'check']])('未知主题 %s 给出最近的 %s，退出 2', async (input, suggestion) => {
   const r = await run(['skill', input]); expect(r.code).toBe(2); expect(r.stdout).toContain(suggestion); expect(r.stdout).toContain('npx joplo skill');
 });
-test('安装短指针、真实哈希，重复运行字节和 mtime 均不变', async () => {
+const feedbackPath = (dir: string) => join(dir, '.claude/skills/joplo-feedback/SKILL.md');
+test('安装与官方技能同源的两个技能（真实哈希），重复运行字节和 mtime 均不变', async () => {
   const dir = await temp(); const r = await run(['skill', 'install', dir]); expect(r.code).toBe(0);
   const content = await readFile(skillPath(dir), 'utf8');
-  expect(content.trimEnd().split('\n').length).toBeLessThanOrEqual(20);
-  expect(content).toContain('name: joplo');
-  expect(content).toContain('description: Use to design feature prototypes, options, and demos in Joplo projects (with joplo.config.ts)');
-  expect(content).toContain('npx joplo skill demo'); expect(content).toContain('npx joplo skill authoring'); expect(content).toContain('npx joplo check'); expect(content).toContain('npx joplo selection');
+  expect(content.trimEnd().split('\n').length).toBeLessThanOrEqual(60);
+  expect(content).toContain('name: joplo\n');
+  expect(content).toMatch(/^description: Build clickable, replayable feature demos with Joplo/m);
+  // 心智模型、起步顺序、常见坑都在，细节指向主题
+  for (const s of ['player for pre-declared scenarios', 'error-and-recovery', 'Common pitfalls', 'npx joplo skill demo', 'npx joplo skill authoring', 'npx joplo check', 'npx joplo selection']) expect(content, s).toContain(s);
   const match = /<!-- joplo-skill ([^ ]+) sha256:([a-f0-9]{64}) -->\n$/.exec(content)!;
   expect(match).not.toBeNull(); expect(match[1]).toBe(await readCliVersion());
   expect(match[2]).toBe(createHash('sha256').update(content.slice(0, match.index)).digest('hex'));
+  // 与仓库 skills/ 下提交的官方技能逐字相同（同一个 skillFiles）
+  const repo = new URL('../../../skills/', import.meta.url);
+  expect(content).toBe(await readFile(new URL('joplo/SKILL.md', repo), 'utf8'));
+  expect(await readFile(feedbackPath(dir), 'utf8')).toBe(await readFile(new URL('joplo-feedback/SKILL.md', repo), 'utf8'));
+  expect(r.stdout).toContain('Wrote .claude/skills/joplo/SKILL.md'); expect(r.stdout).toContain('Wrote .claude/skills/joplo-feedback/SKILL.md');
   const before = await stat(skillPath(dir));
   const second = await run(['skill', 'install', dir]); expect(second.code).toBe(0); expect(second.stdout).toContain('Already up to date');
   expect(await readFile(skillPath(dir), 'utf8')).toBe(content); expect((await stat(skillPath(dir))).mtimeMs).toBe(before.mtimeMs);
   await expect(stat(join(dir, 'AGENTS.md'))).rejects.toMatchObject({ code: 'ENOENT' });
+});
+test('旧版本标记、未修改的指针（0.2.4 及更早写的）自动更新并说明从哪个版本更新；改过的 feedback 技能同样受保护', async () => {
+  const dir = await temp(); await mkdir(join(dir, '.claude/skills/joplo'), { recursive: true });
+  // 0.2.4 的 skill install 原样写出的短指针
+  const body = ['---', 'name: joplo', 'description: Use to design feature prototypes, options, and demos in Joplo projects (with joplo.config.ts)', '---', 'This project uses Joplo for feature prototypes. Read the relevant usage before writing:', '- npx joplo skill authoring   Write pages, options, and scenarios', 'After editing, run npx joplo check and fix issues at file:line.', ''].join('\n');
+  await writeFile(skillPath(dir), body + `<!-- joplo-skill 0.2.3 sha256:${createHash('sha256').update(body).digest('hex')} -->\n`);
+  const r = await run(['skill', 'install', dir]); expect(r.code).toBe(0);
+  expect(r.stdout).toMatch(new RegExp(`Wrote \\.claude/skills/joplo/SKILL\\.md .*updated from 0\\.2\\.3 to ${(await readCliVersion()).replace(/\./g, '\\.')}`));
+  expect(await readFile(skillPath(dir), 'utf8')).toContain('player for pre-declared scenarios');
+  // 改过 joplo-feedback：两个文件都不写，提示先 --diff 再 --force
+  await writeFile(feedbackPath(dir), (await readFile(feedbackPath(dir), 'utf8')).replace('npx joplo check', 'my check'));
+  const before = await readFile(skillPath(dir), 'utf8');
+  const blocked = await run(['skill', 'install', dir]); expect(blocked.code).toBe(1);
+  expect(blocked.stdout).toContain('.claude/skills/joplo-feedback/SKILL.md exists and has been modified since Joplo');
+  expect(blocked.stdout.indexOf('--diff')).toBeLessThan(blocked.stdout.indexOf('--force'));
+  expect(blocked.stdout).not.toContain('Wrote');
+  expect(blocked.stdout).not.toContain('.claude/skills/joplo/SKILL.md exists');
+  expect(await readFile(skillPath(dir), 'utf8')).toBe(before);
+  const forced = await run(['skill', 'install', dir, '--force']); expect(forced.code).toBe(0);
+  expect(await readFile(feedbackPath(dir), 'utf8')).toContain('npx joplo check');
 });
 test.each(['正文修改', 'frontmatter', '末尾追加', '无标记'])('用户改过的 %s 永不自动覆盖，--force 才覆盖', async kind => {
   const dir = await temp(); await run(['skill', 'install', dir]);

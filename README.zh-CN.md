@@ -36,6 +36,22 @@ npx joplo dev --open
 
 ## 与 Agent 配合
 
+### 安装 Agent 技能
+
+有两种方式给编码 Agent（Claude Code、Codex 等）装上 Joplo 的技能 `joplo`（做演示）与 `joplo-feedback`（按评审结论改源码），两者由同一份模板生成、内容相同：
+
+```sh
+npx skills add Joplo-app/Joplo           # 本仓库的官方技能；任何仓库都能用，装 Joplo 之前也行
+npx skills add Joplo-app/Joplo@v0.2.4    # 固定到某个发布 tag
+npx joplo skill install                  # 在 Joplo 项目里：与项目安装的版本一致
+```
+
+- 想让 Agent 在任何仓库里都能发现 Joplo（例如从零开始做一个原型），用 `npx skills add`。[skills CLI](https://github.com/vercel-labs/skills) 会装到 Claude Code 的 `.claude/skills/` 和 Codex 的 `.agents/skills/`。
+- 已经有 `joplo.config.ts` 的项目，用 `npx joplo skill install`：写入 `.claude/skills/joplo*/SKILL.md`，升级 Joplo 后自动更新没改过的文件，不覆盖你改过的文件（`--diff` 看差异、`--force` 覆盖），加 `--agents-md` 还会在 `AGENTS.md` 里写一段托管说明。
+- 技能故意很薄：只有心智模型、起步顺序和最常见的坑；具体 API 一律以 `npx joplo skill <主题>` 为准（与安装的版本一致）。
+
+### 按需读取用法
+
 只读取当前任务需要的用法：
 
 ```sh
@@ -46,7 +62,7 @@ npx joplo skill demo
 npx joplo skill install --agents-md
 ```
 
-七个主题为 `authoring`、`demo`、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。安装命令为 Agent 写入短指针，并保护用户改过的技能文件。`guide` 是 `skill authoring` 的别名。
+七个主题为 `authoring`、`demo`、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
 
 看板运行时，在另一个终端执行：
 

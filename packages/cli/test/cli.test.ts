@@ -114,3 +114,36 @@ test.each([
   const d = await temp(); const r = await cli([args[0]!, ...(args[0] === 'check' ? [d] : []), ...args.slice(1)]);
   expect(r.code, r.stdout + r.stderr).toBe(2);
 });
+
+test.each([['true', 'true'], ['false', 'false'], ["'code' as any", '"code"']])('when={%s} 普通值：一条 INVALID_CONDITION，指向作者源码行，合并多处画面并计 1 条', async (value, shown) => {
+  const d = await temp();
+  const text = await edit(d, option, s => s.replace('<Alert id="alert_denied" color="gray" when={not($.ui.isAdmin)}>', `<Alert id="alert_denied" color="gray" when={${value}}>`));
+  const line = at(text, '<Alert id="alert_denied"');
+  const r = await cli(['check', d, '--format', 'json']);
+  expect(r.code, r.stdout).toBe(1);
+  const out = JSON.parse(r.stdout);
+  const ds = out.diagnostics.filter((x: { code: string }) => x.code === 'INVALID_CONDITION' || x.code === 'INVALID_SCHEMA');
+  expect(ds, r.stdout).toHaveLength(1);
+  const [diag] = ds;
+  expect(diag).toMatchObject({ severity: 'error', code: 'INVALID_CONDITION', source: 'schema', at: expect.stringMatching(new RegExp(`^${option}:${line}:`)) });
+  expect(diag.message).toContain(`when received a plain`);
+  expect(diag.message).toContain(shown);
+  expect(diag.message).toContain("eq($.ui.mode, 'code')");
+  expect(diag.message).toMatch(/\(affects 2 views\)$/);
+  expect(diag.affects).toHaveLength(2);
+  expect(out.data.summary.error).toBe(1);
+  const text2 = await cli(['check', d]);
+  expect(text2.stdout).toMatch(new RegExp(`^${option}:${line}:\\d+  error  INVALID_CONDITION  <Alert> when received a plain`, 'm'));
+  expect(text2.stdout).not.toContain('joplo.config.ts:1:1');
+  expect(text2.stdout).toMatch(/^1 error, /m);
+});
+test('其他结构错误也指向作者元素并合并（不是 joplo.config.ts:1:1）', async () => {
+  const d = await temp();
+  const text = await edit(d, option, s => s.replace('<Alert id="alert_denied" color="gray" when={not($.ui.isAdmin)}>', '<Alert id="alert_denied" color="gray" when={{ truthy: 1 } as any}>'));
+  const line = at(text, '<Alert id="alert_denied"');
+  const r = await cli(['check', d, '--format', 'json']);
+  const ds = JSON.parse(r.stdout).diagnostics.filter((x: { code: string }) => x.code === 'INVALID_SCHEMA');
+  expect(ds.length, r.stdout).toBeGreaterThanOrEqual(1);
+  for (const x of ds) { expect(x.at).toMatch(new RegExp(`^${option}:${line}:`)); expect(x.message).toMatch(/^<Alert> when/); }
+  expect(new Set(ds.map((x: { message: string }) => x.message)).size).toBe(ds.length);
+});

@@ -14,11 +14,13 @@
     "web:build": "pnpm --filter @joplo-app/web build",
     "web:serve": "tsx packages/server/scripts/serve.ts",
     "docs:screenshots": "tsx packages/server/scripts/render-docs.ts",
+    "skills:build": "tsx scripts/build-skills.ts",
     "build:packages": "pnpm -r --filter \"./packages/*\" run build",
     "release:version": "node scripts/release.mjs version",
     "release:pack": "node scripts/release.mjs pack",
     "release:smoke": "node scripts/release.mjs smoke",
-    "release:publish": "node scripts/release.mjs publish"
+    "release:publish": "node scripts/release.mjs publish",
+    "release:verify": "node scripts/release.mjs verify"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

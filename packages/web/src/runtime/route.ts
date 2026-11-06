@@ -90,3 +90,28 @@ export function siteHash(r: SiteRoute): string {
 }
 
 export const samePlay = (a: PlayRoute, b: PlayRoute) => playQuery(a) === playQuery(b) && a.featureId === b.featureId;
+
+/** 演示页 hash 查询里认识的参数（parsePlay 读取的全部）。 */
+export const PLAY_PARAMS = ['o', 'c', 's', 'step', 'l', 'speed'] as const;
+
+/** 演示页 hash 查询里不认识的参数名（去重、按出现顺序）；不是演示页或没有查询时为空。 */
+export function unknownPlayParams(hash: string): string[] {
+  const { query } = split(hash);
+  if (!query) return [];
+  const known = new Set<string>(PLAY_PARAMS);
+  return [...new Set([...new URLSearchParams(query).keys()].filter((k) => !known.has(k)))];
+}
+
+/**
+ * 开发模式的提示（看板，以及在本机预览的发布站）：深链接里写错的参数（例如 layer= 应为 l=）会被静默忽略，
+ * 这里在控制台说明一次。只是提示，不改变解析和播放；返回是否输出了提示。
+ */
+export function warnUnknownPlayParams(hash: string, warn: (message: string) => void = console.warn): boolean {
+  const unknown = unknownPlayParams(hash);
+  if (!unknown.length) return false;
+  warn(`Joplo: ignored URL parameter${unknown.length > 1 ? 's' : ''} ${unknown.map((k) => `"${k}"`).join(', ')}. Deep links use o=<option id>, c=<case id>, s=<scenario id>, step=<n>, l=<layer key>, speed=0.5|1.5 (see npx joplo skill demo).`);
+  return true;
+}
+
+/** 发布站只在本机预览时（localhost / 127.0.0.1 / ::1）算开发模式。 */
+export const isLocalHost = (hostname: string) => hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';

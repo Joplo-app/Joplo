@@ -1,16 +1,17 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { openSync, closeSync } from 'node:fs';
+import { closeSync, existsSync, openSync } from 'node:fs';
 import { trackTemporary } from './cloud-cleanup.ts';
 import { chmod, mkdir, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { createInterface } from 'node:readline/promises';
 import { JoploError } from '@joplo-app/core';
 import type { checkWithProject } from './check.ts';
 import type { PrDependencies } from './cloud-pr.ts';
 import { CloudError, sizeError, terminalText, type CloudCode, type SizeDetails } from './cloud-error.ts';
+import { alignCommand, detectPackageManager, pmCommands } from './pm.ts';
 
 export type Credentials = { server: string; accessToken: string; user: { id: string; email: string }; createdAt: string };
 /** 一次云端调用用的令牌：设备会话（credentials.json）或环境变量 JOPLO_API_KEY（契约 8.4）。 */
@@ -157,6 +158,22 @@ function quotaError(value: unknown): CloudError {
   return new CloudError('QUOTA_EXCEEDED', `${label} limit reached${limit === undefined ? '' : ` (limit ${limit}${actual === undefined ? '' : `, actual ${actual}`})`}. ${retryAt ? `Retry at: ${retryAt}` : 'Try again later'}`, details);
 }
 
+/**
+ * CLIENT_OUTDATED 的修法取决于启动器会用哪个版本（packages/joplo/lib/main.cjs）：
+ * cwd 向上的项目 node_modules 里有 joplo 或 @joplo-app/cli 时，启动器优先用项目版本，npx joplo@latest 也会被顶替，
+ * 所以要在项目里把 joplo 与 @joplo-app/kit 升到同一版本；不在项目里时才建议 npx joplo@latest。
+ */
+export function clientOutdatedMessage(cwd: string = process.cwd(), env: Record<string, string | undefined> = process.env): string {
+  let project: string | null = null;
+  for (let dir = resolve(cwd); ; dir = dirname(dir)) {
+    if (existsSync(join(dir, 'node_modules/joplo/package.json')) || existsSync(join(dir, 'node_modules/@joplo-app/cli/package.json'))) { project = dir; break; }
+    if (dirname(dir) === dir) break;
+  }
+  if (!project) return 'This Joplo CLI is too old for the cloud. Run the latest: npx joplo@latest share';
+  const pm = detectPackageManager(env, project);
+  return `This project's Joplo is too old for the cloud. Upgrade both packages to the same new version in the project: ${alignCommand(pm, 'latest')}, then ${pmCommands(pm).run} share`;
+}
+
 /** 只有网络异常和 5xx 归为 NETWORK，不能被远端响应体改写成其他类别。 */
 function responseCode(status: number, supplied: unknown, authenticated: boolean): CloudCode {
   if (status >= 500 && status <= 599) return 'NETWORK';
@@ -283,7 +300,8 @@ export class CloudClient {
       }
       const apiKey = !!token && token.startsWith('jpk_');
       if (apiKey && code === 'AUTH_EXPIRED') throw new CloudError(code, `The API key ${apiKeyPrefix(token)}… is invalid, expired, or revoked. ${API_KEY_FIX}: ${this.server}/settings/api-keys`, { fix: `${this.server}/settings/api-keys` });
-      if (code === 'PLAN_REQUIRED') throw new CloudError(code, `This action requires Pro: ${this.server}/billing`);
+      if (code === 'PLAN_REQUIRED') throw new CloudError(code, `This action requires Pro: ${this.server}/settings/billing`);
+      if (code === 'CLIENT_OUTDATED') throw new CloudError(code, clientOutdatedMessage(process.cwd(), this.env), undefined, undefined, response.status);
       if (code === 'QUOTA_EXCEEDED') throw quotaError(data.data ?? data.details);
       if (code === 'TOO_LARGE') {
         const details = readSizeDetails(data.data ?? data.details, token);

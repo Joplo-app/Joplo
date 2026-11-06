@@ -36,6 +36,22 @@ Keep the Board process running. Edit the generated TSX files and watch the demo 
 
 ## Work with an agent
 
+### Install the agent skills
+
+Two ways to give a coding agent (Claude Code, Codex, …) the Joplo skills `joplo` (build demos) and `joplo-feedback` (apply review results). Both install the same files from one template:
+
+```sh
+npx skills add Joplo-app/Joplo           # official skills from this repo; any repo, even before Joplo is installed
+npx skills add Joplo-app/Joplo@v0.2.4    # pin to a release tag
+npx joplo skill install                  # inside a Joplo project: skills matching the project's installed version
+```
+
+- Use `npx skills add` when you want agents to discover Joplo in any repository, for example to start a new prototype. The [skills CLI](https://github.com/vercel-labs/skills) installs to `.claude/skills/` for Claude Code and `.agents/skills/` for Codex.
+- Use `npx joplo skill install` inside a project that already has `joplo.config.ts`. It writes `.claude/skills/joplo*/SKILL.md`, updates untouched files when Joplo is upgraded, never overwrites files you edited (`--diff` to compare, `--force` to replace), and with `--agents-md` also writes a managed block into `AGENTS.md`.
+- The skills are thin on purpose: a mental model, the start order, and common pitfalls. The detailed API always comes from `npx joplo skill <topic>`, which matches the installed version.
+
+### Read guidance on demand
+
 Read only the guidance the current task needs:
 
 ```sh
@@ -46,7 +62,7 @@ npx joplo skill demo
 npx joplo skill install --agents-md
 ```
 
-The seven topics are `authoring`, `demo`, `components`, `cases`, `check`, `selection`, and `publish`. Each is under 150 lines. Installation adds a short pointer for agents; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
+The seven topics are `authoring`, `demo`, `components`, `cases`, `check`, `selection`, and `publish`. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
 
 Use a second terminal while the Board is running:
 

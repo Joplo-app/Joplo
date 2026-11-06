@@ -29,6 +29,8 @@ export type Diagnostic = {
   ref?: { kind: string; id: string; optionId?: string; scenarioId?: string; stepId?: string; path?: string };
   /** 源文件位置 `相对路径:行:列`，Agent 据此只打开那一处。 */
   at?: string;
+  /** 同一根因展开到多个画面 / 层级时，受影响的画面或对象（合并为一条后才有；新增字段）。 */
+  affects?: string[];
 };
 
 export class JoploError extends Error {

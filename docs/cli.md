@@ -64,7 +64,7 @@ features/invite/options/a-modal.tsx:24:16  warning  CASE_NOT_COVERED  Case is no
 0 error, 1 warning, 0 info
 ```
 
-每个问题一行 `文件:行:列  级别  代码  说明`，最后汇总；同位置、代码、说明和级别的重复项只输出一次。error 退出 1，用法错误退出 2，只有 warning/info 时退出 0。按定位只读改需要的那一处；代码含义和修法见 `npx joplo skill check`。
+每个问题一行 `文件:行:列  级别  代码  说明`，最后汇总；同位置、代码、说明和级别的重复项只输出一次。结构校验错误定位到最近的作者元素（不再是 `joplo.config.ts:1:1`）；同一个根因（例如共享的 JSX）在多个画面 / 层级展开时合并成一条，说明末尾附 “(affects N views)”，只计 1 个 error，JSON 的诊断项新增 `affects: [画面 id]`（其余字段不变）。`when` 收到普通布尔、数字或字符串时报 `INVALID_CONDITION`，说明要用条件表达式并给出示例。error 退出 1，用法错误退出 2，只有 warning/info 时退出 0。按定位只读改需要的那一处；代码含义和修法见 `npx joplo skill check`。
 
 JSON 为 DomainResult 风格：成功含 `ok/projectId/revision/requestId/summary/changedIds/diagnostics/artifacts/data`；检查失败含 `ok: false/error/diagnostics/data`。data 是 name、diagnostics、summary、verification；载入前或用法错误可能没有 data。`revision: 0` 仅兼容结果信封，文件版本交给 Git。
 
@@ -83,15 +83,15 @@ JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }
 
 ## skill 与 guide
 
-`npx joplo skill` 列出当前 CLI 版本、主题说明和实际行数；每个主题少于 150 行。`npx joplo skill <主题>` 输出 Markdown，结尾指向相关主题。未知主题会建议编辑距离最近的名称并退出 2。
+`npx joplo skill` 先用几行讲清心智模型（预设场景的播放器，不是自由输入的应用原型）和起步顺序，再列出当前 CLI 版本、主题说明和实际行数；每个主题少于 150 行。`npx joplo skill <主题>` 输出 Markdown，结尾指向相关主题。未知主题会建议编辑距离最近的名称并退出 2。
 
 | 主题 | 内容 |
 | --- | --- |
-| authoring | 目录、页面、布局、方案、flow、绑定与规则 |
-| demo | 独立层级、导演、镜头、Diagram/trace、短字幕与主题 |
-| components | 当前组件目录和属性提示 |
-| cases | 八个维度及按产品类型筛选的情况预设 |
-| check | 诊断代码与局部修复 |
+| authoring | 心智模型、起步顺序、目录、页面、布局、方案、flow、绑定、`when` 只接受条件表达式、带错误重试的表单示例、规则 |
+| demo | 独立层级、导演、镜头、Diagram/trace、短字幕、全高布局会压缩什么、深链接参数、截图时机与主题 |
+| components | 当前组件目录和属性提示、支持的 HTML 标签、换行写法 |
+| cases | 八个维度及按产品类型筛选的情况预设；先做正常流程 + 一条错误恢复 |
+| check | 诊断代码与局部修复、合并诊断、`UNBOUND_INTERACTIVE` 的三种处理 |
 | selection | 用户选中后只改指向的位置 |
 | publish | pick、build、云端登录与分享、评审版与 feedback 回流、静态站部署与演示能力 |
 
@@ -99,13 +99,13 @@ JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }
 
 ### skill install
 
-写入不超过 20 行的 `.claude/skills/joplo/SKILL.md` 短指针，详细用法仍由 CLI 按需输出。AGENTS.md 已存在时更新 Joplo 托管段；不存在时仅在显式传 `--agents-md` 后创建。
+写入两个技能 `.claude/skills/joplo/SKILL.md` 与 `.claude/skills/joplo-feedback/SKILL.md`，内容与仓库根目录的官方技能 `skills/` 逐字相同（同一份模板生成，D64）：心智模型、起步顺序、最常见的坑（每条指向详细主题），以及评审回流步骤；具体 API 仍由 `npx joplo skill <主题>` 按需输出。AGENTS.md 已存在时更新 Joplo 托管段（同样包含心智模型、起步顺序和常见坑）；不存在时仅在显式传 `--agents-md` 后创建。
 
 - `--diff`：只打印 unified diff，不创建或改写文件，优先于 force。
-- `--force`：允许覆盖被用户修改过的 SKILL.md。
+- `--force`：允许覆盖被用户修改过的技能文件。
 - `--agents-md`：即使 AGENTS.md 不存在也创建指针段。
 
-SKILL.md 末尾保存版本与 sha256，覆盖标记前全部原始字节。重装时：未改动的生成内容允许更新；字节相同输出“Already up to date”且不重写；用户改过或缺少有效标记时拒绝覆盖，提示 diff/force，退出 1。目录没有 joplo.config.ts 时警告但仍安装。
+SKILL.md 末尾保存 `<!-- joplo-skill <版本> sha256:… -->`，哈希覆盖标记前全部原始字节。重装时：未改动的生成内容（包括旧版本写的短指针、用 `npx skills add` 装的官方技能）自动更新，输出 “Wrote … updated from <旧版本> to <新版本>”；字节相同输出“Already up to date”且不重写；任何一个技能被用户改过或缺少有效标记时，两个技能和 AGENTS.md 都不写，提示先 `--diff` 看差异、再 `--force` 覆盖，退出 1。目录没有 joplo.config.ts 时警告但仍安装。`joplo init` 不安装技能。
 
 AGENTS.md 仅替换 `<!-- joplo:start -->` 与 `<!-- joplo:end -->` 之间的段落，段外字节不变；标记损坏或重复时拒绝写入。指针文件可提交 Git，安装器下次读取哈希/标记决定是否更新，Agent 读取指针后再调用 CLI。
 
@@ -219,7 +219,7 @@ npx joplo share --new
 - Pro 且 `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接；`--new` 新建。免费账号每次新建。
 - `.joplo/cloud.json` 的格式为 `{server, shareId?, url?, review?: {shareId, url}}`：主链接和评审版是**两个分享**，互不覆盖（契约 8.1）。普通 share 只用、只写主 `shareId`/`url`；`--review` 只用、只写 `review`（Pro 重新发布评审版时用 `review.shareId` 作 replaceShareId，评审链接和评论保留，版本 +1），评审版永远不会替换 README 里的主链接。写入时保留另一项；记录属于其他 server 时整体替换。没有 `review` 的旧记录照常使用。
 - 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；一个对象失败会取消其他在途 PUT 和重试等待；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
-- finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/billing`。
+- finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/settings/billing`。
 - 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的 Playwright + Chromium）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有 Playwright、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”，share 照常成功；分享页此时用通用预览图。
 - 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 只用英文，D57）。
 - **评审清单**：每次 share 都在 `POST /api/v1/shares` 请求体里附上 `review`（契约字段 `{v: 1, mode, features, scenarios, elements}`），由 check 编译的 dev IR 经 core 的 `reviewManifest` 生成。它**不是分享文件**：不进上传清单、不进 R2，分享页拿不到；SaaS 只把它存进数据库给评审页用。`mode: "publish"` 只含选定方案（与发布站同一范围，没有选定方案的功能不出现），`--review` 时为 `"review"`，含所有功能的所有方案。id 全部沿用 IR，步骤 `index` 从 0 开始，`elements` 是画面里所有作者元素 id（与 `Rule.elementIds` 同一套）及 `nodeLabel` 标签。
@@ -247,7 +247,7 @@ Agent 可以把 `data.embed.markdown` 直接写进 README；免费链接要同�
 | --- | --- |
 | AUTH_REQUIRED（退出 3） | 请用户运行 npx joplo login，再重试 |
 | AUTH_EXPIRED（401，退出 3） | 重新运行 npx joplo login |
-| PLAN_REQUIRED | 服务端明确要求 Pro；升级入口为当前 server/billing，或用 --new 创建新分享 |
+| PLAN_REQUIRED | 服务端明确要求 Pro；升级入口为当前 server/settings/billing，或用 --new 创建新分享 |
 | ACCOUNT_UNAVAILABLE | 账号目前不能发布，请登录网页查看账号状态；不引导付费 |
 | FORBIDDEN | 当前操作被禁止，请检查账号权限 |
 | RATE_LIMITED | 登录请求过于频繁，稍后再试 |
@@ -255,7 +255,7 @@ Agent 可以把 `data.embed.markdown` 直接写进 README；免费链接要同�
 | CONFLICT | 另一个发布正在进行或上传准备失败，稍后重新运行 joplo share；不自动重试 |
 | QUOTA_EXCEEDED | 按 details 区分每小时发布次数或每小时预留字节上限，显示服务端重试时间；类型未知时使用通用额度说明 |
 | TOO_LARGE | `details.kind=upload` 表示新增上传超限，`total` 表示清单总量超限，`files` 表示文件数超限；查看上限、实际值及最大五个文件 |
-| CLIENT_OUTDATED | 使用 npx joplo@latest share |
+| CLIENT_OUTDATED | 当前目录向上的项目里装了 joplo 时（启动器优先用项目版本，`npx joplo@latest` 也会被顶替），提示在项目里把两个依赖升到同一版本：`npm i -D joplo@latest @joplo-app/kit@latest`（按包管理器换成 pnpm/yarn/bun 的写法），再 `npx joplo share`；不在项目里时才建议 `npx joplo@latest share` |
 | NETWORK | 检查网络后重试；命令内部重试 finalize 时复用 uploadId |
 
 其他云端错误及本地校验失败退出 1，用法错误退出 2。错误正文不回显远端响应或访问令牌。HTTP 状态决定错误类别，4xx 不能被响应体改成可重试的 NETWORK。终端数据片段移除控制字符和 ANSI 转义序列；网址规范化，验证码严格校验。

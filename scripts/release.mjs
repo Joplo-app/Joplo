@@ -5,6 +5,7 @@
  *   node scripts/release.mjs version <版本> [--root <仓库>]   统一修改所有包的版本（pnpm release:version）
  *   node scripts/release.mjs pack                             构建并打包到 release/（pnpm release:pack）
  *   node scripts/release.mjs smoke [--keep]                   打包后在仓库外的临时目录只用 tarball 安装并跑通全流程（pnpm release:smoke）
+ *   node scripts/release.mjs verify [<版本>]                  发布之后必跑：确认每个包都在 registry 上，并实际 npx 安装一次（pnpm release:verify）
  *
  * 真正发布是 `pnpm release:publish`（pnpm -r publish --access public --tag beta），本脚本从不调用 npm publish。
  */
@@ -55,6 +56,10 @@ function version(root, v) {
     fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
   }
   log(`✓ ${pkgs.map(([, p]) => p.name).join('、')} → ${v}`);
+  // 官方 Agent 技能带版本标记（D64）：随版本一起重新生成，scripts/test/skills.test.ts 保证与 skill install 逐字一致
+  const skills = spawnSync(process.execPath, ['--import', 'tsx', path.join(REPO, 'scripts/build-skills.ts'), '--root', root], { cwd: REPO, encoding: 'utf8' });
+  if (skills.status !== 0) die(`重新生成 skills/ 失败：${skills.stderr || skills.stdout}`);
+  log(`✓ skills/ → ${v}（记得一起提交）`);
 }
 
 // ---------------------------------------------------------------- pack
@@ -297,6 +302,11 @@ async function smoke() {
     sh(joplo, ['skill', 'install'], project);
     const skillMd = fs.readFileSync(path.join(project, '.claude/skills/joplo/SKILL.md'), 'utf8');
     assert(skillMd.includes(`joplo-skill ${v}`), `SKILL.md 应记录版本 ${v}`);
+    // 官方技能与 tarball 里 CLI 写出的技能逐字一致（D64，同一份模板）
+    for (const name of ['joplo', 'joplo-feedback']) {
+      const installed = fs.readFileSync(path.join(project, `.claude/skills/${name}/SKILL.md`), 'utf8');
+      assert(installed === fs.readFileSync(path.join(REPO, 'skills', name, 'SKILL.md'), 'utf8'), `skill install 写出的 ${name}/SKILL.md 应与仓库 skills/${name}/SKILL.md 逐字一致（运行 pnpm skills:build）`);
+    }
 
     // 6. build
     const build = sh(joplo, ['build'], project);
@@ -465,6 +475,85 @@ async function publish(tag) {
   log(published ? `✓ 本次发布 ${published} 个包` : '✓ 所有包都已在 registry 上，无需发布');
 }
 
+// ---------------------------------------------------------------- verify
+
+/** npm view <名字>@<版本> version：有这个版本时返回版本号，没有（E404 等）时返回 null。 */
+function npmView(name, v) {
+  const r = spawnSync('npm', ['view', `${name}@${v}`, 'version', '--prefer-online'], { encoding: 'utf8', env: cleanEnv() });
+  const out = (r.stdout ?? '').trim().split('\n').at(-1)?.replace(/^'|'$/g, '') ?? '';
+  return r.status === 0 && out === v ? out : null;
+}
+
+/** 在系统临时目录、用全新的 npm 缓存实际安装并运行一次 npx -y joplo@<版本> --help。 */
+function npxInstall(v) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-verify-'));
+  try {
+    const r = spawnSync('npx', ['-y', `joplo@${v}`, '--help'], { cwd: dir, encoding: 'utf8', env: cleanEnv({ npm_config_cache: path.join(dir, '.npm'), npm_config_update_notifier: 'false' }), timeout: 300_000 });
+    return { ok: r.status === 0, output: `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? String(r.error) : ''}` };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** npx 安装失败输出里提到的缺失包（npm 的 E404 / ETARGET 两种写法）。 */
+export function missingFromInstallOutput(output, names) {
+  return names.filter((name) => {
+    const encoded = name.replace('/', '%2f');
+    // 包名两侧不能紧挨着名字字符：joplo 不应匹配 @joplo-app/…
+    const exact = (n) => `(?<![\\w@%-])${escapeRe(n)}(?![\\w%/-])`;
+    return new RegExp(`404[^\\n]*(?:${exact(name)}|${exact(encoded)})|'${escapeRe(name)}@[^']*' is not in this registry|No matching version found for ${escapeRe(name)}@`, 'i').test(output);
+  });
+}
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+
+/**
+ * 发布之后的验证（0.2.4 时 @joplo-app/core 漏发，joplo → cli → core 是精确依赖，所有人 npx joplo 都装不上）：
+ * 1. 对 PACKAGES 每个包 npm view <名字>@<版本> version，registry 有几十秒延迟，每个包最多试 attempts 次，间隔 delayMs；
+ * 2. 全部都在时，在临时目录实际运行 npx -y joplo@<版本> --help。
+ * 任何一步失败都列出缺的包并返回 ok: false（主入口以非 0 退出），提示用 pnpm release:publish 重跑。
+ * 依赖（view / install / sleep / log）可注入替身，测试不触网。
+ */
+export async function verifyRelease(opts = {}) {
+  const root = opts.root ?? REPO;
+  const view = opts.view ?? npmView;
+  const install = opts.install ?? npxInstall;
+  const sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const attempts = opts.attempts ?? 7;
+  const delayMs = opts.delayMs ?? 10_000;
+  const out = opts.log ?? log;
+  const err = opts.error ?? ((m) => console.error(m));
+  const pkgs = PACKAGES.map((p) => readJson(path.join(root, 'packages', p, 'package.json')));
+  const versions = new Set(pkgs.map((p) => p.version));
+  const v = opts.version ?? (versions.size === 1 ? [...versions][0] : null);
+  if (!v || !SEMVER.test(v)) return fail([], `各包版本不一致或版本不合法（${[...versions].join('、')}）；用 pnpm release:verify <版本> 指定`);
+  const names = pkgs.map((p) => p.name);
+  const missing = [];
+  for (const name of names) {
+    let found = false;
+    for (let i = 0; i < attempts && !found; i++) {
+      if (i > 0) await sleep(delayMs);
+      found = (await view(name, v)) === v;
+    }
+    if (found) out(`  ✓ ${name}@${v} 在 registry 上`);
+    else { missing.push(name); err(`  ✗ ${name}@${v} 不在 registry 上（试了 ${attempts} 次）`); }
+  }
+  if (missing.length) return fail(missing, `registry 上缺少 ${missing.map((n) => `${n}@${v}`).join('、')}`);
+  const installed = await install(v);
+  if (!installed.ok) {
+    const inOutput = missingFromInstallOutput(installed.output, names);
+    return fail(inOutput, `npx -y joplo@${v} --help 安装失败${inOutput.length ? `，缺少 ${inOutput.map((n) => `${n}@${v}`).join('、')}` : ''}：\n${installed.output.trim().split('\n').slice(-15).join('\n')}`);
+  }
+  out(`✓ release:verify 通过：${names.length} 个包都在 registry 上，npx -y joplo@${v} --help 安装运行成功`);
+  return { ok: true, version: v, missing: [] };
+
+  function fail(list, message) {
+    err(`✗ ${message}`);
+    if (list.length) err(`缺少的包：${list.join('、')}`);
+    err('修复：重跑 pnpm release:publish --tag <同一标签>（已发布的包会跳过，只补发缺的），等几十秒后再运行 pnpm release:verify。');
+    return { ok: false, version: v, missing: list, message };
+  }
+}
+
 // ---------------------------------------------------------------- main
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
@@ -475,5 +564,6 @@ if (cmd === 'version') {
 } else if (cmd === 'pack') pack();
 else if (cmd === 'smoke') await smoke();
 else if (cmd === 'publish') await publish(flag('--tag') ?? 'beta');
-else die('用法：node scripts/release.mjs version <版本> | pack | smoke [--keep] | publish [--tag beta]');
+else if (cmd === 'verify') { if (!(await verifyRelease({ version: args[0] })).ok) process.exit(1); }
+else die('用法：node scripts/release.mjs version <版本> | pack | smoke [--keep] | publish [--tag beta] | verify [<版本>]');
 }

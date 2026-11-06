@@ -172,7 +172,7 @@ test.each([['free', false, true, false], ['pro', false, true, true], ['pro', tru
   plan = p; await credentials(); await mkdir(join(project, '.joplo')); await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: sameServer ? base : 'https://other.example', shareId: 'Old1234567', url: base + '/s/Old1234567/' }));
   const r = await cli(['share', project, '--title', 'Custom', ...(fresh ? ['--new'] : [])]); expect(r.code).toBe(0);
   expect(calls.find(c => c.path === '/api/v1/shares')!.body).toMatchObject({ title: 'Custom' }); expect(calls.find(c => c.path === '/api/v1/shares')!.body.replaceShareId).toBe(replace ? 'Old1234567' : undefined);
-  if (p === 'free') expect(r.stdout).toContain(base + '/billing');
+  if (p === 'free') { expect(r.stdout).toContain(base + '/settings/billing'); expect(r.stdout).not.toMatch(new RegExp(base.replace(/[.]/g, '\\.') + '/billing')); }
 });
 test('交互 share 自动登录后继续发布', async () => { expect((await cli(['share', project], { interactive: true })).code).toBe(0); expect(browser).toHaveBeenCalledOnce(); expect(calls.some(c => c.path.endsWith('/finalize'))).toBe(true); });
 test('白名单外文件与不安全路径在上传前列出并拒绝', async () => {
@@ -463,8 +463,8 @@ test('B9 新建 JOPLO_HOME 目录权限为 0700', async () => {
   await credentials(); expect((await stat(home)).mode & 0o777).toBe(0o700);
 });
 test('B10 免费提示和 PLAN_REQUIRED 的 billing 使用当前 server', async () => {
-  await credentials(); const r = await cli(['share', project]); expect(r.stdout).toContain(base + '/billing');
-  fail = { path: '/api/v1/shares', status: 403, code: 'PLAN_REQUIRED' }; const e = await cli(['share', project]); expect(e.stdout).toContain(base + '/billing'); expect(e.stdout).not.toContain('https://cloud.joplo.app/billing');
+  await credentials(); const r = await cli(['share', project]); expect(r.stdout).toContain(base + '/settings/billing');
+  fail = { path: '/api/v1/shares', status: 403, code: 'PLAN_REQUIRED' }; const e = await cli(['share', project]); expect(e.stdout).toContain(base + '/settings/billing'); expect(e.stdout).not.toContain('https://cloud.joplo.app/');
 });
 test('B11 卡住的上传最终被实际 AbortSignal 中止，清理 SIGINT 监听器', async () => {
   await credentials(); stalledPut = true; const original = AbortSignal.timeout; const timeouts: number[] = [];
@@ -623,4 +623,24 @@ test('E1 有渲染能力时上传默认场景第一步的 1200×630 预览图，
   // 本地清单总量预检也包含预览图
   limits.maxTotalBytes = manifestOf().reduce((n, f) => n + f.size, 0) - 1; calls = [];
   const tooLarge = await cli(['share', project, '--format=json']); expect(tooLarge.json().error.code).toBe('TOO_LARGE'); expect(calls.some(c => c.path === '/api/v1/shares')).toBe(false);
+});
+
+test('CLIENT_OUTDATED：项目里装了 joplo 时提示在项目里把两个依赖升到同一版本（npx joplo@latest 会被项目版本顶替）；不在项目里才建议 npx joplo@latest', async () => {
+  const { clientOutdatedMessage } = await import('../src/cloud.ts');
+  const outside = await mkdtemp(join(tmpdir(), 'joplo-outdated-'));
+  try {
+    expect(clientOutdatedMessage(outside, {})).toContain('npx joplo@latest share');
+    const project = join(outside, 'app'); await mkdir(join(project, 'node_modules/joplo'), { recursive: true });
+    await writeFile(join(project, 'node_modules/joplo/package.json'), '{"name":"joplo","version":"0.2.4"}');
+    await mkdir(join(project, 'src'), { recursive: true });
+    for (const cwd of [project, join(project, 'src')]) {
+      const msg = clientOutdatedMessage(cwd, {});
+      expect(msg).toContain('npm i -D joplo@latest @joplo-app/kit@latest');
+      expect(msg).toContain('then npx joplo share');
+      expect(msg).not.toContain('npx joplo@latest');
+    }
+    await writeFile(join(project, 'pnpm-lock.yaml'), '');
+    expect(clientOutdatedMessage(project, {})).toContain('pnpm add -D joplo@latest @joplo-app/kit@latest');
+    expect(clientOutdatedMessage(project, { npm_config_user_agent: 'npm/11 node/24' })).toContain('npm i -D joplo@latest');
+  } finally { await rm(outside, { recursive: true, force: true }); }
 });

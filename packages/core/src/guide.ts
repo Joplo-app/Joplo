@@ -1,15 +1,16 @@
-import { COMPONENT_TYPES, GATED_CONTAINERS, INTERACTIVE_TYPES, JOPLO_PROPS, VALUE_TYPES } from './catalog.ts';
+import { MENTAL_MODEL, START_ORDER } from './agent-skill.ts';
+import { COMPONENT_TYPES, GATED_CONTAINERS, HTML_TAGS, INTERACTIVE_TYPES, JOPLO_PROPS, VALUE_TYPES } from './catalog.ts';
 import { JoploError } from './result.ts';
 import { LAYER_ICONS } from './schema.ts';
 
 export const SKILL_TOPICS = [
-  { name: 'authoring', description: 'Directory conventions; page / layout / option / flow syntax' },
-  { name: 'demo', description: 'Layers, shots, traces, and captions for clear demos' },
-  { name: 'components', description: 'Component catalog and props for this version' },
+  { name: 'authoring', description: 'Mental model, first steps, page / option / flow syntax, when conditions, a form example' },
+  { name: 'demo', description: 'Layers, shots, captions, full-height layout, deep links, and screenshots' },
+  { name: 'components', description: 'Component catalog, supported HTML tags, line breaks, and props' },
   { name: 'cases', description: 'Case dimensions: ask the user before starting' },
-  { name: 'check', description: 'Read diagnostics and fix the indicated file and line' },
+  { name: 'check', description: 'Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line' },
   { name: 'selection', description: 'Edit only the element selected by the user in the board' },
-  { name: 'publish', description: 'pick, build, cloud sharing, review feedback, and static site deployment' },
+  { name: 'publish', description: 'pick, build, share, review version, feedback write-back, deployment' },
 ] as const;
 export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
 
@@ -27,6 +28,13 @@ const related: Record<SkillTopic, readonly SkillTopic[]> = {
 export function skillIndex(version: string, docs?: Readonly<Record<string, string>> | null): string {
   return [
     `Joplo ${version} · Agent usage (read on demand)`,
+    '',
+    ...MENTAL_MODEL,
+    '',
+    'Start here:',
+    ...START_ORDER.map((s, i) => `  ${i + 1}. ${s}`),
+    '',
+    'Topics (suggested order: authoring, cases, components, demo, check; selection and publish when needed):',
     ...SKILL_TOPICS.map(t => `  ${t.name.padEnd(11)} ${t.description}  ${skillTopic(t.name, docs).trimEnd().split('\n').length} lines`),
     'Usage: npx joplo skill <topic>    Install for agents: npx joplo skill install',
     '',
@@ -58,6 +66,12 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
     'Import components from @joplo-app/kit/ui. Names below come from the current compiler catalog; do not invent components.',
     'Prop hints follow names when available; otherwise only names are listed. Write HTML tags directly in JSX; do not import them from ui.',
     '',
+    '## HTML tags and line breaks',
+    `- Supported HTML tags: ${HTML_TAGS.join(', ')} (a is interactive). Any other tag (br, img, button, input, table, form, label, hr, h5) is UNKNOWN_COMPONENT; use the component instead (Divider, Image, Button, TextInput, Table).`,
+    "- Line breaks: JSX collapses newlines in text, and there is no <br/>. Text, Blockquote, List.Item, Timeline.Item, and Accordion.Panel keep \\n, so write <Text>{'Line 1\\nLine 2'}</Text>.",
+    "- Elsewhere add style={{ whiteSpace: 'pre-line' }}, or stack several <Text> in a <Stack gap={4}>. Text with truncate stays on one line.",
+    '- Every component accepts style={{ … }} and the Mantine style props (m, p, w, h, c, bg, fz, fw, ta…); className is not needed.',
+    '',
     '## Component catalog',
     ...names.map(name => `- ${name}${Object.hasOwn(docs, name) && docs[name]?.trim() ? `: ${docs[name]!.replace(/\s+/g, ' ').trim()}` : ''}`),
     '',
@@ -68,13 +82,21 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
     '',
     `Joplo props: ${JOPLO_PROPS.join(', ')}; disabled is the component disable prop.`,
     'when controls visibility; disabledReason explains disabling; unmodeled marks behavior not modeled by this prototype; note is an authoring note.',
-    'Interactive elements need a flow step, disabled=true with a reason, or explicit unmodeled.',
+    'Interactive elements need a flow step, disabled={true} with a disabledReason, or explicit unmodeled (see check: UNBOUND_INTERACTIVE).',
+    'Value components are read-only on stage: they show inputs[id] written by .type/.select/.toggle steps, or a bound value prop. Viewers cannot type their own text.',
     'See authoring for bindings, conditions, and steps; check for component error fixes.',
   ].join('\n');
 }
 
 const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
   authoring: `# Joplo authoring: authoring
+
+## Mental model (read first)
+${MENTAL_MODEL.map(s => `- ${s}`).join('\n')}
+- So write what the viewer should see as steps: typing is .type(id, 'sample'), a click is .click(id), a server answer is .system('caption', set(...)).
+
+## Start small
+${START_ORDER.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
 Describe designs in TS/TSX. Source files are authoritative; Git manages versions. The board and published site consume compiled IR.
 Read only the topics needed, usually one or two at a time. See components for components, cases for questions before starting, and demo for organizing and presenting demos.
@@ -115,16 +137,50 @@ Read only the topics needed, usually one or two at a time. See components for co
 - uses('rule_key', ...): link rules from this option or feature.
 
 ## Bindings and conditions
-- $.ui.x / $.data.x / $.inputs.x bind whole values; arbitrary expressions are not evaluated.
-- when={$.ui.ready}; disabled={not($.ui.isAdmin)}.
+- $.ui.x / $.data.x / $.inputs.x bind whole values; arbitrary expressions are not evaluated. $.inputs.<id> is the value typed into element <id>.
+- Props can bind: <TextInput id="email" error={$.ui.emailError}/>, <Text>{$.data.name}</Text>.
 - not(x), eq(x, value), neq(x, value), empty(x), notEmpty(x), oneOf(x, values), and(...xs), or(...xs).
 - Overlays: <Modal id="dlg" opened={$.ui.open} title="…">; Drawer works the same way. Only opened controls visibility.
+
+## when takes a condition, never a plain value
+- Right: when={$.ui.sent}, when={not($.ui.sent)}, when={eq($.ui.mode, 'code')}, when={and(notEmpty($.inputs.email), not($.ui.sending))}.
+- Wrong: when={!link}, when={mode === 'code'}, when={true}. JavaScript evaluates these once while the project loads, so when gets a plain boolean: check reports INVALID_CONDITION at that line.
+- Value known while writing (a prop of your own component, a loop variable, an option-specific flag): render conditionally in your code instead, {mode === 'code' && <CodeForm/>}. false, null, and undefined children are dropped.
+- Value that changes during the demo: keep it in option state and change it with set() in a step.
+- disabled accepts true/false or a condition: disabled={$.ui.sending} disabledReason="Sending…".
 
 ## Layout and responsiveness (Mantine names and props; no className)
 - Use Stack / Group / SimpleGrid / Grid props: <Group justify="space-between">, <SimpleGrid cols={{ base: 1, md: 3 }}>.
 - Use responsive objects { base, xs, sm, md, lg, xl }, or visibleFrom="sm" / hiddenFrom="sm". AppShell collapses navigation below navbar.breakpoint.
 - Set input labels directly: <TextInput id="email" label="Email"/>. Auto captions use them.
 - Stage height follows the window. Do not use fixed pixel heights for full-height layouts, which clip bottom inputs and buttons in short windows. See Full-height layout in demo.
+
+## Example: form with an error and a retry
+Inputs show what the steps type; the error comes from set(), not from validation code.
+\`\`\`tsx
+import { $, done, flow, option, page, set } from '@joplo-app/kit';
+import { Alert, Button, Loader, Stack, TextInput } from '@joplo-app/kit/ui';
+const send = (name: string, cases: string[]) => flow(name, { start: '/reset', cases })
+  .type('email', 'ana@exmple.com').click('send', 'Send the reset link', set($.ui.sending, true));
+export default option({
+  name: 'A · Email link', idea: 'Send a reset link by email',
+  state: { ui: { sending: false, sent: false, emailError: '' } },
+  routes: { '/reset': page({ title: 'Reset password' }, <Stack>
+    <TextInput id="email" label="Email" error={$.ui.emailError} />
+    <Button id="send" disabled={$.ui.sending} disabledReason="Sending…">Send link</Button>
+    <Loader when={$.ui.sending} />
+    <Alert id="sent" color="green" when={$.ui.sent}>Check your inbox</Alert>
+  </Stack>) },
+  scenarios: {
+    unknown_email: send('Typo, then retry', ['unknown_email'])
+      .system('No account for this email', set($.ui.sending, false), set($.ui.emailError, 'No account with this email'))
+      .type('email', 'ana@example.com', set($.ui.emailError, ''))
+      .click('send', 'Retry', set($.ui.sending, true))
+      .system('Server accepts', set($.ui.sending, false), set($.ui.sent, true), done('Link sent after retry')),
+  },
+});
+\`\`\`
+Add the happy path the same way; declare both cases in feature.ts. Add layers (see demo) once this works in the board.
 
 ## Rules and boundaries
 - rule('Constraint', { origin?, status?, cases?: ['happy'], elements?: ['invite'] }).
@@ -183,6 +239,18 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
   <Group><PromptInput id="prompt"/><Button id="send">Send</Button></Group></Stack></Grid.Col></Grid>
 - The same applies to placeholders and artifacts: use h="100%" on Placeholder; Artifact fills its container by default.
 - Use fixed pixels only for elements with a fixed height (avatars, icons, Diagram canvas height).
+- What gets squeezed: in an h="100%" column, a Table, DataTable, or ScrollArea shrinks to the space left and scrolls inside. Rows stay in the DOM and check passes, but viewers see fewer rows.
+- Budget the height: render uses a 1280×800 desktop stage (the board follows the window, so leave margin); a table row is about 38px, a labeled input about 64px plus the gap.
+- Fixes: show fewer rows (5–8), split a long form across steps or layers, or move the table to its own layer and shot it. style={{ flexShrink: 0 }} keeps every row but pushes what follows off the stage.
+- Verify with npx joplo render: it warns when the next step's target is not visible.
+
+## Deep links and screenshots
+- Board: http://127.0.0.1:<port>/#/<project>/f/<feature>?o=<option>&c=<case>&s=<scenario>&step=<n>&l=<layer>&speed=<0.5|1.5>. Copy the project part from the board URL.
+- Published site: <site>/#/f/<feature>?s=<scenario>&step=<n>&l=<layer>. Embeds use ?embed=1&scenario=<scenario>&autoplay=1 (see publish).
+- Ids are qualified: option invite.a-modal, case invite.no_permission, scenario invite.a-modal.happy. step=n is the state after n steps (0 = initial). l is the layer key from layers: { … }; it turns Follow director off.
+- Other parameters (layer=, option=, scenario= in the hash) are ignored; the board logs a console warning naming them.
+- Screenshot one step: npx joplo render --scenario-id invite.a-modal.happy --step-id 'invite.a-modal.happy#2' --out shot.png. It waits for fonts, layout, and the camera, and needs Playwright (npx playwright install chromium).
+- In a browser, open the deep link, wait for [data-jcamera][data-camera-settled="1"] plus two animation frames, then capture. During autoplay or typing animations the DOM can be ahead of the pixels; pause first.
 
 ## Transition cards, roles, and Agent output (D56)
 - .card('Title', { sub?, points?, role? }, ...effects): one large sentence filling the stage, as a step. Use for openings, endings, time jumps, and role switches.
@@ -213,6 +281,7 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 - Published sites use the config theme, subset fonts against all built text, and never load WenKai. Newly typed characters absent from the build may use system fonts.
 - Variables alone work and are scoped to the stage, leaving the board unaffected: --jp-font, --jp-font-mono, --jp-font-size, --jp-ink, --jp-bg, --jp-surface, --jp-subtle, --jp-muted, --jp-faint, --jp-line, --jp-line-strong, --jp-border, --jp-accent (highlight), --jp-select, --jp-info (Diagram active), --jp-ok, --jp-warn, --jp-danger, --jp-annot (annotations; defaults to danger), --jp-radius, --jp-shadow, --jp-stroke (rough hand-drawn / clean thin lines).
 - Ordinary selectors (.jbox, h1, etc.) also work within the stage. In dark themes, check contrast of --jp-info / --jp-ok / --jp-danger / --jp-accent against the background.
+- Filled buttons default to --jp-ink, so changing --jp-ink also recolors body text. There is no primary-color variable yet: set the brand color on the button itself, <Button color="#e8590c">, instead of overriding inline styles.
 - Example themes/brand.css:
     :root {
       --jp-font: "Inter", system-ui, sans-serif;
@@ -297,6 +366,8 @@ Pick relevant cases to ask the user before starting. Do not include every preset
 - Each option uses flow(..., { cases: ['happy'] }) to reference the shared cases for comparison.
 - A case with a scenario is automatically \`expressed\`; one with neither a scenario nor a declaration is \`missing\`.
 - After adding a case, run check: reconsider it in every option.
+- Start with two scenarios per option, the happy path and one error-and-recovery case; add the rest after the user has seen them in the board.
+- A rule the user stated in this conversation is origin: 'user', status: 'confirmed'; a rule you inferred stays ai_assumption, pending.
 
 ## Declare coverage without a scenario
 Coverage status values: \`expressed\`, \`undecided\`, \`missing\`, \`not_applicable\`, \`excluded\`.
@@ -317,6 +388,8 @@ The whole project still compiles. Option filtering does not hide project compila
 \`file:line:column  severity  CODE  message\`
 Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interactive element has no demo step.
 - File and line/column identify the edit location. Read nearby source and fix only that location; do not rewrite the page.
+- The location is the author element or call that caused the problem. joplo.config.ts:1:1 means no source location was known.
+- One root cause in a shared view (a layout, a component reused in routes and layers) prints once with "(affects N views)" and counts once; JSON adds affects: [view ids].
 - error exits 1; usage errors exit 2; warning/info only exits 0.
 - The last line totals error, warning, info. Run check again after fixing.
 
@@ -346,7 +419,8 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - UNKNOWN_DIAGRAM_NODE: Diagram.Edge from/to does not reference a node in this Diagram. Correct the endpoint ids.
 - ELEMENT_PROP: A component prop contains JSX. Use strings for icons, such as leftSection="+", and children for content.
 - ASSUMPTION_CONFIRMED: Keep AI assumptions \`pending\`. After user confirmation, record the actual origin; do not change only status.
-- UNBOUND_INTERACTIVE: Add a scenario step, explicitly disable with a reason, or mark unmodeled.
+- UNBOUND_INTERACTIVE: see the section below.
+- INVALID_CONDITION: when got a plain boolean, number, or string (when={!x}, when={mode === 'code'}). Use a condition such as when={eq($.ui.mode, 'code')}, or render conditionally in your code: {flag && <X/>}. See authoring.
 - DISABLED_WITHOUT_REASON: Add disabledReason explaining why the element cannot be used.
 - CASE_NOT_COVERED: Add a scenario or declare coverage truthfully. Ask about missing behavior first.
 - EXPRESSED_WITHOUT_SCENARIO / COVERAGE_WITHOUT_REASON: Add a scenario or a reason for \`not_applicable\`/\`excluded\`.
@@ -358,6 +432,13 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - NOT_INTERACTIVE / NOT_A_FIELD: Choose the right component or action; input actions require value components.
 - ALREADY_COMPLETED / NOTHING_TO_GO_BACK: Fix steps after done, or add route navigation before back.
 - LOAD_FAILED / WRONG_EXPORT / INVALID_SCHEMA: Follow the message to fix imports, default exports, or field structure.
+
+## UNBOUND_INTERACTIVE: is every interaction expressed?
+An element that looks usable (Button, TextInput, Select, NavLink, a, …; see components) has an id but no step in any scenario of this option. Viewers will try it; decide what happens:
+1. Show it: add a step to a scenario, .click('send') or .type('email', 'ana@example.com'). Inputs that only display a value need a .type step too.
+2. It cannot be used here: disabled={true} with disabledReason="Only admins can invite". A conditional disabled does not count; it still needs a step for the enabled state.
+3. Out of scope for this prototype: add unmodeled (note="…" optional). Clicking it shows "This demo does not cover …".
+Do not add fake steps just to silence the warning.
 
 When the user points to a stage element, read selection first for its exact location.`,
   selection: `# Joplo selection: selection
@@ -421,6 +502,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - Pro share updates the same-server link in .joplo/cloud.json; --new creates another link and --title sets its title.
 - The review version is a separate share (review: { shareId, url } in .joplo/cloud.json); it never replaces the main link. If the cloud rejects the review manifest, plain share retries once without it and still publishes.
 - npx joplo whoami --format json shows the account, plan, and limits; npx joplo logout signs out.
+- CLIENT_OUTDATED: the cloud needs a newer CLI. In a project, npx joplo@latest still runs the project's version; upgrade both packages to the same version (npm i -D joplo@latest @joplo-app/kit@latest), then share again.
 - maxUploadBytes limits only newly uploaded cloud blobs. The CLI prechecks maxTotalBytes and maxFiles. TOO_LARGE details.kind distinguishes upload / total / files.
 - Credentials are stored only in JOPLO_HOME/credentials.json (default ~/.joplo). Never copy them into a project, print them, or commit them.
 - Cloud commands accept --server <url>, overriding JOPLO_CLOUD_URL; the default is https://cloud.joplo.app.
@@ -428,7 +510,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - CI: set JOPLO_API_KEY (jpk_..., created in Settings → API keys) instead of logging in. Every cloud command then uses it; credentials.json and browser login are never touched. An invalid or revoked key returns AUTH_EXPIRED: ask the user for a new key.
 - PR previews: in GitHub Actions run npx joplo share --new --pr <number> --format json; repo, commit, and run URL come from the Actions environment. Outside Actions pass --repo owner/name. data.pr.comment "skipped" means the Joplo GitHub App is not installed; tell the user, the share itself succeeded.
 
-## Review and feedback
+## Review and feedback (the joplo-feedback skill has the same steps)
 - npx joplo share --review publishes the review version: every option of every feature, so reviewers can compare A/B. Rules, questions, cases, and AI assumptions still never appear in uploaded files; they go only to the review page through the request body. Plain share publishes only picked options.
 - After reviewers comment and the owner decides on the review page, run npx joplo feedback --format json (uses the review share in .joplo/cloud.json, else the main share, or --share <id>). data.decisions are decisions not yet applied; data.comments are unresolved viewer comments with scenario, step, stepId, and element.
 - Apply each decision to the source, then run npx joplo check:
@@ -437,7 +519,10 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
   - reject_rule: rewrite the rule as the note (reason) says. If the reason does not say what to do instead, mark it status: 'conflict' and ask the user; do not guess.
   - answer: delete the question and add a rule with origin: 'user' (status: 'confirmed') stating the answer.
   - Comments are input for discussion only; do not change the source from a comment unless the user asks.
-- When check passes, mark what you applied: npx joplo feedback --applied <decision ids, comma-separated> [--ref <commit or source version>]. Mark only decisions you actually wrote back.`,
+- When check passes, mark what you applied: npx joplo feedback --applied <decision ids, comma-separated> [--ref <commit or source version>]. Mark only decisions you actually wrote back.
+- Full loop: npx joplo share --review --format json (data.mode is "review"; give the user data.url) → reviewers comment, the owner decides → npx joplo feedback --format json → edit source → npx joplo check → commit → npx joplo share --review --format json to refresh the review link → npx joplo feedback --applied d1,d2 --ref "$(git rev-parse HEAD)".
+- data.decisions items: { id, kind: pick|confirm_rule|reject_rule|answer, featureId, targetId, note, decidedAt, version }. targetId is the option id (pick), rule id (confirm_rule, reject_rule), or question id (answer); for answer, note is the answer.
+- --ref works only together with --applied. --applied is idempotent; text output without --format json ends with a Next: line listing the ids.`,
 };
 
 function distance(a: string, b: string): number {

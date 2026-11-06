@@ -14,7 +14,7 @@ export const CLOUD_MESSAGES = {
   UPLOAD_EXPIRED: 'The upload URL has expired. Run joplo share again',
   QUOTA_EXCEEDED: 'The cloud quota has been reached. Try again later',
   TOO_LARGE: 'The build exceeds the plan limit. Reduce large assets and try again',
-  CLIENT_OUTDATED: 'Update the CLI: npx joplo@latest share',
+  CLIENT_OUTDATED: 'This Joplo CLI is too old for the cloud. Update it; inside a project, upgrade joplo and @joplo-app/kit to the same new version',
   NETWORK: 'The cloud request failed. Check your network and try again',
   BAD_REQUEST: 'The cloud rejected the publication request. Check the project and try again',
   NOT_FOUND: 'The cloud share does not exist. Use --new to create one',

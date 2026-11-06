@@ -24,11 +24,15 @@ pnpm install --lockfile-only
 pnpm typecheck
 pnpm test
 pnpm release:smoke
-git add packages/*/package.json pnpm-lock.yaml
+git add packages/*/package.json pnpm-lock.yaml skills
 git commit -m "release: 0.1.3"
 git push origin main
 pnpm release:publish --tag latest
+pnpm release:verify        # 发布之后必跑
+git tag v0.1.3 && git push origin v0.1.3   # 官方 Agent 技能按 tag 固定：npx skills add Joplo-app/Joplo@v0.1.3
 ```
+
+`release:version` 会同时重新生成仓库根目录的官方 Agent 技能 `skills/*/SKILL.md`（带版本标记，D64），要和版本号一起提交；`scripts/test/skills.test.ts` 会在不一致时失败（单独重新生成：`pnpm skills:build`）。
 
 版本必须符合 x.y.z 或 x.y.z-tag。提交并推送 main 后，再由有 npm 发布权限的维护者在自己的终端执行发布。`--tag latest` 用于正式版；脚本默认 tag 为 beta，需要预览版时显式选择对应标签。
 
@@ -50,6 +54,22 @@ pnpm release:publish --tag latest
 跳过已有版本不会修改其 dist-tag；发布到其他标签的既有版本若需转为 latest，应单独维护标签。
 
 首次发布新包时，npm 的暂存发布机制可能生成 `0.0.0-stage` 占位版本。这是正常现象，目标仍是各包 package.json 中的统一版本；不要把占位版本当成正式版本。
+
+## 发布之后必跑：release:verify
+
+0.2.4 发布时 `pnpm -r publish` 中途失败，`@joplo-app/core` 漏发、其余 5 个包发上去了；`joplo` 精确依赖同版本的 `@joplo-app/cli`，cli 又精确依赖 core，于是所有人的 `npx joplo` 都装不上，直到补发。所以 publish 之后必须运行：
+
+```sh
+pnpm release:verify            # 默认取各包 package.json 的统一版本
+pnpm release:verify 0.2.5      # 或显式指定
+```
+
+它做两件事，任何一步失败都列出缺的包并以非 0 退出：
+
+1. 对六个包逐个运行 `npm view <名字>@<版本> version --prefer-online`；registry 有几十秒延迟，每个包最多试 7 次、间隔 10 秒。
+2. 全部都在时，在系统临时目录、用全新的 npm 缓存实际运行一次 `npx -y joplo@<版本> --help`；失败时从 npm 输出（E404 / notarget）里找出缺的包。
+
+失败时按提示重跑 `pnpm release:publish --tag <同一标签>`（已发布的包会跳过，只补发缺的），等几十秒后再运行 `pnpm release:verify`，直到通过。实现见 [release.mjs](../scripts/release.mjs) 的 `verifyRelease`，测试用替身注入 registry 与 npx（scripts/test/release.test.ts）。
 
 ## 查询 registry
 

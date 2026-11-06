@@ -13,6 +13,7 @@ import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, INTERACTIVE_TYPES, PAG
 import { choicesOf, commonPrefix } from './player.ts';
 import { LAYER_ICONS, Project, SCHEMA_VERSION, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
 import type { Diagnostic } from './result.ts';
+import { schemaDiagnostics } from './schema-issues.ts';
 
 export type AuthoringProject = {
   /** 项目根目录绝对路径，用于把源位置改成相对路径。 */
@@ -522,8 +523,8 @@ export function compile(src: AuthoringProject, mode: CompileMode): CompileResult
   if (diags.some((d) => d.severity === 'error')) return { project: null, diagnostics: diags };
   const parsed = Project.safeParse(out);
   if (!parsed.success) {
-    for (const issue of parsed.error.issues.slice(0, 20))
-      diags.push({ severity: 'error', code: 'INVALID_SCHEMA', message: `${issue.path.join('.')}: ${issue.message}`, source: 'schema' });
+    // 同一根因（共享的 JSX）在多个画面展开时合并成一条，定位到作者元素（schema-issues.ts）
+    diags.push(...schemaDiagnostics(out, parsed.error.issues, { limit: 20, rel }));
     return { project: null, diagnostics: diags };
   }
   return { project: parsed.data, diagnostics: diags };

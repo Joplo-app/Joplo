@@ -15,7 +15,7 @@ import { useI18n } from '../i18n/context';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { orderedFeatures, type Project } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
-import { parseSiteHash, siteHash, type PlayRoute, type SiteRoute } from '../runtime/route';
+import { isLocalHost, parseSiteHash, siteHash, warnUnknownPlayParams, type PlayRoute, type SiteRoute } from '../runtime/route';
 import { scenariosOf } from '../runtime/views';
 import type { StageTheme } from '../renderer/rough';
 import { Brand, PlayerPage, TopBar } from '../player/PlayerPage';
@@ -63,6 +63,8 @@ function Site({ project }: { project: Project }) {
   const titleFeature = route.kind === 'play' ? project.features[route.play.featureId]?.name ?? null : null;
   useEffect(() => { document.title = i18n.site.prototypeTitle(tabTitle({ feature: titleFeature, project: project.name }, i18n)); }, [titleFeature, project.name, i18n]);
   const navigate = (r: SiteRoute, replace = false) => go(siteHash(r), replace);
+  // 只在本机预览发布站时提示（观众看不到）：深链接里不认识的参数照常忽略
+  useEffect(() => { if (route.kind === 'play' && isLocalHost(location.hostname)) warnUnknownPlayParams(hash); }, [hash, route.kind]);
   // 旧链接 #/s/<场景>：换成演示页链接
   useEffect(() => {
     if (route.kind !== 'scenario') return;

@@ -27,7 +27,7 @@ function setFavicon(href: string) {
 import { VIEWPORT_SIZE, type Diagnostic } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
-import { boardHash, parseBoardHash, type BoardRoute, type PlayRoute } from '../runtime/route';
+import { boardHash, parseBoardHash, warnUnknownPlayParams, type BoardRoute, type PlayRoute } from '../runtime/route';
 import { ArrowRight, BookOpen, CircleCheck, Smartphone, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch } from 'lucide-react';
 import { PlayerPage, useBoardLayout, type MenuEntry } from '../player/PlayerPage';
 import { Btn, Kbd } from '../player/controls';
@@ -77,6 +77,8 @@ export function BoardApp() {
   const route = parseBoardHash(hash);
   const { list, error } = useProjects();
   const navigate = (r: BoardRoute, replace = false) => go(boardHash(r), replace);
+  // 看板是开发模式：深链接里不认识的参数（例如 layer=，应为 l=）在控制台提示一次，照常播放
+  useEffect(() => { if (route.kind === 'play') warnUnknownPlayParams(hash); }, [hash, route.kind]);
 
   // 旧的设置页：跳到首页并打开外观浮层（所有项目范围）
   const [openAppearance, setOpenAppearance] = useState(false);

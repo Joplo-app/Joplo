@@ -244,6 +244,12 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 规则、问题等只进评审清单：share 从 dev IR 生成 `review` 清单（publish 模式只含选定方案，review 模式含全部），放在创建分享的请求体里，不作为文件上传，分享页拿不到；只有拿到评审链接的人能在评审页看到。清单字符串与数组有上限并截断，id 不截断；整体超过 512 KiB 时 `--review` 报错，不静默丢内容；普通发布不因清单失败（超限时省略清单；服务端以 400 拒绝清单时去掉清单重试一次），以兼容 SaaS 与 CLI 的上线先后。
   - 发布站评审模式 `?embed=1&review=1`：在 D61 的嵌入播放器上增加与外层页面的 postMessage（ready、position、pick-result；接受 goto、pick），只接受来自 `window.parent` 且字段合法的消息；不是评审模式时不发、不收任何消息。可选元素用 IR 的作者元素 id（与规则的 elementIds 同一套）。
   - `joplo feedback` 拉取作者的决定和未解决评论，Agent 按决定改源码（pick → feature.pick；确认 → origin user + confirmed；否决 → 按理由改写，理由不够就问用户；回答 → 删问题、加 user 规则），check 通过后用 `--applied` 显式标记已写回。CI 用环境变量 `JOPLO_API_KEY` 代替设备登录；`--pr` 把 PR 信息交给云端，评论与 PR 关闭后过期由云端负责。
+- D64 官方 Agent 技能与薄技能原则（2026-11-06，来源：用户 2026-11-06，依据新 Agent 从零使用测试：两个没有上下文的 Agent 只凭 npm 上的 0.2.4 做“重置密码”演示，卡在心智模型、`when` 写法、HTML 回退、`UNBOUND_INTERACTIVE`、深链接参数、截图时机、全高布局压缩等处）：
+  - 官方技能放在主仓库根目录 `skills/<名字>/SKILL.md`，用户可 `npx skills add Joplo-app/Joplo`（固定版本 `@v<版本>`）安装：`joplo` 负责被发现（没有 joplo.config.ts 的普通仓库里也能因“功能原型、可交互演示、方案对比、给产品 / 设计 / 评审看的演示”触发），`joplo-feedback` 负责评审回流。
+  - 单一来源：官方技能、`joplo skill install` 写进项目的技能和 AGENTS.md 托管段、`joplo skill` 总览开头的心智模型与起步顺序，都由 core 的 agent-skill.ts 生成；`skills/` 由 `pnpm skills:build` 生成并带 `<!-- joplo-skill <版本> sha256:… -->`，与 `skill install` 的输出逐字相同（测试和 release:smoke 都校验），`release:version` 会一起重新生成。两边技能同名（`joplo`），`skill install` 能识别 `npx skills add` 装的未改动官方技能并直接更新。取代 D37 中“只写约 10 行指针”的做法。
+  - 薄技能 + 按需读取主题：技能只写心智模型（预设场景的播放器，不是自由输入的应用原型）、起步顺序（先做一条正常流程 + 一条错误恢复流程并在看板里确认，再扩展）和最常见的坑；具体 API 一律以 `npx joplo skill <主题>` 为准，和项目安装的版本一致，不会过期。
+  - 同一测试带来的 CLI 改进：结构校验错误定位到作者元素、同一根因合并成一条并附 “affects N views”；`when` 收到普通值报 `INVALID_CONDITION`；深链接里不认识的参数在看板（以及本机预览的发布站）控制台提示一次。
+  - 不做（待办）：主题的稳定颜色变量（例如主按钮颜色 `--jp-primary` 或稳定的 variant 属性）。目前主按钮背景是 `--jp-ink`，只能逐个按钮写 `color`；见下方 Q8。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions
@@ -253,6 +259,7 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
 
 ## Open or deferred questions
 - Q7 跨项目复用（2026-11-05 推迟，用户：“一个项目能够复用暂时就够了”）：项目外的 TSX 文件目前不经过 Joplo 的 JSX 转换（报 `React is not defined`），所以不能跨项目 import 复用件；复用件清单也没进 `joplo skill`。项目内用 `shared/` 复用已经可用。
+- Q8 主题的稳定颜色接口（2026-11-06 记录，D64 不做）：新 Agent 想把主按钮改成品牌色，只能读 DOM 发现按钮背景是内联的 `var(--jp-ink)` 再写覆盖样式。候选：增加 `--jp-primary`（默认等于 `--jp-ink`），并给按钮、输入框、错误文字、标题加稳定的 `data-*` 选择器；需要先用 Joplo 画方案（D40）。
 - 已知 bug：项目有编译 error（例如 LOAD_FAILED）时，`joplo build` 仍然生成站点，没有失败退出。
 
 - Q1 已由 D18 解决：组件目录扩展为 shadcn、AI Elements 和移动端外框，其余组件走自定义逃生口。

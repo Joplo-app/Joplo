@@ -7,6 +7,10 @@
  * 只换词汇，不换渲染：运行时不引入 Mantine，仍由 Joplo 渲染成低保真风格。
  */
 
+/** HTML 兜底标签（不可操作）；`a` 在 INTERACTIVE 里。目录之外的标签（br、img、button、input…）报 UNKNOWN_COMPONENT。 */
+const HTML = ['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'main', 'section', 'header', 'footer', 'nav', 'aside', 'ul', 'ol', 'li', 'strong', 'em', 'small', 'code'] as const;
+export const HTML_TAGS: readonly string[] = [...HTML, 'a'];
+
 /** 布局、展示与容器：不可操作。 */
 const STRUCTURE = [
   // 布局
@@ -30,7 +34,7 @@ const STRUCTURE = [
   // 架构图（Joplo 自有，D41）：节点与连线的 state 绑定 $.ui，由 flow 步骤驱动
   'Diagram', 'Diagram.Group', 'Diagram.Node', 'Diagram.Edge',
   // HTML 兜底
-  'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'main', 'section', 'header', 'footer', 'nav', 'aside', 'ul', 'ol', 'li', 'strong', 'em', 'small', 'code',
+  ...HTML,
   // Joplo
   'Placeholder', // props: label, h —— 图片/图表等占位
   'Custom', // props: kind —— 逃生口：目录没有的组件，渲染为带说明的占位框
