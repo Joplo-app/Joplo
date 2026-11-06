@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SCHEMA_VERSION, holdMsOf, type PlayState, type Project, type Scenario } from '@joplo-app/core';
+import { SCHEMA_VERSION, attachLayouts, holdMsOf, type PlayState, type Project, type Scenario } from '@joplo-app/core';
+import { elkLayout } from '@joplo-app/core/node';
 import { Stage } from '../src/renderer/Stage';
 import { badgeCenter, placeCallout, spotlightHoles, spotlightPath, visibleRegion } from '../src/renderer/cue-math';
 import { scenarioMs } from '../src/player/cover-content';
@@ -74,6 +75,30 @@ describe('呈现层不拦截点击（不变量 3）', () => {
     const old = structuredClone(project) as unknown as { scenarios: { s: { steps: Record<string, unknown>[] } } };
     for (const st of old.scenarios.s.steps) { delete st.cues; delete st.callouts; delete st.hold; }
     expect(() => renderToStaticMarkup(createElement(Stage, { project: old as unknown as Project, state: state(1), theme: 'sketch', mode: 'demo', animate: false, viewportOverride: { width: 400, height: 300 } }))).not.toThrow();
+  });
+  it.each(['Diagram', 'StateMachine'] as const)('%s：独立的连线标签随 redact 条件一起模糊和恢复', (family) => {
+    const p = structuredClone(project);
+    const nodeType = family === 'Diagram' ? 'Diagram.Node' : 'StateMachine.State';
+    const edgeType = family === 'Diagram' ? 'Diagram.Edge' : 'StateMachine.Transition';
+    p.scenes.sc!.root = {
+      id: 'diagram', type: family, children: [
+        { id: 'a', type: nodeType, props: { label: 'A' } },
+        { id: 'b', type: nodeType, props: { label: 'B' } },
+        { id: 'secret', type: edgeType, props: { from: 'a', to: 'b', label: 'private-token' }, redact: { falsy: 'ui.revealed' } },
+      ],
+    };
+    attachLayouts(p.scenes.sc!.root, elkLayout);
+    for (const revealed of [false, true]) {
+      const html = renderToStaticMarkup(createElement(Stage, { project: p, state: state(0, revealed), theme: 'sketch', mode: 'render', animate: false }));
+      const line = /<g[^>]*data-jid="secret"[^>]*>/.exec(html)?.[0];
+      const label = /<g[^>]*data-jedge-for="secret"[^>]*>/.exec(html)?.[0];
+      expect(line).toBeDefined();
+      expect(label).toBeDefined();
+      expect(html).toContain('private-token');
+      for (const element of [line!, label!]) expect(element.includes('data-jredact=""')).toBe(!revealed);
+      // 标签不重复注册元素 ID，镜头和检查仍定位到连线。
+      expect(html.match(/data-jid="secret"/g)).toHaveLength(1);
+    }
   });
   it('hold：自动播放的最短停留按速度缩放；封面时长计入 hold', () => {
     expect(holdMsOf({ hold: 5000 })).toBe(5000);

@@ -5,6 +5,7 @@
  * 估算按 1× 速度、用 IR 里的英文字幕兜底，不含鼠标移动与逐字输入，所以只是“约”。
  */
 import { orderedFeatures } from './features.ts';
+import { holdMsOf } from './focus.ts';
 import { stepDwell } from './pace.ts';
 import { JoploError } from './result.ts';
 import type { Coverage, Project, Scenario, Step } from './schema.ts';
@@ -47,7 +48,7 @@ export function stepTexts(step: Step): (string | undefined)[] {
 /** 一个场景按 1× 自动播放大约多久（毫秒）：每一步 stepDwell 之和。 */
 export function scenarioEstimateMs(scenario: Pick<Scenario, 'steps'>): number {
   return scenario.steps.reduce(
-    (sum, step) => sum + stepDwell({ texts: stepTexts(step), cameraMoved: step.shots.length > 0 || !!step.directorLayer, streams: step.effects.flatMap((e) => (e.type === 'stream' ? [e.value] : [])) }),
+    (sum, step) => sum + Math.max(holdMsOf(step), stepDwell({ texts: stepTexts(step), cameraMoved: step.shots.length > 0 || !!step.directorLayer, streams: step.effects.flatMap((e) => (e.type === 'stream' ? [e.value] : [])) })),
     0,
   );
 }

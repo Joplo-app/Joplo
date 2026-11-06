@@ -2478,7 +2478,7 @@ function DiagramEdge({ node, p }: NodeProps) {
       {/* 标签单独一层，在所有连线之上（不会被别的连线的点击区盖住）；点它等于点这条连线。位置由编译期布局给出（标签进布局） */}
       {label && lb ? (
         <motion.svg width={dctx.width} height={dctx.height} style={{ position: 'absolute', left: -dctx.origin.x, top: -dctx.origin.y, overflow: 'visible', pointerEvents: 'none', zIndex: emph ? 6 : 3 }} data-jfocus-keep={keep} initial={false} animate={{ opacity: 1 }} exit={exit}>
-          <motion.g style={{ pointerEvents: 'all', opacity: state === 'dim' ? 0.5 : 1 }} data-jedge-label="" data-jedge-for={node.id} initial={appear ? { opacity: 0 } : false} animate={{ opacity: state === 'dim' ? 0.5 : 1 }} transition={{ duration: 0.3, delay: appear ? 0.45 : 0 }}>
+          <motion.g style={{ pointerEvents: 'all', opacity: state === 'dim' ? 0.5 : 1 }} data-jedge-label="" data-jedge-for={node.id} data-jredact={attrs['data-jredact']} initial={appear ? { opacity: 0 } : false} animate={{ opacity: state === 'dim' ? 0.5 : 1 }} transition={{ duration: 0.3, delay: appear ? 0.45 : 0 }}>
             {/* 标签带底色；当前调用的标签用调用色描边，一眼对上自己的线 */}
             <rect x={lb.x - (emph ? 2 : 0)} y={lb.y - (emph ? 1 : 0)} width={lb.w + (emph ? 4 : 0)} height={lb.h + (emph ? 2 : 0)} rx={4} style={{ fill: SURFACE, stroke: emph ? color : 'none' }} strokeWidth={emph ? 1.4 : 0} fillOpacity={0.96} />
             <text x={lb.x + lb.w / 2} y={lb.y + lb.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={EDGE_FONT} fontWeight={emph || state === 'active' ? 700 : undefined} fill={state === 'idle' ? INK2 : color}>

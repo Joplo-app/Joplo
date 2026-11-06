@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, go, option, page, set, $, type CaseDef, type Flow } from '@joplo-app/kit';
+import { config, feature, flow, go, hold, option, page, set, $, type CaseDef, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { CARD_POINTS_MAX, DESCRIPTION_MAX, SCENARIO_MS_MAX, compile, outline, replay, scenarioEstimateMs, stateAt, stepDwell, validate, type AuthoringProject } from '../src/index.ts';
 import * as webPace from '../../web/src/runtime/pace.ts';
@@ -49,6 +49,13 @@ describe('阅读节奏在 core，web 原样 re-export', () => {
     const sc = p.scenarios['f.a.happy']!;
     expect(scenarioEstimateMs(sc)).toBe(stepDwell({ texts: ['Opening', 'why it matters'] }) + stepDwell({ texts: ['Send it'] }));
     expect(scenarioEstimateMs({ ...sc, steps: [] })).toBe(0);
+  });
+  it('outline 与 check 计入 hold 最短停留，较短的 hold 不缩短阅读时间', () => {
+    const p = build({ scenarios: { happy: flow('S', { start: '/', cases: ['happy'] })
+      .system('A', hold(30)).system('B', hold(30)).system('C', hold(30)).system('D', hold(0.5)) } });
+    expect(scenarioEstimateMs(p.scenarios['f.a.happy']!)).toBe(93_000);
+    expect(outline(p).features[0]!.options[0]!.scenarios[0]!.ms).toBe(93_000);
+    expect(codes(p, 'SCENARIO_TOO_LONG')).toHaveLength(1);
   });
 });
 

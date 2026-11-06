@@ -94,7 +94,7 @@ check: 0 error, 9 warning, 5 info (warning OUTCOME_MISMATCH ×1, warning CASE_NO
 ```
 
 - 情况一行：键、维度、优先级、每个方案的覆盖、标题 → 期望结果（case.expected，没写时提示）。这是 PM 视角的验收矩阵：标题是 Given，期望结果是 Then。
-- 场景一行：键、名字、步数与估算时长（1×，与自动播放同一份 stepDwell，不含鼠标移动与逐字输入）、结局、是否以过渡卡开场 / 收尾、覆盖的情况。
+- 场景一行：键、名字、步数与估算时长（1×，与自动播放同一份 stepDwell，并计入 hold 最短停留；不含鼠标移动与逐字输入）、结局、是否以过渡卡开场 / 收尾、覆盖的情况。
 - `--option <qid>` 只看一个方案；不存在时 USAGE（退出 2）。有 error 时退出 1：能编译出 IR 时照常输出大纲，编译不出时只写错误数。
 - `--format json`：`data.outline = { name, mode, features: [{ id, name, goal, roles, pick, cases: [{ id, key, title, dimension, priority, expected, coverage: { 方案 id: 状态 } }], options: [{ id, key, name, picked, ms, missing, undecided, scenarios: [{ id, key, name, description, steps, ms, cards, opening, ending, outcome, caseIds }] }] }] }`，`data.summary` 是 check 的汇总；失败时是 `ok: false` 信封，`data.outline` 为 null。
 
