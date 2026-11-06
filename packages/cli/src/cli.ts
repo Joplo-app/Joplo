@@ -1,4 +1,6 @@
 import { Command, CommanderError, Option } from 'commander';
+import { terminalText } from './cloud-error.ts';
+import type { CloudDependencies } from './cloud.ts';
 import { resolve } from 'node:path';
 import { COMPONENT_DOCS, guide, JoploError, skillIndex, skillTopic } from '@joplo-app/core';
 import type * as Server from '@joplo-app/server';
@@ -15,6 +17,7 @@ type Dependencies = {
   loadServer?: () => Promise<Record<string, unknown>>;
   /** 测试用：覆盖 CLI 自己的版本（缺省读 package.json）。 */
   cliVersion?: string;
+  cloud?: CloudDependencies;
 };
 const integer = (name: string, max = Number.MAX_SAFE_INTEGER) => (text: string) => {
   const n = Number(text);
@@ -29,8 +32,10 @@ const scale = (text: string) => {
 
 /** 每次创建独立 commander 实例，测试无需启动真实服务或占用固定端口。 */
 export async function runCli(args: string[], deps: Dependencies = {}): Promise<number> {
-  const stdout = deps.stdout ?? (s => { process.stdout.write(s); });
-  const stderr = deps.stderr ?? (s => { process.stderr.write(s); });
+  const secrets = new Set<string>();
+  const redact = (s: string) => { for (const token of secrets) s = s.split(token).join('[REDACTED]'); return s; };
+  const stdout = (s: string) => (deps.stdout ?? (s => { process.stdout.write(s); }))(redact(s));
+  const stderr = (s: string) => (deps.stderr ?? (s => { process.stderr.write(s); }))(redact(s));
   const line = (s: string) => stdout(s + '\n');
   const json = (value: unknown) => line(JSON.stringify(value));
   let exitCode = 0;
@@ -50,6 +55,38 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     for (const note of projectNotes(resolve(String(action.args[0] ?? '.')), action.name(), { cli: deps.cliVersion })) stderr(note + '\n');
   });
   const format = () => new Option('--format <format>', 'Output format').choices(['text', 'json']).default('text');
+  const cloudClient = async (server?: string, format?: string) => {
+    const { CloudClient } = await import('./cloud.ts');
+    return new CloudClient(server, deps.cliVersion ?? await readCliVersion(), s => stderr(s + '\n'), s => secrets.add(s), { ...deps.cloud, format });
+  };
+  const cloudCommand = (name: string) => program.command(name).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)');
+  cloudCommand('login').description('Authorize the CLI in your browser').addOption(format()).option('--no-browser', 'Open the login URL manually').action(async opts => {
+    const c = await (await cloudClient(opts.server, opts.format)).login(opts.browser === false);
+    if (opts.format === 'json') json(result(c.server, 'Signed in', { server: c.server, user: c.user, createdAt: c.createdAt }));
+    else line(`Signed in as ${terminalText(c.user.email)}`);
+  });
+  cloudCommand('logout').description('Revoke the session and remove local credentials').action(async opts => {
+    const client = await cloudClient(opts.server, opts.format);
+    await client.logout();
+    line('Signed out');
+  });
+  cloudCommand('whoami').description('Show the cloud account, plan, and limits').addOption(format()).action(async opts => {
+    const client = await cloudClient(opts.server, opts.format), credentials = await client.requireCredentials();
+    const data = await client.me(credentials.accessToken);
+    if (opts.format === 'json') json(result(client.server, `${terminalText(data.user.email)} (${data.plan})`, data));
+    else line(`${terminalText(data.user.email)} (${data.plan})\nNew upload limit: ${data.limits.maxUploadBytes} bytes\nManifest total limit: ${data.limits.maxTotalBytes} bytes, ${data.limits.maxFiles} files\nPublications per hour: ${data.limits.publishesPerHour ?? 'Not provided by the server'}`);
+  });
+  cloudCommand('share').description('Check, build, and publish to the cloud').argument('[dir]', 'Project directory', '.').addOption(format())
+    .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)').action(async (dir, opts) => {
+      const client = await cloudClient(opts.server, opts.format);
+      const { share } = await import('./cloud-share.ts');
+      const published = await share(client, dir, opts, async options => (await serverFunction('buildSite'))(options));
+      if (opts.format === 'json') json(result(resolve(dir), 'Published', published.result));
+      else {
+        line(`Published ${published.result.url}\n${published.result.expiresAt ? `Expires at: ${terminalText(published.result.expiresAt)}` : 'Permanent link'}`);
+        if (published.plan === 'free') line(`Free shares expire after 1 hour. Upgrade for permanent links: ${client.server}/billing`);
+      }
+    });
   program.command('check').argument('[dir]', 'Project directory', '.').addOption(format()).option('--option <qid>', 'Validate only the specified option').action(async (dir, opts) => {
     const report = await check(dir, opts.option);
     const summary = `${report.summary.error} error, ${report.summary.warning} warning, ${report.summary.info} info`;
@@ -113,8 +150,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (e instanceof CommanderError && ['commander.helpDisplayed', 'commander.help', 'commander.version'].includes(e.code)) return 0;
     const f = failure(e instanceof CommanderError ? new JoploError('USAGE', e.message) : e);
     const wantsJson = args.some((arg, i) => arg === '--format=json' || arg === '--format' && args[i + 1] === 'json');
-    if (wantsJson) json(f); else line(`${f.error.code}  ${oneLine(f.error.message)}`);
-    return f.error.code === 'USAGE' ? 2 : 1;
+    if (wantsJson) json(f); else line(`${f.error.code}  ${oneLine(terminalText(f.error.message))}`);
+    return f.error.code === 'USAGE' ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : 1;
   }
   return exitCode;
 }

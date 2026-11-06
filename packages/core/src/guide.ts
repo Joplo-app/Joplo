@@ -399,7 +399,21 @@ Use your own Wrangler environment and account in the project directory:
 
 \`npx wrangler deploy --assets dist\`
 Provide the site name and compatibility date through Wrangler project configuration. Handle access control in deployment.
-Deploy only dist output, not author source files. MCP, comments, collaboration, and cloud features are reserved for product V2.`,
+Deploy only dist output, not author source files. MCP, comments, and collaboration are planned separately.
+
+## Cloud sharing
+- Run npx joplo login and verify the code in your browser before authorizing. Use --no-browser to open the URL manually over SSH or without a local browser.
+- Agents publish with npx joplo share --format json. It checks, builds, and uploads only the published output.
+- AUTH_REQUIRED exits 3: ask the user to run npx joplo login in their own terminal, then retry share. Agents must not authorize on their behalf.
+- On AUTH_REQUIRED, ask the user to sign in. Do not run \`joplo logout\` on the user's behalf.
+- AUTH_EXPIRED also exits 3: ask the user to sign in again. Read error.code / message / details for other failures.
+- Free links expire after 1 hour; read data.expiresAt for the exact time. Pro permanent links have expiresAt: null.
+- Pro share updates the same-server link in .joplo/cloud.json; --new creates another link and --title sets its title.
+- npx joplo whoami --format json shows the account, plan, and limits; npx joplo logout signs out.
+- maxUploadBytes limits only newly uploaded cloud blobs. The CLI prechecks maxTotalBytes and maxFiles. TOO_LARGE details.kind distinguishes upload / total / files.
+- Credentials are stored only in JOPLO_HOME/credentials.json (default ~/.joplo). Never copy them into a project, print them, or commit them.
+- Cloud commands accept --server <url>, overriding JOPLO_CLOUD_URL; the default is https://app.joplo.app.
+- Local check / build / dev remain free and do not connect to the cloud.`,
 };
 
 function distance(a: string, b: string): number {
