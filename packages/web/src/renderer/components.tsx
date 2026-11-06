@@ -65,6 +65,8 @@ export type RenderCtx = {
   focus?: string[] | null;
   /** 由 trace 推算的 Diagram 状态（D48，core 的 diagramStateAt）；节点 / 连线没写 state 时用它。 */
   traced?: DiagramStates;
+  /** 本步 trace 到的节点与连线（D69 补充）：图里只有它们突出（加粗、着色、画在上层），其余连线变细变浅。null = 本步没有 trace。 */
+  traceNow?: ReadonlySet<string> | null;
   /** 流式输出（D56）：正在逐字出现的状态路径（如 ui.reply）；null = 全部直接显示全文。 */
   streaming?: StreamingCtx | null;
   /** 相邻步骤的业务状态差异（只由 DataCard / StateFlow 消费）。 */
@@ -2003,6 +2005,8 @@ type DiagramCtxValue = {
   current: string | null;
   /** 图表根节点（起点圆点按 id 找初始状态，跟随它的可见性）。 */
   rootNode: SceneNode;
+  /** 本步的调用线（trace 到的连线 + 状态机这一步走过的转换）。非空时只有它们突出。 */
+  now: ReadonlySet<string>;
 };
 
 /**
@@ -2163,7 +2167,7 @@ function Diagram({ node, p }: NodeProps) {
   const hv = Number(hRaw);
   const H = fill ? availH || 420 : Number.isFinite(hv) && hv > 0 ? hv : 420;
   const { h: _h, value: _v, ...rest } = p;
-  const { focus, traced, changed } = useCtx();
+  const { focus, traced, changed, traceNow } = useCtx();
   const focusKey = focus?.join(',') ?? '';
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const dfocus = useMemo(() => diagramFocus(structure, focus, node.id), [structure, focusKey, node.id]);
@@ -2173,6 +2177,13 @@ function Diagram({ node, p }: NodeProps) {
   const prev = path ? changed?.find((c) => c.path === path)?.before : undefined;
   const machine = root === 'StateMachine' ? machineStates(structure, p.value, prev) : { current: null, states: {} };
   const states = useMemo(() => ({ ...machine.states, ...(traced ?? {}) }), [traced, JSON.stringify(machine.states)]);
+  // 本步的调用线：这张图里本步 trace 到的连线，加上状态机这一步自动走过的转换
+  const nowKey = traceNow ? [...traceNow].join(',') : '';
+  const now = useMemo(
+    () => new Set(structure.edges.filter((e) => traceNow?.has(e.id) || machine.states[e.id]?.state === 'active').map((e) => e.id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [structure, nowKey, JSON.stringify(machine.states)],
+  );
   const { scale } = diagramFit(layout, avail, H);
   const rootProps = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: fill ? String(hRaw) : H, minHeight: fill ? 240 : undefined, overflow: 'hidden' } });
   const W = layout.width * scale;
@@ -2195,7 +2206,7 @@ function Diagram({ node, p }: NodeProps) {
             data-jdiagram-canvas=""
             style={{ position: 'absolute', left: Math.max(0, (avail - W) / 2), top: Math.max(0, (H - HH) / 2), width: layout.width, height: layout.height, transform: `scale(${scale})`, transformOrigin: '0 0' }}
           >
-            <DiagramContext.Provider value={{ root, layout, structure, origin: { x: 0, y: 0 }, width: layout.width, height: layout.height, mountedAt, key: node.id, focus: dfocus, states, current: machine.current, rootNode: node }}>
+            <DiagramContext.Provider value={{ root, layout, structure, origin: { x: 0, y: 0 }, width: layout.width, height: layout.height, mountedAt, key: node.id, focus: dfocus, states, current: machine.current, rootNode: node, now }}>
               {root === 'StateMachine' ? <StartDots /> : null}
               <DiagramChildren nodes={node.children} />
             </DiagramContext.Provider>
@@ -2417,10 +2428,13 @@ function DiagramEdge({ node, p }: NodeProps) {
   const color = selectedId === node.id ? 'var(--sel)' : EDGE_TONE[state]!;
   const dashed = p.async === true || state === 'error';
   const d = edgePath(route.points);
-  const head = arrowHead(route.points);
-  // 聚焦时：突出的连线保持原色、加粗、画在节点之上；其余连线由舞台的调暗规则变淡（data-jfocus-keep 让突出的不被调暗）
-  const emph = dctx.focus ? edgeEmphasized(dctx.focus, { id: node.id, from, to }, state) : false;
-  const sw = (state === 'idle' || state === 'dim' ? 1.5 : 2.4) + (emph ? 1.2 : 0);
+  // 当前调用一眼可见（D69 补充）：本步有调用线时只有它们突出——加粗、着色、箭头更大、画在节点之上、不随焦点外调暗；
+  // 其余连线（包括连着焦点节点的别的线）变细变浅、画在下层。本步没有调用线时，按镜头焦点突出焦点之间的连线。
+  const emph = dctx.now.size ? dctx.now.has(node.id) : dctx.focus ? edgeEmphasized(dctx.focus, { id: node.id, from, to }, state) : false;
+  const quiet = !emph && (dctx.now.size > 0 || !!dctx.focus);
+  const sw = emph ? (state === 'idle' ? 2.6 : 3.4) : quiet ? 1.2 : state === 'idle' || state === 'dim' ? 1.5 : 2.4;
+  const tone = quiet && state === 'idle' ? LINE_STRONG : color;
+  const head = arrowHead(route.points, emph ? 12 : 9);
   const label = str(p.label);
   const lb = route.label;
   const keep = emph ? '' : undefined;
@@ -2444,18 +2458,18 @@ function DiagramEdge({ node, p }: NodeProps) {
             </mask>
           </defs>
         ) : null}
-        <g {...attrs} data-state={state} data-async={p.async === true ? '' : undefined} data-appear={appear ? '' : undefined} style={{ opacity: state === 'dim' ? 0.5 : 1, transition: 'opacity .25s' }} mask={appear ? `url(#${maskId})` : undefined}>
+        <g {...attrs} data-state={state} data-emph={emph ? '' : undefined} data-quiet={quiet ? '' : undefined} data-async={p.async === true ? '' : undefined} data-appear={appear ? '' : undefined} style={{ opacity: state === 'dim' ? 0.5 : 1, transition: 'opacity .25s' }} mask={appear ? `url(#${maskId})` : undefined}>
           {/* 透明的粗线：⌥+单击检查连线时好点中 */}
           <path d={d} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: 'stroke' }} />
           {mode === 'rough' ? (
             <>
-              <RoughPath seedKey={`${node.id}:line`} d={d} stroke={color} strokeWidth={sw} dashed={dashed} />
-              <RoughPath seedKey={`${node.id}:head`} d={head} stroke={color} strokeWidth={1.2} fill={color} roughness={0.5} />
+              <RoughPath seedKey={`${node.id}:line`} d={d} stroke={tone} strokeWidth={sw} dashed={dashed} />
+              <RoughPath seedKey={`${node.id}:head`} d={head} stroke={tone} strokeWidth={1.2} fill={tone} roughness={0.5} />
             </>
           ) : (
             <>
-              <path d={d} fill="none" stroke={color} strokeWidth={sw} strokeDasharray={dashed ? '7 5' : undefined} style={{ transition: 'stroke .25s' }} />
-              <path d={head} fill={color} stroke="none" />
+              <path d={d} fill="none" stroke={tone} strokeWidth={sw} strokeDasharray={dashed ? '7 5' : undefined} style={{ transition: 'stroke .25s' }} />
+              <path d={head} fill={tone} stroke="none" />
             </>
           )}
           {state === 'active' ? <MovingDot d={d} color={color} animate={animate} reverse={eff.reverse} /> : null}
@@ -2465,8 +2479,9 @@ function DiagramEdge({ node, p }: NodeProps) {
       {label && lb ? (
         <motion.svg width={dctx.width} height={dctx.height} style={{ position: 'absolute', left: -dctx.origin.x, top: -dctx.origin.y, overflow: 'visible', pointerEvents: 'none', zIndex: emph ? 6 : 3 }} data-jfocus-keep={keep} initial={false} animate={{ opacity: 1 }} exit={exit}>
           <motion.g style={{ pointerEvents: 'all', opacity: state === 'dim' ? 0.5 : 1 }} data-jedge-label="" data-jedge-for={node.id} initial={appear ? { opacity: 0 } : false} animate={{ opacity: state === 'dim' ? 0.5 : 1 }} transition={{ duration: 0.3, delay: appear ? 0.45 : 0 }}>
-            <rect x={lb.x} y={lb.y} width={lb.w} height={lb.h} rx={4} style={{ fill: SURFACE }} fillOpacity={0.94} />
-            <text x={lb.x + lb.w / 2} y={lb.y + lb.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={EDGE_FONT} fontWeight={emph || state === 'active' ? 600 : undefined} fill={state === 'idle' ? INK2 : color}>
+            {/* 标签带底色；当前调用的标签用调用色描边，一眼对上自己的线 */}
+            <rect x={lb.x - (emph ? 2 : 0)} y={lb.y - (emph ? 1 : 0)} width={lb.w + (emph ? 4 : 0)} height={lb.h + (emph ? 2 : 0)} rx={4} style={{ fill: SURFACE, stroke: emph ? color : 'none' }} strokeWidth={emph ? 1.4 : 0} fillOpacity={0.96} />
+            <text x={lb.x + lb.w / 2} y={lb.y + lb.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={EDGE_FONT} fontWeight={emph || state === 'active' ? 700 : undefined} fill={state === 'idle' ? INK2 : color}>
               {label}
             </text>
           </motion.g>

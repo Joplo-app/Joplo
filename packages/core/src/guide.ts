@@ -445,11 +445,11 @@ Choose by the question: "what is where" → Diagram; "what happens in what order
 
 ## Layout is automatic (compile time)
 - Joplo lays the diagram out when compiling (ELK layered: layers, few crossings, orthogonal edges, groups laid out together). Never write coordinates.
-- direction="right" (left → right) or "down" (top → bottom). Pick the one that fits the stage: wide and short → right.
-- Source order is the order within a layer: write nodes, groups, and edges in reading order.
-- Write the request edge before its reply (api → kernel before kernel → api): the later one is drawn as a return edge.
-- pin="start" / pin="end" on a node or group puts it in the first / last layer of its group (or of the diagram).
-- The layout covers every element, including ones hidden with when. Nodes never move between steps; reveal parts with when={$.ui.show_x} and set($.ui.show_x, true).
+- Leave out direction: Joplo tries top → bottom and left → right and keeps the one that fills the stage with the largest text (domain groups end up side by side). direction="right" / "down" forces one; aspect={1.6} sets the wanted width / height; h="100%" fills a layer.
+- Source order is the order within a layer: write nodes, groups, and edges in reading order. Write the request edge before its reply (api → kernel before kernel → api): the later one is drawn as a return edge.
+- Mark secondary flows async (usage events, audit logs): they may stop pushing their target a layer down, so domains sit side by side instead of in a tall column.
+- pin="start" / pin="end" puts a node or group in the first / last layer of its group. The layout covers every element, including ones hidden with when: nodes never move between steps.
+- In each step only the traced call is bold, colored, with a moving dot and its label outlined; other edges turn thin and light. One call per step reads best.
 
 ## Traces: light up a call
 - trace('api', 'kernel', 'pg') lights api → kernel → pg this step; earlier traces turn ok. trace.fail('kernel', 'pg') marks failure; trace.skip('tools') dims what was not called.

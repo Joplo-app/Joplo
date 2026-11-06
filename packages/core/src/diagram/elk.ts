@@ -8,7 +8,7 @@
  * elkjs 只在这里加载：浏览器端（看板、发布站）不打包它，发布站只读 IR 里写好的坐标。
  */
 import { createRequire } from 'node:module';
-import { layoutGraph, type ElkNode, type ElkRun } from './graph-layout.ts';
+import { DEFAULT_ASPECT, layoutGraph, type ElkNode, type ElkRun, type LayoutGoal } from './graph-layout.ts';
 import { structureKey, type GraphLayout, type GraphStructure } from './model.ts';
 
 type FakeWorker = { onmessage: (e: { data: { id: number; data?: unknown; error?: unknown } }) => void; dispatcher: { saveDispatch: (e: { data: unknown }) => void } };
@@ -46,12 +46,12 @@ export const runElk: ElkRun = (graph: ElkNode): ElkNode => {
 const cache = new Map<string, GraphLayout>();
 const CACHE_MAX = 300;
 
-/** 编译期的图表布局引擎：传给 compile(src, mode, { layout: elkLayout })。 */
-export function elkLayout(s: GraphStructure): GraphLayout {
-  const key = structureKey(s);
+/** 编译期的图表布局引擎：传给 compile(src, mode, { layout: elkLayout })。goal = 目标外框比例（舞台比例）。 */
+export function elkLayout(s: GraphStructure, goal: LayoutGoal = { aspect: DEFAULT_ASPECT }): GraphLayout {
+  const key = `${goal.aspect.toFixed(3)}|${goal.width ?? ''}|${goal.height ?? ''}|${structureKey(s)}`;
   const hit = cache.get(key);
   if (hit) return structuredClone(hit);
-  const l = layoutGraph(structuredClone(s), runElk);
+  const l = layoutGraph(structuredClone(s), runElk, goal);
   cache.set(key, l);
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
   return structuredClone(l);

@@ -11,13 +11,11 @@ import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { START, graphStructure, layoutSequence, sequenceStructure, structureKey, type Box, type GraphLayout, type Point, type SceneNode } from '../src/index.ts';
+import { START, graphStructure, layoutSequence, sampleRoute, sequenceStructure, structureKey, type Box, type GraphLayout, type Point, type SceneNode } from '../src/index.ts';
 import { elkLayout } from '../src/node.ts';
+import { agentArch, E, G, N, loopDiagram } from './fixtures/diagram-arch.ts';
 
-const N = (id: string, label: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'Diagram.Node', props: { label, ...extra } });
-const E = (from: string, to: string, extra: Record<string, unknown> = {}): SceneNode => ({ id: (extra.id as string) ?? `${from}->${to}`, type: 'Diagram.Edge', props: { from, to, ...extra } });
-const G = (id: string, label: string, children: SceneNode[], extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'Diagram.Group', props: { label, ...extra }, children });
-const layout = (n: SceneNode) => elkLayout(graphStructure(n));
+const layout = (n: SceneNode) => elkLayout(graphStructure(n), diagramGoal(n));
 
 /** 夹具：8 个节点、两个分组（其中一个嵌套）、同步与异步连线。state 用参数注入。 */
 function fixture(state: (k: string) => string = () => 'idle', extra: SceneNode[] = [], direction = 'right'): SceneNode {
@@ -44,38 +42,6 @@ function fixture(state: (k: string) => string = () => 'idle', extra: SceneNode[]
       E('brain', 'queue', { label: '用量事件', async: true }),
       E('queue', 'billing', { async: true }),
       ...extra,
-    ],
-  };
-}
-
-/** 与 examples/agent-arch/shared/arch.tsx 相同的结构（v = a：混合的手；v = b：全云端）。 */
-export function agentArch(v: 'a' | 'b', direction: 'right' | 'down'): SceneNode {
-  const n = (id: string, label: string, kind: string, description: string) => N(id, label, { kind, description, state: `$ui.n_${id}` });
-  return {
-    id: 'arch',
-    type: 'Diagram',
-    props: { direction, h: 640 },
-    children: [
-      G('g_device', '用户设备', [n('app', '客户端界面', 'client', '对话、确认弹窗'), ...(v === 'a' ? [n('local', '端侧执行器', 'tool', '手：read_files、delete_files')] : [])], { icon: 'device' }),
-      G('g_aws', 'AWS', [
-        G('g_ctrl', '控制面', [n('biz', 'Biz Server', 'service', '鉴权 · 会话 · 审计 · 转发'), n('registry', 'Tool Registry', 'database', '工具定义：名称 · schema · 危险级别 · 单价'), n('db', 'DynamoDB', 'database', '会话与审计日志')]),
-        G('g_brain', '大脑', [n('brain', 'Agent 大脑', 'service', 'ECS：规划，只产出工具调用'), n('llm', 'Bedrock', 'model', 'Claude 模型')]),
-        G('g_hands', '云端的手', [n('sandbox', '云端沙箱', 'tool', v === 'a' ? 'Fargate：make_sheet 等云端工具' : 'Fargate：所有工具'), ...(v === 'b' ? [n('s3', 'S3 上传区', 'storage', '用户上传的本机文件')] : [])]),
-        G('g_bill', '计费', [n('queue', 'SQS', 'queue', '用量事件'), n('billing', 'Billing', 'service', '额度 · 计量 · 扣费')]),
-      ], { icon: 'cloud' }),
-      E('app', 'biz', { id: 'e_app_biz', label: '消息 ⇄ 回答' }),
-      E('biz', 'billing', { id: 'e_biz_billing', label: '① 额度预检' }),
-      E('biz', 'registry', { id: 'e_biz_registry', label: '② 取工具定义' }),
-      E('biz', 'db', { id: 'e_biz_db', label: '会话 · 审计', async: true }),
-      E('biz', 'brain', { id: 'e_biz_brain', label: '③ 任务 + 工具定义' }),
-      E('brain', 'llm', { id: 'e_brain_llm', label: '④ 推理' }),
-      E('brain', 'biz', { id: 'e_brain_biz', label: '⑤ 工具调用（只发出）' }),
-      ...(v === 'a'
-        ? [E('biz', 'local', { id: 'e_biz_local', label: '下发端侧工具' })]
-        : [E('app', 's3', { id: 'e_app_s3', label: '上传本机文件' }), E('sandbox', 's3', { id: 'e_sandbox_s3', label: '读取' })]),
-      E('biz', 'sandbox', { id: 'e_biz_sandbox', label: '下发云端工具' }),
-      E('brain', 'queue', { id: 'e_brain_queue', label: '用量事件', async: true }),
-      E('queue', 'billing', { id: 'e_queue_billing', label: '入账（幂等）', async: true }),
     ],
   };
 }
@@ -349,5 +315,106 @@ describe('状态机与时序图的布局', () => {
     expect(within(l.actors.web!, l.groups.g!)).toBe(true);
     // 确定
     expect(layoutSequence(sequenceStructure(n))).toEqual(l);
+  });
+});
+
+// ---------- D69 补充：可读性（用户看了 v2：“几乎看不到到底是谁调用了谁”） ----------
+import { diagramGoal } from '../src/index.ts';
+
+/** 两条不同连线之间最长的共线重叠（平行且相距 < 2px 的线段重叠的长度）。 */
+function collinearOverlap(l: GraphLayout): { len: number; pair: string } {
+  const segs = Object.entries(l.edges).flatMap(([id, e]) => e.points.slice(1).map((p, i) => ({ id, a: e.points[i]!, b: p })));
+  let worst = { len: 0, pair: '' };
+  for (let i = 0; i < segs.length; i++)
+    for (let j = i + 1; j < segs.length; j++) {
+      const s = segs[i]!;
+      const t = segs[j]!;
+      if (s.id === t.id) continue;
+      const hor = (x: typeof s) => Math.abs(x.a.y - x.b.y) < 0.5;
+      const ver = (x: typeof s) => Math.abs(x.a.x - x.b.x) < 0.5;
+      let ov = 0;
+      if (hor(s) && hor(t) && Math.abs(s.a.y - t.a.y) < 2) ov = Math.min(Math.max(s.a.x, s.b.x), Math.max(t.a.x, t.b.x)) - Math.max(Math.min(s.a.x, s.b.x), Math.min(t.a.x, t.b.x));
+      if (ver(s) && ver(t) && Math.abs(s.a.x - t.a.x) < 2) ov = Math.min(Math.max(s.a.y, s.b.y), Math.max(t.a.y, t.b.y)) - Math.max(Math.min(s.a.y, s.b.y), Math.min(t.a.y, t.b.y));
+      if (ov > worst.len) worst = { len: ov, pair: `${s.id} / ${t.id}` };
+    }
+  return worst;
+}
+/** 点到盒子的距离（在盒子里为 0）。 */
+const distToBox = (p: Point, b: Box) => Math.hypot(Math.max(b.x - p.x, 0, p.x - (b.x + b.w)), Math.max(b.y - p.y, 0, p.y - (b.y + b.h)));
+
+describe('D69 补充：布局适应舞台、连线可读', () => {
+  const stageW = 1232;
+  const stageH = 756;
+  const fitOf = (l: GraphLayout) => Math.min(1, stageW / l.width, stageH / l.height);
+  const realistic = [
+    ['agent-arch a', agentArch('a', 'auto', { h: '100%' })],
+    ['agent-arch b', agentArch('b', 'auto', { h: '100%' })],
+    ['执行回路', loopDiagram({ h: '100%' })],
+    ['八节点夹具', { ...fixture(), props: { h: '100%' } }],
+  ] as const;
+
+  it('铺满舞台的图（h="100%"）：目标比例就是舞台画面的比例；写了数字 h 时按舞台宽度 / h；写了 aspect 时用它', () => {
+    expect(diagramGoal(agentArch('a', 'auto', { h: '100%' })).aspect).toBeCloseTo(stageW / stageH, 2);
+    expect(diagramGoal(loopDiagram({ h: 320 })).aspect).toBeCloseTo(stageW / 320, 2);
+    expect(diagramGoal(loopDiagram({ aspect: 1.2 })).aspect).toBe(1.2);
+    expect(diagramGoal(loopDiagram(), 'mobile').aspect).toBeLessThan(1);
+  });
+
+  it('横向舞台上不产出瘦高的图：外框比例 ≥ 0.75；放进 1280×800 舞台后节点标题 ≥ 12px（14px 字号 × 缩放）', () => {
+    for (const [name, n] of realistic) {
+      const l = layout(n);
+      expect(l.width / l.height, `${name} ${l.width}×${l.height}`).toBeGreaterThanOrEqual(0.75);
+      expect(14 * fitOf(l), `${name} 缩放 ${fitOf(l).toFixed(2)}`).toBeGreaterThanOrEqual(12 - 0.3);
+    }
+  });
+
+  it('agent-arch（用户截图里的图）：外框比例与舞台比例相差不到 2 倍；业务域分组并排（计费 / 大脑 / 云端的手在同一行）；每个分组本身也不是细长条', () => {
+    for (const v of ['a', 'b'] as const) {
+      const n = agentArch(v, 'auto', { h: '100%' });
+      const l = layout(n);
+      const goal = diagramGoal(n).aspect;
+      const a = l.width / l.height;
+      expect(Math.max(a / goal, goal / a), `${v}: ${l.width}×${l.height}`).toBeLessThanOrEqual(2);
+      const row = ['g_bill', 'g_brain', 'g_hands'].map((g) => l.groups[g]!);
+      for (const g of row) expect(Math.abs(g.y - row[0]!.y), '三个分组在同一行').toBeLessThan(20);
+      for (const [g, b] of Object.entries(l.groups)) expect(b.w / b.h, `${v}:${g}`).toBeGreaterThanOrEqual(0.33);
+    }
+  });
+
+  it('作者写了 direction 时只在这个方向里选；没写时自动选，IR 记下实际方向', () => {
+    expect(layout(agentArch('a', 'right')).direction).toBe('right');
+    expect(layout(agentArch('a', 'down')).direction).toBe('down');
+    expect(['right', 'down']).toContain(layout(agentArch('a', 'auto')).direction);
+  });
+
+  it('连线可读：任意两条不同的连线没有超过 8px 的共线重叠；标签贴着自己的线（≤ 4px），互不重叠，不压节点', () => {
+    const all: (readonly [string, SceneNode])[] = [...realistic, ['agent-arch a/right', agentArch('a', 'right')], ['agent-arch b/down', agentArch('b', 'down')], ['夹具/down', fixture(undefined, [], 'down')]];
+    for (const [name, n] of all) {
+      const s = graphStructure(n);
+      const l = elkLayout(s, diagramGoal(n));
+      const worst = collinearOverlap(l);
+      expect(worst.len, `${name}: ${worst.pair}`).toBeLessThanOrEqual(8);
+      const labels = s.edges.filter((e) => e.label).map((e) => [e.id, l.edges[e.id]!.label!] as const);
+      for (const [id, lb] of labels) {
+        expect(lb, `${name}: ${id} 有标签位置`).toBeTruthy();
+        const near = Math.min(...sampleRoute(l.edges[id]!.points, 2).map((p) => distToBox(p, lb)));
+        expect(near, `${name}: ${id} 的标签离自己的线 ${near.toFixed(1)}px`).toBeLessThanOrEqual(4);
+        for (const [nid, b] of Object.entries(l.nodes)) expect(area(lb, b), `${name}: ${id} 压住节点 ${nid}`).toBe(0);
+      }
+      for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++) expect(area(labels[i]![1], labels[j]![1]), `${name}: ${labels[i]![0]} 与 ${labels[j]![0]}`).toBe(0);
+    }
+  });
+
+  it('压缩层次只放开“还有别的入边”的连线，优先 async；放开的连线照常画出、方向不变（起点在 from，终点在 to）', () => {
+    const n = agentArch('a', 'auto', { h: '100%' });
+    const s = graphStructure(n);
+    const l = layout(n);
+    const q = l.edges.e_brain_queue!.points;
+    const at = (p: Point, b: Box) => p.x >= b.x - 2 && p.x <= b.x + b.w + 2 && p.y >= b.y - 2 && p.y <= b.y + b.h + 2;
+    expect(at(q[0]!, l.nodes.brain!)).toBe(true);
+    expect(at(q[q.length - 1]!, l.nodes.queue!)).toBe(true);
+    expect(s.edges.find((e) => e.id === 'e_brain_queue')!.async).toBe(true);
+    // 没有多余的点：看不见的中转点不出现在节点里
+    expect(Object.keys(l.nodes).some((k) => k.startsWith('__'))).toBe(false);
   });
 });

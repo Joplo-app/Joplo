@@ -63,6 +63,29 @@ describe('D69 不变量 1：节点在一个场景的所有步骤里位置不变'
   });
 });
 
+describe('当前调用一眼可见（D69 补充）', () => {
+  /** 连线 g 上的 data-emph / data-quiet。 */
+  const edgeMark = (html: string, id: string) => {
+    const m = new RegExp(`<g[^>]*data-jid="${id.replace(/[>]/g, '\\$&')}"[^>]*>`).exec(html)?.[0] ?? '';
+    return m.includes('data-emph') ? 'emph' : m.includes('data-quiet') ? 'quiet' : 'plain';
+  };
+  it('本步 trace 的连线突出（加粗、着色、不调暗），连着同一个节点的其他连线变细变浅；只有 shot 的步骤突出焦点节点之间的连线', () => {
+    const p = project();
+    const s1 = render(p, 1); // trace('a', 'b')
+    expect(edgeMark(s1, 'ab')).toBe('emph');
+    expect(edgeMark(s1, 'ac')).toBe('quiet');
+    expect(edgeMark(s1, 'b_data')).toBe('quiet');
+    expect(s1).toMatch(/data-jid="ab"[^>]*data-state="active"/);
+    const s2 = render(p, 2); // trace('a', 'c')：上一步的 ab 变为完成但不再突出
+    expect(edgeMark(s2, 'ac')).toBe('emph');
+    expect(edgeMark(s2, 'ab')).toBe('quiet');
+    const s4 = render(p, 4); // shot('a', 'b', 'c', 'd')：焦点节点之间的连线突出，连到分组的不突出
+    expect(edgeMark(s4, 'ab')).toBe('emph');
+    expect(edgeMark(s4, 'cd')).toBe('emph');
+    expect(edgeMark(s4, 'b_data')).toBe('quiet');
+  });
+});
+
 describe('状态机：value 绑定的当前状态与本步走过的转换（D69）', () => {
   const stateOf = (html: string, id: string) => new RegExp(`data-jid="${id}"[^>]*data-state="([a-z]+)"`).exec(html)?.[1] ?? new RegExp(`data-state="([a-z]+)"[^>]*data-jid="${id}"`).exec(html)?.[1];
   const renderM = (p: Project, pos: number) => {

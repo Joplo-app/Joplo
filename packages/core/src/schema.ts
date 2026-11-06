@@ -63,6 +63,7 @@ export const DiagramLayoutSchema: z.ZodType<DiagramLayoutT> = z.union([
   z.strictObject({
     kind: z.literal('graph'),
     engine: z.enum(['elk', 'grid']),
+    direction: z.enum(['right', 'down']).optional(),
     width: Num,
     height: Num,
     nodes: Boxes,

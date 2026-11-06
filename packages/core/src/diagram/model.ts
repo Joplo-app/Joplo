@@ -16,6 +16,8 @@ export type GraphLayout = {
   kind: 'graph';
   /** elk = 编译期 ELK 布局；grid = 没有布局引擎时的退化排列（只在测试或旧调用方出现）。 */
   engine: 'elk' | 'grid';
+  /** 实际采用的方向（作者没写 direction 时由比例决定，D69 补充）。 */
+  direction?: 'right' | 'down';
   width: number;
   height: number;
   nodes: Record<string, Box>;
@@ -137,8 +139,9 @@ export type GNode = {
   final?: boolean;
 };
 export type GGroup = { id: string; seq: number; label: string; parent: string | null; icon?: string; pin?: 'start' | 'end' };
-export type GEdge = { id: string; from: string; to: string; label: string; lw: number; lh: number };
-export type GraphStructure = { root: GraphRootType; direction: 'right' | 'down'; groups: GGroup[]; nodes: GNode[]; edges: GEdge[] };
+export type GEdge = { id: string; from: string; to: string; label: string; lw: number; lh: number; async?: boolean };
+/** direction：作者写的方向；auto = 没写，按舞台比例在 right / down 里选（D69 补充）。 */
+export type GraphStructure = { root: GraphRootType; direction: 'right' | 'down' | 'auto'; groups: GGroup[]; nodes: GNode[]; edges: GEdge[] };
 
 const pinOf = (v: unknown) => (v === 'start' || v === 'end' ? v : undefined);
 
@@ -150,7 +153,7 @@ export function graphStructure(node: SceneNode): GraphStructure {
   const root = (node.type === 'StateMachine' ? 'StateMachine' : 'Diagram') as GraphRootType;
   const fam = GRAPH_FAMILY[root];
   const p = node.props ?? {};
-  const direction = p.direction === 'down' ? 'down' : 'right';
+  const direction = p.direction === 'down' ? 'down' : p.direction === 'right' ? 'right' : 'auto';
   const groups: GGroup[] = [];
   const nodes: GNode[] = [];
   const edges: GEdge[] = [];
@@ -174,7 +177,7 @@ export function graphStructure(node: SceneNode): GraphStructure {
         }
       } else if (c.type === fam.edge) {
         const label = staticText(cp.label);
-        edges.push({ id: c.id, from: String(cp.from ?? ''), to: String(cp.to ?? ''), label, ...edgeLabelSize(label) });
+        edges.push({ id: c.id, from: String(cp.from ?? ''), to: String(cp.to ?? ''), label, ...edgeLabelSize(label), ...(cp.async === true ? { async: true } : {}) });
       }
       // 嵌套的另一张图自成一图；其他类型在图里不参与布局
     }
