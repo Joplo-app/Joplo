@@ -77,7 +77,7 @@ describe('check：说明与 explain 过长时只给 warning（带 at），不改
     for (const d of [...cap, ...exp]) {
       expect(d.severity).toBe('warning');
       expect(d.at).toBeTruthy();
-      expect(d.message).toContain("layer('设计理由'");
+      expect(d.message).toContain("layer('Design rationale'");
     }
   });
 });
