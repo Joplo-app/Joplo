@@ -27,6 +27,8 @@ import { ThemeStyles } from './renderer/ThemeStyles';
 import { cameraPosition } from './player/cameraFor';
 import { Subtitle } from './player/Subtitle';
 import { subtitleFor, type SubtitleContent } from './player/subtitle-content';
+import { coverFor, coverShown } from './player/cover-content';
+import { Curtain } from './player/Curtain';
 import { waitForFonts } from './board/font-loading';
 
 type W = {
@@ -37,6 +39,9 @@ type W = {
 };
 
 const raf = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
+
+/** 幕布要画什么：位置与（可选的）封面。 */
+type CurtainSpec = { scenarioId: string; position: number; cover: ReturnType<typeof coverFor>; animate: boolean };
 
 export function RenderApp() {
   const { t: i18n } = useBoardI18n();
@@ -135,23 +140,35 @@ export function RenderApp() {
   const fh = (viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).height : vp.height) + SUBTITLE_HEIGHT;
   // 视频与固定尺寸的截图画布用固定高度（画面尺寸不随字幕行数变化）；单张截图与导出图片按内容自适应
   const fixedSub = record || !!shot;
+  // 幕布（D61：过渡卡、场景封面）盖在舞台（手机含外框）上，与演示页一样不进外框；只画不响应，不影响截图报告。
+  // 场景封面只出现在导出图片、视频与固定尺寸截图（分享预览）里；单张截图（Agent 看画面用）保留第 0 步的真实画面。
+  const withCurtain = (node: ReactNode, c: CurtainSpec | null, w: number, h: number) =>
+    c ? (
+      <div style={{ position: 'relative', width: w, height: h }}>
+        {node}
+        <Curtain project={data.project} scenarioId={c.scenarioId} position={c.position} cover={c.cover} theme={theme} font={font} width={w} height={h} animate={c.animate} passive />
+      </div>
+    ) : (
+      node
+    );
   const withSub = (node: ReactNode, sub: SubtitleContent | null, w: number) => (
     <div style={{ display: 'flex', flexDirection: 'column', width: w }}>
       {node}
       <Subtitle content={sub} theme={theme} font={font} width={w} framed fixedHeight={fixedSub ? SUBTITLE_HEIGHT : undefined} />
     </div>
   );
-  const wrap = (stageNode: ReactNode, sub: SubtitleContent | null) => (
+  const fhStage = fh - SUBTITLE_HEIGHT;
+  const wrap = (stageNode: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null = null) => (
     <>
       <ThemeStyles themes={data.project.themes} />
-      {wrapInner(stageNode, sub)}
+      {wrapInner(stageNode, sub, c)}
     </>
   );
-  const wrapInner = (stageNode: ReactNode, sub: SubtitleContent | null) => {
+  const wrapInner = (stageNode: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null) => {
     if (frame)
       return (
         <div data-jexport="" style={{ position: 'absolute', left: 0, top: 0, display: 'inline-block', ...(viewport === 'mobile' ? { background: '#ffffff', padding: 16 } : {}) }}>
-          {withSub(framed(stageNode), sub, fw)}
+          {withSub(withCurtain(framed(stageNode), c, fw, fhStage), sub, fw)}
         </div>
       );
     if (shot) {
@@ -159,13 +176,13 @@ export function RenderApp() {
       const k = Math.min(shot.width / fw, shot.height / fh);
       return (
         <div data-jshot="" style={{ position: 'absolute', left: 0, top: 0, width: shot.width, height: shot.height, overflow: 'hidden', background: '#f8f9fa' }}>
-          <div style={{ position: 'absolute', left: (shot.width - fw * k) / 2, top: (shot.height - fh * k) / 2, width: fw, height: fh, transform: `scale(${k})`, transformOrigin: '0 0' }}>{withSub(framed(stageNode), sub, fw)}</div>
+          <div style={{ position: 'absolute', left: (shot.width - fw * k) / 2, top: (shot.height - fh * k) / 2, width: fw, height: fh, transform: `scale(${k})`, transformOrigin: '0 0' }}>{withSub(withCurtain(framed(stageNode), c, fw, fhStage), sub, fw)}</div>
         </div>
       );
     }
     return (
       <div data-jrender="" style={{ position: 'absolute', left: 0, top: 0 }}>
-        {withSub(stageNode, sub, vp.width)}
+        {withSub(withCurtain(stageNode, c ? { ...c, cover: null } : null, vp.width, vp.height), sub, vp.width)}
       </div>
     );
   };
@@ -186,12 +203,13 @@ export function RenderApp() {
       stageRef={setStage}
       camera={plan.spec}
       sceneId={plan.sceneId}
-    />, subtitleFor(sc, data.state.position, null, data.state.completed, i18n)
+    />, subtitleFor(sc, data.state.position, null, data.state.completed, i18n, data.project),
+    { scenarioId, position: data.state.position, cover: coverShown(sc, data.state.position, false, null) ? coverFor(data.project, scenarioId, i18n) : null, animate: false },
   );
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
-function RecordStage({ project, scenarioId, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null) => ReactNode }) {
+function RecordStage({ project, scenarioId, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null) => ReactNode }) {
   const { t: i18n } = useBoardI18n();
 
   const ctl = useMemo(() => {
@@ -253,6 +271,7 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
       }}
       overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={null} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />}
     />,
-    subtitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n),
+    subtitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n, project),
+    { scenarioId, position: snap.state.position, cover: coverShown(sc, snap.state.position, snap.playing, snap.activeStep) ? coverFor(project, scenarioId, i18n) : null, animate: true },
   );
 }

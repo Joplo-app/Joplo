@@ -442,7 +442,6 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           void ctl.clickNode(id, { x: 0, y: 0 }, { inspect: true });
           setDrawer(true);
         }}
-        stageHint={<span>{i18n.board.holdAndClickToInspect}</span>}
         selectedId={drawer && selection && state && selection.sceneId === state.sceneId ? selection.nodeId : null}
         flash={flash}
         drawer={

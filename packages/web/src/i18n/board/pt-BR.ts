@@ -85,7 +85,6 @@ export function createBoardPtBR(locale: Locale = 'pt-BR') {
       hold: "Segure ⌥",
       nextCase: (p0: Value) => `Próximo caso: ${value(p0, locale)}`,
       copied: (p0: Value) => `Copiado: ${value(p0, locale)}`,
-      holdAndClickToInspect: "Segure ⌥ e clique para inspecionar",
       couldNotSave: (p0: Value) => `Não foi possível salvar: ${value(p0, locale)}`,
       thisProjectOnly: "Só este projeto",
       defaultForAllProjects: "Padrão para todos",

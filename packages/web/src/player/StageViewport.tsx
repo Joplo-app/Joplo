@@ -28,7 +28,16 @@ function NoticeIcon({ icon }: { icon: NoticeView['icon'] }) {
 }
 import type { AppearanceFont } from '../renderer/appearance';
 
-export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null }: { viewport: Viewport; notice: Notice | null; onDismiss: () => void; /** 「回到演示」（顺序不对的提示）。 */ onBack?: () => void; children: (size: { width: number; height: number }) => ReactNode; tag?: ReactNode; theme?: StageTheme; stroke?: StrokeMode; font?: AppearanceFont | null }) {
+export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false }: {
+  viewport: Viewport; notice: Notice | null; onDismiss: () => void; /** 「回到演示」（顺序不对的提示）。 */ onBack?: () => void; children: (size: { width: number; height: number }) => ReactNode; tag?: ReactNode; theme?: StageTheme; stroke?: StrokeMode; font?: AppearanceFont | null;
+  /**
+   * 幕布（D61：过渡卡、场景封面）：铺满整个显示区域，不进手机外框。逻辑尺寸与电脑页面的舞台相同（fillStage），
+   * 按同一比例缩放，所以电脑层与手机层上的卡片一样大。
+   */
+  curtain?: (size: { width: number; height: number }) => ReactNode;
+  /** 幕布此刻挡住了舞台：画面不可聚焦、不可点击（inert）。 */
+  curtainUp?: boolean;
+}) {
   const { t: i18n } = useI18n();
 
   const box = useRef<HTMLDivElement>(null);
@@ -47,6 +56,7 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   const fill = fillStage(avail, vp);
   const scale = phone ? fitStage(avail, frame) : fill.scale;
   const size = phone ? { width: vp.width, height: vp.height } : { width: fill.width, height: fill.height };
+  const sheet = phone ? fillStage(avail, VIEWPORTS.desktop) : fill;
   // 所有提示（含点错位置的三种）都在画面顶部居中，一条轻提示（D55）
   const view = noticeView(notice, i18n);
   return (
@@ -72,7 +82,7 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
           </button>
         </div>
       ) : null}
-      <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute inset-0 flex items-center justify-center" inert={curtainUp || undefined}>
         {phone ? (
           <ThemeContext.Provider value={{ theme, stroke, font, registry: null }}>
             <div data-testid="device-phone">
@@ -89,6 +99,13 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
           </div>
         )}
       </div>
+      {curtain ? (
+        <div className="pointer-events-none absolute inset-0 z-[15] overflow-hidden" data-testid="stage-curtain">
+          <div className="absolute left-1/2 top-1/2" style={{ width: sheet.width, height: sheet.height, transform: `translate(-50%, -50%) scale(${sheet.scale})` }}>
+            {curtain({ width: sheet.width, height: sheet.height })}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

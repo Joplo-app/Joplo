@@ -57,8 +57,8 @@ describe('字幕区：自适应高度与结果小标记', () => {
     expect(subtitleHeight(two)).toBeLessThanOrEqual(SUBTITLE_HEIGHT);
     expect(subtitleHeight(null)).toBe(subtitleHeight(one));
   });
-  it('平时右侧是“第 n / 共 m 步”；场景完成后是“场景完成 · 模拟成功”，第二行没有 explain 时显示结果说明（不再在步骤条里重复）', () => {
-    expect(subtitleFor(sc, 1, null, undefined, zh)!.badge).toEqual({ kind: 'progress', text: '第 1 / 2 步' });
+  it('平时右侧是弱化的“n / m”（D61；读屏仍是“第 n / 共 m 步”）；场景完成后是“场景完成 · 模拟成功”，第二行没有 explain 时显示结果说明（不再在步骤条里重复）', () => {
+    expect(subtitleFor(sc, 1, null, undefined, zh)!.badge).toEqual({ kind: 'progress', text: '1 / 2', label: '第 1 / 2 步' });
     const done = subtitleFor(sc, 2, null, { text: '大脑规划，两只手各自执行', outcome: 'success' }, zh)!;
     expect(done.badge).toMatchObject({ kind: 'done', text: '场景完成 · 模拟成功', outcome: 'success' });
     expect(done.explain).toBe('大脑规划，两只手各自执行');

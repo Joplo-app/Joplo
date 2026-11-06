@@ -85,7 +85,6 @@ export function createBoardJa(locale: Locale = 'ja') {
       hold: "⌥ を長押し",
       nextCase: (p0: Value) => `次のケース：${value(p0, locale)}`,
       copied: (p0: Value) => `コピーしました：${value(p0, locale)}`,
-      holdAndClickToInspect: "⌥ を押しながらクリックして調査",
       couldNotSave: (p0: Value) => `保存できません：${value(p0, locale)}`,
       thisProjectOnly: "このプロジェクトのみ",
       defaultForAllProjects: "全プロジェクトの既定値",

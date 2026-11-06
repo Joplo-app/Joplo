@@ -24,6 +24,8 @@ import { Stage, type ZoomApi } from '../renderer/Stage';
 import { Subtitle } from './Subtitle';
 import { isFullscreenKey, useFullscreen, useIdleVisible } from './fullscreen';
 import { subtitleFor } from './subtitle-content';
+import { coverFor, coverShown } from './cover-content';
+import { Curtain, curtainUp } from './Curtain';
 import { SPEEDS, asSpeed } from '../runtime/pace';
 import { cameraFor, cameraPosition, withLeadFrame } from './cameraFor';
 import type { StageTheme } from '../renderer/rough';
@@ -434,8 +436,6 @@ export type PlayerPageProps = {
   onInspect?: (nodeId: string) => void;
   /** 检查模式（看板「检查」开关）：单击 = 检查元素，不执行步骤。 */
   inspectMode?: boolean;
-  /** 画面右下角的低调提示。 */
-  stageHint?: ReactNode;
   selectedId?: string | null;
   /** 页面级的轻提示（复制链接、导出完成等）。 */
   flash?: ReactNode | null;
@@ -447,7 +447,7 @@ export type PlayerPageProps = {
   exportBadge?: ReactNode;
   /** 全屏控制胶囊里、退出按钮之前的操作（看板：外观）。 */
   fullscreenActions?: ReactNode;
-  /** 手机页面时画面左上角的标注（看板传入“手机页面 · 390 宽 · 外框由画面自动加上”，给作者看；发布站不传）。 */
+  /** 手机页面时画面左上角的标注（看板传入“手机页面 · 390 宽 · 外框由画面自动加上”，给作者看，只在检查时显示；发布站不传）。 */
   deviceTag?: ReactNode;
 };
 
@@ -489,7 +489,10 @@ export function PlayerPage(p: PlayerPageProps) {
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
   // 字幕区（画面下方）显示的步骤：正在播放的一步，否则是刚执行完的一步；第 0 步显示初始状态
   const pos = state?.position ?? 0;
-  const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n);
+  const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n, project);
+  // 幕布（D61）：第 0 步的场景封面、过渡卡；铺满舞台区域，不进手机外框
+  const cover = coverShown(scenario, pos, snap.playing, snap.activeStep) ? coverFor(project, scenario?.id, i18n) : null;
+  const curtainOn = !!scenario && curtainUp(project, scenario.id, pos, cover);
   const speed = asSpeed(p.speed ?? 1);
   useEffect(() => {
     ctl.speed = speed;
@@ -617,7 +620,9 @@ export function PlayerPage(p: PlayerPageProps) {
           notice={snap.notice}
           onDismiss={() => ctl.dismissNotice()}
           onBack={() => ctl.backToDemo()}
-          tag={p.deviceTag && device === 'mobile' && !full ? p.deviceTag : undefined}
+          tag={p.deviceTag && device === 'mobile' && !full && inspecting ? p.deviceTag : undefined}
+          curtainUp={curtainOn}
+          curtain={(size) => <Curtain project={project} scenarioId={scenario?.id} position={pos} cover={cover} onStart={() => void ctl.play({ fromStart: true })} theme={p.theme} font={look.font} width={size.width} height={size.height} animate={!ctl.reducedMotion} />}
         >
           {(size) => (
             <Stage
@@ -661,12 +666,11 @@ export function PlayerPage(p: PlayerPageProps) {
         </div>
       ) : null}
       {completed && !full ? (
-        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-2" data-testid="complete-actions">
+        <div className="absolute bottom-3 right-3 z-30 flex items-center gap-2" data-testid="complete-actions">
           <Btn icon={<RotateCcw className="size-4" />} label={i18n.player.replay} onClick={() => ctl.togglePlay()} data-testid="replay" />
           {p.completeAction}
         </div>
       ) : null}
-      {p.stageHint && !full && !p.inspectMode && !completed ? <div className="pointer-events-none absolute bottom-3 right-3 whitespace-nowrap font-jb text-[12px] text-jb-faint" data-testid="stage-hint">{p.stageHint}</div> : null}
       {p.flash ? (
         <div role="status" className="jb-tip absolute left-1/2 top-3 z-20 -translate-x-1/2 whitespace-nowrap px-3 py-2 text-[13px]" data-testid="flash">
           {p.flash}

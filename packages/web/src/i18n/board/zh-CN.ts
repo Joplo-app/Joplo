@@ -87,11 +87,10 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       switchFeature: "切换功能",
       inspect: "检查",
       exitInspectMode: "关闭检查模式",
-      inspectModeClickAStageElementToSelectIt: "检查模式：单击画面元素 = 选中它（不执行步骤）；也可以按住 ⌥ 临时检查",
+      inspectModeClickAStageElementToSelectIt: "检查模式：单击画面元素 = 选中它（不执行步骤）；平时按住 ⌥ 单击也能检查元素",
       hold: "按住 ⌥",
       nextCase: (p0: Value) => `下一个情况：${value(p0, locale)}`,
       copied: (p0: Value) => `已复制：${value(p0, locale)}`,
-      holdAndClickToInspect: "按住 ⌥ 单击：检查元素",
       // board/Appearance.tsx: Joplo interface text; author content is never translated.
       couldNotSave: (p0: Value) => `保存失败：${value(p0, locale)}`,
       thisProjectOnly: "只改这个项目",

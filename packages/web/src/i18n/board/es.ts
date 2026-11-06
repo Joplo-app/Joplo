@@ -85,7 +85,6 @@ export function createBoardEs(locale: Locale = 'es') {
       hold: "Mantén ⌥",
       nextCase: (p0: Value) => `Siguiente caso: ${value(p0, locale)}`,
       copied: (p0: Value) => `Copiado: ${value(p0, locale)}`,
-      holdAndClickToInspect: "Mantén ⌥ y haz clic para inspeccionar",
       couldNotSave: (p0: Value) => `No se pudo guardar: ${value(p0, locale)}`,
       thisProjectOnly: "Solo este proyecto",
       defaultForAllProjects: "Predeterminado para todos",

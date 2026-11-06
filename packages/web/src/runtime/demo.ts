@@ -20,6 +20,7 @@ import { m } from '../i18n/messages';
  */
 import { animate, type AnimationPlaybackControls } from 'motion';
 import { stepDwell, CAMERA_MS } from './pace';
+import { dwellTexts } from '../player/cover-content';
 import { orderedFeatures, streamsOf, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core';
 import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 
@@ -466,7 +467,7 @@ export class DemoController {
         const dwell = this.reducedMotion
           ? TIMING.reducedStep
           : stepDwell({
-              texts: [stepCaption(step, this.i18n), step.explain, ...(step.action.type === 'card' ? [step.action.sub, ...(step.action.points ?? [])] : [])],
+              texts: dwellTexts(step, this.i18n),
               speed: this.speed,
               cameraMoved: step.shots.length > 0 || !!step.directorLayer,
               dotMs: this.activeDotMs(),
