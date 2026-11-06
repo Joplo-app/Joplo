@@ -568,6 +568,7 @@ export type DiagramStates = Record<string, { state: DiagramState; reverse?: bool
  * - trace.fail：路径上的连线与终点节点 error（起点等其余节点 active），保持到之后又被 trace 成功；
  * - trace.skip：路径上的节点与连线 dim（保持到之后又被 trace）；
  * - 从未涉及的：idle（不在结果里）。
+ * - 分组（D67）：路径经过的节点所在的各级分组同样 active → ok；trace.fail 时终点所在的最内层分组 error；trace.skip 不改分组。
  * 节点或连线上显式写的 state 优先于推算结果（由渲染器处理）。
  */
 export function diagramStateAt(project: Project, scenarioId: string | null | undefined, position: number): DiagramStates {
@@ -588,9 +589,12 @@ export function diagramStateAt(project: Project, scenarioId: string | null | und
         for (const e of t.edges) out[e.id] = { state: 'dim' };
       } else if (t.mode === 'fail') {
         const last = t.nodes[t.nodes.length - 1];
+        for (const id of t.groups ?? []) out[id] = { state: 'active' };
+        for (const id of t.errorGroups ?? []) out[id] = { state: 'error' };
         for (const id of t.nodes) out[id] = { state: id === last ? 'error' : 'active' };
         for (const e of t.edges) out[e.id] = { state: 'error' };
       } else {
+        for (const id of t.groups ?? []) out[id] = { state: 'active' };
         for (const id of t.nodes) out[id] = { state: 'active' };
         for (const e of t.edges) out[e.id] = e.reverse ? { state: 'active', reverse: true } : { state: 'active' };
       }

@@ -17,7 +17,7 @@ npx joplo dev --open
 
 - Author pages, options, cases, rules, and flows in TSX with `@joplo-app/kit`.
 - Review multiple projects in one local Board. Option/Alt-click an element to inspect its rules and exact source location.
-- Use Layers, Director, and Shots to guide the demo. Model architecture with `Diagram` and `trace()`; use `Terminal`, `Phone`, and custom Themes for the right presentation.
+- Use Layers, Director, and Shots to guide the demo. Model architecture with grouped `Diagram`, `Sequence`, `StateMachine`, and `trace()`; use `Terminal`, `Phone`, and custom Themes for the right presentation.
 - Export images or record scenarios locally. Build a static Published site with Layers, Director, and fullscreen playback.
 
 Read only the authoring guidance your agent needs:

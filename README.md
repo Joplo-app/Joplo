@@ -28,7 +28,7 @@ Keep the Board process running. Edit the generated TSX files and watch the demo 
 - **Board:** a home page with recent projects and their features, served by one local process.
 - **Interactive demos:** breadcrumbs, a sidebar grouped by case, playback controls, a step strip, and a dedicated subtitle area.
 - **Layers, Director, and Shots:** give each perspective its own page. The Director follows the flow, switches Layers, and moves the camera to each Shot. Viewers can take over, replay one Layer, zoom, pan, or go fullscreen.
-- **Architecture demos:** `Diagram` defines nodes and edges; `trace()` animates call paths and derives their states. Reveal sections progressively with `when`.
+- **Architecture demos:** `Diagram` groups nodes by business domain, `Sequence` walks a call chain in time order, `StateMachine` shows a lifecycle. Layout is automatic and stable across steps; `trace()` animates call paths and derives their states.
 - **Inspection:** hold Option/Alt and click to open the rules and source drawer. Your agent can retrieve the selection and edit just that location.
 - **Terminal and Phone:** model command-line interactions with `Terminal`; mobile pages use a `Phone` frame. Each page targets one device.
 - **Themes:** choose from nine built-ins or add `themes/<name>.css`. Board settings can apply a Theme to one project or all projects.
@@ -112,7 +112,7 @@ Use your own Wrangler account and configure the site name and compatibility date
 | Example | What to explore |
 | --- | --- |
 | [examples/invite](examples/invite) | Compare an invitation dialog with a batch invitation flow |
-| [examples/agent-arch](examples/agent-arch) | Layers, Director, `Diagram`, and `trace()` for an agent architecture |
+| [examples/agent-arch](examples/agent-arch) | Layers, Director, grouped `Diagram`, `Sequence`, `StateMachine`, and `trace()` for an agent architecture |
 | [examples/joplo-board](examples/joplo-board) | Multi-project Board and player interaction designs |
 | [examples/joplo-dist](examples/joplo-dist) | npm installation and agent guidance flows |
 

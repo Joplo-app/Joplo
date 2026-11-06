@@ -4,7 +4,7 @@
  */
 import path from 'node:path';
 import { compile, type CompileMode, type Diagnostic, type Project } from '@joplo-app/core';
-import { discoverFiles, loadAuthoring } from '@joplo-app/core/node';
+import { discoverFiles, elkLayout, loadAuthoring } from '@joplo-app/core/node';
 import type { ViteDevServer } from 'vite';
 import { isProjectSource } from './vite-shared.ts';
 
@@ -69,7 +69,8 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
   if (!loaded.authoring) return { project: null, diagnostics, home: null };
   const home = loaded.authoring.config.home ?? null;
   if (diagnostics.some((d) => d.severity === 'error')) return { project: null, diagnostics, home };
-  const r = compile(loaded.authoring, mode);
+  // 图表布局在编译期由 ELK 算好写进 IR（D67）：看板与发布站只渲染
+  const r = compile(loaded.authoring, mode, { layout: elkLayout });
   return { project: r.project, diagnostics: [...diagnostics, ...r.diagnostics], home };
 }
 

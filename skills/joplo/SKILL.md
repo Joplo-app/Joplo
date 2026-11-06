@@ -33,7 +33,7 @@ Options (A/B) and cases (edge cases) are compared in the local board; only the p
 - Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user. See npx joplo skill cases.
 - Never share or deploy without the user's go-ahead; free share links expire after 1 hour. See npx joplo skill publish.
 
-Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, demo, components, cases, check, selection, publish). Run npx joplo skill for the overview.
+Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, demo, diagram, components, cases, check, selection, publish). Run npx joplo skill for the overview.
 After the user Alt+clicks a board element, run npx joplo selection and edit only that location.
 Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.7 sha256:bd3c8e2cdbaaf778a57de108719c1f443474b94d5658fd381c1d2b981b5f5092 -->
+<!-- joplo-skill 0.2.7 sha256:a56d9d70359fc4cdce37b2292b062fb8ecf28ab0edfe66dc60b9d1826097aef0 -->

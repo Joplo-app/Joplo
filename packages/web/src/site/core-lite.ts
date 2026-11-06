@@ -9,3 +9,5 @@ export type * from '../../../core/src/schema.ts';
 export type { Selection } from '../../../core/src/selection.ts';
 export * from '../../../core/src/embed.ts';
 export * from '../../../core/src/features.ts';
+/** 图表的结构与渲染辅助（D67）：纯函数；布局已在编译期写进 IR，这里不含 ELK。 */
+export * from '../../../core/src/diagram/index.ts';

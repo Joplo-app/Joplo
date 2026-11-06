@@ -4,8 +4,8 @@ import ts from 'typescript';
 import { COMPONENT_DOCS, COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../src/catalog.ts';
 import { guide, skillIndex, skillTopic, SKILL_TOPICS } from '../src/guide.ts';
 
-const topics = ['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'publish'] as const;
-test('七个主题均少于 150 行，结尾的相关主题均存在', () => {
+const topics = ['authoring', 'demo', 'diagram', 'components', 'cases', 'check', 'selection', 'publish'] as const;
+test('八个主题均少于 150 行，结尾的相关主题均存在', () => {
   expect(SKILL_TOPICS.map(t => t.name)).toEqual(topics);
   for (const topic of topics) {
     const body = skillTopic(topic);
@@ -29,7 +29,10 @@ test('索引行数来自实际内容，版本由调用方提供', () => {
 });
 test('components 取自真实目录与三种行为集合，未知 docs 不增加组件', () => {
   const output = skillTopic('components');
-  for (const name of COMPONENT_TYPES.filter(name => !name.startsWith('#'))) expect(output).toContain(`- ${name}\n`);
+  // 图表家族（D67）各占一行：根组件后面列出它的子组件，细节在 diagram 主题
+  const family = /^(Diagram|StateMachine|Sequence)\./;
+  for (const name of COMPONENT_TYPES.filter(name => !name.startsWith('#') && !family.test(name) && !['Diagram', 'StateMachine', 'Sequence'].includes(name))) expect(output).toContain(`- ${name}\n`);
+  for (const root of ['Diagram', 'StateMachine', 'Sequence']) expect(output).toContain(`- ${[root, ...COMPONENT_TYPES.filter(n => n.startsWith(`${root}.`))].join(', ')}\n`);
   for (const set of [INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS]) for (const name of set) expect(output).toContain(name);
   const withDocs = skillTopic('components', { Button: 'variant / size\n下一行', Bogus: '不应输出' });
   expect(withDocs).toContain('- Button: variant / size 下一行');

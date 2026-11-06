@@ -12,3 +12,4 @@ export * from './embed.ts';
 export * from './features.ts';
 export * from './review.ts';
 export * from './agent-skill.ts';
+export * from './diagram/index.ts';
