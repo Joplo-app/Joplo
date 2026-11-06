@@ -164,7 +164,7 @@ export function CaseNav({
   const loose = scenariosOf(project, optionId).filter((s) => !covered.has(s.id) && !s.caseIds.some((c) => f.caseIds.includes(c)));
   return (
     <div className="flex min-h-full flex-1 flex-col gap-1 font-jb" data-testid="case-nav">
-      <GroupHead title={i18n.board.options} right={i18n.board.count2(options.length)} />
+      <GroupHead title={i18n.board.options} right={i18n.board.itemCount(options.length)} />
       {options.length === 0 ? <p className="px-2 text-[13px] text-jb-muted">{i18n.board.thisFeatureHasNoOptionsYet}</p> : null}
       <ul className="flex flex-col gap-1" data-testid="option-switch">
         {options.map((o, i) => (
@@ -197,9 +197,9 @@ export function CaseNav({
       <div className="min-h-4 flex-1" />
       {optionId ? (
         <button type="button" onClick={() => onCopy(gapCommand(optionId))} data-testid="gap-count" title={i18n.board.copy(gapCommand(optionId))} className="jb-focus sticky bottom-0 flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[8px] bg-jb-app p-2.5 text-left text-[12px] hover:bg-jb-press">
-          <span className="font-semibold text-jb-fg">{i18n.board.options}{letter}</span>
-          <span className={cn(gaps.missing ? 'font-semibold text-jb-danger' : 'text-jb-muted')}>{i18n.board.missing}{gaps.missing}</span>
-          <span className="text-jb-muted">{i18n.board.undecided}{gaps.undecided}</span>
+          <span className="font-semibold text-jb-fg">{i18n.board.optionLabel(letter ?? '')}</span>
+          <span className={cn(gaps.missing ? 'font-semibold text-jb-danger' : 'text-jb-muted')}>{i18n.board.missingCount(gaps.missing)}</span>
+          <span className="text-jb-muted">{i18n.board.undecidedCount(gaps.undecided)}</span>
           <span className="flex-1" />
           <span className="hidden font-jb-mono text-[11px] text-jb-faint min-[1440px]:inline">joplo check</span>
         </button>
@@ -222,7 +222,7 @@ export function CaseRail({ project, featureId, optionId, caseId }: { project: Pr
       {optionsOf(project, featureId).map((o, i) => {
         const { letter, title } = optionLabel(o, i);
         return (
-          <span key={o.id} title={i18n.board.option2(letter, title)} className="flex size-9 items-center justify-center">
+          <span key={o.id} title={i18n.board.optionName(letter, title)} className="flex size-9 items-center justify-center">
             <Letter letter={letter} on={o.id === optionId} />
           </span>
         );

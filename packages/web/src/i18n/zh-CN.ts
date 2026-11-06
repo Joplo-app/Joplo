@@ -1,22 +1,19 @@
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
-import { value, number, list, plural, type Value } from './format';
+import { value, number, list, type Value } from './format';
 import type { Dictionary } from './en';
 
 export function createZhCN(locale: Locale = 'zh-CN') {
   return defineDictionary<Dictionary>()({
     player: {
+      speedValue: (n: number) => `${number(n, locale)}×`,
       transition: "过渡",
       transitionPrefix: "过渡 · ",
       number: (n: number) => number(n, locale),
       list: (items: readonly string[]) => list(items, locale),
 
       language: "语言",
-      selectionSyncFailed: (p0: Value, p1: Value, p2: Value) => `${value(p0, locale)}：${value(p1, locale)}${value(p2, locale)}`,
       // RenderApp.tsx: Joplo interface text; author content is never translated.
-      projectDidNotCompileSuccessfully: "项目没有成功编译",
-      english: "中文",
-      renderFailed: "渲染失败：",
       // player/Overlay.tsx: Joplo interface text; author content is never translated.
       sampleInput: "示例输入",
       // player/PlayerPage.tsx: Joplo interface text; author content is never translated.
@@ -29,11 +26,11 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       previousStep: "上一步",
       space: "空格",
       nextStep: "下一步",
-      step: (p0: Value, p1: Value) => `第 ${value(p0, locale)} 步：${value(p1, locale)}`,
+      stepWithCaption: (p0: Value, p1: Value) => `第 ${value(p0, locale)} 步：${value(p1, locale)}`,
       system: "系统",
-      system2: "系统 · ",
+      systemPrefix: "系统 · ",
       steps: "步骤",
-      stepClickToViewAllSteps: (p0: Value, p1: Value) => `第 ${value(p0, locale)} 步：${value(p1, locale)}（点一下看全部步骤）`,
+      stepMenuLabel: (p0: Value, p1: Value) => `第 ${value(p0, locale)} 步：${value(p1, locale)}（点一下看全部步骤）`,
       playbackControls: "播放控制",
       goToStart: "回到开头",
       autoplaySpeed: (p0: Value) => `自动播放速度（${value(p0, locale)}×）`,
@@ -71,7 +68,7 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       fullscreen: "全屏",
       expandSidebar: "展开左栏",
       demoReplayFailed: "演示回放出错：",
-      hold: "按住 ⌥",
+      holdOptionKey: "按住 ⌥",
       keyboardShortcuts: "快捷键",
       // player/StageThumb.tsx: Joplo interface text; author content is never translated.
       noStageYet: "还没有画面",
@@ -113,7 +110,6 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       scrollDrag: "滚轮 · 拖动",
       other: "其他",
       expandCollapsedSidebarNarrowScreens: "展开收起的左栏（窄屏）",
-      joploBoard: "Joplo · 看板",
       exporting: (p0: Value, p1: Value) => `${value(p0, locale)} · 导出中 ${value(p1, locale)}`,
       // player/status.ts: Joplo interface text; author content is never translated.
       covered: "已表达",
@@ -125,13 +121,9 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       initialState: "初始状态",
       thisScenarioHasNoStepsAndOnlyShowsIts: "这个场景没有步骤，只展示初始状态",
       scenarioComplete: (p0: Value) => `场景完成 · ${value(p0, locale)}`,
-      thisIsADemoResultForNotAResponse: (p0: Value, p1: Value) => `${value(p0, locale)}（这是${value(p1, locale)}的演示结果，不代表真实服务的返回）`,
-      step3: (p0: Value, p1: Value) => `第 ${value(p0, locale)} / ${value(p1, locale)} 步`,
+      demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)}（这是${value(p1, locale)}的演示结果，不代表真实服务的返回）`,
+      stepProgress: (p0: Value, p1: Value) => `第 ${value(p0, locale)} / ${value(p1, locale)} 步`,
       // runtime/demo.ts: Joplo interface text; author content is never translated.
-      selectedElementLocationUpdated: "选中元素的位置已更新",
-      couldNotSyncSelectionToAgent: "选中未能同步给 Agent",
-      theSelectedElementIsNoLongerInThisStage: "选中的元素已不在当前画面中，已取消选中",
-      couldNotSyncClearedSelectionToAgent: "取消选中未能同步给 Agent",
       replayFailedAtStep: (p0: Value, p1: Value) => `回放在第 ${value(p0, locale)} 步失败：${value(p1, locale)}`,
       couldNotStartScenario: (p0: Value) => `场景无法开始：${value(p0, locale)}`,
       thisProjectHasNoRoutesYet: "项目还没有任何路径",
@@ -142,20 +134,12 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       alreadyAtInitialState: "已经是初始状态",
       thisScenarioHasNoStepsAndOnlyShowsIts2: "这个场景没有步骤：只展示初始状态",
       scenarioCompleteResetOrSwitchScenarios: "场景已完成，可以重置或切换场景",
-      staticStageThisOptionDoesNotDemonstrateThisCase: "这是静态画面：当前方案还没有演示这个情况",
       autoplayIsRunningPauseBeforeInteractingManually: "正在自动播放：先暂停，再手动操作",
       couldNotInterpretThisClick: (p0: Value) => `无法解释这次点击：${value(p0, locale)}`,
       thisDemoDoesNotCover: (p0: Value) => `当前演示未覆盖此操作：「${value(p0, locale)}」`,
       inThisScenarioTheNextStepIs: (p0: Value) => `按当前场景，下一步是：${value(p0, locale)}`,
       inThisScenarioTheDemoHasEnded: "按当前场景，演示已经结束",
       scenarioEndedResetOrSwitchScenarios: "场景已结束，可以重置或切换场景",
-      selectedTellAgentWhatYouWantToChange: (p0: Value) => `已选中${value(p0, locale)}，可以在 Agent 会话里说要改什么`,
-      selectionClearedAndSyncedToAgent: "已取消选中，已同步给 Agent",
-      thisPageCannotWriteASelectionReadOnly: "当前页面不能写入选中（只读）",
-      keepingThePreviousSelection: (p0: Value) => `，仍保持上一次的选中「${value(p0, locale)}」`,
-      selectionCleared: "，已取消选中",
-      previousSelectionRestored: "已恢复上次的选中",
-      previousSelectionIsNoLongerValid: "上次的选中已失效",
       couldNotExecuteThisStep: (p0: Value) => `无法执行这一步：${value(p0, locale)}`,
     },
     stage: {
@@ -194,7 +178,7 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       placeholder: "占位",
       customComponent: "自定义组件：",
       unnamed: "未命名",
-      placeholder2: "（占位）",
+      placeholderSuffix: "（占位）",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "目录中没有的组件，按声明的元素 ID 与状态演示",
       // renderer/themes.ts: Joplo interface text; author content is never translated.
       handDrawn: "手绘",
@@ -203,7 +187,7 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       retroTerminal: "复古终端",
       kraft: "牛皮纸",
       highContrast: "高对比",
-      themeN: (p0: Value, p1: Value, p2: Value) => `/* 主题 ${value(p0, locale)}${value(p1, locale)} */
+      themeCssComment: (p0: Value, p1: Value, p2: Value) => `/* 主题 ${value(p0, locale)}${value(p1, locale)} */
 ${value(p2, locale)}`,
     },
     site: {
@@ -213,11 +197,9 @@ ${value(p2, locale)}`,
       // site/SiteApp.tsx: Joplo interface text; author content is never translated.
       prototypeDataIsMissingRunJoploBuildAgain: "页面缺少原型数据。请重新运行 joplo build。",
       features: "功能",
-      count: " 个",
       noFeaturesHaveBeenPublishedYet: "还没有发布任何功能。",
       openDemoFor: (p0: Value) => `打开「${value(p0, locale)}」的演示`,
       openDemo: "打开演示",
-      scenarios: " 个场景",
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "用 Joplo 制作的概念原型 · 非正式实现",
       featureNotFound: "没有这个功能。",
       goToHome: "回到首页",
@@ -226,9 +208,9 @@ ${value(p2, locale)}`,
       copyLinkToCurrentStep: "复制当前步骤的链接",
       linkCopied: "已复制链接",
       clipboardUnavailableCopyFromTheAddressBar: "无法访问剪贴板，请从地址栏复制",
-      scenarios2: "场景",
+      scenarios: "场景",
       // site/site-model.ts: Joplo interface text; author content is never translated.
-      steps: (p0: Value) => `${value(p0, locale)} 步`,
+      stepCount: (p0: Value) => `${value(p0, locale)} 步`,
     },
   });
 }

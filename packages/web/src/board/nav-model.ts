@@ -39,7 +39,7 @@ export function letterOf(project: Project, optionId: string): string {
   return optionLabel(o, Math.max(0, i)).letter;
 }
 
-const gapText = (g: { missing: number; undecided: number }, i18n: BoardMessages = boardEnglish) => [g.missing ? i18n.board.missing3(g.missing) : '', g.undecided ? i18n.board.undecided3(g.undecided) : ''].filter(Boolean).join(' · ');
+const gapText = (g: { missing: number; undecided: number }, i18n: BoardMessages = boardEnglish) => [g.missing ? i18n.board.missingCount(g.missing) : '', g.undecided ? i18n.board.undecidedCount(g.undecided) : ''].filter(Boolean).join(' · ');
 
 export function optionMeta(project: Project, optionId: string, i18n: BoardMessages = boardEnglish): { picked: boolean; missing: number; undecided: number; text: string } {
   const o = project.options[optionId];

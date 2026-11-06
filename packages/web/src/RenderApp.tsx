@@ -1,9 +1,9 @@
+import { m } from './i18n/board/messages';
 import { translate, type Text } from './i18n/messages';
-import { useI18n } from './i18n/context';
-import { en, type Dictionary } from './i18n/en';
+import { useBoardI18n } from './i18n/board/context';
 /**
  * 渲染专用路由（renderStep 与看板导出使用）：
- *   /?render=1&project=<id>&scenario=..&position=..&theme=..[&font=..][&stroke=..][&w=..&h=..][&frame=1][&record=1]
+ *   /?render=1&project=<id>&scenario=..&position=..&theme=..[&font=..][&stroke=..][&w=..&h=..][&frame=1][&record=1][&locale=en]
  * - font / stroke（D55，看板外观）：缺省 = 跟随主题；导出图片、视频与 renderStep 透传，和看板里看到的一致。
  * - 只渲染舞台，尺寸跟随页面自己的 viewport（D44：不再覆盖设备），关闭入场动画。字体、rough 绘制与镜头都稳定后
  *   设置 window.__JOPLO_READY__ = true，并暴露 window.__JOPLO_STATE__（当前 PlayState）。
@@ -38,8 +38,9 @@ type W = {
 const raf = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
 export function RenderApp() {
-  const { t: i18n } = useI18n();
+  const { t: i18n } = useBoardI18n();
 
+  useEffect(() => { document.title = i18n.board.joploBoard; }, [i18n]);
   const params = new URLSearchParams(location.search);
   const projectId = params.get('project') ?? '';
   const scenarioId = params.get('scenario') ?? '';
@@ -63,7 +64,7 @@ export function RenderApp() {
     (async () => {
       const r = await fetchIR(projectId);
       if ('error' in r) return fail(r.error);
-      if (!r.project) return fail(r.diagnostics.map((d) => `${d.at ?? ''} ${d.message}`).join('；') || i18n.player.projectDidNotCompileSuccessfully);
+      if (!r.project) return fail(r.diagnostics.map((d) => `${d.at ?? ''} ${d.message}`).join('；') || m.board.projectDidNotCompileSuccessfully);
       try {
         setData({ project: r.project, state: stateAt(r.project, scenarioId, position) });
       } catch (e) {
@@ -88,7 +89,7 @@ export function RenderApp() {
       await raf();
       {
         // 手绘字体按需加载（主题可能用到）；等它们就绪再截图
-        const text = stage.innerText || i18n.player.english;
+        const text = stage.innerText || i18n.board.english;
         await Promise.all([document.fonts.load('16px "Joplo Excalifont"', text), document.fonts.load('16px "Joplo Xiaolai"', text)]).catch(() => undefined);
       }
       await document.fonts.ready;
@@ -109,7 +110,7 @@ export function RenderApp() {
     };
   }, [data, stage, registry, theme, record]);
 
-  if (error) return <div style={{ padding: 24, color: '#c92a2a', fontFamily: 'system-ui' }} data-render-error="">{i18n.player.renderFailed}{translate(error, i18n)}</div>;
+  if (error) return <div style={{ padding: 24, color: '#c92a2a', fontFamily: 'system-ui' }} data-render-error="">{i18n.board.renderFailed}{translate(error, i18n)}</div>;
   if (!data) return null;
   // 有层级的方案：显示这一步导演层的画面（每层是独立画面），设备取这个画面的设置
   const shownId = data.project.scenarios[scenarioId] ? displaySceneId(data.project, scenarioId, data.state.position) : data.state.sceneId;
@@ -187,7 +188,7 @@ export function RenderApp() {
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
 function RecordStage({ project, scenarioId, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null) => ReactNode }) {
-  const { t: i18n } = useI18n();
+  const { t: i18n } = useBoardI18n();
 
   const ctl = useMemo(() => {
     const c = new DemoController(null);

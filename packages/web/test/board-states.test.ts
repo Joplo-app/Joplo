@@ -177,7 +177,7 @@ describe('标签页标题与 favicon 状态点', () => {
     expect(tabTitle({ feature: '团队成员邀请', project: '团队邀请功能' }, zh)).toBe('团队成员邀请 · 团队邀请功能');
     expect(tabTitle({ feature: '团队成员邀请', project: '团队邀请功能', error: true }, zh)).toBe('✕ 团队成员邀请 · 团队邀请功能');
     expect(tabTitle({ feature: '团队成员邀请', project: '团队邀请功能', exporting: '3/5' }, zh)).toBe('团队成员邀请 · 导出中 3/5');
-    expect(tabTitle({ feature: null, project: null }, zh)).toBe('Joplo · 看板');
+    expect(tabTitle({ feature: null, project: null }, zh, zh.board.joploBoard)).toBe('Joplo · 看板');
   });
   it('favicon：标志；出错右下角红点，导出中黄点', () => {
     const plain = decodeURIComponent(faviconHref(null));

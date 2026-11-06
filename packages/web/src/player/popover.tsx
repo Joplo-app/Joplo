@@ -20,7 +20,7 @@ function usePortalHost(): Element | null {
 }
 
 /** 跟着锚点的 fixed 定位层：锚点移动（滚动、窗口缩放、自身尺寸变化）时重新计算。 */
-function Floating({ anchor, placement, children, className, style, onEl, ...rest }: { anchor: HTMLElement; placement: Placement; children: ReactNode; className?: string; style?: CSSProperties; onEl?: (el: HTMLDivElement | null) => void } & Omit<React.HTMLAttributes<HTMLDivElement>, 'style' | 'className' | 'children'>) {
+function Floating({ anchor, placement, children, className, style, onEl, autoFocus = false, ...rest }: { anchor: HTMLElement; placement: Placement; children: ReactNode; className?: string; style?: CSSProperties; onEl?: (el: HTMLDivElement | null) => void; autoFocus?: boolean } & Omit<React.HTMLAttributes<HTMLDivElement>, 'style' | 'className' | 'children'>) {
   const host = usePortalHost();
   const ref = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<ReturnType<typeof placePopover> | null>(null);
@@ -43,6 +43,13 @@ function Floating({ anchor, placement, children, className, style, onEl, ...rest
       window.removeEventListener('scroll', update, true);
     };
   }, [update, anchor]);
+  // A hidden measuring pass cannot accept focus. Wait until the positioned surface is visible.
+  const positioned = pos !== null;
+  useLayoutEffect(() => {
+    if (!positioned || !autoFocus) return;
+    const first = ref.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]),[role="menuitemcheckbox"]:not([disabled]),[role="menuitemradio"]:not([disabled]),button:not([disabled]),[tabindex="0"]');
+    (first ?? ref.current)?.focus();
+  }, [positioned, autoFocus]);
   if (!host) return null;
   return createPortal(
     <div
@@ -99,6 +106,7 @@ export function Popover({ open, anchor, onClose, placement = 'bottom-end', child
       if (e.key !== 'Escape') return;
       e.stopPropagation();
       closeRef.current();
+      anchor?.focus();
     };
     window.addEventListener('pointerdown', down, true);
     window.addEventListener('keydown', key);
@@ -116,16 +124,12 @@ export function Popover({ open, anchor, onClose, placement = 'bottom-end', child
       focused.current = false;
     };
   }, [open, anchor]);
-  useLayoutEffect(() => {
-    if (!open || !autoFocus) return;
-    const first = el.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]),[role="menuitemcheckbox"]:not([disabled]),[role="menuitemradio"]:not([disabled]),button:not([disabled]),[tabindex="0"]');
-    (first ?? el.current)?.focus();
-  }, [open, autoFocus]);
   if (!open || !anchor) return null;
   return (
     <Floating
       anchor={anchor}
       placement={placement}
+      autoFocus={autoFocus}
       onEl={(x) => (el.current = x)}
       role={role}
       aria-label={label}

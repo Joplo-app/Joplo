@@ -1,3 +1,4 @@
+import { createZhCN } from '../src/i18n/zh-CN';
 /** D56：流式输出的节奏与过渡卡的时间线格子（纯函数）。 */
 import { describe, expect, it } from 'vitest';
 import { MIN_DWELL, STREAM_MAX, STREAM_MIN, STREAM_MS_PER_CHAR, stepDwell, streamMs } from '../src/runtime/pace';
@@ -24,7 +25,7 @@ describe('streamMs / stepDwell 的流式输出', () => {
 
 describe('时间线：过渡卡的格子', () => {
   it('标成 card，悬停写“过渡 · 标题”；普通步骤没有 card 字段', () => {
-    const chips = timelineChips([{ caption: '3 天后', kind: 'card' }, { caption: '点击发送', kind: 'user' }], 0, null);
+    const chips = timelineChips([{ caption: '3 天后', kind: 'card' }, { caption: '点击发送', kind: 'user' }], 0, null, null, false, createZhCN());
     expect(chips[1]).toMatchObject({ card: true, system: false, tip: '1 · 过渡 · 3 天后' });
     expect('card' in chips[2]!).toBe(false);
   });

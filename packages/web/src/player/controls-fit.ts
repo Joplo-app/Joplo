@@ -51,7 +51,7 @@ export const PLAY_LABELS = (playLabel: string, i18n: Dictionary = en): PlayLabel
 export function navGroup(h: number, playLabel: string, i18n: Dictionary = en): Group {
   return { id: 'nav', full: buttonW(i18n.player.previousStep, h) + Math.max(96, buttonW(playLabel, h)) + buttonW(i18n.player.nextStep, h) + 2 * CTRL.gap, collapsed: 3 * h + 2 * CTRL.gap };
 }
-export const speedGroup = (speeds: readonly number[], menuW: number): Group => ({ id: 'speed', full: segmentedW(speeds.map((v) => `${v}×`)), collapsed: menuW });
+export const speedGroup = (speeds: readonly number[], menuW: number, i18n: Dictionary = en): Group => ({ id: 'speed', full: segmentedW(speeds.map((v) => i18n.player.speedValue(v))), collapsed: menuW });
 export const layersGroup = (titles: string[], h: number, i18n: Dictionary = en): Group => ({
   id: 'layers',
   full: segmentedW(titles),
@@ -64,6 +64,6 @@ export function fullscreenBarCollapse(avail: number, playLabel: string, speeds: 
   // 胶囊左右内边距 8 + 退出全屏按钮 + 分隔线（每条 1px + 左右 4px） + 导演标签
   const seps = titles.length > 1 ? 2 : 1;
   const fixed = 16 + CTRL.sm + seps * 9 + (titles.length > 1 ? directorW(director, layerTitle, i18n) : 0);
-  const groups = [navGroup(CTRL.sm, playLabel, i18n), speedGroup(speeds, CTRL.sm), ...(titles.length > 1 ? [layersGroup(titles, CTRL.sm, i18n)] : [])];
+  const groups = [navGroup(CTRL.sm, playLabel, i18n), speedGroup(speeds, CTRL.sm, i18n), ...(titles.length > 1 ? [layersGroup(titles, CTRL.sm, i18n)] : [])];
   return collapseToFit(avail, fixed, groups, CTRL.gap, titles.length > 1 ? 2 : 1);
 }

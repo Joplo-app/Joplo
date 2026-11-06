@@ -106,7 +106,7 @@ export function Overlay({
 
       {/* 点错位置（D55）：目标闪两下；说明在画面顶部居中的轻提示（StageViewport） */}
       {n && anchor && (n.kind === 'disabled' || n.kind === 'uncovered' || n.kind === 'out_of_order') ? (
-        <div key={`${anchorId}|${n.text}`} className="jflash absolute rounded-md border-2 border-[var(--focus)]" style={{ left: anchor.x - 5, top: anchor.y - 5, width: anchor.w + 10, height: anchor.h + 10 }} data-joverlay="notice-target" aria-hidden />
+        <div key={`${anchorId}|${JSON.stringify(n.text)}`} className="jflash absolute rounded-md border-2 border-[var(--focus)]" style={{ left: anchor.x - 5, top: anchor.y - 5, width: anchor.w + 10, height: anchor.h + 10 }} data-joverlay="notice-target" aria-hidden />
       ) : null}
     </>
   );

@@ -111,7 +111,7 @@ function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
 }
 
 const playLabelOf = (snap: Snapshot, i18n: Dictionary = en) => (!snap.playing ? (snap.state?.completed ? i18n.player.replay : i18n.player.play) : snap.paused ? i18n.player.resume : i18n.player.pause);
-const speedItems = (speed: number, onSpeed: (v: number) => void): MenuEntry[] => SPEEDS.map((v) => ({ id: `speed-${v}`, label: `${v}×`, checked: speed === v, onClick: () => onSpeed(v) }));
+const speedItems = (speed: number, onSpeed: (v: number) => void, i18n: Dictionary = en): MenuEntry[] => SPEEDS.map((v) => ({ id: `speed-${v}`, label: i18n.player.speedValue(v), checked: speed === v, onClick: () => onSpeed(v) }));
 
 /** 上一步 / 播放 / 下一步（悬停提示写快捷键）。 */
 function NavButtons({ snap, scenario, ctl, iconOnly, size, ids }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; iconOnly: boolean; size: 32 | 34; ids: { prev: string; play: string; next: string } }) {
@@ -148,7 +148,7 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
         data-state={chip.state}
         data-step-kind={kind}
         data-playing={chip.playing ? '' : undefined}
-        aria-label={i18n.player.step(chip.index, chip.label)}
+        aria-label={i18n.player.stepWithCaption(chip.index, chip.label)}
         aria-current={cur ? 'step' : undefined}
         {...tip}
         style={cur ? { width } : undefined}
@@ -169,13 +169,13 @@ function Chip({ chip, width, onClick, testid, kind }: { chip: TimelineChip; widt
             style={{ animationDuration: `${chip.dwell.ms}ms`, animationDelay: `${-chip.dwell.elapsed}ms`, animationPlayState: chip.dwell.paused ? 'paused' : 'running' }}
           />
         ) : null}
-        <span className="relative">{chip.index}</span>
+        <span className="relative">{i18n.player.number(chip.index)}</span>
         {chip.fork ? <GitFork className="relative size-3 shrink-0" aria-label="分叉" /> : null}
         {chip.system && !cur ? <Cog className="relative size-3" aria-label={i18n.player.system} /> : null}
         {chip.card && !cur ? <Film className="relative size-3" aria-label={i18n.player.transition} /> : null}
         {cur ? (
           <span className="relative min-w-0 truncate font-jb text-[12px] font-semibold">
-            {chip.system ? i18n.player.system2 : chip.card ? i18n.player.transitionPrefix : ''}
+            {chip.system ? i18n.player.systemPrefix : chip.card ? i18n.player.transitionPrefix : ''}
             {chip.label}
           </span>
         ) : null}
@@ -218,8 +218,8 @@ function CompactTimeline({ snap, scenario, ctl }: { snap: Snapshot; scenario: Sc
   return (
     <div className="flex min-w-0 flex-1 items-center px-1.5" data-testid="step-bar" data-compact="">
       <MenuButton
-        trigger={{ label: `${cur.index} / ${scenario.steps.length}`, iconOnly: false }}
-        label={i18n.player.stepClickToViewAllSteps(cur.index, cur.label)}
+        trigger={{ label: `${i18n.player.number(cur.index)} / ${i18n.player.number(scenario.steps.length)}`, iconOnly: false }}
+        label={i18n.player.stepMenuLabel(cur.index, cur.label)}
         testid="step-compact"
         placement="top-start"
         variant="ghost"
@@ -244,7 +244,7 @@ function Dock({ snap, scenario, ctl, speed, onSpeed, L, zoom }: { snap: Snapshot
       <Divider />
       {scenario ? L.compactTimeline ? <CompactTimeline snap={snap} scenario={scenario} ctl={ctl} /> : <Timeline snap={snap} scenario={scenario} ctl={ctl} currentW={L.currentStepW} /> : <div className="flex-1" />}
       <Divider />
-      {onSpeed ? <MenuButton trigger={{ label: `${speed}×`, iconOnly: false }} label={i18n.player.autoplaySpeed(speed)} testid="speed" items={speedItems(speed, onSpeed)} placement="top-end" variant="ghost" size={34} width={120} className="rounded-[8px] px-2.5 font-jb-mono text-[13px] font-semibold" /> : null}
+      {onSpeed ? <MenuButton trigger={{ label: i18n.player.speedValue(speed), iconOnly: false }} label={i18n.player.autoplaySpeed(speed)} testid="speed" items={speedItems(speed, onSpeed, i18n)} placement="top-end" variant="ghost" size={34} width={120} className="rounded-[8px] px-2.5 font-jb-mono text-[13px] font-semibold" /> : null}
       {zoom}
     </div>
   );
@@ -264,9 +264,9 @@ function FullscreenBar({ snap, scenario, ctl, speed, onSpeed, layers, viewLayer,
         <>
           {sep}
           {c.has('speed') ? (
-            <MenuButton trigger={{ icon: <Gauge className="size-4" /> }} label={i18n.player.playbackSpeed(speed)} testid="fs-speed" variant="ghost" size={32} width={120} items={speedItems(speed, onSpeed)} placement="top-center" />
+            <MenuButton trigger={{ icon: <Gauge className="size-4" /> }} label={i18n.player.playbackSpeed(speed)} testid="fs-speed" variant="ghost" size={32} width={120} items={speedItems(speed, onSpeed, i18n)} placement="top-center" />
           ) : (
-            <MenuButton trigger={{ label: `${speed}×`, iconOnly: false }} label={i18n.player.autoplaySpeed(speed)} testid="fs-speed" variant="ghost" size={32} width={120} items={speedItems(speed, onSpeed)} placement="top-center" className="px-2 font-jb-mono text-[13px] font-semibold" />
+            <MenuButton trigger={{ label: i18n.player.speedValue(speed), iconOnly: false }} label={i18n.player.autoplaySpeed(speed)} testid="fs-speed" variant="ghost" size={32} width={120} items={speedItems(speed, onSpeed, i18n)} placement="top-center" className="px-2 font-jb-mono text-[13px] font-semibold" />
           )}
         </>
       ) : null}
@@ -412,7 +412,7 @@ export function PlayerPage(p: PlayerPageProps) {
     };
   }, [railOpen]);
   // 检查模式：悬停的元素画墨色虚线框 + 左上角“类型 · 名字”
-  const [hoverBox, setHoverBox] = useState<{ x: number; y: number; w: number; h: number; label: string } | null>(null);
+  const [hoverBox, setHoverBox] = useState<{ x: number; y: number; w: number; h: number; type: string | null; name: string } | null>(null);
   const inspecting = altDown || !!p.inspectMode;
   const state = snap.state;
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
@@ -508,7 +508,7 @@ export function PlayerPage(p: PlayerPageProps) {
     const box = e.currentTarget.getBoundingClientRect();
     const r = el.getBoundingClientRect();
     const name = (el.getAttribute('aria-label') || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 18);
-    setHoverBox({ x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height, label: `${el.dataset.jtype ?? i18n.player.element}${name ? ` · ${name}` : ''}` });
+    setHoverBox({ x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height, type: el.dataset.jtype ?? null, name });
   };
 
   const currentLayer = layers.find((l) => l.id === viewLayer)?.title ?? viewLayer;
@@ -586,7 +586,7 @@ export function PlayerPage(p: PlayerPageProps) {
       {hoverBox ? (
         <div className="pointer-events-none absolute z-10 border-[1.5px] border-dashed border-jb-ink" style={{ left: hoverBox.x - 3, top: hoverBox.y - 3, width: hoverBox.w + 6, height: hoverBox.h + 6 }} data-testid="inspect-hover">
           <span className="absolute -top-[22px] left-[-1.5px] whitespace-nowrap rounded-[4px] bg-jb-inverse px-1.5 py-0.5 font-jb text-[11px] font-medium text-jb-on-inverse">
-            {hoverBox.label}
+            {hoverBox.type ?? i18n.player.element}{hoverBox.name ? ` · ${hoverBox.name}` : ''}
             <span className="ml-1.5 opacity-60">{i18n.player.clickToSelect}</span>
           </span>
         </div>
@@ -744,7 +744,7 @@ function SubtitleSlot({ content, theme, font, explainInTip, onFork }: { content:
 function ShortcutsPanel({ open, onClose, board }: { open: boolean; onClose: () => void; board: boolean }) {
   const { t: i18n } = useI18n();
 
-  const groups = SHORTCUTS(i18n).map((g) => ({ ...g, items: g.items.filter((i) => board || ![i18n.player.hold, 'T', '[', 'Enter'].includes(i.keys)) })).filter((g) => g.items.length);
+  const groups = SHORTCUTS(i18n).map((g) => ({ ...g, items: g.items.filter((i) => board || ![i18n.player.holdOptionKey, 'T', '[', 'Enter'].includes(i.keys)) })).filter((g) => g.items.length);
   return (
     <CenterPanel open={open} onClose={onClose} label={i18n.player.keyboardShortcuts} testid="shortcuts" width={340}>
       <div className="flex items-center justify-between px-4 pb-1 pt-3.5 font-jb">

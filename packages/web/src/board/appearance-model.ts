@@ -1,3 +1,5 @@
+import { m as commonMessages, type Text } from '../i18n/messages';
+import { m } from '../i18n/board/messages';
 import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 外观浮层的模型（D55，纯函数，创作侧）：
@@ -88,10 +90,10 @@ export function themeSwatch(css: string): { bg: string; ink: string; accent: str
 
 export const FONT_CHOICES = (i18n: BoardMessages = boardEnglish): { value: AppearanceFont | null; name: string; sample: string }[] => ([
   { value: null, name: i18n.board.followTheme, sample: i18n.board.auto },
-  { value: 'hand', name: i18n.board.handwriting, sample: i18n.board.aa01 },
-  { value: 'sans', name: i18n.board.sansSerif, sample: i18n.board.aa01 },
-  { value: 'serif', name: i18n.board.serif, sample: i18n.board.aa01 },
-  { value: 'kai', name: i18n.board.kai, sample: i18n.board.aa01 },
+  { value: 'hand', name: i18n.board.markerGothic, sample: i18n.board.fontSample },
+  { value: 'sans', name: i18n.board.sansSerif, sample: i18n.board.fontSample },
+  { value: 'serif', name: i18n.board.serif, sample: i18n.board.fontSample },
+  { value: 'kai', name: i18n.board.wenKai, sample: i18n.board.fontSample },
   { value: 'mono', name: i18n.board.monospace, sample: 'Aa 01' },
 ]);
 export const STROKE_CHOICES = (i18n: BoardMessages = boardEnglish): { value: AppearanceStroke | null; name: string }[] => ([
@@ -113,3 +115,11 @@ export const themeLine = (theme: string) => `theme: '${theme}',`;
 
 /** “+ 自定义”复制的主题模板。 */
 export const THEME_TEMPLATE = (i18n: BoardMessages = boardEnglish) => (i18n.board.themesNameCssDefineJpVariablesThenSetTheme);
+
+/** Deferred appearance names keep an existing confirmation flash in sync with later language changes. */
+export function appearanceMessage(look: Look, catalog: ThemeInfo[]): Text {
+  const builtins: Record<string, Text> = { sketch: m.board.paperWhite, clean: m.board.paperWhite, blueprint: commonMessages.stage.blueprint, nord: 'Nord', dracula: 'Dracula', 'solarized-light': 'Solarized', terminal: commonMessages.stage.retroTerminal, kraft: commonMessages.stage.kraft, contrast: commonMessages.stage.highContrast };
+  const fonts: Record<AppearanceFont, Text> = { hand: m.board.markerGothic, sans: m.board.sansSerif, serif: m.board.serif, kai: m.board.wenKai, mono: m.board.monospace };
+  const name = builtins[look.theme] ?? catalog.find((t) => t.name === look.theme)?.title ?? look.theme;
+  return look.font ? m.board.appearanceName(name, fonts[look.font]) : name;
+}

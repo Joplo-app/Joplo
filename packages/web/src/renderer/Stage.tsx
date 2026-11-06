@@ -344,6 +344,7 @@ function RoleTag({ role }: { role: RoleInfo }) {
  * 换人时上方是这个人的头像、名字和说明；收尾的要点逐条列在下方。
  */
 function TransitionCard({ card, role, width }: { card: CardAction; role: RoleInfo | null; width: number }) {
+  const { t: i18n } = useI18n();
   const title = Math.round(Math.max(30, Math.min(56, width / 23)));
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-[var(--jp-bg)] px-[8%] text-center text-[var(--jp-ink)]" data-testid="transition-card" data-role={role?.id}>
@@ -366,7 +367,7 @@ function TransitionCard({ card, role, width }: { card: CardAction; role: RoleInf
           {card.points.map((pt, i) => (
             <li key={i} className="flex items-start gap-3">
               <span aria-hidden className="mt-[0.15em] inline-flex size-[1.3em] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[var(--jp-ink)] text-[0.75em] font-bold">
-                {i + 1}
+                {i18n.player.number(i + 1)}
               </span>
               <span style={{ lineHeight: 1.5 }}>{pt}</span>
             </li>

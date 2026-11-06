@@ -1,4 +1,4 @@
-import { translate, type Text } from '../i18n/messages';
+import { type Text } from '../i18n/messages';
 /** 看板的数据钩子：项目列表、某个项目的 IR（首次载入 + 热更新，只应用版本号更大的结果）。 */
 import { useCallback, useEffect, useState } from 'react';
 import { fetchIR, fetchProjects, subscribeIR, subscribeProjects, type DevPayload, type ProjectSummary } from '../runtime/dev-client';

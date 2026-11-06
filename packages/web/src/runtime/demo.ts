@@ -1,3 +1,5 @@
+import type { BoardDictionary } from '../i18n/board/en';
+import { reference } from '../i18n/messages';
 import { type Text } from '../i18n/messages';
 import { m } from '../i18n/messages';
 /**
@@ -115,6 +117,8 @@ function fullyVisible(el: HTMLElement, root: HTMLElement): boolean {
   }
   return true;
 }
+
+const boardRef = reference<BoardDictionary>();
 
 export class DemoController {
   private snap: Snapshot = {
@@ -280,10 +284,10 @@ export class DemoController {
     const stepOk = !sel.nodeId && sel.stepId && sel.scenarioId && p.scenarios[sel.scenarioId]?.steps.some((s) => s.id === sel.stepId);
     if (hit || stepOk) {
       const at = hit ? (hit.node.source ?? null) : (p.scenarios[sel.scenarioId!]!.steps.find((s) => s.id === sel.stepId)?.source ?? null);
-      if (at !== sel.at || (hit && scene && nodeLabel(hit.node) !== sel.label)) void this.writeSelection(this.inputOf(sel), m.player.selectedElementLocationUpdated, m.player.couldNotSyncSelectionToAgent);
+      if (at !== sel.at || (hit && scene && nodeLabel(hit.node) !== sel.label)) void this.writeSelection(this.inputOf(sel), boardRef('board', 'selectedElementLocationUpdated'), boardRef('board', 'couldNotSyncSelectionToAgent'));
       return;
     }
-    void this.writeSelection(null, m.player.theSelectedElementIsNoLongerInThisStage, m.player.couldNotSyncClearedSelectionToAgent, true);
+    void this.writeSelection(null, boardRef('board', 'theSelectedElementIsNoLongerInThisStage'), boardRef('board', 'couldNotSyncClearedSelectionToAgent'), true);
   }
 
   private safeStateAt(project: Project, scenarioId: string, position: number): { state: PlayState | null; error: Text | null } {
@@ -534,7 +538,7 @@ export class DemoController {
     if (!p || !st) return;
     if (opts.inspect) return this.select(nodeId);
     const sc = this.scenario();
-    if (this.snap.view !== 'stage' || !sc) return this.info(m.player.staticStageThisOptionDoesNotDemonstrateThisCase);
+    if (this.snap.view !== 'stage' || !sc) return this.info(boardRef('board', 'staticStageThisOptionDoesNotDemonstrateThisCase'));
 
     if (this.snap.playing && !this.snap.paused) return this.info(m.player.autoplayIsRunningPauseBeforeInteractingManually);
     if (this.snap.playing) this.stop(); // 暂停中手动接管
@@ -647,12 +651,12 @@ export class DemoController {
     const local = this.localSelection(input);
     if (!local) return;
     const what = local.label ? `「${local.label}」` : '';
-    await this.writeSelection(input, m.player.selectedTellAgentWhatYouWantToChange(what), m.player.couldNotSyncSelectionToAgent);
+    await this.writeSelection(input, boardRef('board', 'selectedTellAgentWhatYouWantToChange', what), boardRef('board', 'couldNotSyncSelectionToAgent'));
   }
 
   /** 取消选中，并同步给 Agent（selection.json 写为 null）。 */
   async clearSelection() {
-    await this.writeSelection(null, m.player.selectionClearedAndSyncedToAgent, m.player.couldNotSyncClearedSelectionToAgent);
+    await this.writeSelection(null, boardRef('board', 'selectionClearedAndSyncedToAgent'), boardRef('board', 'couldNotSyncClearedSelectionToAgent'));
   }
 
   /**
@@ -665,7 +669,7 @@ export class DemoController {
     this.set({ selection: optimistic, selectionSync: { status: 'pending' } });
     const writer = this.writer;
     this.syncChain = this.syncChain.then(async () => {
-      const r: SelectionWriteResult = writer ? await writer(input).catch((e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) })) : { ok: false, message: m.player.thisPageCannotWriteASelectionReadOnly };
+      const r: SelectionWriteResult = writer ? await writer(input).catch((e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) })) : { ok: false, message: boardRef('board', 'thisPageCannotWriteASelectionReadOnly') };
       if (r.ok) this.confirmed = r.selection;
       else if (r.current !== undefined) this.confirmed = r.current;
       if (seq !== this.syncSeq) return;
@@ -674,8 +678,8 @@ export class DemoController {
         this.autoClear(quietOk ? 3000 : 5000);
       } else {
         const rolledBack = this.confirmed;
-        const tail = rolledBack ? m.player.keepingThePreviousSelection(rolledBack.label ?? rolledBack.nodeId ?? '') : m.player.selectionCleared;
-        this.set({ selection: rolledBack, selectionSync: { status: 'error', message: r.message }, notice: { kind: 'error', text: m.player.selectionSyncFailed(failText, r.message, tail) } });
+        const tail = rolledBack ? boardRef('board', 'keepingThePreviousSelection', rolledBack.label ?? rolledBack.nodeId ?? '') : boardRef('board', 'selectionCleared');
+        this.set({ selection: rolledBack, selectionSync: { status: 'error', message: r.message }, notice: { kind: 'error', text: boardRef('board', 'selectionSyncFailed', failText, r.message, tail) } });
       }
     });
     return this.syncChain;
@@ -691,7 +695,7 @@ export class DemoController {
       this.set({ view: 'browse', browseSceneId: sel.sceneId, state: browseState(p, sel.sceneId), epoch: this.snap.epoch + 1 });
     }
     this.set({ notice: null });
-    await this.writeSelection(this.inputOf(sel), m.player.previousSelectionRestored, m.player.previousSelectionIsNoLongerValid, true);
+    await this.writeSelection(this.inputOf(sel), boardRef('board', 'previousSelectionRestored'), boardRef('board', 'previousSelectionIsNoLongerValid'), true);
   }
 
   /** 点击步骤条上的一步：跳到该步骤执行之后（-1 = 初始状态）。 */

@@ -304,7 +304,7 @@ export function strokeOfTheme(name: string, authorThemes: Record<string, string>
 /** 所有主题限定作用范围后的 CSS（注入到页面里一次）。 */
 export function allThemesCss(authorThemes: Record<string, string> = {}, i18n: Dictionary = en): string {
   return themeCatalog(authorThemes, i18n)
-    .map((t) => i18n.stage.themeN(t.name, t.builtin ? '' : i18n.stage.authorMarker, scopeThemeCss(t.css, t.name)))
+    .map((t) => i18n.stage.themeCssComment(t.name, t.builtin ? '' : i18n.stage.authorMarker, scopeThemeCss(t.css, t.name)))
     .join('\n');
 }
 

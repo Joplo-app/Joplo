@@ -45,7 +45,7 @@ export const SHORTCUTS = (i18n: Dictionary = en): { group: string; items: { labe
     group: i18n.player.stage,
     items: [
       { label: i18n.player.fullscreenEscToExit, keys: 'F' },
-      { label: i18n.player.inspect, keys: i18n.player.hold },
+      { label: i18n.player.inspect, keys: i18n.player.holdOptionKey },
       { label: i18n.player.zoomPan, keys: i18n.player.scrollDrag },
     ],
   },
@@ -60,8 +60,8 @@ export const SHORTCUTS = (i18n: Dictionary = en): { group: string; items: { labe
 ]);
 
 /** 标签页标题：“功能 · 项目”；编译出错加 ✕；导出中写进度。 */
-export function tabTitle(o: { feature: string | null; project: string | null; error?: boolean; exporting?: string | null }, i18n: Dictionary = en): string {
-  if (!o.feature && !o.project) return i18n.player.joploBoard;
+export function tabTitle(o: { feature: string | null; project: string | null; error?: boolean; exporting?: string | null }, i18n: Dictionary = en, emptyTitle = 'Joplo'): string {
+  if (!o.feature && !o.project) return emptyTitle;
   const name = o.feature ?? o.project ?? 'Joplo';
   if (o.exporting) return i18n.player.exporting(name, o.exporting);
   const base = o.feature && o.project ? `${o.feature} · ${o.project}` : name;

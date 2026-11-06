@@ -49,7 +49,7 @@ export function exportProgress(job: VideoJob | null | undefined, scenarioName: s
   return {
     running,
     percent: Math.max(0, Math.min(100, job.percent)),
-    text: done ? i18n.board.exported2(job.file ?? '').trim() : i18n.board.recording(scenarioName),
+    text: done ? i18n.board.exportedFile(job.file ?? '').trim() : i18n.board.recording(scenarioName),
     step: job.phase === 'recording' ? i18n.board.step(job.step, job.total) : PHASE(i18n)[job.phase],
     done,
     error: job.status === 'error' ? (job.error ?? i18n.board.exportFailed) : null,

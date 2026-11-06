@@ -40,7 +40,7 @@ export const DOCK = { padX: 12, gap: 6, btn: 34, chip: 34, chipGap: 4, timelineP
 export function dockWidth(L: BoardLayout, playLabel: string, speeds: readonly number[], visible: number, i18n: Dictionary = en): number {
   const play = 16 * 2 + 16 + 6 + textW(playLabel, 14);
   const timeline = DOCK.timelinePadX * 2 + DOCK.chip + L.currentStepW + visible * DOCK.chip + (visible + 1) * DOCK.chipGap;
-  const widest = speeds.reduce((a, v) => Math.max(a, textW(`${v}×`, 13)), 0);
+  const widest = speeds.reduce((a, v) => Math.max(a, textW(i18n.player.speedValue(v), 13)), 0);
   const speed = speeds.length ? 10 * 2 + widest + 4 + 14 : 0;
   const zoom = 4 * 2 + DOCK.zoomBtn * 2 + 2 * 2 + (L.zoomLabel ? textW(i18n.player.fit, 12) + 8 : 0);
   const items = [DOCK.btn, DOCK.btn, play, DOCK.btn, 1, timeline, 1, speed, zoom].filter((w) => w > 0);
@@ -81,7 +81,7 @@ export function timelineChips(steps: readonly { caption: string; kind: 'user' | 
     playing: activeStep !== null && activeStep === index - 1,
     ...(dwell && activeStep === null && dwell.position === index && index === shown ? { dwell: { ms: dwell.ms, elapsed: dwell.elapsed, paused } } : {}),
   });
-  return [chip(0, i18n.player.initial, false, i18n.player.initialStateTip), ...steps.map((s, i) => ({ ...chip(i + 1, s.caption, s.kind === 'system', `${i + 1} · ${s.kind === 'system' ? i18n.player.system2 : s.kind === 'card' ? i18n.player.transitionPrefix : ''}${s.caption}${s.forks?.length ? ` · 分叉：${s.forks.map(f => f.label).join('、')}` : ''}`), ...(s.forks?.length ? { fork: true } : {}), ...(s.kind === 'card' ? { card: true } : {}) }))];
+  return [chip(0, i18n.player.initial, false, i18n.player.initialStateTip), ...steps.map((s, i) => ({ ...chip(i + 1, s.caption, s.kind === 'system', `${i18n.player.number(i + 1)} · ${s.kind === 'system' ? i18n.player.systemPrefix : s.kind === 'card' ? i18n.player.transitionPrefix : ''}${s.caption}${s.forks?.length ? ` · 分叉：${s.forks.map(f => f.label).join('、')}` : ''}`), ...(s.forks?.length ? { fork: true } : {}), ...(s.kind === 'card' ? { card: true } : {}) }))];
 }
 
 export type LayerTab = { id: string; title: string; active: boolean; camera: boolean; /** 这一层是谁的画面（D56）。 */ role?: { id: string; name: string; color: string } | null };

@@ -2,7 +2,6 @@ import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/board/messages';
 import { translate, type Text } from '../i18n/messages';
 import { useBoardI18n } from '../i18n/board/context';
-import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 看板首页（D39 home 方案 A“记住打开过的项目”，D55「首页」）：
  * - 左栏：最近打开的项目（~/.joplo/projects.json，按最近打开排序），名字 + 缩写的路径；编译出错写错误数，目录不存在写“找不到”；
@@ -205,7 +204,7 @@ function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (p
   if (!p) return <div className="text-[14px] text-jb-muted">{ir.error ? translate(ir.error, i18n) : i18n.board.compilingProject}</div>;
   // 缩略图用这个项目自己的外观（D55：本项目 > 所有项目 > 项目 config）
   const look = project ? effectiveAppearance(settings, summary.id, project.theme ?? 'sketch', names) : null;
-  const status = !p.ok ? { dot: 'bg-jb-danger', text: i18n.board.compilationErrors3(p.diagnostics.filter((d) => d.severity === 'error').length) } : ir.live ? { dot: 'bg-jb-ok', text: i18n.board.compiledLiveReloadOn } : { dot: 'bg-jb-ok', text: i18n.board.compiled };
+  const status = !p.ok ? { dot: 'bg-jb-danger', text: i18n.board.compilationErrorCount(p.diagnostics.filter((d) => d.severity === 'error').length) } : ir.live ? { dot: 'bg-jb-ok', text: i18n.board.compiledLiveReloadOn } : { dot: 'bg-jb-ok', text: i18n.board.compiled };
   return (
     <div className="flex max-w-[1120px] flex-col gap-5" data-testid="home-project">
       {project ? <ThemeStyles themes={project.themes} /> : null}
@@ -275,7 +274,7 @@ function FeatureCardView({ project, card, look, onOpen }: { project: Project; ca
           ) : (
             <span className="rounded-[4px] border border-jb-line px-1.5 py-px text-[11px] text-jb-muted">{i18n.board.noPickedOptionYet}</span>
           )}
-          <span className="text-jb-muted">{card.optionCount} {i18n.board.options2}</span>
+          <span className="text-jb-muted">{i18n.board.optionCount(card.optionCount)}</span>
           {card.coverage.allExpressed ? (
             <span className="inline-flex items-center gap-1 text-jb-ok">
               <StatusIcon status="expressed" size={13} />
@@ -284,13 +283,13 @@ function FeatureCardView({ project, card, look, onOpen }: { project: Project; ca
           {card.coverage.missing ? (
             <span className="inline-flex items-center gap-1 text-jb-danger">
               <StatusIcon status="missing" size={13} />
-              {i18n.board.missing3(card.coverage.missing)}
+              {i18n.board.missingCount(card.coverage.missing)}
             </span>
           ) : null}
           {card.coverage.undecided ? (
             <span className="inline-flex items-center gap-1 text-jb-muted">
               <StatusIcon status="undecided" size={13} />
-              {i18n.board.undecided3(card.coverage.undecided)}
+              {i18n.board.undecidedCount(card.coverage.undecided)}
             </span>
           ) : null}
         </div>

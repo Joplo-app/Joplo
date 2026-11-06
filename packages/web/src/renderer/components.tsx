@@ -2318,7 +2318,7 @@ function Custom({ node, p }: NodeProps) {
   return (
     <div {...root} data-dashed="">
       <Rough seedKey={node.id} dashed stroke={INK2} />
-      <div className="font-semibold">{i18n.stage.customComponent}{str(p.kind, i18n.stage.unnamed)}{i18n.stage.placeholder2}</div>
+      <div className="font-semibold">{i18n.stage.customComponent}{str(p.kind, i18n.stage.unnamed)}{i18n.stage.placeholderSuffix}</div>
       <div className="text-[12px] text-[var(--jp-muted)]">{i18n.stage.aComponentOutsideTheCatalogTheDemoFollowsIts}</div>
     </div>
   );

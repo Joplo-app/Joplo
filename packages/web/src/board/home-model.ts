@@ -18,7 +18,7 @@ export function shortPath(dir: string): string {
 
 /** 左栏徽标：编译出错写错误数，目录不存在写“找不到”；正常没有。 */
 export function projectBadge(p: Pick<ProjectSummary, 'status' | 'errors'>, i18n: BoardMessages = boardEnglish): { text: string; tone: 'danger' | 'na' } | null {
-  if (p.status === 'error') return { text: p.errors > 0 ? i18n.board.errors4(p.errors) : i18n.board.error, tone: 'danger' };
+  if (p.status === 'error') return { text: p.errors > 0 ? i18n.board.projectErrorBadge(p.errors) : i18n.board.error, tone: 'danger' };
   if (p.status === 'missing') return { text: i18n.board.notFound, tone: 'na' };
   return null;
 }

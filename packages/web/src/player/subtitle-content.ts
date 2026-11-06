@@ -46,8 +46,8 @@ export function subtitleFor(scenario: Scenario | null | undefined, position: num
   const own = (step ? step.explain : (scenario.description ?? (total === 0 ? i18n.player.thisScenarioHasNoStepsAndOnlyShowsIts : undefined)))?.trim() || null;
   const explain = own ?? (done?.text.trim() || null);
   const badge: SubtitleBadge = done
-    ? { kind: 'done', text: i18n.player.scenarioComplete(scenario.mock.label), outcome: scenario.mock.outcome, title: i18n.player.thisIsADemoResultForNotAResponse(done.text, scenario.mock.label) }
-    : { kind: 'progress', text: i18n.player.step3(index, total) };
+    ? { kind: 'done', text: i18n.player.scenarioComplete(scenario.mock.label), outcome: scenario.mock.outcome, title: i18n.player.demoResultDisclaimer(done.text, scenario.mock.label) }
+    : { kind: 'progress', text: i18n.player.stepProgress(index, total) };
   return { forks: forksOf(step), index, kind: step ? step.kind : 'initial', caption, explain, captionLines: 1, explainLines: explain ? 1 : 0, title: explain ? `${caption}\n${explain}` : caption, badge };
 }
 

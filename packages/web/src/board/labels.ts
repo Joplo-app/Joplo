@@ -29,7 +29,7 @@ export const CONFIRM_LABEL = (i18n: BoardMessages = boardEnglish): Record<Rule['
 
 export const DIMENSION_LABEL = (i18n: BoardMessages = boardEnglish): Record<string, string> => ({
   main: i18n.board.mainFlow,
-  input: i18n.board.type,
+  input: i18n.board.input,
   permission: i18n.board.permission,
   lifecycle: i18n.board.lifecycle,
   async: i18n.board.async2,

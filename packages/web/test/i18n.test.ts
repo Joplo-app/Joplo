@@ -23,7 +23,13 @@ describe('locale resolution', () => {
 
 describe('long localized controls', () => {
   const long = (s: string) => s.repeat(2);
-  const t = { ...en, player: Object.fromEntries(Object.entries(en.player).map(([k,v]) => [k, typeof v === 'string' ? long(v) : v])) as typeof en.player };
+  const stretch = <T,>(v: T): T => {
+    if (typeof v === 'string') return long(v) as T;
+    if (typeof v === 'function') return ((...args: unknown[]) => long(v(...args))) as T;
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k,value]) => [k,stretch(value)])) as T;
+    return v;
+  };
+  const t = stretch(en);
   it.each([1280, 1440])('fits a %spx viewport with a pseudo dictionary', (width) => {
     const layout = boardLayout(width, t);
     expect(dockWidth(layout, t.player.play, SPEEDS, 0, t)).toBeLessThanOrEqual(width - layout.navWidth - 32);
@@ -32,7 +38,7 @@ describe('long localized controls', () => {
     expect([...top.collapsed][0]).toBe('language');
     const titles = ['Client view', 'Server processing'];
     const c = fullscreenBarCollapse(width - 48, t.player.replay, SPEEDS, titles, true, titles[0]!, t);
-    const groups = [navGroup(CTRL.sm, t.player.replay, t), speedGroup(SPEEDS, CTRL.sm), layersGroup(titles, CTRL.sm, t)];
+    const groups = [navGroup(CTRL.sm, t.player.replay, t), speedGroup(SPEEDS, CTRL.sm, t), layersGroup(titles, CTRL.sm, t)];
     const fixed = 16 + CTRL.sm + 18 + directorW(true, titles[0]!, t);
     expect(rowWidth(fixed, groups, c, CTRL.gap, 2)).toBeLessThanOrEqual(width - 48);
   });
@@ -50,4 +56,17 @@ it('keeps all translation keys and interpolation signatures exact at compile tim
   define({menu:{title:'Menu',count:(n:string)=>n}});
   // @ts-expect-error Dropped interpolation argument
   define({menu:{title:'Menu',count:()=>''}});
+});
+
+it('keeps every registered locale within desktop control budgets', async () => {
+  const { locales, localeNames } = await import('../src/i18n/locale');
+  const { dictionary } = await import('../src/i18n/dictionaries');
+  for (const locale of locales) for (const width of [1280,1440]) {
+    const t = dictionary(locale);
+    const L = boardLayout(width,t,localeNames[locale]);
+    for (const label of [t.player.play,t.player.pause,t.player.resume,t.player.replay]) {
+      expect(dockWidth(L,label,SPEEDS,0,t)).toBeLessThanOrEqual(width-L.navWidth-32);
+    }
+    expect(topbarCollapse(width,t,localeNames[locale]).width).toBeLessThanOrEqual(width);
+  }
 });

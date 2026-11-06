@@ -1,4 +1,4 @@
-import { en, type Dictionary } from './en';
+import { en } from './en';
 export type Text = string | Message;
 export type Message = { ns: string; key: string; args: readonly (Text | number)[] };
 type Deferred<T> = { [K in keyof T]: T[K] extends (...args: infer A) => string ? (...args: { [I in keyof A]: A[I] extends string | number ? Text | number : A[I] }) => Message : T[K] extends string ? Message : Deferred<T[K]> };
@@ -17,3 +17,7 @@ export function translate(text: Text, dictionary: object): string {
 export class MessageError extends Error {
   constructor(readonly text: Text) { super(typeof text === 'string' ? text : `${text.ns}.${text.key}`); }
 }
+
+type ReferenceArgs<T> = T extends (...args: infer A) => string ? { [I in keyof A]: A[I] extends string | number ? Text | number : A[I] } : [];
+/** Type-only schema references keep creation-side dictionaries out of the published bundle. */
+export const reference = <S,>() => <N extends keyof S & string, K extends keyof S[N] & string>(ns: N, key: K, ...args: ReferenceArgs<S[N][K]>): Message => ({ ns, key, args: args as readonly (Text | number)[] });

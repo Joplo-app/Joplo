@@ -1,4 +1,4 @@
-import { translate, type Text } from '../i18n/messages';
+import { translate } from '../i18n/messages';
 import { useBoardI18n } from '../i18n/board/context';
 import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
@@ -89,7 +89,7 @@ export function InspectDrawer({
             </div>
             {node ? (
               <div className="mt-0.5 text-[12px] text-jb-muted" data-testid="sel-type">
-                {typeLabel(node.type, i18n, locale)} · {from ? i18n.board.option3(shortName(from.name)) : node.source?.startsWith('layouts/') ? i18n.board.layout : node.source?.startsWith('routes/') ? i18n.board.page : '—'}
+                {typeLabel(node.type, i18n, locale)} · {from ? i18n.board.optionLabel(shortName(from.name)) : node.source?.startsWith('layouts/') ? i18n.board.layout : node.source?.startsWith('routes/') ? i18n.board.page : '—'}
                 {stepIdx >= 0 ? i18n.board.targetOfStep(stepIdx + 1) : ''}
               </div>
             ) : null}
@@ -186,7 +186,7 @@ export function InspectDrawer({
           ))}
         </ul>
 
-        <H>{i18n.board.coveredCases}{caseIds.length}）</H>
+        <H>{i18n.board.coveredCaseCount(caseIds.length)}</H>
         <div className="flex flex-wrap gap-1.5" data-testid="sel-cases">
           {caseIds.length === 0 ? <span className="text-[13px] text-jb-muted">{i18n.board.noLinkedCases}</span> : null}
           {caseIds.map((c) => (

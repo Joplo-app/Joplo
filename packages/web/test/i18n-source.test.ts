@@ -11,9 +11,9 @@ function scan(dir: string): string[] {
 it('contains no CJK outside comments and locale dictionaries', () => {
   const errors: string[] = [];
   for (const file of scan(root)) {
-    if (/\/i18n\/(?:board\/)?zh-CN\.ts$/.test(file)) continue;
+    if (/\/i18n\/(?:board\/)?(?:zh-CN|zh-TW|ja|ko|es|fr|de|pt-BR|ru)\.ts$/.test(file)) continue;
     // Required native language names are identifiers in the switcher, not interface copy.
-    if (file.endsWith('/i18n/locale.ts')) continue;
+    if (file.endsWith('/i18n/native-names.ts')) continue;
     const source = readFileSync(file,'utf8');
     const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
     // Comment ranges are obtained from the parser at every token boundary; strings/JSX are preserved.

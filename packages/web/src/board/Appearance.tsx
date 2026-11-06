@@ -2,7 +2,6 @@ import type { Text } from '../i18n/messages';
 import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/board/messages';
 import { useBoardI18n } from '../i18n/board/context';
-import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 外观按钮与外观浮层（D55「演示页 · 外观已打开」「交互约定」）：配色 / 字体 / 线条分开选。
  * - 打开：按钮或 T；关闭：点外面或 Esc（Esc 同时撤掉预览，恢复预览前的外观）。浮层是 e1（portal），盖在画面右上方，不压缩布局。
@@ -19,7 +18,7 @@ import { Popover } from '../player/popover';
 import { FONT_STACKS, type Look } from '../renderer/appearance';
 import type { ThemeInfo } from '../renderer/themes';
 import type { BoardSettings } from '../runtime/dev-client';
-import { FONT_CHOICES, STROKE_CHOICES, THEME_TEMPLATE, appearanceLabel, applyAppearance, isCellSelected, paletteCells, resetAppearance, setAsDefault, themeLine, themeSwatch, themeToWrite, type LookPatch, type Scope } from './appearance-model';
+import { FONT_CHOICES, STROKE_CHOICES, THEME_TEMPLATE, appearanceLabel, appearanceMessage, applyAppearance, isCellSelected, paletteCells, resetAppearance, setAsDefault, themeLine, themeSwatch, themeToWrite, type LookPatch, type Scope } from './appearance-model';
 
 const PREVIEW_DELAY = 150;
 
@@ -251,18 +250,18 @@ export function AppearancePopover(p: AppearanceProps) {
         </Section>
 
         <footer className="flex flex-col gap-2.5 rounded-b-[9px] border-t border-jb-line bg-jb-subtle px-4 pb-3.5 pt-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <Btn
               icon={<RotateCcw className="size-3.5" />}
               label={p.scope === 'project' && p.projectId ? i18n.board.resetToProjectDefault(p.configTheme) : i18n.board.clearChoicesForAllProjects}
               variant="ghost"
               size={28}
-              className="font-normal text-jb-muted"
-              onClick={() => void p.save(resetAppearance(p.settings, p.scope, p.projectId)).then((r) => p.onFlash(<LocalText value={r.ok ? (p.scope === 'project' ? m.board.resetToProjectDefault2(p.configTheme) : m.board.appearanceChoicesClearedForAllProjects) : m.board.couldNotSave(r.message)} />))}
+              className="max-w-full font-normal text-jb-muted [&>span]:truncate"
+              onClick={() => void p.save(resetAppearance(p.settings, p.scope, p.projectId)).then((r) => p.onFlash(<LocalText value={r.ok ? (p.scope === 'project' ? m.board.projectDefaultRestored(p.configTheme) : m.board.appearanceChoicesClearedForAllProjects) : m.board.couldNotSave(r.message)} />))}
               data-testid="appearance-reset"
             />
             {p.scope === 'project' && p.projectId ? (
-              <Btn label={i18n.board.setAsDefaultForAllProjects} size={28} onClick={() => void p.save(setAsDefault(p.settings, p.projectId, look)).then((r) => p.onFlash(<LocalText value={r.ok ? m.board.allProjectsNowUseExceptProjectsWithTheirOwn(appearanceLabel(look, p.catalog, i18n)) : m.board.couldNotSave(r.message)} />))} data-testid="appearance-default" />
+              <Btn label={i18n.board.setAsDefaultForAllProjects} className="max-w-full [&>span]:truncate" size={28} onClick={() => void p.save(setAsDefault(p.settings, p.projectId, look)).then((r) => p.onFlash(<LocalText value={r.ok ? m.board.allProjectsNowUseExceptProjectsWithTheirOwn(appearanceMessage(look, p.catalog)) : m.board.couldNotSave(r.message)} />))} data-testid="appearance-default" />
             ) : null}
           </div>
           <div className="flex items-center gap-1.5 text-[12px]">
@@ -299,7 +298,7 @@ export function AppearanceButton({ look, catalog, wide, open, onToggle, btnRef, 
     return () => window.removeEventListener('keydown', on);
   }, []);
   return (
-    <Btn ref={btnRef} variant={variant} icon={<Swatch css={css} />} label={wide ? i18n.board.appearance2(name) : i18n.board.appearance} iconOnly={!wide} title={wide ? undefined : i18n.board.appearance2(name)} kbd="T" selected={open} aria-haspopup="dialog" aria-expanded={open} onClick={onToggle} data-testid="appearance" data-appearance={`${look.theme}|${look.font ?? ''}|${look.stroke ?? ''}`} />
+    <Btn ref={btnRef} variant={variant} icon={<Swatch css={css} />} label={wide ? i18n.board.appearanceButtonLabel(name) : i18n.board.appearance} iconOnly={!wide} title={wide ? undefined : i18n.board.appearanceButtonLabel(name)} kbd="T" selected={open} aria-haspopup="dialog" aria-expanded={open} onClick={onToggle} data-testid="appearance" data-appearance={`${look.theme}|${look.font ?? ''}|${look.stroke ?? ''}`} />
   );
 }
 

@@ -1,5 +1,5 @@
 import type { Locale } from '../i18n/locale';
-import { translate, type Text } from '../i18n/messages';
+import { type Text } from '../i18n/messages';
 import { useBoardI18n } from '../i18n/board/context';
 /**
  * 导出视频（只在本机看板，D55「导出视频：有进度，能取消」）：

@@ -1,3 +1,4 @@
+import { boardDictionary, boardEnglish } from '../i18n/board/dictionaries';
 import { LanguageMenu } from '../player/LanguageMenu';
 import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/board/messages';
@@ -105,6 +106,7 @@ export function BoardApp() {
 function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpened, onSelect, onView }: { projects: ProjectSummary[] | null; error: Text | null; selected: string | null; openAppearance: boolean; onAppearanceOpened: () => void; onSelect: (id: string) => void; onView: (projectId: string, featureId: string, optionId?: string) => void }) {
   const { t: i18n, locale } = useBoardI18n();
 
+  useEffect(() => { document.title = i18n.board.joploBoard; }, [i18n]);
   const a = useAppearance(null, 'sketch', {});
   const L = useBoardLayout();
   const [flash, setFlash] = useFlash();
@@ -151,7 +153,7 @@ function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
     <div role="alert" className="max-h-[40%] w-full shrink-0 overflow-y-auto rounded-[8px] border-l-4 border-jb-danger bg-jb-danger-bg px-3 py-2 text-left font-jb text-[13px]" data-testid="diagnostics">
       <div className="flex items-center gap-2">
         <CircleX className="size-4 shrink-0 text-jb-danger" aria-hidden />
-        <strong className="text-jb-danger">{i18n.board.compilationErrors}{sum.count} {i18n.board.errors}</strong>
+        <strong className="text-jb-danger">{i18n.board.compilationCount(sum.count)}</strong>
         <span className="text-jb-danger">{i18n.board.showingTheLastSuccessfulStage}</span>
         <span className="flex-1" />
         <button type="button" className="jb-focus shrink-0 rounded-[4px] px-1.5 text-[12px] font-medium text-jb-fg hover:underline" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-testid="diag-toggle">
@@ -193,16 +195,16 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
       setFlash(
         <span className="inline-flex items-center gap-2" data-testid="video-done">
           <CircleCheck className="size-4 text-jb-accent" aria-hidden />
-          {<LocalText value={m.board.exported} />}{job.file}
+          <LocalText value={m.board.exportedFile(job.file ?? '')} />
           <button type="button" className="font-semibold text-jb-accent underline-offset-2 hover:underline" onClick={() => retry.current()}>
             {<LocalText value={m.board.exportAgain} />}</button>
         </span>,
         8000,
       );
-    else if (job.error !== i18n.board.cancelled)
+    else if (job.error !== boardEnglish.board.cancelled && job.error !== boardDictionary('zh-CN').board.cancelled)
       setFlash(
         <span className="inline-flex max-w-[640px] items-center gap-2 whitespace-normal" data-testid="video-error">
-          {<LocalText value={m.board.videoExportFailed} />}{job.error}
+          <LocalText value={m.board.videoExportFailed(job.error ?? '')} />
           <button type="button" className="shrink-0 font-semibold text-jb-accent underline-offset-2 hover:underline" onClick={() => retry.current()}>
             {<LocalText value={m.board.retry} />}</button>
         </span>,
@@ -222,9 +224,9 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   // 标签页标题与 favicon 状态点（D55）：“功能 · 项目”；编译出错加 ✕ 和红点；导出中写进度、黄点
   const compileError = !!(ir.payload && !ir.payload.ok);
   const featureName = project?.features[play.featureId]?.name ?? null;
-  const exporting = vid.running && vid.job ? `${vid.job.step}/${vid.job.total}` : null;
+  const exporting = vid.running && vid.job ? `${i18n.player.number(vid.job.step)}/${i18n.player.number(vid.job.total)}` : null;
   useEffect(() => {
-    document.title = tabTitle({ feature: featureName, project: projectName ?? project?.name ?? null, error: compileError, exporting }, i18n);
+    document.title = tabTitle({ feature: featureName, project: projectName ?? project?.name ?? null, error: compileError, exporting }, i18n, i18n.board.joploBoard);
     setFavicon(faviconHref(compileError ? 'error' : exporting ? 'busy' : null));
   }, [featureName, projectName, project?.name, compileError, exporting, i18n]);
   useEffect(
@@ -315,7 +317,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   retry.current = () => {
     if (!scenario) return;
     videoName.current = scenario.name;
-    void vid.start(scenario.id, a.saved, locale).then((ok) => !ok && setFlash(<LocalText value={m.board.videoExportFailed2(vid.error ?? m.board.couldNotStart)} />));
+    void vid.start(scenario.id, a.saved, locale).then((ok) => !ok && setFlash(<LocalText value={m.board.videoExportFailed(vid.error ?? m.board.couldNotStart)} />));
   };
   // 缺口横幅（D55）：说清楚，再给下一步：复制给 Agent 的话；看已表达这个情况的方案怎么处理
   const gb = gap && option ? gapBanner(project, feature.id, option.id, resolved.caseId, i18n) : null;
@@ -362,7 +364,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             menuLabel: i18n.board.switchProject,
             // 项目 ▾：最近的项目；选一个 → 打开它的首页（功能列表）
             items: [
-              ...(projects ?? []).map((x) => ({ id: `project-${x.id}`, label: x.name, description: x.status === 'missing' ? i18n.board.directoryNotFound : x.status === 'error' ? i18n.board.errors2(x.errors) : undefined, checked: x.id === projectId, onClick: () => navigate({ kind: 'home', projectId: x.id }) })),
+              ...(projects ?? []).map((x) => ({ id: `project-${x.id}`, label: x.name, description: x.status === 'missing' ? i18n.board.directoryNotFound : x.status === 'error' ? i18n.board.projectErrorCount(x.errors) : undefined, checked: x.id === projectId, onClick: () => navigate({ kind: 'home', projectId: x.id }) })),
               { id: 'project-divider', divider: true as const },
               { id: 'project-home', icon: <LayoutGrid />, label: i18n.board.viewProjectHome, onClick: home },
             ],
@@ -403,7 +405,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         deviceTag={
           <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[6px] border border-jb-line bg-jb-surface px-2.5 font-jb text-[12px] text-jb-muted" data-testid="device-tag">
             <Smartphone className="size-3.5" aria-hidden />
-            {i18n.board.mobilePage}{VIEWPORT_SIZE.mobile.width} {i18n.board.wideFrameAddedByTheStage}</span>
+            {i18n.board.mobilePageDetails(VIEWPORT_SIZE.mobile.width)}</span>
         }
         fullscreenActions={<AppearanceButton look={a.saved} catalog={a.catalog} wide={false} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} variant="ghost" />}
         layer={play.layer ?? null}

@@ -1,3 +1,4 @@
+import { tabTitle } from '../player/states';
 import { LanguageMenu } from '../player/LanguageMenu';
 import { useBoardLayout } from '../player/PlayerPage';
 import { LocalText } from '../i18n/LocalText';
@@ -49,8 +50,11 @@ export function SiteApp({ data }: { data: SiteData | null }) {
 }
 
 function Site({ project }: { project: Project }) {
+  const { t: i18n } = useI18n();
   const [hash, go] = useHash();
   const route = parseSiteHash(hash);
+  const titleFeature = route.kind === 'play' ? project.features[route.play.featureId]?.name ?? null : null;
+  useEffect(() => { document.title = tabTitle({ feature: titleFeature, project: project.name }, i18n); }, [titleFeature, project.name, i18n]);
   const navigate = (r: SiteRoute, replace = false) => go(siteHash(r), replace);
   // 旧链接 #/s/<场景>：换成演示页链接
   useEffect(() => {
@@ -84,7 +88,7 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
         <aside className="flex w-[276px] shrink-0 flex-col overflow-y-auto border-r border-jb-line bg-jb-surface px-3 py-4">
           <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
             <span className="font-semibold tracking-[1px] text-jb-muted">{i18n.site.features}</span>
-            <span className="text-jb-faint">{features.length} {i18n.site.count}</span>
+            <span className="text-jb-faint">{i18n.site.itemCount(features.length)}</span>
           </div>
           <ul className="flex flex-col gap-1">
             {features.map((f) => (
@@ -122,7 +126,7 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
                         </span>
                       </div>
                       <p className="line-clamp-2 text-[13px] leading-5 text-jb-muted">{f.goal}</p>
-                      <span className="text-[12px] text-jb-muted">{scs.length} {i18n.site.scenarios}</span>
+                      <span className="text-[12px] text-jb-muted">{i18n.site.scenarioCount(scs.length)}</span>
                     </div>
                   </div>
                 );
@@ -210,8 +214,8 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
             <p className="mt-1 text-[12px] leading-[18px] text-jb-muted">{feature.goal}</p>
           </div>
           <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 text-[12px]">
-            <span className="font-semibold tracking-[1px] text-jb-muted">{i18n.site.scenarios2}</span>
-            <span className="text-jb-faint">{scs.length} {i18n.site.count}</span>
+            <span className="font-semibold tracking-[1px] text-jb-muted">{i18n.site.scenarios}</span>
+            <span className="text-jb-faint">{i18n.site.itemCount(scs.length)}</span>
           </div>
           <ul className="flex flex-col gap-1">
             {siteScenarioRows(project, resolved.optionId, snap.scenarioId, i18n).map((r) => (

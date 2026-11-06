@@ -266,6 +266,7 @@ export function MenuButton({
           onPick={(it) => {
             setOpen(false);
             it.onClick();
+            btn.current?.focus();
           }}
         />
       </Popover>

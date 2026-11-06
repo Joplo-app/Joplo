@@ -4,17 +4,14 @@ import { value, number, list, plural, type Value } from './format';
 export function createEn(locale: Locale = 'en') {
   return {
     player: {
+      speedValue: (n: number) => `${number(n, locale)}×`,
       transition: "Transition",
       transitionPrefix: "Transition · ",
       number: (n: number) => number(n, locale),
       list: (items: readonly string[]) => list(items, locale),
 
       language: "Language",
-      selectionSyncFailed: (p0: Value, p1: Value, p2: Value) => `${value(p0, locale)}: ${value(p1, locale)}${value(p2, locale)}`,
       // RenderApp.tsx: Joplo interface text; author content is never translated.
-      projectDidNotCompileSuccessfully: "Project did not compile successfully",
-      english: "English",
-      renderFailed: "Render failed: ",
       // player/Overlay.tsx: Joplo interface text; author content is never translated.
       sampleInput: "Sample input",
       // player/PlayerPage.tsx: Joplo interface text; author content is never translated.
@@ -27,11 +24,11 @@ export function createEn(locale: Locale = 'en') {
       previousStep: "Previous step",
       space: "Space",
       nextStep: "Next step",
-      step: (p0: Value, p1: Value) => `Step ${value(p0, locale)}: ${value(p1, locale)}`,
+      stepWithCaption: (p0: Value, p1: Value) => `Step ${value(p0, locale)}: ${value(p1, locale)}`,
       system: "System",
-      system2: "System · ",
+      systemPrefix: "System · ",
       steps: "Steps",
-      stepClickToViewAllSteps: (p0: Value, p1: Value) => `Step ${value(p0, locale)}: ${value(p1, locale)} (click to view all steps)`,
+      stepMenuLabel: (p0: Value, p1: Value) => `Step ${value(p0, locale)}: ${value(p1, locale)} (click to view all steps)`,
       playbackControls: "Playback controls",
       goToStart: "Go to start",
       autoplaySpeed: (p0: Value) => `Autoplay speed (${value(p0, locale)}×)`,
@@ -69,7 +66,7 @@ export function createEn(locale: Locale = 'en') {
       fullscreen: "Fullscreen",
       expandSidebar: "Expand sidebar",
       demoReplayFailed: "Demo replay failed: ",
-      hold: "Hold ⌥",
+      holdOptionKey: "Hold ⌥",
       keyboardShortcuts: "Keyboard shortcuts",
       // player/StageThumb.tsx: Joplo interface text; author content is never translated.
       noStageYet: "No stage yet",
@@ -111,7 +108,6 @@ export function createEn(locale: Locale = 'en') {
       scrollDrag: "Scroll · Drag",
       other: "Other",
       expandCollapsedSidebarNarrowScreens: "Expand collapsed sidebar (narrow screens)",
-      joploBoard: "Joplo · Board",
       exporting: (p0: Value, p1: Value) => `${value(p0, locale)} · Exporting ${value(p1, locale)}`,
       // player/status.ts: Joplo interface text; author content is never translated.
       covered: "Covered",
@@ -123,13 +119,9 @@ export function createEn(locale: Locale = 'en') {
       initialState: "Initial state",
       thisScenarioHasNoStepsAndOnlyShowsIts: "This scenario has no steps and only shows its initial state",
       scenarioComplete: (p0: Value) => `Scenario complete · ${value(p0, locale)}`,
-      thisIsADemoResultForNotAResponse: (p0: Value, p1: Value) => `${value(p0, locale)} (this is a demo result for ${value(p1, locale)}, not a response from a live service)`,
-      step3: (p0: Value, p1: Value) => `Step ${value(p0, locale)} / ${value(p1, locale)}`,
+      demoResultDisclaimer: (p0: Value, p1: Value) => `${value(p0, locale)} (this is a demo result for ${value(p1, locale)}, not a response from a live service)`,
+      stepProgress: (p0: Value, p1: Value) => `Step ${value(p0, locale)} / ${value(p1, locale)}`,
       // runtime/demo.ts: Joplo interface text; author content is never translated.
-      selectedElementLocationUpdated: "Selected element location updated",
-      couldNotSyncSelectionToAgent: "Could not sync selection to Agent",
-      theSelectedElementIsNoLongerInThisStage: "The selected element is no longer in this stage. Selection cleared.",
-      couldNotSyncClearedSelectionToAgent: "Could not sync cleared selection to Agent",
       replayFailedAtStep: (p0: Value, p1: Value) => `Replay failed at step ${value(p0, locale)}: ${value(p1, locale)}`,
       couldNotStartScenario: (p0: Value) => `Could not start scenario: ${value(p0, locale)}`,
       thisProjectHasNoRoutesYet: "This project has no routes yet",
@@ -140,20 +132,12 @@ export function createEn(locale: Locale = 'en') {
       alreadyAtInitialState: "Already at initial state",
       thisScenarioHasNoStepsAndOnlyShowsIts2: "This scenario has no steps and only shows its initial state",
       scenarioCompleteResetOrSwitchScenarios: "Scenario complete. Reset or switch scenarios.",
-      staticStageThisOptionDoesNotDemonstrateThisCase: "Static stage: this option does not demonstrate this case yet",
       autoplayIsRunningPauseBeforeInteractingManually: "Autoplay is running. Pause before interacting manually.",
       couldNotInterpretThisClick: (p0: Value) => `Could not interpret this click: ${value(p0, locale)}`,
       thisDemoDoesNotCover: (p0: Value) => `This demo does not cover “${value(p0, locale)}”`,
       inThisScenarioTheNextStepIs: (p0: Value) => `In this scenario, the next step is: ${value(p0, locale)}`,
       inThisScenarioTheDemoHasEnded: "In this scenario, the demo has ended",
       scenarioEndedResetOrSwitchScenarios: "Scenario ended. Reset or switch scenarios.",
-      selectedTellAgentWhatYouWantToChange: (p0: Value) => `Selected ${value(p0, locale)}. Tell Agent what you want to change.`,
-      selectionClearedAndSyncedToAgent: "Selection cleared and synced to Agent",
-      thisPageCannotWriteASelectionReadOnly: "This page cannot write a selection (read-only)",
-      keepingThePreviousSelection: (p0: Value) => `. Keeping the previous selection “${value(p0, locale)}”`,
-      selectionCleared: ". Selection cleared",
-      previousSelectionRestored: "Previous selection restored",
-      previousSelectionIsNoLongerValid: "Previous selection is no longer valid",
       couldNotExecuteThisStep: (p0: Value) => `Could not execute this step: ${value(p0, locale)}`,
     },
     stage: {
@@ -192,7 +176,7 @@ export function createEn(locale: Locale = 'en') {
       placeholder: "Placeholder",
       customComponent: "Custom component: ",
       unnamed: "Unnamed",
-      placeholder2: "(Placeholder)",
+      placeholderSuffix: "(Placeholder)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "A component outside the catalog. The demo follows its declared element IDs and state.",
       // renderer/themes.ts: Joplo interface text; author content is never translated.
       handDrawn: "Hand-drawn",
@@ -201,7 +185,7 @@ export function createEn(locale: Locale = 'en') {
       retroTerminal: "Retro terminal",
       kraft: "Kraft",
       highContrast: "High contrast",
-      themeN: (p0: Value, p1: Value, p2: Value) => `/* Theme ${value(p0, locale)}${value(p1, locale)} */\n${value(p2, locale)}`,
+      themeCssComment: (p0: Value, p1: Value, p2: Value) => `/* Theme ${value(p0, locale)}${value(p1, locale)} */\n${value(p2, locale)}`,
     },
     site: {
       scenarioCount: (n: number) => `${plural(n, { one: '# scenario', other: '# scenarios' }, locale)}`,
@@ -210,11 +194,9 @@ export function createEn(locale: Locale = 'en') {
       // site/SiteApp.tsx: Joplo interface text; author content is never translated.
       prototypeDataIsMissingRunJoploBuildAgain: "Prototype data is missing. Run joplo build again.",
       features: "Features",
-      count: "",
       noFeaturesHaveBeenPublishedYet: "No features have been published yet.",
       openDemoFor: (p0: Value) => `Open demo for “${value(p0, locale)}”`,
       openDemo: "Open demo",
-      scenarios: " scenarios",
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "Concept prototype made with Joplo · Not a production implementation",
       featureNotFound: "Feature not found.",
       goToHome: "Go to home",
@@ -223,9 +205,9 @@ export function createEn(locale: Locale = 'en') {
       copyLinkToCurrentStep: "Copy link to current step",
       linkCopied: "Link copied",
       clipboardUnavailableCopyFromTheAddressBar: "Clipboard unavailable. Copy from the address bar.",
-      scenarios2: "Scenarios",
+      scenarios: "Scenarios",
       // site/site-model.ts: Joplo interface text; author content is never translated.
-      steps: (p0: Value) => plural(Number(p0), { one: '# step', other: '# steps' }, locale),
+      stepCount: (p0: Value) => plural(Number(p0), { one: '# step', other: '# steps' }, locale),
     },
   };
 }
