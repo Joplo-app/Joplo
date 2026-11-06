@@ -28,7 +28,7 @@ npx joplo dev --open
 - **看板 Board**：首页列出最近打开的项目及其功能，一个本地进程服务多个项目。
 - **交互演示**：面包屑、按情况分组的左栏、播放控制、步骤条和独立字幕区。
 - **层级 Layers、导演 Director、镜头 Shots**：每种视角有独立页面。导演按流程切换层级、移动镜头；观众可以接管、只重放一层、缩放、平移或全屏观看。
-- **架构演示**：`Diagram` 声明节点与连线，`trace()` 播放调用链并推算状态，`when` 控制内容逐段出现。
+- **架构演示**：`Diagram` 按业务域分组画架构，`Sequence` 按时间讲一次调用，`StateMachine` 讲生命周期；布局自动且每一步都不变，`trace()` 播放调用链并推算状态。
 - **检查元素**：按住 Option/Alt 单击，打开规则与源码抽屉；Agent 读取选中位置后只改那一处。
 - **Terminal 与 Phone**：用 `Terminal` 表达命令行交互；手机页面使用 `Phone` 外框。每个页面只面向一种设备。
 - **主题 Themes**：九个内置主题，也可添加 `themes/<name>.css`；看板设置可对当前项目或所有项目应用主题。
@@ -64,7 +64,7 @@ npx joplo skill demo
 npx joplo skill install --agents-md
 ```
 
-八个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
+九个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`diagram`（分组的架构图、时序图、状态机与镜头取景）、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
 
 看板运行时，在另一个终端执行：
 
@@ -114,7 +114,7 @@ build 只发布选定方案。发布站与看板共用演示页布局，保留�
 | 示例 | 可以看什么 |
 | --- | --- |
 | [examples/invite](examples/invite) | 比较邀请弹窗与批量邀请流程 |
-| [examples/agent-arch](examples/agent-arch) | 用层级、导演、`Diagram` 与 `trace()` 演示 Agent 架构 |
+| [examples/agent-arch](examples/agent-arch) | 用层级、导演、分组的 `Diagram`、`Sequence`、`StateMachine` 与 `trace()` 演示 Agent 架构 |
 | [examples/joplo-board](examples/joplo-board) | 多项目看板与演示页的交互设计 |
 | [examples/joplo-dist](examples/joplo-dist) | npm 安装与 Agent 用法流程 |
 

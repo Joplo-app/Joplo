@@ -13,7 +13,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { animate as animateEl, motion } from 'motion/react';
 import { Rough, useStroke } from './rough';
-import { fitCamera, highlightRect, revealScroll, union, visibleRect, type Box, type View } from './camera-math';
+import { UI_MAX_ZOOM, fitCamera, frameBox, highlightRect, revealScroll, union, visibleRect, type Box, type FrameTarget, type View } from './camera-math';
 import { CAMERA_EASE, CAMERA_MS } from '../runtime/pace';
 
 export type CameraSpec = {
@@ -24,18 +24,23 @@ export type CameraSpec = {
 };
 
 /**
- * 元素的屏幕矩形；架构图里正在移向聚焦布局的节点（data-jfinal）取它的最终位置（画布坐标 × 画布此刻的屏幕缩放），
- * 镜头与高光不用等节点移动结束，也不会对准移动途中的位置（T-director3）。
+ * 元素的屏幕矩形。图表里的节点不再移动（D69 取代 D47 的聚焦布局），直接取它此刻的矩形；保留这个入口给标注（Marks）用。
  */
 export function finalRect(el: Element): { left: number; top: number; width: number; height: number } {
-  const f = el.getAttribute('data-jfinal');
-  const canvas = f ? el.closest<HTMLElement>('[data-jdiagram-canvas]') : null;
-  if (!f || !canvas) return el.getBoundingClientRect();
-  const [x, y, w, h] = f.split(',').map(Number) as [number, number, number, number];
-  const cr = canvas.getBoundingClientRect();
-  const sc = cr.width / (canvas.offsetWidth || 1) || 1;
-  return { left: cr.left + x * sc, top: cr.top + y * sc, width: w * sc, height: h * sc };
+  return el.getBoundingClientRect();
 }
+
+/** 图表元素（节点、连线、分组、状态、参与者、消息）：取景时找父分组，镜头推近时保证看得清。 */
+const DIAGRAM_EL = /^(Diagram|StateMachine|Sequence)\./;
+/** 图表里的“分组”：节点的上下文（它的标题一定要留在画面里）。 */
+const GROUP_SEL = '[data-jtype="Diagram.Group"],[data-jtype="StateMachine.Group"],[data-jtype="Sequence.Group"],[data-jtype="Sequence.Block"]';
+/**
+ * 界面元素的上下文：最近的“有框容器”（卡片、面板、弹窗、提示、表格、侧栏等）。
+ * 推近到一张卡片时，它所在的面板也留在画面里（D69：截图里“放大一张卡片、旁边全被裁掉”的情况）。
+ */
+const FRAME_SEL = ['Card', 'Paper', 'Modal', 'Drawer', 'Alert', 'Notification', 'Email', 'DataCard', 'StateFlow', 'Artifact', 'Terminal', 'ChatMessage', 'Table', 'DataTable', 'Accordion.Item', 'Tabs.Panel', 'AppShell.Navbar', 'AppShell.Aside', 'AppShell.Header', 'AppShell.Footer', 'Diagram', 'StateMachine', 'Sequence']
+  .map((t) => `[data-jtype="${t}"]`)
+  .join(',');
 
 /** 镜头容器里内容的范围（内容坐标，至少是整个画面）：整层缩放与平移夹紧都用它。 */
 export function contentBounds(wrap: HTMLElement, content: HTMLElement | null, W: number, H: number): Box {
@@ -154,23 +159,48 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       const root = content?.firstElementChild;
       const c = root ? toBox(root.getBoundingClientRect()) : null;
       const bounds = union([{ x: 0, y: 0, w: W, h: H }, ...(c && c.h > 0 ? [c] : [])])!;
-      // 架构图的聚焦布局：镜头框住整张小图（含连线标签），不只是被点名的节点
-      const backdrops = new Set<Element>();
-      for (const f of found) {
-        const b = f.el.closest('[data-jdiagram-canvas]')?.querySelector('[data-jfocus-backdrop]');
-        if (b) backdrops.add(b);
-      }
-      const extra = [...backdrops].map((b) => visibleRect(toBox(b.getBoundingClientRect()), [])).filter((b): b is Box => !!b);
-      let bbox = mode === 'focus' ? union([...found.map((f) => f.box), ...extra]) : bounds;
+      // 取景保留上下文（D69）：图表元素带上父分组（至少它的标题），界面元素带上最近的有框容器
+      const inWrap = (el: Element | null): el is Element => !!el && el !== wrap && wrap.contains(el) && (!content || content.contains(el));
+      const titleOf = (g: Element) => {
+        const t = g.querySelector(':scope > [data-jgroup-title]');
+        return t ? visibleRect(toBox(t.getBoundingClientRect()), []) : null;
+      };
+      const diagramScale = (el: Element) => (Number(el.closest('[data-jtype="Diagram"],[data-jtype="StateMachine"],[data-jtype="Sequence"]')?.getAttribute('data-scale') ?? 1) || 1) * outer;
+      const items: FrameTarget[] = found.map((f) => {
+        const type = f.el.getAttribute('data-jtype') ?? '';
+        if (!DIAGRAM_EL.test(type)) {
+          const frame = f.el.parentElement?.closest(FRAME_SEL) ?? null;
+          return { box: f.box, context: inWrap(frame) ? visibleOf(frame) : null };
+        }
+        const item: FrameTarget = { box: f.box };
+        if (type !== 'Diagram.Edge' && type !== 'StateMachine.Transition') item.nodeScale = diagramScale(f.el);
+        if (type === 'Sequence.Message') {
+          // 时序图的一行：两端参与者的头部一定在画面里（谁在和谁说话），所在片段是上下文
+          const canvas = f.el.closest('[data-jdiagram-canvas]');
+          const ends = (f.el.getAttribute('data-jends') ?? '').split(' ').filter(Boolean);
+          const heads = ends.map((id) => canvas?.querySelector(`[data-jid="${CSS.escape(id)}"]`)).filter((x): x is Element => !!x).map((x) => visibleOf(x)).filter((b): b is Box => !!b);
+          const block = f.el.closest('[data-jtype="Sequence.Block"]');
+          item.title = union(heads);
+          item.context = union([...heads, ...(inWrap(block) ? [visibleOf(block)].filter((b): b is Box => !!b) : [])]);
+          return item;
+        }
+        const group = f.el.parentElement?.closest(GROUP_SEL) ?? null;
+        if (inWrap(group)) {
+          item.context = visibleOf(group);
+          item.title = titleOf(group);
+        }
+        return item;
+      });
+      let bbox = mode === 'focus' ? frameBox(items, W, H) : bounds;
       if (!bbox || bbox.w <= 0 || bbox.h <= 0) {
         mode = 'overview';
         bbox = { x: 0, y: 0, w: W, h: H };
       }
-      // 对准架构图节点：每个节点“内容像素 → 屏幕像素”的比例，保证主标签在屏幕上 ≥ 16px
-      const nodeScales = found
-        .filter((f) => f.el.getAttribute('data-jtype') === 'Diagram.Node')
-        .map((f) => (Number(f.el.closest('[data-jtype="Diagram"]')?.getAttribute('data-scale') ?? 1) || 1) * outer);
-      const { k, tx, ty } = fitCamera({ W, H, mode, bbox, nodeScales, bounds });
+      // 对准图表节点：每个节点“内容像素 → 屏幕像素”的比例，保证主标签在屏幕上 ≥ 16px；只对准界面元素时推近不超过 UI_MAX_ZOOM
+      const nodeScales = items.flatMap((i) => (i.nodeScale ? [i.nodeScale] : []));
+      const onlyUi = found.every((f) => !/^(Diagram|StateMachine|Sequence)(\.|$)/.test(f.el.getAttribute('data-jtype') ?? ''));
+      const maxZoom = onlyUi ? UI_MAX_ZOOM : undefined;
+      const { k, tx, ty } = fitCamera({ W, H, mode, bbox, nodeScales, bounds, maxZoom });
       if (mode === 'focus') hadFocus.current = true;
       return { k, tx, ty, mode, rects: found.map((f) => ({ id: f.id, box: highlightRect(f.box) })), els: found.map((f) => f.el) };
     };
@@ -179,8 +209,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       clearFocus();
       if (!content || !els.length) return;
       content.setAttribute('data-jfocus-dim', '');
-      // 架构图聚焦布局里的小图节点（例如镜头对准连线时它的两端）同样是焦点，不被调暗
-      for (const el of [...els, ...content.querySelectorAll('[data-jfocus-member]')]) {
+      for (const el of els) {
         el.setAttribute('data-jfocus', '');
         for (let p = el.parentElement; p && p !== content; p = p.parentElement) p.setAttribute('data-jfocus-path', '');
       }

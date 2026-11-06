@@ -14,3 +14,4 @@ export * from './review.ts';
 export * from './agent-skill.ts';
 export * from './pace.ts';
 export * from './outline.ts';
+export * from './diagram/index.ts';

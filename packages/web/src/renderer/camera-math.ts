@@ -4,6 +4,9 @@
  *   至少推近到节点主标签在屏幕上 ≥ MIN_NODE_PX（nodeScales = 每个节点“内容像素 → 屏幕像素”的比例，含架构图缩放与舞台外层缩放）。
  *   给了 bounds（这一层内容的范围）时，在不破坏内边距的前提下尽量不露出内容以外的空白。
  * - 整层：只缩小不放大，内容比画面大时整体缩进来、居中。
+ * - 取景保留上下文（D69）：frameBox 把目标与它的上下文（图表元素所在的分组、界面元素所在的有框容器）一起框进来；
+ *   整个分组放不下（节点会小到看不清）时退到“目标 + 分组标题”——父分组的标题一定在画面里，归属信息不会被裁掉。
+ *   界面元素推近不超过 UI_MAX_ZOOM：界面本来按舞台 1:1 设计，推近只为引导注意力，不为放大细节。
  */
 export type Box = { x: number; y: number; w: number; h: number };
 export type CameraMode = 'focus' | 'overview';
@@ -11,6 +14,8 @@ export type CameraFit = { k: number; tx: number; ty: number };
 
 export const CAMERA_PAD = 28;
 export const MAX_ZOOM = 2;
+/** 界面元素（不是图表里的节点）推近的上限（D69）。 */
+export const UI_MAX_ZOOM = 1.25;
 export const MIN_NODE_PX = 16;
 export const NODE_FONT_PX = 14;
 
@@ -32,7 +37,28 @@ function axis(view: number, k: number, b0: number, bs: number, c0: number | null
   return clamp(t, CAMERA_PAD - k * b0, view - CAMERA_PAD - k * (b0 + bs));
 }
 
-export function fitCamera(input: { W: number; H: number; mode: CameraMode; bbox: Box; nodeScales?: number[]; bounds?: Box | null }): CameraFit {
+/**
+ * 取景的一个目标（D69）：box 是目标自己；context 是它的上下文（父分组 / 有框的父容器）；title 是一定要留在画面里的那部分
+ * （父分组的标题、时序图消息两端的参与者）；nodeScale = 图表节点“内容像素 → 屏幕像素”的比例（图表缩放 × 舞台缩放）。
+ */
+export type FrameTarget = { box: Box; context?: Box | null; title?: Box | null; nodeScale?: number };
+
+/**
+ * 取景框（D69）：先试“目标 + 上下文 + 标题”；节点在这个框下看不清（主标签 < MIN_NODE_PX）时退到“目标 + 标题”。
+ * 标题永远包含在内（父分组的归属信息不能被裁掉），可读性次之。没有目标时返回 null。
+ */
+export function frameBox(items: FrameTarget[], W: number, H: number): Box | null {
+  if (!items.length) return null;
+  const full = union(items.flatMap((i) => [i.box, ...(i.context ? [i.context] : []), ...(i.title ? [i.title] : [])]))!;
+  const legible = (b: Box) => {
+    const k = Math.min((W - 2 * CAMERA_PAD) / Math.max(1, b.w), (H - 2 * CAMERA_PAD) / Math.max(1, b.h));
+    return items.every((i) => !i.nodeScale || NODE_FONT_PX * i.nodeScale * k >= MIN_NODE_PX - 1e-6);
+  };
+  if (legible(full)) return full;
+  return union(items.flatMap((i) => [i.box, ...(i.title ? [i.title] : [])]))!;
+}
+
+export function fitCamera(input: { W: number; H: number; mode: CameraMode; bbox: Box; nodeScales?: number[]; bounds?: Box | null; /** 推近上限：缺省 MAX_ZOOM；界面元素用 UI_MAX_ZOOM（D69）。 */ maxZoom?: number }): CameraFit {
   const { W, H, mode, bbox } = input;
   if (mode === 'overview') {
     const k = Math.min(1, W / bbox.w, H / bbox.h);
@@ -40,7 +66,7 @@ export function fitCamera(input: { W: number; H: number; mode: CameraMode; bbox:
     return { k, tx: W / 2 - k * (bbox.x + bbox.w / 2), ty: H / 2 - k * (bbox.y + bbox.h / 2) };
   }
   const fit = Math.min((W - 2 * CAMERA_PAD) / bbox.w, (H - 2 * CAMERA_PAD) / bbox.h);
-  let cap = MAX_ZOOM;
+  let cap = input.maxZoom ?? MAX_ZOOM;
   for (const s of input.nodeScales ?? []) if (s > 0) cap = Math.max(cap, MIN_NODE_PX / (NODE_FONT_PX * s));
   const k = Math.max(0.05, Math.min(fit, cap));
   const c = input.bounds ?? null;

@@ -4,8 +4,8 @@ import ts from 'typescript';
 import { COMPONENT_DOCS, COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../src/catalog.ts';
 import { componentDetails, guide, skillIndex, skillTopic, SKILL_TOPICS } from '../src/guide.ts';
 
-const topics = ['authoring', 'story', 'demo', 'components', 'cases', 'check', 'selection', 'publish'] as const;
-test('八个主题均少于 150 行，结尾的相关主题均存在', () => {
+const topics = ['authoring', 'story', 'demo', 'diagram', 'components', 'cases', 'check', 'selection', 'publish'] as const;
+test('九个主题均少于 150 行，结尾的相关主题均存在', () => {
   expect(SKILL_TOPICS.map(t => t.name)).toEqual(topics);
   for (const topic of topics) {
     const body = skillTopic(topic);
@@ -31,7 +31,10 @@ test('components 取自真实目录与三种行为集合，未知 docs 不增加
   const output = skillTopic('components');
   // D68：HTML 兜底标签只在 “Supported HTML tags” 一行里列出（一律建议改用组件），其余每个组件单独一行
   const html = new Set(['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'main', 'section', 'header', 'footer', 'nav', 'aside', 'ul', 'ol', 'li', 'strong', 'em', 'small', 'code', 'a']);
-  for (const name of COMPONENT_TYPES.filter(name => !name.startsWith('#') && !html.has(name))) expect(output).toContain(`- ${name}\n`);
+  // 图表家族（D69）各占一行：根组件后面列出它的子组件，细节在 diagram 主题
+  const family = /^(Diagram|StateMachine|Sequence)\./;
+  for (const name of COMPONENT_TYPES.filter(name => !name.startsWith('#') && !html.has(name) && !family.test(name) && !['Diagram', 'StateMachine', 'Sequence'].includes(name))) expect(output).toContain(`- ${name}\n`);
+  for (const root of ['Diagram', 'StateMachine', 'Sequence']) expect(output).toContain(`- ${[root, ...COMPONENT_TYPES.filter(n => n.startsWith(`${root}.`))].join(', ')}\n`);
   const htmlLine = output.split('\n').find(l => l.startsWith('- Supported HTML tags: '))!;
   for (const tag of html) expect(htmlLine).toMatch(new RegExp(`[ ,]${tag}[ ,(]`));
   for (const set of [INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS]) for (const name of set) expect(output).toContain(name);
@@ -170,6 +173,12 @@ test('componentDetails（npx joplo components <名字>）：含子组件、行�
   for (const text of ['# Menu', '- Menu: ', '- Menu.Item: ', 'interactive', '- Menu.Dropdown: ', 'shown only while opened', '```tsx', '<Menu opened={$.ui.rowMenu}']) expect(menu, text).toContain(text);
   expect(componentDetails(['TabBar'])).toContain('value: type / select / toggle write to it');
   expect(componentDetails(['Text'])).not.toContain('```tsx');
+  // 集成 0.2.8：图表家族（D69）同样有子组件与示例
+  for (const root of ['Diagram', 'Sequence', 'StateMachine']) {
+    const out = componentDetails([root]);
+    expect(out, root).toContain('```tsx');
+    expect(out, root).toContain(`- ${root}.`);
+  }
   expect(() => componentDetails(['Menuu'])).toThrow(/Did you mean Menu\?/);
   expect(() => componentDetails([''])).toThrow(/Unknown component/);
 });

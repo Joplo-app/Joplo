@@ -560,7 +560,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       web.mode === 'dist'
         ? { noDiscovery: true, include: [] }
         : {
-            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'clsx', 'tailwind-merge', '@dagrejs/dagre', 'modern-screenshot', '@joplo-app/core > zod'],
+            include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', 'react/jsx-runtime', 'motion', 'motion/react', 'roughjs', 'lucide-react', 'clsx', 'tailwind-merge', 'modern-screenshot', '@joplo-app/core > zod'],
           },
     server: {
       host: '127.0.0.1',

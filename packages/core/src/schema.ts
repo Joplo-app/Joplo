@@ -6,6 +6,7 @@
  */
 import { z } from 'zod';
 import { COMPONENT_TYPES } from './catalog.ts';
+import type { DiagramLayout as DiagramLayoutT } from './diagram/model.ts';
 
 /** 层级标签的预设图标（标签压窄时靠它认出是哪一层）。不写时：手机视口 mobile，其余 window。 */
 export const LAYER_ICONS = ['window', 'browser', 'mobile', 'desktop', 'terminal', 'chat', 'agent', 'server', 'data', 'email', 'doc', 'flow'] as const;
@@ -53,6 +54,37 @@ export const Condition: z.ZodType<Condition> = z.lazy(() =>
   ]),
 ) as z.ZodType<Condition>;
 
+// ---------- 图表布局（D69）：编译期算好，渲染器只读 ----------
+const Num = z.number().finite();
+const BoxS = z.strictObject({ x: Num, y: Num, w: Num, h: Num });
+const PointS = z.strictObject({ x: Num, y: Num });
+const Boxes = z.record(z.string(), BoxS);
+export const DiagramLayoutSchema: z.ZodType<DiagramLayoutT> = z.union([
+  z.strictObject({
+    kind: z.literal('graph'),
+    engine: z.enum(['elk', 'grid']),
+    width: Num,
+    height: Num,
+    nodes: Boxes,
+    groups: Boxes,
+    titles: Boxes,
+    edges: z.record(z.string(), z.strictObject({ points: z.array(PointS), label: BoxS.nullable() })),
+    starts: Boxes.optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('sequence'),
+    width: Num,
+    height: Num,
+    actors: Boxes,
+    lifelines: z.record(z.string(), z.strictObject({ x: Num, y1: Num, y2: Num })),
+    messages: z.record(z.string(), z.strictObject({ points: z.array(PointS), label: BoxS.nullable(), n: z.number().int(), self: z.boolean() })),
+    groups: Boxes,
+    titles: Boxes,
+    blocks: Boxes,
+    blockTitles: Boxes,
+  }),
+]) as z.ZodType<DiagramLayoutT>;
+
 // ---------- 画面与元素 ----------
 export type SceneNode = {
   /** 可操作元素必须由作者给出；其余由编译器按位置生成（以 `_` 开头）。 */
@@ -68,6 +100,8 @@ export type SceneNode = {
   note?: string;
   /** 来自哪个功能方案（堆叠到路径上的元素）；页面和布局自身的元素没有此字段。 */
   from?: string;
+  /** 图表根节点（Diagram / StateMachine / Sequence）的布局，编译期算好（D69）；其他节点没有。 */
+  layout?: DiagramLayoutT;
   source?: string;
 };
 
@@ -83,6 +117,7 @@ export const SceneNode: z.ZodType<SceneNode> = z.lazy(() =>
     unmodeled: z.boolean().optional(),
     note: z.string().optional(),
     from: z.string().optional(),
+    layout: DiagramLayoutSchema.optional(),
     source: Source,
   }),
 ) as z.ZodType<SceneNode>;
@@ -131,6 +166,11 @@ export const Trace = z.strictObject({
   mode: z.enum(['ok', 'fail', 'skip']),
   nodes: z.array(z.string().min(1)),
   edges: z.array(z.strictObject({ id: z.string().min(1), reverse: z.boolean().default(false) })),
+  /** 路径经过的分组（节点所在的各级分组，D69）：fail 时 errorGroups 是终点所在的分组。没有分组时省略（IR 与旧版相同）。 */
+  groups: z.array(z.string().min(1)).optional(),
+  errorGroups: z.array(z.string().min(1)).optional(),
+  /** 镜头目标：架构图 / 状态机是路径上的节点，时序图是消息（一行一行的）。旧 IR 没有，按 nodes 处理。 */
+  targets: z.array(z.string().min(1)).optional(),
 });
 
 /** 镜头（D43）：这一步在某个层级里对准哪些元素；targets 为空 = 这一层的整体。 */

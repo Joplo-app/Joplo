@@ -7,6 +7,7 @@ Joplo 六个发行包使用 Apache-2.0，包名为 `joplo`、`@joplo-app/kit`、
 | 包 | 版本 | 许可证 | 用途与安装位置 |
 | --- | --- | --- | --- |
 | zod | 4.6.7 | MIT | core/server：IR 和接口校验 |
+| elkjs | 0.12.1（固定） | EPL-2.0 | core（仅 Node 入口 `@joplo-app/core/node`）：编译期图表布局（D69）。不进 web 包，发布站不带它；npm 解包约 8.2 MB |
 | tsx | 4.23.15 | MIT | CLI：加载作者 TS/TSX；仓库运行脚本 |
 | commander | 15.0.0（^15.0.0） | MIT | CLI 参数与帮助 |
 | vite | 8.3.5 | MIT | server 运行时：看板服务和站点构建；web 构建 |
@@ -25,7 +26,6 @@ Joplo 六个发行包使用 Apache-2.0，包名为 `joplo`、`@joplo-app/kit`、
 | --- | --- | --- | --- |
 | react | 19.3.1 | MIT | 看板和发布站 |
 | react-dom | 19.3.1 | MIT | DOM 渲染 |
-| @dagrejs/dagre | 3.1.3 | MIT | Diagram 自动布局 |
 | modern-screenshot | 4.7.0（^4.7.0） | MIT | 发布站浏览器内图片导出 |
 | motion | 14.9.1 | MIT | 镜头、鼠标与步骤动画 |
 | roughjs | 4.6.6 | MIT | 手绘描边 |

@@ -67,7 +67,7 @@ function joploBody(): string {
     '## Common pitfalls',
     ...PITFALLS.map(([text, topic]) => `- ${text}. See npx joplo skill ${topic}.`),
     '',
-    'Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, components, cases, check, selection, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.',
+    'Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, diagram, components, cases, check, selection, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.',
     'After the user Alt+clicks a board element, run npx joplo selection and edit only that location.',
     'Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).',
   ].join('\n');
@@ -117,7 +117,7 @@ export function skillMarkdown(skill: AgentSkill): string {
 export function agentsBlock(): string {
   return [
     '## Joplo',
-    'This project designs features as Joplo demos (joplo.config.ts). Read npx joplo skill first, then the relevant topics: authoring for pages/options/scenarios, story for planning a demo and writing captions, components, cases before asking about edge cases, demo for layers, shots, traces, and captions.',
+    'This project designs features as Joplo demos (joplo.config.ts). Read npx joplo skill first, then the relevant topics: authoring for pages/options/scenarios, story for planning a demo and writing captions, components, cases before asking about edge cases, demo for layers, shots, traces, and captions, diagram for architecture, sequence, and state diagrams.',
     `Mental model: ${MENTAL_MODEL.slice(0, 4).join(' ')}`,
     `Start: ${START_ORDER.map((s, i) => `(${i + 1}) ${s}`).join(' ')}`,
     'Pitfalls:',

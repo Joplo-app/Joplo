@@ -158,7 +158,7 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 所有层级都能自由缩放和平移（滚轮、捏合、拖动，以及「+ / − / 适应画面」）；导演跟随时，下一步镜头重新接管。
   - 播放放慢：每一步按文字长度停留（不少于 3 秒），等镜头和连线动画走完再进下一步；可以选 0.5× / 1× / 1.5× 速度。
   - 字幕放大；导演模式下焦点旁弹出解说卡，作者可以用 `explain('…')` 写更长的说明。
-- D47 架构图的聚焦布局（2026-11-05，用户反馈“信息不够集中”）：镜头对准同一张 Diagram 里的多个节点时，这些节点动画移到一起，在画面中央重新排成一张紧凑的小图，它们之间的连线加粗并显示流动方向；其他内容变淡留在原位。只聚焦一个节点时仍然只是推近镜头。回到整层时节点动画回到原位。逐段出现时已有元素不移动的约定（D42）不变。
+- D47 架构图的聚焦布局（2026-11-05，用户反馈“信息不够集中”；**已由 D69 取代**：节点不再移动，多节点焦点改为取景容纳全部节点）：镜头对准同一张 Diagram 里的多个节点时，这些节点动画移到一起，在画面中央重新排成一张紧凑的小图，它们之间的连线加粗并显示流动方向；其他内容变淡留在原位。只聚焦一个节点时仍然只是推近镜头。回到整层时节点动画回到原位。逐段出现时已有元素不移动的约定（D42）不变。
 - D48 用 trace() 描述调用链（2026-11-05，用户同意优化写法）：
   - 步骤里写 `trace('biz', 'billing')` 点亮一段调用；上一步点亮的部分进入下一步时自动变为已完成；另有 `trace.fail`、`trace.skip`。
   - Diagram 的节点和连线状态由 trace 自动推算，不必再手写 `state={$.ui.x}` 和一串 set()；手写的 state 仍然有效且优先。
@@ -285,6 +285,17 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - `npx joplo components [名字…]`：不带名字与 `skill components` 相同；带名字时输出该组件及其子组件的属性、行为分组和示例（COMPONENT_EXAMPLES）。components 主题里 HTML 兜底标签合成一行，给新组件和“常见产品画面怎么拼”腾出位置（主题仍少于 150 行）。
   - 样板：examples/invite 的成员页用 Stat 与 DataTable 的头像 / 徽章列；方案 A 新增“撤销邀请后对方再打开链接”场景（Menu 行操作 → 确认 Modal → 底部浮层 Notification → 过渡卡“第二天” → 新增路由 /join 的 EmptyState），覆盖 revoked 情况；feature 按 PM 写法补全 goal 与 expected。截图在 docs/screenshots/story-ux/。
   - 后续候选（证据较弱或需改 IR）：TopBar（手机顶部导航）、Slider、TagsInput、toast 带操作按钮、Modal footer、ToolCall 审批态、Stepper 错误态；Tooltip / Popover 没有需求证据，且与焦点 worker 的标注气泡易混，暂不做。
+- D69 关系类图表 v2：分组、编译期布局、步骤间不动、取景保留上下文、时序图与状态机（2026-11-06，来源：用户 2026-11-06；调研与取舍见 docs/research/diagram-layout.md；取代 D47）：
+  - 起因：用户反馈“图表看不懂含义，一般的 Diagram 都会支持 Group 表示归属的业务域”“A → B 变成 A → C 时节点散开、从屏幕外飞进来，A 应该不动”“放大一张卡片，旁边的归属被裁掉”。目标：给 Agent 一套足够强、足够好用的系统，快速做出讲 UI/UX、功能、用户故事、后端架构的演示。
+  - **分组**：`Diagram.Group` 增加 `icon`（预设）、`tone`（gray / blue / green / orange / red / purple / teal，跟随主题语义色）、`group`（引用父分组，可代替嵌套）、`pin`；节点也可以写 `group="分组 id"` 平铺声明；连线可以连到分组；trace 经过的节点所在的各级分组随之 active → ok，`trace.fail` 时终点所在的最内层分组 error、外层分组仍是 active（Trace 新增可选的 groups / errorGroups，没有分组时省略）。诊断：UNKNOWN_DIAGRAM_GROUP、DIAGRAM_GROUP_CONFLICT（嵌套与 group= 矛盾）、DIAGRAM_GROUP_CYCLE、DIAGRAM_EDGE_INTO_OWN_GROUP、INVALID_DIAGRAM_PROP（节点 kind 写错只给 warning，兼容旧项目）、INVALID_DIAGRAM_CHILD；6 个以上节点却没有业务域分组（或一个分组包住全部）时给 DIAGRAM_UNGROUPED（info）。
+  - **布局**：ELK layered + `hierarchyHandling = INCLUDE_CHILDREN`（分层、少交叉、正交走线、分组内外一起布局、标签带尺寸进布局并压在线上），方向 right / down。在**编译期**算好写进 IR 的 `SceneNode.layout`，看板与发布站只读坐标：网页端删掉 dagre 和自写走线，发布站不带任何布局算法、不发请求（CSP `connect-src 'none'` 不受影响）。elkjs 0.12.1（EPL-2.0，npm 解包约 8.2 MB）只是 `@joplo-app/core` 的依赖，由 Node 入口 `@joplo-app/core/node` 的 `elkLayout` 同步调用（直接调 GWT Dispatcher），`compile(src, mode, { layout: elkLayout })` 保持同步；server（dev / build / render / share）与 check 都传它，不传时退化为确定的网格（`engine: 'grid'`）。按结构缓存。
+  - 回边由 Joplo 自己判定：按源码顺序 DFS，指向栈上节点的连线、以及“指回上游所在分组”的连线，交给 ELK 前反向、布局后再反回来（相当于 Graphviz 的 constraint=false）。所以“先写请求、再写回程”决定方向。作者提示只有两种：同层顺序 = 源码顺序；`pin="start" | "end"` 放到所在分组的第一 / 最后一层。不提供“同层”约束：ELK layered 的普通流程不支持（layerChoiceConstraint、partitioning 实测无效），需要同层时用相同的上游或同一个分组。
+  - **步骤之间不动**（Foresighted Layout）：一张图的坐标只由结构（静态属性）决定，when / state / trace / 镜头都不参与，隐藏的元素也占好位置；同一场景所有步骤的每个节点坐标完全相同。取消 D47 的聚焦布局：多节点焦点改为取景容纳全部节点，相关连线加粗。只有新增 / 消失的元素有动画（淡入、连线沿路径画出 / 淡出）。
+  - **镜头取景保留上下文**：图表元素取景 = 目标 + 最内层父分组；整个分组会让节点主标签小于 16px 时退到“目标 + 分组标题”，父分组标题一定在画面里。时序图的一行带上两端参与者的头部与所在片段。界面元素取景 = 目标 + 最近的有框容器（Card、Paper、Modal、Table、AppShell 侧栏等），推近不超过 1.25 倍（原来 2 倍）。分组框、分组标题、参与者头部不随焦点外调暗（data-jfocus-keep）。Camera / CameraSpec / cameraAt 的形状与语义不变，其他焦点原语（聚光、标注等）由叙事焦点那条线负责。
+  - **新图表**：`Sequence`（Actor / Message / Group / Block；参与者按源码顺序成列、消息成行并编号，reply 虚线返回、async 空心箭头、片段 alt / opt / loop / par / break / critical；布局是纯函数，trace 消息 id，镜头对准那一行）；`StateMachine`（State / Transition / Group；initial 起点圆点、final 双线、复合状态；`value` 绑定当前状态，某一步改了这个值时对应的转换自动点亮；复用 ELK 布局与架构图渲染）。转换和消息没写 id 时缺省 `from->to`，重复的依次加 `~2`、`~3`。C4 用 Diagram 的约定表达（人 kind="user"、系统边界 icon="box"、外部系统 kind="external"），不单独做；ER 图以后再做。
+  - **作者体验**：kit 的图表组件带类型（kind / icon / tone / pin 等可补全）；新增技能主题 `npx joplo skill diagram`（选型、分组、自动布局、trace、时序图、状态机、取景规则），demo 主题的图表段落指向它，components 主题把每个图表家族压成一行；Diagram / Sequence 支持 `h="100%"` 铺满层。
+  - **样板**：examples/agent-arch 的架构图每个节点都在带图标和色调的业务域分组里；方案 A 新增“调用时序”（Sequence，与 happy 的 trace 同步，另有“按时间看一次调用”场景）和“任务状态”（StateMachine，步骤 set(data.task.status) 联动）两层。改造前后截图见 docs/screenshots/diagram-v2/。
+  - 兼容：不用新功能的项目 IR 只多了 `layout` 字段；坐标换成 ELK 布局（更整齐，回程连线方向按源码顺序）；界面元素的镜头推近更克制；UNKNOWN_DIAGRAM_NODE 的消息改为 “node or group”。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

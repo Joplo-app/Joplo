@@ -11,3 +11,5 @@ export * from '../../../core/src/embed.ts';
 export * from '../../../core/src/features.ts';
 // 阅读节奏（D67 从 web 搬到 core 的纯函数，只有常量与算术）
 export * from '../../../core/src/pace.ts';
+/** 图表的结构与渲染辅助（D69）：纯函数；布局已在编译期写进 IR，这里不含 ELK。 */
+export * from '../../../core/src/diagram/index.ts';
