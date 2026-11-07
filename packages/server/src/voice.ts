@@ -461,6 +461,10 @@ export function resolveVoices(config: VoiceConfig | undefined, selected: string 
 // ---------- 项目缓存 ----------
 
 export type ClipRecord = { file: string; stepId: string; fp: string; text: string; locale: string; bytes: number; at: string };
+export type GeneratedClip = { key: string; file: string; generated: boolean };
+/** 正在生成的片段：片段键 → 结果（每个项目一张，见 VoiceCache.generateOne）。 */
+export type Inflight = Map<string, Promise<GeneratedClip>>;
+
 type IndexFile = { version: 1; profileId: string | null; clips: Record<string, ClipRecord>; failures: Record<string, { stepId: string; message: string; at: string }> };
 const FILE_RE = /^[0-9a-f]{64}\.(mp3|wav|ogg|flac|m4a|aac)$/;
 
@@ -525,7 +529,9 @@ export class VoiceCache {
     delete idx.failures[k];
     this.write(idx);
   }
+  /** 记一段失败；这一段已经有音频（别的请求先成功了）时不记。 */
   private recordFailure(k: string, stepId: string, message: string) {
+    if (this.clipOf(k)) return;
     const idx = this.read();
     idx.failures[k] = { stepId, message, at: new Date().toISOString() };
     this.write(idx);
@@ -547,13 +553,28 @@ export class VoiceCache {
     return c && FILE_RE.test(c.file) && fs.existsSync(path.join(this.clipsDir, c.file)) ? c.file : null;
   }
 
-  /** 生成一段（已有就直接返回）：返回文件名；失败记进 failures 并抛 VoiceError。 */
-  async generateOne(seg: Segment, locale: string, resolved: ResolvedVoices, store: ProfileStore, opts: { fetch?: FetchLike; signal?: AbortSignal } = {}): Promise<{ key: string; file: string; generated: boolean }> {
+  /**
+   * 生成一段（已有就直接返回）：返回文件名；失败记进 failures 并抛 VoiceError。
+   * inflight：同一个项目共用的“正在生成”表（片段键 → 结果）。批量生成与边放边生成传同一张表，同一段同时只请求一次，后来的等先来的结果（generated 为 false）。
+   */
+  async generateOne(seg: Segment, locale: string, resolved: ResolvedVoices, store: ProfileStore, opts: { fetch?: FetchLike; signal?: AbortSignal; inflight?: Inflight } = {}): Promise<GeneratedClip> {
     const p = resolved.profile;
     const j = this.plan(seg, resolved);
     if (!p || !j) throw new VoiceError('INVALID', 'No voice provider is selected for this project, or the text is empty');
     const have = this.clipOf(j.key);
     if (have) return { key: j.key, file: have, generated: false };
+    const running = opts.inflight?.get(j.key);
+    if (running) return { ...(await running), generated: false };
+    const run = this.synthesizeOne(seg, locale, p, j, store, opts);
+    opts.inflight?.set(j.key, run);
+    try {
+      return await run;
+    } finally {
+      if (opts.inflight?.get(j.key) === run) opts.inflight.delete(j.key);
+    }
+  }
+
+  private async synthesizeOne(seg: Segment, locale: string, p: VoiceProfile, j: { key: string; text: string; voice: string; fp: string }, store: ProfileStore, opts: { fetch?: FetchLike; signal?: AbortSignal }): Promise<GeneratedClip> {
     const key = store.keyOf(p);
     try {
       if (!key && p.kind !== 'http') throw new VoiceError('NO_KEY', 'No API key for this provider');
@@ -573,7 +594,7 @@ export class VoiceCache {
   /**
    * 生成缺的片段（已有的跳过），并发 2。每段完成后调 onProgress。失败记进 failures，成功时清掉这个键的失败。
    */
-  async generate(segments: Segment[], locale: string, resolved: ResolvedVoices, store: ProfileStore, opts: { fetch?: FetchLike; signal?: AbortSignal; onProgress?: (done: number, total: number, failed: number) => void } = {}): Promise<GenerateSummary> {
+  async generate(segments: Segment[], locale: string, resolved: ResolvedVoices, store: ProfileStore, opts: { fetch?: FetchLike; signal?: AbortSignal; inflight?: Inflight; onProgress?: (done: number, total: number, failed: number) => void } = {}): Promise<GenerateSummary> {
     if (!resolved.profile) return { total: segments.length, generated: 0, skipped: 0, failed: [], noProfile: true };
     const jobs = new Map<string, Segment>();
     for (const s of segments) {

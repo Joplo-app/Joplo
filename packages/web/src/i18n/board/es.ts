@@ -336,7 +336,7 @@ export function createBoardEs(locale: Locale = 'es') {
       voiceGenerateHint: "Abarca todos los escenarios de esta opción. El audio generado se incluye al compilar y compartir; las claves nunca.",
       voiceManage: "Gestionar proveedores…",
       voiceProviders: "Proveedores de voz",
-      voiceProvidersHint: "Se guarda en este equipo (~/.joplo) para todos los proyectos. Las claves nunca van al proyecto ni a lo que compartes.",
+      voiceProvidersHint: (p0: Value) => `Se guarda en este equipo (${value(p0, locale)}) para todos los proyectos. Las claves nunca van al proyecto ni a lo que compartes.`,
       voiceNewProvider: "Nuevo proveedor",
       voicePreset: "Predefinido",
       voiceKeySaved: "Clave guardada",

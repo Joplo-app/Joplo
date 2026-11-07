@@ -336,7 +336,7 @@ export function createBoardDe(locale: Locale = 'de') {
       voiceGenerateHint: "Gilt für alle Szenarien dieser Variante. Erzeugtes Audio geht mit build und Teilen hinaus, Schlüssel nie.",
       voiceManage: "Anbieter verwalten…",
       voiceProviders: "Stimmanbieter",
-      voiceProvidersHint: "Auf diesem Computer gespeichert (~/.joplo), für alle Projekte. Schlüssel kommen nie ins Projekt oder in eine Freigabe.",
+      voiceProvidersHint: (p0: Value) => `Auf diesem Computer gespeichert (${value(p0, locale)}), für alle Projekte. Schlüssel kommen nie ins Projekt oder in eine Freigabe.`,
       voiceNewProvider: "Neuer Anbieter",
       voicePreset: "Vorgabe",
       voiceKeySaved: "Schlüssel gespeichert",

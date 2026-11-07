@@ -336,7 +336,7 @@ export function createBoardKo(locale: Locale = 'ko') {
       voiceGenerateHint: "이 안의 모든 시나리오가 대상입니다. 생성한 음성은 build와 공유에 포함되고, 키는 포함되지 않습니다.",
       voiceManage: "제공처 관리…",
       voiceProviders: "음성 제공처",
-      voiceProvidersHint: "이 컴퓨터(~/.joplo)에 저장되어 모든 프로젝트에서 씁니다. 키는 프로젝트나 공유에 들어가지 않습니다.",
+      voiceProvidersHint: (p0: Value) => `이 컴퓨터(${value(p0, locale)})에 저장되어 모든 프로젝트에서 씁니다. 키는 프로젝트나 공유에 들어가지 않습니다.`,
       voiceNewProvider: "새 제공처",
       voicePreset: "프리셋",
       voiceKeySaved: "키 저장됨",

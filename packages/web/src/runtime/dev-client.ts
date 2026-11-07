@@ -327,6 +327,8 @@ export type VoiceProfileView = {
 export type VoiceProfileInput = Pick<VoiceProfileView, 'name' | 'kind' | 'baseUrl' | 'model' | 'voice' | 'response' | 'path' | 'body' | 'style'>;
 /** 与服务端 voice-http.ts 的 VoiceState 一致。 */
 export type VoiceState = {
+  /** 服务端的状态版本（递增）；见 newerVoiceState。 */
+  rev: number;
   selected: string | null;
   source: 'config' | 'board' | null;
   missing: string | null;
@@ -342,11 +344,13 @@ export type VoiceTestResult = { ok: true; audio: string; bytes: number; contentT
 
 type ErrBody = { error?: { message?: string; code?: string; hint?: { response: VoiceResponseMode; path: string } } } | null;
 
-export async function fetchVoiceProfiles(): Promise<VoiceProfileView[] | { error: Text }> {
+/** profile 列表与本机存储文件（所有项目共用；file 里的用户目录写成 ~）。 */
+export async function fetchVoiceProfiles(): Promise<{ profiles: VoiceProfileView[]; file: string | null } | { error: Text }> {
   try {
     const res = await fetch('/__joplo/voice/profiles', { cache: 'no-store' });
     if (!res.ok) return { error: await readError(res) };
-    return ((await res.json()) as { profiles: VoiceProfileView[] }).profiles;
+    const b = (await res.json()) as { profiles: VoiceProfileView[]; file?: string };
+    return { profiles: b.profiles, file: typeof b.file === 'string' ? b.file : null };
   } catch (e) {
     return { error: errMsg(e) };
   }
@@ -420,15 +424,25 @@ export async function generateVoice(projectId: string, locale: Locale, segments:
   }
 }
 
-/** 订阅某个项目的朗读状态（选用、生成进度、新音频）。 */
-export function subscribeVoice(projectId: string, cb: (s: VoiceState) => void): () => void {
-  const h = hot();
+/**
+ * 订阅某个项目的朗读状态（选用、生成进度、新音频）。
+ * 供应商 profile 是本机共用的：任何看板保存 / 删除 profile 后服务端推 { profilesChanged }，这里重新取本项目的状态
+ * （Key 是否保存、音色、声音指纹都可能变了；不取的话看板会一直用旧指纹找音频、以为没有 Key）。
+ */
+export function subscribeVoice(projectId: string, cb: (s: VoiceState) => void, deps: { hot?: Hot | null; fetchState?: (projectId: string) => Promise<VoiceState | null> } = {}): () => void {
+  const h = deps.hot !== undefined ? deps.hot : hot();
   if (!h) return () => undefined;
-  const handler = (d: { projectId: string; state: VoiceState }) => {
-    if (d.projectId === projectId) cb(d.state);
+  const fetchState = deps.fetchState ?? fetchVoiceState;
+  let alive = true;
+  const handler = (d: { projectId?: string; state?: VoiceState; profilesChanged?: boolean }) => {
+    if (d?.profilesChanged) void fetchState(projectId).then((s) => alive && s && cb(s));
+    else if (d?.projectId === projectId && d.state) cb(d.state);
   };
   h.on('joplo:voice', handler);
-  return () => h.off('joplo:voice', handler);
+  return () => {
+    alive = false;
+    h.off('joplo:voice', handler);
+  };
 }
 
 /** 边放边生成一段（D74）：已有就直接返回；同一段并发只生成一次。 */

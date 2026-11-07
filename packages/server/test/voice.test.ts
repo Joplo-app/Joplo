@@ -8,6 +8,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clipKey, type Project } from '@joplo-app/core';
 import { DEFAULT_STYLE, PRESETS, ProfileStore, VoiceCache, buildRequest, bundleVoice, fingerprint, resolveVoices, sniffAudio, suggestFromJson, synthesize, type FetchLike, type VoiceProfile } from '../src/voice.ts';
+import { VoiceHub, tildify } from '../src/voice-http.ts';
 
 const MP3 = Buffer.concat([Buffer.from('ID3'), Buffer.alloc(64, 1)]);
 const WAV = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVE'), Buffer.alloc(32)]);
@@ -203,6 +204,40 @@ describe('生成、缓存与发布', () => {
     expect(again).toEqual({ key: a.key, file: a.file, generated: false });
   });
 
+  it('批量生成与边放边生成同时要同一段：只请求一次；两边拿到同一个文件', async () => {
+    const store = new ProfileStore(home, {});
+    store.upsert('openai', { ...openai() }, 'k');
+    const cache = new VoiceCache(proj);
+    const resolved = resolveVoices(undefined, 'openai', store);
+    let calls = 0;
+    const slow: FetchLike = () => (calls++, new Promise((r) => setTimeout(() => r(audioRes()), 20)));
+    const inflight = new Map();
+    const seg = { stepId: 'f.a.s#1', text: 'One', role: null };
+    const [batch, one] = await Promise.all([
+      cache.generate([seg], 'en', resolved, store, { fetch: slow, inflight }),
+      cache.generateOne(seg, 'en', resolved, store, { fetch: slow, inflight }),
+    ]);
+    expect(calls).toBe(1);
+    expect(batch.failed).toEqual([]);
+    expect(one.file).toBe(cache.current(resolved.voices).clips[one.key]);
+    expect(inflight.size).toBe(0);
+  });
+
+  it('同一段已经有音频后，晚到的失败不再记进 failures', async () => {
+    const store = new ProfileStore(home, {});
+    store.upsert('openai', { ...openai() }, 'k');
+    const cache = new VoiceCache(proj);
+    const resolved = resolveVoices(undefined, 'openai', store);
+    const seg = { stepId: 'f.a.s#1', text: 'One', role: null };
+    // 两个各自独立的请求（例如两个 dev 进程）：快的成功，慢的失败
+    const ok = cache.generateOne(seg, 'en', resolved, store, { fetch: async () => audioRes() });
+    const bad = cache.generateOne(seg, 'en', resolved, store, { fetch: () => new Promise((_r, j) => setTimeout(() => j(new Error('timeout')), 20)) }).catch(() => null);
+    const [a] = await Promise.all([ok, bad]);
+    const raw = JSON.parse(fs.readFileSync(path.join(proj, '.joplo', 'voice', 'index.json'), 'utf8'));
+    expect(raw.clips[a.key]).toBeTruthy();
+    expect(raw.failures).toEqual({});
+  });
+
   it('没有选用供应商：不带任何音频', () => {
     const store = new ProfileStore(home, {});
     const out = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-voice-out-'));
@@ -214,3 +249,50 @@ describe('生成、缓存与发布', () => {
     }
   });
 });
+
+describe('VoiceHub：profile 改动', () => {
+  const ctxOf = (body: unknown) => {
+    const sent: { status: number; body: unknown }[] = [];
+    return { sent, ctx: { guardWrite: () => true, jsonBody: async () => ({ ok: true as const, body }), send: (status: number, b: unknown) => void sent.push({ status, body: b }) } };
+  };
+
+  it('保存、删除 profile 后通知看板（看板据此重新取声音状态）；列表接口带上存储文件', async () => {
+    let changed = 0;
+    const hub = new VoiceHub(home, { emit: () => undefined, profilesChanged: () => changed++, env: {} });
+    const g = ctxOf(undefined);
+    await hub.handleGlobal('profiles', { method: 'GET' } as never, g.ctx);
+    expect(g.sent[0]!.body).toMatchObject({ file: path.join(home, 'voice', 'profiles.json') });
+    expect(tildify('/Users/a/.joplo/voice/profiles.json', '/Users/a')).toBe('~/.joplo/voice/profiles.json');
+    expect(tildify('/tmp/joplo-home/voice/profiles.json', '/Users/a')).toBe('/tmp/joplo-home/voice/profiles.json');
+    expect(tildify('/Users/ab/x', '/Users/a')).toBe('/Users/ab/x');
+
+    const put = ctxOf({ profile: { name: 'Mine', kind: 'openai', baseUrl: 'https://x.test/v1', model: 'tts-1', voice: 'alloy', response: 'audio' }, key: 'k' });
+    await hub.handleGlobal('profiles/new', { method: 'PUT' } as never, put.ctx);
+    expect(put.sent[0]!.status).toBe(200);
+    expect(changed).toBe(1);
+
+    const bad = ctxOf({ profile: { name: '' } });
+    await hub.handleGlobal('profiles/new', { method: 'PUT' } as never, bad.ctx);
+    expect(bad.sent[0]!.status).toBe(400);
+    expect(changed).toBe(1);
+
+    const id = (put.sent[0]!.body as { profile: { id: string } }).profile.id;
+    const del = ctxOf(undefined);
+    await hub.handleGlobal(`profiles/${id}`, { method: 'DELETE' } as never, del.ctx);
+    expect(del.sent[0]!.status).toBe(200);
+    expect(changed).toBe(2);
+  });
+});
+
+describe('VoiceHub：状态的先后', () => {
+  it('每份声音状态带递增的 rev：先读的旧状态 rev 更小（看板据此丢掉晚到的旧状态）', async () => {
+    const hub = new VoiceHub(home, { emit: () => undefined, env: {} });
+    const a = hub.state('p', proj, null);
+    const b = hub.state('p', proj, null);
+    expect(b.rev).toBeGreaterThan(a.rev);
+    // 新的 VoiceHub（dev 重启）也不会比之前的小
+    const c = new VoiceHub(home, { emit: () => undefined, env: {} }).state('p', proj, null);
+    expect(c.rev).toBeGreaterThan(b.rev);
+  });
+});
+

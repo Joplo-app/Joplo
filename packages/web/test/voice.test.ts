@@ -13,7 +13,8 @@ import { VOICE_BREATH_MS, compile, type AuthoringProject, type Project } from '@
 import { DemoController, TIMING } from '../src/runtime/demo';
 import { Narrator, type Narration } from '../src/runtime/voice';
 import { MIN_UI_PX, UI_LEGIBLE_MAX, UI_MAX_ZOOM, uiMaxZoom } from '../src/renderer/camera-math';
-import { narrationLanguage, sortVoices } from '../src/board/voice-model';
+import { narrationLanguage, newerVoiceState, sortVoices } from '../src/board/voice-model';
+import { subscribeVoice, type VoiceState } from '../src/runtime/dev-client';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
@@ -135,3 +136,39 @@ describe('看板：跟随语言', () => {
     expect(v.map((x) => x.id)).toEqual(['b', 'c', 'a']);
   });
 });
+
+describe('看板：供应商改了之后声音状态跟上', () => {
+  it('收到 profilesChanged：重新取本项目的声音状态；别的项目的推送不理；取消订阅后不再收', async () => {
+    const handlers = new Set<(d: any) => void>();
+    const fakeHot = { on: (_e: string, cb: (d: any) => void) => void handlers.add(cb), off: (_e: string, cb: (d: any) => void) => void handlers.delete(cb) };
+    const fetched: string[] = [];
+    const fresh = { selected: 'aihubmix' } as unknown as VoiceState;
+    const got: VoiceState[] = [];
+    const off = subscribeVoice('p1', (s) => got.push(s), { hot: fakeHot, fetchState: async (id) => (fetched.push(id), fresh) });
+    const emit = (d: unknown) => handlers.forEach((h) => h(d));
+    emit({ projectId: 'p2', state: { selected: 'x' } });
+    expect(got).toEqual([]);
+    emit({ profilesChanged: true });
+    await until(() => got.length === 1);
+    expect(fetched).toEqual(['p1']);
+    expect(got[0]).toBe(fresh);
+    off();
+    emit({ profilesChanged: true });
+    await sleep(20);
+    expect(fetched).toEqual(['p1']);
+  });
+});
+
+describe('看板：声音状态只往新的走', () => {
+  it('晚到的旧状态（rev 更小）不覆盖当前状态；没有当前状态或 rev 不更小时用新的', () => {
+    const st = (rev: number) => ({ rev }) as unknown as VoiceState;
+    const cur = st(5);
+    expect(newerVoiceState(null, cur)).toBe(cur);
+    expect(newerVoiceState(cur, st(4))).toBe(cur);
+    const next = st(6);
+    expect(newerVoiceState(cur, next)).toBe(next);
+    const same = st(5);
+    expect(newerVoiceState(cur, same)).toBe(same);
+  });
+});
+
