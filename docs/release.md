@@ -107,7 +107,7 @@ pnpm release:verify 0.2.5      # 或显式指定
 
 它做两件事，任何一步失败都列出缺的包并以非 0 退出：
 
-1. 对六个包逐个运行 `npm view <名字>@<版本> version --prefer-online`；registry 有几十秒延迟，每个包最多试 7 次、间隔 10 秒。
+1. 对六个包逐个运行 `npm view <名字>@<版本> version --prefer-online`；registry 有延迟，大包（web）发布后 npm 可能“processing”几分钟，所以每个包最多试 21 次、间隔 15 秒（约 5 分钟；0.2.9 CI 发布时 60 秒不够）。
 2. 全部都在时，在系统临时目录、用全新的 npm 缓存实际运行一次 `npx -y joplo@<版本> --help`；失败时从 npm 输出（E404 / notarget）里找出缺的包。
 
 失败时按提示重跑 `pnpm release:publish --tag <同一标签>`（已发布的包会跳过，只补发缺的），等几十秒后再运行 `pnpm release:verify`，直到通过。实现见 [release.mjs](../scripts/release.mjs) 的 `verifyRelease`，测试用替身注入 registry 与 npx（scripts/test/release.test.ts）。

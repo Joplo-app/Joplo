@@ -604,8 +604,9 @@ export async function verifyRelease(opts = {}) {
   const view = opts.view ?? npmView;
   const install = opts.install ?? npxInstall;
   const sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
-  const attempts = opts.attempts ?? 7;
-  const delayMs = opts.delayMs ?? 10_000;
+  // 大包（web 约 2.5 MB）发布后 npm 会“processing”几分钟（0.2.9 CI 发布实测 60 秒不够），所以最多等约 5 分钟
+  const attempts = opts.attempts ?? 21;
+  const delayMs = opts.delayMs ?? 15_000;
   const out = opts.log ?? log;
   const err = opts.error ?? ((m) => console.error(m));
   const pkgs = PACKAGES.map((p) => readJson(path.join(root, 'packages', p, 'package.json')));
