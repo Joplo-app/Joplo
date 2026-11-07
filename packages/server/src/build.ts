@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { build as viteBuild, createServer, type Rollup } from 'vite';
-import { JoploError, orderedFeatures, type Project } from '@joplo-app/core';
+import { hasScope, JoploError, orderedFeatures, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
@@ -47,7 +47,7 @@ export function publishPayload(project: Project, home: string | null): { project
 export const jsonForHtml = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
 /** 后处理 vite 产出的 HTML：内联 IR、内联入口脚本、去掉 crossorigin（file:// 下 CORS 会失败）。 */
-export function finalizeHtml(html: string, readAsset: (rel: string) => string, inline: { project: unknown; home: string | null }): { html: string; inlined: string[] } {
+export function finalizeHtml(html: string, readAsset: (rel: string) => string, inline: { project: unknown; home: string | null; scoped?: true }): { html: string; inlined: string[] } {
   const inlined: string[] = [];
   let out = html.replace(/\s+crossorigin(?:="[^"]*")?/g, '');
   out = out.replace(/<link rel="modulepreload"[^>]*>\s*/g, '');
@@ -124,8 +124,17 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     const errs = compiled.diagnostics.filter((d) => d.severity === 'error');
     throw new JoploError('EXPORT_FAILED', `Project compilation failed; no published site was generated: \n${errs.map((d) => `${d.at ?? ''}  ${d.message}`).join('\n')}`, { diagnostics: compiled.diagnostics });
   }
-  const project = compiled.project;
-  const inline = publishPayload(project, compiled.home);
+  // 按场景保密分享（D75）：先裁剪 IR，再生成产物；写错范围在写任何文件之前报错
+  let project = compiled.project;
+  let scope: ScopeInfo | undefined;
+  if (hasScope(opts.scope)) {
+    const mode = opts.review === true ? 'review' : 'publish';
+    const r = scopeProject(project, resolveScope(project, opts.scope, mode), mode);
+    project = r.project;
+    scope = r.info;
+  }
+  const inline: { project: Record<string, unknown>; home: string | null; scoped?: true } = publishPayload(project, compiled.home);
+  if (scope) inline.scoped = true;
 
   // 2. vite build 到临时目录
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-build-'));
@@ -139,7 +148,8 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
 
     // 朗读（D74）：当前声音已生成的音频拷进 voice/，IR 带上 voiceIndex；Key 不进产物
     const voice = bundleVoice(projectDir, project, staging, new ProfileStore(opts.home ?? joploHome()));
-    if (voice.index) inline.project.voiceIndex = voice.index;
+    // 朗读角色只留范围内功能的（scopeProject 对 voiceIndex 的同一规则；bundleVoice 按声音配置生成全部角色）
+    if (voice.index) inline.project.voiceIndex = scope ? scopeProject({ ...project, voiceIndex: voice.index }, scope.scenarios).project.voiceIndex : voice.index;
     voiceReport = voice.report;
 
     // 3. 后处理
@@ -168,6 +178,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     scenarios: Object.keys(project.scenarios),
     diagnostics: compiled.diagnostics,
     ...(voiceReport && (voiceReport.clips || voiceReport.profile) ? { voice: voiceReport } : {}),
+    ...(scope ? { scope } : {}),
   };
 }
 

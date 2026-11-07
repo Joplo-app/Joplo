@@ -14,11 +14,12 @@ npx joplo skill [topic]
 npx joplo components [name…]
 npx joplo skill install [dir] [--force] [--diff] [--agents-md]
 npx joplo guide
-npx joplo build [dir] [--out-dir <dir>] [--overwrite]
+npx joplo build [dir] [--out-dir <dir>] [--overwrite] [--scenario <id>]… [--feature <id>]…
 npx joplo login [--no-browser] [--format text|json] [--server <url>]
 npx joplo logout [--server <url>]
 npx joplo whoami [--format text|json] [--server <url>]
 npx joplo share [dir] [--format text|json] [--new] [--title <title>] [--review] \
+  [--scenario <id>]… [--feature <id>]… \
   [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
 npx joplo feedback [dir] [--share <id>] [--format text|json] [--server <url>]
 npx joplo feedback [dir] --applied <决定 id,…> [--ref <源码版本>] [--share <id>] [--format text|json]
@@ -155,6 +156,7 @@ npx joplo build
 
 - `--out-dir <dir>`：默认项目 dist；显式相对路径按命令当前目录解析。
 - `--overwrite`：确认原产物可清空后允许重建非空目录；不允许清空项目自身、上级目录或 `.joplo/`。
+- `--scenario <id>` / `--feature <id>`（可重复，D75）：只构建这些场景（功能 = 选定方案的全部场景），范围与 `share --scenario` 相同，方便在本地检查分享出去的产物。输出多一行 `Scope: …`，借用了别的功能的内容时每项一行 `Borrowed from another feature: …`。规则见下方「按场景保密分享」。
 
 产物是可离线打开的静态站，含场景、字幕、层级、镜头、调用链与主题，去掉规则、情况、问题、备注及源位置。
 
@@ -262,7 +264,22 @@ npx joplo whoami --format json
 npx joplo share
 npx joplo share examples/invite --title '邀请流程' --format json
 npx joplo share --new
+npx joplo share --scenario invite.a-modal.success     # 只分享一个场景（D75）
+npx joplo share --feature invite                      # 只分享一个功能
 ```
+
+### 按场景保密分享（D75）
+
+`--scenario <场景 id>`（可重复）只分享这些场景；`--feature <功能 id>`（可重复）= 这个功能选定方案的全部场景（带 `--review` 时是全部方案的场景）；两者可以一起用。不写时分享整个项目，行为不变。看板「导出 ▾」里的「发布到 Joplo Cloud」走同一条路径（D76，见 [web.md](web.md)）。
+
+- **保密靠构建时裁剪**，不是隐藏导航：上传的所有文件（内联 IR 的 index.html、voice/、`_joplo/preview.png`）和评审清单里都没有范围外功能、方案、场景的 id、名字、目标、角色、说明和步骤文字。深链接 `#/f/<功能>?s=<场景>` 和嵌入的 `scenario=` 只决定从哪里开始看，不算保密。
+- 保留：范围内场景及其方案、功能；场景用得到的画面（起始画面、`go()` 能到的画面、方案的层级画面）和这些画面的路径。去掉：范围外的分叉、规则、情况、问题，以及**项目说明**（常常概述所有功能）；项目名保留。
+- **借用**：同一路径上别的功能堆进来的元素（含 `when` 隐藏的）默认去掉；范围内步骤引用到它（操作目标、镜头、标注、焦点提示、标注气泡、trace）时，只保留那一条贡献子树，去掉暴露方案 id 的 `from`。场景跳到别的功能新增的路径时，这个页面也按借用保留，去掉 `addedBy`。stderr 每项一行 `Borrowed from another feature: <功能名> › element "<id>" on <路径> (referenced by …)`，JSON 在 `data.scope.borrowed`，照常发布，由作者判断能不能分享；不想带上就改场景。
+- 写错场景 / 功能（NOT_FOUND，列出相近或可分享的场景）、场景属于没选定的方案、功能没有选定方案（USAGE，退出 2）、范围为空时，在构建和任何云端请求之前失败。旧版 `@joplo-app/server` 忽略范围时（产物里有范围外场景）报 UNSUPPORTED_ACTION，不上传。
+- 预览图用范围内第一个场景（按演示顺序），用裁剪后的 IR 渲染。朗读音频只带范围内步骤用到的。
+- 每个范围是**单独的分享**，记在 `.joplo/cloud.json` 的 `scoped: { <范围键>: { shareId, url } }`，范围键是排序后的场景 id 用逗号连接（评审版加 `review:` 前缀），不覆盖主链接和评审链接。Pro 再次分享同一范围更新原链接，`--new` 新建；场景改名后是新范围、新链接。
+- 默认标题是“项目名 · 场景名”（多个场景时“项目名 · N scenarios”）。文本输出多一行 `Scope: …`；JSON 的 `data.scope = {key, scenarios, features, borrowed}`。
+- 已知边界：作者 CSS 与 Tailwind 扫描到的类名整份打包；`routes/` 下的基础页面所有功能共用，原样保留；元素 id 和项目名由作者自己起，可能带有含义。
 
 - 未登录：交互终端显示“Sharing requires a free Joplo account”，直接进入浏览器登录，完成后继续发布；非交互环境（包含 --format json、有效 CI 环境变量、JOPLO_NONINTERACTIVE=1）立即返回 AUTH_REQUIRED（退出 3），提示用户运行 `npx joplo login`。
 - 先 check，再复用 build 构建到临时目录；结束时清理临时产物，不改项目 dist。检查或构建有 error 时不上传。
@@ -272,7 +289,7 @@ npx joplo share --new
 - `maxUploadBytes` 限制本次缺失对象的新上传量（免费 20 MiB、Pro 100 MiB）；`maxTotalBytes` 限制清单总量（256 MiB），`maxFiles` 限制文件数（2000）。实际数值以 me 为准。
 - CLI 本地只预检清单总量和文件数；新上传量由服务端按已有 blob 去重后判断，不能拿清单总量与新上传限额比较。共用字体和运行时资源可由运维预置。
 - Pro 且 `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接；`--new` 新建。免费账号每次新建。
-- `.joplo/cloud.json` 的格式为 `{server, shareId?, url?, review?: {shareId, url}}`：主链接和评审版是**两个分享**，互不覆盖（契约 8.1）。普通 share 只用、只写主 `shareId`/`url`；`--review` 只用、只写 `review`（Pro 重新发布评审版时用 `review.shareId` 作 replaceShareId，评审链接和评论保留，版本 +1），评审版永远不会替换 README 里的主链接。写入时保留另一项；记录属于其他 server 时整体替换。没有 `review` 的旧记录照常使用。
+- `.joplo/cloud.json` 的格式为 `{server, shareId?, url?, review?: {shareId, url}, scoped?: {<范围键>: {shareId, url}}}`（`scoped` 见上方「按场景保密分享」）：主链接和评审版是**两个分享**，互不覆盖（契约 8.1）。普通 share 只用、只写主 `shareId`/`url`；`--review` 只用、只写 `review`（Pro 重新发布评审版时用 `review.shareId` 作 replaceShareId，评审链接和评论保留，版本 +1），评审版永远不会替换 README 里的主链接。写入时保留另一项；记录属于其他 server 时整体替换。没有 `review` 的旧记录照常使用。
 - 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；一个对象失败会取消其他在途 PUT 和重试等待；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
 - finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/settings/billing`。
 - 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的导出组件，见 `setup export`；项目里已有的 Playwright 也可以）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有导出组件、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”（没有导出组件时括号里给出 `npx joplo setup export`），share 照常成功、从不下载；分享页此时用通用预览图。
@@ -285,7 +302,7 @@ npx joplo share --new
 - PR 预览是独立链接：不发送 replaceShareId，也不写 `.joplo/cloud.json`（不覆盖本项目的主链接和评审版记录，之后的普通 share、--review 与 feedback 仍用原来的记录）。CI 推荐 `npx joplo share --new --pr <number> --format json`；fork 来的 PR 拿不到 secrets，工作流应跳过发布，不推荐 `pull_request_target`。
 - finalize 响应里的 `pr: {comment, reason?, installUrl?}` 原样（白名单字段）放进 `data.pr`；`comment: "skipped"` 时文本输出一行 “PR comment skipped: <原因>. Install the Joplo GitHub App to comment on pull requests: <installUrl 或 <server>/settings/github>”，`failed` 时说明评论失败但已发布。服务端没返回时 `data.pr` 为 null。
 
-JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, embed}`（`--review` 时另有 `mode: "review"`，`--pr` 时另有 `pr`），`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
+JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, embed}`（`--review` 时另有 `mode: "review"`，`--pr` 时另有 `pr`，`--scenario` / `--feature` 时另有 `scope`），`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
 
 `data.embed` 与云端控制台、分享页 Worker 用同一套格式（`<分享页>` 为 `data.url`，规范成以 `/` 结尾）：
 

@@ -32,7 +32,7 @@ Every step is an action on the product and a visible change it causes. If a step
 5. Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.
 6. Extend to every option and every case agreed with the user; run check until 0 errors.
 7. Give the user the board URL and a short list of what to check, then wait for their feedback.
-8. After the user agrees: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. Apply review results with the joplo-feedback skill.
+8. After the user agrees: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. To share only part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items. Apply review results with the joplo-feedback skill.
 
 ## Common pitfalls
 - when takes a condition, not a boolean: when={eq($.ui.mode, 'code')}, never when={mode === 'code'}; for values known while writing use {flag && <X/>}. See npx joplo skill authoring.
@@ -47,4 +47,4 @@ Every step is an action on the product and a visible change it causes. If a step
 Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, focus, diagram, components, cases, check, selection, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.
 After the user Alt+clicks a board element, run npx joplo selection and edit only that location.
 Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.10 sha256:5c5b69c99734353779acd34dbb711da3699e84c28f3eed2feaa96483e04fe19d -->
+<!-- joplo-skill 0.2.10 sha256:1a3dcbd5fb695ce7e534170718cb07a253e5d79e81ae4d7f1090d44ebbb73916 -->

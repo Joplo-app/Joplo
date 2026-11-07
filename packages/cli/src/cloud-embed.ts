@@ -45,7 +45,7 @@ export function embedSnippets(url: string, title: string): EmbedSnippets {
 }
 
 /** 渲染一步截图（@joplo-app/server 的 renderStep；没有时由调用方抛错）。 */
-export type RenderPreview = (opts: { projectDir: string; scenarioId: string; out: string; viewport: { width: number; height: number }; scale: number }) => Promise<unknown>;
+export type RenderPreview = (opts: { projectDir: string; scenarioId: string; out: string; viewport: { width: number; height: number }; scale: number; scope?: string[] }) => Promise<unknown>;
 
 /** 发布 IR（index.html 内联的 joplo-ir）；读不到时为 null。 */
 export function inlineProject(html: string): Parameters<typeof embedStartScenario>[0] | null {
@@ -86,14 +86,15 @@ function pngSize(data: Uint8Array): { width: number; height: number } | null {
  * 失败（没有导出组件、浏览器启动失败、项目没有场景、尺寸不对……）只返回原因，由调用方在 stderr 提示一行，不让 share 失败。
  * 没有导出组件（D66）时只提示安装命令，绝不自动下载。
  */
-export async function writePreview(render: () => Promise<RenderPreview>, projectDir: string, siteDir: string, scratch: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+export async function writePreview(render: () => Promise<RenderPreview>, projectDir: string, siteDir: string, scratch: string, scope?: string[]): Promise<{ ok: true } | { ok: false; reason: string }> {
   try {
     const project = inlineProject(await readFile(join(siteDir, 'index.html'), 'utf8'));
     const scenarioId = project ? embedStartScenario(project) : null;
     if (!scenarioId) return { ok: false, reason: 'no scenario to show' };
     const renderStep = await render();
     await rm(scratch, { force: true });
-    await renderStep({ projectDir, scenarioId, out: scratch, viewport: { ...PREVIEW_SIZE }, scale: 1 });
+    // 范围分享（D75）：预览图也用裁剪后的 IR 渲染，画面里不出现范围外功能堆进来的元素
+    await renderStep({ projectDir, scenarioId, out: scratch, viewport: { ...PREVIEW_SIZE }, scale: 1, ...(scope?.length ? { scope } : {}) });
     const data = await readFile(scratch);
     const size = pngSize(data);
     if (!size || size.width !== PREVIEW_SIZE.width || size.height !== PREVIEW_SIZE.height) return { ok: false, reason: size ? `unexpected size ${size.width}x${size.height}` : 'the render is not a PNG' };

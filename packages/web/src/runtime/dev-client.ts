@@ -455,3 +455,74 @@ export async function requestClip(projectId: string, locale: Locale, segment: Vo
     return { ok: false, message: errMsg(e) };
   }
 }
+
+// ---------- 直接发布到云端（D76） ----------
+/** 与 @joplo-app/server 的 CloudAccount / CloudJob 一致（页面只拿到邮箱和套餐，令牌留在本机进程）。 */
+export type CloudAccount =
+  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null }
+  | { signedIn: false; server: string; loginCommand: string; message?: string };
+export type CloudBorrowed =
+  | { kind: 'element'; featureId: string; featureName: string; optionId: string; elementId: string; route: string; refs: string[]; scenarios: string[] }
+  | { kind: 'page'; featureId: string; featureName: string; optionId: string; route: string; scenarios: string[] };
+export type CloudScope = { key: string; scenarios: string[]; features: string[]; borrowed: CloudBorrowed[] };
+export type CloudPublishRequest = { scenarios?: string[]; features?: string[] };
+export type CloudJob = {
+  id: string;
+  state: 'running' | 'done' | 'failed';
+  request: CloudPublishRequest;
+  startedAt: number;
+  lines: string[];
+  result?: { shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope };
+  error?: { code: string; message: string; loginCommand?: string };
+};
+
+/** 账号：available = false 表示这个看板进程不能发布（旧版 CLI 启动的）。 */
+export async function fetchCloudAccount(): Promise<{ ok: true; available: boolean; account: CloudAccount | null } | { ok: false; message: Text }> {
+  try {
+    const headers = writeHeaders(false);
+    if (!headers) return { ok: false, message: m.board.thisPageHasNoLocalTokenOpenItThrough };
+    const res = await fetch('/__joplo/cloud/account', { headers, cache: 'no-store' });
+    // 旧版看板没有这个接口
+    if (res.status === 404) return { ok: true, available: false, account: null };
+    if (!res.ok) return { ok: false, message: await readError(res) };
+    const b = (await res.json()) as { available: boolean; account?: CloudAccount };
+    return { ok: true, available: b.available, account: b.account ?? null };
+  } catch (e) {
+    return { ok: false, message: m.board.couldNotConnectToJoploDev(errMsg(e)) };
+  }
+}
+
+/** 当前发布任务（没有时 null）。 */
+export async function fetchCloudJob(projectId: string): Promise<CloudJob | null> {
+  try {
+    const headers = writeHeaders(false);
+    if (!headers) return null;
+    const res = await fetch(`/__joplo/p/${enc(projectId)}/cloud/publish`, { headers, cache: 'no-store' });
+    if (!res.ok) return null;
+    return ((await res.json()) as { job: CloudJob | null }).job;
+  } catch {
+    return null;
+  }
+}
+
+/** 开始发布（进度通过 joplo:cloud 推送）；已有进行中的任务时返回那一个。 */
+export async function startCloudPublish(projectId: string, request: CloudPublishRequest): Promise<{ ok: true; job: CloudJob } | { ok: false; message: Text }> {
+  try {
+    const res = await post(`/__joplo/p/${enc(projectId)}/cloud/publish`, request);
+    const b = (await res.json().catch(() => null)) as ({ job?: CloudJob } & NonNullable<ErrBody>) | null;
+    return res.ok && b?.job ? { ok: true, job: b.job } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, message: errMsg(e) };
+  }
+}
+
+/** 订阅某个项目的发布任务。 */
+export function subscribeCloud(projectId: string, cb: (job: CloudJob) => void): () => void {
+  const h = hot();
+  if (!h) return () => undefined;
+  const handler = (d: { projectId: string; job: CloudJob }) => {
+    if (d.projectId === projectId) cb(d.job);
+  };
+  h.on('joplo:cloud', handler);
+  return () => h.off('joplo:cloud', handler);
+}

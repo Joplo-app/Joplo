@@ -11,7 +11,7 @@ Reviewers open the review link from npx joplo share --review, compare every opti
 - Requires a project that was shared (.joplo/cloud.json) or a share id from the user.
 
 ## Steps
-1. npx joplo feedback --format json. It reads the review share in .joplo/cloud.json, else the main share; pass --share <id> for another. data.decisions are decisions not yet applied (id, kind, featureId, targetId, note); data.comments are unresolved comments with scenario, step, stepId, and element.
+1. npx joplo feedback --format json. It reads the review share in .joplo/cloud.json, else the main share; pass --share <id> for another (shares of part of the project, made with --scenario / --feature, are under scoped in .joplo/cloud.json). data.decisions are decisions not yet applied (id, kind, featureId, targetId, note); data.comments are unresolved comments with scenario, step, stepId, and element.
 2. Apply each decision to the source:
    - pick: set pick in features/<feature>/feature.ts to the option file name (targetId without the "<feature>." prefix).
    - confirm_rule: set that rule to origin: 'user', status: 'confirmed'.
@@ -24,4 +24,4 @@ Reviewers open the review link from npx joplo share --review, compare every opti
 
 AUTH_REQUIRED or AUTH_EXPIRED (exit 3): ask the user to run npx joplo login in their own terminal; never log in or out for them.
 Details: npx joplo skill publish (Review and feedback).
-<!-- joplo-skill 0.2.10 sha256:6d6fe572364889328c53ff2b0278ec3be92dce48f8b964fc221acced0122d6bd -->
+<!-- joplo-skill 0.2.10 sha256:d553016e7345efcd16afe68881636661cdc8d7eabafdc7187a2eee29a218440c -->

@@ -23,6 +23,7 @@ import { JoploError, type Diagnostic, type Project } from '@joplo-app/core';
 import type { DevHandle, DevOptions } from './contract.ts';
 import { ExportHub, type ExportDeps } from './export.ts';
 import { VoiceHub } from './voice-http.ts';
+import { CLOUD_EVENT, CloudHub, type CloudBridge } from './cloud.ts';
 import { Registry, clearServerInfo, joploHome, normalizeSettings, pidAlive, projectIdOf, readServerInfo, readSettings, writeServerInfo, writeSettings, type BoardSettings, type ProjectRecord } from './home.ts';
 import { compileProject, invalidateProjectModules } from './project.ts';
 import { SelectionBody, readSelection, resolveSelection, writeSelection } from './selection.ts';
@@ -53,6 +54,7 @@ export const IR_EVENT = 'joplo:ir';
 export const PROJECTS_EVENT = 'joplo:projects';
 /** 朗读状态变化（D74）：{ projectId, state }。 */
 export const VOICE_EVENT = 'joplo:voice';
+export { CLOUD_EVENT };
 const MAX_BODY = 64 * 1024;
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -199,6 +201,8 @@ export type HubOptions = {
   exportDeps?: Partial<ExportDeps>;
   /** 启动这个看板的项目目录（写进 server.json，后来加入的 joplo dev 会说明）。 */
   startedIn?: string;
+  /** 直接发布到云端（D76）：由 CLI 注入；没有时看板禁用「发布到 Joplo Cloud」。 */
+  cloud?: CloudBridge;
 };
 
 /** 本包（与 CLI 同一版本）的版本号：看板 ping 与 server.json 都带上，加入时比较。 */
@@ -404,6 +408,11 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     },
   });
 
+  // 直接发布到云端（D76）：发布任务变化推 joplo:cloud
+  const cloudHub = new CloudHub(opts.cloud, (projectId, job) => {
+    if (!closed) server?.ws.send({ type: 'custom', event: CLOUD_EVENT, data: { projectId, job } });
+  });
+
   // ---------- HTTP ----------
   const deny = (res: http.ServerResponse, status: number, message: string) => sendJson(res, status, { error: { code: 'PERMISSION_DENIED', message } });
   /** 写接口：Origin（有则必须是看板自己）、令牌、Content-Type。返回 false 表示已拒绝。 */
@@ -482,6 +491,11 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       const ctx = { guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), send: (status: number, body: unknown) => sendJson(res, status, body) };
       if (await voiceHub.handleProject(id, slot.dir, slot.payload.project, rest === 'voice' ? '' : rest.slice('voice/'.length), req, res, ctx)) return;
     }
+    if (rest.startsWith('cloud/')) {
+      const slot = await ensure(id);
+      const ctx = { guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), send: (status: number, body: unknown) => sendJson(res, status, body) };
+      if (await cloudHub.handleProject(id, slot.dir, rest.slice('cloud/'.length), req, ctx)) return;
+    }
     if (rest.startsWith('export/')) {
       const slot = await ensure(id);
       return exportsHub.handle(rest.slice('export/'.length), req, res, { projectId: id, dir: slot.dir, project: slot.payload.project, guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), fail: (e) => fail(res, e) });
@@ -539,6 +553,10 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
           if (url.pathname.startsWith('/__joplo/voice/')) {
             const ctx = { guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), send: (status: number, body: unknown) => sendJson(res, status, body) };
             if (await voiceHub.handleGlobal(url.pathname.slice('/__joplo/voice/'.length), req, ctx)) return;
+          }
+          if (url.pathname.startsWith('/__joplo/cloud/')) {
+            const ctx = { guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), send: (status: number, body: unknown) => sendJson(res, status, body) };
+            if (await cloudHub.handleGlobal(url.pathname.slice('/__joplo/cloud/'.length), req, ctx)) return;
           }
           if (url.pathname.startsWith('/__joplo/export-runtime/')) return exportsHub.handleRuntime(url.pathname.slice('/__joplo/export-runtime/'.length), req, res, { guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), fail: (e) => fail(res, e) });
           const pm = /^\/__joplo\/p\/([^/]+)\/(.+)$/.exec(url.pathname);
@@ -641,7 +659,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
 
 // ---------- 单项目句柄（renderStep、测试、文档截图） ----------
 
-export type InternalDevOptions = DevOptions & Pick<HubOptions, 'watch' | 'home' | 'exportDeps'>;
+export type InternalDevOptions = DevOptions & Pick<HubOptions, 'watch' | 'home' | 'exportDeps' | 'cloud'>;
 
 export type InternalDevHandle = DevHandle & {
   token: string;
@@ -656,7 +674,7 @@ export type InternalDevHandle = DevHandle & {
 
 /** 启动一个看板进程并打开一个项目（等首次编译完成）。缺省不持久化。 */
 export async function createDev(opts: InternalDevOptions): Promise<InternalDevHandle> {
-  const hub = await createHub({ port: opts.port, log: opts.log, watch: opts.watch, home: opts.home ?? null, exportDeps: opts.exportDeps });
+  const hub = await createHub({ port: opts.port, log: opts.log, watch: opts.watch, home: opts.home ?? null, exportDeps: opts.exportDeps, cloud: opts.cloud });
   try {
     const { id, url, slot } = hub.addProject(opts.projectDir);
     await slot!.ready;
@@ -732,7 +750,7 @@ export async function startDev(opts: DevOptions & { home?: string; exportDeps?: 
   if (existing) return existing;
   let hub: Hub;
   try {
-    hub = await createHub({ port: opts.port, log, home, exportDeps: opts.exportDeps, startedIn: projectDir });
+    hub = await createHub({ port: opts.port, log, home, exportDeps: opts.exportDeps, startedIn: projectDir, cloud: opts.cloud });
   } catch (e) {
     // 另一个 joplo dev 恰好同时启动：端口被它占了，改为加入它
     if (e instanceof JoploError && (e.details as { code?: string } | undefined)?.code === 'EADDRINUSE') {

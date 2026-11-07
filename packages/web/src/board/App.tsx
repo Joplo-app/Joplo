@@ -28,7 +28,7 @@ import { VIEWPORT_SIZE, type Diagnostic } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
 import { boardHash, parseBoardHash, warnUnknownPlayParams, type BoardRoute, type PlayRoute } from '../runtime/route';
-import { ArrowRight, BookOpen, CircleCheck, Smartphone, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch, Volume2, VolumeX } from 'lucide-react';
+import { ArrowRight, BookOpen, CircleCheck, Cloud, Loader2, Smartphone, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch, Volume2, VolumeX } from 'lucide-react';
 import { PlayerPage, useBoardLayout, type MenuEntry } from '../player/PlayerPage';
 import { Btn, Kbd } from '../player/controls';
 import type { ProjectSummary } from '../runtime/dev-client';
@@ -39,6 +39,7 @@ import { CaseNav, CaseRail } from './CaseNav';
 import { Home } from './Home';
 import { InspectDrawer } from './InspectDrawer';
 import { ProgressRing, VideoProgressCard, useVideoExport } from './VideoExport';
+import { CloudPublishPopover, useCloudPublish } from './CloudPublish';
 import { ExportSetupCard, SetupNeededFlash, showSetupCard, useExportRuntime } from './ExportSetup';
 import { diagnosticsSummary, gapBanner, nextCase } from './states-model';
 import { faviconHref, tabTitle } from '../player/states';
@@ -220,6 +221,8 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   });
 
   // 导出组件（D66）：没装时菜单顶部有安装卡；点导出时提示「安装并导出」；装好后继续刚才的导出
+  // 直接发布到云端（D76）：任务与账号状态；浮层挂在「导出 ▾」按钮下
+  const cloud = useCloudPublish(projectId);
   const rt = useExportRuntime(projectId, {
     onReady: () => setFlash(<LocalText value={m.board.exportSetupReady} />),
     onError: (message) =>
@@ -318,6 +321,19 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
 
   const menu: MenuEntry[] = [
     ...(showSetupCard(rt.status, rt.job) ? [{ id: 'export-setup', custom: <ExportSetupCard rt={rt} /> }, { id: 'export-setup-divider', divider: true as const }] : []),
+    // 发布到 Joplo Cloud（D76）：蓝底单独一项，和下面的本地导出分开
+    {
+      id: 'cloud',
+      tone: 'cloud' as const,
+      icon: cloud.running ? <Loader2 className="animate-spin" /> : <Cloud />,
+      label: i18n.board.cloudPublish,
+      description: cloud.running ? i18n.board.cloudPublishing : !cloud.acct.available ? i18n.board.cloudUnavailableHint : i18n.board.cloudPublishHint,
+      onClick: () => {
+        cloud.setAnchor(document.querySelector<HTMLElement>('[data-testid="more-menu"]'));
+        cloud.setOpen(true);
+      },
+    },
+    { id: 'cloud-divider', divider: true as const },
     {
       id: 'image',
       icon: <ImageDown />,
@@ -506,6 +522,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             ) : null}
             <VoicePopover api={voice} open={voiceOpen} anchor={voiceAnchor} onClose={() => setVoiceOpen(false)} onManage={() => (setVoiceOpen(false), setProvidersOpen(true))} />
             <VoiceProfilesDialog api={voice} open={providersOpen} onClose={() => setProvidersOpen(false)} canSelect={voice.state?.source !== 'config'} />
+            <CloudPublishPopover model={cloud} ctx={{ featureId: play.featureId, scenarioId: scenario?.id ?? null }} names={{ feature: feature.name, scenario: scenario?.name ?? null }} onFlash={setFlash} />
             <AppearancePopover open={a.open} anchor={a.anchor} onClose={() => a.setOpen(false)} scope="project" projectId={projectId} configTheme={project.theme ?? 'sketch'} catalog={a.catalog} settings={a.settings} look={a.saved} save={a.save} onPreview={a.setPreview} onFlash={setFlash} copy={copyText} />
           </>
         }

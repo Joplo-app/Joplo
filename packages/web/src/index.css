@@ -65,6 +65,11 @@
   --jb-status-ok-bg: #E5F2E8;
   --jb-status-pending: #6E6A60;
   --jb-status-na: #9C978B;
+  /* 云端（D76「发布到 Joplo Cloud」）：蓝底白字，与其他导出项区分 */
+  --jb-cloud: #1C5FB8;
+  --jb-cloud-hover: #174F9A;
+  --jb-cloud-bg: #E6EFFA;
+  --jb-fg-on-cloud: #FFFFFF;
   --jb-font: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   --jb-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   /* 浮层 e1：1.5px 墨线 + 3px 实色偏移阴影，圆角 10 */
@@ -99,6 +104,10 @@
   --jb-status-ok-bg: #18301F;
   --jb-status-pending: #BDB7A9;
   --jb-status-na: #6E6A60;
+  --jb-cloud: #3D7FD6;
+  --jb-cloud-hover: #5A93DE;
+  --jb-cloud-bg: #182638;
+  --jb-fg-on-cloud: #FFFFFF;
   --jb-e1: 3px 3px 0 var(--jb-border-strong);
   color: var(--jb-fg-default);
 }
@@ -130,6 +139,10 @@
   --color-jb-ok-bg: var(--jb-status-ok-bg);
   --color-jb-pending: var(--jb-status-pending);
   --color-jb-na: var(--jb-status-na);
+  --color-jb-cloud: var(--jb-cloud);
+  --color-jb-cloud-hover: var(--jb-cloud-hover);
+  --color-jb-cloud-bg: var(--jb-cloud-bg);
+  --color-jb-on-cloud: var(--jb-fg-on-cloud);
   --font-jb: var(--jb-font);
   --font-jb-mono: var(--jb-mono);
   --shadow-jb-e1: var(--jb-e1);

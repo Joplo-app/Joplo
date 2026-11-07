@@ -380,3 +380,61 @@ test('服务端因 review 字段返回 400：普通 share 去掉 review 重试�
     expect(calls.filter(c => c.path === '/api/v1/shares'), String(status)).toHaveLength(1);
   }
 });
+
+// ---------- 按场景保密分享（D75） ----------
+/** 假的范围构建：产物 IR 只有范围内的场景，并返回 scope（与 @joplo-app/server 的 buildSite 一致）。 */
+const scopedBuild = (borrowed: unknown[] = []) => async ({ outDir, scope }: { outDir?: string; scope?: { scenarios?: string[] } }) => {
+  const ids = scope?.scenarios ?? [];
+  const html = `<html><script type="application/json" id="joplo-ir">${JSON.stringify({ project: { mode: 'publish', features: { f: {} }, options: {}, scenarios: Object.fromEntries(ids.map(id => [id, {}])) }, home: null, scoped: true })}</script></html>`;
+  await mkdir(outDir!, { recursive: true }); await writeFile(join(outDir!, 'index.html'), html);
+  return { outDir: outDir!, files: ['index.html'], diagnostics: [], routes: [], scenarios: ids, scope: { key: [...ids].sort().join(','), scenarios: ids, features: ['f'], borrowed } };
+};
+
+test('share --scenario：构建带范围；清单只含范围内；标题带场景名；记在 scoped，不动主链接', async () => {
+  await login();
+  await mkdir(join(project, '.joplo'), { recursive: true });
+  await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/' }));
+  build.mockImplementationOnce(scopedBuild([{ kind: 'element', featureId: 'g', featureName: 'Audit', optionId: 'g.a', elementId: 'seat', route: '/', refs: ['seat'], scenarios: ['f.a.main'] }]));
+  const r = await cli(['share', project, '--scenario', 'f.a.main', '--format=json']); expect(r.code, r.stdout).toBe(0);
+  expect(build.mock.calls[0]![0]).toEqual({ projectDir: project, outDir: expect.any(String), scope: { scenarios: ['f.a.main'] } });
+  const body = createBody();
+  expect(body.title).toBe('Fixture · Main');
+  expect(body.review.features.map((f: any) => f.id)).toEqual(['f']);
+  expect(body.review.scenarios.map((s: any) => s.id)).toEqual(['f.a.main']);
+  expect(r.stderr).toContain('Borrowed from another feature: Audit › element "seat" on /');
+  expect(r.json().data.scope).toMatchObject({ key: 'f.a.main', scenarios: ['f.a.main'] });
+  const record = JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'));
+  expect(record.shareId).toBe('Main123456');
+  expect(record.scoped).toEqual({ 'f.a.main': { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
+});
+
+test('Pro 重新分享同一范围：只替换这个范围的分享，不用主链接', async () => {
+  await login(); plan = 'pro';
+  await mkdir(join(project, '.joplo'), { recursive: true });
+  await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', scoped: { 'f.a.main': { shareId: 'Scop123456', url: base + '/s/Scop123456/' } } }));
+  build.mockImplementationOnce(scopedBuild());
+  const r = await cli(['share', project, '--feature', 'f', '--format=json']); expect(r.code, r.stdout).toBe(0);
+  // --feature f = 选定方案 a 的全部场景 = f.a.main，与上次是同一个范围
+  expect(createBody().replaceShareId).toBe('Scop123456');
+  const record = JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'));
+  expect(record.shareId).toBe('Main123456');
+});
+
+test('写错场景、没选定方案：在构建和任何云端请求之前失败', async () => {
+  await login();
+  let r = await cli(['share', project, '--scenario', 'f.main', '--format=json']);
+  expect(r.code).toBe(1); expect(r.json().error.code).toBe('NOT_FOUND'); expect(r.stdout).toContain('f.a.main');
+  // 没选定方案属于用法错误（USAGE，退出码 2）
+  r = await cli(['share', project, '--scenario', 'f.b.only', '--format=json']);
+  expect(r.code).toBe(2); expect(r.json().error.message).toMatch(/not the picked option/);
+  r = await cli(['share', project, '--feature', 'g', '--format=json']);
+  expect(r.code).toBe(2); expect(r.json().error.message).toMatch(/no picked option/);
+  expect(build).not.toHaveBeenCalled(); expect(calls).toEqual([]);
+});
+
+test('范围分享遇到忽略 scope 的旧 server（产物里有范围外场景）：失败，不上传', async () => {
+  await login();
+  const r = await cli(['share', project, '--scenario', 'f.a.main', '--format=json']);
+  expect(r.code).toBe(1); expect(r.json().error.code).toBe('UNSUPPORTED_ACTION');
+  expect(calls.some(c => c.path === '/api/v1/shares')).toBe(false);
+});

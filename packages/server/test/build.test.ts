@@ -341,3 +341,68 @@ describe('renderStep', () => {
     await expect(renderStep({ projectDir: dir, scenarioId: 'invite.a-modal.success', out: path.join(dir, '.joplo/x.png') })).rejects.toThrow(/\.joplo/);
   }, 180_000);
 });
+
+/**
+ * 按场景保密分享（D75，scope）。不变量：产物里的每个文本文件都不出现范围外功能、方案、场景的名字、目标、说明和步骤字幕；
+ * 写错范围时在写任何文件之前报错。用多功能的 examples/joplo-board：只分享 home 的一个场景。
+ */
+describe('范围构建（scope，D75）', () => {
+  const BOARD = path.resolve(import.meta.dirname, '../../../examples/joplo-board');
+  let dir: string;
+  beforeAll(() => {
+    dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-scope-t-')));
+    fs.cpSync(BOARD, dir, { recursive: true });
+  });
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  async function devIR() {
+    const web = locateWebAssets();
+    const loader = await createServer({ configFile: false, envDir: false, root: dir, logLevel: 'error', appType: 'custom', resolve: { alias: kitAliases(web, dir) }, plugins: [joploProjectPlugin(dir, web)], server: { middlewareMode: true, hmr: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] } });
+    try {
+      return (await compileProject(loader, dir, 'dev')).project!;
+    } finally {
+      await loader.close();
+    }
+  }
+
+  it('只分享一个场景：产物全文搜不到其他功能、方案、场景的文字；没有项目说明；IR 带 scoped', async () => {
+    const dev = await devIR();
+    const SCENARIO = 'home.a-recent.recent';
+    const keep = dev.scenarios[SCENARIO]!;
+    const inScope = JSON.stringify(keep) + dev.features.home!.name + dev.features.home!.goal + JSON.stringify(dev.options['home.a-recent']);
+    // 范围外的文字（与范围内重复的不算：例如两个功能共用的字幕）
+    const outside = [
+      ...Object.values(dev.features).filter((f) => f.id !== 'home').flatMap((f) => [f.name, f.goal]),
+      ...Object.values(dev.options).filter((o) => o.featureId !== 'home').flatMap((o) => [o.name, o.idea]),
+      ...Object.values(dev.scenarios).filter((s) => s.id !== SCENARIO).flatMap((s) => [s.name, ...s.steps.map((st) => st.caption)]),
+      dev.description,
+    ].filter((t) => t && t.length >= 6 && !inScope.includes(t));
+    expect(outside.length).toBeGreaterThan(20);
+
+    const r = await buildSite({ projectDir: dir, outDir: path.join(dir, 'scoped'), scope: { scenarios: [SCENARIO] } });
+    expect(r.scenarios).toEqual([SCENARIO]);
+    expect(r.scope).toMatchObject({ key: SCENARIO, scenarios: [SCENARIO], features: ['home'] });
+    const text = siteText(r.outDir, r.files);
+    for (const s of outside) expect(text, s).not.toContain(s);
+    for (const id of ['player.', 'views.', 'frames.']) expect(text, id).not.toContain(`"${id}`);
+    const ir = JSON.parse(/<script type="application\/json" id="joplo-ir">([\s\S]*?)<\/script>/.exec(fs.readFileSync(path.join(r.outDir, 'index.html'), 'utf8'))![1]!);
+    expect(ir.scoped).toBe(true);
+    expect(ir.project.description).toBe('');
+    expect(Object.keys(ir.project.features)).toEqual(['home']);
+    expect(text).toContain(keep.steps[0]!.caption);
+  }, 180_000);
+
+  it('写错场景：NOT_FOUND，输出目录不创建', async () => {
+    const out = path.join(dir, 'never');
+    await expect(buildSite({ projectDir: dir, outDir: out, scope: { scenarios: ['home.recent'] } })).rejects.toThrow(/Unknown scenario home\.recent[\s\S]*home\.a-recent\.recent/);
+    expect(fs.existsSync(out)).toBe(false);
+  }, 120_000);
+
+  it('不带 scope 时与原来一致（没有 scoped 标记）', async () => {
+    const r = await buildSite({ projectDir: dir, outDir: path.join(dir, 'full') });
+    expect(r.scope).toBeUndefined();
+    const html = fs.readFileSync(path.join(r.outDir, 'index.html'), 'utf8');
+    expect(html).not.toContain('"scoped"');
+    expect(r.scenarios.length).toBeGreaterThan(5);
+  }, 180_000);
+});
