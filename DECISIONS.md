@@ -321,7 +321,7 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
 - D72 自动发布（2026-11-07，来源：用户 2026-11-07：“能不能配置上 CICD 自动发布”）：
   - 推送 main 且 `packages/joplo/package.json` 版本没有对应 `v<版本>` tag 时，`.github/workflows/release.yml` 依次跑 typecheck、test、release:smoke、release:publish（正式版 latest，预发布版 beta），verify 通过后才打 tag 并用 CHANGELOG 对应一节建 GitHub Release。维护者推送版本提交即表示同意发布，取代 A3“执行 npm publish 前再向用户确认”。
   - 认证用 npm Trusted Publishing（GitHub OIDC）：不存 token、无 OTP、自动 provenance；六个包各配一次受信任发布方（docs/release.md）。本地 `pnpm release:publish` 保留为备用。
-  - `.github/workflows/ci.yml`：每次推送分支和每个 PR 跑 typecheck + test。
+  - `.github/workflows/ci.yml`：每次推送分支和每个 PR 跑 typecheck + test + release:smoke（0.2.9 首次 CI 发布时 smoke 因 BSD / GNU tar 输出差异失败，所以分支上就跑）。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

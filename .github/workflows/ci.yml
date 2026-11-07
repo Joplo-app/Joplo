@@ -1,4 +1,4 @@
-# 每次推送分支、每个 PR：类型检查 + 全量测试（发布前的完整检查见 release.yml）。
+# 每次推送分支、每个 PR：类型检查 + 全量测试 + 打包冒烟（在 Linux 上提前暴露发布脚本的平台差异；发布见 release.yml）。
 name: CI
 
 on:
@@ -28,3 +28,4 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm release:smoke

@@ -32,7 +32,7 @@ git push origin main                # 触发 .github/workflows/release.yml
 
 - 中途失败（网络、registry 延迟、smoke 不过）：修好后在 Actions 页面 Re-run，或 `gh workflow run release.yml --ref main`；已发布的包会跳过，只补发缺的，不必为重试改版本号。
 - tag 仍然只在 verify 通过之后才出现，保持“tag 指向的版本一定装得上”。
-- 每次推送分支还会跑 [ci.yml](../.github/workflows/ci.yml)（typecheck + test）。
+- 每次推送分支还会跑 [ci.yml](../.github/workflows/ci.yml)（typecheck + test + release:smoke），发布脚本在 Linux 上的问题在合进 main 之前就能发现。
 
 ### 一次性配置：npm Trusted Publishing
 

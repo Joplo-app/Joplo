@@ -7,13 +7,29 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 // @ts-expect-error release script is an untyped ESM module
-import { checkWebBudget, checkSiteBudget } from '../release.mjs';
+import { checkWebBudget, checkSiteBudget, tarList } from '../release.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const SCRIPT = path.join(ROOT, 'scripts/release.mjs');
 const PACKAGES = ['kit', 'core', 'server', 'web', 'cli', 'joplo'];
 const read = (f: string) => JSON.parse(fs.readFileSync(f, 'utf8'));
 const dirs: string[] = [];
+
+test.each(['pax', 'gnu', 'ustar'])('tarList 直接读 tar 头：%s 格式下路径（含长路径、空格）与字节数都准确，与平台的 tar -tv 输出无关', (format) => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-tar-'));
+  dirs.push(d);
+  const deep = `dist/${'nested-directory/'.repeat(6)}chunk-with-a-long-name.js`;
+  const files: Record<string, string> = { 'package.json': '{}', 'dist/fonts/OFL.txt': 'x'.repeat(1234), 'dist/a b.txt': 'hi', [deep]: 'y'.repeat(700) };
+  if (format === 'ustar') delete files[deep]; // ustar 只能放 155+100 字符以内、能在 / 处拆开的路径；这里仍然覆盖前缀字段
+  for (const [f, body] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(d, 'package', f)), { recursive: true }); fs.writeFileSync(path.join(d, 'package', f), body); }
+  const tgz = path.join(d, 'p.tgz');
+  // GNU tar 写 gnu 用 --format=gnu，bsdtar（macOS）叫 gnutar
+  const formats = format === 'gnu' ? ['gnu', 'gnutar'] : [format];
+  const ok = formats.some((f) => spawnSync('tar', [`--format=${f}`, '-czf', tgz, '-C', d, 'package'], { env: { ...process.env, COPYFILE_DISABLE: '1' } }).status === 0);
+  expect(ok).toBe(true);
+  const got = Object.fromEntries((tarList(tgz) as { file: string; size: number }[]).map((f) => [f.file, f.size]));
+  expect(got).toEqual(Object.fromEntries(Object.entries(files).map(([f, body]) => [f, Buffer.byteLength(body)])));
+});
 
 test('font size budgets fail with actionable size details', () => {
   expect(() => checkWebBudget(6_000_000, [])).not.toThrow();

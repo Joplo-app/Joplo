@@ -17,6 +17,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import zlib from 'node:zlib';
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
@@ -73,13 +74,44 @@ function run(cmd, argv, opts = {}) {
   return r;
 }
 
-function tarList(tgz) {
-  const r = spawnSync('tar', ['-tvzf', tgz], { encoding: 'utf8' });
-  if (r.status !== 0) die(`无法读取 ${tgz}`);
-  return r.stdout.trim().split('\n').map((l) => {
-    const parts = l.trim().split(/\s+/);
-    return { size: Number(parts[4]), file: parts.slice(8).join(' ').replace(/^package\//, '') };
-  });
+/**
+ * 列出 tarball 里的文件（路径去掉 package/ 前缀，大小为字节）。
+ * 直接读 tar 头，不解析 `tar -tv` 的文字输出：BSD tar（macOS）与 GNU tar（Linux CI）列不一样，
+ * 0.2.9 的 CI 发布因此把路径和大小都读错（“缺少字体许可证”、“解包 NaN KB”）。
+ * 支持 ustar 前缀、pax 扩展头（path / size）与 GNU 长文件名（L）；只返回普通文件。
+ */
+export function tarList(tgz) {
+  let buf;
+  try { buf = zlib.gunzipSync(fs.readFileSync(tgz)); } catch { die(`无法读取 ${tgz}`); }
+  const str = (b) => { const i = b.indexOf(0); return (i < 0 ? b : b.subarray(0, i)).toString('utf8'); };
+  const files = [];
+  let pax = {}, longName = null;
+  for (let off = 0; off + 512 <= buf.length;) {
+    const h = buf.subarray(off, off + 512);
+    if (h.every((b) => b === 0)) break;
+    const size = parseInt(str(h.subarray(124, 136)).trim() || '0', 8);
+    const type = String.fromCharCode(h[156]);
+    const body = buf.subarray(off + 512, off + 512 + size);
+    off += 512 + Math.ceil(size / 512) * 512;
+    if (type === 'x') {
+      // pax 记录："<长度> <键>=<值>\n"
+      for (let i = 0, text = body.toString('utf8'); i < text.length;) {
+        const sp = text.indexOf(' ', i), len = Number(text.slice(i, sp));
+        if (!(len > 0)) break;
+        const rec = text.slice(sp + 1, i + len - 1), eq = rec.indexOf('=');
+        pax[rec.slice(0, eq)] = rec.slice(eq + 1);
+        i += len;
+      }
+      continue;
+    }
+    if (type === 'L') { longName = str(body); continue; }
+    if (type === 'g') continue;
+    const prefix = str(h.subarray(257, 262)) === 'ustar' ? str(h.subarray(345, 500)) : '';
+    const name = pax.path ?? longName ?? (prefix ? `${prefix}/${str(h.subarray(0, 100))}` : str(h.subarray(0, 100)));
+    if (type === '0' || type === '\0' || type === '7') files.push({ size: pax.size !== undefined ? Number(pax.size) : size, file: name.replace(/^package\//, '') });
+    pax = {}; longName = null;
+  }
+  return files;
 }
 
 const kb = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${(n / 1024).toFixed(1)} KB`);
