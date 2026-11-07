@@ -1,0 +1,91 @@
+/**
+ * 看板直接发布到云端（D76）的 CLI 一侧：`joplo dev` 启动看板时把它注入给 @joplo-app/server。
+ * - account：只读本机登录（credentials.json 或 JOPLO_API_KEY），再问一次云端拿邮箱和套餐；没登录时给出与 CLI 一致的登录命令。
+ * - publish：就是 `joplo share`（同一个 share()，同一套检查、构建、上传和 .joplo/cloud.json 记录），非交互：没登录时报 AUTH_REQUIRED，不打开浏览器。
+ * 令牌只在这个进程里：进度行与错误信息都先去掉记住的密钥，再交给看板。
+ */
+import { JoploError } from '@joplo-app/core';
+import type { buildSite, CloudAccount, CloudBridge, CloudPublishRequest, CloudPublishResult } from '@joplo-app/server';
+import { CloudError } from './cloud-error.ts';
+import type { RenderPreview } from './cloud-embed.ts';
+import { CloudClient, type CloudDependencies } from './cloud.ts';
+
+export const DEFAULT_CLOUD_SERVER = 'https://cloud.joplo.app';
+
+/**
+ * 登录命令：默认服务器不带 --server；其他服务器带上，和 CLI 的提示一致。
+ * 看板进程设置了 JOPLO_HOME 时（凭证存在那里），命令前面带上同一个 JOPLO_HOME，否则登录写进 ~/.joplo，这个看板读不到。
+ */
+export const loginCommand = (server: string, joploHome?: string): string => {
+  const cmd = server === DEFAULT_CLOUD_SERVER ? 'npx joplo login' : `npx joplo login --server ${server}`;
+  const home = joploHome?.trim();
+  return home ? `JOPLO_HOME=${/^[\w./~-]+$/.test(home) ? home : `'${home.replace(/'/g, `'\\''`)}'`} ${cmd}` : cmd;
+};
+
+const AUTH_CODES = new Set(['AUTH_REQUIRED', 'AUTH_EXPIRED']);
+
+export type BridgeOptions = {
+  version: string;
+  deps?: CloudDependencies;
+  build: typeof buildSite;
+  render: () => Promise<RenderPreview>;
+};
+
+export function cloudBridge(opts: BridgeOptions): CloudBridge {
+  const client = (warn: (line: string) => void, secrets: Set<string>) =>
+    new CloudClient(undefined, opts.version, warn, (s) => secrets.add(s), { ...opts.deps, interactive: false });
+  const redactor = (secrets: Set<string>) => (s: string) => {
+    for (const t of secrets) s = s.split(t).join('[REDACTED]');
+    return s;
+  };
+  const home = () => (opts.deps?.env ?? process.env).JOPLO_HOME;
+  const command = (server: string) => loginCommand(server, home());
+  const fixOf = (e: unknown, server: string): string => {
+    const fix = (e as { details?: { fix?: unknown } }).details?.fix;
+    return typeof fix === 'string' && fix.includes('--server') && !home()?.trim() ? fix : command(server);
+  };
+
+  return {
+    async account(): Promise<CloudAccount> {
+      const secrets = new Set<string>();
+      const redact = redactor(secrets);
+      const c = client(() => undefined, secrets);
+      const signedOut = (message?: string, cmd = command(c.server)): CloudAccount => ({ signedIn: false, server: c.server, loginCommand: cmd, ...(message ? { message: redact(message) } : {}) });
+      let auth;
+      try {
+        auth = await c.auth(true);
+      } catch (e) {
+        if (e instanceof CloudError && AUTH_CODES.has(e.code)) return signedOut(e.message, fixOf(e, c.server));
+        if (e instanceof JoploError) return signedOut(e.message);
+        throw e;
+      }
+      if (!auth) return signedOut();
+      try {
+        const me = await c.me(auth.token);
+        return { signedIn: true, server: c.server, email: me.user.email, plan: me.plan };
+      } catch (e) {
+        if (e instanceof CloudError && AUTH_CODES.has(e.code)) return signedOut(e.message, fixOf(e, c.server));
+        // 云端暂时连不上：仍然算已登录（发布时再报网络错误），邮箱用本机登录里记的
+        const stored = auth.source === 'session' ? await c.credentials(true).catch(() => null) : null;
+        return { signedIn: true, server: c.server, email: stored?.user.email ?? 'API key (JOPLO_API_KEY)', plan: null };
+      }
+    },
+
+    async publish(projectDir: string, request: CloudPublishRequest, progress: (line: string) => void): Promise<CloudPublishResult> {
+      const secrets = new Set<string>();
+      const redact = redactor(secrets);
+      const c = client((line) => progress(redact(line)), secrets);
+      try {
+        const { share } = await import('./cloud-share.ts');
+        const { result, plan } = await share(c, projectDir, { ...(request.scenarios?.length ? { scenarios: request.scenarios } : {}), ...(request.features?.length ? { features: request.features } : {}) }, opts.build, opts.render);
+        return { shareId: result.shareId, url: result.url, expiresAt: result.expiresAt, version: result.version, plan, ...(result.scope ? { scope: result.scope } : {}) };
+      } catch (e) {
+        const code = e instanceof CloudError || e instanceof JoploError ? e.code : 'INTERNAL';
+        // 检查没过：带上第一条错误的位置，看板里直接能看到改哪里
+        const diag = e instanceof JoploError ? e.diagnostics.find((d) => d.severity === 'error') : undefined;
+        const message = redact(`${e instanceof Error ? e.message : String(e)}${diag ? `\n${diag.at ? `${diag.at}  ` : ''}${diag.message}` : ''}`);
+        throw Object.assign(new Error(message), { code, ...(AUTH_CODES.has(code) ? { loginCommand: fixOf(e, c.server) } : {}) });
+      }
+    },
+  };
+}

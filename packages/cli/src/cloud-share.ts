@@ -2,12 +2,12 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
-import { assertReviewManifestSize, JoploError, reviewManifest, type ReviewManifest } from '@joplo-app/core';
+import { assertReviewManifestSize, borrowedLine, hasScope, JoploError, resolveScope, reviewManifest, scopeKey, scopeProject, type ReviewManifest, type ScopeInfo } from '@joplo-app/core';
 import type { buildSite } from '@joplo-app/server';
 import { checkWithProject } from './check.ts';
 import { CloudError, sizeError, terminalText } from './cloud-error.ts';
 import { temporaryDirectory } from './cloud-cleanup.ts';
-import { embedSnippets, inlineProjectMode, writePreview, type EmbedSnippets, type RenderPreview } from './cloud-embed.ts';
+import { embedSnippets, inlineProject, inlineProjectMode, writePreview, type EmbedSnippets, type RenderPreview } from './cloud-embed.ts';
 import { prContext, readPrComment, type PrCommentResult, type SharePr } from './cloud-pr.ts';
 import { atomicJson, CloudClient, httpUrl, nonempty, object, retryAfterMillis } from './cloud.ts';
 
@@ -43,22 +43,32 @@ export async function manifest(dir: string): Promise<{ files: File[]; blobs: Map
 }
 /**
  * 项目的分享记录 `.joplo/cloud.json`（契约 8.1）：主链接 `{ shareId, url }` 与评审版 `review: { shareId, url }` 是两个分享，互不覆盖。
- * 旧格式（没有 review）照常读取；属于其他 server 的记录视为空，下次写入时整体替换。
+ * 范围分享（D75）每个范围一条，记在 `scoped: { <范围键>: { shareId, url } }`，也不覆盖主链接和评审链接。
+ * 旧格式（没有 review / scoped）照常读取；属于其他 server 的记录视为空，下次写入时整体替换。
  */
 export type ShareLink = { shareId: string; url: string };
-export type ShareRecord = { main: ShareLink | null; review: ShareLink | null };
+export type ShareRecord = { main: ShareLink | null; review: ShareLink | null; scoped?: Record<string, ShareLink> };
 const link = (v: unknown): ShareLink | null => { const o = object(v); return shareId(o.shareId) && typeof o.url === 'string' ? { shareId: o.shareId, url: o.url } : null; };
+const validKey = (key: string) => key.length > 0 && key.length <= 4096;
+const links = (v: unknown): Record<string, ShareLink> => Object.fromEntries(Object.entries(object(v)).map(([key, x]) => [key, link(x)] as const).filter((e): e is [string, ShareLink] => e[1] !== null && validKey(e[0])));
 export async function readShareRecord(project: string, server: string): Promise<ShareRecord> {
   try {
     const r = object(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8')));
     if (r.server !== server) return { main: null, review: null };
-    return { main: link(r), review: link(r.review) };
+    const scoped = links(r.scoped);
+    return { main: link(r), review: link(r.review), ...(Object.keys(scoped).length ? { scoped } : {}) };
   } catch { return { main: null, review: null }; }
 }
-const recordJson = (server: string, r: ShareRecord) => ({ server, ...(r.main ? { shareId: r.main.shareId, url: r.main.url } : {}), ...(r.review ? { review: { shareId: r.review.shareId, url: r.review.url } } : {}) });
+const recordJson = (server: string, r: ShareRecord) => ({
+  server,
+  ...(r.main ? { shareId: r.main.shareId, url: r.main.url } : {}),
+  ...(r.review ? { review: { shareId: r.review.shareId, url: r.review.url } } : {}),
+  ...(r.scoped && Object.keys(r.scoped).length ? { scoped: Object.fromEntries(Object.entries(r.scoped).map(([key, l]) => [key, { shareId: l.shareId, url: l.url }])) } : {}),
+});
 
-export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null };
-export type ShareOptions = { new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string };
+export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo };
+/** scenarios / features：按场景保密分享（D75，`--scenario` / `--feature`），可以一起用；都不写时分享整个项目。 */
+export type ShareOptions = { new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[] };
 export async function share(client: CloudClient, dir: string, opts: ShareOptions, build: typeof buildSite, render: () => Promise<RenderPreview> = async () => { throw new Error('this @joplo-app/server cannot render screenshots'); }): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
   if (opts.title !== undefined && (!opts.title.trim() || opts.title.trim().length > 200)) throw new JoploError('USAGE', '--title must contain 1-200 characters');
   if ((opts.repo !== undefined || opts.sha !== undefined) && opts.pr === undefined) throw new JoploError('USAGE', '--repo and --sha apply only with --pr <number>');
@@ -66,6 +76,8 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
   // PR 信息在任何请求、登录和构建之前补全并校验（契约 8.5）
   const pr: SharePr | undefined = opts.pr === undefined ? undefined : await prContext({ pr: opts.pr, repo: opts.repo, sha: opts.sha }, client.env, project, client.deps.pr);
   const reviewMode = opts.review === true ? 'review' : 'publish';
+  const scopeRequest = { scenarios: opts.scenarios ?? [], features: opts.features ?? [] };
+  const scoped = hasScope(scopeRequest);
   let auth = await client.auth(true);
   if (!auth) {
     if (!client.interactive) throw new CloudError('AUTH_REQUIRED', undefined, { fix: 'npx joplo login' });
@@ -78,9 +90,16 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
   if (checked.summary.error) throw new JoploError('INVALID_SCHEMA', `Project validation failed: ${checked.summary.error} error`, { diagnostics: checked.diagnostics });
   // 评审清单（契约 8.1）：从 dev IR 生成，只放进请求体，不作为文件上传。
   // 超过 512 KiB 时：--review 在构建和请求之前失败；普通发布只警告并省略清单（字段可选），发布照常进行
+  // 范围（D75）：在 dev IR 上解析，写错场景 / 功能、没有选定方案时在构建和任何请求之前失败
+  let scenarioIds: string[] | undefined;
+  if (scoped) {
+    if (!checked.project) throw new JoploError('UNSUPPORTED_ACTION', 'share --scenario / --feature needs the compiled project to resolve the scope');
+    scenarioIds = resolveScope(checked.project, scopeRequest, reviewMode);
+  }
   let review: ReviewManifest | undefined;
   if (checked.project) {
-    review = reviewManifest(checked.project, reviewMode);
+    // 评审清单也只含范围内的功能、方案、场景及其规则、问题、情况
+    review = reviewManifest(scenarioIds ? scopeProject(checked.project, scenarioIds, reviewMode).project : checked.project, reviewMode);
     try { assertReviewManifestSize(review); }
     catch (e) {
       if (reviewMode === 'review') throw e;
@@ -92,12 +111,19 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
   const staging = temporary.path;
   try {
     client.warn('Validation passed. Building the published site...');
-    const built = await build({ projectDir: project, outDir: join(staging, 'site'), ...(reviewMode === 'review' ? { review: true } : {}) });
+    const built = await build({ projectDir: project, outDir: join(staging, 'site'), ...(reviewMode === 'review' ? { review: true } : {}), ...(scenarioIds ? { scope: { scenarios: scenarioIds } } : {}) });
     if (built.diagnostics.some(d => d.severity === 'error')) throw new JoploError('EXPORT_FAILED', 'The build contains errors; nothing uploaded', { diagnostics: built.diagnostics });
+    // 范围分享必须真的裁剪过（旧版 @joplo-app/server 会忽略 scope，产物里是整个项目）：产物里的场景只能是范围内的
+    if (scenarioIds) {
+      const inlined = inlineProject(await readFile(join(built.outDir, 'index.html'), 'utf8'));
+      const allowed = new Set(scenarioIds);
+      if (!built.scope || !inlined || Object.keys(inlined.scenarios ?? {}).some(id => !allowed.has(id))) throw new JoploError('UNSUPPORTED_ACTION', 'This @joplo-app/server cannot build scoped sites; nothing uploaded. Update joplo and @joplo-app/server to the same version');
+      for (const b of built.scope.borrowed) client.warn(`Borrowed from another feature: ${terminalText(borrowedLine(b))}. Only this is included; the feature's name, scenarios, and other elements are not. To leave it out, change the scenario so it no longer references it.`);
+    }
     // 评审版必须真的是评审构建（旧版 @joplo-app/server 会忽略 review 选项，只发布选定方案）
     if (reviewMode === 'review' && inlineProjectMode(await readFile(join(built.outDir, 'index.html'), 'utf8')) !== 'review') throw new JoploError('UNSUPPORTED_ACTION', 'This @joplo-app/server cannot build the review site; update joplo and @joplo-app/server to the same version');
     // 预览图（嵌入契约 _joplo/preview.png）：作为普通文件进清单，计入总量和新上传字节；失败只提示一行，不让 share 失败
-    const preview = await writePreview(render, project, built.outDir, join(staging, 'preview.png'));
+    const preview = await writePreview(render, project, built.outDir, join(staging, 'preview.png'), scenarioIds);
     if (!preview.ok) client.warn(`Skipped the preview image (${terminalText(preview.reason).replace(/[\r\n\t]+/g, ' ')}). The share page will use a generic image.`);
     const voiceLine = voiceSummary(built.voice);
     if (voiceLine) client.warn(voiceLine);
@@ -111,8 +137,13 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     // 评审版只更新评审分享，普通 share 只更新主链接（契约 8.1：评审版永远不覆盖主链接）；PR 预览两者都不碰
     const record = await readShareRecord(project, client.server);
     const slot = reviewMode === 'review' ? 'review' : 'main';
-    const replaceShareId = account.plan === 'pro' && !opts.new && !pr ? record[slot]?.shareId : undefined;
-    const title = (opts.title ?? checked.name).trim().slice(0, 200);
+    // 范围分享单独一条（键 = 排序后的场景 id，评审版加前缀），不碰主链接和评审链接
+    const key = scenarioIds ? scopeKey(scenarioIds, reviewMode) : null;
+    const previous = key ? record.scoped?.[key] : record[slot];
+    const replaceShareId = account.plan === 'pro' && !opts.new && !pr ? previous?.shareId : undefined;
+    const firstName = scenarioIds && checked.project ? checked.project.scenarios[scenarioIds[0]!]?.name : undefined;
+    const defaultTitle = scenarioIds ? `${checked.name} · ${scenarioIds.length === 1 && firstName ? firstName : `${scenarioIds.length} scenarios`}` : checked.name;
+    const title = (opts.title ?? defaultTitle).trim().slice(0, 200);
     const create = (withReview: boolean) => client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}), ...(withReview && review ? { review } : {}), ...(pr ? { pr } : {}) }), { create: true });
     let prepared: Record<string, unknown>;
     try { prepared = await create(true); }
@@ -168,7 +199,8 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     if (JSON.stringify(published).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
     // PR 预览是独立链接，不写记录；其余只更新本次的那一项（主链接或评审版），保留另一项
     if (!pr) {
-      try { await atomicJson(join(project, '.joplo/cloud.json'), recordJson(client.server, { ...record, [slot]: { shareId: published.shareId, url } })); }
+      const next: ShareRecord = key ? { ...record, scoped: { ...record.scoped, [key]: { shareId: published.shareId, url } } } : { ...record, [slot]: { shareId: published.shareId, url } };
+      try { await atomicJson(join(project, '.joplo/cloud.json'), recordJson(client.server, next)); }
       catch {
         client.warn('Could not save the share record. The next publication will not update this link');
         try { await rm(join(project, '.joplo/cloud.json'), { force: true }); }
@@ -176,7 +208,7 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
       }
     }
     const prComment = pr ? readPrComment(final.pr ?? prepared.pr) : undefined;
-    return { result: { ...published, embed: embedSnippets(published.url, title), ...(reviewMode === 'review' ? { mode: 'review' as const } : {}), ...(pr ? { pr: prComment ?? null } : {}) }, plan: account.plan };
+    return { result: { ...published, embed: embedSnippets(published.url, title), ...(reviewMode === 'review' ? { mode: 'review' as const } : {}), ...(pr ? { pr: prComment ?? null } : {}), ...(built.scope ? { scope: built.scope } : {}) }, plan: account.plan };
   } finally { try { await rm(staging, { recursive: true, force: true }); } finally { temporary.release(); } }
 }
 

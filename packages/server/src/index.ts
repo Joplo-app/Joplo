@@ -6,7 +6,7 @@
  * - renderStep：某个场景某一步之后的截图、元素索引（带 at）与渲染告警。
  * - exportRuntimeStatus / installExportRuntime / uninstallExportRuntime：Joplo 托管的导出组件（D66，`joplo setup export`）。
  */
-export type { BuildOptions, BuildResult, DevHandle, DevOptions, RenderOptions, RenderResult, RenderedElement } from './contract.ts';
+export type { BuildOptions, BuildResult, CloudAccount, CloudBridge, CloudJob, CloudJobError, CloudPublishRequest, CloudPublishResult, DevHandle, DevOptions, RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 export { startDev } from './dev.ts';
 export { buildSite } from './build.ts';
 export { renderStep } from './render.ts';

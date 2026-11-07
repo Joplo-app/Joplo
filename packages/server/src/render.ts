@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Browser } from 'playwright-core';
-import { JoploError, SUBTITLE_HEIGHT, VIEWPORT_SIZE, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
+import { JoploError, SUBTITLE_HEIGHT, VIEWPORT_SIZE, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, scopeProject, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
 import { exportLocale } from './locale.ts';
 import type { RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 import { createDev } from './dev.ts';
@@ -98,11 +98,13 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
   let browser: Browser | null = null;
   try {
     const payload = server.payload();
-    const project = payload.project;
-    if (!project) {
+    if (!payload.project) {
       const errs = payload.diagnostics.filter((d) => d.severity === 'error');
       throw new JoploError('INVALID_SCHEMA', `Project compilation failed: ${errs.map((d) => `${d.at ?? ''} ${d.message}`).join('; ')}`, { diagnostics: payload.diagnostics });
     }
+    // 按场景保密分享（D75）：渲染页从同一个 payload 读 IR，替换成裁剪后的（watch: false，不会被重新编译覆盖）
+    if (opts.scope?.length) payload.project = scopeProject(payload.project, opts.scope, 'publish').project;
+    const project = payload.project;
     const sc = project.scenarios[opts.scenarioId];
     if (!sc) throw new JoploError('NOT_FOUND', `Scenario does not exist: ${opts.scenarioId} (available: ${Object.keys(project.scenarios).join(', ') || 'none'})`);
     const position = opts.stepId ? positionAfterStep(project, sc.id, opts.stepId) : 0;

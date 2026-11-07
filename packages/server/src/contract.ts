@@ -1,7 +1,9 @@
 /**
  * v2 接口（ADR-0002）：CLI 只依赖这里导出的三个函数。由 T-board 实现，届时 index.ts 改为导出它们。
  */
-import type { AppearanceFont, AppearanceStroke, Diagnostic } from '@joplo-app/core';
+import type { AppearanceFont, AppearanceStroke, Diagnostic, ScopeInfo, ScopeRequest } from '@joplo-app/core';
+import type { CloudBridge } from './cloud.ts';
+export type { CloudAccount, CloudBridge, CloudJob, CloudJobError, CloudPublishRequest, CloudPublishResult } from './cloud.ts';
 
 export type DevOptions = {
   projectDir: string;
@@ -9,6 +11,11 @@ export type DevOptions = {
   port?: number;
   open?: boolean;
   log?: (line: string) => void;
+  /**
+   * 直接发布到云端（D76）：CLI 注入登录与 share()；看板「导出 ▾」里的「发布到 Joplo Cloud」用它。
+   * 只在本进程启动看板时生效（加入已有看板时，那个进程用它自己的）。
+   */
+  cloud?: CloudBridge;
 };
 /** 单进程：同一个 JOPLO_HOME 下只有一个看板进程，同时服务多个项目（编译、热更新、选中、导出）。 */
 /**
@@ -30,13 +37,18 @@ export type BuildOptions = {
   review?: boolean;
   /** 本机目录（缺省 JOPLO_HOME 或 ~/.joplo）：读声音供应商 profile（D74）；测试指向临时目录。 */
   home?: string;
+  /**
+   * 按场景保密分享（D75，`--scenario` / `--feature`）：构建时把 IR 裁剪到这些场景，产物里不出现范围外的功能、方案、场景。
+   * 缺省（或两个数组都为空）时与原来完全一致。写错场景 / 功能时报错，不写任何文件。
+   */
+  scope?: ScopeRequest;
 };
 /** 静态发布站：只含选定方案（compile 的 publish 模式），离线可打开，可直接 `wrangler deploy`。 */
 /**
  * voice（D74）：带上的朗读音频。clips = 片段数；bytes = 新写入的字节；missing = 当前声音下还没有音频的步骤数（观众端这些步骤用浏览器朗读）；
  * profile = 选用的声音供应商名。没有选用供应商、也没有音频时省略。
  */
-export type BuildResult = { outDir: string; files: string[]; routes: string[]; scenarios: string[]; diagnostics: Diagnostic[]; voice?: { clips: number; bytes: number; missing: number; profile: string | null } };
+export type BuildResult = { outDir: string; files: string[]; routes: string[]; scenarios: string[]; diagnostics: Diagnostic[]; voice?: { clips: number; bytes: number; missing: number; profile: string | null }; /** 有 scope 时：范围与借用了哪些别的功能的内容（D75）。 */ scope?: ScopeInfo };
 export declare function buildSite(opts: BuildOptions): Promise<BuildResult>;
 
 export type RenderOptions = {
@@ -57,6 +69,8 @@ export type RenderOptions = {
   /** 截图尺寸（D44）：舞台宽度仍是页面自己的 viewport，按比例放进这个尺寸。缺省为舞台尺寸。 */
   viewport?: { width: number; height: number };
   scale?: number;
+  /** 按场景保密分享（D75）：只用这些场景裁剪后的 IR 渲染（share 的预览图），画面上不出现范围外功能堆进来的元素。 */
+  scope?: string[];
 };
 export type RenderedElement = { id: string; type: string; label: string; visible: boolean; disabled: boolean; at: string | null; box: { x: number; y: number; width: number; height: number } };
 export type RenderResult = { path: string; sceneId: string; position: number; scale: number; elements: RenderedElement[]; warnings: string[] };

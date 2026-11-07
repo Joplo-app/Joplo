@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { Popover, useTip } from './popover';
 import type { Placement } from './popover-place';
 
-export type MenuItem = { lang?: string; highlight?: boolean; radio?: boolean; id: string; label: string; onClick: () => void; checked?: boolean; disabled?: boolean; icon?: ReactNode; hint?: ReactNode; /** 第二行小字（例如功能的选定方案与缺口数）。 */ description?: string };
+export type MenuItem = { lang?: string; highlight?: boolean; radio?: boolean; id: string; label: string; onClick: () => void; checked?: boolean; disabled?: boolean; icon?: ReactNode; hint?: ReactNode; /** 第二行小字（例如功能的选定方案与缺口数）。 */ description?: string; /** cloud：蓝底白字，单独标出（D76「发布到 Joplo Cloud」）。 */ tone?: 'cloud' };
 export type MenuEntry = MenuItem | { id: string; divider: true } | { id: string; custom: ReactNode };
 
 /** 元素的可用宽度（ResizeObserver）。返回回调 ref：元素晚出现（例如进入全屏后才渲染）也能测到。 */
@@ -183,7 +183,12 @@ export function MenuList({ items, onPick, testid }: { items: MenuEntry[]; onPick
             data-menu-item=""
             data-testid={`menu-${it.id}`}
             onClick={() => onPick(it)}
-            className={cn('jb-focus flex w-full shrink-0 items-center gap-2.5 whitespace-nowrap rounded-[6px] px-2.5 text-left font-jb text-[13px] text-jb-fg hover:bg-jb-hover focus-visible:bg-jb-hover disabled:pointer-events-none disabled:opacity-40', it.description ? 'py-1.5' : 'h-8', it.checked && (it.description || it.highlight) && 'bg-jb-selected hover:bg-jb-selected')}
+            className={cn(
+              'jb-focus flex w-full shrink-0 items-center gap-2.5 whitespace-nowrap rounded-[6px] px-2.5 text-left font-jb text-[13px] text-jb-fg hover:bg-jb-hover focus-visible:bg-jb-hover disabled:pointer-events-none disabled:opacity-40',
+              it.description ? 'py-1.5' : 'h-8',
+              it.checked && (it.description || it.highlight) && 'bg-jb-selected hover:bg-jb-selected',
+              it.tone === 'cloud' && 'bg-jb-cloud font-semibold text-jb-on-cloud hover:bg-jb-cloud-hover focus-visible:bg-jb-cloud-hover [&_.text-jb-muted]:text-jb-on-cloud/80',
+            )}
           >
             {it.icon ? <span className="flex size-4 shrink-0 items-center justify-center [&_svg]:size-4">{it.icon}</span> : null}
             {it.description ? (

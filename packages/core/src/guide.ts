@@ -820,6 +820,15 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - share also uploads a 1200x630 preview image of the default scenario when the export component is installed (npx joplo setup export, or Playwright already in the project); without it, share still succeeds, prints one "Skipped the preview image" line, and never downloads anything.
 - Pro share updates the same-server link in .joplo/cloud.json; --new creates another link and --title sets its title.
 - The review version is a separate share (review: { shareId, url } in .joplo/cloud.json); it never replaces the main link. If the cloud rejects the review manifest, plain share retries once without it and still publishes.
+
+## Share part of the project
+- To share only some scenarios, add --scenario <scenario id> (repeatable); --feature <feature id> shares that feature's picked-option scenarios (every option with --review). They combine. Scenario ids look like invite.a-modal.success; npx joplo outline lists them.
+- Everything outside the scope is cut at build time, not hidden: other features, options, scenarios, their pages and stacked elements, and the project description never reach the uploaded files or the review manifest. A deep link (#/f/<feature>?s=<scenario>) or embed &scenario= only picks where viewing starts and is not private.
+- If a scoped step uses an element another feature stacked onto the page (action target, shot, mark, cue, callout, trace) or navigates to a page another feature added, only that element or page is kept. share prints "Borrowed from another feature: …" and lists them in data.scope.borrowed; tell the user and ask whether that is acceptable. To leave one out, change the scenario so it no longer uses it.
+- A wrong scenario or feature id fails with NOT_FOUND and suggestions; a scenario of an option that is not picked, or a feature without pick, fails with USAGE (exit 2). Nothing is built or uploaded.
+- Each scope is its own share, stored under scoped in .joplo/cloud.json (key: sorted scenario ids joined by commas, prefixed review: for --review). It never replaces the main or review link; Pro re-sharing the same scope updates that link.
+- Check the result locally first with npx joplo build --scenario <id> (same scope rules).
+- The author can also publish from the board: Export ▾ → Publish to Joplo Cloud (blue item) offers this scenario, this feature, or the whole project, and shows a copyable login command when signed out.
 - npx joplo whoami --format json shows the account, plan, and limits; npx joplo logout signs out.
 - CLIENT_OUTDATED: the cloud needs a newer CLI. In a project, npx joplo@latest still runs the project's version; upgrade both packages to the same version (npm i -D joplo@latest @joplo-app/kit@latest), then share again.
 - maxUploadBytes limits only newly uploaded cloud blobs. The CLI prechecks maxTotalBytes and maxFiles. TOO_LARGE details.kind distinguishes upload / total / files.

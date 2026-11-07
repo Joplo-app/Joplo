@@ -33,7 +33,8 @@ import { usePlaySync } from '../player/playRoute';
 import { copyText, useFlash, useHash } from '../player/util';
 import { cn } from '@/lib/utils';
 
-export type SiteData = { project: Project; home: string | null };
+/** scoped：按场景保密分享的产物（D75，joplo share --scenario / --feature）；只有一个功能时打开就进演示，不经过首页。 */
+export type SiteData = { project: Project; home: string | null; scoped?: boolean };
 
 export function readInlineIR(): SiteData | null {
   const el = document.getElementById('joplo-ir');
@@ -54,10 +55,10 @@ export function SiteApp({ data, search = typeof location === 'undefined' ? '' : 
 
   if (!data) return <div className="p-8 text-[#c92a2a]">{i18n.site.prototypeDataIsMissingRunJoploBuildAgain}</div>;
   if (embed) return <EmbedApp project={data.project} params={embed} />;
-  return <Site project={data.project} />;
+  return <Site project={data.project} scoped={data.scoped === true} />;
 }
 
-function Site({ project }: { project: Project }) {
+function Site({ project, scoped }: { project: Project; scoped: boolean }) {
   const { t: i18n } = useI18n();
   const [hash, go] = useHash();
   const route = parseSiteHash(hash);
@@ -75,6 +76,9 @@ function Site({ project }: { project: Project }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hash]);
   if (route.kind === 'play') return <SitePlayer project={project} play={route.play} navigate={navigate} />;
+  // 范围分享只有一个功能：首页没有可选的东西，直接进演示（点品牌、面包屑回首页时同样停在演示）
+  const only = scoped ? orderedFeatures(project) : [];
+  if (only.length === 1) return <SitePlayer project={project} play={{ featureId: only[0]!.id }} navigate={navigate} />;
   return <SiteHome project={project} onView={(f) => navigate({ kind: 'play', play: { featureId: f } })} />;
 }
 
@@ -205,8 +209,9 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
         {
           label: feature.name,
           testid: 'crumb-feature',
-          menuLabel: i18n.site.switchFeature,
-          items: orderedFeatures(project).map((f) => ({ id: `feature-${f.id}`, label: f.name, checked: f.id === feature.id, onClick: () => navigate({ kind: 'play', play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
+          // 只有一个功能时没有可切换的，不出下拉（范围分享常见，D75）
+          ...(orderedFeatures(project).length > 1 ? { menuLabel: i18n.site.switchFeature } : {}),
+          items: orderedFeatures(project).length <= 1 ? undefined : orderedFeatures(project).map((f) => ({ id: `feature-${f.id}`, label: f.name, checked: f.id === feature.id, onClick: () => navigate({ kind: 'play', play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
         },
       ]}
       actions={<Btn iconOnly={!L.topLabels} icon={<Link className="size-4" />} label={i18n.site.copyLink} title={i18n.site.copyLinkToCurrentStep} onClick={() => void copyText(location.href).then((ok) => setFlash(<LocalText value={ok ? m.site.linkCopied : m.site.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="copy-link" />}

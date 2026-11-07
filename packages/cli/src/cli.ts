@@ -23,6 +23,8 @@ type Dependencies = {
   interactive?: boolean;
   ask?: (question: string) => Promise<boolean>;
 };
+/** 可重复的选项（--scenario a --scenario b）：逐个收进数组。 */
+const collect = (value: string, previous: string[]) => [...previous, value];
 const integer = (name: string, max = Number.MAX_SAFE_INTEGER) => (text: string) => {
   const n = Number(text);
   if (!/^\d+$/.test(text) || !Number.isSafeInteger(n) || n < 1 || n > max) throw new JoploError('USAGE', `${name} must be an integer from 1 to ${max}`);
@@ -94,13 +96,18 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)')
     .option('--review', 'Publish the review version: every option of every feature (rules and questions still stay out of the uploaded files)')
     .option('--pr <number>', 'Attach a GitHub pull request (PR preview); repo, commit, and run URL come from GitHub Actions', integer('pr', 2147483647))
-    .option('--repo <owner/name>', 'Repository for --pr outside GitHub Actions').option('--sha <commit>', 'Commit for --pr (defaults to the PR head or git HEAD)').action(async (dir, opts) => {
+    .option('--repo <owner/name>', 'Repository for --pr outside GitHub Actions').option('--sha <commit>', 'Commit for --pr (defaults to the PR head or git HEAD)')
+    .option('--scenario <id>', 'Share only this scenario; repeatable. Other features, scenarios, and pages are left out of the uploaded files (D75)', collect, [])
+    .option('--feature <id>', "Share only this feature's scenarios (picked option; every option with --review); repeatable", collect, [])
+    .action(async (dir, opts) => {
       const client = await cloudClient(opts.server, opts.format);
       const { share } = await import('./cloud-share.ts');
-      const published = await share(client, dir, opts, async options => (await serverFunction('buildSite'))(options), () => serverFunction('renderStep'));
+      const published = await share(client, dir, { ...opts, scenarios: opts.scenario, features: opts.feature }, async options => (await serverFunction('buildSite'))(options), () => serverFunction('renderStep'));
       if (opts.format === 'json') json(result(resolve(dir), 'Published', published.result));
       else {
-        line(`Published ${published.result.mode === 'review' ? 'the review version ' : ''}${published.result.url}\n${published.result.expiresAt ? `Expires at: ${terminalText(published.result.expiresAt)}` : 'Permanent link'}`);
+        const scope = published.result.scope;
+        line(`Published ${published.result.mode === 'review' ? 'the review version ' : ''}${scope ? 'a scoped share ' : ''}${published.result.url}\n${published.result.expiresAt ? `Expires at: ${terminalText(published.result.expiresAt)}` : 'Permanent link'}`);
+        if (scope) line(`Scope: ${scope.scenarios.length} scenario(s): ${scope.scenarios.join(', ')}. The main link and the review link are unchanged`);
         if (published.result.pr) { const { prCommentLine } = await import('./cloud-pr.ts'); const note = prCommentLine(published.result.pr, client.server); if (note) line(note); }
         if (published.plan === 'free') line(`Free shares expire after 1 hour. Upgrade for permanent links: ${client.server}/settings/billing`);
         line(`Add to README: ${terminalText(published.result.embed.markdown)}\nMore embed options: ${client.server}/shares/${published.result.shareId}`);
@@ -175,17 +182,29 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   program.command('guide').description('Compatibility alias for joplo skill authoring').action(() => { stdout(guide()); });
   program.command('dev').argument('[dir]', 'Project directory', '.').option('--port <port>', 'Port (default: 4790)', integer('port', 65535)).option('--open', 'Open the browser').action(async (dir, opts) => {
     const startDev = await serverFunction('startDev');
-    const handle = await startDev({ projectDir: resolve(dir), port: opts.port, open: opts.open, log: s => stderr(oneLine(s) + '\n') });
+    // 看板直接发布到云端（D76）：把登录与 share() 注入看板进程；加入已有看板时由那个进程自己的 CLI 提供
+    const { cloudBridge } = await import('./cloud-bridge.ts');
+    const cloud = cloudBridge({ version: deps.cliVersion ?? await readCliVersion(), deps: deps.cloud, build: async options => (await serverFunction('buildSite'))(options), render: () => serverFunction('renderStep') });
+    const handle = await startDev({ projectDir: resolve(dir), port: opts.port, open: opts.open, log: s => stderr(oneLine(s) + '\n'), cloud });
     line(handle.url);
     // 已有存活的看板：项目已注册进去，本进程直接退出（不启动第二个看板进程）
     if (handle.attached) stderr(`Joined the running board. Open ${handle.url}\n`);
   });
-  program.command('build').argument('[dir]', 'Project directory', '.').option('--out-dir <dir>', 'Output directory (default: project dist)').option('--out <dir>', 'Alias for --out-dir').option('--overwrite', 'Allow clearing a nonempty output directory').action(async (dir, opts) => {
+  program.command('build').argument('[dir]', 'Project directory', '.').option('--out-dir <dir>', 'Output directory (default: project dist)').option('--out <dir>', 'Alias for --out-dir').option('--overwrite', 'Allow clearing a nonempty output directory')
+    .option('--scenario <id>', 'Build only this scenario; repeatable (same scope as share --scenario)', collect, [])
+    .option('--feature <id>', "Build only this feature's scenarios; repeatable", collect, [])
+    .action(async (dir, opts) => {
     const buildSite = await serverFunction('buildSite');
     const output = opts.outDir ?? opts.out;
-    const data = await buildSite({ projectDir: resolve(dir), outDir: output === undefined ? undefined : resolve(output), overwrite: opts.overwrite });
+    const scope = opts.scenario.length || opts.feature.length ? { scope: { scenarios: opts.scenario, features: opts.feature } } : {};
+    const data = await buildSite({ projectDir: resolve(dir), outDir: output === undefined ? undefined : resolve(output), overwrite: opts.overwrite, ...scope });
     for (const d of data.diagnostics) line(diagnosticLine(d));
     line(`Built ${data.outDir} (${data.files.length} files)`);
+    if (data.scope) {
+      const { borrowedLine } = await import('@joplo-app/core');
+      line(`Scope: ${data.scope.scenarios.length} scenario(s): ${data.scope.scenarios.join(', ')}`);
+      for (const b of data.scope.borrowed) line(`Borrowed from another feature: ${terminalText(borrowedLine(b))}`);
+    }
     const voice = (await import('./cloud-share.ts')).voiceSummary(data.voice);
     if (voice) line(voice);
     if (data.diagnostics.some(d => d.severity === 'error')) exitCode = 1;
