@@ -8,7 +8,7 @@ import { m } from '../i18n/board/messages';
  * - 推送：Vite HMR 自定义事件 `joplo:ir`（带 projectId，只接收当前项目的）与 `joplo:projects`（列表变化）。
  * - 写：选中、移除项目、打开编辑器、导出 —— 都带本地令牌（页面 meta），服务端另校验 Origin。
  */
-import type { AppearanceFont, AppearanceStroke, Diagnostic, Project, Selection } from '@joplo-app/core';
+import type { AppearanceFont, AppearanceStroke, Diagnostic, Project, Selection, LocalReviewState, LocalReviewWrite } from '@joplo-app/core';
 import type { SelectionInput, SelectionWriteResult } from './demo';
 
 export type DevPayload = { projectId?: string; version: number; ok: boolean; project: Project | null; diagnostics: Diagnostic[]; home: string | null };
@@ -137,6 +137,22 @@ async function post(url: string, body: unknown, method = 'POST'): Promise<Respon
   const headers = writeHeaders(body !== undefined);
   if (!headers) throw new MessageError(m.board.thisPageHasNoLocalTokenOpenItThrough);
   return fetch(url, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+}
+
+/** 仅本地看板可用；读写都带本机令牌，发布站不导入这个客户端。 */
+export async function fetchLocalReview(projectId: string, optionId: string): Promise<{ ok: true; state: LocalReviewState } | { ok: false; message: Text }> {
+  try {
+    const headers = writeHeaders(false);
+    if (!headers) throw new MessageError(m.board.thisPageHasNoLocalToken);
+    const res = await fetch(`/__joplo/p/${enc(projectId)}/review?option=${enc(optionId)}`, { headers, cache: 'no-store' });
+    return res.ok ? { ok: true, state: await res.json() as LocalReviewState } : { ok: false, message: await readError(res) };
+  } catch (e) { return { ok: false, message: errMsg(e) }; }
+}
+export async function writeLocalReviewEvent(projectId: string, input: LocalReviewWrite): Promise<{ ok: true; state: LocalReviewState } | { ok: false; message: Text }> {
+  try {
+    const res = await post(`/__joplo/p/${enc(projectId)}/review`, input);
+    return res.ok ? { ok: true, state: await res.json() as LocalReviewState } : { ok: false, message: await readError(res) };
+  } catch (e) { return { ok: false, message: errMsg(e) }; }
 }
 
 /** 从列表移除（只删记录，不删项目文件）。 */

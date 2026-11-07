@@ -38,7 +38,7 @@ npx joplo dev --open
 
 ### 安装 Agent 技能
 
-有两种方式给编码 Agent（Claude Code、Codex 等）装上 Joplo 的技能 `joplo`（做演示）与 `joplo-feedback`（按评审结论改源码），两者由同一份模板生成、内容相同：
+有两种方式给编码 Agent（Claude Code、Codex 等）装上 Joplo 的技能 `joplo`（做演示并交付评审）与 `joplo-feedback`（接收本地／Share 反馈、及时回执并按评审结论改源码）。两种安装方式使用同一份模板，内容一致：
 
 ```sh
 npx skills add Joplo-app/Joplo           # 本仓库的官方技能；任何仓库都能用，装 Joplo 之前也行
@@ -61,10 +61,11 @@ npx joplo skill authoring
 npx joplo skill story
 npx joplo skill cases
 npx joplo skill demo
+npx joplo skill review
 npx joplo skill install --agents-md
 ```
 
-十个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`focus`（每一步看哪里：默认焦点、聚光、强调、标注、编号、停留、遮挡）、`diagram`（分组的架构图、时序图、状态机与镜头取景）、`components`、`cases`、`check`、`selection`、`publish`，每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
+十一个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`focus`（每一步看哪里：默认焦点、聚光、强调、标注、编号、停留、遮挡）、`diagram`（分组的架构图、时序图、状态机与镜头取景）、`components`、`cases`、`check`、`selection`、`review`（本地监听、Share 轮询、快速回执、版本隔离、恢复与最佳实践）、`publish`，每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
 
 看板运行时，在另一个终端执行：
 
@@ -75,6 +76,19 @@ npx joplo selection
 ```
 
 `outline` 列出每个功能给谁、解决什么，每个情况的期望结果与各方案的覆盖，以及每个场景的步数和估算时长。`check` 每个问题输出一行，包含文件、行、列、级别与代码。error 退出 1，用法错误退出 2，只有 warning/info 时退出 0。在看板中按住 Option/Alt 单击后，`selection` 返回标签、定位和目标行前后各三行源码。
+
+## 本地评审
+
+本地评审时，点演示右侧「反馈与评审」图标填写反馈，或直接确认方案。浮层不会挤压演示页面。Agent 可以在后台监听：
+
+```sh
+npx joplo feedback list --local --json
+npx joplo feedback watch --local --session <id> --json
+```
+
+反馈逐条输出，确认后监听退出 0；多个实例按会话隔离，重新监听可加 `--after <序号>` 补收。源码更新后开始新一轮评审。详见[本地评审命令](docs/cli.md#review本地评审与流式监听)。
+
+Share 通过同一个入口轮询：`npx joplo feedback watch --share <id> --option <功能.方案> --interval 15 --json`。默认每 15 秒，可设 10–30 秒。当前是快照轮询，已解决／已写回记录的完整补收需要 Cloud 扩展，详见[接口说明](docs/cloud-feedback-watch.md)。
 
 ## 项目结构
 
@@ -152,7 +166,7 @@ npx joplo setup export
 
 Joplo 表达设计行为，不运行真实业务后端；只支持静态路径，手机版需要单独的页面或演示。AI 假设未经用户决定不能标为已确认，交互写在 `flow()` 中，不写 `onClick`。
 
-作者模块在本机加载、检查和构建时执行，只运行可信项目。看板和发布站只消费编译后的 IR。本地发行版不包含 MCP、协作与评论同步。
+作者模块在本机加载、检查和构建时执行，只运行可信项目。看板和发布站只消费编译后的 IR。本地反馈保存在项目目录内，不包含 MCP、多人协作或云端评论实时同步。
 
 ## 许可证
 

@@ -61,9 +61,11 @@ function readComment(raw: unknown): FeedbackComment {
   return { id: c.id, version: c.version, scenario: c.scenario, step: c.step, stepId: typeof c.stepId === 'string' ? c.stepId : null, element: element ? { id: element.id as string, label: element.label as string } : null, body: c.body, author: { name: author.name }, createdAt: c.createdAt };
 }
 
-export async function fetchFeedback(client: CloudClient, shareId: string): Promise<Feedback> {
+export async function fetchFeedback(client: CloudClient, shareId: string, options: { signal?: AbortSignal; retry?: boolean } = {}): Promise<Feedback> {
+  options.signal?.throwIfAborted();
   const { token } = await client.requireAuth();
-  const d = await client.retry(() => feedbackRequest(client, `/api/v1/shares/${shareId}/feedback`, token));
+  const request = () => feedbackRequest(client, `/api/v1/shares/${shareId}/feedback`, token, undefined, options.signal);
+  const d = options.retry === false ? await request() : await client.retry(request, { signal: options.signal });
   const share = object(d.share);
   if (share.id !== shareId || !int(share.version, 0) || !Array.isArray(d.decisions) || !Array.isArray(d.comments) || d.decisions.length > 1000 || d.comments.length > 5000) throw new CloudError('INVALID_RESPONSE');
   const out = { share: { id: shareId, version: share.version }, decisions: d.decisions.map(readDecision), comments: d.comments.map(readComment) };
@@ -87,9 +89,9 @@ export async function markApplied(client: CloudClient, shareId: string, ids: str
 }
 
 /** 404 在这里是“分享不存在或没有评审数据”，不是 share 的“用 --new 新建”。 */
-async function feedbackRequest(client: CloudClient, path: string, token: string, body?: unknown): Promise<Record<string, unknown>> {
+async function feedbackRequest(client: CloudClient, path: string, token: string, body?: unknown, signal?: AbortSignal): Promise<Record<string, unknown>> {
   try {
-    return await client.request(path, token, body);
+    return await client.request(path, token, body, { signal });
   } catch (e) {
     if (e instanceof CloudError && e.code === 'NOT_FOUND') throw new CloudError('NOT_FOUND', 'The share does not exist or has no review data. Check --share, or run npx joplo share again');
     if (e instanceof CloudError && (e.code === 'FORBIDDEN' || e.code === 'ACCOUNT_UNAVAILABLE') && !token.startsWith('jpk_')) throw new CloudError('FORBIDDEN', 'Only the owner of the share can read or apply its feedback');

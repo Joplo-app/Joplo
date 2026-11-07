@@ -11,6 +11,7 @@
  * 只有 publish 会调用 npm publish：平时由 .github/workflows/release.yml 在 CI 里运行（npm Trusted Publishing），备用时由维护者在自己的终端运行。
  */
 import { spawn, spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
@@ -336,6 +337,8 @@ async function smoke() {
     const skill = sh(joplo, ['skill'], project);
     assert(skill.stdout.includes(`Joplo ${v}`), `skill 应显示 CLI 版本 ${v}：${skill.stdout.split('\n')[0]}`);
     sh(joplo, ['skill', 'authoring'], project);
+    const reviewGuide = sh(joplo, ['skill', 'review'], project);
+    assert(reviewGuide.stdout.includes('feedback watch') && reviewGuide.stdout.includes('Share'), '安装包应提供本地与 Share 评审指南');
     sh(joplo, ['skill', 'install'], project);
     const skillMd = fs.readFileSync(path.join(project, '.claude/skills/joplo/SKILL.md'), 'utf8');
     assert(skillMd.includes(`joplo-skill ${v}`), `SKILL.md 应记录版本 ${v}`);
@@ -422,6 +425,46 @@ async function smoke() {
       assert(/^features\/example\/options\/a\.tsx:\d+:\d+$/.test(at ?? ''), `selection.at 应为项目相对的 文件:行:列，实际 ${at}`);
       log(`  ✓ joplo dev --port ${port}：GET / 200 看板 HTML，IR ok，选中 start → ${at}`);
 
+      // 本地评审必须在真正安装的 tarball 中工作：保存反馈 → stdout 先输出 → 确认后退出，再按游标补读。
+      const reviews = JSON.parse(sh(joplo, ['feedback', 'list', '--local', '--json'], project).stdout);
+      const review = reviews.find((s) => s.optionId === optionId);
+      assert(review && review.projectDir === fs.realpathSync(project), 'feedback list 应返回当前项目、当前方案的评审会话');
+      const listener = spawn(joplo, ['feedback', 'watch', '--local', '--session', review.id, '--json'], { cwd: project, env: cleanEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+      let listenerOut = '', listenerErr = '';
+      listener.stdout.on('data', c => { listenerOut += c; });
+      listener.stderr.on('data', c => { listenerErr += c; });
+      const listenerExit = new Promise(resolve => listener.on('exit', resolve));
+      const submitReview = (data) => {
+        const body = JSON.stringify({ sessionId: review.id, requestId: crypto.randomUUID(), ...data });
+        return request(port, { method: 'POST', path: `/__joplo/p/${pid}/review`, body, headers: { origin: `http://127.0.0.1:${port}`, 'content-type': 'application/json', 'x-joplo-token': token, 'content-length': Buffer.byteLength(body) } });
+      };
+      let listenerTimeout;
+      try {
+        const scenario = Object.values(ir.project.scenarios).find(s => s.optionId === optionId);
+        assert(scenario, '评审冒烟应有可定位的场景');
+        const feedback = await submitReview({ type: 'feedback', body: 'Smoke-test feedback', context: { scenarioId: scenario.id, position: 0, sceneId: scenario.initial.sceneId } });
+        assert(feedback.status === 200, `提交本地反馈失败：${feedback.status}`);
+        const tFeedback = Date.now();
+        while (!listenerOut.includes('"type":"feedback"')) {
+          assert(listener.exitCode === null && Date.now() - tFeedback < 10000, `监听没有及时输出反馈：${listenerErr}`);
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        assert(listener.exitCode === null, '收到反馈后必须继续等待确认');
+        const approval = await submitReview({ type: 'approved' });
+        assert(approval.status === 200, `确认本地方案失败：${approval.status}`);
+        const exitCode = await Promise.race([listenerExit, new Promise(resolve => { listenerTimeout = setTimeout(() => resolve('timeout'), 10000); })]);
+        clearTimeout(listenerTimeout);
+        assert(exitCode === 0, `确认后监听应退出 0，实际 ${exitCode}：${listenerErr}`);
+        const events = listenerOut.trim().split('\n').map(line => JSON.parse(line));
+        assert(JSON.stringify(events.map(e => e.type)) === '["feedback","approved"]' && events.every(e => e.source === 'local' && e.sessionId === review.id), 'stdout 应为同一会话的纯 NDJSON 反馈和确认事件');
+        const replay = sh(joplo, ['feedback', 'watch', '--local', '--session', review.id, '--after', '1', '--json'], project, { timeout: 10000 });
+        assert(JSON.parse(replay.stdout.trim()).type === 'approved', '--after 1 应只补收确认，并退出 0');
+        log('  ✓ 本地评审：反馈即时输出、确认后 exit 0、游标补收、随包 review skill');
+      } finally {
+        clearTimeout(listenerTimeout);
+        if (listener.exitCode === null) listener.kill('SIGTERM');
+      }
+
       // 热更新：改作者文件 → 重新编译（IR 版本递增）→ 新 className 进入 project.css
       fs.writeFileSync(pageFile, fs.readFileSync(pageFile, 'utf8').replace('tracking-[0.137em]', 'tracking-[0.211em]'));
       const tHot = Date.now();
@@ -482,7 +525,7 @@ async function smoke() {
     assert(hits.length === 0, `发现仓库路径或 workspace: 引用：\n${hits.join('\n')}`);
     log(`  ✓ 扫描 ${scanned.length} 个文件与 ${served.length} 个 dev 响应：没有仓库绝对路径、没有 workspace: 协议`);
 
-    log(`\n✓ release:smoke 通过（${((Date.now() - t0) / 1000).toFixed(1)}s）：init → npm install → check → skill → build → render 提示 → dev → selection`);
+    log(`\n✓ release:smoke 通过（${((Date.now() - t0) / 1000).toFixed(1)}s）：init → npm install → check → skill → build → render 提示 → dev → feedback → selection`);
   } finally {
     if (has('--keep')) log(`保留临时目录：${base}`);
     else fs.rmSync(base, { recursive: true, force: true });
