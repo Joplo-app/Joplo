@@ -2,24 +2,33 @@
  * 朗读（D74）的看板接口。写接口都经 dev.ts 的 guardWrite（Origin + 本机令牌 + JSON）。
  *
  * 全局（本机）：
- * - GET    /__joplo/voice/profiles            → { profiles: PublicProfile[] }（不含 Key）
+ * - GET    /__joplo/voice/profiles            → { profiles: PublicProfile[], file }（不含 Key；file = 本机存储文件，所有项目共用）
  * - PUT    /__joplo/voice/profiles/:id|new    { profile, key? } → { profile, profiles }（key：省略 = 不改，null / '' = 删掉）
  * - DELETE /__joplo/voice/profiles/:id        → { profiles }（自建的删除，预设恢复默认）
+ *   保存、删除成功后调 opts.profilesChanged：dev.ts 推 joplo:voice { profilesChanged }，打开着的看板重新取自己项目的声音状态
+ *   （Key 是否保存、音色、声音指纹都可能变了）。
  * - POST   /__joplo/voice/test                { id?, profile?, key?, text? } → { ok: true, audio: data URL, bytes, contentType }
  *                                              | { ok: false, error: { code, message, hint? } }（hint = 建议的返回内容与字段路径）
  * 项目：
  * - GET    /__joplo/p/:id/voice               → VoiceState
  * - PUT    /__joplo/p/:id/voice               { profileId | null } → VoiceState（看板里选的，记在 .joplo/voice/index.json）
- * - POST   /__joplo/p/:id/voice/clip          { locale, segment: { stepId, text, role } } → { key, url }（边放边生成一段；同一段并发只生成一次）
+ * - POST   /__joplo/p/:id/voice/clip          { locale, segment: { stepId, text, role } } → { key, url }（边放边生成一段；与批量生成共用 inflight，同一段并发只生成一次）
  * - POST   /__joplo/p/:id/voice/generate      { locale, segments: [{ stepId, text, role }] } → { summary, state }；进度推 joplo:voice
  * - GET    /__joplo/p/:id/voice/clips/:file   → 音频
  */
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type http from 'node:http';
 import type { Project } from '@joplo-app/core';
-import { AUDIO_TYPES, ProfileStore, VoiceCache, VoiceError, normalizeProfile, resolveVoices, synthesize, type FetchLike, type GenerateSummary, type PublicProfile, type Segment, type VoiceProfile } from './voice.ts';
+import { AUDIO_TYPES, ProfileStore, VoiceCache, VoiceError, normalizeProfile, resolveVoices, synthesize, type FetchLike, type GenerateSummary, type Inflight, type PublicProfile, type Segment, type VoiceProfile } from './voice.ts';
 
 export type VoiceState = {
+  /**
+   * 版本：每次算状态时递增（以微秒时钟为下限，dev 重启后也不会变小）。看板只接受 rev 不比当前小的状态：
+   * 推送、选择 / 生成的返回、profilesChanged 之后的重新读取可能乱序到达，晚到的旧状态不能覆盖新的。
+   */
+  rev: number;
   /** 看板里选的 profile（config 写了 voice.profile 时以 config 为准，见 source）。 */
   selected: string | null;
   source: 'config' | 'board' | null;
@@ -44,17 +53,30 @@ type Ctx = {
 };
 
 const MAX_SEGMENTS = 2000;
+
+let lastRev = 0;
+const nextRev = () => (lastRev = Math.max(lastRev + 1, Date.now() * 1000));
+
+/** 用户目录写成 ~（看板显示 profile 存在哪里；不在用户目录下时原样）。 */
+export function tildify(file: string, home = os.homedir()): string {
+  return home && (file === home || file.startsWith(home + path.sep)) ? '~' + file.slice(home.length) : file;
+}
 const MAX_TEXT = 2000;
 
 export class VoiceHub {
   readonly store: ProfileStore;
   private jobs = new Map<string, { done: number; total: number; failed: number; abort: AbortController }>();
-  /** 边放边生成：正在生成的段（项目 | 键 → 结果），同一段只请求一次。 */
-  private inflight = new Map<string, Promise<{ key: string; file: string; generated: boolean }>>();
+  /** 正在生成的段：项目 → （片段键 → 结果）。批量生成与边放边生成共用，同一段只请求一次。 */
+  private inflight = new Map<string, Inflight>();
+  private inflightOf(projectId: string): Inflight {
+    let m = this.inflight.get(projectId);
+    if (!m) this.inflight.set(projectId, (m = new Map()));
+    return m;
+  }
 
   constructor(
     home: string,
-    private readonly opts: { emit: (projectId: string, state: VoiceState) => void; fetch?: FetchLike; env?: Record<string, string | undefined> },
+    private readonly opts: { emit: (projectId: string, state: VoiceState) => void; profilesChanged?: () => void; fetch?: FetchLike; env?: Record<string, string | undefined> },
   ) {
     this.store = new ProfileStore(home, opts.env ?? process.env);
   }
@@ -69,7 +91,7 @@ export class VoiceHub {
   /** /__joplo/voice/<rest>；不认识的路径返回 false。 */
   async handleGlobal(rest: string, req: http.IncomingMessage, ctx: Ctx): Promise<boolean> {
     const method = req.method ?? 'GET';
-    if (rest === 'profiles' && method === 'GET') return ctx.send(200, { profiles: this.profiles() }), true;
+    if (rest === 'profiles' && method === 'GET') return ctx.send(200, { profiles: this.profiles(), file: tildify(this.store.file) }), true;
     const pm = /^profiles\/([a-z0-9][a-z0-9_-]{0,39}|new)$/.exec(rest);
     if (pm && method === 'PUT') {
       if (!ctx.guardWrite()) return true;
@@ -80,6 +102,7 @@ export class VoiceHub {
         const key = body.key === undefined ? undefined : body.key === null ? null : typeof body.key === 'string' ? body.key : (() => { throw new VoiceError('INVALID', 'key must be a string or null'); })();
         const saved = this.store.upsert(pm[1] === 'new' ? null : pm[1]!, body.profile, key);
         ctx.send(200, { profile: this.store.publicOf(saved), profiles: this.profiles() });
+        this.opts.profilesChanged?.();
       } catch (e) {
         this.error(ctx, e);
       }
@@ -90,6 +113,7 @@ export class VoiceHub {
       try {
         this.store.remove(pm[1]!);
         ctx.send(200, { profiles: this.profiles() });
+        this.opts.profilesChanged?.();
       } catch (e) {
         this.error(ctx, e);
       }
@@ -128,6 +152,7 @@ export class VoiceHub {
     const job = this.jobs.get(projectId);
     const enc = encodeURIComponent;
     return {
+      rev: nextRev(),
       selected: idx.profileId,
       source: r.source,
       missing: r.missing,
@@ -174,6 +199,7 @@ export class VoiceHub {
         summary = await cache.generate(segs as Segment[], typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en', resolved, this.store, {
           fetch: this.opts.fetch,
           signal: job.abort.signal,
+          inflight: this.inflightOf(projectId),
           onProgress: (done, total, failed) => {
             Object.assign(job, { done, total, failed });
             this.opts.emit(projectId, this.state(projectId, dir, project));
@@ -198,12 +224,7 @@ export class VoiceHub {
       const resolved = resolveVoices(project?.voiceConfig, cache.read().profileId, this.store);
       const plan = cache.plan(seg, resolved);
       if (!plan) return ctx.send(400, { error: { code: 'INVALID', message: 'No voice provider is selected for this project' } }), true;
-      const k = `${projectId}|${plan.key}`;
-      let p = this.inflight.get(k);
-      if (!p) {
-        p = cache.generateOne(seg, typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en', resolved, this.store, { fetch: this.opts.fetch }).finally(() => this.inflight.delete(k));
-        this.inflight.set(k, p);
-      }
+      const p = cache.generateOne(seg, typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en', resolved, this.store, { fetch: this.opts.fetch, inflight: this.inflightOf(projectId) });
       try {
         const r = await p;
         if (r.generated) this.opts.emit(projectId, this.state(projectId, dir, project));

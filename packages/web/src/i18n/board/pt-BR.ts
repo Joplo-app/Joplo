@@ -336,7 +336,7 @@ export function createBoardPtBR(locale: Locale = 'pt-BR') {
       voiceGenerateHint: "Cobre todos os cenários desta opção. O áudio gerado vai junto no build e no compartilhamento; as chaves, nunca.",
       voiceManage: "Gerenciar provedores…",
       voiceProviders: "Provedores de voz",
-      voiceProvidersHint: "Salvo neste computador (~/.joplo) para todos os projetos. As chaves nunca vão para o projeto nem para o compartilhamento.",
+      voiceProvidersHint: (p0: Value) => `Salvo neste computador (${value(p0, locale)}) para todos os projetos. As chaves nunca vão para o projeto nem para o compartilhamento.`,
       voiceNewProvider: "Novo provedor",
       voicePreset: "Predefinição",
       voiceKeySaved: "Chave salva",

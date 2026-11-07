@@ -352,7 +352,7 @@ export function createBoardEn(locale: Locale = 'en') {
       voiceGenerateHint: "Covers every scenario of this option. Generated audio goes out with build and share; keys never do.",
       voiceManage: "Manage providers…",
       voiceProviders: "Voice providers",
-      voiceProvidersHint: "Saved on this computer (~/.joplo) for all projects. Keys never go into a project or a share.",
+      voiceProvidersHint: (p0: Value) => `Saved on this computer (${value(p0, locale)}) for all projects. Keys never go into a project or a share.`,
       voiceNewProvider: "New provider",
       voicePreset: "Preset",
       voiceKeySaved: "Key saved",

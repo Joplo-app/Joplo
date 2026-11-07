@@ -336,7 +336,7 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       voiceGenerateHint: "涵蓋這個方案的所有情境。build 和分享時會帶上產生的音訊，金鑰永遠不會。",
       voiceManage: "管理供應商…",
       voiceProviders: "聲音供應商",
-      voiceProvidersHint: "儲存在這台電腦（~/.joplo），所有專案共用。金鑰不會進專案，也不會隨分享上傳。",
+      voiceProvidersHint: (p0: Value) => `儲存在這台電腦（${value(p0, locale)}），所有專案共用。金鑰不會進專案，也不會隨分享上傳。`,
       voiceNewProvider: "新增供應商",
       voicePreset: "預設",
       voiceKeySaved: "已儲存金鑰",

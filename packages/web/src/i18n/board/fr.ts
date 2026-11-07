@@ -336,7 +336,7 @@ export function createBoardFr(locale: Locale = 'fr') {
       voiceGenerateHint: "Couvre tous les scénarios de cette option. L’audio généré part avec build et le partage ; les clés jamais.",
       voiceManage: "Gérer les fournisseurs…",
       voiceProviders: "Fournisseurs de voix",
-      voiceProvidersHint: "Enregistré sur cet ordinateur (~/.joplo) pour tous les projets. Les clés ne vont jamais dans un projet ni dans un partage.",
+      voiceProvidersHint: (p0: Value) => `Enregistré sur cet ordinateur (${value(p0, locale)}) pour tous les projets. Les clés ne vont jamais dans un projet ni dans un partage.`,
       voiceNewProvider: "Nouveau fournisseur",
       voicePreset: "Préréglage",
       voiceKeySaved: "Clé enregistrée",

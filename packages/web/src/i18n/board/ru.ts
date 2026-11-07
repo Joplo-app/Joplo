@@ -336,7 +336,7 @@ export function createBoardRu(locale: Locale = 'ru') {
       voiceGenerateHint: "Для всех сценариев этого варианта. Созданное аудио попадает в build и общий доступ, ключи — никогда.",
       voiceManage: "Поставщики…",
       voiceProviders: "Поставщики голоса",
-      voiceProvidersHint: "Хранится на этом компьютере (~/.joplo) для всех проектов. Ключи никогда не попадают в проект или общий доступ.",
+      voiceProvidersHint: (p0: Value) => `Хранится на этом компьютере (${value(p0, locale)}) для всех проектов. Ключи никогда не попадают в проект или общий доступ.`,
       voiceNewProvider: "Новый поставщик",
       voicePreset: "Предустановка",
       voiceKeySaved: "Ключ сохранён",

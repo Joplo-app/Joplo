@@ -336,7 +336,7 @@ export function createBoardJa(locale: Locale = 'ja') {
       voiceGenerateHint: "この案のすべてのシナリオが対象です。生成した音声は build と共有に含まれます。キーは含まれません。",
       voiceManage: "提供元を管理…",
       voiceProviders: "音声の提供元",
-      voiceProvidersHint: "このコンピューター（~/.joplo）に保存し、すべてのプロジェクトで使います。キーはプロジェクトにも共有にも入りません。",
+      voiceProvidersHint: (p0: Value) => `このコンピューター（${value(p0, locale)}）に保存し、すべてのプロジェクトで使います。キーはプロジェクトにも共有にも入りません。`,
       voiceNewProvider: "提供元を追加",
       voicePreset: "プリセット",
       voiceKeySaved: "キー保存済み",

@@ -398,6 +398,10 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     emit: (projectId, state) => {
       if (!closed) server?.ws.send({ type: 'custom', event: VOICE_EVENT, data: { projectId, state } });
     },
+    // profile 是本机共用的：改了就通知所有看板，各自重新取自己项目的声音状态
+    profilesChanged: () => {
+      if (!closed) server?.ws.send({ type: 'custom', event: VOICE_EVENT, data: { profilesChanged: true } });
+    },
   });
 
   // ---------- HTTP ----------

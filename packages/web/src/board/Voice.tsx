@@ -36,7 +36,7 @@ import {
   type VoiceState,
   type VoiceTestResult,
 } from '../runtime/dev-client';
-import { connectionChanged, draftOf, draftReady, hasKey, inputOf, narrationLanguage, sortVoices, voiceCoverage, voiceSegments, type VoiceDraft } from './voice-model';
+import { connectionChanged, draftOf, draftReady, hasKey, inputOf, narrationLanguage, newerVoiceState, sortVoices, voiceCoverage, voiceSegments, type VoiceDraft } from './voice-model';
 import type { Locale } from '../i18n/locale';
 
 const ON_KEY = 'joplo.voice.on';
@@ -65,8 +65,12 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
   const narrator = useMemo(() => new Narrator(), [projectId]);
   const [on, setOnState] = useState(() => readLocal(ON_KEY) === '1');
   const [browserVoice, setBrowserVoiceState] = useState<string | null>(() => readLocal(BROWSER_KEY));
-  const [state, setState] = useState<VoiceState | null>(null);
+  const [state, setStateRaw] = useState<VoiceState | null>(null);
+  /** 所有来源（推送、重新读取、选择 / 生成的返回）都经这里：晚到的旧状态不覆盖新的。 */
+  const setState = (s: VoiceState) => setStateRaw((prev) => newerVoiceState(prev, s));
   const [profiles, setProfiles] = useState<VoiceProfileView[] | null>(null);
+  /** profile 的本机存储文件（所有项目共用；dev 用了别的 JOPLO_HOME 时在这里看得出来）。 */
+  const [profilesFile, setProfilesFile] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Text | null>(null);
 
@@ -80,7 +84,12 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
     };
   }, [projectId]);
 
-  const reloadProfiles = () => fetchVoiceProfiles().then((r) => (Array.isArray(r) ? setProfiles(r) : setError(r.error)));
+  const reloadProfiles = () =>
+    fetchVoiceProfiles().then((r) => {
+      if ('error' in r) return setError(r.error);
+      setProfiles(r.profiles);
+      setProfilesFile(r.file);
+    });
 
   // narrator 跟着状态走；控制器在播放时用它
   narrator.enabled = on;
@@ -169,7 +178,7 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
     }
   };
 
-  return { narrator, on, setOn, browserVoice, setBrowserVoice, state, profiles, reloadProfiles, setProfiles, select, generate, busy: busy || !!state?.generating, error, setError, coverage, segments, lang, locale };
+  return { narrator, on, setOn, browserVoice, setBrowserVoice, state, profiles, profilesFile, reloadProfiles, setProfiles, select, generate, busy: busy || !!state?.generating, error, setError, coverage, segments, lang, locale };
 }
 
 const CUSTOM = '__custom__';
@@ -398,6 +407,7 @@ export function VoiceProfilesDialog({ api, open, onClose, canSelect }: { api: Vo
       await api.select(r.profile.id);
       onClose();
     } else setMsg(i18n.board.voiceSaved);
+    // 声音状态（Key、音色、指纹）由服务端的 profilesChanged 推送带回来，见 subscribeVoice
   };
   const remove = async () => {
     if (!cur) return;
@@ -433,7 +443,7 @@ export function VoiceProfilesDialog({ api, open, onClose, canSelect }: { api: Vo
               </button>
             ))}
             <Btn icon={<Plus className="size-4" />} label={i18n.board.voiceNewProvider} variant="default" onClick={() => pick('new')} className="mt-1 w-full" data-testid="voice-profile-new" />
-            <p className="mt-2 px-1 text-[11.5px] leading-snug text-jb-faint">{i18n.board.voiceProvidersHint}</p>
+            <p className="mt-2 px-1 text-[11.5px] leading-snug text-jb-faint [overflow-wrap:anywhere]" data-testid="voice-profiles-file">{i18n.board.voiceProvidersHint(api.profilesFile ?? '~/.joplo')}</p>
           </nav>
           <form
             className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-5"

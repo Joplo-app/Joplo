@@ -353,7 +353,7 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       voiceGenerateHint: "覆盖这个方案的所有场景。build 和分享时会带上生成的音频，密钥永远不会。",
       voiceManage: "管理供应商…",
       voiceProviders: "声音供应商",
-      voiceProvidersHint: "保存在本机（~/.joplo），所有项目共用。密钥不会进项目，也不会随分享上传。",
+      voiceProvidersHint: (p0: Value) => `保存在本机（${value(p0, locale)}），所有项目共用。密钥不会进项目，也不会随分享上传。`,
       voiceNewProvider: "新建供应商",
       voicePreset: "预设",
       voiceKeySaved: "已保存密钥",

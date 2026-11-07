@@ -5,7 +5,15 @@
 import { DEFAULT_STYLE, speakerRoleAt, spokenLine, type Project } from '@joplo-app/core';
 import type { Dictionary } from '../i18n/en';
 import { stepCaption } from '../i18n/step-caption';
-import type { VoiceKind, VoiceProfileInput, VoiceProfileView, VoiceResponseMode, VoiceSegment } from '../runtime/dev-client';
+import type { VoiceKind, VoiceProfileInput, VoiceProfileView, VoiceResponseMode, VoiceSegment, VoiceState } from '../runtime/dev-client';
+
+/**
+ * 声音状态只往新的走：推送、选择 / 生成的返回、profile 改动后的重新读取可能乱序到达；晚到的旧状态（rev 更小）丢掉。
+ * 没有 rev（旧版 joplo dev）时照收。
+ */
+export function newerVoiceState(prev: VoiceState | null, next: VoiceState): VoiceState {
+  return prev && typeof prev.rev === 'number' && typeof next.rev === 'number' && next.rev < prev.rev ? prev : next;
+}
 
 /** 这个方案所有场景要读的段（文字为空的步骤跳过）。 */
 export function voiceSegments(project: Project, optionId: string | null, i18n: Dictionary): VoiceSegment[] {
