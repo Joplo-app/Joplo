@@ -13,26 +13,47 @@
 
 源码入口用于工作区开发；打包时 publishConfig 指向 dist，内部 workspace 依赖转成相同精确版本。项目许可证为 [Apache-2.0](../LICENSE)，字体使用 [SIL OFL 1.1](../packages/web/src/fonts/OFL.txt)。
 
-## 标准步骤（自动发布）
+## 标准步骤：推 tag 发布
 
-在 main 上准备要发布的代码，改版本、更新 CHANGELOG，推送 main 即可，发布由 GitHub Actions 完成：
+平时推送 main 只跑 CI，不发布。想发版时升版本、推 main，再推一个 `v<版本>` tag，发布和 GitHub Release 都由 GitHub Actions 完成：
 
 ```sh
+git switch main && git pull
 pnpm install --frozen-lockfile
-pnpm release:version 0.1.3          # 改六个包的版本，并重新生成 skills/
+pnpm release:version 0.2.10         # 改六个包的版本，并重新生成 skills/（默认升 patch，破坏性变更升 minor）
 pnpm install --lockfile-only
 pnpm typecheck && pnpm test         # 本地先过一遍，CI 会再跑
-# 在 CHANGELOG.md 顶部写 ## 0.1.3 一节（会成为 GitHub Release 的说明）
 git add packages/*/package.json pnpm-lock.yaml skills CHANGELOG.md
-git commit -m "release: 0.1.3"
-git push origin main                # 触发 .github/workflows/release.yml
+git commit -m "release: 0.2.10"
+git push origin main
+git tag v0.2.10 && git push origin v0.2.10   # 触发 .github/workflows/release.yml
 ```
 
-[release.yml](../.github/workflows/release.yml) 在 main 上 `packages/joplo/package.json` 变化且还没有 `v<版本>` tag 时运行：typecheck → test → `release:smoke` → `release:publish`（正式版 `--tag latest`，带 `-` 的预发布版 `--tag beta`，最后自动 verify）→ verify 通过后才打 `v<版本>` tag 并推送，再用 CHANGELOG 里对应一节创建 GitHub Release。已有 tag 的版本直接跳过，所以普通提交不会重复发布。
+[release.yml](../.github/workflows/release.yml) 收到 `v*` tag 后：
 
-- 中途失败（网络、registry 延迟、smoke 不过）：修好后在 Actions 页面 Re-run，或 `gh workflow run release.yml --ref main`；已发布的包会跳过，只补发缺的，不必为重试改版本号。
-- tag 仍然只在 verify 通过之后才出现，保持“tag 指向的版本一定装得上”。
-- 每次推送分支还会跑 [ci.yml](../.github/workflows/ci.yml)（typecheck + test + release:smoke），发布脚本在 Linux 上的问题在合进 main 之前就能发现。
+1. 检查 tag 与六个包的版本一致（不一致直接失败，提示先 `pnpm release:version`），且 tag 指向的提交在 main 上；
+2. typecheck → test → `release:smoke`；
+3. `release:publish`（正式版 `--tag latest`，带 `-` 的预发布版 `--tag beta`），最后自动 verify；
+4. 用 `node scripts/commits.mjs notes <tag>` 生成说明并创建 GitHub Release（预发布版标为 Pre-release）：上一个 `v*` tag 以来的提交按“破坏性变更 / 新功能 / 修复 / 性能”分组，去掉前缀、带短哈希，末尾附 compare 链接。其他类型（docs、test、ci……）不进说明。CHANGELOG.md 里如果有 `## <版本>` 一节，会放在最前面作为概要；不写也行。
+
+- 中途失败（网络、registry 延迟、smoke 不过）：修好后在这次运行上 Re-run，或 `gh workflow run release.yml --ref v0.2.10`；已发布的包会跳过，Release 已存在时只更新说明，不必为重试改版本号。
+- 修复要改代码时：tag 已经指向旧提交。改完推 main 后，`git tag -f v0.2.10 && git push -f origin v0.2.10` 移到新提交（npm 上还没有这个版本时才这样做；已经发出去的版本只能升一个新版本号）。
+- 本地预览说明：`node scripts/commits.mjs notes v0.2.10`（tag 要先在本地打好）。
+- 每次推送分支还会跑 [ci.yml](../.github/workflows/ci.yml)（typecheck + test + release:smoke + 提交前缀检查），发布脚本在 Linux 上的问题在发版之前就能发现。
+
+### 提交信息约定
+
+发布说明靠提交标题的前缀分组，所以提交标题要以类型开头：`<类型>(<可选范围>): <说明>`，例如 `feat: 新增 joplo outline`、`fix(web): 修复发布站跳转`。说明用中文、写给用户看。
+
+| 类型 | 进入发布说明 | 用途 |
+| --- | --- | --- |
+| `feat` | 新功能 | 用户能感知的新能力 |
+| `fix` | 修复 | 用户能感知的问题修复 |
+| `perf` | 性能 | 性能改进 |
+| 类型后加 `!`，或正文含 `BREAKING CHANGE: …` | 破坏性变更（单列在最前） | 需要用户改项目或命令的变更；0.x 阶段这一版升 minor |
+| `refactor` `docs` `test` `chore` `ci` `build` `style` `revert` `release` | 不进入 | 内部改动 |
+
+合并提交和 git 生成的 `Revert "…"` 不要求前缀。CI 的 commits 任务会检查：PR 里的提交和 PR 标题（squash 合并时它会成为 main 上的提交标题）不合规就失败；直接推送只给警告。实现见 [commits.mjs](../scripts/commits.mjs)，测试见 scripts/test/commits.test.ts。
 
 ### 一次性配置：npm Trusted Publishing
 
@@ -62,10 +83,10 @@ git push origin v0.1.3
 顺序不能乱：
 
 1. `pnpm release:version <v>`：改六个包的版本，并重新生成 `skills/*/SKILL.md`（带新版本标记）。
-2. 跑完检查后，把 `packages/*/package.json`、`pnpm-lock.yaml`、`skills/` 一起提交，推送 main。注意：推送 main 会触发自动发布；要手动发布时，先在 Actions 里禁用 Release workflow，或者等它失败后再手动处理。
+2. 跑完检查后，把 `packages/*/package.json`、`pnpm-lock.yaml`、`skills/` 一起提交，推送 main。推送 main 不会触发发布。
 3. `pnpm release:publish --tag <标签>`：先一次性构建并打包全部包（与 `release:pack` 相同，含全部 tarball 检查），再按依赖顺序发布打好的 tarball（可续跑，见下），最后自动运行 `release:verify`，整体退出码就是 verify 的结果。
 4. 第 3 步失败（中途某个包没发出去，或 verify 不通过）：按提示处理后重跑同一条命令，已发布的包会跳过。也可以单独运行 `pnpm release:verify` 复查。
-5. 第 3 步以 0 退出后，才在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`（脚本最后一行会打印这条命令）。用户用 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。注意 `npx skills add Joplo-app/Joplo@v<v>` 不能用：skills CLI 把 `@` 后面当成技能名，报 No matching skills found（2026-11-06 实测）。tag 要等 verify 通过再推，避免指向一个装不上的版本。
+5. 第 3 步以 0 退出后，在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`。tag 会触发 release.yml：重跑检查，发布步骤因为六个包都已存在而跳过，然后生成 GitHub Release。用户用 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。注意 `npx skills add Joplo-app/Joplo@v<v>` 不能用：skills CLI 把 `@` 后面当成技能名，报 No matching skills found（2026-11-06 实测）。手动发布时 tag 要等 verify 通过再推，避免指向一个装不上的版本。
 
 `release:version` 会同时重新生成仓库根目录的官方 Agent 技能 `skills/*/SKILL.md`（带版本标记，D64），要和版本号一起提交；`scripts/test/skills.test.ts` 会在不一致时失败（单独重新生成：`pnpm skills:build`）。
 

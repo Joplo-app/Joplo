@@ -29,3 +29,33 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm release:smoke
+
+  # 提交标题前缀（D73，docs/release.md「提交信息约定」）：发布说明靠它分组。PR 上不合规就失败；直接推送只给警告。
+  commits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Check commit subjects (PR)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          node scripts/commits.mjs check "$BASE..$HEAD" --strict
+          # squash 合并时 PR 标题会成为 main 上的提交标题
+          node --input-type=module -e "import { invalidSubjects } from './scripts/commits.mjs'; if (invalidSubjects([process.env.TITLE]).length) { console.log('✗ PR 标题缺少约定前缀：' + process.env.TITLE); process.exit(1); }"
+      - name: Check commit subjects (push)
+        if: github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            range="origin/main..HEAD"
+          else
+            range="$BEFORE..HEAD"
+          fi
+          node scripts/commits.mjs check "$range"

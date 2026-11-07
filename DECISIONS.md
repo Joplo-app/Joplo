@@ -319,9 +319,14 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 官方技能新增 “Show the product, not slides”：每一步 = 对产品的一个操作 + 它引起的可见变化；四组反例与正例（功能、后端 / 架构、方案对比、状态生命周期）；卡片只用于开场、收尾、时间跳转、切换角色。
   - `npx joplo skill story` 新增第 1 节：同一组要点的“幻灯片版”（只有卡片）与“产品版”（click / type / push / toast / 切角色）TSX 对照，后端用 Diagram + trace()；交付前自查加“关键帧像幻灯片缩略图就重做”。不新增 API 或 check 规则（遵循“先改进现有能力”）。
 - D72 自动发布（2026-11-07，来源：用户 2026-11-07：“能不能配置上 CICD 自动发布”）：
-  - 推送 main 且 `packages/joplo/package.json` 版本没有对应 `v<版本>` tag 时，`.github/workflows/release.yml` 依次跑 typecheck、test、release:smoke、release:publish（正式版 latest，预发布版 beta），verify 通过后才打 tag 并用 CHANGELOG 对应一节建 GitHub Release。维护者推送版本提交即表示同意发布，取代 A3“执行 npm publish 前再向用户确认”。
+  - ~~推送 main 且版本没有对应 tag 时发布、verify 通过后由 CI 打 tag~~（2026-11-07 由 D73 取代：改为维护者推 tag 触发）。维护者推送 tag 即表示同意发布，取代 A3“执行 npm publish 前再向用户确认”。
   - 认证用 npm Trusted Publishing（GitHub OIDC）：不存 token、无 OTP、自动 provenance；六个包各配一次受信任发布方（docs/release.md）。本地 `pnpm release:publish` 保留为备用。
   - `.github/workflows/ci.yml`：每次推送分支和每个 PR 跑 typecheck + test + release:smoke（0.2.9 首次 CI 发布时 smoke 因 BSD / GNU tar 输出差异失败，所以分支上就跑）。
+- D73 推 tag 发布，发布说明按提交前缀自动整理（2026-11-07，来源：用户 2026-11-07：“每次推送有 tag 之后自动产出 release，而不是每次 main 推送都会有”；整理方式选“按提交前缀分组”，版本规则选“默认 patch”）：
+  - 只有推送 `v*` tag 触发 release.yml：tag 必须等于六个包的版本、指向 main 上的提交；检查 → smoke → 发布 npm → verify → GitHub Release。推送 main 只跑 CI。代价：tag 先于发布存在，发布失败时在这个 tag 上重跑（npm 上还没有这个版本时可以把 tag 移到修复后的提交）。
+  - 发布说明由 `scripts/commits.mjs notes` 生成：上一个 v* tag 以来的提交，按破坏性变更 / 新功能（feat）/ 修复（fix）/ 性能（perf）分组；其他类型不进说明；CHANGELOG.md 里这一版的手写段落（可选）放在最前作概要。不做 Release PR、不在 CI 里自动改版本号或提交 CHANGELOG（用户 2026-11-07 否定了 Release PR 方案）。
+  - 版本号仍由维护者 `pnpm release:version` 决定：默认升 patch，破坏性变更升 minor（0.x 阶段）。
+  - 提交标题约定 `<类型>(<范围>): <说明>`（docs/release.md「提交信息约定」）；CI commits 任务对 PR 的提交和标题严格检查，直接推送只警告。之前没有前缀的历史提交不追溯。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

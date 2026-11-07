@@ -556,8 +556,8 @@ export async function publishRelease(opts = {}) {
   out(published.length ? `✓ 本次发布 ${published.length} 个包：${published.join('、')}` : '✓ 所有包都已在 registry 上，无需发布');
   out('— 运行 release:verify');
   const verified = await verify(v);
-  if (verified?.ok) out(`✓ 发布完成。现在打 tag：git tag v${v} && git push origin v${v}`);
-  else err('✗ release:verify 没有通过（见上面的输出）；先不要打 tag。');
+  if (verified?.ok) out(`✓ 发布完成：${v}（CI 由 v${v} tag 触发；本地手动发布时再补 git tag v${v} && git push origin v${v}，会顺带生成 GitHub Release）`);
+  else err("✗ release:verify 没有通过（见上面的输出）：修好后重跑同一条命令（CI 上 Re-run），已发布的包会跳过。");
   return { ok: Boolean(verified?.ok), version: v, published, skipped, unpublished: [] };
 }
 
