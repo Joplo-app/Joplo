@@ -10,6 +10,7 @@
 /** 心智模型：所有入口最先读到的几句话。 */
 export const MENTAL_MODEL = [
   'Joplo is a player for pre-declared scenarios, not a free-form app prototype.',
+  'Its job is to show a product feature working through visuals and motion: the real interface operated step by step, state changing on screen, calls traced through diagrams. It is not a slide or PPT tool.',
   'Inputs show the sample value typed by the current step (read-only); viewers cannot type their own.',
   'Clicking the highlighted element plays the next declared step; other clicks only show a hint.',
   'Results and errors come from scenario effects (set, toast, done), not from real logic or a backend.',
@@ -44,7 +45,7 @@ const ZH_FEEDBACK = '评审有结论了、按评审意见修改演示';
 
 export type AgentSkill = { name: string; description: string; body: string };
 
-const JOPLO_DESCRIPTION = `Build clickable, replayable feature demos with Joplo (scripted scenarios in TSX, viewed in a local board) when the user wants a feature prototype, an interactive or clickable demo, an A/B comparison of options or edge cases, or a demo for product, design, or review (${ZH_JOPLO}), including in a repo without joplo.config.ts.`;
+const JOPLO_DESCRIPTION = `Build clickable, replayable feature demos with Joplo (scripted scenarios in TSX, viewed in a local board) when the user wants a feature prototype, an interactive or clickable demo, an A/B comparison of options or edge cases, or a demo for product, design, or review (${ZH_JOPLO}), including in a repo without joplo.config.ts, but not for slide decks or PPT.`;
 const FEEDBACK_DESCRIPTION = `Apply Joplo review results when reviewers have commented on or decided about a Joplo review link and the user says the review has conclusions or asks to update the demo as reviewed (${ZH_FEEDBACK}); pulls decisions with npx joplo feedback and writes them back into the source.`;
 
 const list = (items: readonly string[]) => items.map((s, i) => `${i + 1}. ${s}`);
@@ -55,9 +56,18 @@ function joploBody(): string {
     '',
     ...MENTAL_MODEL,
     '',
+    '## Show the product, not slides',
+    'Every step is an action on the product and a visible change it causes. If a step could be a bullet on a slide, rebuild it as interface, state, or a trace.',
+    '- Feature: not a card listing "enter email / teammate gets a link / joins today"; instead Ana types the email, clicks Send, the row appears as Pending, then Leo\'s layer opens the mail and lands in the space.',
+    '- Backend or architecture: not a card "App → API → Queue → Worker"; instead a Diagram where trace() lights each hop as the request moves and trace.fail() shows where it breaks, beside the UI whose status changes with it.',
+    '- Comparison: not a pros-and-cons table; instead options A and B each playing the same scenario, compared in the board.',
+    '- State or lifecycle: not a paragraph explaining statuses; instead a StateMachine whose current state moves as the user acts.',
+    '- Cards only open, close, jump in time, or switch roles; text that explains belongs in captions and explain(). Worked example: npx joplo skill story.',
+    '',
     '## When to use',
     '- The user wants to think a feature through before building it: a prototype, clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.',
     '- Not for production UI code, real backends, or demos where viewers type free input.',
+    '- Not for slide decks, pitch decks, or text-and-bullet presentations: with no product behavior to show, use a slides tool instead.',
     '',
     '## Workflow',
     '1. No joplo.config.ts yet: npx joplo@latest init <dir>, or npx joplo@latest init . for the current directory, then npm install there (versions are pinned). Agent and Git files (.git, .gitignore, .agents, .claude, AGENTS.md, skills-lock.json) do not count as content; other existing files need init . --keep, which only adds missing files. init skips these skills when the same version is already installed and never overwrites edited ones. In an existing Joplo project, use its installed npx joplo.',
@@ -118,7 +128,7 @@ export function agentsBlock(): string {
   return [
     '## Joplo',
     'This project designs features as Joplo demos (joplo.config.ts). Read npx joplo skill first, then the relevant topics: authoring for pages/options/scenarios, story for planning a demo and writing captions, components, cases before asking about edge cases, demo for layers, shots, traces, and captions, focus for where viewers look in each step, diagram for architecture, sequence, and state diagrams.',
-    `Mental model: ${MENTAL_MODEL.slice(0, 4).join(' ')}`,
+    `Mental model: ${MENTAL_MODEL.slice(0, 5).join(' ')}`,
     `Start: ${START_ORDER.map((s, i) => `(${i + 1}) ${s}`).join(' ')}`,
     'Pitfalls:',
     ...PITFALLS.slice(0, 6).map(([text, topic]) => `- ${text} (npx joplo skill ${topic}).`),

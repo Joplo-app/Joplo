@@ -146,14 +146,39 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 A demo is a short story a viewer follows without you: who wants what, what gets in the way, what the product does, and the visible result.
 It is not a feature tour. Plan it in a few lines before writing TSX, show the plan to the user, then build. Sources: docs/research/storytelling-and-demos.md.
 
-## 1. Plan the demo first (write it in your reply; ask only questions that change it, each with a default)
+## 1. Show the product working, not slides
+Joplo exists to demonstrate product behavior with visuals and motion. It is not a PPT tool: a demo made of text cards and bullet lists has failed, however good the text.
+- Every step = a cause the viewer sees (a click, typing, an incoming message, a system event) + a change it makes (a new row, a status, a toast, a trace, a layer switch).
+- Show, do not tell: a claim like 'invites are fast' becomes the invite happening on screen; 'the queue absorbs spikes' becomes trace() through the queue while the UI stays responsive.
+- Text has a supporting role: captions narrate what is on screen, explain() says why it matters, cards only open, close, jump in time, or switch roles.
+- Pick the visual by what you prove: UI flow → the product screens; who calls whom → Diagram + trace(); time order → Sequence; lifecycle → StateMachine; two answers → options A/B on the same scenario.
+Slide version (wrong): the same points as cards, nothing to operate, nothing changes.
+\`\`\`tsx
+flow('Invite by email', { start: '/members' })
+  .card('Invite by email', { points: ['Enter an email', 'Teammate gets a link', 'Joins the same day'] })
+  .card('Why it matters', { points: ['Faster onboarding', 'Fewer support tickets'] })
+\`\`\`
+Product version (right): the same points, proven by the interface.
+\`\`\`tsx
+flow('Invite a teammate', { start: '/members' })
+  .card('Ana needs Leo in the space today', { sub: 'She is the space admin' })
+  .click('btn_invite', 'Ana opens Invite', set($.ui.inviteOpen, true))
+  .type('in_email', 'leo@acme.com', 'Ana enters Leo\'s email')
+  .click('btn_send', 'The invite is on its way', set($.ui.inviteOpen, false),
+    push($.data.pending, { email: 'leo@acme.com', status: 'Pending' }), toast.success('Invite sent to leo@acme.com'))
+  .card('Now Leo', { role: 'leo' })
+  .click('mail_join', 'Leo opens the link and lands in the space', go('/space'), done('Leo joins the same day'))
+\`\`\`
+Backend behind the same feature: put a Diagram in its own layer and .system('Send mail', 'The mail job runs in the background', trace('api', 'queue', 'mailer'), shot('mailer')); a failure is trace.fail('queue', 'mailer') plus the error the user sees. Full examples: examples/invite, examples/agent-arch.
+
+## 2. Plan the demo first (write it in your reply; ask only questions that change it, each with a default)
 - Audience: who watches (product review, design review, a customer, engineers) and what they must decide afterward.
 - One to three points: what viewers must believe after watching. Each point becomes a scenario or an A/B comparison, never a single step.
 - Scene list, one line per scenario: Given (who, where, starting state) → When (the user's actions) → Then (the visible result), plus how it opens and how it ends.
 - Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate.
 - Unsure how to frame it? Offer two or three one-line framings and let the user pick.
 
-## 2. PM lens: from a need to roles, goal, cases, and scenarios
+## 3. PM lens: from a need to roles, goal, cases, and scenarios
 Joplo already has the parts of a user story; fill them in that spirit.
 - roles: who it is for, specific ('Space admin', 'Invited teammate'), not 'User'. Use role('Name', { desc }) keys when layers or cards belong to a person; plain names are fine otherwise.
 - goal (the I want + so that): one sentence, who can do what and why, independent of the solution so options A/B are two answers to it.
@@ -168,7 +193,7 @@ Joplo already has the parts of a user story; fill them in that spirit.
 - INVEST check per scenario: Independent (its own start state), Valuable (ends on a visible result), Small (fits the length above), Testable (expected says exactly what appears).
 - Direction still open? Build only the main scenario of options A and B first; add every case after the user picks.
 
-## 3. Openings, middles, endings
+## 4. Openings, middles, endings
 - Opening: the first step or an opening .card('…', { sub }) says who is trying to do what and why, in one sentence. No logo, no 'So you open the app'.
 - Middle: each step proves one thing with a visible action and a visible change; the cause must be visible (a click, an incoming message, a time-jump card).
   A screen that changes with no trigger reads as a screensaver. Mock results come from steps: set(), toast(), go().
@@ -176,7 +201,7 @@ Joplo already has the parts of a user story; fill them in that spirit.
 - Transitions: keep something on screen across a change (the same list, the same person); cards only for time jumps, role switches, opening, and ending.
 - Where the viewer looks each moment (one focus per step, spotlight, highlight, callout, numbered, hold): npx joplo skill focus; layers and shots: npx joplo skill demo.
 
-## 4. Captions and explain
+## 5. Captions and explain
 - One idea per caption, about 24 units (CJK 1, other characters 0.5). Subject + verb, active voice, the visible action first: 'Ana sends the invite', 'The link expires after 7 days'.
 - explain (about 48 units) says why it matters or what it means; never repeat the caption.
 - System steps are narration of what happened ('The server rejects the address'), not labels ('System event').
@@ -185,10 +210,11 @@ Joplo already has the parts of a user story; fill them in that spirit.
 - Cover text: flow({ description }) is the cover sentence, 30 units at most (DESCRIPTION_TOO_LONG). The cover falls back to the feature goal.
 - Rhythm: every short step waits 3 s, so a run of trivial steps feels like a metronome. Merge trivial steps (type, then click) and give key results an explain.
 
-## 5. Before handing over
+## 6. Before handing over
 - npx joplo outline: per feature, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
 - npx joplo check: CAPTION_TOO_LONG, EXPLAIN_TOO_LONG, DESCRIPTION_TOO_LONG, CARD_TEXT_TOO_LONG, SCENARIO_TOO_LONG, HAPPY_PATH_ONLY, CASE_NOT_COVERED (names the expected result).
 - Read only the captions from start to end: do they tell the story? Then look only at key frames (npx joplo render --step-id …): does the screen show it without captions?
+- If the key frames look like slide thumbnails (mostly cards, bullet points, or a screen that never changes), rebuild those steps as actions and visible changes (section 1).
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.`,
   authoring: `# Joplo authoring: authoring
 
