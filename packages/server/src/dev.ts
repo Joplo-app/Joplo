@@ -22,6 +22,7 @@ import { createLogger, createServer, type Logger, type Plugin, type PluginOption
 import { JoploError, type Diagnostic, type Project } from '@joplo-app/core';
 import type { DevHandle, DevOptions } from './contract.ts';
 import { ExportHub, type ExportDeps } from './export.ts';
+import { VoiceHub } from './voice-http.ts';
 import { Registry, clearServerInfo, joploHome, normalizeSettings, pidAlive, projectIdOf, readServerInfo, readSettings, writeServerInfo, writeSettings, type BoardSettings, type ProjectRecord } from './home.ts';
 import { compileProject, invalidateProjectModules } from './project.ts';
 import { SelectionBody, readSelection, resolveSelection, writeSelection } from './selection.ts';
@@ -50,6 +51,8 @@ export type ProjectSummary = {
 
 export const IR_EVENT = 'joplo:ir';
 export const PROJECTS_EVENT = 'joplo:projects';
+/** 朗读状态变化（D74）：{ projectId, state }。 */
+export const VOICE_EVENT = 'joplo:voice';
 const MAX_BODY = 64 * 1024;
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -390,6 +393,13 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     onEvent: () => undefined,
   });
 
+  // 朗读（D74）：声音供应商 profile（本机）与项目音频缓存；状态变化推 joplo:voice
+  const voiceHub = new VoiceHub(opts.home ?? joploHome(), {
+    emit: (projectId, state) => {
+      if (!closed) server?.ws.send({ type: 'custom', event: VOICE_EVENT, data: { projectId, state } });
+    },
+  });
+
   // ---------- HTTP ----------
   const deny = (res: http.ServerResponse, status: number, message: string) => sendJson(res, status, { error: { code: 'PERMISSION_DENIED', message } });
   /** 写接口：Origin（有则必须是看板自己）、令牌、Content-Type。返回 false 表示已拒绝。 */
@@ -463,6 +473,11 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       req.method = 'GET';
       return 'next' as const;
     }
+    if (rest === 'voice' || rest.startsWith('voice/')) {
+      const slot = await ensure(id);
+      const ctx = { guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), send: (status: number, body: unknown) => sendJson(res, status, body) };
+      if (await voiceHub.handleProject(id, slot.dir, slot.payload.project, rest === 'voice' ? '' : rest.slice('voice/'.length), req, res, ctx)) return;
+    }
     if (rest.startsWith('export/')) {
       const slot = await ensure(id);
       return exportsHub.handle(rest.slice('export/'.length), req, res, { projectId: id, dir: slot.dir, project: slot.payload.project, guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), fail: (e) => fail(res, e) });
@@ -517,6 +532,10 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
             return sendJson(res, 200, { ok: true });
           }
           // 导出组件的安装（D66）：只接受本机看板带令牌的请求（handleRuntime 内校验）
+          if (url.pathname.startsWith('/__joplo/voice/')) {
+            const ctx = { guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), send: (status: number, body: unknown) => sendJson(res, status, body) };
+            if (await voiceHub.handleGlobal(url.pathname.slice('/__joplo/voice/'.length), req, ctx)) return;
+          }
           if (url.pathname.startsWith('/__joplo/export-runtime/')) return exportsHub.handleRuntime(url.pathname.slice('/__joplo/export-runtime/'.length), req, res, { guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), fail: (e) => fail(res, e) });
           const pm = /^\/__joplo\/p\/([^/]+)\/(.+)$/.exec(url.pathname);
           if (pm) {
@@ -607,6 +626,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     projects: summaries,
     close: async () => {
       closed = true;
+      voiceHub.close();
       await exportsHub.close();
       for (const s of [...slots.values()]) await deactivate(s);
       await server.close();

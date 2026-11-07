@@ -225,6 +225,10 @@ export const Step = z.strictObject({
   callouts: z.array(Callout).optional(),
   /** 自动播放时这一步至少停留的毫秒数（D70，来自 hold；未按速度缩放）；没有时省略。 */
   hold: z.number().int().positive().max(30_000).optional(),
+  /** 角色台词（D74，来自 say()，多个按空格连接）：用这一步角色的声音读；没有时省略。发布站保留。 */
+  say: z.string().min(1).optional(),
+  /** 旁白（D74，来自 narrate()）：用旁白的声音读，优先于台词和字幕；没有时省略。发布站保留。 */
+  narrate: z.string().min(1).optional(),
   source: Source,
 });
 
@@ -338,6 +342,22 @@ export const Issue = z.strictObject({
   source: Source,
 });
 
+/** 朗读配置（D74，来自 config({ voice })）：只在 dev / review IR 里，发布站去掉。 */
+export const VoiceConfig = z.strictObject({
+  profile: z.string().min(1).optional(),
+  narrator: z.string().min(1).optional(),
+  roles: z.record(z.string(), z.string().min(1)).optional(),
+});
+/**
+ * 发布站带上的朗读音频（D74，joplo build 写入）：voices 是每个声音的指纹（旁白与各角色），
+ * clips 的键是 clipKey(指纹, 朗读文字)，值是相对站点根目录的音频路径。没有时观众端用浏览器朗读。
+ */
+export const VoiceIndex = z.strictObject({
+  narrator: z.string().min(1).nullable(),
+  roles: z.record(z.string(), z.string().min(1)).default({}),
+  clips: z.record(z.string(), z.string().min(1)).default({}),
+});
+
 export const Project = z.strictObject({
   schemaVersion: z.literal(SCHEMA_VERSION),
   name: z.string().min(1),
@@ -346,6 +366,8 @@ export const Project = z.strictObject({
   theme: z.string().min(1).default('sketch'),
   /** 默认焦点行为（D70）：缺省 = 开启；false = 只按作者写的镜头与提示呈现（config({ autoFocus: false })）。发布站保留。 */
   autoFocus: z.boolean().optional(),
+  voiceConfig: VoiceConfig.optional(),
+  voiceIndex: VoiceIndex.optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),
   /** dev = 含全部方案（本地看板）；publish = 只含选定方案，且去掉创作侧信息（D33）；review = 评审版：全部方案，同样去掉创作侧信息（D63）。 */
@@ -387,3 +409,5 @@ export type Fork = z.infer<typeof Fork>;
 export type Mark = z.infer<typeof Mark>;
 export type Cue = z.infer<typeof Cue>;
 export type Callout = z.infer<typeof Callout>;
+export type VoiceConfig = z.infer<typeof VoiceConfig>;
+export type VoiceIndex = z.infer<typeof VoiceIndex>;

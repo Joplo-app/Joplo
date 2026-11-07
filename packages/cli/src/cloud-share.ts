@@ -17,6 +17,8 @@ export const CONTENT_TYPES: Record<string, string> = {
   '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf',
   '.txt': 'text/plain; charset=utf-8',
+  // 朗读音频（D74，build 写进 voice/）；云端分享契约需同时接受这些类型
+  '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.flac': 'audio/flac', '.m4a': 'audio/mp4', '.aac': 'audio/aac',
 };
 type File = { path: string; sha256: string; size: number; contentType: string };
 const shareId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9]{10}$/.test(v);
@@ -97,6 +99,8 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     // 预览图（嵌入契约 _joplo/preview.png）：作为普通文件进清单，计入总量和新上传字节；失败只提示一行，不让 share 失败
     const preview = await writePreview(render, project, built.outDir, join(staging, 'preview.png'));
     if (!preview.ok) client.warn(`Skipped the preview image (${terminalText(preview.reason).replace(/[\r\n\t]+/g, ' ')}). The share page will use a generic image.`);
+    const voiceLine = voiceSummary(built.voice);
+    if (voiceLine) client.warn(voiceLine);
     const { files, blobs } = await manifest(built.outDir);
     const account = await client.me(accessToken);
     const actualBytes = files.reduce((n, f) => n + f.size, 0), largestFiles = [...files].sort((a, b) => b.size - a.size).slice(0, 5).map(({ path, size }) => ({ path, size }));
@@ -174,4 +178,15 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     const prComment = pr ? readPrComment(final.pr ?? prepared.pr) : undefined;
     return { result: { ...published, embed: embedSnippets(published.url, title), ...(reviewMode === 'review' ? { mode: 'review' as const } : {}), ...(pr ? { pr: prComment ?? null } : {}) }, plan: account.plan };
   } finally { try { await rm(staging, { recursive: true, force: true }); } finally { temporary.release(); } }
+}
+
+/**
+ * 朗读音频（D74）的一行说明：带上了几段、多大；还有几步没有当前声音的音频（观众端这些步骤用浏览器朗读，不阻止分享）。
+ * 没有选用声音供应商时为 null（不打扰）。
+ */
+export function voiceSummary(v: { clips: number; bytes: number; missing: number; profile: string | null } | undefined): string | null {
+  if (!v || !v.profile) return null;
+  const kb = Math.max(1, Math.round(v.bytes / 1024));
+  const head = v.clips ? `Narration: ${v.clips} audio clip(s) from ${v.profile} (${kb} KB) included` : `Narration: no generated audio from ${v.profile} yet`;
+  return v.missing ? `${head}; ${v.missing} step(s) have no audio for the current text and will use the viewer's browser voice. Generate them in the board (Voice → Generate) to include them.` : `${head}.`;
 }

@@ -28,7 +28,7 @@ import { VIEWPORT_SIZE, type Diagnostic } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
 import { boardHash, parseBoardHash, warnUnknownPlayParams, type BoardRoute, type PlayRoute } from '../runtime/route';
-import { ArrowRight, BookOpen, CircleCheck, Smartphone, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch } from 'lucide-react';
+import { ArrowRight, BookOpen, CircleCheck, Smartphone, CircleX, Code, Copy, Film, ImageDown, LayoutGrid, Link, ScanSearch, Volume2, VolumeX } from 'lucide-react';
 import { PlayerPage, useBoardLayout, type MenuEntry } from '../player/PlayerPage';
 import { Btn, Kbd } from '../player/controls';
 import type { ProjectSummary } from '../runtime/dev-client';
@@ -51,6 +51,7 @@ import { themeCatalog } from '../renderer/themes';
 import { ThemeStyles } from '../renderer/ThemeStyles';
 import type { Look } from '../renderer/appearance';
 import { AppearanceButton, AppearancePopover } from './Appearance';
+import { VoiceButton, VoicePopover, VoiceProfilesDialog, useVoice } from './Voice';
 import { effectiveAppearance } from './appearance-model';
 import { loadWenKai } from './font-loading';
 
@@ -278,6 +279,11 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   // 播放速度在切换方案 / 情况 / 场景时保留
   const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', projectId, play: { ...(play.speed ? { speed: play.speed } : {}), ...next } }, replace);
   const resolved = usePlaySync(ctl, snap, project, play, (next) => toPlay(next, true));
+  // 朗读（D74）：播放坞的「声音」按钮 → 浮层 →「管理供应商」对话框
+  const voice = useVoice(projectId, project, snap.optionId, ctl, locale, { scenarioId: snap.scenarioId, position: snap.state?.position ?? 0 });
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceAnchor, setVoiceAnchor] = useState<HTMLButtonElement | null>(null);
+  const [providersOpen, setProvidersOpen] = useState(false);
 
   if (!project) {
     const msg = ir.status === 404 ? translate(ir.error ?? '', i18n) : (ir.error ?? (ir.payload && !ir.payload.ok ? null : i18n.board.compilingProject));
@@ -444,6 +450,8 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             <Smartphone className="size-3.5" aria-hidden />
             {i18n.board.mobilePageDetails(VIEWPORT_SIZE.mobile.width)}</span>
         }
+        voice={<VoiceButton api={voice} open={voiceOpen} onToggle={() => setVoiceOpen((v) => !v)} btnRef={setVoiceAnchor} />}
+        fullscreenVoice={<Btn icon={voice.on ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} label={voice.on ? i18n.player.turnNarrationOff : i18n.player.turnNarrationOn} iconOnly variant="ghost" size={32} selected={voice.on} onClick={() => voice.setOn(!voice.on)} data-testid="fs-voice" />}
         fullscreenActions={<AppearanceButton look={a.saved} catalog={a.catalog} wide={false} open={a.open} onToggle={() => a.setOpen(!a.open)} btnRef={a.setAnchor} variant="ghost" />}
         layer={play.layer ?? null}
         speed={play.speed ?? 1}
@@ -496,6 +504,8 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
                 onOpenEditor={(at) => void openInEditor(projectId, at).then((r) => setFlash(<LocalText value={r.ok ? m.board.openedInEditor(at) : m.board.couldNotOpenEditor(r.message)} />))}
               />
             ) : null}
+            <VoicePopover api={voice} open={voiceOpen} anchor={voiceAnchor} onClose={() => setVoiceOpen(false)} onManage={() => (setVoiceOpen(false), setProvidersOpen(true))} />
+            <VoiceProfilesDialog api={voice} open={providersOpen} onClose={() => setProvidersOpen(false)} canSelect={voice.state?.source !== 'config'} />
             <AppearancePopover open={a.open} anchor={a.anchor} onClose={() => a.setOpen(false)} scope="project" projectId={projectId} configTheme={project.theme ?? 'sketch'} catalog={a.catalog} settings={a.settings} look={a.saved} save={a.save} onPreview={a.setPreview} onFlash={setFlash} copy={copyText} />
           </>
         }

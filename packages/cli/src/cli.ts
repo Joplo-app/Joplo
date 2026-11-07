@@ -186,6 +186,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const data = await buildSite({ projectDir: resolve(dir), outDir: output === undefined ? undefined : resolve(output), overwrite: opts.overwrite });
     for (const d of data.diagnostics) line(diagnosticLine(d));
     line(`Built ${data.outDir} (${data.files.length} files)`);
+    const voice = (await import('./cloud-share.ts')).voiceSummary(data.voice);
+    if (voice) line(voice);
     if (data.diagnostics.some(d => d.severity === 'error')) exitCode = 1;
   });
   // 导出组件（D66）：Playwright + Chromium 装在 JOPLO_HOME 下，不改项目；写演示、dev、check、build、share 都不需要它

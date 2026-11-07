@@ -363,6 +363,8 @@ export function captionLength(s: string): number {
 /** 说明 / explain 的建议上限（超过时 check 报 CAPTION_TOO_LONG / EXPLAIN_TOO_LONG）。 */
 export const CAPTION_MAX = 24;
 export const EXPLAIN_MAX = 48;
+/** 旁白 say() 的建议上限（D74，超过时 check 报 SAY_TOO_LONG）：读出来约 10 秒。 */
+export const SAY_MAX = 80;
 /**
  * 叙事提示（D67，见 docs/research/storytelling-and-demos.md）：
  * - 封面说明（flow 的 description）：D61 定为 30 字以内，超过时 DESCRIPTION_TOO_LONG；

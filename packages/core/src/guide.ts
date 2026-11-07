@@ -210,7 +210,24 @@ Joplo already has the parts of a user story; fill them in that spirit.
 - Cover text: flow({ description }) is the cover sentence, 30 units at most (DESCRIPTION_TOO_LONG). The cover falls back to the feature goal.
 - Rhythm: every short step waits 3 s, so a run of trivial steps feels like a metronome. Merge trivial steps (type, then click) and give key results an explain.
 
-## 6. Before handing over
+## 6. Narration: narrate() is a presenter talking, not the caption read aloud
+When the board or the published site reads a demo aloud, each step reads, in order of preference: narrate() in the narrator's voice; else say(), the character's own line in that role's voice; else the caption in the narrator's voice (cards read title and sub). A caption read aloud sounds like a screen reader, so give the steps that will be heard a narrate() line, written the way a person walks a colleague through a feature. It may later be recorded by a real voice, so write how people speak.
+- Short first: one sentence, two at most, mostly 3–8 seconds. Cut every word the screen already shows; the viewer is watching.
+- Each line does one job: orient (who, where, what we are about to see), point (what to look at now and why it matters), connect (carry the viewer from the last step: 'Now over to Ajie'), or conclude (what this proved).
+- Say what the caption cannot: the intent, the reason, the consequence. Never repeat the caption word for word; name an on-screen label only when the viewer must find it.
+- Spoken sentences: subject first, active voice, one idea each. Commas and periods are the breaths; no brackets, slashes, arrows, emoji, or markdown.
+- Write numbers, money, times, and versions the way they are said in the demo's language ('four hundred sixty' rather than '¥460'; 'version two' rather than 'v2').
+- Transitions carry the story: role switches, time jumps, and closing cards need a line that tells the viewer why we moved.
+- Plain and concrete, not flowery: no metaphors, slogans, or hype. Vivid means specific: real names, amounts, and times.
+- Not every step needs its own line: a trivial step can keep its short caption, and a character's say() can carry a moment ('Count me in!').
+- say() is first person, what the character would really say; narration about the characters goes in narrate().
+- Open with the person and their goal; close with the one to three points, as speech, not a list read aloud. Write in the demo's language.
+Wrong, it reads the interface: .click('share', 'Xiaoyu shares the itinerary', narrate('Click Share to share the itinerary.'))
+Right, it says why: .click('share', 'Xiaoyu shares the itinerary', narrate('She sends it as a link, so Ajie needs no app.'))
+A character speaking: .click('can_go', 'Ajie replies: I can go', say('Count me in!'))
+Check: read every line aloud in order without looking at the screen. It should sound like one person telling one story, briskly.
+
+## 7. Before handing over
 - npx joplo outline: per feature, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
 - npx joplo check: CAPTION_TOO_LONG, EXPLAIN_TOO_LONG, DESCRIPTION_TOO_LONG, CARD_TEXT_TOO_LONG, SCENARIO_TOO_LONG, HAPPY_PATH_ONLY, CASE_NOT_COVERED (names the expected result).
 - Read only the captions from start to end: do they tell the story? Then look only at key frames (npx joplo render --step-id …): does the screen show it without captions?
@@ -350,11 +367,14 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
 - Backend / architecture / logic: Diagram (relationships, grouped by business domain), Sequence (one call chain in time order), StateMachine (a lifecycle). Read npx joplo skill diagram.
 - Layout is automatic and computed at compile time; nodes never move between steps, also when parts appear with when.
 - Use trace('a','b','c') for the a→b→c call; trace.fail marks failure, trace.skip dims what was not called. Do not manually write node/edge state props or use set() to simulate calls; use trace().
-- shot of a Diagram node keeps its parent group (at least the group title) in frame; shot of a UI card keeps its framed container and zooms at most 1.25×. See diagram.
+- shot of a Diagram node keeps its parent group (at least the group title) in frame; shot of a UI card keeps its framed container and zooms at most 1.25×, or more (up to 3×) when its text would be smaller than about 15px on screen, as on a phone layer. See diagram.
 
 ## Captions and fitting one screen
 - Keep captions within about 24 units and explain('Additional note') within about 48. CJK characters count as 1 each; all others count as 0.5; whitespace is ignored. check warns when exceeded.
 - Captions and explain notes appear below the stage, never over it. Tell one thing per step; move long content to an explanation layer. How to write them, and how to plan openings and endings: story.
+- Narration (D74): the board and published site can read each step aloud during autoplay (viewers turn it on with the speaker button). Without say() the caption is read (cards read title and sub; explain is not read), which sounds like a screen reader. narrate('…') gives a step the narrator's spoken line and say('…') a character's own words, both kept apart from the caption (the caption is for the eye and stays short). How to write them: npx joplo skill story (section 6). Autoplay waits for the voice to finish plus a short breath before the next step.
+  Example: .type('email', 'ana@example.com', 'Ana enters the email', narrate('She invites Leo as an editor; the role can change later.')).
+  Voices are set up in the board (Voice → Manage providers; keys stay on this machine). config({ voice: { narrator: 'nova', roles: { leo: 'echo' } } }) picks voices per role; generated audio is bundled by build and share.
 - Autoplay reading time: CJK 8 chars/s (125ms each), Latin 15 non-whitespace chars/s; clamp to 3–7 seconds before 0.5× / 1× / 1.5× scaling. Streams, shots and edge waits can exceed 7 seconds. Shots use 700ms ease-out without overshoot.
 - Do not make viewers scroll through a long page. Fit one screen and zoom into details with shots.
 - Each page has one device, desktop by default. page({ viewport: 'mobile' }, tree) uses a Phone frame at a fixed width of 390.
@@ -517,7 +537,7 @@ Choose by the question: "what is where" → Diagram; "what happens in what order
 ## Frame with shot (what the camera keeps)
 - shot('kernel') frames the node with its parent group; when the whole group would make text too small, it keeps at least the group title. Viewers always see which domain they are in.
 - A trace with several nodes frames all of them and their group titles. shot('g_run') frames a whole domain; shot() returns to the whole layer.
-- UI cards and panels zoom at most 1.25× and keep their framed container (Card, Paper, Modal, Table, AppShell side…) in view, so neighbours stay visible.
+- UI cards and panels zoom at most 1.25× (more, up to 3×, only when their text would be under about 15px on screen, e.g. a phone layer) and keep their framed container (Card, Paper, Modal, Table, AppShell side…) in view, so neighbours stay visible.
 - Want more context? shot the container or group. Want the reader to compare two places? shot both ids in one step.
 - Do not use zoom to read tiny text: if a diagram needs heavy zoom, split it into layers.
 - Point at a part without zooming: spotlight / highlight / callout (see focus). A callout on the framed node's group or a message's participant stays in the shot.
@@ -685,6 +705,9 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - DUPLICATE_ELEMENT: Duplicate element ids within a stage. Change only conflicting ids and update references.
 - CAPTION_TOO_LONG: Shorten the caption to about 24 units: CJK characters count as 1 each, all others as 0.5; whitespace is ignored. One thing per step; move long content to an explanation layer. See demo.
 - EXPLAIN_TOO_LONG: Shorten the explain note to about 48 units, using the same CJK 1 / other 0.5 calculation. Put detailed rationale in a separate explanation layer. See demo.
+- SAY_TOO_LONG / NARRATE_TOO_LONG (warning): a say() or narrate() line over about 80 units (about 10 seconds aloud). Autoplay waits until it is read; say less or split the step.
+- SAY_EMPTY / NARRATE_EMPTY: say() needs the character's words, narrate() the narrator's. Remove it to fall back to the caption.
+- VOICE_CONFIG_INVALID: config({ voice }) takes { profile?, narrator?, roles?: { roleKey: 'voice' } } with non-empty strings. API keys never go in the config.
 - DESCRIPTION_TOO_LONG: flow({ description }) is the scenario cover sentence; keep it within 30 units, one sentence saying what this scenario shows. See story.
 - CARD_TEXT_TOO_LONG (info): a transition card's sub is over 48 units, a point over 24, or more than 4 points. Keep one sentence and a few short points; move details into steps.
 - SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.

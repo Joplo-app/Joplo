@@ -25,10 +25,13 @@ import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
 import type { DistWeb, SourceWeb } from './web-assets.ts';
 import { subsetSiteFonts } from './site-fonts.ts';
+import { joploHome } from './home.ts';
+import { ProfileStore, bundleVoice } from './voice.ts';
 
 /** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。层级、镜头、角色（说话人、过渡卡、层级的 role）与 featureIds 顺序属于演示，保留（D43 / D56 / D61）。 */
 export function publishPayload(project: Project, home: string | null): { project: Record<string, unknown>; home: string | null } {
-  const { rules: _r, cases: _c, issues: _i, ...rest } = project;
+  // voiceConfig（D74）：profile 名与音色属于作者本机的设置，发布站只需要 build 写进的 voiceIndex
+  const { rules: _r, cases: _c, issues: _i, voiceConfig: _v, ...rest } = project;
   const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, { id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick }]));
   const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {} }]));
   const scenarios = Object.fromEntries(
@@ -126,12 +129,18 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
 
   // 2. vite build 到临时目录
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-build-'));
+  let voiceReport: BuildResult['voice'];
   // React 与 plugin-react 依据 NODE_ENV 判断生产构建（测试运行器会把它设为 test）；构建期间强制 production。
   const prevEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   try {
     if (web.mode === 'dist') await stageDistSite(web, projectDir, staging);
     else await buildSourceSite(web, projectDir, staging);
+
+    // 朗读（D74）：当前声音已生成的音频拷进 voice/，IR 带上 voiceIndex；Key 不进产物
+    const voice = bundleVoice(projectDir, project, staging, new ProfileStore(opts.home ?? joploHome()));
+    if (voice.index) inline.project.voiceIndex = voice.index;
+    voiceReport = voice.report;
 
     // 3. 后处理
     const siteHtml = path.join(staging, 'site.html');
@@ -158,6 +167,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     routes: Object.keys(project.routes).sort(),
     scenarios: Object.keys(project.scenarios),
     diagnostics: compiled.diagnostics,
+    ...(voiceReport && (voiceReport.clips || voiceReport.profile) ? { voice: voiceReport } : {}),
   };
 }
 

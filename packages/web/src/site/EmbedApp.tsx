@@ -32,6 +32,7 @@ import { pickTarget } from '../renderer/Stage';
 import { JoploMark } from '../player/JoploMark';
 import { translate } from '../i18n/messages';
 import { useI18n } from '../i18n/context';
+import { SiteVoiceButton, useSiteVoice } from '../player/SiteVoice';
 import { cn } from '@/lib/utils';
 import { authorElement, createReviewBridge, elementLabel, type ReviewBridge, type ReviewGoto } from './review-bridge';
 import { embedInitial, embedKey, embedProgress, embedScenarioItems, fullscreenAvailable, standaloneUrl, type EmbedParams } from './embed-model';
@@ -52,6 +53,8 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
     return c;
   }, [project, init.scenarioId]);
   ctl.i18n = i18n;
+  // 朗读（D74）：嵌入同样默认关（autoplay=1 也不自动出声）
+  const voice = useSiteVoice(ctl, project);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot, ctl.getSnapshot);
   const [covered, setCovered] = useState(init.covered);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -374,6 +377,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
                 <div className="h-full rounded-full bg-jb-accent-press transition-[width] duration-300" style={{ width: `${embedProgress(shown, total) * 100}%` }} />
               </div>
             )}
+            <SiteVoiceButton voice={voice} size={32} testid="embed-voice" />
             {items.length > 1 ? (
               <MenuButton
                 trigger={L.compact ? { icon: <ListVideo className="size-4" /> } : { label: scenario.name, iconOnly: false }}

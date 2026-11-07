@@ -17,3 +17,4 @@ export * from './agent-skill.ts';
 export * from './pace.ts';
 export * from './outline.ts';
 export * from './diagram/index.ts';
+export * from './voice.ts';

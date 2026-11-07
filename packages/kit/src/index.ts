@@ -23,7 +23,14 @@ export type StateInit = { ui?: Record<string, Json>; data?: Record<string, Json>
  * autoFocus（D70）：默认焦点行为（结果揭晓：本步新出现或变化的元素轻轻脉冲一次；进入新的一层时先全景再推近）。
  * 缺省开启；写 false 整体关掉，演示只按作者写的 shot / trace / spotlight 等呈现。
  */
-export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; autoFocus?: boolean; source?: string };
+/**
+ * 朗读（D74）：自动播放时把每一步读出来。都可以不写：不写时看板里选哪个声音来源就用哪个，旁白用它的默认音色。
+ * - profile：本机声音供应商 profile 的名字或 id（看板「声音 → 管理供应商」里保存的，例如 'OpenAI'）；写了就优先于看板里的选择。Key 不写在这里。
+ * - narrator：旁白（系统步骤、过渡卡）的音色，例如 'nova'；
+ * - roles：角色的音色，键是 feature.roles 的键，例如 { xiaoyu: 'shimmer' }；没写的角色用旁白的音色。
+ */
+export type VoiceConfig = { profile?: string; narrator?: string; roles?: Record<string, string> };
+export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; autoFocus?: boolean; voice?: VoiceConfig; source?: string };
 export const config = (c: Omit<ConfigDef, 'kind' | 'source'>): ConfigDef => ({ kind: 'config', ...c, source: callsite() });
 
 export type LayoutDef = { kind: 'layout'; tree: JNode; source?: string };
@@ -124,7 +131,9 @@ export type EffectDef =
   | { kind: 'effect'; type: 'mark'; target: string; kindOf: 'circle' | 'underline' | 'box' | 'arrow'; note?: string }
   | { kind: 'effect'; type: 'cue'; cue: 'spotlight' | 'highlight' | 'number'; targets: string[] }
   | { kind: 'effect'; type: 'callout'; target: string; text: string; side?: CalloutSide }
-  | { kind: 'effect'; type: 'hold'; seconds: number };
+  | { kind: 'effect'; type: 'hold'; seconds: number }
+  | { kind: 'effect'; type: 'say'; text: string }
+  | { kind: 'effect'; type: 'narrate'; text: string };
 
 /** 标注气泡放在目标的哪一侧；不写时自动选画面里放得下的一侧（右、左、下、上）。 */
 export type CalloutSide = 'top' | 'right' | 'bottom' | 'left';
@@ -168,6 +177,28 @@ export const shot = (...targets: string[]): EffectDef => ({ kind: 'effect', type
  *   .system('额度预检', '调用模型之前先预检额度', shot('billing'), explain('额度不足时在这里就拦下，不会产生模型费用'))
  */
 export const explain = (text: string): EffectDef => ({ kind: 'effect', type: 'explain', text });
+
+/**
+ * 旁白（D74）：讲解人用旁白的声音说的话，像在给同事介绍功能，不是把字幕念出来。和字幕分开存。
+ * 朗读的优先级：narrate() > say()（角色台词）> 字幕（过渡卡读标题和副标题）；explain 不读。字幕兜底时也用旁白的声音。
+ * 自动播放会等它读完再进下一步。
+ *
+ * 写法（详见 npx joplo skill story 第 6 节）：
+ * - 一句只做一件事：交代、指点、承接或收束；说字幕说不出的意图、原因、结果，不重复字幕；
+ * - 短：一两句，大多 3–8 秒；能删的字都删掉，画面已经看得到的不用再说；
+ * - 口语：主语在前，用逗号句号断气，不写括号、斜杠、箭头；数字按口语写（“四百六十块”“第二版”）；
+ * - 换人、跳时间、收尾也要一句，告诉观众为什么切过去；平实具体，不用比喻和口号。
+ *   .click('share', '小雨把行程单分享给阿杰', narrate('行程用链接发给阿杰，他不用装 App。'))
+ *   .card('现在是阿杰', { role: 'ajie' }, narrate('换到阿杰这边，他只收到一条消息。'))
+ */
+export const narrate = (text: string): EffectDef => ({ kind: 'effect', type: 'narrate', text });
+
+/**
+ * 角色台词（D74）：这一步里角色亲口说的话，用这个角色的声音读（feature.roles 与层级的 role；没有角色时用旁白的声音）。
+ * 写第一人称、像真人说话：.click('can_go', '阿杰回复：我能去', say('我能去！'))。
+ * 同一步写了 narrate() 时只读旁白。讲解、过渡、总结请用 narrate()。
+ */
+export const say = (text: string): EffectDef => ({ kind: 'effect', type: 'say', text });
 
 // ---------- 焦点与呈现形式（D70）：这一步观众看哪里、用什么形式看 ----------
 // 镜头（shot）负责“取景”：推近、跟随。下面这些只负责“强调”：都不推近镜头；目标不在当前镜头里时，镜头先退回整层。

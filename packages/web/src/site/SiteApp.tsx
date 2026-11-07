@@ -4,6 +4,7 @@ import { useBoardLayout } from '../player/PlayerPage';
 import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/messages';
 import { useI18n } from '../i18n/context';
+import { SiteVoiceButton, useSiteVoice } from '../player/SiteVoice';
 /**
  * 发布站（`joplo build` 的产物，D39 / D33 / D55「发布站 · 观众看到的」）：与本机看板同一套布局、时间线、字幕、全屏和快捷键，只有一个项目。
  * - 首页 `#/`：左栏列功能；右侧是项目名、说明和功能卡片（整张可点，带缩略图）；
@@ -175,6 +176,8 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
   // 播放速度在切换场景时保留
   const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', play: { ...(play.speed ? { speed: play.speed } : {}), ...next } }, replace);
   const resolved = usePlaySync(ctl, snap, snap.project, play, (next) => toPlay(next, true));
+  // 朗读（D74）：默认关，观众点 🔊 才出声
+  const voice = useSiteVoice(ctl, project);
   const feature = project.features[play.featureId];
   if (!snap.project) return null;
   if (!feature || !resolved?.ok)
@@ -207,6 +210,8 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
         },
       ]}
       actions={<Btn iconOnly={!L.topLabels} icon={<Link className="size-4" />} label={i18n.site.copyLink} title={i18n.site.copyLinkToCurrentStep} onClick={() => void copyText(location.href).then((ok) => setFlash(<LocalText value={ok ? m.site.linkCopied : m.site.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="copy-link" />}
+      voice={<SiteVoiceButton voice={voice} />}
+      fullscreenVoice={<SiteVoiceButton voice={voice} size={32} testid="fs-voice" />}
       layer={play.layer ?? null}
       speed={play.speed ?? 1}
       onSpeed={(v) => {

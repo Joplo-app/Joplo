@@ -5,10 +5,12 @@ import { useI18n } from '../i18n/context';
  * - 手机页面：固定 390 宽，套上手机外框（直接复用目录组件 Phone 的 PhoneFrame），按比例放进可用区域。
  * children 接收舞台的逻辑尺寸，传给 Stage（镜头、聚焦小图、适应画面都按它计算）。
  */
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Notice } from '../runtime/demo';
 import { VIEWPORTS, type Viewport } from '../renderer/Stage';
-import { PhoneFrame, phoneFrameSize } from '../renderer/components';
+import { PHONE_BEZEL, PHONE_SAFE, PhoneFrame, phoneFrameSize } from '../renderer/components';
+import { DeviceZoomContext, type DeviceFocus } from '../renderer/camera';
+import { CAMERA_EASE, CAMERA_MS } from '../runtime/pace';
 import { ThemeContext, type StageTheme, type StrokeMode } from '../renderer/rough';
 import { fillStage, fitStage } from './fit';
 import { Ban, CircleArrowRight, CircleCheck, CircleDashed, CircleX, Info, X } from 'lucide-react';
@@ -57,6 +59,20 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   const scale = phone ? fitStage(avail, frame) : fill.scale;
   const size = phone ? { width: vp.width, height: vp.height } : { width: fill.width, height: fill.height };
   const sheet = phone ? fillStage(avail, VIEWPORTS.desktop) : fill;
+  // 手机层推近：镜头报来目标在手机内容里的位置与还需要的放大倍数，整台手机放大、目标移到舞台中央（不超过舞台能放下目标的大小）
+  const [focus, setFocus] = useState<DeviceFocus | null>(null);
+  const onDevice = useCallback((f: DeviceFocus | null) => setFocus(f), []);
+  let deviceZoom = 1;
+  let deviceShift = { x: 0, y: 0 };
+  if (phone && focus) {
+    const fit = Math.min((avail.w - 48) / Math.max(1, focus.w * scale), (avail.h - 48) / Math.max(1, focus.h * scale));
+    deviceZoom = Math.max(1, Math.min(focus.z, fit));
+    if (deviceZoom > 1.02) {
+      const px = (4 + PHONE_BEZEL + PHONE_SAFE.x + focus.x) * scale;
+      const py = (PHONE_BEZEL + PHONE_SAFE.top + focus.y) * scale;
+      deviceShift = { x: -deviceZoom * (px - (frame.width * scale) / 2), y: -deviceZoom * (py - (frame.height * scale) / 2) };
+    } else deviceZoom = 1;
+  }
   // 所有提示（含点错位置的三种）都在画面顶部居中，一条轻提示（D55）
   const view = noticeView(notice, i18n);
   return (
@@ -85,10 +101,16 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
       <div className="absolute inset-0 flex items-center justify-center" inert={curtainUp || undefined}>
         {phone ? (
           <ThemeContext.Provider value={{ theme, stroke, font, registry: null }}>
-            <div data-testid="device-phone">
-              <PhoneFrame width={vp.width} height={vp.height} scale={scale} seed="stage-phone">
-                {children(size)}
-              </PhoneFrame>
+            <div
+              data-testid="device-phone"
+              data-device-zoom={deviceZoom.toFixed(3)}
+              style={{ transform: deviceZoom > 1 ? `translate(${deviceShift.x}px, ${deviceShift.y}px) scale(${deviceZoom})` : undefined, transformOrigin: 'center', transition: `transform ${CAMERA_MS}ms cubic-bezier(${CAMERA_EASE.join(',')})` }}
+            >
+              <DeviceZoomContext.Provider value={onDevice}>
+                <PhoneFrame width={vp.width} height={vp.height} scale={scale} seed="stage-phone">
+                  {children(size)}
+                </PhoneFrame>
+              </DeviceZoomContext.Provider>
             </div>
           </ThemeContext.Provider>
         ) : (

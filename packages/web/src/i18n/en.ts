@@ -25,6 +25,13 @@ export function createEn(locale: Locale = 'en') {
       forkSummary: (labels: string) => ` · Fork: ${labels}`,
       switchScenario: (label: string) => `Switch scenario: ${label}`,
       speedValue: (n: number) => `${number(n, locale)}×`,
+      // D74 narration (shared by board and published site).
+      narration: "Narration",
+      turnNarrationOn: "Turn narration on",
+      turnNarrationOff: "Turn narration off",
+      readingAloud: "Reading aloud",
+      waitingForNarration: "Waiting for the narration to finish",
+      narrationAvailable: "This demo has narration",
       transition: "Transition",
       transitionPrefix: "Transition · ",
       number: (n: number) => number(n, locale),

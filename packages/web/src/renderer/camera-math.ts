@@ -17,6 +17,22 @@ export const MAX_ZOOM = 2;
 /** 界面元素（不是图表里的节点）推近的上限（D69）。 */
 export const UI_MAX_ZOOM = 1.25;
 export const MIN_NODE_PX = 16;
+/** 界面文字在屏幕上至少这么大（px）：手机层、窄窗口里画面被整体缩小时，推近到看得清为止。 */
+export const MIN_UI_PX = 15;
+/** 为看清界面文字而推近的上限。 */
+export const UI_LEGIBLE_MAX = 3;
+
+/**
+ * 界面元素的推近上限：平时 UI_MAX_ZOOM（推近只为引导注意力）；目标的文字在屏幕上小于 MIN_UI_PX 时
+ * （手机外框按舞台高度缩小、窗口很窄），放宽到正好看得清，最多 UI_LEGIBLE_MAX。
+ * fontPx = 目标文字的“内容像素”字号（已含手机外框等内部缩放）；outer = 舞台外层缩放（内容像素 → 屏幕像素）。
+ */
+export function uiMaxZoom(fontPx: number[], outer: number): number {
+  const f = fontPx.filter((x) => Number.isFinite(x) && x > 0);
+  if (!f.length || !(outer > 0)) return UI_MAX_ZOOM;
+  const need = MIN_UI_PX / (Math.min(...f) * outer);
+  return Math.min(UI_LEGIBLE_MAX, Math.max(UI_MAX_ZOOM, need));
+}
 export const NODE_FONT_PX = 14;
 
 export function union(bs: Box[]): Box | null {

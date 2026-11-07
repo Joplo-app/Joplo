@@ -28,9 +28,15 @@ export type BuildOptions = {
    * 缺省 false：只含选定方案，与原来完全一致。
    */
   review?: boolean;
+  /** 本机目录（缺省 JOPLO_HOME 或 ~/.joplo）：读声音供应商 profile（D74）；测试指向临时目录。 */
+  home?: string;
 };
 /** 静态发布站：只含选定方案（compile 的 publish 模式），离线可打开，可直接 `wrangler deploy`。 */
-export type BuildResult = { outDir: string; files: string[]; routes: string[]; scenarios: string[]; diagnostics: Diagnostic[] };
+/**
+ * voice（D74）：带上的朗读音频。clips = 片段数；bytes = 新写入的字节；missing = 当前声音下还没有音频的步骤数（观众端这些步骤用浏览器朗读）；
+ * profile = 选用的声音供应商名。没有选用供应商、也没有音频时省略。
+ */
+export type BuildResult = { outDir: string; files: string[]; routes: string[]; scenarios: string[]; diagnostics: Diagnostic[]; voice?: { clips: number; bytes: number; missing: number; profile: string | null } };
 export declare function buildSite(opts: BuildOptions): Promise<BuildResult>;
 
 export type RenderOptions = {

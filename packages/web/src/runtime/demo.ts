@@ -21,6 +21,8 @@ import { m } from '../i18n/messages';
 import { animate, type AnimationPlaybackControls } from 'motion';
 import { stepDwell, CAMERA_MS } from './pace';
 import { dwellTexts } from '../player/cover-content';
+import { VOICE_BREATH_MS, speakerRoleAt, spokenLine } from '@joplo-app/core';
+import type { Narration, Narrator, NarrationSource } from './voice';
 import { holdMsOf, orderedFeatures, streamsOf, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core';
 import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 
@@ -90,6 +92,11 @@ export type Snapshot = {
    * 任何别的方式改变状态（跳转、上一步、重置、热更新）都清空它，所以跳到某一步时直接显示全文。
    */
   streamAt: { position: number; speed: number } | null;
+  /**
+   * 朗读（D74）：第 position 步正在读（source：音频 / 浏览器朗读）；waiting = 画面停留已到、还在等声音读完。
+   * 读完、被取消（跳转、上一步、手动下一步、停止）时为 null。
+   */
+  narration: { position: number; source: NarrationSource; waiting: boolean } | null;
 };
 
 export const TIMING = {
@@ -138,6 +145,7 @@ export class DemoController {
     paused: false,
     dwell: null,
     streamAt: null,
+    narration: null,
     busy: false,
     activeStep: null,
     ripple: null,
@@ -174,6 +182,9 @@ export class DemoController {
   reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
   i18n: Dictionary = en;
+  /** 朗读（D74）：看板 / 发布站注入；为 null 或未开启时不读。 */
+  narrator: Narrator | null = null;
+  private narrating: Narration | null = null;
 
   constructor(private readonly writer: SelectionWriter | null = null) {}
 
@@ -476,7 +487,14 @@ export class DemoController {
             }));
         const elapsed = Math.max(0, Math.round(performance.now() - this.committedAt));
         this.set({ dwell: { position: index + 1, ms: Math.max(dwell, elapsed), elapsed } });
-        const ok2 = await this.wait(dwell - (performance.now() - this.committedAt), gen, true);
+        // 朗读（D74）：停留 = max(画面停留, 声音读完 + 换气)；画面停够了、声音没读完时标出“在等声音”
+        const ok2 = (await Promise.all([
+          this.wait(dwell - (performance.now() - this.committedAt), gen, true).then((ok) => {
+            if (ok && this.narrating && this.snap.narration && !this.snap.narration.waiting) this.set({ narration: { ...this.snap.narration, waiting: true } });
+            return ok;
+          }),
+          this.waitNarration(gen),
+        ])).every(Boolean);
         if (this.snap.dwell) this.set({ dwell: null });
         if (!ok2) return;
       }
@@ -511,18 +529,58 @@ export class DemoController {
   pause() {
     if (!this.snap.playing || this.snap.paused) return;
     this.anim?.pause();
+    this.narrating?.pause();
     this.set({ paused: true });
   }
 
   resume() {
     if (!this.snap.paused) return;
     this.anim?.play();
+    this.narrating?.resume();
     this.set({ paused: false });
+  }
+
+  /** 停掉当前朗读（人的操作优先：跳转、上一步、手动下一步、停止、关闭声音）。 */
+  stopNarration() {
+    const n = this.narrating;
+    this.narrating = null;
+    n?.cancel();
+    if (this.snap.narration) this.set({ narration: null });
+  }
+
+  /** 读刚提交的这一步（第 position 步，1 起）。 */
+  private narrate(sc: Scenario, position: number) {
+    this.stopNarration();
+    const p = this.snap.project;
+    const step = sc.steps[position - 1];
+    if (!p || !step || !this.narrator?.enabled) return;
+    const line = spokenLine(step, stepCaption(step, this.i18n), speakerRoleAt(p, sc.id, position));
+    const n = this.narrator.speak(line.text, line.role, this.speed);
+    if (!n) return;
+    this.narrating = n;
+    this.set({ narration: { position, source: n.source, waiting: false } });
+    void n.done.then(() => {
+      if (this.narrating !== n) return;
+      this.narrating = null;
+      if (this.snap.narration) this.set({ narration: null });
+    });
+  }
+
+  /**
+   * 等当前朗读读完，再换一口气（VOICE_BREATH_MS，按速度缩放，暂停时不计时）。没有朗读时立刻返回 true；被取消时返回 false。
+   */
+  private async waitNarration(gen: number): Promise<boolean> {
+    const n = this.narrating;
+    if (!n) return gen === this.gen;
+    await Promise.race([n.done, new Promise<void>((r) => this.cancelWaiters.push(r))]);
+    if (gen !== this.gen) return false;
+    return this.wait(VOICE_BREATH_MS, gen);
   }
 
   /** 取消一切正在进行的动画与自动播放；被取消的步骤不会推进状态。 */
   stop() {
     this.gen++;
+    this.stopNarration();
     this.anim?.stop();
     this.anim = null;
     this.inflight = null;
@@ -574,6 +632,8 @@ export class DemoController {
         while (cont && gen === this.gen) {
           const nx = this.nextStep();
           if (!nx || nx.kind !== 'system') break;
+          // 朗读开着时，先读完用户这一步再接系统事件（不截断）
+          if (!(await this.waitNarration(gen))) break;
           cont = await this.runStep(sc, gen, { moveCursor: false });
         }
         if (gen === this.gen) this.set({ busy: false });
@@ -784,6 +844,8 @@ export class DemoController {
       // 推进后，锚定在元素上的就地提示（禁用原因、未覆盖、越序）已过时，关闭它。
       this.committedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
       this.set({ leadFrame: null, state: next, streamAt: stream && streamsOf(sc.steps[st.position]).length ? { position: next.position, speed: this.speed } : null, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
+      // 朗读（D74）：播放提交的一步（自动播放、下一步、点原型）才读；跳转、上一步、热更新不读
+      if (stream) this.narrate(sc, next.position);
       return true;
     } catch (e) {
       this.stop();

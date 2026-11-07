@@ -10,10 +10,10 @@
  * - 自由缩放（T-director2）：opts.user 是用户用滚轮 / 捏合 / 拖动得到的视图；有它时用它，镜头算出的视图（base）照常更新但不应用；
  *   user 变回 null（下一步导演接管、点「适应画面」）时平滑回到 base。
  */
-import { useLayoutEffect, useRef, useState } from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, useState } from 'react';
 import { animate as animateEl, motion } from 'motion/react';
 import { Rough, useStroke } from './rough';
-import { UI_MAX_ZOOM, fitCamera, frameBox, highlightRect, revealScroll, union, visibleRect, type Box, type FrameTarget, type View } from './camera-math';
+import { MIN_UI_PX, UI_LEGIBLE_MAX, fitCamera, uiMaxZoom, frameBox, highlightRect, revealScroll, union, visibleRect, type Box, type FrameTarget, type View } from './camera-math';
 import { CAMERA_EASE, CAMERA_MS } from '../runtime/pace';
 
 export type CameraSpec = {
@@ -78,6 +78,14 @@ const FOCUS_ATTRS = ['data-jfocus', 'data-jfocus-path'] as const;
 export const ESTABLISH_MS = 400;
 
 /**
+ * 手机层推近（D74 反馈）：手机层的镜头只能在手机屏幕里取景，屏幕本身按舞台高度缩小了，文字仍然看不清。
+ * 这时镜头把“目标中心在手机内容里的位置（已含镜头变换）、目标大小、还需要放大多少”报给外层（StageViewport），
+ * 由它把整台手机放大、把目标移到舞台中央。null = 不需要（回到整台手机）。
+ */
+export type DeviceFocus = { x: number; y: number; w: number; h: number; z: number };
+export const DeviceZoomContext = createContext<((f: DeviceFocus | null) => void) | null>(null);
+
+/**
  * opts.establish（D70，默认焦点行为，config({ autoFocus: false }) 关闭）：导演换到另一层、且这一层要推近时，
  * 新画面淡入时先停在整层（不做动画），ESTABLISH_MS 后再平滑推近。没有它时镜头从上一层的视图直接过渡过去（方向随意）。
  * 首次挂载（打开深链接、截图）与静态截图不做。
@@ -97,6 +105,16 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
   const userRef = useRef<View | null>(user);
   userRef.current = user;
   const specKey = spec ? `${spec.key}|${spec.targets.join(',')}` : '';
+  const reportDevice = useContext(DeviceZoomContext);
+  const reportRef = useRef(reportDevice);
+  reportRef.current = reportDevice;
+  const lastDevice = useRef('');
+  const report = (d: DeviceFocus | null) => {
+    const sig = d ? [d.x, d.y, d.w, d.h, d.z].map((n) => Math.round(n * 10)).join(',') : '';
+    if (sig === lastDevice.current) return;
+    lastDevice.current = sig;
+    reportRef.current?.(d);
+  };
 
   const applyTo = (wrap: HTMLElement, v: View, smooth: boolean) => {
     current.current = v;
@@ -157,7 +175,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
         }
       }
     };
-    const measure = (): (CameraView & { els: Element[] }) | null => {
+    const measure = (): (CameraView & { els: Element[]; device?: DeviceFocus | null }) | null => {
       const wr = wrap.getBoundingClientRect();
       const S = wr.width / (wrap.offsetWidth || 1) || 1; // 屏幕像素 / 内容像素（含舞台外层缩放与镜头此刻的缩放，过渡中途也对）
       // 舞台外层缩放（看板按可用区域缩放舞台）：从没有镜头变换的舞台根量，过渡中途也稳定
@@ -225,10 +243,27 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       // 对准图表节点：每个节点“内容像素 → 屏幕像素”的比例，保证主标签在屏幕上 ≥ 16px；只对准界面元素时推近不超过 UI_MAX_ZOOM
       const nodeScales = items.flatMap((i) => (i.nodeScale ? [i.nodeScale] : []));
       const onlyUi = found.every((f) => !/^(Diagram|StateMachine|Sequence)(\.|$)/.test(f.el.getAttribute('data-jtype') ?? ''));
-      const maxZoom = onlyUi ? UI_MAX_ZOOM : undefined;
+      // 界面文字的“内容像素”字号：CSS 字号 × 元素自身的缩放（手机外框等）÷ 内容到屏幕的比例 S
+      const fontOf = (el: Element) => {
+        const he = el as HTMLElement;
+        const own = he.offsetWidth ? el.getBoundingClientRect().width / he.offsetWidth : S;
+        return (parseFloat(getComputedStyle(el).fontSize) || 14) * (own / S);
+      };
+      // 外层（手机放大）的缩放不算进来，否则放大之后这里又会缩回去
+      const zNow = Number(wrap.closest('[data-device-zoom]')?.getAttribute('data-device-zoom') ?? 1) || 1;
+      const outer0 = outer / zNow;
+      const fonts = onlyUi ? found.map((f) => fontOf(f.el)) : [];
+      const maxZoom = onlyUi ? uiMaxZoom(fonts, outer0) : undefined;
       const { k, tx, ty } = fitCamera({ W, H, mode, bbox, nodeScales, bounds, maxZoom });
+      // 镜头推到头了文字还是太小（手机层）：请外层把整台手机放大
+      let device: DeviceFocus | null = null;
+      if (reportRef.current && mode === 'focus' && onlyUi && found.length && !userRef.current) {
+        const need = MIN_UI_PX / (Math.min(...fonts) * outer0 * k);
+        const u = union(found.map((f) => f.box))!;
+        if (need > 1.02) device = { x: tx + k * (u.x + u.w / 2), y: ty + k * (u.y + u.h / 2), w: k * u.w, h: k * u.h, z: Math.min(UI_LEGIBLE_MAX, need) };
+      }
       if (mode === 'focus') hadFocus.current = true;
-      return { k, tx, ty, mode, rects: found.map((f) => ({ id: f.id, box: highlightRect(f.box) })), els: found.map((f) => f.el) };
+      return { k, tx, ty, mode, rects: found.map((f) => ({ id: f.id, box: highlightRect(f.box) })), els: found.map((f) => f.el), device };
     };
     /** 焦点外调暗：标记焦点与它的祖先链；CSS 把祖先链上每一层的其他兄弟元素调暗（index.css）。 */
     const markFocus = (els: Element[]) => {
@@ -257,6 +292,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
           setView({ k: v.k, tx: v.tx, ty: v.ty, mode: v.mode, rects: v.rects });
           last = sig;
         }
+        report(v.device ?? null);
       }
       if (++n < 15) raf = requestAnimationFrame(tick);
       else wrap.dataset.cameraSettled = '1';
@@ -290,6 +326,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       markFocus(v.els);
       setView({ k: v.k, tx: v.tx, ty: v.ty, mode: v.mode, rects: v.rects });
       last = sig;
+      report(v.device ?? null);
     };
     const mo = content && spec.targets.length ? new MutationObserver(() => {
       if (!pending) pending = requestAnimationFrame(remeasure);
@@ -304,6 +341,15 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [specKey, opts.width, opts.height, opts.animate, ...opts.deps]);
+
+  // 离开这一层（换层、换场景）：手机回到整台
+  useLayoutEffect(
+    () => () => {
+      lastDevice.current = '';
+      reportRef.current?.(null);
+    },
+    [],
+  );
 
   return { wrapRef, contentRef, view, current };
 }

@@ -300,3 +300,144 @@ export const onSettings = (cb: (s: BoardSettings) => void) => {
   return () => settingsListeners.delete(cb);
 };
 export const emitSettings = (s: BoardSettings) => settingsListeners.forEach((cb) => cb(s));
+
+// ---------- 朗读（D74）：声音供应商 profile（本机）与项目音频 ----------
+export type VoiceKind = 'openai' | 'elevenlabs' | 'http';
+export type VoiceResponseMode = 'audio' | 'json-base64' | 'json-url';
+/** 与服务端 voice.ts 的 PublicProfile 一致：不含 Key，只有是否已保存、末 4 位、可用的环境变量。 */
+export type VoiceProfileView = {
+  id: string;
+  name: string;
+  kind: VoiceKind;
+  preset?: string;
+  baseUrl: string;
+  model: string;
+  voice: string;
+  response: VoiceResponseMode;
+  path?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  /** 说话风格（OpenAI 兼容接口的 instructions）。 */
+  style?: string;
+  key: { saved: boolean; hint: string | null; env: string | null; envSet: boolean };
+  /** 预设音色（与服务端 VoiceChoice 一致）。 */
+  voices: { id: string; name: string; gender: 'female' | 'male' | 'neutral'; accent?: string; recommended?: boolean }[];
+  removable: boolean;
+};
+export type VoiceProfileInput = Pick<VoiceProfileView, 'name' | 'kind' | 'baseUrl' | 'model' | 'voice' | 'response' | 'path' | 'body' | 'style'>;
+/** 与服务端 voice-http.ts 的 VoiceState 一致。 */
+export type VoiceState = {
+  selected: string | null;
+  source: 'config' | 'board' | null;
+  missing: string | null;
+  profile: VoiceProfileView | null;
+  voices: { narrator: string | null; roles: Record<string, string> };
+  narrator: string | null;
+  roles: Record<string, string>;
+  clips: Record<string, string>;
+  failures: Record<string, { stepId: string; message: string }>;
+  generating: { done: number; total: number; failed: number } | null;
+};
+export type VoiceTestResult = { ok: true; audio: string; bytes: number; contentType: string } | { ok: false; message: Text; code?: string; hint?: { response: VoiceResponseMode; path: string } };
+
+type ErrBody = { error?: { message?: string; code?: string; hint?: { response: VoiceResponseMode; path: string } } } | null;
+
+export async function fetchVoiceProfiles(): Promise<VoiceProfileView[] | { error: Text }> {
+  try {
+    const res = await fetch('/__joplo/voice/profiles', { cache: 'no-store' });
+    if (!res.ok) return { error: await readError(res) };
+    return ((await res.json()) as { profiles: VoiceProfileView[] }).profiles;
+  } catch (e) {
+    return { error: errMsg(e) };
+  }
+}
+
+/** 保存 profile；id 为 null 时新建。key：undefined = 不改，null = 删掉保存的 Key。 */
+export async function saveVoiceProfile(id: string | null, profile: VoiceProfileInput, key?: string | null): Promise<{ ok: true; profile: VoiceProfileView; profiles: VoiceProfileView[] } | { ok: false; message: Text }> {
+  try {
+    const res = await post(`/__joplo/voice/profiles/${id ? enc(id) : 'new'}`, { profile, ...(key !== undefined ? { key } : {}) }, 'PUT');
+    const b = (await res.json().catch(() => null)) as ({ profile?: VoiceProfileView; profiles?: VoiceProfileView[] } & NonNullable<ErrBody>) | null;
+    return res.ok && b?.profile && b.profiles ? { ok: true, profile: b.profile, profiles: b.profiles } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, message: errMsg(e) };
+  }
+}
+
+/** 删除自建的 profile；预设恢复默认。 */
+export async function deleteVoiceProfile(id: string): Promise<{ ok: true; profiles: VoiceProfileView[] } | { ok: false; message: Text }> {
+  try {
+    const res = await post(`/__joplo/voice/profiles/${enc(id)}`, undefined, 'DELETE');
+    const b = (await res.json().catch(() => null)) as ({ profiles?: VoiceProfileView[] } & NonNullable<ErrBody>) | null;
+    return res.ok && b?.profiles ? { ok: true, profiles: b.profiles } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, message: errMsg(e) };
+  }
+}
+
+/** 试读一句：传已保存的 id，或表单草稿（profile + 可选的 key）。 */
+export async function testVoiceProfile(body: { id?: string; profile?: VoiceProfileInput; key?: string; text?: string }): Promise<VoiceTestResult> {
+  try {
+    const res = await post('/__joplo/voice/test', body);
+    const b = (await res.json().catch(() => null)) as ({ ok?: boolean; audio?: string; bytes?: number; contentType?: string } & NonNullable<ErrBody>) | null;
+    if (res.ok && b?.ok && b.audio) return { ok: true, audio: b.audio, bytes: b.bytes ?? 0, contentType: b.contentType ?? '' };
+    return { ok: false, message: b?.error?.message ?? `HTTP ${res.status}`, ...(b?.error?.code ? { code: b.error.code } : {}), ...(b?.error?.hint ? { hint: b.error.hint } : {}) };
+  } catch (e) {
+    return { ok: false, message: errMsg(e) };
+  }
+}
+
+export async function fetchVoiceState(projectId: string): Promise<VoiceState | null> {
+  try {
+    const res = await fetch(`/__joplo/p/${enc(projectId)}/voice`, { cache: 'no-store' });
+    return res.ok ? ((await res.json()) as VoiceState) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 看板里选用的 profile（null = 只用浏览器朗读）。 */
+export async function selectVoiceProfile(projectId: string, profileId: string | null): Promise<{ ok: true; state: VoiceState } | { ok: false; message: Text }> {
+  try {
+    const res = await post(`/__joplo/p/${enc(projectId)}/voice`, { profileId }, 'PUT');
+    const b = (await res.json().catch(() => null)) as (VoiceState & NonNullable<ErrBody>) | null;
+    return res.ok && b && 'clips' in b ? { ok: true, state: b } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, message: errMsg(e) };
+  }
+}
+
+export type VoiceSegment = { stepId: string; text: string; role: string | null };
+export type VoiceSummary = { total: number; generated: number; skipped: number; failed: { stepId: string; message: string }[]; noProfile?: boolean };
+
+/** 生成缺的音频（进度通过 joplo:voice 推送）。 */
+export async function generateVoice(projectId: string, locale: Locale, segments: VoiceSegment[]): Promise<{ ok: true; summary: VoiceSummary; state: VoiceState } | { ok: false; message: Text }> {
+  try {
+    const res = await post(`/__joplo/p/${enc(projectId)}/voice/generate`, { locale, segments });
+    const b = (await res.json().catch(() => null)) as ({ summary?: VoiceSummary; state?: VoiceState } & NonNullable<ErrBody>) | null;
+    return res.ok && b?.summary && b.state ? { ok: true, summary: b.summary, state: b.state } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, message: errMsg(e) };
+  }
+}
+
+/** 订阅某个项目的朗读状态（选用、生成进度、新音频）。 */
+export function subscribeVoice(projectId: string, cb: (s: VoiceState) => void): () => void {
+  const h = hot();
+  if (!h) return () => undefined;
+  const handler = (d: { projectId: string; state: VoiceState }) => {
+    if (d.projectId === projectId) cb(d.state);
+  };
+  h.on('joplo:voice', handler);
+  return () => h.off('joplo:voice', handler);
+}
+
+/** 边放边生成一段（D74）：已有就直接返回；同一段并发只生成一次。 */
+export async function requestClip(projectId: string, locale: Locale, segment: VoiceSegment): Promise<{ ok: true; url: string; key: string } | { ok: false; message: Text }> {
+  try {
+    const res = await post(`/__joplo/p/${enc(projectId)}/voice/clip`, { locale, segment });
+    const b = (await res.json().catch(() => null)) as ({ url?: string; key?: string } & NonNullable<ErrBody>) | null;
+    return res.ok && b?.url && b.key ? { ok: true, url: b.url, key: b.key } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, message: errMsg(e) };
+  }
+}

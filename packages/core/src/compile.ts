@@ -70,6 +70,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     theme: src.config.theme ?? 'sketch',
     // 默认焦点行为（D70）：只有作者写了才进 IR（缺省 = 开启），不用这个开关的项目 IR 不变
     ...(typeof src.config.autoFocus === 'boolean' ? { autoFocus: src.config.autoFocus } : {}),
+    // 朗读配置（D74）：只有作者写了才进 IR；build 用它决定带哪些音频，写进站点前由 publishPayload 去掉
+    ...(voiceConfigOf(src.config.voice) ? { voiceConfig: voiceConfigOf(src.config.voice) } : {}),
     themes: { ...(src.themes ?? {}) },
     mode,
     routes: {},
@@ -219,6 +221,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     return { id: sceneId, optionId: ctx?.qid ?? null, route: route.path, name: `${page.title}${ctx ? ` · ${ctx.def.name}` : ''}`, viewport: page.viewport ?? 'desktop', root };
   };
 
+  if (src.config.voice !== undefined && !voiceConfigOf(src.config.voice, true))
+    err('VOICE_CONFIG_INVALID', `config({ voice }) must be { profile?: string, narrator?: string, roles?: { [roleKey]: string } } with non-empty strings; got ${JSON.stringify(src.config.voice)}`, src.config.source ?? `${src.config.file}:1:1`);
   if (src.config.autoFocus !== undefined && typeof src.config.autoFocus !== 'boolean')
     err('AUTOFOCUS_INVALID', `config({ autoFocus }) must be true or false (default true); got ${JSON.stringify(src.config.autoFocus)}`, src.config.source ?? `${src.config.file}:1:1`);
   // 主题（D51）：config.theme 必须是内置主题或 themes/<name>.css
@@ -397,6 +401,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const effects: Step['effects'] = [];
         const ruleIds: string[] = [];
         const explains: string[] = [];
+        const says: string[] = [];
+        const narrates: string[] = [];
         const traces: Trace[] = [];
         const forks: Step['forks'] = [];
         const marks: Step['marks'] = [];
@@ -415,7 +421,13 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           else if (e.type === 'stream') effects.push({ type: 'stream', path: e.path, value: e.value });
           else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
           else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold') continue; // 镜头与焦点提示不是状态变化，下面单独归类
-          else if (e.type === 'explain') {
+          else if (e.type === 'say') {
+            if (typeof e.text === 'string' && e.text.trim()) says.push(e.text.trim());
+            else err('SAY_EMPTY', 'say() needs the line the character speaks, for example say(\'I can make it!\'). Remove it to read the caption instead', st.source);
+          } else if (e.type === 'narrate') {
+            if (typeof e.text === 'string' && e.text.trim()) narrates.push(e.text.trim());
+            else err('NARRATE_EMPTY', 'narrate() needs the narrator\'s words, for example narrate(\'She sends Ajie the plan as a link, so he needs no app.\'). Remove it to read say() or the caption instead', st.source);
+          } else if (e.type === 'explain') {
             if (e.text.trim()) explains.push(e.text.trim());
           } else if (e.type === 'trace') {
             const t = resolveTrace(e.ids, e.mode, st.source);
@@ -551,6 +563,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           ...(cues.length ? { cues } : {}),
           ...(callouts.length ? { callouts } : {}),
           ...(holdMs !== undefined ? { hold: holdMs } : {}),
+          ...(says.length ? { say: says.join(' ') } : {}),
+          ...(narrates.length ? { narrate: narrates.join(' ') } : {}),
           ...(st.source ? { source: rel(st.source) } : {}),
         };
       });
@@ -1040,3 +1054,27 @@ function stripNotes(n: SceneNode): void {
   for (const c of n.children ?? []) stripNotes(c);
 }
 
+/**
+ * config({ voice }) 规整（D74）：去掉空白，空对象视为没写。strict = true 时形状不对返回 null（报 VOICE_CONFIG_INVALID）。
+ */
+function voiceConfigOf(v: unknown, strict = false): { profile?: string; narrator?: string; roles?: Record<string, string> } | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== 'object' || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const str = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim() : null);
+  for (const k of Object.keys(o)) if (!['profile', 'narrator', 'roles'].includes(k)) return null;
+  if (o.profile !== undefined && !str(o.profile)) return null;
+  if (o.narrator !== undefined && !str(o.narrator)) return null;
+  let roles: Record<string, string> | undefined;
+  if (o.roles !== undefined) {
+    if (!o.roles || typeof o.roles !== 'object' || Array.isArray(o.roles)) return null;
+    roles = {};
+    for (const [k, val] of Object.entries(o.roles as Record<string, unknown>)) {
+      const s = str(val);
+      if (!s) return null;
+      roles[k] = s;
+    }
+  }
+  const out = { ...(str(o.profile) ? { profile: str(o.profile)! } : {}), ...(str(o.narrator) ? { narrator: str(o.narrator)! } : {}), ...(roles && Object.keys(roles).length ? { roles } : {}) };
+  return Object.keys(out).length ? out : strict ? out : null;
+}

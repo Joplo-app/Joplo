@@ -1,6 +1,6 @@
 import { orderedFeatures } from './features.ts';
 import { Project, type SceneNode } from './schema.ts';
-import { CAPTION_MAX, CARD_POINTS_MAX, DESCRIPTION_MAX, EXPLAIN_MAX, INTERACTIVE_TYPES, SCENARIO_MS_MAX, captionLength } from './catalog.ts';
+import { CAPTION_MAX, CARD_POINTS_MAX, DESCRIPTION_MAX, EXPLAIN_MAX, SAY_MAX, INTERACTIVE_TYPES, SCENARIO_MS_MAX, captionLength } from './catalog.ts';
 import { scenarioEstimateMs } from './outline.ts';
 import { walkNodes, findNode, replay } from './player.ts';
 import { JoploError, type Diagnostic } from './result.ts';
@@ -163,6 +163,11 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         if (st.explain) {
           const el = captionLength(st.explain);
           if (el > EXPLAIN_MAX) emit('warning', 'EXPLAIN_TOO_LONG', `explain note length is ${el} units (recommended maximum: ${EXPLAIN_MAX}; CJK characters count as 1 each, all others as 0.5; whitespace is not counted). Move long content to a separate explanation layer, for example layers: { why: layer('Design rationale', <Why />) }, then switch to it with shot`, at, r);
+        }
+        // 朗读（D74）：一段大约 SAY_MAX 个“字”读出来约 10 秒，再长观众会等得不耐烦
+        for (const [fn, code, text] of [['say', 'SAY_TOO_LONG', st.say], ['narrate', 'NARRATE_TOO_LONG', st.narrate]] as const) {
+          const sl = text ? captionLength(text) : 0;
+          if (sl > SAY_MAX) emit('warning', code, `${fn}() is ${sl} units (recommended maximum: ${SAY_MAX}, about 10 seconds read aloud; CJK characters count as 1 each, all others as 0.5). Autoplay waits until it is read, so say less or split the step`, at, r);
         }
       }
     }

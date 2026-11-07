@@ -14,3 +14,5 @@ export * from '../../../core/src/pace.ts';
 /** 图表的结构与渲染辅助（D69）：纯函数；布局已在编译期写进 IR，这里不含 ELK。 */
 export * from '../../../core/src/diagram/index.ts';
 export * from '../../../core/src/focus.ts';
+/** 朗读（D74）：读什么、谁来读、音频片段的键，纯函数。 */
+export * from '../../../core/src/voice.ts';

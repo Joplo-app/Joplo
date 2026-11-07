@@ -34,7 +34,7 @@ import { JoploLogo } from './JoploMark';
 import { Overlay } from './Overlay';
 import { StageViewport } from './StageViewport';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from '../renderer/appearance';
-import { PanelLeftOpen } from 'lucide-react';
+import { AudioLines, PanelLeftOpen } from 'lucide-react';
 import { Btn, DirectorTag, Kbd, MenuButton, Segmented, Switch, useWidth, type MenuEntry } from './controls';
 import { SHORTCUTS } from './states';
 import { fullscreenBarCollapse } from './controls-fit';
@@ -236,7 +236,7 @@ function CompactTimeline({ snap, scenario, ctl }: { snap: Snapshot; scenario: Sc
 }
 
 /** 播放坞：⟲ ‹ 播放 › │ 时间线 │ 速度 ▾ · 缩放 − 适应 +。 */
-function Dock({ snap, scenario, ctl, speed, onSpeed, L, zoom }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; speed: number; onSpeed?: (v: number) => void; L: BoardLayout; zoom: ReactNode }) {
+function Dock({ snap, scenario, ctl, speed, onSpeed, L, zoom, voice }: { snap: Snapshot; scenario: Scenario | null; ctl: DemoController; speed: number; onSpeed?: (v: number) => void; L: BoardLayout; zoom: ReactNode; voice?: ReactNode }) {
   const { t: i18n } = useI18n();
 
   const off = !scenario || snap.view !== 'stage';
@@ -247,6 +247,7 @@ function Dock({ snap, scenario, ctl, speed, onSpeed, L, zoom }: { snap: Snapshot
       <Divider />
       {scenario ? L.compactTimeline ? <CompactTimeline snap={snap} scenario={scenario} ctl={ctl} /> : <Timeline snap={snap} scenario={scenario} ctl={ctl} currentW={L.currentStepW} /> : <div className="flex-1" />}
       <Divider />
+      {voice}
       {onSpeed ? <MenuButton trigger={{ label: i18n.player.speedValue(speed), iconOnly: false }} label={i18n.player.autoplaySpeed(speed)} testid="speed" items={speedItems(speed, onSpeed, i18n)} placement="top-end" variant="ghost" size={34} width={120} className="rounded-[8px] px-2.5 font-jb-mono text-[13px] font-semibold" /> : null}
       {zoom}
     </div>
@@ -447,6 +448,10 @@ export type PlayerPageProps = {
   exportBadge?: ReactNode;
   /** 全屏控制胶囊里、退出按钮之前的操作（看板：外观）。 */
   fullscreenActions?: ReactNode;
+  /** 朗读（D74）：播放坞里速度之前的声音按钮（看板：开关 + 浮层；发布站：开关）。 */
+  voice?: ReactNode;
+  /** 全屏控制胶囊里的声音按钮（只是开关）。 */
+  fullscreenVoice?: ReactNode;
   /** 手机页面时画面左上角的标注（看板传入“手机页面 · 390 宽 · 外框由画面自动加上”，给作者看，只在检查时显示；发布站不传）。 */
   deviceTag?: ReactNode;
 };
@@ -699,7 +704,7 @@ export function PlayerPage(p: PlayerPageProps) {
         <div ref={barRowRef} className="relative flex h-16 shrink-0 items-center justify-center px-6">
           {scenario ? (
             <div className={cn('flex max-w-full justify-center transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')} data-visible={idle.visible ? '' : undefined} onMouseMove={idle.poke}>
-              <FullscreenBar snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} layers={useCam ? layers : []} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} onDirector={toggleDirector} onExit={toggleFull} avail={barRowW - 48 - (barRowW >= 1280 ? 2 * 300 : 0)} actions={p.fullscreenActions} />
+              <FullscreenBar snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} layers={useCam ? layers : []} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} onDirector={toggleDirector} onExit={toggleFull} avail={barRowW - 48 - (barRowW >= 1280 ? 2 * 300 : 0)} actions={p.fullscreenVoice || p.fullscreenActions ? <>{p.fullscreenVoice}{p.fullscreenActions}</> : undefined} />
             </div>
           ) : null}
           {/* 快捷键提示（宽屏时在右侧，随控制条一起淡出） */}
@@ -789,10 +794,10 @@ export function PlayerPage(p: PlayerPageProps) {
             {/* 舞台框：画面和字幕合成一体（1.5px 墨线，圆角 10）；字幕区跟随舞台主题 */}
             <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface', hasLayerBar && 'rounded-tl-none')} data-testid="stage-frame" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
               {stageArea}
-              {scenario ? <SubtitleSlot content={subtitle} theme={p.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} explainInTip={L.explainInTip} /> : null}
+              {scenario ? <SubtitleSlot content={subtitle} theme={p.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} explainInTip={L.explainInTip} narration={snap.narration} /> : null}
             </div>
           </div>
-          <Dock snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} L={L} zoom={dockZoom} />
+          <Dock snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} L={L} zoom={dockZoom} voice={p.voice} />
         </main>
       </div>
       {p.drawer}
@@ -802,12 +807,21 @@ export function PlayerPage(p: PlayerPageProps) {
 }
 
 /** 字幕区：< 900 时 explain 收进悬停（字幕区仍只读 --jp-*）。 */
-function SubtitleSlot({ content, theme, font, explainInTip, onFork }: { content: ReturnType<typeof subtitleFor>; theme: StageTheme; font: AppearanceFont | null; explainInTip: boolean; onFork: (fork: import('@joplo-app/core').Fork) => void }) {
+function SubtitleSlot({ content, theme, font, explainInTip, onFork, narration }: { content: ReturnType<typeof subtitleFor>; theme: StageTheme; font: AppearanceFont | null; explainInTip: boolean; onFork: (fork: import('@joplo-app/core').Fork) => void; narration?: Snapshot['narration'] }) {
+  const { t: i18n } = useI18n();
   const hidden = explainInTip && content?.explain ? content.explain : null;
   const [tip, tipNode] = useTip(hidden, { placement: 'top-start' });
+  // 朗读（D74）：正在读这一步时右上角一个小喇叭；画面停够了还在等声音时写明
+  const reading = narration && content && narration.position === content.index ? narration : null;
   return (
-    <div {...tip} className="shrink-0" data-testid="subtitle-slot">
+    <div {...tip} className="relative shrink-0" data-testid="subtitle-slot">
       <Subtitle content={hidden && content ? { ...content, explain: null, explainLines: 0 } : content} theme={theme} font={font} onFork={onFork} framed divider />
+      {reading ? (
+        <span className="pointer-events-none absolute left-3 top-1/2 inline-flex h-7 -translate-y-1/2 items-center gap-1.5 rounded-full border-[1.5px] border-jb-ink bg-jb-selected px-2.5 font-jb text-[13px] font-semibold text-jb-fg shadow-sm" data-testid="narrating" data-waiting={reading.waiting ? '1' : undefined} aria-live="polite">
+          <AudioLines className="size-4 animate-pulse" aria-hidden />
+          <span>{reading.waiting ? i18n.player.waitingForNarration : i18n.player.readingAloud}</span>
+        </span>
+      ) : null}
       {tipNode}
     </div>
   );
