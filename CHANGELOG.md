@@ -1,6 +1,6 @@
 # 更新日志
 
-## 未发布
+## 0.2.10
 
 - 新增导演模式朗读：自动播放时把每一步读出来，并等声音读完再进下一步。默认用浏览器朗读，不用配置；看板里可以接入 OpenAI、ElevenLabs、AiHubMix 或任何 OpenAI 兼容接口（自定义 Base URL 与返回格式），Key 只存在本机。
 - 新增 `narrate()`（旁白）与 `say()`（角色台词），和字幕分开写；`npx joplo skill story` 增加旁白写法。
