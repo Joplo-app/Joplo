@@ -1,5 +1,10 @@
 # 更新日志
 
+## 0.2.9
+
+- 官方 Agent 技能和 `npx joplo skill story` 明确 Joplo 的定位：用可视化和动画演示产品功能，不是做 PPT；增加功能、后端架构、方案对比、状态生命周期四组反例与正例，以及“幻灯片版 / 产品版”的 TSX 对照。
+- 发布改由 GitHub Actions 自动完成，npm 包通过 Trusted Publishing 发布并附带 provenance。
+
 ## 0.2.8
 
 - 新增 `joplo outline`，集中查看功能目标、角色、情况覆盖、场景结构与估算播放时长；增加叙事质量和高优先级缺口提示。
