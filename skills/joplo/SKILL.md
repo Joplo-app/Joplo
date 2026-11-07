@@ -47,4 +47,4 @@ Every step is an action on the product and a visible change it causes. If a step
 Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, focus, diagram, components, cases, check, selection, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.
 After the user Alt+clicks a board element, run npx joplo selection and edit only that location.
 Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.10 sha256:1a3dcbd5fb695ce7e534170718cb07a253e5d79e81ae4d7f1090d44ebbb73916 -->
+<!-- joplo-skill 0.2.11 sha256:1a3dcbd5fb695ce7e534170718cb07a253e5d79e81ae4d7f1090d44ebbb73916 -->
