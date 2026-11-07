@@ -156,7 +156,9 @@ npx joplo build
 - `--out-dir <dir>`：默认项目 dist；显式相对路径按命令当前目录解析。
 - `--overwrite`：确认原产物可清空后允许重建非空目录；不允许清空项目自身、上级目录或 `.joplo/`。
 
-产物是可离线打开的静态站，含场景、字幕、层级、镜头、调用链与主题，去掉规则、情况、问题、备注及源位置。界面与本地演示页共用布局。部署见 publish 主题；发布站边界见[看板文档](web.md#发布站)。
+产物是可离线打开的静态站，含场景、字幕、层级、镜头、调用链与主题，去掉规则、情况、问题、备注及源位置。
+
+朗读（D74）：选用了声音供应商时，当前声音已生成的音频拷进 `voice/`（同一步、同一声音、同一语言只带最新一段），IR 带上 `voiceIndex`；Key 和 `voice` 配置都不进产物。输出多一行 `Narration: N audio clip(s) from <供应商> (… KB) included`；还有步骤没有当前文字的音频时一并说明，这些步骤在发布站用观众浏览器朗读，不影响构建。没有选用供应商时不输出这一行。音频在看板里生成（见[看板文档](web.md#朗读d74)）。界面与本地演示页共用布局。部署见 publish 主题；发布站边界见[看板文档](web.md#发布站)。
 
 ## render
 
@@ -264,7 +266,8 @@ npx joplo share --new
 
 - 未登录：交互终端显示“Sharing requires a free Joplo account”，直接进入浏览器登录，完成后继续发布；非交互环境（包含 --format json、有效 CI 环境变量、JOPLO_NONINTERACTIVE=1）立即返回 AUTH_REQUIRED（退出 3），提示用户运行 `npx joplo login`。
 - 先 check，再复用 build 构建到临时目录；结束时清理临时产物，不改项目 dist。检查或构建有 error 时不上传。
-- 只接受 HTML、CSS、JS/MJS、JSON、PNG/JPEG/GIF/WebP/SVG、WOFF/WOFF2/TTF；路径必须安全。其他类型会在上传前列出并拒绝。
+- 只接受 HTML、CSS、JS/MJS、JSON、PNG/JPEG/GIF/WebP/SVG、WOFF/WOFF2/TTF、TXT，以及朗读音频 MP3/WAV/OGG/FLAC/M4A/AAC（D74，需要云端分享契约同时放开）；路径必须安全。其他类型会在上传前列出并拒绝。
+- 朗读音频随 build 进入上传清单，按内容去重，计入清单总量与新上传量；构建后 stderr 打印与 build 相同的 `Narration: …` 一行。缺音频的步骤只提示、不阻止分享。
 - 默认标题是项目名；`--title` 接受 1–200 个字符。套餐和限额实时读取服务器。
 - `maxUploadBytes` 限制本次缺失对象的新上传量（免费 20 MiB、Pro 100 MiB）；`maxTotalBytes` 限制清单总量（256 MiB），`maxFiles` 限制文件数（2000）。实际数值以 me 为准。
 - CLI 本地只预检清单总量和文件数；新上传量由服务端按已有 blob 去重后判断，不能拿清单总量与新上传限额比较。共用字体和运行时资源可由运维预置。

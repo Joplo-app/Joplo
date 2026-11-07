@@ -40,8 +40,8 @@ export default option({
         done('声音和画面一起播完，没有一句被截断')),
 
     voice_longer: flow('旁白比字幕长', { cases: ['voice_longer'], start: '/', state: { ui: atStep1() }, expected: '画面停留结束后继续等声音，换气后再走；暂停、手动下一步都听人的' })
-      .card('旁白比字幕长的时候', { sub: '作者用 say() 给第 2 步写了更完整的口播' })
-      .system('say() 写法', '字幕给眼睛，say() 给耳朵', shot('a_flow'), uses('say_separate'))
+      .card('旁白比字幕长的时候', { sub: '作者用 narrate() 给第 2 步写了更完整的旁白' })
+      .system('narrate() 写法', '字幕给眼睛，旁白给耳朵', shot('a_flow'), uses('say_separate'))
       .system('第 2 步开始', '字幕和旁白同时开始', ...inner.s2(), ...speak(20), set(ui.textPct, 35), set(ui.paceState, 'reading'), shot('pace'))
       .system('画面停留结束', '3 秒到了，声音才读到一半多', set(ui.textPct, 100), set(ui.voicePct, 58), set(ui.paceState, 'text_done'), highlight('p_text'))
       .system('等声音', '不切走，接着等声音', set(ui.paceState, 'waiting'), set(ui.voice, 'waiting'), set(ui.voicePct, 72), highlight('p_voice'), uses('wait_voice'))
@@ -52,7 +52,7 @@ export default option({
       .click('b_next', '手动下一步：当前声音立刻停', set(ui.voice, 'textwait'), set(ui.voicePct, 100), set(ui.playLabel, '▶ 重播'), set(ui.stepText, '已播完'), callout('b_next', '人的操作优先'),
         done('声音读完才走；暂停和手动下一步都听人的')),
 
-    profile: flow('在看板里接入公司的语音网关', { cases: ['profile'], start: '/', state: { ui: { ...initialUi(), voiceIcon: '🔊', voice: 'ready' } }, expected: '在看板里新建 profile：自定义 Base URL，按测试提示配好返回格式；保存后选中并生成声音，Key 只在本机' })
+    profile: flow('在看板里接入公司的语音网关', { cases: ['profile'], start: '/', state: { ui: { ...initialUi(), voiceIcon: '🔊', voice: 'ready' } }, expected: '在看板里新建 profile：自定义 Base URL，按测试提示配好返回格式；保存后直接播放、边放边生成，Key 只在本机' })
       .card('接入公司自己的语音网关', { sub: '接口兼容 OpenAI，但地址不同，返回的是 JSON' })
       .click('b_voice', '林舟打开声音设置', set(ui.voiceOpen, true))
       .click('b_v_manage', '打开「管理供应商」', set(ui.voiceOpen, false), set(ui.profilesOpen, true))
@@ -65,10 +65,10 @@ export default option({
       .type('m_path', 'data.audio', '填音频字段的路径')
       .click('m_test', '再测一次：读出来了', set(ui.testState, 'ok'), highlight('m_ok'))
       .click('m_save', '保存，并选中这个 profile', set(ui.profilesOpen, false), set(ui.voiceOpen, true), set(ui.engine, 'provider'), set(ui.genStatus, '3 段待生成'), set($.inputs.b_v_profile, '公司网关'), shot('b_root'))
-      .click('b_v_gen', '生成这个场景的 3 段声音', set(ui.generating, true), set(ui.genPct, 30), set(ui.genStatus, '正在生成 1/3'))
-      .system('逐段合成', '用本机的 Key 请求公司网关', trace('key', 'gen', 'prov'), shot('arch'))
-      .system('存进缓存', '生成好了，分享时一起上传', trace('prov', 'files'), set(ui.generating, false), set(ui.genPct, 100), set(ui.genStatus, '3/3 已生成 · 共 11 秒'), set(ui.genButton, '重新生成'),
-        done('公司网关接好了，3 段声音已生成')),
+      .click('b_play', '直接播放，不用先生成', set(ui.voiceOpen, false), ...inner.s1(), ...speak(30, '公司网关 · marin'), set(ui.playLabel, '⏸ 暂停'), shot('b_root'), spotlight('b_sub'))
+      .system('边放边生成', '播到这一步才生成这一段', shot('arch'), trace('key', 'gen', 'prov'))
+      .system('顺手预取', '后面几步提前生成好', trace('prov', 'files'), set(ui.genStatus, '3/3 已生成 · 共 11 秒'), set(ui.genButton, '重新生成'),
+        done('接好就能播，声音边放边生成')),
 
     gen_fail: flow('生成失败', { cases: ['gen_fail'], start: '/', state: { ui: providerReady(), inputs: profileInputs }, outcome: 'success', mock: '模拟供应商限流', expected: '失败的那一步改用浏览器朗读，不静音也不卡住；check 也提示重试' })
       .card('供应商出错，演示照样能放', { sub: '林舟生成声音时，供应商限流了' })

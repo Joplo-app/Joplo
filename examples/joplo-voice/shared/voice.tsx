@@ -2,7 +2,7 @@
  * 导演模式朗读（TTS）的画面：
  * - board：林舟的本地看板（被演示的是“邀请成员”原型），字幕区下方有朗读状态，播放控制右侧是声音浮层；
  * - pace：一步里“文字停留”和“声音”两条时间线，用来讲清楚“声音没读完就不切走”；
- * - author：作者电脑（joplo.config.ts、say() 写法、终端）；
+ * - author：作者电脑（joplo.config.ts、narrate() / say() 写法、终端）；
  * - arch：声音从哪里来（浏览器朗读 / 提前生成的音频；Key 只在本机）；
  * - site：观众在发布站看到的播放器（默认静音，点 🔊 开声音）。
  * 所有层共享同一份状态，由场景步骤驱动。
@@ -100,7 +100,7 @@ const VoicePanel = () => (
       <Text fw={600}>声音</Text>
       <Text size="xs" c="dimmed">只影响自动播放和「下一步」</Text>
     </Group>
-    <Switch id="b_v_on" label="朗读字幕" description="有 say() 时读 say()，否则读字幕" />
+    <Switch id="b_v_on" label="朗读每一步" description="读旁白 narrate()；没有时读角色台词 say()，再没有读字幕" />
     <Select id="b_v_profile" label="声音来源" data={['浏览器朗读（本机）', 'OpenAI', 'ElevenLabs', 'AiHubMix', '公司网关']} placeholder="浏览器朗读（本机）" unmodeled note="切换已保存的供应商 profile" />
     <Stack gap={6} when={eq($.ui.engine, 'browser')}>
       <Select id="b_v_sys" label="旁白的声音（本机）" data={['Tingting（中文）', 'Meijia（中文）', 'Samantha（英文）']} placeholder="Tingting（中文）" unmodeled note="列出浏览器能用的声音" />
@@ -230,7 +230,7 @@ const Site = () => (
 const Pace = () => (
   <Stack id="pace" p="xl" gap="lg" maw={880} mx="auto">
     <Title order={2}>第 2 步：字幕短，旁白长</Title>
-    <KeyValue items={[{ label: '字幕', value: '输入阿杰的邮箱' }, { label: '旁白 say()', value: '她输入阿杰的邮箱，权限先给编辑者，以后随时能改' }]} />
+    <KeyValue items={[{ label: '字幕', value: '输入阿杰的邮箱' }, { label: '旁白 narrate()', value: '她输入阿杰的邮箱，权限先给编辑者，以后随时能改' }]} />
     <Stack id="p_text" gap={4}>
       <Group justify="space-between"><Text fw={600}>画面停留（按字幕字数）</Text><Text c="dimmed">3.0 秒</Text></Group>
       <Progress value={$.ui.textPct} color="gray" size="lg" />
@@ -246,7 +246,7 @@ const Pace = () => (
   </Stack>
 );
 
-/* ---------------- 作者电脑：配置、say()、终端 ---------------- */
+/* ---------------- 作者电脑：配置、narrate() / say()、终端 ---------------- */
 
 const CONFIG = `// joplo.config.ts
 export default config({
@@ -260,7 +260,9 @@ export default config({
 
 const FLOW = `// features/invite/options/a-modal.tsx
 .type('email', 'ajie@example.com', '输入阿杰的邮箱',
-  say('她输入阿杰的邮箱，权限先给编辑者，以后随时能改'))`;
+  narrate('她输入阿杰的邮箱，权限先给编辑者，以后随时能改'))
+// 角色亲口说的话用 say()，用角色的声音读
+.click('can_go', '阿杰回复：我能去', say('周六我能去！'))`;
 
 const Author = () => (
   <Grid h="100%" p="md" gutter="md">
@@ -268,7 +270,7 @@ const Author = () => (
       <Stack h="100%" gap="sm">
         <Code id="a_config" block>{CONFIG}</Code>
         <Code id="a_flow" block>{FLOW}</Code>
-        <Text size="sm" c="dimmed">字幕给眼睛看，say() 给耳朵听，两份分开存。</Text>
+        <Text size="sm" c="dimmed">字幕给眼睛看；narrate() 是旁白，say() 是角色台词，都和字幕分开存。</Text>
       </Stack>
     </Grid.Col>
     <Grid.Col span={6}>
