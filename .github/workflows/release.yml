@@ -1,0 +1,81 @@
+# 自动发布（见 docs/release.md「自动发布」）。
+# main 上 packages/joplo/package.json 的版本变了（pnpm release:version 改的）且还没有 v<版本> tag 时：
+# 完整检查 → smoke → 用 npm Trusted Publishing（OIDC，无 token、无 OTP）发布六个包 → verify 通过后才打 tag、建 GitHub Release。
+# 中途失败直接 Re-run 或 Run workflow：已发布的包会跳过（release:publish 可续跑）。
+# 文件名 release.yml 写在 npm 的受信任发布方配置里，改名要同步改 npm 配置。
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: ['packages/joplo/package.json']
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # 推 tag、建 GitHub Release
+  id-token: write # npm Trusted Publishing
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: v
+        run: |
+          v=$(node -p "require('./packages/joplo/package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          case "$v" in *-*) echo "dist_tag=beta" >> "$GITHUB_OUTPUT" ;; *) echo "dist_tag=latest" >> "$GITHUB_OUTPUT" ;; esac
+          if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
+            echo "tagged=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$v 已有 tag，跳过发布"
+          else
+            echo "tagged=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.v.outputs.tagged == 'false'
+        uses: pnpm/action-setup@v4
+      - if: steps.v.outputs.tagged == 'false'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - name: npm >= 11.5.1 (Trusted Publishing)
+        if: steps.v.outputs.tagged == 'false'
+        run: npm install -g npm@latest && npm --version
+
+      - if: steps.v.outputs.tagged == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.v.outputs.tagged == 'false'
+        run: pnpm typecheck
+      - if: steps.v.outputs.tagged == 'false'
+        run: pnpm test
+      - if: steps.v.outputs.tagged == 'false'
+        run: pnpm release:smoke
+
+      - name: Publish to npm
+        if: steps.v.outputs.tagged == 'false'
+        run: pnpm release:publish --tag ${{ steps.v.outputs.dist_tag }}
+
+      - name: Tag and GitHub Release
+        if: steps.v.outputs.tagged == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          git tag "v$V"
+          git push origin "v$V"
+          awk -v h="## $V" '$0 == h { on = 1; next } on && /^## / { exit } on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          [ -s "$RUNNER_TEMP/notes.md" ] || echo "Joplo $V" > "$RUNNER_TEMP/notes.md"
+          case "$V" in *-*) pre=--prerelease ;; *) pre= ;; esac
+          gh release create "v$V" --title "v$V" --notes-file "$RUNNER_TEMP/notes.md" $pre

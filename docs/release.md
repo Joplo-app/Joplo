@@ -13,20 +13,47 @@
 
 源码入口用于工作区开发；打包时 publishConfig 指向 dist，内部 workspace 依赖转成相同精确版本。项目许可证为 [Apache-2.0](../LICENSE)，字体使用 [SIL OFL 1.1](../packages/web/src/fonts/OFL.txt)。
 
-## 标准步骤
+## 标准步骤（自动发布）
 
-在 main 上准备要发布的代码。用 `pnpm release:version <v>` 统一版本，例：
+在 main 上准备要发布的代码，改版本、更新 CHANGELOG，推送 main 即可，发布由 GitHub Actions 完成：
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm release:version 0.1.3
+pnpm release:version 0.1.3          # 改六个包的版本，并重新生成 skills/
 pnpm install --lockfile-only
-pnpm typecheck
-pnpm test
-pnpm release:smoke
-git add packages/*/package.json pnpm-lock.yaml skills
+pnpm typecheck && pnpm test         # 本地先过一遍，CI 会再跑
+# 在 CHANGELOG.md 顶部写 ## 0.1.3 一节（会成为 GitHub Release 的说明）
+git add packages/*/package.json pnpm-lock.yaml skills CHANGELOG.md
 git commit -m "release: 0.1.3"
-git push origin main
+git push origin main                # 触发 .github/workflows/release.yml
+```
+
+[release.yml](../.github/workflows/release.yml) 在 main 上 `packages/joplo/package.json` 变化且还没有 `v<版本>` tag 时运行：typecheck → test → `release:smoke` → `release:publish`（正式版 `--tag latest`，带 `-` 的预发布版 `--tag beta`，最后自动 verify）→ verify 通过后才打 `v<版本>` tag 并推送，再用 CHANGELOG 里对应一节创建 GitHub Release。已有 tag 的版本直接跳过，所以普通提交不会重复发布。
+
+- 中途失败（网络、registry 延迟、smoke 不过）：修好后在 Actions 页面 Re-run，或 `gh workflow run release.yml --ref main`；已发布的包会跳过，只补发缺的，不必为重试改版本号。
+- tag 仍然只在 verify 通过之后才出现，保持“tag 指向的版本一定装得上”。
+- 每次推送分支还会跑 [ci.yml](../.github/workflows/ci.yml)（typecheck + test）。
+
+### 一次性配置：npm Trusted Publishing
+
+CI 不存 npm token，用 GitHub OIDC 向 npm 证明身份（[npm 文档](https://docs.npmjs.com/trusted-publishers)），无需 OTP，发布的包自动带 provenance。需要 npm CLI ≥ 11.5.1（workflow 会先升级 npm）。由有发布权限的维护者在自己的终端登录后，给六个包各配一次：
+
+```sh
+npm login
+for p in @joplo-app/kit @joplo-app/core @joplo-app/web @joplo-app/server @joplo-app/cli joplo; do
+  npm trust github "$p" --repo Joplo-app/Joplo --file release.yml --allow-publish -y
+done
+npm trust list joplo                # 确认配置
+```
+
+也可以在 npmjs.com 每个包的 Settings → Trusted Publisher 里手动填：Organization `Joplo-app`、Repository `Joplo`、Workflow filename `release.yml`、Environment 留空。workflow 文件改名后要同步改这里。确认 CI 发布成功后，可以把各包的 Publishing access 改为“Require two-factor authentication and disallow tokens”，只留 Trusted Publishing 一条发布通道。
+
+## 本地手动发布（备用）
+
+npm 或 GitHub Actions 不可用时，由有 npm 发布权限的维护者在自己的终端执行（需要 2FA 时现场输入 OTP）：
+
+```sh
+pnpm release:smoke
 pnpm release:publish --tag latest   # 先构建打包全部，再逐个发布 tarball，最后自动运行 release:verify
 git tag v0.1.3                      # 只在上一步以 0 退出（verify 通过）之后
 git push origin v0.1.3
@@ -35,14 +62,14 @@ git push origin v0.1.3
 顺序不能乱：
 
 1. `pnpm release:version <v>`：改六个包的版本，并重新生成 `skills/*/SKILL.md`（带新版本标记）。
-2. 跑完检查后，把 `packages/*/package.json`、`pnpm-lock.yaml`、`skills/` 一起提交，推送 main。
+2. 跑完检查后，把 `packages/*/package.json`、`pnpm-lock.yaml`、`skills/` 一起提交，推送 main。注意：推送 main 会触发自动发布；要手动发布时，先在 Actions 里禁用 Release workflow，或者等它失败后再手动处理。
 3. `pnpm release:publish --tag <标签>`：先一次性构建并打包全部包（与 `release:pack` 相同，含全部 tarball 检查），再按依赖顺序发布打好的 tarball（可续跑，见下），最后自动运行 `release:verify`，整体退出码就是 verify 的结果。
 4. 第 3 步失败（中途某个包没发出去，或 verify 不通过）：按提示处理后重跑同一条命令，已发布的包会跳过。也可以单独运行 `pnpm release:verify` 复查。
 5. 第 3 步以 0 退出后，才在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`（脚本最后一行会打印这条命令）。用户用 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。注意 `npx skills add Joplo-app/Joplo@v<v>` 不能用：skills CLI 把 `@` 后面当成技能名，报 No matching skills found（2026-11-06 实测）。tag 要等 verify 通过再推，避免指向一个装不上的版本。
 
 `release:version` 会同时重新生成仓库根目录的官方 Agent 技能 `skills/*/SKILL.md`（带版本标记，D64），要和版本号一起提交；`scripts/test/skills.test.ts` 会在不一致时失败（单独重新生成：`pnpm skills:build`）。
 
-版本必须符合 x.y.z 或 x.y.z-tag。提交并推送 main 后，再由有 npm 发布权限的维护者在自己的终端执行发布。`--tag latest` 用于正式版；脚本默认 tag 为 beta，需要预览版时显式选择对应标签。
+版本必须符合 x.y.z 或 x.y.z-tag。`--tag latest` 用于正式版；脚本默认 tag 为 beta，需要预览版时显式选择对应标签（自动发布按版本号自动选择）。
 
 ## 构建、打包与冒烟
 
@@ -103,4 +130,4 @@ curl --fail -H 'Cache-Control: no-cache' "https://registry.npmjs.org/joplo?t=$(d
 npm deprecate '<old-package>@<range>' 'Use the corresponding @joplo-app package.'
 ```
 
-这是添加弃用提示，不是删除版本。需要 2FA 时，由维护者在自己的终端执行发布或弃用命令并完成认证。
+这是添加弃用提示，不是删除版本。需要 2FA 时，由维护者在自己的终端执行弃用命令并完成认证。

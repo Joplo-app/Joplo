@@ -314,6 +314,14 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - **不做**：每次点击自动放大、弹簧物理镜头、聚光洞口跨步骤形变、自动识别敏感信息、并排前后对比（D56 已否定并排）、热点门控、章节、motion blur 与光标装饰（理由见调研文档第 6 节）。
   - 技能新增主题 `npx joplo skill focus`（一步一个主体、先上下文后细节、同一主体保持取景、只在看不清时推近、便签讲为什么且不重复字幕、反例与对应提示）；官方技能“常见的坑”加一条；样板为 examples/camping，前后对比截图在 docs/screenshots/narrative-focus/。
   - **与 D69 图表取景的组合**（集成 0.2.8，三方合并时定下，不改两边各自的设计）：焦点决定看哪个对象，D69 的取景规则决定框多大，先全景再推近只改变镜头怎么到达（终点仍是 D69 的取景框）。具体：① trace 的焦点对象与镜头目标相同，读 `Trace.targets ?? nodes`（时序图是消息那一行）；② “在镜头里”= 镜头目标、它的子元素，或 D69 取景一定带上的最内层父分组 / 时序图消息两端参与者（core `inShotFrame`），编译器补整层镜头与 FOCUS_CONFLICT 共用这条规则，同一分组里镜头外的兄弟节点不算；③ 聚光图表元素时洞口同时留出父分组标题（消息留出两端参与者头部），与 D69 的 data-jfocus-keep 同一个目的：归属信息不因取景或压暗丢失；④ 图表元素（Diagram / StateMachine / Sequence 家族）自己呈现变化，默认的结果揭晓不叠加；⑤ 提示与先全景再推近都画在镜头容器里，不改图表 DOM 与坐标，D69 不变量 1 不受影响。测试：core/test/integration-028.test.ts、web/test/integration-028.test.tsx。
+- D71 技能定位：演示产品功能，不是做 PPT（2026-11-07，来源：用户 2026-11-07：“joplo 的本质是为了演示产品功能，而不是做 PPT，是为了可视化和动画”）：
+  - 心智模型第二句写明用途：一步步操作真实界面、屏幕上的状态跟着变、图表追踪调用链路；它不是幻灯片或 PPT 工具。技能 description 加“not for slide decks or PPT”，When to use 加一条不适用场景（没有产品行为可展示时改用幻灯片工具）。
+  - 官方技能新增 “Show the product, not slides”：每一步 = 对产品的一个操作 + 它引起的可见变化；四组反例与正例（功能、后端 / 架构、方案对比、状态生命周期）；卡片只用于开场、收尾、时间跳转、切换角色。
+  - `npx joplo skill story` 新增第 1 节：同一组要点的“幻灯片版”（只有卡片）与“产品版”（click / type / push / toast / 切角色）TSX 对照，后端用 Diagram + trace()；交付前自查加“关键帧像幻灯片缩略图就重做”。不新增 API 或 check 规则（遵循“先改进现有能力”）。
+- D72 自动发布（2026-11-07，来源：用户 2026-11-07：“能不能配置上 CICD 自动发布”）：
+  - 推送 main 且 `packages/joplo/package.json` 版本没有对应 `v<版本>` tag 时，`.github/workflows/release.yml` 依次跑 typecheck、test、release:smoke、release:publish（正式版 latest，预发布版 beta），verify 通过后才打 tag 并用 CHANGELOG 对应一节建 GitHub Release。维护者推送版本提交即表示同意发布，取代 A3“执行 npm publish 前再向用户确认”。
+  - 认证用 npm Trusted Publishing（GitHub OIDC）：不存 token、无 OTP、自动 provenance；六个包各配一次受信任发布方（docs/release.md）。本地 `pnpm release:publish` 保留为备用。
+  - `.github/workflows/ci.yml`：每次推送分支和每个 PR 跑 typecheck + test。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
 ## Working assumptions

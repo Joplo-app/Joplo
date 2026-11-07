@@ -8,7 +8,7 @@
  *   node scripts/release.mjs publish [--tag beta]             先构建打包全部包，再按依赖顺序 npm publish 这些 tarball，最后自动 verify（pnpm release:publish）
  *   node scripts/release.mjs verify [<版本>]                  确认每个包都在 registry 上，并实际 npx 安装一次（pnpm release:verify；publish 最后会自动运行）
  *
- * 只有 publish 会调用 npm publish（由维护者在自己的终端运行）。
+ * 只有 publish 会调用 npm publish：平时由 .github/workflows/release.yml 在 CI 里运行（npm Trusted Publishing），备用时由维护者在自己的终端运行。
  */
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
