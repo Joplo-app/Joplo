@@ -30,6 +30,10 @@ const integer = (name: string, max = Number.MAX_SAFE_INTEGER) => (text: string) 
   if (!/^\d+$/.test(text) || !Number.isSafeInteger(n) || n < 1 || n > max) throw new JoploError('USAGE', `${name} must be an integer from 1 to ${max}`);
   return n;
 };
+const cursor = (value: string) => {
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) throw new JoploError('USAGE', 'after must be a non-negative integer');
+  return Number(value);
+};
 const scale = (text: string) => {
   const n = Number(text);
   if (!Number.isFinite(n) || n <= 0) throw new JoploError('USAGE', 'scale must be positive');
@@ -61,6 +65,28 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     for (const note of projectNotes(resolve(String(action.args[0] ?? '.')), action.name(), { cli: deps.cliVersion })) stderr(note + '\n');
   });
   const format = () => new Option('--format <format>', 'Output format').choices(['text', 'json']).default('text');
+  const withWatchSignal = async (run: (signal: AbortSignal) => Promise<number>) => {
+    const ac = new AbortController();
+    const stop = () => ac.abort();
+    process.on('SIGINT', stop); process.on('SIGTERM', stop);
+    try { exitCode = await run(ac.signal); }
+    finally { process.off('SIGINT', stop); process.off('SIGTERM', stop); }
+  };
+  const review = program.command('review').description('Read and watch local review sessions (no cloud account required)');
+  review.command('list').argument('[dir]', 'Project directory', '.').option('--json', 'Print JSON').option('--all', 'Include approved, closed, and stopped sessions').option('--option <id>', 'Filter by qualified option id')
+    .action(async (dir, opts) => {
+      const { reviewSessions, reviewSummary, reviewLine } = await import('./local-review.ts');
+      const sessions = reviewSessions(dir, opts);
+      if (opts.json) json(sessions.map(reviewSummary));
+      else if (!sessions.length) line('No active reviews. Run joplo dev in this project, or use --all for history.');
+      else sessions.forEach(s => line(reviewLine(s)));
+    });
+  review.command('watch').argument('[dir]', 'Project directory', '.').option('--session <id>', 'Bind to this exact review session').option('--option <id>', 'Filter by qualified option id; fails if multiple instances match')
+    .option('--after <seq>', 'Resume after this event sequence number', cursor, 0).option('--json', 'Stream one JSON event per line (NDJSON)')
+    .action(async (dir, opts) => {
+      const { watchLocalReview } = await import('./local-review.ts');
+      await withWatchSignal(signal => watchLocalReview(dir, opts, { out: stdout, err: stderr }, signal));
+    });
   const cloudClient = async (server?: string, format?: string) => {
     const { CloudClient } = await import('./cloud.ts');
     return new CloudClient(server, deps.cliVersion ?? await readCliVersion(), s => stderr(s + '\n'), s => secrets.add(s), { ...deps.cloud, format });
@@ -113,7 +139,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         line(`Add to README: ${terminalText(published.result.embed.markdown)}\nMore embed options: ${client.server}/shares/${published.result.shareId}`);
       }
     });
-  cloudCommand('feedback').description('Read review decisions and unresolved comments, or mark decisions as applied').argument('[dir]', 'Project directory', '.').addOption(format())
+  const feedbackCommand = cloudCommand('feedback').description('Read cloud feedback, or watch local/cloud reviews').argument('[dir]', 'Project directory', '.').addOption(format())
     .option('--share <id>', 'Share id (defaults to .joplo/cloud.json)').option('--applied <ids>', 'Mark comma-separated decision ids as applied to the source').option('--ref <ref>', 'Source version for --applied (for example a commit SHA)')
     .action(async (dir, opts) => {
       if (opts.ref !== undefined && opts.applied === undefined) throw new JoploError('USAGE', '--ref applies only with --applied <ids>');
@@ -132,6 +158,45 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       const summary = `${data.decisions.length} decision(s), ${data.comments.length} unresolved comment(s)`;
       if (opts.format === 'json') json(result(resolve(dir), summary, data));
       else for (const l of f.feedbackText(data)) line(l);
+    });
+  feedbackCommand.command('list').description('List local review sessions').argument('[dir]', 'Project directory', '.').requiredOption('--local', 'Read this project’s local review sessions')
+    .option('--json', 'Print JSON').option('--all', 'Include completed and stopped sessions').option('--option <id>', 'Filter by qualified option id')
+    .action(async (dir, opts) => {
+      const { reviewSessions, reviewSummary, reviewLine } = await import('./local-review.ts');
+      const sessions = reviewSessions(dir, opts);
+      if (opts.json) json(sessions.map(reviewSummary));
+      else if (!sessions.length) line('No active reviews. Run joplo dev in this project, or use --all for history.');
+      else sessions.forEach(s => line(reviewLine(s)));
+    });
+  feedbackCommand.command('watch').description('Watch local events or poll cloud feedback; exit when the target option is confirmed').argument('[dir]', 'Project directory for local reviews', '.')
+    .option('--local', 'Watch local review files without connecting to Cloud').option('--session <id>', 'Exact local review session')
+    .option('--share <id>', 'Cloud share id (requires --option)').option('--option <id>', 'Qualified option id: feature.option')
+    .option('--version <number>', 'Cloud share version; defaults to the first response', integer('version'))
+    .option('--interval <seconds>', 'Cloud polling interval, 10–30 seconds (default: 15)', integer('interval', 30))
+    .option('--after <seq>', 'Local replay cursor', cursor).option('--json', 'Stream one normalized JSON event per line')
+    .option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)')
+    .action(async (dir, opts, command) => {
+      // 父命令的 --share / --server 在 watch 前后均能识别；拒绝把旧的写回标记用到监听命令。
+      const all = command.optsWithGlobals();
+      opts.json = opts.json || all.format === 'json';
+      if (all.applied !== undefined || all.ref !== undefined) throw new JoploError('USAGE', '--applied and --ref cannot be used with feedback watch');
+      const shareId = opts.share ?? all.share;
+      const server = opts.server ?? all.server;
+      if (opts.local) {
+        if (shareId !== undefined || server !== undefined || opts.interval !== undefined || opts.version !== undefined)
+          throw new JoploError('USAGE', '--local cannot be combined with --share, --server, --interval, or --version');
+        const { watchLocalReview } = await import('./local-review.ts');
+        await withWatchSignal(signal => watchLocalReview(dir, opts, { out: stdout, err: stderr }, signal));
+      } else {
+        if (!shareId || opts.session !== undefined || opts.after !== undefined)
+          throw new JoploError('USAGE', 'Choose --local [--session <id>] or --share <id> --option <feature.option>; --after applies only to local reviews');
+        const { watchCloudFeedback, validateCloudWatchOptions } = await import('./cloud-feedback-watch.ts');
+        validateCloudWatchOptions(opts);
+        const { SHARE_ID } = await import('./cloud-feedback.ts');
+        if (!SHARE_ID.test(shareId)) throw new JoploError('USAGE', 'share must be a 10-character share id');
+        const client = await cloudClient(server, opts.json ? 'json' : 'text');
+        await withWatchSignal(signal => watchCloudFeedback(client, shareId, opts, { out: stdout, err: stderr }, signal));
+      }
     });
   program.command('check').argument('[dir]', 'Project directory', '.').addOption(format()).option('--option <qid>', 'Validate only the specified option').action(async (dir, opts) => {
     const report = await check(dir, opts.option);
@@ -245,7 +310,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (e instanceof CommanderError && ['commander.helpDisplayed', 'commander.help', 'commander.version'].includes(e.code)) return 0;
     const f = failure(e instanceof CommanderError ? new JoploError('USAGE', e.message) : e);
     const wantsJson = args.some((arg, i) => arg === '--format=json' || arg === '--format' && args[i + 1] === 'json');
-    if (wantsJson) json(f); else line(`${f.error.code}  ${oneLine(terminalText(f.error.message))}`);
+    if (args[0] === 'review' || args[0] === 'feedback' && (args.includes('watch') || args.includes('list'))) stderr((args.includes('--json') || wantsJson ? JSON.stringify(f) : `${f.error.code}  ${f.error.message.split('\n').map(line => terminalText(line)).join('\n')}`) + '\n');
+    else if (wantsJson) json(f); else line(`${f.error.code}  ${oneLine(terminalText(f.error.message))}`);
     return f.error.code === 'USAGE' ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : f.error.code === 'EXPORT_COMPONENT_MISSING' ? 4 : 1;
   }
   return exitCode;

@@ -433,6 +433,8 @@ export type PlayerPageProps = {
   actions?: ReactNode;
   /** 右侧抽屉等覆盖层（看板）。 */
   drawer?: ReactNode;
+  /** 本地评审等舞台浮层；传入实际显示的层级，不参与舞台尺寸计算。 */
+  stageOverlay?: (sceneId: string | null) => ReactNode;
   /** 允许 ⌥+单击检查元素（看板）；发布站为 false，⌥+单击按普通单击处理。 */
   onInspect?: (nodeId: string) => void;
   /** 检查模式（看板「检查」开关）：单击 = 检查元素，不执行步骤。 */
@@ -681,6 +683,7 @@ export function PlayerPage(p: PlayerPageProps) {
           {p.flash}
         </div>
       ) : null}
+      {p.stageOverlay?.(shownScene?.id ?? null)}
     </div>
   );
 

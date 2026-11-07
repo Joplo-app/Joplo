@@ -6,7 +6,7 @@ description: Build clickable, replayable feature demos with Joplo (scripted scen
 
 Joplo is a player for pre-declared scenarios, not a free-form app prototype.
 Its job is to show a product feature working through visuals and motion: the real interface operated step by step, state changing on screen, calls traced through diagrams. It is not a slide or PPT tool.
-Inputs show the sample value typed by the current step (read-only); viewers cannot type their own.
+Inputs inside authored demos show the sample value typed by the current step (read-only); viewers cannot type their own. The board's native feedback panel accepts real reviewer input.
 Clicking the highlighted element plays the next declared step; other clicks only show a hint.
 Results and errors come from scenario effects (set, toast, done), not from real logic or a backend.
 Options (A/B) and cases (edge cases) are compared in the local board; only the picked option is published.
@@ -31,8 +31,8 @@ Every step is an action on the product and a visible change it causes. If a step
 4. With minimal code, write one happy path and one error-and-recovery scenario.
 5. Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.
 6. Extend to every option and every case agreed with the user; run check until 0 errors.
-7. Give the user the board URL and a short list of what to check, then wait for their feedback.
-8. After the user agrees: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. To share only part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items. Apply review results with the joplo-feedback skill.
+7. Before handing off for review, read npx joplo skill review. List sessions with npx joplo feedback list [dir] --local --json, bind the exact session with npx joplo feedback watch [dir] --local --session <id> --json, then give the user its actual board URL. While they test, read output with short waits (about 1–5s) and acknowledge feedback immediately; do not wait for approval or process exit. Use the joplo-feedback skill for receiving and applying review results.
+8. When the user asks to share or publish: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. Confirmation of a local option alone does not request publication. To share only part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items. Apply review results with the joplo-feedback skill.
 
 ## Common pitfalls
 - when takes a condition, not a boolean: when={eq($.ui.mode, 'code')}, never when={mode === 'code'}; for values known while writing use {flag && <X/>}. See npx joplo skill authoring.
@@ -44,7 +44,7 @@ Every step is an action on the product and a visible change it causes. If a step
 - Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user. See npx joplo skill cases.
 - Never share or deploy without the user's go-ahead; free share links expire after 1 hour. See npx joplo skill publish.
 
-Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, focus, diagram, components, cases, check, selection, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.
+Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, focus, diagram, components, cases, check, selection, review, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.
 After the user Alt+clicks a board element, run npx joplo selection and edit only that location.
 Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.11 sha256:1a3dcbd5fb695ce7e534170718cb07a253e5d79e81ae4d7f1090d44ebbb73916 -->
+<!-- joplo-skill 0.2.12 sha256:a71c56a4d10a1c8b5a756ae2994605776c11cb90e3039d1f09cb9341dcc30763 -->

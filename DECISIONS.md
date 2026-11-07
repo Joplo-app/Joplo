@@ -355,6 +355,21 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 发布走 CLI 的 `share()`，与 `joplo share` 同一套检查、构建、上传和 `.joplo/cloud.json` 记录。看板是长驻进程，由 CLI 启动 dev 时把云端能力注入进去；令牌只在本机进程里，浏览器只拿到账号邮箱和套餐。发布接口与导出组件的安装接口一样，需要本机令牌（`x-joplo-token`），校验 Host 与 Origin，要求 `application/json`；同一项目同时只能有一个发布任务。旧版本启动的看板进程没有这个能力时，这一项禁用，并提示重启 `joplo dev`。
 - A3 发布顺序（工作假设，用户未明确回答）：先完成 Mantine 切换（D35），再以 beta 标签发布 0.1.0。真正执行 `npm publish` 前再向用户确认。
 
+- D77 本地评审与 Agent 监听（2026-11-07，来源：用户要求本地逐页反馈、确认后监听命令退出；用 `examples/joplo-local-review` 评审，并明确要求“float，不会让演示页面折叠”“点击反馈 Icon 也可以直接完成这次 review”，随后确认实现）：
+  - 演示右侧反馈图标打开浮层，不改变舞台尺寸。浮层可填写真实反馈，也可不填写反馈而直接确认当前方案；保留舞台上的确认入口。支持全屏，发布站和导出画面不带这个本地入口。
+  - 用户通过真实反馈通道补充（2026-11-07）：“反馈的 Icon 可以拖动，不要固定在某个位置”。入口改为舞台内可拖动并记忆相对位置，保持窗口／全屏变化后仍可见；区分拖动和单击，支持方向键微调。用户同时指出 Agent 回应慢：主动评审期间以约 1–5 秒的短窗口读取终端，收到反馈先回执，不等待确认或进程退出。
+  - 反馈绑定打开浮层时的页面、场景、步骤。切页、收起、请求失败或刷新保留草稿；源码更新后必须明确把旧草稿绑定到当前版本。已有未提交草稿时不能直接确认。确认记录只表示用户接受该方案版本，不表示反馈已经实现，也不自动改 TSX 的 pick 或发布。
+  - 本地持久记录：每个实例随机身份，每个项目真实路径、方案版本独立会话；记录写入 `.joplo/reviews/<session>.json` 后才返回保存成功。不同 worktree、多个看板进程即使使用相同端口，也不共用会话。重复请求用 requestId 保证幂等。
+  - Agent 运行 `joplo review list [dir] --json` 找到会话，后台 `joplo review watch [dir] --session <id> --json` 持续观察本地文件；stdout 逐条输出 NDJSON，stderr 输出状态。反馈附定位和版本；approved 输出后退出 0。`--after <seq>` 补收，按 sessionId + seq 去重。多匹配拒绝猜测；中断监听不结束评审。
+  - 实现选择：文件观察通知加定时校验兜底；先完整写入、fsync、原子替换，读者不会读到半条记录。监听短租约只用于显示在线。源码变动关闭旧会话并在成功编译后创建新会话，旧确认不沿用；未确认时服务停止或会话关闭退出非零。
+  - 本地／Share 入口与输出随后按 D78 统一；不自动同步本地反馈到云端。
+  - 使用说明随 Joplo 产品安装：`joplo` 技能负责创作与评审交接，`joplo-feedback` 负责本地／Share 接收、回执、恢复和按授权修改；独立 `joplo skill review` 主题提供命令、事件示例和最佳实践。修改唯一生成模板，保持仓库 `skills/`、`skill install` 和 AGENTS.md 托管段一致，不把这份产品能力说明装成仅当前 Agent 可用的私人技能。
+
+- D78 统一反馈监听入口与 Share 轮询（2026-11-07，来源：用户认可统一评审方案，明确“公共的 share 先不考虑真正的流式，可以用轮询模拟，10–30s 左右”，并要求检查 Cloud 改动需求）：
+  - 主入口 `joplo feedback list/watch --local` 与 `joplo feedback watch --share <id> --option <功能.方案>`；本地 `review list/watch` 保留兼容，旧的云端单次读取与 `--applied` 不变。本地文件实时通知，Share 普通 GET 默认每 15 秒，`--interval` 接受 10–30 整数秒；无 SSE/WebSocket。
+  - 共用 `source/eventId/sessionId/featureId/optionId/revision/createdAt/type` 输出。Cloud 固定分享、方案和版本，旧记录或其他方案不结束监听；作者匹配版本的 pick 映射为 approved，其他决定继续输出但不结束。分享替换版本输出 closed，退出非零。Cloud 没有本地 seq，不伪造可恢复游标。
+  - 本轮 CLI 兼容现有 Cloud 快照接口并按稳定 eventId 去重，不改 Cloud 仓库或线上资源。已解决／已写回记录在轮询间消失可能漏读，限制明确告知。Cloud 所需 expectedVersion 校验、当前有效确认状态、可分页历史读取及验收场景记录于 `docs/cloud-feedback-watch.md`；未声明已部署这些服务端扩展。
+
 ## Working assumptions
 
 - A1 “足够快”暂定为：从描述需求到画板上出现可点击的主流程，只比让 AI 写 HTML 多出“一次 Agent 会话轮次”的量级。具体指标在修订 PRD 时与用户确认。

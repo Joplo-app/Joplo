@@ -19,7 +19,8 @@ import type http from 'node:http';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { createLogger, createServer, type Logger, type Plugin, type PluginOption, type ViteDevServer } from 'vite';
-import { JoploError, type Diagnostic, type Project } from '@joplo-app/core';
+import { JoploError, LocalReviewWrite, type Diagnostic, type Project } from '@joplo-app/core';
+import { LocalReviewHub } from './local-review.ts';
 import type { DevHandle, DevOptions } from './contract.ts';
 import { ExportHub, type ExportDeps } from './export.ts';
 import { VoiceHub } from './voice-http.ts';
@@ -249,6 +250,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   const allowedHosts = () => new Set([`127.0.0.1:${actualPort}`, `localhost:${actualPort}`]);
   const allowedOrigins = () => new Set([`http://127.0.0.1:${actualPort}`, `http://localhost:${actualPort}`]);
   const baseUrl = () => `http://127.0.0.1:${actualPort}/`;
+  const reviewHub = new LocalReviewHub(baseUrl);
 
   const activeDirs = () => [...slots.values()].filter((s) => !s.closed).map((s) => s.dir);
   const slotOfFile = (file: string) => [...slots.values()].find((s) => !s.closed && isProjectSource(s.dir, file)) ?? null;
@@ -293,6 +295,8 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     const errors = out.diagnostics.filter((d) => d.severity === 'error');
     if (errors.length) log(`[joplo] ${path.basename(slot.dir)} compilation failed (${errors.length}): ${errors.map((d) => `${d.at ?? ''} ${d.message}`).join('; ').slice(0, 400)}`);
     if (out.project && out.project.name) registry.rename(slot.dir, out.project.name);
+    if (out.project && !errors.length) reviewHub.sync(slot.dir, slot.id, out.project);
+    else reviewHub.invalidate(slot.dir, 'compile_error');
     if (!closed) server?.ws.send({ type: 'custom', event: IR_EVENT, data: { projectId: slot.id, ...slot.payload } });
     broadcastProjects();
   }
@@ -311,6 +315,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
         try {
           await recompile(slot);
         } catch (e) {
+          reviewHub.invalidate(slot.dir, 'compile_error');
           log(`[joplo] Compilation exception: ${e instanceof Error ? e.message : String(e)}`);
         }
       } while (slot.dirty && !slot.closed);
@@ -351,6 +356,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     slot.closed = true;
     if (slot.timer) clearTimeout(slot.timer);
     await slot.running?.catch(() => undefined);
+    reviewHub.invalidate(slot.dir, 'server_stopped');
     await slot.loader?.close().catch(() => undefined);
     if (watch && server) server.watcher.unwatch(slot.dir);
     slots.delete(slot.id);
@@ -435,12 +441,28 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   };
   const fail = (res: http.ServerResponse, e: unknown) => {
     const code = e instanceof JoploError ? e.code : 'INTERNAL';
-    const status = code === 'NOT_FOUND' ? 404 : code === 'USAGE' ? 400 : code === 'RENDER_FAILED' || code === 'EXPORT_COMPONENT_MISSING' ? 503 : 500;
+    const status = code === 'NOT_FOUND' ? 404 : code === 'USAGE' || code === 'INVALID_REFERENCE' ? 400 : code === 'REVISION_CONFLICT' || code === 'IDEMPOTENCY_MISMATCH' ? 409 : code === 'RENDER_FAILED' || code === 'EXPORT_COMPONENT_MISSING' ? 503 : 500;
     sendJson(res, status, { error: { code, message: e instanceof Error ? e.message : String(e) } });
   };
 
   async function handleProject(id: string, rest: string, req: http.IncomingMessage, res: http.ServerResponse) {
     const method = req.method ?? 'GET';
+    if (rest === 'review' && (method === 'GET' || method === 'POST')) {
+      if (!guardWrite(req, res, 403, method === 'POST')) return;
+      const slot = await ensure(id);
+      if (slot.compiling || slot.dirty || slot.timer || !slot.payload.ok || !slot.payload.project || slot.payload.diagnostics.some(d => d.severity === 'error'))
+        throw new JoploError('REVISION_CONFLICT', 'Wait for the project to compile successfully before reviewing');
+      if (method === 'GET') {
+        const optionId = new URL(req.url!, baseUrl()).searchParams.get('option');
+        if (!optionId) throw new JoploError('USAGE', 'option is required');
+        return sendJson(res, 200, reviewHub.state(slot.dir, optionId));
+      }
+      const body = await jsonBody(req, res);
+      if (!body.ok) return;
+      const input = LocalReviewWrite.safeParse(body.body);
+      if (!input.success) throw new JoploError('USAGE', 'Invalid review request: include a sessionId, requestId, type, and page context for feedback (1–10000 characters)');
+      return sendJson(res, 200, reviewHub.write(slot.dir, slot.payload.project, input.data));
+    }
     if (rest === 'ir' && method === 'GET') {
       const slot = await ensure(id);
       return sendJson(res, 200, { projectId: id, ...slot.payload });
@@ -629,8 +651,9 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     server.watcher.on('all', (_ev, file) => {
       const slot = slotOfFile(path.resolve(file));
       if (!slot) return;
+      reviewHub.invalidate(slot.dir, 'source_changed');
       if (slot.timer) clearTimeout(slot.timer);
-      slot.timer = setTimeout(() => void run(slot), 60);
+      slot.timer = setTimeout(() => { slot.timer = null; void run(slot); }, 60);
     });
   }
 

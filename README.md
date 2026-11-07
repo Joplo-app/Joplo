@@ -38,7 +38,7 @@ Keep the Board process running. Edit the generated TSX files and watch the demo 
 
 ### Install the agent skills
 
-Two ways to give a coding agent (Claude Code, Codex, …) the Joplo skills `joplo` (build demos) and `joplo-feedback` (apply review results). Both install the same files from one template:
+Two ways to give a coding agent (Claude Code, Codex, …) the Joplo skills `joplo` (build demos and hand them off for review) and `joplo-feedback` (receive local/Share feedback, acknowledge it promptly, and apply requested review results). Both install the same files from one template:
 
 ```sh
 npx skills add Joplo-app/Joplo           # official skills from this repo; any repo, even before Joplo is installed
@@ -61,10 +61,11 @@ npx joplo skill authoring
 npx joplo skill story
 npx joplo skill cases
 npx joplo skill demo
+npx joplo skill review
 npx joplo skill install --agents-md
 ```
 
-The ten topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, and `publish`. `npx joplo components <Name>` prints the props and an example for one component. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
+The eleven topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, `review` (local listening, Share polling, prompt acknowledgement, version isolation, recovery, and best practices), and `publish`. `npx joplo components <Name>` prints the props and an example for one component. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
 
 Use a second terminal while the Board is running:
 
@@ -75,6 +76,19 @@ npx joplo selection
 ```
 
 `outline` prints who each feature is for, its goal, each case with its expected result and coverage per option, and every scenario's steps and estimated duration. `check` reports one issue per line with a file, line, column, severity, and code. Errors exit with 1; usage errors exit with 2. Warnings and information exit with 0. After Option/Alt-clicking in the Board, `selection` returns the label and three lines of source on either side of the selected line.
+
+## Local review
+
+For local reviews, open the **Feedback & review** icon on the right of the demo to leave real feedback or confirm the option. The floating panel keeps the stage at its original size. Agents can listen in a background shell:
+
+```sh
+npx joplo feedback list --local --json
+npx joplo feedback watch --local --session <id> --json
+```
+
+Submitted feedback streams as NDJSON. Approval ends the watcher with exit code 0. Sessions isolate instances, projects, and option revisions; resume with `--after <seq>`. Source changes start a new review after compilation. See the [CLI documentation](docs/cli.md).
+
+For Share, use `npx joplo feedback watch --share <id> --option <feature.option> --interval 15 --json`. Polling defaults to 15 seconds, configurable from 10 to 30. The current Cloud endpoint exposes a pending-feedback snapshot, so records resolved/applied between polls can be missed; see the [Cloud follow-up requirements](docs/cloud-feedback-watch.md).
 
 ## Project layout
 
@@ -152,7 +166,7 @@ Run `npx joplo skill` for task-focused authoring guidance that matches your inst
 
 Joplo models behavior; it does not run a real product backend. Routes must be static. A mobile experience needs its own page or demo. AI assumptions cannot be marked as confirmed without a real user decision, and interaction belongs in `flow()` rather than `onClick`.
 
-Author modules execute on your machine during loading, checks, and builds. Only run projects you trust. The Board and Published site consume compiled IR. MCP, collaboration, and comment sync are outside this local release.
+Author modules execute on your machine during loading, checks, and builds. Only run projects you trust. The Board and Published site consume compiled IR. Local review records stay in the project directory. MCP, multi-user collaboration, and real-time cloud comment sync are outside this local release.
 
 ## License
 

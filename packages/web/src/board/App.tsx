@@ -38,6 +38,7 @@ import { copyText, downloadBlob, useFlash, useHash } from '../player/util';
 import { CaseNav, CaseRail } from './CaseNav';
 import { Home } from './Home';
 import { InspectDrawer } from './InspectDrawer';
+import { LocalReview } from './LocalReview';
 import { ProgressRing, VideoProgressCard, useVideoExport } from './VideoExport';
 import { CloudPublishPopover, useCloudPublish } from './CloudPublish';
 import { ExportSetupCard, SetupNeededFlash, showSetupCard, useExportRuntime } from './ExportSetup';
@@ -503,6 +504,9 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           setDrawer(true);
         }}
         selectedId={drawer && selection && state && selection.sceneId === state.sceneId ? selection.nodeId : null}
+        stageOverlay={option ? (sceneId) => <LocalReview key={option.id} projectId={projectId} project={project} optionId={option.id}
+          context={sceneId ? { sceneId, scenarioId: scenario?.id ?? null, position: state?.position ?? 0 } : null}
+          version={ir.payload?.version ?? 0} enabled={!compileError} completed={!!state?.completed} onOpen={() => ctl.pause()} /> : undefined}
         flash={flash}
         drawer={
           <>

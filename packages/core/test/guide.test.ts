@@ -4,8 +4,8 @@ import ts from 'typescript';
 import { COMPONENT_DOCS, COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../src/catalog.ts';
 import { componentDetails, guide, skillIndex, skillTopic, SKILL_TOPICS } from '../src/guide.ts';
 
-const topics = ['authoring', 'story', 'demo', 'focus', 'diagram', 'components', 'cases', 'check', 'selection', 'publish'] as const;
-test('十个主题均少于 150 行，结尾的相关主题均存在', () => {
+const topics = ['authoring', 'story', 'demo', 'focus', 'diagram', 'components', 'cases', 'check', 'selection', 'review', 'publish'] as const;
+test('十一个主题均少于 150 行，结尾的相关主题均存在', () => {
   expect(SKILL_TOPICS.map(t => t.name)).toEqual(topics);
   for (const topic of topics) {
     const body = skillTopic(topic);

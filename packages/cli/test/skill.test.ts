@@ -29,7 +29,7 @@ test('列表版本取自 CLI package.json；主题、guide 均不加载 server',
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const r = await run(['skill']); expect(r.code).toBe(0);
   expect(r.stdout.split('\n')[0]).toBe(`Joplo ${pkg.version} · Agent usage (read on demand)`);
-  for (const name of ['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'publish']) {
+  for (const name of ['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'review', 'publish']) {
     const topic = await run(['skill', name]); expect(topic.code).toBe(0);
     expect(topic.stdout.trimEnd().split('\n').length).toBeLessThan(150);
     expect(topic.stdout.trimEnd().split('\n').at(-1)).toMatch(/^Related topics: /);
@@ -148,7 +148,7 @@ test('install 专用参数不能静默用于主题', async () => {
 });
 
 test('默认接线读取所有主题时不触发 server 模块初始化', async () => {
-  for (const args of [['skill'], ...['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'publish'].map(name => ['skill', name]), ['guide']]) {
+  for (const args of [['skill'], ...['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'review', 'publish'].map(name => ['skill', name]), ['guide']]) {
     expect(await runCli(args, { stdout: () => {}, stderr: () => {} })).toBe(0);
   }
   expect(serverImports).not.toHaveBeenCalled();

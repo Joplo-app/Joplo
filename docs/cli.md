@@ -23,6 +23,11 @@ npx joplo share [dir] [--format text|json] [--new] [--title <title>] [--review] 
   [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
 npx joplo feedback [dir] [--share <id>] [--format text|json] [--server <url>]
 npx joplo feedback [dir] --applied <决定 id,…> [--ref <源码版本>] [--share <id>] [--format text|json]
+npx joplo review list [dir] [--json] [--all] [--option <功能.方案>]
+npx joplo review watch [dir] [--session <id>] [--option <功能.方案>] [--after <序号>] [--json]
+npx joplo feedback list [dir] --local [--json] [--all] [--option <功能.方案>]
+npx joplo feedback watch [dir] --local [--session <id>] [--after <序号>] [--json]
+npx joplo feedback watch --share <id> --option <功能.方案> [--version <版本>] [--interval 15] [--json] [--server <url>]
 npx joplo render [dir] --scenario-id <qid> --out <file> \
   [--step-id <qid>] [--theme <theme>] \
   [--width <pixels> --height <pixels>] [--scale <scale>] [--overwrite]
@@ -116,6 +121,48 @@ text 输出 at、标签和目标行前后各三行带行号源码。文件不存
 
 JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }[]`，note 说明定位不可用的原因。看板写选中 → 服务端对照 IR 计算 at → 本地文件 → CLI 读源码 → Agent 局部修改；详见[选中定位链路](web.md#选中与源码定位)。
 
+## review：本地评审与流式监听
+
+```sh
+npx joplo review list [dir] --json
+npx joplo review watch [dir] --session <id> --json
+npx joplo review watch [dir] --session <id> --after 3 --json
+```
+
+保持 `joplo dev` 运行。每个方案版本有独立会话，反馈面板里可以复制完整的监听命令。`list` 默认列出存活实例的未结束会话；`--all` 查看历史，`--option <功能.方案>` 筛选。`watch` 可省略 `--session`，但必须只有一个匹配的活跃会话；有多个时退出 2，列出候选，绝不自动选择“最新”实例。显式会话也始终限定在给定项目目录里，目录按真实路径解析，worktree 分别处理。
+
+`--json` 的 stdout 是 NDJSON，一行一个事件。状态与错误只写 stderr；不带 `--json` 时输出人可读文本。事件共有字段为 `sessionId`、`instanceId`、`projectDir`、`featureId`、`optionId`、`revision`、`seq`、`requestId`、`createdAt`：
+
+- `feedback`：已提交的完整反馈（`body`），以及服务端验证的 `context`：`route`、`sceneId`、`scenarioId`、`position`（已经执行的步数，初始为 0）、`stepId`、`source`、`pageTitle`、`scenarioName`。不会发送未提交的键盘输入。
+- `approved`：当前方案版本的确认；输出后监听退出 0，本地看板继续运行。确认只记录评审结论，不写 TSX 的 `pick`、不运行代码、不表示意见已经实现，也不发布网站。
+- `closed`：源码变化、编译失败、方案删除或服务正常关闭，附带 `reason`；退出 1，表示尚未得到确认。源码编译成功后是新会话，需重新 `list` 并绑定。
+
+记录先以临时文件写入、fsync、原子替换后才返回成功，保存在项目 `.joplo/reviews/<session>.json`（权限 0600，默认不进 Git）；每个实例使用随机身份和独立会话文件，端口重用不会改变监听目标。监听直接观察本地事件文件，没有网络重连期间丢事件的问题。短期监听租约仅用于界面显示在线状态，不决定评审结果。
+
+默认重放全部已保存事件，`--after <seq>` 只输出之后的事件；消费者按 `sessionId + seq` 去重。两个监听器互不消费对方的事件。用户确认后即使服务已停止，也能用显式会话补读并退出 0。未确认时服务异常退出会报错；Ctrl+C / SIGTERM 停止监听并退出 130，不结束评审。游标非法或超出现有序号退出 2，损坏记录／跨项目记录拒绝读取。每条反馈最多 10,000 字符，每会话最多 999 条反馈，记录总量上限 16 MiB，为终结事件预留空间。
+
+本地监听不需要登录云端。主入口为 `joplo feedback list/watch --local`，上面的 `joplo review list/watch` 保留为兼容入口；两者输出相同。`feedback [dir]` 原有的云端单次读取及 `--applied` 行为保持不变。
+
+## feedback watch：本地与 Share 的统一入口
+
+```sh
+# 本地实时读取文件事件
+npx joplo feedback watch ./my-demo --local --session <id> --json
+
+# Share 普通 GET 轮询，不需要 SSE 或 WebSocket
+npx joplo feedback watch --share Abc1234567 --option invite.a-modal --interval 15 --json
+```
+
+Share 立即读取一次，随后默认每 15 秒轮询；`--interval` 接受 10–30 之间的整数秒，请求完成后再计时，不重叠发送。网络错误按原间隔退避到最多 30 秒；鉴权、权限、找不到分享、配额和响应格式错误会结束命令。Ctrl+C / SIGTERM 会中止在途请求与等待，退出 130。
+
+Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结束监听。`--version` 可显式指定版本，否则锁定首次响应中的分享版本；分享更新时输出 `closed/source_changed` 并退出 1。只有该版本、该方案的作者 `pick` 决定映射为 `approved` 并退出 0；投票、规则确认、其他方案或旧版本决定都不会结束监听。不把 Cloud 的确认写入本地会话，也不自动标记决定 `applied`。
+
+本地和 Cloud 输出统一的 `source`、`eventId`、`sessionId`、`featureId`、`optionId`、`revision`、`createdAt` 及 `type`。`feedback` 携带 `body/context`，`approved` 表示确认，Cloud 的其他决定为 `decision`，监听目标失效为 `closed`。本地继续保留 `seq`、`requestId`、`instanceId`、`projectDir`；Cloud 携带 `server`、`shareId`、`version`，没有可伪造的 `seq`，也暂不接受 `--after`。Cloud 的页面路径与源码位置当前接口不提供，输出 null，保留已有的场景、步骤和元素信息。
+
+**当前兼容模式的边界：**复用 `GET /api/v1/shares/{id}/feedback`，仅能观察未解决评论及未撤回、未写回的决定。单次运行按稳定 `eventId` 去重；重新启动重放当前快照，消费者可按同一 `eventId` 去重。如果记录在两次轮询之间被解决或标记已写回，可能被漏掉。当前接口只取最新 1000 条未解决评论，且没有分页游标。客户端版本过滤也不能替代 Cloud 拍板接口的 `expectedVersion` 校验。完整的补收与旧页面保护需要 [Cloud 改动清单](cloud-feedback-watch.md) 中的服务端配合。
+
+该接口仍仅允许分享主人或其具备 `feedback:read` 的 API Key 读取；“公开 Share 链接”不等于匿名读取管理侧反馈。
+
 ## skill 与 guide
 
 `npx joplo skill` 先用几行讲清心智模型（预设场景的播放器，不是自由输入的应用原型）和起步顺序，再列出当前 CLI 版本、主题说明和实际行数；每个主题少于 150 行。`npx joplo skill <主题>` 输出 Markdown，结尾指向相关主题。未知主题会建议编辑距离最近的名称并退出 2。
@@ -129,13 +176,14 @@ JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }
 | cases | 八个维度及按产品类型筛选的情况预设；先做正常流程 + 一条错误恢复 |
 | check | 诊断代码与局部修复、合并诊断、`UNBOUND_INTERACTIVE` 的三种处理 |
 | selection | 用户选中后只改指向的位置 |
+| review | 本地实时监听、Share 轮询、交接顺序、先回执再处理、多实例／版本隔离、恢复、事件示例和最佳实践 |
 | publish | pick、build、云端登录与分享、评审版与 feedback 回流、静态站部署与演示能力 |
 
 `guide` 与 `skill authoring` 完全相同。读取主题不加载服务端，也不执行作者项目，输出无颜色文本。
 
 ### skill install
 
-写入两个技能 `.claude/skills/joplo/SKILL.md` 与 `.claude/skills/joplo-feedback/SKILL.md`，内容与仓库根目录的官方技能 `skills/` 逐字相同（同一份模板生成，D64）：心智模型、起步顺序、最常见的坑（每条指向详细主题），以及评审回流步骤；具体 API 仍由 `npx joplo skill <主题>` 按需输出。AGENTS.md 已存在时更新 Joplo 托管段（同样包含心智模型、起步顺序和常见坑）；不存在时仅在显式传 `--agents-md` 后创建。
+写入两个技能 `.claude/skills/joplo/SKILL.md` 与 `.claude/skills/joplo-feedback/SKILL.md`，内容与仓库根目录的官方技能 `skills/` 逐字相同（同一份模板生成，D64）。`joplo` 负责创作演示和启动评审交接；`joplo-feedback` 负责本地／Share 的接收、及时回执、恢复以及按授权修改源码。完整使用指南和最佳实践通过 `npx joplo skill review` 按需读取，包括后台进程不会自动唤醒 Agent 的边界；不能挂起监听后结束响应却声称仍实时接收。AGENTS.md 已存在时更新 Joplo 托管段；不存在时仅在显式传 `--agents-md` 后创建。
 
 - `--diff`：只打印 unified diff，不创建或改写文件，优先于 force。
 - `--force`：允许覆盖被用户修改过的技能文件。
