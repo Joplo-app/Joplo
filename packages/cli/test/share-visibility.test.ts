@@ -53,6 +53,8 @@ beforeEach(async () => {
     const r = responses.get(path); if (r) return send(r.body, r.status);
     if (path === '/api/v1/me') return send({ user, plan, limits, credential: req.headers.authorization === `Bearer ${apiKey}` ? { kind: 'api_key', name: 'team-invite CI', prefix: 'jpk_A1b2', scopes: ['shares:publish', 'feedback:read'], expiresAt: '2027-02-04T00:00:00.000Z' } : { kind: 'device' } });
     if (path === '/api/v1/shares') {
+      // 密码契约：更新当前公开的分享时，设置和移除密码都必须同时明确改为私密。
+      if (body.password !== undefined && body.replaceShareId && visibility === 'public' && body.visibility !== 'private') return send({ code: 'BAD_REQUEST', message: 'Password changes on public shares require visibility: private' }, 400);
       // 旧版 SaaS：严格校验，不认识 review 字段时 400（没有创建任何记录）
       if (strictVisibility && body.visibility !== undefined) return send({ code: 'BAD_REQUEST', message: 'Unknown field visibility' }, 400);
       if (rejectReview && body.review !== undefined) return send({ code: 'BAD_REQUEST', ...(reviewErrorMessage ? { message: reviewErrorMessage } : {}) }, rejectReview);
@@ -251,6 +253,34 @@ test('看板范围评审：仅评审结果携带 mode，不误显示为普通分
 
 
 const password = 'test-only-密🔐码-42';
+test.each([
+  { operation: '设置', flags: ['--password', password], value: password },
+  { operation: '移除', flags: ['--no-password'], value: null },
+])('无本地记录时 --update 公开链接并操作密码，必须显式改为私密：$operation', async ({ flags, value }) => {
+  await login(); plan = 'pro'; visibility = 'public';
+  await expect(readFile(join(project, '.joplo/cloud.json'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  const r = await cli(['share', project, '--update', `${base}/s/Abc1234567/`, '--private', '--no-review', ...flags, '--json']);
+  expect(r.code, r.stdout).toBe(0);
+  expect(createBody()).toMatchObject({ replaceShareId: 'Abc1234567', visibility: 'private', password: value });
+  expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
+  expect(r.stdout + r.stderr).not.toContain(password);
+  await scanFiles(root);
+});
+
+test.each([password, null])('看板明确操作密码（%s）时，新建和未知可见性的更新均显式发送私密', async value => {
+  await login(); plan = 'pro';
+  // 先新建，再模拟云端已公开、本地旧记录却没有 visibility 的更新。
+  await boardPublish({ visibility: 'private', review: false, password: value });
+  expect(createBody()).toMatchObject({ visibility: 'private', password: value });
+  expect(createBody()).not.toHaveProperty('replaceShareId');
+  await saveRecord(recordLink('Abc1234567'));
+  visibility = 'public'; calls = [];
+  await boardPublish({ visibility: 'private', review: false, password: value });
+  expect(createBody()).toMatchObject({ replaceShareId: 'Abc1234567', visibility: 'private', password: value });
+  expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
+  await scanFiles(root);
+});
+
 async function scanFiles(dir: string): Promise<void> {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     if (e.isDirectory()) await scanFiles(join(dir, e.name));
@@ -357,7 +387,12 @@ test('保留 #37 私密分享对旧 strict review 字段的兼容重试，密码
    expect(r.code,r.stdout).toBe(0);
    const bodies=calls.filter(c=>c.path==='/api/v1/shares').map(c=>c.body);
    expect(bodies).toHaveLength(2); expect(bodies[0]).toHaveProperty('review'); expect(bodies[1]).not.toHaveProperty('review');
-   if(flags.length) expect(bodies.map(b=>b.password)).toEqual([password,password]);
-   else for(const body of bodies) expect(body).not.toHaveProperty('password');
+   if(flags.length) {
+     expect(bodies.map(b=>b.password)).toEqual([password,password]);
+     expect(bodies.map(b=>b.visibility)).toEqual(['private','private']);
+   } else for(const body of bodies) {
+     expect(body).not.toHaveProperty('password');
+     expect(body).not.toHaveProperty('visibility');
+   }
  }
 });

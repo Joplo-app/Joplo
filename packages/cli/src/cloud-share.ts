@@ -223,9 +223,9 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
     const firstName = scenarioIds && checked.project ? checked.project.scenarios[scenarioIds[0]!]?.name : undefined;
     const defaultTitle = scenarioIds ? `${checked.name} · ${scenarioIds.length === 1 && firstName ? firstName : `${scenarioIds.length} scenarios`}` : checked.name;
     const title = (opts.title ?? defaultTitle).trim().slice(0, 200);
-    // 记录只用于 wire 兼容，不替用户选择：仅已知 public → private 的更新需要显式取消公开。
+    // 密码操作必须显式私密（包括移除）；无密码操作时，仅已知 public → private 的更新发送此字段，兼容旧云端。
     const known = [record.main, record.review, ...Object.values(record.scoped ?? {})].find(l => l?.shareId === replaceShareId);
-    const sendVisibility = visibility === 'public' || !!replaceShareId && known?.visibility === 'public';
+    const sendVisibility = visibility === 'public' || opts.password !== undefined || !!replaceShareId && known?.visibility === 'public';
     const create = async (withReview: boolean) => {
       try {
         return await client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}), ...(withReview && review ? { review } : {}), ...(pr ? { pr } : {}), ...(sendVisibility ? { visibility } : {}), ...(opts.password !== undefined ? { password: opts.password } : {}) }), { create: true });

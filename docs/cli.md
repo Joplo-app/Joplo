@@ -319,7 +319,7 @@ npx joplo whoami --format json
 
 缺任意项时，非 TTY、设置 CI、`--json`（等同 `--format json`）直接以退出码 **2** 返回 `CHOICE_REQUIRED`；JSON 为结果信封 `{ok:false,error:{code:"CHOICE_REQUIRED",message,details:{code:"CHOICE_REQUIRED",missing:["--public / --private","--review / --no-review"]}}`，missing 只列缺失项。此时没有登录、检查、构建或网络请求。交互终端逐项提问；默认高亮公开、不发评审版，必须按键确认，EOF / Ctrl+C 取消。
 
-公开会进入 `show.joplo.app/@用户名` 作品集并被搜索引擎收录。项目名、简介与功能目标应写成希望出现在搜索结果里的样子，不要包含未公开的信息。私密只有拿到链接的人能看，不是密码保护。本轮不支持密码参数。
+公开会进入 `show.joplo.app/@用户名` 作品集并被搜索引擎收录。项目名、简介与功能目标应写成希望出现在搜索结果里的样子，不要包含未公开的信息。私密只有拿到链接的人能看；需要访问密码时，使用下方的密码查看（Pro）。
 
 PR 预览（`--pr`）与按场景/功能保密分享（`--scenario` / `--feature`）隐含私密，不要求可见性参数；显式 `--public` 在本地退出 2。仍须选择是否同时发评审版。对比使用 `diff publish`，始终私密且不支持评审版，不要求上述两项。
 
@@ -338,16 +338,16 @@ PR 预览（`--pr`）与按场景/功能保密分享（`--scenario` / `--feature
 - 设置/更换需 Pro（含创始会员）；降级后已有密码继续保护，免费账号仍能去掉。403 `PLAN_REQUIRED` 沿用退出 **1**，提供当前 `<server><upgradePath>`（`error.details.upgradeUrl`，缺省 `/settings/billing`）。不能用 `--new` 绕过套餐限制。
 - 与 `--review` 同用时主分享和评审版使用同一密码，输出明确说明；两次发布仍各自提交，评审失败时主链接可能已成功，重试需用户再次提供密码。
 - 成功文本显示“已加密”，JSON 的主分享及评审分享带 `passwordProtected: boolean`；旧云端缺字段按 false。不回显密码。Cloud 在返回页面前执行验证，保护页面、资源、音频、Agent 读取和嵌入，预览卡不泄露作品内容；本地静态 build 本身没有密码保护。
-- 只有本次给了 `--password` 或 `--no-password` 才发送创建请求 `password`（字符串 / null）；不传即保持原状，普通私密分享保持 #37 的请求体。400 正文涉及 password 时提示“Joplo Cloud 还不支持密码查看”，退出 **1**，不误走 review 兼容重试。
+- 只有本次给了 `--password` 或 `--no-password` 才发送创建请求 `password`（字符串 / null），并一律显式带 `visibility: "private"`；即使没有本地记录，也能用 `--update <公开分享链接> --private` 同时切为私密并设置或移除密码。不传 password 即保持原状，普通私密分享保持 #37 的请求体。400 正文涉及 password 时提示“Joplo Cloud 还不支持密码查看”，退出 **1**，不误走 review 兼容重试。
 
 ### 可见性兼容与字段数据流
 
-公开请求始终发送 `visibility: "public"`。本次选择私密时，新建分享不发送 visibility；更新仅在同服务器的本地分享记录中，目标链接明确为 `visibility: "public"` 时发送 `visibility: "private"`，用于撤下作品集中的公开作品。目标记录没有 visibility（旧链接）、为 private，或 `--update <链接>` 的目标不在本地记录中时，私密更新都省略此字段，保证旧 strict Cloud 仍可更新。匹配按目标 shareId 查找 main/review/scoped，不能用其他链接的 public 记录代替。记录只决定字段是否必须发送，绝不替代本次显式选择。CLI 与看板共用此规则。旧 Cloud HTTP 400 且信息涉及 visibility / 未知字段时，以 BAD_REQUEST、退出 1 提示“Joplo Cloud 还不支持公开分享，请改用 --private 或稍后再试”；不误走 review 清单降级重试，也不静默改私密。
+公开请求始终发送 `visibility: "public"`。本次选择私密且明确发送 password（字符串或 null）时，新建和更新一律显式带 `visibility: "private"`，不依赖本地记录，确保更新公开链接时同时切为私密。完全没有密码操作时沿用旧兼容规则：新建分享不发送 visibility；更新仅在同服务器的本地分享记录中，目标链接明确为 `visibility: "public"` 时发送 `visibility: "private"`，用于撤下作品集中的公开作品。目标记录没有 visibility（旧链接）、为 private，或 `--update <链接>` 的目标不在本地记录中时，无密码操作的私密更新都省略此字段，保证旧 strict Cloud 仍可更新。匹配按目标 shareId 查找 main/review/scoped，不能用其他链接的 public 记录代替。记录只决定字段是否必须发送，绝不替代本次显式选择。CLI 与看板共用此规则。旧 Cloud HTTP 400 且信息涉及 visibility / 未知字段时，以 BAD_REQUEST、退出 1 提示“Joplo Cloud 还不支持公开分享，请改用 --private 或稍后再试”；不误走 review 清单降级重试，也不静默改私密。
 
 | 字段 | 写入点 → 存储 → 读取点 → 消费者 |
 | --- | --- |
 | visibility / review 选择 | 看板 radio/checkbox → POST 本机 cloud/publish → server 校验并存 CloudHub.job.request → cloud-bridge 转本次 ShareOptions → CLI shareChoices → CloudClient POST shares；review 拆成第二个始终私密的请求 |
-| password | 用户终端隐藏输入 / 显式参数 / JOPLO_SHARE_PASSWORD（需 --password）或看板遮挡输入 → POST 本机 cloud/publish → server → cloud-bridge → CLI → Cloud POST shares；只在内存中，不进任务快照、GET / WebSocket、日志、IR 或构建文件 |
+| password | 用户终端隐藏输入 / 显式参数 / JOPLO_SHARE_PASSWORD（需 --password）或看板遮挡输入 → POST 本机 cloud/publish → server → cloud-bridge → CLI → Cloud POST shares；本次为字符串或 null 时均同时显式发送 visibility: private，未操作时省略 password 并保留原可见性兼容规则；只在内存中，不进任务快照、GET / WebSocket、日志、IR 或构建文件 |
 | passwordProtected | Cloud finalize → CLI JSON / 文本结果 → cloud.json 主/评审/范围记录 → bridge links / publish → 看板“已加密”；旧云端缺字段按 false，本机从不保存密码 |
 | CLI 可见性 / 评审选择 | 本次参数或 TTY 回答 → 仅本次内存 → share → CloudClient；不从配置或记录回填 |
 | mode（仅评审结果） | 请求范围没有 picked 子集 → CLI 只发布评审 → data.mode=review、data.url 为评审链接 → cloud-bridge → CloudHub.job.result → 看板标明链接含全部方案且始终私密；主分享与 --update 目标不更新 |

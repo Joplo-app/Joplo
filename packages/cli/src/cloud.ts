@@ -331,8 +331,10 @@ export class CloudClient {
         if (details) throw sizeError(details);
       }
       // 只保留协议识别结果，不回显可能含密钥的远端错误正文。
-      const unknownPassword = response.status === 400 && /password/i.test(JSON.stringify(data));
-      const unknownVisibility = response.status === 400 && /visibility|unrecogni[sz]ed|unknown (?:key|field)|additional propert/i.test(JSON.stringify(data));
+      const errorText = JSON.stringify(data);
+      const unknownPassword = response.status === 400 && /password/i.test(errorText);
+      // 明确拒绝 review 仍可降级重试；不能因为本次同时发送了私密可见性就误判为 visibility 不支持。
+      const unknownVisibility = response.status === 400 && (/visibility/i.test(errorText) || !/review/i.test(errorText) && /unrecogni[sz]ed|unknown (?:key|field)|additional propert/i.test(errorText));
       throw new CloudError(code, undefined, unknownPassword || unknownVisibility ? { ...(unknownPassword ? { unknownPassword: true } : {}), ...(unknownVisibility ? { unknownVisibility: true } : {}) } : undefined, undefined, response.status);
     }
     return data;
