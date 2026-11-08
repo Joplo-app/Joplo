@@ -39,11 +39,12 @@ export const START_ORDER = [
   'With minimal code, write one happy path and one error-and-recovery scenario.',
   'Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.',
   'Extend to every option and every case agreed with the user; run check until 0 errors.',
-  'Before handing off for review, read npx joplo skill review. Keep npx joplo feedback watch [dir] --local --follow --json running in its own shell (joplo dev prints this exact command), then give the user the board URL dev printed. While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. If you end your response while they test, add --once so the watcher exits (and wakes a host that resumes on background exit) on the first event, then resume with --since. Receive and apply review results with the joplo-feedback skill.',
+  'Required after every round of development: before handing off, read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json in its own shell (joplo dev prints this exact command); only then give the user the board URL dev printed. Never hand off with only a URL, and never end your response without a running watcher (use --once below). While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. If you end your response while they test, add --once so the watcher exits (and wakes a host that resumes on background exit) on the first event, then resume with --since. Receive and apply review results with the joplo-feedback skill.',
 ] as const;
 
 /** 最常见的坑：一句话 + 详细主题。 */
 export const PITFALLS = [
+  ['Finishing development is not the end: always start npx joplo feedback watch [dir] --local --follow --json (add --once if you will end your response) before you give the user the board URL, and keep receiving their feedback', 'review'],
   ['when takes a condition, not a boolean: when={eq($.ui.mode, \'code\')}, never when={mode === \'code\'}; for values known while writing use {flag && <X/>}', 'authoring'],
   ['Only catalog components and the listed HTML tags exist; <br/> is UNKNOWN_COMPONENT, so write \'Line 1\\nLine 2\' inside <Text>', 'components'],
   ['Every interactive element needs a flow step, disabled={true} with disabledReason, or unmodeled; otherwise check warns UNBOUND_INTERACTIVE', 'check'],
@@ -103,6 +104,7 @@ function joploBody(): string {
     '- Cards only open, close, jump in time, or switch roles; text that explains belongs in captions and explain(). Worked example: npx joplo skill story.',
     '',
     '## Review live with the user',
+    'Required: whenever you finish a round of development the user will look at, start the follower below before handing off, even for small changes and even if the user did not ask for a review. A hand-off without a running watcher loses their feedback.',
     'The user reviews in the board: they click through scenarios, write comments with the board\'s native feedback icon, and may confirm (approve) an option. You receive each event the moment it is saved.',
     '1. Start npx joplo feedback watch <dir> --local --follow --json in its own long-running shell (joplo dev prints this exact command; the board\'s feedback panel can copy it too). One follower covers every option of the project and attaches by itself to the new round each source edit opens.',
     '2. Then give the user the board URL that dev printed (do not assume port 4790) and point them to the native feedback icon. If they want to drive the UI themselves, only give the link.',
@@ -140,6 +142,7 @@ function feedbackBody(): string {
     '- Share review uses the owner\'s login or an API key with feedback:read. Keep the local/Cloud source explicit.',
     '',
     '## Local review: one follower for the whole project',
+    'Required: after every round of development, start this follower before you give the user the board URL, and do not end your response without it running (use --once if you must end it). Never hand off with only a link.',
     '```sh',
     'npx joplo dev ./demo                                      # prints the board URL and the command below',
     'npx joplo feedback watch ./demo --local --follow --json   # keep running in its own shell',

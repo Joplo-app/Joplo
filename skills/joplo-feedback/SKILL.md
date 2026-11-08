@@ -12,6 +12,7 @@ Reviews happen in the Joplo board: the reviewer clicks through the demo, writes 
 - Share review uses the owner's login or an API key with feedback:read. Keep the local/Cloud source explicit.
 
 ## Local review: one follower for the whole project
+Required: after every round of development, start this follower before you give the user the board URL, and do not end your response without it running (use --once if you must end it). Never hand off with only a link.
 ```sh
 npx joplo dev ./demo                                      # prints the board URL and the command below
 npx joplo feedback watch ./demo --local --follow --json   # keep running in its own shell
@@ -62,4 +63,4 @@ npx joplo feedback watch --share <share-id> --option <feature.option> --interval
 - AUTH_REQUIRED / AUTH_EXPIRED (exit 3): tell the user how to run npx joplo login; do not log in/out or switch accounts without their instruction. Permission, quota, and missing-share errors are not approvals.
 - If a command is unavailable, check the project's installed Joplo version and its skill output. Do not silently switch to another instance or use another project's credentials.
 - .joplo runtime state stays local, and local feedback is never uploaded just because a Share exists. Details: npx joplo skill review; source write-back and publishing: npx joplo skill publish.
-<!-- joplo-skill 0.2.16 sha256:e1f4c363b45e5b6bf1f9e2fc0b5f440d0119c444291234549d5e12f154755aa9 -->
+<!-- joplo-skill 0.2.16 sha256:feef18032ed47313e976f2ba2adfd085c071414ca806f727cdd43a495785da1e -->

@@ -1,5 +1,9 @@
 # 更新日志
 
+## 未发布
+
+- 官方技能 `joplo` 与 `joplo-feedback`：每轮开发完成后必须先启动 `joplo feedback watch --local --follow`（要结束回复时加 `--once`）再把看板地址交给用户，不再只给链接；这一条也列进常见坑。常见坑不再限制条数。
+
 ## 0.2.16
 
 - 发布站的舞台右上角新增一个淡淡的小 Joplo 图标，点击在新标签页打开 joplo.app。Joplo Cloud 上 Pro 创作者的分享（含嵌入）没有水印；本地 `joplo build` 后自己托管的站点照常带。嵌入沿用原来的「用 Joplo 制作」，Pro 分享里同样去掉。看板和导出的图片、视频不带水印。
