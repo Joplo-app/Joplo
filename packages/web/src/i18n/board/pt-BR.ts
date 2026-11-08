@@ -419,7 +419,7 @@ export function createBoardPtBR(locale: Locale = 'pt-BR') {
       cloudScopeProject: "Projeto inteiro",
       cloudScopeNote: "Só o que você escolher entra no compartilhamento. Os outros recursos não são enviados, não apenas ocultados.",
       cloudSignedInAs: (email: Value) => `Conectado como ${value(email, locale)}`,
-      cloudPlanFree: "Grátis · links expiram em 1 hora",
+      cloudPlanFree: "Grátis · links expiram em 7 dias",
       cloudPlanPro: "Pro · link permanente",
       cloudPublishButton: "Publicar",
       cloudPublishing: "Publicando…",

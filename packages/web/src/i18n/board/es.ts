@@ -419,7 +419,7 @@ export function createBoardEs(locale: Locale = 'es') {
       cloudScopeProject: "Todo el proyecto",
       cloudScopeNote: "Solo lo que elijas entra en el enlace. Las demás funciones no se suben; no solo se ocultan.",
       cloudSignedInAs: (email: Value) => `Sesión iniciada como ${value(email, locale)}`,
-      cloudPlanFree: "Gratis · los enlaces caducan en 1 hora",
+      cloudPlanFree: "Gratis · los enlaces caducan en 7 días",
       cloudPlanPro: "Pro · enlace permanente",
       cloudPublishButton: "Publicar",
       cloudPublishing: "Publicando…",

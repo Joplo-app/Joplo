@@ -436,7 +436,7 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       cloudScopeProject: "整个项目",
       cloudScopeNote: "只有选中的内容进入分享；其他功能不会上传，不只是隐藏。",
       cloudSignedInAs: (email: Value) => `已登录：${value(email, locale)}`,
-      cloudPlanFree: "免费版 · 链接 1 小时后失效",
+      cloudPlanFree: "免费版 · 链接 7 天后失效",
       cloudPlanPro: "Pro · 永久链接",
       cloudPublishButton: "发布",
       cloudPublishing: "正在发布…",

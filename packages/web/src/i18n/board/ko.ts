@@ -419,7 +419,7 @@ export function createBoardKo(locale: Locale = 'ko') {
       cloudScopeProject: "프로젝트 전체",
       cloudScopeNote: "선택한 것만 공유에 들어갑니다. 다른 기능은 숨기는 것이 아니라 업로드하지 않습니다.",
       cloudSignedInAs: (email: Value) => `${value(email, locale)}(으)로 로그인됨`,
-      cloudPlanFree: "무료 · 링크는 1시간 후 만료",
+      cloudPlanFree: "무료 · 링크는 7일 후 만료",
       cloudPlanPro: "Pro · 영구 링크",
       cloudPublishButton: "게시",
       cloudPublishing: "게시 중…",

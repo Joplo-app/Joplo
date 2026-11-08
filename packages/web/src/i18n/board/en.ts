@@ -435,7 +435,7 @@ export function createBoardEn(locale: Locale = 'en') {
       cloudScopeProject: "Whole project",
       cloudScopeNote: "Only what you pick goes into the share. Other features are left out of the uploaded files, not just hidden.",
       cloudSignedInAs: (email: Value) => `Signed in as ${value(email, locale)}`,
-      cloudPlanFree: "Free · links expire after 1 hour",
+      cloudPlanFree: "Free · links expire after 7 days",
       cloudPlanPro: "Pro · permanent link",
       cloudPublishButton: "Publish",
       cloudPublishing: "Publishing…",
