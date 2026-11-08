@@ -2,7 +2,7 @@
  * 看板直接发布到云端（D76）的纯模型：范围选项 → 请求体；发布进度行 → 阶段；结果里的附加说明。
  * 进度行来自 CLI 的 share()（英文，与终端一致），这里只按开头识别阶段，其余行原样当作说明。
  */
-import type { CloudJob, CloudPublishRequest } from '../runtime/dev-client';
+import type { CloudJob, CloudPublishRequest, CloudStorage, CloudStorageFull } from '../runtime/dev-client';
 
 export type CloudScopeChoice = 'scenario' | 'feature' | 'project';
 export type CloudContext = { featureId: string; scenarioId: string | null };
@@ -61,4 +61,34 @@ export function cloudPicks(project: PickSource, ctx: CloudContext): CloudPicks {
 export function cloudUnpicked(choice: CloudScopeChoice, ctx: CloudContext, picks: CloudPicks): CloudScopeChoice | null {
   const scope: CloudScopeChoice = choice === 'scenario' && !ctx.scenarioId ? 'feature' : choice;
   return picks[scope] ? null : scope;
+}
+
+// ---------- 账号容量（C27，原型 storage_quota 方案 B） ----------
+/** 与 CLI 的 formatBytes 一致：按 1024 进位，MB / GB 一位小数且去掉 .0，不足 1 MB 用 KB。 */
+export function formatStorage(bytes: number): string {
+  const mb = bytes / 1024 / 1024;
+  const trim = (n: number) => n.toFixed(1).replace(/\.0$/, '');
+  if (bytes <= 0) return '0 MB';
+  if (mb >= 1024) return `${trim(mb / 1024)} GB`;
+  if (mb < 1) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${trim(mb)} MB`;
+}
+/** 用量一档：ok 时浮层只写一行小字；near（≥80%）出现黄色用量条与提醒；over（满了）用红色。 */
+export type StorageLevel = 'ok' | 'near' | 'over';
+export const STORAGE_NEAR = 0.8;
+export function storageView(storage: CloudStorage | undefined | null): { level: StorageLevel; pct: number; used: string; quota: string } | null {
+  if (!storage || !(storage.quotaBytes > 0)) return null;
+  const ratio = storage.usedBytes / storage.quotaBytes;
+  return { level: ratio >= 1 ? 'over' : ratio >= STORAGE_NEAR ? 'near' : 'ok', pct: Math.min(100, Math.round(ratio * 100)), used: formatStorage(storage.usedBytes), quota: formatStorage(storage.quotaBytes) };
+}
+/** 容量不足的说明：新建写需要多少、还剩多少、还差多少；更新写多占多少；数字缺了只给通用说明。链接原样带上。 */
+export function storageFull(f: CloudStorageFull):
+  | { kind: 'need'; size: string; left: string; short: string; manageUrl: string; upgradeUrl: string }
+  | { kind: 'update'; size: string; left: string; manageUrl: string; upgradeUrl: string }
+  | { kind: 'generic'; manageUrl: string; upgradeUrl: string } {
+  const links = { manageUrl: f.manageUrl, upgradeUrl: f.upgradeUrl };
+  if (f.usedBytes === undefined || f.quotaBytes === undefined || f.shareBytes === undefined) return { kind: 'generic', ...links };
+  const left = Math.max(0, f.quotaBytes - f.usedBytes);
+  if (f.replacedBytes) return { kind: 'update', size: formatStorage(Math.max(0, f.shareBytes - f.replacedBytes)), left: formatStorage(left), ...links };
+  return { kind: 'need', size: formatStorage(f.shareBytes), left: formatStorage(left), short: formatStorage(Math.max(0, f.shareBytes - left)), ...links };
 }

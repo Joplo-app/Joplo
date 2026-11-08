@@ -2,10 +2,41 @@
  * 看板直接发布到云端（D76）的纯模型：范围 → 请求体、进度行 → 阶段、结果说明、是否需要登录。
  */
 import { describe, expect, it } from 'vitest';
-import { cloudNotes, cloudPicks, cloudRequest, cloudStage, cloudUnpicked, defaultChoice, needsLogin } from '../src/board/cloud-model';
+import { cloudNotes, cloudPicks, cloudRequest, cloudStage, cloudUnpicked, defaultChoice, formatStorage, needsLogin, storageFull, storageView } from '../src/board/cloud-model';
 import type { CloudJob } from '../src/runtime/dev-client';
 
 const ctx = { featureId: 'invite', scenarioId: 'invite.a.happy' };
+
+describe('账号容量（C27，方案 B）', () => {
+  const MB = 1024 * 1024, GB = 1024 * MB;
+  it('格式化：MB 一位小数、整数去掉 .0、GB 以上用 GB、不足 1 MB 用 KB、0 是 0 MB', () => {
+    expect(formatStorage(Math.round(47.2 * MB))).toBe('47.2 MB');
+    expect(formatStorage(100 * MB)).toBe('100 MB');
+    expect(formatStorage(5 * GB)).toBe('5 GB');
+    expect(formatStorage(Math.round(1.25 * GB))).toBe('1.3 GB');
+    expect(formatStorage(300 * 1024)).toBe('300 KB');
+    expect(formatStorage(12)).toBe('1 KB');
+    expect(formatStorage(0)).toBe('0 MB');
+  });
+  it('平时只有一行小字；用到 80% 起出现黄色用量条与提醒；满了是 over', () => {
+    expect(storageView({ usedBytes: 38 * MB, quotaBytes: 100 * MB })).toEqual({ level: 'ok', pct: 38, used: '38 MB', quota: '100 MB' });
+    expect(storageView({ usedBytes: 79.9 * MB, quotaBytes: 100 * MB }).level).toBe('ok');
+    expect(storageView({ usedBytes: 80 * MB, quotaBytes: 100 * MB }).level).toBe('near');
+    expect(storageView({ usedBytes: 100 * MB, quotaBytes: 100 * MB })).toMatchObject({ level: 'over', pct: 100 });
+    // 已超额的老账号：百分比封顶 100
+    expect(storageView({ usedBytes: 150 * MB, quotaBytes: 100 * MB })).toMatchObject({ level: 'over', pct: 100 });
+    // 上限为 0 或缺失：不显示
+    expect(storageView({ usedBytes: 1, quotaBytes: 0 })).toBeNull();
+    expect(storageView(undefined)).toBeNull();
+  });
+  it('容量不足：新建写还差多少，更新写多占多少；数字缺了就只给通用说明', () => {
+    const links = { manageUrl: 'https://c/shares', upgradeUrl: 'https://c/settings/billing' };
+    expect(storageFull({ ...links, usedBytes: Math.round(95.9 * MB), quotaBytes: 100 * MB, shareBytes: Math.round(12.4 * MB), replacedBytes: 0 })).toEqual({ kind: 'need', size: '12.4 MB', left: '4.1 MB', short: '8.3 MB', ...links });
+    expect(storageFull({ ...links, usedBytes: 100 * MB, quotaBytes: 100 * MB, shareBytes: 70 * MB, replacedBytes: 60 * MB })).toEqual({ kind: 'update', size: '10 MB', left: '0 MB', ...links });
+    expect(storageFull({ ...links, usedBytes: 6 * GB, quotaBytes: 5 * GB, shareBytes: 2 * MB, replacedBytes: 0 })).toMatchObject({ kind: 'need', left: '0 MB', short: '2 MB' });
+    expect(storageFull({ ...links })).toEqual({ kind: 'generic', ...links });
+  });
+});
 
 describe('cloud-model', () => {
   it('范围：当前场景 / 当前功能 / 整个项目；没有当前场景时退回当前功能', () => {

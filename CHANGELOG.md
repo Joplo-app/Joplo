@@ -1,5 +1,9 @@
 # 更新日志
 
+## 未发布
+
+- 免费分享不再过期，改为按账号空间计算（免费 100 MB、Pro 5 GB）：`joplo share` 发布后打印 `Storage: … of … used`，JSON 带 `data.storage`；空间不够时以 `QUOTA_EXCEEDED`（kind storage）、退出码 6 结束，说明差多少、已有链接不受影响，并给出腾空间和升级的链接。免费账号再次 share 也会更新同一个链接。看板发布浮层平时只显示一行用量，用到八成才出现用量条和提醒，放不下时显示红色提示。需要 Joplo Cloud 同步上线（C27）。
+
 ## 0.2.17
 
 - 作者内容多语言：源文件照常用一种语言写，`npx joplo i18n add <语言>` 生成 `locales/<语言>.json`（原文 → 译文），由 Agent 填写译文；`check` 报出缺失、过期（附最接近的旧条目）和没人用的译文。

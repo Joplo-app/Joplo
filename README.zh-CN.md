@@ -170,7 +170,7 @@ More embed options: https://cloud.joplo.app/shares/<share-id>
 - 保留 `allow="fullscreen *"`：分享页运行在 CSP 沙箱里，只写 `allow="fullscreen"` 时 Chromium、Firefox、WebKit 都会拒绝全屏；去掉后播放器退回为在新标签页打开演示。
 - 嵌入播放器不发网络请求、不依赖存储。GitHub 会过滤 Markdown 里的 iframe，README 里请用徽章。
 - `--scenario <id>`、`--feature <id>` 只分享项目的一部分；范围外的内容在构建时就被裁掉，不是隐藏。
-- 免费链接 7 天后过期，过期后徽章显示“已过期”。Pro 链接永久有效，再次 share 更新同一个链接，已经贴出去的徽章和嵌入会跟着更新。
+- 链接永久有效，免费账号也一样；限制的是账号空间（免费 100 MB、Pro 5 GB，按所有在线分享的原始大小计算），`share` 会打印用了多少。再次 share 更新同一个链接，已经贴出去的徽章和嵌入会跟着更新。
 - CI 中设置 `JOPLO_API_KEY`，用 `npx joplo share --new --pr <number> --format json` 发布 PR 预览。Agent 应原样使用 `data.embed.markdown` / `data.embed.iframe`，不要自己拼地址。
 
 预览图需要可选的导出组件（`npx joplo setup export`）；没有时 share 照常成功，分享页使用通用卡片。详见 [CLI 文档的 share](docs/cli.md#share) 和[嵌入模式](docs/web.md#嵌入模式)。

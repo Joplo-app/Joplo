@@ -90,4 +90,20 @@ export const designRecords = {
     current: 'D84 已实现：加语言、检查译文、按观众语言切换与退回、各语言旁白。',
     evidence: 'DECISIONS D57 / D74 / D84；examples/joplo content_i18n 原型',
   },
+  storage_quota: {
+    problem: '链接不再过期，空间不够了怎么办？',
+    exploration: 'D85 把免费分享从按有效期改为按账号空间。比较一直显示用量条与快满才出现，用户在看板确认 B。',
+    scenario: 'over',
+    decision: '平时不打扰，八成才提醒，放不下时说清差多少',
+    current: 'D85 第一阶段：Cloud 按差额计算与拦截，CLI 和看板显示用量。扩容包还没开卖。',
+    evidence: 'DECISIONS D85；joplo-cloud C27；examples/joplo storage_quota 原型',
+  },
+  cloud_usage: {
+    problem: '朗读和空间用了多少，非得去控制台才知道吗？',
+    exploration: 'D85 加了托管朗读和账号空间。用户要求本地看板和控制台都能看到，并在看板确认首页账号卡片（A）。',
+    scenario: 'cloud_voice',
+    decision: '首页账号卡片看用量，声音浮层里直接用 Joplo Cloud 朗读',
+    current: 'D85 托管朗读实现中：声音来源只留官方的，看板显示剩余字数与生成前的字数估算。',
+    evidence: 'DECISIONS D85；joplo-cloud C27；examples/joplo cloud_usage 原型',
+  },
 } satisfies Record<string, PublicDesignRecord>;

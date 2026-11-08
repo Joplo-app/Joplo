@@ -170,7 +170,7 @@ The embed code from `--format json` or the Cloud console is ready to paste:
 - Keep `allow="fullscreen *"`: the share page runs in a CSP sandbox, so plain `allow="fullscreen"` blocks fullscreen in Chromium, Firefox, and WebKit. Without it the player falls back to opening the demo in a new tab.
 - The embedded player makes no network requests and does not use storage. GitHub strips iframes from Markdown, so use the badge there.
 - `--scenario <id>` and `--feature <id>` share only part of a project. Everything else is cut at build time, not hidden.
-- Free links expire after 7 days, and their badge then shows "expired". Pro links are permanent, and re-sharing updates the same link, so badges and embeds you already published stay current.
+- Links never expire, on free accounts too. Each account has storage instead (free 100 MB, Pro 5 GB, counted from the raw size of every live share), and `share` prints how much you use. Re-sharing updates the same link, so badges and embeds you already published stay current.
 - In CI, set `JOPLO_API_KEY` and run `npx joplo share --new --pr <number> --format json` for a PR preview. Agents should copy `data.embed.markdown` / `data.embed.iframe` as is rather than building URLs themselves.
 
 The preview image needs the optional export component (`npx joplo setup export`); without it, share still succeeds and uses a generic card. Details: [`share` in the CLI reference](docs/cli.md#share) and [embed mode](docs/web.md#嵌入模式).

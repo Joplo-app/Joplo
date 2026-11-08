@@ -9,7 +9,7 @@ import { CloudError, sizeError, terminalText } from './cloud-error.ts';
 import { temporaryDirectory } from './cloud-cleanup.ts';
 import { embedSnippets, inlineProject, inlineProjectMode, writePreview, type EmbedSnippets, type RenderPreview } from './cloud-embed.ts';
 import { prContext, readPrComment, type PrCommentResult, type SharePr } from './cloud-pr.ts';
-import { atomicJson, CloudClient, httpUrl, nonempty, object, retryAfterMillis } from './cloud.ts';
+import { atomicJson, CloudClient, httpUrl, nonempty, object, readStorage, retryAfterMillis } from './cloud.ts';
 
 /** 客户端 MIME 映射；值与云端公开上传契约一致，不从私有包导入实现。 */
 export const CONTENT_TYPES: Record<string, string> = {
@@ -66,7 +66,7 @@ const recordJson = (server: string, r: ShareRecord) => ({
   ...(r.scoped && Object.keys(r.scoped).length ? { scoped: Object.fromEntries(Object.entries(r.scoped).map(([key, l]) => [key, { shareId: l.shareId, url: l.url }])) } : {}),
 });
 
-export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo };
+export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）；旧服务器不返回。 */ storage?: { usedBytes: number; quotaBytes: number; shareBytes: number } };
 /** scenarios / features：按场景保密分享（D75，`--scenario` / `--feature`），可以一起用；都不写时分享整个项目。 */
 /** update（D84）：要更新的已有分享的链接；没有 .joplo/cloud.json 时（例如换了一台电脑）用它指定，并从它沿用朗读音频。 */
 export type ShareOptions = { new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[]; update?: string };
@@ -156,8 +156,8 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     // 范围分享单独一条（键 = 排序后的场景 id，评审版加前缀），不碰主链接和评审链接
     const key = scenarioIds ? scopeKey(scenarioIds, reviewMode) : null;
     const previous = updateLink ?? (key ? record.scoped?.[key] : record[slot]);
-    const replaceShareId = account.plan === 'pro' && !opts.new && !pr ? previous?.shareId : undefined;
-    if (updateLink && account.plan !== 'pro') client.warn('Free shares cannot be updated in place; publishing a new link (the narration audio in the old share is still reused).');
+    // C27：免费账号也更新同一个链接（链接不再过期；每次新建既浪费容量也堆满作品集）；--new 与 PR 预览照旧新建
+    const replaceShareId = !opts.new && !pr ? previous?.shareId : undefined;
     const firstName = scenarioIds && checked.project ? checked.project.scenarios[scenarioIds[0]!]?.name : undefined;
     const defaultTitle = scenarioIds ? `${checked.name} · ${scenarioIds.length === 1 && firstName ? firstName : `${scenarioIds.length} scenarios`}` : checked.name;
     const title = (opts.title ?? defaultTitle).trim().slice(0, 200);
@@ -185,7 +185,7 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
       }
     }
     const prComment = pr ? readPrComment(final.pr ?? prepared.pr) : undefined;
-    return { result: { ...published, embed: embedSnippets(published.url, title), ...(reviewMode === 'review' ? { mode: 'review' as const } : {}), ...(pr ? { pr: prComment ?? null } : {}), ...(built.scope ? { scope: built.scope } : {}) }, plan: account.plan };
+    return { result: { ...published, embed: embedSnippets(published.url, title), ...(reviewMode === 'review' ? { mode: 'review' as const } : {}), ...(pr ? { pr: prComment ?? null } : {}), ...(built.scope ? { scope: built.scope } : {}), ...(readStorage(final.storage, ['shareBytes']) ? { storage: readStorage(final.storage, ['shareBytes'])! } : {}) }, plan: account.plan };
   } finally { try { await rm(staging, { recursive: true, force: true }); } finally { temporary.release(); } }
 }
 

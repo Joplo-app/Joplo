@@ -477,8 +477,11 @@ export async function requestClip(projectId: string, locale: Locale, segment: Vo
 // ---------- 直接发布到云端（D76） ----------
 /** 与 @joplo-app/server 的 CloudAccount / CloudJob 一致（页面只拿到邮箱和套餐，令牌留在本机进程）。 */
 export type CloudAccount =
-  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null }
+  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; storage?: CloudStorage }
   | { signedIn: false; server: string; loginCommand: string; message?: string };
+/** 账号容量（C27），字节。 */
+export type CloudStorage = { usedBytes: number; quotaBytes: number };
+export type CloudStorageFull = { usedBytes?: number; quotaBytes?: number; shareBytes?: number; replacedBytes?: number; manageUrl: string; upgradeUrl: string };
 export type CloudBorrowed =
   | { kind: 'element'; featureId: string; featureName: string; optionId: string; elementId: string; route: string; refs: string[]; scenarios: string[] }
   | { kind: 'page'; featureId: string; featureName: string; optionId: string; route: string; scenarios: string[] };
@@ -490,8 +493,8 @@ export type CloudJob = {
   request: CloudPublishRequest;
   startedAt: number;
   lines: string[];
-  result?: { shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope };
-  error?: { code: string; message: string; loginCommand?: string };
+  result?: { shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope; storage?: CloudStorage & { shareBytes: number } };
+  error?: { code: string; message: string; loginCommand?: string; storage?: CloudStorageFull };
 };
 
 /** 账号：available = false 表示这个看板进程不能发布（旧版 CLI 启动的）。 */

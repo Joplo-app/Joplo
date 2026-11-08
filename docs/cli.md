@@ -253,7 +253,7 @@ npx joplo setup export --uninstall
 - 装完以 `ready.json` 为准：中途失败（网络、npm、Chromium 起不来）不算已安装，重新运行即可续装；同一时间只有一个进程能安装（CLI 与看板共用一把锁）。
 - 升级 Joplo 后 Playwright 版本变化时需要重新安装；装好新版本会删掉旧版本的目录。
 - `--format json`：`data` 是状态（`ready`、`source: managed | project | null`、`version`、`dir`、`downloadMB`、`command`）；`--status` 没装时为 `ok: false`、`error.code: EXPORT_COMPONENT_MISSING`。
-- 退出码：0 成功；2 用法错误；4 导出组件未安装（render、`setup export --status`）。
+- 退出码：0 成功；2 用法错误；4 导出组件未安装（render、`setup export --status`）；6 账号空间不够（share，`QUOTA_EXCEEDED` 且 `details.kind` 为 storage）。
 
 服务契约见 [contract.ts](../packages/server/src/contract.ts)。所有主题和选项以当前 `--help` 为准；需要创作细节时优先读取对应 skill 主题。
 
@@ -343,7 +343,9 @@ npx joplo share --feature invite                      # 只分享一个功能
 - 默认标题是项目名；`--title` 接受 1–200 个字符。套餐和限额实时读取服务器。
 - `maxUploadBytes` 限制本次缺失对象的新上传量（免费 20 MiB、Pro 100 MiB）；`maxTotalBytes` 限制清单总量（256 MiB），`maxFiles` 限制文件数（2000）。实际数值以 me 为准。
 - CLI 本地只预检清单总量和文件数；新上传量由服务端按已有 blob 去重后判断，不能拿清单总量与新上传限额比较。共用字体和运行时资源可由运维预置。
-- Pro 且 `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接；`--new` 新建。免费账号每次新建。
+- `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接，免费账号和 Pro 都一样（C27）；`--new` 新建。
+- 链接不再过期（免费账号也是 `expiresAt: null`）；限制的是账号空间：所有在线分享**当前版本**的原始大小之和，不按去重算（免费 100 MiB、Pro 5 GiB，以 me 的 `storage` 为准）。发布成功后文本输出多一行 `Storage: <已用> of <上限> used (this share: <大小>)`，JSON 的 `data.storage` 是 `{usedBytes, quotaBytes, shareBytes}`；旧服务器不返回时没有这一行。
+- 放不下时以 `QUOTA_EXCEEDED`（`error.details.kind = "storage"`）、**退出码 6** 结束：什么都没上传，已有链接不受影响。`details` 带 `usedBytes`、`quotaBytes`、`shareBytes`、`replacedBytes`（更新同一个链接时旧版本的大小，只按差额判断）、`manageUrl`（当前 server 的 /shares）与 `upgradeUrl`（/settings/billing）。服务端返回的是 413 `STORAGE_FULL`，CLI 转成这个错误码。
 - `.joplo/cloud.json` 的格式为 `{server, shareId?, url?, review?: {shareId, url}, scoped?: {<范围键>: {shareId, url}}}`（`scoped` 见上方「按场景保密分享」）：主链接和评审版是**两个分享**，互不覆盖（契约 8.1）。普通 share 只用、只写主 `shareId`/`url`；`--review` 只用、只写 `review`（Pro 重新发布评审版时用 `review.shareId` 作 replaceShareId，评审链接和评论保留，版本 +1），评审版永远不会替换 README 里的主链接。写入时保留另一项；记录属于其他 server 时整体替换。没有 `review` 的旧记录照常使用。
 - 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；一个对象失败会取消其他在途 PUT 和重试等待；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
 - finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/settings/billing`。
@@ -368,13 +370,14 @@ JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, embed}`（`--revie
 | `badge` | `<分享页>badge.svg` |
 | `preview` | `<分享页>preview.png`（1200×630；有 `_joplo/preview.png` 时由分享页使用它） |
 
-Agent 可以把 `data.embed.markdown` 直接写进 README；免费链接要同时告诉用户 `data.expiresAt`，过期后徽章会显示“已过期”。iframe 地址可以手动加 `&scenario=<场景 id>` 选起始场景、`&autoplay=1` 跳过封面直接播放，见 [发布站的嵌入模式](web.md#嵌入模式)。
+Agent 可以把 `data.embed.markdown` 直接写进 README；链接不会过期，`data.expiresAt` 只在旧分享或已关闭的 PR 预览上不为空。iframe 地址可以手动加 `&scenario=<场景 id>` 选起始场景、`&autoplay=1` 跳过封面直接播放，见 [发布站的嵌入模式](web.md#嵌入模式)。
 
 | 错误码 | 恢复方式 |
 | --- | --- |
 | AUTH_REQUIRED（退出 3） | 请用户运行 npx joplo login，再重试 |
 | AUTH_EXPIRED（401，退出 3） | 重新运行 npx joplo login |
 | PLAN_REQUIRED | 服务端明确要求 Pro；升级入口为当前 server/settings/billing，或用 --new 创建新分享 |
+| QUOTA_EXCEEDED，kind storage（退出 6） | 账号空间不够，这次没有上传，已有链接不受影响；按 `details` 告诉用户差多少，去 `manageUrl` 删掉不需要的分享或去 `upgradeUrl` 升级；不要替用户删分享 |
 | ACCOUNT_UNAVAILABLE | 账号目前不能发布，请登录网页查看账号状态；不引导付费 |
 | FORBIDDEN | 当前操作被禁止，请检查账号权限 |
 | RATE_LIMITED | 登录请求过于频繁，稍后再试 |
@@ -421,7 +424,9 @@ npx joplo feedback --applied d1,d2 --ref "$(git rev-parse HEAD)" --format json
 | path / sha256 / size / contentType | 临时 build 文件 → 内存清单及创建请求 → 云端 → 去重、配额和资源类型校验 |
 | missing[].sha256 / uploadUrl / headers | 创建响应 → 内存 → PUT → 只上传缺失对象并保留签名头 |
 | uploadId | 创建响应 → 内存 → finalize 及其重试 → 幂等确认发布 |
-| --new / replaceShareId | 参数及同服务器 cloud.json.shareId + 实时 Pro 套餐 → 创建请求 → 云端 → 新建或更新链接；免费账号从不发送 replaceShareId |
+| --new / replaceShareId | 参数及同服务器 cloud.json.shareId → 创建请求 → 云端 → 新建或更新链接；免费账号与 Pro 都发送（C27），--new 与 PR 预览不发送 |
+| storage（me / finalize） | 云端 `share_file` 当前版本大小之和 → `me.storage` / finalize 的 `storage` → `Account.storage`、`ShareResult.storage` → 文本 `Storage:` 行、JSON `data.storage`、看板发布浮层（cloud-bridge → `CloudAccount.storage` / `CloudJob.result.storage`） |
+| STORAGE_FULL（413） | 云端创建或 finalize 时按差额判断 → CLI `storageError()` → `QUOTA_EXCEEDED`（kind storage，退出 6）→ JSON `error.details`；看板经 cloud-bridge 的 `CloudJob.error.storage` 画红色提示 |
 | cloud.json.server / shareId / url | 目标服务器及普通 share 的 finalize 响应 → 项目 .joplo/cloud.json（原子写，保留 review） → 下次普通 share → 来源比对与 Pro 更新主链接；feedback 没有评审记录时用它；url 供用户/工具读取 |
 | cloud.json.review.shareId / url | `--review` 的 finalize 响应 → 同一文件的 review（原子写，保留主链接） → 下次 `--review` 的 Pro replaceShareId（评审链接与评论保留）；feedback 默认读它 |
 | shareId / url / expiresAt / version | finalize 响应 → text/JSON 结果 → 用户/Agent → 分享链接及有效期 |

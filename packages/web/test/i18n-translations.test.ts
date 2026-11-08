@@ -10,6 +10,8 @@ const unchanged: Record<string, { locales: readonly Locale[]; reason: string; va
   "player.speedValue": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Numeric speed and multiplication sign; Intl handles formatting." },
   "player.number": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Numeric formatter; no translatable words." },
   "player.list": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Intl list formatting; empty and single-item lists have no connective." },
+  "board.cloudPlanPro": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Pro is the plan's product name, kept as-is (C27)." },
+  "board.cloudStorageOf": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Formatted byte values joined by a neutral slash." },
   "board.appearanceName": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Author/theme/font values joined by a neutral separator." },
   "player.space": { locales: ["zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Physical Space key name, preserved across languages." },
   "site.contentSourceTag": { locales: ["es", "fr", "de", "pt-BR"], reason: "\"Original\" is the native word for the source-language tag in these languages." },
