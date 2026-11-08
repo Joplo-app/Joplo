@@ -605,10 +605,24 @@ function Avatar({ node, p, children }: NodeProps) {
   );
 }
 
+/** 内嵌的图片（asset() 生成的 data:image/… URI）才真正画出来；网址、路径不去加载（编译期会提示），仍画占位。 */
+export const embeddedImage = (src: unknown): string | null => (typeof src === 'string' && src.startsWith('data:image/') ? src : null);
+
 function ImageBox({ node, p }: NodeProps) {
   const { t: i18n } = useI18n();
 
   const r = useR(p);
+  const src = embeddedImage(p.src);
+  if (src) {
+    const h = dim(r('h'));
+    const fit = p.fit === 'contain' ? 'contain' : 'cover';
+    const root = useRoot(node, p, { style: { display: 'block', position: 'relative', overflow: 'hidden', width: dim(r('w')) ?? '100%', height: h ?? 'auto', borderRadius: radius(p.radius) } });
+    return (
+      <div {...root} role="img" aria-label={str(p.alt, i18n.stage.image)} data-jimage="">
+        <img src={src} alt="" draggable={false} style={{ display: 'block', width: '100%', height: h ? '100%' : 'auto', objectFit: fit, objectPosition: str(p.position, 'center') }} />
+      </div>
+    );
+  }
   const root = useRoot(node, p, { className: 'jbox', style: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: dim(r('w')) ?? '100%', height: dim(r('h')) ?? 160, background: SUBTLE, color: DIMMED, fontSize: 13, borderRadius: radius(p.radius) } });
   return (
     <div {...root} role="img" aria-label={str(p.alt, i18n.stage.image)} data-soft="">

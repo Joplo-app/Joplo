@@ -112,7 +112,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'List.Item': 'List item',
   Badge: 'color, variant: filled|light|outline|dot|default, size',
   Avatar: 'name (shows first character), src, color, radius, size',
-  Image: 'src, alt, h, w, radius; renders a placeholder with alt',
+  Image: 'src={asset("./photo.jpg")} (embeds a project image), alt, h, w, radius, fit: cover|contain (default cover), position (e.g. "center 20%"); other src values draw a placeholder with alt',
   ThemeIcon: 'color, variant, size, radius; one character as child',
   Indicator: 'label, color, disabled (hides the badge; can be a condition), processing; wraps one element with a corner badge',
   Timeline: 'active (completed item index), bulletSize; Timeline.Item children',
@@ -262,6 +262,9 @@ export const COMPONENT_EXAMPLES: Partial<Record<ComponentType, string>> = {
   <Stat label="Failed payments" value="3" diff="-2" color="red" />
 </SimpleGrid>`,
   KeyValue: `<KeyValue withDivider total items={[{ label: 'Seats', value: '5 × $9' }, { label: 'Tax', value: '$4.50' }, { label: 'Total', value: $.data.total }]} />`,
+  Image: `<Image src={asset('../../assets/capitol.jpg')} alt="U.S. Capitol" h={240} fit="cover" position="center 40%" radius="md" />
+// import { asset } from '@joplo-app/kit'; the path is relative to this file. jpg/png/gif/webp/avif/svg, up to 2 MB each; compress first.
+// The image is embedded, so the board, build and share show it offline. For a tinted or full-bleed background, use style={{ backgroundImage: \`url(\${asset('./bg.jpg')})\` }}.`,
   BarChart: `<BarChart h={220} dataKey="week" unit="" data={$.data.weeks} series={[{ name: 'signups', label: 'Signups' }, { name: 'churn', label: 'Churn', color: 'red' }]} />
 // state: data: { weeks: [{ week: 'W1', signups: 40, churn: 4 }, { week: 'W2', signups: 52, churn: 6 }] }; set() a new array to animate`,
   LineChart: `<LineChart h={200} dataKey="day" data={[{ day: 'Mon', p95: 320 }, { day: 'Tue', p95: 280 }]} series={[{ name: 'p95', label: 'p95 latency' }]} unit="ms" />`,

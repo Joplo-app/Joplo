@@ -14,7 +14,7 @@ import type { FocusState } from '@joplo-app/core';
 import type { Box } from './camera-math';
 import { ownershipEls } from './camera';
 import { markBox } from './marks-math';
-import { badgeCenter, placeCallout, spotlightHoles, spotlightPath, visibleRegion, SPOT_PAD, type CalloutPlacement, type Side } from './cue-math';
+import { badgeCenter, placeCallout, spotlightHoles, spotlightPath, visibleRegion, SPOT_PAD, TransitionTracker, type CalloutPlacement, type Side } from './cue-math';
 import { Rough, RoughPath, ThemeContext, useStroke } from './rough';
 
 const ACCENT = 'var(--jp-accent)';
@@ -109,13 +109,43 @@ function useBoxes(ids: string[], wrapRef: RefObject<HTMLDivElement | null>, cont
     const ro = new ResizeObserver(schedule);
     if (content) ro.observe(content);
     wrap.addEventListener('scroll', schedule, true);
+    // 作者用 CSS 过渡移动的元素（style 绑定状态 + transition）：开头那几十帧测量结束后它可能还在动。
+    // 舞台里有过渡在跑时逐帧重测，全部结束后再测最后一次，提示框跟着目标走到终点。
+    // 同一元素可能有几个属性各自过渡（left 1.4s、opacity 0.4s），按“元素 + 属性”计数，最长的那个结束才停。
+    const running = new TransitionTracker<EventTarget>();
+    const startedAt = performance.now();
+    let follow = 0;
+    const followTick = () => {
+      // 过渡中途被移除的元素不会再发 transitionend；另设 30 秒上限，避免任何情况下空转
+      running.prune((t) => (t as Node).isConnected);
+      measure();
+      follow = running.active && performance.now() - startedAt < 30_000 ? requestAnimationFrame(followTick) : 0;
+    };
+    const onRun = (e: Event) => {
+      const { target, propertyName } = e as TransitionEvent;
+      if (!target) return;
+      running.run(target, propertyName);
+      if (!follow) follow = requestAnimationFrame(followTick);
+    };
+    const onEnd = (e: Event) => {
+      const { target, propertyName } = e as TransitionEvent;
+      if (target) running.end(target, propertyName);
+      schedule();
+    };
+    wrap.addEventListener('transitionrun', onRun, true);
+    wrap.addEventListener('transitionend', onEnd, true);
+    wrap.addEventListener('transitioncancel', onEnd, true);
     return () => {
       registry?.remove(token);
       mo.disconnect();
       ro.disconnect();
       cancelAnimationFrame(raf);
       cancelAnimationFrame(pending);
+      cancelAnimationFrame(follow);
       wrap.removeEventListener('scroll', schedule, true);
+      wrap.removeEventListener('transitionrun', onRun, true);
+      wrap.removeEventListener('transitionend', onEnd, true);
+      wrap.removeEventListener('transitioncancel', onEnd, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, animate, ...deps]);

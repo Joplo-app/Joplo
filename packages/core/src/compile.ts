@@ -754,6 +754,7 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   const needsId = n.type === 'Diagram.Node' ? 'Diagram node <Diagram.Node>' : n.type === 'StateMachine.State' ? 'State <StateMachine.State>' : n.type === 'Sequence.Actor' ? 'Participant <Sequence.Actor>' : null;
   if (needsId && typeof rawId !== 'string') err('MISSING_ID', `${needsId} "${labelOf(n)}" requires an id for edge from / to and trace`, at);
   if (isDiagramRoot(n.type)) checkDiagramRoot(n, err);
+  if (n.type === 'Image') checkImage(n, err);
   // 连线没写 id 时用「from->to」：⌥+单击检查与 rules 的 elements 都能引用它。
   // 状态机的转换与时序图的消息常有同一对端点的多条（请求、重试、回复），重复的依次加「~2」「~3」。
   const linkLike = n.type === 'Diagram.Edge' || n.type === 'StateMachine.Transition' || n.type === 'Sequence.Message';
@@ -801,6 +802,19 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   const s = rel(at);
   if (s) node.source = s;
   return node;
+}
+
+/**
+ * <Image>：只画内嵌的图片（asset() 生成的 data:image/… URI），本地看板、build、share 都带着它，不依赖外网。
+ * 网址或文件路径不会去加载：画成占位，并提示用 asset() 内嵌；状态绑定在运行时取值，不在这里判断。
+ */
+const IMAGE_FITS = ['cover', 'contain'];
+function checkImage(n: JNode, err: ErrFn): void {
+  const { src, fit } = n.props as Record<string, unknown>;
+  if (typeof src === 'string' && src && !src.startsWith('data:image/'))
+    err('IMAGE_PLACEHOLDER', `<Image src="${src.length > 60 ? `${src.slice(0, 57)}...` : src}"> is drawn as a placeholder: only embedded images are shown. Put the file in the project and write src={asset('./photo.jpg')} (path relative to this file; import asset from @joplo-app/kit)`, n.source, 'warning');
+  if (fit !== undefined && !(typeof fit === 'string' && IMAGE_FITS.includes(fit)))
+    err('INVALID_IMAGE_FIT', `<Image> fit="${String(fit)}" is not supported (available: ${IMAGE_FITS.join(', ')})`, n.source);
 }
 
 /**

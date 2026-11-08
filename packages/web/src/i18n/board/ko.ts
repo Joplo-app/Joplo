@@ -450,6 +450,11 @@ export function createBoardKo(locale: Locale = 'ko') {
       cloudUnavailableBody: "이 보드는 이전 버전 joplo로 시작되었습니다. 중지한 뒤 npx joplo dev를 다시 실행하세요.",
       cloudAccountFailed: (message: Value) => `계정을 읽지 못했습니다: ${value(message, locale)}`,
       cloudClose: "닫기",
+      cloudNotPickedTitle: "아직 게시할 안이 없습니다",
+      cloudNotPickedScenario: (feature: Value) => `이 시나리오의 안은 “${value(feature, locale)}”에서 선택된 안이 아닙니다. 게시에는 선택된 안만 포함됩니다.`,
+      cloudNotPickedFeature: (feature: Value) => `“${value(feature, locale)}”에는 아직 선택된 안이 없어 게시할 내용이 없습니다.`,
+      cloudNotPickedProject: "아직 선택된 안이 있는 기능이 없어 게시할 내용이 없습니다.",
+      cloudNotPickedHow: "리뷰에서 ‘안 승인’을 누르거나 에이전트에게 feature.ts의 pick 설정을 요청한 뒤 게시하세요.",
     },
   });
 }

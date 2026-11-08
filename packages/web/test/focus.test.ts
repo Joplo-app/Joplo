@@ -110,3 +110,29 @@ describe('呈现层不拦截点击（不变量 3）', () => {
     expect(scenarioMs(project, { ...s, steps: s.steps.map((st) => ({ ...st, hold: undefined })) })).toBeLessThan(5000);
   });
 });
+
+describe('TransitionTracker：提示框跟住用 CSS 过渡移动的目标', () => {
+  it('同一元素几个属性分别过渡：最长的那个结束才算停', async () => {
+    const { TransitionTracker } = await import('../src/renderer/cue-math');
+    const t = new TransitionTracker<string>();
+    expect(t.active).toBe(false);
+    t.run('paper', 'left');
+    t.run('paper', 'opacity');
+    t.end('paper', 'opacity');
+    expect(t.active).toBe(true); // left 还在动
+    t.end('paper', 'left');
+    expect(t.active).toBe(false);
+  });
+  it('transitioncancel / 未登记的结束事件不出错；中途被移除的元素会被清掉', async () => {
+    const { TransitionTracker } = await import('../src/renderer/cue-math');
+    const t = new TransitionTracker<string>();
+    t.end('ghost', 'left');
+    expect(t.active).toBe(false);
+    t.run('a', 'left');
+    t.run('b', 'top');
+    t.prune((x) => x !== 'a');
+    expect(t.active).toBe(true);
+    t.prune(() => false);
+    expect(t.active).toBe(false);
+  });
+});

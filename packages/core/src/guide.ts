@@ -107,6 +107,7 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
     "- Line breaks: JSX collapses newlines in text, and there is no <br/>. Text, Blockquote, List.Item, Timeline.Item, and Accordion.Panel keep \\n, so write <Text>{'Line 1\\nLine 2'}</Text>.",
     "- Elsewhere add style={{ whiteSpace: 'pre-line' }}, or stack several <Text> in a <Stack gap={4}>. Text with truncate stays on one line.",
     '- Every component accepts style={{ … }} and the Mantine style props (m, p, w, h, c, bg, fz, fw, ta…); className is not needed.',
+    "- Real images: put the file in the project and write <Image src={asset('./photo.jpg')} alt=\"…\" /> (asset from @joplo-app/kit; path relative to the calling file). It is embedded, so the board, build and share show it offline. URLs and plain paths are not loaded: they draw a placeholder (check: IMAGE_PLACEHOLDER). Use only images you may publish, and credit them on stage when the license asks.",
     '',
     '## Component catalog',
     'Props and an example for any component: npx joplo components <Name> (for example npx joplo components Menu DataTable).',
@@ -253,6 +254,7 @@ Use the actual source and decisions as evidence. Label reconstructed history and
 
 ## Data APIs
 - config({ name, description?, theme?: theme name (9 built-ins or themes/<name>.css; see demo), layout?, home? }).
+- asset('./photo.jpg'): reads an image next to the calling file and returns a data URI for <Image src> or a CSS backgroundImage (see components).
 - layout(tree); Outlet places the current page; <Slot name="actions"/> declares a slot for additions.
 - page({ title, layout?: string|false, viewport?: 'desktop'|'mobile' }, tree). See demo for devices and stages.
 - feature({ name, goal, cases, order?, roles?, constraints?, rules?, questions?, pick? }).
@@ -421,6 +423,11 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
 - Keyboard history: type reuses character-by-character preview during playback; press shows keycaps. Static views show only the latest input/keypress; other steps clear it. Empty keys are hidden.
   Example: .type('prompt', 'Plan a weekend camping trip').press('Enter', set($.ui.asked, true)). Chords such as '⌘K' split into two keycaps automatically.
 
+## Custom motion with style bindings
+- For news-style graphics (a seat chart filling up, a bar growing, a document flying across), bind style values to state and give them a CSS transition: <div id="paper" style={{ left: $.data.paperX, transition: 'left 1.2s ease' }}/>. A step that set()s a new value animates the element.
+- Keep the element mounted across steps (do not swap it with when), so the browser can animate between the two values. Stagger many elements with transition-delay.
+- Cues follow the moving target: spotlight, highlight and callout keep re-measuring until its transitions end.
+
 ## Write a theme
 - A theme is a CSS file at themes/<name>.css in the project root. Set theme: '<name>' in joplo.config.ts as the default. A custom theme overrides a built-in with the same name.
 - Built-ins: sketch (Hand-drawn, default), clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast. Preview them in the board Appearance popover.
@@ -554,6 +561,7 @@ Import spotlight, highlight, numbered, callout, hold from @joplo-app/kit; shot, 
 - User actions: the cursor moves to the element and clicks; the camera brings it into frame if needed. Do not add shot() just to show what is clicked.
 - trace() frames the call path in a Diagram.
 - Result reveal: after a step, an element that newly appears or changes (an alert, a badge, a new message, a menu) pulses once and fades. It never moves the camera.
+- A target moving with a CSS transition (a style bound to state; see demo) is followed: spotlight, highlight and callout track it until the transition ends.
   Skipped on purpose: modals and drawers (their backdrop already says it), DataCard / StateFlow (they show their own change), more than 3 changes at once, a new page or layer, the same element changing again or another line appended to the same log, and any step where you wrote a focus yourself.
 - When the director enters another layer that has a shot, the stage starts on the whole layer, then pushes in (context first, then detail).
 - config({ autoFocus: false }) turns off the reveal pulse and the layer-entry push-in. Your shots and cues still play.
@@ -736,6 +744,8 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - UNBOUND_INTERACTIVE: see the section below.
 - INVALID_CONDITION: when got a plain boolean, number, or string (when={!x}, when={mode === 'code'}). Use a condition such as when={eq($.ui.mode, 'code')}, or render conditionally in your code: {flag && <X/>}. See authoring.
 - DISABLED_WITHOUT_REASON: Add disabledReason explaining why the element cannot be used: a string, disabledReason="Only admins can invite", or a binding, disabledReason={$.ui.sendHint}.
+- IMAGE_PLACEHOLDER: <Image src> is a URL or plain path, which is never loaded. Put the file in the project and write src={asset('./photo.jpg')}.
+- INVALID_IMAGE_FIT: <Image fit> accepts cover or contain.
 - INVALID_DISABLED_REASON: disabledReason got a number, condition, or other value. Use a string or a whole-value binding; for text that changes, set() it into state and bind it.
 - OUTCOME_MISMATCH: flow({ outcome }) and done(…, outcome) disagree; the badge uses flow's. Make them agree (cancelled corresponds to other).
 - CASE_NOT_COVERED: Add a scenario or declare coverage truthfully. Ask about missing behavior first. The message names high priority and the case's expected result, which is what the new scenario must end on.
@@ -897,6 +907,7 @@ Compare cases and options in the board, then decide which option to publish for 
 ## pick
 - Set pick: 'a' in features/<f>/feature.ts to select options/a.tsx. It is not a qualified ID with a feature prefix.
 - Publish only the picked option for each feature. Features without pick are omitted.
+- The board's Publish dialog checks the chosen scope first. With no picked option it says so and disables Publish: confirm an option in review (or set pick), then publish. Confirming an option is not itself a request to publish.
 - Pages and layouts compose the whole product; picked options add elements to routes or add routes.
 
 ## build
