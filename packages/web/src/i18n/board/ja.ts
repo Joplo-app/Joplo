@@ -419,7 +419,7 @@ export function createBoardJa(locale: Locale = 'ja') {
       cloudScopeProject: "プロジェクト全体",
       cloudScopeNote: "選んだものだけが共有に入ります。他の機能はアップロードされず、隠すだけではありません。",
       cloudSignedInAs: (email: Value) => `${value(email, locale)} でログイン中`,
-      cloudPlanFree: "無料 · リンクは 1 時間で失効",
+      cloudPlanFree: "無料 · リンクは 7 日で失効",
       cloudPlanPro: "Pro · 無期限リンク",
       cloudPublishButton: "公開",
       cloudPublishing: "公開中…",

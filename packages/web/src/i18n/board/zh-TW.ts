@@ -419,7 +419,7 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       cloudScopeProject: "整個專案",
       cloudScopeNote: "只有選取的內容會進入分享；其他功能不會上傳，不只是隱藏。",
       cloudSignedInAs: (email: Value) => `已登入：${value(email, locale)}`,
-      cloudPlanFree: "免費版 · 連結 1 小時後失效",
+      cloudPlanFree: "免費版 · 連結 7 天後失效",
       cloudPlanPro: "Pro · 永久連結",
       cloudPublishButton: "發布",
       cloudPublishing: "正在發布…",

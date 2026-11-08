@@ -419,7 +419,7 @@ export function createBoardRu(locale: Locale = 'ru') {
       cloudScopeProject: "Весь проект",
       cloudScopeNote: "В публикацию попадает только выбранное. Другие функции не загружаются, а не просто скрываются.",
       cloudSignedInAs: (email: Value) => `Вход выполнен: ${value(email, locale)}`,
-      cloudPlanFree: "Бесплатно · ссылки истекают через 1 час",
+      cloudPlanFree: "Бесплатно · ссылки истекают через 7 дней",
       cloudPlanPro: "Pro · постоянная ссылка",
       cloudPublishButton: "Опубликовать",
       cloudPublishing: "Публикация…",

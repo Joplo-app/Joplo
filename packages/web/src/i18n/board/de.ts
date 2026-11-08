@@ -419,7 +419,7 @@ export function createBoardDe(locale: Locale = 'de') {
       cloudScopeProject: "Ganzes Projekt",
       cloudScopeNote: "Nur die Auswahl wird geteilt. Andere Funktionen werden nicht hochgeladen, nicht nur ausgeblendet.",
       cloudSignedInAs: (email: Value) => `Angemeldet als ${value(email, locale)}`,
-      cloudPlanFree: "Kostenlos · Links laufen nach 1 Stunde ab",
+      cloudPlanFree: "Kostenlos · Links laufen nach 7 Tagen ab",
       cloudPlanPro: "Pro · dauerhafter Link",
       cloudPublishButton: "Veröffentlichen",
       cloudPublishing: "Wird veröffentlicht…",

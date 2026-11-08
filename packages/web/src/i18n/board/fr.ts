@@ -419,7 +419,7 @@ export function createBoardFr(locale: Locale = 'fr') {
       cloudScopeProject: "Tout le projet",
       cloudScopeNote: "Seul ce que vous choisissez est partagé. Les autres fonctionnalités ne sont pas envoyées, pas seulement masquées.",
       cloudSignedInAs: (email: Value) => `Connecté en tant que ${value(email, locale)}`,
-      cloudPlanFree: "Gratuit · les liens expirent après 1 heure",
+      cloudPlanFree: "Gratuit · les liens expirent après 7 jours",
       cloudPlanPro: "Pro · lien permanent",
       cloudPublishButton: "Publier",
       cloudPublishing: "Publication…",
