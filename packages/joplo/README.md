@@ -31,4 +31,4 @@ npx joplo selection
 npx joplo build
 ```
 
-Documentation and examples: [Joplo-app/Joplo](https://github.com/Joplo-app/Joplo). License: [PolyForm Noncommercial 1.0.0](https://github.com/Joplo-app/Joplo/blob/main/LICENSE). Commercial use needs a Joplo Cloud subscription or a separate license; see [COMMERCIAL.md](https://github.com/Joplo-app/Joplo/blob/main/COMMERCIAL.md).
+Documentation and examples: [Joplo-app/Joplo](https://github.com/Joplo-app/Joplo). License: [PolyForm Shield 1.0.0](https://github.com/Joplo-app/Joplo/blob/main/LICENSE). Free for any use, including commercial, except building products that compete with Joplo or Joplo Cloud; see [COMMERCIAL.md](https://github.com/Joplo-app/Joplo/blob/main/COMMERCIAL.md).

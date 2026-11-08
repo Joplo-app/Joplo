@@ -2,36 +2,31 @@
 
 [中文](#joplo-商业使用说明)
 
-Joplo is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). It is free for noncommercial use. Commercial use needs a Joplo Cloud subscription or a separate commercial license.
+Joplo is source-available under the [PolyForm Shield License 1.0.0](LICENSE). Anyone can use it for free, including companies and commercial projects. The one thing you may not do is use it to provide a product that competes with Joplo or Joplo Cloud.
 
-The lists below summarize the license. The [LICENSE](LICENSE) text and any written agreement with us take precedence. The "Additional permission" section is a grant from the licensor, not a summary.
+This page summarizes the license. The [LICENSE](LICENSE) text and any written agreement with us take precedence.
 
-## Free, no permission needed
+## Free for everyone
 
-- Personal use: study, research, experiments, hobby projects, and personal presentations with no expected commercial use.
-- Use by charities, schools, public research organizations, public safety or health organizations, environmental organizations, and government institutions.
-- Reading, changing, and sharing the source for any of the purposes above.
+- Personal, educational, and nonprofit use.
+- Use at a company: internal product design, specs, reviews, demos, and presentations.
+- Client work and paid consulting, such as prototypes and presentations made for clients.
+- Publishing sites built with Joplo, for any purpose, on Joplo Cloud or on your own hosting.
+- Changing the source and sharing your changes, as long as the result does not compete.
 
-## Needs a commercial license
+## Not allowed: competing products
 
-- Any use at or on behalf of a business: company or client presentations, paid consulting, designing a commercial product, or internal use at a for-profit organization.
-- Publishing sites built with Joplo for commercial purposes. A published site includes Joplo's runtime code.
-- Building, selling, hosting, or offering a product or service based on Joplo's code, including any product or service that competes with Joplo or Joplo Cloud.
+You may not use Joplo or any part of its code to provide a product or service that competes with Joplo or Joplo Cloud. For example:
 
-## Additional permission for Joplo Cloud subscribers
+- forking or rebranding Joplo into another tool for authoring, previewing, reviewing, or publishing prototypes, demos, or presentations;
+- offering a hosted service that publishes, shares, comments on, reviews, or measures other people's Joplo projects;
+- selling Joplo, or a modified version of it, as a product.
 
-While you or your organization has an active paid Joplo Cloud subscription, the licensor grants you permission to use the unmodified Joplo releases published on npm for commercial purposes, to create, preview, export, and publish your own works, including through Joplo Cloud.
+This holds even when the competing product is free, or when it offers the same functionality through a different interface or platform. If a product is marketed as a substitute for Joplo or Joplo Cloud, it competes. The LICENSE also lists Joplo and Joplo Cloud as the licensor's lines of business, so they stay protected even if either one is discontinued.
 
-This permission does not let you:
+## Unsure, or need another license?
 
-1. modify, redistribute, sell, or sublicense Joplo itself; or
-2. use Joplo or any part of its code to build, offer, or support a product or service that competes with Joplo or Joplo Cloud.
-
-The permission ends when the subscription ends. The content you created stays yours, but further commercial use of Joplo needs an active subscription or another license. Joplo Cloud's terms of service also apply.
-
-## Other commercial licenses
-
-For commercial use outside a Joplo Cloud subscription, email [support@joplo.app](mailto:support@joplo.app).
+If you are not sure whether your use competes, or you want a license for a use the terms do not allow, such as an integration, an OEM deal, or a hosted service, email [support@joplo.app](mailto:support@joplo.app).
 
 ## Earlier versions
 
@@ -43,42 +38,37 @@ No license covers the Joplo name or logo. Do not use them for forks or for other
 
 ## Contributions
 
-By submitting a contribution, you agree that the licensor may license it under the PolyForm Noncommercial License 1.0.0, under commercial licenses, or under any other terms.
+By submitting a contribution, you agree that the licensor may license it under the PolyForm Shield License 1.0.0, under commercial licenses, or under any other terms.
 
 ---
 
 # Joplo 商业使用说明
 
-Joplo 的源码公开，许可证是 [PolyForm Noncommercial License 1.0.0](LICENSE)。非商业用途可以免费使用；商业用途需要订阅 Joplo Cloud，或者另外获得商业授权。
+Joplo 的源码公开，许可证是 [PolyForm Shield License 1.0.0](LICENSE)。任何人都可以免费使用，包括公司和商业项目；唯一不允许的，是用它提供与 Joplo 或 Joplo Cloud 竞争的产品。
 
-下面的清单是对许可证的概括，以 [LICENSE](LICENSE) 原文和双方的书面协议为准。「Joplo Cloud 订阅者的额外授权」一节是许可方给出的授权，不是概括。
+本页是对许可证的概括，以 [LICENSE](LICENSE) 原文和双方的书面协议为准。
 
-## 免费，无需申请
+## 人人免费
 
-- 个人使用：学习、研究、实验、业余项目，以及没有商业用途预期的个人演示。
-- 慈善组织、学校、公共研究机构、公共安全或卫生组织、环保组织和政府机构使用。
-- 出于以上目的阅读、修改和分享源码。
+- 个人、教育和非营利用途。
+- 在公司里使用：内部的产品设计、需求说明、评审、演示和汇报。
+- 客户项目和付费咨询，比如给客户做原型和演示。
+- 发布用 Joplo 构建的站点，用途不限，发布到 Joplo Cloud 或自己的服务器都可以。
+- 修改源码并分享修改，只要结果不构成竞争。
 
-## 需要商业授权
+## 不允许：做竞品
 
-- 在企业中或代表企业的任何使用：公司或客户演示、付费咨询、设计商业产品、营利性组织的内部使用。
-- 出于商业目的发布用 Joplo 构建的站点。发布出去的站点包含 Joplo 的运行时代码。
-- 基于 Joplo 的代码构建、销售、托管或提供产品或服务，包括与 Joplo 或 Joplo Cloud 竞争的任何产品或服务。
+不得用 Joplo 或其任何部分代码提供与 Joplo 或 Joplo Cloud 竞争的产品或服务，例如：
 
-## Joplo Cloud 订阅者的额外授权
+- 分叉或换个品牌，把 Joplo 改成另一个用来创作、预览、评审或发布原型、演示、汇报的工具；
+- 提供托管服务，替别人发布、分享、评论、评审 Joplo 项目或统计观看数据；
+- 把 Joplo 或它的修改版当作产品出售。
 
-你本人或你所在的组织持有有效的 Joplo Cloud 付费订阅期间，许可方授权你出于商业目的使用 npm 上发布的未经修改的 Joplo 版本，创作、预览、导出和发布你自己的作品，包括通过 Joplo Cloud 发布。
+即使竞品免费，或者通过不同的界面、平台提供同样的功能，也算竞争。凡是宣传成 Joplo 或 Joplo Cloud 替代品的产品，都算竞品。LICENSE 还把 Joplo 和 Joplo Cloud 列为许可方的业务线，即使其中之一停止提供，也仍然受保护。
 
-这项授权不允许你：
+## 拿不准，或者需要其他授权？
 
-1. 修改、再分发、销售或再许可 Joplo 本身；
-2. 用 Joplo 或其任何部分代码构建、提供或支持与 Joplo 或 Joplo Cloud 竞争的产品或服务。
-
-订阅结束，这项授权随之终止。你创作的内容仍归你所有，但继续商业使用 Joplo 需要有效订阅或其他授权。同时适用 Joplo Cloud 的服务条款。
-
-## 其他商业授权
-
-Joplo Cloud 订阅以外的商业用途，请发邮件到 [support@joplo.app](mailto:support@joplo.app)。
+如果不确定你的用法是否构成竞争，或者想获得条款以外的授权（比如集成、OEM 合作、托管服务），请发邮件到 [support@joplo.app](mailto:support@joplo.app)。
 
 ## 早期版本
 
@@ -90,4 +80,4 @@ Joplo 的名称和标志不在任何许可证的授权范围内，不得用于�
 
 ## 贡献
 
-提交贡献即表示你同意许可方以 PolyForm Noncommercial License 1.0.0、商业许可证或其他任何条款授权该贡献。
+提交贡献即表示你同意许可方以 PolyForm Shield License 1.0.0、商业许可证或其他任何条款授权该贡献。

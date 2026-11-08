@@ -2,7 +2,7 @@
 
 ## 未发布
 
-- 许可证由 Apache-2.0 改为 PolyForm Noncommercial 1.0.0：个人使用和其他非商业用途免费；商业用途（包括在公司里使用、做竞品）需要 Joplo Cloud 付费订阅或另外获得商业授权，详见 COMMERCIAL.md。0.2.15 及更早的版本仍适用 Apache-2.0。
+- 许可证由 Apache-2.0 改为 PolyForm Shield 1.0.0：任何人都可以免费使用，包括在公司里和商业项目中使用；不得用 Joplo 或其代码提供与 Joplo 或 Joplo Cloud 竞争的产品或服务，详见 COMMERCIAL.md。0.2.15 及更早的版本仍适用 Apache-2.0。
 
 ## 0.2.15
 

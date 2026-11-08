@@ -65,9 +65,9 @@ describe('各包的发布配置', () => {
     }
   });
 
-  test('许可证统一为 PolyForm Noncommercial（D81），每个包的 LICENSE 与根目录一致', () => {
+  test('许可证统一为 PolyForm Shield（D81），每个包的 LICENSE 与根目录一致', () => {
     const licenses = new Set(pkgs.map((p) => p.pkg.license));
-    expect([...licenses]).toEqual(['PolyForm-Noncommercial-1.0.0']);
+    expect([...licenses]).toEqual(['PolyForm-Shield-1.0.0']);
     const root = fs.readFileSync(path.join(ROOT, 'LICENSE'), 'utf8');
     expect(root).toMatch(/^Required Notice: /m);
     for (const { dir } of pkgs) expect(fs.readFileSync(path.join(ROOT, 'packages', dir, 'LICENSE'), 'utf8'), dir).toBe(root);
