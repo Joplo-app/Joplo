@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/web",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "description": "Joplo 看板与发布站的预构建资源（含手绘字体，SIL OFL 1.1）",
   "license": "Apache-2.0",
   "type": "module",

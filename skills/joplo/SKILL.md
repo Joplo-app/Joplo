@@ -51,4 +51,4 @@ For comparing feature changes across versions or a PR, read npx joplo skill diff
 Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, focus, diagram, components, cases, check, selection, review, diff, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.
 After the user Alt+clicks a board element, run npx joplo selection and edit only that location.
 Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.12 sha256:44fc3f770d3e391f7e27cd45e5262e577de511d4e48bb86a6fea5d6c0ba148d9 -->
+<!-- joplo-skill 0.2.13 sha256:44fc3f770d3e391f7e27cd45e5262e577de511d4e48bb86a6fea5d6c0ba148d9 -->
