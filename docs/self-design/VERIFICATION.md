@@ -8,7 +8,7 @@
 - 原五项目的 9 个 Feature、14 个 Option、65 条 Scenario ID 全部保留；回归夹具固定原始 ID 清单，检测今后误删。
 - 保留 `_v1` 原始归档；原评审 README 移入历史材料，注明旧命令与状态不能代替当前实现。
 - 普通静态构建：12 个选定 Option、67 条 Scenario、122 文件，约 2.55 MB。检查实际 HTML 中的公开 IR，确认没有 rules/cases/issues、私有取舍字段、规则引用或未选 Option。
-- 公开叙述来自主动整理的场景，不读取私有评审清单。只做本地 build，未上传分享、部署或发布 npm。
+- 公开叙述来自主动整理的场景，不读取私有评审清单。首轮仅做本地 build；后续按明确授权创建固定分享并接入自动发布，见文末。没有发布 npm。
 
 ## 命令结果
 
@@ -42,3 +42,12 @@
 导出路径现在分别隔离舞台与幕布的堆叠上下文，保留 passive、固定尺寸、手机外框和字幕。新增实际 Chromium 回归：修复前 1 项失败、2 项通过；修复后全部通过。高 z-index 终端／图表、固定尺寸／外框、手机封面、非卡片步骤均覆盖。重新检查 views/npm/review 六张开场和收尾图，文字无遮挡，0 渲染告警、0 页面异常。
 
 少量保留的旧原型仍有长标题省略，以及舞台底部辅助说明／作者代码块局部裁切；主操作和状态可见。这些属于历史稿的既有表现，未把它们当成当前产品界面的视觉验收结果。
+
+## 自动发布集成（2026-11-08）
+
+- 固定公开分享 `nZT1VP67LU` 已首次发布，version 1、无到期时间；浏览器验证首页包含 12 个 Feature，并回放功能差异的对齐等待场景。公开 Markdown 路由也返回正确的版本与功能导航。
+- GitHub environment `joplo-design-publisher` 只允许 main；专用 `shares:publish` Key 已写入 environment Secret，固定 Share ID 写入仓库 variable。未复制设备会话到 Actions。
+- 主站发布器 31 项 HTTP/CLI 测试通过，包括固定替换、真实 PUT/finalize、每次 finalize 重试前检查、公开 IR、重复私有 IR、文件边界与错误脱敏。独立审查用真实产物插入第二个 review IR，在认证前拒绝。
+- 新脚本纳入根 `pnpm typecheck`；技能生成与一致性检查通过，实际 diff guide 可用。全仓 102 文件 / 1279 项通过；workflow 的 actionlint 通过。
+- 随后新增的事件筛选专项 49 项通过；与发布器合计 80 项再次通过。两个不含 node_modules 的独立项目目录均由可信源码 CLI 构建成功（每版 122 文件），真实 diff 返回 `unchanged`，没有依赖 PR 自带工具或安装步骤。
+- 公共播放器控制台有 Cloudflare RUM 被既有 `connect-src 'none'` 拒绝的提示；播放器及资源正常，本次没有放宽 CSP。

@@ -1,0 +1,263 @@
+# Runs from main, after CI. Authoring code runs only in the uncredentialed build job.
+name: Self-design preview
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch: # Recover the current main share only after its latest CI succeeds.
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  metadata:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      enabled: ${{ steps.event.outputs.enabled }}
+      mode: ${{ steps.event.outputs.mode }}
+      repo: ${{ steps.event.outputs.repo }}
+      head: ${{ steps.event.outputs.head }}
+      base: ${{ steps.event.outputs.base }}
+      number: ${{ steps.event.outputs.number }}
+      plan: ${{ steps.plan.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 0 # git merge-base reads objects only; no PR tree is checked out here.
+          persist-credentials: false
+          path: trusted
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Verify CI, current head and baseline
+        id: event
+        working-directory: trusted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRUSTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: node scripts/ci/self-design-event.mjs --out "$RUNNER_TEMP/self-design-plan.json"
+      - uses: actions/upload-artifact@v4
+        id: plan
+        if: steps.event.outputs.enabled == 'true'
+        with:
+          name: self-design-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/self-design-plan.json
+          if-no-files-found: error
+          retention-days: 1
+
+  prepare:
+    needs: metadata
+    if: needs.metadata.outputs.enabled == 'true' && needs.metadata.outputs.mode == 'pr'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Configure deployment branches to main only; never store the publishing key at repository scope.
+    environment: joplo-design-publisher
+    outputs:
+      base: ${{ steps.receipt.outputs.base }}
+      head: ${{ steps.receipt.outputs.head }}
+      receipt: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          path: trusted
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: trusted/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+        working-directory: trusted
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.metadata.outputs.plan }}
+          path: ${{ runner.temp }}/self-design/plan
+          merge-multiple: true
+      - name: Recheck the trusted plan
+        working-directory: trusted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRUSTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: node scripts/ci/self-design-event.mjs --verify-plan "$RUNNER_TEMP/self-design/plan/self-design-plan.json"
+      - name: Pin PR baseline with the trusted CLI
+        working-directory: trusted
+        env:
+          JOPLO_API_KEY: ${{ secrets.JOPLO_API_KEY }}
+          JOPLO_CLOUD_URL: ${{ vars.JOPLO_CLOUD_URL || 'https://cloud.joplo.app' }}
+          PR_REPO: ${{ needs.metadata.outputs.repo }}
+          PR_NUMBER: ${{ needs.metadata.outputs.number }}
+          PR_HEAD: ${{ needs.metadata.outputs.head }}
+          CANDIDATE_BASE: ${{ needs.metadata.outputs.base }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/self-design/receipt"
+          pnpm exec tsx "$GITHUB_WORKSPACE/trusted/packages/cli/src/bin.ts" diff prepare \
+            --repo "$PR_REPO" --pr "$PR_NUMBER" --sha "$PR_HEAD" --base-sha "$CANDIDATE_BASE" \
+            --out "$RUNNER_TEMP/self-design/receipt/comparison.json"
+      - name: Validate the returned pinned baseline
+        id: receipt
+        working-directory: trusted
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/ci/self-design-event.mjs --receipt "$RUNNER_TEMP/self-design/receipt/comparison.json" \
+            --plan "$RUNNER_TEMP/self-design/plan/self-design-plan.json"
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: self-design-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/self-design/receipt/comparison.json
+          if-no-files-found: error
+          retention-days: 1
+
+  build:
+    needs: [metadata, prepare]
+    if: >-
+      !cancelled() && needs.metadata.outputs.enabled == 'true' &&
+      (needs.metadata.outputs.mode == 'main' || needs.prepare.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          path: trusted
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: trusted/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+        working-directory: trusted
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.metadata.outputs.head }}
+          persist-credentials: false
+          path: source-head
+      - uses: actions/checkout@v7
+        if: needs.metadata.outputs.mode == 'pr'
+        with:
+          ref: ${{ needs.prepare.outputs.base }}
+          persist-credentials: false
+          path: source-base
+      # This runner evaluates untrusted TSX and has no Joplo key/environment or restored cache.
+      # Both trees use the same trusted source CLI/Kit/player, without installing PR dependencies.
+      - name: Build the design artifact
+        working-directory: trusted
+        env:
+          JOPLO_WEB: source
+          DESIGN_MODE: ${{ needs.metadata.outputs.mode }}
+          DESIGN_HEAD: ${{ needs.metadata.outputs.head }}
+          PINNED_BASE: ${{ needs.prepare.outputs.base }}
+        run: |
+          set -euo pipefail
+          test -f "$GITHUB_WORKSPACE/source-head/examples/joplo/joplo.config.ts"
+          mkdir -p "$RUNNER_TEMP/self-design"
+          if [ "$DESIGN_MODE" = pr ]; then
+            if [ ! -f "$GITHUB_WORKSPACE/source-base/examples/joplo/joplo.config.ts" ]; then
+              echo '::error::Pinned baseline predates examples/joplo. Use a new PR comparison or a supported coordinator reset; retrying cannot replace the pinned baseline.'
+              exit 1
+            fi
+            pnpm exec tsx "$GITHUB_WORKSPACE/trusted/packages/cli/src/bin.ts" build \
+              "$GITHUB_WORKSPACE/source-base/examples/joplo" --out "$RUNNER_TEMP/self-design/before"
+            pnpm exec tsx "$GITHUB_WORKSPACE/trusted/packages/cli/src/bin.ts" build \
+              "$GITHUB_WORKSPACE/source-head/examples/joplo" --out "$RUNNER_TEMP/self-design/after"
+            pnpm exec tsx "$GITHUB_WORKSPACE/trusted/packages/cli/src/bin.ts" diff \
+              "$RUNNER_TEMP/self-design/before" "$RUNNER_TEMP/self-design/after" \
+              --base-sha "$PINNED_BASE" --head-sha "$DESIGN_HEAD" --out "$RUNNER_TEMP/self-design/site"
+          else
+            pnpm exec tsx "$GITHUB_WORKSPACE/trusted/packages/cli/src/bin.ts" build \
+              "$GITHUB_WORKSPACE/source-head/examples/joplo" --out "$RUNNER_TEMP/self-design/site"
+          fi
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: self-design-site-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/self-design/site/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [metadata, prepare, build]
+    if: >-
+      !cancelled() && needs.metadata.outputs.enabled == 'true' && needs.build.result == 'success' &&
+      (needs.metadata.outputs.mode == 'main' || needs.prepare.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: joplo-design-publisher
+    # Serialize only validated publishers. Stale CI events cannot cancel a newer valid build.
+    concurrency:
+      group: joplo-self-design-${{ needs.metadata.outputs.mode }}-${{ needs.metadata.outputs.number || 'main' }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          path: trusted
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: trusted/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+        working-directory: trusted
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.metadata.outputs.plan }}
+          path: ${{ runner.temp }}/self-design/plan
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact }}
+          path: ${{ runner.temp }}/self-design/site
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        if: needs.metadata.outputs.mode == 'pr'
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.receipt }}
+          path: ${{ runner.temp }}/self-design/receipt
+          merge-multiple: true
+      - name: Verify the current CI and head again
+        working-directory: trusted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRUSTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: node scripts/ci/self-design-event.mjs --verify-plan "$RUNNER_TEMP/self-design/plan/self-design-plan.json"
+      - name: Update the fixed main share
+        if: needs.metadata.outputs.mode == 'main'
+        working-directory: trusted
+        env:
+          JOPLO_API_KEY: ${{ secrets.JOPLO_API_KEY }}
+          JOPLO_DESIGN_SHARE_ID: ${{ vars.JOPLO_DESIGN_SHARE_ID }}
+          JOPLO_CLOUD_URL: ${{ vars.JOPLO_CLOUD_URL || 'https://cloud.joplo.app' }}
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH_HEAD: ${{ needs.metadata.outputs.head }}
+        run: |
+          pnpm exec tsx scripts/ci/publish-self-design.ts --site "$RUNNER_TEMP/self-design/site" \
+            --share-id "$JOPLO_DESIGN_SHARE_ID" --repo "$GITHUB_REPOSITORY" --head "$PUBLISH_HEAD"
+      - name: Publish the immutable PR comparison
+        if: needs.metadata.outputs.mode == 'pr'
+        working-directory: trusted
+        env:
+          JOPLO_API_KEY: ${{ secrets.JOPLO_API_KEY }}
+          JOPLO_CLOUD_URL: ${{ vars.JOPLO_CLOUD_URL || 'https://cloud.joplo.app' }}
+          PR_REPO: ${{ needs.metadata.outputs.repo }}
+          PR_NUMBER: ${{ needs.metadata.outputs.number }}
+          PR_HEAD: ${{ needs.metadata.outputs.head }}
+        run: |
+          pnpm exec tsx "$GITHUB_WORKSPACE/trusted/packages/cli/src/bin.ts" diff publish "$RUNNER_TEMP/self-design/site" \
+            --prepared "$RUNNER_TEMP/self-design/receipt/comparison.json" \
+            --repo "$PR_REPO" --pr "$PR_NUMBER" --sha "$PR_HEAD" --title 'Joplo design · PR feature diff' --format json

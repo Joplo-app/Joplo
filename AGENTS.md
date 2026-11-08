@@ -40,3 +40,5 @@
 `examples/joplo/` 是统一的自设计项目。新增自身功能时，在其中新增或迭代原生 Feature/Option/Scenario，不再创建平行的 `examples/joplo-<feature>` 项目。历史证据与边界见 `docs/self-design/EVIDENCE.md`；保留稳定 feature IDs，真实备选与未决项不因公开展示而伪装成已批准。
 
 公开设计过程要主动整理为可见画面与场景。普通 build 只包含 picked options，并剥离规则、问题、取舍等创作信息；不可为展示过程直接公开私有 review manifest。历史重建须有来源且显式标注；现存 `_v1` 归档继续作为证据。
+
+`Self-design preview` 在成功 CI 后自动发布同仓 PR 差异及 main 固定分享。维护 `.github/workflows/self-design.yml` 时遵循 `docs/self-design/CI-CONTRACT.md`：工具固定为可信 workflow SHA，PR 作者模块只在无发布凭证的独立 runner 构建，发布任务只读静态产物。Key 仅放 main 限定的 `joplo-design-publisher` environment；不要改成仓库级 Secret、执行 PR 工作流或伪造空基线。自动设计分享不等于 npm 发行。
