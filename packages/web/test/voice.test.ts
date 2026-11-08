@@ -92,7 +92,7 @@ describe('控制器：等声音读完再走', () => {
     expect(c.getSnapshot().playing).toBe(false);
   });
 
-  it('暂停时声音一起暂停，继续时接着读；手动下一步立刻停掉当前声音', async () => {
+  it('暂停时声音一起暂停，继续时接着读；播放中下一步立刻停掉当前声音，并接着播', async () => {
     const { c, n } = setup();
     void c.play();
     await until(() => n.calls.length === 1);
@@ -102,11 +102,54 @@ describe('控制器：等声音读完再走', () => {
     expect(n.calls[0]!.resumed).toBe(1);
     await c.next();
     expect(n.calls[0]!.cancelled).toBe(true);
-    expect(c.getSnapshot().state!.position).toBe(2);
+    await until(() => c.getSnapshot().state!.position === 2);
+    expect(c.getSnapshot().playing).toBe(true);
     expect(n.calls.at(-1)!.text).toBe('And again!');
     c.stop();
     expect(n.calls.at(-1)!.cancelled).toBe(true);
     expect(c.getSnapshot().narration).toBeNull();
+  });
+
+  it('像视频：播放中 ← → 跳一步后接着播；暂停时跳步保持不播', async () => {
+    const { c, n } = setup();
+    n.enabled = false;
+    void c.play();
+    await until(() => c.getSnapshot().state!.position === 1);
+    // 停留中按 →：跳过剩余停留，开始下一步，播放不中断
+    void c.next();
+    expect(c.getSnapshot().playing).toBe(true);
+    await until(() => c.getSnapshot().state!.position === 2);
+    // 按 ←：退回第 1 步，在那里停留后接着往下播
+    c.prev();
+    expect(c.getSnapshot().state!.position).toBe(1);
+    expect(c.getSnapshot().playing).toBe(true);
+    await until(() => c.getSnapshot().state!.position === 2);
+    // 最后一步的停留中按 →：播完，不从头重播
+    await until(() => c.getSnapshot().state!.position === 3);
+    void c.next();
+    expect(c.getSnapshot().playing).toBe(false);
+    expect(c.getSnapshot().state!.position).toBe(3);
+    // 暂停时 →：只走一步，不恢复播放
+    c.setScenario('f.a.s', 0, { quiet: true });
+    void c.play();
+    await until(() => c.getSnapshot().state!.position === 1);
+    c.pause();
+    await c.next();
+    expect(c.getSnapshot().state!.position).toBe(2);
+    expect(c.getSnapshot().playing).toBe(false);
+  });
+
+  it('像视频：动画进行中按 → 立即完成这一步，停留并朗读后接着播', async () => {
+    const { c, n } = setup();
+    c.reducedMotion = false;
+    void c.play();
+    await until(() => c.getSnapshot().activeStep === 0);
+    void c.next();
+    expect(c.getSnapshot().state!.position).toBe(1);
+    expect(c.getSnapshot().playing).toBe(true);
+    await until(() => n.calls.length === 1);
+    expect(n.calls[0]!.text).toBe('She starts here.');
+    c.stop();
   });
 
   it('朗读关闭：不读，也不等', async () => {

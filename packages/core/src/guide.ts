@@ -924,7 +924,7 @@ Compare cases and options in the board, then decide which option to publish for 
 ## Demos on the published site
 - The published site uses the same layout as the local board, with authoring details such as rules, gaps, and source locations removed.
 - Layer switching, Follow director, replaying one layer, shot focus, and captions all work on the published site. See demo for syntax.
-- Fullscreen works on the published site: F enters/toggles, Space plays/pauses, ←/→ steps back/forward, Esc exits.
+- Fullscreen works on the published site: F enters/toggles, Space plays/pauses, ←/→ steps back/forward, Esc exits. Like a video, ←/→ during playback skips one step and keeps playing; while paused it steps once and stays paused.
 - Fullscreen keeps only the stage and captions. Playback controls float below and hide automatically.
 - Both local and published views can export images. Video export is local only.
 - Local image and video export use the Joplo export component (Playwright + Chromium, kept under ~/.joplo, not in the project). If it is missing, the board's Export menu offers Install export component (about 100 MB) and continues the export after installing; in a terminal, run npx joplo setup export.
