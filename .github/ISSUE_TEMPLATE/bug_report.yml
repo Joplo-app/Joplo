@@ -1,0 +1,34 @@
+name: Bug report / Bug 报告
+description: Something in Joplo does not work as expected. / Joplo 的行为和预期不符。
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Joplo accepts issues, not pull requests (see CONTRIBUTING.md). Report security issues by email to support@joplo.app, not here.
+        感谢反馈！Joplo 接受 issue，不接受 PR（见 CONTRIBUTING.md）。安全问题请发邮件到 support@joplo.app，不要发在这里。
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened / 发生了什么
+      description: What you ran, what you expected, and what happened instead. / 你运行了什么、预期结果、实际结果。
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce / 复现方式
+      description: The smallest project, snippet, or steps that show the problem. Include `npx joplo check` output if relevant. / 能复现问题的最小项目、代码片段或步骤；相关时附上 `npx joplo check` 的输出。
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Joplo version / Joplo 版本
+      description: Output of `npx joplo --version`
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: OS, Node version, browser / 操作系统、Node 版本、浏览器

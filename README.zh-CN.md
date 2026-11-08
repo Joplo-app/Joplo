@@ -237,6 +237,10 @@ Joplo 表达设计行为，不运行真实业务后端；只支持静态路径�
 
 作者模块在本机加载、检查和构建时执行，只运行可信项目。看板和发布站只消费编译后的 IR。本地反馈保存在项目目录内，不包含 MCP、多人协作或云端评论实时同步。
 
+## 参与贡献
+
+Joplo 接受 issue，不接受 pull request。bug 和功能需求请在 [issue](https://github.com/Joplo-app/Joplo/issues/new/choose) 中提交，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请发邮件到 [support@joplo.app](mailto:support@joplo.app)。
+
 ## 许可证
 
 [PolyForm Shield 1.0.0](LICENSE)。任何人都可以免费使用 Joplo，包括在公司里和商业项目中使用；不得用它提供与 Joplo 或 Joplo Cloud 竞争的产品，详见 [COMMERCIAL.md](COMMERCIAL.md)。0.2.15 及更早的版本以 Apache-2.0 发布。随包字体使用 [SIL OFL 1.1](packages/web/src/fonts/OFL.txt)。

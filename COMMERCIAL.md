@@ -38,7 +38,7 @@ No license covers the Joplo name or logo. Do not use them for forks or for other
 
 ## Contributions
 
-By submitting a contribution, you agree that the licensor may license it under the PolyForm Shield License 1.0.0, under commercial licenses, or under any other terms.
+Joplo accepts issues, not pull requests; see [CONTRIBUTING.md](CONTRIBUTING.md). By posting suggestions, code, or other material in an issue, you agree that the licensor may use it in Joplo and license it under any terms.
 
 ---
 
@@ -80,4 +80,4 @@ Joplo 的名称和标志不在任何许可证的授权范围内，不得用于�
 
 ## 贡献
 
-提交贡献即表示你同意许可方以 PolyForm Shield License 1.0.0、商业许可证或其他任何条款授权该贡献。
+Joplo 接受 issue，不接受 pull request，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。在 issue 中发布建议、代码或其他材料，即表示你同意许可方在 Joplo 中使用这些内容，并以任何条款授权。

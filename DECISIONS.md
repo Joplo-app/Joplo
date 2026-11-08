@@ -386,6 +386,7 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 0.2.15 及更早的版本已按 Apache-2.0 发布，这份授权不可撤销；新许可证从下一个版本开始生效。
   - 许可证只保护代码，不保护创意：不用 Joplo 代码、自己重写同样的想法，许可证管不到。要保护品牌，靠注册“Joplo”商标。
   - 项目不再符合 OSI 的“开源”定义，文案统一说“源码公开”。`scripts/test/release.test.ts` 检查 6 个包的许可证字段一致，且 LICENSE 文件与根目录相同。
+- D82 只接受 issue，不接受 PR（2026-11-08，来源：用户：“这个项目接受 issue，不接受 pr”）：`CONTRIBUTING.md` 写明核心团队以外的 PR 直接关闭，不评审；修复思路请写在 issue 里，可以附代码片段。在 issue 中发布的材料，许可方可以以任何条款使用（取代 D81 中“贡献者同意许可方以任何条款授权”的写法）。提供 bug 和功能需求两个 issue 模板，安全问题和授权咨询发邮件到 support@joplo.app。仓库设置 `pull_request_creation_policy` 改为只允许协作者开 PR，PR 模板也提示改提 issue。
 
 ## Working assumptions
 

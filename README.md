@@ -237,6 +237,10 @@ Joplo models behavior; it does not run a real product backend. Routes must be st
 
 Author modules execute on your machine during loading, checks, and builds. Only run projects you trust. The Board and Published site consume compiled IR. Local review records stay in the project directory. MCP, multi-user collaboration, and real-time cloud comment sync are outside this local release.
 
+## Contributing
+
+Joplo accepts issues, not pull requests. Report bugs and request features in [issues](https://github.com/Joplo-app/Joplo/issues/new/choose); see [CONTRIBUTING.md](CONTRIBUTING.md). Email security issues to [support@joplo.app](mailto:support@joplo.app).
+
 ## License
 
 [PolyForm Shield 1.0.0](LICENSE). Anyone can use Joplo for free, including at companies and for commercial work; you may not use it to provide a product that competes with Joplo or Joplo Cloud. See [COMMERCIAL.md](COMMERCIAL.md). Versions 0.2.15 and earlier were released under Apache-2.0. Bundled fonts use [SIL OFL 1.1](packages/web/src/fonts/OFL.txt).
