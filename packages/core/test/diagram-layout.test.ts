@@ -1,3 +1,4 @@
+import type { SceneNode } from '../src/schema.ts';
 /**
  * 编译期图表布局（D69，ELK layered + 层级处理）的不变量：
  * - 确定：同一结构 → 同一坐标（同一进程、另一个进程都一样）；state / when / trace 不参与结构，不移动任何节点；
@@ -11,7 +12,7 @@ import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { START, graphStructure, layoutSequence, sampleRoute, sequenceStructure, structureKey, type Box, type GraphLayout, type Point, type SceneNode } from '../src/index.ts';
+import { START, graphStructure, layoutSequence, sampleRoute, sequenceStructure, structureKey, type Box, type GraphLayout, type Point } from '../../../plugins/diagram/src/model-index.ts';
 import { elkLayout } from '../src/node.ts';
 import { agentArch, E, G, N, loopDiagram } from './fixtures/diagram-arch.ts';
 
@@ -21,7 +22,7 @@ const layout = (n: SceneNode) => elkLayout(graphStructure(n), diagramGoal(n));
 function fixture(state: (k: string) => string = () => 'idle', extra: SceneNode[] = [], direction = 'right'): SceneNode {
   return {
     id: 'arch',
-    type: 'Diagram',
+    type: 'diagram:Diagram',
     props: { direction, h: 520 },
     children: [
       N('client', '客户端', { kind: 'client', state: state('client') }),
@@ -134,9 +135,9 @@ describe('确定性与稳定', () => {
   });
 
   it('边界输入：空图、连线指向不存在的节点、只有空分组都不抛异常', () => {
-    expect(layout({ id: 'd', type: 'Diagram' })).toMatchObject({ width: 0, height: 0 });
-    expect(Object.keys(layout({ id: 'd', type: 'Diagram', children: [N('a', 'A'), E('a', 'ghost')] }).edges)).toEqual([]);
-    const l = layout({ id: 'd', type: 'Diagram', children: [G('g', '空分组', []), N('a', 'A')] });
+    expect(layout({ id: 'd', type: 'diagram:Diagram' })).toMatchObject({ width: 0, height: 0 });
+    expect(Object.keys(layout({ id: 'd', type: 'diagram:Diagram', children: [N('a', 'A'), E('a', 'ghost')] }).edges)).toEqual([]);
+    const l = layout({ id: 'd', type: 'diagram:Diagram', children: [G('g', '空分组', []), N('a', 'A')] });
     expect(l.groups.g).toBeDefined();
   });
 });
@@ -198,7 +199,7 @@ describe('几何：分组、连线、标签', () => {
     }
 
   it('连线可以连到分组：终点落在分组框的边上', () => {
-    const n: SceneNode = { id: 'd', type: 'Diagram', props: { direction: 'right' }, children: [N('api', 'API'), G('data', '存储', [N('pg', 'PostgreSQL', { kind: 'database' }), N('redis', 'Redis', { kind: 'database' })]), E('api', 'data', { id: 'e', label: '读写' })] };
+    const n: SceneNode = { id: 'd', type: 'diagram:Diagram', props: { direction: 'right' }, children: [N('api', 'API'), G('data', '存储', [N('pg', 'PostgreSQL', { kind: 'database' }), N('redis', 'Redis', { kind: 'database' })]), E('api', 'data', { id: 'e', label: '读写' })] };
     const l = layout(n);
     const pts = l.edges.e!.points;
     const end = pts[pts.length - 1]!;
@@ -209,8 +210,8 @@ describe('几何：分组、连线、标签', () => {
   });
 
   it('group="…" 引用与嵌套得到同一个布局', () => {
-    const nested: SceneNode = { id: 'd', type: 'Diagram', children: [G('g', 'G', [N('a', 'A'), N('b', 'B')]), N('c', 'C'), E('a', 'c'), E('b', 'c')] };
-    const flat: SceneNode = { id: 'd', type: 'Diagram', children: [G('g', 'G', []), N('a', 'A', { group: 'g' }), N('b', 'B', { group: 'g' }), N('c', 'C'), E('a', 'c'), E('b', 'c')] };
+    const nested: SceneNode = { id: 'd', type: 'diagram:Diagram', children: [G('g', 'G', [N('a', 'A'), N('b', 'B')]), N('c', 'C'), E('a', 'c'), E('b', 'c')] };
+    const flat: SceneNode = { id: 'd', type: 'diagram:Diagram', children: [G('g', 'G', []), N('a', 'A', { group: 'g' }), N('b', 'B', { group: 'g' }), N('c', 'C'), E('a', 'c'), E('b', 'c')] };
     const ln = layout(nested);
     const lf = layout(flat);
     for (const id of ['a', 'b', 'c']) expect(lf.nodes[id]).toBeDefined();
@@ -220,7 +221,7 @@ describe('几何：分组、连线、标签', () => {
   });
 
   it('pin="end"：节点放到所在分组的最后一层', () => {
-    const n = (pin?: string): SceneNode => ({ id: 'd', type: 'Diagram', props: { direction: 'right' }, children: [G('g', 'G', [N('a', 'A'), N('b', 'B'), N('c', 'C'), N('x', 'X', pin ? { pin } : {})]), E('a', 'b'), E('b', 'c'), E('a', 'x')] });
+    const n = (pin?: string): SceneNode => ({ id: 'd', type: 'diagram:Diagram', props: { direction: 'right' }, children: [G('g', 'G', [N('a', 'A'), N('b', 'B'), N('c', 'C'), N('x', 'X', pin ? { pin } : {})]), E('a', 'b'), E('b', 'c'), E('a', 'x')] });
     const free = layout(n());
     const pinned = layout(n('end'));
     expect(free.nodes.x!.x).toBeLessThan(free.nodes.c!.x);
@@ -257,7 +258,7 @@ describe('几何：分组、连线、标签', () => {
         const b = ids[Math.floor(rnd() * ids.length)]!;
         if (a !== b) edges.push(E(a, b, { id: `e${i}`, label: rnd() > 0.5 ? `调用 ${i}` : undefined }));
       }
-      const n: SceneNode = { id: 'd', type: 'Diagram', props: { direction: rnd() > 0.5 ? 'down' : 'right' }, children: [...groups, ...loose, ...edges] };
+      const n: SceneNode = { id: 'd', type: 'diagram:Diagram', props: { direction: rnd() > 0.5 ? 'down' : 'right' }, children: [...groups, ...loose, ...edges] };
       const l = layout(n);
       checkGroups(n, l);
       for (const e of edges) expect(l.edges[e.id]!.points.length, `${k}: ${e.id}`).toBeGreaterThanOrEqual(2);
@@ -267,9 +268,9 @@ describe('几何：分组、连线、标签', () => {
 
 describe('状态机与时序图的布局', () => {
   it('状态机：起点圆点在初始状态的上游，连线指向初始状态；终态尺寸更大（双线）', () => {
-    const S = (id: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'StateMachine.State', props: { label: id, ...extra } });
-    const T = (from: string, to: string): SceneNode => ({ id: `${from}->${to}`, type: 'StateMachine.Transition', props: { from, to, label: `${from} 到 ${to}` } });
-    const n: SceneNode = { id: 'sm', type: 'StateMachine', props: { direction: 'right' }, children: [S('created', { initial: true }), S('paid'), S('closed', { final: true }), T('created', 'paid'), T('paid', 'closed'), T('created', 'closed')] };
+    const S = (id: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'diagram:StateMachine.State', props: { label: id, ...extra } });
+    const T = (from: string, to: string): SceneNode => ({ id: `${from}->${to}`, type: 'diagram:StateMachine.Transition', props: { from, to, label: `${from} 到 ${to}` } });
+    const n: SceneNode = { id: 'sm', type: 'diagram:StateMachine', props: { direction: 'right' }, children: [S('created', { initial: true }), S('paid'), S('closed', { final: true }), T('created', 'paid'), T('paid', 'closed'), T('created', 'closed')] };
     const l = layout(n);
     expect(l.starts?.created).toBeDefined();
     expect(l.starts!.created!.x).toBeLessThan(l.nodes.created!.x);
@@ -280,17 +281,17 @@ describe('状态机与时序图的布局', () => {
   });
 
   it('时序图：参与者按源码顺序成列，消息按源码顺序成行并编号；标签放得下；片段框包住它的消息', () => {
-    const A = (id: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'Sequence.Actor', props: { label: id, ...extra } });
-    const Msg = (id: string, from: string, to: string, label: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'Sequence.Message', props: { from, to, label, ...extra } });
+    const A = (id: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'diagram:Sequence.Actor', props: { label: id, ...extra } });
+    const Msg = (id: string, from: string, to: string, label: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'diagram:Sequence.Message', props: { from, to, label, ...extra } });
     const n: SceneNode = {
       id: 'seq',
-      type: 'Sequence',
+      type: 'diagram:Sequence',
       children: [
-        { id: 'g', type: 'Sequence.Group', props: { label: '客户端' }, children: [A('web', { kind: 'client' })] },
+        { id: 'g', type: 'diagram:Sequence.Group', props: { label: '客户端' }, children: [A('web', { kind: 'client' })] },
         A('api'),
         A('db', { kind: 'database' }),
         Msg('m1', 'web', 'api', 'POST /orders（很长的标签用来撑开列间距）'),
-        { id: 'b1', type: 'Sequence.Block', props: { kind: 'alt', label: '库存不足' }, children: [Msg('m2', 'api', 'db', '查询库存'), Msg('m3', 'api', 'api', '自检')] },
+        { id: 'b1', type: 'diagram:Sequence.Block', props: { kind: 'alt', label: '库存不足' }, children: [Msg('m2', 'api', 'db', '查询库存'), Msg('m3', 'api', 'api', '自检')] },
         Msg('m4', 'api', 'web', '201 Created', { reply: true }),
       ],
     };
@@ -319,7 +320,7 @@ describe('状态机与时序图的布局', () => {
 });
 
 // ---------- D69 补充：可读性（用户看了 v2：“几乎看不到到底是谁调用了谁”） ----------
-import { diagramGoal } from '../src/index.ts';
+import { diagramGoal } from '../../../plugins/diagram/src/model-index.ts';
 
 /** 两条不同连线之间最长的共线重叠（平行且相距 < 2px 的线段重叠的长度）。 */
 function collinearOverlap(l: GraphLayout): { len: number; pair: string } {

@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+import { standardPlugins } from '@joplo-app/core/node';
 /**
  * `joplo build`：静态发布站。
  *
@@ -166,7 +168,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     fs.rmSync(siteHtml);
     for (const rel of inlined) fs.rmSync(path.join(staging, rel));
     // 插件运行时（D86）：每个打成一个文件，内联在入口脚本之前（file:// 也能打开）；只打包 IR 里用到的插件
-    const used = Object.fromEntries(Object.entries(compiled.pluginRuntimes).filter(([id]) => project.plugins?.[id]));
+    const used = Object.fromEntries(Object.entries(compiled.pluginRuntimes).filter(([id]) => project.plugins?.[id] && !standardPlugins.some(p => p.id === id)));
     const pluginCode = await bundlePluginRuntimes(used, projectDir, web);
     const withPlugins = injectPluginScripts(html, pluginCode);
     fs.writeFileSync(path.join(staging, 'index.html'), withPlugins.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));
@@ -260,6 +262,12 @@ export async function stageDistSite(web: DistWeb, projectDir: string, staging: s
  */
 export async function bundlePluginRuntimes(runtimes: Record<string, string>, projectDir: string, web: WebAssets): Promise<string[]> {
   const out: string[] = [];
+  const requireHost = createRequire(path.join(web.webDir, 'package.json'));
+  const shared = ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client'];
+  const bridge = (name: string) => {
+    const keys = Object.keys(requireHost(name) as object).filter(k => k !== 'default' && /^[A-Za-z_$][\w$]*$/.test(k));
+    return `const shared = globalThis.__JOPLO_SHARED__[${JSON.stringify(name)}]; export default shared; ${keys.map(k => `export const ${k} = shared.${k};`).join(' ')}`;
+  };
   for (const [id, file] of Object.entries(runtimes).sort(([a], [b]) => a.localeCompare(b))) {
     const entry = '\0joplo-plugin-entry';
     const r = (await viteBuild({
@@ -270,16 +278,18 @@ export async function bundlePluginRuntimes(runtimes: Record<string, string>, pro
       logLevel: 'error',
       resolve: { alias: kitAliases(web, projectDir) },
       define: { 'process.env.NODE_ENV': '"production"' },
+      oxc: { jsx: { runtime: 'automatic', importSource: 'react', development: false } },
       plugins: [{
         name: 'joplo:plugin-entry',
-        resolveId: (src) => (src === 'joplo-plugin-entry' ? entry : null),
-        load: (resolved) => (resolved === entry ? `import runtime from ${JSON.stringify(file)};\n(globalThis.__JOPLO_PLUGINS__ ??= []).push(runtime);\n` : null),
+        resolveId: (src) => src === 'joplo-plugin-entry' ? entry : shared.includes(src) ? `\0joplo-shared:${src}` : null,
+        load: (resolved) => (resolved.startsWith('\0joplo-shared:') ? bridge(resolved.slice('\0joplo-shared:'.length)) : resolved === entry ? `import runtime from ${JSON.stringify(file)};\n(globalThis.__JOPLO_PLUGINS__ ??= []).push(runtime);\n` : null),
       }],
       build: { write: false, minify: true, sourcemap: false, modulePreload: false, reportCompressedSize: false, emptyOutDir: false, rolldownOptions: { input: 'joplo-plugin-entry', output: { format: 'es', codeSplitting: false } } },
     })) as Rollup.RollupOutput | Rollup.RollupOutput[];
     const chunks = (Array.isArray(r) ? r : [r]).flatMap((o) => o.output).filter((x): x is Rollup.OutputChunk => x.type === 'chunk');
     if (chunks.length !== 1) throw new JoploError('EXPORT_FAILED', `Plugin ${id}: expected one bundled runtime file, got ${chunks.length}`);
-    out.push(chunks[0]!.code);
+    // Defer evaluation until the host has initialized its shared React instance.
+    out.push(`(globalThis.__JOPLO_PLUGIN_FACTORIES__ ??= []).push({id:${JSON.stringify(id)},load:()=>{\n${chunks[0]!.code}\n}});`);
   }
   return out;
 }

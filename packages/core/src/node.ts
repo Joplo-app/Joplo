@@ -2,4 +2,6 @@
 export * from './load.ts';
 export * from './local-review-files.ts';
 /** 编译期图表布局引擎（elkjs，D69）：compile(src, mode, { layout: elkLayout })。 */
-export { elkLayout, runElk } from './diagram/elk.ts';
+export { elkLayout, runElk } from '@joplo-app/plugin-diagram/node';
+
+export { standardPlugins, enabledPlugins } from './plugins/compiler.ts';

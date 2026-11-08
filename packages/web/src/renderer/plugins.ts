@@ -1,3 +1,9 @@
+import * as React from 'react';
+import * as ReactDOM from 'react-dom';
+import * as ReactDOMClient from 'react-dom/client';
+import * as JSX from 'react/jsx-runtime';
+import * as JSXDev from 'react/jsx-dev-runtime';
+import { standardRuntimes } from './plugins/standard';
 /**
  * 插件运行时注册表（D86）：看板、截图路由与发布站共用。
  *
@@ -12,7 +18,7 @@
 import { useSyncExternalStore } from 'react';
 import type { PluginRuntime } from '@joplo-app/kit/plugin';
 
-export const PLUGIN_API_VERSION = 1;
+export const PLUGIN_API_VERSION = 2;
 
 export type PluginStatus = { state: 'loading' } | { state: 'ready'; runtime: PluginRuntime } | { state: 'error'; message: string };
 
@@ -38,21 +44,36 @@ export function registerPluginRuntime(v: unknown, expectedId?: string): void {
     return;
   }
   if (expectedId && r.id !== expectedId) status.set(expectedId, { state: 'error', message: `runtime id is ${r.id}, expected ${expectedId}` });
-  else if (r.apiVersion !== PLUGIN_API_VERSION) status.set(r.id, { state: 'error', message: `plugin API ${String(r.apiVersion)}; this Joplo supports ${PLUGIN_API_VERSION}` });
+  else if (r.apiVersion !== 1 && r.apiVersion !== PLUGIN_API_VERSION) status.set(r.id, { state: 'error', message: `plugin API ${String(r.apiVersion)}; this Joplo supports ${PLUGIN_API_VERSION}` });
   else status.set(r.id, { state: 'ready', runtime: r });
   notify();
 }
 
 // 发布站：内联的插件脚本可能先于本模块执行
+type Factory = { id: string; load(): void };
 type Queue = { push: (v: unknown) => unknown };
-const g = globalThis as { __JOPLO_PLUGINS__?: unknown[] | Queue };
+const g = globalThis as {
+  __JOPLO_PLUGINS__?: unknown[] | Queue;
+  __JOPLO_SHARED__?: Record<string, unknown>;
+  __JOPLO_PLUGIN_FACTORIES__?: Factory[] | { push(factory: Factory): void };
+};
+g.__JOPLO_SHARED__ = { react: React, 'react/jsx-runtime': JSX, 'react/jsx-dev-runtime': JSXDev, 'react-dom': ReactDOM, 'react-dom/client': ReactDOMClient };
 const early = Array.isArray(g.__JOPLO_PLUGINS__) ? g.__JOPLO_PLUGINS__ : [];
 g.__JOPLO_PLUGINS__ = { push: (v: unknown) => registerPluginRuntime(v) };
 for (const v of early) registerPluginRuntime(v);
+for (const r of standardRuntimes) registerPluginRuntime(r);
+const factories = Array.isArray(g.__JOPLO_PLUGIN_FACTORIES__) ? g.__JOPLO_PLUGIN_FACTORIES__ : [];
+const loadFactory = (factory: Factory) => {
+  try { factory.load(); }
+  catch (e) { status.set(factory.id, { state: 'error', message: e instanceof Error ? e.message : String(e) }); notify(); }
+};
+g.__JOPLO_PLUGIN_FACTORIES__ = { push: loadFactory };
+for (const factory of factories) loadFactory(factory);
 
 /** 看板：按 IR 推送的地址载入（地址没变就不重复载入）。 */
 export function loadPluginRuntimes(urls: Readonly<Record<string, string>> | null | undefined): void {
   for (const [id, url] of Object.entries(urls ?? {})) {
+    if (standardRuntimes.some(r => r.id === id)) continue;
     if (loadedUrl.get(id) === url) continue;
     loadedUrl.set(id, url);
     if (!status.has(id) || status.get(id)!.state !== 'ready') status.set(id, { state: 'loading' });

@@ -9,7 +9,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
+  resolve: { dedupe: ['react', 'react-dom'], alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   server: { host: '127.0.0.1' },
   build: { outDir: 'dist', emptyOutDir: true, assetsInlineLimit: 0, chunkSizeWarningLimit: 2000 },
 });

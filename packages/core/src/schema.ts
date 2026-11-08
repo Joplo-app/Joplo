@@ -1,3 +1,4 @@
+import { LegacyTraceSchema } from './plugins/legacy.ts';
 /**
  * Joplo IR（schemaVersion 2）：由 TSX 源文件编译得到的中间表示，不是作者直接编辑的格式。
  * 权威源是项目文件夹里的 TSX/TS 文件（ADR-0002）；渲染器、播放器、校验器、构建只消费这里的 IR。
@@ -6,7 +7,6 @@
  */
 import { z } from 'zod';
 import { COMPONENT_TYPES, PLUGIN_TYPE, type PluginComponentType } from './catalog.ts';
-import type { DiagramLayout as DiagramLayoutT } from './diagram/model.ts';
 
 /** 层级标签的预设图标（标签压窄时靠它认出是哪一层）。不写时：手机视口 mobile，其余 window。 */
 export const LAYER_ICONS = ['window', 'browser', 'mobile', 'desktop', 'terminal', 'chat', 'agent', 'server', 'data', 'email', 'doc', 'flow'] as const;
@@ -55,43 +55,12 @@ export const Condition: z.ZodType<Condition> = z.lazy(() =>
 ) as z.ZodType<Condition>;
 
 // ---------- 图表布局（D69）：编译期算好，渲染器只读 ----------
-const Num = z.number().finite();
-const BoxS = z.strictObject({ x: Num, y: Num, w: Num, h: Num });
-const PointS = z.strictObject({ x: Num, y: Num });
-const Boxes = z.record(z.string(), BoxS);
-export const DiagramLayoutSchema: z.ZodType<DiagramLayoutT> = z.union([
-  z.strictObject({
-    kind: z.literal('graph'),
-    engine: z.enum(['elk', 'grid']),
-    direction: z.enum(['right', 'down']).optional(),
-    width: Num,
-    height: Num,
-    nodes: Boxes,
-    groups: Boxes,
-    titles: Boxes,
-    edges: z.record(z.string(), z.strictObject({ points: z.array(PointS), label: BoxS.nullable() })),
-    starts: Boxes.optional(),
-  }),
-  z.strictObject({
-    kind: z.literal('sequence'),
-    width: Num,
-    height: Num,
-    actors: Boxes,
-    lifelines: z.record(z.string(), z.strictObject({ x: Num, y1: Num, y2: Num })),
-    messages: z.record(z.string(), z.strictObject({ points: z.array(PointS), label: BoxS.nullable(), n: z.number().int(), self: z.boolean() })),
-    groups: Boxes,
-    titles: Boxes,
-    blocks: Boxes,
-    blockTitles: Boxes,
-  }),
-]) as z.ZodType<DiagramLayoutT>;
-
 // ---------- 画面与元素 ----------
 export type SceneNode = {
   /** 可操作元素必须由作者给出；其余由编译器按位置生成（以 `_` 开头）。 */
   id: string;
   /** 目录组件，或插件组件 `<插件 id>:<组件名>`（D86）。 */
-  type: (typeof COMPONENT_TYPES)[number] | PluginComponentType;
+  type: string;
   /** Mantine 属性原样保留（可含响应式对象 { base, md }）；值可以是字面量或 `$ui.x` / `$data.x` / `$inputs.x` 整值绑定。 */
   props?: Record<string, unknown>;
   children?: SceneNode[];
@@ -104,8 +73,10 @@ export type SceneNode = {
   redact?: boolean | Condition;
   /** 来自哪个功能方案（堆叠到路径上的元素）；页面和布局自身的元素没有此字段。 */
   from?: string;
-  /** 图表根节点（Diagram / StateMachine / Sequence）的布局，编译期算好（D69）；其他节点没有。 */
-  layout?: DiagramLayoutT;
+  /** 命名空间插件派生数据；只允许 JSON。 */
+  ext?: Record<string, unknown>;
+  /** 取景关联由编译钩子给出，播放器只读取。 */
+  framing?: { include?: string[]; kind?: 'root' | 'group' | 'block' | 'content' | 'edge' | 'row' };
   source?: string;
 };
 
@@ -122,7 +93,8 @@ export const SceneNode: z.ZodType<SceneNode> = z.lazy(() =>
     note: z.string().optional(),
     redact: z.union([z.boolean(), Condition]).optional(),
     from: z.string().optional(),
-    layout: DiagramLayoutSchema.optional(),
+    ext: z.record(z.string(), Json).optional(),
+    framing: z.strictObject({ include: z.array(z.string()).optional(), kind: z.enum(['root', 'group', 'block', 'content', 'edge', 'row']).optional() }).optional(),
     source: Source,
   }),
 ) as z.ZodType<SceneNode>;
@@ -163,21 +135,6 @@ export const Effect = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('stream'), path: StatePath, value: z.string() }),
 ]);
 
-/**
- * 调用链（D48）：这一步 trace 的一条路径。nodes 按路径顺序；edges 是路径上的连线，reverse = 沿连线的 to→from 方向走。
- * mode：ok = 正常调用（本步 active，之后 ok）；fail = 失败（连线与终点节点 error）；skip = 没被调用（dim）。
- */
-export const Trace = z.strictObject({
-  mode: z.enum(['ok', 'fail', 'skip']),
-  nodes: z.array(z.string().min(1)),
-  edges: z.array(z.strictObject({ id: z.string().min(1), reverse: z.boolean().default(false) })),
-  /** 路径经过的分组（节点所在的各级分组，D69）：fail 时 errorGroups 是终点所在的分组。没有分组时省略（IR 与旧版相同）。 */
-  groups: z.array(z.string().min(1)).optional(),
-  errorGroups: z.array(z.string().min(1)).optional(),
-  /** 镜头目标：架构图 / 状态机是路径上的节点，时序图是消息（一行一行的）。旧 IR 没有，按 nodes 处理。 */
-  targets: z.array(z.string().min(1)).optional(),
-});
-
 /** 镜头（D43）：这一步在某个层级里对准哪些元素；targets 为空 = 这一层的整体。 */
 export const Shot = z.strictObject({ layer: z.string().min(1), targets: z.array(z.string().min(1)) });
 
@@ -195,6 +152,8 @@ export const CALLOUT_SIDES = ['top', 'right', 'bottom', 'left'] as const;
 export const Callout = z.strictObject({ target: z.string().min(1), text: z.string().min(1), side: z.enum(CALLOUT_SIDES).optional() });
 
 export const Step = z.strictObject({
+  /** 历史 IR 兼容输入；当前编译器不生成。 */
+  traces: z.array(LegacyTraceSchema).optional(),
   id: Qid,
   /** Author identity, unique within a scenario. id remains the legacy playback address. */
   key: Id.optional(),
@@ -216,8 +175,11 @@ export const Step = z.strictObject({
   directorLayer: z.string().nullable().default(null),
   /** 较长的解说（来自 explain()，多个按换行连接）：字幕区第二行显示（说明下方、小一号）；发布站保留。 */
   explain: z.string().min(1).optional(),
-  /** 这一步的调用链（来自 trace()）：Diagram 节点与连线的 state 由 diagramStateAt 从它推算；发布站保留。 */
-  traces: z.array(Trace).default([]),
+  /** 插件效果降级后的逐步快照。 */
+  ext: z.record(z.string(), Json).optional(),
+  /** 插件效果贡献的显式焦点与引用（scope 校验）。 */
+  focusTargets: z.array(z.string()).optional(),
+  references: z.array(z.string()).optional(),
   /** 分叉是演示信息，发布保留；at 在编译时比较动作与业务效果的公共前缀。 */
   forks: z.array(Fork).default([]),
   /** 本步标注，不累积，不参与状态转换。 */
@@ -236,6 +198,7 @@ export const Step = z.strictObject({
 });
 
 export const Scenario = z.strictObject({
+  ext: z.record(z.string(), Json).optional(),
   id: Qid,
   optionId: Qid,
   name: z.string().min(1),
@@ -399,7 +362,7 @@ export const Project = z.strictObject({
     id: z.string().min(1),
     title: z.string(),
     version: z.string().optional(),
-    components: z.record(z.string(), z.strictObject({ interactive: z.boolean().optional(), parent: z.string().optional() })),
+    components: z.record(z.string(), z.strictObject({ interactive: z.boolean().optional(), parent: z.string().optional(), needsId: z.boolean().optional(), selfEvident: z.boolean().optional() })),
   })).optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),
@@ -435,7 +398,6 @@ export type Scenario = z.infer<typeof Scenario>;
 export type Step = z.infer<typeof Step>;
 export type Action = z.infer<typeof Action>;
 export type Effect = z.infer<typeof Effect>;
-export type Trace = z.infer<typeof Trace>;
 export type Shot = z.infer<typeof Shot>;
 
 export type Fork = z.infer<typeof Fork>;

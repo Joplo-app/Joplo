@@ -8,21 +8,22 @@
  * - effectiveState：显式 state 优先，否则用 trace 推算的状态；machineStates：状态机的当前状态与本步走过的转换；
  * - edgePath / arrowHead / pointAt：折线 → SVG 路径。
  */
-import { GROUP_FONT, DESC_FONT, EDGE_FONT, NODE_FONT, START, graphStructure, gridLayout, sampleRoute, sequenceStructure, layoutSequence, textWidth, type Box, type DiagramStates, type GraphLayout, type GraphStructure, type Point, type SceneNode, type SequenceLayout, type SequenceStructure } from '@joplo-app/core';
+import { GROUP_FONT, DESC_FONT, EDGE_FONT, NODE_FONT, START, textWidth, type Box, type GraphLayout, type GraphStructure, type Point, type SequenceLayout, type SequenceStructure } from './model';
+import { sampleRoute } from './graph-layout';
+import type { SceneNode } from '@joplo-app/core';
+import type { DiagramStates } from './state';
 
 export { GROUP_FONT, DESC_FONT, EDGE_FONT, NODE_FONT, START, sampleRoute, textWidth };
 export type { Box, Point, GraphLayout, SequenceLayout };
 
 /** 结构 + 编译期布局。 */
 export function graphView(node: SceneNode): { structure: GraphStructure; layout: GraphLayout } {
-  const structure = graphStructure(node);
-  const layout = node.layout?.kind === 'graph' ? node.layout : gridLayout(structure);
+  const { structure, layout } = node.ext!.diagram as { structure: GraphStructure; layout: GraphLayout };
   return { structure, layout };
 }
 
 export function sequenceView(node: SceneNode): { structure: SequenceStructure; layout: SequenceLayout } {
-  const structure = sequenceStructure(node);
-  const layout = node.layout?.kind === 'sequence' ? node.layout : layoutSequence(structure);
+  const { structure, layout } = node.ext!.diagram as { structure: SequenceStructure; layout: SequenceLayout };
   return { structure, layout };
 }
 
@@ -128,21 +129,6 @@ export function effectiveState(explicit: unknown, traced: DiagramStates | undefi
   if (explicit !== undefined && explicit !== null) return { state: typeof explicit === 'string' && D_STATES.has(explicit) ? explicit : 'idle', reverse: false };
   const t = traced?.[id];
   return t ? { state: t.state, reverse: !!t.reverse } : { state: 'idle', reverse: false };
-}
-
-/**
- * 状态机（D69）：value 绑定的当前状态是 current；这一步 value 从 prev 变成当前值、并且有对应的转换时，这条转换 active（小点流动）。
- * 返回值与 trace 推算的状态合并（trace 优先）：渲染器把它当成“推算值”，显式 state 仍然优先。
- */
-export function machineStates(s: GraphStructure, value: unknown, prev: unknown): { current: string | null; states: DiagramStates } {
-  const cur = typeof value === 'string' && s.nodes.some((n) => n.id === value) ? value : null;
-  const states: DiagramStates = {};
-  if (cur && typeof prev === 'string' && prev !== cur) {
-    const t = s.edges.find((e) => e.from === prev && e.to === cur);
-    if (t) states[t.id] = { state: 'active' };
-  }
-  if (cur) states[cur] = { state: 'active' };
-  return { current: cur, states };
 }
 
 /** 状态机起点圆点的连线 id。 */

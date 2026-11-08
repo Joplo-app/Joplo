@@ -1,3 +1,5 @@
+import { diagramStateAt } from '../../../plugins/diagram/src/state.ts';
+import { nodeData, frameData } from '../../../plugins/diagram/src/data.ts';
 /**
  * D69 编译期：图表的诊断（分组引用 / 成环 / 冲突、连线端点、片段与分组的子元素、按业务域分组的提示）、
  * trace 扩展到分组 / 状态机 / 时序图、布局写进 IR（各步骤共用同一份坐标）、不用新功能的项目 IR 不变。
@@ -6,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/kit/ui';
 import { $, config, feature, flow, layer, option, page, set, shot, trace, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { cameraAt, compile, diagramStateAt, type AuthoringProject, type SceneNode } from '../src/index.ts';
+import { cameraAt, compile, type AuthoringProject, type SceneNode } from '../src/index.ts';
 import { elkLayout } from '../src/node.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
@@ -42,7 +44,7 @@ describe('诊断：分组、连线、子元素', () => {
   it('group= 指向不存在的分组：UNKNOWN_DIAGRAM_GROUP，列出可用分组', () => {
     const r = build(h(D, { id: 'd' }, h(D.Group, { id: 'runtime', label: '运行时' }), h(D.Node, { id: 'a', label: 'A', group: 'storage' })));
     expect(codes(r)).toContain('UNKNOWN_DIAGRAM_GROUP');
-    expect(msgs(r, 'UNKNOWN_DIAGRAM_GROUP')).toContain('group="storage" is not a Diagram.Group id in this Diagram (available: runtime)');
+    expect(msgs(r, 'UNKNOWN_DIAGRAM_GROUP')).toContain('group="storage" is not a diagram:Diagram.Group id in this diagram:Diagram (available: runtime)');
   });
 
   it('分组互相包含（group= 引用成环）：DIAGRAM_GROUP_CYCLE，只报一次', () => {
@@ -91,7 +93,7 @@ describe('诊断：分组、连线、子元素', () => {
   it('转换与消息没写 id：缺省「from->to」，重复的依次加 ~2、~3（不报 DUPLICATE_ID）', () => {
     const r = build(h(Q, { id: 'q' }, h(Q.Actor, { id: 'a', label: 'A' }), h(Q.Actor, { id: 'b', label: 'B' }), h(Q.Message, { from: 'a', to: 'b' }), h(Q.Message, { from: 'a', to: 'b' }), h(Q.Message, { from: 'a', to: 'b' })));
     expect(codes(r)).toEqual([]);
-    const ids = rootOf(r).children!.filter((c) => c.type === 'Sequence.Message').map((c) => c.id);
+    const ids = rootOf(r).children!.filter((c) => c.type === 'diagram:Sequence.Message').map((c) => c.id);
     expect(ids).toEqual(['a->b', 'a->b~2', 'a->b~3']);
   });
 });
@@ -128,7 +130,7 @@ describe('trace：分组、状态机、时序图', () => {
   it('连到分组的连线可以 trace：trace("svc", "data") 走 to_data，分组本身也点亮', () => {
     const r = build(arch, (f) => f.system('写入', trace('svc', 'data')));
     expect(codes(r)).toEqual([]);
-    const t = r.project!.scenarios['f.a.s']!.steps[0]!.traces[0]!;
+    const t = frameData(r.project!.scenarios['f.a.s']!.steps[0]!)!.traces[0]!;
     expect(t.edges).toEqual([{ id: 'to_data', reverse: false }]);
     expect(diagramStateAt(r.project!, 'f.a.s', 1).data?.state).toBe('active');
   });
@@ -162,29 +164,30 @@ describe('布局写进 IR', () => {
   it('每张图表根节点带 layout（ELK）；when 隐藏的元素也在布局里（逐段出现时已有元素不动）', () => {
     const r = build(h(D, { id: 'd' }, h(D.Node, { id: 'a', label: 'A' }), h(D.Node, { id: 'b', label: 'B', when: $.ui.show }), h(D.Edge, { from: 'a', to: 'b', when: $.ui.show })));
     const d = rootOf(r);
-    expect(d.layout?.kind).toBe('graph');
-    if (d.layout?.kind !== 'graph') throw new Error();
-    expect(d.layout.engine).toBe('elk');
-    expect(Object.keys(d.layout.nodes).sort()).toEqual(['a', 'b']);
-    expect(d.layout.edges['a->b']).toBeDefined();
+    const layout = nodeData(d)!.layout;
+    expect(layout.kind).toBe('graph');
+    if (layout.kind !== 'graph') throw new Error();
+    expect(layout.engine).toBe('elk');
+    expect(Object.keys(layout.nodes).sort()).toEqual(['a', 'b']);
+    expect(layout.edges['a->b']).toBeDefined();
   });
 
   it('只有步骤不同的两个项目：图表布局完全相同（坐标只由结构决定）', () => {
     const tree = () => h(D, { id: 'd' }, h(D.Node, { id: 'a', label: 'A' }), h(D.Node, { id: 'b', label: 'B' }), h(D.Node, { id: 'c', label: 'C' }), h(D.Edge, { from: 'a', to: 'b' }), h(D.Edge, { from: 'a', to: 'c' }));
     const one = build(tree(), (f) => f.system('A → B', trace('a', 'b')));
     const two = build(tree(), (f) => f.system('A → C', trace('a', 'c')).system('镜头', shot('a', 'b', 'c')));
-    expect(rootOf(one).layout).toEqual(rootOf(two).layout);
+    expect(nodeData(rootOf(one))!.layout).toEqual(nodeData(rootOf(two))!.layout);
   });
 
   it('时序图、状态机都有布局；不传布局引擎时退化为网格（engine = grid），照样不重叠', () => {
     const seq = build(h(Q, { id: 'q' }, h(Q.Actor, { id: 'a', label: 'A' }), h(Q.Actor, { id: 'b', label: 'B' }), h(Q.Message, { from: 'a', to: 'b', label: 'x' })));
-    expect(rootOf(seq).layout?.kind).toBe('sequence');
+    expect(nodeData(rootOf(seq))!.layout?.kind).toBe('sequence');
     const grid = build(h(D, { id: 'd' }, h(D.Node, { id: 'a', label: 'A' }), h(D.Node, { id: 'b', label: 'B' })), (f) => f, { layout: false });
-    expect(rootOf(grid).layout).toMatchObject({ kind: 'graph', engine: 'grid' });
+    expect(nodeData(rootOf(grid))!.layout).toMatchObject({ kind: 'graph', engine: 'grid' });
   });
 
   it('不用新功能的项目：trace 不带 groups / errorGroups / targets（IR 与旧版相同，只多了 layout）', () => {
     const r = build(h(D, { id: 'd' }, h(D.Node, { id: 'a', label: 'A' }), h(D.Node, { id: 'b', label: 'B' }), h(D.Edge, { from: 'a', to: 'b' })), (f) => f.system('x', trace('a', 'b')));
-    expect(r.project!.scenarios['f.a.s']!.steps[0]!.traces).toEqual([{ mode: 'ok', nodes: ['a', 'b'], edges: [{ id: 'a->b', reverse: false }] }]);
+    expect(frameData(r.project!.scenarios['f.a.s']!.steps[0]!)!.traces).toEqual([{ mode: 'ok', nodes: ['a', 'b'], edges: [{ id: 'a->b', reverse: false }] }]);
   });
 });

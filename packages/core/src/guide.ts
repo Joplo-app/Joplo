@@ -2,7 +2,7 @@ import { MENTAL_MODEL, SKILL_TOPICS, START_ORDER } from './agent-skill.ts';
 import { COMPONENT_DOCS, COMPONENT_EXAMPLES, COMPONENT_TYPES, GATED_CONTAINERS, HTML_TAGS, INTERACTIVE_TYPES, JOPLO_PROPS, VALUE_TYPES, type ComponentType } from './catalog.ts';
 import { JoploError } from './result.ts';
 import { LAYER_ICONS } from './schema.ts';
-import { DIAGRAM_GROUP_ICONS, DIAGRAM_NODE_KINDS, DIAGRAM_TONES, SEQUENCE_BLOCK_KINDS } from './diagram/model.ts';
+import { standardGuides, standardDocs, standardExamples, standardAliases, standardChecks } from './plugins/standard-catalog.ts';
 
 export { SKILL_TOPICS };
 export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
@@ -100,10 +100,12 @@ const HTML_SET: ReadonlySet<string> = new Set(HTML_TAGS);
  * 名字不区分大小写；不认识的名字报 USAGE 并给出最接近的名字。
  */
 export function componentDetails(names: readonly string[]): string {
-  const all = COMPONENT_TYPES.filter((n) => !n.startsWith('#')) as ComponentType[];
+  const all = [...COMPONENT_TYPES, ...Object.keys(standardDocs)].filter(n => !n.startsWith('#'));
   const out: string[] = [];
   for (const raw of names) {
-    const hit = all.find((n) => n.toLowerCase() === String(raw).toLowerCase());
+    const alias = Object.keys(standardAliases).find(k => k.toLowerCase() === String(raw).toLowerCase());
+    const input = alias ? standardAliases[alias]! : raw;
+    const hit = all.find((n) => n.toLowerCase() === String(input).toLowerCase());
     if (!hit) {
       const near = [...all].sort((a, b) => distance(String(raw).toLowerCase(), a.toLowerCase()) - distance(String(raw).toLowerCase(), b.toLowerCase()))[0];
       throw new JoploError('USAGE', `Unknown component "${raw}". Did you mean ${near}?\nRun npx joplo components to list all components.`);
@@ -112,9 +114,9 @@ export function componentDetails(names: readonly string[]): string {
     out.push(`# ${hit}`);
     for (const n of family) {
       const groups = [INTERACTIVE_TYPES.has(n) ? 'interactive: requires id and a step, disabled + disabledReason, or unmodeled' : '', VALUE_TYPES.has(n) ? 'value: type / select / toggle write to it' : '', GATED_CONTAINERS.has(n) ? 'shown only while opened' : ''].filter(Boolean);
-      out.push(`- ${n}: ${COMPONENT_DOCS[n].replace(/\s+/g, ' ').trim()}${groups.length ? ` [${groups.join('; ')}]` : ''}`);
+      out.push(`- ${n}: ${({ ...COMPONENT_DOCS, ...standardDocs } as Record<string, string>)[n]!.replace(/\s+/g, ' ').trim()}${groups.length ? ` [${groups.join('; ')}]` : ''}`);
     }
-    const ex = COMPONENT_EXAMPLES[hit];
+    const ex = ({ ...COMPONENT_EXAMPLES, ...standardExamples } as Record<string, string>)[hit];
     if (ex) out.push('', '```tsx', ex, '```');
     out.push('');
   }
@@ -123,13 +125,13 @@ export function componentDetails(names: readonly string[]): string {
 }
 
 /** 图表家族（D69）在 components 里各占一行（根组件 + 子组件名），细节在 npx joplo skill diagram。 */
-const DIAGRAM_FAMILY = /^(Diagram|StateMachine|Sequence)\./;
+const PLUGIN_PART = /^[^:]+:[^.]+\./;
 
 function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
-  const names = COMPONENT_TYPES.filter(name => !name.startsWith('#') && !HTML_SET.has(name) && !DIAGRAM_FAMILY.test(name));
-  const family = (root: string) => [root, ...COMPONENT_TYPES.filter(n => n.startsWith(`${root}.`))].join(', ');
+  const names = [...COMPONENT_TYPES, ...Object.keys(standardDocs)].filter(name => !name.startsWith('#') && !HTML_SET.has(name) && !PLUGIN_PART.test(name));
+  const family = (root: string) => [root, ...Object.keys(standardDocs).filter(n => n.startsWith(`${root}.`))].join(', ');
   const line = (name: string) => {
-    const label = name === 'Diagram' || name === 'StateMachine' || name === 'Sequence' ? family(name) : name;
+    const label = name.includes(':') && !name.includes('.') ? family(name) : name;
     return `- ${label}${Object.hasOwn(docs, name) && docs[name]?.trim() ? `: ${docs[name]!.replace(/\s+/g, ' ').trim()}` : ''}`;
   };
   const listed = (set: ReadonlySet<string>) => names.filter(name => set.has(name)).join(', ');
@@ -248,6 +250,13 @@ flow('What does it read?', { from: 'hook' })
 
 Plugins are npm packages maintained outside Joplo. They add components (for example an interactive 3D scene) that the Joplo engine schedules like catalog components: flow steps click their elements, state bindings drive them, and the camera, cues, marks, captions, narration, screenshots, video export, build, and share all work unchanged.
 
+## Standard plugins and API v2
+Standard plugins are enabled without config.plugins; third-party plugins still require explicit opt-in. The diagram topic comes from the first-party package. Existing kit imports stay valid; compiled component names use the plugin namespace.
+
+Node hooks validate/normalize nodes, derive geometry and lower effects. Per-step data is computed before playback and checked against the plugin's schemas; the player never invokes hooks. A plugin exception reports PLUGIN_HOOK_FAILED with the author location; fix the plugin or its props, then run check again. PLUGIN_DATA_INVALID means a slot failed its schema; PLUGIN_EFFECT_UNKNOWN means the effect has no enabled compiler. PLUGIN_LEGACY_TYPE means old IR or bare names: recompile the original TSX using the current kit instead of editing generated JSON.
+
+React runtimes use the host's React instance in both the board and exported sites. React containers can call ctx.renderChildren(nodes, container) to create a portal, or ctx.renderChildren() for their direct children. Read ctx.ext for the current compiled snapshot; use ctx.click for interactions. Do not update business state in a renderer. Keep private authoring text, source locations and local paths out of plugin slots: they are public playback data. Use frame.animate=false for a deterministic final frame and ctx.hold() while assets load.
+
 ## Use a plugin
 1. Install it next to @joplo-app/kit: npm install joplo-plugin-scene3d (or pnpm add / yarn add).
 2. Enable it in joplo.config.ts:
@@ -285,7 +294,7 @@ Joplo exists to demonstrate product behavior with visuals and motion. It is not 
 - Every step = a cause the viewer sees (a click, typing, an incoming message, a system event) + a change it makes (a new row, a status, a toast, a trace, a layer switch).
 - Show, do not tell: a claim like 'invites are fast' becomes the invite happening on screen; 'the queue absorbs spikes' becomes trace() through the queue while the UI stays responsive.
 - Text has a supporting role: captions narrate what is on screen, explain() says why it matters, cards only open, close, jump in time, or switch roles.
-- Pick the visual by what you prove: UI flow → the product screens; who calls whom → Diagram + trace(); time order → Sequence; lifecycle → StateMachine; two answers → options A/B on the same scenario.
+- Pick the visual by what you prove: UI flow → the product screens; who calls whom → the diagram plugin; time order → sequence view; lifecycle → lifecycle view; two answers → options A/B on the same scenario.
 Slide version (wrong): the same points as cards, nothing to operate, nothing changes.
 \`\`\`tsx
 flow('Invite by email', { start: '/members' })
@@ -303,7 +312,7 @@ flow('Invite a teammate', { start: '/members' })
   .card('Now Leo', { role: 'leo' })
   .click('mail_join', 'Leo opens the link and lands in the space', go('/space'), done('Leo joins the same day'))
 \`\`\`
-Backend behind the same feature: put a Diagram in its own layer and .system('Send mail', 'The mail job runs in the background', trace('api', 'queue', 'mailer'), shot('mailer')); a failure is trace.fail('queue', 'mailer') plus the error the user sees. Full examples: examples/invite, examples/agent-arch.
+Backend behind the same feature: put a diagram component in its own layer and .system('Send mail', 'The mail job runs in the background', trace('api', 'queue', 'mailer'), shot('mailer')); a failure is trace.fail('queue', 'mailer') plus the error the user sees. Full examples: examples/invite, examples/agent-arch.
 
 ## 2. Plan the demo first (write it in your reply; ask only questions that change it, each with a default)
 - Audience: who watches (product review, design review, a customer, engineers) and what they must decide afterward.
@@ -499,7 +508,7 @@ See authoring for directories, state, and flow syntax. Import layer, shot, trace
 What viewers look at in each step, and the lighter forms (spotlight, highlight, callout, numbered, hold, redact): npx joplo skill focus.
 
 ## Layers are independent pages
-- Declare layers in an option: layers: { client: layer('Client view', <ClientView/>), backend: layer('Backend flow', <Diagram>…</Diagram>) }.
+- Declare layers in an option: layers: { client: layer('Client view', <ClientView/>), backend: layer('Backend flow', <BackendView/>) }.
 - layer(title, <tree/>) owns a JSX tree, renders independently, and fills the stage; it is not a crop of one large page.
 - Layers share ui / data / inputs. Switching layers does not change the step. Declaring layers makes the demo show these independent pages.
 - routes / on and layers work together, but once an option declares layers the stage shows only its layers: route pages are not drawn during the demo. Routes still give flow start, go(), and back() their state, and step targets are found in the layers first (then the route page).
@@ -508,18 +517,18 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
 - Put long notes in a separate explanation layer, such as why: layer('Design rationale', <Why/>), then switch to it with a shot.
 
 ## Shots and the director
-- Write shot(...ids) in a step. Targets can be components, cards, buttons, or Diagram nodes, groups, and edges. Framing keeps context: see "Frame with shot" in diagram.
+- Write shot(...ids) in a step. Targets can be components, cards, buttons, or plugin elements. Framing keeps context: see "Frame with shot" in diagram.
 - Each id resolves in the layer containing it. The same id can affect multiple layers; the first shot determines the director layer.
 - Example: .click('app_send', shot('msg_user'), shot('app', 'biz')) follows the client view first, then sets a backend shot.
 - shot() restores the whole director layer. Without a shot, keep the previous one; a plain click can follow the layer containing the button.
 - During playback, the director switches layers, zooms, and highlights. Clicking a layer tab, or opening a deep link with l=, pins that layer: Follow director turns off and later steps stay on the pinned layer, even when their shot or action is on another layer (the shot still happens there, you just do not see it). Turn Follow director back on (the switch next to the layer tabs) or drop l= from the URL to follow again; you can also replay only one layer.
 - Viewers can zoom with wheel/pinch, drag to pan, and fit the stage to see the whole view. The next director shot takes over again.
 
-## Diagrams and traces
-- Backend / architecture / logic: Diagram (relationships, grouped by business domain), Sequence (one call chain in time order), StateMachine (a lifecycle). Read npx joplo skill diagram.
+## Content plugin usage
+- Backend / architecture / logic: the diagram plugin for relationships, call chains, and lifecycles. Read npx joplo skill diagram.
 - Layout is automatic and computed at compile time; nodes never move between steps, also when parts appear with when.
 - Use trace('a','b','c') for the a→b→c call; trace.fail marks failure, trace.skip dims what was not called. Do not manually write node/edge state props or use set() to simulate calls; use trace().
-- shot of a Diagram node keeps its parent group (at least the group title) in frame; shot of a UI card keeps its framed container and zooms at most 1.25×, or more (up to 3×) when its text would be smaller than about 15px on screen, as on a phone layer. See diagram.
+- shot of a diagram component node keeps its parent group (at least the group title) in frame; shot of a UI card keeps its framed container and zooms at most 1.25×, or more (up to 3×) when its text would be smaller than about 15px on screen, as on a phone layer. See diagram.
 
 ## Captions and fitting one screen
 - Keep captions within about 24 units and explain('Additional note') within about 48. CJK characters count as 1 each; all others count as 0.5; whitespace is ignored. check warns when exceeded.
@@ -540,7 +549,7 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
   <Grid h="100%"><Grid.Col span={6}><Stack h="100%"><ScrollArea style={{ flex: 1, minHeight: 0 }}>Messages</ScrollArea>
   <Group><PromptInput id="prompt"/><Button id="send">Send</Button></Group></Stack></Grid.Col></Grid>
 - The same applies to placeholders and artifacts: use h="100%" on Placeholder; Artifact fills its container by default.
-- Use fixed pixels only for elements with a fixed height (avatars, icons, Diagram canvas height).
+- Use fixed pixels only for elements with a fixed height (avatars, icons, fixed content areas).
 - What gets squeezed: in an h="100%" column, a Table, DataTable, or ScrollArea shrinks to the space left and scrolls inside. Rows stay in the DOM and check passes, but viewers see fewer rows.
 - Budget the height: render uses a 1280×800 desktop stage (the board follows the window, so leave margin); a table row is about 38px, a labeled input about 64px plus the gap.
 - Fixes: show fewer rows (5–8), split a long form across steps or layers, or move the table to its own layer and shot it. style={{ flexShrink: 0 }} keeps every row but pushes what follows off the stage.
@@ -587,7 +596,7 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
 - Keep the element mounted across steps (do not swap it with when), so the browser can animate between the two values. Stagger many elements with transition-delay.
 - Cues follow the moving target: spotlight, highlight and callout keep re-measuring until its transitions end.
 - Many marks (seats, map tiles, bars): compute positions once in TS while authoring, bind each mark's color or size to $.data.<chart>.<key>, and set() a whole object per step. One set() recolors hundreds of marks; transition-delay by index makes them sweep in.
-- Props that shape a Diagram's layout (tone, label, kind) are fixed at compile time and cannot bind state. To recolor per step, draw that part with your own elements and a bound style.
+- Props that shape a diagram component's layout (tone, label, kind) are fixed at compile time and cannot bind state. To recolor per step, draw that part with your own elements and a bound style.
 - Ids inside reusable graphics must be unique across layers: prefix them with the instance id (map_TX, not TX). A cue resolves an id to the first layer that has it, so the same id on two layers sends the director to the wrong layer, and check cannot tell which one you meant.
 - Let a missing asset() fail loudly. Do not wrap it in try/catch with a drawn fallback: a stale dev process or a wrong path then shows a substitute without any error.
 - One screen in several variants (languages, brands, plans): bind every visible string to $.ui, keep the variants in one table, and write a helper that returns the set() effects for a whole variant (...variant('ja')). Include breadcrumbs, badges, button labels, status text and captions; render one key frame per variant to catch strings left in the old variant.
@@ -597,7 +606,7 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
 - Built-ins: sketch (Hand-drawn, default), clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast. Preview them in the board Appearance popover.
 - Default handwriting uses offline Excalifont + Marker Gothic; rare Han and Korean use system fonts. Board WenKai loads online only when selected, falling back to system Kai offline. Exports wait up to 3 seconds.
 - Published sites use the config theme, subset fonts against all built text, and never load WenKai. Newly typed characters absent from the build may use system fonts.
-- Variables alone work and are scoped to the stage, leaving the board unaffected: --jp-font, --jp-font-mono, --jp-font-size, --jp-ink, --jp-bg, --jp-surface, --jp-subtle, --jp-muted, --jp-faint, --jp-line, --jp-line-strong, --jp-border, --jp-accent (highlight), --jp-select, --jp-info (Diagram active), --jp-ok, --jp-warn, --jp-danger, --jp-annot (annotations; defaults to danger), --jp-radius, --jp-shadow, --jp-stroke (rough hand-drawn / clean thin lines).
+- Variables alone work and are scoped to the stage, leaving the board unaffected: --jp-font, --jp-font-mono, --jp-font-size, --jp-ink, --jp-bg, --jp-surface, --jp-subtle, --jp-muted, --jp-faint, --jp-line, --jp-line-strong, --jp-border, --jp-accent (highlight), --jp-select, --jp-info (active content), --jp-ok, --jp-warn, --jp-danger, --jp-annot (annotations; defaults to danger), --jp-radius, --jp-shadow, --jp-stroke (rough hand-drawn / clean thin lines).
 - Ordinary selectors (.jbox, h1, etc.) also work within the stage. In dark themes, check contrast of --jp-info / --jp-ok / --jp-danger / --jp-accent against the background.
 - Filled buttons default to --jp-ink, so changing --jp-ink also recolors body text. There is no primary-color variable yet: set the brand color on the button itself, <Button color="#e8590c">, instead of overriding inline styles.
 - Example themes/brand.css:
@@ -613,7 +622,7 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
     }
 
 ## Full example: examples/agent-arch
-See layersFor/Diagram (domain groups, Sequence, StateMachine) in shared/arch.tsx and flow in features/agent/options/a-hybrid.tsx.
+See layersFor (plugin content in separate layers) in shared/arch.tsx and flow in features/agent/options/a-hybrid.tsx.
 This excerpt shows the main plan steps, omitting business rule links. start in the same file already handles user input and sending:
 \`\`\`tsx
 const plan = (f: ReturnType<typeof start>) =>
@@ -624,97 +633,7 @@ const plan = (f: ReturnType<typeof start>) =>
     .system('Brain reasoning', 'Brain calls Bedrock to plan the next step', trace('brain', 'llm'));
 \`\`\`
 The example also covers insufficient quota, dangerous tool confirmation, client disconnection, and billing retries. Choose scenarios for the requirements; include more than the main flow.`,
-  diagram: `# Joplo diagrams: diagram
-
-Three diagram components explain backend, architecture, and logic. Import them from @joplo-app/kit/ui:
-- Diagram: what talks to what, grouped by business domain (gateway, runtime, storage…). Default for architecture.
-- Sequence: one request moving between services in time order. Use it to walk through a call chain.
-- StateMachine: states and transitions of one entity (order, task, run). Use it for lifecycles.
-Choose by the question: "what is where" → Diagram; "what happens in what order" → Sequence; "what states can it be in" → StateMachine.
-
-## Diagram: group by business domain
-\`\`\`tsx
-<Diagram id="arch" direction="right" h={520}>
-  <Diagram.Group id="g_gw" label="Gateway" icon="gateway" tone="blue">
-    <Diagram.Node id="api" label="API" kind="service" description="auth · rate limit" />
-  </Diagram.Group>
-  <Diagram.Group id="g_run" label="Runtime" icon="service" tone="purple">
-    <Diagram.Node id="kernel" label="Kernel" description="model + tool loop" />
-    <Diagram.Node id="tools" label="Tools" kind="tool" />
-  </Diagram.Group>
-  <Diagram.Group id="g_data" label="Storage" icon="database">
-    <Diagram.Node id="pg" label="PostgreSQL" kind="database" />
-  </Diagram.Group>
-  <Diagram.Edge from="api" to="kernel" label="run" />
-  <Diagram.Edge from="kernel" to="tools" label="call" />
-  <Diagram.Edge from="kernel" to="g_data" label="commit" async />
-</Diagram>
-\`\`\`
-- Every node belongs to a domain group; 2–6 groups, ~3–15 nodes per diagram. One group around everything says nothing (check reports DIAGRAM_UNGROUPED).
-- Group props: label, icon (${DIAGRAM_GROUP_ICONS.join(', ')}), tone (${DIAGRAM_TONES.join(', ')}), group (parent id). Groups nest.
-- Put a node in a group by nesting, or flat with group="g_run" (not both). Edges may connect to a group: to="g_data".
-- Node kind: ${DIAGRAM_NODE_KINDS.join(', ')}. description says the responsibility in a few words; edge label says what flows.
-- Bigger systems: split into layers (overview → one layer per domain) instead of one huge diagram.
-
-## Layout is automatic (compile time)
-- Joplo lays the diagram out when compiling (ELK layered: layers, few crossings, orthogonal edges, groups laid out together). Never write coordinates.
-- Leave out direction: Joplo tries top → bottom and left → right and keeps the one that fills the stage with the largest text (domain groups end up side by side). direction="right" / "down" forces one; aspect={1.6} sets the wanted width / height; h="100%" fills a layer.
-- Source order is the order within a layer: write nodes, groups, and edges in reading order. Write the request edge before its reply (api → kernel before kernel → api): the later one is drawn as a return edge.
-- Mark secondary flows async (usage events, audit logs): they may stop pushing their target a layer down, so domains sit side by side instead of in a tall column.
-- When two chains feed one node (author → storage → player, and viewer → player), write the upstream chain's groups and edges first, in the direction data flows. An edge written before its upstream chain is drawn as a loop back across the stage.
-- pin="start" / pin="end" puts a node or group in the first / last layer of its group. The layout covers every element, including ones hidden with when: nodes never move between steps.
-- In each step only the traced call is bold, colored, with a moving dot and its label outlined; other edges turn thin and light. One call per step reads best.
-
-## Traces: light up a call
-- trace('api', 'kernel', 'pg') lights api → kernel → pg this step; earlier traces turn ok. trace.fail('kernel', 'pg') marks failure; trace.skip('tools') dims what was not called.
-- Ids are nodes, groups, or edge ids. Each segment needs an edge (either direction). For several edges between the same pair, trace the edge id.
-- Groups the call passes through are highlighted too, so viewers see which domains a request touches.
-- Do not write state props or set() to fake calls; trace does it.
-
-## Sequence: one call chain in time order
-\`\`\`tsx
-<Sequence id="login">
-  <Sequence.Group label="Client"><Sequence.Actor id="web" label="Web" kind="client" /></Sequence.Group>
-  <Sequence.Actor id="api" label="API" />
-  <Sequence.Actor id="db" label="DB" kind="database" />
-  <Sequence.Message id="m_req" from="web" to="api" label="POST /login" />
-  <Sequence.Message id="m_q" from="api" to="db" label="find user" />
-  <Sequence.Block kind="alt" label="wrong password">
-    <Sequence.Message id="m_401" from="api" to="web" label="401" reply />
-  </Sequence.Block>
-  <Sequence.Message id="m_ok" from="api" to="web" label="200 + session" reply />
-</Sequence>
-\`\`\`
-- Participants are columns in source order; messages are rows in source order, numbered (numbered={false} to hide numbers).
-- reply = dashed return; async = open arrow; from === to is a self call. Block kind: ${SEQUENCE_BLOCK_KINDS.join(', ')}.
-- Give messages ids and trace them per step: trace('m_req'), then trace('m_q'). Earlier rows turn ok; the camera frames the row with both participants.
-
-## StateMachine: a lifecycle
-\`\`\`tsx
-<StateMachine id="order_sm" value={$.data.order.status}>
-  <StateMachine.State id="created" label="Created" initial />
-  <StateMachine.State id="paid" label="Paid" />
-  <StateMachine.State id="closed" label="Closed" final />
-  <StateMachine.Transition from="created" to="paid" label="pay" />
-  <StateMachine.Transition from="created" to="closed" label="timeout 30 min" />
-</StateMachine>
-\`\`\`
-- value binds the current state (highlighted). When a step changes it (set($.data.order.status, 'paid')), the matching transition lights up by itself.
-- trace('created', 'paid') also works. initial adds a start dot; final draws a double border; StateMachine.Group boxes substates.
-
-## Frame with shot (what the camera keeps)
-- shot('kernel') frames the node with its parent group; when the whole group would make text too small, it keeps at least the group title. Viewers always see which domain they are in.
-- A trace with several nodes frames all of them and their group titles. shot('g_run') frames a whole domain; shot() returns to the whole layer.
-- UI cards and panels zoom at most 1.25× (more, up to 3×, only when their text would be under about 15px on screen, e.g. a phone layer) and keep their framed container (Card, Paper, Modal, Table, AppShell side…) in view, so neighbours stay visible.
-- Want more context? shot the container or group. Want the reader to compare two places? shot both ids in one step.
-- Do not use zoom to read tiny text: if a diagram needs heavy zoom, split it into layers.
-- Point at a part without zooming: spotlight / highlight / callout (see focus). A callout on the framed node's group or a message's participant stays in the shot.
-
-## Other diagram types
-- C4 context / container: use Diagram with kind="user" for people, Diagram.Group icon="box" for each system boundary, kind="external" for outside systems.
-- Data models: show records with DataCard and Table in their own layer (see demo); an ER diagram component is not available yet.
-
-Diagnostics for diagrams are listed in check (UNKNOWN_DIAGRAM_NODE, UNKNOWN_DIAGRAM_GROUP, TRACE_UNKNOWN…). See examples/agent-arch.`,
+  diagram: standardGuides.diagram!,
   focus: `# Joplo focus: focus
 
 A demo is a story told over time. In every step the viewer should know where to look and why.
@@ -724,7 +643,7 @@ Import spotlight, highlight, numbered, callout, hold from @joplo-app/kit; shot, 
 ## Defaults: what you get without writing anything
 - Step 0 is the scenario cover; a .card() step is its own focus.
 - User actions: the cursor moves to the element and clicks; the camera brings it into frame if needed. Do not add shot() just to show what is clicked.
-- trace() frames the call path in a Diagram.
+- trace() frames the call path in a diagram component.
 - Result reveal: after a step, an element that newly appears or changes (an alert, a badge, a new message, a menu) pulses once and fades. It never moves the camera.
 - A target moving with a CSS transition (a style bound to state; see demo) is followed: spotlight, highlight and callout track it until the transition ends.
   Skipped on purpose: modals and drawers (their backdrop already says it), DataCard / StateFlow (they show their own change), more than 3 changes at once, a new page or layer, the same element changing again or another line appended to the same log, and any step where you wrote a focus yourself.
@@ -743,7 +662,7 @@ Import spotlight, highlight, numbered, callout, hold from @joplo-app/kit; shot, 
 
 All cues apply to this step only, render in the stage theme, and never block clicks; spotlight keeps the next click target lit.
 Cues do not zoom. If a cue's target is outside the current shot, the camera first returns to the whole layer.
-In diagrams the frame always keeps the target's group (title at least) and a message's two participants: a cue on them stays in the shot; spotlight keeps the group title lit. Diagrams show their own changes (fade-in, traces), so the reveal pulse skips them.
+In diagrams the frame always keeps the target's group (title at least) and a message's two participants: a cue on them stays in the shot; spotlight keeps the group title lit. Plugin components can declare that they show their own changes (fade-in, traces), so the reveal pulse skips them.
 With layers, a cue switches the director to its target's layer when the step has no shot.
 
 ## Pacing rules
@@ -904,15 +823,8 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - CAMERA_UNKNOWN / CAMERA_INVALID: camera() targets must exist in a layer (put them inside a <Canvas>); pad 0–2000, zoom 0.1–10, ms 0–10000. See content.
 - FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: flow({ from }) must name another scenario key of the same option, must not loop back, and that scenario must replay without errors (fix it first).
 - FROM_WITH_START: a scenario with from starts where the other one ended (its route and layer); remove start, or remove from to start fresh. Step checks and auto captions already use that ending page.
-- TRACE_UNKNOWN: Empty trace, unknown id, ids from different diagrams, or a disconnected path. Use connected ids in one Diagram / StateMachine / Sequence.
-- TRACE_AMBIGUOUS: Multiple candidate edges or messages between two nodes. Use the specific edge / message id in trace.
+${standardChecks}
 - THEME_UNKNOWN: config({ theme }) names neither a built-in nor themes/<name>.css. Use a built-in or add that CSS file; see Write a theme in demo.
-- UNKNOWN_DIAGRAM_NODE: An edge, transition, or message endpoint is not a node / group / state / participant id in the same diagram. Correct the endpoint ids.
-- UNKNOWN_DIAGRAM_GROUP / DIAGRAM_GROUP_CONFLICT / DIAGRAM_GROUP_CYCLE: group="…" names a missing group, disagrees with the group the element is nested in, or makes groups contain each other. Use nesting or group=, not both. See diagram.
-- DIAGRAM_EDGE_INTO_OWN_GROUP: An edge connects an element to a group that contains it. Connect to an element inside, or to another group.
-- INVALID_DIAGRAM_PROP / INVALID_DIAGRAM_CHILD: tone, pin, kind, or block kind is not a preset, or a child is in the wrong container (messages in Sequence.Group, actors in Sequence.Block). See diagram.
-- DIAGRAM_UNGROUPED (info): Many nodes and no domain groups. Group them with <Diagram.Group label icon> so viewers see what belongs where.
-- DIAGRAM_LAYOUT_FAILED (warning): The automatic layout failed and the diagram shows a simple grid. Check its edges and groups; report it if they look right.
 - ELEMENT_PROP: A component prop contains JSX. Use strings for icons, such as leftSection="+", and children for content.
 - ASSUMPTION_CONFIRMED: Keep AI assumptions \`pending\`. After user confirmation, record the actual origin; do not change only status.
 - UNBOUND_INTERACTIVE: see the section below.

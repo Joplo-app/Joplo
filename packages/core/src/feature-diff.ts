@@ -51,7 +51,7 @@ const ref = (s: Step, index: number) => ({ id: s.id, position: index + 1, ...(s.
 const PRESENTATION: [string, (keyof Step)[]][] = [
   ['caption', ['caption', 'captionAuto']], ['explain', ['explain']], ['camera', ['shots', 'directorLayer']],
   ['annotations', ['marks', 'cues', 'callouts']], ['voice', ['say', 'narrate']], ['timing', ['hold']],
-  ['trace', ['traces']], ['forks', ['forks']], ['kind', ['kind']],
+  ['trace', ['traces', 'ext']], ['forks', ['forks']], ['kind', ['kind']],
 ];
 const KIND_ORDER = { state: 0, message: 1, outcome: 2 } as const;
 const shown = (v: unknown) => (typeof v === 'string' ? v : canonical(v)).slice(0, 200);

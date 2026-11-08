@@ -1,0 +1,30 @@
+{
+  "name": "@joplo-app/plugin-diagram",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "joplo": {
+    "api": 2
+  },
+  "exports": {
+    ".": "./src/plugin.ts",
+    "./effects": "./src/effects.ts",
+    "./model": "./src/model-index.ts",
+    "./node": "./src/elk.ts",
+    "./runtime": "./src/runtime.tsx",
+    "./schema": "./src/schema.ts"
+  },
+  "dependencies": {
+    "elkjs": "0.12.1",
+    "zod": "4.6.7"
+  },
+  "peerDependencies": {
+    "@joplo-app/kit": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "react": "19.3.1",
+    "motion": "14.9.1",
+    "vite": "8.3.5"
+  }
+}

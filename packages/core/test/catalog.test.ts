@@ -1,3 +1,4 @@
+import { standardDocs } from '../src/plugins/standard-catalog.ts';
 /**
  * 组件目录（D35 Mantine）：目录是唯一来源；Modal/Drawer 门控、响应式与断点、AppShell 收起、
  * select 动作接受 value 或 label、自动字幕读 label —— 都由 core 计算，渲染器与回放共用。
@@ -51,7 +52,7 @@ describe('目录是唯一来源', () => {
       }
     };
     walk(ui as unknown as Record<string, unknown>, '');
-    for (const n of names) expect(COMPONENT_TYPES as readonly string[], `kit 导出了目录外的 ${n}`).toContain(n);
+    for (const n of names) expect([...COMPONENT_TYPES, ...Object.keys(standardDocs)], `kit 导出了目录外的 ${n}`).toContain(n);
   });
 
   it('COMPONENT_DOCS 覆盖每个组件且只覆盖目录内的组件；交互、值类型、门控集合都在目录内', () => {
@@ -326,8 +327,8 @@ describe('架构图：Diagram / Diagram.Group / Diagram.Node / Diagram.Edge（D4
 
   it('四个组件都在目录里且不是可操作元素（不需要 flow）', () => {
     for (const t of ['Diagram', 'Diagram.Group', 'Diagram.Node', 'Diagram.Edge']) {
-      expect(COMPONENT_TYPES as readonly string[]).toContain(t);
-      expect(INTERACTIVE_TYPES.has(t)).toBe(false);
+      expect(Object.keys(standardDocs)).toContain(`diagram:${t}`);
+      expect(INTERACTIVE_TYPES.has(`diagram:${t}`)).toBe(false);
     }
   });
 
@@ -354,8 +355,8 @@ describe('架构图：Diagram / Diagram.Group / Diagram.Node / Diagram.Edge（D4
     const d = r.diagnostics.filter((x) => x.code === 'UNKNOWN_DIAGRAM_NODE');
     expect(d.length).toBeGreaterThanOrEqual(2);
     expect(d.every((x) => x.severity === 'error' && x.at === 'routes/page.tsx:9:7')).toBe(true);
-    expect(d.map((x) => x.message).join('\n')).toContain('to "nope" is not a node or group id in this Diagram');
-    expect(d.map((x) => x.message).join('\n')).toContain('from "ghost" is not a node or group id in this Diagram');
+    expect(d.map((x) => x.message).join('\n')).toContain('to "nope" is not a node or group id in this diagram:Diagram');
+    expect(d.map((x) => x.message).join('\n')).toContain('from "ghost" is not a node or group id in this diagram:Diagram');
   });
 
   it('节点 id 在同一画面唯一（DUPLICATE_ID）；节点必须有 id', () => {

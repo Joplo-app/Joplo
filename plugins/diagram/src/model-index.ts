@@ -1,7 +1,7 @@
 /**
  * 关系类图表（D69）的公共入口：给编译器挂布局、给 trace 建索引。浏览器安全（不加载 ELK）。
  */
-import type { SceneNode } from '../schema.ts';
+import type { SceneNode } from '../../../packages/core/src/schema.ts';
 import { DEFAULT_ASPECT, gridLayout, type LayoutGoal } from './graph-layout.ts';
 import { layoutSequence } from './sequence-layout.ts';
 import { GRAPH_FAMILY, SEQUENCE_FAMILY, graphStructure, groupChains, isDiagramRoot, sequenceStructure, type DiagramLayout, type DiagramRootType, type GraphLayout, type GraphStructure } from './model.ts';
@@ -32,8 +32,8 @@ export function diagramGoal(node: SceneNode, viewport: 'desktop' | 'mobile' = 'd
 
 /** 算一张图表的布局；ELK 出错时退回网格，并通过 onError 报告（编译器转成 DIAGRAM_LAYOUT_FAILED 警告）。 */
 export function layoutFor(node: SceneNode, engine?: GraphLayoutEngine, onError?: (message: string) => void, viewport: 'desktop' | 'mobile' = 'desktop'): DiagramLayout | null {
-  if (node.type === 'Sequence') return layoutSequence(sequenceStructure(node));
-  if (node.type !== 'Diagram' && node.type !== 'StateMachine') return null;
+  if (node.type === 'diagram:Sequence') return layoutSequence(sequenceStructure(node));
+  if (node.type !== 'diagram:Diagram' && node.type !== 'diagram:StateMachine') return null;
   const s = graphStructure(node);
   if (!engine) return gridLayout(s);
   try {
@@ -49,7 +49,7 @@ export function attachLayouts(root: SceneNode, engine?: GraphLayoutEngine, onErr
   const visit = (n: SceneNode) => {
     if (isDiagramRoot(n.type)) {
       const l = layoutFor(n, engine, (m) => onError?.(n, m), viewport);
-      if (l) n.layout = l;
+      if (l) n.ext = { ...n.ext, diagram: { layout: l, structure: n.type === 'diagram:Sequence' ? sequenceStructure(n) : graphStructure(n) } };
     }
     for (const c of n.children ?? []) visit(c);
   };
@@ -74,7 +74,7 @@ export type DiagramIndex = {
 export function diagramsIn(root: SceneNode): DiagramIndex[] {
   const out: DiagramIndex[] = [];
   const visit = (n: SceneNode) => {
-    if (n.type === 'Diagram' || n.type === 'StateMachine') {
+    if (n.type === 'diagram:Diagram' || n.type === 'diagram:StateMachine') {
       const fam = GRAPH_FAMILY[n.type];
       const s = graphStructure(n);
       const groupIds = new Set(s.groups.filter((g) => !g.id.startsWith('_')).map((g) => g.id));
@@ -86,11 +86,11 @@ export function diagramsIn(root: SceneNode): DiagramIndex[] {
       };
       for (const k of n.children ?? []) walk(k);
       out.push(d);
-    } else if (n.type === 'Sequence') {
+    } else if (n.type === 'diagram:Sequence') {
       const s = sequenceStructure(n);
       out.push({
         id: n.id,
-        type: 'Sequence',
+        type: 'diagram:Sequence',
         nodes: new Set(s.actors.map((a) => a.id)),
         edges: s.messages.map((m) => ({ id: m.id, from: m.from, to: m.to })),
         groupsOf: new Map(s.actors.map((a) => [a.id, a.group ? [a.group] : []])),
@@ -104,4 +104,4 @@ export function diagramsIn(root: SceneNode): DiagramIndex[] {
 }
 
 /** 时序图的消息类型名（compile 生成缺省 id 用）。 */
-export const MESSAGE_TYPES: ReadonlySet<string> = new Set([SEQUENCE_FAMILY.message, GRAPH_FAMILY.StateMachine.edge]);
+export const MESSAGE_TYPES: ReadonlySet<string> = new Set([SEQUENCE_FAMILY.message, GRAPH_FAMILY['diagram:StateMachine'].edge]);

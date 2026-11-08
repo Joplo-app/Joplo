@@ -97,7 +97,7 @@ export function stepRefs(st: Step): string[] {
   for (const m of st.marks) out.push(m.target);
   for (const c of st.cues ?? []) out.push(...c.targets);
   for (const c of st.callouts ?? []) out.push(c.target);
-  for (const t of st.traces) out.push(...t.nodes, ...t.edges.map((e) => e.id), ...(t.groups ?? []), ...(t.errorGroups ?? []), ...(t.targets ?? []));
+  out.push(...st.references ?? []);
   return out;
 }
 

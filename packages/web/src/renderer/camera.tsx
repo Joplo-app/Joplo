@@ -32,16 +32,16 @@ export function finalRect(el: Element): { left: number; top: number; width: numb
 }
 
 /** 图表元素（节点、连线、分组、状态、参与者、消息）：取景时找父分组，镜头推近时保证看得清。 */
-const DIAGRAM_EL = /^(Diagram|StateMachine|Sequence)\./;
+const isContentPart = (el: Element) => !!el.getAttribute('data-jframe') && el.getAttribute('data-jframe') !== 'root';
 /** 图表里的“分组”：节点的上下文（它的标题一定要留在画面里）。 */
-const GROUP_SEL = '[data-jtype="Diagram.Group"],[data-jtype="StateMachine.Group"],[data-jtype="Sequence.Group"],[data-jtype="Sequence.Block"]';
+const GROUP_SEL = '[data-jframe="group"],[data-jframe="block"]';
 /**
  * 界面元素的上下文：最近的“有框容器”（卡片、面板、弹窗、提示、表格、侧栏等）。
  * 推近到一张卡片时，它所在的面板也留在画面里（D69：截图里“放大一张卡片、旁边全被裁掉”的情况）。
  */
-const FRAME_SEL = ['Card', 'Paper', 'Modal', 'Drawer', 'Alert', 'Notification', 'Email', 'DataCard', 'StateFlow', 'Artifact', 'Terminal', 'ChatMessage', 'Table', 'DataTable', 'Accordion.Item', 'Tabs.Panel', 'AppShell.Navbar', 'AppShell.Aside', 'AppShell.Header', 'AppShell.Footer', 'Diagram', 'StateMachine', 'Sequence']
+const FRAME_SEL = ['Card', 'Paper', 'Modal', 'Drawer', 'Alert', 'Notification', 'Email', 'DataCard', 'StateFlow', 'Artifact', 'Terminal', 'ChatMessage', 'Table', 'DataTable', 'Accordion.Item', 'Tabs.Panel', 'AppShell.Navbar', 'AppShell.Aside', 'AppShell.Header', 'AppShell.Footer']
   .map((t) => `[data-jtype="${t}"]`)
-  .join(',');
+  .join(',') + ',[data-jframe="root"]';
 
 /**
  * 图表元素一定要带上的归属信息（D69）：节点 / 分组 / 状态是最内层父分组的标题，时序图的消息是两端参与者的头部。
@@ -50,10 +50,10 @@ const FRAME_SEL = ['Card', 'Paper', 'Modal', 'Drawer', 'Alert', 'Notification', 
  */
 export function ownershipEls(el: Element): Element[] {
   const type = el.getAttribute('data-jtype') ?? '';
-  if (!DIAGRAM_EL.test(type)) return [];
-  if (type === 'Sequence.Message') {
-    const canvas = el.closest('[data-jdiagram-canvas]');
-    const ends = (el.getAttribute('data-jends') ?? '').split(' ').filter(Boolean);
+  if (!isContentPart(el)) return [];
+  if (el.getAttribute('data-jframe') === 'row') {
+    const canvas = el.closest('[data-jframe-canvas]');
+    const ends = (el.getAttribute('data-jframe-include') ?? '').split(' ').filter(Boolean);
     return ends.map((id) => canvas?.querySelector(`[data-jid="${CSS.escape(id)}"]`)).filter((x): x is Element => !!x);
   }
   const title = el.parentElement?.closest(GROUP_SEL)?.querySelector(':scope > [data-jgroup-title]');
@@ -210,21 +210,21 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
         const t = g.querySelector(':scope > [data-jgroup-title]');
         return t ? visibleRect(toBox(rectOf(t)), []) : null;
       };
-      const diagramScale = (el: Element) => (Number(el.closest('[data-jtype="Diagram"],[data-jtype="StateMachine"],[data-jtype="Sequence"]')?.getAttribute('data-scale') ?? 1) || 1) * outer;
+      const contentScale = (el: Element) => (Number(el.closest('[data-jframe="root"]')?.getAttribute('data-scale') ?? 1) || 1) * outer;
       const items: FrameTarget[] = found.map((f) => {
         const type = f.el.getAttribute('data-jtype') ?? '';
-        if (!DIAGRAM_EL.test(type)) {
+        if (!isContentPart(f.el)) {
           const frame = f.el.parentElement?.closest(FRAME_SEL) ?? null;
           return { box: f.box, context: inWrap(frame) ? visibleOf(frame) : null };
         }
         const item: FrameTarget = { box: f.box };
-        if (type !== 'Diagram.Edge' && type !== 'StateMachine.Transition') item.nodeScale = diagramScale(f.el);
-        if (type === 'Sequence.Message') {
+        if (f.el.getAttribute('data-jframe') !== 'edge') item.nodeScale = contentScale(f.el);
+        if (f.el.getAttribute('data-jframe') === 'row') {
           // 时序图的一行：两端参与者的头部一定在画面里（谁在和谁说话），所在片段是上下文
-          const canvas = f.el.closest('[data-jdiagram-canvas]');
-          const ends = (f.el.getAttribute('data-jends') ?? '').split(' ').filter(Boolean);
+          const canvas = f.el.closest('[data-jframe-canvas]');
+          const ends = (f.el.getAttribute('data-jframe-include') ?? '').split(' ').filter(Boolean);
           const heads = ends.map((id) => canvas?.querySelector(`[data-jid="${CSS.escape(id)}"]`)).filter((x): x is Element => !!x).map((x) => visibleOf(x)).filter((b): b is Box => !!b);
-          const block = f.el.closest('[data-jtype="Sequence.Block"]');
+          const block = f.el.closest('[data-jframe="block"]');
           item.title = union(heads);
           item.context = union([...heads, ...(inWrap(block) ? [visibleOf(block)].filter((b): b is Box => !!b) : [])]);
           return item;
@@ -243,7 +243,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       }
       // 对准图表节点：每个节点“内容像素 → 屏幕像素”的比例，保证主标签在屏幕上 ≥ 16px；只对准界面元素时推近不超过 UI_MAX_ZOOM
       const nodeScales = items.flatMap((i) => (i.nodeScale ? [i.nodeScale] : []));
-      const onlyUi = found.every((f) => !/^(Diagram|StateMachine|Sequence)(\.|$)/.test(f.el.getAttribute('data-jtype') ?? ''));
+      const onlyUi = found.every((f) => !f.el.hasAttribute('data-jframe'));
       // 界面文字的“内容像素”字号：CSS 字号 × 元素自身的缩放（手机外框等）÷ 内容到屏幕的比例 S
       const fontOf = (el: Element) => {
         const he = el as HTMLElement;

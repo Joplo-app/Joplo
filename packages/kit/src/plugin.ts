@@ -1,11 +1,11 @@
 /**
- * 插件（D86）：社区维护的 npm 包，给 Joplo 增加组件。引擎（步骤、状态、镜头、提示、朗读、导出、发布）不变，
+ * 插件（D87）：社区维护的 npm 包，给 Joplo 增加组件。引擎（步骤、状态、镜头、提示、朗读、导出、发布）不变，
  * 插件只负责“这个组件长什么样、观众怎么和它互动”。一个插件包有两部分：
  *
- * 1. 入口（Node 端载入，只返回数据）：`definePlugin({...})` 的清单、组件标记、给 Agent 读的技能正文。
+ * 1. 入口（Node 端载入，编译钩子只在编译期运行）：`definePlugin({...})` 的清单、组件标记、给 Agent 读的技能正文。
  *    作者在 joplo.config.ts 写 `plugins: [scene3d]` 启用；`npx joplo skill <插件 id>` 输出它的技能。
  * 2. 运行时（浏览器端）：`defineRuntime({...})`，看板、截图、导出视频与发布站载入，负责把组件画出来。
- *    运行时不依赖 React，自己带依赖（例如 three）；发布站构建时打成一个文件内联进页面。
+ *    运行时支持 mount 或 React 组件；React 共享宿主实例，其余依赖（例如 three）自行打包，发布站内联。
  *
  * 不变量（插件与引擎的契约）：
  * - 业务状态只由引擎的步骤推进；插件只读 ctx，不能改状态。观众在插件里点了什么，调用 ctx.click(id)，
@@ -15,11 +15,11 @@
  * - 同一个 ctx 画出的结果相同（截图、视频可复现）；frame.animate 为 false 时不播放过渡；
  *   资源没准备好时用 ctx.hold() 让截图等待。
  */
-import { component } from './node.ts';
+import { component, type JNode } from './node.ts';
 import type { JoploProps } from './ui.ts';
 
-/** 插件接口版本：引擎只载入相同主版本的插件。 */
-export const PLUGIN_API_VERSION = 1 as const;
+/** 插件接口版本：v2 宿主同时兼容 v1 的 mount 运行时。 */
+export const PLUGIN_API_VERSION = 2 as const;
 
 const ID = /^[a-z][a-z0-9-]*$/;
 const NAME = /^[A-Z][A-Za-z0-9]*(\.[A-Z][A-Za-z0-9]*)*$/;
@@ -30,15 +30,45 @@ export type PluginComponentSpec = {
   doc: string;
   /** 可操作：必须有 id，并且要有演示步骤、禁用原因或 unmodeled（和 Button 一样）。 */
   interactive?: boolean;
+  /** 必须具有作者 id（不要求可操作）。 */
+  needsId?: boolean;
+  /** 自己表现状态变化，不叠加自动 reveal。 */
+  selfEvident?: boolean;
   /** 只能写在哪个组件里面（同一插件的组件名，例如 'Scene'）；写在别处时 check 报错。 */
   parent?: string;
 };
 
+/** 编译钩子只在 Node 端调用；传入的数据不是运行时对象。 */
+export type PluginReport = (code: string, message: string, at?: string, severity?: 'error' | 'warning' | 'info') => void;
+export type PluginIRNode = {
+  id: string; type: string; props?: Record<string, unknown>; children?: PluginIRNode[]; source?: string;
+  ext?: Record<string, unknown>;
+  framing?: { include?: string[]; kind?: 'root' | 'group' | 'block' | 'content' | 'edge' | 'row' };
+};
+export type PluginEffectDef = { kind: 'effect'; type: 'plugin'; plugin: string; name: string; payload: unknown };
+export const pluginEffect = (plugin: string, name: string, payload: unknown): PluginEffectDef => ({ kind: 'effect', type: 'plugin', plugin, name, payload });
+export type PluginState = { ui: Record<string, unknown>; data: Record<string, unknown>; inputs: Record<string, unknown> };
+export type PluginCompileHooks = {
+  /** 子节点转换完后调用；可校验根结构、提供默认 id 与规范化属性。 */
+  node?: (node: JNode, ctx: { ids: ReadonlyMap<string, string | undefined>; report: PluginReport }) => JNode | void;
+  /** 每个根节点的静态派生数据，错误由宿主隔离。 */
+  derive?: (node: PluginIRNode, ctx: { viewport: 'desktop' | 'mobile'; report: PluginReport; options: Record<string, unknown> }) => void;
+  /** 一个作者效果降级为该插件的数据及内核镜头/引用原语。data 是同一步之前的降级结果。 */
+  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; data: unknown; report: PluginReport; source?: string }) => { data?: unknown; targets?: string[]; references?: string[] } | void;
+  /** 编译器回放基础效果后，计算第 0 步及每一步的完整绘制快照。 */
+  frame?: (ctx: { roots: readonly PluginIRNode[]; state: PluginState; previousState?: PluginState; data: unknown; previousData: unknown; position: number; report: PluginReport }) => unknown;
+};
+export type PluginDataSchema = { safeParse(value: unknown): { success: boolean; error?: { message: string } } };
+
 export type PluginDef = {
   kind: 'plugin';
+  compile?: PluginCompileHooks;
+  schemas?: { node?: PluginDataSchema; step?: PluginDataSchema };
+  /** 已迁移裸类型名：宿主只用于给出改写提示。 */
+  legacyTypes?: Record<string, string>;
   /** 小写字母开头，组件类型名为 `<id>:<组件名>`，例如 scene3d:Scene。 */
   id: string;
-  apiVersion: typeof PLUGIN_API_VERSION;
+  apiVersion: 1 | typeof PLUGIN_API_VERSION;
   title: string;
   description?: string;
   /** 插件包的版本（展示用）。 */
@@ -57,10 +87,10 @@ function fileOf(u: string | URL): string {
   return /^\/[A-Za-z]:\//.test(p) ? p.slice(1) : p;
 }
 
-/** 插件入口：返回清单数据。id、组件名、接口版本不对时直接抛错（启用插件时就能看到）。 */
-export function definePlugin(p: Omit<PluginDef, 'kind' | 'runtime' | 'apiVersion'> & { apiVersion?: typeof PLUGIN_API_VERSION; runtime: string | URL }): PluginDef {
+/** 插件入口：返回清单与编译钩子。id、组件名、接口版本不对时直接抛错（启用插件时就能看到）。 */
+export function definePlugin(p: Omit<PluginDef, 'kind' | 'runtime' | 'apiVersion'> & { apiVersion?: 1 | typeof PLUGIN_API_VERSION; runtime: string | URL }): PluginDef {
   if (!ID.test(p.id)) throw new Error(`Joplo plugin id "${p.id}" must be lowercase letters, digits, and -, starting with a letter`);
-  if (p.apiVersion !== undefined && p.apiVersion !== PLUGIN_API_VERSION) throw new Error(`Joplo plugin ${p.id} targets plugin API ${p.apiVersion}; this Joplo supports ${PLUGIN_API_VERSION}`);
+  if (p.apiVersion !== undefined && p.apiVersion !== 1 && p.apiVersion !== PLUGIN_API_VERSION) throw new Error(`Joplo plugin ${p.id} targets plugin API ${p.apiVersion}; this Joplo supports ${PLUGIN_API_VERSION}`);
   for (const [name, spec] of Object.entries(p.components)) {
     if (!NAME.test(name)) throw new Error(`Joplo plugin ${p.id}: component name "${name}" must be PascalCase (dots for compound parts)`);
     if (spec.parent !== undefined && !p.components[spec.parent]) throw new Error(`Joplo plugin ${p.id}: ${name}.parent "${spec.parent}" is not a component of this plugin`);
@@ -99,6 +129,7 @@ export type PluginNode = {
   /** 放在代表这个元素的 DOM 锚点上（data-jid 等），引擎靠它定位与检查。 */
   attrs: Record<string, string>;
   children: PluginNode[];
+  ext?: Record<string, unknown>;
 };
 
 /** 演示此刻的情况：只读。 */
@@ -121,6 +152,12 @@ export type PluginFrame = {
 
 export type ComponentCtx = {
   node: PluginNode;
+  /** 未解析的 IR 节点（几何与容器组合使用）。 */
+  model: PluginIRNode;
+  /** 当前步骤编译好的插件快照（第 0 步取 scenario.ext）。 */
+  ext: Readonly<Record<string, unknown>>;
+  /** React 容器可直接返回子节点；传入 container 时由宿主 portal 渲染。 */
+  renderChildren: (nodes?: readonly PluginNode[], container?: Element) => any;
   frame: PluginFrame;
   /** 读取主题变量，例如 css('--jp-ink')、css('--jp-accent')。 */
   css: (name: string) => string;
@@ -131,10 +168,12 @@ export type ComponentCtx = {
 };
 
 export type ComponentInstance = { update(ctx: ComponentCtx): void; destroy(): void };
-export type RuntimeComponent = { mount(el: HTMLElement, ctx: ComponentCtx): ComponentInstance };
-export type PluginRuntime = { id: string; apiVersion: typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent> };
+export type RuntimeComponent =
+  | { mount(el: HTMLElement, ctx: ComponentCtx): ComponentInstance; react?: never }
+  | { react: (props: { ctx: ComponentCtx }) => any; mount?: never };
+export type PluginRuntime = { id: string; apiVersion: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent> };
 
-/** 插件运行时：只有带 mount 的组件会被引擎挂载，其余组件（例如子元素）作为数据交给父组件。 */
-export function defineRuntime(r: { id: string; apiVersion?: typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent> }): PluginRuntime {
+/** 插件运行时：mount 适配框架无关渲染；react 接收 ctx，由宿主 React 树渲染。 */
+export function defineRuntime(r: { id: string; apiVersion?: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent> }): PluginRuntime {
   return { ...r, apiVersion: PLUGIN_API_VERSION };
 }

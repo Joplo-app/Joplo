@@ -43,9 +43,9 @@ Run dev and the follower in separate long-running shells. dev keeps the board li
 ## Show the product, not slides
 Every step is an action on the product and a visible change it causes. If a step could be a bullet on a slide, rebuild it as interface, state, or a trace.
 - Feature: not a card listing "enter email / teammate gets a link / joins today"; instead Ana types the email, clicks Send, the row appears as Pending, then Leo's layer opens the mail and lands in the space.
-- Backend or architecture: not a card "App → API → Queue → Worker"; instead a Diagram where trace() lights each hop as the request moves and trace.fail() shows where it breaks, beside the UI whose status changes with it.
+- Backend or architecture: not a card "App → API → Queue → Worker"; instead a diagram plugin view where trace() lights each hop as the request moves and trace.fail() shows where it breaks, beside the UI whose status changes with it.
 - Comparison: not a pros-and-cons table; instead options A and B each playing the same scenario, compared in the board.
-- State or lifecycle: not a paragraph explaining statuses; instead a StateMachine whose current state moves as the user acts.
+- State or lifecycle: not a paragraph explaining statuses; instead a lifecycle view whose current state moves as the user acts.
 - Cards only open, close, jump in time, or switch roles; text that explains belongs in captions and explain(). Worked example: npx joplo skill story.
 
 ## Review live with the user
@@ -101,7 +101,7 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - content: Explainers, tutorials, and news-explainer videos: package and plan, hook, one world with Canvas, camera(), motion morphs, chapters with flow({ from }), narration, sources, review
 - demo: Layers, shots, captions, full-height layout, custom motion and data graphics, deep links, and screenshots
 - focus: Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
-- diagram: Architecture, sequence and state diagrams: domain groups, automatic layout, traces, shot framing
+- diagram: Default first-party diagram plugin: architecture, sequence and state diagrams, groups, compiled traces and framing
 - components: Component catalog, supported HTML tags, line breaks, props, and real images
 - cases: Case dimensions: ask the user before starting
 - check: Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line
@@ -109,6 +109,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
-- plugins: Install and enable plugin packages (3D scenes and other components), read their skills, write steps for them; writing a plugin
+- plugins: Default standard plugins and third-party packages; API v2 compilation, snapshots, shared React, diagnostics and skills
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.18 sha256:a405e31e070fa67bafa4c5be7c20e3c71943735486f617af2ad9fa57c3ef5d5f -->
+<!-- joplo-skill 0.2.18 sha256:1f9726520f9f253b36b2e5287fe9145da0756f2a90a92eb52ee96dca5f87f1c5 -->

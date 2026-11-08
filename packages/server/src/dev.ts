@@ -289,7 +289,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       root: slot.dir,
       appType: 'custom',
       customLogger: makeLogger(log),
-      resolve: { alias: kitAliases(web, slot.dir) },
+      resolve: { dedupe: ['react', 'react-dom'], alias: kitAliases(web, slot.dir) },
       plugins: [joploProjectPlugin(slot.dir, web)],
       // 只在服务端载入模块：不开 HMR、不开 WebSocket（多个项目同时运行时不能争用端口）、不监听
       server: { middlewareMode: true, hmr: false, ws: false, watch: null },
@@ -641,7 +641,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     appType: 'spa',
     clearScreen: false,
     customLogger: makeLogger(log),
-    resolve: { alias: web.mode === 'source' ? kitAliases(web, web.webDir) : [] },
+    resolve: { dedupe: ['react', 'react-dom'], alias: web.mode === 'source' ? kitAliases(web, web.webDir) : [] },
     plugins: [cssSourcePlugin(activeDirs, web), boardPlugin, ...(await webPlugins(web))],
     // dist 形态不往 node_modules 里写缓存（可能只读，或被多个项目共享）
     cacheDir: web.mode === 'dist' ? path.join(opts.home ?? path.join(process.cwd(), '.joplo'), 'vite') : path.join(web.webDir, 'node_modules/.vite-joplo'),

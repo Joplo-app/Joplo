@@ -46,7 +46,7 @@ describe('插件组件', () => {
     const { dev, publish } = build();
     for (const r of [dev, publish]) {
       expect(errors(r)).toEqual([]);
-      expect(r.project!.plugins).toEqual({ scene3d: { id: 'scene3d', title: '3D', version: '0.1.0', components: { Scene: {}, Object: { parent: 'Scene' }, Target: { parent: 'Scene', interactive: true } } } });
+      expect(r.project!.plugins).toMatchObject({ scene3d: { id: 'scene3d', title: '3D', version: '0.1.0', components: { Scene: {}, Object: { parent: 'Scene' }, Target: { parent: 'Scene', interactive: true } } } });
       const json = JSON.stringify(r.project);
       expect(json).not.toContain('/abs/plugin');
       expect(json).not.toContain('secret authoring notes');
@@ -83,7 +83,7 @@ describe('插件组件', () => {
     expect(() => definePlugin({ ...base, id: 'Bad' })).toThrow();
     expect(() => definePlugin({ ...base, id: 'ok', components: { lower: { doc: 'x' } } })).toThrow();
     expect(() => definePlugin({ ...base, id: 'ok', components: { A: { doc: 'a', parent: 'Missing' } } })).toThrow();
-    expect(() => definePlugin({ ...base, id: 'ok', apiVersion: 2 as never })).toThrow();
+    expect(() => definePlugin({ ...base, id: 'ok', apiVersion: 99 as never })).toThrow();
     expect(definePlugin({ ...base, id: 'ok', runtime: new URL('file:///tmp/x%20y/runtime.js') }).runtime).toBe('/tmp/x y/runtime.js');
   });
 });

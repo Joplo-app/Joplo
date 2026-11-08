@@ -131,7 +131,7 @@ export function InspectDrawer({
           <p className="mb-1 text-[12px] text-jb-faint">{i18n.board.thisElementHasNoSourceLocation}</p>
         )}
 
-        {node && node.type.startsWith('Diagram.') ? (
+        {node && node.type.startsWith('diagram:Diagram.') ? (
           <dl className="mb-2 grid grid-cols-[64px_1fr] gap-x-2 gap-y-1 rounded-[8px] bg-jb-subtle px-3 py-2 text-[13px]" data-testid="sel-diagram">
             {(() => {
               const p = state && state.sceneId === selection.sceneId ? resolveProps(node, state) : (node.props ?? {});
@@ -144,7 +144,7 @@ export function InspectDrawer({
                       <dd data-testid="sel-description">{p.description}</dd>
                     </>
                   ) : null}
-                  {node.type === 'Diagram.Edge' ? (
+                  {node.type === 'diagram:Diagram.Edge' ? (
                     <>
                       <dt className="text-jb-muted">{i18n.board.edge}</dt>
                       <dd data-testid="sel-endpoints">
@@ -153,7 +153,7 @@ export function InspectDrawer({
                       </dd>
                     </>
                   ) : null}
-                  {node.type !== 'Diagram.Group' ? (
+                  {node.type !== 'diagram:Diagram.Group' ? (
                     <>
                       <dt className="text-jb-muted">{i18n.board.state}</dt>
                       <dd data-testid="sel-state" data-state={st}>

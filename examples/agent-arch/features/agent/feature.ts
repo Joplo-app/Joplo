@@ -1,6 +1,6 @@
 import { feature, question, rule } from '@joplo-app/kit';
 
-export default feature({
+export default feature({ pick: 'a-hybrid',
   name: '一次 Agent 任务的完整链路',
   goal: '讲清楚脑手分离：大脑在云端规划、只产出工具调用；手负责执行；工具定义与实现分离；Biz Server 把关；Billing 先预检、后计量',
   roles: ['用户', 'Agent 大脑', '端侧执行器（手）', '云端沙箱（手）', 'Biz Server', 'Billing'],

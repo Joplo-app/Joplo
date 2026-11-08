@@ -1,6 +1,6 @@
 import { en, type Dictionary } from '../i18n/en';
 /**
- * 主题（D51）：一个主题就是一段 CSS。Joplo 约定一组 CSS 变量（--jp-*），渲染器、Diagram、Terminal、Phone、高光与字幕
+ * 主题（D51）：一个主题就是一段 CSS。Joplo 约定一组 CSS 变量（--jp-*），渲染器、插件内容、Terminal、Phone、高光与字幕
  * 都只读这些变量；主题也可以写普通选择器做细调。主题 CSS 自动限定在舞台范围内（scopeThemeCss），不影响看板本身。
  *
  * 变量（THEME_VARS）：
@@ -11,7 +11,7 @@ import { en, type Dictionary } from '../i18n/en';
  *   --jp-line     分隔线、浅边框          --jp-line-strong 较深的边框（未完成的步骤、dim 状态）
  *   --jp-border   线框描边（--jp-stroke: clean 时的组件边框）
  *   --jp-accent   高光、焦点、示例输入     --jp-select   ⌥+单击选中的元素
- *   --jp-info     Diagram active（流动）  --jp-ok / --jp-warn / --jp-danger  成功 / 警告 / 错误
+ *   --jp-info     插件内容 active（流动）  --jp-ok / --jp-warn / --jp-danger  成功 / 警告 / 错误
  *   --jp-radius   圆角                    --jp-shadow   卡片阴影
  *   --jp-stroke   rough = Rough 手绘描边；clean = 细线边框
  */

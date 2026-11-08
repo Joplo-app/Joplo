@@ -1,3 +1,4 @@
+import { nodeData } from '../../../plugins/diagram/src/data.ts';
 /**
  * 集成 0.2.8：关系类图表 v2（D69）× 叙事焦点（D70）的组合规则。
  * 1. 看哪里由焦点决定：trace 的焦点对象与镜头目标相同（时序图是消息那一行，不是参与者）；
@@ -101,7 +102,7 @@ function paged(steps: (f: Flow) => Flow): Project {
 const codes = (p: Project) => validate(p, { mode: 'all' }).diagnostics.filter((d) => /^(FOCUS_|CALLOUT_)/.test(d.code)).map((d) => d.code);
 const layoutOf = (p: Project, id: string): unknown => {
   const find = (n: SceneNode): SceneNode | null => (n.id === id ? n : (n.children ?? []).map(find).find(Boolean) ?? null);
-  for (const s of Object.values(p.scenes)) { const f = find(s.root); if (f) return f.layout; }
+  for (const s of Object.values(p.scenes)) { const f = find(s.root); if (f) return nodeData(f)?.layout; }
   return undefined;
 };
 

@@ -1,3 +1,5 @@
+import { pluginSpec } from './catalog.ts';
+import { legacyDiagnostics } from './plugins/legacy.ts';
 import { orderedFeatures } from './features.ts';
 import { Project, type SceneNode } from './schema.ts';
 import { CAPTION_MAX, CARD_POINTS_MAX, DESCRIPTION_MAX, EXPLAIN_MAX, SAY_MAX, isInteractiveType, SCENARIO_MS_MAX, captionLength } from './catalog.ts';
@@ -34,6 +36,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     warning: diagnostics.filter(d => d.severity === 'warning').length,
     info: diagnostics.filter(d => d.severity === 'info').length,
   } });
+  diagnostics.push(...legacyDiagnostics(project));
   const parsed = Project.safeParse(project);
   if (!parsed.success) {
     // 与编译器同一套：定位到最近的作者元素，同一根因合并成一条（schema-issues.ts）
@@ -118,6 +121,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
       ref(p.routes[s.route], `Stage route does not exist: ${s.route}`, value, 'scene');
       const ids = new Set<string>();
       walkNodes(s.root, n => {
+        if (pluginSpec(p.plugins, n.type)?.needsId && n.id.startsWith('_')) emit('error', 'MISSING_ID', `<${n.type}> requires an author id; recompile after adding id`, n.source, { kind: 'element', id: n.id });
         const r = { kind: 'element', id: n.id, optionId: n.from ?? s.optionId ?? undefined };
         if (ids.has(n.id)) emit('error', 'DUPLICATE_ELEMENT', `Duplicate element ID in stage: ${n.id}`, n.source, r, 'reference');
         ids.add(n.id);

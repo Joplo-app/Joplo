@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isPluginDef } from '@joplo-app/kit/plugin';
 import { compile, type CompileMode, type Diagnostic, type Project } from '@joplo-app/core';
-import { discoverFiles, elkLayout, loadAuthoring } from '@joplo-app/core/node';
+import { discoverFiles, elkLayout, loadAuthoring, enabledPlugins } from '@joplo-app/core/node';
 import type { ViteDevServer } from 'vite';
 import { isProjectSource } from './vite-shared.ts';
 
@@ -23,8 +23,7 @@ export type CompileOutcome = {
 /** config({ plugins }) 里每个插件的运行时入口（编译器另外校验清单；这里只取存在的文件）。 */
 export function pluginRuntimesOf(plugins: unknown): Record<string, string> {
   const out: Record<string, string> = {};
-  if (!Array.isArray(plugins)) return out;
-  for (const p of plugins) if (isPluginDef(p) && typeof p.runtime === 'string' && path.isAbsolute(p.runtime) && fs.existsSync(p.runtime)) out[p.id] ??= fs.realpathSync(p.runtime);
+  for (const p of enabledPlugins(plugins)) if (isPluginDef(p) && typeof p.runtime === 'string' && path.isAbsolute(p.runtime) && fs.existsSync(p.runtime)) out[p.id] ??= fs.realpathSync(p.runtime);
   return out;
 }
 

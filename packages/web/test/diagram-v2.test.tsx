@@ -1,3 +1,6 @@
+import { machineStates } from '../../../plugins/diagram/src/machine';
+import { nodeData } from '../../../plugins/diagram/src/data';
+import type { GraphLayout } from '../../../plugins/diagram/src/model';
 /**
  * D69 关系类图表在网页端的不变量：
  * 1. 同一张图在同一场景的所有步骤里，每个节点的坐标完全相同（A→B 变成 A→C、节点出现、trace 变化、多节点镜头都不移动节点）；
@@ -11,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { stateAt, type Project } from '@joplo-app/core';
 import { machineProject, project } from './diagram-fixture';
 import { cameraFor } from '../src/player/cameraFor';
-import { edgePath, effectiveState, machineStates } from '../src/renderer/diagram-layout';
+import { edgePath, effectiveState } from '../../../plugins/diagram/src/render-layout';
 import { Stage } from '../src/renderer/Stage';
 import { I18nProvider } from '../src/i18n/context';
 
@@ -24,7 +27,7 @@ const render = (p: Project, pos: number) => {
 /** 每个节点渲染出来的位置（left / top / width / height）。 */
 function nodeBoxes(html: string): Record<string, string> {
   const out: Record<string, string> = {};
-  const re = /<div[^>]*data-jid="([^"]+)"[^>]*data-jtype="Diagram\.Node"[^>]*>/g;
+  const re = /<div[^>]*data-jid="([^"]+)"[^>]*data-jtype="diagram:Diagram\.Node"[^>]*>/g;
   for (const m of html.matchAll(re)) {
     const style = /style="([^"]*)"/.exec(m[0])?.[1] ?? '';
     const pick = (k: string) => new RegExp(`(?:^|;)${k}:([^;]+)`).exec(style)?.[1] ?? '?';
@@ -51,9 +54,9 @@ describe('D69 不变量 1：节点在一个场景的所有步骤里位置不变'
 
   it('坐标来自 IR：渲染出的节点盒子就是编译期布局里的盒子', () => {
     const p = project();
-    const arch = Object.values(p.scenes).flatMap((s) => (s.root.type === 'Diagram' ? [s.root] : [])).find((n) => n.id === 'arch')!;
-    expect(arch.layout?.kind).toBe('graph');
-    const l = arch.layout as Extract<NonNullable<typeof arch.layout>, { kind: 'graph' }>;
+    const arch = Object.values(p.scenes).flatMap((s) => (s.root.type === 'diagram:Diagram' ? [s.root] : [])).find((n) => n.id === 'arch')!;
+    expect(nodeData(arch)?.layout.kind).toBe('graph');
+    const l = nodeData(arch)!.layout as GraphLayout;
     expect(l.engine).toBe('elk');
     const boxes = nodeBoxes(render(p, 2));
     // 节点在分组里：位置相对分组框
@@ -127,7 +130,7 @@ describe('渲染辅助（由 diagram-route.test.ts 移来）', () => {
   });
 
   it('machineStates（D69）：value 是当前状态；这一步从 prev 变过来且有对应转换时，这条转换 active；没有转换或值不是状态时不点亮', () => {
-    const s = { root: 'StateMachine', direction: 'right', groups: [], nodes: ['a', 'b', 'c'].map((id, i) => ({ id, seq: i, label: id, description: '', kind: 'state', parent: null, w: 90, h: 40 })), edges: [{ id: 'a->b', from: 'a', to: 'b', label: '', lw: 0, lh: 0 }] } as const;
+    const s = { root: 'diagram:StateMachine', direction: 'right', groups: [], nodes: ['a', 'b', 'c'].map((id, i) => ({ id, seq: i, label: id, description: '', kind: 'state', parent: null, w: 90, h: 40 })), edges: [{ id: 'a->b', from: 'a', to: 'b', label: '', lw: 0, lh: 0 }] } as const;
     expect(machineStates(s as never, 'b', 'a')).toEqual({ current: 'b', states: { b: { state: 'active' }, 'a->b': { state: 'active' } } });
     expect(machineStates(s as never, 'c', 'a')).toEqual({ current: 'c', states: { c: { state: 'active' } } });
     expect(machineStates(s as never, 'b', undefined)).toEqual({ current: 'b', states: { b: { state: 'active' } } });

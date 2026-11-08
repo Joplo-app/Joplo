@@ -1,3 +1,4 @@
+import { attachLayouts } from '../../../plugins/diagram/src/model-index';
 /**
  * 焦点提示的呈现（D70）：几何纯函数、呈现层不拦截点击（不变量 3）、redact、hold 计入停留与封面时长。
  */
@@ -5,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SCHEMA_VERSION, attachLayouts, holdMsOf, type PlayState, type Project, type Scenario } from '@joplo-app/core';
+import { SCHEMA_VERSION, holdMsOf, type PlayState, type Project, type Scenario } from '@joplo-app/core';
 import { elkLayout } from '@joplo-app/core/node';
 import { Stage } from '../src/renderer/Stage';
 import { badgeCenter, placeCallout, spotlightHoles, spotlightPath, visibleRegion } from '../src/renderer/cue-math';
@@ -76,10 +77,10 @@ describe('呈现层不拦截点击（不变量 3）', () => {
     for (const st of old.scenarios.s.steps) { delete st.cues; delete st.callouts; delete st.hold; }
     expect(() => renderToStaticMarkup(createElement(Stage, { project: old as unknown as Project, state: state(1), theme: 'sketch', mode: 'demo', animate: false, viewportOverride: { width: 400, height: 300 } }))).not.toThrow();
   });
-  it.each(['Diagram', 'StateMachine'] as const)('%s：独立的连线标签随 redact 条件一起模糊和恢复', (family) => {
+  it.each(['diagram:Diagram', 'diagram:StateMachine'] as const)('%s：独立的连线标签随 redact 条件一起模糊和恢复', (family) => {
     const p = structuredClone(project);
-    const nodeType = family === 'Diagram' ? 'Diagram.Node' : 'StateMachine.State';
-    const edgeType = family === 'Diagram' ? 'Diagram.Edge' : 'StateMachine.Transition';
+    const nodeType = family === 'diagram:Diagram' ? 'diagram:Diagram.Node' : 'diagram:StateMachine.State';
+    const edgeType = family === 'diagram:Diagram' ? 'diagram:Diagram.Edge' : 'diagram:StateMachine.Transition';
     p.scenes.sc!.root = {
       id: 'diagram', type: family, children: [
         { id: 'a', type: nodeType, props: { label: 'A' } },

@@ -10,7 +10,7 @@ import { keyboardAt } from './story-data';
 import { CameraLayer, contentBounds, useCamera, type CameraSpec } from './camera';
 import { clampPan, wheelFactor, zoomAt, type View } from './camera-math';
 import { AnimatePresence, motion } from 'motion/react';
-import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, diagramStateAt, focusAt, streamsOf, type PlayState, type Project, type Toast } from '@joplo-app/core';
+import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, focusAt, streamsOf, type PlayState, type Project, type Toast } from '@joplo-app/core';
 import { RenderContext, RenderNode, type RenderMode, type StreamingCtx } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from './appearance';
@@ -108,8 +108,6 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   // 外观（D51 / D55）：线条缺省由主题的 --jp-stroke 决定（内置主题或项目 themes/<name>.css），可以单独覆盖；字体覆盖写成 --jp-font
   const look = useMemo(() => resolveLook({ theme, font, stroke: strokeOverride }, project.themes ?? {}, i18n), [theme, font, strokeOverride, project.themes]);
   const stroke = look.stroke;
-  // 调用链（D48）：Diagram 节点与连线的 state 由每一步的 trace 推算（没写 state 时使用）
-  const traced = useMemo(() => diagramStateAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
   // 流式输出（D56）：只由 IR 与当前位置推导，截图、视频、发布站一致。
   // 过渡卡与场景封面（D61）不在舞台里画：由调用方用幕布（Curtain）盖在整个舞台区域上，不进设备外框；
   // 舞台只在停在过渡卡上时收起按键记录。角色名牌已删除（会遮挡内容），说话人改在字幕里。
@@ -121,12 +119,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     [streamPaths, stream?.paused, stream?.speed, state.scenarioId, state.position],
   );
   const changed = useMemo(() => changedAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
-  // 本步的调用（D69 补充）：这一步 trace 到的节点与连线（不含 trace.skip）。图里只有它们突出，其余变细变浅
-  const traceNow = useMemo(() => {
-    const st = scenario?.steps[state.position - 1];
-    const ids = (st?.traces ?? []).filter((t) => t.mode !== 'skip').flatMap((t) => [...t.nodes, ...t.edges.map((e) => e.id)]);
-    return ids.length ? new Set(ids) : null;
-  }, [scenario, state.position]);
+  const ext = state.position > 0 ? scenario?.steps[state.position - 1]?.ext : scenario?.ext;
   const marks = useMemo(() => marksAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
   // 焦点（D70）：这一步的提示与默认的结果揭晓，只由 IR 与当前位置推导（core 的 focusAt）
   const focus = useMemo(() => focusAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
@@ -290,7 +283,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
           {scene ? (
-            <RenderContext.Provider value={{ scene, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, traced, traceNow, streaming, changed, plugins: project.plugins, nextTargetId }}>
+            <RenderContext.Provider value={{ scene, stage: rootRef.current, state, mode, selectedId, preview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, ext, streaming, changed, plugins: project.plugins, nextTargetId }}>
               {/* 换层（换画面）时淡入 */}
               <motion.div key={shownId} className="absolute inset-0" ref={cam.contentRef} initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
                 <RenderNode node={scene.root} />

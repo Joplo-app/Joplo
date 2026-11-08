@@ -1,6 +1,6 @@
 # Joplo 插件架构：纯粹的引擎 + 可插拔的内容形态（D87）
 
-> 状态：设计稿 + 第一版实现（v1：叶子组件插件、看板载入、发布站内联、插件技能；示例 `plugins/scene3d` + `examples/smart-home-3d`）。
+> 状态：阶段 0 与阶段 1-A 已实现：v1 叶子组件兼容；v2 编译钩子、效果快照、元素特性与 React/容器运行时；第一方 `plugins/diagram` 默认启用。阶段 1-A 的接口与数据流见第 10 节。
 > 目标形态：Joplo 只是**构建与调度引擎**，负责把不同形态的内容串成一个可播放、可评审、可发布的作品；
 > UI 组件、Diagram、Canvas、3D、Alda BGM、朗读供应商、主题……都是插件。
 
@@ -114,3 +114,54 @@ joplo-plugin-x/
 - 发布站：`packages/server/src/build.ts`（`bundlePluginRuntimes`、`injectPluginScripts`）。
 - 技能：`npx joplo skill`（`packages/cli/src/plugins.ts`）、`packages/core/src/guide.ts` 的 `plugins` 主题与 `pluginSkillTopic`。
 - 示例：`plugins/scene3d`（three.js）、`examples/smart-home-3d`。
+
+## 10. 阶段 1-A：契约 v2 与第一方 diagram 插件（已实现）
+
+`plugins/diagram` 是 private workspace 包 `@joplo-app/plugin-diagram`，默认启用。
+`@joplo-app/kit/ui` 的作者标记仍可导入，IR 类型改成 `diagram:Diagram`、`diagram:StateMachine`、`diagram:Sequence` 及其子组件；`@joplo-app/kit` 的 `trace` 转发插件效果工厂。
+ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机转换、绘制实现、diagram 技能和组件提示均归该包所有。Canvas、UI 族和媒体扩展不在 1-A 的范围内。
+
+### 编译契约
+
+`PluginDef.compile` 的四个同步钩子由 Node 宿主调用：
+
+- `node(node, { ids, report })`：验证作者节点并可返回规范化节点。调用时子节点已处理，`ids` 可用于默认 id 去重。显式重复 id 仍由宿主诊断。
+- `derive(node, { viewport, options, report })`：生成节点的静态派生数据。diagram 按完整结构布局，隐藏状态不参与布局；错误保留已有的网格降级及 `DIAGRAM_LAYOUT_FAILED` 提示。
+- `effect(effect, { roots, data, source, report })`：把 `pluginEffect(id, name, payload)` 降级为命名空间数据、`targets` 和 `references`。宿主把 targets 转成普通 shots、导演层与显式焦点；同一步多个效果按作者顺序合并。
+- `frame({ roots, state, previousState, data, previousData, position, report })`：宿主回放内核效果后，生成第 0 步及各步骤的完整快照。无效作者步骤仍由原有 replay/check 诊断，不能令编译崩溃。
+
+插件写入槽位必须提供 `schemas.node` / `schemas.step`（兼容 zod 的 `safeParse`）；宿主验证对应 schema，并由 IR 信封校验确保是 JSON。缺失/失败的 schema 报 `PLUGIN_DATA_INVALID`，钩子或 schema 抛错报 `PLUGIN_HOOK_FAILED`，未注册的效果报 `PLUGIN_EFFECT_UNKNOWN`。源码位置随诊断保留。发布 IR 不保存钩子、schema、技能、运行时路径。
+
+元素声明新增 `needsId` 与 `selfEvident`：编译/检查验证作者 id，焦点系统读取同一份 IR 声明，避免为自行表现变化的内容叠加 reveal。
+旧裸类型或旧 step.traces 在 check 时得到 `PLUGIN_LEGACY_TYPE` 重编译提示；历史 traces 仅保留为输入兼容，以便 feature-diff 比较旧发布物。新编译产物不生成顶层 traces 或 layout。
+
+### IR 数据流
+
+| 数据 | 写入点 | IR 路径 | 读取点及消费者 |
+|---|---|---|---|
+| 布局与静态结构 | diagram `derive` | `scene.root…ext.diagram.{layout,structure}` | 插件 `graphView` / `sequenceView` → 绘制坐标与几何取景，浏览器不重新布局 |
+| 累积 trace 状态、当前调用、状态机当前值/转换 | diagram `frame` | `scenario.ext.diagram`（初始）及 `step.ext.diagram.{states,now,machines}` | `Stage` 选取当前槽位 → `PluginHost` 的 `ctx.ext` → diagram React 渲染；前后跳转直接读快照 |
+| 解析后的调用记录 | diagram `effect` / `frame` | `step.ext.diagram.traces` | 编译期快照计算；发布后的 feature-diff 比较插件表现差异（trace 类别） |
+| 插件镜头目标 | diagram `effect.targets` | 既有 `step.shots`、`step.directorLayer`；新增 `step.focusTargets` | `cameraAt` / 导演 / `focusAt`；均只读内核数据 |
+| 插件引用集合 | diagram `effect.references` | `step.references` | `scope.stepElementIds` → 范围发布保留需要的子树，含 skip 引用 |
+| 镜头关联、绘制角色 | diagram `derive` | `node.framing.{include,kind}` | `inShotFrame` 读取 include；宿主 DOM `data-jframe*` → 镜头/聚光保留分组标题及消息参与者 |
+| 元素特性 | 插件组件声明 → 宿主编译 | `project.plugins[id].components[name].{needsId,selfEvident}` | 编译器与 validate 的 id 检查；focus 的自动 reveal 策略 |
+
+槽位属于公开播放数据，插件作者不得放入本机路径、技能或创作备注。schema 只验证形状，不是保密机制。
+
+### React、容器与共享依赖
+
+v2 运行时组件选择 `{ mount }` 或 `{ react: ({ ctx }) => … }`。React 组件置于宿主 React 树中，拥有错误边界；`ctx.renderChildren()` 由宿主渲染子元素，传 `nodes, container` 时使用 portal。
+第一方运行时随宿主预构建，仍经相同注册表和 PluginHost；第三方运行时在发布时生成共享模块代理，并延迟到宿主的 React / ReactDOM / JSX runtime 就绪后求值。看板用 Vite dedupe 保证同一 React。v1 的 mount 运行时继续兼容。
+
+浏览器插件负责绘制/动画和 `ctx.click`，不推进业务状态。`stateAt`、`explainClick`、`focusAt` 和导演不调用插件代码。截图/视频的 `frame.animate=false`、资产等待 `ctx.hold()` 与逐段出现机制保留。
+
+### 维护与验证
+
+- 守护测试：`packages/core/test/plugin-v2.test.ts` 扫描 core 与 web renderer，只有插件宿主目录可引用具体家族。
+- Node 边界、降级、快照与旧 IR：core plugin-v2、trace、diagram-compile、integration-028 测试。
+- React 共享打包：server plugin-v2；容器与画面：web plugin-v2、diagram-v2、integration-028。
+- diagram 技能的权威正文现在是 `plugins/diagram/src/guide.ts`，core guide 只路由及组合通用主题；仍运行 `pnpm skills:build`，并实际检查 `joplo skill diagram` / `plugins`。
+- 验证普通发布前先确认 feature.pick：无 pick 的方案按既有规则不发布。若只检查全部备选，可用看板或 `buildSite({ review: true })` API；CLI 普通 build 仍只发布已选方案。不要把空站点当成图表播放成功。
+
+阶段 1 的其他扩展点和第一方插件独立分发仍未完成，v2 在阶段 3 前保持实验性。

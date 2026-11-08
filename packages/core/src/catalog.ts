@@ -33,10 +33,6 @@ const STRUCTURE = [
   'Terminal', 'Terminal.Command', 'Terminal.Output', 'Phone',
   // 画布（Joplo 自有）：讲解片与动态图形，设计尺寸等比缩放 + camera() 镜头 + motion 变形
   'Canvas',
-  // 关系类图表（Joplo 自有，D41 / D69）：布局在编译期算好；节点与连线的状态由 flow 步骤的 trace() 推算
-  'Diagram', 'Diagram.Group', 'Diagram.Node', 'Diagram.Edge',
-  'StateMachine', 'StateMachine.Group', 'StateMachine.State', 'StateMachine.Transition',
-  'Sequence', 'Sequence.Group', 'Sequence.Actor', 'Sequence.Message', 'Sequence.Block',
   // 产品界面（D68）：官网示例里反复手拼的常见界面，名字能对齐 Mantine 的就对齐（Menu、Avatar.Group、Radio.Card、BarChart、LineChart）
   'Avatar.Group', 'Radio.Card', 'EmptyState', 'ListRow', 'Stat', 'KeyValue', 'BarChart', 'LineChart',
   'Menu', 'Menu.Target', 'Menu.Dropdown', 'Menu.Label', 'Menu.Divider',
@@ -75,10 +71,10 @@ export const splitPluginType = (type: string): { plugin: string; name: string } 
   return { plugin: type.slice(0, i), name: type.slice(i + 1) };
 };
 /** IR 里记录的插件信息（编译自插件清单；发布站保留，不含运行时路径）。 */
-export type PluginInfo = { id: string; title: string; version?: string; components: Record<string, { interactive?: boolean; parent?: string }> };
+export type PluginInfo = { id: string; title: string; version?: string; components: Record<string, { interactive?: boolean; parent?: string; needsId?: boolean; selfEvident?: boolean }> };
 export type PluginTable = Readonly<Record<string, PluginInfo>> | undefined;
 /** 插件组件的声明；不是插件类型或插件没启用时为 null。 */
-export function pluginSpec(plugins: PluginTable, type: string): { interactive?: boolean; parent?: string } | null {
+export function pluginSpec(plugins: PluginTable, type: string): { interactive?: boolean; parent?: string; needsId?: boolean; selfEvident?: boolean } | null {
   const t = splitPluginType(type);
   return (t && plugins?.[t.plugin]?.components[t.name]) || null;
 }
@@ -175,19 +171,6 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Thinking: 'title (current thought; can bind $.ui.x), active (thinking: title pulses), duration (shows "Thought for …" when finished), opened (expands the process); thinking process in children',
   Artifact: "title, kind: 'doc'|'code'|'sheet'|'web'|'image', status: 'generating'|'ready'|'error', version; Agent artifact side panel, content in children",
   Terminal: 'title; terminal window (CLI prototype), Terminal.Command / Terminal.Output / Terminal.Input children; scrolls internally when content exceeds h or mah',
-  Diagram: "h (height, default 420; h=\"100%\" fills a layer), direction: 'right'|'down' (omit it: chosen to fit the stage), aspect (target width/height); architecture / relationship diagram. Layout is computed at compile time (ELK layered with groups, orthogonal edges), deterministic, and identical in every step: state, when and trace never move nodes. Group nodes by business domain with Diagram.Group. Details: npx joplo skill diagram",
-  'Diagram.Group': "id (required when referenced), label, icon (preset: client|service|model|database|queue|storage|external|tool|user|cloud|gateway|lock|network|device|box|brain), tone: gray|blue|green|orange|red|purple|teal, group (parent group id, instead of nesting), pin: 'start'|'end'; nestable; edges may connect to a group; a trace through its nodes highlights it",
-  'Diagram.Node': "id (required for edges and trace), label, description (small second line), kind: 'client'|'service'|'model'|'database'|'queue'|'storage'|'external'|'tool'|'user', group (group id, instead of nesting), pin: 'start'|'end' (first / last layer within its group); optional state: 'idle'|'active'|'ok'|'error'|'dim' (omit it: trace() derives state)",
-  'Diagram.Edge': "from, to (Node or Group ids in the same Diagram), label, async (dashed), optional state; id defaults to \"from->to\". Use trace('app', 'biz') in steps (active, then ok), trace.fail(...) (error), trace.skip(...) (dim); for multiple edges in the same direction use trace('edge_id')",
-  StateMachine: "direction: 'right'|'down' (omit it: chosen to fit the stage), h, aspect, value (current state id, usually value={$.data.order.status}); lifecycle diagram with StateMachine.State / StateMachine.Transition / StateMachine.Group; the current state is highlighted and the transition taken this step lights up. Details: npx joplo skill diagram",
-  'StateMachine.Group': 'id, label, icon, tone, group; composite state box (substates inside)',
-  'StateMachine.State': 'id (required), label, description, initial (start dot points to it), final (double border), group, pin',
-  'StateMachine.Transition': "from, to (state ids), label (event [guard] / action); id defaults to \"from->to\" (\"from->to~2\" for repeats); trace('paid', 'shipped') or trace('transition_id')",
-  Sequence: 'h, numbered (default true: messages numbered in source order); sequence diagram: lifelines in source order, one row per message; trace message ids to light rows. Details: npx joplo skill diagram',
-  'Sequence.Group': 'id, label, icon; box around participant columns (business domain)',
-  'Sequence.Actor': "id (required), label, description, kind (same kinds as Diagram.Node); a participant column",
-  'Sequence.Message': "id (recommended for trace), from, to (actor ids; from === to is a self call), label, reply (dashed return), async (open arrow); rows follow source order",
-  'Sequence.Block': "label, kind: 'alt'|'opt'|'loop'|'par'|'break'|'critical' (default opt); fragment box around the messages inside it; nestable",
   'Terminal.Command': 'prompt (default "$"); command text in children',
   'Terminal.Output': "tone: 'plain'|'ok'|'warn'|'error' (default plain); output text in children (preserves newlines)",
   Canvas: 'w, h (world size in design pixels, default the view), view ([width, height] design screen, default [1280, 800]), bg; a fixed-size design stage scaled to fit the layer (never re-laid out); children are placed in design pixels (style={{ position: "absolute", left, top }} or ordinary layout); move the camera with camera(…ids) in steps; elements with motion="key" fly from their old place to the new one between steps (motionDelay / motionMs per element); a direct child with screen stays fixed on screen in view coordinates (chapter labels, sources, a poster, an end card)',
@@ -317,38 +300,6 @@ export const COMPONENT_EXAMPLES: Partial<Record<ComponentType, string>> = {
 </Radio.Group>
 // steps: .select('plan', 'pro')`,
   'Avatar.Group': `<Avatar.Group><Avatar name="Ana Lee" /><Avatar name="Bo Chen" /><Avatar name="+3" /></Avatar.Group>`,
-  // 关系类图表（D69）：npx joplo components Diagram / Sequence / StateMachine 也给一个能直接用的例子；分组、布局、取景的细节在 npx joplo skill diagram
-  Diagram: `<Diagram id="arch" direction="right" h={420}>
-  <Diagram.Group id="g_gw" label="Gateway" icon="gateway" tone="blue">
-    <Diagram.Node id="api" label="API" description="auth · rate limit" />
-  </Diagram.Group>
-  <Diagram.Group id="g_run" label="Runtime" icon="service" tone="purple">
-    <Diagram.Node id="kernel" label="Kernel" description="model + tool loop" />
-  </Diagram.Group>
-  <Diagram.Group id="g_data" label="Storage" icon="database">
-    <Diagram.Node id="pg" label="PostgreSQL" kind="database" />
-  </Diagram.Group>
-  <Diagram.Edge from="api" to="kernel" label="run" />
-  <Diagram.Edge from="kernel" to="pg" label="commit" async />
-</Diagram>
-// steps: .system('Run starts', trace('api', 'kernel', 'pg'), shot('kernel')); groups, layout, framing: npx joplo skill diagram`,
-  Sequence: `<Sequence id="login">
-  <Sequence.Actor id="web" label="Web" kind="client" />
-  <Sequence.Actor id="api" label="API" />
-  <Sequence.Actor id="db" label="DB" kind="database" />
-  <Sequence.Message id="m_req" from="web" to="api" label="POST /login" />
-  <Sequence.Message id="m_q" from="api" to="db" label="find user" />
-  <Sequence.Message id="m_ok" from="api" to="web" label="200 + session" reply />
-</Sequence>
-// steps: .system('Sign in', trace('m_req')).system('Look up the user', trace('m_q'))`,
-  StateMachine: `<StateMachine id="order_sm" value={$.data.order.status}>
-  <StateMachine.State id="created" label="Created" initial />
-  <StateMachine.State id="paid" label="Paid" />
-  <StateMachine.State id="closed" label="Closed" final />
-  <StateMachine.Transition from="created" to="paid" label="pay" />
-  <StateMachine.Transition from="created" to="closed" label="timeout 30 min" />
-</StateMachine>
-// steps: .system('Payment received', set($.data.order.status, 'paid')) lights created → paid`,
   Modal: `<Modal id="confirm" opened={$.ui.confirm} title="Revoke this invite?" size="sm">
   <Text>Ana's link stops working right away. You can invite her again later.</Text>
   <Group justify="flex-end"><Button id="cancel_revoke" variant="default">Cancel</Button><Button id="do_revoke" color="red">Revoke</Button></Group>
@@ -417,9 +368,6 @@ export const SCENARIO_MS_MAX = 90_000;
 export const PAGE_LAYER = '@page';
 /** shot()（不带 id）在有层级的方案里：作用于“当时导演所在的层”，让它回到整体。 */
 export const DIRECTOR_LAYER = '@director';
-
-/** Diagram 节点与连线的 state（D41）；节点 kind 等见 diagram/model.ts。 */
-export const DIAGRAM_STATES = ['idle', 'active', 'ok', 'error', 'dim'] as const;
 
 /** 横放的 Phone（landscape）内容区尺寸：844 × 390 的屏幕扣掉安全区（左侧刘海、底部横条）。 */
 export const PHONE_LANDSCAPE = { width: 772, height: 358 } as const;
@@ -507,7 +455,7 @@ export function nodeLabel(node: LabelNode): string {
     if (typeof v === 'string' && v && !IS_BINDING.test(v)) return v;
   }
   // 没有 label 的连线 / 转换 / 消息：「from → to」
-  if ((node.type === 'Diagram.Edge' || node.type === 'StateMachine.Transition' || node.type === 'Sequence.Message') && typeof p.from === 'string' && typeof p.to === 'string') return `${p.from} → ${p.to}`;
+  if (typeof p.from === 'string' && typeof p.to === 'string') return `${p.from} → ${p.to}`;
   const text = collectText(node).trim();
   return text || node.type;
 }

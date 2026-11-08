@@ -71,7 +71,7 @@ const render = (p: Project, pos: number) => {
 /** 每个图表节点 / 分组渲染出来的位置（left / top / width / height）。 */
 function boxes(html: string): Record<string, string> {
   const out: Record<string, string> = {};
-  const re = /<div[^>]*data-jid="([^"]+)"[^>]*data-jtype="Diagram\.(?:Node|Group)"[^>]*>/g;
+  const re = /<div[^>]*data-jid="([^"]+)"[^>]*data-jtype="diagram:Diagram\.(?:Node|Group)"[^>]*>/g;
   for (const m of html.matchAll(re)) {
     const style = /style="([^"]*)"/.exec(m[0])?.[1] ?? '';
     const pick = (k: string) => new RegExp(`(?:^|;)${k}:([^;]+)`).exec(style)?.[1] ?? '?';
@@ -104,7 +104,7 @@ describe('焦点提示 × 图表布局稳定', () => {
       const html = render(p, pos);
       const cues = /<div[^>]*data-jlayer="cues"[^>]*>/.exec(html)?.[0] ?? '';
       expect(cues, `step ${pos}`).toContain('pointer-events-none');
-      const diagramStart = html.indexOf('data-jtype="Diagram"');
+      const diagramStart = html.indexOf('data-jtype="diagram:Diagram"');
       const dialog = html.indexOf('data-jlayer="dialog"');
       expect(diagramStart).toBeGreaterThan(-1);
       expect(html.indexOf('data-jlayer="cues"')).toBeGreaterThan(dialog);

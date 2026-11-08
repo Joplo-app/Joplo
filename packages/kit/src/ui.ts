@@ -190,10 +190,10 @@ export type DiagramEdgeProps = Common & { id?: string; from: string; to: string;
  *   </Diagram>
  * 节点也可以不嵌套、用 group="data" 归到分组里。调用链用步骤里的 trace('api', 'pg')，不要手写 state。
  */
-export const Diagram = Object.assign(c('Diagram') as (p: DiagramProps) => any, {
-  Group: c('Diagram.Group') as (p: DiagramGroupProps) => any,
-  Node: c('Diagram.Node') as (p: DiagramNodeProps) => any,
-  Edge: c('Diagram.Edge') as (p: DiagramEdgeProps) => any,
+export const Diagram = Object.assign(c('diagram:Diagram') as (p: DiagramProps) => any, {
+  Group: c('diagram:Diagram.Group') as (p: DiagramGroupProps) => any,
+  Node: c('diagram:Diagram.Node') as (p: DiagramNodeProps) => any,
+  Edge: c('diagram:Diagram.Edge') as (p: DiagramEdgeProps) => any,
 });
 
 export type StateMachineProps = Common & { id?: string; direction?: 'right' | 'down'; h?: number | string; aspect?: number; value?: string | Bind };
@@ -209,10 +209,10 @@ export type TransitionProps = Common & { id?: string; from: string; to: string; 
  *     <StateMachine.Transition from="created" to="closed" label="超时 30 分钟" />
  *   </StateMachine>
  */
-export const StateMachine = Object.assign(c('StateMachine') as (p: StateMachineProps) => any, {
-  Group: c('StateMachine.Group') as (p: DiagramGroupProps) => any,
-  State: c('StateMachine.State') as (p: StateProps) => any,
-  Transition: c('StateMachine.Transition') as (p: TransitionProps) => any,
+export const StateMachine = Object.assign(c('diagram:StateMachine') as (p: StateMachineProps) => any, {
+  Group: c('diagram:StateMachine.Group') as (p: DiagramGroupProps) => any,
+  State: c('diagram:StateMachine.State') as (p: StateProps) => any,
+  Transition: c('diagram:StateMachine.Transition') as (p: TransitionProps) => any,
 });
 
 export type SequenceProps = Common & { id?: string; h?: number | string; numbered?: boolean };
@@ -229,11 +229,11 @@ export type BlockProps = Common & { id?: string; label?: string; kind?: 'alt' | 
  *     <Sequence.Block kind="alt" label="密码错误"><Sequence.Message id="m_401" from="api" to="web" label="401" reply /></Sequence.Block>
  *   </Sequence>
  */
-export const Sequence = Object.assign(c('Sequence') as (p: SequenceProps) => any, {
-  Group: c('Sequence.Group') as (p: Common & { id?: string; label?: string; icon?: DiagramIcon }) => any,
-  Actor: c('Sequence.Actor') as (p: ActorProps) => any,
-  Message: c('Sequence.Message') as (p: MessageProps) => any,
-  Block: c('Sequence.Block') as (p: BlockProps) => any,
+export const Sequence = Object.assign(c('diagram:Sequence') as (p: SequenceProps) => any, {
+  Group: c('diagram:Sequence.Group') as (p: Common & { id?: string; label?: string; icon?: DiagramIcon }) => any,
+  Actor: c('diagram:Sequence.Actor') as (p: ActorProps) => any,
+  Message: c('diagram:Sequence.Message') as (p: MessageProps) => any,
+  Block: c('diagram:Sequence.Block') as (p: BlockProps) => any,
 });
 
 // ---------- 产品界面（D68） ----------

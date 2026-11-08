@@ -6,7 +6,7 @@
  * - 布局在编译期算好写进 IR（SceneNode.layout），发布站和看板只负责渲染和动画，浏览器里不跑布局算法。
  * - 本文件不依赖 Node，可以被浏览器端（@joplo-app/web）引用；ELK 只在 Node 入口（diagram/elk.ts）里加载。
  */
-import type { SceneNode } from '../schema.ts';
+import type { SceneNode } from '../../../packages/core/src/schema.ts';
 
 export type Point = { x: number; y: number };
 export type Box = { x: number; y: number; w: number; h: number };
@@ -54,14 +54,14 @@ export type DiagramLayout = GraphLayout | SequenceLayout;
 export const START = '__start:';
 
 // ---------- 组件家族 ----------
-export type GraphRootType = 'Diagram' | 'StateMachine';
+export type GraphRootType = 'diagram:Diagram' | 'diagram:StateMachine';
 export const GRAPH_FAMILY = {
-  Diagram: { node: 'Diagram.Node', edge: 'Diagram.Edge', group: 'Diagram.Group' },
-  StateMachine: { node: 'StateMachine.State', edge: 'StateMachine.Transition', group: 'StateMachine.Group' },
+  'diagram:Diagram': { node: 'diagram:Diagram.Node', edge: 'diagram:Diagram.Edge', group: 'diagram:Diagram.Group' },
+  'diagram:StateMachine': { node: 'diagram:StateMachine.State', edge: 'diagram:StateMachine.Transition', group: 'diagram:StateMachine.Group' },
 } as const;
-export const SEQUENCE_FAMILY = { root: 'Sequence', actor: 'Sequence.Actor', message: 'Sequence.Message', group: 'Sequence.Group', block: 'Sequence.Block' } as const;
+export const SEQUENCE_FAMILY = { root: 'diagram:Sequence', actor: 'diagram:Sequence.Actor', message: 'diagram:Sequence.Message', group: 'diagram:Sequence.Group', block: 'diagram:Sequence.Block' } as const;
 /** 能被 trace 的图表根组件。 */
-export const DIAGRAM_ROOTS = ['Diagram', 'StateMachine', 'Sequence'] as const;
+export const DIAGRAM_ROOTS = ['diagram:Diagram', 'diagram:StateMachine', 'diagram:Sequence'] as const;
 export type DiagramRootType = (typeof DIAGRAM_ROOTS)[number];
 export const isDiagramRoot = (t: string): t is DiagramRootType => (DIAGRAM_ROOTS as readonly string[]).includes(t);
 
@@ -150,7 +150,7 @@ const pinOf = (v: unknown) => (v === 'start' || v === 'end' ? v : undefined);
  * （编译期已校验引用存在、不成环、与嵌套不冲突；这里引用无效时退回嵌套的父分组）。
  */
 export function graphStructure(node: SceneNode): GraphStructure {
-  const root = (node.type === 'StateMachine' ? 'StateMachine' : 'Diagram') as GraphRootType;
+  const root = (node.type === 'diagram:StateMachine' ? 'diagram:StateMachine' : 'diagram:Diagram') as GraphRootType;
   const fam = GRAPH_FAMILY[root];
   const p = node.props ?? {};
   const direction = p.direction === 'down' ? 'down' : p.direction === 'right' ? 'right' : 'auto';
@@ -168,7 +168,7 @@ export function graphStructure(node: SceneNode): GraphStructure {
       } else if (c.type === fam.node) {
         const label = staticText(cp.label) || c.id;
         const description = staticText(cp.description);
-        if (root === 'StateMachine') {
+        if (root === 'diagram:StateMachine') {
           const final = cp.final === true;
           nodes.push({ id: c.id, seq: seq++, label, description, kind: 'state', parent: ref ?? parent, ...stateSize(label, description, final), ...(pinOf(cp.pin) ? { pin: pinOf(cp.pin) } : {}), ...(cp.initial === true ? { initial: true } : {}), ...(final ? { final: true } : {}) });
         } else {

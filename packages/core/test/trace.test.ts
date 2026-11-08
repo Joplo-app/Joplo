@@ -1,12 +1,14 @@
+import { diagramStateAt } from '../../../plugins/diagram/src/state.ts';
+import { nodeData, frameData } from '../../../plugins/diagram/src/data.ts';
 /**
- * 调用链 trace()（D48）：编译进 IR 的 Step.traces、TRACE_UNKNOWN / TRACE_AMBIGUOUS、diagramStateAt 的推算规则、
+ * 调用链 trace()（D48）：编译进 IR 的 frameData(Step)!.traces、TRACE_UNKNOWN / TRACE_AMBIGUOUS、diagramStateAt 的推算规则、
  * trace 相当于 shot（导演层、镜头目标、与 shot 合并）、发布站保留，以及旧写法（$.ui 绑定 + set）结果不变。
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/kit/ui';
 import { $, config, feature, flow, layer, option, page, set, shot, trace, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { cameraAt, compile, diagramStateAt, resolveProps, stateAt, type AuthoringProject, type Project } from '../src/index.ts';
+import { cameraAt, compile, resolveProps, stateAt, type AuthoringProject, type Project } from '../src/index.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
@@ -69,13 +71,13 @@ describe('trace() 编译进 IR', () => {
     const { dev } = build(five);
     expect(errors(dev)).toEqual([]);
     const steps = dev.project!.scenarios[sid]!.steps;
-    expect(steps[0]!.traces).toEqual([{ mode: 'ok', nodes: ['app', 'biz'], edges: [{ id: 'e_app_biz', reverse: false }] }]);
-    expect(steps[2]!.traces).toEqual([
+    expect(frameData(steps[0]!)!.traces).toEqual([{ mode: 'ok', nodes: ['app', 'biz'], edges: [{ id: 'e_app_biz', reverse: false }] }]);
+    expect(frameData(steps[2]!)!.traces).toEqual([
       { mode: 'ok', nodes: ['biz', 'brain', 'llm'], edges: [{ id: 'e_biz_brain', reverse: false }, { id: 'brain->llm', reverse: false }] },
       { mode: 'skip', nodes: ['queue'], edges: [] },
     ]);
-    expect(steps[3]!.traces).toEqual([{ mode: 'ok', nodes: ['brain', 'biz'], edges: [{ id: 'e_brain_biz', reverse: false }] }]);
-    expect(steps[4]!.traces[0]).toMatchObject({ mode: 'fail', nodes: ['biz', 'billing'] });
+    expect(frameData(steps[3]!)!.traces).toEqual([{ mode: 'ok', nodes: ['brain', 'biz'], edges: [{ id: 'e_brain_biz', reverse: false }] }]);
+    expect(frameData(steps[4]!)!.traces[0]).toMatchObject({ mode: 'fail', nodes: ['biz', 'billing'] });
     // trace 不是状态变化
     expect(steps.every((s) => s.effects.length === 0)).toBe(true);
   });
@@ -83,8 +85,8 @@ describe('trace() 编译进 IR', () => {
     const { dev } = build((f) => f.system('回调', trace('billing', 'biz')).system('往返', trace('brain', 'biz')));
     expect(errors(dev)).toEqual([]);
     const steps = dev.project!.scenarios[sid]!.steps;
-    expect(steps[0]!.traces[0]!.edges).toEqual([{ id: 'e_biz_billing', reverse: true }]);
-    expect(steps[1]!.traces[0]!.edges).toEqual([{ id: 'e_brain_biz', reverse: false }]);
+    expect(frameData(steps[0]!)!.traces[0]!.edges).toEqual([{ id: 'e_biz_billing', reverse: true }]);
+    expect(frameData(steps[1]!)!.traces[0]!.edges).toEqual([{ id: 'e_brain_biz', reverse: false }]);
   });
   it('找不到连线、未知 id、不在同一个 Diagram：TRACE_UNKNOWN（带 at）；同一方向有多条连线：TRACE_AMBIGUOUS', () => {
     const { dev } = build((f) => f.system('a', trace('app', 'billing')).system('b', trace('nope')).system('c', trace('queue', 'billing')).system('d', trace()));
@@ -101,7 +103,7 @@ describe('trace() 编译进 IR', () => {
   });
   it('发布模式保留 trace 数据', () => {
     const { publish } = build(five);
-    expect(publish.project!.scenarios[sid]!.steps[1]!.traces).toEqual([{ mode: 'ok', nodes: ['biz', 'billing'], edges: [{ id: 'e_biz_billing', reverse: false }] }]);
+    expect(frameData(publish.project!.scenarios[sid]!.steps[1]!)!.traces).toEqual([{ mode: 'ok', nodes: ['biz', 'billing'], edges: [{ id: 'e_biz_billing', reverse: false }] }]);
   });
 });
 

@@ -61,5 +61,8 @@
   "homepage": "https://github.com/Joplo-app/Joplo#readme",
   "bugs": {
     "url": "https://github.com/Joplo-app/Joplo/issues"
+  },
+  "dependencies": {
+    "@joplo-app/plugin-diagram": "workspace:*"
   }
 }

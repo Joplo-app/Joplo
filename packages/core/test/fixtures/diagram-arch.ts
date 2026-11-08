@@ -1,16 +1,16 @@
 /** 图表布局测试共用的结构（D69）：examples/agent-arch 的架构图、hushed-demos 截图里的“执行回路”（按业务域分组后）。 */
 import type { SceneNode } from '../../src/index.ts';
 
-export const N = (id: string, label: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'Diagram.Node', props: { label, ...extra } });
-export const E = (from: string, to: string, extra: Record<string, unknown> = {}): SceneNode => ({ id: (extra.id as string) ?? `${from}->${to}`, type: 'Diagram.Edge', props: { from, to, ...extra } });
-export const G = (id: string, label: string, children: SceneNode[], extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'Diagram.Group', props: { label, ...extra }, children });
+export const N = (id: string, label: string, extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'diagram:Diagram.Node', props: { label, ...extra } });
+export const E = (from: string, to: string, extra: Record<string, unknown> = {}): SceneNode => ({ id: (extra.id as string) ?? `${from}->${to}`, type: 'diagram:Diagram.Edge', props: { from, to, ...extra } });
+export const G = (id: string, label: string, children: SceneNode[], extra: Record<string, unknown> = {}): SceneNode => ({ id, type: 'diagram:Diagram.Group', props: { label, ...extra }, children });
 
 /** 与 examples/agent-arch/shared/arch.tsx 相同的结构（v = a：混合的手；v = b：全云端）。 */
 export function agentArch(v: 'a' | 'b', direction: 'right' | 'down' | 'auto', props: Record<string, unknown> = {}): SceneNode {
   const n = (id: string, label: string, kind: string, description: string) => N(id, label, { kind, description, state: `$ui.n_${id}` });
   return {
     id: 'arch',
-    type: 'Diagram',
+    type: 'diagram:Diagram',
     props: { ...(direction === 'auto' ? {} : { direction }), h: 640, ...props },
     children: [
       G('g_device', '用户设备', [n('app', '客户端界面', 'client', '对话、确认弹窗'), ...(v === 'a' ? [n('local', '端侧执行器', 'tool', '手：read_files、delete_files')] : [])], { icon: 'device' }),
@@ -41,7 +41,7 @@ export function agentArch(v: 'a' | 'b', direction: 'right' | 'down' | 'auto', pr
 /** 用户截图里的“执行回路”，按业务域分成网关 / 运行时 / 存储与结算三组。 */
 export const loopDiagram = (props: Record<string, unknown> = {}): SceneNode => ({
   id: 'loop',
-  type: 'Diagram',
+  type: 'diagram:Diagram',
   props,
   children: [
     G('gw', '网关', [N('host', 'SessionHost', { description: '输入与审批' }), N('prepare', 'Go Host', { description: '本轮准入' })], { icon: 'gateway' }),

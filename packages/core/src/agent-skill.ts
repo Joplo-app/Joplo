@@ -14,7 +14,7 @@ export const SKILL_TOPICS = [
   { name: 'content', description: 'Explainers, tutorials, and news-explainer videos: package and plan, hook, one world with Canvas, camera(), motion morphs, chapters with flow({ from }), narration, sources, review' },
   { name: 'demo', description: 'Layers, shots, captions, full-height layout, custom motion and data graphics, deep links, and screenshots' },
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
-  { name: 'diagram', description: 'Architecture, sequence and state diagrams: domain groups, automatic layout, traces, shot framing' },
+  { name: 'diagram', description: 'Default first-party diagram plugin: architecture, sequence and state diagrams, groups, compiled traces and framing' },
   { name: 'components', description: 'Component catalog, supported HTML tags, line breaks, props, and real images' },
   { name: 'cases', description: 'Case dimensions: ask the user before starting' },
   { name: 'check', description: 'Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line' },
@@ -22,7 +22,7 @@ export const SKILL_TOPICS = [
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
   { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
   { name: 'publish', description: 'pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)' },
-  { name: 'plugins', description: 'Install and enable plugin packages (3D scenes and other components), read their skills, write steps for them; writing a plugin' },
+  { name: 'plugins', description: 'Default standard plugins and third-party packages; API v2 compilation, snapshots, shared React, diagnostics and skills' },
 ] as const;
 
 /** 心智模型：所有入口最先读到的几句话。 */
@@ -120,9 +120,9 @@ function joploBody(): string {
     '## Show the product, not slides',
     'Every step is an action on the product and a visible change it causes. If a step could be a bullet on a slide, rebuild it as interface, state, or a trace.',
     '- Feature: not a card listing "enter email / teammate gets a link / joins today"; instead Ana types the email, clicks Send, the row appears as Pending, then Leo\'s layer opens the mail and lands in the space.',
-    '- Backend or architecture: not a card "App → API → Queue → Worker"; instead a Diagram where trace() lights each hop as the request moves and trace.fail() shows where it breaks, beside the UI whose status changes with it.',
+    '- Backend or architecture: not a card "App → API → Queue → Worker"; instead a diagram plugin view where trace() lights each hop as the request moves and trace.fail() shows where it breaks, beside the UI whose status changes with it.',
     '- Comparison: not a pros-and-cons table; instead options A and B each playing the same scenario, compared in the board.',
-    '- State or lifecycle: not a paragraph explaining statuses; instead a StateMachine whose current state moves as the user acts.',
+    '- State or lifecycle: not a paragraph explaining statuses; instead a lifecycle view whose current state moves as the user acts.',
     '- Cards only open, close, jump in time, or switch roles; text that explains belongs in captions and explain(). Worked example: npx joplo skill story.',
     '',
     '## Review live with the user',

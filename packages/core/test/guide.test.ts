@@ -1,3 +1,4 @@
+import { standardDocs } from '../src/plugins/standard-catalog.ts';
 import { expect, test } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
@@ -34,7 +35,7 @@ test('components 取自真实目录与三种行为集合，未知 docs 不增加
   // 图表家族（D69）各占一行：根组件后面列出它的子组件，细节在 diagram 主题
   const family = /^(Diagram|StateMachine|Sequence)\./;
   for (const name of COMPONENT_TYPES.filter(name => !name.startsWith('#') && !html.has(name) && !family.test(name) && !['Diagram', 'StateMachine', 'Sequence'].includes(name))) expect(output).toContain(`- ${name}\n`);
-  for (const root of ['Diagram', 'StateMachine', 'Sequence']) expect(output).toContain(`- ${[root, ...COMPONENT_TYPES.filter(n => n.startsWith(`${root}.`))].join(', ')}\n`);
+  for (const root of ['diagram:Diagram', 'diagram:StateMachine', 'diagram:Sequence']) expect(output).toContain(`- ${[root, ...Object.keys(standardDocs).filter(n => n.startsWith(`${root}.`))].join(', ')}\n`);
   const htmlLine = output.split('\n').find(l => l.startsWith('- Supported HTML tags: '))!;
   for (const tag of html) expect(htmlLine).toMatch(new RegExp(`[ ,]${tag}[ ,(]`));
   for (const set of [INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS]) for (const name of set) expect(output).toContain(name);
@@ -177,7 +178,7 @@ test('componentDetails（npx joplo components <名字>）：含子组件、行�
   for (const root of ['Diagram', 'Sequence', 'StateMachine']) {
     const out = componentDetails([root]);
     expect(out, root).toContain('```tsx');
-    expect(out, root).toContain(`- ${root}.`);
+    expect(out, root).toContain(`- ${['Diagram', 'StateMachine', 'Sequence'].includes(root) ? `diagram:${root}` : root}.`);
   }
   expect(() => componentDetails(['Menuu'])).toThrow(/Did you mean Menu\?/);
   expect(() => componentDetails([''])).toThrow(/Unknown component/);

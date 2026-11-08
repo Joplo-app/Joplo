@@ -18,8 +18,8 @@
   },
   "dependencies": {
     "@joplo-app/kit": "workspace:*",
-    "elkjs": "0.12.1",
-    "zod": "4.6.7"
+    "zod": "4.6.7",
+    "@joplo-app/plugin-diagram": "workspace:*"
   },
   "engines": {
     "node": ">=22"

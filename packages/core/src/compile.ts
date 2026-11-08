@@ -12,11 +12,12 @@ import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, Eff
 import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, PAGE_LAYER, isInteractiveType, matchChoice, nodeLabel, pluginSpec, splitPluginType, type PluginInfo } from './catalog.ts';
 import { HOLD_MAX_SECONDS, HOLD_MIN_SECONDS, inShotFrame } from './focus.ts';
 import { cameraAt, choicesOf, commonPrefix, stateAt } from './player.ts';
-import { CALLOUT_SIDES, LAYER_ICONS, Project, SCHEMA_VERSION, type Callout, type Cue, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
+import { CALLOUT_SIDES, LAYER_ICONS, Project, SCHEMA_VERSION, type Callout, type Cue, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage } from './schema.ts';
 import type { Diagnostic } from './result.ts';
 import { schemaDiagnostics } from './schema-issues.ts';
 import { CONTENT_LOCALES, collectMessages, isContentLocale, nearestKey, pruneMessages } from './content-i18n.ts';
-import { DIAGRAM_GROUP_ICONS, DIAGRAM_NODE_KINDS, DIAGRAM_PINS, DIAGRAM_TONES, GRAPH_FAMILY, SEQUENCE_BLOCK_KINDS, SEQUENCE_FAMILY, attachLayouts, diagramsIn, isDiagramRoot, type DiagramIndex, type GraphLayoutEngine } from './diagram/index.ts';
+import { PluginCompiler, type CompileOptions } from './plugins/compiler.ts';
+export type { CompileOptions } from './plugins/compiler.ts';
 
 export type AuthoringProject = {
   /** 项目根目录绝对路径，用于把源位置改成相对路径。 */
@@ -39,13 +40,6 @@ const OVERLAY = 'overlay';
 const MOCK_LABEL = { success: 'Mock success', failure: 'Mock failure', denied: 'Mock permission denied', other: 'Mock' } as const;
 
 export type CompileMode = 'dev' | 'publish' | 'review';
-export type CompileOptions = {
-  /**
-   * 图表布局引擎（D69）：Node 端传 `elkLayout`（@joplo-app/core/node）。不传时图表退化为网格排列（engine = 'grid'），
-   * 只用于测试或不关心布局的调用方；dev、build、check 都传 ELK。
-   */
-  layout?: GraphLayoutEngine;
-};
 
 export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileOptions = {}): CompileResult {
   /** 所有方案都参与（dev、review）；创作侧信息要去掉（publish、review）。 */
@@ -92,9 +86,10 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   };
 
   // ---------- 0. 插件（D86）：只取清单里的组件声明，运行时代码不进 IR ----------
-  const plugins = pluginsOf(src, err);
+  const host = new PluginCompiler(src.config.plugins, report, src.config.source ?? `${src.config.file}:1:1`, opts);
+  const plugins = host.info;
   if (Object.keys(plugins).length) out.plugins = plugins;
-  const nodeCtx: NodeCtx = { plugins, report, rel };
+  const nodeCtx: NodeCtx = { plugins, host, report, rel };
 
   // ---------- 1. 选出参与的方案 ----------
   // 排序只在编译时决定；显式列表不依赖对象键的枚举顺序，发布模式也保留这份演示内容。
@@ -229,7 +224,9 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const rootJ: JNode = { ...base, type: base.type === '#fragment' ? 'div' : base.type, children: [...base.children, ...overlays] };
     const ids = new Map<string, string | undefined>();
     const root = toSceneNode(rootJ, 'root', ids, nodeCtx, null);
-    return { id: sceneId, optionId: ctx?.qid ?? null, route: route.path, name: `${page.title}${ctx ? ` · ${ctx.def.name}` : ''}`, viewport: page.viewport ?? 'desktop', root };
+    const scene: Scene = { id: sceneId, optionId: ctx?.qid ?? null, route: route.path, name: `${page.title}${ctx ? ` · ${ctx.def.name}` : ''}`, viewport: page.viewport ?? 'desktop', root };
+    if (!diags.some(d => d.severity === 'error')) host.derive(scene);
+    return scene;
   };
 
   if (src.config.voice !== undefined && !voiceConfigOf(src.config.voice, true))
@@ -297,6 +294,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       const root = toSceneNode(rootJ, `layer_${lk}`, ids, nodeCtx, null);
       const sceneId = `${qid}~${lk}`;
       const scene: Scene = { id: sceneId, optionId: qid, route: layerRoute, name: `${ld.title} · ${def.name}`, viewport: ld.viewport ?? 'desktop', root, layer: lk };
+      if (!diags.some(d => d.severity === 'error')) host.derive(scene);
       addScene(scene);
       layerScenes.push({ key: lk, scene });
       if (ld.role !== undefined && !roleKeys.has(ld.role))
@@ -311,89 +309,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const layersWith = (id: string): string[] => layerScenes.filter((l) => findIn(l.scene.root, id)).map((l) => l.key);
     const layerSceneWith = (id: string): Scene | undefined => layerScenes.find((l) => findIn(l.scene.root, id))?.scene;
 
-    // ---------- 调用链（D48）：trace 在这个方案能看到的 Diagram 里解析 ----------
-    const diagrams = [...layerScenes.map((l) => l.scene), ...[...sceneFor.values()].filter((x) => x.optionId === qid || x.optionId === null || x.optionId === undefined)].flatMap((x) => diagramsIn(x.root));
-    const resolveTrace = (ids: string[], tmode: Trace['mode'], at: string | undefined): Trace | null => {
-      const shown = `trace(${ids.map((x) => JSON.stringify(x)).join(', ')})`;
-      if (!ids.length) {
-        err('TRACE_UNKNOWN', `${shown} requires at least one node or edge id`, at);
-        return null;
-      }
-      const has = (d: DiagramIndex, t: string) => d.nodes.has(t) || d.edges.some((e) => e.id === t);
-      const d = diagrams.find((x) => ids.every((t) => has(x, t)));
-      if (!d) {
-        const missing = ids.find((t) => !diagrams.some((x) => has(x, t)));
-        err('TRACE_UNKNOWN', missing ? `${shown} contains "${missing}", which is not a node, group, edge, state, transition, actor or message id in any Diagram / StateMachine / Sequence` : `${shown} mixes elements from different diagrams; trace one diagram at a time`, at);
-        return null;
-      }
-      const nodes: string[] = [];
-      const edges: Trace['edges'] = [];
-      const addNode = (n: string) => {
-        if (!nodes.includes(n)) nodes.push(n);
-      };
-      /** 节点（或分组）自己是分组时连同它算进去，再加上它的各级父分组。 */
-      const groupsOfNode = (n: string): string[] => [...(d.groupIds.has(n) ? [n] : []), ...(d.groupsOf.get(n) ?? [])];
-      const finishTrace = (): Trace => {
-        if (tmode === 'skip') return { mode: tmode, nodes, edges, ...(d.type === 'Sequence' ? { targets: [] } : {}) };
-        const all = [...new Set(nodes.flatMap(groupsOfNode))];
-        const last = nodes[nodes.length - 1];
-        // 失败只标红终点所在的最内层分组（终点本身是分组时就是它）；外层分组照常 active，不把整个云账号都标红
-        const errorGroups = tmode === 'fail' && last ? groupsOfNode(last).slice(0, 1) : [];
-        return {
-          mode: tmode,
-          nodes,
-          edges,
-          ...(all.some((g) => !errorGroups.includes(g)) ? { groups: all.filter((g) => !errorGroups.includes(g)) } : {}),
-          ...(errorGroups.length ? { errorGroups } : {}),
-          // 时序图的镜头对准消息所在的行（参与者头部在最上面，对准它们会把镜头拉离正在讲的那一行）
-          ...(d.type === 'Sequence' ? { targets: edges.map((e) => e.id) } : {}),
-        };
-      };
-      // trace.skip 标记“这次没被调用”的一组元素，不是路径：节点和连线各自 dim，不要求彼此相连
-      if (tmode === 'skip') {
-        for (const t of ids) {
-          if (d.nodes.has(t)) addNode(t);
-          else edges.push({ id: t, reverse: false });
-        }
-        return finishTrace();
-      }
-      const kind = d.type === 'Sequence' ? 'Sequence.Message' : d.type === 'StateMachine' ? 'StateMachine.Transition' : 'Diagram.Edge';
-      let prev: string | null = null;
-      for (const t of ids) {
-        const edge = d.edges.find((e) => e.id === t);
-        if (edge) {
-          // 写连线 id：方向由上一个节点决定（从 to 端接上时逆向走）；时序图的消息各自独立，连续写几条消息 id 不要求首尾相接
-          const reverse: boolean = prev !== null && prev === edge.to && prev !== edge.from;
-          if (d.type !== 'Sequence' && prev !== null && prev !== edge.from && prev !== edge.to) {
-            err('TRACE_UNKNOWN', `${shown}: edge "${t}"(${edge.from} → ${edge.to}) is not connected to the previous node "${prev}"`, at);
-            return null;
-          }
-          edges.push({ id: edge.id, reverse });
-          addNode(reverse ? edge.to : edge.from);
-          addNode(reverse ? edge.from : edge.to);
-          prev = reverse ? edge.from : edge.to;
-          continue;
-        }
-        if (prev !== null && prev !== t) {
-          // 一段：先找同向的连线，没有再找反向的；同一方向有多条时要写连线 id
-          const fwd = d.edges.filter((e) => e.from === prev && e.to === t);
-          const back = d.edges.filter((e) => e.from === t && e.to === prev);
-          const pick = fwd.length ? fwd : back;
-          if (pick.length > 1) {
-            err('TRACE_AMBIGUOUS', `${shown}: "${prev}" and "${t}" have ${pick.length} ${d.type === 'Sequence' ? 'messages' : 'edges'} (${pick.map((e) => e.id).join(', ')}), use an id instead, for example trace('${pick[0]!.id}')`, at);
-            return null;
-          }
-          if (!pick.length) {
-            err('TRACE_UNKNOWN', `${shown}: "${prev}" and "${t}" have no connecting ${kind} (each segment needs one in the same diagram; either direction is allowed)`, at);
-            return null;
-          }
-          edges.push({ id: pick[0]!.id, reverse: !fwd.length });
-        }
-        addNode(t);
-        prev = t;
-      }
-      return finishTrace();
-    };
+    const effectRoots = [...layerScenes.map(l => l.scene), ...[...sceneFor.values()].filter(x => x.optionId === qid || x.optionId == null)].map(x => x.root);
 
     const scenarioIds: Record<string, string[]> = {};
     // flow({ from }) 接力：按依赖顺序编译，被接的场景先编译，记下它结尾的路径与导演层；
@@ -452,11 +368,13 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const explains: string[] = [];
         const says: string[] = [];
         const narrates: string[] = [];
-        const traces: Trace[] = [];
+        const ext: Record<string, unknown> = {};
+        const references: string[] = [];
+        const pluginFocus: string[] = [];
         const forks: Step['forks'] = [];
         const marks: Step['marks'] = [];
-        /** 每个 trace 效果解析出的节点（作为镜头目标，与 shot 合并）。 */
-        const traceTargets = new Map<EffectDef, string[]>();
+        /** 每个插件效果贡献的节点（作为镜头目标，与 shot 合并）。 */
+        const pluginTargets = new Map<EffectDef, string[]>();
         for (const e of st.effects as EffectDef[]) {
           if (e.type === 'go') {
             if (!ctxRoutes.has(e.route)) err('UNKNOWN_ROUTE', `go("${e.route}") navigates to an unknown route`, st.source);
@@ -478,12 +396,15 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
             else err('NARRATE_EMPTY', 'narrate() needs the narrator\'s words, for example narrate(\'She sends Ajie the plan as a link, so he needs no app.\'). Remove it to read say() or the caption instead', st.source);
           } else if (e.type === 'explain') {
             if (e.text.trim()) explains.push(e.text.trim());
-          } else if (e.type === 'trace') {
-            const t = resolveTrace(e.ids, e.mode, st.source);
-            if (t) {
-              traces.push(t);
-              // trace 相当于一个 shot（trace.skip 只标记没被调用，不移动镜头）
-              if (t.mode !== 'skip') traceTargets.set(e, t.targets ?? t.nodes);
+          } else if (e.type === 'plugin') {
+            const lowered = host.effect(e, effectRoots, ext[e.plugin], st.source);
+            if (lowered) {
+              if (lowered.data !== undefined) ext[e.plugin] = lowered.data;
+              if (lowered.targets?.length) {
+                pluginTargets.set(e, lowered.targets);
+                pluginFocus.push(...lowered.targets);
+              }
+              references.push(...lowered.references ?? []);
             }
           }
           else effects.push({ type: 'complete', text: e.text, outcome: e.outcome });
@@ -558,9 +479,9 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const perLayer = new Map<string, string[]>();
         let directorLayer: string | null = null;
         for (const e of st.effects as EffectDef[]) {
-          if (e.type !== 'shot' && !traceTargets.has(e)) continue;
-          const fromTrace = e.type !== 'shot';
-          const targets = e.type === 'shot' ? e.targets : traceTargets.get(e)!;
+          if (e.type !== 'shot' && !pluginTargets.has(e)) continue;
+          const fromPlugin = e.type !== 'shot';
+          const targets = e.type === 'shot' ? e.targets : pluginTargets.get(e)!;
           if (targets.length === 0) {
             // shot()：导演所在层回到整体（不推近）
             const lk = hasLayers ? DIRECTOR_LAYER : PAGE_LAYER;
@@ -569,7 +490,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           for (const id of targets) {
             const where = hasLayers ? layersWith(id) : [sceneAfter, sceneBefore].some((sc) => sc && findIn(sc.root, id)) ? [PAGE_LAYER] : [];
             if (!where.length) {
-              if (fromTrace) continue; // trace 的节点已在 Diagram 里校验过；不在这一步的画面里时不移动镜头
+              if (fromPlugin) continue; // 插件目标已经校验过；不在这一步的画面里时不移动镜头
               err('SHOT_UNKNOWN', hasLayers ? `shot("${id}") references an element absent from all layers (layers: ${Object.keys(layers).join(', ')})` : `shot("${id}") references an element absent from this step's stage (${sceneAfter?.route ?? sceneBefore?.route ?? '?'})`, st.source);
               continue;
             }
@@ -621,7 +542,9 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           shots,
           directorLayer,
           ...(explains.length ? { explain: explains.join('\n') } : {}),
-          traces,
+          ...(Object.keys(ext).length ? { ext } : {}),
+          ...(references.length ? { references: [...new Set(references)] } : {}),
+          ...(pluginFocus.length ? { focusTargets: [...new Set(pluginFocus)] } : {}),
           forks,
           marks,
           ...(cues.length ? { cues } : {}),
@@ -706,16 +629,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     }
   }
 
-  // ---------- 7. 图表布局（D69）：每张图在编译期布局一次，写进 IR；同一结构只算一次（引擎自带缓存） ----------
-  if (!diags.some((d) => d.severity === 'error')) {
-    const failed = new Set<string>();
-    for (const sc of Object.values(out.scenes) as Scene[])
-      attachLayouts(sc.root, opts.layout, (n, m) => {
-        if (failed.has(`${n.source}|${n.id}`)) return;
-        failed.add(`${n.source}|${n.id}`);
-        warn('DIAGRAM_LAYOUT_FAILED', `<${n.type}> "${n.id}" could not be laid out (${m}); showing a simple grid instead. Check the edges and groups of this diagram`, n.source, { kind: 'element', id: n.id });
-      }, sc.viewport);
-  }
+  // 逐步派生数据只在编译期计算，播放器读取快照。
+  if (!diags.some(d => d.severity === 'error')) host.frames(out as Project);
 
   // ---------- 8. 发布视图与评审版：去掉设计备注与源位置 ----------
   if (strip) {
@@ -900,45 +815,17 @@ function tagFrom(n: JNode, from: string): JNode {
 type ErrFn = (code: string, message: string, at?: string, severity?: 'error' | 'warning' | 'info') => void;
 
 /** JNode → IR 节点：展开 Fragment、文本变 #text、分离 Joplo 属性、生成非交互元素的 ID、检查 ID 唯一。 */
-type NodeCtx = { plugins: Record<string, PluginInfo>; report: ErrFn; rel: (s?: string) => string | undefined };
-
-/** 插件清单 → IR 的插件表；同一 id 启用两次、不是 definePlugin 的返回值时报错。 */
-function pluginsOf(src: AuthoringProject, err: (code: string, message: string, at?: string) => void): Record<string, PluginInfo> {
-  const out: Record<string, PluginInfo> = {};
-  const list = src.config.plugins;
-  if (list === undefined) return out;
-  const at = src.config.source ?? `${src.config.file}:1:1`;
-  if (!Array.isArray(list)) {
-    err('PLUGIN_INVALID', 'config({ plugins }) must be a list of plugins, for example plugins: [scene3d] with import scene3d from \'joplo-plugin-scene3d\'', at);
-    return out;
-  }
-  for (const p of list as unknown[]) {
-    const d = p as Partial<PluginDef> | null;
-    if (!d || typeof d !== 'object' || d.kind !== 'plugin' || typeof d.id !== 'string' || !d.components || typeof d.components !== 'object') {
-      err('PLUGIN_INVALID', `config({ plugins }) contains ${d === null ? 'null' : typeof d === 'object' ? 'an object that is not a plugin' : typeof d}; use the default export of a Joplo plugin package (made with definePlugin)`, at);
-      continue;
-    }
-    if (out[d.id]) {
-      err('PLUGIN_DUPLICATE', `Plugin ${d.id} is enabled twice in config({ plugins })`, at);
-      continue;
-    }
-    out[d.id] = {
-      id: d.id,
-      title: typeof d.title === 'string' ? d.title : d.id,
-      ...(typeof d.version === 'string' ? { version: d.version } : {}),
-      components: Object.fromEntries(Object.entries(d.components).map(([name, c]) => [name, { ...(c?.interactive ? { interactive: true } : {}), ...(typeof c?.parent === 'string' ? { parent: c.parent } : {}) }])),
-    };
-  }
-  return out;
-}
+type NodeCtx = { host: PluginCompiler; plugins: Record<string, PluginInfo>; report: ErrFn; rel: (s?: string) => string | undefined };
 
 function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | undefined>, nc: NodeCtx, parentType: string | null): SceneNode {
   const { report: err, rel } = nc;
+  n = { ...n, props: n.props ?? {}, children: n.children ?? [] };
   if (n.type === 'Menu') n = menuWithOpened(n);
   const children: SceneNode[] = flatten(n.children).map((c, i) =>
     isNode(c) ? toSceneNode(c, `${fallbackId}_${i}`, ids, nc, n.type) : textNode(c, `${fallbackId}_${i}`),
   );
 
+  n = nc.host.node(n, ids);
   const { id: rawId, when, disabled, disabledReason, unmodeled, note, redact, __from, ...rest } = n.props as Record<string, unknown>;
   const at = n.source;
   const plug = splitPluginType(n.type);
@@ -951,20 +838,10 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   } else if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `Component <${n.type}> is not in the catalog (use Mantine component names; run joplo skill components to list them; use <Custom kind="…"> as a placeholder for missing components)`, at);
   const interactive = isInteractiveType(n.type, nc.plugins);
   if (interactive && typeof rawId !== 'string') err('MISSING_ID', `Interactive component <${n.type}> "${labelOf(n)}" requires an id for steps and selection`, at);
-  const needsId = n.type === 'Diagram.Node' ? 'Diagram node <Diagram.Node>' : n.type === 'StateMachine.State' ? 'State <StateMachine.State>' : n.type === 'Sequence.Actor' ? 'Participant <Sequence.Actor>' : null;
-  if (needsId && typeof rawId !== 'string') err('MISSING_ID', `${needsId} "${labelOf(n)}" requires an id for edge from / to and trace`, at);
-  if (isDiagramRoot(n.type)) checkDiagramRoot(n, err);
+  const spec = pluginSpec(nc.plugins, n.type);
+  if (spec?.needsId && typeof rawId !== 'string' && !interactive) err('MISSING_ID', `<${n.type}> "${labelOf(n)}" requires an id`, at);
   if (n.type === 'Image') checkImage(n, err);
-  // 连线没写 id 时用「from->to」：⌥+单击检查与 rules 的 elements 都能引用它。
-  // 状态机的转换与时序图的消息常有同一对端点的多条（请求、重试、回复），重复的依次加「~2」「~3」。
-  const linkLike = n.type === 'Diagram.Edge' || n.type === 'StateMachine.Transition' || n.type === 'Sequence.Message';
-  let edgeId = linkLike && typeof rest.from === 'string' && typeof rest.to === 'string' ? `${rest.from}->${rest.to}` : null;
-  if (edgeId && n.type !== 'Diagram.Edge' && ids.has(edgeId)) {
-    let k = 2;
-    while (ids.has(`${edgeId}~${k}`)) k++;
-    edgeId = `${edgeId}~${k}`;
-  }
-  const id = typeof rawId === 'string' ? rawId : (edgeId ?? `_${fallbackId}`);
+  const id = typeof rawId === 'string' ? rawId : `_${fallbackId}`;
   if (ids.has(id)) err('DUPLICATE_ID', `Duplicate id "${id}" in the same stage (other location: ${rel(ids.get(id)) ?? 'unknown'})`, at);
   ids.set(id, at);
 
@@ -981,7 +858,7 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
     }
     props[k] = toPropValue(v);
   }
-  const node: SceneNode = { id, type: n.type as SceneNode['type'] };
+  const node: SceneNode = { id, type: n.type };
   if (Object.keys(props).length) node.props = props;
   if (children.length) node.children = children;
   if (when !== undefined) node.when = toCondition(when) as SceneNode['when'];
@@ -1032,148 +909,6 @@ function menuWithOpened(menu: JNode): JNode {
     return { ...c, children: c.children.map(visit) };
   };
   return { ...menu, children: menu.children.map(visit) };
-}
-
-/**
- * 关系类图表的校验（D69）：在作者元素上报错，带源位置。
- * - Diagram / StateMachine：连线两端必须是同一张图里的节点或（有 id 的）分组；group="…" 必须引用存在的分组、与嵌套不矛盾、不成环；
- *   连线不能连到包含它端点的分组；icon / tone / pin 取预设值。节点多却没有分组时给一条 info（D69：按业务域分组）。
- * - Sequence：消息两端必须是参与者；Sequence.Group 里只放参与者，Sequence.Block 里只放消息或片段。
- * 嵌套的另一张图表自成一体，不参与本图的校验。
- */
-function checkDiagramRoot(d: JNode, err: ErrFn): void {
-  const type = d.type as 'Diagram' | 'StateMachine' | 'Sequence';
-  const strOf = (v: unknown) => (typeof v === 'string' ? v : String(v));
-  const oneOf = (el: JNode, prop: string, allowed: readonly string[], severity: 'error' | 'warning' = 'error') => {
-    const v = el.props[prop];
-    if (v !== undefined && (typeof v !== 'string' || !allowed.includes(v))) err(prop === 'icon' ? 'ICON_UNKNOWN' : 'INVALID_DIAGRAM_PROP', `<${el.type}> ${prop}="${strOf(v)}" is not supported (available: ${allowed.join(', ')})${severity === 'warning' ? '; it is drawn as the default' : ''}`, el.source, severity);
-  };
-  if (type === 'Sequence') {
-    const actors = new Set<string>();
-    const messages: JNode[] = [];
-    const walk = (cs: JChild[], inside: 'root' | 'group' | 'block') => {
-      for (const c of flatten(cs)) {
-        if (!isNode(c) || isDiagramRoot(c.type)) continue;
-        if (c.type === SEQUENCE_FAMILY.actor) {
-          if (inside === 'block') err('INVALID_DIAGRAM_CHILD', `<Sequence.Actor> "${labelOf(c)}" cannot be inside <Sequence.Block>; declare participants at the top (optionally in <Sequence.Group>) and put messages in blocks`, c.source);
-          if (typeof c.props.id === 'string') actors.add(c.props.id);
-        } else if (c.type === SEQUENCE_FAMILY.message) {
-          if (inside === 'group') err('INVALID_DIAGRAM_CHILD', '<Sequence.Message> cannot be inside <Sequence.Group> (a group boxes participants); put it after the participants, or in a <Sequence.Block>', c.source);
-          messages.push(c);
-        } else if (c.type === SEQUENCE_FAMILY.group) {
-          if (inside !== 'root') err('INVALID_DIAGRAM_CHILD', '<Sequence.Group> must be a direct child of <Sequence>', c.source);
-          oneOf(c, 'icon', DIAGRAM_GROUP_ICONS);
-          walk(c.children, 'group');
-        } else if (c.type === SEQUENCE_FAMILY.block) {
-          if (inside === 'group') err('INVALID_DIAGRAM_CHILD', '<Sequence.Block> cannot be inside <Sequence.Group>', c.source);
-          oneOf(c, 'kind', SEQUENCE_BLOCK_KINDS);
-          walk(c.children, 'block');
-        } else if (c.type.startsWith('Diagram.') || c.type.startsWith('StateMachine.')) {
-          err('INVALID_DIAGRAM_CHILD', `<${c.type}> cannot be used inside <Sequence>; use Sequence.Actor / Sequence.Message / Sequence.Group / Sequence.Block`, c.source);
-        }
-      }
-    };
-    walk(d.children, 'root');
-    const known = [...actors].join(', ') || '(no participants)';
-    for (const m of messages)
-      for (const k of ['from', 'to'] as const) {
-        const v = m.props[k];
-        if (typeof v !== 'string' || !actors.has(v)) err('UNKNOWN_DIAGRAM_NODE', `<Sequence.Message> ${k} "${strOf(v)}" is not a participant id in this Sequence (available: ${known})`, m.source);
-      }
-    return;
-  }
-  const fam = GRAPH_FAMILY[type];
-  const nodes = new Set<string>();
-  const groups = new Map<string, JNode>();
-  /** 元素 → 它的父分组（嵌套或 group= 引用）；记录嵌套父分组，用来查冲突。 */
-  const parentOf = new Map<string, string | null>();
-  const edges: JNode[] = [];
-  const refs: { el: JNode; ref: string; nested: string | null }[] = [];
-  let nodeCount = 0;
-  const walk = (cs: JChild[], nested: string | null) => {
-    for (const c of flatten(cs)) {
-      if (!isNode(c) || isDiagramRoot(c.type)) continue;
-      const id = typeof c.props.id === 'string' ? c.props.id : null;
-      const ref = typeof c.props.group === 'string' ? c.props.group : null;
-      if (c.props.group !== undefined && ref === null) err('UNKNOWN_DIAGRAM_GROUP', `<${c.type}> group must be a group id string`, c.source);
-      if (c.type === fam.node) {
-        nodeCount++;
-        if (id) {
-          nodes.add(id);
-          parentOf.set(id, ref ?? nested);
-        }
-        if (ref) refs.push({ el: c, ref, nested });
-        oneOf(c, 'pin', DIAGRAM_PINS);
-        // kind 以前没有校验（未知值画成 service）：保持兼容，只给 warning
-        if (type === 'Diagram') oneOf(c, 'kind', DIAGRAM_NODE_KINDS, 'warning');
-      } else if (c.type === fam.group) {
-        if (id) {
-          groups.set(id, c);
-          parentOf.set(id, ref ?? nested);
-        }
-        if (ref) refs.push({ el: c, ref, nested });
-        oneOf(c, 'icon', DIAGRAM_GROUP_ICONS);
-        oneOf(c, 'tone', DIAGRAM_TONES);
-        oneOf(c, 'pin', DIAGRAM_PINS);
-        walk(c.children, id ?? nested);
-      } else if (c.type === fam.edge) {
-        edges.push(c);
-      } else if (c.type.startsWith('Diagram.') || c.type.startsWith('StateMachine.') || c.type.startsWith('Sequence.')) {
-        err('INVALID_DIAGRAM_CHILD', `<${c.type}> cannot be used inside <${type}>; use ${fam.node} / ${fam.edge} / ${fam.group}`, c.source);
-      }
-    }
-  };
-  walk(d.children, null);
-  const groupList = [...groups.keys()].join(', ') || '(no groups with an id)';
-  for (const { el, ref, nested } of refs) {
-    if (!groups.has(ref)) err('UNKNOWN_DIAGRAM_GROUP', `<${el.type}> group="${ref}" is not a ${fam.group} id in this ${type} (available: ${groupList})`, el.source);
-    else if (nested && nested !== ref) err('DIAGRAM_GROUP_CONFLICT', `<${el.type}> is nested in group "${nested}" but declares group="${ref}"; use one of the two`, el.source);
-  }
-  // 分组成环（只可能来自 group= 引用）
-  const reported = new Set<string>();
-  for (const gid of groups.keys()) {
-    const seen: string[] = [gid];
-    for (let q = parentOf.get(gid) ?? null; q && groups.has(q); q = parentOf.get(q) ?? null) {
-      if (seen.includes(q)) {
-        const cycle = seen.slice(seen.indexOf(q));
-        const key = [...cycle].sort().join(',');
-        if (!reported.has(key)) {
-          reported.add(key);
-          err('DIAGRAM_GROUP_CYCLE', `Groups ${[...cycle, q].map((x) => `"${x}"`).join(' → ')} contain each other; remove one group= reference`, groups.get(gid)!.source);
-        }
-        break;
-      }
-      seen.push(q);
-    }
-  }
-  const ancestors = (id: string): string[] => {
-    const out: string[] = [];
-    for (let q = parentOf.get(id) ?? null; q && !out.includes(q); q = parentOf.get(q) ?? null) out.push(q);
-    return out;
-  };
-  const known = [...nodes, ...groups.keys()].join(', ') || '(no nodes)';
-  for (const e of edges) {
-    let ok = true;
-    for (const k of ['from', 'to'] as const) {
-      const v = e.props[k];
-      if (typeof v !== 'string' || (!nodes.has(v) && !groups.has(v))) {
-        ok = false;
-        err('UNKNOWN_DIAGRAM_NODE', `<${fam.edge}> ${k} "${strOf(v)}" is not a ${type === 'StateMachine' ? 'state' : 'node'} or group id in this ${type} (available: ${known})`, e.source);
-      }
-    }
-    if (!ok) continue;
-    const from = e.props.from as string;
-    const to = e.props.to as string;
-    if (ancestors(from).includes(to) || ancestors(to).includes(from))
-      err('DIAGRAM_EDGE_INTO_OWN_GROUP', `<${fam.edge}> ${from} → ${to} connects an element to a group that contains it; connect to another element inside the group, or to a group outside`, e.source);
-  }
-  // 按业务域分组的提示：节点多，却没有分组（或只有一个把所有节点都包起来的分组）
-  if (type === 'Diagram' && nodeCount >= 6) {
-    const top = [...groups.values()].filter((g) => !parentOf.get(String(g.props.id)));
-    const allInOne = groups.size === 1 && top.length === 1 && [...nodes].every((n) => parentOf.get(n) === String(top[0]!.props.id));
-    if (groups.size === 0 || allInOne)
-      err('DIAGRAM_UNGROUPED', `<Diagram> has ${nodeCount} nodes but ${groups.size === 0 ? 'no groups' : 'a single group around all of them'}; group nodes by business domain (gateway, runtime, storage…) with <Diagram.Group label icon> so viewers can tell what belongs where. See npx joplo skill diagram`, d.source, 'info');
-  }
 }
 
 /** 展开数组与 Fragment（含插槽展开后的 Fragment），丢弃 null/布尔。 */
