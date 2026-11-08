@@ -44,7 +44,14 @@ export type VoiceState = {
   /** 片段键 → 失败原因。 */
   failures: Record<string, { stepId: string; message: string }>;
   generating: { done: number; total: number; failed: number } | null;
+  /** 内容语言（D83）→ 这种语言的旁白、角色音色与指纹；只有项目写了 locales 才有。看板按当前内容语言取指纹算片段键。 */
+  byLocale?: Record<string, { narrator: string | null; roles: Record<string, string>; voices: { narrator: string | null; roles: Record<string, string> } }>;
 };
+
+/** 请求里的内容语言：必须是项目声明的语言；没有 i18n 或不合法时为 null（按原来的方式处理）。 */
+function contentLocaleOf(project: Project | null, v: unknown): string | null {
+  return typeof v === 'string' && project?.i18n?.locales.includes(v) ? v : null;
+}
 
 type Ctx = {
   guardWrite: (needJson?: boolean) => boolean;
@@ -147,8 +154,11 @@ export class VoiceHub {
   state(projectId: string, dir: string, project: Project | null): VoiceState {
     const cache = new VoiceCache(dir);
     const idx = cache.read();
-    const r = resolveVoices(project?.voiceConfig, idx.profileId, this.store);
-    const cur = cache.current(r.voices);
+    const def = project?.i18n?.default ?? null;
+    const r = resolveVoices(project?.voiceConfig, idx.profileId, this.store, def);
+    const per = Object.fromEntries((project?.i18n?.locales ?? []).map((l) => [l, resolveVoices(project?.voiceConfig, idx.profileId, this.store, l)]));
+    const all = Object.values(per);
+    const cur = cache.current({ narrator: r.voices.narrator, roles: r.voices.roles }, all.flatMap((x) => [x.voices.narrator, ...Object.values(x.voices.roles)]).filter((x): x is string => !!x));
     const job = this.jobs.get(projectId);
     const enc = encodeURIComponent;
     return {
@@ -163,6 +173,7 @@ export class VoiceHub {
       clips: Object.fromEntries(Object.entries(cur.clips).map(([k, f]) => [k, `/__joplo/p/${enc(projectId)}/voice/clips/${f}`])),
       failures: cur.failures,
       generating: job ? { done: job.done, total: job.total, failed: job.failed } : null,
+      ...(all.length ? { byLocale: Object.fromEntries(Object.entries(per).map(([l, x]) => [l, { narrator: x.narrator, roles: x.roles, voices: x.voices }])) } : {}),
     };
   }
 
@@ -185,18 +196,19 @@ export class VoiceHub {
       if (!ctx.guardWrite()) return true;
       const b = await ctx.jsonBody();
       if (!b.ok) return true;
-      const body = (b.body ?? {}) as { locale?: unknown; segments?: unknown };
+      const body = (b.body ?? {}) as { locale?: unknown; contentLocale?: unknown; segments?: unknown };
       const segs = Array.isArray(body.segments) ? body.segments : null;
       const ok = segs && segs.length <= MAX_SEGMENTS && segs.every((s: Segment) => s && typeof s.stepId === 'string' && typeof s.text === 'string' && s.text.length <= MAX_TEXT && (s.role === null || typeof s.role === 'string'));
       if (!ok) return ctx.send(400, { error: { code: 'USAGE', message: `segments must be up to ${MAX_SEGMENTS} items of { stepId, text, role }` } }), true;
       if (this.jobs.has(projectId)) return ctx.send(409, { error: { code: 'BUSY', message: 'Narration is already being generated for this project' } }), true;
       const cache = new VoiceCache(dir);
-      const resolved = resolveVoices(project?.voiceConfig, cache.read().profileId, this.store);
+      const content = contentLocaleOf(project, body.contentLocale);
+      const resolved = resolveVoices(project?.voiceConfig, cache.read().profileId, this.store, content ?? project?.i18n?.default);
       const job = { done: 0, total: segs!.length, failed: 0, abort: new AbortController() };
       this.jobs.set(projectId, job);
       let summary: GenerateSummary;
       try {
-        summary = await cache.generate(segs as Segment[], typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en', resolved, this.store, {
+        summary = await cache.generate(segs as Segment[], content ?? (typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en'), resolved, this.store, {
           fetch: this.opts.fetch,
           signal: job.abort.signal,
           inflight: this.inflightOf(projectId),
@@ -217,14 +229,15 @@ export class VoiceHub {
       if (!ctx.guardWrite()) return true;
       const b = await ctx.jsonBody();
       if (!b.ok) return true;
-      const body = (b.body ?? {}) as { locale?: unknown; segment?: Segment };
+      const body = (b.body ?? {}) as { locale?: unknown; contentLocale?: unknown; segment?: Segment };
       const seg = body.segment;
       if (!seg || typeof seg.stepId !== 'string' || typeof seg.text !== 'string' || seg.text.length > MAX_TEXT || (seg.role !== null && typeof seg.role !== 'string')) return ctx.send(400, { error: { code: 'USAGE', message: 'segment must be { stepId, text, role }' } }), true;
       const cache = new VoiceCache(dir);
-      const resolved = resolveVoices(project?.voiceConfig, cache.read().profileId, this.store);
+      const content = contentLocaleOf(project, body.contentLocale);
+      const resolved = resolveVoices(project?.voiceConfig, cache.read().profileId, this.store, content ?? project?.i18n?.default);
       const plan = cache.plan(seg, resolved);
       if (!plan) return ctx.send(400, { error: { code: 'INVALID', message: 'No voice provider is selected for this project' } }), true;
-      const p = cache.generateOne(seg, typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en', resolved, this.store, { fetch: this.opts.fetch, inflight: this.inflightOf(projectId) });
+      const p = cache.generateOne(seg, content ?? (typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en'), resolved, this.store, { fetch: this.opts.fetch, inflight: this.inflightOf(projectId) });
       try {
         const r = await p;
         if (r.generated) this.opts.emit(projectId, this.state(projectId, dir, project));

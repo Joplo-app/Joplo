@@ -67,7 +67,8 @@ describe.skipIf(!pw)('发布站 CSP 下的新组件（真实 Chromium）', () =>
       document.addEventListener('securitypolicyviolation', (e) => (window as unknown as { __csp: string[] }).__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
     });
     const at = async (step: number) => {
-      await page.goto(`${base}#/f/invite?s=invite.a-modal.revoke&step=${step}`);
+      // examples/invite 有英文译文（D83）：断言按中文原文写，固定内容语言
+      await page.goto(`${base}?lang=zh-CN#/f/invite?s=invite.a-modal.revoke&step=${step}`);
       try {
         await page.waitForSelector('.jstage [data-jid]', { state: 'attached', timeout: 30_000 });
       } catch (e) {

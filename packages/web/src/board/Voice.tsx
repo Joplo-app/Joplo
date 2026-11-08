@@ -37,7 +37,8 @@ import {
   type VoiceTestResult,
 } from '../runtime/dev-client';
 import { connectionChanged, draftOf, draftReady, hasKey, inputOf, narrationLanguage, newerVoiceState, sortVoices, voiceCoverage, voiceSegments, type VoiceDraft } from './voice-model';
-import type { Locale } from '../i18n/locale';
+import { isLocale, type Locale } from '../i18n/locale';
+import { boardVoiceLookup } from '../i18n/content';
 
 const ON_KEY = 'joplo.voice.on';
 const BROWSER_KEY = 'joplo.voice.browser';
@@ -60,7 +61,7 @@ const writeLocal = (k: string, v: string | null) => {
 export type VoiceApi = ReturnType<typeof useVoice>;
 
 /** 看板播放页的朗读：narrator 交给 DemoController；状态来自 joplo dev。 */
-export function useVoice(projectId: string, project: Project | null, optionId: string | null, ctl: DemoController, locale: Locale, at: { scenarioId: string | null; position: number }) {
+export function useVoice(projectId: string, project: Project | null, optionId: string | null, ctl: DemoController, locale: Locale, at: { scenarioId: string | null; position: number }, contentLocale: string | null = null) {
   const { t } = useI18n();
   const narrator = useMemo(() => new Narrator(), [projectId]);
   const [on, setOnState] = useState(() => readLocal(ON_KEY) === '1');
@@ -94,13 +95,14 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
   // narrator 跟着状态走；控制器在播放时用它
   narrator.enabled = on;
   narrator.browserVoice = browserVoice;
-  narrator.locale = locale;
-  narrator.lookup = state ? { narrator: state.voices.narrator, roles: state.voices.roles, clips: state.clips } : null;
+  // 内容多语言（D83）：浏览器朗读用内容语言；生成的音频用这种语言的声音（服务端 byLocale），没有时用默认声音
+  narrator.locale = contentLocale ?? locale;
+  narrator.lookup = boardVoiceLookup(state, contentLocale);
   // 边放边生成：选了供应商且有 Key 时，播到还没有音频的一步就当场生成这一段（同一段只请求一次）
   const inflight = useRef(new Map<string, Promise<string | null>>());
   const ready = !!state?.profile && hasKey(state.profile);
   // 换了供应商或音色（声音指纹变了）：之前请求过的段作废
-  const voicesSig = state ? JSON.stringify(state.voices) : '';
+  const voicesSig = state ? JSON.stringify([state.voices, contentLocale, contentLocale ? state.byLocale?.[contentLocale]?.voices : null]) : '';
   useEffect(() => inflight.current.clear(), [voicesSig]);
   narrator.ensure = ready
     ? (text, role) => {
@@ -108,7 +110,7 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
         let p = inflight.current.get(k);
         if (!p) {
           const stepId = segmentsRef.current.find((s) => s.text === text && s.role === role)?.stepId ?? 'adhoc';
-          p = requestClip(projectId, locale, { stepId, text, role }).then((r) => (r.ok ? r.url : null));
+          p = requestClip(projectId, locale, { stepId, text, role }, contentLocale).then((r) => (r.ok ? r.url : null));
           inflight.current.set(k, p);
           void p.then((u) => !u && inflight.current.delete(k));
         }
@@ -151,7 +153,7 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
   }, [on, ready, project, at.scenarioId, at.position, t]);
   const coverage = voiceCoverage(segments, (s) => narrator.hasClip(s.text, s.role), state?.failures ?? {});
   /** 旁白的语言（跟随语言）：按朗读文字识别，识别不出时跟随界面语言。 */
-  const lang = narrationLanguage(segments, locale);
+  const lang = narrationLanguage(segments, contentLocale && isLocale(contentLocale) ? contentLocale : locale);
 
   const select = async (profileId: string | null) => {
     setError(null);
@@ -166,7 +168,7 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
     setError(null);
     try {
       for (let i = 0; i < segments.length; i += 100) {
-        const r = await generateVoice(projectId, locale, segments.slice(i, i + 100));
+        const r = await generateVoice(projectId, locale, segments.slice(i, i + 100), contentLocale);
         if (!r.ok) {
           setError(r.message);
           break;

@@ -37,6 +37,8 @@ export function readApiKeyInfo(value: unknown): ApiKeyInfo {
 export type CloudDependencies = {
   env?: NodeJS.ProcessEnv; format?: string; interactive?: boolean; confirm?: (question: string) => Promise<boolean>; openBrowser?: (url: string) => Promise<boolean>;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<unknown>; now?: () => number;
+  /** 测试替身：重新发布时读上一次分享的朗读音频（D83）；缺省 previousShareVoice。 */
+  sharedVoice?: (url: string) => Promise<{ index: NonNullable<import('@joplo-app/core').Project['voiceIndex']>; fetch: (file: string) => Promise<Uint8Array | null> } | undefined>;
   /** 测试替身：share 的检查（返回 project 时生成评审清单）。 */
   check?: (dir: string) => Promise<Omit<Awaited<ReturnType<typeof checkWithProject>>, 'project'> & { project?: Awaited<ReturnType<typeof checkWithProject>>['project'] }>;
   pr?: PrDependencies;

@@ -33,6 +33,7 @@ import { JoploMark } from '../player/JoploMark';
 import { translate } from '../i18n/messages';
 import { useI18n } from '../i18n/context';
 import { SiteVoiceButton, useSiteVoice } from '../player/SiteVoice';
+import { ContentFallbackNotice } from './ContentNotice';
 import { cn } from '@/lib/utils';
 import { authorElement, createReviewBridge, elementLabel, type ReviewBridge, type ReviewGoto } from './review-bridge';
 import { embedInitial, embedKey, embedProgress, embedScenarioItems, fullscreenAvailable, standaloneUrl, type EmbedParams } from './embed-model';
@@ -354,6 +355,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
               {project.name}
             </span>
             <span className="text-[13px] opacity-85">{i18n.site.embedCoverMeta(items.length)}</span>
+            <ContentFallbackNotice variant="cover" />
           </button>
         ) : null}
       </main>

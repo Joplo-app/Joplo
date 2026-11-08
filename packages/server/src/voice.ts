@@ -16,7 +16,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_STYLE, clipKey, speakerRoleAt, spokenLine, voiceFingerprint, type Project, type VoiceConfig, type VoiceIndex } from '@joplo-app/core';
+import { DEFAULT_STYLE, clipKey, localizeProject, speakerRoleAt, spokenLine, voiceFingerprint, type Project, type VoiceConfig, type VoiceIndex } from '@joplo-app/core';
 
 export { DEFAULT_STYLE };
 
@@ -433,7 +433,25 @@ export type ResolvedVoices = {
   voices: { narrator: string | null; roles: Record<string, string> };
 };
 
-export function resolveVoices(config: VoiceConfig | undefined, selected: string | null, store: ProfileStore): ResolvedVoices {
+/**
+ * 某种内容语言用哪个音色（D83）：音色有口音（ElevenLabs 预设）且口音不是这种语言、而预设里有这种语言的音色时，
+ * 换成同语言的（优先同性别、推荐的）；多语言音色（OpenAI 预设没有口音）原样用，由说话风格要求母语口音。
+ */
+export function autoVoiceFor(profile: Pick<VoiceProfile, 'preset'>, voice: string, locale: string | null | undefined): string {
+  const choices = presetOf(profile.preset)?.voices;
+  const cur = choices?.find((v) => v.id === voice);
+  if (!locale || !choices || !cur?.accent) return voice;
+  const lang = (tag: string) => tag.toLowerCase().split('-')[0];
+  if (lang(cur.accent) === lang(locale)) return voice;
+  const same = choices.filter((v) => v.accent && lang(v.accent) === lang(locale));
+  const exact = same.filter((v) => v.accent!.toLowerCase() === locale.toLowerCase());
+  const pool = exact.length ? exact : same;
+  const pick = pool.find((v) => v.gender === cur.gender && v.recommended) ?? pool.find((v) => v.gender === cur.gender) ?? pool.find((v) => v.recommended) ?? pool[0];
+  return pick?.id ?? voice;
+}
+
+/** locale：内容语言（D83）。config.voice.locales[locale] 优先，其次按 autoVoiceFor 自动选；不传时与之前一样。 */
+export function resolveVoices(config: VoiceConfig | undefined, selected: string | null, store: ProfileStore, locale?: string | null): ResolvedVoices {
   let profile: VoiceProfile | null = null;
   let source: ResolvedVoices['source'] = null;
   let missing: string | null = null;
@@ -446,8 +464,9 @@ export function resolveVoices(config: VoiceConfig | undefined, selected: string 
     if (profile) source = 'board';
   }
   if (!profile) return { profile: null, source, missing, narrator: null, roles: {}, voices: { narrator: null, roles: {} } };
-  const narrator = config?.narrator ?? profile.voice;
-  const roles = { ...(config?.roles ?? {}) };
+  const own = locale ? config?.locales?.[locale] : undefined;
+  const narrator = own?.narrator ?? autoVoiceFor(profile, config?.narrator ?? profile.voice, locale);
+  const roles = { ...Object.fromEntries(Object.entries(config?.roles ?? {}).map(([r, v]) => [r, autoVoiceFor(profile, v, locale)])), ...(own?.roles ?? {}) };
   return {
     profile,
     source,
@@ -510,8 +529,8 @@ export class VoiceCache {
   }
 
   /** 当前声音下已有的片段：键 → 文件名；以及失败的键 → 原因。 */
-  current(voices: ResolvedVoices['voices']): { clips: Record<string, string>; failures: Record<string, { stepId: string; message: string }> } {
-    const fps = new Set([voices.narrator, ...Object.values(voices.roles)].filter(Boolean) as string[]);
+  current(voices: ResolvedVoices['voices'], extra: string[] = []): { clips: Record<string, string>; failures: Record<string, { stepId: string; message: string }> } {
+    const fps = new Set([voices.narrator, ...Object.values(voices.roles), ...extra].filter(Boolean) as string[]);
     const idx = this.read();
     const clips: Record<string, string> = {};
     for (const [k, c] of Object.entries(idx.clips)) if (fps.has(c.fp) && FILE_RE.test(c.file) && fs.existsSync(path.join(this.clipsDir, c.file))) clips[k] = c.file;
@@ -551,6 +570,16 @@ export class VoiceCache {
   clipOf(key: string): string | null {
     const c = this.read().clips[key];
     return c && FILE_RE.test(c.file) && fs.existsSync(path.join(this.clipsDir, c.file)) ? c.file : null;
+  }
+
+  /** 收下一段别处来的音频（D83：从已发布的分享沿用）：文件名必须是内容的 sha256，否则不收。 */
+  adopt(key: string, file: string, bytes: Uint8Array, rec: Omit<ClipRecord, 'file' | 'bytes' | 'at'>): boolean {
+    if (!FILE_RE.test(file) || crypto.createHash('sha256').update(bytes).digest('hex') !== file.split('.')[0]) return false;
+    fs.mkdirSync(this.clipsDir, { recursive: true });
+    const dest = path.join(this.clipsDir, file);
+    if (!fs.existsSync(dest)) fs.writeFileSync(dest, bytes);
+    this.record(key, { ...rec, file, bytes: bytes.length, at: new Date().toISOString() });
+    return true;
   }
 
   /**
@@ -628,21 +657,77 @@ export class VoiceCache {
 
 // ---------- 发布 ----------
 
-export type BundleReport = { clips: number; bytes: number; missing: number; profile: string | null };
+export type BundleReport = {
+  clips: number;
+  bytes: number;
+  missing: number;
+  profile: string | null;
+  /** 从上一次发布的分享沿用、这次没有重新生成的段数（D83）。 */
+  reused?: number;
+  /** 内容语言（D83）→ 这种语言还缺几步音频。只有项目写了 locales 才有。 */
+  locales?: Record<string, { missing: number }>;
+};
+
+/** 每种内容语言（没有 i18n 时只有 null）用哪套声音指纹：本机有供应商时按本机，否则用已发布分享里的。 */
+type LocaleVoices = { locale: string | null; project: Project; voices: { narrator: string | null; roles: Record<string, string> } };
+function voicesPerLocale(project: Project, resolve: (locale: string | null) => { narrator: string | null; roles: Record<string, string> } | null): LocaleVoices[] {
+  const locales = project.i18n ? project.i18n.locales : [null];
+  return locales.flatMap((l) => {
+    const v = resolve(l);
+    return v ? [{ locale: l, project: l ? localizeProject(project, l) : project, voices: v }] : [];
+  });
+}
+const sharedVoices = (index: VoiceIndex) => (l: string | null) => (l && index.locales?.[l]) || { narrator: index.narrator, roles: index.roles };
+
+/** 上一次发布的分享（D83）：它的 voiceIndex（片段键 → voice/<sha256>.<ext>）和按相对路径取文件的方法。 */
+export type SharedVoice = { index: VoiceIndex; fetch: (file: string) => Promise<Uint8Array | null> };
+
+/**
+ * 从上一次发布的分享沿用音频（D83）：Cloud 只存分享出去的作品，不另设缓存。按当前文字和声音算片段键，
+ * 本机没有、分享里有的就下载到本机缓存（文件名必须是内容的 sha256），之后照常打包；上传时 Cloud 已有这些内容，不会重传。
+ * 本机没有供应商时按分享里的声音指纹算键。自动字幕的步骤（文字由网页按语言生成）不在这里沿用。
+ */
+export async function reuseSharedVoice(projectDir: string, project: Project, shared: SharedVoice, store: ProfileStore, devConfig?: VoiceConfig): Promise<number> {
+  const cache = new VoiceCache(projectDir);
+  const selected = cache.read().profileId;
+  const local = resolveVoices(devConfig ?? project.voiceConfig, selected, store);
+  const per = voicesPerLocale(project, local.profile ? (l) => resolveVoices(devConfig ?? project.voiceConfig, selected, store, l).voices : sharedVoices(shared.index));
+  let reused = 0;
+  for (const { locale, project: p, voices } of per)
+    for (const sc of Object.values(p.scenarios))
+      for (const [i, st] of sc.steps.entries()) {
+        if (st.captionAuto && !st.say && !st.narrate) continue;
+        const line = spokenLine(st, st.caption, speakerRoleAt(p, sc.id, i + 1));
+        const fp = voiceFingerprint(voices, line.role);
+        if (!fp || !line.text) continue;
+        const text = line.text.replace(/\s+/g, ' ').trim();
+        const key = clipKey(fp, text);
+        const rel = shared.index.clips[key];
+        if (!rel || cache.clipOf(key)) continue;
+        const file = rel.replace(/^voice\//, '');
+        const bytes = await shared.fetch(rel).catch(() => null);
+        if (bytes && cache.adopt(key, file, bytes, { stepId: st.id, fp, text, locale: locale ?? 'en' })) reused++;
+      }
+  return reused;
+}
 
 /**
  * 发布（joplo build / share）：把发布 IR 里步骤用到的、当前声音的音频拷进 `<outDir>/voice/`，返回 IR 的 voiceIndex。
  * 同一步同一声音同一语言只留最新的一段（改过字之后旧的不再带上）。
- * missing：当前声音下还没有音频的步骤数（文字与语言无关的步骤按键判断；自动字幕的步骤只要有任意语言的音频就算有）。
- * 没有选用 profile 时不带任何音频（观众端用浏览器朗读）。
+ * 内容多语言（D83）：每种内容语言按 resolveVoices(…, 语言) 选声音，voiceIndex.locales 记各语言的指纹；missing 按语言分别统计。
+ * missing：还没有音频的步骤数（自动字幕的步骤只要有这种语言的任意音频就算有）。
+ * 没有选用 profile 时：给了 fallback（已发布分享的 voiceIndex）就按它的指纹带上本机已有的音频，否则不带（观众端用浏览器朗读）。
  */
-export function bundleVoice(projectDir: string, project: Project, outDir: string, store: ProfileStore, devConfig?: VoiceConfig): { index: VoiceIndex | null; report: BundleReport } {
+export function bundleVoice(projectDir: string, project: Project, outDir: string, store: ProfileStore, devConfig?: VoiceConfig, fallback?: VoiceIndex): { index: VoiceIndex | null; report: BundleReport } {
   const cache = new VoiceCache(projectDir);
   const idx = cache.read();
-  const resolved = resolveVoices(devConfig ?? project.voiceConfig, idx.profileId, store);
-  const empty = { index: null, report: { clips: 0, bytes: 0, missing: 0, profile: resolved.profile?.name ?? null } };
-  if (!resolved.profile) return empty;
-  const fps = new Set([resolved.voices.narrator, ...Object.values(resolved.voices.roles)].filter(Boolean) as string[]);
+  const cfg = devConfig ?? project.voiceConfig;
+  const base = resolveVoices(cfg, idx.profileId, store, project.i18n?.default);
+  const profileName = base.profile?.name ?? (fallback ? 'the published share' : null);
+  const empty = { index: null, report: { clips: 0, bytes: 0, missing: 0, profile: profileName } };
+  if (!base.profile && !fallback) return { ...empty, report: { ...empty.report, profile: null } };
+  const per = voicesPerLocale(project, base.profile ? (l) => resolveVoices(cfg, idx.profileId, store, l).voices : sharedVoices(fallback!));
+  const fps = new Set(per.flatMap((x) => [x.voices.narrator, ...Object.values(x.voices.roles)]).filter(Boolean) as string[]);
   const stepIds = new Set(Object.values(project.scenarios).flatMap((s) => s.steps.map((st) => st.id)));
   const latest = new Map<string, [string, ClipRecord]>();
   for (const [k, c] of Object.entries(idx.clips)) {
@@ -663,16 +748,29 @@ export function bundleVoice(projectDir: string, project: Project, outDir: string
     clips[k] = `voice/${c.file}`;
   }
   let missing = 0;
-  for (const sc of Object.values(project.scenarios))
-    sc.steps.forEach((st, i) => {
-      const line = spokenLine(st, st.caption, speakerRoleAt(project, sc.id, i + 1));
-      const fp = voiceFingerprint(resolved.voices, line.role);
-      if (!fp || !line.text) return;
-      // 自动字幕在网页里按观众语言生成：这一步有任意语言的音频就算有
-      const localized = !!st.captionAuto && !st.say && !st.narrate && st.action.type !== 'card';
-      const ok = localized ? [...latest.values()].some(([, c]) => c.stepId === st.id && c.fp === fp) : !!clips[clipKey(fp, line.text)];
-      if (!ok) missing++;
-    });
-  if (!Object.keys(clips).length) return { index: null, report: { ...empty.report, missing } };
-  return { index: { narrator: resolved.voices.narrator, roles: resolved.voices.roles, clips }, report: { clips: Object.keys(clips).length, bytes, missing, profile: resolved.profile.name } };
+  const byLocale: Record<string, { missing: number }> = {};
+  for (const { locale, project: p, voices } of per) {
+    let n = 0;
+    for (const sc of Object.values(p.scenarios))
+      sc.steps.forEach((st, i) => {
+        const line = spokenLine(st, st.caption, speakerRoleAt(p, sc.id, i + 1));
+        const fp = voiceFingerprint(voices, line.role);
+        if (!fp || !line.text) return;
+        // 自动字幕在网页里按语言生成：这一步有这种语言（没有 i18n 时任意语言）的音频就算有
+        const localized = !!st.captionAuto && !st.say && !st.narrate && st.action.type !== 'card';
+        const ok = localized ? [...latest.values()].some(([, c]) => c.stepId === st.id && c.fp === fp && (!locale || c.locale === locale)) : !!clips[clipKey(fp, line.text)];
+        if (!ok) n++;
+      });
+    missing += n;
+    if (locale) byLocale[locale] = { missing: n };
+  }
+  const head = per[0]!.voices;
+  const extra = project.i18n ? { locales: byLocale } : {};
+  if (!Object.keys(clips).length) return { index: null, report: { ...empty.report, missing, ...extra } };
+  const same = (x: LocaleVoices['voices']) => JSON.stringify([x.narrator, x.roles]) === JSON.stringify([head.narrator, head.roles]);
+  const locales = Object.fromEntries(per.filter((x) => x.locale && x.locale !== project.i18n?.default && !same(x.voices)).map((x) => [x.locale!, { narrator: x.voices.narrator, roles: x.voices.roles }]));
+  return {
+    index: { narrator: head.narrator, roles: head.roles, clips, ...(Object.keys(locales).length ? { locales } : {}) },
+    report: { clips: Object.keys(clips).length, bytes, missing, profile: profileName, ...extra },
+  };
 }

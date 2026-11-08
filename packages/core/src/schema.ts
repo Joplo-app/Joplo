@@ -344,11 +344,26 @@ export const Issue = z.strictObject({
   source: Source,
 });
 
-/** 朗读配置（D74，来自 config({ voice })）：只在 dev / review IR 里，发布站去掉。 */
+/** 作者内容多语言（D83）：default 是原文的语言，locales 第一个就是它。 */
+export const ContentI18nSchema = z.strictObject({
+  default: z.string().min(1),
+  locales: z.array(z.string().min(1)).min(1),
+  /** 语言 → 原文 → 译文（不含空译文）。 */
+  messages: z.record(z.string(), z.record(z.string(), z.string().min(1))).default({}),
+  /** 每种语言里原文改过、旧译文还在的条数（看板菜单显示“过期”）；只在 dev IR。 */
+  stale: z.record(z.string(), z.number().int().nonnegative()).optional(),
+});
+
+/** 朗读配置（D74，来自 config({ voice })）：只在 dev / review IR 里，发布站去掉。locales（D83）：按内容语言覆盖旁白与角色的音色。 */
+const VoiceVoices = z.strictObject({
+  narrator: z.string().min(1).optional(),
+  roles: z.record(z.string(), z.string().min(1)).optional(),
+});
 export const VoiceConfig = z.strictObject({
   profile: z.string().min(1).optional(),
   narrator: z.string().min(1).optional(),
   roles: z.record(z.string(), z.string().min(1)).optional(),
+  locales: z.record(z.string(), VoiceVoices).optional(),
 });
 /**
  * 发布站带上的朗读音频（D74，joplo build 写入）：voices 是每个声音的指纹（旁白与各角色），
@@ -358,6 +373,8 @@ export const VoiceIndex = z.strictObject({
   narrator: z.string().min(1).nullable(),
   roles: z.record(z.string(), z.string().min(1)).default({}),
   clips: z.record(z.string(), z.string().min(1)).default({}),
+  /** 内容语言（D83）→ 这种语言的旁白与角色指纹；没有的语言用上面的默认声音。 */
+  locales: z.record(z.string(), z.strictObject({ narrator: z.string().min(1).nullable(), roles: z.record(z.string(), z.string().min(1)).default({}) })).optional(),
 });
 
 export const Project = z.strictObject({
@@ -370,6 +387,8 @@ export const Project = z.strictObject({
   autoFocus: z.boolean().optional(),
   voiceConfig: VoiceConfig.optional(),
   voiceIndex: VoiceIndex.optional(),
+  /** 作者内容多语言（D83）：只有 config 写了 locales 才有。messages 只含非默认语言、这份 IR 用得到的译文；stale 只在 dev IR。 */
+  i18n: ContentI18nSchema.optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),
   /** dev = 含全部方案（本地看板）；publish = 只含选定方案，且去掉创作侧信息（D33）；review = 评审版：全部方案，同样去掉创作侧信息（D63）。 */
@@ -413,3 +432,4 @@ export type Cue = z.infer<typeof Cue>;
 export type Callout = z.infer<typeof Callout>;
 export type VoiceConfig = z.infer<typeof VoiceConfig>;
 export type VoiceIndex = z.infer<typeof VoiceIndex>;
+export type ContentI18nIR = z.infer<typeof ContentI18nSchema>;

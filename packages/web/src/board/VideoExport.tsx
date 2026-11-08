@@ -37,9 +37,9 @@ export function useVideoExport(projectId: string, onFinish: (job: VideoJob) => v
       (m) => setError(m),
     );
   }, [projectId, watching]);
-  const start = async (scenarioId: string, look: Look, locale: Locale) => {
+  const start = async (scenarioId: string, look: Look, locale: Locale, contentLocale?: string | null) => {
     setError(null);
-    const r = await startVideo(projectId, { scenarioId, ...look, locale });
+    const r = await startVideo(projectId, { scenarioId, ...look, locale, ...(contentLocale ? { contentLocale } : {}) });
     if (r.ok) setJob(r.job);
     else if (r.job) setJob(r.job);
     else {

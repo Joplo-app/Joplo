@@ -8,6 +8,7 @@
  *   features/<f>/feature.ts
  *   features/<f>/options/<o>.tsx
  *   themes/<name>.css               作者主题（D51），按原文读取
+ *   locales/<语言>.json             作者内容译文（D83）：原文 → 译文
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
@@ -45,6 +46,7 @@ export function discoverFiles(root: string): string[] {
     for (const o of list(join(fd, 'options'))) if (/\.(tsx|ts)$/.test(o)) files.push(join(fd, 'options', o));
   }
   for (const f of list(join(r, 'themes'))) if (/\.css$/.test(f)) files.push(join(r, 'themes', f));
+  for (const f of list(join(r, 'locales'))) if (/\.json$/.test(f)) files.push(join(r, 'locales', f));
   return files;
 }
 
@@ -57,6 +59,33 @@ export function loadThemes(root: string): Record<string, string> {
     if (m) out[m[1]!] = readFileSync(join(r, 'themes', f), 'utf8');
   }
   return out;
+}
+
+/**
+ * 作者内容译文（D83）：locales/<语言>.json，一个扁平对象（原文 → 译文，值是字符串）。
+ * 文件名不是语言标签、JSON 写错、值不是字符串时报 LOCALE_FILE_INVALID，这个文件不参与编译。
+ */
+export function loadLocales(root: string): { locales: Record<string, Record<string, string>>; files: Record<string, string>; diagnostics: Diagnostic[] } {
+  const r = resolve(root);
+  const locales: Record<string, Record<string, string>> = {};
+  const files: Record<string, string> = {};
+  const diagnostics: Diagnostic[] = [];
+  for (const f of list(join(r, 'locales'))) {
+    if (!/\.json$/.test(f)) continue;
+    const rel = `locales/${f}`;
+    const bad = (message: string) => diagnostics.push({ severity: 'error', code: 'LOCALE_FILE_INVALID', message: `${rel}: ${message}`, source: 'schema', at: `${rel}:1:1` });
+    const tag = f.slice(0, -5);
+    if (!/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(tag)) { bad('the file name must be a language tag such as ja.json or zh-CN.json'); continue; }
+    let raw: unknown;
+    try { raw = JSON.parse(readFileSync(join(r, 'locales', f), 'utf8')); }
+    catch (e) { bad(`not valid JSON (${e instanceof Error ? e.message : String(e)})`); continue; }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { bad('must be one object of "source text": "translation"'); continue; }
+    const nonString = Object.entries(raw as Record<string, unknown>).find(([, v]) => typeof v !== 'string');
+    if (nonString) { bad(`the value of ${JSON.stringify(nonString[0])} must be a string (write "" while it is not translated yet)`); continue; }
+    locales[tag] = raw as Record<string, string>;
+    files[tag] = rel;
+  }
+  return { locales, files, diagnostics };
 }
 
 export async function loadAuthoring(root: string, importer: Importer): Promise<{ authoring: AuthoringProject | null; diagnostics: Diagnostic[] }> {
@@ -132,5 +161,7 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
   }
 
   if (!config) return { authoring: null, diagnostics: diags };
-  return { authoring: { root: r, config, layouts, routes, features, themes: loadThemes(r) }, diagnostics: diags };
+  const loc = loadLocales(r);
+  diags.push(...loc.diagnostics);
+  return { authoring: { root: r, config, layouts, routes, features, themes: loadThemes(r), ...(Object.keys(loc.files).length ? { locales: loc.locales, localeFiles: loc.files } : {}) }, diagnostics: diags };
 }

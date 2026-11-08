@@ -150,6 +150,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--repo <owner/name>', 'Repository for --pr outside GitHub Actions').option('--sha <commit>', 'Commit for --pr (defaults to the PR head or git HEAD)')
     .option('--scenario <id>', 'Share only this scenario; repeatable. Other features, scenarios, and pages are left out of the uploaded files (D75)', collect, [])
     .option('--feature <id>', "Share only this feature's scenarios (picked option; every option with --review); repeatable", collect, [])
+    .option('--update <link>', 'Update this existing share (its link, for example from another computer without .joplo/cloud.json) and reuse its narration audio (D83)')
     .action(async (dir, opts) => {
       const client = await cloudClient(opts.server, opts.format);
       const { share } = await import('./cloud-share.ts');
@@ -237,6 +238,17 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     } else { for (const d of report.diagnostics) line(diagnosticLine(d)); line(summary); }
     if (report.summary.error) exitCode = 1;
   });
+  const i18n = program.command('i18n').description('Author content in several languages (D83): source text in one language, translations in locales/<lang>.json');
+  i18n.command('add').description('Add a content language, or add missing keys to it; writes locales/<lang>.json with "" for texts to translate')
+    .argument('<lang>', 'Language: en, zh-CN, zh-TW, ja, ko, es, fr, de, pt-BR, ru').argument('[dir]', 'Project directory', '.')
+    .option('--source <lang>', 'Language the source files are written in (needed the first time, when config has no locales)')
+    .option('--prune', 'Remove entries no text uses any more').addOption(format())
+    .action(async (lang, dir, opts) => {
+      const { i18nAdd, i18nAddText } = await import('./i18n.ts');
+      const r = await i18nAdd(dir, lang, { source: opts.source, prune: opts.prune });
+      if (opts.format === 'json') json(result(r.file, `${r.untranslated} to translate`, r));
+      else for (const l of i18nAddText(r)) line(l);
+    });
   program.command('outline').description('Print who each feature is for, its cases with expected results and coverage, and every scenario\'s steps and estimated duration')
     .argument('[dir]', 'Project directory', '.').addOption(format()).option('--option <qid>', 'Only the specified option').action(async (dir, opts) => {
       const { readOutline, outlineText } = await import('./outline.ts');
@@ -328,12 +340,13 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   program.command('render').argument('[dir]', 'Project directory', '.').requiredOption('--scenario-id <qid>', 'Scenario ID').option('--step-id <qid>', 'Position after this step; defaults to the initial state')
     .option('--theme <theme>', 'Theme: built-in (sketch, clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast) or project themes/<name>.css; defaults to the project theme').requiredOption('--out <file>', 'Screenshot file')
     .option('--width <pixels>', 'Screenshot width (stage width follows the page viewport); requires height', integer('width')).option('--height <pixels>', 'Screenshot height; requires width', integer('height'))
-    .option('--scale <scale>', 'Pixel scale', scale).option('--overwrite', 'Allow overwriting the screenshot').action(async (dir, opts) => {
+    .option('--scale <scale>', 'Pixel scale', scale).option('--overwrite', 'Allow overwriting the screenshot')
+    .option('--content <lang>', 'Author content language from config locales (D83); defaults to the source language').action(async (dir, opts) => {
       if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'width and height must be provided together');
       const renderStep = await serverFunction('renderStep');
       const { askYesNo, isInteractive, withExportComponent } = await import('./setup.ts');
       const data = await withExportComponent(() => renderStep({ projectDir: resolve(dir), scenarioId: opts.scenarioId, stepId: opts.stepId, theme: opts.theme, out: resolve(opts.out),
-        viewport: opts.width === undefined ? undefined : { width: opts.width, height: opts.height }, scale: opts.scale, overwrite: opts.overwrite }),
+        viewport: opts.width === undefined ? undefined : { width: opts.width, height: opts.height }, scale: opts.scale, overwrite: opts.overwrite, ...(opts.content ? { content: opts.content } : {}) }),
         { server: setupServer, interactive: deps.interactive ?? isInteractive(), ask: deps.ask ?? askYesNo, io: setupIo() });
       line(data.path);
       for (const warning of data.warnings) stderr(oneLine(warning) + '\n');

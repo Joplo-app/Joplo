@@ -255,6 +255,11 @@ export function createPtBR(locale: Locale = 'pt-BR') {
       // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
       reviewPickHint: "Clique em um elemento do palco para selecioná-lo · Esc para cancelar",
       reviewPickCancel: "Cancelar",
+      // D83: author content languages on the published site.
+      contentMarkNote: "Os idiomas marcados incluem o conteúdo da demo; os outros mudam só a interface",
+      contentSourceTag: "Original",
+      contentTranslatedTag: "Traduzido",
+      contentFallback: (lang: Value, source: Value) => `Esta demo não tem versão em ${value(lang, locale)}. Mostrando o original em ${value(source, locale)}.`,
     },
   });
 }

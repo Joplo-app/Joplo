@@ -96,7 +96,7 @@ test('check 覆盖 compile.ts / validate.ts / schema-issues.ts / focus-check.ts 
   expect(codes).toContain('INVALID_SCHEMA');
   expect(codes).toContain('INVALID_CONDITION');
   expect(codes).toContain('CAPTION_TOO_LONG');
-  const documented = new Set(skillTopic('check').match(/\b[A-Z]+(?:_[A-Z]+)+\b/g));
+  const documented = new Set(skillTopic('check').match(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g));
   expect([...codes].filter(code => !documented.has(code)).sort()).toEqual([]);
 });
 test('cases 按产品类型给出可筛选的预设键、维度和来源示例', () => {

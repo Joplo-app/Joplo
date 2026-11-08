@@ -455,6 +455,11 @@ export function createBoardJa(locale: Locale = 'ja') {
       cloudNotPickedFeature: (feature: Value) => `「${value(feature, locale)}」にはまだ選定された案がないため、公開できる内容がありません。`,
       cloudNotPickedProject: "どの機能にもまだ選定された案がないため、公開できる内容がありません。",
       cloudNotPickedHow: "レビューで「案を承認」を押すか、エージェントに feature.ts の pick を設定してもらってから公開してください。",
+      // D83: content language menu in the board top bar.
+      contentSource: "原文",
+      contentProgress: (done: Value, total: Value) => `翻訳済み ${value(done, locale)}/${value(total, locale)}`,
+      contentStale: (n: Value) => `${value(n, locale)} 件が古い`,
+      contentAddHint: "言語を追加：Agent に npx joplo i18n add <言語> を実行させます",
     },
   });
 }

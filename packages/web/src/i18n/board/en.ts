@@ -471,6 +471,11 @@ export function createBoardEn(locale: Locale = 'en') {
       cloudNotPickedFeature: (feature: Value) => `“${value(feature, locale)}” has no picked option yet, so nothing of it can be published.`,
       cloudNotPickedProject: "No feature has a picked option yet, so there is nothing to publish.",
       cloudNotPickedHow: "Click Confirm option in review, or ask your agent to set pick in feature.ts, then publish.",
+      // D83: content language menu in the board top bar.
+      contentSource: "Source",
+      contentProgress: (done: Value, total: Value) => `${value(done, locale)}/${value(total, locale)} translated`,
+      contentStale: (n: Value) => plural(Number(n), { one: "# outdated", other: "# outdated" }, locale),
+      contentAddHint: "Add a language: ask your agent to run npx joplo i18n add <language>",
     },
   };
 }

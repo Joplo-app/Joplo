@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
-import { assertReviewManifestSize, borrowedLine, hasScope, JoploError, resolveScope, reviewManifest, scopeKey, scopeProject, type ReviewManifest, type ScopeInfo } from '@joplo-app/core';
+import { assertReviewManifestSize, borrowedLine, hasScope, JoploError, resolveScope, reviewManifest, scopeKey, scopeProject, type Project, type ReviewManifest, type ScopeInfo } from '@joplo-app/core';
 import type { buildSite } from '@joplo-app/server';
 import { checkWithProject } from './check.ts';
 import { CloudError, sizeError, terminalText } from './cloud-error.ts';
@@ -68,10 +68,22 @@ const recordJson = (server: string, r: ShareRecord) => ({
 
 export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo };
 /** scenarios / features：按场景保密分享（D75，`--scenario` / `--feature`），可以一起用；都不写时分享整个项目。 */
-export type ShareOptions = { new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[] };
+/** update（D83）：要更新的已有分享的链接；没有 .joplo/cloud.json 时（例如换了一台电脑）用它指定，并从它沿用朗读音频。 */
+export type ShareOptions = { new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[]; update?: string };
+
+/** `--update <链接>`：分享页链接，路径里有 /s/<10 位分享 id>。 */
+export function parseUpdateLink(v: string): ShareLink {
+  let u: URL;
+  try { u = new URL(v); } catch { throw new JoploError('USAGE', `--update needs the share link, for example https://joplo.app/s/AbCdE12345/; got ${JSON.stringify(v)}`); }
+  const m = /\/s\/([A-Za-z0-9]{10})(?:\/|$)/.exec(u.pathname);
+  if (!m || !['https:', 'http:'].includes(u.protocol)) throw new JoploError('USAGE', `--update needs the share link, for example https://joplo.app/s/AbCdE12345/; got ${JSON.stringify(v)}`);
+  return { shareId: m[1]!, url: `${u.origin}${u.pathname.slice(0, m.index)}/s/${m[1]}/` };
+}
 export async function share(client: CloudClient, dir: string, opts: ShareOptions, build: typeof buildSite, render: () => Promise<RenderPreview> = async () => { throw new Error('this @joplo-app/server cannot render screenshots'); }): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
   if (opts.title !== undefined && (!opts.title.trim() || opts.title.trim().length > 200)) throw new JoploError('USAGE', '--title must contain 1-200 characters');
   if ((opts.repo !== undefined || opts.sha !== undefined) && opts.pr === undefined) throw new JoploError('USAGE', '--repo and --sha apply only with --pr <number>');
+  if (opts.update !== undefined && (opts.new || opts.pr !== undefined)) throw new JoploError('USAGE', '--update cannot be combined with --new or --pr');
+  const updateLink = opts.update !== undefined ? parseUpdateLink(opts.update) : undefined;
   const project = resolve(dir);
   // PR 信息在任何请求、登录和构建之前补全并校验（契约 8.5）
   const pr: SharePr | undefined = opts.pr === undefined ? undefined : await prContext({ pr: opts.pr, repo: opts.repo, sha: opts.sha }, client.env, project, client.deps.pr);
@@ -111,7 +123,11 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
   const staging = temporary.path;
   try {
     client.warn('Validation passed. Building the published site...');
-    const built = await build({ projectDir: project, outDir: join(staging, 'site'), ...(reviewMode === 'review' ? { review: true } : {}), ...(scenarioIds ? { scope: { scenarios: scenarioIds } } : {}) });
+    // 重新发布（D83）：上一次的分享里已有的音频（同样的文字和声音）直接沿用，换一台电脑也不用重新生成
+    const before = await readShareRecord(project, client.server);
+    const beforeLink = updateLink ?? (scenarioIds ? before.scoped?.[scopeKey(scenarioIds, reviewMode)] : before[reviewMode === 'review' ? 'review' : 'main']);
+    const sharedVoice = beforeLink ? await (client.deps.sharedVoice ?? previousShareVoice)(beforeLink.url) : undefined;
+    const built = await build({ projectDir: project, outDir: join(staging, 'site'), ...(reviewMode === 'review' ? { review: true } : {}), ...(scenarioIds ? { scope: { scenarios: scenarioIds } } : {}), ...(sharedVoice ? { sharedVoice } : {}) });
     if (built.diagnostics.some(d => d.severity === 'error')) throw new JoploError('EXPORT_FAILED', 'The build contains errors; nothing uploaded', { diagnostics: built.diagnostics });
     // 范围分享必须真的裁剪过（旧版 @joplo-app/server 会忽略 scope，产物里是整个项目）：产物里的场景只能是范围内的
     if (scenarioIds) {
@@ -139,8 +155,9 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     const slot = reviewMode === 'review' ? 'review' : 'main';
     // 范围分享单独一条（键 = 排序后的场景 id，评审版加前缀），不碰主链接和评审链接
     const key = scenarioIds ? scopeKey(scenarioIds, reviewMode) : null;
-    const previous = key ? record.scoped?.[key] : record[slot];
+    const previous = updateLink ?? (key ? record.scoped?.[key] : record[slot]);
     const replaceShareId = account.plan === 'pro' && !opts.new && !pr ? previous?.shareId : undefined;
+    if (updateLink && account.plan !== 'pro') client.warn('Free shares cannot be updated in place; publishing a new link (the narration audio in the old share is still reused).');
     const firstName = scenarioIds && checked.project ? checked.project.scenarios[scenarioIds[0]!]?.name : undefined;
     const defaultTitle = scenarioIds ? `${checked.name} · ${scenarioIds.length === 1 && firstName ? firstName : `${scenarioIds.length} scenarios`}` : checked.name;
     const title = (opts.title ?? defaultTitle).trim().slice(0, 200);
@@ -176,11 +193,42 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
  * 朗读音频（D74）的一行说明：带上了几段、多大；还有几步没有当前声音的音频（观众端这些步骤用浏览器朗读，不阻止分享）。
  * 没有选用声音供应商时为 null（不打扰）。
  */
-export function voiceSummary(v: { clips: number; bytes: number; missing: number; profile: string | null } | undefined): string | null {
+export function voiceSummary(v: { clips: number; bytes: number; missing: number; profile: string | null; reused?: number; locales?: Record<string, { missing: number }> } | undefined): string | null {
   if (!v || !v.profile) return null;
   const kb = Math.max(1, Math.round(v.bytes / 1024));
-  const head = v.clips ? `Narration: ${v.clips} audio clip(s) from ${v.profile} (${kb} KB) included` : `Narration: no generated audio from ${v.profile} yet`;
-  return v.missing ? `${head}; ${v.missing} step(s) have no audio for the current text and will use the viewer's browser voice. Generate them in the board (Voice → Generate) to include them.` : `${head}.`;
+  const reused = v.reused ? `, ${v.reused} reused from the previous share` : '';
+  const head = v.clips ? `Narration: ${v.clips} audio clip(s) from ${v.profile} (${kb} KB${reused}) included` : `Narration: no generated audio from ${v.profile} yet`;
+  // 内容多语言（D83）：按语言列出还缺几步
+  const per = v.locales ? Object.entries(v.locales).filter(([, x]) => x.missing).map(([l, x]) => `${l} ${x.missing}`).join(', ') : '';
+  return v.missing ? `${head}; ${v.missing} step(s) have no audio for the current text${per ? ` (${per})` : ''} and will use the viewer's browser voice. Generate them in the board (Voice → Generate) to include them.` : `${head}.`;
+}
+
+type SharedVoice = { index: NonNullable<Project['voiceIndex']>; fetch: (file: string) => Promise<Uint8Array | null> };
+const MAX_SHARED_CLIP = 20 * 1024 * 1024;
+/**
+ * 读上一次发布的分享里的朗读音频（D83）：公开分享页内联的 voiceIndex（片段键 → voice/<sha256>.<ext>），以及按相对路径下载文件。
+ * 只接受 https（本机测试服务可以是 http://127.0.0.1）；任何失败都当作没有，不影响分享。下载的文件由服务端按 sha256 校验后才收下。
+ */
+export async function previousShareVoice(url: string, fetchImpl: typeof fetch = fetch): Promise<SharedVoice | undefined> {
+  let base: URL;
+  try { base = new URL(url); } catch { return undefined; }
+  if (base.protocol !== 'https:' && !(base.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(base.hostname))) return undefined;
+  try {
+    const res = await fetchImpl(base, { redirect: 'error', signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return undefined;
+    const index = (inlineProject(await res.text()) as { voiceIndex?: unknown } | null)?.voiceIndex as SharedVoice['index'] | undefined;
+    if (!index || typeof index !== 'object' || !index.clips || !Object.keys(index.clips).length) return undefined;
+    return {
+      index,
+      fetch: async (file) => {
+        if (!/^voice\/[0-9a-f]{64}\.(mp3|wav|ogg|flac|m4a|aac)$/.test(file)) return null;
+        const r = await fetchImpl(new URL(file, base), { redirect: 'error', signal: AbortSignal.timeout(30_000) });
+        if (!r.ok || Number(r.headers.get('content-length') ?? 0) > MAX_SHARED_CLIP) return null;
+        const body = new Uint8Array(await r.arrayBuffer());
+        return body.byteLength > MAX_SHARED_CLIP ? null : body;
+      },
+    };
+  } catch { return undefined; }
 }
 
 /** Shared content-addressed upload/finalize path; no project execution. */

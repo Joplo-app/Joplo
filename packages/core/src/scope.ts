@@ -8,6 +8,7 @@
  * - 范围外的分叉去掉；规则、情况、问题只留范围内功能（规则、问题再按方案过滤）；项目说明去掉（常常概述所有功能），项目名保留。
  * dev、publish、review 三种 IR 都能裁剪：share 用它裁剪发布 IR（上传的文件）和 dev IR（评审清单、预览图）。
  */
+import { pruneMessages } from './content-i18n.ts';
 import { orderedFeatures } from './features.ts';
 import { JoploError } from './result.ts';
 import type { Project, Scene, SceneNode, Step } from './schema.ts';
@@ -214,8 +215,15 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
   const featureIds = project.featureIds?.filter((id) => F.has(id));
   const inF = (x: { featureId: string; optionId?: string }) => F.has(x.featureId) && (x.optionId === undefined || O.has(x.optionId));
   const roleIds = new Set(Object.values(features).flatMap((f) => f.roles.map((r) => r.id).filter((r): r is string => !!r)));
-  const keepRoles = <T extends { roles?: Record<string, string> }>(v: T | undefined): T | undefined =>
-    v && v.roles ? { ...v, roles: Object.fromEntries(Object.entries(v.roles).filter(([k]) => roleIds.has(k))) } : v;
+  const onlyRoles = (r: Record<string, string>) => Object.fromEntries(Object.entries(r).filter(([k]) => roleIds.has(k)));
+  const keepRoles = <T extends { roles?: Record<string, string>; locales?: Record<string, { roles?: Record<string, string> }> }>(v: T | undefined): T | undefined =>
+    v && (v.roles || v.locales)
+      ? {
+        ...v,
+        ...(v.roles ? { roles: onlyRoles(v.roles) } : {}),
+        ...(v.locales ? { locales: Object.fromEntries(Object.entries(v.locales).map(([l, x]) => [l, x.roles ? { ...x, roles: onlyRoles(x.roles) } : x])) } : {}),
+      }
+      : v;
 
   const out: Project = {
     ...project,
@@ -234,7 +242,8 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
     ...(project.voiceIndex ? { voiceIndex: keepRoles(project.voiceIndex)! } : {}),
   };
   const ids = Object.keys(scenarios);
-  return { project: out, info: { key: scopeKey(ids, mode), scenarios: ids, features: Object.keys(features), borrowed: merged } };
+  // 译文只留范围内用得到的（D83）：别的功能的文字不随范围分享出去
+  return { project: pruneMessages(out), info: { key: scopeKey(ids, mode), scenarios: ids, features: Object.keys(features), borrowed: merged } };
 }
 
 /** 一条借用的说明（英文，CLI 与看板共用）。 */

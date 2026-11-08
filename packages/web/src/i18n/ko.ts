@@ -255,6 +255,11 @@ export function createKo(locale: Locale = 'ko') {
       // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
       reviewPickHint: "화면의 요소를 클릭해 선택 · Esc로 취소",
       reviewPickCancel: "취소",
+      // D83: author content languages on the published site.
+      contentMarkNote: "표시된 언어는 데모 내용도 바뀝니다. 나머지는 화면 문구만 바뀝니다",
+      contentSourceTag: "원문",
+      contentTranslatedTag: "번역",
+      contentFallback: (lang: Value, source: Value) => `이 데모는 ${value(lang, locale)} 버전이 없어 원본 ${value(source, locale)}로 표시합니다.`,
     },
   });
 }
