@@ -1,0 +1,290 @@
+{
+  "formatVersion": 1,
+  "kind": "joplo-feature-diff",
+  "base": {
+    "sha": "1111111111111111111111111111111111111111"
+  },
+  "head": {
+    "sha": "2222222222222222222222222222222222222222"
+  },
+  "status": "uncertain",
+  "reasons": [],
+  "summary": {
+    "added": [
+      "Invitations / Batch invitation"
+    ],
+    "modified": [
+      "Invitations / Single invitation",
+      "Invitations / Initial status",
+      "Invitations / Repeated retry"
+    ],
+    "removed": [
+      "Invitations / Legacy invitation"
+    ]
+  },
+  "scenarios": [
+    {
+      "featureId": "invite",
+      "featureName": "Invitations",
+      "name": "Single invitation",
+      "before": "invite.main.send",
+      "after": "invite.main.send",
+      "status": "modified",
+      "reasons": [],
+      "steps": [
+        {
+          "before": {
+            "id": "invite.main.send#1",
+            "position": 1,
+            "key": "open"
+          },
+          "after": {
+            "id": "invite.main.send#1",
+            "position": 1,
+            "key": "open"
+          },
+          "status": "unchanged",
+          "match": "key",
+          "reasons": []
+        },
+        {
+          "before": null,
+          "after": {
+            "id": "invite.main.send#2",
+            "position": 2,
+            "key": "preview"
+          },
+          "status": "added",
+          "match": "none",
+          "reasons": [
+            "step-added"
+          ]
+        },
+        {
+          "before": {
+            "id": "invite.main.send#2",
+            "position": 2,
+            "key": "send"
+          },
+          "after": {
+            "id": "invite.main.send#3",
+            "position": 3,
+            "key": "send"
+          },
+          "status": "modified",
+          "match": "key",
+          "reasons": [
+            "effects"
+          ]
+        },
+        {
+          "before": {
+            "id": "invite.main.send#3",
+            "position": 3,
+            "key": "complete"
+          },
+          "after": {
+            "id": "invite.main.send#4",
+            "position": 4,
+            "key": "complete"
+          },
+          "status": "unchanged",
+          "match": "key",
+          "reasons": []
+        }
+      ]
+    },
+    {
+      "featureId": "invite",
+      "featureName": "Invitations",
+      "name": "Initial status",
+      "before": "invite.main.initial",
+      "after": "invite.main.initial",
+      "status": "modified",
+      "reasons": [
+        "initial-state"
+      ],
+      "steps": [
+        {
+          "before": {
+            "id": "invite.main.initial#1",
+            "position": 1
+          },
+          "after": {
+            "id": "invite.main.initial#1",
+            "position": 1
+          },
+          "status": "unchanged",
+          "match": "content",
+          "reasons": []
+        }
+      ]
+    },
+    {
+      "featureId": "invite",
+      "featureName": "Invitations",
+      "name": "Read status",
+      "before": "invite.main.unchanged",
+      "after": "invite.main.unchanged",
+      "status": "unchanged",
+      "reasons": [],
+      "steps": [
+        {
+          "before": {
+            "id": "invite.main.unchanged#1",
+            "position": 1
+          },
+          "after": {
+            "id": "invite.main.unchanged#1",
+            "position": 1
+          },
+          "status": "unchanged",
+          "match": "content",
+          "reasons": []
+        }
+      ]
+    },
+    {
+      "featureId": "invite",
+      "featureName": "Invitations",
+      "name": "Repeated retry",
+      "before": "invite.main.ambiguous",
+      "after": "invite.main.ambiguous",
+      "status": "uncertain",
+      "reasons": [],
+      "steps": [
+        {
+          "before": null,
+          "after": {
+            "id": "invite.main.ambiguous#1",
+            "position": 1
+          },
+          "status": "uncertain",
+          "match": "uncertain",
+          "reasons": [
+            "ambiguous-match"
+          ]
+        },
+        {
+          "before": null,
+          "after": {
+            "id": "invite.main.ambiguous#2",
+            "position": 2
+          },
+          "status": "uncertain",
+          "match": "uncertain",
+          "reasons": [
+            "ambiguous-match"
+          ]
+        },
+        {
+          "before": null,
+          "after": {
+            "id": "invite.main.ambiguous#3",
+            "position": 3
+          },
+          "status": "uncertain",
+          "match": "uncertain",
+          "reasons": [
+            "ambiguous-match"
+          ]
+        },
+        {
+          "before": {
+            "id": "invite.main.ambiguous#1",
+            "position": 1
+          },
+          "after": null,
+          "status": "uncertain",
+          "match": "uncertain",
+          "reasons": [
+            "ambiguous-match"
+          ]
+        },
+        {
+          "before": {
+            "id": "invite.main.ambiguous#2",
+            "position": 2
+          },
+          "after": null,
+          "status": "uncertain",
+          "match": "uncertain",
+          "reasons": [
+            "ambiguous-match"
+          ]
+        },
+        {
+          "before": {
+            "id": "invite.main.ambiguous#3",
+            "position": 3
+          },
+          "after": {
+            "id": "invite.main.ambiguous#4",
+            "position": 4
+          },
+          "status": "unchanged",
+          "match": "content",
+          "reasons": []
+        }
+      ]
+    },
+    {
+      "featureId": "invite",
+      "featureName": "Invitations",
+      "name": "Batch invitation",
+      "before": null,
+      "after": "invite.main.batch",
+      "status": "added",
+      "reasons": [],
+      "steps": [
+        {
+          "before": null,
+          "after": {
+            "id": "invite.main.batch#1",
+            "position": 1
+          },
+          "status": "added",
+          "match": "none",
+          "reasons": [
+            "step-added"
+          ]
+        },
+        {
+          "before": null,
+          "after": {
+            "id": "invite.main.batch#2",
+            "position": 2
+          },
+          "status": "added",
+          "match": "none",
+          "reasons": [
+            "step-added"
+          ]
+        }
+      ]
+    },
+    {
+      "featureId": "invite",
+      "featureName": "Invitations",
+      "name": "Legacy invitation",
+      "before": "invite.main.removed",
+      "after": null,
+      "status": "removed",
+      "reasons": [],
+      "steps": [
+        {
+          "before": {
+            "id": "invite.main.removed#1",
+            "position": 1
+          },
+          "after": null,
+          "status": "removed",
+          "match": "none",
+          "reasons": [
+            "step-removed"
+          ]
+        }
+      ]
+    }
+  ]
+}

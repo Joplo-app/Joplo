@@ -10,11 +10,11 @@ import type { DemoController } from '../runtime/demo';
 import { Narrator } from '../runtime/voice';
 import { Btn, type BtnSize } from './controls';
 
-export function useSiteVoice(ctl: DemoController, project: Project | null) {
+export function useSiteVoice(ctl: DemoController, project: Project | null, muted = false) {
   const { locale } = useI18n();
   const narrator = useMemo(() => new Narrator(), []);
   const [on, setOnState] = useState(false);
-  narrator.enabled = on;
+  narrator.enabled = on && !muted;
   narrator.locale = locale;
   narrator.lookup = project?.voiceIndex ?? null;
   useEffect(() => {
@@ -25,8 +25,8 @@ export function useSiteVoice(ctl: DemoController, project: Project | null) {
     };
   }, [ctl, narrator]);
   const setOn = (v: boolean) => {
-    setOnState(v);
-    narrator.enabled = v;
+    setOnState(v && !muted);
+    narrator.enabled = v && !muted;
     if (!v) ctl.stopNarration();
   };
   return { on, setOn, hasAudio: !!project?.voiceIndex && Object.keys(project.voiceIndex.clips).length > 0 };

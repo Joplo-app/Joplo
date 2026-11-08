@@ -74,10 +74,12 @@ function joploBody(): string {
     ...list(START_ORDER).map(line => line.replace(/^(\d+)/, (_, n: string) => String(Number(n) + 1))),
     `${START_ORDER.length + 2}. When the user asks to share or publish: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. Confirmation of a local option alone does not request publication. To share only part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items. Apply review results with the joplo-feedback skill.`,
     '',
+    'For comparing feature changes across versions or a PR, read npx joplo skill diff. Preserve stable .key() identities, treat repeated candidates as uncertain, and build two real publish versions. If an embedded player changes scenario independently, use Realign and wait for both target positions before resuming. Use prepare → uncredentialed build → trusted publish only within the user’s authorized scope.',
+    '',
     '## Common pitfalls',
     ...PITFALLS.map(([text, topic]) => `- ${text}. See npx joplo skill ${topic}.`),
     '',
-    'Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, focus, diagram, components, cases, check, selection, review, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.',
+    'Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, focus, diagram, components, cases, check, selection, review, diff, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.',
     'After the user Alt+clicks a board element, run npx joplo selection and edit only that location.',
     'Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).',
   ].join('\n');

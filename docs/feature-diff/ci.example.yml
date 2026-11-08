@@ -1,0 +1,182 @@
+# Copy to a trusted workflow only after setting JOPLO_CLI_VERSION to an exact
+# reviewed release supporting diff. Never use this file from an untrusted PR
+# as the publisher's workflow. Example demo project directory: demo/.
+name: PR feature diff
+# This workflow lives on the trusted default branch. The upstream CI only
+# checks PR sources and has no Joplo publication credentials.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+concurrency:
+  group: feature-diff-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  cancel-in-progress: true
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.pr.outputs.enabled }}
+      number: ${{ steps.pr.outputs.number }}
+      head: ${{ steps.pr.outputs.head }}
+      target: ${{ steps.pr.outputs.target }}
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'));
+          const run=event.workflow_run, repo=process.env.GITHUB_REPOSITORY;
+          const number=run.pull_requests?.[0]?.number;
+          if(run.event!=='pull_request' || run.conclusion!=='success' || run.head_repository?.full_name!==repo || !Number.isSafeInteger(number)) {
+            console.log('Skipped publication: no eligible same-repository PR; forks receive no publisher credentials.');
+            process.exit(0);
+          }
+          const response=await fetch(`https://api.github.com/repos/${repo}/pulls/${number}`,{headers:{Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json'}});
+          if(!response.ok) throw Error(`Cannot read PR metadata: ${response.status}`);
+          const pr=await response.json();
+          if(pr.state!=='open' || pr.head.repo?.full_name!==repo || pr.head.sha!==run.head_sha) { console.log('Skipped closed, fork or stale run.'); process.exit(0); }
+          if(!/^[a-f0-9]{40}$/.test(pr.head.sha)||!/^[a-f0-9]{40}$/.test(pr.base.sha)) throw Error('Invalid PR SHAs');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,`enabled=true\nnumber=${number}\nhead=${pr.head.sha}\ntarget=${pr.base.sha}\n`);
+          JS
+  prepare:
+    needs: metadata
+    if: needs.metadata.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    # Store JOPLO_API_KEY in this environment, restricted to the trusted default branch.
+    environment: joplo-publisher
+    outputs:
+      base: ${{ steps.prepare.outputs.base }}
+      head: ${{ steps.prepare.outputs.head }}
+      receipt: ${{ steps.receipt.outputs.artifact-id }}
+    steps:
+      # Only read Git objects here. Never install/run code from this checkout.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.metadata.outputs.head }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: history
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install trusted CLI outside the checkout
+        env:
+          CLI_VERSION: ${{ vars.JOPLO_CLI_VERSION }}
+        run: |
+          [[ "$CLI_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          npm install --prefix "$RUNNER_TEMP/tool" --ignore-scripts --package-lock=false "joplo@$CLI_VERSION"
+      - id: prepare
+        working-directory: ${{ runner.temp }}
+        env:
+          JOPLO_API_KEY: ${{ secrets.JOPLO_API_KEY }}
+          PR_NUMBER: ${{ needs.metadata.outputs.number }}
+          PR_REPO: ${{ github.repository }}
+          PR_HEAD: ${{ needs.metadata.outputs.head }}
+          TARGET_BASE: ${{ needs.metadata.outputs.target }}
+        run: |
+          candidate=$(git -C "$GITHUB_WORKSPACE/history" merge-base "$TARGET_BASE" "$PR_HEAD")
+          node "$RUNNER_TEMP/tool/node_modules/@joplo-app/cli/dist/bin.js" diff prepare \
+            --repo "$PR_REPO" --pr "$PR_NUMBER" --sha "$PR_HEAD" \
+            --base-sha "$candidate" --out "$RUNNER_TEMP/comparison.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const {prepared:p}=JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/comparison.json`,'utf8'));
+          if(!/^[a-f0-9]{40}$/.test(p.baseSha)||!/^[a-f0-9]{40}$/.test(p.headSha)) throw Error('Invalid prepare SHAs');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,`base=${p.baseSha}\nhead=${p.headSha}\n`);
+          JS
+      - uses: actions/upload-artifact@v4
+        id: receipt
+        with:
+          name: trusted-comparison-receipt
+          path: ${{ runner.temp }}/comparison.json
+          retention-days: 1
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    outputs:
+      bundle: ${{ steps.bundle.outputs.artifact-id }}
+    steps:
+      # A missing pinned baseline fails checkout. Never substitute an empty site.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.base }}
+          persist-credentials: false
+          path: before-source
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.head }}
+          persist-credentials: false
+          path: after-source
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install fixed build CLI outside both checkouts
+        env:
+          CLI_VERSION: ${{ vars.JOPLO_CLI_VERSION }}
+        run: |
+          [[ "$CLI_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          npm install --prefix "$RUNNER_TEMP/tool" --ignore-scripts --package-lock=false "joplo@$CLI_VERSION"
+      # This entire runner is untrusted and has NO JOPLO_API_KEY or other secrets.
+      # Adapt package manager/project path to the repository's locked build.
+      - run: npm ci && node "$RUNNER_TEMP/tool/node_modules/@joplo-app/cli/dist/bin.js" build demo --out ../before-site
+        working-directory: before-source
+      - run: npm ci && node "$RUNNER_TEMP/tool/node_modules/@joplo-app/cli/dist/bin.js" build demo --out ../after-site
+        working-directory: after-source
+      - name: Build static diff
+        env:
+          PINNED_BASE: ${{ needs.prepare.outputs.base }}
+          PR_HEAD: ${{ needs.prepare.outputs.head }}
+        run: |
+          node "$RUNNER_TEMP/tool/node_modules/@joplo-app/cli/dist/bin.js" diff before-site after-site \
+            --out diff-site --base-sha "$PINNED_BASE" --head-sha "$PR_HEAD"
+      - uses: actions/upload-artifact@v4
+        id: bundle
+        with:
+          name: static-diff-bundle
+          path: diff-site/
+          retention-days: 1
+  publish:
+    needs: [metadata, prepare, build]
+    environment: joplo-publisher
+    runs-on: ubuntu-latest
+    # No checkout, no PR package install, no project scripts, no shared runner/cache.
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install trusted CLI
+        env:
+          CLI_VERSION: ${{ vars.JOPLO_CLI_VERSION }}
+        run: |
+          [[ "$CLI_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          npm install --prefix "$RUNNER_TEMP/tool" --ignore-scripts --package-lock=false "joplo@$CLI_VERSION"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.receipt }}
+          path: receipt
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.build.outputs.bundle }}
+          path: static-diff
+          merge-multiple: true
+      - name: Publish data only with fixed trusted CLI
+        working-directory: ${{ runner.temp }}
+        env:
+          JOPLO_API_KEY: ${{ secrets.JOPLO_API_KEY }}
+          PR_NUMBER: ${{ needs.metadata.outputs.number }}
+          PR_REPO: ${{ github.repository }}
+          PR_HEAD: ${{ needs.prepare.outputs.head }}
+        run: |
+          node "$RUNNER_TEMP/tool/node_modules/@joplo-app/cli/dist/bin.js" diff publish "$GITHUB_WORKSPACE/static-diff" \
+            --prepared "$GITHUB_WORKSPACE/receipt/comparison.json" \
+            --repo "$PR_REPO" --pr "$PR_NUMBER" --sha "$PR_HEAD" --format json

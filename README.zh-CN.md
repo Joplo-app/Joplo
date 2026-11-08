@@ -171,3 +171,9 @@ Joplo 表达设计行为，不运行真实业务后端；只支持静态路径�
 ## 许可证
 
 [Apache-2.0](LICENSE)。随包字体使用 [SIL OFL 1.1](packages/web/src/fonts/OFL.txt)。
+
+## Feature diff / 功能差异
+
+Compare two real public builds with `joplo diff before-site after-site --out diff-site`. Added scenarios play the new version full width; modified scenarios compare both versions; removed scenarios show the old version. Stable `.key()` identities preserve alignment across inserted steps, and ambiguous legacy matches remain explicit.
+
+使用 `joplo skill diff` 读取当前版本的操作、成功判断与恢复指南。PR CI 使用 `diff prepare` 固定起点，再隔离构建与 `diff publish` 凭证；不把演示变化当成真实实现验证。详见 [CLI](docs/cli.md#diff跨版本功能变化) 和 [完整指南／安全 CI 示例](docs/feature-diff/README.md)。

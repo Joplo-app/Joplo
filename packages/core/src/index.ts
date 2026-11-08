@@ -20,3 +20,6 @@ export * from './outline.ts';
 export * from './diagram/index.ts';
 export * from './voice.ts';
 export * from './local-review.ts';
+
+export * from './feature-diff.ts';
+export * from './step-identity.ts';

@@ -12,7 +12,7 @@ import { siteHash } from '../runtime/route';
 import { isFullscreenKey } from '../player/fullscreen';
 
 /** review：评审模式（`review=1`，云端契约 8.2），见 review-bridge.ts。 */
-export type EmbedParams = { scenario: string | null; autoplay: boolean; review: boolean };
+export type EmbedParams = { scenario: string | null; autoplay: boolean; review: boolean; diff?: boolean };
 
 /** location.search → 嵌入参数；不是嵌入模式时为 null。 */
 export function parseEmbedParams(search: string | null | undefined): EmbedParams | null {
@@ -24,7 +24,7 @@ export function parseEmbedParams(search: string | null | undefined): EmbedParams
   }
   if (q.get('embed') !== '1') return null;
   const scenario = q.get('scenario');
-  return { scenario: scenario ? scenario : null, autoplay: q.get('autoplay') === '1', review: q.get('review') === '1' };
+  return { scenario: scenario ? scenario : null, autoplay: q.get('autoplay') === '1', review: q.get('review') === '1', ...(q.get('diff') === '1' ? { diff: true } : {}) };
 }
 
 /** 嵌入打开时的状态：从哪个场景开始、是否先显示封面。 */

@@ -54,7 +54,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
   }, [project, init.scenarioId]);
   ctl.i18n = i18n;
   // 朗读（D74）：嵌入同样默认关（autoplay=1 也不自动出声）
-  const voice = useSiteVoice(ctl, project);
+  const voice = useSiteVoice(ctl, project, params.diff);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot, ctl.getSnapshot);
   const [covered, setCovered] = useState(init.covered);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -101,7 +101,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
   const look = resolveLook({ theme: project.theme, font: null, stroke: null }, project.themes ?? {}, i18n);
   const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n, project);
   // 场景封面（D61）：嵌入自己的封面（covered）显示时不叠第二层；之后回到第 0 步时与发布站一样是场景封面
-  const cover = !covered && coverShown(scenario, pos, snap.playing, snap.activeStep) ? coverFor(project, scenario?.id, i18n) : null;
+  const cover = !params.diff && !covered && coverShown(scenario, pos, snap.playing, snap.activeStep) ? coverFor(project, scenario?.id, i18n) : null;
   const curtainOn = !!scenario && curtainUp(project, scenario.id, pos, cover);
   // 控制条的步骤与字幕右侧一致：播放中是正在播的那一步，否则是当前位置
   const shown = subtitle?.index ?? pos;
@@ -143,6 +143,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
   useEffect(() => {
     const bridge = createReviewBridge({
       enabled: params.review,
+      acknowledgeGoto: params.diff,
       win: window as unknown as Parameters<typeof createReviewBridge>[0]['win'],
       project,
       onGoto: (g) => reviewHandlers.current.goto(g),
@@ -154,7 +155,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
       bridge?.dispose();
       bridgeRef.current = null;
     };
-  }, [project, params.review]);
+  }, [project, params.review, params.diff]);
   // 位置：场景、步骤、层级任何一项变化时发一次（桥里去重）
   useEffect(() => {
     if (snap.scenarioId && state) bridgeRef.current?.position({ scenario: snap.scenarioId, step: pos, stepId, layer: reviewLayer });
@@ -377,7 +378,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
                 <div className="h-full rounded-full bg-jb-accent-press transition-[width] duration-300" style={{ width: `${embedProgress(shown, total) * 100}%` }} />
               </div>
             )}
-            <SiteVoiceButton voice={voice} size={32} testid="embed-voice" />
+            {!params.diff && <SiteVoiceButton voice={voice} size={32} testid="embed-voice" />}
             {items.length > 1 ? (
               <MenuButton
                 trigger={L.compact ? { icon: <ListVideo className="size-4" /> } : { label: scenario.name, iconOnly: false }}

@@ -51,14 +51,14 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   let exitCode = 0;
   const serverPackage = '@joplo-app/server';
   const loadServer = deps.loadServer ?? (() => import(serverPackage));
-  async function serverFunction<K extends 'startDev' | 'buildSite' | 'renderStep' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime'>(name: K): Promise<typeof Server[K]> {
+  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'renderStep' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime'>(name: K): Promise<typeof Server[K]> {
     let module: Record<string, unknown>;
     try { module = await loadServer(); }
     catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server cannot load ${name}: ${e instanceof Error ? e.message : String(e)}`); }
     if (typeof module[name] !== 'function') throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server does not provide ${name}; use a version implementing the IR v2 service contract`);
     return module[name] as typeof Server[K];
   }
-  const program = new Command().name('joplo').description('Joplo: Author, demo, and publish feature designs with TSX').exitOverride()
+  const program = new Command().enablePositionalOptions().name('joplo').description('Joplo: Author, demo, and publish feature designs with TSX').exitOverride()
     .configureOutput({ writeOut: stdout, writeErr: stderr, outputError: () => {} });
   // 读取项目的命令先检查项目里的 @joplo-app/kit 与 CLI 是否同一版本（只提示，不阻止）
   program.hook('preAction', (_root, action) => {
@@ -118,6 +118,30 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (opts.format === 'json') json(result(client.server, `${terminalText(data.user.email)} (${data.plan})`, data));
     else line(`${terminalText(data.user.email)} (${data.plan})${key ? `\n${key}` : ''}\nNew upload limit: ${data.limits.maxUploadBytes} bytes\nManifest total limit: ${data.limits.maxTotalBytes} bytes, ${data.limits.maxFiles} files\nPublications per hour: ${data.limits.publishesPerHour ?? 'Not provided by the server'}`);
   });
+  const diff = program.command('diff').enablePositionalOptions().description('Compare two public builds; prepare and publish immutable PR comparisons')
+    .argument('[before]', 'Baseline static build directory').argument('[after]', 'Current static build directory')
+    .option('--out <dir>', 'New diff output directory').option('--base-sha <sha>', 'Normalized baseline commit SHA').option('--head-sha <sha>', 'Normalized current commit SHA').addOption(format())
+    .action(async (before, after, opts) => {
+      if (!before || !after || !opts.out) throw new JoploError('USAGE', 'Use joplo diff <before-site> <after-site> --out <new-directory>');
+      const built = await (await serverFunction('buildFeatureDiff'))({ beforeDir: resolve(before), afterDir: resolve(after), outDir: resolve(opts.out), baseSha: opts.baseSha, headSha: opts.headSha });
+      if (opts.format === 'json') json(built); else line(`Feature diff: ${built.manifest.status} · ${built.outDir}`);
+    });
+  diff.command('prepare').description('Pin the PR baseline before building; writes a receipt without credentials')
+    .requiredOption('--pr <number>', 'Pull request number', integer('pr', 2147483647)).option('--repo <owner/name>', 'Repository').option('--sha <sha>', 'Current PR head')
+    .requiredOption('--base-sha <sha>', 'Candidate git merge-base, full SHA').requiredOption('--out <file>', 'New receipt file')
+    .option('--server <url>', 'Cloud server').addOption(format()).action(async opts => {
+      const { prepareComparison } = await import('./feature-diff.ts');
+      const receipt = await prepareComparison(await cloudClient(opts.server, opts.format), opts);
+      if (opts.format === 'json') json(receipt); else line(`Prepared generation ${receipt.prepared.generation}. Build baseline ${receipt.prepared.baseSha} and head ${receipt.prepared.headSha}. Receipt: ${opts.out}`);
+    });
+  diff.command('publish').description('Upload a prepared static diff; never executes project code')
+    .argument('<dir>', 'Diff bundle directory').requiredOption('--prepared <file>', 'Prepare receipt')
+    .requiredOption('--pr <number>', 'Pull request number', integer('pr', 2147483647)).option('--repo <owner/name>', 'Repository').option('--sha <sha>', 'Current PR head')
+    .option('--title <title>', 'Share title').option('--server <url>', 'Cloud server').addOption(format()).action(async (dir, opts) => {
+      const { publishComparison } = await import('./feature-diff.ts');
+      const published = await publishComparison(await cloudClient(opts.server, opts.format), resolve(dir), opts);
+      if (opts.format === 'json') json(published); else line(`Feature diff published: ${published.url}`);
+    });
   cloudCommand('share').description('Check, build, and publish to the cloud').argument('[dir]', 'Project directory', '.').addOption(format())
     .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)')
     .option('--review', 'Publish the review version: every option of every feature (rules and questions still stay out of the uploaded files)')

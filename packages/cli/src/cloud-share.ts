@@ -154,49 +154,9 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
       client.warn('The cloud rejected the review manifest (HTTP 400). Retrying once without it; the review page will not show rules or questions for this version.');
       prepared = await create(false);
     }
-    if (!shareId(prepared.shareId) || !nonempty(prepared.uploadId) || prepared.uploadId.length > 128 || prepared.uploadId.includes(accessToken) || !Array.isArray(prepared.missing)) throw new CloudError('INVALID_RESPONSE');
-    // 完整校验所有上传项后才执行第一个 PUT；不允许服务端请求本地清单之外的文件。
-    const missing = prepared.missing.map(raw => {
-      const m = object(raw), headers = object(m.headers);
-      if (!nonempty(m.sha256) || !blobs.has(m.sha256) || !m.headers || Object.values(headers).some(v => typeof v !== 'string') || Object.keys(headers).some(k => /^(authorization|cookie)$/i.test(k))) throw new CloudError('INVALID_RESPONSE');
-      const url = httpUrl(m.uploadUrl);
-      if (JSON.stringify({ url, headers }).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
-      return { sha256: m.sha256, uploadUrl: url, headers: headers as Record<string, string> };
-    });
-    client.warn(`Built ${files.length} files (${actualBytes} bytes). Uploading ${missing.length} new objects...`);
-    const uploads = new AbortController();
-    const upload = async (item: (typeof missing)[number]) => {
-      const body = new Uint8Array(await readFile(blobs.get(item.sha256)!));
-      await client.retry(async () => {
-        let response: Response;
-        try {
-          // 预签名 PUT 是协议例外：只使用服务端返回的 headers，不添加 bearer 或版本头。
-          response = await fetch(item.uploadUrl, { method: 'PUT', headers: item.headers, body, redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(Math.ceil(30000 + body.byteLength / (100 * 1024) * 1000)), uploads.signal]) });
-        } catch { throw new CloudError('NETWORK'); }
-        if (!response.ok) {
-          // 已知 HTTP 状态优先于正文读取；4xx 的响应中断不能触发重试。
-          await response.body?.cancel().catch(() => {});
-          if (response.status === 412) return;
-          throw new CloudError(response.status >= 500 ? 'NETWORK' : response.status === 403 ? 'UPLOAD_EXPIRED' : response.status === 413 ? 'TOO_LARGE' : 'BAD_REQUEST', undefined, undefined, { afterMs: response.status === 503 ? retryAfterMillis(response.headers.get('retry-after'), client.now()) : undefined });
-        }
-        try { await response.arrayBuffer(); } catch { throw new CloudError('NETWORK'); }
-      }, { signal: uploads.signal });
-    };
-    // 失败后取消所有在途请求和退避等待；仍等所有 worker 结束再清理目录及 SIGINT 监听器。
-    let cursor = 0, failed = false, failure: unknown;
-    await Promise.all(Array.from({ length: Math.min(4, missing.length) }, async () => {
-      while (!failed && cursor < missing.length) {
-        const item = missing[cursor++]!;
-        try { await upload(item); } catch (e) { if (!failed) { failed = true; failure = e; uploads.abort(e); } }
-      }
-    }));
-    if (failed) throw failure;
-    client.warn('Upload complete. Finalizing publication...');
-    const final = await client.retry(() => client.request(`/api/v1/shares/${prepared.shareId}/finalize`, accessToken, { uploadId: prepared.uploadId }));
-    if (!shareId(final.shareId) || final.shareId !== prepared.shareId || !Number.isSafeInteger(final.version) || Number(final.version) < 1 || !(final.expiresAt === null || typeof final.expiresAt === 'string' && Number.isFinite(Date.parse(final.expiresAt)))) throw new CloudError('INVALID_RESPONSE');
-    const url = httpUrl(final.url);
-    const published = { shareId: final.shareId, url, expiresAt: final.expiresAt as string | null, version: final.version as number };
-    if (JSON.stringify(published).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
+    client.warn(`Built ${files.length} files (${actualBytes} bytes).`);
+    const { published, final } = await uploadPreparedFiles(client, accessToken, prepared, blobs);
+    const url = published.url;
     // PR 预览是独立链接，不写记录；其余只更新本次的那一项（主链接或评审版），保留另一项
     if (!pr) {
       const next: ShareRecord = key ? { ...record, scoped: { ...record.scoped, [key]: { shareId: published.shareId, url } } } : { ...record, [slot]: { shareId: published.shareId, url } };
@@ -221,4 +181,53 @@ export function voiceSummary(v: { clips: number; bytes: number; missing: number;
   const kb = Math.max(1, Math.round(v.bytes / 1024));
   const head = v.clips ? `Narration: ${v.clips} audio clip(s) from ${v.profile} (${kb} KB) included` : `Narration: no generated audio from ${v.profile} yet`;
   return v.missing ? `${head}; ${v.missing} step(s) have no audio for the current text and will use the viewer's browser voice. Generate them in the board (Voice → Generate) to include them.` : `${head}.`;
+}
+
+/** Shared content-addressed upload/finalize path; no project execution. */
+export async function uploadPreparedFiles(client: CloudClient, accessToken: string, prepared: Record<string, unknown>, blobs: Map<string, string>) {
+  if (!shareId(prepared.shareId) || !nonempty(prepared.uploadId) || prepared.uploadId.length > 128 || prepared.uploadId.includes(accessToken) || !Array.isArray(prepared.missing)) throw new CloudError('INVALID_RESPONSE');
+  // 完整校验所有上传项后才执行第一个 PUT；不允许服务端请求本地清单之外的文件。
+  const missing = prepared.missing.map(raw => {
+    const m = object(raw), headers = object(m.headers);
+    if (!nonempty(m.sha256) || !blobs.has(m.sha256) || !m.headers || Object.values(headers).some(v => typeof v !== 'string') || Object.keys(headers).some(k => /^(authorization|cookie)$/i.test(k))) throw new CloudError('INVALID_RESPONSE');
+    const url = httpUrl(m.uploadUrl);
+    if (JSON.stringify({ url, headers }).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
+    return { sha256: m.sha256, uploadUrl: url, headers: headers as Record<string, string> };
+  });
+  client.warn(`Uploading ${missing.length} new objects...`);
+  const uploads = new AbortController();
+  const upload = async (item: (typeof missing)[number]) => {
+    const body = new Uint8Array(await readFile(blobs.get(item.sha256)!));
+    if (createHash('sha256').update(body).digest('hex') !== item.sha256) throw new JoploError('EXPORT_FAILED', 'Artifact changed after preparation; nothing finalized. Rebuild and retry');
+    await client.retry(async () => {
+      let response: Response;
+      try {
+        // 预签名 PUT 是协议例外：只使用服务端返回的 headers，不添加 bearer 或版本头。
+        response = await fetch(item.uploadUrl, { method: 'PUT', headers: item.headers, body, redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(Math.ceil(30000 + body.byteLength / (100 * 1024) * 1000)), uploads.signal]) });
+      } catch { throw new CloudError('NETWORK'); }
+      if (!response.ok) {
+        // 已知 HTTP 状态优先于正文读取；4xx 的响应中断不能触发重试。
+        await response.body?.cancel().catch(() => {});
+        if (response.status === 412) return;
+        throw new CloudError(response.status >= 500 ? 'NETWORK' : response.status === 403 ? 'UPLOAD_EXPIRED' : response.status === 413 ? 'TOO_LARGE' : 'BAD_REQUEST', undefined, undefined, { afterMs: response.status === 503 ? retryAfterMillis(response.headers.get('retry-after'), client.now()) : undefined });
+      }
+      try { await response.arrayBuffer(); } catch { throw new CloudError('NETWORK'); }
+    }, { signal: uploads.signal });
+  };
+  // 失败后取消所有在途请求和退避等待；仍等所有 worker 结束再清理目录及 SIGINT 监听器。
+  let cursor = 0, failed = false, failure: unknown;
+  await Promise.all(Array.from({ length: Math.min(4, missing.length) }, async () => {
+    while (!failed && cursor < missing.length) {
+      const item = missing[cursor++]!;
+      try { await upload(item); } catch (e) { if (!failed) { failed = true; failure = e; uploads.abort(e); } }
+    }
+  }));
+  if (failed) throw failure;
+  client.warn('Upload complete. Finalizing publication...');
+  const final = await client.retry(() => client.request(`/api/v1/shares/${prepared.shareId}/finalize`, accessToken, { uploadId: prepared.uploadId }));
+  if (!shareId(final.shareId) || final.shareId !== prepared.shareId || !Number.isSafeInteger(final.version) || Number(final.version) < 1 || !(final.expiresAt === null || typeof final.expiresAt === 'string' && Number.isFinite(Date.parse(final.expiresAt)))) throw new CloudError('INVALID_RESPONSE');
+  const url = httpUrl(final.url);
+  const published = { shareId: final.shareId, url, expiresAt: final.expiresAt as string | null, version: final.version as number };
+  if (JSON.stringify(published).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
+  return { published, final };
 }

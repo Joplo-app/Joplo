@@ -5,6 +5,7 @@
  * - `joplo:ready { scenarios: [{ id, optionId, steps }] }`：IR 里的所有场景（评审版含所有方案），steps 是步骤数；
  * - `joplo:position { scenario, step, stepId, layer }`：step 是播放器位置（0 = 初始状态，k = 已执行 k 步），
  *   stepId = 第 step 步的 id（step = 0 时为 null），layer = 当前显示的层级键（没有层级时 null）；任何一项变化时发一次；
+ *   diff 模式额外确认每次合法 goto 后的实际位置，即使位置与上次相同，仍须等渲染器报告。
  * - `joplo:pick-result { element: { id, label } | null }`：选元素结束（null = 取消）。
  *
  * 入站（外层 → 演示）：只处理 `event.source === window.parent` 且字段校验通过的 `joplo:goto` / `joplo:pick`，其余一律忽略。
@@ -65,7 +66,7 @@ export type BridgeWindow = {
 
 export type ReviewBridge = {
   ready(): void;
-  /** 与上一次发出的位置相同时不发。 */
+  /** 默认对相同位置去重；acknowledgeGoto 模式允许合法 goto 后的首次实际位置再次上报。 */
   position(pos: ReviewPosition): void;
   pickResult(element: ReviewElement | null): void;
   dispose(): void;
@@ -74,7 +75,7 @@ export type ReviewBridge = {
 /**
  * 创建桥。enabled 为 false（不是评审模式）或不在 iframe 里（parent 就是自己）时返回 null，且不碰 window。
  */
-export function createReviewBridge(opts: { enabled: boolean; win: BridgeWindow; project: Project; onGoto: (g: ReviewGoto) => void; onPick: (active: boolean) => void }): ReviewBridge | null {
+export function createReviewBridge(opts: { enabled: boolean; acknowledgeGoto?: boolean; win: BridgeWindow; project: Project; onGoto: (g: ReviewGoto) => void; onPick: (active: boolean) => void }): ReviewBridge | null {
   if (!opts.enabled) return null;
   const { win, project } = opts;
   const parent = win.parent;
@@ -94,7 +95,12 @@ export function createReviewBridge(opts: { enabled: boolean; win: BridgeWindow; 
     const m = parseReviewMessage(e.data, project);
     if (!m) return;
     try {
-      if (m.type === 'goto') opts.onGoto({ scenario: m.scenario, step: m.step, highlight: m.highlight });
+      if (m.type === 'goto') {
+        // Diff needs a fresh observed position even when the requested tuple is unchanged.
+        // Wait for the renderer's position() call; never acknowledge a command speculatively.
+        if (opts.acknowledgeGoto) last = null;
+        opts.onGoto({ scenario: m.scenario, step: m.step, highlight: m.highlight });
+      }
       else opts.onPick(m.active);
     } catch {
       /* 处理失败不影响之后的消息 */

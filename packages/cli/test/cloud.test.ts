@@ -27,6 +27,7 @@ let limits: { maxUploadBytes: number; maxTotalBytes: number; maxFiles: number; p
 let seedRuntime: boolean;
 let revokedAfterReplacement = false;
 let putDelay = 0;
+let putBarrier: Array<() => void> | undefined;
 let putHold = 0, activePuts = 0, maxActivePuts = 0, stalledPut = false;
 const confirm = vi.fn(async (_question: string) => true);
 let truncatedPut = false;
@@ -45,7 +46,7 @@ beforeEach(async () => {
   await mkdir(project); calls = []; plan = 'free'; deviceErrors = []; fail = undefined; putStatus = 200; expires = 600; clock = 0; waits = []; missingCount = 1;
   raceUploads = false; firstUploadFailure = undefined; previousCalls = []; previousStatus = 200;
   revokedAfterReplacement = false; putHold = 0; activePuts = 0; maxActivePuts = 0; stalledPut = false; confirm.mockClear();
-  truncatedPut = false; putDelay = 0; responses = new Map(); seedRuntime = false; limits = { maxUploadBytes: 20 * 1024 * 1024, maxTotalBytes: 256 * 1024 * 1024, maxFiles: 2000, publishesPerHour: 30 };
+  truncatedPut = false; putDelay = 0; putBarrier = undefined; responses = new Map(); seedRuntime = false; limits = { maxUploadBytes: 20 * 1024 * 1024, maxTotalBytes: 256 * 1024 * 1024, maxFiles: 2000, publishesPerHour: 30 };
   files = { 'index.html': '<html>demo</html>', 'assets/site.css': 'body{}' }; renderStep = undefined; browser.mockClear(); build.mockClear(); checkProject.mockClear();
   server = createServer(async (req, res) => {
     if (req.method === 'PUT') {
@@ -58,6 +59,12 @@ beforeEach(async () => {
     const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(chunk);
     const raw = Buffer.concat(chunks).toString(); let body: any = raw; try { body = JSON.parse(raw); } catch { /* PUT */ }
     const path = req.url!; calls.push({ path, method: req.method!, headers: req.headers, body });
+    // Coordinate by completed request bodies, not a timer: a fast 403 can abort
+    // sibling bodies on a busy runner before their delayed handlers read them.
+    if (req.method === 'PUT' && putBarrier) await new Promise<void>(release => {
+      putBarrier!.push(release);
+      if (putBarrier!.length === 4) for (const ready of putBarrier!) ready();
+    });
     res.setHeader('Content-Type', 'application/json');
     const send = (value: unknown) => res.end(JSON.stringify(value));
     if (responses.has(path)) { send(responses.get(path)); return; }
@@ -109,7 +116,7 @@ beforeEach(async () => {
   await new Promise<void>(r => previousServer.listen(0, '127.0.0.1', r));
   previousBase = `http://127.0.0.1:${(previousServer.address() as { port: number }).port}`;
 });
-afterEach(async () => { for (const timer of timers) clearTimeout(timer); timers.clear(); server.closeAllConnections(); await new Promise<void>(r => server.close(() => r())); previousServer.closeAllConnections(); await new Promise<void>(r => previousServer.close(() => r())); await rm(root, { recursive: true, force: true }); vi.restoreAllMocks(); });
+afterEach(async () => { for (const release of putBarrier ?? []) release(); for (const timer of timers) clearTimeout(timer); timers.clear(); server.closeAllConnections(); await new Promise<void>(r => server.close(() => r())); previousServer.closeAllConnections(); await new Promise<void>(r => previousServer.close(() => r())); await rm(root, { recursive: true, force: true }); vi.restoreAllMocks(); });
 async function credentials(serverUrl = base, accessToken = token) {
   await writeCredentials(home, { server: serverUrl, accessToken, user: { id: user.id, email: user.email }, createdAt: new Date().toISOString() });
 }
@@ -483,7 +490,7 @@ test('B2 旧会话撤销失败只警告，新凭证仍有效', async () => {
   const r = await cli(['login']); expect(r.code).toBe(0); expect(r.stderr).toContain('old session'); expect(JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).accessToken).toBe(token);
 });
 test('B5/B11 并发失败等待在途任务结束，停止启动新对象且移除 SIGINT 监听器', async () => {
-  await credentials(); for (let i = 0; i < 9; i++) files[`assets/${i}.css`] = 'body' + i; missingCount = 99; putHold = 35; putStatus = 403;
+  await credentials(); for (let i = 0; i < 9; i++) files[`assets/${i}.css`] = 'body' + i; missingCount = 99; putBarrier = []; putStatus = 403;
   expect((await cli(['share', project])).code).toBe(1); expect(maxActivePuts).toBe(4); expect(calls.filter(c => c.method === 'PUT')).toHaveLength(4); await vi.waitFor(() => expect(activePuts).toBe(0));
 });
 test('A4 Retry-After 支持 HTTP 日期，不按指数退避覆盖它', async () => {

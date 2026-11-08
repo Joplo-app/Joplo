@@ -360,6 +360,19 @@ async function smoke() {
     const budget = checkSiteBudget(siteFiles(path.join(project, 'dist')));
     log(`  ✓ Published site budget: ${budget.fonts} font bytes / 1500000, ${budget.files} files / 150`);
 
+    // Feature diff must work from packed CLI/server assets, without importing workspace sources.
+    const diffGuide = sh(joplo, ['skill', 'diff'], project);
+    assert(diffGuide.stdout.includes('joplo-step-keys'), '安装包应提供稳定身份兼容指南');
+    const diffDir = path.join(project, 'feature-diff');
+    sh(joplo, ['diff', 'dist', 'dist', '--out', diffDir, '--format', 'json'], project);
+    const diffManifest = readJson(path.join(diffDir, 'feature-diff.json'));
+    assert(diffManifest.formatVersion === 1 && diffManifest.status !== 'incompatible', '打包后的 diff 应识别真实发布播放器');
+    for (const rel of ['index.html', 'before/index.html', 'after/index.html']) assert(fs.existsSync(path.join(diffDir, rel)), `diff 缺少 ${rel}`);
+    const diffHtml = fs.readFileSync(path.join(diffDir, 'index.html'), 'utf8');
+    assert(diffHtml.includes('joplo-feature-diff') && diffHtml.includes('joplo:goto') && diffHtml.includes('joplo-diff-locales'), 'tarball 应包含独立 diff runtime 和 UI 词典');
+    assert(!diffHtml.includes('__name'), 'diff runtime 不应依赖源码转译器 helper');
+    log('  ✓ Packed feature diff: two public builds, viewer runtime, manifest, and skill');
+
     // 7. render：没有导出组件（D66）时非交互环境以退出码 4 结束，提示 setup export，不下载、不改项目依赖文件
     const exportHome = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-smoke-export-home-'));
     const depFiles = () => ['package.json', 'package-lock.json'].map((f) => (fs.existsSync(path.join(project, f)) ? fs.readFileSync(path.join(project, f), 'utf8') : '-')).join('\n') + '\n' + fs.readdirSync(path.join(project, 'node_modules')).sort().join(',');

@@ -15,22 +15,24 @@ export const SKILL_TOPICS = [
   { name: 'check', description: 'Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line' },
   { name: 'selection', description: 'Edit only the element selected by the user in the board' },
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
+  { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
   { name: 'publish', description: 'pick, build, share, review version, feedback write-back, deployment' },
 ] as const;
 export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
 
 const related: Record<SkillTopic, readonly SkillTopic[]> = {
-  authoring: ['story', 'demo', 'focus', 'diagram', 'components', 'cases', 'check', 'selection', 'review', 'publish'],
+  authoring: ['story', 'demo', 'focus', 'diagram', 'components', 'cases', 'check', 'selection', 'review', 'publish', 'diff'],
   story: ['authoring', 'cases', 'demo', 'focus', 'check'],
   demo: ['story', 'focus', 'authoring', 'diagram', 'components', 'check', 'review', 'publish'],
   focus: ['demo', 'diagram', 'check', 'authoring'],
   diagram: ['demo', 'focus', 'components', 'check'],
   components: ['authoring', 'demo', 'focus', 'diagram', 'check'],
   cases: ['story', 'authoring', 'check'],
-  check: ['authoring', 'selection'],
+  check: ['authoring', 'selection', 'diff'],
   selection: ['check', 'authoring', 'review'],
   review: ['selection', 'check', 'publish'],
-  publish: ['demo', 'authoring', 'check', 'review'],
+  publish: ['diff', 'demo', 'authoring', 'check', 'review'],
+  diff: ['publish', 'authoring', 'demo', 'check'],
 };
 
 /** CLI 传入其 package.json 版本；行数来自同一次生成的主题正文。 */
@@ -681,6 +683,8 @@ See authoring for flow and rule syntax; check for locating coverage diagnostics.
 No mobile example yet; create a separate demo when mobile is needed (D44).`,
   check: `# Joplo diagnostics: check
 
+STEP_KEY_INVALID: use a letter followed by up to 63 letters/digits/underscores/hyphens. STEP_KEY_DUPLICATE: each step key must be unique within its scenario; keep the same key only for the same action across versions. See diff for identity guidance.
+
 Run npx joplo check [dir]. Use --option feature.option to narrow structure checks and replay; --format json gives machine output.
 The whole project still compiles. Option filtering does not hide project compilation errors. Source files load locally.
 
@@ -847,6 +851,50 @@ It reads .joplo/selection.json directly without recompiling, avoiding a whole-pa
 Edit → npx joplo check → npx joplo dev to view the board (a running board just adds the project) → user ⌥+clicks → npx joplo selection → edit only that location.
 Run check again afterward. Preserve other options, pages, and existing user decisions.
 .joplo/ is local runtime state, not the design authority. Do not commit it to Git.`,
+  diff: `# Joplo feature changes: diff
+
+Use this when comparing two versions of authored feature demos, or publishing cumulative PR changes. It does not verify a real application, run pixel regression, or infer implementation from source lines.
+
+## Stable identity
+- Give an action a key AFTER declaring it: flow('Invite').click('send', set($.ui.sending, true)).key('send-invitation').
+- A key starts with a letter and has at most 64 letters, digits, underscores or hyphens. Keys are unique within one scenario. Keep a key when editing or moving the same action; use a new key for a different action. STEP_KEY_DUPLICATE / STEP_KEY_INVALID must be fixed in source.
+- Existing step ids (scenario#1, scenario#2) still address playback positions. They are not stable identities across versions.
+- Public playback IR keeps the old shape for strict older Readers. Stable keys are in a separate, versioned joplo-step-keys JSON script. Core validates every scenario/step reference and uniqueness before using it. Never hand-edit generated metadata.
+- Old builds without keys use unique content, then unique action identity, conservatively. Repeated candidates are uncertain, never guessed from their order. Add distinct keys in both versions where practical, or review those steps separately. If only one side has keys, a unique legacy content/action match is still allowed and recorded as heuristic; different explicit keys are never paired.
+
+## Build a local comparison
+1. Obtain the two real source versions. Run check/build for EACH in an isolated checkout. A missing or failed baseline build must fail; never substitute an empty project.
+2. Use the SAME fixed diff-capable CLI for both source versions (do not resolve the baseline checkout's older CLI). Run npx joplo build ./before-project --out ./before-site and npx joplo build ./after-project --out ./after-site.
+3. Run npx joplo diff ./before-site ./after-site --out ./diff-site. The output directory must not exist and must be separate from the inputs. Optional --base-sha / --head-sha record normalized 40-character commit SHAs; they are required for PR publication.
+4. Open diff-site/index.html through a static server. Font responses need Access-Control-Allow-Origin: * because the nested players use opaque sandboxes (Joplo Cloud already supplies this). Check the rendered states, not only the JSON summary.
+
+The bundle has root index.html, before/, after/ and feature-diff.json. Only publish builds are accepted; dev/review IR, private authoring fields, symlinks and project files are rejected. Incompatible IR or a missing diff-player capability marker gets a local diagnostic viewer without copied version payloads, and cannot be published.
+
+## Read the result
+- Added scenarios play the new version full width; removed scenarios play the old version full width. Only existing modified scenarios compare both versions. Unchanged scenarios are hidden until requested.
+- Action, effects, captions/presentation, initial state, reachable screens/layers, roles and theme changes count. Shared screen/theme changes conservatively affect scenarios. Private rule text is intentionally outside the public comparison; an observable rule change must change effects or public presentation.
+- The viewer defaults to changed fragments. Both players rebuild ALL preceding state with goto, including unchanged steps, and confirm their positions before automatic playback continues. Expand Full context to inspect everything. A screen/initial/theme change exposes the whole affected scenario.
+- Uncertain matches, incompatible builds, no feature changes, and project presentation changes without a playable scenario have distinct states. No changes is a successful comparison, not a build failure.
+- If an embedded player changes scenario or moves independently, comparison playback stops and prior alignment confirmations expire. Use Realign: both panes must report the requested scenario AND step again, including a pane whose step did not change. A late message or returning independently does not resume playback; after alignment, press Play changes yourself. If either player fails to confirm, playback stops; Reload players or Realign retries. Initial-state comparisons show the actual screen rather than the scenario cover. Synchronized narration is muted; no dual-version speech synchronization is claimed.
+- The manifest is public business data, not a private review manifest. Root HTML is a comparison viewer, not one Project. In the tested Cloud comparison integration, root HTML works while root Markdown/JSON negotiation returns 422 IR_UNAVAILABLE. Nested before/after Markdown/JSON routes return each single version's public resources; they do not expose a cross-version Agent diff model. Verify the deployed Cloud version before relying on those routes. Direct feature-diff.json is the business manifest.
+
+## Prepare, build, publish in isolated CI jobs
+- Use a trusted fixed CLI version, installed outside the PR checkout. Never let PR code run in a job/runner holding JOPLO_API_KEY. Use a trusted default-branch workflow_run publisher and separate fresh hosted runners; keep the key in a publishing environment restricted to that branch, never in PR-editable workflows. Do not execute PR code in pull_request_target. Fork PRs without publication credentials must explicitly skip.
+- In the trusted prepare job, calculate git merge-base for the candidate and run npx joplo diff prepare --repo owner/name --pr <number> --sha <current-head> --base-sha <candidate> --out comparison.json.
+- The receipt contains comparisonId, generation and the pinned baseSha returned by Cloud. It contains no credential. Every prepare increments generation; do not prepare again between build and publish. Build using the RETURNED base, even after rebase/force-push. If it cannot be fetched, stop and report it.
+- In the uncredentialed build job, build both SHAs, then run npx joplo diff before-site after-site --out diff-site --base-sha <receipt-base> --head-sha <receipt-head>. Pass only static artifacts to the publisher. Keep the original trusted receipt separate from build artifacts.
+- In a fresh trusted publishing job with no PR checkout, run the fixed CLI directly (avoid project-local npx resolution): joplo diff publish diff-site --prepared comparison.json --repo owner/name --pr <number> --sha <current-head> --format json.
+- API keys need shares:publish. The CLI validates receipt/source, recomputes the semantic manifest, verifies its hash in the upload list, then uses prepare/upload/finalize. It never executes project code in publish, includes no private review data, and never replaces a completed comparison Share. It does not downgrade failed comparisons to ordinary shares.
+- Only publish when the user's existing authorization includes publication; building a local diff does not itself authorize uploading or PR comments.
+
+## Failures and recovery
+- PR_APP_MISSING: configure/install/link the GitHub App with repository access, then prepare again.
+- PR_CLOSED: stop this publication. PR_STALE_HEAD: prepare and build the newest head against the pinned base. PR_STALE_GENERATION: a newer prepare exists; prepare and rebuild instead of reusing the old package.
+- PR_MISMATCH: correct repo/number/base/head against the receipt. PR_UNAVAILABLE: retry later; never fall back to unverified publication. CONFLICT: retry a concurrent request; comparison shares must be new rather than replaced.
+- AUTH_REQUIRED / AUTH_EXPIRED exit 3. USAGE exits 2. Validation, mismatch, upload and PR errors exit 1. Local unchanged/uncertain/incompatible diagnostic bundles exit 0 with their explicit manifest status; CI publish rejects incompatible bundles.
+- A successful finalize may be a historical link after a newer generation wins; do not claim it is the current PR pointer without Cloud confirmation. pr.comment=failed means publication succeeded but the comment did not; Cloud handles retry.
+`,
+
   publish: `# Joplo publishing: publish
 
 Compare cases and options in the board, then decide which option to publish for each feature.
@@ -908,6 +956,9 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - Local check / build / dev remain free and do not connect to the cloud.
 - CI: set JOPLO_API_KEY (jpk_..., created in Settings → API keys) instead of logging in. Every cloud command then uses it; credentials.json and browser login are never touched. An invalid or revoked key returns AUTH_EXPIRED: ask the user for a new key.
 - PR previews: in GitHub Actions run npx joplo share --new --pr <number> --format json; repo, commit, and run URL come from the Actions environment. Outside Actions pass --repo owner/name. data.pr.comment "skipped" means the Joplo GitHub App is not installed; tell the user, the share itself succeeded.
+
+## Feature changes across versions
+For local comparisons and PR CI, read npx joplo skill diff. It compares two real publish builds and creates one immutable bundle; ordinary share --pr remains a single preview.
 
 ## Review and feedback (the joplo-feedback skill has the same steps)
 - npx joplo share --review publishes the review version: every option of every feature, so reviewers can compare A/B. Rules, questions, cases, and AI assumptions still never appear in uploaded files; they go only to the review page through the request body. Plain share publishes only picked options.
