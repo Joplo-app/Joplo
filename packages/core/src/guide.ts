@@ -221,7 +221,7 @@ Check: read every line aloud in order without looking at the screen. It should s
 
 ## 7. Explainers and news-style demos (a topic, not a product)
 When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets.
-- Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. One chapter per scenario, one case per chapter.
+- Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. One chapter per scenario, one case per chapter; the published site plays them back to back with an Up next countdown, like one video.
 - Case titles are what viewers read in the board sidebar: for an explainer write them as numbered chapter headlines ('01 What is on the ballot?'), not acceptance criteria; name the option after the style ('Dark quick-cut'), not 'A'.
 - Graphics that carry the story: a seat chart filling up, a tile map recoloring, bars growing or flipping, a document flying between two sides and getting stamped. Build them from divs with style bound to state (demo: Custom motion) and real photos (components: Real images).
 - Facts: keep every number in one data module with its source and as-of time, show a source line on each graphic, separate called or projected results from final ones, and leave out what you cannot verify rather than hedging on screen.
