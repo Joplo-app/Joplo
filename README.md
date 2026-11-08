@@ -1,12 +1,23 @@
 <p align="center"><img src="assets/brand/joplo-logo.svg" alt="Joplo" width="320"></p>
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+<p align="center">
+  <a href="https://www.npmjs.com/package/joplo"><img src="https://img.shields.io/npm/v/joplo?color=FFD23F&labelColor=1E1E1E" alt="npm version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-1E1E1E" alt="License: Apache-2.0"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%E2%89%A522-1E1E1E" alt="Node.js 22 or later"></a>
+</p>
+
+<p align="center">
+  <a href="https://joplo.app/s/dn1MWCcnDW/"><img src="https://joplo.app/s/dn1MWCcnDW/badge.svg" alt="Joplo demo: Joplo's own design process"></a><br>
+  <sub>☝️ A live Joplo badge. Click it to play Joplo's own design process, published by CI with <code>joplo share</code>.</sub>
+</p>
+
+<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
 
 # Joplo
 
 **Design the behavior before you build the feature.** Joplo helps you and your coding agent turn ideas into low-fidelity, interactive demos: explore edge cases, compare options, and keep the rules behind each decision.
 
-Author pages and flows in TSX, review them in the local **Board**, then build a static **Published site** from the options you choose. Files are the source of truth; Git keeps the history. Option-click an element to give your agent its exact file and line.
+Author pages and flows in TSX, review them in the local **Board**, then build a static **Published site** from the options you choose — or share it with one command and drop a playable badge or embedded player into a README, docs page, or blog post. Files are the source of truth; Git keeps the history. Option-click an element to give your agent its exact file and line.
 
 ![Joplo Board](docs/screenshots/board-play-initial.png)
 
@@ -33,6 +44,7 @@ Keep the Board process running. Edit the generated TSX files and watch the demo 
 - **Terminal and Phone:** model command-line interactions with `Terminal`; mobile pages use a `Phone` frame. Each page targets one device.
 - **Themes:** choose from nine built-ins or add `themes/<name>.css`. Board settings can apply a Theme to one project or all projects.
 - **Exports:** export the current step as an image or record a whole scenario locally. The Published site supports image export, Layers, Director, and fullscreen playback.
+- **Share and embed:** `npx joplo share` uploads the Published site and prints a README badge; the same link also serves a preview image and a lightweight embedded player for docs and blogs. See [Share and embed](#share-and-embed).
 
 ## Work with an agent
 
@@ -42,7 +54,7 @@ Two ways to give a coding agent (Claude Code, Codex, …) the Joplo skills `jopl
 
 ```sh
 npx skills add Joplo-app/Joplo           # official skills from this repo; any repo, even before Joplo is installed
-npx skills add https://github.com/Joplo-app/Joplo/tree/v0.2.6   # pin to a release tag (Joplo-app/Joplo@v… does not work: the skills CLI reads @… as a skill name)
+npx skills add https://github.com/Joplo-app/Joplo/tree/v0.2.13   # pin to a release tag (Joplo-app/Joplo@v… does not work: the skills CLI reads @… as a skill name)
 npx joplo skill install                  # inside a Joplo project: skills matching the project's installed version
 ```
 
@@ -65,7 +77,7 @@ npx joplo skill review
 npx joplo skill install --agents-md
 ```
 
-The eleven topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, `review` (local listening, Share polling, prompt acknowledgement, version isolation, recovery, and best practices), and `publish`. `npx joplo components <Name>` prints the props and an example for one component. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
+The twelve topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, `review` (local listening, Share polling, prompt acknowledgement, version isolation, recovery, and best practices), `diff` (compare feature changes across builds and in PR CI), and `publish` (build, share, embed, review versions). `npx joplo components <Name>` prints the props and an example for one component. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
 
 Use a second terminal while the Board is running:
 
@@ -123,6 +135,59 @@ Build publishes only the selected Options. The Published site shares the Board's
 
 Use your own Wrangler account and configure the site name and compatibility date for deployment. The output also works with other static hosts. See [CLI reference](docs/cli.md) for output directories, overwrite options, and screenshots.
 
+## Share and embed
+
+Skip hosting entirely: `joplo share` checks, builds, and uploads the Published site to Joplo Cloud, then prints everything you need to put the demo in front of people.
+
+```sh
+npx joplo login          # once
+npx joplo share
+```
+
+```text
+Published https://joplo.app/s/<share-id>/
+Permanent link
+Add to README: [![Joplo 演示 · <title>](https://joplo.app/s/<share-id>/badge.svg)](https://joplo.app/s/<share-id>/)
+More embed options: https://cloud.joplo.app/shares/<share-id>
+```
+
+Every share link comes with three ways to show it:
+
+| Where | Use | What viewers get |
+| --- | --- | --- |
+| README, issue, PR | `[![…](<link>badge.svg)](<link>)` — the `Add to README` line | A playable badge, like the one [at the top of this page](#joplo), that opens the full demo |
+| Social cards, link previews | `<link>preview.png` | A 1200×630 image of the default scenario's first screen |
+| Docs, blogs, product pages | `<iframe src="<link>?embed=1" …>` | A compact player: cover with a big play button, then step controls, scenario switcher, and fullscreen |
+
+The embed code from `--format json` or the Cloud console is ready to paste:
+
+```html
+<iframe src="https://joplo.app/s/<share-id>/?embed=1" title="<title> · Joplo 演示"
+  style="width:100%;aspect-ratio:16/10;border:0"
+  allow="fullscreen *" allowfullscreen loading="lazy"></iframe>
+```
+
+- Add `&scenario=<scenario id>` to start from a specific scenario (`npx joplo outline` lists the ids) and `&autoplay=1` to skip the cover. Invalid values fall back to the cover and the default scenario.
+- Keep `allow="fullscreen *"`: the share page runs in a CSP sandbox, so plain `allow="fullscreen"` blocks fullscreen in Chromium, Firefox, and WebKit. Without it the player falls back to opening the demo in a new tab.
+- The embedded player makes no network requests and does not use storage. GitHub strips iframes from Markdown, so use the badge there.
+- `--scenario <id>` and `--feature <id>` share only part of a project. Everything else is cut at build time, not hidden.
+- Free links expire after one hour, and their badge then shows "expired". Pro links are permanent, and re-sharing updates the same link, so badges and embeds you already published stay current.
+- In CI, set `JOPLO_API_KEY` and run `npx joplo share --new --pr <number> --format json` for a PR preview. Agents should copy `data.embed.markdown` / `data.embed.iframe` as is rather than building URLs themselves.
+
+The preview image needs the optional export component (`npx joplo setup export`); without it, share still succeeds and uses a generic card. Details: [`share` in the CLI reference](docs/cli.md#share) and [embed mode](docs/web.md#嵌入模式).
+
+## Compare feature changes
+
+Compare two real public builds and get one review site that plays both versions:
+
+```sh
+npx joplo diff before-site after-site --out diff-site
+```
+
+Added scenarios play the new version, removed scenarios play the old one, and modified scenarios stack both players in one frame: press Space to flip between old and new in place, or switch to side by side. The sidebar lists every change by caption, and each change card shows what was inserted, deleted, or edited, with the old → new result values. Stable `.key()` identities keep steps aligned across insertions; ambiguous legacy matches stay marked as uncertain. In PR CI, `diff prepare` pins the baseline, the PR is built without credentials, and `diff publish` runs separately with them. A demo change is not proof that the real implementation changed.
+
+Run `npx joplo skill diff` for the version-matched workflow and recovery steps. See the [CLI](docs/cli.md#diff跨版本功能变化) and the [full guide with a safe CI example](docs/feature-diff/README.md).
+
 ## Examples
 
 | Example | What to explore |
@@ -131,7 +196,9 @@ Use your own Wrangler account and configure the site name and compatibility date
 | [examples/agent-arch](examples/agent-arch) | Layers, Director, grouped `Diagram`, `Sequence`, `StateMachine`, and `trace()` for an agent architecture |
 | [examples/joplo](examples/joplo) | Joplo’s own evolving design workspace: real feature alternatives, interaction prototypes and documented decisions |
 
-[Watch Joplo’s design process](https://joplo.app/s/dn1MWCcnDW/). The self-design workflow publishes a separate feature comparison for same-repository PRs after CI passes, and updates this fixed link after successful main CI. See [automation and recovery](docs/self-design/CI-CONTRACT.md); npm releases remain tag-driven.
+[![Joplo demo: Joplo's own design process](https://joplo.app/s/dn1MWCcnDW/badge.svg)](https://joplo.app/s/dn1MWCcnDW/)
+
+The self-design workflow publishes a separate feature comparison for same-repository PRs after CI passes, and updates this fixed link after successful main CI. See [automation and recovery](docs/self-design/CI-CONTRACT.md); npm releases remain tag-driven.
 
 ## Develop in this repository
 
@@ -156,6 +223,8 @@ See [dependencies and licenses](docs/dependencies.md) and the [npm release workf
 
 - [CLI reference](docs/cli.md)
 - [Board and Published site](docs/web.md)
+- [Embed mode](docs/web.md#嵌入模式)
+- [Feature diff](docs/feature-diff/README.md)
 - [Themes](docs/themes.md)
 - [Authoring model](docs/adr/0002-hugo-like-authoring.md)
 - [Demo model and architecture](docs/adr/0003-demo-model.md)
@@ -172,9 +241,3 @@ Author modules execute on your machine during loading, checks, and builds. Only 
 ## License
 
 [Apache-2.0](LICENSE). Bundled fonts use [SIL OFL 1.1](packages/web/src/fonts/OFL.txt).
-
-## Feature diff / 功能差异
-
-Compare two real public builds with `joplo diff before-site after-site --out diff-site`. Added scenarios play the new version full width; modified scenarios compare both versions; removed scenarios show the old version. Stable `.key()` identities preserve alignment across inserted steps, and ambiguous legacy matches remain explicit.
-
-使用 `joplo skill diff` 读取当前版本的操作、成功判断与恢复指南。PR CI 使用 `diff prepare` 固定起点，再隔离构建与 `diff publish` 凭证；不把演示变化当成真实实现验证。详见 [CLI](docs/cli.md#diff跨版本功能变化) 和 [完整指南／安全 CI 示例](docs/feature-diff/README.md)。

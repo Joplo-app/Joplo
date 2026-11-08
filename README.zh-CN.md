@@ -1,12 +1,23 @@
 <p align="center"><img src="assets/brand/joplo-logo.svg" alt="Joplo" width="320"></p>
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+<p align="center">
+  <a href="https://www.npmjs.com/package/joplo"><img src="https://img.shields.io/npm/v/joplo?color=FFD23F&labelColor=1E1E1E" alt="npm 版本"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-1E1E1E" alt="许可证：Apache-2.0"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%E2%89%A522-1E1E1E" alt="Node.js 22 或更新版本"></a>
+</p>
+
+<p align="center">
+  <a href="https://joplo.app/s/dn1MWCcnDW/"><img src="https://joplo.app/s/dn1MWCcnDW/badge.svg" alt="Joplo 演示：Joplo 的真实设计过程"></a><br>
+  <sub>☝️ 这就是 Joplo 徽章：点开就能播放 Joplo 自己的设计过程，由 CI 用 <code>joplo share</code> 发布。</sub>
+</p>
+
+<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
 
 # Joplo
 
 **先把功能想清楚、演示清楚，再动手实现。** Joplo 帮你和编码 Agent 把想法变成低保真、可点击的演示，探索边界情况、比较方案，并保留每个决定背后的规则。
 
-用 TSX 创作页面和流程，在本地看板（Board）查看，选定方案后构建静态发布站（Published site）。源文件是权威源，版本交给 Git。按住 ⌥（Option/Alt）单击元素，就能把精确的文件和行号交给 Agent。
+用 TSX 创作页面和流程，在本地看板（Board）查看，选定方案后构建静态发布站（Published site）；也可以一条命令分享出去，把可播放的徽章或嵌入播放器放进 README、文档和博客。源文件是权威源，版本交给 Git。按住 ⌥（Option/Alt）单击元素，就能把精确的文件和行号交给 Agent。
 
 ![Joplo 看板](docs/screenshots/board-play-initial.png)
 
@@ -33,6 +44,7 @@ npx joplo dev --open
 - **Terminal 与 Phone**：用 `Terminal` 表达命令行交互；手机页面使用 `Phone` 外框。每个页面只面向一种设备。
 - **主题 Themes**：九个内置主题，也可添加 `themes/<name>.css`；看板设置可对当前项目或所有项目应用主题。
 - **导出**：导出当前步骤图片，或在本地录制整个场景。发布站支持图片导出、层级、导演与全屏播放。
+- **分享与嵌入**：`npx joplo share` 上传发布站并打印 README 徽章；同一个链接还提供预览图和给文档、博客用的精简嵌入播放器，见[分享与嵌入](#分享与嵌入)。
 
 ## 与 Agent 配合
 
@@ -42,7 +54,7 @@ npx joplo dev --open
 
 ```sh
 npx skills add Joplo-app/Joplo           # 本仓库的官方技能；任何仓库都能用，装 Joplo 之前也行
-npx skills add https://github.com/Joplo-app/Joplo/tree/v0.2.6   # 固定到某个发布 tag（Joplo-app/Joplo@v… 不能用：skills CLI 把 @ 后面当技能名）
+npx skills add https://github.com/Joplo-app/Joplo/tree/v0.2.13   # 固定到某个发布 tag（Joplo-app/Joplo@v… 不能用：skills CLI 把 @ 后面当技能名）
 npx joplo skill install                  # 在 Joplo 项目里：与项目安装的版本一致
 ```
 
@@ -65,7 +77,7 @@ npx joplo skill review
 npx joplo skill install --agents-md
 ```
 
-十一个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`focus`（每一步看哪里：默认焦点、聚光、强调、标注、编号、停留、遮挡）、`diagram`（分组的架构图、时序图、状态机与镜头取景）、`components`、`cases`、`check`、`selection`、`review`（本地监听、Share 轮询、快速回执、版本隔离、恢复与最佳实践）、`publish`，每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
+十二个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`focus`（每一步看哪里：默认焦点、聚光、强调、标注、编号、停留、遮挡）、`diagram`（分组的架构图、时序图、状态机与镜头取景）、`components`、`cases`、`check`、`selection`、`review`（本地监听、Share 轮询、快速回执、版本隔离、恢复与最佳实践）、`diff`（跨版本与 PR CI 中的功能差异）、`publish`（构建、分享、嵌入、评审版），每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
 
 看板运行时，在另一个终端执行：
 
@@ -123,6 +135,59 @@ build 只发布选定方案。发布站与看板共用演示页布局，保留�
 
 部署使用你自己的 Wrangler 账号，并配置站点名与兼容日期；产物也能交给其他静态托管服务。输出目录、覆盖选项与截图用法见 [CLI 文档](docs/cli.md)。
 
+## 分享与嵌入
+
+不想自己托管时，`joplo share` 会检查、构建并把发布站上传到 Joplo Cloud，然后打印把演示放到别人面前所需的一切：
+
+```sh
+npx joplo login          # 只需一次
+npx joplo share
+```
+
+```text
+Published https://joplo.app/s/<share-id>/
+Permanent link
+Add to README: [![Joplo 演示 · <标题>](https://joplo.app/s/<share-id>/badge.svg)](https://joplo.app/s/<share-id>/)
+More embed options: https://cloud.joplo.app/shares/<share-id>
+```
+
+每个分享链接都有三种展示方式：
+
+| 放在哪里 | 用什么 | 观众看到什么 |
+| --- | --- | --- |
+| README、Issue、PR | `[![…](<链接>badge.svg)](<链接>)`，即 `Add to README` 那一行 | 一个可点击的徽章（就像[本页顶部](#joplo)那个），打开完整演示 |
+| 社交卡片、链接预览 | `<链接>preview.png` | 默认场景首屏的 1200×630 图片 |
+| 文档、博客、产品页 | `<iframe src="<链接>?embed=1" …>` | 精简播放器：先显示带大播放按钮的封面，播放后有逐步控制、场景切换和全屏 |
+
+`--format json` 或云端控制台给出的嵌入代码可以直接粘贴：
+
+```html
+<iframe src="https://joplo.app/s/<share-id>/?embed=1" title="<标题> · Joplo 演示"
+  style="width:100%;aspect-ratio:16/10;border:0"
+  allow="fullscreen *" allowfullscreen loading="lazy"></iframe>
+```
+
+- 加 `&scenario=<场景 id>` 从指定场景开始（`npx joplo outline` 列出场景 id），加 `&autoplay=1` 跳过封面直接播放。参数写错时照常显示封面、从默认场景开始。
+- 保留 `allow="fullscreen *"`：分享页运行在 CSP 沙箱里，只写 `allow="fullscreen"` 时 Chromium、Firefox、WebKit 都会拒绝全屏；去掉后播放器退回为在新标签页打开演示。
+- 嵌入播放器不发网络请求、不依赖存储。GitHub 会过滤 Markdown 里的 iframe，README 里请用徽章。
+- `--scenario <id>`、`--feature <id>` 只分享项目的一部分；范围外的内容在构建时就被裁掉，不是隐藏。
+- 免费链接 1 小时后过期，过期后徽章显示“已过期”。Pro 链接永久有效，再次 share 更新同一个链接，已经贴出去的徽章和嵌入会跟着更新。
+- CI 中设置 `JOPLO_API_KEY`，用 `npx joplo share --new --pr <number> --format json` 发布 PR 预览。Agent 应原样使用 `data.embed.markdown` / `data.embed.iframe`，不要自己拼地址。
+
+预览图需要可选的导出组件（`npx joplo setup export`）；没有时 share 照常成功，分享页使用通用卡片。详见 [CLI 文档的 share](docs/cli.md#share) 和[嵌入模式](docs/web.md#嵌入模式)。
+
+## 比较功能变化
+
+比较两个真实的公开构建，得到一个同时播放两个版本的差异站点：
+
+```sh
+npx joplo diff before-site after-site --out diff-site
+```
+
+新增场景播放新版，删除场景播放旧版；修改的场景把两版播放器叠在同一画面，按空格原地切换旧版／新版，也可以切到并排。左栏按字幕列出每一处变化，变化卡说明是插入、删除还是改了什么，并列出结果的旧 → 新值。稳定的 `.key()` 身份让插入步骤后仍能对齐；无法确定的旧版匹配会明确标为不确定。PR CI 中先用 `diff prepare` 固定基线，在没有凭证的环境构建 PR，再单独用凭证运行 `diff publish`。演示变化不等于真实实现已经改变。
+
+运行 `npx joplo skill diff` 获取与当前版本一致的操作、成功判断与恢复指南。详见 [CLI](docs/cli.md#diff跨版本功能变化) 和[完整指南／安全 CI 示例](docs/feature-diff/README.md)。
+
 ## 示例
 
 | 示例 | 可以看什么 |
@@ -131,7 +196,9 @@ build 只发布选定方案。发布站与看板共用演示页布局，保留�
 | [examples/agent-arch](examples/agent-arch) | 用层级、导演、分组的 `Diagram`、`Sequence`、`StateMachine` 与 `trace()` 演示 Agent 架构 |
 | [examples/joplo](examples/joplo) | 用 Joplo 设计 Joplo：统一的真实功能方案、交互原型与设计决策 |
 
-[观看 Joplo 的真实设计过程](https://joplo.app/s/dn1MWCcnDW/)。自设计工作流在同仓 PR 的 CI 通过后生成独立功能差异预览，在 main CI 通过后更新这个固定链接。配置与恢复见[自动发布说明](docs/self-design/CI-CONTRACT.md)；npm 仍按 tag 单独发布。
+[![Joplo 演示：Joplo 的真实设计过程](https://joplo.app/s/dn1MWCcnDW/badge.svg)](https://joplo.app/s/dn1MWCcnDW/)
+
+自设计工作流在同仓 PR 的 CI 通过后生成独立功能差异预览，在 main CI 通过后更新这个固定链接。配置与恢复见[自动发布说明](docs/self-design/CI-CONTRACT.md)；npm 仍按 tag 单独发布。
 
 ## 仓库内开发
 
@@ -156,6 +223,8 @@ npx joplo setup export
 
 - [CLI 文档](docs/cli.md)
 - [看板与发布站](docs/web.md)
+- [嵌入模式](docs/web.md#嵌入模式)
+- [功能差异](docs/feature-diff/README.md)
 - [主题](docs/themes.md)
 - [创作模型](docs/adr/0002-hugo-like-authoring.md)
 - [演示模型与架构](docs/adr/0003-demo-model.md)
@@ -172,9 +241,3 @@ Joplo 表达设计行为，不运行真实业务后端；只支持静态路径�
 ## 许可证
 
 [Apache-2.0](LICENSE)。随包字体使用 [SIL OFL 1.1](packages/web/src/fonts/OFL.txt)。
-
-## Feature diff / 功能差异
-
-Compare two real public builds with `joplo diff before-site after-site --out diff-site`. Added scenarios play the new version full width; modified scenarios compare both versions; removed scenarios show the old version. Stable `.key()` identities preserve alignment across inserted steps, and ambiguous legacy matches remain explicit.
-
-使用 `joplo skill diff` 读取当前版本的操作、成功判断与恢复指南。PR CI 使用 `diff prepare` 固定起点，再隔离构建与 `diff publish` 凭证；不把演示变化当成真实实现验证。详见 [CLI](docs/cli.md#diff跨版本功能变化) 和 [完整指南／安全 CI 示例](docs/feature-diff/README.md)。
