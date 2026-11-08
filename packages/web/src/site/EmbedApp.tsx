@@ -42,7 +42,8 @@ const BRAND_URL = 'https://joplo.app/';
 /** 控制条随宽度收起：< 560 场景切换只剩图标、品牌只剩标志；< 400 去掉进度条。 */
 const barLayout = (w: number) => ({ compact: w < 560, tiny: w < 400 });
 
-export function EmbedApp({ project, params }: { project: Project; params: EmbedParams }) {
+/** branding：false 时（Pro 分享，D83）不显示「Made with Joplo」。 */
+export function EmbedApp({ project, params, branding = true }: { project: Project; params: EmbedParams; branding?: boolean }) {
   const { t: i18n } = useI18n();
   const init = useMemo(() => embedInitial(project, params), [project, params]);
   // 同步建好控制器并定位到起始场景：首帧就是封面画面（服务端渲染测试也能看到）
@@ -247,7 +248,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const brand = (
+  const brand = branding ? (
     <a
       href={BRAND_URL}
       target="_blank"
@@ -261,7 +262,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
       {covered ? i18n.site.embedMadeWithJoplo : L.compact ? null : 'Joplo'}
       {covered ? null : <ExternalLink className="size-3 text-jb-muted" aria-hidden />}
     </a>
-  );
+  ) : null;
 
   return (
     <div ref={rootRef} tabIndex={-1} className="relative flex h-full w-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg outline-none" data-testid="embed" data-covered={covered ? '' : undefined} data-fullscreen={full ? '' : undefined}>
@@ -361,7 +362,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
         scenario ? <Subtitle content={subtitle} theme={project.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} framed divider /> : null
       ) : covered || !scenario ? (
         <div ref={rowRef} className="flex h-9 shrink-0 items-center justify-between gap-3 border-t border-jb-line bg-jb-surface px-2.5" data-testid="embed-cover-footer">
-          {brand}
+          {brand ?? <span aria-hidden />}
           {scenario && !L.compact ? <span className="min-w-0 truncate text-[12px] text-jb-muted">{i18n.site.embedCoverHint}</span> : null}
         </div>
       ) : (

@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- 发布站的舞台右上角新增一个淡淡的小 Joplo 图标，点击在新标签页打开 joplo.app。Joplo Cloud 上 Pro 创作者的分享（含嵌入）没有水印；本地 `joplo build` 后自己托管的站点照常带。嵌入沿用原来的「用 Joplo 制作」，Pro 分享里同样去掉。看板和导出的图片、视频不带水印。
 - 免费分享链接的有效期与 Cloud 对齐，改为 7 天：`joplo share` 的提示、看板发布弹窗里的套餐说明（10 种语言）、官方技能和文档原来都写着 1 小时。
 - 许可证由 Apache-2.0 改为 PolyForm Shield 1.0.0：任何人都可以免费使用，包括在公司里和商业项目中使用；不得用 Joplo 或其代码提供与 Joplo 或 Joplo Cloud 竞争的产品或服务，详见 COMMERCIAL.md。0.2.15 及更早的版本仍适用 Apache-2.0。
 
