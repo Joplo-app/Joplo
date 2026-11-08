@@ -455,7 +455,7 @@ export function createBoardDe(locale: Locale = 'de') {
       cloudNotPickedFeature: (feature: Value) => `„${value(feature, locale)}“ hat noch keine ausgewählte Variante, daher kann nichts davon veröffentlicht werden.`,
       cloudNotPickedProject: "Noch keine Funktion hat eine ausgewählte Variante, daher gibt es nichts zu veröffentlichen.",
       cloudNotPickedHow: "Klicken Sie in der Prüfung auf „Variante bestätigen“ oder lassen Sie Ihren Agenten pick in feature.ts setzen, und veröffentlichen Sie dann.",
-      // D83: content language menu in the board top bar.
+      // D84: content language menu in the board top bar.
       contentSource: "Original",
       contentProgress: (done: Value, total: Value) => `${value(done, locale)}/${value(total, locale)} übersetzt`,
       contentStale: (n: Value) => plural(Number(n), { one: "# veraltet", other: "# veraltet" }, locale),

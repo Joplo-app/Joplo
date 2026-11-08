@@ -10,14 +10,14 @@ beforeAll(async () => {
   // 放在仓库里（scratch/ 被忽略），这样项目能解析到工作区的 @joplo-app/kit
   await mkdir(join(repo, 'scratch'), { recursive: true });
   dir = await mkdtemp(join(repo, 'scratch', 'i18n-test-'));
-  // 复制时去掉示例自带的 locales（D83），从没有多语言的项目开始
+  // 复制时去掉示例自带的 locales（D84），从没有多语言的项目开始
   await cp(join(repo, 'examples/invite'), dir, { recursive: true, filter: (p) => !p.includes('.joplo') && !p.includes('/locales') });
   const cfg = join(dir, 'joplo.config.ts');
   await writeFile(cfg, (await readFile(cfg, 'utf8')).replace(/^\s*locales:.*\n/m, ''));
 }, 60_000);
 afterAll(async () => { await rm(dir, { recursive: true, force: true }); });
 
-describe('joplo i18n add（D83）', () => {
+describe('joplo i18n add（D84）', () => {
   it('config 里追加或插入 locales', () => {
     expect(addLocaleToConfig("config({\n  name: 'x',\n  locales: ['zh-CN', 'en'],\n})", ['zh-CN', 'en', 'ja'], 'ja')).toContain("locales: ['zh-CN', 'en', 'ja']");
     expect(addLocaleToConfig("config({\n  name: 'x',\n  home: '/',\n})", ['zh-CN', 'ja'], 'ja')).toBe("config({\n  name: 'x',\n  locales: ['zh-CN', 'ja'],\n  home: '/',\n})");

@@ -455,7 +455,7 @@ export function createBoardKo(locale: Locale = 'ko') {
       cloudNotPickedFeature: (feature: Value) => `“${value(feature, locale)}”에는 아직 선택된 안이 없어 게시할 내용이 없습니다.`,
       cloudNotPickedProject: "아직 선택된 안이 있는 기능이 없어 게시할 내용이 없습니다.",
       cloudNotPickedHow: "리뷰에서 ‘안 승인’을 누르거나 에이전트에게 feature.ts의 pick 설정을 요청한 뒤 게시하세요.",
-      // D83: content language menu in the board top bar.
+      // D84: content language menu in the board top bar.
       contentSource: "원문",
       contentProgress: (done: Value, total: Value) => `번역 ${value(done, locale)}/${value(total, locale)}`,
       contentStale: (n: Value) => `${value(n, locale)}개 오래됨`,

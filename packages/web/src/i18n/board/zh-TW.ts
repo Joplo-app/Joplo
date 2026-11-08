@@ -455,7 +455,7 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       cloudNotPickedFeature: (feature: Value) => `「${value(feature, locale)}」還沒有確認方案，所以沒有內容可以發布。`,
       cloudNotPickedProject: "專案裡還沒有任何功能確認過方案，所以沒有內容可以發布。",
       cloudNotPickedHow: "在評審裡點「確認方案」，或讓 Agent 在 feature.ts 裡寫上 pick，然後再發布。",
-      // D83: content language menu in the board top bar.
+      // D84: content language menu in the board top bar.
       contentSource: "原文",
       contentProgress: (done: Value, total: Value) => `已譯 ${value(done, locale)}/${value(total, locale)}`,
       contentStale: (n: Value) => `${value(n, locale)} 條過期`,

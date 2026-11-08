@@ -23,7 +23,7 @@ beforeAll(async () => {
   base = { ...r.authoring!, config: { ...r.authoring!.config, locales: undefined }, locales: undefined, localeFiles: undefined };
 }, 60_000);
 
-describe('作者内容多语言（D83）', () => {
+describe('作者内容多语言（D84）', () => {
   it('没写 locales 时 IR 不变，也不报译文问题', () => {
     const r = compile(base, 'dev');
     expect(r.project!.i18n).toBeUndefined();

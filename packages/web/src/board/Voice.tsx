@@ -95,7 +95,7 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
   // narrator 跟着状态走；控制器在播放时用它
   narrator.enabled = on;
   narrator.browserVoice = browserVoice;
-  // 内容多语言（D83）：浏览器朗读用内容语言；生成的音频用这种语言的声音（服务端 byLocale），没有时用默认声音
+  // 内容多语言（D84）：浏览器朗读用内容语言；生成的音频用这种语言的声音（服务端 byLocale），没有时用默认声音
   narrator.locale = contentLocale ?? locale;
   narrator.lookup = boardVoiceLookup(state, contentLocale);
   // 边放边生成：选了供应商且有 Key 时，播到还没有音频的一步就当场生成这一段（同一段只请求一次）

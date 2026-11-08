@@ -58,7 +58,7 @@ export function readInlineIR(): SiteData | null {
 export function SiteApp({ data, search = typeof location === 'undefined' ? '' : location.search, branding = readBranding() }: { data: SiteData | null; search?: string; branding?: boolean }) {
   const { t: i18n, locale } = useI18n();
   const embed = useMemo(() => parseEmbedParams(search), [search]);
-  // 作者内容多语言（D83）：内容语言跟随界面语言，项目没有时退回默认语言；下面所有组件都只看换过语言的 IR
+  // 作者内容多语言（D84）：内容语言跟随界面语言，项目没有时退回默认语言；下面所有组件都只看换过语言的 IR
   const content = useMemo(() => (data ? siteContent(data.project, locale) : null), [data, locale]);
   const project = useMemo(() => (data ? viewProject(data.project, content?.locale, locale) : null), [data, content?.locale, locale]);
 

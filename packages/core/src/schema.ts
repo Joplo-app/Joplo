@@ -344,7 +344,7 @@ export const Issue = z.strictObject({
   source: Source,
 });
 
-/** 作者内容多语言（D83）：default 是原文的语言，locales 第一个就是它。 */
+/** 作者内容多语言（D84）：default 是原文的语言，locales 第一个就是它。 */
 export const ContentI18nSchema = z.strictObject({
   default: z.string().min(1),
   locales: z.array(z.string().min(1)).min(1),
@@ -354,7 +354,7 @@ export const ContentI18nSchema = z.strictObject({
   stale: z.record(z.string(), z.number().int().nonnegative()).optional(),
 });
 
-/** 朗读配置（D74，来自 config({ voice })）：只在 dev / review IR 里，发布站去掉。locales（D83）：按内容语言覆盖旁白与角色的音色。 */
+/** 朗读配置（D74，来自 config({ voice })）：只在 dev / review IR 里，发布站去掉。locales（D84）：按内容语言覆盖旁白与角色的音色。 */
 const VoiceVoices = z.strictObject({
   narrator: z.string().min(1).optional(),
   roles: z.record(z.string(), z.string().min(1)).optional(),
@@ -373,7 +373,7 @@ export const VoiceIndex = z.strictObject({
   narrator: z.string().min(1).nullable(),
   roles: z.record(z.string(), z.string().min(1)).default({}),
   clips: z.record(z.string(), z.string().min(1)).default({}),
-  /** 内容语言（D83）→ 这种语言的旁白与角色指纹；没有的语言用上面的默认声音。 */
+  /** 内容语言（D84）→ 这种语言的旁白与角色指纹；没有的语言用上面的默认声音。 */
   locales: z.record(z.string(), z.strictObject({ narrator: z.string().min(1).nullable(), roles: z.record(z.string(), z.string().min(1)).default({}) })).optional(),
 });
 
@@ -387,7 +387,7 @@ export const Project = z.strictObject({
   autoFocus: z.boolean().optional(),
   voiceConfig: VoiceConfig.optional(),
   voiceIndex: VoiceIndex.optional(),
-  /** 作者内容多语言（D83）：只有 config 写了 locales 才有。messages 只含非默认语言、这份 IR 用得到的译文；stale 只在 dev IR。 */
+  /** 作者内容多语言（D84）：只有 config 写了 locales 才有。messages 只含非默认语言、这份 IR 用得到的译文；stale 只在 dev IR。 */
   i18n: ContentI18nSchema.optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),

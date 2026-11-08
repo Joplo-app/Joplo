@@ -181,7 +181,7 @@ test.each([['free', false, true, false], ['pro', false, true, true], ['pro', tru
   expect(calls.find(c => c.path === '/api/v1/shares')!.body).toMatchObject({ title: 'Custom' }); expect(calls.find(c => c.path === '/api/v1/shares')!.body.replaceShareId).toBe(replace ? 'Old1234567' : undefined);
   if (p === 'free') { expect(r.stdout).toContain(base + '/settings/billing'); expect(r.stdout).not.toMatch(new RegExp(base.replace(/[.]/g, '\\.') + '/billing')); }
 });
-test.each([['pro', true], ['free', false]] as const)('share --update <链接>：没有 cloud.json 也能更新指定分享（D83） plan=%s', async (p, replace) => {
+test.each([['pro', true], ['free', false]] as const)('share --update <链接>：没有 cloud.json 也能更新指定分享（D84） plan=%s', async (p, replace) => {
   plan = p; await credentials();
   const r = await cli(['share', project, '--update', base + '/s/Old1234567/', '--format=json']); expect(r.code, r.stdout).toBe(0);
   expect(calls.find(c => c.path === '/api/v1/shares')!.body.replaceShareId).toBe(replace ? 'Old1234567' : undefined);

@@ -434,7 +434,7 @@ export type ResolvedVoices = {
 };
 
 /**
- * 某种内容语言用哪个音色（D83）：音色有口音（ElevenLabs 预设）且口音不是这种语言、而预设里有这种语言的音色时，
+ * 某种内容语言用哪个音色（D84）：音色有口音（ElevenLabs 预设）且口音不是这种语言、而预设里有这种语言的音色时，
  * 换成同语言的（优先同性别、推荐的）；多语言音色（OpenAI 预设没有口音）原样用，由说话风格要求母语口音。
  */
 export function autoVoiceFor(profile: Pick<VoiceProfile, 'preset'>, voice: string, locale: string | null | undefined): string {
@@ -453,7 +453,7 @@ export function autoVoiceFor(profile: Pick<VoiceProfile, 'preset'>, voice: strin
 /** 传给 resolveVoices 的语言：默认语言（源文件的语言）不自动换音色，保留作者原来的选择和已生成的音频。 */
 export const voiceLocaleOf = (project: Pick<Project, 'i18n'> | null | undefined, locale: string | null | undefined): string | null => (locale && project?.i18n && locale !== project.i18n.default ? locale : null);
 
-/** locale：内容语言（D83，默认语言传 null，见 voiceLocaleOf）。config.voice.locales[locale] 优先，其次按 autoVoiceFor 自动选；不传时与之前一样。 */
+/** locale：内容语言（D84，默认语言传 null，见 voiceLocaleOf）。config.voice.locales[locale] 优先，其次按 autoVoiceFor 自动选；不传时与之前一样。 */
 export function resolveVoices(config: VoiceConfig | undefined, selected: string | null, store: ProfileStore, locale?: string | null): ResolvedVoices {
   let profile: VoiceProfile | null = null;
   let source: ResolvedVoices['source'] = null;
@@ -575,7 +575,7 @@ export class VoiceCache {
     return c && FILE_RE.test(c.file) && fs.existsSync(path.join(this.clipsDir, c.file)) ? c.file : null;
   }
 
-  /** 收下一段别处来的音频（D83：从已发布的分享沿用）：文件名必须是内容的 sha256，否则不收。 */
+  /** 收下一段别处来的音频（D84：从已发布的分享沿用）：文件名必须是内容的 sha256，否则不收。 */
   adopt(key: string, file: string, bytes: Uint8Array, rec: Omit<ClipRecord, 'file' | 'bytes' | 'at'>): boolean {
     if (!FILE_RE.test(file) || crypto.createHash('sha256').update(bytes).digest('hex') !== file.split('.')[0]) return false;
     fs.mkdirSync(this.clipsDir, { recursive: true });
@@ -665,9 +665,9 @@ export type BundleReport = {
   bytes: number;
   missing: number;
   profile: string | null;
-  /** 从上一次发布的分享沿用、这次没有重新生成的段数（D83）。 */
+  /** 从上一次发布的分享沿用、这次没有重新生成的段数（D84）。 */
   reused?: number;
-  /** 内容语言（D83）→ 这种语言还缺几步音频。只有项目写了 locales 才有。 */
+  /** 内容语言（D84）→ 这种语言还缺几步音频。只有项目写了 locales 才有。 */
   locales?: Record<string, { missing: number }>;
 };
 
@@ -682,11 +682,11 @@ function voicesPerLocale(project: Project, resolve: (locale: string | null) => {
 }
 const sharedVoices = (index: VoiceIndex) => (l: string | null) => (l && index.locales?.[l]) || { narrator: index.narrator, roles: index.roles };
 
-/** 上一次发布的分享（D83）：它的 voiceIndex（片段键 → voice/<sha256>.<ext>）和按相对路径取文件的方法。 */
+/** 上一次发布的分享（D84）：它的 voiceIndex（片段键 → voice/<sha256>.<ext>）和按相对路径取文件的方法。 */
 export type SharedVoice = { index: VoiceIndex; fetch: (file: string) => Promise<Uint8Array | null> };
 
 /**
- * 从上一次发布的分享沿用音频（D83）：Cloud 只存分享出去的作品，不另设缓存。按当前文字和声音算片段键，
+ * 从上一次发布的分享沿用音频（D84）：Cloud 只存分享出去的作品，不另设缓存。按当前文字和声音算片段键，
  * 本机没有、分享里有的就下载到本机缓存（文件名必须是内容的 sha256），之后照常打包；上传时 Cloud 已有这些内容，不会重传。
  * 本机没有供应商时按分享里的声音指纹算键。自动字幕的步骤（文字由网页按语言生成）不在这里沿用。
  */
@@ -717,7 +717,7 @@ export async function reuseSharedVoice(projectDir: string, project: Project, sha
 /**
  * 发布（joplo build / share）：把发布 IR 里步骤用到的、当前声音的音频拷进 `<outDir>/voice/`，返回 IR 的 voiceIndex。
  * 同一步同一声音同一语言只留最新的一段（改过字之后旧的不再带上）。
- * 内容多语言（D83）：每种内容语言按 resolveVoices(…, 语言) 选声音，voiceIndex.locales 记各语言的指纹；missing 按语言分别统计。
+ * 内容多语言（D84）：每种内容语言按 resolveVoices(…, 语言) 选声音，voiceIndex.locales 记各语言的指纹；missing 按语言分别统计。
  * missing：还没有音频的步骤数（自动字幕的步骤只要有这种语言的任意音频就算有）。
  * 没有选用 profile 时：给了 fallback（已发布分享的 voiceIndex）就按它的指纹带上本机已有的音频，否则不带（观众端用浏览器朗读）。
  */

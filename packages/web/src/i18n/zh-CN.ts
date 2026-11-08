@@ -278,7 +278,7 @@ ${value(p2, locale)}`,
       // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
       reviewPickHint: "点画面里的元素来选中 · Esc 取消",
       reviewPickCancel: "取消",
-      // D83: author content languages on the published site.
+      // D84: author content languages on the published site.
       contentMarkNote: "标出的语言有演示内容；其余只换界面文字",
       contentSourceTag: "原文",
       contentTranslatedTag: "译文",

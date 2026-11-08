@@ -255,7 +255,7 @@ export function createRu(locale: Locale = 'ru') {
       // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
       reviewPickHint: "Нажмите на элемент сцены, чтобы выбрать его · Esc — отмена",
       reviewPickCancel: "Отмена",
-      // D83: author content languages on the published site.
+      // D84: author content languages on the published site.
       contentMarkNote: "В отмеченных языках есть содержимое демо; остальные меняют только интерфейс",
       contentSourceTag: "Оригинал",
       contentTranslatedTag: "Перевод",

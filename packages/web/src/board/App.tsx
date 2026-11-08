@@ -191,7 +191,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   // 检查模式（D55 顶栏「检查」开关）：只在本页，不写进网址（不变量 2）
   const [inspectMode, setInspectMode] = useState(false);
   const ir = useProjectIR(projectId);
-  // 内容语言（D83）：和发布站一样跟随界面语言（同一个语言菜单），项目没有这种语言时用默认语言；舞台、字幕、旁白都用换过语言的 IR
+  // 内容语言（D84）：和发布站一样跟随界面语言（同一个语言菜单），项目没有这种语言时用默认语言；舞台、字幕、旁白都用换过语言的 IR
   const raw = ir.payload?.project ?? null;
   const contentLocale = raw ? contentLocaleFor(raw, locale) : null;
   // 语言菜单里给有内容的语言标“原文 / 译文”，看板另外显示翻译进度与过期条数

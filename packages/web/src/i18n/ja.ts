@@ -255,7 +255,7 @@ export function createJa(locale: Locale = 'ja') {
       // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
       reviewPickHint: "画面の要素をクリックして選択 · Esc でキャンセル",
       reviewPickCancel: "キャンセル",
-      // D83: author content languages on the published site.
+      // D84: author content languages on the published site.
       contentMarkNote: "タグの付いた言語はデモの内容も切り替わります。ほかは画面の表示だけが変わります",
       contentSourceTag: "原文",
       contentTranslatedTag: "翻訳",

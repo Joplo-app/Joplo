@@ -68,7 +68,7 @@ const recordJson = (server: string, r: ShareRecord) => ({
 
 export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo };
 /** scenarios / features：按场景保密分享（D75，`--scenario` / `--feature`），可以一起用；都不写时分享整个项目。 */
-/** update（D83）：要更新的已有分享的链接；没有 .joplo/cloud.json 时（例如换了一台电脑）用它指定，并从它沿用朗读音频。 */
+/** update（D84）：要更新的已有分享的链接；没有 .joplo/cloud.json 时（例如换了一台电脑）用它指定，并从它沿用朗读音频。 */
 export type ShareOptions = { new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[]; update?: string };
 
 /** `--update <链接>`：分享页链接，路径里有 /s/<10 位分享 id>。 */
@@ -123,7 +123,7 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
   const staging = temporary.path;
   try {
     client.warn('Validation passed. Building the published site...');
-    // 重新发布（D83）：上一次的分享里已有的音频（同样的文字和声音）直接沿用，换一台电脑也不用重新生成
+    // 重新发布（D84）：上一次的分享里已有的音频（同样的文字和声音）直接沿用，换一台电脑也不用重新生成
     const before = await readShareRecord(project, client.server);
     const beforeLink = updateLink ?? (scenarioIds ? before.scoped?.[scopeKey(scenarioIds, reviewMode)] : before[reviewMode === 'review' ? 'review' : 'main']);
     const sharedVoice = beforeLink ? await (client.deps.sharedVoice ?? previousShareVoice)(beforeLink.url) : undefined;
@@ -198,7 +198,7 @@ export function voiceSummary(v: { clips: number; bytes: number; missing: number;
   const kb = Math.max(1, Math.round(v.bytes / 1024));
   const reused = v.reused ? `, ${v.reused} reused from the previous share` : '';
   const head = v.clips ? `Narration: ${v.clips} audio clip(s) from ${v.profile} (${kb} KB${reused}) included` : `Narration: no generated audio from ${v.profile} yet`;
-  // 内容多语言（D83）：按语言列出还缺几步
+  // 内容多语言（D84）：按语言列出还缺几步
   const per = v.locales ? Object.entries(v.locales).filter(([, x]) => x.missing).map(([l, x]) => `${l} ${x.missing}`).join(', ') : '';
   return v.missing ? `${head}; ${v.missing} step(s) have no audio for the current text${per ? ` (${per})` : ''} and will use the viewer's browser voice. Generate them in the board (Voice → Generate) to include them.` : `${head}.`;
 }
@@ -206,7 +206,7 @@ export function voiceSummary(v: { clips: number; bytes: number; missing: number;
 type SharedVoice = { index: NonNullable<Project['voiceIndex']>; fetch: (file: string) => Promise<Uint8Array | null> };
 const MAX_SHARED_CLIP = 20 * 1024 * 1024;
 /**
- * 读上一次发布的分享里的朗读音频（D83）：公开分享页内联的 voiceIndex（片段键 → voice/<sha256>.<ext>），以及按相对路径下载文件。
+ * 读上一次发布的分享里的朗读音频（D84）：公开分享页内联的 voiceIndex（片段键 → voice/<sha256>.<ext>），以及按相对路径下载文件。
  * 只接受 https（本机测试服务可以是 http://127.0.0.1）；任何失败都当作没有，不影响分享。下载的文件由服务端按 sha256 校验后才收下。
  */
 export async function previousShareVoice(url: string, fetchImpl: typeof fetch = fetch): Promise<SharedVoice | undefined> {

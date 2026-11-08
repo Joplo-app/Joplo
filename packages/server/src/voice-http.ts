@@ -44,7 +44,7 @@ export type VoiceState = {
   /** 片段键 → 失败原因。 */
   failures: Record<string, { stepId: string; message: string }>;
   generating: { done: number; total: number; failed: number } | null;
-  /** 内容语言（D83）→ 这种语言的旁白、角色音色与指纹；只有项目写了 locales 才有。看板按当前内容语言取指纹算片段键。 */
+  /** 内容语言（D84）→ 这种语言的旁白、角色音色与指纹；只有项目写了 locales 才有。看板按当前内容语言取指纹算片段键。 */
   byLocale?: Record<string, { narrator: string | null; roles: Record<string, string>; voices: { narrator: string | null; roles: Record<string, string> } }>;
 };
 

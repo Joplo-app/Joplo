@@ -255,7 +255,7 @@ export function createFr(locale: Locale = 'fr') {
       // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
       reviewPickHint: "Cliquez sur un élément de la scène pour le sélectionner · Échap pour annuler",
       reviewPickCancel: "Annuler",
-      // D83: author content languages on the published site.
+      // D84: author content languages on the published site.
       contentMarkNote: "Les langues marquées incluent le contenu de la démo ; les autres ne changent que l’interface",
       contentSourceTag: "Original",
       contentTranslatedTag: "Traduit",

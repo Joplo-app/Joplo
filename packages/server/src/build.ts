@@ -41,7 +41,7 @@ export function publishPayload(project: Project, home: string | null): { project
     }),
   );
   const out = { ...rest, features, options, scenarios };
-  // 译文（D83）在去掉创作侧字段之后再裁剪一次：约束等只给作者看的原文不能作为译文的键留在站点里
+  // 译文（D84）在去掉创作侧字段之后再裁剪一次：约束等只给作者看的原文不能作为译文的键留在站点里
   return { project: rest.i18n ? pruneMessages(out as unknown as Project) : out, home: home && project.routes[home] ? home : null };
 }
 
@@ -150,7 +150,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
 
     // 朗读（D74）：当前声音已生成的音频拷进 voice/，IR 带上 voiceIndex；Key 不进产物
     const store = new ProfileStore(opts.home ?? joploHome());
-    // 重新发布（D83）：先从上一次的分享沿用本机没有的音频（同样的文字与声音），不重新生成
+    // 重新发布（D84）：先从上一次的分享沿用本机没有的音频（同样的文字与声音），不重新生成
     const reused = opts.sharedVoice ? await reuseSharedVoice(projectDir, project, opts.sharedVoice, store) : 0;
     const voice = bundleVoice(projectDir, project, staging, store, undefined, opts.sharedVoice?.index);
     if (reused) voice.report.reused = reused;

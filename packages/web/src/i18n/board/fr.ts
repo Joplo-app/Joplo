@@ -455,7 +455,7 @@ export function createBoardFr(locale: Locale = 'fr') {
       cloudNotPickedFeature: (feature: Value) => `« ${value(feature, locale)} » n’a pas encore d’option retenue : rien ne peut en être publié.`,
       cloudNotPickedProject: "Aucune fonctionnalité n’a encore d’option retenue : il n’y a rien à publier.",
       cloudNotPickedHow: "Cliquez sur « Confirmer l’option » dans la revue, ou demandez à votre agent de définir pick dans feature.ts, puis publiez.",
-      // D83: content language menu in the board top bar.
+      // D84: content language menu in the board top bar.
       contentSource: "Original",
       contentProgress: (done: Value, total: Value) => `${value(done, locale)}/${value(total, locale)} traduits`,
       contentStale: (n: Value) => plural(Number(n), { one: "# obsolète", other: "# obsolètes" }, locale),

@@ -29,7 +29,7 @@
 | `review` | 反馈怎样回到 Agent | `joplo-local-review`、D77–D78 | 浮层原型、真实实施后的可拖动入口、版本绑定和监听恢复 |
 | `feature_diff` | 怎样看见一个 PR 改了什么 | `docs/feature-diff`、`4603038`、`397310e` | 固定基线、稳定步骤身份、单/双栏、无法匹配和重新对齐的实际取舍 |
 | `mobile_watch` | 手机上怎样看分享 | `examples/joplo/features/mobile_watch`、D79 | 竖屏被挤成竖条的现状、视频式播放页、横屏沉浸、iPhone 伪横屏与连续播放 |
-| `content_i18n` | 观众怎样看到自己语言的作者内容 | `examples/joplo/features/content_i18n`、D57、D74、D83 | 加一种语言、观众自动匹配与退回、过期译文、重新发布沿用音频、没有音频时浏览器朗读（设计阶段，未实现） |
+| `content_i18n` | 观众怎样看到自己语言的作者内容 | `examples/joplo/features/content_i18n`、D57、D74、D84 | 加一种语言、观众自动匹配与退回、过期译文、重新发布沿用音频、没有音频时浏览器朗读（设计阶段，未实现） |
 
 “整个产品”是这些功能的统一目录与共享项目，不要求把无关功能的场景强行串成一个端到端操作，也不把 `camping`、`invite`、`agent-arch` 这些独立业务演示改名成 Joplo 的自身功能。
 
@@ -121,7 +121,7 @@
 
 ### content_i18n：作者内容按观众的语言
 
-- **最初问题与真实决定**：D57 只翻译界面，作者内容不翻译。2026-11-08 用户提出分享链接应按观众的环境和语言给出本地化内容，并包括 TTS；随后选定写法 A（原文作为 key，译文放 `locales/`）、界面跟随观众且内容退回、config 新增语言字段、第一版只做语言、机翻初稿由当前 Agent 完成；又澄清 Cloud 像 YouTube，只存分享出去的作品。记录见 D83。
+- **最初问题与真实决定**：D57 只翻译界面，作者内容不翻译。2026-11-08 用户提出分享链接应按观众的环境和语言给出本地化内容，并包括 TTS；随后选定写法 A（原文作为 key，译文放 `locales/`）、界面跟随观众且内容退回、config 新增语言字段、第一版只做语言、机翻初稿由当前 Agent 完成；又澄清 Cloud 像 YouTube，只存分享出去的作品。记录见 D84。
 - **已有设计**：`a-locales`；六个场景为加日语、日语观众自动匹配、葡萄牙语观众退回英文、原文改动后译文过期、换电脑重新发布沿用音频、英文没有音频时浏览器朗读。
 - **当前实现**：`packages/core/src/content-i18n.ts`（收集、换语言、退回、裁剪）、`compile.ts`（locales 校验与译文检查）、`load.ts`、`packages/cli/src/i18n.ts`（`joplo i18n add`）、`packages/server/src/voice.ts`（按语言选音色、打包、`reuseSharedVoice`）、`packages/cli/src/cloud-share.ts`（`previousShareVoice`）、`packages/web/src/i18n/content.ts`、`board/ContentLanguage.tsx`、`site/ContentNotice.tsx`；英文译文示例见 `examples/invite/locales/en.json`。
 - **原型确认**：用户看过原型后定下：退回默认语言；语言菜单列出全部语言，有内容的打 ✓；分享清单记「缓存键 → 音频哈希」。

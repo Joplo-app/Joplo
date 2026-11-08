@@ -108,7 +108,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     const project = payload.project;
     const sc = project.scenarios[opts.scenarioId];
     if (!sc) throw new JoploError('NOT_FOUND', `Scenario does not exist: ${opts.scenarioId} (available: ${Object.keys(project.scenarios).join(', ') || 'none'})`);
-    // 内容语言（D83）写错时报错，不静默按源语言截图
+    // 内容语言（D84）写错时报错，不静默按源语言截图
     if (opts.content !== undefined && !project.i18n?.locales.includes(opts.content))
       throw new JoploError('USAGE', project.i18n ? `--content ${opts.content} is not in config locales (${project.i18n.locales.join(', ')})` : `--content needs config({ locales }); this project has a single language`);
     const position = opts.stepId ? positionAfterStep(project, sc.id, opts.stepId) : 0;

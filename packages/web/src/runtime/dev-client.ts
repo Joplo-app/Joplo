@@ -175,7 +175,7 @@ export async function openInEditor(projectId: string, at: string): Promise<{ ok:
 }
 
 /** 导出跟随页面自己的 viewport（D44：不再选择设备）。 */
-export type ExportRequest = { locale: Locale; /** 看板当前的内容语言（D83）；项目没有 i18n 时不传。 */ contentLocale?: string; scenarioId: string; position: number; theme: string; /** D55：null = 跟随主题。 */ font?: AppearanceFont | null; stroke?: AppearanceStroke | null };
+export type ExportRequest = { locale: Locale; /** 看板当前的内容语言（D84）；项目没有 i18n 时不传。 */ contentLocale?: string; scenarioId: string; position: number; theme: string; /** D55：null = 跟随主题。 */ font?: AppearanceFont | null; stroke?: AppearanceStroke | null };
 
 /** 本机导出图片：服务端用导出组件（Playwright，D66）渲染当前步骤（与 joplo render 同一渲染路径）。code 是服务端错误码（例如 EXPORT_COMPONENT_MISSING）。 */
 export async function exportImage(projectId: string, body: ExportRequest): Promise<{ ok: true; blob: Blob; name: string } | { ok: false; message: Text; code?: string }> {
@@ -350,7 +350,7 @@ export type VoiceState = {
   missing: string | null;
   profile: VoiceProfileView | null;
   voices: { narrator: string | null; roles: Record<string, string> };
-  /** 各内容语言的声音（D83）：音色与指纹；没有的语言用上面的默认声音。 */
+  /** 各内容语言的声音（D84）：音色与指纹；没有的语言用上面的默认声音。 */
   byLocale?: Record<string, { narrator: string | null; roles: Record<string, string>; voices: { narrator: string | null; roles: Record<string, string> } }>;
   narrator: string | null;
   roles: Record<string, string>;

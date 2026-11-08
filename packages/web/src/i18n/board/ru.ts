@@ -455,7 +455,7 @@ export function createBoardRu(locale: Locale = 'ru') {
       cloudNotPickedFeature: (feature: Value) => `У «${value(feature, locale)}» пока нет выбранного варианта, поэтому публиковать нечего.`,
       cloudNotPickedProject: "Ни у одной функции пока нет выбранного варианта, поэтому публиковать нечего.",
       cloudNotPickedHow: "Нажмите «Подтвердить вариант» в обзоре или попросите агента задать pick в feature.ts, затем опубликуйте.",
-      // D83: content language menu in the board top bar.
+      // D84: content language menu in the board top bar.
       contentSource: "Оригинал",
       contentProgress: (done: Value, total: Value) => `Переведено ${value(done, locale)}/${value(total, locale)}`,
       contentStale: (n: Value) => plural(Number(n), { one: "# устарела", few: "# устарели", many: "# устарели", other: "# устарели" }, locale),

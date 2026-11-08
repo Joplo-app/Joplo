@@ -27,7 +27,7 @@ export type AuthoringProject = {
   features: Record<string, { def: FeatureDef & { file: string }; options: Record<string, OptionDef & { file: string }> }>;
   /** 作者主题（D51）：themes/<name>.css 的原文。 */
   themes?: Record<string, string>;
-  /** 作者内容译文（D83）：locales/<语言>.json 的内容（原文 → 译文）；语言 → 文件相对路径见 localeFiles。 */
+  /** 作者内容译文（D84）：locales/<语言>.json 的内容（原文 → 译文）；语言 → 文件相对路径见 localeFiles。 */
   locales?: Record<string, Record<string, string>>;
   localeFiles?: Record<string, string>;
 };
@@ -679,7 +679,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   return { project, diagnostics: diags };
 }
 
-/** config.locales（D83）：非空、不重复、都是支持的语言；第一个是默认语言。没写时为 null。 */
+/** config.locales（D84）：非空、不重复、都是支持的语言；第一个是默认语言。没写时为 null。 */
 function contentLocalesOf(src: AuthoringProject, err: (code: string, message: string, at?: string) => void): string[] | null {
   const v = src.config.locales;
   const at = src.config.source ?? `${src.config.file}:1:1`;
@@ -700,7 +700,7 @@ function contentLocalesOf(src: AuthoringProject, err: (code: string, message: st
 }
 
 /**
- * 译文的检查（D83，只在 dev）：每种语言一条 I18N_MISSING（缺多少、前几条）、原文改过的每条一条 I18N_STALE（附最接近的旧条目）、
+ * 译文的检查（D84，只在 dev）：每种语言一条 I18N_MISSING（缺多少、前几条）、原文改过的每条一条 I18N_STALE（附最接近的旧条目）、
  * 没人用的旧条目一条 I18N_UNUSED。返回每种语言的过期条数，给看板菜单显示。
  */
 function localeDiagnostics(project: Project, src: AuthoringProject, diags: Diagnostic[]): Record<string, number> {

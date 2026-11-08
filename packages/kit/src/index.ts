@@ -34,11 +34,11 @@ export type VoiceConfig = {
   profile?: string;
   narrator?: string;
   roles?: Record<string, string>;
-  /** 按内容语言覆盖旁白与角色的音色（D83），例如 { ja: { narrator: 'Sarah' } }；不写时自动选同语言的预设音色。 */
+  /** 按内容语言覆盖旁白与角色的音色（D84），例如 { ja: { narrator: 'Sarah' } }；不写时自动选同语言的预设音色。 */
   locales?: Record<string, { narrator?: string; roles?: Record<string, string> }>;
 };
 /**
- * locales（D83）：内容语言，第一个是源文件的语言（默认语言），其余的译文在 locales/<语言>.json（原文 → 译文）。
+ * locales（D84）：内容语言，第一个是源文件的语言（默认语言），其余的译文在 locales/<语言>.json（原文 → 译文）。
  * 可选：en、zh-CN、zh-TW、ja、ko、es、fr、de、pt-BR、ru。加一种语言：npx joplo i18n add <语言>。
  */
 export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; autoFocus?: boolean; voice?: VoiceConfig; locales?: string[]; source?: string };

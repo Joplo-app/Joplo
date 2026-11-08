@@ -4,7 +4,7 @@ import { useContent } from '../i18n/content-context';
 import { isLocale, localeNames } from '../i18n/locale';
 import { cn } from '@/lib/utils';
 
-/** 内容退回默认语言时的一行说明（D83）：观众的界面语言项目里没有，看到的是作者原文。没有退回时不渲染。 */
+/** 内容退回默认语言时的一行说明（D84）：观众的界面语言项目里没有，看到的是作者原文。没有退回时不渲染。 */
 export function ContentFallbackNotice({ variant = 'bar' }: { variant?: 'bar' | 'cover' }) {
   const content = useContent();
   const { t, locale } = useI18n();

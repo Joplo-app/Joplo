@@ -242,7 +242,7 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
     ...(project.voiceIndex ? { voiceIndex: keepRoles(project.voiceIndex)! } : {}),
   };
   const ids = Object.keys(scenarios);
-  // 译文只留范围内用得到的（D83）：别的功能的文字不随范围分享出去
+  // 译文只留范围内用得到的（D84）：别的功能的文字不随范围分享出去
   return { project: pruneMessages(out), info: { key: scopeKey(ids, mode), scenarios: ids, features: Object.keys(features), borrowed: merged } };
 }
 

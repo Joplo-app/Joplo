@@ -214,7 +214,7 @@ describe('发布产物是完整的 IR（只缺有意去掉的创作侧字段）'
       expect(missing).toEqual([]);
       // 集成 0.2.8：可选字段被裁掉时上面查不出来（schema 不会补回可选字段）。编译出的发布 IR 里有的每条路径，
       // 发布产物里都要有（只允许有意去掉的创作侧字段）
-      // 译文（D83）：只给作者看的原文（例如 constraints）去掉之后，它们的译文条目也一起去掉
+      // 译文（D84）：只给作者看的原文（例如 constraints）去掉之后，它们的译文条目也一起去掉
       const constraintTexts = new Set(Object.values(compiled.features).flatMap((f) => f.constraints.map((c) => c.text)));
       const dropped = missingPaths(JSON.parse(JSON.stringify(compiled)), payload).filter((p) => !STRIPPED_FOR_PUBLISH.has(p.split('.').pop()!) && !(p.startsWith('.i18n.messages.') && constraintTexts.has(p.split('.').slice(4).join('.'))));
       expect(dropped).toEqual([]);

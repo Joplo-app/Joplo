@@ -105,7 +105,7 @@ export function exportAppearance(body: unknown): { font: AppearanceFont | null; 
 /** 渲染路由上的外观参数（null 不写）。 */
 const appearanceParams = (a: { font: AppearanceFont | null; stroke: AppearanceStroke | null }): Record<string, string> => ({ ...(a.font ? { font: a.font } : {}), ...(a.stroke ? { stroke: a.stroke } : {}) });
 
-/** content（D83）：作者内容语言；导出与看板当前预览的语言一致。 */
+/** content（D84）：作者内容语言；导出与看板当前预览的语言一致。 */
 type Look = { theme: string; font: AppearanceFont | null; stroke: AppearanceStroke | null; locale?: ExportLocale; content?: ExportLocale };
 
 function parseRequest(project: Project | null, body: unknown, needPosition: boolean) {

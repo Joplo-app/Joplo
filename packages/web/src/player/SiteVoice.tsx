@@ -30,7 +30,7 @@ export function useSiteVoice(ctl: DemoController, project: Project | null, muted
   const narrator = useMemo(() => new Narrator(), []);
   const [on, setOnState] = useState(() => siteVoiceDefault(project, muted));
   narrator.enabled = on && !muted;
-  // 内容多语言（D83）：浏览器朗读用内容语言；生成的音频用这种语言的声音（没有单独的声音时用默认声音）
+  // 内容多语言（D84）：浏览器朗读用内容语言；生成的音频用这种语言的声音（没有单独的声音时用默认声音）
   narrator.locale = content?.locale ?? locale;
   narrator.lookup = siteVoiceLookup(project?.voiceIndex, content?.locale);
   useEffect(() => {

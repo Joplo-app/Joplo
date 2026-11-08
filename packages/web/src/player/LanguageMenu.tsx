@@ -5,7 +5,7 @@ import type { ContentInfo } from '../i18n/content';
 import { locales, localeNames } from '../i18n/locale';
 import { MenuButton, type MenuEntry, type MenuItem } from './controls';
 
-/** 有作者内容的语言的标签（D83）：默认语言标“原文”，其他标“译文”；看板里过期条数用橙色写在标签前。 */
+/** 有作者内容的语言的标签（D84）：默认语言标“原文”，其他标“译文”；看板里过期条数用橙色写在标签前。 */
 function ContentTag({ text, stale }: { text: string; stale?: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 font-jb">
@@ -16,7 +16,7 @@ function ContentTag({ text, stale }: { text: string; stale?: string }) {
 }
 
 /**
- * 语言菜单的项：全部 10 种界面语言，✓ 只表示当前选中。项目有作者内容的语言（D83）带“原文 / 译文”标签；
+ * 语言菜单的项：全部 10 种界面语言，✓ 只表示当前选中。项目有作者内容的语言（D84）带“原文 / 译文”标签；
  * 看板另外给出翻译进度（description）和过期条数。
  */
 export function languageItems(current: string, setLocale: (id: (typeof locales)[number]) => void, content: Pick<ContentInfo, 'locales' | 'default' | 'details'> | null, tags: { source: string; translated: string }): MenuItem[] {
@@ -36,7 +36,7 @@ export function languageItems(current: string, setLocale: (id: (typeof locales)[
   });
 }
 
-/** Shared by board and published site; locale names remain readable in their own language. 一个菜单同时决定界面语言和作者内容的语言（D83）。 */
+/** Shared by board and published site; locale names remain readable in their own language. 一个菜单同时决定界面语言和作者内容的语言（D84）。 */
 export function LanguageMenu({ iconOnly = false }: { iconOnly?: boolean }) {
   const { locale, t, setLocale } = useI18n();
   const content = useContent();

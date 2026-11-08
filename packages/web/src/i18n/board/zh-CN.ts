@@ -472,7 +472,7 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       cloudNotPickedFeature: (feature: Value) => `「${value(feature, locale)}」还没有确认方案，所以没有内容可以发布。`,
       cloudNotPickedProject: "项目里还没有任何功能确认过方案，所以没有内容可以发布。",
       cloudNotPickedHow: "在评审里点「确认方案」，或让 Agent 在 feature.ts 里写上 pick，然后再发布。",
-      // D83: content language menu in the board top bar.
+      // D84: content language menu in the board top bar.
       contentSource: "原文",
       contentProgress: (done: Value, total: Value) => `已译 ${value(done, locale)}/${value(total, locale)}`,
       contentStale: (n: Value) => `${value(n, locale)} 条过期`,

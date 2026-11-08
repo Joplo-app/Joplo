@@ -255,7 +255,7 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
       reviewPickHint: "點畫面裡的元素來選取 · Esc 取消",
       reviewPickCancel: "取消",
-      // D83: author content languages on the published site.
+      // D84: author content languages on the published site.
       contentMarkNote: "標出的語言有展示內容；其餘只換介面文字",
       contentSourceTag: "原文",
       contentTranslatedTag: "譯文",

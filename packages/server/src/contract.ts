@@ -43,7 +43,7 @@ export type BuildOptions = {
    */
   scope?: ScopeRequest;
   /**
-   * 上一次发布的分享（D83，`joplo share` 重新发布时传）：它的 voiceIndex 与取文件的方法。本机没有、分享里有的音频
+   * 上一次发布的分享（D84，`joplo share` 重新发布时传）：它的 voiceIndex 与取文件的方法。本机没有、分享里有的音频
    * （同样的文字和声音）下载进本机缓存后照常打包，不重新生成；本机没有声音供应商时按分享里的声音指纹带上。
    */
   sharedVoice?: { index: VoiceIndex; fetch: (file: string) => Promise<Uint8Array | null> };
@@ -65,7 +65,7 @@ export type RenderOptions = {
   theme?: string;
   /** UI language for the standalone render route. Unsupported values are ignored. */
   locale?: string;
-  /** Author content language (D83): one of config locales; the screenshot shows that translation. */
+  /** Author content language (D84): one of config locales; the screenshot shows that translation. */
   content?: string;
   /** 字体（D55）：hand / sans / serif / kai / mono；缺省跟随主题。 */
   font?: AppearanceFont | null;

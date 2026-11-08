@@ -255,7 +255,7 @@ export function createDe(locale: Locale = 'de') {
       // site/EmbedApp.tsx: review mode (?embed=1&review=1), element picking.
       reviewPickHint: "Klicke auf ein Element der Bühne, um es auszuwählen · Esc zum Abbrechen",
       reviewPickCancel: "Abbrechen",
-      // D83: author content languages on the published site.
+      // D84: author content languages on the published site.
       contentMarkNote: "Markierte Sprachen enthalten die Demo-Inhalte; die übrigen ändern nur die Oberfläche",
       contentSourceTag: "Original",
       contentTranslatedTag: "Übersetzt",

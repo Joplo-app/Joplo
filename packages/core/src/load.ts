@@ -8,7 +8,7 @@
  *   features/<f>/feature.ts
  *   features/<f>/options/<o>.tsx
  *   themes/<name>.css               作者主题（D51），按原文读取
- *   locales/<语言>.json             作者内容译文（D83）：原文 → 译文
+ *   locales/<语言>.json             作者内容译文（D84）：原文 → 译文
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
@@ -62,7 +62,7 @@ export function loadThemes(root: string): Record<string, string> {
 }
 
 /**
- * 作者内容译文（D83）：locales/<语言>.json，一个扁平对象（原文 → 译文，值是字符串）。
+ * 作者内容译文（D84）：locales/<语言>.json，一个扁平对象（原文 → 译文，值是字符串）。
  * 文件名不是语言标签、JSON 写错、值不是字符串时报 LOCALE_FILE_INVALID，这个文件不参与编译。
  */
 export function loadLocales(root: string): { locales: Record<string, Record<string, string>>; files: Record<string, string>; diagnostics: Diagnostic[] } {
