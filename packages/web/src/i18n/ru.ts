@@ -39,6 +39,7 @@ export function createRu(locale: Locale = 'ru') {
       language: "Язык",
       sampleInput: "Пример ввода",
       joploGoToHome: "Joplo · На главную",
+      joploWebsite: "Сайт Joplo (откроется в новой вкладке)",
       breadcrumbs: "Цепочка навигации",
       replay: "Повторить",
       play: "Пуск",

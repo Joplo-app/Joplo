@@ -39,6 +39,7 @@ export function createPtBR(locale: Locale = 'pt-BR') {
       language: "Idioma",
       sampleInput: "Exemplo de entrada",
       joploGoToHome: "Joplo · Ir ao início",
+      joploWebsite: "Site da Joplo (abre em uma nova aba)",
       breadcrumbs: "Caminho de navegação",
       replay: "Repetir",
       play: "Reproduzir",

@@ -39,6 +39,7 @@ export function createFr(locale: Locale = 'fr') {
       language: "Langue",
       sampleInput: "Exemple de saisie",
       joploGoToHome: "Joplo · Accueil",
+      joploWebsite: "Site de Joplo (s’ouvre dans un nouvel onglet)",
       breadcrumbs: "Fil d’Ariane",
       replay: "Rejouer",
       play: "Lire",

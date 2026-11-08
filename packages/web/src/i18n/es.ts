@@ -39,6 +39,7 @@ export function createEs(locale: Locale = 'es') {
       language: "Idioma",
       sampleInput: "Entrada de ejemplo",
       joploGoToHome: "Joplo · Ir al inicio",
+      joploWebsite: "Sitio web de Joplo (se abre en una pestaña nueva)",
       breadcrumbs: "Ruta de navegación",
       replay: "Repetir",
       play: "Reproducir",

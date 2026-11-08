@@ -39,6 +39,7 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       language: "語言",
       sampleInput: "範例輸入",
       joploGoToHome: "Joplo · 回首頁",
+      joploWebsite: "Joplo 官網（在新分頁開啟）",
       breadcrumbs: "導覽路徑",
       replay: "重播",
       play: "播放",

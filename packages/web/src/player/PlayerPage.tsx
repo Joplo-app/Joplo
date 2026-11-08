@@ -59,11 +59,22 @@ export function useViewportWidth(): number {
 }
 export const useBoardLayout = (): BoardLayout => { const { t, locale } = useI18n(); return boardLayout(useViewportWidth(), t, localeNames[locale], useTopbarMeasurements()); };
 
-export function Brand({ onClick }: { onClick?: () => void }) {
-  const { t: i18n } = useI18n();
+/** Joplo 官网：发布站 / 分享页（观众看到的）顶栏标志指向这里。 */
+export const JOPLO_SITE_URL = 'https://joplo.app/';
 
+/** 顶栏标志：看板里是回首页的按钮；传 href（发布站）时是在新标签页打开的外链，观众不会丢掉正在看的演示。 */
+export function Brand({ onClick, href }: { onClick?: () => void; href?: string }) {
+  const { t: i18n } = useI18n();
+  const className = 'jb-focus flex shrink-0 items-center rounded-[6px]';
+
+  if (href)
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" aria-label={i18n.player.joploWebsite} title={i18n.player.joploWebsite} className={className} data-testid="brand">
+        <JoploLogo height={28} />
+      </a>
+    );
   return (
-    <button type="button" onClick={onClick} aria-label={i18n.player.joploGoToHome} className="jb-focus flex shrink-0 items-center rounded-[6px]" data-testid="brand">
+    <button type="button" onClick={onClick} aria-label={i18n.player.joploGoToHome} className={className} data-testid="brand">
       <JoploLogo height={28} />
     </button>
   );
@@ -408,7 +419,10 @@ export type PlayerPageProps = {
   snap: Snapshot;
   project: Project;
   crumbs: Crumb[];
-  onBrand: () => void;
+  /** 看板：点标志回首页。 */
+  onBrand?: () => void;
+  /** 发布站：标志改为在新标签页打开的链接（JOPLO_SITE_URL），优先于 onBrand。 */
+  brandHref?: string;
   theme: StageTheme;
   /** 字体（D55，看板外观）：null / 缺省 = 跟随主题。发布站不传。 */
   font?: AppearanceFont | null;
@@ -754,7 +768,7 @@ export function PlayerPage(p: PlayerPageProps) {
           </>
         }
       >
-        <Brand onClick={p.onBrand} />
+        <Brand onClick={p.onBrand} href={p.brandHref} />
         <span aria-hidden className="h-5 w-px shrink-0 bg-jb-line" />
         <Breadcrumbs crumbs={p.crumbs} />
       </TopBar>

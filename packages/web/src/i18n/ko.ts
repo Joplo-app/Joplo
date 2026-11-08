@@ -39,6 +39,7 @@ export function createKo(locale: Locale = 'ko') {
       language: "언어",
       sampleInput: "입력 예시",
       joploGoToHome: "Joplo · 홈으로",
+      joploWebsite: "Joplo 웹사이트 (새 탭에서 열림)",
       breadcrumbs: "탐색 경로",
       replay: "다시 재생",
       play: "재생",

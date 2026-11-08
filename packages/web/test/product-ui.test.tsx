@@ -18,6 +18,7 @@ import { chartModel, diffTone, menuPlacement, notificationPlacement, selectedIds
 import { CaseNav } from '../src/board/CaseNav';
 import { caseBrief, gapsOf, rolesOfFeature } from '../src/board/nav-model';
 import { SiteApp } from '../src/site/SiteApp';
+import { Brand, JOPLO_SITE_URL } from '../src/player/PlayerPage';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
@@ -200,5 +201,23 @@ describe('PM 视角的默认呈现（只读现有字段）', () => {
     vi.unstubAllGlobals();
     expect(home).toContain('For: Space admin and Member · 1 scenario');
     expect(home).not.toContain('The invite disappears');
+  });
+  it('发布站顶栏的 Joplo 标志在新标签页打开官网；看板里仍是回首页的按钮', () => {
+    const { publish } = build();
+    vi.stubGlobal('location', { hash: '', search: '', href: 'https://share.joplo.app/x/' });
+    const home = renderToStaticMarkup(<I18nProvider explicit="en"><SiteApp data={{ project: publish, home: '/' }} search="" /></I18nProvider>);
+    vi.unstubAllGlobals();
+    // 演示页（SitePlayer）要等 effect 才有内容，SSR 渲染不出来；它和首页传同一个 JOPLO_SITE_URL
+    const player = renderToStaticMarkup(<I18nProvider explicit="en"><Brand href={JOPLO_SITE_URL} /></I18nProvider>);
+    const board = renderToStaticMarkup(<I18nProvider explicit="en"><Brand onClick={() => {}} /></I18nProvider>);
+    expect(board).toMatch(/^<button[^>]*aria-label="Joplo · Go to home"/);
+    const brand = /<a[^>]*data-testid="brand"[^>]*>/;
+    for (const html of [home, player]) {
+      const tag = html.match(brand)?.[0] ?? '';
+      expect(tag).toContain('href="https://joplo.app/"');
+      expect(tag).toContain('target="_blank"');
+      expect(tag).toContain('rel="noopener noreferrer"');
+      expect(tag).toContain('aria-label="Joplo website (opens in a new tab)"');
+    }
   });
 });
