@@ -30,6 +30,7 @@ export function createDe(locale: Locale = 'de') {
       turnNarrationOn: "Sprecher einschalten",
       turnNarrationOff: "Sprecher ausschalten",
       readingAloud: "Wird vorgelesen",
+      browserVoiceFallback: "Browserstimme",
       waitingForNarration: "Warte, bis der Sprecher fertig ist",
       narrationAvailable: "Diese Demo hat einen Sprecher",
       transition: "Übergang",

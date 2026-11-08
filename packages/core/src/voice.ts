@@ -86,3 +86,11 @@ export function clipKey(fingerprint: string, text: string): string {
 export function voiceFingerprint(voices: { narrator: string | null; roles: Record<string, string> }, roleId: string | null): string | null {
   return (roleId ? voices.roles[roleId] : undefined) ?? voices.narrator;
 }
+
+/**
+ * 托管朗读的计费字数（D85，与 Cloud 一致）：规整空白后的朗读文字按 Array.from 计（一个 emoji、一个汉字都算 1 个字）。
+ * 看板的“约 X 字”、`joplo voice --dry-run` 的估算与服务端的扣费用同一个算法。
+ */
+export function spokenChars(text: string): number {
+  return Array.from(text.replace(/\s+/g, ' ').trim()).length;
+}

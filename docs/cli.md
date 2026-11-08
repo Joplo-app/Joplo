@@ -18,6 +18,7 @@ npx joplo build [dir] [--out-dir <dir>] [--overwrite] [--scenario <id>]… [--fe
 npx joplo login [--no-browser] [--format text|json] [--server <url>]
 npx joplo logout [--server <url>]
 npx joplo whoami [--format text|json] [--server <url>]
+npx joplo voice [dir] [--dry-run] [--locale <lang>]… [--format text|json] [--server <url>]
 npx joplo share [dir] [--format text|json] [--new] [--title <title>] [--review] \
   [--scenario <id>]… [--feature <id>]… \
   [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
@@ -33,7 +34,7 @@ npx joplo render [dir] --scenario-id <qid> --out <file> \
   [--width <pixels> --height <pixels>] [--scale <scale>] [--overwrite]
 ```
 
-可省略的 dir 默认为当前目录。`render` 的 scenario-id、out 必填。主输出和帮助写 stdout，服务日志、截图告警和项目依赖版本提示写 stderr；用法错误退出 2，领域或执行失败退出 1，云端需要登录（AUTH_REQUIRED / AUTH_EXPIRED）退出 3，成功退出 0。
+可省略的 dir 默认为当前目录。`render` 的 scenario-id、out 必填。主输出和帮助写 stdout，服务日志、截图告警和项目依赖版本提示写 stderr；用法错误退出 2，领域或执行失败退出 1，云端需要登录（AUTH_REQUIRED / AUTH_EXPIRED）退出 3，账号空间不够（share）退出 6，Joplo Cloud 朗读额度不够（voice，`TTS_QUOTA_EXCEEDED`）退出 7，成功退出 0。
 
 ## init
 
@@ -215,7 +216,7 @@ npx joplo build
 
 产物是可离线打开的静态站，含场景、字幕、层级、镜头、调用链与主题，去掉规则、情况、问题、备注及源位置。
 
-朗读（D74）：选用了声音供应商时，当前声音已生成的音频拷进 `voice/`（同一步、同一声音、同一语言只带最新一段），IR 带上 `voiceIndex`；Key 和 `voice` 配置都不进产物。输出多一行 `Narration: N audio clip(s) from <供应商> (… KB) included`；还有步骤没有当前文字的音频时一并说明，这些步骤在发布站用观众浏览器朗读，不影响构建。没有选用供应商时不输出这一行。音频在看板里生成（见[看板文档](web.md#朗读d74)）。界面与本地演示页共用布局。部署见 publish 主题；发布站边界见[看板文档](web.md#发布站)。
+朗读（D74 / D85）：选用了声音来源时（项目没选过、config 也没写时，已登录 Joplo Cloud 就按 Joplo Cloud 朗读，只读本机登录、不联网），当前声音已生成的音频拷进 `voice/`（同一步、同一声音、同一语言只带最新一段），IR 带上 `voiceIndex`；Key 和 `voice` 配置都不进产物。输出多一行 `Narration: N audio clip(s) from <供应商> (… KB) included`；还有步骤没有当前文字的音频时一并说明，这些步骤在发布站用观众浏览器朗读，不影响构建。没有选用供应商时不输出这一行。不再支持的旧 profile（AiHubMix、OpenAI 兼容、自定义 HTTP）已生成的音频照常带上。音频在看板里生成，或用 [`joplo voice`](#voice)（见[看板文档](web.md#朗读d74)）。界面与本地演示页共用布局。部署见 publish 主题；发布站边界见[看板文档](web.md#发布站)。
 
 ## render
 
@@ -253,7 +254,7 @@ npx joplo setup export --uninstall
 - 装完以 `ready.json` 为准：中途失败（网络、npm、Chromium 起不来）不算已安装，重新运行即可续装；同一时间只有一个进程能安装（CLI 与看板共用一把锁）。
 - 升级 Joplo 后 Playwright 版本变化时需要重新安装；装好新版本会删掉旧版本的目录。
 - `--format json`：`data` 是状态（`ready`、`source: managed | project | null`、`version`、`dir`、`downloadMB`、`command`）；`--status` 没装时为 `ok: false`、`error.code: EXPORT_COMPONENT_MISSING`。
-- 退出码：0 成功；2 用法错误；4 导出组件未安装（render、`setup export --status`）；6 账号空间不够（share，`QUOTA_EXCEEDED` 且 `details.kind` 为 storage）。
+- 退出码：0 成功；2 用法错误；3 需要登录；4 导出组件未安装（render、`setup export --status`）；6 账号空间不够（share，`QUOTA_EXCEEDED` 且 `details.kind` 为 storage）；7 Joplo Cloud 朗读额度不够（voice，`TTS_QUOTA_EXCEEDED`）。
 
 服务契约见 [contract.ts](../packages/server/src/contract.ts)。所有主题和选项以当前 `--help` 为准；需要创作细节时优先读取对应 skill 主题。
 
@@ -262,7 +263,7 @@ npx joplo setup export --uninstall
 
 CLI 和 skill 输出遵循 D57，统一使用英文；本文保留中文说明。云端命令的产品决策见 D58。
 
-只有 `login`、`logout`、`whoami`、`share`、`feedback` 连接云端；本地命令继续完整、免费。评审版、反馈回流、API Key 与 PR 预览的决定见 D63，接口以云端契约（评审、API Key 与 PR 预览）为准。
+只有 `login`、`logout`、`whoami`、`share`、`feedback`、`voice`（用 Joplo Cloud 朗读时）连接云端；本地命令继续完整、免费。评审版、反馈回流、API Key 与 PR 预览的决定见 D63，接口以云端契约（评审、API Key 与 PR 预览）为准。
 地址优先级：`--server <url>` → 非空 `JOPLO_CLOUD_URL` → `https://cloud.joplo.app`。空字符串等同未设置；协议/主机名及默认端口规范化后匹配凭证。地址必须是 HTTP(S) 源（不带路径、查询参数或用户名密码）。
 每个云端 API 请求携带 `X-Joplo-Client: joplo-cli/<版本>`；预签名文件 PUT 严格使用服务端返回的 headers，不附加账号令牌或版本头。
 凭证只适用于其记录的 server；切换服务器需要重新登录，不会把另一个服务器的令牌发送过去。
@@ -279,7 +280,7 @@ CLI 和 skill 输出遵循 D57，统一使用英文；本文保留中文说明�
 - 值必须是 `jpk_` + 至少 32 位字母或数字，否则 USAGE（退出 2），不发请求。完整 Key 只出现在 Authorization 头里，输出中一律替换为 `[REDACTED]`，只显示前 8 位前缀。
 - `login` 只打印 “JOPLO_API_KEY is set: …” 并退出 0（不联网、不写凭证）；`logout` 不动本地凭证，提示取消环境变量或到控制台吊销。
 - Key 无效、过期或已吊销：AUTH_EXPIRED（退出 3），message 写前缀并指向 `<server>/settings/api-keys`（`details.fix`）。Key 缺少某个权限范围时服务端返回 403 FORBIDDEN，CLI 报 FORBIDDEN（退出 1），message 写前缀并说明是 Key 的权限范围不够（不报“账号不可用”），`details.fix` 指向 API Key 页。
-- 权限范围：`shares:publish`（whoami、share）、`shares:read`、`feedback:read`（feedback）、`feedback:write`（feedback --applied）。
+- 权限范围：`shares:publish`（whoami、share）、`shares:read`、`feedback:read`（feedback）、`feedback:write`（feedback --applied）、`voice:generate`（voice、看板里的 Joplo Cloud 朗读）。
 
 ## login
 
@@ -311,7 +312,33 @@ npx joplo whoami --format json
 
 读取云端当前账号、套餐及限额，不以本地缓存推断套餐。JSON 沿用结果信封，`data` 为 `{user: {id, email, name}, plan, limits: {maxUploadBytes, maxTotalBytes, maxFiles, publishesPerHour}}`；服务端 publishesPerHour 返回数字（Pro 为 120）。CLI 兼容旧服务返回 null，显示“Not provided by the server”，不据此推断额度。
 
+朗读额度（D85）：whoami 同时读 `GET /api/v1/voice`，`data.voice` 是 `{plan, period: "trial" | "month", allowanceChars, usedChars, remainingChars, resetsAt, packs: [{remainingChars, expiresAt}], totalRemainingChars}`；文本多一行 `Narration: 3,200 characters left (3,200 of 5,000 free trial)`（Pro 写 `this month, resets 2026-12-01`，有加油包时写 `+ N from top-up packs`）。服务端有 storage 时另有一行 `Storage: <已用> of <上限> used`。旧云端没有 `/api/v1/voice`（404）、连不上或格式不对时没有 `voice` 字段，whoami 照常成功。
+
 使用 `JOPLO_API_KEY` 时 `data` 另有 `apiKey: {name, prefix, scopes, expiresAt}`：取自 `/api/v1/me` 响应的 `credential`（只认 `kind: "api_key"`；设备会话的 `{kind: "device"}` 不显示），服务端没给或格式不对的字段为 null（不让 whoami 失败）；`prefix` 缺省时用本地 Key 的前 8 位。文本输出多一行 `API key "<名字>" jpk_xxxx… · scopes: … · expires … (JOPLO_API_KEY)`。用登录凭证时没有 `apiKey` 字段，输出与原来相同。
+
+## voice
+
+生成缺少的朗读音频（D74 / D85），给 Agent 和脚本用；与看板的「生成缺少的音频」同一套缓存（`.joplo/voice/`）、声音来源与默认规则。
+
+```sh
+npx joplo voice --dry-run            # 只估算：几步没有音频、约多少字、生成后还剩多少
+npx joplo voice --format json        # 生成选定方案所有场景的缺少音频（每种内容语言各一遍）
+npx joplo voice --locale ja          # 只做一种内容语言（必须在 config 的 locales 里；可重复）
+```
+
+- 先 check：编译有 error 时以 `INVALID_SCHEMA` 退出 1，不生成。
+- 范围：每个功能选定方案的全部场景；项目写了 `locales` 时每种内容语言各一遍（D84，音色按 `resolveVoices(…, 语言)`）。朗读文字与 build 打包算片段键的文字相同（自动字幕用编译出的字幕；看板里自动字幕按界面语言生成，非英文界面时可能和这里不同）。
+- 声音来源：`joplo.config.ts` 的 `voice.profile` > 看板里选的 > 没选过时已登录用 Joplo Cloud 朗读（用 CLI 的登录或 `JOPLO_API_KEY`，Key 需要 `voice:generate`）> 都没有时 `VOICE_NO_SOURCE`。Joplo Cloud 的请求带 `locale`（内容语言；项目没写 locales 时不带）与 `project`（项目名，控制台明细用）。
+- 字数：每段 `Array.from(文字).length`，生成成功才扣，云端缓存命中不扣；已经在 `.joplo/voice/` 的段不再请求。`--dry-run` 不发请求，只估算。
+- 文本输出：`Voice source: Joplo Cloud (default when signed in)`、每种语言一行（生成了几段、几段已有、几段失败及原因；`--dry-run` 时是要生成几段、覆盖几步、约多少字——文字相同的步骤共用一段）、剩余字数一行、最后一行合计。`--format json` 的 `data`：`{profile: {id, name, kind}, source: "config" | "board" | "default", dryRun, locales: [{locale, segments, missing, chars, generated, skipped, failed}], total: {segments, missing, chars, generated, failed}, quota, usageUrl, exhausted}`；`quota.totalRemainingChars` 是最后一段响应头里的剩余（不在本地估算）。有失败的段时退出 1（重跑只重试它们）。
+- 错误码：
+  - `TTS_QUOTA_EXCEEDED`（**退出 7**）：额度不够（云端 402）。已生成的保留，剩下的步骤在看板和发布站用浏览器朗读。`details`：`neededChars`、`remainingChars`、`usageUrl`（当前 server 的 `/usage`，买加油包）、`generated`、`remainingSteps`。
+  - `VOICE_UNSUPPORTED`（退出 1）：选用的是不再支持的旧来源（AiHubMix、OpenAI 兼容、自定义 HTTP）。已生成的音频照常播放和发布；换成 Joplo Cloud 朗读、OpenAI 或 ElevenLabs 才能生成。
+  - `VOICE_NO_SOURCE`（退出 1）：没登录也没选来源、OpenAI / ElevenLabs 没有 Key、config 写了本机没有的 profile；message 带登录命令。
+  - `AUTH_REQUIRED` / `AUTH_EXPIRED`（退出 3）、`EMAIL_UNVERIFIED`（要先验证邮箱或用 GitHub 登录）、`FORBIDDEN`（API Key 缺 `voice:generate`）。
+  - 503 `TTS_UNAVAILABLE`、429、网络错误按云端命令的重试策略重试（最多 3 次，读 Retry-After，503 不扣字数），仍失败的段记进失败原因。
+
+托管朗读的云端契约（Cloud C27，CLI 只按它读写）：`GET /api/v1/voice` → `{model, quota, voices: [{id, gender, labels, samples}], recommended: {<locale>: [voiceId…]}, defaultVoice}`；`POST /api/v1/voice/speech` `{text, voice, locale?, project?}` → `audio/mpeg`，响应头 `X-Joplo-Chars-Charged`、`X-Joplo-Chars-Remaining`、`X-Joplo-Cache: hit|miss`、`X-Joplo-Audio-Sha256`；错误 `{code, message, data}`（400 BAD_REQUEST、401、402 TTS_QUOTA_EXCEEDED、403 EMAIL_UNVERIFIED、429、503 TTS_UNAVAILABLE）。音色 id 固定 6 个：`narrator-warm-f`（默认）、`narrator-calm-m`、`bright-f`、`friendly-m`、`clear-f`、`deep-m`。
 
 ## share
 
@@ -426,6 +453,16 @@ npx joplo feedback --applied d1,d2 --ref "$(git rev-parse HEAD)" --format json
 | uploadId | 创建响应 → 内存 → finalize 及其重试 → 幂等确认发布 |
 | --new / replaceShareId | 参数及同服务器 cloud.json.shareId → 创建请求 → 云端 → 新建或更新链接；免费账号与 Pro 都发送（C27），--new 与 PR 预览不发送 |
 | storage（me / finalize） | 云端 `share_file` 当前版本大小之和 → `me.storage` / finalize 的 `storage` → `Account.storage`、`ShareResult.storage` → 文本 `Storage:` 行、JSON `data.storage`、看板发布浮层（cloud-bridge → `CloudAccount.storage` / `CloudJob.result.storage`） |
+| voice quota（D85） | 云端按账号算 → `GET /api/v1/voice` 的 `quota` → CLI `readVoiceQuota()`（cloud-voice.ts，只认合法字段，旧云端 404 为 null）→ whoami 的 `data.voice` 与 `Narration:` 行；`cloudBridge.account()` 的 `CloudAccount.voice` → 看板首页账号卡片；`cloudBridge.voice.status()` → VoiceHub 内存（60 秒）→ `VoiceState.cloud.quota` → 声音浮层“剩 N 字”与“生成后还剩 Y 字” |
+| X-Joplo-Chars-Remaining（D85） | 每次 `POST /api/v1/voice/speech` 成功的响应头 → `speech()` 的 `CloudSpeechResult.remaining` → server `synthesizeCloud` → `GenerateOptions.onCloud` → VoiceHub 改写内存里的 `quota.totalRemainingChars` 并推 `joplo:voice`（看板浮层）；`joplo voice` 写进 `data.quota`。不在本地按字数估算剩余 |
+| X-Joplo-Chars-Charged / X-Joplo-Cache / X-Joplo-Audio-Sha256 | speech 响应头 → `CloudSpeechResult.charged / cache / sha256`（不合法为 null）→ `onCloud` 回执（`charged`、`cache`）；目前只用于判断与诊断，不写磁盘 |
+| speech 请求的 locale / project | 看板：`POST /__joplo/p/:id/voice/generate` 的 `contentLocale`（D84，项目写了 locales 时缺省为默认语言）与项目名 → VoiceHub `speechLocaleOf` / `project.name` → `GenerateOptions.speechLocale / project` → bridge.speech 请求体 → 云端按语言合成、控制台明细按项目归类；`joplo voice` 按每种内容语言同样传 |
+| TTS_QUOTA_EXCEEDED（402） | 云端 → `ttsQuotaError()`（data: neededChars / remainingChars / usagePath → `usageUrl` = 当前 server + 路径）→ bridge 抛 `{code, data}` → server `VoiceError('TTS_QUOTA_EXCEEDED')` → `VoiceCache.generate` 停下（`GenerateSummary.quota`、`stopped`，不记失败）→ VoiceHub `exhausted`（边放边生成直接 402）→ `VoiceState.cloud.exhausted` → 浮层“朗读额度不够”与「买加油包 ↗」；`joplo voice` → `TTS_QUOTA_EXCEEDED`（退出 7，details 同上 + generated / remainingSteps） |
+| cloud-voices.json（音色表） | `GET /api/v1/voice` 的 voices / recommended / defaultVoice → `ProfileStore.rememberCloudCatalog()` 写 `<JOPLO_HOME>/voice/cloud-voices.json`（不含额度）→ `cloudCatalog()`（内存 > 文件 > 内置 6 个英文标签）→ cloud 的 `publicOf().voices`（浮层音色列表、样音）与 `autoVoiceFor` 的推荐音色（D84）；build 离线时也按它选音色，与看板一致 |
+| index.json.chosen（D85） | 看板浮层选来源 → `PUT /__joplo/p/:id/voice` → `VoiceCache.select()` 写 `<项目>/.joplo/voice/index.json` 的 `chosen: true` → `VoiceCache.selection()`（undefined = 没选过）→ `resolveVoices(…, fallback)`：没选过时用默认来源（已登录为 cloud）→ 看板状态、`joplo build` / `share`（BuildOptions.voiceDefault）、`joplo voice` |
+| BuildOptions.voiceDefault（D85） | CLI：`build` 读本机登录（`client.auth()`，不联网）、`share` 总是已登录 → `voiceDefault: 'cloud' \| null` → `bundleVoice` / `reuseSharedVoice` 的 `defaultProfile` → 没选过来源的项目把 Joplo Cloud 生成的音频带进 `voice/` 与 `voiceIndex` |
+| PublicProfile.unsupported（D85） | `ProfileStore.list()/get()` 按 `profiles.json` 里非预设的条目（与从没存过、但项目还选着的 aihubmix）标出（不写进文件）→ `publicOf().unsupported` → 看板浮层“不再支持”、不给生成按钮，「管理密钥」里可删除；`VoiceCache.generate` 返回 `unsupported`、`generateOne` 抛 `UNSUPPORTED` → `joplo voice` 的 `VOICE_UNSUPPORTED`；指纹算法不变 → `bundleVoice` 照常带上旧音频 |
+| VoiceState.cloud（D85） | VoiceHub：`bridge.voice.status()`（登录、额度）+ 每段回执 + 402 → `cloudView()` → `GET /__joplo/p/:id/voice` 与 `joplo:voice` 推送 → 看板 `useVoice`：来源行的“剩 N 字 / 登录后可用 / 暂时连不上”、登录命令、`cloudQuotaView`（生成后还剩、额度不够）、边放边生成是否继续 |
 | STORAGE_FULL（413） | 云端创建或 finalize 时按差额判断 → CLI `storageError()` → `QUOTA_EXCEEDED`（kind storage，退出 6）→ JSON `error.details`；看板经 cloud-bridge 的 `CloudJob.error.storage` 画红色提示 |
 | cloud.json.server / shareId / url | 目标服务器及普通 share 的 finalize 响应 → 项目 .joplo/cloud.json（原子写，保留 review） → 下次普通 share → 来源比对与 Pro 更新主链接；feedback 没有评审记录时用它；url 供用户/工具读取 |
 | cloud.json.review.shareId / url | `--review` 的 finalize 响应 → 同一文件的 review（原子写，保留主链接） → 下次 `--review` 的 Pro replaceShareId（评审链接与评论保留）；feedback 默认读它 |

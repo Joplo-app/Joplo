@@ -31,6 +31,7 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       turnNarrationOn: "打开旁白",
       turnNarrationOff: "关闭旁白",
       readingAloud: "正在朗读",
+      browserVoiceFallback: "浏览器朗读",
       waitingForNarration: "等旁白读完",
       narrationAvailable: "这个演示有旁白",
       transition: "过渡",

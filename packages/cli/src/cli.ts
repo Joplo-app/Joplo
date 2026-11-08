@@ -51,7 +51,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   let exitCode = 0;
   const serverPackage = '@joplo-app/server';
   const loadServer = deps.loadServer ?? (() => import(serverPackage));
-  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'renderStep' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime'>(name: K): Promise<typeof Server[K]> {
+  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'renderStep' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime' | 'generateProjectVoice'>(name: K): Promise<typeof Server[K]> {
     let module: Record<string, unknown>;
     try { module = await loadServer(); }
     catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server cannot load ${name}: ${e instanceof Error ? e.message : String(e)}`); }
@@ -114,11 +114,28 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   });
   cloudCommand('whoami').description('Show the cloud account, plan, and limits').addOption(format()).action(async opts => {
     const client = await cloudClient(opts.server, opts.format), auth = await client.requireAuth();
-    const data = await client.me(auth.token);
+    // 朗读额度（D85）：与账号一起读；旧云端（404）或连不上时没有这一项，不让 whoami 失败
+    const { fetchVoiceInfo, voiceQuotaLine } = await import('./cloud-voice.ts');
+    const [me, voiceInfo] = await Promise.all([client.me(auth.token), fetchVoiceInfo(client, auth.token).catch(() => null)]);
+    const data = { ...me, ...(voiceInfo ? { voice: voiceInfo.quota } : {}) };
     const key = data.apiKey ? `API key ${data.apiKey.name ? `"${data.apiKey.name}" ` : ''}${data.apiKey.prefix ?? ''}…${data.apiKey.scopes ? ` · scopes: ${data.apiKey.scopes.join(', ') || 'none'}` : ''}${data.apiKey.expiresAt ? ` · expires ${data.apiKey.expiresAt}` : ''} (JOPLO_API_KEY)` : null;
     if (opts.format === 'json') json(result(client.server, `${terminalText(data.user.email)} (${data.plan})`, data));
-    else line(`${terminalText(data.user.email)} (${data.plan})${key ? `\n${key}` : ''}\nNew upload limit: ${data.limits.maxUploadBytes} bytes\nManifest total limit: ${data.limits.maxTotalBytes} bytes, ${data.limits.maxFiles} files\nPublications per hour: ${data.limits.publishesPerHour ?? 'Not provided by the server'}`);
+    else line(`${terminalText(data.user.email)} (${data.plan})${key ? `\n${key}` : ''}\nNew upload limit: ${data.limits.maxUploadBytes} bytes\nManifest total limit: ${data.limits.maxTotalBytes} bytes, ${data.limits.maxFiles} files\nPublications per hour: ${data.limits.publishesPerHour ?? 'Not provided by the server'}${data.storage ? `\nStorage: ${formatBytes(data.storage.usedBytes)} of ${formatBytes(data.storage.quotaBytes)} used` : ''}${data.voice ? `\n${voiceQuotaLine(data.voice)}` : ''}`);
   });
+  cloudCommand('voice').description('Generate missing narration audio for the picked options (same cache as the board): Joplo Cloud narration when signed in, or the source chosen in the board or joplo.config.ts')
+    .argument('[dir]', 'Project directory', '.').addOption(format())
+    .option('--dry-run', 'Only count the steps and characters that would be generated')
+    .option('--locale <lang>', 'Only this content language from config locales (D84); repeatable', collect, [])
+    .action(async (dir, opts) => {
+      const { voiceCommand } = await import('./voice.ts');
+      const r = await voiceCommand(resolve(dir), { dryRun: !!opts.dryRun, locales: opts.locale, server: opts.server }, {
+        version: deps.cliVersion ?? await readCliVersion(), cloud: deps.cloud, generate: () => serverFunction('generateProjectVoice'),
+        build: async options => (await serverFunction('buildSite'))(options), render: () => serverFunction('renderStep'), progress: l => stderr(oneLine(l) + '\n'),
+      });
+      if (opts.format === 'json') json(result(resolve(dir), r.summary, r.data));
+      else for (const l of r.lines) line(l);
+      if (r.data.total.failed) exitCode = 1;
+    });
   const diff = program.command('diff').enablePositionalOptions().description('Compare two public builds; prepare and publish immutable PR comparisons')
     .argument('[before]', 'Baseline static build directory').argument('[after]', 'Current static build directory')
     .option('--out <dir>', 'New diff output directory').option('--base-sha <sha>', 'Normalized baseline commit SHA').option('--head-sha <sha>', 'Normalized current commit SHA').addOption(format())
@@ -308,7 +325,9 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const buildSite = await serverFunction('buildSite');
     const output = opts.outDir ?? opts.out;
     const scope = opts.scenario.length || opts.feature.length ? { scope: { scenarios: opts.scenario, features: opts.feature } } : {};
-    const data = await buildSite({ projectDir: resolve(dir), outDir: output === undefined ? undefined : resolve(output), overwrite: opts.overwrite, ...scope });
+    // 项目没选过声音来源时，已登录 Joplo Cloud 就按 cloud 带上已生成的音频（D85，与看板同一规则；只读本机登录，不联网）
+    const signedIn = await cloudClient().then(c => c.auth()).then(Boolean, () => false);
+    const data = await buildSite({ projectDir: resolve(dir), outDir: output === undefined ? undefined : resolve(output), overwrite: opts.overwrite, ...scope, voiceDefault: signedIn ? 'cloud' : null });
     for (const d of data.diagnostics) line(diagnosticLine(d));
     line(`Built ${data.outDir} (${data.files.length} files)`);
     if (data.scope) {
@@ -361,7 +380,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     else if (wantsJson) json(f); else line(`${f.error.code}  ${oneLine(terminalText(f.error.message))}`);
     // 6：账号容量不足（C27），与 QUOTA_EXCEEDED 的其他种类（每小时限额，可以稍后重试）区分
     const storageFull = f.error.code === 'QUOTA_EXCEEDED' && (f.error.details as { kind?: unknown } | undefined)?.kind === 'storage';
-    return f.error.code === 'USAGE' ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : f.error.code === 'EXPORT_COMPONENT_MISSING' ? 4 : storageFull ? 6 : 1;
+    // 7：Joplo Cloud 朗读额度不够（D85，joplo voice）；已生成的音频保留
+    return f.error.code === 'USAGE' ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : f.error.code === 'EXPORT_COMPONENT_MISSING' ? 4 : storageFull ? 6 : f.error.code === 'TTS_QUOTA_EXCEEDED' ? 7 : 1;
   }
   return exitCode;
 }

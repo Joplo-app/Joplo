@@ -20,7 +20,7 @@ export const SKILL_TOPICS = [
   { name: 'selection', description: 'Edit only the element selected by the user in the board' },
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
   { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
-  { name: 'publish', description: 'pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages' },
+  { name: 'publish', description: 'pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)' },
 ] as const;
 
 /** 心智模型：所有入口最先读到的几句话。 */
@@ -52,6 +52,8 @@ export const PITFALLS = [
   ['Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key and pins that layer, so later steps stop switching layers; layer= is ignored); wait for rendering before screenshots', 'demo'],
   ['Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user', 'cases'],
   ['Never share or deploy without the user\'s go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself', 'publish'],
+  ['Joplo Cloud narration spends the user\'s characters: run npx joplo voice --dry-run and tell them the estimate before a large batch; on TTS_QUOTA_EXCEEDED (exit 7) keep what was made, pass on error.details.usageUrl, and never retry in a loop or buy for them', 'publish'],
+  ['AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json', 'publish'],
 ] as const satisfies readonly (readonly [string, string])[];
 
 /** 中文触发词：技能 description 里的匹配文本，不是 CLI 界面文案（english-output 测试的白名单）。 */

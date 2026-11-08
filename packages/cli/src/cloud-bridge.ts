@@ -2,13 +2,16 @@
  * 看板直接发布到云端（D76）的 CLI 一侧：`joplo dev` 启动看板时把它注入给 @joplo-app/server。
  * - account：只读本机登录（credentials.json 或 JOPLO_API_KEY），再问一次云端拿邮箱和套餐；没登录时给出与 CLI 一致的登录命令。
  * - publish：就是 `joplo share`（同一个 share()，同一套检查、构建、上传和 .joplo/cloud.json 记录），非交互：没登录时报 AUTH_REQUIRED，不打开浏览器。
+ * - voice（D85 托管朗读）：status = 登录状态 + `GET /api/v1/voice`（额度、音色表；旧云端 404 或连不上时 voice 为 null）；
+ *   speech = `POST /api/v1/voice/speech`（cloud-voice.ts），失败抛 { code, message, data }。看板（VoiceHub）与 `joplo voice` 都用它。
  * 令牌只在这个进程里：进度行与错误信息都先去掉记住的密钥，再交给看板。
  */
 import { JoploError } from '@joplo-app/core';
-import type { buildSite, CloudAccount, CloudBridge, CloudPublishRequest, CloudPublishResult } from '@joplo-app/server';
+import type { buildSite, CloudAccount, CloudBridge, CloudPublishRequest, CloudPublishResult, CloudSpeechRequest, CloudSpeechResult, CloudVoiceBridge, CloudVoiceStatus } from '@joplo-app/server';
 import { CloudError } from './cloud-error.ts';
 import type { RenderPreview } from './cloud-embed.ts';
 import { CloudClient, type CloudDependencies } from './cloud.ts';
+import { fetchVoiceInfo, speech, speechFailure } from './cloud-voice.ts';
 
 export const DEFAULT_CLOUD_SERVER = 'https://cloud.joplo.app';
 
@@ -45,7 +48,45 @@ export function cloudBridge(opts: BridgeOptions): CloudBridge {
     return typeof fix === 'string' && fix.includes('--server') && !home()?.trim() ? fix : command(server);
   };
 
+  const voice: CloudVoiceBridge = {
+    async status(): Promise<CloudVoiceStatus> {
+      const secrets = new Set<string>();
+      const c = client(() => undefined, secrets);
+      const signedOut = (cmd = command(c.server)): CloudVoiceStatus => ({ signedIn: false, server: c.server, loginCommand: cmd });
+      let auth;
+      try {
+        auth = await c.auth(true);
+      } catch (e) {
+        if (e instanceof CloudError && AUTH_CODES.has(e.code)) return signedOut(fixOf(e, c.server));
+        if (e instanceof JoploError) return signedOut();
+        throw e;
+      }
+      if (!auth) return signedOut();
+      try {
+        return { signedIn: true, server: c.server, voice: await fetchVoiceInfo(c, auth.token) };
+      } catch (e) {
+        if (e instanceof CloudError && AUTH_CODES.has(e.code)) return signedOut(fixOf(e, c.server));
+        return { signedIn: true, server: c.server, voice: null };
+      }
+    },
+    async speech(req: CloudSpeechRequest): Promise<CloudSpeechResult> {
+      const secrets = new Set<string>();
+      const redact = redactor(secrets);
+      const c = client(() => undefined, secrets);
+      try {
+        const auth = await c.auth(true);
+        if (!auth) throw new CloudError('AUTH_REQUIRED', `Joplo Cloud narration needs a Joplo account. Run ${command(c.server)}`);
+        return await speech(c, auth.token, req);
+      } catch (e) {
+        const f = speechFailure(e instanceof JoploError ? new CloudError('AUTH_REQUIRED', e.message) : e);
+        f.message = redact(f.message);
+        throw f;
+      }
+    },
+  };
+
   return {
+    voice,
     async account(): Promise<CloudAccount> {
       const secrets = new Set<string>();
       const redact = redactor(secrets);
@@ -61,8 +102,9 @@ export function cloudBridge(opts: BridgeOptions): CloudBridge {
       }
       if (!auth) return signedOut();
       try {
-        const me = await c.me(auth.token);
-        return { signedIn: true, server: c.server, email: me.user.email, plan: me.plan, ...(me.storage ? { storage: me.storage } : {}) };
+        // 朗读额度（D85）与账号一起取；旧云端（404）或这一项出错时只是不显示
+        const [me, v] = await Promise.all([c.me(auth.token), fetchVoiceInfo(c, auth.token).catch(() => null)]);
+        return { signedIn: true, server: c.server, email: me.user.email, plan: me.plan, ...(me.storage ? { storage: me.storage } : {}), ...(v ? { voice: v.quota } : {}) };
       } catch (e) {
         if (e instanceof CloudError && AUTH_CODES.has(e.code)) return signedOut(e.message, fixOf(e, c.server));
         // 云端暂时连不上：仍然算已登录（发布时再报网络错误），邮箱用本机登录里记的

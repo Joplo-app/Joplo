@@ -30,6 +30,7 @@ export function createJa(locale: Locale = 'ja') {
       turnNarrationOn: "ナレーションをオン",
       turnNarrationOff: "ナレーションをオフ",
       readingAloud: "読み上げ中",
+      browserVoiceFallback: "ブラウザの読み上げ",
       waitingForNarration: "ナレーションの終了を待っています",
       narrationAvailable: "このデモにはナレーションがあります",
       transition: "トランジション",

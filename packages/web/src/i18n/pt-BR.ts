@@ -30,6 +30,7 @@ export function createPtBR(locale: Locale = 'pt-BR') {
       turnNarrationOn: "Ativar a narração",
       turnNarrationOff: "Desativar a narração",
       readingAloud: "Lendo em voz alta",
+      browserVoiceFallback: "Voz do navegador",
       waitingForNarration: "Aguardando a narração terminar",
       narrationAvailable: "Esta demo tem narração",
       transition: "Transição",

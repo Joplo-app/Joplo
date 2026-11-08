@@ -263,6 +263,11 @@ export class Narrator {
     void this.ensure?.(t, role)?.catch(() => null);
   }
 
+  /** 选了声音来源（有这个角色的声音指纹）：这时用浏览器朗读就是“兜底”，字幕区标出来（额度不够、没生成、云端连不上）。 */
+  hasVoice(role: string | null): boolean {
+    return !!this.lookup && !!voiceFingerprint(this.lookup, role);
+  }
+
   /** 这段文字有没有现成的音频（看板浮层统计用）。 */
   hasClip(text: string, role: string | null): boolean {
     const fp = this.lookup ? voiceFingerprint(this.lookup, role) : null;

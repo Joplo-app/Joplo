@@ -30,6 +30,7 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       turnNarrationOn: "開啟旁白",
       turnNarrationOff: "關閉旁白",
       readingAloud: "正在朗讀",
+      browserVoiceFallback: "瀏覽器朗讀",
       waitingForNarration: "等待旁白讀完",
       narrationAvailable: "這個示範有旁白",
       transition: "轉場",

@@ -30,6 +30,7 @@ export function createEs(locale: Locale = 'es') {
       turnNarrationOn: "Activar la narración",
       turnNarrationOff: "Desactivar la narración",
       readingAloud: "Leyendo en voz alta",
+      browserVoiceFallback: "Voz del navegador",
       waitingForNarration: "Esperando a que termine la narración",
       narrationAvailable: "Esta demo tiene narración",
       transition: "Transición",

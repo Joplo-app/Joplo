@@ -30,6 +30,7 @@ export function createFr(locale: Locale = 'fr') {
       turnNarrationOn: "Activer la narration",
       turnNarrationOff: "Couper la narration",
       readingAloud: "Lecture à voix haute",
+      browserVoiceFallback: "Voix du navigateur",
       waitingForNarration: "En attente de la fin de la narration",
       narrationAvailable: "Cette démo est commentée",
       transition: "Transition",

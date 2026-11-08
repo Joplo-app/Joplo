@@ -71,6 +71,8 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key and pins that layer, so later steps stop switching layers; layer= is ignored); wait for rendering before screenshots. See npx joplo skill demo.
 - Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user. See npx joplo skill cases.
 - Never share or deploy without the user's go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself. See npx joplo skill publish.
+- Joplo Cloud narration spends the user's characters: run npx joplo voice --dry-run and tell them the estimate before a large batch; on TTS_QUOTA_EXCEEDED (exit 7) keep what was made, pass on error.details.usageUrl, and never retry in a loop or buy for them. See npx joplo skill publish.
+- AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json. See npx joplo skill publish.
 
 ## Reference
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.
@@ -85,6 +87,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - selection: Edit only the element selected by the user in the board
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
-- publish: pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages
+- publish: pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.17 sha256:ac891b04b0ec9269c79bbdc0030eb149867750c76d51cfb7c76a440892b8c478 -->
+<!-- joplo-skill 0.2.17 sha256:97e65fda1066ff7a2f69f34f9997a8bfffcb4928f9423e55e04002112a4839b4 -->

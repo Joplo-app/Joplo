@@ -317,9 +317,12 @@ export const onSettings = (cb: (s: BoardSettings) => void) => {
 };
 export const emitSettings = (s: BoardSettings) => settingsListeners.forEach((cb) => cb(s));
 
-// ---------- 朗读（D74）：声音供应商 profile（本机）与项目音频 ----------
-export type VoiceKind = 'openai' | 'elevenlabs' | 'http';
+// ---------- 朗读（D74 / D85）：声音来源（本机）与项目音频 ----------
+/** 声音来源的类型（D85：只有官方的）；http 只出现在本机旧的 profile 里（不再支持）。 */
+export type VoiceKind = 'cloud' | 'openai' | 'elevenlabs' | 'http';
 export type VoiceResponseMode = 'audio' | 'json-base64' | 'json-url';
+/** 音色候选（与服务端 VoiceChoice 一致）；cloud 的音色另有 labels / samples（按界面语言）。 */
+export type VoiceChoiceView = { id: string; name: string; gender: 'female' | 'male' | 'neutral'; accent?: string; recommended?: boolean; labels?: Record<string, string>; samples?: Record<string, string> };
 /** 与服务端 voice.ts 的 PublicProfile 一致：不含 Key，只有是否已保存、末 4 位、可用的环境变量。 */
 export type VoiceProfileView = {
   id: string;
@@ -330,23 +333,25 @@ export type VoiceProfileView = {
   model: string;
   voice: string;
   response: VoiceResponseMode;
-  path?: string;
-  headers?: Record<string, string>;
-  body?: string;
-  /** 说话风格（OpenAI 兼容接口的 instructions）。 */
+  /** 说话风格（OpenAI 的 instructions）。 */
   style?: string;
   key: { saved: boolean; hint: string | null; env: string | null; envSet: boolean };
-  /** 预设音色（与服务端 VoiceChoice 一致）。 */
-  voices: { id: string; name: string; gender: 'female' | 'male' | 'neutral'; accent?: string; recommended?: boolean }[];
+  voices: VoiceChoiceView[];
   removable: boolean;
+  /** 不再支持的旧 profile（D85）：已生成的音频照常播放与发布，不能再生成。 */
+  unsupported?: boolean;
 };
-export type VoiceProfileInput = Pick<VoiceProfileView, 'name' | 'kind' | 'baseUrl' | 'model' | 'voice' | 'response' | 'path' | 'body' | 'style'>;
+/** 与服务端 cloud.ts 的 VoiceQuota 一致（D85）。 */
+export type VoiceQuota = { plan: string; period: 'trial' | 'month'; allowanceChars: number; usedChars: number; remainingChars: number; resetsAt: string | null; packs: { remainingChars: number; expiresAt: string }[]; totalRemainingChars: number };
+/** 与服务端 voice-http.ts 的 VoiceCloudView 一致。 */
+export type VoiceCloudView = { signedIn: boolean; server: string | null; loginCommand: string | null; available: boolean; quota: VoiceQuota | null; usageUrl: string | null; exhausted: { neededChars: number | null; remainingChars: number | null } | null };
 /** 与服务端 voice-http.ts 的 VoiceState 一致。 */
 export type VoiceState = {
   /** 服务端的状态版本（递增）；见 newerVoiceState。 */
   rev: number;
   selected: string | null;
-  source: 'config' | 'board' | null;
+  /** default = 没选过时的默认（D85：已登录为 Joplo Cloud 朗读）。 */
+  source: 'config' | 'board' | 'default' | null;
   missing: string | null;
   profile: VoiceProfileView | null;
   voices: { narrator: string | null; roles: Record<string, string> };
@@ -357,8 +362,10 @@ export type VoiceState = {
   clips: Record<string, string>;
   failures: Record<string, { stepId: string; message: string }>;
   generating: { done: number; total: number; failed: number } | null;
+  /** 托管朗读（D85）；旧版 joplo dev 没有这一项。 */
+  cloud?: VoiceCloudView | null;
 };
-export type VoiceTestResult = { ok: true; audio: string; bytes: number; contentType: string } | { ok: false; message: Text; code?: string; hint?: { response: VoiceResponseMode; path: string } };
+export type VoiceTestResult = { ok: true; audio: string; bytes: number; contentType: string } | { ok: false; message: Text; code?: string };
 
 type ErrBody = { error?: { message?: string; code?: string; hint?: { response: VoiceResponseMode; path: string } } } | null;
 
@@ -374,10 +381,10 @@ export async function fetchVoiceProfiles(): Promise<{ profiles: VoiceProfileView
   }
 }
 
-/** 保存 profile；id 为 null 时新建。key：undefined = 不改，null = 删掉保存的 Key。 */
-export async function saveVoiceProfile(id: string | null, profile: VoiceProfileInput, key?: string | null): Promise<{ ok: true; profile: VoiceProfileView; profiles: VoiceProfileView[] } | { ok: false; message: Text }> {
+/** 改预设（D85：只有 cloud / openai / elevenlabs）：默认音色（浮层里换旁白音色）或 Key（「管理密钥」）。key：undefined = 不改，null = 删掉保存的 Key。 */
+export async function saveVoiceProfile(id: string, profile: { voice?: string } | undefined, key?: string | null): Promise<{ ok: true; profile: VoiceProfileView; profiles: VoiceProfileView[] } | { ok: false; message: Text }> {
   try {
-    const res = await post(`/__joplo/voice/profiles/${id ? enc(id) : 'new'}`, { profile, ...(key !== undefined ? { key } : {}) }, 'PUT');
+    const res = await post(`/__joplo/voice/profiles/${enc(id)}`, { ...(profile ? { profile } : {}), ...(key !== undefined ? { key } : {}) }, 'PUT');
     const b = (await res.json().catch(() => null)) as ({ profile?: VoiceProfileView; profiles?: VoiceProfileView[] } & NonNullable<ErrBody>) | null;
     return res.ok && b?.profile && b.profiles ? { ok: true, profile: b.profile, profiles: b.profiles } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
   } catch (e) {
@@ -385,7 +392,7 @@ export async function saveVoiceProfile(id: string | null, profile: VoiceProfileI
   }
 }
 
-/** 删除自建的 profile；预设恢复默认。 */
+/** 删除本机旧的 profile；预设恢复默认。 */
 export async function deleteVoiceProfile(id: string): Promise<{ ok: true; profiles: VoiceProfileView[] } | { ok: false; message: Text }> {
   try {
     const res = await post(`/__joplo/voice/profiles/${enc(id)}`, undefined, 'DELETE');
@@ -396,21 +403,22 @@ export async function deleteVoiceProfile(id: string): Promise<{ ok: true; profil
   }
 }
 
-/** 试读一句：传已保存的 id，或表单草稿（profile + 可选的 key）。 */
-export async function testVoiceProfile(body: { id?: string; profile?: VoiceProfileInput; key?: string; text?: string }): Promise<VoiceTestResult> {
+/** 用 OpenAI / ElevenLabs 试读一句（「管理密钥」里测试 Key）：传 id 与可选的、还没保存的 key。 */
+export async function testVoiceProfile(body: { id: string; key?: string; text?: string }): Promise<VoiceTestResult> {
   try {
     const res = await post('/__joplo/voice/test', body);
     const b = (await res.json().catch(() => null)) as ({ ok?: boolean; audio?: string; bytes?: number; contentType?: string } & NonNullable<ErrBody>) | null;
     if (res.ok && b?.ok && b.audio) return { ok: true, audio: b.audio, bytes: b.bytes ?? 0, contentType: b.contentType ?? '' };
-    return { ok: false, message: b?.error?.message ?? `HTTP ${res.status}`, ...(b?.error?.code ? { code: b.error.code } : {}), ...(b?.error?.hint ? { hint: b.error.hint } : {}) };
+    return { ok: false, message: b?.error?.message ?? `HTTP ${res.status}`, ...(b?.error?.code ? { code: b.error.code } : {}) };
   } catch (e) {
     return { ok: false, message: errMsg(e) };
   }
 }
 
-export async function fetchVoiceState(projectId: string): Promise<VoiceState | null> {
+/** refresh：让服务端重新问一次云端的朗读额度（打开声音浮层时）。 */
+export async function fetchVoiceState(projectId: string, refresh = false): Promise<VoiceState | null> {
   try {
-    const res = await fetch(`/__joplo/p/${enc(projectId)}/voice`, { cache: 'no-store' });
+    const res = await fetch(`/__joplo/p/${enc(projectId)}/voice${refresh ? '?refresh=1' : ''}`, { cache: 'no-store' });
     return res.ok ? ((await res.json()) as VoiceState) : null;
   } catch {
     return null;
@@ -429,7 +437,19 @@ export async function selectVoiceProfile(projectId: string, profileId: string | 
 }
 
 export type VoiceSegment = { stepId: string; text: string; role: string | null };
-export type VoiceSummary = { total: number; generated: number; skipped: number; failed: { stepId: string; message: string }[]; noProfile?: boolean };
+export type VoiceSummary = {
+  total: number;
+  generated: number;
+  skipped: number;
+  failed: { stepId: string; message: string }[];
+  noProfile?: boolean;
+  /** 选用的来源不再支持（D85）。 */
+  unsupported?: boolean;
+  /** cloud 额度不够（402），生成在这里停下。 */
+  quota?: { neededChars: number | null; remainingChars: number | null };
+  stopped?: number;
+  error?: { code: string; message: string };
+};
 
 /** 生成缺的音频（进度通过 joplo:voice 推送）。 */
 export async function generateVoice(projectId: string, locale: Locale, segments: VoiceSegment[], contentLocale?: string | null): Promise<{ ok: true; summary: VoiceSummary; state: VoiceState } | { ok: false; message: Text }> {
@@ -477,7 +497,7 @@ export async function requestClip(projectId: string, locale: Locale, segment: Vo
 // ---------- 直接发布到云端（D76） ----------
 /** 与 @joplo-app/server 的 CloudAccount / CloudJob 一致（页面只拿到邮箱和套餐，令牌留在本机进程）。 */
 export type CloudAccount =
-  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; storage?: CloudStorage }
+  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; storage?: CloudStorage; /** 托管朗读额度（D85）；旧云端或连不上时没有。 */ voice?: VoiceQuota }
   | { signedIn: false; server: string; loginCommand: string; message?: string };
 /** 账号容量（C27），字节。 */
 export type CloudStorage = { usedBytes: number; quotaBytes: number };

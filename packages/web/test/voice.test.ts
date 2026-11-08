@@ -231,3 +231,33 @@ describe('发布站朗读开关的初始值（D74）', () => {
     expect(siteVoiceDefault(withClips({ k: 'voice/a.mp3' }), true)).toBe(false);
   });
 });
+
+describe('额度不够 / 没有音频时用浏览器朗读，字幕区标出（D85）', () => {
+  class BrowserNarrator extends FakeNarrator {
+    override speak(text: string, role: string | null): Narration | null {
+      const n = super.speak(text, role);
+      return n ? { ...n, source: 'browser' } : null;
+    }
+  }
+  it('选了声音来源（有声音指纹）却用浏览器朗读：narration.fallback；没选来源时不标', async () => {
+    const c = new DemoController(null);
+    c.reducedMotion = true;
+    c.setProject(project(), 1, null);
+    c.setScenario('f.a.s', 0, { quiet: true });
+    const n = new BrowserNarrator();
+    n.enabled = true;
+    n.lookup = { narrator: 'fp-cloud', roles: {}, clips: {} };
+    c.narrator = n;
+    expect(n.hasVoice(null)).toBe(true);
+    void c.play();
+    await until(() => n.calls.length === 1);
+    expect(c.getSnapshot().narration).toMatchObject({ position: 1, source: 'browser', fallback: true });
+    c.pause();
+    n.lookup = null;
+    expect(n.hasVoice(null)).toBe(false);
+    c.next();
+    await until(() => n.calls.length >= 2);
+    expect(c.getSnapshot().narration?.fallback).toBeUndefined();
+    c.pause();
+  });
+});

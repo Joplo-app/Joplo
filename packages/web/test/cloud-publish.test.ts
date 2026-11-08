@@ -20,8 +20,8 @@ describe('账号容量（C27，方案 B）', () => {
   });
   it('平时只有一行小字；用到 80% 起出现黄色用量条与提醒；满了是 over', () => {
     expect(storageView({ usedBytes: 38 * MB, quotaBytes: 100 * MB })).toEqual({ level: 'ok', pct: 38, used: '38 MB', quota: '100 MB' });
-    expect(storageView({ usedBytes: 79.9 * MB, quotaBytes: 100 * MB }).level).toBe('ok');
-    expect(storageView({ usedBytes: 80 * MB, quotaBytes: 100 * MB }).level).toBe('near');
+    expect(storageView({ usedBytes: 79.9 * MB, quotaBytes: 100 * MB })!.level).toBe('ok');
+    expect(storageView({ usedBytes: 80 * MB, quotaBytes: 100 * MB })!.level).toBe('near');
     expect(storageView({ usedBytes: 100 * MB, quotaBytes: 100 * MB })).toMatchObject({ level: 'over', pct: 100 });
     // 已超额的老账号：百分比封顶 100
     expect(storageView({ usedBytes: 150 * MB, quotaBytes: 100 * MB })).toMatchObject({ level: 'over', pct: 100 });
