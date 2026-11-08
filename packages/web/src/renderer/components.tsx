@@ -1,3 +1,4 @@
+import { registerRendererServices } from '@joplo-app/kit/renderer';
 import { useI18n } from '../i18n/context';
 import { en, type Dictionary } from '../i18n/en';
 /**
@@ -2114,7 +2115,7 @@ function PluginHost({ node, p }: NodeProps) {
       const children = chosen.map(n => <RenderNode key={n.id} node={n} />);
       return container ? createPortal(children, container) : children;
     },
-    frame: { mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
+    frame: { mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, sceneId: ctx.scene.id, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
     css: (name) => { const el = element() ?? ctx.stage; return el ? getComputedStyle(el).getPropertyValue(name).trim() : ''; },
     click: (id, at) => {
       const el = element();
@@ -2650,3 +2651,5 @@ export function RenderNode({ node }: { node: SceneNode }) {
     </Impl>
   );
 }
+
+registerRendererServices({ useCtx, useI18n, useR, useRoot, useRootAttrs, useStroke, RenderNode, Rough, RoughPath, roundRectPath, rectOf, resolveProps, isSelfVisible, walkNodes });

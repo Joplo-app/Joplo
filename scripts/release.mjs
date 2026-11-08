@@ -22,7 +22,8 @@ import zlib from 'node:zlib';
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
-export const PACKAGES = ['kit', 'core', 'web', 'server', 'cli', 'joplo'];
+export const PACKAGES = ['kit', 'plugin-diagram', 'core', 'web', 'server', 'cli', 'joplo'];
+export const packageDir = (name, root = REPO) => path.join(root, name === 'plugin-diagram' ? 'plugins/diagram' : `packages/${name}`);
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const LICENSE_PLACEHOLDER = 'UNLICENSED';
 
@@ -50,7 +51,7 @@ const log = (s) => console.log(s);
 
 function version(root, v) {
   if (!v || !SEMVER.test(v)) die(`用法：pnpm release:version <版本>，例如 0.1.1 或 0.2.0-beta.1（收到 ${v ?? '空'}）`);
-  const files = PACKAGES.map((p) => path.join(root, 'packages', p, 'package.json'));
+  const files = PACKAGES.map((p) => path.join(packageDir(p, root), 'package.json'));
   for (const f of files) if (!fs.existsSync(f)) die(`缺少 ${f}`);
   // 先全部读出再写入：任何一个读失败都不会留下改了一半的版本
   const pkgs = files.map((f) => [f, readJson(f)]);
@@ -58,6 +59,10 @@ function version(root, v) {
     pkg.version = v;
     fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
   }
+  // Runtime version metadata must not pull the workspace manifest into browser bundles.
+  const pluginVersion = path.join(packageDir('plugin-diagram', root), 'src/version.json');
+  fs.mkdirSync(path.dirname(pluginVersion), { recursive: true });
+  fs.writeFileSync(pluginVersion, JSON.stringify({ version: v }, null, 2) + '\n');
   log(`✓ ${pkgs.map(([, p]) => p.name).join('、')} → ${v}`);
   // 官方 Agent 技能带版本标记（D64）：随版本一起重新生成，scripts/test/skills.test.ts 保证与 skill install 逐字一致
   const skills = spawnSync(process.execPath, ['--import', 'tsx', path.join(REPO, 'scripts/build-skills.ts'), '--root', root], { cwd: REPO, encoding: 'utf8' });
@@ -143,13 +148,13 @@ function siteFiles(dir, base = dir) {
 }
 
 function pack() {
-  const pkgs = PACKAGES.map((p) => ({ dir: path.join(REPO, 'packages', p), pkg: readJson(path.join(REPO, 'packages', p, 'package.json')) }));
+  const pkgs = PACKAGES.map((p) => ({ dir: packageDir(p), pkg: readJson(path.join(packageDir(p), 'package.json')) }));
   const versions = new Set(pkgs.map((p) => p.pkg.version));
   if (versions.size !== 1) die(`各包版本不一致：${pkgs.map((p) => `${p.pkg.name}@${p.pkg.version}`).join('、')}。先运行 pnpm release:version <版本>`);
   const v = [...versions][0];
 
-  log('— 构建（pnpm -r build，按依赖顺序）');
-  run('pnpm', ['-r', '--filter', './packages/*', 'run', 'build'], { cwd: REPO });
+  log('— 构建公开包（含第一方插件，按依赖顺序）');
+  run('pnpm', ['-r', '--filter', './packages/*', '--filter', './plugins/diagram', 'run', 'build'], { cwd: REPO });
 
   log('— 打包到 release/');
   fs.rmSync(RELEASE, { recursive: true, force: true });
@@ -665,7 +670,7 @@ export async function verifyRelease(opts = {}) {
   const delayMs = opts.delayMs ?? 15_000;
   const out = opts.log ?? log;
   const err = opts.error ?? ((m) => console.error(m));
-  const pkgs = PACKAGES.map((p) => readJson(path.join(root, 'packages', p, 'package.json')));
+  const pkgs = PACKAGES.map((p) => readJson(path.join(packageDir(p, root), 'package.json')));
   const versions = new Set(pkgs.map((p) => p.version));
   const v = opts.version ?? (versions.size === 1 ? [...versions][0] : null);
   if (!v || !SEMVER.test(v)) return fail([], `各包版本不一致或版本不合法（${[...versions].join('、')}）；用 pnpm release:verify <版本> 指定`);

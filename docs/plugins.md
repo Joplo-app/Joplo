@@ -117,8 +117,8 @@ joplo-plugin-x/
 
 ## 10. 阶段 1-A：契约 v2 与第一方 diagram 插件（已实现）
 
-`plugins/diagram` 是 private workspace 包 `@joplo-app/plugin-diagram`，默认启用。
-`@joplo-app/kit/ui` 的作者标记仍可导入，IR 类型改成 `diagram:Diagram`、`diagram:StateMachine`、`diagram:Sequence` 及其子组件；`@joplo-app/kit` 的 `trace` 转发插件效果工厂。
+`plugins/diagram` 是可独立发布的 `@joplo-app/plugin-diagram`，与内核统一为 0.2.17，默认启用。
+`@joplo-app/kit/ui` 的作者标记仍可导入，IR 类型改成 `diagram:Diagram`、`diagram:StateMachine`、`diagram:Sequence` 及其子组件；`@joplo-app/kit` 的 `trace` 保留兼容标记工厂，与插件效果工厂产生相同信封；语义仍归插件，kit 不反向依赖插件。
 ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机转换、绘制实现、diagram 技能和组件提示均归该包所有。Canvas、UI 族和媒体扩展不在 1-A 的范围内。
 
 ### 编译契约
@@ -126,9 +126,11 @@ ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机�
 `PluginDef.compile` 的四个同步钩子由 Node 宿主调用：
 
 - `node(node, { ids, report })`：验证作者节点并可返回规范化节点。调用时子节点已处理，`ids` 可用于默认 id 去重。显式重复 id 仍由宿主诊断。
-- `derive(node, { viewport, options, report })`：生成节点的静态派生数据。diagram 按完整结构布局，隐藏状态不参与布局；错误保留已有的网格降级及 `DIAGRAM_LAYOUT_FAILED` 提示。
+- `derive(node, { viewport, options, report })`：输入深冻结；返回 `{ data, framing }`，由宿主校验后只写自己的槽位及子树内的取景元数据，不允许改 id/children 或其他命名空间。diagram 按完整结构布局，隐藏状态不参与布局；错误保留已有的网格降级及 `DIAGRAM_LAYOUT_FAILED` 提示。
 - `effect(effect, { roots, data, source, report })`：把 `pluginEffect(id, name, payload)` 降级为命名空间数据、`targets` 和 `references`。宿主把 targets 转成普通 shots、导演层与显式焦点；同一步多个效果按作者顺序合并。
-- `frame({ roots, state, previousState, data, previousData, position, report })`：宿主回放内核效果后，生成第 0 步及各步骤的完整快照。无效作者步骤仍由原有 replay/check 诊断，不能令编译崩溃。
+- `frame({ roots, scenes, state, previousState, data, previousData, position, resolveProps, report })`：宿主回放内核效果后，生成第 0 步及各步骤的完整快照。无效作者步骤仍由原有 replay/check 诊断，不能令编译崩溃。
+
+所有钩子的输入均为隔离的深冻结副本，不能污染后续步骤或其他插件。derive 后再次检查舞台内元素身份；frame 通过宿主注入的 resolveProps(node, previous?) 读取绑定值，无需依赖 core 实现。宿主在消费前检查返回值信封；先验证有限、无环、深度不超过 100 的 JSON，再验证插件 schema，最后才剥离创作信息。异步钩子/异步 schema 被拒绝且其 rejection 被接住。
 
 插件写入槽位必须提供 `schemas.node` / `schemas.step`（兼容 zod 的 `safeParse`）；宿主验证对应 schema，并由 IR 信封校验确保是 JSON。缺失/失败的 schema 报 `PLUGIN_DATA_INVALID`，钩子或 schema 抛错报 `PLUGIN_HOOK_FAILED`，未注册的效果报 `PLUGIN_EFFECT_UNKNOWN`。源码位置随诊断保留。发布 IR 不保存钩子、schema、技能、运行时路径。
 
@@ -140,11 +142,13 @@ ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机�
 | 数据 | 写入点 | IR 路径 | 读取点及消费者 |
 |---|---|---|---|
 | 布局与静态结构 | diagram `derive` | `scene.root…ext.diagram.{layout,structure}` | 插件 `graphView` / `sequenceView` → 绘制坐标与几何取景，浏览器不重新布局 |
-| 累积 trace 状态、当前调用、状态机当前值/转换 | diagram `frame` | `scenario.ext.diagram`（初始）及 `step.ext.diagram.{states,now,machines}` | `Stage` 选取当前槽位 → `PluginHost` 的 `ctx.ext` → diagram React 渲染；前后跳转直接读快照 |
+| 累积 trace 状态、当前调用、状态机当前值/转换 | diagram `frame` | `scenario.ext.diagram.scenes[sceneId]`（初始）及 `step.ext.diagram.scenes[sceneId].{states,now,machines}` | `Stage` 选取当前槽位 → `PluginHost` 的 `ctx.ext` → diagram React 渲染；前后跳转直接读快照 |
 | 解析后的调用记录 | diagram `effect` / `frame` | `step.ext.diagram.traces` | 编译期快照计算；发布后的 feature-diff 比较插件表现差异（trace 类别） |
 | 插件镜头目标 | diagram `effect.targets` | 既有 `step.shots`、`step.directorLayer`；新增 `step.focusTargets` | `cameraAt` / 导演 / `focusAt`；均只读内核数据 |
 | 插件引用集合 | diagram `effect.references` | `step.references` | `scope.stepElementIds` → 范围发布保留需要的子树，含 skip 引用 |
 | 镜头关联、绘制角色 | diagram `derive` | `node.framing.{include,kind}` | `inShotFrame` 读取 include；宿主 DOM `data-jframe*` → 镜头/聚光保留分组标题及消息参与者 |
+| 调用所属舞台 | diagram effect | `step.ext.diagram.traceScenes` | frame 按舞台累计调用，避免跨页/层同名 id 串用；scope 同步投影 |
+| 文本/投影声明 | 插件 data 元数据 | `project.plugins[id].data.{node,step}` | content-i18n 只翻译声明文本；scope 只保留范围内的缓存与快照 |
 | 元素特性 | 插件组件声明 → 宿主编译 | `project.plugins[id].components[name].{needsId,selfEvident}` | 编译器与 validate 的 id 检查；focus 的自动 reveal 策略 |
 
 槽位属于公开播放数据，插件作者不得放入本机路径、技能或创作备注。schema 只验证形状，不是保密机制。
@@ -158,10 +162,22 @@ v2 运行时组件选择 `{ mount }` 或 `{ react: ({ ctx }) => … }`。React �
 
 ### 维护与验证
 
-- 守护测试：`packages/core/test/plugin-v2.test.ts` 扫描 core 与 web renderer，只有插件宿主目录可引用具体家族。
+- 已知 P2-11（本轮暂不修）：源码守护仍整体豁免 plugins 目录，浏览器检查只覆盖两个入口文件的直接依赖；尚不能防止专用语义经宿主目录或传递依赖回流。
 - Node 边界、降级、快照与旧 IR：core plugin-v2、trace、diagram-compile、integration-028 测试。
 - React 共享打包：server plugin-v2；容器与画面：web plugin-v2、diagram-v2、integration-028。
 - diagram 技能的权威正文现在是 `plugins/diagram/src/guide.ts`，core guide 只路由及组合通用主题；仍运行 `pnpm skills:build`，并实际检查 `joplo skill diagram` / `plugins`。
 - 验证普通发布前先确认 feature.pick：无 pick 的方案按既有规则不发布。若只检查全部备选，可用看板或 `buildSite({ review: true })` API；CLI 普通 build 仍只发布已选方案。不要把空站点当成图表播放成功。
 
-阶段 1 的其他扩展点和第一方插件独立分发仍未完成，v2 在阶段 3 前保持实验性。
+diagram 的独立包交付已完成；阶段 1 的其他扩展点、其他第一方插件迁移和生态工具仍未完成，v2 在阶段 3 前保持实验性。
+
+
+### P1-A review 修正：发布、投影与历史输入
+
+- diagram 提供 build、dist、声明与 publishConfig，纳入 release 的七包集合：kit → plugin-diagram → core → web → server → cli → joplo。core 使用正式包入口读取 catalog/guide；插件没有指向 core/web 源码的跨包相对导入。所有 Node 包沿用标准 tsconfig.build 与 build-package.mjs。
+- 第一方浏览器代码通过 @joplo-app/kit/renderer 使用宿主注册的共享渲染服务，通过 @joplo-app/kit/renderer-style 使用纯样式常量。服务在调用时解析，避免模块初始化循环；业务状态仍由内核推进，插件只读快照。
+- 第三方 React 桥接使用 web 包交付的 shared-modules.json 导出表，生产安装不需要从 web 的 devDependencies require React。导出表与当前宿主版本由测试对齐。共享模块代理优先于 Vite 的普通包解析，项目或插件实际安装 React 时也不会打入第二份实例；测试同时覆盖有/无 React、源码/预构建 web。
+- 插件通过 data.node.text / data.step.text 声明文本路径（分段数组，* 代表对象值/数组项），普通 id、枚举、引用不会被盲翻。
+- 插件通过 data.node.scope / data.step.scope 声明纯数据投影规则。map/items/values/reference 分别投影映射、实体数组、id 列表和单一引用；scene 域切换后按该舞台的元素集合继续投影。只对确实独立于范围的数据使用 global。未声明规则的槽位在范围分享时失败关闭，报 PLUGIN_SCOPE_UNSUPPORTED。
+- 图表缓存、状态机快照按合格舞台 id 寻址，元素 id 仍只要求在同一舞台唯一。裁剪节点后会同步裁剪结构/布局副本、场景和步骤快照；保留可见元素原有坐标，不调用插件代码重新布局。
+- feature-diff 比较 scenario.ext 和 step.ext。对 b817425 的真实旧公开 IR，先严格适配裸名及 layout，再走公开数据检查；不丢弃 note/source 等私有字段来伪装兼容。适配用于历史对比，不是浏览器补算旧 trace 的回退。
+- 验收必须覆盖公开包的 tsconfig.build、七包构建、tarball 和不含工作区开发依赖的安装；不能仅凭 pnpm typecheck / pnpm test 宣布发布正确。

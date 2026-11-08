@@ -1,3 +1,4 @@
+import { mapSlotTexts } from './plugin-data.ts';
 /**
  * 作者内容多语言（D84）：源文件用默认语言写，译文放在 `locales/<语言>.json`（原文 → 译文）。
  *
@@ -62,14 +63,14 @@ function mapCondition(c: Condition | undefined, visit: Visit): Condition | undef
   return c;
 }
 
-function mapNode(n: SceneNode, visit: Visit): SceneNode {
-  const out: SceneNode = { ...n };
+function mapNode(n: SceneNode, visit: Visit, plugins: Project['plugins']): SceneNode {
+  const out: SceneNode = { ...n, ...(n.ext ? { ext: mapSlotTexts(n.ext, plugins, 'node', s => visit(s, 'text', n.source)) } : {}) };
   if (n.props) {
     const props: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(n.props)) props[k] = STRUCTURAL.has(k) ? v : mapDeep(v, (s, _p, itemValue) => visit(s, DISPLAY_PROPS.has(k) && !itemValue ? 'text' : 'prop', n.source), '');
     out.props = props;
   }
-  if (n.children) out.children = n.children.map((c) => mapNode(c, visit));
+  if (n.children) out.children = n.children.map((c) => mapNode(c, visit, plugins));
   if (n.when) out.when = mapCondition(n.when, visit);
   if (n.disabled && typeof n.disabled === 'object') out.disabled = mapCondition(n.disabled, visit);
   if (n.redact && typeof n.redact === 'object') out.redact = mapCondition(n.redact, visit);
@@ -82,7 +83,7 @@ function mapNode(n: SceneNode, visit: Visit): SceneNode {
 const t = (s: string | undefined, visit: Visit, at?: string) => (s ? visit(s, 'text', at) : s);
 const stateMap = (v: unknown, base: string, visit: Visit) => mapDeep(v, (s, p) => visit(s, 'state', undefined, `${base}${p}`), '');
 
-function mapStep(st: Step, visit: Visit): Step {
+function mapStep(st: Step, visit: Visit, plugins: Project['plugins']): Step {
   const at = st.source;
   const a = st.action;
   const action: Step['action'] =
@@ -98,6 +99,7 @@ function mapStep(st: Step, visit: Visit): Step {
   });
   return {
     ...st,
+    ...(st.ext ? { ext: mapSlotTexts(st.ext, plugins, 'step', s => visit(s, 'text', st.source)) } : {}),
     action,
     // 自动字幕是英文兜底，网页按 captionAuto 生成；只换它引用的元素名和值
     caption: st.captionAuto ? st.caption : visit(st.caption, 'text', at),
@@ -112,16 +114,17 @@ function mapStep(st: Step, visit: Visit): Step {
   };
 }
 
-function mapScenario(sc: Scenario, visit: Visit): Scenario {
+function mapScenario(sc: Scenario, visit: Visit, plugins: Project['plugins']): Scenario {
   const at = sc.source;
   return {
     ...sc,
+    ...(sc.ext ? { ext: mapSlotTexts(sc.ext, plugins, 'step', s => visit(s, 'text', sc.source)) } : {}),
     name: visit(sc.name, 'text', at),
     description: t(sc.description, visit, at) ?? '',
     ...(sc.expected !== undefined ? { expected: t(sc.expected, visit, at) ?? '' } : {}),
     mock: sc.mock.auto ? sc.mock : { ...sc.mock, label: visit(sc.mock.label, 'text', at) },
     initial: { ...sc.initial, ui: stateMap(sc.initial.ui, 'ui', visit) as Record<string, unknown>, data: stateMap(sc.initial.data, 'data', visit) as Record<string, unknown>, inputs: stateMap(sc.initial.inputs, 'inputs', visit) as Record<string, unknown> },
-    steps: sc.steps.map((st) => mapStep(st, visit)),
+    steps: sc.steps.map((st) => mapStep(st, visit, plugins)),
   };
 }
 
@@ -149,8 +152,8 @@ function mapProject(p: Project, visit: Visit): Project {
     cases: obj(p.cases, (c) => ({ ...c, title: visit(c.title, 'text', c.source), expected: t(c.expected, visit, c.source) ?? '' })),
     rules: obj(p.rules, (r) => ({ ...r, text: visit(r.text, 'text', r.source) })),
     issues: obj(p.issues, (q) => ({ ...q, text: visit(q.text, 'text', q.source) })),
-    scenes: obj(p.scenes, (s) => ({ ...s, root: mapNode(s.root, visit) })),
-    scenarios: obj(p.scenarios, (s) => mapScenario(s, visit)),
+    scenes: obj(p.scenes, (s) => ({ ...s, root: mapNode(s.root, visit, p.plugins) })),
+    scenarios: obj(p.scenarios, (s) => mapScenario(s, visit, p.plugins)),
   };
 }
 

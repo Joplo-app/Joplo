@@ -6,7 +6,7 @@
  * - 布局在编译期算好写进 IR（SceneNode.layout），发布站和看板只负责渲染和动画，浏览器里不跑布局算法。
  * - 本文件不依赖 Node，可以被浏览器端（@joplo-app/web）引用；ELK 只在 Node 入口（diagram/elk.ts）里加载。
  */
-import type { SceneNode } from '../../../packages/core/src/schema.ts';
+import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
 
 export type Point = { x: number; y: number };
 export type Box = { x: number; y: number; w: number; h: number };

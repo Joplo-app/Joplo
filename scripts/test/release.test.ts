@@ -11,7 +11,8 @@ import { checkWebBudget, checkSiteBudget, tarList } from '../release.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const SCRIPT = path.join(ROOT, 'scripts/release.mjs');
-const PACKAGES = ['kit', 'core', 'server', 'web', 'cli', 'joplo'];
+const PACKAGES = ['kit', 'plugin-diagram', 'core', 'server', 'web', 'cli', 'joplo'];
+const pkgDir = (root: string, name: string) => path.join(root, name === 'plugin-diagram' ? 'plugins/diagram' : `packages/${name}`);
 const read = (f: string) => JSON.parse(fs.readFileSync(f, 'utf8'));
 const dirs: string[] = [];
 
@@ -44,19 +45,20 @@ function copyManifests() {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-release-')); dirs.push(d);
   fs.copyFileSync(path.join(ROOT, 'package.json'), path.join(d, 'package.json'));
   for (const p of PACKAGES) {
-    fs.mkdirSync(path.join(d, 'packages', p), { recursive: true });
-    fs.copyFileSync(path.join(ROOT, 'packages', p, 'package.json'), path.join(d, 'packages', p, 'package.json'));
+    fs.mkdirSync(pkgDir(d, p), { recursive: true });
+    fs.copyFileSync(path.join(pkgDir(ROOT, p), 'package.json'), path.join(pkgDir(d, p), 'package.json'));
   }
   return d;
 }
 const run = (args: string[]) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
 
 describe('各包的发布配置', () => {
-  const pkgs = PACKAGES.map((p) => ({ dir: p, pkg: read(path.join(ROOT, 'packages', p, 'package.json')) }));
+  const pkgs = PACKAGES.map((p) => ({ dir: p, pkg: read(path.join(pkgDir(ROOT, p), 'package.json')) }));
 
   test('同一版本号，全部可发布、公开访问、只发布构建产物', () => {
     const versions = new Set(pkgs.map((p) => p.pkg.version));
     expect([...versions]).toHaveLength(1);
+    expect(read(path.join(ROOT, 'plugins/diagram/src/version.json')).version).toBe(pkgs[0]!.pkg.version);
     for (const { dir, pkg } of pkgs) {
       expect(pkg.private, dir).toBeUndefined();
       expect(pkg.publishConfig?.access, dir).toBe('public');
@@ -70,11 +72,11 @@ describe('各包的发布配置', () => {
     expect([...licenses]).toEqual(['PolyForm-Shield-1.0.0']);
     const root = fs.readFileSync(path.join(ROOT, 'LICENSE'), 'utf8');
     expect(root).toMatch(/^Required Notice: /m);
-    for (const { dir } of pkgs) expect(fs.readFileSync(path.join(ROOT, 'packages', dir, 'LICENSE'), 'utf8'), dir).toBe(root);
+    for (const { dir } of pkgs) expect(fs.readFileSync(path.join(pkgDir(ROOT, dir), 'LICENSE'), 'utf8'), dir).toBe(root);
   });
 
   test('发布后的 exports 指向 dist 的 JS 与 .d.ts；仓库内仍指向源码', () => {
-    for (const { dir, pkg } of pkgs.filter((p) => ['kit', 'core', 'server', 'cli'].includes(p.dir))) {
+    for (const { dir, pkg } of pkgs.filter((p) => ['kit', 'plugin-diagram', 'core', 'server', 'cli'].includes(p.dir))) {
       const pub = pkg.publishConfig.exports as Record<string, { types: string; default: string }>;
       expect(Object.keys(pub), dir).toEqual(expect.arrayContaining(Object.keys(pkg.exports)));
       for (const [k, v] of Object.entries(pub)) {
@@ -109,7 +111,8 @@ describe('release:version', () => {
     const d = copyManifests();
     const r = run(['version', '0.3.0-beta.1', '--root', d]);
     expect(r.status, r.stderr).toBe(0);
-    for (const p of PACKAGES) expect(read(path.join(d, 'packages', p, 'package.json')).version).toBe('0.3.0-beta.1');
+    for (const p of PACKAGES) expect(read(path.join(pkgDir(d, p), 'package.json')).version).toBe('0.3.0-beta.1');
+    expect(read(path.join(d, 'plugins/diagram/src/version.json')).version).toBe('0.3.0-beta.1');
     expect(read(path.join(d, 'package.json')).version).toBeUndefined();
     // 官方技能随版本重新生成（D64）
     for (const name of ['joplo', 'joplo-feedback']) expect(fs.readFileSync(path.join(d, 'skills', name, 'SKILL.md'), 'utf8')).toMatch(/<!-- joplo-skill 0\.3\.0-beta\.1 sha256:[a-f0-9]{64} -->\n$/);
@@ -117,15 +120,15 @@ describe('release:version', () => {
 
   test.each([[[]], [['v1']], [['1.2']], [['1.2.3.4']], [['latest']]])('非法版本 %j 被拒绝，不改任何文件', (args) => {
     const d = copyManifests();
-    const before = PACKAGES.map((p) => fs.readFileSync(path.join(d, 'packages', p, 'package.json'), 'utf8'));
+    const before = PACKAGES.map((p) => fs.readFileSync(path.join(pkgDir(d, p), 'package.json'), 'utf8'));
     const r = run(['version', ...args, '--root', d]);
     expect(r.status).not.toBe(0);
-    expect(PACKAGES.map((p) => fs.readFileSync(path.join(d, 'packages', p, 'package.json'), 'utf8'))).toEqual(before);
+    expect(PACKAGES.map((p) => fs.readFileSync(path.join(pkgDir(d, p), 'package.json'), 'utf8'))).toEqual(before);
   });
 });
 
 describe('release:verify（发布之后必跑；registry 与 npx 用替身）', () => {
-  const names = ['@joplo-app/kit', '@joplo-app/core', '@joplo-app/web', '@joplo-app/server', '@joplo-app/cli', 'joplo'];
+  const names = ['@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/core', '@joplo-app/web', '@joplo-app/server', '@joplo-app/cli', 'joplo'];
   async function verify(opts: Record<string, unknown>) {
     // @ts-expect-error release script is an untyped ESM module
     const { verifyRelease } = await import('../release.mjs');
@@ -183,7 +186,7 @@ describe('release:verify（发布之后必跑；registry 与 npx 用替身）', 
 });
 
 describe('release:publish（先构建打包全部，再按依赖顺序发布 tarball；registry / npm publish / verify 用替身）', () => {
-  const names = ['@joplo-app/kit', '@joplo-app/core', '@joplo-app/web', '@joplo-app/server', '@joplo-app/cli', 'joplo'];
+  const names = ['@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/core', '@joplo-app/web', '@joplo-app/server', '@joplo-app/cli', 'joplo'];
   const tarballs = names.map((name) => ({ name, file: `/release/${name.replace('/', '-')}-0.2.7.tgz` }));
   async function publish(opts: Record<string, unknown>) {
     // @ts-expect-error release script is an untyped ESM module
@@ -199,10 +202,10 @@ describe('release:publish（先构建打包全部，再按依赖顺序发布 tar
     const verify = vi.fn(async () => ({ ok: true }));
     const { r, errors, prepare } = await publish({ isPublished: async () => false, publishTarball, verify });
     expect(prepare).toHaveBeenCalledOnce();
-    expect(order).toEqual(['@joplo-app/kit@latest', '@joplo-app/core@latest', '@joplo-app/web@latest']);
+    expect(order).toEqual(['@joplo-app/kit@latest', '@joplo-app/plugin-diagram@latest', '@joplo-app/core@latest', '@joplo-app/web@latest']);
     expect(publishTarball.mock.calls[0]![0].file).toBe(tarballs[0]!.file); // 发布的是已打好的 tarball
     expect(verify).not.toHaveBeenCalled();
-    expect(r).toMatchObject({ ok: false, published: ['@joplo-app/kit', '@joplo-app/core'], unpublished: ['@joplo-app/web', '@joplo-app/server', '@joplo-app/cli', 'joplo'] });
+    expect(r).toMatchObject({ ok: false, published: ['@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/core'], unpublished: ['@joplo-app/web', '@joplo-app/server', '@joplo-app/cli', 'joplo'] });
     const text = errors.join('\n');
     expect(text).toContain('@joplo-app/web');
     expect(text).toContain('@joplo-app/server、@joplo-app/cli、joplo');
@@ -212,7 +215,7 @@ describe('release:publish（先构建打包全部，再按依赖顺序发布 tar
     const publishTarball = vi.fn(async () => true);
     const isPublished = vi.fn(async (name: string) => { if (name === '@joplo-app/server') throw new Error('HTTP 503'); return false; });
     const { r } = await publish({ isPublished, publishTarball, verify: vi.fn() });
-    expect(publishTarball).toHaveBeenCalledTimes(3);
+    expect(publishTarball).toHaveBeenCalledTimes(4);
     expect(r).toMatchObject({ ok: false, unpublished: ['@joplo-app/server', '@joplo-app/cli', 'joplo'] });
   });
   test('全部成功（已发布的跳过）：最后运行 verify，用它的结果作为整体结果', async () => {

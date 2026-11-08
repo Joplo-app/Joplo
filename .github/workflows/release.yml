@@ -1,6 +1,6 @@
 # 推送 v* tag 时发布（见 docs/release.md「标准步骤」，D72 / D73）：
-# 检查 tag 与六个包的版本一致、tag 指向 main 上的提交 → 完整检查 → smoke
-# → 用 npm Trusted Publishing（OIDC，无 token、无 OTP）发布六个包并 verify
+# 检查 tag 与七个包的版本一致、tag 指向 main 上的提交 → 完整检查 → smoke
+# → 用 npm Trusted Publishing（OIDC，无 token、无 OTP）发布七个包并 verify
 # → 用上一个 tag 以来的 feat / fix / perf 提交生成 GitHub Release（scripts/commits.mjs notes）。
 # 中途失败：修好后在这次运行上 Re-run，或 gh workflow run release.yml --ref v<版本>；已发布的包会跳过。
 # 文件名 release.yml 写在 npm 的受信任发布方配置里，改名要同步改 npm 配置。

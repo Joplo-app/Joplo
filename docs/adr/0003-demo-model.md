@@ -22,7 +22,7 @@
 
 - **主题**：九个内置主题与 themes/name.css 通过 CSS 变量作用于演示、字幕和手机外框。config.theme 是项目默认，IR 保存作者 CSS；本机 settings.json 保存看板覆盖，发布站使用项目默认。
 - **单进程多项目**：同一 JOPLO_HOME 下一个本地看板服务多个项目，各项目按需编译与独立热更新。再次 dev 注册到存活实例；projects.json 记项目，server.json 记实例，settings.json 记设置。
-- **npm 结构**：joplo 是命令入口；`@joplo-app/kit` 创作，core 编译/播放/校验，web 提供预构建界面，server 提供服务/构建/渲染，cli 接线命令。六个包同版本发布；作者模块在本机执行，看板和 Published site 只消费 IR。
+- **npm 结构**：joplo 是命令入口；`@joplo-app/kit` 创作，core 编译/播放/校验，web 提供预构建界面，server 提供服务/构建/渲染，cli 接线命令，`@joplo-app/plugin-diagram` 交付图表内容形态。七个包同版本发布；作者模块在本机执行，看板和 Published site 只消费 IR。
 - **发布边界**：build 仅保留 pick 的方案和可演示内容，不发布规则来源、缺口、待决问题与源码位置；观众使用同一套演示布局，可导出图片，本地另可录制视频。
 
 用法见 [CLI](../cli.md)、[看板](../web.md)、[主题](../themes.md)；发布流程见 [release.md](../release.md)。

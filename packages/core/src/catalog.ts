@@ -1,3 +1,4 @@
+import type { PluginDataSpec } from '@joplo-app/kit/plugin';
 /**
  * 组件目录 v3（D35）：名称与属性对齐 Mantine（数据表对齐 mantine-datatable），另加少量 AI 交互组件、
  * HTML 兜底标签和 Joplo 专用组件。复合组件用点语法：`<AppShell.Header>` 编译出的节点 type 就是 'AppShell.Header'。
@@ -71,7 +72,7 @@ export const splitPluginType = (type: string): { plugin: string; name: string } 
   return { plugin: type.slice(0, i), name: type.slice(i + 1) };
 };
 /** IR 里记录的插件信息（编译自插件清单；发布站保留，不含运行时路径）。 */
-export type PluginInfo = { id: string; title: string; version?: string; components: Record<string, { interactive?: boolean; parent?: string; needsId?: boolean; selfEvident?: boolean }> };
+export type PluginInfo = { data?: PluginDataSpec; id: string; title: string; version?: string; components: Record<string, { interactive?: boolean; parent?: string; needsId?: boolean; selfEvident?: boolean }> };
 export type PluginTable = Readonly<Record<string, PluginInfo>> | undefined;
 /** 插件组件的声明；不是插件类型或插件没启用时为 null。 */
 export function pluginSpec(plugins: PluginTable, type: string): { interactive?: boolean; parent?: string; needsId?: boolean; selfEvident?: boolean } | null {

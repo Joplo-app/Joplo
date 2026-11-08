@@ -1,3 +1,5 @@
+import { jsonData } from './plugins/data.ts';
+import { adaptPublicInput } from './plugins/legacy.ts';
 /** Public feature comparison. Positional ids are addresses, never cross-version identities. */
 import { z } from 'zod';
 import { Project, type Effect, type Scenario, type Step } from './schema.ts';
@@ -146,7 +148,9 @@ export function compareSteps(before: Step[], after: Step[]): DiffStep[] {
 
 /** Refuse private IR instead of projecting potentially private unknown fields into a public comparison. */
 export function readPublicProject(value: unknown): Project {
-  const parsed = Project.safeParse(value);
+  let input: unknown;
+  try { input = adaptPublicInput(jsonData(value)); } catch { throw new JoploError('INVALID_SCHEMA', 'Invalid public playback IR; expected finite JSON and valid legacy geometry'); }
+  const parsed = Project.safeParse(input);
   if (!parsed.success) throw new JoploError('INVALID_SCHEMA', 'Invalid public playback IR; rebuild both versions with a compatible CLI');
   const p = parsed.data;
   if (p.mode !== 'publish') throw new JoploError('INVALID_SCHEMA', 'Feature diff requires two publish builds, not dev or review IR');
@@ -186,7 +190,7 @@ export function featureDiff(before: unknown, after: unknown, source: { baseSha?:
     let status: DiffScenario['status'] = !old ? 'added' : !next ? 'removed' : 'unchanged';
     if (old && next) {
       const bo = b.options[old.optionId], bf = b.features[bo!.featureId];
-      if (canonical(old.initial) !== canonical(next.initial)) reasons.push('initial-state');
+      if (canonical([old.initial, old.ext]) !== canonical([next.initial, next.ext])) reasons.push('initial-state');
       if (canonical(sceneInputs(b, old)) !== canonical(sceneInputs(a, next))) reasons.push('scenes');
       if (canonical([b.theme, b.themes, b.autoFocus]) !== canonical([a.theme, a.themes, a.autoFocus])) reasons.push('theme');
       if (canonical([bo?.layers, bf?.roles]) !== canonical([option?.layers, feature.roles])) reasons.push('layers-roles');

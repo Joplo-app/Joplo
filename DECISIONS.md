@@ -443,6 +443,8 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
     - 私有插件（工作假设，用户问“为什么 private 插件制作的内容不能 public”后澄清：内容可以公开，问题只在插件编译后的代码会随站点发布）：默认不拦截；插件作者标了 `private: true` 时，`share` 公开分享前提示一次“这个分享会带上某插件的编译后代码”并要求确认，确认后照常发布。
   - 已实现（阶段 0）：`@joplo-app/kit/plugin`；IR `project.plugins`；组件类型 `<插件 id>:<组件名>`；`UNKNOWN_PLUGIN` / `PLUGIN_PARENT` / `PLUGIN_INVALID` / `PLUGIN_DUPLICATE` / `PLUGIN_RUNTIME_MISSING`；看板经 `/@fs/` 载入运行时；`build` 把运行时打成单文件内联在入口脚本之前；`npx joplo skill` 列出项目插件、`npx joplo skill <插件 id>` 输出插件技能；技能新增 `plugins` 主题。
   - 阶段 1-A 已实现（2026-11-08）：`plugins/diagram`（private，`@joplo-app/plugin-diagram`）承接 Diagram / StateMachine / Sequence、ELK、trace 校验及编译期快照、渲染与 diagram 技能；标准插件默认启用，作者原导入方式不变，IR 一律 `diagram:*`。契约 v2 增加 node / derive / effect / frame 同步钩子、槽位 schema、needsId / selfEvident、React 与 renderChildren；看板/发布站共享宿主 React，v1 mount 继续兼容。播放器、焦点和导演只读 IR，守护测试限制专用逻辑边界。旧裸名/旧 traces 给重编译提示；Canvas、Alda 与 UI 家族未迁移。接口/字段端到端流向见 docs/plugins.md 第 10 节；验证报告见 `.done-P1-A`。
+  - 阶段 1-A 评审修正（2026-11-08）：钩子输入隔离/深冻结、受控 derive 输出、有限无环 JSON 信封；快照按舞台寻址；IR 声明文本路径及范围投影，未知槽位范围分享失败关闭；初始快照参与 diff，真实旧 Diagram IR 严格适配后比较。diagram 作为 0.2.17 正式 npm 包提供 build/dist/publishConfig，加入七包发布集合；kit 兼容标记不反向依赖插件，插件经公开 SDK 和宿主注入服务访问渲染/属性能力。React 导出表随 web 交付；验证生产 tarball 安装，不把开发工作区成功等同于发布成功。
+  - 已知 P2-11（用户明确延后）：源码守护仍整体豁免 plugins 目录，浏览器边界检查仅覆盖两个文件的直接依赖，尚无传递依赖守护；本轮不修。
 
 ## Working assumptions
 

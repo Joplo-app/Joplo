@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isPluginDef } from '@joplo-app/kit/plugin';
 import { compile, type CompileMode, type Diagnostic, type Project } from '@joplo-app/core';
-import { discoverFiles, elkLayout, loadAuthoring, enabledPlugins } from '@joplo-app/core/node';
+import { discoverFiles, elkLayout, loadAuthoring, enabledPlugins, standardPlugins } from '@joplo-app/core/node';
 import type { ViteDevServer } from 'vite';
 import { isProjectSource } from './vite-shared.ts';
 
@@ -83,7 +83,7 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
   if (diagnostics.some((d) => d.severity === 'error')) return { project: null, diagnostics, home, pluginRuntimes };
   // 图表布局在编译期由 ELK 算好写进 IR（D69）：看板与发布站只渲染
   const r = compile(loaded.authoring, mode, { layout: elkLayout });
-  const missing = Object.keys(r.project?.plugins ?? {}).filter((id) => !pluginRuntimes[id]);
+  const missing = Object.keys(r.project?.plugins ?? {}).filter((id) => !pluginRuntimes[id] && !standardPlugins.some(p => p.id === id));
   const extra: Diagnostic[] = missing.map((id) => ({ severity: 'error', code: 'PLUGIN_RUNTIME_MISSING', message: `Plugin ${id}: runtime file not found; reinstall the plugin package`, source: 'reference', at: `${loaded.authoring!.config.file}:1:1` }));
   return { project: extra.length ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes };
 }

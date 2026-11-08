@@ -309,7 +309,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const layersWith = (id: string): string[] => layerScenes.filter((l) => findIn(l.scene.root, id)).map((l) => l.key);
     const layerSceneWith = (id: string): Scene | undefined => layerScenes.find((l) => findIn(l.scene.root, id))?.scene;
 
-    const effectRoots = [...layerScenes.map(l => l.scene), ...[...sceneFor.values()].filter(x => x.optionId === qid || x.optionId == null)].map(x => x.root);
+    const effectRoots = [...layerScenes.map(l => l.scene), ...[...sceneFor.values()].filter(x => x.optionId === qid || x.optionId == null)];
 
     const scenarioIds: Record<string, string[]> = {};
     // flow({ from }) 接力：按依赖顺序编译，被接的场景先编译，记下它结尾的路径与导演层；
@@ -397,7 +397,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           } else if (e.type === 'explain') {
             if (e.text.trim()) explains.push(e.text.trim());
           } else if (e.type === 'plugin') {
-            const lowered = host.effect(e, effectRoots, ext[e.plugin], st.source);
+            const lowered = host.effect(e, effectRoots.filter(scene => scene.layer || scene.id === sceneOf(stepRouteBefore(fl.steps, i + 1, start))), ext[e.plugin], st.source);
             if (lowered) {
               if (lowered.data !== undefined) ext[e.plugin] = lowered.data;
               if (lowered.targets?.length) {
@@ -631,6 +631,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
 
   // 逐步派生数据只在编译期计算，播放器读取快照。
   if (!diags.some(d => d.severity === 'error')) host.frames(out as Project);
+
+  if (diags.some(d => d.severity === 'error')) return { project: null, diagnostics: diags };
 
   // ---------- 8. 发布视图与评审版：去掉设计备注与源位置 ----------
   if (strip) {

@@ -8,10 +8,10 @@
  * - effectiveState：显式 state 优先，否则用 trace 推算的状态；machineStates：状态机的当前状态与本步走过的转换；
  * - edgePath / arrowHead / pointAt：折线 → SVG 路径。
  */
-import { GROUP_FONT, DESC_FONT, EDGE_FONT, NODE_FONT, START, textWidth, type Box, type GraphLayout, type GraphStructure, type Point, type SequenceLayout, type SequenceStructure } from './model';
-import { sampleRoute } from './graph-layout';
-import type { SceneNode } from '@joplo-app/core';
-import type { DiagramStates } from './state';
+import { GROUP_FONT, DESC_FONT, EDGE_FONT, NODE_FONT, START, textWidth, type Box, type GraphLayout, type GraphStructure, type Point, type SequenceLayout, type SequenceStructure } from './model.ts';
+import { sampleRoute } from './graph-layout.ts';
+import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
+import type { DiagramStates } from './state.ts';
 
 export { GROUP_FONT, DESC_FONT, EDGE_FONT, NODE_FONT, START, sampleRoute, textWidth };
 export type { Box, Point, GraphLayout, SequenceLayout };

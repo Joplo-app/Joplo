@@ -12,6 +12,14 @@ import { COMPONENT_TYPES, PLUGIN_TYPE, type PluginComponentType } from './catalo
 export const LAYER_ICONS = ['window', 'browser', 'mobile', 'desktop', 'terminal', 'chat', 'agent', 'server', 'data', 'email', 'doc', 'flow'] as const;
 export type LayerIcon = (typeof LAYER_ICONS)[number];
 
+const DataPath = z.array(z.string().min(1));
+const ScopeRule: z.ZodType<import('@joplo-app/kit/plugin').PluginScopeRule> = z.lazy(() => z.strictObject({
+  path: DataPath, kind: z.enum(['map', 'items', 'values', 'reference']), domain: z.enum(['element', 'scene']).optional(),
+  prefix: z.string().optional(), references: z.array(DataPath).optional(), children: z.array(ScopeRule).optional(),
+}));
+const SlotSpec = z.strictObject({ text: z.array(DataPath).optional(), scope: z.union([z.literal('global'), z.array(ScopeRule)]).optional() });
+const DataSpec = z.strictObject({ node: SlotSpec.optional(), step: SlotSpec.optional() });
+
 export const SCHEMA_VERSION = 2 as const;
 
 /** 作者可写的 ID（对象键、元素 id）。 */
@@ -359,6 +367,7 @@ export const Project = z.strictObject({
   i18n: ContentI18nSchema.optional(),
   /** 启用的插件（D86）：插件 id → 名称、版本与组件声明（可操作、父组件）。运行时代码不在 IR 里，由看板 / 发布站另外载入。 */
   plugins: z.record(z.string(), z.strictObject({
+    data: DataSpec.optional(),
     id: z.string().min(1),
     title: z.string(),
     version: z.string().optional(),

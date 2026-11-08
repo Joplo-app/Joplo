@@ -1,8 +1,9 @@
+import { jsonData, snapshot, object, strings, syncResult, authoringData } from './data.ts';
 /** Node-side plugin host. Callbacks never enter IR or the player. */
-import type { JNode } from '@joplo-app/kit/node';
+import { isNode, type JNode } from '@joplo-app/kit/node';
 import { PLUGIN_API_VERSION, type PluginDef, type PluginEffectDef, type PluginReport } from '@joplo-app/kit/plugin';
 import standard from '@joplo-app/plugin-diagram';
-import { initialState, applyStep, type PlayState } from '../player.ts';
+import { initialState, applyStep, resolveProps, type PlayState } from '../player.ts';
 import type { Scene, SceneNode, Project } from '../schema.ts';
 import type { PluginInfo } from '../catalog.ts';
 import type { GraphLayoutEngine } from '@joplo-app/plugin-diagram/model';
@@ -23,7 +24,7 @@ export class PluginCompiler {
       if (this.defs.has(p.id)) { report('PLUGIN_DUPLICATE', `Plugin ${p.id} is enabled twice in config({ plugins })`, source); continue; }
       if (p.apiVersion !== 1 && p.apiVersion !== PLUGIN_API_VERSION) { report('PLUGIN_INVALID', `Plugin ${p.id} targets API ${p.apiVersion}; supported: 1, ${PLUGIN_API_VERSION}`, source); continue; }
       this.defs.set(p.id, p);
-      this.info[p.id] = { id: p.id, title: p.title, ...(p.version ? { version: p.version } : {}), components: Object.fromEntries(Object.entries(p.components).map(([name, c]) => [name, { ...(c?.interactive ? { interactive: true } : {}), ...(c?.parent ? { parent: c.parent } : {}), ...(c?.needsId ? { needsId: true } : {}), ...(c?.selfEvident ? { selfEvident: true } : {}) }])) };
+      this.info[p.id] = { ...(p.data ? { data: this.envelope(p, p.data, source) as PluginInfo['data'] } : {}), id: p.id, title: p.title, ...(p.version ? { version: p.version } : {}), components: Object.fromEntries(Object.entries(p.components).map(([name, c]) => [name, { ...(c?.interactive ? { interactive: true } : {}), ...(c?.parent ? { parent: c.parent } : {}), ...(c?.needsId ? { needsId: true } : {}), ...(c?.selfEvident ? { selfEvident: true } : {}) }])) };
     }
   }
   private run<T>(p: PluginDef, hook: string, at: string | undefined, fn: () => T): T | undefined {
@@ -35,27 +36,67 @@ export class PluginCompiler {
       for (const def of this.defs.values()) if (def.legacyTypes?.[node.type]) this.report('PLUGIN_LEGACY_TYPE', `Legacy component ${node.type}: recompile with the current kit; use ${def.legacyTypes[node.type]} in IR`, node.source);
       return node;
     }
-    return this.run(p, 'node', node.source, () => p.compile?.node?.(node, { ids, report: this.report })) ?? node;
+    const result = this.run(p, 'node', node.source, () => {
+      const n = syncResult(p.compile?.node?.(snapshot(node), { ids: new Map(ids), report: this.report }));
+      if (n === undefined) return node;
+      if (!isNode(n) || typeof n.type !== 'string' || !object(n.props)) {
+        this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id} node must return a node with string type and object props`, node.source); return node;
+      }
+      try { authoringData(n.props); } catch { this.invalid(p, node.source); return node; }
+      // Only this node's type/props can be normalized; children already have checked identities.
+      return { ...node, type: n.type, props: snapshot(n.props) };
+    });
+    return result ?? node;
   }
   derive(scene: Scene): void {
     const visit = (node: SceneNode) => {
       const p = this.defs.get(node.type.split(':')[0]!);
       if (p?.compile?.derive) {
-        this.run(p, 'derive', node.source, () => p.compile!.derive!(node, { viewport: scene.viewport, report: this.report, options: this.options.pluginOptions?.[p.id] ?? { layout: this.options.layout } }));
-        this.checkData(p, 'node', node.ext?.[p.id], node.source);
+        this.run(p, 'derive', node.source, () => {
+          const result = syncResult(p.compile!.derive!(snapshot(node), { viewport: scene.viewport, report: this.report, options: snapshot(this.options.pluginOptions?.[p.id] ?? { layout: this.options.layout }) }));
+          if (result === undefined) return;
+          if (!object(result) || Object.keys(result).some(k => k !== 'data' && k !== 'framing')) { this.invalid(p, node.source); return; }
+          if (result.data !== undefined) {
+            const data = this.checkData(p, 'node', result.data, node.source);
+            if (data !== undefined) node.ext = { ...node.ext, [p.id]: data };
+          }
+          if (result.framing !== undefined) {
+            const nodes = new Map<string, SceneNode>();
+            const collect = (n: SceneNode) => { nodes.set(n.id, n); n.children?.forEach(collect); }; collect(node);
+            const framing = this.envelope(p, result.framing, node.source);
+            if (!object(framing) || Object.entries(framing).some(([id, f]) => !nodes.has(id) || !object(f) || Object.keys(f).some(k => k !== 'include' && k !== 'kind') || f.include !== undefined && !strings(f.include) || f.kind !== undefined && !['root', 'group', 'block', 'content', 'edge', 'row'].includes(String(f.kind)))) { this.invalid(p, node.source); return; }
+            for (const [id, frame] of Object.entries(framing)) nodes.get(id)!.framing = frame as SceneNode['framing'];
+          }
+        });
       }
       for (const c of node.children ?? []) visit(c);
     };
     visit(scene.root);
+    // Identities are stage-local and remain an invariant after every derivation pass.
+    const ids = new Set<string>();
+    const checkIdentity = (n: SceneNode) => {
+      if (typeof n.id !== 'string' || !n.id) this.report('MISSING_ID', 'Derived node requires a nonempty id', n.source);
+      else if (ids.has(n.id)) this.report('DUPLICATE_ID', `Duplicate id "${n.id}" after plugin derivation in ${scene.id}`, n.source);
+      ids.add(n.id);
+      for (const child of n.children ?? []) checkIdentity(child);
+    };
+    checkIdentity(scene.root);
   }
-  effect(effect: PluginEffectDef, roots: readonly SceneNode[], data: unknown, source?: string) {
+  effect(effect: PluginEffectDef, scenes: readonly Scene[], data: unknown, source?: string) {
     const p = this.defs.get(effect.plugin);
     if (!p?.compile?.effect) { this.report('PLUGIN_EFFECT_UNKNOWN', `Plugin ${effect.plugin} has no effect compiler for ${effect.name}`, source); return undefined; }
-    return this.run(p, 'effect', source, () => p.compile!.effect!(effect, { roots, data, source, report: this.report }));
+    return this.run(p, 'effect', source, () => {
+      const result = syncResult(p.compile!.effect!(snapshot(effect), { roots: snapshot(scenes.map(s => s.root)), scenes: snapshot(scenes.map(s => ({ id: s.id, root: s.root }))), data: snapshot(data), source, report: this.report }));
+      if (result === undefined) return;
+      if (!object(result) || Object.keys(result).some(k => !['data', 'targets', 'references'].includes(k)) || result.targets !== undefined && !strings(result.targets) || result.references !== undefined && !strings(result.references)) { this.invalid(p, source); return; }
+      const value = result.data === undefined ? undefined : this.envelope(p, result.data, source);
+      return { ...(value !== undefined ? { data: value } : {}), ...(result.targets ? { targets: [...result.targets] } : {}), ...(result.references ? { references: [...result.references] } : {}) };
+    });
   }
   frames(project: Project): void {
     for (const sc of Object.values(project.scenarios)) {
-      const roots = Object.values(project.scenes).filter(s => s.optionId === sc.optionId || s.optionId == null).map(s => s.root);
+      const scenes = Object.values(project.scenes).filter(s => s.optionId === sc.optionId || s.optionId == null).map(s => ({ id: s.id, root: s.root }));
+      const roots = scenes.map(s => s.root);
       let previousState: PlayState | undefined;
       let state = initialState(project, sc.id);
       let previousData: Record<string, unknown> = {};
@@ -68,10 +109,10 @@ export class PluginCompiler {
         const ext = { ...target.ext };
         for (const p of this.defs.values()) {
           if (p.compile?.frame) {
-            const value = this.run(p, 'frame', target.source, () => p.compile!.frame!({ roots, state, previousState, data: target.ext?.[p.id], previousData: previousData[p.id], position: i, report: this.report }));
-            if (value !== undefined) ext[p.id] = value;
+            const value = this.run(p, 'frame', target.source, () => syncResult(p.compile!.frame!({ roots: snapshot(roots), scenes: snapshot(scenes), state: snapshot(state), previousState: snapshot(previousState), resolveProps: (node, previous) => resolveProps(node, snapshot(previous && previousState ? previousState : state)), data: snapshot(target.ext?.[p.id]), previousData: snapshot(previousData[p.id]), position: i, report: this.report })));
+            if (value !== undefined) { const data = this.checkData(p, 'step', value, target.source); if (data !== undefined) ext[p.id] = data; }
           }
-          this.checkData(p, 'step', ext[p.id], target.source);
+          if (!p.compile?.frame && ext[p.id] !== undefined) { const data = this.checkData(p, 'step', ext[p.id], target.source); if (data !== undefined) ext[p.id] = data; }
         }
         if (Object.keys(ext).length) target.ext = ext;
         previousData = ext;
@@ -79,13 +120,20 @@ export class PluginCompiler {
       }
     }
   }
-  private checkData(p: PluginDef, slot: 'node' | 'step', value: unknown, at?: string): void {
+  private invalid(p: PluginDef, at?: string) { this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id}: invalid hook output envelope`, at); }
+  private envelope(p: PluginDef, value: unknown, at?: string): unknown {
+    try { return jsonData(value); } catch (e) { this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id}: ${e instanceof Error ? e.message : String(e)}`, at); return undefined; }
+  }
+  private checkData(p: PluginDef, slot: 'node' | 'step', value: unknown, at?: string): unknown {
     if (value === undefined) return;
-    this.run(p, `${slot} schema`, at, () => {
+    const data = this.envelope(p, value, at);
+    if (data === undefined) return;
+    return this.run(p, `${slot} schema`, at, () => {
       const schema = p.schemas?.[slot];
       if (!schema) { this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id} writes ${slot} data without a schema`, at); return; }
-      const r = schema.safeParse(value);
-      if (r && !r.success) this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id} ${slot}: ${r.error?.message ?? 'invalid data'}`, at);
+      const r = syncResult(schema.safeParse(snapshot(data)));
+      if (!r || r.success !== true) { this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id} ${slot}: ${r?.error?.message ?? 'invalid data'}`, at); return; }
+      return data;
     });
   }
 }

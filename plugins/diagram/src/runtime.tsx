@@ -1,22 +1,22 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { defineRuntime } from '@joplo-app/kit/plugin';
-import type { SceneNode } from '@joplo-app/core';
-import { resolveProps, isSelfVisible, walkNodes } from '@joplo-app/core';
+import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
+import { resolveProps, isSelfVisible, walkNodes } from '@joplo-app/kit/renderer';
 import { AnimatePresence, motion } from 'motion/react';
 import { animate as animateValue } from 'motion';
-import { useI18n, useCtx as useHostCtx, useR, useRoot, useRootAttrs, RenderNode, Rough, RoughPath, roundRectPath, useStroke, type NodeProps } from '../../../packages/web/src/renderer/plugin-api';
-import { ACCENT, BG, DANGER, onFill, DIMMED, FONT, INFO, INK, INK2, LINE, LINE_STRONG, MONO, OK, SOFT, SPACING, SUBTLE, SURFACE, TITLE_SIZE, WARN, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf, tint } from '../../../packages/web/src/renderer/style';
-import { rectOf } from '../../../packages/web/src/renderer/rect';
-import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, edgeEmphasized, effectiveState, edgePath, graphView, sequenceView, startEdgeId, type GraphLayout, type SequenceLayout } from './render-layout';
-import type { GraphStructure, SequenceStructure } from './model';
-import type { DiagramStates } from './state';
-import type { FrameData } from './schema';
+import { useI18n, useCtx as useHostCtx, useR, useRoot, useRootAttrs, RenderNode, Rough, RoughPath, roundRectPath, useStroke, type NodeProps } from '@joplo-app/kit/renderer';
+import { DANGER, DIMMED, INFO, INK, INK2, LINE_STRONG, MONO, OK, SURFACE, WARN, color, dim, fontSize, radius, tint } from '@joplo-app/kit/renderer-style';
+import { rectOf } from '@joplo-app/kit/renderer';
+import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, edgeEmphasized, effectiveState, edgePath, graphView, sequenceView, startEdgeId, type GraphLayout, type SequenceLayout } from './render-layout.ts';
+import type { GraphStructure, SequenceStructure } from './model.ts';
+import type { DiagramStates } from './state.ts';
+import type { FrameData } from './schema.ts';
 import type { z } from 'zod';
 type Frame = z.infer<typeof FrameData>;
 const str = (v: unknown, fallback = ''): string => (v === undefined || v === null ? fallback : typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : JSON.stringify(v));
 function useCtx() {
   const ctx = useHostCtx();
-  const data = ctx.ext?.diagram as Frame | undefined;
+  const data = (ctx.ext?.diagram as Frame | undefined)?.scenes[ctx.scene.id];
   return { ...ctx, traced: data?.states ?? {}, traceNow: data?.now.length ? new Set(data.now) : null };
 }
 // ============ 关系类图表（D41 / D69）：架构图、状态机、时序图 ============
@@ -174,7 +174,7 @@ const useExit = () => {
  * 子元素照常经 DiagramChildren 渲染（可见性、绑定由 core 计算），位置从 DiagramContext 取。
  */
 function Diagram({ node, p }: NodeProps) {
-  const { t: i18n } = useI18n();
+  const { t: i18n } = useI18n<{ thisDiagramHasNoNodesYet: string }>();
   const r = useR(p);
   const { structure, layout } = useMemo(() => graphView(node), [node]);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -205,7 +205,7 @@ function Diagram({ node, p }: NodeProps) {
   const dfocus = useMemo(() => diagramFocus(structure, focus, node.id), [structure, focusKey, node.id]);
   // 状态机：value 绑定的当前状态，这一步 value 变化时对应的转换点亮（trace 写了的以 trace 为准）
   const root = node.type === 'diagram:StateMachine' ? 'diagram:StateMachine' : 'diagram:Diagram';
-  const machine = (useCtx().ext?.diagram as Frame | undefined)?.machines[node.id] ?? { current: null, states: {} };
+  const machine = (useCtx().ext?.diagram as Frame | undefined)?.scenes[useCtx().scene.id]?.machines[node.id] ?? { current: null, states: {} };
   const states = useMemo(() => ({ ...machine.states, ...(traced ?? {}) }), [traced, JSON.stringify(machine.states)]);
   // 本步的调用线：这张图里本步 trace 到的连线，加上状态机这一步自动走过的转换
   const nowKey = traceNow ? [...traceNow].join(',') : '';
@@ -527,7 +527,7 @@ const SeqDiagramContext = createContext<SeqCtxValue | null>(null);
 
 /** 时序图：坐标来自 IR（纯函数布局），整体缩放到放得下容器；参与者成列、消息成行，trace 点亮这一行。 */
 function SequenceDiagram({ node, p }: NodeProps) {
-  const { t: i18n } = useI18n();
+  const { t: i18n } = useI18n<{ thisDiagramHasNoNodesYet: string }>();
   const r = useR(p);
   const { structure, layout } = useMemo(() => sequenceView(node), [node]);
   const ref = useRef<HTMLDivElement | null>(null);

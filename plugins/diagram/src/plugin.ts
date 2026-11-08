@@ -1,7 +1,8 @@
+import packageInfo from './version.json' with { type: 'json' };
+import { dataSpec } from './data-spec.ts';
 import { definePlugin, type PluginCompileHooks, type PluginIRNode } from '@joplo-app/kit/plugin';
 import { isNode, type JNode, type JChild } from '@joplo-app/kit/node';
-import { resolveProps } from '../../../packages/core/src/player.ts';
-import type { SceneNode } from '../../../packages/core/src/schema.ts';
+import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
 import { docs } from './catalog.ts';
 import { skill } from './guide.ts';
 import { checkDiagramRoot, resolveTrace } from './compile-helpers.ts';
@@ -34,7 +35,8 @@ const hooks: PluginCompileHooks = {
     if (!isDiagramRoot(node.type)) return;
     const n = node as SceneNode;
     const layout = layoutFor(n, options.layout as GraphLayoutEngine | undefined, message => report('DIAGRAM_LAYOUT_FAILED', `<${n.type}> "${n.id}" could not be laid out (${message}); showing a simple grid instead. Check the edges and groups of this diagram`, n.source, 'warning'), viewport);
-    if (layout) n.ext = { ...n.ext, diagram: { layout, structure: n.type === 'diagram:Sequence' ? sequenceStructure(n) : graphStructure(n) } };
+    const data = layout ? { layout, structure: n.type === 'diagram:Sequence' ? sequenceStructure(n) : graphStructure(n) } : undefined;
+    const framing: NonNullable<import('@joplo-app/kit/plugin').PluginDerived['framing']> = {};
     const index = diagramsIn(n).find(d => d.id === n.id);
     if (!index) return;
     for (const child of all(node)) {
@@ -43,8 +45,9 @@ const hooks: PluginCompileHooks = {
       const kind = isDiagramRoot(child.type) ? 'root' : name.endsWith('.Block') ? 'block' : name.endsWith('.Group') ? 'group' : name.endsWith('.Message') ? 'row' : links.has(child.type) ? 'edge' : 'content';
       const edge = index.edges.find(e => e.id === child.id);
       const include = kind === 'row' && edge ? [edge.from, edge.to] : index.groupsOf.get(child.id)?.slice(0, 1) ?? [];
-      child.framing = { kind, ...(include.length ? { include } : {}) };
+      framing[child.id] = { kind, ...(include.length ? { include } : {}) };
     }
+    return { data, framing };
   },
   effect(effect, ctx) {
     if (effect.name !== 'trace') { ctx.report('PLUGIN_EFFECT_UNKNOWN', `Unknown diagram effect ${effect.name}`, ctx.source); return; }
@@ -54,9 +57,10 @@ const hooks: PluginCompileHooks = {
     }
     const t = resolveTrace(ctx.roots.flatMap(r => diagramsIn(r as SceneNode)), p.ids as string[], p.mode as Trace['mode'], ctx.source, ctx.report);
     if (!t) return;
-    const previous = ctx.data as { traces?: Trace[] } | undefined;
+    const previous = ctx.data as { traces?: Trace[]; traceScenes?: string[] } | undefined;
+    const owner = ctx.scenes.find(s => diagramsIn(s.root as SceneNode).some(d => (p.ids as string[]).every(id => d.nodes.has(id) || d.edges.some(e => e.id === id))));
     return {
-      data: { traces: [...previous?.traces ?? [], t] },
+      data: { traces: [...previous?.traces ?? [], t], traceScenes: [...previous?.traceScenes ?? [], owner!.id] },
       targets: t.mode === 'skip' ? undefined : t.targets ?? t.nodes,
       references: [...t.nodes, ...t.edges.map(e => e.id), ...t.groups ?? [], ...t.errorGroups ?? [], ...t.targets ?? []],
     };
@@ -64,21 +68,28 @@ const hooks: PluginCompileHooks = {
   frame(ctx) {
     if (!ctx.roots.some(r => all(r).some(n => isDiagramRoot(n.type)))) return undefined;
     const traces = (ctx.data as { traces?: Trace[] } | undefined)?.traces ?? [];
-    const previous = ctx.previousData as { states?: import('./state.ts').DiagramStates } | undefined;
-    const states = advanceStates(previous?.states ?? {}, traces);
-    const machines: Record<string, ReturnType<typeof machineStates>> = {};
-    for (const node of ctx.roots.flatMap(all)) if (node.type === 'diagram:StateMachine') {
-      const n = node as SceneNode;
-      const props = resolveProps(n, ctx.state);
-      const prev = ctx.previousState ? resolveProps(n, ctx.previousState).value : undefined;
-      machines[n.id] = machineStates(graphStructure(n), props.value, prev);
+    const traceScenes = (ctx.data as { traceScenes?: string[] } | undefined)?.traceScenes ?? [];
+    const previous = ctx.previousData as import('./data.ts').Frame | undefined;
+    const scenes: import('./data.ts').Frame['scenes'] = {};
+    for (const scene of ctx.scenes) {
+      if (!all(scene.root).some(n => isDiagramRoot(n.type))) continue;
+      const calls = traces.filter((_, i) => traceScenes[i] === scene.id);
+      const states = advanceStates(previous?.scenes[scene.id]?.states ?? {}, calls);
+      const machines: Record<string, ReturnType<typeof machineStates>> = {};
+      for (const node of all(scene.root)) if (node.type === 'diagram:StateMachine') {
+        const n = node as SceneNode;
+        const props = ctx.resolveProps(n);
+        const prev = ctx.previousState ? ctx.resolveProps(n, true).value : undefined;
+        machines[n.id] = machineStates(graphStructure(n), props.value, prev);
+      }
+      scenes[scene.id] = { states, now: [...new Set(calls.filter(t => t.mode !== 'skip').flatMap(t => [...t.nodes, ...t.edges.map(e => e.id)]))], machines };
     }
-    return { traces, states, now: [...new Set(traces.filter(t => t.mode !== 'skip').flatMap(t => [...t.nodes, ...t.edges.map(e => e.id)]))], machines };
+    return { traces, traceScenes, scenes };
   },
 };
-export default definePlugin({
-  id: 'diagram', title: 'Diagrams', version: '0.1.0', runtime: new URL('./runtime.tsx', import.meta.url), skill,
+export default /* @__PURE__ */ definePlugin({
+  id: 'diagram', title: 'Diagrams', version: packageInfo.version, runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url), skill,
   components: Object.fromEntries(Object.entries(docs).map(([name, doc]) => [name, { doc, selfEvident: true, ...(required.has(name) ? { needsId: true } : {}) }])),
   legacyTypes: Object.fromEntries(Object.keys(docs).map(name => [name, `diagram:${name}`])),
-  compile: hooks, schemas: { node: NodeData, step: FrameData },
+  data: dataSpec, compile: hooks, schemas: { node: NodeData, step: FrameData },
 });

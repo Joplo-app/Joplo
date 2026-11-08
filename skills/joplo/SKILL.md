@@ -109,6 +109,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
-- plugins: Default standard plugins and third-party packages; API v2 compilation, snapshots, shared React, diagnostics and skills
+- plugins: Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.18 sha256:1f9726520f9f253b36b2e5287fe9145da0756f2a90a92eb52ee96dca5f87f1c5 -->
+<!-- joplo-skill 0.2.18 sha256:631e154ae2a0a10f63f024037af7128edd52b25b93207428bc42a25d4e18e113 -->

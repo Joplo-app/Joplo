@@ -18,7 +18,7 @@ describe('plugin API v2', () => {
   it('runs normalization, derivation and effect lowering; stores only validated data', () => {
     const p = definePlugin({ id: 'probe', title: 'Probe', runtime: '/probe.js', schemas: { node: z.object({ measured: z.number() }), step: z.object({ value: z.number() }) }, components: { Item: { doc: 'item', needsId: true, selfEvident: true } }, compile: {
       node(n) { return { ...n, props: { ...n.props, label: 'normalized' } }; },
-      derive(n) { n.ext = { probe: { measured: 12 } }; },
+      derive() { return { data: { measured: 12 } }; },
       effect(e) { return { data: { value: e.payload }, targets: ['item'], references: ['item'] }; },
     } });
     const r = compile(source(h(pluginComponent(p, 'Item'), { id: 'item' }), [p], [pluginEffect('probe', 'show', 7)]), 'dev');
@@ -38,8 +38,8 @@ describe('plugin API v2', () => {
     expect(r.diagnostics).toEqual([]);
     expect(r.project?.scenes['f.a@/']?.root.type).toBe('diagram:Diagram');
     const steps = r.project?.scenarios['f.a.s']?.steps;
-    expect(steps?.[0]?.ext?.diagram).toMatchObject({ states: { a: { state: 'active' }, 'a->b': { state: 'active' } } });
-    expect(steps?.[1]?.ext?.diagram).toMatchObject({ states: { a: { state: 'ok' } } });
+    expect(steps?.[0]?.ext?.diagram).toMatchObject({ scenes: { 'f.a@/': { states: { a: { state: 'active' }, 'a->b': { state: 'active' } } } } });
+    expect(steps?.[1]?.ext?.diagram).toMatchObject({ scenes: { 'f.a@/': { states: { a: { state: 'ok' } } } } });
   });
 });
 
@@ -62,7 +62,7 @@ describe('plugin boundaries and data-only playback', () => {
   });
   it('validates plugin schemas and catches schema exceptions', () => {
     for (const throwing of [false, true]) {
-      const p = definePlugin({ id: 'bad', title: 'Bad', runtime: '/bad.js', components: { Item: { doc: 'item' } }, compile: { derive(n) { n.ext = { bad: null }; } }, schemas: { node: { safeParse() { if (throwing) throw new Error('broken schema'); return { success: false, error: { message: 'expected measured geometry' } }; } } } });
+      const p = definePlugin({ id: 'bad', title: 'Bad', runtime: '/bad.js', components: { Item: { doc: 'item' } }, compile: { derive() { return { data: null }; } }, schemas: { node: { safeParse() { if (throwing) throw new Error('broken schema'); return { success: false, error: { message: 'expected measured geometry' } }; } } } });
       expect(compile(source(h(pluginComponent(p, 'Item')), [p]), 'dev').diagnostics.map(d => d.code)).toContain(throwing ? 'PLUGIN_HOOK_FAILED' : 'PLUGIN_DATA_INVALID');
     }
   });
@@ -102,7 +102,7 @@ describe('plugin boundaries and data-only playback', () => {
     expect(explainClick(project, state, 'a').kind).toBe('static');
     expect(cameraAt(project, 'f.a.s', 1).perLayer['@page']).toEqual(['a', 'b']);
     expect(focusAt(project, 'f.a.s', 1).targets).toEqual(['a', 'b']);
-    expect(project.scenarios['f.a.s'].steps[0].ext.diagram.states.b.state).toBe('error');
+    expect(project.scenarios['f.a.s'].steps[0].ext.diagram.scenes['f.a@/'].states.b.state).toBe('error');
     expect(calls).toBe(n);
   });
   it('gives a recompile hint for old bare types and old IR', async () => {

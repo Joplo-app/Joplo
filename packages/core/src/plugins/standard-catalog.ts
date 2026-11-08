@@ -1,5 +1,5 @@
-import { docs, examples } from '../../../../plugins/diagram/src/catalog.ts';
-import { skill, diagnostics } from '../../../../plugins/diagram/src/guide.ts';
+import { docs, examples } from '@joplo-app/plugin-diagram/catalog';
+import { skill, diagnostics } from '@joplo-app/plugin-diagram/guide';
 export const standardGuides = { diagram: skill };
 export const standardDocs = Object.fromEntries(Object.entries(docs).map(([k, v]) => [`diagram:${k}`, v]));
 export const standardExamples = Object.fromEntries(Object.entries(examples).map(([k, v]) => [`diagram:${k}`, v]));

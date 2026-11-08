@@ -22,7 +22,7 @@ export const SKILL_TOPICS = [
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
   { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
   { name: 'publish', description: 'pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)' },
-  { name: 'plugins', description: 'Default standard plugins and third-party packages; API v2 compilation, snapshots, shared React, diagnostics and skills' },
+  { name: 'plugins', description: 'Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks' },
 ] as const;
 
 /** 心智模型：所有入口最先读到的几句话。 */

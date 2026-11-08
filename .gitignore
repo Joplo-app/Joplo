@@ -41,3 +41,8 @@ scratch/
 
 # 发布打包产物（pnpm release:pack）
 release/
+
+# Local task handoff and review artifacts
+.done-*
+.blocked-*
+.review-*

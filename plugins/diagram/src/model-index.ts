@@ -1,7 +1,7 @@
 /**
  * 关系类图表（D69）的公共入口：给编译器挂布局、给 trace 建索引。浏览器安全（不加载 ELK）。
  */
-import type { SceneNode } from '../../../packages/core/src/schema.ts';
+import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
 import { DEFAULT_ASPECT, gridLayout, type LayoutGoal } from './graph-layout.ts';
 import { layoutSequence } from './sequence-layout.ts';
 import { GRAPH_FAMILY, SEQUENCE_FAMILY, graphStructure, groupChains, isDiagramRoot, sequenceStructure, type DiagramLayout, type DiagramRootType, type GraphLayout, type GraphStructure } from './model.ts';

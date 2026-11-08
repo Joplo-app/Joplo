@@ -268,7 +268,11 @@ export const callout = (target: string, text: string, opts: { side?: CalloutSide
  */
 export const hold = (seconds: number): EffectDef => ({ kind: 'effect', type: 'hold', seconds });
 
-export { trace } from '@joplo-app/plugin-diagram/effects';
+/** Compatibility authoring markers; resolution and state semantics belong to the content plugin. */
+export const trace = Object.assign((...ids: string[]): EffectDef => ({ kind: 'effect', type: 'plugin', plugin: 'diagram', name: 'trace', payload: { ids, mode: 'ok' } }), {
+  fail: (...ids: string[]): EffectDef => ({ kind: 'effect', type: 'plugin', plugin: 'diagram', name: 'trace', payload: { ids, mode: 'fail' } }),
+  skip: (...ids: string[]): EffectDef => ({ kind: 'effect', type: 'plugin', plugin: 'diagram', name: 'trace', payload: { ids, mode: 'skip' } }),
+});
 
 
 /**

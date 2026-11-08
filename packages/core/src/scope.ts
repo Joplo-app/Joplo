@@ -1,3 +1,4 @@
+import { scopePluginData } from './plugin-data.ts';
 /**
  * 按场景保密分享（D75）：把编译好的 IR 裁剪到若干场景。
  *
@@ -243,7 +244,7 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
   };
   const ids = Object.keys(scenarios);
   // 译文只留范围内用得到的（D84）：别的功能的文字不随范围分享出去
-  return { project: pruneMessages(out), info: { key: scopeKey(ids, mode), scenarios: ids, features: Object.keys(features), borrowed: merged } };
+  return { project: pruneMessages(scopePluginData(out)), info: { key: scopeKey(ids, mode), scenarios: ids, features: Object.keys(features), borrowed: merged } };
 }
 
 /** 一条借用的说明（英文，CLI 与看板共用）。 */

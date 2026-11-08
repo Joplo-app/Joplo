@@ -1,4 +1,5 @@
-import { pluginEffect, type PluginEffectDef } from '@joplo-app/kit/plugin';
+import type { PluginEffectDef } from '@joplo-app/kit/plugin';
+const pluginEffect = (plugin: string, name: string, payload: unknown): PluginEffectDef => ({ kind: 'effect', type: 'plugin', plugin, name, payload });
 /**
  * 调用链（D48）：这一步沿 Diagram 的连线走了哪条路径。节点与连线的 state 由每一步的 trace 自动推算，不用再手写 set / state 绑定：
  * 本步 trace 到的是 active，之前 trace 过、本步没再 trace 的是 ok，trace.fail 的是 error（保持到之后又被 trace 成功），

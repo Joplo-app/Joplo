@@ -47,21 +47,32 @@ export type PluginIRNode = {
 };
 export type PluginEffectDef = { kind: 'effect'; type: 'plugin'; plugin: string; name: string; payload: unknown };
 export const pluginEffect = (plugin: string, name: string, payload: unknown): PluginEffectDef => ({ kind: 'effect', type: 'plugin', plugin, name, payload });
-export type PluginState = { ui: Record<string, unknown>; data: Record<string, unknown>; inputs: Record<string, unknown> };
+export type PluginState = { readonly ui: Readonly<Record<string, unknown>>; readonly data: Readonly<Record<string, unknown>>; readonly inputs: Readonly<Record<string, unknown>> };
+export type PluginScene = { id: string; root: PluginIRNode };
+export type PluginDerived = { data?: unknown; framing?: Record<string, NonNullable<PluginIRNode['framing']>> };
 export type PluginCompileHooks = {
   /** 子节点转换完后调用；可校验根结构、提供默认 id 与规范化属性。 */
-  node?: (node: JNode, ctx: { ids: ReadonlyMap<string, string | undefined>; report: PluginReport }) => JNode | void;
+  node?: (node: Readonly<JNode>, ctx: { ids: ReadonlyMap<string, string | undefined>; report: PluginReport }) => JNode | void;
   /** 每个根节点的静态派生数据，错误由宿主隔离。 */
-  derive?: (node: PluginIRNode, ctx: { viewport: 'desktop' | 'mobile'; report: PluginReport; options: Record<string, unknown> }) => void;
+  derive?: (node: Readonly<PluginIRNode>, ctx: { viewport: 'desktop' | 'mobile'; report: PluginReport; options: Readonly<Record<string, unknown>> }) => PluginDerived | void;
   /** 一个作者效果降级为该插件的数据及内核镜头/引用原语。data 是同一步之前的降级结果。 */
-  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; data: unknown; report: PluginReport; source?: string }) => { data?: unknown; targets?: string[]; references?: string[] } | void;
+  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; data: unknown; report: PluginReport; source?: string }) => { data?: unknown; targets?: string[]; references?: string[] } | void;
   /** 编译器回放基础效果后，计算第 0 步及每一步的完整绘制快照。 */
-  frame?: (ctx: { roots: readonly PluginIRNode[]; state: PluginState; previousState?: PluginState; data: unknown; previousData: unknown; position: number; report: PluginReport }) => unknown;
+  frame?: (ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; state: PluginState; previousState?: PluginState; resolveProps: (node: PluginIRNode, previous?: boolean) => Record<string, unknown>; data: unknown; previousData: unknown; position: number; report: PluginReport }) => unknown;
 };
 export type PluginDataSchema = { safeParse(value: unknown): { success: boolean; error?: { message: string } } };
 
+/** Paths are segment arrays; * visits array items/object values, never their keys. */
+export type PluginScopeRule = {
+  path: string[]; kind: 'map' | 'items' | 'values' | 'reference'; domain?: 'element' | 'scene';
+  prefix?: string; references?: string[][]; children?: PluginScopeRule[];
+};
+export type PluginSlotSpec = { text?: string[][]; scope?: 'global' | PluginScopeRule[] };
+export type PluginDataSpec = { node?: PluginSlotSpec; step?: PluginSlotSpec };
+
 export type PluginDef = {
   kind: 'plugin';
+  data?: PluginDataSpec;
   compile?: PluginCompileHooks;
   schemas?: { node?: PluginDataSchema; step?: PluginDataSchema };
   /** 已迁移裸类型名：宿主只用于给出改写提示。 */
@@ -139,6 +150,8 @@ export type PluginFrame = {
   /** false：截图、导出、跳转，直接画到终点，不播放过渡。 */
   animate: boolean;
   scenarioId: string;
+  /** Fully qualified stage identity; element ids are only unique inside this stage. */
+  sceneId: string;
   /** 已经执行的步数。 */
   position: number;
   /** 镜头此刻对准的元素 id；null = 没有聚焦。 */

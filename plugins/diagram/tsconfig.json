@@ -1,11 +1,12 @@
 {
-  "extends": "../../packages/web/tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "paths": {
-      "@/*": [
-        "../../packages/web/src/*"
-      ]
-    }
+    "jsx": "react-jsx",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ]
   },
   "include": [
     "src"

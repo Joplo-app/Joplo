@@ -1,4 +1,4 @@
-import type { Project } from '../../../packages/core/src/schema.ts';
+type Project = { scenarios: Record<string, { ext?: Record<string, unknown>; steps: { ext?: Record<string, unknown> }[] }> };
 import type { Trace } from './schema.ts';
 // ---------- 调用链（D48）：Diagram 节点与连线的 state 由每一步的 trace 推算 ----------
 export type DiagramState = 'idle' | 'active' | 'ok' | 'error' | 'dim';
@@ -11,7 +11,7 @@ export function diagramStateAt(project: Project, scenarioId: string | null | und
   if (!sc) return {};
   const n = Math.max(0, Math.min(position, sc.steps.length));
   const ext = n ? sc.steps[n - 1]?.ext : sc.ext;
-  return structuredClone((ext?.diagram as { states?: DiagramStates } | undefined)?.states ?? {});
+  return structuredClone(Object.assign({}, ...Object.values((ext?.diagram as import('./data.ts').Frame | undefined)?.scenes ?? {}).map(s => s.states)));
 }
 
 /** 编译期累计状态：本步 active，过去 active 变 ok；fail / skip 保持到下一次调用。 */

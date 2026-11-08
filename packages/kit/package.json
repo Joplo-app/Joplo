@@ -11,7 +11,9 @@
     "./jsx-dev-runtime": "./src/jsx-dev-runtime.ts",
     "./node": "./src/node.ts",
     "./plugin": "./src/plugin.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./renderer": "./src/renderer.ts",
+    "./renderer-style": "./src/renderer-style.ts"
   },
   "files": [
     "dist"
@@ -50,7 +52,15 @@
         "types": "./dist/plugin.d.ts",
         "default": "./dist/plugin.js"
       },
-      "./package.json": "./package.json"
+      "./package.json": "./package.json",
+      "./renderer": {
+        "types": "./dist/renderer.d.ts",
+        "default": "./dist/renderer.js"
+      },
+      "./renderer-style": {
+        "types": "./dist/renderer-style.d.ts",
+        "default": "./dist/renderer-style.js"
+      }
     }
   },
   "repository": {
@@ -62,7 +72,7 @@
   "bugs": {
     "url": "https://github.com/Joplo-app/Joplo/issues"
   },
-  "dependencies": {
-    "@joplo-app/plugin-diagram": "workspace:*"
+  "devDependencies": {
+    "@types/react": "^19.3.0"
   }
 }

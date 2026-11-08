@@ -6,10 +6,12 @@
   "type": "module",
   "exports": {
     "./package.json": "./package.json",
-    "./manifest.json": "./dist/manifest.json"
+    "./manifest.json": "./dist/manifest.json",
+    "./shared-modules.json": "./shared-modules.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "shared-modules.json"
   ],
   "scripts": {
     "dev": "vite",

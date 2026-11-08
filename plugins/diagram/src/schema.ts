@@ -48,9 +48,13 @@ const States = z.record(z.string(), z.strictObject({
   state: z.enum(['idle', 'active', 'ok', 'error', 'dim']),
   reverse: z.boolean().optional(),
 }));
-export const FrameData = z.strictObject({
-  traces: z.array(Trace),
+export const SceneFrame = z.strictObject({
   states: States,
   now: z.array(z.string()),
   machines: z.record(z.string(), z.strictObject({ current: z.string().nullable(), states: States })),
+});
+export const FrameData = z.strictObject({
+  traces: z.array(Trace),
+  traceScenes: z.array(z.string()),
+  scenes: z.record(z.string(), SceneFrame),
 });

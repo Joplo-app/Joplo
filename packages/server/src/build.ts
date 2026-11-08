@@ -1,4 +1,4 @@
-import { createRequire } from 'node:module';
+import sharedModules from '@joplo-app/web/shared-modules.json' with { type: 'json' };
 import { standardPlugins } from '@joplo-app/core/node';
 /**
  * `joplo build`：静态发布站。
@@ -262,10 +262,10 @@ export async function stageDistSite(web: DistWeb, projectDir: string, staging: s
  */
 export async function bundlePluginRuntimes(runtimes: Record<string, string>, projectDir: string, web: WebAssets): Promise<string[]> {
   const out: string[] = [];
-  const requireHost = createRequire(path.join(web.webDir, 'package.json'));
-  const shared = ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client'];
+  const modules: Record<string, string[]> = sharedModules;
+  const shared = Object.keys(modules);
   const bridge = (name: string) => {
-    const keys = Object.keys(requireHost(name) as object).filter(k => k !== 'default' && /^[A-Za-z_$][\w$]*$/.test(k));
+    const keys = modules[name]!;
     return `const shared = globalThis.__JOPLO_SHARED__[${JSON.stringify(name)}]; export default shared; ${keys.map(k => `export const ${k} = shared.${k};`).join(' ')}`;
   };
   for (const [id, file] of Object.entries(runtimes).sort(([a], [b]) => a.localeCompare(b))) {
@@ -281,6 +281,8 @@ export async function bundlePluginRuntimes(runtimes: Record<string, string>, pro
       oxc: { jsx: { runtime: 'automatic', importSource: 'react', development: false } },
       plugins: [{
         name: 'joplo:plugin-entry',
+        // Resolve shared modules before Vite finds a plugin's installed React copy.
+        enforce: 'pre',
         resolveId: (src) => src === 'joplo-plugin-entry' ? entry : shared.includes(src) ? `\0joplo-shared:${src}` : null,
         load: (resolved) => (resolved.startsWith('\0joplo-shared:') ? bridge(resolved.slice('\0joplo-shared:'.length)) : resolved === entry ? `import runtime from ${JSON.stringify(file)};\n(globalThis.__JOPLO_PLUGINS__ ??= []).push(runtime);\n` : null),
       }],
