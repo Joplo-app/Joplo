@@ -129,8 +129,7 @@ build 只发布选定方案。发布站与看板共用演示页布局，保留�
 | --- | --- |
 | [examples/invite](examples/invite) | 比较邀请弹窗与批量邀请流程 |
 | [examples/agent-arch](examples/agent-arch) | 用层级、导演、分组的 `Diagram`、`Sequence`、`StateMachine` 与 `trace()` 演示 Agent 架构 |
-| [examples/joplo-board](examples/joplo-board) | 多项目看板与演示页的交互设计 |
-| [examples/joplo-dist](examples/joplo-dist) | npm 安装与 Agent 用法流程 |
+| [examples/joplo](examples/joplo) | 用 Joplo 设计 Joplo：统一的真实功能方案、交互原型与设计决策 |
 
 ## 仓库内开发
 

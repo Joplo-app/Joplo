@@ -129,8 +129,7 @@ Use your own Wrangler account and configure the site name and compatibility date
 | --- | --- |
 | [examples/invite](examples/invite) | Compare an invitation dialog with a batch invitation flow |
 | [examples/agent-arch](examples/agent-arch) | Layers, Director, grouped `Diagram`, `Sequence`, `StateMachine`, and `trace()` for an agent architecture |
-| [examples/joplo-board](examples/joplo-board) | Multi-project Board and player interaction designs |
-| [examples/joplo-dist](examples/joplo-dist) | npm installation and agent guidance flows |
+| [examples/joplo](examples/joplo) | Joplo’s own evolving design workspace: real feature alternatives, interaction prototypes and documented decisions |
 
 ## Develop in this repository
 

@@ -34,3 +34,9 @@
 ## 发布
 
 遵循 [docs/release.md](docs/release.md)：六个包统一版本，版本变化后重新生成技能，检查通过后合并，再按 tag 流程发布并验证 registry。发布时检查技能是否随相同版本正确安装，不能只验证工作区中的源码。
+
+## Joplo 自身的设计项目
+
+`examples/joplo/` 是统一的自设计项目。新增自身功能时，在其中新增或迭代原生 Feature/Option/Scenario，不再创建平行的 `examples/joplo-<feature>` 项目。历史证据与边界见 `docs/self-design/EVIDENCE.md`；保留稳定 feature IDs，真实备选与未决项不因公开展示而伪装成已批准。
+
+公开设计过程要主动整理为可见画面与场景。普通 build 只包含 picked options，并剥离规则、问题、取舍等创作信息；不可为展示过程直接公开私有 review manifest。历史重建须有来源且显式标注；现存 `_v1` 归档继续作为证据。
