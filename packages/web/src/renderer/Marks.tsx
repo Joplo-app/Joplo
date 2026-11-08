@@ -5,6 +5,7 @@ import { finalRect } from './camera';
 import type { Box } from './camera-math';
 import { markBox, markGeometry } from './marks-math';
 import { RoughPath, ThemeContext } from './rough';
+import { rectOf } from './rect';
 
 type Measured = { mark: Mark; box: Box };
 export function Marks({ marks, wrapRef, contentRef, width, height, animate, pulseKey }: { marks: readonly Mark[]; wrapRef: RefObject<HTMLDivElement | null>; contentRef: RefObject<HTMLDivElement | null>; width: number; height: number; animate: boolean; pulseKey: string }) {
@@ -16,17 +17,17 @@ export function Marks({ marks, wrapRef, contentRef, width, height, animate, puls
     let last = '', pending = 0, raf = 0, n = 0;
     const boxOf = (r: { left: number; top: number; width: number; height: number }): Box => ({ x: r.left, y: r.top, w: r.width, h: r.height });
     const measure = () => {
-      const wr = wrap.getBoundingClientRect(), scale = wr.width / (wrap.offsetWidth || 1);
+      const wr = rectOf(wrap), scale = wr.width / (wrap.offsetWidth || 1);
       const next: Measured[] = [];
       for (const mark of marks) {
         const el: HTMLElement | null = wrap.querySelector<HTMLElement>(`[data-jid="${CSS.escape(mark.target)}"]`);
         if (!el) continue;
-        const clips = [boxOf(host.getBoundingClientRect())];
+        const clips = [boxOf(rectOf(host))];
         let hidden = false;
         for (let p: HTMLElement | null = el; p && p !== wrap; p = p.parentElement) {
           const cs = getComputedStyle(p);
           if (cs.display === 'none' || cs.visibility === 'hidden') { hidden = true; break; }
-          if (p !== el && (cs.overflowX !== 'visible' || cs.overflowY !== 'visible')) clips.push(boxOf(p.getBoundingClientRect()));
+          if (p !== el && (cs.overflowX !== 'visible' || cs.overflowY !== 'visible')) clips.push(boxOf(rectOf(p)));
         }
         if (hidden) continue;
         const box = markBox(boxOf(finalRect(el)), { x: wr.left, y: wr.top }, scale, clips);

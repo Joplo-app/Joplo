@@ -82,6 +82,8 @@ export type Snapshot = {
    * 再移动鼠标，保证观众看得到点击和输入；这一步提交后清空，之后由这一步自己的镜头决定。
    */
   leadFrame: string | null;
+  /** 连续播放时两章之间：接下来放哪个场景、还剩几秒（mobile_watch）。 */
+  upNext: { scenarioId: string; left: number } | null;
   /**
    * 自动播放停在第 position 步（D55）：总共停 ms，开始公布时已过去 elapsed；时间线据此画进度（暂停时停住）。
    * 不在停留中（手动、执行动画中、停止后）为 null。
@@ -159,6 +161,7 @@ export class DemoController {
     epoch: 0,
     leadLayer: null,
     leadFrame: null,
+    upNext: null,
   };
   private listeners = new Set<() => void>();
   private gen = 0;
@@ -505,8 +508,48 @@ export class DemoController {
       if (!quick && !(await this.dwellOn(sc, index, gen))) return;
     }
     this.fast = null;
-    if (gen === this.gen) this.set({ playing: false, paused: false, busy: false, dwell: null });
+    if (gen !== this.gen) return;
+    // 连续播放（mobile_watch）：自动播放把一个场景放完时，接着放下一个场景；手动一步步看、最后一个场景、被停止时不跳
+    const end = this.snap.state;
+    const next = end && (end.completed || end.position >= sc.steps.length) ? (this.autoNext?.(sc.id) ?? null) : null;
+    if (!next || !this.snap.project?.scenarios[next]) {
+      this.set({ playing: false, paused: false, busy: false, dwell: null });
+      return;
+    }
+    // 页面上显示“下一章 · N 秒”：暂停时倒计时也停；立即播放跳过等待；取消（或停止）就停在这一章的结尾
+    this.set({ busy: false, dwell: null, upNext: { scenarioId: next, left: Math.ceil(this.autoNextDelay / 1000) } });
+    this.skipUpNext = false;
+    let remaining = this.autoNextDelay;
+    let last = performance.now();
+    while (remaining > 0 && !this.skipUpNext) {
+      await sleep(Math.min(remaining, 100));
+      if (gen !== this.gen) return;
+      const now = performance.now();
+      if (!this.snap.paused) remaining -= now - last;
+      last = now;
+      const left = Math.max(0, Math.ceil(remaining / 1000));
+      if (this.snap.upNext && left !== this.snap.upNext.left) this.set({ upNext: { scenarioId: next, left } });
+    }
+    if (gen !== this.gen) return;
+    this.set({ upNext: null });
+    this.setScenario(next, 0, { quiet: true });
+    void this.play({ fromStart: true });
   }
+
+  private skipUpNext = false;
+  /** 下一章倒计时中：立即播放。 */
+  playNextNow() {
+    if (this.snap.upNext) this.skipUpNext = true;
+  }
+  /** 下一章倒计时中：取消，停在当前这一章的结尾。 */
+  cancelNext() {
+    if (this.snap.upNext) this.stop();
+  }
+
+  /** 自动播放放完一个场景后，接着放哪个场景（返回 null 就停下）。发布站按选定方案的场景顺序设置；看板不设置。 */
+  autoNext: ((scenarioId: string) => string | null) | null = null;
+  /** 两个场景之间的倒计时（毫秒，不随速度缩放；暂停时不计时）。页面上显示“下一章 · N 秒”。 */
+  autoNextDelay = 3000;
 
   private fast: ((index: number) => boolean) | null = null;
 
@@ -620,8 +663,8 @@ export class DemoController {
     const ws = this.cancelWaiters;
     this.cancelWaiters = [];
     ws.forEach((w) => w());
-    if (this.snap.playing || this.snap.busy || this.snap.preview || this.snap.systemEvent || this.snap.ripple || this.snap.activeStep !== null || this.snap.leadLayer || this.snap.leadFrame)
-      this.set({ playing: false, paused: false, busy: false, dwell: null, preview: null, systemEvent: null, ripple: null, activeStep: null, leadLayer: null, leadFrame: null });
+    if (this.snap.playing || this.snap.busy || this.snap.preview || this.snap.systemEvent || this.snap.ripple || this.snap.activeStep !== null || this.snap.leadLayer || this.snap.leadFrame || this.snap.upNext)
+      this.set({ playing: false, paused: false, busy: false, dwell: null, preview: null, systemEvent: null, ripple: null, activeStep: null, leadLayer: null, leadFrame: null, upNext: null });
   }
 
   // ---------- 点击 ----------

@@ -8,7 +8,7 @@ import { loadAuthoring } from '../src/load.ts';
 
 const dir = resolve(import.meta.dirname, '../../../examples/joplo');
 const original = JSON.parse(await readFile(new URL('./fixtures/self-design-original-ids.json', import.meta.url), 'utf8')) as { featureIds: string[]; options: string[]; scenarios: string[] };
-const order = ['workbench_origin', 'authoring_model', 'home', 'player', 'views', 'frames', 'npm', 'skill', 'voice', 'review', 'share_scope', 'feature_diff'];
+const order = ['workbench_origin', 'authoring_model', 'home', 'player', 'views', 'frames', 'npm', 'skill', 'voice', 'review', 'share_scope', 'feature_diff', 'mobile_watch'];
 let dev: Project, published: Project;
 beforeAll(async () => {
   const source = await loadAuthoring(dir, file => tsImport(file, { parentURL: import.meta.url, tsconfig: join(dir, 'tsconfig.json') }));
@@ -28,12 +28,12 @@ describe('one real Joplo design workspace', () => {
     for (const id of original.scenarios) expect(dev.scenarios[id], id).toBeDefined();
     expect(dev.featureIds).toEqual(order);
   });
-  it('publishes all twelve features with visible design journeys while keeping unpicked alternatives private', () => {
+  it('publishes every feature with a visible design journey while keeping unpicked alternatives private', () => {
     expect(published.featureIds).toEqual(order);
     expect(Object.keys(published.options)).toHaveLength(order.length);
     expect(published.options['workbench_origin.a-fold']).toBeUndefined();
     expect(published.options['authoring_model.a-data']).toBeUndefined();
-    for (const feature of original.featureIds) {
+    for (const feature of [...original.featureIds, 'mobile_watch']) {
       const picked = Object.values(published.options).find(o => o.featureId === feature)!;
       const story = published.scenarios[`${picked.id}.design_journey`];
       expect(story, feature).toBeDefined();

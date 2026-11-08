@@ -16,6 +16,7 @@ import { ownershipEls } from './camera';
 import { markBox } from './marks-math';
 import { badgeCenter, placeCallout, spotlightHoles, spotlightPath, visibleRegion, SPOT_PAD, TransitionTracker, type CalloutPlacement, type Side } from './cue-math';
 import { Rough, RoughPath, ThemeContext, useStroke } from './rough';
+import { rectOf } from './rect';
 
 const ACCENT = 'var(--jp-accent)';
 const BADGE = 24;
@@ -69,17 +70,17 @@ function useBoxes(ids: string[], wrapRef: RefObject<HTMLDivElement | null>, cont
     let n = 0;
     const toBox = (r: DOMRect): Box => ({ x: r.left, y: r.top, w: r.width, h: r.height });
     const measure = () => {
-      const wr = wrap.getBoundingClientRect();
+      const wr = rectOf(wrap);
       const scale = wr.width / (wrap.offsetWidth || 1);
       const next = new Map<string, Box>();
       const boxOf = (el: Element): Box | null => {
-        const clips = [toBox(host.getBoundingClientRect())];
+        const clips = [toBox(rectOf(host))];
         for (let p: Element | null = el; p && p !== wrap; p = p.parentElement) {
           const cs = getComputedStyle(p);
           if (cs.display === 'none' || cs.visibility === 'hidden') return null;
-          if (p !== el && (cs.overflowX !== 'visible' || cs.overflowY !== 'visible')) clips.push(toBox(p.getBoundingClientRect()));
+          if (p !== el && (cs.overflowX !== 'visible' || cs.overflowY !== 'visible')) clips.push(toBox(rectOf(p)));
         }
-        return markBox(toBox(el.getBoundingClientRect()), { x: wr.left, y: wr.top }, scale, clips);
+        return markBox(toBox(rectOf(el)), { x: wr.left, y: wr.top }, scale, clips);
       };
       for (const id of ids) {
         const el: HTMLElement | null = wrap.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`);

@@ -23,6 +23,7 @@ import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
 import { Subtitle } from './Subtitle';
 import { isFullscreenKey, useFullscreen, useIdleVisible } from './fullscreen';
+import { UpNextCard, usePhoneLayout, WatchView, type Chapter } from './WatchView';
 import { subtitleFor } from './subtitle-content';
 import { coverFor, coverShown } from './cover-content';
 import { Curtain, curtainUp } from './Curtain';
@@ -470,6 +471,11 @@ export type PlayerPageProps = {
   fullscreenVoice?: ReactNode;
   /** 手机页面时画面左上角的标注（看板传入“手机页面 · 390 宽 · 外框由画面自动加上”，给作者看，只在检查时显示；发布站不传）。 */
   deviceTag?: ReactNode;
+  /**
+   * 发布站：在手机上像看视频一样看（mobile_watch）。传入时，设备是手机就换成 WatchView（竖屏播放页 / 横屏沉浸）；
+   * 电脑和平板不受影响。chapters 是选定方案的场景（按顺序）。
+   */
+  watch?: { title: string; chapters: Chapter[]; onChapter: (id: string) => void; onRestart: () => void };
 };
 
 export function PlayerPage(p: PlayerPageProps) {
@@ -549,6 +555,8 @@ export function PlayerPage(p: PlayerPageProps) {
   // 全屏（T-stage）：只保留舞台与字幕；播放控制浮在画面下方，鼠标静止约 2.5 秒后淡出
   const rootRef = useRef<HTMLDivElement | null>(null);
   const { full, toggle: toggleFull } = useFullscreen(rootRef);
+  // 手机上看分享（mobile_watch）：只有发布站传了 watch 才检测
+  const phone = usePhoneLayout(!!p.watch);
   const idle = useIdleVisible(full);
 
   // 键盘：← → 逐步，Home 回到开头，空格播放/暂停，F 全屏（Esc 由浏览器退出）；按住 ⌥ 时标出可检查的元素
@@ -630,10 +638,12 @@ export function PlayerPage(p: PlayerPageProps) {
   ) : null;
 
   const completed = !!(scenario && state?.completed && !snap.playing);
-  const stageArea = (
+  // video：手机上看分享（WatchView）时舞台按设计尺寸整体缩放、留黑边；完成操作由 WatchView 自己画
+  const renderStage = (video: boolean) => (
     <div className="relative flex min-h-0 flex-1 flex-col" onMouseMove={inspecting ? onInspectHover : undefined} onMouseLeave={() => setHoverBox(null)}>
       {hasStage ? (
         <StageViewport
+          video={video}
           viewport={device}
           theme={p.theme}
           stroke={look.stroke}
@@ -686,7 +696,7 @@ export function PlayerPage(p: PlayerPageProps) {
           </span>
         </div>
       ) : null}
-      {completed && !full ? (
+      {completed && !full && !video ? (
         <div className="absolute bottom-3 right-3 z-30 flex items-center gap-2" data-testid="complete-actions">
           <Btn icon={<RotateCcw className="size-4" />} label={i18n.player.replay} onClick={() => ctl.togglePlay()} data-testid="replay" />
           {p.completeAction}
@@ -698,8 +708,32 @@ export function PlayerPage(p: PlayerPageProps) {
         </div>
       ) : null}
       {p.stageOverlay?.(shownScene?.id ?? null)}
+      {/* 下一章倒计时（连续播放）；手机视图由 WatchView 自己放 */}
+      {!video ? <UpNextCard ctl={ctl} snap={snap} variant="corner" /> : null}
     </div>
   );
+  const stageArea = renderStage(false);
+
+  if (p.watch && phone.layout)
+    return (
+      <WatchView
+        layout={phone.layout}
+        viewport={{ w: phone.w, h: phone.h }}
+        ctl={ctl}
+        snap={snap}
+        scenario={scenario}
+        subtitle={subtitle}
+        stage={renderStage(true)}
+        title={p.watch.title}
+        brand={<Brand onClick={p.onBrand} href={p.brandHref} />}
+        chapters={p.watch.chapters}
+        onChapter={p.watch.onChapter}
+        onRestart={p.watch.onRestart}
+        actions={<><LanguageMenu iconOnly />{p.actions}</>}
+        voice={p.voice}
+        flash={p.flash}
+      />
+    );
 
   if (full)
     return (

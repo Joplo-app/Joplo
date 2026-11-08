@@ -164,7 +164,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'Sequence.Block': "label, kind: 'alt'|'opt'|'loop'|'par'|'break'|'critical' (default opt); fragment box around the messages inside it; nestable",
   'Terminal.Command': 'prompt (default "$"); command text in children',
   'Terminal.Output': "tone: 'plain'|'ok'|'warn'|'error' (default plain); output text in children (preserves newlines)",
-  Phone: 'scale (visual scale, default 1), h (screen height, default 844); phone frame, children laid out at mobile width 390 with breakpoints based on that width; viewport: "mobile" on a page adds it automatically; do not add Phone explicitly',
+  Phone: 'scale (visual scale, default 1), h (screen height, default 844), landscape (turned sideways: content 772 × 358, notch on the left; use it for video-style or landscape mobile screens); phone frame, children laid out at mobile width 390 with breakpoints based on that width; viewport: "mobile" on a page adds it automatically; do not add Phone explicitly',
   div: 'HTML fallback; prefer Box/Stack/Group',
   span: 'HTML fallback; prefer Text span',
   p: 'HTML fallback; prefer Text',
@@ -386,9 +386,13 @@ export const DIRECTOR_LAYER = '@director';
 /** Diagram 节点与连线的 state（D41）；节点 kind 等见 diagram/model.ts。 */
 export const DIAGRAM_STATES = ['idle', 'active', 'ok', 'error', 'dim'] as const;
 
-/** 子节点排版用的宽度：Phone 内部按手机宽度（响应式取值、visibleFrom / hiddenFrom、AppShell 收起都按它算），其余节点沿用外部宽度。 */
-export function childWidth(type: string, width: number): number {
-  return type === 'Phone' ? VIEWPORT_SIZE.mobile.width : width;
+/** 横放的 Phone（landscape）内容区尺寸：844 × 390 的屏幕扣掉安全区（左侧刘海、底部横条）。 */
+export const PHONE_LANDSCAPE = { width: 772, height: 358 } as const;
+
+/** 子节点排版用的宽度：Phone 内部按手机宽度（横放按横屏宽度；响应式取值、visibleFrom / hiddenFrom、AppShell 收起都按它算），其余节点沿用外部宽度。 */
+export function childWidth(type: string, width: number, props?: { landscape?: unknown }): number {
+  if (type !== 'Phone') return width;
+  return props?.landscape === true ? PHONE_LANDSCAPE.width : VIEWPORT_SIZE.mobile.width;
 }
 
 /** 是否为响应式对象 `{ base, sm, md }`：普通对象，至少一个键，且全部键都是断点名。 */

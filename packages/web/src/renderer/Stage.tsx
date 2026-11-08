@@ -14,6 +14,7 @@ import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, diagramStateAt, focusAt, str
 import { RenderContext, RenderNode, type RenderMode, type StreamingCtx } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from './appearance';
+import { rectOf } from './rect';
 
 export const VIEWPORTS = VIEWPORT_SIZE;
 export type Viewport = keyof typeof VIEWPORTS;
@@ -172,7 +173,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     const el = rootRef.current;
     if (!el || !zoomOn) return;
     const pt = (cx: number, cy: number) => {
-      const r = el.getBoundingClientRect();
+      const r = rectOf(el);
       const s = r.width / el.offsetWidth || 1;
       return { x: (cx - r.left) / s, y: (cy - r.top) / s };
     };
@@ -212,7 +213,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     const d = drag.current;
     if (!d || !(e.buttons & 1)) return;
     const el = rootRef.current!;
-    const s = el.getBoundingClientRect().width / el.offsetWidth || 1;
+    const s = rectOf(el).width / el.offsetWidth || 1;
     const dx = (e.clientX - d.x) / s;
     const dy = (e.clientY - d.y) / s;
     if (!d.moved && Math.hypot(dx, dy) < 4) return;
@@ -230,7 +231,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   const toFramePoint = (clientX: number, clientY: number) => {
     const el = rootRef.current;
     if (!el) return { x: 0, y: 0 };
-    const r = el.getBoundingClientRect();
+    const r = rectOf(el);
     const s = r.width / el.offsetWidth || 1;
     return { x: (clientX - r.left) / s, y: (clientY - r.top) / s };
   };
@@ -250,7 +251,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     const hit = pickTarget(t, mode, e.altKey || inspectMode);
     if (!hit) return;
     e.preventDefault();
-    const r = hit.getBoundingClientRect();
+    const r = rectOf(hit);
     onNodeClick(hit.dataset.jid!, toFramePoint(r.left + r.width / 2, r.top + r.height / 2), { inspect: e.altKey || inspectMode });
   };
 
@@ -338,9 +339,9 @@ function ToastLayer({ toasts, nextTargetId, animate, rootRef }: { toasts: Toast[
       setCorner('br');
       return;
     }
-    const s = root.getBoundingClientRect().width / root.offsetWidth || 1;
-    const rr = root.getBoundingClientRect();
-    const tr = target.getBoundingClientRect();
+    const s = rectOf(root).width / root.offsetWidth || 1;
+    const rr = rectOf(root);
+    const tr = rectOf(target);
     const t = { x: (tr.left - rr.left) / s, y: (tr.top - rr.top) / s, w: tr.width / s, h: tr.height / s };
     const W = root.offsetWidth;
     const H = root.offsetHeight;

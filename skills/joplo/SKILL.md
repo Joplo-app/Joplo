@@ -35,7 +35,7 @@ Run dev and the follower in separate long-running shells. dev keeps the board li
 4. With minimal code, write one happy path and one error-and-recovery scenario.
 5. Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.
 6. Extend to every option and every case agreed with the user; run check until 0 errors.
-7. Before handing off for review, read npx joplo skill review. Keep npx joplo feedback watch [dir] --local --follow --json running in its own shell (joplo dev prints this exact command), then give the user the board URL dev printed. While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. Receive and apply review results with the joplo-feedback skill.
+7. Before handing off for review, read npx joplo skill review. Keep npx joplo feedback watch [dir] --local --follow --json running in its own shell (joplo dev prints this exact command), then give the user the board URL dev printed. While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. If you end your response while they test, add --once so the watcher exits (and wakes a host that resumes on background exit) on the first event, then resume with --since. Receive and apply review results with the joplo-feedback skill.
 8. Only when the user asks to share or publish: npx joplo share --format json publishes picked options; npx joplo share --review publishes every option for reviewers. Confirming an option in the board is not a publish request. To share part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items.
 
 ## Show the product, not slides
@@ -51,6 +51,7 @@ The user reviews in the board: they click through scenarios, write comments with
 1. Start npx joplo feedback watch <dir> --local --follow --json in its own long-running shell (joplo dev prints this exact command; the board's feedback panel can copy it too). One follower covers every option of the project and attaches by itself to the new round each source edit opens.
 2. Then give the user the board URL that dev printed (do not assume port 4790) and point them to the native feedback icon. If they want to drive the UI themselves, only give the link.
 3. While they test, read the follower's output with short waits (about 1–5 seconds). Each stdout line is one JSON event (feedback, approved, closed) carrying eventId, optionId, sessionId and context (route, scenario, step, source); deduplicate by eventId. A background shell alone does not wake an idle agent: stay in a receive loop, and do not claim you are still listening after ending your response unless the host can resume you.
+   - If you will end your response while the user tests, and your host wakes you when a background command finishes (Claude Code does): run the follower in the background with --once added. It exits 0 on the first feedback or approval, which wakes you. Handle the events, then start it again with --since <createdAt of the last event> (the exit message prints this exact command) so nothing is replayed or lost. Without such a host, tell the user to message you after they confirm.
 4. On feedback, acknowledge the actual text and its page/step right away, in the reviewer's language, then keep listening. Change the demo only when the user asked for changes; after edits, run npx joplo check. closed (source_changed) is then expected and the follower moves to the new round.
 5. approved confirms that option version only: it is not proof the feedback was implemented and not permission to publish. The follower ends with exit 1 only when the board stops (restart dev, then the follower) or 130 on Ctrl+C.
 Exact-session watching, Share polling, and applying pick / rule / question decisions: joplo-feedback skill and npx joplo skill review.
@@ -84,6 +85,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - selection: Edit only the element selected by the user in the board
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
-- publish: pick, build, share, review version, feedback write-back, deployment
+- publish: pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.14 sha256:8a8529f2d7f1295604a4a20b06fe87eb30dba11eabfc4edb3c1f09d7c992d70c -->
+<!-- joplo-skill 0.2.14 sha256:ebe5c9c41e0c70b3136fb0433693ac7f69dfa348de2dfebe51402b422def40ea -->

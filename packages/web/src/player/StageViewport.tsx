@@ -12,7 +12,7 @@ import { PHONE_BEZEL, PHONE_SAFE, PhoneFrame, phoneFrameSize } from '../renderer
 import { DeviceZoomContext, type DeviceFocus } from '../renderer/camera';
 import { CAMERA_EASE, CAMERA_MS } from '../runtime/pace';
 import { ThemeContext, type StageTheme, type StrokeMode } from '../renderer/rough';
-import { fillStage, fitStage } from './fit';
+import { fillStage, fitStage, videoStage } from './fit';
 import { Ban, CircleArrowRight, CircleCheck, CircleDashed, CircleX, Info, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { noticeView, type NoticeView } from './states';
@@ -30,7 +30,7 @@ function NoticeIcon({ icon }: { icon: NoticeView['icon'] }) {
 }
 import type { AppearanceFont } from '../renderer/appearance';
 
-export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false }: {
+export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false, video = false }: {
   viewport: Viewport; notice: Notice | null; onDismiss: () => void; /** 「回到演示」（顺序不对的提示）。 */ onBack?: () => void; children: (size: { width: number; height: number }) => ReactNode; tag?: ReactNode; theme?: StageTheme; stroke?: StrokeMode; font?: AppearanceFont | null;
   /**
    * 幕布（D61：过渡卡、场景封面）：铺满整个显示区域，不进手机外框。逻辑尺寸与电脑页面的舞台相同（fillStage），
@@ -39,6 +39,8 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   curtain?: (size: { width: number; height: number }) => ReactNode;
   /** 幕布此刻挡住了舞台：画面不可聚焦、不可点击（inert）。 */
   curtainUp?: boolean;
+  /** 视频式（手机上看分享，mobile_watch）：电脑页面按设计尺寸 1280×800 整体等比缩放、留黑边，不按可用区域改变逻辑尺寸。 */
+  video?: boolean;
 }) {
   const { t: i18n } = useI18n();
 
@@ -55,10 +57,10 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   const vp = VIEWPORTS[viewport];
   const phone = viewport === 'mobile';
   const frame = phone ? phoneFrameSize(vp.width, vp.height) : vp;
-  const fill = fillStage(avail, vp);
+  const fill = video ? videoStage(avail, vp) : fillStage(avail, vp);
   const scale = phone ? fitStage(avail, frame) : fill.scale;
   const size = phone ? { width: vp.width, height: vp.height } : { width: fill.width, height: fill.height };
-  const sheet = phone ? fillStage(avail, VIEWPORTS.desktop) : fill;
+  const sheet = phone ? (video ? videoStage(avail, VIEWPORTS.desktop) : fillStage(avail, VIEWPORTS.desktop)) : fill;
   // 手机层推近：镜头报来目标在手机内容里的位置与还需要的放大倍数，整台手机放大、目标移到舞台中央（不超过舞台能放下目标的大小）
   const [focus, setFocus] = useState<DeviceFocus | null>(null);
   const onDevice = useCallback((f: DeviceFocus | null) => setFocus(f), []);
@@ -76,7 +78,7 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   // 所有提示（含点错位置的三种）都在画面顶部居中，一条轻提示（D55）
   const view = noticeView(notice, i18n);
   return (
-    <div ref={box} className={cn('relative min-h-0 flex-1 overflow-hidden', phone && 'bg-jb-app')} data-testid="stage-viewport" data-scale={scale.toFixed(3)} data-device={viewport}>
+    <div ref={box} className={cn('relative min-h-0 flex-1 overflow-hidden', phone && !video && 'bg-jb-app', video && 'bg-black')} data-testid="stage-viewport" data-scale={scale.toFixed(3)} data-device={viewport}>
       {tag ? <div className="absolute left-3 top-3 z-10 flex items-center gap-2 text-[12px]">{tag}</div> : null}
       {view ? (
         <div

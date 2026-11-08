@@ -19,3 +19,12 @@ export function fillStage(avail: { w: number; h: number }, base: { width: number
   if (h / scale < minH) scale = Math.max(0.2, h / minH);
   return { width: Math.round(w / scale), height: Math.round(h / scale), scale: w / Math.round(w / scale) };
 }
+
+/**
+ * 视频式舞台（mobile_watch）：舞台逻辑尺寸固定为设计尺寸（电脑页面 1280×800），整体等比缩放放进可用区域，
+ * 像视频一样留黑边；不按可用区域的宽高比改变逻辑尺寸，所以手机上看到的排版和电脑上一样。
+ */
+export function videoStage(avail: { w: number; h: number }, base: { width: number; height: number }): { width: number; height: number; scale: number } {
+  const scale = Math.max(0.05, Math.min(Math.max(1, avail.w) / base.width, Math.max(1, avail.h) / base.height));
+  return { width: base.width, height: base.height, scale };
+}
