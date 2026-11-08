@@ -19,7 +19,7 @@ import { DemoController } from '../runtime/demo';
 import { isLocalHost, parseSiteHash, siteHash, warnUnknownPlayParams, type PlayRoute, type SiteRoute } from '../runtime/route';
 import { scenariosOf } from '../runtime/views';
 import type { StageTheme } from '../renderer/rough';
-import { Brand, PlayerPage, TopBar } from '../player/PlayerPage';
+import { Brand, JOPLO_SITE_URL, PlayerPage, TopBar } from '../player/PlayerPage';
 import { ArrowRight, CirclePlay, Link } from 'lucide-react';
 import { Btn } from '../player/controls';
 import { JoploMark } from '../player/JoploMark';
@@ -76,7 +76,7 @@ function Site({ project, scoped }: { project: Project; scoped: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hash]);
   if (route.kind === 'play') return <SitePlayer project={project} play={route.play} navigate={navigate} />;
-  // 范围分享只有一个功能：首页没有可选的东西，直接进演示（点品牌、面包屑回首页时同样停在演示）
+  // 范围分享只有一个功能：首页没有可选的东西，直接进演示（点面包屑回首页时同样停在演示）
   const only = scoped ? orderedFeatures(project) : [];
   if (only.length === 1) return <SitePlayer project={project} play={{ featureId: only[0]!.id }} navigate={navigate} />;
   return <SiteHome project={project} onView={(f) => navigate({ kind: 'play', play: { featureId: f } })} />;
@@ -92,7 +92,7 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
     <div className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="site-home">
       <ThemeStyles themes={project.themes} />
       <TopBar right={<LanguageMenu iconOnly={L.languageIconOnly} />}>
-        <Brand />
+        <Brand href={JOPLO_SITE_URL} />
         <span aria-hidden className="h-5 w-px shrink-0 bg-jb-line" />
         <span className="truncate px-2 text-[14px] font-medium" data-testid="site-name">
           {project.name}
@@ -203,7 +203,7 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
       ctl={ctl}
       snap={snap}
       project={project}
-      onBrand={home}
+      brandHref={JOPLO_SITE_URL}
       crumbs={[
         { label: project.name, testid: 'crumb-project', onClick: home },
         {

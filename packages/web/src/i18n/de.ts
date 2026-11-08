@@ -39,6 +39,7 @@ export function createDe(locale: Locale = 'de') {
       language: "Sprache",
       sampleInput: "Beispieleingabe",
       joploGoToHome: "Joplo · Zur Startseite",
+      joploWebsite: "Joplo-Website (öffnet in neuem Tab)",
       breadcrumbs: "Brotkrümelnavigation",
       replay: "Wiederholen",
       play: "Abspielen",

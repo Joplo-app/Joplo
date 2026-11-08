@@ -39,6 +39,7 @@ export function createJa(locale: Locale = 'ja') {
       language: "言語",
       sampleInput: "入力例",
       joploGoToHome: "Joplo · ホームへ",
+      joploWebsite: "Joplo 公式サイト（新しいタブで開く）",
       breadcrumbs: "パンくずリスト",
       replay: "リプレイ",
       play: "再生",

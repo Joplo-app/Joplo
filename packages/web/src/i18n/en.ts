@@ -43,6 +43,7 @@ export function createEn(locale: Locale = 'en') {
       sampleInput: "Sample input",
       // player/PlayerPage.tsx: Joplo interface text; author content is never translated.
       joploGoToHome: "Joplo · Go to home",
+      joploWebsite: "Joplo website (opens in a new tab)",
       breadcrumbs: "Breadcrumbs",
       replay: "Replay",
       play: "Play",

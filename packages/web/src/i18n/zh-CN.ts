@@ -44,6 +44,7 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       sampleInput: "示例输入",
       // player/PlayerPage.tsx: Joplo interface text; author content is never translated.
       joploGoToHome: "Joplo · 回到首页",
+      joploWebsite: "Joplo 官网（在新标签页打开）",
       breadcrumbs: "面包屑",
       replay: "重新播放",
       play: "播放",
