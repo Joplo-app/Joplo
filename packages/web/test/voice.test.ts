@@ -12,6 +12,7 @@ import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { VOICE_BREATH_MS, compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController, TIMING } from '../src/runtime/demo';
 import { Narrator, type Narration } from '../src/runtime/voice';
+import { siteVoiceDefault } from '../src/player/SiteVoice';
 import { MIN_UI_PX, UI_LEGIBLE_MAX, UI_MAX_ZOOM, uiMaxZoom } from '../src/renderer/camera-math';
 import { narrationLanguage, newerVoiceState, sortVoices } from '../src/board/voice-model';
 import { subscribeVoice, type VoiceState } from '../src/runtime/dev-client';
@@ -215,3 +216,18 @@ describe('看板：声音状态只往新的走', () => {
   });
 });
 
+
+describe('发布站朗读开关的初始值（D74）', () => {
+  const withClips = (clips: Record<string, string>) => ({ ...project(), voiceIndex: { narrator: 'n', roles: {}, clips } }) as Project;
+  it('分享带音频时默认开', () => {
+    expect(siteVoiceDefault(withClips({ k: 'voice/a.mp3' }))).toBe(true);
+  });
+  it('没有音频（没有 voiceIndex 或片段为空）时默认关', () => {
+    expect(siteVoiceDefault(project())).toBe(false);
+    expect(siteVoiceDefault(withClips({}))).toBe(false);
+    expect(siteVoiceDefault(null)).toBe(false);
+  });
+  it('差异同步播放（muted）始终关', () => {
+    expect(siteVoiceDefault(withClips({ k: 'voice/a.mp3' }), true)).toBe(false);
+  });
+});

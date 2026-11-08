@@ -180,7 +180,7 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
   // 播放速度在切换场景时保留
   const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', play: { ...(play.speed ? { speed: play.speed } : {}), ...next } }, replace);
   const resolved = usePlaySync(ctl, snap, snap.project, play, (next) => toPlay(next, true));
-  // 朗读（D74）：默认关，观众点 🔊 才出声
+  // 朗读（D74）：分享带音频时默认开，否则默认关、观众点 🔊 才出声
   const voice = useSiteVoice(ctl, project);
   const feature = project.features[play.featureId];
   if (!snap.project) return null;

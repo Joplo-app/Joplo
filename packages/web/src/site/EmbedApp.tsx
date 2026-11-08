@@ -53,7 +53,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
     return c;
   }, [project, init.scenarioId]);
   ctl.i18n = i18n;
-  // 朗读（D74）：嵌入同样默认关（autoplay=1 也不自动出声）
+  // 朗读（D74）：与发布站一致，带音频时默认开；差异同步播放（diff=1）始终静音
   const voice = useSiteVoice(ctl, project, params.diff);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot, ctl.getSnapshot);
   const [covered, setCovered] = useState(init.covered);
