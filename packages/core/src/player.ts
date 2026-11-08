@@ -531,7 +531,8 @@ export type Camera = { directorLayer: string; perLayer: Record<string, string[]>
 export function cameraAt(project: Project, scenarioId: string, position: number): Camera {
   const sc = project.scenarios[scenarioId];
   const perLayer: Record<string, string[]> = {};
-  let directorLayer = layersOf(project, scenarioId)[0]?.id ?? PAGE_LAYER;
+  const layers = layersOf(project, scenarioId);
+  let directorLayer = (sc?.initial.layer && layers.some((l) => l.id === sc.initial.layer) ? sc.initial.layer : layers[0]?.id) ?? PAGE_LAYER;
   if (!sc) return { directorLayer, perLayer };
   const n = Math.max(0, Math.min(position, sc.steps.length));
   for (let i = 0; i < n; i++) {

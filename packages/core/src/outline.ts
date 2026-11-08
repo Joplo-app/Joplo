@@ -6,7 +6,7 @@
  */
 import { orderedFeatures } from './features.ts';
 import { holdMsOf } from './focus.ts';
-import { stepDwell } from './pace.ts';
+import { stepDwell, voiceMs } from './pace.ts';
 import { JoploError } from './result.ts';
 import type { Coverage, Project, Scenario, Step } from './schema.ts';
 
@@ -45,10 +45,10 @@ export function stepTexts(step: Step): (string | undefined)[] {
   return [step.caption, step.explain, ...(step.action.type === 'card' ? [step.action.sub, ...(step.action.points ?? [])] : [])];
 }
 
-/** 一个场景按 1× 自动播放大约多久（毫秒）：每一步 stepDwell 之和。 */
+/** 一个场景按 1× 自动播放大约多久（毫秒）：每一步取 hold、阅读停留（stepDwell）与旁白朗读估算（narrate / say）中最长的，再求和。 */
 export function scenarioEstimateMs(scenario: Pick<Scenario, 'steps'>): number {
   return scenario.steps.reduce(
-    (sum, step) => sum + Math.max(holdMsOf(step), stepDwell({ texts: stepTexts(step), cameraMoved: step.shots.length > 0 || !!step.directorLayer, streams: step.effects.flatMap((e) => (e.type === 'stream' ? [e.value] : [])) })),
+    (sum, step) => sum + Math.max(holdMsOf(step), voiceMs(step.narrate ?? step.say), stepDwell({ texts: stepTexts(step), cameraMoved: step.shots.length > 0 || !!step.directorLayer, streams: step.effects.flatMap((e) => (e.type === 'stream' ? [e.value] : [])) })),
     0,
   );
 }

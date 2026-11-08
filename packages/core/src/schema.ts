@@ -246,6 +246,8 @@ export const Scenario = z.strictObject({
     ui: z.record(z.string(), Json).default({}),
     data: z.record(z.string(), Json).default({}),
     inputs: z.record(z.string(), Json).default({}),
+    /** 起始导演层（flow({ layer })，或 flow({ from }) 接力时那个场景结尾的导演层）；缺省为第一层。 */
+    layer: z.string().optional(),
   }),
   steps: z.array(Step).default([]),
   expected: z.string().default(''),

@@ -51,7 +51,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   let exitCode = 0;
   const serverPackage = '@joplo-app/server';
   const loadServer = deps.loadServer ?? (() => import(serverPackage));
-  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'renderStep' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime'>(name: K): Promise<typeof Server[K]> {
+  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'renderStep' | 'renderSheet' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime'>(name: K): Promise<typeof Server[K]> {
     let module: Record<string, unknown>;
     try { module = await loadServer(); }
     catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server cannot load ${name}: ${e instanceof Error ? e.message : String(e)}`); }
@@ -341,8 +341,20 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--theme <theme>', 'Theme: built-in (sketch, clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast) or project themes/<name>.css; defaults to the project theme').requiredOption('--out <file>', 'Screenshot file')
     .option('--width <pixels>', 'Screenshot width (stage width follows the page viewport); requires height', integer('width')).option('--height <pixels>', 'Screenshot height; requires width', integer('height'))
     .option('--scale <scale>', 'Pixel scale', scale).option('--overwrite', 'Allow overwriting the screenshot')
-    .option('--content <lang>', 'Author content language from config locales (D84); defaults to the source language').action(async (dir, opts) => {
+    .option('--content <lang>', 'Author content language from config locales (D84); defaults to the source language')
+    .option('--sheet', 'Storyboard: every step of the scenario in one image, with step number, caption, and narration under each frame')
+    .option('--columns <n>', 'Storyboard columns (with --sheet; default 3)', integer('columns')).action(async (dir, opts) => {
       if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'width and height must be provided together');
+      if (opts.sheet) {
+        if (opts.stepId !== undefined || opts.width !== undefined) throw new JoploError('USAGE', '--sheet renders every step; do not combine it with --step-id, --width, or --height');
+        const renderSheet = await serverFunction('renderSheet');
+        const { askYesNo, isInteractive, withExportComponent } = await import('./setup.ts');
+        const sheet = await withExportComponent(() => renderSheet({ projectDir: resolve(dir), scenarioId: opts.scenarioId, theme: opts.theme, out: resolve(opts.out), overwrite: opts.overwrite, ...(opts.columns ? { columns: opts.columns } : {}), ...(opts.content ? { content: opts.content } : {}) }),
+          { server: setupServer, interactive: deps.interactive ?? isInteractive(), ask: deps.ask ?? askYesNo, io: setupIo() });
+        line(sheet.path);
+        for (const warning of sheet.warnings) stderr(oneLine(warning) + '\n');
+        return;
+      }
       const renderStep = await serverFunction('renderStep');
       const { askYesNo, isInteractive, withExportComponent } = await import('./setup.ts');
       const data = await withExportComponent(() => renderStep({ projectDir: resolve(dir), scenarioId: opts.scenarioId, stepId: opts.stepId, theme: opts.theme, out: resolve(opts.out),

@@ -33,6 +33,8 @@
     const cx = r.left + r.width / 2;
     const cy = r.top + r.height / 2;
     if (cx < sr.left || cx > sr.right || cy < sr.top || cy > sr.bottom) {
+      // 画布（Canvas）里的元素被镜头移出画面是常态：只在它是下一步要操作的目标时才提示
+      if (el.closest('[data-jcanvas-world]') && el.dataset.jid !== args.nextTargetId) return;
       warnings.push(`Outside frame: "${e.label}"(${e.id}) has its center outside the frame`);
       return;
     }

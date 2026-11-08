@@ -1,6 +1,6 @@
 ---
 name: joplo
-description: Build clickable, replayable feature demos with Joplo (scripted scenarios in TSX, viewed in a local board) when the user wants a feature prototype, an interactive or clickable demo, an A/B comparison of options or edge cases, or a demo for product, design, or review (功能原型、可交互演示、方案对比、给产品 / 设计 / 评审看的演示), including in a repo without joplo.config.ts, but not for slide decks or PPT.
+description: Build clickable, replayable feature demos with Joplo (scripted scenarios in TSX, viewed in a local board) when the user wants a feature prototype, an interactive or clickable demo, an A/B comparison of options or edge cases, or a demo for product, design, or review, or a narrated explainer, tutorial, or news-explainer piece that should play like a video (功能原型、可交互演示、方案对比、给产品 / 设计 / 评审看的演示、讲解视频、科普、教程、资讯解读), including in a repo without joplo.config.ts, but not for slide decks, PPT, or editing real video footage.
 ---
 # Joplo
 
@@ -13,11 +13,13 @@ Options and cases are compared in the local board; only the picked option is pub
 ## When to use
 - The user wants to think a feature through before building it: a prototype, a clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.
 - The user wants to compare how a feature changed between two versions or in a PR (see npx joplo skill diff).
+- The user wants an explainer, tutorial, science piece, or news explainer that plays like a video (narration, chapters, animated graphics): read npx joplo skill content first.
 
 ## When not to use
 - Production UI code or real backends: Joplo demos are scripted; nothing runs real logic.
 - Demos where viewers must type their own free input.
-- Slide decks, pitch decks, or text-and-bullet presentations with no product behavior to show: use a slides tool instead.
+- Slide decks, pitch decks, or text-and-bullet presentations with no product behavior or animated explanation to show: use a slides tool instead.
+- Editing real video footage, music videos, or soundtracks: Joplo has no video clips, music, or sound effects.
 
 ## Quick start
 ```sh
@@ -71,11 +73,20 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key and pins that layer, so later steps stop switching layers; layer= is ignored); wait for rendering before screenshots. See npx joplo skill demo.
 - Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user. See npx joplo skill cases.
 - Never share or deploy without the user's go-ahead; free share links expire after 7 days. See npx joplo skill publish.
+- Explainers that read as slides: one board per chapter, title cards, bullet cards, panels fading in and out. Build one <Canvas> world instead, keep objects with motion keys so they morph between steps, and move camera() between them. See npx joplo skill content.
+- Moving the view with shot() in an explainer draws a pulsing focus ring and caps UI zoom at 1.25×; inside a <Canvas> use camera('id', …), which frames by content and does not draw a ring. See npx joplo skill content.
+- Chapters that should continue the last frame: write flow({ from: 'previousKey' }) instead of copying state by hand; scenarios with only system steps stay on the first layer unless a camera(), shot, or cue moves the director (or flow({ layer })). See npx joplo skill content.
+- The share preview is the first scenario's first frame: design it as a thumbnail (a screen poster in the Canvas that the first step fades out), not an empty screen. See npx joplo skill content.
+- outline and the cover estimate narration at about 4.5 CJK characters per second; a chapter whose narrate() lines total more than about 400 characters runs past 90 s. See npx joplo skill content.
+- Label illustrative numbers on screen and keep them apart from sourced facts; bars start at zero and lengths stay proportional. See npx joplo skill content.
+- HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it. See npx joplo skill check.
+- Judge a scenario from its storyboard, not from check alone: npx joplo render --scenario-id <id> --sheet --out board.png shows every step with its caption and narration in one image. See npx joplo skill content.
 
 ## Reference
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.
 - authoring: Mental model, first steps, page / option / flow syntax, when conditions, a form example
 - story: Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos
+- content: Explainers, tutorials, and news-explainer videos: package and plan, hook, one world with Canvas, camera(), motion morphs, chapters with flow({ from }), narration, sources, review
 - demo: Layers, shots, captions, full-height layout, custom motion and data graphics, deep links, and screenshots
 - focus: Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
 - diagram: Architecture, sequence and state diagrams: domain groups, automatic layout, traces, shot framing
@@ -87,4 +98,4 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.17 sha256:990d1505a35cc700d730648ee03fb100acebe42e2ff30473fa44242fe0b476f7 -->
+<!-- joplo-skill 0.2.17 sha256:171e7d6805b3685986998fda2a39dbe7a528913c265992930192914d5f424b4b -->

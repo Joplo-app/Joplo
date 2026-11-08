@@ -267,6 +267,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         data-stroke={stroke}
         data-font={look.font ?? undefined}
         data-mode={mode}
+        data-jstill={animate ? undefined : ''}
         data-scene={shownId}
         data-width={vp.width}
         className="jstage relative overflow-hidden"
