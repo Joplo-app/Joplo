@@ -428,6 +428,7 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - **朗读供应商只给官方的**（用户：“去掉 aihubmix 这种，默认只给官方的，不提供 openai 兼容……我们的 TTS 服务我们自己可以用 aihubmix”）：用户可选的只剩浏览器朗读、Joplo Cloud 朗读（登录后默认）、OpenAI 官方与 ElevenLabs 官方（接口地址固定不可改，自带 Key）。去掉 AiHubMix 预设、可改地址的 OpenAI 兼容和自定义 HTTP（取代 D74 的供应商 profile 设计），不再读 `AIHUBMIX_API_KEY`。本机已有的这类配置标为“不再支持”：已生成的音频照常播放、照常随分享上传，只是不能再生成。Cloud 服务端经 AiHubMix 调 Gemini（原生接口 `/gemini/v1beta/models/…:generateContent`，`x-goog-api-key`），备用一把官方 Key；用户看到的是 Joplo 自己的音色名，由服务端映射到上游音色，以后换模型不影响用户配置。
   - **试听**（用户：“默认的语言都要有，另外用户在体验的时候也能直接试听”）：Joplo 音色表为 10 种界面语言各配推荐音色；每个音色 × 语言预先生成一段样音放在 Cloud 静态地址，看板选音色时与定价页上点 ▶ 直接听，不扣额度，免费用户也能听。
   - 顺序：容量计费（作品集的前提）→ 作品集、公开与私密、强制选择、自动 SEO、密码查看 → 托管朗读（可并行）。看板与网页的新界面先画原型再实现。
+  - **第一阶段（容量计费）已确认的细节**（2026-11-08，原型 `examples/joplo` 的 storage_quota，用户在看板确认方案 B 并回复“可以”）：发布浮层平时只在账号下写一行“已用 / 上限 · 链接永久有效”，用到八成才出现黄色用量条与提醒（免费版给管理与升级两个入口，Pro 只给管理），放不下时红色提示写清差多少、已有链接不受影响。免费账号也更新同一个链接（`--new` 与 PR 预览照旧新建）。放不放得下在构建完、上传前由 Cloud 判断，更新只按新旧版本的差额，变小的更新总是允许。CLI 超出时以 `QUOTA_EXCEEDED`（`details.kind = "storage"`）、退出码 6 结束；线上协议是 413 `STORAGE_FULL`（`QUOTA_EXCEEDED` 固定 429，旧 CLI 收到会重试）。上线顺序：Cloud 先于 CLI。实现：Joplo #33、joplo-cloud #29。
 
 ## Working assumptions
 
