@@ -15,6 +15,9 @@ export default feature({
     initial: { title: '步骤没变，初始状态变了', dimension: 'consistency', expected: '在0步直接展示初始状态变化，不被封面遮挡' },
     drift: { title: '一侧独立切场景后再对齐', dimension: 'interrupt', priority: 'high', expected: '立即暂停并失效旧确认，只有两侧新回执才恢复对齐，恢复后仍暂停' },
     stale: { title: '旧 head 或旧 generation 任务完成', dimension: 'conflict', priority: 'high', expected: '旧任务不能覆盖当前分享与评论，用户知道要重新 prepare 和构建' },
+    legible: { title: '两版画面都缩成半宽，字读不清', dimension: 'main', priority: 'high', expected: '画面优先：列表和变化卡让出空间，播放器里的字接近真实页面大小' },
+    zoom: { title: '想仔细看其中一版', dimension: 'main', priority: 'high', expected: '能放大到整个工作区，两版仍停在对应的同一步' },
+    spot: { title: '看不出这一步两版到底哪里不同', dimension: 'main', priority: 'high', expected: '在同一步对照两版时，能直接找到改变的位置和结果的前后值' },
   },
   rules: {
     baseline: rule('首次 prepare 固定 PR 比较起点；后续使用返回的基线，不把缺失基线伪装成新增。（Cloud CONTRACT v1）', { origin: 'project_material', status: 'confirmed', cases: ['rationale', 'stale'] }),
@@ -23,6 +26,9 @@ export default feature({
     layout: rule('新增场景新版单栏、修改双栏、删除旧版单栏；不制造不存在的另一版。（双方契约与已确认原型）', { origin: 'project_material', status: 'confirmed', cases: ['added', 'removed', 'rationale'] }),
     fresh_receipts: rule('独立切场景使对齐失效；每次 realign 都要求两侧目标场景/步骤的新回执，旧缓存不能放行。（397310e）', { origin: 'code_observed', status: 'confirmed', cases: ['drift'] }),
     immutable: rule('每次成功发布新建不可变 comparison Share；检查真实 head 与 generation，旧任务不更新当前产物。', { origin: 'project_material', status: 'confirmed', cases: ['stale'] }),
+    canvas_first: rule('画面优先：对比时隐藏每个播放器自带的控制条，由差异页统一控制；修改场景默认一个大画面。（2026-11-08 用户确认，随方案 C 实现）', { origin: 'user', status: 'confirmed', cases: ['legible'] }),
+    result_values: rule('变化卡写出这一步结果的前后值（set/stream/append 状态、toast、done），来自 manifest 步骤的 results。（2026-11-08 用户确认，随方案 C 实现）', { origin: 'user', status: 'confirmed', cases: ['legible', 'spot'] }),
+    layout_choice: rule('采用 C：默认一个大画面，旧版/新版来回切换；也可以并排，并排时点任一侧的标题栏就只看那一版（像多路直播）。（2026-11-08 用户选定）', { origin: 'user', status: 'confirmed', cases: ['legible', 'zoom', 'spot'] }),
     boundary: rule('此处回放是依据真实设计和实现重建的原型，使用示例 PR 状态，不调用 GitHub 或 Cloud；新 CLI 尚未 npm 发布。', { origin: 'code_observed', status: 'confirmed', cases: ['rationale', 'stale'] }),
   },
   questions: {

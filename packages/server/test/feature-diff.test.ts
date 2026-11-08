@@ -23,6 +23,7 @@ describe('static diff bundle', () => {
     expect(JSON.parse(await readFile(join(result.outDir, 'feature-diff.json'), 'utf8'))).toEqual(result.manifest);
     const html = await readFile(join(result.outDir, 'index.html'), 'utf8');
     expect(html).toContain('joplo:goto'); expect(html).toContain('allow-scripts'); expect(html).not.toContain('__name');
+    expect(html).toMatch(/<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,%3Csvg%20xmlns/);
     expect(() => new Function(html.split('<script>')[1]!.split('</script>')[0]!)).not.toThrow();
   });
   it('does not mistake a missing baseline for a new feature', async () => {

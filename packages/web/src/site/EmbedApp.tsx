@@ -356,7 +356,10 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
           </button>
         ) : null}
       </main>
-      {covered || !scenario ? (
+      {params.diff ? (
+        // 功能差异页统一控制两侧播放器：这里只保留字幕，控制条与封面页脚都不显示，把高度留给画面
+        scenario ? <Subtitle content={subtitle} theme={project.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} framed divider /> : null
+      ) : covered || !scenario ? (
         <div ref={rowRef} className="flex h-9 shrink-0 items-center justify-between gap-3 border-t border-jb-line bg-jb-surface px-2.5" data-testid="embed-cover-footer">
           {brand}
           {scenario && !L.compact ? <span className="min-w-0 truncate text-[12px] text-jb-muted">{i18n.site.embedCoverHint}</span> : null}

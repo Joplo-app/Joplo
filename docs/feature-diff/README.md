@@ -34,8 +34,8 @@ joplo diff publish diff-site --prepared comparison.json \
 
 - `feature-diff.json`：`FeatureDiffManifest`（Core 导出 Zod schema），`formatVersion: 1`、`kind: joplo-feature-diff`、base/head 的 SHA、status/reasons、summary、按功能归属的 scenarios。
 - summary 的 added/modified/removed 与上传 comparison.summary 完全一致，每组最多 100 项，每项最多 200 字符。uncertain 放在 modified 摘要，manifest 内仍明确区分。
-- scenarios 的 before/after 引用实际场景 ID 或 null。steps 的 before/after 引用实际步骤 ID、1-based 播放位置、可选 key 或 null；match 为 key/content/action/none/uncertain。序号 id 永远不作跨版本身份。只有一版补充 key 时仍允许唯一内容／动作匹配，并标为 content/action；双方已有不同 key 时不配对，重复候选仍 uncertain。
-- `before/`、`after/`：真实静态发布播放器与资产。根 `index.html` 是独立差异 viewer；修改双栏、新增新版全宽、删除旧版全宽。
+- scenarios 的 before/after 引用实际场景 ID 或 null。steps 的 before/after 引用实际步骤 ID、1-based 播放位置、可选 key、公开字幕 caption（最多 300 字符）或 null；match 为 key/content/action/none/uncertain。修改步骤的 reasons 列出具体字段：action、effects、caption、explain、camera（镜头）、annotations（标注／焦点／气泡）、voice（台词／旁白）、timing（停留）、trace、forks、kind、order；无法归类的公开内容变化仍为 presentation。effects 变化时附可选 results（最多 12 项）：每项 kind 为 state（set/stream/append 写入的状态路径）、message（toast）或 outcome（done），before/after 是这一步最终产生的显示值（最多 200 字符），某一版这一步不产生时为 null；值相同的项不列出。viewer 在变化卡里显示前三项的旧 → 新。序号 id 永远不作跨版本身份。只有一版补充 key 时仍允许唯一内容／动作匹配，并标为 content/action；双方已有不同 key 时不配对，重复候选仍 uncertain。
+- `before/`、`after/`：真实静态发布播放器与资产。根 `index.html` 是独立差异 viewer；修改场景默认单画面：两侧播放器叠放在同一位置，空格或版本标签在旧版／新版之间原地切换；可切到并排，并排时点某一版的标题栏只看那一版（布局选择记在本机）。新增场景只有新版、删除场景只有旧版。差异模式下播放器不显示自带控制条，由差异页统一控制。左栏按功能列出变化场景，选中场景下按字幕列出每一处变化；播放器上方的变化卡说明这一处是插入、删除还是改了哪些字段，字幕变化显示旧／新对照。视觉稿见 `design/joplo-board.pen` 的「功能差异 · 单画面（默认）」与「功能差异 · 并排 + 播放器跑偏」；单画面／并排的取舍见 `examples/joplo` 的 `feature_diff` 方案 B／C。
 - 初始状态、实际可能使用的画面树、层级、角色、主题变更保守标记受影响场景。未变化步骤仍参与完整状态重建；双方确认场景和步骤后才继续自动播放。内嵌播放器独立切换场景或移动步骤会停止比较播放并使旧确认失效；点击重新对齐后，两侧都须重新回报目标场景及步骤，不能使用旧缓存或单侧回执提前宣布对齐。对齐成功后需手动点击播放变化，迟到回执不会自动恢复播放。身份重复时分别显示，不猜测配对。
 - `unchanged` 是成功且没有变化；`uncertain` 需要人工确认；`incompatible` 为本地诊断 viewer，不复制不能验证的版本载荷，禁止发布。没有可播放场景但项目表现改变也与无变化区分。
 

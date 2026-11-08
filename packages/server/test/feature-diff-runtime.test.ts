@@ -8,7 +8,7 @@ const runtime = readFileSync(new URL('../src/feature-diff-runtime.js', import.me
 const locales = readFileSync(new URL('../src/feature-diff-locales.json', import.meta.url), 'utf8');
 const SEND = 'invite.main.send', OTHER = 'invite.main.other';
 class Element {
-  textContent = ''; value = ''; checked = false; disabled = false;
+  textContent = ''; value = ''; checked = false; disabled = false; hidden = false; className = ''; title = '';
   children: Element[] = []; attrs: Record<string, string> = {};
   onclick?: () => void;
   contentWindow?: { sent: unknown[]; postMessage(data: unknown): void };
@@ -31,8 +31,9 @@ function harness(m = manifest()) {
   const node = (id: string) => { if (!nodes.has(id)) nodes.set(id, new Element()); return nodes.get(id)!; };
   node('joplo-feature-diff').textContent = JSON.stringify(m);
   node('joplo-diff-locales').textContent = locales;
+  const doc: { onkeydown?: (e: object) => void; [k: string]: unknown } = { documentElement: {}, getElementById: node, querySelector: node, createElement: (tag: string) => { const el = new Element(tag); if (tag === 'iframe') frames.push(el); return el; } };
   runInNewContext(runtime, {
-    document: { documentElement: {}, getElementById: node, querySelector: node, createElement: (tag: string) => { const el = new Element(tag); if (tag === 'iframe') frames.push(el); return el; } },
+    document: doc,
     location: { search: '' }, navigator: { language: 'en' }, URLSearchParams,
     window: { addEventListener: (_type: string, fn: typeof listener) => { listener = fn; } }, setTimeout, clearTimeout,
   });
@@ -41,7 +42,7 @@ function harness(m = manifest()) {
   const ready = (frame: Element) => message(frame, { type: 'joplo:ready', scenarios: [{ id: SEND, steps: 2 }, { id: OTHER, steps: 2 }] });
   const alignInitially = () => { frames.forEach(frame => { ready(frame); position(frame); }); expect(node('status').textContent).toMatch(/^Aligned/); };
   const click = (id: string) => { expect(node(id).disabled, `${id} should be enabled`).toBe(false); node(id).onclick!(); };
-  return { node, frames, message, position, ready, alignInitially, click, sent: () => frames.map(f => f.contentWindow!.sent.length) };
+  return { doc, node, frames, message, position, ready, alignInitially, click, sent: () => frames.map(f => f.contentWindow!.sent.length) };
 }
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -124,4 +125,55 @@ it('invalidates a pane that independently steps away after acknowledging while i
   expect(h.node('status').textContent).toMatch(/independently/);
   h.position(h.frames[1]!);
   expect(h.node('status').textContent).toMatch(/independently/); expect(vi.getTimerCount()).toBe(0);
+});
+it('names each change with its public caption and keeps the change list in step with navigation', () => {
+  const m = manifest();
+  m.scenarios[0]!.steps = [
+    { before: null, after: { id: `${SEND}#1`, position: 1, caption: 'Preview the email' }, status: 'added', match: 'none', reasons: ['step-added'] },
+    { before: { id: `${SEND}#1`, position: 1, caption: 'Send' }, after: { id: `${SEND}#2`, position: 2, caption: 'Send invitation' }, status: 'modified', match: 'key', reasons: ['caption', 'effects'], results: [{ kind: 'state', label: 'ui.status', before: 'Sent', after: 'Sending…' }, { kind: 'outcome', label: 'done', before: null, after: 'Invitation sent' }] },
+  ];
+  const h = harness(m);
+  const text = (el: { textContent: string; children: unknown[] }): string => el.textContent + el.children.map(c => text(c as typeof el)).join('');
+  expect(h.node('kind').textContent).toBe('New step inserted');
+  expect(text(h.node('detail'))).toContain('Preview the email');
+  const pane = (h.node('players').children[0] as unknown as { className: string; children: { children: { textContent: string; hidden?: boolean }[] }[] });
+  expect(pane.className).toContain('paused');
+  h.frames.forEach(f => { h.ready(f); h.position(f, SEND, f === h.frames[0] ? 0 : 1); });
+  h.click('next');
+  expect(h.node('kind').textContent).toBe('This step changed: Caption · Result');
+  expect(text(h.node('detail'))).toMatch(/Old 1.*Send.*New 2.*Send invitation/);
+  // The result values that changed are spelled out, so readers need not spot them on screen.
+  expect(text(h.node('detail'))).toMatch(/ui\.status.*Sent.*→.*Sending….*Outcome.*—.*→.*Invitation sent/);
+  const rows = (h.node('scenarios').children.find(c => (c as unknown as { className: string }).className === 'changes')!).children;
+  expect(rows.map(r => r.attrs['aria-current'])).toEqual(['false', 'true']);
+});
+it('shows one large version, flips with Space without moving players, and enlarges one side from side-by-side', () => {
+  const h = harness(); h.alignInitially();
+  const panes = h.node('players').children;
+  const front = () => panes.filter(p => p.className.split(' ').includes('front')).map(p => (p === panes[0] ? 'before' : 'after'));
+  expect(h.node('players').className).toBe('players single');
+  expect(front()).toEqual(['after']);
+  const sent = h.sent();
+  const press = (target: object = {}) => h.doc.onkeydown!({ key: ' ', target, preventDefault() {} });
+  press();
+  expect(front()).toEqual(['before']);
+  expect(panes[1]!.attrs['aria-hidden']).toBe('true');
+  // Space on a control keeps its native meaning.
+  press({ closest: () => ({}) });
+  expect(front()).toEqual(['before']);
+  h.click('view-split');
+  expect(h.node('players').className).toBe('players split');
+  expect(h.node('sides').hidden).toBe(true);
+  expect(panes.every(p => p.attrs['aria-hidden'] === 'false')).toBe(true);
+  const zoom = panes[1]!.children[0]!.children.at(-1)!;
+  zoom.onclick!();
+  expect(h.node('players').className).toBe('players single');
+  expect(front()).toEqual(['after']);
+  expect(h.sent()).toEqual(sent);
+  expect(h.node('status').textContent).toMatch(/^Aligned/);
+  // A mouse press on the version tabs must not steal focus from Space.
+  let prevented = false;
+  const tab = h.node('sides').children[0]! as unknown as { onmousedown(e: object): void };
+  tab.onmousedown({ preventDefault: () => { prevented = true; } });
+  expect(prevented).toBe(true);
 });
