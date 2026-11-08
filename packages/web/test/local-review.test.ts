@@ -33,5 +33,6 @@ it('survives disabled browser storage and ignores malformed stored context', () 
   expect(() => saveReviewDraft('x', null)).not.toThrow();
 });
 it('quotes project paths in the exact-session command without executing their contents', () => {
-  expect(localReviewCommand(session)).toBe("npx joplo feedback watch '/work/a project/it'\\''s-a-demo' --local --session rv_" + 'a'.repeat(32) + ' --json');
+  // The copied command follows the whole project, so it keeps working across options and new rounds.
+  expect(localReviewCommand(session)).toBe("npx joplo feedback watch '/work/a project/it'\\''s-a-demo' --local --follow --json");
 });

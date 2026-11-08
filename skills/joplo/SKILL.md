@@ -4,12 +4,39 @@ description: Build clickable, replayable feature demos with Joplo (scripted scen
 ---
 # Joplo
 
-Joplo is a player for pre-declared scenarios, not a free-form app prototype.
-Its job is to show a product feature working through visuals and motion: the real interface operated step by step, state changing on screen, calls traced through diagrams. It is not a slide or PPT tool.
-Inputs inside authored demos show the sample value typed by the current step (read-only); viewers cannot type their own. The board's native feedback panel accepts real reviewer input.
-Clicking the highlighted element plays the next declared step; other clicks only show a hint.
-Results and errors come from scenario effects (set, toast, done), not from real logic or a backend.
-Options (A/B) and cases (edge cases) are compared in the local board; only the picked option is published.
+Joplo turns a feature idea into a clickable, replayable demo. It is a player for pre-declared scenarios, not a free-form app prototype, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.
+Structure: a project has features; a feature has options (alternative designs, A/B) and cases (edge cases to cover); an option plays scenarios; a scenario is a list of steps.
+A step is one user action (.click / .type / .select / .press) or system event plus its visible effects (set, toast, go, done). Results and errors come from these effects, not from real logic or a backend.
+Viewers advance by clicking the highlighted element (other clicks only show a hint). Inputs show the sample value the step types; viewers cannot type their own, but the board's native feedback panel accepts real reviewer text.
+Options and cases are compared in the local board; only the picked option is published.
+
+## When to use
+- The user wants to think a feature through before building it: a prototype, a clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.
+- The user wants to compare how a feature changed between two versions or in a PR (see npx joplo skill diff).
+
+## When not to use
+- Production UI code or real backends: Joplo demos are scripted; nothing runs real logic.
+- Demos where viewers must type their own free input.
+- Slide decks, pitch decks, or text-and-bullet presentations with no product behavior to show: use a slides tool instead.
+
+## Quick start
+```sh
+npx joplo@latest init demo && cd demo && npm install   # new project (an existing project uses its installed npx joplo)
+npx joplo check                                        # compile and validate; fix until 0 errors
+npx joplo dev                                          # stdout: the board URL; stderr: the feedback command for agents
+npx joplo feedback watch . --local --follow --json     # in its own long-running shell: reviewer feedback as NDJSON
+```
+Run dev and the follower in separate long-running shells. dev keeps the board live: every saved edit recompiles and refreshes it.
+
+## Workflow
+1. No joplo.config.ts yet: npx joplo@latest init <dir>, or npx joplo@latest init . for the current directory, then npm install there (versions are pinned). Agent and Git files (.git, .gitignore, .agents, .claude, AGENTS.md, skills-lock.json) do not count as content; other existing files need init . --keep, which only adds missing files. init skips these skills when the same version is already installed and never overwrites edited ones. In an existing Joplo project, use its installed npx joplo.
+2. Read npx joplo skill authoring; read cases before asking the user about edge cases; demo and components as needed.
+3. Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case's expected is its Then); show the plan to the user. A demo is a story, not a feature tour.
+4. With minimal code, write one happy path and one error-and-recovery scenario.
+5. Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.
+6. Extend to every option and every case agreed with the user; run check until 0 errors.
+7. Before handing off for review, read npx joplo skill review. Keep npx joplo feedback watch [dir] --local --follow --json running in its own shell (joplo dev prints this exact command), then give the user the board URL dev printed. While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. Receive and apply review results with the joplo-feedback skill.
+8. Only when the user asks to share or publish: npx joplo share --format json publishes picked options; npx joplo share --review publishes every option for reviewers. Confirming an option in the board is not a publish request. To share part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items.
 
 ## Show the product, not slides
 Every step is an action on the product and a visible change it causes. If a step could be a bullet on a slide, rebuild it as interface, state, or a trace.
@@ -19,24 +46,20 @@ Every step is an action on the product and a visible change it causes. If a step
 - State or lifecycle: not a paragraph explaining statuses; instead a StateMachine whose current state moves as the user acts.
 - Cards only open, close, jump in time, or switch roles; text that explains belongs in captions and explain(). Worked example: npx joplo skill story.
 
-## When to use
-- The user wants to think a feature through before building it: a prototype, clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.
-- Not for production UI code, real backends, or demos where viewers type free input.
-- Not for slide decks, pitch decks, or text-and-bullet presentations: with no product behavior to show, use a slides tool instead.
+## Review live with the user
+The user reviews in the board: they click through scenarios, write comments with the board's native feedback icon, and may confirm (approve) an option. You receive each event the moment it is saved.
+1. Start npx joplo feedback watch <dir> --local --follow --json in its own long-running shell (joplo dev prints this exact command; the board's feedback panel can copy it too). One follower covers every option of the project and attaches by itself to the new round each source edit opens.
+2. Then give the user the board URL that dev printed (do not assume port 4790) and point them to the native feedback icon. If they want to drive the UI themselves, only give the link.
+3. While they test, read the follower's output with short waits (about 1–5 seconds). Each stdout line is one JSON event (feedback, approved, closed) carrying eventId, optionId, sessionId and context (route, scenario, step, source); deduplicate by eventId. A background shell alone does not wake an idle agent: stay in a receive loop, and do not claim you are still listening after ending your response unless the host can resume you.
+4. On feedback, acknowledge the actual text and its page/step right away, in the reviewer's language, then keep listening. Change the demo only when the user asked for changes; after edits, run npx joplo check. closed (source_changed) is then expected and the follower moves to the new round.
+5. approved confirms that option version only: it is not proof the feedback was implemented and not permission to publish. The follower ends with exit 1 only when the board stops (restart dev, then the follower) or 130 on Ctrl+C.
+Exact-session watching, Share polling, and applying pick / rule / question decisions: joplo-feedback skill and npx joplo skill review.
 
-## Workflow
-1. No joplo.config.ts yet: npx joplo@latest init <dir>, or npx joplo@latest init . for the current directory, then npm install there (versions are pinned). Agent and Git files (.git, .gitignore, .agents, .claude, AGENTS.md, skills-lock.json) do not count as content; other existing files need init . --keep, which only adds missing files. init skips these skills when the same version is already installed and never overwrites edited ones. In an existing Joplo project, use its installed npx joplo.
-2. Read npx joplo skill authoring; read cases before asking the user about edge cases; demo and components as needed.
-3. Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case's expected is its Then); show the plan to the user. A demo is a story, not a feature tour.
-4. With minimal code, write one happy path and one error-and-recovery scenario.
-5. Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.
-6. Extend to every option and every case agreed with the user; run check until 0 errors.
-7. Before handing off for review, read npx joplo skill review. List sessions with npx joplo feedback list [dir] --local --json, bind the exact session with npx joplo feedback watch [dir] --local --session <id> --json, then give the user its actual board URL. While they test, read output with short waits (about 1–5s) and acknowledge feedback immediately; do not wait for approval or process exit. Use the joplo-feedback skill for receiving and applying review results.
-8. When the user asks to share or publish: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. Confirmation of a local option alone does not request publication. To share only part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items. Apply review results with the joplo-feedback skill.
-
-When a product uses Joplo to design itself, keep one project with stable feature IDs and multiple options/scenarios (repository example: examples/joplo). Preserve actual evidence and label historical reconstructions; never invent review or approval history. Public design narration must be explicitly curated into visible scenarios because build strips private authoring fields. See npx joplo skill authoring. For authorized CI publication, separate PR comparison previews from the fixed main share, isolate credentials from author-code builds, and verify actual workflow runs after activation; see npx joplo skill diff.
-
-For comparing feature changes across versions or a PR, read npx joplo skill diff. Preserve stable .key() identities, treat repeated candidates as uncertain, and build two real publish versions. If an embedded player changes scenario independently, use Realign and wait for both target positions before resuming. Use prepare → uncredentialed build → trusted publish only within the user’s authorized scope.
+## Other ways to work together
+- Pointing at something: after the user Alt+clicks a board element, run npx joplo selection and edit only that location.
+- Designing a product with Joplo itself: keep one project with stable feature IDs and multiple options/scenarios (repository example: examples/joplo). Preserve actual evidence and label historical reconstructions; never invent review or approval history. Public design narration must be curated into visible scenarios because build strips private authoring fields. Details: npx joplo skill authoring.
+- CI publication (only when authorized): separate PR comparison previews from the fixed main share, isolate credentials from author-code builds, and verify actual workflow runs after activation. A PR preview is published only while the PR is still open, so do not merge before its comparison link appears. Details: npx joplo skill diff.
+- Comparing versions or a PR: read npx joplo skill diff. Preserve stable .key() identities, treat repeated candidates as uncertain, and build two real publish versions. If an embedded player changes scenario independently, use Realign and wait for both target positions before resuming. Use prepare → uncredentialed build → trusted publish only within the user's authorized scope.
 
 ## Common pitfalls
 - when takes a condition, not a boolean: when={eq($.ui.mode, 'code')}, never when={mode === 'code'}; for values known while writing use {flag && <X/>}. See npx joplo skill authoring.
@@ -48,7 +71,19 @@ For comparing feature changes across versions or a PR, read npx joplo skill diff
 - Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user. See npx joplo skill cases.
 - Never share or deploy without the user's go-ahead; free share links expire after 1 hour. See npx joplo skill publish.
 
-Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, focus, diagram, components, cases, check, selection, review, diff, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.
-After the user Alt+clicks a board element, run npx joplo selection and edit only that location.
-Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.13 sha256:44fc3f770d3e391f7e27cd45e5262e577de511d4e48bb86a6fea5d6c0ba148d9 -->
+## Reference
+npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.
+- authoring: Mental model, first steps, page / option / flow syntax, when conditions, a form example
+- story: Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions
+- demo: Layers, shots, captions, full-height layout, deep links, and screenshots
+- focus: Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
+- diagram: Architecture, sequence and state diagrams: domain groups, automatic layout, traces, shot framing
+- components: Component catalog, supported HTML tags, line breaks, and props
+- cases: Case dimensions: ask the user before starting
+- check: Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line
+- selection: Edit only the element selected by the user in the board
+- review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
+- diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
+- publish: pick, build, share, review version, feedback write-back, deployment
+npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
+<!-- joplo-skill 0.2.13 sha256:a77f462877559dbaaf36a15693afa507438bdbfaf18908d06e83738da42d3025 -->

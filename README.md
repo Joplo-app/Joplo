@@ -91,14 +91,13 @@ npx joplo selection
 
 ## Local review
 
-For local reviews, open the **Feedback & review** icon on the right of the demo to leave real feedback or confirm the option. The floating panel keeps the stage at its original size. Agents can listen in a background shell:
+For local reviews, open the **Feedback & review** icon on the right of the demo to leave real feedback or confirm the option. The floating panel keeps the stage at its original size. Agents follow the whole project from a second long-running shell; `joplo dev` prints this exact command after it starts, and the feedback panel can copy it:
 
 ```sh
-npx joplo feedback list --local --json
-npx joplo feedback watch --local --session <id> --json
+npx joplo feedback watch --local --follow --json
 ```
 
-Submitted feedback streams as NDJSON. Approval ends the watcher with exit code 0. Sessions isolate instances, projects, and option revisions; resume with `--after <seq>`. Source changes start a new review after compilation. See the [CLI documentation](docs/cli.md).
+Submitted feedback streams as NDJSON, one event per line with `eventId`, `optionId` and `sessionId`. The follower covers every option and attaches by itself to the new review round that each source edit opens; approving one option does not stop it. It exits 1 when the board stops and 130 on Ctrl+C. To wait for one option version's approval or resume from a cursor, bind an exact session instead (`feedback list --local`, then `feedback watch --local --session <id> [--after <seq>]`, which exits 0 on approval). See the [CLI documentation](docs/cli.md).
 
 For Share, use `npx joplo feedback watch --share <id> --option <feature.option> --interval 15 --json`. Polling defaults to 15 seconds, configurable from 10 to 30. The current Cloud endpoint exposes a pending-feedback snapshot, so records resolved/applied between polls can be missed; see the [Cloud follow-up requirements](docs/cloud-feedback-watch.md).
 

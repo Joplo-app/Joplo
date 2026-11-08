@@ -7,6 +7,7 @@
 ## 已实现的客户端行为
 
 ```sh
+joplo feedback watch ./demo --local --follow --json
 joplo feedback watch ./demo --local --session <id> --json
 joplo feedback watch --share Abc1234567 --option invite.a-modal --interval 15 --json
 ```

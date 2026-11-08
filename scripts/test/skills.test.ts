@@ -54,7 +54,10 @@ test('joplo 的 description 覆盖中英文触发词，可在没有 joplo.config
   const body = joplo!.slice(joplo!.indexOf('---', 3) + 4);
   expect(body.split('\n')[2]).toContain('player for pre-declared scenarios, not a free-form app prototype');
   for (const step of ['npx joplo@latest init', 'npm install', 'npx joplo skill authoring', 'happy path and one error-and-recovery', 'npx joplo check', 'npx joplo dev', 'npx joplo share']) expect(body, step).toContain(step);
-  const order = ['npx joplo@latest init', 'npx joplo skill authoring', 'error-and-recovery', 'npx joplo check', 'Extend to every option', 'board URL', 'npx joplo share'].map(s => body.indexOf(s));
+  // Step order inside the Workflow section (Quick start above it shows the same commands in brief).
+  const workflow = body.slice(body.indexOf('## Workflow'));
+  const order = ['npx joplo@latest init', 'npx joplo skill authoring', 'error-and-recovery', 'npx joplo check', 'Extend to every option', 'board URL', 'npx joplo share'].map(s => workflow.indexOf(s));
+  expect(order.every(i => i >= 0)).toBe(true);
   expect(order).toEqual([...order].sort((a, b) => a - b));
   const pitfalls = body.split('\n').filter(l => l.startsWith('- ') && l.includes('See npx joplo skill '));
   expect(pitfalls.length).toBeGreaterThanOrEqual(5); expect(pitfalls.length).toBeLessThanOrEqual(8);
