@@ -145,6 +145,13 @@ describe('画面', () => {
     expect(html).toContain('target="_blank"');
     for (const shell of ['topbar', 'left-nav', 'layer-bar']) expect(html, shell).not.toContain(`data-testid="${shell}"`);
   });
+  it('diff initial state has no scenario curtain or narration control', () => {
+    const html = render('?embed=1&review=1&diff=1&autoplay=1');
+    expect(html).toContain('data-testid="embed-stage"');
+    expect(html).not.toContain('data-testid="embed-voice"');
+    expect(html).not.toContain('data-testid="curtain"');
+    expect(parseEmbedParams('?embed=1&diff=1')?.diff).toBe(true);
+  });
   it('只有一个场景时没有场景切换；没有场景时显示空状态和品牌', () => {
     const p = published();
     const one = { ...p, features: { f: p.features.f! }, scenarios: { 'f.a.main': p.scenarios['f.a.main']! } } as Project;

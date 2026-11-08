@@ -177,6 +177,7 @@ Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结�
 | check | 诊断代码与局部修复、合并诊断、`UNBOUND_INTERACTIVE` 的三种处理 |
 | selection | 用户选中后只改指向的位置 |
 | review | 本地实时监听、Share 轮询、交接顺序、先回执再处理、多实例／版本隔离、恢复、事件示例和最佳实践 |
+| diff | 双版本公开演示差异、稳定步骤 key、歧义匹配、prepare 与隔离 CI 发布 |
 | publish | pick、build、云端登录与分享、评审版与 feedback 回流、静态站部署与演示能力 |
 
 `guide` 与 `skill authoring` 完全相同。读取主题不加载服务端，也不执行作者项目，输出无颜色文本。
@@ -437,3 +438,15 @@ npx joplo feedback --applied d1,d2 --ref "$(git rev-parse HEAD)" --format json
 
 
 并发上传共享 AbortController；发生失败后取消其他请求和可中止的退避等待，每次重试前检查取消状态，不再发新 PUT。仍会等待所有任务结束，再清理临时目录和 SIGINT 监听器。上传 headers（含 content-length）完全来自服务端，不由 CLI 增删。
+
+## diff：跨版本功能变化
+
+```sh
+npx joplo diff <before-site> <after-site> --out <new-directory> [--base-sha <40hex>] [--head-sha <40hex>] [--format text|json]
+npx joplo diff prepare --repo owner/name --pr <number> --sha <head> --base-sha <candidate> --out comparison.json [--server <url>] [--format text|json]
+npx joplo diff publish <diff-site> --prepared comparison.json --repo owner/name --pr <number> --sha <head> [--title <title>] [--server <url>] [--format text|json]
+```
+
+本地 diff 从两份真实 `joplo build` 产物生成根 viewer、before/、after/ 和 feature-diff.json；新增／删除单栏、修改双栏。原序号 ID 保持兼容，作者为前一步追加 `.key('stable-action')` 提供稳定身份；重复候选明确 uncertain。公开身份独立于旧播放 IR，普通分享不要求 Cloud 放宽 schema。
+
+prepare 的返回基线是权威值；用它编译旧版，不能继续使用候选 merge-base。发布前校验 receipt 与 manifest、两版实际 IR、summary 和文件 hash，复用上传／finalize，永远新建 comparison Share。publish 不构建、不执行 PR 代码、不附私有 review、不替换普通分享。安全 CI、错误码、Agent 路由限制和 fixture 见 [功能差异指南](feature-diff/README.md)；按需运行 `npx joplo skill diff`。

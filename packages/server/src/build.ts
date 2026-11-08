@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { build as viteBuild, createServer, type Rollup } from 'vite';
-import { hasScope, JoploError, orderedFeatures, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
+import { stepIdentity, type StepIdentity, hasScope, JoploError, orderedFeatures, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
@@ -37,7 +37,7 @@ export function publishPayload(project: Project, home: string | null): { project
   const scenarios = Object.fromEntries(
     Object.entries(project.scenarios).map(([id, s]) => {
       const { caseIds: _ci, ...sr } = s;
-      return [id, { ...sr, caseIds: [], steps: s.steps.map(({ ruleIds: _ri, ...st }) => ({ ...st, ruleIds: [] })) }];
+      return [id, { ...sr, caseIds: [], steps: s.steps.map(({ ruleIds: _ri, key: _key, ...st }) => ({ ...st, ruleIds: [] })) }];
     }),
   );
   return { project: { ...rest, features, options, scenarios }, home: home && project.routes[home] ? home : null };
@@ -47,7 +47,7 @@ export function publishPayload(project: Project, home: string | null): { project
 export const jsonForHtml = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
 /** 后处理 vite 产出的 HTML：内联 IR、内联入口脚本、去掉 crossorigin（file:// 下 CORS 会失败）。 */
-export function finalizeHtml(html: string, readAsset: (rel: string) => string, inline: { project: unknown; home: string | null; scoped?: true }): { html: string; inlined: string[] } {
+export function finalizeHtml(html: string, readAsset: (rel: string) => string, inline: { project: unknown; home: string | null; scoped?: true }, identity?: StepIdentity): { html: string; inlined: string[] } {
   const inlined: string[] = [];
   let out = html.replace(/\s+crossorigin(?:="[^"]*")?/g, '');
   out = out.replace(/<link rel="modulepreload"[^>]*>\s*/g, '');
@@ -56,7 +56,7 @@ export function finalizeHtml(html: string, readAsset: (rel: string) => string, i
     const code = readAsset(rel).replace(/<\/script/gi, '<\\/script');
     return `<script type="module">${code}</script>`;
   });
-  const data = `<script type="application/json" id="joplo-ir">${jsonForHtml(inline)}</script>`;
+  const data = `<meta name="joplo-feature-diff-player" content="1"><script type="application/json" id="joplo-ir">${jsonForHtml(inline)}</script>` + (identity ? `\n<script type="application/json" id="joplo-step-keys">${jsonForHtml(identity)}</script>` : '');
   out = out.replace('</head>', `    ${data}\n  </head>`);
   return { html: out, inlined };
 }
@@ -154,7 +154,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
 
     // 3. 后处理
     const siteHtml = path.join(staging, 'site.html');
-    const { html, inlined } = finalizeHtml(fs.readFileSync(siteHtml, 'utf8'), (rel) => fs.readFileSync(path.join(staging, rel), 'utf8'), inline);
+    const { html, inlined } = finalizeHtml(fs.readFileSync(siteHtml, 'utf8'), (rel) => fs.readFileSync(path.join(staging, rel), 'utf8'), inline, stepIdentity(project));
     fs.rmSync(siteHtml);
     for (const rel of inlined) fs.rmSync(path.join(staging, rel));
     fs.writeFileSync(path.join(staging, 'index.html'), html.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));

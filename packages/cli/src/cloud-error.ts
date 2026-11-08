@@ -5,6 +5,12 @@ export const terminalText = (text: string) => stripVTControlCharacters(text).rep
 
 /** 云端错误只在 CLI 边界扩展，不改变本地 core 的错误契约。 */
 export const CLOUD_MESSAGES = {
+  PR_APP_MISSING: 'Configure, install and link the GitHub App with access to this repository, then run joplo diff prepare again',
+  PR_CLOSED: 'The PR is closed. Stop this publication',
+  PR_STALE_HEAD: 'The PR head changed. Prepare again and rebuild the latest head against the returned pinned baseline',
+  PR_STALE_GENERATION: 'A newer prepare exists. Prepare again and rebuild; do not reuse the old bundle',
+  PR_MISMATCH: 'Repository, PR number, baseline or head does not match prepare. Correct the parameters and rebuild',
+  PR_UNAVAILABLE: 'GitHub PR metadata is temporarily unavailable. Retry later; do not downgrade to an unverified share',
   AUTH_REQUIRED: 'Sharing requires a free Joplo account. Run npx joplo login',
   AUTH_EXPIRED: 'Your session has expired. Run npx joplo login again',
   PLAN_REQUIRED: 'This action requires Pro',

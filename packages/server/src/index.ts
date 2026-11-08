@@ -11,3 +11,5 @@ export { startDev } from './dev.ts';
 export { buildSite } from './build.ts';
 export { renderStep } from './render.ts';
 export { EXPORT_DOWNLOAD_MB, PLAYWRIGHT_VERSION, SETUP_COMMAND, exportRuntimeStatus, installExportRuntime, uninstallExportRuntime, type ExportRuntimeStatus, type InstallProgress, type InstallResult } from './export-runtime.ts';
+
+export { buildFeatureDiff, publicIRFromHtml, type DiffBuildOptions, type DiffBuildResult } from './feature-diff.ts';

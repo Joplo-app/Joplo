@@ -270,6 +270,8 @@ export type StepArg = string | EffectDef;
 export type CardOpts = { sub?: string; points?: string[]; role?: string };
 
 export type StepDef = {
+  /** Stable identity within this scenario; independent of the playback position. */
+  key?: string;
   kind: 'user' | 'system' | 'card';
   action:
     | { type: 'click'; target: string }
@@ -313,6 +315,14 @@ export class Flow {
     const caption = args.find((a): a is string => typeof a === 'string');
     const effects = args.filter((a): a is EffectDef => typeof a !== 'string');
     this.steps.push({ kind, action, ...(caption ? { caption } : {}), effects, source: callsite(4) });
+    return this;
+  }
+  /** Give the preceding step a stable key. Keep it when editing or moving the same action. */
+  key(key: string): this {
+    const step = this.steps.at(-1);
+    if (!step) throw new Error('flow.key() must follow a step');
+    if (step.key !== undefined) throw new Error('This step already has a key');
+    step.key = key;
     return this;
   }
   click(target: string, ...args: StepArg[]): this {

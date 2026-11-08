@@ -22,7 +22,8 @@
     "@joplo-app/core": "workspace:*",
     "@joplo-app/server": "workspace:*",
     "commander": "^15.0.0",
-    "tsx": "4.23.15"
+    "tsx": "4.23.15",
+    "zod": "4.6.7"
   },
   "engines": {
     "node": ">=22"

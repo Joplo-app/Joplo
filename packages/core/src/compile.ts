@@ -397,7 +397,13 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       // 镜头状态（与 player.cameraAt 同一规则，逐步累积）：判断焦点提示的目标在不在当前镜头里（D70）
       const frame = new Map<string, string[]>();
       let director = hasLayers ? Object.keys(layers)[0]! : PAGE_LAYER;
+      const stepKeys = new Set<string>();
       const steps: Step[] = fl.steps.map((st: StepDef, i: number): Step => {
+        if (st.key !== undefined) {
+          if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(st.key)) err('STEP_KEY_INVALID', 'Step key must start with a letter and contain at most 64 letters, digits, underscores or hyphens', st.source);
+          if (stepKeys.has(st.key)) err('STEP_KEY_DUPLICATE', `Duplicate step key ${st.key} in ${sid}; use a distinct key for each action`, st.source);
+          stepKeys.add(st.key);
+        }
         const effects: Step['effects'] = [];
         const ruleIds: string[] = [];
         const explains: string[] = [];
@@ -548,6 +554,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const generated = st.caption === undefined ? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore) : null;
         return {
           id: `${sid}#${i + 1}`,
+          ...(st.key !== undefined ? { key: st.key } : {}),
           kind: st.kind,
           action: st.action,
           caption: st.caption ?? generated!.caption,

@@ -195,6 +195,8 @@ export const Callout = z.strictObject({ target: z.string().min(1), text: z.strin
 
 export const Step = z.strictObject({
   id: Qid,
+  /** Author identity, unique within a scenario. id remains the legacy playback address. */
+  key: Id.optional(),
   kind: z.enum(['user', 'system', 'card']),
   action: Action,
   caption: z.string().min(1),

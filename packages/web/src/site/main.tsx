@@ -6,6 +6,6 @@ import { SiteApp, readInlineIR } from './SiteApp';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <I18nProvider><SiteApp data={readInlineIR()} /></I18nProvider>
+    <I18nProvider explicit={new URLSearchParams(window.location.search).get('diff') === '1' ? new URLSearchParams(window.location.search).get('locale') : undefined}><SiteApp data={readInlineIR()} /></I18nProvider>
   </StrictMode>,
 );

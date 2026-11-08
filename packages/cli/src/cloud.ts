@@ -176,6 +176,8 @@ export function clientOutdatedMessage(cwd: string = process.cwd(), env: Record<s
 
 /** 只有网络异常和 5xx 归为 NETWORK，不能被远端响应体改写成其他类别。 */
 function responseCode(status: number, supplied: unknown, authenticated: boolean): CloudCode {
+  const prStatus: Record<string, number> = { PR_APP_MISSING: 409, PR_CLOSED: 409, PR_STALE_HEAD: 409, PR_STALE_GENERATION: 409, PR_MISMATCH: 400, PR_UNAVAILABLE: 503 };
+  if (typeof supplied === 'string' && Object.hasOwn(prStatus, supplied) && prStatus[supplied] === status) return supplied as CloudCode;
   if (status >= 500 && status <= 599) return 'NETWORK';
   if (status === 401) return authenticated ? 'AUTH_EXPIRED' : 'AUTH_REQUIRED';
   if (status === 403) return supplied === 'PLAN_REQUIRED' ? 'PLAN_REQUIRED' : supplied === 'FORBIDDEN' ? 'ACCOUNT_UNAVAILABLE' : 'FORBIDDEN';

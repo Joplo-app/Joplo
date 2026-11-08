@@ -4,8 +4,8 @@ import ts from 'typescript';
 import { COMPONENT_DOCS, COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../src/catalog.ts';
 import { componentDetails, guide, skillIndex, skillTopic, SKILL_TOPICS } from '../src/guide.ts';
 
-const topics = ['authoring', 'story', 'demo', 'focus', 'diagram', 'components', 'cases', 'check', 'selection', 'review', 'publish'] as const;
-test('十一个主题均少于 150 行，结尾的相关主题均存在', () => {
+const topics = ['authoring', 'story', 'demo', 'focus', 'diagram', 'components', 'cases', 'check', 'selection', 'review', 'diff', 'publish'] as const;
+test('十二个主题均少于 150 行，结尾的相关主题均存在', () => {
   expect(SKILL_TOPICS.map(t => t.name)).toEqual(topics);
   for (const topic of topics) {
     const body = skillTopic(topic);
@@ -181,4 +181,9 @@ test('componentDetails（npx joplo components <名字>）：含子组件、行�
   }
   expect(() => componentDetails(['Menuu'])).toThrow(/Did you mean Menu\?/);
   expect(() => componentDetails([''])).toThrow(/Unknown component/);
+});
+
+test('diff covers identity compatibility, conservative matching, isolated publication and explicit route limits', () => {
+  const body = skillTopic('diff');
+  for (const term of ['joplo-step-keys', 'uncertain', 'prepare', 'JOPLO_API_KEY', 'PR_STALE_GENERATION', 'Markdown/JSON', 'ALL preceding state']) expect(body).toContain(term);
 });
