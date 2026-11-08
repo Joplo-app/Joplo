@@ -17,7 +17,7 @@ export default option({
   scenarios: {
     rationale: flow('设计演进：比较功能，怎样才可信', { cases: ['rationale'], start: '/comparison', expected: '看见固定起点、匹配与布局选择的因果关系' })
       .card('PR 改了很多行，功能到底变了什么？', { sub: '真实需求：从固定 PR 起点看累计变化，而不是只看源码行数。' })
-      .system('先固定比较的起点', shot('cd_boundary'), uses('baseline', 'boundary'))
+      .system('CI 验收：先固定比较的起点', shot('cd_boundary'), uses('baseline', 'boundary'))
       .system('再把变化放回具体场景', shot('cd_viewer'))
       .click('cd_match', '插一步，不代表后面全变了', ...matched(), highlight('cd_after'), uses('semantics'))
       .click('cd_added', '全新场景，只看新版', set($.ui.kind, '新增'), set($.ui.scenario, '批量邀请'), set($.ui.beforeVisible, false), set($.ui.span, 12), set($.ui.afterTitle, '批量邀请'), set($.ui.afterState, '3 位成员等待邀请'), set($.ui.afterValue, '示例：团队列表已准备'), set($.ui.afterStep, '新版 · 批量场景'), uses('layout'))
