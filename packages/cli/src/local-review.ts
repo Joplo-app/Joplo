@@ -89,3 +89,111 @@ export async function watchLocalReview(dir: string, opts: ReviewFilter & { after
     pump();
   });
 }
+
+/**
+ * `--follow`：跟住整个项目的本地评审，而不是某一个会话。
+ * - 每个方案各有一个评审会话；改源码会关闭旧会话、开新会话。这里自动挂上所有正在进行的会话和之后新开的会话，
+ *   事件自带 sessionId / optionId / eventId，Agent 不用先 list 再选。
+ * - 某个方案确认（approved）不结束监听，其他方案和下一轮仍会到达；只有看板进程全部停止（1）或中断（130）才结束。
+ * - 每个会话各自的游标与身份校验与单会话监听相同；正在跟的会话都写“正在监听”的租约。
+ */
+export async function followLocalReviews(dir: string, opts: ReviewFilter & { after?: number; json?: boolean }, io: FeedbackStreamIo, signal?: AbortSignal): Promise<number> {
+  if (opts.session || opts.after) throw new JoploError('USAGE', '--follow watches every review round of the project; it cannot be combined with --session or --after');
+  const root = fs.realpathSync(path.resolve(dir));
+  const startedAt = new Date().toISOString();
+  const wanted = (s: LocalReviewSession) => !opts.option || s.optionId === opts.option;
+  const initial = listLocalReviews(root).filter(s => wanted(s) && localReviewStatus(s) === 'open' && localReviewOwnerAlive(s));
+  if (!initial.length) throw new JoploError('NOT_FOUND', 'No active local review in this project. Start joplo dev for it first, then run this command again');
+  type Tracked = { session: LocalReviewSession; cursor: number; previousRequest: string | null; stamp: string; lease: string };
+  const tracked = new Map<string, Tracked>();
+  const done = new Set<string>();
+  // Directory scan cache: only files whose size/mtime changed are parsed again.
+  const known = new Map<string, { stamp: string; session: LocalReviewSession }>();
+  const scan = () => {
+    let files: string[];
+    try { files = fs.readdirSync(localReviewDir(root)); } catch { files = []; }
+    const out: LocalReviewSession[] = [];
+    for (const f of files) {
+      if (!/^rv_[a-f0-9]{32}\.json$/.test(f)) continue;
+      const id = f.slice(0, -5);
+      let stat: fs.BigIntStats;
+      try { stat = fs.statSync(path.join(localReviewDir(root), f), { bigint: true }); } catch { continue; }
+      const stamp = `${stat.mtimeNs}:${stat.size}`;
+      const hit = known.get(id);
+      const session = hit?.stamp === stamp ? hit.session : readLocalReview(root, id);
+      known.set(id, { stamp, session });
+      out.push(session);
+    }
+    return out;
+  };
+  const track = (s: LocalReviewSession) => {
+    tracked.set(s.id, { session: s, cursor: 0, previousRequest: null, stamp: '', lease: path.join(localReviewWatcherDir(root, s.id), `${crypto.randomUUID()}.json`) });
+  };
+  initial.forEach(track);
+  io.err(terminalLines(`Following ${initial.length} review round(s) in ${root}\n${initial.map(s => `  ${s.optionId}  ${s.url}`).join('\n')}\n`)
+    + 'New rounds after source edits and other options are picked up automatically. Feedback streams to stdout; Ctrl+C stops only the watcher.\n');
+  let lastLease = 0;
+  return new Promise<number>((resolve, reject) => {
+    let timer: ReturnType<typeof setInterval> | undefined;
+    let watcher: fs.FSWatcher | undefined;
+    let finished = false;
+    const finish = (code: number, error?: unknown) => {
+      if (finished) return;
+      finished = true;
+      clearInterval(timer);
+      watcher?.close();
+      signal?.removeEventListener('abort', abort);
+      for (const t of tracked.values()) { try { fs.rmSync(t.lease, { force: true }); } catch { /* 短租约会自动失效。 */ } }
+      if (error) reject(error); else resolve(code);
+    };
+    const abort = () => { io.err('Stopped following; reviews remain open.\n'); finish(130); };
+    const drain = (t: Tracked) => {
+      const file = localReviewFile(root, t.session.id);
+      const stat = fs.statSync(file, { bigint: true });
+      const stamp = `${stat.mtimeNs}:${stat.size}`;
+      if (stamp === t.stamp) return;
+      const s = readLocalReview(root, t.session.id);
+      if (s.instanceId !== t.session.instanceId || s.revision !== t.session.revision || s.optionId !== t.session.optionId || s.events.length < t.cursor || (t.previousRequest && s.events[t.cursor - 1]?.requestId !== t.previousRequest))
+        throw new JoploError('INVALID_SCHEMA', 'Review identity or event history changed unexpectedly; refusing to switch sessions');
+      for (const e of s.events.slice(t.cursor)) {
+        writeFeedbackEvent(localFeedbackEvent(s, e), !!opts.json, io);
+        t.cursor = e.seq;
+        t.previousRequest = e.requestId;
+      }
+      t.stamp = stamp;
+      t.session = s;
+      if (localReviewStatus(s) !== 'open') {
+        try { fs.rmSync(t.lease, { force: true }); } catch { /* 短租约会自动失效。 */ }
+        tracked.delete(s.id);
+        done.add(s.id);
+      }
+    };
+    const pump = () => {
+      if (finished) return;
+      try {
+        if (signal?.aborted) return abort();
+        // 新一轮（改源码后）与之后才出现的会话：只要是开着的，或在开始监听之后创建的，都挂上。
+        const sessions = scan().filter(wanted);
+        for (const s of sessions) {
+          if (tracked.has(s.id) || done.has(s.id)) continue;
+          if ((localReviewStatus(s) === 'open' && localReviewOwnerAlive(s)) || s.createdAt >= startedAt) track(s);
+        }
+        for (const t of [...tracked.values()]) drain(t);
+        // The board is gone once no review of this project (open, approved or closed) has a live owner process.
+        if (!sessions.some(localReviewOwnerAlive)) {
+          io.err('The board stopped. Restart joplo dev, then run this command again.\n');
+          return finish(1);
+        }
+        if (Date.now() - lastLease > 3000) {
+          for (const t of tracked.values()) writeLocalReview(t.lease, { pid: process.pid, expiresAt: Date.now() + 10_000 });
+          lastLease = Date.now();
+        }
+      } catch (e) { finish(1, e); }
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+    try { watcher = fs.watch(localReviewDir(root), { persistent: false }, () => pump()); watcher.on('error', () => { watcher?.close(); }); }
+    catch { /* 不支持 fs.watch 的文件系统使用定时校验。 */ }
+    timer = setInterval(pump, 500);
+    pump();
+  });
+}

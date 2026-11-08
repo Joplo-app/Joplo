@@ -24,9 +24,9 @@ npx joplo share [dir] [--format text|json] [--new] [--title <title>] [--review] 
 npx joplo feedback [dir] [--share <id>] [--format text|json] [--server <url>]
 npx joplo feedback [dir] --applied <决定 id,…> [--ref <源码版本>] [--share <id>] [--format text|json]
 npx joplo review list [dir] [--json] [--all] [--option <功能.方案>]
-npx joplo review watch [dir] [--session <id>] [--option <功能.方案>] [--after <序号>] [--json]
+npx joplo review watch [dir] [--session <id> | --follow] [--option <功能.方案>] [--after <序号>] [--json]
 npx joplo feedback list [dir] --local [--json] [--all] [--option <功能.方案>]
-npx joplo feedback watch [dir] --local [--session <id>] [--after <序号>] [--json]
+npx joplo feedback watch [dir] --local [--session <id> | --follow] [--after <序号>] [--json]
 npx joplo feedback watch --share <id> --option <功能.方案> [--version <版本>] [--interval 15] [--json] [--server <url>]
 npx joplo render [dir] --scenario-id <qid> --out <file> \
   [--step-id <qid>] [--theme <theme>] \
@@ -124,12 +124,17 @@ JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }
 ## review：本地评审与流式监听
 
 ```sh
+npx joplo feedback watch [dir] --local --follow --json
 npx joplo review list [dir] --json
 npx joplo review watch [dir] --session <id> --json
 npx joplo review watch [dir] --session <id> --after 3 --json
 ```
 
-保持 `joplo dev` 运行。每个方案版本有独立会话，反馈面板里可以复制完整的监听命令。`list` 默认列出存活实例的未结束会话；`--all` 查看历史，`--option <功能.方案>` 筛选。`watch` 可省略 `--session`，但必须只有一个匹配的活跃会话；有多个时退出 2，列出候选，绝不自动选择“最新”实例。显式会话也始终限定在给定项目目录里，目录按真实路径解析，worktree 分别处理。
+保持 `joplo dev` 运行。`dev` 启动后在 stderr 打印第一条命令（stdout 仍只有看板地址），反馈面板里也能复制它。
+
+`--follow` 跟住整个项目：所有方案的进行中会话，以及之后新开的会话（改源码后的新一轮、新方案）。事件格式与单会话相同，靠 `sessionId`、`optionId`、`eventId` 区分；某个方案 `approved` 不结束监听。所有会话的看板进程都停止后输出提示并退出 1，Ctrl+C 退出 130。启动时没有存活的进行中会话退出（NOT_FOUND）；不能与 `--session`、`--after` 同用。启动时重放进行中会话的已有事件，消费者按 `eventId` 去重。正在跟的每个会话都写监听租约，看板显示 Agent 在线。
+
+需要等待某一个方案版本确认、或按游标补收时，使用精确会话：每个方案版本有独立会话。`list` 默认列出存活实例的未结束会话；`--all` 查看历史，`--option <功能.方案>` 筛选。`watch` 可省略 `--session`，但必须只有一个匹配的活跃会话；有多个时退出 2，列出候选，绝不自动选择“最新”实例。显式会话也始终限定在给定项目目录里，目录按真实路径解析，worktree 分别处理。
 
 `--json` 的 stdout 是 NDJSON，一行一个事件。状态与错误只写 stderr；不带 `--json` 时输出人可读文本。事件共有字段为 `sessionId`、`instanceId`、`projectDir`、`featureId`、`optionId`、`revision`、`seq`、`requestId`、`createdAt`：
 
@@ -146,7 +151,8 @@ npx joplo review watch [dir] --session <id> --after 3 --json
 ## feedback watch：本地与 Share 的统一入口
 
 ```sh
-# 本地实时读取文件事件
+# 本地实时读取文件事件：跟住整个项目，或绑定一个会话
+npx joplo feedback watch ./my-demo --local --follow --json
 npx joplo feedback watch ./my-demo --local --session <id> --json
 
 # Share 普通 GET 轮询，不需要 SSE 或 WebSocket

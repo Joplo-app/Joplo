@@ -91,14 +91,13 @@ npx joplo selection
 
 ## 本地评审
 
-本地评审时，点演示右侧「反馈与评审」图标填写反馈，或直接确认方案。浮层不会挤压演示页面。Agent 可以在后台监听：
+本地评审时，点演示右侧「反馈与评审」图标填写反馈，或直接确认方案。浮层不会挤压演示页面。Agent 在另一个常驻终端里跟住整个项目；`joplo dev` 启动后会打印这条命令，反馈浮层里也能复制：
 
 ```sh
-npx joplo feedback list --local --json
-npx joplo feedback watch --local --session <id> --json
+npx joplo feedback watch --local --follow --json
 ```
 
-反馈逐条输出，确认后监听退出 0；多个实例按会话隔离，重新监听可加 `--after <序号>` 补收。源码更新后开始新一轮评审。详见[本地评审命令](docs/cli.md#review本地评审与流式监听)。
+反馈逐条以 NDJSON 输出，每条带 `eventId`、`optionId`、`sessionId`。它覆盖所有方案，改源码后自动接上新一轮评审；某个方案确认不会让它结束。看板停止时退出 1，Ctrl+C 退出 130。需要等待某个方案版本的确认、或从游标补收时，改用精确会话：先 `feedback list --local`，再 `feedback watch --local --session <id> [--after <序号>]`，确认后退出 0。详见[本地评审命令](docs/cli.md#review本地评审与流式监听)。
 
 Share 通过同一个入口轮询：`npx joplo feedback watch --share <id> --option <功能.方案> --interval 15 --json`。默认每 15 秒，可设 10–30 秒。当前是快照轮询，已解决／已写回记录的完整补收需要 Cloud 扩展，详见[接口说明](docs/cloud-feedback-watch.md)。
 

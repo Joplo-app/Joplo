@@ -48,7 +48,8 @@ const feedbackPath = (dir: string) => join(dir, '.claude/skills/joplo-feedback/S
 test('安装与官方技能同源的两个技能（真实哈希），重复运行字节和 mtime 均不变', async () => {
   const dir = await temp(); const r = await run(['skill', 'install', dir]); expect(r.code).toBe(0);
   const content = await readFile(skillPath(dir), 'utf8');
-  expect(content.trimEnd().split('\n').length).toBeLessThanOrEqual(60);
+  // No length cap: the skill must make Joplo's purpose, usage and live review with the user unambiguous.
+  for (const s of ['## When to use', '## Quick start', '## Review live with the user', '--local --follow --json', '## Reference']) expect(content, s).toContain(s);
   expect(content).toContain('name: joplo\n');
   expect(content).toMatch(/^description: Build clickable, replayable feature demos with Joplo/m);
   // 心智模型、起步顺序、常见坑都在，细节指向主题

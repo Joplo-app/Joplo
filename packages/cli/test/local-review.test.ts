@@ -7,7 +7,7 @@ import { compile, localReviewStatus } from '@joplo-app/core';
 import { localReviewWatcherCount, readLocalReview, writeLocalReview, localReviewFile } from '@joplo-app/core/node';
 import { reviewSource } from '../../core/test/fixtures/review.ts';
 import { LocalReviewHub } from '../../server/src/local-review.ts';
-import { reviewSessions, watchLocalReview } from '../src/local-review.ts';
+import { followLocalReviews, reviewSessions, watchLocalReview } from '../src/local-review.ts';
 import { runCli } from '../src/cli.ts';
 
 const dirs: string[] = [];
@@ -23,6 +23,7 @@ const setup = () => {
 };
 const capture = () => { let out = '', err = ''; return { io: { out: (s: string) => { out += s; }, err: (s: string) => { err += s; } }, get out() { return out; }, get err() { return err; } }; };
 const until = async (test: () => boolean) => { const end = Date.now() + 4000; while (!test()) { if (Date.now() > end) throw new Error('Timed out'); await new Promise(r => setTimeout(r, 20)); } };
+const bContext = (project: ReturnType<typeof compile>['project'] & object) => { const sc = Object.values(project.scenarios).find(s => s.optionId === 'f.b')!; return { scenarioId: sc.id, position: 0, sceneId: sc.initial.sceneId }; };
 const signal = () => { const c = new AbortController(); controllers.push(c); return c; };
 
 it('streams submitted feedback before approval and returns 0 only after approval', async () => {
@@ -117,4 +118,56 @@ it('feedback watch --local is compatible with review watch and never needs cloud
   expect(await runCli(['review', 'watch', x.dir, '--session', x.session.id, '--json'], { stdout: alias.io.out, stderr: alias.io.err })).toBe(0);
   expect(primary.out).toBe(alias.out);
   expect(JSON.parse(primary.out.split('\n')[0]!)).toMatchObject({ source: 'local', eventId: `${x.session.id}:1` });
+});
+
+it('--follow streams every option of the project, keeps going after one is approved, and picks up new rounds after source edits', async () => {
+  const x = setup(), io = capture(), ac = signal();
+  let ended = false;
+  const result = followLocalReviews(x.dir, { json: true }, io.io, ac.signal).then(code => { ended = true; return code; });
+  const options = reviewSessions(x.dir).map(s => s.optionId).sort();
+  expect(options.length).toBeGreaterThan(1);
+  // Every followed round shows an agent listening in the board.
+  for (const s of reviewSessions(x.dir)) expect(localReviewWatcherCount(x.dir, s.id)).toBe(1);
+  const b = x.hub.state(x.dir, 'f.b').session;
+  x.hub.write(x.dir, x.project, { sessionId: b.id, requestId: crypto.randomUUID(), type: 'feedback', body: 'B needs a hint', context: bContext(x.project) });
+  await until(() => io.out.includes('B needs a hint'));
+  x.approve();
+  await until(() => io.out.includes('"approved"'));
+  await new Promise(r => setTimeout(r, 550));
+  expect(ended).toBe(false);
+  // A source edit closes the open round and opens a new one; the follower attaches by itself.
+  x.project.options['f.b']!.name = 'Revised'; x.hub.sync(x.dir, 'test-project', x.project);
+  await until(() => io.out.includes('source_changed'));
+  const next = x.hub.state(x.dir, 'f.b').session;
+  expect(next.id).not.toBe(b.id);
+  x.hub.write(x.dir, x.project, { sessionId: next.id, requestId: crypto.randomUUID(), type: 'feedback', body: 'Round two', context: bContext(x.project) });
+  await until(() => io.out.includes('Round two'));
+  const events = io.out.trim().split('\n').map(l => JSON.parse(l));
+  expect(new Set(events.map(e => e.eventId)).size).toBe(events.length);
+  expect(events.find(e => e.body === 'Round two')).toMatchObject({ sessionId: next.id, optionId: 'f.b', seq: 1 });
+  expect(io.err).toContain('Following');
+  ac.abort();
+  expect(await result).toBe(130);
+});
+
+it('--follow ends with 1 once the board that owns the reviews has stopped', async () => {
+  const x = setup(), io = capture();
+  const result = followLocalReviews(x.dir, { json: true }, io.io);
+  await until(() => io.err.includes('Following'));
+  x.hub.invalidate(x.dir, 'server_stopped');
+  for (const s of reviewSessions(x.dir, { all: true })) writeLocalReview(localReviewFile(x.dir, s.id), { ...readLocalReview(x.dir, s.id), ownerPid: 2 ** 22 + 12345 });
+  expect(await result).toBe(1);
+  expect(io.out).toContain('server_stopped');
+  expect(io.err).toMatch(/board stopped/i);
+});
+
+it('--follow refuses an exact session or cursor and needs a running board', async () => {
+  const x = setup();
+  await expect(followLocalReviews(x.dir, { session: x.session.id }, capture().io)).rejects.toThrow(/--follow/);
+  await expect(followLocalReviews(x.dir, { after: 2 }, capture().io)).rejects.toThrow(/--follow/);
+  x.hub.invalidate(x.dir, 'server_stopped');
+  await expect(followLocalReviews(x.dir, {}, capture().io)).rejects.toThrow(/joplo dev/);
+  let err = '';
+  expect(await runCli(['feedback', 'watch', x.dir, '--follow', '--json'], { stdout: () => {}, stderr: (s: string) => { err += s; } })).toBe(2);
+  expect(JSON.parse(err.trim()).error.message).toMatch(/--local/);
 });

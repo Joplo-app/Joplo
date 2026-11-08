@@ -83,9 +83,10 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     });
   review.command('watch').argument('[dir]', 'Project directory', '.').option('--session <id>', 'Bind to this exact review session').option('--option <id>', 'Filter by qualified option id; fails if multiple instances match')
     .option('--after <seq>', 'Resume after this event sequence number', cursor, 0).option('--json', 'Stream one JSON event per line (NDJSON)')
+    .option('--follow', 'Follow every option and every new round of this project until the board stops')
     .action(async (dir, opts) => {
-      const { watchLocalReview } = await import('./local-review.ts');
-      await withWatchSignal(signal => watchLocalReview(dir, opts, { out: stdout, err: stderr }, signal));
+      const { watchLocalReview, followLocalReviews } = await import('./local-review.ts');
+      await withWatchSignal(signal => (opts.follow ? followLocalReviews : watchLocalReview)(dir, opts, { out: stdout, err: stderr }, signal));
     });
   const cloudClient = async (server?: string, format?: string) => {
     const { CloudClient } = await import('./cloud.ts');
@@ -198,6 +199,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--version <number>', 'Cloud share version; defaults to the first response', integer('version'))
     .option('--interval <seconds>', 'Cloud polling interval, 10–30 seconds (default: 15)', integer('interval', 30))
     .option('--after <seq>', 'Local replay cursor', cursor).option('--json', 'Stream one normalized JSON event per line')
+    .option('--follow', 'With --local: follow every option and every new round of this project until the board stops')
     .option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)')
     .action(async (dir, opts, command) => {
       // 父命令的 --share / --server 在 watch 前后均能识别；拒绝把旧的写回标记用到监听命令。
@@ -209,9 +211,10 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       if (opts.local) {
         if (shareId !== undefined || server !== undefined || opts.interval !== undefined || opts.version !== undefined)
           throw new JoploError('USAGE', '--local cannot be combined with --share, --server, --interval, or --version');
-        const { watchLocalReview } = await import('./local-review.ts');
-        await withWatchSignal(signal => watchLocalReview(dir, opts, { out: stdout, err: stderr }, signal));
+        const { watchLocalReview, followLocalReviews } = await import('./local-review.ts');
+        await withWatchSignal(signal => (opts.follow ? followLocalReviews : watchLocalReview)(dir, opts, { out: stdout, err: stderr }, signal));
       } else {
+        if (opts.follow) throw new JoploError('USAGE', '--follow applies to local reviews: add --local');
         if (!shareId || opts.session !== undefined || opts.after !== undefined)
           throw new JoploError('USAGE', 'Choose --local [--session <id>] or --share <id> --option <feature.option>; --after applies only to local reviews');
         const { watchCloudFeedback, validateCloudWatchOptions } = await import('./cloud-feedback-watch.ts');
@@ -278,6 +281,9 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     line(handle.url);
     // 已有存活的看板：项目已注册进去，本进程直接退出（不启动第二个看板进程）
     if (handle.attached) stderr(`Joined the running board. Open ${handle.url}\n`);
+    // stdout 只有地址（脚本会读）；在 stderr 告诉 Agent 用哪一条命令跟住这个项目的全部评审反馈。
+    const shown = /^[\w./@:+-]+$/.test(dir) ? dir : `'${dir.replace(/'/g, `'\\''`)}'`;
+    stderr(`Agents: stream reviewer feedback from this board with\n  npx joplo feedback watch ${shown} --local --follow --json\n`);
   });
   program.command('build').argument('[dir]', 'Project directory', '.').option('--out-dir <dir>', 'Output directory (default: project dist)').option('--out <dir>', 'Alias for --out-dir').option('--overwrite', 'Allow clearing a nonempty output directory')
     .option('--scenario <id>', 'Build only this scenario; repeatable (same scope as share --scenario)', collect, [])

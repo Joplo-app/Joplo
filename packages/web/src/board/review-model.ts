@@ -17,6 +17,7 @@ export function saveReviewDraft(key: string, draft: ReviewDraft | null): void {
   catch { /* 存储不可用时，本页内存仍保留草稿。 */ }
 }
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+/** 给 Agent 的命令：跟住整个项目（所有方案、改源码后的新一轮），而不是只绑这一轮会话。 */
 export function localReviewCommand(session: LocalReviewSession): string {
-  return `npx joplo feedback watch ${quote(session.projectDir)} --local --session ${session.id} --json`;
+  return `npx joplo feedback watch ${quote(session.projectDir)} --local --follow --json`;
 }
