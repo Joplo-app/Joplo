@@ -53,6 +53,11 @@
   if (offViewport.length)
     warnings.push(`Outside viewport: viewport ${vw}×${vh} is smaller than the stage; ${offViewport.length} interactive elements have centers outside the viewport; occlusion checks skipped (${offViewport.join(', ')})`);
 
+  // 1b. 画布（Canvas）没有尺寸：放在没有宽 / 高的容器里时整块不可见
+  stage.querySelectorAll('[data-jcanvas]').forEach((c) => {
+    if (c.clientWidth < 1 || c.clientHeight < 1) warnings.push(`Canvas has no size: ${name(c)} is ${c.clientWidth}×${c.clientHeight}px, so nothing in it is visible; give its container a width and height (h="100%" in a layer) or let it size from its view ratio`);
+  });
+
   // 2. 标签文字溢出
   stage.querySelectorAll('[data-jtext], .jtrunc').forEach((t) => {
     if (t.scrollWidth > t.clientWidth + 1) warnings.push(`Label text overflow: ${name(t)} text "${(t.textContent ?? '').slice(0, 40)}" is clipped`);

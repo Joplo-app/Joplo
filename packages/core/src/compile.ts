@@ -391,9 +391,31 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     };
 
     const scenarioIds: Record<string, string[]> = {};
-    for (const [skey, fl] of Object.entries(def.scenarios ?? {})) {
+    // flow({ from }) 接力：按依赖顺序编译，被接的场景先编译，记下它结尾的路径与导演层；
+    // 接力场景的逐步校验（页面里找目标、焦点提示、镜头、自动字幕）都从那里开始，而不是默认起点
+    const scenarioDefs = def.scenarios ?? {};
+    const orderedKeys: string[] = [];
+    {
+      const placed = new Set<string>();
+      const place = (k: string, seen: Set<string>) => {
+        if (placed.has(k) || seen.has(k)) return;
+        seen.add(k);
+        const dep = scenarioDefs[k]?.opts.from;
+        if (dep !== undefined && dep !== k && Object.hasOwn(scenarioDefs, dep)) place(dep, seen);
+        placed.add(k);
+        orderedKeys.push(k);
+      };
+      for (const k of Object.keys(scenarioDefs)) place(k, new Set());
+    }
+    /** 每个场景编译完之后的结尾：路径（按 go / back 推算）与导演层。 */
+    const scenarioEnd = new Map<string, { route: string; director: string }>();
+    for (const skey of orderedKeys) {
+      const fl = scenarioDefs[skey]!;
       const sid = `${qid}.${skey}`;
-      const start = fl.opts.start ?? touched[0] ?? src.config.home ?? [...ctxRoutes][0];
+      const fromEnd = fl.opts.from !== undefined && fl.opts.from !== skey ? scenarioEnd.get(fl.opts.from) : undefined;
+      if (fl.opts.from !== undefined && fl.opts.start !== undefined)
+        err('FROM_WITH_START', `flow({ from: ${JSON.stringify(fl.opts.from)}, start: ${JSON.stringify(fl.opts.start)} }): a scenario that continues another starts where that one ended; remove start (or remove from to start fresh)`, fl.source);
+      const start = fromEnd?.route ?? fl.opts.start ?? touched[0] ?? src.config.home ?? [...ctxRoutes][0];
       if (!start || !ctxRoutes.has(start)) {
         err('UNKNOWN_ROUTE', `Scenario ${sid} starts at unknown route ${start ?? '(none)'}`, fl.source);
         continue;
@@ -404,7 +426,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       }
       // 镜头状态（与 player.cameraAt 同一规则，逐步累积）：判断焦点提示的目标在不在当前镜头里（D70）
       const frame = new Map<string, string[]>();
-      let director = hasLayers ? Object.keys(layers)[0]! : PAGE_LAYER;
+      let director = fromEnd?.director ?? (hasLayers ? Object.keys(layers)[0]! : PAGE_LAYER);
       if (fl.opts.layer !== undefined) {
         if (!hasLayers || !Object.hasOwn(layers, fl.opts.layer)) err('LAYER_UNKNOWN', `flow({ layer: ${JSON.stringify(fl.opts.layer)} }) is not a layer of option ${qid}${hasLayers ? ` (layers: ${Object.keys(layers).join(', ')})` : '; this option declares no layers'}`, fl.source);
         else director = fl.opts.layer;
@@ -625,6 +647,14 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         ...(fl.source ? { source: rel(fl.source) } : {}),
       };
       out.scenarios[sid] = sc;
+      scenarioEnd.set(skey, { route: stepRouteBefore(fl.steps, fl.steps.length, start), director });
+    }
+
+    // 按依赖顺序编译后，恢复作者声明的顺序（发布站按它当章节播放，情况里的场景列表也按它排）
+    {
+      const declared = Object.keys(scenarioDefs).map((k) => `${qid}.${k}`);
+      for (const id of declared) if (Object.hasOwn(out.scenarios, id)) { const v = out.scenarios[id]; delete out.scenarios[id]; out.scenarios[id] = v; }
+      for (const list of Object.values(scenarioIds)) list.sort((a, b) => declared.indexOf(a) - declared.indexOf(b));
     }
 
     // 所有场景完成后再解析分叉（允许向后声明的场景），不把创作信息参与前缀比较。

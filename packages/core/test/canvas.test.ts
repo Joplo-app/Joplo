@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/kit/ui';
-import { $, camera, config, feature, flow, layer, narrate, option, page, patch, set, type Flow } from '@joplo-app/kit';
+import { $, camera, config, feature, flow, go, layer, narrate, option, page, patch, set, spotlight, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, scenarioEstimateMs, stateAt, voiceMs, type AuthoringProject } from '../src/index.ts';
 
@@ -122,5 +122,57 @@ describe('narration in time estimates', () => {
     const loud = scenarioEstimateMs(p.scenarios['f.a.loud']!);
     expect(quiet).toBeLessThan(voiceMs(long));
     expect(loud).toBeGreaterThanOrEqual(voiceMs(long));
+  });
+});
+
+/** 没有 layers 的方案：两个路径页面，/ 上有 atext，/b 上有按钮 bbtn（文字 Open）和 btext。 */
+function buildPages(scenarios: Record<string, Flow>) {
+  const home = page({ title: 'Home', layout: false }, h(ui.Stack, null, h(ui.Text, { id: 'atext' }, 'on home')));
+  const b = page({ title: 'B', layout: false }, h(ui.Stack, null, h(ui.Button, { id: 'bbtn' }, 'Open'), h(ui.Text, { id: 'btext' }, 'on b')));
+  const opt = option({ name: 'A', idea: 'i', state: { ui: { n: 0 } }, scenarios });
+  const src: AuthoringProject = {
+    root: '/p',
+    config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
+    layouts: {},
+    routes: { '/': { ...home, ...F('routes/page.tsx') }, '/b': { ...b, ...F('routes/b/page.tsx') } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+  };
+  return compile(src, 'dev');
+}
+
+describe('flow({ from }) checks each step against where the previous scenario ended', () => {
+  it('validates cues and builds auto captions on the page the previous scenario ended on', () => {
+    const r = buildPages({
+      a: flow('A', { start: '/' }).system('to b', go('/b')),
+      b: flow('B', { from: 'a' }).click('bbtn').system('look', spotlight('btext')),
+    });
+    expect(errorCodes(r)).toEqual([]);
+    const b = r.project!.scenarios['f.a.b']!;
+    expect(b.steps[0]!.caption).toContain('Open');
+    expect(b.initial.sceneId).toBe(stateAt(r.project!, 'f.a.a', 1).sceneId);
+  });
+  it('reports a cue whose target is only on the default start page, not where the previous scenario ended', () => {
+    const r = buildPages({
+      a: flow('A', { start: '/' }).system('to b', go('/b')),
+      b: flow('B', { from: 'a' }).system('look', spotlight('atext')),
+    });
+    expect(errorCodes(r)).toContain('FOCUS_UNKNOWN');
+  });
+  it('resolves chains declared in any order', () => {
+    const r = buildPages({
+      c: flow('C', { from: 'b' }).system('look', spotlight('btext')),
+      b: flow('B', { from: 'a' }).system('stay', set($.ui.n, 2)),
+      a: flow('A', { start: '/' }).system('to b', go('/b')),
+    });
+    expect(errorCodes(r)).toEqual([]);
+    // 编译按依赖顺序，IR 仍按作者声明的顺序（发布站按它当章节播放）
+    expect(Object.keys(r.project!.scenarios)).toEqual(['f.a.c', 'f.a.b', 'f.a.a']);
+  });
+  it('does not silently ignore start when from is also written', () => {
+    const r = buildPages({
+      a: flow('A', { start: '/' }).system('to b', go('/b')),
+      b: flow('B', { from: 'a', start: '/' }).system('stay', set($.ui.n, 2)),
+    });
+    expect(errorCodes(r)).toContain('FROM_WITH_START');
   });
 });

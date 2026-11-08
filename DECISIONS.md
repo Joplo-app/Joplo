@@ -424,6 +424,9 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - `camera(...ids, { pad?, zoom?, ms? })` 效果：编译成状态 `ui.__camera`（跨步保留、回放与深链一致），Canvas 按目标的布局范围（offset，不含 transform）取景、居中、放大上限默认 3 倍，不画焦点框；导演切到目标所在层（优先于焦点提示与操作目标）。目标不存在报 CAMERA_UNKNOWN，参数越界报 CAMERA_INVALID。
   - `motion="key"` / `motionDelay` / `motionMs`（Joplo 通用属性，Canvas 内生效）：两步之间同一个键的元素位置或大小变了、或换了容器（一个隐藏、另一个出现），渲染器用 FLIP（Web Animations 的 translate / scale，不碰作者的 transform）从旧位置飞到新位置；同一步镜头也在动时用镜头的时长与缓动，两者同步落定。静态画面（截图、缩略图）不播放，作者 CSS 动画与过渡在 Canvas 里直接显示终态。
   - `flow({ from, layer })`：from 接同一方案的另一个场景，初始状态 = 它最后一步之后的状态（路径、ui / data / inputs、画布镜头、导演层）再叠上本场景的 state；编译末尾按依赖顺序回放解析，成环 FROM_CYCLE、找不到 FROM_UNKNOWN、被接的场景回放失败 FROM_FAILED。layer 指定起始导演层（Scenario.initial.layer），写错 LAYER_UNKNOWN。
+  - 接力场景按依赖顺序编译：被接场景结尾的路径与导演层就是接力场景逐步校验（目标、焦点提示、镜头、自动字幕）的起点；IR 里场景仍按声明顺序。from 与 start 同时写报 FROM_WITH_START（PR #35 评审 P1）。
+  - Canvas 在没有高度的容器里按 view 比例撑开（aspect-ratio），不会塌成 0；仍然没有尺寸时 render 告警 “Canvas has no size”（PR #35 评审 P1）。
+  - IR 只新增可选的 `initial.layer`（只在用了 from / layer 时出现），按惯例不升 SCHEMA_VERSION（仍为 2）。云端分享 Worker 用固定的 core 0.2.10 严格解析公开 IR（给 Agent 的 JSON / Markdown），带这个字段的分享在那里会被拒，需要云端升级固定的 core（与 C23 的 voiceIndex 同类）；上传与分享页播放不受影响。
   - `patch(target, { … })`：一次多个 set；步骤参数可以直接传效果数组。
   - 时长估算计入旁白：outline、封面“约 M 秒”、SCENARIO_TOO_LONG 每步取 hold、阅读停留与旁白朗读估算（中日韩约每秒 4.5 字、拉丁约 13 字符，加 0.45 秒换气）中最长者；自动播放仍以真实读完为准。
   - `joplo render --sheet [--columns n]`：分镜，一个场景每一步一格拼成一张图，格下写步号、字幕、旁白；告警按步号前缀汇总。render 的“目标出画”检查对 Canvas 里被镜头移出画面的元素只在它是下一步目标时提示。

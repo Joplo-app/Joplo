@@ -2070,7 +2070,8 @@ function Canvas({ node, p }: NodeProps) {
   const view = { w: numOr(viewArr[0], 1280), h: numOr(viewArr[1], 800) };
   const world = { w: numOr(p.w, view.w), h: numOr(p.h, view.h) };
   const { w: _w, h: _h, view: _v, ...rest } = p;
-  const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: '100%', overflow: 'hidden' } });
+  // 父元素给了高度（层、h="100%"）时铺满；没给高度时 height: 100% 解析为 auto，aspect-ratio 按 view 的比例撑开，不会塌成 0
+  const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: '100%', aspectRatio: `${view.w} / ${view.h}`, overflow: 'hidden' } });
   const outer = useRef<HTMLDivElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });

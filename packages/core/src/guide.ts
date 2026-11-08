@@ -155,7 +155,7 @@ Same machinery as demos: a feature is the episode, each case a chapter, each sce
 
 ## 3. Not slides: one world, continuous objects, a moving camera (the core)
 Failure mode, even with nice graphics: one board per chapter (big title, panels, footer), chapter title cards, cards of bullets, things fading in and out. Viewers read it as a deck. Instead:
-- One layer holding one <Canvas w={2560} h={1600}> world (the default view is 1280×800, scaled to fit, never re-laid out). Place a few containers absolutely in design pixels; lay out inside them with flex.
+- One layer holding one <Canvas w={2560} h={1600}> world (the default view is 1280×800, scaled to fit, never re-laid out; in a container without a height it sizes itself from the view ratio, and render warns 'Canvas has no size' if it still has none). Place a few containers absolutely in design pixels; lay out inside them with flex.
 - Objects keep their identity: give each one motion="key". Write each arrangement as static JSX switched with when, reusing the same key; between steps Joplo flies the object from its old place and size to the new one, also across containers. Morph, never replace: the question's words split into tokens, flip into ids, then fly onto a tape; bars rearrange into a lottery strip.
 - Camera: camera('id', …) frames those elements (Joplo measures them, adds pad, caps zoom); camera() shows the whole canvas. Establish wide, push in on detail, pull back for the payoff. Object flights in the same step follow the camera's timing, so both land together.
 - Chapters continue: flow({ from: 'previousKey' }) starts from the previous chapter's last frame (state, camera, director layer). patch($.ui, { … }) changes several values in one step.
@@ -350,7 +350,7 @@ Use the actual source and decisions as evidence. Label reconstructed history and
 - state: { ui: { ready: false }, data: {}, inputs: {} }: initial option state.
 - scenarios: { happy: flow('Success', { cases: ['happy'], start: '/members' }).click('invite', done('Completed')) }.
 - flow(name, { cases?, start?, state?, from?, layer?, description?, expected?, mock?, outcome? }): state overrides the option's initial state; description and expected describe the scenario.
-- from: 'otherKey' starts from the end of another scenario of the same option (its route, state, canvas camera, and director layer), then applies state on top: chapters of one story, long flows in parts. layer: 'key' sets the starting layer.
+- from: 'otherKey' starts from the end of another scenario of the same option (its route, state, canvas camera, and director layer), then applies state on top: chapters of one story, long flows in parts. Its steps are checked against that ending page and layer, so do not also write start. layer: 'key' sets the starting layer.
 - outcome: 'success' | 'failure' | 'denied' | 'other' is the board's result badge ("Mock failure"). Without it, the badge follows done's second argument, else success. mock: 'Mock: link expired' replaces the badge text.
 - See cases for case and coverage declarations; publish for pick and publishing.
 
@@ -834,6 +834,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - LAYER_UNKNOWN: Invalid layer key or missing content, or flow({ layer }) names a layer the option does not declare. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
 - CAMERA_UNKNOWN / CAMERA_INVALID: camera() targets must exist in a layer (put them inside a <Canvas>); pad 0–2000, zoom 0.1–10, ms 0–10000. See content.
 - FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: flow({ from }) must name another scenario key of the same option, must not loop back, and that scenario must replay without errors (fix it first).
+- FROM_WITH_START: a scenario with from starts where the other one ended (its route and layer); remove start, or remove from to start fresh. Step checks and auto captions already use that ending page.
 - TRACE_UNKNOWN: Empty trace, unknown id, ids from different diagrams, or a disconnected path. Use connected ids in one Diagram / StateMachine / Sequence.
 - TRACE_AMBIGUOUS: Multiple candidate edges or messages between two nodes. Use the specific edge / message id in trace.
 - THEME_UNKNOWN: config({ theme }) names neither a built-in nor themes/<name>.css. Use a built-in or add that CSS file; see Write a theme in demo.
