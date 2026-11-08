@@ -108,10 +108,44 @@ test('范围没有 picked 内容时勾选评审仍可发布，普通发布保持
   tree = render(() => CloudPublishPopover(props));
   const button = find(tree, n => n.props['data-testid'] === 'cloud-publish');
   expect(button.props.disabled).toBe(false); button.props.onClick();
-  expect(publish).toHaveBeenCalledWith(props.ctx, 'scenario', 'private', true);
+  expect(publish).toHaveBeenCalledWith(props.ctx, 'scenario', 'private', true, undefined);
 });
 
 test.each([{}, { links: {} }, { links: null }, { links: {main:false} }, { links: {main:[]} }, { links: {main:{visibility:'unknown'}} }])('损坏/旧接口成功响应也不能冒充新建记录：%j', async body => {
  vi.stubGlobal('fetch', vi.fn(async () => Response.json(body)));
  await expect(fetchCloudLinks('project')).rejects.toThrow();
+});
+
+
+test('密码草稿仅交给本次发布；提交、关闭和范围变化清空，已有链接默认保持', () => {
+  const publish=vi.fn();
+  const model={open:true,setOpen:()=>{},anchor:null,links:{main:null,scoped:{'f.a.main':{visibility:'private',passwordProtected:true}}},linksReady:true,linksError:null,
+    acct:{loading:false,available:true,account:{signedIn:true,email:'a@b.c',plan:'pro',server:'https://cloud.example'}},job:null,publish,refresh:async()=>null} as unknown as CloudPublishModel;
+  const props={model,ctx:{featureId:'f',scenarioId:'f.a.main'},names:{feature:'F',scenario:'Main'},picks:{scenario:true,feature:true,project:true},onFlash:()=>{}};
+  const draw=()=>CloudPublishPopover(props);
+  const field=(tree:any)=>find(tree,n=>typeof n.type==='function'&&n.type.name==='PasswordFields');
+  const button=(tree:any)=>find(tree,n=>n.props['data-testid']==='cloud-publish');
+  let tree=render(draw); expect(field(tree).props.protectedLink).toBe(true); expect(field(tree).props.value).toBeUndefined();
+  field(tree).props.onChange('short'); tree=render(draw); expect(button(tree).props.disabled).toBe(true);
+  field(tree).props.onChange('test-only-password'); tree=render(draw); expect(button(tree).props.disabled).toBe(false);
+  button(tree).props.onClick(); tree=render(draw); expect(field(tree).props.value).toBeUndefined();
+  expect(publish).toHaveBeenLastCalledWith(props.ctx,'scenario','private',false,'test-only-password');
+  field(tree).props.onChange(null); tree=render(draw); button(tree).props.onClick();
+  expect(publish).toHaveBeenLastCalledWith(props.ctx,'scenario','private',false,null);
+  field(tree).props.onChange('test-only-password'); tree=render(draw);
+  model.open=false; render(draw); model.open=true; tree=render(draw); expect(field(tree).props.value).toBeUndefined();
+  field(tree).props.onChange('test-only-password'); tree=render(draw);
+  props.ctx.scenarioId='f.a.other'; tree=render(draw); expect(field(tree).props.value).toBeUndefined();
+});
+
+test('hook 的请求不默认添加 password，只转发本次设置或移除', async()=>{
+ const requests:any[]=[];
+ vi.stubGlobal('fetch',vi.fn(async(_url:string,init?:RequestInit)=>{if(init?.method==='POST') requests.push(JSON.parse(String(init.body)));return Response.json({job:null});}));
+ const model=render(()=>useCloudPublish('project'));
+ const ctx={featureId:'f',scenarioId:'f.a.main'};
+ await model.publish(ctx,'scenario','private',false);
+ await model.publish(ctx,'scenario','private',true,'test-only-password');
+ await model.publish(ctx,'scenario','private',false,null);
+ expect(requests[0]).toEqual({scenarios:['f.a.main'],visibility:'private',review:false});
+ expect(requests[1]).toMatchObject({password:'test-only-password',review:true}); expect(requests[2].password).toBeNull();
 });

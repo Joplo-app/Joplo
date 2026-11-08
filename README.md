@@ -154,6 +154,8 @@ Choose `--public` or `--private` and `--review` or `--no-review` every time. Pub
 
 `--review` also publishes a separate private, commentable link with all options (`data.review.url`); `data.url` is the main share. A scoped review with no picked scenarios publishes only the private review at `data.url` (`data.mode: "review"`), leaving the ordinary share unchanged. Scoped shares and PR previews are always private. Public share results include a portfolio work URL or a username setup link; the player shows “Author · More works” only on official Cloud shares, outside embeds. Write names, descriptions and goals as search-result content and keep unpublished information out.
 
+Private Pro shares can require an access password: run `npx joplo share --private --no-review --password` in your terminal for hidden input and confirmation. In automation, set `JOPLO_SHARE_PASSWORD` securely yourself and include `--password`; using a literal value can put it in shell history. Agents must never invent or choose passwords, or put them in files or conversation summaries. Omit both password flags to keep protection; `--no-password` removes it, including on free accounts after a downgrade. PR previews and comparisons cannot use passwords. With `--review`, a newly set password protects both links. The board offers the same controls for private shares, with a Pro upgrade link for free accounts. Results/records contain only `passwordProtected`, never the password; viewer protection requires the matching Cloud rollout. [Password details](docs/cli.md#密码查看pro).
+
 Every share link comes with three ways to show it:
 
 | Where | Use | What viewers get |

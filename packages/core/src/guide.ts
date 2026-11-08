@@ -349,6 +349,7 @@ After editing, run npx joplo check. View the board; use npx joplo selection to r
 See check for diagnostic fixes and selection for editing only the selected location.`,
   demo: `# Joplo demos: demo
 
+For demos of secrets or gated access, use masked placeholders as the sample input; real secrets must never enter source, IR or exports. Show setting, keeping and removing protection as distinct states; a demo gate is not real access control.
 Tell one thing per step: separate viewpoints with independent layers, zoom into details with shots, and describe what happened with short captions.
 See authoring for directories, state, and flow syntax. Import layer, shot, trace, explain from @joplo-app/kit.
 What viewers look at in each step, and the lighter forms (spotlight, highlight, callout, numbered, hold, redact): npx joplo skill focus.
@@ -977,6 +978,15 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - share also uploads a 1200x630 preview image of the default scenario when the export component is installed (npx joplo setup export, or Playwright already in the project); without it, share still succeeds, prints one "Skipped the preview image" line, and never downloads anything.
 - Re-sharing updates the same-server link in .joplo/cloud.json, for free and Pro accounts alike; --new creates another link and --title sets its title.
 - The review version is a separate share (review: { shareId, url } in .joplo/cloud.json); it never replaces the main link. If the cloud rejects the review manifest, plain share retries once without it and still publishes.
+
+## Password protection (Pro)
+- Only for private ordinary/scoped shares. Ask whether the user wants a password; NEVER invent, select, or set one for them. Ask the user to enter it in their own terminal or set JOPLO_SHARE_PASSWORD themselves. Never write a password into shell history, files, source, or conversation summaries.
+- In a terminal: npx joplo share --private --no-review --password prompts with hidden input and asks once to confirm. Non-interactive: the user sets JOPLO_SHARE_PASSWORD securely, then runs the same command; an explicit --password <value> also works but risks shell history. An environment variable alone does nothing: --password must be present. Use 8–128 Unicode characters (code points), without trimming.
+- Omit --password / --no-password to keep existing protection. --no-password removes it, including after a downgrade to free; setting/changing needs Pro (founding members included). --public, --pr and diff publish cannot use either password flag (exit 2, no network); the two flags conflict.
+- With --password and --review, both publications use the same password; the CLI says so. Success reports password protection and data.passwordProtected (old Cloud missing it = false), never the password. Main/review are still independent publications: if review fails after main succeeds, retry with the same choices and ask the user to supply the password again.
+- The board reveals Set access password (Pro) only for private shares. Free accounts get an upgrade link, Pro gets masked input with Show/Hide; an already protected link says Password protected and defaults to keeping it. First remove protection in a private update before changing visibility to public. Drafts clear on close, scope changes, or publication; after a failure the user must re-enter a new password.
+- HTTP 403 PLAN_REQUIRED exits 1: give the user error.details.upgradeUrl (<server><upgradePath>), never retry with --new to bypass Pro. HTTP 400 mentioning password reports that Cloud does not support password viewing yet (exit 1): wait for Cloud rollout; ordinary private shares without either flag still use the old strict request schema.
+- The password goes only through browser POST → server → cloud-bridge → CLI → Cloud create request, in memory. Local records contain only passwordProtected; task snapshots/GET/WebSocket, logs, stdout/JSON, IR and build files never contain it. Cloud enforces the viewer gate for pages/resources/audio/Agent/embeds and generic preview cards; a local static build is not protected. Do not claim a local overlay provides access control.
 
 ## Share part of the project
 - To share only some scenarios, add --scenario <scenario id> (repeatable); --feature <feature id> shares that feature's picked-option scenarios (every option with --review). They combine. Scenario ids look like invite.a-modal.success; npx joplo outline lists them.

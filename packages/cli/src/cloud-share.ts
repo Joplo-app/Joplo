@@ -1,4 +1,5 @@
-import { PUBLIC_UNSUPPORTED } from './share-messages.ts';
+import { PASSWORD_UNSUPPORTED, PUBLIC_UNSUPPORTED } from './share-messages.ts';
+import { sharePassword } from './share-password.ts';
 import { shareChoices } from './share-choice.ts';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, rm } from 'node:fs/promises';
@@ -50,7 +51,7 @@ export async function manifest(dir: string): Promise<{ files: File[]; blobs: Map
  */
 export type Visibility = 'public' | 'private';
 export type Portfolio = { workUrl: string | null; profileUrl: string | null; needsUsername: boolean; setupPath: string };
-export type ShareLink = { shareId: string; url: string; visibility?: Visibility };
+export type ShareLink = { shareId: string; url: string; visibility?: Visibility; passwordProtected?: boolean };
 export function readPortfolio(value: unknown): Portfolio | undefined {
   const p = object(value);
   if (typeof p.needsUsername !== 'boolean' || typeof p.setupPath !== 'string' || !/^\/(?!\/)[^\s\\]*$/.test(p.setupPath)) return;
@@ -63,7 +64,7 @@ export function readPortfolio(value: unknown): Portfolio | undefined {
   return { workUrl: p.workUrl as string | null, profileUrl: p.profileUrl as string | null, needsUsername: p.needsUsername, setupPath: p.setupPath };
 }
 export type ShareRecord = { main: ShareLink | null; review: ShareLink | null; scoped?: Record<string, ShareLink> };
-const link = (v: unknown): ShareLink | null => { const o = object(v); return shareId(o.shareId) && typeof o.url === 'string' ? { shareId: o.shareId, url: o.url, ...(['public', 'private'].includes(String(o.visibility)) ? { visibility: o.visibility as Visibility } : {}) } : null; };
+const link = (v: unknown): ShareLink | null => { const o = object(v); return shareId(o.shareId) && typeof o.url === 'string' ? { shareId: o.shareId, url: o.url, passwordProtected: o.passwordProtected === true, ...(['public', 'private'].includes(String(o.visibility)) ? { visibility: o.visibility as Visibility } : {}) } : null; };
 const validKey = (key: string) => key.length > 0 && key.length <= 4096;
 const links = (v: unknown): Record<string, ShareLink> => Object.fromEntries(Object.entries(object(v)).map(([key, x]) => [key, link(x)] as const).filter((e): e is [string, ShareLink] => e[1] !== null && validKey(e[0])));
 export async function readShareRecord(project: string, server: string): Promise<ShareRecord> {
@@ -81,10 +82,10 @@ const recordJson = (server: string, r: ShareRecord) => ({
   ...(r.scoped && Object.keys(r.scoped).length ? { scoped: Object.fromEntries(Object.entries(r.scoped).map(([key, l]) => [key, l])) } : {}),
 });
 
-export type ShareResult = { visibility?: Visibility; portfolio?: Portfolio; review?: ShareResult; shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）；旧服务器不返回。 */ storage?: { usedBytes: number; quotaBytes: number; shareBytes: number } };
+export type ShareResult = { passwordProtected: boolean; visibility?: Visibility; portfolio?: Portfolio; review?: ShareResult; shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）；旧服务器不返回。 */ storage?: { usedBytes: number; quotaBytes: number; shareBytes: number } };
 /** scenarios / features：按场景保密分享（D75，`--scenario` / `--feature`），可以一起用；都不写时分享整个项目。 */
 /** update（D84）：要更新的已有分享的链接；没有 .joplo/cloud.json 时（例如换了一台电脑）用它指定，并从它沿用朗读音频。 */
-export type ShareOptions = { public?: boolean; private?: boolean; new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[]; update?: string };
+export type ShareOptions = { password?: string | boolean | null; public?: boolean; private?: boolean; new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[]; update?: string };
 
 /** `--update <链接>`：分享页链接，路径里有 /s/<10 位分享 id>。 */
 export function parseUpdateLink(v: string): ShareLink {
@@ -95,7 +96,12 @@ export function parseUpdateLink(v: string): ShareLink {
   return { shareId: m[1]!, url: `${u.origin}${u.pathname.slice(0, m.index)}/s/${m[1]}/` };
 }
 export async function share(client: CloudClient, dir: string, opts: ShareOptions, build: typeof buildSite, render: () => Promise<RenderPreview> = async () => { throw new Error('this @joplo-app/server cannot render screenshots'); }): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
+  // 尽早登记，任何校验或下游错误都不能回显输入。
+  if (typeof opts.password === 'string' && opts.password) client.rememberSecret(opts.password);
   const choices = await shareChoices(client, opts);
+  const password = await sharePassword(client, opts, choices.visibility);
+  opts = { ...opts, password };
+  if (choices.review && typeof password === 'string') client.warn('The review version will use the same password as the main share.');
   if (opts.title !== undefined && (!opts.title.trim() || opts.title.trim().length > 200)) throw new JoploError('USAGE', '--title must contain 1-200 characters');
   if ((opts.repo !== undefined || opts.sha !== undefined) && opts.pr === undefined) throw new JoploError('USAGE', '--repo and --sha apply only with --pr <number>');
   if (opts.update !== undefined && (opts.new || opts.pr !== undefined)) throw new JoploError('USAGE', '--update cannot be combined with --new or --pr');
@@ -220,11 +226,19 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
     // 记录只用于 wire 兼容，不替用户选择：仅已知 public → private 的更新需要显式取消公开。
     const known = [record.main, record.review, ...Object.values(record.scoped ?? {})].find(l => l?.shareId === replaceShareId);
     const sendVisibility = visibility === 'public' || !!replaceShareId && known?.visibility === 'public';
-    const create = (withReview: boolean) => client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}), ...(withReview && review ? { review } : {}), ...(pr ? { pr } : {}), ...(sendVisibility ? { visibility } : {}) }), { create: true });
+    const create = async (withReview: boolean) => {
+      try {
+        return await client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}), ...(withReview && review ? { review } : {}), ...(pr ? { pr } : {}), ...(sendVisibility ? { visibility } : {}), ...(opts.password !== undefined ? { password: opts.password } : {}) }), { create: true });
+      } catch (e) {
+        if (e instanceof CloudError && e.status === 400 && opts.password !== undefined && object(e.details).unknownPassword) throw new CloudError('BAD_REQUEST', PASSWORD_UNSUPPORTED, { unknownPassword: true }, undefined, 400);
+        if (e instanceof CloudError && e.status === 400 && sendVisibility && object(e.details).unknownVisibility) throw new CloudError('BAD_REQUEST', PUBLIC_UNSUPPORTED, { unknownVisibility: true }, undefined, 400);
+        throw e;
+      }
+    };
     let prepared: Record<string, unknown>;
     try { prepared = await create(true); }
     catch (e) {
-      if (e instanceof CloudError && e.status === 400 && sendVisibility && object(e.details).unknownVisibility) throw new CloudError('BAD_REQUEST', PUBLIC_UNSUPPORTED, undefined, undefined, 400);
+      if (e instanceof CloudError && (opts.password !== undefined && object(e.details).unknownPassword || sendVisibility && object(e.details).unknownVisibility)) throw e;
       // 发布顺序容错（契约 8.1）：旧版 SaaS 拒绝 review 字段时返回 400，此时没有创建任何记录；普通发布去掉清单重试一次。
       // 只认真正的 400（413/422 等不重试），--review 没有清单没有意义，照常报错。
       if (!(e instanceof CloudError && e.code === 'BAD_REQUEST' && e.status === 400 && review && reviewMode === 'publish')) throw e;
@@ -232,11 +246,11 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
       prepared = await create(false);
     }
     client.warn(`Built ${files.length} files (${actualBytes} bytes).`);
-    const { published, final } = await uploadPreparedFiles(client, accessToken, prepared, blobs);
+    const { published, final } = await uploadPreparedFiles(client, accessToken, prepared, blobs, typeof opts.password === 'string' ? opts.password : undefined);
     const url = published.url;
     // PR 预览是独立链接，不写记录；其余只更新本次的那一项（主链接或评审版），保留另一项
     if (!pr) {
-      const next: ShareRecord = key ? { ...record, scoped: { ...record.scoped, [key]: { shareId: published.shareId, url, ...(published.visibility ? { visibility: published.visibility } : {}) } } } : { ...record, [slot]: { shareId: published.shareId, url, ...(published.visibility ? { visibility: published.visibility } : {}) } };
+      const next: ShareRecord = key ? { ...record, scoped: { ...record.scoped, [key]: { shareId: published.shareId, url, passwordProtected: published.passwordProtected, ...(published.visibility ? { visibility: published.visibility } : {}) } } } : { ...record, [slot]: { shareId: published.shareId, url, passwordProtected: published.passwordProtected, ...(published.visibility ? { visibility: published.visibility } : {}) } };
       try { await atomicJson(join(project, '.joplo/cloud.json'), recordJson(client.server, next)); }
       catch {
         client.warn('Could not save the share record. The next publication will not update this link');
@@ -291,8 +305,17 @@ export async function previousShareVoice(url: string, fetchImpl: typeof fetch = 
   } catch { return undefined; }
 }
 
+/** 检查响应值，不把 passwordProtected 这样的固定协议键误判为密码回显。 */
+function containsSecret(value: unknown, secret: string): boolean {
+  if (typeof value === 'string') return value.includes(secret);
+  if (value && typeof value === 'object') return Object.values(value).some(v => containsSecret(v, secret));
+  return false;
+}
+
 /** Shared content-addressed upload/finalize path; no project execution. */
-export async function uploadPreparedFiles(client: CloudClient, accessToken: string, prepared: Record<string, unknown>, blobs: Map<string, string>) {
+export async function uploadPreparedFiles(client: CloudClient, accessToken: string, prepared: Record<string, unknown>, blobs: Map<string, string>, password?: string) {
+  // 不接受远端回显的秘密进入链接、上传元数据或持久化记录。
+  if (password && containsSecret(prepared, password)) throw new CloudError('INVALID_RESPONSE');
   if (!shareId(prepared.shareId) || !nonempty(prepared.uploadId) || prepared.uploadId.length > 128 || prepared.uploadId.includes(accessToken) || !Array.isArray(prepared.missing)) throw new CloudError('INVALID_RESPONSE');
   // 完整校验所有上传项后才执行第一个 PUT；不允许服务端请求本地清单之外的文件。
   const missing = prepared.missing.map(raw => {
@@ -333,9 +356,10 @@ export async function uploadPreparedFiles(client: CloudClient, accessToken: stri
   if (failed) throw failure;
   client.warn('Upload complete. Finalizing publication...');
   const final = await client.retry(() => client.request(`/api/v1/shares/${prepared.shareId}/finalize`, accessToken, { uploadId: prepared.uploadId }));
+  if (password && containsSecret(final, password)) throw new CloudError('INVALID_RESPONSE');
   if (!shareId(final.shareId) || final.shareId !== prepared.shareId || !Number.isSafeInteger(final.version) || Number(final.version) < 1 || !(final.expiresAt === null || typeof final.expiresAt === 'string' && Number.isFinite(Date.parse(final.expiresAt)))) throw new CloudError('INVALID_RESPONSE');
   const url = httpUrl(final.url);
-  const published = { shareId: final.shareId, url, expiresAt: final.expiresAt as string | null, version: final.version as number, ...(['public', 'private'].includes(String(final.visibility)) ? { visibility: final.visibility as Visibility } : {}) };
+  const published = { passwordProtected: final.passwordProtected === true, shareId: final.shareId, url, expiresAt: final.expiresAt as string | null, version: final.version as number, ...(['public', 'private'].includes(String(final.visibility)) ? { visibility: final.visibility as Visibility } : {}) };
   if (JSON.stringify(published).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
   return { published, final };
 }

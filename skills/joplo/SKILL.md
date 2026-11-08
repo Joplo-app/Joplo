@@ -74,6 +74,7 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - Public portfolio work and the always-private review version are two separate links: give reviewers data.review.url, the audience data.url. See npx joplo skill publish.
 - Required: before every share, ask the user public or private AND whether to also publish a review version. Never choose for them or reuse a previous choice; CI must pin both flags in its workflow. See npx joplo skill publish.
 - Public shares enter the portfolio and search engines: write the project name, description, and feature goals as search-result content; exclude unpublished information. See npx joplo skill publish.
+- Never invent or set an access password for the user: ask them to type it in their own terminal or set JOPLO_SHARE_PASSWORD; never put passwords in command history, files, or conversation summaries. Private Pro shares accept --password; omit both password flags to preserve protection. See npx joplo skill publish.
 - Never share or deploy without the user's go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself. See npx joplo skill publish.
 
 ## Reference
@@ -89,6 +90,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - selection: Edit only the element selected by the user in the board
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
-- publish: pick, build, explicit public/private and review choices, portfolios and SEO, feedback write-back, deployment, chapters, languages
+- publish: pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, feedback write-back, deployment, chapters, languages
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.17 sha256:b4f26902cf738cd112a01f0e47ba28d7cd8a9f1b97875d9047cbe0c80abe38fd -->
+<!-- joplo-skill 0.2.17 sha256:a15aaebb6b77e0c6b2a0edb7cd9328b20083dda23376efc6d48a85efda4976a9 -->

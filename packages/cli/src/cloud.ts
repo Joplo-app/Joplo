@@ -44,6 +44,7 @@ export function readApiKeyInfo(value: unknown): ApiKeyInfo {
 }
 /** 可替换时钟与系统边界；只有交互式跨服务器替换凭证时才读取确认输入。 */
 export type CloudDependencies = {
+  readPassword?: (question: string) => Promise<string>;
   choose?: (question: string, choices: readonly string[], initial: number) => Promise<number>;
   env?: NodeJS.ProcessEnv; format?: string; interactive?: boolean; confirm?: (question: string) => Promise<boolean>; openBrowser?: (url: string) => Promise<boolean>;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<unknown>; now?: () => number;
@@ -318,7 +319,11 @@ export class CloudClient {
       }
       const apiKey = !!token && token.startsWith('jpk_');
       if (apiKey && code === 'AUTH_EXPIRED') throw new CloudError(code, `The API key ${apiKeyPrefix(token)}… is invalid, expired, or revoked. ${API_KEY_FIX}: ${this.server}/settings/api-keys`, { fix: `${this.server}/settings/api-keys` });
-      if (code === 'PLAN_REQUIRED') throw new CloudError(code, `This action requires Pro: ${this.server}/settings/billing`);
+      if (code === 'PLAN_REQUIRED') {
+        const path = object(data.data ?? data.details).upgradePath;
+        const upgradeUrl = this.server + (typeof path === 'string' && /^\/[A-Za-z0-9/_-]*$/.test(path) ? path : '/settings/billing');
+        throw new CloudError(code, `This action requires Pro: ${upgradeUrl}`, { upgradeUrl });
+      }
       if (code === 'CLIENT_OUTDATED') throw new CloudError(code, clientOutdatedMessage(process.cwd(), this.env), undefined, undefined, response.status);
       if (code === 'QUOTA_EXCEEDED') throw quotaError(data.data ?? data.details);
       if (code === 'TOO_LARGE') {
@@ -326,8 +331,9 @@ export class CloudClient {
         if (details) throw sizeError(details);
       }
       // 只保留协议识别结果，不回显可能含密钥的远端错误正文。
+      const unknownPassword = response.status === 400 && /password/i.test(JSON.stringify(data));
       const unknownVisibility = response.status === 400 && /visibility|unrecogni[sz]ed|unknown (?:key|field)|additional propert/i.test(JSON.stringify(data));
-      throw new CloudError(code, undefined, unknownVisibility ? { unknownVisibility: true } : undefined, undefined, response.status);
+      throw new CloudError(code, undefined, unknownPassword || unknownVisibility ? { ...(unknownPassword ? { unknownPassword: true } : {}), ...(unknownVisibility ? { unknownVisibility: true } : {}) } : undefined, undefined, response.status);
     }
     return data;
   }

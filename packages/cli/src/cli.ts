@@ -1,4 +1,4 @@
-import { USERNAME_SETUP } from './share-messages.ts';
+import { PASSWORD_PROTECTED, USERNAME_SETUP } from './share-messages.ts';
 import { Command, CommanderError, Option } from 'commander';
 import { formatBytes, terminalText } from './cloud-error.ts';
 import type { CloudDependencies } from './cloud.ts';
@@ -44,11 +44,21 @@ const scale = (text: string) => {
 /** 每次创建独立 commander 实例，测试无需启动真实服务或占用固定端口。 */
 export async function runCli(args: string[], deps: Dependencies = {}): Promise<number> {
   const secrets = new Set<string>();
-  const redact = (s: string) => { for (const token of secrets) s = s.split(token).join('[REDACTED]'); return s; };
-  const stdout = (s: string) => (deps.stdout ?? (s => { process.stdout.write(s); }))(redact(s));
+  // 在参数解析之前登记，Commander 的用法错误也不能回显密码。
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    const secret = arg.startsWith('--password=') ? arg.slice(11) : arg === '--password' && args[i + 1] && !args[i + 1]!.startsWith('-') ? args[i + 1] : undefined;
+    if (secret) secrets.add(secret);
+  }
+  const envPassword = (deps.cloud?.env ?? process.env).JOPLO_SHARE_PASSWORD;
+  if (envPassword && args.some(a => a === '--password' || a.startsWith('--password='))) secrets.add(envPassword);
+  const redact = (s: string) => { for (const token of secrets) for (const form of new Set([token, JSON.stringify(token).slice(1, -1), terminalText(token)])) if (form) s = s.split(form).join('[REDACTED]'); return s; };
+  const writeStdout = (s: string) => (deps.stdout ?? (s => { process.stdout.write(s); }))(s);
+  const stdout = (s: string) => writeStdout(redact(s));
   const stderr = (s: string) => (deps.stderr ?? (s => { process.stderr.write(s); }))(redact(s));
   const line = (s: string) => stdout(s + '\n');
-  const json = (value: unknown) => line(JSON.stringify(value));
+  // 按值脱敏，保留 passwordProtected 等协议键；也保证引号和换行不会破坏 JSON。
+  const json = (value: unknown) => writeStdout(JSON.stringify(value, (_key, v: unknown) => typeof v === 'string' ? redact(v) : v) + '\n');
   let exitCode = 0;
   const serverPackage = '@joplo-app/server';
   const loadServer = deps.loadServer ?? (() => import(serverPackage));
@@ -146,6 +156,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     });
   cloudCommand('share').description('Check, build, and publish to the cloud').argument('[dir]', 'Project directory', '.').addOption(format())
     .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)')
+    .option('--password [password]', 'Protect a private share (Pro); omit value for hidden terminal input or JOPLO_SHARE_PASSWORD').option('--no-password', 'Remove the existing access password (private shares only)')
     .option('--public', 'Publish publicly: portfolio and search engines').option('--private', 'Only people with the link can view')
     .option('--review', 'Also publish a private review link containing every option').option('--no-review', 'Do not publish a review version').option('--json', 'Print structured JSON (non-interactive)')
     .option('--pr <number>', 'Attach a GitHub pull request (PR preview); repo, commit, and run URL come from GitHub Actions', integer('pr', 2147483647))
@@ -156,6 +167,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .action(async (dir, opts) => {
       if (opts.json) opts.format = 'json';
       if (args.includes('--review') && args.includes('--no-review')) throw new JoploError('USAGE', '--review and --no-review are mutually exclusive');
+      if (args.some(a => a === '--password' || a.startsWith('--password=')) && args.includes('--no-password')) throw new JoploError('USAGE', '--password and --no-password are mutually exclusive');
       const client = await cloudClient(opts.server, opts.format);
       const { share } = await import('./cloud-share.ts');
       const published = await share(client, dir, { ...opts, scenarios: opts.scenario, features: opts.feature }, async options => (await serverFunction('buildSite'))(options), () => serverFunction('renderStep'));
@@ -163,6 +175,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       else {
         const scope = published.result.scope;
         line(`Published ${published.result.mode === 'review' ? 'the review version ' : ''}${scope ? 'a scoped share ' : ''}${published.result.url}\n${published.result.expiresAt ? `Expires at: ${terminalText(published.result.expiresAt)}` : 'Permanent link'}`);
+        if (published.result.passwordProtected) line(PASSWORD_PROTECTED);
+        if (published.result.review?.passwordProtected) line('The review version is protected with the same password.');
         if (scope) line(`Scope: ${scope.scenarios.length} scenario(s): ${scope.scenarios.join(', ')}. The main link and the review link are unchanged`);
         if (published.result.pr) { const { prCommentLine } = await import('./cloud-pr.ts'); const note = prCommentLine(published.result.pr, client.server); if (note) line(note); }
         // C27：免费分享不再过期；改为告诉作者账号用了多少空间

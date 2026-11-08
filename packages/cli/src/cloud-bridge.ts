@@ -6,7 +6,7 @@
  */
 import { JoploError } from '@joplo-app/core';
 import type { buildSite, CloudAccount, CloudBridge, CloudPublishRequest, CloudPublishResult } from '@joplo-app/server';
-import { CloudError } from './cloud-error.ts';
+import { CloudError, terminalText } from './cloud-error.ts';
 import type { RenderPreview } from './cloud-embed.ts';
 import { CloudClient, type CloudDependencies } from './cloud.ts';
 
@@ -35,7 +35,7 @@ export function cloudBridge(opts: BridgeOptions): CloudBridge {
   const client = (warn: (line: string) => void, secrets: Set<string>) =>
     new CloudClient(undefined, opts.version, warn, (s) => secrets.add(s), { ...opts.deps, interactive: false });
   const redactor = (secrets: Set<string>) => (s: string) => {
-    for (const t of secrets) s = s.split(t).join('[REDACTED]');
+    for (const t of secrets) for (const form of new Set([t, JSON.stringify(t).slice(1, -1), terminalText(t)])) if (form) s = s.split(form).join('[REDACTED]');
     return s;
   };
   const home = () => (opts.deps?.env ?? process.env).JOPLO_HOME;
@@ -78,21 +78,22 @@ export function cloudBridge(opts: BridgeOptions): CloudBridge {
 
     async publish(projectDir: string, request: CloudPublishRequest, progress: (line: string) => void): Promise<CloudPublishResult> {
       const secrets = new Set<string>();
+      if (typeof request.password === 'string' && request.password) secrets.add(request.password);
       const redact = redactor(secrets);
       const c = client((line) => progress(redact(line)), secrets);
       try {
         const { share } = await import('./cloud-share.ts');
-        const { result, plan } = await share(c, projectDir, { public: request.visibility === 'public', private: request.visibility === 'private', review: request.review, ...(request.scenarios?.length ? { scenarios: request.scenarios } : {}), ...(request.features?.length ? { features: request.features } : {}) }, opts.build, opts.render);
-        return { shareId: result.shareId, url: result.url, expiresAt: result.expiresAt, version: result.version, plan, ...(result.scope ? { scope: result.scope } : {}), ...(result.storage ? { storage: result.storage } : {}), ...(result.mode ? { mode: result.mode } : {}), ...(result.visibility ? { visibility: result.visibility } : {}), ...(result.portfolio ? { portfolio: result.portfolio } : {}), ...(result.review ? { review: { url: result.review.url, shareId: result.review.shareId } } : {}) };
+        const { result, plan } = await share(c, projectDir, { public: request.visibility === 'public', private: request.visibility === 'private', review: request.review, ...(request.password !== undefined ? { password: request.password } : {}), ...(request.scenarios?.length ? { scenarios: request.scenarios } : {}), ...(request.features?.length ? { features: request.features } : {}) }, opts.build, opts.render);
+        return { passwordProtected: result.passwordProtected, shareId: result.shareId, url: result.url, expiresAt: result.expiresAt, version: result.version, plan, ...(result.scope ? { scope: result.scope } : {}), ...(result.storage ? { storage: result.storage } : {}), ...(result.mode ? { mode: result.mode } : {}), ...(result.visibility ? { visibility: result.visibility } : {}), ...(result.portfolio ? { portfolio: result.portfolio } : {}), ...(result.review ? { review: { url: result.review.url, shareId: result.review.shareId } } : {}) };
       } catch (e) {
         const code = e instanceof CloudError || e instanceof JoploError ? e.code : 'INTERNAL';
         // 检查没过：带上第一条错误的位置，看板里直接能看到改哪里
         const diag = e instanceof JoploError ? e.diagnostics.find((d) => d.severity === 'error') : undefined;
         const message = redact(`${e instanceof Error ? e.message : String(e)}${diag ? `\n${diag.at ? `${diag.at}  ` : ''}${diag.message}` : ''}`);
         // 容量不足（C27）：把数字和链接交给看板，画成红色提示，不只是一段英文报错
-        const details = e instanceof CloudError ? e.details as { kind?: unknown } | undefined : undefined;
+        const details = e instanceof CloudError ? e.details as { kind?: unknown; upgradeUrl?: unknown } | undefined : undefined;
         const storage = code === 'QUOTA_EXCEEDED' && details?.kind === 'storage' ? (({ kind: _kind, ...rest }) => rest)(details as Record<string, unknown>) : undefined;
-        throw Object.assign(new Error(message), { code, ...(AUTH_CODES.has(code) ? { loginCommand: fixOf(e, c.server) } : {}), ...(storage ? { storage } : {}) });
+        throw Object.assign(new Error(message), { code, ...(AUTH_CODES.has(code) ? { loginCommand: fixOf(e, c.server) } : {}), ...(storage ? { storage } : {}), ...(code === 'PLAN_REQUIRED' && typeof details?.upgradeUrl === 'string' ? { upgradeUrl: redact(details.upgradeUrl) } : {}) });
       }
     },
   };

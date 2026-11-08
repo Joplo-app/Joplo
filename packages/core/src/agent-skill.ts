@@ -20,7 +20,7 @@ export const SKILL_TOPICS = [
   { name: 'selection', description: 'Edit only the element selected by the user in the board' },
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
   { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
-  { name: 'publish', description: 'pick, build, explicit public/private and review choices, portfolios and SEO, feedback write-back, deployment, chapters, languages' },
+  { name: 'publish', description: 'pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, feedback write-back, deployment, chapters, languages' },
 ] as const;
 
 /** 心智模型：所有入口最先读到的几句话。 */
@@ -55,6 +55,7 @@ export const PITFALLS = [
   ['Public portfolio work and the always-private review version are two separate links: give reviewers data.review.url, the audience data.url', 'publish'],
   ['Required: before every share, ask the user public or private AND whether to also publish a review version. Never choose for them or reuse a previous choice; CI must pin both flags in its workflow', 'publish'],
   ['Public shares enter the portfolio and search engines: write the project name, description, and feature goals as search-result content; exclude unpublished information', 'publish'],
+  ['Never invent or set an access password for the user: ask them to type it in their own terminal or set JOPLO_SHARE_PASSWORD; never put passwords in command history, files, or conversation summaries. Private Pro shares accept --password; omit both password flags to preserve protection', 'publish'],
   ['Never share or deploy without the user\'s go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself', 'publish'],
 ] as const satisfies readonly (readonly [string, string])[];
 

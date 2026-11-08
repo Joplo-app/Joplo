@@ -18,7 +18,7 @@ npx joplo build [dir] [--out-dir <dir>] [--overwrite] [--scenario <id>]… [--fe
 npx joplo login [--no-browser] [--format text|json] [--server <url>]
 npx joplo logout [--server <url>]
 npx joplo whoami [--format text|json] [--server <url>]
-npx joplo share [dir] (--public | --private) (--review | --no-review) [--format text|json] [--new] [--title <title>] [--json] \
+npx joplo share [dir] (--public | --private) (--review | --no-review) [--format text|json] [--new] [--title <title>] [--json] [--password [<值>] | --no-password] \
   [--scenario <id>]… [--feature <id>]… \
   [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
 npx joplo feedback [dir] [--share <id>] [--format text|json] [--server <url>]
@@ -327,6 +327,19 @@ PR 预览（`--pr`）与按场景/功能保密分享（`--scenario` / `--feature
 
 公开成功时 JSON 附带云端返回的 `visibility` 与 `portfolio: {workUrl,profileUrl,needsUsername,setupPath}`；有用户名时文本输出作品详情地址，`needsUsername` 时输出“设置用户名后，这个作品会出现在你的作品集：<server><setupPath>”。字段缺失或 URL 为 null 时照常成功。`whoami` 透传可选 `username: string|null`、`portfolioUrl: string|null`；旧 Cloud 缺失时不补造值。
 
+### 密码查看（Pro）
+
+私密分享可用 `--password [<值>]` 设置或更换访问密码，`--no-password` 去掉密码；两者互斥。不带这两个参数时保持已有保护（新建时不设密码），**环境变量本身不会开启密码**。密码按 Unicode 码点计算，8–128 个字符，不裁剪空格。
+
+- 交互终端省略值：`npx joplo share --private --no-review --password`，隐藏输入并确认一次。EOF / Ctrl+C 取消，不发布。
+- 非交互、CI、JSON：用户自己安全地设置 `JOPLO_SHARE_PASSWORD` 后，运行同一命令。推荐环境变量；`--password <值>` 虽支持，但会进入 shell 历史，Agent 不应代填。
+- Agent 不能替用户设或编密码；请用户自己在终端输入或设置环境变量。不要把密码写进历史、文件、源码或对话总结。
+- 只能配私密普通/范围分享；`--public`、`--pr`、对比分享带密码参数，或长度不合法、非交互缺值，均以 **2** 退出，且不发网络请求。`--no-password` 同样只能用于私密非 PR 分享。
+- 设置/更换需 Pro（含创始会员）；降级后已有密码继续保护，免费账号仍能去掉。403 `PLAN_REQUIRED` 沿用退出 **1**，提供当前 `<server><upgradePath>`（`error.details.upgradeUrl`，缺省 `/settings/billing`）。不能用 `--new` 绕过套餐限制。
+- 与 `--review` 同用时主分享和评审版使用同一密码，输出明确说明；两次发布仍各自提交，评审失败时主链接可能已成功，重试需用户再次提供密码。
+- 成功文本显示“已加密”，JSON 的主分享及评审分享带 `passwordProtected: boolean`；旧云端缺字段按 false。不回显密码。Cloud 在返回页面前执行验证，保护页面、资源、音频、Agent 读取和嵌入，预览卡不泄露作品内容；本地静态 build 本身没有密码保护。
+- 只有本次给了 `--password` 或 `--no-password` 才发送创建请求 `password`（字符串 / null）；不传即保持原状，普通私密分享保持 #37 的请求体。400 正文涉及 password 时提示“Joplo Cloud 还不支持密码查看”，退出 **1**，不误走 review 兼容重试。
+
 ### 可见性兼容与字段数据流
 
 公开请求始终发送 `visibility: "public"`。本次选择私密时，新建分享不发送 visibility；更新仅在同服务器的本地分享记录中，目标链接明确为 `visibility: "public"` 时发送 `visibility: "private"`，用于撤下作品集中的公开作品。目标记录没有 visibility（旧链接）、为 private，或 `--update <链接>` 的目标不在本地记录中时，私密更新都省略此字段，保证旧 strict Cloud 仍可更新。匹配按目标 shareId 查找 main/review/scoped，不能用其他链接的 public 记录代替。记录只决定字段是否必须发送，绝不替代本次显式选择。CLI 与看板共用此规则。旧 Cloud HTTP 400 且信息涉及 visibility / 未知字段时，以 BAD_REQUEST、退出 1 提示“Joplo Cloud 还不支持公开分享，请改用 --private 或稍后再试”；不误走 review 清单降级重试，也不静默改私密。
@@ -334,6 +347,8 @@ PR 预览（`--pr`）与按场景/功能保密分享（`--scenario` / `--feature
 | 字段 | 写入点 → 存储 → 读取点 → 消费者 |
 | --- | --- |
 | visibility / review 选择 | 看板 radio/checkbox → POST 本机 cloud/publish → server 校验并存 CloudHub.job.request → cloud-bridge 转本次 ShareOptions → CLI shareChoices → CloudClient POST shares；review 拆成第二个始终私密的请求 |
+| password | 用户终端隐藏输入 / 显式参数 / JOPLO_SHARE_PASSWORD（需 --password）或看板遮挡输入 → POST 本机 cloud/publish → server → cloud-bridge → CLI → Cloud POST shares；只在内存中，不进任务快照、GET / WebSocket、日志、IR 或构建文件 |
+| passwordProtected | Cloud finalize → CLI JSON / 文本结果 → cloud.json 主/评审/范围记录 → bridge links / publish → 看板“已加密”；旧云端缺字段按 false，本机从不保存密码 |
 | CLI 可见性 / 评审选择 | 本次参数或 TTY 回答 → 仅本次内存 → share → CloudClient；不从配置或记录回填 |
 | mode（仅评审结果） | 请求范围没有 picked 子集 → CLI 只发布评审 → data.mode=review、data.url 为评审链接 → cloud-bridge → CloudHub.job.result → 看板标明链接含全部方案且始终私密；主分享与 --update 目标不更新 |
 | visibility 返回值 | Cloud finalize → CLI 白名单解析 → data.visibility → cloud-bridge → CloudHub.job.result（GET / 推送）→ 看板结果；旧云端省略 |
@@ -375,11 +390,11 @@ npx joplo share --private --no-review --feature invite                      # �
 - `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接，免费账号和 Pro 都一样（C27）；`--new` 新建。
 - 链接不再过期（免费账号也是 `expiresAt: null`）；限制的是账号空间：所有在线分享**当前版本**的原始大小之和，不按去重算（免费 100 MiB、Pro 5 GiB，以 me 的 `storage` 为准）。发布成功后文本输出多一行 `Storage: <已用> of <上限> used (this share: <大小>)`，JSON 的 `data.storage` 是 `{usedBytes, quotaBytes, shareBytes}`；旧服务器不返回时没有这一行。
 - 放不下时以 `QUOTA_EXCEEDED`（`error.details.kind = "storage"`）、**退出码 6** 结束：什么都没上传，已有链接不受影响。`details` 带 `usedBytes`、`quotaBytes`、`shareBytes`、`replacedBytes`（更新同一个链接时旧版本的大小，只按差额判断）、`manageUrl`（当前 server 的 /shares）与 `upgradeUrl`（/settings/billing）。服务端返回的是 413 `STORAGE_FULL`，CLI 转成这个错误码。
-- `.joplo/cloud.json` 的格式为 `{server, shareId?, url?, visibility?, review?: {shareId, url, visibility?}, scoped?: {<范围键>: {shareId, url, visibility?}}}`（`scoped` 见上方「按场景保密分享」）：主链接和评审版是**两个分享**，互不覆盖（契约 8.1）。普通 share 只用、只写主 `shareId`/`url`；`--review` 同时更新主链接与独立 `review`，评审步骤只用、只写 `review`（Pro 重新发布评审版时用 `review.shareId` 作 replaceShareId，评审链接和评论保留，版本 +1），评审版永远不会替换 README 里的主链接。写入时保留另一项；记录属于其他 server 时整体替换。没有 `review` 的旧记录照常使用。
+- `.joplo/cloud.json` 的格式为 `{server, shareId?, url?, visibility?, passwordProtected?, review?: {shareId, url, visibility?, passwordProtected?}, scoped?: {<范围键>: {shareId, url, visibility?, passwordProtected?}}}`（`scoped` 见上方「按场景保密分享」）：主链接和评审版是**两个分享**，互不覆盖（契约 8.1）。普通 share 只用、只写主 `shareId`/`url`；`--review` 同时更新主链接与独立 `review`，评审步骤只用、只写 `review`（Pro 重新发布评审版时用 `review.shareId` 作 replaceShareId，评审链接和评论保留，版本 +1），评审版永远不会替换 README 里的主链接。写入时保留另一项；记录属于其他 server 时整体替换。没有 `review` 的旧记录照常使用。
 - 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；一个对象失败会取消其他在途 PUT 和重试等待；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
 - finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。链接永久有效，升级入口为当前 `<server>/settings/billing`。
 - 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的导出组件，见 `setup export`；项目里已有的 Playwright 也可以）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有导出组件、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”（没有导出组件时括号里给出 `npx joplo setup export`），share 照常成功、从不下载；分享页此时用通用预览图。
-- 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 沿用英文（D57），D85 指定的兼容错误和设置用户名提示除外）。
+- 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 沿用英文（D57），D85 指定的“已加密”、兼容错误和设置用户名提示除外）。
 - **评审清单**：每次 share 都在 `POST /api/v1/shares` 请求体里附上 `review`（契约字段 `{v: 1, mode, features, scenarios, elements}`），由 check 编译的 dev IR 经 core 的 `reviewManifest` 生成。它**不是分享文件**：不进上传清单、不进 R2，分享页拿不到；SaaS 只把它存进数据库给评审页用。`mode: "publish"` 只含选定方案（与发布站同一范围，没有选定方案的功能不出现），`--review` 时为 `"review"`，含所有功能的所有方案。id 全部沿用 IR，步骤 `index` 从 0 开始，`elements` 是画面里所有作者元素 id（与 `Rule.elementIds` 同一套）及 `nodeLabel` 标签。
 - **清单上限**：字符串按码点截断（末尾 “…”）——名字 200、目标/思路/规则/问题/explain 2000、取舍 500、字幕 500、元素标签 200；数组超出部分丢弃——每个功能 20 个方案、300 条规则、100 个问题，每个方案 20 条取舍，每条规则 50 个元素，最多 100 个功能、500 个场景、每个场景 200 步、每步 50 条规则、2000 个元素；id 永不截断。截断后序列化仍超过 512 KiB（524288 字节）时：`--review` 报 EXPORT_FAILED（`details: {maxBytes, actualBytes}`），在构建和上传之前失败，不静默丢内容；普通 share 不因清单失败，stderr 提示一行 “Skipped the review manifest (…)”，请求体省略 `review`（契约里它是可选字段），评审页此时看不到规则和问题。
 - **发布顺序容错**：创建请求带着 `review` 被服务端以 HTTP 400 拒绝时（例如还不认识这个字段的旧版 SaaS；400 表示请求被拒、没有创建任何记录），普通 share 去掉 `review` 原样重试一次，stderr 提示一行 “The cloud rejected the review manifest (HTTP 400). Retrying once without it …”；评审步骤不重试，照常报 BAD_REQUEST；主分享可能已发布（评审版没有清单没有意义）。413、422、429 等其他状态不触发这个重试。
@@ -388,7 +403,7 @@ npx joplo share --private --no-review --feature invite                      # �
 - PR 预览是独立链接：不发送 replaceShareId，也不写 `.joplo/cloud.json`（不覆盖本项目的主链接和评审版记录，之后的普通 share、--review 与 feedback 仍用原来的记录）。CI 推荐 `npx joplo share --private --no-review --new --pr <number> --format json`；fork 来的 PR 拿不到 secrets，工作流应跳过发布，不推荐 `pull_request_target`。
 - finalize 响应里的 `pr: {comment, reason?, installUrl?}` 原样（白名单字段）放进 `data.pr`；`comment: "skipped"` 时文本输出一行 “PR comment skipped: <原因>. Install the Joplo GitHub App to comment on pull requests: <installUrl 或 <server>/settings/github>”，`failed` 时说明评论失败但已发布。服务端没返回时 `data.pr` 为 null。
 
-JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, embed}`（`--review` 时另有 `review: {…, mode: "review"}`，`--pr` 时另有 `pr`，`--scenario` / `--feature` 时另有 `scope`），`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
+JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, passwordProtected, embed}`（`--review` 时另有 `review: {…, mode: "review"}`，`--pr` 时另有 `pr`，`--scenario` / `--feature` 时另有 `scope`），`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
 
 `data.embed` 与云端控制台、分享页 Worker 用同一套格式（`<分享页>` 为 `data.url`，规范成以 `/` 结尾）：
 
@@ -407,7 +422,7 @@ Agent 可以把 `data.embed.markdown` 直接写进 README；链接不会过期�
 | USAGE（退出 2） | 互斥参数或受限模式选公开；按错误改正，本地拒绝且没有构建上传 |
 | AUTH_REQUIRED（退出 3） | 请用户运行 npx joplo login，再重试 |
 | AUTH_EXPIRED（401，退出 3） | 重新运行 npx joplo login |
-| PLAN_REQUIRED | 服务端明确要求 Pro；升级入口为当前 server/settings/billing，或用 --new 创建新分享 |
+| PLAN_REQUIRED（403，退出 1） | 服务端明确要求 Pro；给出 error.details.upgradeUrl（当前 server + 服务端 upgradePath，缺省 /settings/billing）；密码不能用 --new 绕过 |
 | QUOTA_EXCEEDED，kind storage（退出 6） | 账号空间不够，这次没有上传，已有链接不受影响；按 `details` 告诉用户差多少，去 `manageUrl` 删掉不需要的分享或去 `upgradeUrl` 升级；不要替用户删分享 |
 | ACCOUNT_UNAVAILABLE | 账号目前不能发布，请登录网页查看账号状态；不引导付费 |
 | FORBIDDEN | 当前操作被禁止，请检查账号权限 |

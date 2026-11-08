@@ -64,9 +64,9 @@ export function useCloudPublish(projectId: string) {
   }, [open, refresh, projectId, job?.state, linksAttempt]);
 
   const publish = useCallback(
-    async (ctx: CloudContext, choice: CloudScopeChoice, visibility: CloudVisibility, review: boolean) => {
+    async (ctx: CloudContext, choice: CloudScopeChoice, visibility: CloudVisibility, review: boolean, password?: string | null) => {
       setStartError(null);
-      const r = await startCloudPublish(projectId, { ...cloudRequest(choice, ctx), visibility, review });
+      const r = await startCloudPublish(projectId, { ...cloudRequest(choice, ctx), visibility, review, ...(password !== undefined ? { password } : {}) });
       if (r.ok) setJob(r.job);
       else setStartError(r.message);
     },
@@ -236,29 +236,60 @@ function Result({ job, onFlash, server }: { job: CloudJob & { result: NonNullabl
 }
 
 /** 可见性和评审是这次发布的明确选择；范围限制始终优先。 */
-export function VisibilityFields({ visibility, review, onVisibility, onReview, disabled, restricted }: { visibility: CloudVisibility; review: boolean; onVisibility: (v: CloudVisibility) => void; onReview: (v: boolean) => void; disabled: boolean; restricted: boolean }) {
+export function VisibilityFields({ visibility, review, onVisibility, onReview, disabled, restricted, protectedLink = false }: { visibility: CloudVisibility; review: boolean; onVisibility: (v: CloudVisibility) => void; onReview: (v: boolean) => void; disabled: boolean; restricted: boolean; protectedLink?: boolean }) {
   const { t: i18n } = useBoardI18n();
   return <div className="flex flex-col gap-2" data-testid="cloud-choices">
     <fieldset disabled={disabled} className="flex flex-col gap-1.5">
       <legend className="text-[12px] font-semibold text-jb-muted">{i18n.board.cloudVisibility}</legend>
       <div className="flex gap-4">
         {(['public', 'private'] as const).map((v) => <label key={v} className="flex min-h-8 items-center gap-2 text-[13px]">
-          <input type="radio" name="cloud-visibility" value={v} disabled={disabled || (v === 'public' && restricted)} checked={visibility === v} onChange={() => onVisibility(v)} className="accent-[var(--jb-cloud)]" />
+          <input type="radio" name="cloud-visibility" value={v} disabled={disabled || (v === 'public' && (restricted || protectedLink))} checked={visibility === v} onChange={() => onVisibility(v)} className="accent-[var(--jb-cloud)]" />
           {v === 'public' ? i18n.board.cloudPublic : i18n.board.cloudPrivate}
         </label>)}
       </div>
-      <p className="text-[12px] leading-[1.5] text-jb-faint">{restricted ? i18n.board.cloudPrivateOnly : visibility === 'public' ? i18n.board.cloudPublicNote : i18n.board.cloudPrivateNote}</p>
+      <p className="text-[12px] leading-[1.5] text-jb-faint">{protectedLink ? i18n.board.cloudPasswordPublicBlocked : restricted ? i18n.board.cloudPrivateOnly : visibility === 'public' ? i18n.board.cloudPublicNote : i18n.board.cloudPrivateNote}</p>
     </fieldset>
     <label className="flex min-h-8 items-center gap-2 text-[13px]"><input type="checkbox" checked={review} disabled={disabled} onChange={(e) => onReview(e.target.checked)} className="accent-[var(--jb-cloud)]" />{i18n.board.cloudAlsoReview}</label>
     {review ? <p className="text-[12px] text-jb-faint">{i18n.board.cloudReviewNote}</p> : null}
   </div>;
 }
 
-export function PublicationLinks({ result, server }: { result: { mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string } }; server: string }) {
+/** undefined = 保持；null = 去掉；string = 设置。只存在浮层内存，不进入任务。 */
+export function PasswordFields({ visibility, plan, server, protectedLink, value, onChange, disabled, review }: {
+  visibility: CloudVisibility; plan: 'free' | 'pro' | null; server: string; protectedLink: boolean;
+  value: string | null | undefined; onChange: (value: string | null | undefined) => void; disabled: boolean; review: boolean;
+}) {
+  const { t: i18n } = useBoardI18n();
+  const [show, setShow] = useState(false);
+  useEffect(() => { setShow(false); }, [value === undefined, visibility]);
+  if (visibility !== 'private') return null;
+  const editing = typeof value === 'string' && plan === 'pro';
+  return <fieldset disabled={disabled} className="flex flex-col gap-2 rounded-[8px] border border-jb-line p-3" data-testid="cloud-password">
+    <legend className="px-1 text-[12px] font-semibold text-jb-muted">{i18n.board.cloudPasswordTitle}</legend>
+    {protectedLink ? <p className="text-[12px] font-semibold">{i18n.board.cloudPasswordProtected} · {value === undefined ? i18n.board.cloudPasswordKeep : value === null ? i18n.board.cloudPasswordRemoving : i18n.board.cloudPasswordChange}</p> : null}
+    {plan !== 'pro' ? <p className="text-[12px] text-jb-muted">{i18n.board.cloudPasswordUpgrade} <a href={`${server}/settings/billing`} target="_blank" rel="noopener noreferrer" className="jb-focus text-jb-cloud hover:underline">{i18n.board.cloudStorageUpgrade}</a></p> : null}
+    {editing ? <>
+      <label className="flex flex-col gap-1 text-[12px]">{i18n.board.cloudPasswordLabel}
+        <input type={show ? 'text' : 'password'} value={value} onChange={e => onChange(e.target.value)} autoComplete="new-password" spellCheck={false} autoCapitalize="none" aria-describedby="cloud-password-length" aria-invalid={Array.from(value).length < 8 || Array.from(value).length > 128} className="jb-focus h-9 rounded-[6px] border border-jb-line bg-jb-surface px-2 text-[14px]" />
+      </label>
+      <p id="cloud-password-length" className="text-[12px] text-jb-muted">{i18n.board.cloudPasswordLength}</p>
+      <button type="button" aria-pressed={show} className="jb-focus self-start text-[12px] text-jb-cloud" onClick={() => setShow(v => !v)}>{show ? i18n.board.cloudPasswordHide : i18n.board.cloudPasswordShow}</button>
+    </> : null}
+    <div className="flex flex-wrap gap-3 text-[12px] text-jb-cloud">
+      {plan === 'pro' && !editing ? <button type="button" className="jb-focus" onClick={() => onChange('')}>{protectedLink ? i18n.board.cloudPasswordChange : i18n.board.cloudPasswordSet}</button> : null}
+      {protectedLink && value !== null ? <button type="button" className="jb-focus" onClick={() => onChange(null)}>{i18n.board.cloudPasswordRemove}</button> : null}
+      {value !== undefined ? <button type="button" className="jb-focus" onClick={() => onChange(undefined)}>{protectedLink ? i18n.board.cloudPasswordKeep : i18n.board.cancel}</button> : null}
+    </div>
+    {review && editing ? <p className="text-[12px] text-jb-muted">{i18n.board.cloudPasswordReview}</p> : null}
+  </fieldset>;
+}
+
+export function PublicationLinks({ result, server }: { result: { passwordProtected?: boolean; mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string } }; server: string }) {
   const { t: i18n } = useBoardI18n();
   const p = result.portfolio;
   return <div className="flex flex-col gap-1 text-[12px]" data-testid="cloud-publication-links">
     <span>{result.visibility === 'public' ? i18n.board.cloudPublic : i18n.board.cloudPrivate}</span>
+    {result.passwordProtected ? <span>{i18n.board.cloudPasswordProtected}</span> : null}
     {result.mode === 'review' ? <p>{i18n.board.cloudReviewNote}</p> : null}
     {result.visibility === 'public' && p && (p.needsUsername || p.workUrl) ? <a href={p.needsUsername ? `${server}${p.setupPath}` : p.workUrl!} target="_blank" rel="noopener noreferrer" className="jb-focus text-jb-cloud hover:underline">{p.needsUsername ? i18n.board.cloudSetupUsername : i18n.board.cloudPortfolioWork}</a> : null}
     {result.review ? <a href={result.review.url} target="_blank" rel="noopener noreferrer" className="jb-focus text-jb-cloud hover:underline">{i18n.board.cloudAlsoReview} · {i18n.board.cloudPrivate}</a> : null}
@@ -271,9 +302,11 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
   const [choice, setChoice] = useState<CloudScopeChoice>(() => defaultChoice(ctx));
   const [visibility, setVisibility] = useState<CloudVisibility>('public');
   const [review, setReview] = useState(false);
+  const [password, setPassword] = useState<string | null | undefined>(undefined);
   const restricted = choice !== 'project' || !!ctx.pr;
   const key = choice === 'scenario' && ctx.scenarioId ? ctx.scenarioId : [...(ctx.featureScenarioIds ?? [])].sort().join(',');
   const previous = choice === 'project' ? model.links.main : model.links.scoped?.[key] ?? null;
+  useEffect(() => { setPassword(undefined); }, [model.open, choice, key, ctx.featureId, model.publish]);
   const previousValue = previous ? previous.visibility ?? 'private' : 'new';
   useEffect(() => {
     if (model.open) setVisibility(restricted ? 'private' : defaultVisibility(previousValue === 'new' ? null : { visibility: previousValue }));
@@ -292,6 +325,7 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
     setStillOut(!a || !a.signedIn);
   };
   const account = acct.account;
+  const passwordInvalid = typeof password === 'string' && (account?.signedIn && account.plan !== 'pro' || Array.from(password).length < 8 || Array.from(password).length > 128);
   const loginFromJob = needsLogin(job) && !(account && account.signedIn);
   const signedOut = account && !account.signedIn ? account : null;
 
@@ -341,7 +375,8 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
           <ScopeRadio value={choice} onChange={setChoice} ctx={ctx} names={names} disabled={running || !model.linksReady} />
           <p className="text-[12px] leading-[1.45] text-jb-faint">{i18n.board.cloudScopeNote}</p>
         </div>
-        <VisibilityFields visibility={restricted ? 'private' : visibility} review={review} onVisibility={setVisibility} onReview={setReview} disabled={running || !model.linksReady} restricted={restricted} />
+        <VisibilityFields visibility={restricted ? 'private' : visibility} review={review} onVisibility={v => { setVisibility(v); setPassword(undefined); }} onReview={setReview} disabled={running || !model.linksReady} restricted={restricted} protectedLink={previous?.passwordProtected === true} />
+        <PasswordFields visibility={restricted ? 'private' : visibility} plan={account?.signedIn ? account.plan : null} server={account?.server ?? 'https://cloud.joplo.app'} protectedLink={previous?.passwordProtected === true} value={password} onChange={setPassword} disabled={running || !model.linksReady} review={review} />
         {unpicked && !running ? (
           <div className="flex flex-col gap-1 rounded-[8px] border border-jb-accent bg-jb-selected px-3 py-2" data-testid="cloud-unpicked" data-scope={unpicked}>
             <div className="text-[13px] font-semibold">{i18n.board.cloudNotPickedTitle}</div>
@@ -358,13 +393,14 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
           <div className="flex flex-col gap-1 rounded-[8px] border border-jb-danger bg-jb-danger-bg px-3 py-2" data-testid="cloud-error">
             <div className="text-[13px] font-semibold text-jb-danger">{i18n.board.cloudFailed}</div>
             <p className="whitespace-pre-wrap break-words font-jb-mono text-[12px]">{job.error.message}</p>
+            {job.error.upgradeUrl ? <a href={job.error.upgradeUrl} target="_blank" rel="noopener noreferrer" className="jb-focus text-[12px] text-jb-cloud">{i18n.board.cloudStorageUpgrade}</a> : null}
           </div>
         ) : null}
         {model.startError ? <p className="text-[12px] text-jb-danger"><LocalText value={model.startError} /></p> : null}
         <button
           type="button"
-          disabled={running || !model.linksReady || !!unpicked}
-          onClick={() => void model.publish(ctx, choice, restricted ? 'private' : visibility, review)}
+          disabled={running || !model.linksReady || !!unpicked || !!passwordInvalid}
+          onClick={() => { const secret = password; setPassword(undefined); void model.publish(ctx, choice, restricted ? 'private' : visibility, review, secret); }}
           className="jb-focus inline-flex h-9 items-center justify-center gap-2 rounded-[8px] bg-jb-cloud px-4 font-jb text-[14px] font-semibold text-jb-on-cloud hover:bg-jb-cloud-hover disabled:opacity-60"
           data-testid="cloud-publish"
         >
