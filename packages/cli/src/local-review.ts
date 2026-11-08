@@ -97,8 +97,11 @@ export async function watchLocalReview(dir: string, opts: ReviewFilter & { after
  * - 某个方案确认（approved）不结束监听，其他方案和下一轮仍会到达；只有看板进程全部停止（1）或中断（130）才结束。
  * - 每个会话各自的游标与身份校验与单会话监听相同；正在跟的会话都写“正在监听”的租约。
  */
-export async function followLocalReviews(dir: string, opts: ReviewFilter & { after?: number; json?: boolean }, io: FeedbackStreamIo, signal?: AbortSignal): Promise<number> {
+export async function followLocalReviews(dir: string, opts: ReviewFilter & { after?: number; json?: boolean; once?: boolean; since?: string }, io: FeedbackStreamIo, signal?: AbortSignal): Promise<number> {
   if (opts.session || opts.after) throw new JoploError('USAGE', '--follow watches every review round of the project; it cannot be combined with --session or --after');
+  const since = opts.since === undefined ? null : Date.parse(opts.since);
+  if (since !== null && (!Number.isFinite(since) || !/^\d{4}-\d{2}-\d{2}T/.test(opts.since!)))
+    throw new JoploError('USAGE', `--since takes an ISO time such as 2026-11-08T17:08:09.192Z (the createdAt of the last event you handled); got "${opts.since}"`);
   const root = fs.realpathSync(path.resolve(dir));
   const startedAt = new Date().toISOString();
   const wanted = (s: LocalReviewSession) => !opts.option || s.optionId === opts.option;
@@ -131,7 +134,11 @@ export async function followLocalReviews(dir: string, opts: ReviewFilter & { aft
   };
   initial.forEach(track);
   io.err(terminalLines(`Following ${initial.length} review round(s) in ${root}\n${initial.map(s => `  ${s.optionId}  ${s.url}`).join('\n')}\n`)
-    + 'New rounds after source edits and other options are picked up automatically. Feedback streams to stdout; Ctrl+C stops only the watcher.\n');
+    + (opts.once
+      ? 'Exits as soon as new feedback or an approval arrives (--once), so a host that wakes the agent when a background command ends delivers it.\n'
+      : 'New rounds after source edits and other options are picked up automatically. Feedback streams to stdout; Ctrl+C stops only the watcher.\n'));
+  // --once：本轮 pump 里写出的事件；有就退出 0，并告诉 Agent 怎样接着听（--since 最后一条的时间：不重放、不遗漏）
+  let emitted: { createdAt: string }[] = [];
   let lastLease = 0;
   return new Promise<number>((resolve, reject) => {
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -156,7 +163,12 @@ export async function followLocalReviews(dir: string, opts: ReviewFilter & { aft
       if (s.instanceId !== t.session.instanceId || s.revision !== t.session.revision || s.optionId !== t.session.optionId || s.events.length < t.cursor || (t.previousRequest && s.events[t.cursor - 1]?.requestId !== t.previousRequest))
         throw new JoploError('INVALID_SCHEMA', 'Review identity or event history changed unexpectedly; refusing to switch sessions');
       for (const e of s.events.slice(t.cursor)) {
-        writeFeedbackEvent(localFeedbackEvent(s, e), !!opts.json, io);
+        // --since：已经处理过的事件（重新启动时会重放开着的轮次）只推进游标，不再输出
+        if (since === null || Date.parse(e.createdAt) > since) {
+          writeFeedbackEvent(localFeedbackEvent(s, e), !!opts.json, io);
+          // --once 只为评审人的动作退出：feedback / approved。改源码带来的 closed 是 Agent 自己的工作，照常输出但不唤醒
+          if (e.type === 'feedback' || e.type === 'approved') emitted.push({ createdAt: e.createdAt });
+        }
         t.cursor = e.seq;
         t.previousRequest = e.requestId;
       }
@@ -178,7 +190,13 @@ export async function followLocalReviews(dir: string, opts: ReviewFilter & { aft
           if (tracked.has(s.id) || done.has(s.id)) continue;
           if ((localReviewStatus(s) === 'open' && localReviewOwnerAlive(s)) || s.createdAt >= startedAt) track(s);
         }
+        emitted = [];
         for (const t of [...tracked.values()]) drain(t);
+        if (opts.once && emitted.length) {
+          const last = emitted.map(e => e.createdAt).sort().at(-1)!;
+          io.err(`Received ${emitted.length} reviewer event(s); exiting (--once). Handle them, then listen again with:\n  npx joplo feedback watch ${dir} --local --follow --once --since ${last} --json\n`);
+          return finish(0);
+        }
         // The board is gone once no review of this project (open, approved or closed) has a live owner process.
         if (!sessions.some(localReviewOwnerAlive)) {
           io.err('The board stopped. Restart joplo dev, then run this command again.\n');

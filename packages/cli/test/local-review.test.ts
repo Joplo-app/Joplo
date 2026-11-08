@@ -171,3 +171,50 @@ it('--follow refuses an exact session or cursor and needs a running board', asyn
   expect(await runCli(['feedback', 'watch', x.dir, '--follow', '--json'], { stdout: () => {}, stderr: (s: string) => { err += s; } })).toBe(2);
   expect(JSON.parse(err.trim()).error.message).toMatch(/--local/);
 });
+
+it('--follow --once exits 0 after the first new events, so a host that only wakes the agent on exit gets them; --since resumes without replay or loss', async () => {
+  const x = setup(), io = capture();
+  const result = followLocalReviews(x.dir, { json: true, once: true }, io.io);
+  await until(() => io.err.includes('Following'));
+  x.feedback('First note');
+  expect(await result).toBe(0);
+  const first = io.out.trim().split('\n').map(l => JSON.parse(l));
+  expect(first.map(e => e.body)).toEqual(['First note']);
+  // The exit message tells the agent exactly how to resume.
+  expect(io.err).toContain(`--since ${first[0].createdAt}`);
+  // Feedback that arrives while the agent handles the first one is not lost, and the first is not replayed.
+  await new Promise(r => setTimeout(r, 5));
+  x.feedback('Arrived in between');
+  const io2 = capture();
+  expect(await followLocalReviews(x.dir, { json: true, once: true, since: first[0].createdAt }, io2.io)).toBe(0);
+  expect(io2.out.trim().split('\n').map(l => JSON.parse(l).body)).toEqual(['Arrived in between']);
+  // An approval also wakes it.
+  const io3 = capture();
+  const third = followLocalReviews(x.dir, { json: true, once: true, since: new Date().toISOString() }, io3.io);
+  await until(() => io3.err.includes('Following'));
+  x.approve();
+  expect(await third).toBe(0);
+  expect(JSON.parse(io3.out.trim())).toMatchObject({ type: 'approved', optionId: 'f.a' });
+});
+
+it('--since must be an ISO time and --once / --since need --follow', async () => {
+  const x = setup();
+  await expect(followLocalReviews(x.dir, { since: 'yesterday' }, capture().io)).rejects.toThrow(/--since/);
+  let err = '';
+  expect(await runCli(['feedback', 'watch', x.dir, '--local', '--once', '--json'], { stdout: () => {}, stderr: (s: string) => { err += s; } })).toBe(2);
+  expect(JSON.parse(err.trim()).error.message).toMatch(/--follow/);
+});
+
+it('--once ignores closed rounds from source edits (the agent own work) and still exits on the next reviewer feedback', async () => {
+  const x = setup(), io = capture();
+  let ended = false;
+  const result = followLocalReviews(x.dir, { json: true, once: true }, io.io).then(code => { ended = true; return code; });
+  await until(() => io.err.includes('Following'));
+  x.project.options['f.b']!.name = 'Revised'; x.hub.sync(x.dir, 'test-project', x.project);
+  await until(() => io.out.includes('source_changed'));
+  await new Promise(r => setTimeout(r, 550));
+  expect(ended).toBe(false);
+  x.feedback('After the edit');
+  expect(await result).toBe(0);
+  expect(io.out).toContain('After the edit');
+});
