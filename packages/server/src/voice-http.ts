@@ -15,13 +15,14 @@
  * - GET    /__joplo/p/:id/voice[?refresh=1]   → VoiceState（refresh=1 时重新问一次云端额度）
  * - PUT    /__joplo/p/:id/voice               { profileId | null } → VoiceState（看板里选的，记在 .joplo/voice/index.json，chosen: true）
  * - POST   /__joplo/p/:id/voice/clip          { locale, segment: { stepId, text, role } } → { key, url }（边放边生成一段；与批量生成共用 inflight）
- *                                              cloud 额度不够时 402 TTS_QUOTA_EXCEEDED（不再问云端，直到额度刷新）
+ *                                              只给 OpenAI / ElevenLabs（用户自己的 Key）：Joplo Cloud 朗读返回 409 CLOUD_GENERATE_ONLY，不请求云端
  * - POST   /__joplo/p/:id/voice/generate      { locale, segments: [{ stepId, text, role }] } → { summary, state }；进度推 joplo:voice
  * - GET    /__joplo/p/:id/voice/clips/:file   → 音频
  *
  * 托管朗读的状态（D85）：opts.cloud（CLI 注入的 bridge.voice）→ status() 记在内存 60 秒（cloudInfo）→ VoiceState.cloud（已登录、额度、用量页）。
  * 已登录且项目没选过来源时默认用 cloud（resolveVoices 的 fallback）。每段 cloud 合成成功后用响应头 X-Joplo-Chars-Remaining 更新内存里的
- * totalRemainingChars 并推送状态；402 时记下 exhausted（需要 / 剩余），之后的边放边生成直接返回 402，直到重新取到的额度大于 0。
+ * totalRemainingChars 并推送状态；402 时记下 exhausted（需要 / 剩余），直到重新取到的额度大于 0。
+ * 云端连不上或旧云端 404 时仍按 cloud 指纹找已有的音频（离线也能播已生成的），但生成直接返回 TTS_UNAVAILABLE，不请求云端。
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -248,8 +249,9 @@ export class VoiceHub {
     const fallback = this.fallbackOf(status);
     const cache = new VoiceCache(dir);
     const selected = cache.selection();
-    const r = resolveVoices(project?.voiceConfig, selected, this.store, null, fallback);
-    const per = Object.fromEntries((project?.i18n?.locales ?? []).map((l) => [l, resolveVoices(project?.voiceConfig, selected, this.store, voiceLocaleOf(project, l), fallback)]));
+    const pins = cache.pins();
+    const r = resolveVoices(project?.voiceConfig, selected, this.store, null, fallback, pins);
+    const per = Object.fromEntries((project?.i18n?.locales ?? []).map((l) => [l, resolveVoices(project?.voiceConfig, selected, this.store, voiceLocaleOf(project, l), fallback, pins)]));
     const all = Object.values(per);
     const cur = cache.current({ narrator: r.voices.narrator, roles: r.voices.roles }, all.flatMap((x) => [x.voices.narrator, ...Object.values(x.voices.roles)]).filter((x): x is string => !!x));
     const job = this.jobs.get(projectId);
@@ -278,7 +280,19 @@ export class VoiceHub {
   /** 生成用的声音：与 state() 同一套默认来源。 */
   private async resolveFor(dir: string, project: Project | null, content: string | null) {
     const fallback = this.fallbackOf(await this.cloudStatus());
-    return resolveVoices(project?.voiceConfig, new VoiceCache(dir).selection(), this.store, voiceLocaleOf(project, content), fallback);
+    const cache = new VoiceCache(dir);
+    return resolveVoices(project?.voiceConfig, cache.selection(), this.store, voiceLocaleOf(project, content), fallback, cache.pins());
+  }
+
+  /**
+   * cloud 现在能不能生成（P1-4）：没登录 → AUTH_REQUIRED；云端连不上或旧云端没有朗读（404）→ TTS_UNAVAILABLE。
+   * 这时不请求云端（否则每一段都要经 CLI 重试好几秒），已有的音频照常按 cloud 指纹播放与打包。能生成时返回 null。
+   */
+  private cloudBlocked(): { code: string; message: string } | null {
+    const s = this.cloudCache?.status;
+    if (s && !s.signedIn) return { code: 'AUTH_REQUIRED', message: `Joplo Cloud narration needs a Joplo account. Run ${s.loginCommand}` };
+    if (!s?.signedIn || !s.voice) return { code: 'TTS_UNAVAILABLE', message: 'Joplo Cloud narration is not available right now (the cloud cannot be reached, or it does not offer narration yet). Steps without audio use the browser voice; try again later' };
+    return null;
   }
 
   /** cloud 请求的内容语言（D84）：项目写了 locales 时是当前内容语言（没传时是默认语言）；没写时不带，由云端按文字判断。 */
@@ -313,6 +327,11 @@ export class VoiceHub {
       const cache = new VoiceCache(dir);
       const content = contentLocaleOf(project, body.contentLocale);
       const resolved = await this.resolveFor(dir, project, content);
+      const blocked = resolved.profile?.kind === 'cloud' ? this.cloudBlocked() : null;
+      if (blocked) {
+        const summary: GenerateSummary = { total: segs!.length, generated: 0, skipped: 0, failed: [], error: blocked };
+        return ctx.send(200, { summary, state: await this.state(projectId, dir, project) }), true;
+      }
       const job = { done: 0, total: segs!.length, failed: 0, abort: new AbortController() };
       this.jobs.set(projectId, job);
       let summary: GenerateSummary;
@@ -351,9 +370,8 @@ export class VoiceHub {
       const resolved = await this.resolveFor(dir, project, content);
       const plan = cache.plan(seg, resolved);
       if (!plan) return ctx.send(400, { error: { code: 'INVALID', message: 'No voice provider is selected for this project' } }), true;
-      const have = cache.clipOf(plan.key);
-      // 额度已经用完：不再问云端（每播一步都会来一次），这一步由网页用浏览器朗读
-      if (!have && resolved.profile?.kind === 'cloud' && this.exhausted) return ctx.send(402, { error: { code: 'TTS_QUOTA_EXCEEDED', message: 'Not enough Joplo Cloud narration characters left', data: this.exhausted } }), true;
+      // Joplo Cloud 朗读不在播放时现场生成（会花用户的字数）：只有「生成缺少的音频」或 joplo voice 才请求云端；缺音频的步骤用浏览器朗读
+      if (resolved.profile?.kind === 'cloud') return ctx.send(409, { error: { code: 'CLOUD_GENERATE_ONLY', message: 'Joplo Cloud narration is generated only with Generate missing audio (or npx joplo voice); this step uses the browser voice' } }), true;
       const p = cache.generateOne(seg, content ?? (typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en'), resolved, this.store, {
         fetch: this.opts.fetch,
         inflight: this.inflightOf(projectId),

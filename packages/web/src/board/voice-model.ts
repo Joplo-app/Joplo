@@ -69,11 +69,19 @@ export function cloudQuotaView(cloud: VoiceCloudView | null | undefined, estimat
 /** 有没有能用的 Key（保存的或环境变量）。cloud 不要 Key（看登录）。 */
 export const hasKey = (p: VoiceProfileView) => p.kind === 'cloud' || p.key.saved || p.key.envSet;
 
-/** 这个来源现在能不能生成：cloud 要已登录；openai / elevenlabs 要有 Key；不再支持的不能。 */
+/** 这个来源现在能不能生成：cloud 要已登录、云端给了朗读（连不上或旧云端 404 时不能）；openai / elevenlabs 要有 Key；不再支持的不能。 */
 export function canGenerate(p: VoiceProfileView | null, cloud: VoiceCloudView | null | undefined): boolean {
   if (!p || p.unsupported) return false;
-  if (p.kind === 'cloud') return !!cloud?.signedIn;
+  if (p.kind === 'cloud') return !!cloud?.signedIn && !!cloud.available;
   return hasKey(p);
+}
+
+/**
+ * 播放时能不能边放边生成、预取后面几步：只有用户自己的 Key（OpenAI / ElevenLabs）。
+ * Joplo Cloud 朗读会花用户的字数，只在点「生成缺少的音频」或运行 joplo voice 时请求；播放只用已生成的音频，缺的步骤用浏览器朗读。
+ */
+export function liveGenerate(p: VoiceProfileView | null, cloud: VoiceCloudView | null | undefined): boolean {
+  return !!p && p.kind !== 'cloud' && canGenerate(p, cloud);
 }
 
 /**

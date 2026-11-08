@@ -16,6 +16,7 @@ import { useI18n } from '../i18n/context';
  * - 试听：cloud 用音色的样音地址（samples[语言]，<audio> 直接播放，不扣字数）。
  * - 音频：GET …/voice + joplo:voice 推送 → narrator.lookup（声音指纹 + 片段键 → 地址）→ DemoController 播放时用；
  *   没有音频的步骤用浏览器朗读，字幕区标“浏览器朗读”（额度不够、云端连不上时也一样）。
+ *   Joplo Cloud 朗读不在播放时现场生成、也不预取（会花用户的字数）：只有点「生成缺少的音频」或运行 joplo voice 才请求云端。
  * - 生成：voiceSegments（当前方案所有场景、当前语言）→ POST …/voice/generate（每 100 段一批）；402 时服务端停下并在 state.cloud.exhausted 里标出。
  * - Key：GET/PUT/DELETE /__joplo/voice/profiles；Key 只提交、不回显（只显示末 4 位）。
  */
@@ -44,7 +45,7 @@ import {
   type VoiceState,
   type VoiceTestResult,
 } from '../runtime/dev-client';
-import { canGenerate, cloudQuotaView, hasKey, narrationLanguage, newerVoiceState, sampleUrl, sortVoices, sourceRows, voiceCoverage, voiceEstimate, voiceLabel, voiceSegments, type CloudQuotaView } from './voice-model';
+import { canGenerate, cloudQuotaView, hasKey, liveGenerate, narrationLanguage, newerVoiceState, sampleUrl, sortVoices, sourceRows, voiceCoverage, voiceEstimate, voiceLabel, voiceSegments, type CloudQuotaView } from './voice-model';
 import { isLocale, type Locale } from '../i18n/locale';
 import { boardVoiceLookup } from '../i18n/content';
 
@@ -108,11 +109,10 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
   // 内容多语言（D84）：浏览器朗读用内容语言；生成的音频用这种语言的声音（服务端 byLocale），没有时用默认声音
   narrator.locale = contentLocale ?? locale;
   narrator.lookup = boardVoiceLookup(state, contentLocale);
-  // 边放边生成：来源能生成（cloud 已登录、其他有 Key）时，播到还没有音频的一步就当场生成这一段（同一段只请求一次）。
-  // Joplo Cloud 朗读额度不够时不再请求：没有音频的步骤直接用浏览器朗读。
+  // 边放边生成：只有用户自己的 Key（OpenAI / ElevenLabs）——播到还没有音频的一步就当场生成这一段（同一段只请求一次），并预取后面几步。
+  // Joplo Cloud 朗读不在播放时请求（会花字数）：只用已生成的音频，缺的步骤用浏览器朗读并在字幕区标出。
   const inflight = useRef(new Map<string, Promise<string | null>>());
-  const exhausted = state?.profile?.kind === 'cloud' && !!state.cloud?.exhausted;
-  const ready = canGenerate(state?.profile ?? null, state?.cloud) && !exhausted;
+  const ready = liveGenerate(state?.profile ?? null, state?.cloud);
   // 换了供应商或音色（声音指纹变了）：之前请求过的段作废
   const voicesSig = state ? JSON.stringify([state.voices, contentLocale, contentLocale ? state.byLocale?.[contentLocale]?.voices : null]) : '';
   useEffect(() => inflight.current.clear(), [voicesSig]);
@@ -469,7 +469,7 @@ export function VoicePanel({ api, onManage }: { api: Pick<VoiceApi, 'state' | 'p
         {g ? <div className="h-1.5 overflow-hidden rounded-full bg-jb-sunken"><div className="h-full bg-jb-ink transition-[width]" style={{ width: `${g.total ? Math.round((g.done / g.total) * 100) : 0}%` }} /></div> : null}
         {cov.failed ? <p className="text-[12px] text-jb-danger" data-testid="voice-failed">{i18n.board.voiceFailed(cov.failed, Object.values(state?.failures ?? {})[0]?.message ?? '')}</p> : null}
         {current.kind !== 'cloud' && !current.unsupported && !hasKey(current) ? <p className="text-[12px] text-jb-pending">{i18n.board.voiceNoKey}</p> : null}
-        {current.kind === 'cloud' && cloud?.signedIn && !cloud.quota ? <p className="text-[12px] text-jb-pending" data-testid="voice-cloud-offline">{i18n.board.voiceCloudOfflineBody}</p> : null}
+        {current.kind === 'cloud' && cloud?.signedIn && !cloud.available ? <p className="text-[12px] text-jb-pending" data-testid="voice-cloud-offline">{i18n.board.voiceCloudOfflineBody}</p> : null}
         {out && q ? (
           <VoiceQuotaOut q={q} steps={est.steps} chars={est.chars} />
         ) : current.unsupported ? null : (

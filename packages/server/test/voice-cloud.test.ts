@@ -287,11 +287,11 @@ describe('字数估算与剩余字数', () => {
     expect(seen).toContain(86);
     expect(seen.every((n) => [3200, 93, 86, 1].includes(n as number))).toBe(true);
     expect(seen.at(-1)).toBe(1);
-    // 边放边生成：额度不够时直接 402，不再问云端
+    // 边放边生成：Joplo Cloud 朗读不在播放时现场生成（P1-6），不再问云端
     const before = f.calls.length;
     const clip: { status: number; body: unknown }[] = [];
     await hub.handleProject('p', proj, project(), 'clip', { method: 'POST' } as never, {} as never, { ...ctx, jsonBody: async () => ({ ok: true as const, body: { locale: 'en', segment: segs[3] } }), send: (status: number, b: unknown) => void clip.push({ status, body: b }) });
-    expect(clip[0]).toMatchObject({ status: 402, body: { error: { code: 'TTS_QUOTA_EXCEEDED' } } });
+    expect(clip[0]).toMatchObject({ status: 409, body: { error: { code: 'CLOUD_GENERATE_ONLY' } } });
     expect(f.calls.length).toBe(before);
   });
 });

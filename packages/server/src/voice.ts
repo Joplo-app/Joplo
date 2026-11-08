@@ -192,6 +192,13 @@ export function normalizeProfile(input: unknown, base: VoiceProfile): Omit<Voice
 
 type StoreFile = { version: 1; profiles: VoiceProfile[] };
 
+/** 本机对 OpenAI / ElevenLabs 预设的覆盖改了地址、请求头或返回格式（旧版允许）：不再是官方预设。 */
+function isCustomOverride(p: Preset, s: VoiceProfile): boolean {
+  if (p.kind !== 'openai' && p.kind !== 'elevenlabs') return false;
+  const url = typeof s.baseUrl === 'string' && s.baseUrl.trim() ? s.baseUrl.trim().replace(/\/+$/, '') : p.baseUrl;
+  return url !== p.baseUrl || (!!s.headers && Object.keys(s.headers).length > 0) || (!!s.response && s.response !== 'audio') || !!s.path || !!s.body;
+}
+
 /**
  * `<JOPLO_HOME>/voice/profiles.json`：改过的预设（Key、默认音色）与本机旧的 profile，权限 0600。
  * `<JOPLO_HOME>/voice/cloud-voices.json`：最近一次从云端拿到的 Joplo 音色表（不含额度、没有秘密）。
@@ -211,7 +218,15 @@ export class ProfileStore {
   private read(): VoiceProfile[] {
     try {
       const raw = JSON.parse(fs.readFileSync(this.file, 'utf8')) as StoreFile;
-      return Array.isArray(raw?.profiles) ? raw.profiles.filter((p) => p && typeof p.id === 'string' && ID_RE.test(p.id) && typeof p.name === 'string') : [];
+      const list = Array.isArray(raw?.profiles) ? raw.profiles.filter((p) => p && typeof p.id === 'string' && ID_RE.test(p.id) && typeof p.name === 'string') : [];
+      // 旧版自建的 profile 恰好叫 cloud（D85 之前没有 Joplo Cloud 预设）：改名保留为旧 profile，不当作 Joplo Cloud 的覆盖。
+      // 下一次写文件时新名字就存下来了。
+      return list.map((p) => {
+        if (p.id !== 'cloud' || p.kind === 'cloud') return p;
+        let id = 'cloud-old';
+        for (let i = 2; list.some((x) => x.id === id); i++) id = `cloud-old-${i}`;
+        return { ...p, id };
+      });
     } catch {
       return [];
     }
@@ -225,10 +240,15 @@ export class ProfileStore {
     fs.renameSync(tmp, this.file);
   }
 
-  /** 预设（合并本机改过的默认音色、模型、风格与 Key；地址固定）在前；本机旧的 profile（不再支持）在后。 */
+  /**
+   * 预设（合并本机改过的默认音色、模型、风格与 Key；地址固定）在前；本机旧的 profile（不再支持）在后。
+   * 旧版把 OpenAI / ElevenLabs 预设改成别的地址（代理）、请求头或返回格式的，不再当作官方预设：作为不再支持的旧 profile
+   * 按原来的字段算指纹（旧音频照常播放与打包），Key 不给出去（原本是给代理的，绝不能发到官方地址）；删掉它才恢复官方预设。
+   */
   list(): VoiceProfile[] {
     const stored = this.read();
-    const presets = PRESETS.map(({ env: _e, voices: _v, ...p }): VoiceProfile => {
+    const customized = new Set<string>(PRESETS.filter((p) => { const s = stored.find((x) => x.id === p.id); return !!s && isCustomOverride(p, s); }).map((p) => p.id));
+    const presets = PRESETS.filter((p) => !customized.has(p.id)).map(({ env: _e, voices: _v, ...p }): VoiceProfile => {
       const s = stored.find((x) => x.id === p.id);
       const out: VoiceProfile = { ...p };
       if (typeof s?.voice === 'string' && s.voice.trim()) out.voice = s.voice;
@@ -242,8 +262,14 @@ export class ProfileStore {
       return out;
     });
     const legacy = stored
-      .filter((s) => !presetOf(s.id))
-      .map((s): VoiceProfile => (s.id === LEGACY_AIHUBMIX.id ? { ...LEGACY_AIHUBMIX, ...s, id: s.id, unsupported: true } : { ...s, unsupported: true }));
+      .filter((s) => !presetOf(s.id) || customized.has(s.id))
+      .map((s): VoiceProfile => {
+        if (s.id === LEGACY_AIHUBMIX.id) return { ...LEGACY_AIHUBMIX, ...s, id: s.id, unsupported: true };
+        // 改过地址的预设：以前的合并方式是“预设 + 本机覆盖”，指纹也按它算
+        const base = presetOf(s.id);
+        if (base) { const { env: _e, voices: _v, ...b } = base; return { ...b, ...s, id: s.id, kind: base.kind, unsupported: true }; }
+        return { ...s, unsupported: true };
+      });
     return [...presets, ...legacy];
   }
 
@@ -279,6 +305,7 @@ export class ProfileStore {
       throw new VoiceError('INVALID', 'Custom voice providers are no longer supported. Use Joplo Cloud narration, OpenAI or ElevenLabs');
     }
     const current = this.get(id)!;
+    if (current.unsupported) throw new VoiceError('INVALID', `${current.name} uses an address, headers or response format that is no longer supported. Delete it first to use the official ${current.name}`);
     const fields = normalizeProfile(input, current);
     if (key !== undefined && key !== null && (typeof key !== 'string' || key.length > 500 || /[\r\n]/.test(key))) throw new VoiceError('INVALID', 'Invalid API key');
     const list = this.read();
@@ -457,7 +484,14 @@ export type ResolvedVoices = {
   roles: Record<string, string>;
   /** 旁白与各角色的声音指纹（没有 profile 时都是 null / 空）。 */
   voices: { narrator: string | null; roles: Record<string, string> };
+  /**
+   * cloud 在非默认语言下自动选的音色（D84 / D85）：基础音色 → 选中的音色。第一次在这种语言下生成成功时记进项目 index.json 的 pins
+   * （VoiceCache.pin），之后推荐列表变了、换了电脑也按记下的选，指纹不变。
+   */
+  autoPicks?: { locale: string; map: Record<string, string> };
 };
+/** 项目里记下的 cloud 自动音色：内容语言 → （基础音色 → 选中的音色）。 */
+export type VoicePins = Record<string, Record<string, string>>;
 
 /**
  * 某种内容语言用哪个音色（D84）：
@@ -494,7 +528,7 @@ export const voiceLocaleOf = (project: Pick<Project, 'i18n'> | null | undefined,
  * selected：看板里选的（VoiceCache.selection()）：字符串 = 某个来源；null = 选了浏览器朗读；undefined = 没选过，这时用 fallback
  * （调用方给：已登录为 'cloud'，否则 null）。
  */
-export function resolveVoices(config: VoiceConfig | undefined, selected: string | null | undefined, store: ProfileStore, locale?: string | null, fallback?: string | null): ResolvedVoices {
+export function resolveVoices(config: VoiceConfig | undefined, selected: string | null | undefined, store: ProfileStore, locale?: string | null, fallback?: string | null, pins?: VoicePins): ResolvedVoices {
   let profile: VoiceProfile | null = null;
   let source: ResolvedVoices['source'] = null;
   let missing: string | null = null;
@@ -513,8 +547,16 @@ export function resolveVoices(config: VoiceConfig | undefined, selected: string 
   const p = profile;
   const catalog = p.kind === 'cloud' ? store.cloudCatalog() : undefined;
   const own = locale ? config?.locales?.[locale] : undefined;
-  const narrator = own?.narrator ?? autoVoiceFor(p, config?.narrator ?? p.voice, locale, catalog);
-  const roles = { ...Object.fromEntries(Object.entries(config?.roles ?? {}).map(([r, v]) => [r, autoVoiceFor(p, v, locale, catalog)])), ...(own?.roles ?? {}) };
+  // cloud：这种语言下已经记下的选择优先（不随推荐列表变），没记过才按推荐挑
+  const picks: Record<string, string> = {};
+  const auto = (v: string) => {
+    if (p.kind !== 'cloud' || !locale) return autoVoiceFor(p, v, locale, catalog);
+    const chosen = pins?.[locale]?.[v] ?? autoVoiceFor(p, v, locale, catalog);
+    picks[v] = chosen;
+    return chosen;
+  };
+  const narrator = own?.narrator ?? auto(config?.narrator ?? p.voice);
+  const roles = { ...Object.fromEntries(Object.entries(config?.roles ?? {}).filter(([r]) => !own?.roles?.[r]).map(([r, v]) => [r, auto(v)])), ...(own?.roles ?? {}) };
   return {
     profile,
     source,
@@ -522,6 +564,7 @@ export function resolveVoices(config: VoiceConfig | undefined, selected: string 
     narrator,
     roles,
     voices: { narrator: fingerprint(p, narrator), roles: Object.fromEntries(Object.entries(roles).map(([r, v]) => [r, fingerprint(p, v)])) },
+    ...(Object.keys(picks).length && locale ? { autoPicks: { locale, map: picks } } : {}),
   };
 }
 
@@ -536,7 +579,7 @@ export type Inflight = Map<string, Promise<GeneratedClip>>;
  * profileId：看板里选的来源（null = 浏览器朗读）；chosen：作者在看板里选过（D85：没选过时用默认来源，已登录为 cloud）。
  * 旧版写下的文件没有 chosen：profileId 是字符串时算选过，null 时算没选过（旧版没选过时也写 null）。
  */
-type IndexFile = { version: 1; profileId: string | null; chosen?: boolean; clips: Record<string, ClipRecord>; failures: Record<string, { stepId: string; message: string; at: string }> };
+type IndexFile = { version: 1; profileId: string | null; chosen?: boolean; pins?: VoicePins; clips: Record<string, ClipRecord>; failures: Record<string, { stepId: string; message: string; at: string }> };
 const FILE_RE = /^[0-9a-f]{64}\.(mp3|wav|ogg|flac|m4a|aac)$/;
 
 export type Segment = { stepId: string; text: string; role: string | null };
@@ -572,7 +615,7 @@ export type GenerateOptions = {
   onCloud?: (r: CloudReceipt) => void;
 };
 /** 账号层面的错误：继续请求别的段也一样失败，生成在这里停下，也不记成某一步的失败。 */
-const STOP_CODES = new Set<string>(['TTS_QUOTA_EXCEEDED', 'AUTH_REQUIRED', 'AUTH_EXPIRED', 'EMAIL_UNVERIFIED', 'FORBIDDEN', 'CLOUD_UNAVAILABLE', 'UNSUPPORTED']);
+const STOP_CODES = new Set<string>(['TTS_QUOTA_EXCEEDED', 'AUTH_REQUIRED', 'AUTH_EXPIRED', 'EMAIL_UNVERIFIED', 'FORBIDDEN', 'CLOUD_UNAVAILABLE', 'UNSUPPORTED', 'NOT_FOUND']);
 const nonNeg = (v: unknown) => (Number.isSafeInteger(v) && (v as number) >= 0 ? (v as number) : null);
 
 /**
@@ -605,7 +648,8 @@ export class VoiceCache {
     try {
       const raw = JSON.parse(fs.readFileSync(path.join(this.root, 'index.json'), 'utf8')) as IndexFile;
       const profileId = typeof raw.profileId === 'string' ? raw.profileId : null;
-      return { version: 1, profileId, chosen: raw.chosen === true || profileId !== null, clips: raw.clips && typeof raw.clips === 'object' ? raw.clips : {}, failures: raw.failures && typeof raw.failures === 'object' ? raw.failures : {} };
+      const pins = raw.pins && typeof raw.pins === 'object' && !Array.isArray(raw.pins) ? raw.pins : undefined;
+      return { version: 1, profileId, chosen: raw.chosen === true || profileId !== null, ...(pins ? { pins } : {}), clips: raw.clips && typeof raw.clips === 'object' ? raw.clips : {}, failures: raw.failures && typeof raw.failures === 'object' ? raw.failures : {} };
     } catch {
       return { version: 1, profileId: null, chosen: false, clips: {}, failures: {} };
     }
@@ -627,6 +671,20 @@ export class VoiceCache {
 
   select(profileId: string | null) {
     this.write({ ...this.read(), profileId, chosen: true });
+  }
+
+  /** 记下的 cloud 自动音色（见 ResolvedVoices.autoPicks）；build、share、播放、joplo voice 都传给 resolveVoices。 */
+  pins(): VoicePins {
+    return this.read().pins ?? {};
+  }
+
+  /** 记下这种语言自动选的音色：已经记过的不改（只有从没生成过的组合才按推荐挑）。 */
+  pin(locale: string, map: Record<string, string>) {
+    const idx = this.read();
+    const cur = idx.pins?.[locale] ?? {};
+    const add = Object.entries(map).filter(([k]) => !(k in cur));
+    if (!add.length) return;
+    this.write({ ...idx, pins: { ...(idx.pins ?? {}), [locale]: { ...cur, ...Object.fromEntries(add) } } });
   }
 
   /** 片段文件的绝对路径（文件名不合法或不存在时为 null）。 */
@@ -706,7 +764,10 @@ export class VoiceCache {
     const run = this.synthesizeOne(seg, locale, p, j, store, opts);
     opts.inflight?.set(j.key, run);
     try {
-      return await run;
+      const r = await run;
+      // 第一次在这种语言下用 cloud 生成成功：把自动选的音色记进项目，之后不随推荐列表变
+      if (resolved.autoPicks) this.pin(resolved.autoPicks.locale, resolved.autoPicks.map);
+      return r;
     } finally {
       if (opts.inflight?.get(j.key) === run) opts.inflight.delete(j.key);
     }
@@ -816,8 +877,11 @@ export type SharedVoice = { index: VoiceIndex; fetch: (file: string) => Promise<
 export async function reuseSharedVoice(projectDir: string, project: Project, shared: SharedVoice, store: ProfileStore, devConfig?: VoiceConfig, defaultProfile?: string | null): Promise<number> {
   const cache = new VoiceCache(projectDir);
   const selected = cache.selection();
-  const local = resolveVoices(devConfig ?? project.voiceConfig, selected, store, null, defaultProfile);
-  const per = voicesPerLocale(project, local.profile ? (l) => resolveVoices(devConfig ?? project.voiceConfig, selected, store, voiceLocaleOf(project, l), defaultProfile).voices : sharedVoices(shared.index));
+  const pins = cache.pins();
+  const local = resolveVoices(devConfig ?? project.voiceConfig, selected, store, null, defaultProfile, pins);
+  // 没选过来源（默认来源）时按分享里的指纹沿用：默认来源变了（例如登录后默认 cloud）也不能让已发布的音频丢掉
+  const own = local.profile && local.source !== 'default';
+  const per = voicesPerLocale(project, own ? (l) => resolveVoices(devConfig ?? project.voiceConfig, selected, store, voiceLocaleOf(project, l), defaultProfile, pins).voices : sharedVoices(shared.index));
   let reused = 0;
   for (const { locale, project: p, voices } of per)
     for (const sc of Object.values(p.scenarios))
@@ -851,11 +915,14 @@ export function bundleVoice(projectDir: string, project: Project, outDir: string
   const idx = cache.read();
   const selected = cache.selection();
   const cfg = devConfig ?? project.voiceConfig;
-  const base = resolveVoices(cfg, selected, store, null, defaultProfile);
-  const profileName = base.profile?.name ?? (fallback ? 'the published share' : null);
+  const pins = cache.pins();
+  const base = resolveVoices(cfg, selected, store, null, defaultProfile, pins);
+  // 有上一次的分享、而这里只是默认来源（没选过）时，按分享里的指纹打包（P0：默认来源的改变不能让已发布的音频丢失）
+  const own = !!base.profile && !(fallback && base.source === 'default');
+  const profileName = own ? base.profile!.name : fallback ? 'the published share' : null;
   const empty = { index: null, report: { clips: 0, bytes: 0, missing: 0, profile: profileName } };
-  if (!base.profile && !fallback) return { ...empty, report: { ...empty.report, profile: null } };
-  const per = voicesPerLocale(project, base.profile ? (l) => resolveVoices(cfg, selected, store, voiceLocaleOf(project, l), defaultProfile).voices : sharedVoices(fallback!));
+  if (!own && !fallback) return { ...empty, report: { ...empty.report, profile: null } };
+  const per = voicesPerLocale(project, own ? (l) => resolveVoices(cfg, selected, store, voiceLocaleOf(project, l), defaultProfile, pins).voices : sharedVoices(fallback!));
   const fps = new Set(per.flatMap((x) => [x.voices.narrator, ...Object.values(x.voices.roles)]).filter(Boolean) as string[]);
   const stepIds = new Set(Object.values(project.scenarios).flatMap((s) => s.steps.map((st) => st.id)));
   const latest = new Map<string, [string, ClipRecord]>();

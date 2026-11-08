@@ -73,6 +73,7 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - Never share or deploy without the user's go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself. See npx joplo skill publish.
 - Joplo Cloud narration spends the user's characters: run npx joplo voice --dry-run and tell them the estimate before a large batch; on TTS_QUOTA_EXCEEDED (exit 7) keep what was made, pass on error.details.usageUrl, and never retry in a loop or buy for them. See npx joplo skill publish.
 - AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json. See npx joplo skill publish.
+- Playing a demo never generates Joplo Cloud narration (it would spend characters): steps without audio use the browser voice until the user clicks Generate missing audio or you run npx joplo voice with their go-ahead. See npx joplo skill publish.
 
 ## Reference
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.
@@ -89,4 +90,4 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.17 sha256:97e65fda1066ff7a2f69f34f9997a8bfffcb4928f9423e55e04002112a4839b4 -->
+<!-- joplo-skill 0.2.17 sha256:a4c4482912a9418ed2581af7b9ec9df66e477e912b06675b8384507b8ce48d94 -->

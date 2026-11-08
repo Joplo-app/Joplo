@@ -200,3 +200,16 @@ test('joplo voice：选着不再支持的旧 profile 时 VOICE_UNSUPPORTED 并�
   expect(r.json().error.message).toMatch(/no longer supported.*Joplo Cloud narration/);
   expect(speechCalls()).toHaveLength(0);
 });
+
+test('joplo voice：旧云端没有 /api/v1/voice（404）时不发请求，以 NETWORK 结束；--dry-run 照常估算', async () => {
+  await login();
+  voiceStatus = 404;
+  const r = await cli(['voice', project, '--format=json']);
+  expect(r.code).toBe(1);
+  expect(r.json().error.code).toBe('NETWORK');
+  expect(r.json().error.message).toContain('not available right now');
+  expect(speechCalls()).toHaveLength(0);
+  const dry = await cli(['voice', project, '--dry-run']);
+  expect(dry.code).toBe(0);
+  expect(speechCalls()).toHaveLength(0);
+});

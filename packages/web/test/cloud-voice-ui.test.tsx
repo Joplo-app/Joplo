@@ -11,7 +11,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nProvider } from '../src/i18n/context';
 import { CloudAccountCard } from '../src/board/CloudAccountCard';
 import { VoicePanel, type VoiceApi } from '../src/board/Voice';
-import { cloudQuotaView, sourceRows, voiceEstimate, voiceLabel, sampleUrl } from '../src/board/voice-model';
+import { canGenerate, cloudQuotaView, liveGenerate, sourceRows, voiceEstimate, voiceLabel, sampleUrl } from '../src/board/voice-model';
 import { Narrator } from '../src/runtime/voice';
 import type { CloudAccount, VoiceCloudView, VoiceProfileView, VoiceState } from '../src/runtime/dev-client';
 
@@ -149,5 +149,23 @@ describe('估算与额度', () => {
     expect(voiceLabel(undefined, 'x', 'en')).toBe('x');
     expect(sampleUrl(voices[1], 'zh-CN')).toBe('https://cdn.example/narrator-calm-m.zh.mp3');
     expect(sampleUrl(voices[1], 'fr')).toBe('https://cdn.example/narrator-calm-m.en.mp3');
+  });
+});
+
+describe('评审修复：离线与现场生成（P1-4 / P1-6）', () => {
+  it('云端连不上或旧云端 404：说明“暂时连不上，用浏览器朗读”，生成按钮不可用', () => {
+    const html = render(<VoicePanel api={api({ cloud: { ...cloudOk, available: false, quota: null, usageUrl: null } })} onManage={() => undefined} />);
+    expect(html).toContain('data-testid="voice-cloud-offline"');
+    expect(html).toContain('没有音频的步骤用浏览器朗读');
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="voice-generate"|<button[^>]*data-testid="voice-generate"[^>]*disabled=""/);
+    expect(canGenerate(profile('cloud'), { ...cloudOk, available: false })).toBe(false);
+    expect(canGenerate(profile('cloud'), cloudOk)).toBe(true);
+  });
+  it('播放时现场生成与预取：只有自己的 Key（OpenAI / ElevenLabs），Joplo Cloud 朗读从不', () => {
+    expect(liveGenerate(profile('cloud'), cloudOk)).toBe(false);
+    expect(liveGenerate(profile('openai', { key: { saved: true, hint: '…1234', env: 'OPENAI_API_KEY', envSet: false } }), cloudOk)).toBe(true);
+    expect(liveGenerate(profile('openai'), cloudOk)).toBe(false);
+    expect(liveGenerate(profile('acme', { unsupported: true, key: { saved: true, hint: null, env: null, envSet: false } }), cloudOk)).toBe(false);
+    expect(liveGenerate(null, cloudOk)).toBe(false);
   });
 });
