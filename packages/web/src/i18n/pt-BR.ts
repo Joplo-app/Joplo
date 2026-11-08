@@ -1,3 +1,4 @@
+import { autoCaptionMessages } from '@joplo-app/core';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -6,15 +7,7 @@ import type { Dictionary } from './en';
 export function createPtBR(locale: Locale = 'pt-BR') {
   return defineDictionary<Dictionary>()({
     player: {
-      autoClick: (label: string) => `Clique em “${value(label, locale)}”`,
-      autoType: (label: string, text: string) => `Digite “${value(text, locale)}” em “${value(label, locale)}”`,
-      autoSelect: (label: string, text: string) => `Selecione “${value(text, locale)}” em “${value(label, locale)}”`,
-      autoCheck: (label: string) => `Marque “${value(label, locale)}”`,
-      autoUncheck: (label: string) => `Desmarque “${value(label, locale)}”`,
-      autoSwitchOn: (label: string) => `Ative “${value(label, locale)}”`,
-      autoSwitchOff: (label: string) => `Desative “${value(label, locale)}”`,
-      autoBack: "Volte",
-      autoPress: (keys: string) => keys.trim() ? `Pressione ${value(keys, locale)}` : "Pressione uma tecla",
+      ...autoCaptionMessages('pt-BR'),
       mockSuccess: "Sucesso simulado",
       mockFailure: "Falha simulada",
       mockDenied: "Acesso negado simulado",

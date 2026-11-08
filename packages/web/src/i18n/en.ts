@@ -1,18 +1,19 @@
+import { autoCaptionMessages } from '@joplo-app/core';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
 
 export function createEn(locale: Locale = 'en') {
   return {
     player: {
-      autoClick: (label: string) => `Click “${label}”`,
-      autoType: (label: string, text: string) => `Type “${text}” in “${label}”`,
-      autoSelect: (label: string, text: string) => `Select “${text}” in “${label}”`,
-      autoCheck: (label: string) => `Check “${label}”`,
-      autoUncheck: (label: string) => `Uncheck “${label}”`,
-      autoSwitchOn: (label: string) => `Turn on “${label}”`,
-      autoSwitchOff: (label: string) => `Turn off “${label}”`,
-      autoBack: 'Go back',
-      autoPress: (keys: string) => keys.trim() ? `Press ${keys}` : 'Press a key',
+      autoClick: (label: string) => autoCaptionMessages('en').autoClick(label),
+      autoType: (label: string, text: string) => autoCaptionMessages('en').autoType(label, text),
+      autoSelect: (label: string, text: string) => autoCaptionMessages('en').autoSelect(label, text),
+      autoCheck: (label: string) => autoCaptionMessages('en').autoCheck(label),
+      autoUncheck: (label: string) => autoCaptionMessages('en').autoUncheck(label),
+      autoSwitchOn: (label: string) => autoCaptionMessages('en').autoSwitchOn(label),
+      autoSwitchOff: (label: string) => autoCaptionMessages('en').autoSwitchOff(label),
+      autoBack: autoCaptionMessages('en').autoBack,
+      autoPress: (keys: string) => autoCaptionMessages('en').autoPress(keys),
       mockSuccess: 'Mock success',
       mockFailure: 'Mock failure',
       mockDenied: 'Mock permission denied',

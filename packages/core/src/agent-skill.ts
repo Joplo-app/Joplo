@@ -55,7 +55,7 @@ export const PITFALLS = [
   ['Joplo Cloud narration spends the user\'s characters: run npx joplo voice --dry-run and tell them the estimate before a large batch; on TTS_QUOTA_EXCEEDED (exit 7) keep what was made, pass on error.details.usageUrl, and never retry in a loop or buy for them', 'publish'],
   ['AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json', 'publish'],
   ['Playing a demo never generates Joplo Cloud narration (it would spend characters): steps without audio use the browser voice until the user clicks Generate missing audio or you run npx joplo voice with their go-ahead', 'publish'],
-  ['Re-sharing with the default voice keeps valid local clips plus reusable published clips, even when their voices differ; an old custom provider named cloud stays unsupported until the user explicitly chooses official Joplo Cloud (use voice.profile: \'Joplo Cloud\' when config owns the selection)', 'publish'],
+  ['Re-sharing with the default voice keeps valid local clips plus reusable published clips, even when their voices differ (automatic captions must still match current text in the clip language; stale audio is excluded); an old custom provider named cloud stays unsupported until the user explicitly chooses official Joplo Cloud (use voice.profile: \'Joplo Cloud\' when config owns the selection)', 'publish'],
 ] as const satisfies readonly (readonly [string, string])[];
 
 /** 中文触发词：技能 description 里的匹配文本，不是 CLI 界面文案（english-output 测试的白名单）。 */

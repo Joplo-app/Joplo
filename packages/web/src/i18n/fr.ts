@@ -1,3 +1,4 @@
+import { autoCaptionMessages } from '@joplo-app/core';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -6,15 +7,7 @@ import type { Dictionary } from './en';
 export function createFr(locale: Locale = 'fr') {
   return defineDictionary<Dictionary>()({
     player: {
-      autoClick: (label: string) => `Cliquer sur « ${value(label, locale)} »`,
-      autoType: (label: string, text: string) => `Saisir « ${value(text, locale)} » dans « ${value(label, locale)} »`,
-      autoSelect: (label: string, text: string) => `Choisir « ${value(text, locale)} » dans « ${value(label, locale)} »`,
-      autoCheck: (label: string) => `Cocher « ${value(label, locale)} »`,
-      autoUncheck: (label: string) => `Décocher « ${value(label, locale)} »`,
-      autoSwitchOn: (label: string) => `Activer « ${value(label, locale)} »`,
-      autoSwitchOff: (label: string) => `Désactiver « ${value(label, locale)} »`,
-      autoBack: "Revenir en arrière",
-      autoPress: (keys: string) => keys.trim() ? `Appuyer sur ${value(keys, locale)}` : "Appuyer sur une touche",
+      ...autoCaptionMessages('fr'),
       mockSuccess: "Succès simulé",
       mockFailure: "Échec simulé",
       mockDenied: "Accès refusé simulé",

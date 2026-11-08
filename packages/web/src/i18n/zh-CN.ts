@@ -1,3 +1,4 @@
+import { autoCaptionMessages } from '@joplo-app/core';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, type Value } from './format';
@@ -6,15 +7,7 @@ import type { Dictionary } from './en';
 export function createZhCN(locale: Locale = 'zh-CN') {
   return defineDictionary<Dictionary>()({
     player: {
-      autoClick: (label: string) => `点击「${label}」`,
-      autoType: (label: string, text: string) => `在「${label}」中输入“${text}”`,
-      autoSelect: (label: string, text: string) => `在「${label}」中选择“${text}”`,
-      autoCheck: (label: string) => `勾选「${label}」`,
-      autoUncheck: (label: string) => `取消勾选「${label}」`,
-      autoSwitchOn: (label: string) => `打开「${label}」`,
-      autoSwitchOff: (label: string) => `关闭「${label}」`,
-      autoBack: '返回上一页',
-      autoPress: (keys: string) => keys.trim() ? `按下 ${keys}` : '按下按键',
+      ...autoCaptionMessages('zh-CN'),
       mockSuccess: '模拟成功',
       mockFailure: '模拟失败',
       mockDenied: '模拟无权限',

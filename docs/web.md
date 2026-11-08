@@ -185,6 +185,7 @@ trace 同时提供镜头目标。取景保留上下文：镜头对准图表里�
 - **接口**（都要本机令牌）：`GET/PUT/DELETE /__joplo/voice/profiles[/:id]`（PUT 只能改预设的默认音色与 Key）、`POST /__joplo/voice/test`（OpenAI / ElevenLabs 的 Key）、`GET /__joplo/p/:id/voice[?refresh=1]`（状态里有 `cloud`：是否登录、额度、用量页、是否收到过 402）、`PUT /__joplo/p/:id/voice`、`POST /__joplo/p/:id/voice/generate`、`POST /__joplo/p/:id/voice/clip`（Joplo Cloud 朗读返回 409 `CLOUD_GENERATE_ONLY`）、`GET /__joplo/p/:id/voice/clips/:file`；状态变化推 HMR 事件 `joplo:voice`。实现见 `packages/server/src/voice.ts`、`voice-http.ts`，网页 `runtime/voice.ts`、`board/Voice.tsx`、`player/SiteVoice.tsx`，纯函数 `core/src/voice.ts`。
 - **重新发布沿用音频**：项目没选过来源（默认来源，例如登录后默认 Joplo Cloud）、又有上一次的分享时（`share` 更新同一个链接、`share --update`），逐片段优先带上本机按当前默认来源生成的有效音频，再按上次分享中相同文字的实际指纹补齐；新增语言、换了默认音色或新旧来源不同也能共存，发布索引按语言、角色与文字记录实际声音，后续换电脑更新仍能沿用。在看板或 config 里明确选过来源时按选的来源，不再继承旧来源。
 - **旧来源的 cloud 名称冲突**：旧版自建、id 为 `cloud` 的来源会以 `cloud-old`（重名时加序号）显示为“不再支持”，旧的看板选择和 `voice.profile: 'cloud'` 继续使用其原指纹，已生成音频仍可播放、发布。主动在看板选「Joplo Cloud 朗读」会持久记住官方选择；若来源由 config 控制，将 `voice.profile` 改为明确的官方名称 `'Joplo Cloud'`。切换前不会用官方 cloud 代替旧来源生成，也不会转用旧 Key。
+- **自动字幕音频有效性**：改过按钮名、输入/选择值或按键后，build/share 会按当前自动字幕参数与每段缓存的语言重新计算文字，只打包仍然匹配且缓存键一致的音频，再按本机与旧分享的优先级选声音。无法验证的语言或旧文本不进入站点文件和播放索引；没有有效片段时计入缺失并退回浏览器朗读，其他语言仍有效的音频继续保留。
 - **音色记录恢复**：`pins` 逐层校验语言、映射与六种固定音色 ID；损坏项单独忽略，保留合法项，缺失项按推荐规则选择并在成功生成后记下。无需删除整个 `.joplo/voice/index.json`，其中还保存已有音频的索引。
 - **已知限制**：视频导出还不带声音（第二期）；看板外观不发布；角色的音色只能在 `joplo.config.ts` 的 `voice.roles` 里写；观众切到别的语言时，自动字幕那几步用浏览器朗读。
 

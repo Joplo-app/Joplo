@@ -1,3 +1,4 @@
+import { autoCaptionMessages } from '@joplo-app/core';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -6,15 +7,7 @@ import type { Dictionary } from './en';
 export function createJa(locale: Locale = 'ja') {
   return defineDictionary<Dictionary>()({
     player: {
-      autoClick: (label: string) => `「${value(label, locale)}」をクリック`,
-      autoType: (label: string, text: string) => `「${value(label, locale)}」に「${value(text, locale)}」を入力`,
-      autoSelect: (label: string, text: string) => `「${value(label, locale)}」で「${value(text, locale)}」を選択`,
-      autoCheck: (label: string) => `「${value(label, locale)}」にチェックを入れる`,
-      autoUncheck: (label: string) => `「${value(label, locale)}」のチェックを外す`,
-      autoSwitchOn: (label: string) => `「${value(label, locale)}」をオンにする`,
-      autoSwitchOff: (label: string) => `「${value(label, locale)}」をオフにする`,
-      autoBack: "前のページに戻る",
-      autoPress: (keys: string) => keys.trim() ? `${value(keys, locale)} を押す` : "キーを押す",
+      ...autoCaptionMessages('ja'),
       mockSuccess: "模擬成功",
       mockFailure: "模擬失敗",
       mockDenied: "模擬アクセス拒否",

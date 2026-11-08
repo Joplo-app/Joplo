@@ -1,3 +1,4 @@
+import { autoCaptionMessages } from '@joplo-app/core';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -6,15 +7,7 @@ import type { Dictionary } from './en';
 export function createRu(locale: Locale = 'ru') {
   return defineDictionary<Dictionary>()({
     player: {
-      autoClick: (label: string) => `Нажать «${value(label, locale)}»`,
-      autoType: (label: string, text: string) => `Ввести «${value(text, locale)}» в «${value(label, locale)}»`,
-      autoSelect: (label: string, text: string) => `Выбрать «${value(text, locale)}» в «${value(label, locale)}»`,
-      autoCheck: (label: string) => `Отметить «${value(label, locale)}»`,
-      autoUncheck: (label: string) => `Снять отметку «${value(label, locale)}»`,
-      autoSwitchOn: (label: string) => `Включить «${value(label, locale)}»`,
-      autoSwitchOff: (label: string) => `Выключить «${value(label, locale)}»`,
-      autoBack: "Вернуться назад",
-      autoPress: (keys: string) => keys.trim() ? `Нажать ${value(keys, locale)}` : "Нажать клавишу",
+      ...autoCaptionMessages('ru'),
       mockSuccess: "Имитация успеха",
       mockFailure: "Имитация ошибки",
       mockDenied: "Имитация отказа в доступе",

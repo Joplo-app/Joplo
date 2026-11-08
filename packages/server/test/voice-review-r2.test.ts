@@ -197,17 +197,17 @@ describe('R2 默认来源：发布索引能够播放新生成与沿用的不同�
     const store = new ProfileStore(home, {}), cache = new VoiceCache(proj);
     const oldFp = resolveVoices(undefined, 'openai', store).voices.narrator!;
     const newFp = resolveVoices(undefined, undefined, store, null, 'cloud').voices.narrator!;
-    seed(cache, oldFp, 'f.a.s#1', 'Click Go', 'en');
-    seed(cache, newFp, 'f.a.s#1', '点击前进', 'zh-CN');
+    seed(cache, oldFp, 'f.a.s#1', 'Click “Go”', 'en');
+    seed(cache, newFp, 'f.a.s#1', '点击「Go」', 'zh-CN');
     const fallback = { narrator: oldFp, roles: {}, clips: {} };
     const result = bundleVoice(proj, p, out, store, undefined, fallback, 'cloud');
     expect(result.report).toMatchObject({ clips: 2, missing: 0 });
-    playable(result.index!, null, 'Click Go');
-    playable(result.index!, null, '点击前进');
+    playable(result.index!, null, 'Click “Go”');
+    playable(result.index!, null, '点击「Go」');
     // 此时 current cloud 不能直接找到旧指纹下的英文，必须读取上一轮的实际声音覆盖。
     const again = bundleVoice(proj, p, tmp('joplo-r2-auto-again-'), store, undefined, result.index!, null);
     expect(again.report).toMatchObject({ clips: 2, missing: 0 });
-    playable(again.index!, null, '点击前进');
+    playable(again.index!, null, '点击「Go」');
   });
 
   it('新电脑按语言沿用 cloud 同文不同音色，不把刚下载的中文当成新生成的英文', async () => {

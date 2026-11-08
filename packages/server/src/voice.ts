@@ -24,7 +24,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_STYLE, clipKey, localizeProject, speakerRoleAt, spokenChars, spokenLine, voiceFingerprint, type Project, type VoiceConfig, type VoiceIndex } from '@joplo-app/core';
+import { DEFAULT_STYLE, automaticCaption, clipKey, localizeProject, speakerRoleAt, spokenChars, spokenLine, voiceFingerprint, type Project, type VoiceConfig, type VoiceIndex } from '@joplo-app/core';
 import type { CloudSpeechResult, CloudVoice, CloudVoiceBridge, CloudVoiceCatalog } from './cloud.ts';
 
 export { DEFAULT_STYLE };
@@ -944,7 +944,7 @@ export async function reuseSharedVoice(projectDir: string, project: Project, sha
  * 发布（joplo build / share）：把发布 IR 里步骤用到的、当前声音的音频拷进 `<outDir>/voice/`，返回 IR 的 voiceIndex。
  * 同一步同一声音同一语言只留最新的一段（改过字之后旧的不再带上）。
  * 内容多语言（D84）：每种内容语言按 resolveVoices(…, 语言) 选声音，voiceIndex.locales 记各语言的指纹；missing 按语言分别统计。
- * missing：还没有音频的步骤数（自动字幕的步骤只要有这种语言的任意音频就算有）。
+ * missing：还没有有效音频的步骤数（自动字幕必须匹配当前参数在片段语言下生成的文字）。
  * 没有选用 profile 时：给了 fallback（已发布分享的 voiceIndex）就按它的指纹带上本机已有的音频，否则不带（观众端用浏览器朗读）。
  * defaultProfile：项目没选过来源时的默认（D85：已登录为 'cloud'，与看板同一规则，见 resolveVoices）。
  * 不再支持的旧 profile 照常按它的指纹打包（D85：已生成的音频照常随分享上传）。
@@ -986,7 +986,13 @@ export function bundleVoice(projectDir: string, project: Project, outDir: string
         const chosen: [string, ClipRecord][] = [];
         if (localized) {
           const records = Object.entries(idx.clips)
-            .filter(([key, c]) => c.stepId === st.id && (!locale || c.locale === locale) && !!cache.clipOf(key))
+            .filter(([key, c]) => {
+              if (c.stepId !== st.id || (locale && c.locale !== locale) || typeof c.text !== 'string') return false;
+              const expected = automaticCaption(st.captionAuto!, c.locale);
+              // 先证明文字仍属于当前内容，再考虑来源优先级；未知语言、旧文字或错配缓存键均不能发布。
+              return expected !== null && c.text.replace(/\s+/g, ' ').trim() === expected.replace(/\s+/g, ' ').trim()
+                && key === clipKey(c.fp, expected) && !!cache.clipOf(key);
+            })
             .sort((a, b) => b[1].at.localeCompare(a[1].at));
           // 没有作者内容语言时，仍保留每种看板界面语言的自动字幕音频。
           for (const lang of new Set(records.map(([, c]) => c.locale))) {
