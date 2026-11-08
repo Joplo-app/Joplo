@@ -181,6 +181,17 @@ test.each([['free', false, true, false], ['pro', false, true, true], ['pro', tru
   expect(calls.find(c => c.path === '/api/v1/shares')!.body).toMatchObject({ title: 'Custom' }); expect(calls.find(c => c.path === '/api/v1/shares')!.body.replaceShareId).toBe(replace ? 'Old1234567' : undefined);
   if (p === 'free') { expect(r.stdout).toContain(base + '/settings/billing'); expect(r.stdout).not.toMatch(new RegExp(base.replace(/[.]/g, '\\.') + '/billing')); }
 });
+test.each([['pro', true], ['free', false]] as const)('share --update <链接>：没有 cloud.json 也能更新指定分享（D84） plan=%s', async (p, replace) => {
+  plan = p; await credentials();
+  const r = await cli(['share', project, '--update', base + '/s/Old1234567/', '--format=json']); expect(r.code, r.stdout).toBe(0);
+  expect(calls.find(c => c.path === '/api/v1/shares')!.body.replaceShareId).toBe(replace ? 'Old1234567' : undefined);
+  // 发布后写下记录，之后在这台电脑上照常 share 就会更新它
+  expect(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8')).shareId).toBe(r.json().data.shareId);
+});
+test.each([[['--update', 'not a link']], [['--update', 'https://joplo.app/x/abc']], [['--update', 'https://joplo.app/s/Old1234567/', '--new']]] as const)('share --update 写错时报 USAGE，不发请求 %j', async (args) => {
+  await credentials();
+  const r = await cli(['share', project, ...args, '--format=json']); expect(r.code).toBe(2); expect(r.json().error.code).toBe('USAGE'); expect(calls.filter(c => c.path.startsWith('/api/'))).toEqual([]);
+});
 test('交互 share 自动登录后继续发布', async () => { expect((await cli(['share', project], { interactive: true })).code).toBe(0); expect(browser).toHaveBeenCalledOnce(); expect(calls.some(c => c.path.endsWith('/finalize'))).toBe(true); });
 test('白名单外文件与不安全路径在上传前列出并拒绝', async () => {
   await credentials(); files = { ...files, 'assets/movie.mp4': 'video', 'assets/readme.bin': 'binary', 'assets/a%20.png': 'png' };

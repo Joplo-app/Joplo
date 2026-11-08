@@ -1,7 +1,7 @@
 /**
  * v2 接口（ADR-0002）：CLI 只依赖这里导出的三个函数。由 T-board 实现，届时 index.ts 改为导出它们。
  */
-import type { AppearanceFont, AppearanceStroke, Diagnostic, ScopeInfo, ScopeRequest } from '@joplo-app/core';
+import type { AppearanceFont, AppearanceStroke, Diagnostic, ScopeInfo, ScopeRequest, VoiceIndex } from '@joplo-app/core';
 import type { CloudBridge } from './cloud.ts';
 export type { CloudAccount, CloudBridge, CloudJob, CloudJobError, CloudPublishRequest, CloudPublishResult } from './cloud.ts';
 
@@ -42,13 +42,18 @@ export type BuildOptions = {
    * 缺省（或两个数组都为空）时与原来完全一致。写错场景 / 功能时报错，不写任何文件。
    */
   scope?: ScopeRequest;
+  /**
+   * 上一次发布的分享（D84，`joplo share` 重新发布时传）：它的 voiceIndex 与取文件的方法。本机没有、分享里有的音频
+   * （同样的文字和声音）下载进本机缓存后照常打包，不重新生成；本机没有声音供应商时按分享里的声音指纹带上。
+   */
+  sharedVoice?: { index: VoiceIndex; fetch: (file: string) => Promise<Uint8Array | null> };
 };
 /** 静态发布站：只含选定方案（compile 的 publish 模式），离线可打开，可直接 `wrangler deploy`。 */
 /**
  * voice（D74）：带上的朗读音频。clips = 片段数；bytes = 新写入的字节；missing = 当前声音下还没有音频的步骤数（观众端这些步骤用浏览器朗读）；
  * profile = 选用的声音供应商名。没有选用供应商、也没有音频时省略。
  */
-export type BuildResult = { outDir: string; files: string[]; routes: string[]; scenarios: string[]; diagnostics: Diagnostic[]; voice?: { clips: number; bytes: number; missing: number; profile: string | null }; /** 有 scope 时：范围与借用了哪些别的功能的内容（D75）。 */ scope?: ScopeInfo };
+export type BuildResult = { outDir: string; files: string[]; routes: string[]; scenarios: string[]; diagnostics: Diagnostic[]; voice?: { clips: number; bytes: number; missing: number; profile: string | null; reused?: number; locales?: Record<string, { missing: number }> }; /** 有 scope 时：范围与借用了哪些别的功能的内容（D75）。 */ scope?: ScopeInfo };
 export declare function buildSite(opts: BuildOptions): Promise<BuildResult>;
 
 export type RenderOptions = {
@@ -60,6 +65,8 @@ export type RenderOptions = {
   theme?: string;
   /** UI language for the standalone render route. Unsupported values are ignored. */
   locale?: string;
+  /** Author content language (D84): one of config locales; the screenshot shows that translation. */
+  content?: string;
   /** 字体（D55）：hand / sans / serif / kai / mono；缺省跟随主题。 */
   font?: AppearanceFont | null;
   /** 线条（D55）：rough / clean；缺省跟随主题。 */

@@ -11,6 +11,8 @@ import { useI18n } from '../i18n/context';
 import type { DemoController } from '../runtime/demo';
 import { Narrator } from '../runtime/voice';
 import { Btn, type BtnSize } from './controls';
+import { useContent } from '../i18n/content-context';
+import { siteVoiceLookup } from '../i18n/content';
 
 /** 分享里有没有 build 带上的音频。 */
 export function hasVoiceClips(project: Project | null): boolean {
@@ -24,11 +26,13 @@ export function siteVoiceDefault(project: Project | null, muted = false): boolea
 
 export function useSiteVoice(ctl: DemoController, project: Project | null, muted = false) {
   const { locale } = useI18n();
+  const content = useContent();
   const narrator = useMemo(() => new Narrator(), []);
   const [on, setOnState] = useState(() => siteVoiceDefault(project, muted));
   narrator.enabled = on && !muted;
-  narrator.locale = locale;
-  narrator.lookup = project?.voiceIndex ?? null;
+  // 内容多语言（D84）：浏览器朗读用内容语言；生成的音频用这种语言的声音（没有单独的声音时用默认声音）
+  narrator.locale = content?.locale ?? locale;
+  narrator.lookup = siteVoiceLookup(project?.voiceIndex, content?.locale);
   useEffect(() => {
     ctl.narrator = narrator;
     return () => {

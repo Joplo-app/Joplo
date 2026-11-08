@@ -68,7 +68,7 @@ function useBoxes(ids: string[], wrapRef: RefObject<HTMLDivElement | null>, cont
     let raf = 0;
     let pending = 0;
     let n = 0;
-    const toBox = (r: DOMRect): Box => ({ x: r.left, y: r.top, w: r.width, h: r.height });
+    const toBox = (r: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>): Box => ({ x: r.left, y: r.top, w: r.width, h: r.height });
     const measure = () => {
       const wr = rectOf(wrap);
       const scale = wr.width / (wrap.offsetWidth || 1);

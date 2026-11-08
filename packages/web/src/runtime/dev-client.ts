@@ -175,7 +175,7 @@ export async function openInEditor(projectId: string, at: string): Promise<{ ok:
 }
 
 /** 导出跟随页面自己的 viewport（D44：不再选择设备）。 */
-export type ExportRequest = { locale: Locale; scenarioId: string; position: number; theme: string; /** D55：null = 跟随主题。 */ font?: AppearanceFont | null; stroke?: AppearanceStroke | null };
+export type ExportRequest = { locale: Locale; /** 看板当前的内容语言（D84）；项目没有 i18n 时不传。 */ contentLocale?: string; scenarioId: string; position: number; theme: string; /** D55：null = 跟随主题。 */ font?: AppearanceFont | null; stroke?: AppearanceStroke | null };
 
 /** 本机导出图片：服务端用导出组件（Playwright，D66）渲染当前步骤（与 joplo render 同一渲染路径）。code 是服务端错误码（例如 EXPORT_COMPONENT_MISSING）。 */
 export async function exportImage(projectId: string, body: ExportRequest): Promise<{ ok: true; blob: Blob; name: string } | { ok: false; message: Text; code?: string }> {
@@ -350,6 +350,8 @@ export type VoiceState = {
   missing: string | null;
   profile: VoiceProfileView | null;
   voices: { narrator: string | null; roles: Record<string, string> };
+  /** 各内容语言的声音（D84）：音色与指纹；没有的语言用上面的默认声音。 */
+  byLocale?: Record<string, { narrator: string | null; roles: Record<string, string>; voices: { narrator: string | null; roles: Record<string, string> } }>;
   narrator: string | null;
   roles: Record<string, string>;
   clips: Record<string, string>;
@@ -430,9 +432,9 @@ export type VoiceSegment = { stepId: string; text: string; role: string | null }
 export type VoiceSummary = { total: number; generated: number; skipped: number; failed: { stepId: string; message: string }[]; noProfile?: boolean };
 
 /** 生成缺的音频（进度通过 joplo:voice 推送）。 */
-export async function generateVoice(projectId: string, locale: Locale, segments: VoiceSegment[]): Promise<{ ok: true; summary: VoiceSummary; state: VoiceState } | { ok: false; message: Text }> {
+export async function generateVoice(projectId: string, locale: Locale, segments: VoiceSegment[], contentLocale?: string | null): Promise<{ ok: true; summary: VoiceSummary; state: VoiceState } | { ok: false; message: Text }> {
   try {
-    const res = await post(`/__joplo/p/${enc(projectId)}/voice/generate`, { locale, segments });
+    const res = await post(`/__joplo/p/${enc(projectId)}/voice/generate`, { locale, segments, ...(contentLocale ? { contentLocale } : {}) });
     const b = (await res.json().catch(() => null)) as ({ summary?: VoiceSummary; state?: VoiceState } & NonNullable<ErrBody>) | null;
     return res.ok && b?.summary && b.state ? { ok: true, summary: b.summary, state: b.state } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
   } catch (e) {
@@ -462,9 +464,9 @@ export function subscribeVoice(projectId: string, cb: (s: VoiceState) => void, d
 }
 
 /** 边放边生成一段（D74）：已有就直接返回；同一段并发只生成一次。 */
-export async function requestClip(projectId: string, locale: Locale, segment: VoiceSegment): Promise<{ ok: true; url: string; key: string } | { ok: false; message: Text }> {
+export async function requestClip(projectId: string, locale: Locale, segment: VoiceSegment, contentLocale?: string | null): Promise<{ ok: true; url: string; key: string } | { ok: false; message: Text }> {
   try {
-    const res = await post(`/__joplo/p/${enc(projectId)}/voice/clip`, { locale, segment });
+    const res = await post(`/__joplo/p/${enc(projectId)}/voice/clip`, { locale, segment, ...(contentLocale ? { contentLocale } : {}) });
     const b = (await res.json().catch(() => null)) as ({ url?: string; key?: string } & NonNullable<ErrBody>) | null;
     return res.ok && b?.url && b.key ? { ok: true, url: b.url, key: b.key } : { ok: false, message: b?.error?.message ?? `HTTP ${res.status}` };
   } catch (e) {

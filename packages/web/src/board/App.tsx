@@ -55,6 +55,9 @@ import { ThemeStyles } from '../renderer/ThemeStyles';
 import type { Look } from '../renderer/appearance';
 import { AppearanceButton, AppearancePopover } from './Appearance';
 import { VoiceButton, VoicePopover, VoiceProfilesDialog, useVoice } from './Voice';
+import { contentMenuRows, viewProject, type ContentInfo } from '../i18n/content';
+import { ContentContext } from '../i18n/content-context';
+import { contentLocaleFor } from '@joplo-app/core';
 import { effectiveAppearance } from './appearance-model';
 import { loadWenKai } from './font-loading';
 
@@ -188,6 +191,15 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   // 检查模式（D55 顶栏「检查」开关）：只在本页，不写进网址（不变量 2）
   const [inspectMode, setInspectMode] = useState(false);
   const ir = useProjectIR(projectId);
+  // 内容语言（D84）：和发布站一样跟随界面语言（同一个语言菜单），项目没有这种语言时用默认语言；舞台、字幕、旁白都用换过语言的 IR
+  const raw = ir.payload?.project ?? null;
+  const contentLocale = raw ? contentLocaleFor(raw, locale) : null;
+  // 语言菜单里给有内容的语言标“原文 / 译文”，看板另外显示翻译进度与过期条数
+  const contentInfo = useMemo((): ContentInfo | null => {
+    if (!raw?.i18n || !contentLocale) return null;
+    const details = Object.fromEntries(contentMenuRows(raw).filter((r) => !r.isDefault).map((r) => [r.locale, { description: i18n.board.contentProgress(r.translated, r.total), ...(r.stale ? { stale: i18n.board.contentStale(r.stale) } : {}) }]));
+    return { locales: raw.i18n.locales, default: raw.i18n.default, locale: contentLocale, fallback: false, details, footer: i18n.board.contentAddHint };
+  }, [raw, contentLocale, i18n]);
   const ctl = useMemo(() => new DemoController(selectionWriter(projectId)), [projectId]);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
   // 外观（D51 / D55）：本项目 > 所有项目 > 项目 config；在外观浮层里改，立即生效；悬停时临时预览
@@ -249,8 +261,8 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   useEffect(() => {
     const p = ir.payload;
     if (!p?.project) return;
-    if (p.ok || !ctl.getSnapshot().project) ctl.setProject(p.project, p.version, p.home);
-  }, [ir.payload, ctl]);
+    if (p.ok || !ctl.getSnapshot().project) ctl.setProject(viewProject(p.project, contentLocale, locale), p.version, p.home);
+  }, [ir.payload, ctl, contentLocale, locale]);
 
   const project = snap.project;
   // 标签页标题与 favicon 状态点（D55）：“功能 · 项目”；编译出错加 ✕ 和红点；导出中写进度、黄点
@@ -285,7 +297,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', projectId, play: { ...(play.speed ? { speed: play.speed } : {}), ...next } }, replace);
   const resolved = usePlaySync(ctl, snap, project, play, (next) => toPlay(next, true));
   // 朗读（D74）：播放坞的「声音」按钮 → 浮层 →「管理供应商」对话框
-  const voice = useVoice(projectId, project, snap.optionId, ctl, locale, { scenarioId: snap.scenarioId, position: snap.state?.position ?? 0 });
+  const voice = useVoice(projectId, project, snap.optionId, ctl, locale, { scenarioId: snap.scenarioId, position: snap.state?.position ?? 0 }, contentLocale);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [voiceAnchor, setVoiceAnchor] = useState<HTMLButtonElement | null>(null);
   const [providersOpen, setProvidersOpen] = useState(false);
@@ -343,7 +355,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
       disabled: !scenario,
       onClick: () => {
         if (!scenario || !state) return;
-        const body = { scenarioId: scenario.id, position: state.position, ...a.saved, locale };
+        const body = { scenarioId: scenario.id, position: state.position, ...a.saved, locale, ...(contentLocale ? { contentLocale } : {}) };
         const run = () => {
           setFlash(<LocalText value={m.board.generatingImage} />);
           void exportImage(projectId, body).then((r) => {
@@ -376,7 +388,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
     if (!scenario) return;
     const run = () => {
       videoName.current = scenario.name;
-      void vid.start(scenario.id, a.saved, locale).then((ok) => !ok && setFlash(<LocalText value={m.board.videoExportFailed(vid.error ?? m.board.couldNotStart)} />));
+      void vid.start(scenario.id, a.saved, locale, contentLocale).then((ok) => !ok && setFlash(<LocalText value={m.board.videoExportFailed(vid.error ?? m.board.couldNotStart)} />));
     };
     if (!needsSetup(run)) run();
   };
@@ -411,7 +423,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
 
   const selection = snap.selection;
   return (
-    <>
+    <ContentContext.Provider value={contentInfo}>
       <ThemeStyles themes={project.themes} />
       <PlayerPage
         ctl={ctl}
@@ -532,6 +544,6 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           </>
         }
       />
-    </>
+    </ContentContext.Provider>
   );
 }

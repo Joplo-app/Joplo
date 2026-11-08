@@ -20,7 +20,7 @@ export const SKILL_TOPICS = [
   { name: 'selection', description: 'Edit only the element selected by the user in the board' },
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
   { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
-  { name: 'publish', description: 'pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing' },
+  { name: 'publish', description: 'pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages' },
 ] as const;
 
 /** 心智模型：所有入口最先读到的几句话。 */

@@ -5,6 +5,9 @@ import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/messages';
 import { useI18n } from '../i18n/context';
 import { SiteVoiceButton, useSiteVoice } from '../player/SiteVoice';
+import { ContentContext } from '../i18n/content-context';
+import { siteContent, viewProject } from '../i18n/content';
+import { ContentFallbackNotice } from './ContentNotice';
 /**
  * 发布站（`joplo build` 的产物，D39 / D33 / D55「发布站 · 观众看到的」）：与本机看板同一套布局、时间线、字幕、全屏和快捷键，只有一个项目。
  * - 首页 `#/`：左栏列功能；右侧是项目名、说明和功能卡片（整张可点，带缩略图）；
@@ -53,12 +56,18 @@ export function readInlineIR(): SiteData | null {
  * `branding` 缺省读页面里的 joplo-branding 标记（D83）：只有 Joplo Cloud 给 Pro 分享注入 off 时才去掉水印。
  */
 export function SiteApp({ data, search = typeof location === 'undefined' ? '' : location.search, branding = readBranding() }: { data: SiteData | null; search?: string; branding?: boolean }) {
-  const { t: i18n } = useI18n();
+  const { t: i18n, locale } = useI18n();
   const embed = useMemo(() => parseEmbedParams(search), [search]);
+  // 作者内容多语言（D84）：内容语言跟随界面语言，项目没有时退回默认语言；下面所有组件都只看换过语言的 IR
+  const content = useMemo(() => (data ? siteContent(data.project, locale) : null), [data, locale]);
+  const project = useMemo(() => (data ? viewProject(data.project, content?.locale, locale) : null), [data, content?.locale, locale]);
 
-  if (!data) return <div className="p-8 text-[#c92a2a]">{i18n.site.prototypeDataIsMissingRunJoploBuildAgain}</div>;
-  if (embed) return <EmbedApp project={data.project} params={embed} branding={branding} />;
-  return <Site project={data.project} scoped={data.scoped === true} branding={branding} />;
+  if (!data || !project) return <div className="p-8 text-[#c92a2a]">{i18n.site.prototypeDataIsMissingRunJoploBuildAgain}</div>;
+  return (
+    <ContentContext.Provider value={content}>
+      {embed ? <EmbedApp project={project} params={embed} branding={branding} /> : <Site project={project} scoped={data.scoped === true} branding={branding} />}
+    </ContentContext.Provider>
+  );
 }
 
 function Site({ project, scoped, branding }: { project: Project; scoped: boolean; branding: boolean }) {
@@ -125,6 +134,7 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
               <h1 className="text-[24px] font-bold leading-8">{project.name}</h1>
               {project.description ? <p className="mt-1.5 max-w-[860px] text-[14px] leading-[22px] text-jb-muted">{project.description}</p> : null}
             </div>
+            <ContentFallbackNotice />
             {features.length === 0 ? <p className="text-[14px] text-jb-muted">{i18n.site.noFeaturesHaveBeenPublishedYet}</p> : null}
             <section className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2">
               {features.map((f) => {
@@ -273,6 +283,7 @@ function SitePlayer({ project, play, navigate, branding }: { project: Project; p
         </div>
       }
       menu={[]}
+      banner={<ContentFallbackNotice />}
       flash={flash}
       watch={{
         title: feature.name,

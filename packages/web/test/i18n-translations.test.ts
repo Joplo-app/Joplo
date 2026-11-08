@@ -12,6 +12,7 @@ const unchanged: Record<string, { locales: readonly Locale[]; reason: string; va
   "player.list": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Intl list formatting; empty and single-item lists have no connective." },
   "board.appearanceName": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Author/theme/font values joined by a neutral separator." },
   "player.space": { locales: ["zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Physical Space key name, preserved across languages." },
+  "site.contentSourceTag": { locales: ["es", "fr", "de", "pt-BR"], reason: "\"Original\" is the native word for the source-language tag in these languages." },
   "site.itemCount": { locales: ["zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Numeric count only; Intl handles formatting." },
   "board.itemCount": { locales: ["zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Author value or numeric count only." },
   "board.markerGothic": { locales: ["zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Font family brand name." },

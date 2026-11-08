@@ -441,6 +441,7 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
 - Props that shape a Diagram's layout (tone, label, kind) are fixed at compile time and cannot bind state. To recolor per step, draw that part with your own elements and a bound style.
 - Ids inside reusable graphics must be unique across layers: prefix them with the instance id (map_TX, not TX). A cue resolves an id to the first layer that has it, so the same id on two layers sends the director to the wrong layer, and check cannot tell which one you meant.
 - Let a missing asset() fail loudly. Do not wrap it in try/catch with a drawn fallback: a stale dev process or a wrong path then shows a substitute without any error.
+- One screen in several variants (languages, brands, plans): bind every visible string to $.ui, keep the variants in one table, and write a helper that returns the set() effects for a whole variant (...variant('ja')). Include breadcrumbs, badges, button labels, status text and captions; render one key frame per variant to catch strings left in the old variant.
 
 ## Write a theme
 - A theme is a CSS file at themes/<name>.css in the project root. Set theme: '<name>' in joplo.config.ts as the default. A custom theme overrides a built-in with the same name.
@@ -511,6 +512,7 @@ Choose by the question: "what is where" → Diagram; "what happens in what order
 - Leave out direction: Joplo tries top → bottom and left → right and keeps the one that fills the stage with the largest text (domain groups end up side by side). direction="right" / "down" forces one; aspect={1.6} sets the wanted width / height; h="100%" fills a layer.
 - Source order is the order within a layer: write nodes, groups, and edges in reading order. Write the request edge before its reply (api → kernel before kernel → api): the later one is drawn as a return edge.
 - Mark secondary flows async (usage events, audit logs): they may stop pushing their target a layer down, so domains sit side by side instead of in a tall column.
+- When two chains feed one node (author → storage → player, and viewer → player), write the upstream chain's groups and edges first, in the direction data flows. An edge written before its upstream chain is drawn as a loop back across the stage.
 - pin="start" / pin="end" puts a node or group in the first / last layer of its group. The layout covers every element, including ones hidden with when: nodes never move between steps.
 - In each step only the traced call is bold, colored, with a moving dot and its label outlined; other edges turn thin and light. One call per step reads best.
 
@@ -729,7 +731,9 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - EXPLAIN_TOO_LONG: Shorten the explain note to about 48 units, using the same CJK 1 / other 0.5 calculation. Put detailed rationale in a separate explanation layer. See demo.
 - SAY_TOO_LONG / NARRATE_TOO_LONG (warning): a say() or narrate() line over about 80 units (about 10 seconds aloud). Autoplay waits until it is read; say less or split the step.
 - SAY_EMPTY / NARRATE_EMPTY: say() needs the character's words, narrate() the narrator's. Remove it to fall back to the caption.
-- VOICE_CONFIG_INVALID: config({ voice }) takes { profile?, narrator?, roles?: { roleKey: 'voice' } } with non-empty strings. API keys never go in the config.
+- VOICE_CONFIG_INVALID: config({ voice }) takes { profile?, narrator?, roles?: { roleKey: 'voice' }, locales?: { ja: { narrator?, roles? } } } with non-empty strings. API keys never go in the config.
+- LOCALES_INVALID / LOCALES_UNDECLARED: config({ locales }) lists supported languages once each, source language first; every locales/<lang>.json must be listed there and must not be the source language. LOCALE_FILE_INVALID: the file must be one JSON object of "source text": "translation" strings.
+- I18N_MISSING / I18N_STALE / I18N_UNUSED (warnings): texts with no translation (viewers see the source text), a source text that changed (the closest old entry is shown: rename the key and update the translation), entries nothing uses. npx joplo i18n add <lang> adds the missing keys.
 - DESCRIPTION_TOO_LONG: flow({ description }) is the scenario cover sentence; keep it within 30 units, one sentence saying what this scenario shows. See story.
 - CARD_TEXT_TOO_LONG (info): a transition card's sub is over 48 units, a point over 24, or more than 4 points. Keep one sentence and a few short points; move details into steps.
 - SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.
@@ -983,6 +987,13 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - Local check / build / dev remain free and do not connect to the cloud.
 - CI: set JOPLO_API_KEY (jpk_..., created in Settings → API keys) instead of logging in. Every cloud command then uses it; credentials.json and browser login are never touched. An invalid or revoked key returns AUTH_EXPIRED: ask the user for a new key.
 - PR previews: in GitHub Actions run npx joplo share --new --pr <number> --format json; repo, commit, and run URL come from the Actions environment. Outside Actions pass --repo owner/name. data.pr.comment "skipped" means the Joplo GitHub App is not installed; tell the user, the share itself succeeded.
+
+## Viewers in several languages
+- Write the source files in one language. To add another: npx joplo i18n add <lang> (first time also --source <source lang>). It adds the language to config({ locales }) (the first entry is the source language) and writes locales/<lang>.json as "source text": "" for every text viewers see: screens, captions, narrate / say, cards, toasts, done, feature and scenario names, displayed sample data, and board-only texts (case titles and expected results, rules, questions, element notes).
+- Translate every "" yourself, whole sentences, keeping on-screen names consistent where captions quote them; narration as people say it in that language. Do not put t() calls or per-language objects in the TSX. Then npx joplo check: I18N_MISSING lists what is left, I18N_STALE means a source text changed (it shows the closest old entry: rename the key and update the translation).
+- After editing source texts, run npx joplo i18n add <lang> again for each language: it adds new keys and keeps existing translations (--prune drops unused ones).
+- One link serves everyone: viewers get their browser language, ?lang=<lang> picks one, and languages the project lacks fall back to the source language. The board's content-language menu previews each language; npx joplo render --content <lang> screenshots one.
+- Narration: generate audio per language in the board; each language picks a native preset voice when the provider has one, or set config({ voice: { locales: { ja: { narrator } } } }). Languages without audio use the viewer's browser voice. Re-sharing reuses the audio already in the previous share (same text and voice). On another computer (no .joplo/cloud.json) run npx joplo share --update <share link>: it updates that share (Pro; free plans get a new link) and reuses its audio instead of regenerating it.
 
 ## Feature changes across versions
 For local comparisons and PR CI, read npx joplo skill diff. It compares two real publish builds and creates one immutable bundle; ordinary share --pr remains a single preview.

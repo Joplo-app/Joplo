@@ -19,14 +19,14 @@ import os from 'node:os';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { build as viteBuild, createServer, type Rollup } from 'vite';
-import { stepIdentity, type StepIdentity, hasScope, JoploError, orderedFeatures, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
+import { stepIdentity, type StepIdentity, hasScope, JoploError, orderedFeatures, pruneMessages, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
 import type { DistWeb, SourceWeb } from './web-assets.ts';
 import { subsetSiteFonts } from './site-fonts.ts';
 import { joploHome } from './home.ts';
-import { ProfileStore, bundleVoice } from './voice.ts';
+import { ProfileStore, bundleVoice, reuseSharedVoice } from './voice.ts';
 
 /** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。层级、镜头、角色（说话人、过渡卡、层级的 role）与 featureIds 顺序属于演示，保留（D43 / D56 / D61）。 */
 export function publishPayload(project: Project, home: string | null): { project: Record<string, unknown>; home: string | null } {
@@ -40,7 +40,9 @@ export function publishPayload(project: Project, home: string | null): { project
       return [id, { ...sr, caseIds: [], steps: s.steps.map(({ ruleIds: _ri, key: _key, ...st }) => ({ ...st, ruleIds: [] })) }];
     }),
   );
-  return { project: { ...rest, features, options, scenarios }, home: home && project.routes[home] ? home : null };
+  const out = { ...rest, features, options, scenarios };
+  // 译文（D84）在去掉创作侧字段之后再裁剪一次：约束等只给作者看的原文不能作为译文的键留在站点里
+  return { project: rest.i18n ? pruneMessages(out as unknown as Project) : out, home: home && project.routes[home] ? home : null };
 }
 
 /** 把 JSON 安全地放进 <script type="application/json">。 */
@@ -147,7 +149,11 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     else await buildSourceSite(web, projectDir, staging);
 
     // 朗读（D74）：当前声音已生成的音频拷进 voice/，IR 带上 voiceIndex；Key 不进产物
-    const voice = bundleVoice(projectDir, project, staging, new ProfileStore(opts.home ?? joploHome()));
+    const store = new ProfileStore(opts.home ?? joploHome());
+    // 重新发布（D84）：先从上一次的分享沿用本机没有的音频（同样的文字与声音），不重新生成
+    const reused = opts.sharedVoice ? await reuseSharedVoice(projectDir, project, opts.sharedVoice, store) : 0;
+    const voice = bundleVoice(projectDir, project, staging, store, undefined, opts.sharedVoice?.index);
+    if (reused) voice.report.reused = reused;
     // 朗读角色只留范围内功能的（scopeProject 对 voiceIndex 的同一规则；bundleVoice 按声音配置生成全部角色）
     if (voice.index) inline.project.voiceIndex = scope ? scopeProject({ ...project, voiceIndex: voice.index }, scope.scenarios).project.voiceIndex : voice.index;
     voiceReport = voice.report;

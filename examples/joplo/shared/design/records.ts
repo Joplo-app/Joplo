@@ -82,4 +82,12 @@ export const designRecords = {
     current: 'D79 实现竖屏播放页、横屏沉浸、iPhone 伪横屏和连续播放。真机体验以发布后的站点为准。',
     evidence: 'DECISIONS D79；examples/joplo mobile_watch 原型',
   },
+  content_i18n: {
+    problem: '分享的就是网页，观众为什么不能看自己的语言？',
+    exploration: 'D57 只翻译了界面，作者写的内容不翻译。D84 让作者内容和旁白也能按观众的语言切换。',
+    scenario: 'viewer_auto',
+    decision: '原文写一种，译文放 locales/，一个链接给所有人',
+    current: 'D84 已实现：加语言、检查译文、按观众语言切换与退回、各语言旁白。',
+    evidence: 'DECISIONS D57 / D74 / D84；examples/joplo content_i18n 原型',
+  },
 } satisfies Record<string, PublicDesignRecord>;

@@ -72,7 +72,7 @@ type PageReport = { elements: RenderedElement[]; warnings: string[] };
  * 渲染路由的参数（纯函数）：主题必填（调用方缺省时传项目主题）；字体与线条（D55）只在指定且合法时带上，
  * 缺省 = 跟随主题，与 D55 之前的截图一致。
  */
-export function renderQuery(q: { projectId: string; scenarioId: string; position: number; theme: string; locale?: string; font?: AppearanceFont | null; stroke?: AppearanceStroke | null; viewport?: { width: number; height: number } }): string {
+export function renderQuery(q: { projectId: string; scenarioId: string; position: number; theme: string; locale?: string; content?: string; font?: AppearanceFont | null; stroke?: AppearanceStroke | null; viewport?: { width: number; height: number } }): string {
   return new URLSearchParams({
     render: '1',
     project: q.projectId,
@@ -80,6 +80,7 @@ export function renderQuery(q: { projectId: string; scenarioId: string; position
     position: String(q.position),
     theme: q.theme,
     ...(exportLocale(q.locale) ? { locale: exportLocale(q.locale)! } : {}),
+    ...(exportLocale(q.content) ? { content: exportLocale(q.content)! } : {}),
     ...(isAppearanceFont(q.font) ? { font: q.font } : {}),
     ...(isAppearanceStroke(q.stroke) ? { stroke: q.stroke } : {}),
     ...(q.viewport ? { w: String(q.viewport.width), h: String(q.viewport.height) } : {}),
@@ -107,6 +108,9 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     const project = payload.project;
     const sc = project.scenarios[opts.scenarioId];
     if (!sc) throw new JoploError('NOT_FOUND', `Scenario does not exist: ${opts.scenarioId} (available: ${Object.keys(project.scenarios).join(', ') || 'none'})`);
+    // 内容语言（D84）写错时报错，不静默按源语言截图
+    if (opts.content !== undefined && !project.i18n?.locales.includes(opts.content))
+      throw new JoploError('USAGE', project.i18n ? `--content ${opts.content} is not in config locales (${project.i18n.locales.join(', ')})` : `--content needs config({ locales }); this project has a single language`);
     const position = opts.stepId ? positionAfterStep(project, sc.id, opts.stepId) : 0;
     const state: PlayState = stateAt(project, sc.id, position); // 回放失败会抛出 PLAYBACK_FAILED
     // 有层级的方案：截图与元素索引用这一步导演层的画面（每层一个独立画面）
@@ -121,7 +125,7 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     browser = await launch(playwright);
     const page = await browser.newPage({ viewport, deviceScaleFactor: opts.scale ?? 1, reducedMotion: 'reduce' });
     // D44：舞台宽度固定为页面自己的 viewport；指定 viewport 时它只是截图尺寸（舞台按比例放进去）
-    const q = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, locale: opts.locale, font: opts.font, stroke: opts.stroke, ...(opts.viewport ? { viewport: opts.viewport } : {}) });
+    const q = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, locale: opts.locale, content: opts.content, font: opts.font, stroke: opts.stroke, ...(opts.viewport ? { viewport: opts.viewport } : {}) });
     await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => (window as unknown as { __JOPLO_READY__?: boolean }).__JOPLO_READY__ === true, null, { timeout: 60000 });
     const err = await page.evaluate(() => (window as unknown as { __JOPLO_ERROR__?: string | null }).__JOPLO_ERROR__ ?? null);

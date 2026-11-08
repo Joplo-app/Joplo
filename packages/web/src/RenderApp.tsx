@@ -3,7 +3,8 @@ import { translate, type Text } from './i18n/messages';
 import { useBoardI18n } from './i18n/board/context';
 /**
  * 渲染专用路由（renderStep 与看板导出使用）：
- *   /?render=1&project=<id>&scenario=..&position=..&theme=..[&font=..][&stroke=..][&w=..&h=..][&frame=1][&record=1][&locale=en]
+ *   /?render=1&project=<id>&scenario=..&position=..&theme=..[&font=..][&stroke=..][&w=..&h=..][&frame=1][&record=1][&locale=en][&content=ja]
+ * - content（D84）：作者内容的语言（看板当前的内容语言）；项目没有这种语言或没有 i18n 时忽略。
  * - font / stroke（D55，看板外观）：缺省 = 跟随主题；导出图片、视频与 renderStep 透传，和看板里看到的一致。
  * - 只渲染舞台，尺寸跟随页面自己的 viewport（D44：不再覆盖设备），关闭入场动画。字体、rough 绘制与镜头都稳定后
  *   设置 window.__JOPLO_READY__ = true，并暴露 window.__JOPLO_STATE__（当前 PlayState）。
@@ -30,6 +31,12 @@ import { subtitleFor, type SubtitleContent } from './player/subtitle-content';
 import { coverFor, coverShown } from './player/cover-content';
 import { Curtain } from './player/Curtain';
 import { waitForFonts } from './board/font-loading';
+import { viewProject } from './i18n/content';
+
+/** 截图用的 IR：content 参数是项目的内容语言时换成这种语言（与看板预览同一个 viewProject）。 */
+export function renderProject(project: Project, content: string | null, uiLocale: string): Project {
+  return content && project.i18n?.locales.includes(content) ? viewProject(project, content, uiLocale) : project;
+}
 
 type W = {
   __JOPLO_READY__?: boolean;
@@ -44,7 +51,7 @@ const raf = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 type CurtainSpec = { scenarioId: string; position: number; cover: ReturnType<typeof coverFor>; animate: boolean };
 
 export function RenderApp() {
-  const { t: i18n } = useBoardI18n();
+  const { t: i18n, locale } = useBoardI18n();
 
   useEffect(() => { document.title = i18n.board.joploBoard; }, [i18n]);
   const params = new URLSearchParams(location.search);
@@ -72,7 +79,8 @@ export function RenderApp() {
       if ('error' in r) return fail(r.error);
       if (!r.project) return fail(r.diagnostics.map((d) => `${d.at ?? ''} ${d.message}`).join(i18n.board.diagnosticSeparator) || m.board.projectDidNotCompileSuccessfully);
       try {
-        setData({ project: r.project, state: stateAt(r.project, scenarioId, position) });
+        const project = renderProject(r.project, params.get('content'), locale);
+        setData({ project, state: stateAt(project, scenarioId, position) });
       } catch (e) {
         fail(e instanceof Error ? e.message : String(e));
       }

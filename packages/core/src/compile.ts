@@ -15,6 +15,7 @@ import { choicesOf, commonPrefix } from './player.ts';
 import { CALLOUT_SIDES, LAYER_ICONS, Project, SCHEMA_VERSION, type Callout, type Cue, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
 import type { Diagnostic } from './result.ts';
 import { schemaDiagnostics } from './schema-issues.ts';
+import { CONTENT_LOCALES, collectMessages, isContentLocale, nearestKey, pruneMessages } from './content-i18n.ts';
 import { DIAGRAM_GROUP_ICONS, DIAGRAM_NODE_KINDS, DIAGRAM_PINS, DIAGRAM_TONES, GRAPH_FAMILY, SEQUENCE_BLOCK_KINDS, SEQUENCE_FAMILY, attachLayouts, diagramsIn, isDiagramRoot, type DiagramIndex, type GraphLayoutEngine } from './diagram/index.ts';
 
 export type AuthoringProject = {
@@ -26,6 +27,9 @@ export type AuthoringProject = {
   features: Record<string, { def: FeatureDef & { file: string }; options: Record<string, OptionDef & { file: string }> }>;
   /** 作者主题（D51）：themes/<name>.css 的原文。 */
   themes?: Record<string, string>;
+  /** 作者内容译文（D84）：locales/<语言>.json 的内容（原文 → 译文）；语言 → 文件相对路径见 localeFiles。 */
+  locales?: Record<string, Record<string, string>>;
+  localeFiles?: Record<string, string>;
 };
 
 export type CompileResult = { project: Project | null; diagnostics: Diagnostic[] };
@@ -222,7 +226,9 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   };
 
   if (src.config.voice !== undefined && !voiceConfigOf(src.config.voice, true))
-    err('VOICE_CONFIG_INVALID', `config({ voice }) must be { profile?: string, narrator?: string, roles?: { [roleKey]: string } } with non-empty strings; got ${JSON.stringify(src.config.voice)}`, src.config.source ?? `${src.config.file}:1:1`);
+    err('VOICE_CONFIG_INVALID', `config({ voice }) must be { profile?: string, narrator?: string, roles?: { [roleKey]: string }, locales?: { [locale]: { narrator?: string, roles?: { [roleKey]: string } } } } with non-empty strings; got ${JSON.stringify(src.config.voice)}`, src.config.source ?? `${src.config.file}:1:1`);
+  const i18nCfg = contentLocalesOf(src, err);
+  if (i18nCfg) out.i18n = { default: i18nCfg[0]!, locales: i18nCfg, messages: Object.fromEntries(i18nCfg.slice(1).map((l) => [l, Object.fromEntries(Object.entries(src.locales?.[l] ?? {}).filter(([, v]) => typeof v === 'string' && v.trim()))])) };
   if (src.config.autoFocus !== undefined && typeof src.config.autoFocus !== 'boolean')
     err('AUTOFOCUS_INVALID', `config({ autoFocus }) must be true or false (default true); got ${JSON.stringify(src.config.autoFocus)}`, src.config.source ?? `${src.config.file}:1:1`);
   // 主题（D51）：config.theme 必须是内置主题或 themes/<name>.css
@@ -665,7 +671,70 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     diags.push(...schemaDiagnostics(out, parsed.error.issues, { limit: 20, rel }));
     return { project: null, diagnostics: diags };
   }
-  return { project: parsed.data, diagnostics: diags };
+  const project = pruneMessages(parsed.data);
+  if (mode === 'dev' && project.i18n) {
+    const stale = localeDiagnostics(project, src, diags);
+    project.i18n = { ...project.i18n, stale };
+  }
+  return { project, diagnostics: diags };
+}
+
+/** config.locales（D84）：非空、不重复、都是支持的语言；第一个是默认语言。没写时为 null。 */
+function contentLocalesOf(src: AuthoringProject, err: (code: string, message: string, at?: string) => void): string[] | null {
+  const v = src.config.locales;
+  const at = src.config.source ?? `${src.config.file}:1:1`;
+  if (v === undefined) {
+    for (const [l, f] of Object.entries(src.localeFiles ?? {}))
+      err('LOCALES_UNDECLARED', `${f} exists but joplo.config.ts has no locales; add locales: ['<source language>', '${l}'] (the first is the language the source files are written in)`, at);
+    return null;
+  }
+  const bad = !Array.isArray(v) || !v.length ? 'must be a non-empty array' : v.find((x) => !isContentLocale(x)) !== undefined ? `contains "${String(v.find((x) => !isContentLocale(x)))}"` : new Set(v).size !== v.length ? 'lists a language twice' : null;
+  if (bad) {
+    err('LOCALES_INVALID', `config({ locales }) ${bad}. Write the source language first, for example locales: ['zh-CN', 'en', 'ja']; supported: ${CONTENT_LOCALES.join(', ')}`, at);
+    return null;
+  }
+  for (const [l, f] of Object.entries(src.localeFiles ?? {}))
+    if (!v.includes(l)) err('LOCALES_UNDECLARED', `${f} is not in config({ locales }); add '${l}' to locales or delete the file`, at);
+  if (src.localeFiles?.[v[0]!]) err('LOCALES_UNDECLARED', `${src.localeFiles[v[0]!]} translates the default language ${v[0]}; the source files are already in ${v[0]}, so delete it (or put another language first in locales)`, at);
+  return [...v];
+}
+
+/**
+ * 译文的检查（D84，只在 dev）：每种语言一条 I18N_MISSING（缺多少、前几条）、原文改过的每条一条 I18N_STALE（附最接近的旧条目）、
+ * 没人用的旧条目一条 I18N_UNUSED。返回每种语言的过期条数，给看板菜单显示。
+ */
+function localeDiagnostics(project: Project, src: AuthoringProject, diags: Diagnostic[]): Record<string, number> {
+  const i18n = project.i18n!;
+  const uses = collectMessages(project);
+  const texts = new Set(uses.map((u) => u.text));
+  const stale: Record<string, number> = {};
+  const q = (s: string) => JSON.stringify(s.length > 40 ? `${s.slice(0, 40)}…` : s);
+  for (const l of i18n.locales.slice(1)) {
+    const file = src.localeFiles?.[l] ?? `locales/${l}.json`;
+    const table = src.locales?.[l] ?? {};
+    const unused = Object.keys(table).filter((k) => !texts.has(k) && typeof table[k] === 'string' && table[k]!.trim());
+    const missing = uses.filter((u) => !(typeof table[u.text] === 'string' && table[u.text]!.trim()));
+    const plain: typeof missing = [];
+    const matched = new Set<string>();
+    let n = 0;
+    for (const m of missing) {
+      const old = nearestKey(m.text, unused);
+      if (old === null) { plain.push(m); continue; }
+      matched.add(old);
+      n++;
+      diags.push({ severity: 'warning', code: 'I18N_STALE', message: `${file}: no translation for ${q(m.text)}; the closest old entry is ${q(old)}: ${q(table[old]!)} (the source text changed). Update the key and translation`, source: 'structure', ...(m.at ? { at: m.at } : {}) });
+    }
+    stale[l] = n;
+    if (plain.length) {
+      const first = plain.slice(0, 5).map((m) => q(m.text)).join(', ');
+      const hint = src.localeFiles?.[l] ? `translate them in ${file}` : `run npx joplo i18n add ${l}, then translate ${file}`;
+      diags.push({ severity: 'warning', code: 'I18N_MISSING', message: `${l}: ${plain.length} of ${uses.length} texts have no translation (${first}${plain.length > 5 ? `, +${plain.length - 5} more` : ''}); ${hint}. Viewers see the ${i18n.default} source text for them`, source: 'structure', at: `${file}:1:1` });
+    }
+    const leftover = unused.filter((k) => !matched.has(k));
+    if (leftover.length)
+      diags.push({ severity: 'info', code: 'I18N_UNUSED', message: `${file}: ${leftover.length} entries are not used by any text (${leftover.slice(0, 3).map(q).join(', ')}${leftover.length > 3 ? ', …' : ''}); delete them or run npx joplo i18n add ${l} --prune`, source: 'structure', at: `${file}:1:1` });
+  }
+  return stale;
 }
 
 // ---------- 帮助函数 ----------
@@ -1078,24 +1147,41 @@ function stripNotes(n: SceneNode): void {
 /**
  * config({ voice }) 规整（D74）：去掉空白，空对象视为没写。strict = true 时形状不对返回 null（报 VOICE_CONFIG_INVALID）。
  */
-function voiceConfigOf(v: unknown, strict = false): { profile?: string; narrator?: string; roles?: Record<string, string> } | null {
+function voiceConfigOf(v: unknown, strict = false): { profile?: string; narrator?: string; roles?: Record<string, string>; locales?: Record<string, { narrator?: string; roles?: Record<string, string> }> } | null {
   if (v === undefined || v === null) return null;
   if (typeof v !== 'object' || Array.isArray(v)) return null;
   const o = v as Record<string, unknown>;
   const str = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim() : null);
-  for (const k of Object.keys(o)) if (!['profile', 'narrator', 'roles'].includes(k)) return null;
+  for (const k of Object.keys(o)) if (!['profile', 'narrator', 'roles', 'locales'].includes(k)) return null;
   if (o.profile !== undefined && !str(o.profile)) return null;
-  if (o.narrator !== undefined && !str(o.narrator)) return null;
-  let roles: Record<string, string> | undefined;
-  if (o.roles !== undefined) {
-    if (!o.roles || typeof o.roles !== 'object' || Array.isArray(o.roles)) return null;
-    roles = {};
-    for (const [k, val] of Object.entries(o.roles as Record<string, unknown>)) {
-      const s = str(val);
-      if (!s) return null;
-      roles[k] = s;
+  /** 旁白与角色（顶层，或某种语言下）；形状不对时返回 false。 */
+  const voices = (x: Record<string, unknown>): { narrator?: string; roles?: Record<string, string> } | false => {
+    if (x.narrator !== undefined && !str(x.narrator)) return false;
+    let roles: Record<string, string> | undefined;
+    if (x.roles !== undefined) {
+      if (!x.roles || typeof x.roles !== 'object' || Array.isArray(x.roles)) return false;
+      roles = {};
+      for (const [k, val] of Object.entries(x.roles as Record<string, unknown>)) {
+        const s = str(val);
+        if (!s) return false;
+        roles[k] = s;
+      }
+    }
+    return { ...(str(x.narrator) ? { narrator: str(x.narrator)! } : {}), ...(roles && Object.keys(roles).length ? { roles } : {}) };
+  };
+  const top = voices(o);
+  if (!top) return null;
+  let locales: Record<string, { narrator?: string; roles?: Record<string, string> }> | undefined;
+  if (o.locales !== undefined) {
+    if (!o.locales || typeof o.locales !== 'object' || Array.isArray(o.locales)) return null;
+    locales = {};
+    for (const [l, x] of Object.entries(o.locales as Record<string, unknown>)) {
+      if (!x || typeof x !== 'object' || Array.isArray(x) || Object.keys(x).some((k) => k !== 'narrator' && k !== 'roles')) return null;
+      const vv = voices(x as Record<string, unknown>);
+      if (!vv) return null;
+      if (Object.keys(vv).length) locales[l] = vv;
     }
   }
-  const out = { ...(str(o.profile) ? { profile: str(o.profile)! } : {}), ...(str(o.narrator) ? { narrator: str(o.narrator)! } : {}), ...(roles && Object.keys(roles).length ? { roles } : {}) };
+  const out = { ...(str(o.profile) ? { profile: str(o.profile)! } : {}), ...top, ...(locales && Object.keys(locales).length ? { locales } : {}) };
   return Object.keys(out).length ? out : strict ? out : null;
 }

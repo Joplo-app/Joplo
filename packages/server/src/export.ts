@@ -105,11 +105,12 @@ export function exportAppearance(body: unknown): { font: AppearanceFont | null; 
 /** 渲染路由上的外观参数（null 不写）。 */
 const appearanceParams = (a: { font: AppearanceFont | null; stroke: AppearanceStroke | null }): Record<string, string> => ({ ...(a.font ? { font: a.font } : {}), ...(a.stroke ? { stroke: a.stroke } : {}) });
 
-type Look = { theme: string; font: AppearanceFont | null; stroke: AppearanceStroke | null; locale?: ExportLocale };
+/** content（D84）：作者内容语言；导出与看板当前预览的语言一致。 */
+type Look = { theme: string; font: AppearanceFont | null; stroke: AppearanceStroke | null; locale?: ExportLocale; content?: ExportLocale };
 
 function parseRequest(project: Project | null, body: unknown, needPosition: boolean) {
   if (!project) throw new JoploError('INVALID_SCHEMA', 'Cannot export before the project compiles successfully');
-  const b = (body ?? {}) as { scenarioId?: unknown; position?: unknown; theme?: unknown; locale?: unknown };
+  const b = (body ?? {}) as { scenarioId?: unknown; position?: unknown; theme?: unknown; locale?: unknown; contentLocale?: unknown };
   if (typeof b.scenarioId !== 'string' || !project.scenarios[b.scenarioId]) throw new JoploError('USAGE', `Scenario does not exist: ${String(b.scenarioId)}`);
   const sc = project.scenarios[b.scenarioId]!;
   const position = needPosition ? Number(b.position ?? 0) : 0;
@@ -119,7 +120,7 @@ function parseRequest(project: Project | null, body: unknown, needPosition: bool
   const device: Device = project.scenes[sceneId]?.viewport === 'mobile' ? 'mobile' : 'desktop';
   // 主题（D51）：请求里的主题名，没有或不合法时用项目配置的主题
   const theme = typeof b.theme === 'string' && THEME_NAME.test(b.theme) ? b.theme : project.theme;
-  return { sc, position, device, look: { theme, ...exportAppearance(body), locale: exportLocale(b.locale) } satisfies Look };
+  return { sc, position, device, look: { theme, ...exportAppearance(body), locale: exportLocale(b.locale), ...(exportLocale(b.contentLocale) ? { content: exportLocale(b.contentLocale)! } : {}) } satisfies Look };
 }
 
 const fileSafe = (s: string) => s.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'scenario';
@@ -254,7 +255,7 @@ export class ExportHub {
     const browser = await launch(pw);
     try {
       const page = await browser.newPage({ viewport: EXPORT_SIZE[device], deviceScaleFactor: 2, reducedMotion: 'reduce' });
-      await page.goto(this.renderUrl(projectId, { scenario: scenarioId, position: String(position), theme: look.theme, ...appearanceParams(look), ...(look.locale ? { locale: look.locale } : {}), frame: '1' }), { waitUntil: 'domcontentloaded' });
+      await page.goto(this.renderUrl(projectId, { scenario: scenarioId, position: String(position), theme: look.theme, ...appearanceParams(look), ...(look.locale ? { locale: look.locale } : {}), ...(look.content ? { content: look.content } : {}), frame: '1' }), { waitUntil: 'domcontentloaded' });
       await waitReady(page);
       return await page.locator('[data-jexport]').screenshot({ type: 'png', animations: 'disabled' });
     } finally {
@@ -275,7 +276,7 @@ export class ExportHub {
         this.update(job, { phase: 'starting', percent: 2 });
         await this.deps.recordVideo({
           projectDir: dir,
-          url: this.renderUrl(projectId, { scenario: scenarioId, position: '0', theme: look.theme, ...appearanceParams(look), ...(look.locale ? { locale: look.locale } : {}), frame: '1', record: '1' }),
+          url: this.renderUrl(projectId, { scenario: scenarioId, position: '0', theme: look.theme, ...appearanceParams(look), ...(look.locale ? { locale: look.locale } : {}), ...(look.content ? { content: look.content } : {}), frame: '1', record: '1' }),
           size: EXPORT_SIZE[device],
           out,
           total,
