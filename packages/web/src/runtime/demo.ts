@@ -403,6 +403,15 @@ export class DemoController {
   prev() {
     const st = this.snap.state;
     if (!st || this.snap.view !== 'stage') return;
+    if (this.snap.playing && !this.snap.paused) {
+      // 像视频：播放中后退一步后接着播——先停在退回的那一步上（停留、朗读），再往下走
+      const fast = this.fast;
+      const back = !this.inflight && st.position > 0;
+      this.stop();
+      if (back) this.goto(st.position - 1);
+      void this.play({ fast: fast ?? undefined, hold: true });
+      return;
+    }
     if (this.inflight) {
       // 界面正显示尚未提交的第 k 步（position = k-1）：取消它即回到第 k-1 步，字幕同步回退。
       this.stop();
@@ -428,6 +437,20 @@ export class DemoController {
     const sc = this.scenario();
     const st = this.snap.state;
     if (!sc || !st || this.snap.view !== 'stage') return;
+    if (this.snap.playing && !this.snap.paused) {
+      // 像视频：播放中快进一步后接着播。动画进行中 = 立即完成这一步并停留；停留中 = 跳过剩余停留，开始下一步。
+      // 最后一步的停留中快进 = 播完（不从头重播）。
+      const fast = this.fast;
+      if (this.inflight) {
+        this.finishInflight(sc);
+        if (!this.snap.playbackError) void this.play({ fast: fast ?? undefined, hold: true });
+        return;
+      }
+      this.stop();
+      if (st.completed || st.position >= sc.steps.length) return;
+      void this.play({ fast: fast ?? undefined });
+      return;
+    }
     if (this.inflight) {
       // 正在播放某一步的动画：立即完成这一步。
       this.finishInflight(sc);
@@ -451,20 +474,27 @@ export class DemoController {
   /**
    * 自动播放。opts.fromStart：从第 0 步开始；opts.fast(i)：第 i 步快速带过（约 300ms，不移动鼠标、不逐字输入），
    * 用于“只重放这一层”时跳过这一层没有变化的步骤。
+   * opts.hold：先在当前这一步上停留（并朗读）再往下走——播放中按 ← → 跳步后接着播时用；到了最后一步就停在那里，不从头重播。
    */
-  async play(opts: { fromStart?: boolean; fast?: (index: number) => boolean } = {}) {
+  async play(opts: { fromStart?: boolean; fast?: (index: number) => boolean; hold?: boolean } = {}) {
     const p = this.snap.project;
     const sc = this.scenario();
     if (!p || !sc || !this.snap.state || this.snap.view !== 'stage') return;
     this.stop();
     if (sc.steps.length === 0) return this.info(m.player.thisScenarioHasNoStepsAndOnlyShowsIts2);
-    if (opts.fromStart || this.snap.state.completed || this.snap.state.position >= sc.steps.length) {
+    if (opts.fromStart || (!opts.hold && (this.snap.state.completed || this.snap.state.position >= sc.steps.length))) {
       const r = this.safeStateAt(p, sc.id, 0);
       this.set({ state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1 });
     }
     this.fast = opts.fast ?? null;
     const gen = this.gen;
     this.set({ playing: true, paused: false, busy: true, cursorVisible: !this.reducedMotion, notice: null });
+    const at = this.snap.state.position;
+    if (opts.hold && at > 0) {
+      this.committedAt = performance.now();
+      this.narrate(sc, at);
+      if (!(await this.dwellOn(sc, at - 1, gen))) return;
+    }
     while (gen === this.gen) {
       const st = this.snap.state;
       if (!st || st.completed || st.position >= sc.steps.length) break;
@@ -472,38 +502,41 @@ export class DemoController {
       const quick = !!this.fast?.(index);
       const ok = quick ? await this.runQuick(sc, gen) : await this.runStep(sc, gen, { moveCursor: true });
       if (!ok || gen !== this.gen) return;
-      if (!quick) {
-        // 停留（T-director2）：按说明与解说的字数，至少 3 秒；并等镜头过渡结束、本步 active 连线上的小点跑完一圈
-        const step = sc.steps[index]!;
-        // hold（D70）：作者要求的最短停留（按速度缩放）；减少动态效果时同样保留，它是看的时间，不是动画
-        const dwell = Math.max(holdMsOf(step, this.speed), this.reducedMotion
-          ? TIMING.reducedStep
-          : stepDwell({
-              texts: dwellTexts(step, this.i18n),
-              speed: this.speed,
-              cameraMoved: step.shots.length > 0 || !!step.directorLayer,
-              dotMs: this.activeDotMs(),
-              streams: streamsOf(step).map((x) => x.value),
-            }));
-        const elapsed = Math.max(0, Math.round(performance.now() - this.committedAt));
-        this.set({ dwell: { position: index + 1, ms: Math.max(dwell, elapsed), elapsed } });
-        // 朗读（D74）：停留 = max(画面停留, 声音读完 + 换气)；画面停够了、声音没读完时标出“在等声音”
-        const ok2 = (await Promise.all([
-          this.wait(dwell - (performance.now() - this.committedAt), gen, true).then((ok) => {
-            if (ok && this.narrating && this.snap.narration && !this.snap.narration.waiting) this.set({ narration: { ...this.snap.narration, waiting: true } });
-            return ok;
-          }),
-          this.waitNarration(gen),
-        ])).every(Boolean);
-        if (this.snap.dwell) this.set({ dwell: null });
-        if (!ok2) return;
-      }
+      if (!quick && !(await this.dwellOn(sc, index, gen))) return;
     }
     this.fast = null;
     if (gen === this.gen) this.set({ playing: false, paused: false, busy: false, dwell: null });
   }
 
   private fast: ((index: number) => boolean) | null = null;
+
+  /** 停留在刚提交的第 index 步（0 起）上；被取消时返回 false。 */
+  private async dwellOn(sc: Scenario, index: number, gen: number): Promise<boolean> {
+    // 停留（T-director2）：按说明与解说的字数，至少 3 秒；并等镜头过渡结束、本步 active 连线上的小点跑完一圈
+    const step = sc.steps[index]!;
+    // hold（D70）：作者要求的最短停留（按速度缩放）；减少动态效果时同样保留，它是看的时间，不是动画
+    const dwell = Math.max(holdMsOf(step, this.speed), this.reducedMotion
+      ? TIMING.reducedStep
+      : stepDwell({
+          texts: dwellTexts(step, this.i18n),
+          speed: this.speed,
+          cameraMoved: step.shots.length > 0 || !!step.directorLayer,
+          dotMs: this.activeDotMs(),
+          streams: streamsOf(step).map((x) => x.value),
+        }));
+    const elapsed = Math.max(0, Math.round(performance.now() - this.committedAt));
+    this.set({ dwell: { position: index + 1, ms: Math.max(dwell, elapsed), elapsed } });
+    // 朗读（D74）：停留 = max(画面停留, 声音读完 + 换气)；画面停够了、声音没读完时标出“在等声音”
+    const ok2 = (await Promise.all([
+      this.wait(dwell - (performance.now() - this.committedAt), gen, true).then((ok) => {
+        if (ok && this.narrating && this.snap.narration && !this.snap.narration.waiting) this.set({ narration: { ...this.snap.narration, waiting: true } });
+        return ok;
+      }),
+      this.waitNarration(gen),
+    ])).every(Boolean);
+    if (this.snap.dwell) this.set({ dwell: null });
+    return ok2;
+  }
 
   /** 画面上 active 连线的小点跑一圈的最长时间（毫秒；没有为 0）。 */
   private activeDotMs(): number {
