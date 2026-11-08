@@ -224,6 +224,7 @@ export function createKo(locale: Locale = 'ko') {
       themeCssComment: (p0: Value, p1: Value, p2: Value) => `/* 테마 ${value(p0, locale)}${value(p1, locale)} */\n${value(p2, locale)}`,
     },
     site: {
+      authorMoreWorks: (name: string) => `${name} · 다른 작품 ↗`,
       prototypeTitle: (name: string) => `${value(name, locale)} · 콘셉트 프로토타입`,
       scenarioCount: (n: number) => plural(Number(n), { other: "#개 시나리오" }, locale),
       itemCount: (n: number) => `${number(n, locale)}`,

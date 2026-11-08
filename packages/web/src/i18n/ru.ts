@@ -224,6 +224,7 @@ export function createRu(locale: Locale = 'ru') {
       themeCssComment: (p0: Value, p1: Value, p2: Value) => `/* Тема ${value(p0, locale)}${value(p1, locale)} */\n${value(p2, locale)}`,
     },
     site: {
+      authorMoreWorks: (name: string) => `${name} · Другие работы ↗`,
       prototypeTitle: (name: string) => `${value(name, locale)} · Концептуальный прототип`,
       scenarioCount: (n: number) => plural(Number(n), { one: "# сценарий", few: "# сценария", many: "# сценариев", other: "# сценария" }, locale),
       itemCount: (n: number) => `${number(n, locale)}`,

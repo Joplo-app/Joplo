@@ -6,6 +6,17 @@ import type { BoardDictionary } from './en';
 export function createBoardFr(locale: Locale = 'fr') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudPublic: "Public",
+      cloudPrivate: "Privé",
+      cloudPublicNote: "Public : ajouté au portfolio show.joplo.app/@utilisateur et indexé par les moteurs de recherche.",
+      cloudPrivateNote: "Privé : seules les personnes ayant le lien peuvent consulter.",
+      cloudPrivateOnly: "Les partages limités et aperçus PR restent privés pour protéger le contenu.",
+      cloudAlsoReview: "Publier aussi une version de revue",
+      cloudReviewNote: "Le lien de revue contient toutes les options et reste privé.",
+      cloudPortfolioWork: "Voir cette création",
+      cloudSetupUsername: "Choisir un nom utilisateur",
+      cloudVisibility: "Visibilité",
+
       localReviewMoveHint: "Cliquez pour commenter ; faites glisser pour déplacer. Ajustez avec les flèches.",
       localReviewApprovedDraft: "Cette revue a été confirmée ailleurs. Votre brouillon non envoyé est conservé pour être copié.",
       localReviewTitle: "Commentaires et revue",

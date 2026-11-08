@@ -476,8 +476,11 @@ export async function requestClip(projectId: string, locale: Locale, segment: Vo
 
 // ---------- 直接发布到云端（D76） ----------
 /** 与 @joplo-app/server 的 CloudAccount / CloudJob 一致（页面只拿到邮箱和套餐，令牌留在本机进程）。 */
+export type CloudVisibility = 'public' | 'private';
+export type CloudPortfolio = { workUrl: string | null; profileUrl: string | null; needsUsername: boolean; setupPath: string };
+export type CloudLinks = { main: { visibility?: CloudVisibility } | null; scoped?: Record<string, { visibility?: CloudVisibility }> };
 export type CloudAccount =
-  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; storage?: CloudStorage }
+  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; storage?: CloudStorage; username?: string | null; portfolioUrl?: string | null }
   | { signedIn: false; server: string; loginCommand: string; message?: string };
 /** 账号容量（C27），字节。 */
 export type CloudStorage = { usedBytes: number; quotaBytes: number };
@@ -486,14 +489,14 @@ export type CloudBorrowed =
   | { kind: 'element'; featureId: string; featureName: string; optionId: string; elementId: string; route: string; refs: string[]; scenarios: string[] }
   | { kind: 'page'; featureId: string; featureName: string; optionId: string; route: string; scenarios: string[] };
 export type CloudScope = { key: string; scenarios: string[]; features: string[]; borrowed: CloudBorrowed[] };
-export type CloudPublishRequest = { scenarios?: string[]; features?: string[] };
+export type CloudPublishRequest = { visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; features?: string[] };
 export type CloudJob = {
   id: string;
   state: 'running' | 'done' | 'failed';
   request: CloudPublishRequest;
   startedAt: number;
   lines: string[];
-  result?: { shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope; storage?: CloudStorage & { shareBytes: number } };
+  result?: { visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope; storage?: CloudStorage & { shareBytes: number } };
   error?: { code: string; message: string; loginCommand?: string; storage?: CloudStorageFull };
 };
 
@@ -514,6 +517,16 @@ export async function fetchCloudAccount(): Promise<{ ok: true; available: boolea
 }
 
 /** 当前发布任务（没有时 null）。 */
+export async function fetchCloudLinks(projectId: string): Promise<CloudLinks> {
+  try {
+    const headers = writeHeaders(false);
+    if (!headers) return { main: null };
+    const res = await fetch(`/__joplo/p/${enc(projectId)}/cloud/links`, { headers, cache: 'no-store' });
+    if (!res.ok) return { main: null };
+    return (await res.json()).links ?? { main: null };
+  } catch { return { main: null }; }
+}
+
 export async function fetchCloudJob(projectId: string): Promise<CloudJob | null> {
   try {
     const headers = writeHeaders(false);

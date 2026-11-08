@@ -32,6 +32,7 @@ import { displaySceneId } from '@joplo-app/core';
 import { siteScenarioRows } from './site-model';
 import { EmbedApp } from './EmbedApp';
 import { parseEmbedParams } from './embed-model';
+import { AuthorLink, readAuthor, type Author } from './author';
 import { readBranding } from './branding';
 import { ThemeStyles } from '../renderer/ThemeStyles';
 import { usePlaySync } from '../player/playRoute';
@@ -55,7 +56,7 @@ export function readInlineIR(): SiteData | null {
  * `search` 缺省读 location.search：只有 `?embed=1` 进入嵌入模式（EmbedApp）；其他情况（含 embed=0、空值）与原来的发布站完全一样。
  * `branding` 缺省读页面里的 joplo-branding 标记（D83）：只有 Joplo Cloud 给 Pro 分享注入 off 时才去掉水印。
  */
-export function SiteApp({ data, search = typeof location === 'undefined' ? '' : location.search, branding = readBranding() }: { data: SiteData | null; search?: string; branding?: boolean }) {
+export function SiteApp({ data, search = typeof location === 'undefined' ? '' : location.search, branding = readBranding(), author = readAuthor() }: { data: SiteData | null; search?: string; branding?: boolean; author?: Author | null }) {
   const { t: i18n, locale } = useI18n();
   const embed = useMemo(() => parseEmbedParams(search), [search]);
   // 作者内容多语言（D84）：内容语言跟随界面语言，项目没有时退回默认语言；下面所有组件都只看换过语言的 IR
@@ -65,12 +66,12 @@ export function SiteApp({ data, search = typeof location === 'undefined' ? '' : 
   if (!data || !project) return <div className="p-8 text-[#c92a2a]">{i18n.site.prototypeDataIsMissingRunJoploBuildAgain}</div>;
   return (
     <ContentContext.Provider value={content}>
-      {embed ? <EmbedApp project={project} params={embed} branding={branding} /> : <Site project={project} scoped={data.scoped === true} branding={branding} />}
+      {embed ? <EmbedApp project={project} params={embed} branding={branding} /> : <Site project={project} scoped={data.scoped === true} branding={branding} author={author} />}
     </ContentContext.Provider>
   );
 }
 
-function Site({ project, scoped, branding }: { project: Project; scoped: boolean; branding: boolean }) {
+function Site({ project, scoped, branding, author }: { project: Project; scoped: boolean; branding: boolean; author?: Author | null }) {
   const { t: i18n } = useI18n();
   const [hash, go] = useHash();
   const route = parseSiteHash(hash);
@@ -87,14 +88,14 @@ function Site({ project, scoped, branding }: { project: Project; scoped: boolean
     navigate(f ? { kind: 'play', play: { featureId: f, scenarioId: sc!.id } } : { kind: 'home' }, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hash]);
-  if (route.kind === 'play') return <SitePlayer project={project} play={route.play} navigate={navigate} branding={branding} />;
+  if (route.kind === 'play') return <SitePlayer project={project} play={route.play} navigate={navigate} branding={branding} author={author} />;
   // 范围分享只有一个功能：首页没有可选的东西，直接进演示（点面包屑回首页时同样停在演示）
   const only = scoped ? orderedFeatures(project) : [];
-  if (only.length === 1) return <SitePlayer project={project} play={{ featureId: only[0]!.id }} navigate={navigate} branding={branding} />;
-  return <SiteHome project={project} onView={(f) => navigate({ kind: 'play', play: { featureId: f } })} />;
+  if (only.length === 1) return <SitePlayer project={project} play={{ featureId: only[0]!.id }} navigate={navigate} branding={branding} author={author} />;
+  return <SiteHome project={project} author={author} onView={(f) => navigate({ kind: 'play', play: { featureId: f } })} />;
 }
 
-function SiteHome({ project, onView }: { project: Project; onView: (featureId: string) => void }) {
+function SiteHome({ project, onView, author }: { author?: Author | null; project: Project; onView: (featureId: string) => void }) {
   const { t: i18n } = useI18n();
 
   const L = useBoardLayout();
@@ -103,7 +104,7 @@ function SiteHome({ project, onView }: { project: Project; onView: (featureId: s
   return (
     <div className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="site-home">
       <ThemeStyles themes={project.themes} />
-      <TopBar right={<LanguageMenu iconOnly={L.languageIconOnly} />}>
+      <TopBar right={<><AuthorLink author={author} /><LanguageMenu iconOnly={L.languageIconOnly} /></>}>
         <Brand href={JOPLO_SITE_URL} />
         <span aria-hidden className="h-5 w-px shrink-0 bg-jb-line" />
         <span className="truncate px-2 text-[14px] font-medium" data-testid="site-name">
@@ -178,7 +179,7 @@ function SiteFooter() {
   );
 }
 
-function SitePlayer({ project, play, navigate, branding }: { project: Project; play: PlayRoute; navigate: (r: SiteRoute, replace?: boolean) => void; branding: boolean }) {
+function SitePlayer({ project, play, navigate, branding, author }: { project: Project; play: PlayRoute; navigate: (r: SiteRoute, replace?: boolean) => void; branding: boolean; author?: Author | null }) {
   const L = useBoardLayout();
   const { t: i18n } = useI18n();
 
@@ -225,6 +226,7 @@ function SitePlayer({ project, play, navigate, branding }: { project: Project; p
       snap={snap}
       project={project}
       brandHref={JOPLO_SITE_URL}
+      author={author}
       watermark={branding ? { href: JOPLO_SITE_URL, label: i18n.site.embedMadeWithJoplo } : undefined}
       crumbs={[
         { label: project.name, testid: 'crumb-project', onClick: home },

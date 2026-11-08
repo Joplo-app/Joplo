@@ -6,6 +6,17 @@ import type { BoardDictionary } from './en';
 export function createBoardJa(locale: Locale = 'ja') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudPublic: "公開",
+      cloudPrivate: "非公開",
+      cloudPublicNote: "公開：show.joplo.app/@ユーザー名 の作品集に掲載され、検索エンジンに登録されます。",
+      cloudPrivateNote: "非公開：リンクを知っている人だけが閲覧できます。",
+      cloudPrivateOnly: "範囲限定共有と PR プレビューは機密保持のため非公開です。",
+      cloudAlsoReview: "レビュー版も公開する",
+      cloudReviewNote: "レビューリンクは全案を含み、常に非公開です。",
+      cloudPortfolioWork: "作品の詳細を見る",
+      cloudSetupUsername: "ユーザー名を設定",
+      cloudVisibility: "公開範囲",
+
       localReviewMoveHint: "クリックでフィードバック、ドラッグで移動。矢印キーで微調整。",
       localReviewApprovedDraft: "このレビューは別の画面で承認されました。未送信の下書きはコピーできるよう保持されています。",
       localReviewTitle: "フィードバックとレビュー",

@@ -55,6 +55,7 @@ type Props = {
   onRestart: () => void;
   /** 顶栏右侧（语言、复制链接）。 */
   actions?: ReactNode;
+  author?: ReactNode;
   voice?: ReactNode;
   flash?: ReactNode | null;
 };
@@ -138,7 +139,7 @@ export function WatchView(p: Props) {
         canExit={forced}
         onExit={exit}
         finished={finished}
-        onRestart={p.onRestart}
+        onRestart={p.onRestart} author={p.author}
       />
     );
 
@@ -151,7 +152,7 @@ export function WatchView(p: Props) {
       </header>
       <div className="relative w-full shrink-0 bg-black" style={{ aspectRatio: '16 / 10' }} data-testid="watch-video">
         <div className="absolute inset-0 flex flex-col">{p.stage}</div>
-        {finished ? <Finished onRestart={p.onRestart} /> : null}
+        {finished ? <Finished onRestart={p.onRestart} author={p.author} /> : null}
         <UpNextCard ctl={ctl} snap={snap} variant="center" />
       </div>
       <p className="min-h-[52px] shrink-0 px-4 pt-3 text-[15px] font-semibold leading-[1.45]" data-testid="watch-caption" aria-live="polite">
@@ -223,11 +224,12 @@ function RoundBtn({ label, onClick, disabled, testid, primary, children }: { lab
   );
 }
 
-function Finished({ onRestart, dark }: { onRestart: () => void; dark?: boolean }) {
+function Finished({ onRestart, dark, author }: { onRestart: () => void; dark?: boolean; author?: ReactNode }) {
   const { t: i18n } = useI18n();
   return (
     <div className={cn('absolute inset-0 z-20 flex flex-col items-center justify-center gap-3', dark ? 'bg-black/70' : 'bg-black/65')} data-testid="watch-finished">
       <div className="text-[18px] font-bold text-white">{i18n.player.watchFinished}</div>
+      {author}
       <button type="button" onClick={onRestart} className="jb-focus inline-flex h-10 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-semibold text-black" data-testid="watch-again">
         <RotateCcw className="size-4" />
         {i18n.player.watchAgain}
@@ -252,6 +254,7 @@ function Immersive(p: {
   canExit: boolean;
   onExit: () => void;
   finished: boolean;
+  author?: ReactNode;
   onRestart: () => void;
 }) {
   const { t: i18n } = useI18n();
@@ -364,7 +367,7 @@ function Immersive(p: {
           </div>
         </div>
       ) : null}
-      {p.finished ? <Finished onRestart={p.onRestart} dark /> : null}
+      {p.finished ? <Finished onRestart={p.onRestart} author={p.author} dark /> : null}
       <UpNextCard ctl={p.ctl} snap={p.snap} variant="center" />
     </div>
   );

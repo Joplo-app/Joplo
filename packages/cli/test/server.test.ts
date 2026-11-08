@@ -22,7 +22,7 @@ test('动态 import 失败说明服务端不可用', async () => {
 test('dev 参数与日志输出', async () => {
   const startDev = vi.fn(async (opts: any) => { opts.log('服务日志'); return { url: 'http://127.0.0.1:12345', close: async () => {} }; });
   const r = await run(['dev', 'project', '--port', '12345', '--open'], { startDev });
-  expect(r.code).toBe(0); expect(startDev).toHaveBeenCalledWith({ projectDir: resolve('project'), port: 12345, open: true, log: expect.any(Function), cloud: { account: expect.any(Function), publish: expect.any(Function) } });
+  expect(r.code).toBe(0); expect(startDev).toHaveBeenCalledWith({ projectDir: resolve('project'), port: 12345, open: true, log: expect.any(Function), cloud: { account: expect.any(Function), links: expect.any(Function), publish: expect.any(Function) } });
   expect(r.stdout).toBe('http://127.0.0.1:12345\n');
   // stdout stays the URL only; stderr tells agents the one command that follows every review round of this project.
   expect(r.stderr).toBe('服务日志\nAgents: stream reviewer feedback from this board with\n  npx joplo feedback watch project --local --follow --json\nIf you end your response while the user tests and your host wakes you when a background command ends, add --once (it prints how to resume with --since).\n');

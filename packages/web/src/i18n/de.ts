@@ -224,6 +224,7 @@ export function createDe(locale: Locale = 'de') {
       themeCssComment: (p0: Value, p1: Value, p2: Value) => `/* Thema ${value(p0, locale)}${value(p1, locale)} */\n${value(p2, locale)}`,
     },
     site: {
+      authorMoreWorks: (name: string) => `${name} · Weitere Werke ↗`,
       prototypeTitle: (name: string) => `${value(name, locale)} · Konzeptprototyp`,
       scenarioCount: (n: number) => plural(Number(n), { one: "# Szenario", other: "# Szenarien" }, locale),
       itemCount: (n: number) => `${number(n, locale)}`,

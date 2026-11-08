@@ -1,6 +1,6 @@
 /**
  * 按场景保密分享（D75）的画面：
- * - author：林舟的电脑（终端里运行 joplo share，右边是 .joplo/cloud.json）；
+ * - author：林舟的电脑（终端里运行 joplo share --private --no-review，右边是 .joplo/cloud.json）；
  * - inside：分享里有什么（项目里的功能、场景、页面、堆叠进来的元素，逐条标出进分享 / 保留 / 裁掉 / 借用）；
  * - site：小周的浏览器（打开分享链接看到的发布站，可以点「查看源码」在 index.html 里搜索）。
  * 被分享的项目是「团队空间」：邀请成员（要给外部合作方小周看）、账单（新定价，还没公布）、数据导出。
@@ -147,30 +147,30 @@ const Author = () => (
     <Grid.Col span={7}>
       <Terminal id="t_term" title="终端 · team-space" h="100%">
         {/* 现在：整个项目 + 深链接 */}
-        <Terminal.Command when={$.ui.tOld}>npx joplo share</Terminal.Command>
+        <Terminal.Command when={$.ui.tOld}>npx joplo share --private --no-review</Terminal.Command>
         <Terminal.Output id="t_old" when={$.ui.tOld} tone="ok">{'构建：3 个功能 · 6 个场景\n✓ https://joplo.app/s/k3x9q'}</Terminal.Output>
         <Terminal.Output id="t_deeplink" when={$.ui.tDeep}>{'复制场景链接：https://joplo.app/s/k3x9q#/f/invite?s=invite.a-modal.happy\n（只决定从哪里开始看）'}</Terminal.Output>
 
         {/* 按场景分享 */}
-        <Terminal.Command when={$.ui.tHappy}>npx joplo share --scenario invite.a-modal.happy</Terminal.Command>
+        <Terminal.Command when={$.ui.tHappy}>npx joplo share --private --no-review --scenario invite.a-modal.happy</Terminal.Command>
         <Terminal.Output id="t_scope" when={$.ui.tHappy}>{'范围：邀请成员 › 正常发出邀请（1 个场景）\n裁掉：2 个功能 · 5 个场景 · 2 个页面 · 4 个别的功能堆进来的元素'}</Terminal.Output>
         <Terminal.Output id="t_happy_ok" when={$.ui.tHappyOk} tone="ok">{'上传 6 个文件（3 段朗读音频、预览图用「正常发出邀请」）\n✓ https://joplo.app/s/p7m2c  范围分享，主链接不变'}</Terminal.Output>
 
         {/* 按功能分享 */}
-        <Terminal.Command when={$.ui.tFeature}>npx joplo share --feature invite</Terminal.Command>
+        <Terminal.Command when={$.ui.tFeature}>npx joplo share --private --no-review --feature invite</Terminal.Command>
         <Terminal.Output id="t_feature" when={$.ui.tFeature}>{'范围：邀请成员 · 选定方案 A · 弹窗（3 个场景）\n裁掉：2 个功能 · 3 个场景 · 2 个页面 · 3 个别的功能堆进来的元素'}</Terminal.Output>
         <Terminal.Output id="t_feature_borrow" when={$.ui.tFeature} tone="warn">{'带上了 1 个别的功能的元素：账单 › 「席位 5 / 5」徽标（「席位已满时邀请」第 2 步的镜头）'}</Terminal.Output>
         <Terminal.Output id="t_feature_ok" when={$.ui.tFeature} tone="ok">✓ https://joplo.app/s/n2v6h  范围分享</Terminal.Output>
 
         {/* 借用：场景引用了别的功能堆进来的元素 */}
-        <Terminal.Command when={$.ui.tFull}>npx joplo share --scenario invite.a-modal.full</Terminal.Command>
+        <Terminal.Command when={$.ui.tFull}>npx joplo share --private --no-review --scenario invite.a-modal.full</Terminal.Command>
         <Terminal.Output id="t_borrow" when={$.ui.tFull} tone="warn">{'带上了 1 个别的功能的元素（第 2 步的镜头对准了它）：\n  账单 › 「席位 5 / 5」徽标   /members 顶栏\n只带这一个元素：不带账单的名字、场景和其他元素\n不想带上：改这个场景，不再引用它'}</Terminal.Output>
         <Terminal.Output id="t_full_ok" when={$.ui.tFullOk} tone="ok">✓ https://joplo.app/s/w8d4e  范围分享</Terminal.Output>
 
         {/* 写错场景 id */}
-        <Terminal.Command when={$.ui.tBad}>npx joplo share --scenario invite.happy</Terminal.Command>
+        <Terminal.Command when={$.ui.tBad}>npx joplo share --private --no-review --scenario invite.happy</Terminal.Command>
         <Terminal.Output id="t_bad" when={$.ui.tBad} tone="error">{'SCOPE_UNKNOWN_SCENARIO  没有场景 invite.happy\n邀请成员（选定方案 a-modal）的场景：\n  invite.a-modal.happy    正常发出邀请\n  invite.a-modal.full     席位已满时邀请\n  invite.a-modal.expired  邀请链接过期\n没有上传任何文件'}</Terminal.Output>
-        <Terminal.Command when={$.ui.tFix}>npx joplo share --scenario invite.a-modal.happy</Terminal.Command>
+        <Terminal.Command when={$.ui.tFix}>npx joplo share --private --no-review --scenario invite.a-modal.happy</Terminal.Command>
         <Terminal.Output id="t_fix" when={$.ui.tFix} tone="ok">{'✓ 更新范围分享 https://joplo.app/s/p7m2c（第 2 版）\n链接和评论保留；主链接、评审链接不变'}</Terminal.Output>
 
         <Terminal.Input id="t_in" placeholder="输入命令" />
@@ -309,7 +309,7 @@ export const site = (mode: 'full' | 'feature' | 'scenario', scenario: 'happy' | 
 /** 初始状态：林舟准备把演示发给小周。 */
 export const initialUi = () => ({
   ...Object.fromEntries(ALL_KEYS.map((k) => [`r_${k}`, 'all'])),
-  insideTitle: '现在：joplo share（整个项目）', insideNote: '',
+  insideTitle: '现在：joplo share --private --no-review（整个项目）', insideNote: '',
   tOld: false, tDeep: false, tHappy: false, tHappyOk: false, tFeature: false, tFull: false, tFullOk: false, tBad: false, tFix: false,
   cloud: 'before',
   siteMode: 'full', siteScenario: 'happy',

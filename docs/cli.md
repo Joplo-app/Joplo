@@ -18,7 +18,7 @@ npx joplo build [dir] [--out-dir <dir>] [--overwrite] [--scenario <id>]… [--fe
 npx joplo login [--no-browser] [--format text|json] [--server <url>]
 npx joplo logout [--server <url>]
 npx joplo whoami [--format text|json] [--server <url>]
-npx joplo share [dir] [--format text|json] [--new] [--title <title>] [--review] \
+npx joplo share [dir] (--public | --private) (--review | --no-review) [--format text|json] [--new] [--title <title>] [--json] \
   [--scenario <id>]… [--feature <id>]… \
   [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
 npx joplo feedback [dir] [--share <id>] [--format text|json] [--server <url>]
@@ -184,7 +184,7 @@ Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结�
 | selection | 用户选中后只改指向的位置 |
 | review | 本地实时监听、Share 轮询、交接顺序、先回执再处理、多实例／版本隔离、恢复、事件示例和最佳实践 |
 | diff | 双版本公开演示差异、稳定步骤 key、歧义匹配、prepare 与隔离 CI 发布 |
-| publish | pick、build、云端登录与分享、评审版与 feedback 回流、静态站部署与演示能力 |
+| publish | pick、build、每次可见性与评审选择、作品集与 SEO、feedback 回流、静态站部署与演示能力 |
 
 `guide` 与 `skill authoring` 完全相同。读取主题不加载服务端，也不执行作者项目，输出无颜色文本。
 
@@ -315,12 +315,40 @@ npx joplo whoami --format json
 
 ## share
 
+**每次必须选择两项**：公开 `--public` / 私密 `--private`，以及同时发评审版 `--review` / 不发 `--no-review`。参数互斥时退出 2；CLI 绝不读取项目默认值、上次记录或账号偏好。Agent 发布前必须先问用户这两件事，不能替用户决定；下面示例假设已获相应授权，CI 必须在 workflow 写死两项。
+
+缺任意项时，非 TTY、设置 CI、`--json`（等同 `--format json`）直接以退出码 **2** 返回 `CHOICE_REQUIRED`；JSON 为结果信封 `{ok:false,error:{code:"CHOICE_REQUIRED",message,details:{code:"CHOICE_REQUIRED",missing:["--public / --private","--review / --no-review"]}}`，missing 只列缺失项。此时没有登录、检查、构建或网络请求。交互终端逐项提问；默认高亮公开、不发评审版，必须按键确认，EOF / Ctrl+C 取消。
+
+公开会进入 `show.joplo.app/@用户名` 作品集并被搜索引擎收录。项目名、简介与功能目标应写成希望出现在搜索结果里的样子，不要包含未公开的信息。私密只有拿到链接的人能看，不是密码保护。本轮不支持密码参数。
+
+PR 预览（`--pr`）与按场景/功能保密分享（`--scenario` / `--feature`）隐含私密，不要求可见性参数；显式 `--public` 在本地退出 2。仍须选择是否同时发评审版。对比使用 `diff publish`，始终私密且不支持评审版，不要求上述两项。
+
+`--review` 先发布主分享，再发布包含所有方案、可评论的独立私密评审链接。JSON 的主链接为 `data.url`，评审链接为 `data.review.url`（其 `mode` 为 review）；文本分行显示。评审版不进入作品集。第二次发布失败时主分享可能已上线且已记入记录：stderr 给出主链接，重试时沿用同样选择，不加 `--new`。
+
+公开成功时 JSON 附带云端返回的 `visibility` 与 `portfolio: {workUrl,profileUrl,needsUsername,setupPath}`；有用户名时文本输出作品详情地址，`needsUsername` 时输出“设置用户名后，这个作品会出现在你的作品集：<server><setupPath>”。字段缺失或 URL 为 null 时照常成功。`whoami` 透传可选 `username: string|null`、`portfolioUrl: string|null`；旧 Cloud 缺失时不补造值。
+
+### 可见性兼容与字段数据流
+
+新建私密不发送 visibility（与旧客户端请求体一致）；公开发送 public；更新已有链接必须显式发送 public 或 private，以支持公开改私密。旧 Cloud HTTP 400 且信息涉及 visibility / 未知字段时，以 BAD_REQUEST、退出 1 提示“Joplo Cloud 还不支持公开分享，请改用 --private 或稍后再试”；不误走 review 清单降级重试，也不静默改私密。
+
+| 字段 | 写入点 → 存储 → 读取点 → 消费者 |
+| --- | --- |
+| visibility / review 选择 | 看板 radio/checkbox → POST 本机 cloud/publish → server 校验并存 CloudHub.job.request → cloud-bridge 转本次 ShareOptions → CLI shareChoices → CloudClient POST shares；review 拆成第二个始终私密的请求 |
+| CLI 可见性 / 评审选择 | 本次参数或 TTY 回答 → 仅本次内存 → share → CloudClient；不从配置或记录回填 |
+| visibility 返回值 | Cloud finalize → CLI 白名单解析 → data.visibility → cloud-bridge → CloudHub.job.result（GET / 推送）→ 看板结果；旧云端省略 |
+| portfolio | Cloud finalize → CLI readPortfolio → data.portfolio → cloud-bridge → CloudHub.job.result → 看板作品详情或 <server><setupPath> 新标签链接；缺失和 null 兼容 |
+| username / portfolioUrl | Cloud GET me → CloudClient.me → whoami JSON / cloud-bridge.account → server account → 看板账号模型；仅返回已存在字段 |
+| 链接 visibility 记录 | CLI finalize 后 atomicJson 写 .joplo/cloud.json 的主/review/scoped 链接 → bridge.links(projectDir) → GET /__joplo/p/<id>/cloud/links → 看板仅作更新预填，缺失按私密；CLI 选项永不读取它 |
+| 云端 shares 列表 visibility | Cloud GET shares 每项 → 控制台列表消费者；开源 CLI 目前不消费该列表，看板从上述本机记录与任务结果读，缺失按私密 |
+| 作者 name / url | Cloud 删除作者自带同名 meta 并仅为公开分享注入 head meta joplo-author → 分享 HTML → readAuthor → 普通播放器顶栏和结束画面；不写入 IR/本地记录，不进入嵌入/导出 |
+
+
 ```sh
-npx joplo share
-npx joplo share examples/invite --title '邀请流程' --format json
-npx joplo share --new
-npx joplo share --scenario invite.a-modal.success     # 只分享一个场景（D75）
-npx joplo share --feature invite                      # 只分享一个功能
+npx joplo share --private --no-review
+npx joplo share --private --no-review examples/invite --title '邀请流程' --format json
+npx joplo share --private --no-review --new
+npx joplo share --private --no-review --scenario invite.a-modal.success     # 只分享一个场景（D75）
+npx joplo share --private --no-review --feature invite                      # 只分享一个功能
 ```
 
 ### 按场景保密分享（D75）
@@ -346,20 +374,20 @@ npx joplo share --feature invite                      # 只分享一个功能
 - `.joplo/cloud.json` 记录属于当前服务器时，自动更新同一个链接，免费账号和 Pro 都一样（C27）；`--new` 新建。
 - 链接不再过期（免费账号也是 `expiresAt: null`）；限制的是账号空间：所有在线分享**当前版本**的原始大小之和，不按去重算（免费 100 MiB、Pro 5 GiB，以 me 的 `storage` 为准）。发布成功后文本输出多一行 `Storage: <已用> of <上限> used (this share: <大小>)`，JSON 的 `data.storage` 是 `{usedBytes, quotaBytes, shareBytes}`；旧服务器不返回时没有这一行。
 - 放不下时以 `QUOTA_EXCEEDED`（`error.details.kind = "storage"`）、**退出码 6** 结束：什么都没上传，已有链接不受影响。`details` 带 `usedBytes`、`quotaBytes`、`shareBytes`、`replacedBytes`（更新同一个链接时旧版本的大小，只按差额判断）、`manageUrl`（当前 server 的 /shares）与 `upgradeUrl`（/settings/billing）。服务端返回的是 413 `STORAGE_FULL`，CLI 转成这个错误码。
-- `.joplo/cloud.json` 的格式为 `{server, shareId?, url?, review?: {shareId, url}, scoped?: {<范围键>: {shareId, url}}}`（`scoped` 见上方「按场景保密分享」）：主链接和评审版是**两个分享**，互不覆盖（契约 8.1）。普通 share 只用、只写主 `shareId`/`url`；`--review` 只用、只写 `review`（Pro 重新发布评审版时用 `review.shareId` 作 replaceShareId，评审链接和评论保留，版本 +1），评审版永远不会替换 README 里的主链接。写入时保留另一项；记录属于其他 server 时整体替换。没有 `review` 的旧记录照常使用。
+- `.joplo/cloud.json` 的格式为 `{server, shareId?, url?, visibility?, review?: {shareId, url, visibility?}, scoped?: {<范围键>: {shareId, url, visibility?}}}`（`scoped` 见上方「按场景保密分享」）：主链接和评审版是**两个分享**，互不覆盖（契约 8.1）。普通 share 只用、只写主 `shareId`/`url`；`--review` 同时更新主链接与独立 `review`，评审步骤只用、只写 `review`（Pro 重新发布评审版时用 `review.shareId` 作 replaceShareId，评审链接和评论保留，版本 +1），评审版永远不会替换 README 里的主链接。写入时保留另一项；记录属于其他 server 时整体替换。没有 `review` 的旧记录照常使用。
 - 只上传服务端 `missing` 中的对象，412 表示对象已存在；网络错误和 5xx 最多重试 3 次，按 1、2、4 秒退避。4xx 不重试（412 作为成功）。收到 503 SERVICE_UNAVAILABLE 时按 Retry-After 等待（最多 30 秒），计入三次重试。create 仅在该错误明确带 Retry-After、服务端保证未提交时重试；create 的其他网络错误或 5xx 不重放。finalize 重试沿用同一个 uploadId。PUT 最多四路并发；一个对象失败会取消其他在途 PUT 和重试等待；链接 403 时提示过期并要求重新 share。PUT 时限为 30 秒 + 文件字节数 / (100 × 1024 字节/秒)，允许慢速大文件传输。
-- finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。免费链接 1 小时有效，升级入口为当前 `<server>/settings/billing`。
+- finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。链接永久有效，升级入口为当前 `<server>/settings/billing`。
 - 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的导出组件，见 `setup export`；项目里已有的 Playwright 也可以）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有导出组件、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”（没有导出组件时括号里给出 `npx joplo setup export`），share 照常成功、从不下载；分享页此时用通用预览图。
-- 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 只用英文，D57）。
+- 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 沿用英文（D57），D85 指定的兼容错误和设置用户名提示除外）。
 - **评审清单**：每次 share 都在 `POST /api/v1/shares` 请求体里附上 `review`（契约字段 `{v: 1, mode, features, scenarios, elements}`），由 check 编译的 dev IR 经 core 的 `reviewManifest` 生成。它**不是分享文件**：不进上传清单、不进 R2，分享页拿不到；SaaS 只把它存进数据库给评审页用。`mode: "publish"` 只含选定方案（与发布站同一范围，没有选定方案的功能不出现），`--review` 时为 `"review"`，含所有功能的所有方案。id 全部沿用 IR，步骤 `index` 从 0 开始，`elements` 是画面里所有作者元素 id（与 `Rule.elementIds` 同一套）及 `nodeLabel` 标签。
 - **清单上限**：字符串按码点截断（末尾 “…”）——名字 200、目标/思路/规则/问题/explain 2000、取舍 500、字幕 500、元素标签 200；数组超出部分丢弃——每个功能 20 个方案、300 条规则、100 个问题，每个方案 20 条取舍，每条规则 50 个元素，最多 100 个功能、500 个场景、每个场景 200 步、每步 50 条规则、2000 个元素；id 永不截断。截断后序列化仍超过 512 KiB（524288 字节）时：`--review` 报 EXPORT_FAILED（`details: {maxBytes, actualBytes}`），在构建和上传之前失败，不静默丢内容；普通 share 不因清单失败，stderr 提示一行 “Skipped the review manifest (…)”，请求体省略 `review`（契约里它是可选字段），评审页此时看不到规则和问题。
-- **发布顺序容错**：创建请求带着 `review` 被服务端以 HTTP 400 拒绝时（例如还不认识这个字段的旧版 SaaS；400 表示请求被拒、没有创建任何记录），普通 share 去掉 `review` 原样重试一次，stderr 提示一行 “The cloud rejected the review manifest (HTTP 400). Retrying once without it …”；`--review` 不重试，照常报 BAD_REQUEST（评审版没有清单没有意义）。413、422、429 等其他状态不触发这个重试。
-- **`--review`（评审版，D63）**：构建时 `buildSite({ review: true })`，发布站包含所有功能的所有方案（未选定的功能也在），评审页通过 `joplo:goto` 指定任一场景即切换方案；规则、问题、情况、AI 假设、备注、取舍、源位置与普通发布一样不进任何上传文件。CLI 会核对产物里内联 IR 的 `mode` 是 `review`，旧版 `@joplo-app/server` 忽略该选项时报 UNSUPPORTED_ACTION，不上传。成功的 `data` 多一个 `mode: "review"`，文本写 “Published the review version …”。不带 `--review` 时构建参数、上传文件、输出与原来完全一致。
+- **发布顺序容错**：创建请求带着 `review` 被服务端以 HTTP 400 拒绝时（例如还不认识这个字段的旧版 SaaS；400 表示请求被拒、没有创建任何记录），普通 share 去掉 `review` 原样重试一次，stderr 提示一行 “The cloud rejected the review manifest (HTTP 400). Retrying once without it …”；评审步骤不重试，照常报 BAD_REQUEST；主分享可能已发布（评审版没有清单没有意义）。413、422、429 等其他状态不触发这个重试。
+- **`--review`（评审版，D63）**：构建时 `buildSite({ review: true })`，发布站包含所有功能的所有方案（未选定的功能也在），评审页通过 `joplo:goto` 指定任一场景即切换方案；规则、问题、情况、AI 假设、备注、取舍、源位置与普通发布一样不进任何上传文件。CLI 会核对产物里内联 IR 的 `mode` 是 `review`，旧版 `@joplo-app/server` 忽略该选项时报 UNSUPPORTED_ACTION，不上传。成功的 `data.review` 带 `mode: "review"`，文本写 “Published the review version …”。选择 `--no-review` 时只发布主分享。
 - **`--pr <number>`（PR 预览）**：请求体加 `pr: {provider: "github", repo, number, headSha, runUrl}`。在 GitHub Actions（`GITHUB_ACTIONS=true`）里：repo 取 `--repo` 或 `GITHUB_REPOSITORY`；headSha 取 `--sha`，否则读 `GITHUB_EVENT_PATH` 事件 JSON 的 `pull_request.head.sha`（PR 事件的 `GITHUB_SHA` 是合并提交），没有时用 `GITHUB_SHA`；runUrl 为 `GITHUB_SERVER_URL/GITHUB_REPOSITORY/actions/runs/GITHUB_RUN_ID`（重试的运行加 `/attempts/N`），只在 github.com 上生成，否则为 null。不在 Actions 里必须 `--repo owner/name`，headSha 取 `--sha` 或 `git rev-parse HEAD`。缺少或格式不对时在登录、检查、构建和任何请求之前报 USAGE（退出 2）。`--repo`、`--sha` 只能和 `--pr` 一起用。
-- PR 预览是独立链接：不发送 replaceShareId，也不写 `.joplo/cloud.json`（不覆盖本项目的主链接和评审版记录，之后的普通 share、--review 与 feedback 仍用原来的记录）。CI 推荐 `npx joplo share --new --pr <number> --format json`；fork 来的 PR 拿不到 secrets，工作流应跳过发布，不推荐 `pull_request_target`。
+- PR 预览是独立链接：不发送 replaceShareId，也不写 `.joplo/cloud.json`（不覆盖本项目的主链接和评审版记录，之后的普通 share、--review 与 feedback 仍用原来的记录）。CI 推荐 `npx joplo share --private --no-review --new --pr <number> --format json`；fork 来的 PR 拿不到 secrets，工作流应跳过发布，不推荐 `pull_request_target`。
 - finalize 响应里的 `pr: {comment, reason?, installUrl?}` 原样（白名单字段）放进 `data.pr`；`comment: "skipped"` 时文本输出一行 “PR comment skipped: <原因>. Install the Joplo GitHub App to comment on pull requests: <installUrl 或 <server>/settings/github>”，`failed` 时说明评论失败但已发布。服务端没返回时 `data.pr` 为 null。
 
-JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, embed}`（`--review` 时另有 `mode: "review"`，`--pr` 时另有 `pr`，`--scenario` / `--feature` 时另有 `scope`），`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
+JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, embed}`（`--review` 时另有 `review: {…, mode: "review"}`，`--pr` 时另有 `pr`，`--scenario` / `--feature` 时另有 `scope`），`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
 
 `data.embed` 与云端控制台、分享页 Worker 用同一套格式（`<分享页>` 为 `data.url`，规范成以 `/` 结尾）：
 
@@ -374,6 +402,8 @@ Agent 可以把 `data.embed.markdown` 直接写进 README；链接不会过期�
 
 | 错误码 | 恢复方式 |
 | --- | --- |
+| CHOICE_REQUIRED（退出 2） | 缺少本次可见性或评审选择；先问用户，再补齐对应参数 |
+| USAGE（退出 2） | 互斥参数或受限模式选公开；按错误改正，本地拒绝且没有构建上传 |
 | AUTH_REQUIRED（退出 3） | 请用户运行 npx joplo login，再重试 |
 | AUTH_EXPIRED（401，退出 3） | 重新运行 npx joplo login |
 | PLAN_REQUIRED | 服务端明确要求 Pro；升级入口为当前 server/settings/billing，或用 --new 创建新分享 |
@@ -381,11 +411,11 @@ Agent 可以把 `data.embed.markdown` 直接写进 README；链接不会过期�
 | ACCOUNT_UNAVAILABLE | 账号目前不能发布，请登录网页查看账号状态；不引导付费 |
 | FORBIDDEN | 当前操作被禁止，请检查账号权限 |
 | RATE_LIMITED | 登录请求过于频繁，稍后再试 |
-| UPLOAD_EXPIRED | 预签名上传链接已过期，重新运行 joplo share |
-| CONFLICT | 另一个发布正在进行或上传准备失败，稍后重新运行 joplo share；不自动重试 |
+| UPLOAD_EXPIRED | 预签名上传链接已过期，先向用户重新确认两项选择，再运行 joplo share --public/--private --review/--no-review |
+| CONFLICT | 另一个发布正在进行或上传准备失败，稍后先向用户重新确认两项选择，再运行 joplo share --public/--private --review/--no-review；不自动重试 |
 | QUOTA_EXCEEDED | 按 details 区分每小时发布次数或每小时预留字节上限，显示服务端重试时间；类型未知时使用通用额度说明 |
 | TOO_LARGE | `details.kind=upload` 表示新增上传超限，`total` 表示清单总量超限，`files` 表示文件数超限；查看上限、实际值及最大五个文件 |
-| CLIENT_OUTDATED | 当前目录向上的项目里装了 joplo 时（启动器优先用项目版本，`npx joplo@latest` 也会被顶替），提示在项目里把两个依赖升到同一版本：`npm i -D joplo@latest @joplo-app/kit@latest`（按包管理器换成 pnpm/yarn/bun 的写法），再 `npx joplo share`；不在项目里时才建议 `npx joplo@latest share` |
+| CLIENT_OUTDATED | 当前目录向上的项目里装了 joplo 时（启动器优先用项目版本，`npx joplo@latest` 也会被顶替），提示在项目里把两个依赖升到同一版本：`npm i -D joplo@latest @joplo-app/kit@latest`（按包管理器换成 pnpm/yarn/bun 的写法），再 `npx joplo share --private --no-review`；不在项目里时才建议 `npx joplo@latest share --private --no-review`（示例假设本次明确选择私密、不发评审版） |
 | NETWORK | 检查网络后重试；命令内部重试 finalize 时复用 uploadId |
 
 其他云端错误及本地校验失败退出 1，用法错误退出 2。错误正文不回显远端响应或访问令牌。HTTP 状态决定错误类别，4xx 不能被响应体改成可重试的 NETWORK。终端数据片段移除控制字符和 ANSI 转义序列；网址规范化，验证码严格校验。

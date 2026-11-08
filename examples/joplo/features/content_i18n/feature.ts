@@ -12,7 +12,7 @@ export default feature({
   },
   cases: {
     add_locale: { title: '给项目加一种语言', dimension: 'main', priority: 'high', expected: 'Agent 运行 joplo i18n add ja，按清单填好译文，check 通过；看板切到日本語，原型、字幕和旁白都是日语，旁白自动用日语音色' },
-    viewer_auto: { title: '观众打开链接，自动是自己的语言', dimension: 'main', priority: 'high', expected: '照常 joplo share；日语浏览器打开同一个链接，界面、内容、旁白都是日语，不用选' },
+    viewer_auto: { title: '观众打开链接，自动是自己的语言', dimension: 'main', priority: 'high', expected: '照常 joplo share --private --no-review；日语浏览器打开同一个链接，界面、内容、旁白都是日语，不用选' },
     fallback: { title: '观众的语言项目里没有', dimension: 'consistency', priority: 'high', expected: '界面用观众的语言（葡萄牙语），内容退回默认语言（中文）并说明；语言菜单列出全部语言，有内容的打 ✓' },
     stale: { title: '改了原文，译文没跟上', dimension: 'lifecycle', priority: 'high', expected: 'check 报出过期的译文并给出最接近的旧条目；看板的语言菜单显示过期条数；Agent 更新后 check 通过；分享照常，只提醒' },
     cloud_cache: { title: '换一台电脑重新发布', dimension: 'consistency', priority: 'high', expected: '这台电脑没配语音供应商，也没有本地音频：重新发布同一个分享时，分享里已有的各语言音频直接沿用，一段都不用重新生成或上传' },

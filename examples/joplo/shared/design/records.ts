@@ -106,4 +106,12 @@ export const designRecords = {
     current: 'D85 托管朗读实现中：声音来源只留官方的，看板显示剩余字数与生成前的字数估算。',
     evidence: 'DECISIONS D85；joplo-cloud C27；examples/joplo cloud_usage 原型',
   },
+  share_visibility: {
+    problem: '发出链接之前，谁能看到这个作品？',
+    exploration: 'D85 要求每次明确选择可见性与评审版；范围分享始终保密。',
+    scenario: 'review',
+    decision: '主分享与评审版分别显示，公开范围在发布前说明',
+    current: 'D85 第二阶段客户端；云端必须先上线，本轮不包含密码。',
+    evidence: 'D85 决策分支与客户端任务契约；docs/cli.md 字段数据流',
+  },
 } satisfies Record<string, PublicDesignRecord>;

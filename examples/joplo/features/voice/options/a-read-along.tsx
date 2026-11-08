@@ -85,9 +85,9 @@ export default withDesignRecord(option({
       .click('b_v_gen', '重试失败的 1 段', set(ui.genPct, 100), set(ui.genStatus, '3/3 已生成 · 共 11 秒'), set(ui.genButton, '重新生成'), trace('gen', 'prov'),
         done('重试后 3 段都齐了')),
 
-    share: flow('分享时带上声音', { cases: ['share'], start: '/voice', state: { ui: { ...providerReady(), voiceOpen: false, voice: 'off', voiceIcon: '🔇', genStatus: '2/3 已生成 · 第 2 段过期', siteHint: true }, inputs: profileInputs }, expected: '照常 joplo share，生成好的声音随分享上传；观众打开声音就能听，过期的一段用观众的浏览器读' })
+    share: flow('分享时带上声音', { cases: ['share'], start: '/voice', state: { ui: { ...providerReady(), voiceOpen: false, voice: 'off', voiceIcon: '🔇', genStatus: '2/3 已生成 · 第 2 段过期', siteHint: true }, inputs: profileInputs }, expected: '照常 joplo share --private --no-review，生成好的声音随分享上传；观众打开声音就能听，过期的一段用观众的浏览器读' })
       .card('把带旁白的演示发给小周', { sub: '小周没来开会，林舟把演示分享给他' })
-      .type('t_in', 'npx joplo share', '林舟像平时一样分享')
+      .type('t_in', 'npx joplo share --private --no-review', '林舟像平时一样分享')
       .press('Enter', '声音跟着一起打包', set($.inputs.t_in, ''), set(ui.tShare, true), shot('t_term'), uses('share_bundle'))
       .system('过期的一段', '过期的那段不卡分享，只提醒', highlight('t_stale'), uses('fallback_browser'))
       .system('上传完成', '只传新文件，Key 不上传', set(ui.tShared, true), highlight('t_upload'))

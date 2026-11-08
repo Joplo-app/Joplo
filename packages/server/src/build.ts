@@ -52,6 +52,8 @@ export const jsonForHtml = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u0
 export function finalizeHtml(html: string, readAsset: (rel: string) => string, inline: { project: unknown; home: string | null; scoped?: true }, identity?: StepIdentity): { html: string; inlined: string[] } {
   const inlined: string[] = [];
   let out = html.replace(/\s+crossorigin(?:="[^"]*")?/g, '');
+  // 作者标记只由 Cloud 注入，不能随本地构建或导出传播。
+  out = out.replace(/<meta\b[^>]*\bname\s*=\s*["']joplo-author["'][^>]*>/gi, '');
   out = out.replace(/<link rel="modulepreload"[^>]*>\s*/g, '');
   out = out.replace(/<script type="module" src="\.\/([^"]+)"><\/script>/g, (_m, rel: string) => {
     inlined.push(rel);

@@ -6,6 +6,17 @@ import type { BoardDictionary } from './en';
 export function createBoardKo(locale: Locale = 'ko') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudPublic: "공개",
+      cloudPrivate: "비공개",
+      cloudPublicNote: "공개: show.joplo.app/@사용자명 포트폴리오에 추가되고 검색 엔진에 등록됩니다.",
+      cloudPrivateNote: "비공개: 링크를 가진 사람만 볼 수 있습니다.",
+      cloudPrivateOnly: "범위 공유 및 PR 미리보기는 기밀 보호를 위해 비공개입니다.",
+      cloudAlsoReview: "리뷰 버전도 게시",
+      cloudReviewNote: "리뷰 링크는 모든 안을 포함하며 항상 비공개입니다.",
+      cloudPortfolioWork: "작품 상세 보기",
+      cloudSetupUsername: "사용자명 설정",
+      cloudVisibility: "공개 범위",
+
       localReviewMoveHint: "클릭하여 피드백을 열고 드래그하여 이동하세요. 방향키로 위치를 조정할 수 있습니다.",
       localReviewApprovedDraft: "이 검토는 다른 화면에서 승인되었습니다. 보내지 않은 초안은 복사할 수 있도록 보존됩니다.",
       localReviewTitle: "피드백 및 검토",

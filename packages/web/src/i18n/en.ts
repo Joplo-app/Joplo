@@ -242,6 +242,7 @@ export function createEn(locale: Locale = 'en') {
       themeCssComment: (p0: Value, p1: Value, p2: Value) => `/* Theme ${value(p0, locale)}${value(p1, locale)} */\n${value(p2, locale)}`,
     },
     site: {
+      authorMoreWorks: (name: string) => `${name} · More works ↗`,
       prototypeTitle: (name: string) => `${name} · Concept prototype`,
       scenarioCount: (n: number) => `${plural(n, { one: '# scenario', other: '# scenarios' }, locale)}`,
       itemCount: (n: number) => `${number(n, locale)}`,

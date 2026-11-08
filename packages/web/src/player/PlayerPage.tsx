@@ -1,3 +1,4 @@
+import { AuthorLink, type Author } from '../site/author';
 import { useTopbarMeasurements } from './topbar-fit';
 import { LanguageMenu } from './LanguageMenu';
 import { localeNames } from '../i18n/locale';
@@ -426,6 +427,7 @@ export type PlayerPageProps = {
   brandHref?: string;
   /** 发布站水印（D83）：舞台右上角的小 Joplo 图标；看板不传，Pro 分享不传。 */
   watermark?: StageWatermark;
+  author?: Author | null;
   theme: StageTheme;
   /** 字体（D55，看板外观）：null / 缺省 = 跟随主题。发布站不传。 */
   font?: AppearanceFont | null;
@@ -703,6 +705,7 @@ export function PlayerPage(p: PlayerPageProps) {
         <div className="absolute bottom-3 right-3 z-30 flex items-center gap-2" data-testid="complete-actions">
           <Btn icon={<RotateCcw className="size-4" />} label={i18n.player.replay} onClick={() => ctl.togglePlay()} data-testid="replay" />
           {p.completeAction}
+          <AuthorLink author={p.author} />
         </div>
       ) : null}
       {p.flash ? (
@@ -732,7 +735,8 @@ export function PlayerPage(p: PlayerPageProps) {
         chapters={p.watch.chapters}
         onChapter={p.watch.onChapter}
         onRestart={p.watch.onRestart}
-        actions={<><LanguageMenu iconOnly />{p.actions}</>}
+        author={<AuthorLink author={p.author} />}
+        actions={<><AuthorLink author={p.author} /><LanguageMenu iconOnly />{p.actions}</>}
         voice={p.voice}
         flash={p.flash}
       />
@@ -744,6 +748,7 @@ export function PlayerPage(p: PlayerPageProps) {
       <div ref={rootRef} className="jb-dark flex h-screen w-screen flex-col bg-jb-app" data-view={snap.view} data-fullscreen="" onMouseMove={idle.poke} style={idle.visible ? undefined : { cursor: 'none' }}>
         <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-[6%] pb-6 pt-8" data-inspecting={inspecting ? '' : undefined} data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
           {stageArea}
+          {completed ? <div className="flex justify-end"><AuthorLink author={p.author} /></div> : null}
           {hasStage ? (
             <div className={cn('absolute right-3 top-3 z-10 transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')}>
               <div className="flex items-center gap-0.5 rounded-[8px] border border-jb-line bg-jb-surface p-0.5" role="group" aria-label={i18n.player.zoom} data-testid="zoom-bar">
@@ -788,6 +793,7 @@ export function PlayerPage(p: PlayerPageProps) {
         right={
           <>
             {!p.onInspect ? <LanguageMenu iconOnly={L.languageIconOnly} /> : null}
+            <AuthorLink author={p.author} />
             {p.actions}
             {p.onInspect ? <LanguageMenu iconOnly={L.languageIconOnly} /> : null}
             {p.menu.length ? <MenuButton trigger={{ icon: p.exportBadge && !L.topLabels ? p.exportBadge : p.menuLabel ? <Ellipsis className="size-4" /> : <Share className="size-4" />, label: p.menuLabel ?? i18n.player.export, iconOnly: !L.topLabels, extra: L.topLabels ? p.exportBadge : null }} label={p.menuLabel ?? i18n.player.export} testid="more-menu" items={p.menu} placement="bottom-end" width={240} /> : null}
@@ -848,6 +854,7 @@ export function PlayerPage(p: PlayerPageProps) {
             {/* 舞台框：画面和字幕合成一体（1.5px 墨线，圆角 10）；字幕区跟随舞台主题 */}
             <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface', hasLayerBar && 'rounded-tl-none')} data-testid="stage-frame" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
               {stageArea}
+          {completed ? <div className="flex justify-end"><AuthorLink author={p.author} /></div> : null}
               {scenario ? <SubtitleSlot content={subtitle} theme={p.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} explainInTip={L.explainInTip} narration={snap.narration} /> : null}
             </div>
           </div>

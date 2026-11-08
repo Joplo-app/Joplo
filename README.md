@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://joplo.app/s/dn1MWCcnDW/"><img src="https://joplo.app/s/dn1MWCcnDW/badge.svg" alt="Joplo demo: Joplo's own design process"></a><br>
-  <sub>☝️ A live Joplo badge. Click it to play Joplo's own design process, published by CI with <code>joplo share</code>.</sub>
+  <sub>☝️ A live Joplo badge. Click it to play Joplo's own design process, published by trusted CI.</sub>
 </p>
 
 <p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
@@ -44,7 +44,7 @@ Keep the Board process running. Edit the generated TSX files and watch the demo 
 - **Terminal and Phone:** model command-line interactions with `Terminal`; mobile pages use a `Phone` frame. Each page targets one device.
 - **Themes:** choose from nine built-ins or add `themes/<name>.css`. Board settings can apply a Theme to one project or all projects.
 - **Exports:** export the current step as an image or record a whole scenario locally. The Published site supports image export, Layers, Director, and fullscreen playback.
-- **Share and embed:** `npx joplo share` uploads the Published site and prints a README badge; the same link also serves a preview image and a lightweight embedded player for docs and blogs. See [Share and embed](#share-and-embed).
+- **Share and embed:** `npx joplo share --private --no-review` uploads the Published site and prints a README badge; the same link also serves a preview image and a lightweight embedded player for docs and blogs. See [Share and embed](#share-and-embed).
 
 ## Work with an agent
 
@@ -77,7 +77,7 @@ npx joplo skill review
 npx joplo skill install --agents-md
 ```
 
-The twelve topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, `review` (local listening, Share polling, prompt acknowledgement, version isolation, recovery, and best practices), `diff` (compare feature changes across builds and in PR CI), and `publish` (build, share, embed, review versions). `npx joplo components <Name>` prints the props and an example for one component. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
+The twelve topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, `review` (local listening, Share polling, prompt acknowledgement, version isolation, recovery, and best practices), `diff` (compare feature changes across builds and in PR CI), and `publish` (build, share, embed, review choices, portfolios and SEO). `npx joplo components <Name>` prints the props and an example for one component. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
 
 Use a second terminal while the Board is running:
 
@@ -136,11 +136,11 @@ Use your own Wrangler account and configure the site name and compatibility date
 
 ## Share and embed
 
-Skip hosting entirely: `joplo share` checks, builds, and uploads the Published site to Joplo Cloud, then prints everything you need to put the demo in front of people.
+Skip hosting entirely: `joplo share --private --no-review` checks, builds, and uploads the Published site to Joplo Cloud, then prints everything you need to put the demo in front of people.
 
 ```sh
 npx joplo login          # once
-npx joplo share
+npx joplo share --private --no-review
 ```
 
 ```text
@@ -149,6 +149,10 @@ Permanent link
 Add to README: [![Joplo 演示 · <title>](https://joplo.app/s/<share-id>/badge.svg)](https://joplo.app/s/<share-id>/)
 More embed options: https://cloud.joplo.app/shares/<share-id>
 ```
+
+Choose `--public` or `--private` and `--review` or `--no-review` every time. Public shares enter your portfolio at `show.joplo.app/@username` and search engines; private shares are visible to anyone holding the link. Agents must ask the user both questions before publishing. CI must pin both flags; missing choices fail with exit 2 before building or connecting. Interactive terminals ask instead.
+
+`--review` also publishes a separate private, commentable link with all options (`data.review.url`); `data.url` is the main share. Scoped shares and PR previews are always private. Public share results include a portfolio work URL or a username setup link; the player shows “Author · More works” only on official Cloud shares, outside embeds. Write names, descriptions and goals as search-result content and keep unpublished information out.
 
 Every share link comes with three ways to show it:
 
@@ -171,7 +175,7 @@ The embed code from `--format json` or the Cloud console is ready to paste:
 - The embedded player makes no network requests and does not use storage. GitHub strips iframes from Markdown, so use the badge there.
 - `--scenario <id>` and `--feature <id>` share only part of a project. Everything else is cut at build time, not hidden.
 - Links never expire, on free accounts too. Each account has storage instead (free 100 MB, Pro 5 GB, counted from the raw size of every live share), and `share` prints how much you use. Re-sharing updates the same link, so badges and embeds you already published stay current.
-- In CI, set `JOPLO_API_KEY` and run `npx joplo share --new --pr <number> --format json` for a PR preview. Agents should copy `data.embed.markdown` / `data.embed.iframe` as is rather than building URLs themselves.
+- In CI, set `JOPLO_API_KEY` and run `npx joplo share --private --no-review --new --pr <number> --format json` for a PR preview. Agents should copy `data.embed.markdown` / `data.embed.iframe` as is rather than building URLs themselves.
 
 The preview image needs the optional export component (`npx joplo setup export`); without it, share still succeeds and uses a generic card. Details: [`share` in the CLI reference](docs/cli.md#share) and [embed mode](docs/web.md#嵌入模式).
 

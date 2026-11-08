@@ -156,7 +156,7 @@ test('P1 authoring rules, components, and annotation theme variable remain docum
 
 test('publish 说明评审版、feedback 与按决定改源码的规则、API Key 与 PR 预览', () => {
   const body = skillTopic('publish');
-  for (const s of ['npx joplo share --review', 'npx joplo feedback --format json', 'feedback --applied', 'feature.pick', "origin: 'user', status: 'confirmed'", "status: 'conflict' and ask the user", 'delete the question', 'JOPLO_API_KEY', '--pr <number>', 'run npx joplo check']) expect(body, s).toContain(s);
+  for (const s of ['npx joplo share --private --review', 'npx joplo feedback --format json', 'feedback --applied', 'feature.pick', "origin: 'user', status: 'confirmed'", "status: 'conflict' and ask the user", 'delete the question', 'JOPLO_API_KEY', '--pr <number>', 'run npx joplo check']) expect(body, s).toContain(s);
 });
 
 test('story（D67）：先规划再动手、PM 视角对应现有字段、字幕写法，并指回 cases / demo / check / outline', () => {

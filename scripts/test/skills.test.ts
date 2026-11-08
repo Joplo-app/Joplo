@@ -60,9 +60,9 @@ test('joplo 的 description 覆盖中英文触发词，可在没有 joplo.config
   expect(order.every(i => i >= 0)).toBe(true);
   expect(order).toEqual([...order].sort((a, b) => a - b));
   const pitfalls = body.split('\n').filter(l => l.startsWith('- ') && l.includes('See npx joplo skill '));
-  expect(pitfalls.length).toBeGreaterThanOrEqual(5); expect(pitfalls.length).toBeLessThanOrEqual(8);
+  expect(pitfalls.length).toBeGreaterThanOrEqual(5); // Publishing pitfalls intentionally have no upper bound (D85).
   expect(body).toContain('npx joplo skill <topic>');
   const ffm = frontmatter(feedback!);
   for (const word of ['review', '评审']) expect(ffm.description).toContain(word);
-  for (const s of ['npx joplo feedback --format json', 'pick', 'confirm_rule', "origin: 'user', status: 'confirmed'", 'reject_rule', "status: 'conflict' and ask the user", 'answer', 'delete the question', 'npx joplo check', 'npx joplo share --review', 'npx joplo feedback --applied', '--ref']) expect(feedback, s).toContain(s);
+  for (const s of ['npx joplo feedback --format json', 'pick', 'confirm_rule', "origin: 'user', status: 'confirmed'", 'reject_rule', "status: 'conflict' and ask the user", 'answer', 'delete the question', 'npx joplo check', 'npx joplo share --private --review', 'npx joplo feedback --applied', '--ref']) expect(feedback, s).toContain(s);
 });

@@ -1,7 +1,7 @@
 /**
  * 「按容量发布」的画面（两个方案共用，只有用量条什么时候出现不同）：
  * - board：林舟的本地看板，右上角「发布到 Joplo Cloud」打开的发布浮层（账号、范围、容量、发布、结果）；
- * - terminal：Agent 在终端里运行 joplo share 的输出（用量一行；超出时 QUOTA_EXCEEDED）。
+ * - terminal：Agent 在终端里运行 joplo share --private --no-review 的输出（用量一行；超出时 QUOTA_EXCEEDED）。
  * 被演示的原型（邀请成员）只画个轮廓，这里关心的是发布浮层。
  */
 import { $, and, done, eq, flow, highlight, hold, layer, narrate, not, numbered, or, set, shot, spotlight, callout, uses, type Bind, type EffectDef } from '@joplo-app/kit';
@@ -171,7 +171,7 @@ export const scenarios = (v: Variant) => {
         done('Pro 空间宽裕')),
 
     agent: flow('Agent 用 CLI 发布', { cases: ['agent'], start: '/', state: { ui: base }, expected: '输出里有用量；超出时单独的错误码和下一步' })
-      .card('林舟让 Agent 发布', { role: 'lin', sub: 'Agent 在终端里运行 joplo share' }, narrate('林舟让 Agent 帮他发布。'))
+      .card('林舟让 Agent 发布', { role: 'lin', sub: 'Agent 在终端里运行 joplo share --private --no-review' }, narrate('林舟让 Agent 帮他发布。'))
       .system('发布成功', '最后一行是用量', narrate('发布成功，最后一行写着用了多少空间。'), set($.ui.term, 'ok'), shot('t_term'))
       .system('空间不够时', 'QUOTA_EXCEEDED，退出码 6', narrate('空间不够时，以单独的错误结束：写明差多少、已有链接不受影响、去哪里腾地方，Agent 原样转告就行。'), set($.ui.term, 'over'), spotlight('t_over'), uses('agent_code'),
         done('Agent 能把原因和下一步告诉用户')),

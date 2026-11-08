@@ -36,7 +36,7 @@ Run dev and the follower in separate long-running shells. dev keeps the board li
 5. Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.
 6. Extend to every option and every case agreed with the user; run check until 0 errors.
 7. Before handing off for review, read npx joplo skill review. Keep npx joplo feedback watch [dir] --local --follow --json running in its own shell (joplo dev prints this exact command), then give the user the board URL dev printed. While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. If you end your response while they test, add --once so the watcher exits (and wakes a host that resumes on background exit) on the first event, then resume with --since. Receive and apply review results with the joplo-feedback skill.
-8. Only when the user asks to share or publish: npx joplo share --format json publishes picked options; npx joplo share --review publishes every option for reviewers. Confirming an option in the board is not a publish request. To share part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items.
+8. Only when the user asks to share or publish: npx joplo share --private --no-review --format json publishes picked options; npx joplo share --private --review also publishes a separate, always-private link containing every option for reviewers (data.review.url); data.url is the main link. Confirming an option in the board is not a publish request. To share part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items.
 
 ## Show the product, not slides
 Every step is an action on the product and a visible change it causes. If a step could be a bullet on a slide, rebuild it as interface, state, or a trace.
@@ -70,6 +70,10 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - Full-height layouts squeeze tables and forms: rows exist in the DOM but are cut off on screen; show 5–8 rows or move the table to its own layer. See npx joplo skill demo.
 - Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key and pins that layer, so later steps stop switching layers; layer= is ignored); wait for rendering before screenshots. See npx joplo skill demo.
 - Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user. See npx joplo skill cases.
+- CHOICE_REQUIRED (exit 2): ask both publishing questions; never fix it by silently adding --private --no-review, and do not reuse the previous invocation. See npx joplo skill publish.
+- Public portfolio work and the always-private review version are two separate links: give reviewers data.review.url, the audience data.url. See npx joplo skill publish.
+- Required: before every share, ask the user public or private AND whether to also publish a review version. Never choose for them or reuse a previous choice; CI must pin both flags in its workflow. See npx joplo skill publish.
+- Public shares enter the portfolio and search engines: write the project name, description, and feature goals as search-result content; exclude unpublished information. See npx joplo skill publish.
 - Never share or deploy without the user's go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself. See npx joplo skill publish.
 
 ## Reference
@@ -85,6 +89,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - selection: Edit only the element selected by the user in the board
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
-- publish: pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages
+- publish: pick, build, explicit public/private and review choices, portfolios and SEO, feedback write-back, deployment, chapters, languages
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.17 sha256:ac891b04b0ec9269c79bbdc0030eb149867750c76d51cfb7c76a440892b8c478 -->
+<!-- joplo-skill 0.2.17 sha256:414b6d68ba739b53340d6108740f2e06a4e8da1a2fe9145ab808d7c1e4352340 -->

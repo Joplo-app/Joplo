@@ -216,7 +216,7 @@ trace 同时提供镜头目标。取景保留上下文：镜头对准图表里�
   - 发布中：检查项目 → 构建站点 → 上传 → 收尾，逐项打勾；关掉浮层不会中断，菜单项的第二行写“正在发布…”，再打开能看到同一个任务。同一项目同时只有一个发布任务。
   - 完成：链接（可点、复制、在新标签页打开）、有效期或“永久链接”；借用了别的功能的内容时列出每一项（功能名 › 元素 / 页面）并说明只带这些、怎么去掉；预览图跳过、朗读音频等提示原样列在下面。按钮变为「再发布一次」。
   - 失败：红框写错误（检查没过时带第一条错误的 `文件:行`）和「重试」；因为没登录或登录过期而失败时改为显示登录命令。
-  - 发布走 CLI 的 `share()`（与 `joplo share --scenario / --feature` 同一套检查、构建、上传和 `.joplo/cloud.json` 记录）。CLI 启动看板时把它注入看板进程；令牌只在本机进程里，页面只拿到邮箱和套餐。接口：`POST /__joplo/p/<id>/cloud/publish`（本机令牌 + Origin + JSON，body `{scenarios?, features?}`，都为空 = 整个项目）开始，`GET` 同一路径读当前任务，进度推 `joplo:cloud`。旧版 CLI 启动的看板没有这个能力：菜单项第二行写“重启 joplo dev 后才能从看板发布”，浮层说明原因。
+  - 发布走 CLI 的 `share()`（与 `joplo share --private --no-review --scenario / --feature` 同一套检查、构建、上传和 `.joplo/cloud.json` 记录）。CLI 启动看板时把它注入看板进程；令牌只在本机进程里，页面只拿到邮箱和套餐。接口：`POST /__joplo/p/<id>/cloud/publish`（本机令牌 + Origin + JSON，body `{scenarios?, features?, visibility, review}`，都为空 = 整个项目）开始，`GET` 同一路径读当前任务，进度推 `joplo:cloud`。旧版 CLI 启动的看板没有这个能力：菜单项第二行写“重启 joplo dev 后才能从看板发布”，浮层说明原因。
 
 ![检查抽屉](screenshots/board-inspect-drawer.png)
 
@@ -226,9 +226,9 @@ trace 同时提供镜头目标。取景保留上下文：镜头对准图表里�
 
 发布站字体按内容裁剪：在 source 与 npm dist 两种模式下，先完成 IR/入口 JS 内联和作者 CSS 编译，再扫描 staging 目录里全部 UTF-8 文本产物（含全部语言词典、HTML、CSS content 与 Unicode 转义），保留有交集的 Excalifont / 霞鹜漫黑 `@font-face` 和对应 woff2。无法解析的规则保守保留；许可证随实际分发字体保留。裁剪后的 CSS 重新计算文件名哈希并更新 HTML 引用，避免静态托管缓存旧规则。目录仍自包含，默认字体不引用外部 URL，不加载文楷，不带小赖。观众在输入框中新输入、且产物未出现过的字可能退回系统字体；罕用汉字与韩文也使用系统字体。
 
-发布站与本地看板共用首页和演示页布局，只呈现选定方案、功能目标、角色、场景、步骤字幕及整体布局（首页卡片与左栏写“面向：角色”，D67；情况的期望结果与优先级是创作侧信息，不发布）。没有本机项目目录、缺口、待决问题、规则来源或源码检查抽屉。`joplo share --review` 构建的评审版（`buildSite({ review: true })`，D63）另含所有功能的所有方案，供云端评审页按场景切换比较；规则、问题、情况、AI 假设、备注、取舍和源位置同样不进产物。
+发布站与本地看板共用首页和演示页布局，只呈现选定方案、功能目标、角色、场景、步骤字幕及整体布局（首页卡片与左栏写“面向：角色”，D67；情况的期望结果与优先级是创作侧信息，不发布）。没有本机项目目录、缺口、待决问题、规则来源或源码检查抽屉。`joplo share --private --review` 构建的评审版（`buildSite({ review: true })`，D63）另含所有功能的所有方案，供云端评审页按场景切换比较；规则、问题、情况、AI 假设、备注、取舍和源位置同样不进产物。
 
-层级、导演、只重放一层、缩放平移、播放速度、时间线、字幕、全屏和快捷键与看板一致；分享带了音频时朗读默认开，没有音频时默认关、点 🔊 打开（见[朗读](#朗读d74)）。带 `?embed=1` 时是给 iframe 用的嵌入模式，见[嵌入模式](#嵌入模式)；再加 `review=1` 是给云端评审页用的评审模式，见[评审模式](#评审模式embed1review1)。首页是项目名、说明和功能卡片（带缩略图）；按场景保密分享（D75，`joplo share --scenario / --feature`）的产物里 IR 带 `scoped: true`，只有一个功能时打开就进演示、不经过首页，产物里不带项目说明。只有一个功能时，面包屑上的功能不再是下拉。演示页的顶栏只有「复制链接」和全屏，左栏是功能名、目标和选定方案的场景（按场景排列，没有方案切换），底部标明“用 Joplo 制作的概念原型 · 非正式实现”。没有检查、外观和导出（D55）。发布站的配色固定用 config 的 theme，字体和线条暂不发布；作者 CSS 随产物打包。
+层级、导演、只重放一层、缩放平移、播放速度、时间线、字幕、全屏和快捷键与看板一致；分享带了音频时朗读默认开，没有音频时默认关、点 🔊 打开（见[朗读](#朗读d74)）。带 `?embed=1` 时是给 iframe 用的嵌入模式，见[嵌入模式](#嵌入模式)；再加 `review=1` 是给云端评审页用的评审模式，见[评审模式](#评审模式embed1review1)。首页是项目名、说明和功能卡片（带缩略图）；按场景保密分享（D75，`joplo share --private --no-review --scenario / --feature`）的产物里 IR 带 `scoped: true`，只有一个功能时打开就进演示、不经过首页，产物里不带项目说明。只有一个功能时，面包屑上的功能不再是下拉。演示页的顶栏只有「复制链接」和全屏，左栏是功能名、目标和选定方案的场景（按场景排列，没有方案切换），底部标明“用 Joplo 制作的概念原型 · 非正式实现”。没有检查、外观和导出（D55）。发布站的配色固定用 config 的 theme，字体和线条暂不发布；作者 CSS 随产物打包。
 
 ### 水印（D83）
 
@@ -238,7 +238,7 @@ trace 同时提供镜头目标。取景保留上下文：镜头对准图表里�
 
 分享页地址带 `?embed=1` 时，发布站换成给第三方页面 iframe 用的精简播放器（[EmbedApp.tsx](../packages/web/src/site/EmbedApp.tsx)，方案 A「大播放按钮」）。不带 `embed=1`（包括 `embed=0`、空值）时发布站完全不变。
 
-- 参数：`scenario=<场景 id>` 选起始场景；`autoplay=1` 跳过封面直接播放。写错（场景不存在、autoplay 不是 1）时照常显示封面，从默认场景开始，不报错；其他参数忽略。默认场景是第一个功能的选定方案的第一个场景（与 `joplo share` 的预览图相同）。
+- 参数：`scenario=<场景 id>` 选起始场景；`autoplay=1` 跳过封面直接播放。写错（场景不存在、autoplay 不是 1）时照常显示封面，从默认场景开始，不报错；其他参数忽略。默认场景是第一个功能的选定方案的第一个场景（与 `joplo share --private --no-review` 的预览图相同）。
 - 封面（默认）：起始场景的初始画面压暗，中央一个大的「播放演示」，下面是项目名和“可点击的原型演示 · N 个场景”；底部一行「用 Joplo 制作」（Pro 分享不显示，见[水印](#水印d83)）和“播放后可暂停、逐步、全屏”。整块封面都可点，键盘 Tab 聚焦后 Enter / 空格开始；被遮住的画面是 inert，不能聚焦。
 - 播放后：画面 + 字幕 + 一条控制条：上一步 · 播放 / 暂停 · 下一步、“步骤 2 / 5”和进度条、场景切换（多个场景时；多个功能时写“功能 · 场景”）、「Joplo ↗」、全屏。宽度 < 560 时场景切换只剩图标、品牌只剩标志；< 400 去掉进度条。
 - 没有顶栏、左栏、层级标签、复制链接和语言菜单；镜头总是跟随导演。语言跟随观众浏览器（沙箱里读不到 localStorage 时按浏览器语言）。
@@ -258,7 +258,7 @@ trace 同时提供镜头目标。取景保留上下文：镜头对准图表里�
 
 ### 评审模式（`?embed=1&review=1`）
 
-云端评审页（`cloud.joplo.app/review/<id>`）用 iframe 嵌入分享页并加 `review=1`，在嵌入播放器上多一条 postMessage 通道（云端契约第 8.2 节，实现见 [review-bridge.ts](../packages/web/src/site/review-bridge.ts)）。画面和控件与普通嵌入相同；`review` 必须恰好是 `1`，且页面确实在 iframe 里（`window.parent !== window`），否则不注册 `message` 监听、不发任何消息，与普通嵌入完全一样。评审版（`joplo share --review`）的发布站含所有方案，评审页靠 `joplo:goto` 指定场景来切换方案；评审模式下 `scenario=` 参数也可以指向任何方案的场景。
+云端评审页（`cloud.joplo.app/review/<id>`）用 iframe 嵌入分享页并加 `review=1`，在嵌入播放器上多一条 postMessage 通道（云端契约第 8.2 节，实现见 [review-bridge.ts](../packages/web/src/site/review-bridge.ts)）。画面和控件与普通嵌入相同；`review` 必须恰好是 `1`，且页面确实在 iframe 里（`window.parent !== window`），否则不注册 `message` 监听、不发任何消息，与普通嵌入完全一样。评审版（`joplo share --private --review`）的发布站含所有方案，评审页靠 `joplo:goto` 指定场景来切换方案；评审模式下 `scenario=` 参数也可以指向任何方案的场景。
 
 | 方向 | 消息 | 时机 |
 | --- | --- | --- |
@@ -279,7 +279,7 @@ trace 同时提供镜头目标。取景保留上下文：镜头对准图表里�
 
 #### 实测（2026-11-06）
 
-方法同上一节：分享源 `127.0.0.1` 返回 `joplo build examples/invite` 的产物，HTML 带 CSP `sandbox allow-scripts allow-popups allow-downloads; connect-src 'none'; form-action 'none'; base-uri 'none'`（另加 `Access-Control-Allow-Origin: *` 让字体能加载）；外层页面在另一个源，嵌入三个 iframe：`?embed=1&review=1`、不带 review 的 `?embed=1`，以及一个和外层同源、冒充外层给演示发消息的 iframe。产物有两份：普通发布（只含选定方案），以及 `buildSite({ review: true })`（即 `joplo share --review` 用的构建）产出的真实评审版（invite 的 a-modal、b-batch 两个方案共 5 个场景）。Playwright 在 Chromium、Firefox、WebKit 上，普通发布各 28 项、评审版各 29 项全部通过：
+方法同上一节：分享源 `127.0.0.1` 返回 `joplo build examples/invite` 的产物，HTML 带 CSP `sandbox allow-scripts allow-popups allow-downloads; connect-src 'none'; form-action 'none'; base-uri 'none'`（另加 `Access-Control-Allow-Origin: *` 让字体能加载）；外层页面在另一个源，嵌入三个 iframe：`?embed=1&review=1`、不带 review 的 `?embed=1`，以及一个和外层同源、冒充外层给演示发消息的 iframe。产物有两份：普通发布（只含选定方案），以及 `buildSite({ review: true })`（即 `joplo share --private --review` 用的构建）产出的真实评审版（invite 的 a-modal、b-batch 两个方案共 5 个场景）。Playwright 在 Chromium、Firefox、WebKit 上，普通发布各 28 项、评审版各 29 项全部通过：
 
 - 收到 ready，场景列表与内联 IR 一致（id、optionId、步数、protocol 1）；沙箱里 `origin` 是 `null`、`localStorage` 抛 SecurityError。
 - ready 后立即收到一次 step 0 / stepId null 的 position。
@@ -295,3 +295,15 @@ trace 同时提供镜头目标。取景保留上下文：镜头对准图表里�
 ## 实现入口
 
 界面见 [PlayerPage.tsx](../packages/web/src/player/PlayerPage.tsx)，渲染见 [Stage.tsx](../packages/web/src/renderer/Stage.tsx)，服务接口见 [contract.ts](../packages/server/src/contract.ts)。手动、逐步、自动播放、回放、截图和视频共享 core 播放器；界面只消费 IR。
+
+### 发布可见性与作者标记（D85）
+
+发布浮层在范围下提供「公开 / 私密」与默认不勾选的「同时发评审版」。新建整项目默认公开，说明会进入 `show.joplo.app/@用户名` 并被搜索引擎收录；私密说明只有拿到链接的人能看。原有默认范围仍为当前场景，因此受 D75 约束：当前场景/功能（以及 PR 上下文）的公开选项禁用并说明保密原因，必须选整个项目才能公开。更新已有链接时从 `.joplo/cloud.json` 经本机 `/cloud/links` 读取当前可见性，缺字段按私密；这些预填不用于 CLI。
+
+本次 `visibility` / `review` 随看板请求经过 server 校验与 CloudHub 任务、cloud-bridge、CLI share 进入 Cloud；结果的 `visibility` / `portfolio` / 独立 `review` 链接沿相反路径显示。结果显示公开/私密，作品详情或设置用户名入口以新标签打开；字段缺失及 null 兼容旧云端。完整字段表见 [CLI 数据流](cli.md#可见性兼容与字段数据流)。
+
+Cloud 只给公开分享注入 `head > meta[name="joplo-author"]`，先删除作者自带同名标记。`readAuthor()` 同时要求页面在 `https://joplo.app/s/<10位id>/`、name 为非空字符串、作者 URL 的 origin 恰好为 `https://show.joplo.app` 且不含用户名密码；损坏 JSON、伪造后缀域名、HTTP、脚本 URL、本地文件与第三方托管全部忽略。无开发放宽常量。构建后处理也删除自带作者 meta。
+
+普通播放器顶栏右侧和播放完成操作旁显示「作者 · 更多作品 ↗」，手机的完成画面同样显示；新标签打开，`rel="noopener noreferrer"`，十种界面语言均有文案。`?embed=1` 分支不接收作者字段，本地 RenderApp 导出也不经过该入口。没有合法标记时不留空白条。
+
+手动检查：整项目新建默认公开；现有私密/公开链接分别预填；切到场景后公开禁用且解释；切换评审勾选后发布两个链接；公开有用户名/无用户名的结果入口；桌面/手机顶栏与完成画面的作者链接、长姓名、窄屏和键盘焦点；嵌入与本地导出无作者条。本轮未运行浏览器 E2E。

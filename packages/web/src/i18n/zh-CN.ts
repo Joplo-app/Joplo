@@ -244,6 +244,7 @@ export function createZhCN(locale: Locale = 'zh-CN') {
 ${value(p2, locale)}`,
     },
     site: {
+      authorMoreWorks: (name: string) => `${name} · 更多作品 ↗`,
       prototypeTitle: (name: string) => `${name} · 概念原型`,
       scenarioCount: (n: number) => `${number(n, locale)} 个场景`,
       itemCount: (n: number) => `${number(n, locale)} 个`,

@@ -25,7 +25,7 @@ test('R8 真 SIGINT 清理当前 share 临时目录并退出 130', async () => {
   const result = await interruptAtReady(`
     import { runCli } from ${moduleUrl('cli.ts')};
     const keepAlive = setInterval(() => {}, 1000);
-    await runCli(['share', ${JSON.stringify(dir)}], {
+    await runCli(['share', '--private', '--no-review',  ${JSON.stringify(dir)}], {
       cloud: { env: { JOPLO_HOME: ${JSON.stringify(home)} }, check: async () => ({name:'test',summary:{error:0},diagnostics:[]}) },
       loadServer: async () => ({ buildSite: async ({outDir}) => { process.stdout.write('READY\\n'); await new Promise(() => {}); } }),
     });

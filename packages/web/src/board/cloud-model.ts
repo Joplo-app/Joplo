@@ -5,7 +5,7 @@
 import type { CloudJob, CloudPublishRequest, CloudStorage, CloudStorageFull } from '../runtime/dev-client';
 
 export type CloudScopeChoice = 'scenario' | 'feature' | 'project';
-export type CloudContext = { featureId: string; scenarioId: string | null };
+export type CloudContext = { featureId: string; scenarioId: string | null; featureScenarioIds?: string[]; pr?: boolean };
 
 /** 范围选项 → 请求体（D75）：当前场景 / 当前功能（选定方案的全部场景）/ 整个项目（空）。没有当前场景时退回当前功能。 */
 export function cloudRequest(choice: CloudScopeChoice, ctx: CloudContext): CloudPublishRequest {
@@ -92,3 +92,6 @@ export function storageFull(f: CloudStorageFull):
   if (f.replacedBytes) return { kind: 'update', size: formatStorage(Math.max(0, f.shareBytes - f.replacedBytes)), left: formatStorage(left), ...links };
   return { kind: 'need', size: formatStorage(f.shareBytes), left: formatStorage(left), short: formatStorage(Math.max(0, f.shareBytes - left)), ...links };
 }
+
+/** 看板预填：没有链接是新建（公开）；旧链接未带 visibility 时为私密。CLI 从不读这个默认值。 */
+export const defaultVisibility = (link: { visibility?: 'public' | 'private' } | null): 'public' | 'private' => link ? link.visibility ?? 'private' : 'public';

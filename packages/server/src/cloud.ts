@@ -14,8 +14,11 @@ import type { ScopeInfo } from '@joplo-app/core';
 
 export const CLOUD_EVENT = 'joplo:cloud';
 
+export type CloudVisibility = 'public' | 'private';
+export type CloudPortfolio = { workUrl: string | null; profileUrl: string | null; needsUsername: boolean; setupPath: string };
+export type CloudLinks = { main: { visibility?: CloudVisibility } | null; scoped?: Record<string, { visibility?: CloudVisibility }> };
 export type CloudAccount =
-  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; /** 账号容量（C27）；云端连不上或旧云端时没有。 */ storage?: CloudStorage }
+  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; /** 账号容量（C27）；云端连不上或旧云端时没有。 */ storage?: CloudStorage; username?: string | null; portfolioUrl?: string | null }
   | { signedIn: false; server: string; loginCommand: string; message?: string };
 /** 账号容量（C27）：已用 / 上限，字节。 */
 export type CloudStorage = { usedBytes: number; quotaBytes: number };
@@ -23,13 +26,14 @@ export type CloudStorage = { usedBytes: number; quotaBytes: number };
 export type CloudStorageFull = { usedBytes?: number; quotaBytes?: number; shareBytes?: number; replacedBytes?: number; manageUrl: string; upgradeUrl: string };
 
 /** 范围：都为空 = 整个项目（D75）。 */
-export type CloudPublishRequest = { scenarios?: string[]; features?: string[] };
+export type CloudPublishRequest = { visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; features?: string[] };
 
-export type CloudPublishResult = { shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）。 */ storage?: CloudStorage & { shareBytes: number } };
+export type CloudPublishResult = { visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）。 */ storage?: CloudStorage & { shareBytes: number } };
 
 /** CLI 实现：account 只读本机登录（必要时问一次云端套餐）；publish 就是 share()，progress 是它写给终端的每一行。 */
 export type CloudBridge = {
   account(): Promise<CloudAccount>;
+  links?(projectDir: string): Promise<CloudLinks>;
   publish(projectDir: string, request: CloudPublishRequest, progress: (line: string) => void): Promise<CloudPublishResult>;
 };
 
@@ -87,6 +91,11 @@ export class CloudHub {
 
   /** `/__joplo/p/<id>/cloud/<sub>`：sub = 'publish'（GET 读任务，POST 开始发布）。 */
   async handleProject(projectId: string, dir: string, sub: string, req: http.IncomingMessage, ctx: Ctx): Promise<boolean> {
+    if (sub === 'links' && req.method === 'GET') {
+      if (!ctx.guardWrite(false)) return true;
+      ctx.send(200, { links: await this.bridge?.links?.(dir) ?? { main: null } });
+      return true;
+    }
     if (sub !== 'publish') return false;
     const method = req.method ?? 'GET';
     if (method === 'GET') {
@@ -101,10 +110,13 @@ export class CloudHub {
     if (!b.ok) return true;
     let request: CloudPublishRequest;
     try {
-      const body = (b.body ?? {}) as { scenarios?: unknown; features?: unknown };
+      const body = (b.body ?? {}) as { scenarios?: unknown; features?: unknown; visibility?: unknown; review?: unknown };
       const scenarios = strings(body.scenarios, 'scenarios');
       const features = strings(body.features, 'features');
-      request = { ...(scenarios?.length ? { scenarios } : {}), ...(features?.length ? { features } : {}) };
+      if (body.visibility !== 'public' && body.visibility !== 'private') throw new Error('Choose visibility: public / private');
+      if (typeof body.review !== 'boolean') throw new Error('Choose review: true / false');
+      if (body.visibility === 'public' && (scenarios?.length || features?.length)) throw new Error('Scoped shares must be private');
+      request = { visibility: body.visibility, review: body.review, ...(scenarios?.length ? { scenarios } : {}), ...(features?.length ? { features } : {}) };
     } catch (e) {
       return ctx.send(400, { error: { code: 'USAGE', message: e instanceof Error ? e.message : String(e) } }), true;
     }
