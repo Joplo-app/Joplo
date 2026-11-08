@@ -162,6 +162,31 @@ describe('桥', () => {
       { type: 'joplo:pick-result', protocol: 1, element: null },
     ]);
   });
+  it('ordinary review goto keeps its existing position deduplication', () => {
+    const w = fakeWindow();
+    const b = createReviewBridge({ enabled: true, win: w.win, project: project(), onGoto: vi.fn(), onPick: vi.fn() })!;
+    const pos = { scenario: 'f.a.main', step: 1, stepId: 'f.a.main#1', layer: null };
+    b.position(pos);
+    w.send({ type: 'joplo:goto', protocol: 1, scenario: pos.scenario, step: pos.step });
+    b.position(pos);
+    expect(w.parent.postMessage).toHaveBeenCalledTimes(1);
+  });
+  it('diff goto invalidates deduplication but only an observed renderer position acknowledges it', () => {
+    const w = fakeWindow();
+    const onGoto = vi.fn();
+    const b = createReviewBridge({ enabled: true, acknowledgeGoto: true, win: w.win, project: project(), onGoto, onPick: vi.fn() })!;
+    const pos = { scenario: 'f.a.main', step: 1, stepId: 'f.a.main#1', layer: 'app' };
+    b.position(pos); b.position(pos);
+    expect(w.parent.postMessage).toHaveBeenCalledTimes(1);
+    w.send({ type: 'joplo:goto', protocol: 1, scenario: pos.scenario, step: pos.step });
+    expect(onGoto).toHaveBeenCalledOnce();
+    expect(w.parent.postMessage).toHaveBeenCalledTimes(1); // Command receipt alone is not completion.
+    b.position(pos); b.position(pos);
+    expect(w.parent.postMessage).toHaveBeenCalledTimes(2);
+    w.send({ type: 'joplo:goto', protocol: 1, scenario: 'missing', step: 0 });
+    b.position(pos);
+    expect(w.parent.postMessage).toHaveBeenCalledTimes(2); // Invalid commands do not invalidate a good observation.
+  });
   it('只处理来自 window.parent 的合法消息；dispose 后不再处理', () => {
     const w = fakeWindow();
     const onGoto = vi.fn(), onPick = vi.fn();

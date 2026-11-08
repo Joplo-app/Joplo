@@ -143,6 +143,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
   useEffect(() => {
     const bridge = createReviewBridge({
       enabled: params.review,
+      acknowledgeGoto: params.diff,
       win: window as unknown as Parameters<typeof createReviewBridge>[0]['win'],
       project,
       onGoto: (g) => reviewHandlers.current.goto(g),
@@ -154,7 +155,7 @@ export function EmbedApp({ project, params }: { project: Project; params: EmbedP
       bridge?.dispose();
       bridgeRef.current = null;
     };
-  }, [project, params.review]);
+  }, [project, params.review, params.diff]);
   // 位置：场景、步骤、层级任何一项变化时发一次（桥里去重）
   useEffect(() => {
     if (snap.scenarioId && state) bridgeRef.current?.position({ scenario: snap.scenarioId, step: pos, stepId, layer: reviewLayer });

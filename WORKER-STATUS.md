@@ -103,3 +103,28 @@ Final fixture: 6 scenarios; sha256=e6accf8aca5d1ffb6a30fd6db42f40678930abdd1a4ba
 - 最后全仓 `pnpm test`：98 文件 / **1232 项通过**；随后新增 future IR + future identity 的不兼容边界测试，`pnpm test packages/core/test/feature-diff.test.ts packages/server/test/feature-diff.test.ts packages/cli/test/feature-diff.test.ts` **36 项通过**。
 - 最终 `pnpm typecheck`、web typecheck、skills build/check、两个实际 skill 命令、actionlint、node --check、git diff --check 通过。最终 `pnpm release:pack` 再次通过，六包反映最终源码与指南。
 - 本地 conventional commit：`feat: add feature diff bundles and isolated PR publication`（具体 SHA 见本分支 HEAD / worker 完成 envelope）。
+
+### P2 交叉审查修复 · 进行中
+
+- 已在 J1 worktree 复现注册 iframe 切换其他合法场景后仍 aligned 的问题；实际 runtime 的 VM 回归首轮 6 项中 5 项失败，确认跨场景过滤和旧缓存放行两个缺口。
+- 修复方向：分别记录实际 scenario/step 与本轮 confirmation；独立移动停播放、清计时器并使确认失效；go/realign 每次要求全部 pane 新回执。diff 模式的 review bridge 在合法 goto 后清除位置去重缓存，等实际渲染上报才确认，普通评审保持原行为。
+- 原有同场景浏览器验证未覆盖跨场景移动，本次新增实际 runtime 回归，不以源码字符串断言代替行为验证。
+- 不修改 Cloud transport；不 push/merge/npm publish。完成后重新生成 bundle 和六包 tarball。
+
+### P2 修复完成与验收产物
+
+- 实际 runtime 新增 8 项 VM 回归，覆盖其他场景（含步号相同）、等待期间切场景、同场景移动、无效消息、旧位置缓存、超时恢复、0 步与迟到回执；修复前 5 项失败，修复后全部通过。review bridge 新增 diff 重复 goto 的实际回执测试及普通评审去重保持测试。
+- 真实浏览器操作内嵌场景菜单：切场景立即停止比较并禁用未对齐播放；等过自动推进时间仍保持原比较位置；realign 收到两侧目标场景新回执后才 aligned，保持暂停；相同位置反复 realign 仍有双侧新回执；手动继续播放正常。运行时异常 0。
+- pnpm test：99 个文件 / 1243 项通过；相关专项 9 文件 / 143 项通过；pnpm typecheck、web typecheck、skills:build/check、实际 skill diff、node --check、git diff --check 通过。
+- pnpm exec tsx scripts/feature-diff-fixture.ts 已重建最终真实 bundle；pnpm release:smoke --keep 已重新构建、打包六包并完成仓库外安装冒烟，退出 0。最终 tarball 在 release/，版本仍为 0.2.12。
+- 本次是 runtime/播放器桥修复，业务 manifest 不变。验收必须使用完整新 bundle（包括两侧的新播放器），不能只替换根 viewer。Cloud transport、identity schema 和匹配行为均未改变。
+- 本地提交名：fix: invalidate feature diff alignment on independent scenario changes。无 push、merge、npm publish 或真实外部消息。
+
+最终 bundle 摘要：
+
+```text
+index.html: 58a255d936c5a98f44fb6bd53e5049ab4d56db1ee91adf4746e7189a0fd6fedc
+before/index.html: 5b7a2815ed46e67b30aa1d17272d059b4a3c871451887840679e248b72246644
+after/index.html: fe6ffdc739590f4b3c42b8aa57c1ed83db14e5d8998d85ddb576a6173f9616a8
+feature-diff.json: e6accf8aca5d1ffb6a30fd6db42f40678930abdd1a4ba62fab535ae564bad9b4
+```

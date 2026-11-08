@@ -36,7 +36,7 @@ joplo diff publish diff-site --prepared comparison.json \
 - summary 的 added/modified/removed 与上传 comparison.summary 完全一致，每组最多 100 项，每项最多 200 字符。uncertain 放在 modified 摘要，manifest 内仍明确区分。
 - scenarios 的 before/after 引用实际场景 ID 或 null。steps 的 before/after 引用实际步骤 ID、1-based 播放位置、可选 key 或 null；match 为 key/content/action/none/uncertain。序号 id 永远不作跨版本身份。只有一版补充 key 时仍允许唯一内容／动作匹配，并标为 content/action；双方已有不同 key 时不配对，重复候选仍 uncertain。
 - `before/`、`after/`：真实静态发布播放器与资产。根 `index.html` 是独立差异 viewer；修改双栏、新增新版全宽、删除旧版全宽。
-- 初始状态、实际可能使用的画面树、层级、角色、主题变更保守标记受影响场景。未变化步骤仍参与完整状态重建；双方确认位置后才继续自动播放。身份重复时分别显示，不猜测配对。
+- 初始状态、实际可能使用的画面树、层级、角色、主题变更保守标记受影响场景。未变化步骤仍参与完整状态重建；双方确认场景和步骤后才继续自动播放。内嵌播放器独立切换场景或移动步骤会停止比较播放并使旧确认失效；点击重新对齐后，两侧都须重新回报目标场景及步骤，不能使用旧缓存或单侧回执提前宣布对齐。对齐成功后需手动点击播放变化，迟到回执不会自动恢复播放。身份重复时分别显示，不猜测配对。
 - `unchanged` 是成功且没有变化；`uncertain` 需要人工确认；`incompatible` 为本地诊断 viewer，不复制不能验证的版本载荷，禁止发布。没有可播放场景但项目表现改变也与无变化区分。
 
 ## 旧 Reader 兼容

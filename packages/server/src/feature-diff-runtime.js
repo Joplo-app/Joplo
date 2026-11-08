@@ -24,18 +24,30 @@ function viewer() {
     $('steps').setAttribute('aria-label', t('Change position'));
     $('disclaimer').textContent = t("Changes to a concept demo, not verification of the real product. Synchronized playback is muted.");
     $('source').textContent = `${m.base.sha?.slice(0, 8) ?? t("Local baseline")} → ${m.head.sha?.slice(0, 8) ?? t("Local current")}`;
-    let selected = -1, rows = [], index = 0, panes = [], playing = false, waiting = false;
+    let selected = -1, rows = [], index = 0, panes = [], playing = false, waiting = false, misaligned = false;
     let timeout, advance;
     function stop() { playing = false; clearTimeout(advance); button('play').textContent = t("Play changes"); }
     function controls() {
         button('prev').disabled = waiting || index <= 0;
         button('next').disabled = waiting || index >= rows.length - 1;
-        button('play').disabled = (waiting && !playing) || !rows.length;
+        button('play').disabled = misaligned || (waiting && !playing) || !rows.length;
         $('counter').textContent = rows.length ? `${index + 1} / ${rows.length}` : '';
         $('steps').value = String(index);
     }
+    function invalidate() {
+        stop();
+        clearTimeout(timeout);
+        waiting = false;
+        misaligned = true;
+        for (const p of panes) p.confirmed = false;
+        controls();
+    }
+    function independentMove() {
+        invalidate();
+        $('status').textContent = t("Player moved independently. Realign to continue comparing.");
+    }
     function positioned() {
-        if (!panes.every(p => p.ready && p.position === p.target))
+        if (!waiting || misaligned || !panes.every(p => p.ready && p.confirmed && p.actual?.scenario === p.scenario && p.actual.step === p.target))
             return;
         waiting = false;
         clearTimeout(timeout);
@@ -58,15 +70,18 @@ function viewer() {
         clearTimeout(advance);
         index = i;
         waiting = true;
+        misaligned = false;
         $('status').textContent = t("Restoring both versions\u2026");
         for (const p of panes) {
             p.target = rows[i][p.side];
-            send(p);
+            p.confirmed = false;
         }
+        // Even a pane that stays on the same step must confirm this goto again.
+        for (const p of panes) send(p);
         controls();
         positioned();
         if (waiting)
-            timeout = setTimeout(() => { waiting = false; stop(); controls(); $('status').textContent = t("Player did not confirm its position. Reload players or realign to retry."); }, 12000);
+            timeout = setTimeout(() => { invalidate(); $('status').textContent = t("Player did not confirm its position. Reload players or realign to retry."); }, 12000);
     }
     function makeRows() {
         const s = m.scenarios[selected];
@@ -106,7 +121,7 @@ function viewer() {
             // Opaque sandbox keeps untrusted scripts in either build away from the viewer and its sibling.
             iframe.setAttribute('sandbox', 'allow-scripts');
             iframe.setAttribute('allow', "autoplay 'none'");
-            const pane = { iframe, side, scenario, ready: false, position: null, target: 0 };
+            const pane = { iframe, side, scenario, ready: false, scenarios: new Map(), actual: null, confirmed: false, target: 0 };
             panes.push(pane);
             iframe.src = `${side}/index.html?embed=1&review=1&diff=1&locale=${encodeURIComponent(locale)}&scenario=${encodeURIComponent(scenario)}`;
             wrap.append(h, iframe);
@@ -132,17 +147,27 @@ function viewer() {
         const p = panes.find(p => p.iframe.contentWindow === e.source);
         if (!p || !e.data || e.data.protocol !== 1)
             return;
-        if (e.data.type === 'joplo:ready' && Array.isArray(e.data.scenarios) && e.data.scenarios.some((s) => s.id === p.scenario && Number.isInteger(s.steps) && s.steps >= p.target)) {
-            p.ready = true;
+        if (e.data.type === 'joplo:ready' && Array.isArray(e.data.scenarios) && e.data.scenarios.every(s => s && typeof s.id === 'string' && s.id && Number.isSafeInteger(s.steps) && s.steps >= 0)) {
+            if (p.ready && !waiting) independentMove();
+            p.scenarios = new Map(e.data.scenarios.map(s => [s.id, s.steps]));
+            p.ready = p.scenarios.has(p.scenario) && p.scenarios.get(p.scenario) >= p.target;
+            p.actual = null;
+            p.confirmed = false;
             send(p);
         }
-        if (e.data.type === 'joplo:position' && e.data.scenario === p.scenario && Number.isInteger(e.data.step)) {
-            p.position = e.data.step;
-            if (waiting)
+        if (e.data.type === 'joplo:position' && p.ready && typeof e.data.scenario === 'string' && p.scenarios.has(e.data.scenario) && Number.isSafeInteger(e.data.step) && e.data.step >= 0 && e.data.step <= p.scenarios.get(e.data.scenario)) {
+            const previous = p.actual;
+            p.actual = { scenario: e.data.scenario, step: e.data.step };
+            const matches = p.actual.scenario === p.scenario && p.actual.step === p.target;
+            if (!matches) {
+                // An initial/previous step can arrive while goto is pending. A different
+                // scenario or a newly observed independent step must stop synchronization.
+                if (p.actual.scenario !== p.scenario || !waiting || p.confirmed || (previous && (previous.scenario !== p.actual.scenario || previous.step !== p.actual.step))) independentMove();
+                p.confirmed = false;
+            }
+            else if (waiting && !misaligned) {
+                p.confirmed = true;
                 positioned();
-            else if (p.position !== p.target) {
-                stop();
-                $('status').textContent = t("Player moved independently. Realign to continue comparing.");
             }
         }
     });

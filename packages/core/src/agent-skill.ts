@@ -74,7 +74,7 @@ function joploBody(): string {
     ...list(START_ORDER).map(line => line.replace(/^(\d+)/, (_, n: string) => String(Number(n) + 1))),
     `${START_ORDER.length + 2}. When the user asks to share or publish: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. Confirmation of a local option alone does not request publication. To share only part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items. Apply review results with the joplo-feedback skill.`,
     '',
-    'For comparing feature changes across versions or a PR, read npx joplo skill diff. Preserve stable .key() identities, treat repeated candidates as uncertain, and build two real publish versions. Use prepare → uncredentialed build → trusted publish only within the user’s authorized scope.',
+    'For comparing feature changes across versions or a PR, read npx joplo skill diff. Preserve stable .key() identities, treat repeated candidates as uncertain, and build two real publish versions. If an embedded player changes scenario independently, use Realign and wait for both target positions before resuming. Use prepare → uncredentialed build → trusted publish only within the user’s authorized scope.',
     '',
     '## Common pitfalls',
     ...PITFALLS.map(([text, topic]) => `- ${text}. See npx joplo skill ${topic}.`),
