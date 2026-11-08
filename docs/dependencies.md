@@ -1,6 +1,6 @@
 # 依赖与许可证
 
-Joplo 六个发行包使用 Apache-2.0，包名为 `joplo`、`@joplo-app/kit`、`@joplo-app/core`、`@joplo-app/cli`、`@joplo-app/server`、`@joplo-app/web`。下表覆盖根目录及各包 package.json 的外部直接依赖、开发依赖与可选 peer；版本是当前锁文件安装结果，括号内标明非精确声明。
+Joplo 六个发行包使用 PolyForm Noncommercial 1.0.0（商业使用见 [COMMERCIAL.md](../COMMERCIAL.md)，D81），包名为 `joplo`、`@joplo-app/kit`、`@joplo-app/core`、`@joplo-app/cli`、`@joplo-app/server`、`@joplo-app/web`。下表覆盖根目录及各包 package.json 的外部直接依赖、开发依赖与可选 peer；版本是当前锁文件安装结果，括号内标明非精确声明。
 
 ## 运行与构建
 

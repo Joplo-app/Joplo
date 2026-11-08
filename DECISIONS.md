@@ -3,7 +3,7 @@
 ## Goal and scope
 
 Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静态发布，并通过 npm 分发 `joplo` 和 `@joplo-app/*`（当前版本 0.1.2）。当前工作是让这些能力好用、稳定，并保持创作协议、实现与文档一致。
-本地 CLI 保持开源、完整、免费；云端能力在独立仓库推进，产品边界与后续决定以本文件的决策条目为准。
+本地 CLI 保持源码公开、功能完整，非商业使用免费（许可证见 D81）；云端能力在独立仓库推进，产品边界与后续决定以本文件的决策条目为准。
 
 ## 问题陈述（2026-11-05 与用户共同确认）
 
@@ -119,7 +119,7 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - `joplo skill` 列出主题，`joplo skill <主题>` 输出该主题，每个主题少于 150 行；现有的 `joplo guide` 拆进这些主题。
   - `joplo skill install` 只写一个约 10 行的“指针” `.claude/skills/joplo/SKILL.md`，告诉 Agent 运行哪条命令；正文每次由项目安装的 CLI 输出，不会过期。
   - 已存在且被修改过的文件不覆盖，`--diff` 查看差异，`--force` 覆盖。
-- D38 npm 作用域（2026-11-05，取代 D36 中的 `@joplo/*`）：npm 上的 `@joplo` 组织属于另一个账号，无法发布。改用用户自己的 `@tokenroll` 组织，包名为 `@tokenroll/joplo-kit`、`-core`、`-cli`、`-server`、`-web`；入口包仍是不带作用域的 `joplo`，用户照样写 `npx joplo`。作者项目写 `import … from '@tokenroll/joplo-kit'`，tsconfig 写 `jsxImportSource: "@tokenroll/joplo-kit"`。许可证为 Apache-2.0。
+- D38 npm 作用域（2026-11-05，取代 D36 中的 `@joplo/*`）：npm 上的 `@joplo` 组织属于另一个账号，无法发布。改用用户自己的 `@tokenroll` 组织，包名为 `@tokenroll/joplo-kit`、`-core`、`-cli`、`-server`、`-web`；入口包仍是不带作用域的 `joplo`，用户照样写 `npx joplo`。作者项目写 `import … from '@tokenroll/joplo-kit'`，tsconfig 写 `jsxImportSource: "@tokenroll/joplo-kit"`。许可证为 Apache-2.0（D81 起改为 PolyForm Noncommercial 1.0.0）。
 - D39 新界面（2026-11-05，用户手绘草图；原型见 `examples/joplo-board`）：取代 D32 的“演示 / 审阅”双模式和拥挤的顶栏。
   - 首页：左栏是记住的项目（`~/.joplo/projects.json`，按最近打开排序），右侧是所选项目的功能和「查看」。一个本机只运行一个看板进程，再次 `joplo dev` 时把项目注册进已运行的进程。
   - 演示页：顶栏只放面包屑（项目 / 功能 / 方案 / 场景）和电脑 / 手机切换；左栏按情况分组（方案 B），顶部切换当前方案；中间是画面；下方是播放控制和「…」菜单（导出图片、导出视频、线框风格、复制链接、在编辑器中打开）；最底下是带说明的步骤条。
@@ -176,7 +176,7 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 域名 `joplo.app` 已购买。云端只做轻功能，算力尽量用 Cloudflare 免费额度和用户的浏览器。
   - 支付使用 Waffo Pancake（MoR）。
   - **默认分享免费，但链接只有 1 小时有效**；过期后需要重新发布，或者升级会员获得永久链接。
-  - 本地 CLI 保持开源、完整、免费；收费点放在只有云端才能提供的能力上（托管、永久链接、观看数据、评论回流、方案确认、分享页一键导出）。
+  - 本地 CLI 保持开源、完整、免费（D81 起改为源码公开、非商业免费，商业使用随 Cloud 订阅授权）；收费点放在只有云端才能提供的能力上（托管、永久链接、观看数据、评论回流、方案确认、分享页一键导出）。
   - 云端代码放在单独的私有仓库 `Joplo-app/joplo-cloud`（本地 `~/.paradev/projects/joplo-cloud`），它有自己的决策记录 `docs/decisions.md`。
 - D53 仓库迁到 Joplo-app 组织（2026-11-05，用户要求）：开源的 `Joplo-app/Joplo` 和私有的 `Joplo-app/joplo-cloud` 都从 TokenRollAI 迁到 `Joplo-app`；TokenRollAI 只保留纯开源项目。npm 包仍在 `@tokenroll` 作用域下（D38），各包的 repository 字段改为新地址，下次发布时生效。
 - D54 npm 作用域改为 `@joplo-app`（2026-11-05，用户决定；取代 D38 的 `@tokenroll/joplo-*`）：包名为 `@joplo-app/kit`、`/core`、`/cli`、`/server`、`/web`，入口包仍是 `joplo`。作者项目写 `import … from '@joplo-app/kit'`，tsconfig 写 `jsxImportSource: "@joplo-app/kit"`。版本统一为 0.1.1。npm 组织 `joplo-app` 由用户创建；已发布的 `@tokenroll/joplo-*@0.1.0` 之后标记为 deprecated，指向新包名。
@@ -378,6 +378,12 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 连续播放：发布站（电脑和手机）自动播放放完一个场景，画面上出现「下一章」卡片（章节名 + 3 秒倒计时，可「立即播放」或「取消」，暂停时倒计时也停；用户 2026-11-08：“某个条目播放完成之后，完全可以在页面上显示 3s 后播放下一个”），然后接着放选定方案的下一个场景；最后一个放完停下，手机上显示「看完了 · 重看」。手动一步步看时不自动跳。
   - 为画原型先给 `Phone` 加了 `landscape`（横放：内容 772×358，刘海在左），属于正式组件能力。
 - D80 监听在 Agent 结束回复后也能送达（2026-11-08，来源：用户在看板点了「确认方案」，Agent 没有反应，要求修复）：后台命令的输出不会唤醒 Agent，但 Claude Code 等宿主会在后台命令**退出**时唤醒。`joplo feedback watch --local --follow` 新增 `--once`（收到第一条新反馈或确认就退出 0，并打印继续监听的完整命令）与 `--since <ISO 时间>`（跳过已处理的事件，不重放、不遗漏）；`joplo dev` 的提示、官方技能与 review 主题同步说明何时用。
+- D81 许可证改为 PolyForm Noncommercial 1.0.0（2026-11-08，来源：用户要求“确保这个项目不能被其他人商用”，并说明想要的效果是“能够自己使用，使用我们提供的云服务，但是禁止商用，禁止抄袭创意做竞品”；全部提交都出自用户本人，可以自行改许可证）：
+  - 根目录与 6 个包的 `LICENSE` 换成 PolyForm Noncommercial 1.0.0 原文，开头加上 `Required Notice:` 版权行；`package.json` 的 `license` 写 SPDX 标识 `PolyForm-Noncommercial-1.0.0`。个人和非营利组织免费；在企业中使用、出于商业目的发布站点、基于代码做产品或竞品，都属于商用。
+  - `COMMERCIAL.md` 是许可证之外的额外授权：Joplo Cloud 付费订阅期间，可以出于商业目的使用 npm 上未经修改的版本创作和发布作品；但不得修改再分发，也不得做竞品。其他商用单独授权，联系 support@joplo.app。文件里同时写明商标不在授权范围内、贡献者同意许可方以任何条款授权其贡献。
+  - 0.2.15 及更早的版本已按 Apache-2.0 发布，这份授权不可撤销；新许可证从下一个版本开始生效。
+  - 许可证只保护代码，不保护创意：别人不用 Joplo 代码、自己重写同样的想法，许可证管不到。要保护品牌，靠注册“Joplo”商标。
+  - 项目不再符合 OSI 的“开源”定义，文案统一说“源码公开”。`scripts/test/release.test.ts` 检查 6 个包的许可证字段一致，且 LICENSE 文件与根目录相同。
 
 ## Working assumptions
 

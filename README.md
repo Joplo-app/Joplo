@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/joplo"><img src="https://img.shields.io/npm/v/joplo?color=FFD23F&labelColor=1E1E1E" alt="npm version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-1E1E1E" alt="License: Apache-2.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-1E1E1E" alt="License: PolyForm Noncommercial 1.0.0"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%E2%89%A522-1E1E1E" alt="Node.js 22 or later"></a>
 </p>
 
@@ -239,4 +239,4 @@ Author modules execute on your machine during loading, checks, and builds. Only 
 
 ## License
 
-[Apache-2.0](LICENSE). Bundled fonts use [SIL OFL 1.1](packages/web/src/fonts/OFL.txt).
+[PolyForm Noncommercial 1.0.0](LICENSE). Joplo is free for personal and other noncommercial use. Commercial use, including use at a company and building competing products, needs a Joplo Cloud subscription or a separate commercial license; see [COMMERCIAL.md](COMMERCIAL.md). Versions 0.2.15 and earlier were released under Apache-2.0. Bundled fonts use [SIL OFL 1.1](packages/web/src/fonts/OFL.txt).
