@@ -82,9 +82,9 @@ const hooks: PluginCompileHooks = {
         const prev = ctx.previousState ? ctx.resolveProps(n, true).value : undefined;
         machines[n.id] = machineStates(graphStructure(n), props.value, prev);
       }
-      scenes[scene.id] = { states, now: [...new Set(calls.filter(t => t.mode !== 'skip').flatMap(t => [...t.nodes, ...t.edges.map(e => e.id)]))], machines };
+      scenes[scene.id] = { traces: calls, states, now: [...new Set(calls.filter(t => t.mode !== 'skip').flatMap(t => [...t.nodes, ...t.edges.map(e => e.id)]))], machines };
     }
-    return { traces, traceScenes, scenes };
+    return { scenes };
   },
 };
 export default /* @__PURE__ */ definePlugin({

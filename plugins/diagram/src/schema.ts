@@ -49,12 +49,11 @@ const States = z.record(z.string(), z.strictObject({
   reverse: z.boolean().optional(),
 }));
 export const SceneFrame = z.strictObject({
+  traces: z.array(Trace),
   states: States,
   now: z.array(z.string()),
   machines: z.record(z.string(), z.strictObject({ current: z.string().nullable(), states: States })),
 });
 export const FrameData = z.strictObject({
-  traces: z.array(Trace),
-  traceScenes: z.array(z.string()),
   scenes: z.record(z.string(), SceneFrame),
 });

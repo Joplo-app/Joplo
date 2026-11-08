@@ -130,7 +130,7 @@ describe('trace：分组、状态机、时序图', () => {
   it('连到分组的连线可以 trace：trace("svc", "data") 走 to_data，分组本身也点亮', () => {
     const r = build(arch, (f) => f.system('写入', trace('svc', 'data')));
     expect(codes(r)).toEqual([]);
-    const t = frameData(r.project!.scenarios['f.a.s']!.steps[0]!)!.traces[0]!;
+    const t = frameData(r.project!.scenarios['f.a.s']!.steps[0]!)!.scenes['f.a~v']!.traces[0]!;
     expect(t.edges).toEqual([{ id: 'to_data', reverse: false }]);
     expect(diagramStateAt(r.project!, 'f.a.s', 1).data?.state).toBe('active');
   });
@@ -188,6 +188,6 @@ describe('布局写进 IR', () => {
 
   it('不用新功能的项目：trace 不带 groups / errorGroups / targets（IR 与旧版相同，只多了 layout）', () => {
     const r = build(h(D, { id: 'd' }, h(D.Node, { id: 'a', label: 'A' }), h(D.Node, { id: 'b', label: 'B' }), h(D.Edge, { from: 'a', to: 'b' })), (f) => f.system('x', trace('a', 'b')));
-    expect(frameData(r.project!.scenarios['f.a.s']!.steps[0]!)!.traces).toEqual([{ mode: 'ok', nodes: ['a', 'b'], edges: [{ id: 'a->b', reverse: false }] }]);
+    expect(frameData(r.project!.scenarios['f.a.s']!.steps[0]!)!.scenes['f.a~v']!.traces).toEqual([{ mode: 'ok', nodes: ['a', 'b'], edges: [{ id: 'a->b', reverse: false }] }]);
   });
 });

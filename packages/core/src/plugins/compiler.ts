@@ -1,4 +1,4 @@
-import { jsonData, snapshot, object, strings, syncResult, authoringData } from './data.ts';
+import { jsonData, snapshot, object, strings, syncResult, authoringData, materialize, errorMessage } from './data.ts';
 /** Node-side plugin host. Callbacks never enter IR or the player. */
 import { isNode, type JNode } from '@joplo-app/kit/node';
 import { PLUGIN_API_VERSION, type PluginDef, type PluginEffectDef, type PluginReport } from '@joplo-app/kit/plugin';
@@ -28,7 +28,12 @@ export class PluginCompiler {
     }
   }
   private run<T>(p: PluginDef, hook: string, at: string | undefined, fn: () => T): T | undefined {
-    try { return fn(); } catch (e) { this.report('PLUGIN_HOOK_FAILED', `Plugin ${p.id} ${hook}: ${e instanceof Error ? e.message : String(e)}`, at); return undefined; }
+    try { return fn(); } catch (e) { this.report('PLUGIN_HOOK_FAILED', `Plugin ${p.id} ${hook}: ${errorMessage(e)}`, at); return undefined; }
+  }
+  private output<T>(p: PluginDef, value: T, at?: string, authoring = false): T | undefined {
+    const synchronous = syncResult(value);
+    try { return materialize(synchronous, authoring ? 'authoring' : 'hook'); }
+    catch (e) { this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id}: ${errorMessage(e)}`, at); return undefined; }
   }
   node(node: JNode, ids: ReadonlyMap<string, string | undefined>): JNode {
     const p = this.defs.get(node.type.split(':')[0]!);
@@ -37,14 +42,14 @@ export class PluginCompiler {
       return node;
     }
     const result = this.run(p, 'node', node.source, () => {
-      const n = syncResult(p.compile?.node?.(snapshot(node), { ids: new Map(ids), report: this.report }));
+      const n = this.output(p, p.compile?.node?.(snapshot(node), { ids: new Map(ids), report: this.report }), node.source, true);
       if (n === undefined) return node;
       if (!isNode(n) || typeof n.type !== 'string' || !object(n.props)) {
         this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id} node must return a node with string type and object props`, node.source); return node;
       }
       try { authoringData(n.props); } catch { this.invalid(p, node.source); return node; }
       // Only this node's type/props can be normalized; children already have checked identities.
-      return { ...node, type: n.type, props: snapshot(n.props) };
+      return { ...node, type: n.type, props: n.props };
     });
     return result ?? node;
   }
@@ -53,7 +58,7 @@ export class PluginCompiler {
       const p = this.defs.get(node.type.split(':')[0]!);
       if (p?.compile?.derive) {
         this.run(p, 'derive', node.source, () => {
-          const result = syncResult(p.compile!.derive!(snapshot(node), { viewport: scene.viewport, report: this.report, options: snapshot(this.options.pluginOptions?.[p.id] ?? { layout: this.options.layout }) }));
+          const result = this.output(p, p.compile!.derive!(snapshot(node), { viewport: scene.viewport, report: this.report, options: snapshot(this.options.pluginOptions?.[p.id] ?? { layout: this.options.layout }) }), node.source);
           if (result === undefined) return;
           if (!object(result) || Object.keys(result).some(k => k !== 'data' && k !== 'framing')) { this.invalid(p, node.source); return; }
           if (result.data !== undefined) {
@@ -86,7 +91,7 @@ export class PluginCompiler {
     const p = this.defs.get(effect.plugin);
     if (!p?.compile?.effect) { this.report('PLUGIN_EFFECT_UNKNOWN', `Plugin ${effect.plugin} has no effect compiler for ${effect.name}`, source); return undefined; }
     return this.run(p, 'effect', source, () => {
-      const result = syncResult(p.compile!.effect!(snapshot(effect), { roots: snapshot(scenes.map(s => s.root)), scenes: snapshot(scenes.map(s => ({ id: s.id, root: s.root }))), data: snapshot(data), source, report: this.report }));
+      const result = this.output(p, p.compile!.effect!(snapshot(effect), { roots: snapshot(scenes.map(s => s.root)), scenes: snapshot(scenes.map(s => ({ id: s.id, root: s.root }))), data: snapshot(data), source, report: this.report }), source);
       if (result === undefined) return;
       if (!object(result) || Object.keys(result).some(k => !['data', 'targets', 'references'].includes(k)) || result.targets !== undefined && !strings(result.targets) || result.references !== undefined && !strings(result.references)) { this.invalid(p, source); return; }
       const value = result.data === undefined ? undefined : this.envelope(p, result.data, source);
@@ -109,20 +114,28 @@ export class PluginCompiler {
         const ext = { ...target.ext };
         for (const p of this.defs.values()) {
           if (p.compile?.frame) {
-            const value = this.run(p, 'frame', target.source, () => syncResult(p.compile!.frame!({ roots: snapshot(roots), scenes: snapshot(scenes), state: snapshot(state), previousState: snapshot(previousState), resolveProps: (node, previous) => resolveProps(node, snapshot(previous && previousState ? previousState : state)), data: snapshot(target.ext?.[p.id]), previousData: snapshot(previousData[p.id]), position: i, report: this.report })));
-            if (value !== undefined) { const data = this.checkData(p, 'step', value, target.source); if (data !== undefined) ext[p.id] = data; }
+            const value = this.run(p, 'frame', target.source, () => this.output(p, p.compile!.frame!({ roots: snapshot(roots), scenes: snapshot(scenes), state: snapshot(state), previousState: snapshot(previousState), resolveProps: (node, previous) => resolveProps(node, snapshot(previous && previousState ? previousState : state)), data: snapshot(target.ext?.[p.id]), previousData: snapshot(previousData[p.id]), position: i, report: this.report }), target.source));
+            if (value !== undefined) ext[p.id] = value;
           }
-          if (!p.compile?.frame && ext[p.id] !== undefined) { const data = this.checkData(p, 'step', ext[p.id], target.source); if (data !== undefined) ext[p.id] = data; }
         }
-        if (Object.keys(ext).length) target.ext = ext;
-        previousData = ext;
+        // Validate every final slot, including effect data left unchanged by an abstaining frame.
+        const validated: Record<string, unknown> = {};
+        for (const [id, value] of Object.entries(ext)) {
+          const p = this.defs.get(id);
+          if (!p) { this.report('PLUGIN_DATA_INVALID', `Unregistered plugin slot ${id}`, target.source); continue; }
+          const data = this.checkData(p, 'step', value, target.source);
+          if (data !== undefined) validated[id] = data;
+        }
+        if (Object.keys(validated).length) target.ext = validated;
+        else delete target.ext;
+        previousData = validated;
         previousState = state;
       }
     }
   }
   private invalid(p: PluginDef, at?: string) { this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id}: invalid hook output envelope`, at); }
   private envelope(p: PluginDef, value: unknown, at?: string): unknown {
-    try { return jsonData(value); } catch (e) { this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id}: ${e instanceof Error ? e.message : String(e)}`, at); return undefined; }
+    try { return jsonData(value); } catch (e) { this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id}: ${errorMessage(e)}`, at); return undefined; }
   }
   private checkData(p: PluginDef, slot: 'node' | 'step', value: unknown, at?: string): unknown {
     if (value === undefined) return;

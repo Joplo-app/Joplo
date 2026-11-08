@@ -130,9 +130,9 @@ ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机�
 - `effect(effect, { roots, data, source, report })`：把 `pluginEffect(id, name, payload)` 降级为命名空间数据、`targets` 和 `references`。宿主把 targets 转成普通 shots、导演层与显式焦点；同一步多个效果按作者顺序合并。
 - `frame({ roots, scenes, state, previousState, data, previousData, position, resolveProps, report })`：宿主回放内核效果后，生成第 0 步及各步骤的完整快照。无效作者步骤仍由原有 replay/check 诊断，不能令编译崩溃。
 
-所有钩子的输入均为隔离的深冻结副本，不能污染后续步骤或其他插件。derive 后再次检查舞台内元素身份；frame 通过宿主注入的 resolveProps(node, previous?) 读取绑定值，无需依赖 core 实现。宿主在消费前检查返回值信封；先验证有限、无环、深度不超过 100 的 JSON，再验证插件 schema，最后才剥离创作信息。异步钩子/异步 schema 被拒绝且其 rejection 被接住。
+所有钩子的输入均为隔离的深冻结副本，不能污染后续步骤或其他插件。derive 后再次检查舞台内元素身份；frame 通过宿主注入的 resolveProps(node, previous?) 读取绑定值，无需依赖 core 实现。宿主先按属性描述符把四类钩子返回值物化成自己持有的数据，再校验和使用同一份数据；拒绝 getter/setter 和 toJSON 方法，不重复读取返回对象。node 的作者绑定转换为稳定标记。宿主在消费前检查返回值信封；先验证有限、无环、深度不超过 100 的 JSON，再验证插件 schema，最后才剥离创作信息。异步钩子/异步 schema 被拒绝且其 rejection 被接住。
 
-插件写入槽位必须提供 `schemas.node` / `schemas.step`（兼容 zod 的 `safeParse`）；宿主验证对应 schema，并由 IR 信封校验确保是 JSON。缺失/失败的 schema 报 `PLUGIN_DATA_INVALID`，钩子或 schema 抛错报 `PLUGIN_HOOK_FAILED`，未注册的效果报 `PLUGIN_EFFECT_UNKNOWN`。源码位置随诊断保留。发布 IR 不保存钩子、schema、技能、运行时路径。
+插件写入槽位必须提供 `schemas.node` / `schemas.step`（兼容 zod 的 `safeParse`）；宿主验证最终写入值的对应 schema，并由 IR 信封校验确保是 JSON；frame 返回 undefined 时保留的 effect 数据也必须验证。发布清理只剥离内核来源元数据，不能再改动已验证的插件槽位字段。缺失/失败的 schema 报 `PLUGIN_DATA_INVALID`，钩子或 schema 抛错报 `PLUGIN_HOOK_FAILED`，未注册的效果报 `PLUGIN_EFFECT_UNKNOWN`。源码位置随诊断保留。发布 IR 不保存钩子、schema、技能、运行时路径。
 
 元素声明新增 `needsId` 与 `selfEvident`：编译/检查验证作者 id，焦点系统读取同一份 IR 声明，避免为自行表现变化的内容叠加 reveal。
 旧裸类型或旧 step.traces 在 check 时得到 `PLUGIN_LEGACY_TYPE` 重编译提示；历史 traces 仅保留为输入兼容，以便 feature-diff 比较旧发布物。新编译产物不生成顶层 traces 或 layout。
@@ -143,11 +143,11 @@ ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机�
 |---|---|---|---|
 | 布局与静态结构 | diagram `derive` | `scene.root…ext.diagram.{layout,structure}` | 插件 `graphView` / `sequenceView` → 绘制坐标与几何取景，浏览器不重新布局 |
 | 累积 trace 状态、当前调用、状态机当前值/转换 | diagram `frame` | `scenario.ext.diagram.scenes[sceneId]`（初始）及 `step.ext.diagram.scenes[sceneId].{states,now,machines}` | `Stage` 选取当前槽位 → `PluginHost` 的 `ctx.ext` → diagram React 渲染；前后跳转直接读快照 |
-| 解析后的调用记录 | diagram `effect` / `frame` | `step.ext.diagram.traces` | 编译期快照计算；发布后的 feature-diff 比较插件表现差异（trace 类别） |
+| 解析后的调用记录 | diagram `effect` / `frame` | `step.ext.diagram.scenes[sceneId].traces` | 编译期快照计算；发布后的 feature-diff 比较插件表现差异（trace 类别） |
 | 插件镜头目标 | diagram `effect.targets` | 既有 `step.shots`、`step.directorLayer`；新增 `step.focusTargets` | `cameraAt` / 导演 / `focusAt`；均只读内核数据 |
 | 插件引用集合 | diagram `effect.references` | `step.references` | `scope.stepElementIds` → 范围发布保留需要的子树，含 skip 引用 |
 | 镜头关联、绘制角色 | diagram `derive` | `node.framing.{include,kind}` | `inShotFrame` 读取 include；宿主 DOM `data-jframe*` → 镜头/聚光保留分组标题及消息参与者 |
-| 调用所属舞台 | diagram effect | `step.ext.diagram.traceScenes` | frame 按舞台累计调用，避免跨页/层同名 id 串用；scope 同步投影 |
+| 调用所属舞台 | diagram effect → frame | effect 的临时 traceScenes → 最终 `ext.diagram.scenes[sceneId].traces` | frame 按舞台累计调用；scope 在同一 scene 域中投影，不发布独立的 traceScenes 数组 |
 | 文本/投影声明 | 插件 data 元数据 | `project.plugins[id].data.{node,step}` | content-i18n 只翻译声明文本；scope 只保留范围内的缓存与快照 |
 | 元素特性 | 插件组件声明 → 宿主编译 | `project.plugins[id].components[name].{needsId,selfEvident}` | 编译器与 validate 的 id 检查；focus 的自动 reveal 策略 |
 
@@ -177,7 +177,7 @@ diagram 的独立包交付已完成；阶段 1 的其他扩展点、其他第一
 - 第一方浏览器代码通过 @joplo-app/kit/renderer 使用宿主注册的共享渲染服务，通过 @joplo-app/kit/renderer-style 使用纯样式常量。服务在调用时解析，避免模块初始化循环；业务状态仍由内核推进，插件只读快照。
 - 第三方 React 桥接使用 web 包交付的 shared-modules.json 导出表，生产安装不需要从 web 的 devDependencies require React。导出表与当前宿主版本由测试对齐。共享模块代理优先于 Vite 的普通包解析，项目或插件实际安装 React 时也不会打入第二份实例；测试同时覆盖有/无 React、源码/预构建 web。
 - 插件通过 data.node.text / data.step.text 声明文本路径（分段数组，* 代表对象值/数组项），普通 id、枚举、引用不会被盲翻。
-- 插件通过 data.node.scope / data.step.scope 声明纯数据投影规则。map/items/values/reference 分别投影映射、实体数组、id 列表和单一引用；scene 域切换后按该舞台的元素集合继续投影。只对确实独立于范围的数据使用 global。未声明规则的槽位在范围分享时失败关闭，报 PLUGIN_SCOPE_UNSUPPORTED。
+- 插件通过 data.node.scope / data.step.scope 声明纯数据投影规则。map/items/values/reference 分别投影映射、实体数组、id 列表和单一引用；scene map 的键、scene items 的 references（默认 [["id"]]）提供所属舞台；items 的引用必须解析出唯一舞台，prefix 去除后再寻址，子规则只使用该舞台的元素集合。缺失/多义身份或没有所属舞台的元素投影都失败关闭，不用全舞台 id 并集兜底。只对确实独立于范围的数据使用 global。未声明规则的槽位在范围分享时失败关闭，报 PLUGIN_SCOPE_UNSUPPORTED。
 - 图表缓存、状态机快照按合格舞台 id 寻址，元素 id 仍只要求在同一舞台唯一。裁剪节点后会同步裁剪结构/布局副本、场景和步骤快照；保留可见元素原有坐标，不调用插件代码重新布局。
 - feature-diff 比较 scenario.ext 和 step.ext。对 b817425 的真实旧公开 IR，先严格适配裸名及 layout，再走公开数据检查；不丢弃 note/source 等私有字段来伪装兼容。适配用于历史对比，不是浏览器补算旧 trace 的回退。
 - 验收必须覆盖公开包的 tsconfig.build、七包构建、tarball 和不含工作区开发依赖的安装；不能仅凭 pnpm typecheck / pnpm test 宣布发布正确。

@@ -233,7 +233,7 @@ describe('发布产物是完整的 IR（只缺有意去掉的创作侧字段）'
         // 关系类图表 v2（D69）：编译期布局、trace 经过的分组、时序图的镜头目标
         const kinds = new Set(nodes.flatMap((n) => ((n.ext as any)?.diagram?.layout ? [(n.ext as any).diagram.layout.kind] : [])));
         expect([...kinds].sort()).toEqual(['graph', 'sequence']);
-        const traces = steps.flatMap((st) => ((st.ext as any)?.diagram?.traces as Record<string, unknown>[] | undefined) ?? []);
+        const traces = steps.flatMap((st) => Object.values((st.ext as any)?.diagram?.scenes ?? {}).flatMap((scene: any) => scene.traces as Record<string, unknown>[]));
         expect(traces.some((t) => Array.isArray(t.groups) && t.groups.length)).toBe(true);
         expect(traces.some((t) => Array.isArray(t.targets) && t.targets.length)).toBe(true);
       }

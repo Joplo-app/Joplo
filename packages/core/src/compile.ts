@@ -1002,7 +1002,9 @@ function stripSources(o: unknown): void {
   if (Array.isArray(o)) return o.forEach(stripSources);
   if (o && typeof o === 'object') {
     delete (o as Record<string, unknown>).source;
-    Object.values(o).forEach(stripSources);
+    // Plugin slots are already validated public data. Stripping their own fields would
+    // invalidate the plugin schema after validation (e.g. a public provenance `source`).
+    for (const [key, value] of Object.entries(o)) if (key !== 'ext') stripSources(value);
   }
 }
 

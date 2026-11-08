@@ -11,10 +11,15 @@ function atPath(value: unknown, path: readonly string[], transform: (v: unknown)
   if (obj(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, key === '*' || key === k ? atPath(v, rest, transform) : v]));
   return value;
 }
-function values(value: unknown, path: readonly string[]): unknown[] {
-  const out: unknown[] = [];
-  atPath(value, path, v => { out.push(v); return v; });
-  return out;
+function values(value: unknown, path: readonly string[], required: boolean): unknown[] {
+  if (!path.length) return [value];
+  const [key, ...rest] = path;
+  if (Array.isArray(value) || obj(value)) {
+    if (key === '*') return Object.values(value).flatMap(v => values(v, rest, required));
+    if (Object.hasOwn(value, key!)) return values((value as Record<string, unknown>)[key!], rest, required);
+  }
+  if (required) throw new JoploError('PLUGIN_SCOPE_UNSUPPORTED', 'Missing scene identity in a stage ownership path');
+  return [];
 }
 export function mapSlotTexts(ext: Record<string, unknown> | undefined, plugins: Table, slot: 'node' | 'step', visit: (s: string) => string): Record<string, unknown> | undefined {
   if (!ext) return ext;
@@ -24,15 +29,32 @@ export function scopePluginData(project: Project): Project {
   const ids = new Map<string, Set<string>>();
   const collect = (n: SceneNode, set: Set<string>) => { set.add(n.id); n.children?.forEach(c => collect(c, set)); };
   for (const scene of Object.values(project.scenes)) { const set = new Set<string>(); collect(scene.root, set); ids.set(scene.id, set); }
-  const union = new Set([...ids.values()].flatMap(x => [...x]));
+  const unsupported = (message: string): never => { throw new JoploError('PLUGIN_SCOPE_UNSUPPORTED', message); };
   const rules = (value: unknown, specs: readonly PluginScopeRule[], scene?: string): unknown => specs.reduce((data, rule) => atPath(data, rule.path, v => {
-    const allowed = rule.domain === 'scene' ? new Set(ids.keys()) : scene ? ids.get(scene) ?? new Set<string>() : union;
-    const keep = (id: unknown) => typeof id !== 'string' || allowed.has(rule.prefix && id.startsWith(rule.prefix) ? id.slice(rule.prefix.length) : id);
-    if (rule.kind === 'reference') return keep(v) ? v : null;
-    if (rule.kind === 'map' && obj(v)) return Object.fromEntries(Object.entries(v).filter(([k]) => keep(k)).map(([k, item]) => [k, rules(item, rule.children ?? [], rule.domain === 'scene' ? k : scene)]));
+    const allowed = rule.domain === 'scene' ? new Set(ids.keys()) : scene && ids.get(scene);
+    if (!allowed) return unsupported('Element scope projection requires an unambiguous owning stage; declare a scene-domain map or items parent');
+    const identity = (id: unknown): string => {
+      if (typeof id !== 'string' || !id) return unsupported('Scope projection requires a nonempty scene/element identity');
+      const normalized = rule.prefix && id.startsWith(rule.prefix) ? id.slice(rule.prefix.length) : id;
+      if (!normalized) return unsupported('Scope projection requires a nonempty scene/element identity after removing its prefix');
+      return normalized;
+    };
+    const keep = (id: unknown) => allowed.has(identity(id));
+    if (rule.kind === 'reference') return v === null || keep(v) ? v : null;
+    if (rule.kind === 'map' && obj(v)) return Object.fromEntries(Object.entries(v).filter(([k]) => keep(k)).map(([k, item]) => [k, rules(item, rule.children ?? [], rule.domain === 'scene' ? identity(k) : scene)]));
     if (rule.kind === 'values' && Array.isArray(v)) return v.filter(keep);
-    if (rule.kind === 'items' && Array.isArray(v)) return v.filter(item => (rule.references ?? [['id']]).every(path => values(item, path).every(keep))).map(item => rules(item, rule.children ?? [], scene));
-    return v;
+    if (rule.kind === 'items' && Array.isArray(v)) return v.flatMap(item => {
+      const refs = (rule.references ?? [['id']]).map(path => values(item, path, rule.domain === 'scene'));
+      const identities = refs.flat().map(identity);
+      if (!identities.length) return unsupported('Scope items must declare their scene/element identity');
+      if (rule.domain === 'scene') {
+        if (refs.some(matches => !matches.length) || new Set(identities).size !== 1) return unsupported('Scene-domain items require exactly one owning stage');
+        const owner = identities[0]!;
+        return allowed.has(owner) ? [rules(item, rule.children ?? [], owner)] : [];
+      }
+      return identities.every(id => allowed.has(id)) ? [rules(item, rule.children ?? [], scene)] : [];
+    });
+    return unsupported(`Invalid ${rule.kind} scope data for scene/element projection`);
   }), value);
   const ext = (input: Record<string, unknown> | undefined, slot: 'node' | 'step', scene?: string) => {
     if (!input) return input;
