@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/kit",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "description": "Joplo 创作 SDK：组件、feature/option/flow 与 JSX 运行时（收集成数据，不作为 React 执行）",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
