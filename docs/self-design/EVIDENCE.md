@@ -124,6 +124,7 @@
 - **有据的取舍**：固定 PR 首次基线；旧无 key 项目保守匹配；重复动作 uncertain；新增/删除单栏、修改双栏；恢复完整前置状态后只展示变化；Cloud 只验证 transport，Core 定义业务 manifest；构建与持有凭证的发布隔离。
 - **真实后续修复**：`397310e` 修正某一侧独立切场景后仍显示对齐，要求两边新回执；`8b24ceb` 只修 CI 上传测试时序，不应被包装为产品设计方案。
 - **当前实现**：`packages/core/src/feature-diff.ts`、`step-identity.ts`、`packages/server/src/feature-diff*.ts/js`、`packages/cli/src/feature-diff.ts`。本地包与 fixture 不能冒充已发生的真实 PR 或线上发布结果。
+- **后续线上证据（2026-11-08）**：本仓库临时 PR #15 已实际验证自动预览、第二次推送原评论更新、比较起点不变以及关闭后两版链接 410。固定主分享由 main CI 更新；凭证隔离、账号归属和账号级并发约束见 [自动发布说明](CI-CONTRACT.md) 与 [验收记录](VERIFICATION.md)。这组证据与原先合成 fixture 分开记录，未发布新的 npm CLI。
 - **缺失/待验收**：独立初版视觉稿的来源不在此 Joplo worktree；不能创造一段原始用户评审。该基线文档明确尚未发布新 CLI、根跨版本 Agent 协商未提供；生产状态需另查 Cloud，不由本目录推断。
 
 ## 公开页面为什么不能直接依赖规则与问题字段

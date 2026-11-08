@@ -91,7 +91,7 @@ const PublishBoundary = () => (
     <Divider />
     <Title order={3}>这项功能的实际设计边界</Title>
     <Text>对比的是 Joplo 演示，不证明真实产品已实现；根页面支持 HTML 与 manifest，未提供跨版本 Agent 读取模型。</Text>
-    <Text>Cloud 比较接口与迁移已部署，Core/CLI 代码已合入；新 diff CLI 尚未发布到 npm，真实 PR 评论生命周期仍需发布验收。</Text>
+    <Text>Cloud 比较接口已部署，仓库 CI 已验证真实 PR 预览、原评论更新、固定起点及关闭后过期。新 diff CLI 尚未发布到 npm，自动流程固定使用可信源码版本。</Text>
     <Text size="sm" c="dimmed">来源：Cloud docs/feature-diff/CONTRACT.md；Core docs/feature-diff/README.md；Joplo PR #13。</Text>
   </Stack>
 );

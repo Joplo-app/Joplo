@@ -58,6 +58,11 @@ jobs:
     timeout-minutes: 10
     # Configure deployment branches to main only; never store the publishing key at repository scope.
     environment: joplo-design-publisher
+    # Cloud serializes publication writes per account, across different PRs too.
+    concurrency:
+      group: joplo-self-design-cloud-account
+      queue: max
+      cancel-in-progress: false
     outputs:
       base: ${{ steps.receipt.outputs.base }}
       head: ${{ steps.receipt.outputs.head }}
@@ -196,9 +201,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: joplo-design-publisher
-    # Serialize only validated publishers. Stale CI events cannot cancel a newer valid build.
+    # Share the account queue with prepare; keep pending PRs instead of replacing them.
     concurrency:
-      group: joplo-self-design-${{ needs.metadata.outputs.mode }}-${{ needs.metadata.outputs.number || 'main' }}
+      group: joplo-self-design-cloud-account
+      queue: max
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
