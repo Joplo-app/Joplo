@@ -131,7 +131,7 @@ build 只发布选定方案。发布站与看板共用演示页布局，保留�
 | [examples/agent-arch](examples/agent-arch) | 用层级、导演、分组的 `Diagram`、`Sequence`、`StateMachine` 与 `trace()` 演示 Agent 架构 |
 | [examples/joplo](examples/joplo) | 用 Joplo 设计 Joplo：统一的真实功能方案、交互原型与设计决策 |
 
-[观看 Joplo 的真实设计过程](https://joplo.app/s/nZT1VP67LU/)。自设计工作流在同仓 PR 的 CI 通过后生成独立功能差异预览，在 main CI 通过后更新这个固定链接。配置与恢复见[自动发布说明](docs/self-design/CI-CONTRACT.md)；npm 仍按 tag 单独发布。
+[观看 Joplo 的真实设计过程](https://joplo.app/s/dn1MWCcnDW/)。自设计工作流在同仓 PR 的 CI 通过后生成独立功能差异预览，在 main CI 通过后更新这个固定链接。配置与恢复见[自动发布说明](docs/self-design/CI-CONTRACT.md)；npm 仍按 tag 单独发布。
 
 ## 仓库内开发
 

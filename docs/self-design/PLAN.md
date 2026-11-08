@@ -31,4 +31,4 @@
 
 ## 集成结果
 
-已完成统一项目与本地预览；完整验证见 [VERIFICATION.md](VERIFICATION.md)。后续用户授权配置 PR 自动预览和 main 固定分享，已创建[公开设计过程](https://joplo.app/s/nZT1VP67LU/)；工作流边界见 [CI-CONTRACT.md](CI-CONTRACT.md)。代码提交与 PR 不代表 npm 已发布。后续新增自身功能继续迭代同一项目。
+已完成统一项目与本地预览；完整验证见 [VERIFICATION.md](VERIFICATION.md)。后续用户授权配置 PR 自动预览和 main 固定分享，已创建[公开设计过程](https://joplo.app/s/dn1MWCcnDW/)；工作流边界见 [CI-CONTRACT.md](CI-CONTRACT.md)。代码提交与 PR 不代表 npm 已发布。后续新增自身功能继续迭代同一项目。

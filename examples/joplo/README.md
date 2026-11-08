@@ -37,7 +37,7 @@ pnpm joplo dev examples/joplo --open
 
 ## 准备给观众看的静态版本
 
-固定公开链接：[用 Joplo 设计 Joplo](https://joplo.app/s/nZT1VP67LU/)。仓库维护者已配置自动发布：同仓 PR 的 CI 通过后生成独立的前后差异链接；main CI 通过后更新固定分享。基线固定为第一次 prepare 返回的提交，不随重推漂移；PR 关闭后由 Joplo GitHub App 使预览过期。配置、权限和失败恢复见[自动发布说明](../../docs/self-design/CI-CONTRACT.md)。
+固定公开链接：[用 Joplo 设计 Joplo](https://joplo.app/s/dn1MWCcnDW/)。仓库维护者已配置自动发布：同仓 PR 的 CI 通过后生成独立的前后差异链接；main CI 通过后更新固定分享。基线固定为第一次 prepare 返回的提交，不随重推漂移；PR 关闭后由 Joplo GitHub App 使预览过期。配置、权限和失败恢复见[自动发布说明](../../docs/self-design/CI-CONTRACT.md)。
 
 ```sh
 pnpm joplo build examples/joplo --out scratch/joplo-design-site
