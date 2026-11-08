@@ -11,7 +11,7 @@
 | `@joplo-app/cli` | 命令实现 |
 | `joplo` | Node 版本检查与命令转发入口 |
 
-源码入口用于工作区开发；打包时 publishConfig 指向 dist，内部 workspace 依赖转成相同精确版本。项目许可证为 [Apache-2.0](../LICENSE)，字体使用 [SIL OFL 1.1](../packages/web/src/fonts/OFL.txt)。
+源码入口用于工作区开发；打包时 publishConfig 指向 dist，内部 workspace 依赖转成相同精确版本。项目许可证为 [PolyForm Noncommercial 1.0.0](../LICENSE)（商业使用见 [COMMERCIAL.md](../COMMERCIAL.md)，D81；每个包都带一份与根目录相同的 LICENSE），字体使用 [SIL OFL 1.1](../packages/web/src/fonts/OFL.txt)。
 
 ## 标准步骤：推 tag 发布
 
