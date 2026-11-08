@@ -45,9 +45,12 @@
 
 ## 自动发布集成（2026-11-08）
 
-- 固定公开分享 `nZT1VP67LU` 已首次发布，version 1、无到期时间；浏览器验证首页包含 12 个 Feature，并回放功能差异的对齐等待场景。公开 Markdown 路由也返回正确的版本与功能导航。
+- 固定公开分享 `dn1MWCcnDW` 已首次发布，version 1、无到期时间；浏览器验证首页包含 12 个 Feature，并回放功能差异的对齐等待场景。公开 Markdown 路由也返回正确的版本与功能导航。
 - GitHub environment `joplo-design-publisher` 只允许 main；专用 `shares:publish` Key 已写入 environment Secret，固定 Share ID 写入仓库 variable。未复制设备会话到 Actions。
 - 主站发布器 31 项 HTTP/CLI 测试通过，包括固定替换、真实 PUT/finalize、每次 finalize 重试前检查、公开 IR、重复私有 IR、文件边界与错误脱敏。独立审查用真实产物插入第二个 review IR，在认证前拒绝。
 - 新脚本纳入根 `pnpm typecheck`；技能生成与一致性检查通过，实际 diff guide 可用。全仓 102 文件 / 1279 项通过；workflow 的 actionlint 通过。
 - 随后新增的事件筛选专项 49 项通过；与发布器合计 80 项再次通过。两个不含 node_modules 的独立项目目录均由可信源码 CLI 构建成功（每版 122 文件），真实 diff 返回 `unchanged`，没有依赖 PR 自带工具或安装步骤。
 - 公共播放器控制台有 Cloudflare RUM 被既有 `connect-src 'none'` 拒绝的提示；播放器及资源正常，本次没有放宽 CSP。
+
+- 合入 PR #14 后 main CI [42480531987](https://github.com/Joplo-app/Joplo/actions/runs/42480531987) 的远端 102 文件 / 1327 项通过，另有 1 文件 / 1 项按平台跳过；发布冒烟通过。首次自动发布发现设备会话与 CI Key 账号不一致，固定链接跨账号覆盖返回 NOT_FOUND；随后用专用 Key 所属账号重建固定链接并修正 variable，未扩大权限。
+- 临时 PR #15 的自动流程 [42480773753](https://github.com/Joplo-app/Joplo/actions/runs/42480773753) 全部成功，Joplo App 自动创建[预览评论](https://github.com/Joplo-app/Joplo/pull/15#issuecomment-6721552697)：固定 base `1a72004`、head `0672b4c`，准确报告一个修改场景。

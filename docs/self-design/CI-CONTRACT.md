@@ -1,6 +1,6 @@
 # 自设计项目自动发布
 
-固定分享：[用 Joplo 设计 Joplo](https://joplo.app/s/nZT1VP67LU/)。源项目为 `examples/joplo/`。工作流 `.github/workflows/self-design.yml` 名称为 **Self-design preview**；已有 npm tag/Release 工作流保持独立。
+固定分享：[用 Joplo 设计 Joplo](https://joplo.app/s/dn1MWCcnDW/)。源项目为 `examples/joplo/`。工作流 `.github/workflows/self-design.yml` 名称为 **Self-design preview**；已有 npm tag/Release 工作流保持独立。
 
 ## 触发与发布对象
 
@@ -26,11 +26,13 @@
 | --- | --- |
 | `JOPLO_API_KEY` | GitHub environment `joplo-design-publisher` 的 Secret；Cloud Key 只需 `shares:publish`。仅 prepare/publish 的实际调用步骤获得该值 |
 | 环境分支策略 | 只允许 `main`，不允许 tag；不得移到 PR 可读取的仓库级 Secret |
-| `JOPLO_DESIGN_SHARE_ID` | 仓库 Actions variable；首次人工创建固定分享后写入，不能由并发工作流抢建 |
+| `JOPLO_DESIGN_SHARE_ID` | 仓库 Actions variable；用 CI Key 所属账号首次创建固定分享后写入，不能由并发工作流抢建 |
 | `JOPLO_CLOUD_URL` | 可选 variable，默认 `https://cloud.joplo.app` |
 | GitHub App | 必须安装、关联并授权访问 `Joplo-app/Joplo`，负责 PR 评论更新及关闭后过期 |
 
 当前专用 Key 创建于 2026-11-08，有效期 90 天。到期前在 Cloud 生成相同最小权限 Key，替换上述 environment Secret 后运行一次手动 main 发布验证；撤销旧 Key。不要把任何 Key、设备会话或一次性生成值写入源码、日志或文档。
+
+首次建链时必须核对账号：本机设备登录和浏览器生成的 API Key 可能属于不同账号，即使两者都是 Pro 也不能跨账号覆盖分享。应使用专用发布 Key 创建固定链接，再写入 variable；不能仅凭设备会话的 whoami 推断 Key 的所有者。
 
 ## 查看结果与恢复
 
