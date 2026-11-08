@@ -200,6 +200,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--interval <seconds>', 'Cloud polling interval, 10–30 seconds (default: 15)', integer('interval', 30))
     .option('--after <seq>', 'Local replay cursor', cursor).option('--json', 'Stream one normalized JSON event per line')
     .option('--follow', 'With --local: follow every option and every new round of this project until the board stops')
+    .option('--once', 'With --follow: exit 0 as soon as new feedback or an approval arrives (for hosts that wake the agent when a background command ends)')
+    .option('--since <time>', 'With --follow: skip events created at or before this ISO time (the createdAt of the last event you handled)')
     .option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)')
     .action(async (dir, opts, command) => {
       // 父命令的 --share / --server 在 watch 前后均能识别；拒绝把旧的写回标记用到监听命令。
@@ -208,6 +210,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       if (all.applied !== undefined || all.ref !== undefined) throw new JoploError('USAGE', '--applied and --ref cannot be used with feedback watch');
       const shareId = opts.share ?? all.share;
       const server = opts.server ?? all.server;
+      if ((opts.once || opts.since !== undefined) && !opts.follow) throw new JoploError('USAGE', '--once and --since work with --local --follow');
       if (opts.local) {
         if (shareId !== undefined || server !== undefined || opts.interval !== undefined || opts.version !== undefined)
           throw new JoploError('USAGE', '--local cannot be combined with --share, --server, --interval, or --version');
@@ -283,7 +286,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (handle.attached) stderr(`Joined the running board. Open ${handle.url}\n`);
     // stdout 只有地址（脚本会读）；在 stderr 告诉 Agent 用哪一条命令跟住这个项目的全部评审反馈。
     const shown = /^[\w./@:+-]+$/.test(dir) ? dir : `'${dir.replace(/'/g, `'\\''`)}'`;
-    stderr(`Agents: stream reviewer feedback from this board with\n  npx joplo feedback watch ${shown} --local --follow --json\n`);
+    stderr(`Agents: stream reviewer feedback from this board with\n  npx joplo feedback watch ${shown} --local --follow --json\nIf you end your response while the user tests and your host wakes you when a background command ends, add --once (it prints how to resume with --since).\n`);
   });
   program.command('build').argument('[dir]', 'Project directory', '.').option('--out-dir <dir>', 'Output directory (default: project dist)').option('--out <dir>', 'Alias for --out-dir').option('--overwrite', 'Allow clearing a nonempty output directory')
     .option('--scenario <id>', 'Build only this scenario; repeatable (same scope as share --scenario)', collect, [])

@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { MousePointer2 } from 'lucide-react';
 import type { Snapshot } from '../runtime/demo';
+import { rectOf } from '../renderer/rect';
 
 type Box = { x: number; y: number; w: number; h: number };
 
@@ -20,14 +21,14 @@ function useBoxes(stage: HTMLElement | null, ids: (string | null | undefined)[])
     let prev = '';
     const list = key ? key.split('|') : [];
     const tick = () => {
-      const rr = stage.getBoundingClientRect();
+      const rr = rectOf(stage);
       const s = rr.width / stage.offsetWidth || 1;
       const out: Record<string, Box> = {};
       for (const id of list) {
         // 输入组件的根包含 label 等，光标与高亮对准真正的控件
         const el = stage.querySelector<HTMLElement>(`[data-jcontrol="${CSS.escape(id)}"]`) ?? stage.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`);
         if (!el) continue;
-        const r = el.getBoundingClientRect();
+        const r = rectOf(el);
         out[id] = { x: (r.left - rr.left) / s, y: (r.top - rr.top) / s, w: r.width / s, h: r.height / s };
       }
       const sig = JSON.stringify(out);

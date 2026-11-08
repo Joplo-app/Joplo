@@ -20,6 +20,7 @@ import {
   INTERACTIVE_TYPES,
   appShellLayout,
   VIEWPORT_SIZE,
+  PHONE_LANDSCAPE,
   atWidth,
   childWidth,
   choicesOf,
@@ -47,6 +48,7 @@ import { Rough, RoughPath, ThemeContext, roundRectPath, useStageTheme, useStroke
 import { fontStyle } from './appearance';
 import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, edgeEmphasized, effectiveState, edgePath, graphView, machineStates, sequenceView, startEdgeId, type GraphLayout, type SequenceLayout } from './diagram-layout';
 import { ACCENT, BG, DANGER, onFill, DIMMED, FONT, INFO, INK, INK2, LINE, LINE_STRONG, MONO, OK, SOFT, SPACING, SUBTLE, SURFACE, TITLE_SIZE, WARN, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf, tint } from './style';
+import { rectOf } from './rect';
 
 export type RenderMode = 'review' | 'demo' | 'render';
 
@@ -1920,9 +1922,19 @@ const PHONE_BUTTONS: { side: 'left' | 'right'; top: number; h: number }[] = [
   { side: 'right', top: 196, h: 90 },
 ];
 
-/** 外框占用的总尺寸（含侧键余量），内容区为 width × height。 */
-export function phoneFrameSize(width: number, height: number) {
-  return { width: width + (PHONE_BEZEL + PHONE_SAFE.x) * 2 + 8, height: height + PHONE_BEZEL * 2 + PHONE_SAFE.top + PHONE_SAFE.bottom };
+/** 横放（刘海在左）时屏幕内的安全区：左侧避开刘海，右侧与上下避开圆角，底部避开横条。 */
+export const PHONE_SAFE_LANDSCAPE = { top: 12, bottom: 20, left: 44, right: 28 } as const;
+
+type Insets = { top: number; bottom: number; left: number; right: number };
+const phoneInsets = (landscape: boolean): Insets =>
+  landscape ? PHONE_SAFE_LANDSCAPE : { top: PHONE_SAFE.top, bottom: PHONE_SAFE.bottom, left: PHONE_SAFE.x, right: PHONE_SAFE.x };
+
+/** 外框占用的总尺寸（含侧键余量），内容区为 width × height；横放时侧键在机身上下沿。 */
+export function phoneFrameSize(width: number, height: number, landscape = false) {
+  const s = phoneInsets(landscape);
+  const screenW = width + s.left + s.right;
+  const screenH = height + s.top + s.bottom;
+  return landscape ? { width: screenW + PHONE_BEZEL * 2, height: screenH + PHONE_BEZEL * 2 + 8 } : { width: screenW + PHONE_BEZEL * 2 + 8, height: screenH + PHONE_BEZEL * 2 };
 }
 
 /**
@@ -1930,27 +1942,38 @@ export function phoneFrameSize(width: number, height: number) {
  * children 放在屏幕安全区以内的内容区，内容区正好是 width × height（断点按 width 计算，不被圆角和听筒遮挡）；
  * scale 只做视觉缩放。主题取外层 ThemeContext（sketch 用手绘描边）。
  */
-export function PhoneFrame({ width, height, scale = 1, children, seed = 'phone' }: { width: number; height: number; scale?: number; children: ReactNode; seed?: string }) {
+export function PhoneFrame({ width, height, scale = 1, children, seed = 'phone', landscape = false }: { width: number; height: number; scale?: number; children: ReactNode; seed?: string; /** 横放：刘海在左，侧键在机身上下沿。 */ landscape?: boolean }) {
   const mode = useStroke();
   const theme = useStageTheme();
   const font = useContext(ThemeContext).font;
   const sketch = mode === 'rough';
-  const screenW = width + PHONE_SAFE.x * 2;
-  const screenH = height + PHONE_SAFE.top + PHONE_SAFE.bottom;
+  const safe = phoneInsets(landscape);
+  const screenW = width + safe.left + safe.right;
+  const screenH = height + safe.top + safe.bottom;
   const W = screenW + PHONE_BEZEL * 2;
   const H = screenH + PHONE_BEZEL * 2;
   const ink = INK;
-  const size = phoneFrameSize(width, height);
+  const size = phoneFrameSize(width, height, landscape);
+  // 竖放：侧键在左右两侧，机身左移 4 留出左侧键；横放（逆时针转 90°）：左侧键转到下沿、右侧键转到上沿，机身下移 4
+  const buttons = PHONE_BUTTONS.map((b) =>
+    landscape
+      ? { edge: (b.side === 'left' ? 'bottom' : 'top') as 'top' | 'bottom', at: b.side === 'left' ? b.top : W - b.top - b.h, len: b.h }
+      : { edge: b.side, at: b.top, len: b.h },
+  );
   return (
     // 舞台外的手机外框也跟随主题（.jtheme 在主题的作用范围里）
     <div className="jtheme" style={{ width: size.width * scale, height: size.height * scale, position: 'relative', flexShrink: 0, ...fontStyle(font) }} data-jphone-frame="" data-theme={theme} data-stroke={mode} data-font={font ?? undefined}>
-      <div style={{ position: 'absolute', left: 4, top: 0, width: W, height: H, transform: scale === 1 ? undefined : `scale(${scale})`, transformOrigin: '0 0' }}>
-        {PHONE_BUTTONS.map((b, i) => (
+      <div style={{ position: 'absolute', left: landscape ? 0 : 4, top: landscape ? 4 : 0, width: W, height: H, transform: scale === 1 ? undefined : `scale(${scale})`, transformOrigin: '0 0' }}>
+        {buttons.map((b, i) => (
           <div
             key={i}
             aria-hidden
-            data-jphone-button={b.side}
-            style={{ position: 'absolute', top: b.top, height: b.h, width: 5, [b.side]: -5, background: sketch ? 'transparent' : ink, borderRadius: b.side === 'left' ? '3px 0 0 3px' : '0 3px 3px 0' }}
+            data-jphone-button={b.edge}
+            style={
+              b.edge === 'left' || b.edge === 'right'
+                ? { position: 'absolute', top: b.at, height: b.len, width: 5, [b.edge]: -5, background: sketch ? 'transparent' : ink, borderRadius: b.edge === 'left' ? '3px 0 0 3px' : '0 3px 3px 0' }
+                : { position: 'absolute', left: b.at, width: b.len, height: 5, [b.edge]: -5, background: sketch ? 'transparent' : ink, borderRadius: b.edge === 'top' ? '3px 3px 0 0' : '0 0 3px 3px' }
+            }
           >
             {sketch ? <Rough seedKey={`${seed}:btn${i}`} strokeWidth={1.4} inset={0.5} /> : null}
           </div>
@@ -1962,13 +1985,17 @@ export function PhoneFrame({ width, height, scale = 1, children, seed = 'phone' 
           style={{ position: 'absolute', left: PHONE_BEZEL, top: PHONE_BEZEL, width: screenW, height: screenH, borderRadius: PHONE_RADIUS - PHONE_BEZEL, overflow: 'hidden', background: SURFACE, isolation: 'isolate' }}
           data-jphone-screen=""
         >
-          {sketch ? null : <div aria-hidden style={{ position: 'absolute', top: 12, left: '50%', width: 96, height: 24, marginLeft: -48, borderRadius: 12, background: ink }} />}
-          <div aria-hidden style={{ position: 'absolute', bottom: 9, left: '50%', width: 120, height: 4, marginLeft: -60, borderRadius: 2, background: sketch ? INK2 : LINE_STRONG }} />
-          <div style={{ position: 'absolute', left: PHONE_SAFE.x, top: PHONE_SAFE.top, width, height, overflow: 'hidden' }} data-jphone-content-box="">
+          {sketch ? null : landscape
+            ? <div aria-hidden style={{ position: 'absolute', left: 12, top: '50%', width: 24, height: 96, marginTop: -48, borderRadius: 12, background: ink }} />
+            : <div aria-hidden style={{ position: 'absolute', top: 12, left: '50%', width: 96, height: 24, marginLeft: -48, borderRadius: 12, background: ink }} />}
+          <div aria-hidden style={{ position: 'absolute', bottom: landscape ? 7 : 9, left: '50%', width: landscape ? 160 : 120, height: 4, marginLeft: landscape ? -80 : -60, borderRadius: 2, background: sketch ? INK2 : LINE_STRONG }} />
+          <div style={{ position: 'absolute', left: safe.left, top: safe.top, width, height, overflow: 'hidden' }} data-jphone-content-box="">
             {children}
           </div>
         </div>
-        {sketch ? <div aria-hidden style={{ position: 'absolute', top: PHONE_BEZEL + 14, left: '50%', width: 64, height: 6, marginLeft: -32, borderRadius: 3, border: `1.5px solid ${INK2}` }} /> : null}
+        {sketch ? (landscape
+          ? <div aria-hidden style={{ position: 'absolute', left: PHONE_BEZEL + 14, top: '50%', width: 6, height: 64, marginTop: -32, borderRadius: 3, border: `1.5px solid ${INK2}` }} />
+          : <div aria-hidden style={{ position: 'absolute', top: PHONE_BEZEL + 14, left: '50%', width: 64, height: 6, marginLeft: -32, borderRadius: 3, border: `1.5px solid ${INK2}` }} />) : null}
       </div>
     </div>
   );
@@ -1979,16 +2006,18 @@ function Phone({ node, p, children }: NodeProps) {
   const ctx = useCtx();
   const [layer, setLayer] = useState<HTMLDivElement | null>(null);
   const r = useR(p);
-  const width = childWidth('Phone', ctx.width);
+  const landscape = p.landscape === true;
+  // 横放：内容区按横屏手机的尺寸排版（断点按这个宽度算）；h 仍可改高度
+  const width = childWidth('Phone', ctx.width, p);
   const hv = Number(r('h'));
-  const height = Number.isFinite(hv) && hv > 0 ? hv : VIEWPORT_SIZE.mobile.height;
+  const height = Number.isFinite(hv) && hv > 0 ? hv : landscape ? PHONE_LANDSCAPE.height : VIEWPORT_SIZE.mobile.height;
   const sv = Number(r('scale'));
   const scale = Number.isFinite(sv) && sv > 0 ? sv : 1;
-  const { h: _h, w: _w, ...rest } = p;
+  const { h: _h, w: _w, landscape: _l, ...rest } = p;
   const root = useRoot(node, rest, { style: { display: 'inline-block', flexShrink: 0 } });
   return (
     <div {...root}>
-      <PhoneFrame width={width} height={height} scale={scale} seed={node.id}>
+      <PhoneFrame width={width} height={height} scale={scale} seed={node.id} landscape={landscape}>
         <RenderContext.Provider value={{ ...ctx, width, dialogLayer: layer }}>
           <div style={{ position: 'absolute', inset: 0, overflow: 'auto' }} data-jphone-content="">
             {children}
@@ -3000,8 +3029,8 @@ function MenuDropdown({ node, p, children }: NodeProps) {
   useLayoutEffect(() => {
     const a = menu?.anchor.current;
     if (!a || !dialogLayer) return;
-    const ar = a.getBoundingClientRect();
-    const lr = dialogLayer.getBoundingClientRect();
+    const ar = rectOf(a);
+    const lr = rectOf(dialogLayer);
     const k = dialogLayer.offsetWidth ? lr.width / dialogLayer.offsetWidth : 1;
     const next = { left: ((place.end ? ar.right : ar.left) - lr.left) / (k || 1), top: ((place.top ? ar.top - 6 : ar.bottom + 6) - lr.top) / (k || 1) };
     if (!pos || Math.abs(pos.left - next.left) > 0.5 || Math.abs(pos.top - next.top) > 0.5) setPos(next);

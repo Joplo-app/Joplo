@@ -28,6 +28,7 @@
 | `share_scope` | 只分享允许别人看的部分 | `joplo-share-scope`、D75–D76 | 深链接为什么不保密，构建裁剪的选择，借用元素与独立分享记录 |
 | `review` | 反馈怎样回到 Agent | `joplo-local-review`、D77–D78 | 浮层原型、真实实施后的可拖动入口、版本绑定和监听恢复 |
 | `feature_diff` | 怎样看见一个 PR 改了什么 | `docs/feature-diff`、`4603038`、`397310e` | 固定基线、稳定步骤身份、单/双栏、无法匹配和重新对齐的实际取舍 |
+| `mobile_watch` | 手机上怎样看分享 | `examples/joplo/features/mobile_watch`、D79 | 竖屏被挤成竖条的现状、视频式播放页、横屏沉浸、iPhone 伪横屏与连续播放 |
 
 “整个产品”是这些功能的统一目录与共享项目，不要求把无关功能的场景强行串成一个端到端操作，也不把 `camping`、`invite`、`agent-arch` 这些独立业务演示改名成 Joplo 的自身功能。
 
@@ -109,6 +110,13 @@
 - **扩展**：D76 由同一实现加入看板发布浮层、默认当前场景、未登录时复制 CLI 命令，不需要另造一段“历史 A/B”。
 - **当前实现**：`packages/core/src/scope.ts`、`packages/cli/src/cloud-share.ts`、`packages/web/src/board/CloudPublish.tsx`。
 - **边界**：作者 CSS 仍整份分发；共用基础页面保留，借用贡献子树明确报告。这里的“保密”是范围裁剪，不是登录控制或不可转发的私密链接。D75 不做跨 feature 自动串链。
+
+### mobile_watch：在手机上像看视频一样看分享
+
+- **最初问题与真实决定**：D79 记载用户在手机上看真实分享（2026 中期选举讲解）后指出体验差，要求横屏、移动端适配和自动播放下一个场景。原型直接在本项目新建，用户在本地看板确认方案 A，并回复“可以，就按这个方案搞”；三个待定点（横屏字幕位置、电脑也连续播放、iPhone 伪横屏）按默认处理。
+- **已有设计**：`a-video`；四个场景为现状、从头看到尾并横过来看、iPhone 锁竖屏、最后一章播完。为画横放手机先给 `Phone` 加了 `landscape`。
+- **当前实现**：`packages/web/src/player/WatchView.tsx`、`watch.ts`、`fit.ts`（`videoStage`）、`runtime/demo.ts`（`autoNext`）、`site/SiteApp.tsx`。
+- **边界**：只在发布站且设备是手机时启用；本地看板与嵌入模式不变。iPhone 的伪横屏依赖旋转画面，地址栏和系统手势仍在；真机效果以发布后的站点为准。
 
 ### review：浮层、确认与 Agent 监听
 

@@ -20,7 +20,7 @@ export const SKILL_TOPICS = [
   { name: 'selection', description: 'Edit only the element selected by the user in the board' },
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
   { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
-  { name: 'publish', description: 'pick, build, share, review version, feedback write-back, deployment' },
+  { name: 'publish', description: 'pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing' },
 ] as const;
 
 /** 心智模型：所有入口最先读到的几句话。 */
@@ -39,7 +39,7 @@ export const START_ORDER = [
   'With minimal code, write one happy path and one error-and-recovery scenario.',
   'Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.',
   'Extend to every option and every case agreed with the user; run check until 0 errors.',
-  'Before handing off for review, read npx joplo skill review. Keep npx joplo feedback watch [dir] --local --follow --json running in its own shell (joplo dev prints this exact command), then give the user the board URL dev printed. While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. Receive and apply review results with the joplo-feedback skill.',
+  'Before handing off for review, read npx joplo skill review. Keep npx joplo feedback watch [dir] --local --follow --json running in its own shell (joplo dev prints this exact command), then give the user the board URL dev printed. While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. If you end your response while they test, add --once so the watcher exits (and wakes a host that resumes on background exit) on the first event, then resume with --since. Receive and apply review results with the joplo-feedback skill.',
 ] as const;
 
 /** 最常见的坑：一句话 + 详细主题。 */
@@ -107,6 +107,7 @@ function joploBody(): string {
     '1. Start npx joplo feedback watch <dir> --local --follow --json in its own long-running shell (joplo dev prints this exact command; the board\'s feedback panel can copy it too). One follower covers every option of the project and attaches by itself to the new round each source edit opens.',
     '2. Then give the user the board URL that dev printed (do not assume port 4790) and point them to the native feedback icon. If they want to drive the UI themselves, only give the link.',
     '3. While they test, read the follower\'s output with short waits (about 1–5 seconds). Each stdout line is one JSON event (feedback, approved, closed) carrying eventId, optionId, sessionId and context (route, scenario, step, source); deduplicate by eventId. A background shell alone does not wake an idle agent: stay in a receive loop, and do not claim you are still listening after ending your response unless the host can resume you.',
+    '   - If you will end your response while the user tests, and your host wakes you when a background command finishes (Claude Code does): run the follower in the background with --once added. It exits 0 on the first feedback or approval, which wakes you. Handle the events, then start it again with --since <createdAt of the last event> (the exit message prints this exact command) so nothing is replayed or lost. Without such a host, tell the user to message you after they confirm.',
     '4. On feedback, acknowledge the actual text and its page/step right away, in the reviewer\'s language, then keep listening. Change the demo only when the user asked for changes; after edits, run npx joplo check. closed (source_changed) is then expected and the follower moves to the new round.',
     '5. approved confirms that option version only: it is not proof the feedback was implemented and not permission to publish. The follower ends with exit 1 only when the board stops (restart dev, then the follower) or 130 on Ctrl+C.',
     'Exact-session watching, Share polling, and applying pick / rule / question decisions: joplo-feedback skill and npx joplo skill review.',

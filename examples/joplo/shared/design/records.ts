@@ -74,4 +74,12 @@ export const designRecords = {
     current: 'D76 加入看板发布。公共页面与 CSS 仍可能随包分发；范围裁剪不是登录保护。',
     evidence: 'DECISIONS D75–D76；098cb85 → 944a1cc',
   },
+  mobile_watch: {
+    problem: '手机上打开分享，为什么看不下去？',
+    exploration: 'D79 起因是一次真实分享：舞台按手机宽度重排，标签、字幕、控制条都挤坏了。用户在看板确认了视频式方案。',
+    scenario: 'watch',
+    decision: '手机上把分享当成分章节的视频来看',
+    current: 'D79 实现竖屏播放页、横屏沉浸、iPhone 伪横屏和连续播放。真机体验以发布后的站点为准。',
+    evidence: 'DECISIONS D79；examples/joplo mobile_watch 原型',
+  },
 } satisfies Record<string, PublicDesignRecord>;

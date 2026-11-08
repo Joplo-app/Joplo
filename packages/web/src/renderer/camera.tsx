@@ -15,6 +15,7 @@ import { animate as animateEl, motion } from 'motion/react';
 import { Rough, useStroke } from './rough';
 import { MIN_UI_PX, UI_LEGIBLE_MAX, fitCamera, uiMaxZoom, frameBox, highlightRect, revealScroll, union, visibleRect, type Box, type FrameTarget, type View } from './camera-math';
 import { CAMERA_EASE, CAMERA_MS } from '../runtime/pace';
+import { rectOf } from './rect';
 
 export type CameraSpec = {
   /** 对准的元素 id；空 = 这一层（这个画面）整体。 */
@@ -27,7 +28,7 @@ export type CameraSpec = {
  * 元素的屏幕矩形。图表里的节点不再移动（D69 取代 D47 的聚焦布局），直接取它此刻的矩形；保留这个入口给标注（Marks）用。
  */
 export function finalRect(el: Element): { left: number; top: number; width: number; height: number } {
-  return el.getBoundingClientRect();
+  return rectOf(el);
 }
 
 /** 图表元素（节点、连线、分组、状态、参与者、消息）：取景时找父分组，镜头推近时保证看得清。 */
@@ -61,9 +62,9 @@ export function ownershipEls(el: Element): Element[] {
 
 /** 镜头容器里内容的范围（内容坐标，至少是整个画面）：整层缩放与平移夹紧都用它。 */
 export function contentBounds(wrap: HTMLElement, content: HTMLElement | null, W: number, H: number): Box {
-  const wr = wrap.getBoundingClientRect();
+  const wr = rectOf(wrap);
   const S = wr.width / (wrap.offsetWidth || 1) || 1;
-  const r = content?.firstElementChild?.getBoundingClientRect();
+  const r = (content?.firstElementChild ? rectOf(content.firstElementChild) : undefined);
   const c = r && r.height > 0 ? { x: (r.left - wr.left) / S, y: (r.top - wr.top) / S, w: r.width / S, h: r.height / S } : null;
   return union([{ x: 0, y: 0, w: W, h: H }, ...(c ? [c] : [])])!;
 }
@@ -165,8 +166,8 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
         if (!el) continue;
         for (let p: HTMLElement | null = el.parentElement; p && p !== wrap; p = p.parentElement) {
           const cs = getComputedStyle(p);
-          const pr = p.getBoundingClientRect();
-          const r = el.getBoundingClientRect();
+          const pr = rectOf(p);
+          const r = rectOf(el);
           const s = pr.width / (p.offsetWidth || 1) || 1;
           if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight)
             p.scrollTop = revealScroll((r.top - pr.top) / s, r.height / s, p.clientHeight, p.scrollTop, p.scrollHeight - p.clientHeight);
@@ -176,18 +177,18 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       }
     };
     const measure = (): (CameraView & { els: Element[]; device?: DeviceFocus | null }) | null => {
-      const wr = wrap.getBoundingClientRect();
+      const wr = rectOf(wrap);
       const S = wr.width / (wrap.offsetWidth || 1) || 1; // 屏幕像素 / 内容像素（含舞台外层缩放与镜头此刻的缩放，过渡中途也对）
       // 舞台外层缩放（看板按可用区域缩放舞台）：从没有镜头变换的舞台根量，过渡中途也稳定
       const host = wrap.parentElement;
-      const outer = host ? host.getBoundingClientRect().width / (host.offsetWidth || 1) || 1 : S / (current.current.k || 1);
+      const outer = host ? rectOf(host).width / (host.offsetWidth || 1) || 1 : S / (current.current.k || 1);
       const toBox = (r: { left: number; top: number; width: number; height: number }): Box => ({ x: (r.left - wr.left) / S, y: (r.top - wr.top) / S, w: r.width / S, h: r.height / S });
       /** 元素实际可见的矩形：与裁切它的祖先（直到镜头容器）求交。 */
       const visibleOf = (el: Element): Box | null => {
         const clips: Box[] = [];
         for (let p = el.parentElement; p && p !== wrap; p = p.parentElement) {
           const cs = getComputedStyle(p);
-          if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') clips.push(toBox(p.getBoundingClientRect()));
+          if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') clips.push(toBox(rectOf(p)));
         }
         return visibleRect(toBox(finalRect(el)), clips);
       };
@@ -201,13 +202,13 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       let mode: CameraView['mode'] = found.length ? 'focus' : 'overview';
       // 这一层内容的范围（至少是整个画面）：整层时整体缩进来；聚焦时尽量不露出它以外的空白
       const root = content?.firstElementChild;
-      const c = root ? toBox(root.getBoundingClientRect()) : null;
+      const c = root ? toBox(rectOf(root)) : null;
       const bounds = union([{ x: 0, y: 0, w: W, h: H }, ...(c && c.h > 0 ? [c] : [])])!;
       // 取景保留上下文（D69）：图表元素带上父分组（至少它的标题），界面元素带上最近的有框容器
       const inWrap = (el: Element | null): el is Element => !!el && el !== wrap && wrap.contains(el) && (!content || content.contains(el));
       const titleOf = (g: Element) => {
         const t = g.querySelector(':scope > [data-jgroup-title]');
-        return t ? visibleRect(toBox(t.getBoundingClientRect()), []) : null;
+        return t ? visibleRect(toBox(rectOf(t)), []) : null;
       };
       const diagramScale = (el: Element) => (Number(el.closest('[data-jtype="Diagram"],[data-jtype="StateMachine"],[data-jtype="Sequence"]')?.getAttribute('data-scale') ?? 1) || 1) * outer;
       const items: FrameTarget[] = found.map((f) => {
@@ -246,7 +247,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       // 界面文字的“内容像素”字号：CSS 字号 × 元素自身的缩放（手机外框等）÷ 内容到屏幕的比例 S
       const fontOf = (el: Element) => {
         const he = el as HTMLElement;
-        const own = he.offsetWidth ? el.getBoundingClientRect().width / he.offsetWidth : S;
+        const own = he.offsetWidth ? rectOf(el).width / he.offsetWidth : S;
         return (parseFloat(getComputedStyle(el).fontSize) || 14) * (own / S);
       };
       // 外层（手机放大）的缩放不算进来，否则放大之后这里又会缩回去

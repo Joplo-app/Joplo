@@ -18,6 +18,7 @@ import { orderedFeatures, type Project } from '@joplo-app/core';
 import { DemoController } from '../runtime/demo';
 import { isLocalHost, parseSiteHash, siteHash, warnUnknownPlayParams, type PlayRoute, type SiteRoute } from '../runtime/route';
 import { scenariosOf } from '../runtime/views';
+import { nextScenarioId } from '../player/watch';
 import type { StageTheme } from '../renderer/rough';
 import { Brand, JOPLO_SITE_URL, PlayerPage, TopBar } from '../player/PlayerPage';
 import { ArrowRight, CirclePlay, Link } from 'lucide-react';
@@ -182,6 +183,14 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
   const resolved = usePlaySync(ctl, snap, snap.project, play, (next) => toPlay(next, true));
   // 朗读（D74）：分享带音频时默认开，否则默认关、观众点 🔊 才出声
   const voice = useSiteVoice(ctl, project);
+  // 连续播放（mobile_watch）：自动播放放完一个场景，接着放选定方案的下一个场景，像一个分章节的视频；最后一个放完停下
+  const optionId = resolved?.ok ? resolved.optionId : null;
+  useEffect(() => {
+    ctl.autoNext = (id) => nextScenarioId(scenariosOf(project, optionId), id);
+    return () => {
+      ctl.autoNext = null;
+    };
+  }, [ctl, project, optionId]);
   const feature = project.features[play.featureId];
   if (!snap.project) return null;
   if (!feature || !resolved?.ok)
@@ -262,6 +271,20 @@ function SitePlayer({ project, play, navigate }: { project: Project; play: PlayR
       }
       menu={[]}
       flash={flash}
+      watch={{
+        title: feature.name,
+        chapters: siteScenarioRows(project, resolved.optionId, snap.scenarioId, i18n),
+        onChapter: (id) => toPlay({ featureId: feature.id, scenarioId: id }),
+        onRestart: () => {
+          const first = scs[0];
+          if (!first) return;
+          if (first.id === snap.scenarioId) void ctl.play({ fromStart: true });
+          else {
+            ctl.setScenario(first.id, 0, { quiet: true });
+            void ctl.play({ fromStart: true });
+          }
+        },
+      }}
     />
     </>
   );

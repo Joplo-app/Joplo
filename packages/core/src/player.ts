@@ -195,7 +195,7 @@ export function isNodeVisible(scene: Scene, nodeId: string, state: PlayState, wi
       const r = n.type === 'AppShell.Navbar' ? l.navbar : l.aside;
       if (r?.collapsed) return false;
     }
-    w = childWidth(n.type, w);
+    w = childWidth(n.type, w, n.props);
   }
   return true;
 }

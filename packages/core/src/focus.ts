@@ -76,7 +76,7 @@ export function visibleIds(scene: Scene, state: Vis, width: number = sceneWidth(
       if ((n.type === 'AppShell.Navbar' ? l.navbar : l.aside)?.collapsed) return;
     }
     out.add(n.id);
-    const cw = childWidth(n.type, w);
+    const cw = childWidth(n.type, w, n.props);
     for (const c of n.children ?? []) rec(c, cw, sh);
   };
   rec(scene.root, width, null);
