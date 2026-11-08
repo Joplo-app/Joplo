@@ -2,7 +2,9 @@
  * 用 Vite 的 ssrLoadModule 载入项目源文件，交给 core 的 loadAuthoring + compile。
  * dev（看板、截图）与 build（发布站）共用这一条路径。
  */
+import fs from 'node:fs';
 import path from 'node:path';
+import { isPluginDef } from '@joplo-app/kit/plugin';
 import { compile, type CompileMode, type Diagnostic, type Project } from '@joplo-app/core';
 import { discoverFiles, elkLayout, loadAuthoring } from '@joplo-app/core/node';
 import type { ViteDevServer } from 'vite';
@@ -14,7 +16,17 @@ export type CompileOutcome = {
   diagnostics: Diagnostic[];
   /** joplo.config 的 home（看板与发布站的首页路径）。 */
   home: string | null;
+  /** 启用的插件（D86）：插件 id → 运行时入口的绝对路径（看板按它载入，build 按它打包）。 */
+  pluginRuntimes: Record<string, string>;
 };
+
+/** config({ plugins }) 里每个插件的运行时入口（编译器另外校验清单；这里只取存在的文件）。 */
+export function pluginRuntimesOf(plugins: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!Array.isArray(plugins)) return out;
+  for (const p of plugins) if (isPluginDef(p) && typeof p.runtime === 'string' && path.isAbsolute(p.runtime) && fs.existsSync(p.runtime)) out[p.id] ??= fs.realpathSync(p.runtime);
+  return out;
+}
 
 const LOC_IN_MESSAGE = /((?:[\w@.-]+\/)*[\w@.-]+\.(?:tsx|ts|jsx|js|mts)):(\d+):(\d+)/;
 
@@ -66,12 +78,15 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
     seen.add(key);
     diagnostics.push(out);
   }
-  if (!loaded.authoring) return { project: null, diagnostics, home: null };
+  if (!loaded.authoring) return { project: null, diagnostics, home: null, pluginRuntimes: {} };
   const home = loaded.authoring.config.home ?? null;
-  if (diagnostics.some((d) => d.severity === 'error')) return { project: null, diagnostics, home };
+  const pluginRuntimes = pluginRuntimesOf(loaded.authoring.config.plugins);
+  if (diagnostics.some((d) => d.severity === 'error')) return { project: null, diagnostics, home, pluginRuntimes };
   // 图表布局在编译期由 ELK 算好写进 IR（D69）：看板与发布站只渲染
   const r = compile(loaded.authoring, mode, { layout: elkLayout });
-  return { project: r.project, diagnostics: [...diagnostics, ...r.diagnostics], home };
+  const missing = Object.keys(r.project?.plugins ?? {}).filter((id) => !pluginRuntimes[id]);
+  const extra: Diagnostic[] = missing.map((id) => ({ severity: 'error', code: 'PLUGIN_RUNTIME_MISSING', message: `Plugin ${id}: runtime file not found; reinstall the plugin package`, source: 'reference', at: `${loaded.authoring!.config.file}:1:1` }));
+  return { project: extra.length ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes };
 }
 
 /** 让项目源文件在下次载入时重新转译、重新求值。 */

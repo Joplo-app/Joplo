@@ -22,6 +22,7 @@ export const SKILL_TOPICS = [
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
   { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
   { name: 'publish', description: 'pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)' },
+  { name: 'plugins', description: 'Install and enable plugin packages (3D scenes and other components), read their skills, write steps for them; writing a plugin' },
 ] as const;
 
 /** 心智模型：所有入口最先读到的几句话。 */
@@ -71,6 +72,7 @@ export const PITFALLS = [
   ['Label illustrative numbers on screen and keep them apart from sourced facts; bars start at zero and lengths stay proportional', 'content'],
   ['HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it', 'check'],
   ['Judge a scenario from its storyboard, not from check alone: npx joplo render --scenario-id <id> --sheet --out board.png shows every step with its caption and narration in one image', 'content'],
+  ['Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components', 'plugins'],
 ] as const satisfies readonly (readonly [string, string])[];
 
 /** 中文触发词：技能 description 里的匹配文本，不是 CLI 界面文案（english-output 测试的白名单）。 */

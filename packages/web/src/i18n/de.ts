@@ -206,6 +206,8 @@ export function createDe(locale: Locale = 'de') {
       thisDiagramHasNoNodesYet: "Dieses Diagramm hat noch keine Knoten",
       placeholder: "Platzhalter",
       customComponent: "Eigene Komponente: ",
+      pluginLoading: "Plugin wird geladen: ",
+      pluginUnavailable: "Plugin nicht verfügbar: ",
       unnamed: "Unbenannt",
       placeholderSuffix: "(Platzhalter)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "Komponente außerhalb des Katalogs. Die Demo folgt ihren deklarierten Element-IDs und Zuständen.",

@@ -14,6 +14,8 @@ import { bindPath, callsite, isBind, type Bind, type CondExpr, type JNode } from
 export { $, and, empty, eq, Fragment, neq, not, notEmpty, oneOf, or, Outlet, Slot } from './node.ts';
 export type { Bind, CondExpr, JNode } from './node.ts';
 export { asset } from './asset.ts';
+import type { PluginDef } from './plugin.ts';
+export type { PluginDef } from './plugin.ts';
 
 type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 export type StateInit = { ui?: Record<string, Json>; data?: Record<string, Json>; inputs?: Record<string, Json> };
@@ -41,7 +43,8 @@ export type VoiceConfig = {
  * locales（D84）：内容语言，第一个是源文件的语言（默认语言），其余的译文在 locales/<语言>.json（原文 → 译文）。
  * 可选：en、zh-CN、zh-TW、ja、ko、es、fr、de、pt-BR、ru。加一种语言：npx joplo i18n add <语言>。
  */
-export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; autoFocus?: boolean; voice?: VoiceConfig; locales?: string[]; source?: string };
+/** plugins（D86）：启用的插件（npm 包的默认导出，`import scene3d from 'joplo-plugin-scene3d'`）；用法见 npx joplo skill <插件 id>。 */
+export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; autoFocus?: boolean; voice?: VoiceConfig; locales?: string[]; plugins?: PluginDef[]; source?: string };
 export const config = (c: Omit<ConfigDef, 'kind' | 'source'>): ConfigDef => ({ kind: 'config', ...c, source: callsite() });
 
 export type LayoutDef = { kind: 'layout'; tree: JNode; source?: string };

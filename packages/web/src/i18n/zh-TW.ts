@@ -206,6 +206,8 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       thisDiagramHasNoNodesYet: "此圖表尚無節點",
       placeholder: "預留區塊",
       customComponent: "自訂元件：",
+      pluginLoading: "正在載入外掛 ",
+      pluginUnavailable: "外掛無法使用：",
       unnamed: "未命名",
       placeholderSuffix: "（預留區塊）",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "非元件目錄內的元件。示範會依其宣告的元素 ID 與狀態執行。",

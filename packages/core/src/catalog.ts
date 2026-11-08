@@ -63,6 +63,30 @@ export type ComponentType = (typeof COMPONENT_TYPES)[number];
 
 export const INTERACTIVE_TYPES: ReadonlySet<string> = new Set<string>(INTERACTIVE);
 
+// ---------- 插件组件（D86）----------
+/** 插件组件的类型名：`<插件 id>:<组件名>`（例如 scene3d:Target）。目录组件的名字里没有冒号。 */
+export const PLUGIN_TYPE = /^[a-z][a-z0-9-]*:[A-Z][A-Za-z0-9]*(\.[A-Z][A-Za-z0-9]*)*$/;
+export type PluginComponentType = `${string}:${string}`;
+export const isPluginType = (type: string): type is PluginComponentType => PLUGIN_TYPE.test(type);
+/** 插件 id 与组件名：scene3d:Scene.Part → { plugin: 'scene3d', name: 'Scene.Part' }。 */
+export const splitPluginType = (type: string): { plugin: string; name: string } | null => {
+  if (!isPluginType(type)) return null;
+  const i = type.indexOf(':');
+  return { plugin: type.slice(0, i), name: type.slice(i + 1) };
+};
+/** IR 里记录的插件信息（编译自插件清单；发布站保留，不含运行时路径）。 */
+export type PluginInfo = { id: string; title: string; version?: string; components: Record<string, { interactive?: boolean; parent?: string }> };
+export type PluginTable = Readonly<Record<string, PluginInfo>> | undefined;
+/** 插件组件的声明；不是插件类型或插件没启用时为 null。 */
+export function pluginSpec(plugins: PluginTable, type: string): { interactive?: boolean; parent?: string } | null {
+  const t = splitPluginType(type);
+  return (t && plugins?.[t.plugin]?.components[t.name]) || null;
+}
+/** 可操作的类型：目录里的可操作组件，或声明了 interactive 的插件组件。 */
+export function isInteractiveType(type: string, plugins?: PluginTable): boolean {
+  return INTERACTIVE_TYPES.has(type) || pluginSpec(plugins, type)?.interactive === true;
+}
+
 /** 可接收输入值；type/select/toggle 动作写入 state.inputs[nodeId]。 */
 export const VALUE_TYPES: ReadonlySet<string> = new Set<string>([
   'TextInput', 'PasswordInput', 'NumberInput', 'Textarea', 'Select', 'MultiSelect', 'Checkbox', 'Radio.Group', 'Switch',

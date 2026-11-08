@@ -10,8 +10,10 @@ import { m } from '../i18n/board/messages';
  */
 import type { AppearanceFont, AppearanceStroke, Diagnostic, Project, Selection, LocalReviewState, LocalReviewWrite } from '@joplo-app/core';
 import type { SelectionInput, SelectionWriteResult } from './demo';
+import { loadPluginRuntimes } from '../renderer/plugins';
 
-export type DevPayload = { projectId?: string; version: number; ok: boolean; project: Project | null; diagnostics: Diagnostic[]; home: string | null };
+/** plugins（D86）：插件 id → 运行时地址（Vite 的 /@fs/…）；收到即载入（renderer/plugins.ts）。 */
+export type DevPayload = { projectId?: string; version: number; ok: boolean; project: Project | null; diagnostics: Diagnostic[]; home: string | null; plugins?: Record<string, string> };
 
 export type ProjectSummary = {
   id: string;
@@ -69,7 +71,9 @@ export async function fetchIR(projectId: string): Promise<DevPayload | { error: 
   try {
     const res = await fetch(`/__joplo/p/${enc(projectId)}/ir`, { cache: 'no-store' });
     if (!res.ok) return { error: await readError(res), status: res.status };
-    return (await res.json()) as DevPayload;
+    const payload = (await res.json()) as DevPayload;
+    loadPluginRuntimes(payload.plugins);
+    return payload;
   } catch (e) {
     return { error: m.board.couldNotConnectToJoploDev(errMsg(e)) };
   }
@@ -83,7 +87,9 @@ export function subscribeIR(projectId: string, cb: (p: DevPayload) => void, onCo
   const h = hot();
   if (!h) return () => undefined;
   const handler = (p: DevPayload) => {
-    if (p.projectId === projectId) cb(p);
+    if (p.projectId !== projectId) return;
+    loadPluginRuntimes(p.plugins);
+    cb(p);
   };
   const up = () => onConnection?.(true);
   const down = () => onConnection?.(false);

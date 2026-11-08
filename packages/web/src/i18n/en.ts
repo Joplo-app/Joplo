@@ -231,6 +231,8 @@ export function createEn(locale: Locale = 'en') {
       thisDiagramHasNoNodesYet: "This diagram has no nodes yet",
       placeholder: "Placeholder",
       customComponent: "Custom component: ",
+      pluginLoading: "Loading plugin ",
+      pluginUnavailable: "Plugin unavailable: ",
       unnamed: "Unnamed",
       placeholderSuffix: "(Placeholder)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "A component outside the catalog. The demo follows its declared element IDs and state.",

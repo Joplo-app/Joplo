@@ -206,6 +206,8 @@ export function createJa(locale: Locale = 'ja') {
       thisDiagramHasNoNodesYet: "この図にはまだノードがありません",
       placeholder: "プレースホルダー",
       customComponent: "カスタムコンポーネント：",
+      pluginLoading: "プラグインを読み込み中: ",
+      pluginUnavailable: "プラグインを使用できません: ",
       unnamed: "名前なし",
       placeholderSuffix: "（プレースホルダー）",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "カタログ外のコンポーネントです。デモは宣言された要素 ID と状態に従います。",

@@ -5,7 +5,7 @@
  * 位置（position）语义：0 = 场景初始状态；k = 已执行前 k 个步骤之后的状态。
  * “上一步”通过从初始状态重放到 k-1 实现，因此恢复的是业务可见状态，而不是撤销动画。
  */
-import { DIRECTOR_LAYER, GATED_CONTAINERS, INTERACTIVE_TYPES, PAGE_LAYER, VALUE_TYPES, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
+import { DIRECTOR_LAYER, GATED_CONTAINERS, PAGE_LAYER, isInteractiveType, VALUE_TYPES, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
 import type { Condition, LayerIcon, Project, Scenario, Scene, SceneNode, Step } from './schema.ts';
 import { JoploError, type Diagnostic } from './result.ts';
 
@@ -325,7 +325,7 @@ function checkStepInner(project: Project, scenario: Scenario, state: PlayState, 
     return { severity: 'error', code: 'TARGET_HIDDEN', message: `Step ${step.id} target "${nodeLabel(node)}" is currently hidden`, source: 'replay', ref };
   if (isNodeDisabled(node, state))
     return { severity: 'error', code: 'TARGET_DISABLED', message: `Step ${step.id} target "${nodeLabel(node)}" is currently disabled`, source: 'replay', ref };
-  if (a.type === 'click' && !INTERACTIVE_TYPES.has(node.type))
+  if (a.type === 'click' && !isInteractiveType(node.type, project.plugins))
     return { severity: 'error', code: 'NOT_INTERACTIVE', message: `Step ${step.id} clicks ${node.type} "${nodeLabel(node)}", which is not interactive`, source: 'replay', ref };
   if (a.type !== 'click' && !VALUE_TYPES.has(node.type))
     return { severity: 'error', code: 'NOT_A_FIELD', message: `Step ${step.id} ${a.type} action target ${node.type} cannot accept input`, source: 'replay', ref };
@@ -485,7 +485,7 @@ export function explainClick(project: Project, state: PlayState, nodeId: string,
   const current = sc.steps[state.position];
   const targetOf = (s: Step) => ('target' in s.action ? s.action.target : null);
   if (current && !state.completed && targetOf(current) === nodeId && checkStep(project, sc, state, current) === null) return { kind: 'advance' };
-  if (!INTERACTIVE_TYPES.has(node.type)) return { kind: 'static' };
+  if (!isInteractiveType(node.type, project.plugins)) return { kind: 'static' };
   if (node.unmodeled) return { kind: 'unmodeled', label };
   if (sc.steps.some((s) => targetOf(s) === nodeId)) return { kind: 'out_of_order', label, expectedCaption: current && !state.completed ? current.caption : null };
   return { kind: 'not_covered', label };

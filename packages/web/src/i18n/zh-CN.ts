@@ -224,6 +224,8 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       thisDiagramHasNoNodesYet: "架构图还没有节点",
       placeholder: "占位",
       customComponent: "自定义组件：",
+      pluginLoading: "正在载入插件 ",
+      pluginUnavailable: "插件无法使用：",
       unnamed: "未命名",
       placeholderSuffix: "（占位）",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "目录中没有的组件，按声明的元素 ID 与状态演示",

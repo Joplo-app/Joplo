@@ -23,7 +23,7 @@ import { stepIdentity, type StepIdentity, hasScope, JoploError, orderedFeatures,
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
-import type { DistWeb, SourceWeb } from './web-assets.ts';
+import type { DistWeb, SourceWeb, WebAssets } from './web-assets.ts';
 import { subsetSiteFonts } from './site-fonts.ts';
 import { joploHome } from './home.ts';
 import { ProfileStore, bundleVoice, reuseSharedVoice } from './voice.ts';
@@ -165,7 +165,11 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     const { html, inlined } = finalizeHtml(fs.readFileSync(siteHtml, 'utf8'), (rel) => fs.readFileSync(path.join(staging, rel), 'utf8'), inline, stepIdentity(project));
     fs.rmSync(siteHtml);
     for (const rel of inlined) fs.rmSync(path.join(staging, rel));
-    fs.writeFileSync(path.join(staging, 'index.html'), html.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));
+    // 插件运行时（D86）：每个打成一个文件，内联在入口脚本之前（file:// 也能打开）；只打包 IR 里用到的插件
+    const used = Object.fromEntries(Object.entries(compiled.pluginRuntimes).filter(([id]) => project.plugins?.[id]));
+    const pluginCode = await bundlePluginRuntimes(used, projectDir, web);
+    const withPlugins = injectPluginScripts(html, pluginCode);
+    fs.writeFileSync(path.join(staging, 'index.html'), withPlugins.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));
 
     // D59: scan every staged text artifact, then retain only font subsets its content needs.
     subsetSiteFonts(staging, web);
@@ -248,6 +252,45 @@ export async function stageDistSite(web: DistWeb, projectDir: string, staging: s
   } finally {
     fs.rmSync(cssOut, { recursive: true, force: true });
   }
+}
+
+/**
+ * 把每个插件运行时打成一个自包含的 ES 模块（依赖一起打进去），执行时注册到 globalThis.__JOPLO_PLUGINS__
+ * （web 的 renderer/plugins.ts 取走）。按插件 id 排序，产物稳定。
+ */
+export async function bundlePluginRuntimes(runtimes: Record<string, string>, projectDir: string, web: WebAssets): Promise<string[]> {
+  const out: string[] = [];
+  for (const [id, file] of Object.entries(runtimes).sort(([a], [b]) => a.localeCompare(b))) {
+    const entry = '\0joplo-plugin-entry';
+    const r = (await viteBuild({
+      configFile: false,
+      envDir: false,
+      root: path.dirname(file),
+      mode: 'production',
+      logLevel: 'error',
+      resolve: { alias: kitAliases(web, projectDir) },
+      define: { 'process.env.NODE_ENV': '"production"' },
+      plugins: [{
+        name: 'joplo:plugin-entry',
+        resolveId: (src) => (src === 'joplo-plugin-entry' ? entry : null),
+        load: (resolved) => (resolved === entry ? `import runtime from ${JSON.stringify(file)};\n(globalThis.__JOPLO_PLUGINS__ ??= []).push(runtime);\n` : null),
+      }],
+      build: { write: false, minify: true, sourcemap: false, modulePreload: false, reportCompressedSize: false, emptyOutDir: false, rolldownOptions: { input: 'joplo-plugin-entry', output: { format: 'es', codeSplitting: false } } },
+    })) as Rollup.RollupOutput | Rollup.RollupOutput[];
+    const chunks = (Array.isArray(r) ? r : [r]).flatMap((o) => o.output).filter((x): x is Rollup.OutputChunk => x.type === 'chunk');
+    if (chunks.length !== 1) throw new JoploError('EXPORT_FAILED', `Plugin ${id}: expected one bundled runtime file, got ${chunks.length}`);
+    out.push(chunks[0]!.code);
+  }
+  return out;
+}
+
+/** 插件脚本放在第一个模块脚本（入口）之前：模块脚本按文档顺序执行，注册表载入时插件已经就位。 */
+export function injectPluginScripts(html: string, codes: string[]): string {
+  if (!codes.length) return html;
+  const tags = codes.map((c) => `<script type="module" data-joplo-plugin>${c.replace(/<\/script/gi, '<\\/script')}</script>`).join('\n');
+  const i = html.indexOf('<script type="module">');
+  if (i < 0) throw new JoploError('EXPORT_FAILED', 'Published site has no entry script to put plugin runtimes before');
+  return `${html.slice(0, i)}${tags}\n${html.slice(i)}`;
 }
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

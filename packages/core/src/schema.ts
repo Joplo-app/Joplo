@@ -5,7 +5,7 @@
  * 带 `source` 的对象记录其来源 `相对路径:行:列`，用于选中元素、诊断定位，让 Agent 只读写那一处。
  */
 import { z } from 'zod';
-import { COMPONENT_TYPES } from './catalog.ts';
+import { COMPONENT_TYPES, PLUGIN_TYPE, type PluginComponentType } from './catalog.ts';
 import type { DiagramLayout as DiagramLayoutT } from './diagram/model.ts';
 
 /** 层级标签的预设图标（标签压窄时靠它认出是哪一层）。不写时：手机视口 mobile，其余 window。 */
@@ -90,7 +90,8 @@ export const DiagramLayoutSchema: z.ZodType<DiagramLayoutT> = z.union([
 export type SceneNode = {
   /** 可操作元素必须由作者给出；其余由编译器按位置生成（以 `_` 开头）。 */
   id: string;
-  type: (typeof COMPONENT_TYPES)[number];
+  /** 目录组件，或插件组件 `<插件 id>:<组件名>`（D86）。 */
+  type: (typeof COMPONENT_TYPES)[number] | PluginComponentType;
   /** Mantine 属性原样保留（可含响应式对象 { base, md }）；值可以是字面量或 `$ui.x` / `$data.x` / `$inputs.x` 整值绑定。 */
   props?: Record<string, unknown>;
   children?: SceneNode[];
@@ -111,7 +112,7 @@ export type SceneNode = {
 export const SceneNode: z.ZodType<SceneNode> = z.lazy(() =>
   z.strictObject({
     id: z.string().min(1),
-    type: z.enum(COMPONENT_TYPES),
+    type: z.union([z.enum(COMPONENT_TYPES), z.string().regex(PLUGIN_TYPE) as unknown as z.ZodType<PluginComponentType>]),
     props: z.record(z.string(), Json).optional(),
     children: z.array(SceneNode).optional(),
     when: Condition.optional(),
@@ -393,6 +394,13 @@ export const Project = z.strictObject({
   voiceIndex: VoiceIndex.optional(),
   /** 作者内容多语言（D84）：只有 config 写了 locales 才有。messages 只含非默认语言、这份 IR 用得到的译文；stale 只在 dev IR。 */
   i18n: ContentI18nSchema.optional(),
+  /** 启用的插件（D86）：插件 id → 名称、版本与组件声明（可操作、父组件）。运行时代码不在 IR 里，由看板 / 发布站另外载入。 */
+  plugins: z.record(z.string(), z.strictObject({
+    id: z.string().min(1),
+    title: z.string(),
+    version: z.string().optional(),
+    components: z.record(z.string(), z.strictObject({ interactive: z.boolean().optional(), parent: z.string().optional() })),
+  })).optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),
   /** dev = 含全部方案（本地看板）；publish = 只含选定方案，且去掉创作侧信息（D33）；review = 评审版：全部方案，同样去掉创作侧信息（D63）。 */

@@ -82,7 +82,7 @@ describe('kitAliases', () => {
 
   it('发布形态：项目没装 @joplo-app/kit 时退回 CLI 自带的 kit，且不出现 @/ 源码别名', () => {
     const a = kitAliases(dist(), temp());
-    expect(a.map((x) => String(x.find))).toEqual([String(/^@joplo-app\/kit$/), String(/^@joplo-app\/kit\/(ui|node|jsx-runtime|jsx-dev-runtime)$/)]);
+    expect(a.map((x) => String(x.find))).toEqual([String(/^@joplo-app\/kit$/), String(/^@joplo-app\/kit\/(ui|node|plugin|jsx-runtime|jsx-dev-runtime)$/)]);
     for (const x of a) expect(path.isAbsolute(String(x.replacement).replace('$1', 'ui'))).toBe(true);
   });
 });

@@ -3,7 +3,8 @@ import { Command, CommanderError, Option } from 'commander';
 import { formatBytes, terminalText } from './cloud-error.ts';
 import type { CloudDependencies } from './cloud.ts';
 import { resolve } from 'node:path';
-import { COMPONENT_DOCS, componentDetails, guide, JoploError, skillIndex, skillTopic } from '@joplo-app/core';
+import { COMPONENT_DOCS, componentDetails, findPluginTopic, guide, JoploError, pluginSkillIndex, pluginSkillTopic, skillIndex, skillTopic } from '@joplo-app/core';
+import { projectPlugins } from './plugins.ts';
 import type * as Server from '@joplo-app/server';
 import { check } from './check.ts';
 import { initProject, initSummary } from './init.ts';
@@ -315,7 +316,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--no-skill', 'Do not install the agent skills (.claude/skills/joplo*, AGENTS.md block)')
     .action(async (dir, opts) => { for (const l of initSummary(await initProject(dir, opts.name, { keep: opts.keep, skill: opts.skill }))) line(l); });
   program.command('skill').description('Read agent usage on demand or install a usage pointer')
-    .argument('[topic]', 'authoring/demo/components/cases/check/selection/publish, or install')
+    .argument('[topic]', 'authoring/demo/components/cases/check/selection/publish/plugins, a plugin id, or install')
     .argument('[dir]', 'Target project directory for install')
     .option('--force', 'Overwrite a modified SKILL.md')
     .option('--diff', 'Show a unified diff without writing files')
@@ -326,7 +327,13 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         stdout(installed.output); exitCode = installed.code;
       } else {
         if (dir !== undefined || opts.force || opts.diff || opts.agentsMd) throw new JoploError('USAGE', 'dir, --force, --diff, and --agents-md apply only to joplo skill install');
-        stdout(topic === undefined ? skillIndex(await readCliVersion(), COMPONENT_DOCS) : skillTopic(topic, COMPONENT_DOCS));
+        // 插件（D86）：当前目录是 Joplo 项目时，列出 config({ plugins }) 并输出插件自己的技能
+        const { plugins, error } = await projectPlugins('.');
+        const note = error ? `Could not read plugins from joplo.config.ts: ${error}\n` : '';
+        const plugin = topic === undefined ? null : findPluginTopic(topic, plugins);
+        if (plugin) stdout(pluginSkillTopic(plugin));
+        else if (topic === undefined) stdout(`${skillIndex(await readCliVersion(), COMPONENT_DOCS)}${pluginSkillIndex(plugins)}${note}`);
+        else stdout(skillTopic(topic, COMPONENT_DOCS));
       }
     });
   program.command('guide').description('Compatibility alias for joplo skill authoring').action(() => { stdout(guide()); });

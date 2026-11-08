@@ -21,6 +21,7 @@ const related: Record<SkillTopic, readonly SkillTopic[]> = {
   review: ['selection', 'check', 'publish'],
   publish: ['diff', 'demo', 'authoring', 'check', 'review'],
   diff: ['publish', 'authoring', 'demo', 'check'],
+  plugins: ['components', 'demo', 'focus', 'check', 'publish'],
 };
 
 /** CLI 传入其 package.json 版本；行数来自同一次生成的主题正文。 */
@@ -51,6 +52,41 @@ export function skillTopic(topic: string, docs?: Readonly<Record<string, string>
   const name = topic as SkillTopic;
   const body = name === 'components' ? componentTopic(docs ?? undefined) : CONTENT[name];
   return `${body.trimEnd()}\n\nRelated topics: ${related[name].join(', ')}\n`;
+}
+
+/** 插件（D86）在 skill 里的样子：只用清单里的数据（名称、组件声明、技能正文）。 */
+export type PluginSkillSource = { id: string; title: string; version?: string; description?: string; components: Record<string, { doc: string; interactive?: boolean; parent?: string }>; skill?: string };
+
+/** `npx joplo skill` 总览末尾：本项目启用的插件。主题名被内置主题占用时用 plugin:<id>。 */
+export function pluginSkillIndex(plugins: readonly PluginSkillSource[]): string {
+  if (!plugins.length) return '';
+  return ['Plugins enabled in this project (config({ plugins })):', ...plugins.map((p) => `  ${pluginTopicName(p.id).padEnd(11)} ${p.title}${p.version ? ` ${p.version}` : ''}${p.description ? ` — ${p.description}` : ''}`), 'Usage: npx joplo skill <plugin id>', ''].join('\n');
+}
+const pluginTopicName = (id: string) => (SKILL_TOPICS.some((t) => t.name === id) ? `plugin:${id}` : id);
+
+/** 主题名对应的插件（<id> 或 plugin:<id>）；不是插件时为 null。 */
+export function findPluginTopic(topic: string, plugins: readonly PluginSkillSource[]): PluginSkillSource | null {
+  const id = topic.startsWith('plugin:') ? topic.slice('plugin:'.length) : SKILL_TOPICS.some((t) => t.name === topic) ? null : topic;
+  return (id && plugins.find((p) => p.id === id)) || null;
+}
+
+/** `npx joplo skill <插件 id>`：插件自己的用法 + 组件清单（类型名、可操作、父组件）。 */
+export function pluginSkillTopic(p: PluginSkillSource): string {
+  const comps = Object.entries(p.components).map(([name, c]) => {
+    const traits = [c.interactive ? 'interactive: requires id and a step, disabled + disabledReason, or unmodeled' : '', c.parent ? `only directly inside ${p.id}:${c.parent}` : ''].filter(Boolean);
+    return `- ${p.id}:${name} — ${c.doc}${traits.length ? ` (${traits.join('; ')})` : ''}`;
+  });
+  return [
+    `# Joplo plugin ${p.id}: ${p.title}${p.version ? ` ${p.version}` : ''}`,
+    ...(p.description ? ['', p.description] : []),
+    '',
+    'Components (import the JSX markers from the package; element types below):',
+    ...comps,
+    ...(p.skill?.trim() ? ['', p.skill.trim()] : []),
+    '',
+    'General plugin rules: npx joplo skill plugins',
+    '',
+  ].join('\n');
 }
 
 /** 兼容旧入口：与 joplo skill authoring 输出完全相同。 */
@@ -208,6 +244,37 @@ flow('What does it read?', { from: 'hook' })
 - Evidence, not belief: 'it plays' needs check 0 errors plus a run in the board; 'it looks right' needs the rendered frames; 'it is clear' needs captions-only and frames-only passes that both tell the story.
 - Tell the user what you could not verify (a real voice on a phone, other window sizes).`,
 
+  plugins: `# Joplo plugins: plugins
+
+Plugins are npm packages maintained outside Joplo. They add components (for example an interactive 3D scene) that the Joplo engine schedules like catalog components: flow steps click their elements, state bindings drive them, and the camera, cues, marks, captions, narration, screenshots, video export, build, and share all work unchanged.
+
+## Use a plugin
+1. Install it next to @joplo-app/kit: npm install joplo-plugin-scene3d (or pnpm add / yarn add).
+2. Enable it in joplo.config.ts:
+\`\`\`ts
+import { config } from '@joplo-app/kit';
+import scene3d from 'joplo-plugin-scene3d';
+
+export default config({ name: 'Smart home', plugins: [scene3d] });
+\`\`\`
+3. Run npx joplo skill: the index lists the enabled plugins. Then read npx joplo skill <plugin id>: the plugin's own usage, components, and props. Treat it as the source of truth for that plugin; it matches the installed version.
+4. Import its components in the files that use them: import { Scene3D } from 'joplo-plugin-scene3d'. Their element types are <plugin id>:<Name> (scene3d:Target); check messages and the inspector show these names.
+5. Write steps as usual. .click('<id>') targets a plugin element the plugin declares interactive; props bound to state ($.ui.x, $.data.x) change what the plugin shows, so set() in a step changes the scene. shot(), spotlight(), mark(), callout() accept plugin element ids too.
+
+## Rules
+- Interactive plugin elements need an id plus a step, disabled with disabledReason, or unmodeled, exactly like Button (UNBOUND_INTERACTIVE).
+- UNKNOWN_PLUGIN: the component's plugin is not in config({ plugins }). PLUGIN_PARENT: that element must be written directly inside the parent the message names. PLUGIN_RUNTIME_MISSING: the package's runtime file is gone; reinstall the package.
+- Behavior still lives in flow steps. Plugins only render and report clicks; they never change state themselves. Function props are still rejected.
+- Viewers may play with a plugin's own view (for example drag to orbit a 3D scene). That never changes business state or advances the demo; only clicking the highlighted element does.
+- npx joplo build and share bundle each enabled plugin's runtime into the site (it works offline and from file://). The site grows with the plugin's dependencies, so remove plugins you no longer use.
+- A plugin runs code in the board and in the published site, like any npm dependency. Install only packages the user trusts, and tell the user which plugin you are adding.
+- When the board shows "Plugin unavailable", read the reason under it (wrong plugin API version, runtime failed to load) before changing the TSX.
+
+## Write a plugin
+A plugin package has two entry points; ship compiled JavaScript, list @joplo-app/kit as a peerDependency, and bundle-friendly dependencies (for example three) as dependencies.
+- Entry (loaded in Node while compiling; return data only): export default definePlugin({ id, title, version, description, components, skill, runtime: new URL('./runtime.js', import.meta.url) }) from @joplo-app/kit/plugin. components maps PascalCase names to { doc, interactive?, parent? }: doc is one line for the skill listing, interactive makes the element clickable by steps, parent restricts where it may be written. skill is the Markdown usage agents read: when to use it, a minimal example, how steps and state drive it, and its pitfalls. Also export JSX markers: export const Scene3D = Object.assign(pluginComponent(plugin, 'Scene'), { Target: pluginComponent(plugin, 'Target') }).
+- Runtime (browser): export default defineRuntime({ id, components: { Scene: { mount(el, ctx) { …; return { update(ctx) {…}, destroy() {…} } } } } }). Only components with mount are mounted; children arrive as data in ctx.node.children with props already resolved from state.
+- Contract: put one anchor element per targetable child inside el, with every attribute from child.attrs, positioned where the child appears on screen; the engine finds cursor targets, camera framing, cues, marks, and ⌥-click inspection through these anchors. Forward clicks on your own canvas to ctx.click(child.id, { clientX, clientY, altKey }) instead of acting on them. Render the same picture for the same ctx; when ctx.frame.animate is false jump to the final state without transitions; wrap loading and the first frame in const done = ctx.hold() … done() so screenshots wait. Read colors from the theme with ctx.css('--jp-ink') and re-read them when ctx.frame.theme changes. Stop pointer events you handle (orbit) from reaching the stage; leave wheel events alone so stage zoom keeps working.`,
   story: `# Joplo storytelling and planning: story
 
 A demo is a short story a viewer follows without you: who wants what, what gets in the way, what the product does, and the visible result.
@@ -800,6 +867,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 
 ## Common codes → fixes
 - UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
+- UNKNOWN_PLUGIN / PLUGIN_PARENT / PLUGIN_INVALID / PLUGIN_DUPLICATE / PLUGIN_RUNTIME_MISSING: plugin components need their package in config({ plugins: [...] }) once, written inside the parent named in the message; a missing runtime means reinstall the package (npx joplo skill plugins).
 - MISSING_ID / DUPLICATE_ID: Give interactive elements stable ids unique within the stage; update step references.
 - FUNCTION_PROP: Replace onClick and other callbacks with flow steps and state effects.
 - UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE: Check case, rule, and reference keys and their owning option.

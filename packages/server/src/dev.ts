@@ -31,6 +31,16 @@ import { SelectionBody, readSelection, resolveSelection, writeSelection } from '
 import { IGNORED_DIRS, cssSourcePlugin, isProjectSource, joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
 import type { DistWeb, WebAssets } from './web-assets.ts';
 
+/** 文件绝对路径 → Vite 的 /@fs/ 地址。 */
+const fsUrl = (abs: string) => `/@fs${abs.split(path.sep).join('/').replace(/^(?!\/)/, '/')}`;
+/** 离文件最近的 package.json 所在目录（插件包根目录）；没有时用文件所在目录。 */
+function packageRootOf(file: string): string {
+  for (let d = path.dirname(file); ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, 'package.json'))) return d;
+    if (path.dirname(d) === d) return path.dirname(file);
+  }
+}
+
 /** 推给看板的编译结果。`project` 始终是最近一次成功的 IR；`ok=false` 时看板显示错误列表、保留画面。 */
 export type DevPayload = {
   version: number;
@@ -38,6 +48,8 @@ export type DevPayload = {
   project: Project | null;
   diagnostics: Diagnostic[];
   home: string | null;
+  /** 插件（D86）：插件 id → 运行时地址（本服务以 /@fs/<绝对路径> 提供，Vite 负责转译与依赖解析）。 */
+  plugins?: Record<string, string>;
 };
 
 /** 首页项目列表的一行。status：idle 未编译、compiling 首次编译中、ok、error（编译出错）、missing（目录不存在）。 */
@@ -286,12 +298,24 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     });
   }
 
+  /**
+   * 插件运行时由看板的 Vite 服务以 /@fs/ 提供（D86）。dist 形态的 fs.allow 只有 @joplo-app/web：
+   * 把项目目录（npm 安装的插件与它的依赖在 node_modules 里）和插件包目录加进去。source 形态默认允许整个工作区。
+   */
+  function allowPluginFiles(projectDir: string, runtimes: string[]) {
+    if (web.mode !== 'dist' || !server) return;
+    const allow = server.config.server.fs.allow as string[];
+    for (const dir of [projectDir, ...runtimes.map(packageRootOf)]) if (!allow.some((a) => dir === a || dir.startsWith(a + path.sep))) allow.push(dir);
+  }
+
   async function recompile(slot: ProjectSlot) {
     const loader = slot.loader!;
     invalidateProjectModules(loader, slot.dir);
     const out = await compileProject(loader, slot.dir, 'dev');
     const prev = slot.payload;
-    slot.payload = { version: prev.version + 1, ok: out.project !== null, project: out.project ?? prev.project, diagnostics: out.diagnostics, home: out.home ?? prev.home };
+    const plugins = Object.keys(out.pluginRuntimes).length ? out.pluginRuntimes : null;
+    if (plugins) allowPluginFiles(slot.dir, Object.values(plugins));
+    slot.payload = { version: prev.version + 1, ok: out.project !== null, project: out.project ?? prev.project, diagnostics: out.diagnostics, home: out.home ?? prev.home, ...(plugins ? { plugins: Object.fromEntries(Object.entries(plugins).map(([id, f]) => [id, fsUrl(f)])) } : prev.plugins ? { plugins: prev.plugins } : {}) };
     const errors = out.diagnostics.filter((d) => d.severity === 'error');
     if (errors.length) log(`[joplo] ${path.basename(slot.dir)} compilation failed (${errors.length}): ${errors.map((d) => `${d.at ?? ''} ${d.message}`).join('; ').slice(0, 400)}`);
     if (out.project && out.project.name) registry.rename(slot.dir, out.project.name);

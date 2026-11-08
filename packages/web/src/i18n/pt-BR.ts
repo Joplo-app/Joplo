@@ -206,6 +206,8 @@ export function createPtBR(locale: Locale = 'pt-BR') {
       thisDiagramHasNoNodesYet: "Este diagrama ainda não tem nós",
       placeholder: "Espaço reservado",
       customComponent: "Componente personalizado: ",
+      pluginLoading: "Carregando plugin ",
+      pluginUnavailable: "Plugin indisponível: ",
       unnamed: "Sem nome",
       placeholderSuffix: "(Espaço reservado)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "Componente fora do catálogo. A demo segue seus IDs de elementos e estados declarados.",

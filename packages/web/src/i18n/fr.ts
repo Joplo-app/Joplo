@@ -206,6 +206,8 @@ export function createFr(locale: Locale = 'fr') {
       thisDiagramHasNoNodesYet: "Ce diagramme n’a pas encore de nœuds",
       placeholder: "Espace réservé",
       customComponent: "Composant personnalisé : ",
+      pluginLoading: "Chargement du plugin ",
+      pluginUnavailable: "Plugin indisponible : ",
       unnamed: "Sans nom",
       placeholderSuffix: "(Espace réservé)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "Composant hors catalogue. La démo suit ses identifiants d’éléments et états déclarés.",

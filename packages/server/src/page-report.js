@@ -45,6 +45,9 @@
     }
     const hit = document.elementFromPoint(cx, cy);
     if (hit && (hit === el || el.contains(hit))) return;
+    // 插件组件（D86）的锚点在插件自己的画布上方、不接收指针：被同一个插件根里的画布“盖住”是预期的，命中由插件自己判断
+    const pluginRoot = el.closest('[data-jplugin]');
+    if (pluginRoot && hit && pluginRoot.contains(hit)) return;
     // 弹窗打开时，背景被遮罩或弹窗面板覆盖是预期的层次，不算遮挡（窄屏下面板常盖住背景按钮）
     if ((hit?.closest('[data-jbackdrop]') || (dialogOpen && hit?.closest('[role="dialog"]'))) && !el.closest('[role="dialog"]')) return;
     warnings.push(`Occluded: "${e.label}"(${e.id}) has its center covered by ${hit ? name(hit) : 'content outside the frame'}`);

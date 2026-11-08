@@ -17,8 +17,11 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { animate as animateValue } from 'motion';
 import {
-  INTERACTIVE_TYPES,
   appShellLayout,
+  disabledReasonOf,
+  isInteractiveType,
+  splitPluginType,
+  type PluginTable,
   VIEWPORT_SIZE,
   PHONE_LANDSCAPE,
   atWidth,
@@ -49,6 +52,8 @@ import { fontStyle } from './appearance';
 import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, edgeEmphasized, effectiveState, edgePath, graphView, machineStates, sequenceView, startEdgeId, type GraphLayout, type SequenceLayout } from './diagram-layout';
 import { ACCENT, BG, DANGER, onFill, DIMMED, FONT, INFO, INK, INK2, LINE, LINE_STRONG, MONO, OK, SOFT, SPACING, SUBTLE, SURFACE, TITLE_SIZE, WARN, color, dim, flexVal, fontSize, light, radius, space, spaceNum, styleOf, tint } from './style';
 import { rectOf } from './rect';
+import { usePluginStatus } from './plugins';
+import type { ComponentCtx, ComponentInstance, PluginNode } from '@joplo-app/kit/plugin';
 
 export type RenderMode = 'review' | 'demo' | 'render';
 
@@ -73,6 +78,10 @@ export type RenderCtx = {
   streaming?: StreamingCtx | null;
   /** 相邻步骤的业务状态差异（只由 DataCard / StateFlow 消费）。 */
   changed?: readonly StateChange[];
+  /** 启用的插件（D86，IR 的 plugins）：插件组件的可操作声明。 */
+  plugins?: PluginTable;
+  /** 下一步要操作的元素（插件可以提示观众）。 */
+  nextTargetId?: string | null;
 };
 
 /** key 变化时重新开始逐字输出；paused 时停住；speed 与自动播放的速度一致。 */
@@ -104,8 +113,12 @@ type NodeProps = { node: SceneNode; p: Record<string, unknown>; disabled: boolea
 
 /** 每个组件根 DOM 共用的属性。 */
 function useRootAttrs(node: SceneNode, disabled = false) {
-  const ctx = useCtx();
-  const interactive = INTERACTIVE_TYPES.has(node.type);
+  return rootAttrsOf(node, useCtx(), disabled);
+}
+
+/** 根 DOM 属性（纯函数）：插件组件的锚点也用它，引擎的光标、镜头、提示、检查都按这些属性定位。 */
+function rootAttrsOf(node: SceneNode, ctx: Pick<RenderCtx, 'state' | 'selectedId' | 'plugins'>, disabled: boolean) {
+  const interactive = isInteractiveType(node.type, ctx.plugins);
   return {
     'data-jid': node.id,
     'data-jtype': node.type,
@@ -2289,7 +2302,7 @@ const DIAGRAM_PART = /^(Diagram|StateMachine|Sequence)\./;
 /** 渲染一个图表元素：可见性已由父级判断（消失时 AnimatePresence 还要把它渲染到淡出结束）。 */
 function DiagramPart({ node }: { node: SceneNode }) {
   const { state } = useCtx();
-  const Impl = IMPL[node.type];
+  const Impl = IMPL[node.type as ComponentType];
   if (!Impl) return null;
   return <Impl node={node} p={resolveProps(node, state)} disabled={false}>{null}</Impl>;
 }
@@ -2901,6 +2914,105 @@ function Placeholder({ node, p }: NodeProps) {
   );
 }
 
+/**
+ * 插件组件（D86）：由插件运行时挂载到根 DOM 上，引擎每次渲染调用 update。子元素不由 React 渲染，
+ * 作为数据（PluginNode，属性已按状态取值、带锚点属性）交给插件。插件没载入、载入失败、或这个组件不能单独挂载时画成占位框。
+ */
+function PluginHost({ node, p }: NodeProps) {
+  const { t: i18n } = useI18n();
+  const ctx = useCtx();
+  const { theme, registry } = useContext(ThemeContext);
+  const split = splitPluginType(node.type)!;
+  const status = usePluginStatus(split.plugin);
+  const comp = status.state === 'ready' ? status.runtime.components[split.name] : undefined;
+  const elRef = useRef<HTMLDivElement | null>(null);
+  const inst = useRef<ComponentInstance | null>(null);
+  const [crash, setCrash] = useState<string | null>(null);
+  const root = useRoot(node, p, { className: 'relative w-full' });
+
+  // 截图与导出等插件载入（失败也会结束等待）
+  useLayoutEffect(() => {
+    if (status.state !== 'loading' || !registry) return;
+    const token = {};
+    registry.add(token);
+    return () => registry.done(token);
+  }, [status.state, registry]);
+
+  const toNode = (n: SceneNode): PluginNode => ({
+    id: n.id,
+    type: n.type,
+    name: splitPluginType(n.type)?.name ?? n.type,
+    props: resolveProps(n, ctx.state),
+    label: nodeLabel(n),
+    visible: isSelfVisible(n, ctx.state, ctx.width),
+    disabled: isNodeDisabled(n, ctx.state),
+    disabledReason: disabledReasonOf(n, ctx.state),
+    interactive: isInteractiveType(n.type, ctx.plugins),
+    attrs: Object.fromEntries(Object.entries(rootAttrsOf(n, ctx, isNodeDisabled(n, ctx.state))).map(([k, v]) => [k, v === true ? 'true' : String(v)])),
+    children: (n.children ?? []).filter((c) => c.type !== '#text').map(toNode),
+  });
+  const pctx: ComponentCtx = {
+    node: toNode(node),
+    frame: { mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
+    css: (name) => (elRef.current ? getComputedStyle(elRef.current).getPropertyValue(name).trim() : ''),
+    click: (id, at) => {
+      const el = elRef.current;
+      const target = el?.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`) ?? el;
+      target?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: at?.clientX ?? 0, clientY: at?.clientY ?? 0, altKey: at?.altKey ?? false }));
+    },
+    hold: () => {
+      const token = {};
+      registry?.add(token);
+      let done = false;
+      return () => {
+        if (done) return;
+        done = true;
+        registry?.done(token);
+      };
+    },
+  };
+  const latest = useRef(pctx);
+  latest.current = pctx;
+
+  useLayoutEffect(() => {
+    const el = elRef.current;
+    if (!comp || !el) return;
+    try {
+      inst.current = comp.mount(el, latest.current);
+      setCrash(null);
+    } catch (e) {
+      setCrash(e instanceof Error ? e.message : String(e));
+    }
+    return () => {
+      try {
+        inst.current?.destroy();
+      } finally {
+        inst.current = null;
+        el.replaceChildren();
+      }
+    };
+  }, [comp]);
+  useLayoutEffect(() => {
+    try {
+      inst.current?.update(latest.current);
+    } catch (e) {
+      setCrash(e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  const problem = crash ?? (status.state === 'error' ? status.message : status.state === 'ready' && !comp ? `${split.name} cannot be shown on its own` : null);
+  if (comp && !problem) return <div {...root} ref={elRef} data-jplugin={split.plugin} />;
+  return (
+    <div {...root} data-jplugin={split.plugin} data-dashed="">
+      <div className="jbox flex min-h-24 w-full flex-col items-center justify-center gap-1 p-4 text-center">
+        <Rough seedKey={node.id} dashed stroke={INK2} />
+        <div className="font-semibold">{problem ? `${i18n.stage.pluginUnavailable}${split.plugin}` : `${i18n.stage.pluginLoading}${split.plugin}…`}</div>
+        {problem ? <div className="text-[12px] text-[var(--jp-muted)]">{problem}</div> : null}
+      </div>
+    </div>
+  );
+}
+
 function Custom({ node, p }: NodeProps) {
   const { t: i18n } = useI18n();
 
@@ -3380,7 +3492,7 @@ export function RenderNode({ node }: { node: SceneNode }) {
   if (!isSelfVisible(node, state, width)) return null;
   const p = resolveProps(node, state);
   const disabled = isNodeDisabled(node, state);
-  const Impl = IMPL[node.type];
+  const Impl = splitPluginType(node.type) ? PluginHost : IMPL[node.type as ComponentType];
   if (!Impl) return null;
   const children = (node.children ?? []).map((c) => <RenderNode key={c.id} node={c} />);
   return (

@@ -206,6 +206,8 @@ export function createEs(locale: Locale = 'es') {
       thisDiagramHasNoNodesYet: "Este diagrama aún no tiene nodos",
       placeholder: "Marcador de posición",
       customComponent: "Componente personalizado: ",
+      pluginLoading: "Cargando complemento ",
+      pluginUnavailable: "Complemento no disponible: ",
       unnamed: "Sin nombre",
       placeholderSuffix: "(Marcador de posición)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "Componente fuera del catálogo. La demo sigue sus ID de elementos y estados declarados.",

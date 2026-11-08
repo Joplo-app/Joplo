@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@joplo-app/core": "workspace:*",
+    "@joplo-app/kit": "workspace:*",
     "@joplo-app/server": "workspace:*",
     "commander": "^15.0.0",
     "tsx": "4.23.15",

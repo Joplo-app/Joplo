@@ -10,6 +10,7 @@
     "./jsx-runtime": "./src/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx-dev-runtime.ts",
     "./node": "./src/node.ts",
+    "./plugin": "./src/plugin.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -44,6 +45,10 @@
       "./node": {
         "types": "./dist/node.d.ts",
         "default": "./dist/node.js"
+      },
+      "./plugin": {
+        "types": "./dist/plugin.d.ts",
+        "default": "./dist/plugin.js"
       },
       "./package.json": "./package.json"
     }

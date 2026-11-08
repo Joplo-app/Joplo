@@ -8,8 +8,8 @@
  * - review 模式（评审版，D63）：画面与场景同 dev（所有功能的所有方案），创作侧信息按 publish 的规则去掉。
  */
 import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo-app/kit/node';
-import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@joplo-app/kit';
-import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, INTERACTIVE_TYPES, PAGE_LAYER, matchChoice, nodeLabel } from './catalog.ts';
+import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef, PluginDef } from '@joplo-app/kit';
+import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, PAGE_LAYER, isInteractiveType, matchChoice, nodeLabel, pluginSpec, splitPluginType, type PluginInfo } from './catalog.ts';
 import { HOLD_MAX_SECONDS, HOLD_MIN_SECONDS, inShotFrame } from './focus.ts';
 import { cameraAt, choicesOf, commonPrefix, stateAt } from './player.ts';
 import { CALLOUT_SIDES, LAYER_ICONS, Project, SCHEMA_VERSION, type Callout, type Cue, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
@@ -90,6 +90,11 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     scenarios: {},
     issues: {},
   };
+
+  // ---------- 0. 插件（D86）：只取清单里的组件声明，运行时代码不进 IR ----------
+  const plugins = pluginsOf(src, err);
+  if (Object.keys(plugins).length) out.plugins = plugins;
+  const nodeCtx: NodeCtx = { plugins, report, rel };
 
   // ---------- 1. 选出参与的方案 ----------
   // 排序只在编译时决定；显式列表不依赖对象键的枚举顺序，发布模式也保留这份演示内容。
@@ -223,7 +228,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const base = tree as JNode;
     const rootJ: JNode = { ...base, type: base.type === '#fragment' ? 'div' : base.type, children: [...base.children, ...overlays] };
     const ids = new Map<string, string | undefined>();
-    const root = toSceneNode(rootJ, 'root', ids, report, rel);
+    const root = toSceneNode(rootJ, 'root', ids, nodeCtx, null);
     return { id: sceneId, optionId: ctx?.qid ?? null, route: route.path, name: `${page.title}${ctx ? ` · ${ctx.def.name}` : ''}`, viewport: page.viewport ?? 'desktop', root };
   };
 
@@ -289,7 +294,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       }
       const rootJ: JNode = nodes.length === 1 ? nodes[0]! : { ...nodes[0]!, type: 'div', props: {}, children: nodes };
       const ids = new Map<string, string | undefined>();
-      const root = toSceneNode(rootJ, `layer_${lk}`, ids, report, rel);
+      const root = toSceneNode(rootJ, `layer_${lk}`, ids, nodeCtx, null);
       const sceneId = `${qid}~${lk}`;
       const scene: Scene = { id: sceneId, optionId: qid, route: layerRoute, name: `${ld.title} · ${def.name}`, viewport: ld.viewport ?? 'desktop', root, layer: lk };
       addScene(scene);
@@ -895,16 +900,56 @@ function tagFrom(n: JNode, from: string): JNode {
 type ErrFn = (code: string, message: string, at?: string, severity?: 'error' | 'warning' | 'info') => void;
 
 /** JNode → IR 节点：展开 Fragment、文本变 #text、分离 Joplo 属性、生成非交互元素的 ID、检查 ID 唯一。 */
-function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | undefined>, err: ErrFn, rel: (s?: string) => string | undefined): SceneNode {
+type NodeCtx = { plugins: Record<string, PluginInfo>; report: ErrFn; rel: (s?: string) => string | undefined };
+
+/** 插件清单 → IR 的插件表；同一 id 启用两次、不是 definePlugin 的返回值时报错。 */
+function pluginsOf(src: AuthoringProject, err: (code: string, message: string, at?: string) => void): Record<string, PluginInfo> {
+  const out: Record<string, PluginInfo> = {};
+  const list = src.config.plugins;
+  if (list === undefined) return out;
+  const at = src.config.source ?? `${src.config.file}:1:1`;
+  if (!Array.isArray(list)) {
+    err('PLUGIN_INVALID', 'config({ plugins }) must be a list of plugins, for example plugins: [scene3d] with import scene3d from \'joplo-plugin-scene3d\'', at);
+    return out;
+  }
+  for (const p of list as unknown[]) {
+    const d = p as Partial<PluginDef> | null;
+    if (!d || typeof d !== 'object' || d.kind !== 'plugin' || typeof d.id !== 'string' || !d.components || typeof d.components !== 'object') {
+      err('PLUGIN_INVALID', `config({ plugins }) contains ${d === null ? 'null' : typeof d === 'object' ? 'an object that is not a plugin' : typeof d}; use the default export of a Joplo plugin package (made with definePlugin)`, at);
+      continue;
+    }
+    if (out[d.id]) {
+      err('PLUGIN_DUPLICATE', `Plugin ${d.id} is enabled twice in config({ plugins })`, at);
+      continue;
+    }
+    out[d.id] = {
+      id: d.id,
+      title: typeof d.title === 'string' ? d.title : d.id,
+      ...(typeof d.version === 'string' ? { version: d.version } : {}),
+      components: Object.fromEntries(Object.entries(d.components).map(([name, c]) => [name, { ...(c?.interactive ? { interactive: true } : {}), ...(typeof c?.parent === 'string' ? { parent: c.parent } : {}) }])),
+    };
+  }
+  return out;
+}
+
+function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | undefined>, nc: NodeCtx, parentType: string | null): SceneNode {
+  const { report: err, rel } = nc;
   if (n.type === 'Menu') n = menuWithOpened(n);
   const children: SceneNode[] = flatten(n.children).map((c, i) =>
-    isNode(c) ? toSceneNode(c, `${fallbackId}_${i}`, ids, err, rel) : textNode(c, `${fallbackId}_${i}`),
+    isNode(c) ? toSceneNode(c, `${fallbackId}_${i}`, ids, nc, n.type) : textNode(c, `${fallbackId}_${i}`),
   );
 
   const { id: rawId, when, disabled, disabledReason, unmodeled, note, redact, __from, ...rest } = n.props as Record<string, unknown>;
   const at = n.source;
-  if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `Component <${n.type}> is not in the catalog (use Mantine component names; run joplo skill components to list them; use <Custom kind="…"> as a placeholder for missing components)`, at);
-  const interactive = INTERACTIVE_TYPES.has(n.type);
+  const plug = splitPluginType(n.type);
+  if (plug) {
+    const spec = pluginSpec(nc.plugins, n.type);
+    if (!nc.plugins[plug.plugin]) err('UNKNOWN_PLUGIN', `<${n.type}> comes from plugin ${plug.plugin}, which is not enabled: add it to config({ plugins: [...] }) in joplo.config.ts (npx joplo skill plugins)`, at);
+    else if (!spec) err('UNKNOWN_COMPONENT', `Plugin ${plug.plugin} has no component ${plug.name} (available: ${Object.keys(nc.plugins[plug.plugin]!.components).join(', ')}; npx joplo skill ${plug.plugin})`, at);
+    else if (spec.parent && parentType !== `${plug.plugin}:${spec.parent}`)
+      err('PLUGIN_PARENT', `<${n.type}> must be written directly inside <${plug.plugin}:${spec.parent}> (npx joplo skill ${plug.plugin})`, at);
+  } else if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `Component <${n.type}> is not in the catalog (use Mantine component names; run joplo skill components to list them; use <Custom kind="…"> as a placeholder for missing components)`, at);
+  const interactive = isInteractiveType(n.type, nc.plugins);
   if (interactive && typeof rawId !== 'string') err('MISSING_ID', `Interactive component <${n.type}> "${labelOf(n)}" requires an id for steps and selection`, at);
   const needsId = n.type === 'Diagram.Node' ? 'Diagram node <Diagram.Node>' : n.type === 'StateMachine.State' ? 'State <StateMachine.State>' : n.type === 'Sequence.Actor' ? 'Participant <Sequence.Actor>' : null;
   if (needsId && typeof rawId !== 'string') err('MISSING_ID', `${needsId} "${labelOf(n)}" requires an id for edge from / to and trace`, at);

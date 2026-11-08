@@ -92,6 +92,7 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - Label illustrative numbers on screen and keep them apart from sourced facts; bars start at zero and lengths stay proportional. See npx joplo skill content.
 - HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it. See npx joplo skill check.
 - Judge a scenario from its storyboard, not from check alone: npx joplo render --scenario-id <id> --sheet --out board.png shows every step with its caption and narration in one image. See npx joplo skill content.
+- Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components. See npx joplo skill plugins.
 
 ## Reference
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.
@@ -108,5 +109,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
+- plugins: Install and enable plugin packages (3D scenes and other components), read their skills, write steps for them; writing a plugin
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.18 sha256:4fd1f0df35ecdcfb9352c08726a1b95511175eef69dd0f96ffd75a199a8ada94 -->
+<!-- joplo-skill 0.2.18 sha256:a405e31e070fa67bafa4c5be7c20e3c71943735486f617af2ad9fa57c3ef5d5f -->

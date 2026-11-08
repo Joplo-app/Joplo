@@ -206,6 +206,8 @@ export function createRu(locale: Locale = 'ru') {
       thisDiagramHasNoNodesYet: "В этой диаграмме ещё нет узлов",
       placeholder: "Заполнитель",
       customComponent: "Свой компонент: ",
+      pluginLoading: "Загрузка плагина ",
+      pluginUnavailable: "Плагин недоступен: ",
       unnamed: "Без имени",
       placeholderSuffix: "(Заполнитель)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "Компонент вне каталога. Демо следует объявленным ID элементов и состояниям.",

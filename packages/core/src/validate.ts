@@ -1,6 +1,6 @@
 import { orderedFeatures } from './features.ts';
 import { Project, type SceneNode } from './schema.ts';
-import { CAPTION_MAX, CARD_POINTS_MAX, DESCRIPTION_MAX, EXPLAIN_MAX, SAY_MAX, INTERACTIVE_TYPES, SCENARIO_MS_MAX, captionLength } from './catalog.ts';
+import { CAPTION_MAX, CARD_POINTS_MAX, DESCRIPTION_MAX, EXPLAIN_MAX, SAY_MAX, isInteractiveType, SCENARIO_MS_MAX, captionLength } from './catalog.ts';
 import { scenarioEstimateMs } from './outline.ts';
 import { walkNodes, findNode, replay } from './player.ts';
 import { JoploError, type Diagnostic } from './result.ts';
@@ -123,7 +123,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         ids.add(n.id);
         // Indicator 的 disabled 只是隐藏角标（Mantine 的含义），不是“不能用”，不要求原因
         if (n.disabled !== undefined && n.disabled !== false && !n.disabledReason?.trim() && n.type !== 'Indicator') emit('warning', 'DISABLED_WITHOUT_REASON', `Disabled element has no reason: ${n.id}. Add disabledReason="…" (for example disabledReason="Only admins can invite"), or bind it to state like disabled: disabledReason={$.ui.sendHint}`, n.source, r);
-        if (INTERACTIVE_TYPES.has(n.type) && !bound.has(identity(n)) && !(n.disabled === true && n.disabledReason?.trim()) && !n.unmodeled) emit('warning', 'UNBOUND_INTERACTIVE', `Interactive element has no demo step: ${n.id}; bind a step, disable with a reason, or mark unmodeled`, n.source, r);
+        if (isInteractiveType(n.type, project.plugins) && !bound.has(identity(n)) && !(n.disabled === true && n.disabledReason?.trim()) && !n.unmodeled) emit('warning', 'UNBOUND_INTERACTIVE', `Interactive element has no demo step: ${n.id}; bind a step, disable with a reason, or mark unmodeled`, n.source, r);
       });
     }
     const stepIds = new Set<string>();
