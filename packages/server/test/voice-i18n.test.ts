@@ -48,6 +48,20 @@ describe('按内容语言选音色', () => {
   });
 });
 
+describe('默认语言', () => {
+  it('源文件的语言不自动换音色：作者选的音色和已生成的音频不失效', async () => {
+    const { voiceLocaleOf } = await import('../src/voice.ts');
+    const p = project();
+    expect(voiceLocaleOf(p, 'zh-CN')).toBeNull();
+    expect(voiceLocaleOf(p, 'en')).toBe('en');
+    expect(voiceLocaleOf({}, 'en')).toBeNull();
+    const store = new ProfileStore(home, {});
+    store.upsert('elevenlabs', eleven(), 'k');
+    const cfg = { narrator: 'XB0fDUnXU5powFXDhCwa' };
+    expect(resolveVoices(cfg, 'elevenlabs', store, voiceLocaleOf(p, 'zh-CN')).narrator).toBe('XB0fDUnXU5powFXDhCwa');
+  });
+});
+
 describe('打包与沿用', () => {
   const seed = (cache: VoiceCache, fp: string, stepId: string, text: string, locale: string) => {
     const b = MP3(text);

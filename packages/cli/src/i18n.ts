@@ -31,7 +31,8 @@ export function addLocaleToConfig(text: string, locales: string[], locale: strin
   if (arr) {
     const body = arr[2]!.trim();
     const quote = /"/.test(body) && !/'/.test(body) ? '"' : "'";
-    const next = body ? `${body.replace(/,\s*$/, '')}, ${quote}${locale}${quote}` : `${quote}${locale}${quote}`;
+    // 空数组（locales: []）：写完整列表，源语言在第一个
+    const next = body ? `${body.replace(/,\s*$/, '')}, ${quote}${locale}${quote}` : locales.map((l) => `${quote}${l}${quote}`).join(', ');
     return text.slice(0, arr.index) + arr[1] + next + arr[3] + text.slice(arr.index + arr[0].length);
   }
   const name = /^([ \t]*)name\s*:.*,[ \t]*$/m.exec(text);
@@ -63,7 +64,12 @@ export async function i18nAdd(dir: string, locale: string, opts: { source?: stri
     locales = [opts.source, locale];
   }
 
-  // 1. config
+  // 1. 收集原文（用加上语言之后的 config 在内存里编译；收集与语言无关）
+  const compiled = compile({ ...authoring, config: { ...authoring.config, locales } }, 'dev');
+  if (!compiled.project) throw new JoploError('INVALID_SCHEMA', 'The project has compile errors; run npx joplo check and fix them first', { diagnostics: compiled.diagnostics });
+  const uses = collectMessages(compiled.project);
+
+  // 写 config（编译通过之后才改文件，失败时什么都不动）
   let configState: boolean | string = false;
   if (!(Array.isArray(declared) && declared.includes(locale))) {
     const cfgFile = authoring.config.file ? join(root, authoring.config.file) : join(root, 'joplo.config.ts');
@@ -75,12 +81,7 @@ export async function i18nAdd(dir: string, locale: string, opts: { source?: stri
     } else configState = `locales: [${locales.map((l) => `'${l}'`).join(', ')}],`;
   }
 
-  // 2. 收集原文（用加上语言之后的 config 编译；收集与语言无关）
-  const compiled = compile({ ...authoring, config: { ...authoring.config, locales } }, 'dev');
-  if (!compiled.project) throw new JoploError('INVALID_SCHEMA', 'The project has compile errors; run npx joplo check and fix them first', { diagnostics: compiled.diagnostics });
-  const uses = collectMessages(compiled.project);
-
-  // 3. locales/<语言>.json：保留已有译文，新原文写 ""
+  // 2. locales/<语言>.json：保留已有译文，新原文写 ""
   const dirL = join(root, 'locales');
   const file = join(dirL, `${locale}.json`);
   let old: Record<string, string> = {};

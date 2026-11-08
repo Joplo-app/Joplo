@@ -715,10 +715,12 @@ function localeDiagnostics(project: Project, src: AuthoringProject, diags: Diagn
     const unused = Object.keys(table).filter((k) => !texts.has(k) && typeof table[k] === 'string' && table[k]!.trim());
     const missing = uses.filter((u) => !(typeof table[u.text] === 'string' && table[u.text]!.trim()));
     const plain: typeof missing = [];
+    const matched = new Set<string>();
     let n = 0;
     for (const m of missing) {
       const old = nearestKey(m.text, unused);
       if (old === null) { plain.push(m); continue; }
+      matched.add(old);
       n++;
       diags.push({ severity: 'warning', code: 'I18N_STALE', message: `${file}: no translation for ${q(m.text)}; the closest old entry is ${q(old)}: ${q(table[old]!)} (the source text changed). Update the key and translation`, source: 'structure', ...(m.at ? { at: m.at } : {}) });
     }
@@ -728,7 +730,7 @@ function localeDiagnostics(project: Project, src: AuthoringProject, diags: Diagn
       const hint = src.localeFiles?.[l] ? `translate them in ${file}` : `run npx joplo i18n add ${l}, then translate ${file}`;
       diags.push({ severity: 'warning', code: 'I18N_MISSING', message: `${l}: ${plain.length} of ${uses.length} texts have no translation (${first}${plain.length > 5 ? `, +${plain.length - 5} more` : ''}); ${hint}. Viewers see the ${i18n.default} source text for them`, source: 'structure', at: `${file}:1:1` });
     }
-    const leftover = unused.filter((k) => !missing.some((m) => nearestKey(m.text, [k]) !== null));
+    const leftover = unused.filter((k) => !matched.has(k));
     if (leftover.length)
       diags.push({ severity: 'info', code: 'I18N_UNUSED', message: `${file}: ${leftover.length} entries are not used by any text (${leftover.slice(0, 3).map(q).join(', ')}${leftover.length > 3 ? ', …' : ''}); delete them or run npx joplo i18n add ${l} --prune`, source: 'structure', at: `${file}:1:1` });
   }

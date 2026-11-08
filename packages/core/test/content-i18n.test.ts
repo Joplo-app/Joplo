@@ -107,6 +107,21 @@ describe('作者内容多语言（D83）', () => {
     expect(pub.i18n!.stale).toBeUndefined();
   });
 
+  it('选项对象的 value 和状态、条件一起换：受控的 Tabs / Select 不会丢失选中项', () => {
+    const p = {
+      name: 'P', description: '', routes: {}, features: {}, options: {}, cases: {}, rules: {}, issues: {},
+      i18n: { default: 'en', locales: ['en', 'ja'], messages: { ja: { Overview: '概要' } } },
+      scenes: { s: { id: 's', root: { id: 'r', type: 'Tabs', props: { value: '$ui.tab', data: [{ value: 'Overview', label: 'Overview' }] }, when: { eq: ['ui.tab', 'Overview'] } } } },
+      scenarios: { x: { id: 'x', name: 'X', description: '', mock: { label: 'm', outcome: 'success', auto: true }, initial: { sceneId: 's', ui: { tab: 'Overview' }, data: {}, inputs: {} }, steps: [] } },
+    } as unknown as Project;
+    const ja = localizeProject(p, 'ja');
+    const root = ja.scenes.s!.root as any;
+    expect(root.props.data[0]).toEqual({ value: '概要', label: '概要' });
+    expect(root.when).toEqual({ eq: ['ui.tab', '概要'] });
+    expect(ja.scenarios.x!.initial.ui.tab).toBe('概要');
+    expect(root.props.value).toBe('$ui.tab');
+  });
+
   it('nearestKey 只接受相近的条目', () => {
     expect(nearestKey('邀请同事', ['邀请成员', '账单'])).toBe('邀请成员');
     expect(nearestKey('邀请同事', ['完全不一样的一句话'])).toBeNull();

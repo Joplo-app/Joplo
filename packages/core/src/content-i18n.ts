@@ -27,8 +27,8 @@ const isBinding = (s: string) => BIND.test(s);
 const STRUCTURAL = new Set(['from', 'to', 'accessor', 'target', 'href', 'src', 'type', 'kind', 'tone', 'variant', 'color', 'c', 'bg', 'size', 'radius', 'position', 'direction', 'icon', 'pin', 'states', 'style', 'layout', 'orientation', 'align', 'justify', 'ff', 'fw', 'fz', 'ta', 'shadow', 'dir', 'lang', 'id', 'key', 'side', 'tt', 'td', 'fs', 'lh', 'display', 'pos', 'inset', 'top', 'left', 'right', 'bottom',
   'p', 'px', 'py', 'pt', 'pb', 'pl', 'pr', 'm', 'mx', 'my', 'mt', 'mb', 'ml', 'mr', 'w', 'h', 'maw', 'mah', 'miw', 'mih', 'gap', 'rowGap', 'columnGap', 'gutter', 'spacing', 'verticalSpacing', 'horizontalSpacing',
   'cols', 'span', 'offset', 'order', 'wrap', 'grow', 'mode', 'aspect', 'fit', 'inputMode', 'autoComplete', 'visibleFrom', 'hiddenFrom', 'transition', 'transitionProps', 'loaderProps', 'overlayProps', 'zIndex', 'opacity']);
-/** 选项、列表项（数组里的对象）里额外不翻译的键：value 是选项的身份。 */
-const ITEM_STRUCTURAL = new Set(['value']);
+/** 选项、列表项（数组里的对象）的 value 是选项的身份：照常按同一张表换（和状态值、选择动作的值一致），但收集时当作普通属性（像 id 的单词不收）。 */
+const ITEM_VALUE = 'value';
 
 /** 显示文字的属性：收集时不跳过单个英文词（英文项目的按钮名就是一个词）。其余属性里的单个 ASCII 词多半是枚举（sm、blue），不收。 */
 const DISPLAY_PROPS = new Set(['text', 'label', 'title', 'description', 'placeholder', 'aria-label', 'alt', 'error', 'hint', 'caption', 'message', 'content', 'subtitle', 'tooltip', 'leftSection', 'rightSection', 'name', 'value', 'data', 'records', 'labels', 'emptyText', 'actionLabel', 'sub', 'badge', 'status', 'items']);
@@ -40,12 +40,12 @@ const hasLetter = (s: string) => /\p{L}/u.test(s);
 /** 像代码的单个 ASCII 词：id、邮箱、网址、命令参数。只对状态值和输入值跳过。 */
 const codeLike = (s: string) => /^[\x21-\x7e]+$/.test(s.trim());
 
-function mapDeep(v: unknown, visit: (s: string, path: string) => string, path: string, inItem = false): unknown {
-  if (typeof v === 'string') return isBinding(v) ? v : visit(v, path);
+function mapDeep(v: unknown, visit: (s: string, path: string, itemValue: boolean) => string, path: string, inItem = false, itemValue = false): unknown {
+  if (typeof v === 'string') return isBinding(v) ? v : visit(v, path, itemValue);
   if (Array.isArray(v)) return v.map((x, i) => mapDeep(x, visit, `${path}.${i}`, true));
   if (v && typeof v === 'object') {
     const out: Record<string, unknown> = {};
-    for (const [k, x] of Object.entries(v)) out[k] = STRUCTURAL.has(k) || (inItem && ITEM_STRUCTURAL.has(k)) ? x : mapDeep(x, visit, `${path}.${k}`);
+    for (const [k, x] of Object.entries(v)) out[k] = STRUCTURAL.has(k) ? x : mapDeep(x, visit, `${path}.${k}`, false, inItem && k === ITEM_VALUE);
     return out;
   }
   return v;
@@ -66,7 +66,7 @@ function mapNode(n: SceneNode, visit: Visit): SceneNode {
   const out: SceneNode = { ...n };
   if (n.props) {
     const props: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(n.props)) props[k] = STRUCTURAL.has(k) ? v : mapDeep(v, (s) => visit(s, DISPLAY_PROPS.has(k) ? 'text' : 'prop', n.source), '');
+    for (const [k, v] of Object.entries(n.props)) props[k] = STRUCTURAL.has(k) ? v : mapDeep(v, (s, _p, itemValue) => visit(s, DISPLAY_PROPS.has(k) && !itemValue ? 'text' : 'prop', n.source), '');
     out.props = props;
   }
   if (n.children) out.children = n.children.map((c) => mapNode(c, visit));
@@ -215,24 +215,6 @@ export function pruneMessages(p: Project): Project {
   const used = new Set(collectMessages(p).map((m) => m.text));
   const messages = Object.fromEntries(Object.entries(p.i18n.messages).map(([l, table]) => [l, Object.fromEntries(Object.entries(table).filter(([k, v]) => used.has(k) && v))]));
   return { ...p, i18n: { ...p.i18n, messages } };
-}
-
-export type LocaleStatus = { locale: string; total: number; translated: number; missing: string[]; stale: number };
-
-/**
- * 每种非默认语言的翻译进度（看板的内容语言菜单用）：missing = 还没有译文的原文；
- * stale = 缺的原文里，能在 locales 文件中找到相近旧条目的数量（原文改过）。only 给出时只统计这些原文（例如当前方案用到的）。
- */
-export function localeStatus(p: Project, files: Record<string, Record<string, string>>, uses: MessageUse[] = collectMessages(p)): LocaleStatus[] {
-  if (!p.i18n) return [];
-  const texts = new Set(uses.map((u) => u.text));
-  return p.i18n.locales.filter((l) => l !== p.i18n!.default).map((locale) => {
-    const table = files[locale] ?? {};
-    const missing = uses.filter((u) => !table[u.text]).map((u) => u.text);
-    const unused = Object.keys(table).filter((k) => !texts.has(k) && table[k]);
-    const stale = missing.filter((m) => nearestKey(m, unused) !== null).length;
-    return { locale, total: uses.length, translated: uses.length - missing.length, missing, stale };
-  });
 }
 
 /** 编辑距离（按码点）。 */

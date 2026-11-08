@@ -151,7 +151,7 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
       throw sizeError({ kind: actualBytes > account.limits.maxTotalBytes ? 'total' : 'files', maxBytes: account.limits.maxTotalBytes, actualBytes, maxFiles: account.limits.maxFiles, actualFiles: files.length, largestFiles });
     }
     // 评审版只更新评审分享，普通 share 只更新主链接（契约 8.1：评审版永远不覆盖主链接）；PR 预览两者都不碰
-    const record = await readShareRecord(project, client.server);
+    const record = before;
     const slot = reviewMode === 'review' ? 'review' : 'main';
     // 范围分享单独一条（键 = 排序后的场景 id，评审版加前缀），不碰主链接和评审链接
     const key = scenarioIds ? scopeKey(scenarioIds, reviewMode) : null;

@@ -450,7 +450,10 @@ export function autoVoiceFor(profile: Pick<VoiceProfile, 'preset'>, voice: strin
   return pick?.id ?? voice;
 }
 
-/** locale：内容语言（D83）。config.voice.locales[locale] 优先，其次按 autoVoiceFor 自动选；不传时与之前一样。 */
+/** 传给 resolveVoices 的语言：默认语言（源文件的语言）不自动换音色，保留作者原来的选择和已生成的音频。 */
+export const voiceLocaleOf = (project: Pick<Project, 'i18n'> | null | undefined, locale: string | null | undefined): string | null => (locale && project?.i18n && locale !== project.i18n.default ? locale : null);
+
+/** locale：内容语言（D83，默认语言传 null，见 voiceLocaleOf）。config.voice.locales[locale] 优先，其次按 autoVoiceFor 自动选；不传时与之前一样。 */
 export function resolveVoices(config: VoiceConfig | undefined, selected: string | null, store: ProfileStore, locale?: string | null): ResolvedVoices {
   let profile: VoiceProfile | null = null;
   let source: ResolvedVoices['source'] = null;
@@ -691,7 +694,7 @@ export async function reuseSharedVoice(projectDir: string, project: Project, sha
   const cache = new VoiceCache(projectDir);
   const selected = cache.read().profileId;
   const local = resolveVoices(devConfig ?? project.voiceConfig, selected, store);
-  const per = voicesPerLocale(project, local.profile ? (l) => resolveVoices(devConfig ?? project.voiceConfig, selected, store, l).voices : sharedVoices(shared.index));
+  const per = voicesPerLocale(project, local.profile ? (l) => resolveVoices(devConfig ?? project.voiceConfig, selected, store, voiceLocaleOf(project, l)).voices : sharedVoices(shared.index));
   let reused = 0;
   for (const { locale, project: p, voices } of per)
     for (const sc of Object.values(p.scenarios))
@@ -722,11 +725,11 @@ export function bundleVoice(projectDir: string, project: Project, outDir: string
   const cache = new VoiceCache(projectDir);
   const idx = cache.read();
   const cfg = devConfig ?? project.voiceConfig;
-  const base = resolveVoices(cfg, idx.profileId, store, project.i18n?.default);
+  const base = resolveVoices(cfg, idx.profileId, store);
   const profileName = base.profile?.name ?? (fallback ? 'the published share' : null);
   const empty = { index: null, report: { clips: 0, bytes: 0, missing: 0, profile: profileName } };
   if (!base.profile && !fallback) return { ...empty, report: { ...empty.report, profile: null } };
-  const per = voicesPerLocale(project, base.profile ? (l) => resolveVoices(cfg, idx.profileId, store, l).voices : sharedVoices(fallback!));
+  const per = voicesPerLocale(project, base.profile ? (l) => resolveVoices(cfg, idx.profileId, store, voiceLocaleOf(project, l)).voices : sharedVoices(fallback!));
   const fps = new Set(per.flatMap((x) => [x.voices.narrator, ...Object.values(x.voices.roles)]).filter(Boolean) as string[]);
   const stepIds = new Set(Object.values(project.scenarios).flatMap((s) => s.steps.map((st) => st.id)));
   const latest = new Map<string, [string, ClipRecord]>();

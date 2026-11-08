@@ -21,7 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type http from 'node:http';
 import type { Project } from '@joplo-app/core';
-import { AUDIO_TYPES, ProfileStore, VoiceCache, VoiceError, normalizeProfile, resolveVoices, synthesize, type FetchLike, type GenerateSummary, type Inflight, type PublicProfile, type Segment, type VoiceProfile } from './voice.ts';
+import { AUDIO_TYPES, ProfileStore, voiceLocaleOf, VoiceCache, VoiceError, normalizeProfile, resolveVoices, synthesize, type FetchLike, type GenerateSummary, type Inflight, type PublicProfile, type Segment, type VoiceProfile } from './voice.ts';
 
 export type VoiceState = {
   /**
@@ -154,9 +154,8 @@ export class VoiceHub {
   state(projectId: string, dir: string, project: Project | null): VoiceState {
     const cache = new VoiceCache(dir);
     const idx = cache.read();
-    const def = project?.i18n?.default ?? null;
-    const r = resolveVoices(project?.voiceConfig, idx.profileId, this.store, def);
-    const per = Object.fromEntries((project?.i18n?.locales ?? []).map((l) => [l, resolveVoices(project?.voiceConfig, idx.profileId, this.store, l)]));
+    const r = resolveVoices(project?.voiceConfig, idx.profileId, this.store);
+    const per = Object.fromEntries((project?.i18n?.locales ?? []).map((l) => [l, resolveVoices(project?.voiceConfig, idx.profileId, this.store, voiceLocaleOf(project, l))]));
     const all = Object.values(per);
     const cur = cache.current({ narrator: r.voices.narrator, roles: r.voices.roles }, all.flatMap((x) => [x.voices.narrator, ...Object.values(x.voices.roles)]).filter((x): x is string => !!x));
     const job = this.jobs.get(projectId);
@@ -203,7 +202,7 @@ export class VoiceHub {
       if (this.jobs.has(projectId)) return ctx.send(409, { error: { code: 'BUSY', message: 'Narration is already being generated for this project' } }), true;
       const cache = new VoiceCache(dir);
       const content = contentLocaleOf(project, body.contentLocale);
-      const resolved = resolveVoices(project?.voiceConfig, cache.read().profileId, this.store, content ?? project?.i18n?.default);
+      const resolved = resolveVoices(project?.voiceConfig, cache.read().profileId, this.store, voiceLocaleOf(project, content));
       const job = { done: 0, total: segs!.length, failed: 0, abort: new AbortController() };
       this.jobs.set(projectId, job);
       let summary: GenerateSummary;
@@ -234,7 +233,7 @@ export class VoiceHub {
       if (!seg || typeof seg.stepId !== 'string' || typeof seg.text !== 'string' || seg.text.length > MAX_TEXT || (seg.role !== null && typeof seg.role !== 'string')) return ctx.send(400, { error: { code: 'USAGE', message: 'segment must be { stepId, text, role }' } }), true;
       const cache = new VoiceCache(dir);
       const content = contentLocaleOf(project, body.contentLocale);
-      const resolved = resolveVoices(project?.voiceConfig, cache.read().profileId, this.store, content ?? project?.i18n?.default);
+      const resolved = resolveVoices(project?.voiceConfig, cache.read().profileId, this.store, voiceLocaleOf(project, content));
       const plan = cache.plan(seg, resolved);
       if (!plan) return ctx.send(400, { error: { code: 'INVALID', message: 'No voice provider is selected for this project' } }), true;
       const p = cache.generateOne(seg, content ?? (typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en'), resolved, this.store, { fetch: this.opts.fetch, inflight: this.inflightOf(projectId) });

@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { build as viteBuild, createServer, type Rollup } from 'vite';
-import { stepIdentity, type StepIdentity, hasScope, JoploError, orderedFeatures, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
+import { stepIdentity, type StepIdentity, hasScope, JoploError, orderedFeatures, pruneMessages, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
@@ -40,7 +40,9 @@ export function publishPayload(project: Project, home: string | null): { project
       return [id, { ...sr, caseIds: [], steps: s.steps.map(({ ruleIds: _ri, key: _key, ...st }) => ({ ...st, ruleIds: [] })) }];
     }),
   );
-  return { project: { ...rest, features, options, scenarios }, home: home && project.routes[home] ? home : null };
+  const out = { ...rest, features, options, scenarios };
+  // 译文（D83）在去掉创作侧字段之后再裁剪一次：约束等只给作者看的原文不能作为译文的键留在站点里
+  return { project: rest.i18n ? pruneMessages(out as unknown as Project) : out, home: home && project.routes[home] ? home : null };
 }
 
 /** 把 JSON 安全地放进 <script type="application/json">。 */
