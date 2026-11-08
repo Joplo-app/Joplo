@@ -152,7 +152,7 @@ More embed options: https://cloud.joplo.app/shares/<share-id>
 
 Choose `--public` or `--private` and `--review` or `--no-review` every time. Public shares enter your portfolio at `show.joplo.app/@username` and search engines; private shares are visible to anyone holding the link. Agents must ask the user both questions before publishing. CI must pin both flags; missing choices fail with exit 2 before building or connecting. Interactive terminals ask instead.
 
-`--review` also publishes a separate private, commentable link with all options (`data.review.url`); `data.url` is the main share. Scoped shares and PR previews are always private. Public share results include a portfolio work URL or a username setup link; the player shows “Author · More works” only on official Cloud shares, outside embeds. Write names, descriptions and goals as search-result content and keep unpublished information out.
+`--review` also publishes a separate private, commentable link with all options (`data.review.url`); `data.url` is the main share. A scoped review with no picked scenarios publishes only the private review at `data.url` (`data.mode: "review"`), leaving the ordinary share unchanged. Scoped shares and PR previews are always private. Public share results include a portfolio work URL or a username setup link; the player shows “Author · More works” only on official Cloud shares, outside embeds. Write names, descriptions and goals as search-result content and keep unpublished information out.
 
 Every share link comes with three ways to show it:
 

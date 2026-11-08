@@ -6,6 +6,7 @@ import type { BoardDictionary } from './en';
 export function createBoardDe(locale: Locale = 'de') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudLinksFailed: "Die vorhandenen Freigabelinks konnten nicht gelesen werden. Die Veröffentlichung ist angehalten. Bitte erneut versuchen.",
       cloudPublic: "Öffentlich",
       cloudPrivate: "Privat",
       cloudPublicNote: "Öffentlich: im Portfolio show.joplo.app/@benutzername und in Suchmaschinen sichtbar.",

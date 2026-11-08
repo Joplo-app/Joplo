@@ -6,6 +6,7 @@ import type { BoardDictionary } from './en';
 export function createBoardKo(locale: Locale = 'ko') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudLinksFailed: "기존 공유 링크를 읽지 못했습니다. 게시가 일시 중지되었습니다. 다시 시도해 주세요.",
       cloudPublic: "공개",
       cloudPrivate: "비공개",
       cloudPublicNote: "공개: show.joplo.app/@사용자명 포트폴리오에 추가되고 검색 엔진에 등록됩니다.",

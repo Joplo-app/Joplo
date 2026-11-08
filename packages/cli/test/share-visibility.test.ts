@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { compile, type Project } from '@joplo-app/core';
 import { runCli } from '../src/cli.ts';
 import { writeCredentials } from '../src/cloud.ts';
+import type { CloudPublishRequest } from '../../server/src/cloud.ts';
 import { reviewSource } from '../../core/test/fixtures/review.ts';
 
 const token = 'session-token-NEVER-PRINT';
@@ -26,19 +27,21 @@ let responses: Map<string, { status?: number; body: unknown }>;
 let devIr: Project;
 let portfolio: unknown, visibility: unknown;
 let plan: 'free' | 'pro', rejectReview: number;
+let strictVisibility: boolean;
 const browser = vi.fn(async () => true);
 const files = { 'index.html': '<html><script type="application/json" id="joplo-ir">{"project":{"mode":"publish","features":{},"options":{},"scenarios":{}}}</script></html>', 'assets/a.css': 'body{}' };
 let built: Record<string, string>;
-const build = vi.fn(async ({ outDir, review }: { outDir?: string; review?: boolean }) => {
+const buildFiles = async ({ outDir, review }: { outDir?: string; review?: boolean }) => {
   const out = review ? { ...built, 'index.html': built['index.html']!.replace('"mode":"publish"', '"mode":"review"') } : built;
   for (const [p, content] of Object.entries(out)) { await mkdir(join(outDir!, p, '..'), { recursive: true }); await writeFile(join(outDir!, p), content); }
   return { outDir: outDir!, files: Object.keys(out), diagnostics: [], routes: [], scenarios: [] };
-});
+};
+const build = vi.fn(buildFiles);
 const checkProject = vi.fn(async (): Promise<any> => ({ name: 'Fixture', diagnostics: [], summary: { error: 0, warning: 0, info: 0 }, verification: {}, project: devIr }));
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'joplo-review-cli-')); home = join(root, 'home'); project = join(root, 'project');
-  await mkdir(project); calls = []; responses = new Map(); portfolio = undefined; visibility = undefined; plan = 'free'; rejectReview = 0; built = { ...files }; build.mockClear(); checkProject.mockClear(); browser.mockClear();
+  await mkdir(project); calls = []; responses = new Map(); portfolio = undefined; visibility = undefined; plan = 'free'; rejectReview = 0; strictVisibility = false; built = { ...files }; build.mockReset(); build.mockImplementation(buildFiles); checkProject.mockClear(); browser.mockClear();
   devIr = compile(reviewSource(), 'dev').project!;
   server = createServer(async (req, res) => {
     const chunks: Buffer[] = []; for await (const c of req) chunks.push(c);
@@ -50,6 +53,7 @@ beforeEach(async () => {
     if (path === '/api/v1/me') return send({ user, plan, limits, credential: req.headers.authorization === `Bearer ${apiKey}` ? { kind: 'api_key', name: 'team-invite CI', prefix: 'jpk_A1b2', scopes: ['shares:publish', 'feedback:read'], expiresAt: '2027-02-04T00:00:00.000Z' } : { kind: 'device' } });
     if (path === '/api/v1/shares') {
       // 旧版 SaaS：严格校验，不认识 review 字段时 400（没有创建任何记录）
+      if (strictVisibility && body.visibility !== undefined) return send({ code: 'BAD_REQUEST', message: 'Unknown field visibility' }, 400);
       if (rejectReview && body.review !== undefined) return send({ code: 'BAD_REQUEST' }, rejectReview);
       return send({ shareId: body.review?.mode === 'review' ? 'Rev1234567' : 'Abc1234567', uploadId: 'u1', missing: [] });
     }
@@ -106,7 +110,7 @@ test('私密新建请求体完全不加 visibility；公开发送 public，更�
   await login();
   const r = await cli(['share', project, '--private','--no-review','--json']); expect(r.code, r.stdout).toBe(0);
   expect(Object.keys(createBody()).sort()).toEqual(['files','review','title']);
-  calls=[]; await cli(['share',project,'--public','--no-review','--json']); expect(createBody().visibility).toBe('public');
+  calls=[]; visibility='public'; await cli(['share',project,'--public','--no-review','--json']); expect(createBody().visibility).toBe('public');
   calls=[]; await cli(['share',project,'--private','--no-review','--json']); expect(createBody()).toMatchObject({visibility:'private', replaceShareId:'Abc1234567'});
 });
 test('旧云端拒绝 visibility：明确提示，不按 review 兼容逻辑重试', async () => {
@@ -155,4 +159,91 @@ test('看板 bridge：本次选择进入请求；portfolio/visibility/评审返�
  const r=await bridge.publish(project,{visibility:'public',review:true},()=>{});
  expect(createBody().visibility).toBe('public'); expect(r).toMatchObject({visibility:'public',portfolio,review:{shareId:'Rev1234567'}});
  expect(await bridge.links!(project)).toMatchObject({main:{visibility:'public'}});
+});
+
+
+const recordLink = (id: string, v?: 'public' | 'private') => ({ shareId: id, url: `${base}/s/${id}/`, ...(v ? { visibility: v } : {}) });
+const saveRecord = async (record: object) => {
+  await mkdir(join(project, '.joplo'), { recursive: true });
+  await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, ...record }));
+};
+async function boardPublish(request: CloudPublishRequest = { visibility: 'private', review: false }) {
+  const { cloudBridge } = await import('../src/cloud-bridge.ts');
+  return cloudBridge({ version: '0.2.17', build: build as never, render: async () => async () => undefined,
+    deps: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base }, check: checkProject, sharedVoice: async () => undefined },
+  }).publish(project, request, () => undefined);
+}
+test.each([undefined, 'private', 'public'] as const)('私密更新：只在本地记录为 public 时发送 visibility，记录=%s；CLI/看板一致', async (previous) => {
+  await login();
+  strictVisibility = previous !== 'public';
+  for (const path of ['cli', 'board']) {
+    await saveRecord(recordLink('Abc1234567', previous)); calls = [];
+    if (path === 'cli') expect((await cli(['share', project, '--private', '--no-review', '--json'])).code).toBe(0);
+    else await boardPublish();
+    expect(createBody().replaceShareId).toBe('Abc1234567');
+    if (previous === 'public') expect(createBody().visibility).toBe('private');
+    else expect(createBody()).not.toHaveProperty('visibility');
+  }
+});
+test.each([undefined, 'private', 'public'] as const)('--update 匹配本地目标链接记录时采用相同的兼容规则，记录=%s', async (previous) => {
+  await login(); strictVisibility = previous !== 'public';
+  // 目标可以记在任意槽位；不能误用主链接或其他链接的可见性。
+  await saveRecord({ ...recordLink('Main123456', 'public'), review: recordLink('Abc1234567', previous) });
+  const r = await cli(['share', project, '--private', '--no-review', '--update', `${base}/s/Abc1234567/`, '--json']);
+  expect(r.code, r.stdout).toBe(0); expect(createBody().replaceShareId).toBe('Abc1234567');
+  if (previous === 'public') expect(createBody().visibility).toBe('private');
+  else expect(createBody()).not.toHaveProperty('visibility');
+});
+test('--update 指向无本地记录的链接：私密更新不发送 visibility，旧 strict 云端接受', async () => {
+  await login(); strictVisibility = true;
+  await saveRecord(recordLink('Main123456', 'public'));
+  const r = await cli(['share', project, '--private', '--no-review', '--update', `${base}/s/Abc1234567/`, '--json']);
+  expect(r.code, r.stdout).toBe(0); expect(createBody().replaceShareId).toBe('Abc1234567'); expect(createBody()).not.toHaveProperty('visibility');
+});
+
+/** build 替身保留真实范围/模式，检查上传清单只含这次允许的场景。 */
+const scopedBuild = async ({ outDir, scope, review }: { outDir: string; scope?: { scenarios: string[] }; review?: boolean }) => {
+  const ids = scope?.scenarios ?? [];
+  await mkdir(outDir, { recursive: true });
+  await writeFile(join(outDir, 'index.html'), `<script type="application/json" id="joplo-ir">${JSON.stringify({ project: { mode: review ? 'review' : 'publish', features: {}, options: {}, scenarios: Object.fromEntries(ids.map(id => [id, {}])) } })}</script>`);
+  return { outDir, files: ['index.html'], diagnostics: [], routes: [], scenarios: ids,
+    scope: { key: `${review ? 'review:' : ''}${[...ids].sort().join(',')}`, scenarios: ids, features: ['f'], borrowed: [] } };
+};
+test.each([['--scenario', 'f.b.only'], ['--feature', 'g']] as const)('范围评审 %s %s：没有 picked 内容时只发私密评审，保留普通记录', async (flag, id) => {
+  await login(); await saveRecord(recordLink('Main123456', 'private'));
+  build.mockImplementationOnce(scopedBuild as never);
+  const r = await cli(['share', project, '--private', '--review', flag, id, '--json']);
+  expect(r.code, r.stdout).toBe(0); expect(r.json().data).toMatchObject({ mode: 'review', visibility: 'private', url: `${base}/s/Rev1234567/` });
+  const creates = calls.filter(c => c.path === '/api/v1/shares'); expect(creates).toHaveLength(1);
+  expect(creates[0]!.body.review.mode).toBe('review'); expect(creates[0]!.body).not.toHaveProperty('visibility');
+  expect(creates[0]!.body.review.scenarios.map((s: any) => s.id)).toEqual([flag === '--scenario' ? 'f.b.only' : 'g.a.view']);
+  expect(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'))).toMatchObject({ shareId: 'Main123456' });
+});
+test('混合范围评审：普通版只含 picked 子集，评审版包含完整范围，分别记录各自范围', async () => {
+  await login(); build.mockImplementationOnce(scopedBuild as never).mockImplementationOnce(scopedBuild as never);
+  const r = await cli(['share', project, '--review', '--feature', 'f', '--feature', 'g', '--json']);
+  expect(r.code, r.stdout).toBe(0);
+  const creates = calls.filter(c => c.path === '/api/v1/shares'); expect(creates).toHaveLength(2);
+  expect(creates[0]!.body.review.scenarios.map((s: any) => s.id)).toEqual(['f.a.main']);
+  expect(creates[1]!.body.review.scenarios.map((s: any) => s.id)).toEqual(['f.a.main', 'f.b.only', 'g.a.view']);
+  expect(r.json().data.scope.scenarios).toEqual(['f.a.main']);
+  expect(r.json().data.review.scope.scenarios).toEqual(['f.a.main', 'f.b.only', 'g.a.view']);
+  const record = JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'));
+  expect(Object.keys(record.scoped).sort()).toEqual(['f.a.main', 'review:f.a.main,f.b.only,g.a.view']);
+});
+
+test('仅评审范围不把 --update 的普通链接改成评审版', async () => {
+  await login(); await saveRecord(recordLink('Main123456', 'private'));
+  build.mockImplementationOnce(scopedBuild as never);
+  const r = await cli(['share', project, '--private', '--review', '--scenario', 'f.b.only', '--update', `${base}/s/Main123456/`, '--json']);
+  expect(r.code, r.stdout).toBe(0); expect(createBody()).not.toHaveProperty('replaceShareId');
+  expect(r.stderr).toContain('--update target are unchanged');
+  expect(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8')).shareId).toBe('Main123456');
+});
+
+test('看板范围评审：仅评审结果携带 mode，不误显示为普通分享', async () => {
+  await login(); build.mockImplementationOnce(scopedBuild as never);
+  const result = await boardPublish({ visibility: 'private', review: true, features: ['g'] });
+  expect(result).toMatchObject({ mode: 'review', url: `${base}/s/Rev1234567/`, visibility: 'private' });
+  expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
 });

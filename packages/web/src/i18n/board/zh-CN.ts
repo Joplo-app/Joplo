@@ -6,6 +6,7 @@ import type { BoardDictionary } from './en';
 export function createBoardZhCN(locale: Locale = 'zh-CN') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudLinksFailed: "无法读取已有分享链接，已暂停发布。请重试。",
       cloudPublic: "公开",
       cloudPrivate: "私密",
       cloudPublicNote: "公开：进入作品集 show.joplo.app/@用户名，并被搜索引擎收录。",

@@ -4,6 +4,7 @@ import { value, number, plural, type Value } from '../format';
 export function createBoardEn(locale: Locale = 'en') {
   return {
     board: {
+      cloudLinksFailed: "Couldn't read the existing share links. Publishing is paused. Try again.",
       cloudPublic: "Public",
       cloudPrivate: "Private",
       cloudPublicNote: "Public: added to show.joplo.app/@username and indexed by search engines.",

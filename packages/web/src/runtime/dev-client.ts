@@ -496,7 +496,7 @@ export type CloudJob = {
   request: CloudPublishRequest;
   startedAt: number;
   lines: string[];
-  result?: { visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope; storage?: CloudStorage & { shareBytes: number } };
+  result?: { mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope; storage?: CloudStorage & { shareBytes: number } };
   error?: { code: string; message: string; loginCommand?: string; storage?: CloudStorageFull };
 };
 
@@ -516,17 +516,24 @@ export async function fetchCloudAccount(): Promise<{ ok: true; available: boolea
   }
 }
 
-/** 当前发布任务（没有时 null）。 */
+/** 读取分享历史。失败必须与“没有链接”区分，避免更新预选为公开。 */
 export async function fetchCloudLinks(projectId: string): Promise<CloudLinks> {
-  try {
-    const headers = writeHeaders(false);
-    if (!headers) return { main: null };
-    const res = await fetch(`/__joplo/p/${enc(projectId)}/cloud/links`, { headers, cache: 'no-store' });
-    if (!res.ok) return { main: null };
-    return (await res.json()).links ?? { main: null };
-  } catch { return { main: null }; }
+  const headers = writeHeaders(false);
+  if (!headers) throw new MessageError(m.board.thisPageHasNoLocalTokenOpenItThrough);
+  const res = await fetch(`/__joplo/p/${enc(projectId)}/cloud/links`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error(await readError(res));
+  const body = await res.json();
+  // 只有成功读到明确的空记录才能按新建处理；错误/旧接口响应不能悄悄变成公开预选。
+  const main = body?.links?.main;
+  if (!body?.links || typeof body.links !== 'object' || !('main' in body.links)
+    || !(main === null || typeof main === 'object' && !Array.isArray(main)
+      && (main.visibility === undefined || main.visibility === 'private' || main.visibility === 'public'))) {
+    throw new MessageError(m.board.cloudLinksFailed);
+  }
+  return body.links;
 }
 
+/** 当前发布任务（没有时 null）。 */
 export async function fetchCloudJob(projectId: string): Promise<CloudJob | null> {
   try {
     const headers = writeHeaders(false);

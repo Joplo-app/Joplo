@@ -6,6 +6,7 @@ import type { BoardDictionary } from './en';
 export function createBoardJa(locale: Locale = 'ja') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudLinksFailed: "既存の共有リンクを読み込めませんでした。公開を一時停止しています。もう一度お試しください。",
       cloudPublic: "公開",
       cloudPrivate: "非公開",
       cloudPublicNote: "公開：show.joplo.app/@ユーザー名 の作品集に掲載され、検索エンジンに登録されます。",

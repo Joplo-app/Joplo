@@ -6,6 +6,7 @@ import type { BoardDictionary } from './en';
 export function createBoardRu(locale: Locale = 'ru') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudLinksFailed: "Не удалось прочитать существующие ссылки. Публикация приостановлена. Повторите попытку.",
       cloudPublic: "Публично",
       cloudPrivate: "Приватно",
       cloudPublicNote: "Публично: работа попадёт в show.joplo.app/@имя и поисковые системы.",

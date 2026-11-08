@@ -17,3 +17,8 @@ test('受限范围禁用公开并解释，发布结果包含可见性和设置�
  expect(result).toContain('公开'); expect(result).toContain('href="https://cloud.example/settings/profile"'); expect(result).toContain('target="_blank"');
  expect(render(<PublicationLinks result={{}} server="https://cloud.example" />)).toContain('私密');
 });
+
+test('仅评审结果说明链接含全部方案且始终私密', () => {
+ const html = render(<PublicationLinks result={{mode:'review',visibility:'private'}} server="https://cloud.example" />);
+ expect(html).toContain('私密'); expect(html).toContain('所有方案');
+});

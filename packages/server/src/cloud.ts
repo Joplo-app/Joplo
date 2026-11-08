@@ -28,7 +28,7 @@ export type CloudStorageFull = { usedBytes?: number; quotaBytes?: number; shareB
 /** 范围：都为空 = 整个项目（D75）。 */
 export type CloudPublishRequest = { visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; features?: string[] };
 
-export type CloudPublishResult = { visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）。 */ storage?: CloudStorage & { shareBytes: number } };
+export type CloudPublishResult = { mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）。 */ storage?: CloudStorage & { shareBytes: number } };
 
 /** CLI 实现：account 只读本机登录（必要时问一次云端套餐）；publish 就是 share()，progress 是它写给终端的每一行。 */
 export type CloudBridge = {

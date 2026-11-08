@@ -6,6 +6,7 @@ import type { BoardDictionary } from './en';
 export function createBoardEs(locale: Locale = 'es') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudLinksFailed: "No se pudieron leer los enlaces compartidos existentes. La publicación está en pausa. Inténtalo de nuevo.",
       cloudPublic: "Público",
       cloudPrivate: "Privado",
       cloudPublicNote: "Público: se añade a show.joplo.app/@usuario y se indexa en buscadores.",

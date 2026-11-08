@@ -96,7 +96,12 @@ export function parseUpdateLink(v: string): ShareLink {
 }
 export async function share(client: CloudClient, dir: string, opts: ShareOptions, build: typeof buildSite, render: () => Promise<RenderPreview> = async () => { throw new Error('this @joplo-app/server cannot render screenshots'); }): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
   const choices = await shareChoices(client, opts);
+  if (opts.title !== undefined && (!opts.title.trim() || opts.title.trim().length > 200)) throw new JoploError('USAGE', '--title must contain 1-200 characters');
+  if ((opts.repo !== undefined || opts.sha !== undefined) && opts.pr === undefined) throw new JoploError('USAGE', '--repo and --sha apply only with --pr <number>');
+  if (opts.update !== undefined && (opts.new || opts.pr !== undefined)) throw new JoploError('USAGE', '--update cannot be combined with --new or --pr');
+  if (opts.update !== undefined) parseUpdateLink(opts.update);
   let checked: Awaited<ReturnType<typeof checkWithProject>> | undefined;
+  let mainOptions = { ...opts, review: false };
   if (choices.review) {
     checked = await (client.deps.check ?? checkWithProject)(resolve(dir)) as Awaited<ReturnType<typeof checkWithProject>>;
     if (checked.summary.error) throw new JoploError('INVALID_SCHEMA', `Project validation failed: ${checked.summary.error} error`, { diagnostics: checked.diagnostics });
@@ -104,8 +109,21 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     const request = { scenarios: opts.scenarios ?? [], features: opts.features ?? [] };
     const ids = hasScope(request) ? resolveScope(checked.project, request, 'review') : undefined;
     assertReviewManifestSize(reviewManifest(ids ? scopeProject(checked.project, ids, 'review').project : checked.project, 'review'));
+    if (ids) {
+      // 先按 review 校验完整范围，再筛选普通版：未选方案只能出现在独立私密评审里。
+      const project = checked.project;
+      const picked = ids.filter(id => {
+        const option = project.options[project.scenarios[id]!.optionId];
+        return option && project.features[option.featureId]?.pick === option.id;
+      });
+      if (!picked.length) {
+        client.warn('The scope has no picked scenarios. Publishing only the private review version; the ordinary share and --update target are unchanged.');
+        return publishShare(client, dir, { ...opts, review: true, update: undefined }, 'private', build, render, checked);
+      }
+      mainOptions = { ...mainOptions, scenarios: picked, features: [] };
+    }
   }
-  const result = await publishShare(client, dir, { ...opts, review: false }, choices.visibility, build, render, checked);
+  const result = await publishShare(client, dir, mainOptions, choices.visibility, build, render, checked);
   if (choices.review) {
     // 两条独立链接：主分享先成功并持久化；评审失败时保留主链接并给出恢复入口。
     try {
@@ -121,9 +139,6 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
 }
 
 async function publishShare(client: CloudClient, dir: string, opts: ShareOptions, visibility: Visibility, build: typeof buildSite, render: () => Promise<RenderPreview>, prechecked?: Awaited<ReturnType<typeof checkWithProject>>): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
-  if (opts.title !== undefined && (!opts.title.trim() || opts.title.trim().length > 200)) throw new JoploError('USAGE', '--title must contain 1-200 characters');
-  if ((opts.repo !== undefined || opts.sha !== undefined) && opts.pr === undefined) throw new JoploError('USAGE', '--repo and --sha apply only with --pr <number>');
-  if (opts.update !== undefined && (opts.new || opts.pr !== undefined)) throw new JoploError('USAGE', '--update cannot be combined with --new or --pr');
   const updateLink = opts.update !== undefined ? parseUpdateLink(opts.update) : undefined;
   const project = resolve(dir);
   // PR 信息在任何请求、登录和构建之前补全并校验（契约 8.5）
@@ -202,11 +217,14 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
     const firstName = scenarioIds && checked.project ? checked.project.scenarios[scenarioIds[0]!]?.name : undefined;
     const defaultTitle = scenarioIds ? `${checked.name} · ${scenarioIds.length === 1 && firstName ? firstName : `${scenarioIds.length} scenarios`}` : checked.name;
     const title = (opts.title ?? defaultTitle).trim().slice(0, 200);
-    const create = (withReview: boolean) => client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}), ...(withReview && review ? { review } : {}), ...(pr ? { pr } : {}), ...(visibility === 'public' || replaceShareId ? { visibility } : {}) }), { create: true });
+    // 记录只用于 wire 兼容，不替用户选择：仅已知 public → private 的更新需要显式取消公开。
+    const known = [record.main, record.review, ...Object.values(record.scoped ?? {})].find(l => l?.shareId === replaceShareId);
+    const sendVisibility = visibility === 'public' || !!replaceShareId && known?.visibility === 'public';
+    const create = (withReview: boolean) => client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}), ...(withReview && review ? { review } : {}), ...(pr ? { pr } : {}), ...(sendVisibility ? { visibility } : {}) }), { create: true });
     let prepared: Record<string, unknown>;
     try { prepared = await create(true); }
     catch (e) {
-      if (e instanceof CloudError && e.status === 400 && (visibility === 'public' || replaceShareId) && object(e.details).unknownVisibility) throw new CloudError('BAD_REQUEST', PUBLIC_UNSUPPORTED, undefined, undefined, 400);
+      if (e instanceof CloudError && e.status === 400 && sendVisibility && object(e.details).unknownVisibility) throw new CloudError('BAD_REQUEST', PUBLIC_UNSUPPORTED, undefined, undefined, 400);
       // 发布顺序容错（契约 8.1）：旧版 SaaS 拒绝 review 字段时返回 400，此时没有创建任何记录；普通发布去掉清单重试一次。
       // 只认真正的 400（413/422 等不重试），--review 没有清单没有意义，照常报错。
       if (!(e instanceof CloudError && e.code === 'BAD_REQUEST' && e.status === 400 && review && reviewMode === 'publish')) throw e;

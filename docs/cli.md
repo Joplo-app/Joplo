@@ -323,22 +323,23 @@ npx joplo whoami --format json
 
 PR 预览（`--pr`）与按场景/功能保密分享（`--scenario` / `--feature`）隐含私密，不要求可见性参数；显式 `--public` 在本地退出 2。仍须选择是否同时发评审版。对比使用 `diff publish`，始终私密且不支持评审版，不要求上述两项。
 
-`--review` 先发布主分享，再发布包含所有方案、可评论的独立私密评审链接。JSON 的主链接为 `data.url`，评审链接为 `data.review.url`（其 `mode` 为 review）；文本分行显示。评审版不进入作品集。第二次发布失败时主分享可能已上线且已记入记录：stderr 给出主链接，重试时沿用同样选择，不加 `--new`。
+`--review` 先发布主分享，再发布包含所有方案、可评论的独立私密评审链接。JSON 的主链接为 `data.url`，评审链接为 `data.review.url`（其 `mode` 为 review）；文本分行显示。范围分享先按评审模式校验，再分别取普通版的 picked 子集和评审版的全部请求范围，分别记录范围键。如果请求范围没有 picked 场景（例如未选方案 B，或尚未 pick 的功能），只发布私密评审版：`data.mode = "review"`、`data.url` 就是评审链接，没有 `data.review`；主分享与 `--update` 的普通目标均不更新。评审版不进入作品集。第二次发布失败时主分享可能已上线且已记入记录：stderr 给出主链接，重试时沿用同样选择，不加 `--new`。
 
 公开成功时 JSON 附带云端返回的 `visibility` 与 `portfolio: {workUrl,profileUrl,needsUsername,setupPath}`；有用户名时文本输出作品详情地址，`needsUsername` 时输出“设置用户名后，这个作品会出现在你的作品集：<server><setupPath>”。字段缺失或 URL 为 null 时照常成功。`whoami` 透传可选 `username: string|null`、`portfolioUrl: string|null`；旧 Cloud 缺失时不补造值。
 
 ### 可见性兼容与字段数据流
 
-新建私密不发送 visibility（与旧客户端请求体一致）；公开发送 public；更新已有链接必须显式发送 public 或 private，以支持公开改私密。旧 Cloud HTTP 400 且信息涉及 visibility / 未知字段时，以 BAD_REQUEST、退出 1 提示“Joplo Cloud 还不支持公开分享，请改用 --private 或稍后再试”；不误走 review 清单降级重试，也不静默改私密。
+公开请求始终发送 `visibility: "public"`。本次选择私密时，新建分享不发送 visibility；更新仅在同服务器的本地分享记录中，目标链接明确为 `visibility: "public"` 时发送 `visibility: "private"`，用于撤下作品集中的公开作品。目标记录没有 visibility（旧链接）、为 private，或 `--update <链接>` 的目标不在本地记录中时，私密更新都省略此字段，保证旧 strict Cloud 仍可更新。匹配按目标 shareId 查找 main/review/scoped，不能用其他链接的 public 记录代替。记录只决定字段是否必须发送，绝不替代本次显式选择。CLI 与看板共用此规则。旧 Cloud HTTP 400 且信息涉及 visibility / 未知字段时，以 BAD_REQUEST、退出 1 提示“Joplo Cloud 还不支持公开分享，请改用 --private 或稍后再试”；不误走 review 清单降级重试，也不静默改私密。
 
 | 字段 | 写入点 → 存储 → 读取点 → 消费者 |
 | --- | --- |
 | visibility / review 选择 | 看板 radio/checkbox → POST 本机 cloud/publish → server 校验并存 CloudHub.job.request → cloud-bridge 转本次 ShareOptions → CLI shareChoices → CloudClient POST shares；review 拆成第二个始终私密的请求 |
 | CLI 可见性 / 评审选择 | 本次参数或 TTY 回答 → 仅本次内存 → share → CloudClient；不从配置或记录回填 |
+| mode（仅评审结果） | 请求范围没有 picked 子集 → CLI 只发布评审 → data.mode=review、data.url 为评审链接 → cloud-bridge → CloudHub.job.result → 看板标明链接含全部方案且始终私密；主分享与 --update 目标不更新 |
 | visibility 返回值 | Cloud finalize → CLI 白名单解析 → data.visibility → cloud-bridge → CloudHub.job.result（GET / 推送）→ 看板结果；旧云端省略 |
 | portfolio | Cloud finalize → CLI readPortfolio → data.portfolio → cloud-bridge → CloudHub.job.result → 看板作品详情或 <server><setupPath> 新标签链接；缺失和 null 兼容 |
 | username / portfolioUrl | Cloud GET me → CloudClient.me → whoami JSON / cloud-bridge.account → server account → 看板账号模型；仅返回已存在字段 |
-| 链接 visibility 记录 | CLI finalize 后 atomicJson 写 .joplo/cloud.json 的主/review/scoped 链接 → bridge.links(projectDir) → GET /__joplo/p/<id>/cloud/links → 看板仅作更新预填，缺失按私密；CLI 选项永不读取它 |
+| 链接 visibility 记录 | CLI finalize 后 atomicJson 写 .joplo/cloud.json 的 main/review/scoped 链接 → readShareRecord 按同服务器读取 → ① bridge.links → 本机 /cloud/links → 看板更新预填（缺字段私密，读取失败禁用发布并重试）；② CLI 按本次 replaceShareId 匹配记录，仅 public→private 更新显式发 private，private/缺字段/无匹配省略。CLI 仍独立要求本次选择，不用记录补选项 |
 | 云端 shares 列表 visibility | Cloud GET shares 每项 → 控制台列表消费者；开源 CLI 目前不消费该列表，看板从上述本机记录与任务结果读，缺失按私密 |
 | 作者 name / url | Cloud 删除作者自带同名 meta 并仅为公开分享注入 head meta joplo-author → 分享 HTML → readAuthor → 普通播放器顶栏和结束画面；不写入 IR/本地记录，不进入嵌入/导出 |
 
@@ -358,7 +359,7 @@ npx joplo share --private --no-review --feature invite                      # �
 - **保密靠构建时裁剪**，不是隐藏导航：上传的所有文件（内联 IR 的 index.html、voice/、`_joplo/preview.png`）和评审清单里都没有范围外功能、方案、场景的 id、名字、目标、角色、说明和步骤文字。深链接 `#/f/<功能>?s=<场景>` 和嵌入的 `scenario=` 只决定从哪里开始看，不算保密。
 - 保留：范围内场景及其方案、功能；场景用得到的画面（起始画面、`go()` 能到的画面、方案的层级画面）和这些画面的路径。去掉：范围外的分叉、规则、情况、问题，以及**项目说明**（常常概述所有功能）；项目名保留。
 - **借用**：同一路径上别的功能堆进来的元素（含 `when` 隐藏的）默认去掉；范围内步骤引用到它（操作目标、镜头、标注、焦点提示、标注气泡、trace）时，只保留那一条贡献子树，去掉暴露方案 id 的 `from`。场景跳到别的功能新增的路径时，这个页面也按借用保留，去掉 `addedBy`。stderr 每项一行 `Borrowed from another feature: <功能名> › element "<id>" on <路径> (referenced by …)`，JSON 在 `data.scope.borrowed`，照常发布，由作者判断能不能分享；不想带上就改场景。
-- 写错场景 / 功能（NOT_FOUND，列出相近或可分享的场景）、场景属于没选定的方案、功能没有选定方案（USAGE，退出 2）、范围为空时，在构建和任何云端请求之前失败。旧版 `@joplo-app/server` 忽略范围时（产物里有范围外场景）报 UNSUPPORTED_ACTION，不上传。
+- 写错场景 / 功能（NOT_FOUND，列出相近或可分享的场景）、范围为空时，在构建和任何云端请求之前失败。不带 `--review` 时，场景属于没选定的方案、功能没有选定方案（USAGE，退出 2）同样提前失败；带 `--review` 时允许这些范围，普通版只含 picked 子集，没有 picked 子集就仅发布私密评审版。旧版 `@joplo-app/server` 忽略范围时（产物里有范围外场景）报 UNSUPPORTED_ACTION，不上传。
 - 预览图用范围内第一个场景（按演示顺序），用裁剪后的 IR 渲染。朗读音频只带范围内步骤用到的。
 - 每个范围是**单独的分享**，记在 `.joplo/cloud.json` 的 `scoped: { <范围键>: { shareId, url } }`，范围键是排序后的场景 id 用逗号连接（评审版加 `review:` 前缀），不覆盖主链接和评审链接。Pro 再次分享同一范围更新原链接，`--new` 新建；场景改名后是新范围、新链接。
 - 默认标题是“项目名 · 场景名”（多个场景时“项目名 · N scenarios”）。文本输出多一行 `Scope: …`；JSON 的 `data.scope = {key, scenarios, features, borrowed}`。

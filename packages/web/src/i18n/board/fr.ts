@@ -6,6 +6,7 @@ import type { BoardDictionary } from './en';
 export function createBoardFr(locale: Locale = 'fr') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudLinksFailed: "Impossible de lire les liens de partage existants. La publication est suspendue. Réessayez.",
       cloudPublic: "Public",
       cloudPrivate: "Privé",
       cloudPublicNote: "Public : ajouté au portfolio show.joplo.app/@utilisateur et indexé par les moteurs de recherche.",

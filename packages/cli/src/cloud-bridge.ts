@@ -83,7 +83,7 @@ export function cloudBridge(opts: BridgeOptions): CloudBridge {
       try {
         const { share } = await import('./cloud-share.ts');
         const { result, plan } = await share(c, projectDir, { public: request.visibility === 'public', private: request.visibility === 'private', review: request.review, ...(request.scenarios?.length ? { scenarios: request.scenarios } : {}), ...(request.features?.length ? { features: request.features } : {}) }, opts.build, opts.render);
-        return { shareId: result.shareId, url: result.url, expiresAt: result.expiresAt, version: result.version, plan, ...(result.scope ? { scope: result.scope } : {}), ...(result.storage ? { storage: result.storage } : {}), ...(result.visibility ? { visibility: result.visibility } : {}), ...(result.portfolio ? { portfolio: result.portfolio } : {}), ...(result.review ? { review: { url: result.review.url, shareId: result.review.shareId } } : {}) };
+        return { shareId: result.shareId, url: result.url, expiresAt: result.expiresAt, version: result.version, plan, ...(result.scope ? { scope: result.scope } : {}), ...(result.storage ? { storage: result.storage } : {}), ...(result.mode ? { mode: result.mode } : {}), ...(result.visibility ? { visibility: result.visibility } : {}), ...(result.portfolio ? { portfolio: result.portfolio } : {}), ...(result.review ? { review: { url: result.review.url, shareId: result.review.shareId } } : {}) };
       } catch (e) {
         const code = e instanceof CloudError || e instanceof JoploError ? e.code : 'INTERNAL';
         // 检查没过：带上第一条错误的位置，看板里直接能看到改哪里

@@ -28,6 +28,9 @@ export function useCloudPublish(projectId: string) {
   const [job, setJob] = useState<CloudJob | null>(null);
   const [links, setLinks] = useState<CloudLinks>({ main: null });
   const [linksReady, setLinksReady] = useState(false);
+  const [linksError, setLinksError] = useState<Text | null>(null);
+  const [linksAttempt, setLinksAttempt] = useState(0);
+  const retryLinks = useCallback(() => setLinksAttempt(n => n + 1), []);
   const [startError, setStartError] = useState<Text | null>(null);
 
   useEffect(() => {
@@ -50,12 +53,15 @@ export function useCloudPublish(projectId: string) {
   useEffect(() => {
     let alive = true;
     setLinksReady(false);
+    setLinksError(null);
     if (open) {
       void refresh();
-      void fetchCloudLinks(projectId).then((next) => { if (alive) { setLinks(next); setLinksReady(true); } });
+      void fetchCloudLinks(projectId)
+        .then((next) => { if (alive) { setLinks(next); setLinksReady(true); } })
+        .catch(() => { if (alive) setLinksError(m.board.cloudLinksFailed); });
     }
     return () => { alive = false; };
-  }, [open, refresh, projectId, job?.state]);
+  }, [open, refresh, projectId, job?.state, linksAttempt]);
 
   const publish = useCallback(
     async (ctx: CloudContext, choice: CloudScopeChoice, visibility: CloudVisibility, review: boolean) => {
@@ -67,7 +73,7 @@ export function useCloudPublish(projectId: string) {
     [projectId],
   );
 
-  return { open, setOpen, anchor, setAnchor, acct, refresh, job, links, linksReady, publish, startError, running: job?.state === 'running' };
+  return { open, setOpen, anchor, setAnchor, acct, refresh, job, links, linksReady, linksError, retryLinks, publish, startError, running: job?.state === 'running' };
 }
 export type CloudPublishModel = ReturnType<typeof useCloudPublish>;
 
@@ -248,11 +254,12 @@ export function VisibilityFields({ visibility, review, onVisibility, onReview, d
   </div>;
 }
 
-export function PublicationLinks({ result, server }: { result: { visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string } }; server: string }) {
+export function PublicationLinks({ result, server }: { result: { mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string } }; server: string }) {
   const { t: i18n } = useBoardI18n();
   const p = result.portfolio;
   return <div className="flex flex-col gap-1 text-[12px]" data-testid="cloud-publication-links">
     <span>{result.visibility === 'public' ? i18n.board.cloudPublic : i18n.board.cloudPrivate}</span>
+    {result.mode === 'review' ? <p>{i18n.board.cloudReviewNote}</p> : null}
     {result.visibility === 'public' && p && (p.needsUsername || p.workUrl) ? <a href={p.needsUsername ? `${server}${p.setupPath}` : p.workUrl!} target="_blank" rel="noopener noreferrer" className="jb-focus text-jb-cloud hover:underline">{p.needsUsername ? i18n.board.cloudSetupUsername : i18n.board.cloudPortfolioWork}</a> : null}
     {result.review ? <a href={result.review.url} target="_blank" rel="noopener noreferrer" className="jb-focus text-jb-cloud hover:underline">{i18n.board.cloudAlsoReview} · {i18n.board.cloudPrivate}</a> : null}
   </div>;
@@ -305,8 +312,8 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
     body = <LoginBlock command={command} message={signedOut?.message ?? job?.error?.message} onCheck={() => void check()} checking={acct.loading} stillOut={stillOut} />;
   } else {
     const running = job?.state === 'running';
-    // 发布只包含确认过的方案：所选范围里没有时先说清楚、给出下一步，不让作者点了发布才看到英文报错
-    const unpicked = cloudUnpicked(choice, ctx, picks);
+    // 普通版只包含已选方案；评审允许未选方案，空普通范围由 CLI 仅发布私密评审。
+    const unpicked = review ? null : cloudUnpicked(choice, ctx, picks);
     body = (
       <div className="flex flex-col gap-3">
         {account?.signedIn ? (
@@ -322,6 +329,12 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
             plan={account.plan}
             full={job?.state === 'failed' && !!job.error?.storage}
           />
+        ) : null}
+        {model.linksError ? (
+          <div role="alert" className="flex flex-col gap-2 text-[12px] text-jb-danger" data-testid="cloud-links-error">
+            <LocalText value={model.linksError} />
+            <Btn icon={<RotateCw className="size-4" />} label={i18n.board.cloudTryAgain} onClick={model.retryLinks} className="self-start" data-testid="cloud-links-retry" />
+          </div>
         ) : null}
         <div className="flex flex-col gap-1.5">
           <div className="text-[12px] font-semibold tracking-[0.5px] text-jb-muted">{i18n.board.cloudScope}</div>
@@ -356,7 +369,7 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
           data-testid="cloud-publish"
         >
           {running ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />}
-          {!model.linksReady ? i18n.board.cloudStageChecking : running ? i18n.board.cloudPublishing : job?.state === 'done' ? i18n.board.cloudPublishAgain : job?.state === 'failed' ? i18n.board.cloudTryAgain : i18n.board.cloudPublishButton}
+          {model.linksError ? i18n.board.cloudPublishButton : !model.linksReady ? i18n.board.cloudStageChecking : running ? i18n.board.cloudPublishing : job?.state === 'done' ? i18n.board.cloudPublishAgain : job?.state === 'failed' ? i18n.board.cloudTryAgain : i18n.board.cloudPublishButton}
         </button>
       </div>
     );
