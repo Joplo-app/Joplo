@@ -219,7 +219,16 @@ Right, it says why: .click('share', 'Xiaoyu shares the itinerary', narrate('She 
 A character speaking: .click('can_go', 'Ajie replies: I can go', say('Count me in!'))
 Check: read every line aloud in order without looking at the screen. It should sound like one person telling one story, briskly.
 
-## 7. Before handing over
+## 7. Explainers and news-style demos (a topic, not a product)
+When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets.
+- Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. One chapter per scenario, one case per chapter.
+- Case titles are what viewers read in the board sidebar: for an explainer write them as numbered chapter headlines ('01 What is on the ballot?'), not acceptance criteria; name the option after the style ('Dark quick-cut'), not 'A'.
+- Graphics that carry the story: a seat chart filling up, a tile map recoloring, bars growing or flipping, a document flying between two sides and getting stamped. Build them from divs with style bound to state (demo: Custom motion) and real photos (components: Real images).
+- Facts: keep every number in one data module with its source and as-of time, show a source line on each graphic, separate called or projected results from final ones, and leave out what you cannot verify rather than hedging on screen.
+- Photos: use public-domain or properly licensed images, credit them on stage when the license asks, keep a CREDITS file next to them, and strip EXIF / GPS metadata before embedding.
+- Follow the audience's conventions and state them in a legend (Chinese stock viewers expect red up, green down).
+
+## 8. Before handing over
 - npx joplo outline: per feature, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
 - npx joplo check: CAPTION_TOO_LONG, EXPLAIN_TOO_LONG, DESCRIPTION_TOO_LONG, CARD_TEXT_TOO_LONG, SCENARIO_TOO_LONG, HAPPY_PATH_ONLY, CASE_NOT_COVERED (names the expected result).
 - Read only the captions from start to end: do they tell the story? Then look only at key frames (npx joplo render --step-id …): does the screen show it without captions?
@@ -427,6 +436,10 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
 - For news-style graphics (a seat chart filling up, a bar growing, a document flying across), bind style values to state and give them a CSS transition: <div id="paper" style={{ left: $.data.paperX, transition: 'left 1.2s ease' }}/>. A step that set()s a new value animates the element.
 - Keep the element mounted across steps (do not swap it with when), so the browser can animate between the two values. Stagger many elements with transition-delay.
 - Cues follow the moving target: spotlight, highlight and callout keep re-measuring until its transitions end.
+- Many marks (seats, map tiles, bars): compute positions once in TS while authoring, bind each mark's color or size to $.data.<chart>.<key>, and set() a whole object per step. One set() recolors hundreds of marks; transition-delay by index makes them sweep in.
+- Props that shape a Diagram's layout (tone, label, kind) are fixed at compile time and cannot bind state. To recolor per step, draw that part with your own elements and a bound style.
+- Ids inside reusable graphics must be unique across layers: prefix them with the instance id (map_TX, not TX). A cue resolves an id to the first layer that has it, so the same id on two layers sends the director to the wrong layer, and check cannot tell which one you meant.
+- Let a missing asset() fail loudly. Do not wrap it in try/catch with a drawn fallback: a stale dev process or a wrong path then shows a substitute without any error.
 
 ## Write a theme
 - A theme is a CSS file at themes/<name>.css in the project root. Set theme: '<name>' in joplo.config.ts as the default. A custom theme overrides a built-in with the same name.
@@ -596,6 +609,8 @@ With layers, a cue switches the director to its target's layer when the step has
 - A callout / mark / highlight on another layer → FOCUS_OFF_LAYER; add shot('<id>') to switch there.
 - Several system steps with only captions → FOCUS_IDLE; set() visible state, or merge.
 - A paragraph in a callout → CALLOUT_TOO_LONG; keep it to about 24 units like captions, put the rest in explain().
+- shot() on a layer whose next step clicks outside the framed area → the click target is off screen (render warns "Outside frame"). When the whole layer fits one screen, use highlight / spotlight instead of shot.
+- numbered() on items that already print their own numbers → two sets of badges; spotlight the group instead.
 - Rings everywhere: if everything is highlighted, nothing is.
 
 ## Example

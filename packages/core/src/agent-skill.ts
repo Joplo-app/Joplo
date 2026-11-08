@@ -10,11 +10,11 @@
 /** `npx joplo skill <主题>` 的主题与一句话用途（guide.ts 生成正文；技能里按这份清单列出主题）。 */
 export const SKILL_TOPICS = [
   { name: 'authoring', description: 'Mental model, first steps, page / option / flow syntax, when conditions, a form example' },
-  { name: 'story', description: 'Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions' },
-  { name: 'demo', description: 'Layers, shots, captions, full-height layout, deep links, and screenshots' },
+  { name: 'story', description: 'Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos' },
+  { name: 'demo', description: 'Layers, shots, captions, full-height layout, custom motion and data graphics, deep links, and screenshots' },
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
   { name: 'diagram', description: 'Architecture, sequence and state diagrams: domain groups, automatic layout, traces, shot framing' },
-  { name: 'components', description: 'Component catalog, supported HTML tags, line breaks, and props' },
+  { name: 'components', description: 'Component catalog, supported HTML tags, line breaks, props, and real images' },
   { name: 'cases', description: 'Case dimensions: ask the user before starting' },
   { name: 'check', description: 'Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line' },
   { name: 'selection', description: 'Edit only the element selected by the user in the board' },
