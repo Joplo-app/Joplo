@@ -1,4 +1,4 @@
-import { $, done, flow, highlight, option, set, shot, uses } from '@joplo-app/kit';
+import { $, done, flow, highlight, missing, option, set, shot, uses } from '@joplo-app/kit';
 import { comparisonInitial, comparisonLayers } from '../../../shared/comparison/view.tsx';
 
 const matched = () => [
@@ -14,6 +14,11 @@ export default option({
   tradeoffs: ['新增与删除不制造不存在的另一版', '重复动作无法可靠匹配时明确 uncertain', '固定起点保持累计比较，重置起点的 UI 延后'],
   layers: comparisonLayers(),
   state: { ui: comparisonInitial() },
+  coverage: {
+    legible: missing('两版各占半宽，再加上播放器自带的控制条，画面里的字读不清'),
+    zoom: missing('不能放大其中一版'),
+    spot: missing('只能左右来回目测，变化卡只写原因、不写前后值'),
+  },
   scenarios: {
     rationale: flow('设计演进：比较功能，怎样才可信', { cases: ['rationale'], start: '/comparison', expected: '看见固定起点、匹配与布局选择的因果关系' })
       .card('PR 改了很多行，功能到底变了什么？', { sub: '真实需求：从固定 PR 起点看累计变化，而不是只看源码行数。' })

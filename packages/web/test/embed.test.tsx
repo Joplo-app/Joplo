@@ -150,6 +150,10 @@ describe('画面', () => {
     expect(html).toContain('data-testid="embed-stage"');
     expect(html).not.toContain('data-testid="embed-voice"');
     expect(html).not.toContain('data-testid="curtain"');
+    // The diff page drives both players; their own control bars would only shrink the stage.
+    expect(html).not.toContain('data-testid="embed-bar"');
+    expect(html).not.toContain('data-testid="embed-cover-footer"');
+    expect(html).toContain('data-testid="subtitle"');
     expect(parseEmbedParams('?embed=1&diff=1')?.diff).toBe(true);
   });
   it('只有一个场景时没有场景切换；没有场景时显示空状态和品牌', () => {

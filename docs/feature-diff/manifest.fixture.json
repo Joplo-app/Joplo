@@ -36,12 +36,14 @@
           "before": {
             "id": "invite.main.send#1",
             "position": 1,
-            "key": "open"
+            "key": "open",
+            "caption": "Open"
           },
           "after": {
             "id": "invite.main.send#1",
             "position": 1,
-            "key": "open"
+            "key": "open",
+            "caption": "Open"
           },
           "status": "unchanged",
           "match": "key",
@@ -52,7 +54,8 @@
           "after": {
             "id": "invite.main.send#2",
             "position": 2,
-            "key": "preview"
+            "key": "preview",
+            "caption": "Preview"
           },
           "status": "added",
           "match": "none",
@@ -64,29 +67,41 @@
           "before": {
             "id": "invite.main.send#2",
             "position": 2,
-            "key": "send"
+            "key": "send",
+            "caption": "Send"
           },
           "after": {
             "id": "invite.main.send#3",
             "position": 3,
-            "key": "send"
+            "key": "send",
+            "caption": "Send"
           },
           "status": "modified",
           "match": "key",
           "reasons": [
             "effects"
+          ],
+          "results": [
+            {
+              "kind": "state",
+              "label": "ui.status",
+              "before": "Sent",
+              "after": "Sending…"
+            }
           ]
         },
         {
           "before": {
             "id": "invite.main.send#3",
             "position": 3,
-            "key": "complete"
+            "key": "complete",
+            "caption": "Complete"
           },
           "after": {
             "id": "invite.main.send#4",
             "position": 4,
-            "key": "complete"
+            "key": "complete",
+            "caption": "Complete"
           },
           "status": "unchanged",
           "match": "key",
@@ -108,11 +123,13 @@
         {
           "before": {
             "id": "invite.main.initial#1",
-            "position": 1
+            "position": 1,
+            "caption": "Finish"
           },
           "after": {
             "id": "invite.main.initial#1",
-            "position": 1
+            "position": 1,
+            "caption": "Finish"
           },
           "status": "unchanged",
           "match": "content",
@@ -132,11 +149,13 @@
         {
           "before": {
             "id": "invite.main.unchanged#1",
-            "position": 1
+            "position": 1,
+            "caption": "Read"
           },
           "after": {
             "id": "invite.main.unchanged#1",
-            "position": 1
+            "position": 1,
+            "caption": "Read"
           },
           "status": "unchanged",
           "match": "content",
@@ -157,7 +176,8 @@
           "before": null,
           "after": {
             "id": "invite.main.ambiguous#1",
-            "position": 1
+            "position": 1,
+            "caption": "Retry"
           },
           "status": "uncertain",
           "match": "uncertain",
@@ -169,7 +189,8 @@
           "before": null,
           "after": {
             "id": "invite.main.ambiguous#2",
-            "position": 2
+            "position": 2,
+            "caption": "Retry"
           },
           "status": "uncertain",
           "match": "uncertain",
@@ -181,7 +202,8 @@
           "before": null,
           "after": {
             "id": "invite.main.ambiguous#3",
-            "position": 3
+            "position": 3,
+            "caption": "Retry"
           },
           "status": "uncertain",
           "match": "uncertain",
@@ -192,7 +214,8 @@
         {
           "before": {
             "id": "invite.main.ambiguous#1",
-            "position": 1
+            "position": 1,
+            "caption": "Retry"
           },
           "after": null,
           "status": "uncertain",
@@ -204,7 +227,8 @@
         {
           "before": {
             "id": "invite.main.ambiguous#2",
-            "position": 2
+            "position": 2,
+            "caption": "Retry"
           },
           "after": null,
           "status": "uncertain",
@@ -216,11 +240,13 @@
         {
           "before": {
             "id": "invite.main.ambiguous#3",
-            "position": 3
+            "position": 3,
+            "caption": "Finish"
           },
           "after": {
             "id": "invite.main.ambiguous#4",
-            "position": 4
+            "position": 4,
+            "caption": "Finish"
           },
           "status": "unchanged",
           "match": "content",
@@ -241,7 +267,8 @@
           "before": null,
           "after": {
             "id": "invite.main.batch#1",
-            "position": 1
+            "position": 1,
+            "caption": "Select team"
           },
           "status": "added",
           "match": "none",
@@ -253,7 +280,8 @@
           "before": null,
           "after": {
             "id": "invite.main.batch#2",
-            "position": 2
+            "position": 2,
+            "caption": "Send batch"
           },
           "status": "added",
           "match": "none",
@@ -275,7 +303,8 @@
         {
           "before": {
             "id": "invite.main.removed#1",
-            "position": 1
+            "position": 1,
+            "caption": "Legacy"
           },
           "after": null,
           "status": "removed",

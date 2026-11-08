@@ -1,15 +1,22 @@
 /** Public feature comparison. Positional ids are addresses, never cross-version identities. */
 import { z } from 'zod';
-import { Project, type Scenario, type Step } from './schema.ts';
+import { Project, type Effect, type Scenario, type Step } from './schema.ts';
 import { JoploError } from './result.ts';
 
 export const GitSha = z.string().regex(/^[a-f0-9]{40}$/);
 export const DiffSource = z.strictObject({ sha: GitSha.nullable() });
-const Ref = z.strictObject({ id: z.string(), position: z.number().int().positive(), key: z.string().optional() });
+/** caption is the public step caption, shown so readers can tell which step changed without playing it. */
+const Ref = z.strictObject({ id: z.string(), position: z.number().int().positive(), key: z.string().optional(), caption: z.string().max(300).optional() });
+/**
+ * What a reader can see change when the step runs: state values written by set/stream/append,
+ * toast text and the scenario outcome. null = this version's step does not produce it.
+ */
+const Result = z.strictObject({ kind: z.enum(['state', 'message', 'outcome']), label: z.string().max(120), before: z.string().max(200).nullable(), after: z.string().max(200).nullable() });
 const Status = z.enum(['added', 'modified', 'removed', 'unchanged', 'uncertain']);
 export const DiffStep = z.strictObject({
   before: Ref.nullable(), after: Ref.nullable(), status: Status,
   match: z.enum(['key', 'content', 'action', 'none', 'uncertain']), reasons: z.array(z.string()),
+  results: z.array(Result).max(12).optional(),
 });
 export const DiffScenario = z.strictObject({
   featureId: z.string(), featureName: z.string(), name: z.string(),
@@ -39,7 +46,40 @@ const identity = (s: Step) => {
   const a = s.action;
   return canonical([s.kind, a.type, 'target' in a ? a.target : 'name' in a ? a.name : 'keys' in a ? a.keys : 'title' in a ? a.title : null]);
 };
-const ref = (s: Step, index: number) => ({ id: s.id, position: index + 1, ...(s.key ? { key: s.key } : {}) });
+const ref = (s: Step, index: number) => ({ id: s.id, position: index + 1, ...(s.key ? { key: s.key } : {}), caption: s.caption.slice(0, 300) });
+/** Presentation-only step fields, grouped into reader-facing reasons. Unlisted content changes fall back to 'presentation'. */
+const PRESENTATION: [string, (keyof Step)[]][] = [
+  ['caption', ['caption', 'captionAuto']], ['explain', ['explain']], ['camera', ['shots', 'directorLayer']],
+  ['annotations', ['marks', 'cues', 'callouts']], ['voice', ['say', 'narrate']], ['timing', ['hold']],
+  ['trace', ['traces']], ['forks', ['forks']], ['kind', ['kind']],
+];
+const KIND_ORDER = { state: 0, message: 1, outcome: 2 } as const;
+const shown = (v: unknown) => (typeof v === 'string' ? v : canonical(v)).slice(0, 200);
+/** Final visible value per result slot; the last write in a step wins, appends and toasts accumulate. */
+function resultSlots(effects: Effect[]) {
+  const slots = new Map<string, { kind: keyof typeof KIND_ORDER; label: string; value: string }>();
+  const add = (key: string, kind: keyof typeof KIND_ORDER, label: string, value: string, accumulate = false) => {
+    const prev = slots.get(key);
+    slots.set(key, { kind, label, value: (accumulate && prev ? `${prev.value} · ${value}` : value).slice(0, 200) });
+  };
+  for (const e of effects) {
+    if (e.type === 'set' || e.type === 'stream') add(`s:${e.path}`, 'state', e.path, shown(e.value));
+    else if (e.type === 'append') add(`a:${e.path}`, 'state', `${e.path} +`, shown(e.value), true);
+    else if (e.type === 'toast') add('toast', 'message', 'toast', e.text, true);
+    else if (e.type === 'complete') add('done', 'outcome', 'done', e.outcome === 'success' ? e.text : `${e.text} (${e.outcome})`);
+  }
+  return slots;
+}
+function resultChanges(before: Effect[], after: Effect[]): NonNullable<DiffStep['results']> {
+  const b = resultSlots(before), a = resultSlots(after);
+  const keys = [...new Set([...a.keys(), ...b.keys()])];
+  return keys
+    .map(k => ({ slot: (a.get(k) ?? b.get(k))!, before: b.get(k)?.value ?? null, after: a.get(k)?.value ?? null }))
+    .filter(r => r.before !== r.after)
+    .sort((x, y) => KIND_ORDER[x.slot.kind] - KIND_ORDER[y.slot.kind])
+    .slice(0, 12)
+    .map(r => ({ kind: r.slot.kind, label: r.slot.label.slice(0, 120), before: r.before, after: r.after }));
+}
 const groups = (steps: Step[], fn: (s: Step) => string) => {
   const map = new Map<string, number[]>();
   steps.forEach((s, i) => { const k = fn(s); map.set(k, [...(map.get(k) ?? []), i]); });
@@ -93,9 +133,12 @@ export function compareSteps(before: Step[], after: Step[]): DiffStep[] {
     const reasons: string[] = [];
     if (canonical(old.action) !== canonical(s.action)) reasons.push('action');
     if (canonical(old.effects) !== canonical(s.effects)) reasons.push('effects');
+    const presentation = PRESENTATION.filter(([, fields]) => fields.some(f => canonical(old[f]) !== canonical(s[f]))).map(([reason]) => reason);
+    reasons.push(...presentation);
     if (canonical(stepContent(old)) !== canonical(stepContent(s)) && !reasons.length) reasons.push('presentation');
     if ([...pairs].some(([otherJ, other]) => (otherJ - j) * (other.index - pair.index) < 0)) reasons.push('order');
-    rows.push({ before: ref(old, pair.index), after: ref(s, j), status: reasons.length ? 'modified' : 'unchanged', match: pair.match, reasons });
+    const results = reasons.includes('effects') ? resultChanges(old.effects, s.effects) : [];
+    rows.push({ before: ref(old, pair.index), after: ref(s, j), status: reasons.length ? 'modified' : 'unchanged', match: pair.match, reasons, ...(results.length ? { results } : {}) });
   });
   before.forEach((_, i) => addBefore(i));
   return rows;

@@ -32,9 +32,38 @@ describe('feature diff matching reliability', () => {
     const b = [step('Open', 1, 'open'), step('Send', 2, 'send')];
     const a = [step('Different', 1, 'send'), step('Open', 2, 'open')];
     const rows = compareSteps(b, a);
-    expect(rows[0]).toMatchObject({ match: 'key', before: { position: 2 }, after: { position: 1 }, reasons: ['action', 'order'] });
+    expect(rows[0]).toMatchObject({ match: 'key', before: { position: 2 }, after: { position: 1 }, reasons: ['action', 'caption', 'order'] });
     expect(rows[1]!.reasons).toContain('order');
     expect(compareSteps(b, [step('Open', 1, 'renamed'), b[1]!]).some(r => r.before?.key === 'open' && r.after)).toBe(false);
+  });
+  it('names the presentation fields that changed and carries public captions for readers', () => {
+    const b = [step('Open', 1, 'open')], a = [structuredClone(b[0]!)];
+    a[0]!.caption = 'Open the invite dialog'; a[0]!.explain = 'Now with a preview'; a[0]!.hold = 2000;
+    const [row] = compareSteps(b, a);
+    expect(row).toMatchObject({ status: 'modified', reasons: ['caption', 'explain', 'timing'], after: { caption: 'Open the invite dialog' } });
+    expect(row!.before!.caption).toBe(b[0]!.caption);
+    a[0] = { ...structuredClone(b[0]!), caption: 'x'.repeat(400) };
+    expect(compareSteps(b, a)[0]!.after!.caption).toHaveLength(300);
+  });
+  it('lists the visible result values that changed, with before and after side by side', () => {
+    const b = [step('Send', 1, 'send')], a = [structuredClone(b[0]!)];
+    b[0]!.effects = [{ type: 'set', path: 'ui.status', value: 'Sent' }, { type: 'set', path: 'ui.count', value: 1 }, { type: 'toast', text: 'Done', tone: 'info' }];
+    a[0]!.effects = [{ type: 'set', path: 'ui.status', value: 'Draft' }, { type: 'set', path: 'ui.status', value: 'Sending…' }, { type: 'set', path: 'ui.count', value: 1 }, { type: 'set', path: 'data.invite', value: { to: 'lin@example.com' } }, { type: 'complete', text: 'Invitation sent', outcome: 'success' }];
+    const [row] = compareSteps(b, a);
+    // Last write wins; unchanged values are omitted; a side that does not write the value is null.
+    expect(row!.results).toEqual([
+      { kind: 'state', label: 'ui.status', before: 'Sent', after: 'Sending…' },
+      { kind: 'state', label: 'data.invite', before: null, after: '{"to":"lin@example.com"}' },
+      { kind: 'message', label: 'toast', before: 'Done', after: null },
+      { kind: 'outcome', label: 'done', before: null, after: 'Invitation sent' },
+    ]);
+    a[0]!.effects = [{ type: 'set', path: 'ui.status', value: 'y'.repeat(500) }, ...Array.from({ length: 20 }, (_, i) => ({ type: 'set' as const, path: `ui.f${i}`, value: i }))];
+    const capped = compareSteps(b, a)[0]!.results!;
+    expect(capped).toHaveLength(12);
+    expect(capped[0]!.after).toHaveLength(200);
+    // Only result changes carry results; caption-only edits do not.
+    const c = [structuredClone(b[0]!)]; c[0]!.caption = 'Send now';
+    expect(compareSteps(b, c)[0]!.results).toBeUndefined();
   });
   it.each(['initial', 'scene', 'theme', 'roles'] as const)('detects %s changes without changed actions', input => {
     const b = diffProject(), a = structuredClone(b);
