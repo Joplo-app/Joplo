@@ -58,7 +58,8 @@ export function viewProject(project: Project, contentLocale: string | null | und
 export function siteVoiceLookup(index: VoiceIndex | null | undefined, contentLocale: string | null | undefined): VoiceLookup | null {
   if (!index) return null;
   const own = contentLocale ? index.locales?.[contentLocale] : undefined;
-  return { narrator: own ? own.narrator : index.narrator, roles: own ? own.roles : index.roles, clips: index.clips };
+  const v = own ?? index;
+  return { narrator: v.narrator, roles: v.roles, clips: index.clips, ...(v.overrides ? { overrides: v.overrides } : {}) };
 }
 
 /** 看板的声音指纹：服务端给了这种内容语言的声音（byLocale）就用它，否则用默认声音。 */

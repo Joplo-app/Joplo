@@ -250,8 +250,8 @@ export class VoiceHub {
     const cache = new VoiceCache(dir);
     const selected = cache.selection();
     const pins = cache.pins();
-    const r = resolveVoices(project?.voiceConfig, selected, this.store, null, fallback, pins);
-    const per = Object.fromEntries((project?.i18n?.locales ?? []).map((l) => [l, resolveVoices(project?.voiceConfig, selected, this.store, voiceLocaleOf(project, l), fallback, pins)]));
+    const r = resolveVoices(project?.voiceConfig, selected, this.store, null, fallback, pins, cache.officialCloud());
+    const per = Object.fromEntries((project?.i18n?.locales ?? []).map((l) => [l, resolveVoices(project?.voiceConfig, selected, this.store, voiceLocaleOf(project, l), fallback, pins, cache.officialCloud())]));
     const all = Object.values(per);
     const cur = cache.current({ narrator: r.voices.narrator, roles: r.voices.roles }, all.flatMap((x) => [x.voices.narrator, ...Object.values(x.voices.roles)]).filter((x): x is string => !!x));
     const job = this.jobs.get(projectId);
@@ -281,7 +281,7 @@ export class VoiceHub {
   private async resolveFor(dir: string, project: Project | null, content: string | null) {
     const fallback = this.fallbackOf(await this.cloudStatus());
     const cache = new VoiceCache(dir);
-    return resolveVoices(project?.voiceConfig, cache.selection(), this.store, voiceLocaleOf(project, content), fallback, cache.pins());
+    return resolveVoices(project?.voiceConfig, cache.selection(), this.store, voiceLocaleOf(project, content), fallback, cache.pins(), cache.officialCloud());
   }
 
   /**

@@ -74,7 +74,7 @@ export async function generateProjectVoice(opts: VoiceRunOptions): Promise<Voice
   const selected = cache.selection();
   const pins = cache.pins();
   const project = opts.project;
-  const base = resolveVoices(project.voiceConfig, selected, store, null, fallback, pins);
+  const base = resolveVoices(project.voiceConfig, selected, store, null, fallback, pins, cache.officialCloud());
   const usageUrl = status ? `${status.server}/usage` : null;
   if (!base.profile) {
     if (base.missing) throw new VoiceError('NOT_FOUND', `joplo.config.ts asks for voice profile "${base.missing}", which is not set up on this computer. Use cloud, openai or elevenlabs`);
@@ -96,7 +96,7 @@ export async function generateProjectVoice(opts: VoiceRunOptions): Promise<Voice
   const result: VoiceRunResult = { profile: { id: base.profile.id, name: base.profile.name, kind: base.profile.kind }, source: base.source, dryRun: !!opts.dryRun, locales: [], total: { segments: 0, missing: 0, chars: 0, generated: 0, failed: 0 }, quota, usageUrl, exhausted: null };
   for (const locale of locales) {
     const p = locale ? localizeProject(project, locale) : project;
-    const resolved = resolveVoices(project.voiceConfig, selected, store, voiceLocaleOf(project, locale), fallback, cache.pins());
+    const resolved = resolveVoices(project.voiceConfig, selected, store, voiceLocaleOf(project, locale), fallback, cache.pins(), cache.officialCloud());
     const segments = projectSegments(p);
     const est = estimateVoice(segments, resolved, cache);
     const row: VoiceRunLocale = { locale, segments: segments.length, missing: est.steps, chars: est.chars, generated: 0, skipped: 0, failed: [] };

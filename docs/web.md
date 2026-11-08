@@ -183,7 +183,9 @@ trace 同时提供镜头目标。取景保留上下文：镜头对准图表里�
 - **发布站与嵌入**：`joplo build` 把当前声音已生成的音频拷进站点 `voice/`，IR 带上 `voiceIndex`（声音指纹与片段地址）；发布站和嵌入在带了音频时朗读默认开（观众可点 🔊 关掉；没有音频时默认关，点 🔊 才用浏览器朗读；浏览器在观众按播放前拒绝出声时跳过这一段，播放照常进行；PR 差异的同步播放始终静音），用 `<audio>` 播放同一站点的文件（分享页 `connect-src 'none'` 下也能用），没有音频的步骤用观众浏览器朗读。
 - **终端**：`npx joplo voice [dir]` 与看板的「生成缺少的音频」同一套缓存与规则（选定方案的所有场景、每种内容语言），`--dry-run` 只估算，见 [CLI 文档](cli.md#voice)。
 - **接口**（都要本机令牌）：`GET/PUT/DELETE /__joplo/voice/profiles[/:id]`（PUT 只能改预设的默认音色与 Key）、`POST /__joplo/voice/test`（OpenAI / ElevenLabs 的 Key）、`GET /__joplo/p/:id/voice[?refresh=1]`（状态里有 `cloud`：是否登录、额度、用量页、是否收到过 402）、`PUT /__joplo/p/:id/voice`、`POST /__joplo/p/:id/voice/generate`、`POST /__joplo/p/:id/voice/clip`（Joplo Cloud 朗读返回 409 `CLOUD_GENERATE_ONLY`）、`GET /__joplo/p/:id/voice/clips/:file`；状态变化推 HMR 事件 `joplo:voice`。实现见 `packages/server/src/voice.ts`、`voice-http.ts`，网页 `runtime/voice.ts`、`board/Voice.tsx`、`player/SiteVoice.tsx`，纯函数 `core/src/voice.ts`。
-- **重新发布沿用音频**：项目没选过来源（默认来源，例如登录后默认 Joplo Cloud）、又有上一次的分享时（`share` 更新同一个链接、`share --update`），按分享里的声音指纹沿用并打包，默认来源变了也不会让已发布的音频丢失；在看板里明确选过来源时按选的来源。
+- **重新发布沿用音频**：项目没选过来源（默认来源，例如登录后默认 Joplo Cloud）、又有上一次的分享时（`share` 更新同一个链接、`share --update`），逐片段优先带上本机按当前默认来源生成的有效音频，再按上次分享中相同文字的实际指纹补齐；新增语言、换了默认音色或新旧来源不同也能共存，发布索引按语言、角色与文字记录实际声音，后续换电脑更新仍能沿用。在看板或 config 里明确选过来源时按选的来源，不再继承旧来源。
+- **旧来源的 cloud 名称冲突**：旧版自建、id 为 `cloud` 的来源会以 `cloud-old`（重名时加序号）显示为“不再支持”，旧的看板选择和 `voice.profile: 'cloud'` 继续使用其原指纹，已生成音频仍可播放、发布。主动在看板选「Joplo Cloud 朗读」会持久记住官方选择；若来源由 config 控制，将 `voice.profile` 改为明确的官方名称 `'Joplo Cloud'`。切换前不会用官方 cloud 代替旧来源生成，也不会转用旧 Key。
+- **音色记录恢复**：`pins` 逐层校验语言、映射与六种固定音色 ID；损坏项单独忽略，保留合法项，缺失项按推荐规则选择并在成功生成后记下。无需删除整个 `.joplo/voice/index.json`，其中还保存已有音频的索引。
 - **已知限制**：视频导出还不带声音（第二期）；看板外观不发布；角色的音色只能在 `joplo.config.ts` 的 `voice.roles` 里写；观众切到别的语言时，自动字幕那几步用浏览器朗读。
 
 ## 全屏与快捷键

@@ -57,6 +57,8 @@ export type VoiceProfile = {
   key?: string;
   /** 不再支持的旧 profile（D85）：不能再生成；声音指纹不变，已生成的音频照常播放与发布。由 ProfileStore 标出，不写进文件。 */
   unsupported?: true;
+  /** 旧 id=cloud 的持久兼容别名；新项目默认 cloud 与明确选择官方 cloud 不使用它。 */
+  legacyId?: 'cloud';
 };
 
 /**
@@ -225,7 +227,7 @@ export class ProfileStore {
         if (p.id !== 'cloud' || p.kind === 'cloud') return p;
         let id = 'cloud-old';
         for (let i = 2; list.some((x) => x.id === id); i++) id = `cloud-old-${i}`;
-        return { ...p, id };
+        return { ...p, id, legacyId: 'cloud' as const };
       });
     } catch {
       return [];
@@ -284,6 +286,15 @@ export class ProfileStore {
     const all = [...this.list(), ...(this.list().some((p) => p.id === LEGACY_AIHUBMIX.id) ? [] : [LEGACY_AIHUBMIX])];
     const hit = all.find((p) => p.id === r || p.name.toLowerCase() === r);
     return hit ? { ...hit } : null;
+  }
+
+  /** 项目升级前保存的 cloud 引用继续指向旧来源；官方名称始终可显式选用。 */
+  projectProfile(ref: string, officialCloud = false): VoiceProfile | null {
+    if (ref.trim().toLowerCase() === 'cloud' && !officialCloud) {
+      const legacy = this.list().find((p) => p.legacyId === 'cloud');
+      if (legacy) return legacy;
+    }
+    return this.find(ref);
   }
 
   /** Key：保存的优先，其次是预设对应的环境变量。cloud 不用 Key（用 CLI 的登录）；旧 profile 不再生成，也不给 Key。 */
@@ -493,6 +504,18 @@ export type ResolvedVoices = {
 /** 项目里记下的 cloud 自动音色：内容语言 → （基础音色 → 选中的音色）。 */
 export type VoicePins = Record<string, Record<string, string>>;
 
+/** 磁盘元数据不可信：只保留合法语言、基础音色和固定契约中的目标音色。 */
+function cleanVoicePins(value: unknown): VoicePins {
+  const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+  const validVoice = (v: unknown): v is string => typeof v === 'string' && (CLOUD_VOICE_IDS as readonly string[]).includes(v);
+  if (!object(value)) return {};
+  return Object.fromEntries(Object.entries(value).flatMap(([locale, map]) => {
+    if (!/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(locale) || !object(map)) return [];
+    const entries = Object.entries(map).filter((entry): entry is [string, string] => validVoice(entry[0]) && validVoice(entry[1]));
+    return entries.length ? [[locale, Object.fromEntries(entries)]] : [];
+  }));
+}
+
 /**
  * 某种内容语言用哪个音色（D84）：
  * - ElevenLabs 预设：音色有口音且口音不是这种语言、而预设里有这种语言的音色时，换成同语言的（优先同性别、推荐的）；
@@ -528,16 +551,16 @@ export const voiceLocaleOf = (project: Pick<Project, 'i18n'> | null | undefined,
  * selected：看板里选的（VoiceCache.selection()）：字符串 = 某个来源；null = 选了浏览器朗读；undefined = 没选过，这时用 fallback
  * （调用方给：已登录为 'cloud'，否则 null）。
  */
-export function resolveVoices(config: VoiceConfig | undefined, selected: string | null | undefined, store: ProfileStore, locale?: string | null, fallback?: string | null, pins?: VoicePins): ResolvedVoices {
+export function resolveVoices(config: VoiceConfig | undefined, selected: string | null | undefined, store: ProfileStore, locale?: string | null, fallback?: string | null, pins?: VoicePins, officialCloud = false): ResolvedVoices {
   let profile: VoiceProfile | null = null;
   let source: ResolvedVoices['source'] = null;
   let missing: string | null = null;
   if (config?.profile) {
-    profile = store.find(config.profile);
+    profile = store.projectProfile(config.profile);
     if (profile) source = 'config';
     else missing = config.profile;
   } else if (selected) {
-    profile = store.get(selected);
+    profile = store.projectProfile(selected, officialCloud);
     if (profile) source = 'board';
   } else if (selected === undefined && fallback) {
     profile = store.get(fallback);
@@ -549,9 +572,10 @@ export function resolveVoices(config: VoiceConfig | undefined, selected: string 
   const own = locale ? config?.locales?.[locale] : undefined;
   // cloud：这种语言下已经记下的选择优先（不随推荐列表变），没记过才按推荐挑
   const picks: Record<string, string> = {};
+  const safePins = cleanVoicePins(pins);
   const auto = (v: string) => {
     if (p.kind !== 'cloud' || !locale) return autoVoiceFor(p, v, locale, catalog);
-    const chosen = pins?.[locale]?.[v] ?? autoVoiceFor(p, v, locale, catalog);
+    const chosen = safePins[locale]?.[v] ?? autoVoiceFor(p, v, locale, catalog);
     picks[v] = chosen;
     return chosen;
   };
@@ -570,7 +594,7 @@ export function resolveVoices(config: VoiceConfig | undefined, selected: string 
 
 // ---------- 项目缓存 ----------
 
-export type ClipRecord = { file: string; stepId: string; fp: string; text: string; locale: string; bytes: number; at: string };
+export type ClipRecord = { file: string; stepId: string; fp: string; text: string; locale: string; bytes: number; at: string; origin?: 'shared' };
 export type GeneratedClip = { key: string; file: string; generated: boolean };
 /** 正在生成的片段：片段键 → 结果（每个项目一张，见 VoiceCache.generateOne）。 */
 export type Inflight = Map<string, Promise<GeneratedClip>>;
@@ -579,7 +603,7 @@ export type Inflight = Map<string, Promise<GeneratedClip>>;
  * profileId：看板里选的来源（null = 浏览器朗读）；chosen：作者在看板里选过（D85：没选过时用默认来源，已登录为 cloud）。
  * 旧版写下的文件没有 chosen：profileId 是字符串时算选过，null 时算没选过（旧版没选过时也写 null）。
  */
-type IndexFile = { version: 1; profileId: string | null; chosen?: boolean; pins?: VoicePins; clips: Record<string, ClipRecord>; failures: Record<string, { stepId: string; message: string; at: string }> };
+type IndexFile = { version: 1; profileId: string | null; chosen?: boolean; cloudSource?: 'official'; pins?: VoicePins; clips: Record<string, ClipRecord>; failures: Record<string, { stepId: string; message: string; at: string }> };
 const FILE_RE = /^[0-9a-f]{64}\.(mp3|wav|ogg|flac|m4a|aac)$/;
 
 export type Segment = { stepId: string; text: string; role: string | null };
@@ -648,8 +672,8 @@ export class VoiceCache {
     try {
       const raw = JSON.parse(fs.readFileSync(path.join(this.root, 'index.json'), 'utf8')) as IndexFile;
       const profileId = typeof raw.profileId === 'string' ? raw.profileId : null;
-      const pins = raw.pins && typeof raw.pins === 'object' && !Array.isArray(raw.pins) ? raw.pins : undefined;
-      return { version: 1, profileId, chosen: raw.chosen === true || profileId !== null, ...(pins ? { pins } : {}), clips: raw.clips && typeof raw.clips === 'object' ? raw.clips : {}, failures: raw.failures && typeof raw.failures === 'object' ? raw.failures : {} };
+      const pins = cleanVoicePins(raw.pins);
+      return { version: 1, profileId, chosen: raw.chosen === true || profileId !== null, ...(raw.cloudSource === 'official' ? { cloudSource: 'official' as const } : {}), ...(Object.keys(pins).length ? { pins } : {}), clips: raw.clips && typeof raw.clips === 'object' ? raw.clips : {}, failures: raw.failures && typeof raw.failures === 'object' ? raw.failures : {} };
     } catch {
       return { version: 1, profileId: null, chosen: false, clips: {}, failures: {} };
     }
@@ -670,8 +694,11 @@ export class VoiceCache {
   }
 
   select(profileId: string | null) {
-    this.write({ ...this.read(), profileId, chosen: true });
+    this.write({ ...this.read(), profileId, chosen: true, cloudSource: profileId === 'cloud' ? 'official' : undefined });
   }
+
+  /** 新版看板明确选过官方 cloud；旧选择没有此标记。 */
+  officialCloud(): boolean { return this.read().cloudSource === 'official'; }
 
   /** 记下的 cloud 自动音色（见 ResolvedVoices.autoPicks）；build、share、播放、joplo voice 都传给 resolveVoices。 */
   pins(): VoicePins {
@@ -682,7 +709,7 @@ export class VoiceCache {
   pin(locale: string, map: Record<string, string>) {
     const idx = this.read();
     const cur = idx.pins?.[locale] ?? {};
-    const add = Object.entries(map).filter(([k]) => !(k in cur));
+    const add = Object.entries(cleanVoicePins({ [locale]: map })[locale] ?? {}).filter(([k]) => !Object.hasOwn(cur, k));
     if (!add.length) return;
     this.write({ ...idx, pins: { ...(idx.pins ?? {}), [locale]: { ...cur, ...Object.fromEntries(add) } } });
   }
@@ -736,6 +763,11 @@ export class VoiceCache {
   clipOf(key: string): string | null {
     const c = this.read().clips[key];
     return c && FILE_RE.test(c.file) && fs.existsSync(path.join(this.clipsDir, c.file)) ? c.file : null;
+  }
+
+  /** 分享下载的片段不能被误认成本机新生成，进而覆盖另一语言的旧声音。旧缓存缺省为本机生成。 */
+  localClipOf(key: string): string | null {
+    return this.read().clips[key]?.origin === 'shared' ? null : this.clipOf(key);
   }
 
   /** 收下一段别处来的音频（D84：从已发布的分享沿用）：文件名必须是内容的 sha256，否则不收。 */
@@ -856,15 +888,16 @@ export type BundleReport = {
 };
 
 /** 每种内容语言（没有 i18n 时只有 null）用哪套声音指纹：本机有供应商时按本机，否则用已发布分享里的。 */
-type LocaleVoices = { locale: string | null; project: Project; voices: { narrator: string | null; roles: Record<string, string> } };
-function voicesPerLocale(project: Project, resolve: (locale: string | null) => { narrator: string | null; roles: Record<string, string> } | null): LocaleVoices[] {
+type PlaybackVoices = Pick<VoiceIndex, 'narrator' | 'roles' | 'overrides'>;
+type LocaleVoices = { locale: string | null; project: Project; voices: PlaybackVoices };
+function voicesPerLocale(project: Project, resolve: (locale: string | null) => PlaybackVoices | null): LocaleVoices[] {
   const locales = project.i18n ? project.i18n.locales : [null];
   return locales.flatMap((l) => {
     const v = resolve(l);
     return v ? [{ locale: l, project: l ? localizeProject(project, l) : project, voices: v }] : [];
   });
 }
-const sharedVoices = (index: VoiceIndex) => (l: string | null) => (l && index.locales?.[l]) || { narrator: index.narrator, roles: index.roles };
+const sharedVoices = (index: VoiceIndex) => (l: string | null) => (l && index.locales?.[l]) || { narrator: index.narrator, roles: index.roles, ...(index.overrides ? { overrides: index.overrides } : {}) };
 
 /** 上一次发布的分享（D84）：它的 voiceIndex（片段键 → voice/<sha256>.<ext>）和按相对路径取文件的方法。 */
 export type SharedVoice = { index: VoiceIndex; fetch: (file: string) => Promise<Uint8Array | null> };
@@ -878,25 +911,31 @@ export async function reuseSharedVoice(projectDir: string, project: Project, sha
   const cache = new VoiceCache(projectDir);
   const selected = cache.selection();
   const pins = cache.pins();
-  const local = resolveVoices(devConfig ?? project.voiceConfig, selected, store, null, defaultProfile, pins);
+  const local = resolveVoices(devConfig ?? project.voiceConfig, selected, store, null, defaultProfile, pins, cache.officialCloud());
   // 没选过来源（默认来源）时按分享里的指纹沿用：默认来源变了（例如登录后默认 cloud）也不能让已发布的音频丢掉
   const own = local.profile && local.source !== 'default';
-  const per = voicesPerLocale(project, own ? (l) => resolveVoices(devConfig ?? project.voiceConfig, selected, store, voiceLocaleOf(project, l), defaultProfile, pins).voices : sharedVoices(shared.index));
+  const per = voicesPerLocale(project, own ? (l) => resolveVoices(devConfig ?? project.voiceConfig, selected, store, voiceLocaleOf(project, l), defaultProfile, pins, cache.officialCloud()).voices : sharedVoices(shared.index));
   let reused = 0;
   for (const { locale, project: p, voices } of per)
     for (const sc of Object.values(p.scenarios))
       for (const [i, st] of sc.steps.entries()) {
         if (st.captionAuto && !st.say && !st.narrate) continue;
         const line = spokenLine(st, st.caption, speakerRoleAt(p, sc.id, i + 1));
-        const fp = voiceFingerprint(voices, line.role);
+        const fp = voiceFingerprint(voices, line.role, line.text);
         if (!fp || !line.text) continue;
+        // 默认来源下已有的新片段优先，不为同一片段额外下载旧声音。
+        if (local.source === 'default') {
+          const current = resolveVoices(devConfig ?? project.voiceConfig, selected, store, voiceLocaleOf(project, locale), defaultProfile, pins, cache.officialCloud());
+          const currentFp = voiceFingerprint(current.voices, line.role);
+          if (currentFp && cache.localClipOf(clipKey(currentFp, line.text))) continue;
+        }
         const text = line.text.replace(/\s+/g, ' ').trim();
         const key = clipKey(fp, text);
         const rel = shared.index.clips[key];
         if (!rel || cache.clipOf(key)) continue;
         const file = rel.replace(/^voice\//, '');
         const bytes = await shared.fetch(rel).catch(() => null);
-        if (bytes && cache.adopt(key, file, bytes, { stepId: st.id, fp, text, locale: locale ?? 'en' })) reused++;
+        if (bytes && cache.adopt(key, file, bytes, { stepId: st.id, fp, text, locale: locale ?? 'en', origin: 'shared' })) reused++;
       }
   return reused;
 }
@@ -916,57 +955,80 @@ export function bundleVoice(projectDir: string, project: Project, outDir: string
   const selected = cache.selection();
   const cfg = devConfig ?? project.voiceConfig;
   const pins = cache.pins();
-  const base = resolveVoices(cfg, selected, store, null, defaultProfile, pins);
+  const base = resolveVoices(cfg, selected, store, null, defaultProfile, pins, cache.officialCloud());
   // 有上一次的分享、而这里只是默认来源（没选过）时，按分享里的指纹打包（P0：默认来源的改变不能让已发布的音频丢失）
   const own = !!base.profile && !(fallback && base.source === 'default');
   const profileName = own ? base.profile!.name : fallback ? 'the published share' : null;
   const empty = { index: null, report: { clips: 0, bytes: 0, missing: 0, profile: profileName } };
   if (!own && !fallback) return { ...empty, report: { ...empty.report, profile: null } };
-  const per = voicesPerLocale(project, own ? (l) => resolveVoices(cfg, selected, store, voiceLocaleOf(project, l), defaultProfile, pins).voices : sharedVoices(fallback!));
-  const fps = new Set(per.flatMap((x) => [x.voices.narrator, ...Object.values(x.voices.roles)]).filter(Boolean) as string[]);
-  const stepIds = new Set(Object.values(project.scenarios).flatMap((s) => s.steps.map((st) => st.id)));
-  const latest = new Map<string, [string, ClipRecord]>();
-  for (const [k, c] of Object.entries(idx.clips)) {
-    if (!stepIds.has(c.stepId) || !fps.has(c.fp) || !FILE_RE.test(c.file) || !fs.existsSync(path.join(cache.clipsDir, c.file))) continue;
-    const g = `${c.stepId}|${c.fp}|${c.locale}`;
-    const prev = latest.get(g);
-    if (!prev || prev[1].at < c.at) latest.set(g, [k, c]);
-  }
+  const per = voicesPerLocale(project, own ? (l) => resolveVoices(cfg, selected, store, voiceLocaleOf(project, l), defaultProfile, pins, cache.officialCloud()).voices : sharedVoices(fallback!));
   const clips: Record<string, string> = {};
-  let bytes = 0;
-  if (latest.size) fs.mkdirSync(path.join(outDir, 'voice'), { recursive: true });
-  for (const [k, c] of latest.values()) {
-    const dest = path.join(outDir, 'voice', c.file);
-    if (!fs.existsSync(dest)) {
-      fs.copyFileSync(path.join(cache.clipsDir, c.file), dest);
-      bytes += c.bytes;
-    }
-    clips[k] = `voice/${c.file}`;
-  }
-  let missing = 0;
+  let bytes = 0, missing = 0;
   const byLocale: Record<string, { missing: number }> = {};
+  const output: LocaleVoices[] = [];
   for (const { locale, project: p, voices } of per) {
+    const current = base.source === 'default'
+      ? resolveVoices(cfg, selected, store, voiceLocaleOf(project, locale), defaultProfile, pins, cache.officialCloud()).voices
+      : null;
+    const overrides: Record<string, string> = {};
     let n = 0;
     for (const sc of Object.values(p.scenarios))
       sc.steps.forEach((st, i) => {
         const line = spokenLine(st, st.caption, speakerRoleAt(p, sc.id, i + 1));
-        const fp = voiceFingerprint(voices, line.role);
-        if (!fp || !line.text) return;
-        // 自动字幕在网页里按语言生成：这一步有这种语言（没有 i18n 时任意语言）的音频就算有
+        const primary = voiceFingerprint(voices, line.role);
+        if (!primary || !line.text) return;
+        const localFp = current ? voiceFingerprint(current, line.role) : null;
+        const previousFp = voiceFingerprint(voices, line.role, line.text);
+        const preferredFp = localFp && cache.localClipOf(clipKey(localFp, line.text)) ? localFp : null;
+        const candidates = [...new Set([preferredFp, previousFp, primary, localFp].filter((fp): fp is string => !!fp))];
         const localized = !!st.captionAuto && !st.say && !st.narrate && st.action.type !== 'card';
-        const ok = localized ? [...latest.values()].some(([, c]) => c.stepId === st.id && c.fp === fp && (!locale || c.locale === locale)) : !!clips[clipKey(fp, line.text)];
-        if (!ok) n++;
+        // 自动字幕在网页里生成。按来源优先级找这种语言的最新片段，其他步骤严格匹配当前文字。
+        const chosen: [string, ClipRecord][] = [];
+        if (localized) {
+          const records = Object.entries(idx.clips)
+            .filter(([key, c]) => c.stepId === st.id && (!locale || c.locale === locale) && !!cache.clipOf(key))
+            .sort((a, b) => b[1].at.localeCompare(a[1].at));
+          // 没有作者内容语言时，仍保留每种看板界面语言的自动字幕音频。
+          for (const lang of new Set(records.map(([, c]) => c.locale))) {
+            const sameLanguage = records.filter(([, c]) => c.locale === lang);
+            const clip = sameLanguage.find(([, c]) => c.fp === localFp && c.origin !== 'shared')
+              ?? sameLanguage.find(([, c]) => c.fp === voiceFingerprint(voices, line.role, c.text))
+              ?? sameLanguage.find(([, c]) => c.fp === localFp);
+            if (clip) chosen.push(clip);
+          }
+        } else {
+          for (const fp of candidates) {
+            const key = clipKey(fp, line.text);
+            const c = idx.clips[key];
+            if (c && cache.clipOf(key)) { chosen.push([key, c]); break; }
+          }
+        }
+        if (!chosen.length) { n++; return; }
+        for (const [key, c] of chosen) {
+          if (!clips[key]) {
+            fs.mkdirSync(path.join(outDir, 'voice'), { recursive: true });
+            const dest = path.join(outDir, 'voice', c.file);
+            if (!fs.existsSync(dest)) {
+              fs.copyFileSync(path.join(cache.clipsDir, c.file), dest);
+              bytes += c.bytes;
+            }
+            clips[key] = `voice/${c.file}`;
+          }
+          // 不伪造缓存指纹：索引单独记下这一语言、角色和文字实际使用的声音。
+          if (c.fp !== primary) overrides[clipKey(line.role ?? '', c.text)] = c.fp;
+        }
       });
     missing += n;
     if (locale) byLocale[locale] = { missing: n };
+    output.push({ locale, project: p, voices: { narrator: voices.narrator, roles: voices.roles, ...(Object.keys(overrides).length ? { overrides } : {}) } });
   }
-  const head = per[0]!.voices;
+  const head = output[0]!.voices;
   const extra = project.i18n ? { locales: byLocale } : {};
   if (!Object.keys(clips).length) return { index: null, report: { ...empty.report, missing, ...extra } };
-  const same = (x: LocaleVoices['voices']) => JSON.stringify([x.narrator, x.roles]) === JSON.stringify([head.narrator, head.roles]);
-  const locales = Object.fromEntries(per.filter((x) => x.locale && x.locale !== project.i18n?.default && !same(x.voices)).map((x) => [x.locale!, { narrator: x.voices.narrator, roles: x.voices.roles }]));
+  const same = (x: PlaybackVoices) => JSON.stringify(x) === JSON.stringify(head);
+  const locales = Object.fromEntries(output.filter((x) => x.locale && x.locale !== project.i18n?.default && !same(x.voices)).map((x) => [x.locale!, x.voices]));
   return {
-    index: { narrator: head.narrator, roles: head.roles, clips, ...(Object.keys(locales).length ? { locales } : {}) },
+    index: { ...head, clips, ...(Object.keys(locales).length ? { locales } : {}) },
     report: { clips: Object.keys(clips).length, bytes, missing, profile: profileName, ...extra },
   };
 }

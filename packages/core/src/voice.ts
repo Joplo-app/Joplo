@@ -82,8 +82,12 @@ export function clipKey(fingerprint: string, text: string): string {
   return `c${cyrb53(s, 1).toString(16).padStart(14, '0')}${cyrb53(s, 7).toString(16).padStart(14, '0')}`;
 }
 
-/** 某个角色（null = 旁白）用哪个声音指纹；角色没有单独的声音时用旁白的。 */
-export function voiceFingerprint(voices: { narrator: string | null; roles: Record<string, string> }, roleId: string | null): string | null {
+/** 某个角色（null = 旁白）的声音；传文字时优先该语言索引中的片段覆盖，再用角色 / 旁白指纹。 */
+export function voiceFingerprint(voices: { narrator: string | null; roles: Record<string, string>; overrides?: Record<string, string> }, roleId: string | null, text?: string): string | null {
+  if (text !== undefined) {
+    const override = voices.overrides?.[clipKey(roleId ?? '', text)];
+    if (override) return override;
+  }
   return (roleId ? voices.roles[roleId] : undefined) ?? voices.narrator;
 }
 
