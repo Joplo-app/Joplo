@@ -450,6 +450,11 @@ export function createBoardEs(locale: Locale = 'es') {
       cloudUnavailableBody: "Este tablero se inició con una versión anterior de joplo. Detenlo y vuelve a ejecutar npx joplo dev.",
       cloudAccountFailed: (message: Value) => `No se pudo leer la cuenta: ${value(message, locale)}`,
       cloudClose: "Cerrar",
+      cloudNotPickedTitle: "Aún no hay nada que publicar",
+      cloudNotPickedScenario: (feature: Value) => `Este escenario pertenece a una opción que no está elegida para «${value(feature, locale)}». Solo se publican las opciones elegidas.`,
+      cloudNotPickedFeature: (feature: Value) => `«${value(feature, locale)}» aún no tiene una opción elegida, así que no se puede publicar nada de ella.`,
+      cloudNotPickedProject: "Ninguna función tiene aún una opción elegida, así que no hay nada que publicar.",
+      cloudNotPickedHow: "Pulsa «Confirmar opción» en la revisión o pide a tu agente que defina pick en feature.ts, y luego publica.",
     },
   });
 }

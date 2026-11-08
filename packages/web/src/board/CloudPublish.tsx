@@ -17,7 +17,7 @@ import { Popover } from '../player/popover';
 import { copyText } from '../player/util';
 import type { Text } from '../i18n/messages';
 import { fetchCloudAccount, fetchCloudJob, startCloudPublish, subscribeCloud, type CloudAccount, type CloudJob } from '../runtime/dev-client';
-import { CLOUD_STAGES, cloudNotes, cloudRequest, cloudStage, defaultChoice, needsLogin, type CloudContext, type CloudScopeChoice } from './cloud-model';
+import { CLOUD_STAGES, cloudNotes, cloudRequest, cloudStage, cloudUnpicked, defaultChoice, needsLogin, type CloudContext, type CloudPicks, type CloudScopeChoice } from './cloud-model';
 
 type AccountState = { loading: boolean; available: boolean; account: CloudAccount | null; error: Text | null };
 
@@ -162,7 +162,7 @@ function Result({ job, onFlash }: { job: CloudJob & { result: NonNullable<CloudJ
   );
 }
 
-export function CloudPublishPopover({ model, ctx, names, onFlash }: { model: CloudPublishModel; ctx: CloudContext; names: { feature: string; scenario: string | null }; onFlash: (n: React.ReactNode) => void }) {
+export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { model: CloudPublishModel; ctx: CloudContext; names: { feature: string; scenario: string | null }; picks: CloudPicks; onFlash: (n: React.ReactNode) => void }) {
   const { t: i18n } = useBoardI18n();
   const { acct, job } = model;
   const [choice, setChoice] = useState<CloudScopeChoice>(() => defaultChoice(ctx));
@@ -200,6 +200,8 @@ export function CloudPublishPopover({ model, ctx, names, onFlash }: { model: Clo
     body = <LoginBlock command={command} message={signedOut?.message ?? job?.error?.message} onCheck={() => void check()} checking={acct.loading} stillOut={stillOut} />;
   } else {
     const running = job?.state === 'running';
+    // 发布只包含确认过的方案：所选范围里没有时先说清楚、给出下一步，不让作者点了发布才看到英文报错
+    const unpicked = cloudUnpicked(choice, ctx, picks);
     body = (
       <div className="flex flex-col gap-3">
         {account?.signedIn ? (
@@ -213,9 +215,18 @@ export function CloudPublishPopover({ model, ctx, names, onFlash }: { model: Clo
           <ScopeRadio value={choice} onChange={setChoice} ctx={ctx} names={names} disabled={running} />
           <p className="text-[12px] leading-[1.45] text-jb-faint">{i18n.board.cloudScopeNote}</p>
         </div>
+        {unpicked && !running ? (
+          <div className="flex flex-col gap-1 rounded-[8px] border border-jb-accent bg-jb-selected px-3 py-2" data-testid="cloud-unpicked" data-scope={unpicked}>
+            <div className="text-[13px] font-semibold">{i18n.board.cloudNotPickedTitle}</div>
+            <p className="text-[12px] leading-[1.5]">
+              {unpicked === 'project' ? i18n.board.cloudNotPickedProject : unpicked === 'scenario' ? i18n.board.cloudNotPickedScenario(names.feature) : i18n.board.cloudNotPickedFeature(names.feature)}
+            </p>
+            <p className="text-[12px] leading-[1.5] text-jb-muted">{i18n.board.cloudNotPickedHow}</p>
+          </div>
+        ) : null}
         {running && job ? <Progress job={job} /> : null}
         {job?.state === 'done' && job.result ? <Result job={job as CloudJob & { result: NonNullable<CloudJob['result']> }} onFlash={onFlash} /> : null}
-        {job?.state === 'failed' && job.error ? (
+        {job?.state === 'failed' && job.error && !unpicked ? (
           <div className="flex flex-col gap-1 rounded-[8px] border border-jb-danger bg-jb-danger-bg px-3 py-2" data-testid="cloud-error">
             <div className="text-[13px] font-semibold text-jb-danger">{i18n.board.cloudFailed}</div>
             <p className="whitespace-pre-wrap break-words font-jb-mono text-[12px]">{job.error.message}</p>
@@ -224,7 +235,7 @@ export function CloudPublishPopover({ model, ctx, names, onFlash }: { model: Clo
         {model.startError ? <p className="text-[12px] text-jb-danger"><LocalText value={model.startError} /></p> : null}
         <button
           type="button"
-          disabled={running}
+          disabled={running || !!unpicked}
           onClick={() => void model.publish(ctx, choice)}
           className="jb-focus inline-flex h-9 items-center justify-center gap-2 rounded-[8px] bg-jb-cloud px-4 font-jb text-[14px] font-semibold text-jb-on-cloud hover:bg-jb-cloud-hover disabled:opacity-60"
           data-testid="cloud-publish"

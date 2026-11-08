@@ -450,6 +450,11 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       cloudUnavailableBody: "這個看板是舊版 joplo 啟動的。停止它，再執行 npx joplo dev。",
       cloudAccountFailed: (message: Value) => `讀取帳號失敗：${value(message, locale)}`,
       cloudClose: "關閉",
+      cloudNotPickedTitle: "還沒有可發布的方案",
+      cloudNotPickedScenario: (feature: Value) => `目前場景所在的方案，不是「${value(feature, locale)}」已確認的方案。發布只包含已確認的方案。`,
+      cloudNotPickedFeature: (feature: Value) => `「${value(feature, locale)}」還沒有確認方案，所以沒有內容可以發布。`,
+      cloudNotPickedProject: "專案裡還沒有任何功能確認過方案，所以沒有內容可以發布。",
+      cloudNotPickedHow: "在評審裡點「確認方案」，或讓 Agent 在 feature.ts 裡寫上 pick，然後再發布。",
     },
   });
 }

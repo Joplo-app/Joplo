@@ -1,0 +1,22 @@
+/* 自媒体资讯视频风格：深色舞台、高对比白字、红蓝两党强调色、无手绘描边。 */
+:root {
+  --jp-font: "PingFang SC", "Noto Sans SC", "Inter", "Helvetica Neue", system-ui, sans-serif;
+  --jp-ink: #f4f1ea;
+  --jp-bg: #0a0e16;
+  --jp-surface: #121927;
+  --jp-subtle: #182133;
+  --jp-muted: #93a0b8;
+  --jp-faint: #5b6478;
+  --jp-line: #26304a;
+  --jp-line-strong: #3a4663;
+  --jp-border: #2c3752;
+  --jp-accent: #f5b301;
+  --jp-select: #f5b301;
+  --jp-info: #3b82f6;
+  --jp-ok: #22c55e;
+  --jp-warn: #f5b301;
+  --jp-danger: #ef4444;
+  --jp-radius: 8px;
+  --jp-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+  --jp-stroke: clean;
+}

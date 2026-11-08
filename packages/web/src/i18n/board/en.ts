@@ -466,6 +466,11 @@ export function createBoardEn(locale: Locale = 'en') {
       cloudUnavailableBody: "This board was started by an older joplo. Stop it, then run npx joplo dev again.",
       cloudAccountFailed: (message: Value) => `Couldn't read the account: ${value(message, locale)}`,
       cloudClose: "Close",
+      cloudNotPickedTitle: "Nothing to publish yet",
+      cloudNotPickedScenario: (feature: Value) => `This scenario belongs to an option that isn't picked for “${value(feature, locale)}”. Publishing only includes picked options.`,
+      cloudNotPickedFeature: (feature: Value) => `“${value(feature, locale)}” has no picked option yet, so nothing of it can be published.`,
+      cloudNotPickedProject: "No feature has a picked option yet, so there is nothing to publish.",
+      cloudNotPickedHow: "Click Confirm option in review, or ask your agent to set pick in feature.ts, then publish.",
     },
   };
 }

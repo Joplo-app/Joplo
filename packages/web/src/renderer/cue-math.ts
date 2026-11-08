@@ -127,3 +127,29 @@ export function badgeCenter(target: Box, size: number, region: Box): { x: number
   const y = Math.max(region.y + r + 2, Math.min(region.y + region.h - r - 2, target.y));
   return { x, y };
 }
+
+/**
+ * 正在运行的 CSS 过渡（按“元素 + 属性”计数）：作者用 style 绑定 + transition 移动元素时，
+ * 提示层靠它判断目标是否还在动，动着就逐帧重测，最长的那个属性结束才停。
+ */
+export class TransitionTracker<T> {
+  private readonly running = new Map<T, Set<string>>();
+  run(target: T, prop: string): void {
+    const props = this.running.get(target) ?? new Set<string>();
+    props.add(prop);
+    this.running.set(target, props);
+  }
+  end(target: T, prop: string): void {
+    const props = this.running.get(target);
+    if (!props) return;
+    props.delete(prop);
+    if (!props.size) this.running.delete(target);
+  }
+  /** 过渡中途被移除的元素不会再发结束事件：按 alive 清掉。 */
+  prune(alive: (target: T) => boolean): void {
+    for (const t of [...this.running.keys()]) if (!alive(t)) this.running.delete(t);
+  }
+  get active(): boolean {
+    return this.running.size > 0;
+  }
+}

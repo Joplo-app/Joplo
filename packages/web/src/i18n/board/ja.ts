@@ -450,6 +450,11 @@ export function createBoardJa(locale: Locale = 'ja') {
       cloudUnavailableBody: "このボードは古い joplo で起動されています。停止してから npx joplo dev を実行してください。",
       cloudAccountFailed: (message: Value) => `アカウントを読み取れません: ${value(message, locale)}`,
       cloudClose: "閉じる",
+      cloudNotPickedTitle: "公開できる案がまだありません",
+      cloudNotPickedScenario: (feature: Value) => `このシナリオの案は「${value(feature, locale)}」で選定された案ではありません。公開されるのは選定済みの案だけです。`,
+      cloudNotPickedFeature: (feature: Value) => `「${value(feature, locale)}」にはまだ選定された案がないため、公開できる内容がありません。`,
+      cloudNotPickedProject: "どの機能にもまだ選定された案がないため、公開できる内容がありません。",
+      cloudNotPickedHow: "レビューで「案を承認」を押すか、エージェントに feature.ts の pick を設定してもらってから公開してください。",
     },
   });
 }

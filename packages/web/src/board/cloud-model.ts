@@ -42,3 +42,23 @@ export function cloudNotes(lines: readonly string[]): string[] {
 /** 失败是否因为没登录（显示登录命令，而不是错误信息）。 */
 export const needsLogin = (job: CloudJob | null): job is CloudJob & { error: { loginCommand: string } } =>
   !!job && job.state === 'failed' && !!job.error?.loginCommand && (job.error.code === 'AUTH_REQUIRED' || job.error.code === 'AUTH_EXPIRED');
+
+/** 发布只包含每个功能确认过的方案（feature.pick）。这里记下当前范围各级是否有确认的方案。 */
+export type CloudPicks = { scenario: boolean; feature: boolean; project: boolean };
+type PickSource = { features: Record<string, { pick?: string | null } | undefined>; scenarios: Record<string, { optionId: string } | undefined> };
+
+export function cloudPicks(project: PickSource, ctx: CloudContext): CloudPicks {
+  const pick = project.features[ctx.featureId]?.pick ?? null;
+  const sc = ctx.scenarioId ? project.scenarios[ctx.scenarioId] : undefined;
+  return {
+    scenario: !!pick && !!sc && sc.optionId === pick,
+    feature: !!pick,
+    project: Object.values(project.features).some((f) => !!f?.pick),
+  };
+}
+
+/** 发布前检查：所选范围里没有确认的方案时返回是哪一级（scenario / feature / project），可以发布时返回 null。 */
+export function cloudUnpicked(choice: CloudScopeChoice, ctx: CloudContext, picks: CloudPicks): CloudScopeChoice | null {
+  const scope: CloudScopeChoice = choice === 'scenario' && !ctx.scenarioId ? 'feature' : choice;
+  return picks[scope] ? null : scope;
+}

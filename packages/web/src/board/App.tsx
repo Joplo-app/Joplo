@@ -41,6 +41,7 @@ import { InspectDrawer } from './InspectDrawer';
 import { LocalReview } from './LocalReview';
 import { ProgressRing, VideoProgressCard, useVideoExport } from './VideoExport';
 import { CloudPublishPopover, useCloudPublish } from './CloudPublish';
+import { cloudPicks } from './cloud-model';
 import { ExportSetupCard, SetupNeededFlash, showSetupCard, useExportRuntime } from './ExportSetup';
 import { diagnosticsSummary, gapBanner, nextCase } from './states-model';
 import { faviconHref, tabTitle } from '../player/states';
@@ -526,7 +527,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             ) : null}
             <VoicePopover api={voice} open={voiceOpen} anchor={voiceAnchor} onClose={() => setVoiceOpen(false)} onManage={() => (setVoiceOpen(false), setProvidersOpen(true))} />
             <VoiceProfilesDialog api={voice} open={providersOpen} onClose={() => setProvidersOpen(false)} canSelect={voice.state?.source !== 'config'} />
-            <CloudPublishPopover model={cloud} ctx={{ featureId: play.featureId, scenarioId: scenario?.id ?? null }} names={{ feature: feature.name, scenario: scenario?.name ?? null }} onFlash={setFlash} />
+            <CloudPublishPopover model={cloud} ctx={{ featureId: play.featureId, scenarioId: scenario?.id ?? null }} names={{ feature: feature.name, scenario: scenario?.name ?? null }} picks={cloudPicks(project, { featureId: play.featureId, scenarioId: scenario?.id ?? null })} onFlash={setFlash} />
             <AppearancePopover open={a.open} anchor={a.anchor} onClose={() => a.setOpen(false)} scope="project" projectId={projectId} configTheme={project.theme ?? 'sketch'} catalog={a.catalog} settings={a.settings} look={a.saved} save={a.save} onPreview={a.setPreview} onFlash={setFlash} copy={copyText} />
           </>
         }

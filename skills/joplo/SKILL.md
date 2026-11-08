@@ -74,11 +74,11 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 ## Reference
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.
 - authoring: Mental model, first steps, page / option / flow syntax, when conditions, a form example
-- story: Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions
-- demo: Layers, shots, captions, full-height layout, deep links, and screenshots
+- story: Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos
+- demo: Layers, shots, captions, full-height layout, custom motion and data graphics, deep links, and screenshots
 - focus: Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
 - diagram: Architecture, sequence and state diagrams: domain groups, automatic layout, traces, shot framing
-- components: Component catalog, supported HTML tags, line breaks, and props
+- components: Component catalog, supported HTML tags, line breaks, props, and real images
 - cases: Case dimensions: ask the user before starting
 - check: Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line
 - selection: Edit only the element selected by the user in the board
@@ -86,4 +86,4 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, share, review version, feedback write-back, deployment
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.14 sha256:a77f462877559dbaaf36a15693afa507438bdbfaf18908d06e83738da42d3025 -->
+<!-- joplo-skill 0.2.14 sha256:8a8529f2d7f1295604a4a20b06fe87eb30dba11eabfc4edb3c1f09d7c992d70c -->

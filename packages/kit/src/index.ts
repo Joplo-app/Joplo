@@ -13,6 +13,7 @@ import { bindPath, callsite, isBind, type Bind, type CondExpr, type JNode } from
 
 export { $, and, empty, eq, Fragment, neq, not, notEmpty, oneOf, or, Outlet, Slot } from './node.ts';
 export type { Bind, CondExpr, JNode } from './node.ts';
+export { asset } from './asset.ts';
 
 type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 export type StateInit = { ui?: Record<string, Json>; data?: Record<string, Json>; inputs?: Record<string, Json> };

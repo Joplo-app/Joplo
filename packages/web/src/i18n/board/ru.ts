@@ -450,6 +450,11 @@ export function createBoardRu(locale: Locale = 'ru') {
       cloudUnavailableBody: "Эта доска запущена старой версией joplo. Остановите её и снова запустите npx joplo dev.",
       cloudAccountFailed: (message: Value) => `Не удалось прочитать учётную запись: ${value(message, locale)}`,
       cloudClose: "Закрыть",
+      cloudNotPickedTitle: "Пока нечего публиковать",
+      cloudNotPickedScenario: (feature: Value) => `Этот сценарий относится к варианту, который не выбран для «${value(feature, locale)}». Публикуются только выбранные варианты.`,
+      cloudNotPickedFeature: (feature: Value) => `У «${value(feature, locale)}» пока нет выбранного варианта, поэтому публиковать нечего.`,
+      cloudNotPickedProject: "Ни у одной функции пока нет выбранного варианта, поэтому публиковать нечего.",
+      cloudNotPickedHow: "Нажмите «Подтвердить вариант» в обзоре или попросите агента задать pick в feature.ts, затем опубликуйте.",
     },
   });
 }

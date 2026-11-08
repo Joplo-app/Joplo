@@ -450,6 +450,11 @@ export function createBoardDe(locale: Locale = 'de') {
       cloudUnavailableBody: "Dieses Board wurde mit einer älteren joplo-Version gestartet. Beende es und führe npx joplo dev erneut aus.",
       cloudAccountFailed: (message: Value) => `Konto konnte nicht gelesen werden: ${value(message, locale)}`,
       cloudClose: "Schließen",
+      cloudNotPickedTitle: "Noch nichts zu veröffentlichen",
+      cloudNotPickedScenario: (feature: Value) => `Dieses Szenario gehört zu einer Variante, die für „${value(feature, locale)}“ nicht ausgewählt ist. Veröffentlicht werden nur ausgewählte Varianten.`,
+      cloudNotPickedFeature: (feature: Value) => `„${value(feature, locale)}“ hat noch keine ausgewählte Variante, daher kann nichts davon veröffentlicht werden.`,
+      cloudNotPickedProject: "Noch keine Funktion hat eine ausgewählte Variante, daher gibt es nichts zu veröffentlichen.",
+      cloudNotPickedHow: "Klicken Sie in der Prüfung auf „Variante bestätigen“ oder lassen Sie Ihren Agenten pick in feature.ts setzen, und veröffentlichen Sie dann.",
     },
   });
 }

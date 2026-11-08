@@ -467,6 +467,11 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       cloudUnavailableBody: "这个看板是旧版 joplo 启动的。停掉它，再运行 npx joplo dev。",
       cloudAccountFailed: (message: Value) => `读取账号失败：${value(message, locale)}`,
       cloudClose: "关闭",
+      cloudNotPickedTitle: "还没有可发布的方案",
+      cloudNotPickedScenario: (feature: Value) => `当前场景所在的方案，不是「${value(feature, locale)}」已确认的方案。发布只包含已确认的方案。`,
+      cloudNotPickedFeature: (feature: Value) => `「${value(feature, locale)}」还没有确认方案，所以没有内容可以发布。`,
+      cloudNotPickedProject: "项目里还没有任何功能确认过方案，所以没有内容可以发布。",
+      cloudNotPickedHow: "在评审里点「确认方案」，或让 Agent 在 feature.ts 里写上 pick，然后再发布。",
     },
   });
 }

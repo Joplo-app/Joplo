@@ -450,6 +450,11 @@ export function createBoardFr(locale: Locale = 'fr') {
       cloudUnavailableBody: "Ce tableau a été lancé par une ancienne version de joplo. Arrêtez-le, puis relancez npx joplo dev.",
       cloudAccountFailed: (message: Value) => `Impossible de lire le compte : ${value(message, locale)}`,
       cloudClose: "Fermer",
+      cloudNotPickedTitle: "Rien à publier pour l’instant",
+      cloudNotPickedScenario: (feature: Value) => `Ce scénario appartient à une option qui n’est pas retenue pour « ${value(feature, locale)} ». Seules les options retenues sont publiées.`,
+      cloudNotPickedFeature: (feature: Value) => `« ${value(feature, locale)} » n’a pas encore d’option retenue : rien ne peut en être publié.`,
+      cloudNotPickedProject: "Aucune fonctionnalité n’a encore d’option retenue : il n’y a rien à publier.",
+      cloudNotPickedHow: "Cliquez sur « Confirmer l’option » dans la revue, ou demandez à votre agent de définir pick dans feature.ts, puis publiez.",
     },
   });
 }
