@@ -2,7 +2,7 @@
   "name": "@joplo-app/cli",
   "version": "0.2.15",
   "description": "Joplo 命令实现（init / dev / check / build / render / selection）；通常经由 joplo 命令入口使用",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "bin": {
     "joplo-cli": "./src/bin.ts"

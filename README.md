@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/joplo"><img src="https://img.shields.io/npm/v/joplo?color=FFD23F&labelColor=1E1E1E" alt="npm version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-1E1E1E" alt="License: PolyForm Noncommercial 1.0.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm_Shield_1.0.0-1E1E1E" alt="License: PolyForm Shield 1.0.0"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%E2%89%A522-1E1E1E" alt="Node.js 22 or later"></a>
 </p>
 
@@ -237,6 +237,10 @@ Joplo models behavior; it does not run a real product backend. Routes must be st
 
 Author modules execute on your machine during loading, checks, and builds. Only run projects you trust. The Board and Published site consume compiled IR. Local review records stay in the project directory. MCP, multi-user collaboration, and real-time cloud comment sync are outside this local release.
 
+## Contributing
+
+Joplo accepts issues, not pull requests. Report bugs and request features in [issues](https://github.com/Joplo-app/Joplo/issues/new/choose); see [CONTRIBUTING.md](CONTRIBUTING.md). Email security issues to [support@joplo.app](mailto:support@joplo.app).
+
 ## License
 
-[PolyForm Noncommercial 1.0.0](LICENSE). Joplo is free for personal and other noncommercial use. Commercial use, including use at a company and building competing products, needs a Joplo Cloud subscription or a separate commercial license; see [COMMERCIAL.md](COMMERCIAL.md). Versions 0.2.15 and earlier were released under Apache-2.0. Bundled fonts use [SIL OFL 1.1](packages/web/src/fonts/OFL.txt).
+[PolyForm Shield 1.0.0](LICENSE). Anyone can use Joplo for free, including at companies and for commercial work; you may not use it to provide a product that competes with Joplo or Joplo Cloud. See [COMMERCIAL.md](COMMERCIAL.md). Versions 0.2.15 and earlier were released under Apache-2.0. Bundled fonts use [SIL OFL 1.1](packages/web/src/fonts/OFL.txt).

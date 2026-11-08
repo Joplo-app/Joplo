@@ -2,7 +2,7 @@
   "name": "@joplo-app/web",
   "version": "0.2.15",
   "description": "Joplo 看板与发布站的预构建资源（含手绘字体，SIL OFL 1.1）",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "exports": {
     "./package.json": "./package.json",

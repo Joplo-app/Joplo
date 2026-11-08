@@ -2,7 +2,7 @@
   "name": "@joplo-app/server",
   "version": "0.2.15",
   "description": "Joplo 本地服务：dev 看板、build 发布站、render 截图",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",

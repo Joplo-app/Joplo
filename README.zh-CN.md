@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/joplo"><img src="https://img.shields.io/npm/v/joplo?color=FFD23F&labelColor=1E1E1E" alt="npm 版本"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-1E1E1E" alt="许可证：PolyForm Noncommercial 1.0.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm_Shield_1.0.0-1E1E1E" alt="许可证：PolyForm Shield 1.0.0"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%E2%89%A522-1E1E1E" alt="Node.js 22 或更新版本"></a>
 </p>
 
@@ -237,6 +237,10 @@ Joplo 表达设计行为，不运行真实业务后端；只支持静态路径�
 
 作者模块在本机加载、检查和构建时执行，只运行可信项目。看板和发布站只消费编译后的 IR。本地反馈保存在项目目录内，不包含 MCP、多人协作或云端评论实时同步。
 
+## 参与贡献
+
+Joplo 接受 issue，不接受 pull request。bug 和功能需求请在 [issue](https://github.com/Joplo-app/Joplo/issues/new/choose) 中提交，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请发邮件到 [support@joplo.app](mailto:support@joplo.app)。
+
 ## 许可证
 
-[PolyForm Noncommercial 1.0.0](LICENSE)。个人使用和其他非商业用途免费；商业用途（包括在公司里使用、做竞品）需要订阅 Joplo Cloud 或另外获得商业授权，详见 [COMMERCIAL.md](COMMERCIAL.md)。0.2.15 及更早的版本以 Apache-2.0 发布。随包字体使用 [SIL OFL 1.1](packages/web/src/fonts/OFL.txt)。
+[PolyForm Shield 1.0.0](LICENSE)。任何人都可以免费使用 Joplo，包括在公司里和商业项目中使用；不得用它提供与 Joplo 或 Joplo Cloud 竞争的产品，详见 [COMMERCIAL.md](COMMERCIAL.md)。0.2.15 及更早的版本以 Apache-2.0 发布。随包字体使用 [SIL OFL 1.1](packages/web/src/fonts/OFL.txt)。
