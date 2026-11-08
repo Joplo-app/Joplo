@@ -33,7 +33,7 @@ import type { StageTheme } from '../renderer/rough';
 import { cn } from '@/lib/utils';
 import { JoploLogo } from './JoploMark';
 import { Overlay } from './Overlay';
-import { StageViewport } from './StageViewport';
+import { StageViewport, type StageWatermark } from './StageViewport';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from '../renderer/appearance';
 import { AudioLines, PanelLeftOpen } from 'lucide-react';
 import { Btn, DirectorTag, Kbd, MenuButton, Segmented, Switch, useWidth, type MenuEntry } from './controls';
@@ -424,6 +424,8 @@ export type PlayerPageProps = {
   onBrand?: () => void;
   /** 发布站：标志改为在新标签页打开的链接（JOPLO_SITE_URL），优先于 onBrand。 */
   brandHref?: string;
+  /** 发布站水印（D83）：舞台右上角的小 Joplo 图标；看板不传，Pro 分享不传。 */
+  watermark?: StageWatermark;
   theme: StageTheme;
   /** 字体（D55，看板外观）：null / 缺省 = 跟随主题。发布站不传。 */
   font?: AppearanceFont | null;
@@ -644,6 +646,7 @@ export function PlayerPage(p: PlayerPageProps) {
       {hasStage ? (
         <StageViewport
           video={video}
+          watermark={p.watermark}
           viewport={device}
           theme={p.theme}
           stroke={look.stroke}

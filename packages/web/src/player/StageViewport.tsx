@@ -29,8 +29,12 @@ function NoticeIcon({ icon }: { icon: NoticeView['icon'] }) {
   return <Info className={cn(cls, 'text-jb-muted')} aria-hidden />;
 }
 import type { AppearanceFont } from '../renderer/appearance';
+import { JoploMark } from './JoploMark';
 
-export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false, video = false }: {
+/** 发布站水印的去向与读屏文字（D83）。 */
+export type StageWatermark = { href: string; label: string };
+
+export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false, video = false, watermark }: {
   viewport: Viewport; notice: Notice | null; onDismiss: () => void; /** 「回到演示」（顺序不对的提示）。 */ onBack?: () => void; children: (size: { width: number; height: number }) => ReactNode; tag?: ReactNode; theme?: StageTheme; stroke?: StrokeMode; font?: AppearanceFont | null;
   /**
    * 幕布（D61：过渡卡、场景封面）：铺满整个显示区域，不进手机外框。逻辑尺寸与电脑页面的舞台相同（fillStage），
@@ -41,6 +45,8 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   curtainUp?: boolean;
   /** 视频式（手机上看分享，mobile_watch）：电脑页面按设计尺寸 1280×800 整体等比缩放、留黑边，不按可用区域改变逻辑尺寸。 */
   video?: boolean;
+  /** 发布站水印（D83）：舞台右上角的小 Joplo 图标，在新标签页打开 href。只有发布站传；看板、Pro 分享、导出不传。 */
+  watermark?: StageWatermark;
 }) {
   const { t: i18n } = useI18n();
 
@@ -123,6 +129,20 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
           </div>
         )}
       </div>
+      {watermark ? (
+        // 幕布（z-15）之上、提示（z-20）之下；淡淡的，指向或聚焦时才完全显示。左上角是层级标签，右下角是完成操作与下一章卡片
+        <a
+          href={watermark.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={watermark.label}
+          title={watermark.label}
+          className="jb-focus absolute right-3 top-3 z-[16] flex rounded-[6px] opacity-45 transition-opacity duration-200 hover:opacity-100 focus-visible:opacity-100"
+          data-testid="stage-watermark"
+        >
+          <JoploMark size={video ? 16 : 20} />
+        </a>
+      ) : null}
       {curtain ? (
         <div className="pointer-events-none absolute inset-0 z-[15] overflow-hidden" data-testid="stage-curtain">
           <div className="absolute left-1/2 top-1/2" style={{ width: sheet.width, height: sheet.height, transform: `translate(-50%, -50%) scale(${sheet.scale})` }}>

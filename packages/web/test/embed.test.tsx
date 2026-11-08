@@ -118,6 +118,16 @@ describe('画面', () => {
       expect(html).not.toContain('data-testid="embed');
     }
   });
+  it('branding 关掉（Pro 分享，D83）时嵌入里也没有「Made with Joplo」；封面和播放中都去掉', () => {
+    const off = (search: string) => renderToStaticMarkup(<I18nProvider explicit="en"><SiteApp data={{ project: published(), home: null }} search={search} branding={false} /></I18nProvider>);
+    for (const search of ['?embed=1', '?embed=1&autoplay=1']) {
+      const html = off(search);
+      expect(html, search).toContain('data-testid="embed"');
+      expect(html, search).not.toContain('data-testid="embed-brand"');
+      expect(html, search).not.toContain('Made with Joplo');
+    }
+    expect(render('?embed=1&autoplay=1')).toContain('data-testid="embed-brand"');
+  });
   it('嵌入默认显示封面：压暗画面 + 大播放按钮 + 标题 + 场景数 + 用 Joplo 制作；没有看板 / 左栏 / 层级标签', () => {
     const html = render('?embed=1');
     expect(html).toContain('data-testid="embed"');

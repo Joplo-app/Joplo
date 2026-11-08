@@ -960,6 +960,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - On AUTH_REQUIRED, ask the user to sign in. Do not run \`joplo logout\` on the user's behalf.
 - AUTH_EXPIRED also exits 3: ask the user to sign in again. Read error.code / message / details for other failures.
 - Free links expire after 7 days; read data.expiresAt for the exact time. Pro permanent links have expiresAt: null.
+- Free shares and sites from joplo build carry a small, faint Joplo icon in the stage's top-right corner (it opens joplo.app in a new tab); keep that corner free of important content. Only Joplo Cloud removes it, for Pro creators' shares (embeds too); local exports have none.
 - Successful share JSON includes data.embed: { iframe, markdown, badge, preview }. To add the demo to a README, write data.embed.markdown as is; do not build badge links yourself. For a free link, tell the user the badge shows "expired" after data.expiresAt.
 - data.embed.iframe embeds a player for blogs and docs: it shows a cover first; append &scenario=<scenario id> to pick the start or &autoplay=1 to skip the cover.
 - share also uploads a 1200x630 preview image of the default scenario when the export component is installed (npx joplo setup export, or Playwright already in the project); without it, share still succeeds, prints one "Skipped the preview image" line, and never downloads anything.
