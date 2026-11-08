@@ -34,6 +34,8 @@ Every step is an action on the product and a visible change it causes. If a step
 7. Before handing off for review, read npx joplo skill review. List sessions with npx joplo feedback list [dir] --local --json, bind the exact session with npx joplo feedback watch [dir] --local --session <id> --json, then give the user its actual board URL. While they test, read output with short waits (about 1–5s) and acknowledge feedback immediately; do not wait for approval or process exit. Use the joplo-feedback skill for receiving and applying review results.
 8. When the user asks to share or publish: npx joplo share --format json (picked options), or npx joplo share --review for reviewers comparing every option. Confirmation of a local option alone does not request publication. To share only part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items. Apply review results with the joplo-feedback skill.
 
+When a product uses Joplo to design itself, keep one project with stable feature IDs and multiple options/scenarios (repository example: examples/joplo). Preserve actual evidence and label historical reconstructions; never invent review or approval history. Public design narration must be explicitly curated into visible scenarios because build strips private authoring fields. See npx joplo skill authoring. For authorized CI publication, separate PR comparison previews from the fixed main share, isolate credentials from author-code builds, and verify actual workflow runs after activation; see npx joplo skill diff.
+
 For comparing feature changes across versions or a PR, read npx joplo skill diff. Preserve stable .key() identities, treat repeated candidates as uncertain, and build two real publish versions. If an embedded player changes scenario independently, use Realign and wait for both target positions before resuming. Use prepare → uncredentialed build → trusted publish only within the user’s authorized scope.
 
 ## Common pitfalls
@@ -49,4 +51,4 @@ For comparing feature changes across versions or a PR, read npx joplo skill diff
 Exact APIs: npx joplo skill <topic> prints guidance matching the installed version (authoring, story, demo, focus, diagram, components, cases, check, selection, review, diff, publish). Run npx joplo skill for the overview; npx joplo components <Name> shows props and an example.
 After the user Alt+clicks a board element, run npx joplo selection and edit only that location.
 Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.12 sha256:b9fda05408e56ccce33f6d104538a723456990a1f408c7d748cf100873d9cd08 -->
+<!-- joplo-skill 0.2.12 sha256:44fc3f770d3e391f7e27cd45e5262e577de511d4e48bb86a6fea5d6c0ba148d9 -->

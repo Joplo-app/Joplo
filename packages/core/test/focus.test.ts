@@ -313,7 +313,7 @@ describe('check：焦点提示（少而准）', () => {
 
 describe('不制造噪音：examples/ 下的项目没有新的焦点提示；camping 样板用到了全部原语', () => {
   const root = resolve(import.meta.dirname, '../../../examples');
-  for (const name of ['agent-arch', 'camping', 'invite', 'joplo-board', 'joplo-dist']) {
+  for (const name of ['agent-arch', 'camping', 'invite', 'joplo']) {
     it(name, async () => {
       const dir = join(root, name);
       const r = await loadAuthoring(dir, (p) => tsImport(p, { parentURL: import.meta.url, tsconfig: join(dir, 'tsconfig.json') }));

@@ -1,0 +1,77 @@
+import type { PublicDesignRecord } from './record.ts';
+
+// Only explicitly curated, public design evidence. Full provenance: docs/self-design/EVIDENCE.md.
+export const designRecords = {
+  home: {
+    problem: '一个看板，怎样承载多个项目？',
+    exploration: 'D39 首页草图：左栏记住项目，右侧列功能。以下操作保留的原型。',
+    scenario: 'recent',
+    decision: '先选项目，再进入一个功能',
+    current: 'D39 实现最近项目，D55 继续整理视觉。这里的目录和项目都是演示数据。',
+    evidence: 'DECISIONS D39 / D55；f9cc713 → 86e67c7 → dad74d6',
+  },
+  player: {
+    problem: '评审时，怎样比较同一种情况？',
+    exploration: 'D39 比较按方案与按情况两套原型，选择 B。下面操作保留的设计稿。',
+    scenario: 'switch',
+    decision: '情况组织比较，画面保留主位置',
+    current: 'D55 统一舞台与步骤条，D61 加入封面。这里是历史设计稿，不是最新产品截图。',
+    evidence: 'DECISIONS D39 / D55 / D61；a8dbe9a → 86e67c7 → 1564840',
+  },
+  views: {
+    problem: '画面挤在一起，怎样看清同一步？',
+    exploration: 'D43 比较切换与并排两层，选择 A。旧原型当时还设想自动全景。',
+    scenario: 'switch_layer',
+    decision: '切换视角，保持同一步的状态',
+    current: 'D45 取消自动全景，改成独立层级；D60 采用书签标签。全景要由作者显式设计。',
+    evidence: 'DECISIONS D43–D46 / D60 / D69–D70；66e805d → e1566fa → 4c7cea8',
+  },
+  frames: {
+    problem: '终端与手机，怎样成为正式表达能力？',
+    exploration: 'D40 先补 Terminal / Phone，再用正式组件画 Joplo 自己。',
+    scenario: 'terminal',
+    decision: '正式组件承担表达，页面固定设备',
+    current: 'D44 固定每页设备。手机页需要独立设计；外框不会自动转换桌面交互。',
+    evidence: 'DECISIONS D40 / D44；09c5f1b → 072ae3f → fb8d4aa',
+  },
+  npm: {
+    problem: '离开源码仓库，用户怎样开始？',
+    exploration: 'D36 比较单包与轻入口方案，选择 B。旧版本号和大小是当时的演示数据。',
+    scenario: 'first_run',
+    decision: '入口轻，创作依赖跟随项目版本',
+    current: 'D54 改用 @joplo-app；导出依赖移至 JOPLO_HOME；D73 明确推 tag 才发布。',
+    evidence: 'D36 / D54 / D65–D66 / D73；abedf48 → 3904c6d → c8b6ac6',
+  },
+  skill: {
+    problem: 'Agent 怎样读到恰好需要的用法？',
+    exploration: 'D37 比较打印、薄指针、复制正文，选择 B 保持用法与版本一致。',
+    scenario: 'auto',
+    decision: '从薄指针，继续迭代为官方任务技能',
+    current: 'D64 根据试用反馈补齐官方技能；D71 强调交互演示。今天已不只是十行指针。',
+    evidence: 'DECISIONS D37 / D64–D65 / D71；6521a50 → daa3eb0 → 834ce5c',
+  },
+  voice: {
+    problem: '声音没读完，画面该不该继续？',
+    exploration: 'D74 从零配置朗读开始。下面观察声音更长时的等待、暂停与手动切步。',
+    scenario: 'voice_longer',
+    decision: '等声音读完，但始终服从人的操作',
+    current: '试听后补齐短旁白与供应商切换行为。视频带声音仍在后续范围。',
+    evidence: 'DECISIONS D74；b24b768 → 69102f3 → f76dd5b',
+  },
+  review: {
+    problem: '用户在画面上反馈，Agent 怎样收到？',
+    exploration: 'D77 要求反馈浮层不挤压画面，并可直接确认。下面回放已有会话原型。',
+    scenario: 'happy',
+    decision: '保留上下文，确认只结束当前评审',
+    current: 'D77–D78 已实现可拖动入口与反馈命令。确认不代表反馈已实现，也不自动发布。',
+    evidence: 'DECISIONS D77–D78；24494f6；docs/cloud-feedback-watch.md',
+  },
+  share_scope: {
+    problem: '只发一个场景，为什么深链接不够？',
+    exploration: 'D75 明确要范围保密：深链接不够，必须在构建时裁剪。',
+    scenario: 'scenario',
+    decision: '范围之外的内容，不进入产物',
+    current: 'D76 加入看板发布。公共页面与 CSS 仍可能随包分发；范围裁剪不是登录保护。',
+    evidence: 'DECISIONS D75–D76；098cb85 → 944a1cc',
+  },
+} satisfies Record<string, PublicDesignRecord>;

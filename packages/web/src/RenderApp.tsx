@@ -145,8 +145,11 @@ export function RenderApp() {
   const withCurtain = (node: ReactNode, c: CurtainSpec | null, w: number, h: number) =>
     c ? (
       <div style={{ position: 'relative', width: w, height: h }}>
-        {node}
-        <Curtain project={data.project} scenarioId={c.scenarioId} position={c.position} cover={c.cover} theme={theme} font={font} width={w} height={h} animate={c.animate} passive />
+        {/* Author-controlled z-index stays inside the stage, below the export curtain. */}
+        <div style={{ position: 'relative', zIndex: 0, width: w, height: h }}>{node}</div>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
+          <Curtain project={data.project} scenarioId={c.scenarioId} position={c.position} cover={c.cover} theme={theme} font={font} width={w} height={h} animate={c.animate} passive />
+        </div>
       </div>
     ) : (
       node

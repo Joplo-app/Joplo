@@ -5,6 +5,7 @@
     "packages/core/src",
     "packages/core/test",
     "packages/kit/src",
-    "packages/server/src"
+    "packages/server/src",
+    "scripts/ci"
   ]
 }

@@ -129,8 +129,9 @@ Use your own Wrangler account and configure the site name and compatibility date
 | --- | --- |
 | [examples/invite](examples/invite) | Compare an invitation dialog with a batch invitation flow |
 | [examples/agent-arch](examples/agent-arch) | Layers, Director, grouped `Diagram`, `Sequence`, `StateMachine`, and `trace()` for an agent architecture |
-| [examples/joplo-board](examples/joplo-board) | Multi-project Board and player interaction designs |
-| [examples/joplo-dist](examples/joplo-dist) | npm installation and agent guidance flows |
+| [examples/joplo](examples/joplo) | Joplo’s own evolving design workspace: real feature alternatives, interaction prototypes and documented decisions |
+
+[Watch Joplo’s design process](https://joplo.app/s/nZT1VP67LU/). The self-design workflow publishes a separate feature comparison for same-repository PRs after CI passes, and updates this fixed link after successful main CI. See [automation and recovery](docs/self-design/CI-CONTRACT.md); npm releases remain tag-driven.
 
 ## Develop in this repository
 

@@ -249,6 +249,11 @@ ${START_ORDER.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 Describe designs in TS/TSX. Source files are authoritative; Git manages versions. The board and published site consume compiled IR.
 Read only the topics needed, usually one or two at a time. See components for components, cases for questions before starting, and demo for organizing and presenting demos.
 
+## Designing your own product with Joplo
+Keep one Joplo project per product and model each real product feature under features/<id>; keep alternatives as options and cases as scenarios. The repository's examples/joplo is Joplo's own design workspace: historical workbench choices, authoring, player, sharing, feedback and feature diffs. Keep those feature IDs when iterating; do not create another joplo-<feature> project for each change.
+
+Use the actual source and decisions as evidence. Label reconstructed history and pending choices; never invent reviews or approvals. A design prototype is not proof of the production implementation. For public design histories, deliberately curate safe narration into visible scenarios: ordinary build only includes picked options and strips rules, questions, tradeoffs and private review data. Keep original alternatives in the authoring project; do not expose a private review manifest to fill in the public story. Inspect both live playback and actual exported PNGs, including opening/closing cards over terminals or diagrams; a clean DOM warning report alone cannot prove that text is unobscured.
+
 ## Directory conventions
 - joplo.config.ts: export default config({ name, layout: 'app', home: '/' }).
 - layouts/app.tsx: export default layout(<AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: 'sm' }}><AppShell.Navbar>…</AppShell.Navbar><AppShell.Main><Outlet/></AppShell.Main><Slot name="overlay"/></AppShell>).
@@ -644,7 +649,7 @@ Pick relevant cases to ask the user before starting. Do not include every preset
 - usage_retry · async · How should failed billing event delivery retry with idempotency?
 - model_failed · async · How should model failure or timeout be explained and recovered from?
 
-### CLI / developer tools (source: examples/joplo-dist)
+### CLI / developer tools (source: examples/joplo/features/npm)
 - first_run · main · How should a new user succeed within three commands?
 - env_old · input · How should an outdated runtime be explained and fixed?
 - version_skew · consistency · How should global and project version mismatches prompt alignment?
@@ -654,7 +659,7 @@ Pick relevant cases to ask the user before starting. Do not include every preset
 - user_modified · conflict · How should user edits be protected from overwriting?
 - offline · async · How should offline limitations and recovery be explained?
 
-### Local tools / multiple projects (source: examples/joplo-board)
+### Local tools / multiple projects (source: examples/joplo/features/home)
 - first_open · main · How should a first visit with no data offer a starting point?
 - single_instance · conflict · How should an existing instance be reused instead of starting another?
 - stale_resource · lifecycle · How should records for missing directories or resources be cleaned up?
@@ -886,6 +891,8 @@ The bundle has root index.html, before/, after/ and feature-diff.json. Only publ
 - In a fresh trusted publishing job with no PR checkout, run the fixed CLI directly (avoid project-local npx resolution): joplo diff publish diff-site --prepared comparison.json --repo owner/name --pr <number> --sha <current-head> --format json.
 - API keys need shares:publish. The CLI validates receipt/source, recomputes the semantic manifest, verifies its hash in the upload list, then uses prepare/upload/finalize. It never executes project code in publish, includes no private review data, and never replaces a completed comparison Share. It does not downgrade failed comparisons to ordinary shares.
 - Only publish when the user's existing authorization includes publication; building a local diff does not itself authorize uploading or PR comments.
+- A workflow_run publisher must exist on the default branch before it can trigger. Verify the expected CI workflow ID, successful result, same-repository open PR and current head; skip stale/fork/failed runs. Select one CI event per PR head to avoid duplicate prepares. Keep the trusted receipt separate from artifacts produced by author code.
+- A continuously published main design needs a pre-created fixed Share ID (Pro), current-head checks before preparation and each finalize attempt, and a separate main-only credential environment. Verify the real main update and a real PR preview/comment after activation; a YAML file or local test alone does not prove automation is running. Preserve the existing npm/tag release process.
 
 ## Failures and recovery
 - PR_APP_MISSING: configure/install/link the GitHub App with repository access, then prepare again.

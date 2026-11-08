@@ -1,10 +1,10 @@
 /**
  * 生成文档截图（唯一写入 docs/screenshots 的途径）：对 examples/invite 的临时副本
  *   1. 调用 renderStep 输出舞台截图（手绘 / 线框；桌面与手机宽度）；
- *   2. 启动看板进程（临时 JOPLO_HOME，登记 invite、joplo-dist、一个编译出错的项目和一个已删除的目录），截取新界面（D39）：
+ *   2. 启动看板进程（临时 JOPLO_HOME，登记 invite、joplo、一个编译出错的项目和一个已删除的目录），截取新界面（D39）：
  *      首页、演示页（电脑 / 手机）、缺口、检查抽屉、「…」菜单、导出视频进度、编译错误；
  *   3. 调用 buildSite，用 file:// 打开发布站截图；
- *   4. 把 examples/joplo-board 原型里对应的场景也渲染出来（prototype-*），与新界面放在一起对照；
+ *   4. 把 examples/joplo 原型里对应的场景也渲染出来（prototype-*），与新界面放在一起对照；
  *   5. 架构图（Diagram）测试夹具的调用链截图（stage-diagram-*），以及 examples/agent-arch 的两步（stage-agent-arch-*，1600×1000）。
  * 用法：pnpm docs:screenshots [输出目录]
  */
@@ -68,7 +68,7 @@ for (const [name, scenarioId, step] of [['stage-agent-arch-happy-7', 'agent.a-hy
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-docs-home-'));
 const dist = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-docs-dist-')));
-fs.cpSync(path.join(root, 'examples/joplo-dist'), dist, { recursive: true, filter: (s) => !/[/\\](\.joplo|dist|node_modules)([/\\]|$)/.test(s) });
+fs.cpSync(path.join(root, 'examples/joplo'), dist, { recursive: true, filter: (s) => !/[/\\](\.joplo|dist|node_modules)([/\\]|$)/.test(s) });
 const shop = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'shop-')));
 fs.writeFileSync(path.join(shop, 'joplo.config.ts'), "import { config } from '@joplo-app/kit';\nexport default config({ name: '网店结算' });\n");
 fs.mkdirSync(path.join(shop, 'features/cart'), { recursive: true });
@@ -188,14 +188,15 @@ try {
   for (const d of [tmp, dist, shop, home]) fs.rmSync(d, { recursive: true, force: true });
 }
 
-// 原型对照：examples/joplo-board 中与上面各图对应的场景（sketch）
-const proto = path.join(root, 'examples/joplo-board');
+// 原型对照：examples/joplo 中与上面各图对应的场景（sketch）
+const proto = path.join(root, 'examples/joplo');
 const PROTO: { name: string; scenarioId: string; stepId?: string; viewport?: { width: number; height: number } }[] = [
   { name: 'prototype-home', scenarioId: 'home.a-recent.recent' },
   { name: 'prototype-home-compile-error', scenarioId: 'home.a-recent.second_dev', stepId: 'home.a-recent.second_dev#1' },
   { name: 'prototype-play', scenarioId: 'player.b-by-case.play', stepId: 'player.b-by-case.play#1' },
   { name: 'prototype-play-gap', scenarioId: 'player.b-by-case.switch', stepId: 'player.b-by-case.switch#2' },
-  { name: 'prototype-play-mobile', scenarioId: 'player.b-by-case.device', stepId: 'player.b-by-case.device#2' },
+  // D44 removed per-demo device switching; render the real device-frame design instead.
+  { name: 'prototype-device-frames', scenarioId: 'frames.a-builtin.terminal', stepId: 'frames.a-builtin.terminal#1' },
   { name: 'prototype-inspect-drawer', scenarioId: 'player.b-by-case.inspect', stepId: 'player.b-by-case.inspect#1' },
   { name: 'prototype-more-menu', scenarioId: 'player.b-by-case.export_image', stepId: 'player.b-by-case.export_image#1' },
   { name: 'prototype-video-progress', scenarioId: 'player.b-by-case.export_video', stepId: 'player.b-by-case.export_video#4' },

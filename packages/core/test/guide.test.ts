@@ -104,8 +104,8 @@ test('cases 按产品类型给出可筛选的预设键、维度和来源示例',
   const groups = [
     { example: 'examples/invite', cases: { no_permission: 'permission', invalid_input: 'input', revoked: 'lifecycle', expired: 'lifecycle', already_exists: 'conflict', duplicate_submit: 'conflict', request_failed: 'async' } },
     { example: 'examples/agent-arch', cases: { quota: 'permission', dangerous_tool: 'permission', hand_offline: 'async', local_data: 'main', tool_version: 'consistency', usage_retry: 'async', model_failed: 'async' } },
-    { example: 'examples/joplo-dist', cases: { first_run: 'main', env_old: 'input', version_skew: 'consistency', optional_dep: 'async', dir_not_empty: 'conflict', typo: 'input', user_modified: 'conflict', offline: 'async' } },
-    { example: 'examples/joplo-board', cases: { first_open: 'main', single_instance: 'conflict', stale_resource: 'lifecycle', one_broken: 'consistency', public_view: 'consistency', recent: 'main' } },
+    { example: 'examples/joplo/features/npm', cases: { first_run: 'main', env_old: 'input', version_skew: 'consistency', optional_dep: 'async', dir_not_empty: 'conflict', typo: 'input', user_modified: 'conflict', offline: 'async' } },
+    { example: 'examples/joplo/features/home', cases: { first_open: 'main', single_instance: 'conflict', stale_resource: 'lifecycle', one_broken: 'consistency', public_view: 'consistency', recent: 'main' } },
   ];
   for (const group of groups) {
     expect(body).toContain(group.example);

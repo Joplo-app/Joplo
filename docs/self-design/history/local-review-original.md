@@ -1,0 +1,30 @@
+# 本地评审：保留的原型说明
+
+以下为合并到统一自设计项目前的原始说明，来源 `d566856:examples/joplo-local-review/README.md`。这是历史设计稿，命令与“尚未实现”状态不代表当前产品。当前设计从 `examples/joplo` 的 `review` Feature 进入；实际命令与能力以 `docs/cloud-feedback-watch.md`、D77–D78 和当前 CLI 为准。
+
+---
+
+# 本地评审与 Agent 反馈
+
+用 Joplo 自己演示拟议功能，未实现真实反馈存储、监听命令或后台事件服务。
+输入、事件与退出状态均由 `flow()` 预设步骤驱动；点击高亮目标或播放查看。
+
+从仓库根目录运行：
+
+```sh
+pnpm joplo check examples/joplo-local-review
+pnpm joplo dev examples/joplo-local-review
+```
+
+五条流程：反馈后确认、无需反馈直接确认、切页保留定位、多实例隔离、断线补收。
+右侧反馈图标打开覆盖在演示上方的浮层，不改变演示页面宽度；浮层内可提交反馈，也可直接确认方案、结束本轮评审。
+
+拟议 CLI：`joplo review watch --session <id> --json [--after <seq>]`。
+`--json` 表达一事件一行的 NDJSON；演示为了阅读将单个事件排为多行。
+会话绑定实例、项目真实路径（worktree 分开）、功能、方案和版本，不能只靠端口或当前最新项目猜测。
+真实实现时 stdout 只输出事件，状态提示输出到 stderr；收到 `approved` 才正常退出，断线不等于确认。
+事件先持久化再确认保存；游标为会话内事件序号，消费者用会话 ID + 序号去重。
+同一进程服务多个项目也分别创建会话；端口重用时验证实例身份，避免接入另一进程。
+
+以上会话协议、命令名称、草稿定位和恢复方式均是待评审假设，见 feature.ts 的 pending 规则。
+方案修改后的新一轮评审方式仍待决定；未设置 pick，也未发布。

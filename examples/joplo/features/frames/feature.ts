@@ -1,0 +1,20 @@
+import { feature, question, rule } from '@joplo-app/kit';
+
+export default feature({
+  order: 6,
+  name: '设备外框：终端与手机',
+  goal: '写命令行和移动端原型时，作者直接用现成的终端组件和手机外框，不用自己拼',
+  roles: ['作者'],
+  cases: {
+    terminal: { title: 'CLI 原型：输入命令，出现输出', dimension: 'main', priority: 'high', expected: '命令一块、输出一块；输出可以有成功 / 警告 / 错误三种颜色' },
+    phone: { title: '移动端页面放进手机外框', dimension: 'main', priority: 'high', expected: 'page 写 viewport: "mobile" 时自动套上外框；同一个原型不再同时适配电脑和手机，需要手机版就单独做一个演示' },
+    long_output: { title: '命令输出很长', dimension: 'input', expected: '终端内部滚动，不把页面撑开' },
+  },
+  rules: {
+    frame_is_component: rule('终端和手机是目录里的组件（Terminal、Phone）；页面写 viewport: "mobile" 时舞台自动套上 Phone', { origin: 'user', status: 'confirmed', cases: ['terminal', 'phone'] }),
+  },
+  questions: {
+    more_frames: question('还要别的外框吗？例如浏览器窗口（带地址栏）、平板、桌面应用窗口', { severity: 'minor', refs: ['phone'] }),
+  },
+  pick: 'a-builtin',
+});

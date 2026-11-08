@@ -7,7 +7,7 @@ import { buildSite, finalizeHtml, jsonForHtml, publishPayload } from '../src/bui
 import { renderStep } from '../src/render.ts';
 import { PLAYWRIGHT_VERSION, exportRuntimeStatus, runtimePaths } from '../src/export-runtime.ts';
 import { compileProject } from '../src/project.ts';
-import { Project as ProjectSchema } from '@joplo-app/core';
+import { Project as ProjectSchema, walkNodes } from '@joplo-app/core';
 import { joploProjectPlugin, kitAliases, locateWebAssets } from '../src/vite-shared.ts';
 import { createServer } from 'vite';
 import { pickedExample } from './picked-example.ts';
@@ -344,10 +344,10 @@ describe('renderStep', () => {
 
 /**
  * 按场景保密分享（D75，scope）。不变量：产物里的每个文本文件都不出现范围外功能、方案、场景的名字、目标、说明和步骤字幕；
- * 写错范围时在写任何文件之前报错。用多功能的 examples/joplo-board：只分享 home 的一个场景。
+ * 写错范围时在写任何文件之前报错。用多功能的 examples/joplo：只分享 home 的一个场景。
  */
 describe('范围构建（scope，D75）', () => {
-  const BOARD = path.resolve(import.meta.dirname, '../../../examples/joplo-board');
+  const BOARD = path.resolve(import.meta.dirname, '../../../examples/joplo');
   let dir: string;
   beforeAll(() => {
     dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-scope-t-')));
@@ -369,7 +369,17 @@ describe('范围构建（scope，D75）', () => {
     const dev = await devIR();
     const SCENARIO = 'home.a-recent.recent';
     const keep = dev.scenarios[SCENARIO]!;
-    const inScope = JSON.stringify(keep) + dev.features.home!.name + dev.features.home!.goal + JSON.stringify(dev.options['home.a-recent']);
+    // The home prototype itself contains illustrative feature rows (for example
+    // “npm 包发布”). After unifying the projects those labels also name real
+    // out-of-scope features; identical text authored by home is not a data leak.
+    // Only whitelist this initial scene's own/base node props, never other
+    // options' contributions or the resulting scoped output.
+    const ownLabels: string[] = [];
+    walkNodes(dev.scenes[keep.initial.sceneId]!.root, (node, ancestors) => {
+      if (![node, ...ancestors].some(n => n.from && n.from !== keep.optionId))
+        ownLabels.push(JSON.stringify(node.props ?? {}));
+    });
+    const inScope = JSON.stringify(keep) + dev.features.home!.name + dev.features.home!.goal + JSON.stringify(dev.options['home.a-recent']) + ownLabels.join('');
     // 范围外的文字（与范围内重复的不算：例如两个功能共用的字幕）
     const outside = [
       ...Object.values(dev.features).filter((f) => f.id !== 'home').flatMap((f) => [f.name, f.goal]),
@@ -389,6 +399,8 @@ describe('范围构建（scope，D75）', () => {
     expect(ir.scoped).toBe(true);
     expect(ir.project.description).toBe('');
     expect(Object.keys(ir.project.features)).toEqual(['home']);
+    expect(Object.keys(ir.project.options)).toEqual(['home.a-recent']);
+    expect(Object.keys(ir.project.scenarios)).toEqual([SCENARIO]);
     expect(text).toContain(keep.steps[0]!.caption);
   }, 180_000);
 
