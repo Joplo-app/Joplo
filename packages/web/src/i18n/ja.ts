@@ -1,7 +1,7 @@
 import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
-import { value, number, list, plural, type Value } from './format';
+import { value, number, list, plural, twoDigits, clock, type Value } from './format';
 import type { Dictionary } from './en';
 
 export function createJa(locale: Locale = 'ja') {
@@ -153,6 +153,16 @@ export function createJa(locale: Locale = 'ja') {
       coverStart: "開始",
       /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
       forRoles: (names: string[]) => `対象：${list(names, locale)}`,
+      film: "映像",
+      featureDemo: "機能デモ",
+      chapterNo: (n: number) => twoDigits(n, locale),
+      clock: (ms: number) => clock(ms, locale),
+      chapterCount: (n: number) => `${number(n, locale)} 章`,
+      sideChapterCount: (n: number) => `番外編 ${number(n, locale)} 本`,
+      filmMeta: (n: number, min: number, sec: number) => `${number(n, locale)} 章 · ${(min === 0 ? `約 ${number(sec, locale)} 秒` : sec === 0 ? `約 ${number(min, locale)} 分` : `約 ${number(min, locale)} 分 ${number(sec, locale)} 秒`)}`,
+      chapterKicker: (n: number) => `第 ${number(n, locale)} 章`,
+      sideChapter: "番外編",
+      sideChapters: "番外編",
       coverStartTitle: "最初から再生",
       coverSteps: (n: number) => plural(n, { other: '約 # ステップ' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `約 ${number(d.value, locale)} 秒` : `約 ${number(d.value, locale)} 分`,
@@ -251,6 +261,11 @@ export function createJa(locale: Locale = 'ja') {
       // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
       embedPlayDemo: "デモを再生",
       embedCoverMeta: (n: number) => `クリックできるプロトタイプ · ${plural(Number(n), { other: "# シナリオ" }, locale)}`,
+      films: "映像",
+      works: "作品",
+      watchFilm: "視聴",
+      watchFilmFor: (name: string) => `「${name}」を視聴`,
+      embedPlayFilm: "映像を再生",
       embedMadeWithJoplo: "Joplo で作成",
       embedCoverHint: "再生後に一時停止・ステップ送り・全画面表示ができます",
       embedStepProgress: (current: number, total: number) => `ステップ ${number(current, locale)} / ${number(total, locale)}`,

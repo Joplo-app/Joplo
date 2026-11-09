@@ -12,9 +12,11 @@ import { captureReviewDraft, localReviewCommand, readReviewDraft, reviewDraftKey
 import { useReviewDrag } from './useReviewDrag';
 
 /** 跨页面保留草稿的位置；portal 浮层与图标均不占布局宽度。 */
-export function LocalReview({ projectId, project, optionId, context, version, enabled, completed, onOpen }: {
+export function LocalReview({ projectId, project, optionId, context, version, enabled, completed, onOpen, approvable = true }: {
   projectId: string; project: Project; optionId: string; context: LocalReviewLocation | null;
   version: number; enabled: boolean; completed: boolean; onOpen: () => void;
+  /** 能否“确认方案”：影片（D102）没有方案这一层，只留反馈，不出确认按钮。 */
+  approvable?: boolean;
 }) {
   const { t } = useBoardI18n();
   const l = t.board;
@@ -120,7 +122,7 @@ export function LocalReview({ projectId, project, optionId, context, version, en
     </div>
     <div className={`absolute right-3 z-30 ${completed ? 'bottom-14' : 'bottom-3'}`} data-testid="local-review-confirm">
       {status === 'approved' ? <span role="status" className="rounded-[6px] border border-jb-line bg-jb-surface px-3 py-2 text-[13px] text-jb-ok">{l.localReviewApproved}</span>
-        : <Btn icon={<Check className="size-4" />} label={l.localReviewApprove} variant="primary" disabled={!canWrite || !!draft?.text.trim()} title={draft?.text.trim() ? l.localReviewSubmitDraft : undefined} onClick={() => void send('approved')} data-testid="local-review-approve" />}
+        : !approvable ? null : <Btn icon={<Check className="size-4" />} label={l.localReviewApprove} variant="primary" disabled={!canWrite || !!draft?.text.trim()} title={draft?.text.trim() ? l.localReviewSubmitDraft : undefined} onClick={() => void send('approved')} data-testid="local-review-approve" />}
     </div>
     <Popover open={open} anchor={anchor} onClose={() => setOpen(false)} placement="right-start" width={360} autoFocus label={l.localReviewTitle} testid="local-review-popover" className="flex max-h-[calc(100vh-32px)] max-w-[calc(100vw-16px)] flex-col font-jb">
       <div className="flex shrink-0 items-center justify-between border-b border-jb-line px-4 py-3"><h2 className="text-[15px] font-semibold">{l.localReviewTitle}</h2><Btn icon={<X className="size-4" />} label={l.localReviewClose} iconOnly variant="ghost" onClick={() => setOpen(false)} /></div>

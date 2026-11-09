@@ -1,7 +1,7 @@
 import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
-import { value, number, list, plural, type Value } from './format';
+import { value, number, list, plural, twoDigits, clock, type Value } from './format';
 import type { Dictionary } from './en';
 
 export function createPtBR(locale: Locale = 'pt-BR') {
@@ -153,6 +153,16 @@ export function createPtBR(locale: Locale = 'pt-BR') {
       coverStart: "Começar",
       /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
       forRoles: (names: string[]) => `Para: ${list(names, locale)}`,
+      film: "Filme",
+      featureDemo: "Demo de recurso",
+      chapterNo: (n: number) => twoDigits(n, locale),
+      clock: (ms: number) => clock(ms, locale),
+      chapterCount: (n: number) => plural(n, { one: '# capítulo', other: '# capítulos' }, locale),
+      sideChapterCount: (n: number) => plural(n, { one: '# capítulo extra', other: '# capítulos extras' }, locale),
+      filmMeta: (n: number, min: number, sec: number) => `${plural(n, { one: '# capítulo', other: '# capítulos' }, locale)} · ${(min === 0 ? `cerca de ${number(sec, locale)} s` : sec === 0 ? `cerca de ${number(min, locale)} min` : `cerca de ${number(min, locale)} min ${number(sec, locale)} s`)}`,
+      chapterKicker: (n: number) => `Capítulo ${number(n, locale)}`,
+      sideChapter: "Capítulo extra",
+      sideChapters: "Capítulos extras",
       coverStartTitle: "Reproduzir do início",
       coverSteps: (n: number) => plural(n, { one: 'Cerca de # etapa', other: 'Cerca de # etapas' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `Cerca de ${number(d.value, locale)} s` : `Cerca de ${number(d.value, locale)} min`,
@@ -251,6 +261,11 @@ export function createPtBR(locale: Locale = 'pt-BR') {
       // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
       embedPlayDemo: "Reproduzir demo",
       embedCoverMeta: (n: number) => `Protótipo interativo · ${plural(Number(n), { one: "# cenário", other: "# cenários" }, locale)}`,
+      films: "Filmes",
+      works: "Obras",
+      watchFilm: "Assistir",
+      watchFilmFor: (name: string) => `Assistir “${name}”`,
+      embedPlayFilm: "Reproduzir filme",
       embedMadeWithJoplo: "Feito com Joplo",
       embedCoverHint: "Ao reproduzir: pausar, avançar por etapas e tela cheia",
       embedStepProgress: (current: number, total: number) => `Etapa ${number(current, locale)} / ${number(total, locale)}`,

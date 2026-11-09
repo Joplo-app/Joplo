@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardEs(locale: Locale = 'es') {
@@ -188,6 +188,16 @@ export function createBoardEs(locale: Locale = 'es') {
       coverageFor: (p0: Value) => `Cobertura de ${value(p0, locale)}`,
       thisFeatureHasNoCasesYet: "Esta función aún no tiene casos.",
       otherScenarios: "Otros escenarios",
+      films: "Películas",
+      featureDemos: "Demos de funciones",
+      filmMenuHint: (n: number, time: string) => `${plural(n, { one: '# capítulo', other: '# capítulos' }, locale)} · ${time}`,
+      draftNotPublished: "Borrador · no se publica",
+      chapterMeta: (time: string, steps: number) => `${time} · ${plural(steps, { one: '# paso', other: '# pasos' }, locale)}`,
+      filmReview: "Revisión",
+      filmReviewHint: "Tira de fotogramas de toda la película, con cortes y pausas:",
+      filmCopyCommand: "Copiar",
+      filmEmptyTitle: "Esta película aún no tiene capítulos",
+      filmEmptyBody: (file: string) => `Escribe el primer capítulo en chapters de ${file}:`,
       copy: (p0: Value) => `Copiar ${value(p0, locale)}`,
       missing: "Sin cubrir",
       undecided: "Por decidir",

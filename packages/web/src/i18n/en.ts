@@ -1,6 +1,6 @@
 import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import type { Locale } from './locale';
-import { value, number, list, plural, type Value } from './format';
+import { value, number, list, plural, twoDigits, clock, type Value } from './format';
 
 export function createEn(locale: Locale = 'en') {
   return {
@@ -177,6 +177,17 @@ export function createEn(locale: Locale = 'en') {
       coverStart: "Start",
       /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
       forRoles: (names: string[]) => `For: ${list(names, locale)}`,
+      // D102 films: form badge, automatic chapter numbers, chapter counts and lengths (board, site, embed, RenderApp).
+      film: "Film",
+      featureDemo: "Feature demo",
+      chapterNo: (n: number) => twoDigits(n, locale),
+      clock: (ms: number) => clock(ms, locale),
+      chapterCount: (n: number) => plural(n, { one: '# chapter', other: '# chapters' }, locale),
+      sideChapterCount: (n: number) => plural(n, { one: '# side chapter', other: '# side chapters' }, locale),
+      filmMeta: (n: number, min: number, sec: number) => `${plural(n, { one: '# chapter', other: '# chapters' }, locale)} · ${(min === 0 ? `about ${number(sec, locale)} sec` : sec === 0 ? `about ${number(min, locale)} min` : `about ${number(min, locale)} min ${number(sec, locale)} sec`)}`,
+      chapterKicker: (n: number) => `Chapter ${number(n, locale)}`,
+      sideChapter: "Side chapter",
+      sideChapters: "Side chapters",
       coverStartTitle: "Play from the beginning",
       coverSteps: (n: number) => plural(n, { one: 'About # step', other: 'About # steps' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `About ${number(d.value, locale)} sec` : plural(d.value, { one: 'About # min', other: 'About # min' }, locale),
@@ -283,6 +294,11 @@ export function createEn(locale: Locale = 'en') {
       // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
       embedPlayDemo: "Play demo",
       embedCoverMeta: (n: number) => `Interactive prototype · ${plural(n, { one: '# scenario', other: '# scenarios' }, locale)}`,
+      films: "Films",
+      works: "Works",
+      watchFilm: "Watch",
+      watchFilmFor: (name: string) => `Watch “${name}”`,
+      embedPlayFilm: "Play film",
       embedMadeWithJoplo: "Made with Joplo",
       embedCoverHint: "Pause, step through, or go fullscreen after playing",
       embedStepProgress: (current: number, total: number) => `Step ${number(current, locale)} / ${number(total, locale)}`,

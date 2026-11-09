@@ -1,7 +1,7 @@
 import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
-import { value, number, list, type Value } from './format';
+import { value, number, list, twoDigits, clock, type Value } from './format';
 import type { Dictionary } from './en';
 
 export function createZhCN(locale: Locale = 'zh-CN') {
@@ -167,6 +167,16 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       coverStart: "开始",
       /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
       forRoles: (names: string[]) => `面向：${list(names, locale)}`,
+      film: "影片",
+      featureDemo: "功能演示",
+      chapterNo: (n: number) => twoDigits(n, locale),
+      clock: (ms: number) => clock(ms, locale),
+      chapterCount: (n: number) => `${number(n, locale)} 章`,
+      sideChapterCount: (n: number) => `${number(n, locale)} 条支线`,
+      filmMeta: (n: number, min: number, sec: number) => `${number(n, locale)} 章 · ${(min === 0 ? `约 ${number(sec, locale)} 秒` : sec === 0 ? `约 ${number(min, locale)} 分` : `约 ${number(min, locale)} 分 ${number(sec, locale)} 秒`)}`,
+      chapterKicker: (n: number) => `第 ${number(n, locale)} 章`,
+      sideChapter: "支线",
+      sideChapters: "支线",
       coverStartTitle: "从头开始播放",
       coverSteps: (n: number) => `约 ${number(n, locale)} 步`,
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `约 ${number(d.value, locale)} 秒` : `约 ${number(d.value, locale)} 分钟`,
@@ -274,6 +284,11 @@ ${value(p2, locale)}`,
       // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
       embedPlayDemo: "播放演示",
       embedCoverMeta: (n: number) => `可点击的原型演示 · ${number(n, locale)} 个场景`,
+      films: "影片",
+      works: "作品",
+      watchFilm: "观看",
+      watchFilmFor: (name: string) => `观看「${name}」`,
+      embedPlayFilm: "播放影片",
       embedMadeWithJoplo: "用 Joplo 制作",
       embedCoverHint: "播放后可暂停、逐步、全屏",
       embedStepProgress: (current: number, total: number) => `步骤 ${number(current, locale)} / ${number(total, locale)}`,

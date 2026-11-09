@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardKo(locale: Locale = 'ko') {
@@ -188,6 +188,16 @@ export function createBoardKo(locale: Locale = 'ko') {
       coverageFor: (p0: Value) => `${value(p0, locale)} 반영 상태`,
       thisFeatureHasNoCasesYet: "이 기능에는 아직 케이스가 없습니다.",
       otherScenarios: "다른 시나리오",
+      films: "영상",
+      featureDemos: "기능 데모",
+      filmMenuHint: (n: number, time: string) => `${number(n, locale)}장 · ${time}`,
+      draftNotPublished: "초안 · 게시 안 함",
+      chapterMeta: (time: string, steps: number) => `${time} · ${number(steps, locale)}단계`,
+      filmReview: "시사",
+      filmReviewHint: "영상 전체의 필름 스트립(하드 컷과 정지):",
+      filmCopyCommand: "복사",
+      filmEmptyTitle: "이 영상에는 아직 장이 없습니다",
+      filmEmptyBody: (file: string) => `${file}의 chapters에 첫 장을 작성하세요:`,
       copy: (p0: Value) => `${value(p0, locale)} 복사`,
       missing: "누락",
       undecided: "미정",

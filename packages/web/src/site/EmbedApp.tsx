@@ -39,7 +39,7 @@ import { SiteVoiceButton, useSiteVoice } from '../player/SiteVoice';
 import { ContentFallbackNotice } from './ContentNotice';
 import { cn } from '@/lib/utils';
 import { authorElement, createReviewBridge, elementLabel, type ReviewBridge, type ReviewGoto } from './review-bridge';
-import { embedInitial, embedKey, embedProgress, embedScenarioItems, fullscreenAvailable, standaloneUrl, type EmbedParams } from './embed-model';
+import { embedFilmCover, embedInitial, embedKey, embedProgress, embedScenarioItems, fullscreenAvailable, standaloneUrl, type EmbedParams } from './embed-model';
 
 const BRAND_URL = 'https://joplo.app/';
 
@@ -112,7 +112,9 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
   const curtainOn = !!scenario && curtainUp(project, scenario.id, pos, cover);
   // 控制条的步骤与字幕右侧一致：播放中是正在播的那一步，否则是当前位置
   const shown = scenario ? shownIndex(scenario, pos, snap.activeStep) : pos;
-  const items = embedScenarioItems(project, snap.scenarioId);
+  const items = embedScenarioItems(project, snap.scenarioId, i18n);
+  // 影片（D102）：封面写影片标题与「影片 · N 章 · 约 M」；功能演示为 null，封面不变
+  const filmCover = embedFilmCover(project, snap.scenarioId, i18n);
   const reviewLayer = plan.layers.length ? plan.viewLayer : null;
   const stepId = scenario && pos > 0 ? (scenario.steps[pos - 1]?.id ?? null) : null;
   const playing = snap.playing && !snap.paused;
@@ -358,7 +360,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
               focusAfterStart.current = true;
               start();
             }}
-            aria-label={`${i18n.site.embedPlayDemo} · ${project.name}`}
+            aria-label={`${filmCover?.play ?? i18n.site.embedPlayDemo} · ${filmCover?.title ?? project.name}`}
             data-testid="embed-cover"
             className="group absolute inset-0 z-20 flex cursor-pointer flex-col items-center justify-center gap-3 bg-[rgba(24,24,24,0.55)] px-6 text-center text-white outline-none"
           >
@@ -367,12 +369,12 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
               data-testid="embed-play"
             >
               <Play className="size-6 fill-current" aria-hidden />
-              {i18n.site.embedPlayDemo}
+              {filmCover?.play ?? i18n.site.embedPlayDemo}
             </span>
             <span className="max-w-full truncate text-[18px] font-bold leading-7" data-testid="embed-title">
-              {project.name}
+              {filmCover?.title ?? project.name}
             </span>
-            <span className="text-[13px] opacity-85">{i18n.site.embedCoverMeta(items.length)}</span>
+            <span className="text-[13px] opacity-85">{filmCover?.meta ?? i18n.site.embedCoverMeta(items.length)}</span>
             <ContentFallbackNotice variant="cover" />
           </button>
         ) : null}
@@ -404,7 +406,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
             {!params.diff && <SiteVoiceButton voice={voice} size={32} testid="embed-voice" />}
             {items.length > 1 ? (
               <MenuButton
-                trigger={L.compact ? { icon: <ListVideo className="size-4" /> } : { label: scenario.name, iconOnly: false }}
+                trigger={L.compact ? { icon: <ListVideo className="size-4" /> } : { label: filmCover ? (items.find((it) => it.current)?.label ?? scenario.name) : scenario.name, iconOnly: false }}
                 label={i18n.site.embedSwitchScenario}
                 testid="embed-scenarios"
                 items={items.map((it) => ({ id: `scenario-${it.id}`, label: it.label, checked: it.current, onClick: () => switchScenario(it.id) }))}
@@ -416,7 +418,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
               />
             ) : L.compact ? null : (
               <span className="min-w-0 max-w-[220px] truncate px-1 text-[13px] text-jb-muted" data-testid="embed-scenario-name">
-                {scenario.name}
+                {filmCover ? (items.find((it) => it.current)?.label ?? scenario.name) : scenario.name}
               </span>
             )}
             {brand}

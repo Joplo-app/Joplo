@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardZhTW(locale: Locale = 'zh-TW') {
@@ -188,6 +188,16 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       coverageFor: (p0: Value) => `${value(p0, locale)} 的涵蓋狀態`,
       thisFeatureHasNoCasesYet: "此功能尚無情況。",
       otherScenarios: "其他情境",
+      films: "影片",
+      featureDemos: "功能演示",
+      filmMenuHint: (n: number, time: string) => `${number(n, locale)} 章 · ${time}`,
+      draftNotPublished: "草稿 · 不發佈",
+      chapterMeta: (time: string, steps: number) => `${time} · ${number(steps, locale)} 步`,
+      filmReview: "審片",
+      filmReviewHint: "整部影片的膠片條（硬切與靜止）：",
+      filmCopyCommand: "複製",
+      filmEmptyTitle: "這部影片還沒有章節",
+      filmEmptyBody: (file: string) => `在 ${file} 的 chapters 裡寫第一章：`,
       copy: (p0: Value) => `複製 ${value(p0, locale)}`,
       missing: "缺少",
       undecided: "待決定",

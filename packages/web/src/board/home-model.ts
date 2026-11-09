@@ -2,7 +2,7 @@ import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 看板首页的视图模型（D55「首页」，纯函数）：项目路径缩写、项目徽标、↑↓ 移动选中、项目摘要、功能卡片。
  */
-import { displaySceneId, orderedFeatures, type Project } from '@joplo-app/core/runtime';
+import { displaySceneId, orderedFeatures, workKind, workOf, type Project, type Work } from '@joplo-app/core/runtime';
 import type { ProjectSummary } from '../runtime/dev-client';
 import { optionsOf, scenariosOf } from '../runtime/views';
 import { gapsOf, optionLabel } from './nav-model';
@@ -48,6 +48,8 @@ export type FeatureCard = {
   open: { featureId: string; optionId: string } | null;
   /** 缩略图：这个方案第一个场景的初始画面（render 模式渲染）。 */
   thumb: { scenarioId: string; sceneId: string } | null;
+  /** 影片（D102）：卡片写「影片 · N 章 · 约 M」与草稿，不写方案与覆盖；功能演示为 null（卡片不变）。 */
+  film: Work | null;
 };
 
 export function featureCard(project: Project, featureId: string): FeatureCard | null {
@@ -57,7 +59,10 @@ export function featureCard(project: Project, featureId: string): FeatureCard | 
   const pickIdx = f.pick ? options.findIndex((o) => o.id === f.pick) : -1;
   const target = pickIdx >= 0 ? options[pickIdx]! : (options[0] ?? null);
   const g = gapsOf(project, target?.id ?? null);
-  const sc = target ? scenariosOf(project, target.id)[0] : undefined;
+  const film = workKind(f) === 'film' ? workOf(project, f.id) : null;
+  // 影片的缩略图取播放顺序里的第一章（打开时的封面就画在那里）
+  const first = film ? (film.slices.find((s) => s.inSequence) ?? film.slices[0]) : undefined;
+  const sc = film ? (first ? project.scenarios[first.id] : undefined) : target ? scenariosOf(project, target.id)[0] : undefined;
   const sceneId = sc ? displaySceneId(project, sc.id, 0) : null;
   return {
     id: f.id,
@@ -68,6 +73,7 @@ export function featureCard(project: Project, featureId: string): FeatureCard | 
     coverage: { ...g, allExpressed: !!target && f.caseIds.length > 0 && g.missing === 0 && g.undecided === 0 },
     open: target ? { featureId: f.id, optionId: target.id } : null,
     thumb: sc && sceneId && project.scenes[sceneId] ? { scenarioId: sc.id, sceneId } : null,
+    film,
   };
 }
 

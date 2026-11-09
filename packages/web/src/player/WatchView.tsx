@@ -6,7 +6,7 @@
  *   手机还竖着时提示把手机横过来；手机真的横过来后不再旋转。
  * 连续播放（一章接一章）由控制器的 autoNext 负责，发布站设置。
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, CirclePlay, Pause, Play, RotateCcw, RectangleHorizontal, X } from 'lucide-react';
 import type { Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
@@ -16,7 +16,8 @@ import type { SpokenSubtitle } from './subtitle-content';
 import { phoneLayout } from './watch';
 import { ROTATED_ATTR } from '../renderer/rect';
 
-export type Chapter = { id: string; name: string; current: boolean; steps: string };
+/** no：影片（D102）章节的两位编号，支线为 null；功能演示的场景没有这个字段。steps：右侧小字（场景写步数，影片写时长）。 */
+export type Chapter = { id: string; name: string; current: boolean; steps: string; no?: string | null };
 
 /** 视口尺寸与是否是手机（粗指针、短边 < 600）；enabled = false 时总是 null。 */
 export function usePhoneLayout(enabled: boolean) {
@@ -114,9 +115,13 @@ export function WatchView(p: Props) {
   const playing = snap.playing && !snap.paused;
   const chapterIndex = p.chapters.findIndex((c) => c.current);
   const isLast = chapterIndex === p.chapters.length - 1;
+  // 影片：“第 n / N 章”只数有编号的章节，支线写“支线”；功能演示按列表位置（不变）
+  const numbered = p.chapters.filter((c) => c.no);
+  const film = p.chapters.some((c) => c.no !== undefined);
+  const cur = p.chapters[chapterIndex];
   const finished = !!scenario && !snap.playing && total > 0 && (!!snap.state?.completed || pos >= total) && isLast;
   const progress = total ? Math.round((pos / total) * 100) : 0;
-  const chapterLabel = chapterIndex >= 0 ? i18n.player.watchChapterOf(chapterIndex + 1, p.chapters.length) : '';
+  const chapterLabel = chapterIndex < 0 ? '' : !film ? i18n.player.watchChapterOf(chapterIndex + 1, p.chapters.length) : cur?.no ? i18n.player.watchChapterOf(numbered.indexOf(cur) + 1, numbered.length) : i18n.player.sideChapter;
   // 封面、过渡卡这一步没有字幕（画面上已经是大字）：竖屏时显示“第几章 · 章节名”，不让字幕区空着
   const spoken = p.subtitle?.text ?? '';
   const caption = spoken || (scenario ? [chapterLabel, scenario.name].filter(Boolean).join(' · ') : '');
@@ -177,26 +182,41 @@ export function WatchView(p: Props) {
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto border-t border-jb-line px-2 pb-6 pt-2" data-testid="watch-chapters">
-        <div className="px-2 pb-1 text-[12px] font-semibold tracking-[1px] text-jb-muted">
-          {i18n.player.watchChapters} · {p.chapters.length}
-        </div>
-        <ul className="flex flex-col gap-0.5">
-          {p.chapters.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => p.onChapter(c.id)}
-                aria-current={c.current ? 'true' : undefined}
-                className={cn('jb-focus flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2.5 text-left text-[14px]', c.current ? 'bg-jb-selected font-semibold' : 'active:bg-jb-hover')}
-                data-testid={`watch-chapter-${c.id}`}
-              >
-                <CirclePlay className={cn('size-4 shrink-0', c.current ? 'text-jb-fg' : 'text-jb-muted')} aria-hidden />
-                <span className="min-w-0 flex-1">{c.name}</span>
-                <span className="shrink-0 text-[11px] font-normal text-jb-faint">{c.steps}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        {/* 影片（D102）：有编号的章节一组、支线一组（标题写“支线”）；功能演示是一组（不变） */}
+        {(film ? [{ key: 'main', title: i18n.player.watchChapters, list: numbered }, { key: 'side', title: i18n.player.sideChapters, list: p.chapters.filter((c) => !c.no) }] : [{ key: 'main', title: i18n.player.watchChapters, list: p.chapters }])
+          .filter((g) => g.key === 'main' || g.list.length > 0)
+          .map((g) => {
+            const body = (
+              <>
+              <div className="px-2 pb-1 text-[12px] font-semibold tracking-[1px] text-jb-muted">
+                {g.title} · {g.list.length}
+              </div>
+              <ul className="flex flex-col gap-0.5">
+                {g.list.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => p.onChapter(c.id)}
+                      aria-current={c.current ? 'true' : undefined}
+                      className={cn('jb-focus flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2.5 text-left text-[14px]', c.current ? 'bg-jb-selected font-semibold' : 'active:bg-jb-hover')}
+                      data-testid={`watch-chapter-${c.id}`}
+                    >
+                      {c.no ? (
+                        <span className="w-5 shrink-0 font-jb-mono text-[12px] font-bold text-jb-muted" data-testid="chapter-no">{c.no}</span>
+                      ) : (
+                        <CirclePlay className={cn('size-4 shrink-0', c.current ? 'text-jb-fg' : 'text-jb-muted')} aria-hidden />
+                      )}
+                      <span className={cn('min-w-0 flex-1', film && '[overflow-wrap:anywhere]')}>{c.name}</span>
+                      <span className="shrink-0 text-[11px] font-normal text-jb-faint">{c.steps}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              </>
+            );
+            // 功能演示的 DOM 不变：主列表不额外包一层
+            return g.key === 'side' ? <div key={g.key} className="pt-3" data-testid="watch-side-chapters">{body}</div> : <Fragment key={g.key}>{body}</Fragment>;
+          })}
       </div>
       {p.flash ? (
         <div role="status" className="jb-tip fixed left-1/2 top-14 z-30 -translate-x-1/2 whitespace-nowrap px-3 py-2 text-[13px]">
