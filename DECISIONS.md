@@ -447,6 +447,7 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
     - 标准库也一律带命名空间（`ui:Button`、`diagram:Diagram`），不给第一方保留裸名。作者在 TSX 里照常写 `<Button>`（标记决定类型名），命名空间只出现在 IR、check 信息和检查抽屉里；已发布的分享自带当时的运行时，不受影响。迁移时编译器对旧裸名给出改写提示。HTML 兜底标签（div、span…）同样归入一个第一方插件。
     - 标准库默认全部启用：`joplo init` 的体验不变，进阶用户可以在 config 里关掉不需要的。
     - 私有插件（工作假设，用户问“为什么 private 插件制作的内容不能 public”后澄清：内容可以公开，问题只在插件编译后的代码会随站点发布）：默认不拦截；插件作者标了 `private: true` 时，`share` 公开分享前提示一次“这个分享会带上某插件的编译后代码”并要求确认，确认后照常发布。
+    - 2026-11-08 收口（关闭 Q10）：先不做 `private` 标记与分享前确认——分享不拦截、不额外确认，Cloud 也不识别私有插件。发布的站点只带插件编译后的代码，作者对自己分享的内容负责；等有真实的私有插件用户再重新评估。
   - 已实现（阶段 0）：`@joplo-app/kit/plugin`；IR `project.plugins`；组件类型 `<插件 id>:<组件名>`；`UNKNOWN_PLUGIN` / `PLUGIN_PARENT` / `PLUGIN_INVALID` / `PLUGIN_DUPLICATE` / `PLUGIN_RUNTIME_MISSING`；看板经 `/@fs/` 载入运行时；`build` 把运行时打成单文件内联在入口脚本之前；`npx joplo skill` 列出项目插件、`npx joplo skill <插件 id>` 输出插件技能；技能新增 `plugins` 主题。
   - 阶段 1-A 已实现（2026-11-08）：`plugins/diagram`（private，`@joplo-app/plugin-diagram`）承接 Diagram / StateMachine / Sequence、ELK、trace 校验及编译期快照、渲染与 diagram 技能；标准插件默认启用，作者原导入方式不变，IR 一律 `diagram:*`。契约 v2 增加 node / derive / effect / frame 同步钩子、槽位 schema、needsId / selfEvident、React 与 renderChildren；看板/发布站共享宿主 React，v1 mount 继续兼容。播放器、焦点和导演只读 IR，守护测试限制专用逻辑边界。旧裸名/旧 traces 给重编译提示；Canvas、Alda 与 UI 家族未迁移。接口/字段端到端流向见 docs/plugins.md 第 10 节；验证报告见 `.done-P1-A`。
   - 阶段 1-A 评审修正（2026-11-08）：钩子输入隔离/深冻结、受控 derive 输出、有限无环 JSON 信封；快照按舞台寻址；IR 声明文本路径及范围投影，未知槽位范围分享失败关闭；初始快照参与 diff，真实旧 Diagram IR 严格适配后比较。diagram 作为 0.2.17 正式 npm 包提供 build/dist/publishConfig，加入七包发布集合；kit 兼容标记不反向依赖插件，插件经公开 SDK 和宿主注入服务访问渲染/属性能力。React 导出表随 web 交付；验证生产 tarball 安装，不把开发工作区成功等同于发布成功。
@@ -499,7 +500,6 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
 验收：仓库内示例显式迁移后诊断与 R 基线相同、关键帧一致；新项目仅靠安装技能写出 ui+diagram+content 示例，check/dev/build/file:// 离线播放通过；所有新增字段和生成文件的数据流记录在 docs/plugins.md。Release tag 必须先包含模板，再发布 npm；冒烟用本地模板，网络边界用模拟 tarball 测试。
 
 ## Open or deferred questions
-- Q10 D87 私有插件的处理（2026-11-08，工作假设已记在 D87：默认不拦截，`private: true` 时公开分享前确认一次），待用户确认。
 - Q7 跨项目复用（2026-11-05 推迟，用户：“一个项目能够复用暂时就够了”）：项目外的 TSX 文件目前不经过 Joplo 的 JSX 转换（报 `React is not defined`），所以不能跨项目 import 复用件；复用件清单也没进 `joplo skill`。项目内用 `shared/` 复用已经可用。
 - Q9 D84 分享里的音频的生命周期（2026-11-08 记录，不阻塞实现）：对应表放在分享清单里（用户已确认）；分享过期或删除后，这些音频是否随之删除、不另外保留，需要和 joplo-cloud 一起确认。
 - Q8 主题的稳定颜色接口（2026-11-06 记录，D64 不做）：新 Agent 想把主按钮改成品牌色，只能读 DOM 发现按钮背景是内联的 `var(--jp-ink)` 再写覆盖样式。候选：增加 `--jp-primary`（默认等于 `--jp-ink`），并给按钮、输入框、错误文字、标题加稳定的 `data-*` 选择器；需要先用 Joplo 画方案（D40）。
