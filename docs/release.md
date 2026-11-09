@@ -5,16 +5,18 @@
 | 包 | 内容 |
 | --- | --- |
 | `@joplo-app/kit` | 创作 API、组件标记与 JSX 运行时 |
-| `@joplo-app/plugin-content` | 默认讲解内容插件、设计画布、取景、FLIP、studio 主题与技能 |
-| `@joplo-app/plugin-tripo` | 可选 3D 生成插件、费用确认、项目 GLB 与任务恢复技能 |
-| `@joplo-app/plugin-alda` | 可选配乐插件、本机 MIDI 编译、离线合成及技能 |
 | `@joplo-app/plugin-diagram` | 图表、状态机、时序图的编译与运行时、技能及声明 |
+| `@joplo-app/plugin-alda` | 可选配乐插件、本机 MIDI 编译、离线合成及技能 |
+| `@joplo-app/plugin-tripo` | 可选 3D 生成插件、费用确认、项目 GLB 与任务恢复技能 |
+| `@joplo-app/plugin-content` | 默认讲解内容插件、设计画布、取景、FLIP、studio 主题与技能 |
 | `@joplo-app/plugin-ui` | 默认 UI 与 HTML 词汇、绘制及组件指南 |
 | `@joplo-app/core` | 编译、校验与播放器 |
 | `@joplo-app/web` | 预构建看板、发布站、字体与 OFL 许可证 |
 | `@joplo-app/server` | 本地看板、构建、截图与导出 |
 | `@joplo-app/cli` | 命令实现 |
 | `joplo` | Node 版本检查与命令转发入口 |
+
+`joplo-plugin-scene3d` 是 `private: true` 的仓库示例插件，不在上述 npm 发布集合中，保留自身的 0.1.0 版本。十一份公开 tarball（含 `@joplo-app/plugin-tripo`）统一为 0.3.0；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
 
 `release:version` 同步插件的轻量 `src/version.json`，运行时只读取版本，避免把整个开发 manifest 带进浏览器。
 
@@ -27,13 +29,13 @@
 ```sh
 git switch main && git pull
 pnpm install --frozen-lockfile
-pnpm release:version 0.2.10         # 改十一个包的版本，并重新生成 skills/（默认升 patch，破坏性变更升 minor）
+pnpm release:version 0.3.0         # 改十一个包的版本，并重新生成 skills/（默认升 patch，破坏性变更升 minor）
 pnpm install --lockfile-only
 pnpm typecheck && pnpm test         # 本地先过一遍，CI 会再跑
-git add packages/*/package.json plugins/diagram/package.json plugins/diagram/src/version.json pnpm-lock.yaml skills CHANGELOG.md
-git commit -m "release: 0.2.10"
+git add packages/*/package.json plugins/*/package.json plugins/*/src/version.json pnpm-lock.yaml skills templates/starter/.claude/skills CHANGELOG.md
+git commit -m "release: 0.3.0"
 git push origin main
-git tag v0.2.10 && git push origin v0.2.10   # 触发 .github/workflows/release.yml
+git tag v0.3.0 && git push origin v0.3.0   # 触发 .github/workflows/release.yml
 ```
 
 [release.yml](../.github/workflows/release.yml) 收到 `v*` tag 后：
@@ -43,9 +45,9 @@ git tag v0.2.10 && git push origin v0.2.10   # 触发 .github/workflows/release.
 3. `release:publish`（正式版 `--tag latest`，带 `-` 的预发布版 `--tag beta`），最后自动 verify；
 4. 用 `node scripts/commits.mjs notes <tag>` 生成说明并创建 GitHub Release（预发布版标为 Pre-release）：上一个 `v*` tag 以来的提交按“破坏性变更 / 新功能 / 修复 / 性能”分组，去掉前缀、带短哈希，末尾附 compare 链接。其他类型（docs、test、ci……）不进说明。CHANGELOG.md 里如果有 `## <版本>` 一节，会放在最前面作为概要；不写也行。
 
-- 中途失败（网络、registry 延迟、smoke 不过）：修好后在这次运行上 Re-run，或 `gh workflow run release.yml --ref v0.2.10`；已发布的包会跳过，Release 已存在时只更新说明，不必为重试改版本号。
-- 修复要改代码时：tag 已经指向旧提交。改完推 main 后，`git tag -f v0.2.10 && git push -f origin v0.2.10` 移到新提交（npm 上还没有这个版本时才这样做；已经发出去的版本只能升一个新版本号）。
-- 本地预览说明：`node scripts/commits.mjs notes v0.2.10`（tag 要先在本地打好）。
+- 中途失败（网络、registry 延迟、smoke 不过）：修好后在这次运行上 Re-run，或 `gh workflow run release.yml --ref v0.3.0`；已发布的包会跳过，Release 已存在时只更新说明，不必为重试改版本号。
+- 修复要改代码时：tag 已经指向旧提交。改完推 main 后，`git tag -f v0.3.0 && git push -f origin v0.3.0` 移到新提交（npm 上还没有这个版本时才这样做；已经发出去的版本只能升一个新版本号）。
+- 本地预览说明：`node scripts/commits.mjs notes v0.3.0`（tag 要先在本地打好）。
 - 每次推送分支还会跑 [ci.yml](../.github/workflows/ci.yml)（typecheck + test + release:smoke + 提交前缀检查），发布脚本在 Linux 上的问题在发版之前就能发现。
 
 ### 提交信息约定
@@ -83,14 +85,14 @@ npm 或 GitHub Actions 不可用时，由有 npm 发布权限的维护者在自�
 ```sh
 pnpm release:smoke
 pnpm release:publish --tag latest   # 先构建打包全部，再逐个发布 tarball，最后自动运行 release:verify
-git tag v0.1.3                      # 只在上一步以 0 退出（verify 通过）之后
-git push origin v0.1.3
+git tag v0.3.0                      # 只在上一步以 0 退出（verify 通过）之后
+git push origin v0.3.0
 ```
 
 顺序不能乱：
 
 1. `pnpm release:version <v>`：改十一个包的版本，并重新生成 `skills/*/SKILL.md`（带新版本标记）。
-2. 跑完检查后，把 `packages/*/package.json`、`plugins/diagram/package.json`、`plugins/diagram/src/version.json`、`pnpm-lock.yaml`、`skills/` 一起提交，推送 main。推送 main 不会触发发布。
+2. 跑完检查后，把 `packages/*/package.json`、`plugins/*/package.json`、`plugins/*/src/version.json`、`pnpm-lock.yaml`、`skills/` 和 `templates/starter/.claude/skills/` 一起提交，推送 main。推送 main 不会触发发布。
 3. `pnpm release:publish --tag <标签>`：先一次性构建并打包全部包（与 `release:pack` 相同，含全部 tarball 检查），再按依赖顺序发布打好的 tarball（可续跑，见下），最后自动运行 `release:verify`，整体退出码就是 verify 的结果。
 4. 第 3 步失败（中途某个包没发出去，或 verify 不通过）：按提示处理后重跑同一条命令，已发布的包会跳过。也可以单独运行 `pnpm release:verify` 复查。
 5. 第 3 步以 0 退出后，在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`。tag 会触发 release.yml：重跑检查，发布步骤因为十一个包都已存在而跳过，然后生成 GitHub Release。用户用 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。注意 `npx skills add Joplo-app/Joplo@v<v>` 不能用：skills CLI 把 `@` 后面当成技能名，报 No matching skills found（2026-11-06 实测）。手动发布时 tag 要等 verify 通过再推，避免指向一个装不上的版本。

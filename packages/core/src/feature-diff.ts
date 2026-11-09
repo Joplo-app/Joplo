@@ -200,6 +200,7 @@ export function featureDiff(before: unknown, after: unknown, source: { baseSha?:
       if (canonical([b.theme, projectThemes(b), b.autoFocus]) !== canonical([a.theme, projectThemes(a), a.autoFocus])) reasons.push('theme');
       if (canonical(bo?.free) !== canonical(option?.free)) reasons.push('free-reactions');
       if ((old.actionEntry ?? 'before') !== (next.actionEntry ?? 'before')) reasons.push('action-entry');
+      if ((old.autoplay !== false) !== (next.autoplay !== false)) reasons.push('autoplay');
       if (canonical(actionContracts(b, old)) !== canonical(actionContracts(a, next))) reasons.push('action-contracts');
       if (canonical([bo?.layers, bf?.roles]) !== canonical([option?.layers, feature.roles])) reasons.push('layers-roles');
       if (canonical([old.name, old.description, old.expected, old.mock, bf?.name, bf?.goal, bo?.name, bo?.idea]) !== canonical([next.name, next.description, next.expected, next.mock, feature.name, feature.goal, option?.name, option?.idea])) reasons.push('description');

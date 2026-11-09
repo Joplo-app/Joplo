@@ -126,4 +126,15 @@ describe('D88 end-to-end projection', () => {
     const before=compile(s,'publish').project!;const after=structuredClone(before);after.plugins!.probe!.actions!.rotate!.fields.angle!.tolerance=8;
     expect(featureDiff(before,after).scenarios.find(s=>s.after==='f.a.main')?.reasons).toContain('action-contracts');
   });
+  it('feature-diff reports optional autoplay separately from action entry, treating omitted and true alike', async () => {
+    const {featureDiff} = await import('../src/feature-diff.ts');
+    const before=compile(source(),'publish').project!;
+    const after=structuredClone(before);
+    after.scenarios['f.a.main']!.autoplay=true;
+    expect(featureDiff(before,after).scenarios.find(s=>s.after==='f.a.main')?.reasons ?? []).not.toContain('autoplay');
+    after.scenarios['f.a.main']!.autoplay=false;
+    const reasons=featureDiff(before,after).scenarios.find(s=>s.after==='f.a.main')?.reasons;
+    expect(reasons).toContain('autoplay');
+    expect(reasons).not.toContain('action-entry');
+  });
 });

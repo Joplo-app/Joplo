@@ -41,10 +41,11 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 - A compiler may declare persistent:true and estimate(input):{credits}; its compile context receives projectDir, home and allowSpend. Persistent output must be checked before credentials/network, and remains authoritative across compiler code updates. Only the explicit resources command grants allowSpend after displaying each estimate; ordinary host calls pass false. Do not infer permission from a configured key.
 - Release ctx.hold on success, error, superseded requests and unmount, after drawing the ready frame. Recheck scope before inlining assets; unused resources must not ship.
 - Step effects can emit play/stop commands for named tracks. Replay uses fixed step anchors and one engine clock; jumping/replaying resets to the same snapshot. Pause, speed, fade and narration ducking are host behavior, synthesis belongs to the plugin.
+- Free reactions are playback data: public payloads retain option.free after scope filtering, while authoring notes and source positions are stripped. Validate the actual built file:// site with arbitrary input and a secondary reaction; replay-only tests cannot detect a dropped free map.
 - Scope before inlining media. Build embeds validated resources and plugin runtimes; file:// must work without network. Video mixing capability is separate from playback support—state its actual limit.
 
 ## Verify the package
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.3.0 sha256:75502726c9e02121edc7dbc6d837a16621f8c9ae0d6908bd88f89cfba8b0cd84 -->
+<!-- joplo-skill 0.3.0 sha256:246506284af0f723dbc3dd7c85e3305c377c9f96f8743ee0b0358ec0d3806828 -->

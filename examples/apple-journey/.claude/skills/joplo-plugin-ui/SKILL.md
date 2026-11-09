@@ -16,7 +16,7 @@ Use this plugin for application interfaces, forms, overlays, navigation, data di
 - Give interactive elements stable ids. Describe their behavior with flow steps, disabled plus disabledReason, or unmodeled. Run check, then render the affected steps; passing schema validation alone does not prove the intended screen is visible.
 
 ## State and visibility
-- type / select / toggle steps write inputs[id]. Use value, checked or defaultValue for initial visuals. Paused audiences can type, change Switch/Checkbox/Radio/Select/SegmentedControl, switch Tabs and expand Accordion locally; value/checked bindings synchronize local views. Playing, jumping or Reset discards these edits. A matching next scripted action wins; an action in another reachable scenario asks to switch.
+- type / select / toggle steps write inputs[id]. Use value, checked or defaultValue for initial visuals. Paused audiences can type (including multiline PromptInput), change Switch/Checkbox/Radio/Select/SegmentedControl, switch Tabs and expand Accordion locally; value/checked bindings synchronize local views. Playing, jumping or Reset discards these edits. A matching next scripted action wins; an action in another reachable scenario asks to switch.
 - Select accepts the displayed label or stored value; MultiSelect toggles membership. For a bound option list, ensure the list exists before the select step.
 - Modal and Drawer use opened, only; the old open alias is not supported. Menu forwards opened to its own dropdown; an explicitly set child value wins, and a nested menu owns its own state.
 - AppShell regions and Phone child width use the same declared layout data as playback. A narrow screen can hide a target even when when is true; check the actual viewport before changing the step.
@@ -39,4 +39,4 @@ General engine contracts: npx joplo skill plugins
 - [patterns](./topics/patterns.md): UI recipes and individual pitfalls
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.3.0 sha256:983c082435116ba23e6dc67e1f332565aeca6a6fad555f0ac435a54a2122287c -->
+<!-- joplo-skill 0.3.0 sha256:07946c25c287ede3807bac09f7985cc7eaf443011984ff5a3cb34516300a2a3f -->
