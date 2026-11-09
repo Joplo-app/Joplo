@@ -27,7 +27,8 @@ import { Stage, type ZoomApi } from '../renderer/Stage';
 import { Subtitle } from './Subtitle';
 import { isFullscreenKey, useFullscreen, useIdleVisible } from './fullscreen';
 import { UpNextCard, usePhoneLayout, WatchView, type Chapter } from './WatchView';
-import { subtitleFor } from './subtitle-content';
+import { spokenSubtitleFor, stepTitleFor } from './subtitle-content';
+import { StepTitle } from './StepTitle';
 import { coverFor, coverShown } from './cover-content';
 import { Curtain, curtainUp } from './Curtain';
 import { SPEEDS, asSpeed } from '../runtime/pace';
@@ -520,9 +521,11 @@ export function PlayerPage(p: PlayerPageProps) {
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
   const next = ctl.nextStep();
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
-  // 字幕区（画面下方）显示的步骤：正在播放的一步，否则是刚执行完的一步；第 0 步显示初始状态
+  // 字幕（D97）：画面底部正中，正在说的话；步骤标题条：左上角弹出再收成小圆点。都按正在播放的一步，否则刚执行完的一步
   const pos = state?.position ?? 0;
-  const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n, project);
+  const subtitle = spokenSubtitleFor(scenario, pos, snap.activeStep, i18n, project);
+  const stepTitle = stepTitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n);
+  const narrating = snap.narration && subtitle && snap.narration.position === subtitle.index ? { waiting: !!snap.narration.waiting, fallback: !!snap.narration.fallback } : null;
   // 幕布（D61）：第 0 步的场景封面、过渡卡；铺满舞台区域，不进手机外框
   const cover = coverShown(scenario, pos, snap.playing, snap.activeStep, snap.freeMode) ? coverFor(project, scenario?.id, i18n) : null;
   const curtainOn = !!scenario && curtainUp(project, scenario.id, pos, cover);
@@ -652,6 +655,12 @@ export function PlayerPage(p: PlayerPageProps) {
           clock={ctl.clock}
           video={video}
           playground={!curtainOn && snap.freeMode ? <PlaygroundNotice ctl={ctl} snap={snap} /> : undefined}
+          hud={scenario && !video ? (
+            <>
+              <StepTitle title={stepTitle} clock={ctl.clock} animate={!ctl.reducedMotion} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} />
+              <Subtitle content={subtitle} animate={!ctl.reducedMotion} narrating={narrating} />
+            </>
+          ) : undefined}
           watermark={p.watermark}
           viewport={device}
           theme={p.theme}
@@ -755,7 +764,7 @@ export function PlayerPage(p: PlayerPageProps) {
 
   if (full)
     return (
-      // 全屏：画面 / 字幕 / 控制条三段，上下排列。控制条那一行（64px）始终保留：淡出时只是变透明，画面与镜头尺寸不变、不跳动
+      // 全屏：画面（字幕浮在画面上，D97）/ 控制条两段，上下排列。控制条那一行（64px）始终保留：淡出时只是变透明，画面与镜头尺寸不变、不跳动
       <div ref={rootRef} className="jb-dark flex h-screen w-screen flex-col bg-jb-app" data-view={snap.view} data-fullscreen="" onMouseMove={idle.poke} style={idle.visible ? undefined : { cursor: 'none' }}>
         <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-[6%] pb-6 pt-8" data-inspecting={inspecting ? '' : undefined} data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
           {stageArea}
@@ -770,7 +779,6 @@ export function PlayerPage(p: PlayerPageProps) {
             </div>
           ) : null}
         </main>
-        {scenario ? <Subtitle content={subtitle} theme={p.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} framed dark /> : null}
         <div ref={barRowRef} className="relative flex h-16 shrink-0 items-center justify-center px-6">
           {scenario ? (
             <div className={cn('flex max-w-full justify-center transition-opacity duration-300', idle.visible ? 'opacity-100' : 'pointer-events-none opacity-0')} data-visible={idle.visible ? '' : undefined} onMouseMove={idle.poke}>
@@ -862,11 +870,10 @@ export function PlayerPage(p: PlayerPageProps) {
           ) : null}
           <div className="flex min-h-0 flex-1 flex-col">
             {hasLayerBar ? <LayerTabs layers={layers.map((l) => ({ ...l, role: roleOfScene(project, l.sceneId) }))} viewLayer={viewLayer} director={director} onLayer={(id) => p.onLayer(id)} onDirector={(on) => p.onLayer(on ? null : viewLayer)} onReplay={replayLayer} /> : null}
-            {/* 舞台框：画面和字幕合成一体（1.5px 墨线，圆角 10）；字幕区跟随舞台主题 */}
+            {/* 舞台框（1.5px 墨线，圆角 10）；字幕与步骤标题条浮在画面上（D97） */}
             <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface', hasLayerBar && 'rounded-tl-none')} data-testid="stage-frame" data-layer={useCam ? viewLayer : undefined} data-director={useCam ? (director ? 'on' : 'off') : undefined}>
               {stageArea}
           {completed ? <div className="flex justify-end"><AuthorLink author={p.author} /></div> : null}
-              {scenario ? <SubtitleSlot content={subtitle} theme={p.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} explainInTip={L.explainInTip} narration={snap.narration} /> : null}
             </div>
           </div>
           <Dock snap={snap} scenario={scenario} ctl={ctl} speed={speed} onSpeed={p.onSpeed} L={L} zoom={dockZoom} voice={p.voice} />
@@ -874,28 +881,6 @@ export function PlayerPage(p: PlayerPageProps) {
       </div>
       {p.drawer}
       <ShortcutsPanel open={keysOpen} onClose={() => setKeysOpen(false)} board={!!p.onInspect} />
-    </div>
-  );
-}
-
-/** 字幕区：< 900 时 explain 收进悬停（字幕区仍只读 --jp-*）。 */
-function SubtitleSlot({ content, theme, font, explainInTip, onFork, narration }: { content: ReturnType<typeof subtitleFor>; theme: StageTheme; font: AppearanceFont | null; explainInTip: boolean; onFork: (fork: import('@joplo-app/core').Fork) => void; narration?: Snapshot['narration'] }) {
-  const { t: i18n } = useI18n();
-  const hidden = explainInTip && content?.explain ? content.explain : null;
-  const [tip, tipNode] = useTip(hidden, { placement: 'top-start' });
-  // 朗读（D74）：正在读这一步时右上角一个小喇叭；画面停够了还在等声音时写明
-  const reading = narration && content && narration.position === content.index ? narration : null;
-  return (
-    <div {...tip} className="relative shrink-0" data-testid="subtitle-slot">
-      <Subtitle content={hidden && content ? { ...content, explain: null, explainLines: 0 } : content} theme={theme} font={font} onFork={onFork} framed divider />
-      {reading ? (
-        <span className="pointer-events-none absolute left-3 top-1/2 inline-flex h-7 -translate-y-1/2 items-center gap-1.5 rounded-full border-[1.5px] border-jb-ink bg-jb-selected px-2.5 font-jb text-[13px] font-semibold text-jb-fg shadow-sm" data-testid="narrating" data-waiting={reading.waiting ? '1' : undefined} aria-live="polite">
-          <AudioLines className="size-4 animate-pulse" aria-hidden />
-          <span>{reading.waiting ? i18n.player.waitingForNarration : i18n.player.readingAloud}</span>
-          {reading.fallback ? <span className="rounded-full bg-jb-sunken px-1.5 text-[11.5px] font-medium text-jb-muted" data-testid="narrating-browser">{i18n.player.browserVoiceFallback}</span> : null}
-        </span>
-      ) : null}
-      {tipNode}
     </div>
   );
 }

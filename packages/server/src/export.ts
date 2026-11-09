@@ -25,7 +25,7 @@ import type http from 'node:http';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright-core';
 import { exportLocale, type ExportLocale } from './locale.ts';
-import { JoploError, SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, type Project } from '@joplo-app/core';
+import { JoploError, THEME_NAME, displaySceneId, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, type Project } from '@joplo-app/core';
 import { launch } from './render.ts';
 import { exportRuntimeStatus, installExportRuntime, loadPlaywright, type InstallDeps, type InstallProgress, type PlaywrightModule } from './export-runtime.ts';
 
@@ -33,11 +33,11 @@ export type Device = 'desktop' | 'mobile';
 
 /**
  * 导出画面的尺寸：电脑 = 舞台 1280×800；手机 = 外框（renderer 的 phoneFrameSize(390, 844) = 446×934）
- * 四周再留 16px（RenderApp 的 frame 模式）。舞台正下方是字幕区（SUBTITLE_HEIGHT），一起导出。
+ * 四周再留 16px（RenderApp 的 frame 模式）。字幕与步骤标题条浮在舞台上（D97），不另占高度。
  */
 export const EXPORT_SIZE: Record<Device, { width: number; height: number }> = {
-  desktop: { width: 1280, height: 800 + SUBTITLE_HEIGHT },
-  mobile: { width: 446 + 32, height: 934 + 32 + SUBTITLE_HEIGHT },
+  desktop: { width: 1280, height: 800 },
+  mobile: { width: 446 + 32, height: 934 + 32 },
 };
 
 export type VideoJob = {

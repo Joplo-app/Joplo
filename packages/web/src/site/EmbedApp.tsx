@@ -25,7 +25,8 @@ import { resolveLook } from '../renderer/appearance';
 import { StageViewport } from '../player/StageViewport';
 import { Overlay } from '../player/Overlay';
 import { Subtitle } from '../player/Subtitle';
-import { subtitleFor } from '../player/subtitle-content';
+import { shownIndex, spokenSubtitleFor, stepTitleFor } from '../player/subtitle-content';
+import { StepTitle } from '../player/StepTitle';
 import { coverFor, coverShown } from '../player/cover-content';
 import { Curtain, curtainUp } from '../player/Curtain';
 import { cameraFor, cameraPosition, withLeadFrame } from '../player/cameraFor';
@@ -103,12 +104,14 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
   const device = shownScene?.viewport === 'mobile' ? 'mobile' : 'desktop';
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, true), [ctl, plan.sceneId]);
   const look = resolveLook({ theme: project.theme, font: null, stroke: null }, projectThemes(project), i18n);
-  const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n, project);
+  const subtitle = spokenSubtitleFor(scenario, pos, snap.activeStep, i18n, project);
+  const stepTitle = stepTitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n);
+  const narrating = snap.narration && subtitle && snap.narration.position === subtitle.index ? { waiting: !!snap.narration.waiting, fallback: !!snap.narration.fallback } : null;
   // 场景封面（D61）：嵌入自己的封面（covered）显示时不叠第二层；之后回到第 0 步时与发布站一样是场景封面
   const cover = !params.diff && !covered && coverShown(scenario, pos, snap.playing, snap.activeStep, snap.freeMode) ? coverFor(project, scenario?.id, i18n) : null;
   const curtainOn = !!scenario && curtainUp(project, scenario.id, pos, cover);
   // 控制条的步骤与字幕右侧一致：播放中是正在播的那一步，否则是当前位置
-  const shown = subtitle?.index ?? pos;
+  const shown = scenario ? shownIndex(scenario, pos, snap.activeStep) : pos;
   const items = embedScenarioItems(project, snap.scenarioId);
   const reviewLayer = plan.layers.length ? plan.viewLayer : null;
   const stepId = scenario && pos > 0 ? (scenario.steps[pos - 1]?.id ?? null) : null;
@@ -282,7 +285,12 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
         {scenario && state && shownScene ? (
           // 封面显示时画面只是背景：inert，Tab 不会落到被遮住的原型元素上
           <div className="flex min-h-0 flex-1 flex-col" inert={covered || undefined} data-testid="embed-stage">
-          <StageViewport clock={ctl.clock} playground={!covered && !curtainOn && snap.freeMode ? <PlaygroundNotice ctl={ctl} snap={snap} /> : undefined} viewport={device} theme={project.theme} stroke={look.stroke} font={look.font} notice={covered ? null : snap.notice} onDismiss={() => ctl.dismissNotice()} onBack={() => ctl.backToDemo()} curtainUp={curtainOn} curtain={(size) => <Curtain project={project} scenarioId={scenario.id} position={pos} cover={cover} onStart={() => void ctl.play({ fromStart: true })} theme={project.theme} font={look.font} width={size.width} height={size.height} animate={!ctl.reducedMotion} />}>
+          <StageViewport clock={ctl.clock} hud={scenario && !covered ? (
+            <>
+              <StepTitle title={stepTitle} clock={ctl.clock} animate={!ctl.reducedMotion} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} />
+              <Subtitle content={subtitle} animate={!ctl.reducedMotion} narrating={narrating} />
+            </>
+          ) : undefined} playground={!covered && !curtainOn && snap.freeMode ? <PlaygroundNotice ctl={ctl} snap={snap} /> : undefined} viewport={device} theme={project.theme} stroke={look.stroke} font={look.font} notice={covered ? null : snap.notice} onDismiss={() => ctl.dismissNotice()} onBack={() => ctl.backToDemo()} curtainUp={curtainOn} curtain={(size) => <Curtain project={project} scenarioId={scenario.id} position={pos} cover={cover} onStart={() => void ctl.play({ fromStart: true })} theme={project.theme} font={look.font} width={size.width} height={size.height} animate={!ctl.reducedMotion} />}>
             {(size) => (
               <Stage
                 viewportOverride={device === 'mobile' ? null : size}
@@ -370,8 +378,8 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
         ) : null}
       </main>
       {params.diff ? (
-        // 功能差异页统一控制两侧播放器：这里只保留字幕，控制条与封面页脚都不显示，把高度留给画面
-        scenario ? <Subtitle content={subtitle} theme={project.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} framed divider /> : null
+        // 功能差异页统一控制两侧播放器：字幕与标题条浮在画面上，控制条与封面页脚都不显示，把高度留给画面
+        null
       ) : covered || !scenario ? (
         <div ref={rowRef} className="flex h-9 shrink-0 items-center justify-between gap-3 border-t border-jb-line bg-jb-surface px-2.5" data-testid="embed-cover-footer">
           {brand ?? <span aria-hidden />}
@@ -379,7 +387,6 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
         </div>
       ) : (
         <>
-          <Subtitle content={subtitle} theme={project.theme} font={look.font} onFork={(f) => ctl.setScenario(f.scenarioId, f.at)} framed divider />
           <div ref={rowRef} className="flex h-12 shrink-0 items-center gap-1.5 border-t border-jb-line bg-jb-surface px-2" role="toolbar" aria-label={i18n.site.embedPlayer} data-testid="embed-bar">
             <Btn icon={<ChevronLeft className="size-4" />} label={i18n.player.previousStep} kbd="←" iconOnly variant="ghost" size={32} onClick={() => ctl.prev()} disabled={pos === 0 && !snap.busy} data-testid="embed-prev" />
             <Btn ref={playRef} icon={playing ? <Pause className="size-4" /> : <Play className="size-4" />} label={playLabel} kbd={i18n.player.space} iconOnly variant="play" size={32} onClick={() => ctl.togglePlay()} disabled={total === 0} data-testid="embed-toggle" />

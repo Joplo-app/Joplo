@@ -20,7 +20,7 @@ import { useBoardI18n } from './i18n/board/context';
  *   画面停留与发布站开着朗读时一致；不调用任何朗读服务。
  */
 import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, stateAt, type AppearanceFont, type AppearanceStroke, type PlayState, type Project } from '@joplo-app/core/runtime';
+import { THEME_NAME, displaySceneId, stateAt, type AppearanceFont, type AppearanceStroke, type PlayState, type Project } from '@joplo-app/core/runtime';
 import { fetchIR } from './runtime/dev-client';
 import { useMedia } from './runtime/useMedia';
 import { DemoController } from './runtime/demo';
@@ -35,7 +35,12 @@ import { appearanceFromParams, resolveLook } from './renderer/appearance';
 import { ThemeStyles } from './renderer/ThemeStyles';
 import { cameraPosition } from './player/cameraFor';
 import { Subtitle } from './player/Subtitle';
-import { subtitleFor, type SubtitleContent } from './player/subtitle-content';
+import { spokenSubtitleFor, stepTitleFor, type SpokenSubtitle, type StepTitle as StepTitleContent } from './player/subtitle-content';
+import { StepTitle } from './player/StepTitle';
+import type { ClockSource } from './runtime/clock';
+
+/** 浮在画面上的字幕与步骤标题条（D97）。clock 为空 = 静态画面（标题条始终展开、不做动画）。 */
+export type Hud = { subtitle: SpokenSubtitle | null; title: StepTitleContent | null; clock?: ClockSource };
 import { coverFor, coverShown } from './player/cover-content';
 import { Curtain } from './player/Curtain';
 import { waitForFonts } from './board/font-loading';
@@ -184,11 +189,9 @@ export function RenderApp() {
     ) : (
       stageNode
     );
-  // 字幕区放在舞台（手机含外框）正下方，宽度相同：截图、导出图片与视频都带上它
+  // 字幕与步骤标题条浮在舞台（手机含外框）上（D97）：截图、导出图片与视频的尺寸就是舞台本身
   const fw = viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).width : vp.width;
-  const fh = (viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).height : vp.height) + SUBTITLE_HEIGHT;
-  // 视频与固定尺寸的截图画布用固定高度（画面尺寸不随字幕行数变化）；单张截图与导出图片按内容自适应
-  const fixedSub = record || !!shot;
+  const fh = viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).height : vp.height;
   // 幕布（D61：过渡卡、场景封面）盖在舞台（手机含外框）上，与演示页一样不进外框；只画不响应，不影响截图报告。
   // 场景封面只出现在导出图片、视频与固定尺寸截图（分享预览）里；单张截图（Agent 看画面用）保留第 0 步的真实画面。
   const withCurtain = (node: ReactNode, c: CurtainSpec | null, w: number, h: number) =>
@@ -203,38 +206,38 @@ export function RenderApp() {
     ) : (
       node
     );
-  const withSub = (node: ReactNode, sub: SubtitleContent | null, w: number) => (
-    <div style={{ display: 'flex', flexDirection: 'column', width: w }}>
+  const withHud = (node: ReactNode, hud: Hud, w: number, h: number) => (
+    <div style={{ position: 'relative', width: w, height: h }}>
       {node}
-      <Subtitle content={sub} theme={theme} font={font} width={w} framed fixedHeight={fixedSub ? SUBTITLE_HEIGHT : undefined} />
+      <StepTitle title={hud.title} clock={hud.clock} animate={!!hud.clock} staticMode={!hud.clock} />
+      <Subtitle content={hud.subtitle} animate={!!hud.clock} />
     </div>
   );
-  const fhStage = fh - SUBTITLE_HEIGHT;
-  const wrap = (stageNode: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null = null) => (
+  const wrap = (stageNode: ReactNode, hud: Hud, c: CurtainSpec | null = null) => (
     <>
       <ThemeStyles themes={projectThemes(data.project)} />
-      {wrapInner(stageNode, sub, c)}
+      {wrapInner(stageNode, hud, c)}
     </>
   );
-  const wrapInner = (stageNode: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null) => {
+  const wrapInner = (stageNode: ReactNode, hud: Hud, c: CurtainSpec | null) => {
     if (frame)
       return (
         <div data-jexport="" style={{ position: 'absolute', left: 0, top: 0, display: 'inline-block', ...(viewport === 'mobile' ? { background: '#ffffff', padding: 16 } : {}) }}>
-          {withSub(withCurtain(framed(stageNode), c, fw, fhStage), sub, fw)}
+          {withHud(withCurtain(framed(stageNode), c, fw, fh), hud, fw, fh)}
         </div>
       );
     if (shot) {
-      // 截图画布：舞台（手机页面带外框）加字幕区按比例放进 w×h，居中
+      // 截图画布：舞台（手机页面带外框）按比例放进 w×h，居中
       const k = Math.min(shot.width / fw, shot.height / fh);
       return (
         <div data-jshot="" style={{ position: 'absolute', left: 0, top: 0, width: shot.width, height: shot.height, overflow: 'hidden', background: '#f8f9fa' }}>
-          <div style={{ position: 'absolute', left: (shot.width - fw * k) / 2, top: (shot.height - fh * k) / 2, width: fw, height: fh, transform: `scale(${k})`, transformOrigin: '0 0' }}>{withSub(withCurtain(framed(stageNode), c, fw, fhStage), sub, fw)}</div>
+          <div style={{ position: 'absolute', left: (shot.width - fw * k) / 2, top: (shot.height - fh * k) / 2, width: fw, height: fh, transform: `scale(${k})`, transformOrigin: '0 0' }}>{withHud(withCurtain(framed(stageNode), c, fw, fh), hud, fw, fh)}</div>
         </div>
       );
     }
     return (
       <div data-jrender="" style={{ position: 'absolute', left: 0, top: 0 }}>
-        {withSub(withCurtain(stageNode, c ? { ...c, cover: null } : null, vp.width, vp.height), sub, vp.width)}
+        {withHud(withCurtain(stageNode, c ? { ...c, cover: null } : null, vp.width, vp.height), hud, vp.width, vp.height)}
       </div>
     );
   };
@@ -255,13 +258,13 @@ export function RenderApp() {
       stageRef={setStage}
       camera={plan.spec}
       sceneId={plan.sceneId}
-    />, subtitleFor(sc, data.state.position, null, data.state.completed, i18n, data.project),
+    />, { subtitle: spokenSubtitleFor(sc, data.state.position, null, i18n, data.project), title: stepTitleFor(sc, data.state.position, null, data.state.completed, i18n) },
     { scenarioId, position: data.state.position, cover: coverShown(sc, data.state.position, false, null) ? coverFor(data.project, scenarioId, i18n) : null, animate: false },
   );
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
-function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; chain: boolean; captureAudio: boolean; voiceEstimate: boolean; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null) => ReactNode }) {
+function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; chain: boolean; captureAudio: boolean; voiceEstimate: boolean; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, hud: Hud, c: CurtainSpec | null) => ReactNode }) {
   const { t: i18n } = useBoardI18n();
 
   const ctl = useMemo(() => {
@@ -351,7 +354,7 @@ function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, 
       }}
       overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={null} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />}
     />,
-    subtitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n, project),
+    { subtitle: spokenSubtitleFor(sc, snap.state.position, snap.activeStep, i18n, project), title: stepTitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n), clock: ctl.clock },
     { scenarioId: shownScenario, position: snap.state.position, cover: coverShown(sc, snap.state.position, snap.playing, snap.activeStep, snap.freeMode) ? coverFor(project, shownScenario, i18n) : null, animate: true },
   )}</EngineClockContext.Provider>;
 }

@@ -36,11 +36,6 @@ const BP_KEYS = ['base', 'xs', 'sm', 'md', 'lg', 'xl'] as const;
 
 /** 页面 viewport 对应的舞台尺寸。 */
 export const VIEWPORT_SIZE = { desktop: { width: 1280, height: 800 }, mobile: { width: 390, height: 844 } } as const;
-/**
- * 字幕区：画面下方、播放控制上方的一块固定高度区域，最多两行：一行本步说明（大字），一行 explain（小一号）。
- * 演示页、发布站、renderStep 截图、导出图片与视频都把它放在舞台正下方，宽度与舞台（手机含外框）相同。
- */
-export const SUBTITLE_HEIGHT = 84;
 
 /**
  * 内置主题（D51）：每个主题是一个只写 CSS 变量（--jp-*）的样式表，CSS 在 web 包里（renderer/themes.ts）。

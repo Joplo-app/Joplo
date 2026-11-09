@@ -1,101 +1,55 @@
+import { AnimatePresence, motion } from 'motion/react';
+import { AudioLines } from 'lucide-react';
 import { useI18n } from '../i18n/context';
 /**
- * 字幕区（D61，画面下方、播放控制上方）：高度按内容自适应（subtitleHeight），宽度占满；字体与颜色跟随舞台主题（只读 --jp-*）。
- * 三栏：左空 │ 中间居中的字幕 │ 右侧标记。右栏至少是自己内容的宽度，左右平分剩下的空间，所以字幕在正中；
- * 右侧内容多（分叉标签、完成标记）或说明很长时，中间一栏先让出位置并截断（悬停看全文），任何时候都不重叠。
- * - 第一行：用户操作 = [说话人头像 + 名字（小一号、次级色）] 说明（正文色）；系统事件 = 小圆点（舞台高亮色、墨线描边）+ 说明（次级色）。
- * - 第二行：explain，居中、小一号、次级色。
- * - 右栏：分叉「↳ …」、场景完成的结果标记（取代进度），平时是右下角最弱字色的「n / m」。
- * 演示页、发布站、全屏、嵌入、renderStep 截图、导出图片与视频共用；视频用固定高度（fixedHeight），画面尺寸不变。
+ * 字幕（D97，修订 D61）：浮在画面底部正中，只放“正在说的话”（旁白、角色台词，或兜底的标题）。
+ * 半透明黑底白字、系统字体、17px，一到两行，宽度跟着字数走。不可点击，不挡画面里的操作。
+ * 换一句时淡出旧的、从下方轻轻浮起新的；reduced motion 与静态画面（截图、导出图片）直接切换。
+ * 看板、发布站、全屏、嵌入、截图、导出图片与视频共用。
  */
-import { cn } from '@/lib/utils';
-import type { Fork } from '@joplo-app/core/runtime';
-import type { StageTheme } from '../renderer/rough';
-import { fontStyle, type AppearanceFont } from '../renderer/appearance';
-import { JP_SECONDARY, RoleAvatar } from './RoleAvatar';
-import { MOCK_CLS } from './labels';
-import { SUBTITLE_AVATAR_PX, SUBTITLE_CAPTION_PX, SUBTITLE_EXPLAIN_PX, SUBTITLE_PAD_Y, SUBTITLE_PROGRESS_PX, SUBTITLE_SPEAKER_PX, subtitleHeight, type SubtitleContent } from './subtitle-content';
+import { RoleAvatar } from './RoleAvatar';
+import { SUBTITLE_AVATAR_PX, SUBTITLE_PX, SUBTITLE_SPEAKER_PX, type SpokenSubtitle } from './subtitle-content';
 
-const CAPTION_LH = 1.35;
+export const HUD_FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", Roboto, sans-serif';
+export const HUD_BG = 'rgba(0, 0, 0, 0.55)';
 
-export function Subtitle({ content, theme, width, framed = false, fixedHeight, dark = false, divider = false, font = null, onFork }: { content: SubtitleContent | null; onFork?: (fork: Fork) => void; theme: StageTheme; /** 字体（D55）：null = 跟随主题。 */ font?: AppearanceFont | null; width?: number | string; framed?: boolean; fixedHeight?: number; dark?: boolean; /** 上沿一条细线（看板的舞台框里，画面和字幕之间）。 */ divider?: boolean }) {
+export type Narrating = { waiting: boolean; fallback: boolean } | null;
+
+export function Subtitle({ content, animate = true, narrating = null, bottom = 24 }: { content: SpokenSubtitle | null; animate?: boolean; /** 正在朗读这一句（D74）：左侧小喇叭（不写“等旁白读完”之类的文字）。 */ narrating?: Narrating; bottom?: number }) {
   const { t: i18n } = useI18n();
-  const badge = content?.badge;
-  const system = content?.kind === 'system';
+  const key = content ? `${content.index}:${content.text}` : 'none';
   return (
-    <div
-      className={cn('jsubtitle jtheme grid shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,max-content)_minmax(max-content,1fr)] items-stretch gap-x-4 overflow-hidden px-6 text-[var(--jp-ink)]', dark ? 'bg-[var(--jp-bg)]' : 'bg-[var(--jp-surface)]', !framed && !dark && 'rounded-lg border border-[var(--jp-line)]', divider && 'border-t border-[var(--jp-line)]')}
-      style={{ ...fontStyle(font), height: fixedHeight ?? subtitleHeight(content), width: width ?? '100%', paddingTop: SUBTITLE_PAD_Y, paddingBottom: SUBTITLE_PAD_Y }}
-      data-theme={theme}
-      data-font={font ?? undefined}
-      data-testid="subtitle"
-      data-jsubtitle=""
-      data-kind={content?.kind}
-      title={content?.title || undefined}
-      aria-live="polite"
-    >
-      <span aria-hidden />
-      <div className="flex min-w-0 flex-col items-center justify-center text-center">
-        {content?.caption ? (
-          <div className="flex min-w-0 max-w-full items-center" style={{ gap: system ? 10 : 12, height: Math.ceil(SUBTITLE_CAPTION_PX * CAPTION_LH) }} data-jsubtitle-caption="">
-            {content.speaker ? (
-              <span className="flex min-w-0 max-w-[9em] shrink-0 items-center gap-1.5" data-testid="subtitle-speaker" data-role={content.speaker.id}>
-                <RoleAvatar role={content.speaker} size={SUBTITLE_AVATAR_PX} />
-                <span className="truncate text-[var(--jp-muted)]" style={{ fontSize: SUBTITLE_SPEAKER_PX, lineHeight: 1.2 }}>
-                  {content.speaker.name}
-                </span>
+    <div className="pointer-events-none absolute inset-x-0 z-[18] flex justify-center px-6" style={{ bottom }} data-testid="subtitle" data-jsubtitle="" aria-live="polite">
+      <AnimatePresence mode="popLayout" initial={false}>
+        {content ? (
+          <motion.div
+            key={key}
+            className="flex max-w-[min(860px,100%)] items-center gap-2.5 rounded-[10px] px-6 py-[10px] text-white"
+            style={{ background: HUD_BG, fontFamily: HUD_FONT, WebkitFontSmoothing: 'antialiased' }}
+            initial={animate ? { opacity: 0, y: 6 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            exit={animate ? { opacity: 0, transition: { duration: 0.12 } } : { opacity: 0, transition: { duration: 0 } }}
+            transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+            data-source={content.source}
+            data-index={content.index}
+          >
+            {narrating ? (
+              <span className="flex shrink-0 items-center gap-1.5 text-white/75" data-testid="narrating" data-waiting={narrating.waiting ? '1' : undefined} title={narrating.fallback ? i18n.player.browserVoiceFallback : i18n.player.readingAloud}>
+                <AudioLines className="size-4 animate-pulse" aria-label={i18n.player.readingAloud} />
               </span>
             ) : null}
-            {system ? (
-              <>
-                <span aria-hidden className="size-2 shrink-0 rounded-full border border-[var(--jp-ink)] bg-[var(--jp-accent)]" data-testid="subtitle-dot" />
-                <span className="sr-only">{i18n.player.system}</span>
-              </>
+            {content.speaker ? (
+              <span className="flex shrink-0 items-center gap-1.5" data-testid="subtitle-speaker" data-role={content.speaker.id}>
+                <RoleAvatar role={content.speaker} size={SUBTITLE_AVATAR_PX} />
+                <span className="text-white/70" style={{ fontSize: SUBTITLE_SPEAKER_PX }}>{content.speaker.name}</span>
+              </span>
             ) : null}
-            <span className="min-w-0 truncate" style={{ fontSize: SUBTITLE_CAPTION_PX, lineHeight: CAPTION_LH, color: system ? JP_SECONDARY : 'var(--jp-ink)' }}>
-              {content.caption}
+            <span className="min-w-0 text-center [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden" style={{ fontSize: SUBTITLE_PX, lineHeight: 1.45 }} title={content.text} data-jsubtitle-text="">
+              {content.text}
             </span>
-          </div>
+          </motion.div>
         ) : null}
-        {content?.explain ? (
-          <div
-            className="max-w-full truncate text-[var(--jp-muted)]"
-            style={{ marginTop: content.caption ? 4 : 0, fontSize: SUBTITLE_EXPLAIN_PX, lineHeight: content.caption ? 1.5 : `${Math.ceil(SUBTITLE_CAPTION_PX * CAPTION_LH)}px` }}
-            data-jsubtitle-explain=""
-          >
-            {content.explain}
-          </div>
-        ) : null}
-      </div>
-      <div className="flex min-w-0 items-center justify-end gap-2">
-        {content?.forks?.length ? (
-          <div className="flex max-w-[min(300px,28vw)] items-center gap-1.5 overflow-x-auto [scrollbar-width:none]" aria-label={i18n.player.otherStoryRoutes}>
-            {content.forks.map((fork, i) => {
-              const cls = 'max-w-[200px] shrink-0 truncate whitespace-nowrap rounded-full border border-[var(--jp-line-strong)] px-2 py-1 text-[12px] leading-none';
-              return onFork ? (
-                <button type="button" key={i} onClick={() => onFork(fork)} title={i18n.player.switchScenario(fork.label)} className={cn(cls, 'hover:bg-[var(--jp-subtle)] focus-visible:outline-2 focus-visible:outline-[var(--jp-accent)]')}>
-                  ↳ {fork.label}
-                </button>
-              ) : (
-                <span key={i} className={cls} title={fork.label}>
-                  ↳ {fork.label}
-                </span>
-              );
-            })}
-          </div>
-        ) : null}
-        {badge ? (
-          badge.kind === 'done' ? (
-            <span role="status" title={badge.title} data-testid="complete-badge" className={cn('shrink-0 whitespace-nowrap rounded-full border px-2 py-1 text-[12px] leading-none', MOCK_CLS[badge.outcome])}>
-              {badge.text}
-            </span>
-          ) : (
-            <span data-testid="step-index" aria-label={badge.label} title={badge.label} className="shrink-0 self-end whitespace-nowrap font-[var(--jp-font-mono)] text-[var(--jp-faint)]" style={{ fontSize: SUBTITLE_PROGRESS_PX, lineHeight: 1 }}>
-              {badge.text}
-            </span>
-          )
-        ) : null}
-      </div>
+      </AnimatePresence>
     </div>
   );
 }

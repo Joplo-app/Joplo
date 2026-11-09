@@ -34,6 +34,14 @@ export function bindEngineAnimations(root: HTMLElement, clock: ClockSource): () 
   sample();
   return () => { owners.delete(root); unsubscribe(); observer?.disconnect(); root.removeEventListener('animationstart', sample, true); root.removeEventListener('transitionrun', sample, true); };
 }
+/**
+ * 界面层（字幕、步骤标题条，D97）不是画面内容：它们的动画用浏览器时间，暂停时也要能淡入淡出。
+ * 把 el 登记成自己的 owner，舞台的引擎采样就会跳过它的子树。返回解除函数。
+ */
+export function exemptFromEngineAnimations(el: HTMLElement): () => void {
+  owners.set(el, el);
+  return () => { if (owners.get(el) === el) owners.delete(el); };
+}
 export function useEngineAnimations(root: RefObject<HTMLElement | null>, clock?: ClockSource) {
   useLayoutEffect(() => {
     if (!root.current || !clock) return;

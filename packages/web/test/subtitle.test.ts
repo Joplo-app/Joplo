@@ -3,45 +3,43 @@ import { createZhCN } from '../src/i18n/zh-CN';
 import { createBoardZhCN } from '../src/i18n/board/zh-CN';
 const zh = { ...createZhCN(), ...createBoardZhCN() };
 /**
- * 字幕区（画面下方、播放控制上方）：显示哪一步、最多两行（一行说明、一行 explain）、悬停全文；
+ * 字幕（D97）：浮在画面底部正中，只放正在说的话；标题与说明在左上角的步骤标题条里。显示哪一步只依赖位置。
  * check 的 CAPTION_TOO_LONG / EXPLAIN_TOO_LONG 只提示、不改写作者的文字。界面由用户检查。
  */
 import { describe, expect, it } from 'vitest';
-import { CAPTION_MAX, EXPLAIN_MAX, SUBTITLE_HEIGHT, captionLength, compile, validate, type AuthoringProject, type Scenario } from '@joplo-app/core';
+import { CAPTION_MAX, EXPLAIN_MAX, captionLength, compile, validate, type AuthoringProject, type Scenario } from '@joplo-app/core';
 import * as ui from '@joplo-app/plugin-ui';
 import { explain, feature, flow, option, page, Slot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { SUBTITLE_CAPTION_PX, SUBTITLE_EXPLAIN_PX, subtitleFor } from '../src/player/subtitle-content';
+import { SUBTITLE_PX, TITLE_CAPTION_PX, TITLE_EXPLAIN_PX, spokenSubtitleFor, stepTitleFor } from '../src/player/subtitle-content';
 
 const sc = {
   id: 'f.a.s',
   description: '演示一次完整的调用',
   steps: [
-    { id: 's1', kind: 'user', caption: '点击发送', explain: undefined },
-    { id: 's2', kind: 'system', caption: '额度预检', explain: '额度不足时在这里就拦下' },
+    { id: 's1', kind: 'user', caption: '点击发送', explain: undefined, action: { type: 'click', target: 'send' } },
+    { id: 's2', kind: 'system', caption: '额度预检', explain: '额度不足时在这里就拦下', action: { type: 'event', name: '额度预检' } },
   ],
 } as unknown as Scenario;
 
-describe('subtitleFor（字幕区显示的内容）', () => {
-  it('第 0 步是场景封面（D61：字幕只留进度，场景描述在封面上）；之后是刚执行完的一步；播放中是正在播放的一步', () => {
-    expect(subtitleFor(sc, 0, null, undefined, zh)).toMatchObject({ index: 0, kind: 'cover', caption: '', explain: null });
-    expect(subtitleFor(sc, 1, null, undefined, zh)).toMatchObject({ index: 1, kind: 'user', caption: '点击发送', explain: null });
-    expect(subtitleFor(sc, 1, 1, undefined, zh)).toMatchObject({ index: 2, kind: 'system', caption: '额度预检', explain: '额度不足时在这里就拦下' });
-    expect(subtitleFor(sc, 99, null, undefined, zh)!.index).toBe(2);
-    expect(subtitleFor(null, 0, null, undefined, zh)).toBeNull();
+describe('字幕与步骤标题条显示哪一步', () => {
+  it('第 0 步没有字幕也没有标题条；之后是刚执行完的一步；播放中是正在播放的一步；超出时夹到最后一步', () => {
+    expect(spokenSubtitleFor(sc, 0, null, zh)).toBeNull();
+    expect(stepTitleFor(sc, 0, null, null, zh)).toBeNull();
+    expect(spokenSubtitleFor(sc, 1, null, zh)).toMatchObject({ index: 1, text: '点击发送' });
+    expect(spokenSubtitleFor(sc, 1, 1, zh)).toMatchObject({ index: 2, text: '额度预检' });
+    expect(stepTitleFor(sc, 1, 1, null, zh)).toMatchObject({ index: 2, caption: '额度预检', explain: '额度不足时在这里就拦下' });
+    expect(spokenSubtitleFor(sc, 99, null, zh)!.index).toBe(2);
+    expect(spokenSubtitleFor(null, 0, null, zh)).toBeNull();
   });
-  it('最多两行：说明一行、explain 一行；没有 explain 时只有一行；悬停显示全文（不截断原文）', () => {
-    const a = subtitleFor(sc, 2, null, undefined, zh)!;
-    expect([a.captionLines, a.explainLines]).toEqual([1, 1]);
-    expect(a.title).toBe('额度预检\n额度不足时在这里就拦下');
-    const b = subtitleFor(sc, 1, null, undefined, zh)!;
-    expect([b.captionLines, b.explainLines]).toEqual([1, 0]);
-    expect(b.title).toBe('点击发送');
+  it('explain 只在标题条里，不进字幕', () => {
+    expect(spokenSubtitleFor(sc, 2, null, zh)!.text).toBe('额度预检');
+    expect(stepTitleFor(sc, 1, null, null, zh)!.explain).toBeNull();
   });
-  it('字号：说明 ≥ 20px，explain 小一号；固定高度放得下两行', () => {
-    expect(SUBTITLE_CAPTION_PX).toBeGreaterThanOrEqual(20);
-    expect(SUBTITLE_EXPLAIN_PX).toBeLessThan(SUBTITLE_CAPTION_PX);
-    expect(SUBTITLE_HEIGHT).toBeGreaterThanOrEqual(SUBTITLE_CAPTION_PX * 1.35 + SUBTITLE_EXPLAIN_PX * 1.5 + 4 + 16);
+  it('字号：字幕 17px，比标题条的标题大；说明比标题小一号', () => {
+    expect(SUBTITLE_PX).toBe(17);
+    expect(TITLE_CAPTION_PX).toBeLessThan(SUBTITLE_PX);
+    expect(TITLE_EXPLAIN_PX).toBeLessThan(TITLE_CAPTION_PX);
   });
 });
 

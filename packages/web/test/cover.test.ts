@@ -2,20 +2,20 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { createZhCN } from '../src/i18n/zh-CN';
 import { createEn } from '../src/i18n/en';
 /**
- * D61 第一批（字幕、说话人、场景封面）：显示信息都是「IR + 当前位置」的纯函数。
+ * 字幕、步骤标题条（D97，修订 D61）与场景封面：显示信息都是「IR + 当前位置」的纯函数。
  * 不变量：
- * - 跳到任意一步与一步步播放到那里，字幕与封面完全一致（只依赖 project / scenario / position / activeStep）；
- * - 说话人只出现在用户操作上，取这一步导演层的角色（与层级标签的头像一致）；系统事件与没有角色的项目没有说话人；
- * - 第 0 步（至少一步、没在播放）是封面；字幕区此时只有进度「0 / m」，高度与一行相同；
- * - 过渡卡那一步，字幕不重复卡片标题，只留进度；
+ * - 跳到任意一步与一步步播放到那里，字幕、标题条与封面完全一致（只依赖 project / scenario / position / activeStep）；
+ * - 字幕 = 这一步读出来的那句话（与 core spokenLine 同一规则）：narrate() > say()（带说话人）> 标题兜底；
+ * - 说话人只出现在 say() 上，取这一步导演层的角色（与层级标签的头像一致）；没有角色的项目没有说话人；
+ * - 封面、过渡卡：画面上已经是大字，没写旁白 / 台词时没有字幕，也不弹标题条；
  * - 封面时长由 pace.ts 的 stepDwell 逐步估算再求和（不写死数值）。
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { explain, feature, flow, fork, layer, option, page, role, set, stream, Slot, $ } from '@joplo-app/kit';
+import { explain, feature, flow, fork, layer, narrate, option, page, role, say, set, stream, Slot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { compile, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
-import { speakerOf, subtitleFor, subtitleHeight } from '../src/player/subtitle-content';
+import { compile, spokenLine, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
+import { speakerOf, spokenSubtitleFor, stepTitleFor, titleDwellMs, TITLE_DWELL_MS, TITLE_DWELL_MAX_MS } from '../src/player/subtitle-content';
 import { approxDuration, coverFor, coverShown, dwellTexts, scenarioMs } from '../src/player/cover-content';
 import { stepDwell } from '../src/runtime/pace';
 import { stepCaption } from '../src/i18n/step-caption';
@@ -35,9 +35,9 @@ function build(o: { roles?: boolean; description?: string; empty?: boolean } = {
     : base
         .card('周末一起去露营', { sub: '两个人，预算 500' })
         .click('send', '小雨把想法发给助手', explain('周六、两个人'))
-        .system('回复', '几秒后，助手把行程单写好了', stream($.ui.reply, '周六晴，推荐白河营地。'))
+        .system('回复', '几秒后，助手把行程单写好了', stream($.ui.reply, '周六晴，推荐白河营地。'), narrate('助手几秒就把行程排好了。'))
         .card('现在是阿杰', withRoles ? { role: 'ajie' } : {})
-        .click('accept', '阿杰回复：我能去', set($.ui.accepted, true), fork('如果阿杰去不了', 'other'));
+        .click('accept', '阿杰回复：我能去', say('我能去！'), set($.ui.accepted, true), fork('如果阿杰去不了', 'other'));
   const opt = option({
     name: 'A · 对话',
     idea: 'i',
@@ -87,60 +87,79 @@ describe('speakerOf（字幕里的说话人）', () => {
   });
 });
 
-describe('subtitleFor（D61 字幕内容）', () => {
+describe('spokenSubtitleFor（D97 字幕 = 正在说的话）', () => {
   const p = build();
   const sc = p.scenarios[sid]!;
-  it('第 0 步是封面：没有说明，只有进度 0 / m；高度与一行相同', () => {
-    const s = subtitleFor(sc, 0, null, null, zh, p)!;
-    expect(s).toMatchObject({ index: 0, kind: 'cover', caption: '', explain: null, speaker: null, badge: { kind: 'progress', text: '0 / 5' } });
-    expect(subtitleHeight(s)).toBe(subtitleHeight(null));
+  it('封面（第 0 步）与没写旁白 / 台词的过渡卡没有字幕', () => {
+    expect(spokenSubtitleFor(sc, 0, null, zh, p)).toBeNull();
+    expect(spokenSubtitleFor(sc, 1, null, zh, p)).toBeNull();
+    expect(spokenSubtitleFor(sc, 4, null, zh, p)).toBeNull();
   });
-  it('用户操作带说话人与 explain；进度是「n / m」，读屏标签是完整的“第 n / m 步”', () => {
-    const s = subtitleFor(sc, 2, null, null, zh, p)!;
-    expect(s).toMatchObject({ kind: 'user', caption: '小雨把想法发给助手', explain: '周六、两个人', speaker: { name: '小雨' }, badge: { kind: 'progress', text: '2 / 5', label: '第 2 / 5 步' } });
-    expect(subtitleHeight(s)).toBeGreaterThan(subtitleHeight(null));
+  it('没写旁白 / 台词：用标题兜底，没有说话人', () => {
+    expect(spokenSubtitleFor(sc, 2, null, zh, p)).toEqual({ index: 2, text: '小雨把想法发给助手', source: 'caption', speaker: null });
   });
-  it('系统事件：没有说话人（只有小圆点，由组件按 kind 画）', () => {
-    expect(subtitleFor(sc, 3, null, null, zh, p)).toMatchObject({ kind: 'system', caption: '几秒后，助手把行程单写好了', speaker: null });
+  it('narrate()：显示旁白，不显示标题', () => {
+    expect(spokenSubtitleFor(sc, 3, null, zh, p)).toEqual({ index: 3, text: '助手几秒就把行程排好了。', source: 'narrate', speaker: null });
   });
-  it('播放中显示正在播放的一步（说话人也跟着这一步）', () => {
-    expect(subtitleFor(sc, 4, 4, null, zh, p)).toMatchObject({ index: 5, kind: 'user', speaker: { name: '阿杰' } });
+  it('say()：显示台词，带这一步导演层的角色（与层级标签的头像一致）', () => {
+    expect(spokenSubtitleFor(sc, 5, null, zh, p)).toMatchObject({ index: 5, text: '我能去！', source: 'say', speaker: { name: '阿杰' } });
+    expect(speakerOf(p, sid, 5)?.name).toBe('阿杰');
   });
-  it('过渡卡：字幕不重复卡片标题，只留进度；一行高；悬停仍是卡片标题', () => {
-    const s = subtitleFor(sc, 4, null, null, zh, p)!;
-    expect(s).toMatchObject({ kind: 'card', caption: '', explain: null, speaker: null, title: '现在是阿杰', badge: { text: '4 / 5' } });
-    expect(subtitleHeight(s)).toBe(subtitleHeight(null));
-  });
-  it('分叉标签保留在内容里', () => {
-    expect(subtitleFor(sc, 5, null, null, zh, p)!.forks).toEqual([{ label: '如果阿杰去不了', scenarioId: 'f.a.other', at: 0 }]);
-  });
-  it('场景完成：结果标记取代进度；第二行是结果说明；正在播放时不显示完成', () => {
-    const done = subtitleFor(sc, 5, null, { text: '两个人都知道了', outcome: 'success' }, zh, p)!;
-    expect(done.badge).toMatchObject({ kind: 'done', outcome: 'success' });
-    expect(done.explain).toBe('两个人都知道了');
-    expect(subtitleFor(sc, 4, 4, { text: 'x', outcome: 'success' }, zh, p)!.badge.kind).toBe('progress');
-  });
-  it('停在最后一张过渡卡上完成：没有标题，只有结果说明（一行），不会空出第一行', () => {
-    const q = { ...sc, steps: sc.steps.slice(0, 4) };
-    const s = subtitleFor(q, 4, null, { text: '两个人都知道了', outcome: 'success' }, zh, p)!;
-    expect(s).toMatchObject({ kind: 'card', caption: '', explain: '两个人都知道了' });
-    expect(subtitleHeight(s)).toBe(subtitleHeight(null));
-  });
-  it('没有角色的项目：字幕里没有说话人；不传 project 时也没有', () => {
+  it('播放中显示正在播放的一步；没有角色的项目与不传 project 时没有说话人', () => {
+    expect(spokenSubtitleFor(sc, 4, 4, zh, p)).toMatchObject({ index: 5, source: 'say' });
     const q = build({ roles: false });
-    expect(subtitleFor(q.scenarios[sid], 2, null, null, zh, q)!.speaker).toBeNull();
-    expect(subtitleFor(sc, 2, null, null, zh)!.speaker).toBeNull();
+    expect(spokenSubtitleFor(q.scenarios[sid], 5, null, zh, q)!.speaker).toBeNull();
+    expect(spokenSubtitleFor(sc, 5, null, zh)!.speaker).toBeNull();
   });
-  it('空场景：没有封面，仍是“初始状态”与说明', () => {
-    const q = build({ empty: true });
-    expect(subtitleFor(q.scenarios[sid], 0, null, null, zh, q)).toMatchObject({ kind: 'empty', caption: '初始状态', explain: '这个场景没有步骤，只展示初始状态' });
+  it('字幕就是朗读的那句话（core spokenLine），开不开声音都一样', () => {
+    for (let i = 1; i <= sc.steps.length; i++) {
+      const step = sc.steps[i - 1]!;
+      const sub = spokenSubtitleFor(sc, i, null, zh, p);
+      if (sub) expect(sub.text).toBe(spokenLine(step, stepCaption(step, zh), null).text);
+      else expect(step.kind).toBe('card');
+    }
   });
   it('跳到任意一步与一步步走到那里一致（只依赖位置）', () => {
     for (let i = 0; i <= sc.steps.length; i++) {
-      const jump = subtitleFor(sc, i, null, null, zh, p);
-      const walked = subtitleFor(sc, stateAt(p, sid, i).position, null, null, zh, p);
-      expect(walked).toEqual(jump);
+      expect(spokenSubtitleFor(sc, stateAt(p, sid, i).position, null, zh, p)).toEqual(spokenSubtitleFor(sc, i, null, zh, p));
+      expect(stepTitleFor(sc, stateAt(p, sid, i).position, null, null, zh)).toEqual(stepTitleFor(sc, i, null, null, zh));
     }
+  });
+});
+
+describe('stepTitleFor（D97 左上角的步骤标题条）', () => {
+  const p = build();
+  const sc = p.scenarios[sid]!;
+  it('封面与过渡卡不弹标题条（画面上已经是大字）', () => {
+    expect(stepTitleFor(sc, 0, null, null, zh)).toBeNull();
+    expect(stepTitleFor(sc, 1, null, null, zh)).toBeNull();
+    expect(stepTitleFor(sc, 4, null, null, zh)).toBeNull();
+  });
+  it('步骤号 + 标题 + 说明；key 随步骤变化（变化即重新弹出）', () => {
+    const t = stepTitleFor(sc, 2, null, null, zh)!;
+    expect(t).toMatchObject({ index: 2, caption: '小雨把想法发给助手', explain: '周六、两个人', done: null, forks: [] });
+    expect(stepTitleFor(sc, 3, null, null, zh)!.key).not.toBe(t.key);
+    expect(stepTitleFor(sc, 2, null, null, zh)!.key).toBe(t.key);
+  });
+  it('分叉跟着这一步放进标题条', () => {
+    expect(stepTitleFor(sc, 5, null, null, zh)!.forks).toEqual([{ label: '如果阿杰去不了', scenarioId: 'f.a.other', at: 0 }]);
+  });
+  it('场景完成：标题条是“场景完成 · 模拟成功”与结果说明；正在播放时不显示完成', () => {
+    const done = stepTitleFor(sc, 5, null, { text: '两个人都知道了', outcome: 'success' }, zh)!;
+    expect(done).toMatchObject({ explain: '两个人都知道了', done: { outcome: 'success' } });
+    expect(done.caption).toContain(zh.player.scenarioComplete(''));
+    expect(stepTitleFor(sc, 4, 4, { text: 'x', outcome: 'success' }, zh)!.done).toBeNull();
+  });
+  it('空场景：“初始状态”与说明', () => {
+    const q = build({ empty: true });
+    expect(stepTitleFor(q.scenarios[sid], 0, null, null, zh)).toMatchObject({ index: 0, caption: '初始状态', explain: '这个场景没有步骤，只展示初始状态' });
+  });
+  it('停留：基础 2.5s，说明越长越久，最多 5s', () => {
+    expect(titleDwellMs(null)).toBe(0);
+    expect(titleDwellMs(stepTitleFor(sc, 3, null, null, zh))).toBe(TITLE_DWELL_MS);
+    const long = { ...stepTitleFor(sc, 2, null, null, zh)!, explain: '很'.repeat(200) };
+    expect(titleDwellMs(long)).toBe(TITLE_DWELL_MAX_MS);
+    expect(titleDwellMs(stepTitleFor(sc, 2, null, null, zh))).toBeGreaterThan(TITLE_DWELL_MS);
   });
 });
 

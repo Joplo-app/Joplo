@@ -7,12 +7,12 @@ import type { Scenario } from '@joplo-app/core';
 import { keyboardAt, splitKeys } from '../src/renderer/story-data';
 import { markGeometry } from '../src/renderer/marks-math';
 import { timelineChips } from '../src/player/layout';
-import { subtitleFor } from '../src/player/subtitle-content';
+import { stepTitleFor } from '../src/player/subtitle-content';
+import { StepTitle } from '../src/player/StepTitle';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Project, stateAt } from '@joplo-app/core';
 import { Stage } from '../src/renderer/Stage';
-import { Subtitle } from '../src/player/Subtitle';
 import { DemoController } from '../src/runtime/demo';
 import { markBox } from '../src/renderer/marks-math';
 import { playForScenario, resolvePlay } from '../src/player/playRoute';
@@ -34,10 +34,10 @@ describe('按键记录纯函数', () => {
     expect(splitKeys('')).toEqual([]);
   });
 });
-describe('分叉与字幕/时间线', () => {
-  it('press 是用户步骤；字幕本步与时间线都有分叉，下一步消失', () => {
-    expect(subtitleFor(sc, 2, null)).toMatchObject({ kind: 'user', forks: sc.steps[1]!.forks });
-    expect(subtitleFor(sc, 3, null)!.forks).toEqual([]);
+describe('分叉与步骤标题条/时间线', () => {
+  it('press 是用户步骤；标题条本步与时间线都有分叉，下一步消失', () => {
+    expect(stepTitleFor(sc, 2, null)).toMatchObject({ forks: sc.steps[1]!.forks });
+    expect(stepTitleFor(sc, 3, null)!.forks).toEqual([]);
     expect(timelineChips(sc.steps, 2, null, null, false, createZhCN())[2]).toMatchObject({ fork: true, system: false, tip: '2 · 按下 ⌘K · 分叉：另一条路' });
   });
 });
@@ -85,7 +85,7 @@ describe('IR → 静态组件与控制器（无浏览器）', () => {
     expect(after).not.toContain('data-changed=""');
     expect(after).not.toContain('data-state-change=""');
     expect(after).not.toContain('data-jlayer="keyboard"');
-    const subtitle = renderToStaticMarkup(createElement(Subtitle, { content: subtitleFor(p.scenarios.s, 1, null), theme: 'sketch', onFork: () => {} }));
+    const subtitle = renderToStaticMarkup(createElement(StepTitle, { title: stepTitleFor(p.scenarios.s, 1, null), staticMode: true, animate: false, onFork: () => {} }));
     expect(subtitle).toContain('↳ 另一条路');
     expect(subtitle).toContain('<button');
   });
