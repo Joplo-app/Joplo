@@ -20,12 +20,12 @@ describe('D88 animation adapters share one engine clock', () => {
     driver.stop(); cleanup();
   });
   it('first-party plugin runtimes cannot start independent animation clocks', () => {
-    for (const [name,ext] of [['ui','tsx'],['diagram','tsx'],['content','tsx'],['scene3d','ts'],['alda','ts']]) {
+    for (const [name,ext] of [['ui','tsx'],['diagram','tsx'],['content','tsx'],['3d','ts'],['alda','ts']]) {
       const source=readFileSync(`plugins/${name}/src/runtime.${ext}`,'utf8');
       expect(source, name).not.toMatch(/\b(?:requestAnimationFrame|setInterval|setTimeout)\s*\(|\bperformance\.now\s*\(/);
     }
     const demo=readFileSync('packages/web/src/runtime/demo.ts','utf8');
     expect(demo).not.toMatch(/from ['"]motion/);
-    expect(readFileSync('plugins/scene3d/src/runtime.ts','utf8')).toContain('ctx.frame.gesture');
+    expect(readFileSync('plugins/3d/src/runtime.ts','utf8')).toContain('ctx.frame.gesture');
   });
 });

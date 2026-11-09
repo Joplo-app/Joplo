@@ -11,7 +11,7 @@ Enable scene3d in config.plugins, import { asset } from '@joplo-app/kit', then w
 </Scene3D>
 ```
 
-asset paths are relative to the calling source file. A local-generation plugin's resource reference also works as src. Read that plugin's guide for generation, cost confirmation and recovery. Commit model files and their metadata; a missing model must never silently trigger paid generation during check/build/render.
+asset paths are relative to the calling source file. The same package exports model() for a declarative generated src. Read npx joplo skill scene3d/generation for cost confirmation and recovery. Commit model files and their metadata; a missing model must never silently trigger paid generation during check/build/render.
 
 size is a bounding fit preserving the original aspect ratio; at is bottom-center with Y up; rotate is degrees around Y. Keep the original textures by omitting color; color explicitly tints the material with a theme role or CSS color. outline defaults true; turn it off for smooth textured assets to avoid distracting triangle edges. lit, visibility, disabled state, label and showLabel work with state. Material tint and outlines follow theme changes. Changing only color reuses the loaded model and textures, without a loading placeholder; removing color restores the original material color. showLabel={false} hides the visible nameplate even for an interactive model, while its labeled anchor remains available for input and accessibility.
 
@@ -27,4 +27,4 @@ The loader supports embedded textures and meshopt geometry compression without e
 - Check mouse rotation, keyboard arrows, a declared object drag, hover, and a click independently. A declared model drag takes priority over orbit; drag empty canvas to rotate that scene. Reset/play discard local orbit, but snapshots always read scripted angles.
 
 Keep web geometry around 10k–50k faces and GLB below 5 MB. Inspect actual GLB accessor/index counts and bytes; a generation parameter alone is not proof of the exported budget. Models above 5 MB warn, above 50 MB fail. Check the initial frame and a focused frame, then open the build via file:// with networking disabled. A GLB download succeeding alone does not prove texture, anchoring or camera fit.
-<!-- joplo-skill 0.3.0 sha256:d2a898c925d29036bc93bc25b06254b8a29aa7c52be0073f1fb6d0a30d0917ff -->
+<!-- joplo-skill 0.3.0 sha256:11aa7a1de93fd957857e43fd13549a67c68fa492c54eed1d3579df7e7f9fb932 -->

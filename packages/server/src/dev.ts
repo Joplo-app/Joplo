@@ -1,4 +1,4 @@
-import { TripoKeyStore } from './tripo-key.ts';
+import { PluginKeyStore } from './plugin-keys.ts';
 import { binaryAssets } from './binary-assets.ts';
 import { inlineResources, referencedResources } from './local-resources.ts';
 /**
@@ -322,6 +322,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     invalidateProjectModules(loader, slot.dir);
     const out = await compileProject(loader, slot.dir, 'dev');
     if (out.resources) localResources.set(slot.id, out.resources);
+    else localResources.delete(slot.id);
     resourceWarnings.set(slot.id, new Map());
     if (out.project && out.resources?.requests.length) out.project.mediaAssets = Object.fromEntries(out.resources.requests.map(r => [r.id, `/__joplo/p/${encodeURIComponent(slot.id)}/resources/${encodeURIComponent(r.id)}`]));
     if (out.project) {
@@ -464,7 +465,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   });
 
   // 朗读（D74）：声音供应商 profile（本机）与项目音频缓存；状态变化推 joplo:voice
-  const tripoKeys = new TripoKeyStore(opts.home ?? joploHome());
+  const pluginKeys = new PluginKeyStore(opts.home ?? joploHome());
   const voiceHub = new VoiceHub(opts.home ?? joploHome(), {
     // 托管朗读（D85）：CLI 注入的登录与合成；旧 CLI 没有时只用浏览器朗读与自带 Key 的供应商
     cloud: opts.cloud?.voice,
@@ -510,6 +511,21 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
 
   async function handleProject(id: string, rest: string, req: http.IncomingMessage, res: http.ServerResponse) {
     const method = req.method ?? 'GET';
+    if (rest === 'plugin-keys' || rest.startsWith('plugin-keys/')) {
+      if (!guardWrite(req, res, 403, method === 'PUT')) return;
+      await ensure(id);
+      const declarations = localResources.get(id)?.host.keys ?? {};
+      if (rest === 'plugin-keys' && method === 'GET') return sendJson(res, 200, Object.entries(declarations).flatMap(([plugin, keys]) => keys.map(key => pluginKeys.status(plugin,key))));
+      const match = /^plugin-keys\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)$/.exec(rest);
+      const declaration = match ? declarations[match[1]!]?.find(key => key.id === match[2]) : undefined;
+      if (!match || !declaration) return sendJson(res,404,{error:{code:'NOT_FOUND',message:'Plugin key is not declared by this project'}});
+      if (method === 'PUT') {
+        const parsed = await jsonBody(req,res); if (!parsed.ok) return;
+        try { return sendJson(res,200,pluginKeys.save(match[1]!,declaration,(parsed.body as {key?:unknown})?.key)); }
+        catch { return sendJson(res,400,{error:{code:'INVALID_KEY',message:'Invalid plugin API key'}}); }
+      }
+      return sendJson(res,405,{error:{code:'METHOD_NOT_ALLOWED',message:'Method not allowed'}});
+    }
     if (rest === 'review' && (method === 'GET' || method === 'POST')) {
       if (!guardWrite(req, res, 403, method === 'POST')) return;
       const slot = await ensure(id);
@@ -666,15 +682,6 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
             return sendJson(res, 200, { ok: true });
           }
           // 导出组件的安装（D66）：只接受本机看板带令牌的请求（handleRuntime 内校验）
-          if (url.pathname === '/__joplo/tripo/key') {
-            if (method === 'GET') return sendJson(res,200,tripoKeys.status());
-            if (method === 'PUT') {
-              if (!guardWrite(req,res)) return;
-              const parsed = await jsonBody(req,res); if (!parsed.ok) return;
-              try { return sendJson(res,200,tripoKeys.save((parsed.body as {key?:unknown})?.key)); }
-              catch { return sendJson(res,400,{error:{code:'INVALID_KEY',message:'Invalid Tripo API key'}}); }
-            }
-          }
           if (url.pathname.startsWith('/__joplo/voice/')) {
             const ctx = { guardWrite: (needJson = true) => guardWrite(req, res, 403, needJson), jsonBody: () => jsonBody(req, res), send: (status: number, body: unknown) => sendJson(res, status, body) };
             if (await voiceHub.handleGlobal(url.pathname.slice('/__joplo/voice/'.length), req, ctx)) return;

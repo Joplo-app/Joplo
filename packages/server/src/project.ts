@@ -87,7 +87,7 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
   // Enabled plugins derive their own layout and drawing snapshots; the host schedules resources.
   const requests: ResourceRequest[] = [];
   const entries = Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).filter(p => p.local).map(p => [p.id, p.local!]));
-  const resources = { requests, host: new LocalResources(projectDir, entries) };
+  const resources = { requests, host: new LocalResources(projectDir, entries, Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).map(p => [p.id, p.keys ?? []]))) };
   const r = compile(loaded.authoring, mode, { onResource: request => requests.push(request) });
   const missing = Object.keys(r.project?.plugins ?? {}).filter((id) => !pluginRuntimes[id]);
   const extra: Diagnostic[] = missing.map((id) => ({ severity: 'error', code: 'PLUGIN_RUNTIME_MISSING', message: `Plugin ${id}: runtime file not found; reinstall the plugin package`, source: 'reference', at: `${loaded.authoring!.config.file}:1:1` }));

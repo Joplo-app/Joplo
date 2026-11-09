@@ -6,7 +6,7 @@ import { agentSkills, skillMarkdown } from '../src/agent-skill.ts';
 import ui from '../../../plugins/ui/src/plugin.ts';
 import diagram from '../../../plugins/diagram/src/plugin.ts';
 import content from '../../../plugins/content/src/plugin.ts';
-import scene3d from '../../../plugins/scene3d/src/index.ts';
+import scene3d from '../../../plugins/3d/src/index.ts';
 import alda from '../../../plugins/alda/src/index.ts';
 const topics=['authoring','story','demo','focus','cases','check','selection','review','diff','publish','plugins'];
 test('engine topic routing contains no component topics and every reference resolves',()=>{

@@ -99,7 +99,9 @@ export type PluginCompileHooks = {
 /** Author-only requests never enter IR. Local compilers run in a bounded Node process. */
 export type ResourceRequest = { id: string; plugin: string; compiler: string; input: string; source?: string };
 export const localResource = (plugin: string, compiler: string, input: string) => ({ kind: 'local-resource' as const, plugin, compiler, input });
-export type LocalCompiler = { version: string; mime: string; persistent?: boolean; estimate?: (input: string) => { credits: number }; compile(input: string, ctx: { directory: string; projectDir?: string; home?: string; allowSpend?: boolean; maxBytes: number }): Promise<Uint8Array> | Uint8Array };
+export type LocalCompiler = { version: string; mime: string; persistent?: boolean; estimate?: (input: string) => { credits: number }; compile(input: string, ctx: { directory: string; projectDir?: string; keys: Readonly<Record<string, string>>; allowSpend?: boolean; maxBytes: number }): Promise<Uint8Array> | Uint8Array };
+/** Local-only credential metadata. Never put secret values in this declaration. */
+export type PluginKey = { id: string; title: string; description: string; url: string; env: string };
 export type PluginLocal = { compilers: Record<string, LocalCompiler> };
 export type MediaCommand = { track: string; action: 'play'; resource: string; volume?: number; loop?: boolean; fadeMs?: number } | { track: string; action: 'stop'; fadeMs?: number };
 /** Full state at a step boundary; elapsed time is in unscaled engine milliseconds. */
@@ -162,6 +164,8 @@ export type PluginDef = {
   runtime: string;
   /** Node-only entry; excluded from browser bundles and IR. */
   local?: string;
+  /** Host resolves only these keys for this plugin’s local compiler, after spending permission. */
+  keys?: readonly PluginKey[];
 };
 
 function fileOf(u: string | URL): string {
@@ -175,6 +179,13 @@ function fileOf(u: string | URL): string {
 export function definePlugin(p: Omit<PluginDef, 'kind' | 'runtime' | 'apiVersion' | 'local'> & { apiVersion?: typeof PLUGIN_API_VERSION; runtime: string | URL; local?: string | URL }): PluginDef {
   if (!ID.test(p.id)) throw new Error(`Joplo plugin id "${p.id}" must be lowercase letters, digits, and -, starting with a letter`);
   if (p.apiVersion !== undefined && p.apiVersion !== PLUGIN_API_VERSION) throw new Error(`Joplo plugin ${p.id} targets plugin API ${p.apiVersion}; this Joplo supports ${PLUGIN_API_VERSION}`);
+  if (p.keys) {
+    const ids = new Set<string>();
+    for (const key of p.keys) {
+      if (!ID.test(key.id) || ids.has(key.id) || !key.title?.trim() || !key.description?.trim() || !/^[A-Z][A-Z0-9_]*$/.test(key.env) || !/^https:\/\//.test(key.url)) throw new Error(`Plugin ${p.id}: invalid key declaration`);
+      ids.add(key.id);
+    }
+  }
   if (p.skillTopics) for (const [key, topic] of Object.entries(p.skillTopics)) {
     if (!/^[a-z][a-z0-9-]*$/.test(key) || !topic || typeof topic.description !== 'string' || !topic.description.trim() || typeof topic.body !== 'string' || !topic.body.trim()) throw new Error(`Plugin ${p.id}: invalid skill topic ${key}`);
   }

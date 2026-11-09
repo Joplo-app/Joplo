@@ -114,7 +114,7 @@ joplo-plugin-x/
 - 看板：`packages/server/src/project.ts`（`pluginRuntimesOf`）、`dev.ts`（推送 `/@fs/` 地址、dist 形态放行目录）。
 - 发布站：`packages/server/src/build.ts`（`bundlePluginRuntimes`、`injectPluginScripts`）。
 - 技能：`npx joplo skill`（`packages/cli/src/plugins.ts`）、`packages/core/src/guide.ts` 的 `plugins` 主题与 `pluginSkillTopic`。
-- 示例：`plugins/scene3d`（three.js）、`examples/smart-home-3d`。
+- 示例：`plugins/3d`（three.js）、`examples/smart-home-3d`。
 
 ## 10. 阶段 1-A：契约 v2 与第一方 diagram 插件（已实现）
 
@@ -467,7 +467,15 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 
 `scene3d:Model` 用 `src={asset('./model.glb')}` 或 `src={model({prompt: '…'})}` 引用资源。GLTFLoader + 内置 MeshoptDecoder 读取自包含 GLB；模型共享场景锚点、标签、focus、主题描边、状态 tint/lit、点击与拖拽/旋转仲裁。`size` 等比装入包围盒，`at` 为底部中心。纹理模型建议 `outline={false}`。加载以 `ctx.hold()` 保持导出等待，成功首帧、失败、源切换、卸载均释放；失败可见 `MODEL_LOAD_FAILED` 占位。
 
-`@joplo-app/plugin-tripo` 是可选第一方插件（需显式安装/启用），没有浏览器网络能力。作者 `model()` 返回通用 `localResource()` 标记。CLI `joplo resources --dry-run` 显示估计 credits；交互终端逐项确认，非交互默认拒绝、必须明确 `--allow-spend`。check/build/render 从不带这个许可。持久资源先读项目文件，再检查许可和 Key，已有模型不会请求 Tripo。
+`@joplo-app/plugin-3d` 是可选第一方插件（需显式安装/启用），浏览器只负责绘制，生成仅在可选 `/local` 入口。作者 `model()` 返回通用 `localResource()` 标记。CLI `joplo resources --dry-run` 显示估计 credits；交互终端逐项确认，非交互默认拒绝、必须明确 `--allow-spend`。check/build/render 从不带这个许可。持久资源先读项目文件，再检查许可和 Key，已有模型不会请求 Tripo。
+
+### 通用插件密钥（D91）
+
+插件 `keys: [{id,title,description,url,env}]` 只声明元数据 → compileProject 读取 config.plugins 并交给 LocalResources（不复制进 IR）→ 看板 `GET /__joplo/p/<project>/plugin-keys` 仅返回声明/存在状态 → Voice 管理密钥按声明展示 → `PUT /__joplo/p/<project>/plugin-keys/<plugin>/<key>` 校验当前声明、令牌和 Origin → PluginKeyStore 原子写入本机 0600 文件，支持删除。未启用插件或未声明 key 返回 404；编译失败清除旧声明。
+
+生成时，宿主优先读取声明的环境变量，再读取该插件自己的本机文件；只通过 stdin 将当前插件的值传入 `compile(input, {keys,...})`。不向其他插件传值，不传密钥目录；metadata/estimate 子进程不取密钥。子进程只继承 PATH/临时目录等系统环境，避免环境凭证跨插件泄漏；stderr 不透传，已知密钥从诊断中删去，含密钥的资源输出拒绝缓存/发布。插件依然是可信本机代码，进程隔离不等于文件系统沙箱；插件必须遵守不读取其他凭证、不输出密钥的契约。
+
+持久 GLB 文件名保持 SHA-256(JSON.stringify(normalize(request)))，没有包名、插件 id 或代码哈希；旧产物与 provenance 无需迁移，绝不因此重新花费。
 
 ### 新字段与文件的数据流（E5）
 
@@ -475,13 +483,13 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 | --- | --- |
 | `localResource(plugin, compiler, input)` | 插件作者工厂 → 源码求值的标记 → PluginCompiler 提取 → 仅 Node 的 `ResourceRequest`；IR 中只留下 `joplo-resource:<id>` |
 | `LocalCompiler.persistent / estimate` | 插件 local 清单 → 本机编译模块 → LocalResources.describe → CLI 每项费用提示、持久产物策略 |
-| `projectDir / home / allowSpend` | 宿主调用 → 子进程 stdin 内存 → 本机 compile 上下文 → 项目产物定位、本机凭证读取和生成许可；不进 IR |
+| `projectDir / keys / allowSpend` | 宿主调用 → 子进程 stdin 内存 → 本机 compile 上下文 → 项目产物定位、按插件声明注入的凭证和生成许可；不进 IR |
 | `assets/models/<hash>.glb` | Tripo 下载（不带 Authorization）、验证、原子 rename → 项目/Git → 本机编译器离线读取 → 场景 GLTFLoader |
 | 同名 `.json` | 创建前记录 `status:creating`，收到响应立即保存 `task_id`，完成后记录时间/实际 credits → 项目/Git → 重试续查；`prompt/model/参数/image_sha256` 用于溯源，临时签名 URL/Key/参考图字节不写入 |
 | `.glb.lock` | 生成进程原子创建 → 临时项目锁（忽略 Git）→ 生成进程检查 owner 存活 → 防止并发付费；完成删除，崩溃后按 PID 回收 |
 | `project.mediaAssets` | 构建填充资源 ID→data URI；看板替换为哈希 URL → IR 的公共资源表 → RenderContext.assets → 插件已解析 props；同一资源只内嵌一次，scope 删除未引用资源 |
 | `.joplo/binary/<content-hash>` | 看板编译提取二进制 → 本机缓存 → 只允许 64 位哈希的 GET 文件服务 → 浏览器模型/音频；发布站直接内嵌，不依赖绝对路径或本机服务 |
-| `~/.joplo/tripo.json` | Voice 管理密钥卡片密码输入 → 带 Origin/令牌保护的 PUT → 0600 原子文件 → Node-only local 编译器；GET 仅返回保存/环境变量存在状态；环境变量 TRIPO_API_KEY 优先，JOPLO_HOME 可覆盖目录 |
+| `~/.joplo/plugins/<plugin>/keys/<key>.json` | Voice 管理密钥卡片密码输入 → 带 Origin/令牌保护的 PUT → 0600 原子文件 → Node-only local 编译器；GET 仅返回保存/环境变量存在状态；声明中的环境变量优先，JOPLO_HOME 可覆盖目录 |
 | `MODEL_SIZE` | 构建扫描唯一 GLB 的二进制大小 → diagnostics → CLI/看板报告；超过 5 MB 警告，二进制最大 50 MB，图片仍为 2 MB |
 
 任务 API 固定 `https://openapi.tripo3d.ai/v3`；参考图通过 `/files` 上传。只对明确 429 退避重试创建；丢失响应或服务器结果不明时保留 unknown 日志并停止，要求从 Tripo 历史恢复 task_id。轮询/下载失败保留 task_id；超时不是退款。失败/取消由 Tripo 退回冻结 credits，不自动重新创建。Key/供应商原始错误/临时 URL 不进入日志或发布物。

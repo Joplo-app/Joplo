@@ -1,5 +1,5 @@
 import { $, asset, option, flow, page, set, patch, hold, narrate, free, eq, fork, done, shot } from '@joplo-app/kit';
-import { Scene3D } from 'joplo-plugin-scene3d';
+import { Scene3D } from '@joplo-app/plugin-3d';
 import { Canvas, camera } from '@joplo-app/plugin-content';
 import { Image, Button } from '@joplo-app/plugin-ui';
 import { music } from '@joplo-app/plugin-alda';

@@ -3,16 +3,19 @@ name: joplo-plugin-scene3d
 description: "Use the 3D scene plugin in Joplo; read its entry, component recipes and recovery rules for this project."
 ---
 
-# Joplo plugin scene3d: 3D scene 0.1.0
+# Joplo plugin scene3d: 3D scene 0.3.0
 Interactive 3D scenes (three.js): steps click objects, state drives lights, doors, windows, and the camera
-
+Author package: @joplo-app/plugin-3d
 ## When to use
 A spatial product: smart home, retail shelf, factory line, data center, venue map, a physical device. The 3D view shows where things are and what changed; the rest of the screen (app UI, captions) stays normal Joplo components. Prefer ordinary components when space does not matter.
+
+## Enable
+Install @joplo-app/plugin-3d, import its default manifest into joplo.config.ts and add it once to config.plugins. Run npx joplo skill install. The package uses plugin id scene3d for components, actions, skill topics and local resources; the starter intentionally omits it. The /local entry is Node-only; three.js stays in the runtime.
 
 ## Minimal example
 ```tsx
 import { $ } from '@joplo-app/kit';
-import { Scene3D } from 'joplo-plugin-scene3d';
+import { Scene3D } from '@joplo-app/plugin-3d';
 
 <Scene3D id="home" height={440} focus={$.ui.focus} label="Living room">
   <Scene3D.Object shape="floor" size={[8, 0.1, 6]} />
@@ -42,15 +45,17 @@ Then in the option's flow: .click('lamp', 'Turn the lamp on', set($.data.lampOn,
 - Free device reactions use option({ free: { light: free.click('lamp', set($.data.lamp, false)) } }). A matching next action or another reachable scenario takes priority; the first stage input during playback pauses and applies immediately, including the same orbit drag or arrow key. Hover never pauses.
 - Do not put text inside the scene to explain things; use captions, callout() on the object, or the surrounding UI.
 
-For real GLB geometry read npx joplo skill scene3d/models.
+For real GLB geometry read npx joplo skill scene3d/models. For optional model() generation, cost approval and task recovery read npx joplo skill scene3d/generation. Existing GLB rendering needs no key.
 
+- npx joplo skill scene3d/generation: Optional Tripo generation, cost confirmation, persisted models and task recovery
 - npx joplo skill scene3d/models: GLB assets, loading readiness, material tint, anchors and offline checks
 
 General engine contracts: npx joplo skill plugins
 
 
 ## Installed references
+- [generation](./topics/generation.md): Optional Tripo generation, cost confirmation, persisted models and task recovery
 - [models](./topics/models.md): GLB assets, loading readiness, material tint, anchors and offline checks
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.3.0 sha256:f55d30a8ea68ebd55bc1d3b8ffa22cc06c98fbca42000eb5a1190e3cd10c7cac -->
+<!-- joplo-skill 0.3.0 sha256:d435f93cb4131c050ea7dfada3396fcfb874c68d920328c50d0c989631671a93 -->

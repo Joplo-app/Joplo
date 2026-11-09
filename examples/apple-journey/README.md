@@ -13,7 +13,7 @@ JOPLO_HOME=/tmp/joplo-apple-preview pnpm joplo dev examples/apple-journey --port
 pnpm joplo build examples/apple-journey
 ```
 
-依赖使用 `workspace:*`，通过本地 starter 的 `joplo init` 创建。`.claude/skills/` 是初始化并同步后的引擎与已启用插件技能。`scene3d` 的包名是 `joplo-plugin-scene3d`，不是 `@joplo-app/plugin-scene3d`。
+依赖使用 `workspace:*`，通过本地 starter 的 `joplo init` 创建。`.claude/skills/` 是初始化并同步后的引擎与已启用插件技能。`scene3d` 是 `@joplo-app/plugin-3d` 的插件 id；同包包含可选本机生成。
 
 生成的模型与任务元数据已经提交；普通 check/build/render 不调用 Tripo，不需要 API Key。只有改变提示词并显式执行 `joplo resources --allow-spend` 才会生成新的付费资源。不要为复现现有示例再次生成。
 

@@ -1,0 +1,56 @@
+{
+  "name": "@joplo-app/plugin-3d",
+  "version": "0.3.0",
+  "type": "module",
+  "joplo": {
+    "api": 2
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./local": "./src/local.ts",
+    "./runtime": "./src/runtime.ts",
+    "./guide": "./src/guide.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@joplo-app/kit": "workspace:*",
+    "three": "0.187.0"
+  },
+  "description": "Joplo 3D scenes, GLB models and optional local Tripo generation",
+  "license": "PolyForm-Shield-1.0.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs",
+    "prepublishOnly": "node ../../scripts/build-package.mjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./local": {
+        "types": "./dist/local.d.ts",
+        "default": "./dist/local.js"
+      },
+      "./runtime": {
+        "types": "./dist/runtime.d.ts",
+        "default": "./dist/runtime.js"
+      },
+      "./guide": {
+        "types": "./dist/guide.d.ts",
+        "default": "./dist/guide.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "devDependencies": {
+    "@types/three": "0.187.0"
+  }
+}
