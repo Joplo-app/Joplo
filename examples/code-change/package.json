@@ -1,0 +1,11 @@
+{
+  "name": "joplo-example-code-change",
+  "private": true,
+  "type": "module",
+  "description": "Joplo 示例：用代码插件（@joplo-app/plugin-code）演示一次代码修改——逐字输入、按行 diff、高亮（D96 原型）",
+  "devDependencies": {
+    "@joplo-app/kit": "workspace:*",
+    "@joplo-app/plugin-ui": "workspace:*",
+    "@joplo-app/plugin-code": "workspace:*"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "joplo-example-media-upload",
+  "private": true,
+  "type": "module",
+  "description": "Joplo 示例：用媒体插件（@joplo-app/plugin-media）播放视频片段与 Lottie 动画（D96 原型）",
+  "devDependencies": {
+    "@joplo-app/kit": "workspace:*",
+    "@joplo-app/plugin-ui": "workspace:*",
+    "@joplo-app/plugin-media": "workspace:*"
+  }
+}
