@@ -353,8 +353,27 @@ async function smoke() {
       import local from '@joplo-app/plugin-alda/local';
       import runtime from '@joplo-app/plugin-alda/runtime';
       const p = alda({ theme: 'piano: c4' });
-      if (p.id !== 'alda' || !p.local.endsWith('/local.js') || !p.skill.includes('music.play') || !local.compilers.midi.version || !runtime.media || music.play('theme').plugin !== 'alda') process.exit(1);
+      if (p.id !== 'alda' || !p.local.endsWith('/local.js') || !p.skill.includes('music.play') || !local.compilers.audio.version || runtime.media || music.play('theme').plugin !== 'alda') process.exit(1);
     `], project);
+
+    // Real rendering from the installed tarball, not workspace sources. No fake success when Alda is absent.
+    const aldaVersion = spawnSync('alda', ['version'], { encoding: 'utf8', timeout: 25000 });
+    if (aldaVersion.status === 0 && aldaVersion.stdout.trim() === 'alda 2.4.8') {
+      sh(process.execPath, ['--input-type=module', '-e', `
+        import fs from 'node:fs/promises'; import os from 'node:os'; import path from 'node:path';
+        import local from '@joplo-app/plugin-alda/local';
+        const directory=await fs.mkdtemp(path.join(os.tmpdir(),'joplo-music-smoke-'));
+        try {
+          const input=JSON.stringify({score:'piano: (tempo! 120) %start o3 c2/e2/g2 | %end r2 | midi-percussion: @start o2 c4 c+4 @end r2',loop:true});
+          const info=await local.compilers.audio.inspect(input,{directory});
+          if(info.markers.end!==1000 || info.durationMs!==2000 || !Object.values(info.parts).every(n=>n>0))throw new Error('Music inspection failed');
+          const bytes=await local.compilers.audio.compile(input,{directory,maxBytes:8*1024*1024});
+          if(Buffer.from(bytes).toString('ascii',0,4)!=='fLaC' || bytes.length<1024)throw new Error('Real SoundFont render failed');
+          console.log('Real SoundFont render:',bytes.length,'bytes,',info.durationMs,'ms');
+        } finally {await fs.rm(directory,{recursive:true,force:true});}
+      `], project, { timeout: 180000 });
+      log('  ✓ installed plugin: real MIDI → SoundFont → FLAC rendering');
+    } else log('  SKIP real SoundFont rendering: Alda 2.4.8 is unavailable; install it and rerun release:smoke. Plugin imports were checked, audio rendering was not.');
 
     sh(process.execPath, ['--input-type=module', '-e', `
       import ui from '@joplo-app/plugin-ui';
