@@ -369,6 +369,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const ruleIds: string[] = [];
         const explains: string[] = [];
         const says: string[] = [];
+        let sayRole: string | null = null;
         const narrates: string[] = [];
         /** 插件效果声明的最短停留（D98）：同一步取最大值。 */
         let effectHoldMs = 0;
@@ -390,10 +391,18 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
               if (q) ruleIds.push(q);
             }
           } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
-          else if (e.type === 'stream') effects.push({ type: 'stream', path: e.path, value: e.value });
+          else if (e.type === 'stream') {
+            if (e.pace !== undefined && e.pace !== 'voice') err('STREAM_PACE_INVALID', `stream() pace must be 'voice' (got ${JSON.stringify(e.pace)}); omit it to stream at model-output speed`, st.source);
+            effects.push({ type: 'stream', path: e.path, value: e.value, ...(e.pace === 'voice' ? { pace: 'voice' as const } : {}) });
+          }
           else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
           else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold') continue; // 镜头与焦点提示不是状态变化，下面单独归类
           else if (e.type === 'say') {
+            if (e.role !== undefined) {
+              if (typeof e.role !== 'string' || !roleKeys.has(e.role)) err('ROLE_UNKNOWN', `say() role "${String(e.role)}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ' (feature.roles must use { key: role(\'Name\') })'}`, st.source);
+              else if (sayRole !== null && sayRole !== e.role) err('SAY_ROLE_CONFLICT', `One step has say() lines from two roles ("${sayRole}" and "${e.role}"); split them into two steps`, st.source);
+              else sayRole = e.role;
+            }
             if (typeof e.text === 'string' && e.text.trim()) says.push(e.text.trim());
             else err('SAY_EMPTY', 'say() needs the line the character speaks, for example say(\'I can make it!\'). Remove it to read the caption instead', st.source);
           } else if (e.type === 'narrate') {
@@ -551,6 +560,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           ...(holdMs !== undefined ? { hold: holdMs } : {}),
           ...(effectHoldMs > 0 ? { effectHold: effectHoldMs } : {}),
           ...(says.length ? { say: says.join(' ') } : {}),
+          ...(says.length && sayRole ? { sayRole } : {}),
           ...(narrates.length ? { narrate: narrates.join(' ') } : {}),
           ...(st.source ? { source: rel(st.source) } : {}),
         };

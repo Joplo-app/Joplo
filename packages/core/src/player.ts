@@ -9,6 +9,7 @@ import { pluginActionSpec, validActionData } from './actions.ts';
 import { DIRECTOR_LAYER, PAGE_LAYER, isInteractiveType, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
 import type { Condition, LayerIcon, Project, Scenario, Scene, SceneNode, Step } from './schema.ts';
 import { JoploError, type Diagnostic } from './result.ts';
+import { streamMs, voicePacedMs } from './pace.ts';
 
 export type Toast = { id: string; text: string; tone: 'success' | 'error' | 'info' };
 
@@ -563,8 +564,26 @@ export function roleOfScene(project: Project, sceneId: string | null | undefined
 }
 
 /** 第 index 步（0 起）流式输出的状态路径与文字。 */
-export function streamsOf(step: Step | undefined): { path: string; value: string }[] {
-  return (step?.effects ?? []).flatMap((e) => (e.type === 'stream' ? [{ path: e.path, value: e.value }] : []));
+export function streamsOf(step: Step | undefined): { path: string; value: string; pace?: 'voice' }[] {
+  return (step?.effects ?? []).flatMap((e) => (e.type === 'stream' ? [{ path: e.path, value: e.value, ...(e.pace ? { pace: e.pace } : {}) }] : []));
+}
+
+/** 一段流式输出怎么出字：keep 个字一开始就在（原来的值），其余的字在 ms 毫秒（1×）里逐字出现。 */
+export type StreamPlan = { path: string; value: string; keep: number; ms: number; pace?: 'voice' };
+
+/**
+ * 这一步的流式输出怎么出字（D56，D100）。prev 是这一步之前的状态；不知道时传 null（整段重新出，用于估算）。
+ * - 接着往后写：新值以原来的值开头时，原有的字直接显示，只有新加的字逐字出现；
+ * - pace: 'voice'：新加的字在这一步朗读（narrate ?? say）的估算时长里出完，读到哪写到哪；没有朗读时退回按字数。
+ */
+export function streamPlan(step: Step | undefined, prev: Pick<PlayState, 'ui' | 'data' | 'inputs'> | null): StreamPlan[] {
+  return streamsOf(step).map((s) => {
+    const before = prev ? readPath(prev, s.path) : undefined;
+    const keep = typeof before === 'string' && before && s.value.startsWith(before) ? [...before].length : 0;
+    const fresh = [...s.value].slice(keep).join('');
+    const voiced = s.pace === 'voice' ? voicePacedMs(step?.narrate ?? step?.say) : 0;
+    return { path: s.path, value: s.value, keep, ms: fresh ? (voiced || streamMs(fresh)) : 0, ...(s.pace ? { pace: s.pace } : {}) };
+  });
 }
 
 

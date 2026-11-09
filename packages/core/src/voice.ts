@@ -56,6 +56,8 @@ export function narrationText(step: Step, caption: string): string {
 /** 第 index 步（1 起）的说话角色：用户操作取这一步之后导演所在层画面的角色 id；没有角色、系统步骤与过渡卡为 null。say() 用它的声音。 */
 export function speakerRoleAt(project: Project, scenarioId: string, index: number): string | null {
   const step = project.scenarios[scenarioId]?.steps[index - 1];
+  // say(…, { role }) 写明了是谁（D100）：任何步骤都以它为准（系统步骤没有“操作的人”）
+  if (step?.say && step.sayRole) return step.sayRole;
   if (!step || step.kind !== 'user') return null;
   const layer = cameraAt(project, scenarioId, index).directorLayer;
   const sceneId = layersOf(project, scenarioId).find((l) => l.id === layer)?.sceneId;

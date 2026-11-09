@@ -1,0 +1,11 @@
+{
+  "name": "joplo-example-manus-voice",
+  "private": true,
+  "type": "module",
+  "description": "Joplo 示例：复刻一段 Manus 语音输入的产品演示——同一个输入框，四章讲清开始说、框里已有字、说得很长、光标在哪写在哪",
+  "devDependencies": {
+    "@joplo-app/kit": "workspace:*",
+    "@joplo-app/plugin-ui": "workspace:*",
+    "@joplo-app/plugin-content": "workspace:*"
+  }
+}

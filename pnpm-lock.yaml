@@ -337,6 +337,18 @@ importers:
         specifier: workspace:*
         version: link:../../plugins/ui
 
+  examples/manus-voice:
+    devDependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@joplo-app/plugin-content':
+        specifier: workspace:*
+        version: link:../../plugins/content
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
+
   examples/media-upload:
     devDependencies:
       '@joplo-app/kit':

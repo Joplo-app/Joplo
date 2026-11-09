@@ -7,7 +7,6 @@ import { Component, createContext, useContext, useEffect, useLayoutEffect, useMe
 import { createPortal } from 'react-dom';
 import { resolveResourceProps, disabledReasonOf, isInteractiveType, splitPluginType, type PluginTable, atWidth, childWidth, choicesOf, layoutRegions, evaluateCondition, isNodeDisabled, isSelfVisible, nodeLabel, resolveProps, resolveValue, walkNodes, type ComponentType, type StateChange, type PlayState, type Scene, type SceneNode } from '@joplo-app/core/runtime';
 import { cn } from '@/lib/utils';
-import { streamMs } from '../runtime/pace';
 import { Rough, RoughPath, ThemeContext, roundRectPath, useStroke } from './rough';
 import { fontStyle } from './appearance';
 import { DIMMED, INK2, styleOf } from './style';
@@ -53,7 +52,8 @@ export type RenderCtx = {
 };
 
 /** key 变化时重新开始逐字输出；paused 时停住；speed 与自动播放的速度一致。 */
-export type StreamingCtx = { paths: ReadonlySet<string>; key: string; paused: boolean; speed: number };
+/** plans：每个正在逐字出现的状态路径，开头 keep 个字直接显示，其余的字在 ms（1×）里出完（D100）。 */
+export type StreamingCtx = { plans: ReadonlyMap<string, { keep: number; ms: number; voice?: boolean }>; key: string; paused: boolean; speed: number; /** 这一步的朗读读到哪了（0–1，D100）；null = 不知道，按估算时长。 */ voice?: () => number | null };
 
 export const RenderContext = createContext<RenderCtx | null>(null);
 export const useCtx = () => {
@@ -118,7 +118,8 @@ function TextNode({ node, p }: NodeProps) {
   const { streaming } = useCtx();
   const raw = node.props?.text;
   const path = typeof raw === 'string' && raw.startsWith('$') ? raw.slice(1) : null;
-  if (streaming && path && streaming.paths.has(path)) return <StreamText key={streaming.key} attrs={attrs} text={str(p.text)} s={streaming} />;
+  const plan = streaming && path ? streaming.plans.get(path) : undefined;
+  if (streaming && plan) return <StreamText key={streaming.key} attrs={attrs} text={str(p.text)} plan={plan} voice={streaming.voice} />;
   return <span {...attrs}>{str(p.text)}</span>;
 }
 
@@ -131,17 +132,29 @@ export function useEngineFrame(enabled = true): ClockFrame | undefined {
   return useSyncExternalStore(on ? source!.subscribe : noSubscribe, on ? source!.getSnapshot : noFrame, noFrame);
 }
 
-/** 逐字出现的文字（D56）：总时长与自动播放的停留用同一个 streamMs；出完之前末尾有光标。 */
-function StreamText({ attrs, text, s }: { attrs: Record<string, unknown>; text: string; s: StreamingCtx }) {
+/**
+ * 逐字出现的文字（D56）：总时长与自动播放的停留用同一份出字计划（core streamPlan）；出完之前末尾有光标。
+ * 接着往后写（D100）：开头 keep 个字一开始就在，只有后面的字逐字出现。
+ * 跟着朗读出字（pace: 'voice'）时不画块状光标。
+ */
+function StreamText({ attrs, text, plan, voice }: { attrs: Record<string, unknown>; text: string; plan: { keep: number; ms: number; voice?: boolean }; voice?: () => number | null }) {
   const chars = useMemo(() => [...text], [text]);
   const { clock } = useCtx();
+  // 逐字出现与跟着朗读都要逐帧更新（D99）：时钟在时订阅每一帧
   const live = useEngineFrame(!!clock);
-  const n = clock ? Math.min(chars.length, Math.floor((live ?? clock).elapsedMs / (streamMs(text, 1) / Math.max(1, chars.length)))) : chars.length;
+  const keep = Math.min(plan.keep, chars.length);
+  const fresh = chars.length - keep;
+  // 跟着朗读出字：正在放这一步的声音时按它读到的比例（真实时长）；没开声音、录制估算朗读时按估算时长
+  const spoken = plan.voice && clock ? voice?.() ?? null : null;
+  const n = !clock || fresh <= 0 ? chars.length
+    : spoken !== null ? Math.min(chars.length, keep + Math.floor(Math.max(0, Math.min(1, spoken)) * fresh))
+    : plan.ms > 0 ? Math.min(chars.length, keep + Math.floor((live ?? clock).elapsedMs / (plan.ms / fresh))) : chars.length;
   const done = n >= chars.length;
   return (
     <span {...attrs} data-jstreaming={done ? undefined : ''}>
       {done ? text : chars.slice(0, n).join('')}
-      {done ? null : <span aria-hidden className="jcaret">▍</span>}
+      {/* 跟着朗读出的字（语音转写，D100）是“正在听写”，画面自己有光标，不加“模型在输出”的块状光标 */}
+      {done || plan.voice ? null : <span aria-hidden className="jcaret">▍</span>}
     </span>
   );
 }

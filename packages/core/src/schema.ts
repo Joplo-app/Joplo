@@ -153,7 +153,8 @@ export const Effect = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('navigate'), sceneId: Qid }),
   z.strictObject({ type: z.literal('complete'), text: z.string().min(1), outcome: z.enum(['success', 'failure', 'cancelled']) }),
   /** 流式输出（D56）：状态上等同 set；播放到这一步时绑定它的文字逐字出现。 */
-  z.strictObject({ type: z.literal('stream'), path: StatePath, value: z.string() }),
+  /** pace: 'voice'（D100）：新加的字跟着这一步的朗读出；没有时按模型输出的速度。 */
+  z.strictObject({ type: z.literal('stream'), path: StatePath, value: z.string(), pace: z.literal('voice').optional() }),
 ]);
 
 /** 镜头（D43）：这一步在某个层级里对准哪些元素；targets 为空 = 这一层的整体。 */
@@ -219,6 +220,8 @@ export const Step = z.strictObject({
   effectHold: z.number().int().positive().max(60_000).optional(),
   /** 角色台词（D74，来自 say()，多个按空格连接）：用这一步角色的声音读；没有时省略。发布站保留。 */
   say: z.string().min(1).optional(),
+  /** 台词是谁说的（D100，来自 say(…, { role })，feature.roles 的键）：优先于“操作步骤取导演层的角色”；没有时省略。 */
+  sayRole: z.string().min(1).optional(),
   /** 旁白（D74，来自 narrate()）：用旁白的声音读，优先于台词和字幕；没有时省略。发布站保留。 */
   narrate: z.string().min(1).optional(),
   source: Source,

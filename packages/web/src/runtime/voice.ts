@@ -18,6 +18,11 @@ export interface Narration {
   pause(): void;
   resume(): void;
   cancel(): void;
+  /**
+   * 读到哪了（D100）：0–1 = 这句话已经读出的比例，读完、出错、被取消时为 1；不知道时为 null（浏览器没给字词边界）。
+   * 跟着朗读出字的 stream(…, { pace: 'voice' }) 用它对齐真实声音；没有这个方法或返回 null 时按估算时长出字。
+   */
+  progress?(): number | null;
 }
 
 export type VoiceLookup = { narrator: string | null; roles: Record<string, string>; clips: Record<string, string>; overrides?: Record<string, string> };
@@ -97,11 +102,15 @@ function speakBrowser(text: string, o: { speed: number; lang: string; voiceURI: 
   };
   u.onend = end;
   u.onerror = end;
+  // 字词边界（不是所有声音都给）：读到第几个字，用来让跟着朗读的字对齐声音
+  let spoken: number | null = null;
+  u.onboundary = (e) => { spoken = Math.min(text.length, e.charIndex + Math.max(0, e.charLength ?? 0)); };
   synth.cancel();
   synth.speak(u);
   return {
     source: 'browser',
     done: s.done,
+    progress: () => (s.finished() ? 1 : spoken === null ? null : spoken / Math.max(1, text.length)),
     pause: () => {
       g.pause();
       synth.pause();
@@ -162,6 +171,12 @@ function playClip(url: string, o: { speed: number; onFail: () => Narration | nul
       return fallback ? 'browser' : 'clip';
     },
     done: s.done,
+    // 音频：已经播放的比例；元数据还没到时是 0（字等着声音）；改用浏览器朗读后跟它走
+    progress: () => {
+      if (s.finished()) return 1;
+      if (fallback) return fallback.progress?.() ?? null;
+      return Number.isFinite(a.duration) && a.duration > 0 ? Math.min(1, a.currentTime / a.duration) : 0;
+    },
     pause: () => {
       paused = true;
       g.pause();
@@ -208,6 +223,8 @@ function pendingClip(url: Promise<string | null>, o: { waitMs: number; play: (ur
       return inner?.source ?? 'clip';
     },
     done: s.done,
+    // 还在等生成的音频：声音没出来，字也不出（0）
+    progress: () => (over ? 1 : inner ? (inner.progress?.() ?? null) : 0),
     pause: () => {
       paused = true;
       g.pause();

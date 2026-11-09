@@ -634,4 +634,12 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
 - **逐帧的呈现器自己订阅**：新增渲染服务 useEngineFrame()（@joplo-app/kit/renderer）。content Canvas（镜头）、diagram 连线上移动的小点、逐字出现的文字用它；命令式 mount/update 组件（3D）由宿主逐帧订阅，update 照常每帧调用。Canvas 用 useMemo 固定世界与屏幕层子树，镜头每帧移动时子树不重渲染，状态变化仍经渲染上下文传到各节点。
 - **结果**：同一段播放约 52 fps，中位帧时间 16.7ms；剩余卡顿在换步时的整树更新（看板为开发版 React）。
 - **插件契约**：在渲染里读 clock.timeMs、或把它当 effect 依赖来驱动动画，而不调用 useEngineFrame()，动画会停住。技能 plugins 主题已写明。
+## D100 · 语音输入类演示：stream() 接着往后写、跟着朗读出字，say() 可写明说话人（2026-11-09）
 
+来源：复刻 Manus 语音输入的产品演示（examples/manus-voice）。用户：“文字会在语音结束前就出现，这个可以 fix 一下”“配上多语言吧”“顺便把 tts 一起做完吧”。
+
+- **stream() 接着往后写**：新值以原来的值开头时，原有的字直接显示，只有新加的字逐字出现（以前每一步都从第一个字重新打一遍）。出字计划由 core `streamPlan(step, 提交前的状态)` 算出；演示控制器在提交那一步时算好放进 `streamAt.plan`，看板、发布站、嵌入页、视频录制都走它。跳到某一步、截图、深链仍直接显示全文。outline 与封面时长估算不知道之前的状态，按整段估算（偏长，可接受）。
+- **stream(…, { pace: 'voice' })**：新加的字跟着这一步的朗读（narrate ?? say）出——正在放这一步的声音时按真实进度（音频 currentTime / duration；浏览器朗读按字词边界；还在等生成的音频时为 0，字等着声音），拿不到进度（没开声音、视频录制的估算朗读、浏览器没给边界）时按 `voicePacedMs` 估算时长（与 voiceMs 同一套语速，不含换气）。跟着朗读出的字不画“模型在输出”的块状光标。Narration 接口新增可选的 `progress()`。
+- **say(text, { role })**：写明是谁说的（feature.roles 的键），编译进 Step.sayRole；朗读（core speakerRoleAt）与字幕（web speakerOf）都以它为准，系统步骤也能用角色的声音。没写时规则不变：用户操作取导演层的角色，系统步骤用旁白。同一步两个角色报 SAY_ROLE_CONFLICT；未知角色报 ROLE_UNKNOWN；pace 只接受 'voice'（STREAM_PACE_INVALID）。
+- **翻译的约束**：stream 的值和其他屏幕文字一样按原文整句翻译；作者要让每种语言里相邻两步的值保持“前一句 + 新加的字”，否则那一步退回整段重出（不报错）。
+- **边界（D94）**：这是“状态怎么被看见”的胶水——字跟着声音出，不是逐帧动画 API。

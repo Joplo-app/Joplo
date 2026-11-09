@@ -40,6 +40,8 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - EXPLAIN_TOO_LONG: Shorten the explain note to about 48 units, using the same CJK 1 / other 0.5 calculation. Put detailed rationale in a separate explanation layer. See demo.
 - SAY_TOO_LONG / NARRATE_TOO_LONG (warning): a say() or narrate() line over about 80 units (about 10 seconds aloud). Autoplay waits until it is read; say less or split the step.
 - SAY_EMPTY / NARRATE_EMPTY: say() needs the character's words, narrate() the narrator's. Remove it to fall back to the caption.
+- SAY_ROLE_CONFLICT: one step has say(…, { role }) lines from two different roles. A step reads one speaker; split the lines into consecutive steps.
+- STREAM_PACE_INVALID: stream()'s pace is only 'voice' (follow this step's spoken line); omit it for model-output speed.
 - VOICE_CONFIG_INVALID: config({ voice }) takes { profile?, narrator?, roles?: { roleKey: 'voice' }, locales?: { ja: { narrator?, roles? } } } with non-empty strings. API keys never go in the config.
 - LOCALES_INVALID / LOCALES_UNDECLARED: config({ locales }) lists supported languages once each, source language first; every locales/<lang>.json must be listed there and must not be the source language. LOCALE_FILE_INVALID: the file must be one JSON object of "source text": "translation" strings.
 - I18N_MISSING / I18N_STALE / I18N_UNUSED (warnings): texts with no translation (viewers see the source text), a source text that changed (the closest old entry is shown: rename the key and update the translation), entries nothing uses. npx joplo i18n add <lang> adds the missing keys.
@@ -47,7 +49,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - CARD_TEXT_TOO_LONG (info): a transition card's sub is over 48 units, a point over 24, or more than 4 points. Keep one sentence and a few short points; move details into steps.
 - SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.
 - HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior. Explainers and other content whose chapters are all main-flow can ignore it (see content).
-- ROLE_UNKNOWN: A layer or card role is not in feature.roles. Declare roles as { key: role('Name') }; see demo.
+- ROLE_UNKNOWN: A layer, card or say() role is not in feature.roles. Declare roles as { key: role('Name') }; see demo.
 - ICON_UNKNOWN: A layer icon is not a preset. Use one of window, browser, mobile, desktop, terminal, chat, agent, server, data, email, doc, flow; see demo.
 - FORK_UNKNOWN: fork must target another scenario key in the same option; it cannot reference itself.
 - MARK_UNKNOWN: The mark target is absent from this step's route stage (after go() and back() in earlier steps) or, with layers, from every layer. Check the element id; currently hidden targets are valid references.
@@ -103,4 +105,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.4.1 sha256:99c6e24eaeb6ba1a696c29dc18c918707c049f92c78906af743c2548a331408e -->
+<!-- joplo-skill 0.4.1 sha256:0c27e79b8d4d9da8bb135eaf7d93cb8e21247c09a9d5fc2cd63efada560c6c0f -->

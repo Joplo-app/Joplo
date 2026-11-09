@@ -34,6 +34,7 @@ Backend behind the same feature: put a diagram component in its own layer and .s
 - Scenario list, one line per scenario: Given (who, where, starting state) → When (the user's actions) → Then (the visible result), plus how it opens and how it ends.
 - Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate.
 - Unsure how to frame it? Offer two or three one-line framings and let the user pick.
+- Recreating an existing video, GIF or screen recording: read it before planning. Extract frames into contact sheets (for example ffmpeg -i ref.gif -vf "fps=1,tile=3x3" sheet%02d.png, written outside the project) and list its chapters, the states each chapter passes through and every on-screen sentence; those become cases, steps and narration. Map the reference's own chrome to the player's instead of redrawing it: its chapter label → case title and the player's step title, its bottom progress → the player's chapter list, its key badge → the host key record after .press(), its spoken captions → narrate()/say(). Ask about anything the reference does not show (chapters cut off, unseen states) instead of inventing it; replace third-party logos with neutral shapes.
 
 ## 3. PM lens: from a need to roles, goal, cases, and scenarios
 Joplo already has the parts of a user story; fill them in that spirit.
@@ -77,7 +78,11 @@ When the board or the published site reads a demo aloud, each step reads, in ord
 - Transitions carry the story: role switches, time jumps, and closing cards need a line that tells the viewer why we moved.
 - Plain and concrete, not flowery: no metaphors, slogans, or hype. Vivid means specific: real names, amounts, and times.
 - Not every step needs its own line: a trivial step can keep its short caption, and a character's say() can carry a moment ('Count me in!').
+- Once a piece will be heard, every step without narrate()/say() reads its caption aloud ('Hover the mic', 'Click Done'), which sounds like a screen reader. Listen for those: merge a hover or setup step into the step that explains it, give a short narrate() to the clicks that stay, or drop steps that only exist to show a tooltip.
+- An on-screen headline and narration play together: narrate the point in spoken words (the why, the consequence) rather than reading the headline back, since the subtitle would show the same sentence twice.
 - say() is first person, what the character would really say; narration about the characters goes in narrate().
+- Who says it: a user action's say() uses the role of the layer it lands on. A system step has no acting person, so it reads in the narrator's voice unless you name the speaker: say('Book it for Friday', { role: 'me' }). Use that for a person talking to the product (voice input, a call, a voice assistant) while the screen reacts in system steps.
+- Voice input / dictation: one system step per spoken phrase, say(phrase, { role }) plus stream($.ui.text, fullTextSoFar, { pace: 'voice' }), so the subtitle shows the phrase, the speaker's voice reads it and the transcript grows in step with the voice. Put the presenter's explanation in narrate() on separate steps (pauses, results); one step reads only one line, and narrate() wins over say().
 - Open with the person and their goal; close with the one to three points, as speech, not a list read aloud. Write in the demo's language.
 Wrong, it reads the interface: .click('share', 'Xiaoyu shares the itinerary', narrate('Click Share to share the itinerary.'))
 Right, it says why: .click('share', 'Xiaoyu shares the itinerary', narrate('She sends it as a link, so Ajie needs no app.'))
@@ -109,4 +114,4 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.4.1 sha256:86e436af61e01d0b0b318f09e6c62f78db0e346ec5739a139353d0186343a20b -->
+<!-- joplo-skill 0.4.1 sha256:e6ce32a6e780e14d06f1439fdfe9be94ae87d93e8ddc6fbbf783edc11a1d64b6 -->

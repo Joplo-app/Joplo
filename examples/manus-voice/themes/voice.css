@@ -1,0 +1,98 @@
+/* 产品录屏风格：浅暖灰底、白色输入框、系统字体、细线图标。所有选择器都限定在 .mv-world 下。 */
+:root {
+  --jp-stroke: clean;
+  --jp-font: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', 'Microsoft YaHei', sans-serif;
+  --jp-bg: #f6f6f4; --jp-surface: #ffffff; --jp-subtle: #efefec;
+  --jp-ink: #1a1a19; --jp-muted: #8a8a86; --jp-accent: #1a1a19;
+  --jp-line: #e6e6e3; --jp-line-strong: #c9c9c5; --jp-annot: #1a1a19;
+}
+
+.mv-world { background: #f6f6f4; color: #1a1a19; font-family: var(--jp-font); }
+
+/* ---------- 版面：输入框居中，大字说明浮在它上方，不推动输入框 ---------- */
+.mv-world .mv-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.mv-world .mv-cluster { position: relative; width: 960px; }
+.mv-world .mv-headline {
+  position: absolute; left: -80px; right: -80px; bottom: calc(100% + 48px);
+  text-align: center; font-size: 30px; font-weight: 600; letter-spacing: .5px; line-height: 1.35; text-wrap: balance;
+}
+
+/* ---------- 输入框 ---------- */
+.mv-world .mv-box { background: #fbfbfa; border: 1px solid #ececea; border-radius: 22px; box-shadow: 0 18px 50px rgba(20, 20, 18, .07); }
+.mv-world .mv-chips { display: flex; gap: 22px; padding: 12px 20px 10px; font-size: 15px; color: #4a4a47; }
+.mv-world .mv-chip { display: inline-flex; align-items: center; gap: 7px; }
+.mv-world .mv-card { background: #fff; border-top: 1px solid #ededeb; border-radius: 20px; padding: 18px 20px 14px; }
+.mv-world .mv-body { max-height: 330px; min-height: 50px; padding-bottom: 18px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.mv-world .mv-text { font-size: 19px; line-height: 32px; white-space: pre-wrap; overflow-wrap: anywhere; color: #1a1a19; }
+.mv-world .mv-placeholder { color: #a3a3a0; }
+.mv-world .mv-hint { color: #a3a3a0; }
+/* 这次说的话：细虚下划线，说完点完成就去掉 */
+.mv-world .mv-spoken { text-decoration: underline dotted #9a9a96; text-decoration-thickness: 1.5px; text-underline-offset: 6px; }
+/* 停顿：末尾一小段虚线一直闪，表示还在听 */
+.mv-world .mv-tail { display: inline-block; width: 30px; height: 1px; margin-left: 2px; vertical-align: -6px; border-bottom: 1.5px dotted #6d6d69; animation: mv-blink 1s ease-in-out infinite; }
+/* 光标：一条细竖线 + 正下方一个小麦克风 */
+.mv-world .mv-caret { position: relative; display: inline-block; width: 1.5px; height: 22px; margin: 0 1px; vertical-align: -4px; background: #1a1a19; animation: mv-caret 1.06s steps(1, end) infinite; }
+.mv-world .mv-caret-mic { position: absolute; left: -7px; top: 25px; width: 15px; height: 15px; color: #6d6d69; animation: none; }
+.mv-world .mv-caret-mic .mv-ic { width: 15px; height: 15px; }
+.mv-world .mv-pivot { cursor: text; }
+
+/* ---------- 底栏 ---------- */
+.mv-world .mv-bar-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; height: 36px; }
+.mv-world .mv-tools, .mv-world .mv-actions { display: flex; align-items: center; gap: 12px; }
+.mv-world .mv-plain { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; color: #4a4a47; }
+.mv-world .mv-apps { display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; font-size: 14px; color: #4a4a47; }
+.mv-world .mv-app { width: 16px; height: 16px; border-radius: 4px; }
+.mv-world .mv-app-a { background: repeating-conic-gradient(#2b2b29 0 25%, #8c8c88 0 50%) 0 0 / 8px 8px; }
+.mv-world .mv-app-b { background: #3a3a37; border-radius: 50%; }
+.mv-world .mv-app-c { background: #2f6fe4; }
+.mv-world .mv-more { margin-left: 2px; }
+.mv-world .mv-mode { display: inline-flex; align-items: center; gap: 4px; font-size: 15px; color: #4a4a47; }
+.mv-world .mv-mode .mv-ic { width: 14px; height: 14px; }
+.mv-world .mv-anchor { position: relative; display: inline-flex; }
+.mv-world .mv-btn { width: 32px !important; height: 32px !important; min-width: 32px !important; border-radius: 50% !important; border: 0 !important; background: transparent !important; color: #4a4a47 !important; display: inline-flex; align-items: center; justify-content: center; padding: 0 !important; }
+.mv-world .mv-btn:hover { background: #f0f0ee !important; }
+.mv-world .mv-send { display: inline-flex; width: 34px; height: 34px; border-radius: 50%; align-items: center; justify-content: center; background: #1a1a19; color: #fff; }
+.mv-world .mv-send-off { background: #e9e9e6; color: #fff; }
+
+/* 提示：按钮正上方的小黑条 */
+.mv-world .mv-tip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); white-space: nowrap; background: #1a1a19; color: #fff; font-size: 13px; padding: 5px 10px; border-radius: 8px; animation: mv-pop .22s ease-out both; }
+.mv-world .mv-key { color: #a9a9a5; margin-left: 4px; }
+
+/* 波形与计时 */
+.mv-world .mv-meter { display: inline-flex; align-items: center; gap: 12px; margin: 0 4px; }
+.mv-world .mv-wave { display: inline-flex; align-items: center; gap: 2.5px; height: 24px; width: 96px; justify-content: flex-end; }
+.mv-world .mv-bar { width: 3px; height: 2px; border-radius: 2px; background: #3a3a37; opacity: .7; }
+.mv-world .mv-wave .mv-bar { animation: mv-hush 1.4s ease-in-out infinite; }
+.mv-world .mv-wave-loud .mv-bar { opacity: 1; animation: mv-talk .7s ease-in-out infinite alternate; }
+.mv-world .mv-timer { font-size: 14px; color: #4a4a47; font-variant-numeric: tabular-nums; width: 34px; }
+.mv-world .mv-finishing { display: inline-flex; align-items: center; gap: 14px; font-size: 14px; color: #8a8a86; margin-right: 6px; }
+.mv-world .mv-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #dadad6; border-top-color: #4a4a47; animation: mv-spin .8s linear infinite; }
+
+/* 屏幕角落：章节、品牌（左上角留给播放器的步骤标题小圆点） */
+.mv-world .mv-chapter { position: absolute; left: 56px; top: 21px; font-size: 14px; font-weight: 600; color: #1a1a19; }
+.mv-world .mv-chapter-no { color: #8a8a86; font-weight: 500; margin-right: 8px; }
+.mv-world .mv-brand { position: absolute; right: 28px; top: 22px; font-size: 13px; color: #8a8a86; }
+
+/* ---------- 图标（细线，CSS mask） ---------- */
+.mv-world .mv-ic { display: inline-block; width: 18px; height: 18px; background: currentColor; -webkit-mask: var(--mv-svg) center / contain no-repeat; mask: var(--mv-svg) center / contain no-repeat; flex: none; }
+.mv-world .mv-chip .mv-ic { width: 15px; height: 15px; }
+.mv-world .mv-send .mv-ic { width: 17px; height: 17px; }
+.mv-world .mv-ic-mic { --mv-svg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='9' y='3' width='6' height='11' rx='3'/><path d='M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21'/></svg>"); }
+.mv-world .mv-ic-cloud { --mv-svg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M7 18.5h10a4 4 0 0 0 .4-7.98A6 6 0 0 0 5.8 10 4.3 4.3 0 0 0 7 18.5z'/></svg>"); }
+.mv-world .mv-ic-folder { --mv-svg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><rect x='3.5' y='5' width='17' height='14' rx='2.5'/><path d='M3.5 9.5h17'/></svg>"); }
+.mv-world .mv-ic-plus { --mv-svg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><path d='M12 5v14M5 12h14'/></svg>"); }
+.mv-world .mv-ic-x { --mv-svg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><path d='M7 7l10 10M17 7L7 17'/></svg>"); }
+.mv-world .mv-ic-check { --mv-svg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M5.5 12.5l4.5 4.5 8.5-9.5'/></svg>"); }
+.mv-world .mv-ic-up { --mv-svg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M12 19V5.5M6.5 11l5.5-5.5 5.5 5.5'/></svg>"); }
+.mv-world .mv-ic-chat { --mv-svg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M4.5 12a7.5 7.5 0 1 1 3.2 6.15L4.5 19.5l1.1-3.3A7.46 7.46 0 0 1 4.5 12z'/><path d='M9 11h6M9 14h4' stroke-linecap='round'/></svg>"); }
+.mv-world .mv-ic-down { --mv-svg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 10l5 5 5-5'/></svg>"); }
+
+/* ---------- 动画（引擎时钟采样，暂停一起停） ---------- */
+@keyframes mv-caret { 0% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes mv-blink { 0%, 100% { opacity: 1; } 50% { opacity: .15; } }
+@keyframes mv-hush { 0%, 100% { height: 2px; } 50% { height: 3px; } }
+@keyframes mv-talk { 0% { transform: scaleY(1); } 35% { transform: scaleY(.45); } 70% { transform: scaleY(1.1); } 100% { transform: scaleY(.7); } }
+@keyframes mv-pop { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes mv-spin { to { transform: rotate(360deg); } }
+/* 第 04 章“点进句子中间”的那个字：用 a 才能被点击，外观和正文一样 */
+.mv-world a.mv-pivot { color: inherit !important; text-decoration: none !important; font: inherit !important; cursor: text; }
