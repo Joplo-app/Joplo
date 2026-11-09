@@ -17,6 +17,7 @@ import type { Diagnostic } from './result.ts';
 import { schemaDiagnostics } from './schema-issues.ts';
 import { CONTENT_LOCALES, collectMessages, isContentLocale, nearestKey, pruneMessages } from './content-i18n.ts';
 import { PluginCompiler, type CompileOptions } from './plugins/compiler.ts';
+import { materialize, errorMessage } from './plugins/data.ts';
 export type { CompileOptions } from './plugins/compiler.ts';
 
 export type AuthoringProject = {
@@ -647,7 +648,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     diags.push(...schemaDiagnostics(out, parsed.error.issues, { limit: 20, rel }));
     return { project: null, diagnostics: diags };
   }
-  const project = pruneMessages(parsed.data);
+  let project = pruneMessages(parsed.data);
   // flow({ from }) 接力：初始状态 = 被接的场景最后一步之后的状态（路径、ui / data / inputs、导演层），再叠上本场景写的 state。
   // 链式接力按依赖顺序解析；成环或被接的场景回放失败时报错。
   if (pendingFrom.size) {
@@ -683,6 +684,15 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   if (mode === 'dev' && project.i18n) {
     const stale = localeDiagnostics(project, src, diags);
     project.i18n = { ...project.i18n, stale };
+  }
+  // A slot can fit on its own but exceed the public reader's limit once wrapped in
+  // scenes/scenarios/steps/ext. Validate that final depth before reporting success.
+  if (mode === 'publish') {
+    try { project = materialize(project); }
+    catch (e) {
+      err('PLUGIN_DATA_INVALID', `Published IR is not readable JSON data: ${errorMessage(e)}`, src.config.source ?? `${src.config.file}:1:1`);
+      return { project: null, diagnostics: diags };
+    }
   }
   return { project, diagnostics: diags };
 }

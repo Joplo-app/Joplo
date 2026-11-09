@@ -130,7 +130,7 @@ ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机�
 - `effect(effect, { roots, data, source, report })`：把 `pluginEffect(id, name, payload)` 降级为命名空间数据、`targets` 和 `references`。宿主把 targets 转成普通 shots、导演层与显式焦点；同一步多个效果按作者顺序合并。
 - `frame({ roots, scenes, state, previousState, data, previousData, position, resolveProps, report })`：宿主回放内核效果后，生成第 0 步及各步骤的完整快照。无效作者步骤仍由原有 replay/check 诊断，不能令编译崩溃。
 
-所有钩子的输入均为隔离的深冻结副本，不能污染后续步骤或其他插件。derive 后再次检查舞台内元素身份；frame 通过宿主注入的 resolveProps(node, previous?) 读取绑定值，无需依赖 core 实现。宿主先按属性描述符把四类钩子返回值物化成自己持有的数据，再校验和使用同一份数据；拒绝 getter/setter 和 toJSON 方法，不重复读取返回对象。node 的作者绑定转换为稳定标记。宿主在消费前检查返回值信封；先验证有限、无环、深度不超过 100 的 JSON，再验证插件 schema，最后才剥离创作信息。异步钩子/异步 schema 被拒绝且其 rejection 被接住。
+所有钩子的输入均为隔离的深冻结副本，不能污染后续步骤或其他插件。derive 后再次检查舞台内元素身份；frame 通过宿主注入的 resolveProps(node, previous?) 读取绑定值，无需依赖 core 实现。宿主先按属性描述符把四类钩子返回值物化成自己持有的数据，再校验和使用同一份数据；拒绝 getter/setter 和 toJSON 方法，不重复读取返回对象。node 的作者绑定转换为稳定标记。宿主在消费前检查返回值信封；先验证有限、无环、深度不超过 100 的 JSON，再验证插件 schema，最后才剥离创作信息。共享引用展开为独立副本，不复用输出子树；只缓存原对象的属性描述符，避免重复读取原始对象。深度从根 0 开始，按最终展开后的每条路径计算，包含原始值叶子；发布成功前还检查完整 IR（包括 scene/step/ext 外层）的深度。超过上限报 PLUGIN_DATA_INVALID，应压平数据或用字符串 id 表达关联，不能依赖共享对象绕过限制。异步钩子/异步 schema 被拒绝且其 rejection 被接住。
 
 插件写入槽位必须提供 `schemas.node` / `schemas.step`（兼容 zod 的 `safeParse`）；宿主验证最终写入值的对应 schema，并由 IR 信封校验确保是 JSON；frame 返回 undefined 时保留的 effect 数据也必须验证。发布清理只剥离内核来源元数据，不能再改动已验证的插件槽位字段。缺失/失败的 schema 报 `PLUGIN_DATA_INVALID`，钩子或 schema 抛错报 `PLUGIN_HOOK_FAILED`，未注册的效果报 `PLUGIN_EFFECT_UNKNOWN`。源码位置随诊断保留。发布 IR 不保存钩子、schema、技能、运行时路径。
 

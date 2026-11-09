@@ -2,8 +2,11 @@ import { BIND, NODE, isBind } from '@joplo-app/kit/node';
 /** Capture descriptors once; validation and consumers only see this host-owned, accessor-free copy. */
 export function materialize<T>(value: T, mode: 'hook' | 'authoring' | 'json' = 'hook'): T {
   const active = new Set<object>();
-  const completed = new Map<object, unknown>();
+  // Cache the source description, never an output subtree: each occurrence gets its
+  // own copy and is checked at its actual depth in the expanded JSON tree.
+  const captured = new Map<object, { array: boolean; descriptors: PropertyDescriptorMap }>();
   const walk = (v: unknown, depth: number): unknown => {
+    if (depth > 100) throw new Error('plugin data must have depth <= 100 after expanding shared references');
     if (v === null || typeof v === 'string' || typeof v === 'boolean') return v;
     if (v === undefined && mode !== 'json') return v;
     if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -12,27 +15,31 @@ export function materialize<T>(value: T, mode: 'hook' | 'authoring' | 'json' = '
       const binding = (v as unknown as Record<symbol, unknown>)[BIND];
       if (typeof binding === 'string') return Object.freeze({ [BIND]: binding });
     }
-    if (!v || typeof v !== 'object' || depth > 100 || active.has(v)) throw new Error('plugin data must be finite, acyclic data (depth <= 100)');
-    if (completed.has(v)) return completed.get(v);
-    if (!Array.isArray(v) && ![Object.prototype, null].includes(Object.getPrototypeOf(v))) throw new Error('plugin data must contain only plain JSON objects');
+    if (!v || typeof v !== 'object' || active.has(v)) throw new Error('plugin data must be finite, acyclic data (depth <= 100)');
+    let description = captured.get(v);
+    if (!description) {
+      const array = Array.isArray(v);
+      if (!array && ![Object.prototype, null].includes(Object.getPrototypeOf(v))) throw new Error('plugin data must contain only plain JSON objects');
+      description = { array, descriptors: Object.getOwnPropertyDescriptors(v) };
+      captured.set(v, description);
+    }
     active.add(v);
-    const descriptors = Object.getOwnPropertyDescriptors(v);
-    const out: any = Array.isArray(v) ? [] : {};
+    const { array, descriptors } = description;
+    const out: any = array ? [] : {};
     for (const key of Reflect.ownKeys(descriptors)) {
       const descriptor = (descriptors as Record<PropertyKey, PropertyDescriptor>)[key]!;
       if (!Object.hasOwn(descriptor, 'value')) throw new Error('plugin output accessors are not supported; return plain data');
-      if (Array.isArray(v) && key === 'length') continue;
+      if (array && key === 'length') continue;
       if (typeof key === 'symbol' && (mode !== 'authoring' || key !== NODE && key !== BIND)) throw new Error('plugin data cannot contain symbol keys');
       if (mode !== 'authoring' && !descriptor.enumerable) throw new Error('plugin data must use enumerable data properties');
-      if (Array.isArray(v) && (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key))) throw new Error('plugin arrays must contain only indexed data');
+      if (array && (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key))) throw new Error('plugin arrays must contain only indexed data');
       Object.defineProperty(out, key, { value: walk(descriptor.value, depth + 1), enumerable: descriptor.enumerable, configurable: true, writable: true });
     }
-    if (Array.isArray(v)) {
+    if (array) {
       const length = descriptors.length!.value as number;
       for (let i = 0; i < length; i++) if (!Object.hasOwn(out, i)) throw new Error('plugin data cannot contain sparse arrays');
     }
     active.delete(v);
-    completed.set(v, out);
     return out;
   };
   return walk(value, 0) as T;
