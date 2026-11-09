@@ -43,4 +43,4 @@ Keep credits and sources outside the animated object area. Render every chapter 
 - Whole-screen white/colour flashes over a still picture look like a stalled player; keep the picture moving under any fade.
 
 Common pitfall: For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, film-strip the chain, and verify playback before claiming it works
-<!-- joplo-skill 0.4.0 sha256:f07b4073923238d62578a5810f57c9253bbbb51f6fb02737d16fcca05115a889 -->
+<!-- joplo-skill 0.4.1 sha256:f07b4073923238d62578a5810f57c9253bbbb51f6fb02737d16fcca05115a889 -->

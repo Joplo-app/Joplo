@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/plugin-content",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "joplo": {
     "api": 2
@@ -23,6 +23,11 @@
   },
   "description": "Joplo first-party visual explainers, camera and motion",
   "license": "PolyForm-Shield-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joplo-app/Joplo.git",
+    "directory": "plugins/content"
+  },
   "engines": {
     "node": ">=22"
   },

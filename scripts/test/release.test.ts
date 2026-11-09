@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 // @ts-expect-error release script is an untyped ESM module
-import { checkWebBudget, checkSiteBudget, tarList } from '../release.mjs';
+import { checkWebBudget, checkSiteBudget, tarList, PACKAGES as RELEASE_PACKAGES, packageDir } from '../release.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const SCRIPT = path.join(ROOT, 'scripts/release.mjs');
@@ -230,5 +230,14 @@ describe('release:publish（先构建打包全部，再按依赖顺序发布 tar
     expect(verify).toHaveBeenCalledExactlyOnceWith('0.2.7');
     expect(bad.r.ok).toBe(false);
     expect(bad.logs.join('\n')).not.toContain('git tag v0.2.7');
+  });
+});
+
+// 0.4.0 发布事故：npm 校验 provenance 时要求 repository.url 与发布所在仓库一致，插件包没写，发了 kit 之后就停了。
+describe('every published package declares this repository (npm provenance)', () => {
+  test.each(RELEASE_PACKAGES)('%s', (name) => {
+    const dir = packageDir(name);
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    expect(pkg.repository).toEqual({ type: 'git', url: 'git+https://github.com/Joplo-app/Joplo.git', directory: path.relative(ROOT, dir).split(path.sep).join('/') });
   });
 });

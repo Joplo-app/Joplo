@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/plugin-alda",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "joplo": {
     "api": 2
@@ -22,6 +22,11 @@
   },
   "description": "Joplo optional text-authored background music and offline SoundFont audio rendering",
   "license": "PolyForm-Shield-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joplo-app/Joplo.git",
+    "directory": "plugins/alda"
+  },
   "engines": {
     "node": ">=22"
   },

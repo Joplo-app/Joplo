@@ -3,7 +3,7 @@ name: joplo-plugin-diagram
 description: "Use the Diagrams plugin in Joplo; read its entry, component recipes and recovery rules for this project."
 ---
 
-# Joplo plugin diagram: Diagrams 0.4.0
+# Joplo plugin diagram: Diagrams 0.4.1
 
 Author package: @joplo-app/plugin-diagram
 # Joplo diagrams: diagram
@@ -116,4 +116,4 @@ General engine contracts: npx joplo skill plugins
 - [patterns](./topics/patterns.md): Recipes and individual pitfalls
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.4.0 sha256:c0780ac1f62fc5de03576cde4144aa4eec3aa1bca67eec6b9ccc8a5fe8c285ab -->
+<!-- joplo-skill 0.4.1 sha256:d9e7cf4a786df289cbbfaf6d203a91062bb595fd913957388e3d88ec35635032 -->

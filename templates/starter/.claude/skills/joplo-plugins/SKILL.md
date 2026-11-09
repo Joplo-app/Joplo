@@ -7,15 +7,15 @@ description: Discover the plugins explicitly enabled in this Joplo project and r
 
 Source: config.plugins. Run joplo skill install after installing, adding or removing packages.
 
-- [ui](../joplo-plugin-ui/SKILL.md): Standard UI · 0.4.0 · @joplo-app/plugin-ui
+- [ui](../joplo-plugin-ui/SKILL.md): Standard UI · 0.4.1 · @joplo-app/plugin-ui
   - [ui/components](../joplo-plugin-ui/topics/components.md): Component props and author examples
   - [ui/patterns](../joplo-plugin-ui/topics/patterns.md): UI recipes and individual pitfalls
 
-- [diagram](../joplo-plugin-diagram/SKILL.md): Diagrams · 0.4.0 · @joplo-app/plugin-diagram
+- [diagram](../joplo-plugin-diagram/SKILL.md): Diagrams · 0.4.1 · @joplo-app/plugin-diagram
   - [diagram/patterns](../joplo-plugin-diagram/topics/patterns.md): Recipes and individual pitfalls
 
-- [content](../joplo-plugin-content/SKILL.md): Visual explainers · 0.4.0 · @joplo-app/plugin-content
+- [content](../joplo-plugin-content/SKILL.md): Visual explainers · 0.4.1 · @joplo-app/plugin-content
   - [content/patterns](../joplo-plugin-content/topics/patterns.md): Recipes and individual pitfalls
 
-- [alda](../joplo-plugin-alda/SKILL.md): Alda background music · 0.4.0 · @joplo-app/plugin-alda
-<!-- joplo-skill 0.4.0 sha256:28d93283189276f7a45b08181c4b9f9df282db25a671b98e34c768d8f4a34b64 -->
+- [alda](../joplo-plugin-alda/SKILL.md): Alda background music · 0.4.1 · @joplo-app/plugin-alda
+<!-- joplo-skill 0.4.1 sha256:39d84f32d22599431d898691a3bf615c9bc0f8bd9a17dcabc69868d149587f23 -->

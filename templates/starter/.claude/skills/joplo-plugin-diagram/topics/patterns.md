@@ -8,4 +8,4 @@ From check:
 
 From check:
 - DIAGRAM_UNGROUPED (info): Many nodes and no domain groups. Group them with <Diagram.Group label icon> so viewers see what belongs where.
-<!-- joplo-skill 0.4.0 sha256:c658cbafd142366f80950088f36f423e725b57190171a10296f89c98b515a2f4 -->
+<!-- joplo-skill 0.4.1 sha256:c658cbafd142366f80950088f36f423e725b57190171a10296f89c98b515a2f4 -->

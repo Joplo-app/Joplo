@@ -67,6 +67,9 @@ function version(root, v) {
   fs.writeFileSync(pluginVersion, JSON.stringify({ version: v }, null, 2) + '\n');
   }
   log(`✓ ${pkgs.map(([, p]) => p.name).join('、')} → ${v}`);
+  // 技能里写死的可选插件安装命令（npm install @joplo-app/plugin-3d@<版本>）与发布版本一致，否则照着装会配错版本
+  const guide = path.join(root, 'packages/core/src/guide.ts');
+  if (fs.existsSync(guide)) fs.writeFileSync(guide, fs.readFileSync(guide, 'utf8').replace(/(@joplo-app\/plugin-[a-z0-9-]+@)\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?/g, `$1${v}`));
   // 官方 Agent 技能带版本标记（D64）：随版本一起重新生成，scripts/test/skills.test.ts 保证与 skill install 逐字一致
   const skills = spawnSync(process.execPath, ['--import', 'tsx', path.join(REPO, 'scripts/build-skills.ts'), '--root', root], { cwd: REPO, encoding: 'utf8' });
   if (skills.status !== 0) die(`重新生成 skills/ 失败：${skills.stderr || skills.stdout}`);
