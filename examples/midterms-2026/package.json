@@ -1,0 +1,11 @@
+{
+  "name": "midterms-2026",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@joplo-app/kit": "workspace:*",
+    "@joplo-app/plugin-ui": "workspace:*",
+    "@joplo-app/plugin-diagram": "workspace:*",
+    "@joplo-app/plugin-content": "workspace:*"
+  }
+}

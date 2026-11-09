@@ -1,5 +1,5 @@
 import { $, and, layer, not } from '@joplo-app/kit';
-import { Alert, Badge, Button, Code, Divider, Grid, Group, Paper, Stack, Text, TextInput, Title } from '@joplo-app/kit/ui';
+import { Alert, Badge, Button, Code, Divider, Grid, Group, Paper, Stack, Text, TextInput, Title } from '@joplo-app/plugin-ui';
 
 export const modelInitial = () => ({
   model: false, modal: false, failed: false, revised: false, sent: false,

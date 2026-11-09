@@ -861,11 +861,11 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   const plug = splitPluginType(n.type);
   if (plug) {
     const spec = pluginSpec(nc.plugins, n.type);
-    if (!nc.plugins[plug.plugin]) err('UNKNOWN_PLUGIN', `<${n.type}> comes from plugin ${plug.plugin}, which is not enabled: add it to config({ plugins: [...] }) in joplo.config.ts (npx joplo skill plugins)`, at);
+    if (!nc.plugins[plug.plugin]) err('UNKNOWN_PLUGIN', `<${n.type}> comes from plugin ${plug.plugin}, which is not enabled: ${n.packageName ? `install ${n.packageName}; import plugin from ${JSON.stringify(n.packageName)}; ` : `install its author package; `}add plugin to config({ plugins: [plugin] }) in joplo.config.ts (npx joplo skill plugins)`, at);
     else if (!spec) err('UNKNOWN_COMPONENT', `Plugin ${plug.plugin} has no component ${plug.name} (available: ${Object.keys(nc.plugins[plug.plugin]!.components).join(', ')}; npx joplo skill ${plug.plugin})`, at);
     else if (spec.parent && parentType !== `${plug.plugin}:${spec.parent}`)
       err('PLUGIN_PARENT', `<${n.type}> must be written directly inside <${plug.plugin}:${spec.parent}> (npx joplo skill ${plug.plugin})`, at);
-  } else if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `Component <${n.type}> is not in the catalog (use Mantine component names; run joplo skill components to list them; use <Custom kind="…"> as a placeholder for missing components)`, at);
+  } else if (!KNOWN.has(n.type)) err('UNKNOWN_COMPONENT', `No enabled plugin declares <${n.type}>. Install a plugin that provides this element and list it in config.plugins; run joplo skill to discover the installed plugin guides`, at);
   const interactive = isInteractiveType(n.type, nc.plugins);
   if (interactive && typeof rawId !== 'string') err('MISSING_ID', `Interactive component <${n.type}> "${labelOf(n)}" requires an id for steps and selection`, at);
   const spec = pluginSpec(nc.plugins, n.type);

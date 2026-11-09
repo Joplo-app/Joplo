@@ -4,6 +4,3 @@ packages:
   - examples/*
 allowBuilds:
   esbuild: true
-minimumReleaseAgeExclude:
-  - '@joplo-app/core@0.2.10'
-  - '@joplo-app/kit@0.2.10'

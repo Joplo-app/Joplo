@@ -1,3 +1,5 @@
+import '../../../scripts/test/render-fixtures.ts';
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 发布站嵌入模式（?embed=1，云端嵌入契约）。不变量：
  * 1. 不带 embed=1（含 embed=0 / 空值 / 大小写不同）时发布站行为不变：仍是原来的首页，没有嵌入外壳；
@@ -9,8 +11,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, layer, option, page, shot } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, layer, option, page, shot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';

@@ -1,10 +1,11 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { config, feature, flow, option, page, set, $ } from '@joplo-app/kit';
+import { feature, flow, option, page, set, $ } from '@joplo-app/kit';
 import { definePlugin, pluginComponent } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { Button, Modal } from '@joplo-app/kit/ui';
+import { Button, Modal } from '@joplo-app/plugin-ui';
 import { compile, type AuthoringProject } from '../src/compile.ts';
 import { applyStep, initialState, stateAt, isNodeVisible, choicesOf } from '../src/player.ts';
 import { visibleIds } from '../src/focus.ts';
@@ -46,16 +47,7 @@ describe('P2 declaration-driven semantics',()=>{
   const p=definePlugin({id:'probe',title:'Probe',runtime:'/probe.js',components:{Item:{doc:'item',traits:{input:'typo'}}}} as any);
   expect(compile(source(h(pluginComponent(p,'Item')),[p]),'dev').diagnostics.map(d=>d.code)).toContain('PLUGIN_TRAITS_INVALID');
  });
- it('explains old bare names and gives a clear result for pre-migration public IR',()=>{
-  const r=compile(source(h('Button',{id:'go'})),'dev');
-  expect(r.diagnostics.find(d=>d.code==='PLUGIN_LEGACY_TYPE')?.message).toContain('ui:Button');
-  const project=compile(source(h(Button,{id:'go',unmodeled:true})),'publish').project!;
-  for(const s of Object.values(project.scenes)) s.root.type='Button';
-  delete project.plugins!.ui;
-  // Old shares carry their own renderer; a current diff must adapt or explicitly reject, never silently change semantics.
-  try { const old=readPublicProject(project); expect(Object.values(old.scenes)[0]!.root.type).toBe('ui:Button'); }
-  catch(e){expect(String(e)).toMatch(/incompatible.*ui|ui.*rebuild/i);}
- });
+
 });
 
 it('P2 core and rendering/playback hosts contain no component dispatch, including plugins directories',()=>{
@@ -67,15 +59,10 @@ it('P2 core and rendering/playback hosts contain no component dispatch, includin
  expect(hits).toEqual([]);
 });
 
-it('reports a real 237f0a6 public share as incompatible UI IR instead of pretending to compare',()=>{
- const old=JSON.parse(readFileSync(new URL('./fixtures/legacy-ui-publish.json',import.meta.url),'utf8'));
- expect(()=>readPublicProject(old)).toThrow(/incompatible.*ui.*rebuild/i);
- const current=compile(source(h(Button,{id:'go',unmodeled:true})),'publish').project!;
- expect(featureDiff(old,current)).toMatchObject({status:'incompatible',scenarios:[],reasons:['plugin-vocabulary: rebuild both versions with the current kit']});
-});
+
 
 it('component inventory and translations follow each enabled plugin declaration',async()=>{
- const {componentDetails,skillTopic}=await import('../src/guide.ts');
+ const {componentDetails,componentIndex}=await import('../src/guide.ts');
  const {localizeProject,collectMessages}=await import('../src/content-i18n.ts');
  const plugin=definePlugin({id:'probe',title:'Probe',runtime:'/probe.js',components:{Label:{doc:'only headline is displayed',traits:{text:['headline'],textPaths:[['columns','*','title']]},example:'<Label headline="Run"/>'}}});
  const r=compile(source(h(pluginComponent(plugin,'Label'),{id:'label',headline:'Run',enum:'Run',columns:[{title:'Run',color:'Run'}]}),[plugin]),'dev');
@@ -84,6 +71,6 @@ it('component inventory and translations follow each enabled plugin declaration'
  const node=localizeProject(p,'ja').scenes['f.a@/']!.root;
  expect(node.props).toEqual({headline:'実行',enum:'Run',columns:[{title:'実行',color:'Run'}]});
  expect(componentDetails(['Label'],[plugin])).toContain('<Label headline="Run"/>');
- const overview=skillTopic('components',null,[plugin]);
+ const overview=componentIndex([plugin]);
  expect(overview).toContain('probe:Label');expect(overview).not.toContain('- ui:Button:');
 });

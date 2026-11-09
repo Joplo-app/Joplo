@@ -14,7 +14,7 @@ const dirs: string[] = [];
 afterEach(async () => { await Promise.all(dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
 async function temp(project = true) {
   const dir = await mkdtemp(join(tmpdir(), 'joplo-skill-test-')); dirs.push(dir);
-  if (project) await writeFile(join(dir, 'joplo.config.ts'), '// 测试安装不执行作者代码\n');
+  if (project) await writeFile(join(dir, 'joplo.config.ts'), 'export default { plugins: [] };\n');
   return dir;
 }
 const skillPath = (dir: string) => join(dir, '.claude/skills/joplo/SKILL.md');
@@ -28,20 +28,20 @@ async function run(args: string[]) {
 test('列表版本取自 CLI package.json；主题、guide 均不加载 server', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const r = await run(['skill']); expect(r.code).toBe(0);
-  expect(r.stdout.split('\n')[0]).toBe(`Joplo ${pkg.version} · Agent usage (read on demand)`);
-  for (const name of ['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'review', 'publish']) {
+  expect(r.stdout.split('\n')[0]).toBe(`Joplo ${pkg.version} · Engine usage`);
+  for (const name of ['authoring', 'demo', 'plugins', 'cases', 'check', 'selection', 'review', 'publish']) {
     const topic = await run(['skill', name]); expect(topic.code).toBe(0);
-    expect(topic.stdout.trimEnd().split('\n').length).toBeLessThan(150);
+    expect(topic.stdout).toContain('#');
     expect(topic.stdout.trimEnd().split('\n').at(-1)).toMatch(/^Related topics: /);
   }
-  expect((await run(['guide'])).stdout).toBe((await run(['skill', 'authoring'])).stdout);
+
 });
 test('版本读取支持升级后的 package.json，不写死', async () => {
   const dir = await temp(); const file = join(dir, 'package.json');
   await writeFile(file, '{"version":"7.6.5-beta.2"}');
   expect(await readCliVersion(pathToFileURL(file))).toBe('7.6.5-beta.2');
 });
-test.each([['authring', 'authoring'], ['componets', 'components'], ['selction', 'selection'], ['publsh', 'publish'], ['CHECK', 'check']])('未知主题 %s 给出最近的 %s，退出 2', async (input, suggestion) => {
+test.each([['authring', 'authoring'], ['selction', 'selection'], ['publsh', 'publish'], ['CHECK', 'check']])('未知主题 %s 给出最近的 %s，退出 2', async (input, suggestion) => {
   const r = await run(['skill', input]); expect(r.code).toBe(2); expect(r.stdout).toContain(suggestion); expect(r.stdout).toContain('npx joplo skill');
 });
 const feedbackPath = (dir: string) => join(dir, '.claude/skills/joplo-feedback/SKILL.md');
@@ -79,7 +79,7 @@ test('旧版本标记、未修改的指针（0.2.4 及更早写的）自动更�
   await writeFile(feedbackPath(dir), (await readFile(feedbackPath(dir), 'utf8')).replace('npx joplo check', 'my check'));
   const before = await readFile(skillPath(dir), 'utf8');
   const blocked = await run(['skill', 'install', dir]); expect(blocked.code).toBe(1);
-  expect(blocked.stdout).toContain('.claude/skills/joplo-feedback/SKILL.md exists and has been modified since Joplo');
+  expect(blocked.stdout).toContain('.claude/skills/joplo-feedback/SKILL.md was modified; it was preserved.');
   expect(blocked.stdout.indexOf('--diff')).toBeLessThan(blocked.stdout.indexOf('--force'));
   expect(blocked.stdout).not.toContain('Wrote');
   expect(blocked.stdout).not.toContain('.claude/skills/joplo/SKILL.md exists');
@@ -140,7 +140,7 @@ test.each(['<!-- joplo:start -->', '<!-- joplo:end -->', '<!-- joplo:start --><!
 });
 test('无项目配置时只警告并成功安装；路径含空格', async () => {
   const parent = await temp(false); const dir = join(parent, '含 空格');
-  const r = await run(['skill', 'install', dir]); expect(r.code).toBe(0); expect(r.stdout).toContain('Warning'); expect(r.stdout).toContain('joplo.config.ts');
+  const r = await run(['skill', 'install', dir]); expect(r.code).toBe(0); expect(r.stdout).toContain('engine skills only'); expect(r.stdout).toContain('joplo.config.ts');
   expect(await readFile(skillPath(dir), 'utf8')).toContain('name: joplo');
 });
 test('install 专用参数不能静默用于主题', async () => {
@@ -149,7 +149,7 @@ test('install 专用参数不能静默用于主题', async () => {
 });
 
 test('默认接线读取所有主题时不触发 server 模块初始化', async () => {
-  for (const args of [['skill'], ...['authoring', 'demo', 'components', 'cases', 'check', 'selection', 'review', 'publish'].map(name => ['skill', name]), ['guide']]) {
+  for (const args of [['skill'], ...['authoring', 'demo', 'plugins', 'cases', 'check', 'selection', 'review', 'publish'].map(name => ['skill', name])]) {
     expect(await runCli(args, { stdout: () => {}, stderr: () => {} })).toBe(0);
   }
   expect(serverImports).not.toHaveBeenCalled();

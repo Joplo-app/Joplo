@@ -1,11 +1,13 @@
+import '../../../scripts/test/render-fixtures.ts';
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * <Image>：内嵌的图片（asset() 生成的 data:image/… URI）真正画出来，fit / position 生效；
  * 其他 src（网址、路径）不加载，仍画带 alt 的占位（发布站 CSP 不允许外部资源）。
  */
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../src/i18n/context';

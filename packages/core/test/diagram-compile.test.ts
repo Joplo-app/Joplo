@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { diagramStateAt } from '../../../plugins/diagram/src/state.ts';
 import { nodeData, frameData } from '../../../plugins/diagram/src/data.ts';
 /**
@@ -5,17 +6,17 @@ import { nodeData, frameData } from '../../../plugins/diagram/src/data.ts';
  * trace 扩展到分组 / 状态机 / 时序图、布局写进 IR（各步骤共用同一份坐标）、不用新功能的项目 IR 不变。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { $, config, feature, flow, layer, option, page, set, shot, trace, type Flow } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
+import { $, feature, flow, layer, option, page, set, shot, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, type AuthoringProject, type SceneNode } from '../src/index.ts';
-import { elkLayout } from '../src/node.ts';
+import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
-const D = ui.Diagram;
-const SM = ui.StateMachine;
-const Q = ui.Sequence;
+const D = uiDiagram.Diagram;
+const SM = uiDiagram.StateMachine;
+const Q = uiDiagram.Sequence;
 
 function build(tree: unknown, steps: (f: Flow) => Flow = (f) => f, opts: { layout?: boolean; state?: Record<string, unknown> } = {}) {
   const home = page({ title: 'P', layout: false }, h(ui.Text, { id: 'note' }, 'x'));
@@ -34,7 +35,7 @@ function build(tree: unknown, steps: (f: Flow) => Flow = (f) => f, opts: { layou
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
   };
-  return compile(src, 'dev', opts.layout === false ? {} : { layout: elkLayout });
+  return compile(src, 'dev', { pluginOptions: { diagram: { layout: opts.layout === false ? undefined : elkLayout } } });
 }
 const codes = (r: ReturnType<typeof build>, sev = 'error') => r.diagnostics.filter((d) => d.severity === sev).map((d) => d.code);
 const msgs = (r: ReturnType<typeof build>, code: string) => r.diagnostics.filter((d) => d.code === code).map((d) => d.message).join('\n');

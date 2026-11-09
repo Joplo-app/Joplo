@@ -1,6 +1,5 @@
 import { ElementTraitsSchema } from './traits.ts';
 import type { ElementTraits } from '@joplo-app/kit/plugin';
-import { Trace as LegacyTraceSchema } from '@joplo-app/plugin-diagram/schema';
 /**
  * Joplo IR（schemaVersion 2）：由 TSX 源文件编译得到的中间表示，不是作者直接编辑的格式。
  * 权威源是项目文件夹里的 TSX/TS 文件（ADR-0002）；渲染器、播放器、校验器、构建只消费这里的 IR。
@@ -180,10 +179,8 @@ export const MediaSnapshot = z.record(z.string(), z.strictObject({
 
 export const Step = z.strictObject({
   media: MediaSnapshot.optional(),
-  /** 历史 IR 兼容输入；当前编译器不生成。 */
-  traces: z.array(LegacyTraceSchema).optional(),
   id: Qid,
-  /** Author identity, unique within a scenario. id remains the legacy playback address. */
+  /** Author identity, unique within a scenario. id remains the playback address. */
   key: Id.optional(),
   kind: z.enum(['user', 'system', 'card']),
   action: Action,

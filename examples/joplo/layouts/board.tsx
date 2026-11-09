@@ -1,5 +1,5 @@
 import { layout, Outlet, Slot } from '@joplo-app/kit';
-import { AppShell, Burger, Group, Title } from '@joplo-app/kit/ui';
+import { AppShell, Burger, Group, Title } from '@joplo-app/plugin-ui';
 
 /** Joplo 的外壳：左上角品牌，顶栏其余位置由页面决定（首页为空，演示页放面包屑和设备切换）。 */
 export default layout(

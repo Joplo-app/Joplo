@@ -1,7 +1,8 @@
+import { fixtureConfig as config } from '../../../../scripts/test/fixtures.ts';
 /** 评审版与评审清单的测试夹具：两个功能（f 有 A/B 两个方案，选定 A；g 没有选定），带功能级与方案级规则、AI 假设、问题、备注、取舍。 */
-import { config, explain, feature, flow, option, page, question, rule, uses } from '@joplo-app/kit';
+import { explain, feature, flow, option, page, question, rule, uses } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import * as ui from '@joplo-app/kit/ui';
+import * as ui from '@joplo-app/plugin-ui';
 import type { AuthoringProject } from '../../src/index.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });

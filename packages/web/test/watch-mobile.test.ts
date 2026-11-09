@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 手机上像看视频一样看分享（examples/joplo mobile_watch，已确认）：
  * - 舞台按设计尺寸（1280×800）整体等比缩放，像视频一样留黑边，不按手机宽度重新排版；
@@ -5,8 +6,8 @@
  * - 自动播放时一个场景播完接着播下一个（按选定方案的场景顺序），最后一个播完停下；手动一步步看时不自动跳。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';

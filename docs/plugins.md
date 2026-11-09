@@ -1,6 +1,6 @@
 # Joplo 插件架构：纯粹的引擎 + 可插拔的内容形态（D87）
 
-> 状态：阶段 0、阶段 1-A/B/C/D 与阶段 2 已实现（阶段 2 字段与边界见第 13 节）：v1 叶子组件兼容；v2 编译钩子、效果快照、元素特性与 React/容器运行时；第一方 `plugins/diagram` 默认启用。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节，通用属性、插件主题与讲解内容见第 12 节。
+> 状态：阶段 0、阶段 1-A/B/C/D 与阶段 2 已实现（阶段 2 字段与边界见第 13 节）：API v2 编译钩子、效果快照、元素特性与 React/容器运行时；D89 起引擎不隐式启用任何插件，标准库由版本化 starter 显式声明。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节，通用属性、插件主题与讲解内容见第 12 节。
 > 目标形态：Joplo 只是**构建与调度引擎**，负责把不同形态的内容串成一个可播放、可评审、可发布的作品；
 > UI 组件、Diagram、Canvas、3D、Alda BGM、朗读供应商、主题……都是插件。
 
@@ -34,8 +34,8 @@
 
 | 扩展点 | 运行在 | 作用 | 现有的例子（迁移后由插件提供） | v1 |
 |---|---|---|---|---|
-| A 词汇 | Node（创作） | JSX 标记、效果工厂（`trace()`、`camera()`、`bgm.play()`）、属性说明 | `@joplo-app/kit/ui` 的组件、`trace`、`camera` | ✓ 组件标记 |
-| B 技能 | Node | 给 Agent 读的用法、常见坑 | `skill components / diagram / content` | ✓ |
+| A 词汇 | Node（创作） | JSX 标记、效果工厂（`trace()`、`camera()`、`bgm.play()`）、属性说明 | `@joplo-app/plugin-ui` 的组件、`trace`、`camera` | ✓ 组件标记 |
+| B 技能 | Node | 给 Agent 读的用法、常见坑 | `skill ui/components / diagram / content` | ✓ |
 | C 元素特性（数据） | IR | 可操作、接收输入值、门控可见（`opened`）、不言自明、只能在某父组件里 | `INTERACTIVE_TYPES`、`VALUE_TYPES`、`GATED_CONTAINERS` | 部分（可操作、父组件） |
 | D 编译钩子 | Node，编译期 | 校验与规范化节点、派生数据（布局）、生成 id、诊断 | ELK 布局、连线 id `a->b`、Menu 抄 `opened`、Image 检查 | ✗ |
 | E 效果降级 | Node，编译期 | 插件效果 → 内核原语（状态写入、镜头目标、每步派生数据、媒体事件）+ 校验 | `trace()` → `step.traces` → 每步状态；`camera()` → `ui.__camera` + 导演换层 | ✗ |
@@ -89,7 +89,7 @@ joplo-plugin-x/
 | 0（本版） | 叶子组件插件：清单、标记、技能汇总、看板载入、发布站内联、可操作特性 | `scene3d` + 智能家居示例 | 已完成；第三方能写 3D 一类的叶子组件 |
 | 1 | 契约 v2：容器组合、元素特性补全（输入值、门控、取景）、编译钩子、效果降级、通用属性、媒体轨道、本机能力、React 写法与共享依赖 | 把 **Diagram**（编译期布局、trace 降级）、**Canvas**（容器、camera 降级、motion）、**Alda BGM**（本机能力 + 媒体轨道）做成仓库内的插件 | 三者从 core 移出，示例与测试照常通过 |
 | 2 | 标准库：内置 UI 词汇按族（布局、排版、表单、浮层、导航、数据、AI 交互、设备外框、HTML 兜底）改成第一方插件，一律带命名空间（`ui:Button`），经同一个注册表接入；`COMPONENT_TYPES` / `IMPL` 由注册表生成；旧裸名给改写提示 | 守护测试：core、web 渲染宿主里不出现组件名 | 内核零组件名 |
-| 3 | 分发与生态：标准库作为 `joplo` 的默认依赖发布；插件模板（`npx joplo plugin init`）；私有标记与分享检查；第三方插件文档 | 一个仓库外的插件包 | 社区可以独立发布插件 |
+| 3 | 分发与生态：标准库由 starter 模板显式安装和启用；插件模板（`npx joplo plugin init`）；私有标记与分享检查；第三方插件文档 | 一个仓库外的插件包 | 社区可以独立发布插件 |
 
 阶段 1 用三个真实案例一起逼出接口，不先设计一个“通用插件框架”再找用例；阶段 2 只是搬家，行为不变。
 
@@ -97,7 +97,7 @@ joplo-plugin-x/
 
 1. **信任模型**：第三方运行时与 Joplo 同页面运行，像 npm 依赖一样信任；必须在 `config({ plugins })` 里显式启用，分享时列出用了哪些插件。出现插件市场、陌生作者时再评估沙箱 iframe。
 2. **命名**：标准库也一律带命名空间（`ui:Button`、`diagram:Diagram`、HTML 兜底标签归入一个第一方插件）。作者在 TSX 里照常写 `<Button>`，类型名由标记决定，命名空间只出现在 IR、check 信息与检查抽屉里。已发布的分享自带当时的运行时，不受影响；迁移时编译器对旧裸名给出改写提示。
-3. **标准库默认启用**：`joplo init` 的体验不变；进阶用户可以在 config 里关掉不需要的。
+3. **标准库归模板**（D89）：starter 显式安装并启用 ui、diagram、content、alda；引擎无默认插件。作者可同时删去 config 项和依赖，再运行 skill install 同步指南。
 4. **私有插件（工作假设，待确认）**：内容可以公开，问题只在插件编译后的代码会随站点发布。默认不拦截；插件标了 `private: true` 时，`share` 公开分享前提示一次并要求确认。
 
 ## 8. 代价与重新评估的条件
@@ -118,8 +118,8 @@ joplo-plugin-x/
 
 ## 10. 阶段 1-A：契约 v2 与第一方 diagram 插件（已实现）
 
-`plugins/diagram` 是可独立发布的 `@joplo-app/plugin-diagram`，与内核统一为 0.2.17，默认启用。
-`@joplo-app/kit/ui` 的作者标记仍可导入，IR 类型改成 `diagram:Diagram`、`diagram:StateMachine`、`diagram:Sequence` 及其子组件；`@joplo-app/kit` 的 `trace` 保留兼容标记工厂，与插件效果工厂产生相同信封；语义仍归插件，kit 不反向依赖插件。
+`plugins/diagram` 是可独立发布的 `@joplo-app/plugin-diagram`，与内核统一版本，由项目 config.plugins 显式启用。
+`@joplo-app/plugin-ui` 的作者标记仍可导入，IR 类型改成 `diagram:Diagram`、`diagram:StateMachine`、`diagram:Sequence` 及其子组件；`@joplo-app/kit` 的 `trace` 保留兼容标记工厂，与插件效果工厂产生相同信封；语义仍归插件，kit 不反向依赖插件。
 ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机转换、绘制实现、diagram 技能和组件提示均归该包所有。Canvas、UI 族和媒体扩展不在 1-A 的范围内。
 
 ### 编译契约
@@ -136,7 +136,7 @@ ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机�
 插件写入槽位必须提供 `schemas.node` / `schemas.step`（兼容 zod 的 `safeParse`）；宿主验证最终写入值的对应 schema，并由 IR 信封校验确保是 JSON；frame 返回 undefined 时保留的 effect 数据也必须验证。发布清理只剥离内核来源元数据，不能再改动已验证的插件槽位字段。缺失/失败的 schema 报 `PLUGIN_DATA_INVALID`，钩子或 schema 抛错报 `PLUGIN_HOOK_FAILED`，未注册的效果报 `PLUGIN_EFFECT_UNKNOWN`。源码位置随诊断保留。发布 IR 不保存钩子、schema、技能、运行时路径。
 
 元素声明新增 `needsId` 与 `selfEvident`：编译/检查验证作者 id，焦点系统读取同一份 IR 声明，避免为自行表现变化的内容叠加 reveal。
-旧裸类型或旧 step.traces 在 check 时得到 `PLUGIN_LEGACY_TYPE` 重编译提示；历史 traces 仅保留为输入兼容，以便 feature-diff 比较旧发布物。新编译产物不生成顶层 traces 或 layout。
+D89 起不保留旧裸类型、step.traces 或重编译适配分支；图表状态只通过插件命名空间快照进入当前 IR。
 
 ### IR 数据流
 
@@ -157,7 +157,7 @@ ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机�
 ### React、容器与共享依赖
 
 v2 运行时组件选择 `{ mount }` 或 `{ react: ({ ctx }) => … }`。React 组件置于宿主 React 树中，拥有错误边界；`ctx.renderChildren()` 由宿主渲染子元素，传 `nodes, container` 时使用 portal。
-第一方运行时随宿主预构建，仍经相同注册表和 PluginHost；第三方运行时在发布时生成共享模块代理，并延迟到宿主的 React / ReactDOM / JSX runtime 就绪后求值。看板用 Vite dedupe 保证同一 React。v1 的 mount 运行时继续兼容。
+第一方与第三方运行时均按显式项目配置载入，通过同一注册表和 PluginHost。发布时生成共享模块代理，延迟到宿主 React / ReactDOM / JSX runtime 就绪后求值；看板用 Vite dedupe 保证同一 React。仅接纳 API v2。
 
 浏览器插件负责绘制/动画和 `ctx.click`，不推进业务状态。`stateAt`、`explainClick`、`focusAt` 和导演不调用插件代码。截图/视频的 `frame.animate=false`、资产等待 `ctx.hold()` 与逐段出现机制保留。
 
@@ -174,7 +174,7 @@ diagram 的独立包交付已完成；阶段 1 的其他扩展点、其他第一
 
 ### P1-A review 修正：发布、投影与历史输入
 
-- diagram 提供 build、dist、声明与 publishConfig，纳入 release 的七包集合：kit → plugin-diagram → core → web → server → cli → joplo。core 使用正式包入口读取 catalog/guide；插件没有指向 core/web 源码的跨包相对导入。所有 Node 包沿用标准 tsconfig.build 与 build-package.mjs。
+- diagram 提供 build、dist、声明与 publishConfig，纳入 release 的七包集合：kit → plugin-diagram → core → web → server → cli → joplo。catalog/guide 仅由项目插件清单和技能命令读取，core 不导入标准插件；插件没有指向 core/web 源码的跨包相对导入。所有 Node 包沿用标准 tsconfig.build 与 build-package.mjs。
 - 第一方浏览器代码通过 @joplo-app/kit/renderer 使用宿主注册的共享渲染服务，通过 @joplo-app/kit/renderer-style 使用纯样式常量。服务在调用时解析，避免模块初始化循环；业务状态仍由内核推进，插件只读快照。
 - 第三方 React 桥接使用 web 包交付的 shared-modules.json 导出表，生产安装不需要从 web 的 devDependencies require React。导出表与当前宿主版本由测试对齐。共享模块代理优先于 Vite 的普通包解析，项目或插件实际安装 React 时也不会打入第二份实例；测试同时覆盖有/无 React、源码/预构建 web。
 - 插件通过 data.node.text / data.step.text 声明文本路径（分段数组，* 代表对象值/数组项），普通 id、枚举、引用不会被盲翻。
@@ -185,7 +185,7 @@ diagram 的独立包交付已完成；阶段 1 的其他扩展点、其他第一
 
 ## 11. 阶段 1-B：媒体轨道与本机资源（已实现）
 
-第一方 `@joplo-app/plugin-alda` 与其他七包同版本，**不是标准默认插件**。作者安装后在 `config.plugins` 写 `alda(scores)`；`scores` 是项目 `music.ts` 中的命名文本字符串，步骤通过 `music.play(name, { fadeMs, loop, volume })` / `music.stop({ fadeMs })` 使用。技能正文归插件 `src/guide.ts`，在启用它的项目中读取 `joplo skill alda`。`examples/smart-home-3d` 的三个场景各自第一步播放，`done` 所在步骤淡出。
+第一方 `@joplo-app/plugin-alda` 与其余九包同版本，starter 显式启用 `alda({})`，没有音轨时不生成资源。作者安装后在 `config.plugins` 写 `alda(scores)`；`scores` 是项目 `music.ts` 中的命名文本字符串，步骤通过 `music.play(name, { fadeMs, loop, volume })` / `music.stop({ fadeMs })` 使用。技能正文归插件 `src/guide.ts`，在启用它的项目中读取 `joplo skill alda`。`examples/smart-home-3d` 的三个场景各自第一步播放，`done` 所在步骤淡出。
 
 ### Node 本机能力
 
@@ -239,7 +239,7 @@ Alda 的 MIDI 解析、节奏/音高、近似 GM 乐器音色与 WebAudio 振荡
 
 ## 12. 阶段 1-C：讲解内容、通用属性与插件主题（已实现）
 
-`@joplo-app/plugin-content` 是默认启用的第一方插件，版本与其他八包一致。直接导入时在项目依赖声明该包；不重复加入 `config.plugins`。作者从它导入 `Canvas / camera`，从 kit 导入通用 `flow / patch / narrate / hold`。IR 类型为 `content:Canvas`，主题为 `content:studio`；技能正文在 `plugins/content/src/guide.ts`，`joplo skill content` 通过标准技能路由读取。PR #35 **未合并**：仅读取 8284901、0fcb8f5 及远端分支最终内容，示例仅调整导入和主题配置。
+`@joplo-app/plugin-content` 是第一方插件，版本与其余九包一致。项目必须在依赖中声明并在 `config.plugins` 显式启用；starter 已包含这两项。作者从它导入 `Canvas / camera`，从 kit 导入通用 `flow / patch / narrate / hold`。IR 类型为 `content:Canvas`，主题为 `content:studio`；技能正文在 `plugins/content/src/guide.ts`，`joplo skill content` 从当前项目已启用插件的技能元数据读取。PR #35 **未合并**：仅读取 8284901、0fcb8f5 及远端分支最终内容，示例仅调整导入和主题配置。
 
 ### 通用属性与布局观察
 
@@ -297,11 +297,11 @@ content 的 camera 工厂产生插件效果信封，插件校验 `CAMERA_UNKNOWN
 - 本阶段保持原示例视觉和内容，未重新设计素材或叙事。技能沉淀：同物体贯穿章节、镜头与 FLIP 同步、screen 覆盖层、无高度容器恢复、静态动画取消、接力在快照前解析、分镜与实际播放分别验证、示意数字与事实来源分开。
 - 通用属性当前只接收字面量；插件观察器是可信的 npm 绘制代码，与页面同域，不是沙箱。音乐视频混音、逐词旁白同步、素材剪辑与地图组件仍不在本阶段范围内。
 
-## 13. 阶段 2：默认 UI 插件与无组件词汇内核（D87）
+## 13. 阶段 2：UI 插件与无组件词汇内核（D87）
 
-标准 UI 与 HTML 兜底由 `@joplo-app/plugin-ui` 提供，与其他九包统一版本，默认启用。作者仍从 `@joplo-app/kit/ui` 导入并写 `<Button>`；kit 的兼容标记产生 `ui:Button`，已有命名空间标记保持原样。HTML 直接写 `<div>`，由启用插件的 `intrinsic` 声明编译为 `ui:div`。HTML 与 UI 共用 `ui:` 命名空间，不另设隐式内置词汇。`Custom`、`#text`、`#fragment`、Slot/Outlet 展开和通用 Joplo 属性仍归内核。
+标准 UI 与 HTML 兜底由 `@joplo-app/plugin-ui` 提供，与其他九包统一版本，由 starter 显式启用。作者从 `@joplo-app/plugin-ui` 直接导入并写 `<Button>`，标记产生 `ui:Button`；kit 不再提供组件转发。HTML 直接写 `<div>`，由启用插件的 `intrinsic` 声明编译为 `ui:div`。HTML 与 UI 共用 `ui:` 命名空间，不另设隐式内置词汇。`Custom`、`#text`、`#fragment`、Slot/Outlet 展开和通用 Joplo 属性仍归内核。
 
-UI 的目录、属性提示、示例、资源检查和 React 实现在 `plugins/ui/src`。`joplo components`、`joplo components <名称>` 和 `joplo skill components` 从当前项目启用插件的清单生成；无项目时使用默认插件。名称可用唯一的短名或完整命名空间；短名冲突时使用完整名称。组件示例保持作者 TSX 写法，不能把 IR 类型名直接当成 JSX 标签。`catalogFamily` 只控制技能目录中复合家族的折叠，详情命令仍展开所有子组件。
+UI 的目录、属性提示、示例、资源检查和 React 实现在 `plugins/ui/src`。`joplo components` 与 `joplo components <名称>` 从当前项目启用插件的清单生成；`joplo skill ui/components` 提供 UI 主题，无项目时没有插件目录。名称可用唯一的短名或完整命名空间；短名冲突时使用完整名称。组件示例保持作者 TSX 写法，不能把 IR 类型名直接当成 JSX 标签。`catalogFamily` 只控制技能目录中复合家族的折叠，详情命令仍展开所有子组件。
 
 ### 数据声明与消费者
 
@@ -329,11 +329,11 @@ UI 的目录、属性提示、示例、资源检查和 React 实现在 `plugins/
 
 ### 历史输入、浏览器边界与发布
 
-- `check` 对旧 UI 裸名给 `PLUGIN_LEGACY_TYPE` 和目标 `ui:*` 提示。真实 `237f0a6` 发布 IR 固定为历史测试夹具；新 feature-diff 明确返回不兼容，要求用当前 kit 重建两边。旧分享继续使用随发布物携带的旧运行时；不让新播放器猜测缺失的语义数据。
+- D89 删除旧 UI 裸名改写提示及旧 reader 夹具；只接纳当前插件声明与 IR 契约。不让播放器猜测缺失语义，不改已有静态发布物。
 - P2-11 已修：组件词汇守护递归扫描 core、渲染和播放宿主，包含 `plugins/` 子目录。只有精确的作者技能正文文件作为文档例外；不再豁免整个目录。AST 守护检查组件类型字面量，避免把几何 `Box` 类型、英文动词或播放控制栏的同名控件误认为内容词汇。
 - 另一守护从浏览器入口和所有第一方运行时追踪可执行 import、re-export 和字面量动态 import 的传递依赖；类型引用被擦除。禁止编译器、插件创作入口、技能、历史适配器、本机能力和布局/状态计算模块进入这张图。Diagram 的路径采样已从布局模块拆到纯绘图 geometry 模块。
 - web 使用 `@joplo-app/core/runtime`。发布站既有 core-lite 别名同时覆盖该入口，避免带入看板用的运行时 schema。UI 与其他第一方运行时经同一个注册表和 PluginHost，React 继续共享；子树数据按需物化，避免每个 UI 节点重复展开所有后代。
-- 十包 release/version/pack/smoke 覆盖 plugin-ui 的 author/runtime/catalog/guide 出口，默认 init 无需额外配置。版本元数据读取自身 version.json，发布脚本同步更新；不依赖工作区文件或作者机器路径。smoke 会直接导入 UI runtime；其 react-dom 属于正式运行依赖，不能仅靠开发依赖或预构建网页掩盖缺包。
+- 十包 release/version/pack/smoke 覆盖 plugin-ui 的 author/runtime/catalog/guide 出口，starter 的 config.plugins 已显式配置全部标准插件。版本元数据读取自身 version.json，发布脚本同步更新；不依赖工作区文件或作者机器路径。smoke 会直接导入 UI runtime；其 react-dom 属于正式运行依赖，不能仅靠开发依赖或预构建网页掩盖缺包。
 
 ### Cordis 的参考价值（本阶段不引入依赖）
 
@@ -407,3 +407,38 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 `clock` 的子字段：`timeMs` 为累计逻辑时间、`elapsedMs` 为当前脚本步骤锚点后的逻辑偏移、`rawMs` 为同一次积分得到的未缩放经过量（用于不随倍速变化的等待）、`running/paused/speed` 为调度状态；都由控制器写、宿主/插件/媒体读，冻结且不序列化。`gesture.action` 是冻结的动作数据副本，`gesture.progress` 为同一时钟产生的 0–1 进度。
 
 新增诊断：`FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID`、`PLUGIN_ACTION_INVALID`、`ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID`。按对应源码目标、字段或效果修复后重新 check；不要用运行时回调绕过编译校验。
+
+
+## 15. D89：纯引擎、插件技能与 GitHub 模板
+
+生产依赖图不再让 kit/core/CLI/server/web 导入标准插件。core 只遍历 config.plugins；浏览器宿主按项目给出的 runtime URL 载入，并等待所需运行时完成后提交首个 IR。源码开发直接由 Vite 提供模块；npm 的预构建看板先将运行时及其依赖打包为 ES module，用共享模块代理引用宿主同一份 React，避免直接把 CommonJS 入口发给浏览器。发布站把这些运行时与共享 React 装配进静态 HTML，file:// 不依赖网络。模板默认带上标准库是作者项目的选择，不是引擎的隐式行为。
+
+官方作者入口：UI/HTML 标记从 `@joplo-app/plugin-ui` 导入，diagram 标记和 trace 从 `@joplo-app/plugin-diagram` 导入，Canvas/camera 从 `@joplo-app/plugin-content` 导入，music 从 `@joplo-app/plugin-alda` 导入。`Custom`、Slot/Outlet、Fragment、故事和调度 API 留在 kit。配置、依赖与导入必须同时成立；UNKNOWN_PLUGIN 会用标记上的包来源给出安装/import/config 修法。
+
+引擎技能正文不含插件组件名，守护从插件清单动态取词。原组件说明、示例和常见坑移到对应插件；引擎正文保留全部通用经验和 Required 反馈监听。入口保持短路由，主题可以完整展开，数量不限。`joplo skill <id>/<topic>` 和项目安装后的 Markdown 都读取同一份插件元数据。
+
+### 新增数据的端到端流向
+
+| 字段 / 文件 | 写入点 → 存储 | 读取点 → 消费者 |
+| --- | --- | --- |
+| PluginDef.packageName | 插件 definePlugin 清单 → Node 内存 | pluginComponent 转入作者标记；技能索引显示准确安装包。不会写入播放 IR |
+| ComponentMarker.packageName / JNode.packageName | component / JSX createNode → 作者树 | 编译器缺插件诊断给出包名/import/config 修法；转换 SceneNode 时剥离 |
+| PluginDef.skillTopics[key].description/body | 插件 guide.ts → 插件清单 | CLI skill 解析 id/topic；install 写入口链接、主题与总索引；不进入 IR 或 runtime |
+| CompileOptions.pluginOptions[id] | 编译调用者 → 本次编译上下文 | 仅对应插件读取自己的编译选项；diagram 在插件内选择 ELK，测试可注入 layout，宿主不懂算法 |
+| init --template | CLI 参数 → parseTemplate / loadTemplate 的来源结构 | 本地读取或 GitHub tarball 下载；限制体积、文件数、路径、链接；完整验证后 renderTemplate 与事务写入目标 |
+| GITHUB_TOKEN / gh auth token | 用户环境/已登录 CLI → 本次请求内存 | GitHub API Authorization；跟随到 codeload 时不带头；文件、日志、输出中不保存令牌 |
+| templates/starter/* | 仓库模板 → release tag tarball / 本地目录 | init 选择 CLI 版本 tag，替换版本/包名/项目名占位符；npm 安装后作者 config 显式加载四个插件 |
+| templates/starter/.claude/skills/* | skills:build 显式读取官方插件 → 模板版本化技能 | init 尚未安装依赖时按 D64 安装这些说明；随后 skill install 从真实 config 重新同步 |
+| .claude/skills/joplo/topics/*.md | core guide 模板 → skillFiles 带 SHA 的文件 | Agent 直接读相对链接，或 CLI skill 读取同源主题 |
+| .claude/skills/joplo-plugin-<id>/** 与 joplo-plugins/SKILL.md | config.plugins → pluginSkillFiles → 带 SHA 的 Markdown | Agent 读取组件技能/子主题；再次 install 对照哈希保护用户修改 |
+| .claude/skills/.joplo-plugins.json | install 成功事务 → format:1 + 自有文件路径列表 | 后续 install 计算过期插件文件；仅删除未修改文件，用户编辑导致整批停止；--diff 展示，--force 才替换/删除 |
+| ProjectSlot.runtimeModules / runtime URL | 预构建 dev 的本次编译 → 通用 bundlePluginRuntimes(module) → 内存 Map，URL 含内容哈希 | 项目 runtime HTTP 端点返回 JS → 浏览器动态 import/default runtime 注册；无磁盘文件，不进 IR；源码更新重新打包，删除项目释放 Map |
+| 插件运行时 Promise / revision | loadPluginRuntimes(urls) → 当前 URL 的 Promise 缓存 | dev-client 首载/HMR 等待后提交最新 revision，避免插件未就绪时出现占位画面 |
+
+### 删除范围与恢复
+
+删除 guide/review 旧命令别名、kit/ui 转发与 kit.trace、core 的 standard-catalog 和 legacy 适配器、web 内置 standard 注册、diagram legacy 适配器、旧裸类型/旧 IR 的专门重编译提示、Step.traces、API v1 接纳、仅证明旧 reader 行为的 fixture 与测试依赖。缺插件报明确错误，不能靠兼容分支悄悄启用；所有仓库示例已改为显式 config 和依赖。
+
+这不是数据库迁移，不改用户凭证、分享可见性、评审权限或已有静态站。格式不明、无 runtime 能力标记等输入仍失败关闭；这些是数据完整性边界，不能当成兼容代码一起删。技能 SHA 保护与旧生成文件自动更新也保留，承担 D64 的编辑保护契约。
+
+模板错误应先修来源或用 `--template <本地路径>` 重试。依赖未安装时可先读模板技能；完成 npm install 后必须运行 skill install 和 check，不能把“模板复制成功”当成插件加载成功。插件技能删改保护触发时先读 --diff；不要用 --force 掩盖用户修改。

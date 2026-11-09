@@ -158,3 +158,10 @@ npm deprecate '<old-package>@<range>' 'Use the corresponding @joplo-app package.
 ```
 
 这是添加弃用提示，不是删除版本。需要 2FA 时，由维护者在自己的终端执行弃用命令并完成认证。
+
+
+### 版本化 starter 模板（D89）
+
+每个正式发布 tag 必须包含 `templates/starter/`，包括 package/config、示例、引擎版本占位符和四个插件的生成技能。`release:version` 后运行 `pnpm skills:build --check` 并一起提交；Release workflow 在 tag 提交上检查模板关键文件存在，再发布 npm。已发布 CLI 默认下载该 tag 的模板，因此不能先发布包、后补模板，也不能移动 tag 修补。
+
+`release:smoke` 固定使用仓库本地 `--template templates/starter`，不下载 GitHub 模板；在仓库外只安装 tarball，验证四个插件的精确版本和实际技能同步。另从安装后的技能文件构造 ui + diagram + content 演示，check 通过后用真实 Chromium 打开 dev，再在禁用网络的 file:// 中前进/回退验证发布站。测试驱动使用工作区 Playwright，不把它安装到用户项目；CI 先安装 Chromium，本地可用 `pnpm --filter @joplo-app/server exec playwright install chromium` 准备。下载、私有令牌、解压失败与路径穿越由 CLI 单元测试中的内存 tarball 覆盖。

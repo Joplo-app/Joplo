@@ -1,11 +1,12 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { config, feature, flow, option, page, trace } from '@joplo-app/kit';
+import { feature, flow, option, page } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { definePlugin, pluginComponent, pluginEffect } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { Diagram } from '@joplo-app/kit/ui';
+import { Diagram } from '@joplo-app/plugin-diagram';
 import { compile, type AuthoringProject } from '../src/compile.ts';
 
 const h = (type: unknown, props: Record<string, unknown> = {}) => jsx(type, props);
@@ -105,18 +106,7 @@ describe('plugin boundaries and data-only playback', () => {
     expect(project.scenarios['f.a.s'].steps[0].ext.diagram.scenes['f.a@/'].states.b.state).toBe('error');
     expect(calls).toBe(n);
   });
-  it('gives a recompile hint for old bare types and old IR', async () => {
-    const old = h('Diagram' as never, { id: 'd' });
-    expect(compile(source(old), 'dev').diagnostics.map(d => d.code)).toContain('PLUGIN_LEGACY_TYPE');
-    const { validate } = await import('../src/validate.ts');
-    const p = compile(source(graph()), 'dev').project!;
-    p.scenes['f.a@/']!.root.type = 'Diagram';
-    p.scenarios['f.a.s']!.initial.data = { type: 'Diagram', action: 'report', traces: ['business data'] };
-    const diagnostic = validate(p).diagnostics.find(d => d.code === 'PLUGIN_LEGACY_TYPE');
-    expect(diagnostic?.message).toMatch(/recompile.*diagram:Diagram/);
-    p.scenes['f.a@/']!.root.type = 'diagram:Diagram';
-    expect(validate(p).diagnostics.some(d => d.code === 'PLUGIN_LEGACY_TYPE')).toBe(false);
-  });
+
 });
 
 it('browser drawing modules do not import compile-time state or layout engines', () => {

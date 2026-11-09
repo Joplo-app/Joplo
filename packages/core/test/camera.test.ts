@@ -1,17 +1,18 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 视角层级与导演镜头（T-layers：每层一个完全独立的画面）：
  * layer(title, tree) 单独编译成画面；shot 在包含它的层里解析；导演层；cameraAt / displaySceneId 纯函数；
  * 各层共享同一份状态；没有 layers 的方案行为不变；属性值为 undefined 时当作没写。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, explain, feature, flow, layer, option, page, set, shot, Slot, $ } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
+import { explain, feature, flow, layer, option, page, set, shot, Slot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { DIRECTOR_LAYER, LAYER_ICONS, PAGE_LAYER, cameraAt, compile, displaySceneId, explainClick, findNode, isNodeVisible, layersOf, layersWithNode, replay, stateAt, stepTouchesLayer, validate, type AuthoringProject } from '../src/index.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
-const D = ui.Diagram;
+const D = uiDiagram.Diagram;
 
 /** 客户端层：发送按钮与消息；后端层：架构图。两层都有一个同名的 shared 元素。 */
 const clientTree = () => h(ui.Paper, { id: 'client_panel' }, h(ui.Button, { id: 'app_send' }, '发送'), h(ui.Text, { id: 'msg_user', when: $.ui.sent }, '你好'), h(ui.Badge, { id: 'shared' }, '共享'));

@@ -1,6 +1,5 @@
 import { inlineResources } from './local-resources.ts';
 import sharedModules from '@joplo-app/web/shared-modules.json' with { type: 'json' };
-import { standardPlugins } from '@joplo-app/core/node';
 /**
  * `joplo build`：静态发布站。
  *
@@ -174,7 +173,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     fs.rmSync(siteHtml);
     for (const rel of inlined) fs.rmSync(path.join(staging, rel));
     // 插件运行时（D86）：每个打成一个文件，内联在入口脚本之前（file:// 也能打开）；只打包 IR 里用到的插件
-    const used = Object.fromEntries(Object.entries(compiled.pluginRuntimes).filter(([id]) => project.plugins?.[id] && !standardPlugins.some(p => p.id === id)));
+    const used = Object.fromEntries(Object.entries(compiled.pluginRuntimes).filter(([id]) => project.plugins?.[id]));
     const pluginCode = await bundlePluginRuntimes(used, projectDir, web);
     const withPlugins = injectPluginScripts(html, pluginCode);
     fs.writeFileSync(path.join(staging, 'index.html'), withPlugins.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));
@@ -266,7 +265,7 @@ export async function stageDistSite(web: DistWeb, projectDir: string, staging: s
  * 把每个插件运行时打成一个自包含的 ES 模块（依赖一起打进去），执行时注册到 globalThis.__JOPLO_PLUGINS__
  * （web 的 renderer/plugins.ts 取走）。按插件 id 排序，产物稳定。
  */
-export async function bundlePluginRuntimes(runtimes: Record<string, string>, projectDir: string, web: WebAssets): Promise<string[]> {
+export async function bundlePluginRuntimes(runtimes: Record<string, string>, projectDir: string, web: WebAssets, mode: 'factory' | 'module' = 'factory'): Promise<string[]> {
   const out: string[] = [];
   const modules: Record<string, string[]> = sharedModules;
   const shared = Object.keys(modules);
@@ -290,14 +289,14 @@ export async function bundlePluginRuntimes(runtimes: Record<string, string>, pro
         // Resolve shared modules before Vite finds a plugin's installed React copy.
         enforce: 'pre',
         resolveId: (src) => src === 'joplo-plugin-entry' ? entry : shared.includes(src) ? `\0joplo-shared:${src}` : null,
-        load: (resolved) => (resolved.startsWith('\0joplo-shared:') ? bridge(resolved.slice('\0joplo-shared:'.length)) : resolved === entry ? `import runtime from ${JSON.stringify(file)};\n(globalThis.__JOPLO_PLUGINS__ ??= []).push(runtime);\n` : null),
+        load: (resolved) => (resolved.startsWith('\0joplo-shared:') ? bridge(resolved.slice('\0joplo-shared:'.length)) : resolved === entry ? `import runtime from ${JSON.stringify(file)};\n${mode === 'module' ? 'export default runtime;' : '(globalThis.__JOPLO_PLUGINS__ ??= []).push(runtime);'}\n` : null),
       }],
-      build: { write: false, minify: true, sourcemap: false, modulePreload: false, reportCompressedSize: false, emptyOutDir: false, rolldownOptions: { input: 'joplo-plugin-entry', output: { format: 'es', codeSplitting: false } } },
+      build: { write: false, minify: true, sourcemap: false, modulePreload: false, reportCompressedSize: false, emptyOutDir: false, rolldownOptions: { input: 'joplo-plugin-entry', ...(mode === 'module' ? {preserveEntrySignatures:'strict' as const} : {}), output: { format: 'es', codeSplitting: false } } },
     })) as Rollup.RollupOutput | Rollup.RollupOutput[];
     const chunks = (Array.isArray(r) ? r : [r]).flatMap((o) => o.output).filter((x): x is Rollup.OutputChunk => x.type === 'chunk');
     if (chunks.length !== 1) throw new JoploError('EXPORT_FAILED', `Plugin ${id}: expected one bundled runtime file, got ${chunks.length}`);
     // Defer evaluation until the host has initialized its shared React instance.
-    out.push(`(globalThis.__JOPLO_PLUGIN_FACTORIES__ ??= []).push({id:${JSON.stringify(id)},load:()=>{\n${chunks[0]!.code}\n}});`);
+    out.push(mode === 'module' ? chunks[0]!.code : `(globalThis.__JOPLO_PLUGIN_FACTORIES__ ??= []).push({id:${JSON.stringify(id)},load:()=>{\n${chunks[0]!.code}\n}});`);
   }
   return out;
 }

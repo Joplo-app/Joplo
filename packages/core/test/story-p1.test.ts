@@ -1,6 +1,7 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
-import { $, config, feature, flow, fork, layer, mark, option, page, push, set, stream, type Flow } from '@joplo-app/kit';
-import * as ui from '@joplo-app/kit/ui';
+import { $, feature, flow, fork, layer, mark, option, page, push, set, stream, type Flow } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { applyStep, changedAt, commonPrefix, compile, forksAt, initialState, keyboardActionOf, marksAt, replay, stateAt, type AuthoringProject } from '../src/index.ts';
 

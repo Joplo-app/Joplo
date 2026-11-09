@@ -1,3 +1,5 @@
+import '../../../scripts/test/render-fixtures.ts';
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 集成 0.2.8：焦点提示（D70）不破坏关系类图表的布局稳定（D69 不变量 1）。
  * 同一场景里穿插 trace、spotlight / highlight / numbered / callout（指向节点和分组）、节点逐段出现、多节点镜头、
@@ -7,18 +9,18 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { $, callout, config, feature, flow, highlight, layer, numbered, option, page, set, shot, spotlight, trace } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
+import { $, callout, feature, flow, highlight, layer, numbered, option, page, set, shot, spotlight } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, focusAt, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
-import { elkLayout } from '@joplo-app/core/node';
+import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
 import { cameraFor } from '../src/player/cameraFor';
 import { Stage } from '../src/renderer/Stage';
 import { I18nProvider } from '../src/i18n/context';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
-const D = ui.Diagram;
+const D = uiDiagram.Diagram;
 const SID = 'f.a.s';
 
 function project(autoFocus?: boolean): Project {
@@ -58,7 +60,7 @@ function project(autoFocus?: boolean): Project {
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
   };
-  const r = compile(src, 'dev', { layout: elkLayout });
+  const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
   return r.project!;
 }

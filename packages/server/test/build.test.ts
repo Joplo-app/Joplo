@@ -1,3 +1,4 @@
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
 /** buildSite：拒绝覆盖、只发布选定方案、HTML 后处理；renderStep：截图 + 带 at 的元素索引 + 告警。 */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,7 +16,8 @@ import { pickedExample } from './picked-example.ts';
 const EXAMPLE = path.resolve(import.meta.dirname, '../../../examples/invite');
 const copy = () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-build-t-'));
-  fs.cpSync(EXAMPLE, d, { recursive: true });
+  fs.cpSync(EXAMPLE, d, { recursive: true, filter: s => !/[/\\](node_modules|dist|exports|\.joplo)([/\\]|$)/.test(s.slice(EXAMPLE.length)) });
+  installFixturePlugins(d);
   return fs.realpathSync(d);
 };
 
@@ -326,7 +328,7 @@ describe('renderStep', () => {
 
   it('Toast 场景（线框主题）与跨路径场景都能渲染（托管运行时）；未知场景报 NOT_FOUND；不能写到源文件或 .joplo/', async () => {
     // 托管运行时：<JOPLO_HOME>/runtime/playwright-<版本>/，项目里不再有 playwright
-    fs.rmSync(path.join(dir, 'node_modules'), { recursive: true, force: true });
+    fs.rmSync(path.join(dir, 'node_modules/playwright'), { recursive: true, force: true });
     const p = runtimePaths(home);
     fs.mkdirSync(path.join(p.dir, 'node_modules'), { recursive: true });
     fs.symlinkSync(fs.realpathSync(path.join(SERVER_MODULES, 'playwright-core')), path.join(p.dir, 'node_modules/playwright-core'), 'junction');
@@ -353,7 +355,8 @@ describe('范围构建（scope，D75）', () => {
   let dir: string;
   beforeAll(() => {
     dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-scope-t-')));
-    fs.cpSync(BOARD, dir, { recursive: true });
+    fs.cpSync(BOARD, dir, { recursive: true, filter: s => !/[/\\](node_modules|dist|exports|\.joplo)([/\\]|$)/.test(s.slice(BOARD.length)) });
+  installFixturePlugins(dir);
   });
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 

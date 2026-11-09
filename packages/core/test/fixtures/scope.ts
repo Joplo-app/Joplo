@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../../scripts/test/fixtures.ts';
 /**
  * 按场景保密分享（D75）的测试夹具：「团队空间」三个功能都往 / 的 header 插槽堆元素。
  * - invite（选定 a）：邀请按钮；happy 只点自己的按钮；full 的镜头对准 billing 堆进来的席位徽标（借用）；
@@ -5,9 +6,9 @@
  * - billing（选定 a）：席位徽标、when 隐藏的新定价横幅、新增 /billing 页面，名字、目标、场景都带 SECRET。
  * - exp（选定 a）：导出按钮。
  */
-import { $, config, feature, flow, go, option, page, role, rule, shot, Slot } from '@joplo-app/kit';
+import { $, feature, flow, go, option, page, role, rule, shot, Slot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import * as ui from '@joplo-app/kit/ui';
+import * as ui from '@joplo-app/plugin-ui';
 import type { AuthoringProject } from '../../src/index.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });

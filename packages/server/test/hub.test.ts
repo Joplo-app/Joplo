@@ -1,3 +1,5 @@
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
+import { fixtureConfigSource } from '../../../scripts/test/fixtures.ts';
 /**
  * 一个进程、多个项目（D39）：注册表、server.json、再次 joplo dev 只注册不另起进程、新接口的 Host/Origin/令牌、
  * 删除记录不删文件、按项目的编译与选中、导出（图片 / 视频，注入假的 Playwright）。
@@ -18,11 +20,12 @@ const tmp = (p: string) => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),
 const copy = () => {
   const d = tmp('joplo-hub-');
   fs.cpSync(EXAMPLE, d, { recursive: true, filter: (s) => !/[/\\](\.joplo|dist|node_modules|exports)([/\\]|$)/.test(s.slice(EXAMPLE.length)) });
+  installFixturePlugins(d);
   return d;
 };
 const minimal = (name: string) => {
   const d = tmp('joplo-min-');
-  fs.writeFileSync(path.join(d, 'joplo.config.ts'), `import { config } from '@joplo-app/kit';\nexport default config({ name: ${JSON.stringify(name)} });\n`);
+  fs.writeFileSync(path.join(d, 'joplo.config.ts'), fixtureConfigSource(`import { config } from '@joplo-app/kit';\nexport default config({ name: ${JSON.stringify(name)} });\n`));
   return d;
 };
 

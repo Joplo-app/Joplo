@@ -4,7 +4,7 @@ import { definePlugin, type PluginCompileHooks, type PluginIRNode } from '@joplo
 import { isNode, type JNode, type JChild } from '@joplo-app/kit/node';
 import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
 import { docs, examples } from './catalog.ts';
-import { skill } from './guide.ts';
+import { skill, patterns } from './guide.ts';
 import { checkDiagramRoot, resolveTrace } from './compile-helpers.ts';
 import { diagramsIn, isDiagramRoot, layoutFor, graphStructure, sequenceStructure, type GraphLayoutEngine } from './model-index.ts';
 import { NodeData, FrameData, type Trace } from './schema.ts';
@@ -12,7 +12,8 @@ import { advanceStates } from './state.ts';
 import { machineStates } from './machine.ts';
 
 export { trace } from './effects.ts';
-export { Diagram, StateMachine, Sequence } from '@joplo-app/kit/ui';
+export * from './components.ts';
+import { elkLayout } from './elk.ts';
 const links = new Set(['diagram:Diagram.Edge', 'diagram:StateMachine.Transition', 'diagram:Sequence.Message']);
 const required = new Set(['Diagram.Node', 'StateMachine.State', 'Sequence.Actor']);
 const cleanChild = (c: JChild): JChild => Array.isArray(c) ? c.map(cleanChild) : isNode(c) ? clean(c) : c;
@@ -34,7 +35,7 @@ const hooks: PluginCompileHooks = {
   derive(node, { viewport, options, report }) {
     if (!isDiagramRoot(node.type)) return;
     const n = node as SceneNode;
-    const layout = layoutFor(n, options.layout as GraphLayoutEngine | undefined, message => report('DIAGRAM_LAYOUT_FAILED', `<${n.type}> "${n.id}" could not be laid out (${message}); showing a simple grid instead. Check the edges and groups of this diagram`, n.source, 'warning'), viewport);
+    const layout = layoutFor(n, (Object.hasOwn(options, 'layout') ? options.layout : elkLayout) as GraphLayoutEngine | undefined, message => report('DIAGRAM_LAYOUT_FAILED', `<${n.type}> "${n.id}" could not be laid out (${message}); showing a simple grid instead. Check the edges and groups of this diagram`, n.source, 'warning'), viewport);
     const data = layout ? { layout, structure: n.type === 'diagram:Sequence' ? sequenceStructure(n) : graphStructure(n) } : undefined;
     const framing: NonNullable<import('@joplo-app/kit/plugin').PluginDerived['framing']> = {};
     const index = diagramsIn(n).find(d => d.id === n.id);
@@ -87,9 +88,8 @@ const hooks: PluginCompileHooks = {
     return { scenes };
   },
 };
-export default /* @__PURE__ */ definePlugin({
+export default /* @__PURE__ */ definePlugin({ skillTopics: { patterns: { description: 'Recipes and individual pitfalls', body: patterns } }, packageName: '@joplo-app/plugin-diagram',
   id: 'diagram', title: 'Diagrams', version: packageInfo.version, runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url), skill,
   components: Object.fromEntries(Object.entries(docs).map(([name, doc]) => [name, { doc, example: examples[name], catalogFamily: !name.includes('.'), traits: { text: ['label', 'description', 'name', 'value'] }, selfEvident: true, ...(required.has(name) ? { needsId: true } : {}) }])),
-  legacyTypes: Object.fromEntries(Object.keys(docs).map(name => [name, `diagram:${name}`])),
   data: dataSpec, compile: hooks, schemas: { node: NodeData, step: FrameData },
 });

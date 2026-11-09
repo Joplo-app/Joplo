@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 /** 回归测试：执行真实 hook/浮层的状态、异步读取和点击处理；不启动浏览器或上传项目。 */
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { ReactElement } from 'react';

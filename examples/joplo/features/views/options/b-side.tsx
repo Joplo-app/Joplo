@@ -1,5 +1,5 @@
 import { $, done, flow, missing, option, set } from '@joplo-app/kit';
-import { Button, Group, Paper, SimpleGrid, Stack, Text } from '@joplo-app/kit/ui';
+import { Button, Group, Paper, SimpleGrid, Stack, Text } from '@joplo-app/plugin-ui';
 
 import { authorCode, backendLayer, clientLayer, header, step, stepBar, viewsState } from '../../../shared/board/views.tsx';
 

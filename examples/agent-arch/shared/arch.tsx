@@ -5,9 +5,9 @@
  * 和 StateMachine（任务的生命周期），步骤里用 trace / set 联动。
  */
 import { $, layer, set, type Bind, type JNode } from '@joplo-app/kit';
-import {
-  ActionIcon, Alert, Box, Button, Card, Center, ChatMessage, Diagram, Group, Modal, Paper, PromptInput, Sequence, SimpleGrid, Stack, StateMachine, Text, ToolCall,
-} from '@joplo-app/kit/ui';
+import { ActionIcon, Alert, Box, Button, Card, Center, ChatMessage, Group, Modal, Paper, PromptInput, SimpleGrid, Stack, Text, ToolCall } from '@joplo-app/plugin-ui'; import { Diagram, Sequence, StateMachine } from '@joplo-app/plugin-diagram';
+
+
 
 type V = 'a' | 'b';
 const ui = $.ui as unknown as Record<string, Bind>;

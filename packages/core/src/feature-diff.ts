@@ -1,6 +1,5 @@
 import { projectThemes } from './themes.ts';
 import { jsonData } from './plugins/data.ts';
-import { adaptPublicInput, legacyDiagnostics } from './plugins/legacy.ts';
 /** Public feature comparison. Positional ids are addresses, never cross-version identities. */
 import { z } from 'zod';
 import { Project, type Effect, type Scenario, type Step } from './schema.ts';
@@ -54,7 +53,7 @@ const ref = (s: Step, index: number) => ({ id: s.id, position: index + 1, ...(s.
 const PRESENTATION: [string, (keyof Step)[]][] = [
   ['caption', ['caption', 'captionAuto']], ['explain', ['explain']], ['camera', ['shots', 'directorLayer']],
   ['annotations', ['marks', 'cues', 'callouts']], ['voice', ['say', 'narrate']], ['timing', ['hold']],
-  ['trace', ['traces', 'ext']], ['forks', ['forks']], ['kind', ['kind']],
+  ['plugin-data', ['ext']], ['forks', ['forks']], ['kind', ['kind']],
 ];
 const KIND_ORDER = { state: 0, message: 1, outcome: 2 } as const;
 const shown = (v: unknown) => (typeof v === 'string' ? v : canonical(v)).slice(0, 200);
@@ -150,8 +149,7 @@ export function compareSteps(before: Step[], after: Step[]): DiffStep[] {
 /** Refuse private IR instead of projecting potentially private unknown fields into a public comparison. */
 export function readPublicProject(value: unknown): Project {
   let input: unknown;
-  try { input = adaptPublicInput(jsonData(value)); } catch { throw new JoploError('INVALID_SCHEMA', 'Invalid public playback IR; expected finite JSON and valid legacy geometry'); }
-  if (legacyDiagnostics(input).some(d => d.message.includes('ui:'))) throw new JoploError('INVALID_SCHEMA', 'Incompatible pre-plugin UI IR; rebuild both versions with the current kit before comparison. Existing shares retain their own runtime.');
+  try { input = jsonData(value); } catch { throw new JoploError('INVALID_SCHEMA', 'Invalid public playback IR; expected finite JSON'); }
   const parsed = Project.safeParse(input);
   if (!parsed.success) throw new JoploError('INVALID_SCHEMA', 'Invalid public playback IR; rebuild both versions with a compatible CLI');
   const p = parsed.data;
@@ -188,7 +186,6 @@ export function featureDiff(before: unknown, after: unknown, source: { baseSha?:
   const base = DiffSource.parse({ sha: source.baseSha ?? null }), head = DiffSource.parse({ sha: source.headSha ?? null });
   const result: FeatureDiffManifest = { formatVersion: 1, kind: 'joplo-feature-diff', base, head, status: 'unchanged', reasons: [], summary: { added: [], modified: [], removed: [] }, scenarios: [] };
   if ((before as Project)?.schemaVersion !== 2 || (after as Project)?.schemaVersion !== 2) return { ...result, status: 'incompatible', reasons: ['schema-version'] };
-  if ([before, after].some(p => legacyDiagnostics(p).some(d => d.message.includes('ui:')))) return {...result, status:'incompatible', reasons:['plugin-vocabulary: rebuild both versions with the current kit']};
   const b = readPublicProject(before), a = readPublicProject(after);
   for (const id of new Set([...Object.keys(a.scenarios), ...Object.keys(b.scenarios)])) {
     const old = b.scenarios[id], next = a.scenarios[id], s = next ?? old!, p = next ? a : b;

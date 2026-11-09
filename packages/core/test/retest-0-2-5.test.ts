@@ -1,9 +1,10 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 0.2.5 复测（X3）发现的问题：.back() 之后的画面推算、done 的结局、disabledReason 绑定状态。
  */
 import { describe, expect, it } from 'vitest';
-import { $, config, done, feature, flow, go, mark, option, page, set, shot, type Flow } from '@joplo-app/kit';
-import * as ui from '@joplo-app/kit/ui';
+import { $, done, feature, flow, go, mark, option, page, set, shot, type Flow } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, explainClick, initialState, replay, stateAt, validate, type AuthoringProject } from '../src/index.ts';
 

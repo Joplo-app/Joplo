@@ -1,5 +1,5 @@
 import { $, page, Slot } from '@joplo-app/kit';
-import { DataTable, Group, SimpleGrid, Stack, Stat, Title } from '@joplo-app/kit/ui';
+import { DataTable, Group, SimpleGrid, Stack, Stat, Title } from '@joplo-app/plugin-ui';
 
 export default page(
   { title: '成员' },

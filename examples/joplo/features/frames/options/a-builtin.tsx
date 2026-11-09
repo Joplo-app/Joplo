@@ -1,7 +1,7 @@
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
 import { $, done, flow, option, set, uses } from '@joplo-app/kit';
-import { Center, Code, Phone, SimpleGrid, Stack, Terminal, Text, Title } from '@joplo-app/kit/ui';
+import { Center, Code, Phone, SimpleGrid, Stack, Terminal, Text, Title } from '@joplo-app/plugin-ui';
 
 const API =
   '<Terminal title="~/work">\n' +

@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 import { machineStates } from '../../../plugins/diagram/src/machine';
 import { nodeData } from '../../../plugins/diagram/src/data';
 import type { GraphLayout } from '../../../plugins/diagram/src/model';

@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { createZhCN } from '../src/i18n/zh-CN';
 import { createBoardZhCN } from '../src/i18n/board/zh-CN';
 const zh = { ...createZhCN(), ...createBoardZhCN() };
@@ -7,8 +8,8 @@ const zh = { ...createZhCN(), ...createBoardZhCN() };
  */
 import { describe, expect, it } from 'vitest';
 import { CAPTION_MAX, EXPLAIN_MAX, SUBTITLE_HEIGHT, captionLength, compile, validate, type AuthoringProject, type Scenario } from '@joplo-app/core';
-import * as ui from '@joplo-app/kit/ui';
-import { config, explain, feature, flow, option, page, Slot } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { explain, feature, flow, option, page, Slot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { SUBTITLE_CAPTION_PX, SUBTITLE_EXPLAIN_PX, subtitleFor } from '../src/player/subtitle-content';
 

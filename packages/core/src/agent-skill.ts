@@ -9,20 +9,17 @@
 
 /** `npx joplo skill <主题>` 的主题与一句话用途（guide.ts 生成正文；技能里按这份清单列出主题）。 */
 export const SKILL_TOPICS = [
-  { name: 'authoring', description: 'Mental model, page / option / flow, local free reactions, when conditions, a form example' },
+  { name: 'authoring', description: 'Engine model, page / option / flow, explicit plugins, local reactions, state and conditions' },
   { name: 'story', description: 'Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos' },
   { name: 'demo', description: 'Scripted playback and local exploration, drag / hover / scroll / plugin actions, layers, captions, deep links and screenshots' },
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
-  { name: 'content', description: 'Default first-party content plugin: continuous visual explainers, chapters, design worlds and review practices' },
-  { name: 'diagram', description: 'Default first-party diagram plugin: architecture, sequence and state diagrams, groups, compiled traces and framing' },
-  { name: 'components', description: 'Enabled plugin component catalog, namespaced UI/HTML, props, examples, and real images' },
   { name: 'cases', description: 'Case dimensions: ask the user before starting' },
   { name: 'check', description: 'Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line' },
   { name: 'selection', description: 'Edit only the element selected by the user in the board' },
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
   { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
   { name: 'publish', description: 'pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)' },
-  { name: 'plugins', description: 'Data-only action contracts, native local behavior, engine-clock presenters; Universal properties, plugin themes, state writes and director targets; Media tracks, local text-to-resource compilers, cached offline publishing; Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks' },
+  { name: 'plugins', description: 'Data-only action contracts, native local behavior, engine-clock presenters; Universal properties, plugin themes, state writes and director targets; Media tracks, local text-to-resource compilers, cached offline publishing; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks' },
 ] as const;
 
 /** 心智模型：所有入口最先读到的几句话。 */
@@ -36,7 +33,7 @@ export const MENTAL_MODEL = [
 
 /** 推荐的起步顺序（X2：先做最小的一条正常流程 + 一条错误恢复流程，在看板里确认交互模型后再扩展）。 */
 export const START_ORDER = [
-  'Read npx joplo skill authoring; read cases before asking the user about edge cases; demo and components as needed.',
+  'Read npx joplo skill authoring; read cases before asking the user about edge cases; demo and installed plugin skills as needed.',
   'Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case\'s expected is its Then); show the plan to the user. A demo is a story, not a feature tour.',
   'With minimal code, write one happy path and one error-and-recovery scenario.',
   'Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.',
@@ -46,30 +43,27 @@ export const START_ORDER = [
 
 /** 最常见的坑：一句话 + 详细主题。 */
 export const PITFALLS = [
-  ['Finishing development is not the end: always start npx joplo feedback watch [dir] --local --follow --json (add --once if you will end your response) before you give the user the board URL, and keep receiving their feedback', 'review'],
-  ['when takes a condition, not a boolean: when={eq($.ui.mode, \'code\')}, never when={mode === \'code\'}; for values known while writing use {flag && <X/>}', 'authoring'],
-  ['Only catalog components and the listed HTML tags exist; <br/> is UNKNOWN_COMPONENT, so write \'Line 1\\nLine 2\' inside <Text>', 'components'],
-  ['Every interactive element needs a flow step, disabled={true} with disabledReason, or unmodeled; otherwise check warns UNBOUND_INTERACTIVE', 'check'],
-  ['No onClick or other function props: behavior lives in flow steps (.click/.type/.select) and effects (set, push, go, done)', 'authoring'],
-  ['Full-height layouts squeeze tables and forms: rows exist in the DOM but are cut off on screen; show 5–8 rows or move the table to its own layer', 'demo'],
-  ['Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key and pins that layer, so later steps stop switching layers; layer= is ignored); wait for rendering before screenshots', 'demo'],
-  ['Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user', 'cases'],
-  ['CHOICE_REQUIRED (exit 2): ask both publishing questions; never fix it by silently adding --private --no-review, and do not reuse the previous invocation', 'publish'],
-  ['Public portfolio work and the always-private review version are two separate links: give reviewers data.review.url, the audience data.url', 'publish'],
-  ['Required: before every share, ask the user public or private AND whether to also publish a review version. Never choose for them or reuse a previous choice; CI must pin both flags in its workflow', 'publish'],
-  ['Public shares enter the portfolio and search engines: write the project name, description, and feature goals as search-result content; exclude unpublished information', 'publish'],
-  ['Never invent or set an access password for the user: ask them to type it in their own terminal or set JOPLO_SHARE_PASSWORD; never put passwords in command history, files, or conversation summaries. Private Pro shares accept --password; omit both password flags to preserve protection', 'publish'],
-  ['Never share or deploy without the user\'s go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself', 'publish'],
-  ['Joplo Cloud narration spends the user\'s characters: run npx joplo voice --dry-run and tell them the estimate before a large batch; on TTS_QUOTA_EXCEEDED (exit 7) keep what was made, pass on error.details.usageUrl, and never retry in a loop or buy for them', 'publish'],
-  ['AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json', 'publish'],
-  ['Playing a demo never generates Joplo Cloud narration (it would spend characters): steps without audio use the browser voice until the user clicks Generate missing audio or you run npx joplo voice with their go-ahead', 'publish'],
-  ['Re-sharing with the default voice keeps valid local clips plus reusable published clips, even when their voices differ (automatic captions must still match current text in the clip language; stale audio is excluded); an old custom provider named cloud stays unsupported until the user explicitly chooses official Joplo Cloud (use voice.profile: \'Joplo Cloud\' when config owns the selection)', 'publish'],
-  ['HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it', 'check'],
-  ['For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, and verify playback before claiming it works', 'content'],
-  ['For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings', 'plugins'],
-  ['Default UI and HTML belong to the ui plugin; keep kit/ui imports and author TSX, use ui: names only in IR and diagnostics. Recompile old bare-name IR before comparing versions', 'components'],
-  ['For audience exploration, use native UI controls or option.free; keep deterministic results in flow steps. Read demo before using drag, hover, scroll or plugin actions', 'demo'],
-  ['Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components', 'plugins'],
+  ["Finishing development is not the end: always start npx joplo feedback watch [dir] --local --follow --json (add --once if you will end your response) before you give the user the board URL, and keep receiving their feedback", "review"],
+  ["when takes a condition, not a boolean: when={eq($.ui.mode, 'code')}, never when={mode === 'code'}; for values known while writing use {flag && <X/>}", "authoring"],
+  ["Every interactive element needs a flow step, disabled={true} with disabledReason, or unmodeled; otherwise check warns UNBOUND_INTERACTIVE", "check"],
+  ["No onClick or other function props: behavior lives in flow steps (.click/.type/.select) and effects (set, push, go, done)", "authoring"],
+  ["Full-height layouts squeeze tables and forms: rows exist in the DOM but are cut off on screen; show 5–8 rows or move the table to its own layer", "demo"],
+  ["Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key and pins that layer, so later steps stop switching layers; layer= is ignored); wait for rendering before screenshots", "demo"],
+  ["Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user", "cases"],
+  ["CHOICE_REQUIRED (exit 2): ask both publishing questions; never fix it by silently adding --private --no-review, and do not reuse the previous invocation", "publish"],
+  ["Public portfolio work and the always-private review version are two separate links: give reviewers data.review.url, the audience data.url", "publish"],
+  ["Required: before every share, ask the user public or private AND whether to also publish a review version. Never choose for them or reuse a previous choice; CI must pin both flags in its workflow", "publish"],
+  ["Public shares enter the portfolio and search engines: write the project name, description, and feature goals as search-result content; exclude unpublished information", "publish"],
+  ["Never invent or set an access password for the user: ask them to type it in their own terminal or set JOPLO_SHARE_PASSWORD; never put passwords in command history, files, or conversation summaries. Private Pro shares accept --password; omit both password flags to preserve protection", "publish"],
+  ["Never share or deploy without the user's go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself", "publish"],
+  ["Joplo Cloud narration spends the user's characters: run npx joplo voice --dry-run and tell them the estimate before a large batch; on TTS_QUOTA_EXCEEDED (exit 7) keep what was made, pass on error.details.usageUrl, and never retry in a loop or buy for them", "publish"],
+  ["AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json", "publish"],
+  ["Playing a demo never generates Joplo Cloud narration (it would spend characters): steps without audio use the browser voice until the user clicks Generate missing audio or you run npx joplo voice with their go-ahead", "publish"],
+  ["Re-sharing with the default voice keeps valid local clips plus reusable published clips, even when their voices differ (automatic captions must still match current text in the clip language; stale audio is excluded); an old custom provider named cloud stays unsupported until the user explicitly chooses official Joplo Cloud (use voice.profile: 'Joplo Cloud' when config owns the selection)", "publish"],
+  ["HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it", "check"],
+  ["For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings", "plugins"],
+  ["For audience exploration, use native UI controls or option.free; keep deterministic results in flow steps. Read demo before using drag, hover, scroll or plugin actions", "demo"],
+  ["Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components", "plugins"],
 ] as const satisfies readonly (readonly [string, string])[];
 
 /** 中文触发词：技能 description 里的匹配文本，不是 CLI 界面文案（english-output 测试的白名单）。 */
@@ -92,7 +86,7 @@ function joploBody(): string {
     '## When to use',
     '- The user wants to think a feature through before building it: a prototype, a clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.',
     '- The user wants to compare how a feature changed between two versions or in a PR (see npx joplo skill diff).',
-    '- The user wants an explainer, tutorial, science piece, or news explainer that plays like a video (narration, chapters, animated graphics): read npx joplo skill content first.',
+    '- The user wants an explainer, tutorial, science piece, or news explainer that plays like a video (narration, chapters, animated graphics): read .claude/skills/joplo-plugins/SKILL.md and the relevant installed plugin skill first.',
     '',
     '## When not to use',
     '- Production UI code or real backends: Joplo demos are scripted; nothing runs real logic.',
@@ -117,7 +111,7 @@ function joploBody(): string {
     '## Show the product, not slides',
     'Every step is an action on the product and a visible change it causes. If a step could be a bullet on a slide, rebuild it as interface, state, or a trace.',
     '- Feature: not a card listing "enter email / teammate gets a link / joins today"; instead Ana types the email, clicks Send, the row appears as Pending, then Leo\'s layer opens the mail and lands in the space.',
-    '- Backend or architecture: not a card "App → API → Queue → Worker"; instead a diagram plugin view where trace() lights each hop as the request moves and trace.fail() shows where it breaks, beside the UI whose status changes with it.',
+    '- Backend or architecture: not a card "App → API → Queue → Worker"; instead an installed plugin view where each request hop and failure changes on screen, beside the UI whose status changes with it.',
     '- Comparison: not a pros-and-cons table; instead options A and B each playing the same scenario, compared in the board.',
     '- State or lifecycle: not a paragraph explaining statuses; instead a lifecycle view whose current state moves as the user acts.',
     '- Cards only open, close, jump in time, or switch roles; text that explains belongs in captions and explain(). Worked example: npx joplo skill story.',
@@ -128,7 +122,7 @@ function joploBody(): string {
     '1. Start npx joplo feedback watch <dir> --local --follow --json in its own long-running shell (joplo dev prints this exact command; the board\'s feedback panel can copy it too). One follower covers every option of the project and attaches by itself to the new round each source edit opens.',
     '2. Then give the user the board URL that dev printed (do not assume port 4790) and point them to the native feedback icon. If they want to drive the UI themselves, only give the link.',
     '3. While they test, read the follower\'s output with short waits (about 1–5 seconds). Each stdout line is one JSON event (feedback, approved, closed) carrying eventId, optionId, sessionId and context (route, scenario, step, source); deduplicate by eventId. A background shell alone does not wake an idle agent: stay in a receive loop, and do not claim you are still listening after ending your response unless the host can resume you.',
-    '   - If you will end your response while the user tests, and your host wakes you when a background command finishes (Claude Code does): run the follower in the background with --once added. It exits 0 on the first feedback or approval, which wakes you. Handle the events, then start it again with --since <createdAt of the last event> (the exit message prints this exact command) so nothing is replayed or lost. Without such a host, tell the user to message you after they confirm.',
+    '   - If you will end your response while the user tests, and your host wakes you when a background command finishes (a host configured to resume on process exit does): run the follower in the background with --once added. It exits 0 on the first feedback or approval, which wakes you. Handle the events, then start it again with --since <createdAt of the last event> (the exit message prints this exact command) so nothing is replayed or lost. Without such a host, tell the user to message you after they confirm.',
     '4. On feedback, acknowledge the actual text and its page/step right away, in the reviewer\'s language, then keep listening. Change the demo only when the user asked for changes; after edits, run npx joplo check. closed (source_changed) is then expected and the follower moves to the new round.',
     '5. approved confirms that option version only: it is not proof the feedback was implemented and not permission to publish. The follower ends with exit 1 only when the board stops (restart dev, then the follower) or 130 on Ctrl+C.',
     'Exact-session watching, Share polling, and applying pick / rule / question decisions: joplo-feedback skill and npx joplo skill review.',
@@ -143,8 +137,8 @@ function joploBody(): string {
     ...PITFALLS.map(([text, topic]) => `- ${text}. See npx joplo skill ${topic}.`),
     '',
     '## Reference',
-    'npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.',
-    ...SKILL_TOPICS.map(t => `- ${t.name}: ${t.description}`),
+    'npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists engine and enabled plugin topics. Installed engine references are linked below; plugin guides are indexed in ../joplo-plugins/SKILL.md.',
+    ...SKILL_TOPICS.map(t => `- [${t.name}](./topics/${t.name}.md): ${t.description}`),
     'npx joplo components <Name> shows a component\'s props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).',
   ].join('\n');
 }

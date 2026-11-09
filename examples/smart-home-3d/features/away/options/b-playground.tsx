@@ -1,5 +1,5 @@
 import { $, done, flow, free, option, set } from '@joplo-app/kit';
-import { Accordion, Badge, Button, Group, Select, Stack, Switch, Text, TextInput, Title } from '@joplo-app/kit/ui';
+import { Accordion, Badge, Button, Group, Select, Stack, Switch, Text, TextInput, Title } from '@joplo-app/plugin-ui';
 import base from './a-one-tap.tsx';
 import { Home } from '../../../shared/home.tsx';
 

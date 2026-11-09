@@ -1,5 +1,5 @@
 import { $, flow, notApplicable, option, set } from '@joplo-app/kit';
-import { Button, Group, Paper, Stack, Switch, Text, Title } from '@joplo-app/kit/ui';
+import { Button, Group, Paper, Stack, Switch, Text, Title } from '@joplo-app/plugin-ui';
 
 /** D88 用户已定模型；原型步骤演示状态，不代表产品里的游玩数据会进入时间线。 */
 export default option({

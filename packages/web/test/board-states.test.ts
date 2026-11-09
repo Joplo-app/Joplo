@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { createZhCN } from '../src/i18n/zh-CN';
 import { createBoardZhCN } from '../src/i18n/board/zh-CN';
 const zh = { ...createZhCN(), ...createBoardZhCN() };
@@ -8,8 +9,8 @@ const zh = { ...createZhCN(), ...createBoardZhCN() };
  * - 导出视频的进度与取消；快捷键面板；标签页标题与 favicon 状态点；窄屏收起 ⑤–⑦。
  */
 import { describe, expect, it, vi } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';

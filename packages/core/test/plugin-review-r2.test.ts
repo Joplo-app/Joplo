@@ -1,5 +1,6 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
-import { $, config, feature, flow, option, page, Slot } from '@joplo-app/kit';
+import { $, feature, flow, option, page, Slot } from '@joplo-app/kit';
 import { jsx as h } from '@joplo-app/kit/jsx-runtime';
 import { definePlugin, pluginComponent, pluginEffect, type PluginScopeRule } from '@joplo-app/kit/plugin';
 import { compile, type AuthoringProject } from '../src/compile.ts';

@@ -5,7 +5,7 @@
  * - why：三个数字解释“为什么”。
  */
 import { $, eq, type Bind } from '@joplo-app/kit';
-import { Button } from '@joplo-app/kit/ui';
+import { Button } from '@joplo-app/plugin-ui';
 import { AS_OF, GOV_FLIPS, GOV_PENDING, GOV_SOURCE, HOUSE, NATIONAL, RACES, SENATE, SENATE_FLIPS, SENATE_RESULT, WHY } from './data.ts';
 import { Frame, Key } from './frame.tsx';
 import { Hemicycle, seatColors } from './hemicycle.tsx';

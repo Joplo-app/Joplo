@@ -1,5 +1,5 @@
 import { $, done, flow, option, set } from '@joplo-app/kit';
-import { Diagram } from '@joplo-app/kit/ui';
+import { Diagram } from '@joplo-app/plugin-diagram';
 
 export default option({
   name: 'A · 脑手分离',

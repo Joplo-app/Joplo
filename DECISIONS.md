@@ -486,6 +486,18 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
 - A1 “足够快”暂定为：从描述需求到画板上出现可点击的主流程，只比让 AI 写 HTML 多出“一次 Agent 会话轮次”的量级。具体指标在修订 PRD 时与用户确认。
 - A2 本地确认、修订冲突保护、幂等等机制在单用户场景下仍然保留。原因是 CLI、MCP 和浏览器会并发写同一个项目，而“固定版本交接”依赖它们。属于实现层面的判断，可以调整。
 
+## D89 技能归插件、模板按版本从主仓库下载（2026-11-08）
+
+用户原话：“skill 也要做大幅度的改动，默认的 template 也得处理掉（这里最好有个 template 放在 github 上）”；补充：“现在线上还没有用户，可以随便改”。
+
+决定一：引擎和引擎技能都只负责构建、调度及故事/状态/交互/评审/发布契约。组件、命名空间、专属画面手法、属性与常见坑归各插件的 skill / skillTopics；常见坑逐条迁移，不删、不合并、不设条数上限。完成开发后必须启动 feedback watch 的 Required 指导保留。skill install 从 config.plugins 生成插件入口、主题与索引，增删同步；用户修改保护沿用 D64。
+
+决定二：模板保存在公开主仓库 Joplo-app/Joplo 的 templates/starter。发布 CLI 默认从 `github:Joplo-app/Joplo/templates/starter#v<CLI版本>` 下载 tarball，本仓库开发默认读本地目录；支持本地路径与自定义 GitHub 子目录/ref，私有库用 GITHUB_TOKEN 或 gh 登录。starter 显式依赖、启用全部四个标准插件，版本与 CLI 精确一致。模板失败用中文说明与本地恢复路径，验证完整后才写目标，沿用 D65 的目录规则。
+
+不保留旧组件/IR 兼容层：删除 kit/ui、kit.trace、默认插件清单、旧裸类型改写和 API v1 接纳。作者直接从插件包导入并在 config.plugins 声明；未声明插件给安装和配置修法。此决定不改变分享授权、用户数据保护、凭证保护、并发写入与不兼容输入的失败关闭规则，也不授权发布。
+
+验收：仓库内示例显式迁移后诊断与 R 基线相同、关键帧一致；新项目仅靠安装技能写出 ui+diagram+content 示例，check/dev/build/file:// 离线播放通过；所有新增字段和生成文件的数据流记录在 docs/plugins.md。Release tag 必须先包含模板，再发布 npm；冒烟用本地模板，网络边界用模拟 tarball 测试。
+
 ## Open or deferred questions
 - Q10 D87 私有插件的处理（2026-11-08，工作假设已记在 D87：默认不拦截，`private: true` 时公开分享前确认一次），待用户确认。
 - Q7 跨项目复用（2026-11-05 推迟，用户：“一个项目能够复用暂时就够了”）：项目外的 TSX 文件目前不经过 Joplo 的 JSX 转换（报 `React is not defined`），所以不能跨项目 import 复用件；复用件清单也没进 `joplo skill`。项目内用 `shared/` 复用已经可用。

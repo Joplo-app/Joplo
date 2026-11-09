@@ -1,5 +1,6 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
-import { $, config, feature, flow, free, option, page, set, go } from '@joplo-app/kit';
+import { $, feature, flow, free, option, page, set, go } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { definePlugin } from '@joplo-app/kit/plugin';
 import { compile, stateAt, type AuthoringProject } from '../src/index.ts';
@@ -66,7 +67,7 @@ describe('D88 pure input arbitration and separate playground', () => {
     expect(actionMatches({ type: 'scroll', target: 'drop', to: { x: 0, y: 200 } }, { type: 'scroll', target: 'drop', to: { x: 0, y: 205 } })).toBe(true);
   });
   it('compiles new actions and a second plugin action to data; validates endpoints and payloads', () => {
-    const s = source(); s.config.plugins = [definePlugin({ id: 'probe', title: 'Probe', runtime: '/probe.js', components: {},
+    const s = source(); s.config.plugins = [...s.config.plugins!, definePlugin({ id: 'probe', title: 'Probe', runtime: '/probe.js', components: {},
       actions: { rotate: { caption: 'Rotate {label}', durationMs: 800, fields: { angle: { type: 'number', min: 0, max: 360, tolerance: 2 } } } },
     })];
     s.features.f!.options.a!.scenarios.main = flow('Gestures').drag('next', 'drop').hover('next', 500).scroll('drop', { x: 0, y: 200 }).act('probe:rotate', 'drop', { angle: 90 });
@@ -110,7 +111,7 @@ describe('D88 end-to-end projection', () => {
     q.options['f.a']!.free!.next!.effects=[{type:'set',path:'ui.free',value:false}];
     expect(featureDiff(p,q).scenarios.find(s=>s.after==='f.a.main')?.reasons).toContain('free-reactions');
     const plugin=definePlugin({id:'probe',title:'Probe',runtime:'/probe.js',components:{},actions:{rotate:{caption:'Rotate {label}',durationMs:800,fields:{angle:{type:'number',tolerance:2}}}}});
-    s.config.plugins=[plugin];s.features.f!.options.a!.scenarios.main=flow('Rotate').act('probe:rotate','drop',{angle:90});
+    s.config.plugins=[...s.config.plugins!,plugin];s.features.f!.options.a!.scenarios.main=flow('Rotate').act('probe:rotate','drop',{angle:90});
     const before=compile(s,'publish').project!;const after=structuredClone(before);after.plugins!.probe!.actions!.rotate!.fields.angle!.tolerance=8;
     expect(featureDiff(before,after).scenarios.find(s=>s.after==='f.a.main')?.reasons).toContain('action-contracts');
   });

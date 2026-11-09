@@ -34,6 +34,8 @@ npm install
 npx joplo dev --open
 ```
 
+The default template lives in `templates/starter` in this repository and is downloaded from the CLI’s exact `v<version>` tag. It explicitly installs and enables ui, diagram, content, and alda; the engine loads no plugins implicitly. For offline use, pass `--template ./templates/starter`; custom repositories use `--template github:owner/repo/path#ref`. Private repositories use `GITHUB_TOKEN` or `gh auth token`. Download or validation failures leave no partial project.
+
 Keep the Board process running. Edit the generated TSX files and watch the demo update. Running `npx joplo dev` from another project adds it to the same Board process. The default port is 4790; `--port <port>` selects a port when starting a new Board.
 
 ## What you can show
@@ -62,7 +64,7 @@ npx joplo skill install                  # inside a Joplo project: skills matchi
 ```
 
 - Use `npx skills add` when you want agents to discover Joplo in any repository, for example to start a new prototype. The [skills CLI](https://github.com/vercel-labs/skills) installs to `.claude/skills/` for Claude Code and `.agents/skills/` for Codex.
-- `npx joplo init` installs the same skills (and an `AGENTS.md` block) into new projects; pass `--no-skill` to skip. Installing skills first and then running `npx joplo init .` works: agent and Git files (`.git`, `.gitignore`, `.agents/`, `.claude/`, `AGENTS.md`, `skills-lock.json`, …) do not make the directory non-empty, skills already installed at the same version are skipped, and skills you edited are kept (`npx joplo skill install --force` replaces them). Other existing files still need `init . --keep`.
+- `npx joplo init` installs engine skills, topics, four plugin skills and their index (and an `AGENTS.md` block) into new projects; pass `--no-skill` to skip. Installing skills first and then running `npx joplo init .` works: agent and Git files (`.git`, `.gitignore`, `.agents/`, `.claude/`, `AGENTS.md`, `skills-lock.json`, …) do not make the directory non-empty, skills already installed at the same version are skipped, and skills you edited are kept (`npx joplo skill install --force` replaces them). Other existing files still need `init . --keep`.
 - Use `npx joplo skill install` inside a project that already has `joplo.config.ts`. It writes `.claude/skills/joplo*/SKILL.md`, updates untouched files when Joplo is upgraded, never overwrites files you edited (`--diff` to compare, `--force` to replace), and with `--agents-md` also writes a managed block into `AGENTS.md`.
 - The skills are thin on purpose: a mental model, the start order, and common pitfalls. The detailed API always comes from `npx joplo skill <topic>`, which matches the installed version.
 
@@ -81,7 +83,7 @@ npx joplo skill review
 npx joplo skill install --agents-md
 ```
 
-Topics include `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `content` (explainers, tutorials, and news explainers that play like a video: the default content plugin’s `Canvas` world, `camera()`, morphing objects, chapters that continue with `flow({ from })`), `plugins` (action contracts, engine-clock presenters and extension contracts), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, `review` (local listening, Share polling, prompt acknowledgement, version isolation, recovery, and best practices), `diff` (compare feature changes across builds and in PR CI), and `publish` (build, share, embed, review choices, portfolios and SEO, Pro passwords, narration (Joplo Cloud characters, keys, joplo voice)). `npx joplo components <Name>` prints the props and an example for one component. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
+Engine topics are `authoring`, `story`, `demo`, `focus`, `cases`, `check`, `selection`, `review`, `diff`, `publish`, and `plugins`. Component recipes belong to enabled plugins: read `joplo skill ui/components`, `diagram`, `content`, `alda`, and their subtopics. `joplo skill install` writes engine entries, topic files, plugin entries, and an index; rerun after adding or removing plugins. Edited skills are protected. Individual pitfalls are retained, and starting feedback watch after development remains Required.
 
 Use a second terminal while the Board is running:
 
@@ -120,7 +122,7 @@ themes/brand.css
 dist/
 ```
 
-Routes follow folders. Layouts provide the shell and named Slots; Options add content to those Slots or define new routes. A Feature holds its goal, cases, rules, and `pick`. Scenarios describe behavior with `flow()`. Use `@joplo-app/kit` for the authoring API and `@joplo-app/kit/ui` for components named and configured like Mantine.
+Routes follow folders. Layouts provide the shell and named Slots; Options add content to those Slots or define new routes. A Feature holds its goal, cases, rules, and `pick`. Scenarios describe behavior with `flow()`. Use `@joplo-app/kit` for the authoring API and `@joplo-app/plugin-ui` for components named and configured like Mantine.
 
 Reuse modules inside the project with `shared/`. Keep runtime state in `.joplo/` and build output in `dist/` out of Git. See the authoring topic for exact APIs and [Themes](docs/themes.md) for CSS variables.
 
@@ -255,6 +257,6 @@ Joplo accepts issues, not pull requests. Report bugs and request features in [is
 
 [PolyForm Shield 1.0.0](LICENSE). Anyone can use Joplo for free, including at companies and for commercial work; you may not use it to provide a product that competes with Joplo or Joplo Cloud. See [COMMERCIAL.md](COMMERCIAL.md). Versions 0.2.15 and earlier were released under Apache-2.0. Bundled fonts use [SIL OFL 1.1](packages/web/src/fonts/OFL.txt).
 
-The default `@joplo-app/plugin-content` provides `content:Canvas`, `camera()`, FLIP properties and the `content:studio` theme. Import its authoring API directly from the package; declare it at the Joplo version in your project dependencies. `npx joplo skill content` covers continuous visual explainers; see [llm-explainer](examples/llm-explainer) and the [plugin contracts](docs/plugins.md). Use `flow({ from })` for chapter continuity and `joplo render --sheet --columns 3` for storyboards.
+The template explicitly enables `@joplo-app/plugin-content`, which provides `content:Canvas`, `camera()`, FLIP properties and the `content:studio` theme. Import its authoring API directly from the package; declare it at the Joplo version in project dependencies and enable it in config.plugins. `npx joplo skill content` covers continuous visual explainers; see [llm-explainer](examples/llm-explainer) and the [plugin contracts](docs/plugins.md). Use `flow({ from })` for chapter continuity and `joplo render --sheet --columns 3` for storyboards.
 
-Standard UI and HTML fallbacks are provided by the default `@joplo-app/plugin-ui`. Keep importing author markers from `@joplo-app/kit/ui`; IR uses `ui:Button` / `ui:div`. `joplo components` and `joplo skill components` read enabled plugin manifests. Recompile old bare-name IR before comparison; existing shares retain their bundled runtime. See [plugin contracts](docs/plugins.md).
+Standard UI and HTML are provided by `@joplo-app/plugin-ui`: import markers directly from that package and explicitly enable it in config.plugins. IR uses `ui:Button` / `ui:div`. `joplo components` reads enabled plugin manifests; `joplo skill ui/components` provides the full UI guide. Import diagram components and trace from `@joplo-app/plugin-diagram`. See [plugin contracts](docs/plugins.md).

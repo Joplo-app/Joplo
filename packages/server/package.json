@@ -1,7 +1,7 @@
 {
   "name": "@joplo-app/server",
   "version": "0.2.18",
-  "description": "Joplo 本地服务：dev 看板、build 发布站、render 截图",
+  "description": "Joplo \u672c\u5730\u670d\u52a1\uff1adev \u770b\u677f\u3001build \u53d1\u5e03\u7ad9\u3001render \u622a\u56fe",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "exports": {
@@ -25,7 +25,6 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@joplo-app/core-legacy": "npm:@joplo-app/core@0.2.10",
     "@vitejs/plugin-react": "6.2.1",
     "playwright": "1.64.1",
     "playwright-core": "1.64.1"

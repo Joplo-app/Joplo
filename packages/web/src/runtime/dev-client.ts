@@ -12,7 +12,7 @@ import type { AppearanceFont, AppearanceStroke, Diagnostic, Project, Selection, 
 import type { SelectionInput, SelectionWriteResult } from './demo';
 import { loadPluginRuntimes } from '../renderer/plugins';
 
-/** plugins（D86）：插件 id → 运行时地址（Vite 的 /@fs/…）；收到即载入（renderer/plugins.ts）。 */
+/** plugins（D86）：插件 id → 运行时地址（源码 Vite /@fs/… 或预构建看板的打包模块端点）；收到即载入（renderer/plugins.ts）。 */
 export type DevPayload = { projectId?: string; version: number; ok: boolean; project: Project | null; diagnostics: Diagnostic[]; home: string | null; plugins?: Record<string, string> };
 
 export type ProjectSummary = {
@@ -72,7 +72,7 @@ export async function fetchIR(projectId: string): Promise<DevPayload | { error: 
     const res = await fetch(`/__joplo/p/${enc(projectId)}/ir`, { cache: 'no-store' });
     if (!res.ok) return { error: await readError(res), status: res.status };
     const payload = (await res.json()) as DevPayload;
-    loadPluginRuntimes(payload.plugins);
+    await loadPluginRuntimes(payload.plugins);
     return payload;
   } catch (e) {
     return { error: m.board.couldNotConnectToJoploDev(errMsg(e)) };
@@ -86,10 +86,11 @@ const hot = (): Hot | null => (import.meta.hot as unknown as Hot | undefined) ??
 export function subscribeIR(projectId: string, cb: (p: DevPayload) => void, onConnection?: (connected: boolean) => void): () => void {
   const h = hot();
   if (!h) return () => undefined;
+  let revision=0,closed=false;
   const handler = (p: DevPayload) => {
     if (p.projectId !== projectId) return;
-    loadPluginRuntimes(p.plugins);
-    cb(p);
+    const current=++revision;
+    void loadPluginRuntimes(p.plugins).then(()=>{if(!closed&&current===revision)cb(p);});
   };
   const up = () => onConnection?.(true);
   const down = () => onConnection?.(false);
@@ -98,6 +99,7 @@ export function subscribeIR(projectId: string, cb: (p: DevPayload) => void, onCo
   h.on('vite:ws:disconnect', down);
   onConnection?.(true);
   return () => {
+    closed=true;
     h.off('joplo:ir', handler);
     h.off('vite:ws:connect', up);
     h.off('vite:ws:disconnect', down);

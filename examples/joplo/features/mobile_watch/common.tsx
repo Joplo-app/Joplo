@@ -6,7 +6,7 @@
  * 画面里的“演示”用一块深色画框代替（标题随章节变化），这里关心的是播放器，不是演示内容。
  */
 import { $, eq, layer, not, oneOf, type Bind } from '@joplo-app/kit';
-import { ActionIcon, Badge, Box, Button, Group, ListRow, Phone, Progress, Stack, Text } from '@joplo-app/kit/ui';
+import { ActionIcon, Badge, Box, Button, Group, ListRow, Phone, Progress, Stack, Text } from '@joplo-app/plugin-ui';
 
 const ui = $.ui as unknown as Record<string, Bind>;
 

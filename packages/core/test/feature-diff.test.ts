@@ -1,6 +1,7 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { flow, config, feature, option, page } from '@joplo-app/kit';
+import { flow, feature, option, page } from '@joplo-app/kit';
 import { compile, compareSteps, featureDiff, stateAt } from '../src/index.ts';
 import { diffProject, step } from './fixtures/feature-diff.ts';
 import type { AuthoringProject } from '../src/compile.ts';

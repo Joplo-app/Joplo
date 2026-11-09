@@ -1,3 +1,4 @@
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
 /**
  * `joplo setup export` 与 render 缺少导出组件时的行为（D66）。
  * 不变量：① 任何命令都不改项目的 package.json / lockfile / node_modules；② 非交互环境不自动下载；
@@ -143,6 +144,7 @@ describe('真实 server：项目文件不变（不变量 ① ③ ⑤）', () => 
     project = path.join(tmp, 'project');
     out = path.join(tmp, 'shots');
     fs.cpSync(EXAMPLE, project, { recursive: true, filter: (s) => !/[/\\](\.joplo|dist|node_modules|exports)([/\\]|$)/.test(s.slice(EXAMPLE.length)) });
+  installFixturePlugins(project);
     fs.writeFileSync(path.join(project, 'package.json'), '{"name":"invite","devDependencies":{"joplo":"0.2.6","@joplo-app/kit":"0.2.6"}}\n');
     fs.writeFileSync(path.join(project, 'package-lock.json'), '{"lockfileVersion":3}\n');
     process.env.JOPLO_HOME = home;

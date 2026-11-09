@@ -1,6 +1,6 @@
 import { music } from '@joplo-app/plugin-alda';
 import { $, done, explain, flow, option, set, spotlight, toast, undecided, uses } from '@joplo-app/kit';
-import { Alert, Badge, Button, Divider, Group, Loader, Stack, Switch, Text, Title } from '@joplo-app/kit/ui';
+import { Alert, Badge, Button, Divider, Group, Loader, Stack, Switch, Text, Title } from '@joplo-app/plugin-ui';
 
 import { Home } from '../../../shared/home.tsx';
 

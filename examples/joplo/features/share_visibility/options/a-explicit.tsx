@@ -1,5 +1,5 @@
 import { $, and, done, eq, flow, layer, not, option, set } from '@joplo-app/kit';
-import { Alert, Anchor, Badge, Button, Group, Paper, PasswordInput, Stack, Text, Title } from '@joplo-app/kit/ui';
+import { Alert, Anchor, Badge, Button, Group, Paper, PasswordInput, Stack, Text, Title } from '@joplo-app/plugin-ui';
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
 const initial = { visibility: 'public', review: false, scoped: false, result: false, pro: false, passwordEditing: false, passwordProtected: false, passwordRemove: false };

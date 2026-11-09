@@ -1,3 +1,4 @@
+import { fixtureConfigSource } from '../../../scripts/test/fixtures.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,8 +16,8 @@ it('publishes scoped fake WAV artifacts offline without author text, paths or lo
       // PRIVATE_LOCAL_IMPLEMENTATION
       const b=Buffer.alloc(44+800);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(8000,24);b.writeUInt32LE(8000,28);b.writeUInt16LE(1,32);b.writeUInt16LE(8,34);b.write('data',36);b.writeUInt32LE(800,40);for(let i=44;i<b.length;i++)b[i]=128+Math.round(40*Math.sin(i*input.length));return b;
     }}}};`);
-    fs.writeFileSync(path.join(dir,'joplo.config.ts'), `import {config} from '@joplo-app/kit';
-      export default config({name:'Media fixture',plugins:[{kind:'plugin',apiVersion:2,id:'fake',title:'Fake WAV',components:{},runtime:${JSON.stringify(path.join(dir,'runtime.ts'))},local:${JSON.stringify(path.join(dir,'local.ts'))},compile:{effect(e,ctx){return {media:[{track:'bgm',action:'play',resource:ctx.resource({compiler:'wav',input:e.payload}),loop:true}]};}}}]});`);
+    fs.writeFileSync(path.join(dir,'joplo.config.ts'), fixtureConfigSource(`import {config} from '@joplo-app/kit';
+      export default config({name:'Media fixture',plugins:[{kind:'plugin',apiVersion:2,id:'fake',title:'Fake WAV',components:{},runtime:${JSON.stringify(path.join(dir,'runtime.ts'))},local:${JSON.stringify(path.join(dir,'local.ts'))},compile:{effect(e,ctx){return {media:[{track:'bgm',action:'play',resource:ctx.resource({compiler:'wav',input:e.payload}),loop:true}]};}}}]});`));
     fs.writeFileSync(path.join(dir,'routes/page.tsx'), `import {page} from '@joplo-app/kit';export default page({title:'Home'},<div>Home</div>);`);
     fs.writeFileSync(path.join(dir,'features/f/feature.ts'), `import {feature} from '@joplo-app/kit';export default feature({name:'F',goal:'g',cases:{},pick:'a'});`);
     fs.writeFileSync(path.join(dir,'features/f/options/a.tsx'), `import {option,flow} from '@joplo-app/kit';import {pluginEffect} from '@joplo-app/kit/plugin';export default option({name:'A',idea:'i',on:{},scenarios:{a:flow('Included',{start:'/'}).system('Play',pluginEffect('fake','play','PRIVATE_SCORE_ALPHA')),b:flow('Omitted',{start:'/'}).system('Play',pluginEffect('fake','play','PRIVATE_SCORE_BETA'))}});`);

@@ -5,7 +5,7 @@
  * 被演示的原型（邀请成员）只画个轮廓，这里关心的是发布浮层。
  */
 import { $, and, done, eq, flow, highlight, hold, layer, narrate, not, numbered, or, set, shot, spotlight, callout, uses, type Bind, type EffectDef } from '@joplo-app/kit';
-import { Alert, Anchor, Badge, Box, Button, Group, Paper, Progress, Stack, Terminal, Text } from '@joplo-app/kit/ui';
+import { Alert, Anchor, Badge, Box, Button, Group, Paper, Progress, Stack, Terminal, Text } from '@joplo-app/plugin-ui';
 
 const ui = $.ui as unknown as Record<string, Bind>;
 export type Variant = 'a' | 'b';

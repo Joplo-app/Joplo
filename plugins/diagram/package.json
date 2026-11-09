@@ -12,7 +12,6 @@
     "./node": "./src/elk.ts",
     "./runtime": "./src/runtime.tsx",
     "./schema": "./src/schema.ts",
-    "./legacy": "./src/legacy.ts",
     "./catalog": "./src/catalog.ts",
     "./guide": "./src/guide.ts",
     "./package.json": "./package.json"
@@ -65,10 +64,6 @@
       "./schema": {
         "types": "./dist/schema.d.ts",
         "default": "./dist/schema.js"
-      },
-      "./legacy": {
-        "types": "./dist/legacy.d.ts",
-        "default": "./dist/legacy.js"
       },
       "./catalog": {
         "types": "./dist/catalog.d.ts",

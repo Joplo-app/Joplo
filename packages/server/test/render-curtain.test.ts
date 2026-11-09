@@ -1,3 +1,5 @@
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
+import { fixtureConfigSource } from '../../../scripts/test/fixtures.ts';
 /** Real render-route regression: authored z-index must never paint above cards/covers. */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,10 +23,11 @@ describe('render curtain stacking (real Chromium)', () => {
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, content);
     };
-    write('joplo.config.ts', `import { config } from '@joplo-app/kit'; export default config({ name: 'Curtain fixture', home: '/' });`);
+    installFixturePlugins(root);
+    write('joplo.config.ts', fixtureConfigSource(`import { config } from '@joplo-app/kit'; export default config({ name: 'Curtain fixture', home: '/' });`));
     for (const [route, viewport] of [['page.tsx', 'desktop'], ['phone/page.tsx', 'mobile']]) {
       write(`routes/${route}`, `import { $, page } from '@joplo-app/kit';
-import { Box, Diagram, Terminal } from '@joplo-app/kit/ui';
+import { Box, Terminal } from '@joplo-app/plugin-ui'; import { Diagram } from '@joplo-app/plugin-diagram';
 export default page({title:'Prototype',layout:false,viewport:'${viewport}'},
 <Box id="foreground" style={{position:'absolute',inset:0,zIndex:9999,background:'#ffffff'}}>
   <Terminal title="Prototype terminal"><Terminal.Command>design feature</Terminal.Command><Terminal.Output id="result">{$.ui.status}</Terminal.Output></Terminal>

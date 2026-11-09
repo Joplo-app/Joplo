@@ -1,6 +1,8 @@
+import '../../../scripts/test/render-fixtures.ts';
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, embedScenarioIds, Project, type AuthoringProject } from '@joplo-app/core';
 import { publishPayload } from '../../server/src/build';

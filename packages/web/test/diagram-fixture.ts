@@ -1,14 +1,15 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /** D69 测试用的小项目：三组、四个节点，D 逐段出现，有一条连到分组的连线。 */
 import { expect } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { $, config, feature, flow, layer, option, page, set, shot, trace } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
+import { $, feature, flow, layer, option, page, set, shot } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
-import { elkLayout } from '@joplo-app/core/node';
+import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
-const D = ui.Diagram;
+const D = uiDiagram.Diagram;
 
 export function project(): Project {
   const home = page({ title: 'P', layout: false }, h(ui.Text, { id: 'note' }, 'x'));
@@ -46,7 +47,7 @@ export function project(): Project {
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
   };
-  const r = compile(src, 'dev', { layout: elkLayout });
+  const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
   return r.project!;
 }
@@ -54,7 +55,7 @@ export function project(): Project {
 
 /** 状态机夹具：value 绑定 data.order.status，第 1 步支付、第 2 步不变、第 3 步发货。 */
 export function machineProject(): Project {
-  const SM = ui.StateMachine;
+  const SM = uiDiagram.StateMachine;
   const home = page({ title: 'P', layout: false }, h(ui.Text, { id: 'note' }, 'x'));
   const sm = h(
     SM,
@@ -85,7 +86,7 @@ export function machineProject(): Project {
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
   };
-  const r = compile(src, 'dev', { layout: elkLayout });
+  const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
   return r.project!;
 }

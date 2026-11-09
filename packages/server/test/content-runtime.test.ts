@@ -1,3 +1,4 @@
+import { fixtureConfigSource } from '../../../scripts/test/fixtures.ts';
 /** Real browser proof for universal attributes/observers, plugin themes and deterministic content playback. */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -20,7 +21,7 @@ describe('content and a second attribute/theme plugin (real Chromium)', () => {
     fs.symlinkSync(path.join(REPO, 'packages/core'), path.join(root, 'node_modules/@joplo-app/core'));
     fs.symlinkSync(path.join(REPO, 'plugins/content'), path.join(root, 'node_modules/@joplo-app/plugin-content'));
     const write = (name: string, source: string) => { const f = path.join(root, name); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, source); };
-    write('joplo.config.ts', `import { config } from '@joplo-app/kit'; import probe from './probe.ts'; export default config({ name: 'Content fixture', theme: 'probe:night', plugins: [probe] });`);
+    write('joplo.config.ts', fixtureConfigSource(`import { config } from '@joplo-app/kit'; import probe from './probe.ts'; export default config({ name: 'Content fixture', theme: 'probe:night', plugins: [probe] });`));
     write('probe.ts', `import { definePlugin } from '@joplo-app/kit/plugin'; export default definePlugin({ id:'probe', title:'Probe', runtime:new URL('./runtime.ts',import.meta.url), components:{}, properties:{badge:{type:'string',attribute:'data-jp-probe-badge'}}, themes:{night:':root{--jp-ink:#ddeeff;--jp-bg:#111827;--jp-stroke:clean} [data-jp-probe-badge]{color:rgb(221,238,255)}'} });`);
     write('runtime.ts', `import { defineRuntime } from '@joplo-app/kit/plugin'; export default defineRuntime({ id:'probe', components:{}, observe(root) { window.observedMounts=(window.observedMounts??0)+1; return { update({frame}) { root.dataset.probePosition=String(frame.position); root.dataset.probeBadge=root.querySelector('[data-jp-probe-badge]')?.getAttribute('data-jp-probe-badge'); }, destroy() {window.observedDestroys=(window.observedDestroys??0)+1;} }; } });`);
     write('routes/page.tsx', `import { $, page } from '@joplo-app/kit'; import { Canvas } from '@joplo-app/plugin-content';
@@ -29,7 +30,7 @@ export default page({title:'World',layout:false}, <Canvas id="world"><div id="mo
     write('features/f/options/a.ts', `import { $, flow, option, patch, narrate } from '@joplo-app/kit'; import { camera } from '@joplo-app/plugin-content'; export default option({name:'A',idea:'I',state:{ui:{x:50,width:100}},scenarios:{s:flow('S',{start:'/'}).system('Move',patch($.ui,{x:400,width:160}),camera('moving',{ms:1200}),narrate('A narrated move')).system('Move again',patch($.ui,{x:700,width:120})).system('Whole',camera())}});`);
     // Test-only React harness, served by the same Vite host/registry as the board. No player hooks are replaced.
     write('harness.ts', `import { createElement } from 'react'; import {createRoot} from 'react-dom/client'; import {stateAt, projectThemes} from '@joplo-app/core'; import {Stage} from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/Stage.tsx'))}; import {ThemeStyles} from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/ThemeStyles.tsx'))}; import {loadPluginRuntimes} from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/plugins.ts'))};
-let reactRoot, project; window.fixtureStart=(p,urls)=>{project=p;loadPluginRuntimes(urls);const el=document.createElement('div');el.id='fixture';document.body.replaceChildren(el);reactRoot=createRoot(el);window.fixtureAt(0,false);};window.fixtureAt=(position,animate)=>reactRoot.render(createElement('div',{},createElement(ThemeStyles,{themes:projectThemes(project)}),createElement(Stage,{project,state:stateAt(project,'f.a.s',position),theme:project.theme,mode:'demo',animate})));window.fixtureUnmount=()=>reactRoot.unmount();`);
+let reactRoot, project; window.fixtureStart=async(p,urls)=>{project=p;await loadPluginRuntimes(urls);const el=document.createElement('div');el.id='fixture';document.body.replaceChildren(el);reactRoot=createRoot(el);window.fixtureAt(0,false);};window.fixtureAt=(position,animate)=>reactRoot.render(createElement('div',{},createElement(ThemeStyles,{themes:projectThemes(project)}),createElement(Stage,{project,state:stateAt(project,'f.a.s',position),theme:project.theme,mode:'demo',animate})));window.fixtureUnmount=()=>reactRoot.unmount();`);
     write('fixture.html', `<!doctype html><style>body{margin:0}</style><script type="module">import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>type=>type;window.__vite_plugin_react_preamble_installed__=true;await import('./harness.ts');</script>`);
     server = await createDev({ projectDir: root, port: 0, watch: false, log: () => undefined });
     expect(server.payload().diagnostics.filter(d => d.severity === 'error')).toEqual([]);
@@ -74,7 +75,7 @@ let reactRoot, project; window.fixtureStart=(p,urls)=>{project=p;loadPluginRunti
     const sequential = await page.locator('#fixture').screenshot();
     await page.evaluate(() => (window as any).fixtureUnmount());
     const payload = server.payload();
-    await page.evaluate(({ project, urls }) => { (window as any).fixtureStart(project, urls); (window as any).fixtureAt(2, false); }, { project: payload.project, urls: payload.plugins });
+    await page.evaluate(async ({ project, urls }) => { await (window as any).fixtureStart(project, urls); (window as any).fixtureAt(2, false); }, { project: payload.project, urls: payload.plugins });
     await page.waitForSelector('[data-probe-position="2"]');
     await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     expect(await page.locator('#fixture').screenshot()).toEqual(sequential);

@@ -1,5 +1,4 @@
 import { pluginSpec } from './catalog.ts';
-import { legacyDiagnostics } from './plugins/legacy.ts';
 import { orderedFeatures } from './features.ts';
 import { Project, type SceneNode } from './schema.ts';
 import { CAPTION_MAX, CARD_POINTS_MAX, DESCRIPTION_MAX, EXPLAIN_MAX, SAY_MAX, isInteractiveType, SCENARIO_MS_MAX, captionLength } from './catalog.ts';
@@ -36,7 +35,6 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     warning: diagnostics.filter(d => d.severity === 'warning').length,
     info: diagnostics.filter(d => d.severity === 'info').length,
   } });
-  diagnostics.push(...legacyDiagnostics(project));
   const parsed = Project.safeParse(project);
   if (!parsed.success) {
     // 与编译器同一套：定位到最近的作者元素，同一根因合并成一条（schema-issues.ts）

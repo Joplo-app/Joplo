@@ -3,10 +3,10 @@
  * 导出视频弹窗和检查抽屉。两个方案只在左栏的组织方式上不同。p 是元素 ID 前缀。
  */
 import { $, done, eq, flow, not, set, toast, uses, type JNode } from '@joplo-app/kit';
-import {
-  ActionIcon, Alert, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, DataTable, Drawer, Group, List, Modal,
-  Paper, Progress, Select, Stack, Stepper, Switch, Text, Title,
-} from '@joplo-app/kit/ui';
+import { ActionIcon, Alert, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, DataTable, Drawer, Group, List, Modal, Paper, Progress, Select, Stack, Stepper, Switch, Text, Title } from '@joplo-app/plugin-ui';
+
+
+
 
 const members = [
   { name: '王芳', email: 'wang.fang@example.com', role: '管理员' },

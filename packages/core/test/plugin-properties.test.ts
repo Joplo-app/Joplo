@@ -1,7 +1,8 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { config, feature, flow, layer, option, page, set, $ } from '@joplo-app/kit';
+import { feature, flow, layer, option, page, set, $ } from '@joplo-app/kit';
 import { definePlugin, pluginComponent, pluginEffect, type PluginDef } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, projectThemes, stateAt, cameraAt, type AuthoringProject } from '../src/index.ts';

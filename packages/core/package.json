@@ -1,7 +1,7 @@
 {
   "name": "@joplo-app/core",
   "version": "0.2.18",
-  "description": "Joplo 编译器、校验器与播放器（IR v2）",
+  "description": "Joplo \u7f16\u8bd1\u5668\u3001\u6821\u9a8c\u5668\u4e0e\u64ad\u653e\u5668\uff08IR v2\uff09",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "exports": {
@@ -19,10 +19,7 @@
   },
   "dependencies": {
     "@joplo-app/kit": "workspace:*",
-    "zod": "4.6.7",
-    "@joplo-app/plugin-diagram": "workspace:*",
-    "@joplo-app/plugin-content": "workspace:*",
-    "@joplo-app/plugin-ui": "workspace:*"
+    "zod": "4.6.7"
   },
   "engines": {
     "node": ">=22"
@@ -53,6 +50,5 @@
   "homepage": "https://github.com/Joplo-app/Joplo#readme",
   "bugs": {
     "url": "https://github.com/Joplo-app/Joplo/issues"
-  },
-  "devDependencies": {}
+  }
 }

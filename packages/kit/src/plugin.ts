@@ -16,7 +16,8 @@
  *   资源没准备好时用 ctx.hold() 让截图等待。
  */
 import { component, type JNode } from './node.ts';
-import type { JoploProps } from './ui.ts';
+import type { JoploProps } from './props.ts';
+export type { JoploProps } from './props.ts';
 
 /** 插件接口版本：v2 宿主同时兼容 v1 的 mount 运行时。 */
 export const PLUGIN_API_VERSION = 2 as const;
@@ -142,11 +143,9 @@ export type PluginDef = {
   data?: PluginDataSpec;
   compile?: PluginCompileHooks;
   schemas?: { node?: PluginDataSchema; step?: PluginDataSchema };
-  /** 已迁移裸类型名：宿主只用于给出改写提示。 */
-  legacyTypes?: Record<string, string>;
   /** 小写字母开头，组件类型名为 `<id>:<组件名>`，例如 scene3d:Scene。 */
   id: string;
-  apiVersion: 1 | typeof PLUGIN_API_VERSION;
+  apiVersion: typeof PLUGIN_API_VERSION;
   title: string;
   description?: string;
   /** 插件包的版本（展示用）。 */
@@ -154,6 +153,10 @@ export type PluginDef = {
   components: Record<string, PluginComponentSpec>;
   /** 给 Agent 读的用法（Markdown）：何时用、怎么写、和步骤怎样配合、常见的坑。 */
   skill?: string;
+  /** Additional versioned agent guides, keyed by topic. No runtime/IR content. */
+  skillTopics?: Record<string, { description: string; body: string }>;
+  /** Published author package; used for discovery and missing-plugin recovery. */
+  packageName?: string;
   /** 运行时入口的绝对路径（definePlugin 接受 `new URL('./runtime.js', import.meta.url)`）。 */
   runtime: string;
   /** Node-only entry; excluded from browser bundles and IR. */
@@ -168,9 +171,13 @@ function fileOf(u: string | URL): string {
 }
 
 /** 插件入口：返回清单与编译钩子。id、组件名、接口版本不对时直接抛错（启用插件时就能看到）。 */
-export function definePlugin(p: Omit<PluginDef, 'kind' | 'runtime' | 'apiVersion' | 'local'> & { apiVersion?: 1 | typeof PLUGIN_API_VERSION; runtime: string | URL; local?: string | URL }): PluginDef {
+export function definePlugin(p: Omit<PluginDef, 'kind' | 'runtime' | 'apiVersion' | 'local'> & { apiVersion?: typeof PLUGIN_API_VERSION; runtime: string | URL; local?: string | URL }): PluginDef {
   if (!ID.test(p.id)) throw new Error(`Joplo plugin id "${p.id}" must be lowercase letters, digits, and -, starting with a letter`);
-  if (p.apiVersion !== undefined && p.apiVersion !== 1 && p.apiVersion !== PLUGIN_API_VERSION) throw new Error(`Joplo plugin ${p.id} targets plugin API ${p.apiVersion}; this Joplo supports ${PLUGIN_API_VERSION}`);
+  if (p.apiVersion !== undefined && p.apiVersion !== PLUGIN_API_VERSION) throw new Error(`Joplo plugin ${p.id} targets plugin API ${p.apiVersion}; this Joplo supports ${PLUGIN_API_VERSION}`);
+  if (p.skillTopics) for (const [key, topic] of Object.entries(p.skillTopics)) {
+    if (!/^[a-z][a-z0-9-]*$/.test(key) || !topic || typeof topic.description !== 'string' || !topic.description.trim() || typeof topic.body !== 'string' || !topic.body.trim()) throw new Error(`Plugin ${p.id}: invalid skill topic ${key}`);
+  }
+  if (p.packageName && !/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/.test(p.packageName)) throw new Error(`Plugin ${p.id}: invalid author package name`);
   for (const [name, spec] of Object.entries(p.components)) {
     if (!NAME.test(name) || /^[a-z]/.test(name) && spec.intrinsic !== name) throw new Error(`Joplo plugin ${p.id}: component name "${name}" must be PascalCase (dots for compound parts)`);
     if (spec.parent !== undefined && !p.components[spec.parent]) throw new Error(`Joplo plugin ${p.id}: ${name}.parent "${spec.parent}" is not a component of this plugin`);
@@ -187,7 +194,7 @@ type Marker = (props: JoploProps) => any;
 /** 插件组件的 JSX 标记：`export const Scene3D = Object.assign(pluginComponent(plugin, 'Scene'), { Target: pluginComponent(plugin, 'Target') })`。 */
 export function pluginComponent(plugin: PluginDef, name: string): Marker {
   if (!plugin.components[name]) throw new Error(`Joplo plugin ${plugin.id} has no component ${name}`);
-  return component(pluginType(plugin.id, name)) as unknown as Marker;
+  return component(pluginType(plugin.id, name), plugin.packageName) as unknown as Marker;
 }
 
 // ---------- 运行时（浏览器端）----------
@@ -283,9 +290,9 @@ export type ViewportDecoration = {
   size(width:number,height:number):{width:number;height:number};
   react: import('react').ComponentType<{width:number;height:number;scale?:number;seed?:string;children?:import('react').ReactNode}>;
 };
-export type PluginRuntime = { id: string; apiVersion: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; viewports?: Record<string, ViewportDecoration>; media?: MediaFactory; observe?: PluginObserve };
+export type PluginRuntime = { id: string; apiVersion: typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; viewports?: Record<string, ViewportDecoration>; media?: MediaFactory; observe?: PluginObserve };
 
 /** 插件运行时：mount 适配框架无关渲染；react 接收 ctx，由宿主 React 树渲染。 */
-export function defineRuntime(r: { id: string; apiVersion?: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; viewports?: Record<string, ViewportDecoration>; media?: MediaFactory; observe?: PluginObserve }): PluginRuntime {
+export function defineRuntime(r: { id: string; apiVersion?: typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; viewports?: Record<string, ViewportDecoration>; media?: MediaFactory; observe?: PluginObserve }): PluginRuntime {
   return { ...r, apiVersion: PLUGIN_API_VERSION };
 }

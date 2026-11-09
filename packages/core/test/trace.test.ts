@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { diagramStateAt } from '../../../plugins/diagram/src/state.ts';
 import { nodeData, frameData } from '../../../plugins/diagram/src/data.ts';
 /**
@@ -5,14 +6,14 @@ import { nodeData, frameData } from '../../../plugins/diagram/src/data.ts';
  * trace 相当于 shot（导演层、镜头目标、与 shot 合并）、发布站保留，以及旧写法（$.ui 绑定 + set）结果不变。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { $, config, feature, flow, layer, option, page, set, shot, trace, type Flow } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
+import { $, feature, flow, layer, option, page, set, shot, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, resolveProps, stateAt, type AuthoringProject, type Project } from '../src/index.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
-const D = ui.Diagram;
+const D = uiDiagram.Diagram;
 
 /** 客户端层：发送按钮；后端层：app → biz → billing / brain，biz ⇄ brain 往返，brain → llm，queue → billing。 */
 function build(steps: (f: Flow) => Flow, opts: { edgeState?: boolean; extraEdges?: unknown[] } = {}) {

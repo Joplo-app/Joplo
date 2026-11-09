@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 import { expect, test } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readAuthor, AuthorLink } from '../src/site/author';

@@ -5,7 +5,7 @@
  *   每勾一项，右边对应的图就亮起来（金色 = 本次改选）。
  */
 import { $, eq, oneOf, type Bind } from '@joplo-app/kit';
-import { Radio } from '@joplo-app/kit/ui';
+import { Radio } from '@joplo-app/plugin-ui';
 import { Frame, Hl, Key } from './frame.tsx';
 import { Hemicycle, blankSeats } from './hemicycle.tsx';
 import { C } from './palette.ts';

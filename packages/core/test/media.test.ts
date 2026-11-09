@@ -1,5 +1,6 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { expect, it } from 'vitest';
-import { config, feature, flow, option, page, hold } from '@joplo-app/kit';
+import { feature, flow, option, page, hold } from '@joplo-app/kit';
 import { definePlugin, pluginEffect } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '../src/compile.ts';
@@ -50,7 +51,7 @@ it('keeps music-vendor names outside core and browser rendering/playback hosts',
  const files=(dir:string):string[]=>readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?files(join(dir,e.name)):/\.tsx?$/.test(e.name)&&e.name!=='guide.ts'?[join(dir,e.name)]:[]);
  const hits=['packages/core/src','packages/web/src/renderer','packages/web/src/runtime','packages/web/src/player'].flatMap(files).filter(f=>/\balda\b/i.test(readFileSync(f,'utf8')));
  expect(hits).toEqual([]);
- const src=source();src.config.plugins=[];src.features.f!.options.a!.scenarios={s:flow('No music',{start:'/'}).system('Quiet')};
+ const src=source();src.config.plugins=src.config.plugins!.filter(p=>p.id!=='alda');src.features.f!.options.a!.scenarios={s:flow('No music',{start:'/'}).system('Quiet')};
  const p=compile(src,'publish').project!;
  expect(Object.keys(p.plugins??{})).not.toContain('alda');expect(p.scenarios['f.a.s']!.media).toBeUndefined();
 });

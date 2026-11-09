@@ -19,6 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import zlib from 'node:zlib';
+import { writeSkillReadingDemo, verifySkillReadingBrowser } from './skill-reading-smoke.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
@@ -294,6 +295,7 @@ async function smoke() {
     sh(npm, ['install', ...npmFlags], tool);
     const npxJoplo = path.join(tool, 'node_modules/.bin/joplo');
     assert(fs.existsSync(npxJoplo), 'joplo 的 bin 没有安装');
+    for(const name of ['ui','diagram','content','alda'])assert(!fs.existsSync(path.join(tool,'node_modules/@joplo-app',`plugin-${name}`)),`CLI alone must not install plugin-${name}`);
     assert(fs.realpathSync(npxJoplo) === fs.realpathSync(path.join(tool, 'node_modules/joplo/bin/joplo.cjs')), `.bin/joplo 应指向 joplo 入口包，实际 ${fs.realpathSync(npxJoplo)}`);
 
     // Node 版本过低：只打印要求，退出 1
@@ -304,13 +306,13 @@ async function smoke() {
 
     // 2. init
     const ua = { npm_config_user_agent: `npm/11.0.0 node/${process.version} ${process.platform} ${process.arch} workspaces/false` };
-    const init = sh(npxJoplo, ['init', 'my-demo'], base, { env: ua });
+    const init = sh(npxJoplo, ['init', 'my-demo', '--template', path.join(REPO,'templates/starter')], base, { env: ua });
     const lastLine = init.stdout.trim().split('\n').at(-1);
     assert(lastLine === 'Next: cd my-demo && npm install && npx joplo dev', `init 最后一行：${lastLine}`);
     const project = path.join(base, 'my-demo');
     const pkg = readJson(path.join(project, 'package.json'));
     assert(pkg.devDependencies?.joplo === v && pkg.devDependencies?.['@joplo-app/kit'] === v, `init 应写入精确版本 ${v}：${JSON.stringify(pkg.devDependencies)}`);
-    sh(npxJoplo, ['init', 'my-demo'], base, { env: ua, expect: 1 });
+    sh(npxJoplo, ['init', 'my-demo', '--template', path.join(REPO,'templates/starter')], base, { env: ua, expect: 1 });
     // init 默认安装 Agent 技能与 AGENTS.md 托管段（D64），与仓库 skills/ 逐字一致
     for (const name of ['joplo', 'joplo-feedback']) assert(fs.readFileSync(path.join(base, 'my-demo/.claude/skills', name, 'SKILL.md'), 'utf8') === fs.readFileSync(path.join(REPO, 'skills', name, 'SKILL.md'), 'utf8'), `init 应写入与 skills/${name} 相同的技能`);
     assert(fs.readFileSync(path.join(base, 'my-demo/AGENTS.md'), 'utf8').includes('<!-- joplo:start -->'), 'init 应写入 AGENTS.md 托管段');
@@ -322,7 +324,8 @@ async function smoke() {
     fs.writeFileSync(pageFile, addSmokeClassName(fs.readFileSync(pageFile, 'utf8')));
 
     // 3. npm install：registry 上还没有这些版本，改用 tarball（版本号已在上面断言）
-    pkg.devDependencies = { joplo: tgz.joplo, '@joplo-app/kit': tgz['@joplo-app/kit'], '@joplo-app/plugin-alda': tgz['@joplo-app/plugin-alda'], '@joplo-app/plugin-content': tgz['@joplo-app/plugin-content'] };
+    for(const name of ['joplo','@joplo-app/kit',...['ui','diagram','content','alda'].map(p=>`@joplo-app/plugin-${p}`)])assert(pkg.devDependencies[name]===v,`Template must pin ${name} to ${v}`);
+    pkg.devDependencies = Object.fromEntries(Object.keys(pkg.devDependencies).map(name=>[name,tgz[name]??pkg.devDependencies[name]]));
     pkg.overrides = overrides;
     fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
     sh(npm, ['install', ...npmFlags], project);
@@ -345,6 +348,7 @@ async function smoke() {
     `], project);
 
     sh(process.execPath, ['--input-type=module', '-e', `
+      import ui from '@joplo-app/plugin-ui';
       import content, { Canvas, camera } from '@joplo-app/plugin-content';
       import runtime from '@joplo-app/plugin-content/runtime';
       import { skill } from '@joplo-app/plugin-content/guide';
@@ -353,7 +357,7 @@ async function smoke() {
       import { compile, stateAt } from '@joplo-app/core';
       if (content.id !== 'content' || typeof Canvas !== 'function' || camera('target').plugin !== 'content' || !content.themes.studio || !runtime.observe || !runtime.components.Canvas.react || !skill.includes('motion')) process.exit(1);
       const file = '/smoke/source.tsx';
-      const r = compile({ root:'/smoke', config:{...config({name:'Content smoke',theme:'content:studio'}),file}, layouts:{}, routes:{'/':{...page({title:'World'},jsx(Canvas,{children:jsx('div',{id:'target',motion:'piece',children:'Target'})})),file}}, features:{f:{def:{...feature({name:'F',goal:'G',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'I',scenarios:{s:flow('S',{start:'/'}).system('Aim',camera('target'))}}),file}}}} }, 'publish');
+      const r = compile({ root:'/smoke', config:{...config({name:'Content smoke',theme:'content:studio',plugins:[ui,content]}),file}, layouts:{}, routes:{'/':{...page({title:'World'},jsx(Canvas,{children:jsx('div',{id:'target',motion:'piece',children:'Target'})})),file}}, features:{f:{def:{...feature({name:'F',goal:'G',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'I',scenarios:{s:flow('S',{start:'/'}).system('Aim',camera('target'))}}),file}}}} }, 'publish');
       if (!r.project || r.diagnostics.some(d=>d.severity==='error') || stateAt(r.project,'f.a.s',1).ui.__plugins.content.camera.targets[0] !== 'target' || !r.project.scenarios['f.a.s'].steps[0].ext.content) process.exit(1);
     `], project);
     const contentGuide = sh(joplo, ['skill', 'content'], project);
@@ -365,13 +369,13 @@ async function smoke() {
       import runtime from '@joplo-app/plugin-ui/runtime';
       import { COMPONENT_TYPES } from '@joplo-app/plugin-ui/catalog';
       import { skill } from '@joplo-app/plugin-ui/guide';
-      import { TextInput } from '@joplo-app/kit/ui';
+      import { TextInput } from '@joplo-app/plugin-ui';
       import { config, feature, flow, option, page } from '@joplo-app/kit';
       import { jsx } from '@joplo-app/kit/jsx-runtime';
       import { compile, stateAt } from '@joplo-app/core';
       if (!ui.runtime.endsWith('/runtime.js') || !skill.includes('ui:') || COMPONENT_TYPES.some(name => !runtime.components[name]?.react) || !runtime.viewports.mobile) process.exit(1);
       const file='/smoke/source.tsx';
-      const r=compile({root:'/smoke',config:{...config({name:'UI smoke'}),file},layouts:{},routes:{'/':{...page({title:'UI'},jsx('div',{children:jsx(TextInput,{id:'field'})})),file}},features:{f:{def:{...feature({name:'F',goal:'G',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'I',scenarios:{s:flow('S',{start:'/'}).type('field','value')}}),file}}}}},'publish');
+      const r=compile({root:'/smoke',config:{...config({name:'UI smoke',plugins:[ui]}),file},layouts:{},routes:{'/':{...page({title:'UI'},jsx('div',{children:jsx(TextInput,{id:'field'})})),file}},features:{f:{def:{...feature({name:'F',goal:'G',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'I',scenarios:{s:flow('S',{start:'/'}).type('field','value')}}),file}}}}},'publish');
       if (!r.project || Object.values(r.project.scenes).some(s=>s.root.type!=='ui:div') || stateAt(r.project,'f.a.s',1).inputs.field!=='value') process.exit(1);
     `], project);
     const uiGuide=sh(joplo,['components','Button'],project);
@@ -396,6 +400,10 @@ async function smoke() {
       const installed = fs.readFileSync(path.join(project, `.claude/skills/${name}/SKILL.md`), 'utf8');
       assert(installed === fs.readFileSync(path.join(REPO, 'skills', name, 'SKILL.md'), 'utf8'), `skill install 写出的 ${name}/SKILL.md 应与仓库 skills/${name}/SKILL.md 逐字一致（运行 pnpm skills:build）`);
     }
+
+    writeSkillReadingDemo(project);
+    const readingCheck=sh(joplo,['check'],project);
+    assert(/0 error/.test(readingCheck.stdout),'Demo authored from installed skills must pass check');
 
     // 6. build
     const build = sh(joplo, ['build'], project);
@@ -480,6 +488,8 @@ async function smoke() {
       const sceneId = Object.keys(ir.project.scenes).find((id) => JSON.stringify(ir.project.scenes[id]).includes('"id":"start"'));
       const optionId = Object.keys(ir.project.options)[0];
       assert(sceneId && optionId, '找不到包含按钮 start 的画面');
+      await verifySkillReadingBrowser(REPO,project,`http://127.0.0.1:${port}/#/${pid}/f/example?s=example.a.happy&step=0`);
+      log('  ✓ Installed skills → ui + diagram + content → check → dev Chromium → file:// offline steps 1/2/1');
       const body = JSON.stringify({ selection: { optionId, scenarioId: null, position: 0, sceneId, nodeId: 'start' } });
       const put = await request(port, { method: 'PUT', path: `/__joplo/p/${pid}/selection`, body, headers: { origin: `http://127.0.0.1:${port}`, 'content-type': 'application/json', 'x-joplo-token': token, 'content-length': Buffer.byteLength(body) } });
       assert(put.status === 200, `PUT selection 返回 ${put.status}：${put.text}`);
@@ -542,7 +552,11 @@ async function smoke() {
 
       // 一个进程、多个项目（D39）：在另一个目录再运行 joplo dev → 注册到已运行的看板并退出（不启动第二个进程）
       const second = path.join(base, 'second');
-      sh(joplo, ['init', 'second'], base);
+      sh(joplo, ['init', 'second', '--template', path.join(REPO,'templates/starter')], base);
+      const secondPkg=readJson(path.join(second,'package.json'));
+      secondPkg.devDependencies={...pkg.devDependencies};secondPkg.overrides=overrides;
+      fs.writeFileSync(path.join(second,'package.json'),JSON.stringify(secondPkg,null,2));
+      sh(npm,['install',...npmFlags],second);
       const t2 = Date.now();
       const again = sh(joplo, ['dev', '--port', String(await freePort())], second, { env: { JOPLO_HOME: joploHome }, timeout: 30000 });
       assert(again.stdout.includes(`http://127.0.0.1:${port}/#/`), `第二次 joplo dev 应输出已运行看板的链接：${again.out}`);

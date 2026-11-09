@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { START, graphStructure, layoutSequence, sampleRoute, sequenceStructure, structureKey, type Box, type GraphLayout, type Point } from '../../../plugins/diagram/src/model-index.ts';
-import { elkLayout } from '../src/node.ts';
+import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
 import { agentArch, E, G, N, loopDiagram } from './fixtures/diagram-arch.ts';
 
 const layout = (n: SceneNode) => elkLayout(graphStructure(n), diagramGoal(n));
@@ -111,7 +111,7 @@ describe('确定性与稳定', () => {
     const n = agentArch('a', 'down');
     const file = join(tmpdir(), `joplo-elk-${process.pid}.json`);
     writeFileSync(file, JSON.stringify(graphStructure(n)));
-    const script = `import { readFileSync } from 'node:fs'; import { elkLayout } from ${JSON.stringify(join(import.meta.dirname, '../src/node.ts'))}; process.stdout.write(JSON.stringify(elkLayout(JSON.parse(readFileSync(${JSON.stringify(file)}, 'utf8')))));`;
+    const script = `import { readFileSync } from 'node:fs'; import { elkLayout } from ${JSON.stringify(join(import.meta.dirname, '../../../plugins/diagram/src/elk.ts'))}; process.stdout.write(JSON.stringify(elkLayout(JSON.parse(readFileSync(${JSON.stringify(file)}, 'utf8')))));`;
     const out = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { encoding: 'utf8', cwd: join(import.meta.dirname, '..') });
     expect(JSON.parse(out)).toEqual(layout(n));
   });

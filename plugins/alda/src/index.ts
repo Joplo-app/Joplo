@@ -4,7 +4,7 @@ import packageInfo from './version.json' with { type: 'json' };
 export type MusicOptions = { fadeMs?: number; loop?: boolean; volume?: number };
 /** Keep scores in a project-owned music.ts; no binaries or local execution during authoring. */
 export function alda(scores: Record<string, string>) {
-  return definePlugin({ id: 'alda', title: 'Alda background music', version: packageInfo.version, components: {}, skill,
+  return definePlugin({ packageName: '@joplo-app/plugin-alda', id: 'alda', title: 'Alda background music', version: packageInfo.version, components: {}, skill,
     runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.ts' : './runtime.js', import.meta.url),
     local: new URL(import.meta.url.endsWith('.ts') ? './local.ts' : './local.js', import.meta.url),
     compile: { effect(e, ctx) {

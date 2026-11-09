@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 import { attachLayouts } from '../../../plugins/diagram/src/model-index';
 /**
  * 焦点提示的呈现（D70）：几何纯函数、呈现层不拦截点击（不变量 3）、redact、hold 计入停留与封面时长。
@@ -7,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { SCHEMA_VERSION, holdMsOf, type PlayState, type Project, type Scenario } from '@joplo-app/core';
-import { elkLayout } from '@joplo-app/core/node';
+import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
 import { Stage } from '../src/renderer/Stage';
 import { badgeCenter, placeCallout, spotlightHoles, spotlightPath, visibleRegion } from '../src/renderer/cue-math';
 import { scenarioMs } from '../src/player/cover-content';
@@ -62,7 +63,7 @@ describe('呈现层不拦截点击（不变量 3）', () => {
     root: { id: 'root', type: 'ui:Stack', children: [{ id: 'key', type: 'ui:Code', redact: { falsy: 'ui.revealed' }, children: [{ id: '_t', type: '#text', props: { text: 'sk-live' } }] }, { id: 'go', type: 'ui:Button', children: [{ id: '_g', type: '#text', props: { text: 'Go' } }] }] },
   };
   const sc = { id: 's', optionId: 'o', name: 's', description: '', caseIds: [], mock: { label: 'ok', outcome: 'success' }, initial: { sceneId: 'sc', ui: {}, data: {}, inputs: {} }, expected: '',
-    steps: [{ id: 's#1', kind: 'system', action: { type: 'event', name: 'e' }, caption: 'e', effects: [], ruleIds: [], shots: [], directorLayer: null, traces: [], forks: [], marks: [], cues: [{ kind: 'spotlight', targets: ['key'] }], callouts: [{ target: 'go', text: '点这里' }], hold: 5000 }] };
+    steps: [{ id: 's#1', kind: 'system', action: { type: 'event', name: 'e' }, caption: 'e', effects: [], ruleIds: [], shots: [], directorLayer: null, forks: [], marks: [], cues: [{ kind: 'spotlight', targets: ['key'] }], callouts: [{ target: 'go', text: '点这里' }], hold: 5000 }] };
   const project = { schemaVersion: SCHEMA_VERSION, name: 'p', description: '', theme: 'sketch', themes: {}, mode: 'publish', routes: {}, features: {}, cases: {}, options: {}, rules: {}, scenes: { sc: scene }, scenarios: { s: sc }, issues: {} } as unknown as Project;
   const state = (position: number, revealed = false): PlayState => ({ scenarioId: 's', position, sceneId: 'sc', ui: { revealed }, data: {}, inputs: {}, toasts: [], completed: null, sceneStack: [] });
   it('舞台：提示层存在且不接收指针；redact 按条件给元素加 data-jredact', () => {

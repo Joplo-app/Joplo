@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { nodeData } from '../../../plugins/diagram/src/data.ts';
 /**
  * 集成 0.2.8：关系类图表 v2（D69）× 叙事焦点（D70）的组合规则。
@@ -8,17 +9,17 @@ import { nodeData } from '../../../plugins/diagram/src/data.ts';
  * 4. 焦点与镜头都是步骤的纯函数，任意顺序取同一位置结果相同；IR 里的图表布局不随步骤变化。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { $, callout, config, feature, flow, highlight, layer, option, page, set, shot, spotlight, trace, type Flow } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
+import { $, callout, feature, flow, highlight, layer, option, page, set, shot, spotlight, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, focusAt, inShotFrame, validate, type AuthoringProject, type Project, type SceneNode } from '../src/index.ts';
-import { elkLayout } from '../src/node.ts';
+import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
-const D = ui.Diagram;
-const Q = ui.Sequence;
-const SM = ui.StateMachine;
+const D = uiDiagram.Diagram;
+const Q = uiDiagram.Sequence;
+const SM = uiDiagram.StateMachine;
 const SID = 'f.a.s';
 
 const arch = () =>
@@ -65,7 +66,7 @@ function layered(steps: (f: Flow) => Flow, extra: Record<string, unknown> = {}):
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
   };
-  const dev = compile(src, 'dev', { layout: elkLayout });
+  const dev = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
   expect(dev.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
   return { dev, p: dev.project! };
 }
@@ -94,7 +95,7 @@ function paged(steps: (f: Flow) => Flow): Project {
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
   };
-  const r = compile(src, 'dev', { layout: elkLayout });
+  const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
   return r.project!;
 }

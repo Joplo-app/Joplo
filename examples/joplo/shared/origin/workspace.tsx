@@ -1,5 +1,5 @@
 import { $, and, eq, not, or } from '@joplo-app/kit';
-import { Badge, Box, Button, Divider, Group, Paper, Stack, Text, Title } from '@joplo-app/kit/ui';
+import { Badge, Box, Button, Divider, Group, Paper, Stack, Text, Title } from '@joplo-app/plugin-ui';
 
 export type OriginVariant = 'fold' | 'mode' | 'annotations';
 export const originState = (variant: OriginVariant) => ({

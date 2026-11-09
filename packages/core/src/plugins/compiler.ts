@@ -1,5 +1,4 @@
 import { PluginAction } from '../schema.ts';
-import ui from '@joplo-app/plugin-ui';
 import { ElementTraitsSchema, InheritSchema } from '../traits.ts';
 import { advanceMedia } from '../media.ts';
 import type { MediaCommand, MediaSnapshot, ResourceRequest } from '@joplo-app/kit/plugin';
@@ -7,17 +6,13 @@ import { jsonData, snapshot, object, strings, syncResult, authoringData, materia
 /** Node-side plugin host. Callbacks never enter IR or the player. */
 import { isNode, type JNode } from '@joplo-app/kit/node';
 import { PLUGIN_API_VERSION, type PluginDef, type PluginEffectDef, type PluginReport } from '@joplo-app/kit/plugin';
-import standard from '@joplo-app/plugin-diagram';
-import content from '@joplo-app/plugin-content';
 import { initialState, applyStep, resolveProps, type PlayState } from '../player.ts';
 import type { Scene, SceneNode, Project } from '../schema.ts';
 import type { PluginInfo } from '../catalog.ts';
-import type { GraphLayoutEngine } from '@joplo-app/plugin-diagram/model';
 
-export const standardPlugins: readonly PluginDef[] = [ui, standard, content];
-export type CompileOptions = { layout?: GraphLayoutEngine; onResource?: (request: ResourceRequest) => void; pluginOptions?: Record<string, Record<string, unknown>> };
+export type CompileOptions = { onResource?: (request: ResourceRequest) => void; pluginOptions?: Record<string, Record<string, unknown>> };
 export function enabledPlugins(configured: unknown): unknown[] {
-  return [...standardPlugins, ...(Array.isArray(configured) ? configured : [])];
+  return Array.isArray(configured) ? configured : [];
 }
 function validMediaCommand(value: unknown, plugin: string, owners: ReadonlyMap<string, string>): boolean {
   if (!object(value) || typeof value.track !== 'string' || !/^[a-z][a-z0-9-]*$/.test(value.track)) return false;
@@ -45,7 +40,7 @@ export class PluginCompiler {
       const p = raw as PluginDef | null;
       if (!p || typeof p !== 'object' || p.kind !== 'plugin' || typeof p.id !== 'string' || !p.components || typeof p.components !== 'object' || Array.isArray(p.components)) { report('PLUGIN_INVALID', 'config({ plugins }) entries must be made with definePlugin', source); continue; }
       if (this.defs.has(p.id)) { report('PLUGIN_DUPLICATE', `Plugin ${p.id} is enabled twice in config({ plugins })`, source); continue; }
-      if (p.apiVersion !== 1 && p.apiVersion !== PLUGIN_API_VERSION) { report('PLUGIN_INVALID', `Plugin ${p.id} targets API ${p.apiVersion}; supported: 1, ${PLUGIN_API_VERSION}`, source); continue; }
+      if (p.apiVersion !== PLUGIN_API_VERSION) { report('PLUGIN_INVALID', `Plugin ${p.id} targets API ${p.apiVersion}; supported: ${PLUGIN_API_VERSION}`, source); continue; }
       this.defs.set(p.id, p);
       const properties = this.envelope(p, p.properties ?? {}, source);
       if (!object(properties)) { this.invalid(p, source); continue; }
@@ -119,7 +114,6 @@ export class PluginCompiler {
   node(node: JNode, ids: ReadonlyMap<string, string | undefined>): JNode {
     const p = this.defs.get(node.type.split(':')[0]!);
     if (!p) {
-      for (const def of this.defs.values()) if (def.legacyTypes?.[node.type]) this.report('PLUGIN_LEGACY_TYPE', `Legacy component ${node.type}: recompile with the current kit; use ${def.legacyTypes[node.type]} in IR`, node.source);
       this.validateProperties(node);
       return node;
     }
@@ -142,7 +136,7 @@ export class PluginCompiler {
       const p = this.defs.get(node.type.split(':')[0]!);
       if (p?.compile?.derive) {
         this.run(p, 'derive', node.source, () => {
-          const result = this.output(p, p.compile!.derive!(snapshot(node), { viewport: scene.viewport, report: this.report, options: snapshot(this.options.pluginOptions?.[p.id] ?? { layout: this.options.layout }) }), node.source);
+          const result = this.output(p, p.compile!.derive!(snapshot(node), { viewport: scene.viewport, report: this.report, options: snapshot(this.options.pluginOptions?.[p.id] ?? {}) }), node.source);
           if (result === undefined) return;
           if (!object(result) || Object.keys(result).some(k => k !== 'data' && k !== 'framing')) { this.invalid(p, node.source); return; }
           if (result.data !== undefined) {

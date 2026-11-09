@@ -23,13 +23,15 @@
     "release:verify": "node scripts/release.mjs verify"
   },
   "devDependencies": {
+    "@joplo-app/core": "workspace:*",
+    "@joplo-app/kit": "workspace:*",
+    "@joplo-app/plugin-alda": "workspace:*",
+    "@joplo-app/plugin-content": "workspace:*",
+    "@joplo-app/plugin-diagram": "workspace:*",
+    "@joplo-app/plugin-ui": "workspace:*",
     "@types/node": "^24.0.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vitest": "5.1.0",
-    "@joplo-app/kit": "workspace:*",
-    "@joplo-app/core": "workspace:*",
-    "@joplo-app/plugin-content": "workspace:*",
-    "@joplo-app/plugin-ui": "workspace:*"
+    "vitest": "5.1.0"
   }
 }

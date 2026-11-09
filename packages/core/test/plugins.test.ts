@@ -1,11 +1,12 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 插件组件（D87 阶段 0）：config({ plugins }) 启用；类型名 `<插件 id>:<组件名>`；可操作、父组件声明；
  * 没启用的插件、不存在的组件、写错位置都报错；IR 的 plugins 只有组件声明，不含运行时路径；
  * 步骤可以点插件声明为可操作的元素，回放与 explainClick 认它；没有步骤时 UNBOUND_INTERACTIVE。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, option, page, set, Slot, $ } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, option, page, set, Slot, $ } from '@joplo-app/kit';
 import { definePlugin, pluginComponent } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, explainClick, replay, stateAt, validate, type AuthoringProject } from '../src/index.ts';

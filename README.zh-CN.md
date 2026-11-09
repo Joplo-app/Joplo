@@ -32,6 +32,8 @@ npm install
 npx joplo dev --open
 ```
 
+默认模板位于主仓库 `templates/starter`，按当前 CLI 的 `v<版本>` tag 下载。它显式安装并启用 ui、diagram、content、alda 四个标准插件；引擎不加载默认插件。离线用 `npx joplo init my-demo --template ./templates/starter`，自定义远端用 `--template github:owner/repo/path#ref`；私有仓库读取 `GITHUB_TOKEN` 或 `gh auth token`。下载与模板校验失败不会留下半截项目。
+
 保持看板进程运行，编辑生成的 TSX 文件，演示会自动更新。在另一个项目中运行 `npx joplo dev`，会把项目加入同一个看板进程。默认端口为 4790；启动新看板时可用 `--port <port>` 指定端口。
 
 ## 能演示什么
@@ -60,7 +62,7 @@ npx joplo skill install                  # 在 Joplo 项目里：与项目安装
 ```
 
 - 想让 Agent 在任何仓库里都能发现 Joplo（例如从零开始做一个原型），用 `npx skills add`。[skills CLI](https://github.com/vercel-labs/skills) 会装到 Claude Code 的 `.claude/skills/` 和 Codex 的 `.agents/skills/`。
-- `npx joplo init` 新建项目时默认就装好这两个技能（以及 `AGENTS.md` 托管段），用 `--no-skill` 跳过。先装技能再 `npx joplo init .` 也可以：Agent 与 Git 文件（`.git`、`.gitignore`、`.agents/`、`.claude/`、`AGENTS.md`、`skills-lock.json` 等）不算目录非空；已装好的同版本技能会跳过，你改过的技能会保留（`npx joplo skill install --force` 才覆盖）。还有其他文件时仍需 `init . --keep`。
+- `npx joplo init` 新建项目时默认装好引擎技能、主题、四个插件技能与索引（以及 `AGENTS.md` 托管段），用 `--no-skill` 跳过。先装技能再 `npx joplo init .` 也可以：Agent 与 Git 文件（`.git`、`.gitignore`、`.agents/`、`.claude/`、`AGENTS.md`、`skills-lock.json` 等）不算目录非空；已装好的同版本技能会跳过，你改过的技能会保留（`npx joplo skill install --force` 才覆盖）。还有其他文件时仍需 `init . --keep`。
 - 已经有 `joplo.config.ts` 的项目，用 `npx joplo skill install`：写入 `.claude/skills/joplo*/SKILL.md`，升级 Joplo 后自动更新没改过的文件，不覆盖你改过的文件（`--diff` 看差异、`--force` 覆盖），加 `--agents-md` 还会在 `AGENTS.md` 里写一段托管说明。
 - 技能故意很薄：只有心智模型、起步顺序和最常见的坑；具体 API 一律以 `npx joplo skill <主题>` 为准（与安装的版本一致）。
 
@@ -79,7 +81,7 @@ npx joplo skill review
 npx joplo skill install --agents-md
 ```
 
-主题包括 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`content`（像视频一样播放的讲解、教程、资讯解读：默认 content 插件的一张 `Canvas` 画布、`camera()` 镜头、物件变形、用 `flow({ from })` 接力的章节）、`plugins`（扩展契约）、`demo`、`focus`（每一步看哪里：默认焦点、聚光、强调、标注、编号、停留、遮挡）、`diagram`（分组的架构图、时序图、状态机与镜头取景）、`components`、`cases`、`check`、`selection`、`review`（本地监听、Share 轮询、快速回执、版本隔离、恢复与最佳实践）、`diff`（跨版本与 PR CI 中的功能差异）、`publish`（构建、分享、嵌入、公开 / 私密与评审选择、作品集与 SEO、Pro 密码、朗读）。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
+引擎主题包括 `authoring`、`story`、`demo`、`focus`、`cases`、`check`、`selection`、`review`、`diff`、`publish`、`plugins`。组件与具体画面手法由项目插件提供：`joplo skill ui/components`、`diagram`、`content`、`alda`，以及各自的子主题。`joplo skill install` 写入引擎入口、主题文件、插件入口与主题索引；增删插件后重跑即可同步，用户改过的技能受保护。常见坑逐条保留，开发完成后的 feedback watch 仍是 Required。
 
 看板运行时，在另一个终端执行：
 
@@ -118,7 +120,7 @@ themes/brand.css
 dist/
 ```
 
-文件夹定义页面路径；布局提供外壳与命名插槽；方案往插槽里堆叠内容，也可新增路径。功能记录目标、情况、规则和 `pick`，场景用 `flow()` 表达行为。创作 API 从 `@joplo-app/kit` 导入，组件从 `@joplo-app/kit/ui` 导入，名称与属性对齐 Mantine。
+文件夹定义页面路径；布局提供外壳与命名插槽；方案往插槽里堆叠内容，也可新增路径。功能记录目标、情况、规则和 `pick`，场景用 `flow()` 表达行为。创作 API 从 `@joplo-app/kit` 导入，组件从 `@joplo-app/plugin-ui` 导入，名称与属性对齐 Mantine。
 
 项目内可用 `shared/` 复用模块；本地运行状态 `.joplo/` 和构建产物 `dist/` 不进入 Git。具体 API 见 authoring 主题，CSS 变量见[主题文档](docs/themes.md)。
 
@@ -247,9 +249,9 @@ Joplo 接受 issue，不接受 pull request。bug 和功能需求请在 [issue](
 
 [PolyForm Shield 1.0.0](LICENSE)。任何人都可以免费使用 Joplo，包括在公司里和商业项目中使用；不得用它提供与 Joplo 或 Joplo Cloud 竞争的产品，详见 [COMMERCIAL.md](COMMERCIAL.md)。0.2.15 及更早的版本以 Apache-2.0 发布。随包字体使用 [SIL OFL 1.1](packages/web/src/fonts/OFL.txt)。
 
-默认标准插件 `@joplo-app/plugin-content` 提供 `content:Canvas`、`camera()`、FLIP 通用属性与 `content:studio` 主题。直接导入其创作 API 时，将同版本插件声明为项目依赖。`npx joplo skill content` 介绍连续讲解内容的做法，示例见 [llm-explainer](examples/llm-explainer)，契约见 [插件架构](docs/plugins.md)。章节用 `flow({ from })` 接力，分镜用 `joplo render --sheet --columns 3`。
+模板显式启用的 `@joplo-app/plugin-content` 提供 `content:Canvas`、`camera()`、FLIP 通用属性与 `content:studio` 主题。从插件包直接导入创作 API，并在 package.json 和 config.plugins 显式声明。`npx joplo skill content` 介绍连续讲解内容的做法，示例见 [llm-explainer](examples/llm-explainer)，契约见 [插件架构](docs/plugins.md)。章节用 `flow({ from })` 接力，分镜用 `joplo render --sheet --columns 3`。
 
-标准 UI 和 HTML 兜底默认由 `@joplo-app/plugin-ui` 提供：作者继续从 `@joplo-app/kit/ui` 导入，IR 使用 `ui:Button` / `ui:div`。`joplo components` 与 `joplo skill components` 按启用插件生成目录；旧裸名 IR 需重新编译，已发布分享自带其原运行时。见[插件契约](docs/plugins.md#13-阶段-2默认-ui-插件与无组件词汇内核d87)。
+标准 UI 和 HTML 由 `@joplo-app/plugin-ui` 提供：直接从该包导入，并在 config.plugins 显式启用，IR 使用 `ui:Button` / `ui:div`。`joplo components` 读取当前插件清单，`joplo skill ui/components` 提供完整 UI 用法。diagram 的组件与 trace 从 `@joplo-app/plugin-diagram` 导入。见[插件契约](docs/plugins.md)。
 
 ### 分享可见性与作品集
 

@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 /**
  * 看板里的 Joplo Cloud 账号卡片与声音浮层（D85，原型 examples/joplo 的 cloud_usage 方案 A）：
  * - 首页卡片：套餐、邮箱、空间（已用 / 上限）、朗读（免费写“体验额度”，Pro 写“本月 · 几号重置”）、“用量与音色 ↗”；

@@ -1,5 +1,5 @@
 import { $, layer, not } from '@joplo-app/kit';
-import { Alert, Badge, Button, Divider, Grid, Group, Paper, Stack, Text, Title } from '@joplo-app/kit/ui';
+import { Alert, Badge, Button, Divider, Grid, Group, Paper, Stack, Text, Title } from '@joplo-app/plugin-ui';
 
 export const comparisonInitial = () => ({
   kind: '修改', scenario: '单人邀请', status: '已对齐 · 完整前置状态已恢复',

@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 主题（D51）：config.theme 是内置主题或 themes/<name>.css，否则 THEME_UNKNOWN（带 at）；作者主题写进 IR，发布模式保留；
  * 加载器读取 themes/*.css 并参与 dev 监听。
@@ -6,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { config } from '@joplo-app/kit';
+
 import { BUILTIN_THEMES, compile, type AuthoringProject } from '../src/index.ts';
 import { discoverFiles, loadThemes } from '../src/load.ts';
 

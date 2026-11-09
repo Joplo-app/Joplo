@@ -3,7 +3,7 @@ export const skill = `# Joplo content production: content
 For explainers, tutorials, science and news-explainer pieces that should feel like a good video, not a deck: the viewer watches a world change while a voice explains it.
 Same machinery as demos: a feature is the episode, each case a chapter, each scenario plays one chapter (the published site plays them back to back), narrate() is the voice-over. Full example: examples/llm-explainer.
 
-Default standard plugin (enabled automatically): declare @joplo-app/plugin-content at the same version as Joplo as a project dependency when importing it directly, then import { Canvas, camera } from '@joplo-app/plugin-content'; keep flow, patch, narrate and hold imports from '@joplo-app/kit'. Do not add the default plugin again to config.plugins. IR types are content:Canvas. Use config({ theme: 'content:studio' }) for its bundled studio CSS; no project themes/studio.css is needed.
+Install @joplo-app/plugin-content at the Joplo version; import content and add it to config.plugins. Import { Canvas, camera } from this package; keep flow, patch, narrate and hold from @joplo-app/kit. Use theme: 'content:studio' for the bundled CSS. No plugin is implicitly enabled.
 
 ## 1. Before TSX: package and plan within the agreed scope
 - One thing the viewer should be able to repeat afterwards, in one sentence.
@@ -24,6 +24,7 @@ Failure mode, even with nice graphics: one board per chapter (big title, panels,
 - One layer holding one <Canvas w={2560} h={1600}> world (the default view is 1280×800, scaled to fit, never re-laid out; in a container without a height it sizes itself from the view ratio, and render warns 'Canvas has no size' if it still has none). Place a few containers absolutely in design pixels; lay out inside them with flex.
 - Objects keep their identity: give each one motion="key". Write each arrangement as static JSX switched with when, reusing the same key; between steps Joplo flies the object from its old place and size to the new one, also across containers. Morph, never replace: the question's words split into tokens, flip into ids, then fly onto a tape; bars rearrange into a lottery strip.
 - shot() draws the host focus ring and caps UI zoom at 1.25×; use camera() for traveling inside a Canvas without that ring.
+- When another plugin effect also suggests host focus (for example a diagram trace inside a Canvas), use an explicit shot() for the whole director layer if the Canvas camera should own the framing. Otherwise host zoom and Canvas zoom can multiply and push nearby text out of view. Verify the actual visible bounds in playback, not only DOM text.
 - Camera: camera('id', …) frames those elements (Joplo measures them, adds pad, caps zoom); camera() shows the whole canvas. Establish wide, push in on detail, pull back for the payoff. Object flights in the same step follow the camera's timing, so both land together.
 - Chapters continue: flow({ from: 'previousKey' }) starts from the previous chapter's last frame (state, camera, director layer). patch($.ui, { … }) changes several values in one step.
 - System-only chapters stay on the initial director layer unless camera(), shot(), a cue, or flow({ layer }) selects another layer. Continuing from a chapter inherits its final layer; do not copy its state by hand.
@@ -79,7 +80,6 @@ flow('What does it read?', { from: 'hook' })
 ## Diagnostics and recovery
 - CAMERA_UNKNOWN: the id must exist in a current layer or stage; frame elements inside this Canvas. CAMERA_INVALID: pad 0–2000, zoom 0.1–10, ms 0–10000, finite numbers only.
 - PLUGIN_PROPERTY_INVALID: motion is a nonempty string; motionDelay/motionMs are finite numbers 0–10000; screen is boolean. These universal properties are literals, not state bindings. Use separate same-key elements with when for a flight between containers.
-- PR #35 authoring compatibility: an initial ui.__camera value is read only by this plugin. New camera effects write ui.__plugins.content.camera; do not implement either state key in the host.
 - Give each visible object one motion key. Hidden previous locations remain available for a later same-key arrival. Avoid duplicate simultaneously visible keys. Independent translate/scale keeps the author's transform intact.
 - Keep camera and FLIP duration together when both move; motionMs explicitly overrides duration, including 0. animate=false cancels an existing flight and renders the final layout.
 - A Canvas with no parent height uses its view aspect ratio; with an explicit parent height it fills that parent. A zero-sized parent still needs a layout fix; render reports the measured surface.
@@ -87,3 +87,7 @@ flow('What does it read?', { from: 'hook' })
 - One world per continuous chapter; use flow({ from }) to avoid manually copied end states. The initial frame and every step contain complete compiled drawing snapshots; deep links do not replay plugin logic.
 - HAPPY_PATH_ONLY is expected for a main-flow explainer. Do not invent product failures solely to silence it. Review every storyboard and verify animation separately from static renders.
 `;
+
+export const patterns = `# content recipes and pitfalls
+
+Common pitfall: For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, and verify playback before claiming it works`;

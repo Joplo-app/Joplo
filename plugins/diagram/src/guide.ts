@@ -1,13 +1,20 @@
 import { DIAGRAM_GROUP_ICONS, DIAGRAM_NODE_KINDS, DIAGRAM_TONES, SEQUENCE_BLOCK_KINDS } from './model.ts';
 export const skill = `# Joplo diagrams: diagram
 
-The first-party diagram plugin is enabled by default; no config.plugins entry is needed. Three diagram components explain backend, architecture, and logic. Import them from @joplo-app/kit/ui:
+Install @joplo-app/plugin-diagram at the same version as Joplo. Explicitly enable the manifest in config.plugins; no plugin is implicitly loaded.
+\`\`\`tsx
+import { config } from '@joplo-app/kit';
+import diagram from '@joplo-app/plugin-diagram';
+export default config({ name: 'Architecture', plugins: [diagram] });
+// In author TSX: import { Diagram, Sequence, StateMachine, trace } from '@joplo-app/plugin-diagram';
+\`\`\`
+Three diagram components explain backend, architecture, and logic:
 - Diagram: what talks to what, grouped by business domain (gateway, runtime, storage…). Default for architecture.
 - Sequence: one request moving between services in time order. Use it to walk through a call chain.
 - StateMachine: states and transitions of one entity (order, task, run). Use it for lifecycles.
 Choose by the question: "what is where" → Diagram; "what happens in what order" → Sequence; "what states can it be in" → StateMachine.
 
-The existing trace import from @joplo-app/kit stays valid. IR names are diagram:Diagram, diagram:StateMachine and diagram:Sequence; never hand-edit generated IR. check reporting PLUGIN_LEGACY_TYPE means you should recompile the author TSX with the current kit. Trace and state-machine transition states are compiled once per step, so seeking and offline playback read the same snapshot.
+Import trace from @joplo-app/plugin-diagram. IR names are diagram:Diagram, diagram:StateMachine and diagram:Sequence; never hand-edit generated IR. UNKNOWN_PLUGIN means install this package and add diagram to config.plugins, then rerun check. Trace and state-machine transition states are compiled once per step, so seeking and offline playback read the same snapshot.
 
 ## Diagram: group by business domain
 \`\`\`tsx
@@ -104,3 +111,14 @@ export const diagnostics = `- Every node belongs to a domain group; 2–6 groups
 - INVALID_DIAGRAM_PROP / INVALID_DIAGRAM_CHILD: tone, pin, kind, or block kind is not a preset, or a child is in the wrong container (messages in Sequence.Group, actors in Sequence.Block). See diagram.
 - DIAGRAM_UNGROUPED (info): Many nodes and no domain groups. Group them with <Diagram.Group label icon> so viewers see what belongs where.
 - DIAGRAM_LAYOUT_FAILED (warning): The automatic layout failed and the diagram shows a simple grid. Check its edges and groups; report it if they look right.`;
+
+export const patterns = `# diagram recipes and pitfalls
+
+From check:
+- TRACE_UNKNOWN: Empty trace, unknown id, ids from different diagrams, or a disconnected path. Use connected ids in one Diagram / StateMachine / Sequence.
+
+From check:
+- INVALID_DIAGRAM_PROP / INVALID_DIAGRAM_CHILD: tone, pin, kind, or block kind is not a preset, or a child is in the wrong container (messages in Sequence.Group, actors in Sequence.Block). See diagram.
+
+From check:
+- DIAGRAM_UNGROUPED (info): Many nodes and no domain groups. Group them with <Diagram.Group label icon> so viewers see what belongs where.`;

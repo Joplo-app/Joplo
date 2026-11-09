@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * D67 叙事质量与 PM 视角（不新增作者概念，只用现有的 goal / roles / cases / flow）：
  * - 阅读节奏的纯函数在 core（web 原样 re-export），outline 与 check 用同一份估算；
@@ -6,8 +7,8 @@
  *   HAPPY_PATH_ONLY（只有顺利路径）；CASE_NOT_COVERED 的说明带上优先级与 expected；Indicator 的 disabled 不要求 disabledReason。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, go, hold, option, page, set, $, type CaseDef, type Flow } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, go, hold, option, page, set, $, type CaseDef, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { CARD_POINTS_MAX, DESCRIPTION_MAX, SCENARIO_MS_MAX, compile, outline, replay, scenarioEstimateMs, stateAt, stepDwell, validate, type AuthoringProject } from '../src/index.ts';
 import * as webPace from '../../web/src/runtime/pace.ts';

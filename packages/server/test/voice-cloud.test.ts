@@ -68,7 +68,7 @@ function fakeBridge(opts: { signedIn?: boolean; voice?: 'ok' | 'none'; speech?: 
 const quotaError = (needed: number, remaining: number) => Object.assign(new Error('Not enough narration characters'), { code: 'TTS_QUOTA_EXCEEDED', data: { neededChars: needed, remainingChars: remaining, usagePath: '/usage' } });
 
 function project(name = 'Team space'): Project {
-  const step = (id: string, caption: string) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, traces: [], forks: [], marks: [] });
+  const step = (id: string, caption: string) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, forks: [], marks: [] });
   return {
     schemaVersion: 2, name, mode: 'publish', routes: {}, features: {},
     scenarios: { 'f.a.s': { id: 'f.a.s', optionId: 'f.a', name: 'S', description: '', mock: { label: 'm', outcome: 'success', auto: true }, initial: { sceneId: 'x', ui: {}, data: {}, inputs: {} }, steps: [step('f.a.s#1', 'One'), step('f.a.s#2', 'Two'), step('f.a.s#3', 'Three'), step('f.a.s#4', 'Four')] } },

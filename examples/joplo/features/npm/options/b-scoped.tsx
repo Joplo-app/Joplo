@@ -1,7 +1,7 @@
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
 import { $, done, flow, notApplicable, option, rule, undecided, uses } from '@joplo-app/kit';
-import { Card, DataTable, Stack, Text, Title } from '@joplo-app/kit/ui';
+import { Card, DataTable, Stack, Text, Title } from '@joplo-app/plugin-ui';
 
 import { Cmd } from '../../../shared/distribution/term.tsx';
 import { run } from '../../../shared/distribution/steps.ts';

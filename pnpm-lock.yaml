@@ -172,9 +172,15 @@ importers:
       '@joplo-app/kit':
         specifier: workspace:*
         version: link:packages/kit
+      '@joplo-app/plugin-alda':
+        specifier: workspace:*
+        version: link:plugins/alda
       '@joplo-app/plugin-content':
         specifier: workspace:*
         version: link:plugins/content
+      '@joplo-app/plugin-diagram':
+        specifier: workspace:*
+        version: link:plugins/diagram
       '@joplo-app/plugin-ui':
         specifier: workspace:*
         version: link:plugins/ui
@@ -191,6 +197,66 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
+  examples/agent-arch:
+    devDependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@joplo-app/plugin-content':
+        specifier: workspace:*
+        version: link:../../plugins/content
+      '@joplo-app/plugin-diagram':
+        specifier: workspace:*
+        version: link:../../plugins/diagram
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
+
+  examples/camping:
+    devDependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@joplo-app/plugin-content':
+        specifier: workspace:*
+        version: link:../../plugins/content
+      '@joplo-app/plugin-diagram':
+        specifier: workspace:*
+        version: link:../../plugins/diagram
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
+
+  examples/invite:
+    devDependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@joplo-app/plugin-content':
+        specifier: workspace:*
+        version: link:../../plugins/content
+      '@joplo-app/plugin-diagram':
+        specifier: workspace:*
+        version: link:../../plugins/diagram
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
+
+  examples/joplo:
+    devDependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@joplo-app/plugin-content':
+        specifier: workspace:*
+        version: link:../../plugins/content
+      '@joplo-app/plugin-diagram':
+        specifier: workspace:*
+        version: link:../../plugins/diagram
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
+
   examples/llm-explainer:
     dependencies:
       '@joplo-app/plugin-content':
@@ -200,6 +266,27 @@ importers:
       '@joplo-app/kit':
         specifier: workspace:*
         version: link:../../packages/kit
+      '@joplo-app/plugin-diagram':
+        specifier: workspace:*
+        version: link:../../plugins/diagram
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
+
+  examples/midterms-2026:
+    devDependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@joplo-app/plugin-content':
+        specifier: workspace:*
+        version: link:../../plugins/content
+      '@joplo-app/plugin-diagram':
+        specifier: workspace:*
+        version: link:../../plugins/diagram
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
 
   examples/smart-home-3d:
     dependencies:
@@ -213,6 +300,15 @@ importers:
       '@joplo-app/kit':
         specifier: workspace:*
         version: link:../../packages/kit
+      '@joplo-app/plugin-content':
+        specifier: workspace:*
+        version: link:../../plugins/content
+      '@joplo-app/plugin-diagram':
+        specifier: workspace:*
+        version: link:../../plugins/diagram
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
 
   packages/cli:
     dependencies:
@@ -228,6 +324,9 @@ importers:
       commander:
         specifier: ^15.0.0
         version: 15.0.0
+      tar:
+        specifier: 7.5.22
+        version: 7.5.22
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -240,15 +339,6 @@ importers:
       '@joplo-app/kit':
         specifier: workspace:*
         version: link:../kit
-      '@joplo-app/plugin-content':
-        specifier: workspace:*
-        version: link:../../plugins/content
-      '@joplo-app/plugin-diagram':
-        specifier: workspace:*
-        version: link:../../plugins/diagram
-      '@joplo-app/plugin-ui':
-        specifier: workspace:*
-        version: link:../../plugins/ui
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -289,9 +379,6 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
-      '@joplo-app/core-legacy':
-        specifier: npm:@joplo-app/core@0.2.10
-        version: '@joplo-app/core@0.2.10'
       '@vitejs/plugin-react':
         specifier: 6.2.1
         version: 6.2.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
@@ -310,15 +397,6 @@ importers:
       '@joplo-app/kit':
         specifier: workspace:*
         version: link:../kit
-      '@joplo-app/plugin-content':
-        specifier: workspace:*
-        version: link:../../plugins/content
-      '@joplo-app/plugin-diagram':
-        specifier: workspace:*
-        version: link:../../plugins/diagram
-      '@joplo-app/plugin-ui':
-        specifier: workspace:*
-        version: link:../../plugins/ui
       '@tailwindcss/vite':
         specifier: 4.3.4
         version: 4.3.4(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
@@ -617,13 +695,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@joplo-app/core@0.2.10':
-    resolution: {integrity: sha512-o25XvCa79GBpMg4+vCU5JL5/UXNzaRyEmPJsQoVndG4UMxcgLBkPvR2AwQEo4kZgVcG+SrGPVOcGdm4sIfsKjw==}
-    engines: {node: '>=22'}
-
-  '@joplo-app/kit@0.2.10':
-    resolution: {integrity: sha512-UqCvkfUiVgkRMWzwiQQIYf9gNdSVBZXnwAbVpvWETQhef7zuxpK7019H6tAzYyFQYwDhGhjm755u+f3F87KxzA==}
-    engines: {node: '>=22'}
+  '@isaacs/fs-minipass@4.0.1':
+    resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
+    engines: {node: '>=18.0.0'}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -906,6 +980,10 @@ packages:
     resolution: {integrity: sha512-XWAtwJ6OHO+tj0EKCs0Y2UamnyOxseZWltU4x2U2wh8g4AigdjwvtUjvLP2tqkA/avxHEtzxNaqGq/YGNwckKg==}
     engines: {node: '>=18'}
 
+  chownr@3.0.0:
+    resolution: {integrity: sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==}
+    engines: {node: '>=18'}
+
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
     engines: {node: '>=6'}
@@ -1073,6 +1151,14 @@ packages:
   meshoptimizer@1.1.1:
     resolution: {integrity: sha512-oRFNWJRDA/WTrVj7NWvqa5HqE1t9MYDj2VaWirQCzCCrAd2GHrqR/sQezCxiWATPNlKTcRaPRHPJwIRoPBAp5g==}
 
+  minipass@7.1.3:
+    resolution: {integrity: sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==}
+    engines: {node: '>=16 || 14 >=14.17'}
+
+  minizlib@3.1.0:
+    resolution: {integrity: sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==}
+    engines: {node: '>= 18'}
+
   modern-screenshot@4.7.0:
     resolution: {integrity: sha512-9YxN+ddPSMMlhylOv25VHzXrl9u67QRxoh7+SEewGtgUw7t6hHTrjptSDJUSne9oG4Xk/h2cwG15nIt4Hc9ujg==}
 
@@ -1171,6 +1257,10 @@ packages:
   tapable@2.3.3:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
+
+  tar@7.5.22:
+    resolution: {integrity: sha512-MFO/QzvtAOmJbkhOaCTvbGcFN9L9b+JunIsDwaKljSOdcLMea3NJ1k9Usz/rjdfSXTq4dfzfeS7W4p4YOAAHeA==}
+    engines: {node: '>=18'}
 
   three@0.187.0:
     resolution: {integrity: sha512-Qiu7R+Cmh8CstZsY1uJOSWnVlfo7ZtNLV7mF8Jltk3LB3AtDu9cRZlcnRKkAk8Y4z6KKw35z7Y7Urd7jWY8etA==}
@@ -1292,6 +1382,10 @@ packages:
     engines: {node: '>=20.11'}
     hasBin: true
 
+  yallist@5.0.0:
+    resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
+    engines: {node: '>=18'}
+
   zod@4.6.7:
     resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
@@ -1377,13 +1471,9 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@joplo-app/core@0.2.10':
+  '@isaacs/fs-minipass@4.0.1':
     dependencies:
-      '@joplo-app/kit': 0.2.10
-      elkjs: 0.12.1
-      zod: 4.6.7
-
-  '@joplo-app/kit@0.2.10': {}
+      minipass: 7.1.3
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -1577,6 +1667,8 @@ snapshots:
 
   chai@6.3.0: {}
 
+  chownr@3.0.0: {}
+
   clsx@2.1.1: {}
 
   commander@15.0.0: {}
@@ -1714,6 +1806,12 @@ snapshots:
 
   meshoptimizer@1.1.1: {}
 
+  minipass@7.1.3: {}
+
+  minizlib@3.1.0:
+    dependencies:
+      minipass: 7.1.3
+
   modern-screenshot@4.7.0: {}
 
   motion-dom@14.9.1:
@@ -1806,6 +1904,14 @@ snapshots:
 
   tapable@2.3.3: {}
 
+  tar@7.5.22:
+    dependencies:
+      '@isaacs/fs-minipass': 4.0.1
+      chownr: 3.0.0
+      minipass: 7.1.3
+      minizlib: 3.1.0
+      yallist: 5.0.0
+
   three@0.187.0: {}
 
   tinybench@6.2.3: {}
@@ -1865,5 +1971,7 @@ snapshots:
       - msw
 
   why-is-node-running@3.2.1: {}
+
+  yallist@5.0.0: {}
 
   zod@4.6.7: {}

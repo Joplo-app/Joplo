@@ -11,7 +11,7 @@
  */
 import { bindPath, callsite, isBind, type Bind, type CondExpr, type JNode } from './node.ts';
 
-export { $, and, empty, eq, Fragment, neq, not, notEmpty, oneOf, or, Outlet, Slot } from './node.ts';
+export { Custom, $, and, empty, eq, Fragment, neq, not, notEmpty, oneOf, or, Outlet, Slot } from './node.ts';
 export type { Bind, CondExpr, JNode } from './node.ts';
 export { asset } from './asset.ts';
 import type { PluginDef } from './plugin.ts';
@@ -250,13 +250,6 @@ export const callout = (target: string, text: string, opts: { side?: CalloutSide
  */
 export const hold = (seconds: number): EffectDef => ({ kind: 'effect', type: 'hold', seconds });
 
-/** Compatibility authoring markers; resolution and state semantics belong to the content plugin. */
-export const trace = Object.assign((...ids: string[]): EffectDef => ({ kind: 'effect', type: 'plugin', plugin: 'diagram', name: 'trace', payload: { ids, mode: 'ok' } }), {
-  fail: (...ids: string[]): EffectDef => ({ kind: 'effect', type: 'plugin', plugin: 'diagram', name: 'trace', payload: { ids, mode: 'fail' } }),
-  skip: (...ids: string[]): EffectDef => ({ kind: 'effect', type: 'plugin', plugin: 'diagram', name: 'trace', payload: { ids, mode: 'skip' } }),
-});
-
-
 /**
  * 层级（视角，D43 / T-layers）：一个完全独立的画面，有自己的 JSX 树，单独渲染、按自己的布局占满舞台。
  * 各层共享同一份场景状态（ui / data / inputs），切层时步骤不变。需要全景就自己声明一个 overview 层。
@@ -440,3 +433,5 @@ export type OptionDef = {
 export const option = (o: Omit<OptionDef, 'kind' | 'source'>): OptionDef => ({ kind: 'option', ...o, source: callsite() });
 
 export type { CondExpr as Condition };
+
+export type { JoploProps } from './props.ts';

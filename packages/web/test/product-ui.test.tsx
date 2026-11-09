@@ -1,3 +1,5 @@
+import '../../../scripts/test/render-fixtures.ts';
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * D68 产品界面组件与 D67 PM 视角的默认呈现（无浏览器，服务端渲染）：
  * - 每个新组件都能编译、check 没有 error、回放通过（replay_ok），交互状态（Menu 打开、TabBar 当前项、DataTable 选中 / 排序 / 加载、
@@ -8,8 +10,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, option, page, set, $ } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, option, page, set, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, isNodeVisible, replay, stateAt, validate, type AuthoringProject, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../src/i18n/context';

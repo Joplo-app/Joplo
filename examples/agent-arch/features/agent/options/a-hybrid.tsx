@@ -1,4 +1,4 @@
-import { $, done, explain, flow, option, set, shot, trace, undecided, uses } from '@joplo-app/kit';
+import { $, done, explain, flow, option, set, shot, undecided, uses } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 
 import { ASK, initialUi, layersFor, show, status } from '../../../shared/arch.tsx';
 

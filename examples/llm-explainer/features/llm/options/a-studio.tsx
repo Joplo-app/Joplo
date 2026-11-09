@@ -116,7 +116,7 @@ export default option({
   layers: { world: layer('世界', <WorldLayer />, { icon: 'flow' }) },
   state: {
     ui: {
-      __camera: { targets: ['chat'] }, poster: 1, asked: false, ans: 'hidden', ansFlip: false, pAt: 'bubble', pMode: 'plain',
+      __plugins: { content: { camera: { targets: ['chat'] } } }, poster: 1, asked: false, ans: 'hidden', ansFlip: false, pAt: 'bubble', pMode: 'plain',
       tag0: 'hidden', tag1: 'hidden', tag2: 'hidden', tag3: 'hidden', overview: false,
       ...machIdle, machOp: 0, scan: '40px', bars: 'none', out: 0, outFlip: false, meter: '', rail: false, ptr: 'none', dial: 'none', hints: false,
       q2: false, tips: false, score: 'none', hudN: '', hudT: '', src: '', cta: false,

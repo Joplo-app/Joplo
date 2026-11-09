@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { createZhCN } from '../src/i18n/zh-CN';
 import { createEn } from '../src/i18n/en';
 /**
@@ -10,8 +11,8 @@ import { createEn } from '../src/i18n/en';
  * - 封面时长由 pace.ts 的 stepDwell 逐步估算再求和（不写死数值）。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, explain, feature, flow, fork, layer, option, page, role, set, stream, Slot, $ } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { explain, feature, flow, fork, layer, option, page, role, set, stream, Slot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
 import { speakerOf, subtitleFor, subtitleHeight } from '../src/player/subtitle-content';

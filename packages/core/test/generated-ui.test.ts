@@ -1,6 +1,7 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { expect, it } from 'vitest';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
-import * as ui from '@joplo-app/kit/ui';
+import { feature, flow, option, page } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, explainClick, initialState, type AuthoringProject } from '../src/index.ts';
 import { en } from '../../web/src/i18n/en.ts';

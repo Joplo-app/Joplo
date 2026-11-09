@@ -13,6 +13,7 @@
  * 端口被占用时直接报错（strictPort），不静默换端口。
  */
 import { spawn } from 'node:child_process';
+import { bundlePluginRuntimes } from './build.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import type http from 'node:http';
@@ -195,6 +196,7 @@ export type ProjectSlot = {
   loader: ViteDevServer | null;
   ready: Promise<void>;
   payload: DevPayload;
+  runtimeModules: Map<string,string>;
   compiling: boolean;
   closed: boolean;
   running: Promise<void> | null;
@@ -320,9 +322,25 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     resourceWarnings.set(slot.id, new Map());
     if (out.project && out.resources?.requests.length) out.project.mediaAssets = Object.fromEntries(out.resources.requests.map(r => [r.id, `/__joplo/p/${encodeURIComponent(slot.id)}/resources/${encodeURIComponent(r.id)}`]));
     const prev = slot.payload;
-    const plugins = Object.keys(out.pluginRuntimes).length ? out.pluginRuntimes : null;
-    if (plugins) allowPluginFiles(slot.dir, Object.values(plugins));
-    slot.payload = { version: prev.version + 1, ok: out.project !== null, project: out.project ?? prev.project, diagnostics: out.diagnostics, home: out.home ?? prev.home, ...(plugins ? { plugins: Object.fromEntries(Object.entries(plugins).map(([id, f]) => [id, fsUrl(f)])) } : prev.plugins ? { plugins: prev.plugins } : {}) };
+    const plugins=out.pluginRuntimes;
+    let runtimeUrls:Record<string,string>={};
+    if(web.mode==='dist'&&out.project){
+      // A prebuilt board owns React. Bundle npm/CommonJS dependencies and bridge
+      // React to that exact host instance, just as the file:// publish path does.
+      const ids=Object.keys(plugins).sort();
+      const modules=await bundlePluginRuntimes(plugins,slot.dir,web,'module');
+      const next=new Map<string,string>();
+      ids.forEach((id,i)=>{
+        const code=modules[i]!;
+        const key=`${id}-${crypto.createHash('sha256').update(code).digest('hex').slice(0,20)}.js`;
+        next.set(key,code);runtimeUrls[id]=`/__joplo/p/${encodeURIComponent(slot.id)}/runtime/${key}`;
+      });
+      slot.runtimeModules=next;
+    }else if(web.mode==='source'){
+      allowPluginFiles(slot.dir,Object.values(plugins));
+      runtimeUrls=Object.fromEntries(Object.entries(plugins).map(([id,f])=>[id,fsUrl(f)]));
+    }
+    slot.payload = { version: prev.version + 1, ok: out.project !== null, project: out.project ?? prev.project, diagnostics: out.diagnostics, home: out.home ?? prev.home, plugins: out.project ? runtimeUrls : prev.plugins ?? runtimeUrls };
     const errors = out.diagnostics.filter((d) => d.severity === 'error');
     if (errors.length) log(`[joplo] ${path.basename(slot.dir)} compilation failed (${errors.length}): ${errors.map((d) => `${d.at ?? ''} ${d.message}`).join('; ').slice(0, 400)}`);
     if (out.project && out.project.name) registry.rename(slot.dir, out.project.name);
@@ -367,6 +385,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       loader: null,
       ready: Promise.resolve(),
       payload: { version: 0, ok: false, project: null, diagnostics: [], home: null },
+      runtimeModules: new Map(),
       compiling: true,
       closed: false,
       running: null,
@@ -495,6 +514,11 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       const input = LocalReviewWrite.safeParse(body.body);
       if (!input.success) throw new JoploError('USAGE', 'Invalid review request: include a sessionId, requestId, type, and page context for feedback (1–10000 characters)');
       return sendJson(res, 200, reviewHub.write(slot.dir, slot.payload.project, input.data));
+    }
+    if(rest.startsWith('runtime/')&&method==='GET'){
+      const slot=await ensure(id),code=slot.runtimeModules.get(rest.slice('runtime/'.length));
+      if(code===undefined)throw new JoploError('NOT_FOUND','Plugin runtime is not available for this project revision');
+      res.writeHead(200,{'content-type':'text/javascript; charset=utf-8','cache-control':'no-cache','x-content-type-options':'nosniff'});res.end(code);return;
     }
     if (rest === 'ir' && method === 'GET') {
       const slot = await ensure(id);

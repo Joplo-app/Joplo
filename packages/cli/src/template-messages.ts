@@ -1,0 +1,18 @@
+/** D89 explicitly requests Chinese template errors. Keep localized output separate from engine logic. */
+export const templateMessages = {
+  fallback: '可使用 --template <本地路径> 离线初始化。',
+  invalidSpec: '模板地址无效。请使用 github:owner/repo[/子目录][#ref] 或本地目录。',
+  invalidPath: '模板包含不安全的路径或链接，已拒绝写入。',
+  noDirectory: '本地模板目录不存在或不是目录。',
+  empty: '模板目录为空，或指定的 GitHub 子目录不存在。',
+  noPackage: '模板缺少有效的 package.json。',
+  noConfig: '模板缺少 joplo.config.ts 或 joplo.config.tsx。',
+  network: '模板下载失败，请检查网络后重试。',
+  missing: '找不到模板仓库或版本 tag/ref；私有仓库还需要有效的 GITHUB_TOKEN 或 gh 登录。',
+  unauthorized: 'GitHub 令牌无效或无权读取此仓库，请检查 GITHUB_TOKEN 或重新 gh auth login。',
+  archive: '模板压缩包损坏或无法解压。',
+  tooLarge: '模板超过大小或文件数量限制。',
+  placeholder: '模板源码中的项目名称占位符必须放在字符串引号内。',
+  collision: '模板文件路径重复或与目录冲突。',
+  changed: '目标目录在初始化期间发生变化；本次写入已撤回，请重新运行。',
+};

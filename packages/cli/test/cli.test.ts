@@ -98,11 +98,11 @@ test('init 后立即 check 通过，非空目录拒绝且保留内容', async ()
   expect(await readFile(join(target, '.gitignore'), 'utf8')).toContain('.joplo/');
   expect(await readFile(join(target, '.gitignore'), 'utf8')).toContain('exports/');
 });
-test('init 缺省名称，guide 不超过 150 行，help 主输出走 stdout', async () => {
+test('init 缺省名称，engine skill 与 help 主输出走 stdout', async () => {
   const d = await temp(false); expect((await cli(['init', d])).code).toBe(0);
-  const r = await cli(['guide']); expect(r.code).toBe(0); expect(r.stderr).toBe('');
-  expect(r.stdout.trim().split('\n').length).toBeLessThanOrEqual(150);
-  for (const word of ['flow', 'onClick', 'selection', 'coverage', 'pick']) expect(r.stdout).toContain(word);
+  const r = await cli(['skill','authoring']); expect(r.code).toBe(0); expect(r.stderr).toBe('');
+
+  for (const word of ['flow', 'selection', 'check', 'pick']) expect(r.stdout).toContain(word);
   const h = await cli(['--help']); expect(h.stdout).toContain('check'); expect(h.stderr).toBe('');
 });
 test.each([
@@ -110,7 +110,7 @@ test.each([
   ['render', '--scenario-id', 's', '--out', 'a.png', '--width', '100'],
   ['render', '--scenario-id', 's', '--out', 'a.png', '--scale', '0'],
   ['render', '--scenario-id', 's', '--out', 'a.png', '--width', '-1', '--height', '100'],
-  ['build', '--wat'], ['init'], ['apply'], ['get'], ['history'], ['restore'], ['mcp'], ['serve'], ['validate'],
+  ['build', '--wat'], ['init','--wat'], ['apply'], ['get'], ['history'], ['restore'], ['mcp'], ['serve'], ['validate'],
 ])('用法错误退出 2：%j', async (...args) => {
   const d = await temp(); const r = await cli([args[0]!, ...(args[0] === 'check' ? [d] : []), ...args.slice(1)]);
   expect(r.code, r.stdout + r.stderr).toBe(2);

@@ -5,7 +5,7 @@
 ## 命令与参数
 
 ```sh
-npx joplo init <dir> [--name <name>] [--keep] [--no-skill]
+npx joplo init [dir] [--template <spec>] [--name <name>] [--keep] [--no-skill]
 npx joplo dev [dir] [--port <port>] [--open]
 npx joplo check [dir] [--format text|json] [--option <qid>]
 npx joplo outline [dir] [--format text|json] [--option <qid>]
@@ -13,7 +13,6 @@ npx joplo selection [dir] [--format text|json]
 npx joplo skill [topic]
 npx joplo components [name…]
 npx joplo skill install [dir] [--force] [--diff] [--agents-md]
-npx joplo guide
 npx joplo build [dir] [--out-dir <dir>] [--overwrite] [--scenario <id>]… [--feature <id>]…
 npx joplo login [--no-browser] [--format text|json] [--server <url>]
 npx joplo logout [--server <url>]
@@ -24,8 +23,6 @@ npx joplo share [dir] (--public | --private) (--review | --no-review) [--format 
   [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
 npx joplo feedback [dir] [--share <id>] [--format text|json] [--server <url>]
 npx joplo feedback [dir] --applied <决定 id,…> [--ref <源码版本>] [--share <id>] [--format text|json]
-npx joplo review list [dir] [--json] [--all] [--option <功能.方案>]
-npx joplo review watch [dir] [--session <id> | --follow] [--option <功能.方案>] [--after <序号>] [--json]
 npx joplo feedback list [dir] --local [--json] [--all] [--option <功能.方案>]
 npx joplo feedback watch [dir] --local [--session <id> | --follow] [--after <序号>] [--json]
 npx joplo feedback watch --share <id> --option <功能.方案> [--version <版本>] [--interval 15] [--json] [--server <url>]
@@ -39,14 +36,19 @@ npx joplo render [dir] --scenario-id <qid> --out <file> --sheet [--columns <n>] 
 
 ## init
 
-生成可运行的最小项目：config、布局、首页、一个功能/方案/场景，以及 package.json、tsconfig.json、.gitignore。
+从版本化模板生成可运行项目。默认模板为 `github:Joplo-app/Joplo/templates/starter#v<CLI版本>`，直接下载 tarball，不需要 Git；在本仓库源码开发环境运行时使用本地 `templates/starter`。
+
+- `--template ./local-template` 使用本地目录，适合离线开发。
+- `--template github:owner/repo/templates/team#ref` 支持仓库、可选子目录和分支/tag/提交；省略 ref 时使用 HEAD。私有仓库优先读取 `GITHUB_TOKEN`，其次读取 `gh auth token`。令牌只发给 GitHub API，不写入文件、输出或 codeload 请求头。
+- 模板必须含有效 `package.json` 和 `joplo.config.ts`（或 tsx）。先完整读取、验证再创建目标；空目录、缺文件、下载失败、找不到 ref/子目录、压缩包损坏、链接或 `..` 路径都给出中文恢复提示，可改用本地模板，不留下半截目录。
+- 模板占位符 `__JOPLO_VERSION__`、`__PACKAGE_NAME__`、`__PROJECT_NAME__` 分别替换成 CLI 精确版本、目录生成的 npm 包名、项目显示名；源码里的项目名占位符必须是完整引号字符串。
 
 - `--name <name>`：项目名，默认目录名。
 - `--keep`：目录非空时只补缺失文件，已有文件不改动；不传时拒绝非空目录，并列出前几个文件名。
 - 只含 Agent / 版本控制文件（`.git`、`.gitignore`、`.gitattributes`、`.agents`、`.claude`、`.codex`、`.cursor`、`AGENTS.md`、`CLAUDE.md`、`skills-lock.json`、`.DS_Store`）的目录视为空目录（D65）：不要求 `--keep`，按 `--keep` 的方式写入，已有文件一字不改；保留的 `.gitignore` 缺少 `node_modules/`、`.joplo/`、`dist/`、`exports/` 时在输出里提示。
-- package.json 将 `joplo` 与 `@joplo-app/kit` 锁到当前 CLI 的相同精确版本，并提供 dev/check/build 脚本。
+- starter 的 package.json 将 `joplo`、`@joplo-app/kit`、`@joplo-app/plugin-ui` / `diagram` / `content` / `alda` 锁到当前 CLI 精确版本，config.plugins 显式列出四个插件；引擎不隐式加载任何插件。
 - tsconfig 使用 `react-jsxdev`、`jsxImportSource: '@joplo-app/kit'`、`allowImportingTsExtensions`。
-- 默认同时安装 Agent 技能（D64），等同于对新项目运行 `npx joplo skill install --agents-md`：写入 `.claude/skills/joplo/SKILL.md`、`.claude/skills/joplo-feedback/SKILL.md` 和 AGENTS.md 的 Joplo 托管段，输出一行 “✓ Agent skills: …; skip with --no-skill”。`--keep` 时沿用 skill install 的保护：用户改过的技能不覆盖（两个都不写，提示先 `--diff` 再 `--force`），AGENTS.md 只增改托管段；标记损坏时不写技能并说明原因。这些情况都不影响 init 成功。已经装好的同版本、未修改的技能（例如 `npx skills add` 装的官方技能，含指向 `.agents/skills` 的软链接）跳过不写，输出 “already installed (Joplo <版本>, unchanged)”；用户改过的技能不带 `--keep` 时同样保留，提示 `--force`。
+- 默认同时安装 Agent 技能（D64），等同于对新项目运行 `npx joplo skill install --agents-md`：写入 `.claude/skills/joplo/SKILL.md`、`.claude/skills/joplo-feedback/SKILL.md` 、引擎 `topics/*.md`、启用插件各自的入口/主题与索引，以及 AGENTS.md 的 Joplo 托管段，输出一行 “✓ Agent skills: …; skip with --no-skill”。`--keep` 时沿用 skill install 的保护：用户改过的技能不覆盖（整批技能都不写，提示先 `--diff` 再 `--force`），AGENTS.md 只增改托管段；标记损坏时不写技能并说明原因。这些情况都不影响 init 成功。已经装好的同版本、未修改的技能（例如 `npx skills add` 装的官方技能，含指向 `.agents/skills` 的软链接）跳过不写，输出 “already installed (Joplo <版本>, unchanged)”；用户改过的技能不带 `--keep` 时同样保留，提示 `--force`。
 - `--no-skill`：不安装技能，也不写 AGENTS.md。
 - 最后一行提示安装依赖并启动看板；命令写法按 npm/pnpm/yarn/bun 环境选择。
 
@@ -108,7 +110,7 @@ check: 0 error, 9 warning, 5 info (warning OUTCOME_MISMATCH ×1, warning CASE_NO
 
 ## components
 
-`npx joplo components` 与 `npx joplo skill components` 输出相同（组件目录与一行属性提示）。`npx joplo components Menu DataTable` 输出这些组件及其子组件（Menu → Menu.Item 等）的属性、行为分组（可操作 / 接收输入 / 只在打开时显示）和示例；名字不区分大小写，不认识的名字给出最接近的名字并退出 2。示例来自 core 的 COMPONENT_EXAMPLES（D68）。
+`npx joplo components` 列出当前 config.plugins 声明的组件。`npx joplo components Menu DataTable` 输出组件及子组件的属性、行为分组和示例；名称不区分大小写，短名歧义时使用 `ui:Menu`。未知名称退出 2。所有说明来自启用插件的清单；UI 的完整主题为 `npx joplo skill ui/components`。无项目或未启用插件时目录为空。
 
 ## selection
 
@@ -127,9 +129,8 @@ JSON 的 data.selection 保留 core Selection，data.lines 是 `{ number, text }
 
 ```sh
 npx joplo feedback watch [dir] --local --follow --json
-npx joplo review list [dir] --json
-npx joplo review watch [dir] --session <id> --json
-npx joplo review watch [dir] --session <id> --after 3 --json
+npx joplo feedback watch [dir] --local --session <id> --json
+npx joplo feedback watch [dir] --local --session <id> --after 3 --json
 ```
 
 保持 `joplo dev` 运行。`dev` 启动后在 stderr 打印第一条命令（stdout 仍只有看板地址），反馈面板里也能复制它。
@@ -148,7 +149,7 @@ npx joplo review watch [dir] --session <id> --after 3 --json
 
 默认重放全部已保存事件，`--after <seq>` 只输出之后的事件；消费者按 `sessionId + seq` 去重。两个监听器互不消费对方的事件。用户确认后即使服务已停止，也能用显式会话补读并退出 0。未确认时服务异常退出会报错；Ctrl+C / SIGTERM 停止监听并退出 130，不结束评审。游标非法或超出现有序号退出 2，损坏记录／跨项目记录拒绝读取。每条反馈最多 10,000 字符，每会话最多 999 条反馈，记录总量上限 16 MiB，为终结事件预留空间。
 
-本地监听不需要登录云端。主入口为 `joplo feedback list/watch --local`，上面的 `joplo review list/watch` 保留为兼容入口；两者输出相同。`feedback [dir]` 原有的云端单次读取及 `--applied` 行为保持不变。
+本地监听不需要登录云端。入口为 `joplo feedback list/watch --local`。`feedback [dir]` 原有的云端单次读取及 `--applied` 行为保持不变。
 
 ## feedback watch：本地与 Share 的统一入口
 
@@ -171,16 +172,17 @@ Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结�
 
 该接口仍仅允许分享主人或其具备 `feedback:read` 的 API Key 读取；“公开 Share 链接”不等于匿名读取管理侧反馈。
 
-## skill 与 guide
+## skill
 
-`npx joplo skill` 先用几行讲清心智模型（预设场景的播放器，不是自由输入的应用原型）和起步顺序，再列出当前 CLI 版本、主题说明和实际行数；每个主题少于 150 行。`npx joplo skill <主题>` 输出 Markdown，结尾指向相关主题。未知主题会建议编辑距离最近的名称并退出 2。
+`npx joplo skill` 先用几行讲清心智模型（预设场景的播放器，不是自由输入的应用原型）和起步顺序，再列出当前 CLI 版本、引擎主题、已启用插件及其主题；不限制技能长度，常见坑逐条保留。`npx joplo skill <主题>` 输出 Markdown，结尾指向相关主题。未知主题会建议编辑距离最近的名称并退出 2。
 
 | 主题 | 内容 |
 | --- | --- |
 | authoring | 心智模型、起步顺序、目录、页面、布局、方案、flow、绑定、`when` 只接受条件表达式、带错误重试的表单示例、规则 |
 | story | 先规划再动手（受众、1–3 件事、每个场景一行 Given → When → Then）；PM 视角怎样用 roles / goal / cases / expected / priority / rules 表达需求、怎样拆场景；开场、收尾、字幕与 explain 的写法；交付前的检查（D67） |
 | demo | 自由体验与丢弃语义、drag/hover/scroll/插件动作、独立层级、导演、镜头、短字幕、布局、深链接与截图 |
-| components | 当前组件目录和属性提示、支持的 HTML 标签、换行写法、常见产品画面用哪些组件（D68）；单个组件的示例用 `npx joplo components <名字>` |
+| focus | 聚焦、标注、停留与遮挡的引擎规则 |
+| plugins | 发现/安装/阅读插件技能、API v2 扩展契约、动作、运行时、资源、属性、主题 |
 | cases | 八个维度及按产品类型筛选的情况预设；先做正常流程 + 一条错误恢复 |
 | check | 诊断代码与局部修复、合并诊断、`UNBOUND_INTERACTIVE` 的三种处理 |
 | selection | 用户选中后只改指向的位置 |
@@ -188,19 +190,21 @@ Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结�
 | diff | 双版本公开演示差异、稳定步骤 key、歧义匹配、prepare 与隔离 CI 发布 |
 | publish | pick、build、每次可见性与评审选择、作品集与 SEO、feedback 回流、静态站部署与演示能力 |
 
-`guide` 与 `skill authoring` 完全相同。读取主题不加载服务端，也不执行作者项目，输出无颜色文本。
+引擎主题不讲具体组件。`npx joplo skill ui`、`ui/components`、`diagram`、`diagram/patterns`、`content`、`content/patterns`、`alda` 由项目启用插件提供；在项目目录运行，CLI 会读取 config 模块，不启动服务端或编译整套作者文件。无项目时只列引擎指南与插件使用说明。
 
 `authoring` 说明 `option.free` 无顺序本机反应，`demo` 说明新动作和播放仲裁。`plugins` 主题也说明动作声明、`ctx.act` 识别器、引擎时钟演示器、通用本机资源编译器与媒体轨道。可选 `@joplo-app/plugin-alda` 需要先安装并在项目 `config.plugins` 中显式启用，然后在该项目目录运行 `npx joplo skill alda`；不要把项目路径作为读取主题的第二参数（该参数只供 install 使用）。技能说明配乐文本、步骤 play/stop、缓存、warning 恢复和离线验证。`check` 不执行本机编译器；看板首次需要声音时生成，`build/share` 在范围裁剪后生成，失败 warning 保留在看板/构建结果，其他演示内容继续可用。
 
 ### skill install
 
-写入两个技能 `.claude/skills/joplo/SKILL.md` 与 `.claude/skills/joplo-feedback/SKILL.md`，内容与仓库根目录的官方技能 `skills/` 逐字相同（同一份模板生成，D64）。`joplo` 负责创作演示和启动评审交接；`joplo-feedback` 负责本地／Share 的接收、及时回执、恢复以及按授权修改源码。完整使用指南和最佳实践通过 `npx joplo skill review` 按需读取，包括后台进程不会自动唤醒 Agent 的边界；不能挂起监听后结束响应却声称仍实时接收。AGENTS.md 已存在时更新 Joplo 托管段；不存在时仅在显式传 `--agents-md` 后创建。
+写入引擎入口 `.claude/skills/joplo/SKILL.md`、`joplo-feedback/SKILL.md` 和 `joplo/topics/*.md`，与仓库 `skills/` 逐字一致。读取项目 config.plugins 后，生成每个插件的 `joplo-plugin-<id>/SKILL.md`、`topics/*.md` 和总索引 `joplo-plugins/SKILL.md`；`.joplo-plugins.json` 记录安装器拥有的插件文件。
+
+增删插件后重新运行 install：新增和更新当前插件技能，删除已禁用插件的未修改生成文件，不动无关技能。任何待写或待删技能被用户改过，整批操作都停止，退出 1；`--diff` 包含删除项，`--force` 才明确替换或删除。配置/依赖加载失败不视为“无插件”，保留全部已装技能并提示安装依赖后重试。init 在依赖未安装时使用模板随附的版本化插件技能；安装后再同步 config.plugins。`joplo` 负责创作演示和启动评审交接；`joplo-feedback` 负责本地／Share 的接收、及时回执、恢复以及按授权修改源码。完整使用指南和最佳实践通过 `npx joplo skill review` 按需读取，包括后台进程不会自动唤醒 Agent 的边界；不能挂起监听后结束响应却声称仍实时接收。AGENTS.md 已存在时更新 Joplo 托管段；不存在时仅在显式传 `--agents-md` 后创建。
 
 - `--diff`：只打印 unified diff，不创建或改写文件，优先于 force。
-- `--force`：允许覆盖被用户修改过的技能文件。
+- `--force`：允许覆盖或删除被用户修改过的托管技能文件。
 - `--agents-md`：即使 AGENTS.md 不存在也创建指针段。
 
-SKILL.md 末尾保存 `<!-- joplo-skill <版本> sha256:… -->`，哈希覆盖标记前全部原始字节。重装时：未改动的生成内容（包括旧版本写的短指针、用 `npx skills add` 装的官方技能）自动更新，输出 “Wrote … updated from <旧版本> to <新版本>”；字节相同输出“Already up to date”且不重写；任何一个技能被用户改过或缺少有效标记时，两个技能和 AGENTS.md 都不写，提示先 `--diff` 看差异、再 `--force` 覆盖，退出 1。目录没有 joplo.config.ts 时警告但仍安装。`joplo init` 默认对新项目做同样的安装（见下）。
+SKILL.md 末尾保存 `<!-- joplo-skill <版本> sha256:… -->`，哈希覆盖标记前全部原始字节。重装时：未改动的生成内容（包括旧版本写的短指针、用 `npx skills add` 装的官方技能）自动更新，输出 “Wrote … updated from <旧版本> to <新版本>”；字节相同输出“Already up to date”且不重写；任何一个技能被用户改过或缺少有效标记时，全部技能和 AGENTS.md 都不写，提示先 `--diff` 看差异、再 `--force` 覆盖，退出 1。目录没有 joplo.config.ts 时只安装引擎技能并说明插件发现方法。`joplo init` 默认对新项目做同样的安装（见下）。
 
 AGENTS.md 仅替换 `<!-- joplo:start -->` 与 `<!-- joplo:end -->` 之间的段落，段外字节不变；标记损坏或重复时拒绝写入。指针文件可提交 Git，安装器下次读取哈希/标记决定是否更新，Agent 读取指针后再调用 CLI。
 
@@ -558,4 +562,4 @@ npx joplo diff publish <diff-site> --prepared comparison.json --repo owner/name 
 
 prepare 的返回基线是权威值；用它编译旧版，不能继续使用候选 merge-base。发布前校验 receipt 与 manifest、两版实际 IR、summary 和文件 hash，复用上传／finalize，永远新建 comparison Share。publish 不构建、不执行 PR 代码、不附私有 review、不替换普通分享。安全 CI、错误码、Agent 路由限制和 fixture 见 [功能差异指南](feature-diff/README.md)；按需运行 `npx joplo skill diff`。
 
-组件目录由启用插件生成：`joplo components` / `joplo skill components` 列出 UI、HTML 兜底与其他插件；`joplo components ui:Button` 或唯一短名 `Button` 输出属性和例子。作者 TSX 导入方式不变；旧裸名 IR 的 check 会提示重编译，feature-diff 明确报告不兼容。
+组件目录由 config.plugins 生成：`joplo components` 列出启用插件的组件，`joplo skill ui/components` 读取 UI 专题；`joplo components ui:Button` 或唯一短名 `Button` 输出属性和例子。作者直接从插件包导入，不再使用 kit/ui 或 kit.trace；未启用插件时报安装与配置诊断。

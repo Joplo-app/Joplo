@@ -1,12 +1,13 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { COMPONENT_DOCS, COMPONENT_TYPES, GATED_CONTAINERS, INTERACTIVE_TYPES, VALUE_TYPES } from '../../../plugins/ui/src/catalog.ts';
-import { standardDocs } from '../src/plugins/standard-catalog.ts';
+import { fixtureDocs as standardDocs } from '../../../scripts/test/fixtures.ts';
 /**
  * 组件目录（D35 Mantine）：目录是唯一来源；Modal/Drawer 门控、响应式与断点、AppShell 收起、
  * select 动作接受 value 或 label、自动字幕读 label —— 都由 core 计算，渲染器与回放共用。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, layout, option, page, set, $, Outlet, Slot } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
+import { feature, flow, layout, option, page, set, $, Outlet, Slot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { COMPONENT } from '@joplo-app/kit/node';
 import {
@@ -30,7 +31,7 @@ const HTML = new Set(['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'main', 'secti
 const kitExport = (name: string): unknown => name.split('.').reduce<any>((o, k) => (o == null ? undefined : o[k]), ui);
 
 describe('目录是唯一来源', () => {
-  it('COMPONENT_TYPES 与 @joplo-app/kit/ui 的导出一一对应（复合组件用点语法）', () => {
+  it('COMPONENT_TYPES 与 @joplo-app/plugin-ui 的导出一一对应（复合组件用点语法）', () => {
     for (const t of COMPONENT_TYPES) {
       if (HTML.has(t)) continue;
       const fn = kitExport(t) as Record<symbol, unknown> | undefined;
@@ -109,10 +110,10 @@ function build(viewport: 'desktop' | 'mobile' = 'desktop'): Project {
           h(ui.Radio.Group, { id: 'plan', label: '套餐' }, h(ui.Radio, { value: 'free', label: '免费' }), h(ui.Radio, { value: 'pro', label: '专业' })),
           h(ui.Button, { id: 'save' }, '保存'),
         ),
-        x: h(ui.Drawer, { id: 'legacy', open: $.ui.legacy }, h(ui.Text, null, '旧写法 open')),
+        x: h(ui.Drawer, { id: 'drawer', opened: $.ui.drawer }, h(ui.Text, null, '显式 opened')),
       },
     },
-    state: { ui: { open: false, legacy: false, navClosed: true } },
+    state: { ui: { open: false, drawer: false, navClosed: true } },
     scenarios: {
       main: flow('主流程', { start: '/' })
         .click('open', set($.ui.open, true))
@@ -150,15 +151,15 @@ describe('Mantine 语义（编译 + 播放器）', () => {
     expect(root.children![3]!.children!.find((c) => c.id === 'plan')!.type).toBe('ui:Radio.Group');
   });
 
-  it('Modal 用 opened 门控；Drawer 兼容旧写法 open', () => {
+  it('Modal 用 opened 门控；Drawer 兼容显式 opened', () => {
     const p = build();
     const scene = p.scenes['f.a@/']!;
     const s0 = initialState(p, 'f.a.main');
     expect(isNodeVisible(scene, 'name', s0)).toBe(false);
-    expect(isNodeVisible(scene, 'legacy', s0)).toBe(false);
+    expect(isNodeVisible(scene, 'drawer', s0)).toBe(false);
     const s1 = stateAt(p, 'f.a.main', 1);
     expect(isNodeVisible(scene, 'name', s1)).toBe(true);
-    expect(isNodeVisible(scene, 'legacy', { ...s0, ui: { ...s0.ui, legacy: true } })).toBe(true);
+    expect(isNodeVisible(scene, 'drawer', { ...s0, ui: { ...s0.ui, drawer: true } })).toBe(true);
   });
 
   it('值类型：select 接受 label 并存 value；MultiSelect 逐项切换；SegmentedControl、Radio.Group、Checkbox 写入 inputs', () => {
@@ -288,7 +289,7 @@ describe('设备外框：Terminal 与 Phone', () => {
 });
 
 describe('架构图：Diagram / Diagram.Group / Diagram.Node / Diagram.Edge（D41）', () => {
-  const D = ui.Diagram;
+  const D = uiDiagram.Diagram;
   function buildDiagram(edges: unknown[], extraNodes: unknown[] = []): ReturnType<typeof compile> {
     const home = page(
       { title: '架构' },
@@ -319,7 +320,7 @@ describe('架构图：Diagram / Diagram.Group / Diagram.Node / Diagram.Edge（D4
     };
     return compile(src, 'dev');
   }
-  const edge = (props: Record<string, unknown>) => ({ ...h(ui.Diagram.Edge, props), source: '/p/routes/page.tsx:9:7' });
+  const edge = (props: Record<string, unknown>) => ({ ...h(uiDiagram.Diagram.Edge, props), source: '/p/routes/page.tsx:9:7' });
 
   it('四个组件都在目录里且不是可操作元素（不需要 flow）', () => {
     for (const t of ['Diagram', 'Diagram.Group', 'Diagram.Node', 'Diagram.Edge']) {
@@ -356,9 +357,9 @@ describe('架构图：Diagram / Diagram.Group / Diagram.Node / Diagram.Edge（D4
   });
 
   it('节点 id 在同一画面唯一（DUPLICATE_ID）；节点必须有 id', () => {
-    const dup = buildDiagram([], [h(ui.Diagram.Node, { id: 'client', label: '又一个客户端' })]);
+    const dup = buildDiagram([], [h(uiDiagram.Diagram.Node, { id: 'client', label: '又一个客户端' })]);
     expect(dup.diagnostics.map((d) => d.code)).toContain('DUPLICATE_ID');
-    const noId = buildDiagram([], [h(ui.Diagram.Node, { label: '无名' })]);
+    const noId = buildDiagram([], [h(uiDiagram.Diagram.Node, { label: '无名' })]);
     expect(noId.diagnostics.find((d) => d.code === 'MISSING_ID')?.message).toContain('Diagram.Node');
   });
 });

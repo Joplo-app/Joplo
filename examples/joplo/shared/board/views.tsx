@@ -3,9 +3,9 @@
  * 样例场景取自 examples/agent-arch 的“整理本机的报销发票”，缩成 5 步。
  */
 import { $, set, type Bind, type JNode } from '@joplo-app/kit';
-import {
-  Badge, Breadcrumbs, Anchor, ChatMessage, Code, Diagram, Group, Paper, Stack, Stepper, Text, ToolCall,
-} from '@joplo-app/kit/ui';
+import { Badge, Breadcrumbs, Anchor, ChatMessage, Code, Group, Paper, Stack, Stepper, Text, ToolCall } from '@joplo-app/plugin-ui'; import { Diagram } from '@joplo-app/plugin-diagram';
+
+
 
 const ui = $.ui as unknown as Record<string, Bind>;
 

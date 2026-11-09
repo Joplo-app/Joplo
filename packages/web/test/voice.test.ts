@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * D74 朗读（网页）：
  * - 控制器：自动播放每一步停留 = max(画面停留, 声音读完 + 换气)；暂停时声音一起暂停；手动下一步立刻停掉当前声音；
@@ -6,8 +7,8 @@
  * - 看板：旁白语言识别、预设音色排序。
  */
 import { describe, expect, it, vi } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, narrate, option, page, say } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, narrate, option, page, say } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { VOICE_BREATH_MS, compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController, TIMING } from '../src/runtime/demo';

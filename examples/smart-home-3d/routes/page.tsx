@@ -1,5 +1,5 @@
 import { page, Slot } from '@joplo-app/kit';
-import { Box, Group, Paper } from '@joplo-app/kit/ui';
+import { Box, Group, Paper } from '@joplo-app/plugin-ui';
 
 /** 左边 3D 场景，右边 App 面板；具体内容由方案填进插槽。 */
 export default page(

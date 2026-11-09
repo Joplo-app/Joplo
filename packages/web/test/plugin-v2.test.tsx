@@ -1,8 +1,10 @@
+import '../../../scripts/test/render-fixtures.ts';
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { expect, it } from 'vitest';
 import { createElement, useState } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
-import { Text } from '@joplo-app/kit/ui';
+import { feature, flow, option, page } from '@joplo-app/kit';
+import { Text } from '@joplo-app/plugin-ui';
 import { definePlugin, defineRuntime, pluginComponent } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, stateAt } from '@joplo-app/core';

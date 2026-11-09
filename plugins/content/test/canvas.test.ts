@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 讲解片原语：<Canvas> 的 camera()、flow({ from, layer })、patch()、旁白计入时长估算。
  * 不变量：
@@ -7,9 +8,9 @@
  * 4. 带旁白的步骤，估算时长按朗读计；没有旁白的项目估算不变。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
+import * as ui from '@joplo-app/plugin-ui';
 import { Canvas, camera } from '../src/plugin.ts';
-import { $, config, feature, flow, go, layer, narrate, option, page, patch, set, spotlight, type Flow } from '@joplo-app/kit';
+import { $, feature, flow, go, layer, narrate, option, page, patch, set, spotlight, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, scenarioEstimateMs, stateAt, voiceMs, type AuthoringProject } from '@joplo-app/core';
 

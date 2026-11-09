@@ -1,3 +1,4 @@
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -106,6 +107,7 @@ it('HTTP review endpoints enforce token, origin, project ownership, and revision
   const dir = temp();
   const example = path.resolve('examples/invite');
   fs.cpSync(example, dir, { recursive: true, filter: s => !/[/\\](\.joplo|node_modules|dist)([/\\]|$)/.test(s.slice(example.length)) });
+  installFixturePlugins(dir);
   const dev = await createDev({ projectDir: dir, port: 0, watch: false, log: () => {} }); hubs.push(dev);
   const p = dev.payload().project!;
   const option = Object.keys(p.options)[0]!;

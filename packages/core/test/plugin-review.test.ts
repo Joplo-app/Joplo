@@ -1,14 +1,14 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { trace as pluginTrace } from '@joplo-app/plugin-diagram/effects';
 import { describe, expect, it } from 'vitest';
-import { config, feature, flow, option, page, layer, trace, Slot } from '@joplo-app/kit';
+import { feature, flow, option, page, layer, Slot } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx as h } from '@joplo-app/kit/jsx-runtime';
-import { Diagram, StateMachine } from '@joplo-app/kit/ui';
+import { Diagram, StateMachine } from '@joplo-app/plugin-diagram';
 import { definePlugin, pluginComponent, pluginEffect } from '@joplo-app/kit/plugin';
 import { compile, type AuthoringProject } from '../src/compile.ts';
 import { scopeProject } from '../src/scope.ts';
 import { featureDiff } from '../src/feature-diff.ts';
 import { localizeProject } from '../src/content-i18n.ts';
-import legacy from './fixtures/legacy-diagram-publish.json';
 const file = '/p/test.tsx';
 const schema = { safeParse: () => ({ success: true }) };
 function plugin(hooks: any, extra: any = {}) { return definePlugin({ id: 'probe', title: 'Probe', runtime: '/probe.js', components: { Item: { doc: 'item' } }, schemas: { node: schema, step: schema }, compile: hooks, ...extra }); }
@@ -145,13 +145,5 @@ describe('P1-A review regressions', () => {
     const after = compile(s, 'publish').project!;
     expect(featureDiff(before, after).scenarios[0]).toMatchObject({ status: 'modified', reasons: ['initial-state'] });
   });
-  it('can compare a genuine b817425 Diagram publish IR with itself', () => {
-    expect(featureDiff(legacy, legacy).status).toBe('unchanged');
-    const privateIR = structuredClone(legacy) as any;
-    Object.values(privateIR.scenes).forEach((s: any) => { s.root.note = 'private'; });
-    expect(() => featureDiff(privateIR, legacy)).toThrow(/Private authoring data/);
-    const bad = structuredClone(legacy) as any;
-    Object.values(bad.scenes).forEach((s: any) => { s.root.layout.privateNote = 'private'; });
-    expect(() => featureDiff(bad, legacy)).toThrow(/Invalid public/);
-  });
+
 });

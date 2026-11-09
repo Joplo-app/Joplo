@@ -1,12 +1,14 @@
+import '../../../scripts/test/render-fixtures.ts';
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * <Canvas> 在任何合法父容器里都可见：父元素没给高度（Stack、页面里普通的块）时，按 view 的宽高比撑开，
  * 不会因为 height: 100% 解析成 0 而整块消失；父元素给了高度（层、h="100%"）时照常铺满。
  */
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import * as ui from '@joplo-app/kit/ui';
+import * as ui from '@joplo-app/plugin-ui';
 import { Canvas, camera } from '../src/plugin.ts';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../../../packages/web/src/i18n/context';

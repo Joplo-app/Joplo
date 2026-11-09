@@ -1,7 +1,7 @@
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
 import { $, done, eq, flow, option, set, uses } from '@joplo-app/kit';
-import { Box, Button, Group, Paper, SegmentedControl, SimpleGrid, Stack, Text } from '@joplo-app/kit/ui';
+import { Box, Button, Group, Paper, SegmentedControl, SimpleGrid, Stack, Text } from '@joplo-app/plugin-ui';
 
 import { authorCode, backendLayer, clientLayer, header, step, stepBar, viewsState } from '../../../shared/board/views.tsx';
 

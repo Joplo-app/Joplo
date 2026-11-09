@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 /** Layout budgets plus server-rendered nowrap contracts; no browser/e2e runner. */
 import { expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';

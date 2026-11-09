@@ -1,5 +1,5 @@
 import { page } from '@joplo-app/kit';
-import { Badge, Stack, Text, Title } from '@joplo-app/kit/ui';
+import { Badge, Stack, Text, Title } from '@joplo-app/plugin-ui';
 
 export default page({ title: '用 Joplo 设计 Joplo', layout: false },
   <Stack p="xl" gap="lg">

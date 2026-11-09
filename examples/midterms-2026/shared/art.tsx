@@ -3,7 +3,7 @@
  * 用 Joplo 的 asset() 内嵌、<Image> 显示，再叠上去色、党派色调和边缘渐隐。
  */
 import { asset, type Bind } from '@joplo-app/kit';
-import { Image } from '@joplo-app/kit/ui';
+import { Image } from '@joplo-app/plugin-ui';
 
 const abs = { position: 'absolute' as const, inset: 0 };
 

@@ -11,7 +11,7 @@ let root: string;
 let original: Project;
 beforeAll(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), 'joplo-validate-')));
-  await cp('examples/invite', root, { recursive: true });
+  await cp('examples/invite', root, { recursive: true, filter: s => !s.includes('node_modules') });
   await symlink(resolve('node_modules'), join(root, 'node_modules'));
   await writeFile(join(root, 'package.json'), JSON.stringify({ type: 'module' }));
   const loaded = await loadAuthoring(root, p => tsImport(p, { parentURL: import.meta.url, tsconfig: join(root, 'tsconfig.json') }));

@@ -1,3 +1,4 @@
+import { fixtureConfigSource } from '../../../scripts/test/fixtures.ts';
 /**
  * 看板直接发布到云端（D76）。不变量：
  * 1. 账号与发布接口都要本机令牌；发布还要 JSON 与本机 Origin；请求体只接受字符串数组形式的范围；
@@ -15,7 +16,7 @@ import { CloudHub, type CloudBridge, type CloudPublishRequest } from '../src/clo
 
 const minimal = () => {
   const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-cloud-')));
-  fs.writeFileSync(path.join(d, 'joplo.config.ts'), `import { config } from '@joplo-app/kit';\nexport default config({ name: 'Cloud' });\n`);
+  fs.writeFileSync(path.join(d, 'joplo.config.ts'), fixtureConfigSource(`import { config } from '@joplo-app/kit';\nexport default config({ name: 'Cloud' });\n`));
   return d;
 };
 function req(port: number, opts: { method?: string; path: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; body: any }> {

@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 import { dataRows, stateFlowItems, changeFor } from '../../../plugins/ui/src/story-data.ts';
 import { createZhCN } from '../src/i18n/zh-CN';
 import { I18nProvider } from '../src/i18n/context';

@@ -1,5 +1,5 @@
 import { $, done, flow, notApplicable, option, undecided, uses } from '@joplo-app/kit';
-import { Badge, Card, Code, Group, Stack, Text, Title } from '@joplo-app/kit/ui';
+import { Badge, Card, Code, Group, Stack, Text, Title } from '@joplo-app/plugin-ui';
 
 import { Cmd } from '../../../shared/distribution/term.tsx';
 import { run } from '../../../shared/distribution/steps.ts';

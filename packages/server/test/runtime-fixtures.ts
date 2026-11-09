@@ -30,7 +30,8 @@ export function projectSnapshot(dir: string): string {
   const walk = (p: string) => {
     if (!fs.existsSync(p)) return;
     const st = fs.lstatSync(p);
-    if (st.isDirectory()) for (const n of fs.readdirSync(p).sort()) walk(path.join(p, n));
+    if (st.isSymbolicLink()) out.push(`${path.relative(dir,p)}:symlink:${fs.readlinkSync(p)}`);
+    else if (st.isDirectory()) for (const n of fs.readdirSync(p).sort()) walk(path.join(p, n));
     else out.push(`${path.relative(dir, p)}:${fs.readFileSync(p, 'utf8')}`);
   };
   for (const f of ['package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'node_modules']) walk(path.join(dir, f));

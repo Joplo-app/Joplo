@@ -1,3 +1,5 @@
+import '../../../scripts/test/render-fixtures.ts';
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 作者内容多语言（D84）在网页里的不变量：
  * 1. 发布站 / 嵌入的内容语言 = 界面语言（项目有）或默认语言（退回时显示一行说明）；?lang= 是这次打开的显式界面语言。
@@ -8,8 +10,8 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../src/i18n/context';
