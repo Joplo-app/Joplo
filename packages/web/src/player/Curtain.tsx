@@ -9,8 +9,10 @@ import { useI18n } from '../i18n/context';
  * 不在 renderer/ 里：它画在舞台外（StageViewport / RenderApp 那一层）。文字与底色只读 --jp-*（跟随舞台主题）；
  * 所属与「约 N 步」这类小字、开始按钮是播放器的界面，用看板字体与主操作色（与嵌入封面的播放按钮一致）。
  */
-import { AnimatePresence } from 'motion/react';
-import { motion } from '../renderer/engine-motion';
+// 幕布在舞台外（播放器外壳）：用浏览器时间的 Motion。封面是在“未播放”时渲染的，若绑引擎时钟，退场会沿用暂停时的
+// skipAnimations，开播那一刻一帧消失（D92：胶片条与视频都量到了这处硬切）。
+import { AnimatePresence, motion } from 'motion/react';
+const noop = () => {};
 import { ListOrdered, Play, Timer, Users } from 'lucide-react';
 import { cardAt, roleOf, type CardAction, type Project, type RoleInfo } from '@joplo-app/core/runtime';
 import type { CoverContent } from './cover-content';
@@ -64,6 +66,8 @@ export function Curtain({ project, scenarioId, position, cover, onStart, theme, 
           animate={{ opacity: 1 }}
           exit={animate ? { opacity: 0 } : undefined}
           transition={{ duration: card ? 0.45 : 0.3 }}
+          // JS 帧循环（不走原生 WAAPI）：录制与胶片条的假时钟能逐帧取样这段淡入淡出
+          onUpdate={noop}
         >
           {card ? <TransitionCard card={card} role={cardRole} k={k} /> : cover ? <SceneCover cover={cover} k={k} onStart={onStart} /> : null}
         </motion.div>

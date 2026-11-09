@@ -161,10 +161,11 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
     const helper = await ctx.newPage();
     await helper.setContent(DIFF_PAGE);
     const stageRatio = (size.height - SUBTITLE_HEIGHT) / size.height;
-    await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { play(): void } }).__JOPLO_RECORD__.play());
     const samples: Sample[] = [];
     let tail = -1;
+    // 第一帧在开播之前采（封面 / 第 0 步）：开播那一下的切换也要量到
     for (let t = 0; t <= MAX_MS; t += sampleMs) {
+      if (t === sampleMs) await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { play(): void } }).__JOPLO_RECORD__.play());
       if (t > 0) await page.clock.runFor(sampleMs);
       await flush(page);
       const p = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { progress: Progress } }).__JOPLO_RECORD__.progress);

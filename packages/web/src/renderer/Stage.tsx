@@ -274,7 +274,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   // 拖动平移：移动超过 4px 才算拖动，之后的 click 不当作点击元素
   const drag = useRef<{ x: number; y: number; v: View; moved: boolean; id: number; target?: string; scroll?: {element:HTMLElement;x:number;y:number}; source?: { el: HTMLElement; scale: number; translate: string; pointerEvents: string } } | null>(null);
   /**
-   * 拖动一个声明过的源（D92 U1）：元素按自己的本地坐标跟着指针走（含 Canvas / 镜头缩放），拖动中对命中测试透明，
+   * 拖动一个声明过的源（D92 U1）：元素按自己的本地坐标跟着指针走（含插件画面与镜头的缩放），拖动中对命中测试透明，
    * 结束（松手、Esc、pointercancel、丢失捕获、卸载）时一律回到原样：内联样式还原、data-jdragging 移除。
    */
   const releaseSource = () => {
