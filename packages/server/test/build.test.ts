@@ -53,7 +53,7 @@ describe('buildSite', () => {
     for (const s of ['复制给 Agent', 'joplo check --option', '恢复项目默认', '设为所有项目的默认', 'selection.json', '手机页面 ·', '外观浮层']) expect(html, s).not.toContain(s);
   }, 120_000);
 
-  it('Tailwind 以项目目录为 @source：项目里独有的 className 被编译进 CSS', async () => {
+  it('Tailwind 从公开 IR 提取：公开页面独有的 className 被编译进 CSS', async () => {
     const f = path.join(dir, 'routes/settings/page.tsx');
     fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('<Title order={2}>空间设置</Title>', '<Title order={2} className="tracking-[0.37em]">空间设置</Title>'));
     const r = await buildSite({ projectDir: dir, outDir: path.join(dir, 'dist-tw') });
