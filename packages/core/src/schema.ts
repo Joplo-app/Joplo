@@ -227,6 +227,8 @@ export const Scenario = z.strictObject({
   autoplay: z.boolean().optional(),
   /** Where a confirmed cross-scenario action enters; autoplay is unaffected. */
   actionEntry: z.enum(['before', 'after']).optional(),
+  /** flow({ from }) 接力的上一个场景（D92）：连续播放时一镜到底接上，不倒计时、不重置画面与配乐。 */
+  from: Qid.optional(),
   media: MediaSnapshot.optional(),
   ext: z.record(z.string(), Json).optional(),
   id: Qid,

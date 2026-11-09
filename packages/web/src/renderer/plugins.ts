@@ -109,7 +109,9 @@ export function usePluginObservers(root: RefObject<HTMLElement | null>, ids: rea
   useLayoutEffect(() => () => { for (const record of active.current.values()) destroy(record); active.current.clear(); }, []);
   useLayoutEffect(() => {
     const el = root.current;
-    const key = `${context.frame.scenarioId}:${context.frame.sceneId}`;
+    // 只按画面重建（D92）：接力的下一章与同一画面上的换章继续用同一个观察器，进退场、变形与镜头不断开；
+    // 跳转与重置由 frame.resetKey 告诉观察器丢弃本地状态
+    const key = context.frame.sceneId;
     for (const [id, record] of active.current) {
       const state = pluginStatus(id);
       if (!ids.includes(id) || state.state !== 'ready' || state.runtime.observe !== record.factory || record.root !== el || record.key !== key) {

@@ -40,6 +40,23 @@ test('render 参数', async () => {
   const r = await run(['render', 'project', '--scenario-id', 'f.a.s', '--step-id', 'f.a.s.1', '--theme', 'clean', '--out', 'a.png', '--width', '1280', '--height', '720', '--scale', '2', '--overwrite'], { renderStep });
   expect(r.code).toBe(0); expect(renderStep).toHaveBeenCalledWith({ projectDir: resolve('project'), scenarioId: 'f.a.s', stepId: 'f.a.s.1', theme: 'clean', out: resolve('a.png'), viewport: { width: 1280, height: 720 }, scale: 2, overwrite: true });
 });
+test('render --film / --video：参数、摘要与互斥（D92）', async () => {
+  const film = { path: resolve('f-1.png'), files: [resolve('f-1.png'), resolve('f-2.png')], durationMs: 12500, sampleMs: 50, every: 250, samples: 251, maxDiff: .12,
+    cuts: [{ atMs: 4000, diff: .2, changed: .55, scenarioId: 'f.a.s', position: 3 }], stills: [{ fromMs: 6000, toMs: 8000, scenarioId: 'f.a.s', position: 4 }],
+    boundaries: [{ atMs: 9000, scenarioId: 'f.a.t', position: 0, chapter: true, maxDiff: .03, maxChanged: .08 }], warnings: [] };
+  const renderFilm = vi.fn(async () => film);
+  const r = await run(['render', 'project', '--scenario-id', 'f.a.s', '--film', '--chain', '--every', '500', '--out', 'f.png', '--overwrite'], { renderFilm });
+  expect(r.code).toBe(0);
+  expect(renderFilm).toHaveBeenCalledWith({ projectDir: resolve('project'), scenarioId: 'f.a.s', theme: undefined, out: resolve('f.png'), overwrite: true, chain: true, every: 500 });
+  expect(r.stdout).toContain('chapter → f.a.t at 9.00s: max adjacent diff 3.0%');
+  expect(r.stdout).toContain('CUT 4.00s f.a.s step 3');
+  expect(r.stdout).toContain('STILL 6.00s–8.00s (2.00s)');
+  const renderVideo = vi.fn(async () => ({ path: resolve('v.webm'), durationMs: 1 }));
+  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--video', '--chain', '--out', 'v.webm'], { renderVideo })).stdout).toBe(resolve('v.webm') + '\n');
+  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--film', '--sheet', '--out', 'f.png'])).code).toBe(2);
+  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--chain', '--out', 'f.png'])).code).toBe(2);
+  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--film', '--step-id', 'x', '--out', 'f.png'])).code).toBe(2);
+});
 test('无服务端命令不触发动态 import；无效参数先拒绝', async () => {
   expect((await run(['guide'])).loadServer).not.toHaveBeenCalled();
   const r = await run(['dev', '--port', '65536']); expect(r.code).toBe(2); expect(r.loadServer).not.toHaveBeenCalled();

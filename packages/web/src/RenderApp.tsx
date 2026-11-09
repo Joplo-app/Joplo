@@ -14,7 +14,10 @@ import { useBoardI18n } from './i18n/board/context';
  * - w/h：截图尺寸。`[data-jshot]` 是 w×h 的画布，舞台（手机页面带外框）按比例放进去。
  * - frame=1：导出图片 / 视频用，`[data-jexport]` 包住画面；手机时套上与看板相同的手机外框（DeviceFrame）。
  * - record=1：导出视频用，带鼠标、点击波纹与字幕；window.__JOPLO_RECORD__.play() 开始自动播放，
- *   .progress = { step, done, error } 供服务端读取进度。
+ *   .progress = { step, done, error, scenarioId, position, activeStep } 供服务端读取进度。
+ * - chain=1（与 record 同用）：放完一个场景接着放同一方案的下一个场景，顺序与发布站的连续播放相同（nextScenarioId）。
+ * - voice=estimate（与 record 同用，`joplo render --film/--video`）：不出声，但每段旁白按 voiceMs 估算的时长“读”，
+ *   画面停留与发布站开着朗读时一致；不调用任何朗读服务。
  */
 import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, stateAt, type AppearanceFont, type AppearanceStroke, type PlayState, type Project } from '@joplo-app/core/runtime';
@@ -36,6 +39,10 @@ import { coverFor, coverShown } from './player/cover-content';
 import { Curtain } from './player/Curtain';
 import { waitForFonts } from './board/font-loading';
 import { viewProject } from './i18n/content';
+import { Narrator, type Narration } from './runtime/voice';
+import { voiceMs } from '@joplo-app/core/runtime';
+import { nextScenarioId } from './player/watch';
+import { scenariosOf } from './runtime/views';
 
 /** 截图用的 IR：content 参数是项目的内容语言时换成这种语言（与看板预览同一个 viewProject）。 */
 export function renderProject(project: Project, content: string | null, uiLocale: string): Project {
@@ -46,8 +53,34 @@ type W = {
   __JOPLO_READY__?: boolean;
   __JOPLO_STATE__?: PlayState | null;
   __JOPLO_ERROR__?: string | null;
-  __JOPLO_RECORD__?: { play(): void; progress: { step: number; done: boolean; error: string | null } };
+  __JOPLO_RECORD__?: { play(): void; progress: RecordProgress };
 };
+
+export type RecordProgress = { step: number; done: boolean; error: string | null; scenarioId: string | null; position: number; activeStep: number | null };
+
+/** 估算朗读（voice=estimate）：不出声，按 voiceMs 读完；时长只经过 setTimeout，所以录制时由页面时钟（含 Playwright 假时钟）决定。 */
+export function estimatedNarrator(): Narrator {
+  const n = new Narrator();
+  n.enabled = true;
+  n.speak = (text: string, _role: string | null, speed: number): Narration | null => {
+    const ms = voiceMs(text.trim(), speed);
+    if (!ms) return null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let left = ms;
+    let started = 0;
+    let finish: () => void = () => {};
+    const done = new Promise<void>((resolve) => { finish = resolve; });
+    const run = () => { started = Date.now(); timer = setTimeout(() => { timer = null; finish(); }, left); };
+    run();
+    return {
+      source: 'browser', done,
+      pause: () => { if (!timer) return; clearTimeout(timer); timer = null; left = Math.max(0, left - (Date.now() - started)); },
+      resume: () => { if (!timer && left > 0) run(); },
+      cancel: () => { if (timer) clearTimeout(timer); timer = null; finish(); },
+    };
+  };
+  return n;
+}
 
 const raf = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
@@ -66,6 +99,8 @@ export function RenderApp() {
   const themeParam = params.get('theme');
   const frame = params.get('frame') === '1';
   const record = params.get('record') === '1';
+  const chain = params.get('chain') === '1';
+  const voiceEstimate = params.get('voice') === 'estimate';
   // 可选的截图尺寸（renderStep 的 viewport）：只决定画布大小，舞台宽度仍是页面自己的 viewport（D44）
   const w = Number(params.get('w'));
   const h = Number(params.get('h'));
@@ -201,7 +236,7 @@ export function RenderApp() {
       </div>
     );
   };
-  if (record) return <RecordStage project={data.project} scenarioId={scenarioId} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} />;
+  if (record) return <RecordStage project={data.project} scenarioId={scenarioId} chain={chain} voiceEstimate={voiceEstimate} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} />;
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
   const plan = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null);
@@ -224,7 +259,7 @@ export function RenderApp() {
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
-function RecordStage({ project, scenarioId, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null) => ReactNode }) {
+function RecordStage({ project, scenarioId, chain, voiceEstimate, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; chain: boolean; voiceEstimate: boolean; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null) => ReactNode }) {
   const { t: i18n } = useBoardI18n();
 
   const ctl = useMemo(() => {
@@ -232,8 +267,13 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
     c.reducedMotion = false;
     c.setProject(project, 1, null);
     c.setScenario(scenarioId, 0, { quiet: true });
+    if (chain) {
+      const optionId = project.scenarios[scenarioId]?.optionId ?? null;
+      c.autoNext = (id) => nextScenarioId(scenariosOf(project, optionId), id);
+    }
+    if (voiceEstimate) c.narrator = estimatedNarrator();
     return c;
-  }, [project, scenarioId]);
+  }, [project, scenarioId, chain, voiceEstimate]);
   ctl.i18n = i18n;
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
@@ -241,7 +281,8 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
 
   useEffect(() => {
     const w = window as unknown as W;
-    const total = project.scenarios[scenarioId]?.steps.length ?? 0;
+    const current = snap.scenarioId ? project.scenarios[snap.scenarioId] : undefined;
+    const total = current?.steps.length ?? 0;
     w.__JOPLO_STATE__ = snap.state;
     w.__JOPLO_RECORD__ = {
       play: () => {
@@ -251,8 +292,9 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
       },
       progress: {
         step: snap.state?.position ?? 0,
-        done: started && !snap.playing && (total === 0 || !!snap.state?.completed || (snap.state?.position ?? 0) >= total || !!snap.playbackError),
+        done: started && !snap.playing && !snap.upNext && (total === 0 || !!snap.state?.completed || (snap.state?.position ?? 0) >= total || !!snap.playbackError),
         error: snap.playbackError ? translate(snap.playbackError, i18n) : null,
+        scenarioId: snap.scenarioId, position: snap.state?.position ?? 0, activeStep: snap.activeStep,
       },
     };
   }, [snap, started, ctl, project, scenarioId]);
@@ -261,7 +303,8 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
   const sc = ctl.scenario();
   // 与演示页一致：导演跟随；下一步的操作目标不在当前层时先切到它所在的层（leadLayer）
-  const plan = cameraFor(project, scenarioId, cameraPosition(ctl.scenario(), snap.state?.position ?? 0, snap.activeStep), snap.leadLayer);
+  const shownScenario = snap.scenarioId ?? scenarioId;
+  const plan = cameraFor(project, shownScenario, cameraPosition(ctl.scenario(), snap.state?.position ?? 0, snap.activeStep), snap.leadLayer);
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, true), [ctl, plan.sceneId]);
   if (!snap.state) return null;
   return <EngineClockContext.Provider value={ctl.clock}>{wrap(
@@ -291,6 +334,6 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
       overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={null} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />}
     />,
     subtitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n, project),
-    { scenarioId, position: snap.state.position, cover: coverShown(sc, snap.state.position, snap.playing, snap.activeStep, snap.freeMode) ? coverFor(project, scenarioId, i18n) : null, animate: true },
+    { scenarioId: shownScenario, position: snap.state.position, cover: coverShown(sc, snap.state.position, snap.playing, snap.activeStep, snap.freeMode) ? coverFor(project, shownScenario, i18n) : null, animate: true },
   )}</EngineClockContext.Provider>;
 }

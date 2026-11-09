@@ -205,3 +205,37 @@ describe('DemoController 下一章倒计时（upNext）', () => {
     expect(c.getSnapshot().scenarioId).toBe('f.a.one');
   });
 });
+
+describe('DemoController 接力（flow({ from })，D92）：一镜到底，不倒计时、不重置', () => {
+  function relay(): Project {
+    const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
+    const opt = option({ name: 'A', idea: 'i', scenarios: {
+      one: flow('One', { start: '/' }).click('go', 'First chapter'),
+      two: flow('Two', { from: 'one' }).click('go', 'Second chapter'),
+    } });
+    const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } } };
+    return compile(src, 'dev').project!;
+  }
+  it('接力的下一章：没有 upNext、播放不停、跳转计数 seek 不变，状态从上一章结尾继续', async () => {
+    const c = new DemoController(null);
+    c.reducedMotion = true;
+    c.setProject(relay(), 1, null);
+    c.setScenario('f.a.one', 0, { quiet: true });
+    c.autoNextDelay = 60_000;
+    c.autoNext = (id) => nextScenarioId([{ id: 'f.a.one' }, { id: 'f.a.two' }], id);
+    const seen: { upNext: boolean; playing: boolean; seek: number }[] = [];
+    c.subscribe(() => { const s = c.getSnapshot(); seen.push({ upNext: !!s.upNext, playing: s.playing, seek: s.seek }); });
+    const seek = c.getSnapshot().seek;
+    void c.play();
+    await until(() => c.getSnapshot().scenarioId === 'f.a.two' && c.getSnapshot().state?.position === 1);
+    await until(() => !c.getSnapshot().playing);
+    expect(seen.some(s => s.upNext)).toBe(false);
+    // 开播后第一次停下就是全片结束：换章时没有任何一刻 playing=false
+    const start = seen.findIndex(s => s.playing);
+    const stopAt = seen.findIndex((s, i) => i > start && !s.playing);
+    expect(stopAt).toBe(seen.length - 1);
+    expect(c.getSnapshot().state?.position).toBe(1);
+    expect([...new Set(seen.map(s => s.seek))]).toEqual([seek]);
+  });
+});

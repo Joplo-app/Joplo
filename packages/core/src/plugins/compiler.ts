@@ -7,7 +7,7 @@ import { jsonData, snapshot, object, strings, syncResult, authoringData, materia
 import { isNode, type JNode } from '@joplo-app/kit/node';
 import { PLUGIN_API_VERSION, type PluginDef, type PluginEffectDef, type PluginReport } from '@joplo-app/kit/plugin';
 import { initialState, applyStep, resolveProps, type PlayState } from '../player.ts';
-import type { Scene, SceneNode, Project } from '../schema.ts';
+import type { Scene, SceneNode, Project, Scenario } from '../schema.ts';
 import type { PluginInfo } from '../catalog.ts';
 
 export type CompileOptions = { onResource?: (request: ResourceRequest) => void; pluginOptions?: Record<string, Record<string, unknown>> };
@@ -208,11 +208,23 @@ export class PluginCompiler {
     });
   }
   frames(project: Project): void {
-    for (const sc of Object.values(project.scenarios)) {
+    // 接力（flow({ from })，D92）：先算被接力的一章，下一章第 0 步继承它结尾的配乐（推进它最后一步的停留估算）
+    const ended = new Map<string, MediaSnapshot>();
+    const order: Scenario[] = [];
+    const visit = (sc: Scenario, seen = new Set<string>()) => {
+      if (order.includes(sc) || seen.has(sc.id)) return;
+      seen.add(sc.id);
+      const prev = sc.from ? project.scenarios[sc.from] : undefined;
+      if (prev) visit(prev, seen);
+      order.push(sc);
+    };
+    for (const sc of Object.values(project.scenarios)) visit(sc);
+    for (const sc of order) {
       const scenes = Object.values(project.scenes).filter(s => s.optionId === sc.optionId || s.optionId == null).map(s => ({ id: s.id, root: s.root }));
       const roots = scenes.map(s => s.root);
-      const hasMedia = sc.steps.some(step => this.mediaCommands.has(step.id));
-      let media: MediaSnapshot = {};
+      const prev = sc.from ? project.scenarios[sc.from] : undefined;
+      let media: MediaSnapshot = prev && ended.has(prev.id) ? advanceMedia(ended.get(prev.id)!, prev.steps.length ? prev.steps[prev.steps.length - 1]!.hold ?? 3000 : 0) : {};
+      const hasMedia = Object.keys(media).length > 0 || sc.steps.some(step => this.mediaCommands.has(step.id));
       let previousState: PlayState | undefined;
       let state = initialState(project, sc.id);
       let previousData: Record<string, unknown> = {};
@@ -227,8 +239,20 @@ export class PluginCompiler {
           media = advanceMedia(media, i > 1 ? (sc.steps[i - 2]!.hold ?? 3000) : 0);
           for (const c of this.mediaCommands.get(sc.steps[i - 1]!.id) ?? []) {
             const key = `${c.plugin}:${c.track}`;
-            if (c.action === 'play') media[key] = { plugin: c.plugin, resource: c.resource, offsetMs: 0, volume: c.volume ?? 1, loop: c.loop ?? false, fadeInMs: c.fadeMs ?? 0 };
-            else if (media[key]) { if (c.fadeMs) media[key] = { ...media[key]!, stopAfterMs: c.fadeMs }; else delete media[key]; }
+            const current = media[key];
+            if (c.action === 'play' && current?.resource === c.resource) {
+              // 同一首再 play：继续播放（含取消正在进行的淡出），只更新音量与循环
+              const { stopAfterMs: _fading, ...kept } = current;
+              media[key] = { ...kept, volume: c.volume ?? 1, loop: c.loop ?? false };
+            } else if (c.action === 'play') {
+              // 换曲：有 fadeMs 时旧曲换到「轨道>旧资源」键上同时淡出，与新曲交叉，中间没有静音
+              if (current && c.fadeMs) media[`${key}>${current.resource}`] = { ...current, stopAfterMs: Math.min(current.stopAfterMs ?? c.fadeMs, c.fadeMs) };
+              media[key] = { plugin: c.plugin, resource: c.resource, offsetMs: 0, volume: c.volume ?? 1, loop: c.loop ?? false, fadeInMs: c.fadeMs ?? 0 };
+            } else {
+              for (const k of Object.keys(media)) if (k === key || k.startsWith(`${key}>`)) {
+                if (c.fadeMs) media[k] = { ...media[k]!, stopAfterMs: Math.min(media[k]!.stopAfterMs ?? c.fadeMs, c.fadeMs) }; else delete media[k];
+              }
+            }
           }
         }
         if (hasMedia) target.media = structuredClone(media);
@@ -251,6 +275,7 @@ export class PluginCompiler {
         previousData = validated;
         previousState = state;
       }
+      ended.set(sc.id, media);
     }
   }
   private invalid(p: PluginDef, at?: string) { this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id}: invalid hook output envelope`, at); }

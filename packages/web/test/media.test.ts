@@ -43,3 +43,31 @@ it('diagnostic-only updates preserve the exact project object and reject stale g
  expect(withDiagnostics(next,{projectId:'p',version:3,diagnostics:[]})).toBe(next);
  expect(withDiagnostics(next,{projectId:'p',version:4,diagnostics:[]})!.diagnostics).toEqual([]);
 });
+it('keeps a track continuous on the engine clock across step snapshots and adopts the old slot for a crossfade (D92)', async () => {
+  vi.stubGlobal('AudioContext', FakeAudio); mock.factory.mockImplementation(async () => ({ update: mock.update, destroy: mock.destroy }));
+  const engine = new MediaEngine(); engine.unlock();
+  const assets = { a: 'data:audio/wav;base64,UklGRg==', b: 'data:audio/wav;base64,UklGRh==' };
+  const A = { plugin: 'fake', resource: 'a', offsetMs: 0, volume: .5, loop: true, fadeInMs: 0 };
+  engine.update({ 'fake:bgm': A }, assets, { ...frame, elapsedMs: 0, timeMs: 1000 });
+  await new Promise(r => setTimeout(r, 0));
+  engine.update({ 'fake:bgm': A }, assets, { ...frame, elapsedMs: 5000, timeMs: 6000 });
+  expect(mock.update.mock.lastCall?.[0].offsetMs).toBe(5000);
+  // 下一步的快照按估算写了 3000 ms（编译期不知道真实时长）：同一个 epoch 里以引擎时钟为准，不回跳
+  engine.update({ 'fake:bgm': { ...A, offsetMs: 3000 } }, assets, { ...frame, elapsedMs: 0, timeMs: 6000 });
+  expect(mock.update.mock.lastCall?.[0].offsetMs).toBe(5000);
+  engine.update({ 'fake:bgm': { ...A, offsetMs: 3000 } }, assets, { ...frame, elapsedMs: 100, timeMs: 6100 });
+  expect(mock.update.mock.lastCall?.[0].offsetMs).toBe(5100);
+  expect(mock.factory).toHaveBeenCalledTimes(1);
+  // 交叉淡化：旧曲换到 >a 键继续（不重建驱动），新曲另起一条
+  engine.update({ 'fake:bgm': { ...A, resource: 'b', fadeInMs: 800 }, 'fake:bgm>a': { ...A, offsetMs: 3000, stopAfterMs: 800 } }, assets, { ...frame, elapsedMs: 0, timeMs: 6100 });
+  await new Promise(r => setTimeout(r, 0));
+  expect(mock.factory).toHaveBeenCalledTimes(2);
+  expect(mock.destroy).not.toHaveBeenCalled();
+  expect(engine.status().tracks).toBe(2);
+  // 换 epoch（跳转）才按快照重新定位
+  engine.update({ 'fake:bgm': { ...A, offsetMs: 3000 } }, assets, { ...frame, identity: 'jump', elapsedMs: 0, timeMs: 9000 });
+  await new Promise(r => setTimeout(r, 0));
+  engine.update({ 'fake:bgm': { ...A, offsetMs: 3000 } }, assets, { ...frame, identity: 'jump', elapsedMs: 0, timeMs: 9000 });
+  expect(mock.update.mock.lastCall?.[0].offsetMs).toBe(3000);
+  engine.destroy();
+});
