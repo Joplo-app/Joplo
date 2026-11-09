@@ -1,0 +1,17 @@
+{
+  "name": "button-40-years",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "joplo dev",
+    "check": "joplo check",
+    "build": "joplo build"
+  },
+  "devDependencies": {
+    "joplo": "workspace:*",
+    "@joplo-app/kit": "workspace:*",
+    "@joplo-app/plugin-ui": "workspace:*",
+    "@joplo-app/plugin-content": "workspace:*",
+    "@joplo-app/plugin-alda": "workspace:*"
+  }
+}

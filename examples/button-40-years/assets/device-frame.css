@@ -1,0 +1,7 @@
+/* Adapted from Devices.css / Marvelapp, Copyright 2014, MIT.
+   Generic black chassis, glass inset, speaker and round home button only.
+   Selectors scoped/renamed; dimensions overridden by the film theme. */
+.b40 .handset07 { padding:129px 27px;width:320px;height:480px;background:#686868;border-radius:54px; }
+.b40 .handset07:before { content:'';width:calc(100% - 8px);height:calc(100% - 8px);position:absolute;top:4px;left:4px;z-index:1;border-radius:50px;background:#1e1e1e; }
+.b40 .handset07 .speaker07 { background:#292728;width:64px;height:10px;position:absolute;top:72px;left:50%;z-index:3;margin-left:-32px;border-radius:5px; }
+.b40 .handset07 .home07 { background:#242324;border-radius:100%;width:72px;height:72px;z-index:3;position:absolute;left:50%;margin-left:-36px;bottom:30px; }

@@ -199,7 +199,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'Tabs.Tab': 'value, leftSection (character), rightSection (count or short text, e.g. 3)',
   'Accordion.Control': 'Clickable heading (requires id)',
   Pagination: 'total, value / defaultValue; select action writes the page number',
-  PromptInput: 'placeholder; AI input, type action writes the value; use ActionIcon or Button to send',
+  PromptInput: 'placeholder, value; native multiline AI input, type action writes the value; audience edits are disposable exploration; use ActionIcon or Button to send',
   'Artifact.Ref': "title, kind, status; card linking to an artifact in the conversation (requires id; clickable)",
   'Terminal.Input': 'prompt (default "$"), placeholder; terminal input line (requires id), type action writes the value',
   'Menu.Item': 'leftSection (character), rightSection (text), color (red for destructive); clickable menu row (requires id)',

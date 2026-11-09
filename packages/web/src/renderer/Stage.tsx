@@ -2,7 +2,7 @@ import { useScrollState } from './scroll-state';
 import { useEngineAnimations } from './engine-animations';
 import { EngineClockContext } from './engine-motion';
 import { playgroundState, type Playground, type Action } from '@joplo-app/core/runtime';
-import { editableTarget, inputOwner, hoverAction } from '../runtime/input';
+import { editableTarget, inputOwner, hoverAction, HoverIntent, resolveDropTarget } from '../runtime/input';
 import type { ClockSource, ClockFrame } from '../runtime/clock';
 import type { ActionPresentation } from '@joplo-app/kit/plugin';
 import { projectThemes } from '@joplo-app/core/runtime';
@@ -195,9 +195,22 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   const draggable = new Set(gestureActions.flatMap(a => a.type === 'drag' ? [a.target] : []));
   const scrollIntentUntil = useRef(0);
   useLayoutEffect(() => { scrollIntentUntil.current = 0; }, [epoch, shownId]);
-  const hover = useRef<{ target: string; timer: ReturnType<typeof setTimeout> } | null>(null);
-  const cancelHover = () => { if (hover.current) clearTimeout(hover.current.timer); hover.current = null; };
+  const hoverFns = useRef({ gestureActions, inspectMode });
+  hoverFns.current = { gestureActions, inspectMode };
+  const hover = useRef<HoverIntent | null>(null);
+  if (!hover.current) hover.current = new HoverIntent(
+    id => {
+      const el = rootRef.current?.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`);
+      if (!el || !el.getBoundingClientRect().width) return undefined;
+      const a = hoverFns.current.gestureActions.find(a => a.type === 'hover' && a.target === id);
+      return a?.type === 'hover' ? a : undefined;
+    },
+    () => !inputFns.current.onAction || hoverFns.current.inspectMode || (clock?.getSnapshot().running ?? inputFns.current.frame.running),
+    a => inputFns.current.onAction?.(a),
+  );
+  const cancelHover = () => hover.current?.reset();
   useEffect(() => cancelHover, [epoch, shownId]);
+  useEffect(() => { if (frame.running) cancelHover(); }, [frame.running]);
 
   /** 当前视图（用户的，或镜头此刻的目标视图），在它上面继续缩放平移，并把内容夹在画面里。 */
   const setClamped = (v: View) => {
@@ -311,6 +324,18 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     return { x: (clientX - r.left) / s, y: (clientY - r.top) / s };
   };
 
+  const pluginAction = (action: Action): Action => {
+    if (action.type !== 'drag' || typeof action.to === 'string') return action;
+    const destinations = gestureActions.flatMap(a => a.type === 'drag' && a.target === action.target && typeof a.to === 'string' ? [a.to] : []);
+    const to = resolveDropTarget(action.to, destinations, id => {
+      const el = rootRef.current?.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`);
+      if (!el) return null;
+      const b = el.getBoundingClientRect(), start = toFramePoint(b.left, b.top), end = toFramePoint(b.right, b.bottom);
+      return { ...start, width: end.x - start.x, height: end.y - start.y };
+    });
+    return { ...action, to };
+  };
+
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     if (!onNodeClick && !onAction) return;
     const inspect = e.altKey || inspectMode;
@@ -375,17 +400,13 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         onPointerOver={e => {
           if (!onAction || inspectMode || e.pointerType === 'touch' || (clock?.getSnapshot().running ?? frame.running)) return;
           const a = gestureFor('hover', e.target as HTMLElement);
-          if (!a || a.type !== 'hover' || hover.current?.target === a.target) return;
-          cancelHover();
-          hover.current = { target: a.target, timer: setTimeout(() => {
-            if (!(clock?.getSnapshot().running ?? inputFns.current.frame.running)) onAction(a);
-            hover.current = null;
-          }, a.ms) };
+          // A raycast surface reports its precise hit through ctx.hover instead.
+          if ((e.target as HTMLElement).closest('[data-jgesture-view]')) return;
+          hover.current?.move(a?.type === 'hover' ? a.target : null);
         }}
         onPointerOut={e => {
-          const id = hover.current?.target;
-          const el = id ? rootRef.current?.querySelector(`[data-jid="${CSS.escape(id)}"]`) : null;
-          if (!el?.contains(e.relatedTarget as Node | null)) cancelHover();
+          const a = e.relatedTarget instanceof HTMLElement ? gestureFor('hover', e.relatedTarget) : undefined;
+          hover.current?.move(a?.type === 'hover' ? a.target : null);
         }}
         onScrollCapture={e => {
           if (!onAction || (clock?.getSnapshot().running ?? frame.running) || e.timeStamp > scrollIntentUntil.current) return;
@@ -420,7 +441,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
           {scene ? (
-            <RenderContext.Provider value={{ act: onAction ? (target, action, native) => onAction({ ...action, target }, native) : undefined, interactive: !!onAction && mode === 'demo' && !inspectMode, draggable: onAction ? draggable : undefined, clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, scene, stage: rootRef.current, state: viewState, mode, selectedId, preview: shownPreview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, ext, streaming, changed, plugins: project.plugins, nextTargetId }}>
+            <RenderContext.Provider value={{ assets: project.mediaAssets, act: onAction ? (target, action, native) => onAction(pluginAction({ ...action, target }), native ? pluginAction(native) : undefined) : undefined, hover: id => hover.current?.move(id), interactive: !!onAction && mode === 'demo' && !inspectMode, draggable: onAction ? draggable : undefined, clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, scene, stage: rootRef.current, state: viewState, mode, selectedId, preview: shownPreview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, ext, streaming, changed, plugins: project.plugins, nextTargetId }}>
               {/* 换层（换画面）时淡入 */}
               <motion.div key={shownId} className="absolute inset-0" ref={cam.contentRef} initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
                 <RenderNode node={scene.root} />

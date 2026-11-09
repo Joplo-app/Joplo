@@ -1,0 +1,19 @@
+/* The art and models carry the imagery. CSS supplies typography, atmosphere and controls. */
+:root {
+  --jp-stroke: clean;
+  --jp-font: 'Avenir Next', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --jp-bg: #0b1012; --jp-surface: #192220; --jp-subtle: #24302b;
+  --jp-ink: #f3efdf; --jp-muted: #aeb9ab; --jp-accent: #d8b66c;
+  --jp-line: #4b5548; --jp-line-strong: #829079; --jp-annot: #e5c77e;
+}
+.journey { color: #f3efdf; font-family: var(--jp-font); }
+.journey .chapter { font-size: 20px; letter-spacing: 4px; color: #d2d8c5; }
+.journey .headline { font-family: 'Songti SC', 'Noto Serif CJK SC', serif; font-size: 66px; font-weight: 400; line-height: 1.2; letter-spacing: -2px; }
+.journey .kicker { font-size: 24px; line-height: 1.6; color: #c4ccba; }
+.journey .note { font-size: 22px; line-height: 1.65; }
+.journey .action { border-radius: 24px !important; border: 1px solid #b5bc9d88; background: #0c1518c9; color: #f4efdd !important; padding: 10px 22px; font-size: 21px !important; min-height: 48px; cursor: pointer; }
+.journey .action:focus-visible { outline: 3px solid #f0cf80; outline-offset: 5px; }
+.journey .action:hover { background: #414735; }
+.journey .caption-source { font-size: 15px; line-height: 1.5; color: #abb5a3; }
+.journey .fact { background: #101a16ed; border-left: 2px solid #d4b776; padding: 22px 26px; font-size: 23px; line-height: 1.65; }
+.journey .year { font-family: 'Georgia', serif; font-size: 128px; letter-spacing: -7px; color: #e2d2a4; opacity: .16; line-height: 1; }

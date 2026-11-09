@@ -42,7 +42,7 @@
 
 ## 发布
 
-遵循 [docs/release.md](docs/release.md)：十个包（含 plugin-diagram、plugin-alda、plugin-content、plugin-ui）统一版本，版本变化后重新生成技能，检查通过后合并，再按 tag 流程发布并验证 registry。发布时检查技能是否随相同版本正确安装，不能只验证工作区中的源码。
+遵循 [docs/release.md](docs/release.md)：十一个包（含 plugin-diagram、plugin-alda、plugin-tripo、plugin-content、plugin-ui）统一版本，版本变化后重新生成技能，检查通过后合并，再按 tag 流程发布并验证 registry。发布时检查技能是否随相同版本正确安装，不能只验证工作区中的源码。
 
 ## Joplo 自身的设计项目
 

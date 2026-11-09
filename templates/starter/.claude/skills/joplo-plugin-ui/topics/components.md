@@ -466,7 +466,7 @@ Clickable heading (requires id)
 total, value / defaultValue; select action writes the page number
 
 ## PromptInput
-placeholder; AI input, type action writes the value; use ActionIcon or Button to send
+placeholder, value; native multiline AI input, type action writes the value; audience edits are disposable exploration; use ActionIcon or Button to send
 
 ## Artifact.Ref
 title, kind, status; card linking to an artifact in the conversation (requires id; clickable)
@@ -487,4 +487,4 @@ data: string[] | [{ value, label, icon?, badge? }], value / defaultValue, aria-l
 </Stack>
 // steps: .select('tabs', 'trips', go('/trips'))
 ```
-<!-- joplo-skill 0.3.0 sha256:4b58a6f8af5b3389ff2b1cde93139c7d0896693f03c9d5eef29646163d246700 -->
+<!-- joplo-skill 0.3.0 sha256:5173f83edd4b35359319843fd847012d788910dd7bc1d39821ff070e2ffea19a -->

@@ -413,7 +413,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
               references.push(...lowered.references ?? []);
             }
           }
-          else effects.push({ type: 'complete', text: e.text, outcome: e.outcome });
+          else if (e.type === 'complete') effects.push({ type: 'complete', text: e.text, outcome: e.outcome });
+          else err('EFFECT_INVALID', 'Unknown step effect; use a documented effect helper instead of constructing effect objects', st.source);
         }
         const sceneBefore = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i, start)));
         const sceneAfter = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i + 1, start)));
@@ -558,9 +559,11 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       const outcome = fl.opts.outcome ?? fromDone ?? 'success';
       const state = mergeState(def.state, fl.opts.state);
       const sc: Scenario = {
+        ...(fl.opts.actionEntry !== undefined ? { actionEntry: fl.opts.actionEntry } : {}),
         id: sid,
         optionId: qid,
         name: fl.name,
+        ...(fl.opts.autoplay !== undefined ? { autoplay: fl.opts.autoplay } : {}),
         description: fl.opts.description ?? '',
         caseIds: strip ? [] : (fl.opts.cases ?? []).filter((c) => fdef.cases?.[c]).map((c) => `${fid}.${c}`),
         mock: { label: fl.opts.mock ?? MOCK_LABEL[outcome], outcome, ...(fl.opts.mock === undefined ? { auto: true as const } : {}) },

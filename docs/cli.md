@@ -192,7 +192,7 @@ Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结�
 
 引擎主题不讲具体组件。`npx joplo skill ui`、`ui/components`、`diagram`、`diagram/patterns`、`content`、`content/patterns`、`alda` 由项目启用插件提供；在项目目录运行，CLI 会读取 config 模块，不启动服务端或编译整套作者文件。无项目时只列引擎指南与插件使用说明。
 
-`authoring` 说明 `option.free` 无顺序本机反应，`demo` 说明新动作和播放仲裁。`plugins` 主题也说明动作声明、`ctx.act` 识别器、引擎时钟演示器、通用本机资源编译器与媒体轨道。可选 `@joplo-app/plugin-alda` 需要先安装并在项目 `config.plugins` 中显式启用，然后在该项目目录运行 `npx joplo skill alda`；不要把项目路径作为读取主题的第二参数（该参数只供 install 使用）。技能说明配乐文本、步骤 play/stop、缓存、warning 恢复和离线验证。`check` 不执行本机编译器；看板首次需要声音时生成，`build/share` 在范围裁剪后生成，失败 warning 保留在看板/构建结果，其他演示内容继续可用。
+`authoring` 说明具名 `option.free` 字典、可嵌套组合的效果数组与本机反应；`demo` 说明动作和播放仲裁。`flow({ actionEntry: 'after' })` 让跨场景确认直接落到匹配动作之后，用于时间轴等直接操纵；缺省或 `'before'` 仍停在动作前。取消保留本地体验，确认丢弃体验且只消费匹配动作，后续步骤等待继续；普通章节选择、自动播放与 `from` 不受该策略影响。效果对象拼错会报 `EFFECT_INVALID`，不会隐式结束场景。`story` 说明先收集素材、核实字体与样本许可证并记录 `assets/SOURCES.md`；插件指南补充复古主题作用域、同物件连续转场和逐章配乐。`plugins` 主题也说明动作声明、`ctx.act` 识别器、引擎时钟演示器、通用本机资源编译器与媒体轨道。可选 `@joplo-app/plugin-alda` 需要先安装并在项目 `config.plugins` 中显式启用，然后在该项目目录运行 `npx joplo skill alda`；不要把项目路径作为读取主题的第二参数（该参数只供 install 使用）。技能说明配乐文本、步骤 play/stop、缓存、warning 恢复和离线验证。`check` 不执行本机编译器；看板首次需要声音时生成，`build/share` 在范围裁剪后生成，失败 warning 保留在看板/构建结果，其他演示内容继续可用。
 
 ### skill install
 
@@ -563,3 +563,19 @@ npx joplo diff publish <diff-site> --prepared comparison.json --repo owner/name 
 prepare 的返回基线是权威值；用它编译旧版，不能继续使用候选 merge-base。发布前校验 receipt 与 manifest、两版实际 IR、summary 和文件 hash，复用上传／finalize，永远新建 comparison Share。publish 不构建、不执行 PR 代码、不附私有 review、不替换普通分享。安全 CI、错误码、Agent 路由限制和 fixture 见 [功能差异指南](feature-diff/README.md)；按需运行 `npx joplo skill diff`。
 
 组件目录由 config.plugins 生成：`joplo components` 列出启用插件的组件，`joplo skill ui/components` 读取 UI 专题；`joplo components ui:Button` 或唯一短名 `Button` 输出属性和例子。作者直接从插件包导入，不再使用 kit/ui 或 kit.trace；未启用插件时报安装与配置诊断。
+
+### `joplo resources [dir] [--dry-run] [--allow-spend] [--format json]`
+
+生成源码声明的持久本机资源（例如启用 Tripo 后的模型）。`--dry-run` 列出每项估计 credits，不联网、不生成。普通终端逐项显示费用后询问；非交互/JSON 模式不询问，也默认不花钱，只有显式 `--allow-spend` 才授权所展示的估计。已有项目产物直接复用、费用 0。拒绝生成或失败返回诊断与非零退出码，dry-run 仅估算。
+
+```sh
+npx joplo resources --dry-run
+npx joplo resources                 # 逐项确认
+npx joplo resources --allow-spend   # 已获得用户授权时的非交互调用
+```
+
+check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同名 JSON 提交 Git，队友和 CI 不需要 Key；丢失输出时先从 Git 恢复。超时/断网后重新运行 resources 续查已记录 task_id；unknown/creating 日志必须先从供应商任务历史恢复，不能删日志盲重试。Key 在看板 Voice → 管理密钥 → Tripo 保存（本机 0600），或使用 TRIPO_API_KEY，不写项目配置。版本对应详细用法：`joplo skill tripo`、`joplo skill scene3d/models`。
+
+### 检查含可选支线的短片
+
+先用 `joplo outline` 确认场景 ID，再按章 `joplo render --scenario-id <id> --sheet`。`flow({ autoplay:false })` 标记的支线依然可独立渲染、手动选择或通过 fork 进入，但发布站连续播放会跳过它；支线结束后停下。fork 本身不会改变自动播放资格。`joplo check` 不证明本机配乐已成功编译，最终还须检查 build 的资源警告和真实输入、声音、file:// 离线播放。

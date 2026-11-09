@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ResourceRequest } from '@joplo-app/kit/plugin';
-import { LocalResources } from './local-resources.ts';
+import { LocalResources, referencedResources } from './local-resources.ts';
 import { isPluginDef } from '@joplo-app/kit/plugin';
 import { compile, type CompileMode, type Diagnostic, type Project } from '@joplo-app/core';
 import { discoverFiles, loadAuthoring, enabledPlugins } from '@joplo-app/core/node';
@@ -91,6 +91,10 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
   const r = compile(loaded.authoring, mode, { onResource: request => requests.push(request) });
   const missing = Object.keys(r.project?.plugins ?? {}).filter((id) => !pluginRuntimes[id]);
   const extra: Diagnostic[] = missing.map((id) => ({ severity: 'error', code: 'PLUGIN_RUNTIME_MISSING', message: `Plugin ${id}: runtime file not found; reinstall the plugin package`, source: 'reference', at: `${loaded.authoring!.config.file}:1:1` }));
+  for (const request of requests) if (referencedResources(r.project).has(request.id)) {
+    const result = await resources.host.ensure(request);
+    if (result.diagnostic) diagnostics.push(result.diagnostic);
+  }
   return { project: extra.length ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes, resources };
 }
 

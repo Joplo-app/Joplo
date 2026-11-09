@@ -22,6 +22,9 @@ Install @joplo-app/plugin-content at the Joplo version; import content and add i
 - Write the script as one line per step: ears (narrate), eyes (what changes on stage), source. Adjacent steps should connect with 'but' or 'so'; a chain of 'and then' is flat.
 - Budget: narration reads about 4.5 CJK characters (2.5 English words) per second; 45–90 s per chapter. About 400 CJK characters can already exceed 90 seconds. npx joplo outline counts narration in its estimates.
 
+## Asset-first preparation
+Before building a device, historical interface or illustrated object, make an asset list. Prefer a suitable licensed library, icon set or model; do not hand-write complex SVG or build a model merely because JSX can draw it. Verify the actual asset license, collect files in assets/, retain licenses and record author, URL and modifications in assets/SOURCES.md. Historical facts and historical appearance are separate evidence: label stylized reconstructions and invented messages, and avoid copied logos/system icons. Use original work only when a suitable reusable asset is unavailable, keeping it simple.
+
 ## 2. Hook (first chapter, 20–35 s)
 - Beat 1: a familiar scene that pays off the thumbnail. Never a logo, an agenda, or a definition first.
 - Beat 2: the twist, shown on stage (the answer splits into pieces with probabilities, a name changes on the second try).
@@ -89,6 +92,7 @@ flow('What does it read?', { from: 'hook' })
 - CAMERA_UNKNOWN: the id must exist in a current layer or stage; frame elements inside this Canvas. CAMERA_INVALID: pad 0–2000, zoom 0.1–10, ms 0–10000, finite numbers only.
 - PLUGIN_PROPERTY_INVALID: motion is a nonempty string; motionDelay/motionMs are finite numbers 0–10000; screen is boolean. These universal properties are literals, not state bindings. Use separate same-key elements with when for a flight between containers.
 - Give each visible object one motion key. Hidden previous locations remain available for a later same-key arrival. Avoid duplicate simultaneously visible keys. Independent translate/scale keeps the author's transform intact.
+- Cross-container flights temporarily lift clipping ancestors inside the world and restore their overflow at finish/cancel. During playground edits the flight yields its visual transform to the final usable layout while preserving its animation/time anchor for resume. Do not globally remove device clipping or duplicate the animated control to make it clickable; test first input during a flight.
 - Keep camera and FLIP duration together when both move; motionMs explicitly overrides duration, including 0. animate=false cancels an existing flight and renders the final layout.
 - A Canvas with no parent height uses its view aspect ratio; with an explicit parent height it fills that parent. A zero-sized parent still needs a layout fix; render reports the measured surface.
 - screen only separates direct Canvas children into the fixed overlay. Nested screen props remain ordinary descendants.
@@ -104,4 +108,4 @@ General engine contracts: npx joplo skill plugins
 - [patterns](./topics/patterns.md): Recipes and individual pitfalls
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.3.0 sha256:49c7093c575066e9a732f9d3f6db31373f4c31260622394fdfb6caf84f25c56f -->
+<!-- joplo-skill 0.3.0 sha256:7037eeacd45fa0c56b2bb91946441b25dc1df377f63cbfa7ae5bc1d1fa8b1a73 -->

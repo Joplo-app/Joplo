@@ -15,7 +15,7 @@ export * from './voice.ts';
 export * from './content-i18n.ts';
 export * from './local-review.ts';
 export type * from './step-identity.ts';
-export { mediaAt, mediaResourceIds } from './media.ts';
+export { nodeResourceIds, resolveResourceProps, mediaAt, mediaResourceIds } from './media.ts';
 export { projectThemes } from './themes.ts';
 export type { FeatureDiffManifest, DiffScenario, DiffStep } from './feature-diff.ts';
 export { autoCaptionMessages, automaticCaption } from './auto-caption.ts';

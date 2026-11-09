@@ -410,7 +410,7 @@ export function createBoardRu(locale: Locale = 'ru') {
       voiceLoginBrowser: "До тех пор шаги читает браузер.",
       voiceManageKeys: "Управление ключами…",
       voiceKeysTitle: "Ключи API",
-      voiceKeysHint: (file: Value) => `Только для OpenAI и ElevenLabs. Хранятся на этом компьютере (${value(file, locale)}) для всех проектов; никогда не попадают в проект или публикацию.`,
+      voiceKeysHint: (file: Value) => `Хранятся на этом компьютере (${value(file, locale)}) для всех проектов; никогда не попадают в проект или публикацию.`,
       voiceLegacyTitle: "Прежние источники голоса",
       voiceRemoveKey: "Удалить ключ",
       cloudCardNarration: "Озвучка",

@@ -410,7 +410,7 @@ export function createBoardJa(locale: Locale = 'ja') {
       voiceLoginBrowser: "それまではブラウザで読み上げます。",
       voiceManageKeys: "キーを管理…",
       voiceKeysTitle: "API キー",
-      voiceKeysHint: (file: Value) => `OpenAI と ElevenLabs 用です。このコンピューター（${value(file, locale)}）に保存され、すべてのプロジェクトで共有します。プロジェクトや共有には書き込まれません。`,
+      voiceKeysHint: (file: Value) => `このコンピューター（${value(file, locale)}）に保存され、すべてのプロジェクトで共有します。プロジェクトや共有には書き込まれません。`,
       voiceLegacyTitle: "以前の音声ソース",
       voiceRemoveKey: "キーを削除",
       cloudCardNarration: "ナレーション",

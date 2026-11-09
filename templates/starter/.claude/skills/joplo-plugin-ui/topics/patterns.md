@@ -1,6 +1,29 @@
 # UI recipes and pitfalls
 
+## A prompt the audience can actually edit
+PromptInput renders a native textarea. Arbitrary text is disposable exploration and follows the same first-input pause, bound value synchronization and reset/resume rules as other text fields. Captures and disabled prompts remain read-only. Keep submission in a declared click/press step or free reaction; editing alone does not call a model or send anything. Test a non-script phrase with a real keyboard, because replayed .type() does not prove that audience input works.
+
+## Readable period interfaces
+Make the working interface the subject: enlarge input text, action targets and visible results together, rather than using a large year beside a tiny window. A compact chapter label and one source line can carry context; keep the full attribution/license inventory with the assets.
+
+For a collected CSS device frame, retain only licensed generic shell parts and record the adaptations; a later frame library is not evidence of a historical model. When CSS or fonts are embedded into an offline export, retain the applicable full license notices in that exported asset as well as in the repository. Scope and match the original selector specificity when resizing a speaker or button, otherwise an apparently correct override can lose to a library descendant rule. Use the rendered control dimensions to verify the override.
+
+HTML text nodes may be wrapped in spans by this renderer. Avoid blanket descendant-span hiding to remove one note: it can also hide the main text. Remove the unwanted note from the authored tree or give that specific element a class. Device children with z-index can also overpaint a later sibling: give a transition scrim and its focal object explicit stacking levels and inspect the real pixels.
+
+## Styling a collected interface library
+Vendor only the required, redistributable CSS primitives; scope them under an authored root class. Exclude unverified bundled fonts, icon files and logos rather than treating the stylesheet's license as permission for all assets. Record the exact extraction and selector changes alongside retained licenses.
+
+Choose --jp-stroke: clean in a project theme when CSS supplies historical borders and button bevels. UI components supply inline defaults for size, padding and color; a class alone may not win. Prefer documented props or explicit style overrides for ordinary cases. When a reusable vendor theme must own these values, narrowly scoped !important declarations can override just those defaults. Check computed styles, the actual rendered button and text contrast; do not globally change --jp-ink merely to tint a button.
+
+Native inputs are the editable surface; their displayed text is not a real backend. A local send reaction can set ui.sent while the result bubble reads inputs.<fieldId>, so the audience sees their own text without copying it into script data. Use a named option.free object, give each reaction a stable key, and retain the deterministic send effects in a scenario. Verify the same reaction in the actual built site as well as the board; a valid script does not prove that publication retained local reaction data. Test a non-script phrase: an exact next action can commit the script instead, and an exact action belonging to another scenario can prompt to switch.
+
+
 These examples use this explicitly enabled plugin. Engine flow/state/review rules remain in the engine skill.
+
+## Controls over a visual story
+- Use Image with asset() for the actual downloaded artwork; keep source/creator/license/modification details beside the files. CSS crop/opacity changes still belong in that record. Do not use a remote URL as an offline-image substitute.
+- On a dark art background, Button's default filled variant may draw a Rough fill over your custom CSS. Use variant="subtle" when authoring the whole surface, set text size/color explicitly, and choose --jp-stroke: clean in the project theme when appropriate. A class does not automatically override component inline font/color values. Verify contrast, focus and hitbox after the final composition.
+- Hover and dragging need a visible click alternative. A discrete timeline can use one draggable handle plus labeled endpoint buttons; keep the effects identical in both paths. Use a large enough drop zone and test it after the Canvas scales, not only at design resolution.
 
 ### authoring: worked example
 ```tsx
@@ -132,4 +155,4 @@ From focus:
 Common pitfall: Only catalog components and the listed HTML tags exist; <br/> is UNKNOWN_COMPONENT, so write 'Line 1\nLine 2' inside <Text>
 
 Common pitfall: UI and HTML belong to this plugin: import author markers directly from @joplo-app/plugin-ui, explicitly enable ui in config.plugins, and read ui/components. The engine has no bare-name or old-IR compatibility layer.
-<!-- joplo-skill 0.3.0 sha256:b23f35fd770ce82727c99ada229b223a8673caaa6a6786e31297a468c3cfea85 -->
+<!-- joplo-skill 0.3.0 sha256:ca0dbf9b4ed602447fdb675f954c3d5ff8137fdcf6beb75c413383a1efb773ab -->

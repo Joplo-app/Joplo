@@ -1,0 +1,48 @@
+{
+  "models": [
+    {
+      "file": "22636ecded192c03c00c5bdb46680e3dd8adc24dfe17b0b867322b20bcc7e7c9.glb",
+      "bytes": 1091504,
+      "triangles": 6446,
+      "credits": 30,
+      "prompt": "One golden apple fruit with a long organic curved stem, warm luminous amber skin, fine natural speckles, mythic botanical specimen in an original museum sculpture style, round and imperfect, isolated single object, no ground no pedestal no text"
+    },
+    {
+      "file": "4272d933180bfb17a0edcd77ce5905b64724c6fadf5b99d31b3601a7db47ab95.glb",
+      "bytes": 1082788,
+      "triangles": 5610,
+      "credits": 30,
+      "prompt": "One ripe old English orchard apple, red and yellow mottled matte skin, stout round ribbed fruit, short brown stem and single little curled leaf, realistic botanical museum specimen, isolated single object, no ground no pedestal no text"
+    },
+    {
+      "file": "50910a611c6b8b14ea05f49d1bf0ba8c726127cd5fb0f4784198912cd213eff5.glb",
+      "bytes": 633512,
+      "triangles": 5679,
+      "credits": 30,
+      "prompt": "A single small apple sculpted from polished deep cobalt blue ceramic with pearlescent highlights, short copper colored curved stem and a small attached copper leaf, rounded simple fruit volume, original contemporary sculpture for a digital story, no logos no text no ground no pedestal"
+    },
+    {
+      "file": "65aebd329ec312dcc9ccbe2727d2411c873c1474fc98a9a89743439404f34f02.glb",
+      "bytes": 708952,
+      "triangles": 5793,
+      "credits": 30,
+      "prompt": "A single fairytale apple fruit divided vertically into two halves: one ivory white half and one deep crimson red half, continuous whole apple, long crooked brown stem with a dark curled leaf, original gothic botanical sculpture, subtle satin sheen, no characters no face no Disney no logo no ground no pedestal"
+    },
+    {
+      "file": "90907827c37c70f9006b0f69cd8234d4d3cf7ef1dff4740642eadecc757ed6ba.glb",
+      "bytes": 773968,
+      "triangles": 6391,
+      "credits": 30,
+      "prompt": "An original asymmetric apple fruit sculpture with a big irregular bite removed from its LEFT side revealing pale flesh, a long curly brown stem with two small attached leaves, plump lopsided body, matte ivory ceramic surface, three dimensional contemporary gallery sculpture, NOT any company logo, no detached leaf no text no brand no ground no pedestal"
+    },
+    {
+      "file": "e3a30ecc94467a33d2960d2c641f6dd746b8846bbcbadda190e7adebdc6b7ae2.glb",
+      "bytes": 720944,
+      "triangles": 5778,
+      "credits": 30,
+      "prompt": "A single small wild apple, irregular round green fruit with subtle russet speckles and a short curved brown stem, one small leaf, botanical specimen, natural matte skin, original realistic sculpture, isolated object, no ground no pedestal no text"
+    }
+  ],
+  "totalBytes": 5011668,
+  "totalCredits": 180
+}

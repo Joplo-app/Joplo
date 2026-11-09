@@ -1,4 +1,4 @@
-import { $, callout, done, flow, highlight, hold, mark, narrate, numbered, option, set, shot, spotlight, uses } from '@joplo-app/kit';
+import { $, callout, done, flow, fork, highlight, hold, mark, narrate, numbered, option, set, shot, spotlight, uses } from '@joplo-app/kit';
 
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
@@ -56,6 +56,10 @@ export default withDesignRecord(option({
     end: flow('最后一章播完', { cases: ['end'], start: '/', state: { ui: { ...initialUi(), mode: 'video', playing: true, ch: 4, chapterTag: '第 4 章', frameTitle: '影响', cap: '最后，说说和你有关的部分', prog: 96 } }, expected: '停在结束画面：重看、复制链接' })
       .system('最后一章播完', '停在结束画面', narrate('最后一章播完，停在结束画面，不会再跳到别处。'), set($.ui.playing, false), set($.ui.ended, true), set($.ui.prog, 100), set($.ui.cap, ''), spotlight('p_video'), uses('autoplay_next'))
       .click('p_replay', '小陈点「重看」', narrate('想再看一遍，点重看，从第一章开始。'), set($.ui.ended, false), set($.ui.playing, true), ...chapter(1, 2), highlight('p_ch1'),
-        done('从第一章重新开始')),
+        done('从第一章重新开始'), fork('可选：幕后说明', 'optional_branch')),
+
+    optional_branch: flow('可选支线：主动进入，播完停下', { cases: ['optional_branch'], from: 'end', autoplay: false, expected: '连续播放跳过这条支线；主动选择后可以观看，结束停下并提供返回主线入口' })
+      .system('打开幕后', '观众主动选择了支线', set($.ui.chapterTag, '可选支线'), set($.ui.frameTitle, '故事背后的选择'), set($.ui.cap, '主线继续向前，支线留给好奇的人'), set($.ui.playing, true), shot('p_video'), narrate('这段只在观众选择后播放。它不会插入原本的章节顺序。'), uses('optional_autoplay'))
+      .system('支线结束', '停下，等待观众选择', set($.ui.playing, false), set($.ui.cap, '回到主线，或留在这里'), fork('回到主线', 'watch'), done('支线由观众决定，不自动接续')),
   },
 }), designRecords.mobile_watch);

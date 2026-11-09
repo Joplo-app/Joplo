@@ -1,0 +1,14 @@
+{
+  "prompt": "A single ripe red apple with a short curved brown wooden stem and one small green leaf. Original stylized low-poly design, gently faceted rounded shape, matte red skin, no logos, no text, no ground, no background objects.",
+  "model": "v3.1-20260211",
+  "texture": true,
+  "pbr": true,
+  "texture_quality": "standard",
+  "smart_low_poly": true,
+  "face_limit": 10000,
+  "compress": "geometry",
+  "status": "success",
+  "generated_at": "2026-11-09T05:56:49.574Z",
+  "task_id": "3b390c2e-c041-47c2-94fd-ea7db1e2d228",
+  "credits_consumed": 30
+}

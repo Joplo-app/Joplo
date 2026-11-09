@@ -262,7 +262,9 @@ export type LayerDef = { kind: 'layer'; title: string; tree: JNode | JNode[]; vi
 export const layer = (title: string, tree: JNode | JNode[], opts: { viewport?: 'desktop' | 'mobile'; role?: string; icon?: LayerIcon } = {}): LayerDef => ({ kind: 'layer', title, tree, ...opts, source: callsite() });
 
 /** 步骤参数：字幕、效果，或一组效果（patch() 返回数组，直接传入即可）。 */
-export type StepArg = string | EffectDef | readonly EffectDef[];
+/** Helpers can compose other helpers (for example patch plus timing effects). */
+export type StepArg = string | EffectDef | readonly StepArg[];
+const flattenArgs = (args: readonly unknown[]): unknown[] => args.flat(Infinity);
 
 /**
  * 过渡卡（D56）的内容：整屏一句大字，用于开场、收尾、时间跳跃（「3 天后」）和换人。
@@ -270,6 +272,7 @@ export type StepArg = string | EffectDef | readonly EffectDef[];
  * 卡片之后导演切到这个人的层级。
  */
 export type CardOpts = { sub?: string; points?: string[]; role?: string };
+export type CardArg = CardOpts | EffectDef | readonly CardArg[];
 
 export type StepDef = {
   /** Stable identity within this scenario; independent of the playback position. */
@@ -294,6 +297,8 @@ export type StepDef = {
 };
 
 export type FlowOpts = {
+  /** Cross-scenario action confirmation lands before the match by default; after consumes it once. */
+  actionEntry?: 'before' | 'after';
   /** 覆盖的情况（feature.cases 的键）。 */
   cases?: string[];
   /** 模拟结果标签，例如“模拟失败”。缺省按 outcome 生成。 */
@@ -308,6 +313,8 @@ export type FlowOpts = {
    * 再叠上这里的 state。讲解片的章节、长流程的分段都用它，每一段从上一段结尾的画面开始，不用手抄状态。
    */
   from?: string;
+  /** false：保留手动/分支访问，但从发布站连续播放序列中排除；该场景播完停下。 */
+  autoplay?: boolean;
   /** 从哪一层开始（layers 的键）；缺省为第一层，写了 from 时为那个场景结尾的导演层。 */
   layer?: string;
   description?: string;
@@ -325,7 +332,7 @@ export class Flow {
     this.source = callsite(4);
   }
   private add(kind: StepDef['kind'], action: StepDef['action'], args: StepArg[]): this {
-    const flat = args.flat() as (string | EffectDef)[];
+    const flat = flattenArgs(args) as (string | EffectDef)[];
     const caption = flat.find((a): a is string => typeof a === 'string');
     const effects = flat.filter((a): a is EffectDef => typeof a !== 'string');
     this.steps.push({ kind, action, ...(caption ? { caption } : {}), effects, source: callsite(4) });
@@ -378,8 +385,8 @@ export class Flow {
    *   .card('出发前一天', set($.data.weather, 'rain'))
    *   .card('这个方案确认了', { points: ['行程单可以分享', '天气变了会主动提醒'] })
    */
-  card(title: string, ...rest: (CardOpts | EffectDef | readonly EffectDef[])[]): this {
-    const args = rest.flat() as (CardOpts | EffectDef)[];
+  card(title: string, ...rest: CardArg[]): this {
+    const args = flattenArgs(rest) as (CardOpts | EffectDef)[];
     const effects = args.filter((a): a is EffectDef => (a as EffectDef).kind === 'effect');
     const opts = Object.assign({}, ...args.filter((a) => (a as EffectDef).kind !== 'effect')) as CardOpts;
     const { sub, points, role } = opts;

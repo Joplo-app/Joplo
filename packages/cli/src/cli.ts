@@ -63,7 +63,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   let exitCode = 0;
   const serverPackage = '@joplo-app/server';
   const loadServer = deps.loadServer ?? (() => import(serverPackage));
-  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'renderStep' | 'renderSheet' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime' | 'generateProjectVoice'>(name: K): Promise<typeof Server[K]> {
+  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'renderStep' | 'renderSheet' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime' | 'generateProjectVoice' | 'generateResources'>(name: K): Promise<typeof Server[K]> {
     let module: Record<string, unknown>;
     try { module = await loadServer(); }
     catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server cannot load ${name}: ${e instanceof Error ? e.message : String(e)}`); }
@@ -257,6 +257,18 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         await withWatchSignal(signal => watchCloudFeedback(client, shareId, opts, { out: stdout, err: stderr }, signal));
       }
     });
+  program.command('resources').argument('[dir]', 'Project directory', '.').option('--dry-run', 'List missing persistent resources and estimated credits').option('--allow-spend', 'Authorize the displayed generation estimates').addOption(format()).action(async (dir, opts) => {
+    const generateResources = await serverFunction('generateResources');
+    const interactive = deps.interactive ?? (!!process.stdin.isTTY && !!process.stderr.isTTY && !process.env.CI);
+    const data = await generateResources(resolve(dir), { dryRun: !!opts.dryRun, allowSpend: !!opts.allowSpend, onProgress: s => stderr(`${s}\n`), confirm: interactive && opts.format !== 'json' ? deps.ask ?? (async message => {
+      const { createInterface } = await import('node:readline/promises');
+      const rl = createInterface({input:process.stdin,output:process.stderr});
+      try { return /^(y|yes)$/i.test((await rl.question(`${message} [y/N] `)).trim()); } finally { rl.close(); }
+    }) : undefined });
+    const failed = !opts.dryRun && data.some(r => r.diagnostic);
+    if (opts.format === 'json') json({ok:!failed,data}); else for (const item of data) line(JSON.stringify(item));
+    if (failed) exitCode = 1;
+  });
   program.command('check').argument('[dir]', 'Project directory', '.').addOption(format()).option('--option <qid>', 'Validate only the specified option').action(async (dir, opts) => {
     const report = await check(dir, opts.option);
     const summary = `${report.summary.error} error, ${report.summary.warning} warning, ${report.summary.info} info`;

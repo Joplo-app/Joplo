@@ -1,3 +1,4 @@
+import { binaryAssets } from './binary-assets.ts';
 import { inlineResources } from './local-resources.ts';
 import { inlinePluginAssets, PLUGIN_ASSET_BASE } from './plugin-assets.ts';
 import sharedModules from '@joplo-app/web/shared-modules.json' with { type: 'json' };
@@ -145,6 +146,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     if (Object.keys(resources.assets).length) project = { ...project, mediaAssets: resources.assets };
     compiled.diagnostics.push(...resources.diagnostics);
   }
+  binaryAssets(project, {diagnostics:compiled.diagnostics});
   const inline: { project: Record<string, unknown>; home: string | null; scoped?: true } = publishPayload(project, compiled.home);
   if (scope) inline.scoped = true;
 

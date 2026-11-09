@@ -105,7 +105,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
   const look = resolveLook({ theme: project.theme, font: null, stroke: null }, projectThemes(project), i18n);
   const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n, project);
   // 场景封面（D61）：嵌入自己的封面（covered）显示时不叠第二层；之后回到第 0 步时与发布站一样是场景封面
-  const cover = !params.diff && !covered && coverShown(scenario, pos, snap.playing, snap.activeStep) ? coverFor(project, scenario?.id, i18n) : null;
+  const cover = !params.diff && !covered && coverShown(scenario, pos, snap.playing, snap.activeStep, snap.freeMode) ? coverFor(project, scenario?.id, i18n) : null;
   const curtainOn = !!scenario && curtainUp(project, scenario.id, pos, cover);
   // 控制条的步骤与字幕右侧一致：播放中是正在播的那一步，否则是当前位置
   const shown = subtitle?.index ?? pos;

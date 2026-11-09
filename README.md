@@ -41,7 +41,7 @@ Keep the Board process running. Edit the generated TSX files and watch the demo 
 ## What you can show
 
 - **Board:** a home page with recent projects and their features, served by one local process.
-- **Interactive demos:** scripted playback plus disposable exploration. Click the playing stage once to pause; type, switch controls or try declared free reactions, then Play to restore the script. Drag, hover, scroll and plugin gestures can be steps. See `npx joplo skill demo` and `authoring`.
+- **Interactive demos:** scripted playback plus disposable exploration. Click the playing stage once to pause; type, switch controls or try declared free reactions, then Play to restore the script. Drag, hover, scroll and plugin gestures can be steps. A destination flow can opt into `actionEntry: 'after'` so a confirmed cross-scenario gesture lands on its result; guided practice defaults to the action's starting frame. See `npx joplo skill demo` and `authoring`.
 - **Layers, Director, and Shots:** give each perspective its own page. The Director follows the flow, switches Layers, and moves the camera to each Shot. Viewers can take over, replay one Layer, zoom, pan, or go fullscreen.
 - **Architecture demos:** `Diagram` groups nodes by business domain, `Sequence` walks a call chain in time order, `StateMachine` shows a lifecycle. Layout is automatic and stable across steps; `trace()` animates call paths and derives their states.
 - **Inspection:** hold Option/Alt and click to open the rules and source drawer. Your agent can retrieve the selection and edit just that location.
@@ -203,6 +203,7 @@ Run `npx joplo skill diff` for the version-matched workflow and recovery steps. 
 
 | Example | What to explore |
 | --- | --- |
+| [examples/button-40-years](examples/button-40-years) | One send button through four decades; playable period interfaces, chapter dragging and original Alda music |
 | [examples/invite](examples/invite) | Compare an invitation dialog with a batch invitation flow |
 | [examples/agent-arch](examples/agent-arch) | Layers, Director, grouped `Diagram`, `Sequence`, `StateMachine`, and `trace()` for an agent architecture |
 | [examples/joplo](examples/joplo) | Joplo’s own evolving design workspace: real feature alternatives, interaction prototypes and documented decisions |
@@ -260,3 +261,9 @@ Joplo accepts issues, not pull requests. Report bugs and request features in [is
 The template explicitly enables `@joplo-app/plugin-content`, which provides `content:Canvas`, `camera()`, FLIP properties and the `content:studio` theme. Import its authoring API directly from the package; declare it at the Joplo version in project dependencies and enable it in config.plugins. `npx joplo skill content` covers continuous visual explainers; see [llm-explainer](examples/llm-explainer) and the [plugin contracts](docs/plugins.md). Use `flow({ from })` for chapter continuity and `joplo render --sheet --columns 3` for storyboards.
 
 Standard UI and HTML are provided by `@joplo-app/plugin-ui`: import markers directly from that package and explicitly enable it in config.plugins. IR uses `ui:Button` / `ui:div`. `joplo components` reads enabled plugin manifests; `joplo skill ui/components` provides the full UI guide. Import diagram components and trace from `@joplo-app/plugin-diagram`. See [plugin contracts](docs/plugins.md).
+
+GLB 资源与生成：`asset('./model.glb')` 支持离线模型；scene3d 的 `Model` 用法见 `joplo skill scene3d/models`。可选 `@joplo-app/plugin-tripo` 通过 `joplo resources --dry-run` 估算、明确确认后生成，模型与元数据进 Git，Key 仅留本机。详见 [插件资源契约](docs/plugins.md#17-p1-eglb-与显式付费的持久资源)。
+
+### A journey through one apple
+
+[apple-journey](examples/apple-journey) combines six generated GLB subjects, public-domain paintings, original instrumental scores and Chinese narration. Pause to orbit, hover, drop the fruit, scrub a discrete timeline or choose a fairy-tale branch. Its asset ledger records licenses, generation costs and local optimization. Optional scenarios use `flow({ autoplay: false })`: they remain selectable but do not interrupt sequential playback.

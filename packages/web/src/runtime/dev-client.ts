@@ -607,3 +607,10 @@ export function subscribeCloud(projectId: string, cb: (job: CloudJob) => void): 
   h.on('joplo:cloud', handler);
   return () => h.off('joplo:cloud', handler);
 }
+
+export type TripoKeyState = {saved:boolean;envSet:boolean;env:string;file:string};
+export async function tripoKey(key?: string | null): Promise<TripoKeyState> {
+  const res = key === undefined ? await fetch('/__joplo/tripo/key',{cache:'no-store'}) : await post('/__joplo/tripo/key',{key},'PUT');
+  if(!res.ok) throw new Error('Tripo key request failed');
+  return res.json();
+}

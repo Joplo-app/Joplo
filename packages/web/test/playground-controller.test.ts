@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Project, stateAt, playgroundState } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';
+import { coverShown } from '../src/player/cover-content';
 
 const project = () => Project.parse({schemaVersion:2, mode:'dev', name:'Playground',
   features:{f:{id:'f',name:'F',goal:'G',pick:'f.a',optionIds:['f.a']}},
@@ -39,6 +40,23 @@ describe('D88 controller lifecycle', () => {
     expect(c.getSnapshot().playground).toBeNull();
     c.stop(); await vi.runAllTimersAsync();
   });
+  it('an optional after-action entry applies the confirmed gesture once and leaves later steps pending', async () => {
+    const c=controller(), p=c.getSnapshot().project!;
+    const other=p.scenarios['f.a.other']!;
+    Object.assign(other, {actionEntry:'after',autoplay:false});
+    other.steps[0]!.effects=[{type:'set',path:'ui.era',value:'new'}];
+    other.steps.push({...other.steps[0]!,id:'other:2',kind:'system',action:{type:'event',name:'later'},effects:[{type:'set',path:'ui.later',value:true}]});
+    c.setProject(p,2);c.setScenario('f.a.main');
+    await c.act({type:'toggle',target:'lamp',value:false});
+    await c.act({type:'click',target:'other'});
+    c.dismissSwitch();expect(c.getSnapshot().state!.scenarioId).toBe('f.a.main');
+    expect(c.getSnapshot().playground).not.toBeNull();
+    await c.act({type:'click',target:'other'});c.confirmSwitch(0);
+    expect(c.getSnapshot()).toMatchObject({scenarioId:'f.a.other',playing:false,freeMode:false,playground:null,state:{position:1,ui:{era:'new'}}});
+    expect(c.getSnapshot().state!.ui.later).toBeUndefined();
+    c.confirmSwitch(0);expect(c.getSnapshot().state!.position).toBe(1);
+    c.stop();
+  });
   it('requires confirmation, cancellation preserves the local view, switching enters before the matching action', async () => {
     const c=controller();
     await c.act({type:'toggle',target:'lamp',value:false});
@@ -48,6 +66,8 @@ describe('D88 controller lifecycle', () => {
     c.dismissSwitch(); expect(c.getSnapshot().playground).not.toBeNull();
     await c.act({type:'click',target:'other'}); c.confirmSwitch(0);
     expect(c.getSnapshot()).toMatchObject({scenarioId:'f.a.other',playground:null,state:{position:0}});
+    const snap = c.getSnapshot();
+    expect(coverShown(snap.project!.scenarios['f.a.other'], 0, snap.playing, snap.activeStep, snap.freeMode)).toBe(false);
     c.stop();
   });
 });

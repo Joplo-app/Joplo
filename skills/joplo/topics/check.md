@@ -22,6 +22,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - LOCAL_RESOURCE_FAILED / LOCAL_RESOURCE_TIMEOUT / LOCAL_RESOURCE_TOO_LARGE: an optional local resource could not compile. Playback continues without it; the board shows the source location and reason without resetting the timeline. Repair the native tool/input and retry build; for playback, switch scenarios, toggle sound off/on, or reload first. A failed media slot currently survives a simple pause/play, so that alone may not retry resource generation. Successful regeneration clears the warning. check does not execute native tools, so verify actual playback/build too (plugins).
 - PLUGIN_DATA_INVALID: plugin output failed its JSON/schema contract, or the complete published IR exceeds depth 100 after shared references are expanded (root depth 0, including primitive leaves). For depth errors, flatten the cache or replace nested objects with string ids, then rebuild and verify that the published output can be compared with itself. See npx joplo skill plugins for the output contract.
 - MISSING_ID / DUPLICATE_ID: Give interactive elements stable ids unique within the stage; update step references.
+- EFFECT_INVALID: Use documented helpers, with arrays for composition. Arbitrary or misspelled effect objects are rejected, never interpreted as done().
 - FUNCTION_PROP: Replace onClick and other callbacks with flow steps and state effects.
 - UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE: Check case, rule, and reference keys and their owning option.
 - UNKNOWN_SLOT / UNKNOWN_ROUTE / UNKNOWN_LAYOUT: Check routes, layouts, and Slot declarations; add elements only to existing locations.
@@ -98,4 +99,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.3.0 sha256:fd2a5cd43e46c3b7e654298fd9391cdd522fd2c1b82b067bb01a9bee653604ff -->
+<!-- joplo-skill 0.3.0 sha256:b369e3d32d7695ecaec7202cd3f0f433a06e5c4b5463ed959f4bd26b93666d7f -->

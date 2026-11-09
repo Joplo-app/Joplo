@@ -1,5 +1,5 @@
 import { $, flow, notApplicable, option, set } from '@joplo-app/kit';
-import { Button, Group, Paper, Stack, Switch, Text, Title } from '@joplo-app/plugin-ui';
+import { Button, Group, Paper, PromptInput, Stack, Switch, Text, Title } from '@joplo-app/plugin-ui';
 
 /** D88 用户已定模型；原型步骤演示状态，不代表产品里的游玩数据会进入时间线。 */
 export default option({
@@ -10,7 +10,14 @@ export default option({
       <Stack gap="lg">
         <Title order={3}>我的家</Title>
         <Text id="pg_stage" size="sm" c="dimmed">舞台空白 · 只暂停，不显示体验提示</Text>
+        <PromptInput id="pg_prompt" placeholder="暂停后写下自己的话" />
+        <Text size="sm">本地草稿：{$.inputs.pg_prompt}</Text>
         <Switch id="pg_lamp" label="落地灯" checked={$.ui.lamp} />
+        <Paper withBorder p="sm">
+          <Group><Button id="pg_time_cursor" size="sm" variant="default">↔ 拖到傍晚</Button><Text id="pg_evening">傍晚</Text></Group>
+          <Text size="sm">当前时段：{$.ui.period}</Text>
+          <Text size="xs" c="dimmed">拖拽后确认，立即看到目标画面；普通教学入口仍停在动作前。</Text>
+        </Paper>
         <Button id="pg_window" variant="default">客厅窗 · 在另一场景演示</Button>
         <Paper withBorder radius="md" p="sm" when={$.ui.free}>
           <Group justify="space-between"><Stack gap={2}>
@@ -33,8 +40,13 @@ export default option({
     export_video: notApplicable('视频始终使用时间线；本方案不调整导出流程'),
     publish_play: notApplicable('看板、发布和嵌入复用同一舞台；本方案不单独设计发布页'),
   },
-  state: { ui: { free: false, lamp: true, prompt: false } },
+  state: { ui: { free: false, lamp: true, prompt: false, period: '清晨' } },
   scenarios: {
+    prompt_input: flow('真实编辑提示词，继续时恢复脚本', { cases: ['play'], start: '/board/play' })
+      .type('pg_prompt', '一段演示输入', '原生多行输入框可自由编辑'),
+    direct_entry: flow('直接操纵：确认拖拽后进入目标画面', { cases: ['switch'], start: '/board/play', actionEntry: 'after' })
+      .drag('pg_time_cursor', 'pg_evening', '确认后时段已变为傍晚', set($.ui.period, '傍晚'))
+      .system('继续播放', '后续步骤等观众继续', set($.ui.period, '傍晚 · 继续播放后')),
     explore: flow('暂停、体验、重置、继续', { cases: ['play'], start: '/board/play' })
       .toggle('pg_lamp', false, '播放中第一次拨灯：暂停并立即关灯', set($.ui.free, true))
       .toggle('pg_lamp', true, '继续自由体验，等观众主动恢复播放')

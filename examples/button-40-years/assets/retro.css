@@ -1,0 +1,10 @@
+/* Adapted from system.css, Copyright 2022 Sakun Acharige (MIT).
+   Only dialog and title-bar primitives; no bundled fonts or icons. */
+.b40 .mono-window { border:2px solid #181818; padding:10px; box-shadow:4px 4px #181818; background:#fffef8; }
+.b40 .mono-title { display:flex; align-items:center; height:34px; background:linear-gradient(#181818 50%,transparent 50%); background-size:7px 5px; background-clip:content-box; }
+.b40 .mono-title span { margin:auto; padding:0 14px; background:#fffef8; font-weight:bold; }
+/* Adapted from 98.css, Copyright 2020 Jordan Scales (MIT).
+   Window/button bevels only; variables resolved and selectors scoped. */
+.b40 .win-window { background:#c0c0c0; padding:5px; box-shadow:inset -1px -1px #0a0a0a,inset 1px 1px #dfdfdf,inset -2px -2px #808080,inset 2px 2px #fff; }
+.b40 .win-button { border:0; border-radius:0 !important; color:#181818 !important; background:#c0c0c0 !important; box-shadow:inset -1px -1px #0a0a0a,inset 1px 1px #fff,inset -2px -2px #808080,inset 2px 2px #dfdfdf; }
+.b40 .win-button:active { box-shadow:inset -1px -1px #fff,inset 1px 1px #0a0a0a,inset -2px -2px #dfdfdf,inset 2px 2px #808080; }

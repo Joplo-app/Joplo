@@ -98,7 +98,8 @@ export type PluginCompileHooks = {
 };
 /** Author-only requests never enter IR. Local compilers run in a bounded Node process. */
 export type ResourceRequest = { id: string; plugin: string; compiler: string; input: string; source?: string };
-export type LocalCompiler = { version: string; mime: string; compile(input: string, ctx: { directory: string; maxBytes: number }): Promise<Uint8Array> | Uint8Array };
+export const localResource = (plugin: string, compiler: string, input: string) => ({ kind: 'local-resource' as const, plugin, compiler, input });
+export type LocalCompiler = { version: string; mime: string; persistent?: boolean; estimate?: (input: string) => { credits: number }; compile(input: string, ctx: { directory: string; projectDir?: string; home?: string; allowSpend?: boolean; maxBytes: number }): Promise<Uint8Array> | Uint8Array };
 export type PluginLocal = { compilers: Record<string, LocalCompiler> };
 export type MediaCommand = { track: string; action: 'play'; resource: string; volume?: number; loop?: boolean; fadeMs?: number } | { track: string; action: 'stop'; fadeMs?: number };
 /** Full state at a step boundary; elapsed time is in unscaled engine milliseconds. */
@@ -271,6 +272,8 @@ export type ComponentCtx = {
   css: (name: string) => string;
   /** 观众点了某个子元素（例如 3D 物体）：和点 DOM 元素一样交给引擎判断。坐标是视口坐标（MouseEvent.clientX/Y）；altKey 照抄指针事件（⌥+单击 = 检查元素）。 */
   act?: ActionDispatch;
+  /** Report the pointer's raycast hit (null on leave). The host owns declared hover dwell and playback gating. */
+  hover?: (id: string | null) => void;
   click: (id: string, at?: { clientX: number; clientY: number; altKey?: boolean }) => void;
   /** 截图、导出前要等待的工作（加载模型、首帧渲染）：返回一个 done 函数，完成后调用。 */
   hold: () => () => void;

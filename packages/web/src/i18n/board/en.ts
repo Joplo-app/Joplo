@@ -426,7 +426,7 @@ export function createBoardEn(locale: Locale = 'en') {
       voiceLoginBrowser: "Until then, steps use the browser voice.",
       voiceManageKeys: "Manage keys…",
       voiceKeysTitle: "API keys",
-      voiceKeysHint: (file: Value) => `For OpenAI and ElevenLabs only. Saved on this computer (${value(file, locale)}) for all projects; never written into a project or a share.`,
+      voiceKeysHint: (file: Value) => `Saved on this computer (${value(file, locale)}) for all projects; never written into a project or a share.`,
       voiceLegacyTitle: "Old voice sources",
       voiceRemoveKey: "Remove key",
       cloudCardNarration: "Narration",

@@ -90,8 +90,16 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Case titles are what viewers read in the board sidebar: for an explainer write them as numbered chapter headlines ('01 What is on the ballot?'), not acceptance criteria; name the option after the style ('Dark quick-cut'), not 'A'.
 - Graphics that carry the story: a seat chart filling up, a tile map recoloring, bars growing or flipping, a document flying between two sides and getting stamped. Build them from divs with style bound to state (demo: Custom motion) and real photos (components: Real images).
 - Facts: keep every number in one data module with its source and as-of time, show a source line on each graphic, separate called or projected results from final ones, and leave out what you cannot verify rather than hedging on screen.
+- Collect assets before drawing complex visuals: list the needed interface primitives, fonts, icons and sounds; prefer suitable reusable libraries or licensed assets over hand-built SVG or models. Keep redistributable files in assets/ and record each source URL, author, license and modifications in assets/SOURCES.md; retain license files and show attribution where required. A library license does not automatically establish the license of its bundled fonts, logos or samples. Scope third-party styles and embed required assets for offline playback.
 - Photos: use public-domain or properly licensed images, credit them on stage when the license asks, keep a CREDITS file next to them, and strip EXIF / GPS metadata before embedding.
 - Follow the audience's conventions and state them in a legend (Chinese stock viewers expect red up, green down).
+
+## Asset-led multimodal stories
+- Before TSX, inventory the actual assets: subject, source URL, creator, license, intended crop/tint, and whether the picture is evidence or an illustrative reconstruction. A historic painting of a forest is not a photograph of a specific location. Keep the inventory with the project, and put required attribution on stage.
+- Separate a source's narrow claim from a popular retelling and your own interpretation. A wordplay, anecdote or resemblance is not proof of historical causation. If source checking changes the premise, correct narration and interactions together; do not preserve a pleasing but unsupported reveal.
+- Choose one persistent visual subject and one question per chapter. Change its material, scale, surroundings and sound at the era boundary; keep reading text still. Write each beat as picture + action + spoken sentence + evidence.
+- Start with one real asset and one fully playable chapter. Verify initial framing, a close-up, input, reset and a local build before commissioning a whole batch. Keep a spending ledger separate from estimates, and count the final bytes rather than prompt limits.
+- Explicitly distinguish the main sequence from optional branches and return paths. A closing menu may return to earlier chapters without making those chapters optional; verify autoplay order in the published player.
 
 ## 8. Before handing over
 - npx joplo outline: per feature, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
@@ -101,4 +109,4 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.3.0 sha256:44bae497f0a620dbccf7fd71eeef5d8bcdaeaae74903286885a71e921926e39c -->
+<!-- joplo-skill 0.3.0 sha256:86e436af61e01d0b0b318f09e6c62f78db0e346ec5739a139353d0186343a20b -->

@@ -1,0 +1,25 @@
+import { describe, expect, it, vi, afterEach } from 'vitest';
+import { observe } from '../src/runtime.tsx';
+import type { PluginObservation } from '@joplo-app/kit/plugin';
+afterEach(()=>vi.unstubAllGlobals());
+it('keeps cross-container flights visible, yields their visual transform to exploration, and restores on resume',()=>{
+  const properties=new Map<string,string>();
+  const style={getPropertyValue:(k:string)=>properties.get(k)||'',getPropertyPriority:()=>'',setProperty:(k:string,v:string)=>properties.set(k,v),removeProperty:(k:string)=>properties.delete(k)};
+  const world:any={dataset:{},querySelectorAll:()=>[el]};
+  const clip:any={offsetLeft:0,offsetTop:0,offsetParent:world,parentElement:world,style};
+  const animation:any={id:'',effect:{target:null},cancel:vi.fn(),addEventListener:vi.fn()};
+  const el:any={dataset:{jpContentMotion:'button'},offsetLeft:0,offsetTop:0,offsetWidth:100,offsetHeight:40,offsetParent:clip,parentElement:clip,isConnected:true,getAnimations:()=>animation.id?[animation]:[],animate:vi.fn(()=>animation)};
+  animation.effect.target=el;
+  const root:any={querySelectorAll:()=>[world],contains:(e:unknown)=>e===el};
+  vi.stubGlobal('getComputedStyle',()=>({overflowX:'hidden',overflowY:'hidden'}));
+  const observer=observe(root);
+  const frame=(playground=false,animate=true)=>({frame:{animate,playground},ext:{}} as PluginObservation);
+  observer.update(frame());el.offsetLeft=300;observer.update(frame());
+  expect(el.animate).toHaveBeenCalledOnce();
+  expect(properties.get('overflow')).toBe('visible');
+  const effect=animation.effect;
+  observer.update(frame(true));expect(animation.effect).toBeNull();expect(properties.has('overflow')).toBe(false);
+  observer.update(frame(false));expect(animation.effect).toBe(effect);expect(properties.get('overflow')).toBe('visible');
+  observer.update(frame(false,false));expect(animation.cancel).toHaveBeenCalled();expect(properties.has('overflow')).toBe(false);
+  observer.destroy();
+});

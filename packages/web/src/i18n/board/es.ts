@@ -410,7 +410,7 @@ export function createBoardEs(locale: Locale = 'es') {
       voiceLoginBrowser: "Mientras tanto, los pasos usan la voz del navegador.",
       voiceManageKeys: "Gestionar claves…",
       voiceKeysTitle: "Claves de API",
-      voiceKeysHint: (file: Value) => `Solo para OpenAI y ElevenLabs. Se guardan en este equipo (${value(file, locale)}) para todos los proyectos; nunca se escriben en un proyecto ni se comparten.`,
+      voiceKeysHint: (file: Value) => `Se guardan en este equipo (${value(file, locale)}) para todos los proyectos; nunca se escriben en un proyecto ni se comparten.`,
       voiceLegacyTitle: "Fuentes de voz anteriores",
       voiceRemoveKey: "Quitar clave",
       cloudCardNarration: "Narración",

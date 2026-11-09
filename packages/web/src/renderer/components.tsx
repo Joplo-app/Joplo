@@ -4,7 +4,7 @@ import { registerRendererServices } from '@joplo-app/kit/renderer';
 import { useI18n } from '../i18n/context';
 import { Component, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type ComponentType as ReactComponentType, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { disabledReasonOf, isInteractiveType, splitPluginType, type PluginTable, atWidth, childWidth, choicesOf, layoutRegions, evaluateCondition, isNodeDisabled, isSelfVisible, nodeLabel, resolveProps, resolveValue, walkNodes, type ComponentType, type StateChange, type PlayState, type Scene, type SceneNode } from '@joplo-app/core/runtime';
+import { resolveResourceProps, disabledReasonOf, isInteractiveType, splitPluginType, type PluginTable, atWidth, childWidth, choicesOf, layoutRegions, evaluateCondition, isNodeDisabled, isSelfVisible, nodeLabel, resolveProps, resolveValue, walkNodes, type ComponentType, type StateChange, type PlayState, type Scene, type SceneNode } from '@joplo-app/core/runtime';
 import { cn } from '@/lib/utils';
 import { streamMs } from '../runtime/pace';
 import { Rough, RoughPath, ThemeContext, roundRectPath, useStroke } from './rough';
@@ -16,7 +16,9 @@ import type { ComponentCtx, ComponentInstance, PluginNode } from '@joplo-app/kit
 export type RenderMode = 'review' | 'demo' | 'render';
 
 export type RenderCtx = {
+  assets?: Readonly<Record<string,string>>;
   act?: ActionDispatch;
+  hover?: (id: string | null) => void;
   interactive?: boolean;
   draggable?: ReadonlySet<string>;
   clock?: EngineFrame;
@@ -162,7 +164,7 @@ function PluginHost({ node, p }: NodeProps) {
     id: n.id,
     type: n.type,
     name: splitPluginType(n.type)?.name ?? n.type,
-    props: resolveProps(n, ctx.state),
+    props: resolveResourceProps(resolveProps(n, ctx.state), ctx.assets ?? {}),
     label: nodeLabel(n),
     visible: isSelfVisible(n, ctx.state, ctx.width),
     disabled: isNodeDisabled(n, ctx.state),
@@ -187,6 +189,7 @@ function PluginHost({ node, p }: NodeProps) {
     frame: { clock: ctx.clock, gesture: ctx.gesture, playground: ctx.playground, resetKey: ctx.resetKey, mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, sceneId: ctx.scene.id, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
     css: (name) => { const el = element() ?? ctx.stage; return el ? getComputedStyle(el).getPropertyValue(name).trim() : ''; },
     act: ctx.act,
+    hover: ctx.hover,
     click: (id, at) => {
       const el = element();
       const target = el?.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`) ?? el;

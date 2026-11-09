@@ -55,12 +55,17 @@ const CONTENT:Record<SkillTopic,string>={
 Joplo compiles trusted TS/TSX into deterministic scenes and schedules their playback. It does not supply a component library or execute real backend requests. Use components from the project's explicitly installed plugins; read their skills before writing view trees.
 
 ## Start from the project
-1. Run npx joplo init <dir>, install its dependencies, then npx joplo skill install. The starter supplies its own plugin choices; a custom project may choose different ones.
+1. Run npx joplo init <dir>, install its dependencies, then npx joplo skill install. In the Joplo source monorepo, initialize with --template ./templates/starter and use the monorepo workspace protocol for local package dependencies before installing; external projects keep pinned published versions. The starter supplies its own plugin choices; a custom project may choose different ones.
 2. Read the installed engine skill and .claude/skills/joplo-plugins/SKILL.md. Read each relevant plugin's entry and component/recipe topics. npx joplo skill lists what this config enables.
 3. Create one feature, one option and a runnable scenario. Run check, inspect the rendered frames, then test the real inputs.
 4. Required before handing a development round to the user: read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json. A running board alone does not receive feedback for the agent.
 
-## Model and files
+## Binary assets
+- asset('./file.glb') embeds a self-contained GLB; MP3/WAV/OGG/M4A/FLAC are supported too. Paths are relative to the calling source file. Images retain a 2 MB limit; binary files have a 50 MB limit. Dev serves binary bytes by content hash; published builds embed them for file://.
+- Prefer existing CC0 assets and public-domain reference images, then use a generation plugin to fill gaps in an original style. Read the enabled plugin's skill before generation. Commit persistent artifacts and metadata; never put API keys in project source.
+- npx joplo resources --dry-run lists missing persistent resources and estimated credits. Interactive resources confirms each item; unattended generation requires --allow-spend. check/build/render remain offline for these artifacts. Missing or corrupt output gives diagnostics, not an implicit paid retry. Keep large GLB files below 5 MB where possible and inspect MODEL_SIZE warnings before sharing.
+
+## Structure and files
 - joplo.config.ts exports config({ name, plugins, layout?, home?, theme?, autoFocus?, voice?, locales? }). plugins is explicit; installation alone does not enable a plugin.
 - layouts/<id>.tsx exports layout(tree). Outlet places the current page; Slot declares a named insertion point. Those are engine composition primitives.
 - routes/**/page.tsx exports page({ title, layout?, viewport? }, tree). The directory determines its route. Set layout: false to opt out of the shared layout.
@@ -92,13 +97,22 @@ export default option({
 Declare both success and recovery cases in the feature. View code belongs to the chosen plugin; the engine example defines state and behavior only.
 
 ## Steps and effects
-- flow(name, { cases?, start?, state?, from?, layer?, description?, expected?, mock?, outcome? }). state overrides option state. description is the cover sentence; expected describes what the viewer should observe.
+- flow(name, { cases?, start?, state?, from?, autoplay?, layer?, description?, expected?, mock?, outcome?, actionEntry? }). state overrides option state. description is the cover sentence; expected describes what the viewer should observe.
+- autoplay: false keeps an optional scenario selectable through a fork, chapter list or deep link, but skips it in sequential published-site playback. Playing that scenario manually stops at its end. Default/true preserves declaration order.
 - from: 'previousKey' continues that scenario's final route, ui/data/inputs and director layer. Validate steps and automatic captions against that ending page; dependency order does not change chapter order. Do not combine from with start. layer overrides the initial director layer.
 - .click(id), .type(id, value), .select(id, value), .toggle(id, boolean), .press(keys), .back(), .drag(id, destination), .hover(id, ms), .scroll(id, destination), .act(pluginAction, id, data). Read demo and the action-owning plugin skill for recognition requirements.
 - .system('event', ...effects) models a response, not a real request. .card() creates a transition. Strings are captions; other arguments are effects. Step arguments and card accept effect arrays.
 - set(path, value) replaces; push(path, value) appends; patch(path, object) expands to sets (nested objects replace, not deep-merge). go(route) navigates in this option; back returns to the prior route.
 - toast(text), toast.success/error/info(text) show an engine message. done(result, outcome?) ends a scenario; outcomes success/failure/cancelled must agree with flow's badge. uses(ruleKey, ...) links rules; it is an effect, not a flow method.
-- free.click/type/select/toggle/drag/hover/scroll/act in option.free declare local reactions. Only set, push and toast are local effects; navigation, completion and media remain scripted. Play/jump/scenario/reset discard the local layer.
+- free.click/type/select/toggle/drag/hover/scroll/act in option.free declare local reactions. free is a named object, not an array: free: { open: free.click('open', set($.ui.open, true)) }. Only set, push and toast are local effects; navigation, completion and media remain scripted. Play/jump/scenario/reset discard the local layer.
+
+## Reusable effect factories
+Step arguments and card effects accept nested arrays, flattened in order. Compose helpers that return patch() plus other effects instead of copying transition state. Only done() completes a scenario; unknown effect objects report EFFECT_INVALID.
+\`\`\`ts
+const arrive = () => [patch($.ui, { screen: 'inbox', sent: false }), [hold(4)]];
+flow('Inbox').system('Arrive', arrive(), 'The inbox opens');
+\`\`\`
+For a long story use from to inherit the previous ending. An action-driven navigation entry can also declare actionEntry: 'after'; read demo for its confirmation and replay boundary.
 
 ## Bindings, rules and reuse
 - $.ui.x / $.data.x / $.inputs.id are whole-value bindings. Expressions are not reevaluated. Props supported by a plugin may bind to these values; read that plugin's value and visibility rules.
@@ -201,8 +215,16 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Case titles are what viewers read in the board sidebar: for an explainer write them as numbered chapter headlines ('01 What is on the ballot?'), not acceptance criteria; name the option after the style ('Dark quick-cut'), not 'A'.
 - Graphics that carry the story: a seat chart filling up, a tile map recoloring, bars growing or flipping, a document flying between two sides and getting stamped. Build them from divs with style bound to state (demo: Custom motion) and real photos (components: Real images).
 - Facts: keep every number in one data module with its source and as-of time, show a source line on each graphic, separate called or projected results from final ones, and leave out what you cannot verify rather than hedging on screen.
+- Collect assets before drawing complex visuals: list the needed interface primitives, fonts, icons and sounds; prefer suitable reusable libraries or licensed assets over hand-built SVG or models. Keep redistributable files in assets/ and record each source URL, author, license and modifications in assets/SOURCES.md; retain license files and show attribution where required. A library license does not automatically establish the license of its bundled fonts, logos or samples. Scope third-party styles and embed required assets for offline playback.
 - Photos: use public-domain or properly licensed images, credit them on stage when the license asks, keep a CREDITS file next to them, and strip EXIF / GPS metadata before embedding.
 - Follow the audience's conventions and state them in a legend (Chinese stock viewers expect red up, green down).
+
+## Asset-led multimodal stories
+- Before TSX, inventory the actual assets: subject, source URL, creator, license, intended crop/tint, and whether the picture is evidence or an illustrative reconstruction. A historic painting of a forest is not a photograph of a specific location. Keep the inventory with the project, and put required attribution on stage.
+- Separate a source's narrow claim from a popular retelling and your own interpretation. A wordplay, anecdote or resemblance is not proof of historical causation. If source checking changes the premise, correct narration and interactions together; do not preserve a pleasing but unsupported reveal.
+- Choose one persistent visual subject and one question per chapter. Change its material, scale, surroundings and sound at the era boundary; keep reading text still. Write each beat as picture + action + spoken sentence + evidence.
+- Start with one real asset and one fully playable chapter. Verify initial framing, a close-up, input, reset and a local build before commissioning a whole batch. Keep a spending ledger separate from estimates, and count the final bytes rather than prompt limits.
+- Explicitly distinguish the main sequence from optional branches and return paths. A closing menu may return to earlier chapters without making those chapters optional; verify autoplay order in the published player.
 
 ## 8. Before handing over
 - npx joplo outline: per feature, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
@@ -230,7 +252,12 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - .drag(target, destination) accepts an element id or stage pixel point; .scroll(target, destination) accepts an element id or content offset. Declare the correct source and endpoint.
 - .hover(target, ms) expresses a dwell; .act(name, target, data) uses the enabled plugin's data-only contract. Read its installed skill for field types, ranges, matching tolerance and presentation duration.
 - Engine frames expose clock time, speed, running/paused state and gesture progress. Presenters sample it; independent timers must not drive the timeline. Pausing freezes cursor, gestures, media, text and plugin animation together.
-- Inputs belonging to another scenario prompt before switching and enter immediately before the matching action. Cancel preserves current exploration; confirm discards it.
+- Inputs belonging to another scenario prompt before switching. The default actionEntry: 'before' enters immediately before the matching action, useful for guided practice. For direct manipulation such as a chapter scrubber, set flow({ actionEntry: 'after' }) on the destination scenario: confirmation lands after the matched action exactly once, showing its scripted result and leaving subsequent steps pending. Cancel preserves exploration; confirm discards it. Before-action entry at step zero exposes the selected action without reopening the inert scenario cover; ordinary reset or chapter selection still shows the cover. This does not change autoplay, normal case selection or from continuity.
+
+## A draggable chapter entry
+Give the scrubber and all year/chapter endpoints stable ids on the same stage. Declare each destination with a distinct .drag('scrubber', 'chapter_target', …effects) action and actionEntry: 'after'. The endpoint, not just the source, distinguishes destinations; different free reactions must not silently navigate. Keyboard activation of a declared drag source chooses a scripted destination, so also keep the player's chapter/case selector available when there are several destinations.
+
+Start playback before testing stage gestures: covers and transition cards intentionally ignore them. Confirm a cross-scenario drag, verify the destination picture immediately, cancel another switch and verify edits remain, then reset/resume and compare with a pristine timeline frame. With from, an ordinary chapter selection at step zero can still show the preceding ending until the entry action plays; do not mistake that for an after-entry failure.
 
 ## Independent views and focus
 - Each layer is an independent view tree, created with components from installed plugins. In an option with layers, the first declared layer is the default initial view; start chooses a route, not a layer. Use flow({ layer }) to choose another declared view, and keep unrelated demonstrations in separate features/options. Layers share state; one layer may show a different role or device. Do not put independent views inside a scaled composite screenshot.
@@ -244,15 +271,30 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - Transition cards mark a real opening/ending/time shift. Most information should change on the view, not arrive as a text deck. Read story and the installed visual plugins' recipes.
 - Media is provided by an explicitly configured plugin. A viewer gesture unlocks sound; pause/resume/speed share the clock and narration ducks background audio. Static frames stay silent. Read the plugin skill for resources and production limits.
 
+## Authoring an exploration beside the film
+- Share the same state patch between a scripted action and its free reaction; put camera, media and completion effects only in the scripted step. Do not filter an arbitrary effect array by hand: patch() itself returns an array of writes.
+- A discrete draggable timeline can snap to named endpoint elements. Pair each endpoint with a labeled click alternative. This demonstrates declared choices, not a continuously calculated simulation.
+- Test each interaction at two positions: immediately before its scripted action (it should advance once and stop), and somewhere it is only a free reaction (timeline state must stay unchanged). Then test reset, resumed playback, and a branch's Cancel/Confirm separately.
+
+## Film framing and control space
+Keep authored navigation outside a transforming picture: use an independently sized visual region from the installed plugin, with the chapter selector, credits and drag affordance in the surrounding stage layout. A camera close-up must not enlarge or move the controls viewers need to pause, seek or recover.
+
+The host can draw an input/keyboard record after a type/press step, and toasts can move it upward. Reserve a clear band for those host overlays, then inspect the type step in both render --sheet and live playback. Do not infer safety from the authored tree alone or hide host overlays with project CSS. A camera can intentionally crop contextual menus during a close-up; the current action and its result still need to be visible and reachable.
+
 ## Frames, deep links and verification
 - outline lists scenario and step ids. Use those ids in render/export; a deep link chooses where viewing starts and is not an access boundary.
 - joplo render --scenario-id <id> --step-id <id> --out frame.png renders timeline state. --sheet --columns 3 renders every step with captions/narration; inspect transitions with actual playback as well.
+- A full-size render can pass while a shorter board clips the input area. Check the actual visible hitbox with real pointer input in the board and the built site; DOM text existing is not proof it can be used.
 - Fixed render dimensions are a capture size; viewport belongs to page/layer. In a browser wait for fonts and [data-jcamera][data-camera-settled="1"] plus two animation frames. Do not mistake DOM progress for painted pixels.
 - Test first input, drag, wheel, hover, keyboard, confirmation cancel/confirm, reset and resumed playback. Compare restored frames and direct jumps with pristine script frames. Explain unverified devices or audio behavior.
 - For layout, visual motion, shapes, charts and component APIs use the installed plugin skills. The engine has no built-in component vocabulary.
 
+## Write a theme
+A project theme is themes/<name>.css selected by config({ theme: '<name>' }). Define --jp-bg, --jp-ink, --jp-surface and --jp-font; set --jp-stroke: clean for ordinary CSS borders (omitting it inherits hand-drawn strokes). Scope ordinary selectors to an authored root class so third-party libraries do not recolor the player. Include required font bytes as data URLs or use an already installed platform font; remote CSS/font URLs are not an offline asset pipeline. Verify computed styles and file:// playback. Component defaults and styling recipes belong to the owning plugin.
+
 ## Branches, annotations and appearance
-- fork(label, scenarioKey) adds a labeled route to another scenario; it does not silently branch automatic playback. Autoplay stays on the main flow until the viewer chooses a fork.
+- fork(label, scenarioKey) adds a labeled route to another scenario; it does not silently branch automatic playback. Feature diffs report action-entry and autoplay policy changes separately, even when their static pictures are identical. Mark the optional destination flow with autoplay:false so sequential playback skips it; fork alone is a navigation choice, not an autoplay exclusion. Return links to main chapters must not mark those chapters optional.
+- Keep fork labels short and verify the last choice at the actual viewport width: the strip scrolls horizontally when crowded. Avoid hiding an important return path in unnoticeable overflow. A film can end on its final visible state without a done badge when that badge crowds the choices.
 - mark(id, text?, opts?) is an annotation anchored to a stable element. Empty labels are omitted; targets are still validated. Use --jp-annot for annotation color in a theme.
 - .press('⌘K', ...effects) models a targetless keyboard step; keep editing keys inside editable elements. Keys and ids are not translated.
 - Appearance changes host theme/font/stroke, not state. Follow director keeps framing in sync; a manually selected layer uses that layer until the viewer follows again.
@@ -416,6 +458,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - LOCAL_RESOURCE_FAILED / LOCAL_RESOURCE_TIMEOUT / LOCAL_RESOURCE_TOO_LARGE: an optional local resource could not compile. Playback continues without it; the board shows the source location and reason without resetting the timeline. Repair the native tool/input and retry build; for playback, switch scenarios, toggle sound off/on, or reload first. A failed media slot currently survives a simple pause/play, so that alone may not retry resource generation. Successful regeneration clears the warning. check does not execute native tools, so verify actual playback/build too (plugins).
 - PLUGIN_DATA_INVALID: plugin output failed its JSON/schema contract, or the complete published IR exceeds depth 100 after shared references are expanded (root depth 0, including primitive leaves). For depth errors, flatten the cache or replace nested objects with string ids, then rebuild and verify that the published output can be compared with itself. See npx joplo skill plugins for the output contract.
 - MISSING_ID / DUPLICATE_ID: Give interactive elements stable ids unique within the stage; update step references.
+- EFFECT_INVALID: Use documented helpers, with arrays for composition. Arbitrary or misspelled effect objects are rejected, never interpreted as done().
 - FUNCTION_PROP: Replace onClick and other callbacks with flow steps and state effects.
 - UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE: Check case, rule, and reference keys and their owning option.
 - UNKNOWN_SLOT / UNKNOWN_ROUTE / UNKNOWN_LAYOUT: Check routes, layouts, and Slot declarations; add elements only to existing locations.
@@ -648,7 +691,7 @@ Compare cases and options in the board, then decide which option to publish for 
 - Layer switching, Follow director, replaying one layer, shot focus, and captions all work on the published site. See demo for syntax.
 - Fullscreen works on the published site: F enters/toggles, spacebar plays/pauses, ←/→ steps back/forward, Esc exits. Like a video, ←/→ during playback skips one step and keeps playing; while paused it steps once and stays paused.
 - Fullscreen keeps only the stage and captions. Playback controls float below and hide automatically.
-- Autoplay plays the picked option's scenarios back to back, like chapters of one video: after the last step of a scenario an Up next card names the next one and counts down 3 seconds (Play now / Cancel; pausing pauses the countdown), then it starts; after the last scenario it stops. Stepping by hand never jumps. So order scenarios as chapters (the first one is the hook) and end each on a clear result.
+- Autoplay plays the picked option's scenarios back to back, like chapters of one video: after the last step of a scenario an Up next card names the next one and counts down 3 seconds (Play now / Cancel; pausing pauses the countdown), then it starts; after the last scenario it stops. Stepping by hand never jumps. So order scenarios as chapters (the first one is the hook) and end each on a clear result. Use flow({ autoplay:false }) for optional branches: they remain manually selectable but are skipped by continuous playback, and stop at their own ending. A fork or return link alone does not remove a chapter from autoplay.
 - On phones the published site becomes a video player: the 1280 × 800 desktop stage is scaled as a whole with black bars (never re-laid out to the phone width); portrait shows the video, full captions, one row of controls and the chapter list; turning the phone sideways (or tapping Landscape) fills the screen with stage and captions plus a separate control bar. Stage taps pause/explore and stage drags belong to the prototype; use the control bar to step. On an iPhone, which cannot fullscreen a page or lock orientation, the stage is rotated 90° until the phone is turned.
 - Design for that: text on a 1280 × 800 stage shrinks to about 30% in portrait, so keep key text large (24px or more) and let shots zoom into details; in landscape the caption sits over the bottom of the stage, so keep important content out of the bottom 12%.
 - Both local and published views can export images. Video export is local only.
@@ -791,7 +834,8 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 - actions declares field types/ranges/tolerances, targets, caption and duration. Runtime recognizers use ctx.act; frame.gesture and frame.clock present the same action. Do not accumulate private timeline time or advance state from a drawing callback.
 
 ## Runtime and projection
-- Export defineRuntime({ id, components, observe? }) with the current API version. mount returns update/destroy; renderChildren preserves host rendering. Every targetable element needs an anchor carrying all supplied attrs, and canvas hits report through ctx.click/ctx.act.
+- Export defineRuntime({ id, components, observe? }) with the current API version. mount returns update/destroy; renderChildren preserves host rendering. Every targetable element needs an anchor carrying all supplied attrs, and canvas hits report through ctx.click/ctx.act. Report raycast hover with ctx.hover?.(id), and null on leave or drag start; the host resolves the declared dwell, cancels it on reset/resume, and never pauses playback for hover. Do not run a private hover timer or guess the author duration.
+- For a canvas drag, report a named hit or stage CSS-pixel point through ctx.act. The host resolves points against declared drop-zone anchors, including ordinary DOM targets outside the canvas. Keep anchors current after camera/scale changes; do not report canvas-local pixels as stage pixels.
 - frame contains resolved state, drawing snapshot, animate, clock/gesture, local playground and reset epoch. animate=false renders final layout; use ctx.hold while required assets load. Stop handled gesture propagation where ownership requires it.
 - Use @joplo-app/kit/renderer and renderer-style services instead of internal source imports. Share React through the published bridge; clean up observers/listeners and animation on destroy.
 - properties declares literal types, constraints and namespaced DOM attributes. Attributes propagate to every anchor. An observe instance is local to a stage/runtime and updates after layout; switching/unmount destroys it. Exceptions disable that instance, not the engine.
@@ -799,8 +843,12 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 - data declares text and scope projections for node/step slots. Missing projection stops scoped publication; never leave cut content merely hidden in DOM. Translation changes only declared display paths, not ids, colors or structural values.
 
 ## Local resources and media
+- Node props can use localResource(plugin, compiler, input) from kit/plugin. The compiler extracts author-only input into ResourceRequest and leaves an opaque reference in IR; the renderer resolves it from the scoped asset table. No description or credentials belong in public IR.
 - Optional Node local entry exposes text-to-resource compilers. The host caches by compiler version/code and exact input, coalesces requests and records warnings for local failures. Requests/source text are not public IR.
+- A compiler may declare persistent:true and estimate(input):{credits}; its compile context receives projectDir, home and allowSpend. Persistent output must be checked before credentials/network, and remains authoritative across compiler code updates. Only the explicit resources command grants allowSpend after displaying each estimate; ordinary host calls pass false. Do not infer permission from a configured key.
+- Release ctx.hold on success, error, superseded requests and unmount, after drawing the ready frame. Recheck scope before inlining assets; unused resources must not ship.
 - Step effects can emit play/stop commands for named tracks. Replay uses fixed step anchors and one engine clock; jumping/replaying resets to the same snapshot. Pause, speed, fade and narration ducking are host behavior, synthesis belongs to the plugin.
+- Free reactions are playback data: public payloads retain option.free after scope filtering, while authoring notes and source positions are stripped. Validate the actual built file:// site with arbitrary input and a secondary reaction; replay-only tests cannot detect a dropped free map.
 - Scope before inlining media. Build embeds validated resources and plugin runtimes; file:// must work without network. Video mixing capability is separate from playback support—state its actual limit.
 
 ## Verify the package

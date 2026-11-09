@@ -58,3 +58,5 @@ pnpm joplo build examples/joplo --out scratch/joplo-design-site
 5. 更新证据目录、相关文档与官方技能；不再另开一个平行 `joplo-<feature>` 项目。
 
 新合入源码不自动等于 npm 已发行；尤其 `feature_diff` 的演示是设计回放，不证明生产 PR 评论生命周期已经验收。当前版本边界见[功能差异说明](../../docs/feature-diff/README.md)。
+
+`model_assets` 是 D90 / P1-E 的当前实现设计：显式费用确认、项目 GLB 复用、断网任务恢复。来源为本轮任务要求与实现，不回填到历史归档，不把 CLI 生成说成已实现的看板生成按钮。

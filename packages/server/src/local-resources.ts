@@ -1,16 +1,17 @@
 /** Node-only resource host. Work runs in a disposable process, never the browser. */
 import fs from 'node:fs';
+import { joploHome } from './home.ts';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { build } from 'vite';
 import type { ResourceRequest } from '@joplo-app/kit/plugin';
-import { mediaResourceIds, type Project, type Diagnostic } from '@joplo-app/core';
+import { nodeResourceIds as referencedResources, mediaResourceIds, type Project, type Diagnostic } from '@joplo-app/core';
 
 type Result = { url?: string; diagnostic?: Diagnostic };
 const inflight = new Map<string, Promise<Result>>();
 const digest = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
-const LIMIT = 8 * 1024 * 1024;
+const LIMIT = 50 * 1024 * 1024;
 /** Serialize separate board/build processes too; crashed owners do not poison the cache. */
 async function resourceLease(directory: string): Promise<() => void> {
   const token = crypto.randomUUID(), started = Date.now();
@@ -34,6 +35,7 @@ async function resourceLease(directory: string): Promise<() => void> {
 }
 export class LocalResources {
   private bundles = new Map<string, Promise<string>>();
+  private descriptions = new Map<string, Promise<{persistent:boolean;credits?:number}>>();
   constructor(readonly directory: string, private entries: Record<string, string>) {}
   private bundle(plugin: string): Promise<string> {
     if (!this.bundles.has(plugin)) this.bundles.set(plugin, (async () => {
@@ -46,23 +48,49 @@ export class LocalResources {
     })());
     return this.bundles.get(plugin)!;
   }
-  async ensure(request: ResourceRequest, limits: { timeoutMs?: number; maxBytes?: number } = {}): Promise<Result> {
+  async describe(request: ResourceRequest): Promise<{ persistent: boolean; credits?: number }> {
+    const code = await this.bundle(request.plugin), dir = path.join(this.directory, '.joplo', 'resources');
+    fs.mkdirSync(dir, { recursive: true });
+    const entry = path.join(dir, `${digest(code)}.mjs`);
+    if (!fs.existsSync(entry)) { const tmp = `${entry}.${crypto.randomUUID()}.tmp`; fs.writeFileSync(tmp,code); fs.renameSync(tmp,entry); }
+    const key = JSON.stringify([entry,request.compiler,request.input]);
+    if (!this.descriptions.has(key)) this.descriptions.set(key, new Promise((resolve,reject) => {
+      // Even metadata is evaluated in a bounded child: plugin top-level code never runs in the host.
+      const script = `import {pathToFileURL} from 'node:url';
+        let input='';for await(const chunk of process.stdin)input+=chunk;const r=JSON.parse(input);
+        try {const c=(await import(pathToFileURL(r.entry).href)).default?.compilers?.[r.compiler];
+          if(!c)throw new Error();const estimate=c.estimate?.(r.input);
+          if(estimate && (!Number.isFinite(estimate.credits)||estimate.credits<0))throw new Error();
+          process.stdout.write(JSON.stringify({persistent:c.persistent===true,...(estimate?{credits:estimate.credits}:{})}));
+        }catch{process.exitCode=1;}`;
+      const child = spawn(process.execPath,['--input-type=module','-e',script],{stdio:['pipe','pipe','ignore']});
+      let output='', settled=false;
+      const finish = (ok:boolean) => {if(settled)return;settled=true;clearTimeout(timer);child.kill('SIGKILL');if(ok){try{resolve(JSON.parse(output));return;}catch{}}reject(new Error('Invalid local resource declaration or estimate'));};
+      const timer=setTimeout(()=>finish(false),5000);
+      child.stdout.on('data',b=>{output+=b;if(output.length>4096)finish(false);});
+      child.on('error',()=>finish(false));child.on('close',status=>finish(status===0));
+      child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({entry,compiler:request.compiler,input:request.input}));
+    }));
+    return this.descriptions.get(key)!;
+  }
+  async ensure(request: ResourceRequest, limits: { timeoutMs?: number; maxBytes?: number; allowSpend?: boolean; home?: string } = {}): Promise<Result> {
     const warning = (code: string, message: string): Result => ({ diagnostic: { severity: 'warning', source: 'structure', code, message: `${request.plugin}/${request.compiler}: ${message}`, at: request.source ? request.source.replace(this.directory + path.sep, '') : 'joplo.config.ts:1:1' } });
     try {
       const code = await this.bundle(request.plugin);
+      const description = await this.describe(request);
       // Compiler version is part of the bundled declaration; code changes also invalidate.
       const key = digest(JSON.stringify([request.plugin, request.compiler, code, request.input]));
       const dir = path.join(this.directory, '.joplo', 'resources');
       const cache = path.join(dir, `${key}.json`);
       const maxBytes = Math.min(LIMIT, limits.maxBytes ?? LIMIT);
-      const cached = (): Result | undefined => { try { const saved = JSON.parse(fs.readFileSync(cache, 'utf8')); if (typeof saved.url === 'string' && Number.isInteger(saved.bytes) && saved.bytes >= 0 && saved.bytes <= maxBytes && saved.url.length <= maxBytes * 1.4 + 256) return { url: saved.url }; } catch { /* cache miss */ } return undefined; };
+      const cached = (): Result | undefined => { if (description.persistent) return undefined; try { const saved = JSON.parse(fs.readFileSync(cache, 'utf8')); if (typeof saved.url === 'string' && Number.isInteger(saved.bytes) && saved.bytes >= 0 && saved.bytes <= maxBytes && saved.url.length <= maxBytes * 1.4 + 256) return { url: saved.url }; } catch { /* cache miss */ } return undefined; };
       const hit = cached(); if (hit) return hit;
-      const lock = `${cache}:${maxBytes}:${limits.timeoutMs ?? 30000}`;
+      const lock = `${cache}:${maxBytes}:${!!limits.allowSpend}:${limits.timeoutMs ?? 30000}`;
       const existing = inflight.get(lock);
       if (existing) { const r = await existing; return r.diagnostic ? warning(r.diagnostic.code, r.diagnostic.message) : r; }
       const work = (async (): Promise<Result> => {
         fs.mkdirSync(dir, { recursive: true });
-        const release = await resourceLease(`${cache}.lock`);
+        const release = description.persistent ? () => {} : await resourceLease(`${cache}.lock`);
         try {
         const hit = cached(); if (hit) return hit;
         const entry = path.join(dir, `${digest(code)}.mjs`);
@@ -70,13 +98,13 @@ export class LocalResources {
         const jobDir = fs.mkdtempSync(path.join(dir, 'job-'));
         try {
           const result = await new Promise<{ mime: string; data: string; bytes: number }>((resolve, reject) => {
-            const script = `import { pathToFileURL } from 'node:url';
+            const script = `import {pathToFileURL} from 'node:url';
               const alive=setInterval(()=>{},1000); let input=''; for await (const chunk of process.stdin) input+=chunk;
               const r=JSON.parse(input); const m=await import(pathToFileURL(r.entry).href);
               const c=m.default?.compilers?.[r.compiler];
               try {
                 if(!c || typeof c.version!=='string' || !/^[a-z]+\\/[a-z0-9.+-]+$/.test(c.mime)) throw new Error('Invalid local compiler declaration');
-                const bytes=await c.compile(r.input,{directory:r.directory,maxBytes:r.maxBytes});
+                const bytes=await c.compile(r.input,{directory:r.directory,projectDir:r.projectDir,home:r.home,allowSpend:r.allowSpend,maxBytes:r.maxBytes});
                 if(!(bytes instanceof Uint8Array)) throw new Error('Compiler must return Uint8Array');
                 if(bytes.byteLength>r.maxBytes) throw Object.assign(new Error('Resource exceeds size limit'),{code:'LOCAL_RESOURCE_TOO_LARGE'});
                 process.stdout.write(JSON.stringify({mime:c.mime,data:Buffer.from(bytes).toString('base64'),bytes:bytes.byteLength}));
@@ -85,17 +113,17 @@ export class LocalResources {
             let stdout = '', stderr = '', settled = false;
             const kill = () => { try { if (process.platform !== 'win32') process.kill(-child.pid!, 'SIGKILL'); else child.kill('SIGKILL'); } catch { /* exited */ } };
             const finish = (error?: Error, value?: { mime: string; data: string; bytes: number }) => { if (settled) return; settled = true; clearTimeout(timer); kill(); if (error) reject(error); else resolve(value!); };
-            const timer = setTimeout(() => finish(Object.assign(new Error('Compilation timed out'), { code: 'LOCAL_RESOURCE_TIMEOUT' })), Math.min(30000, limits.timeoutMs ?? 30000));
+            const timer = setTimeout(() => finish(Object.assign(new Error('Compilation timed out'), { code: 'LOCAL_RESOURCE_TIMEOUT' })), (limits.allowSpend ? 21 * 60 * 1000 : Math.min(30000, limits.timeoutMs ?? 30000)));
             child.stdout.on('data', b => { stdout += b; if (stdout.length > maxBytes * 1.4 + 4096) finish(Object.assign(new Error('Resource exceeds size limit'), { code: 'LOCAL_RESOURCE_TOO_LARGE' })); });
             child.stderr.on('data', b => { if (stderr.length < 4000) stderr += b; });
             child.on('error', e => finish(e));
             child.on('close', status => { try { const value = JSON.parse(stdout); if (status || value.error) finish(Object.assign(new Error(value.error ?? stderr), { code: value.code })); else finish(undefined, value); } catch { finish(new Error(stderr || 'Compiler exited without a resource')); } });
             child.stdin.on('error', () => {});
-            child.stdin.end(JSON.stringify({ entry, compiler: request.compiler, input: request.input, directory: jobDir, maxBytes }));
+            child.stdin.end(JSON.stringify({ entry, compiler: request.compiler, input: request.input, directory: jobDir, projectDir: this.directory, home: limits.home ?? joploHome(), allowSpend: limits.allowSpend === true, maxBytes }));
           });
           const url = `data:${result.mime};base64,${result.data}`;
           const tmp = `${cache}.${crypto.randomUUID()}.tmp`;
-          fs.writeFileSync(tmp, JSON.stringify({ url, bytes: result.bytes })); fs.renameSync(tmp, cache);
+          if (!description.persistent) { fs.writeFileSync(tmp, JSON.stringify({ url, bytes: result.bytes })); fs.renameSync(tmp, cache); }
           return { url };
         } catch (e) {
           const err = e as Error & { code?: string };
@@ -109,7 +137,9 @@ export class LocalResources {
   }
 }
 export async function inlineResources(project: Project, requests: ResourceRequest[], host: LocalResources) {
-  const used = mediaResourceIds(project), assets: Record<string, string> = {}, diagnostics: Diagnostic[] = [];
+  const used = mediaResourceIds(project);
+  for (const id of referencedResources(project)) used.add(id);
+  const assets: Record<string, string> = {}, diagnostics: Diagnostic[] = [];
   for (const request of requests) if (used.has(request.id)) {
     const r = await host.ensure(request);
     if (r.url) assets[request.id] = r.url;
@@ -117,3 +147,5 @@ export async function inlineResources(project: Project, requests: ResourceReques
   }
   return { assets, diagnostics };
 }
+
+export { nodeResourceIds as referencedResources, resolveResourceProps } from '@joplo-app/core';

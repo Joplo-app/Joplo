@@ -45,7 +45,7 @@ describe('asset()', () => {
   });
   it('文件不存在、类型不支持：报错并说明怎么改', () => {
     expect(() => asset('../../../nope.jpg', from)).toThrow(/file not found .*relative to the file that calls asset/);
-    expect(() => asset('../../../notes.txt', from)).toThrow(/unsupported image type "\.txt"/);
+    expect(() => asset('../../../notes.txt', from)).toThrow(/unsupported asset type "\.txt"/);
   });
 });
 

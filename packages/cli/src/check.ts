@@ -2,7 +2,8 @@ import { existsSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
-import { compile, validate, type Diagnostic, type Project, type ValidationReport } from '@joplo-app/core';
+import { nodeResourceIds, compile, validate, type Diagnostic, type Project, type ValidationReport } from '@joplo-app/core';
+import { isPluginDef, type ResourceRequest } from '@joplo-app/kit/plugin';
 import { loadAuthoring } from '@joplo-app/core/node';
 
 export type CheckReport = ValidationReport & { name: string };
@@ -19,11 +20,25 @@ export async function checkWithProject(dir: string, optionId?: string): Promise<
   const tsconfig = join(root, 'tsconfig.json');
   const loaded = await loadAuthoring(root, p => tsImport(p, { parentURL: import.meta.url, tsconfig: existsSync(tsconfig) ? tsconfig : false }));
   // 与看板同一套布局（D69）：布局失败的图表在 check 里报 DIAGRAM_LAYOUT_FAILED
-  const compiled = loaded.authoring ? compile(loaded.authoring, 'dev', {}) : null;
+  const requests: ResourceRequest[] = [];
+  const compiled = loaded.authoring ? compile(loaded.authoring, 'dev', { onResource:r=>requests.push(r) }) : null;
+  const resourceDiagnostics: Diagnostic[] = [];
+  if (requests.length && loaded.authoring) {
+    const { LocalResources } = await import('@joplo-app/server');
+    const plugins = loaded.authoring.config.plugins ?? [];
+    const host = new LocalResources(root,Object.fromEntries(plugins.filter(isPluginDef).filter(p=>p.local).map(p=>[p.id,p.local!])));
+    for (const request of requests) {
+      if (!nodeResourceIds(compiled?.project).has(request.id)) continue;
+      const description = await host.describe(request);
+      if (!description.persistent) continue;
+      const result = await host.ensure(request);
+      if (result.diagnostic) resourceDiagnostics.push(result.diagnostic);
+    }
+  }
   const validated = compiled?.project ? validate(compiled.project, { optionId, mode: 'all' }) : null;
   // 编译器也会为同一布局的每份画面输出相同诊断；在 CLI 边界统一去重。
   const seen = new Set<string>();
-  const diagnostics: Diagnostic[] = [...loaded.diagnostics, ...(compiled?.diagnostics ?? []), ...(validated?.diagnostics ?? [])].map(d => ({ ...d, at: d.at ?? 'joplo.config.ts:1:1' })).filter(d => {
+  const diagnostics: Diagnostic[] = [...resourceDiagnostics, ...loaded.diagnostics, ...(compiled?.diagnostics ?? []), ...(validated?.diagnostics ?? [])].map(d => ({ ...d, at: d.at ?? 'joplo.config.ts:1:1' })).filter(d => {
     const key = JSON.stringify([d.at, d.code, d.message, d.severity]);
     if (seen.has(key)) return false;
     seen.add(key); return true;

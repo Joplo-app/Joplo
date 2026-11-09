@@ -11,9 +11,11 @@ export default feature({
     now: { title: '现在：竖屏打开分享', dimension: 'main', priority: 'high', expected: '（现状）画面被按手机宽度重新排版，挤成竖条；图层标签挤在一起，字幕被盖住，控制条溢出' },
     watch: { title: '从头看到尾，横过来看', dimension: 'main', priority: 'high', expected: '竖屏是 16:10 的画面加章节列表；一章播完自动进入下一章；点「横屏」或把手机横过来就铺满屏幕，点画面才出控件' },
     ios_locked: { title: 'iPhone 锁着竖屏点「横屏」', dimension: 'permission', priority: 'high', expected: '网页不能全屏也不能锁方向，就把画面转 90° 铺满屏幕，提示把手机横过来；手机真的横过来后取消旋转' },
+    optional_branch: { title: '可选支线不打断连续观看', dimension: 'lifecycle', expected: '连续播放只经过主线；支线可从选择入口打开，结束后停下' },
     end: { title: '最后一章播完', dimension: 'lifecycle', expected: '停在结束画面：重看、复制链接；不再自动跳到别处' },
   },
   rules: {
+    optional_autoplay: rule('作者可以将支线标为 autoplay:false；发布站连续播放跳过它，手动和 fork 仍可访问，支线结束不自动跳走', { origin: 'code_observed', status: 'pending', cases: ['optional_branch'] }),
     video_aspect: rule('手机上舞台按作者的设计尺寸（电脑页面 16:10）整体等比缩放，像视频一样留黑边，不按手机宽度重新排版', { origin: 'user', status: 'confirmed', cases: ['now', 'watch'], elements: ['p_video', 'n_video'] }),
     autoplay_next: rule('自动播放时，一个场景播完先在画面上显示「下一章」和 3 秒倒计时（可立即播放或取消），再接着播下一个场景（按功能里的场景顺序），直到最后一个；手动一步步看时不自动跳', { origin: 'user', status: 'confirmed', cases: ['watch', 'end'], elements: ['p_chapters'] }),
     landscape_fill: rule('横屏时只保留画面和字幕，铺满屏幕；控件浮在画面上，点一下画面出现，约 3 秒没操作就隐藏', { origin: 'user', status: 'confirmed', cases: ['watch'], elements: ['l_stage', 'l_controls'] }),
