@@ -24,6 +24,7 @@ export type RenderCtx = {
   clock?: EngineFrame;
   gesture?: ActionPresentation | null;
   resetKey?: string;
+  inputs?: number;
   playground?: boolean;
   scene: Scene;
   stage?: HTMLElement | null;
@@ -186,7 +187,7 @@ function PluginHost({ node, p }: NodeProps) {
       const children = chosen.map(n => <RenderNode key={n.id} node={n} />);
       return container ? createPortal(children, container) : children;
     },
-    frame: { clock: ctx.clock, gesture: ctx.gesture, playground: ctx.playground, resetKey: ctx.resetKey, mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, sceneId: ctx.scene.id, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
+    frame: { clock: ctx.clock, gesture: ctx.gesture, playground: ctx.playground, resetKey: ctx.resetKey, inputs: ctx.inputs, mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, sceneId: ctx.scene.id, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
     css: (name) => { const el = element() ?? ctx.stage; return el ? getComputedStyle(el).getPropertyValue(name).trim() : ''; },
     act: ctx.act,
     hover: ctx.hover,

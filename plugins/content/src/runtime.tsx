@@ -180,13 +180,15 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
     const drift = timed ? driftOf(cam?.drift, canvasDrift) : null;
     const dk = JSON.stringify(drift);
     const camMoves = !same(target.current, next);
+    const mounted = lastMark.current !== null;
     const jumped = jumpedSince(lastMark.current, ctx);
     lastMark.current = markOf(ctx);
-    if (camMoves || jumped || dk !== driftKey.current || !timed && seg.current.drift) {
+    if (camMoves || jumped || !mounted || dk !== driftKey.current || !timed && seg.current.drift) {
       target.current = next;
       driftKey.current = dk;
-      // 跳转（resetKey 变了）、截图与静态画面：直接落定在新取景；播放中：从当前实际位置（含漂移）出发
-      const glide = timed && camMoves && !jumped;
+      // 只有连续播放中（时钟在走、已经挂载过、不是跳转）才补间；首次挂载、停止状态、跳转、截图与静态画面直接落定（D92 R1）。
+      // 暂停时目标不会变，已有的镜头段原样冻结。
+      const glide = timed && camMoves && !jumped && mounted && !!clock?.running;
       const from = glide ? cameraAt(seg.current, now, lensView) : next;
       seg.current = { from, to: next, start: now, ms: glide ? cam?.ms ?? 1200 : 0, drift };
       redraw((n) => n + 1);
@@ -265,7 +267,8 @@ function copyLive(from: Element, to: Element) {
 }
 
 /** One observer per stage: cache only design-space layouts, never player state. */
-export const observe: PluginObserve = (root) => {
+export const observe: PluginObserve = (root, initial) => {
+  const context0Inputs = initial?.frame.inputs;
   const layouts = new Map<HTMLElement, Map<string, Box>>();
   const clips = new Map<HTMLElement, { count: number; value: string; priority: string }>();
   // FLIP crosses containers; their normal overflow must not clip that travel.
@@ -299,6 +302,7 @@ export const observe: PluginObserve = (root) => {
   const watchers = new Map<HTMLElement, MutationObserver>();
   let quiet = true;
   let last: Mark | null = null;
+  let lastInputs: number | undefined = context0Inputs;
   const drop = (outer: Element) => { ghosts.delete(outer); outer.remove(); };
   /** 落定：进场直接到终态、幽灵立刻消失（跳转、自由体验、停止、截图、组件卸载）。 */
   const settle = () => {
@@ -364,9 +368,12 @@ export const observe: PluginObserve = (root) => {
       const f = context.frame;
       const running = !f.clock || f.clock.running;
       const jumped = jumpedSince(last, f);
-      quiet = !f.animate || !!f.playground || !running || jumped;
+      // 观众刚在舞台上输入（D92 R6）：先落定进退场，再让输入作用在终态画面上；播放器的普通暂停不改变 inputs，仍冻结
+      const touched = f.inputs !== undefined && f.inputs !== lastInputs;
+      lastInputs = f.inputs;
+      quiet = !f.animate || !!f.playground || !running || jumped || touched;
       // 暂停：保持冻结（引擎时钟不走）；其余安静的情况一律落定
-      if (!f.animate || f.playground || jumped || (!running && !f.clock?.paused)) settle();
+      if (!f.animate || f.playground || jumped || touched || (!running && !f.clock?.paused)) settle();
       last = markOf(f);
       // 这次提交里被移除的节点同步处理：此刻的布局缓存还是移除前的
       for (const [w, mo] of watchers) handle(mo.takeRecords(), w);

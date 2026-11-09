@@ -26,7 +26,7 @@ import { dwellTexts } from '../player/cover-content';
 import { VOICE_BREATH_MS, speakerRoleAt, spokenLine } from '@joplo-app/core/runtime';
 import type { Narration, Narrator, NarrationSource } from './voice';
 import { holdMsOf, orderedFeatures, streamsOf, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core/runtime';
-import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
+import { browseSceneId, browseState, optionsOf, scenariosOf, playSequence } from './views';
 
 /** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */
 export type View = 'stage' | 'browse';
@@ -83,6 +83,8 @@ export type Snapshot = {
    * 配乐据此决定接着播还是按快照重新定位。写入点：set（同一次更新里同时换了 epoch 与 state）。
    */
   seek: number;
+  /** 观众在舞台上的输入次数（点、按键、拖动按下，D92 R6）。写入点：stageInput → Stage 的 inputs → 插件 frame.inputs；变化时插件先落定展示。 */
+  inputs: number;
   /**
    * 有层级的方案（T-layers）：下一步的操作目标不在当前显示的层里时，先切到包含它的层（导演跟随时），
    * 再移动鼠标；这一步提交后清空，之后由 cameraAt 决定导演层。
@@ -191,6 +193,7 @@ export class DemoController {
     leadFrame: null,
     upNext: null,
     seek: 0,
+    inputs: 0,
   };
   private listeners = new Set<() => void>();
   private gen = 0;
@@ -616,14 +619,14 @@ export class DemoController {
   }
 
   /**
-   * 自动播放放完一个场景后，接着放哪个场景（返回 null 就停下）。缺省（D92 U2，看板、发布站、嵌入一致）：同一方案里按声明顺序的
-   * 下一个、跳过 flow({ autoplay: false }) 的支线；from 接力链就是按这个顺序声明的。支线本身播完就停。录制等场合可以设为 null。
+   * 自动播放放完一个场景后，接着放哪个场景（返回 null 就停下）。缺省（D92 U2 / R9，看板、发布站、嵌入一致）：playSequence 里的
+   * 下一个——from 接力链优先，其余按声明顺序，跳过 flow({ autoplay: false }) 的支线。支线本身播完就停。录制等场合可以设为 null。
    */
   autoNext: ((scenarioId: string) => string | null) | null = (id) => {
     const p = this.snap.project;
     const sc = p?.scenarios[id];
     if (!p || !sc) return null;
-    const sequence = scenariosOf(p, sc.optionId).filter((s) => s.autoplay !== false);
+    const sequence = playSequence(p, sc.optionId);
     const i = sequence.findIndex((s) => s.id === id);
     return i >= 0 && i + 1 < sequence.length ? sequence[i + 1]!.id : null;
   };
@@ -767,6 +770,8 @@ export class DemoController {
    */
   /** Pause before delivery; never cancel or replay the viewer's original DOM event. */
   stageInput(explore = false): void {
+    // 先让舞台上进行中的展示落定（进退场、幽灵），再处理这次输入（D92 R6）：计数变化就是插件的信号
+    this.set({ inputs: this.snap.inputs + 1 });
     if ((this.snap.playing || this.snap.busy) && !this.snap.paused) this.pause(explore);
     if (explore && !this.snap.freeMode) this.set({ freeMode: true });
   }

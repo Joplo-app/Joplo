@@ -290,6 +290,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
                 state={state}
                 playground={snap.playground}
                 freeMode={snap.freeMode}
+                inputs={snap.inputs}
                 clock={ctl.clock}
                 gesture={snap.gesture}
                 inspect={picking}

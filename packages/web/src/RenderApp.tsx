@@ -42,7 +42,7 @@ import { viewProject } from './i18n/content';
 import { Narrator, type Narration } from './runtime/voice';
 import { voiceMs } from '@joplo-app/core/runtime';
 import { nextScenarioId } from './player/watch';
-import { scenariosOf } from './runtime/views';
+import { playSequence } from './runtime/views';
 
 /** 截图用的 IR：content 参数是项目的内容语言时换成这种语言（与看板预览同一个 viewProject）。 */
 export function renderProject(project: Project, content: string | null, uiLocale: string): Project {
@@ -270,7 +270,7 @@ function RecordStage({ project, scenarioId, chain, voiceEstimate, theme, font, s
     // 不带 chain 时只录这一个场景（控制器缺省会接着播下一个）
     if (chain) {
       const optionId = project.scenarios[scenarioId]?.optionId ?? null;
-      c.autoNext = (id) => nextScenarioId(scenariosOf(project, optionId), id);
+      c.autoNext = (id) => nextScenarioId(playSequence(project, optionId), id);
     } else c.autoNext = null;
     if (voiceEstimate) c.narrator = estimatedNarrator();
     return c;

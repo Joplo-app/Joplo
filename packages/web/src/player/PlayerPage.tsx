@@ -671,6 +671,7 @@ export function PlayerPage(p: PlayerPageProps) {
               state={state!}
               playground={snap.playground}
               freeMode={snap.freeMode}
+              inputs={snap.inputs}
               clock={ctl.clock}
               gesture={snap.gesture}
               onStageInput={explore => ctl.stageInput(explore)}

@@ -285,3 +285,26 @@ describe('U2 默认无缝接下一个场景（D92）：看板与发布站同一�
     paused.stop();
   });
 });
+
+// 评审 RF11：接力章写在被接的一章前面（编译器允许），默认接续仍按 from 链走，不提前停、不回头循环
+describe('U2 from 链优先于声明顺序（D92 R9）', () => {
+  it('逆声明顺序的接力章仍是下一个；链尾之后接下一个根场景；不会回到已经放过的章', () => {
+    const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
+    const opt = option({ name: 'A', idea: 'i', scenarios: {
+      two: flow('Two', { from: 'one' }).click('go', 'Second'),
+      side: flow('Side', { from: 'one', autoplay: false }).click('go', 'Side'),
+      one: flow('One', { start: '/' }).click('go', 'First'),
+      three: flow('Three', { start: '/' }).click('go', 'Third'),
+    } });
+    const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } } };
+    const p = compile(src, 'dev').project!;
+    const c = new DemoController(null);
+    c.setProject(p, 1, null);
+    expect(c.autoNext?.('f.a.one')).toBe('f.a.two');
+    expect(c.autoNext?.('f.a.two')).toBe('f.a.three');
+    expect(c.autoNext?.('f.a.three')).toBeNull();
+    expect(c.autoNext?.('f.a.side')).toBeNull();
+    c.stop();
+  });
+});

@@ -36,7 +36,7 @@ describe('D92 content transitions in a real browser', () => {
       scrubA:flow('Scrub A',{start:'/scrub',actionEntry:'after'}).drag('scrubber','year_a','To A',set($.ui.sx,200),hold(5)).system('later','Later',hold(5)),
       scrubB:flow('Scrub B',{start:'/scrub',actionEntry:'after'}).drag('scrubber','year_b','To B',set($.ui.sx,1400),hold(5)),
     }});`);
-    write('harness.ts', `import ${JSON.stringify(path.join(REPO, 'packages/web/src/index.css'))};import{createElement as h,useSyncExternalStore}from'react';import{createRoot}from'react-dom/client';import{projectThemes}from'@joplo-app/core';import{Stage}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/Stage.tsx'))};import{ThemeStyles}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/ThemeStyles.tsx'))};import{DemoController}from ${JSON.stringify(path.join(REPO, 'packages/web/src/runtime/demo.ts'))};import{loadPluginRuntimes}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/plugins.ts'))};let project,ctl;window.fixtureAnimate=true;function App(){const s=useSyncExternalStore(ctl.subscribe,ctl.getSnapshot);return h('div',{},h(ThemeStyles,{themes:projectThemes(project)}),h(Stage,{project,state:s.state,theme:project.theme,mode:'demo',animate:window.fixtureAnimate,playground:s.playground,freeMode:s.freeMode,clock:ctl.clock,epoch:s.epoch,activeStep:s.activeStep,onStageInput:explore=>ctl.stageInput(explore),onAction:(a,n)=>void ctl.act(a,n),stageRef:node=>ctl.setStageEl(node)}));}window.fixtureStart=async(p,urls)=>{project=p;await loadPluginRuntimes(urls);ctl=new DemoController();ctl.autoNext=null;ctl.reducedMotion=true;ctl.setProject(p,1);ctl.setScenario('f.a.swap');window.fixtureCtl=ctl;const el=document.createElement('div');document.body.replaceChildren(el);window.fixtureRoot=createRoot(el);window.fixtureRender=()=>window.fixtureRoot.render(h(App));window.fixtureRender();};`);
+    write('harness.ts', `import ${JSON.stringify(path.join(REPO, 'packages/web/src/index.css'))};import{createElement as h,useSyncExternalStore}from'react';import{createRoot}from'react-dom/client';import{projectThemes}from'@joplo-app/core';import{Stage}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/Stage.tsx'))};import{ThemeStyles}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/ThemeStyles.tsx'))};import{DemoController}from ${JSON.stringify(path.join(REPO, 'packages/web/src/runtime/demo.ts'))};import{loadPluginRuntimes}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/plugins.ts'))};let project,ctl;window.fixtureAnimate=true;function App(){const s=useSyncExternalStore(ctl.subscribe,ctl.getSnapshot);return h('div',{},h(ThemeStyles,{themes:projectThemes(project)}),h(Stage,{key:window.fixtureStageKey??0,inputs:s.inputs,project,state:s.state,theme:project.theme,mode:'demo',animate:window.fixtureAnimate,playground:s.playground,freeMode:s.freeMode,clock:ctl.clock,epoch:s.epoch,activeStep:s.activeStep,onStageInput:explore=>ctl.stageInput(explore),onAction:(a,n)=>void ctl.act(a,n),stageRef:node=>ctl.setStageEl(node)}));}window.fixtureStart=async(p,urls)=>{project=p;await loadPluginRuntimes(urls);ctl=new DemoController();ctl.autoNext=null;ctl.reducedMotion=true;ctl.setProject(p,1);ctl.setScenario('f.a.swap');window.fixtureCtl=ctl;const el=document.createElement('div');document.body.replaceChildren(el);window.fixtureRoot=createRoot(el);window.fixtureRender=()=>window.fixtureRoot.render(h(App));window.fixtureRender();};`);
     write('fixture.html', `<!doctype html><style>body{margin:0}</style><script type="module">import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>type=>type;window.__vite_plugin_react_preamble_installed__=true;await import('./harness.ts');</script>`);
     server = await createDev({ projectDir: root, port: 0, watch: false, log: () => undefined });
     expect(server.payload().diagnostics.filter(d => d.severity === 'error')).toEqual([]);
@@ -210,6 +210,46 @@ describe('D92 content transitions in a real browser', () => {
     await page.evaluate(() => document.querySelector('[data-joplo-stage]')!.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 1 })));
     expect(await leftovers()).toEqual({ translate: '', pe: '', dragging: 0 });
     await page.mouse.up();
+    expect(await page.evaluate(() => !!(window as any).fixtureCtl.getSnapshot().switchPrompt)).toBe(false);
+  });
+
+  // 评审 RF1：中途步骤首次挂载（停止状态）直接显示落定取景，不冻结在全景
+  it('R1 a first mount at a stopped mid-scenario step shows the settled camera frame, not a frozen whole view', async () => {
+    await at('drift', 1);
+    await page.evaluate(() => { (window as any).fixtureStageKey = ((window as any).fixtureStageKey ?? 0) + 1; (window as any).fixtureRender(); });
+    await frame();
+    const read = () => page.evaluate(() => (document.querySelector('[data-jcanvas-world]') as HTMLElement).style.transform);
+    const initial = await read(); await page.waitForTimeout(150);
+    expect(initial).toContain('scale(3)');
+    expect(await read()).toBe(initial);
+  });
+  // 评审 RF6：第一下舞台输入先让幽灵 / 进场落定（普通暂停仍冻结，见 G3）
+  it('R6 the first stage input settles exit ghosts and enter animations before the input is handled', async () => {
+    await at('swap'); await playTo(1); await page.waitForTimeout(150);
+    expect(await ghosts()).toBe(1);
+    await page.evaluate(() => (window as any).fixtureCtl.stageInput(true)); await frame();
+    expect(await ghosts()).toBe(0);
+    expect(await page.evaluate(() => document.getAnimations().filter(x => x.id === 'jexit' || x.id === 'jenter').length)).toBe(0);
+    // 拖动开始前的按下（不进入自由体验）也算输入
+    await at('swap'); await playTo(1); await page.waitForTimeout(150);
+    await page.evaluate(() => (window as any).fixtureCtl.stageInput()); await frame();
+    expect(await ghosts()).toBe(0);
+  });
+  // 评审 RF10 / RF4：第二根指针不能顶掉正在拖的源；窗口失焦取消拖动
+  it('R3 a second pointer cannot orphan the dragged source, and window blur cancels the drag', async () => {
+    await at('scrubA');
+    let start = await scrubberDown();
+    await page.mouse.move(start.x + 120, start.y, { steps: 3 });
+    await page.evaluate(() => document.querySelector('[data-joplo-stage]')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, buttons: 1, pointerType: 'touch', pointerId: 2, isPrimary: false })));
+    await page.evaluate(() => document.querySelector('[data-joplo-stage]')!.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, buttons: 1, pointerType: 'touch', pointerId: 2, clientX: 10, clientY: 10 })));
+    await page.mouse.up(); await page.keyboard.press('Escape'); await frame();
+    expect(await leftovers()).toEqual({ translate: '', pe: '', dragging: 0 });
+    await at('scrubA');
+    start = await scrubberDown();
+    await page.mouse.move(start.x + 100, start.y, { steps: 3 });
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    expect(await leftovers()).toEqual({ translate: '', pe: '', dragging: 0 });
+    await page.mouse.up(); await frame();
     expect(await page.evaluate(() => !!(window as any).fixtureCtl.getSnapshot().switchPrompt)).toBe(false);
   });
 

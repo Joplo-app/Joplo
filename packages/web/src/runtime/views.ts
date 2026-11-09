@@ -9,6 +9,26 @@ export const optionsOf = (project: Project, featureId: string | null): Option[] 
 
 export const scenariosOf = (project: Project, optionId: string | null): Scenario[] => (optionId ? Object.values(project.scenarios).filter((s) => s.optionId === optionId) : []);
 
+/**
+ * 连续播放的顺序（D92 U2 / R9；看板、发布站、嵌入与录制 --chain 共用）：按声明顺序取不接力的场景（根），每个根之后
+ * 深度优先接上 flow({ from }) 接力它的章（多章接同一章时按声明顺序）。autoplay:false 的场景连同接在它后面的章都不进顺序。
+ * 因此接力章写在被接章前面也不会被截断，也不会回头重放。
+ */
+export function playSequence(project: Project, optionId: string | null): Scenario[] {
+  const all = scenariosOf(project, optionId);
+  const ids = new Set(all.map((s) => s.id));
+  const out: Scenario[] = [];
+  const seen = new Set<string>();
+  const visit = (s: Scenario) => {
+    if (seen.has(s.id) || s.autoplay === false) return;
+    seen.add(s.id);
+    out.push(s);
+    for (const child of all) if (child.from === s.id) visit(child);
+  };
+  for (const s of all) if (!s.from || !ids.has(s.from)) visit(s);
+  return out;
+}
+
 /** 方案的短名：「A · 单人邮件邀请弹窗」→「A」。 */
 export const shortName = (name: string) => (name.includes(' · ') ? name.split(' · ')[0]! : name);
 

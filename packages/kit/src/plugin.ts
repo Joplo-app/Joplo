@@ -254,6 +254,8 @@ export type PluginFrame = {
   playground?: boolean;
   /** Changes when local view state must be discarded (play, jump, reset, scene change). */
   resetKey?: string;
+  /** Viewer inputs on this stage so far (D92). When it changes, settle in-flight presentation (enter/exit, overlays) before the input is handled; an ordinary pause from player controls does not change it. Missing in old hosts. */
+  inputs?: number;
   /** demo = 体验与播放；review = 审阅（点击用于检查元素）。 */
   mode: string;
   /** false：截图、导出、跳转，直接画到终点，不播放过渡。 */

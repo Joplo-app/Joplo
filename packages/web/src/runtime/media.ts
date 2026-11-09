@@ -3,7 +3,7 @@ import { pluginStatus } from '../renderer/plugins';
 /** Browser host owns permission, clock, gain and lifecycle; plugins only synthesize bytes. */
 export class MediaEngine {
   private audio: AudioContext | null = null;
-  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; origin?: number }>();
+  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
   private urls = new Map<string, Promise<Uint8Array | null>>();
   private disposed = false;
   unlock = () => {
@@ -63,14 +63,30 @@ export class MediaEngine {
         }).catch(() => { current.dead = true; current.gain.disconnect(); });
       }
       const elapsed = frame.elapsedMs;
-      const offset = slot.origin !== undefined && frame.timeMs !== undefined ? frame.timeMs - slot.origin : t.offsetMs + elapsed;
-      const fadeIn = t.fadeInMs ? Math.min(1, (t.offsetMs + elapsed) / t.fadeInMs) : 1;
-      const fadeOut = t.stopAfterMs !== undefined ? Math.max(0, 1 - elapsed / Math.max(1, t.stopAfterMs)) : 1;
-      const playing = frame.playing && (t.stopAfterMs === undefined || elapsed < t.stopAfterMs);
-      slot.gain.gain.setTargetAtTime(playing ? t.volume * fadeIn * fadeOut * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);
+      const now = frame.timeMs;
+      const anchored = slot.origin !== undefined && now !== undefined;
+      const offset = anchored ? now - slot.origin! : t.offsetMs + elapsed;
+      // 淡入按这条轨道自己的（引擎时间）偏移；淡出在第一次出现时锚定起点、时长与当时的音量（D92 R2）：
+      // 之后各步快照里编译期按估算推进的 stopAfterMs / volume 不再改变它，淡完就一直静音，直到快照不再要求淡出（再次 play 同一首）
+      const fadeIn = t.fadeInMs ? Math.min(1, offset / t.fadeInMs) : 1;
+      if (t.stopAfterMs === undefined) slot.fade = undefined;
+      else if (!slot.fade) slot.fade = { start: anchored ? now - elapsed : 0, ms: Math.max(1, t.stopAfterMs), volume: t.volume };
+      const fadeOut = !slot.fade ? 1 : anchored ? Math.max(0, 1 - (now - slot.fade.start) / slot.fade.ms) : Math.max(0, 1 - elapsed / Math.max(1, t.stopAfterMs!));
+      const volume = slot.fade && anchored ? slot.fade.volume : t.volume;
+      const playing = frame.playing && fadeOut > 0;
+      slot.gain.gain.setTargetAtTime(playing ? volume * fadeIn * fadeOut * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);
+      slot.loop = t.loop;
       slot.driver?.update({ offsetMs: offset, volume: 1, loop: t.loop, speed: frame.speed, playing });
     }
-    for (const key of this.slots.keys()) if (!wanted.has(key)) this.remove(key);
+    for (const [key, slot] of this.slots) {
+      if (wanted.has(key)) continue;
+      // 编译期按 hold 估算淡出已结束、快照不再列出它，但按引擎时间还没淡完（这一步比 hold 短）：在同一个 seek 里淡完再销毁（D92 R2）
+      const now = frame.timeMs;
+      const left = slot.fade && slot.origin !== undefined && now !== undefined && key.startsWith(`${frame.identity}:`) && frame.enabled ? 1 - (now - slot.fade.start) / slot.fade.ms : 0;
+      if (left <= 0) { this.remove(key); continue; }
+      slot.gain.gain.setTargetAtTime(frame.playing ? slot.fade!.volume * left * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);
+      slot.driver?.update({ offsetMs: now! - slot.origin!, volume: 1, loop: slot.loop ?? false, speed: frame.speed, playing: frame.playing });
+    }
   }
   private remove(key: string) { const slot = this.slots.get(key); if (!slot) return; slot.dead = true; slot.driver?.destroy(); slot.gain.disconnect(); this.slots.delete(key); }
   destroy() { this.disposed = true; for (const k of this.slots.keys()) this.remove(k); void this.audio?.close().catch(() => {}); this.audio = null; }
