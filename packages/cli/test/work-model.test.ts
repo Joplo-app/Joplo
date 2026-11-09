@@ -105,3 +105,14 @@ test('技能用作品与能力教创作，诊断逐条可恢复，常见坑仍�
   expect(skillTopic('story')).not.toMatch(/one case per chapter|numbered chapter headlines|chapters with from/);
   expect(agentSkills()[0]!.body).not.toMatch(/--option|--feature/);
 });
+
+test('空独立作品不进入发布，--work 选空作品明确拒绝，仅空作品不生成站点', async () => {
+  const d=await project();await work(d,'empty','', '');
+  const built=await buildSite({projectDir:d,outDir:join(d,'mixed-empty')});
+  expect(built.entries!.map(e=>e.id)).toEqual(['demo']);
+  expect(built.diagnostics).toContainEqual(expect.objectContaining({code:'WORK_EMPTY',severity:'info'}));
+  await expect(buildSite({projectDir:d,outDir:join(d,'selected-empty'),scope:{features:['empty']}})).rejects.toThrow(/empty|no slices|no scenarios/i);
+  expect((await run(['build',d,'--work','empty','--out',join(d,'cli-empty')])).code).toBe(2);
+  await work(d,'demo','', '');
+  await expect(buildSite({projectDir:d,outDir:join(d,'all-empty')})).rejects.toThrow(/no picked option|no publishable/i);
+},60000);

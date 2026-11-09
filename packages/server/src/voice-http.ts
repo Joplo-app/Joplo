@@ -300,6 +300,12 @@ export class VoiceHub {
     return project?.i18n ? (content ?? project.i18n.default) : null;
   }
 
+  /** dev IR 的草稿仍能本地播放，但不能把它的朗读文字发送给任何供应商。 */
+  private draftSegments(project: Project | null, segments: readonly Segment[]): boolean {
+    const privateIds = new Set(Object.values(project?.scenarios ?? {}).filter(s => project?.features?.[project.options[s.optionId]?.featureId ?? '']?.draft).flatMap(s => s.steps.map(st => st.id)));
+    return segments.some(s => privateIds.has(s.stepId));
+  }
+
   /** /__joplo/p/:id/voice[/…]；不认识的路径返回 false。 */
   async handleProject(projectId: string, dir: string, project: Project | null, rest: string, req: http.IncomingMessage, res: http.ServerResponse, ctx: Ctx): Promise<boolean> {
     const method = req.method ?? 'GET';
@@ -323,6 +329,7 @@ export class VoiceHub {
       const segs = Array.isArray(body.segments) ? body.segments : null;
       const ok = segs && segs.length <= MAX_SEGMENTS && segs.every((s: Segment) => s && typeof s.stepId === 'string' && typeof s.text === 'string' && s.text.length <= MAX_TEXT && (s.role === null || typeof s.role === 'string'));
       if (!ok) return ctx.send(400, { error: { code: 'USAGE', message: `segments must be up to ${MAX_SEGMENTS} items of { stepId, text, role }` } }), true;
+      if (this.draftSegments(project, segs as Segment[])) return ctx.send(403, { error: { code: 'USAGE', message: 'Draft narration stays on this computer. Remove draft: true before sending it to a voice service' } }), true;
       if (this.jobs.has(projectId)) return ctx.send(409, { error: { code: 'BUSY', message: 'Narration is already being generated for this project' } }), true;
       const cache = new VoiceCache(dir);
       const content = contentLocaleOf(project, body.contentLocale);
@@ -365,6 +372,7 @@ export class VoiceHub {
       const body = (b.body ?? {}) as { locale?: unknown; contentLocale?: unknown; segment?: Segment };
       const seg = body.segment;
       if (!seg || typeof seg.stepId !== 'string' || typeof seg.text !== 'string' || seg.text.length > MAX_TEXT || (seg.role !== null && typeof seg.role !== 'string')) return ctx.send(400, { error: { code: 'USAGE', message: 'segment must be { stepId, text, role }' } }), true;
+      if (this.draftSegments(project, [seg])) return ctx.send(403, { error: { code: 'USAGE', message: 'Draft narration stays on this computer. Remove draft: true before sending it to a voice service' } }), true;
       const cache = new VoiceCache(dir);
       const content = contentLocaleOf(project, body.contentLocale);
       const resolved = await this.resolveFor(dir, project, content);

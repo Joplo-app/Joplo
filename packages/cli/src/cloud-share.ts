@@ -185,7 +185,11 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
       client.warn(`Skipped the review manifest (${e instanceof Error ? e.message.split('.')[0] : 'too large'}). The share is published without it; the review page will not show rules or questions.`);
     }
   } else if (reviewMode === 'review') throw new JoploError('UNSUPPORTED_ACTION', 'share --review needs the compiled project to build the review manifest');
-  if (checked.project && !entriesOf(checked.project).some(e => !e.draft) && entriesOf(checked.project).some(e => e.draft)) throw new JoploError('USAGE', 'There is no picked option or publishable work. All standalone works are drafts; remove draft: true when ready');
+  if (checked.project) {
+    const entries = entriesOf(checked.project);
+    if (entries.length && !entries.some(e => !e.draft && e.slices.length))
+      throw new JoploError('USAGE', entries.every(e => e.draft) ? 'There is no picked option or publishable work. All standalone works are drafts; remove draft: true when ready' : 'There is no picked option or publishable work. Add at least one flow() or chapter() to an empty work before sharing');
+  }
   const temporary = temporaryDirectory(join(tmpdir(), 'joplo-share-'));
   const staging = temporary.path;
   try {

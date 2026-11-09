@@ -12,10 +12,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { work, chapter } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { compile, REVIEW_LIMITS, type Project } from '@joplo-app/core';
+import { compile, scopeProject, REVIEW_LIMITS, type Project } from '@joplo-app/core';
 import { runCli } from '../src/cli.ts';
 import { writeCredentials } from '../src/cloud.ts';
 import { prContext } from '../src/cloud-pr.ts';
+import { publicationSource, PRIVATE } from '../../core/test/fixtures/publication.ts';
 import { reviewSource } from '../../core/test/fixtures/review.ts';
 
 const token = 'session-token-NEVER-PRINT';
@@ -467,4 +468,25 @@ test('share --work：独立作品范围、摘要与草稿拒绝；评审版不�
     expect(draft.code).toBe(2); expect(draft.json().error.message).toMatch(/draft/i);
     expect(build).not.toHaveBeenCalled(); expect(calls).toEqual([]);
   }
+});
+
+test.each(['stage','on','routes','translated'] as const)('分享请求的全部 JSON 不含 %s 草稿，普通/评审/范围分享均覆盖',async kind=>{
+  devIr=compile(publicationSource(kind),'dev').project!;
+  const original=build.getMockImplementation()!;
+  build.mockImplementation(async opts=>{
+    const baseResult=await original(opts);
+    const publicProject=compile(publicationSource(kind),opts.review?'review':'publish').project!;
+    const request=(opts as typeof opts & {scope?:{scenarios:string[]}}).scope;
+    const scoped=request?scopeProject(publicProject,request.scenarios,opts.review?'review':'publish'):undefined;
+    await writeFile(join(baseResult.outDir,'index.html'),`<script type="application/json" id="joplo-ir">${JSON.stringify({project:scoped?.project??publicProject})}</script>`);
+    return {...baseResult,...(scoped?{scope:scoped.info}:{})};
+  });
+  try {
+    for(const review of ['--review','--no-review'])for(const scoped of [false,true]){
+      const r=await cli(['share','--private',review,project,...(scoped?['--work','live']:[]),'--format=json'],{JOPLO_API_KEY:apiKey});
+      expect(r.code,r.stdout).toBe(0);
+      const sent=JSON.stringify(calls.filter(c=>c.path==='/api/v1/shares').map(c=>c.body));
+      for(const secret of PRIVATE)expect(sent).not.toContain(secret);
+    }
+  } finally {build.mockImplementation(original);}
 });

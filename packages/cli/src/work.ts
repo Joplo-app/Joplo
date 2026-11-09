@@ -14,6 +14,7 @@ export function resolveWorkScope(project: Project, request: ScopeRequest, mode: 
   for (const id of request.features ?? []) {
     const e = entryOf(project, id);
     if (!e) throw new JoploError('NOT_FOUND', `Unknown work "${id}". Works: ${entriesOf(project).map(e => e.id).join(', ') || 'none'}`);
+    if (e.featureId === null && !e.slices.length) throw new JoploError('USAGE', `Work "${id}" has no slices and cannot be published or reviewed. Add at least one flow() or chapter() in scenarios`);
     if (e.draft) throw new JoploError('USAGE', `Work "${id}" is a draft and cannot be published or reviewed. Remove draft: true when it is ready`);
   }
   for (const id of request.scenarios ?? []) {
