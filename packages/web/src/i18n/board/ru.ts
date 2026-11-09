@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardRu(locale: Locale = 'ru') {
@@ -188,6 +188,16 @@ export function createBoardRu(locale: Locale = 'ru') {
       coverageFor: (p0: Value) => `Охват для ${value(p0, locale)}`,
       thisFeatureHasNoCasesYet: "У этой функции ещё нет случаев.",
       otherScenarios: "Другие сценарии",
+      films: "Фильмы",
+      featureDemos: "Демо функций",
+      filmMenuHint: (n: number, time: string) => `${plural(n, { one: '# глава', few: '# главы', many: '# глав', other: '# главы' }, locale)} · ${time}`,
+      draftNotPublished: "Черновик · не публикуется",
+      chapterMeta: (time: string, steps: number) => `${time} · ${plural(steps, { one: '# шаг', few: '# шага', many: '# шагов', other: '# шага' }, locale)}`,
+      filmReview: "Просмотр",
+      filmReviewHint: "Раскадровка всего фильма: жёсткие склейки и паузы:",
+      filmCopyCommand: "Копировать",
+      filmEmptyTitle: "В этом фильме пока нет глав",
+      filmEmptyBody: (file: string) => `Напишите первую главу в chapters файла ${file}:`,
       copy: (p0: Value) => `Копировать ${value(p0, locale)}`,
       missing: "Отсутствует",
       undecided: "Не решено",

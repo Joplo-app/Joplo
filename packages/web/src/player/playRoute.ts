@@ -3,14 +3,16 @@
  *
  * - resolvePlay：从 URL 算出要播放的方案、场景、位置。情况 c 优先：播放当前方案里覆盖它的第一个场景；
  *   方案没有表达它（覆盖状态不是“已表达”）时返回 gap，画面静态展示方案的页面。
+ *   没写场景时：功能演示取方案的第一个场景；影片（D102）取播放顺序里的第一章（影片封面画在它的第 0 步）。
  * - usePlaySync：URL 变化 → 控制器定位（不弹“已切换”提示）；控制器的场景 / 位置变化 → 写回 URL（replaceState）。
  *   两个方向都只在不一致时动作，所以不会来回触发。
  */
 import { useEffect, useMemo } from 'react';
-import type { Coverage, Project, Scenario } from '@joplo-app/core/runtime';
+import { workKind, workOf, type Coverage, type Project, type Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import type { PlayRoute } from '../runtime/route';
 import { optionsOf, scenariosOf } from '../runtime/views';
+import { firstSlice } from './work-view';
 
 export type Resolved = {
   ok: boolean;
@@ -40,7 +42,7 @@ export function resolvePlay(project: Project, play: PlayRoute): Resolved {
     const byCase = ids[0] ?? scs.find((s) => s.caseIds.includes(caseId))?.id ?? null;
     if (cov?.status === 'expressed' && byCase) scenarioId = byCase;
     else gap = { status: cov?.status ?? 'none', basis: cov?.basis, ...(cov?.reason ? { reason: cov.reason } : {}) };
-  } else scenarioId = scs[0]?.id ?? null;
+  } else scenarioId = (workKind(f) === 'film' ? firstSlice(workOf(project, f.id)!)?.id : null) ?? scs[0]?.id ?? null;
   const total = scenarioId ? project.scenarios[scenarioId]!.steps.length : 0;
   const step = Math.max(0, Math.min(play.step ?? 0, total));
   return { ok: true, optionId, scenarioId, step, caseId, gap };

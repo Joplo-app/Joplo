@@ -11,3 +11,10 @@ export function list(items: readonly string[], locale: Locale): string {
 export function plural(n: number, forms: Partial<Record<Intl.LDMLPluralRule, string>> & { other: string }, locale: Locale): string {
   return (forms[new Intl.PluralRules(locale).select(n)] ?? forms.other).replaceAll('#', number(n, locale));
 }
+/** Two-digit ordinal for automatic chapter numbering (D102): 1 → 01. Latin digits in every supported locale. */
+export const twoDigits = (n: number, locale: Locale) => new Intl.NumberFormat(locale, { minimumIntegerDigits: 2, useGrouping: false }).format(n);
+/** Clock-style duration m:ss (D102 chapter lengths): 280000 ms → 4:40. Rounded to the second. */
+export function clock(ms: number, locale: Locale): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  return `${number(Math.floor(total / 60), locale)}:${twoDigits(total % 60, locale)}`;
+}

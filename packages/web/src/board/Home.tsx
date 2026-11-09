@@ -31,6 +31,7 @@ import { useProjectIR } from './hooks';
 import { useBoardSettings } from './useSettings';
 import { effectiveAppearance } from './appearance-model';
 import { featureCards, moveSelection, projectBadge, projectMeta, shortPath, type FeatureCard } from './home-model';
+import { filmMetaText } from '../player/work-view';
 import { HomeCloudCard } from './CloudAccountCard';
 
 export function Home({
@@ -269,6 +270,13 @@ function FeatureCardView({ project, card, look, onOpen }: { project: Project; ca
           ) : null}
         </div>
         <p className="line-clamp-2 text-[13px] leading-5 text-jb-muted">{card.goal}</p>
+        {card.film ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px]" data-testid={`film-meta-${card.id}`}>
+            <span className="rounded-[4px] bg-jb-inverse px-1.5 py-px text-[11px] font-medium text-jb-on-inverse">{i18n.player.film}</span>
+            <span className="text-jb-muted">{filmMetaText(card.film, i18n)}</span>
+            {card.film.draft ? <span className="rounded-[4px] border border-jb-line px-1.5 py-px text-[11px] text-jb-muted" data-testid={`film-draft-${card.id}`}>{i18n.board.draftNotPublished}</span> : null}
+          </div>
+        ) : (
         <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px]" data-testid={`feature-gaps-${card.id}`}>
           {card.pick ? (
             <span className="rounded-[4px] bg-jb-inverse px-1.5 py-px text-[11px] font-medium text-jb-on-inverse">
@@ -296,6 +304,7 @@ function FeatureCardView({ project, card, look, onOpen }: { project: Project; ca
             </span>
           ) : null}
         </div>
+        )}
       </div>
     </div>
   );

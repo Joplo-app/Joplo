@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardJa(locale: Locale = 'ja') {
@@ -188,6 +188,16 @@ export function createBoardJa(locale: Locale = 'ja') {
       coverageFor: (p0: Value) => `${value(p0, locale)} の対応状況`,
       thisFeatureHasNoCasesYet: "この機能にはまだケースがありません。",
       otherScenarios: "他のシナリオ",
+      films: "映像",
+      featureDemos: "機能デモ",
+      filmMenuHint: (n: number, time: string) => `${number(n, locale)} 章 · ${time}`,
+      draftNotPublished: "下書き · 公開しない",
+      chapterMeta: (time: string, steps: number) => `${time} · ${number(steps, locale)} ステップ`,
+      filmReview: "試写",
+      filmReviewHint: "映像全体のフィルムストリップ（ハードカットと静止）：",
+      filmCopyCommand: "コピー",
+      filmEmptyTitle: "この映像にはまだ章がありません",
+      filmEmptyBody: (file: string) => `${file} の chapters に最初の章を書きます：`,
       copy: (p0: Value) => `${value(p0, locale)} をコピー`,
       missing: "未対応",
       undecided: "未決定",
