@@ -169,6 +169,19 @@ jobs:
           set -euo pipefail
           test -f "$GITHUB_WORKSPACE/source-head/examples/joplo/joplo.config.ts"
           mkdir -p "$RUNNER_TEMP/self-design"
+          # First-party plugins (D87/D89) come from the trusted tree, like Kit: link each
+          # trusted plugins/<dir> into the untrusted project's node_modules without installing PR dependencies.
+          link_trusted_plugins() {
+            local modules="$1/node_modules/@joplo-app"
+            mkdir -p "$modules"
+            for dir in "$GITHUB_WORKSPACE"/trusted/plugins/*/; do
+              [ -f "$dir/package.json" ] || continue
+              name="$(node -p "require('$dir/package.json').name")"
+              case "$name" in @joplo-app/*) rm -rf "$modules/${name#@joplo-app/}"; ln -s "$dir" "$modules/${name#@joplo-app/}" ;; esac
+            done
+          }
+          link_trusted_plugins "$GITHUB_WORKSPACE/source-head/examples/joplo"
+          if [ -d "$GITHUB_WORKSPACE/source-base/examples/joplo" ]; then link_trusted_plugins "$GITHUB_WORKSPACE/source-base/examples/joplo"; fi
           if [ "$DESIGN_MODE" = pr ]; then
             if [ ! -f "$GITHUB_WORKSPACE/source-base/examples/joplo/joplo.config.ts" ]; then
               echo '::error::Pinned baseline predates examples/joplo. Use a new PR comparison or a supported coordinator reset; retrying cannot replace the pinned baseline.'
