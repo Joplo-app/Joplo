@@ -575,3 +575,7 @@ npx joplo resources --allow-spend   # 已获得用户授权时的非交互调用
 ```
 
 check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同名 JSON 提交 Git，队友和 CI 不需要 Key；丢失输出时先从 Git 恢复。超时/断网后重新运行 resources 续查已记录 task_id；unknown/creating 日志必须先从供应商任务历史恢复，不能删日志盲重试。Key 在看板 Voice → 管理密钥 → Tripo 保存（本机 0600），或使用 TRIPO_API_KEY，不写项目配置。版本对应详细用法：`joplo skill tripo`、`joplo skill scene3d/models`。
+
+### 检查含可选支线的短片
+
+先用 `joplo outline` 确认场景 ID，再按章 `joplo render --scenario-id <id> --sheet`。`flow({ autoplay:false })` 标记的支线依然可独立渲染、手动选择或通过 fork 进入，但发布站连续播放会跳过它；支线结束后停下。fork 本身不会改变自动播放资格。`joplo check` 不证明本机配乐已成功编译，最终还须检查 build 的资源警告和真实输入、声音、file:// 离线播放。

@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "files": [
+    "joplo-plugin-alda/SKILL.md",
+    "joplo-plugin-content/SKILL.md",
+    "joplo-plugin-content/topics/patterns.md",
+    "joplo-plugin-scene3d/SKILL.md",
+    "joplo-plugin-scene3d/topics/models.md",
+    "joplo-plugin-tripo/SKILL.md",
+    "joplo-plugin-ui/SKILL.md",
+    "joplo-plugin-ui/topics/components.md",
+    "joplo-plugin-ui/topics/patterns.md",
+    "joplo-plugins/SKILL.md"
+  ]
+}

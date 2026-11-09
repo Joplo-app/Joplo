@@ -1,0 +1,14 @@
+{
+  "prompt": "One ripe old English orchard apple, red and yellow mottled matte skin, stout round ribbed fruit, short brown stem and single little curled leaf, realistic botanical museum specimen, isolated single object, no ground no pedestal no text",
+  "model": "v3.1-20260211",
+  "texture": true,
+  "pbr": true,
+  "texture_quality": "standard",
+  "smart_low_poly": true,
+  "face_limit": 5000,
+  "status": "success",
+  "created_at": "2026-11-09T06:52:36.176Z",
+  "task_id": "e3a3752f-022a-43ae-b8f8-a498c85b8fc0",
+  "generated_at": "2026-11-09T06:55:47.737Z",
+  "credits_consumed": 30
+}

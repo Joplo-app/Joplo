@@ -2,7 +2,7 @@
 import type { CSSProperties, ReactNode, ComponentType } from 'react';
 import type { ActionDispatch, EngineFrame, ActionPresentation, PluginIRNode, PluginState } from './plugin.ts';
 export type NodeProps = { node: PluginIRNode; p: Record<string, unknown>; disabled: boolean; children: ReactNode };
-export type RendererContext = { act?: ActionDispatch; interactive?: boolean; clock?: EngineFrame; gesture?: ActionPresentation | null; resetKey?: string; playground?: boolean; scene: { id: string; route: string }; state: PluginState; width: number; animate: boolean; selectedId: string | null; focus?: string[] | null; ext?: Readonly<Record<string, unknown>>;
+export type RendererContext = { act?: ActionDispatch; hover?: (id: string | null) => void; interactive?: boolean; clock?: EngineFrame; gesture?: ActionPresentation | null; resetKey?: string; playground?: boolean; scene: { id: string; route: string }; state: PluginState; width: number; animate: boolean; selectedId: string | null; focus?: string[] | null; ext?: Readonly<Record<string, unknown>>;
   stage?: HTMLElement | null; dialogLayer: HTMLElement | null;
   preview: {nodeId:string;text:string}|null;
   mode: 'review'|'demo'|'render';

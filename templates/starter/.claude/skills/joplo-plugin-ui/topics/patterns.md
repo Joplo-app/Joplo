@@ -2,6 +2,11 @@
 
 These examples use this explicitly enabled plugin. Engine flow/state/review rules remain in the engine skill.
 
+## Controls over a visual story
+- Use Image with asset() for the actual downloaded artwork; keep source/creator/license/modification details beside the files. CSS crop/opacity changes still belong in that record. Do not use a remote URL as an offline-image substitute.
+- On a dark art background, Button's default filled variant may draw a Rough fill over your custom CSS. Use variant="subtle" when authoring the whole surface, set text size/color explicitly, and choose --jp-stroke: clean in the project theme when appropriate. A class does not automatically override component inline font/color values. Verify contrast, focus and hitbox after the final composition.
+- Hover and dragging need a visible click alternative. A discrete timeline can use one draggable handle plus labeled endpoint buttons; keep the effects identical in both paths. Use a large enough drop zone and test it after the Canvas scales, not only at design resolution.
+
 ### authoring: worked example
 ```tsx
 import { $, done, flow, option, page, set } from '@joplo-app/kit';
@@ -132,4 +137,4 @@ From focus:
 Common pitfall: Only catalog components and the listed HTML tags exist; <br/> is UNKNOWN_COMPONENT, so write 'Line 1\nLine 2' inside <Text>
 
 Common pitfall: UI and HTML belong to this plugin: import author markers directly from @joplo-app/plugin-ui, explicitly enable ui in config.plugins, and read ui/components. The engine has no bare-name or old-IR compatibility layer.
-<!-- joplo-skill 0.3.0 sha256:b23f35fd770ce82727c99ada229b223a8673caaa6a6786e31297a468c3cfea85 -->
+<!-- joplo-skill 0.3.0 sha256:538611069849727f0b3f22b70f0746989a367249ad292733f7b26c7713ba6c76 -->

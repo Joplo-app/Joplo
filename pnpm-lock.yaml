@@ -212,6 +212,30 @@ importers:
         specifier: workspace:*
         version: link:../../plugins/ui
 
+  examples/apple-journey:
+    devDependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@joplo-app/plugin-alda':
+        specifier: workspace:*
+        version: link:../../plugins/alda
+      '@joplo-app/plugin-content':
+        specifier: workspace:*
+        version: link:../../plugins/content
+      '@joplo-app/plugin-tripo':
+        specifier: workspace:*
+        version: link:../../plugins/tripo
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
+      joplo:
+        specifier: workspace:*
+        version: link:../../packages/joplo
+      joplo-plugin-scene3d:
+        specifier: workspace:*
+        version: link:../../plugins/scene3d
+
   examples/camping:
     devDependencies:
       '@joplo-app/kit':

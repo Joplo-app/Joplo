@@ -15,7 +15,7 @@ const plugin = definePlugin({
   runtime: new URL(new URL(import.meta.url).pathname.endsWith('.ts') ? './runtime.ts' : './runtime.js', import.meta.url),
   actions: { rotate: { caption: 'Rotate {label} to {data.azimuth}°', durationMs: 1000, targets: ['scene3d:Scene'], fields: { azimuth: {type:'number',min:-180,max:180,tolerance:6}, elevation: {type:'number',min:6,max:86,tolerance:6} } } },
   components: {
-    Model: { parent: 'Scene', interactive: true, traits: { text: ['label'] }, doc: 'src: asset(GLB) or local resource; at, size (bounding fit, preserves aspect), rotate, color (optional tint), outline, label, showLabel, lit; clickable model' },
+    Model: { parent: 'Scene', interactive: true, traits: { text: ['label'] }, doc: 'src: asset(GLB) or local resource; at, size (bounding fit, preserves aspect), rotate, color (optional tint), outline, label, showLabel (false hides the nameplate), lit; clickable model' },
     Scene: { traits: { text: ['label'] }, doc: 'height (px, default 420), focus (child id or null: the 3D camera frames it), view ("iso" | "front" | "top"), azimuth / elevation (degrees, bind to state for a scripted view), label; root of a 3D scene, viewers drag to orbit' },
     Object: { parent: 'Scene', traits: { text: ['label'] }, doc: `shape (${SHAPES}), at [x, y, z], size [w, h, d], rotate (degrees around the vertical axis), color, lit, open, label, showLabel; decorative or state-driven object` },
     Target: { parent: 'Scene', interactive: true, traits: { text: ['label'] }, doc: 'same props as Object; an object viewers click (steps: .click(id)); always shows its label' },

@@ -561,6 +561,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         id: sid,
         optionId: qid,
         name: fl.name,
+        ...(fl.opts.autoplay !== undefined ? { autoplay: fl.opts.autoplay } : {}),
         description: fl.opts.description ?? '',
         caseIds: strip ? [] : (fl.opts.cases ?? []).filter((c) => fdef.cases?.[c]).map((c) => `${fid}.${c}`),
         mock: { label: fl.opts.mock ?? MOCK_LABEL[outcome], outcome, ...(fl.opts.mock === undefined ? { auto: true as const } : {}) },

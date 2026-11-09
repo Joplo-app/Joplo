@@ -9,7 +9,8 @@
  * - 颜色读主题变量（--jp-*），主题变化时重新上色；描边用墨色线条，和手绘 / 线框主题一致。
  */
 import * as THREE from 'three';
-import { loadModel, disposeModel } from './model.ts';
+import { loadModel, disposeModel, modelStructureKey } from './model.ts';
+import { visibleLabel } from './label.ts';
 import { defineRuntime, type ComponentCtx, type ComponentInstance, type PluginNode } from '@joplo-app/kit/plugin';
 
 type Vec3 = [number, number, number];
@@ -94,7 +95,7 @@ function toonGradient(): THREE.DataTexture {
 }
 
 /** glow：亮起时的自发光颜色；tint：亮起时底色渐变到的颜色（灯罩）。 */
-type Paint = { mat: THREE.MeshToonMaterial | THREE.MeshStandardMaterial | THREE.LineBasicMaterial; role: Role | string; glow?: Role; tint?: Role };
+type Paint = { mat: THREE.MeshToonMaterial | THREE.MeshStandardMaterial | THREE.LineBasicMaterial; role: Role | string; glow?: Role; tint?: Role; originalColor?: THREE.Color };
 
 /** 一个子元素在场景里的样子。 */
 type Item = {
@@ -254,7 +255,7 @@ class SceneView implements ComponentInstance {
       if (n.name !== 'Object' && n.name !== 'Target' && n.name !== 'Model') continue;
       seen.add(n.id);
       const shape = typeof n.props.shape === 'string' && PRESET[n.props.shape] ? n.props.shape : 'box';
-      const key = JSON.stringify([shape, n.props.at, n.props.size, n.props.rotate, n.props.color, n.props.outline]);
+      const key = n.name === 'Model' ? modelStructureKey(n.props) : JSON.stringify([shape, n.props.at, n.props.size, n.props.rotate, n.props.color, n.props.outline]);
       let it = this.items.get(n.id);
       if (it && (it.key !== key || it.src !== n.props.src)) {
         this.dispose(it);
@@ -268,13 +269,18 @@ class SceneView implements ComponentInstance {
         // 新出现的物体：第一次就在终点（不从 0 长出来），之后的显示 / 隐藏才过渡
         it.cur = { lit: n.props.lit ? 1 : 0, open: n.props.open ? 1 : 0, show: n.visible ? 1 : 0, fade: n.disabled ? 1 : 0 };
       }
+      const colorChanged = it.node.props.color !== n.props.color;
       it.node = n;
+      if (it.loaded && colorChanged) {
+        for (const paint of it.paints) if (paint.originalColor) paint.role = typeof n.props.color === 'string' ? n.props.color : 'original';
+        this.repaint(it);
+      }
       it.goal = { lit: n.props.lit ? 1 : 0, open: n.props.open ? 1 : 0, show: n.visible ? 1 : 0, fade: n.disabled ? 1 : 0 };
       // 锚点：引擎要求的属性原样放上
       for (const a of [...it.anchor.attributes]) if (a.name.startsWith('data-') || a.name.startsWith('aria-')) it.anchor.removeAttribute(a.name);
       for (const [k, v] of Object.entries(n.attrs)) it.anchor.setAttribute(k, v);
-      const text = typeof n.props.label === 'string' ? n.props.label : '';
-      const wantLabel = !!text && (n.interactive || n.props.showLabel === true);
+      const text = visibleLabel(n.props, n.interactive);
+      const wantLabel = text !== null;
       if (wantLabel && !it.label) {
         it.label = document.createElement('div');
         it.label.style.cssText = 'position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font:500 12px/1.4 var(--jp-font);color:var(--jp-ink);background:var(--jp-surface);border:1px solid var(--jp-line-strong);border-radius:4px;padding:1px 7px;transition:opacity .25s';
@@ -463,6 +469,7 @@ class SceneView implements ComponentInstance {
       else if (p.mat instanceof THREE.LineBasicMaterial) p.mat.color.copy(this.palette.ink);
       else {
         if (p.role !== 'original') p.mat.color.copy(this.color(p.role));
+        else if (p.originalColor) p.mat.color.copy(p.originalColor);
         if (p.glow) p.mat.emissive.copy(this.palette[p.glow]);
       }
     }
@@ -493,7 +500,7 @@ class SceneView implements ComponentInstance {
         if (!(object instanceof THREE.Mesh)) return;
         object.userData.itemId = it.id; it.meshes.push(object);
         for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-          if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshToonMaterial) it.paints.push({mat:material,role:typeof it.node.props.color === 'string' ? it.node.props.color : 'original',glow:'warn'});
+          if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshToonMaterial) it.paints.push({mat:material,role:typeof it.node.props.color === 'string' ? it.node.props.color : 'original',glow:'warn',originalColor:material.color.clone()});
         }
         if (it.node.props.outline !== false) {
           const material = new THREE.LineBasicMaterial({transparent:true});
@@ -726,6 +733,7 @@ class SceneView implements ComponentInstance {
       const hit = this.pick(e.clientX, e.clientY);
       // Host-owned anchor metadata is the same ownership decision used by DOM gestures.
       const target = hit?.anchor.hasAttribute('data-jdraggable') ? hit.id : undefined;
+      this.ctx.hover?.(null);
       this.drag = { x: e.clientX, y: e.clientY, az: this.view.az, el: this.view.el, moved: false, id: e.pointerId, target };
     });
     on('pointermove', (e) => {
@@ -751,6 +759,7 @@ class SceneView implements ComponentInstance {
       }
       const hit = this.pick(e.clientX, e.clientY);
       const id = hit?.id ?? null;
+      this.ctx.hover?.(e.pointerType === 'touch' ? null : id);
       if (id !== this.hover) {
         this.hover = id;
         this.tick(this.ctx.frame.clock?.timeMs ?? 0, true);
@@ -758,6 +767,7 @@ class SceneView implements ComponentInstance {
       canvas.style.cursor = this.ctx.frame.mode === 'review' ? 'help' : hit?.node.interactive ? 'pointer' : 'grab';
     });
     on('pointerleave', () => {
+      this.ctx.hover?.(null);
       if (this.hover) {
         this.hover = null;
         this.tick(this.ctx.frame.clock?.timeMs ?? 0, true);

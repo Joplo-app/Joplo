@@ -308,6 +308,8 @@ export type FlowOpts = {
    * 再叠上这里的 state。讲解片的章节、长流程的分段都用它，每一段从上一段结尾的画面开始，不用手抄状态。
    */
   from?: string;
+  /** false：保留手动/分支访问，但从发布站连续播放序列中排除；该场景播完停下。 */
+  autoplay?: boolean;
   /** 从哪一层开始（layers 的键）；缺省为第一层，写了 from 时为那个场景结尾的导演层。 */
   layer?: string;
   description?: string;

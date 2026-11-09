@@ -17,8 +17,9 @@ export function gestureOf(t: { dx: number; dy: number; ms: number }): 'tap' | 'n
   return t.dx < 0 ? 'next' : 'prev';
 }
 
-/** 按顺序取下一个场景；最后一个或不在列表里时 null。 */
-export function nextScenarioId(list: readonly { id: string }[], id: string): string | null {
-  const i = list.findIndex((s) => s.id === id);
-  return i >= 0 && i + 1 < list.length ? list[i + 1]!.id : null;
+/** 按声明顺序连续播放主线；可选支线仍可手动进入，结束后停下。 */
+export function nextScenarioId(list: readonly { id: string; autoplay?: boolean }[], id: string): string | null {
+  const sequence = list.filter(s => s.autoplay !== false);
+  const i = sequence.findIndex((s) => s.id === id);
+  return i >= 0 && i + 1 < sequence.length ? sequence[i + 1]!.id : null;
 }

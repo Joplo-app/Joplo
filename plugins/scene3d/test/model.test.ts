@@ -1,5 +1,10 @@
 import { expect, it, vi } from 'vitest';
-import { loadModel, disposeModel } from '../src/model.ts';
+import { loadModel, disposeModel, modelStructureKey } from '../src/model.ts';
+it('keeps a loaded model for palette changes but rebuilds structural geometry', () => {
+  const pose = { at: [0, 0, 0], size: [3, 3, 3], outline: false };
+  expect(modelStructureKey({ ...pose, color: '#fff' })).toBe(modelStructureKey({ ...pose, color: '#abc' }));
+  expect(modelStructureKey(pose)).not.toBe(modelStructureKey({ ...pose, size: [1, 1, 1] }));
+});
 function triangle() {
   const body=JSON.stringify({asset:{version:'2.0'},buffers:[{byteLength:36}],bufferViews:[{buffer:0,byteOffset:0,byteLength:36}],accessors:[{bufferView:0,componentType:5126,count:3,type:'VEC3',min:[0,0,0],max:[1,1,0]}],meshes:[{primitives:[{attributes:{POSITION:0}}]}],nodes:[{mesh:0}],scenes:[{nodes:[0]}],scene:0});
   const json=Buffer.from(body.padEnd(Math.ceil(body.length/4)*4,' '));

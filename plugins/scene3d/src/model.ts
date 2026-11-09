@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+export function modelStructureKey(props: Record<string, unknown>): string {
+  return JSON.stringify([props.at, props.size, props.rotate, props.outline]);
+}
 /** Parse self-contained GLB bytes; no external buffer/texture or decoder requests. */
 export async function loadModel(src: unknown): Promise<THREE.Group> {
   if (typeof src !== 'string' || !/^(data:model\/gltf-binary;base64,|\/__joplo\/p\/[^/]+\/binary\/)/.test(src)) throw new Error('Use asset(GLB) or a compiled local model resource');

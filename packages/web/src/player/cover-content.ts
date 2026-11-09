@@ -31,8 +31,8 @@ export type CoverContent = {
 };
 
 /** 封面显示的条件：场景至少有一步、位置为 0、没在播放、也没有正在执行的一步。 */
-export function coverShown(scenario: Scenario | null | undefined, position: number, playing: boolean, activeStep: number | null): boolean {
-  return !!scenario && scenario.steps.length > 0 && position === 0 && !playing && activeStep === null;
+export function coverShown(scenario: Scenario | null | undefined, position: number, playing: boolean, activeStep: number | null, exploring = false): boolean {
+  return !!scenario && scenario.steps.length > 0 && position === 0 && !playing && activeStep === null && !exploring;
 }
 
 /** 一步停留时要读的文字：说明、explain，过渡卡再加副标题与要点（演示控制器与封面估算共用）。 */

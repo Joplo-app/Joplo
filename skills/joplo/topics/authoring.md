@@ -45,7 +45,8 @@ export default option({
 Declare both success and recovery cases in the feature. View code belongs to the chosen plugin; the engine example defines state and behavior only.
 
 ## Steps and effects
-- flow(name, { cases?, start?, state?, from?, layer?, description?, expected?, mock?, outcome? }). state overrides option state. description is the cover sentence; expected describes what the viewer should observe.
+- flow(name, { cases?, start?, state?, from?, autoplay?, layer?, description?, expected?, mock?, outcome? }). state overrides option state. description is the cover sentence; expected describes what the viewer should observe.
+- autoplay: false keeps an optional scenario selectable through a fork, chapter list or deep link, but skips it in sequential published-site playback. Playing that scenario manually stops at its end. Default/true preserves declaration order.
 - from: 'previousKey' continues that scenario's final route, ui/data/inputs and director layer. Validate steps and automatic captions against that ending page; dependency order does not change chapter order. Do not combine from with start. layer overrides the initial director layer.
 - .click(id), .type(id, value), .select(id, value), .toggle(id, boolean), .press(keys), .back(), .drag(id, destination), .hover(id, ms), .scroll(id, destination), .act(pluginAction, id, data). Read demo and the action-owning plugin skill for recognition requirements.
 - .system('event', ...effects) models a response, not a real request. .card() creates a transition. Strings are captions; other arguments are effects. Step arguments and card accept effect arrays.
@@ -64,4 +65,4 @@ Declare both success and recovery cases in the feature. View code belongs to the
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.3.0 sha256:d80252878e0aa6d51672018077a233415f6df5674e57a8ce51016eff49f68600 -->
+<!-- joplo-skill 0.3.0 sha256:7c13d9f419fb45d026714bbc90af9973a9a5377859fcf60e24f9bd3b45198e9d -->

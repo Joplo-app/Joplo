@@ -487,3 +487,9 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 任务 API 固定 `https://openapi.tripo3d.ai/v3`；参考图通过 `/files` 上传。只对明确 429 退避重试创建；丢失响应或服务器结果不明时保留 unknown 日志并停止，要求从 Tripo 历史恢复 task_id。轮询/下载失败保留 task_id；超时不是退款。失败/取消由 Tripo 退回冻结 credits，不自动重新创建。Key/供应商原始错误/临时 URL 不进入日志或发布物。
 
 参数白名单固定 H 系列 `v3.1-20260211` 和已核实计费选项；扩展版本前核实费用。真实预算与生成批准由调用者控制，`--allow-spend` 不代表自动购买额度。已知限制：不支持 Draco/KTX2、外部纹理/缓冲文件；不提供网页生成按钮，生成通过 CLI 明确确认。官方契约：[生成](https://developers.tripo3d.ai/zh/docs/generation-text-to-model/standard)、[上传](https://developers.tripo3d.ai/zh/docs/files)、[计费/退款](https://developers.tripo3d.ai/zh/docs/billing)。
+
+### 交互示例补齐的运行时边界
+
+- canvas / WebGL 插件在真实指针移动时用 `ctx.hover?.(targetId)` 报告射线命中的元素，离开、开始拖动时传 `null`。宿主查当前脚本/自由反应的声明时长，统一处理停留、离开取消、重置与继续；播放中的 hover 不暂停也不执行。插件不自建时间线或猜测作者的停留阈值。此可选服务不序列化进 IR。
+- `ctx.act(id, { type:'drag', to:{x,y} })` 的点必须是舞台坐标；宿主会按该源元素已声明的目标锚点，把落在 DOM drop zone 中的点转换为目标 id。3D 与普通页面目标共用仲裁；不可见/零尺寸锚点不能接住拖拽。
+- `flow({ autoplay:false })` → `scenario.autoplay`（可选布尔）随编译、发布和范围投影保留 → 发布站顺序选择器跳过它。默认/true 保持旧行为。支线仍在章节列表、深链和 fork 中可访问；手动播放支线结束后停下。返回主线的 fork 不会隐式改变主线的播放资格。

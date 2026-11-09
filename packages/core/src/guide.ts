@@ -97,7 +97,8 @@ export default option({
 Declare both success and recovery cases in the feature. View code belongs to the chosen plugin; the engine example defines state and behavior only.
 
 ## Steps and effects
-- flow(name, { cases?, start?, state?, from?, layer?, description?, expected?, mock?, outcome? }). state overrides option state. description is the cover sentence; expected describes what the viewer should observe.
+- flow(name, { cases?, start?, state?, from?, autoplay?, layer?, description?, expected?, mock?, outcome? }). state overrides option state. description is the cover sentence; expected describes what the viewer should observe.
+- autoplay: false keeps an optional scenario selectable through a fork, chapter list or deep link, but skips it in sequential published-site playback. Playing that scenario manually stops at its end. Default/true preserves declaration order.
 - from: 'previousKey' continues that scenario's final route, ui/data/inputs and director layer. Validate steps and automatic captions against that ending page; dependency order does not change chapter order. Do not combine from with start. layer overrides the initial director layer.
 - .click(id), .type(id, value), .select(id, value), .toggle(id, boolean), .press(keys), .back(), .drag(id, destination), .hover(id, ms), .scroll(id, destination), .act(pluginAction, id, data). Read demo and the action-owning plugin skill for recognition requirements.
 - .system('event', ...effects) models a response, not a real request. .card() creates a transition. Strings are captions; other arguments are effects. Step arguments and card accept effect arrays.
@@ -209,6 +210,13 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Photos: use public-domain or properly licensed images, credit them on stage when the license asks, keep a CREDITS file next to them, and strip EXIF / GPS metadata before embedding.
 - Follow the audience's conventions and state them in a legend (Chinese stock viewers expect red up, green down).
 
+## Asset-led multimodal stories
+- Before TSX, inventory the actual assets: subject, source URL, creator, license, intended crop/tint, and whether the picture is evidence or an illustrative reconstruction. A historic painting of a forest is not a photograph of a specific location. Keep the inventory with the project, and put required attribution on stage.
+- Separate a source's narrow claim from a popular retelling and your own interpretation. A wordplay, anecdote or resemblance is not proof of historical causation. If source checking changes the premise, correct narration and interactions together; do not preserve a pleasing but unsupported reveal.
+- Choose one persistent visual subject and one question per chapter. Change its material, scale, surroundings and sound at the era boundary; keep reading text still. Write each beat as picture + action + spoken sentence + evidence.
+- Start with one real asset and one fully playable chapter. Verify initial framing, a close-up, input, reset and a local build before commissioning a whole batch. Keep a spending ledger separate from estimates, and count the final bytes rather than prompt limits.
+- Explicitly distinguish the main sequence from optional branches and return paths. A closing menu may return to earlier chapters without making those chapters optional; verify autoplay order in the published player.
+
 ## 8. Before handing over
 - npx joplo outline: per feature, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
 - npx joplo check: CAPTION_TOO_LONG, EXPLAIN_TOO_LONG, DESCRIPTION_TOO_LONG, CARD_TEXT_TOO_LONG, SCENARIO_TOO_LONG, HAPPY_PATH_ONLY, CASE_NOT_COVERED (names the expected result).
@@ -235,7 +243,7 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - .drag(target, destination) accepts an element id or stage pixel point; .scroll(target, destination) accepts an element id or content offset. Declare the correct source and endpoint.
 - .hover(target, ms) expresses a dwell; .act(name, target, data) uses the enabled plugin's data-only contract. Read its installed skill for field types, ranges, matching tolerance and presentation duration.
 - Engine frames expose clock time, speed, running/paused state and gesture progress. Presenters sample it; independent timers must not drive the timeline. Pausing freezes cursor, gestures, media, text and plugin animation together.
-- Inputs belonging to another scenario prompt before switching and enter immediately before the matching action. Cancel preserves current exploration; confirm discards it.
+- Inputs belonging to another scenario prompt before switching and enter immediately before the matching action. Cancel preserves current exploration; confirm discards it and exposes the matching action’s pre-state. A confirmed jump to step zero does not reopen the inert scenario cover; ordinary reset or chapter selection still does.
 
 ## Independent views and focus
 - Each layer is an independent view tree, created with components from installed plugins. In an option with layers, the first declared layer is the default initial view; start chooses a route, not a layer. Use flow({ layer }) to choose another declared view, and keep unrelated demonstrations in separate features/options. Layers share state; one layer may show a different role or device. Do not put independent views inside a scaled composite screenshot.
@@ -249,15 +257,22 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - Transition cards mark a real opening/ending/time shift. Most information should change on the view, not arrive as a text deck. Read story and the installed visual plugins' recipes.
 - Media is provided by an explicitly configured plugin. A viewer gesture unlocks sound; pause/resume/speed share the clock and narration ducks background audio. Static frames stay silent. Read the plugin skill for resources and production limits.
 
+## Authoring an exploration beside the film
+- Share the same state patch between a scripted action and its free reaction; put camera, media and completion effects only in the scripted step. Do not filter an arbitrary effect array by hand: patch() itself returns an array of writes.
+- A discrete draggable timeline can snap to named endpoint elements. Pair each endpoint with a labeled click alternative. This demonstrates declared choices, not a continuously calculated simulation.
+- Test each interaction at two positions: immediately before its scripted action (it should advance once and stop), and somewhere it is only a free reaction (timeline state must stay unchanged). Then test reset, resumed playback, and a branch's Cancel/Confirm separately.
+
 ## Frames, deep links and verification
 - outline lists scenario and step ids. Use those ids in render/export; a deep link chooses where viewing starts and is not an access boundary.
 - joplo render --scenario-id <id> --step-id <id> --out frame.png renders timeline state. --sheet --columns 3 renders every step with captions/narration; inspect transitions with actual playback as well.
+- A full-size render can pass while a shorter board clips the input area. Check the actual visible hitbox with real pointer input in the board and the built site; DOM text existing is not proof it can be used.
 - Fixed render dimensions are a capture size; viewport belongs to page/layer. In a browser wait for fonts and [data-jcamera][data-camera-settled="1"] plus two animation frames. Do not mistake DOM progress for painted pixels.
 - Test first input, drag, wheel, hover, keyboard, confirmation cancel/confirm, reset and resumed playback. Compare restored frames and direct jumps with pristine script frames. Explain unverified devices or audio behavior.
 - For layout, visual motion, shapes, charts and component APIs use the installed plugin skills. The engine has no built-in component vocabulary.
 
 ## Branches, annotations and appearance
-- fork(label, scenarioKey) adds a labeled route to another scenario; it does not silently branch automatic playback. Autoplay stays on the main flow until the viewer chooses a fork.
+- fork(label, scenarioKey) adds a labeled route to another scenario; it does not silently branch automatic playback. Mark the optional destination flow with autoplay:false so sequential playback skips it; fork alone is a navigation choice, not an autoplay exclusion. Return links to main chapters must not mark those chapters optional.
+- Keep fork labels short and verify the last choice at the actual viewport width: the strip scrolls horizontally when crowded. Avoid hiding an important return path in unnoticeable overflow. A film can end on its final visible state without a done badge when that badge crowds the choices.
 - mark(id, text?, opts?) is an annotation anchored to a stable element. Empty labels are omitted; targets are still validated. Use --jp-annot for annotation color in a theme.
 - .press('⌘K', ...effects) models a targetless keyboard step; keep editing keys inside editable elements. Keys and ids are not translated.
 - Appearance changes host theme/font/stroke, not state. Follow director keeps framing in sync; a manually selected layer uses that layer until the viewer follows again.
@@ -653,7 +668,7 @@ Compare cases and options in the board, then decide which option to publish for 
 - Layer switching, Follow director, replaying one layer, shot focus, and captions all work on the published site. See demo for syntax.
 - Fullscreen works on the published site: F enters/toggles, spacebar plays/pauses, ←/→ steps back/forward, Esc exits. Like a video, ←/→ during playback skips one step and keeps playing; while paused it steps once and stays paused.
 - Fullscreen keeps only the stage and captions. Playback controls float below and hide automatically.
-- Autoplay plays the picked option's scenarios back to back, like chapters of one video: after the last step of a scenario an Up next card names the next one and counts down 3 seconds (Play now / Cancel; pausing pauses the countdown), then it starts; after the last scenario it stops. Stepping by hand never jumps. So order scenarios as chapters (the first one is the hook) and end each on a clear result.
+- Autoplay plays the picked option's scenarios back to back, like chapters of one video: after the last step of a scenario an Up next card names the next one and counts down 3 seconds (Play now / Cancel; pausing pauses the countdown), then it starts; after the last scenario it stops. Stepping by hand never jumps. So order scenarios as chapters (the first one is the hook) and end each on a clear result. Use flow({ autoplay:false }) for optional branches: they remain manually selectable but are skipped by continuous playback, and stop at their own ending. A fork or return link alone does not remove a chapter from autoplay.
 - On phones the published site becomes a video player: the 1280 × 800 desktop stage is scaled as a whole with black bars (never re-laid out to the phone width); portrait shows the video, full captions, one row of controls and the chapter list; turning the phone sideways (or tapping Landscape) fills the screen with stage and captions plus a separate control bar. Stage taps pause/explore and stage drags belong to the prototype; use the control bar to step. On an iPhone, which cannot fullscreen a page or lock orientation, the stage is rotated 90° until the phone is turned.
 - Design for that: text on a 1280 × 800 stage shrinks to about 30% in portrait, so keep key text large (24px or more) and let shots zoom into details; in landscape the caption sits over the bottom of the stage, so keep important content out of the bottom 12%.
 - Both local and published views can export images. Video export is local only.
@@ -796,7 +811,8 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 - actions declares field types/ranges/tolerances, targets, caption and duration. Runtime recognizers use ctx.act; frame.gesture and frame.clock present the same action. Do not accumulate private timeline time or advance state from a drawing callback.
 
 ## Runtime and projection
-- Export defineRuntime({ id, components, observe? }) with the current API version. mount returns update/destroy; renderChildren preserves host rendering. Every targetable element needs an anchor carrying all supplied attrs, and canvas hits report through ctx.click/ctx.act.
+- Export defineRuntime({ id, components, observe? }) with the current API version. mount returns update/destroy; renderChildren preserves host rendering. Every targetable element needs an anchor carrying all supplied attrs, and canvas hits report through ctx.click/ctx.act. Report raycast hover with ctx.hover?.(id), and null on leave or drag start; the host resolves the declared dwell, cancels it on reset/resume, and never pauses playback for hover. Do not run a private hover timer or guess the author duration.
+- For a canvas drag, report a named hit or stage CSS-pixel point through ctx.act. The host resolves points against declared drop-zone anchors, including ordinary DOM targets outside the canvas. Keep anchors current after camera/scale changes; do not report canvas-local pixels as stage pixels.
 - frame contains resolved state, drawing snapshot, animate, clock/gesture, local playground and reset epoch. animate=false renders final layout; use ctx.hold while required assets load. Stop handled gesture propagation where ownership requires it.
 - Use @joplo-app/kit/renderer and renderer-style services instead of internal source imports. Share React through the published bridge; clean up observers/listeners and animation on destroy.
 - properties declares literal types, constraints and namespaced DOM attributes. Attributes propagate to every anchor. An observe instance is local to a stage/runtime and updates after layout; switching/unmount destroys it. Exceptions disable that instance, not the engine.

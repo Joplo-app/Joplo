@@ -27,7 +27,8 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 - actions declares field types/ranges/tolerances, targets, caption and duration. Runtime recognizers use ctx.act; frame.gesture and frame.clock present the same action. Do not accumulate private timeline time or advance state from a drawing callback.
 
 ## Runtime and projection
-- Export defineRuntime({ id, components, observe? }) with the current API version. mount returns update/destroy; renderChildren preserves host rendering. Every targetable element needs an anchor carrying all supplied attrs, and canvas hits report through ctx.click/ctx.act.
+- Export defineRuntime({ id, components, observe? }) with the current API version. mount returns update/destroy; renderChildren preserves host rendering. Every targetable element needs an anchor carrying all supplied attrs, and canvas hits report through ctx.click/ctx.act. Report raycast hover with ctx.hover?.(id), and null on leave or drag start; the host resolves the declared dwell, cancels it on reset/resume, and never pauses playback for hover. Do not run a private hover timer or guess the author duration.
+- For a canvas drag, report a named hit or stage CSS-pixel point through ctx.act. The host resolves points against declared drop-zone anchors, including ordinary DOM targets outside the canvas. Keep anchors current after camera/scale changes; do not report canvas-local pixels as stage pixels.
 - frame contains resolved state, drawing snapshot, animate, clock/gesture, local playground and reset epoch. animate=false renders final layout; use ctx.hold while required assets load. Stop handled gesture propagation where ownership requires it.
 - Use @joplo-app/kit/renderer and renderer-style services instead of internal source imports. Share React through the published bridge; clean up observers/listeners and animation on destroy.
 - properties declares literal types, constraints and namespaced DOM attributes. Attributes propagate to every anchor. An observe instance is local to a stage/runtime and updates after layout; switching/unmount destroys it. Exceptions disable that instance, not the engine.
@@ -46,4 +47,4 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.3.0 sha256:619386ded0d4ad1935edd7a664a89668c2976e742fc92b54d57ed97039b8a1ba -->
+<!-- joplo-skill 0.3.0 sha256:75502726c9e02121edc7dbc6d837a16621f8c9ae0d6908bd88f89cfba8b0cd84 -->

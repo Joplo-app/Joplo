@@ -719,7 +719,11 @@ export class DemoController {
   dismissSwitch() { this.set({ switchPrompt: null }); }
   confirmSwitch(index: number) {
     const candidate = this.snap.switchPrompt?.[index];
-    if (candidate) this.setScenario(candidate.scenarioId, candidate.position);
+    if (candidate) {
+      this.setScenario(candidate.scenarioId, candidate.position);
+      // The viewer already chose an action; expose its pre-state even at step zero.
+      this.set({ freeMode: true });
+    }
   }
   async clickNode(nodeId: string, point: { x: number; y: number }, opts: { inspect?: boolean } = {}) {
     if (opts.inspect) return this.select(nodeId);

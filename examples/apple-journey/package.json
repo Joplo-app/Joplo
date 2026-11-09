@@ -1,0 +1,20 @@
+{
+  "name": "apple-journey",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "joplo dev",
+    "check": "joplo check",
+    "build": "joplo build",
+    "audit:assets": "node scripts/audit-models.mjs"
+  },
+  "devDependencies": {
+    "joplo": "workspace:*",
+    "@joplo-app/kit": "workspace:*",
+    "@joplo-app/plugin-ui": "workspace:*",
+    "@joplo-app/plugin-content": "workspace:*",
+    "@joplo-app/plugin-alda": "workspace:*",
+    "joplo-plugin-scene3d": "workspace:*",
+    "@joplo-app/plugin-tripo": "workspace:*"
+  }
+}

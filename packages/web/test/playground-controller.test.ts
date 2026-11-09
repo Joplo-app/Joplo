@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Project, stateAt, playgroundState } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';
+import { coverShown } from '../src/player/cover-content';
 
 const project = () => Project.parse({schemaVersion:2, mode:'dev', name:'Playground',
   features:{f:{id:'f',name:'F',goal:'G',pick:'f.a',optionIds:['f.a']}},
@@ -48,6 +49,8 @@ describe('D88 controller lifecycle', () => {
     c.dismissSwitch(); expect(c.getSnapshot().playground).not.toBeNull();
     await c.act({type:'click',target:'other'}); c.confirmSwitch(0);
     expect(c.getSnapshot()).toMatchObject({scenarioId:'f.a.other',playground:null,state:{position:0}});
+    const snap = c.getSnapshot();
+    expect(coverShown(snap.project!.scenarios['f.a.other'], 0, snap.playing, snap.activeStep, snap.freeMode)).toBe(false);
     c.stop();
   });
 });

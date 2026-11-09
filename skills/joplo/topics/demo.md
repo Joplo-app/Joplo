@@ -17,7 +17,7 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - .drag(target, destination) accepts an element id or stage pixel point; .scroll(target, destination) accepts an element id or content offset. Declare the correct source and endpoint.
 - .hover(target, ms) expresses a dwell; .act(name, target, data) uses the enabled plugin's data-only contract. Read its installed skill for field types, ranges, matching tolerance and presentation duration.
 - Engine frames expose clock time, speed, running/paused state and gesture progress. Presenters sample it; independent timers must not drive the timeline. Pausing freezes cursor, gestures, media, text and plugin animation together.
-- Inputs belonging to another scenario prompt before switching and enter immediately before the matching action. Cancel preserves current exploration; confirm discards it.
+- Inputs belonging to another scenario prompt before switching and enter immediately before the matching action. Cancel preserves current exploration; confirm discards it and exposes the matching action’s pre-state. A confirmed jump to step zero does not reopen the inert scenario cover; ordinary reset or chapter selection still does.
 
 ## Independent views and focus
 - Each layer is an independent view tree, created with components from installed plugins. In an option with layers, the first declared layer is the default initial view; start chooses a route, not a layer. Use flow({ layer }) to choose another declared view, and keep unrelated demonstrations in separate features/options. Layers share state; one layer may show a different role or device. Do not put independent views inside a scaled composite screenshot.
@@ -31,19 +31,26 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - Transition cards mark a real opening/ending/time shift. Most information should change on the view, not arrive as a text deck. Read story and the installed visual plugins' recipes.
 - Media is provided by an explicitly configured plugin. A viewer gesture unlocks sound; pause/resume/speed share the clock and narration ducks background audio. Static frames stay silent. Read the plugin skill for resources and production limits.
 
+## Authoring an exploration beside the film
+- Share the same state patch between a scripted action and its free reaction; put camera, media and completion effects only in the scripted step. Do not filter an arbitrary effect array by hand: patch() itself returns an array of writes.
+- A discrete draggable timeline can snap to named endpoint elements. Pair each endpoint with a labeled click alternative. This demonstrates declared choices, not a continuously calculated simulation.
+- Test each interaction at two positions: immediately before its scripted action (it should advance once and stop), and somewhere it is only a free reaction (timeline state must stay unchanged). Then test reset, resumed playback, and a branch's Cancel/Confirm separately.
+
 ## Frames, deep links and verification
 - outline lists scenario and step ids. Use those ids in render/export; a deep link chooses where viewing starts and is not an access boundary.
 - joplo render --scenario-id <id> --step-id <id> --out frame.png renders timeline state. --sheet --columns 3 renders every step with captions/narration; inspect transitions with actual playback as well.
+- A full-size render can pass while a shorter board clips the input area. Check the actual visible hitbox with real pointer input in the board and the built site; DOM text existing is not proof it can be used.
 - Fixed render dimensions are a capture size; viewport belongs to page/layer. In a browser wait for fonts and [data-jcamera][data-camera-settled="1"] plus two animation frames. Do not mistake DOM progress for painted pixels.
 - Test first input, drag, wheel, hover, keyboard, confirmation cancel/confirm, reset and resumed playback. Compare restored frames and direct jumps with pristine script frames. Explain unverified devices or audio behavior.
 - For layout, visual motion, shapes, charts and component APIs use the installed plugin skills. The engine has no built-in component vocabulary.
 
 ## Branches, annotations and appearance
-- fork(label, scenarioKey) adds a labeled route to another scenario; it does not silently branch automatic playback. Autoplay stays on the main flow until the viewer chooses a fork.
+- fork(label, scenarioKey) adds a labeled route to another scenario; it does not silently branch automatic playback. Mark the optional destination flow with autoplay:false so sequential playback skips it; fork alone is a navigation choice, not an autoplay exclusion. Return links to main chapters must not mark those chapters optional.
+- Keep fork labels short and verify the last choice at the actual viewport width: the strip scrolls horizontally when crowded. Avoid hiding an important return path in unnoticeable overflow. A film can end on its final visible state without a done badge when that badge crowds the choices.
 - mark(id, text?, opts?) is an annotation anchored to a stable element. Empty labels are omitted; targets are still validated. Use --jp-annot for annotation color in a theme.
 - .press('⌘K', ...effects) models a targetless keyboard step; keep editing keys inside editable elements. Keys and ids are not translated.
 - Appearance changes host theme/font/stroke, not state. Follow director keeps framing in sync; a manually selected layer uses that layer until the viewer follows again.
 - Custom themes live in themes/<name>.css and define --jp-* tokens; do not change authored data to recolor a view. For component-specific layout, motion and visual variables, read its installed plugin skill.
 
 Related topics: authoring, plugins, focus, review, publish
-<!-- joplo-skill 0.3.0 sha256:ab41e42a931fd06e63c760afd447dfa0e7e74ae4ff6abdd026c8a6b1abf3334e -->
+<!-- joplo-skill 0.3.0 sha256:52fcecebd8bcc1a7d1ee33093c875142ea726009236a2da3811a7d49c7380986 -->

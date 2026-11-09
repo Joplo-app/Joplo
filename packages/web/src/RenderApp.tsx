@@ -291,6 +291,6 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
       overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={null} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />}
     />,
     subtitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n, project),
-    { scenarioId, position: snap.state.position, cover: coverShown(sc, snap.state.position, snap.playing, snap.activeStep) ? coverFor(project, scenarioId, i18n) : null, animate: true },
+    { scenarioId, position: snap.state.position, cover: coverShown(sc, snap.state.position, snap.playing, snap.activeStep, snap.freeMode) ? coverFor(project, scenarioId, i18n) : null, animate: true },
   )}</EngineClockContext.Provider>;
 }

@@ -74,16 +74,22 @@ describe('nextScenarioId', () => {
     expect(nextScenarioId(list, 'c')).toBeNull();
     expect(nextScenarioId(list, 'x')).toBeNull();
   });
+  it('skips explicitly optional branches without treating return links as exclusions', () => {
+    const list = [{ id: 'main' }, { id: 'bonus', autoplay: false }, { id: 'ending', autoplay: true }];
+    expect(nextScenarioId(list, 'main')).toBe('ending');
+    expect(nextScenarioId(list, 'bonus')).toBeNull();
+    expect(nextScenarioId(list, 'ending')).toBeNull();
+  });
 });
 
-function project(): Project {
+function project(autoplay?: boolean, mode: 'dev' | 'publish' = 'dev'): Project {
   const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
   const opt = option({
     name: 'A',
     idea: 'i',
     scenarios: {
       one: flow('One', { start: '/' }).click('go', 'First chapter'),
-      two: flow('Two', { start: '/' }).click('go', 'Second chapter'),
+      two: flow('Two', { start: '/', autoplay }).click('go', 'Second chapter'),
     },
   });
   const src: AuthoringProject = {
@@ -93,8 +99,14 @@ function project(): Project {
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
   };
-  return compile(src, 'dev').project!;
+  return compile(src, mode).project!;
 }
+
+it('preserves the explicit autoplay choice in both author and publish IR', () => {
+  expect(project(false).scenarios['f.a.two']!.autoplay).toBe(false);
+  expect(project(false, 'publish').scenarios['f.a.two']!.autoplay).toBe(false);
+  expect(project().scenarios['f.a.one']!.autoplay).toBeUndefined();
+});
 
 function setup() {
   const c = new DemoController(null);

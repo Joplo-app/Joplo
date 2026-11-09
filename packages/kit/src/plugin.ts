@@ -272,6 +272,8 @@ export type ComponentCtx = {
   css: (name: string) => string;
   /** 观众点了某个子元素（例如 3D 物体）：和点 DOM 元素一样交给引擎判断。坐标是视口坐标（MouseEvent.clientX/Y）；altKey 照抄指针事件（⌥+单击 = 检查元素）。 */
   act?: ActionDispatch;
+  /** Report the pointer's raycast hit (null on leave). The host owns declared hover dwell and playback gating. */
+  hover?: (id: string | null) => void;
   click: (id: string, at?: { clientX: number; clientY: number; altKey?: boolean }) => void;
   /** 截图、导出前要等待的工作（加载模型、首帧渲染）：返回一个 done 函数，完成后调用。 */
   hold: () => () => void;

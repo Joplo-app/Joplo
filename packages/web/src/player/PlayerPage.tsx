@@ -524,7 +524,7 @@ export function PlayerPage(p: PlayerPageProps) {
   const pos = state?.position ?? 0;
   const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n, project);
   // 幕布（D61）：第 0 步的场景封面、过渡卡；铺满舞台区域，不进手机外框
-  const cover = coverShown(scenario, pos, snap.playing, snap.activeStep) ? coverFor(project, scenario?.id, i18n) : null;
+  const cover = coverShown(scenario, pos, snap.playing, snap.activeStep, snap.freeMode) ? coverFor(project, scenario?.id, i18n) : null;
   const curtainOn = !!scenario && curtainUp(project, scenario.id, pos, cover);
   const speed = asSpeed(p.speed ?? 1);
   useEffect(() => {

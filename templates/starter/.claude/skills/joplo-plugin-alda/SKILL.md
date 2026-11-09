@@ -29,6 +29,10 @@ import { music } from '@joplo-app/plugin-alda';
 
 Put play on the first step, stop alongside done. Each scenario starts silent and owns its own track. A later play replaces the track and restarts at zero. volume is 0–1; fadeMs is 0–30000. Music is independent of content language. Use hold(seconds) when exact musical pacing matters: step anchors advance by the previous step's hold, default 3000ms. On each step/jump the track aligns to that anchor; variable narration or interaction waits do not redefine the score timeline.
 
+For a period-spanning story, reuse a short melodic motif and change its instrument at the visual transition. Give each chapter its own named score and play it in the same step that changes the scene; stop at the chapter ending. Leave space between notes for narration.
+
+Verify instrument names with alda instruments on the author machine. Familiar aliases such as piano are not a rule for every instrument: full names include midi-synth-pad-new-age and midi-electric-piano-1. Export a new score before a long build, and inspect build warnings; a successful joplo check does not prove Alda accepted an instrument or produced audible bytes.
+
 The board compiles on first playback demand. Build/share compiles only referenced resources after scope filtering. Source text, local entry and paths stay on the author machine; only MIDI bytes and browser synthesis ship. Unchanged compiler/input reuses .joplo/resources; compiler version/code changes invalidate the cache. Do not commit the cache or MIDI.
 
 Verify with joplo check, then build and click Play with sound enabled. Sound requires a viewer gesture; thumbnails/screenshots stay silent. Pause, resume, jump and speed use the engine clock; narration ducks music to 25%. The offline synthesizer approximates instruments without downloading soundfonts. Piano uses a struck attack, decaying amplitude and darkening harmonics; organ sustains, while strings/brass use slower attacks. Envelope and brightness are sampled at the note's score-time age, so pausing/seeking into a held note does not strike it again. It supports standard MIDI format 0/1 with PPQN tempo, note, program and sustain events, not SMPTE or format 2.
@@ -43,4 +47,4 @@ General engine contracts: npx joplo skill plugins
 ## Installed references
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.3.0 sha256:174b8ec99a9131373984f5e3fcd4d8f59cfa6a267289d56837f0a321c44255ea -->
+<!-- joplo-skill 0.3.0 sha256:9f9a3ef6d5a5e50965f0c03931df65c1f96e05fbbed6ef7f6d4e6902f4700259 -->

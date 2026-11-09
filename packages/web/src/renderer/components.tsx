@@ -18,6 +18,7 @@ export type RenderMode = 'review' | 'demo' | 'render';
 export type RenderCtx = {
   assets?: Readonly<Record<string,string>>;
   act?: ActionDispatch;
+  hover?: (id: string | null) => void;
   interactive?: boolean;
   draggable?: ReadonlySet<string>;
   clock?: EngineFrame;
@@ -188,6 +189,7 @@ function PluginHost({ node, p }: NodeProps) {
     frame: { clock: ctx.clock, gesture: ctx.gesture, playground: ctx.playground, resetKey: ctx.resetKey, mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, sceneId: ctx.scene.id, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
     css: (name) => { const el = element() ?? ctx.stage; return el ? getComputedStyle(el).getPropertyValue(name).trim() : ''; },
     act: ctx.act,
+    hover: ctx.hover,
     click: (id, at) => {
       const el = element();
       const target = el?.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`) ?? el;

@@ -25,6 +25,11 @@ export const patterns = `# UI recipes and pitfalls
 
 These examples use this explicitly enabled plugin. Engine flow/state/review rules remain in the engine skill.
 
+## Controls over a visual story
+- Use Image with asset() for the actual downloaded artwork; keep source/creator/license/modification details beside the files. CSS crop/opacity changes still belong in that record. Do not use a remote URL as an offline-image substitute.
+- On a dark art background, Button's default filled variant may draw a Rough fill over your custom CSS. Use variant="subtle" when authoring the whole surface, set text size/color explicitly, and choose --jp-stroke: clean in the project theme when appropriate. A class does not automatically override component inline font/color values. Verify contrast, focus and hitbox after the final composition.
+- Hover and dragging need a visible click alternative. A discrete timeline can use one draggable handle plus labeled endpoint buttons; keep the effects identical in both paths. Use a large enough drop zone and test it after the Canvas scales, not only at design resolution.
+
 ### authoring: worked example
 \`\`\`tsx
 import { $, done, flow, option, page, set } from '@joplo-app/kit';
