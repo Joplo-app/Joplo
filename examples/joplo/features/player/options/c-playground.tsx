@@ -4,12 +4,12 @@ import { Button, Group, Paper, Stack, Switch, Text, Title } from '@joplo-app/kit
 /** D88 用户已定模型；原型步骤演示状态，不代表产品里的游玩数据会进入时间线。 */
 export default option({
   name: 'C · 时间线 + 自由体验',
-  idea: '播放时点舞台只暂停；再次操作才体验。播放、跳步或换场景丢弃体验改动。',
+  idea: '播放中第一次操作先暂停并立即生效，体验后由观众继续播放。播放、跳步或换场景丢弃体验改动。',
   on: { '/board/play': { main: <Stack gap="sm">
     <Paper withBorder radius="lg" p="lg" mih={440}>
       <Stack gap="lg">
         <Title order={3}>我的家</Title>
-        <Button id="pg_stage" variant="subtle">舞台 · 点一下暂停</Button>
+        <Text id="pg_stage" size="sm" c="dimmed">舞台空白 · 只暂停，不显示体验提示</Text>
         <Switch id="pg_lamp" label="落地灯" checked={$.ui.lamp} />
         <Button id="pg_window" variant="default">客厅窗 · 在另一场景演示</Button>
         <Paper withBorder radius="md" p="sm" when={$.ui.free}>
@@ -36,8 +36,8 @@ export default option({
   state: { ui: { free: false, lamp: true, prompt: false } },
   scenarios: {
     explore: flow('暂停、体验、重置、继续', { cases: ['play'], start: '/board/play' })
-      .click('pg_stage', '第一次点舞台只暂停，灯仍然亮着', set($.ui.free, true))
-      .toggle('pg_lamp', false, '再次操作才改变体验画面')
+      .toggle('pg_lamp', false, '播放中第一次拨灯：暂停并立即关灯', set($.ui.free, true))
+      .toggle('pg_lamp', true, '继续自由体验，等观众主动恢复播放')
       .click('pg_reset', '重置只清空体验，不改第 k 步', set($.inputs.pg_lamp, true))
       .click('pg_play', '继续脚本，丢弃体验改动', set($.ui.free, false)),
     switch: flow('命中另一场景，确认后进入', { cases: ['switch'], start: '/board/play', state: { ui: { free: true } } })

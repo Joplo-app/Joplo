@@ -293,7 +293,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
                 clock={ctl.clock}
                 gesture={snap.gesture}
                 inspect={picking}
-                onStageInput={() => ctl.stageInput()}
+                onStageInput={explore => ctl.stageInput(explore)}
                 onAction={(action, native) => { void ctl.act(action, native); }}
                 theme={project.theme}
                 camera={camera}

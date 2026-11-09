@@ -216,10 +216,14 @@ class SceneView implements ComponentInstance {
     }
     const gesture = ctx.frame.gesture;
     if (gesture?.action.type === 'plugin' && gesture.action.name === 'scene3d:rotate' && gesture.action.target === ctx.node.id) {
-      if (!this.gestureFrom) this.gestureFrom = { ...this.view, target: this.view.target.clone() };
-      const data = gesture.action.data;
-      this.tween = null;
-      this.view = { ...this.gestureFrom, az: this.gestureFrom.az + (num(data.azimuth, 45) * DEG - this.gestureFrom.az) * gesture.progress, el: this.gestureFrom.el + (num(data.elevation, 32) * DEG - this.gestureFrom.el) * gesture.progress };
+      // Audience orbit owns the view until the reset epoch. Retain the original
+      // gesture anchor so reset/resume restores the same in-flight orientation.
+      if (!this.userMoved) {
+        if (!this.gestureFrom) this.gestureFrom = { ...this.view, target: this.view.target.clone() };
+        const data = gesture.action.data;
+        this.tween = null;
+        this.view = { ...this.gestureFrom, az: this.gestureFrom.az + (num(data.azimuth, 45) * DEG - this.gestureFrom.az) * gesture.progress, el: this.gestureFrom.el + (num(data.elevation, 32) * DEG - this.gestureFrom.el) * gesture.progress };
+      }
     } else this.gestureFrom = null;
     this.tick(ctx.frame.clock?.timeMs ?? 0, false);
   }

@@ -7,12 +7,11 @@ description: Build clickable, replayable feature demos with Joplo (scripted scen
 Joplo turns a feature idea into a clickable, replayable demo. It is a player for pre-declared scenarios, not a free-form app prototype with persistent data or real backend logic, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.
 Structure: a project has features; a feature has options (alternative designs, A/B) and cases (edge cases to cover); an option plays scenarios; a scenario is a list of steps.
 A step is one user action (.click / .type / .select / .press / .drag / .hover / .scroll / .act) or system event plus its visible effects (set, toast, go, done). Results and errors come from these effects, not from real logic or a backend.
-During playback, the first stage input only pauses. While paused, matching the next action advances the script; another reachable scenario asks to switch; native controls and declared free reactions change only a local playground. Play, jump, scenario change and reset discard exploration. Screenshots, video and deep links always use scripted state.
+During playback, the first picture-changing stage input pauses and applies that same input. Hover does not pause; blank clicks only pause without an exploration notice. Matching the next action advances the script and stays stopped; another reachable scenario asks to switch; native controls and declared free reactions change only a local playground. Play, jump, scenario change and reset discard exploration. Screenshots, video and deep links always use scripted state.
 Options and cases are compared in the local board; only the picked option is published.
 
 ## When to use
 - The user wants to think a feature through before building it: a prototype, a clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.
-- The user wants a visual explainer with a continuous scene and narrated chapters: read npx joplo skill content.
 - The user wants to compare how a feature changed between two versions or in a PR (see npx joplo skill diff).
 - The user wants an explainer, tutorial, science piece, or news explainer that plays like a video (narration, chapters, animated graphics): read npx joplo skill content first.
 
@@ -109,4 +108,4 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - publish: pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 - plugins: Data-only action contracts, native local behavior, engine-clock presenters; Universal properties, plugin themes, state writes and director targets; Media tracks, local text-to-resource compilers, cached offline publishing; Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.18 sha256:e0dade16e48cc3cf1123f5ccaf919ee94462544b70813e3c107810458527b34a -->
+<!-- joplo-skill 0.2.18 sha256:855179c084ce787eabffef2b446ae2ebdf4c4b1bc6e0c9d08a0a3926f075e0ed -->

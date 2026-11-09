@@ -7,11 +7,11 @@ import { Home } from '../../../shared/home.tsx';
 export default option({
   ...base,
   name: 'B · 像网页一样自由体验',
-  idea: '先观看，再暂停拨动设备；点窗户可进入对应场景；播放会恢复脚本。',
+  idea: '先观看，拨动设备时暂停并生效；点窗户可进入对应场景；播放会恢复脚本。',
   state: { ...base.state, ui: { ...base.state?.ui, azimuth: 45, elevation: 32 } },
   on: { '/': { scene: <Home explore />, panel: <Stack gap="sm" h="100%">
     <Title order={3}>我的家</Title>
-    <Text size="sm" c="dimmed">播放时点舞台只暂停，下一次操作才生效。</Text>
+    <Text size="sm" c="dimmed">播放中第一次操作即暂停并生效，体验后按播放继续。</Text>
     <Switch id="sw_lamp" label="落地灯" checked={$.data.lamp} unmodeled />
     <Switch id="sw_ac" label="空调" checked={$.data.ac} />
     <Switch id="sw_tv" label="电视" checked={$.data.tv} unmodeled />

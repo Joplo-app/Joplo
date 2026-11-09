@@ -9,7 +9,6 @@ export type LocalEffect = Extract<Effect, { type: 'set' | 'append' | 'toast' }>;
 export type Playground = { effects: LocalEffect[] };
 export type ActionEntry = { scenarioId: string; position: number; sceneId: string; action: Action };
 export type ActionVerdict =
-  | { kind: 'pause' }
   | { kind: 'advance' }
   | { kind: 'switch'; candidates: ActionEntry[] }
   | { kind: 'free'; effects: LocalEffect[] }
@@ -64,8 +63,7 @@ function nativeEffects(scene: Scene, state: PlayState, action: Action): LocalEff
   return effects;
 }
 
-export function arbitrateAction(project: Project, timeline: PlayState, action: Action, opts: { playing?: boolean; layer?: Playground | null; sceneId?: string; index?: readonly ActionEntry[]; native?: Action } = {}): ActionVerdict {
-  if (opts.playing) return { kind: 'pause' };
+export function arbitrateAction(project: Project, timeline: PlayState, action: Action, opts: { layer?: Playground | null; sceneId?: string; index?: readonly ActionEntry[]; native?: Action } = {}): ActionVerdict {
   const scenario = project.scenarios[timeline.scenarioId];
   const scene = project.scenes[opts.sceneId ?? timeline.sceneId];
   if (!scenario || !scene) return { kind: 'hint', verdict: { kind: 'static' } };

@@ -640,10 +640,10 @@ export class DemoController {
     return true;
   }
 
-  pause() {
+  pause(explore = true) {
     if ((!this.snap.playing && !this.snap.busy) || this.snap.paused) return;
     this.narrating?.pause();
-    this.set({ paused: true, freeMode: true });
+    this.set({ paused: true, freeMode: explore || this.snap.freeMode });
   }
 
   resume() {
@@ -708,11 +708,10 @@ export class DemoController {
    * 单击画面元素：按当前场景解释（推进、禁用原因、演示范围外、不是当前步骤）。
    * inspect（⌥+单击）：只检查 —— 写入选中，不操作原型。
    */
-  /** Capture-phase stage gate. The initiating gesture is consumed, including its later click. */
-  stageInput(): boolean {
-    if ((this.snap.playing || this.snap.busy) && !this.snap.paused) { this.pause(); return true; }
-    if (!this.snap.freeMode) this.set({ freeMode: true });
-    return false;
+  /** Pause before delivery; never cancel or replay the viewer's original DOM event. */
+  stageInput(explore = false): void {
+    if ((this.snap.playing || this.snap.busy) && !this.snap.paused) this.pause(explore);
+    if (explore && !this.snap.freeMode) this.set({ freeMode: true });
   }
   resetPlayground(keepMode = true) {
     this.set({ playground: null, switchPrompt: null, freeMode: keepMode && this.snap.freeMode, epoch: this.snap.epoch + 1 });
@@ -732,11 +731,12 @@ export class DemoController {
     if (!p || !st) return;
     const sc = this.scenario();
     if (this.snap.view !== 'stage' || !sc) return this.info(m.player.staticStageThisOptionDoesNotDemonstrateThisCase);
-    if (this.stageInput()) return;
+    // Hover is passive during playback. Touch hover is preceded by pointerdown's pause.
+    if (action.type === 'hover' && (this.snap.playing || this.snap.busy) && !this.snap.paused) return;
+    this.stageInput(true);
     let index = this.indexes.get(sc.optionId);
     if (!index) { index = actionIndex(p, sc.optionId); this.indexes.set(sc.optionId, index); }
     const result = arbitrateAction(p, st, action, { layer: this.snap.playground, sceneId: this.shownSceneId() ?? undefined, index, native });
-    if (result.kind === 'pause') { this.pause(); return; }
     if (result.kind === 'free') { this.set({ playground: applyPlayground(this.snap.playground, result.effects), freeMode: true, notice: null, switchPrompt: null }); return; }
     if (result.kind === 'switch') { this.set({ switchPrompt: result.candidates, notice: null }); return; }
     const nodeId = 'target' in action ? action.target : '';
@@ -747,6 +747,7 @@ export class DemoController {
     const label = node ? nodeLabel(node) : m.player.element;
     switch (verdict.kind) {
       case 'advance': {
+        const stayPaused = this.snap.paused;
         this.stop(); // Cancel any frozen demonstration, then apply the matched scripted step exactly once.
         this.set({ notice: null, freeMode: true });
         const gen = this.gen;
@@ -754,9 +755,10 @@ export class DemoController {
         this.set({ busy: true, cursorVisible: false });
         // The viewer already performed the gesture. Commit the script without replaying their typing/drag.
         const ok = this.commit(sc, true);
-        // 用户动作之后紧跟的系统事件自动执行（模拟请求返回）。
+        // Interrupted playback stays at this step, including before a system response.
+        // A stopped/manual walkthrough retains its existing automatic response behavior.
         let cont = ok;
-        while (cont && gen === this.gen) {
+        while (cont && !stayPaused && gen === this.gen) {
           const nx = this.nextStep();
           if (!nx || nx.kind !== 'system') break;
           // 朗读开着时，先读完用户这一步再接系统事件（不截断）

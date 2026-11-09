@@ -26,6 +26,7 @@ Failure mode, even with nice graphics: one board per chapter (big title, panels,
 - shot() draws the host focus ring and caps UI zoom at 1.25×; use camera() for traveling inside a Canvas without that ring.
 - Camera: camera('id', …) frames those elements (Joplo measures them, adds pad, caps zoom); camera() shows the whole canvas. Establish wide, push in on detail, pull back for the payoff. Object flights in the same step follow the camera's timing, so both land together.
 - Chapters continue: flow({ from: 'previousKey' }) starts from the previous chapter's last frame (state, camera, director layer). patch($.ui, { … }) changes several values in one step.
+- System-only chapters stay on the initial director layer unless camera(), shot(), a cue, or flow({ layer }) selects another layer. Continuing from a chapter inherits its final layer; do not copy its state by hand.
 - screen children of the Canvas stay fixed on screen: chapter label, source line, poster, end card.
 - Takeaways land on objects (a pinned question flips to '✓ answer'); the recap is a pull back to the whole world. Use .card() only when nothing on stage can carry the moment.
 \`\`\`tsx

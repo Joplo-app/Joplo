@@ -30,7 +30,7 @@ export const MENTAL_MODEL = [
   'Joplo turns a feature idea into a clickable, replayable demo. It is a player for pre-declared scenarios, not a free-form app prototype with persistent data or real backend logic, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.',
   'Structure: a project has features; a feature has options (alternative designs, A/B) and cases (edge cases to cover); an option plays scenarios; a scenario is a list of steps.',
   'A step is one user action (.click / .type / .select / .press / .drag / .hover / .scroll / .act) or system event plus its visible effects (set, toast, go, done). Results and errors come from these effects, not from real logic or a backend.',
-  'During playback, the first stage input only pauses. While paused, matching the next action advances the script; another reachable scenario asks to switch; native controls and declared free reactions change only a local playground. Play, jump, scenario change and reset discard exploration. Screenshots, video and deep links always use scripted state.',
+  'During playback, the first picture-changing stage input pauses and applies that same input. Hover does not pause; blank clicks only pause without an exploration notice. Matching the next action advances the script and stays stopped; another reachable scenario asks to switch; native controls and declared free reactions change only a local playground. Play, jump, scenario change and reset discard exploration. Screenshots, video and deep links always use scripted state.',
   'Options and cases are compared in the local board; only the picked option is published.',
 ] as const;
 
@@ -91,7 +91,6 @@ function joploBody(): string {
     '',
     '## When to use',
     '- The user wants to think a feature through before building it: a prototype, a clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.',
-    '- The user wants a visual explainer with a continuous scene and narrated chapters: read npx joplo skill content.',
     '- The user wants to compare how a feature changed between two versions or in a PR (see npx joplo skill diff).',
     '- The user wants an explainer, tutorial, science piece, or news explainer that plays like a video (narration, chapters, animated graphics): read npx joplo skill content first.',
     '',

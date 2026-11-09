@@ -29,9 +29,8 @@ describe('D88 pure input arbitration and separate playground', () => {
     expect(actionMatches({ type: 'type', target: 'name', value: 'Ada' }, { type: 'type', target: 'name', value: 'A' })).toBe(false);
     expect(actionMatches({ type: 'toggle', target: 'lamp', value: false }, { type: 'toggle', target: 'lamp', value: true })).toBe(false);
   });
-  it('pauses without executing, then prioritizes next step over cross-scene and free reactions', () => {
+  it('prioritizes next step over cross-scene and free reactions after the host pauses input', () => {
     const p = project(), s = stateAt(p, 'f.a.main', 0), input = { type: 'click' as const, target: 'next' };
-    expect(arbitrateAction(p, s, input, { playing: true }).kind).toBe('pause');
     expect(arbitrateAction(p, s, input).kind).toBe('advance');
     expect(s.position).toBe(0); expect(s.ui).toEqual({ name: '' });
   });

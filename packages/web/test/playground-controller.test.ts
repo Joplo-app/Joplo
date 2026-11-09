@@ -16,13 +16,12 @@ function controller() { const c = new DemoController(); c.setProject(project(),1
 afterEach(() => vi.useRealTimers());
 
 describe('D88 controller lifecycle', () => {
-  it('first stage action only pauses; native changes stay local, resume restores exact scripted state', async () => {
+  it('J1/J6 first stage action pauses and applies locally; resume restores exact scripted state', async () => {
     vi.useFakeTimers(); const c = controller(); const p = c.getSnapshot().project!;
     const playback = c.play();
     await c.act({type:'toggle',target:'lamp',value:false});
-    expect(c.getSnapshot()).toMatchObject({playing:true,paused:true,freeMode:true,playground:null});
+    expect(c.getSnapshot()).toMatchObject({playing:true,paused:true,freeMode:true});
     const frozen = c.mediaElapsed(); await vi.advanceTimersByTimeAsync(1000); expect(c.mediaElapsed()).toBe(frozen);
-    await c.act({type:'toggle',target:'lamp',value:false});
     expect(playgroundState(c.getSnapshot().state!,c.getSnapshot().playground).data.lamp).toBe(false);
     expect(c.getSnapshot().state).toEqual(stateAt(p,'f.a.main',0));
     c.resume(); expect(c.getSnapshot().playground).toBeNull(); expect(c.getSnapshot().freeMode).toBe(false);
@@ -50,5 +49,50 @@ describe('D88 controller lifecycle', () => {
     await c.act({type:'click',target:'other'}); c.confirmSwitch(0);
     expect(c.getSnapshot()).toMatchObject({scenarioId:'f.a.other',playground:null,state:{position:0}});
     c.stop();
+  });
+});
+
+
+describe('D88 revised first input', () => {
+  it.each([
+    {type:'toggle' as const,target:'lamp',value:false},
+    {type:'click' as const,target:'other'},
+    {type:'click' as const,target:'next'},
+    {type:'click' as const,target:'missing'},
+  ])('J1 same arbitration as a manual pause for $type/$target', async action => {
+    vi.useFakeTimers(); const live=controller(), manual=controller();
+    void live.play(); void manual.play(); manual.pause();
+    await live.act(action); await manual.act(action);
+    for (const key of ['state','playground','switchPrompt','notice'] as const) expect(live.getSnapshot()[key]).toEqual(manual.getSnapshot()[key]);
+    live.stop(); manual.stop(); await vi.runAllTimersAsync();
+  });
+  it('J2 blank stage input pauses without a local-change notice', async () => {
+    vi.useFakeTimers(); const c=controller(); void c.play(); c.stageInput();
+    expect(c.getSnapshot()).toMatchObject({paused:true,freeMode:false,playground:null,notice:null,switchPrompt:null});
+    c.stop(); await vi.runAllTimersAsync();
+  });
+  it('J3 hover while playing neither pauses nor runs arbitration', async () => {
+    vi.useFakeTimers(); const c=controller(); void c.play();
+    await c.act({type:'hover',target:'next',ms:100});
+    expect(c.getSnapshot()).toMatchObject({playing:true,paused:false,freeMode:false,notice:null,state:{position:0}});
+    c.stop(); await vi.runAllTimersAsync();
+  });
+  it('J7 first matching action commits once and stays stopped', async () => {
+    vi.useFakeTimers(); const c=controller(); void c.play();
+    await c.act({type:'click',target:'next'}); await vi.advanceTimersByTimeAsync(4000);
+    expect(c.getSnapshot()).toMatchObject({playing:false,busy:false,state:{position:1,ui:{script:true}}});
+    c.stop();
+  });
+});
+
+
+describe('D88 interrupted playback boundary', () => {
+  it('J7 a matching first action leaves even the following system step pending', async () => {
+    vi.useFakeTimers(); const c=controller(); const p=c.getSnapshot().project!;
+    p.scenarios['f.a.main']!.steps.push({...p.scenarios['f.a.main']!.steps[0]!,id:'main:2',kind:'system',caption:'Later response',action:{type:'event',name:'response'},effects:[{type:'set',path:'ui.response',value:true}],hold:1000});
+    c.setProject(p,2); c.setScenario('f.a.main'); void c.play();
+    const action=c.act({type:'click',target:'next'});await vi.advanceTimersByTimeAsync(4000);await action;
+    expect(c.getSnapshot()).toMatchObject({playing:false,busy:false,state:{position:1,ui:{script:true}}});
+    expect(c.getSnapshot().state!.ui.response).toBeUndefined();c.stop();
   });
 });

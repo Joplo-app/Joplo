@@ -59,7 +59,7 @@ export type StageProps = {
   freeMode?: boolean;
   clock?: ClockSource;
   gesture?: ActionPresentation | null;
-  onStageInput?: () => boolean;
+  onStageInput?: (explore?: boolean) => void;
   onAction?: (action: Action, native?: Action) => void;
   project: Project;
   state: PlayState;
@@ -121,6 +121,9 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   const { t: i18n } = useI18n();
   const frame = useSyncExternalStore((clock ?? noClock).subscribe, (clock ?? noClock).getSnapshot, noClock.getSnapshot);
   const viewState = useMemo(() => mode === 'demo' ? playgroundState(state, playground) : state, [state, playground, mode]);
+  // A viewer edit owns that input while exploring. Keep the frozen script preview
+  // intact in the controller so reset/resume can restore it without losing progress.
+  const shownPreview = preview && mode === 'demo' && playground?.effects.some(e => e.type === 'set' && e.path === `inputs.${preview.nodeId}`) ? null : preview;
   const inputFns = useRef({ onStageInput, onAction, freeMode, frame });
   inputFns.current = { onStageInput, onAction, freeMode, frame };
   const shownId = sceneId ?? state.sceneId;
@@ -190,9 +193,6 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     return undefined;
   };
   const draggable = new Set(gestureActions.flatMap(a => a.type === 'drag' ? [a.target] : []));
-  const blockedPointer = useRef<number | null>(null);
-  const blockedKeys = useRef(new Set<string>());
-  const wheelPauseUntil = useRef(0);
   const scrollIntentUntil = useRef(0);
   useLayoutEffect(() => { scrollIntentUntil.current = 0; }, [epoch, shownId]);
   const hover = useRef<{ target: string; timer: ReturnType<typeof setTimeout> } | null>(null);
@@ -228,8 +228,11 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
       return { x: (cx - r.left) / s, y: (cy - r.top) / s };
     };
     const onWheel = (e: WheelEvent) => {
-      if (e.timeStamp < wheelPauseUntil.current || inputFns.current.onStageInput?.()) { wheelPauseUntil.current = e.timeStamp + 150; e.preventDefault(); e.stopPropagation(); return; }
-      if (!e.ctrlKey && scrollsItself(e.target, el, e.deltaY)) { scrollIntentUntil.current = e.timeStamp + 500; return; }
+      if (inspectMode) return;
+      inputFns.current.onStageInput?.(true);
+      // Keep the entire wheel burst in its scroll area, even after reaching its edge.
+      // Native scrolling consumes the first event too; inertia must not become stage zoom.
+      if (!e.ctrlKey && (scrollsItself(e.target, el, e.deltaY) || e.timeStamp < scrollIntentUntil.current)) { scrollIntentUntil.current = e.timeStamp + 500; return; }
       if (!zoomOn) return;
       e.preventDefault();
       zoomFns.current.zoomAround(wheelFactor(e.deltaY, { ctrlKey: e.ctrlKey, deltaMode: e.deltaMode }), pt(e.clientX, e.clientY));
@@ -237,6 +240,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     let g: { v: View; p: { x: number; y: number } } | null = null;
     type GE = Event & { scale: number; clientX: number; clientY: number };
     const gStart = (e: Event) => {
+      inputFns.current.onStageInput?.(true);
       e.preventDefault();
       const ge = e as GE;
       g = { v: zoomFns.current.nowView(), p: pt(ge.clientX, ge.clientY) };
@@ -253,7 +257,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
       el.removeEventListener('gesturestart', gStart);
       el.removeEventListener('gesturechange', gChange);
     };
-  }, [zoomOn, !!onStageInput]);
+  }, [zoomOn, !!onStageInput, inspectMode]);
   // 拖动平移：移动超过 4px 才算拖动，之后的 click 不当作点击元素
   const drag = useRef<{ x: number; y: number; v: View; moved: boolean; id: number; target?: string; scroll?: {element:HTMLElement;x:number;y:number} } | null>(null);
   const suppressClick = useRef(false);
@@ -312,6 +316,8 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     const inspect = e.altKey || inspectMode;
     const hit = pickTarget(e.target as HTMLElement, mode, inspect);
     if (!hit || !rootRef.current?.contains(hit)) return;
+    // Unmodeled layout/text is blank space, unless an author declared an action on it.
+    if (!inspect && !hit.hasAttribute('data-jinteractive') && !gestureActions.some(a => 'target' in a && a.target === hit.dataset.jid)) return;
     e.preventDefault();
     if (onNodeClick) onNodeClick(hit.dataset.jid!, toFramePoint(e.clientX, e.clientY), { inspect });
     else onAction?.({ type: 'click', target: hit.dataset.jid! });
@@ -358,24 +364,23 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         onKeyDown={onKeyDown}
         onPointerDownCapture={e => {
           suppressClick.current = false;
-          if (e.altKey || inspectMode || !onStageInput) return;
-          if (onStageInput()) { blockedPointer.current = e.pointerId; suppressClick.current = true; e.preventDefault(); e.stopPropagation(); }
-        }}
-        onPointerUpCapture={e => {
-          if (blockedPointer.current === e.pointerId) { blockedPointer.current = null; e.preventDefault(); e.stopPropagation(); }
+          if (e.altKey || inspectMode) return;
+          onStageInput?.();
         }}
         onKeyDownCapture={e => {
-          if (blockedKeys.current.has(e.code) || !e.altKey && !inspectMode && onStageInput?.()) { blockedKeys.current.add(e.code); e.preventDefault(); e.stopPropagation(); return; }
+          if (e.altKey || inspectMode || ['Tab', 'Shift', 'Control', 'Meta', 'Alt', 'Escape'].includes(e.key)) return;
+          onStageInput?.(true);
           if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) scrollIntentUntil.current = e.timeStamp + 500;
         }}
-        onKeyUpCapture={e => { if (blockedKeys.current.delete(e.code)) { e.preventDefault(); e.stopPropagation(); } }}
         onPointerOver={e => {
-          if (!onAction || inspectMode || e.pointerType === 'touch') return;
+          if (!onAction || inspectMode || e.pointerType === 'touch' || (clock?.getSnapshot().running ?? frame.running)) return;
           const a = gestureFor('hover', e.target as HTMLElement);
           if (!a || a.type !== 'hover' || hover.current?.target === a.target) return;
           cancelHover();
-          if (onStageInput?.()) return;
-          hover.current = { target: a.target, timer: setTimeout(() => { onAction(a); hover.current = null; }, a.ms) };
+          hover.current = { target: a.target, timer: setTimeout(() => {
+            if (!(clock?.getSnapshot().running ?? inputFns.current.frame.running)) onAction(a);
+            hover.current = null;
+          }, a.ms) };
         }}
         onPointerOut={e => {
           const id = hover.current?.target;
@@ -383,7 +388,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
           if (!el?.contains(e.relatedTarget as Node | null)) cancelHover();
         }}
         onScrollCapture={e => {
-          if (!onAction || !freeMode || frame.running || e.timeStamp > scrollIntentUntil.current) return;
+          if (!onAction || (clock?.getSnapshot().running ?? frame.running) || e.timeStamp > scrollIntentUntil.current) return;
           const scroller = e.target as HTMLElement;
           const target = scroller.closest<HTMLElement>('[data-jid]')?.dataset.jid;
           if (!target) return;
@@ -415,7 +420,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
           {scene ? (
-            <RenderContext.Provider value={{ act: onAction ? (target, action, native) => onAction({ ...action, target }, native) : undefined, interactive: !!onAction && mode === 'demo' && !inspectMode, draggable: onAction ? draggable : undefined, clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, scene, stage: rootRef.current, state: viewState, mode, selectedId, preview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, ext, streaming, changed, plugins: project.plugins, nextTargetId }}>
+            <RenderContext.Provider value={{ act: onAction ? (target, action, native) => onAction({ ...action, target }, native) : undefined, interactive: !!onAction && mode === 'demo' && !inspectMode, draggable: onAction ? draggable : undefined, clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, scene, stage: rootRef.current, state: viewState, mode, selectedId, preview: shownPreview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, ext, streaming, changed, plugins: project.plugins, nextTargetId }}>
               {/* 换层（换画面）时淡入 */}
               <motion.div key={shownId} className="absolute inset-0" ref={cam.contentRef} initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
                 <RenderNode node={scene.root} />

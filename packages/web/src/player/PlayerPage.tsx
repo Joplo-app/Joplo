@@ -673,7 +673,7 @@ export function PlayerPage(p: PlayerPageProps) {
               freeMode={snap.freeMode}
               clock={ctl.clock}
               gesture={snap.gesture}
-              onStageInput={() => ctl.stageInput()}
+              onStageInput={explore => ctl.stageInput(explore)}
               onAction={(action, native) => { void ctl.act(action, native); }}
               theme={p.theme}
               font={p.font ?? null}
