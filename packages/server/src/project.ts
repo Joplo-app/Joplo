@@ -86,17 +86,34 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
   const pluginRuntimes = pluginRuntimesOf(loaded.authoring.config.plugins);
   if (diagnostics.some((d) => d.severity === 'error')) return { project: null, diagnostics, home, pluginRuntimes };
   // Enabled plugins derive their own layout and drawing snapshots; the host schedules resources.
-  const requests: ResourceRequest[] = [];
   const entries = Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).filter(p => p.local).map(p => [p.id, p.local!]));
-  const resources = { requests, host: resourceHost(projectDir, entries, Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).map(p => [p.id, p.keys ?? []]))) };
-  // 资源元数据（时长、marker）要先编译一遍才知道有哪些资源、再异步检查。上一次检查到的元数据按请求内容记着，
-  // 这一遍直接用上；检查结果没变就不再编译第二遍（热更新时绝大多数如此）。
-  const known = knownInfo.get(projectDir) ?? new Map<string, LocalResourceInfo>();
-  const first = compile(loaded.authoring, mode, { onResource: request => requests.push(request), resourceInfoFor: request => known.get(requestKey(request)) });
-  const inspected = await inspectResources(first.project, requests, resources.host);
-  const unchanged = requests.every(request => JSON.stringify(known.get(requestKey(request))) === JSON.stringify(inspected.resourceInfo[request.id]));
-  knownInfo.set(projectDir, new Map(requests.flatMap(request => inspected.resourceInfo[request.id] ? [[requestKey(request), inspected.resourceInfo[request.id]!] as const] : [])));
-  const r = unchanged ? first : compile(loaded.authoring, mode, { resourceInfo: inspected.resourceInfo });
+  const host = resourceHost(projectDir, entries, Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).map(p => [p.id, p.keys ?? []])));
+  // 资源元数据（时长、marker）要先编译一遍才知道有哪些资源，再异步检查，再带着元数据编译一遍。
+  // 上一次检查到的元数据按请求内容记着，只当作提示：带着它编译一遍，然后照常重新检查——
+  // 只有“这一遍编译成功，并且每个资源重新检查到的元数据都和提示一致”时才直接用这一遍的结果。
+  // 其余情况（提示过期、提示让编译报错、多了或少了资源）一律退回不带提示的两遍流程，
+  // 所以提示永远不会改变结果，也不会让过期的元数据产生一个看起来成功的错误编译（D101 评审 P1）。
+  const known = knownInfo.get(projectDir);
+  let requests: ResourceRequest[] = [];
+  let inspected: Awaited<ReturnType<typeof inspectResources>> | null = null;
+  let r: ReturnType<typeof compile> | null = null;
+  if (known?.size) {
+    const hinted: ResourceRequest[] = [];
+    const fast = compile(loaded.authoring, mode, { onResource: request => hinted.push(request), resourceInfoFor: request => known.get(requestKey(request)) });
+    if (fast.project) {
+      const seen = await inspectResources(fast.project, hinted, host);
+      if (hinted.every(request => JSON.stringify(known.get(requestKey(request))) === JSON.stringify(seen.resourceInfo[request.id]))) { r = fast; requests = hinted; inspected = seen; }
+    }
+  }
+  if (!r || !inspected) {
+    requests = [];
+    const first = compile(loaded.authoring, mode, { onResource: request => requests.push(request) });
+    inspected = await inspectResources(first.project, requests, host);
+    r = Object.keys(inspected.resourceInfo).length ? compile(loaded.authoring, mode, { resourceInfo: inspected.resourceInfo }) : first;
+  }
+  const checked = inspected;
+  knownInfo.set(projectDir, new Map(requests.flatMap(request => checked.resourceInfo[request.id] ? [[requestKey(request), checked.resourceInfo[request.id]!] as const] : [])));
+  const resources = { requests, host };
   diagnostics.push(...inspected.diagnostics, ...(r.project ? mediaDiagnostics(r.project, inspected.resourceInfo) : []));
   const missing = Object.keys(r.project?.plugins ?? {}).filter((id) => !pluginRuntimes[id]);
   const extra: Diagnostic[] = missing.map((id) => ({ severity: 'error', code: 'PLUGIN_RUNTIME_MISSING', message: `Plugin ${id}: runtime file not found; reinstall the plugin package`, source: 'reference', at: `${loaded.authoring!.config.file}:1:1` }));
