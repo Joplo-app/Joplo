@@ -99,6 +99,8 @@ describe('IR → 静态组件与控制器（无浏览器）', () => {
     await c.next();
     expect(c.getSnapshot().state?.scenarioId).toBe('s');
     c.setScenario('s', 0, { quiet: true });
+    // 这里只测分叉：fork 本身不让自动播放跟过去（顺序播放是否跳过支线由 autoplay:false 决定，D92 U2 的缺省接续另有测试）
+    c.autoNext = null;
     await c.play({ fast: () => true });
     expect(c.getSnapshot().state?.scenarioId).toBe('s');
     expect(c.getSnapshot().state?.position).toBe(2);

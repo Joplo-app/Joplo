@@ -570,6 +570,11 @@ export class DemoController {
       sc = following;
     }
     if (!next) return;
+    if (this.autoNextDelay <= 0) {
+      this.setScenario(next, 0, { quiet: true });
+      void this.play({ fromStart: true });
+      return;
+    }
     // 页面上显示“下一章 · N 秒”：暂停时倒计时也停；立即播放跳过等待；取消（或停止）就停在这一章的结尾
     this.set({ busy: false, dwell: null, upNext: { scenarioId: next, left: Math.ceil(this.autoNextDelay / 1000) } });
     this.skipUpNext = false;
@@ -610,10 +615,20 @@ export class DemoController {
     if (this.snap.upNext) this.stop();
   }
 
-  /** 自动播放放完一个场景后，接着放哪个场景（返回 null 就停下）。发布站按选定方案的场景顺序设置；看板不设置。 */
-  autoNext: ((scenarioId: string) => string | null) | null = null;
-  /** 两个场景之间的倒计时（毫秒，不随速度缩放；暂停时不计时）。页面上显示“下一章 · N 秒”。 */
-  autoNextDelay = 3000;
+  /**
+   * 自动播放放完一个场景后，接着放哪个场景（返回 null 就停下）。缺省（D92 U2，看板、发布站、嵌入一致）：同一方案里按声明顺序的
+   * 下一个、跳过 flow({ autoplay: false }) 的支线；from 接力链就是按这个顺序声明的。支线本身播完就停。录制等场合可以设为 null。
+   */
+  autoNext: ((scenarioId: string) => string | null) | null = (id) => {
+    const p = this.snap.project;
+    const sc = p?.scenarios[id];
+    if (!p || !sc) return null;
+    const sequence = scenariosOf(p, sc.optionId).filter((s) => s.autoplay !== false);
+    const i = sequence.findIndex((s) => s.id === id);
+    return i >= 0 && i + 1 < sequence.length ? sequence[i + 1]!.id : null;
+  };
+  /** 两个场景之间的倒计时（毫秒，不随速度缩放；暂停时不计时）。缺省 0：不倒计时、不出“下一章”卡片，直接接着播（D92 U2）。 */
+  autoNextDelay = 0;
 
   private fast: ((index: number) => boolean) | null = null;
 

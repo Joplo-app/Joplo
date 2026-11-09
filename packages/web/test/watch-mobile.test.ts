@@ -239,3 +239,49 @@ describe('DemoController 接力（flow({ from })，D92）：一镜到底，不�
     expect([...new Set(seen.map(s => s.seek))]).toEqual([seek]);
   });
 });
+
+describe('U2 默认无缝接下一个场景（D92）：看板与发布站同一条规则', () => {
+  function chain(): Project {
+    const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
+    const opt = option({ name: 'A', idea: 'i', scenarios: {
+      one: flow('One', { start: '/' }).click('go', 'First'),
+      side: flow('Side', { start: '/', autoplay: false }).click('go', 'Side branch'),
+      two: flow('Two', { from: 'one' }).click('go', 'Second'),
+      three: flow('Three', { start: '/' }).click('go', 'Third'),
+    } });
+    const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } } };
+    return compile(src, 'dev').project!;
+  }
+  const fresh = (id = 'f.a.one') => { const c = new DemoController(null); c.reducedMotion = true; c.setProject(chain(), 1, null); c.setScenario(id, 0, { quiet: true }); return c; };
+  it('没有任何设置：播完接着播下一个场景，不出倒计时；跳过 autoplay:false 的支线；整条链播完才停', async () => {
+    const c = fresh();
+    const seen = new Set<string>();
+    let upNext = false;
+    c.subscribe(() => { const s = c.getSnapshot(); if (s.scenarioId) seen.add(s.scenarioId); if (s.upNext) upNext = true; });
+    void c.play();
+    await until(() => c.getSnapshot().scenarioId === 'f.a.three' && !c.getSnapshot().playing, 8000);
+    expect([...seen]).toEqual(['f.a.one', 'f.a.two', 'f.a.three']);
+    expect(upNext).toBe(false);
+    expect(c.getSnapshot().state?.completed || c.getSnapshot().state?.position === 1).toBe(true);
+  });
+  it('支线播完就停；暂停中、手动一步步走到结尾都不接', async () => {
+    const side = fresh('f.a.side');
+    void side.play();
+    await until(() => !side.getSnapshot().playing && side.getSnapshot().state?.position === 1);
+    await sleep(80);
+    expect(side.getSnapshot().scenarioId).toBe('f.a.side');
+    const manual = fresh();
+    await manual.next();
+    await until(() => manual.getSnapshot().state?.position === 1);
+    await sleep(80);
+    expect(manual.getSnapshot().scenarioId).toBe('f.a.one');
+    const paused = fresh();
+    void paused.play();
+    await until(() => paused.getSnapshot().state?.position === 1);
+    paused.pause();
+    await sleep(800);
+    expect(paused.getSnapshot().scenarioId).toBe('f.a.one');
+    paused.stop();
+  });
+});

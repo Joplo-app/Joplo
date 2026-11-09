@@ -267,10 +267,11 @@ function RecordStage({ project, scenarioId, chain, voiceEstimate, theme, font, s
     c.reducedMotion = false;
     c.setProject(project, 1, null);
     c.setScenario(scenarioId, 0, { quiet: true });
+    // 不带 chain 时只录这一个场景（控制器缺省会接着播下一个）
     if (chain) {
       const optionId = project.scenarios[scenarioId]?.optionId ?? null;
       c.autoNext = (id) => nextScenarioId(scenariosOf(project, optionId), id);
-    }
+    } else c.autoNext = null;
     if (voiceEstimate) c.narrator = estimatedNarrator();
     return c;
   }, [project, scenarioId, chain, voiceEstimate]);

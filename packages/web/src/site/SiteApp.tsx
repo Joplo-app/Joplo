@@ -22,7 +22,6 @@ import { orderedFeatures, type Project } from '@joplo-app/core/runtime';
 import { DemoController } from '../runtime/demo';
 import { isLocalHost, parseSiteHash, siteHash, warnUnknownPlayParams, type PlayRoute, type SiteRoute } from '../runtime/route';
 import { scenariosOf } from '../runtime/views';
-import { nextScenarioId } from '../player/watch';
 import type { StageTheme } from '../renderer/rough';
 import { Brand, JOPLO_SITE_URL, PlayerPage, TopBar } from '../player/PlayerPage';
 import { ArrowRight, CirclePlay, Link } from 'lucide-react';
@@ -197,14 +196,7 @@ function SitePlayer({ project, play, navigate, branding, author }: { project: Pr
   const resolved = usePlaySync(ctl, snap, snap.project, play, (next) => toPlay(next, true));
   // 朗读（D74）：分享带音频时默认开，否则默认关、观众点 🔊 才出声
   const voice = useSiteVoice(ctl, project);
-  // 连续播放（mobile_watch）：自动播放放完一个场景，接着放选定方案的下一个场景，像一个分章节的视频；最后一个放完停下
-  const optionId = resolved?.ok ? resolved.optionId : null;
-  useEffect(() => {
-    ctl.autoNext = (id) => nextScenarioId(scenariosOf(project, optionId), id);
-    return () => {
-      ctl.autoNext = null;
-    };
-  }, [ctl, project, optionId]);
+  // 连续播放：控制器缺省就接着放同一方案的下一个场景（D92 U2，与看板一致），这里不再另设规则
   const feature = project.features[play.featureId];
   if (!snap.project) return null;
   if (!feature || !resolved?.ok)
