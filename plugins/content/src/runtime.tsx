@@ -183,7 +183,9 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
     const mounted = lastMark.current !== null;
     const jumped = jumpedSince(lastMark.current, ctx);
     lastMark.current = markOf(ctx);
-    if (camMoves || jumped || !mounted || dk !== driftKey.current || !timed && seg.current.drift) {
+    // 时钟停了（不是暂停）而镜头段还没走完：直接落到目标，不卡在半路（D97：手动单步的收尾比作者写的 ms 短时）
+    const stranded = timed && !!clock && !clock.running && !clock.paused && seg.current.ms > 0 && now < seg.current.start + seg.current.ms;
+    if (camMoves || jumped || !mounted || stranded || dk !== driftKey.current || !timed && seg.current.drift) {
       target.current = next;
       driftKey.current = dk;
       // 只有连续播放中（时钟在走、已经挂载过、不是跳转）才补间；首次挂载、停止状态、跳转、截图与静态画面直接落定（D92 R1）。

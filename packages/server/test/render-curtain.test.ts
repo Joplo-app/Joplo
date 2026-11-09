@@ -36,7 +36,7 @@ export default page({title:'Prototype',layout:false,viewport:'${viewport}'},
     }
     write('features/demo/feature.ts', `import { feature } from '@joplo-app/kit'; export default feature({name:'Export',goal:'Keep cards readable',cases:{},pick:'a'});`);
     write('features/demo/options/a.tsx', `import { $, flow, option, set } from '@joplo-app/kit';
-const scene = (start) => flow('Design replay',{start}).card('Opening context',{sub:'Read the design problem'}).system('Prototype interaction','Subtitle stays below the stage',set($.ui.status,'after')).card('Closing boundary',{sub:'Keep the evidence readable'});
+const scene = (start) => flow('Design replay',{start}).card('Opening context',{sub:'Read the design problem'}).system('Prototype interaction','Subtitle floats over the stage',set($.ui.status,'after')).card('Closing boundary',{sub:'Keep the evidence readable'});
 export default option({name:'A',idea:'Compare scene and curtain',state:{ui:{status:'before'}},scenarios:{desktop:scene('/'),phone:scene('/phone')}});`);
     server = await createDev({ projectDir: root, port: 0, watch: false, log: () => undefined });
     expect(server.payload().diagnostics.filter(d => d.severity === 'error')).toEqual([]);
@@ -84,15 +84,17 @@ export default option({name:'A',idea:'Compare scene and curtain',state:{ui:{stat
         const curtain = document.querySelector('[data-jlayer="curtain"]')!.getBoundingClientRect();
         const sub = document.querySelector('[data-jsubtitle]')!.getBoundingClientRect();
         const shot = document.querySelector('[data-jshot]')?.getBoundingClientRect();
-        return { gap: sub.y - curtain.bottom, widthGap: sub.width - curtain.width, shot: shot && { width: shot.width, height: shot.height } };
+        return { top: sub.top - curtain.top, bottom: curtain.bottom - sub.bottom, widthGap: sub.width - curtain.width, shot: shot && { width: shot.width, height: shot.height } };
       });
-      expect(Math.abs(bounds.gap)).toBeLessThan(1);
+      // D97：字幕浮在舞台上，不再另占一条——字幕层在幕布（= 舞台）范围之内，宽度相同
+      expect(bounds.top).toBeGreaterThanOrEqual(-1);
+      expect(bounds.bottom).toBeGreaterThanOrEqual(-1);
       expect(Math.abs(bounds.widthGap)).toBeLessThan(1);
       if ('w' in extra) expect(bounds.shot).toEqual({ width: 640, height: 500 });
     }
   }, 120_000);
 
-  it('mobile cards and initial covers span the phone frame while subtitles stay below it', async () => {
+  it('mobile cards and initial covers span the phone frame; the subtitle layer floats inside it (D97)', async () => {
     for (const position of [0, 1]) {
       await at('phone', position, { frame: '1' });
       expect(await curtainIsAbove(position === 0 ? 'cover-title' : 'card-title')).toMatchObject({ wasPassive: true, curtainOnTop: true });
@@ -100,10 +102,11 @@ export default option({name:'A',idea:'Compare scene and curtain',state:{ui:{stat
         const frame = document.querySelector('[data-jphone-frame]')!.getBoundingClientRect();
         const curtain = document.querySelector('[data-jlayer="curtain"]')!.getBoundingClientRect();
         const sub = document.querySelector('[data-jsubtitle]')!.getBoundingClientRect();
-        return { frame: { x: frame.x, y: frame.y, width: frame.width, height: frame.height }, curtain: { x: curtain.x, y: curtain.y, width: curtain.width, height: curtain.height }, subtitleTop: sub.y };
+        return { frame: { x: frame.x, y: frame.y, width: frame.width, height: frame.height }, curtain: { x: curtain.x, y: curtain.y, width: curtain.width, height: curtain.height }, sub: { top: sub.top, bottom: sub.bottom } };
       });
       expect(bounds.curtain).toEqual(bounds.frame);
-      expect(bounds.subtitleTop).toBeGreaterThanOrEqual(bounds.curtain.y + bounds.curtain.height);
+      expect(bounds.sub.top).toBeGreaterThanOrEqual(bounds.frame.y - 1);
+      expect(bounds.sub.bottom).toBeLessThanOrEqual(bounds.frame.y + bounds.frame.height + 1);
     }
   }, 120_000);
 
@@ -111,6 +114,6 @@ export default option({name:'A',idea:'Compare scene and curtain',state:{ui:{stat
     await at('desktop', 2);
     expect(await page.locator('[data-jlayer="curtain"]').count()).toBe(0);
     expect(await page.locator('[data-jid="result"]').innerText()).toBe('after');
-    expect(await page.locator('[data-jsubtitle]').innerText()).toContain('Subtitle stays below the stage');
+    expect(await page.locator('[data-jsubtitle]').innerText()).toContain('Subtitle floats over the stage');
   }, 120_000);
 });

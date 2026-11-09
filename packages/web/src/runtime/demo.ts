@@ -22,6 +22,8 @@ import { m } from '../i18n/messages';
 import { EngineClock, gesturePoint, gestureProgress } from './clock';
 import { actionIndex, arbitrateAction, applyPlayground, pluginActionSpec, type Playground, type ActionEntry, type Action } from '@joplo-app/core/runtime';
 import { stepDwell, CAMERA_MS } from './pace';
+/** 手动单步之后时钟再走多久（引擎时间）：覆盖 content camera 默认 1.2s 的补间与 0.9s 的元素飞行。 */
+export const VISUAL_SETTLE_MS = 1200;
 import { dwellTexts } from '../player/cover-content';
 import { VOICE_BREATH_MS, speakerRoleAt, spokenLine } from '@joplo-app/core/runtime';
 import type { Narration, Narrator, NarrationSource } from './voice';
@@ -512,6 +514,9 @@ export class DemoController {
     const gen = this.gen;
     this.set({ busy: true });
     await this.runStep(sc, gen, { moveCursor: true });
+    // 手动单步也把这一步的画面过渡走完（D97）：镜头补间、元素飞行按引擎时间走，比操作动画长；时钟一停就会卡在半路。
+    // 收尾期间再按下一步会 stop()（gen 变化）并立刻执行下一步。reduced motion 没有过渡，不等。
+    if (gen === this.gen && !this.reducedMotion) await this.wait(VISUAL_SETTLE_MS, gen);
     if (gen === this.gen) this.set({ busy: false });
   }
 

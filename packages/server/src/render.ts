@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Browser } from 'playwright-core';
-import { JoploError, SUBTITLE_HEIGHT, VIEWPORT_SIZE, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, scopeProject, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
+import { JoploError, VIEWPORT_SIZE, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, scopeProject, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
 import { exportLocale } from './locale.ts';
 import type { RenderOptions, RenderResult, RenderedElement, SheetOptions, SheetResult } from './contract.ts';
 import { createDev } from './dev.ts';
@@ -119,8 +119,8 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     const next = state.completed ? undefined : sc.steps[position];
     const nextTargetId = next && 'target' in next.action ? next.action.target : null;
     const stage = STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];
-    // 舞台正下方是字幕区（与演示页一致）：页面高度加上字幕区，截图截舞台 + 字幕区
-    const viewport = opts.viewport ?? { width: stage.width, height: stage.height + SUBTITLE_HEIGHT };
+    // 字幕与步骤标题条浮在舞台上（D97）：页面就是舞台大小
+    const viewport = opts.viewport ?? { width: stage.width, height: stage.height };
 
     browser = await launch(playwright);
     const page = await browser.newPage({ viewport, deviceScaleFactor: opts.scale ?? 1, reducedMotion: 'reduce' });
@@ -200,7 +200,7 @@ export async function renderSheet(opts: SheetOptions): Promise<SheetResult> {
       const stage = STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];
       const next = state.completed ? undefined : sc.steps[position];
       const nextTargetId = next && 'target' in next.action ? next.action.target : null;
-      const page = await browser.newPage({ viewport: { width: stage.width, height: stage.height + SUBTITLE_HEIGHT }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
+      const page = await browser.newPage({ viewport: { width: stage.width, height: stage.height }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
       const q = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, locale: opts.locale, content: opts.content, font: opts.font, stroke: opts.stroke });
       await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => (window as unknown as { __JOPLO_READY__?: boolean }).__JOPLO_READY__ === true, null, { timeout: 60000 });

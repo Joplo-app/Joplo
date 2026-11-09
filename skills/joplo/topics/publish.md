@@ -20,10 +20,12 @@ Compare cases and options in the board, then decide which option to publish for 
 - The published site uses the same layout as the local board, with authoring details such as rules, gaps, and source locations removed.
 - Layer switching, Follow director, replaying one layer, shot focus, and captions all work on the published site. See demo for syntax.
 - Fullscreen works on the published site: F enters/toggles, spacebar plays/pauses, ←/→ steps back/forward, Esc exits. Like a video, ←/→ during playback skips one step and keeps playing; while paused it steps once and stays paused.
-- Fullscreen keeps only the stage and captions. Playback controls float below and hide automatically.
+- On every surface (board, published site, fullscreen, embed, screenshots, image and video export) two things float over the stage. The subtitle at the bottom centre shows what is being said: narrate(), else say() with the speaker's avatar and name, else the caption; cards and the cover show it only for narrate / say. The step title pops out at the top left when the step changes (number, caption, explain on a second line, branch links), stays about 2.5–5 s of timeline time, then shrinks to a dot the viewer can click to reopen; static frames show it open.
+- Design for that: keep important content out of the bottom centre of every screen (about the bottom 12%) and expect the top-left corner to be briefly covered when a step starts. Put the reason in explain() or narrate(), not in a long caption: the caption is a short title.
+- Fullscreen keeps only the stage (with its subtitle and step title). Playback controls float below and hide automatically.
 - Autoplay plays the picked option's scenarios back to back, like chapters of one video: after the last step of a scenario an Up next card names the next one and counts down 3 seconds (Play now / Cancel; pausing pauses the countdown), then it starts; after the last scenario it stops. Stepping by hand never jumps. So order scenarios as chapters (the first one is the hook) and end each on a clear result. Use flow({ autoplay:false }) for optional branches: they remain manually selectable but are skipped by continuous playback, and stop at their own ending. A fork or return link alone does not remove a chapter from autoplay.
 - On phones the published site becomes a video player: the 1280 × 800 desktop stage is scaled as a whole with black bars (never re-laid out to the phone width); portrait shows the video, full captions, one row of controls and the chapter list; turning the phone sideways (or tapping Landscape) fills the screen with stage and captions plus a separate control bar. Stage taps pause/explore and stage drags belong to the prototype; use the control bar to step. On an iPhone, which cannot fullscreen a page or lock orientation, the stage is rotated 90° until the phone is turned.
-- Design for that: text on a 1280 × 800 stage shrinks to about 30% in portrait, so keep key text large (24px or more) and let shots zoom into details; in landscape the caption sits over the bottom of the stage, so keep important content out of the bottom 12%.
+- Design for that: text on a 1280 × 800 stage shrinks to about 30% in portrait, so keep key text large (24px or more) and let shots zoom into details.
 - Both local and published views can export images. Video export is local only.
 - Local image and video export use the Joplo export component (Playwright + Chromium, kept under ~/.joplo, not in the project). If it is missing, the board's Export menu offers Install export component (about 100 MB) and continues the export after installing; in a terminal, run npx joplo setup export.
 
@@ -136,4 +138,4 @@ For local comparisons and PR CI, read npx joplo skill diff. It compares two real
 - --ref works only together with --applied. --applied is idempotent; text output without --format json ends with a Next: line listing the ids.
 
 Related topics: diff, demo, review, plugins
-<!-- joplo-skill 0.3.0 sha256:a763c161e72459f16dd9c2482319b5b88659143b0b0490cbce3ef5d328f8a6d1 -->
+<!-- joplo-skill 0.3.0 sha256:12a3fffbec252ffc22e49763e3481ca125f0c30d7fabc8843991db18db89a45b -->

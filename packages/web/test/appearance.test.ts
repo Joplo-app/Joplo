@@ -139,10 +139,10 @@ describe('消费者', () => {
     expect(plain).toMatch(/data-stroke="rough"/);
     expect(plain).not.toContain('--jp-font:');
   });
-  it('字幕区与手机外框（.jtheme）跟随同一套外观', () => {
-    const sub = renderToStaticMarkup(createElement(Subtitle, { content: null, theme: 'nord', font: 'kai' }));
-    expect(sub).toMatch(/data-theme="nord"/);
-    expect(sub).toContain('--jp-font:');
+  it('字幕用系统字体、不跟随舞台主题（D97）；手机外框（.jtheme）跟随外观', () => {
+    const sub = renderToStaticMarkup(createElement(Subtitle, { content: { index: 1, text: '一句话', source: 'caption', speaker: null }, animate: false }));
+    expect(sub).not.toMatch(/data-theme=/);
+    expect(sub).toContain('PingFang SC');
     const phone = renderToStaticMarkup(createElement(ThemeContext.Provider, { value: { theme: 'nord', stroke: 'clean', font: 'mono', registry: null } }, createElement(PhoneFrame, { width: 100, height: 200, children: null })));
     expect(phone).toMatch(/data-stroke="clean"/);
     expect(phone).toContain('--jp-font:');

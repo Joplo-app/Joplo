@@ -41,6 +41,8 @@ export function createEn(locale: Locale = 'en') {
       turnNarrationOn: "Turn narration on",
       turnNarrationOff: "Turn narration off",
       readingAloud: "Reading aloud",
+      showStepTitle: "Show step title",
+      hideStepTitle: "Hide step title",
       browserVoiceFallback: "Browser voice",
       waitingForNarration: "Waiting for the narration to finish",
       narrationAvailable: "This demo has narration",

@@ -40021,6 +40021,2078 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "rkp0j",
+      "x": 5627,
+      "y": -6495,
+      "name": "字幕 · 玻璃悬浮条 v1",
+      "fill": "#F2F1EC",
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 80,
+      "children": [
+        {
+          "type": "frame",
+          "id": "adv5e",
+          "name": "Header",
+          "layout": "vertical",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "RO71j",
+              "name": "Title",
+              "fill": "#1D1D1F",
+              "content": "字幕 · 悬浮在画面中间（候选 v2）",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 40,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "i8q6Z",
+              "name": "Sub",
+              "fill": "#6E6E73",
+              "content": "中间只放“正在说的话”：旁白 narrate() 直接显示，角色台词 say() 带头像和名字，没写时显示朗读兜底的步骤说明；去掉 n / m 进度；标题与说明（caption / explain）移到步骤条",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 20,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "jYFxF",
+          "name": "Row 1",
+          "gap": 80,
+          "children": [
+            {
+              "type": "frame",
+              "id": "rIoiY",
+              "name": "A · 旁白一行（玻璃）",
+              "clip": true,
+              "width": 1280,
+              "height": 768,
+              "fill": {
+                "type": "image",
+                "enabled": true,
+                "url": "png/subtitle/stage-light.png",
+                "mode": "cover"
+              },
+              "cornerRadius": 14,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "CJlAt",
+                  "x": 0,
+                  "y": 628,
+                  "name": "Dock",
+                  "width": 1280,
+                  "height": 140,
+                  "padding": [
+                    0,
+                    0,
+                    24,
+                    0
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "jk4KB",
+                      "name": "Glass pill",
+                      "fill": "#FFFFFFB3",
+                      "cornerRadius": 999,
+                      "stroke": "#FFFFFFCC",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "effect": [
+                        {
+                          "type": "background_blur",
+                          "radius": 24
+                        },
+                        {
+                          "type": "shadow",
+                          "shadowType": "outer",
+                          "color": "#0000001F",
+                          "offset": {
+                            "x": 0,
+                            "y": 8
+                          },
+                          "blur": 28
+                        },
+                        {
+                          "type": "shadow",
+                          "shadowType": "outer",
+                          "color": "#0000000F"
+                        }
+                      ],
+                      "gap": 10,
+                      "padding": [
+                        10,
+                        18
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ytLRs",
+                          "name": "Caption",
+                          "fill": "#1D1D1F",
+                          "content": "没注册的邮箱也会提示已发送，别人就试不出谁有账号。",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 15
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "ADjc1",
+              "name": "B · 旁白两行（玻璃）",
+              "clip": true,
+              "width": 1280,
+              "height": 768,
+              "fill": {
+                "type": "image",
+                "enabled": true,
+                "url": "png/subtitle/stage-light.png",
+                "mode": "cover"
+              },
+              "cornerRadius": 14,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "y8xEXU",
+                  "x": 0,
+                  "y": 628,
+                  "name": "Dock",
+                  "width": 1280,
+                  "height": 140,
+                  "padding": [
+                    0,
+                    0,
+                    24,
+                    0
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "oj4Oo",
+                      "name": "Glass card",
+                      "fill": "#FFFFFFB3",
+                      "cornerRadius": 16,
+                      "stroke": "#FFFFFFCC",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "effect": [
+                        {
+                          "type": "background_blur",
+                          "radius": 24
+                        },
+                        {
+                          "type": "shadow",
+                          "shadowType": "outer",
+                          "color": "#0000001F",
+                          "offset": {
+                            "x": 0,
+                            "y": 8
+                          },
+                          "blur": 28
+                        },
+                        {
+                          "type": "shadow",
+                          "shadowType": "outer",
+                          "color": "#0000000F"
+                        }
+                      ],
+                      "layout": "vertical",
+                      "gap": 3,
+                      "padding": [
+                        11,
+                        22
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "QAN9x",
+                          "name": "Line 1",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "CThyG",
+                              "name": "Caption",
+                              "fill": "#1D1D1F",
+                              "content": "链接只在十五分钟内有效，点过一次就失效。",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 15
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "aftI0",
+                          "name": "Explain",
+                          "fill": "#1D1D1F",
+                          "content": "过期了也不用重新输入邮箱，点一下就会发新的。",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 15,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "b29ec",
+          "name": "Row 2",
+          "gap": 80,
+          "children": [
+            {
+              "type": "frame",
+              "id": "VWzOr",
+              "name": "C · 角色台词 say()（玻璃）",
+              "clip": true,
+              "width": 1280,
+              "height": 768,
+              "fill": {
+                "type": "image",
+                "enabled": true,
+                "url": "png/subtitle/stage-light.png",
+                "mode": "cover"
+              },
+              "cornerRadius": 14,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "cOAWb",
+                  "x": 0,
+                  "y": 628,
+                  "name": "Dock",
+                  "width": 1280,
+                  "height": 140,
+                  "padding": [
+                    0,
+                    0,
+                    24,
+                    0
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "zUYin",
+                      "name": "Glass pill",
+                      "fill": "#FFFFFFB3",
+                      "cornerRadius": 999,
+                      "stroke": "#FFFFFFCC",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "effect": [
+                        {
+                          "type": "background_blur",
+                          "radius": 24
+                        },
+                        {
+                          "type": "shadow",
+                          "shadowType": "outer",
+                          "color": "#0000001F",
+                          "offset": {
+                            "x": 0,
+                            "y": 8
+                          },
+                          "blur": 28
+                        },
+                        {
+                          "type": "shadow",
+                          "shadowType": "outer",
+                          "color": "#0000000F"
+                        }
+                      ],
+                      "gap": 10,
+                      "padding": [
+                        8,
+                        18,
+                        8,
+                        8
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "QFpES",
+                          "name": "Speaker",
+                          "fill": "#0000000A",
+                          "cornerRadius": 999,
+                          "gap": 6,
+                          "padding": [
+                            3,
+                            10,
+                            3,
+                            3
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "Jq9ii",
+                              "name": "Avatar",
+                              "width": 22,
+                              "height": 22,
+                              "fill": "#5B8DEF",
+                              "cornerRadius": 999,
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "ywEmS",
+                                  "name": "Initial",
+                                  "fill": "#FFFFFF",
+                                  "content": "L",
+                                  "fontFamily": "Noto Sans SC",
+                                  "fontSize": 11,
+                                  "fontWeight": "700"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "f0t7se",
+                              "name": "Name",
+                              "fill": "#6E6E73",
+                              "content": "Lin",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 13,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "q3aHO",
+                          "name": "Caption",
+                          "fill": "#1D1D1F",
+                          "content": "我用工作邮箱登录。",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 15
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "QlPFz",
+              "name": "D · 旁白（玻璃，深色画面）",
+              "clip": true,
+              "width": 1280,
+              "height": 768,
+              "fill": {
+                "type": "image",
+                "enabled": true,
+                "url": "png/subtitle/stage-dark.png",
+                "mode": "cover"
+              },
+              "cornerRadius": 14,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "yQyfJ",
+                  "x": 0,
+                  "y": 628,
+                  "name": "Dock",
+                  "width": 1280,
+                  "height": 140,
+                  "padding": [
+                    0,
+                    0,
+                    24,
+                    0
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "nCkN7",
+                      "name": "Glass pill",
+                      "fill": "#1C1C1EB8",
+                      "cornerRadius": 999,
+                      "stroke": "#FFFFFF24",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "effect": [
+                        {
+                          "type": "background_blur",
+                          "radius": 24
+                        },
+                        {
+                          "type": "shadow",
+                          "shadowType": "outer",
+                          "color": "#00000066",
+                          "offset": {
+                            "x": 0,
+                            "y": 8
+                          },
+                          "blur": 28
+                        },
+                        {
+                          "type": "shadow",
+                          "shadowType": "outer",
+                          "color": "#00000000"
+                        }
+                      ],
+                      "gap": 10,
+                      "padding": [
+                        10,
+                        18
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "muFih",
+                          "name": "Caption",
+                          "fill": "#F5F5F7",
+                          "content": "每个候选都会拿到一个分数，再换算成概率。",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 15
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "uaPvJ",
+          "name": "Row 3",
+          "gap": 80,
+          "children": [
+            {
+              "type": "frame",
+              "id": "fmbvO",
+              "name": "E · 旁白两行（半透明黑底）",
+              "clip": true,
+              "width": 1280,
+              "height": 768,
+              "fill": {
+                "type": "image",
+                "enabled": true,
+                "url": "png/subtitle/stage-light.png",
+                "mode": "cover"
+              },
+              "cornerRadius": 14,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "PgaGd",
+                  "x": 0,
+                  "y": 628,
+                  "name": "Dock",
+                  "width": 1280,
+                  "height": 140,
+                  "padding": [
+                    0,
+                    0,
+                    24,
+                    0
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "lcQK9",
+                      "name": "Translucent card",
+                      "fill": "#0000008C",
+                      "cornerRadius": 10,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "padding": [
+                        9,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "V7YyxW",
+                          "name": "Line 1",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "C2Sst",
+                              "name": "Caption",
+                              "fill": "#FFFFFF",
+                              "content": "没注册的邮箱也会提示已发送，",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 15
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "Xu4di",
+                          "name": "Explain",
+                          "fill": "#FFFFFF",
+                          "content": "别人就试不出谁有账号。",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 15,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "E9deL",
+              "name": "F · 旁白（半透明黑底，深色画面）",
+              "clip": true,
+              "width": 1280,
+              "height": 768,
+              "fill": {
+                "type": "image",
+                "enabled": true,
+                "url": "png/subtitle/stage-dark.png",
+                "mode": "cover"
+              },
+              "cornerRadius": 14,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "AAG7v",
+                  "x": 0,
+                  "y": 628,
+                  "name": "Dock",
+                  "width": 1280,
+                  "height": 140,
+                  "padding": [
+                    0,
+                    0,
+                    24,
+                    0
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "T27e20",
+                      "name": "Translucent card",
+                      "fill": "#0000008C",
+                      "cornerRadius": 10,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "padding": [
+                        9,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "beSS6",
+                          "name": "Line 1",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ilP3s",
+                              "name": "Caption",
+                              "fill": "#FFFFFF",
+                              "content": "每个候选都会拿到一个分数，再换算成概率。",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 15
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Erp8l",
+          "name": "Notes",
+          "width": 2720,
+          "layout": "vertical",
+          "gap": 10,
+          "children": [
+            {
+              "type": "text",
+              "id": "rZE42",
+              "name": "Note",
+              "fill": "#3A3A3C",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "D 深色画面：玻璃跟随舞台明暗切换（深色半透明 + 浅色字）。注意左下角的来源行被压住了一截——这就是悬浮带来的遮挡，实现时舞台底部留 72px 安全区：content 的 camera() 取景避开它，ui 画面在底部垫空白，check/render 报告被压住的元素。",
+              "lineHeight": 1.5,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 18,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "vFGJp",
+              "name": "Note",
+              "fill": "#3A3A3C",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "中间这条只放“正在说的话”，像电影字幕：一到两行、居中、正文字重；不再有系统圆点和 n / m 进度。",
+              "lineHeight": 1.5,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 18,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "cpJBB",
+              "name": "Note",
+              "fill": "#3A3A3C",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "旁白 narrate()：只显示文字（A / B / D / E / F）。角色台词 say()：前面带说话人的小头像 + 名字（C）。都没写时，显示朗读兜底读的步骤说明。",
+              "lineHeight": 1.5,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 18,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "FkJCx",
+              "name": "Note",
+              "fill": "#3A3A3C",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "标题与说明移出画面：caption 在步骤条当前那一格（已经有了），explain 放进这一格的悬停提示；分叉“↳ 另一条路”和完成标记也移到步骤条。",
+              "lineHeight": 1.5,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 18,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "MxhMX",
+              "name": "Note",
+              "fill": "#3A3A3C",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "D 深色画面里左下角的来源行仍会被压住：实现时舞台底部留安全区，camera() 取景避开，check / render 报告被压住的元素。",
+              "lineHeight": 1.5,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 18,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "VgdlT",
+              "name": "Note",
+              "fill": "#B25000",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "待定：字幕字体用系统字体（PingFang / SF，更像系统浮窗，图上是这个效果），还是继续跟随舞台主题字体（手绘主题下是手写体）。",
+              "lineHeight": 1.5,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 18,
+              "fontWeight": "500"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "RkCWG",
+      "x": 5627,
+      "y": -3444,
+      "name": "字幕 v3 · 完整播放器",
+      "fill": "#F2F1EC",
+      "gap": 60,
+      "padding": 80,
+      "children": [
+        {
+          "type": "frame",
+          "id": "dSkpK",
+          "name": "Player",
+          "width": 1280,
+          "layout": "vertical",
+          "gap": 12,
+          "children": [
+            {
+              "type": "frame",
+              "id": "L09yU3",
+              "name": "Stage",
+              "clip": true,
+              "width": 1280,
+              "height": 768,
+              "fill": {
+                "type": "image",
+                "enabled": true,
+                "url": "png/subtitle/stage-light.png",
+                "mode": "cover"
+              },
+              "cornerRadius": 14,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "uozLc",
+                  "x": 0,
+                  "y": 628,
+                  "name": "Dock",
+                  "width": 1280,
+                  "height": 140,
+                  "padding": [
+                    0,
+                    0,
+                    28,
+                    0
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Lb69G",
+                      "name": "Subtitle",
+                      "fill": "#0000008C",
+                      "cornerRadius": 10,
+                      "gap": 10,
+                      "padding": [
+                        11,
+                        24
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "L1vHqm",
+                          "name": "Line",
+                          "fill": "#FFFFFF",
+                          "content": "没注册的邮箱也会提示已发送，这样别人就试不出谁有账号。",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 17,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "kFi29",
+              "name": "Step bar",
+              "width": "fill_container",
+              "fill": "#FFFFFF",
+              "cornerRadius": 14,
+              "stroke": "#E3E1DA",
+              "strokeWidth": 1,
+              "gap": 8,
+              "padding": [
+                12,
+                16
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "qUQu9",
+                  "name": "Btn ↺",
+                  "fill": "#FFFFFF00",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "towmt",
+                      "name": "L",
+                      "fill": "#1D1D1F",
+                      "content": "↺",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "fEMPU",
+                  "name": "Btn ‹",
+                  "fill": "#FFFFFF00",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "fS52Q",
+                      "name": "L",
+                      "fill": "#1D1D1F",
+                      "content": "‹",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "E6Nom",
+                  "name": "Btn ▷ 继续",
+                  "fill": "#FFD43B",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "strokeWidth": 1.5,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "k4v62t",
+                      "name": "L",
+                      "fill": "#1D1D1F",
+                      "content": "▷ 继续",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "A8kCas",
+                  "name": "Btn ›",
+                  "fill": "#FFFFFF00",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "rPmmR",
+                      "name": "L",
+                      "fill": "#1D1D1F",
+                      "content": "›",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "t4Wh0j",
+                  "name": "Btn 0",
+                  "fill": "#1D1D1F",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "strokeWidth": 1.5,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "EpD9r",
+                      "name": "L",
+                      "fill": "#FFD43B",
+                      "content": "0",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Y5HMN7",
+                  "name": "Btn 1",
+                  "fill": "#1D1D1F",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "strokeWidth": 1.5,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "gbq0L",
+                      "name": "L",
+                      "fill": "#FFD43B",
+                      "content": "1",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "XLwAS",
+                  "name": "Btn 2  发送登录链接",
+                  "fill": "#FFD43B",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "strokeWidth": 1.5,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "skp3W",
+                      "name": "L",
+                      "fill": "#1D1D1F",
+                      "content": "2  发送登录链接",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "R7xZ2f",
+                  "name": "Btn 3",
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "strokeWidth": 1.5,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "hrd0r",
+                      "name": "L",
+                      "fill": "#A1A1A6",
+                      "content": "3",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "x4hzQ",
+                  "name": "Btn 4",
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "strokeWidth": 1.5,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "ZNyj7",
+                      "name": "L",
+                      "fill": "#A1A1A6",
+                      "content": "4",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Z5gS6",
+                  "name": "Btn 5",
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "strokeWidth": 1.5,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "gg6Qh",
+                      "name": "L",
+                      "fill": "#A1A1A6",
+                      "content": "5",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "p3Wc6L",
+                  "name": "Btn 6",
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 10,
+                  "stroke": "#1D1D1F",
+                  "strokeWidth": 1.5,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "A6Pjqo",
+                      "name": "L",
+                      "fill": "#A1A1A6",
+                      "content": "6",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 15,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "o8SrM",
+              "name": "Tooltip row",
+              "width": "fill_container",
+              "padding": [
+                0,
+                0,
+                0,
+                330
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "G9qIv",
+                  "name": "Explain tooltip",
+                  "width": 360,
+                  "fill": "#1D1D1F",
+                  "cornerRadius": 10,
+                  "layout": "vertical",
+                  "gap": 4,
+                  "padding": [
+                    10,
+                    14
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "H8lgRM",
+                      "name": "Title",
+                      "fill": "#FFFFFF",
+                      "content": "发送登录链接",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "R9jbnp",
+                      "name": "Explain",
+                      "fill": "#D1D1D6",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "说明（explain）：链接 15 分钟内有效，只能用一次",
+                      "lineHeight": 1.45,
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "jrZYD",
+                      "name": "Hint",
+                      "fill": "#8E8E93",
+                      "content": "↑ 鼠标停在步骤条当前这一格时出现",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "k26Hv2",
+          "name": "Mapping",
+          "width": 700,
+          "layout": "vertical",
+          "gap": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "iY6j2",
+              "name": "H",
+              "fill": "#1D1D1F",
+              "content": "一行代码里的每样东西，显示在哪",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 28,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "T4DtP",
+              "name": "Code",
+              "width": "fill_container",
+              "fill": "#1D1D1F",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 6,
+              "padding": 20,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "YTyFW",
+                  "name": "Code line",
+                  "fill": "#F5F5F7",
+                  "content": ".click('submit',",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "nXzQO",
+                  "name": "Code line",
+                  "fill": "#F5F5F7",
+                  "content": "  '发送登录链接',              // ① 标题 caption",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "UxrAo",
+                  "name": "Code line",
+                  "fill": "#F5F5F7",
+                  "content": "  explain('15 分钟内有效…'),  // ② 说明",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "IHbqg",
+                  "name": "Code line",
+                  "fill": "#F5F5F7",
+                  "content": "  narrate('没注册的邮箱也…'), // ③ 旁白",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "CFtkp",
+                  "name": "Code line",
+                  "fill": "#F5F5F7",
+                  "content": "  say('我用工作邮箱登录。'),   // ④ 角色台词",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "ePN49",
+                  "name": "Code line",
+                  "fill": "#F5F5F7",
+                  "content": ")",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "l2NUD",
+              "name": "Row ①",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 4,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "sr7rl",
+                  "name": "What",
+                  "fill": "#1D1D1F",
+                  "content": "①  标题 caption",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "g0Izdj",
+                  "name": "Where",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "现在：画面下方字幕条第一行　→　改成：步骤条当前这一格（一直显示），没写旁白/台词时也是字幕",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "bISeH",
+              "name": "Row ②",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 4,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "B2F3w",
+                  "name": "What",
+                  "fill": "#1D1D1F",
+                  "content": "②  说明 explain",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "V2sTSx",
+                  "name": "Where",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "现在：画面下方字幕条第二行　→　改成：步骤条当前这一格的悬停提示（左图黑色小卡）",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "d33QXS",
+              "name": "Row ③",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 4,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dZhkB",
+                  "name": "What",
+                  "fill": "#1D1D1F",
+                  "content": "③  旁白 narrate()",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "zsaGK",
+                  "name": "Where",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "现在：只有声音，不显示文字　→　改成：画面中间的字幕",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "CQQ1l",
+              "name": "Row ④",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 4,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "mvor1",
+                  "name": "What",
+                  "fill": "#1D1D1F",
+                  "content": "④  角色台词 say()",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "Ffi15",
+                  "name": "Where",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "现在：只有声音，不显示文字　→　改成：画面中间的字幕，前面带说话人头像和名字；同一步也写了旁白时只显示旁白",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "bHbxv",
+              "name": "Note",
+              "fill": "#B25000",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "一句话：画面中间只放“正在说的话”；步骤叫什么、为什么这样做，看下面的步骤条。",
+              "lineHeight": 1.5,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 17,
+              "fontWeight": "500"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "PuuJu",
+      "x": 5627,
+      "y": -2226,
+      "name": "步骤标题 · 左上角弹出条",
+      "fill": "#F2F1EC",
+      "layout": "vertical",
+      "gap": 40,
+      "padding": 80,
+      "children": [
+        {
+          "type": "frame",
+          "id": "VxtwT",
+          "name": "Header",
+          "layout": "vertical",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "MZDXt",
+              "name": "Title",
+              "fill": "#1D1D1F",
+              "content": "步骤标题：左上角弹出，再收回",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 40,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "Q78m0",
+              "name": "Sub",
+              "fill": "#6E6E73",
+              "content": "标题变化时，左上角伸出一个小条显示新标题（和说明），停一会儿后缩回隐藏；平时不占画面。系统字体，和字幕同一套半透明黑底。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 20,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "vxBzc",
+          "name": "Timeline",
+          "gap": 28,
+          "children": [
+            {
+              "type": "frame",
+              "id": "rCwkY",
+              "name": "State",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "yVW44",
+                  "name": "Crop",
+                  "clip": true,
+                  "width": 470,
+                  "height": 260,
+                  "cornerRadius": 12,
+                  "stroke": "#E3E1DA",
+                  "strokeWidth": 1,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "id": "tkLOk",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Stage bg",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "png/subtitle/stage-light.png",
+                        "mode": "cover"
+                      },
+                      "width": 1280,
+                      "height": 768
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "eyErj",
+                  "name": "Cap",
+                  "fill": "#3A3A3C",
+                  "content": "① 上一步结束：收起，看不见",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 17,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "P1fJb",
+              "name": "State",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "I62TXP",
+                  "name": "Crop",
+                  "clip": true,
+                  "width": 470,
+                  "height": 260,
+                  "cornerRadius": 12,
+                  "stroke": "#E3E1DA",
+                  "strokeWidth": 1,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "id": "aPBgj",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Stage bg",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "png/subtitle/stage-light.png",
+                        "mode": "cover"
+                      },
+                      "width": 1280,
+                      "height": 768
+                    },
+                    {
+                      "type": "frame",
+                      "id": "x7S6Rs",
+                      "x": 20,
+                      "y": 20,
+                      "name": "Anchor",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "A8czx",
+                          "name": "Step label",
+                          "clip": true,
+                          "width": 120,
+                          "fill": "#0000008C",
+                          "cornerRadius": 10,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "padding": [
+                            10,
+                            16
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "tpeMH",
+                              "name": "Line",
+                              "gap": 8,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "ODzqI",
+                                  "name": "Num",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": "#FFD43B",
+                                  "cornerRadius": 999,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "dgbcl",
+                                      "name": "N",
+                                      "fill": "#1D1D1F",
+                                      "content": "2",
+                                      "fontFamily": "Noto Sans SC",
+                                      "fontSize": 12,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "rqoKw",
+                                  "name": "Caption",
+                                  "fill": "#FFFFFF",
+                                  "content": "发送登录链接",
+                                  "fontFamily": "Noto Sans SC",
+                                  "fontSize": 16,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "qepHg",
+                  "name": "Cap",
+                  "fill": "#3A3A3C",
+                  "content": "② 进入第 2 步：从左上角伸出（约 0.25s）",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 17,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "nIWL7",
+              "name": "State",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "H3NUxq",
+                  "name": "Crop",
+                  "clip": true,
+                  "width": 470,
+                  "height": 260,
+                  "cornerRadius": 12,
+                  "stroke": "#E3E1DA",
+                  "strokeWidth": 1,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "id": "obS0N",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Stage bg",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "png/subtitle/stage-light.png",
+                        "mode": "cover"
+                      },
+                      "width": 1280,
+                      "height": 768
+                    },
+                    {
+                      "type": "frame",
+                      "id": "jutrG",
+                      "x": 20,
+                      "y": 20,
+                      "name": "Anchor",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "QB8Q8",
+                          "name": "Step label",
+                          "fill": "#0000008C",
+                          "cornerRadius": 10,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "padding": [
+                            10,
+                            16
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "heEsE",
+                              "name": "Line",
+                              "gap": 8,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "VRaBv",
+                                  "name": "Num",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": "#FFD43B",
+                                  "cornerRadius": 999,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "wKnyP",
+                                      "name": "N",
+                                      "fill": "#1D1D1F",
+                                      "content": "2",
+                                      "fontFamily": "Noto Sans SC",
+                                      "fontSize": 12,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "AGxeE",
+                                  "name": "Caption",
+                                  "fill": "#FFFFFF",
+                                  "content": "发送登录链接",
+                                  "fontFamily": "Noto Sans SC",
+                                  "fontSize": 16,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "hbIJI",
+                              "name": "Explain",
+                              "fill": "#FFFFFFB3",
+                              "content": "链接 15 分钟内有效，只能用一次",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 13,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "QxdN8",
+                  "name": "Cap",
+                  "fill": "#3A3A3C",
+                  "content": "③ 停留约 2.5s（有说明时显示第二行）",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 17,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "X6qGH",
+              "name": "State",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "daZG1",
+                  "name": "Crop",
+                  "clip": true,
+                  "width": 470,
+                  "height": 260,
+                  "cornerRadius": 12,
+                  "stroke": "#E3E1DA",
+                  "strokeWidth": 1,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "id": "w5ilV",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Stage bg",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "png/subtitle/stage-light.png",
+                        "mode": "cover"
+                      },
+                      "width": 1280,
+                      "height": 768
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "Lj0aQ",
+                  "name": "Cap",
+                  "fill": "#3A3A3C",
+                  "content": "④ 缩回隐藏（约 0.25s）",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 17,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "o6KHEp",
+          "name": "Full stage",
+          "gap": 48,
+          "children": [
+            {
+              "type": "frame",
+              "id": "Dz9I1",
+              "name": "Stage",
+              "clip": true,
+              "width": 1280,
+              "height": 768,
+              "fill": {
+                "type": "image",
+                "enabled": true,
+                "url": "png/subtitle/stage-light.png",
+                "mode": "cover"
+              },
+              "cornerRadius": 14,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "kO0T4",
+                  "x": 20,
+                  "y": 20,
+                  "name": "Anchor",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "C4cdY",
+                      "name": "Step label",
+                      "fill": "#0000008C",
+                      "cornerRadius": 10,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "padding": [
+                        10,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "e1Fd28",
+                          "name": "Line",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "lSkUK",
+                              "name": "Num",
+                              "width": 20,
+                              "height": 20,
+                              "fill": "#FFD43B",
+                              "cornerRadius": 999,
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "NI6gP",
+                                  "name": "N",
+                                  "fill": "#1D1D1F",
+                                  "content": "2",
+                                  "fontFamily": "Noto Sans SC",
+                                  "fontSize": 12,
+                                  "fontWeight": "700"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "Oyroe",
+                              "name": "Caption",
+                              "fill": "#FFFFFF",
+                              "content": "发送登录链接",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 16,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "rgY66",
+                          "name": "Explain",
+                          "fill": "#FFFFFFB3",
+                          "content": "链接 15 分钟内有效，只能用一次",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "sM1EQ",
+                  "x": 0,
+                  "y": 628,
+                  "name": "Dock",
+                  "width": 1280,
+                  "height": 140,
+                  "padding": [
+                    0,
+                    0,
+                    28,
+                    0
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "UaTkP",
+                      "name": "Subtitle",
+                      "fill": "#0000008C",
+                      "cornerRadius": 10,
+                      "padding": [
+                        11,
+                        24
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "fFgrS",
+                          "name": "Line",
+                          "fill": "#FFFFFF",
+                          "content": "没注册的邮箱也会提示已发送，这样别人就试不出谁有账号。",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 17,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "yCB9T",
+              "name": "Notes",
+              "width": 620,
+              "layout": "vertical",
+              "gap": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Rxyq5",
+                  "name": "Note",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "规则",
+                  "lineHeight": 1.55,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "U4BIj",
+                  "name": "Note",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· 只在标题变化时弹出：同一步内不重复弹；连续快速翻步时只显示最新那一条。",
+                  "lineHeight": 1.55,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "jkTaL",
+                  "name": "Note",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· 停留时间：约 2.5s，有说明（explain）时多停一会儿（按字数，最多约 5s）；暂停时停住不收。",
+                  "lineHeight": 1.55,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "pkO4t",
+                  "name": "Note",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· 鼠标移到左上角，或停在步骤条当前这一格，重新展开。",
+                  "lineHeight": 1.55,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "WWccL",
+                  "name": "Note",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· 截图、深链、静态画面：显示展开状态，分镜图里每一格都带标题。",
+                  "lineHeight": 1.55,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "CU07r",
+                  "name": "Note",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· 导出视频：照常弹出再收回，所以视频里也看得到每一步的标题。",
+                  "lineHeight": 1.55,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "fKETp",
+                  "name": "Note",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "· 字幕（画面中间）和标题条（左上角）分工：中间是正在说的话，左上角是这一步叫什么。",
+                  "lineHeight": 1.55,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "x8YXpo",
+                  "name": "Note",
+                  "fill": "#3A3A3C",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "注意：展开的 2.5s 里会压住画面左上角的内容（图里压住了白板标题“免密登录 · 流程白板”）。它是临时的，收回后就露出来；check / render 可以提示“左上角有重要内容会被标题条短暂压住”。",
+                  "lineHeight": 1.55,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "ZhRZb",
+                  "name": "Note",
+                  "fill": "#B25000",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "待定：收回后是完全隐藏，还是留一个小圆点 / 步骤号让人知道可以再点开？",
+                  "lineHeight": 1.55,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 18,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "themes": {

@@ -30,6 +30,8 @@ export function createRu(locale: Locale = 'ru') {
       turnNarrationOn: "Включить озвучку",
       turnNarrationOff: "Выключить озвучку",
       readingAloud: "Читается вслух",
+      showStepTitle: "Показать название шага",
+      hideStepTitle: "Скрыть название шага",
       browserVoiceFallback: "Голос браузера",
       waitingForNarration: "Ждём, пока закончится озвучка",
       narrationAvailable: "В этой демонстрации есть озвучка",

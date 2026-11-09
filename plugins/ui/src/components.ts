@@ -136,3 +136,7 @@ export const TabBar = c('TabBar');
 
 // ---------- Joplo ----------
 export const Placeholder = c('Placeholder');
+export const Board = c('Board');
+export const BrowserWindow = c('BrowserWindow');
+export const Note = c('Note');
+export const Arrow = c('Arrow');

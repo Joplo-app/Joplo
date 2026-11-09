@@ -12,7 +12,7 @@ import type { Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { useI18n } from '../i18n/context';
 import { cn } from '@/lib/utils';
-import type { SubtitleContent } from './subtitle-content';
+import type { SpokenSubtitle } from './subtitle-content';
 import { phoneLayout } from './watch';
 import { ROTATED_ATTR } from '../renderer/rect';
 
@@ -43,7 +43,7 @@ type Props = {
   ctl: DemoController;
   snap: Snapshot;
   scenario: Scenario | null;
-  subtitle: SubtitleContent | null;
+  subtitle: SpokenSubtitle | null;
   /** 舞台（视频式 StageViewport）。 */
   stage: ReactNode;
   title: string;
@@ -117,8 +117,8 @@ export function WatchView(p: Props) {
   const finished = !!scenario && !snap.playing && total > 0 && (!!snap.state?.completed || pos >= total) && isLast;
   const progress = total ? Math.round((pos / total) * 100) : 0;
   const chapterLabel = chapterIndex >= 0 ? i18n.player.watchChapterOf(chapterIndex + 1, p.chapters.length) : '';
-  // 封面、过渡卡这一步字幕为空（画面上已经是大字）：竖屏时显示“第几章 · 章节名”，不让字幕区空着
-  const spoken = p.subtitle ? [p.subtitle.caption, p.subtitle.explain].filter(Boolean).join(' · ') : '';
+  // 封面、过渡卡这一步没有字幕（画面上已经是大字）：竖屏时显示“第几章 · 章节名”，不让字幕区空着
+  const spoken = p.subtitle?.text ?? '';
   const caption = spoken || (scenario ? [chapterLabel, scenario.name].filter(Boolean).join(' · ') : '');
 
   if (immersive)

@@ -1,6 +1,6 @@
 import type { ClockSource } from '../runtime/clock';
 import { EngineClockContext } from '../renderer/engine-motion';
-import { useEngineAnimations } from '../renderer/engine-animations';
+import { exemptFromEngineAnimations, useEngineAnimations } from '../renderer/engine-animations';
 import { useI18n } from '../i18n/context';
 /**
  * 舞台的显示区域（看板与发布站共用）：
@@ -37,7 +37,7 @@ import { JoploMark } from './JoploMark';
 /** 发布站水印的去向与读屏文字（D83）。 */
 export type StageWatermark = { href: string; label: string };
 
-export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false, video = false, watermark, playground, clock }: {
+export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false, video = false, watermark, playground, clock, hud }: {
   viewport: Viewport; notice: Notice | null; onDismiss: () => void; /** 「回到演示」（顺序不对的提示）。 */ onBack?: () => void; children: (size: { width: number; height: number }) => ReactNode; tag?: ReactNode; theme?: StageTheme; stroke?: StrokeMode; font?: AppearanceFont | null;
   /**
    * 幕布（D61：过渡卡、场景封面）：铺满整个显示区域，不进手机外框。逻辑尺寸与电脑页面的舞台相同（fillStage），
@@ -52,11 +52,15 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   watermark?: StageWatermark;
   playground?: ReactNode;
   clock?: ClockSource;
+  /** 浮在画面上的字幕与步骤标题条（D97）：在幕布之上、提示之下。 */
+  hud?: ReactNode;
 }) {
   const { t: i18n } = useI18n();
 
   const box = useRef<HTMLDivElement>(null);
   useEngineAnimations(box, clock);
+  // 字幕与步骤标题条是界面，不是画面：动画用浏览器时间（暂停时也能展开、淡入）
+  const hudRef = useCallback((el: HTMLDivElement | null) => { if (el) exemptFromEngineAnimations(el); }, []);
   const [avail, setAvail] = useState({ w: 800, h: 500 });
   useLayoutEffect(() => {
     const el = box.current;
@@ -159,6 +163,7 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
           </div>
         </div>
       ) : null}
+      {hud ? <div ref={hudRef} className="contents" data-jhud="">{hud}</div> : null}
     </div></EngineClockContext.Provider>
   );
 }

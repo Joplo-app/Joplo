@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright-core';
-import { JoploError, SUBTITLE_HEIGHT, displaySceneId, type Project } from '@joplo-app/core';
+import { JoploError, displaySceneId, type Project } from '@joplo-app/core';
 import type { FilmOptions, FilmResult, FilmCut, FilmStill, FilmBoundary, VideoOptions, VideoResult } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';
@@ -160,7 +160,9 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
     await page.clock.pauseAt(now + 1);
     const helper = await ctx.newPage();
     await helper.setContent(DIFF_PAGE);
-    const stageRatio = (size.height - SUBTITLE_HEIGHT) / size.height;
+    // 字幕与步骤标题条浮在画面上（D97）：胶片条只看画面本身的运动，采样时把它们藏起来，文字换行不算镜头切换
+    await page.addStyleTag({ content: '[data-jsubtitle],[data-testid="step-title"]{visibility:hidden!important}' });
+    const stageRatio = 1;
     const samples: Sample[] = [];
     let tail = -1;
     // 第一帧在开播之前采（封面 / 第 0 步）：开播那一下的切换也要量到

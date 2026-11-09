@@ -6,9 +6,9 @@ const zh = { ...createZhCN(), ...createBoardZhCN() };
  * 全屏快捷键（isFullscreenKey）。界面（全屏、浮动控制淡出）由用户在浏览器里检查。
  */
 import { describe, expect, it } from 'vitest';
-import { SUBTITLE_HEIGHT, VIEWPORT_SIZE, type Scenario } from '@joplo-app/core';
+import { VIEWPORT_SIZE, type Scenario } from '@joplo-app/core';
 import { fillStage } from '../src/player/fit';
-import { subtitleFor, subtitleHeight } from '../src/player/subtitle-content';
+import { spokenSubtitleFor, stepTitleFor } from '../src/player/subtitle-content';
 import { isFullscreenKey } from '../src/player/fullscreen';
 
 const base = VIEWPORT_SIZE.desktop;
@@ -43,27 +43,18 @@ const sc = {
   description: undefined,
   mock: { label: '模拟成功', outcome: 'success' },
   steps: [
-    { id: 'a', kind: 'user', caption: '点击发送' },
-    { id: 'b', kind: 'system', caption: '结束', explain: undefined },
+    { id: 'a', kind: 'user', caption: '点击发送', action: { type: 'click', target: 'send' } },
+    { id: 'b', kind: 'system', caption: '结束', explain: undefined, action: { type: 'event', name: '结束' } },
   ],
 } as unknown as Scenario;
 
-describe('字幕区：自适应高度与结果小标记', () => {
-  it('没有 explain 时只占一行；有 explain 时两行；都不超过导出用的固定高度', () => {
-    const one = subtitleFor(sc, 1, null, undefined, zh)!;
-    const two = subtitleFor({ ...sc, steps: [{ ...sc.steps[0]!, explain: '补充一句' }] } as Scenario, 1, null, undefined, zh)!;
-    expect(subtitleHeight(one)).toBeLessThan(subtitleHeight(two));
-    expect(subtitleHeight(one)).toBeLessThanOrEqual(56);
-    expect(subtitleHeight(two)).toBeLessThanOrEqual(SUBTITLE_HEIGHT);
-    expect(subtitleHeight(null)).toBe(subtitleHeight(one));
-  });
-  it('平时右侧是弱化的“n / m”（D61；读屏仍是“第 n / 共 m 步”）；场景完成后是“场景完成 · 模拟成功”，第二行没有 explain 时显示结果说明（不再在步骤条里重复）', () => {
-    expect(subtitleFor(sc, 1, null, undefined, zh)!.badge).toEqual({ kind: 'progress', text: '1 / 2', label: '第 1 / 2 步' });
-    const done = subtitleFor(sc, 2, null, { text: '大脑规划，两只手各自执行', outcome: 'success' }, zh)!;
-    expect(done.badge).toMatchObject({ kind: 'done', text: '场景完成 · 模拟成功', outcome: 'success' });
-    expect(done.explain).toBe('大脑规划，两只手各自执行');
-    // 正在播放（还没提交）时不显示完成
-    expect(subtitleFor(sc, 2, 1, { text: 'x', outcome: 'success' }, zh)!.badge.kind).toBe('progress');
+describe('字幕与步骤标题条（D97）：不再有 n / m 进度，完成结果在标题条里', () => {
+  it('字幕只有正在说的话；场景完成时标题条是“场景完成 · 模拟成功”与结果说明，正在播放时不显示完成', () => {
+    expect(spokenSubtitleFor(sc, 1, null, zh)).toMatchObject({ index: 1, source: 'caption' });
+    expect(Object.keys(spokenSubtitleFor(sc, 1, null, zh)!)).not.toContain('badge');
+    const done = stepTitleFor(sc, 2, null, { text: '大脑规划，两只手各自执行', outcome: 'success' }, zh)!;
+    expect(done).toMatchObject({ caption: '场景完成 · 模拟成功', explain: '大脑规划，两只手各自执行', done: { outcome: 'success' } });
+    expect(stepTitleFor(sc, 2, 1, { text: 'x', outcome: 'success' }, zh)!.done).toBeNull();
   });
 });
 

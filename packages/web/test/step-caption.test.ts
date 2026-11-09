@@ -7,7 +7,7 @@ import { createZhCN } from '../src/i18n/zh-CN';
 import { m, translate } from '../src/i18n/messages';
 import { stepCaption, mockLabel, selectionLabel } from '../src/i18n/step-caption';
 import { timelineChips } from '../src/player/layout';
-import { subtitleFor } from '../src/player/subtitle-content';
+import { spokenSubtitleFor, stepTitleFor } from '../src/player/subtitle-content';
 
 it('keeps author captions and mock labels verbatim and translates generated text at consumption', () => {
   const t = createZhCN();
@@ -23,7 +23,9 @@ it('keeps author captions and mock labels verbatim and translates generated text
   expect(mockLabel(mock,t)).toBe('模拟成功');
   expect(mockLabel({...mock,auto:undefined,label:'作者的结果'},en)).toBe('作者的结果');
   const sc = {steps:[step],mock} as Scenario;
-  expect(subtitleFor(sc,1,null,{outcome:'success',text:'作者的说明'},t)).toMatchObject({caption:'点击「Send」',badge:{text:'场景完成 · 模拟成功'}});
+  expect(spokenSubtitleFor(sc,1,null,t)).toMatchObject({text:'点击「Send」',source:'caption'});
+  expect(stepTitleFor(sc,1,null,null,t)).toMatchObject({caption:'点击「Send」'});
+  expect(stepTitleFor(sc,1,null,{outcome:'success',text:'作者的说明'},t)).toMatchObject({caption:'场景完成 · 模拟成功',explain:'作者的说明'});
   for (const kind of ['type','select','check','uncheck','switch_on','switch_off','back','press'] as const) {
     const s = {...step,captionAuto:{kind,label:'Send',value:'作者值',keys:'Enter'}};
     expect(stepCaption(s,t)).not.toBe(stepCaption(s,en));

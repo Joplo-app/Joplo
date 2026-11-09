@@ -30,6 +30,8 @@ export function createKo(locale: Locale = 'ko') {
       turnNarrationOn: "내레이션 켜기",
       turnNarrationOff: "내레이션 끄기",
       readingAloud: "읽는 중",
+      showStepTitle: "단계 제목 보기",
+      hideStepTitle: "단계 제목 숨기기",
       browserVoiceFallback: "브라우저 낭독",
       waitingForNarration: "내레이션이 끝나기를 기다리는 중",
       narrationAvailable: "이 데모에는 내레이션이 있습니다",

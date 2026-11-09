@@ -38,6 +38,8 @@ const STRUCTURE = [
   ...HTML,
   // Joplo
   'Placeholder', // props: label, h —— 图片/图表等占位
+  // 白板（D96）：一块白板上摆多屏画面，箭头连成流程，便签写说明
+  'Board', 'BrowserWindow', 'Note', 'Arrow',
 ] as const;
 
 /** 看起来可操作：必须有演示行为、明确禁用并说明原因，或标记 unmodeled。 */
@@ -69,7 +71,7 @@ export const GATED_CONTAINERS: ReadonlySet<string> = new Set<string>(['Modal', '
 
 /**
  * 每个组件一行常用属性提示（`joplo skill components` 由此生成）。所有组件另外都接受：
- * 样式属性 m/mt/mb/ml/mr/mx/my、p/pt/pb/pl/pr/px/py、w/h/miw/maw/mih/mah、c/bg/fz/fw/ta/ff/lh/opacity，
+ * 样式属性 m/mt/mb/ml/mr/mx/my、p/pt/pb/pl/pr/px/py、w/h/miw/maw/mih/mah、pos/top/left/right/bottom、c/bg/fz/fw/ta/ff/lh/opacity，
  * 响应式写成 { base, xs, sm, md, lg, xl }；visibleFrom / hiddenFrom；以及 Joplo 属性 id/when/disabled/disabledReason/unmodeled/note。
  */
 export const COMPONENT_DOCS: Record<ComponentType, string> = {
@@ -177,6 +179,10 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'Menu.Label': 'Section label inside Menu.Dropdown',
   'Menu.Divider': 'Divider inside Menu.Dropdown',
   Placeholder: 'label, h; placeholder for images, charts, etc.',
+  Board: 'dots (dotted paper, default true); a whiteboard: place screens, notes and arrows on it with pos="absolute" top / left (design px). Put it inside content:Canvas to move the camera between screens',
+  BrowserWindow: 'url, label (caption above the frame, e.g. "1. Sign in"), w, h; a browser window frame for one screen on a Board; children are its page',
+  Note: 'color (yellow default; pink, blue, green, gray), rotate (degrees, default -2), w; a sticky note that stays on the Board; children = text',
+  Arrow: 'from, to (ids of elements on the same Board), label, bend (-1…1, default 0.25), dashed, color; a persistent arrow between two elements; direct child of Board, reveal it with when',
   Button: 'variant: filled|light|outline|subtle|default|white, color, size, fullWidth, loading, leftSection / rightSection (character)',
   ActionIcon: "Icon button: aria-label (required as name), variant, color, size; one character child such as '+'",
   CloseButton: 'aria-label, size',
@@ -211,6 +217,16 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
  * 只给最容易写错、或需要和步骤配合的组件；其余组件看 COMPONENT_DOCS 的一行提示就够。
  */
 export const COMPONENT_EXAMPLES: Partial<Record<ComponentType, string>> = {
+  Board: `<Canvas w={2400} h={1400}>
+  <Board>
+    <BrowserWindow id="login" label="1. Sign in" url="app.com/login" pos="absolute" top={200} left={120} w={520} h={400}>
+      <Stack p="lg"><TextInput id="email" label="Email" /><Button id="send">Send link</Button></Stack>
+    </BrowserWindow>
+    <BrowserWindow id="sent" label="2. Check email" pos="absolute" top={200} left={800} w={520} h={400} when={$.ui.sent}>…</BrowserWindow>
+    <Arrow id="a_send" from="send" to="sent" label="send" when={$.ui.sent} />
+    <Note id="n_privacy" pos="absolute" top={660} left={140} color="pink">Unknown email? Still say "sent"</Note>
+  </Board>
+</Canvas>`,
   EmptyState: `<EmptyState icon="✉" title="No members yet" description="Invite teammates to start working together">
   <Button id="invite_first">Invite members</Button>
 </EmptyState>`,

@@ -233,8 +233,8 @@ describe('D88 real browser input and clock',()=>{
       const timeline=await embedded.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__));
       await field.click();expect(await field.getAttribute('aria-checked')).toBe('false');
       expect(await embedded.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__))).toBe(timeline);
-      expect(await embedded.getByTestId('playground-notice').isVisible()).toBe(true);
-      await embedded.getByTestId('playground-reset').focus();await embedded.keyboard.press('Enter');
+      // D97：自由体验不再显示状态卡（只有切换场景时才有确认框）
+      expect(await embedded.getByTestId('playground-notice').count()).toBe(0);
       expect(await field.getAttribute('aria-checked')).toBe('false');
       await field.click();await embedded.getByTestId('embed-toggle').click();
       await embedded.waitForFunction(()=>(window as any).__JOPLO_UI__?.paused===false);
@@ -293,7 +293,8 @@ describe('D88 real browser input and clock',()=>{
       await expect.poll(()=>viewer.locator('[data-jid="profile"]').count()).toBe(1);
       expect(await viewer.locator('[data-jid="profile"]').innerText()).toBe('Profile open');
       expect(await viewer.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__))).toBe(timeline);
-      await viewer.getByTestId('playground-reset').click();
+      // D97：没有自由体验状态卡了；控制条的 ↺（回到开头）同样丢弃自由体验的改动
+      await viewer.getByTestId('ctl-reset').click();
       await expect.poll(()=>viewer.locator('[data-jid="profile"]').count()).toBe(0);
       expect(failures).toEqual([]);
     }finally{await context.close();}
