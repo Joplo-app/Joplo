@@ -3,7 +3,7 @@ name: joplo-plugin-alda
 description: "Use the Alda background music plugin in Joplo; read its entry, component recipes and recovery rules for this project."
 ---
 
-# Joplo plugin alda: Alda background music 0.4.1
+# Joplo plugin alda: Alda background music 0.5.0
 
 Author package: @joplo-app/plugin-alda
 # Alda background music: compose, inspect, render
@@ -158,4 +158,4 @@ General engine contracts: npx joplo skill plugins
 ## Installed references
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.4.1 sha256:c4499a462fa2a19d3f26bda9340154c088471331c94c786eff27e52395f1f2f5 -->
+<!-- joplo-skill 0.5.0 sha256:0f04395ddeaa3bedb0e4191ea3f94c4e2e9a909f291e91e3c7b9c8cc620798d0 -->

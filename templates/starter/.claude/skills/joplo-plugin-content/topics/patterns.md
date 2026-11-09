@@ -69,4 +69,4 @@ Symptoms in an existing piece: one board per chapter (label, big title, panels, 
 - Whole-screen white/colour flashes over a still picture look like a stalled player; keep the picture moving under any fade.
 
 Common pitfall: For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, film-strip the chain, and verify playback before claiming it works
-<!-- joplo-skill 0.4.1 sha256:9457540221d0661186b73ca41f4a38d1707f081c4098de4d8df40e645f0ebec3 -->
+<!-- joplo-skill 0.5.0 sha256:9457540221d0661186b73ca41f4a38d1707f081c4098de4d8df40e645f0ebec3 -->
