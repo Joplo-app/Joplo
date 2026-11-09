@@ -59,7 +59,7 @@ it('reads IR step captions only inside stepCaption (including aliases and indexe
     visit(source);
   }
   expect(errors).toEqual([]);
-});
+}, 30_000); // 整个 web 项目建 TypeScript 程序做类型扫描，CI 上约 5 s，默认 5 s 超时太紧
 
 it('localizes selected-step labels without changing the English selection record', () => {
   const project = Project.parse({schemaVersion:2,mode:'dev',name:'Test',scenarios:{s:{id:'s',optionId:'f.a',name:'Demo',mock:{label:'Mock',outcome:'other'},initial:{sceneId:'scene'},steps:[{id:'s#1',kind:'user',action:{type:'press',keys:'Enter'},caption:'Press Enter',captionAuto:{kind:'press',label:'',keys:'Enter'}}]}}});
