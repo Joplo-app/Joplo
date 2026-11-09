@@ -52,7 +52,7 @@ export const PITFALLS = [
   ['Full-height layouts squeeze tables and forms: rows exist in the DOM but are cut off on screen; show 5–8 rows or move the table to its own layer', 'demo'],
   ['Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key and pins that layer, so later steps stop switching layers; layer= is ignored); wait for rendering before screenshots', 'demo'],
   ['Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user', 'cases'],
-  ['Never share or deploy without the user\'s go-ahead; free share links expire after 7 days', 'publish'],
+  ['Never share or deploy without the user\'s go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself', 'publish'],
 ] as const satisfies readonly (readonly [string, string])[];
 
 /** 中文触发词：技能 description 里的匹配文本，不是 CLI 界面文案（english-output 测试的白名单）。 */

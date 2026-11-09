@@ -62,7 +62,7 @@ export function cloudBridge(opts: BridgeOptions): CloudBridge {
       if (!auth) return signedOut();
       try {
         const me = await c.me(auth.token);
-        return { signedIn: true, server: c.server, email: me.user.email, plan: me.plan };
+        return { signedIn: true, server: c.server, email: me.user.email, plan: me.plan, ...(me.storage ? { storage: me.storage } : {}) };
       } catch (e) {
         if (e instanceof CloudError && AUTH_CODES.has(e.code)) return signedOut(e.message, fixOf(e, c.server));
         // 云端暂时连不上：仍然算已登录（发布时再报网络错误），邮箱用本机登录里记的
@@ -78,13 +78,16 @@ export function cloudBridge(opts: BridgeOptions): CloudBridge {
       try {
         const { share } = await import('./cloud-share.ts');
         const { result, plan } = await share(c, projectDir, { ...(request.scenarios?.length ? { scenarios: request.scenarios } : {}), ...(request.features?.length ? { features: request.features } : {}) }, opts.build, opts.render);
-        return { shareId: result.shareId, url: result.url, expiresAt: result.expiresAt, version: result.version, plan, ...(result.scope ? { scope: result.scope } : {}) };
+        return { shareId: result.shareId, url: result.url, expiresAt: result.expiresAt, version: result.version, plan, ...(result.scope ? { scope: result.scope } : {}), ...(result.storage ? { storage: result.storage } : {}) };
       } catch (e) {
         const code = e instanceof CloudError || e instanceof JoploError ? e.code : 'INTERNAL';
         // 检查没过：带上第一条错误的位置，看板里直接能看到改哪里
         const diag = e instanceof JoploError ? e.diagnostics.find((d) => d.severity === 'error') : undefined;
         const message = redact(`${e instanceof Error ? e.message : String(e)}${diag ? `\n${diag.at ? `${diag.at}  ` : ''}${diag.message}` : ''}`);
-        throw Object.assign(new Error(message), { code, ...(AUTH_CODES.has(code) ? { loginCommand: fixOf(e, c.server) } : {}) });
+        // 容量不足（C27）：把数字和链接交给看板，画成红色提示，不只是一段英文报错
+        const details = e instanceof CloudError ? e.details as { kind?: unknown } | undefined : undefined;
+        const storage = code === 'QUOTA_EXCEEDED' && details?.kind === 'storage' ? (({ kind: _kind, ...rest }) => rest)(details as Record<string, unknown>) : undefined;
+        throw Object.assign(new Error(message), { code, ...(AUTH_CODES.has(code) ? { loginCommand: fixOf(e, c.server) } : {}), ...(storage ? { storage } : {}) });
       }
     },
   };

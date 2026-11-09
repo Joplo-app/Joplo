@@ -1,5 +1,5 @@
 import { Command, CommanderError, Option } from 'commander';
-import { terminalText } from './cloud-error.ts';
+import { formatBytes, terminalText } from './cloud-error.ts';
 import type { CloudDependencies } from './cloud.ts';
 import { resolve } from 'node:path';
 import { COMPONENT_DOCS, componentDetails, guide, JoploError, skillIndex, skillTopic } from '@joplo-app/core';
@@ -161,7 +161,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         line(`Published ${published.result.mode === 'review' ? 'the review version ' : ''}${scope ? 'a scoped share ' : ''}${published.result.url}\n${published.result.expiresAt ? `Expires at: ${terminalText(published.result.expiresAt)}` : 'Permanent link'}`);
         if (scope) line(`Scope: ${scope.scenarios.length} scenario(s): ${scope.scenarios.join(', ')}. The main link and the review link are unchanged`);
         if (published.result.pr) { const { prCommentLine } = await import('./cloud-pr.ts'); const note = prCommentLine(published.result.pr, client.server); if (note) line(note); }
-        if (published.plan === 'free') line(`Free shares expire after 7 days. Upgrade for permanent links: ${client.server}/settings/billing`);
+        // C27：免费分享不再过期；改为告诉作者账号用了多少空间
+        if (published.result.storage) line(`Storage: ${formatBytes(published.result.storage.usedBytes)} of ${formatBytes(published.result.storage.quotaBytes)} used (this share: ${formatBytes(published.result.storage.shareBytes)})`);
         line(`Add to README: ${terminalText(published.result.embed.markdown)}\nMore embed options: ${client.server}/shares/${published.result.shareId}`);
       }
     });
@@ -358,7 +359,9 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const wantsJson = args.some((arg, i) => arg === '--format=json' || arg === '--format' && args[i + 1] === 'json');
     if (args[0] === 'review' || args[0] === 'feedback' && (args.includes('watch') || args.includes('list'))) stderr((args.includes('--json') || wantsJson ? JSON.stringify(f) : `${f.error.code}  ${f.error.message.split('\n').map(line => terminalText(line)).join('\n')}`) + '\n');
     else if (wantsJson) json(f); else line(`${f.error.code}  ${oneLine(terminalText(f.error.message))}`);
-    return f.error.code === 'USAGE' ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : f.error.code === 'EXPORT_COMPONENT_MISSING' ? 4 : 1;
+    // 6：账号容量不足（C27），与 QUOTA_EXCEEDED 的其他种类（每小时限额，可以稍后重试）区分
+    const storageFull = f.error.code === 'QUOTA_EXCEEDED' && (f.error.details as { kind?: unknown } | undefined)?.kind === 'storage';
+    return f.error.code === 'USAGE' ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : f.error.code === 'EXPORT_COMPONENT_MISSING' ? 4 : storageFull ? 6 : 1;
   }
   return exitCode;
 }

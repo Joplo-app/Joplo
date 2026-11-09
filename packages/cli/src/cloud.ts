@@ -10,7 +10,7 @@ import { createInterface } from 'node:readline/promises';
 import { JoploError } from '@joplo-app/core';
 import type { checkWithProject } from './check.ts';
 import type { PrDependencies } from './cloud-pr.ts';
-import { CloudError, sizeError, terminalText, type CloudCode, type SizeDetails } from './cloud-error.ts';
+import { CloudError, sizeError, storageError, terminalText, type CloudCode, type SizeDetails } from './cloud-error.ts';
 import { alignCommand, detectPackageManager, pmCommands } from './pm.ts';
 
 export type Credentials = { server: string; accessToken: string; user: { id: string; email: string }; createdAt: string };
@@ -18,7 +18,16 @@ export type Credentials = { server: string; accessToken: string; user: { id: str
 export type Auth = { token: string; source: 'session' | 'api_key' };
 /** whoami 里 API Key 的展示信息：服务端返回什么就显示什么，缺字段为 null。 */
 export type ApiKeyInfo = { name: string | null; prefix: string | null; scopes: string[] | null; expiresAt: string | null };
-export type Account = { user: { id: string; email: string; name: string }; plan: 'free' | 'pro'; limits: { maxUploadBytes: number; maxTotalBytes: number; maxFiles: number; publishesPerHour: number | null }; apiKey?: ApiKeyInfo };
+/** 账号容量（C27）：已用 / 上限（字节）；旧服务器不返回时为 undefined。 */
+export type StorageUsage = { usedBytes: number; quotaBytes: number };
+export type Account = { user: { id: string; email: string; name: string }; plan: 'free' | 'pro'; limits: { maxUploadBytes: number; maxTotalBytes: number; maxFiles: number; publishesPerHour: number | null }; storage?: StorageUsage; apiKey?: ApiKeyInfo };
+/** 服务器给的容量合法时才采纳（非负安全整数）；extra 是额外要求的字段（例如 finalize 的 shareBytes）。 */
+export function readStorage<K extends string = never>(value: unknown, extra: readonly K[] = []): (StorageUsage & Record<K, number>) | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const d = value as Record<string, unknown>, keys = ['usedBytes', 'quotaBytes', ...extra];
+  if (!keys.every(k => Number.isSafeInteger(d[k]) && Number(d[k]) >= 0)) return undefined;
+  return Object.fromEntries(keys.map(k => [k, Number(d[k])])) as StorageUsage & Record<K, number>;
+}
 /** 契约 8.4：jpk_ + 至少 32 位 base62。 */
 export const API_KEY_PATTERN = /^jpk_[0-9A-Za-z]{32,}$/;
 export const API_KEY_FIX = 'Create a new key in Settings → API keys';
@@ -299,6 +308,8 @@ export class CloudClient {
       // API Key 缺少权限范围时 SaaS 返回 403 FORBIDDEN；不能被映射成“账号不可用”
       if (token?.startsWith('jpk_') && response.status === 403 && data.code !== 'PLAN_REQUIRED')
         throw new CloudError('FORBIDDEN', `The API key ${apiKeyPrefix(token)}… does not have permission for this action. ${API_KEY_FIX} with the required scope: ${this.server}/settings/api-keys`, { fix: `${this.server}/settings/api-keys` });
+      // C27：容量不足是 413 + STORAGE_FULL；旧 CLI 会把它当成 TOO_LARGE，这里转成 QUOTA_EXCEEDED（kind: storage）
+      if (response.status === 413 && data.code === 'STORAGE_FULL') throw storageError(data.data ?? data.details, this.server);
       const code = responseCode(response.status, data.code, Boolean(token));
       if (code === 'NETWORK') {
         const afterMs = response.status === 503 ? retryAfterMillis(response.headers.get('retry-after'), this.now()) : undefined;
@@ -320,7 +331,7 @@ export class CloudClient {
   async me(token: string): Promise<Account> {
     const d = await this.request('/api/v1/me', token), u = object(d.user), l = object(d.limits);
     if (!nonempty(u.id) || !nonempty(u.email) || typeof u.name !== 'string' || !['free', 'pro'].includes(String(d.plan)) || !Number.isSafeInteger(l.maxUploadBytes) || Number(l.maxUploadBytes) < 0 || !Number.isSafeInteger(l.maxTotalBytes) || Number(l.maxTotalBytes) < 0 || !Number.isSafeInteger(l.maxFiles) || Number(l.maxFiles) < 1 || !(l.publishesPerHour === null || Number.isSafeInteger(l.publishesPerHour) && Number(l.publishesPerHour) >= 0)) throw new CloudError('INVALID_RESPONSE');
-    const account: Account = { user: { id: u.id, email: u.email, name: u.name }, plan: d.plan as Account['plan'], limits: { maxUploadBytes: l.maxUploadBytes as number, maxTotalBytes: l.maxTotalBytes as number, maxFiles: l.maxFiles as number, publishesPerHour: l.publishesPerHour as number | null } };
+    const account: Account = { user: { id: u.id, email: u.email, name: u.name }, plan: d.plan as Account['plan'], limits: { maxUploadBytes: l.maxUploadBytes as number, maxTotalBytes: l.maxTotalBytes as number, maxFiles: l.maxFiles as number, publishesPerHour: l.publishesPerHour as number | null }, ...(readStorage(d.storage) ? { storage: readStorage(d.storage) } : {}) };
     // 用 API Key 调用时附上 Key 的展示信息（服务端没给的字段为 null；前缀缺省时用本地 Key 的前 8 位）
     if (token.startsWith('jpk_')) {
       const info = readApiKeyInfo(d.credential);

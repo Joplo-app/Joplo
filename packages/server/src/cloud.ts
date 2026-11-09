@@ -15,13 +15,17 @@ import type { ScopeInfo } from '@joplo-app/core';
 export const CLOUD_EVENT = 'joplo:cloud';
 
 export type CloudAccount =
-  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null }
+  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; /** 账号容量（C27）；云端连不上或旧云端时没有。 */ storage?: CloudStorage }
   | { signedIn: false; server: string; loginCommand: string; message?: string };
+/** 账号容量（C27）：已用 / 上限，字节。 */
+export type CloudStorage = { usedBytes: number; quotaBytes: number };
+/** 容量不足（QUOTA_EXCEEDED，kind: storage）：数字可能缺；两个链接已拼好当前 server。 */
+export type CloudStorageFull = { usedBytes?: number; quotaBytes?: number; shareBytes?: number; replacedBytes?: number; manageUrl: string; upgradeUrl: string };
 
 /** 范围：都为空 = 整个项目（D75）。 */
 export type CloudPublishRequest = { scenarios?: string[]; features?: string[] };
 
-export type CloudPublishResult = { shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: ScopeInfo };
+export type CloudPublishResult = { shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）。 */ storage?: CloudStorage & { shareBytes: number } };
 
 /** CLI 实现：account 只读本机登录（必要时问一次云端套餐）；publish 就是 share()，progress 是它写给终端的每一行。 */
 export type CloudBridge = {
@@ -30,7 +34,7 @@ export type CloudBridge = {
 };
 
 /** 发布失败：code 来自 CLI（AUTH_REQUIRED、NOT_FOUND、NETWORK…）；需要登录时带 loginCommand。 */
-export type CloudJobError = { code: string; message: string; loginCommand?: string };
+export type CloudJobError = { code: string; message: string; loginCommand?: string; /** 容量不足时的数字与链接（C27）。 */ storage?: CloudStorageFull };
 
 export type CloudJob = {
   id: string;
@@ -125,12 +129,13 @@ export class CloudHub {
         job.result = result;
       })
       .catch((e: unknown) => {
-        const err = e as { code?: unknown; message?: unknown; loginCommand?: unknown };
+        const err = e as { code?: unknown; message?: unknown; loginCommand?: unknown; storage?: unknown };
         job.state = 'failed';
         job.error = {
           code: typeof err.code === 'string' ? err.code : 'INTERNAL',
           message: typeof err.message === 'string' ? err.message : String(e),
           ...(typeof err.loginCommand === 'string' ? { loginCommand: err.loginCommand } : {}),
+          ...(err.storage && typeof err.storage === 'object' ? { storage: err.storage as CloudStorageFull } : {}),
         };
       })
       .finally(push);

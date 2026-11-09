@@ -22,6 +22,7 @@ let previousBase: string, previousCalls: Call[], previousStatus: number;
 let raceUploads: boolean, firstUploadFailure: number | undefined;
 let raceFailureHash: string;
 type Call = { path: string; method: string; headers: IncomingMessage['headers']; body: any };
+let finalizeStorage: { usedBytes: number; quotaBytes: number; shareBytes: number } | undefined;
 let calls: Call[], plan: 'free' | 'pro', deviceErrors: string[], fail: { path: string; status?: number; code?: string; disconnect?: number; details?: unknown; remaining?: number; retryAfter?: string; xRetryAfter?: string; until?: number } | undefined;
 let limits: { maxUploadBytes: number; maxTotalBytes: number; maxFiles: number; publishesPerHour: number | null };
 let seedRuntime: boolean;
@@ -42,6 +43,7 @@ const build = vi.fn(async ({ outDir }: { outDir?: string }) => {
 let renderStep: ((opts: any) => Promise<unknown>) | undefined;
 const checkProject = vi.fn(async () => ({ name: 'Invite', diagnostics: [], summary: { error: 0, warning: 0, info: 0 }, verification: {} }));
 beforeEach(async () => {
+  finalizeStorage = undefined;
   root = await mkdtemp(join(tmpdir(), 'joplo-cloud-test-')); home = join(root, 'home'); project = join(root, 'project');
   await mkdir(project); calls = []; plan = 'free'; deviceErrors = []; fail = undefined; putStatus = 200; expires = 600; clock = 0; waits = []; missingCount = 1;
   raceUploads = false; firstUploadFailure = undefined; previousCalls = []; previousStatus = 200;
@@ -99,7 +101,7 @@ beforeEach(async () => {
       if (truncatedPut) { res.writeHead(400, { 'content-length': '100' }); res.flushHeaders(); const timer = setTimeout(() => { timers.delete(timer); res.destroy(); }, 30); timers.add(timer); return; }
       res.statusCode = putStatus; res.end(); return;
     }
-    if (path === '/api/v1/shares/Abc1234567/finalize') { send({ shareId: 'Abc1234567', url: base + '/s/Abc1234567/', expiresAt: plan === 'free' ? '2026-11-05T12:00:00.000Z' : null, version: 1 }); return; }
+    if (path === '/api/v1/shares/Abc1234567/finalize') { send({ shareId: 'Abc1234567', url: base + '/s/Abc1234567/', expiresAt: plan === 'free' ? '2026-11-05T12:00:00.000Z' : null, version: 1, ...(finalizeStorage ? { storage: finalizeStorage } : {}) }); return; }
     if (path === '/api/auth/sign-out') {
       if (req.headers.authorization === `Bearer ${oldToken}`) revokedAfterReplacement = JSON.parse(await readFile(join(home, 'credentials.json'), 'utf8')).accessToken === token;
       if (![`Bearer ${token}`, `Bearer ${oldToken}`].includes(req.headers.authorization ?? '') || Object.keys(body).length) res.statusCode = 400; send({ success: res.statusCode === 200 }); return; }
@@ -175,13 +177,14 @@ test('share 只上传 missing、保留签名 headers、412 成功、finalize 重
   expect(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'))).toEqual({ server: base, shareId: r.json().data.shareId, url: r.json().data.url });
   expect(r.json().data.expiresAt).toBe('2026-11-05T12:00:00.000Z'); await expect(stat(build.mock.calls[0]![0].outDir!)).rejects.toThrow();
 });
-test.each([['free', false, true, false], ['pro', false, true, true], ['pro', true, true, false], ['pro', false, false, false]] as const)('replaceShareId plan=%s new=%s sameServer=%s', async (p, fresh, sameServer, replace) => {
+test.each([['free', false, true, true], ['free', true, true, false], ['pro', false, true, true], ['pro', true, true, false], ['pro', false, false, false]] as const)('replaceShareId plan=%s new=%s sameServer=%s（C27：免费账号也更新同一个链接）', async (p, fresh, sameServer, replace) => {
   plan = p; await credentials(); await mkdir(join(project, '.joplo')); await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: sameServer ? base : 'https://other.example', shareId: 'Old1234567', url: base + '/s/Old1234567/' }));
   const r = await cli(['share', project, '--title', 'Custom', ...(fresh ? ['--new'] : [])]); expect(r.code).toBe(0);
   expect(calls.find(c => c.path === '/api/v1/shares')!.body).toMatchObject({ title: 'Custom' }); expect(calls.find(c => c.path === '/api/v1/shares')!.body.replaceShareId).toBe(replace ? 'Old1234567' : undefined);
-  if (p === 'free') { expect(r.stdout).toContain(base + '/settings/billing'); expect(r.stdout).not.toMatch(new RegExp(base.replace(/[.]/g, '\\.') + '/billing')); }
+  // C27：免费分享不再过期，发布后不再提示“7 天后过期 · 升级”
+  expect(r.stdout).not.toContain('Free shares expire');
 });
-test.each([['pro', true], ['free', false]] as const)('share --update <链接>：没有 cloud.json 也能更新指定分享（D84） plan=%s', async (p, replace) => {
+test.each([['pro', true], ['free', true]] as const)('share --update <链接>：没有 cloud.json 也能更新指定分享（D84；C27 起免费账号也原地更新） plan=%s', async (p, replace) => {
   plan = p; await credentials();
   const r = await cli(['share', project, '--update', base + '/s/Old1234567/', '--format=json']); expect(r.code, r.stdout).toBe(0);
   expect(calls.find(c => c.path === '/api/v1/shares')!.body.replaceShareId).toBe(replace ? 'Old1234567' : undefined);
@@ -201,6 +204,31 @@ test.each([[401, 'AUTH_EXPIRED'], [403, 'PLAN_REQUIRED'], [413, 'TOO_LARGE'], [4
   await credentials(); fail = { path: '/api/v1/shares', status, code, ...(code === 'TOO_LARGE' ? { details: { kind: 'upload', maxBytes: 5, actualBytes: 6, largestFiles: [{ path: 'assets/site.css', size: 6 }] } } : {}) }; const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(code === 'AUTH_EXPIRED' ? 3 : 1); expect(r.json().error.code).toBe(code);
   if (code === 'TOO_LARGE') expect(r.json().error.details).toMatchObject({ kind: 'upload', maxBytes: 5, actualBytes: 6, largestFiles: [{ path: 'assets/site.css', size: 6 }] });
   expect(calls.some(c => c.method === 'PUT')).toBe(false);
+});
+test('C27 发布后输出账号用量（文本与 JSON）；旧服务器没有 storage 时不输出', async () => {
+  await credentials(); finalizeStorage = { usedBytes: Math.round(47.2 * 1024 * 1024), quotaBytes: 100 * 1024 * 1024, shareBytes: Math.round(9.1 * 1024 * 1024) };
+  const r = await cli(['share', project]); expect(r.code).toBe(0);
+  expect(r.stdout).toContain('Storage: 47.2 MB of 100 MB used (this share: 9.1 MB)');
+  const j = await cli(['share', project, '--format=json']); expect(j.json().data.storage).toEqual(finalizeStorage);
+  finalizeStorage = undefined; const old = await cli(['share', project]); expect(old.code).toBe(0); expect(old.stdout).not.toContain('Storage:');
+});
+test.each([
+  [{ kind: 'storage', usedBytes: Math.round(95.9 * 1024 * 1024), quotaBytes: 100 * 1024 * 1024, shareBytes: Math.round(12.4 * 1024 * 1024), replacedBytes: 0, managePath: '/shares', upgradePath: '/settings/billing' }, 'This share needs 12.4 MB, but only 4.1 MB of your 100 MB is left'],
+  [{ kind: 'storage', usedBytes: 100 * 1024 * 1024, quotaBytes: 100 * 1024 * 1024, shareBytes: 70 * 1024 * 1024, replacedBytes: 60 * 1024 * 1024, managePath: '/shares', upgradePath: '/settings/billing' }, 'This update adds 10 MB (60 MB → 70 MB), but only 0 MB of your 100 MB is left'],
+  [{ kind: 'storage', usedBytes: 6 * 1024 * 1024 * 1024, quotaBytes: 5 * 1024 * 1024 * 1024, shareBytes: 2 * 1024 * 1024, replacedBytes: 0, managePath: '/shares', upgradePath: '/settings/billing' }, 'only 0 MB of your 5 GB is left (6 GB used)'],
+] as const)('C27 STORAGE_FULL → QUOTA_EXCEEDED(kind storage)，退出码 6，不上传，链接用当前 server：%#', async (details, text) => {
+  await credentials(); fail = { path: '/api/v1/shares', status: 413, code: 'STORAGE_FULL', details };
+  const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(6);
+  const e = r.json().error; expect(e.code).toBe('QUOTA_EXCEEDED');
+  expect(e.details).toEqual({ kind: 'storage', usedBytes: details.usedBytes, quotaBytes: details.quotaBytes, shareBytes: details.shareBytes, replacedBytes: details.replacedBytes, manageUrl: base + '/shares', upgradeUrl: base + '/settings/billing' });
+  expect(e.message).toContain(text); expect(e.message).toContain('Nothing was uploaded. Existing links keep working');
+  expect(calls.some(c => c.method === 'PUT')).toBe(false); expect(r.stdout).not.toContain(token);
+  const t = await cli(['share', project]); expect(t.code).toBe(6); expect(t.stdout).toMatch(/^QUOTA_EXCEEDED {2}/m); expect(t.stdout).toContain(text); expect(t.stdout).toContain(base + '/shares');
+});
+test('C27 STORAGE_FULL 带不完整的 data 时仍是 QUOTA_EXCEEDED(kind storage)，退出码 6', async () => {
+  await credentials(); fail = { path: '/api/v1/shares/Abc1234567/finalize', status: 413, code: 'STORAGE_FULL', details: { kind: 'storage' } };
+  const r = await cli(['share', project, '--format=json']); expect(r.code).toBe(6);
+  expect(r.json().error).toMatchObject({ code: 'QUOTA_EXCEEDED', details: { kind: 'storage', manageUrl: base + '/shares', upgradeUrl: base + '/settings/billing' } });
 });
 test('网络中断最多重试三次，失败后无 cloud.json', async () => {
   await credentials(); fail = { path: '/blob/' + createHash('sha256').update(files['assets/site.css']!).digest('hex'), disconnect: 20 };
@@ -480,8 +508,8 @@ test('B8 AUTH_EXPIRED 统一退出 3', async () => {
 test('B9 新建 JOPLO_HOME 目录权限为 0700', async () => {
   await credentials(); expect((await stat(home)).mode & 0o777).toBe(0o700);
 });
-test('B10 免费提示和 PLAN_REQUIRED 的 billing 使用当前 server', async () => {
-  await credentials(); const r = await cli(['share', project]); expect(r.stdout).toContain(base + '/settings/billing');
+test('B10 PLAN_REQUIRED 的 billing 使用当前 server', async () => {
+  await credentials();
   fail = { path: '/api/v1/shares', status: 403, code: 'PLAN_REQUIRED' }; const e = await cli(['share', project]); expect(e.stdout).toContain(base + '/settings/billing'); expect(e.stdout).not.toContain('https://cloud.joplo.app/');
 });
 test('B11 卡住的上传最终被实际 AbortSignal 中止，清理 SIGINT 监听器', async () => {

@@ -3,6 +3,7 @@
 ## 未发布
 
 - 官方技能 `joplo` 与 `joplo-feedback`：每轮开发完成后必须先启动 `joplo feedback watch --local --follow`（要结束回复时加 `--once`）再把看板地址交给用户，不再只给链接；这一条也列进常见坑。常见坑不再限制条数。
+- 免费分享不再过期，改为按账号空间计算（免费 100 MB、Pro 5 GB）：`joplo share` 发布后打印 `Storage: … of … used`，JSON 带 `data.storage`；空间不够时以 `QUOTA_EXCEEDED`（kind storage）、退出码 6 结束，说明差多少、已有链接不受影响，并给出腾空间和升级的链接。免费账号再次 share 也会更新同一个链接。看板发布浮层平时只显示一行用量，用到八成才出现用量条和提醒，放不下时显示红色提示。需要 Joplo Cloud 同步上线（C27）。
 
 ## 0.2.17
 

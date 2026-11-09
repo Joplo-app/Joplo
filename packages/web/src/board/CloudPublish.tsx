@@ -16,8 +16,8 @@ import { Btn } from '../player/controls';
 import { Popover } from '../player/popover';
 import { copyText } from '../player/util';
 import type { Text } from '../i18n/messages';
-import { fetchCloudAccount, fetchCloudJob, startCloudPublish, subscribeCloud, type CloudAccount, type CloudJob } from '../runtime/dev-client';
-import { CLOUD_STAGES, cloudNotes, cloudRequest, cloudStage, cloudUnpicked, defaultChoice, needsLogin, type CloudContext, type CloudPicks, type CloudScopeChoice } from './cloud-model';
+import { fetchCloudAccount, fetchCloudJob, startCloudPublish, subscribeCloud, type CloudAccount, type CloudJob, type CloudStorage, type CloudStorageFull } from '../runtime/dev-client';
+import { CLOUD_STAGES, cloudNotes, cloudRequest, cloudStage, cloudUnpicked, defaultChoice, formatStorage, needsLogin, storageFull, storageView, type CloudContext, type CloudPicks, type CloudScopeChoice } from './cloud-model';
 
 type AccountState = { loading: boolean; available: boolean; account: CloudAccount | null; error: Text | null };
 
@@ -89,6 +89,61 @@ function LoginBlock({ command, message, onCheck, checking, stillOut }: { command
   );
 }
 
+/** 账号容量（C27，方案 B）：平时一行小字；用到八成出现用量条与提醒；满了变红。 */
+export function StorageUsage({ storage, server, plan, full }: { storage: CloudStorage | undefined; server: string; plan: 'free' | 'pro' | null; full: boolean }) {
+  const { t: i18n } = useBoardI18n();
+  const view = storageView(storage);
+  if (!view) return null;
+  if (view.level === 'ok' && !full) return <p className="text-[12px] text-jb-faint" data-testid="cloud-storage-mini">{i18n.board.cloudStorageMini(view.used, view.quota)}</p>;
+  const level = full ? 'over' : view.level;
+  return (
+    <div className="flex flex-col gap-2" data-testid="cloud-storage-meter" data-level={level}>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between text-[12px]">
+          <span className="font-semibold tracking-[0.5px] text-jb-muted">{i18n.board.cloudStorage}</span>
+          <span className="text-jb-muted">{i18n.board.cloudStorageOf(view.used, view.quota)}</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-jb-sunken" role="meter" aria-label={i18n.board.cloudStorage} aria-valuemin={0} aria-valuemax={100} aria-valuenow={view.pct}>
+          <div className={cn('h-full rounded-full', level === 'over' ? 'bg-jb-danger' : 'bg-[#E0AE00]')} style={{ width: `${view.pct}%` }} />
+        </div>
+      </div>
+      {level === 'near' ? (
+        <div className="flex flex-col gap-1 rounded-[8px] border border-[#E0AE00] bg-jb-selected px-3 py-2" data-testid="cloud-storage-near">
+          <div className="text-[13px] font-semibold">{i18n.board.cloudStorageNearTitle}</div>
+          <p className="text-[12px] leading-[1.5]">{plan === 'pro' ? i18n.board.cloudStorageNearBodyPro : i18n.board.cloudStorageNearBody}</p>
+          <StorageLinks manageUrl={`${server}/shares`} upgradeUrl={plan === 'pro' ? null : `${server}/settings/billing`} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StorageLinks({ manageUrl, upgradeUrl }: { manageUrl: string; upgradeUrl: string | null }) {
+  const { t: i18n } = useBoardI18n();
+  const link = 'jb-focus rounded-[4px] text-[12px] font-medium text-jb-cloud underline-offset-2 hover:underline';
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-1">
+      <a href={manageUrl} target="_blank" rel="noreferrer" className={link} data-testid="cloud-storage-manage">{i18n.board.cloudStorageManage}</a>
+      {upgradeUrl ? <a href={upgradeUrl} target="_blank" rel="noreferrer" className={link} data-testid="cloud-storage-upgrade">{i18n.board.cloudStorageUpgrade}</a> : null}
+    </div>
+  );
+}
+
+/** 这次放不下（QUOTA_EXCEEDED，kind: storage）：差多少、已有链接不受影响、去哪里腾地方或升级。 */
+export function StorageFull({ full, plan }: { full: CloudStorageFull; plan: 'free' | 'pro' | null }) {
+  const { t: i18n } = useBoardI18n();
+  const f = storageFull(full);
+  const text = f.kind === 'need' ? i18n.board.cloudStorageFullNeed(f.size, f.left, f.short) : f.kind === 'update' ? i18n.board.cloudStorageFullUpdate(f.size, f.left) : i18n.board.cloudStorageFullGeneric;
+  return (
+    <div className="flex flex-col gap-1 rounded-[8px] border border-jb-danger bg-jb-danger-bg px-3 py-2" data-testid="cloud-storage-full" role="alert">
+      <div className="text-[13px] font-semibold text-jb-danger">{i18n.board.cloudStorageFullTitle}</div>
+      <p className="text-[12px] leading-[1.5]">{text}</p>
+      <p className="text-[12px] font-semibold leading-[1.5]">{i18n.board.cloudStorageExisting}</p>
+      <StorageLinks manageUrl={f.manageUrl} upgradeUrl={plan === 'pro' ? null : f.upgradeUrl} />
+    </div>
+  );
+}
+
 function ScopeRadio({ value, onChange, ctx, names, disabled }: { value: CloudScopeChoice; onChange: (v: CloudScopeChoice) => void; ctx: CloudContext; names: { feature: string; scenario: string | null }; disabled: boolean }) {
   const { t: i18n } = useBoardI18n();
   const rows: { id: CloudScopeChoice; label: string; off?: boolean }[] = [
@@ -139,7 +194,10 @@ function Result({ job, onFlash }: { job: CloudJob & { result: NonNullable<CloudJ
         <Btn size={28} icon={<Copy className="size-4" />} label={i18n.board.cloudCopyLink} iconOnly onClick={() => void copyText(r.url).then((ok) => onFlash(<LocalText value={ok ? m.board.cloudLinkCopied : m.board.clipboardUnavailableCopyFromTheAddressBar} />))} data-testid="cloud-copy-link" />
         <Btn size={28} icon={<ExternalLink className="size-4" />} label={i18n.board.cloudOpenLink} iconOnly onClick={() => window.open(r.url, '_blank', 'noopener')} data-testid="cloud-open-link" />
       </div>
-      <p className="text-[12px] text-jb-muted">{expires ? i18n.board.cloudExpiresAt(expires) : i18n.board.cloudPermanentLink}</p>
+      <p className="text-[12px] text-jb-muted" data-testid="cloud-result-life">
+        {expires ? i18n.board.cloudExpiresAt(expires) : i18n.board.cloudPermanentLink}
+        {r.storage ? ` · ${i18n.board.cloudThisShareSize(formatStorage(r.storage.shareBytes))}` : ''}
+      </p>
       {borrowed.length ? (
         <div className="flex flex-col gap-1 rounded-[8px] border border-[#E0AE00] bg-jb-selected px-3 py-2" data-testid="cloud-borrowed">
           <div className="text-[13px] font-semibold">{i18n.board.cloudBorrowedTitle}</div>
@@ -210,6 +268,14 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
             {account.plan ? ` · ${account.plan === 'pro' ? i18n.board.cloudPlanPro : i18n.board.cloudPlanFree}` : ''}
           </p>
         ) : null}
+        {account?.signedIn ? (
+          <StorageUsage
+            storage={job?.state === 'done' && job.result?.storage ? job.result.storage : account.storage}
+            server={account.server}
+            plan={account.plan}
+            full={job?.state === 'failed' && !!job.error?.storage}
+          />
+        ) : null}
         <div className="flex flex-col gap-1.5">
           <div className="text-[12px] font-semibold tracking-[0.5px] text-jb-muted">{i18n.board.cloudScope}</div>
           <ScopeRadio value={choice} onChange={setChoice} ctx={ctx} names={names} disabled={running} />
@@ -226,7 +292,8 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
         ) : null}
         {running && job ? <Progress job={job} /> : null}
         {job?.state === 'done' && job.result ? <Result job={job as CloudJob & { result: NonNullable<CloudJob['result']> }} onFlash={onFlash} /> : null}
-        {job?.state === 'failed' && job.error && !unpicked ? (
+        {job?.state === 'failed' && job.error?.storage && !unpicked ? <StorageFull full={job.error.storage} plan={account?.signedIn ? account.plan : null} /> : null}
+        {job?.state === 'failed' && job.error && !job.error.storage && !unpicked ? (
           <div className="flex flex-col gap-1 rounded-[8px] border border-jb-danger bg-jb-danger-bg px-3 py-2" data-testid="cloud-error">
             <div className="text-[13px] font-semibold text-jb-danger">{i18n.board.cloudFailed}</div>
             <p className="whitespace-pre-wrap break-words font-jb-mono text-[12px]">{job.error.message}</p>

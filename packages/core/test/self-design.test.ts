@@ -8,7 +8,7 @@ import { loadAuthoring } from '../src/load.ts';
 
 const dir = resolve(import.meta.dirname, '../../../examples/joplo');
 const original = JSON.parse(await readFile(new URL('./fixtures/self-design-original-ids.json', import.meta.url), 'utf8')) as { featureIds: string[]; options: string[]; scenarios: string[] };
-const order = ['workbench_origin', 'authoring_model', 'home', 'player', 'views', 'frames', 'npm', 'skill', 'voice', 'review', 'share_scope', 'feature_diff', 'mobile_watch', 'content_i18n'];
+const order = ['workbench_origin', 'authoring_model', 'home', 'player', 'views', 'frames', 'npm', 'skill', 'voice', 'review', 'share_scope', 'feature_diff', 'mobile_watch', 'content_i18n', 'storage_quota', 'cloud_usage'];
 let dev: Project, published: Project;
 beforeAll(async () => {
   const source = await loadAuthoring(dir, file => tsImport(file, { parentURL: import.meta.url, tsconfig: join(dir, 'tsconfig.json') }));
@@ -33,7 +33,7 @@ describe('one real Joplo design workspace', () => {
     expect(Object.keys(published.options)).toHaveLength(order.length);
     expect(published.options['workbench_origin.a-fold']).toBeUndefined();
     expect(published.options['authoring_model.a-data']).toBeUndefined();
-    for (const feature of [...original.featureIds, 'mobile_watch', 'content_i18n']) {
+    for (const feature of [...original.featureIds, 'mobile_watch', 'content_i18n', 'storage_quota', 'cloud_usage']) {
       const picked = Object.values(published.options).find(o => o.featureId === feature)!;
       const story = published.scenarios[`${picked.id}.design_journey`];
       expect(story, feature).toBeDefined();

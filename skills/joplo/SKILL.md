@@ -72,7 +72,7 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - Full-height layouts squeeze tables and forms: rows exist in the DOM but are cut off on screen; show 5–8 rows or move the table to its own layer. See npx joplo skill demo.
 - Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key and pins that layer, so later steps stop switching layers; layer= is ignored); wait for rendering before screenshots. See npx joplo skill demo.
 - Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user. See npx joplo skill cases.
-- Never share or deploy without the user's go-ahead; free share links expire after 7 days. See npx joplo skill publish.
+- Never share or deploy without the user's go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself. See npx joplo skill publish.
 
 ## Reference
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.
@@ -89,4 +89,4 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.17 sha256:54cb7d3fa667f0855e4457a8018ff8294e2277e7b188ef7d55d15415ef54ff4e -->
+<!-- joplo-skill 0.2.17 sha256:f8ace797fd50241c6a255ee54ebb0138dea47c2295fc03c9637ddffff8806826 -->
