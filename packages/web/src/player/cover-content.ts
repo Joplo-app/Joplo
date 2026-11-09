@@ -8,7 +8,7 @@ import { holdMsOf } from '@joplo-app/core/runtime';
  * 时长逐步调用 pace.ts 的 stepDwell 再求和（与演示控制器用同一份文字，见 dwellTexts）；参数在 pace.ts 里调整，这里不写死。
  * 估算不含鼠标移动、逐字输入与连线小点，所以写「约」。
  */
-import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, streamsOf, type Project, type RoleInfo, type Scenario, type Step } from '@joplo-app/core/runtime';
+import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, streamPlan, type Project, type RoleInfo, type Scenario, type Step } from '@joplo-app/core/runtime';
 
 export type Duration = { unit: 's' | 'min'; value: number };
 
@@ -44,7 +44,7 @@ export function dwellTexts(step: Step, i18n: Dictionary = en): (string | null | 
 export function scenarioMs(_project: Project, scenario: Scenario, i18n: Dictionary = en): number {
   // hold（D70）：作者要求这一步至少停这么久
   // 有旁白 / 台词的步骤按朗读估算（读完才进下一步），封面上的“约 M 秒”与带声音的真实时长一致
-  return scenario.steps.reduce((sum, step) => sum + Math.max(holdMsOf(step), voiceMs(step.narrate ?? step.say), stepDwell({ texts: dwellTexts(step, i18n), paced: step.hold !== undefined, cameraMoved: step.shots.length > 0 || !!step.directorLayer, streams: streamsOf(step).map((x) => x.value) })), 0);
+  return scenario.steps.reduce((sum, step) => sum + Math.max(holdMsOf(step), voiceMs(step.narrate ?? step.say), stepDwell({ texts: dwellTexts(step, i18n), paced: step.hold !== undefined, cameraMoved: step.shots.length > 0 || !!step.directorLayer, streamMs: Math.max(0, ...streamPlan(step, null).map((x) => x.ms)) })), 0);
 }
 
 /** 取整成好读的数：10 秒以内按秒向上取整，一分钟以内按 5 秒取整，再长按分钟四舍五入。 */

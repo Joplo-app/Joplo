@@ -27,7 +27,7 @@ export const VISUAL_SETTLE_MS = 1200;
 import { dwellTexts } from '../player/cover-content';
 import { VOICE_BREATH_MS, speakerRoleAt, spokenLine } from '@joplo-app/core/runtime';
 import type { Narration, Narrator, NarrationSource } from './voice';
-import { holdMsOf, orderedFeatures, streamsOf, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core/runtime';
+import { holdMsOf, orderedFeatures, streamPlan, type StreamPlan, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core/runtime';
 import { browseSceneId, browseState, optionsOf, scenariosOf, playSequence } from './views';
 
 /** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */
@@ -107,8 +107,10 @@ export type Snapshot = {
   /**
    * 流式输出（D56）：播放（自动或下一步）刚提交第 position 步时，这一步 stream 的文字逐字出现，speed 是当时的速度。
    * 任何别的方式改变状态（跳转、上一步、重置、热更新）都清空它，所以跳到某一步时直接显示全文。
+   * plan（D98）：提交时用提交前的状态算好的出字计划（接着往后写时原有的字不重出；pace: 'voice' 跟着朗读出字）。
+   * voice：这一步的朗读读到哪了（0–1；没在读这一步、或不知道时为 null），pace: 'voice' 的字优先对齐它，没有时按估算时长。
    */
-  streamAt: { position: number; speed: number } | null;
+  streamAt: { position: number; speed: number; plan: StreamPlan[]; voice: () => number | null } | null;
   /**
    * 朗读（D74）：第 position 步正在读（source：音频 / 浏览器朗读）；waiting = 画面停留已到、还在等声音读完。
    * 读完、被取消（跳转、上一步、手动下一步、停止）时为 null。
@@ -653,7 +655,8 @@ export class DemoController {
           paced: step.hold !== undefined,
           cameraMoved: step.shots.length > 0 || !!step.directorLayer,
           dotMs: this.activeDotMs(),
-          streams: streamsOf(step).map((x) => x.value),
+          // 流式输出（D98）：刚提交的这一步用提交时算好的计划；否则按整段估算
+          streamMs: Math.max(0, ...(this.snap.streamAt?.position === index + 1 ? this.snap.streamAt.plan : streamPlan(step, null)).map((x) => x.ms)),
         }));
     const elapsed = Math.max(0, Math.round(this.clock.rawTime - this.committedAt));
     this.set({ dwell: { position: index + 1, ms: Math.max(dwell, elapsed), elapsed } });
@@ -727,6 +730,12 @@ export class DemoController {
       this.narrating = null;
       if (this.snap.narration) this.set({ narration: null });
     });
+  }
+
+  /** 第 position 步的朗读读到哪了（0–1）；没在读这一步、或朗读方式给不出进度时为 null。 */
+  private voiceProgress(position: number): number | null {
+    if (!this.narrating || this.snap.narration?.position !== position) return null;
+    return this.narrating.progress?.() ?? null;
   }
 
   /**
@@ -1053,11 +1062,13 @@ export class DemoController {
     if (!p || !st) return false;
     try {
       const next = applyStep(p, getScenario(p, sc.id), st);
+      // 出字计划要用提交前的状态（D98）：接着往后写时，原来就有的字不重新出
+      const plan = stream ? streamPlan(sc.steps[st.position], st) : [];
       const n = this.snap.notice;
       // 推进后，锚定在元素上的就地提示（禁用原因、未覆盖、越序）已过时，关闭它。
       this.tickClock();
       this.committedAt = this.clock.rawTime;
-      this.set({ playground: null, switchPrompt: null, leadFrame: null, state: next, streamAt: stream && streamsOf(sc.steps[st.position]).length ? { position: next.position, speed: this.speed } : null, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
+      this.set({ playground: null, switchPrompt: null, leadFrame: null, state: next, streamAt: plan.length ? { position: next.position, speed: this.speed, plan, voice: () => this.voiceProgress(next.position) } : null, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
       // 朗读（D74）：播放提交的一步（自动播放、下一步、点原型）才读；跳转、上一步、热更新不读
       if (stream) this.narrate(sc, next.position);
       return true;

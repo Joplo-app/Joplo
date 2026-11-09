@@ -19,7 +19,7 @@ import { CameraLayer, contentBounds, useCamera, type CameraSpec } from './camera
 import { clampPan, wheelFactor, zoomAt, type View } from './camera-math';
 import { AnimatePresence } from 'motion/react';
 import { motion } from './engine-motion';
-import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, focusAt, streamsOf, type PlayState, type Project, type Toast } from '@joplo-app/core/runtime';
+import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, focusAt, type StreamPlan, type PlayState, type Project, type Toast } from '@joplo-app/core/runtime';
 import { RenderContext, RenderNode, type RenderMode, type StreamingCtx } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from './appearance';
@@ -96,7 +96,7 @@ export type StageProps = {
   /** 观众在舞台上的输入次数（D92 R6，控制器的 snap.inputs）：传给插件 frame.inputs。 */
   inputs?: number;
   /** 流式输出（D56，演示控制器的 streamAt + 暂停）：position 等于当前位置时，这一步 stream 的文字逐字出现。 */
-  stream?: { position: number; speed: number; paused: boolean } | null;
+  stream?: { position: number; speed: number; paused: boolean; plan: readonly StreamPlan[]; voice?: () => number | null } | null;
 };
 
 export type ZoomApi = { zoomBy: (factor: number) => void; fit: () => void };
@@ -145,10 +145,10 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   // 舞台只在停在过渡卡上时收起按键记录。角色名牌已删除（会遮挡内容），说话人改在字幕里。
   const scenario = project.scenarios[state.scenarioId];
   const card = cardAt(project, state.scenarioId, state.position);
-  const streamPaths = stream && stream.position === state.position && scenario ? streamsOf(scenario.steps[state.position - 1]).map((x) => x.path).join('|') : '';
+  const streamPlans = stream && stream.position === state.position && scenario ? stream.plan : null;
   const streaming = useMemo<StreamingCtx | null>(
-    () => (streamPaths && stream ? { paths: new Set(streamPaths.split('|')), key: `${state.scenarioId}#${state.position}`, paused: stream.paused, speed: stream.speed } : null),
-    [streamPaths, stream?.paused, stream?.speed, state.scenarioId, state.position],
+    () => (streamPlans?.length && stream ? { plans: new Map(streamPlans.map((x) => [x.path, { keep: x.keep, ms: x.ms, voice: x.pace === 'voice' }])), key: `${state.scenarioId}#${state.position}`, paused: stream.paused, speed: stream.speed, voice: stream.voice } : null),
+    [streamPlans, stream?.paused, stream?.speed, stream?.voice, state.scenarioId, state.position],
   );
   const changed = useMemo(() => changedAt(project, state.scenarioId, state.position), [project, state.scenarioId, state.position]);
   const ext = state.position > 0 ? scenario?.steps[state.position - 1]?.ext : scenario?.ext;

@@ -26,7 +26,7 @@ const h = (type: unknown, props: Record<string, unknown> | null, ...children: un
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 
 /** 两个角色、两层（小雨的电脑 / 阿杰的手机）的露营故事；roles=false 时不声明角色也不分层。 */
-function build(o: { roles?: boolean; description?: string; empty?: boolean } = {}): Project {
+function build(o: { roles?: boolean; description?: string; empty?: boolean; sayRole?: boolean } = {}): Project {
   const home = page({ title: '首页', layout: false }, h(ui.Stack, null, h(ui.Button, { id: 'send' }, '发送'), h(ui.Button, { id: 'accept' }, '我能去'), h(Slot, { name: 'main' })));
   const withRoles = o.roles !== false;
   const base = flow('小雨约上了阿杰', { start: '/', ...(o.description !== undefined ? { description: o.description } : {}) });
@@ -38,6 +38,7 @@ function build(o: { roles?: boolean; description?: string; empty?: boolean } = {
         .system('回复', '几秒后，助手把行程单写好了', stream($.ui.reply, '周六晴，推荐白河营地。'), narrate('助手几秒就把行程排好了。'))
         .card('现在是阿杰', withRoles ? { role: 'ajie' } : {})
         .click('accept', '阿杰回复：我能去', say('我能去！'), set($.ui.accepted, true), fork('如果阿杰去不了', 'other'));
+  const flx = o.sayRole ? fl.system('阿杰补一句', say('我带帐篷。', { role: 'ajie' })).system('助手确认', say('好的。')) : fl;
   const opt = option({
     name: 'A · 对话',
     idea: 'i',
@@ -51,7 +52,7 @@ function build(o: { roles?: boolean; description?: string; empty?: boolean } = {
           },
         }
       : {}),
-    scenarios: { happy: fl, other: flow('阿杰去不了', { start: '/' }).click('send', '发出去') },
+    scenarios: { happy: flx, other: flow('阿杰去不了', { start: '/' }).click('send', '发出去') },
   });
   const src: AuthoringProject = {
     root: '/p',
@@ -79,6 +80,12 @@ describe('speakerOf（字幕里的说话人）', () => {
     expect(speakerOf(p, sid, 2)).toMatchObject({ id: 'xiaoyu', name: '小雨' });
     expect(speakerOf(p, sid, 3)).toBeNull(); // 系统事件
     expect(speakerOf(p, sid, 5)).toMatchObject({ id: 'ajie', name: '阿杰', color: '#1971C2' });
+  });
+  it("say(…, { role })：系统步骤也显示写明的那个人（D98，与朗读同一规则）；没写角色的系统步骤仍没有", () => {
+    const q = build({ sayRole: true });
+    expect(speakerOf(q, sid, 6)).toMatchObject({ id: 'ajie', name: '阿杰' });
+    expect(spokenSubtitleFor(q.scenarios[sid], 6, null, zh, q)).toMatchObject({ text: '我带帐篷。', source: 'say', speaker: { name: '阿杰' } });
+    expect(speakerOf(q, sid, 7)).toBeNull();
   });
   it('没有声明角色的项目：任何一步都没有说话人；场景不存在时为 null', () => {
     const q = build({ roles: false });

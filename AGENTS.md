@@ -23,6 +23,7 @@
 - 引擎经验写进 `packages/core/src/guide.ts`（叙事进 story、调度与节奏进 demo、焦点进 focus、诊断进 check）；具体组件、画面手法、动效与其常见坑写进对应 `plugins/*/src/guide.ts`。主题范围变了就同步引擎 `SKILL_TOPICS` 或插件 `skillTopics`，再运行 `pnpm skills:build`。
 - 写成可复用的做法：什么情况下用、怎么写、为什么这样做、常见错误是什么。不写示例专属的数据、文案、人名或素材。
 - 交付示例时向用户说明这次沉淀了哪些条目；没有新东西可沉淀时也说一声。
+- 示例改到了引擎（core / web / 插件运行时）时，要用当前 checkout 的看板验证：同一个 JOPLO_HOME 只跑一个看板，`joplo dev` 会加入别的 worktree 已经在跑的看板，那里跑的是那个 worktree 的引擎代码。另起时用单独的 JOPLO_HOME（复制 credentials.json、settings.json、voice/，保留 0600 权限，放在用户私有临时目录）加 `--port`，不要停掉别人的看板。
 
 ## 技能的权威来源与生成方式
 

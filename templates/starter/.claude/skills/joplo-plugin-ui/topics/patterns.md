@@ -28,6 +28,18 @@ Use when reviewers should see the whole feature, not one screen at a time: sever
 - Per step: camera('screenA', 'screenB') frames the pair being connected. End with a camera on every visible screen and note, not camera() of the whole world, which leaves empty paper when later screens are hidden.
 - Leave 160–280 px between screens for arrow labels; keep notes slightly rotated (default -2°) and screens straight. Text inside screens is read at the zoom of a two-screen shot: check it in a rendered storyboard.
 
+## Recreating a product screen recording (an editor, a chat box, voice input)
+Use when the reference is a real product's recording and the look must match closely: one fixed screen whose small parts change (caret, hints, a timer, a waveform), not a tour of pages.
+- Frame it like the recording: one layer holding a content <Canvas> at the view size (1280×800) with drift={false}, the product UI centred in it, and chapter or brand labels as screen children. No camera moves are needed; a drifting camera makes small UI text shimmer.
+- Write the screen with HTML tags and a project theme scoped to one root class (--jp-stroke: clean). There are no svg/img tags: draw line icons as CSS mask-image data-URL SVGs on an empty span, so they take currentColor. Replace third-party logos with neutral shapes.
+- Put the editable text in state split around the cursor: before, the clickable character, the words being added, the caret, an inline hint, after. An empty string draws nothing, so one tree covers an empty box, appending at the end and inserting mid-sentence. Keep the box's text column bottom-aligned with overflow hidden ("scrolls to the newest line") and pad its bottom for anything hanging under the caret.
+- Clicking into the middle of text: only interactive elements can be click targets, and a plain span gives NOT_INTERACTIVE. Wrap the character to click in <a id> styled exactly like the body text, then move it into "after" in the click step.
+- Live details (caret blink, waveform, a blinking tail) are CSS @keyframes in the theme: the engine clock samples and pauses them. Static frames (storyboards, deep links, thumbnails) show the animation's start, so give bars a static base height per element and animate only transform; otherwise "talking" looks silent in every screenshot.
+- Text that appears while someone talks: stream(…, { pace: 'voice' }) with say(…, { role }) on each phrase step (engine skill, story). Write each step's full text so far; the earlier words stay put and only the new ones type out in step with the voice.
+- The host already draws a key record after .press('⌃D') and floats the step title at the top left and the subtitle at the bottom centre. Do not draw your own keycap; keep a chapter label clear of the collapsed title dot (about 56 px from the left) and important content out of the bottom centre.
+- A product recording explains itself: config({ autoFocus: false }) removes the automatic pulse rings around changed elements.
+- Translations are longer: let a headline wrap (text-wrap: balance) instead of nowrap, and use overflow-wrap: anywhere rather than word-break: break-all, which splits English words. Text split across state values needs spaces at the seams in English (engine skill, publish). Render each language with render --content <lang>.
+
 ## Controls over a visual story
 - Use Image with asset() for the actual downloaded artwork; keep source/creator/license/modification details beside the files. CSS crop/opacity changes still belong in that record. Do not use a remote URL as an offline-image substitute.
 - On a dark art background, Button's default filled variant may draw a Rough fill over your custom CSS. Use variant="subtle" when authoring the whole surface, set text size/color explicitly, and choose --jp-stroke: clean in the project theme when appropriate. A class does not automatically override component inline font/color values. Verify contrast, focus and hitbox after the final composition.
@@ -163,4 +175,4 @@ From focus:
 Common pitfall: Only catalog components and the listed HTML tags exist; <br/> is UNKNOWN_COMPONENT, so write 'Line 1\nLine 2' inside <Text>
 
 Common pitfall: UI and HTML belong to this plugin: import author markers directly from @joplo-app/plugin-ui, explicitly enable ui in config.plugins, and read ui/components. The engine has no bare-name or old-IR compatibility layer.
-<!-- joplo-skill 0.4.1 sha256:941d69312c6e17990cb423a97a70f83cc07ae17f7bd372658406d1d6803fee51 -->
+<!-- joplo-skill 0.4.1 sha256:b53af418c7f06b74eb8071aa5a5422ac08a0fa144e5f116e9ae93d657e0d57a4 -->

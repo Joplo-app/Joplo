@@ -13,7 +13,7 @@ import { en, type Dictionary } from '../i18n/en';
  * - 分叉（↳ 另一条路）跟着这一步放在标题条里；
  * - key 变化时重新弹出（同一步不重复弹）。
  */
-import { cameraAt, forksOf, layersOf, roleOfScene, spokenLine, type PlayState, type Project, type RoleInfo, type Scenario } from '@joplo-app/core/runtime';
+import { cameraAt, forksOf, layersOf, roleOf, roleOfScene, spokenLine, type PlayState, type Project, type RoleInfo, type Scenario } from '@joplo-app/core/runtime';
 
 export const SUBTITLE_PX = 17;
 /** 说话人的头像直径与名字字号。 */
@@ -56,6 +56,8 @@ export const shownIndex = (scenario: Scenario, position: number, activeStep: num
  */
 export function speakerOf(project: Project, scenarioId: string, index: number): RoleInfo | null {
   const step = project.scenarios[scenarioId]?.steps[index - 1];
+  // say(…, { role }) 写明了是谁（D98）：与朗读（core speakerRoleAt）同一规则
+  if (step?.say && step.sayRole) return roleOf(project, project.scenarios[scenarioId]?.optionId, step.sayRole);
   if (!step || step.kind !== 'user') return null;
   const layer = cameraAt(project, scenarioId, index).directorLayer;
   const sceneId = layersOf(project, scenarioId).find((l) => l.id === layer)?.sceneId;

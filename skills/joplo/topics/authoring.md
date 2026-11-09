@@ -51,6 +51,7 @@ Declare both success and recovery cases in the feature. View code belongs to the
 - .click(id), .type(id, value), .select(id, value), .toggle(id, boolean), .press(keys), .back(), .drag(id, destination), .hover(id, ms), .scroll(id, destination), .act(pluginAction, id, data). Read demo and the action-owning plugin skill for recognition requirements.
 - .system('event', ...effects) models a response, not a real request. .card() creates a transition. Strings are captions; other arguments are effects. Step arguments and card accept effect arrays.
 - set(path, value) replaces; push(path, value) appends; patch(path, object) expands to sets (nested objects replace, not deep-merge). go(route) navigates in this option; back returns to the prior route.
+- stream(path, text, { pace? }) writes like set, but during playback the bound text appears character by character (a model answering, speech being transcribed); jumps, screenshots and deep links show the full text. When the new value starts with the old one, only the added characters stream, so write each step's full value (previous text + the new words) rather than juggling separate fragments. pace: 'voice' spreads the new characters over this step's narrate()/say() line, so the words land as they are spoken; the default pace is model-output speed. Only a plain text child bound to the path streams ({$.ui.reply}); stream values are translated like other on-screen text, so keep every language's successive values prefix-consistent.
 - toast(text), toast.success/error/info(text) show an engine message. done(result, outcome?) ends a scenario; outcomes success/failure/cancelled must agree with flow's badge. uses(ruleKey, ...) links rules; it is an effect, not a flow method.
 - free.click/type/select/toggle/drag/hover/scroll/act in option.free declare local reactions. free is a named object, not an array: free: { open: free.click('open', set($.ui.open, true)) }. Only set, push and toast are local effects; navigation, completion and media remain scripted. Play/jump/scenario/reset discard the local layer.
 
@@ -73,4 +74,4 @@ For a long story use from to inherit the previous ending. An action-driven navig
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.4.1 sha256:6e5b505c4f8424018607d4078fa748a30728a73e255a4c0c0da9b74a2031a437 -->
+<!-- joplo-skill 0.4.1 sha256:7abb0572f4180cec2b098af31aa2c1c4ca3ff1c8e61fd9aa2f1fc45d205a8478 -->
