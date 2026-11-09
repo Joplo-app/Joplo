@@ -8,7 +8,7 @@
  *   作者写的：shot / trace / spotlight / highlight / numbered / callout / mark 的目标（source = explicit）；
  *   默认推导（source = auto）：
  *     scene    换页、导演换层：整个新画面就是焦点（先看全局）；
- *     elements 用户操作 = 被操作的元素（呈现就是鼠标与点击波纹）；系统步骤 = 本步新出现或变化的元素；
+ *     elements 用户操作 = 被操作的元素（呈现就是鼠标与点击波纹）；系统步骤 = 本步新出现或变化的元素，以及插件效果引用的元素（D98，插件自己表现变化，不加脉冲）；
  *     toast    画面里没变，只弹了 Toast；
  *   caption  画面上没有新东西，只看字幕（source = none）。
  *
@@ -202,6 +202,9 @@ export function focusTimeline(project: Project, scenarioId: string): FocusState[
     const hits = scene ? changedElements(scene, before, after, project.plugins).filter((h) => !(target && findIn(target, h.id))) : [];
     for (const h of hits) { prevChanged.add(h.id); if (h.appended && h.parent) prevChanged.add(`^${h.parent}`); }
     const targets = [...(actionTarget ? [actionTarget] : []), ...hits.map((h) => h.id)];
+    // 插件效果改的是插件自己的画面（编辑器打字、3D、镜头……），状态里看不出来：它引用的元素就是这一步的焦点对象（D98）。
+    // 插件自己表现变化，不加默认脉冲（reveal 只来自 hits）。
+    for (const id of step.references ?? []) if (!targets.includes(id)) targets.push(id);
     if (targets.length) Object.assign(f, { subject: 'elements', source: 'auto', targets });
     else if (after.toasts.length) Object.assign(f, { subject: 'toast', source: 'auto' });
     // 连续性：同一个元素上一步刚变过；或者往上一步刚追加过的同一个容器里再追加（终端、聊天记录一行行出现）。

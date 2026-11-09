@@ -11,6 +11,7 @@ import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '../src/compile.ts';
 import { holdMsOf, stepAnchorMs } from '../src/focus.ts';
 import { outline } from '../src/outline.ts';
+import { focusTimeline } from '../src/focus.ts';
 
 const h = (type: unknown, props: Record<string, unknown> = {}) => jsx(type, props);
 const timed = definePlugin({ id: 'timed', title: 'Timed', runtime: '/timed.js', components: { Box: { doc: 'box', selfEvident: true } }, compile: {
@@ -65,6 +66,24 @@ describe('插件效果时长 holdMs（D98）', () => {
       const r = compile(source((f) => f.system('Clip', 'Play', play(bad))), 'dev');
       expect(r.diagnostics.some((d) => d.severity === 'error'), String(bad)).toBe(true);
       expect(r.project?.scenarios['f.a.s']?.steps[0]?.effectHold).toBeUndefined();
+    }
+  });
+});
+
+describe('插件效果引用的元素是这一步的焦点对象（D98，代码插件示例反推）', () => {
+  const touch = definePlugin({ id: 'touch', title: 'Touch', runtime: '/touch.js', components: { Box: { doc: 'box', selfEvident: true } }, compile: {
+    effect() { return { references: ['box'] }; },
+  } });
+  const poke = () => pluginEffect('touch', 'poke', {});
+  it('只改插件画面的系统步骤不再算“画面没变”，也不加默认脉冲', () => {
+    const file = '/p/test.tsx';
+    const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'Test', plugins: [touch] }), file }, layouts: {}, routes: { '/': { ...page({ title: 'Home' }, h(pluginComponent(touch, 'Box'), { id: 'box' })), file } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('A', 'a', poke()).system('B', 'b', poke()).system('C', 'c', poke()) } }), file } } } } };
+    const p = compile(src, 'dev').project!;
+    const tl = focusTimeline(p, 'f.a.s');
+    for (const i of [1, 2, 3]) {
+      expect(tl[i]).toMatchObject({ subject: 'elements', source: 'auto', targets: ['box'] });
+      expect(tl[i]!.reveal).toEqual([]);
     }
   });
 });
