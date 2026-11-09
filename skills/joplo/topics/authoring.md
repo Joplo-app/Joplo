@@ -73,4 +73,4 @@ For a long story use from to inherit the previous ending. An action-driven navig
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.3.0 sha256:6e5b505c4f8424018607d4078fa748a30728a73e255a4c0c0da9b74a2031a437 -->
+<!-- joplo-skill 0.4.0 sha256:6e5b505c4f8424018607d4078fa748a30728a73e255a4c0c0da9b74a2031a437 -->
