@@ -5,7 +5,7 @@ Joplo compiles trusted TS/TSX into deterministic scenes and schedules their play
 ## Start from the project
 1. Run npx joplo init <dir>, install its dependencies, then npx joplo skill install. In the Joplo source monorepo, initialize with --template ./templates/starter and use the monorepo workspace protocol for local package dependencies before installing; external projects keep pinned published versions. The starter supplies its own plugin choices; a custom project may choose different ones.
 2. Read the installed engine skill and .claude/skills/joplo-plugins/SKILL.md. Read each relevant plugin's entry and component/recipe topics. npx joplo skill lists what this config enables.
-3. Create one feature, one option and a runnable scenario. Run check, inspect the rendered frames, then test the real inputs.
+3. Create one feature, one option and a runnable scenario. Run check, inspect the rendered frames, then test the real inputs. For a short film or explainer that should feel like a video, also run the motion review in npx joplo skill demo ("Make it play like a film") — static frames cannot show hard cuts or frozen pictures.
 4. Required before handing a development round to the user: read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json. A running board alone does not receive feedback for the agent.
 
 ## Binary assets
@@ -73,4 +73,4 @@ For a long story use from to inherit the previous ending. An action-driven navig
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.3.0 sha256:498f2c29e8fbc01b6a11150e1342886c1056d73a12d1d49c9ab89d36af664105 -->
+<!-- joplo-skill 0.3.0 sha256:ec0621b103c006cbb5807a2ced0a05e69510b4f26b762a1b157dc0dbf7314cd3 -->

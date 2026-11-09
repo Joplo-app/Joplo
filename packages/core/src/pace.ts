@@ -32,26 +32,31 @@ export function readChars(...texts: (string | null | undefined)[]): number {
 
 /** 保留 readChars 的非空白字符口径，宽字符 125ms、拉丁字符 1000/15ms；先截断阅读时间，再应用倍速。 */
 export function readingMs(...texts: (string | null | undefined)[]): number {
+  return Math.min(MAX_READ_MS, Math.max(MIN_DWELL, rawReadingMs(...texts)));
+}
+
+/** 不套 3 秒下限的阅读时间（作者用 hold 掌握节奏时，D92）：仍按字数，最多 MAX_READ_MS。 */
+export function rawReadingMs(...texts: (string | null | undefined)[]): number {
   let ms = 0;
   for (const t of texts) if (t) for (const ch of t) {
     if (/\s/.test(ch)) continue;
     ms += (ch.codePointAt(0) ?? 0) > 0x2e80 ? MS_PER_CHAR : LATIN_MS_PER_CHAR;
   }
-  return Math.min(MAX_READ_MS, Math.max(MIN_DWELL, ms));
+  return Math.min(MAX_READ_MS, ms);
 }
 
 /**
  * 这一步提交之后至少停留多久（毫秒）。
  * text：说明与解说；cameraMoved：这一步镜头有变化（切层或换焦点）；dotMs：本步 active 连线上小点跑一圈的最长时间（没有为 0）。
  */
-export function stepDwell(o: { texts: (string | null | undefined)[]; speed?: number; cameraMoved?: boolean; dotMs?: number; /** 本步流式输出的文字（D56）：等它们出完再加阅读时间。 */ streams?: string[] }): number {
+export function stepDwell(o: { texts: (string | null | undefined)[]; speed?: number; cameraMoved?: boolean; dotMs?: number; /** 本步流式输出的文字（D56）：等它们出完再加阅读时间。 */ streams?: string[]; /** 作者写了 hold（D92）：节奏由作者掌握，阅读时间不套 3 秒下限（仍按字数）。 */ paced?: boolean }): number {
   const speed = o.speed && o.speed > 0 ? o.speed : 1;
-  const read = readingMs(...o.texts) / speed;
+  const read = (o.paced ? rawReadingMs(...o.texts) : readingMs(...o.texts)) / speed;
   const cam = o.cameraMoved ? CAMERA_MS + SETTLE : 0;
   const dots = o.dotMs && o.dotMs > 0 ? o.dotMs + SETTLE : 0;
   // 流式输出：先等最长的一段出完，再留出读完它的时间（按出完之后再读一遍的一半计）
   const longest = Math.max(0, ...(o.streams ?? []).map((t) => streamMs(t, speed)));
-  const streamed = longest ? longest + Math.max(MIN_DWELL / speed, read / 2) : 0;
+  const streamed = longest ? longest + Math.max((o.paced ? 0 : MIN_DWELL) / speed, read / 2) : 0;
   return Math.round(Math.max(read, cam, dots, streamed));
 }
 

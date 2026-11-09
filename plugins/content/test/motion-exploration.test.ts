@@ -5,7 +5,7 @@ afterEach(()=>vi.unstubAllGlobals());
 it('keeps cross-container flights visible, yields their visual transform to exploration, and restores on resume',()=>{
   const properties=new Map<string,string>();
   const style={getPropertyValue:(k:string)=>properties.get(k)||'',getPropertyPriority:()=>'',setProperty:(k:string,v:string)=>properties.set(k,v),removeProperty:(k:string)=>properties.delete(k)};
-  const world:any={dataset:{},querySelectorAll:()=>[el]};
+  const world:any={dataset:{},querySelectorAll:(sel:string)=>sel.includes('motion')?[el]:[]};
   const clip:any={offsetLeft:0,offsetTop:0,offsetParent:world,parentElement:world,style};
   const animation:any={id:'',effect:{target:null},cancel:vi.fn(),addEventListener:vi.fn()};
   const el:any={dataset:{jpContentMotion:'button'},offsetLeft:0,offsetTop:0,offsetWidth:100,offsetHeight:40,offsetParent:clip,parentElement:clip,isConnected:true,getAnimations:()=>animation.id?[animation]:[],animate:vi.fn(()=>animation)};

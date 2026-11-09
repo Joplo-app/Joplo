@@ -271,7 +271,7 @@ properties: {
 
 content 的 camera 工厂产生插件效果信封，插件校验 `CAMERA_UNKNOWN / CAMERA_INVALID`，写 `ui.__plugins.content.camera`，并在 frame 钩子输出每个舞台完整的取景快照（初始帧也有）。PR #35 示例的初始 `ui.__camera` 仅由插件兼容读取；后续新状态优先。Canvas 运行时只读编译快照，按目标 DOM 的 offset 布局范围取景；没有目标时看完整世界，默认视口 1280×800、默认 pad 48、zoom 上限 3、运动 1200ms。父容器没有高度时使用 view 的 aspect-ratio 撑开。任意一步直达与从头播放到该步，最终画面相同。
 
-引擎迁入 `flow({ from, layer })`、`patch()`、步骤效果数组、旁白时长估算与分镜。接力先按依赖决定逐步校验使用的路径 / 导演层，再回放前章结尾叠加本章 state，最后生成插件快照；IR 保持声明顺序。from 不存入公开 IR；只有最终初始状态和可选 `initial.layer`。错误为 `FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED / FROM_WITH_START / LAYER_UNKNOWN`。分镜含初始画面与每一步，标注字幕和旁白，告警带步号前缀；`--columns` 控制 1–6 列。
+引擎迁入 `flow({ from, layer })`、`patch()`、步骤效果数组、旁白时长估算与分镜。接力先按依赖决定逐步校验使用的路径 / 导演层，再回放前章结尾叠加本章 state，最后生成插件快照；IR 保持声明顺序。IR 记录 `Scenario.from`（D92：连续播放一镜到底、媒体快照继承、播放顺序；分享范围外的 from 被裁掉），初始状态与可选 `initial.layer` 仍是回放结果。错误为 `FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED / FROM_WITH_START / LAYER_UNKNOWN`。分镜含初始画面与每一步，标注字幕和旁白，告警带步号前缀；`--columns` 控制 1–6 列。
 
 ### 新字段与槽位的端到端流向
 
@@ -287,8 +287,17 @@ content 的 camera 工厂产生插件效果信封，插件校验 `CAMERA_UNKNOWN
 | 插件内 `world.dataset.flightMs/flightEase` | Canvas 布局效果按本次取景变化写入 DOM | content observe 在宿主提交布局后读取，FLIP 与镜头同步；仅插件运行时数据，不进 IR |
 | `runtime.observe`、`PluginObservation.{frame,ext}` | 插件浏览器入口 → 注册表 | Stage 提交布局 → update；卸载 / 场景变化 / 热更新 → destroy；仅存在浏览器，不存 IR |
 | `data-jreport-viewport` / `data-jreport-surface` | 任意插件绘制的 DOM 能力标记 | render 的通用报告：平移视口内仅检查下一目标出画、报告零尺寸表面；引擎不含组件名 |
-| `FlowOpts.from/layer` → `Scenario.initial.layer` | 作者接力声明 → 依赖编译 / 结尾回放 → 初始 state 与 layer | initialState / cameraAt / 插件初始快照；from 与作者声明不进入 IR |
+| `FlowOpts.from/layer` → `Scenario.initial.layer` | 作者接力声明 → 依赖编译 / 结尾回放 → 初始 state 与 layer | initialState / cameraAt / 插件初始快照；`Scenario.from` 进入 IR（D92），其余作者声明不进入 |
 | `SheetOptions.{columns,cellWidth}` / `SheetResult.{path,steps,warnings}` | CLI --sheet/--columns 或 server API → renderSheet | 原 render 路由逐步截图 → 网格 PNG；无新增项目 IR 字段 |
+| `PluginDef.properties[name].values`（D92） | Node 清单 → 宿主声明校验（仅字符串属性） | 编译节点值必须是其中之一，否则 PLUGIN_PROPERTY_INVALID 并列出可选值；`project.plugins[id].properties` 原样携带 |
+| content 属性 `enter/exit`、`enterMs/enterDelay/exitMs/exitDelay`（D92） | 作者 JSX 字面量 → 声明属性校验 → 节点 props → `data-jp-content-enter*` / `-exit*` | content observe：新出现的节点按 enter 播放；MutationObserver 在提交后同步取到被移除的子树，按 exit 克隆幽灵放回原父元素原位置、按上一次提交缓存的布局绝对定位；动画交给引擎时钟采样；跳转 / 自由体验 / 停止 / 静态 / 卸载时落定 |
+| `camera(…, { drift })`、`<Canvas drift>`、`<Canvas safe>`（D92） | 作者 → content effect / node 钩子校验（CAMERA_INVALID）→ drift 随镜头状态写入 `step.ext.content.scenes[sceneId].camera.drift`；Canvas 的 drift / safe 是节点 props | Canvas 用 `frame.clock.timeMs` 逐帧计算镜头段（从实际取景出发 → 落定 → 漂移到终点）；`frame.animate=false` 显示落定取景；safe 只影响带目标的取景与漂移中心 |
+| `Scenario.from`（D92） | 编译 from 接力 → IR；scope 裁掉范围外的 from | 编译期媒体快照继承；演示控制器连续播放时一镜到底（不倒计时、不 stop、不换 epoch） |
+| 媒体快照 `<plugin>:<track>>[资源]` 淡出键（D92） | 编译期：换曲且有 fadeMs 时旧曲移到该键并带 stopAfterMs | MediaEngine 把旧槽位挪到淡出键继续播；同一 seek 内偏移跟随引擎时钟；`Snapshot.seek` 变化才按快照重新定位 |
+| `PluginFrame.inputs`、`Snapshot.inputs`（D92 R6） | 控制器 stageInput（舞台上的点、按键、拖动按下）计数 → Stage `inputs` → 插件 frame | content observe：计数变化即落定进退场（幽灵、进场）；播放器暂停键不改变它；镜头冻结不落定 |
+| 媒体槽位的淡出锚点（D92 R2） | MediaEngine 第一次看到某键的 stopAfterMs 时记下引擎时间起点、时长与音量 | 之后的快照估算不再改变；淡完静音不复活；快照提前删除的淡出键在同一 seek 里按引擎时间淡完再销毁 |
+| `playSequence(project, optionId)`（D92 R9） | 方案场景：根按声明顺序，深度优先接上 from 接力章，排除 autoplay:false 子树 | 控制器缺省 autoNext 与录制 --chain 共用 |
+| `FilmOptions` / `FilmResult`、`VideoOptions` / `VideoResult`（D92） | CLI `render --film/--video` 或 server API → renderFilm / renderVideo | 渲染路由 `record=1&chain=1&voice=estimate`；胶片条 PNG + JSON、webm；无新增项目 IR 字段 |
 
 ### 证据与边界
 

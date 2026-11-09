@@ -206,6 +206,7 @@ describe('禁止网络与存储（CSP sandbox + connect-src none）', () => {
       c.reducedMotion = true;
       c.setProject(project, 1, null);
       c.setScenario(embedInitial(project, parseEmbedParams('?embed=1')!).scenarioId!, 0, { quiet: true });
+      c.autoNext = null; // 只测这一个场景的播放与切步不发请求；缺省会接着播下一个场景（D92 U2）
       await c.play();
       expect(c.getSnapshot().state).toMatchObject({ scenarioId: 'f.a.main', position: 2 });
       expect(c.getSnapshot().playing).toBe(false);

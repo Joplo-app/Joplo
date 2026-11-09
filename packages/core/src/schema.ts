@@ -227,6 +227,8 @@ export const Scenario = z.strictObject({
   autoplay: z.boolean().optional(),
   /** Where a confirmed cross-scenario action enters; autoplay is unaffected. */
   actionEntry: z.enum(['before', 'after']).optional(),
+  /** flow({ from }) 接力的上一个场景（D92）：连续播放时一镜到底接上，不倒计时、不重置画面与配乐。 */
+  from: Qid.optional(),
   media: MediaSnapshot.optional(),
   ext: z.record(z.string(), Json).optional(),
   id: Qid,
@@ -394,7 +396,7 @@ export const Project = z.strictObject({
   plugins: z.record(z.string(), z.strictObject({
     actions: z.record(z.string(), PluginAction).optional(),
     themes: z.record(z.string(), z.string()).optional(),
-    properties: z.record(z.string(), z.strictObject({ type: z.enum(['string', 'number', 'boolean']), attribute: z.string().regex(/^data-jp-[a-z0-9-]+$/).optional(), min: z.number().optional(), max: z.number().optional(), nonempty: z.boolean().optional() })).optional(),
+    properties: z.record(z.string(), z.strictObject({ type: z.enum(['string', 'number', 'boolean']), attribute: z.string().regex(/^data-jp-[a-z0-9-]+$/).optional(), min: z.number().optional(), max: z.number().optional(), nonempty: z.boolean().optional(), values: z.array(z.string()).optional() })).optional(),
     data: DataSpec.optional(),
     id: z.string().min(1),
     title: z.string(),

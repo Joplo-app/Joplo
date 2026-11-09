@@ -55,7 +55,7 @@ export type VideoJob = {
 };
 
 /** 录制实现：报告进度，返回写好的文件绝对路径。测试可注入。 */
-export type VideoRecorder = (input: { projectDir: string; url: string; size: { width: number; height: number }; out: string; total: number; progress: (step: number) => void; signal: AbortSignal }) => Promise<void>;
+export type VideoRecorder = (input: { projectDir: string; url: string; size: { width: number; height: number }; out: string; total: number; progress: (step: number) => void; signal: AbortSignal; /** 最长录制时长（毫秒，默认 5 分钟）。 */ maxMs?: number }) => Promise<void>;
 
 export type ExportDeps = {
   /** 按项目解析 Playwright（托管运行时优先，其次项目里已有的）。 */
@@ -134,7 +134,7 @@ async function waitReady(page: Page) {
 
 /** 缺省的录制：Playwright recordVideo + 渲染路由的录制模式（window.__JOPLO_RECORD__）。 */
 export function defaultRecorder(load: (projectDir: string) => Promise<PlaywrightModule>): VideoRecorder {
-  return async ({ projectDir, url, size, out, progress, signal }) => {
+  return async ({ projectDir, url, size, out, progress, signal, maxMs = 5 * 60_000 }) => {
     const pw = await load(projectDir);
     const browser: Browser = await launch(pw);
     const tmp = fs.mkdtempSync(path.join(path.dirname(out), '.rec-'));
@@ -152,7 +152,7 @@ export function defaultRecorder(load: (projectDir: string) => Promise<Playwright
         if (p.error) throw new JoploError('EXPORT_FAILED', `Playback failed: ${p.error}`);
         progress(p.step);
         if (p.done) break;
-        if (Date.now() - t0 > 5 * 60_000) throw new JoploError('EXPORT_FAILED', 'Recording exceeded 5 minutes and was stopped');
+        if (Date.now() - t0 > maxMs) throw new JoploError('EXPORT_FAILED', `Recording exceeded ${Math.round(maxMs / 60000)} minutes and was stopped`);
         await page.waitForTimeout(150);
       }
       await page.waitForTimeout(900); // 停留在结果画面

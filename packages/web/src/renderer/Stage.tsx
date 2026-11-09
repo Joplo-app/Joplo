@@ -2,7 +2,7 @@ import { useScrollState } from './scroll-state';
 import { useEngineAnimations } from './engine-animations';
 import { EngineClockContext } from './engine-motion';
 import { playgroundState, type Playground, type Action } from '@joplo-app/core/runtime';
-import { editableTarget, inputOwner, hoverAction, HoverIntent, resolveDropTarget } from '../runtime/input';
+import { editableTarget, inputOwner, hoverAction, HoverIntent, resolveDropTarget, dropTarget } from '../runtime/input';
 import type { ClockSource, ClockFrame } from '../runtime/clock';
 import type { ActionPresentation } from '@joplo-app/kit/plugin';
 import { projectThemes } from '@joplo-app/core/runtime';
@@ -93,6 +93,8 @@ export type StageProps = {
   font?: AppearanceFont | null;
   /** 线条（D55）：null / 缺省 = 跟随主题的 --jp-stroke。 */
   stroke?: AppearanceStroke | null;
+  /** 观众在舞台上的输入次数（D92 R6，控制器的 snap.inputs）：传给插件 frame.inputs。 */
+  inputs?: number;
   /** 流式输出（D56，演示控制器的 streamAt + 暂停）：position 等于当前位置时，这一步 stream 的文字逐字出现。 */
   stream?: { position: number; speed: number; paused: boolean } | null;
 };
@@ -117,15 +119,19 @@ function scrollsItself(target: EventTarget | null, root: HTMLElement, dy: number
   return false;
 }
 
-export function Stage({ project, state, theme, mode, selectedId = null, preview = null, activeStep = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false, font = null, stroke: strokeOverride = null, stream = null, playground = null, freeMode = false, clock, gesture = null, onStageInput, onAction }: StageProps) {
+export function Stage({ project, state, theme, mode, selectedId = null, preview = null, activeStep = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false, font = null, stroke: strokeOverride = null, stream = null, playground = null, freeMode = false, clock, gesture = null, onStageInput, onAction, inputs = 0 }: StageProps) {
   const { t: i18n } = useI18n();
   const frame = useSyncExternalStore((clock ?? noClock).subscribe, (clock ?? noClock).getSnapshot, noClock.getSnapshot);
   const viewState = useMemo(() => mode === 'demo' ? playgroundState(state, playground) : state, [state, playground, mode]);
   // A viewer edit owns that input while exploring. Keep the frozen script preview
   // intact in the controller so reset/resume can restore it without losing progress.
   const shownPreview = preview && mode === 'demo' && playground?.effects.some(e => e.type === 'set' && e.path === `inputs.${preview.nodeId}`) ? null : preview;
-  const inputFns = useRef({ onStageInput, onAction, freeMode, frame });
-  inputFns.current = { onStageInput, onAction, freeMode, frame };
+  // 舞台输入计数（D92 R6）：宿主传入的控制器计数 + 舞台自己看到的输入 + 进入自由体验，变化即让插件先落定展示
+  const [touches, setTouches] = useState(0);
+  const touch = (explore = true) => { setTouches((n) => n + 1); onStageInput?.(explore); };
+  const inputCount = inputs + touches + (freeMode ? 1 : 0);
+  const inputFns = useRef({ onStageInput, onAction, freeMode, frame, touch });
+  inputFns.current = { onStageInput, onAction, freeMode, frame, touch };
   const shownId = sceneId ?? state.sceneId;
   const scene = project.scenes[shownId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
@@ -169,7 +175,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   }, [resetKey]);
   const cam = useCamera(camera, { width: vp.width, height: vp.height, animate, clock, deps: [state, scene], user, establish: project.autoFocus !== false });
   usePluginObservers(rootRef, Object.keys(project.plugins ?? {}), {
-    frame: { clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, mode, animate, scenarioId: state.scenarioId, sceneId: shownId, position: state.position, focus: camera?.targets ?? null, nextTarget: nextTargetId, selectedId, theme }, ext: ext ?? {},
+    frame: { clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, inputs: inputCount, mode, animate, scenarioId: state.scenarioId, sceneId: shownId, position: state.position, focus: camera?.targets ?? null, nextTarget: nextTargetId, selectedId, theme }, ext: ext ?? {},
   });
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -242,7 +248,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     };
     const onWheel = (e: WheelEvent) => {
       if (inspectMode) return;
-      inputFns.current.onStageInput?.(true);
+      inputFns.current.touch();
       // Keep the entire wheel burst in its scroll area, even after reaching its edge.
       // Native scrolling consumes the first event too; inertia must not become stage zoom.
       if (!e.ctrlKey && (scrollsItself(e.target, el, e.deltaY) || e.timeStamp < scrollIntentUntil.current)) { scrollIntentUntil.current = e.timeStamp + 500; return; }
@@ -253,7 +259,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     let g: { v: View; p: { x: number; y: number } } | null = null;
     type GE = Event & { scale: number; clientX: number; clientY: number };
     const gStart = (e: Event) => {
-      inputFns.current.onStageInput?.(true);
+      inputFns.current.touch();
       e.preventDefault();
       const ge = e as GE;
       g = { v: zoomFns.current.nowView(), p: pt(ge.clientX, ge.clientY) };
@@ -272,10 +278,41 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     };
   }, [zoomOn, !!onStageInput, inspectMode]);
   // 拖动平移：移动超过 4px 才算拖动，之后的 click 不当作点击元素
-  const drag = useRef<{ x: number; y: number; v: View; moved: boolean; id: number; target?: string; scroll?: {element:HTMLElement;x:number;y:number} } | null>(null);
+  const drag = useRef<{ x: number; y: number; v: View; moved: boolean; id: number; target?: string; scroll?: {element:HTMLElement;x:number;y:number}; source?: { el: HTMLElement; scale: number; translate: string; pointerEvents: string } } | null>(null);
+  /**
+   * 拖动一个声明过的源（D92 U1）：元素按自己的本地坐标跟着指针走（含插件画面与镜头的缩放），拖动中对命中测试透明，
+   * 结束（松手、Esc、pointercancel、丢失捕获、卸载）时一律回到原样：内联样式还原、data-jdragging 移除。
+   */
+  const releaseSource = () => {
+    const src = drag.current?.source;
+    if (!src) return;
+    src.el.style.translate = src.translate;
+    src.el.style.pointerEvents = src.pointerEvents;
+    src.el.removeAttribute('data-jdragging');
+    drag.current!.source = undefined;
+  };
+  const cancelDrag = () => {
+    const d = drag.current;
+    releaseSource();
+    drag.current = null;
+    if (d) try { rootRef.current?.releasePointerCapture?.(d.id); } catch { /* not captured */ }
+  };
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape' && drag.current?.source) { e.preventDefault(); suppressClick.current = true; cancelDrag(); } };
+    // 窗口失焦、页面隐藏：松手事件可能永远不会来，统一取消（D92 R3）
+    const onLeave = () => { if (drag.current) { if (drag.current.moved) suppressClick.current = true; cancelDrag(); } };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') onLeave(); };
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('blur', onLeave);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('blur', onLeave); document.removeEventListener('visibilitychange', onVisibility); cancelDrag(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const suppressClick = useRef(false);
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if ((!zoomOn && !onAction) || e.button !== 0 || e.altKey || inspectMode) return;
+    // 一次拖动只属于按下它的那根指针：别的指针（多指触摸、混合输入）不能顶掉它（D92 R3）
+    if (drag.current && drag.current.id !== e.pointerId) return;
     const el = e.target as HTMLElement;
     const target = el.closest<HTMLElement>('[data-jdraggable]');
     const owner = inputOwner({ editable: editableTarget(el), draggable: !!target, plugin: !!el.closest('[data-jgesture-view]') });
@@ -288,7 +325,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
-    if (!d || !(e.buttons & 1)) return;
+    if (!d || d.id !== e.pointerId || !(e.buttons & 1)) return;
     const el = rootRef.current!;
     const s = rectOf(el).width / el.offsetWidth || 1;
     const dx = (e.clientX - d.x) / s;
@@ -297,22 +334,38 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     if (!d.moved) {
       d.moved = true;
       el.setPointerCapture?.(d.id);
+      const source = d.target ? el.querySelector<HTMLElement>(`[data-jid="${CSS.escape(d.target)}"]`) : null;
+      if (source) {
+        // 被抓起的元素不再播放自己的变形飞行；本地坐标 = 屏幕位移 ÷ 它此刻的总缩放
+        for (const a of source.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel();
+        const scale = source.getBoundingClientRect().width / (source.offsetWidth || 1) || 1;
+        d.source = { el: source, scale, translate: source.style.translate, pointerEvents: source.style.pointerEvents };
+        source.style.pointerEvents = 'none';
+        source.setAttribute('data-jdragging', '');
+      }
     }
+    if (d.source) d.source.el.style.translate = `${(e.clientX - d.x) / d.source.scale}px ${(e.clientY - d.y) / d.source.scale}px`;
     if (d.scroll) { scrollIntentUntil.current = e.timeStamp + 500; d.scroll.element.scrollLeft = d.scroll.x - dx; d.scroll.element.scrollTop = d.scroll.y - dy; }
     else if (!d.target) setClamped({ k: d.v.k, tx: d.v.tx + dx, ty: d.v.ty + dy });
   };
   const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
+    if (d && d.id !== e.pointerId) return;
     if (d?.moved) {
       suppressClick.current = true;
       if (d.target && e.type !== 'pointercancel') {
-        const destinations = new Set(gestureActions.flatMap(a => a.type === 'drag' && a.target === d.target && typeof a.to === 'string' ? [a.to] : []));
-        let hit = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-        while (hit && !destinations.has(hit.dataset.jid ?? '')) hit = hit.parentElement;
-        const to = hit?.dataset.jid ?? toFramePoint(e.clientX, e.clientY);
-        onAction?.({ type: 'drag', target: d.target, to });
+        const ids = gestureActions.flatMap(a => a.type === 'drag' && a.target === d.target && typeof a.to === 'string' ? [a.to] : []);
+        const pointOnly = gestureActions.some(a => a.type === 'drag' && a.target === d.target && typeof a.to !== 'string');
+        const dragged = d.source?.el.getBoundingClientRect() ?? null;
+        const boxes = ids.flatMap(id => { const el = rootRef.current?.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`); return el ? [{ id, r: el.getBoundingClientRect() }] : []; });
+        const stagePx = rootRef.current ? rectOf(rootRef.current).width / (rootRef.current.offsetWidth || 1) : 1;
+        const to = dropTarget({ x: e.clientX, y: e.clientY }, dragged, boxes, 48 * stagePx) ?? (pointOnly ? toFramePoint(e.clientX, e.clientY) : null);
+        releaseSource();
+        // 没落在任何声明的目标上（也不接受坐标落点）：回到原位，不改状态
+        if (to !== null) onAction?.({ type: 'drag', target: d.target, to });
       }
     }
+    releaseSource();
     drag.current = null;
   };
 
@@ -390,11 +443,11 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         onPointerDownCapture={e => {
           suppressClick.current = false;
           if (e.altKey || inspectMode) return;
-          onStageInput?.();
+          touch(false);
         }}
         onKeyDownCapture={e => {
           if (e.altKey || inspectMode || ['Tab', 'Shift', 'Control', 'Meta', 'Alt', 'Escape'].includes(e.key)) return;
-          onStageInput?.(true);
+          touch();
           if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) scrollIntentUntil.current = e.timeStamp + 500;
         }}
         onPointerOver={e => {
@@ -428,6 +481,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
           if (a?.type === 'hover') { const input = hoverAction(a.target, 0, a.ms, 'touch'); if (input) onAction(input); suppressClick.current = true; }
         }}
         onPointerCancel={onPointerUp}
+        onLostPointerCapture={() => { if (drag.current?.source) { suppressClick.current = true; cancelDrag(); } }}
         onClickCapture={(e) => {
           if (!suppressClick.current) return;
           suppressClick.current = false;
@@ -441,7 +495,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
           {scene ? (
-            <RenderContext.Provider value={{ assets: project.mediaAssets, act: onAction ? (target, action, native) => onAction(pluginAction({ ...action, target }), native ? pluginAction(native) : undefined) : undefined, hover: id => hover.current?.move(id), interactive: !!onAction && mode === 'demo' && !inspectMode, draggable: onAction ? draggable : undefined, clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, scene, stage: rootRef.current, state: viewState, mode, selectedId, preview: shownPreview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, ext, streaming, changed, plugins: project.plugins, nextTargetId }}>
+            <RenderContext.Provider value={{ assets: project.mediaAssets, act: onAction ? (target, action, native) => onAction(pluginAction({ ...action, target }), native ? pluginAction(native) : undefined) : undefined, hover: id => hover.current?.move(id), interactive: !!onAction && mode === 'demo' && !inspectMode, draggable: onAction ? draggable : undefined, clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, inputs: inputCount, scene, stage: rootRef.current, state: viewState, mode, selectedId, preview: shownPreview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, ext, streaming, changed, plugins: project.plugins, nextTargetId }}>
               {/* 换层（换画面）时淡入 */}
               <motion.div key={shownId} className="absolute inset-0" ref={cam.contentRef} initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
                 <RenderNode node={scene.root} />

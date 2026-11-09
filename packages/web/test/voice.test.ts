@@ -94,6 +94,21 @@ describe('控制器：等声音读完再走', () => {
     expect(c.getSnapshot().playing).toBe(false);
   });
 
+  it('等声音时引擎时钟照常走（D92）：漂移与进退场不会因为只在等旁白而冻住；暂停时钟才停', async () => {
+    const { c, n } = setup();
+    void c.play();
+    await until(() => n.calls.length === 1);
+    await until(() => c.getSnapshot().narration?.waiting === true);
+    const t0 = c.clock.getSnapshot().timeMs;
+    await sleep(200);
+    expect(c.clock.getSnapshot().timeMs - t0).toBeGreaterThan(100);
+    c.pause();
+    const t1 = c.clock.getSnapshot().timeMs;
+    await sleep(150);
+    expect(c.clock.getSnapshot().timeMs).toBe(t1);
+    c.stop();
+  });
+
   it('暂停时声音一起暂停，继续时接着读；播放中下一步立刻停掉当前声音，并接着播', async () => {
     const { c, n } = setup();
     void c.play();

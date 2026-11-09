@@ -91,3 +91,17 @@ export declare function renderStep(opts: RenderOptions): Promise<RenderResult>;
 export type SheetOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope'> & { /** 每行几格，默认 3。 */ columns?: number; /** 每格宽度（像素），默认 480。 */ cellWidth?: number };
 export type SheetResult = { path: string; steps: number; warnings: string[] };
 export declare function renderSheet(opts: SheetOptions): Promise<SheetResult>;
+/**
+ * 胶片条（`joplo render --film`）：按引擎时间逐帧定格（Playwright 假时钟），每 sampleMs 算一次相邻帧差，每 every 取一格。
+ * 每个场景一页（多页时 out 之后加 -1、-2…）；cuts = 单帧整屏突变，stills = 至少 stillMs 没有可见变化，boundaries = 每次提交一步前后的最大相邻帧差。
+ */
+export type FilmOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 'scale'> & { chain?: boolean; every?: number; sampleMs?: number; stillMs?: number; columns?: number; cellWidth?: number; /** 把胶片格另存为 JPEG 的目录（可选）。 */ frames?: string };
+export type FilmCut = { atMs: number; diff: number; changed: number; scenarioId: string | null; position: number };
+export type FilmStill = { fromMs: number; toMs: number; scenarioId: string | null; position: number };
+export type FilmBoundary = { atMs: number; scenarioId: string | null; position: number; chapter: boolean; maxDiff: number; maxChanged: number };
+export type FilmResult = { path: string; files: string[]; durationMs: number; sampleMs: number; every: number; samples: number; cuts: FilmCut[]; stills: FilmStill[]; boundaries: FilmBoundary[]; maxDiff: number; warnings: string[] };
+export declare function renderFilm(opts: FilmOptions): Promise<FilmResult>;
+/** 视频（`joplo render --video`）：与看板导出同一个录制器（真实时间，webm）。 */
+export type VideoOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 'scale'> & { chain?: boolean };
+export type VideoResult = { path: string; durationMs: number };
+export declare function renderVideo(opts: VideoOptions): Promise<VideoResult>;

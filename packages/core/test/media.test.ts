@@ -73,3 +73,48 @@ it('rejects resource metadata spoofing and cross-plugin media references', () =>
  src.config.plugins=[fake,bad];src.features.f!.options.a!.scenarios={s:flow('S',{start:'/'}).system('A',pluginEffect('fake','play','score')).system('B',pluginEffect('bad','play',null))};
  expect(compile(src,'publish').diagnostics.map(d=>d.code)).toContain('PLUGIN_DATA_INVALID');
 });
+
+// D92：章节交叉淡化与接力继承都在通用媒体快照里完成，与具体音乐插件无关
+const crossfade = definePlugin({ id: 'xf', title: 'Crossfade', components: {}, runtime: '/runtime.js', local: '/local.js', compile: {
+  effect(e, ctx) {
+    const p = e.payload as { name: string; fadeMs?: number };
+    return { media: e.name === 'stop' ? [{ track: 'bgm', action: 'stop', fadeMs: p.fadeMs ?? 0 }] : [{ track: 'bgm', action: 'play', resource: ctx.resource({ compiler: 'wav', input: p.name }), volume: .5, loop: true, fadeMs: p.fadeMs ?? 0 }] };
+  },
+} });
+function chapters(): AuthoringProject {
+  const file = '/p/chapters.ts';
+  const play = (name: string, fadeMs = 800) => pluginEffect('xf', 'play', { name, fadeMs });
+  return { root: '/p', config: { ...config({ name: 'Chapters', plugins: [crossfade] }), file }, layouts: {}, routes: { '/': { ...page({ title: 'Home' }, jsx('div', {})), file } }, features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'i', on: {}, scenarios: {
+    one: flow('One', { start: '/' }).system('A', play('a'), hold(4)).system('Still A', play('a'), hold(3)).system('To B', play('b', 900), hold(2)),
+    two: flow('Two', { from: 'one' }).system('Keep B', hold(2)).system('To C', play('c', 600)),
+    fresh: flow('Fresh', { start: '/' }).system('Quiet'),
+  } }), file } } } } };
+}
+it('crossfades on the generic media layer: the old track fades out under its own key while the new one fades in', () => {
+  const r = compile(chapters(), 'publish');
+  expect(r.diagnostics).toEqual([]);
+  const sc = r.project!.scenarios['f.a.one']!;
+  const a = sc.steps[0]!.media!['xf:bgm']!.resource;
+  // 同一首再 play 一次：继续播放，不从头开始
+  expect(sc.steps[1]!.media!['xf:bgm']).toMatchObject({ resource: a, offsetMs: 4000 });
+  const b = sc.steps[2]!.media!;
+  expect(b['xf:bgm']).toMatchObject({ offsetMs: 0, fadeInMs: 900 });
+  expect(b['xf:bgm']!.resource).not.toBe(a);
+  expect(b[`xf:bgm>${a}`]).toMatchObject({ resource: a, offsetMs: 7000, stopAfterMs: 900 });
+});
+it('a flow({ from }) chapter starts with the music of the chapter it continues', () => {
+  const p = compile(chapters(), 'publish').project!;
+  const one = p.scenarios['f.a.one']!, two = p.scenarios['f.a.two']!;
+  expect(two.from).toBe('f.a.one');
+  expect(p.scenarios['f.a.fresh']!.from).toBeUndefined();
+  const end = one.steps[2]!.media!;
+  // 第 0 步：上一章结尾的快照向前推进上一章最后一步的停留，淡出完的旧曲已经不在
+  expect(two.media!['xf:bgm']).toMatchObject({ resource: end['xf:bgm']!.resource, offsetMs: 2000 });
+  expect(Object.keys(two.media!)).toEqual(['xf:bgm']);
+  expect(two.steps[0]!.media!['xf:bgm']).toMatchObject({ offsetMs: 2000 });
+  expect(two.steps[1]!.media![`xf:bgm>${end['xf:bgm']!.resource}`]).toMatchObject({ stopAfterMs: 600 });
+  expect(p.scenarios['f.a.fresh']!.media).toBeUndefined();
+  // 分享范围不含被接力的一章时，不留下悬空的 from
+  expect(scopeProject(p, ['f.a.two'], 'publish').project.scenarios['f.a.two']!.from).toBeUndefined();
+  expect(scopeProject(p, ['f.a.one', 'f.a.two'], 'publish').project.scenarios['f.a.two']!.from).toBe('f.a.one');
+});

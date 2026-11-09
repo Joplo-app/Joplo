@@ -671,6 +671,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const layer = p.layer ?? (hasLayers ? cameraAt(out as Project, p.from, prev.steps.length).directorLayer : undefined);
         const merged = mergeState({ ui: end.ui as never, data: end.data as never, inputs: end.inputs as never }, p.state);
         target.initial = { sceneId: end.sceneId, ui: merged.ui, data: merged.data, inputs: merged.inputs, ...(layer ? { layer } : {}) };
+        target.from = p.from;
       } catch (e) {
         err('FROM_FAILED', `Scenario ${sid} continues from ${p.from}, which does not replay: ${(e as Error).message}`, p.at);
         return false;

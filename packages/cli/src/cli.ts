@@ -63,7 +63,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   let exitCode = 0;
   const serverPackage = '@joplo-app/server';
   const loadServer = deps.loadServer ?? (() => import(serverPackage));
-  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'renderStep' | 'renderSheet' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime' | 'generateProjectVoice' | 'generateResources'>(name: K): Promise<typeof Server[K]> {
+  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'renderStep' | 'renderSheet' | 'renderFilm' | 'renderVideo' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime' | 'generateProjectVoice' | 'generateResources'>(name: K): Promise<typeof Server[K]> {
     let module: Record<string, unknown>;
     try { module = await loadServer(); }
     catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server cannot load ${name}: ${e instanceof Error ? e.message : String(e)}`); }
@@ -393,8 +393,38 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--scale <scale>', 'Pixel scale', scale).option('--overwrite', 'Allow overwriting the screenshot')
     .option('--content <lang>', 'Author content language from config locales (D84); defaults to the source language')
     .option('--sheet', 'Storyboard: every step of the scenario in one image, with step number, caption, and narration under each frame')
-    .option('--columns <n>', 'Storyboard columns (with --sheet; default 3)', integer('columns')).action(async (dir, opts) => {
+    .option('--columns <n>', 'Storyboard / film columns (with --sheet default 3, with --film default 8)', integer('columns'))
+    .option('--film', 'Film strip: play the scenario on a frozen engine clock and sample a frame every --every ms, with time, step, adjacent-frame change, hard cuts, and still runs marked; one page per scenario')
+    .option('--video', 'Record a .webm of the scenario playing in real time (same recorder as the board export)')
+    .option('--chain', 'With --film/--video: keep playing the next scenarios of the option in published order, to the last one')
+    .option('--every <ms>', 'With --film: one cell every N ms of engine time (default 250)', integer('every'))
+    .option('--frames <dir>', 'With --film: also save each cell as a JPEG in this directory')
+    .option('--format <format>', 'With --film: text or json summary', 'text').action(async (dir, opts) => {
       if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'width and height must be provided together');
+      if ([opts.sheet, opts.film, opts.video].filter(Boolean).length > 1) throw new JoploError('USAGE', '--sheet, --film and --video are separate modes; pick one');
+      if ((opts.chain || opts.every !== undefined || opts.frames) && !opts.film && !opts.video) throw new JoploError('USAGE', '--chain, --every and --frames need --film (or --video for --chain)');
+      if (opts.film || opts.video) {
+        if (opts.stepId !== undefined || opts.width !== undefined) throw new JoploError('USAGE', '--film/--video play the whole scenario; do not combine with --step-id, --width, or --height');
+        const { askYesNo, isInteractive, withExportComponent } = await import('./setup.ts');
+        const base = { projectDir: resolve(dir), scenarioId: opts.scenarioId, theme: opts.theme, out: resolve(opts.out), overwrite: opts.overwrite, chain: !!opts.chain, ...(opts.content ? { content: opts.content } : {}) };
+        const setup = { server: setupServer, interactive: deps.interactive ?? isInteractive(), ask: deps.ask ?? askYesNo, io: setupIo() };
+        if (opts.video) {
+          const renderVideo = await serverFunction('renderVideo');
+          const video = await withExportComponent(() => renderVideo(base), setup);
+          line(video.path);
+          return;
+        }
+        const renderFilm = await serverFunction('renderFilm');
+        const film = await withExportComponent(() => renderFilm({ ...base, ...(opts.every ? { every: opts.every } : {}), ...(opts.columns ? { columns: opts.columns } : {}), ...(opts.frames ? { frames: resolve(opts.frames) } : {}) }), setup);
+        if (opts.format === 'json') { json(film); return; }
+        for (const f of film.files) line(f);
+        const s = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
+        line(`duration ${s(film.durationMs)} · ${film.samples} frames every ${film.sampleMs} ms · max adjacent diff ${(film.maxDiff * 100).toFixed(1)}%`);
+        for (const b of film.boundaries.filter(b => b.chapter)) line(`chapter → ${b.scenarioId} at ${s(b.atMs)}: max adjacent diff ${(b.maxDiff * 100).toFixed(1)}%, changed ${(b.maxChanged * 100).toFixed(0)}%`);
+        for (const c of film.cuts) line(`CUT ${s(c.atMs)} ${c.scenarioId} step ${c.position}: ${(c.changed * 100).toFixed(0)}% of pixels changed in one frame`);
+        for (const x of film.stills) line(`STILL ${s(x.fromMs)}–${s(x.toMs)} (${s(x.toMs - x.fromMs)}) ${x.scenarioId} step ${x.position}`);
+        return;
+      }
       if (opts.sheet) {
         if (opts.stepId !== undefined || opts.width !== undefined) throw new JoploError('USAGE', '--sheet renders every step; do not combine it with --step-id, --width, or --height');
         const renderSheet = await serverFunction('renderSheet');

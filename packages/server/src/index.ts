@@ -12,6 +12,7 @@ export { buildSite } from './build.ts';
 export { generateProjectVoice, type VoiceRunOptions, type VoiceRunResult } from './voice-run.ts';
 export type { CloudSpeechRequest, CloudSpeechResult, CloudVoice, CloudVoiceBridge, CloudVoiceCatalog, CloudVoiceInfo, CloudVoiceStatus, VoiceQuota } from './cloud.ts';
 export { renderSheet, renderStep } from './render.ts';
+export { renderFilm, renderVideo } from './film.ts';
 export { EXPORT_DOWNLOAD_MB, PLAYWRIGHT_VERSION, SETUP_COMMAND, exportRuntimeStatus, installExportRuntime, uninstallExportRuntime, type ExportRuntimeStatus, type InstallProgress, type InstallResult } from './export-runtime.ts';
 
 export { buildFeatureDiff, publicIRFromHtml, type DiffBuildOptions, type DiffBuildResult } from './feature-diff.ts';

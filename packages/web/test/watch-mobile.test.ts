@@ -205,3 +205,106 @@ describe('DemoController 下一章倒计时（upNext）', () => {
     expect(c.getSnapshot().scenarioId).toBe('f.a.one');
   });
 });
+
+describe('DemoController 接力（flow({ from })，D92）：一镜到底，不倒计时、不重置', () => {
+  function relay(): Project {
+    const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
+    const opt = option({ name: 'A', idea: 'i', scenarios: {
+      one: flow('One', { start: '/' }).click('go', 'First chapter'),
+      two: flow('Two', { from: 'one' }).click('go', 'Second chapter'),
+    } });
+    const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } } };
+    return compile(src, 'dev').project!;
+  }
+  it('接力的下一章：没有 upNext、播放不停、跳转计数 seek 不变，状态从上一章结尾继续', async () => {
+    const c = new DemoController(null);
+    c.reducedMotion = true;
+    c.setProject(relay(), 1, null);
+    c.setScenario('f.a.one', 0, { quiet: true });
+    c.autoNextDelay = 60_000;
+    c.autoNext = (id) => nextScenarioId([{ id: 'f.a.one' }, { id: 'f.a.two' }], id);
+    const seen: { upNext: boolean; playing: boolean; seek: number }[] = [];
+    c.subscribe(() => { const s = c.getSnapshot(); seen.push({ upNext: !!s.upNext, playing: s.playing, seek: s.seek }); });
+    const seek = c.getSnapshot().seek;
+    void c.play();
+    await until(() => c.getSnapshot().scenarioId === 'f.a.two' && c.getSnapshot().state?.position === 1);
+    await until(() => !c.getSnapshot().playing);
+    expect(seen.some(s => s.upNext)).toBe(false);
+    // 开播后第一次停下就是全片结束：换章时没有任何一刻 playing=false
+    const start = seen.findIndex(s => s.playing);
+    const stopAt = seen.findIndex((s, i) => i > start && !s.playing);
+    expect(stopAt).toBe(seen.length - 1);
+    expect(c.getSnapshot().state?.position).toBe(1);
+    expect([...new Set(seen.map(s => s.seek))]).toEqual([seek]);
+  });
+});
+
+describe('U2 默认无缝接下一个场景（D92）：看板与发布站同一条规则', () => {
+  function chain(): Project {
+    const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
+    const opt = option({ name: 'A', idea: 'i', scenarios: {
+      one: flow('One', { start: '/' }).click('go', 'First'),
+      side: flow('Side', { start: '/', autoplay: false }).click('go', 'Side branch'),
+      two: flow('Two', { from: 'one' }).click('go', 'Second'),
+      three: flow('Three', { start: '/' }).click('go', 'Third'),
+    } });
+    const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } } };
+    return compile(src, 'dev').project!;
+  }
+  const fresh = (id = 'f.a.one') => { const c = new DemoController(null); c.reducedMotion = true; c.setProject(chain(), 1, null); c.setScenario(id, 0, { quiet: true }); return c; };
+  it('没有任何设置：播完接着播下一个场景，不出倒计时；跳过 autoplay:false 的支线；整条链播完才停', async () => {
+    const c = fresh();
+    const seen = new Set<string>();
+    let upNext = false;
+    c.subscribe(() => { const s = c.getSnapshot(); if (s.scenarioId) seen.add(s.scenarioId); if (s.upNext) upNext = true; });
+    void c.play();
+    await until(() => c.getSnapshot().scenarioId === 'f.a.three' && !c.getSnapshot().playing, 8000);
+    expect([...seen]).toEqual(['f.a.one', 'f.a.two', 'f.a.three']);
+    expect(upNext).toBe(false);
+    expect(c.getSnapshot().state?.completed || c.getSnapshot().state?.position === 1).toBe(true);
+  });
+  it('支线播完就停；暂停中、手动一步步走到结尾都不接', async () => {
+    const side = fresh('f.a.side');
+    void side.play();
+    await until(() => !side.getSnapshot().playing && side.getSnapshot().state?.position === 1);
+    await sleep(80);
+    expect(side.getSnapshot().scenarioId).toBe('f.a.side');
+    const manual = fresh();
+    await manual.next();
+    await until(() => manual.getSnapshot().state?.position === 1);
+    await sleep(80);
+    expect(manual.getSnapshot().scenarioId).toBe('f.a.one');
+    const paused = fresh();
+    void paused.play();
+    await until(() => paused.getSnapshot().state?.position === 1);
+    paused.pause();
+    await sleep(800);
+    expect(paused.getSnapshot().scenarioId).toBe('f.a.one');
+    paused.stop();
+  });
+});
+
+// 评审 RF11：接力章写在被接的一章前面（编译器允许），默认接续仍按 from 链走，不提前停、不回头循环
+describe('U2 from 链优先于声明顺序（D92 R9）', () => {
+  it('逆声明顺序的接力章仍是下一个；链尾之后接下一个根场景；不会回到已经放过的章', () => {
+    const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
+    const opt = option({ name: 'A', idea: 'i', scenarios: {
+      two: flow('Two', { from: 'one' }).click('go', 'Second'),
+      side: flow('Side', { from: 'one', autoplay: false }).click('go', 'Side'),
+      one: flow('One', { start: '/' }).click('go', 'First'),
+      three: flow('Three', { start: '/' }).click('go', 'Third'),
+    } });
+    const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } } };
+    const p = compile(src, 'dev').project!;
+    const c = new DemoController(null);
+    c.setProject(p, 1, null);
+    expect(c.autoNext?.('f.a.one')).toBe('f.a.two');
+    expect(c.autoNext?.('f.a.two')).toBe('f.a.three');
+    expect(c.autoNext?.('f.a.three')).toBeNull();
+    expect(c.autoNext?.('f.a.side')).toBeNull();
+    c.stop();
+  });
+});

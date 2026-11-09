@@ -26,7 +26,7 @@ import { dwellTexts } from '../player/cover-content';
 import { VOICE_BREATH_MS, speakerRoleAt, spokenLine } from '@joplo-app/core/runtime';
 import type { Narration, Narrator, NarrationSource } from './voice';
 import { holdMsOf, orderedFeatures, streamsOf, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core/runtime';
-import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
+import { browseSceneId, browseState, optionsOf, scenariosOf, playSequence } from './views';
 
 /** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */
 export type View = 'stage' | 'browse';
@@ -78,6 +78,13 @@ export type Snapshot = {
   selectionSync: SelectionSync;
   /** 状态被“跳转”时递增：舞台据此直接移除旧 Toast，不播放退出动画。 */
   epoch: number;
+  /**
+   * 状态被替换（跳转、重置、换章、从头播放）时递增；逐步提交、接力的下一章、暂停 → 继续与丢弃自由体验都不变（D92）。
+   * 配乐据此决定接着播还是按快照重新定位。写入点：set（同一次更新里同时换了 epoch 与 state）。
+   */
+  seek: number;
+  /** 观众在舞台上的输入次数（点、按键、拖动按下，D92 R6）。写入点：stageInput → Stage 的 inputs → 插件 frame.inputs；变化时插件先落定展示。 */
+  inputs: number;
   /**
    * 有层级的方案（T-layers）：下一步的操作目标不在当前显示的层里时，先切到包含它的层（导演跟随时），
    * 再移动鼠标；这一步提交后清空，之后由 cameraAt 决定导演层。
@@ -185,6 +192,8 @@ export class DemoController {
     leadLayer: null,
     leadFrame: null,
     upNext: null,
+    seek: 0,
+    inputs: 0,
   };
   private listeners = new Set<() => void>();
   private gen = 0;
@@ -231,6 +240,7 @@ export class DemoController {
 
   private set(patch: Partial<Snapshot>, sampleClock = true) {
     if (sampleClock) this.mediaElapsed();
+    if (patch.epoch !== undefined && patch.state !== undefined) patch = { ...patch, seek: this.snap.seek + 1 };
     if (patch.state !== undefined && (patch.state?.position !== this.snap.state?.position || patch.state?.sceneId !== this.snap.state?.sceneId) || patch.scenarioId !== undefined && patch.scenarioId !== this.snap.scenarioId) this.clock.mark();
     // 状态被替换但不是播放提交的：不再逐字输出（跳到某一步直接显示全文）
     if (patch.state !== undefined && patch.streamAt === undefined && patch.state !== this.snap.state) patch = { ...patch, streamAt: null };
@@ -519,7 +529,7 @@ export class DemoController {
    */
   async play(opts: { fromStart?: boolean; fast?: (index: number) => boolean; hold?: boolean } = {}) {
     const p = this.snap.project;
-    const sc = this.scenario();
+    let sc = this.scenario();
     if (!p || !sc || !this.snap.state || this.snap.view !== 'stage') return;
     this.stop();
     if (sc.steps.length === 0) return this.info(m.player.thisScenarioHasNoStepsAndOnlyShowsIts2);
@@ -536,22 +546,36 @@ export class DemoController {
       this.narrate(sc, at);
       if (!(await this.dwellOn(sc, at - 1, gen))) return;
     }
-    while (gen === this.gen) {
-      const st = this.snap.state;
-      if (!st || st.completed || st.position >= sc.steps.length) break;
-      const index = st.position;
-      const quick = !!this.fast?.(index);
-      const ok = quick ? await this.runQuick(sc, gen) : await this.runStep(sc, gen, { moveCursor: true });
-      if (!ok || gen !== this.gen) return;
-      if (!quick && !(await this.dwellOn(sc, index, gen))) return;
+    let next: string | null = null;
+    for (;;) {
+      while (gen === this.gen) {
+        const st = this.snap.state;
+        if (!st || st.completed || st.position >= sc.steps.length) break;
+        const index = st.position;
+        const quick = !!this.fast?.(index);
+        const ok = quick ? await this.runQuick(sc, gen) : await this.runStep(sc, gen, { moveCursor: true });
+        if (!ok || gen !== this.gen) return;
+        if (!quick && !(await this.dwellOn(sc, index, gen))) return;
+      }
+      this.fast = null;
+      if (gen !== this.gen) return;
+      // 连续播放（mobile_watch）：自动播放把一个场景放完时，接着放下一个场景；手动一步步看、最后一个场景、被停止时不跳
+      const end = this.snap.state;
+      next = end && (end.completed || end.position >= sc.steps.length) ? (this.autoNext?.(sc.id) ?? null) : null;
+      const following = next ? this.snap.project?.scenarios[next] : undefined;
+      if (!next || !following) {
+        this.set({ playing: false, paused: false, busy: false, dwell: null });
+        return;
+      }
+      // 接力（D92）：flow({ from }) 接着这一章的下一章一镜到底——不倒计时、不停播、不换 epoch，
+      // 画面、插件观察器与配乐都不重置；状态就是这一章的结尾（下一章第 0 步由它推导）
+      if (following.from !== sc.id || !this.continueInto(following)) break;
+      sc = following;
     }
-    this.fast = null;
-    if (gen !== this.gen) return;
-    // 连续播放（mobile_watch）：自动播放把一个场景放完时，接着放下一个场景；手动一步步看、最后一个场景、被停止时不跳
-    const end = this.snap.state;
-    const next = end && (end.completed || end.position >= sc.steps.length) ? (this.autoNext?.(sc.id) ?? null) : null;
-    if (!next || !this.snap.project?.scenarios[next]) {
-      this.set({ playing: false, paused: false, busy: false, dwell: null });
+    if (!next) return;
+    if (this.autoNextDelay <= 0) {
+      this.setScenario(next, 0, { quiet: true });
+      void this.play({ fromStart: true });
       return;
     }
     // 页面上显示“下一章 · N 秒”：暂停时倒计时也停；立即播放跳过等待；取消（或停止）就停在这一章的结尾
@@ -574,6 +598,16 @@ export class DemoController {
     void this.play({ fromStart: true });
   }
 
+  /** 接力到下一章：只换场景与（相同的）第 0 步状态，播放不停；回放失败时返回 false（按普通换章处理）。 */
+  private continueInto(sc: Scenario): boolean {
+    const p = this.snap.project;
+    if (!p) return false;
+    const r = this.safeStateAt(p, sc.id, 0);
+    if (r.error || !r.state) return false;
+    this.set({ featureId: p.options[sc.optionId]?.featureId ?? this.snap.featureId, scenarioId: sc.id, optionId: sc.optionId, state: r.state, playbackError: null, dwell: null });
+    return true;
+  }
+
   private skipUpNext = false;
   /** 下一章倒计时中：立即播放。 */
   playNextNow() {
@@ -584,16 +618,26 @@ export class DemoController {
     if (this.snap.upNext) this.stop();
   }
 
-  /** 自动播放放完一个场景后，接着放哪个场景（返回 null 就停下）。发布站按选定方案的场景顺序设置；看板不设置。 */
-  autoNext: ((scenarioId: string) => string | null) | null = null;
-  /** 两个场景之间的倒计时（毫秒，不随速度缩放；暂停时不计时）。页面上显示“下一章 · N 秒”。 */
-  autoNextDelay = 3000;
+  /**
+   * 自动播放放完一个场景后，接着放哪个场景（返回 null 就停下）。缺省（D92 U2 / R9，看板、发布站、嵌入一致）：playSequence 里的
+   * 下一个——from 接力链优先，其余按声明顺序，跳过 flow({ autoplay: false }) 的支线。支线本身播完就停。录制等场合可以设为 null。
+   */
+  autoNext: ((scenarioId: string) => string | null) | null = (id) => {
+    const p = this.snap.project;
+    const sc = p?.scenarios[id];
+    if (!p || !sc) return null;
+    const sequence = playSequence(p, sc.optionId);
+    const i = sequence.findIndex((s) => s.id === id);
+    return i >= 0 && i + 1 < sequence.length ? sequence[i + 1]!.id : null;
+  };
+  /** 两个场景之间的倒计时（毫秒，不随速度缩放；暂停时不计时）。缺省 0：不倒计时、不出“下一章”卡片，直接接着播（D92 U2）。 */
+  autoNextDelay = 0;
 
   private fast: ((index: number) => boolean) | null = null;
 
   /** 停留在刚提交的第 index 步（0 起）上；被取消时返回 false。 */
   private async dwellOn(sc: Scenario, index: number, gen: number): Promise<boolean> {
-    // 停留（T-director2）：按说明与解说的字数，至少 3 秒；并等镜头过渡结束、本步 active 连线上的小点跑完一圈
+    // 停留（T-director2）：按说明与解说的字数，至少 3 秒（写了 hold 时由作者掌握节奏，不套 3 秒下限，D92）；并等镜头过渡结束、本步 active 连线上的小点跑完一圈
     const step = sc.steps[index]!;
     // hold（D70）：作者要求的最短停留（按速度缩放）；减少动态效果时同样保留，它是看的时间，不是动画
     const dwell = Math.max(holdMsOf(step, this.speed), this.reducedMotion
@@ -601,6 +645,7 @@ export class DemoController {
       : stepDwell({
           texts: dwellTexts(step, this.i18n),
           speed: this.speed,
+          paced: step.hold !== undefined,
           cameraMoved: step.shots.length > 0 || !!step.directorLayer,
           dotMs: this.activeDotMs(),
           streams: streamsOf(step).map((x) => x.value),
@@ -685,7 +730,22 @@ export class DemoController {
   private async waitNarration(gen: number): Promise<boolean> {
     const n = this.narrating;
     if (!n) return gen === this.gen;
+    // 等声音时引擎时钟照常走（D92）：镜头漂移、进退场与逐字输出都由它驱动，不能因为“只在等旁白”就冻住画面
+    let reading = true;
+    void n.done.then(() => { reading = false; });
+    const ticking = (async () => {
+      while (reading && gen === this.gen) {
+        this.tickClock();
+        await new Promise<void>((resolve) => {
+          const done = () => { clearTimeout(timer); this.cancelWaiters = this.cancelWaiters.filter((f) => f !== done); resolve(); };
+          const timer = setTimeout(done, 16);
+          this.cancelWaiters.push(done);
+        });
+      }
+    })();
     await Promise.race([n.done, new Promise<void>((r) => this.cancelWaiters.push(r))]);
+    reading = false;
+    await ticking;
     if (gen !== this.gen) return false;
     return this.wait(VOICE_BREATH_MS, gen);
   }
@@ -710,6 +770,8 @@ export class DemoController {
    */
   /** Pause before delivery; never cancel or replay the viewer's original DOM event. */
   stageInput(explore = false): void {
+    // 先让舞台上进行中的展示落定（进退场、幽灵），再处理这次输入（D92 R6）：计数变化就是插件的信号
+    this.set({ inputs: this.snap.inputs + 1 });
     if ((this.snap.playing || this.snap.busy) && !this.snap.paused) this.pause(explore);
     if (explore && !this.snap.freeMode) this.set({ freeMode: true });
   }

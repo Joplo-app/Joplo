@@ -197,7 +197,8 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
   for (const sid of Object.keys(project.scenarios)) {
     if (!S.has(sid)) continue;
     const s = project.scenarios[sid]!;
-    scenarios[sid] = { ...s, steps: s.steps.map((st) => (st.forks.some((f) => !S.has(f.scenarioId)) ? { ...st, forks: st.forks.filter((f) => S.has(f.scenarioId)) } : st)) };
+    const { from, ...rest } = s;
+    scenarios[sid] = { ...rest, ...(from && S.has(from) ? { from } : {}), steps: s.steps.map((st) => (st.forks.some((f) => !S.has(f.scenarioId)) ? { ...st, forks: st.forks.filter((f) => S.has(f.scenarioId)) } : st)) };
   }
   const options: Project['options'] = {};
   for (const [id, o] of Object.entries(project.options)) {

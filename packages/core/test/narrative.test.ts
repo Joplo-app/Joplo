@@ -51,11 +51,12 @@ describe('阅读节奏在 core，web 原样 re-export', () => {
     expect(scenarioEstimateMs(sc)).toBe(stepDwell({ texts: ['Opening', 'why it matters'] }) + stepDwell({ texts: ['Send it'] }));
     expect(scenarioEstimateMs({ ...sc, steps: [] })).toBe(0);
   });
-  it('outline 与 check 计入 hold 最短停留，较短的 hold 不缩短阅读时间', () => {
+  it('outline 与 check 计入 hold；写了 hold 的步骤由作者掌握节奏，不再套 3 秒阅读下限（D92），字数阅读时间仍然计入', () => {
     const p = build({ scenarios: { happy: flow('S', { start: '/', cases: ['happy'] })
-      .system('A', hold(30)).system('B', hold(30)).system('C', hold(30)).system('D', hold(0.5)) } });
-    expect(scenarioEstimateMs(p.scenarios['f.a.happy']!)).toBe(93_000);
-    expect(outline(p).features[0]!.options[0]!.scenarios[0]!.ms).toBe(93_000);
+      .system('A', hold(30)).system('B', hold(30)).system('C', hold(30)).system('D', hold(0.5)).system('一句需要读上一会儿的较长说明文字', hold(0.5)) } });
+    // D：一个字母约 67 ms，按 hold 的 0.5 s；长说明 16 个汉字 × 125 ms = 2 s，读完才走
+    expect(scenarioEstimateMs(p.scenarios['f.a.happy']!)).toBe(92_500);
+    expect(outline(p).features[0]!.options[0]!.scenarios[0]!.ms).toBe(92_500);
     expect(codes(p, 'SCENARIO_TOO_LONG')).toHaveLength(1);
   });
 });
