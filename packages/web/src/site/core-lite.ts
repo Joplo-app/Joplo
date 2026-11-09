@@ -14,7 +14,7 @@ export * from '../../../core/src/pace.ts';
 /** 步骤时间计划：演示控制器、封面估算共用，纯函数。 */
 export * from '../../../core/src/step-plan.ts';
 /** 作品投影（D102）：首页卡片、封面、连续播放顺序，纯函数。 */
-export * from '../../../core/src/works.ts';
+export * from '../../../core/src/entries.ts';
 export * from '../../../core/src/focus.ts';
 /** 朗读（D74）：读什么、谁来读、音频片段的键，纯函数。 */
 export * from '../../../core/src/voice.ts';

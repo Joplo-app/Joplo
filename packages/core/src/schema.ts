@@ -269,19 +269,13 @@ export const Route = z.strictObject({
   source: Source,
 });
 
-/**
- * 作品的形态（D102）：demo = 功能演示（功能 → 方案 → 情况 × 场景，带设计评审）；film = 影片（影片 → 章节 → 步骤，对标视频创作）。
- * IR 里两种形态共用 Feature / Option / Scenario 这套容器：影片是一个 Feature、恰好一个 Option、章节就是 Scenario。
- * 以后新增形态（例如交互作品）在这里加一个值；任何形态都经 works.ts 的投影得到首页卡片与封面。
- */
-export const WORK_KINDS = ['demo', 'film'] as const;
-
+/** 独立作品仍复用 Feature 容器；外部通过 Entry 读取能力。 */
 export const Feature = z.strictObject({
-  /** 形态；缺省 = demo。影片由 film() 创作入口编译而来。发布站保留。 */
-  kind: z.enum(WORK_KINDS).optional(),
-  /** 影片的观众（film({ audience })）：给谁看的一句话；功能演示用 roles 表达“面向谁”。发布站保留。 */
+  /** work() 写入；entries.ts 将它投影为 Entry.featureId = null。公开载荷保留。 */
+  standalone: z.literal(true).optional(),
+  /** 给观众看的说明，参与作者内容多语言。 */
   audience: z.string().min(1).optional(),
-  /** 草稿（film({ draft: true })）：只在本地看板里，发布、评审版与分享都不带；只出现在 dev IR。 */
+  /** 只在 dev；发布与评审模式整件作品都跳过。 */
   draft: z.literal(true).optional(),
   id: Id,
   name: z.string().min(1),
@@ -317,6 +311,8 @@ export const Coverage = z.strictObject({
 
 export const FreeReaction = z.strictObject({ action: Action, effects: z.array(Effect).default([]), source: Source });
 export const Option = z.strictObject({
+  /** 共享切片解析器在全部切片使用 chapter() 时写入；Entry.sequencing 消费，公开保留；缺省 independent。 */
+  sequencing: z.literal('linear').optional(),
   free: z.record(Id, FreeReaction).optional(),
   id: Qid,
   featureId: Id,

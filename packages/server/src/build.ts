@@ -39,10 +39,10 @@ export function publishPayload(project: Project, home: string | null): { project
   const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, {
     id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick,
     // 形态与观众属于公开内容；只复制已有字段，保持旧功能演示的载荷逐字节不变。draft 仍只属于 dev。
-    ...(f.kind !== undefined ? { kind: f.kind } : {}),
+    ...(f.standalone !== undefined ? { standalone: f.standalone } : {}),
     ...(f.audience !== undefined ? { audience: f.audience } : {}),
   }]));
-  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {}, ...(o.free ? {free:o.free} : {}) }]));
+  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {}, ...(o.sequencing ? { sequencing: o.sequencing } : {}), ...(o.free ? {free:o.free} : {}) }]));
   const scenarios = Object.fromEntries(
     Object.entries(project.scenarios).map(([id, s]) => {
       const { caseIds: _ci, ...sr } = s;

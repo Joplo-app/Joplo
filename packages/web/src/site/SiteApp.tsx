@@ -11,7 +11,7 @@ import { siteContent, viewProject } from '../i18n/content';
 import { ContentFallbackNotice } from './ContentNotice';
 /**
  * 发布站（`joplo build` 的产物，D39 / D33 / D55「发布站 · 观众看到的」）：与本机看板同一套布局、时间线、字幕、全屏和快捷键，只有一个项目。
- * - 首页 `#/`：左栏列作品；右侧是项目名、说明和作品卡片（整张可点，带缩略图）。卡片只读 core 的 Work（D102）：
+ * - 首页 `#/`：左栏列作品；右侧是项目名、说明和作品卡片（整张可点，带缩略图）。卡片只读 core 的 Entry（D102）：
  *   影片写「N 章 · 约 M」与观众，功能演示写角色与场景数（不变）；项目里有影片时卡片带形态徽标；
  * - 打开时先落在首页或封面上（D102）：只有一个作品时 `#/` 直接是这个作品的演示页第 0 步（封面），多个作品时是首页；
  * - 影片的左栏叫“章节”（与手机一致），章节带自动编号与时长，支线单独一组；功能演示仍叫“场景”；
@@ -21,7 +21,7 @@ import { ContentFallbackNotice } from './ContentNotice';
  *   （字体、线条暂不发布）。只消费 publish 模式的 IR；没有写接口。hash 路由，file:// 可直接打开。
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { orderedFeatures, workKind, workOf, worksOf, type Project, type Work } from '@joplo-app/core/runtime';
+import { orderedFeatures, entryOf, entriesOf, type Project, type Entry } from '@joplo-app/core/runtime';
 import { DemoController } from '../runtime/demo';
 import { isLocalHost, parseSiteHash, siteHash, warnUnknownPlayParams, type PlayRoute, type SiteRoute } from '../runtime/route';
 import { scenariosOf } from '../runtime/views';
@@ -103,11 +103,11 @@ export function SiteHome({ project, onView, author }: { author?: Author | null; 
   const { t: i18n } = useI18n();
 
   const L = useBoardLayout();
-  const works = worksOf(project);
+  const works = entriesOf(project);
   const forms = formsOf(works);
   // 只有一种形态时不出形态徽标（功能演示的项目与以前一样）；左栏标题按形态：功能 / 影片 / 作品
   const mixed = forms.size > 1;
-  const listTitle = mixed ? i18n.site.works : forms.has('film') ? i18n.site.films : i18n.site.features;
+  const listTitle = mixed ? i18n.site.works : forms.has(true) ? i18n.site.films : i18n.site.features;
   const look = { theme: project.theme, font: null, stroke: null };
   return (
     <div className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="site-home">
@@ -147,10 +147,10 @@ export function SiteHome({ project, onView, author }: { author?: Author | null; 
             {works.length === 0 ? <p className="text-[14px] text-jb-muted">{i18n.site.noFeaturesHaveBeenPublishedYet}</p> : null}
             <section className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2">
               {works.map((w) => {
-                const film = w.kind === 'film';
+                const film = w.featureId === null;
                 const sc = firstSlice(w);
                 return (
-                  <div key={w.id} className="group relative flex flex-col overflow-hidden rounded-[10px] border border-jb-line bg-jb-surface hover:border-jb-ink hover:shadow-[var(--jb-e1)]" data-testid={`site-feature-row-${w.id}`} data-kind={mixed || film ? w.kind : undefined}>
+                  <div key={w.id} className="group relative flex flex-col overflow-hidden rounded-[10px] border border-jb-line bg-jb-surface hover:border-jb-ink hover:shadow-[var(--jb-e1)]" data-testid={`site-feature-row-${w.id}`} data-kind={mixed || film ? (w.featureId === null ? 'film' : 'demo') : undefined}>
                     <button type="button" onClick={() => onView(w.id)} aria-label={film ? i18n.site.watchFilmFor(w.title) : i18n.site.openDemoFor(w.title)} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" data-testid={`site-view-${w.id}`} />
                     <StageThumb project={project} scenarioId={sc?.id ?? null} sceneId={sc ? displaySceneId(project, sc.id, 0) : null} look={look} />
                     <div className="flex flex-col gap-1.5 border-t border-jb-line px-4 pb-4 pt-3">
@@ -186,11 +186,11 @@ export function SiteHome({ project, onView, author }: { author?: Author | null; 
 }
 
 /** 形态徽标（D102）：影片 / 功能演示。 */
-function WorkBadge({ work }: { work: Work }) {
+function WorkBadge({ work }: { work: Entry }) {
   const { t: i18n } = useI18n();
   return (
-    <span className={cn('shrink-0 rounded-[4px] px-1.5 py-px text-[11px] font-medium', work.kind === 'film' ? 'bg-jb-inverse text-jb-on-inverse' : 'border border-jb-line text-jb-muted')} data-testid="work-badge">
-      {work.kind === 'film' ? i18n.player.film : i18n.player.featureDemo}
+    <span className={cn('shrink-0 rounded-[4px] px-1.5 py-px text-[11px] font-medium', work.featureId === null ? 'bg-jb-inverse text-jb-on-inverse' : 'border border-jb-line text-jb-muted')} data-testid="work-badge">
+      {work.featureId === null ? i18n.player.film : i18n.player.featureDemo}
     </span>
   );
 }
@@ -269,8 +269,8 @@ function SitePlayer({ project, play, navigate, branding, author }: { project: Pr
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
   const home = () => navigate({ kind: 'home' });
   const scs = scenariosOf(project, resolved.optionId);
-  // 影片（D102）：左栏与手机章节列表都按 Work 的切片，章节带两位编号与时长；功能演示不变
-  const work = workKind(feature) === 'film' ? workOf(project, feature.id) : null;
+  // 影片（D102）：左栏与手机章节列表都按 Entry 的切片，章节带两位编号与时长；功能演示不变
+  const work = entryOf(project, feature.id)?.sequencing === 'linear' ? entryOf(project, feature.id) : null;
   const rows = work ? chapterRows(work, snap.scenarioId, i18n) : null;
   const first = work ? firstSlice(work) : scs[0];
   return (

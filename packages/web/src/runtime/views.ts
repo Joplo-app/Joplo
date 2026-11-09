@@ -7,7 +7,7 @@ import { orderedFeatures, nodeLabel, walkNodes, type Coverage, type Option, type
 export const optionsOf = (project: Project, featureId: string | null): Option[] =>
   featureId && project.features[featureId] ? project.features[featureId]!.optionIds.map((id) => project.options[id]).filter((o): o is Option => !!o) : [];
 
-// 场景列表与连续播放顺序在 core（works.ts，D102）：作品投影、outline 与这里共用同一份
+// 场景列表与连续播放顺序在 core（entries.ts，D102）：作品投影、outline 与这里共用同一份
 export { scenariosOf, playSequence } from '@joplo-app/core/runtime';
 import { scenariosOf } from '@joplo-app/core/runtime';
 

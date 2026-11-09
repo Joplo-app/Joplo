@@ -6,12 +6,12 @@ import { en, type Dictionary } from '../i18n/en';
  * 时长是每一步时间计划（core 的 stepPlan，与演示控制器同一份：操作演示 + 停留与朗读估算中较长者）之和，文字用当前语言的字幕（dwellTexts）。
  * 朗读是估算、切层引导只在播放时才知道，所以写「约」。
  *
- * 影片（D102）：形态的判断在这里（workKind），播放器、嵌入与截图页（RenderApp）都只按 film 字段画。
+ * 影片（D102）：形态的判断在这里（Entry 能力），播放器、嵌入与截图页（RenderApp）都只按 film 字段画。
  * - 第一章（顺序里的第一个切片）的第 0 步是影片封面：标题、简介、给谁看、「N 章 · 约 M」；
  * - 从中间某一章打开时是这一章的封面：「第 n 章 · 影片标题」、章节标题与 description；支线不编号。
- * 影片封面的标题、简介、给谁看与时长只从 Work 取（Work.ms / WorkSlice.ms），不另算。功能演示的封面不变（film = null）。
+ * 影片封面的标题、简介、给谁看与时长只从 Entry 取（Entry.ms / EntrySlice.ms），不另算。功能演示的封面不变（film = null）。
  */
-import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, scenarioPlanMs, workKind, workOf, type Project, type RoleInfo, type Scenario, type Step, type Work } from '@joplo-app/core/runtime';
+import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, scenarioPlanMs, entryOf, type Project, type RoleInfo, type Scenario, type Step, type Entry } from '@joplo-app/core/runtime';
 import { chapterNumber, filmMetaText, firstSlice } from './work-view';
 
 export type Duration = { unit: 's' | 'min'; value: number };
@@ -39,7 +39,7 @@ export type CoverContent = {
 /** 影片封面（at = film，第一章）或章节封面（at = chapter，从中间某一章打开）。 */
 export type FilmCover = {
   at: 'film' | 'chapter';
-  /** 影片标题、简介、给谁看（Work）。 */
+  /** 影片标题、简介、给谁看（Entry）。 */
   title: string;
   summary: string | null;
   audience: string | null;
@@ -49,9 +49,9 @@ export type FilmCover = {
   chapter: number | null;
 };
 
-function filmCover(work: Work, scenarioId: string, i18n: Dictionary): FilmCover {
+function filmCover(work: Entry, scenarioId: string, i18n: Dictionary): FilmCover {
   return {
-    at: firstSlice(work)?.id === scenarioId ? 'film' : 'chapter',
+    at: work.sequencing !== 'linear' || firstSlice(work)?.id === scenarioId ? 'film' : 'chapter',
     title: work.title,
     summary: work.summary.trim() || null,
     audience: work.audience,
@@ -104,9 +104,9 @@ export function coverFor(project: Project, scenarioId: string | null | undefined
   if (!sc || sc.steps.length === 0) return null;
   const opt = project.options[sc.optionId];
   const feat = opt ? project.features[opt.featureId] : undefined;
-  const work = feat && workKind(feat) === 'film' ? workOf(project, feat.id) : null;
+  const work = feat && (entryOf(project, feat.id)?.featureId === null || entryOf(project, feat.id)?.sequencing === 'linear') ? entryOf(project, feat.id) : null;
   const film = work ? filmCover(work, sc.id, i18n) : null;
-  // 影片：时长只读 Work（影片封面 = 顺序里各章之和，章节封面 = 这一章）；说明只用章节自己的 description
+  // 影片：时长只读 Entry（影片封面 = 顺序里各章之和，章节封面 = 这一章）；说明只用章节自己的 description
   const slice = work?.slices.find((s) => s.id === sc.id);
   const ms = film ? (film.at === 'film' ? work!.ms : (slice?.ms ?? 0)) : scenarioMs(project, sc, i18n);
   return {

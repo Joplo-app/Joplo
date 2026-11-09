@@ -6,7 +6,7 @@
  *   routes/<path>/page.tsx     page({ title }, <…/>)        文件夹路径 = 页面路径
  *   features/<f>/feature.ts    feature({ name, goal, cases, rules, pick })
  *   features/<f>/options/<o>.tsx  option({ name, idea, on, routes, state, scenarios })
- *   films/<key>.tsx              film({ title, summary, stage, chapters })
+ *   works/<key>.tsx              work({ title, summary, stage, scenarios })
  *
  * 所有函数只返回数据；画板不会执行这些代码，只消费编译出的 IR。
  */
@@ -442,7 +442,7 @@ export type OptionDef = {
   /** 层级（视角）：每层一个独立画面 { client: layer('客户端视角', <ClientView />), backend: layer('后端流转', <Arch />) }。 */
   layers?: Record<string, LayerDef>;
   free?: Record<string, StepDef>;
-  scenarios: Record<string, Flow>;
+  scenarios: Record<string, Flow | Chapter>;
   source?: string;
 };
 export const option = (o: Omit<OptionDef, 'kind' | 'source'>): OptionDef => ({ kind: 'option', ...o, source: callsite() });
@@ -451,10 +451,8 @@ export type { CondExpr as Condition };
 
 export type { JoploProps } from './props.ts';
 
-// ---------- 影片：章节复用 Flow 的全部步骤方法 ----------
-export type ChapterOpts = Pick<FlowOpts, 'state' | 'layer' | 'autoplay' | 'actionEntry' | 'description'> & {
-  /** 这一章结束时观众应该看懂的事；映射为 Scenario.expected。 */
-  takeaway?: string;
+// ---------- 独立作品与章节：共用 Flow 的全部步骤方法 ----------
+export type ChapterOpts = Omit<FlowOpts, 'from'> & {
   /** 缺省接声明顺序里的上一章；null 从初始状态重新开始。只在编译时解析。 */
   from?: string | null;
 };
@@ -462,16 +460,16 @@ export type ChapterOpts = Pick<FlowOpts, 'state' | 'layer' | 'autoplay' | 'actio
 export class Chapter extends Flow<'chapter'> {
   override readonly source: string | undefined;
   constructor(title: string, readonly chapterOptions: ChapterOpts = {}) {
-    const { from, takeaway, ...opts } = chapterOptions;
-    super(title, { ...opts, ...(typeof from === 'string' ? { from } : {}), ...(takeaway !== undefined ? { expected: takeaway } : {}) }, 'chapter');
+    const { from, ...opts } = chapterOptions;
+    super(title, { ...opts, ...(typeof from === 'string' ? { from } : {}) }, 'chapter');
     this.source = callsite(4);
   }
 }
-/** 影片中的一章：步骤、效果和插件能力与 flow() 相同。 */
+/** 任意作品中的一章：步骤、效果和插件能力与 flow() 相同。 */
 export const chapter = (title: string, opts: ChapterOpts = {}): Chapter => new Chapter(title, opts);
 
-export type FilmDef = {
-  kind: 'film';
+export type WorkDef = {
+  kind: 'work';
   title: string;
   summary: string;
   /** 给观众看的受众说明，参与作者内容翻译。空字符串等于未写。 */
@@ -480,6 +478,9 @@ export type FilmDef = {
   /** stage 与 layers 二选一。 */
   stage?: JNode;
   layers?: Record<string, LayerDef>;
+  /** 复用项目页面的插槽与新增页面；与 option() 相同。 */
+  on?: OptionDef['on'];
+  routes?: OptionDef['routes'];
   /** 只对 stage 生效。 */
   viewport?: 'desktop' | 'mobile';
   state?: StateInit;
@@ -487,8 +488,8 @@ export type FilmDef = {
   /** 草稿只进入 dev IR。 */
   draft?: boolean;
   order?: number;
-  chapters: Record<string, Chapter>;
+  scenarios: Record<string, Flow | Chapter>;
   source?: string;
 };
-/** 一支独立影片；键来自 films/<key>.tsx 的文件名。结构错误由编译器带源位置报告。 */
-export const film = (f: Omit<FilmDef, 'kind' | 'source'>): FilmDef => ({ kind: 'film', ...f, source: callsite() });
+/** 一件独立作品；键来自 works/<key>.tsx 的文件名。结构错误由编译器带源位置报告。 */
+export const work = (f: Omit<WorkDef, 'kind' | 'source'>): WorkDef => ({ kind: 'work', ...f, source: callsite() });

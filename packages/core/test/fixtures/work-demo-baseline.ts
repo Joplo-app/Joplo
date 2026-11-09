@@ -3,7 +3,7 @@ import { $, config, feature, flow, Fragment, option, page, set } from '@joplo-ap
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import type { AuthoringProject } from '../../src/compile.ts';
 
-export function filmDemoBaseline(): AuthoringProject {
+export function workDemoBaseline(): AuthoringProject {
   const scenario = flow('Opening', { start: '/', cases: ['main'], expected: 'Ready' })
     .system('Open', 'Opening the demo', set($.ui.ready, true));
   Object.assign(scenario, { source: '/p/features/demo/options/a.tsx:4:1' });

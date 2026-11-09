@@ -9,7 +9,7 @@
  *   截断后序列化仍超过 512 KiB 时 assertReviewManifestSize 报错（share 在发任何请求之前失败），不静默丢内容。
  */
 import { nodeLabel } from './catalog.ts';
-import { workKind } from './works.ts';
+import { entryOf } from './entries.ts';
 import { orderedFeatures } from './features.ts';
 import { JoploError } from './result.ts';
 import type { Project, SceneNode } from './schema.ts';
@@ -74,7 +74,7 @@ export function reviewManifest(project: Project, mode: ReviewManifestMode): Revi
   const included = new Set<string>();
   for (const f of orderedFeatures(project)) {
     // 清单读取 dev IR；草稿仍不能随普通分享或评审版上传。
-    if (workKind(f) === 'film' && f.draft === true) continue;
+    if (entryOf(project, f.id)?.featureId === null && f.draft === true) continue;
     const optionIds = (mode === 'publish' ? (f.pick ? [f.pick] : []) : f.optionIds).filter((id) => project.options[id]);
     if (mode === 'publish' && !optionIds.length) continue;
     for (const id of optionIds) included.add(id);

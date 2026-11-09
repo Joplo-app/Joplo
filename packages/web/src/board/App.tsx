@@ -1,4 +1,4 @@
-import { projectThemes, workKind, workOf } from '@joplo-app/core/runtime';
+import { projectThemes, entryOf } from '@joplo-app/core/runtime';
 import { LanguageMenu } from '../player/LanguageMenu';
 import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/board/messages';
@@ -336,7 +336,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
 
   const option = resolved.optionId ? project.options[resolved.optionId] : null;
   // 影片（D102）：形态只看 Feature.kind；左栏换成章节清单，没有方案、情况、缺口与“确认方案”
-  const film = workKind(feature) === 'film' ? workOf(project, feature.id) : null;
+  const film = entryOf(project, feature.id)?.featureId === null ? entryOf(project, feature.id) : null;
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
   const state = snap.state;
   const home = () => navigate({ kind: 'home', projectId });

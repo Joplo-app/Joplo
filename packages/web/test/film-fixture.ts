@@ -1,8 +1,8 @@
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
- * 影片形状的 IR（D102，docs/film-form.md 第 4 节）。film() 的编译在另一条分支上，这里先用功能演示的创作 API 编译，
- * 再按契约的映射改成影片：Feature.kind = 'film'、唯一的方案 `<键>.main`、caseIds = []、pick 指向它、章节之间用 from 链起来
- * （flow({ from }) 编译期就写好 Scenario.from，与 film() 的默认接续一致）、mock 为自动的“成功”。
+ * 影片形状的 IR（D102，docs/work-model.md 第 4 节）。work() 的编译在另一条分支上，这里先用功能演示的创作 API 编译，
+ * 再按契约的映射改成影片：Feature.standalone = 'film'、唯一的方案 `<键>.main`、caseIds = []、pick 指向它、章节之间用 from 链起来
+ * （flow({ from }) 编译期就写好 Scenario.from，与 work() 的默认接续一致）、mock 为自动的“成功”。
  *
  * 需要“项目里还有功能演示”时，withDemo 加一个普通的功能演示 `invite`（两个方案、带情况），它不经过任何改写。
  */
@@ -56,7 +56,7 @@ const chapterFlows = (chapters: ChapterSpec[]): Record<string, Flow> => {
     let fl = flow(c.title, { ...(from ? { from } : { start: '/' }), ...(c.description ? { description: c.description } : {}), ...(c.side ? { autoplay: false } : {}) });
     for (let i = 0; i < (c.steps ?? 1); i++) fl = fl.system(`${c.key} ${i + 1}`, `${c.title} — beat ${i + 1}`);
     out[c.key] = fl;
-    // 支线不进连续播放；下一章仍接上一条主线（与 film() 的“声明顺序里的上一章”一致时，作者会显式写 from）
+    // 支线不进连续播放；下一章仍接上一条主线（与 work() 的“声明顺序里的上一章”一致时，作者会显式写 from）
     if (!c.side) prev = c.key;
   }
   return out;
@@ -65,8 +65,8 @@ const chapterFlows = (chapters: ChapterSpec[]): Record<string, Flow> => {
 function filmSource(key: string, title: string, summary: string, chapters: ChapterSpec[]) {
   const stage = layer(title, h(ui.Stack, { id: `${key}_world` }, h(ui.Text, { id: `${key}_frame` }, title)));
   return {
-    def: { ...feature({ name: title, goal: summary, cases: {}, pick: 'main' }), ...F(`films/${key}.tsx`) },
-    options: { main: { ...option({ name: title, idea: summary, layers: { stage }, scenarios: chapterFlows(chapters) }), ...F(`films/${key}.tsx`) } },
+    def: { ...feature({ name: title, goal: summary, cases: {}, pick: 'main' }), ...F(`works/${key}.tsx`) },
+    options: { main: { ...option({ name: title, idea: summary, layers: { stage }, scenarios: chapterFlows(chapters) }), ...F(`works/${key}.tsx`) } },
   };
 }
 
@@ -74,8 +74,8 @@ function filmSource(key: string, title: string, summary: string, chapters: Chapt
 function toFilm(p: Project, key: string, o: { audience?: string; draft?: boolean }) {
   const f = p.features[key]!;
   const optionId = `${key}.main`;
-  Object.assign(f, { kind: 'film', caseIds: [], optionIds: [optionId], pick: optionId, ...(o.audience ? { audience: o.audience } : {}), ...(o.draft ? { draft: true } : {}) });
-  Object.assign(p.options[optionId]!, { coverage: {}, routes: [] });
+  Object.assign(f, { standalone: true, caseIds: [], optionIds: [optionId], pick: optionId, ...(o.audience ? { audience: o.audience } : {}), ...(o.draft ? { draft: true } : {}) });
+  Object.assign(p.options[optionId]!, { coverage: {}, routes: [], sequencing: 'linear' });
   for (const s of Object.values(p.scenarios)) if (s.optionId === optionId) Object.assign(s, { caseIds: [], mock: { label: 'Mock success', outcome: 'success', auto: true } });
 }
 

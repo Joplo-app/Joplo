@@ -8,7 +8,7 @@
  *   两个方向都只在不一致时动作，所以不会来回触发。
  */
 import { useEffect, useMemo } from 'react';
-import { workKind, workOf, type Coverage, type Project, type Scenario } from '@joplo-app/core/runtime';
+import { entryOf, type Coverage, type Project, type Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import type { PlayRoute } from '../runtime/route';
 import { optionsOf, scenariosOf } from '../runtime/views';
@@ -42,7 +42,7 @@ export function resolvePlay(project: Project, play: PlayRoute): Resolved {
     const byCase = ids[0] ?? scs.find((s) => s.caseIds.includes(caseId))?.id ?? null;
     if (cov?.status === 'expressed' && byCase) scenarioId = byCase;
     else gap = { status: cov?.status ?? 'none', basis: cov?.basis, ...(cov?.reason ? { reason: cov.reason } : {}) };
-  } else scenarioId = (workKind(f) === 'film' ? firstSlice(workOf(project, f.id)!)?.id : null) ?? scs[0]?.id ?? null;
+  } else scenarioId = (entryOf(project, f.id)?.sequencing === 'linear' ? firstSlice(entryOf(project, f.id)!)?.id : null) ?? scs[0]?.id ?? null;
   const total = scenarioId ? project.scenarios[scenarioId]!.steps.length : 0;
   const step = Math.max(0, Math.min(play.step ?? 0, total));
   return { ok: true, optionId, scenarioId, step, caseId, gap };

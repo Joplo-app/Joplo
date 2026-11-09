@@ -1,14 +1,14 @@
 import { useBoardI18n } from '../i18n/board/context';
 /**
- * 影片的左栏（看板，D102 方案 A「左栏章节清单」）：当前作品是影片（workKind = film）时换掉功能演示的方案 / 情况左栏。
+ * 影片的左栏（看板，D102 方案 A「左栏章节清单」）：当前作品是影片（entry.featureId === null）时换掉功能演示的方案 / 情况左栏。
  * - 影片信息：形态徽标 +「N 章 · 约 M」、草稿标记、标题、简介、「给：观众」（写了才显示）；
  * - 章节：两位自动编号在左，标题两行内换行，第二行「时长 · 步数」；当前章高亮；点一下跳到这一章的开头；
  * - 支线（不在连续播放顺序里的章节）单独一组，不编号；
  * - 审片：胶片条命令与复制；
  * - 空状态：还没有章节时说明第一章怎么写。
- * 影片没有方案区、情况区、覆盖缺口、其他方案小标与“确认方案”。数据只读 core 的 Work（chapterRows / filmMetaText）。
+ * 影片没有方案区、情况区、覆盖缺口、其他方案小标与“确认方案”。数据只读 core 的 Entry（chapterRows / filmMetaText）。
  */
-import type { Project, Work } from '@joplo-app/core/runtime';
+import type { Project, Entry } from '@joplo-app/core/runtime';
 import { Clapperboard, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Btn } from '../player/controls';
@@ -42,7 +42,7 @@ function ChapterItem({ row, onPick }: { row: ChapterRow; onPick: () => void }) {
   );
 }
 
-export function FilmNav({ project, work, scenarioId, onScenario, onCopy }: { project: Project; work: Work; scenarioId: string | null; onScenario: (id: string) => void; onCopy: (text: string) => void }) {
+export function FilmNav({ project, work, scenarioId, onScenario, onCopy }: { project: Project; work: Entry; scenarioId: string | null; onScenario: (id: string) => void; onCopy: (text: string) => void }) {
   const { t: i18n } = useBoardI18n();
   const rows = chapterRows(work, scenarioId, i18n);
   const command = filmReviewCommand(work);
@@ -98,7 +98,7 @@ export function FilmNav({ project, work, scenarioId, onScenario, onCopy }: { pro
 }
 
 /** 窄屏（< 1100）收成的竖条：章节只剩两位编号（悬停写标题），当前章高亮；支线是一个点。整体是“展开左栏”的按钮（PlayerPage），这里只放图形。 */
-export function FilmRail({ work, scenarioId }: { work: Work; scenarioId: string | null }) {
+export function FilmRail({ work, scenarioId }: { work: Entry; scenarioId: string | null }) {
   const { t: i18n } = useBoardI18n();
   const rows = chapterRows(work, scenarioId, i18n);
   return (

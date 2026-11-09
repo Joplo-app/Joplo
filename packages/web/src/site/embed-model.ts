@@ -6,10 +6,10 @@
  * - 默认显示封面、不自动播放；只有 `autoplay` 恰好是 `1` 才跳过封面直接播放；
  * - `scenario` 写错（不存在、为空）时从默认场景开始，访客看不到报错；未知参数忽略；
  * - 只有 `review` 恰好是 `1` 才是评审模式（review-bridge.ts）。
- * - 影片（D102，形态只看 workKind）：没指定场景时从播放顺序里的第一章开始；切换菜单里的章节带两位编号，支线不编号；
+ * - 影片（D102，形态只看 Entry 能力）：没指定场景时从播放顺序里的第一章开始；切换菜单里的章节带两位编号，支线不编号；
  *   封面写影片标题与「影片 · N 章 · 约 M」。功能演示的封面与菜单不变。
  */
-import { embedScenarioIds, embedStartScenario, workKind, workOf, type Project } from '@joplo-app/core/runtime';
+import { embedScenarioIds, embedStartScenario, entryOf, type Project } from '@joplo-app/core/runtime';
 import { en, type Dictionary } from '../i18n/en';
 import { filmMetaText, filmOfScenario, firstSlice, sliceLabel } from '../player/work-view';
 import { siteHash } from '../runtime/route';
@@ -46,8 +46,8 @@ export function embedInitial(project: Project, params: EmbedParams): { scenarioI
 export function embedScenarioItems(project: Project, currentId: string | null, i18n: Dictionary = en): { id: string; label: string; current: boolean }[] {
   const ids = embedScenarioIds(project);
   const features = new Set(ids.map((id) => project.options[project.scenarios[id]!.optionId]?.featureId));
-  const films = new Map([...features].flatMap((fid) => (fid && workKind(project.features[fid]) === 'film' ? [[fid, workOf(project, fid)!] as const] : [])));
-  // 影片的章节按 Work 的切片顺序（顺序里的章节在前、支线在后）；功能演示保持原来的顺序
+  const films = new Map([...features].flatMap((fid) => (fid && entryOf(project, fid)?.sequencing === 'linear' ? [[fid, entryOf(project, fid)!] as const] : [])));
+  // 影片的章节按 Entry 的切片顺序（顺序里的章节在前、支线在后）；功能演示保持原来的顺序
   const order = films.size ? ids.map((id, i) => [id, i] as const).sort(([a, i], [b, j]) => {
     const fa = project.options[project.scenarios[a]!.optionId]?.featureId ?? '';
     const fb = project.options[project.scenarios[b]!.optionId]?.featureId ?? '';

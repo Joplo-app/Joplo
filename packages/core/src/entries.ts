@@ -1,23 +1,10 @@
-/**
- * 作品（D102，纯函数）：项目里可以独立观看的一件东西。现在有两种形态——功能演示（demo）与影片（film），
- * 以后的形态（例如交互作品）也走这里。
- *
- * 不变量：任何形态的作品都能投影成同一个 Work——标题、一句话简介、给谁看、按播放顺序的切片与时长。
- * 项目的首页（作品卡片）和每个作品的封面只读 Work，不认识具体形态的内部结构；所以新增形态时，
- * 首页与封面的能力自动具备，只需要在这里给出它的投影。
- *
- * IR 里两种形态共用 Feature / Option / Scenario：
- * - demo：播放的是选定的方案（没有选定时取第一个方案），切片 = 这个方案的场景；
- * - film：只有一个方案（作者看不到这一层），切片 = 章节。
- */
+/** 首页条目：外部只读此投影，内部 Feature / Option 的接缝留在这里。 */
 import { scenarioPlanMs } from './step-plan.ts';
 import { orderedFeatures } from './features.ts';
 import type { Project, Scenario } from './schema.ts';
 
-export type WorkKind = 'demo' | 'film';
-
 /** 作品里可以单独打开的一段：功能演示的场景、影片的章节。 */
-export type WorkSlice = {
+export type EntrySlice = {
   /** 场景 id（深链、分享、导出都用它）。 */
   id: string;
   /** 作者写的键（场景键 / 章节键）。 */
@@ -31,10 +18,13 @@ export type WorkSlice = {
   inSequence: boolean;
 };
 
-export type Work = {
+export type Entry = {
   /** 作品 id = IR 的 feature id。 */
   id: string;
-  kind: WorkKind;
+  /** 功能所属 id；独立作品为 null，不从情况或方案数量推断。 */
+  featureId: string | null;
+  /** 播放用作品的切片接续能力，与是否挂功能相互独立。 */
+  sequencing: 'independent' | 'linear';
   title: string;
   /** 一句话简介：功能演示是目标（goal），影片是 summary。 */
   summary: string;
@@ -45,14 +35,12 @@ export type Work = {
   /** 草稿：不进发布与分享。 */
   draft: boolean;
   /** 播放用的方案：影片唯一的那个；功能演示是选定的方案，没有选定时取第一个；没有方案时为 null。 */
-  optionId: string | null;
+  workId: string | null;
   /** 切片：先是连续播放顺序里的（playSequence），再是不在顺序里的支线，各自按声明顺序。 */
-  slices: WorkSlice[];
+  slices: EntrySlice[];
   /** 连续播放顺序里各切片的时长之和（毫秒）。 */
   ms: number;
 };
-
-export const workKind = (feature: { kind?: WorkKind } | null | undefined): WorkKind => feature?.kind ?? 'demo';
 
 /** 某个方案的场景，按声明顺序。 */
 export const scenariosOf = (project: Pick<Project, 'scenarios'>, optionId: string | null | undefined): Scenario[] =>
@@ -78,14 +66,14 @@ export function playSequence(project: Pick<Project, 'scenarios'>, optionId: stri
 }
 
 /** 一个作品的投影；feature 不存在时为 null。 */
-export function workOf(project: Project, featureId: string | null | undefined): Work | null {
+export function entryOf(project: Project, featureId: string | null | undefined): Entry | null {
   const f = featureId ? project.features[featureId] : undefined;
   if (!f) return null;
   const optionId = (f.pick && project.options[f.pick] ? f.pick : f.optionIds.find((id) => project.options[id])) ?? null;
   const sequence = playSequence(project, optionId);
   const inSequence = new Set(sequence.map((s) => s.id));
   const ordered = [...sequence, ...scenariosOf(project, optionId).filter((s) => !inSequence.has(s.id))];
-  const slices = ordered.map((s): WorkSlice => ({
+  const slices = ordered.map((s): EntrySlice => ({
     id: s.id,
     key: s.id.slice(s.optionId.length + 1),
     title: s.name,
@@ -97,19 +85,20 @@ export function workOf(project: Project, featureId: string | null | undefined): 
   const roles = f.roles.map((r) => r.name.trim()).filter(Boolean);
   return {
     id: f.id,
-    kind: workKind(f),
+    featureId: f.standalone === true ? null : f.id,
+    sequencing: optionId ? project.options[optionId]?.sequencing ?? 'independent' : 'independent',
     title: f.name,
     summary: f.goal,
     audience: f.audience?.trim() || null,
     roles: [...new Set(roles)],
     draft: f.draft === true,
-    optionId,
+    workId: optionId,
     slices,
     ms: slices.reduce((sum, s) => sum + (s.inSequence ? s.ms : 0), 0),
   };
 }
 
 /** 项目里的全部作品，按演示顺序（orderedFeatures）。首页的卡片、看板顶栏的下拉、outline 都从这里取。 */
-export function worksOf(project: Project): Work[] {
-  return orderedFeatures(project).map((f) => workOf(project, f.id)!).filter(Boolean);
+export function entriesOf(project: Project): Entry[] {
+  return orderedFeatures(project).map((f) => entryOf(project, f.id)!).filter(Boolean);
 }

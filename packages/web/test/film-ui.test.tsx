@@ -4,7 +4,7 @@ import '../../../scripts/test/render-fixtures.ts';
  * 不变量：
  * 1. 形态只由 workKind(feature) 决定：同一份 IR 去掉 kind 就按功能演示呈现；不靠“没有情况”“只有一个方案”推断；
  * 2. 功能演示的下拉、封面、首页卡片、嵌入封面与改动前一样（只有功能演示的项目不出现任何影片的东西）；
- * 3. 首页卡片、封面、左栏的标题 / 简介 / 观众 / 切片数 / 时长都从 Work 取，时长就是 Work.ms 与 WorkSlice.ms；
+ * 3. 首页卡片、封面、左栏的标题 / 简介 / 观众 / 切片数 / 时长都从 Entry 取，时长就是 Entry.ms 与 EntrySlice.ms；
  * 4. 发布站打开时先落在首页或封面上：一个作品 → 它的封面，多个 → 首页；嵌入与评审模式默认停在封面；
  * 5. 章节按播放顺序从 01 编号，支线不编号、单独一组，作者标题原样；
  * 6. 草稿影片在看板里能打开，下拉与左栏标“草稿 · 不发布”；
@@ -14,7 +14,7 @@ import '../../../scripts/test/render-fixtures.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { workOf, worksOf, type Project } from '@joplo-app/core';
+import { entryOf, entriesOf, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../src/i18n/context';
 import { dictionary } from '../src/i18n/dictionaries';
 import { boardDictionary, boardEnglish } from '../src/i18n/board/dictionaries';
@@ -35,23 +35,42 @@ import { DEFAULT_CHAPTERS, filmProject } from './film-fixture';
 const en = dictionary('en');
 const site = (project: Project, search = '') => renderToStaticMarkup(<I18nProvider explicit="en"><SiteApp data={{ project, home: null }} search={search} /></I18nProvider>);
 const filmNav = (project: Project, id = 'midterms', scenarioId: string | null = null, locale = 'en') =>
-  renderToStaticMarkup(<I18nProvider explicit={locale} extend={boardDictionary}><FilmNav project={project} work={workOf(project, id)!} scenarioId={scenarioId} onScenario={() => {}} onCopy={() => {}} /></I18nProvider>);
+  renderToStaticMarkup(<I18nProvider explicit={locale} extend={boardDictionary}><FilmNav project={project} work={entryOf(project, id)!} scenarioId={scenarioId} onScenario={() => {}} onCopy={() => {}} /></I18nProvider>);
 /** 同一份 IR 去掉形态标记：应当完全按功能演示呈现。 */
 const asDemo = (p: Project, id = 'midterms') => {
   const q = structuredClone(p);
-  delete (q.features[id] as { kind?: string }).kind;
+  delete q.features[id]!.standalone;
+  for (const oid of q.features[id]!.optionIds) delete q.options[oid]!.sequencing;
   return q;
 };
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe('条目能力的机械适配', () => {
+  it('功能选定的方案带 linear 时同样显示章节与编号', () => {
+    const p=filmProject({withDemo:true});p.options['invite.a']!.sequencing='linear';
+    const entry=entryOf(p,'invite')!;
+    expect(entry.featureId).toBe('invite');expect(entry.sequencing).toBe('linear');
+    expect(chapterRows(entry,'invite.a.main').chapters[0]!.no).toBe('01');
+    expect(coverFor(p,'invite.a.main')!.film).not.toBeNull();
+  });
+  it('独立作品带 independent 时不显示章节编号或审片命令', () => {
+    const p=filmProject();delete p.options['midterms.main']!.sequencing;
+    const entry=entryOf(p,'midterms')!;
+    expect(entry.featureId).toBeNull();expect(entry.sequencing).toBe('independent');
+    expect(chapterRows(entry,null).chapters.every(r=>r.no===null)).toBe(true);
+    expect(filmReviewCommand(entry)).toBeNull();
+    expect(coverFor(p,'midterms.main.basics')!.film!.at).toBe('film');
+  });
+});
 
 describe('不变量 1：形态只由 workKind 决定', () => {
   it('影片形状的 IR 去掉 kind 后，下拉、封面、嵌入、默认场景都按功能演示（不看有没有情况、有几个方案）', () => {
     const film = filmProject();
     const demo = asDemo(film);
     // 下拉：影片写章节与时长；去掉 kind 后与 featureMenu 一模一样（“已选定 A”那一套）
-    expect(workMenu(film, 'midterms')[0]).toMatchObject({ kind: 'film', hint: expect.stringContaining('3 chapters') });
-    expect(workMenu(demo, 'midterms')).toEqual(featureMenu(demo, 'midterms').map((f) => ({ ...f, kind: 'demo', draft: false })));
+    expect(workMenu(film, 'midterms')[0]).toMatchObject({ featureId: null, hint: expect.stringContaining('3 chapters') });
+    expect(workMenu(demo, 'midterms')).toEqual(featureMenu(demo, 'midterms').map((f) => ({ ...f, featureId: f.id, draft: false })));
     // 封面
     expect(coverFor(film, 'midterms.main.hook')!.film).toMatchObject({ at: 'film' });
     expect(coverFor(demo, 'midterms.main.hook')!.film).toBeNull();
@@ -71,9 +90,9 @@ describe('不变量 1：形态只由 workKind 决定', () => {
     f.optionIds = ['invite.a'];
     f.caseIds = [];
     delete one.options['invite.b'];
-    expect(workOf(one, 'invite')!.kind).toBe('demo');
+    expect(entryOf(one, 'invite')!.featureId).toBe('invite');
     expect(coverFor(one, 'invite.a.main')!.film).toBeNull();
-    expect(workMenu(one, 'invite').find((e) => 'name' in e && e.id === 'invite')).toMatchObject({ kind: 'demo', hint: featureMenu(one, 'invite').find((x) => x.id === 'invite')!.hint });
+    expect(workMenu(one, 'invite').find((e) => 'name' in e && e.id === 'invite')).toMatchObject({ featureId: 'invite', hint: featureMenu(one, 'invite').find((x) => x.id === 'invite')!.hint });
   });
 
   it('新增的呈现代码里没有按情况 / 方案数量推断形态的写法', () => {
@@ -91,7 +110,7 @@ describe('不变量 2：功能演示的呈现不变', () => {
     delete demoOnly.features.midterms;
     (demoOnly as { featureIds?: string[] }).featureIds = ['invite'];
     expect(workMenu(demoOnly, 'invite').some((e) => 'heading' in e)).toBe(false);
-    expect(workMenu(demoOnly, 'invite').map(({ kind: _k, draft: _d, ...rest }: any) => rest)).toEqual(featureMenu(demoOnly, 'invite'));
+    expect(workMenu(demoOnly, 'invite').map(({ featureId: _f, draft: _d, ...rest }: any) => rest)).toEqual(featureMenu(demoOnly, 'invite'));
     expect(coverFor(demoOnly, 'invite.a.main')).toMatchObject({ film: null, feature: 'Invite teammates', option: 'A · Banner' });
     const home = renderToStaticMarkup(<I18nProvider explicit="en"><SiteHome project={demoOnly} onView={() => {}} /></I18nProvider>);
     expect(home).not.toContain('work-badge');
@@ -112,10 +131,10 @@ describe('不变量 2：功能演示的呈现不变', () => {
   });
 });
 
-describe('不变量 3：首页卡片、封面、左栏只读 Work', () => {
-  it('影片封面的时长 = Work.ms，章节封面 = WorkSlice.ms；标题、简介、观众来自 Work', () => {
+describe('不变量 3：首页卡片、封面、左栏只读 Entry', () => {
+  it('影片封面的时长 = Entry.ms，章节封面 = EntrySlice.ms；标题、简介、观众来自 Entry', () => {
     const p = filmProject({ audience: 'Curious readers' });
-    const w = workOf(p, 'midterms')!;
+    const w = entryOf(p, 'midterms')!;
     const film = coverFor(p, 'midterms.main.hook')!;
     expect(film.ms).toBe(w.ms);
     expect(film.film).toEqual({ at: 'film', title: w.title, summary: w.summary, audience: 'Curious readers', meta: filmMetaText(w, en), chapter: 1 });
@@ -126,8 +145,8 @@ describe('不变量 3：首页卡片、封面、左栏只读 Work', () => {
     expect(coverFor(p, 'midterms.main.basics')).toMatchObject({ description: null, film: { at: 'chapter', chapter: 2 } });
   });
 
-  it('「N 章 · 约 M」按 Work 计算：章节数 = 顺序里的切片数，时长 = approxLength(Work.ms)', () => {
-    const w = workOf(filmProject(), 'midterms')!;
+  it('「N 章 · 约 M」按 Entry 计算：章节数 = 顺序里的切片数，时长 = approxLength(Entry.ms)', () => {
+    const w = entryOf(filmProject(), 'midterms')!;
     const d = approxLength(w.ms);
     expect(filmMetaText(w, en)).toBe(en.player.filmMeta(3, d.min, d.sec));
     expect(filmMetaText(w, en)).toMatch(/^3 chapters · about \d+ sec$/);
@@ -141,9 +160,9 @@ describe('不变量 3：首页卡片、封面、左栏只读 Work', () => {
     expect(boardDictionary('zh-CN').board.filmMenuHint(5, en.player.clock(280_000))).toBe('5 章 · 4:40');
   });
 
-  it('发布站首页卡片：形态徽标、标题、简介、给：观众、章节数与时长都取自 Work', () => {
+  it('发布站首页卡片：形态徽标、标题、简介、给：观众、章节数与时长都取自 Entry', () => {
     const p = filmProject({ mode: 'publish', withDemo: true, audience: 'Curious readers' });
-    const w = workOf(p, 'midterms')!;
+    const w = entryOf(p, 'midterms')!;
     const html = renderToStaticMarkup(<I18nProvider explicit="en"><SiteHome project={p} onView={() => {}} /></I18nProvider>);
     expect(html).toContain('>Works<');
     expect(html).toMatch(/data-testid="site-feature-row-midterms" data-kind="film"/);
@@ -156,9 +175,9 @@ describe('不变量 3：首页卡片、封面、左栏只读 Work', () => {
     expect(html).toContain('>Feature demo<');
   });
 
-  it('看板左栏的章节行：时长就是 WorkSlice.ms，步数就是 WorkSlice.steps', () => {
+  it('看板左栏的章节行：时长就是 EntrySlice.ms，步数就是 EntrySlice.steps', () => {
     const p = filmProject();
-    const w = workOf(p, 'midterms')!;
+    const w = entryOf(p, 'midterms')!;
     const html = filmNav(p, 'midterms', 'midterms.main.basics');
     for (const s of w.slices) expect(html).toContain(boardEnglish.board.chapterMeta(en.player.clock(s.ms), s.steps));
     expect(html).toContain(`data-testid="film-meta">${filmMetaText(w, en)}<`);
@@ -229,7 +248,7 @@ describe('不变量 4：先落在首页或封面上', () => {
       const html = site(p, search);
       expect(html, search).toContain('data-testid="embed-cover"');
       expect(html, search).toContain('Play film');
-      expect(html, search).toContain(`Film · ${filmMetaText(workOf(p, 'midterms')!, en)}`);
+      expect(html, search).toContain(`Film · ${filmMetaText(entryOf(p, 'midterms')!, en)}`);
       expect(html, search).toContain('>After he lost Congress<');
     }
     expect(embedInitial(p, parseEmbedParams('?embed=1&scenario=midterms.main.results')!).scenarioId).toBe('midterms.main.results');
@@ -245,7 +264,7 @@ describe('不变量 4：先落在首页或封面上', () => {
 describe('不变量 5：章节编号', () => {
   it('按播放顺序从 01 编号；支线不编号、单独一组；作者标题原样', () => {
     const p = filmProject({ chapters: [{ key: 'a', title: '00 Cold open' }, { key: 'b', title: 'Aside', side: true }, { key: 'c', title: 'Second' }, { key: 'd', title: 'Restart', from: null }] });
-    const w = workOf(p, 'midterms')!;
+    const w = entryOf(p, 'midterms')!;
     const rows = chapterRows(w, 'midterms.main.c', en);
     expect(rows.chapters.map((r) => [r.no, r.title, r.current])).toEqual([['01', '00 Cold open', false], ['02', 'Second', true], ['03', 'Restart', false]]);
     expect(rows.side.map((r) => [r.no, r.title])).toEqual([[null, 'Aside']]);
@@ -262,7 +281,7 @@ describe('不变量 5：章节编号', () => {
   it('发布站左栏与手机章节列表用同一份编号与时长；左栏标题电脑上也叫“章节”', () => {
     vi.stubGlobal('location', { hash: '', search: '', href: 'https://joplo.app/s/x/' });
     const p = filmProject({ mode: 'publish' });
-    const w = workOf(p, 'midterms')!;
+    const w = entryOf(p, 'midterms')!;
     const html = site(p);
     expect(html).toContain('>Chapters<');
     expect(html).not.toContain('>Scenarios<');
@@ -278,7 +297,7 @@ describe('不变量 5：章节编号', () => {
 describe('不变量 6：草稿影片', () => {
   it('看板里能打开，下拉与左栏都标“草稿 · 不发布”；发布 IR 里没有它', () => {
     const p = filmProject({ second: { key: 'v1', title: 'Earlier cut', draft: true } });
-    expect(workMenu(p, 'v1').find((e) => 'name' in e && e.id === 'v1')).toMatchObject({ draft: true, hint: '2 chapters · ' + en.player.clock(workOf(p, 'v1')!.ms) + ' · Draft · not published' });
+    expect(workMenu(p, 'v1').find((e) => 'name' in e && e.id === 'v1')).toMatchObject({ draft: true, hint: '2 chapters · ' + en.player.clock(entryOf(p, 'v1')!.ms) + ' · Draft · not published' });
     expect(resolvePlay(p, { featureId: 'v1' })).toMatchObject({ ok: true, scenarioId: 'v1.main.hook' });
     expect(filmNav(p, 'v1')).toContain('data-testid="film-draft">Draft · not published<');
     expect(filmNav(p, 'midterms')).not.toContain('film-draft');
@@ -331,14 +350,14 @@ describe('不变量 8：边界输入', () => {
   it('没有章节：左栏是空状态（写哪个文件、第一章怎么写），没有审片命令；发布站与封面不报错', () => {
     vi.stubGlobal('location', { hash: '', search: '', href: 'https://joplo.app/s/x/' });
     const p = filmProject({ chapters: [] });
-    const w = workOf(p, 'midterms')!;
+    const w = entryOf(p, 'midterms')!;
     expect(w.slices).toEqual([]);
     expect(filmMetaText(w, en)).toBe('0 chapters');
     expect(filmReviewCommand(w)).toBeNull();
     expect(firstSlice(w)).toBeNull();
     const html = filmNav(p);
     expect(html).toContain('data-testid="film-empty"');
-    expect(html).toContain('Add the first chapter to chapters in films/midterms.tsx:');
+    expect(html).toContain('Add the first chapter to chapters in works/midterms.tsx:');
     expect(html).toContain("hook: chapter(&#x27;…&#x27;).system(&#x27;…&#x27;),");
     expect(html).not.toContain('film-review');
     expect(html).not.toContain('film-chapters');
@@ -349,7 +368,7 @@ describe('不变量 8：边界输入', () => {
 
   it('只有一章：单数；没写 audience：不出“给：”', () => {
     const p = filmProject({ chapters: [{ key: 'only', title: 'Only', steps: 2 }] });
-    const w = workOf(p, 'midterms')!;
+    const w = entryOf(p, 'midterms')!;
     expect(filmMetaText(w, en)).toMatch(/^1 chapter · about/);
     expect(w.audience).toBeNull();
     const html = filmNav(p);
@@ -363,7 +382,7 @@ describe('不变量 8：边界输入', () => {
 
   it('全部章节都是支线：摘要写支线数，没有编号；审片命令与封面落在第一个支线', () => {
     const p = filmProject({ chapters: [{ key: 'x', title: 'X', side: true }, { key: 'y', title: 'Y', side: true, from: null }] });
-    const w = workOf(p, 'midterms')!;
+    const w = entryOf(p, 'midterms')!;
     expect(filmMetaText(w, en)).toBe('2 side chapters');
     expect(chapterRows(w, null, en).chapters).toEqual([]);
     expect(filmReviewCommand(w)).toBe('npx joplo render --film --chain --scenario-id midterms.main.x');
@@ -379,14 +398,14 @@ describe('不变量 8：边界输入', () => {
     expect(workMenu(films, 'midterms').some((e) => 'heading' in e)).toBe(false);
     const mixed = filmProject({ withDemo: true });
     expect(workMenu(mixed, 'invite').map((e) => ('heading' in e ? `# ${e.heading}` : e.id))).toEqual(['# Films', 'midterms', '# Feature demos', 'invite']);
-    expect(worksOf(mixed).map((w) => w.id)).toEqual(['invite', 'midterms']);
+    expect(entriesOf(mixed).map((w) => w.id)).toEqual(['invite', 'midterms']);
     // 功能演示那一项与原来的 featureMenu 一样
     expect(workMenu(mixed, 'invite').find((e) => 'name' in e && e.id === 'invite')).toMatchObject(featureMenu(mixed, 'invite').find((f) => f.id === 'invite')!);
   });
 
   it('窄屏竖条：章节只剩编号，当前章高亮，支线是一个点', () => {
     const p = filmProject();
-    const html = renderToStaticMarkup(<I18nProvider explicit="en" extend={boardDictionary}><FilmRail work={workOf(p, 'midterms')!} scenarioId="midterms.main.basics" /></I18nProvider>);
+    const html = renderToStaticMarkup(<I18nProvider explicit="en" extend={boardDictionary}><FilmRail work={entryOf(p, 'midterms')!} scenarioId="midterms.main.basics" /></I18nProvider>);
     expect([...html.matchAll(/font-bold[^"]*">([^<]+)</g)].map((m) => m[1])).toEqual(['01', '02', '03', '·']);
     expect(html).toMatch(/bg-jb-selected[^"]*">02</);
   });

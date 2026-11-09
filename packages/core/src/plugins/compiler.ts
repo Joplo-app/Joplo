@@ -1,4 +1,3 @@
-import { workKind } from '../works.ts';
 import { PluginAction } from '../schema.ts';
 import { ElementTraitsSchema, InheritSchema, PluginInspectFieldSchema, PluginTextSchema } from '../traits.ts';
 import { advanceMedia } from '../media.ts';
@@ -263,8 +262,9 @@ export class PluginCompiler {
     };
     for (const sc of Object.values(project.scenarios)) visit(sc);
     for (const sc of order) {
-      const isFilm = workKind(project.features[project.options[sc.optionId]?.featureId ?? '']) === 'film';
-      const { roots, scenes } = this.frozenScenes(Object.values(project.scenes).filter(s => s.optionId === sc.optionId || !isFilm && s.optionId == null));
+      const option = project.options[sc.optionId];
+      const isolated = project.features[option?.featureId ?? '']?.standalone === true && !option?.routes.length;
+      const { roots, scenes } = this.frozenScenes(Object.values(project.scenes).filter(s => s.optionId === sc.optionId || !isolated && s.optionId == null));
       const prev = sc.from ? project.scenarios[sc.from] : undefined;
       let media: MediaSnapshot = prev && ended.has(prev.id) ? advanceMedia(ended.get(prev.id)!, commitGapMs(project, prev.steps, prev.steps.length - 1)) : {};
       const hasMedia = Object.keys(media).length > 0 || sc.steps.some(step => this.mediaCommands.has(step.id));

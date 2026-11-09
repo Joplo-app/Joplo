@@ -4,7 +4,7 @@
  * - 方案与场景：步数、估算时长（与自动播放同一份 stepDwell）、是否以过渡卡开场 / 收尾、结局、覆盖的情况。
  * 估算按 1× 速度、用 IR 里的英文字幕兜底，不含鼠标移动与逐字输入，所以只是“约”。
  */
-import { workKind, type WorkKind } from './works.ts';
+import { entryOf, type Entry } from './entries.ts';
 import { orderedFeatures } from './features.ts';
 import { scenarioPlanMs } from './step-plan.ts';
 import { JoploError } from './result.ts';
@@ -37,7 +37,7 @@ export type OutlineScenario = {
   caseIds: string[];
 };
 export type OutlineOption = { id: string; key: string; name: string; picked: boolean; ms: number; missing: number; undecided: number; scenarios: OutlineScenario[] };
-export type OutlineFeature = { kind: WorkKind; draft: boolean; id: string; name: string; goal: string; roles: string[]; pick: string | null; cases: OutlineCase[]; options: OutlineOption[] };
+export type OutlineFeature = { standalone: boolean; sequencing: Entry['sequencing']; draft: boolean; id: string; name: string; goal: string; roles: string[]; pick: string | null; cases: OutlineCase[]; options: OutlineOption[] };
 export type Outline = { name: string; mode: Project['mode']; features: OutlineFeature[] };
 
 /** 一个场景按 1× 自动播放大约多久（毫秒）：每一步的时间计划（stepPlan：操作演示 + 停留与朗读估算中较长者）之和。 */
@@ -91,7 +91,8 @@ export function outline(project: Project, opts: { optionId?: string } = {}): Out
         scenarios,
       };
     });
-    features.push({ kind: workKind(f), draft: f.draft === true, id: f.id, name: f.name, goal: f.goal, roles: f.roles.map((r) => r.name), pick: f.pick, cases, options });
+    const entry = entryOf(project, f.id)!;
+    features.push({ standalone: entry.featureId === null, sequencing: entry.sequencing, draft: entry.draft, id: entry.id, name: entry.title, goal: entry.summary, roles: entry.roles, pick: f.pick, cases, options });
   }
   return { name: project.name, mode: project.mode, features };
 }

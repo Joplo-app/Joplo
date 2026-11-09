@@ -1,5 +1,5 @@
 import { pluginSpec } from './catalog.ts';
-import { workKind, workOf } from './works.ts';
+import { entryOf, playSequence, scenariosOf } from './entries.ts';
 import { orderedFeatures } from './features.ts';
 import { Project, type SceneNode } from './schema.ts';
 import { CAPTION_MAX, CARD_POINTS_MAX, DESCRIPTION_MAX, EXPLAIN_MAX, SAY_MAX, isInteractiveType, SCENARIO_MS_MAX, captionLength } from './catalog.ts';
@@ -22,8 +22,13 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
   const diagnostics: Diagnostic[] = [];
   const verification: ValidationReport['verification'] = {};
   const seen = new Set<string>();
+  const publicMessage = (message: string) => {
+    for (const f of Object.values(project?.features ?? {})) if (f?.standalone) message = message.replaceAll(`Option ${f.id}.main`, `Work ${f.id}`).replaceAll(`option ${f.id}.main`, `work ${f.id}`).replaceAll(`${f.id}.main`, f.id);
+    return message;
+  };
   const emit = (severity: Diagnostic['severity'], code: string, message: string, at: string | undefined,
     ref?: Diagnostic['ref'], source: Diagnostic['source'] = 'structure') => {
+    message = publicMessage(message);
     const location = at ?? 'joplo.config.ts:1:1';
     // 同一布局/页面会复制到许多画面。相同问题只输出一次；不同情况/元素的诊断仍保留。
     const key = JSON.stringify([severity, code, location, message]);
@@ -39,7 +44,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
   const parsed = Project.safeParse(project);
   if (!parsed.success) {
     // 与编译器同一套：定位到最近的作者元素，同一根因合并成一条（schema-issues.ts）
-    for (const d of schemaDiagnostics(project, parsed.error.issues)) diagnostics.push({ ...d, at: d.at ?? 'joplo.config.ts:1:1' });
+    for (const d of schemaDiagnostics(project, parsed.error.issues)) diagnostics.push({ ...d, message: publicMessage(d.message), at: d.at ?? 'joplo.config.ts:1:1' });
     return report();
   }
   const p = parsed.data;
@@ -48,8 +53,10 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
   const included = (optionId?: string | null) => !opts.optionId || !optionId || optionId === opts.optionId;
   const scenarios = Object.values(p.scenarios).filter(s => included(s.optionId));
   const chapterLabels = new Map<string, string>();
-  for (const f of orderedFeatures(p)) if (workKind(f) === 'film') {
-    workOf(p, f.id)!.slices.forEach((s, i) => chapterLabels.set(s.id, `Chapter ${String(i + 1).padStart(2, '0')}`));
+  for (const o of Object.values(p.options)) if (o.sequencing === 'linear') {
+    const sequence = playSequence(p, o.id);
+    const ids = new Set(sequence.map(s => s.id));
+    [...sequence, ...scenariosOf(p, o.id).filter(s => !ids.has(s.id))].forEach((s, i) => chapterLabels.set(s.id, `Chapter ${String(i + 1).padStart(2, '0')}`));
   }
   const ref = (ok: unknown, message: string, value: { id: string; source?: string; optionId?: string }, kind: string) => {
     if (!ok) emit('error', 'INVALID_REFERENCE', message, value.source, { kind, id: value.id, optionId: value.optionId }, 'reference');
@@ -88,7 +95,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     for (const f of orderedFeatures(p).filter(f => !opts.optionId || f.optionIds.includes(opts.optionId))) {
       const own = scenarios.filter(s => p.options[s.optionId]?.featureId === f.id);
       const edge = f.caseIds.some(id => p.cases[id] && p.cases[id]!.dimension !== 'main');
-      if (workKind(f) !== 'film' && p.mode === 'dev' && own.length && !edge && own.every(s => s.mock.outcome === 'success'))
+      if (entryOf(p, f.id)?.featureId !== null && p.mode === 'dev' && own.length && !edge && own.every(s => s.mock.outcome === 'success'))
         emit('info', 'HAPPY_PATH_ONLY', `Feature "${f.name}" only shows the happy path: every case is a main-flow case and every scenario succeeds. Ask the user about input, permission, async, and lifecycle cases (npx joplo skill cases), then add at least one error-and-recovery scenario`, f.source, { kind: 'feature', id: f.id });
     }
     for (const r of Object.values(p.rules).filter(r => included(r.optionId) && (!opts.optionId || r.featureId === p.options[opts.optionId]?.featureId))) {
