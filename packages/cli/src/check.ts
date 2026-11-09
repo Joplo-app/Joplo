@@ -21,12 +21,16 @@ export async function checkWithProject(dir: string, optionId?: string): Promise<
   const loaded = await loadAuthoring(root, p => tsImport(p, { parentURL: import.meta.url, tsconfig: existsSync(tsconfig) ? tsconfig : false }));
   // 与看板同一套布局（D69）：布局失败的图表在 check 里报 DIAGRAM_LAYOUT_FAILED
   const requests: ResourceRequest[] = [];
-  const compiled = loaded.authoring ? compile(loaded.authoring, 'dev', { onResource:r=>requests.push(r) }) : null;
+  let compiled = loaded.authoring ? compile(loaded.authoring, 'dev', { onResource:r=>requests.push(r) }) : null;
   const resourceDiagnostics: Diagnostic[] = [];
   if (requests.length && loaded.authoring) {
-    const { LocalResources } = await import('@joplo-app/server');
+    const { LocalResources, inspectResources, mediaDiagnostics } = await import('@joplo-app/server');
     const plugins = loaded.authoring.config.plugins ?? [];
     const host = new LocalResources(root,Object.fromEntries(plugins.filter(isPluginDef).filter(p=>p.local).map(p=>[p.id,p.local!])));
+    const inspected = await inspectResources(compiled?.project ?? null, requests, host);
+    resourceDiagnostics.push(...inspected.diagnostics);
+    if (Object.keys(inspected.resourceInfo).length) compiled = compile(loaded.authoring, 'dev', { resourceInfo: inspected.resourceInfo });
+    if (compiled?.project) resourceDiagnostics.push(...mediaDiagnostics(compiled.project, inspected.resourceInfo));
     for (const request of requests) {
       if (!nodeResourceIds(compiled?.project).has(request.id)) continue;
       const description = await host.describe(request);

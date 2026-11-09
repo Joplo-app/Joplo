@@ -1,11 +1,33 @@
+import { audioMedia, decodeAudio } from './audio-media';
 import type { MediaDriver, MediaSnapshot } from '@joplo-app/kit/plugin';
 import { pluginStatus } from '../renderer/plugins';
-/** Browser host owns permission, clock, gain and lifecycle; plugins only synthesize bytes. */
+/** Browser host owns permission, clock, gain and lifecycle; the host decodes audio bytes; custom media plugins may supply a driver. */
 export class MediaEngine {
   private audio: AudioContext | null = null;
   private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
   private urls = new Map<string, Promise<Uint8Array | null>>();
   private disposed = false;
+  private capture?: MediaStreamAudioDestinationNode;
+  private recorder?: MediaRecorder;
+  private chunks: Blob[] = [];
+  private captureStarted = 0;
+  async startCapture(assets: Record<string, string>) {
+    this.unlock();
+    const audio = this.audio; if (!audio) throw new Error('AudioContext unavailable for video export');
+    await audio.resume();
+    await Promise.all(Object.values(assets).map(async url => { const bytes = await this.bytes(url); if (!bytes) throw new Error('Music resource unavailable for video export'); await decodeAudio(audio, bytes); }));
+    this.capture = audio.createMediaStreamDestination();
+    this.recorder = new MediaRecorder(this.capture.stream, { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 128000 });
+    this.chunks = []; this.recorder.ondataavailable = e => { if (e.data.size) this.chunks.push(e.data); };
+    this.captureStarted = Date.now(); this.recorder.start(250);
+  }
+  async endCapture(): Promise<{ data: string; started: number } | null> {
+    const recorder = this.recorder; if (!recorder) return null;
+    await new Promise<void>((resolve, reject) => { recorder.onstop = () => resolve(); recorder.onerror = () => reject(new Error('Audio recording failed')); recorder.stop(); });
+    const blob = new Blob(this.chunks, { type: recorder.mimeType });
+    const data = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]!); reader.onerror = () => reject(reader.error); reader.readAsDataURL(blob); });
+    return { data, started: this.captureStarted };
+  }
   unlock = () => {
     if (this.disposed || typeof AudioContext === 'undefined') return;
     this.audio ??= new AudioContext();
@@ -52,13 +74,15 @@ export class MediaEngine {
       if (!slot) {
         if (!frame.playing) continue;
         const runtime = pluginStatus(t.plugin);
-        if (runtime.state !== 'ready' || !runtime.runtime.media) continue;
+        if (runtime.state !== 'ready') continue;
+        const factory = runtime.runtime.media ?? audioMedia;
         const gain = audio.createGain(); gain.gain.value = 0; gain.connect(audio.destination);
+        if (this.capture) gain.connect(this.capture);
         slot = { resource: url, gain, dead: false, origin: frame.timeMs === undefined ? undefined : frame.timeMs - (t.offsetMs + frame.elapsedMs) }; this.slots.set(key, slot);
         const current = slot;
         void this.bytes(url).then(async bytes => {
           if (!bytes || current.dead) return;
-          const driver = await runtime.runtime.media!({ audio, destination: gain, bytes });
+          const driver = await factory({ audio, destination: gain, bytes });
           if (current.dead) driver.destroy(); else current.driver = driver;
         }).catch(() => { current.dead = true; current.gain.disconnect(); });
       }
@@ -89,6 +113,6 @@ export class MediaEngine {
     }
   }
   private remove(key: string) { const slot = this.slots.get(key); if (!slot) return; slot.dead = true; slot.driver?.destroy(); slot.gain.disconnect(); this.slots.delete(key); }
-  destroy() { this.disposed = true; for (const k of this.slots.keys()) this.remove(k); void this.audio?.close().catch(() => {}); this.audio = null; }
+  destroy() { this.disposed = true; if (this.recorder?.state === 'recording') this.recorder.stop(); this.capture?.stream.getTracks().forEach(t => t.stop()); for (const k of this.slots.keys()) this.remove(k); void this.audio?.close().catch(() => {}); this.audio = null; }
   status() { return { state: this.audio?.state ?? 'locked', tracks: [...this.slots.values()].filter(s => s.driver).length, time: this.audio?.currentTime ?? 0 }; }
 }

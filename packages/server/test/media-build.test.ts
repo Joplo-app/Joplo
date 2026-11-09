@@ -9,6 +9,7 @@ import { buildSite } from '../src/build.ts';
 it('publishes scoped fake WAV artifacts offline without author text, paths or local code', async () => {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-media-build-')));
   try {
+    fs.writeFileSync(path.join(dir, 'private.sf3'), 'PRIVATE_SOUNDFONT_BYTES');
     fs.mkdirSync(path.join(dir, 'routes')); fs.mkdirSync(path.join(dir, 'features/f/options'), {recursive:true});
     fs.writeFileSync(path.join(dir,'tsconfig.json'),JSON.stringify({compilerOptions:{jsx:'react-jsx',jsxImportSource:'@joplo-app/kit'}}));
     fs.writeFileSync(path.join(dir,'runtime.ts'), `export default {id:'fake',apiVersion:2,components:{},media:async({audio,destination,bytes})=>{const buffer=await audio.decodeAudioData(bytes.buffer.slice(0));let source;return {update(f){if(source){source.stop();source=null;}if(f.playing){source=audio.createBufferSource();source.buffer=buffer;source.connect(destination);source.start(0,(f.offsetMs/1000)%buffer.duration);}},destroy(){source?.stop();}};}};`);
@@ -23,7 +24,7 @@ it('publishes scoped fake WAV artifacts offline without author text, paths or lo
     fs.writeFileSync(path.join(dir,'features/f/options/a.tsx'), `import {option,flow} from '@joplo-app/kit';import {pluginEffect} from '@joplo-app/kit/plugin';export default option({name:'A',idea:'i',on:{},scenarios:{a:flow('Included',{start:'/'}).system('Play',pluginEffect('fake','play','PRIVATE_SCORE_ALPHA')),b:flow('Omitted',{start:'/'}).system('Play',pluginEffect('fake','play','PRIVATE_SCORE_BETA'))}});`);
     const dev = await createDev({ projectDir: dir, port: 0, watch: false, log: () => undefined });
     try {
-      expect(fs.existsSync(path.join(dir, '.joplo/resources'))).toBe(false);
+      expect(fs.readdirSync(path.join(dir, '.joplo/resources')).filter(f => f.endsWith('.json'))).toEqual([]);
       const runtime = await fetch(`http://127.0.0.1:${dev.port}${dev.payload().plugins!.fake}`);
       expect(runtime.status).toBe(200);
       const [url] = Object.values(dev.payload().project!.mediaAssets!);
@@ -43,7 +44,7 @@ it('publishes scoped fake WAV artifacts offline without author text, paths or lo
     expect(Object.keys(p.mediaAssets)).toHaveLength(1);
     expect(Object.values(p.mediaAssets)[0]).toMatch(/^data:audio\/wav;base64,UklGR/);
     expect(Object.keys(p.scenarios)).toEqual(['f.a.a']);
-    for(const forbidden of ['PRIVATE_SCORE_ALPHA','PRIVATE_SCORE_BETA','PRIVATE_LOCAL_IMPLEMENTATION',dir,'local.ts'])expect(html).not.toContain(forbidden);
+    for(const forbidden of ['PRIVATE_SCORE_ALPHA','PRIVATE_SCORE_BETA','PRIVATE_LOCAL_IMPLEMENTATION','PRIVATE_SOUNDFONT_BYTES','private.sf3',dir,'local.ts'])expect(html).not.toContain(forbidden);
     expect(fs.readdirSync(path.join(dir,'.joplo/resources')).filter(f=>f.endsWith('.json'))).toHaveLength(1);
     fs.writeFileSync(path.join(dir,'local.ts'),`export default {compilers:{wav:{version:'2',mime:'audio/wav',compile(){throw new Error('No native tool')}}}};`);
     const silent=await buildSite({projectDir:dir,outDir:path.join(dir,'silent'),scope:{scenarios:['f.a.a']}});

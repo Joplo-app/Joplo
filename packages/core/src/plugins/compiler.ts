@@ -1,7 +1,7 @@
 import { PluginAction } from '../schema.ts';
 import { ElementTraitsSchema, InheritSchema } from '../traits.ts';
 import { advanceMedia } from '../media.ts';
-import type { MediaCommand, MediaSnapshot, ResourceRequest } from '@joplo-app/kit/plugin';
+import type { MediaCommand, MediaSnapshot, ResourceRequest, LocalResourceInfo } from '@joplo-app/kit/plugin';
 import { jsonData, snapshot, object, strings, syncResult, authoringData, materialize, errorMessage } from './data.ts';
 /** Node-side plugin host. Callbacks never enter IR or the player. */
 import { isNode, type JNode } from '@joplo-app/kit/node';
@@ -10,7 +10,7 @@ import { initialState, applyStep, resolveProps, type PlayState } from '../player
 import type { Scene, SceneNode, Project, Scenario } from '../schema.ts';
 import type { PluginInfo } from '../catalog.ts';
 
-export type CompileOptions = { onResource?: (request: ResourceRequest) => void; pluginOptions?: Record<string, Record<string, unknown>> };
+export type CompileOptions = { onResource?: (request: ResourceRequest) => void; resourceInfo?: Record<string, LocalResourceInfo>; pluginOptions?: Record<string, Record<string, unknown>> };
 export function enabledPlugins(configured: unknown): unknown[] {
   return Array.isArray(configured) ? configured : [];
 }
@@ -19,7 +19,8 @@ function validMediaCommand(value: unknown, plugin: string, owners: ReadonlyMap<s
   if (value.fadeMs !== undefined && (typeof value.fadeMs !== 'number' || value.fadeMs < 0 || value.fadeMs > 30000)) return false;
   if (value.action === 'stop') return Object.keys(value).every(k => ['track', 'action', 'fadeMs'].includes(k));
   if (value.action !== 'play' || typeof value.resource !== 'string' || owners.get(value.resource) !== plugin) return false;
-  return Object.keys(value).every(k => ['track', 'action', 'resource', 'volume', 'loop', 'fadeMs'].includes(k))
+  return Object.keys(value).every(k => ['track', 'action', 'resource', 'volume', 'loop', 'fadeMs', 'offsetMs'].includes(k))
+    && (value.offsetMs === undefined || typeof value.offsetMs === 'number' && Number.isFinite(value.offsetMs) && value.offsetMs >= 0)
     && (value.volume === undefined || typeof value.volume === 'number' && value.volume >= 0 && value.volume <= 1)
     && (value.loop === undefined || typeof value.loop === 'boolean');
 }
@@ -187,7 +188,7 @@ export class PluginCompiler {
     const p = this.defs.get(effect.plugin);
     if (!p?.compile?.effect) { this.report('PLUGIN_EFFECT_UNKNOWN', `Plugin ${effect.plugin} has no effect compiler for ${effect.name}`, source); return undefined; }
     return this.run(p, 'effect', source, () => {
-      const result = this.output(p, p.compile!.effect!(snapshot(effect), { roots: snapshot(scenes.map(s => s.root)), scenes: snapshot(scenes.map(s => ({ id: s.id, root: s.root }))), data: snapshot(data), source, report: this.report, resource: request => {
+      const result = this.output(p, p.compile!.effect!(snapshot(effect), { roots: snapshot(scenes.map(s => s.root)), scenes: snapshot(scenes.map(s => ({ id: s.id, root: s.root }))), data: snapshot(data), source, report: this.report, resourceInfo: id => this.resourceOwners.get(id) === p.id ? snapshot(this.options.resourceInfo?.[id]) : undefined, resource: request => {
         request = materialize(request);
         if (!request || typeof request.compiler !== 'string' || !/^[a-z][a-z0-9-]*$/.test(request.compiler) || typeof request.input !== 'string' || Object.keys(request).some(k => k !== 'compiler' && k !== 'input')) throw new Error('resource requires compiler and text input');
         const key = JSON.stringify([p.id, request.compiler, request.input]);
@@ -242,14 +243,14 @@ export class PluginCompiler {
           for (const c of this.mediaCommands.get(sc.steps[i - 1]!.id) ?? []) {
             const key = `${c.plugin}:${c.track}`;
             const current = media[key];
-            if (c.action === 'play' && current?.resource === c.resource) {
+            if (c.action === 'play' && current?.resource === c.resource && c.offsetMs === undefined) {
               // 同一首再 play：继续播放（含取消正在进行的淡出），只更新音量与循环
               const { stopAfterMs: _fading, ...kept } = current;
               media[key] = { ...kept, volume: c.volume ?? 1, loop: c.loop ?? false };
             } else if (c.action === 'play') {
               // 换曲：有 fadeMs 时旧曲换到「轨道>旧资源」键上同时淡出，与新曲交叉，中间没有静音
               if (current && c.fadeMs) media[`${key}>${current.resource}`] = { ...current, stopAfterMs: Math.min(current.stopAfterMs ?? c.fadeMs, c.fadeMs) };
-              media[key] = { plugin: c.plugin, resource: c.resource, offsetMs: 0, volume: c.volume ?? 1, loop: c.loop ?? false, fadeInMs: c.fadeMs ?? 0 };
+              media[key] = { plugin: c.plugin, resource: c.resource, offsetMs: c.offsetMs ?? 0, ...(c.offsetMs ? { startOffsetMs: c.offsetMs } : {}), volume: c.volume ?? 1, loop: c.loop ?? false, fadeInMs: c.fadeMs ?? 0 };
             } else {
               for (const k of Object.keys(media)) if (k === key || k.startsWith(`${key}>`)) {
                 if (c.fadeMs) media[k] = { ...media[k]!, stopAfterMs: Math.min(media[k]!.stopAfterMs ?? c.fadeMs, c.fadeMs) }; else delete media[k];

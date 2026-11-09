@@ -13,9 +13,12 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@joplo-app/kit": "workspace:*"
+    "@joplo-app/kit": "workspace:*",
+    "libflacjs": "5.6.0",
+    "spessasynth_core": "4.4.9",
+    "stb-vorbis": "0.0.7"
   },
-  "description": "Joplo optional text-authored background music and offline MIDI synthesis",
+  "description": "Joplo optional text-authored background music and offline SoundFont audio rendering",
   "license": "PolyForm-Shield-1.0.0",
   "engines": {
     "node": ">=22"

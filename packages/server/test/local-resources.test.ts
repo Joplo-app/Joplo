@@ -62,3 +62,18 @@ it('shares the content lock across independent author processes', async () => {
   expect(fs.readFileSync(calls,'utf8')).toBe('x');
   expect(fs.readdirSync(path.join(x.dir,'.joplo/resources')).some(f=>f.endsWith('.lock'))).toBe(false);
 },15000);
+it('inspects metadata without rendering, caches success, and invalidates the SoundFont identity', async()=>{
+ const x=setup();
+ const write=(hash:string)=>fs.writeFileSync(x.entry,`import fs from 'node:fs';export default {compilers:{wav:{version:'font-${hash}-renderer-1-encoder-1',mime:'audio/flac',async inspect(){fs.appendFileSync(${JSON.stringify(path.join(x.dir,'inspections'))},'x');return {durationMs:8000,markers:{chapter:2000},parts:{piano:4}}},compile(){fs.appendFileSync(${JSON.stringify(path.join(x.dir,'renders'))},'x');return new TextEncoder().encode('${hash}')}}}};`);
+ write('aaa');const first=await x.host.inspect(x.req);
+ expect(first.info).toMatchObject({durationMs:8000,markers:{chapter:2000}});
+ expect((await new LocalResources(x.dir,{fake:x.entry}).inspect(x.req)).info).toEqual(first.info);
+ expect(fs.readFileSync(path.join(x.dir,'inspections'),'utf8')).toBe('x');
+ expect(fs.existsSync(path.join(x.dir,'renders'))).toBe(false);
+ const rendered=await x.host.ensure(x.req);
+ write('bbb');await new LocalResources(x.dir,{fake:x.entry}).inspect(x.req);
+ expect(fs.readFileSync(path.join(x.dir,'inspections'),'utf8')).toBe('xx');
+ const changed=await new LocalResources(x.dir,{fake:x.entry}).ensure(x.req);
+ expect(changed.url).not.toBe(rendered.url);
+ expect(fs.readFileSync(path.join(x.dir,'renders'),'utf8')).toBe('xx');
+});

@@ -99,7 +99,7 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - [demo](./topics/demo.md): Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots
 - [focus](./topics/focus.md): Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
 - [cases](./topics/cases.md): Case dimensions: ask the user before starting
-- [check](./topics/check.md): Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line
+- [check](./topics/check.md): Read diagnostics, music duration/markers and timing warnings, UNBOUND_INTERACTIVE, and fix the indicated file and line
 - [selection](./topics/selection.md): Edit only the element selected by the user in the board
 - [review](./topics/review.md): Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - [diff](./topics/diff.md): Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication

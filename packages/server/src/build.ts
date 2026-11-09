@@ -141,10 +141,12 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     project = r.project;
     scope = r.info;
   }
+  let mediaCredits: string[] = [];
   if (compiled.resources) {
     const resources = await inlineResources(project, compiled.resources.requests, compiled.resources.host);
     if (Object.keys(resources.assets).length) project = { ...project, mediaAssets: resources.assets };
     compiled.diagnostics.push(...resources.diagnostics);
+    mediaCredits = resources.credits;
   }
   binaryAssets(project, {diagnostics:compiled.diagnostics});
   const inline: { project: Record<string, unknown>; home: string | null; scoped?: true } = publishPayload(project, compiled.home);
@@ -178,7 +180,11 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     // 插件运行时（D86）：每个打成一个文件，内联在入口脚本之前（file:// 也能打开）；只打包 IR 里用到的插件
     const used = Object.fromEntries(Object.entries(compiled.pluginRuntimes).filter(([id]) => project.plugins?.[id]));
     const pluginCode = await bundlePluginRuntimes(used, projectDir, web);
-    const withPlugins = injectPluginScripts(html, pluginCode);
+    let withPlugins = injectPluginScripts(html, pluginCode);
+    if (mediaCredits.length) {
+      fs.writeFileSync(path.join(staging, 'credits.txt'), `Music sound libraries\n\n${mediaCredits.join('\n\n')}\n`);
+      withPlugins = withPlugins.replace('</head>', '<link rel="license" href="./credits.txt" title="Music credits"></head>');
+    }
     fs.writeFileSync(path.join(staging, 'index.html'), withPlugins.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));
 
     // D59: scan every staged text artifact, then retain only font subsets its content needs.

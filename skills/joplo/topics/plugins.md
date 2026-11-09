@@ -1,5 +1,9 @@
 # Joplo plugins: plugins
 
+## Rendered background music
+Music plugins compile text into compressed audio on the author machine. A lightweight resource inspection pass supplies marker times before final compilation; author marker names become numeric media offsets, used identically by normal playback, jumping and deep links. The generic media layer decodes audio, follows the engine clock, pauses/seeks/changes speed, fades, ducks under narration and records its mix during video export. Static screenshots remain silent. Plugins supply audio bytes, not a separate player. Sound banks, score source, local code and paths stay out of published sites; only referenced audio and credits ship. First rendering may download a pinned, verified sound bank; prepare its cache on an online author machine before offline work. Read the enabled music plugin's guide for its bank, license, composition and installation command.
+
+
 The engine supplies authoring, compilation, state, scheduling and host services. It loads only config.plugins; no component or media library is implicitly installed or enabled. A template is one explicit choice of packages, not an engine default.
 
 ## Discover and use

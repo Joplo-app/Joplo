@@ -2,13 +2,14 @@ import { useEffect, useRef } from 'react';
 import type { Project } from '@joplo-app/core/runtime';
 import type { DemoController } from './demo';
 import { MediaEngine } from './media';
-/** Mounted only by interactive players, never Stage thumbnails or render routes. */
+/** Shared by interactive players and video recording; static screenshots never mount it. */
 export function useMedia(ctl: DemoController, project: Project | null, enabled: boolean) {
+  const reference = useRef<MediaEngine | null>(null);
   const current = useRef({ project, enabled });
   current.current = { project, enabled };
   useEffect(() => {
     if (!project?.mediaAssets || !Object.keys(project.mediaAssets).length) return;
-    const engine = new MediaEngine();
+    const engine = new MediaEngine(); reference.current = engine;
     const unlock = (e: Event) => { if (e.isTrusted) engine.unlock(); };
     window.addEventListener('pointerdown', unlock, true); window.addEventListener('keydown', unlock, true);
     let raf = 0;
@@ -23,6 +24,7 @@ export function useMedia(ctl: DemoController, project: Project | null, enabled: 
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(raf); engine.destroy(); window.removeEventListener('pointerdown', unlock, true); window.removeEventListener('keydown', unlock, true); };
+    return () => { reference.current = null; cancelAnimationFrame(raf); engine.destroy(); window.removeEventListener('pointerdown', unlock, true); window.removeEventListener('keydown', unlock, true); };
   }, [ctl, project?.mediaAssets]);
+  return reference;
 }
