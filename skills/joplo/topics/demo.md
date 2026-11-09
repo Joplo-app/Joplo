@@ -17,7 +17,12 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - .drag(target, destination) accepts an element id or stage pixel point; .scroll(target, destination) accepts an element id or content offset. Declare the correct source and endpoint.
 - .hover(target, ms) expresses a dwell; .act(name, target, data) uses the enabled plugin's data-only contract. Read its installed skill for field types, ranges, matching tolerance and presentation duration.
 - Engine frames expose clock time, speed, running/paused state and gesture progress. Presenters sample it; independent timers must not drive the timeline. Pausing freezes cursor, gestures, media, text and plugin animation together.
-- Inputs belonging to another scenario prompt before switching and enter immediately before the matching action. Cancel preserves current exploration; confirm discards it and exposes the matching action’s pre-state. A confirmed jump to step zero does not reopen the inert scenario cover; ordinary reset or chapter selection still does.
+- Inputs belonging to another scenario prompt before switching. The default actionEntry: 'before' enters immediately before the matching action, useful for guided practice. For direct manipulation such as a chapter scrubber, set flow({ actionEntry: 'after' }) on the destination scenario: confirmation lands after the matched action exactly once, showing its scripted result and leaving subsequent steps pending. Cancel preserves exploration; confirm discards it. Before-action entry at step zero exposes the selected action without reopening the inert scenario cover; ordinary reset or chapter selection still shows the cover. This does not change autoplay, normal case selection or from continuity.
+
+## A draggable chapter entry
+Give the scrubber and all year/chapter endpoints stable ids on the same stage. Declare each destination with a distinct .drag('scrubber', 'chapter_target', …effects) action and actionEntry: 'after'. The endpoint, not just the source, distinguishes destinations; different free reactions must not silently navigate. Keyboard activation of a declared drag source chooses a scripted destination, so also keep the player's chapter/case selector available when there are several destinations.
+
+Start playback before testing stage gestures: covers and transition cards intentionally ignore them. Confirm a cross-scenario drag, verify the destination picture immediately, cancel another switch and verify edits remain, then reset/resume and compare with a pristine timeline frame. With from, an ordinary chapter selection at step zero can still show the preceding ending until the entry action plays; do not mistake that for an after-entry failure.
 
 ## Independent views and focus
 - Each layer is an independent view tree, created with components from installed plugins. In an option with layers, the first declared layer is the default initial view; start chooses a route, not a layer. Use flow({ layer }) to choose another declared view, and keep unrelated demonstrations in separate features/options. Layers share state; one layer may show a different role or device. Do not put independent views inside a scaled composite screenshot.
@@ -44,6 +49,9 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - Test first input, drag, wheel, hover, keyboard, confirmation cancel/confirm, reset and resumed playback. Compare restored frames and direct jumps with pristine script frames. Explain unverified devices or audio behavior.
 - For layout, visual motion, shapes, charts and component APIs use the installed plugin skills. The engine has no built-in component vocabulary.
 
+## Write a theme
+A project theme is themes/<name>.css selected by config({ theme: '<name>' }). Define --jp-bg, --jp-ink, --jp-surface and --jp-font; set --jp-stroke: clean for ordinary CSS borders (omitting it inherits hand-drawn strokes). Scope ordinary selectors to an authored root class so third-party libraries do not recolor the player. Include required font bytes as data URLs or use an already installed platform font; remote CSS/font URLs are not an offline asset pipeline. Verify computed styles and file:// playback. Component defaults and styling recipes belong to the owning plugin.
+
 ## Branches, annotations and appearance
 - fork(label, scenarioKey) adds a labeled route to another scenario; it does not silently branch automatic playback. Mark the optional destination flow with autoplay:false so sequential playback skips it; fork alone is a navigation choice, not an autoplay exclusion. Return links to main chapters must not mark those chapters optional.
 - Keep fork labels short and verify the last choice at the actual viewport width: the strip scrolls horizontally when crowded. Avoid hiding an important return path in unnoticeable overflow. A film can end on its final visible state without a done badge when that badge crowds the choices.
@@ -53,4 +61,4 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - Custom themes live in themes/<name>.css and define --jp-* tokens; do not change authored data to recolor a view. For component-specific layout, motion and visual variables, read its installed plugin skill.
 
 Related topics: authoring, plugins, focus, review, publish
-<!-- joplo-skill 0.3.0 sha256:52fcecebd8bcc1a7d1ee33093c875142ea726009236a2da3811a7d49c7380986 -->
+<!-- joplo-skill 0.3.0 sha256:67223e56c0a86f306a176205ad687c697da5ec58333fb6b46f6e08e2eee55e3c -->

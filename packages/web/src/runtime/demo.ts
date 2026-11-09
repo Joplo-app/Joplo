@@ -720,9 +720,11 @@ export class DemoController {
   confirmSwitch(index: number) {
     const candidate = this.snap.switchPrompt?.[index];
     if (candidate) {
-      this.setScenario(candidate.scenarioId, candidate.position);
-      // The viewer already chose an action; expose its pre-state even at step zero.
-      this.set({ freeMode: true });
+      const after = this.snap.project?.scenarios[candidate.scenarioId]?.actionEntry === 'after';
+      this.setScenario(candidate.scenarioId, candidate.position + (after ? 1 : 0));
+      // Before-action entry must expose its pre-state even at step zero.
+      // After-action entry already shows the committed result and stays stopped.
+      if (!after) this.set({ freeMode: true });
     }
   }
   async clickNode(nodeId: string, point: { x: number; y: number }, opts: { inspect?: boolean } = {}) {

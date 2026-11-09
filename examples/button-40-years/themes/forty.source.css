@@ -1,0 +1,110 @@
+/* The film's design pixels are 1280 × 800; only this canvas is styled. */
+:root { --jp-font: 'Plex', 'PingFang SC', 'Microsoft YaHei', sans-serif; --jp-bg:#f3f0e8; --jp-ink:#242520; --jp-radius:0; --jp-stroke:clean; }
+.b40 { background:#f3f0e8; color:#242520; font-family:'Plex','PingFang SC','Microsoft YaHei',sans-serif; overflow:hidden; }
+.b40 * { box-sizing:border-box; }
+.b40 h1,.b40 h2,.b40 h3,.b40 p { margin:0; }
+.b40 button { cursor:pointer; font-family:inherit; }
+.b40 button:focus-visible { outline:3px solid #d44729; outline-offset:4px; }
+.b40 .film-header { position:absolute; top:30px; left:56px; right:56px; padding-bottom:22px; border-bottom:1px solid #c4c2b9; }
+.b40 .kicker { font-size:12px; letter-spacing:2px; margin-bottom:9px; }
+.b40 h1 { font-size:38px; font-weight:600; letter-spacing:-1.5px; }
+.b40 .accent { color:#c64428; }
+.b40 .episode-number { position:absolute; right:0; bottom:27px; font-size:14px; color:#686a61; }
+.b40 .era-label { position:absolute; left:56px; top:184px; width:335px; }
+.b40 .chapter-no { font-size:14px; color:#c64428; letter-spacing:3px; }
+.b40 .year { font-family:'Plex',monospace; font-size:105px; line-height:1.3; letter-spacing:-8px; }
+.b40 h2 { font-size:32px; letter-spacing:1px; margin:5px 0 15px; }
+.b40 .era-label p { font-size:16px; color:#686a61; }
+.b40 .tiny-rule { width:36px; height:3px; background:#c64428; margin:32px 0 24px; }
+.b40 .era-label .play-hint { font-size:13px; line-height:1.9; }
+.b40 .play-hint span { display:block; }
+.b40 .interface { position:absolute; left:424px; top:158px; width:800px; height:456px; overflow:hidden; }
+.b40 .send { height:46px !important; min-width:102px !important; font-size:20px !important; padding:0 26px !important; display:inline-flex !important; justify-content:center !important; align-items:center !important; flex-shrink:0 !important; transition:background .25s !important; }
+.b40 .send-row { display:flex; align-items:center; gap:26px; margin-top:18px; }
+.b40 .echo { display:block; max-width:350px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:13px; margin-top:6px; }
+.b40 .fact-source { position:absolute; left:424px; top:626px; font-size:11px; color:#686a61; }
+.b40 .desktop84 { background:repeating-conic-gradient(#c9c9be 0% 25%,#e3e3d7 0% 50%) 0/4px 4px; border:2px solid #242520; }
+.b40 .menu84 { height:44px; background:#fffef8; border-bottom:2px solid #242520; display:flex; align-items:center; gap:30px; font-size:17px; }
+.b40 .brand-mark { margin-left:20px; }
+.b40 .plain84 { background:#fffef8 !important; color:#181818 !important; padding:5px 12px !important; border:0 !important; border-radius:0 !important; font-size:17px !important; height:36px !important; }
+.b40 .menu-time { margin-left:auto; margin-right:20px; font-size:13px; }
+.b40 .paper84 { position:absolute; top:74px; left:72px; width:648px; height:300px; }
+.b40 .address84 { padding:17px 14px 12px; font-size:14px; border-bottom:1px dotted #92938b; }
+.b40 .letter84 { padding:12px 14px 0; }
+.b40 .letter84 textarea { background:transparent !important; border:0 !important; border-radius:0 !important; color:#242520 !important; font-family:inherit !important; font-size:19px !important; min-height:72px !important; resize:none !important; }
+.b40 .paper84 .send-row { margin-left:16px; margin-top:10px; }
+.b40 .send84 { background:#fffef8 !important; border:2px solid #181818 !important; border-radius:7px !important; color:#181818 !important; box-shadow:0 0 0 3px #fffef8,0 0 0 5px #181818 !important; height:40px !important; }
+.b40 .receipt84 { font-size:14px; }
+.b40 .desktop-note { position:absolute; bottom:23px; right:32px; font-size:13px; }
+.b40 .popup84 { position:absolute; top:45px; left:43px; width:264px; z-index:3; font-size:15px; }
+.b40 .popup84 p { font-size:13px; padding:20px 0; }
+.b40 .desktop95 { background:#0e7778; }
+.b40 .mail95 { position:absolute; top:35px; left:64px; width:664px; }
+.b40 .title95 { background:linear-gradient(90deg,#1a285c,#497f9f); color:white; font-size:18px; font-weight:bold; padding:7px 10px; display:flex; justify-content:space-between; }
+.b40 .tools95 { font-size:13px; padding:10px; }
+.b40 .mail-body95 { padding:6px 16px 20px; }
+.b40 .address95 { font-size:14px; padding:9px; background:#f3f3e9; border:1px solid #808080; }
+.b40 .input95 { margin-top:14px; }
+.b40 .input95 textarea { background:#fffef8 !important; border-radius:0 !important; border:0 !important; box-shadow:inset 1px 1px #808080,inset 2px 2px #181818 !important; font-size:19px !important; color:#242520 !important; min-height:90px !important; resize:none !important; }
+.b40 .receipt95 { font-size:14px; }
+.b40 .taskbar95 { position:absolute; bottom:0; height:49px; padding:5px; background:#c0c0c0; border-top:2px solid white; width:100%; display:flex; gap:16px; align-items:center; font-size:14px; }
+.b40 .taskbar95 button { height:35px !important; font-size:18px !important; padding:2px 20px !important; }
+.b40 .taskbar95>span { margin-left:auto; margin-right:15px; }
+.b40 .task-item95 { border:2px inset #e0e0e0; padding:6px 54px 6px 12px; }
+.b40 .start-menu95 { position:absolute; bottom:48px; left:5px; width:330px; display:flex; z-index:3; }
+.b40 .start-stripe { writing-mode:vertical-rl; transform:rotate(180deg); background:#555d72; color:white; padding:14px 8px; font-size:15px; letter-spacing:2px; }
+.b40 .menu-entry { width:265px !important; padding:12px 18px !important; text-align:left !important; display:block !important; height:53px !important; background:transparent !important; color:#181818 !important; border:0 !important; font-size:18px !important; border-radius:0 !important; }
+.b40 .menu-entry:hover { background:#1a285c; color:white; }
+.b40 .start-menu95 p { font-size:12px; padding:10px 18px; }
+.b40 .touch07 { background:#e2e6e1; border-radius:2px; }
+.b40 .touch-note { position:absolute; top:90px; left:38px; width:280px; }
+.b40 .micro-label { font-size:11px; color:#6f756d; letter-spacing:2px; }
+.b40 .touch-note>p { font-size:30px; line-height:1.7; margin:24px 0; }
+.b40 .touch-note p span { display:block; }
+.b40 .touch-tip { font-size:13px; border-bottom:1px solid #7b837a; padding:10px 0; width:240px; cursor:help; }
+.b40 .touch-tooltip { font-size:13px; background:#fffdf5; padding:14px; margin-top:12px; line-height:1.7; border:1px solid #92998e; }
+.b40 .touch-tooltip span { display:block; color:#6f756d; font-size:11px; }
+.b40 .handset07 { position:absolute; top:12px; right:91px; width:278px; height:432px; border-radius:29px; background:linear-gradient(120deg,#333,#101010 36%,#222); border:3px solid #77796e; padding:33px 12px 37px; box-shadow:10px 12px 20px #26332a24; }
+.b40 .speaker07 { position:absolute; left:109px; top:14px; width:56px; height:5px; background:#080808; border-radius:5px; }
+.b40 .phone-screen07 { height:100%; background:#f1f1ee; position:relative; overflow:hidden; border:1px solid #060606; }
+.b40 .status07 { background:#252a2d; color:white; font-size:9px; padding:5px 8px; display:flex; justify-content:space-between; }
+.b40 .phone-title07 { background:linear-gradient(#b4c4d0,#728a9f); color:#fff; padding:10px; text-align:center; font-size:15px; border-bottom:1px solid #5b6a7d; }
+.b40 .messages07 { height:202px; padding:14px 10px; overflow:auto; }
+.b40 .bubble07 { padding:12px; border-radius:13px; font-size:13px; line-height:1.6; width:190px; }
+.b40 .bubble07 span { display:block; }
+.b40 .incoming { background:linear-gradient(#fff,#dadada); border:1px solid #b7b7b7; }
+.b40 .outgoing { background:linear-gradient(#caeaa8,#9fcd76); border:1px solid #79a954; margin-left:auto; margin-top:12px; overflow-wrap:anywhere; }
+.b40 .delivered07 { text-align:right; font-size:10px; color:#5c7050; margin:6px 0; }
+.b40 .composer07 { display:flex; align-items:center; gap:6px; padding:7px; background:linear-gradient(#ddd,#aaa); border-top:1px solid #a1a1a1; }
+.b40 .composer07>div { flex:1; min-width:0; }
+.b40 .composer07 input { width:100% !important; font-size:12px !important; min-height:31px !important; height:31px !important; border:1px solid #888 !important; border-radius:12px !important; padding:5px 9px !important; color:#242520 !important; background:white !important; }
+.b40 .send07 { min-width:54px !important; height:31px !important; padding:0 8px !important; font-size:12px !important; border:1px solid #346a9a !important; border-radius:8px !important; background:linear-gradient(#8ebbe7,#3478b8) !important; color:white !important; }
+.b40 .keyboard-caption07 { font-size:10px; color:#555; text-align:center; padding:8px 0; }
+.b40 .home07 { position:absolute; bottom:7px; left:123px; width:26px; height:26px; border:1px solid #555; border-radius:50%; }
+.b40 .ai24 { background:#fbfaf6; border:1px solid #cfcfc5; border-radius:16px; }
+.b40 .ai-top { padding:18px 24px; font-size:14px; border-bottom:1px solid #e1e1d7; display:flex; align-items:center; gap:10px; }
+.b40 .ai-dot { height:8px; width:8px; border-radius:50%; background:#537060; }
+.b40 .demo-badge { margin-left:auto; font-size:10px; color:#77796d; }
+.b40 .ai-conversation { height:265px; padding:20px 30px; overflow:auto; }
+.b40 .ai-empty { text-align:center; margin-top:10px; }
+.b40 .spark24 { font-size:44px; color:#c64428; line-height:1.5; }
+.b40 .ai-empty h3 { font-size:24px; margin:8px 0 20px; }
+.b40 .suggest24 { border:1px solid #deded3 !important; background:#f3f2ea !important; color:#53594d !important; border-radius:20px !important; padding:9px 18px !important; height:38px !important; font-size:13px !important; }
+.b40 .ai-question { margin-left:auto; max-width:580px; background:#e9eae2; padding:12px 18px; border-radius:18px 18px 3px 18px; font-size:15px; overflow-wrap:anywhere; }
+.b40 .ai-answer { padding:22px 3px; }
+.b40 .ai-answer p { font-size:21px; line-height:1.7; margin:10px 0; }
+.b40 .ai-answer p span { display:block; }
+.b40 .ai-answer small { font-size:11px; color:#77796d; }
+.b40 .ai-composer { margin:0 24px; padding:11px 12px 11px 17px; border:1px solid #c8cac0; border-radius:25px; display:flex; align-items:center; gap:12px; box-shadow:0 3px 10px #20241806; }
+.b40 .ai-composer>div { flex:1; min-width:0; }
+.b40 .ai-composer textarea { background:transparent !important; color:#242520 !important; border:0 !important; box-shadow:none !important; font-size:16px !important; resize:none !important; min-height:42px !important; padding:10px 0 !important; }
+.b40 .send24 { min-width:44px !important; width:44px !important; height:44px !important; padding:0 !important; border:0 !important; border-radius:50% !important; background:#242520 !important; color:white !important; font-size:24px !important; }
+.b40 .ai-foot { text-align:center; padding:12px 0; font-size:11px; color:#77796d; }
+.b40 .timeline { position:absolute; left:56px; right:56px; top:665px; height:95px; }
+.b40 .timeline-top { display:flex; justify-content:space-between; font-size:11px; color:#686a61; }
+.b40 .timeline-line { position:absolute; left:60px; right:88px; height:1px; background:#aaa99f; top:40px; }
+.b40 .timeline-year { position:absolute; top:27px; width:150px; height:28px; display:flex; align-items:center; gap:10px; font-size:20px; }
+.b40 .timeline-dot { width:10px; height:10px; background:#c64428; border-radius:50%; box-shadow:0 0 0 6px #f3f0e8; }
+.b40 .timeline-year>span { background:#f3f0e8; padding-right:10px; }
+.b40 .scrubber { border:0 !important; border-radius:3px !important; background:#c64428 !important; color:white !important; height:25px !important; min-width:84px !important; font-size:11px !important; padding:3px 12px !important; touch-action:none !important; }
+.b40 .credits { position:absolute; bottom:12px; left:56px; right:56px; font-size:9px; color:#77796d; border-top:1px solid #d8d6cd; padding-top:9px; }

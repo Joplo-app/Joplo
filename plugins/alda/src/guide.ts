@@ -21,7 +21,7 @@ import { music } from '@joplo-app/plugin-alda';
 
 Put play on the first step, stop alongside done. Each scenario starts silent and owns its own track. A later play replaces the track and restarts at zero. volume is 0–1; fadeMs is 0–30000. Music is independent of content language. Use hold(seconds) when exact musical pacing matters: step anchors advance by the previous step's hold, default 3000ms. On each step/jump the track aligns to that anchor; variable narration or interaction waits do not redefine the score timeline.
 
-For a period-spanning story, reuse a short melodic motif and change its instrument at the visual transition. Give each chapter its own named score and play it in the same step that changes the scene; stop at the chapter ending. Leave space between notes for narration.
+For a historical or multi-theme piece, keep original motifs in one score map, reuse a short melodic motif, and change its instrument at the visual transition. Use distinct named scores and instrument programs rather than copyrighted startup recordings. Put play in the same step that changes the chapter's visual state and stop at its ending; leave space between notes for narration. A from chapter inherits UI state but does not imply inherited music: start that chapter's score explicitly. Direct navigation to an after-action entry also resolves that step's media snapshot.
 
 Verify instrument names with alda instruments on the author machine. Familiar aliases such as piano are not a rule for every instrument: full names include midi-synth-pad-new-age and midi-electric-piano-1. Export a new score before a long build, and inspect build warnings; a successful joplo check does not prove Alda accepted an instrument or produced audible bytes.
 

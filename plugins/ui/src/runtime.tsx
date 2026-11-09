@@ -1707,14 +1707,18 @@ function ArtifactRef({ node, p, disabled }: NodeProps) {
 
 function PromptInput({ node, p, disabled }: NodeProps) {
   const { t: i18n } = useI18n();
-
+  const ctx = useCtx();
   const v = useInputValue(node, p);
   const has = v !== undefined && v !== null && v !== '';
   const root = useRoot(node, p, { disabled, className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-xl', style: { flex: 1, minWidth: 0, width: '100%', minHeight: 44, padding: '10px 14px', whiteSpace: 'pre-wrap', color: has ? INK : SOFT, background: SURFACE } });
   return (
-    <div {...root} role="textbox" aria-readonly="true" tabIndex={0} data-jcontrol={node.id}>
+    <div {...root} data-jcontrol={node.id}>
       <Rough seedKey={node.id} />
-      <span data-jtext="">{has ? str(v) : str(p.placeholder, i18n.stage.typeAMessage)}</span>
+      <textarea readOnly={!ctx.interactive || disabled} tabIndex={ctx.interactive && !disabled ? 0 : -1}
+        onChange={e => ctx.act?.(node.id, { type: 'type', value: e.currentTarget.value })}
+        onClick={ctx.interactive ? e => e.stopPropagation() : undefined}
+        aria-label={nodeLabel(node)} value={str(v)} placeholder={str(p.placeholder, i18n.stage.typeAMessage)} rows={1}
+        className={FIELD_CLASS} style={{ display: 'block', width: '100%', font: 'inherit', color: INK, lineHeight: '24px', maxHeight: 144, overflowY: 'auto' }} />
     </div>
   );
 }

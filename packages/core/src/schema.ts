@@ -225,6 +225,8 @@ export const Step = z.strictObject({
 export const Scenario = z.strictObject({
   /** Optional chapters remain selectable but do not join sequential autoplay. */
   autoplay: z.boolean().optional(),
+  /** Where a confirmed cross-scenario action enters; autoplay is unaffected. */
+  actionEntry: z.enum(['before', 'after']).optional(),
   media: MediaSnapshot.optional(),
   ext: z.record(z.string(), Json).optional(),
   id: Qid,

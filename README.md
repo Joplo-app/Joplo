@@ -41,7 +41,7 @@ Keep the Board process running. Edit the generated TSX files and watch the demo 
 ## What you can show
 
 - **Board:** a home page with recent projects and their features, served by one local process.
-- **Interactive demos:** scripted playback plus disposable exploration. Click the playing stage once to pause; type, switch controls or try declared free reactions, then Play to restore the script. Drag, hover, scroll and plugin gestures can be steps. See `npx joplo skill demo` and `authoring`.
+- **Interactive demos:** scripted playback plus disposable exploration. Click the playing stage once to pause; type, switch controls or try declared free reactions, then Play to restore the script. Drag, hover, scroll and plugin gestures can be steps. A destination flow can opt into `actionEntry: 'after'` so a confirmed cross-scenario gesture lands on its result; guided practice defaults to the action's starting frame. See `npx joplo skill demo` and `authoring`.
 - **Layers, Director, and Shots:** give each perspective its own page. The Director follows the flow, switches Layers, and moves the camera to each Shot. Viewers can take over, replay one Layer, zoom, pan, or go fullscreen.
 - **Architecture demos:** `Diagram` groups nodes by business domain, `Sequence` walks a call chain in time order, `StateMachine` shows a lifecycle. Layout is automatic and stable across steps; `trace()` animates call paths and derives their states.
 - **Inspection:** hold Option/Alt and click to open the rules and source drawer. Your agent can retrieve the selection and edit just that location.
@@ -203,6 +203,7 @@ Run `npx joplo skill diff` for the version-matched workflow and recovery steps. 
 
 | Example | What to explore |
 | --- | --- |
+| [examples/button-40-years](examples/button-40-years) | One send button through four decades; playable period interfaces, chapter dragging and original Alda music |
 | [examples/invite](examples/invite) | Compare an invitation dialog with a batch invitation flow |
 | [examples/agent-arch](examples/agent-arch) | Layers, Director, grouped `Diagram`, `Sequence`, `StateMachine`, and `trace()` for an agent architecture |
 | [examples/joplo](examples/joplo) | Joplo’s own evolving design workspace: real feature alternatives, interaction prototypes and documented decisions |

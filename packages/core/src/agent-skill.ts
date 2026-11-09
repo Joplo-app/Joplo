@@ -9,9 +9,9 @@
 
 /** `npx joplo skill <主题>` 的主题与一句话用途（guide.ts 生成正文；技能里按这份清单列出主题）。 */
 export const SKILL_TOPICS = [
-  { name: 'authoring', description: 'Engine model, page / option / flow, explicit plugins, local reactions, state and conditions' },
+  { name: 'authoring', description: 'Engine model, page / option / flow, explicit plugins, named local reactions, composable effects, state and conditions' },
   { name: 'story', description: 'Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos' },
-  { name: 'demo', description: 'Scripted playback and local exploration, drag / hover / scroll / plugin actions, layers, captions, deep links and screenshots' },
+  { name: 'demo', description: 'Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots' },
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
   { name: 'cases', description: 'Case dimensions: ask the user before starting' },
   { name: 'check', description: 'Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line' },
@@ -27,7 +27,7 @@ export const MENTAL_MODEL = [
   'Joplo turns a feature idea into a clickable, replayable demo. It is a player for pre-declared scenarios, not a free-form app prototype with persistent data or real backend logic, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.',
   'Structure: a project has features; a feature has options (alternative designs, A/B) and cases (edge cases to cover); an option plays scenarios; a scenario is a list of steps.',
   'A step is one user action (.click / .type / .select / .press / .drag / .hover / .scroll / .act) or system event plus its visible effects (set, toast, go, done). Results and errors come from these effects, not from real logic or a backend.',
-  'During playback, the first picture-changing stage input pauses and applies that same input. Hover does not pause; blank clicks only pause without an exploration notice. Matching the next action advances the script and stays stopped; another reachable scenario asks to switch; native controls and declared free reactions change only a local playground. Play, jump, scenario change and reset discard exploration. Screenshots, video and deep links always use scripted state.',
+  'During playback, the first picture-changing stage input pauses and applies that same input. Hover does not pause; blank clicks only pause without an exploration notice. Matching the next action advances the script and stays stopped; another reachable scenario asks to switch (default before the action; actionEntry: \'after\' consumes it on confirmation); native controls and declared free reactions change only a local playground. Play, jump, scenario change and reset discard exploration. Screenshots, video and deep links always use scripted state.',
   'Options and cases are compared in the local board; only the picked option is published.',
 ] as const;
 
@@ -64,6 +64,7 @@ export const PITFALLS = [
   ["For multimodal stories, list assets and licenses first, prove one real asset in a playable chapter, then extend the batch within the agreed spending limit. Keep source claims separate from interpretations", "story"],
   ["For generated binary assets, first look for CC0/public-domain material; use an enabled generation plugin for gaps. Run resources --dry-run before spending; check/build/render never generate paid artifacts. Commit outputs and metadata, keep keys local", "plugins"],
   ["For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings", "plugins"],
+  ["Collect reusable assets before drawing complex visuals; keep source URLs, authors, licenses and changes in assets/SOURCES.md, and verify bundled fonts and samples separately", "story"],
   ["For audience exploration, use native UI controls or option.free; keep deterministic results in flow steps. Read demo before using drag, hover, scroll or plugin actions", "demo"],
   ["Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components", "plugins"],
 ] as const satisfies readonly (readonly [string, string])[];

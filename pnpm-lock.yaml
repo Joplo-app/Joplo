@@ -236,6 +236,24 @@ importers:
         specifier: workspace:*
         version: link:../../plugins/scene3d
 
+  examples/button-40-years:
+    devDependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@joplo-app/plugin-alda':
+        specifier: workspace:*
+        version: link:../../plugins/alda
+      '@joplo-app/plugin-content':
+        specifier: workspace:*
+        version: link:../../plugins/content
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
+      joplo:
+        specifier: workspace:*
+        version: link:../../packages/joplo
+
   examples/camping:
     devDependencies:
       '@joplo-app/kit':

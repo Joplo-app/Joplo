@@ -44,6 +44,15 @@ describe('D88 pure input arbitration and separate playground', () => {
     p.scenarios['f.a.other']!.steps.unshift({ ...p.scenarios['f.a.other']!.steps[0]!, id: 'broken', action: { type: 'event', name: 'broken' } });
     expect(actionIndex(p, 'f.a').some(e => e.scenarioId === 'f.a.other' && e.position > 0)).toBe(false);
   });
+  it('preserves the authored action entry policy in development and offline publication', () => {
+    const s=source();
+    s.features.f!.options.a!.scenarios.other=flow('Other', {actionEntry:'after'}).click('other',set($.ui.other,true));
+    for(const mode of ['dev','publish'] as const){
+      const r=compile(s,mode);expect(r.diagnostics.filter(d=>d.severity==='error')).toEqual([]);
+      expect(r.project!.scenarios['f.a.other']!.actionEntry).toBe('after');
+      expect(actionIndex(r.project!,'f.a').find(e=>e.scenarioId==='f.a.other')!.position).toBe(0);
+    }
+  });
   it('keeps native writes and declared reactions out of replay, and discards by dropping the layer', () => {
     const p = project(), s = stateAt(p, 'f.a.main', 0), original = structuredClone(s);
     const v = arbitrateAction(p, s, { type: 'toggle', target: 'lamp', value: false });
@@ -108,6 +117,8 @@ describe('D88 end-to-end projection', () => {
   it('feature-diff reports free reactions and plugin matching-contract changes at scenario level', async () => {
     const {featureDiff} = await import('../src/feature-diff.ts');
     const s=source(); const p=compile(s,'publish').project!; const q=structuredClone(p);
+    q.scenarios['f.a.main']!.actionEntry='after';
+    expect(featureDiff(p,q).scenarios.find(s=>s.after==='f.a.main')?.reasons).toContain('action-entry');
     q.options['f.a']!.free!.next!.effects=[{type:'set',path:'ui.free',value:false}];
     expect(featureDiff(p,q).scenarios.find(s=>s.after==='f.a.main')?.reasons).toContain('free-reactions');
     const plugin=definePlugin({id:'probe',title:'Probe',runtime:'/probe.js',components:{},actions:{rotate:{caption:'Rotate {label}',durationMs:800,fields:{angle:{type:'number',tolerance:2}}}}});

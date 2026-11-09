@@ -3,7 +3,7 @@
 Joplo compiles trusted TS/TSX into deterministic scenes and schedules their playback. It does not supply a component library or execute real backend requests. Use components from the project's explicitly installed plugins; read their skills before writing view trees.
 
 ## Start from the project
-1. Run npx joplo init <dir>, install its dependencies, then npx joplo skill install. The starter supplies its own plugin choices; a custom project may choose different ones.
+1. Run npx joplo init <dir>, install its dependencies, then npx joplo skill install. In the Joplo source monorepo, initialize with --template ./templates/starter and use the monorepo workspace protocol for local package dependencies before installing; external projects keep pinned published versions. The starter supplies its own plugin choices; a custom project may choose different ones.
 2. Read the installed engine skill and .claude/skills/joplo-plugins/SKILL.md. Read each relevant plugin's entry and component/recipe topics. npx joplo skill lists what this config enables.
 3. Create one feature, one option and a runnable scenario. Run check, inspect the rendered frames, then test the real inputs.
 4. Required before handing a development round to the user: read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json. A running board alone does not receive feedback for the agent.
@@ -45,14 +45,22 @@ export default option({
 Declare both success and recovery cases in the feature. View code belongs to the chosen plugin; the engine example defines state and behavior only.
 
 ## Steps and effects
-- flow(name, { cases?, start?, state?, from?, autoplay?, layer?, description?, expected?, mock?, outcome? }). state overrides option state. description is the cover sentence; expected describes what the viewer should observe.
+- flow(name, { cases?, start?, state?, from?, autoplay?, layer?, description?, expected?, mock?, outcome?, actionEntry? }). state overrides option state. description is the cover sentence; expected describes what the viewer should observe.
 - autoplay: false keeps an optional scenario selectable through a fork, chapter list or deep link, but skips it in sequential published-site playback. Playing that scenario manually stops at its end. Default/true preserves declaration order.
 - from: 'previousKey' continues that scenario's final route, ui/data/inputs and director layer. Validate steps and automatic captions against that ending page; dependency order does not change chapter order. Do not combine from with start. layer overrides the initial director layer.
 - .click(id), .type(id, value), .select(id, value), .toggle(id, boolean), .press(keys), .back(), .drag(id, destination), .hover(id, ms), .scroll(id, destination), .act(pluginAction, id, data). Read demo and the action-owning plugin skill for recognition requirements.
 - .system('event', ...effects) models a response, not a real request. .card() creates a transition. Strings are captions; other arguments are effects. Step arguments and card accept effect arrays.
 - set(path, value) replaces; push(path, value) appends; patch(path, object) expands to sets (nested objects replace, not deep-merge). go(route) navigates in this option; back returns to the prior route.
 - toast(text), toast.success/error/info(text) show an engine message. done(result, outcome?) ends a scenario; outcomes success/failure/cancelled must agree with flow's badge. uses(ruleKey, ...) links rules; it is an effect, not a flow method.
-- free.click/type/select/toggle/drag/hover/scroll/act in option.free declare local reactions. Only set, push and toast are local effects; navigation, completion and media remain scripted. Play/jump/scenario/reset discard the local layer.
+- free.click/type/select/toggle/drag/hover/scroll/act in option.free declare local reactions. free is a named object, not an array: free: { open: free.click('open', set($.ui.open, true)) }. Only set, push and toast are local effects; navigation, completion and media remain scripted. Play/jump/scenario/reset discard the local layer.
+
+## Reusable effect factories
+Step arguments and card effects accept nested arrays, flattened in order. Compose helpers that return patch() plus other effects instead of copying transition state. Only done() completes a scenario; unknown effect objects report EFFECT_INVALID.
+```ts
+const arrive = () => [patch($.ui, { screen: 'inbox', sent: false }), [hold(4)]];
+flow('Inbox').system('Arrive', arrive(), 'The inbox opens');
+```
+For a long story use from to inherit the previous ending. An action-driven navigation entry can also declare actionEntry: 'after'; read demo for its confirmation and replay boundary.
 
 ## Bindings, rules and reuse
 - $.ui.x / $.data.x / $.inputs.id are whole-value bindings. Expressions are not reevaluated. Props supported by a plugin may bind to these values; read that plugin's value and visibility rules.
@@ -65,4 +73,4 @@ Declare both success and recovery cases in the feature. View code belongs to the
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.3.0 sha256:7c13d9f419fb45d026714bbc90af9973a9a5377859fcf60e24f9bd3b45198e9d -->
+<!-- joplo-skill 0.3.0 sha256:498f2c29e8fbc01b6a11150e1342886c1056d73a12d1d49c9ab89d36af664105 -->

@@ -192,7 +192,7 @@ Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结�
 
 引擎主题不讲具体组件。`npx joplo skill ui`、`ui/components`、`diagram`、`diagram/patterns`、`content`、`content/patterns`、`alda` 由项目启用插件提供；在项目目录运行，CLI 会读取 config 模块，不启动服务端或编译整套作者文件。无项目时只列引擎指南与插件使用说明。
 
-`authoring` 说明 `option.free` 无顺序本机反应，`demo` 说明新动作和播放仲裁。`plugins` 主题也说明动作声明、`ctx.act` 识别器、引擎时钟演示器、通用本机资源编译器与媒体轨道。可选 `@joplo-app/plugin-alda` 需要先安装并在项目 `config.plugins` 中显式启用，然后在该项目目录运行 `npx joplo skill alda`；不要把项目路径作为读取主题的第二参数（该参数只供 install 使用）。技能说明配乐文本、步骤 play/stop、缓存、warning 恢复和离线验证。`check` 不执行本机编译器；看板首次需要声音时生成，`build/share` 在范围裁剪后生成，失败 warning 保留在看板/构建结果，其他演示内容继续可用。
+`authoring` 说明具名 `option.free` 字典、可嵌套组合的效果数组与本机反应；`demo` 说明动作和播放仲裁。`flow({ actionEntry: 'after' })` 让跨场景确认直接落到匹配动作之后，用于时间轴等直接操纵；缺省或 `'before'` 仍停在动作前。取消保留本地体验，确认丢弃体验且只消费匹配动作，后续步骤等待继续；普通章节选择、自动播放与 `from` 不受该策略影响。效果对象拼错会报 `EFFECT_INVALID`，不会隐式结束场景。`story` 说明先收集素材、核实字体与样本许可证并记录 `assets/SOURCES.md`；插件指南补充复古主题作用域、同物件连续转场和逐章配乐。`plugins` 主题也说明动作声明、`ctx.act` 识别器、引擎时钟演示器、通用本机资源编译器与媒体轨道。可选 `@joplo-app/plugin-alda` 需要先安装并在项目 `config.plugins` 中显式启用，然后在该项目目录运行 `npx joplo skill alda`；不要把项目路径作为读取主题的第二参数（该参数只供 install 使用）。技能说明配乐文本、步骤 play/stop、缓存、warning 恢复和离线验证。`check` 不执行本机编译器；看板首次需要声音时生成，`build/share` 在范围裁剪后生成，失败 warning 保留在看板/构建结果，其他演示内容继续可用。
 
 ### skill install
 

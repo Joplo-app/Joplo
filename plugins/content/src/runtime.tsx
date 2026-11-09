@@ -125,9 +125,39 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
 /** One observer per stage: cache only design-space layouts, never player state. */
 export const observe: PluginObserve = (root) => {
   const layouts = new Map<HTMLElement, Map<string, Box>>();
+  const clips = new Map<HTMLElement, { count: number; value: string; priority: string }>();
+  // FLIP crosses containers; their normal overflow must not clip that travel.
+  const lift = (el: HTMLElement, world: HTMLElement) => {
+    const held: HTMLElement[] = [];
+    for (let p = el.parentElement; p && p !== world; p = p.parentElement) {
+      const existing = clips.get(p);
+      const css = getComputedStyle(p);
+      if (!existing && ![css.overflowX, css.overflowY].some(v => ['hidden', 'clip', 'auto', 'scroll'].includes(v))) continue;
+      const entry = existing ?? { count: 0, value: p.style.getPropertyValue('overflow'), priority: p.style.getPropertyPriority('overflow') };
+      entry.count++; clips.set(p, entry); held.push(p);
+      p.style.setProperty('overflow', 'visible', 'important');
+    }
+    return () => { for (const p of held) {
+      const entry = clips.get(p); if (!entry || --entry.count > 0) continue;
+      if (entry.value) p.style.setProperty('overflow', entry.value, entry.priority); else p.style.removeProperty('overflow');
+      clips.delete(p);
+    } };
+  };
+  const flights = new Map<Animation, { el: HTMLElement; world: HTMLElement; effect: AnimationEffect | null; release: (() => void) | null }>();
+  const forget = (a: Animation) => { flights.get(a)?.release?.(); flights.delete(a); };
   const cancel = (w: HTMLElement) => { for (const el of w.querySelectorAll<HTMLElement>('[data-jp-content-motion]')) for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); };
   return {
     update(context) {
+      for (const [animation, flight] of flights) {
+        if (!context.frame.animate || !root.contains(flight.el)) { animation.cancel(); forget(animation); continue; }
+        if (context.frame.playground && animation.effect) {
+          // Keep the animation identity/time anchor, but yield its transform to
+          // the editable final layout. Restoring the effect resumes one clock.
+          animation.effect = null; flight.release?.(); flight.release = null;
+        } else if (!context.frame.playground && !animation.effect) {
+          animation.effect = flight.effect; flight.release = lift(flight.el, flight.world);
+        }
+      }
       const worlds = [...root.querySelectorAll<HTMLElement>('[data-jcanvas-world]')];
       for (const w of layouts.keys()) if (!worlds.includes(w)) { cancel(w); layouts.delete(w); }
       for (const w of worlds) {
@@ -142,7 +172,7 @@ export const observe: PluginObserve = (root) => {
           const prev = previous.get(key);
           seen.set(key, r);
           if (!context.frame.animate) { for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); }
-          if (!prev || !context.frame.animate) continue;
+          if (!prev || !context.frame.animate || context.frame.playground) continue;
           if (Math.abs(prev.x - r.x) < 0.5 && Math.abs(prev.y - r.y) < 0.5 && Math.abs(prev.w - r.w) < 0.5 && Math.abs(prev.h - r.h) < 0.5) continue;
           const dx = prev.x + prev.w / 2 - (r.x + r.w / 2);
           const dy = prev.y + prev.h / 2 - (r.y + r.h / 2);
@@ -155,11 +185,14 @@ export const observe: PluginObserve = (root) => {
             { duration: el.dataset.jpContentMotionMs === undefined ? flight.ms : Number(el.dataset.jpContentMotionMs), easing: flight.ease, delay: Number(el.dataset.jpContentMotionDelay) || 0, fill: 'backwards' },
           );
           anim.id = 'jmotion';
+          flights.set(anim, { el, world: w, effect: anim.effect, release: lift(el, w) });
+          anim.addEventListener('finish', () => forget(anim), { once: true });
+          anim.addEventListener('cancel', () => forget(anim), { once: true });
         }
-        layouts.set(w, seen);
+        if (!context.frame.playground) layouts.set(w, seen);
       }
     },
-    destroy() { for (const w of layouts.keys()) cancel(w); layouts.clear(); },
+    destroy() { for (const [animation] of flights) { animation.cancel(); forget(animation); } for (const w of layouts.keys()) cancel(w); layouts.clear(); },
   };
 };
 

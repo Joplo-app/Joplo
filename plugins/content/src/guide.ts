@@ -14,6 +14,9 @@ Install @joplo-app/plugin-content at the Joplo version; import content and add i
 - Write the script as one line per step: ears (narrate), eyes (what changes on stage), source. Adjacent steps should connect with 'but' or 'so'; a chain of 'and then' is flat.
 - Budget: narration reads about 4.5 CJK characters (2.5 English words) per second; 45–90 s per chapter. About 400 CJK characters can already exceed 90 seconds. npx joplo outline counts narration in its estimates.
 
+## Asset-first preparation
+Before building a device, historical interface or illustrated object, make an asset list. Prefer a suitable licensed library, icon set or model; do not hand-write complex SVG or build a model merely because JSX can draw it. Verify the actual asset license, collect files in assets/, retain licenses and record author, URL and modifications in assets/SOURCES.md. Historical facts and historical appearance are separate evidence: label stylized reconstructions and invented messages, and avoid copied logos/system icons. Use original work only when a suitable reusable asset is unavailable, keeping it simple.
+
 ## 2. Hook (first chapter, 20–35 s)
 - Beat 1: a familiar scene that pays off the thumbnail. Never a logo, an agenda, or a definition first.
 - Beat 2: the twist, shown on stage (the answer splits into pieces with probabilities, a name changes on the second try).
@@ -81,6 +84,7 @@ flow('What does it read?', { from: 'hook' })
 - CAMERA_UNKNOWN: the id must exist in a current layer or stage; frame elements inside this Canvas. CAMERA_INVALID: pad 0–2000, zoom 0.1–10, ms 0–10000, finite numbers only.
 - PLUGIN_PROPERTY_INVALID: motion is a nonempty string; motionDelay/motionMs are finite numbers 0–10000; screen is boolean. These universal properties are literals, not state bindings. Use separate same-key elements with when for a flight between containers.
 - Give each visible object one motion key. Hidden previous locations remain available for a later same-key arrival. Avoid duplicate simultaneously visible keys. Independent translate/scale keeps the author's transform intact.
+- Cross-container flights temporarily lift clipping ancestors inside the world and restore their overflow at finish/cancel. During playground edits the flight yields its visual transform to the final usable layout while preserving its animation/time anchor for resume. Do not globally remove device clipping or duplicate the animated control to make it clickable; test first input during a flight.
 - Keep camera and FLIP duration together when both move; motionMs explicitly overrides duration, including 0. animate=false cancels an existing flight and renders the final layout.
 - A Canvas with no parent height uses its view aspect ratio; with an explicit parent height it fills that parent. A zero-sized parent still needs a layout fix; render reports the measured surface.
 - screen only separates direct Canvas children into the fixed overlay. Nested screen props remain ordinary descendants.
@@ -96,5 +100,14 @@ export const patterns = `# content recipes and pitfalls
 - Keep chapter/source labels as direct screen children when the world camera travels. Nested screen does not escape its parent. Frame a stable hero cluster with a modest pad; an oversized pad may zoom out and expose empty margins instead of producing a close-up.
 - Reuse a motion key for the same subject's wrapper across arrangements. For a subject entering a device, establish the device first or in the same step, then shrink and move the subject into its screen. Keep the ending actionable through real forks or controls.
 - Match-cut the subject at a chapter boundary while changing its background and sound in that same scripted step. The input stays concrete: click the object, drag it to a visible destination, or choose an explicitly labeled branch. Avoid a slide of historical bullet points.
+
+## A continuous object inside playable chapter interfaces
+Use one motion key for the recurring object and distinct element ids for its location in each mutually exclusive arrangement. Keep exactly one visible instance. Each interface should contain a real native input or declared local reaction: the same picture must make sense both during playback and after the viewer pauses.
+
+A useful story holds the message or task constant while the surrounding interface changes. The motion gives continuity; the input, menu and result prove the interaction paradigm. Label canned results explicitly when the audience can type arbitrary requests. Do not imply a model or backend computed a result.
+
+A chapter transition should own both its state change and its track change. Use from for continuity, and the engine's actionEntry: 'after' when a confirmed chapter drag should immediately show the new arrangement. Static storyboards prove layout; observe real playback to verify FLIP travel. If a flight does not appear, check for two visible same-key objects, a replaced Canvas/stage, or a manual jump with animate=false before changing the animation.
+
+Keep credits and sources outside the animated object area. Render every chapter and inspect the target frame after seeking; then test real typing, first-input pause, hover/touch, reset, continue and cross-chapter confirmation. A menu temporarily covering content is expected while open; verify it closes before the next action needs that content.
 
 Common pitfall: For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, and verify playback before claiming it works`;

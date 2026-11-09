@@ -196,7 +196,7 @@ function missingPaths(full: unknown, partial: unknown, at = ''): string[] {
   return out;
 }
 describe('发布产物是完整的 IR（只缺有意去掉的创作侧字段）', () => {
-  for (const name of ['camping', 'agent-arch', 'invite']) {
+  for (const name of ['camping', 'agent-arch', 'invite', 'button-40-years']) {
     it(`examples/${name}`, async () => {
       // camping / agent-arch 没有 pick，直接发布时没有任何场景：用补了 pick 的副本（集成 0.2.8）
       const dir = pickedExample(name);
