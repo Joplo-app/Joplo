@@ -18,8 +18,9 @@ export function pickedExample(name: string, pick = SAMPLE_PICKS[name]): string {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `joplo-${name}-`)));
   fs.cpSync(path.join(EXAMPLES, name), dir, { recursive: true, filter: (src) => !/[/\\](dist|node_modules|\.joplo)([/\\]|$)/.test(src) });
   installFixturePlugins(dir);
+  // 独立作品无需 pick，也可能完全没有 features/。
   const featuresDir = path.join(dir, 'features');
-  for (const f of fs.readdirSync(featuresDir)) {
+  for (const f of fs.existsSync(featuresDir) ? fs.readdirSync(featuresDir) : []) {
     const file = path.join(featuresDir, f, 'feature.ts');
     if (!fs.existsSync(file) || !pick) continue;
     const src = fs.readFileSync(file, 'utf8');

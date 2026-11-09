@@ -1,12 +1,15 @@
-import { $, callout, done, flow, highlight, hold, layer, narrate, numbered, option, set, shot, spotlight } from '@joplo-app/kit';
-import { BallotLayer, TermLayer, basicsMap, basicsSeats, basicsState } from '../../../shared/basics.tsx';
-import { CoverLayer, coverFlip, coverState } from '../../../shared/cover.tsx';
-import { GOV_SOURCE, SENATE } from '../../../shared/data.ts';
-import { HistoryLayer, histCols, historyState } from '../../../shared/history.tsx';
-import { AiLayer, MarketLayer, VIX, aiBars, indexBars, marketState } from '../../../shared/market.tsx';
-import { C } from '../../../shared/palette.ts';
-import { AT, PowerLayer, STAMP_UP, congressBlue, powerState, stampDown } from '../../../shared/power.tsx';
-import { CongressLayer, MapLayer, WhyLayer, counts, maps, resultsState, seats } from '../../../shared/results.tsx';
+/**
+ * 自媒体快剪风格：深色舞台、红蓝强对比、真实照片做调色，每一章用钩子开场、用画面里的变化讲事实
+ */
+import { $, callout, done, chapter, highlight, hold, layer, narrate, numbered, work, set, shot, spotlight } from '@joplo-app/kit';
+import { BallotLayer, TermLayer, basicsMap, basicsSeats, basicsState } from '../shared/basics.tsx';
+import { CoverLayer, coverFlip, coverState } from '../shared/cover.tsx';
+import { GOV_SOURCE, SENATE } from '../shared/data.ts';
+import { HistoryLayer, histCols, historyState } from '../shared/history.tsx';
+import { AiLayer, MarketLayer, VIX, aiBars, indexBars, marketState } from '../shared/market.tsx';
+import { C } from '../shared/palette.ts';
+import { AT, PowerLayer, STAMP_UP, congressBlue, powerState, stampDown } from '../shared/power.tsx';
+import { CongressLayer, MapLayer, WhyLayer, counts, maps, resultsState, seats } from '../shared/results.tsx';
 
 /** 一次 set 多个 $.data / $.ui 字段。 */
 const setData = (o: Record<string, unknown>) => Object.entries(o).map(([k, v]) => set(($.data as unknown as Record<string, never>)[k]!, v as never));
@@ -18,9 +21,10 @@ const r = resultsState();
 const m = marketState();
 const p = powerState();
 
-export default option({
-  name: '深色快剪版',
-  idea: '自媒体快剪风格：深色舞台、红蓝强对比、真实照片做调色，每一章用钩子开场、用画面里的变化讲事实',
+export default work({
+  title: '特朗普丢掉国会之后（讲解版）',
+  draft: true,
+  summary: '五分钟看懂 2026 美国中期选举：选的是什么、民主党赢了多少、特朗普接下来会被怎样卡住、AI 和股市会受什么影响',
   layers: {
     cover: layer('开场', <CoverLayer />, { icon: 'window' }),
     term: layer('任期', <TermLayer />, { icon: 'flow' }),
@@ -39,7 +43,7 @@ export default option({
   },
   scenarios: {
     // ---------- 00 开场 ----------
-    hook: flow('一夜之间，特朗普丢掉了整个国会', { cases: ['hook'], start: '/', description: '一夜之间，国会由红变蓝' })
+    hook: chapter('一夜之间，特朗普丢掉了整个国会', { expected: '开场 20 秒内知道发生了什么，并带着三个问题往下看', description: '一夜之间，国会由红变蓝' })
       .system('选票上没有他', '选票上没有特朗普的名字', narrate('十一月三号，美国人去投票。选票上没有特朗普的名字，可这次投票，决定了他接下来两年还能做多少事。'),
         highlight('cv_intro'), hold(4))
       .system('一夜之间', '一夜之间，国会由红变蓝', narrate('结果出来，一夜之间，众议院和参议院同时被民主党拿走。'),
@@ -48,7 +52,7 @@ export default option({
         ...setUi({ cover: 'ask' }), spotlight('cv_ask'), hold(5), done('带着三个问题往下看')),
 
     // ---------- 01 中期选举是什么 ----------
-    basics: flow('中期选举，到底在选什么？', { cases: ['basics'], start: '/', description: '一张选票，改写整个国会' })
+    basics: chapter('中期选举，到底在选什么？', { expected: '看懂一张选票上选了哪几样，以及它们对应国会的哪部分', from: null, description: '一张选票，改写整个国会' })
       .card('01 中期选举，到底在选什么？', { sub: '三十秒讲清楚' }, narrate('先花三十秒，把规则讲清楚。'))
       .system('总统就职', '2025 年 1 月，特朗普第二次就职', narrate('总统一届四年。特朗普这一届，从二零二五年一月开始。'), set($.ui.term, 'start'), set($.data.termWidth, '1.4%'), highlight('m_inaug'))
       .system('走到一半', '走到一半，就是中期选举', narrate('走到第二年年底，正好是任期的一半，所以叫中期选举。'), set($.ui.term, 'mid'), set($.data.termWidth, '47.1%'), highlight('m_mid'))
@@ -63,7 +67,7 @@ export default option({
         done('看懂一张选票选什么')),
 
     // ---------- 02 结果 ----------
-    results: flow('蓝色浪潮有多大？', { cases: ['results'], start: '/', description: '两院一起翻蓝，七个州翻转' })
+    results: chapter('蓝色浪潮有多大？', { expected: '看到两院席位由红变蓝、关键州翻转，以及选民为什么换人', from: null, description: '两院一起翻蓝，七个州翻转' })
       .card('02 蓝色浪潮有多大？', { sub: '数据截至美东时间 11 月 7 日' }, narrate('那这次的结果，到底有多夸张？'))
       .system('选前', '选前：两院都是共和党', narrate('先看选前。众议院和参议院，红色都过了中线，也就是都在共和党手里。'), numbered('c_house', 'c_senate'), hold(4))
       .system('众议院', '众议院：民主党 254 席', narrate('开票后，众议院的蓝色一路越过中线。民主党已经拿到两百五十四席，还有十九席没出结果。'),
@@ -82,7 +86,7 @@ export default option({
         numbered('why_approval', 'why_cost', 'why_inflation'), hold(6), done('看到两院翻蓝和原因')),
 
     // ---------- 03 后果 ----------
-    stakes: flow('他接下来会被怎样卡住？', { cases: ['stakes'], start: '/', description: '白宫 vs 国会：否决、停摆、调查' })
+    stakes: chapter('他接下来会被怎样卡住？', { expected: '看到失去国会后，法案、预算、调查、人事各自怎么变，以及历史上几乎每任总统都会输', from: null, description: '白宫 vs 国会：否决、停摆、调查' })
       .card('03 他接下来会被怎样卡住？', { sub: '从 2027 年 1 月 3 日起' }, narrate('国会换了主人，特朗普接下来会被怎样卡住？'))
       .system('国会变蓝', '1 月 3 日，新国会就职', narrate('明年一月三号，新国会宣誓就职。白宫还是红的，国会变成了蓝的。这就叫分裂政府。'),
         ...setData(congressBlue), set($.data.rule, '2027 年 1 月 3 日起：国会两院归民主党，白宫还是特朗普'), highlight('cap_chips'), hold(3))
@@ -111,7 +115,7 @@ export default option({
         done('看懂失去国会的后果')),
 
     // ---------- 04 AI 和股市 ----------
-    money: flow('AI 和股市：你的钱会怎样？', { cases: ['money'], start: '/', description: '利好只撑一天，AI 股冰火两重天' })
+    money: chapter('AI 和股市：你的钱会怎样？', { expected: '看到选后股市的实际反应，以及 AI 政策可能怎么变', from: null, description: '利好只撑一天，AI 股冰火两重天' })
       .card('04 AI 和股市：你的钱会怎样？', { sub: '选后三个交易日' }, narrate('最后，说说大家最关心的：钱。'))
       .system('第一天', '第一天：道指大涨 3%', narrate('结果出来第一天，市场先是欢呼。道指涨了百分之三，是一年半以来最好的一天。'),
         set($.ui.day, 'd1'), set($.data.idx, indexBars.d1), set($.data.vix, VIX.d1), set($.data.vixColor, C.ink), set($.data.mkTitle, '第一天：“分裂政府利好股市”'), highlight('idx_dow'))

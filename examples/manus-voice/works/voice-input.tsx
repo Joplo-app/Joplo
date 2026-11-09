@@ -1,8 +1,11 @@
-import { $, done, flow, free, hold, layer, narrate, option, patch, say, stream } from '@joplo-app/kit';
-import { VoiceWorld } from '../../../shared/world.tsx';
+/**
+ * 同一个输入框从头到尾不换：四章接着上一章的画面开始，大字说明浮在输入框上方，字幕放正在说的那句话
+ */
+import { $, done, chapter, free, hold, layer, narrate, work, patch, role, say, stream } from '@joplo-app/kit';
+import { VoiceWorld } from '../shared/world.tsx';
 
 /**
- * 台本：四章连成一条，后一章 from 前一章，接着上一章最后的画面开始。
+ * 台本：四章连成一条，后一章默认接续前一章，接着上一章最后的画面开始。
  *
  * 一步 = 输入框的一个状态。两种声音：
  * - 用户说的每一小段是一个 system 步骤：say(这一小段, { role: 'me' }) 用“我”的声音读、字幕显示这句话；
@@ -23,13 +26,13 @@ const speak = (phrase: string, sofar: string, timer: string) => [
 const pause = (timer: string) => ui({ level: 'pause', timer });
 /** 结束：这次说的话并进原文，去掉虚下划线；字留在框里，不发出去。 */
 const commit = (text: string, after = '') => ui({ rec: false, finishing: false, before: text, spoken: '', after, hint: '', level: 'quiet', tip: '' });
-const chapter = (no: string, title: string) => ui({ chNo: no, chTitle: title });
+const chapterLabel = (no: string, title: string) => ui({ chNo: no, chTitle: title });
 
 // ---------- 01 开始说 ----------
 const S1 = '帮我写一封邮件给王总。告诉他，发布会改到下周四下午。';
-const start = flow('开始说', { cases: ['start'], start: '/', description: '点一下麦克风，说的话实时写进输入框' })
+const start = chapter('开始说', { expected: '点麦克风开始，说的话边说边出现；停顿时末尾虚线闪着表示还在听；点完成后字留在框里，不会自动发出去', description: '点一下麦克风，说的话实时写进输入框' })
   .card('Manus 语音输入', { sub: '这是 Manus 的语音输入：你说的话，会实时写在光标处' })
-  .hover('mic', 900, '点麦克风，或按 Control D', chapter('01', '开始说'), ui({ tip: 'mic', headline: '点一下麦克风，或者按 Control D，就能开始' }),
+  .hover('mic', 900, '点麦克风，或按 Control D', chapterLabel('01', '开始说'), ui({ tip: 'mic', headline: '点一下麦克风，或者按 Control D，就能开始' }),
     narrate('想把要求说出来，不想打字？点一下麦克风，或者按 Control D。'))
   .click('mic', '点一下，开始听', listen('请说，我在听…'), ui({ tip: 'finish', headline: '' }), narrate('它马上开始听。'), hold(1))
   .system('说', '“帮我写一封”', speak('帮我写一封', '帮我写一封', '0:03'), ui({ tip: '' }), hold(0.5))
@@ -46,8 +49,8 @@ const start = flow('开始说', { cases: ['start'], start: '/', description: '�
 // ---------- 02 框里已有文字 ----------
 const S2 = '帮我写一封邮件给王总，告诉他发布会改到下周四下午。';
 const S2_ADD = '把会议纪要整理好发给我。';
-const existing = flow('框里已有文字', { cases: ['existing'], from: 'start', description: '框里有字时按 Control D，接着往后说' })
-  .system('框里已有文字', '框里已经有一段字', chapter('02', '框里已有文字'), commit(S2), ui({ headline: '' }), narrate('如果框里已经有字了呢？'), hold(1))
+const existing = chapter('框里已有文字', { expected: '框里已有字时按 Control D 开始，原文照样看得见，新说的话接在光标后面；再按一次结束', description: '框里有字时按 Control D，接着往后说' })
+  .system('框里已有文字', '框里已经有一段字', chapterLabel('02', '框里已有文字'), commit(S2), ui({ headline: '' }), narrate('如果框里已经有字了呢？'), hold(1))
   .press('⌃D', '按 Control D 开始', listen('请说…'), ui({ headline: '框里已经有字也没关系，原文照样看得见，提示就出现在光标处' }),
     narrate('照样按 Control D。原文都还在，提示就出现在光标后面。'), hold(2))
   .system('说', '“把”', speak('把', '把', '0:06'), ui({ headline: '' }), hold(0.5))
@@ -72,8 +75,8 @@ const REQS = [
 ];
 const LONG = `${REQS.join('\n')}\n补充：`;
 const S3 = '另外，记得提醒王总，开场致辞控制在五分钟以内。';
-const long = flow('说得很长', { cases: ['long'], from: 'existing', description: '说得再长，框长到上限就在框里滚动' })
-  .system('说得很长', '一段很长的要求', chapter('03', '说得很长'), commit(LONG), ui({ headline: '' }), narrate('再看一段很长的要求。'), hold(1))
+const long = chapter('说得很长', { expected: '说得再长，输入框长到上限后在框里滚动，始终显示最新的字', description: '说得再长，框长到上限就在框里滚动' })
+  .system('说得很长', '一段很长的要求', chapterLabel('03', '说得很长'), commit(LONG), ui({ headline: '' }), narrate('再看一段很长的要求。'), hold(1))
   .press('⌃D', '按 Control D 开始', listen('请说…'), narrate('按 Control D，接着往下补充。'), hold(1))
   .system('说', '“另外，”', speak('另外，', '另外，', '0:02'), hold(0.5))
   .system('说', '“记得提醒王总，”', speak('记得提醒王总，', '另外，记得提醒王总，', '0:04'), hold(0.5))
@@ -88,8 +91,8 @@ const long = flow('说得很长', { cases: ['long'], from: 'existing', descripti
 const S4_BEFORE = '邮件里写清楚发布会时间，';
 const S4_AFTER = '提醒大家准时参加。';
 const S4_ADD = '附上新的日程安排。';
-const cursor = flow('光标在哪，写在哪', { cases: ['cursor'], from: 'long', description: '光标点在句子中间再说，字插在那里' })
-  .system('光标在哪，写在哪', '一句写好的话', chapter('04', '光标在哪，写在哪'), commit(S4_BEFORE, S4_AFTER),
+const cursor = chapter('光标在哪，写在哪', { expected: '把光标点在句子中间再说，字插在光标处，后面的原文往后挪', description: '光标点在句子中间再说，字插在那里' })
+  .system('光标在哪，写在哪', '一句写好的话', chapterLabel('04', '光标在哪，写在哪'), commit(S4_BEFORE, S4_AFTER),
     ui({ pivot: '再', caret: false, headline: '光标点到哪，字就写到哪，后面的原文会自动往后挪' }), narrate('最后一个细节：字会写在光标所在的地方。'), hold(1.5))
   .click('pivot', '光标点在“再”字前面', ui({ pivot: '', after: `再${S4_AFTER}`, caret: true }), narrate('先把光标点在“再”字前面。'), hold(0.8))
   .click('mic', '点一下，开始听', listen('请说…'), ui({ tip: 'finish' }), narrate('然后点麦克风。'), hold(1))
@@ -100,9 +103,11 @@ const cursor = flow('光标在哪，写在哪', { cases: ['cursor'], from: 'long
   .system('完成', '插进去的字和原文连成一句', commit(S4_BEFORE + S4_ADD, `再${S4_AFTER}`), ui({ caret: false }),
     narrate('插进去的字和原文，连成了一句话。'), hold(2), done('字插在光标处'));
 
-export default option({
-  name: '产品录屏',
-  idea: '同一个输入框从头到尾不换：四章接着上一章的画面开始，大字说明浮在输入框上方，字幕放正在说的那句话',
+export default work({
+  title: 'Manus 语音输入',
+  summary: '看懂语音输入怎么用：点麦克风或按 Control D 开始，说的话实时写在光标处，点完成留在框里、不会自动发出去',
+  // 用户说的话用“我”的声音读，字幕里显示角色名。
+  roles: { me: role('我', { desc: '习惯用嘴代替打字、要写长指令的人' }) },
   layers: { box: layer('输入框', <VoiceWorld />, { icon: 'chat' }) },
   state: {
     ui: {
