@@ -1,4 +1,4 @@
-import { model } from '@joplo-app/plugin-tripo';
+import { model } from '@joplo-app/plugin-3d';
 export const apples = {
   wild: model({ prompt: 'A single small wild apple, irregular round green fruit with subtle russet speckles and a short curved brown stem, one small leaf, botanical specimen, natural matte skin, original realistic sculpture, isolated object, no ground no pedestal no text', texture: true, smart_low_poly: true, face_limit: 5000 }),
   eden: model({ prompt: 'One golden apple fruit with a long organic curved stem, warm luminous amber skin, fine natural speckles, mythic botanical specimen in an original museum sculpture style, round and imperfect, isolated single object, no ground no pedestal no text', texture: true, smart_low_poly: true, face_limit: 5000 }),

@@ -608,9 +608,14 @@ export function subscribeCloud(projectId: string, cb: (job: CloudJob) => void): 
   return () => h.off('joplo:cloud', handler);
 }
 
-export type TripoKeyState = {saved:boolean;envSet:boolean;env:string;file:string};
-export async function tripoKey(key?: string | null): Promise<TripoKeyState> {
-  const res = key === undefined ? await fetch('/__joplo/tripo/key',{cache:'no-store'}) : await post('/__joplo/tripo/key',{key},'PUT');
-  if(!res.ok) throw new Error('Tripo key request failed');
+export type PluginKeyState = {plugin:string;id:string;title:string;description:string;url:string;saved:boolean;envSet:boolean;env:string;file:string};
+export async function pluginKeys(projectId:string):Promise<PluginKeyState[]> {
+  const res=await post(`/__joplo/p/${encodeURIComponent(projectId)}/plugin-keys`,undefined,'GET');
+  if(!res.ok)throw new Error('Plugin key settings unavailable');
+  return res.json();
+}
+export async function savePluginKey(projectId:string,plugin:string,id:string,key:string|null):Promise<PluginKeyState> {
+  const res=await post(`/__joplo/p/${encodeURIComponent(projectId)}/plugin-keys/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`,{key},'PUT');
+  if(!res.ok)throw new Error('Plugin key could not be saved');
   return res.json();
 }

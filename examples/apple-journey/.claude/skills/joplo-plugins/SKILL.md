@@ -14,10 +14,9 @@ Source: config.plugins. Run joplo skill install after installing, adding or remo
 - [content](../joplo-plugin-content/SKILL.md): Visual explainers · 0.3.0 · @joplo-app/plugin-content
   - [content/patterns](../joplo-plugin-content/topics/patterns.md): Recipes and individual pitfalls
 
-- [scene3d](../joplo-plugin-scene3d/SKILL.md): 3D scene · 0.1.0
+- [scene3d](../joplo-plugin-scene3d/SKILL.md): 3D scene · 0.3.0 · @joplo-app/plugin-3d
+  - [scene3d/generation](../joplo-plugin-scene3d/topics/generation.md): Optional Tripo generation, cost confirmation, persisted models and task recovery
   - [scene3d/models](../joplo-plugin-scene3d/topics/models.md): GLB assets, loading readiness, material tint, anchors and offline checks
 
-- [tripo](../joplo-plugin-tripo/SKILL.md): Tripo 3D models · 0.3.0 · @joplo-app/plugin-tripo
-
 - [alda](../joplo-plugin-alda/SKILL.md): Alda background music · 0.3.0 · @joplo-app/plugin-alda
-<!-- joplo-skill 0.3.0 sha256:56ac48c2760fc19c2d83515b44039ab356898474101dd487a6b2f144473ae915 -->
+<!-- joplo-skill 0.3.0 sha256:975944d02777520616a806999ba2553575f47b0b49a49a1d866ad78a3122c4d9 -->

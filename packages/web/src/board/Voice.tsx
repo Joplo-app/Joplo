@@ -32,8 +32,9 @@ import { copyText } from '../player/util';
 import type { DemoController } from '../runtime/demo';
 import { Narrator, browserVoices } from '../runtime/voice';
 import {
-  tripoKey,
-  type TripoKeyState,
+  pluginKeys,
+  savePluginKey,
+  type PluginKeyState,
   deleteVoiceProfile,
   fetchVoiceProfiles,
   fetchVoiceState,
@@ -215,7 +216,7 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
     }
   };
 
-  return { narrator, on, setOn, browserVoice, setBrowserVoice, state, profiles, profilesFile, reloadProfiles, refresh, setProfiles, select, setVoice, generate, busy: busy || !!state?.generating, error, setError, coverage, estimate, segments, lang, locale, contentLocale };
+  return { projectId, narrator, on, setOn, browserVoice, setBrowserVoice, state, profiles, profilesFile, reloadProfiles, refresh, setProfiles, select, setVoice, generate, busy: busy || !!state?.generating, error, setError, coverage, estimate, segments, lang, locale, contentLocale };
 }
 
 const field = 'jb-focus h-8 w-full min-w-0 rounded-[6px] border border-jb-line bg-jb-surface px-2.5 font-jb text-[13px] text-jb-fg placeholder:text-jb-faint disabled:opacity-50';
@@ -531,7 +532,7 @@ export function VoicePanel({ api, onManage }: { api: Pick<VoiceApi, 'state' | 'p
   );
 }
 
-/** 「管理密钥」对话框（D85）：只管 OpenAI 与 ElevenLabs 的 Key（地址固定）；本机旧的 profile 列在下面，可以删除。 */
+/** 「管理密钥」对话框（D85 / D91）：声音供应商与当前项目插件声明的 Key；本机旧的 profile 列在下面，可以删除。 */
 export function VoiceKeysDialog({ api, open, onClose }: { api: VoiceApi; open: boolean; onClose: () => void }) {
   const { t: i18n } = useBoardI18n();
   useEffect(() => {
@@ -558,7 +559,7 @@ export function VoiceKeysDialog({ api, open, onClose }: { api: VoiceApi; open: b
           {keyed.map((p) => (
             <KeyRow key={p.id} p={p} api={api} />
           ))}
-          <TripoKeyRow />
+          <PluginKeyRows projectId={api.projectId} />
           {legacy.length ? (
             <section className="flex flex-col gap-2 border-t border-jb-line pt-3" data-testid="voice-legacy">
               <div className="text-[12px] font-semibold text-jb-muted">{i18n.board.voiceLegacyTitle}</div>
@@ -626,20 +627,26 @@ function KeyRow({ p, api }: { p: VoiceProfileView; api: VoiceApi }) {
 }
 
 /** Uses the same local-key card, labels, password field and save/remove flow as voice providers. */
-function TripoKeyRow() {
+function PluginKeyRows({projectId}:{projectId:string}) {
+  const [keys,setKeys]=useState<PluginKeyState[]>([]),[error,setError]=useState(false);
+  useEffect(()=>{let alive=true;setKeys([]);setError(false);void pluginKeys(projectId).then(v=>{if(alive)setKeys(v);}).catch(()=>{if(alive)setError(true);});return()=>{alive=false;};},[projectId]);
+  return <>{error ? <p role="status">Plugin key settings unavailable</p> : null}{keys.map(state=><PluginKeyRow key={`${state.plugin}/${state.id}`} projectId={projectId} initial={state}/>)}</>;
+}
+function PluginKeyRow({projectId,initial}:{projectId:string;initial:PluginKeyState}) {
   const { t: i18n } = useBoardI18n();
-  const [state,setState] = useState<TripoKeyState | null>(null), [key,setKey] = useState(''), [busy,setBusy] = useState(false), [message,setMessage] = useState<Text | null>(null);
-  useEffect(()=>{ let alive=true; void tripoKey().then(v=>{if(alive)setState(v);}).catch(()=>{if(alive)setMessage('Tripo key settings unavailable');}); return ()=>{alive=false;}; },[]);
+  const [state,setState] = useState(initial), [key,setKey] = useState(''), [busy,setBusy] = useState(false), [message,setMessage] = useState<Text | null>(null);
   const save = async (value:string|null) => {
     setBusy(true); setMessage(null);
-    try {setState(await tripoKey(value)); setKey(''); setMessage(i18n.board.voiceSaved);}
-    catch {setMessage('Tripo key could not be saved');} finally {setBusy(false);}
+    try {setState(await savePluginKey(projectId,state.plugin,state.id,value)); setKey(''); setMessage(i18n.board.voiceSaved);}
+    catch {setMessage('Plugin key could not be saved');} finally {setBusy(false);}
   };
-  return <section className="flex flex-col gap-2 rounded-[10px] border border-jb-line p-3" data-testid="tripo-key">
-    <div className="flex items-center justify-between gap-2"><span className="text-[14px] font-semibold">Tripo · 3D</span><span className="text-[11.5px] text-jb-muted">{state?.envSet ? i18n.board.voiceKeyFromEnv('TRIPO_API_KEY') : state?.saved ? i18n.board.voiceKeySaved : i18n.board.voiceNoKeyBadge}</span></div>
-    <Label text={i18n.board.voiceApiKey} hint={i18n.board.voiceKeyEnv('TRIPO_API_KEY')}><input className={field} type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} data-testid="tripo-key-input" /></Label>
-    <p className="text-[12px] text-jb-muted">{i18n.board.voiceKeysHint(state?.file ?? '~/.joplo/tripo.json')}</p>
+  const testId=`plugin-key-${state.plugin}-${state.id}`;
+  return <section className="flex flex-col gap-2 rounded-[10px] border border-jb-line p-3" data-testid={testId}>
+    <div className="flex items-center justify-between gap-2"><span className="text-[14px] font-semibold">{state.title}</span><span className="text-[11.5px] text-jb-muted">{state.envSet ? i18n.board.voiceKeyFromEnv(state.env) : state.saved ? i18n.board.voiceKeySaved : i18n.board.voiceNoKeyBadge}</span></div>
+    <p className="text-[12px] text-jb-muted">{state.description} <a href={state.url} target="_blank" rel="noreferrer" className={linkClass}>{i18n.board.voiceApiKey}</a></p>
+    <Label text={i18n.board.voiceApiKey} hint={i18n.board.voiceKeyEnv(state.env)}><input className={field} type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} data-testid={`${testId}-input`} /></Label>
+    <p className="text-[12px] text-jb-muted">{i18n.board.voiceKeysHint(state.file)}</p>
     {message ? <p className="text-[12px] text-jb-muted"><LocalText value={message}/></p> : null}
-    <div className="flex flex-wrap items-center justify-end gap-2">{state?.saved ? <Btn label={i18n.board.voiceRemoveKey} size={28} variant="ghost" disabled={busy} onClick={()=>void save(null)} data-testid="tripo-key-remove" /> : null}<Btn label={i18n.board.voiceSave} size={28} variant="primary" disabled={busy || !key.trim()} onClick={()=>void save(key.trim())} data-testid="tripo-key-save" /></div>
+    <div className="flex flex-wrap items-center justify-end gap-2">{state.saved ? <Btn label={i18n.board.voiceRemoveKey} size={28} variant="ghost" disabled={busy} onClick={()=>void save(null)} data-testid={`${testId}-remove`} /> : null}<Btn label={i18n.board.voiceSave} size={28} variant="primary" disabled={busy || !key.trim()} onClick={()=>void save(key.trim())} data-testid={`${testId}-save`} /></div>
   </section>;
 }

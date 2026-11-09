@@ -1,6 +1,6 @@
 import { apple } from './models.ts';
 import { $ } from '@joplo-app/kit';
-import { Scene3D } from 'joplo-plugin-scene3d';
+import { Scene3D } from '@joplo-app/plugin-3d';
 
 /**
  * 客厅与玄关的 3D 场景：单位是米，y 向上，地面 y = 0。墙在后方（z = -3）和左侧（x = -4），

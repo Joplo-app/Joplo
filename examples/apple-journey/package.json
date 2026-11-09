@@ -13,8 +13,9 @@
     "@joplo-app/kit": "workspace:*",
     "@joplo-app/plugin-ui": "workspace:*",
     "@joplo-app/plugin-content": "workspace:*",
-    "@joplo-app/plugin-alda": "workspace:*",
-    "joplo-plugin-scene3d": "workspace:*",
-    "@joplo-app/plugin-tripo": "workspace:*"
+    "@joplo-app/plugin-alda": "workspace:*"
+  },
+  "dependencies": {
+    "@joplo-app/plugin-3d": "workspace:*"
   }
 }
