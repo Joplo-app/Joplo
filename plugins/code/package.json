@@ -1,0 +1,29 @@
+{
+  "name": "@joplo-app/plugin-code",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "joplo": {
+    "api": 2
+  },
+  "exports": {
+    ".": "./src/plugin.ts",
+    "./runtime": "./src/runtime.tsx",
+    "./guide": "./src/guide.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@joplo-app/kit": "workspace:*",
+    "react": "19.3.1",
+    "shiki": "4.6.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0"
+  },
+  "description": "Joplo code plugin: an editor that types code, animates diffs and highlights lines on the engine clock (D96 prototype)",
+  "license": "PolyForm-Shield-1.0.0",
+  "engines": {
+    "node": ">=22"
+  }
+}
