@@ -502,3 +502,10 @@
   border-radius: 4px;
   box-shadow: 0 0 0 6px color-mix(in srgb, #e03131 18%, transparent);
 }
+
+/* Plugin-declared local hover; scripted hover uses the same appearance. */
+.jstage[data-jfree] [data-jhoverable]:hover:not([data-jdisabled]),
+.jstage [data-jhoverable][data-jhover]:not([data-jdisabled]) {
+  outline: 2px solid color-mix(in srgb, var(--jp-accent) 50%, transparent);
+  outline-offset: 2px;
+}

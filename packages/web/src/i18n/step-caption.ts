@@ -10,6 +10,9 @@ export function stepCaption(step: CaptionStep, t: Dictionary | typeof m = en): T
   const auto = step.captionAuto;
   if (!auto) return step.caption;
   switch (auto.kind) {
+    case 'drag': return t.player.autoDrag(auto.label, auto.value ?? '');
+    case 'hover': return t.player.autoHover(auto.label);
+    case 'scroll': return t.player.autoScroll(auto.label, auto.value ?? '');
     case 'click': return t.player.autoClick(auto.label);
     case 'type': return t.player.autoType(auto.label, auto.value ?? '');
     case 'select': return t.player.autoSelect(auto.label, auto.value ?? '');

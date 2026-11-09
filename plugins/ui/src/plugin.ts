@@ -20,6 +20,12 @@ const display: Record<string,string[]> = {
 const textPaths: Record<string,string[][]> = {DataTable:[['columns','*','title']],DataCard:[['fields','*','label']],BarChart:[['series','*','label']],LineChart:[['series','*','label']]};
 const fieldText = ['label','description','placeholder','error','value'];
 const traits = (name: string): ElementTraits => ({
+  ...(INTERACTIVE_TYPES.has(name) ? {hover:true} : {}),
+  ...(name === 'Tabs.Panel' ? {selectionGate:{owner:'ui:Tabs',value:'value',fallbackFirst:true}} : {}),
+  ...(name === 'Accordion.Panel' ? {selectionGate:{owner:'ui:Accordion',item:'ui:Accordion.Item',value:'value'}} : {}),
+  ...(['TextInput', 'Textarea', 'PasswordInput', 'NumberInput', 'Autocomplete'].includes(name) ? {native:{action:'type',prop:'value'}} as const : {}),
+  ...(['Switch', 'Checkbox', 'Radio'].includes(name) ? {native:{action:'toggle',prop:'checked'}} as const : {}),
+  ...(['Tabs', 'Accordion', 'Radio.Group', 'Select', 'MultiSelect', 'SegmentedControl'].includes(name) ? {native:{action:'select',prop:'value',...(name === 'Accordion' ? {deselect:true} : {})}} as const : {}),
   ...(textPaths[name] ? {textPaths:textPaths[name]} : {}),
   text: ['aria-label', ...(display[name] ?? []), ...(VALUE_TYPES.has(name) ? fieldText : []), ...(['Select','MultiSelect','SegmentedControl','TabBar'].includes(name) ? ['data'] : [])],
   ...(name === 'Indicator' ? {disabledPresentation:true} : {}),

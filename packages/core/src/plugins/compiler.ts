@@ -1,3 +1,4 @@
+import { PluginAction } from '../schema.ts';
 import ui from '@joplo-app/plugin-ui';
 import { ElementTraitsSchema, InheritSchema } from '../traits.ts';
 import { advanceMedia } from '../media.ts';
@@ -63,6 +64,14 @@ export class PluginCompiler {
         }
         this.properties.set(key, { plugin: p, spec: spec as import('@joplo-app/kit/plugin').PluginPropertySpec });
       }
+      const actions: NonNullable<PluginInfo['actions']> = {};
+      const rawActions = this.envelope(p, p.actions ?? {}, source);
+      if (!object(rawActions)) report('PLUGIN_ACTION_INVALID', `Plugin ${p.id}: actions must be a record`, source);
+      else for (const [name, raw] of Object.entries(rawActions)) {
+        const parsed = PluginAction.safeParse(raw);
+        if (!/^[a-z][a-zA-Z0-9-]*$/.test(name) || !parsed.success) report('PLUGIN_ACTION_INVALID', `Plugin ${p.id}: invalid action ${name}`, source);
+        else actions[name] = parsed.data;
+      }
       const themes = this.envelope(p, p.themes ?? {}, source);
       if (!object(themes)) this.invalid(p, source);
       else for (const [name, css] of Object.entries(themes)) {
@@ -87,7 +96,7 @@ export class PluginCompiler {
           else this.intrinsic.set(c.intrinsic, type);
         }
       }
-      this.info[p.id] = { ...(object(themes) && Object.keys(themes).length ? { themes: themes as Record<string, string> } : {}), ...(Object.keys(properties).length ? { properties: properties as NonNullable<PluginInfo['properties']> } : {}), ...(p.data ? { data: this.envelope(p, p.data, source) as PluginInfo['data'] } : {}), id: p.id, title: p.title, ...(p.version ? { version: p.version } : {}), components: Object.fromEntries(Object.entries(p.components).map(([name, c]) => [name, { ...(checked[name] ? {traits:checked[name]} : {}), ...(c?.interactive ? { interactive: true } : {}), ...(c?.parent ? { parent: c.parent } : {}), ...(c?.needsId ? { needsId: true } : {}), ...(c?.selfEvident ? { selfEvident: true } : {}) }])) };
+      this.info[p.id] = { ...(Object.keys(actions).length ? { actions } : {}), ...(object(themes) && Object.keys(themes).length ? { themes: themes as Record<string, string> } : {}), ...(Object.keys(properties).length ? { properties: properties as NonNullable<PluginInfo['properties']> } : {}), ...(p.data ? { data: this.envelope(p, p.data, source) as PluginInfo['data'] } : {}), id: p.id, title: p.title, ...(p.version ? { version: p.version } : {}), components: Object.fromEntries(Object.entries(p.components).map(([name, c]) => [name, { ...(checked[name] ? {traits:checked[name]} : {}), ...(c?.interactive ? { interactive: true } : {}), ...(c?.parent ? { parent: c.parent } : {}), ...(c?.needsId ? { needsId: true } : {}), ...(c?.selfEvident ? { selfEvident: true } : {}) }])) };
     }
   }
   private run<T>(p: PluginDef, hook: string, at: string | undefined, fn: () => T): T | undefined {

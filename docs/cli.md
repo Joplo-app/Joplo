@@ -179,7 +179,7 @@ Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结�
 | --- | --- |
 | authoring | 心智模型、起步顺序、目录、页面、布局、方案、flow、绑定、`when` 只接受条件表达式、带错误重试的表单示例、规则 |
 | story | 先规划再动手（受众、1–3 件事、每个场景一行 Given → When → Then）；PM 视角怎样用 roles / goal / cases / expected / priority / rules 表达需求、怎样拆场景；开场、收尾、字幕与 explain 的写法；交付前的检查（D67） |
-| demo | 独立层级、导演、镜头、Diagram/trace、短字幕、全高布局会压缩什么、深链接参数、截图时机与主题 |
+| demo | 自由体验与丢弃语义、drag/hover/scroll/插件动作、独立层级、导演、镜头、短字幕、布局、深链接与截图 |
 | components | 当前组件目录和属性提示、支持的 HTML 标签、换行写法、常见产品画面用哪些组件（D68）；单个组件的示例用 `npx joplo components <名字>` |
 | cases | 八个维度及按产品类型筛选的情况预设；先做正常流程 + 一条错误恢复 |
 | check | 诊断代码与局部修复、合并诊断、`UNBOUND_INTERACTIVE` 的三种处理 |
@@ -190,7 +190,7 @@ Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结�
 
 `guide` 与 `skill authoring` 完全相同。读取主题不加载服务端，也不执行作者项目，输出无颜色文本。
 
-`plugins` 主题也说明通用本机资源编译器与媒体轨道。可选 `@joplo-app/plugin-alda` 需要先安装并在项目 `config.plugins` 中显式启用，然后在该项目目录运行 `npx joplo skill alda`；不要把项目路径作为读取主题的第二参数（该参数只供 install 使用）。技能说明配乐文本、步骤 play/stop、缓存、warning 恢复和离线验证。`check` 不执行本机编译器；看板首次需要声音时生成，`build/share` 在范围裁剪后生成，失败 warning 保留在看板/构建结果，其他演示内容继续可用。
+`authoring` 说明 `option.free` 无顺序本机反应，`demo` 说明新动作和播放仲裁。`plugins` 主题也说明动作声明、`ctx.act` 识别器、引擎时钟演示器、通用本机资源编译器与媒体轨道。可选 `@joplo-app/plugin-alda` 需要先安装并在项目 `config.plugins` 中显式启用，然后在该项目目录运行 `npx joplo skill alda`；不要把项目路径作为读取主题的第二参数（该参数只供 install 使用）。技能说明配乐文本、步骤 play/stop、缓存、warning 恢复和离线验证。`check` 不执行本机编译器；看板首次需要声音时生成，`build/share` 在范围裁剪后生成，失败 warning 保留在看板/构建结果，其他演示内容继续可用。
 
 ### skill install
 

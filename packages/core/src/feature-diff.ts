@@ -47,7 +47,7 @@ export function canonical(value: unknown): string {
 const stepContent = ({ id: _id, key: _key, source: _source, ruleIds: _rules, ...rest }: Step) => rest;
 const identity = (s: Step) => {
   const a = s.action;
-  return canonical([s.kind, a.type, 'target' in a ? a.target : 'name' in a ? a.name : 'keys' in a ? a.keys : 'title' in a ? a.title : null]);
+  return canonical([s.kind, a.type, ...(a.type === 'plugin' ? [a.name] : []), 'target' in a ? a.target : 'name' in a ? a.name : 'keys' in a ? a.keys : 'title' in a ? a.title : null]);
 };
 const ref = (s: Step, index: number) => ({ id: s.id, position: index + 1, ...(s.key ? { key: s.key } : {}), caption: s.caption.slice(0, 300) });
 /** Presentation-only step fields, grouped into reader-facing reasons. Unlisted content changes fall back to 'presentation'. */
@@ -178,6 +178,11 @@ function sceneInputs(p: Project, s: Scenario) {
   for (const st of s.steps) for (const e of st.effects) if (e.type === 'navigate') ids.add(e.sceneId);
   return [...ids].sort().map(id => p.scenes[id] ?? { missing: id });
 }
+function actionContracts(p: Project, s: Scenario) {
+  const actions = [...s.steps.map(st => st.action), ...Object.values(p.options[s.optionId]?.free ?? {}).map(r => r.action)];
+  const names = [...new Set(actions.flatMap(a => a.type === 'plugin' ? [a.name] : []))].sort();
+  return names.map(name => { const [id, key] = name.split(':'); return [name, p.plugins?.[id!]?.actions?.[key!]]; });
+}
 export function featureDiff(before: unknown, after: unknown, source: { baseSha?: string; headSha?: string } = {}): FeatureDiffManifest {
   if ([source.baseSha, source.headSha].some(sha => sha !== undefined && !GitSha.safeParse(sha).success)) throw new JoploError('USAGE', 'Source SHAs must be normalized 40-character hexadecimal git commits');
   const base = DiffSource.parse({ sha: source.baseSha ?? null }), head = DiffSource.parse({ sha: source.headSha ?? null });
@@ -196,6 +201,8 @@ export function featureDiff(before: unknown, after: unknown, source: { baseSha?:
       if (canonical([old.initial, old.ext]) !== canonical([next.initial, next.ext])) reasons.push('initial-state');
       if (canonical(sceneInputs(b, old)) !== canonical(sceneInputs(a, next))) reasons.push('scenes');
       if (canonical([b.theme, projectThemes(b), b.autoFocus]) !== canonical([a.theme, projectThemes(a), a.autoFocus])) reasons.push('theme');
+      if (canonical(bo?.free) !== canonical(option?.free)) reasons.push('free-reactions');
+      if (canonical(actionContracts(b, old)) !== canonical(actionContracts(a, next))) reasons.push('action-contracts');
       if (canonical([bo?.layers, bf?.roles]) !== canonical([option?.layers, feature.roles])) reasons.push('layers-roles');
       if (canonical([old.name, old.description, old.expected, old.mock, bf?.name, bf?.goal, bo?.name, bo?.idea]) !== canonical([next.name, next.description, next.expected, next.mock, feature.name, feature.goal, option?.name, option?.idea])) reasons.push('description');
       status = steps.some(st => st.status === 'uncertain') ? 'uncertain' : reasons.length || steps.some(st => st.status !== 'unchanged') ? 'modified' : 'unchanged';

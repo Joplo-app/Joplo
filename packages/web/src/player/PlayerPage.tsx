@@ -1,4 +1,5 @@
 import { AuthorLink, type Author } from '../site/author';
+import { PlaygroundNotice } from './PlaygroundNotice';
 import { projectThemes } from '@joplo-app/core/runtime';
 import { useTopbarMeasurements } from './topbar-fit';
 import { LanguageMenu } from './LanguageMenu';
@@ -570,7 +571,7 @@ export function PlayerPage(p: PlayerPageProps) {
       if (e.key === 'Alt') setAltDown(e.type === 'keydown' && !!p.onInspect);
       if (e.type !== 'keydown') return;
       const t = e.target as HTMLElement;
-      if (t.closest('input,textarea,select,[contenteditable],[data-joplo-stage],[role="menu"],[role="dialog"],[role="tablist"],[role="radiogroup"]')) return;
+      if (t.closest('input,textarea,select,[contenteditable],[data-joplo-stage],[data-testid="playground-notice"],[role="menu"],[role="dialog"],[role="tablist"],[role="radiogroup"]')) return;
       if (e.metaKey || e.ctrlKey) return;
       if (e.key === '?') {
         e.preventDefault();
@@ -648,7 +649,9 @@ export function PlayerPage(p: PlayerPageProps) {
     <div className="relative flex min-h-0 flex-1 flex-col" onMouseMove={inspecting ? onInspectHover : undefined} onMouseLeave={() => setHoverBox(null)}>
       {hasStage ? (
         <StageViewport
+          clock={ctl.clock}
           video={video}
+          playground={!curtainOn && snap.freeMode ? <PlaygroundNotice ctl={ctl} snap={snap} /> : undefined}
           watermark={p.watermark}
           viewport={device}
           theme={p.theme}
@@ -666,6 +669,12 @@ export function PlayerPage(p: PlayerPageProps) {
               viewportOverride={device === 'mobile' ? null : size}
               project={project}
               state={state!}
+              playground={snap.playground}
+              freeMode={snap.freeMode}
+              clock={ctl.clock}
+              gesture={snap.gesture}
+              onStageInput={() => ctl.stageInput()}
+              onAction={(action, native) => { void ctl.act(action, native); }}
               theme={p.theme}
               font={p.font ?? null}
               stroke={p.stroke ?? null}

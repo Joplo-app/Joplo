@@ -8,7 +8,7 @@ Use this plugin for application interfaces, forms, overlays, navigation, data di
 - Give interactive elements stable ids. Describe their behavior with flow steps, disabled plus disabledReason, or unmodeled. Run check, then render the affected steps; passing schema validation alone does not prove the intended screen is visible.
 
 ## State and visibility
-- type / select / toggle steps write inputs[id]. Use value, checked or defaultValue for initial visuals; viewers do not edit the demo's business state directly.
+- type / select / toggle steps write inputs[id]. Use value, checked or defaultValue for initial visuals. Paused audiences can type, change Switch/Checkbox/Radio/Select/SegmentedControl, switch Tabs and expand Accordion locally; value/checked bindings synchronize local views. Playing, jumping or Reset discards these edits. A matching next scripted action wins; an action in another reachable scenario asks to switch.
 - Select accepts the displayed label or stored value; MultiSelect toggles membership. For a bound option list, ensure the list exists before the select step.
 - Modal and Drawer use opened, with open as a legacy fallback only when opened is absent. Menu forwards opened to its own dropdown; an explicitly set child value wins, and a nested menu owns its own state.
 - AppShell regions and Phone child width use the same declared layout data as playback. A narrow screen can hide a target even when when is true; check the actual viewport before changing the step.

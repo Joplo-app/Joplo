@@ -1,3 +1,4 @@
+import { EngineClockContext } from './renderer/engine-motion';
 import { projectThemes } from '@joplo-app/core/runtime';
 import { m } from './i18n/board/messages';
 import { translate, type Text } from './i18n/messages';
@@ -263,10 +264,14 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
   const plan = cameraFor(project, scenarioId, cameraPosition(ctl.scenario(), snap.state?.position ?? 0, snap.activeStep), snap.leadLayer);
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, true), [ctl, plan.sceneId]);
   if (!snap.state) return null;
-  return wrap(
+  return <EngineClockContext.Provider value={ctl.clock}>{wrap(
     <Stage
       project={project}
       state={snap.state}
+      clock={ctl.clock}
+      gesture={snap.gesture}
+      activeStep={snap.activeStep}
+      stream={snap.streamAt ? { ...snap.streamAt, paused: snap.paused } : null}
       theme={theme}
       font={font}
       stroke={stroke}
@@ -287,5 +292,5 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
     />,
     subtitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n, project),
     { scenarioId, position: snap.state.position, cover: coverShown(sc, snap.state.position, snap.playing, snap.activeStep) ? coverFor(project, scenarioId, i18n) : null, animate: true },
-  );
+  )}</EngineClockContext.Provider>;
 }

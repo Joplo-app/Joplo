@@ -5,6 +5,16 @@ import { value, number, list, plural, type Value } from './format';
 export function createEn(locale: Locale = 'en') {
   return {
     player: {
+      freeExploration: `Free exploration · Press play to continue`,
+      freeChangesDiscarded: `Changes will not be kept`,
+      freeReset: `Reset`,
+      freeSwitchPrompt: (name: string) => `Switch to “${name}”?`,
+      freeSwitchDescription: `Start just before this action. Your exploration changes will be discarded.`,
+      freeSwitchConfirm: `Switch scenario`,
+      freeSwitchCancel: `Stay here`,
+      autoDrag: (label: string, value: string) => autoCaptionMessages('en').autoDrag(label, value),
+      autoHover: (label: string) => autoCaptionMessages('en').autoHover(label),
+      autoScroll: (label: string, value: string) => autoCaptionMessages('en').autoScroll(label, value),
       autoClick: (label: string) => autoCaptionMessages('en').autoClick(label),
       autoType: (label: string, text: string) => autoCaptionMessages('en').autoType(label, text),
       autoSelect: (label: string, text: string) => autoCaptionMessages('en').autoSelect(label, text),

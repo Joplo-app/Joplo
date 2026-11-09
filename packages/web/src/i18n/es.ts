@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createEs(locale: Locale = 'es') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `Exploración libre · Reproducir para continuar`,
+      freeChangesDiscarded: `Los cambios no se guardarán`,
+      freeReset: `Restablecer`,
+      freeSwitchPrompt: (name: string) => `¿Cambiar a «${name}»?`,
+      freeSwitchDescription: `Comienza justo antes de esta acción. Se descartarán los cambios de la exploración.`,
+      freeSwitchConfirm: `Cambiar de escenario`,
+      freeSwitchCancel: `Quedarse aquí`,
       ...autoCaptionMessages('es'),
       mockSuccess: "Éxito simulado",
       mockFailure: "Fallo simulado",

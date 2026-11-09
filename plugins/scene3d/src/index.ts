@@ -12,8 +12,9 @@ const plugin = definePlugin({
   version: '0.1.0',
   description: 'Interactive 3D scenes (three.js): steps click objects, state drives lights, doors, windows, and the camera',
   runtime: new URL('./runtime.ts', import.meta.url),
+  actions: { rotate: { caption: 'Rotate {label} to {data.azimuth}°', durationMs: 1000, targets: ['scene3d:Scene'], fields: { azimuth: {type:'number',min:-180,max:180,tolerance:6}, elevation: {type:'number',min:6,max:86,tolerance:6} } } },
   components: {
-    Scene: { traits: { text: ['label'] }, doc: 'height (px, default 420), focus (child id or null: the 3D camera frames it), view ("iso" | "front" | "top"), label; root of a 3D scene, viewers drag to orbit' },
+    Scene: { traits: { text: ['label'] }, doc: 'height (px, default 420), focus (child id or null: the 3D camera frames it), view ("iso" | "front" | "top"), azimuth / elevation (degrees, bind to state for a scripted view), label; root of a 3D scene, viewers drag to orbit' },
     Object: { parent: 'Scene', traits: { text: ['label'] }, doc: `shape (${SHAPES}), at [x, y, z], size [w, h, d], rotate (degrees around the vertical axis), color, lit, open, label, showLabel; decorative or state-driven object` },
     Target: { parent: 'Scene', interactive: true, traits: { text: ['label'] }, doc: 'same props as Object; an object viewers click (steps: .click(id)); always shows its label' },
   },
@@ -48,7 +49,8 @@ Then in the option's flow: .click('lamp', 'Turn the lamp on', set($.data.lampOn,
 ## Pitfalls
 - Every Target needs a step, disabled + disabledReason, or unmodeled (UNBOUND_INTERACTIVE). Decorative items are Object, not Target.
 - Object and Target must be direct children of Scene3D (PLUGIN_PARENT); other components inside Scene3D are ignored.
-- Dragging orbits the view for that viewer only; it is not a step. Do not write steps that expect a particular viewing angle; use focus instead.
+- Dragging orbits locally. A scripted orbit uses .act('scene3d:rotate', 'home', { azimuth: 90, elevation: 32 }, set($.ui.azimuth, 90), set($.ui.elevation, 32)); bind these state paths to Scene3D azimuth/elevation for deterministic replay and screenshots. Matching tolerates 6 degrees; the demonstrator samples the engine clock. Arrow keys orbit too (Shift = fine adjustment). Playing/resetting discards an audience orbit.
+- Free device reactions use option({ free: { light: free.click('lamp', set($.data.lamp, false)) } }). A matching next action or another reachable scenario takes priority; the first stage input during playback only pauses.
 - Do not put text inside the scene to explain things; use captions, callout() on the object, or the surrounding UI.`,
 });
 

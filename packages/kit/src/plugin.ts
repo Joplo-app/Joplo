@@ -26,6 +26,12 @@ const NAME = /^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)*$/;
 
 /** Serializable element behavior. The compiler copies it to nodes; playback reads only IR. */
 export type ElementTraits = {
+  /** Native local value behavior; never writes timeline state. */
+  native?: { action: 'type' | 'toggle' | 'select'; prop: string; deselect?: boolean };
+  draggable?: boolean;
+  hover?: boolean;
+  /** Visibility of a panel selected by an ancestor value control. */
+  selectionGate?: { owner: string; item?: string; value: string; fallbackFirst?: boolean };
   input?: 'single' | 'multiple';
   frame?: boolean;
   disabledPresentation?: boolean;
@@ -119,7 +125,15 @@ export type PluginPropertySpec = {
 };
 export type PluginWrite = { path: string; value: unknown };
 
+/** Data-only action contract. Payload fields are exact; numeric tolerance is used only for gestures. */
+export type PluginActionSpec = {
+  caption: string;
+  durationMs: number;
+  fields: Record<string, { type: 'string' | 'number' | 'boolean'; min?: number; max?: number; tolerance?: number; text?: boolean }>;
+  targets?: string[];
+};
 export type PluginDef = {
+  actions?: Record<string, PluginActionSpec>;
   /** Theme name → CSS source. Host publishes them as <plugin>:<name>. */
   themes?: Record<string, string>;
   /** Compile-time literal properties; copied to resolved DOM anchors by the host. */
@@ -198,8 +212,27 @@ export type PluginNode = {
   ext?: Record<string, unknown>;
 };
 
+/** Browser input carries data only. A recognizer reports intent; the engine decides what it means. */
+export type ActionGesture =
+  | { type: 'click' }
+  | { type: 'type' | 'select'; value: string }
+  | { type: 'toggle'; value: boolean }
+  | { type: 'drag' | 'scroll'; to: string | {x:number;y:number} }
+  | { type: 'hover'; ms: number }
+  | { type: 'plugin'; name: string; data: Record<string, unknown> };
+export type AudienceAction = ActionGesture & { target: string };
+export type EngineFrame = Readonly<{ timeMs: number; elapsedMs: number; rawMs: number; running: boolean; speed: number; paused?: boolean }>;
+export type ActionPresentation = { action: import('./index.ts').StepDef['action']; progress: number };
+export type ActionDispatch = (id: string, action: ActionGesture, native?: AudienceAction) => void;
+
 /** 演示此刻的情况：只读。 */
 export type PluginFrame = {
+  /** Only time source for demonstrations. Missing in old hosts; draw the final state then. */
+  clock?: EngineFrame;
+  gesture?: ActionPresentation | null;
+  playground?: boolean;
+  /** Changes when local view state must be discarded (play, jump, reset, scene change). */
+  resetKey?: string;
   /** demo = 体验与播放；review = 审阅（点击用于检查元素）。 */
   mode: string;
   /** false：截图、导出、跳转，直接画到终点，不播放过渡。 */
@@ -230,6 +263,7 @@ export type ComponentCtx = {
   /** 读取主题变量，例如 css('--jp-ink')、css('--jp-accent')。 */
   css: (name: string) => string;
   /** 观众点了某个子元素（例如 3D 物体）：和点 DOM 元素一样交给引擎判断。坐标是视口坐标（MouseEvent.clientX/Y）；altKey 照抄指针事件（⌥+单击 = 检查元素）。 */
+  act?: ActionDispatch;
   click: (id: string, at?: { clientX: number; clientY: number; altKey?: boolean }) => void;
   /** 截图、导出前要等待的工作（加载模型、首帧渲染）：返回一个 done 函数，完成后调用。 */
   hold: () => () => void;

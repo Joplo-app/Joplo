@@ -95,6 +95,7 @@ export function resolveScope(project: Project, request: ScopeRequest, mode: Scop
 export function stepRefs(st: Step): string[] {
   const out: string[] = [];
   if ('target' in st.action) out.push(st.action.target);
+  if ((st.action.type === 'drag' || st.action.type === 'scroll') && typeof st.action.to === 'string') out.push(st.action.to);
   for (const s of st.shots) out.push(...s.targets);
   for (const m of st.marks) out.push(m.target);
   for (const c of st.cues ?? []) out.push(...c.targets);
@@ -206,7 +207,12 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
         .filter(([cid]) => F.has(project.cases[cid]?.featureId ?? cid.split('.')[0] ?? ''))
         .map(([cid, c]) => [cid, { ...c, scenarioIds: c.scenarioIds.filter((x) => S.has(x)) }]),
     );
-    options[id] = { ...o, coverage };
+    const retained = new Set(Object.values(scenes).filter(s => s.optionId === id || s.optionId === null).flatMap(s => idsIn(s.root)));
+    const free = o.free ? Object.fromEntries(Object.entries(o.free).filter(([, reaction]) => {
+      const a = reaction.action;
+      return 'target' in a && retained.has(a.target) && (!('to' in a) || typeof a.to !== 'string' || retained.has(a.to));
+    })) : undefined;
+    options[id] = { ...o, coverage, ...(free ? { free } : {}) };
   }
   const features: Project['features'] = {};
   for (const f of orderedFeatures(project)) {

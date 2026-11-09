@@ -15,7 +15,7 @@ export const splitPluginType = (type: string): { plugin: string; name: string } 
   return { plugin: type.slice(0, i), name: type.slice(i + 1) };
 };
 /** IR 里记录的插件信息（编译自插件清单；发布站保留，不含运行时路径）。 */
-export type PluginInfo = { themes?: Record<string, string>; properties?: Record<string, import('@joplo-app/kit/plugin').PluginPropertySpec>; data?: PluginDataSpec; id: string; title: string; version?: string; components: Record<string, ComponentInfo> };
+export type PluginInfo = { actions?: Record<string, import('@joplo-app/kit/plugin').PluginActionSpec>; themes?: Record<string, string>; properties?: Record<string, import('@joplo-app/kit/plugin').PluginPropertySpec>; data?: PluginDataSpec; id: string; title: string; version?: string; components: Record<string, ComponentInfo> };
 export type PluginTable = Readonly<Record<string, PluginInfo>> | undefined;
 /** 插件组件的声明；不是插件类型或插件没启用时为 null。 */
 export function pluginSpec(plugins: PluginTable, type: string): ComponentInfo | null {

@@ -1,3 +1,6 @@
+import type { ClockSource } from '../runtime/clock';
+import { EngineClockContext } from '../renderer/engine-motion';
+import { useEngineAnimations } from '../renderer/engine-animations';
 import { useI18n } from '../i18n/context';
 /**
  * 舞台的显示区域（看板与发布站共用）：
@@ -34,7 +37,7 @@ import { JoploMark } from './JoploMark';
 /** 发布站水印的去向与读屏文字（D83）。 */
 export type StageWatermark = { href: string; label: string };
 
-export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false, video = false, watermark }: {
+export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false, video = false, watermark, playground, clock }: {
   viewport: Viewport; notice: Notice | null; onDismiss: () => void; /** 「回到演示」（顺序不对的提示）。 */ onBack?: () => void; children: (size: { width: number; height: number }) => ReactNode; tag?: ReactNode; theme?: StageTheme; stroke?: StrokeMode; font?: AppearanceFont | null;
   /**
    * 幕布（D61：过渡卡、场景封面）：铺满整个显示区域，不进手机外框。逻辑尺寸与电脑页面的舞台相同（fillStage），
@@ -47,10 +50,13 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   video?: boolean;
   /** 发布站水印（D83）：舞台右上角的小 Joplo 图标，在新标签页打开 href。只有发布站传；看板、Pro 分享、导出不传。 */
   watermark?: StageWatermark;
+  playground?: ReactNode;
+  clock?: ClockSource;
 }) {
   const { t: i18n } = useI18n();
 
   const box = useRef<HTMLDivElement>(null);
+  useEngineAnimations(box, clock);
   const [avail, setAvail] = useState({ w: 800, h: 500 });
   useLayoutEffect(() => {
     const el = box.current;
@@ -86,7 +92,8 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   // 所有提示（含点错位置的三种）都在画面顶部居中，一条轻提示（D55）
   const view = noticeView(notice, i18n);
   return (
-    <div ref={box} className={cn('relative min-h-0 flex-1 overflow-hidden', phone && !video && 'bg-jb-app', video && 'bg-black')} data-testid="stage-viewport" data-scale={scale.toFixed(3)} data-device={viewport}>
+    <EngineClockContext.Provider value={clock}><div ref={box} className={cn('relative min-h-0 flex-1 overflow-hidden', phone && !video && 'bg-jb-app', video && 'bg-black')} data-testid="stage-viewport" data-scale={scale.toFixed(3)} data-device={viewport}>
+      {playground ? <div className="absolute bottom-3 left-3 z-30 max-w-[min(420px,calc(100%-24px))]">{playground}</div> : null}
       {tag ? <div className="absolute left-3 top-3 z-10 flex items-center gap-2 text-[12px]">{tag}</div> : null}
       {view ? (
         <div
@@ -152,6 +159,6 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
           </div>
         </div>
       ) : null}
-    </div>
+    </div></EngineClockContext.Provider>
   );
 }

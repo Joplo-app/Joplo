@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createJa(locale: Locale = 'ja') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `自由に操作中 · 再生で続行`,
+      freeChangesDiscarded: `変更は保存されません`,
+      freeReset: `リセット`,
+      freeSwitchPrompt: (name: string) => `「${name}」に切り替えますか？`,
+      freeSwitchDescription: `この操作の直前から開始します。操作中の変更は破棄されます。`,
+      freeSwitchConfirm: `シナリオを切り替え`,
+      freeSwitchCancel: `ここに留まる`,
       ...autoCaptionMessages('ja'),
       mockSuccess: "模擬成功",
       mockFailure: "模擬失敗",

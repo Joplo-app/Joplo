@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createKo(locale: Locale = 'ko') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `자유 체험 중 · 재생으로 계속`,
+      freeChangesDiscarded: `변경 사항은 저장되지 않습니다`,
+      freeReset: `초기화`,
+      freeSwitchPrompt: (name: string) => `“${name}” 시나리오로 전환할까요?`,
+      freeSwitchDescription: `이 동작 직전부터 시작합니다. 체험 중 변경 사항은 삭제됩니다.`,
+      freeSwitchConfirm: `시나리오 전환`,
+      freeSwitchCancel: `여기에 머물기`,
       ...autoCaptionMessages('ko'),
       mockSuccess: "모의 성공",
       mockFailure: "모의 실패",

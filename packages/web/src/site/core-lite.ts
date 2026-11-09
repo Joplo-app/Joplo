@@ -19,3 +19,5 @@ export * from '../../../core/src/content-i18n.ts';
 
 export { autoCaptionMessages } from '../../../core/src/auto-caption.ts';
 export * from '../../../core/src/themes.ts';
+
+export * from "../../../core/src/playground.ts";

@@ -114,6 +114,13 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         for (const e of step.effects) if (e.type === 'navigate') { stack.push(sceneId); sceneId = e.sceneId; }
       }
     }
+    for (const option of Object.values(p.options)) for (const reaction of Object.values(option.free ?? {})) {
+      if (!('target' in reaction.action)) continue;
+      for (const scene of Object.values(p.scenes).filter(s => s.optionId === option.id || s.optionId === null)) {
+        const hit = findNode(scene, reaction.action.target)?.node;
+        if (hit && (!hit.from || hit.from === option.id)) bound.add(identity(hit));
+      }
+    }
     for (const s of Object.values(p.scenes).filter(s => included(s.optionId))) {
       const value = { id: s.id, optionId: s.optionId ?? undefined, source: s.root.source ?? (s.optionId ? p.options[s.optionId]?.source : undefined) };
       ref(p.scenes[s.id] === s, `Stage key does not match ID: ${s.id}`, value, 'scene');

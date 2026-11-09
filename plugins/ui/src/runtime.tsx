@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'motion/react';
-import { animate as animateValue } from 'motion';
+import { AnimatePresence } from 'motion/react';
+import { motion } from '@joplo-app/kit/renderer';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { defineRuntime, type PluginIRNode as SceneNode, type PluginState as PlayState } from '@joplo-app/kit/plugin';
@@ -24,7 +24,7 @@ function appShellLayout(node: SceneNode, state: PlayState, width: number): Shell
 /** Tabs / Radio.Group / SegmentedControl 的当前值。 */
 const ValueContext = createContext<{ owner: string; value: string | null; disabled: boolean } | null>(null);
 /** Accordion：展开的项。 */
-const AccordionContext = createContext<{ open: Set<string> } | null>(null);
+const AccordionContext = createContext<{ owner: string; open: Set<string> } | null>(null);
 const AccordionItemContext = createContext<{ value: string; open: boolean } | null>(null);
 /** Timeline / Stepper：子项序号与当前进度。 */
 const ItemProgressContext = createContext<{ ids: string[]; active: number; content: HTMLElement | null } | null>(null);
@@ -728,7 +728,7 @@ function Accordion({ node, p, children }: NodeProps) {
   const open = new Set<string>(Array.isArray(v) ? v.map(String) : v !== undefined && v !== null && v !== '' ? [str(v)] : []);
   const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { display: 'flex', flexDirection: 'column', background: SURFACE } });
   return (
-    <AccordionContext.Provider value={{ open }}>
+    <AccordionContext.Provider value={{ owner: node.id, open }}>
       <div {...root} data-soft="">
         <Rough seedKey={node.id} stroke={SOFT} />
         {children}
@@ -748,9 +748,11 @@ function AccordionItem({ node, p, children }: NodeProps) {
 }
 function AccordionControl({ node, p, disabled, children }: NodeProps) {
   const item = useContext(AccordionItemContext);
+  const owner = useContext(AccordionContext);
+  const ctx = useCtx();
   const root = useRoot(node, p, { disabled, style: { display: 'flex', alignItems: 'center', width: '100%', padding: '10px 14px', gap: 8, fontWeight: 500, textAlign: 'left', color: disabled ? DIMMED : undefined } });
   return (
-    <button {...root} type="button" aria-expanded={!!item?.open}>
+    <button {...root} type="button" aria-expanded={!!item?.open} onClick={ctx.interactive ? e => { e.stopPropagation(); if (!disabled && owner && item) ctx.act?.(node.id, {type:'click'}, {type:'select',target:owner.owner,value:item.value}); } : undefined}>
       <span className="jtrunc" style={{ flex: 1 }} data-jtext="">
         {children}
       </span>
@@ -1110,6 +1112,12 @@ function NavLink({ node, p, disabled, children }: NodeProps) {
 /** Mantine 输入组件的外壳：label（withAsterisk）/ description / 控件 / error。根节点包含全部，控件带 data-jcontrol。 */
 function Field({ node, p, disabled, control, inline = false }: { node: SceneNode; p: Record<string, unknown>; disabled: boolean; control: ReactNode; inline?: boolean }) {
   const root = useRoot(node, p, { disabled, style: inline ? { display: 'flex', alignItems: 'flex-start', gap: 10 } : { display: 'flex', flexDirection: 'column', gap: 4, width: '100%' } });
+  const ctx = useCtx();
+  const toggle = node.traits?.native?.action === 'toggle';
+  if (ctx.interactive && toggle) {
+    const activate = () => { if (!disabled) ctx.act?.(node.id, {type:'click'}, {type:'toggle',target:node.id,value:!Boolean(ctx.state.inputs[node.id] ?? p.checked ?? p.defaultChecked)}); };
+    Object.assign(root, {onClick:(e: React.MouseEvent) => {e.stopPropagation(); activate();},onKeyDown:(e:React.KeyboardEvent) => {if(e.key===' '||e.key==='Enter'){e.preventDefault();e.stopPropagation();activate();}}});
+  }
   const label = p.label !== undefined && p.label !== '' ? str(p.label) : '';
   const desc = p.description !== undefined ? str(p.description) : '';
   const error = typeof p.error === 'string' && p.error ? p.error : '';
@@ -1151,6 +1159,7 @@ function InputBox({ node, p, disabled, children, minH = 40, open }: { node: Scen
       style={{ minHeight: minH, background: disabled ? SUBTLE : SURFACE, ...(err ? { borderColor: DANGER } : {}) }}
       data-jcontrol={node.id}
       role={open !== undefined ? 'combobox' : undefined}
+      aria-label={open !== undefined ? nodeLabel(node) : undefined}
       aria-expanded={open}
       tabIndex={0}
     >
@@ -1165,8 +1174,9 @@ function InputBox({ node, p, disabled, children, minH = 40, open }: { node: Scen
 const FIELD_CLASS = 'min-w-0 flex-1 cursor-[inherit] resize-none border-none bg-transparent p-0 text-[15px] text-inherit outline-none placeholder:text-[var(--jp-faint)]';
 
 /** 只读的原生输入框：值来自状态，用户不能直接编辑（输入由步骤驱动）。 */
-function NativeInput({ label, value, placeholder, mask = false }: { label: string; value: unknown; placeholder: unknown; mask?: boolean }) {
-  return <input readOnly tabIndex={-1} aria-label={label} type={mask ? 'password' : 'text'} value={str(value)} placeholder={str(placeholder)} className={cn(FIELD_CLASS, 'h-9')} style={{ font: 'inherit', fontSize: 15 }} />;
+function NativeInput({ node, disabled, label, value, placeholder, mask = false }: { node: SceneNode; disabled: boolean; label: string; value: unknown; placeholder: unknown; mask?: boolean }) {
+  const ctx = useCtx();
+  return <input readOnly={!ctx.interactive || disabled} tabIndex={ctx.interactive && !disabled ? 0 : -1} onChange={e => ctx.act?.(node.id, {type:'type',value:e.currentTarget.value})} onClick={ctx.interactive ? e => e.stopPropagation() : undefined} aria-label={label} type={mask ? 'password' : 'text'} value={str(value)} placeholder={str(placeholder)} className={cn(FIELD_CLASS, 'h-9')} style={{ font: 'inherit', fontSize: 15 }} />;
 }
 
 function TextInput({ node, p, disabled }: NodeProps) {
@@ -1183,7 +1193,7 @@ function TextInput({ node, p, disabled }: NodeProps) {
       disabled={disabled}
       control={
         <InputBox node={node} p={p} disabled={disabled}>
-          <NativeInput label={nodeLabel(node)} value={value} placeholder={p.placeholder} mask={mask} />
+          <NativeInput node={node} disabled={disabled} label={nodeLabel(node)} value={value} placeholder={p.placeholder} mask={mask} />
           {node.type === 'ui:PasswordInput' ? <span aria-hidden style={{ color: DIMMED, fontSize: 13 }}>👁</span> : null}
           {node.type === 'ui:NumberInput' ? <span aria-hidden style={{ color: DIMMED, fontSize: 10, lineHeight: 1 }}>▴<br />▾</span> : null}
           {node.type === 'ui:FileInput' && !has ? <span aria-hidden style={{ color: DIMMED, fontSize: 13 }}>📎</span> : null}
@@ -1194,6 +1204,7 @@ function TextInput({ node, p, disabled }: NodeProps) {
 }
 
 function Textarea({ node, p, disabled }: NodeProps) {
+  const ctx = useCtx();
   const v = useInputValue(node, p);
   const rows = typeof p.minRows === 'number' ? p.minRows : typeof p.rows === 'number' ? p.rows : 3;
   return (
@@ -1203,7 +1214,7 @@ function Textarea({ node, p, disabled }: NodeProps) {
       disabled={disabled}
       control={
         <InputBox node={node} p={p} disabled={disabled} minH={rows * 22 + 16}>
-          <textarea readOnly tabIndex={-1} aria-label={nodeLabel(node)} value={str(v)} placeholder={str(p.placeholder)} rows={rows} className={cn(FIELD_CLASS, 'self-stretch py-2')} style={{ font: 'inherit', fontSize: 15, lineHeight: '22px' }} />
+          <textarea readOnly={!ctx.interactive || disabled} tabIndex={ctx.interactive && !disabled ? 0 : -1} onChange={e => ctx.act?.(node.id, {type:'type',value:e.currentTarget.value})} onClick={ctx.interactive ? e => e.stopPropagation() : undefined} aria-label={nodeLabel(node)} value={str(v)} placeholder={str(p.placeholder)} rows={rows} className={cn(FIELD_CLASS, 'self-stretch py-2')} style={{ font: 'inherit', fontSize: 15, lineHeight: '22px' }} />
         </InputBox>
       }
     />
@@ -1214,14 +1225,17 @@ function Textarea({ node, p, disabled }: NodeProps) {
 function Select({ node, p, disabled }: NodeProps) {
   const { t: i18n } = useI18n();
 
-  const { state, preview } = useCtx();
+  const ctx = useCtx();
+  const { state, preview } = ctx;
+  const [localOpen, setLocalOpen] = useState(false);
+  useLayoutEffect(() => setLocalOpen(false), [ctx.resetKey]);
   const v = useInputValue(node, p);
   const choices = choicesOf(node, state) ?? [];
   const multi = node.type === 'ui:MultiSelect';
   const values = multi ? (Array.isArray(v) ? v.map(String) : []) : v !== undefined && v !== null && v !== '' ? [str(v)] : [];
   const labelOf = (x: string) => choices.find((c) => c.value === x)?.label ?? x;
   const pv = preview && preview.nodeId === node.id ? preview.text : null;
-  const open = pv !== null;
+  const open = pv !== null || !!ctx.interactive && localOpen;
   const previewChoice = pv !== null ? (choices.find((c) => c.value === pv || c.label === pv)?.value ?? null) : null;
   return (
     <Field
@@ -1229,7 +1243,12 @@ function Select({ node, p, disabled }: NodeProps) {
       p={p}
       disabled={disabled}
       control={
-        <div className="relative w-full">
+        <div className="relative w-full" onClick={ctx.interactive ? e => { e.stopPropagation(); if (!disabled) { setLocalOpen(v => !v); ctx.act?.(node.id, {type:'click'}); } } : undefined} onKeyDown={ctx.interactive ? e => {
+          if (disabled) return;
+          if (e.key === 'Escape') { e.stopPropagation(); setLocalOpen(false); }
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setLocalOpen(v => !v); }
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); setLocalOpen(true); const index = choices.findIndex(c => c.value === values[0]); const next = choices[(index + (e.key === 'ArrowDown' ? 1 : choices.length - 1) + choices.length) % choices.length]; if (next) ctx.act?.(node.id, {type:'select',value:next.value}); }
+        } : undefined}>
           <InputBox node={node} p={p} disabled={disabled} open={open}>
             {multi && values.length ? (
               <span className="flex min-w-0 flex-1 flex-wrap gap-1 py-1.5">
@@ -1254,7 +1273,7 @@ function Select({ node, p, disabled }: NodeProps) {
               {choices.map((c) => {
                 const on = c.value === previewChoice || values.includes(c.value);
                 return (
-                  <div key={c.value} role="option" aria-selected={on} className={cn('px-3 py-1.5 text-[15px]', on && 'bg-[var(--jp-subtle)] font-semibold')}>
+                  <div key={c.value} role="option" tabIndex={ctx.interactive ? 0 : undefined} onClick={ctx.interactive ? e => { e.stopPropagation(); ctx.act?.(node.id, {type:'select',value:c.value}); if (!multi) setLocalOpen(false); } : undefined} onKeyDown={ctx.interactive ? e => { if(e.key==='Enter'||e.key===' '){e.preventDefault(); e.stopPropagation(); ctx.act?.(node.id,{type:'select',value:c.value});if(!multi)setLocalOpen(false);} } : undefined} aria-selected={on} className={cn('px-3 py-1.5 text-[15px]', on && 'bg-[var(--jp-subtle)] font-semibold')}>
                     {multi && values.includes(c.value) ? '✓ ' : ''}
                     {c.label}
                   </div>
@@ -1269,7 +1288,8 @@ function Select({ node, p, disabled }: NodeProps) {
 }
 
 function SegmentedControl({ node, p, disabled }: NodeProps) {
-  const { state, preview } = useCtx();
+  const ctx = useCtx();
+  const { state, preview } = ctx;
   const v = useInputValue(node, p);
   const choices = choicesOf(node, state) ?? [];
   const pv = preview && preview.nodeId === node.id ? preview.text : null;
@@ -1285,7 +1305,7 @@ function SegmentedControl({ node, p, disabled }: NodeProps) {
       {choices.map((c) => {
         const on = c.value === cur;
         return (
-          <span key={c.value} role="radio" aria-checked={on} className={cn('relative px-3 py-1 text-[14px] [.jstage[data-stroke=clean]_&]:rounded', on ? 'bg-[var(--jp-surface)] font-semibold shadow-sm' : 'text-[var(--jp-muted)]')} style={{ flex: p.fullWidth ? 1 : undefined, textAlign: 'center' }}>
+          <span key={c.value} role="radio" tabIndex={ctx.interactive && !disabled ? 0 : undefined} onClick={ctx.interactive ? e => {e.stopPropagation(); if(!disabled)ctx.act?.(node.id,{type:'click'},{type:'select',target:node.id,value:c.value});} : undefined} onKeyDown={ctx.interactive ? e => {if(e.key===' '||e.key==='Enter'){e.preventDefault();e.stopPropagation();if(!disabled)ctx.act?.(node.id,{type:'select',value:c.value});}} : undefined} aria-checked={on} className={cn('relative px-3 py-1 text-[14px] [.jstage[data-stroke=clean]_&]:rounded', on ? 'bg-[var(--jp-surface)] font-semibold shadow-sm' : 'text-[var(--jp-muted)]')} style={{ flex: p.fullWidth ? 1 : undefined, textAlign: 'center' }}>
             {on ? <Rough seedKey={`${node.id}:${c.value}`} stroke={INK} strokeWidth={1.1} /> : null}
             <span className="relative">{c.label}</span>
           </span>
@@ -1304,7 +1324,7 @@ function Checkbox({ node, p, disabled }: NodeProps) {
       disabled={disabled}
       inline
       control={
-        <span className="jbox inline-flex shrink-0 items-center justify-center rounded-[3px]" style={{ width: 20, height: 20, marginTop: 1, background: checked ? INK : SURFACE, color: BG, fontSize: 13, lineHeight: 1 }} data-jcontrol={node.id} role="checkbox" aria-checked={checked} tabIndex={0}>
+        <span className="jbox inline-flex shrink-0 items-center justify-center rounded-[3px]" style={{ width: 20, height: 20, marginTop: 1, background: checked ? INK : SURFACE, color: BG, fontSize: 13, lineHeight: 1 }} data-jcontrol={node.id} role="checkbox" aria-label={nodeLabel(node)} aria-checked={checked} tabIndex={0}>
           <Rough seedKey={node.id} inset={1} stroke={disabled ? SOFT : INK} fill={checked ? INK : undefined} fillStyle="solid" />
           {checked ? <span>✓</span> : null}
         </span>
@@ -1315,6 +1335,12 @@ function Checkbox({ node, p, disabled }: NodeProps) {
 
 function Switch({ node, p, disabled }: NodeProps) {
   const on = useInputValue(node, p) === true;
+  const ctx = useCtx();
+  const scripted = useRef({ value: on, changedLocally: false });
+  const changedLocally = !!ctx.playground && on !== scripted.current.value;
+  const instant = changedLocally || scripted.current.changedLocally;
+  if (!ctx.playground) scripted.current = { value: on, changedLocally: false };
+  else if (changedLocally) scripted.current.changedLocally = true;
   const c = color(p.color) ?? INK;
   return (
     <Field
@@ -1323,8 +1349,8 @@ function Switch({ node, p, disabled }: NodeProps) {
       disabled={disabled}
       inline
       control={
-        <span className="relative inline-flex shrink-0 items-center rounded-full" style={{ width: 38, height: 22, background: on ? c : LINE, transition: 'background .2s', marginTop: 1 }} data-jcontrol={node.id} role="switch" aria-checked={on} tabIndex={0}>
-          <span style={{ position: 'absolute', left: on ? 18 : 2, width: 18, height: 18, borderRadius: 9, background: SURFACE, boxShadow: '0 1px 2px rgba(0,0,0,.25)', transition: 'left .2s' }} />
+        <span className="relative inline-flex shrink-0 items-center rounded-full" style={{ width: 38, height: 22, background: on ? c : LINE, transition: instant ? 'none' : 'background .2s', marginTop: 1 }} data-jcontrol={node.id} role="switch" aria-label={nodeLabel(node)} aria-checked={on} tabIndex={0}>
+          <span style={{ position: 'absolute', left: on ? 18 : 2, width: 18, height: 18, borderRadius: 9, background: SURFACE, boxShadow: '0 1px 2px rgba(0,0,0,.25)', transition: instant ? 'none' : 'left .2s' }} />
         </span>
       }
     />
@@ -1347,12 +1373,14 @@ function RadioGroup({ node, p, disabled, children }: NodeProps) {
     </ValueContext.Provider>
   );
 }
-function Radio({ node, p }: NodeProps) {
+function Radio({ node, p, disabled }: NodeProps) {
+  const host = useCtx();
   const ctx = useContext(ValueContext);
-  const on = ctx ? ctx.value !== null && ctx.value === str(p.value) : p.checked === true;
+  const standalone = useInputValue(node, p) === true;
+  const on = ctx ? ctx.value !== null && ctx.value === str(p.value) : standalone;
   const root = useRoot(node, p, { style: { display: 'inline-flex', alignItems: 'center', gap: 8 } });
   return (
-    <span {...root} role="radio" aria-checked={on}>
+    <span {...root} role="radio" tabIndex={host.interactive ? 0 : undefined} onClick={host.interactive ? e => {e.stopPropagation(); if(!disabled && !ctx?.disabled)host.act?.(node.id,{type:'click'}, ctx ? {type:'select',target:ctx.owner,value:str(p.value)} : {type:'toggle',target:node.id,value:!on});} : undefined} onKeyDown={host.interactive ? e => {if(e.key===' '||e.key==='Enter'){e.preventDefault();e.stopPropagation();e.currentTarget.click();}} : undefined} aria-checked={on}>
       <span className="jbox inline-flex shrink-0 items-center justify-center rounded-full" style={{ width: 20, height: 20 }}>
         <Rough seedKey={node.id} shape="ellipse" inset={1} />
         {on ? <span style={{ width: 9, height: 9, borderRadius: 5, background: INK }} /> : null}
@@ -1385,12 +1413,13 @@ function TabsList({ node, p, children }: NodeProps) {
   );
 }
 function TabsTab({ node, p, disabled, children }: NodeProps) {
+  const host = useCtx();
   const ctx = useContext(ValueContext);
   const dis = disabled || !!ctx?.disabled;
   const active = ctx?.value !== null && ctx?.value === str(p.value);
   const root = useRoot(node, p, { disabled: dis, style: { position: 'relative', padding: '8px 14px', marginBottom: -2, fontSize: 14, borderBottom: `2px solid ${active ? INK : 'transparent'}`, fontWeight: active ? 650 : 400, color: dis ? SOFT : active ? INK : DIMMED, display: 'inline-flex', gap: 6, alignItems: 'center' } });
   return (
-    <button {...root} type="button" role="tab" aria-selected={active}>
+    <button {...root} type="button" role="tab" aria-selected={active} onClick={host.interactive ? e => { e.stopPropagation(); if (!dis && ctx) host.act?.(node.id, {type:'click'}, {type:'select',target:ctx.owner,value:str(p.value)}); } : undefined}>
       {p.leftSection !== undefined ? <span aria-hidden>{str(p.leftSection)}</span> : null}
       <span className="jtrunc" data-jtext="">
         {children}
@@ -1917,12 +1946,14 @@ function AvatarGroup({ node, p, children }: NodeProps) {
 }
 
 /** Radio.Card：Radio.Group 里的可选卡片；是否选中读 Radio.Group 的当前值。 */
-function RadioCard({ node, p }: NodeProps) {
+function RadioCard({ node, p, disabled }: NodeProps) {
+  const host = useCtx();
   const ctx = useContext(ValueContext);
-  const on = ctx ? ctx.value !== null && ctx.value === str(p.value) : p.checked === true;
+  const standalone = useInputValue(node, p) === true;
+  const on = ctx ? ctx.value !== null && ctx.value === str(p.value) : standalone;
   const root = useRoot(node, p, { className: 'jbox [.jstage[data-stroke=clean]_&]:rounded-md', style: { display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%', padding: '12px 14px', background: on ? tint(INK, 6) : SURFACE } });
   return (
-    <div {...root} role="radio" aria-checked={on} data-jchecked={on ? '' : undefined}>
+    <div {...root} role="radio" tabIndex={host.interactive ? 0 : undefined} onClick={host.interactive ? e => { e.stopPropagation(); if (!disabled && ctx && !ctx.disabled) host.act?.(node.id, {type:'click'}, {type:'select',target:ctx.owner,value:str(p.value)}); } : undefined} onKeyDown={host.interactive ? e => { if(e.key===' '||e.key==='Enter'){e.preventDefault();e.stopPropagation();e.currentTarget.click();} } : undefined} aria-checked={on} data-jchecked={on ? '' : undefined}>
       <Rough seedKey={node.id} stroke={on ? INK : SOFT} strokeWidth={on ? 1.8 : 1.1} />
       {p.leftSection !== undefined ? <span aria-hidden style={{ fontSize: 20, lineHeight: '24px' }}>{str(p.leftSection)}</span> : null}
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>

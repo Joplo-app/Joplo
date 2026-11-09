@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createPtBR(locale: Locale = 'pt-BR') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `Exploração livre · Reproduza para continuar`,
+      freeChangesDiscarded: `As alterações não serão salvas`,
+      freeReset: `Redefinir`,
+      freeSwitchPrompt: (name: string) => `Mudar para “${name}”?`,
+      freeSwitchDescription: `Começa logo antes desta ação. As alterações da exploração serão descartadas.`,
+      freeSwitchConfirm: `Mudar de cenário`,
+      freeSwitchCancel: `Ficar aqui`,
       ...autoCaptionMessages('pt-BR'),
       mockSuccess: "Sucesso simulado",
       mockFailure: "Falha simulada",

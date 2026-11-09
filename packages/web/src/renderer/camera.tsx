@@ -11,7 +11,9 @@
  *   user 变回 null（下一步导演接管、点「适应画面」）时平滑回到 base。
  */
 import { createContext, useContext, useLayoutEffect, useRef, useState } from 'react';
-import { animate as animateEl, motion } from 'motion/react';
+import { animate as animateEl } from 'motion/react';
+import { motion, engineTransition } from './engine-motion';
+import type { ClockSource } from '../runtime/clock';
 import { Rough, useStroke } from './rough';
 import { MIN_UI_PX, UI_LEGIBLE_MAX, fitCamera, uiMaxZoom, frameBox, highlightRect, revealScroll, union, visibleRect, type Box, type FrameTarget, type View } from './camera-math';
 import { CAMERA_EASE, CAMERA_MS } from '../runtime/pace';
@@ -89,7 +91,7 @@ export const DeviceZoomContext = createContext<((f: DeviceFocus | null) => void)
  * 新画面淡入时先停在整层（不做动画），ESTABLISH_MS 后再平滑推近。没有它时镜头从上一层的视图直接过渡过去（方向随意）。
  * 首次挂载（打开深链接、截图）与静态截图不做。
  */
-export function useCamera(spec: CameraSpec | null, opts: { width: number; height: number; animate: boolean; deps: unknown[]; user?: View | null; establish?: boolean }) {
+export function useCamera(spec: CameraSpec | null, opts: { width: number; height: number; animate: boolean; clock?: ClockSource; deps: unknown[]; user?: View | null; establish?: boolean }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState<CameraView | null>(null);
@@ -115,11 +117,27 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     reportRef.current?.(d);
   };
 
-  const applyTo = (wrap: HTMLElement, v: View, smooth: boolean) => {
+  const cameraAnimation = useRef<ReturnType<typeof animateEl> | null>(null);
+  const scriptedView = useRef<View>({ k: 1, tx: 0, ty: 0 });
+  const drawView = (wrap: HTMLElement, v: View) => {
     current.current = v;
+    wrap.style.transform = v.k === 1 && v.tx === 0 && v.ty === 0 ? 'none' : `translateX(${v.tx}px) translateY(${v.ty}px) scale(${v.k})`;
+  };
+  useLayoutEffect(() => () => cameraAnimation.current?.stop(), []);
+  const applyTo = (wrap: HTMLElement, v: View, smooth: boolean) => {
+    const from = { ...scriptedView.current };
+    if (!opts.clock) current.current = v;
     wrap.dataset.cameraView = JSON.stringify({ k: round(v.k), tx: round(v.tx), ty: round(v.ty) });
     wrap.dataset.zoom = userRef.current ? 'user' : 'camera';
-    void animateEl(wrap, { x: v.tx, y: v.ty, scale: v.k }, smooth ? { duration: CAMERA_MS / 1000, ease: CAMERA_EASE } : { duration: 0 });
+    cameraAnimation.current?.stop();
+    if (opts.clock) {
+      const draw = (t: number) => {
+        scriptedView.current = { k: from.k + (v.k - from.k) * t, tx: from.tx + (v.tx - from.tx) * t, ty: from.ty + (v.ty - from.ty) * t };
+        if (!userRef.current) drawView(wrap, scriptedView.current);
+      };
+      if (!smooth || !opts.clock.getSnapshot().running && !opts.clock.getSnapshot().paused) draw(1);
+      else cameraAnimation.current = animateEl(0, 1, { ...engineTransition({ duration: CAMERA_MS / 1000, ease: CAMERA_EASE }, opts.clock), onUpdate: draw });
+    } else void animateEl(wrap, { x: v.tx, y: v.ty, scale: v.k }, smooth ? { duration: CAMERA_MS / 1000, ease: CAMERA_EASE } : { duration: 0 });
   };
 
   // 用户缩放 / 平移：立即应用；回到镜头（null）时平滑过渡
@@ -127,7 +145,11 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
-    applyTo(wrap, user ?? base.current, !user && opts.animate);
+    if (opts.clock) {
+      // Local pan/zoom never cancels the frozen scripted camera animation.
+      // Restoring it reveals the same sampled frame, then its existing driver continues.
+      drawView(wrap, user ?? scriptedView.current);
+    } else applyTo(wrap, user ?? base.current, !user && opts.animate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userSig]);
 
@@ -299,7 +321,8 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     delete wrap.dataset.cameraSettled;
     reveal();
     // 先全景再推近（D70）：换层时先停在新画面的整层（被淡入盖住，不做动画），停一下再推近到焦点
-    let establishTimer: ReturnType<typeof setTimeout> | 0 = 0;
+    let establishTimer = false;
+    let cancelEstablish: (() => void) | undefined;
     if (cut && opts.establish && opts.animate && spec.targets.length && !userRef.current) {
       const o = fitCamera({ W, H, mode: 'overview', bbox: contentBounds(wrap, content, W, H) });
       apply(o.k, o.tx, o.ty, false);
@@ -307,7 +330,11 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
       clearFocus();
       setView({ k: o.k, tx: o.tx, ty: o.ty, mode: 'overview', rects: [] });
       wrap.dataset.establish = '1';
-      establishTimer = setTimeout(() => { establishTimer = 0; delete wrap.dataset.establish; tick(); }, ESTABLISH_MS);
+      if (opts.clock) {
+        establishTimer = true;
+        const start = opts.clock.getSnapshot().timeMs;
+        cancelEstablish = opts.clock.subscribe(() => { if (opts.clock!.getSnapshot().timeMs - start >= ESTABLISH_MS) { establishTimer = false; cancelEstablish?.(); delete wrap.dataset.establish; tick(); } });
+      } else { delete wrap.dataset.establish; tick(); }
     } else tick();
     // 内容在停稳之后还会变（流式输出逐字变长、元素随后出现，D56）：每次变化后的下一帧重新测量，
     // 镜头与高光始终套住目标的最终大小。只听文字与子节点变化，不听属性（markFocus 自己会改属性）。
@@ -332,7 +359,7 @@ export function useCamera(spec: CameraSpec | null, opts: { width: number; height
     }) : null;
     mo?.observe(content!, { childList: true, characterData: true, subtree: true });
     return () => {
-      if (establishTimer) clearTimeout(establishTimer);
+      cancelEstablish?.();
       delete wrap.dataset.establish;
       cancelAnimationFrame(raf);
       cancelAnimationFrame(pending);

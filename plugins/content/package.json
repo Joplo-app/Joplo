@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/plugin-content",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "type": "module",
   "joplo": {
     "api": 2

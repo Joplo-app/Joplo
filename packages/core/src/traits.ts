@@ -3,6 +3,10 @@ import type { ElementTraits } from '@joplo-app/kit/plugin';
 const key = z.string().min(1).refine(s => !['__proto__', 'prototype', 'constructor'].includes(s));
 const keys = z.array(key).min(1);
 export const ElementTraitsSchema: z.ZodType<ElementTraits> = z.strictObject({
+  native: z.strictObject({ action: z.enum(['type', 'toggle', 'select']), prop: key, deselect: z.boolean().optional() }).optional(),
+  draggable: z.boolean().optional(),
+  hover: z.boolean().optional(),
+  selectionGate: z.strictObject({ owner: key, item: key.optional(), value: key, fallbackFirst: z.boolean().optional() }).optional(),
   disabledPresentation: z.boolean().optional(),
   frame: z.boolean().optional(),
   input: z.enum(['single', 'multiple']).optional(),

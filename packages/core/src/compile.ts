@@ -1,3 +1,4 @@
+import { validActionData, pluginActionSpec } from './actions.ts';
 /**
  * 编译：作者的源文件（经 @joplo-app/kit 收集成数据）→ IR v2。组件词汇对齐 Mantine（D35），见 catalog.ts。
  *
@@ -12,7 +13,7 @@ import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, Eff
 import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, PAGE_LAYER, isInteractiveType, matchChoice, nodeLabel, pluginSpec, splitPluginType, type PluginInfo } from './catalog.ts';
 import { HOLD_MAX_SECONDS, HOLD_MIN_SECONDS, inShotFrame } from './focus.ts';
 import { cameraAt, choicesOf, commonPrefix, stateAt } from './player.ts';
-import { CALLOUT_SIDES, LAYER_ICONS, Project, SCHEMA_VERSION, type Callout, type Cue, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage } from './schema.ts';
+import { Action, Effect, CALLOUT_SIDES, LAYER_ICONS, Project, SCHEMA_VERSION, type Callout, type Cue, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage } from './schema.ts';
 import type { Diagnostic } from './result.ts';
 import { schemaDiagnostics } from './schema-issues.ts';
 import { CONTENT_LOCALES, collectMessages, isContentLocale, nearestKey, pruneMessages } from './content-i18n.ts';
@@ -417,6 +418,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const sceneBefore = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i, start)));
         const sceneAfter = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i + 1, start)));
         const actionTarget = 'target' in st.action ? st.action.target : null;
+        validateNewAction(st.action, hasLayers ? layerScenes.map(l => l.scene) : sceneBefore ? [sceneBefore] : [], out as Project, (code, message) => err(code, message, st.source));
         for (const e of st.effects) {
           if (e.type === 'fork') {
             if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `Fork target "${e.scenario}" must be another scenario key in the same option`, st.source);
@@ -522,7 +524,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const shots = [...perLayer].map(([layer, targets]) => ({ layer, targets }));
         if (directorLayer) director = directorLayer;
         for (const s of shots) frame.set(s.layer === DIRECTOR_LAYER ? director : s.layer, [...s.targets]);
-        const generated = st.caption === undefined ? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore) : null;
+        const generated = st.caption === undefined ? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore, out as Project) : null;
         return {
           id: `${sid}#${i + 1}`,
           ...(st.key !== undefined ? { key: st.key } : {}),
@@ -598,7 +600,29 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       }
       for (const ck of Object.keys(def.coverage ?? {})) if (!fdef.cases?.[ck]) err('UNKNOWN_CASE', `Option ${qid} coverage declares unknown case "${ck}"`, def.source);
     }
+    const free: NonNullable<import('./schema.ts').Option['free']> = {};
+    for (const [key, reaction] of Object.entries(def.free ?? {})) {
+      const a = Action.safeParse(reaction.action);
+      if (!a.success || !('target' in reaction.action)) { err('FREE_ACTION_INVALID', `Free reaction ${key} needs a targeted action`, reaction.source); continue; }
+      const roots = effectRoots.filter(scene => scene.optionId === qid || mode === 'publish' && scene.optionId === null);
+      const target = reaction.action.target;
+      if (!roots.some(scene => findIn(scene.root, target))) err('FREE_TARGET_MISSING', `Free reaction ${key}: target ${reaction.action.target} is not in option ${qid}`, reaction.source);
+      const targets = roots.map(scene => findIn(scene.root, target)).filter((n): n is SceneNode => !!n);
+      if (reaction.action.type === 'click' && targets.length && !targets.some(n => isInteractiveType(n.type, out.plugins))) err('FREE_ACTION_INVALID', `Free reaction ${key}: ${target} is not interactive`, reaction.source);
+      if (['type', 'toggle', 'select'].includes(reaction.action.type) && targets.length && !targets.some(n => n.traits?.input)) err('FREE_ACTION_INVALID', `Free reaction ${key}: ${target} cannot accept values`, reaction.source);
+      validateNewAction(reaction.action, roots, out as Project, (code, message) => err(code, message, reaction.source));
+      const effects: Step['effects'] = [];
+      for (const effect of reaction.effects) {
+        if (!['set', 'append', 'toast'].includes(effect.type)) { err('FREE_EFFECT_INVALID', `Free reaction ${key}: ${effect.type} is not local state. Use set, append or toast; navigation, completion and timeline animation belong in steps`, reaction.source); continue; }
+        const { kind: _kind, ...raw } = effect;
+        const parsed = Effect.safeParse(raw);
+        if (!parsed.success || 'path' in raw && (!/^(ui|data|inputs)\.[A-Za-z0-9_.-]+$/.test(String(raw.path)) || String(raw.path).split('.').some(k => ['__proto__', 'constructor', 'prototype'].includes(k)))) err('FREE_EFFECT_INVALID', `Free reaction ${key}: invalid local effect`, reaction.source);
+        else effects.push(parsed.data);
+      }
+      free[key] = { action: a.data, effects, ...(reaction.source ? {source:rel(reaction.source)} : {}) };
+    }
     out.options[qid] = {
+      ...(Object.keys(free).length ? { free } : {}),
       id: qid,
       featureId: fid,
       key: o.key,
@@ -968,12 +992,16 @@ function findIn(node: SceneNode, id: string): SceneNode | null {
 const NO_STATE = { ui: {}, data: {}, inputs: {} };
 
 /** 自动字幕：元素名取 Mantine 的 label 属性（其次 title / aria-label / placeholder / 文字）；select 显示选项的 label。 */
-function autoCaption(st: StepDef, scene: Scene | undefined): Pick<Step, 'caption' | 'captionAuto'> {
+function autoCaption(st: StepDef, scene: Scene | undefined, project: Project): Pick<Step, 'caption' | 'captionAuto'> {
   const a = st.action;
   const node = 'target' in a && scene ? findIn(scene.root, a.target) : null;
   const label = node ? nodeLabel(node) : 'target' in a ? a.target : '';
   const result = (kind: NonNullable<Step['captionAuto']>['kind'], caption: string, extra: { value?: string; keys?: string } = {}) => ({ caption, captionAuto: { kind, label, ...extra } });
   switch (a.type) {
+    case 'drag': return result('drag', `Drag “${label}” to ${typeof a.to === 'string' ? a.to : `${a.to.x}, ${a.to.y}`}`, {value: typeof a.to === 'string' ? (scene && findIn(scene.root, a.to) ? nodeLabel(findIn(scene.root, a.to)!) : a.to) : `${a.to.x}, ${a.to.y}`});
+    case 'hover': return result('hover', `Hover over “${label}”`);
+    case 'scroll': return result('scroll', `Scroll “${label}” to ${typeof a.to === 'string' ? a.to : `${a.to.x}, ${a.to.y}`}`, {value: typeof a.to === 'string' ? (scene && findIn(scene.root, a.to) ? nodeLabel(findIn(scene.root, a.to)!) : a.to) : `${a.to.x}, ${a.to.y}`});
+    case 'plugin': return {caption: (pluginActionSpec(project, a.name)?.caption ?? a.name).replaceAll('{label}', label).replace(/\{data\.([A-Za-z0-9_-]+)\}/g, (_, k: string) => String(a.data[k] ?? ''))};
     case 'click': return result('click', `Click “${label}”`);
     case 'type': return result('type', `Type “${a.value}” in “${label}”`, { value: a.value });
     case 'select': {
@@ -990,6 +1018,28 @@ function autoCaption(st: StepDef, scene: Scene | undefined): Pick<Step, 'caption
     case 'back': return result('back', 'Go back');
     case 'event': return { caption: a.name };
     case 'card': return { caption: a.title };
+  }
+}
+
+/** Validate extension actions while all scene anchors and enabled declarations are available. */
+function validateNewAction(action: StepDef['action'], scenes: Scene[], project: Project, report: (code:string,message:string)=>void): void {
+  if (!['drag', 'hover', 'scroll', 'plugin'].includes(action.type)) return;
+  const parsed = Action.safeParse(action);
+  if (!parsed.success) { report('ACTION_INVALID', `Invalid ${action.type} action: ${parsed.error.message}`); return; }
+  if (!('target' in action)) return;
+  const nodes = scenes.map(s => findIn(s.root, action.target)).filter((n): n is SceneNode => !!n);
+  if (!nodes.length) report('MISSING_TARGET', `Action target ${action.target} is not in the current stage`);
+  if (action.type === 'drag' || action.type === 'scroll') {
+    if (typeof action.to === 'string' && !scenes.some(s => findIn(s.root, action.target) && findIn(s.root, action.to as string))) report('ACTION_DESTINATION_MISSING', `${action.type} destination ${action.to} must be in the same stage as ${action.target}`);
+    else if (action.type === 'scroll' && typeof action.to === 'string' && !nodes.some(n => findIn(n, action.to as string))) report('ACTION_DESTINATION_INVALID', `Scroll destination ${action.to} must be inside ${action.target}`);
+  }
+  if (action.type === 'plugin') {
+    const spec = pluginActionSpec(project, action.name);
+    if (!spec) report('ACTION_UNKNOWN', `Plugin action ${action.name} is not declared by an enabled plugin`);
+    else {
+      if (!validActionData(spec, action.data)) report('ACTION_DATA_INVALID', `Plugin action ${action.name} payload does not match its declared fields`);
+      if (spec.targets && nodes.some(n => !spec.targets!.includes(n.type))) report('ACTION_TARGET_INVALID', `Plugin action ${action.name} does not accept this target type`);
+    }
   }
 }
 

@@ -1,3 +1,4 @@
+import { pluginActionSpec, validActionData } from './actions.ts';
 /**
  * 播放器：纯函数的状态转换。手动体验、逐步查看、自动播放、回放校验和渲染截图
  * 全部调用这里，不允许任何一方另写一套按钮逻辑（PRD 8.4）。
@@ -165,8 +166,20 @@ export function isNodeVisible(scene: Scene, nodeId: string, state: PlayState, wi
   let shell: SceneNode | null = null;
   let shellWidth = width;
   let w = width;
-  for (const n of [...hit.ancestors, hit.node]) {
+  const chain = [...hit.ancestors, hit.node];
+  for (const [index, n] of chain.entries()) {
     if (!isSelfVisible(n, state, w)) return false;
+    const gate = n.traits?.selectionGate;
+    if (gate) {
+      const ancestors = chain.slice(0, index).reverse();
+      const owner = ancestors.find(a => a.type === gate.owner);
+      const item = gate.item ? ancestors.find(a => a.type === gate.item) : n;
+      if (!owner || !item) return false;
+      let selected = state.inputs[owner.id] !== undefined ? state.inputs[owner.id] : resolveValue(owner.props?.value ?? owner.props?.defaultValue, state);
+      if (gate.fallbackFirst && (selected === undefined || selected === null || selected === '')) selected = choicesOf(owner, state)?.[0]?.value;
+      const value = String(resolveValue(item.props?.[gate.value], state) ?? '');
+      if (Array.isArray(selected) ? !selected.map(String).includes(value) : selected === undefined || selected === null || String(selected) !== value) return false;
+    }
     if (n.traits?.layout) {
       shell = n;
       shellWidth = w;
@@ -283,8 +296,14 @@ function checkStepInner(project: Project, scenario: Scenario, state: PlayState, 
     return { severity: 'error', code: 'TARGET_DISABLED', message: `Step ${step.id} target "${nodeLabel(node)}" is currently disabled`, source: 'replay', ref };
   if (a.type === 'click' && !isInteractiveType(node.type, project.plugins))
     return { severity: 'error', code: 'NOT_INTERACTIVE', message: `Step ${step.id} clicks ${node.type} "${nodeLabel(node)}", which is not interactive`, source: 'replay', ref };
-  if (a.type !== 'click' && !node.traits?.input)
+  if ((a.type === 'type' || a.type === 'select' || a.type === 'toggle') && !node.traits?.input)
     return { severity: 'error', code: 'NOT_A_FIELD', message: `Step ${step.id} ${a.type} action target ${node.type} cannot accept input`, source: 'replay', ref };
+  if ((a.type === 'drag' || a.type === 'scroll') && typeof a.to === 'string' && !findNode(scene, a.to)) return { severity: 'error', code: 'ACTION_DESTINATION_MISSING', message: `Step ${step.id} destination ${a.to} is missing`, source: 'replay', ref };
+  if (a.type === 'scroll' && typeof a.to === 'string' && !findNode({ ...scene, root: node }, a.to)) return {severity:'error',code:'ACTION_DESTINATION_INVALID',message:`Step ${step.id} scroll destination ${a.to} is outside ${a.target}`,source:'replay',ref};
+  if (a.type === 'plugin') {
+    const spec = pluginActionSpec(project, a.name);
+    if (!spec || !validActionData(spec, a.data) || spec.targets && !spec.targets.includes(node.type)) return { severity: 'error', code: 'ACTION_DATA_INVALID', message: `Step ${step.id} has an unknown or invalid plugin action ${a.name}`, source: 'replay', ref };
+  }
   if (a.type === 'select') {
     const choices = choicesOf(node, state);
     if (choices && !matchChoice(choices, a.value))

@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createZhTW(locale: Locale = 'zh-TW') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `自由體驗中 · 按播放繼續`,
+      freeChangesDiscarded: `變更不會保留`,
+      freeReset: `重設`,
+      freeSwitchPrompt: (name: string) => `切換到「${name}」場景？`,
+      freeSwitchDescription: `從這個操作之前開始，目前體驗變更會捨棄。`,
+      freeSwitchConfirm: `切換場景`,
+      freeSwitchCancel: `留在這裡`,
       ...autoCaptionMessages('zh-TW'),
       mockSuccess: "模擬成功",
       mockFailure: "模擬失敗",

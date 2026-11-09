@@ -125,8 +125,18 @@ export const Scene = z.strictObject({
 });
 
 // ---------- 步骤与场景 ----------
+const ActionPoint = z.strictObject({ x: z.number().finite(), y: z.number().finite() });
+export const PluginAction = z.strictObject({
+  caption: z.string().min(1), durationMs: z.number().finite().positive().max(30000),
+  fields: z.record(z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/).refine(k => !['__proto__', 'prototype', 'constructor'].includes(k)), z.strictObject({ type: z.enum(['string', 'number', 'boolean']), min: z.number().finite().optional(), max: z.number().finite().optional(), tolerance: z.number().finite().nonnegative().optional(), text: z.boolean().optional() }).refine(f => (f.min === undefined || f.max === undefined || f.min <= f.max) && (f.type === 'number' || f.min === undefined && f.max === undefined && f.tolerance === undefined) && (!f.text || f.type === 'string'))),
+  targets: z.array(z.string().min(1)).optional(),
+});
 export const Action = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('click'), target: Id }),
+  z.strictObject({ type: z.literal('drag'), target: Id, to: z.union([Id, ActionPoint]) }),
+  z.strictObject({ type: z.literal('hover'), target: Id, ms: z.number().finite().nonnegative().max(30000) }),
+  z.strictObject({ type: z.literal('scroll'), target: Id, to: z.union([Id, ActionPoint.refine(p => p.x >= 0 && p.y >= 0)]) }),
+  z.strictObject({ type: z.literal('plugin'), name: z.string().regex(/^[a-z][a-z0-9-]*:[a-z][a-zA-Z0-9-]*$/), target: Id, data: z.record(z.string(), Json) }),
   z.strictObject({ type: z.literal('type'), target: Id, value: z.string() }),
   z.strictObject({ type: z.literal('select'), target: Id, value: z.string() }),
   z.strictObject({ type: z.literal('toggle'), target: Id, value: z.boolean() }),
@@ -180,7 +190,7 @@ export const Step = z.strictObject({
   caption: z.string().min(1),
   /** Generated caption metadata; caption remains the English fallback for tools. */
   captionAuto: z.strictObject({
-    kind: z.enum(['click', 'type', 'select', 'check', 'uncheck', 'switch_on', 'switch_off', 'back', 'press']),
+    kind: z.enum(['click', 'type', 'select', 'check', 'uncheck', 'switch_on', 'switch_off', 'back', 'press', 'drag', 'hover', 'scroll']),
     label: z.string(),
     value: z.string().optional(),
     keys: z.string().optional(),
@@ -284,7 +294,9 @@ export const Coverage = z.strictObject({
   basis: z.enum(['derived', 'declared']).default('declared'),
 });
 
+export const FreeReaction = z.strictObject({ action: Action, effects: z.array(Effect).default([]), source: Source });
 export const Option = z.strictObject({
+  free: z.record(Id, FreeReaction).optional(),
   id: Qid,
   featureId: Id,
   /** 文件名，例如 `a-modal`。 */
@@ -379,6 +391,7 @@ export const Project = z.strictObject({
   i18n: ContentI18nSchema.optional(),
   /** 启用的插件（D86）：插件 id → 名称、版本与组件声明（可操作、父组件）。运行时代码不在 IR 里，由看板 / 发布站另外载入。 */
   plugins: z.record(z.string(), z.strictObject({
+    actions: z.record(z.string(), PluginAction).optional(),
     themes: z.record(z.string(), z.string()).optional(),
     properties: z.record(z.string(), z.strictObject({ type: z.enum(['string', 'number', 'boolean']), attribute: z.string().regex(/^data-jp-[a-z0-9-]+$/).optional(), min: z.number().optional(), max: z.number().optional(), nonempty: z.boolean().optional() })).optional(),
     data: DataSpec.optional(),
@@ -421,6 +434,7 @@ export type Scenario = z.infer<typeof Scenario>;
 export type Step = z.infer<typeof Step>;
 export type Action = z.infer<typeof Action>;
 export type Effect = z.infer<typeof Effect>;
+export type FreeReaction = z.infer<typeof FreeReaction>;
 export type Shot = z.infer<typeof Shot>;
 
 export type Fork = z.infer<typeof Fork>;

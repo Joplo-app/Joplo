@@ -137,10 +137,12 @@ class SceneView implements ComponentInstance {
   /** 观众拖动过视角：画框尺寸变化时不再自动重新取景，直到下一次 focus 变化。 */
   private userMoved = false;
   private framedOnce = false;
-  private raf = 0;
+  private resetKey: string | undefined;
+  private frozen: { focusKey: string | null; view: SceneView['view']; tween: SceneView['tween']; values: Map<string, Item['cur']> } | null = null;
+  private gestureFrom: SceneView['view'] | null = null;
   private last = 0;
   private hover: string | null = null;
-  private drag: { x: number; y: number; az: number; el: number; moved: boolean; id: number } | null = null;
+  private drag: { x: number; y: number; az: number; el: number; moved: boolean; id: number; target?: string } | null = null;
   private readonly ro: ResizeObserver;
   private readonly raycaster = new THREE.Raycaster();
   private readonly cleanup: (() => void)[] = [];
@@ -167,6 +169,9 @@ class SceneView implements ComponentInstance {
     sun.position.set(6, 10, 8);
     this.scene.add(hemi, sun);
 
+    canvas.dataset.jgestureView = '';
+    canvas.tabIndex = 0;
+    canvas.setAttribute('aria-label', String(ctx.node.props.label ?? ctx.node.label));
     this.bindPointer(canvas);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(el);
@@ -175,6 +180,13 @@ class SceneView implements ComponentInstance {
 
   // ---------- 引擎每次渲染调用 ----------
   update(ctx: ComponentCtx): void {
+    if (this.resetKey !== ctx.frame.resetKey && this.frozen) {
+      this.view = this.frozen.view; this.tween = this.frozen.tween; this.focusKey = this.frozen.focusKey;
+      for (const [id, value] of this.frozen.values) { const item = this.items.get(id); if (item) item.cur = value; }
+      this.userMoved = false; this.frozen = null;
+    }
+    if (ctx.frame.playground && !this.frozen) this.freezeView();
+    this.resetKey = ctx.frame.resetKey;
     this.ctx = ctx;
     const p = ctx.node.props;
     this.el.style.height = `${Math.max(160, num(p.height, 420))}px`;
@@ -187,26 +199,36 @@ class SceneView implements ComponentInstance {
     this.resize(false);
     // 镜头：focus 变化（或第一次）时重新取景；用户拖动过的视角由导演接管
     const focus = typeof p.focus === 'string' && this.items.has(p.focus) ? p.focus : null;
-    const key = `${focus ?? '*'}|${String(p.view ?? 'iso')}`;
+    const key = `${focus ?? '*'}|${String(p.view ?? 'iso')}|${String(p.azimuth ?? '')}|${String(p.elevation ?? '')}`;
     if (!this.framedOnce || key !== this.focusKey) {
       const to = this.frameFor(focus, String(p.view ?? 'iso'));
-      if (!this.framedOnce || !ctx.frame.animate) {
+      if (!this.framedOnce || !ctx.frame.animate || !ctx.frame.clock || !ctx.frame.clock.running && !ctx.frame.clock.paused || ctx.frame.playground) {
         this.view = to;
         this.tween = null;
-      } else this.tween = { from: { ...this.view, target: this.view.target.clone() }, to, t0: performance.now() };
+      } else this.tween = { from: { ...this.view, target: this.view.target.clone() }, to, t0: ctx.frame.clock?.timeMs ?? 0 };
       this.focusKey = key;
       this.framedOnce = true;
       this.userMoved = false;
     }
-    if (!ctx.frame.animate) {
+    if (!ctx.frame.animate || !ctx.frame.clock || !ctx.frame.clock.running && !ctx.frame.clock.paused || ctx.frame.playground) {
       for (const it of this.items.values()) it.cur = { ...it.goal };
       this.tween = null;
     }
-    this.tick(performance.now(), true);
+    const gesture = ctx.frame.gesture;
+    if (gesture?.action.type === 'plugin' && gesture.action.name === 'scene3d:rotate' && gesture.action.target === ctx.node.id) {
+      if (!this.gestureFrom) this.gestureFrom = { ...this.view, target: this.view.target.clone() };
+      const data = gesture.action.data;
+      this.tween = null;
+      this.view = { ...this.gestureFrom, az: this.gestureFrom.az + (num(data.azimuth, 45) * DEG - this.gestureFrom.az) * gesture.progress, el: this.gestureFrom.el + (num(data.elevation, 32) * DEG - this.gestureFrom.el) * gesture.progress };
+    } else this.gestureFrom = null;
+    this.tick(ctx.frame.clock?.timeMs ?? 0, false);
+  }
+
+  private freezeView() {
+    if (!this.frozen) this.frozen = { focusKey: this.focusKey, view: { ...this.view, target: this.view.target.clone() }, tween: this.tween, values: new Map([...this.items].map(([id, item]) => [id, {...item.cur}])) };
   }
 
   destroy(): void {
-    cancelAnimationFrame(this.raf);
     this.ro.disconnect();
     for (const f of this.cleanup) f();
     for (const it of this.items.values()) this.dispose(it);
@@ -498,7 +520,8 @@ class SceneView implements ComponentInstance {
     const aspect = this.width / Math.max(1, this.height);
     const r = Math.max(sphere.radius, focus ? 0.9 : 1.5);
     const half = (focus ? 1.9 : 1.04) * Math.max(r, r / Math.max(0.2, aspect)) * (focus ? 1 : 0.92);
-    return { ...angles, target: sphere.center.clone(), half };
+    const p = this.ctx.node.props;
+    return { ...angles, az: typeof p.azimuth === 'number' ? p.azimuth * DEG : angles.az, el: typeof p.elevation === 'number' ? p.elevation * DEG : angles.el, target: sphere.center.clone(), half };
   }
 
   private placeCamera(): void {
@@ -521,6 +544,11 @@ class SceneView implements ComponentInstance {
     return typeof f === 'string' && this.items.has(f) ? f : null;
   }
 
+  private reportOrbit() {
+    const azimuth = ((this.view.az / DEG + 180) % 360 + 360) % 360 - 180;
+    this.ctx.act?.(this.ctx.node.id, {type:'plugin',name:'scene3d:rotate',data:{azimuth,elevation:this.view.el / DEG}});
+  }
+
   // ---------- 帧 ----------
   private resize(render = true): void {
     const w = Math.max(1, this.el.clientWidth);
@@ -530,15 +558,7 @@ class SceneView implements ComponentInstance {
     this.height = h;
     this.renderer.setSize(w, h, false);
     if (this.framedOnce && !this.userMoved && !this.tween) this.view = this.frameFor(this.focusId(), String(this.ctx.node.props.view ?? 'iso'));
-    if (render) this.tick(performance.now(), true);
-  }
-
-  private invalidate(): void {
-    if (this.raf) return;
-    this.raf = requestAnimationFrame((t) => {
-      this.raf = 0;
-      this.tick(t, false);
-    });
+    if (render) this.tick(this.ctx.frame.clock?.timeMs ?? 0, true);
   }
 
   private tick(now: number, immediate: boolean): void {
@@ -571,8 +591,7 @@ class SceneView implements ComponentInstance {
     this.placeCamera();
     this.renderer.render(this.scene, this.camera);
     this.placeOverlay();
-    if (busy && this.ctx.frame.animate) this.invalidate();
-    else if (busy) {
+    if (busy && (!this.ctx.frame.animate || !this.ctx.frame.clock)) {
       for (const it of this.items.values()) {
         it.cur = { ...it.goal };
         this.apply(it);
@@ -636,10 +655,22 @@ class SceneView implements ComponentInstance {
       const r = canvas.getBoundingClientRect();
       return r.width / Math.max(1, canvas.clientWidth) || 1;
     };
+    const key = (e: KeyboardEvent) => {
+      if (!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
+      e.preventDefault(); e.stopPropagation(); this.freezeView(); this.userMoved = true; this.tween = null;
+      const step = (e.shiftKey ? 1 : 15) * DEG;
+      this.view.az += e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+      this.view.el = Math.max(6 * DEG, Math.min(86 * DEG, this.view.el + (e.key === 'ArrowUp' ? step : e.key === 'ArrowDown' ? -step : 0)));
+      this.tick(this.ctx.frame.clock?.timeMs ?? 0, true); this.reportOrbit();
+    };
+    canvas.addEventListener('keydown', key); this.cleanup.push(() => canvas.removeEventListener('keydown', key));
     on('pointerdown', (e) => {
       if (e.button !== 0) return;
       e.stopPropagation(); // 不让舞台把拖动当作平移
-      this.drag = { x: e.clientX, y: e.clientY, az: this.view.az, el: this.view.el, moved: false, id: e.pointerId };
+      const hit = this.pick(e.clientX, e.clientY);
+      // Host-owned anchor metadata is the same ownership decision used by DOM gestures.
+      const target = hit?.anchor.hasAttribute('data-jdraggable') ? hit.id : undefined;
+      this.drag = { x: e.clientX, y: e.clientY, az: this.view.az, el: this.view.el, moved: false, id: e.pointerId, target };
     });
     on('pointermove', (e) => {
       const d = this.drag;
@@ -654,24 +685,26 @@ class SceneView implements ComponentInstance {
           canvas.setPointerCapture?.(d.id);
           canvas.style.cursor = 'grabbing';
         }
+        if (d.target) return;
+        this.freezeView();
         this.tween = null;
         this.userMoved = true;
         this.view = { ...this.view, az: d.az - dx * 0.008, el: Math.max(6 * DEG, Math.min(86 * DEG, d.el + dy * 0.006)) };
-        this.tick(performance.now(), true);
+        this.tick(this.ctx.frame.clock?.timeMs ?? 0, true);
         return;
       }
       const hit = this.pick(e.clientX, e.clientY);
       const id = hit?.id ?? null;
       if (id !== this.hover) {
         this.hover = id;
-        this.tick(performance.now(), true);
+        this.tick(this.ctx.frame.clock?.timeMs ?? 0, true);
       }
       canvas.style.cursor = this.ctx.frame.mode === 'review' ? 'help' : hit?.node.interactive ? 'pointer' : 'grab';
     });
     on('pointerleave', () => {
       if (this.hover) {
         this.hover = null;
-        this.tick(performance.now(), true);
+        this.tick(this.ctx.frame.clock?.timeMs ?? 0, true);
       }
     });
     on('pointerup', (e) => {
@@ -680,7 +713,17 @@ class SceneView implements ComponentInstance {
       canvas.style.cursor = 'grab';
       if (!d) return;
       e.stopPropagation();
-      if (d.moved) return;
+      if (d.moved) {
+        if (d.target) {
+          const stage = this.el.closest<HTMLElement>('[data-joplo-stage]');
+          const box = stage?.getBoundingClientRect();
+          const scale = box && stage ? box.width / stage.offsetWidth || 1 : 1;
+          const point = {x:(e.clientX-(box?.left??0))/scale,y:(e.clientY-(box?.top??0))/scale};
+          const destination = this.pick(e.clientX, e.clientY);
+          this.ctx.act?.(d.target, {type:'drag',to:destination && destination.id !== d.target ? destination.id : point}, {type:'drag',target:d.target,to:point});
+        } else this.reportOrbit();
+        return;
+      }
       const hit = this.pick(e.clientX, e.clientY);
       if (hit) this.ctx.click(hit.id, { clientX: e.clientX, clientY: e.clientY, altKey: e.altKey });
     });

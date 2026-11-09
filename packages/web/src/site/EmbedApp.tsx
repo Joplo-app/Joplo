@@ -1,3 +1,4 @@
+import { PlaygroundNotice } from '../player/PlaygroundNotice';
 import { projectThemes } from '@joplo-app/core/runtime';
 /**
  * 发布站的嵌入模式（`?embed=1`，云端嵌入契约 · 方案 A「大播放按钮」）：给博客等第三方页面的 iframe 用的精简播放器。
@@ -281,12 +282,19 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
         {scenario && state && shownScene ? (
           // 封面显示时画面只是背景：inert，Tab 不会落到被遮住的原型元素上
           <div className="flex min-h-0 flex-1 flex-col" inert={covered || undefined} data-testid="embed-stage">
-          <StageViewport viewport={device} theme={project.theme} stroke={look.stroke} font={look.font} notice={covered ? null : snap.notice} onDismiss={() => ctl.dismissNotice()} onBack={() => ctl.backToDemo()} curtainUp={curtainOn} curtain={(size) => <Curtain project={project} scenarioId={scenario.id} position={pos} cover={cover} onStart={() => void ctl.play({ fromStart: true })} theme={project.theme} font={look.font} width={size.width} height={size.height} animate={!ctl.reducedMotion} />}>
+          <StageViewport clock={ctl.clock} playground={!covered && !curtainOn && snap.freeMode ? <PlaygroundNotice ctl={ctl} snap={snap} /> : undefined} viewport={device} theme={project.theme} stroke={look.stroke} font={look.font} notice={covered ? null : snap.notice} onDismiss={() => ctl.dismissNotice()} onBack={() => ctl.backToDemo()} curtainUp={curtainOn} curtain={(size) => <Curtain project={project} scenarioId={scenario.id} position={pos} cover={cover} onStart={() => void ctl.play({ fromStart: true })} theme={project.theme} font={look.font} width={size.width} height={size.height} animate={!ctl.reducedMotion} />}>
             {(size) => (
               <Stage
                 viewportOverride={device === 'mobile' ? null : size}
                 project={project}
                 state={state}
+                playground={snap.playground}
+                freeMode={snap.freeMode}
+                clock={ctl.clock}
+                gesture={snap.gesture}
+                inspect={picking}
+                onStageInput={() => ctl.stageInput()}
+                onAction={(action, native) => { void ctl.act(action, native); }}
                 theme={project.theme}
                 camera={camera}
                 sceneId={plan.sceneId}

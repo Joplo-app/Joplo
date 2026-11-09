@@ -1,3 +1,4 @@
+import { pluginActionSpec } from './actions.ts';
 import { pluginSpec } from './catalog.ts';
 import { mapSlotTexts, mapTextPaths } from './plugin-data.ts';
 /**
@@ -83,20 +84,26 @@ function mapNode(n: SceneNode, visit: Visit, plugins: Project['plugins']): Scene
 const t = (s: string | undefined, visit: Visit, at?: string) => (s ? visit(s, 'text', at) : s);
 const stateMap = (v: unknown, base: string, visit: Visit) => mapDeep(v, (s, p) => visit(s, 'state', undefined, `${base}${p}`), '');
 
-function mapStep(st: Step, visit: Visit, plugins: Project['plugins']): Step {
-  const at = st.source;
-  const a = st.action;
-  const action: Step['action'] =
-    a.type === 'card' ? { ...a, title: visit(a.title, 'text', at), ...(a.sub ? { sub: visit(a.sub, 'text', at) } : {}), ...(a.points ? { points: a.points.map((p) => visit(p, 'text', at)) } : {}) }
+function mapAction(a: Step['action'], visit: Visit, plugins: Project['plugins'], at?: string): Step['action'] {
+  return a.type === 'card' ? { ...a, title: visit(a.title, 'text', at), ...(a.sub ? { sub: visit(a.sub, 'text', at) } : {}), ...(a.points ? { points: a.points.map((p) => visit(p, 'text', at)) } : {}) }
       : a.type === 'type' || a.type === 'select' ? { ...a, value: visit(a.value, 'typed', at) }
         : a.type === 'event' ? { ...a, name: visit(a.name, 'text', at) }
+          : a.type === 'plugin' ? { ...a, data: Object.fromEntries(Object.entries(a.data).map(([key, value]) => [key, typeof value === 'string' && pluginActionSpec({ plugins }, a.name)?.fields[key]?.text ? visit(value, 'typed', at) : value])) }
           : a;
-  const effects = st.effects.map((e): Step['effects'][number] => {
+}
+function mapEffects(effects: Step['effects'], visit: Visit, at?: string): Step['effects'] {
+  return effects.map((e): Step['effects'][number] => {
     if (e.type === 'set' || e.type === 'append') return { ...e, value: stateMap(e.value, e.path, visit) as typeof e.value };
     if (e.type === 'stream') return { ...e, value: visit(e.value, 'text', at) };
     if (e.type === 'toast' || e.type === 'complete') return { ...e, text: visit(e.text, 'text', at) };
     return e;
   });
+}
+
+function mapStep(st: Step, visit: Visit, plugins: Project['plugins']): Step {
+  const at = st.source;
+  const action = mapAction(st.action, visit, plugins, at);
+  const effects = mapEffects(st.effects, visit, at);
   return {
     ...st,
     ...(st.ext ? { ext: mapSlotTexts(st.ext, plugins, 'step', s => visit(s, 'text', st.source)) } : {}),
@@ -141,6 +148,7 @@ function mapProject(p: Project, visit: Visit): Project {
     features: obj(p.features, (f) => ({ ...f, name: visit(f.name, 'text', f.source), goal: visit(f.goal, 'text', f.source), roles: arr(f.roles, (r) => ({ ...r, name: visit(r.name, 'text', f.source), ...(r.desc ? { desc: visit(r.desc, 'text', f.source) } : {}) })), constraints: arr(f.constraints, (c) => ({ ...c, text: visit(c.text, 'text', f.source) })) })),
     options: obj(p.options, (o) => ({
       ...o,
+      ...(o.free ? {free:obj(o.free, r => ({...r, action:mapAction(r.action, visit, p.plugins, r.source),effects:mapEffects(r.effects, visit, r.source)}))} : {}),
       name: visit(o.name, 'text', o.source),
       idea: visit(o.idea, 'text', o.source),
       ...(o.decisionFocus !== undefined ? { decisionFocus: t(o.decisionFocus, visit, o.source) ?? '' } : {}),

@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createRu(locale: Locale = 'ru') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `Свободный режим · Нажмите воспроизведение`,
+      freeChangesDiscarded: `Изменения не сохранятся`,
+      freeReset: `Сбросить`,
+      freeSwitchPrompt: (name: string) => `Перейти к «${name}»?`,
+      freeSwitchDescription: `Начнётся прямо перед этим действием. Изменения свободного режима будут отменены.`,
+      freeSwitchConfirm: `Сменить сценарий`,
+      freeSwitchCancel: `Остаться здесь`,
       ...autoCaptionMessages('ru'),
       mockSuccess: "Имитация успеха",
       mockFailure: "Имитация ошибки",

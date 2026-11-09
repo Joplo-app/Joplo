@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createZhCN(locale: Locale = 'zh-CN') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `自由体验中 · 按播放继续`,
+      freeChangesDiscarded: `改动不会保留`,
+      freeReset: `重置`,
+      freeSwitchPrompt: (name: string) => `切到「${name}」场景？`,
+      freeSwitchDescription: `从这个操作之前开始，当前体验改动会丢弃。`,
+      freeSwitchConfirm: `切换场景`,
+      freeSwitchCancel: `留在这里`,
       ...autoCaptionMessages('zh-CN'),
       mockSuccess: '模拟成功',
       mockFailure: '模拟失败',

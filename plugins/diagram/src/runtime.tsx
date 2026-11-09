@@ -2,8 +2,8 @@ import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef,
 import { defineRuntime } from '@joplo-app/kit/plugin';
 import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
 import { resolveProps, isSelfVisible, walkNodes } from '@joplo-app/kit/renderer';
-import { AnimatePresence, motion } from 'motion/react';
-import { animate as animateValue } from 'motion';
+import { AnimatePresence } from 'motion/react';
+import { motion } from '@joplo-app/kit/renderer';
 import { useI18n, useCtx as useHostCtx, useR, useRoot, useRootAttrs, RenderNode, Rough, RoughPath, roundRectPath, useStroke, type NodeProps } from '@joplo-app/kit/renderer';
 import { DANGER, DIMMED, INFO, INK, INK2, LINE_STRONG, MONO, OK, SURFACE, WARN, color, dim, fontSize, radius, tint } from '@joplo-app/kit/renderer-style';
 import { rectOf } from '@joplo-app/kit/renderer';
@@ -47,8 +47,8 @@ type DiagramCtxValue = {
  * 布局始终按全部元素计算（when 不参与），所以出现时已有元素不移动。
  */
 function useAppear(mountedAt: number | undefined): boolean {
-  const { animate } = useCtx();
-  const [appear] = useState(() => mountedAt !== undefined && animate && typeof performance !== 'undefined' && performance.now() - mountedAt > 300);
+  const { animate, clock } = useCtx();
+  const [appear] = useState(() => mountedAt !== undefined && animate && !!clock && clock.timeMs - mountedAt > 300);
   return appear;
 }
 const DiagramContext = createContext<DiagramCtxValue | null>(null);
@@ -178,7 +178,8 @@ function Diagram({ node, p }: NodeProps) {
   const r = useR(p);
   const { structure, layout } = useMemo(() => graphView(node), [node]);
   const ref = useRef<HTMLDivElement | null>(null);
-  const [mountedAt] = useState(() => (typeof performance !== 'undefined' ? performance.now() : 0));
+  const { clock } = useCtx();
+  const [mountedAt] = useState(() => clock?.timeMs ?? 0);
   const [avail, setAvail] = useState(0);
   const [availH, setAvailH] = useState(0);
   useLayoutEffect(() => {
@@ -410,6 +411,7 @@ function DiagramNode({ node, p }: NodeProps) {
 function MovingDot({ d, color, animate: anim, reverse = false }: { d: string; color: string; animate: boolean; reverse?: boolean }) {
   const pathRef = useRef<SVGPathElement>(null);
   const dotRef = useRef<SVGCircleElement>(null);
+  const { clock } = useCtx();
   useEffect(() => {
     const path = pathRef.current;
     const dot = dotRef.current;
@@ -420,7 +422,7 @@ function MovingDot({ d, color, animate: anim, reverse = false }: { d: string; co
       dot.setAttribute('cx', String(pt.x));
       dot.setAttribute('cy', String(pt.y));
     };
-    if (!anim) {
+    if (!anim || !clock) {
       place(reverse ? 0.25 : 0.75); // 中点通常是连线标签，停在标签与（行进方向上的）终点之间
       return;
     }
@@ -428,9 +430,9 @@ function MovingDot({ d, color, animate: anim, reverse = false }: { d: string; co
     const dur = Math.max(0.9, len / 260);
     // 一圈的时长写在元素上：自动播放会等本步 active 连线上的小点至少跑完一圈（T-director2）
     dot.setAttribute('data-jdot-ms', String(Math.round(dur * 1000)));
-    const ctl = animateValue(0, 1, { duration: dur, ease: 'linear', repeat: Infinity, onUpdate: (t) => place(reverse ? 1 - t : t) });
-    return () => ctl.stop();
-  }, [d, anim, reverse]);
+    const t = (clock.elapsedMs % (dur * 1000)) / (dur * 1000);
+    place(reverse ? 1 - t : t);
+  }, [d, anim, reverse, clock?.timeMs]);
   return (
     <>
       <path ref={pathRef} d={d} fill="none" stroke="none" />
@@ -531,7 +533,8 @@ function SequenceDiagram({ node, p }: NodeProps) {
   const r = useR(p);
   const { structure, layout } = useMemo(() => sequenceView(node), [node]);
   const ref = useRef<HTMLDivElement | null>(null);
-  const [mountedAt] = useState(() => (typeof performance !== 'undefined' ? performance.now() : 0));
+  const { clock } = useCtx();
+  const [mountedAt] = useState(() => clock?.timeMs ?? 0);
   const [avail, setAvail] = useState(0);
   const [availH, setAvailH] = useState(0);
   useLayoutEffect(() => {

@@ -284,6 +284,10 @@ export type StepDef = {
   kind: 'user' | 'system' | 'card';
   action:
     | { type: 'click'; target: string }
+    | { type: 'drag'; target: string; to: string | { x: number; y: number } }
+    | { type: 'hover'; target: string; ms: number }
+    | { type: 'scroll'; target: string; to: string | { x: number; y: number } }
+    | { type: 'plugin'; name: string; target: string; data: Record<string, unknown> }
     | { type: 'type'; target: string; value: string }
     | { type: 'select'; target: string; value: string }
     | { type: 'toggle'; target: string; value: boolean }
@@ -345,6 +349,19 @@ export class Flow {
   click(target: string, ...args: StepArg[]): this {
     return this.add('user', { type: 'click', target }, args);
   }
+  drag(target: string, to: string | { x: number; y: number }, ...args: StepArg[]): this {
+    return this.add('user', { type: 'drag', target, to }, args);
+  }
+  hover(target: string, ms = 500, ...args: StepArg[]): this {
+    return this.add('user', { type: 'hover', target, ms }, args);
+  }
+  scroll(target: string, to: string | { x: number; y: number }, ...args: StepArg[]): this {
+    return this.add('user', { type: 'scroll', target, to }, args);
+  }
+  /** Namespaced plugin action; payload and matching are declared by its plugin. */
+  act(name: string, target: string, data: Record<string, unknown>, ...args: StepArg[]): this {
+    return this.add('user', { type: 'plugin', name, target, data }, args);
+  }
   type(target: string, value: string, ...args: StepArg[]): this {
     return this.add('user', { type: 'type', target, value }, args);
   }
@@ -386,6 +403,19 @@ export class Flow {
 /** 一条演示路径。 */
 export const flow = (name: string, opts: FlowOpts = {}): Flow => new Flow(name, opts);
 
+/** Unordered local reactions; the compiler permits only local state effects. */
+const reaction = (build: (f: Flow) => Flow): StepDef => ({ ...build(new Flow('free', {})).steps[0]!, source: callsite(4) });
+export const free = {
+  click: (target: string, ...args: StepArg[]) => reaction(f => f.click(target, ...args)),
+  type: (target: string, value: string, ...args: StepArg[]) => reaction(f => f.type(target, value, ...args)),
+  select: (target: string, value: string, ...args: StepArg[]) => reaction(f => f.select(target, value, ...args)),
+  toggle: (target: string, value: boolean, ...args: StepArg[]) => reaction(f => f.toggle(target, value, ...args)),
+  drag: (target: string, to: string | {x:number;y:number}, ...args: StepArg[]) => reaction(f => f.drag(target, to, ...args)),
+  hover: (target: string, ms = 500, ...args: StepArg[]) => reaction(f => f.hover(target, ms, ...args)),
+  scroll: (target: string, to: string | {x:number;y:number}, ...args: StepArg[]) => reaction(f => f.scroll(target, to, ...args)),
+  act: (name: string, target: string, data: Record<string, unknown>, ...args: StepArg[]) => reaction(f => f.act(name, target, data, ...args)),
+};
+
 export type OptionDef = {
   kind: 'option';
   name: string;
@@ -403,6 +433,7 @@ export type OptionDef = {
   coverage?: Record<string, CoverageDecl>;
   /** 层级（视角）：每层一个独立画面 { client: layer('客户端视角', <ClientView />), backend: layer('后端流转', <Arch />) }。 */
   layers?: Record<string, LayerDef>;
+  free?: Record<string, StepDef>;
   scenarios: Record<string, Flow>;
   source?: string;
 };

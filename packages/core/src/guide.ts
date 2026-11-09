@@ -176,7 +176,7 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}, plugins?: r
     `Joplo props: ${JOPLO_PROPS.join(', ')}; disabled is the component disable prop.`,
     'when controls visibility; disabledReason explains disabling; unmodeled marks behavior not modeled by this prototype; note is an authoring note; redact blurs secrets or private data (true or a condition; see focus).',
     'Interactive elements need a flow step, disabled={true} with a disabledReason, or explicit unmodeled (see check: UNBOUND_INTERACTIVE).',
-    'Value components are read-only on stage: they show inputs[id] written by .type/.select/.toggle steps, or a bound value prop. Viewers cannot type their own text.',
+    'Value components show scripted inputs[id] or bound props. While paused, native UI controls accept local input; play/jump/reset discards it. Matching an exact scripted action advances instead. See demo for free reactions and gestures.',
     'See authoring for bindings, conditions, and steps; check for component error fixes.',
   ].join('\n');
 }
@@ -185,6 +185,13 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
   plugins: `# Joplo plugins: plugins
 
 Plugins are npm packages maintained outside Joplo. They add components (for example an interactive 3D scene) that the Joplo engine schedules like catalog components: flow steps click their elements, state bindings drive them, and the camera, cues, marks, captions, narration, screenshots, video export, build, and share all work unchanged.
+
+## Actions, native behavior and one clock
+Declare actions: { rotate: { caption: 'Rotate {label} to {data.angle}', durationMs: 800, fields: { angle: { type: 'number', min: 0, max: 360, tolerance: 2 } }, targets: ['probe:Scene'] } }. The action name is probe:rotate. Fields are exact string/number/boolean payload keys; numeric min/max validate and tolerance matches gestures; text:true on a string field opts its value into content translation. Captions support {label} and {data.key}. No match callbacks enter IR.
+Recognizers call ctx.act?.(targetId, { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }). Present frame.gesture.action with frame.gesture.progress; derive drawing from frame.clock.timeMs/elapsedMs. Runtime mount/update and observers receive these same frames. Missing clock or animate:false means draw final state. Never use setTimeout/setInterval/requestAnimationFrame/performance.now to drive a timeline animation. React plugins use motion from @joplo-app/kit/renderer; the host supplies its engine driver. CSS/WAAPI/SMIL are sampled by that same clock. RAF for layout measurement must not accumulate animation time.
+Declare traits.native: {action:'type'|'toggle'|'select', prop:'value'|'checked', deselect?:true}, traits.hover, traits.draggable and traits.selectionGate ({owner,item?,value,fallbackFirst?}) as data. selectionGate keeps replay and entry checks consistent with panels selected by an ancestor control. The UI plugin owns these defaults. A renderer can report an original click plus its native value intent; one arbiter chooses the next step, cross-scenario entry or local reaction, never both.
+Keep arbitrary local view state only inside a runtime, and restore it on frame.resetKey. Binding changes belong in option.free or step effects. Persist a scripted orientation with explicit set effects/bound props so screenshots and direct entry match autoplay. Free reactions support local state effects only; plugin effects with derived snapshots/media must stay on the timeline.
+Action and free data survive build/review; scope drops reactions whose targets/endpoints were removed and rebuilds cross-scenario candidates from retained scenarios. Content translation visits free values/effects and marked plugin fields, never IDs/coordinates. Feature-diff reports action, free-reactions and action-contracts changes. Test a second plugin and file:// publication; workspace playback alone does not prove the packaged contract.
 
 ## Standard plugins and API v2
 UI, HTML fallback, diagram and explainer standard plugins are enabled without config.plugins; third-party plugins still require explicit opt-in. The diagram topic comes from the first-party package. Existing kit imports stay valid; compiled component names use the plugin namespace.
@@ -235,8 +242,8 @@ export default config({ name: 'Smart home', plugins: [scene3d] });
 ## Rules
 - Interactive plugin elements need an id plus a step, disabled with disabledReason, or unmodeled, exactly like Button (UNBOUND_INTERACTIVE).
 - UNKNOWN_PLUGIN: the component's plugin is not in config({ plugins }). PLUGIN_PARENT: that element must be written directly inside the parent the message names. PLUGIN_RUNTIME_MISSING: the package's runtime file is gone; reinstall the package.
-- Behavior still lives in flow steps. Plugins only render and report clicks; they never change state themselves. Function props are still rejected.
-- Viewers may play with a plugin's own view (for example drag to orbit a 3D scene). That never changes business state or advances the demo; only clicking the highlighted element does.
+- Timeline behavior lives in flow steps; local reactions use option.free. Plugins render and report actions through ctx.act; the player never executes plugin semantics. Function props are still rejected.
+- Viewers may change plugin-local view state (for example orbit a 3D scene). Honor frame.resetKey to discard it; report recognized actions through ctx.act so matching scripted gestures can advance. Do not mutate ctx state.
 - npx joplo build and share bundle each enabled plugin's runtime into the site (it works offline and from file://). The site grows with the plugin's dependencies, so remove plugins you no longer use.
 - A plugin runs code in the board and in the published site, like any npm dependency. Install only packages the user trusts, and tell the user which plugin you are adding.
 - When the board shows "Plugin unavailable", read the reason under it (wrong plugin API version, runtime failed to load) before changing the TSX.
@@ -359,6 +366,11 @@ ${START_ORDER.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 Describe designs in TS/TSX. Source files are authoritative; Git manages versions. The board and published site consume compiled IR.
 Read only the topics needed, usually one or two at a time. See components for components, cases for questions before starting, and demo for organizing and presenting demos.
 
+## Unordered local reactions
+Import free from @joplo-app/kit and add option({ free: { profile: free.click('avatar', set($.ui.card, true)) }, scenarios: { ... } }). Each named reaction has one action and local effects (set, push/append, toast); navigation, done, media and plugin effects remain in scripted steps. Targets and effects are checked at compile time.
+Native UI controls need no free declaration: Tabs, Accordion, text inputs, Switch, Checkbox, Radio, Select and SegmentedControl change local values. A bound checked/value prop updates locally too, keeping two views of the same state synchronized. Keep the scripted result in step effects; do not store audience input or credentials in the source.
+Free reactions match exact action type, target and value, in declaration order. A matching next step wins, then a reachable action in another scenario of this option (with confirmation), then free/native behavior. To diagnose a click that opens a switch prompt instead of a reaction, inspect other scenarios; never silently bypass confirmation. Run check and test both manual and automatic playback (demo).
+
 ## Designing your own product with Joplo
 Keep one Joplo project per product and model each real product feature under features/<id>; keep alternatives as options and cases as scenarios. The repository's examples/joplo is Joplo's own design workspace: historical workbench choices, authoring, player, sharing, feedback and feature diffs. Keep those feature IDs when iterating; do not create another joplo-<feature> project for each change.
 
@@ -468,6 +480,16 @@ For demos of secrets or gated access, use masked placeholders as the sample inpu
 Tell one thing per step: separate viewpoints with independent layers, zoom into details with shots, and describe what happened with short captions.
 See authoring for directories, state, and flow syntax. Import layer, shot, trace, explain from @joplo-app/kit.
 What viewers look at in each step, and the lighter forms (spotlight, highlight, callout, numbered, hold, redact): npx joplo skill focus.
+
+## Playback and free exploration (D88)
+- Picture = deterministic timeline at step k + disposable local playground. The first pointer/key action on a playing stage only pauses; it never also edits or advances. Playback controls live outside the stage.
+- While paused: exact next action → advance and clear local edits; another reachable action in this option → ask to switch and enter before that action; native control/free reaction → local only; otherwise show the existing hint. Typing must match the scripted value; merely clicking a type/select target never completes that step.
+- Play, jump, scenario change and reset discard local edits/view/scroll state. The corner message and Reset are keyboard accessible. Deep links, render, screenshots and video contain only scripted state; never claim an audience edit has been saved or implemented.
+- Use option.free for unordered small reactions (authoring). UI native controls need no handlers. Prototype real input stays local; the native feedback panel still sends actual review feedback.
+- New steps: .drag('item', 'drop_zone', set(...)) or .drag('item', { x: 400, y: 200 }, set(...)); .hover('help', 600, set(...)); .scroll('list', 'last_row') or .scroll('list', { x: 0, y: 300 }). Coordinates for drag are stage CSS pixels; scroll uses the container's scroll offsets. Place a drag destination inside its stage and a scroll target inside its scroll container. Effects still determine persistent business results.
+- Drag begins on a declared drag target before stage pan/plugin orbit; Enter or Space on that target provides the scripted drag alternative. Touch activates hover by tapping; editable input keeps Space/arrow keys. Scroll areas consume wheel movement before stage zoom.
+- .act('plugin:action', 'target', { ...payload }, set(...)) uses a plugin's data-only matching/caption contract. Read its skill; never invent its payload. The runtime recognizes gestures via ctx.act and presents them using frame.gesture plus frame.clock, including pause/resume; see plugins.
+- When building a spatial demo, keep device state in bindings shared by UI and 3D; add a small local reaction for a secondary device and a separate scripted orientation step. Test pause-only first input, exploration, reset, resume and cross-scenario cancel/confirm. A nice autoplay is insufficient evidence for interaction.
 
 ## Layers are independent pages
 - Declare layers in an option: layers: { client: layer('Client view', <ClientView/>), backend: layer('Backend flow', <BackendView/>) }.
@@ -750,6 +772,8 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - The last line totals error, warning, info. Run check again after fixing.
 
 ## Common codes → fixes
+- FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID: give each free reaction a valid targeted action in this option and only set, append or toast with valid leaf state paths. Move navigation, completion, media and plugin effects into flow steps; do not add event callbacks.
+- ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID / PLUGIN_ACTION_INVALID: check the action shape, enabled plugin declaration, exact payload fields/ranges, allowed target type, and drag/scroll endpoint. Read the plugin skill; keep endpoints in the current stage, then rerun check.
 - UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
 - UNKNOWN_PLUGIN / PLUGIN_PARENT / PLUGIN_INVALID / PLUGIN_DUPLICATE / PLUGIN_RUNTIME_MISSING: plugin components need their package in config({ plugins: [...] }) once, written inside the parent named in the message; a missing runtime means reinstall the package (npx joplo skill plugins).
 - LOCAL_RESOURCE_FAILED / LOCAL_RESOURCE_TIMEOUT / LOCAL_RESOURCE_TOO_LARGE: an optional local resource could not compile. Playback continues without it; the board shows the source location and reason without resetting the timeline. Repair the native tool/input and retry playback or build; successful retry clears the warning. check does not execute native tools, so verify actual playback/build too (plugins).
@@ -832,7 +856,7 @@ Required after every round of development: start the follower before handing the
 --follow covers every option of the project and attaches by itself to the new round that each source edit opens, so no session id is needed. Give the reviewer the URL dev printed only after the follower is ready; a running board may use a different port or serve several projects. If they want to operate the UI themselves, hand over the link without navigating or submitting on their behalf.
 
 ## Local review: feedback without leaving the board
-- The native feedback icon is draggable and remembers its relative position. Its floating panel never resizes the stage. Reviewers can type real feedback here (unlike scripted demo inputs), or confirm without writing feedback. Point them to this native control, not a simulated icon inside the demo.
+- The native feedback icon is draggable and remembers its relative position. Its floating panel never resizes the stage. Reviewers can type persistent review feedback here (prototype input is disposable exploration), or confirm without writing feedback. Point them to this native control, not a simulated icon inside the demo.
 - Each successful option revision is its own review round (session). The follower streams all of them: stdout is NDJSON, one event per line, each with sessionId, optionId and eventId; diagnostics go to stderr. Approving one option does not stop it. It exits 1 when the board stops (restart dev and run it again) and 130 on Ctrl+C. On restart it replays the open rounds, so deduplicate by eventId.
 - Exact-session mode is for waiting on one option version or resuming from a cursor: npx joplo feedback list [dir] --local --json (--all includes completed/stopped sessions, --option <qualified-id> filters), then npx joplo feedback watch [dir] --local --session <id> --json. Without --session or --follow, exactly one active match is required; never guess between multiple instances. joplo review list/watch remain compatible local aliases.
 - During an active review, read background output with short tool waits (about 1–5 seconds) and acknowledge feedback as it arrives. Do not wait for approved or process exit: a long output-read window can delay the agent's response even though the CLI emitted feedback immediately. A background shell alone is not an agent wake-up mechanism; stay in the active receive loop while the user is testing.
@@ -977,7 +1001,7 @@ Compare cases and options in the board, then decide which option to publish for 
 - Fullscreen works on the published site: F enters/toggles, Space plays/pauses, ←/→ steps back/forward, Esc exits. Like a video, ←/→ during playback skips one step and keeps playing; while paused it steps once and stays paused.
 - Fullscreen keeps only the stage and captions. Playback controls float below and hide automatically.
 - Autoplay plays the picked option's scenarios back to back, like chapters of one video: after the last step of a scenario an Up next card names the next one and counts down 3 seconds (Play now / Cancel; pausing pauses the countdown), then it starts; after the last scenario it stops. Stepping by hand never jumps. So order scenarios as chapters (the first one is the hook) and end each on a clear result.
-- On phones the published site becomes a video player: the 1280 × 800 desktop stage is scaled as a whole with black bars (never re-laid out to the phone width); portrait shows the video, full captions, one row of controls and the chapter list; turning the phone sideways (or tapping Landscape) fills the screen with stage and captions, a tap shows or hides the controls, and a swipe steps. On an iPhone, which cannot fullscreen a page or lock orientation, the stage is rotated 90° until the phone is turned.
+- On phones the published site becomes a video player: the 1280 × 800 desktop stage is scaled as a whole with black bars (never re-laid out to the phone width); portrait shows the video, full captions, one row of controls and the chapter list; turning the phone sideways (or tapping Landscape) fills the screen with stage and captions plus a separate control bar. Stage taps pause/explore and stage drags belong to the prototype; use the control bar to step. On an iPhone, which cannot fullscreen a page or lock orientation, the stage is rotated 90° until the phone is turned.
 - Design for that: text on a 1280 × 800 stage shrinks to about 30% in portrait, so keep key text large (24px or more) and let shots zoom into details; in landscape the caption sits over the bottom of the stage, so keep important content out of the bottom 12%.
 - Both local and published views can export images. Video export is local only.
 - Local image and video export use the Joplo export component (Playwright + Chromium, kept under ~/.joplo, not in the project). If it is missing, the board's Export menu offers Install export component (about 100 MB) and continues the export after installing; in a terminal, run npx joplo setup export.

@@ -1,6 +1,8 @@
+import { motion as engineMotion } from './engine-motion';
+import type { ActionDispatch, EngineFrame, ActionPresentation } from '@joplo-app/kit/plugin';
 import { registerRendererServices } from '@joplo-app/kit/renderer';
 import { useI18n } from '../i18n/context';
-import { Component, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Component, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type ComponentType as ReactComponentType, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { disabledReasonOf, isInteractiveType, splitPluginType, type PluginTable, atWidth, childWidth, choicesOf, layoutRegions, evaluateCondition, isNodeDisabled, isSelfVisible, nodeLabel, resolveProps, resolveValue, walkNodes, type ComponentType, type StateChange, type PlayState, type Scene, type SceneNode } from '@joplo-app/core/runtime';
 import { cn } from '@/lib/utils';
@@ -14,6 +16,13 @@ import type { ComponentCtx, ComponentInstance, PluginNode } from '@joplo-app/kit
 export type RenderMode = 'review' | 'demo' | 'render';
 
 export type RenderCtx = {
+  act?: ActionDispatch;
+  interactive?: boolean;
+  draggable?: ReadonlySet<string>;
+  clock?: EngineFrame;
+  gesture?: ActionPresentation | null;
+  resetKey?: string;
+  playground?: boolean;
   scene: Scene;
   stage?: HTMLElement | null;
   state: PlayState;
@@ -60,13 +69,15 @@ export function useRootAttrs(node: SceneNode, disabled = false) {
 }
 
 /** 根 DOM 属性（纯函数）：插件组件的锚点也用它，引擎的光标、镜头、提示、检查都按这些属性定位。 */
-function rootAttrsOf(node: SceneNode, ctx: Pick<RenderCtx, 'state' | 'selectedId' | 'plugins'>, disabled: boolean) {
+function rootAttrsOf(node: SceneNode, ctx: Pick<RenderCtx, 'state' | 'selectedId' | 'plugins' | 'draggable' | 'interactive'>, disabled: boolean) {
   const interactive = isInteractiveType(node.type, ctx.plugins);
   return {
     ...Object.fromEntries(Object.values(ctx.plugins ?? {}).flatMap(plugin => Object.entries(plugin.properties ?? {}).flatMap(([key, spec]) => {
       const value = node.props?.[key];
       return spec.attribute && value !== undefined ? [[spec.attribute, String(value)]] : [];
     }))),
+    ...(node.traits?.hover ? { 'data-jhoverable': '' } : {}),
+    ...(node.traits?.draggable || ctx.draggable?.has(node.id) ? { 'data-jdraggable': '', ...(ctx.interactive ? {tabIndex:0} : {}) } : {}),
     ...(node.traits?.frame ? {'data-jframe-container':''} : {}),
     'data-jid': node.id,
     'data-jtype': node.type,
@@ -110,23 +121,8 @@ function TextNode({ node, p }: NodeProps) {
 /** 逐字出现的文字（D56）：总时长与自动播放的停留用同一个 streamMs；出完之前末尾有光标。 */
 function StreamText({ attrs, text, s }: { attrs: Record<string, unknown>; text: string; s: StreamingCtx }) {
   const chars = useMemo(() => [...text], [text]);
-  const [n, setN] = useState(0);
-  const paused = useRef(s.paused);
-  paused.current = s.paused;
-  useEffect(() => {
-    const per = streamMs(text, s.speed) / Math.max(1, chars.length);
-    let elapsed = 0;
-    let last = performance.now();
-    const id = setInterval(() => {
-      const now = performance.now();
-      if (!paused.current) elapsed += now - last;
-      last = now;
-      const k = Math.min(chars.length, Math.floor(elapsed / per));
-      setN(k);
-      if (k >= chars.length) clearInterval(id);
-    }, 30);
-    return () => clearInterval(id);
-  }, [text, chars, s.speed]);
+  const { clock } = useCtx();
+  const n = clock ? Math.min(chars.length, Math.floor(clock.elapsedMs / (streamMs(text, 1) / Math.max(1, chars.length)))) : chars.length;
   const done = n >= chars.length;
   return (
     <span {...attrs} data-jstreaming={done ? undefined : ''}>
@@ -188,8 +184,9 @@ function PluginHost({ node, p }: NodeProps) {
       const children = chosen.map(n => <RenderNode key={n.id} node={n} />);
       return container ? createPortal(children, container) : children;
     },
-    frame: { mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, sceneId: ctx.scene.id, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
+    frame: { clock: ctx.clock, gesture: ctx.gesture, playground: ctx.playground, resetKey: ctx.resetKey, mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, sceneId: ctx.scene.id, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
     css: (name) => { const el = element() ?? ctx.stage; return el ? getComputedStyle(el).getPropertyValue(name).trim() : ''; },
+    act: ctx.act,
     click: (id, at) => {
       const el = element();
       const target = el?.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`) ?? el;
@@ -284,4 +281,4 @@ export function RenderNode({ node }: { node: SceneNode }) {
   );
 }
 
-registerRendererServices({ useLook: () => { const {theme,font} = useContext(ThemeContext); return {theme,font:font??null,style:fontStyle(font)}; }, RendererContextProvider: ({value,children}) => <RenderContext.Provider value={{...useCtx(),...value}}>{children}</RenderContext.Provider>, nodeLabel, atWidth, childWidth, choicesOf, layoutRegions, resolveValue, styleOf, useCtx, useI18n, useR, useRoot, useRootAttrs, useStroke, RenderNode, Rough, RoughPath, roundRectPath, rectOf, resolveProps, isSelfVisible, walkNodes });
+registerRendererServices({ motion: engineMotion as unknown as Record<keyof JSX.IntrinsicElements, ReactComponentType<any>>, useLook: () => { const {theme,font} = useContext(ThemeContext); return {theme,font:font??null,style:fontStyle(font)}; }, RendererContextProvider: ({value,children}) => <RenderContext.Provider value={{...useCtx(),...value}}>{children}</RenderContext.Provider>, nodeLabel, atWidth, childWidth, choicesOf, layoutRegions, resolveValue, styleOf, useCtx, useI18n, useR, useRoot, useRootAttrs, useStroke, RenderNode, Rough, RoughPath, roundRectPath, rectOf, resolveProps, isSelfVisible, walkNodes });

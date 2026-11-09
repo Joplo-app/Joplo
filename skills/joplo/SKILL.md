@@ -4,10 +4,10 @@ description: Build clickable, replayable feature demos with Joplo (scripted scen
 ---
 # Joplo
 
-Joplo turns a feature idea into a clickable, replayable demo. It is a player for pre-declared scenarios, not a free-form app prototype, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.
+Joplo turns a feature idea into a clickable, replayable demo. It is a player for pre-declared scenarios, not a free-form app prototype with persistent data or real backend logic, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.
 Structure: a project has features; a feature has options (alternative designs, A/B) and cases (edge cases to cover); an option plays scenarios; a scenario is a list of steps.
-A step is one user action (.click / .type / .select / .press) or system event plus its visible effects (set, toast, go, done). Results and errors come from these effects, not from real logic or a backend.
-Viewers advance by clicking the highlighted element (other clicks only show a hint). Inputs show the sample value the step types; viewers cannot type their own, but the board's native feedback panel accepts real reviewer text.
+A step is one user action (.click / .type / .select / .press / .drag / .hover / .scroll / .act) or system event plus its visible effects (set, toast, go, done). Results and errors come from these effects, not from real logic or a backend.
+During playback, the first stage input only pauses. While paused, matching the next action advances the script; another reachable scenario asks to switch; native controls and declared free reactions change only a local playground. Play, jump, scenario change and reset discard exploration. Screenshots, video and deep links always use scripted state.
 Options and cases are compared in the local board; only the picked option is published.
 
 ## When to use
@@ -18,9 +18,9 @@ Options and cases are compared in the local board; only the picked option is pub
 
 ## When not to use
 - Production UI code or real backends: Joplo demos are scripted; nothing runs real logic.
-- Demos where viewers must type their own free input.
+- Apps that must persist audience edits or execute real backend logic. Local typing and controls are supported only as disposable exploration.
 - Slide decks, pitch decks, or text-and-bullet presentations with no product behavior or animated explanation to show: use a slides tool instead.
-- Editing real video footage, music videos, or soundtracks: Joplo has no video clips, music, or sound effects.
+- Editing real video footage: media plugins add background sound, but Joplo is not a footage editor.
 
 ## Quick start
 ```sh
@@ -89,13 +89,14 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, and verify playback before claiming it works. See npx joplo skill content.
 - For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings. See npx joplo skill plugins.
 - Default UI and HTML belong to the ui plugin; keep kit/ui imports and author TSX, use ui: names only in IR and diagnostics. Recompile old bare-name IR before comparing versions. See npx joplo skill components.
+- For audience exploration, use native UI controls or option.free; keep deterministic results in flow steps. Read demo before using drag, hover, scroll or plugin actions. See npx joplo skill demo.
 - Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components. See npx joplo skill plugins.
 
 ## Reference
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.
-- authoring: Mental model, first steps, page / option / flow syntax, when conditions, a form example
+- authoring: Mental model, page / option / flow, local free reactions, when conditions, a form example
 - story: Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos
-- demo: Layers, shots, captions, full-height layout, custom motion and data graphics, deep links, and screenshots
+- demo: Scripted playback and local exploration, drag / hover / scroll / plugin actions, layers, captions, deep links and screenshots
 - focus: Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
 - content: Default first-party content plugin: continuous visual explainers, chapters, design worlds and review practices
 - diagram: Default first-party diagram plugin: architecture, sequence and state diagrams, groups, compiled traces and framing
@@ -106,6 +107,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
-- plugins: Universal properties, plugin themes, state writes and director targets; Media tracks, local text-to-resource compilers, cached offline publishing; Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
+- plugins: Data-only action contracts, native local behavior, engine-clock presenters; Universal properties, plugin themes, state writes and director targets; Media tracks, local text-to-resource compilers, cached offline publishing; Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.18 sha256:fc975761378ccc0463db99b3e17c1266c76e0f950419378201834ab57ed3dec5 -->
+<!-- joplo-skill 0.2.18 sha256:e0dade16e48cc3cf1123f5ccaf919ee94462544b70813e3c107810458527b34a -->

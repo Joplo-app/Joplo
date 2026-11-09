@@ -1,6 +1,6 @@
 # Joplo 插件架构：纯粹的引擎 + 可插拔的内容形态（D87）
 
-> 状态：阶段 0、阶段 1-A/B/C 与阶段 2 已实现（阶段 2 字段与边界见第 13 节）：v1 叶子组件兼容；v2 编译钩子、效果快照、元素特性与 React/容器运行时；第一方 `plugins/diagram` 默认启用。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节，通用属性、插件主题与讲解内容见第 12 节。
+> 状态：阶段 0、阶段 1-A/B/C/D 与阶段 2 已实现（阶段 2 字段与边界见第 13 节）：v1 叶子组件兼容；v2 编译钩子、效果快照、元素特性与 React/容器运行时；第一方 `plugins/diagram` 默认启用。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节，通用属性、插件主题与讲解内容见第 12 节。
 > 目标形态：Joplo 只是**构建与调度引擎**，负责把不同形态的内容串成一个可播放、可评审、可发布的作品；
 > UI 组件、Diagram、Canvas、3D、Alda BGM、朗读供应商、主题……都是插件。
 
@@ -10,7 +10,7 @@
 |---|---|---|
 | 内容形态会持续增加，而且由别人维护 | 3D、音乐、地图、讲解画布、公司自己的设计系统 | 引擎不认识任何具体形态；新形态不改 core |
 | Agent 是主要作者，省 token（D25） | Agent 装一个包、读一份技能就能写 | 每个插件自带技能；`npx joplo skill` 汇总 |
-| 演示必须可复现（截图、视频、深链、评审定位） | 同一份 IR、同一步，永远是同一个画面 | 业务状态只由步骤推进；插件不能改状态 |
+| 演示必须可复现（截图、视频、深链、评审定位） | 同一份 IR、同一步，永远是同一个画面 | 时间线状态只由步骤推进；游玩层不回写时间线 |
 | 发布站离线可播放（file://、静态托管） | 观众没有作者的电脑、工具和网络 | 发布物自包含：IR + 编译后的运行时 + 生成好的资源 |
 | 私有项目 | 公司组件、私有仓库 | 源码与本机能力不进发布物；私有插件不能误发公开分享 |
 | 已有项目不能坏 | 现有示例、已发布的分享 | 作者 TSX 不变；新 IR 使用命名空间，旧分享保留其原运行时 |
@@ -20,7 +20,7 @@
 内核只保留**所有形态共有的东西**。判断标准：换掉任何一种内容形态，它都还在。
 
 1. **故事模型**：项目 → 功能 → 方案 → 情况 → 场景 → 步骤；规则、覆盖、待决问题、评审与反馈。这是 Joplo 的产品视角，也是它和视频工具的区别。
-2. **时间线与状态机**：`ui / data / inputs` 状态；步骤的动作（click / type / select / toggle / press / back / event / card）与基础效果（set / append / go / done / fork / stream / toast）；`stateAt` 回放、`flow({ from })` 接力。纯函数、确定。
+2. **时间线与状态机**：`ui / data / inputs` 状态；步骤的动作（click / type / select / toggle / press / drag / hover / scroll / plugin / back / event / card）与基础效果（set / append / go / done / fork / stream / toast）；`stateAt` 回放、`flow({ from })` 接力。纯函数、确定。
 3. **导演与节奏**：层级、镜头目标（shot）、焦点提示（spotlight / highlight / number / callout / mark）、字幕 / explain / narrate / say、停留与阅读时长、过渡卡、自动播放时钟。
 4. **寻址与检查**：元素 id、源位置（文件:行）、选中、DOM 锚点（`data-jid`）、评审定位到“第几步的哪个元素”。
 5. **输出管线**：看板、截图 / 分镜 / 视频、build / share、多语言、范围分享与脱敏、资源打包。
@@ -43,6 +43,7 @@
 | G 通用属性 | IR + 浏览器 | 插件声明能写在任意元素上的属性，并观察步骤之间的 DOM 变化 | `motion` / `motionDelay`（FLIP 飞行） | ✗ |
 | H 媒体轨道 | 浏览器，按引擎时钟 | 播放、停止、淡入淡出，受暂停 / 跳转 / 旁白压低控制 | Alda BGM、音效 | ✗ |
 | I 本机能力 | Node，只在作者机器 | 文本 → 资源（音频、模型、图片），按内容哈希缓存；build 时打包产物 | Alda → MIDI / 音频；朗读供应商（D74） | ✗ |
+| K 动作与原生行为 | IR + 浏览器 | 声明字段/匹配/字幕；运行时识别 ctx.act；按引擎帧演示，原生本机值特性 | drag / hover / scroll、scene3d:rotate、UI 原生控件 | ✗ |
 | J 主题与材质 | 浏览器 | CSS 变量包、描边方式（手绘 / 直线 / 玻璃……） | 内置 9 个主题、Rough | ✗ |
 
 ### 关键设计：插件只在编译期“降级”，播放器里没有插件代码
@@ -74,7 +75,7 @@ joplo-plugin-x/
 
 ## 5. 契约（不变量）
 
-1. **状态只由步骤推进**：插件不能改业务状态；观众在插件里的点击调用 `ctx.click(id)`，由引擎的 `explainClick` 判断。观众自己的视角操作（拖动旋转）不是状态。
+1. **时间线状态只由步骤推进**：插件不能改时间线状态；`ctx.click(id)` 与 `ctx.act(id, 数据)` 都交给同一输入仲裁者。自由体验只改本机游玩层或插件本机视图，播放/跳转/重置丢弃（D88，第 14 节）。
 2. **可寻址**：能被步骤、镜头、提示、检查引用的东西都是元素：有 id，在 DOM 里有锚点（`node.attrs`），摆在它在画面上的位置。
 3. **确定**：同一个 ctx 画出同一个画面；`frame.animate = false` 时直接到终点；资源没准备好时用 `ctx.hold()` 让截图等待。
 4. **自包含发布**：播放需要的一切都在站点里（IR、编译后的运行时、生成好的资源）；不依赖作者的电脑、本机工具或网络。
@@ -337,3 +338,72 @@ UI 的目录、属性提示、示例、资源检查和 React 实现在 `plugins/
 ### Cordis 的参考价值（本阶段不引入依赖）
 
 参考 [Cordis 仓库](https://github.com/cordiverse/cordis)及其链接的[入门文档](https://deepseek-harness.github.io/deepseek-harness/reference/cordis-primer)：上下文提供服务、显式 inject 依赖、注册具有对应 disposer，适合检查 Joplo 宿主服务和运行时生命周期的边界。Joplo 的确定性业务语义仍须编译为 IR；动态服务容器不能替代该协议。当前 P2 沿用已有 v2 扩展点；若后续作者端出现真实的服务依赖、热重载需求，再独立验证 Cordis 的收益与成本。上游目前声明 API 尚不稳定，本文不把尚未引入的机制描述成已实现功能。
+
+## 14. P1-D：自由体验、动作扩展与统一时钟（D88）
+
+画面由确定的时间线和本机游玩层组成。播放中舞台的第一下指针/键盘输入只暂停并消耗整次手势，控制条不在这个事件范围里。暂停后的判定只有一个入口：下一步的动作类型、目标与值匹配 → 提交该脚本步骤并丢弃游玩层；同方案另一场景在相同舞台上可进入的动作 → 确认后回放到它前一位置；作者自由反应/组件原生行为 → 仅改游玩层；否则沿用提示。播放、跳步、换场景和重置丢弃游玩层；媒体、光标与插件演示从冻结的逻辑时刻继续。
+
+### 作者接口与边界
+
+```tsx
+import { $, free, flow, option, set } from '@joplo-app/kit';
+option({
+  name: 'Explore', idea: 'Scripted results with local exploration',
+  free: { profile: free.click('avatar', set($.ui.card, true)) },
+  scenarios: {
+    main: flow('Arrange')
+      .drag('tile', 'slot', set($.ui.placed, true))
+      .hover('help', 600, set($.ui.tip, true))
+      .scroll('list', 'last_row')
+      .act('probe:rotate', 'model', { angle: 90 }, set($.ui.angle, 90)),
+  },
+});
+```
+
+`free.click/type/select/toggle/drag/hover/scroll/act` 返回单条声明，无时间线顺序；同名反应键在对象内唯一。当前只接受 `set`、`push`（IR append）、`toast`，目标必须存在于本方案；不允许导航、完成、媒体或有派生快照的插件效果。纯数据编译保证播放器不调用插件业务代码。自由值匹配采用和步骤相同的规则，不执行任意函数；首个匹配声明生效。
+
+UI 插件用 `traits.native` 声明输入类型和 `value/checked` 属性；Tabs、Accordion、真实文本输入、Switch、Checkbox、Radio、Select、SegmentedControl 不需作者写事件回调。原生动作同时写本机 `inputs[id]` 与绑定的属性路径，使 UI/3D 的相同绑定一起变化。组件自身的展开选择菜单属于本机视图状态，必须响应 `resetKey`。悬停外观由 `traits.hover` 声明，滚动区域使用浏览器本机滚动；滚动步骤的最终位置由脚本动作回放。拖拽坐标是舞台 CSS 像素；滚动坐标是容器内容偏移；到元素的端点必须存在于当前舞台（滚动端点必须在容器内）。坐标匹配半径为 16px，hover 必须达到声明的停留毫秒数。
+
+### 插件动作契约
+
+```ts
+// Node 清单：普通数据，不含识别器或业务匹配函数。
+actions: {
+  rotate: {
+    caption: 'Rotate {label} to {data.angle}', durationMs: 800,
+    targets: ['probe:Scene'],
+    fields: { angle: { type: 'number', min: 0, max: 360, tolerance: 2 } },
+  },
+}
+// 浏览器识别器：报告目标和数据，是否推进由引擎决定。
+ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } });
+// 演示器：在 mount/update 或 React 组件里按 frame.gesture.progress 绘制。
+// frame.gesture.action 给出目标/数据；frame.clock 是唯一时间来源。
+```
+
+字段类型为 string/number/boolean，payload 键必须精确匹配；数字范围用于校验，tolerance 用于手势匹配。`text: true` 仅用于需要翻译的字符串值，身份枚举默认不翻译。字幕支持 `{label}` 和 `{data.key}`；作者也可提供步骤字幕。`targets` 约束接受该动作的完整组件类型；组件名和动作名均由插件拥有。`scene3d:rotate` 实证方位角/仰角匹配、鼠标与键盘识别、引擎时钟演示；脚本将角度写入绑定，使直接进入和截图可复现。
+
+### 时钟与输入归属
+
+- `DemoController.clock` 是唯一时间积分器。等待、光标路径、内置手势、插件 `frame.clock`、`frame.gesture`、流式文字和媒体偏移都读取同一逻辑时间；暂停不积分，速度在同一处应用。
+- React 插件从 `@joplo-app/kit/renderer` 导入 `motion`，宿主提供 Motion driver；CSS/WAAPI 动画由宿主暂停原生计时并按引擎时间采样，SVG 动画也由宿主采样。第三方组件只能读取帧进行绘制，不得自行启动 timer/RAF 累积演示时间。无 clock 或 `animate:false` 时画最终状态。第一方运行时源码守护以及时钟适配器测试防止倒退。
+- 拖拽始于声明的 drag 目标/`traits.draggable` 时优先归该元素，否则由插件视角或舞台平移处理；输入框拥有其编辑键。触屏将 hover 降级为点按；聚焦拖拽目标后 Enter/Space 提供执行该动作的替代入口。舞台捕获阶段消耗暂停输入，包含后续 pointerup/click、同次按键的重复事件和滚轮惯性序列。手机横屏改用独立控制条，移除盖在舞台上的滑动切步层，避免它抢走原型拖拽。
+- 界面展示角落状态、改动不保留说明与可聚焦 Reset；跨场景提示可取消、Escape 关闭、按钮确认。只索引同方案、同舞台且前缀回放成功、目标当时可操作的位置，不把未验证的位置当作可进入。
+
+### 字段端到端流向
+
+| 新字段 | 写入/编译 | 消费者 | 范围、翻译、diff 与静态输出 |
+|---|---|---|---|
+| `OptionDef.free` → `options[id].free[key].{action,effects,source?}` | kit `free.*` → compile 目标/效果校验，source 发布时移除 | core `arbitrateAction/applyPlayground` → controller 本机层 → Stage 视图 | scope 移除目标/端点被裁掉的反应；i18n 映射匹配值和显示效果；diff `free-reactions`；静态输出只保留声明、从不应用观众操作 |
+| `action.{type:drag/scroll,target,to}` / `hover.ms` | Flow 工厂 → Action schema → 端点/时长 check | 控制器演示、Stage 手势、纯数据匹配；scroll-state 回放最终滚动 | scope 的 stepRefs 包括端点；坐标/ID 不翻译；captionAuto 文案本地化；diff action；render 在对应步应用脚本滚动 |
+| `action.{type:plugin,name,target,data}` | Flow.act → 已启用清单/类型/payload 校验 | 通用匹配；插件运行时读取 gesture 绘制，无业务回调 | scope 保持有效目标；仅 text 字段参与翻译；diff action 与 action-contracts；最终效果由脚本 set 决定 |
+| `PluginDef.actions` → `project.plugins[id].actions` | PluginCompiler JSON 信封 + schema | matcher / check / caption / 控制器时长；浏览器无需 Node 清单 | 作为可发布契约数据；不带源码/计时器；diff 比较使用到的契约 |
+| `traits.{native,hover,draggable,selectionGate}` → node.traits 与 plugin components | UI/第三方声明 → 既有特性 schema 和节点复制 | 原生本机值写入、悬停属性、输入归属；selectionGate 声明祖先值控件及面板值来源，使 check/跨场景索引排除未选中面板 | 同既有节点投影进入 scope/diff；无组件名进入内核；静态不附加游玩行为 |
+| 宿主 `RenderContext.draggable` → `data-jdraggable` | 从本方案步骤/free 的 drag 目标与 traits 合并 | DOM 仲裁、3D 射线识别器读取同一宿主标记，元素拖拽优先于 orbit | 纯本机派生集合；不进 IR；静态帧不提供动作入口 |
+| SDK `ctx.act` / renderer `act,interactive` | Stage 将识别数据传给 DemoController.act | 一个仲裁者，含原始 click 与原生值意图 | 不序列化；render/缩略图不传可执行输入入口 |
+| SDK `frame.{clock,gesture,playground,resetKey}` / renderer 同名字段 | controller 引擎时间、演示进度、本机层和 epoch → Stage → 插件/观察器 | 绘制、冻结、恢复本机视角/菜单；UI 使用宿主 motion | 不进 IR、URL、分享数据；静态帧无本机层或时钟 |
+| Snapshot `playground,freeMode,switchPrompt,gesture` | 仅浏览器控制器持有；项目/位置变更清理 | 共用 PlayerPage/StageViewport 的提示和画面 | 看板/发布/嵌入共用；深链和导出只取 Snapshot.state，视频只按脚本运行 |
+
+`clock` 的子字段：`timeMs` 为累计逻辑时间、`elapsedMs` 为当前脚本步骤锚点后的逻辑偏移、`rawMs` 为同一次积分得到的未缩放经过量（用于不随倍速变化的等待）、`running/paused/speed` 为调度状态；都由控制器写、宿主/插件/媒体读，冻结且不序列化。`gesture.action` 是冻结的动作数据副本，`gesture.progress` 为同一时钟产生的 0–1 进度。
+
+新增诊断：`FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID`、`PLUGIN_ACTION_INVALID`、`ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID`。按对应源码目标、字段或效果修复后重新 check；不要用运行时回调绕过编译校验。

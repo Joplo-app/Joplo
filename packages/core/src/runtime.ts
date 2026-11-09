@@ -19,3 +19,5 @@ export { mediaAt, mediaResourceIds } from './media.ts';
 export { projectThemes } from './themes.ts';
 export type { FeatureDiffManifest, DiffScenario, DiffStep } from './feature-diff.ts';
 export { autoCaptionMessages, automaticCaption } from './auto-caption.ts';
+
+export * from './playground.ts';

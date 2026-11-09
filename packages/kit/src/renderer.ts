@@ -1,14 +1,15 @@
 /** Browser renderer services supplied by the host, shared by React content packages. */
 import type { CSSProperties, ReactNode, ComponentType } from 'react';
-import type { PluginIRNode, PluginState } from './plugin.ts';
+import type { ActionDispatch, EngineFrame, ActionPresentation, PluginIRNode, PluginState } from './plugin.ts';
 export type NodeProps = { node: PluginIRNode; p: Record<string, unknown>; disabled: boolean; children: ReactNode };
-export type RendererContext = { scene: { id: string; route: string }; state: PluginState; width: number; animate: boolean; selectedId: string | null; focus?: string[] | null; ext?: Readonly<Record<string, unknown>>;
+export type RendererContext = { act?: ActionDispatch; interactive?: boolean; clock?: EngineFrame; gesture?: ActionPresentation | null; resetKey?: string; playground?: boolean; scene: { id: string; route: string }; state: PluginState; width: number; animate: boolean; selectedId: string | null; focus?: string[] | null; ext?: Readonly<Record<string, unknown>>;
   stage?: HTMLElement | null; dialogLayer: HTMLElement | null;
   preview: {nodeId:string;text:string}|null;
   mode: 'review'|'demo'|'render';
   changed?: readonly {path:string;before:unknown;after:unknown}[];
 };
 export type RendererServices = {
+  motion: Record<keyof import('react').JSX.IntrinsicElements, ComponentType<any>>;
   RendererContextProvider: ComponentType<{value: Pick<RendererContext, 'width'|'dialogLayer'>; children?: ReactNode}>;
   useLook(): {theme:string;font:string|null;style: Record<string,string>|undefined};
   atWidth(value:unknown,width:number):unknown;
@@ -64,3 +65,6 @@ export const resolveValue: RendererServices['resolveValue'] = (...args) => host(
 export const styleOf: RendererServices['styleOf'] = (...args) => host().styleOf(...args);
 
 export const nodeLabel: RendererServices['nodeLabel'] = (...args) => host().nodeLabel(...args);
+
+/** Clocked drawing primitives provided by the host; no plugin animation timers. */
+export const motion = new Proxy({} as Record<keyof import('react').JSX.IntrinsicElements, ComponentType<any>>, { get: (_target, key: string) => host().motion[key as keyof import('react').JSX.IntrinsicElements] });
