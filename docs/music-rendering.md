@@ -17,7 +17,7 @@
 | 构建验证解码 | mpg123-decoder **1.0.3**，原始 JS 为 MIT / libmpg123 为 LGPL-2.1 | [固定源码与构建说明](https://github.com/eshaz/wasm-audio-decoders/tree/8f2428c1cd96b54dab74836c8471ff75fe35cbee)、[上游许可说明](https://github.com/eshaz/wasm-audio-decoders#licensing)、[mpg123](https://www.mpg123.de/)。Node 内嵌 WASM 解码自身 MP3，测实际延迟/填充，未修改库源码。只在作者机运行。 |
 | 视频封装 | Mediabunny **1.65.2**，MPL-2.0 | [上游许可](https://github.com/Vanilagy/mediabunny)、[编码包直接复制](https://mediabunny.dev/guide/media-sources)。活跃维护。未修改上游源码；只在 Node 复制 Playwright 的 VP8/VP9 与 MediaRecorder 的 Opus 包到 WebM，不做音频编解码，不用本机 ffmpeg。 |
 
-音色 URL 固定到提交 `3a6eda823dac2ec3e134d38544ca839217358f08`，SHA-256 `cfcd66d89e8386823400eca64934b14fbea7bf48ba1f00d21189af1262794ec2`；许可 SHA-256 `c21ed6be2fea862673953977c616befc28d1b20dfa60349e4461b97c759db6ca`。两者均校验成功才可使用，下载有大小上限和超时，原子落盘到 `JOPLO_HOME/soundfonts/<hash>/`。不把银行文件或作者路径塞进 npm、IR 或站点。
+音色 URL 固定到提交 `3a6eda823dac2ec3e134d38544ca839217358f08`，SHA-256 `cfcd66d89e8386823400eca64934b14fbea7bf48ba1f00d21189af1262794ec2`；许可 SHA-256 `c21ed6be2fea862673953977c616befc28d1b20dfa60349e4461b97c759db6ca`。两者均校验成功才可使用，下载有大小上限和超时，原子落盘到 `JOPLO_HOME/plugins/alda/cache/soundfonts/<hash>/`（插件私有缓存目录 `ctx.cacheDir`；本机编译器拿不到整个 JOPLO_HOME，D91）。不把银行文件或作者路径塞进 npm、IR 或站点。
 
 预安装命令（项目目录）：
 

@@ -24,6 +24,7 @@ it('only injects declared own keys for authorized generation; redacts compiler e
   const store=new PluginKeyStore(home,{});store.save('alpha',declaration,'private-alpha');store.save('beta',declaration,'private-beta');
   fs.writeFileSync(entry,`export default {compilers:{test:{version:'1',mime:'text/plain',compile(input,ctx){
     if(process.env.MODEL_TEST_KEY || process.env.OTHER_PLUGIN_KEY || ctx.home)throw Error('environment isolation failed');
+    if(ctx.cacheDir!==${JSON.stringify(path.join(home,'plugins','alpha','cache'))})throw Error('cache dir is not plugin-private');
     if(input==='offline'){if(Object.keys(ctx.keys).length)throw Error('unrequested keys');return new Uint8Array([1]);}
     if(ctx.keys.api !== 'private-alpha' || Object.keys(ctx.keys).length!==1)throw Error('key isolation failed');
     if(input==='error'){console.error(ctx.keys.api);throw Object.assign(Error(ctx.keys.api),{code:'LOCAL_RESOURCE_'+ctx.keys.api});}

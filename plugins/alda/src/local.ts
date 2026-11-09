@@ -41,7 +41,7 @@ export default { compilers: { audio: {
     const info = await inspectScore(score, ctx.directory);
     const output = path.join(ctx.directory, 'score.mid');
     await run(['export', '-f', path.join(ctx.directory, 'score.alda'), '-o', output], ctx.directory);
-    const pcm = await renderPCM(await fs.readFile(output), await soundfont(ctx.home), info.durationMs!, loop);
+    const pcm = await renderPCM(await fs.readFile(output), await soundfont(ctx.cacheDir), info.durationMs!, loop);
     const master=await encodeFlac(pcm);
     const masters=path.join(ctx.projectDir??ctx.directory,'.joplo','music-masters');await fs.mkdir(masters,{recursive:true});
     const key=createHash('sha256').update(JSON.stringify([score,loop,RENDER_VERSION,SOUNDFONT.sha256])).digest('hex');

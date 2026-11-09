@@ -12,8 +12,10 @@ export const SOUNDFONT = {
 };
 export const credit = `${SOUNDFONT.name} (MIT). Original SoundFont © 2000–2002, 2008 Frank Wen; mono version © 2014–2016 Michael Cowgill; Temple Blocks © 2002 Ethan Winer; Drumline Percussion © 2016 Michael Schorsch. Source and license: ${SOUNDFONT.licenseUrl}`;
 export const sha256 = (data: Uint8Array | string) => createHash('sha256').update(data).digest('hex');
-export async function soundfont(home = process.env.JOPLO_HOME || path.join(os.homedir(), '.joplo')) {
-  const directory = path.join(home, 'soundfonts', SOUNDFONT.sha256);
+/** cacheDir is the alda plugin's private cache (JOPLO_HOME/plugins/alda/cache), not JOPLO_HOME itself. */
+export const defaultCacheDir = () => path.join(process.env.JOPLO_HOME || path.join(os.homedir(), '.joplo'), 'plugins', 'alda', 'cache');
+export async function soundfont(cacheDir = defaultCacheDir()) {
+  const directory = path.join(cacheDir, 'soundfonts', SOUNDFONT.sha256);
   await fs.mkdir(directory, { recursive: true });
   const load = async (name: string, url: string, hash: string, maxBytes: number) => {
     const file = path.join(directory, name);
@@ -28,7 +30,7 @@ export async function soundfont(home = process.env.JOPLO_HOME || path.join(os.ho
       const tmp = `${file}.${randomUUID()}.tmp`;
       await fs.writeFile(tmp, data); await fs.rename(tmp, file);
       return data;
-    } catch (e) { throw new Error(`SoundFont cache missing or invalid; download failed (${(e as Error).message}). Connect to the internet and run: node --input-type=module -e "import('@joplo-app/plugin-alda/local').then(m=>m.installSoundfont())". For offline use, copy the verified soundfonts/${SOUNDFONT.sha256}/ directory into JOPLO_HOME on this machine.`); }
+    } catch (e) { throw new Error(`SoundFont cache missing or invalid; download failed (${(e as Error).message}). Connect to the internet and run: node --input-type=module -e "import('@joplo-app/plugin-alda/local').then(m=>m.installSoundfont())". For offline use, copy the verified soundfonts/${SOUNDFONT.sha256}/ directory into JOPLO_HOME/plugins/alda/cache/ on this machine.`); }
   };
   // Keep the exact license beside the bank; no bank is usable without its verified license.
   await load('LICENSE.md', SOUNDFONT.licenseUrl, SOUNDFONT.licenseSha256, 64 * 1024);

@@ -151,7 +151,7 @@ export class LocalResources {
               const c=m.default?.compilers?.[r.compiler];
               try {
                 if(!c || typeof c.version!=='string' || !/^[a-z]+\\/[a-z0-9.+-]+$/.test(c.mime)) throw new Error('Invalid local compiler declaration');
-                const artifact=await c.compile(r.input,{directory:r.directory,projectDir:r.projectDir,home:r.home,keys:r.keys,allowSpend:r.allowSpend,maxBytes:r.maxBytes});
+                const artifact=await c.compile(r.input,{directory:r.directory,projectDir:r.projectDir,cacheDir:r.cacheDir,keys:r.keys,allowSpend:r.allowSpend,maxBytes:r.maxBytes});
                 const bytes=artifact instanceof Uint8Array?artifact:artifact?.bytes;
                 if(!(bytes instanceof Uint8Array)) throw new Error('Compiler must return bytes');
                 if(c.requiresAttribution&&(!artifact.credit||!artifact.license))throw Object.assign(new Error('Audio attribution/license missing'),{code:'LOCAL_RESOURCE_ATTRIBUTION_MISSING'});
@@ -168,7 +168,7 @@ export class LocalResources {
             child.on('error', e => finish(e));
             child.on('close', status => { try { const value = JSON.parse(stdout); if (status || value.error) finish(Object.assign(new Error(value.error ?? stderr), { code: value.code })); else finish(undefined, value); } catch { finish(new Error(stderr || 'Compiler exited without a resource')); } });
             child.stdin.on('error', () => {});
-            child.stdin.end(JSON.stringify({ entry, compiler: request.compiler, input: request.input, directory: jobDir, projectDir: this.directory, home: limits.home ?? joploHome(), keys: secrets, allowSpend: limits.allowSpend === true, maxBytes }));
+            child.stdin.end(JSON.stringify({ entry, compiler: request.compiler, input: request.input, directory: jobDir, projectDir: this.directory, cacheDir: path.join(limits.home ?? joploHome(), 'plugins', request.plugin, 'cache'), keys: secrets, allowSpend: limits.allowSpend === true, maxBytes }));
           });
           if (Object.values(secrets).some(key => result.mime.includes(key) || Buffer.from(result.data, 'base64').includes(Buffer.from(key)))) throw new Error('Compiler output contains a local credential');
           if(result.audio)result.audio=AudioRegionSchema.parse(result.audio);

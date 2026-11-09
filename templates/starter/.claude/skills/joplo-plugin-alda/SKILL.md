@@ -128,7 +128,7 @@ To preinstall on a connected author machine, run this **from the project**:
 node --input-type=module -e "import('@joplo-app/plugin-alda/local').then(m=>m.installSoundfont())"
 ```
 
-For an offline author machine, copy that verified soundfonts/<hash>/ directory (including LICENSE.md) into its JOPLO_HOME; an absent/corrupt cache fails with the command above. Do not replace files with an unverified bank. If a future upstream decoder range resolves a second version, rendering fails explicitly: pin spessasynth_core’s stb-vorbis dependency to 0.0.7 with your package manager overrides and reinstall. A SoundFont or renderer/encoder upgrade invalidates the cache; the host keys on exact compiler code/version and input, which include bank hash, renderer, SF3 decoder, FLAC/master encoder, MP3 format/bitrate/resampling/context/trim/seam parameters and loop mode. Cache and temporary scores/MIDI are author-only, under .joplo/resources; do not commit them. Only audio bytes, numeric playback-region metadata and media snapshots ship, with attribution text. Build/scope includes only referenced audio.
+For an offline author machine, copy that verified soundfonts/<hash>/ directory (including LICENSE.md) into its JOPLO_HOME/plugins/alda/cache/ (the plugin's private cache; local compilers never receive JOPLO_HOME itself); an absent/corrupt cache fails with the command above. Do not replace files with an unverified bank. If a future upstream decoder range resolves a second version, rendering fails explicitly: pin spessasynth_core’s stb-vorbis dependency to 0.0.7 with your package manager overrides and reinstall. A SoundFont or renderer/encoder upgrade invalidates the cache; the host keys on exact compiler code/version and input, which include bank hash, renderer, SF3 decoder, FLAC/master encoder, MP3 format/bitrate/resampling/context/trim/seam parameters and loop mode. Cache and temporary scores/MIDI are author-only, under .joplo/resources; do not commit them. Only audio bytes, numeric playback-region metadata and media snapshots ship, with attribution text. Build/scope includes only referenced audio.
 
 MP3 is about 0.72 MB/min before base64. Build reports each cue's bytes/duration, all raw audio, embedded base64/data-URI bytes and the complete site. It warns above 0.75 MB/min or 2MiB/cue, and at 18MiB/site against the documented Free 20MiB single-upload budget. Short loops can warn because of fixed context/probe overhead. Base64 adds about one third: measure the built site before sharing. Lowering track volume does not reduce bytes; shorten/split music or narrow the share scope.
 
@@ -158,4 +158,4 @@ General engine contracts: npx joplo skill plugins
 ## Installed references
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.3.0 sha256:e78fa0a5776bb3167553e7db7903df7b66a430407926fc6be1808fb2447a508c -->
+<!-- joplo-skill 0.3.0 sha256:8719f2de45b6bd1ed120bda760fe3d71297e6ef19bf0fff3a2bfcdca7e8a25f2 -->
