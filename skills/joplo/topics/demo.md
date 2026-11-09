@@ -18,6 +18,7 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - .drag(target, destination) accepts an element id or stage pixel point; .scroll(target, destination) accepts an element id or content offset. Declare the correct source and endpoint.
 - .hover(target, ms) expresses a dwell; .act(name, target, data) uses the enabled plugin's data-only contract. Read its installed skill for field types, ranges, matching tolerance and presentation duration.
 - Engine frames expose clock time, speed, running/paused state and gesture progress. Presenters sample it; independent timers must not drive the timeline. Pausing freezes cursor, gestures, media, text and plugin animation together.
+- Only per-frame presenters re-render on every clock frame; ordinary elements re-render when state, run/pause or speed changes. If playback still stutters, measure before changing the piece: open the scenario in a browser, press Play, and record requestAnimationFrame intervals (fps, median, frames over 50 ms) or a CPU profile for 10–15 s. Time in React rendering points at the engine or a presenter re-rendering too much; time in paint points at heavy filters, masks or blend modes. A slow step change in the board can come from development-mode React; check the built site before cutting elements.
 - Inputs belonging to another scenario prompt before switching. The default actionEntry: 'before' enters immediately before the matching action, useful for guided practice. For direct manipulation such as a chapter scrubber, set flow({ actionEntry: 'after' }) on the destination scenario: confirmation lands after the matched action exactly once, showing its scripted result and leaving subsequent steps pending. Cancel preserves exploration; confirm discards it. Before-action entry at step zero exposes the selected action without reopening the inert scenario cover; ordinary reset or chapter selection still shows the cover. This does not change autoplay, normal case selection or from continuity.
 
 ## A draggable chapter entry
@@ -80,4 +81,4 @@ A project theme is themes/<name>.css selected by config({ theme: '<name>' }). De
 - Custom themes live in themes/<name>.css and define --jp-* tokens; do not change authored data to recolor a view. For component-specific layout, motion and visual variables, read its installed plugin skill.
 
 Related topics: authoring, plugins, focus, review, publish
-<!-- joplo-skill 0.4.1 sha256:7b57d58912ffa4598a8a299873ba81e97d993f44dc57a35413f2074ea355403f -->
+<!-- joplo-skill 0.4.1 sha256:9bcfc08dbcce4ace9e9208afd5cfd82e961b63dd2dad36c4c5b73acea97be7bd -->

@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { defineRuntime, type ComponentCtx } from '@joplo-app/kit/plugin';
-import { useRoot } from '@joplo-app/kit/renderer';
+import { useEngineFrame, useRoot } from '@joplo-app/kit/renderer';
 import type { DiffRow, EditorFrame, Line } from './model.ts';
 
 /**
@@ -85,6 +85,8 @@ function Editor({ ctx }: { ctx: ComponentCtx }) {
   const snap = (ctx.ext.code as { editors?: Record<string, EditorFrame> } | undefined)?.editors?.[node.id];
   const clock = f.clock;
   const live = f.animate && !!clock && (clock.running || !!clock.paused);
+  // 逐字输入、diff 是逐帧画的：只在这一步有动画时订阅每一帧（D99），frame.clock 的时间字段是读取时的实时值
+  useEngineFrame(live && !!snap?.anim);
   const t = live ? clock!.elapsedMs : Infinity;
   const h = typeof p.h === 'number' ? p.h : 360;
   const { file: _f, lang: _l, code: _c, h: _h, w, ...rest } = p;

@@ -1,8 +1,9 @@
-import { motion as engineMotion } from './engine-motion';
+import { EngineClockContext, motion as engineMotion } from './engine-motion';
+import type { ClockFrame } from '../runtime/clock';
 import type { ActionDispatch, EngineFrame, ActionPresentation } from '@joplo-app/kit/plugin';
 import { registerRendererServices } from '@joplo-app/kit/renderer';
 import { useI18n } from '../i18n/context';
-import { Component, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type ComponentType as ReactComponentType, type CSSProperties, type ReactNode } from 'react';
+import { Component, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type JSX, type ComponentType as ReactComponentType, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { resolveResourceProps, disabledReasonOf, isInteractiveType, splitPluginType, type PluginTable, atWidth, childWidth, choicesOf, layoutRegions, evaluateCondition, isNodeDisabled, isSelfVisible, nodeLabel, resolveProps, resolveValue, walkNodes, type ComponentType, type StateChange, type PlayState, type Scene, type SceneNode } from '@joplo-app/core/runtime';
 import { cn } from '@/lib/utils';
@@ -121,11 +122,21 @@ function TextNode({ node, p }: NodeProps) {
   return <span {...attrs}>{str(p.text)}</span>;
 }
 
+const noSubscribe = () => () => {};
+const noFrame = () => undefined;
+/** 逐帧订阅引擎时钟（D99）：只给真正逐帧画的呈现器用；普通节点读 useCtx().clock（粗粒度，时间字段实时）。 */
+export function useEngineFrame(enabled = true): ClockFrame | undefined {
+  const source = useContext(EngineClockContext);
+  const on = enabled && !!source;
+  return useSyncExternalStore(on ? source!.subscribe : noSubscribe, on ? source!.getSnapshot : noFrame, noFrame);
+}
+
 /** 逐字出现的文字（D56）：总时长与自动播放的停留用同一个 streamMs；出完之前末尾有光标。 */
 function StreamText({ attrs, text, s }: { attrs: Record<string, unknown>; text: string; s: StreamingCtx }) {
   const chars = useMemo(() => [...text], [text]);
   const { clock } = useCtx();
-  const n = clock ? Math.min(chars.length, Math.floor(clock.elapsedMs / (streamMs(text, 1) / Math.max(1, chars.length)))) : chars.length;
+  const live = useEngineFrame(!!clock);
+  const n = clock ? Math.min(chars.length, Math.floor((live ?? clock).elapsedMs / (streamMs(text, 1) / Math.max(1, chars.length)))) : chars.length;
   const done = n >= chars.length;
   return (
     <span {...attrs} data-jstreaming={done ? undefined : ''}>
@@ -152,6 +163,8 @@ function PluginHost({ node, p }: NodeProps) {
   const inst = useRef<ComponentInstance | null>(null);
   const [crash, setCrash] = useState<string | null>(null);
   const root = useRoot(node, p, { className: 'relative w-full' });
+  // 命令式组件（mount/update，例如 3D）靠每次提交里的 update 推进画面：逐帧订阅时钟
+  useEngineFrame(!!comp?.mount);
 
   // 截图与导出等插件载入（失败也会结束等待）
   useLayoutEffect(() => {
@@ -285,4 +298,4 @@ export function RenderNode({ node }: { node: SceneNode }) {
   );
 }
 
-registerRendererServices({ motion: engineMotion as unknown as Record<keyof JSX.IntrinsicElements, ReactComponentType<any>>, useLook: () => { const {theme,font} = useContext(ThemeContext); return {theme,font:font??null,style:fontStyle(font)}; }, RendererContextProvider: ({value,children}) => <RenderContext.Provider value={{...useCtx(),...value}}>{children}</RenderContext.Provider>, nodeLabel, atWidth, childWidth, choicesOf, layoutRegions, resolveValue, styleOf, useCtx, useI18n, useR, useRoot, useRootAttrs, useStroke, RenderNode, Rough, RoughPath, roundRectPath, rectOf, resolveProps, isSelfVisible, walkNodes });
+registerRendererServices({ useEngineFrame, motion: engineMotion as unknown as Record<keyof JSX.IntrinsicElements, ReactComponentType<any>>, useLook: () => { const {theme,font} = useContext(ThemeContext); return {theme,font:font??null,style:fontStyle(font)}; }, RendererContextProvider: ({value,children}) => <RenderContext.Provider value={{...useCtx(),...value}}>{children}</RenderContext.Provider>, nodeLabel, atWidth, childWidth, choicesOf, layoutRegions, resolveValue, styleOf, useCtx, useI18n, useR, useRoot, useRootAttrs, useStroke, RenderNode, Rough, RoughPath, roundRectPath, rectOf, resolveProps, isSelfVisible, walkNodes });

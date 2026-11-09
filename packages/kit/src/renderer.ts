@@ -21,6 +21,8 @@ export type RendererServices = {
 
   nodeLabel(node:PluginIRNode):string;
   useCtx(): RendererContext;
+  /** Subscribe to every engine clock frame (D99). Only per-frame presenters need it; useCtx().clock changes only on run / pause / speed, with live time fields. */
+  useEngineFrame(enabled?: boolean): EngineFrame | undefined;
   useI18n(): { t: { stage: Record<string, unknown> } };
   useR(p: Record<string, unknown>): (key: string) => unknown;
   useRoot(n: PluginIRNode, p: Record<string, unknown>, options?: { disabled?: boolean; className?: string; style?: CSSProperties }): Record<string, any>;
@@ -40,6 +42,7 @@ const global = globalThis as typeof globalThis & { [KEY]?: RendererServices };
 export function registerRendererServices(services: RendererServices): void { global[KEY] = Object.freeze(services); }
 const host = (): RendererServices => { if (!global[KEY]) throw new Error('Joplo renderer services are not initialized'); return global[KEY]; };
 export const useCtx = () => host().useCtx();
+export const useEngineFrame = (enabled = true) => host().useEngineFrame(enabled);
 export const useI18n = <Messages extends Record<string, unknown>>() => host().useI18n() as { t: { stage: Messages } };
 export const useR: RendererServices['useR'] = (...args) => host().useR(...args);
 export const useRoot: RendererServices['useRoot'] = (...args) => host().useRoot(...args);

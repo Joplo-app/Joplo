@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import lottie from 'lottie-web/build/player/lottie_light';
 import { defineRuntime, embeddedAsset, type ComponentCtx } from '@joplo-app/kit/plugin';
-import { useRoot } from '@joplo-app/kit/renderer';
+import { useEngineFrame, useRoot } from '@joplo-app/kit/renderer';
 import type { ClipFrame } from './model.ts';
 
 /**
@@ -12,6 +12,13 @@ import type { ClipFrame } from './model.ts';
  */
 type Clips = { clips?: Record<string, ClipFrame> };
 const num = (v: unknown, d?: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+
+/** 片段这一步要逐帧定位：只在它在播时订阅每一帧（D99）。 */
+function useClipTime(ctx: ComponentCtx, clip: ClipFrame | undefined): { t: number; playing: boolean } {
+  const clock = ctx.frame.clock;
+  useEngineFrame(!!clip?.live && ctx.frame.animate && !!clock);
+  return timeOf(ctx, clip);
+}
 
 function timeOf(ctx: ComponentCtx, clip: ClipFrame | undefined): { t: number; playing: boolean } {
   if (!clip) return { t: 0, playing: false };
@@ -26,7 +33,7 @@ function Video({ ctx }: { ctx: ComponentCtx }) {
   const node = ctx.model;
   const p = ctx.node.props;
   const clip = (ctx.ext.media as Clips | undefined)?.clips?.[node.id];
-  const { t, playing } = timeOf(ctx, clip);
+  const { t, playing } = useClipTime(ctx, clip);
   const src = embeddedAsset(p.src, 'video');
   const ref = useRef<HTMLVideoElement>(null);
   const { src: _s, w, h, fit, start: _st, ...rest } = p;
@@ -67,7 +74,7 @@ function Lottie({ ctx }: { ctx: ComponentCtx }) {
   const node = ctx.model;
   const p = ctx.node.props;
   const clip = (ctx.ext.media as Clips | undefined)?.clips?.[node.id];
-  const { t } = timeOf(ctx, clip);
+  const { t } = useClipTime(ctx, clip);
   const src = embeddedAsset(p.src, 'json');
   const box = useRef<HTMLDivElement>(null);
   const [anim, setAnim] = useState<Anim | null>(null);

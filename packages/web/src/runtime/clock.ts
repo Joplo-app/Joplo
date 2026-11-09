@@ -26,5 +26,25 @@ export class EngineClock implements ClockSource {
     this.listeners.forEach(fn => fn());
   }
 }
+const coarse = new WeakMap<ClockSource, { key: string; frame: ClockFrame }>();
+/**
+ * 粗粒度时钟快照：只在“运行 / 暂停 / 倍速”变化时换一个对象，时间字段是读取那一刻的实时值。
+ * 舞台和普通节点订阅它，播放时不会每帧整树重渲染；真正逐帧画的呈现器（画布镜头、3D、逐字文字、连线小点）
+ * 另外用 useEngineFrame() 订阅每一帧。
+ */
+export function coarseFrame(source: ClockSource): ClockFrame {
+  const s = source.getSnapshot();
+  const key = `${s.running}|${s.speed}|${!!s.paused}`;
+  const hit = coarse.get(source);
+  if (hit && hit.key === key) return hit.frame;
+  const frame: ClockFrame = Object.freeze({
+    get timeMs() { return source.getSnapshot().timeMs; },
+    get elapsedMs() { return source.getSnapshot().elapsedMs; },
+    get rawMs() { return source.getSnapshot().rawMs; },
+    running: s.running, speed: s.speed, paused: !!s.paused,
+  });
+  coarse.set(source, { key, frame });
+  return frame;
+}
 export const gestureProgress = (now: number, start: number, duration: number) => duration <= 0 ? 1 : Math.max(0, Math.min(1, (now - start) / duration));
 export const gesturePoint = (from: {x:number;y:number}, to: {x:number;y:number}, t: number) => ({ x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t });
