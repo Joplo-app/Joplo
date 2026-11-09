@@ -10,9 +10,16 @@ import { rectOf } from './rect';
 type Measured = { mark: Mark; box: Box };
 export function Marks({ marks, wrapRef, contentRef, width, height, animate, pulseKey }: { marks: readonly Mark[]; wrapRef: RefObject<HTMLDivElement | null>; contentRef: RefObject<HTMLDivElement | null>; width: number; height: number; animate: boolean; pulseKey: string }) {
   const [measured, setMeasured] = useState<Measured[]>([]);
+  // 首次挂载（深链、截图、视频第一帧）时 Marks 和外层镜头容器在同一次提交里挂上：子组件的 layout effect
+  // 先于父元素的 ref 赋值执行，wrapRef 还是 null。等下一帧再量，否则这一步的标注永远不画。
+  const [attempt, setAttempt] = useState(0);
   const look = useContext(ThemeContext);
   useLayoutEffect(() => {
     const wrap = wrapRef.current, content = contentRef.current, host = wrap?.parentElement;
+    if (marks.length && (!wrap || !host) && attempt < 30) {
+      const retry = requestAnimationFrame(() => setAttempt(a => a + 1));
+      return () => cancelAnimationFrame(retry);
+    }
     if (!wrap || !host || !marks.length) { setMeasured([]); return; }
     let last = '', pending = 0, raf = 0, n = 0;
     const boxOf = (r: { left: number; top: number; width: number; height: number }): Box => ({ x: r.left, y: r.top, w: r.width, h: r.height });
@@ -40,7 +47,8 @@ export function Marks({ marks, wrapRef, contentRef, width, height, animate, puls
     const schedule = () => { if (!pending) pending = requestAnimationFrame(() => { pending = 0; measure(); }); };
     tick();
     const mo = new MutationObserver(schedule);
-    if (content) mo.observe(content, { childList: true, characterData: true, subtree: true });
+    // style 也要看：插件自己的镜头移动的是内容里的元素（改 transform），不是外层镜头容器（D97）
+    if (content) mo.observe(content, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['style'] });
     // 镜头/自由平移只改变容器 transform，内容不变时也必须重新判断画面内可见性。
     const viewObserver = new MutationObserver(schedule);
     viewObserver.observe(wrap, { attributes: true, attributeFilter: ['style'] });
@@ -50,7 +58,7 @@ export function Marks({ marks, wrapRef, contentRef, width, height, animate, puls
     wrap.addEventListener('scroll', schedule, true);
     window.addEventListener('resize', schedule);
     return () => { mo.disconnect(); viewObserver.disconnect(); ro.disconnect(); cancelAnimationFrame(raf); cancelAnimationFrame(pending); wrap.removeEventListener('scroll', schedule, true); window.removeEventListener('resize', schedule); };
-  }, [marks, wrapRef, contentRef, width, height, animate, pulseKey]);
+  }, [marks, wrapRef, contentRef, width, height, animate, pulseKey, attempt]);
   return <ThemeContext.Provider value={{ ...look, stroke: 'rough' }}>
     <div className="pointer-events-none absolute inset-0 z-30" data-jlayer="marks" style={{ color: 'var(--jp-annot, var(--jp-danger))' }}>
       <svg width={width} height={height} style={{ position: 'absolute', overflow: 'visible' }} aria-hidden>

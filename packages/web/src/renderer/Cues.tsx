@@ -106,7 +106,8 @@ function useBoxes(ids: string[], wrapRef: RefObject<HTMLDivElement | null>, cont
     const schedule = () => { if (!pending) pending = requestAnimationFrame(() => { pending = 0; measure(); }); };
     const content = contentRef.current;
     const mo = new MutationObserver(schedule);
-    if (content) mo.observe(content, { childList: true, characterData: true, subtree: true });
+    // style 也要看：插件自己的镜头移动的是内容里的元素（改 transform），不是外层镜头容器（D97）
+    if (content) mo.observe(content, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['style'] });
     const ro = new ResizeObserver(schedule);
     if (content) ro.observe(content);
     wrap.addEventListener('scroll', schedule, true);
