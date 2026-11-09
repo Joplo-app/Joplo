@@ -109,4 +109,4 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.17 sha256:4fd1f0df35ecdcfb9352c08726a1b95511175eef69dd0f96ffd75a199a8ada94 -->
+<!-- joplo-skill 0.2.18 sha256:4fd1f0df35ecdcfb9352c08726a1b95511175eef69dd0f96ffd75a199a8ada94 -->
