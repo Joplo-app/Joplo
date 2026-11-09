@@ -23,7 +23,7 @@ One sentence: push in until the recurring object fills the frame, swap the world
 - Beat 2 (first step of chapter N+1): switch the state that swaps the worlds (old interface exit="fade", new interface enter="fade", 800–1000 ms each) and in the same step camera('<new overview>', { ms: 2400–2800 }). The camera curve starts slowly, so the crossfade happens while the object still covers the frame, then the new world opens up. Put the chapter's timeline/scrubber movement and year label change in this same step.
 - Keep (do not downgrade): the shared centre point (otherwise the camera whips across the world at 8× and the old ghost slides away), the slow-start pull-back, and exit/enter on whole interfaces rather than on each child.
 - Known pitfalls: a fine 1-px checker or hairline pattern behind the object shimmers (moiré) at high zoom — use a low-contrast texture; a deep link or timeline jump to beat 2 lands on the settled overview, which is what a viewer jumping chapters wants; verify the seam in the film strip (no red CUT) and at full size with --frames.
-- Reference: examples/button-40-years (features/forty/options/a.tsx, throughTheButton).
+- Reference: examples/button-40-years (works/forty.tsx, throughTheButton).
 
 An older variant moves the object out of its interface into a central arrangement before the next chapter catches it (same motion key, exclusive when). It reads as a transfer beat rather than a cut; verify a mid-flight frame in playback because static sheets show only the declared endpoints.
 
@@ -69,4 +69,4 @@ Symptoms in an existing piece: one board per chapter (label, big title, panels, 
 - Whole-screen white/colour flashes over a still picture look like a stalled player; keep the picture moving under any fade.
 
 Common pitfall: For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, film-strip the chain, and verify playback before claiming it works
-<!-- joplo-skill 0.4.1 sha256:9457540221d0661186b73ca41f4a38d1707f081c4098de4d8df40e645f0ebec3 -->
+<!-- joplo-skill 0.4.1 sha256:684e20b11153dc8f94e5ee8e643e4eba36f1f66e09c936981a23b7977910f2f7 -->

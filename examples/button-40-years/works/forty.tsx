@@ -1,8 +1,12 @@
-import { $, option, flow, free, eq, set, patch, narrate, hold, done, not, stream } from '@joplo-app/kit';
+/**
+ * 一个镜头讲完四十年：观众始终盯着同一个发送按钮，年代在它身边换掉；暂停即可上手每个年代的界面。
+ */
+import { Fragment } from '@joplo-app/kit/jsx-runtime';
+import { $, work, chapter, free, eq, set, patch, narrate, hold, done, not, stream, page } from '@joplo-app/kit';
 import { Button, TextInput, Textarea, PromptInput } from '@joplo-app/plugin-ui';
 import { Canvas, camera } from '@joplo-app/plugin-content';
 import { music } from '@joplo-app/plugin-alda';
-import { eras } from '../../../facts';
+import { eras } from '../facts';
 
 /*
  * 一个镜头讲完四十年：四个年代的发送按钮都落在同一个世界坐标（.lens 所在的位置）。
@@ -21,9 +25,9 @@ const throughTheButton = (next: number) => [
 const sendButton = (id: string, className: string, text = '发送', when?: unknown) =>
   <Button id={id} className={`send ${className}`} motion="the-same-send" {...(when === undefined ? {} : { when, enter: 'shrink', enterMs: 600 })}>{text}</Button>;
 
-export default option({
-  name: '一封跨越四十年的消息',
-  idea: '一个镜头讲完四十年：观众始终盯着同一个发送按钮，年代在它身边换掉；暂停即可上手每个年代的界面。',
+export default work({
+  title: '同一个按钮的 40 年',
+  summary: '跟着同一个发送按钮，亲手体验从鼠标命令到自然语言意图的四段交互变化。',
   state: { ui: { era: '1984', cursorX: 66, sent: false, menu: false, hint: false, kbd: false, open: false, draft: '' }, inputs: { letter: '', mail: '', sms: '', prompt: '' } },
   free: {
     send84: sent('send84'), send95: sent('send95'), send07: sent('send07'), send24: sent('send24'),
@@ -33,7 +37,8 @@ export default option({
     suggest24: free.click('suggest24', set($.inputs.prompt, '帮我把周六见面写成一封简短邀请。'), set($.ui.sent, false)),
     touchHint: free.hover('touch_hint', 450, set($.ui.hint, true)),
   },
-  on: { '/': { story: <div className="film-shell" style={{ position: 'relative', width: '100%', height: 800 }}>
+  // 画面直接属于作品页面，保留原来的节点层级与镜头 / 配乐定位。
+  routes: { '/': page({ title: '同一个按钮的 40 年', layout: false }, <Fragment name="story"><div className="film-shell" style={{ position: 'relative', width: '100%', height: 800 }}>
     <Canvas w={1280} h={800} view={[1280, 800]} safe={[86, 0, 196, 0]} drift={{ zoom: 1.08, ms: 6000 }}>
     <div className="b40 world" style={{ position: 'absolute', inset: 0 }}>
       <section when={eq($.ui.era, '1984')} id="desktop84" className="desktop84 interface" enter="fade" enterMs={900} exit="fade" exitMs={900}>
@@ -104,30 +109,30 @@ export default option({
       <div className="credits">视觉：system.css / 98.css / Devices.css · MIT　字体：IBM Plex Mono · OFL　原创配乐</div>
     </div>
     </Canvas>
-  </div> } },
+  </div></Fragment>) },
   scenarios: {
-    mac: flow('1984 · 指向命令', { start: '/', actionEntry: 'after', cases: ['mac'], description: '同一个发送按钮，四十年的交互变化。' })
+    mac: chapter('1984 · 指向命令', { expected: '编辑信件、点发送，理解鼠标把命令放到可见的界面里。', actionEntry: 'after', description: '同一个发送按钮，四十年的交互变化。' })
       .drag('scrubber', 'year_1984', '1984 · 鼠标指向命令', arrive(0), set($.ui.open, true), music.play('chip', { loop: true, fadeMs: 1200, volume: .42 }), camera('paper84', { pad: 60, ms: 2200 }), narrate('一九八四年，鼠标把命令放进了屏幕。'), hold(2.5))
       .click('file84', '打开文件菜单', set($.ui.menu, true), camera('popup84', 'paper84', { pad: 30, ms: 1100 }), hold(1.6))
       .click('close84', '回到信件', set($.ui.menu, false), camera('paper84', { pad: 40, ms: 1000 }), hold(1.2))
       .type('letter', '未来的我，周六见。', '给未来写封信', camera('letter', 'send84', { pad: 40, zoom: 1.7, ms: 1400 }), narrate('先指向，再按下。'), hold(1.5))
       .click('send84', '点一下，信寄出了', set($.ui.sent, true), camera('receipt84', 'send84', { pad: 50, zoom: 2.2, ms: 1100 }), narrate('屏幕上的按钮，让命令有了位置。'), hold(2))
       .system('穿过按钮', '按钮会变，发送还在', ...throughTheButton(1), done('第一站：指向命令'), hold(1.2)),
-    desktop: flow('1995 · 找到应用', { from: 'mac', actionEntry: 'after', cases: ['desktop'], description: '从开始菜单找到信箱，再按下发送。' })
+    desktop: chapter('1995 · 找到应用', { expected: '打开开始菜单和信箱，发送消息；凸起按钮成为桌面的动作入口。', actionEntry: 'after', description: '从开始菜单找到信箱，再按下发送。' })
       .drag('scrubber', 'year_1995', '1995 · 按钮来到桌面', arrive(1), camera('window95', { pad: 30, ms: 2600 }), narrate('十一年后，按钮落进了更忙碌的桌面。'), hold(2.6))
       .click('start95', '从开始菜单出发', set($.ui.menu, true), camera('start_menu95', 'taskbar95', 'window95', { pad: 10, ms: 1200 }), hold(1.6))
       .click('mail95', '打开信箱', set($.ui.menu, false), camera('window95', { pad: 30, ms: 1100 }), narrate('先找到应用，再找到动作。'), hold(1.5))
       .type('mail', '未来的我，周六见。', '键入同一句话', camera('mail', 'send95', { pad: 40, zoom: 1.7, ms: 1300 }), hold(1.2))
       .click('send95', '消息进入发件箱', set($.ui.sent, true), camera('receipt95', 'send95', { pad: 50, zoom: 2.2, ms: 1100 }), narrate('凸起的边框，像一颗等着被按下的开关。'), hold(2))
       .system('穿过按钮', '发件箱里多了一封信', ...throughTheButton(2), done('第二站：找到应用'), hold(1.2)),
-    touch: flow('2007 · 直接触碰', { from: 'desktop', actionEntry: 'after', cases: ['touch'], description: '手指成为指针，消息装进口袋。' })
+    touch: chapter('2007 · 直接触碰', { expected: '在手机里输入和发送消息，悬停读提示；手指成为指针。', actionEntry: 'after', description: '手指成为指针，消息装进口袋。' })
       .drag('scrubber', 'year_2007', '2007 · 按钮装进口袋', arrive(2), camera('handset07', { pad: 40, ms: 2600 }), narrate('二零零七年，手指可以直接碰到内容。'), hold(2.6))
       .hover('touch_hint', 450, '给手指留出空间', set($.ui.hint, true), camera('touch_tooltip', 'handset07', { pad: 30, ms: 1200 }), hold(1.6))
       .system('键盘升起', '轻点输入框，键盘升起', set($.ui.kbd, true), camera('phone_screen07', { pad: 30, ms: 1100 }), hold(1.2))
       .type('sms', '未来的我，周六见。', '在手机上写下约定', camera('composer07', 'keyboard07', 'send07', { pad: 30, zoom: 2, ms: 1100 }), narrate('不再隔着鼠标。'), hold(1.2))
       .click('send07', '消息变成对话气泡', set($.ui.sent, true), camera('messages07', 'send07', { pad: 30, ms: 1100 }), narrate('一句话，从指尖装进了口袋。'), hold(2))
       .system('穿过按钮', '手指成为新的指针', ...throughTheButton(3), done('第三站：直接触碰'), hold(1.2)),
-    intent: flow('2024 · 说出意图', { from: 'touch', actionEntry: 'after', cases: ['intent'], description: '发送的从一句消息，变成一个意图。' })
+    intent: chapter('2024 · 说出意图', { expected: '输入请求、查看预设草稿，理解同一个发送动作可以交代意图。', actionEntry: 'after', description: '发送的从一句消息，变成一个意图。' })
       .drag('scrubber', 'year_2024', '2024 · 按钮收到一个意图', arrive(3), set($.ui.draft, ''), camera('ai24', { pad: 20, ms: 2600 }), narrate('走到二零二四年。我们仍然按发送。'), hold(2.6))
       .click('suggest24', '从一句请求开始', set($.inputs.prompt, '帮我把周六见面写成一封简短邀请。'), camera('composer24', 'send24', { pad: 70, zoom: 1.6, ms: 1200 }), narrate('但这一次，交代的是意图。'), hold(1.5))
       .click('send24', '一份邀请草稿出现了', set($.ui.sent, true), stream($.ui.draft, '周六见个面吧。聊聊这些年，也聊聊接下来。'), camera('conversation24', 'composer24', { pad: 20, ms: 1200 }), narrate('这是一份预设的演示草稿，不连接模型。'), hold(2.5))

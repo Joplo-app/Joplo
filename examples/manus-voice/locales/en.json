@@ -4,16 +4,10 @@
   "看懂语音输入怎么用：点麦克风或按 Control D 开始，说的话实时写在光标处，点完成留在框里、不会自动发出去": "Learn how voice input works: click the mic or press Control D, your words appear at the cursor as you speak, and Done leaves them in the box without sending.",
   "我": "Me",
   "习惯用嘴代替打字、要写长指令的人": "Someone who would rather talk than type long instructions",
-  "产品录屏": "Screen recording",
-  "同一个输入框从头到尾不换：四章接着上一章的画面开始，大字说明浮在输入框上方，字幕放正在说的那句话": "One input box from start to finish: each of the four chapters picks up where the last one ended, a headline floats above the box, and the subtitle shows what is being said",
   "输入框": "Input box",
-  "01 开始说": "01 Start talking",
   "点麦克风开始，说的话边说边出现；停顿时末尾虚线闪着表示还在听；点完成后字留在框里，不会自动发出去": "Click the mic to start and words appear as you speak; when you pause, the dashed line at the end blinks to show it is still listening; Done leaves the text in the box without sending it",
-  "02 框里已有文字": "02 Text already in the box",
   "框里已有字时按 Control D 开始，原文照样看得见，新说的话接在光标后面；再按一次结束": "With text already in the box, press Control D; the original stays visible and new words continue after the cursor; press again to stop",
-  "03 说得很长": "03 A long dictation",
   "说得再长，输入框长到上限后在框里滚动，始终显示最新的字": "However long you talk, the box grows to its limit, then scrolls inside and always shows the newest words",
-  "04 光标在哪，写在哪": "04 It writes where the cursor is",
   "把光标点在句子中间再说，字插在光标处，后面的原文往后挪": "Put the cursor mid-sentence and speak: the words go in at the cursor and the rest moves along",
   "云服务": "Cloud",
   "选择项目": "Project",
@@ -128,5 +122,6 @@
   "邮件里写清楚发布会时间，附上新的日程安排。": "In the email, state the launch time, attach the new schedule, ",
   "字插在光标处": "Words inserted at the cursor",
   "插进去的字和原文连成一句": "The inserted words join the sentence",
-  "插进去的字和原文，连成了一句话。": "The new words and the original now read as one sentence."
+  "插进去的字和原文，连成了一句话。": "The new words and the original now read as one sentence.",
+  "Work stage": "Work stage"
 }

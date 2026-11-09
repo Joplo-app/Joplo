@@ -95,7 +95,7 @@ let reactRoot, project; window.fixtureStart=async(p,urls)=>{project=p;await load
       offline.on('pageerror', e => failures.push(e.message));
       offline.on('requestfailed', r => failures.push(r.url()));
       offline.on('request', r => { if (/^https?:/.test(r.url()) && !r.url().startsWith(site.url)) network.push(r.url()); });
-      await offline.goto(site.url + 'index.html#/f/llm?s=llm.a-studio.tokens&step=2');
+      await offline.goto(site.url + 'index.html#/f/llm?s=llm.main.tokens&step=2');
       await offline.waitForSelector('[data-jcanvas-world]');
       await offline.evaluate(() => document.fonts.ready);
       const transform = await offline.locator('[data-jcanvas-world]').evaluate(el => (el as HTMLElement).style.transform);

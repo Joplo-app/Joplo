@@ -19,7 +19,7 @@ pnpm joplo skill install examples/button-40-years
 pnpm joplo check examples/button-40-years
 pnpm joplo dev examples/button-40-years --port 4814
 pnpm joplo build examples/button-40-years
-pnpm joplo render examples/button-40-years --scenario-id forty.a.mac --film --chain --out scratch/film.png
+pnpm joplo render examples/button-40-years --scenario-id forty.main.mac --film --chain --out scratch/film.png
 ```
 
 使用本地模板 `joplo init --template ./templates/starter` 初始化；仓库内依赖用 `workspace:*`。独立使用时应改成匹配的已发行版本。配乐编译需要本机 Alda 2.4.8；观众只需浏览器。构建的 `dist/index.html` 可通过 `file://` 打开；首次点击播放解锁声音，旁白回退到浏览器语音，不会请求付费朗读。

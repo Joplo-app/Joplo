@@ -1,16 +1,19 @@
-import { $, done, flow, free, hold, layer, narrate, option, patch, set } from '@joplo-app/kit';
+/**
+ * 整支片子是同一张“华盛顿地图”：选票、席位图、地图从头用到尾，镜头在区块间推拉摇；三个问题钉在各自的区块上，章末翻成答案
+ */
+import { $, done, chapter, free, hold, layer, narrate, work, patch, set } from '@joplo-app/kit';
 import { camera } from '@joplo-app/plugin-content';
-import { basicsMap, basicsSeats } from '../../../shared/basics.tsx';
-import { AS_OF, GOV_SOURCE, HISTORY_SOURCE, HOUSE, SENATE } from '../../../shared/data.ts';
-import { histCols, indexBars, VIX } from '../../../shared/film/bottom.tsx';
-import { WorldLayer } from '../../../shared/film/world.tsx';
-import { C } from '../../../shared/palette.ts';
-import { maps, seats } from '../../../shared/results.tsx';
+import { basicsMap, basicsSeats } from '../shared/basics.tsx';
+import { AS_OF, GOV_SOURCE, HISTORY_SOURCE, HOUSE, SENATE } from '../shared/data.ts';
+import { histCols, indexBars, VIX } from '../shared/film/bottom.tsx';
+import { WorldLayer } from '../shared/film/world.tsx';
+import { C } from '../shared/palette.ts';
+import { maps, seats } from '../shared/results.tsx';
 
 /**
  * 台本：整支片子是同一张画布上的一串状态变化。
  * - ui({...}) 一步改多处；camera(...) 移镜头（按区块 id 取景）；
- * - 每一章 flow({ from: '上一章' })：从上一章最后的画面接着开始，不翻页、不放章节卡；
+ * - 每一章 chapter() 默认接续上一章：从上一章最后的画面接着开始，不翻页、不放章节卡；
  * - 每一步：镜头去哪 + 画面里哪个物件变了 + 一句旁白。屏幕上只放标签和数字，整句话交给字幕。
  */
 const ui = (v: Record<string, string | number | boolean>) => patch($.ui, v);
@@ -26,7 +29,7 @@ const SRC = {
 };
 
 // ---------- 00 开场：封面 → 推近 → 一夜翻蓝 → 拉远，三个问题钉在各自的区块上 ----------
-const hook = flow('一夜之间，特朗普丢掉了整个国会', { cases: ['hook'], start: '/', description: '一夜之间，国会由红变蓝' })
+const hook = chapter('一夜之间，特朗普丢掉了整个国会', { expected: '开场 20 秒内知道发生了什么，并带着三个问题往下看', description: '一夜之间，国会由红变蓝' })
   .system('选票上没有他', '选票上没有特朗普', camera('sd_trump', 'headline', { pad: 30, ms: 2200 }),
     narrate('十一月三号，美国人去投票。选票上没有特朗普的名字，可这次投票，决定了他接下来两年还能做多少事。'))
   .system('一夜之间', '一夜之间，国会由红变蓝', ui({ head: 'flip', capTint: '#2563eb', chipBg: C.dem, chipParty: '民主党' }), camera('headline', 'sd_cap', { pad: 20, ms: 1800 }),
@@ -36,7 +39,7 @@ const hook = flow('一夜之间，特朗普丢掉了整个国会', { cases: ['ho
     done('带着三个问题往下看'));
 
 // ---------- 01 规则：任期过半 → 一张选票勾三项，席位和地图跟着亮 ----------
-const basics = flow('中期选举，到底在选什么？', { cases: ['basics'], from: 'hook', description: '一张选票，改写整个国会' })
+const basics = chapter('中期选举，到底在选什么？', { expected: '看懂一张选票上选了哪几样，以及它们对应国会的哪部分', description: '一张选票，改写整个国会' })
   .system('任期', '总统一届四年', ui({ overview: false, q1: 'now', chN: '01', src: SRC.term, term: 'start', termW: '1.4%' }), camera('c_term', { ms: 2400 }),
     narrate('先花三十秒，把规则讲清楚。总统一届四年，特朗普这一届从二零二五年一月开始。'))
   .system('走到一半', '走到一半，就是中期选举', ui({ term: 'mid', termW: '47.1%' }), camera('term_axis', { pad: 60, ms: 1600 }), hold(3),
@@ -57,7 +60,7 @@ const basics = flow('中期选举，到底在选什么？', { cases: ['basics'],
     done('看懂一张选票选什么'));
 
 // ---------- 02 结果：同一张席位图由红翻蓝 → 地图上的翻转 → 原因 ----------
-const results = flow('蓝色浪潮有多大？', { cases: ['results'], from: 'basics', description: '两院一起翻蓝，七个州翻转' })
+const results = chapter('蓝色浪潮有多大？', { expected: '看到两院席位由红变蓝、关键州翻转，以及选民为什么换人', description: '两院一起翻蓝，七个州翻转' })
   .system('选前', '选前：两院都在共和党手里', ui({ chN: '02', src: SRC.house, cgH: 'result', cgS: 'result', hD: '215', hU: '—', hR: '220', sD: '47', sU: '—', sR: '53' }),
     set($.data.house, seats.houseBefore), set($.data.senate, seats.senateBefore), camera('c_congress', { ms: 2000 }),
     narrate('那这次的结果，到底有多夸张？先看选前：两院的红色都过了中线，都在共和党手里。'), hold(3))
@@ -82,7 +85,7 @@ const results = flow('蓝色浪潮有多大？', { cases: ['results'], from: 'ba
     done('看到两院翻蓝和原因'));
 
 // ---------- 03 后果：回到开场那一幕，文件在白宫和国会之间飞、盖章；再把丢掉的 39 席放进历史 ----------
-const stakes = flow('他接下来会被怎样卡住？', { cases: ['stakes'], from: 'results', description: '白宫 vs 国会：否决、停摆、搁置' })
+const stakes = chapter('他接下来会被怎样卡住？', { expected: '看到失去国会后，法案、预算、调查、人事各自怎么变，以及历史上几乎每任总统都会输', description: '白宫 vs 国会：否决、停摆、搁置' })
   .system('分裂政府', '2027 年 1 月 3 日：分裂政府', ui({ chN: '03', q2: 'now', head: 'none', split: true, sworn: true, src: SRC.stakes }), camera('c_standoff', { ms: 2400 }),
     narrate('回到开头这一幕。明年一月三号新国会就职，白宫还是红的，国会变成了蓝的。这就叫分裂政府。'), hold(3))
   .system('送出法案', '民主党能让法案在国会通过', ui({ sworn: false, paperAt: 'cap', paperKind: '法案', paperText: '两院都已通过，等待总统签字' }), camera('sd_cap', 'split_label', { pad: 20, ms: 1400 }),
@@ -112,7 +115,7 @@ const stakes = flow('他接下来会被怎样卡住？', { cases: ['stakes'], fr
     done('看懂失去国会的后果'));
 
 // ---------- 04 钱：股市三天 → AI 股分成两堆 → 回到得州 → 全景，三个问题都有了答案 ----------
-const money = flow('AI 和股市：你的钱会怎样？', { cases: ['money'], from: 'stakes', description: '利好只撑一天，AI 股冰火两重天' })
+const money = chapter('AI 和股市：你的钱会怎样？', { expected: '看到选后股市的实际反应，以及 AI 政策可能怎么变', description: '利好只撑一天，AI 股冰火两重天' })
   .system('第一天', '第一天：道指大涨 3%', ui({ chN: '04', q3: 'now', src: SRC.market, day: 'd1', vix: VIX.d1, vixColor: C.ink }), set($.data.idx, indexBars.d1), camera('c_market', { ms: 2200 }),
     narrate('最后，说说大家最关心的：钱。结果出来第一天，市场先是欢呼，道指涨了百分之三，一年半以来最好的一天。'))
   .system('第二天', '第二天：芯片股跌 12%', ui({ day: 'd2', vix: VIX.d2, vixColor: C.rep }), set($.data.idx, indexBars.d2), camera('idx', { pad: 40, ms: 1400 }), hold(3),
@@ -134,9 +137,9 @@ const money = flow('AI 和股市：你的钱会怎样？', { cases: ['money'], f
     narrate('退后一步再看：中期选举选的是国会和州长；国会换了主人，法案、预算、人事都会被卡；钱的方面，利好只撑了一天，芯片和算力跌得最多。接下来两年，盯住否决、停摆和听证。'),
     done('看懂选后股市和 AI 的变化'));
 
-export default option({
-  name: '一镜到底版',
-  idea: '整支片子是同一张“华盛顿地图”：选票、席位图、地图从头用到尾，镜头在区块间推拉摇；三个问题钉在各自的区块上，章末翻成答案',
+export default work({
+  title: '特朗普丢掉国会之后',
+  summary: '五分钟看懂 2026 美国中期选举：选的是什么、民主党赢了多少、特朗普接下来会被怎样卡住、AI 和股市会受什么影响',
   layers: { world: layer('世界', <WorldLayer />, { icon: 'flow' }) },
   free: {
     tx: free.click('btn_tx', set($.ui.race, 'TX')),

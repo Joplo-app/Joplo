@@ -1,13 +1,16 @@
+/**
+ * 整支片子是同一个世界：同一批物件（那句话、纸带、机器、概率条）从头到尾变形、移动，镜头在它们之间推拉摇，不翻页
+ */
 import { camera } from '@joplo-app/plugin-content';
-import { $, callout, done, flow, hold, layer, narrate, option, patch } from '@joplo-app/kit';
-import { BIRTHDAY_Q, PROMPT, SRC } from '../../../shared/data.ts';
-import { C } from '../../../shared/palette.ts';
-import { WorldLayer } from '../../../shared/world.tsx';
+import { $, callout, done, chapter, hold, layer, narrate, work, patch } from '@joplo-app/kit';
+import { BIRTHDAY_Q, PROMPT, SRC } from '../shared/data.ts';
+import { C } from '../shared/palette.ts';
+import { WorldLayer } from '../shared/world.tsx';
 
 /**
  * 台本：整支片子是同一张画布上的一串状态变化。
  * - patch($.ui, {...}) 一步改多处；camera(...) 移镜头；
- * - 每一章 flow({ from: '上一章' })：从上一章最后的画面接着开始，不用手抄状态。
+ * - 每一章 chapter() 默认接续上一章：从上一章最后的画面接着开始，不用手抄状态。
  */
 const ui = (v: Record<string, string | number | boolean>) => patch($.ui, v);
 const machOn = { machOp: 1, machBd: C.accent, machGlow: '0 0 60px rgba(255,176,32,.35)', scanOp: 1 };
@@ -15,7 +18,7 @@ const machIdle = { machOp: 1, machBd: C.lineStrong, machGlow: 'none', scanOp: 0 
 const hud = (n: string, t: string, src: string) => ({ hudN: n, hudT: t, src });
 
 // ---------- 00 开场：熟悉的一幕 → 反常 → 拉远，四个问题钉在各自的位置 ----------
-const hook = flow('它不是在写，是在猜', { cases: ['hook'], start: '/', description: '你看到的逐字出现，背后是抽签' })
+const hook = chapter('它不是在写，是在猜', { expected: '开场 30 秒内看到“逐字出现”背后是概率，并带着三个问题往下看', description: '你看到的逐字出现，背后是抽签' })
   .type('prompt', PROMPT, '你一定见过这一幕', ui({ poster: 0 }), narrate('你一定见过这一幕：问 AI 一个问题，比如，给我的橘猫起个名字。'))
   .click('send', '答案一个字一个字蹦出来', ui({ asked: true, ans: 'plain' }), narrate('答案一个字一个字地蹦出来，像有人在那头打字。'))
   .system('定格', '其实每一块都是猜出来的', ui({ ans: 'split' }), hold(5),
@@ -27,7 +30,7 @@ const hook = flow('它不是在写，是在猜', { cases: ['hook'], start: '/', 
     done('带着四个问题往下看'));
 
 // ---------- 01 词元 ----------
-const tokens = flow('它读到的“字”是什么？', { cases: ['tokens'], from: 'hook', description: '一句话先被切成词元，再变成编号' })
+const tokens = chapter('它读到的“字”是什么？', { expected: '看到一句话被切成词元、换成编号，并知道价格和长度上限按词元算', description: '一句话先被切成词元，再变成编号' })
   .system('章节', '01 它读到的“字”是什么？', ui({ overview: false, tag0: 'now', ...hud('01', '它读到的“字”是什么？', SRC.tokens) }), camera('q1_bubble', 'a1_bubble', { pad: 60 }),
     narrate('第一个问题：它读到的字，到底是什么？凑近看你发出的这句话。'))
   .system('切开', '九个字，在它眼里是七块', ui({ pMode: 'split' }), hold(4),
@@ -45,7 +48,7 @@ const tokens = flow('它读到的“字”是什么？', { cases: ['tokens'], fr
     done('知道它读的是词元'));
 
 // ---------- 02 生成循环：慢放一圈，再快进 ----------
-const loop = flow('下一个字，怎么选出来？', { cases: ['loop'], from: 'tokens', description: '读入、打分、挑一个、接上，循环往复' })
+const loop = chapter('下一个字，怎么选出来？', { expected: '看懂“读入 → 打分 → 挑一个 → 接上”的循环，以及回答在“结束”记号处停下', description: '读入、打分、挑一个、接上，循环往复' })
   .system('章节', '02 下一个字，怎么选出来？', ui({ tag1: 'now', ...machIdle, ...hud('02', '下一个字，怎么选出来？', SRC.predict) }), camera('tape', 'machine', 'bars', 'tag_1'),
     narrate('第二个问题：下一个字，是怎么选出来的？先慢放一圈。'))
   .system('读入', '第一步：整条纸带读进去', ui({ ...machOn, scan: '400px' }),
@@ -67,7 +70,7 @@ const loop = flow('下一个字，怎么选出来？', { cases: ['loop'], from: 
     done('看懂生成的循环'));
 
 // ---------- 03 温度：条形图排成抽签带 ----------
-const temperature = flow('同一个问题，为什么答案会变？', { cases: ['temperature'], from: 'loop', description: '按概率抽签，温度调的是手气' })
+const temperature = chapter('同一个问题，为什么答案会变？', { expected: '看到按概率抽签会抽到第二名，以及温度怎样让概率变尖或变平', description: '按概率抽签，温度调的是手气' })
   .system('章节', '03 同一个问题，为什么答案会变？', ui({ tag2: 'now', bars: 'name', ...hud('03', '同一个问题，为什么答案会变？', SRC.temp) }), camera('bars', 'strip', 'dial', 'tag_2', { pad: 40 }),
     narrate('第三个问题：同一个问题，答案为什么会变？回到起名字的那一圈：橘子百分之四十五，南瓜百分之二十，其他更少。'))
   .system('排成一条', '把概率首尾相接，排成一条', ui({ bars: 'strip1', dial: 't1', ptr: 'start' }), hold(4),
@@ -85,7 +88,7 @@ const temperature = flow('同一个问题，为什么答案会变？', { cases: 
     done('看懂答案为什么会变'));
 
 // ---------- 04 胡说 + 全片收尾 ----------
-const hallucinate = flow('为什么它会一本正经地胡说？', { cases: ['hallucinate'], from: 'temperature', description: '没把握也必须挑一个' })
+const hallucinate = chapter('为什么它会一本正经地胡说？', { expected: '看到没把握时概率很平却仍必须挑一个，以及“只算答对”的考法为什么鼓励蒙', description: '没把握也必须挑一个' })
   .system('章节', '04 为什么它会一本正经地胡说？', ui({ tag3: 'now', ...hud('04', '为什么它会一本正经地胡说？', SRC.hallu) }), camera('chat'),
     narrate('最后一个问题：为什么它会一本正经地胡说？回到聊天窗。'))
   .type('prompt', BIRTHDAY_Q, '问它一个不可能知道的事', narrate('我们问一个它不可能知道的事：我的橘猫哪天生日？'))
@@ -110,9 +113,10 @@ const hallucinate = flow('为什么它会一本正经地胡说？', { cases: ['h
     narrate('你也可以自己试试：同一个问题问两遍，看看它起的名字变没变。'),
     done('看懂胡说的成因'));
 
-export default option({
-  name: '连续世界版',
-  idea: '整支片子是同一个世界：同一批物件（那句话、纸带、机器、概率条）从头到尾变形、移动，镜头在它们之间推拉摇，不翻页',
+export default work({
+  title: '大模型是怎么“写”出一句话的？',
+  summary: '五分钟看懂大模型怎样生成文字：读的是词元、每次只猜下一块、按概率抽签所以答案会变、没把握也必须挑一个所以会胡说',
+  audience: '天天用 AI 聊天、但不写代码的人',
   layers: { world: layer('世界', <WorldLayer />, { icon: 'flow' }) },
   state: {
     ui: {
