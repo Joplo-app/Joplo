@@ -43,6 +43,14 @@ Native inputs are the editable surface; their displayed text is not a real backe
 
 These examples use this explicitly enabled plugin. Engine flow/state/review rules remain in the engine skill.
 
+## A whole flow on one whiteboard
+Use when reviewers should see the whole feature, not one screen at a time: several screens side by side, joined by arrows, with sticky notes for edge cases, and the camera walking from screen to screen.
+- One layer: <Canvas w h> (from @joplo-app/plugin-content, enable content too) containing one <Board>. Place each screen as <BrowserWindow id label url pos="absolute" top left w h> (or a Phone) and write its page inside with normal ui components; they stay clickable and typeable.
+- <Arrow from to label> joins two element ids on the same Board (a button to the next screen reads best). <Note pos="absolute" top left color> holds a comment that stays on the board; callout() is for a reason that belongs to one step only. Arrow must be a direct child of Board; ARROW_TARGET_UNKNOWN means no element on that Board has the id.
+- Reveal the next screen and its arrow in the same step with when; an arrow to a hidden element is not drawn. Arrows draw themselves in when they appear during playback.
+- Per step: camera('screenA', 'screenB') frames the pair being connected. End with a camera on every visible screen and note, not camera() of the whole world, which leaves empty paper when later screens are hidden.
+- Leave 160–280 px between screens for arrow labels; keep notes slightly rotated (default -2°) and screens straight. Text inside screens is read at the zoom of a two-screen shot: check it in a rendered storyboard.
+
 ## Controls over a visual story
 - Use Image with asset() for the actual downloaded artwork; keep source/creator/license/modification details beside the files. CSS crop/opacity changes still belong in that record. Do not use a remote URL as an offline-image substitute.
 - On a dark art background, Button's default filled variant may draw a Rough fill over your custom CSS. Use variant="subtle" when authoring the whole surface, set text size/color explicitly, and choose --jp-stroke: clean in the project theme when appropriate. A class does not automatically override component inline font/color values. Verify contrast, focus and hitbox after the final composition.

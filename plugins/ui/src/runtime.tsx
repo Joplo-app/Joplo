@@ -2264,6 +2264,129 @@ function TabBar({ node, p, disabled }: NodeProps) {
 
 // ============ 注册表：目录中每个类型都必须有实现（Record<ComponentType, …> 由类型检查保证） ============
 
+// ============ 白板（D96）：多屏画面摆在一块白板上，箭头连成流程，便签写说明 ============
+
+/** 白板：点阵纸，默认铺满父容器（放进 content:Canvas 就能用镜头在各屏之间移动）；子元素用 pos="absolute" top / left 摆放。 */
+function Board({ node, p, children }: NodeProps) {
+  const dots = p.dots !== false;
+  const root = useRoot(node, p, { style: { position: 'relative', width: '100%', height: '100%', background: dots ? `radial-gradient(circle, ${LINE_STRONG} 1.3px, transparent 1.5px) 0 0 / 28px 28px, ${SURFACE}` : SURFACE } });
+  return <div {...root} data-jboard="">{children}</div>;
+}
+
+/** 浏览器窗口外框：一屏画面；label 是框上方的手写标题（“1. 登录”）。 */
+function BrowserWindow({ node, p, children }: NodeProps) {
+  const mode = useStroke();
+  const root = useRoot(node, p, { className: cn('jbox', mode === 'clean' && 'rounded-lg'), style: { display: 'flex', flexDirection: 'column', background: SURFACE, width: 520, height: 400, flexShrink: 0 } });
+  return (
+    <div {...root}>
+      <Rough seedKey={node.id} strokeWidth={1.6} />
+      {p.label !== undefined ? <div aria-hidden style={{ position: 'absolute', left: 2, bottom: '100%', marginBottom: 10, fontSize: 22, color: DIMMED, whiteSpace: 'nowrap' }}>{str(p.label)}</div> : null}
+      <div className="flex shrink-0 items-center gap-2 px-3" style={{ height: 38, borderBottom: mode === 'clean' ? `1px solid ${LINE}` : undefined, position: 'relative' }}>
+        {[0, 1, 2].map(i => <span key={i} className="jbox" data-jround="" style={{ width: 11, height: 11, borderRadius: 999 }}><Rough seedKey={`${node.id}:dot${i}`} shape="ellipse" strokeWidth={1.1} inset={0} stroke={SOFT} /></span>)}
+        <span className="jbox jtrunc" style={{ flex: 1, height: 22, marginLeft: 6, fontSize: 13, color: DIMMED, display: 'flex', alignItems: 'center', padding: '0 10px', borderRadius: 6, background: SUBTLE }}>
+          <Rough seedKey={`${node.id}:url`} strokeWidth={1} roughness={0.8} inset={1} stroke={SOFT} />
+          <span>{str(p.url)}</span>
+        </span>
+        {mode === 'rough' ? <span className="jbox" style={{ position: 'absolute', left: 4, right: 4, bottom: -2, height: 4 }}><Rough seedKey={`${node.id}:bar`} shape="line" strokeWidth={1.1} inset={0} stroke={SOFT} /></span> : null}
+      </div>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>{children}</div>
+    </div>
+  );
+}
+
+/** 便签：一直留在白板上的说明（callout 只在一步里出现）。 */
+function Note({ node, p, children }: NodeProps) {
+  const c = color(p.color ?? 'yellow') ?? WARN;
+  const deg = typeof p.rotate === 'number' && Number.isFinite(p.rotate) ? p.rotate : -2;
+  const root = useRoot(node, p, { className: 'jbox', style: { width: 240, padding: '14px 16px', fontSize: 17, lineHeight: 1.4, color: INK, whiteSpace: 'pre-line', background: tint(c, 26), boxShadow: '0 6px 14px rgba(0,0,0,.08)', rotate: `${deg}deg` } });
+  return (
+    <div {...root}>
+      <Rough seedKey={node.id} stroke={tint(c, 70)} strokeWidth={1} roughness={0.7} inset={0} />
+      <div data-jtext="">{children}</div>
+    </div>
+  );
+}
+
+type BoardRect = { x: number; y: number; w: number; h: number };
+/** 元素在白板里的布局位置：offset 链，不受镜头缩放和 FLIP transform 影响。 */
+function offsetInBoard(el: HTMLElement, root: HTMLElement): BoardRect | null {
+  let x = 0, y = 0;
+  let n: HTMLElement | null = el;
+  while (n && n !== root) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent as HTMLElement | null; }
+  return n === root ? { x, y, w: el.offsetWidth, h: el.offsetHeight } : null;
+}
+const cssEscape = (id: string) => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id.replace(/"/g, '\\"'));
+
+/** 量出白板上若干元素的位置；目标出现、消失、改尺寸、字体加载完成都会重新量；没渲染的目标给 null。 */
+function useBoardRects(ids: string[]) {
+  const ref = useRef<SVGSVGElement>(null);
+  const [rects, setRects] = useState<(BoardRect | null)[] | null>(null);
+  const key = ids.join('\n');
+  useLayoutEffect(() => {
+    const svg = ref.current;
+    const board = svg?.closest('[data-jboard]') as HTMLElement | null;
+    if (!svg || !board) return;
+    let last = '';
+    const find = (id: string) => board.querySelector(`[data-jid="${cssEscape(id)}"]`) as HTMLElement | null;
+    const measure = () => {
+      const next = ids.map(id => { const el = find(id); return el && el.offsetParent ? offsetInBoard(el, board) : null; });
+      const sig = JSON.stringify(next);
+      if (sig !== last) { last = sig; setRects(next); }
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(board);
+    for (const id of ids) { const el = find(id); if (el) ro.observe(el); }
+    const mo = new MutationObserver(measure);
+    mo.observe(board, { childList: true, subtree: true });
+    let alive = true;
+    document.fonts?.ready.then(() => { if (alive) measure(); });
+    return () => { alive = false; ro.disconnect(); mo.disconnect(); };
+  }, [key]);
+  return { ref, rects };
+}
+
+/** 从 r 的中心朝 (tx, ty) 出发，落在外扩 pad 的边框上的点。 */
+function edgePoint(r: BoardRect, tx: number, ty: number, pad: number) {
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  const dx = tx - cx, dy = ty - cy;
+  if (!dx && !dy) return { x: cx, y: cy };
+  const t = Math.min(dx ? (r.w / 2 + pad) / Math.abs(dx) : Infinity, dy ? (r.h / 2 + pad) / Math.abs(dy) : Infinity);
+  return { x: cx + dx * t, y: cy + dy * t };
+}
+
+/** 两个元素之间一直保留的箭头（引擎的 mark 只在一步里出现）。手绘描边用 Rough.js，干净线框退回普通 SVG。 */
+function Arrow({ node, p }: NodeProps) {
+  const mode = useStroke();
+  const { animate } = useCtx();
+  const attrs = useRootAttrs(node);
+  const { ref, rects } = useBoardRects([str(p.from), str(p.to)]);
+  const stroke = color(p.color) ?? INK;
+  const a = rects?.[0], b = rects?.[1];
+  let d = '', at: { x: number; y: number } | null = null;
+  if (a && b) {
+    const s = edgePoint(a, b.x + b.w / 2, b.y + b.h / 2, 10), e = edgePoint(b, a.x + a.w / 2, a.y + a.h / 2, 14);
+    const len = Math.hypot(e.x - s.x, e.y - s.y) || 1;
+    const bend = Math.max(-1, Math.min(1, typeof p.bend === 'number' && Number.isFinite(p.bend) ? p.bend : 0.25));
+    const c = { x: (s.x + e.x) / 2 - ((e.y - s.y) / len) * bend * len * 0.3, y: (s.y + e.y) / 2 + ((e.x - s.x) / len) * bend * len * 0.3 };
+    const ang = Math.atan2(e.y - c.y, e.x - c.x), head = 16, spread = 0.45;
+    const f = (n: number) => n.toFixed(1);
+    d = `M${f(s.x)},${f(s.y)} Q${f(c.x)},${f(c.y)} ${f(e.x)},${f(e.y)} M${f(e.x - head * Math.cos(ang - spread))},${f(e.y - head * Math.sin(ang - spread))} L${f(e.x)},${f(e.y)} L${f(e.x - head * Math.cos(ang + spread))},${f(e.y - head * Math.sin(ang + spread))}`;
+    at = { x: 0.25 * s.x + 0.5 * c.x + 0.25 * e.x, y: 0.25 * s.y + 0.5 * c.y + 0.25 * e.y };
+  }
+  const dashed = p.dashed === true;
+  return (
+    <>
+      <svg ref={ref} {...attrs} aria-label={nodeLabel(node)} style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none', zIndex: 5 }}>
+        {d ? (mode === 'clean'
+          ? <path d={d} fill="none" stroke={stroke} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dashed ? '7 6' : undefined} />
+          : <RoughPath seedKey={`${node.id}:${d.length}`} d={d} stroke={stroke} strokeWidth={1.8} dashed={dashed} roughness={1} draw={animate} />) : null}
+      </svg>
+      {at && p.label !== undefined ? <div aria-hidden data-jtext="" style={{ position: 'absolute', left: at.x, top: at.y, transform: 'translate(-50%, -50%)', background: SURFACE, padding: '1px 8px', fontSize: 17, color: p.color !== undefined ? stroke : DIMMED, whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 6 }}>{str(p.label)}</div> : null}
+    </>
+  );
+}
+
 const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   AppShell,
   'AppShell.Header': ShellHeader,
@@ -2378,6 +2501,10 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   PromptInput,
   'Artifact.Ref': ArtifactRef,
   'Terminal.Input': TerminalInput,
+  Board,
+  BrowserWindow,
+  Note,
+  Arrow,
 };
 
 

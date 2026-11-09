@@ -1,0 +1,11 @@
+{
+  "name": "joplo-example-feature-board",
+  "private": true,
+  "type": "module",
+  "description": "Joplo 示例：用 ui 的 Board / BrowserWindow / Arrow / Note 把一个功能的整个流程画在一块白板上（D96）",
+  "devDependencies": {
+    "@joplo-app/kit": "workspace:*",
+    "@joplo-app/plugin-ui": "workspace:*",
+    "@joplo-app/plugin-content": "workspace:*"
+  }
+}

@@ -1,6 +1,6 @@
 import packageInfo from './version.json' with { type: 'json' };
 import { skill, patterns, componentGuide } from './guide.ts';
-import { definePlugin, type ElementTraits, type PluginComponentSpec } from '@joplo-app/kit/plugin';
+import { definePlugin, type ElementTraits, type PluginComponentSpec, type PluginIRNode } from '@joplo-app/kit/plugin';
 import { COMPONENT_TYPES, COMPONENT_DOCS, COMPONENT_EXAMPLES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS, HTML_TAGS } from './catalog.ts';
 
 // The UI family owns its vocabulary and display semantics, including HTML fallbacks.
@@ -16,6 +16,7 @@ const display: Record<string,string[]> = {
   KeyValue:['items'], BarChart:['data','unit'], LineChart:['data','unit'],
   NavLink:['label','description','leftSection','rightSection'], Button:['leftSection','rightSection'],
   'Menu.Item':['leftSection','rightSection'], 'Tabs.Tab':['leftSection','rightSection'],
+  BrowserWindow:['label','url'], Arrow:['label'],
 };
 const textPaths: Record<string,string[][]> = {DataTable:[['columns','*','title']],DataCard:[['fields','*','label']],BarChart:[['series','*','label']],LineChart:[['series','*','label']]};
 const fieldText = ['label','description','placeholder','error','value'];
@@ -29,10 +30,10 @@ const traits = (name: string): ElementTraits => ({
   ...(textPaths[name] ? {textPaths:textPaths[name]} : {}),
   text: ['aria-label', ...(display[name] ?? []), ...(VALUE_TYPES.has(name) ? fieldText : []), ...(['Select','MultiSelect','SegmentedControl','TabBar'].includes(name) ? ['data'] : [])],
   ...(name === 'Indicator' ? {disabledPresentation:true} : {}),
-  ...(['Card','Paper','Modal','Drawer','Alert','Notification','Email','DataCard','StateFlow','Artifact','Terminal','ChatMessage','Table','DataTable','Accordion.Item','Tabs.Panel','AppShell.Navbar','AppShell.Aside','AppShell.Header','AppShell.Footer'].includes(name) ? {frame:true} : {}),
+  ...(['Card','Paper','Modal','Drawer','Alert','Notification','Email','DataCard','StateFlow','Artifact','Terminal','ChatMessage','Table','DataTable','Accordion.Item','Tabs.Panel','AppShell.Navbar','AppShell.Aside','AppShell.Header','AppShell.Footer','BrowserWindow'].includes(name) ? {frame:true} : {}),
   ...(VALUE_TYPES.has(name) ? { input: name === 'MultiSelect' ? 'multiple' : 'single' } as const : {}),
   ...(GATED_CONTAINERS.has(name) ? { gate: ['opened'], selfEvident: true } : {}),
-  ...(['DataCard','StateFlow'].includes(name) ? {selfEvident:true} : {}),
+  ...(['DataCard','StateFlow','Board','Arrow'].includes(name) ? {selfEvident:true} : {}),
   ...(name === 'Checkbox' ? {toggleCaption:'check'} as const : {}),
   ...(['Select','MultiSelect','SegmentedControl','TabBar'].includes(name) ? {choices:{prop:'data'}} : {}),
   ...(name === 'Radio.Group' ? {choices:{descendants:['ui:Radio','ui:Radio.Card']}} : {}),
@@ -51,10 +52,26 @@ export const components: Record<string, PluginComponentSpec> = Object.fromEntrie
   ...(INTERACTIVE_TYPES.has(name) ? {interactive:true} : {}),
   traits: traits(name),
   ...(name==='Menu' ? {inherit:[{target:'ui:Menu.Dropdown',props:['opened']}]} : {}),
+  ...(name==='Arrow' ? {parent:'Board'} : {}),
 }]));
 export default definePlugin({ packageName: '@joplo-app/plugin-ui',
   id:'ui', title:'Standard UI', version:packageInfo.version, runtime:new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js',import.meta.url), skill, skillTopics: { components: { description: 'Component props and author examples', body: componentGuide(COMPONENT_DOCS, COMPONENT_EXAMPLES) }, patterns: { description: 'UI recipes and individual pitfalls', body: patterns } }, components,
-  compile:{node(n,{report}){
+  compile:{
+  // derive 对每个节点各调一次、只给它自己的子树；箭头都在 Board 里，所以从 Board 统一校验 from / to。
+  derive(root,{report}){
+    if(root.type !== 'ui:Board') return;
+    const all=(n:PluginIRNode):PluginIRNode[]=>[n,...(n.children??[]).flatMap(all)];
+    const nodes=all(root); const ids=new Set(nodes.map(n=>n.id));
+    for(const n of nodes){
+      if(n.type!=='ui:Arrow') continue;
+      for(const key of ['from','to'] as const){
+        const v=n.props?.[key];
+        if(typeof v!=='string'||!v) report('ARROW_INVALID',`<Arrow> needs ${key}="<element id>"`,n.source);
+        else if(!ids.has(v)) report('ARROW_TARGET_UNKNOWN',`<Arrow ${key}="${v}">: no element with id "${v}" on this Board; give the target element id="${v}"`,n.source);
+      }
+    }
+  },
+  node(n,{report}){
     if(n.type !== 'ui:Image') return;
     const {src,fit}=n.props;
     if(typeof src==='string'&&src&&!src.startsWith('data:image/')) report('IMAGE_PLACEHOLDER',`<ui:Image src="${src.length>60?`${src.slice(0,57)}...`:src}"> is drawn as a placeholder: only embedded images are shown. Put the file in the project and write src={asset('./photo.jpg')} (path relative to this file; import asset from @joplo-app/kit)`,n.source,'warning');
