@@ -1,3 +1,5 @@
+import { lowerFilms } from './films.ts';
+import { workKind } from './works.ts';
 import { validActionData, pluginActionSpec } from './actions.ts';
 /**
  * 编译：作者的源文件（经 @joplo-app/kit 收集成数据）→ IR v2。组件词汇对齐 Mantine（D35），见 catalog.ts。
@@ -8,8 +10,8 @@ import { validActionData, pluginActionSpec } from './actions.ts';
  * - publish 模式：只有发布视图；只含选定方案的场景；去掉规则、情况、问题等创作侧信息（D33）。
  * - review 模式（评审版，D63）：画面与场景同 dev（所有功能的所有方案），创作侧信息按 publish 的规则去掉。
  */
-import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo-app/kit/node';
-import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef, PluginDef } from '@joplo-app/kit';
+import { createNode, isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo-app/kit/node';
+import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef, PluginDef, FilmDef } from '@joplo-app/kit';
 import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, PAGE_LAYER, isInteractiveType, matchChoice, nodeLabel, pluginSpec, splitPluginType, type PluginInfo } from './catalog.ts';
 import { HOLD_MAX_SECONDS, HOLD_MIN_SECONDS, inShotFrame } from './focus.ts';
 import { cameraOf, choicesOf, commonPrefix, replayTo } from './player.ts';
@@ -28,6 +30,8 @@ export type AuthoringProject = {
   layouts: Record<string, LayoutDef & { file: string }>;
   routes: Record<string, PageDef & { file: string }>;
   features: Record<string, { def: FeatureDef & { file: string }; options: Record<string, OptionDef & { file: string }> }>;
+  /** 影片文件名为作品键；可省略以保持既有项目的输入与 IR 不变。 */
+  films?: Record<string, FilmDef & { file: string }>;
   /** 作者主题（D51）：themes/<name>.css 的原文。 */
   themes?: Record<string, string>;
   /** 作者内容译文（D84）：locales/<语言>.json 的内容（原文 → 译文）；语言 → 文件相对路径见 localeFiles。 */
@@ -62,6 +66,11 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     seenHints.add(key);
     diags.push({ severity, code, message, source: 'structure', ...(at ? { at: rel(at) } : {}) });
   };
+
+  const lowered = lowerFilms(src, mode, report);
+  src = lowered.source;
+  const films = lowered.films;
+  if (diags.some(d => d.severity === 'error')) return { project: null, diagnostics: diags };
 
   /** flow({ from }) 接力：所有场景编译完后，按回放结果替换初始状态（见文末）。 */
   const pendingFrom = new Map<string, { from: string; state: OptionDef['state']; layer: string | undefined; at: string | undefined }>();
@@ -131,8 +140,12 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       addedRoutes.set(`${o.qid}|${path}`, { path, page: { ...p, file: o.def.file }, addedBy: o });
     }
   }
+  // 影片总是从独立空白画面开始，不借用项目的页面、布局或 home。
+  const filmRoute: RouteEntry = { path: '/', page: { kind: 'page', title: 'Film stage', layout: false, tree: createNode('#fragment', {}), file: '' } };
+  if (!baseRoutes.size && films.size) baseRoutes.set('/', filmRoute);
   /** 在给定方案上下文（null = 发布视图）中可见的路径。 */
   const routesIn = (ctx: Opt | null): RouteEntry[] => {
+    if (ctx && films.has(ctx.fid)) return [filmRoute];
     const added = [...addedRoutes.values()].filter((r) => {
       const by = r.addedBy!;
       if (ctx && by.qid === ctx.qid) return true;
@@ -143,7 +156,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   };
 
   const layoutOf = (page: PageDef): string | null => (page.layout === false ? null : (page.layout ?? src.config.layout ?? null));
-  for (const r of [...baseRoutes.values(), ...[...addedRoutes.values()].filter((r) => included.some((o) => o.qid === r.addedBy!.qid))]) {
+  for (const r of [...baseRoutes.values(), ...(films.size ? [filmRoute] : []), ...[...addedRoutes.values()].filter((r) => included.some((o) => o.qid === r.addedBy!.qid))]) {
     const lid = layoutOf(r.page);
     if (lid && !src.layouts[lid]) err('UNKNOWN_LAYOUT', `Page ${r.path} uses an unknown layout "${lid}"`, r.page.source);
     if (out.routes[r.path]) continue;
@@ -168,6 +181,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const caseIds = Object.keys(fdef.cases ?? {}).map((k) => `${fid}.${k}`);
     out.features[fid] = {
       id: fid,
+      ...(films.has(fid) ? { kind: 'film', ...(films.get(fid)!.audience?.trim() ? { audience: films.get(fid)!.audience!.trim() } : {}), ...(mode === 'dev' && films.get(fid)!.draft === true ? { draft: true } : {}) } : {}),
       name: fdef.name,
       goal: fdef.goal,
       roles: rolesOf(fdef.roles),
@@ -185,6 +199,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
 
   // ---------- 4. 画面合成 ----------
   const contributionsFor = (ctx: Opt | null): Opt[] => {
+    if (ctx && workKind(out.features[ctx.fid]) === 'film') return [ctx];
     const list = [...picked.values()].filter((o) => !ctx || o.fid !== ctx.fid);
     if (ctx) list.push(ctx);
     return list;
@@ -250,16 +265,17 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     out.scenes[s.id] = s;
   };
   for (const r of routesIn(null)) addScene(composeScene(r, null));
-  if (allOpts) for (const o of included) for (const r of routesIn(o)) addScene(composeScene(r, o));
+  for (const o of included) if (allOpts || films.has(o.fid)) for (const r of routesIn(o)) addScene(composeScene(r, o));
 
   // ---------- 5. 方案、场景、覆盖 ----------
   for (const o of included) {
     const { def, fid, qid } = o;
     const fdef = src.features[fid]!.def;
+    const isFilm = workKind(out.features[fid]) === 'film';
     const ctxRoutes = new Set(routesIn(o).map((r) => r.path));
     const touched = [...Object.keys(def.on ?? {}), ...Object.keys(def.routes ?? {})];
     for (const p of Object.keys(def.on ?? {})) if (!ctxRoutes.has(p)) err('UNKNOWN_ROUTE', `Option ${qid} adds elements to an unknown route ${p}`, def.source);
-    const sceneOf = (path: string) => (allOpts ? `${qid}@${path}` : `@${path}`);
+    const sceneOf = (path: string) => (allOpts || isFilm ? `${qid}@${path}` : `@${path}`);
 
     if (mode === 'dev') {
       for (const [k, r] of Object.entries(def.rules ?? {})) out.rules[`${qid}.${k}`] = ruleOf(`${qid}.${k}`, fid, qid, r, rel);
@@ -278,7 +294,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     // ---------- 层级（T-layers）：每层一个完全独立的画面，单独编译、单独渲染 ----------
     const layers: Record<string, { title: string; sceneId: string; role?: string; icon?: LayerIcon }> = {};
     const layerScenes: { key: string; scene: Scene }[] = [];
-    const layerRoute = touched.find((r) => ctxRoutes.has(r)) ?? src.config.home ?? [...ctxRoutes][0] ?? '/';
+    const layerRoute = isFilm ? '/' : touched.find((r) => ctxRoutes.has(r)) ?? src.config.home ?? [...ctxRoutes][0] ?? '/';
     for (const [lk, ld] of Object.entries(def.layers ?? {})) {
       const at = ld.source ?? def.source;
       if (!/^[A-Za-z_][\w-]*$/.test(lk)) {
@@ -311,7 +327,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const layersWith = (id: string): string[] => layerScenes.filter((l) => findIn(l.scene.root, id)).map((l) => l.key);
     const layerSceneWith = (id: string): Scene | undefined => layerScenes.find((l) => findIn(l.scene.root, id))?.scene;
 
-    const effectRoots = [...layerScenes.map(l => l.scene), ...[...sceneFor.values()].filter(x => x.optionId === qid || x.optionId == null)];
+    const effectRoots = [...layerScenes.map(l => l.scene), ...[...sceneFor.values()].filter(x => x.optionId === qid || !isFilm && x.optionId == null)];
 
     const scenarioIds: Record<string, string[]> = {};
     // flow({ from }) 接力：按依赖顺序编译，被接的场景先编译，记下它结尾的路径与导演层；
@@ -338,7 +354,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       const fromEnd = fl.opts.from !== undefined && fl.opts.from !== skey ? scenarioEnd.get(fl.opts.from) : undefined;
       if (fl.opts.from !== undefined && fl.opts.start !== undefined)
         err('FROM_WITH_START', `flow({ from: ${JSON.stringify(fl.opts.from)}, start: ${JSON.stringify(fl.opts.start)} }): a scenario that continues another starts where that one ended; remove start (or remove from to start fresh)`, fl.source);
-      const start = fromEnd?.route ?? fl.opts.start ?? touched[0] ?? src.config.home ?? [...ctxRoutes][0];
+      const start = fromEnd?.route ?? fl.opts.start ?? (isFilm ? '/' : touched[0] ?? src.config.home ?? [...ctxRoutes][0]);
       if (!start || !ctxRoutes.has(start)) {
         err('UNKNOWN_ROUTE', `Scenario ${sid} starts at unknown route ${start ?? '(none)'}`, fl.source);
         continue;
@@ -355,7 +371,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         else director = fl.opts.layer;
       }
       if (fl.opts.from !== undefined) {
-        if (!Object.hasOwn(def.scenarios ?? {}, fl.opts.from) || fl.opts.from === skey) err('FROM_UNKNOWN', `flow({ from: ${JSON.stringify(fl.opts.from)} }) must name another scenario key of option ${qid} (available: ${Object.keys(def.scenarios ?? {}).filter((k) => k !== skey).join(', ') || 'none'})`, fl.source);
+        if (!Object.hasOwn(def.scenarios ?? {}, fl.opts.from) || fl.opts.from === skey) err('FROM_UNKNOWN', isFilm ? `chapter({ from: ${JSON.stringify(fl.opts.from)} }) must name another chapter key of film ${fid} (available chapters: ${Object.keys(scenarioDefs).join(', ') || 'none'})` : `flow({ from: ${JSON.stringify(fl.opts.from)} }) must name another scenario key of option ${qid} (available: ${Object.keys(def.scenarios ?? {}).filter((k) => k !== skey).join(', ') || 'none'})`, fl.source);
         else pendingFrom.set(sid, { from: `${qid}.${fl.opts.from}`, state: fl.opts.state, layer: fl.opts.layer, at: fl.source });
       }
       const stepKeys = new Set<string>();
@@ -367,7 +383,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       const fromDone = doneOutcome === undefined ? undefined : doneOutcome === 'cancelled' ? 'other' : doneOutcome;
       if (fl.opts.outcome !== undefined && fromDone !== undefined && fl.opts.outcome !== fromDone)
         warn('OUTCOME_MISMATCH', `Scenario ${sid} has flow outcome '${fl.opts.outcome}' but ends with done(…, '${doneOutcome}'); the board shows '${fl.opts.outcome}'. Make them agree: change done's second argument, or write flow(…, { outcome: '${fromDone}' })`, fl.source);
-      const outcome = fl.opts.outcome ?? fromDone ?? 'success';
+      const outcome = isFilm ? 'success' : fl.opts.outcome ?? fromDone ?? 'success';
       const state = mergeState(def.state, fl.opts.state);
       const sc: Scenario = {
         ...(fl.opts.actionEntry !== undefined ? { actionEntry: fl.opts.actionEntry } : {}),

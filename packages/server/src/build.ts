@@ -36,7 +36,12 @@ import { ProfileStore, bundleVoice, reuseSharedVoice } from './voice.ts';
 export function publishPayload(project: Project, home: string | null): { project: Record<string, unknown>; home: string | null } {
   // voiceConfig（D74）：profile 名与音色属于作者本机的设置，发布站只需要 build 写进的 voiceIndex
   const { rules: _r, cases: _c, issues: _i, voiceConfig: _v, ...rest } = project;
-  const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, { id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick }]));
+  const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, {
+    id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick,
+    // 形态与观众属于公开内容；只复制已有字段，保持旧功能演示的载荷逐字节不变。draft 仍只属于 dev。
+    ...(f.kind !== undefined ? { kind: f.kind } : {}),
+    ...(f.audience !== undefined ? { audience: f.audience } : {}),
+  }]));
   const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {}, ...(o.free ? {free:o.free} : {}) }]));
   const scenarios = Object.fromEntries(
     Object.entries(project.scenarios).map(([id, s]) => {

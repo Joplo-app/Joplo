@@ -7,6 +7,7 @@
  *   routes/**\/page.tsx              routes/page.tsx → /，routes/members/page.tsx → /members
  *   features/<f>/feature.ts
  *   features/<f>/options/<o>.tsx
+ *   films/<key>.tsx                影片 → 章节 → 步骤
  *   themes/<name>.css               作者主题（D51），按原文读取
  *   locales/<语言>.json             作者内容译文（D84）：原文 → 译文
  */
@@ -45,6 +46,7 @@ export function discoverFiles(root: string): string[] {
     if (ff) files.push(ff);
     for (const o of list(join(fd, 'options'))) if (/\.(tsx|ts)$/.test(o)) files.push(join(fd, 'options', o));
   }
+  for (const f of list(join(r, 'films'))) if (/\.(tsx|ts)$/.test(f) && !isDir(join(r, 'films', f))) files.push(join(r, 'films', f));
   for (const f of list(join(r, 'themes'))) if (/\.css$/.test(f)) files.push(join(r, 'themes', f));
   for (const f of list(join(r, 'locales'))) if (/\.json$/.test(f)) files.push(join(r, 'locales', f));
   return files;
@@ -101,7 +103,7 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
       const mod = await importer(file);
       const v = (mod.default ?? null) as { kind?: string } | null;
       if (!v || v.kind !== kind) {
-        fail(file, `Default export must be ${kind}(...); got ${v?.kind ?? typeof v}`, 'WRONG_EXPORT');
+        fail(file, `Default export must be ${kind}(...); got ${v?.kind ?? typeof v}`, kind === 'film' ? 'FILM_INVALID' : 'WRONG_EXPORT');
         return null;
       }
       return { ...v, file: relp(file) };
@@ -160,8 +162,15 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
     features[fid] = { def, options };
   }
 
+  const films: NonNullable<AuthoringProject['films']> = {};
+  for (const f of list(join(r, 'films'))) {
+    if (!/\.(tsx|ts)$/.test(f) || isDir(join(r, 'films', f))) continue;
+    const v = await load(join(r, 'films', f), 'film');
+    if (v) films[stem(f)] = v;
+  }
+
   if (!config) return { authoring: null, diagnostics: diags };
   const loc = loadLocales(r);
   diags.push(...loc.diagnostics);
-  return { authoring: { root: r, config, layouts, routes, features, themes: loadThemes(r), ...(Object.keys(loc.files).length ? { locales: loc.locales, localeFiles: loc.files } : {}) }, diagnostics: diags };
+  return { authoring: { root: r, config, layouts, routes, features, ...(Object.keys(films).length ? { films } : {}), themes: loadThemes(r), ...(Object.keys(loc.files).length ? { locales: loc.locales, localeFiles: loc.files } : {}) }, diagnostics: diags };
 }
