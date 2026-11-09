@@ -7,7 +7,7 @@ import { feature } from '@joplo-app/kit';
 export default feature({
   name: '特朗普丢掉国会之后',
   goal: '五分钟看懂 2026 美国中期选举：选的是什么、民主党赢了多少、特朗普接下来会被怎样卡住、AI 和股市会受什么影响',
-  pick: 'a-explainer',
+  pick: 'b-film',
   cases: {
     hook: { title: '00 一夜之间，特朗普丢掉了整个国会', dimension: 'main', priority: 'high', expected: '开场 20 秒内知道发生了什么，并带着三个问题往下看' },
     basics: { title: '01 中期选举，到底在选什么？', dimension: 'main', priority: 'high', expected: '看懂一张选票上选了哪几样，以及它们对应国会的哪部分' },
