@@ -1,8 +1,8 @@
 /**
- * “影片形态”的原型（D40：新功能先用 Joplo 画出来，确认后再实现）。四个独立画面：
+ * “独立作品与章节能力”的设计记录（D40：新功能先用 Joplo 画出来，确认后再实现）。四个独立画面：
  * 创作文件（作者写什么）、看板（审片时看到什么）、终端（check / outline / build 说什么）、发布站（观众看到什么）。
  * 两个方案只在看板里“章节放在哪”不同：variant = 'list'（左栏清单）或 'timeline'（画面下方的时间轴）。
- * 这里画的是提议中的界面与输出，不是已经实现的功能；示例影片借用 examples/midterms-2026 的章节。
+ * 这里记录最终外部模型；内部容器暂不改；示例影片借用 examples/midterms-2026 的章节。
  */
 import { $, done, eq, explain, flow, highlight, layer, neq, not, set, shot, uses, type Flow } from '@joplo-app/kit';
 import { Alert, Badge, Button, Code, Divider, Grid, Group, List, Menu, NavLink, Paper, Stack, Terminal, Text, Title } from '@joplo-app/plugin-ui';
@@ -21,7 +21,7 @@ const TOTAL = '约 4 分 40 秒';
 const no = (n: number) => String(n).padStart(2, '0');
 
 export const filmInitial = () => ({
-  form: 'before', kind: 'film', ch: 1, menu: false, recut: false, empty: false,
+  form: 'before', hasFeature: false, ch: 1, menu: false, recut: false, empty: false,
   term: 'check_before', site: 'home', playLabel: '▶ 播放',
   frame: '开票夜：国会由红变蓝', caption: '十一月三号晚上，结果比所有人预想的都快。', progress: '0:00 / 4:40',
 });
@@ -53,15 +53,15 @@ export default option({
   },
 })`;
 
-const AFTER = `// films/midterms.tsx
-export default film({
+const AFTER = `// works/midterms.tsx
+export default work({
   title: '特朗普丢掉国会之后',
   summary: '五分钟看懂 2026 美国中期选举',
   audience: '关心时事、不熟悉美国选举制度的人',
   stage: <World />,                 // 一个画面；多个视角时写 layers
   state: { ui: { … } },
-  chapters: {
-    hook: chapter('一夜之间，特朗普丢掉了整个国会', { takeaway: '知道发生了什么，带着三个问题往下看' })
+  scenarios: {
+    hook: chapter('一夜之间，特朗普丢掉了整个国会', { expected: '知道发生了什么，带着三个问题往下看' })
       .system('开票夜', camera('map'), narrate('十一月三号晚上……')),
     basics: chapter('中期选举，到底在选什么？')
       .system(…),                   // 接着上一章结尾的画面
@@ -71,12 +71,13 @@ export default film({
   },
 })`;
 
-const RECUT = `// films/midterms-v1.tsx —— 旧版留着对比，不发布
-export default film({
+const RECUT = `// works/midterms-v1.tsx —— 旧版留着对比，不发布
+export default work({
   title: '特朗普丢掉国会之后（讲解版）',
+  summary: '旧版讲解，保留本地参考',
   draft: true,
   stage: <Boards />,
-  chapters: { … },
+  scenarios: { … },
 })`;
 
 const Row = (p: { name: string; note?: string; tone?: 'red' | 'green' }) => (
@@ -89,10 +90,10 @@ const Row = (p: { name: string; note?: string; tone?: 'red' | 'green' }) => (
 const FilmFiles = () => (
   <Stack id="ff_files" h="100%" p="lg" gap="md">
     <Group justify="space-between">
-      <Stack gap={2}><Title order={2}>写一支影片，要写什么</Title><Text c="dimmed">提议中的创作方式 · 示例取自 examples/midterms-2026</Text></Stack>
+      <Stack gap={2}><Title order={2}>写一支影片，要写什么</Title><Text c="dimmed">最终创作模型 · 示例取自 examples/midterms-2026</Text></Stack>
       <Group gap="xs">
-        <Button id="ff_before" variant="default" size="xs" unmodeled>现在的写法</Button>
-        <Button id="ff_after" size="xs">film() 的写法</Button>
+        <Button id="ff_before" variant="default" size="xs" unmodeled>历史写法</Button>
+        <Button id="ff_after" size="xs">work() 的写法</Button>
       </Group>
     </Group>
     <Grid gutter="lg" style={{ flex: 1, minHeight: 0 }}>
@@ -100,7 +101,7 @@ const FilmFiles = () => (
         <Stack gap="sm">
           <Paper id="ff_tree" withBorder p="md">
             <Stack gap="xs" when={eq($.ui.form, 'before')}>
-              <Text fw={700}>现在：借功能演示的写法</Text>
+              <Text fw={700}>历史：借功能演示的写法</Text>
               <Row name="joplo.config.ts" />
               <Row name="routes/page.tsx" note="占位" tone="red" />
               <Row name="features/midterms/feature.ts" note="每章写一遍" tone="red" />
@@ -108,10 +109,10 @@ const FilmFiles = () => (
               <Row name="shared/film/world.tsx" />
             </Stack>
             <Stack gap="xs" when={eq($.ui.form, 'after')}>
-              <Text fw={700}>提议：影片是一种形态</Text>
+              <Text fw={700}>作品 → 切片 + 能力</Text>
               <Row name="joplo.config.ts" />
-              <Row name="films/midterms.tsx" note="影片、章节、步骤" tone="green" />
-              <Row name="films/midterms-v1.tsx" note="旧版 · draft" />
+              <Row name="works/midterms.tsx" note="作品、章节、步骤" tone="green" />
+              <Row name="works/midterms-v1.tsx" note="旧版 · draft" />
               <Row name="shared/film/world.tsx" />
             </Stack>
           </Paper>
@@ -125,7 +126,7 @@ const FilmFiles = () => (
                 <List.Item>每一章手写的 from: '上一章'</List.Item>
                 <List.Item>标题里手写的 00、01 编号</List.Item>
               </List>
-              <Text size="xs" c="dimmed">步骤、状态、镜头、旁白、配乐、发布的写法都不变。</Text>
+              <Text size="xs" c="dimmed">外部按作品与能力呈现；内部仍保留 Feature + 隐藏 Option。步骤、状态、镜头、旁白与配乐共用原引擎。</Text>
             </Stack>
           </Paper>
         </Stack>
@@ -151,7 +152,7 @@ const FilmFiles = () => (
 // ---------- 看板 ----------
 /** 功能演示项目的左栏：保持现在的样子（方案、情况、缺口）。 */
 const FeatureRail = () => (
-  <Stack id="ff_rail_feature" gap={4} when={eq($.ui.kind, 'feature')}>
+  <Stack id="ff_rail_feature" gap={4} when={eq($.ui.hasFeature, true)}>
     <Text fw={700}>订阅到期提醒</Text>
     <Text size="xs" c="dimmed">让用户在到期前知道并能一键续费 · 面向：订阅用户</Text>
     <Divider my="xs" label="方案 · 2" labelPosition="left" />
@@ -176,15 +177,15 @@ const FilmInfo = () => (
 const EmptyFilm = () => (
   <Alert id="ff_empty" color="blue" title="这支影片还没有章节" when={$.ui.empty}>
     <Stack gap="xs">
-      <Text size="sm">在 films/midterms.tsx 的 chapters 里写第一章：</Text>
-      <Code block>{"chapters: {\n  hook: chapter('开场').system('…'),\n}"}</Code>
+      <Text size="sm">在 works/midterms.tsx 的 scenarios 里写第一章：</Text>
+      <Code block>{"scenarios: {\n  hook: chapter('开场').system('…'),\n}"}</Code>
     </Stack>
   </Alert>
 );
 
 /** 方案 A：左栏章节清单。 */
 const ChapterList = () => (
-  <Stack id="ff_rail" gap={4} when={eq($.ui.kind, 'film')}>
+  <Stack id="ff_rail" gap={4} when={eq($.ui.hasFeature, false)}>
     <FilmInfo />
     <EmptyFilm />
     <Stack gap={4} when={not($.ui.empty)}>
@@ -201,7 +202,7 @@ const ChapterList = () => (
 
 /** 方案 B：画面下方按时长比例分段的章节时间轴；左栏只留影片信息。 */
 const ChapterStrip = () => (
-  <Paper id="ff_strip" withBorder p="sm" when={eq($.ui.kind, 'film')}>
+  <Paper id="ff_strip" withBorder p="sm" when={eq($.ui.hasFeature, false)}>
     <Stack gap="xs">
       <Group justify="space-between"><Text size="sm" fw={600}>章节时间轴</Text><Text size="xs" c="dimmed">宽度按时长 · {TOTAL}</Text></Group>
       <EmptyFilm />
@@ -228,8 +229,8 @@ const FilmBoard = (p: { variant: Variant }) => (
         <Menu opened={$.ui.menu} position="bottom-start">
           <Menu.Target>
             <Button id="ff_crumb" variant="default" size="xs" rightSection="▾">
-              <Text span when={eq($.ui.kind, 'film')}>影片 · 特朗普丢掉国会之后</Text>
-              <Text span when={eq($.ui.kind, 'feature')}>功能演示 · 订阅到期提醒</Text>
+              <Text span when={eq($.ui.hasFeature, false)}>影片 · 特朗普丢掉国会之后</Text>
+              <Text span when={eq($.ui.hasFeature, true)}>功能演示 · 订阅到期提醒</Text>
             </Button>
           </Menu.Target>
           <Menu.Dropdown>
@@ -251,14 +252,14 @@ const FilmBoard = (p: { variant: Variant }) => (
     <Grid gutter="md" style={{ flex: 1, minHeight: 0 }}>
       <Grid.Col span={p.variant === 'list' ? 4 : 3}>
         <Paper withBorder p="sm" h="100%">
-          {p.variant === 'list' ? <ChapterList /> : <Stack gap="sm" when={eq($.ui.kind, 'film')}><FilmInfo /><Text size="xs" c="dimmed">章节在画面下方的时间轴上。</Text></Stack>}
+          {p.variant === 'list' ? <ChapterList /> : <Stack gap="sm" when={eq($.ui.hasFeature, false)}><FilmInfo /><Text size="xs" c="dimmed">章节在画面下方的时间轴上。</Text></Stack>}
           <FeatureRail />
         </Paper>
       </Grid.Col>
       <Grid.Col span={p.variant === 'list' ? 8 : 9}>
         <Stack gap="sm">
           <Paper id="ff_stage" withBorder radius="lg" p="xl" mih={p.variant === 'list' ? 330 : 250}>
-            <Stack gap="sm" when={eq($.ui.kind, 'film')}>
+            <Stack gap="sm" when={eq($.ui.hasFeature, false)}>
               <Stack gap="sm" when={not($.ui.empty)}>
                 <Badge variant="outline">画面</Badge>
                 <Title order={3}>{$.ui.frame}</Title>
@@ -266,7 +267,7 @@ const FilmBoard = (p: { variant: Variant }) => (
               </Stack>
               <Text c="dimmed" when={$.ui.empty}>还没有画面。</Text>
             </Stack>
-            <Stack gap="sm" when={eq($.ui.kind, 'feature')}>
+            <Stack gap="sm" when={eq($.ui.hasFeature, true)}>
               <Badge variant="outline">画面</Badge>
               <Title order={3}>你的订阅将在 7 天后到期</Title>
               <Text c="dimmed">功能演示的画面、左栏和检查都和现在一样。</Text>
@@ -279,7 +280,7 @@ const FilmBoard = (p: { variant: Variant }) => (
               <Button id="ff_play" size="xs">{$.ui.playLabel}</Button>
               <Button id="ff_next" variant="default" size="xs" unmodeled>下一步</Button>
             </Group>
-            <Text size="sm" c="dimmed" when={eq($.ui.kind, 'film')}>{$.ui.progress}</Text>
+            <Text size="sm" c="dimmed" when={eq($.ui.hasFeature, false)}>{$.ui.progress}</Text>
           </Group>
         </Stack>
       </Grid.Col>
@@ -291,25 +292,25 @@ const FilmBoard = (p: { variant: Variant }) => (
 const OUT = {
   check_before: `features/midterms/feature.ts:7:16  info  HAPPY_PATH_ONLY  Feature "特朗普丢掉国会之后" only shows the happy path: every case is a main-flow case and every scenario succeeds. Ask the user about input, permission, async, and lifecycle cases
 0 error, 0 warning, 1 info`,
-  check_after: `films/midterms.tsx:85:12  info  CHAPTER_TOO_LONG  Chapter 4 "他接下来会被怎样卡住？" plays about 95 s at 1× (recommended: 45–90 s). Split it or trim the narration
+  check_after: `works/midterms.tsx:85:12  info  SCENARIO_TOO_LONG  Chapter 4 "他接下来会被怎样卡住？" plays about 95 s at 1× (recommended: 45–90 s). Split it or trim the narration
 0 error, 0 warning, 1 info`,
-  outline: `特朗普丢掉国会之后 · film · 5 chapters · about 4 min 40 s
+  outline: `特朗普丢掉国会之后 · 5 chapters · about 4 min 40 s
   1  hook     一夜之间，特朗普丢掉了整个国会    6 steps   0:28
   2  basics   中期选举，到底在选什么？          9 steps   0:52
   3  results  蓝色浪潮有多大？                 11 steps   1:05
   4  stakes   他接下来会被怎样卡住？            12 steps   1:35
   5  money    AI 和股市：你的钱会怎样？          8 steps   0:40`,
-  error: `films/midterms.tsx:85:12  error  FROM_UNKNOWN  Chapter "stakes" continues "result", which is not a chapter of this film. Chapters: hook, basics, results, stakes, money
+  error: `works/midterms.tsx:85:12  error  FROM_UNKNOWN  Chapter "stakes" continues "result", which is not a slice of this work. Available slices: hook, basics, results, stakes, money
 1 error, 0 warning, 0 info`,
-  empty: `films/midterms.tsx:3:16  info  FILM_EMPTY  Film "特朗普丢掉国会之后" has no chapters yet. Add chapters: { hook: chapter('…').system('…') }
+  empty: `works/midterms.tsx:3:16  info  WORK_EMPTY  Work "特朗普丢掉国会之后" has no slices yet. Add scenarios: { hook: chapter('…').system('…') }
 0 error, 0 warning, 1 info`,
-  build: `Published 1 film: 特朗普丢掉国会之后 (5 chapters, about 4 min 40 s)
-Skipped draft: midterms-v1`,
+  build: `Works: 1 · midterms · 特朗普丢掉国会之后 (5 chapters, about 4 min 40 s)
+WORK_DRAFT_SKIPPED  Draft work "midterms-v1" was skipped; remove draft: true when ready`,
 };
 
 const FilmTerminal = () => (
   <Stack id="ff_cli" h="100%" p="lg" gap="md">
-    <Stack gap={2}><Title order={2}>命令行说什么</Title><Text c="dimmed">提议中的输出：只说和影片有关的事</Text></Stack>
+    <Stack gap={2}><Title order={2}>命令行说什么</Title><Text c="dimmed">按作品与切片呈现的输出示意</Text></Stack>
     <Terminal id="ff_term" title="终端 · midterms-2026" mah={420}>
       <Terminal.Command when={neq($.ui.term, 'outline')}>
         <Text span when={neq($.ui.term, 'build')}>npx joplo check</Text>
@@ -323,8 +324,8 @@ const FilmTerminal = () => (
       <Terminal.Output when={eq($.ui.term, 'empty')}>{OUT.empty}</Terminal.Output>
       <Terminal.Output tone="ok" when={eq($.ui.term, 'build')}>{OUT.build}</Terminal.Output>
     </Terminal>
-    <Alert id="ff_term_note" color="yellow" title="现在的问题" when={eq($.ui.term, 'check_before')}>
-      影片的每一章都是“主流程”、都“成功”，所以一定会收到这条提示；技能里只能写“忽略它”。
+    <Alert id="ff_term_note" color="yellow" title="历史问题" when={eq($.ui.term, 'check_before')}>
+      影片的每一章都是“主流程”、都“成功”，旧写法因此收到评审提示。现在独立作品不挂功能，不做情况覆盖检查。
     </Alert>
     <Alert id="ff_term_fix" color="red" title="写错章节键" when={eq($.ui.term, 'error')}>
       第 4 章写了 from: 'result'（少了一个 s）。错误指到这一行，并列出这支影片里有哪些章节。
@@ -380,11 +381,11 @@ export const filmScenarios = (variant: Variant): Record<string, Flow> => {
   const chapters = variant === 'list' ? 'ff_rail' : 'ff_strip';
   const third = variant === 'list' ? 'ff_ch3' : 'ff_seg3';
   return {
-    write: flow('写一支影片：一个文件，只有影片、章节、步骤', { cases: ['write'], layer: 'files', description: '从借用功能演示的写法，到 film() 的写法', expected: '影片文件里不出现功能、方案、情况和占位页' })
-      .system('现在：借功能演示的写法', '一支影片要写四个文件，每一章写两遍', highlight('ff_tree'))
-      .click('ff_after', '换成 film()：一个文件', set($.ui.form, 'after'), shot('ff_code'), uses('form'))
+    write: flow('写一支影片：一个文件，只有作品、章节、步骤', { cases: ['write'], layer: 'files', description: '从借用功能演示的写法，到 work() 的写法', expected: '影片文件里不出现功能、方案、情况和占位页' })
+      .system('历史：借功能演示的写法', '一支影片要写四个文件，每一章写两遍', highlight('ff_tree'))
+      .click('ff_after', '换成 work()：一个文件', set($.ui.form, 'after'), shot('ff_code'), uses('form'))
       .system('章节接着上一章', '每一章默认从上一章结尾的画面开始', highlight('ff_code'), explain("要从干净的画面开始，才写 from: null；接别的章节写 from: '章节键'"), uses('continue_default'))
-      .system('外壳都不用写了', '功能、方案、情况、占位页、手写编号都不用再写', shot('ff_removed'), uses('no_route', 'numbering'), done('影片文件里只有影片、章节、步骤')),
+      .system('外壳都不用写了', '功能、方案、情况、占位页、手写编号都不用再写', shot('ff_removed'), uses('no_route', 'numbering'), done('影片文件里只有作品、章节、步骤')),
 
     board: flow('在看板里审片：章节和时长', { cases: ['board'], layer: 'board', description: '打开一个影片项目', expected: '看到每一章的时长和总时长；没有方案、情况和覆盖缺口' })
       .system('打开影片项目', variant === 'list' ? '左栏是章节清单：编号、步数、时长' : '画面下方是按时长比例的章节时间轴', shot(chapters), highlight(chapters), uses('form'))
@@ -403,9 +404,9 @@ export const filmScenarios = (variant: Variant): Record<string, Flow> => {
 
     mixed: flow('一个项目里既有影片也有功能演示', { cases: ['mixed'], layer: 'board', description: '看板按打开的是哪一种换左栏', expected: '影片看章节，功能演示看方案与情况，互不影响' })
       .click('ff_crumb', '顶栏的下拉分成“影片”和“功能演示”两组', set($.ui.menu, true), uses('mixed_project'))
-      .click('ff_m_feature', '切到功能演示：左栏还是方案、情况和缺口', set($.ui.menu, false), set($.ui.kind, 'feature'), shot('ff_rail_feature'), highlight('ff_rail_feature'))
+      .click('ff_m_feature', '切到功能演示：左栏还是方案、情况和缺口', set($.ui.menu, false), set($.ui.hasFeature, true), shot('ff_rail_feature'), highlight('ff_rail_feature'))
       .click('ff_crumb', '再打开下拉', shot('ff_board'), set($.ui.menu, true))
-      .click('ff_m_film', '切回影片：换回章节', set($.ui.menu, false), set($.ui.kind, 'film'), shot(chapters), done('两种形态各用各的呈现')),
+      .click('ff_m_film', '切回影片：换回章节', set($.ui.menu, false), set($.ui.hasFeature, false), shot(chapters), done('按功能与章节能力呈现')),
 
     recut: flow('重做一版，和旧版对比', { cases: ['recut'], layer: 'files', state: { ui: { form: 'after' } }, description: '旧版标成草稿留在项目里', expected: '两版都能在看板打开；发布只带没有标草稿的那一版' })
       .system('旧版标成草稿', '重做时新建另一支影片，旧的写 draft: true', set($.ui.recut, true), shot('ff_recut'), highlight('ff_recut'), uses('draft'))

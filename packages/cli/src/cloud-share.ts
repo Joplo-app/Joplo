@@ -1,3 +1,5 @@
+import type { BuildResult } from '@joplo-app/server';
+import { resolveWorkScope } from './work.ts';
 import { PASSWORD_UNSUPPORTED, PUBLIC_UNSUPPORTED } from './share-messages.ts';
 import { sharePassword } from './share-password.ts';
 import { shareChoices } from './share-choice.ts';
@@ -5,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
-import { assertReviewManifestSize, borrowedLine, hasScope, JoploError, resolveScope, reviewManifest, scopeKey, scopeProject, type Project, type ReviewManifest, type ScopeInfo } from '@joplo-app/core';
+import { assertReviewManifestSize, borrowedLine, entriesOf, entryOf, hasScope, JoploError, reviewManifest, scopeKey, scopeProject, type Project, type ReviewManifest, type ScopeInfo } from '@joplo-app/core';
 import type { buildSite } from '@joplo-app/server';
 import { checkWithProject } from './check.ts';
 import { CloudError, sizeError, terminalText } from './cloud-error.ts';
@@ -84,8 +86,8 @@ const recordJson = (server: string, r: ShareRecord) => ({
   ...(r.scoped && Object.keys(r.scoped).length ? { scoped: Object.fromEntries(Object.entries(r.scoped).map(([key, l]) => [key, l])) } : {}),
 });
 
-export type ShareResult = { passwordProtected: boolean; visibility?: Visibility; portfolio?: Portfolio; review?: ShareResult; shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）；旧服务器不返回。 */ storage?: { usedBytes: number; quotaBytes: number; shareBytes: number } };
-/** scenarios / features：按场景保密分享（D75，`--scenario` / `--feature`），可以一起用；都不写时分享整个项目。 */
+export type ShareResult = { passwordProtected: boolean; visibility?: Visibility; portfolio?: Portfolio; review?: ShareResult; shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo; entries?: BuildResult['entries']; /** 发布后的账号容量与这次大小（C27）；旧服务器不返回。 */ storage?: { usedBytes: number; quotaBytes: number; shareBytes: number } };
+/** scenarios / features：按场景保密分享（D75，`--scenario` / `--work`），可以一起用；都不写时分享整个项目。 */
 /** update（D84）：要更新的已有分享的链接；没有 .joplo/cloud.json 时（例如换了一台电脑）用它指定，并从它沿用朗读音频。 */
 export type ShareOptions = { password?: string | boolean | null; public?: boolean; private?: boolean; new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[]; update?: string };
 
@@ -115,14 +117,14 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     if (checked.summary.error) throw new JoploError('INVALID_SCHEMA', `Project validation failed: ${checked.summary.error} error`, { diagnostics: checked.diagnostics });
     if (!checked.project) throw new JoploError('UNSUPPORTED_ACTION', 'share --review needs the compiled project to build the review manifest');
     const request = { scenarios: opts.scenarios ?? [], features: opts.features ?? [] };
-    const ids = hasScope(request) ? resolveScope(checked.project, request, 'review') : undefined;
+    const ids = hasScope(request) ? resolveWorkScope(checked.project, request, 'review') : undefined;
     assertReviewManifestSize(reviewManifest(ids ? scopeProject(checked.project, ids, 'review').project : checked.project, 'review'));
     if (ids) {
       // 先按 review 校验完整范围，再筛选普通版：未选方案只能出现在独立私密评审里。
       const project = checked.project;
       const picked = ids.filter(id => {
         const option = project.options[project.scenarios[id]!.optionId];
-        return option && project.features[option.featureId]?.pick === option.id;
+        return option && !entryOf(project, option.featureId)?.draft && project.features[option.featureId]?.pick === option.id;
       });
       if (!picked.length) {
         client.warn('The scope has no picked scenarios. Publishing only the private review version; the ordinary share and --update target are unchanged.');
@@ -169,8 +171,8 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
   // 范围（D75）：在 dev IR 上解析，写错场景 / 功能、没有选定方案时在构建和任何请求之前失败
   let scenarioIds: string[] | undefined;
   if (scoped) {
-    if (!checked.project) throw new JoploError('UNSUPPORTED_ACTION', 'share --scenario / --feature needs the compiled project to resolve the scope');
-    scenarioIds = resolveScope(checked.project, scopeRequest, reviewMode);
+    if (!checked.project) throw new JoploError('UNSUPPORTED_ACTION', 'share --scenario / --work needs the compiled project to resolve the scope');
+    scenarioIds = resolveWorkScope(checked.project, scopeRequest, reviewMode);
   }
   let review: ReviewManifest | undefined;
   if (checked.project) {
@@ -183,6 +185,7 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
       client.warn(`Skipped the review manifest (${e instanceof Error ? e.message.split('.')[0] : 'too large'}). The share is published without it; the review page will not show rules or questions.`);
     }
   } else if (reviewMode === 'review') throw new JoploError('UNSUPPORTED_ACTION', 'share --review needs the compiled project to build the review manifest');
+  if (checked.project && !entriesOf(checked.project).some(e => !e.draft) && entriesOf(checked.project).some(e => e.draft)) throw new JoploError('USAGE', 'There is no picked option or publishable work. All standalone works are drafts; remove draft: true when ready');
   const temporary = temporaryDirectory(join(tmpdir(), 'joplo-share-'));
   const staging = temporary.path;
   try {
@@ -193,6 +196,8 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
     const sharedVoice = beforeLink ? await (client.deps.sharedVoice ?? previousShareVoice)(beforeLink.url) : undefined;
     const built = await build({ projectDir: project, outDir: join(staging, 'site'), ...(reviewMode === 'review' ? { review: true } : {}), ...(scenarioIds ? { scope: { scenarios: scenarioIds } } : {}), ...(sharedVoice ? { sharedVoice } : {}), voiceDefault: 'cloud' });
     if (built.diagnostics.some(d => d.severity === 'error')) throw new JoploError('EXPORT_FAILED', 'The build contains errors; nothing uploaded', { diagnostics: built.diagnostics });
+    for (const d of built.diagnostics.filter(d => d.code === 'WORK_DRAFT_SKIPPED')) client.warn(`${d.code}  ${d.message}`);
+    if (built.entries) client.warn(`Works: ${built.entries.length} · ${built.entries.map(e => `${e.id} (${e.title})`).join(', ')}`);
     // 范围分享必须真的裁剪过（旧版 @joplo-app/server 会忽略 scope，产物里是整个项目）：产物里的场景只能是范围内的
     if (scenarioIds) {
       const inlined = inlineProject(await readFile(join(built.outDir, 'index.html'), 'utf8'));
@@ -261,7 +266,7 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
       }
     }
     const prComment = pr ? readPrComment(final.pr ?? prepared.pr) : undefined;
-    return { result: { ...published, ...(readPortfolio(final.portfolio) ? { portfolio: readPortfolio(final.portfolio) } : {}), embed: embedSnippets(published.url, title), ...(reviewMode === 'review' ? { mode: 'review' as const } : {}), ...(pr ? { pr: prComment ?? null } : {}), ...(built.scope ? { scope: built.scope } : {}), ...(readStorage(final.storage, ['shareBytes']) ? { storage: readStorage(final.storage, ['shareBytes'])! } : {}) }, plan: account.plan };
+    return { result: { ...published, ...(built.entries ? { entries: built.entries } : {}), ...(readPortfolio(final.portfolio) ? { portfolio: readPortfolio(final.portfolio) } : {}), embed: embedSnippets(published.url, title), ...(reviewMode === 'review' ? { mode: 'review' as const } : {}), ...(pr ? { pr: prComment ?? null } : {}), ...(built.scope ? { scope: built.scope } : {}), ...(readStorage(final.storage, ['shareBytes']) ? { storage: readStorage(final.storage, ['shareBytes'])! } : {}) }, plan: account.plan };
   } finally { try { await rm(staging, { recursive: true, force: true }); } finally { temporary.release(); } }
 }
 

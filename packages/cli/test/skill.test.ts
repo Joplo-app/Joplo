@@ -90,7 +90,7 @@ test('旧版本标记、未修改的指针（0.2.4 及更早写的）自动更�
 test.each(['正文修改', 'frontmatter', '末尾追加', '无标记'])('用户改过的 %s 永不自动覆盖，--force 才覆盖', async kind => {
   const dir = await temp(); await run(['skill', 'install', dir]);
   const original = await readFile(skillPath(dir), 'utf8');
-  const modified = kind === '正文修改' ? original.replace('npx joplo check', 'npx joplo check --option mine.a') : kind === 'frontmatter' ? original.replace('name: joplo', 'name: mine') : kind === '末尾追加' ? original + '用户追加\n' : '# 我的文件\n';
+  const modified = kind === '正文修改' ? original.replace('npx joplo check', 'npx joplo check --work mine.a') : kind === 'frontmatter' ? original.replace('name: joplo', 'name: mine') : kind === '末尾追加' ? original + '用户追加\n' : '# 我的文件\n';
   await writeFile(skillPath(dir), modified); await writeFile(join(dir, 'AGENTS.md'), '用户说明\n');
   const r = await run(['skill', 'install', dir]); expect(r.code).toBe(1); expect(r.stdout).toContain('--diff'); expect(r.stdout).toContain('--force');
   expect(await readFile(skillPath(dir), 'utf8')).toBe(modified); expect(await readFile(join(dir, 'AGENTS.md'), 'utf8')).toBe('用户说明\n');

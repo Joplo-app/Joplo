@@ -40,7 +40,7 @@ npx joplo feedback watch ./demo --local --session <id-from-list> [--after <last-
 
 ## Share review: poll, do not pretend it is a lossless stream
 ```sh
-npx joplo feedback watch --share <share-id> --option <feature.option> --interval 15 --json
+npx joplo feedback watch --share <share-id> --work <feature.option> --interval 15 --json
 ```
 - Polling defaults to 15 seconds; --interval accepts 10–30. Pin --version <n> when the version is known; otherwise the first response sets it.
 - Only the target version's owner pick ends this watcher. Votes, rule confirmations, other options, and older versions do not. A replaced share version emits closed and exits 1.
@@ -64,4 +64,4 @@ npx joplo feedback watch --share <share-id> --option <feature.option> --interval
 - AUTH_REQUIRED / AUTH_EXPIRED (exit 3): tell the user how to run npx joplo login; do not log in/out or switch accounts without their instruction. Permission, quota, and missing-share errors are not approvals.
 - If a command is unavailable, check the project's installed Joplo version and its skill output. Do not silently switch to another instance or use another project's credentials.
 - .joplo runtime state stays local, and local feedback is never uploaded just because a Share exists. Details: npx joplo skill review; source write-back and publishing: npx joplo skill publish.
-<!-- joplo-skill 0.3.0 sha256:4edde35ab18d08ec46451c5d7885857954f3b25595691053af10a5df19eb3710 -->
+<!-- joplo-skill 0.4.1 sha256:cfa130b54ae2ee684a0376f1792fb155049f559d02ec9944db86785b6e962b84 -->

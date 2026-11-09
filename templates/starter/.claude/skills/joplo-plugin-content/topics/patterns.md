@@ -32,7 +32,7 @@ Use one motion key for the recurring object and distinct element ids for its loc
 
 A useful story holds the message or task constant while the surrounding interface changes. The motion gives continuity; the input, menu and result prove the interaction paradigm. Label canned results explicitly when the audience can type arbitrary requests. Do not imply a model or backend computed a result.
 
-For the match-cut transition above, use from for continuity, and the engine's actionEntry: 'after' when a confirmed chapter drag should immediately show the new arrangement. Static storyboards prove layout; observe real playback to verify FLIP travel. If a flight does not appear, check for two visible same-key objects, a replaced Canvas/stage, or a manual jump with animate=false before changing the animation.
+For the match-cut transition above, use chapter() default continuation, and the engine's actionEntry: 'after' when a confirmed chapter drag should immediately show the new arrangement. Static storyboards prove layout; observe real playback to verify FLIP travel. If a flight does not appear, check for two visible same-key objects, a replaced Canvas/stage, or a manual jump with animate=false before changing the animation.
 
 Keep credits and sources outside the animated object area. Render every chapter and inspect the target frame after seeking; then test real typing, first-input pause, hover/touch, reset, continue and cross-chapter confirmation. A menu temporarily covering content is expected while open; verify it closes before the next action needs that content.
 
@@ -52,7 +52,7 @@ For a topic explainer (an election, a policy, a market week), lay the whole epis
 
 ## Remaking a deck-like piece as a film
 Symptoms in an existing piece: one board per chapter (label, big title, panels, footer), a title card opening each chapter, hard cuts between layers, an on-screen headline that repeats the caption and the narration, and opening questions that are never closed.
-- Keep the data module, sources and licensed assets; rebuild only the stage and the script. Add the remake as a new option and pick it, so the board can compare it with the old one on the same cases.
+- Keep the data module, sources and licensed assets; rebuild only the stage and the script. Create the remake as another work in works/<new-key>.tsx and mark the old work draft: true. Both remain accessible locally; only the ready work is published. Use build/share --work <key> to publish just one piece; selecting a draft is an error.
 - Before TSX, map each old board to a cluster of one world and each old title card to a camera move. Turn on-screen sentences into labels: the subtitle carries the sentence.
 - Then follow the review loop: storyboard every chapter, film-strip the chain until CUT and STILL are gone, and play it in the board. If playback stutters, measure before changing the piece (npx joplo skill demo).
 
@@ -69,4 +69,4 @@ Symptoms in an existing piece: one board per chapter (label, big title, panels, 
 - Whole-screen white/colour flashes over a still picture look like a stalled player; keep the picture moving under any fade.
 
 Common pitfall: For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, film-strip the chain, and verify playback before claiming it works
-<!-- joplo-skill 0.4.1 sha256:684e20b11153dc8f94e5ee8e643e4eba36f1f66e09c936981a23b7977910f2f7 -->
+<!-- joplo-skill 0.4.1 sha256:5338570d78a4e000ae9506ce9faca39da4f4f7919472d09bf0997c6d5d986661 -->

@@ -2,10 +2,64 @@
 
 Joplo compiles trusted TS/TSX into deterministic scenes and schedules their playback. It does not supply a component library or execute real backend requests. Use components from the project's explicitly installed plugins; read their skills before writing view trees.
 
+## Works → slices → steps
+A project is a portfolio of works. A work combines its stage, initial state and slices; each slice is a sequence of steps. Every work has a cover and appears on the home page. Capabilities compose:
+- Feature review groups alternative works (options), shared cases, coverage, rules, questions and a pick. Use feature() + option() when comparing solutions or making design decisions.
+- Sequencing is independent for flow() slices, linear for chapter() slices. Use work() + chapter() for an audience-facing explainer, tutorial, news piece or product film. Both authoring paths can coexist in one project; chapter() also works inside option().
+- draft: true on a standalone work keeps it available locally and excludes it from build/share. For a remake create another work and mark the old work as draft.
+- Publish one entry with npx joplo build --work <key> or npx joplo share --work <key> plus the explicitly authorized publication flags. A standalone work needs no pick; a feature key selects its picked option (all options in the review version).
+
+### Minimal standalone work
+buildStage() is your local view tree made from explicitly enabled plugin elements. Keep package.json type: module and the starter's JSX tsconfig; only stage/layers needs no routes/ directory. To reuse product pages, explicitly supply on or routes.
+```tsx
+// works/explainer.tsx
+import { work, chapter, narrate } from '@joplo-app/kit';
+import { buildStage } from '../shared/stage';
+export default work({
+  title: 'How the queue works', summary: 'Follow one request through a busy queue',
+  stage: buildStage(),
+  scenarios: {
+    arrival: chapter('A request arrives', { expected: 'Understand why requests wait' })
+      .system('Arrive', narrate('A request joins the queue.')),
+    finish: chapter('The worker responds').system('Respond', narrate('The worker handles the request.')),
+  },
+});
+```
+chapter() continues the previous chapter by declaration order; the first starts from the initial state. Only exceptions use from: null (restart) or from: 'sliceKey' (another predecessor). Do not mix flow() and chapter() in one work, write cases/uses() in standalone works, or number titles manually: the UI and outline number chapters automatically. Empty scenarios: {} is a valid work in progress.
+
+### Migrating an existing piece
+- Before changing files, freeze the old dev IR. Compare every step, compiled plugin snapshot and every stateAt position with the migrated work. Renaming flow() to chapter() alone does not prove continuous state or audiovisual equivalence; review motion and sound as well.
+- Preserve independent starts: if an old chapter began from the initial state, give the new chapter from: null. Otherwise chapter two onward inherits ui/data/inputs and music from its predecessor. Keep default continuation only where the story really continues.
+- Move feature.roles audience descriptions into work.audience; preserve actual role() speakers. Keep say() role keys and config.voice.roles aligned so dialogue still uses the intended voices.
+- Rename project helper functions already called chapter before importing the kit's chapter builder; a name collision is not a compiler-model problem.
+- Remove manual numbering only from chapter titles. The same source string may still appear in a card or caption: use i18n checks to decide which translation keys remain in use, and check for stale/missing entries after edits.
+- Read a route before deleting it. A page containing only Slot or an empty container can go when the work uses stage/layers; preserve real screen content with explicit on reuse or the work's routes.
+- Verify draft exclusion in the built files: search the complete artifact text for a full sentence unique to the old draft, chosen so it is not a substring of current copy. Absence of a card in the UI alone does not prove the old content stayed out of publication.
+
+### Minimal feature review
+Use the same cases to compare alternative designs; each option remains a separate file. buildStage() below is a local enabled-plugin view tree.
+```ts
+// features/queue/feature.ts
+import { feature } from '@joplo-app/kit';
+export default feature({ name: 'Queue', goal: 'Keep waiting understandable',
+  cases: { waiting: { title: 'A request waits', expected: 'See that it is queued' } }, pick: 'a' });
+```
+```tsx
+// features/queue/options/a.tsx
+import { option, flow, page, narrate } from '@joplo-app/kit';
+import { buildStage } from '../../../shared/stage';
+export default option({ name: 'A · Visible queue', idea: 'Explain the wait',
+  routes: { '/queue': page({ title: 'Queue' }, buildStage()) },
+  scenarios: { waiting: flow('Request waits', { cases: ['waiting'], start: '/queue' })
+    .system('Queued', narrate('The request is waiting.')) },
+});
+```
+Success: check reports 0 errors; outline --work explainer shows the intended slices and estimated duration, with automatic chapter numbers. Inspect each chapter with render --scenario-id <id-from-outline> --sheet --out board.png; review motion using --film --chain --out film.png and actual playback before claiming it looks right. The scenario id used for rendering/deep links currently contains three segments; copy it from outline JSON rather than inventing it.
+
 ## Start from the project
 1. Run npx joplo init <dir>, install its dependencies, then npx joplo skill install. In the Joplo source monorepo, initialize with --template ./templates/starter and use the monorepo workspace protocol for local package dependencies before installing; external projects keep pinned published versions. The starter supplies its own plugin choices; a custom project may choose different ones.
 2. Read the installed engine skill and .claude/skills/joplo-plugins/SKILL.md. Read each relevant plugin's entry and component/recipe topics. npx joplo skill lists what this config enables.
-3. Create one feature, one option and a runnable scenario. Run check, inspect the rendered frames, then test the real inputs. For a short film or explainer that should feel like a video, also run the motion review in npx joplo skill demo ("Make it play like a film") — static frames cannot show hard cuts or frozen pictures.
+3. Create one standalone work and chapter, or one feature, option and runnable scenario for design review. Run check, inspect the rendered frames, then test the real inputs. For a short film or explainer that should feel like a video, also run the motion review in npx joplo skill demo ("Make it play like a film") — static frames cannot show hard cuts or frozen pictures.
 4. Required before handing a development round to the user: read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json. A running board alone does not receive feedback for the agent.
 
 ## Binary assets
@@ -17,6 +71,7 @@ Joplo compiles trusted TS/TSX into deterministic scenes and schedules their play
 - joplo.config.ts exports config({ name, plugins, layout?, home?, theme?, autoFocus?, voice?, locales? }). plugins is explicit; installation alone does not enable a plugin.
 - layouts/<id>.tsx exports layout(tree). Outlet places the current page; Slot declares a named insertion point. Those are engine composition primitives.
 - routes/**/page.tsx exports page({ title, layout?, viewport? }, tree). The directory determines its route. Set layout: false to opt out of the shared layout.
+- works/<key>.tsx (or .ts) exports work({ title, summary, scenarios, stage? | layers?, on?, routes?, audience?, roles?, state?, free?, draft?, order? }). The filename is the entry key and must not collide with a feature folder.
 - features/<id>/feature.ts exports feature({ name, goal, cases, order?, roles?, constraints?, rules?, questions?, pick? }). Finite numeric order sorts first; ties and omitted order use natural folder order. Do not number names by hand.
 - features/<id>/options/<key>.tsx exports option({ name, idea, focus?, tradeoffs?, on?, routes?, layers?, state?, free?, rules?, questions?, coverage?, scenarios }). Keep stable feature/option ids when revising a design.
 - on adds a tree to a route's slot; routes adds an option-specific page; layers defines independently framed views. Obtain each tree from components documented by installed plugins.
@@ -45,6 +100,7 @@ export default option({
 Declare both success and recovery cases in the feature. View code belongs to the chosen plugin; the engine example defines state and behavior only.
 
 ## Steps and effects
+- chapter(name, options) uses the same slice options as flow(); its default predecessor is the previous chapter, with from: null to restart. Use all chapter() or all flow() in one work/option.
 - flow(name, { cases?, start?, state?, from?, autoplay?, layer?, description?, expected?, mock?, outcome?, actionEntry? }). state overrides option state. description is the cover sentence; expected describes what the viewer should observe.
 - autoplay: false keeps an optional scenario selectable through a fork, chapter list or deep link, but skips it in sequential published-site playback. Playing that scenario manually stops at its end. Default/true preserves declaration order.
 - from: 'previousKey' continues that scenario's final route, ui/data/inputs and director layer. Validate steps and automatic captions against that ending page; dependency order does not change chapter order. Do not combine from with start. layer overrides the initial director layer.
@@ -61,7 +117,7 @@ Step arguments and card effects accept nested arrays, flattened in order. Compos
 const arrive = () => [patch($.ui, { screen: 'inbox', sent: false }), [hold(4)]];
 flow('Inbox').system('Arrive', arrive(), 'The inbox opens');
 ```
-For a long story use from to inherit the previous ending. An action-driven navigation entry can also declare actionEntry: 'after'; read demo for its confirmation and replay boundary.
+For a long story use chapter() to inherit the previous ending by default; from is an explicit exception. An action-driven navigation entry can also declare actionEntry: 'after'; read demo for its confirmation and replay boundary.
 
 ## Bindings, rules and reuse
 - $.ui.x / $.data.x / $.inputs.id are whole-value bindings. Expressions are not reevaluated. Props supported by a plugin may bind to these values; read that plugin's value and visibility rules.
@@ -74,4 +130,4 @@ For a long story use from to inherit the previous ending. An action-driven navig
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.4.1 sha256:7abb0572f4180cec2b098af31aa2c1c4ca3ff1c8e61fd9aa2f1fc45d205a8478 -->
+<!-- joplo-skill 0.4.1 sha256:fc412aae26dd368046c300ac4fd45c0bcc233b9ac39de6fa2a2393091817d5e2 -->

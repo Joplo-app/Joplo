@@ -2,7 +2,7 @@ import { fixturePlugins } from '../../../scripts/test/fixtures.ts';
 /**
  * D67 `joplo outline` 与 D68 `joplo components`：
  * - outline 只读现有 IR（goal、roles、cases 的维度 / 优先级 / expected、覆盖、场景步数与估算时长），文字与 JSON 两种输出；
- * - 编译失败时退出码 1、给出错误数；--option 只看一个方案，写错报 USAGE（退出码 2）；
+ * - 编译失败时退出码 1、给出错误数；--work 只看一个方案，写错报 USAGE（退出码 2）；
  * - components 不带名字时与 skill components 相同，带名字时输出属性、行为分组与示例。
  */
 import { afterEach, expect, test } from 'vitest';
@@ -49,9 +49,9 @@ test('文字大纲：给谁、解决什么、情况（expected 与各方案覆�
   expect(lines.at(-2)).toMatch(/^check: 0 error, \d+ warning, \d+ info \(.*warning CASE_NOT_COVERED ×\d+/);
 });
 
-test('JSON 大纲与文字同一份数据；--option 只看一个方案', async () => {
+test('JSON 大纲与文字同一份数据；--work 只看一个方案', async () => {
   const d = await project();
-  const r = await run(['outline', d, '--format', 'json', '--option', 'invite.b-batch']);
+  const r = await run(['outline', d, '--format', 'json', '--work', 'invite.b-batch']);
   expect(r.code).toBe(0);
   const j = JSON.parse(r.out);
   expect(j).toMatchObject({ ok: true, data: { summary: { error: 0 } } });
@@ -59,9 +59,9 @@ test('JSON 大纲与文字同一份数据；--option 只看一个方案', async 
   expect(f.options.map((o: { id: string }) => o.id)).toEqual(['invite.b-batch']);
   expect(f.cases.find((c: { key: string }) => c.key === 'happy')).toMatchObject({ priority: 'high', dimension: 'main', expected: '管理员发出邀请，受邀者接受后成为成员', coverage: { 'invite.b-batch': expect.any(String) } });
   expect(f.options[0].scenarios[0]).toMatchObject({ id: expect.stringMatching(/^invite\.b-batch\./), steps: expect.any(Number), ms: expect.any(Number), opening: false, ending: false });
-  const bad = await run(['outline', d, '--option', 'invite.zz']);
+  const bad = await run(['outline', d, '--work', 'invite.zz']);
   expect(bad.code).toBe(2);
-  expect(bad.out).toMatch(/^USAGE {2}Option does not exist: invite\.zz/);
+  expect(bad.out).toMatch(/^USAGE {2}Work does not exist: invite\.zz/);
 });
 
 test('有 error 时退出 1：能编译出 IR 时照常输出大纲并写出错误数；编译不出时只写错误数，JSON 是失败信封', async () => {

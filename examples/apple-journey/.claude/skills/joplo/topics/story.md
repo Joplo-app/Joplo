@@ -1,5 +1,7 @@
 # Joplo storytelling and planning: story
 
+The PM lens, cases and coverage in this topic apply only to works attached to a feature. General storytelling also applies to standalone work()/chapter() pieces; those do not need review cases.
+
 A demo is a short story a viewer follows without you: who wants what, what gets in the way, what the product does, and the visible result.
 It is not a feature tour. Plan it in a few lines before writing TSX, show the plan to the user, then build. Sources: docs/research/storytelling-and-demos.md.
 
@@ -32,10 +34,12 @@ Backend behind the same feature: put a diagram component in its own layer and .s
 - Audience: who watches (product review, design review, a customer, engineers) and what they must decide afterward.
 - One to three points: what viewers must believe after watching. Each point becomes a scenario or an A/B comparison, never a single step.
 - Scenario list, one line per scenario: Given (who, where, starting state) → When (the user's actions) → Then (the visible result), plus how it opens and how it ends.
-- Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate.
+- Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate. An estimate is the sum of each step's time plan: the action demonstration (cursor travel, press, typing or a 0.9 s system pause) plus the longer of its stay and its estimated narration, the same plan autoplay runs.
 - Unsure how to frame it? Offer two or three one-line framings and let the user pick.
+- Recreating an existing video, GIF or screen recording: read it before planning. Extract frames into contact sheets (for example ffmpeg -i ref.gif -vf "fps=1,tile=3x3" sheet%02d.png, written outside the project) and list its chapters, the states each chapter passes through and every on-screen sentence; those become slices, steps and narration (shared cases only for feature review). Map the reference's own chrome to the player's instead of redrawing it: its chapter label → chapter title (case title in feature review) and the player's step title, its bottom progress → the player's chapter list, its key badge → the host key record after .press(), its spoken captions → narrate()/say(). Ask about anything the reference does not show (chapters cut off, unseen states) instead of inventing it; replace third-party logos with neutral shapes.
 
 ## 3. PM lens: from a need to roles, goal, cases, and scenarios
+This PM method applies only to works attached to a feature. For a standalone work, plan audience, takeaway and chapters with work()/chapter(); do not invent cases, coverage or rules.
 Joplo already has the parts of a user story; fill them in that spirit.
 - roles: who it is for, specific ('Workspace admin', 'Invited teammate'), not 'User'. Use role('Name', { desc }) keys when layers or cards belong to a person; plain names are fine otherwise.
 - goal (the I want + so that): one sentence, who can do what and why, independent of the solution so options A/B are two answers to it.
@@ -77,7 +81,11 @@ When the board or the published site reads a demo aloud, each step reads, in ord
 - Transitions carry the story: role switches, time jumps, and closing cards need a line that tells the viewer why we moved.
 - Plain and concrete, not flowery: no metaphors, slogans, or hype. Vivid means specific: real names, amounts, and times.
 - Not every step needs its own line: a trivial step can keep its short caption, and a character's say() can carry a moment ('Count me in!').
+- Once a piece will be heard, every step without narrate()/say() reads its caption aloud ('Hover the mic', 'Click Done'), which sounds like a screen reader. Listen for those: merge a hover or setup step into the step that explains it, give a short narrate() to the clicks that stay, or drop steps that only exist to show a tooltip.
+- An on-screen headline and narration play together: narrate the point in spoken words (the why, the consequence) rather than reading the headline back, since the subtitle would show the same sentence twice.
 - say() is first person, what the character would really say; narration about the characters goes in narrate().
+- Who says it: a user action's say() uses the role of the layer it lands on. A system step has no acting person, so it reads in the narrator's voice unless you name the speaker: say('Book it for Friday', { role: 'me' }). Use that for a person talking to the product (voice input, a call, a voice assistant) while the screen reacts in system steps.
+- Voice input / dictation: one system step per spoken phrase, say(phrase, { role }) plus stream($.ui.text, fullTextSoFar, { pace: 'voice' }), so the subtitle shows the phrase, the speaker's voice reads it and the transcript grows in step with the voice. Put the presenter's explanation in narrate() on separate steps (pauses, results); one step reads only one line, and narrate() wins over say().
 - Open with the person and their goal; close with the one to three points, as speech, not a list read aloud. Write in the demo's language.
 Wrong, it reads the interface: .click('share', 'Xiaoyu shares the itinerary', narrate('Click Share to share the itinerary.'))
 Right, it says why: .click('share', 'Xiaoyu shares the itinerary', narrate('She sends it as a link, so Ajie needs no app.'))
@@ -85,9 +93,9 @@ A character speaking: .click('can_go', 'Ajie replies: I can go', say('Count me i
 Check: read every line aloud in order without looking at the screen. It should sound like one person telling one story, briskly.
 
 ## 7. Explainers and news-style demos (a topic, not a product)
-When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets. The full method (package, hook, a continuous world, morphing objects, chapters with from, review): the installed explainer plugin skill.
-- Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. One chapter per scenario, one case per chapter; the published site plays them back to back with an Up next countdown, like one video.
-- Case titles are what viewers read in the board sidebar: for an explainer write them as numbered chapter headlines ('01 What is on the ballot?'), not acceptance criteria; name the option after the style ('Dark quick-cut'), not 'A'.
+When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets. The full method (package, hook, a continuous world, morphing objects, work()/chapter() default continuation, review): the installed explainer plugin skill.
+- Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. Write one chapter() slice per question under work().scenarios; the published site plays continuing chapters back to back without a countdown, like one video.
+- Chapter titles are what viewers read in the sidebar: write a question ('What is on the ballot?'), with expected describing what the viewer can now explain. The UI adds chapter numbers; standalone works need no option or cases.
 - Graphics that carry the story: a seat chart filling up, a tile map recoloring, bars growing or flipping, a document flying between two sides and getting stamped. Build them from divs with style bound to state (demo: Custom motion) and real photos (components: Real images).
 - Facts: keep every number in one data module with its source and as-of time, show a source line on each graphic, separate called or projected results from final ones, and leave out what you cannot verify rather than hedging on screen.
 - Collect assets before drawing complex visuals: list the needed interface primitives, fonts, icons and sounds; prefer suitable reusable libraries or licensed assets over hand-built SVG or models. Keep redistributable files in assets/ and record each source URL, author, license and modifications in assets/SOURCES.md; retain license files and show attribution where required. A library license does not automatically establish the license of its bundled fonts, logos or samples. Scope third-party styles and embed required assets for offline playback.
@@ -102,11 +110,11 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Explicitly distinguish the main sequence from optional branches and return paths. A closing menu may return to earlier chapters without making those chapters optional; verify autoplay order in the published player.
 
 ## 8. Before handing over
-- npx joplo outline: per feature, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
+- npx joplo outline: per entry, standalone slices and duration; for features, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
 - npx joplo check: CAPTION_TOO_LONG, EXPLAIN_TOO_LONG, DESCRIPTION_TOO_LONG, CARD_TEXT_TOO_LONG, SCENARIO_TOO_LONG, HAPPY_PATH_ONLY, CASE_NOT_COVERED (names the expected result).
 - Read only the captions from start to end: do they tell the story? Then look only at key frames (npx joplo render --step-id …): does the screen show it without captions?
 - If the key frames look like slide thumbnails (mostly cards, bullet points, or a screen that never changes), rebuild those steps as actions and visible changes (section 1).
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.3.0 sha256:86e436af61e01d0b0b318f09e6c62f78db0e346ec5739a139353d0186343a20b -->
+<!-- joplo-skill 0.4.1 sha256:c2de3b70d7bf1a392296c38230ef9daedfecd1fb68b1e0eeb98905ae76bb9e71 -->
