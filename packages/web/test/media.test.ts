@@ -24,8 +24,9 @@ it('requires a gesture, consumes only bytes, pauses/resumes/seeks, ducks and mut
  expect(FakeAudio.gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(.1,1,.015);
  engine.update(snapshot,assets,{...frame,elapsedMs:0});expect(mock.update.mock.lastCall?.[0].offsetMs).toBe(4000);
  engine.update({'fake:bgm':{...snapshot['fake:bgm'],offsetMs:12000,startOffsetMs:12000,fadeInMs:1000}},assets,frame);
- expect(FakeAudio.gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(.1,1,.015);
- engine.update(snapshot,assets,{...frame,enabled:false});expect(mock.destroy).toHaveBeenCalledTimes(1);
+ await new Promise(r=>setTimeout(r,0));
+ expect(FakeAudio.gains.at(-1).gain.setTargetAtTime).toHaveBeenLastCalledWith(.1,1,.015);
+ engine.update(snapshot,assets,{...frame,enabled:false});expect(mock.destroy).toHaveBeenCalledTimes(2);
  engine.destroy();
 });
 it('fades stop snapshots and destroys asynchronous drivers after leaving a scenario',async()=>{

@@ -57,4 +57,4 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.3.0 sha256:557506f41313e52c2c7a9afa7127f03a9cb3e0c04b2f37b6bd9135a727b0b01f -->
+<!-- joplo-skill 0.3.0 sha256:e8da5ce653ffc359dcd0552bb385c67ed63f8dba9a126ed6976eeedd22cb2616 -->

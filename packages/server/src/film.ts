@@ -116,11 +116,11 @@ async function compiled(projectDir: string) {
   return { server, project: payload.project };
 }
 
-function recordUrl(base: string, projectId: string, project: Project, o: { scenarioId: string; theme?: string; chain?: boolean; locale?: string; content?: string }) {
+function recordUrl(base: string, projectId: string, project: Project, o: { scenarioId: string; theme?: string; chain?: boolean; audio?: boolean; locale?: string; content?: string }) {
   if (!project.scenarios[o.scenarioId]) throw new JoploError('NOT_FOUND', `Scenario does not exist: ${o.scenarioId} (available: ${Object.keys(project.scenarios).join(', ') || 'none'})`);
   if (o.content !== undefined && !project.i18n?.locales.includes(o.content))
     throw new JoploError('USAGE', project.i18n ? `--content ${o.content} is not in config locales (${project.i18n.locales.join(', ')})` : `--content needs config({ locales }); this project has a single language`);
-  const q = new URLSearchParams({ render: '1', project: projectId, scenario: o.scenarioId, position: '0', theme: o.theme ?? project.theme ?? 'sketch', frame: '1', record: '1', voice: 'estimate', ...(o.chain ? { chain: '1' } : {}), ...(o.locale ? { locale: o.locale } : {}), ...(o.content ? { content: o.content } : {}) });
+  const q = new URLSearchParams({ render: '1', project: projectId, scenario: o.scenarioId, position: '0', theme: o.theme ?? project.theme ?? 'sketch', frame: '1', record: '1', voice: 'estimate', ...(o.chain ? { chain: '1' } : {}), ...(o.audio === false ? {audio:'0'} : {}), ...(o.locale ? { locale: o.locale } : {}), ...(o.content ? { content: o.content } : {}) });
   const device = project.scenes[displaySceneId(project, o.scenarioId, 0)]?.viewport === 'mobile' ? 'mobile' : 'desktop';
   return { url: `${base}?${q}`, size: EXPORT_SIZE[device] };
 }
@@ -138,7 +138,7 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
   const { server, project } = await compiled(projectDir);
   let browser: Browser | null = null;
   try {
-    const { url, size } = recordUrl(server.url, server.projectId, project, opts);
+    const { url, size } = recordUrl(server.url, server.projectId, project, {...opts,audio:false});
     browser = await launch(playwright);
     const ctx = await browser.newContext({ viewport: size, deviceScaleFactor: 0.5 });
     const page = await ctx.newPage();

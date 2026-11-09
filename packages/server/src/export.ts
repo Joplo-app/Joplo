@@ -167,7 +167,7 @@ export function defaultRecorder(load: (projectDir: string) => Promise<Playwright
       if (audio) {
         if(!calibrated)throw new Error('Audio/video calibration unavailable');
         const analysis=await browser.newContext();const probe=await analysis.newPage();await probe.goto(url,{waitUntil:'domcontentloaded'});
-        try {const bytes=Buffer.from(audio.data,'base64');const timing=await recordedCalibration(probe,out,bytes);await muxRecordedAudio(out,bytes,timing.offsetSeconds,{videoEnd:timing.videoPTS,audioEnd:timing.audioPTS});}
+        try {const bytes=Buffer.from(audio.data,'base64');const timing=await recordedCalibration(probe,out,bytes);await muxRecordedAudio(out,bytes,timing.offsetSeconds,{videoEnd:timing.videoPTS,audioEnd:timing.audioPTS,audioDurations:timing.audioDurations});}
         finally{await analysis.close();}
       }
     } finally {

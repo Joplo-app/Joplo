@@ -5,7 +5,7 @@ import { pluginStatus } from '../renderer/plugins';
 /** Browser host owns permission, clock, gain and lifecycle; the host decodes audio bytes; custom media plugins may supply a driver. */
 export class MediaEngine {
   private audio: AudioContext | null = null;
-  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; release?:()=>void; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
+  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; release?:()=>void; startOffset?: number; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
   private encoded=new MediaCache<{bytes:Uint8Array;audio?:AudioRegion}>({budgetBytes:4*1024*1024,concurrency:2});
   private decoded=new MediaCache<AudioBuffer>({budgetBytes:32*1024*1024,concurrency:1});
   private warm:(()=>void)[]=[];
@@ -88,7 +88,7 @@ export class MediaEngine {
       if (!url || !frame.enabled) continue;
       wanted.add(key);
       let slot = this.slots.get(key);
-      if (slot && slot.resource !== url) { this.remove(key); slot = undefined; }
+      if (slot && (slot.resource !== url || slot.startOffset !== t.startOffsetMs)) { this.remove(key); slot = undefined; }
       if (!slot) {
         if (!frame.playing) continue;
         const runtime = pluginStatus(t.plugin);
@@ -96,7 +96,7 @@ export class MediaEngine {
         const factory = runtime.runtime.media ?? audioMedia;
         const gain = audio.createGain(); gain.gain.value = 0; gain.connect(audio.destination);
         if (this.capture) gain.connect(this.capture);
-        slot = { resource: url, gain, dead: false, origin: frame.timeMs === undefined ? undefined : frame.timeMs - (t.offsetMs + frame.elapsedMs) }; this.slots.set(key, slot);
+        slot = { resource: url, gain, dead: false, startOffset: t.startOffsetMs, origin: frame.timeMs === undefined ? undefined : frame.timeMs - (t.offsetMs + frame.elapsedMs) }; this.slots.set(key, slot);
         const current = slot;
         const lease=this.bytes(url);current.release=lease.release;
         void lease.value.then(async loaded => {
@@ -113,7 +113,7 @@ export class MediaEngine {
       const offset = anchored ? now - slot.origin! : t.offsetMs + elapsed;
       // 淡入按这条轨道自己的（引擎时间）偏移；淡出在第一次出现时锚定起点、时长与当时的音量（D92 R2）：
       // 之后各步快照里编译期按估算推进的 stopAfterMs / volume 不再改变它，淡完就一直静音，直到快照不再要求淡出（再次 play 同一首）
-      const fadeIn = t.fadeInMs ? Math.min(1, offset / t.fadeInMs) : 1;
+      const fadeIn = t.fadeInMs ? Math.max(0, Math.min(1, (offset - (t.startOffsetMs ?? 0)) / t.fadeInMs)) : 1;
       if (t.stopAfterMs === undefined) slot.fade = undefined;
       else if (!slot.fade) slot.fade = { start: anchored ? now - elapsed : 0, ms: Math.max(1, t.stopAfterMs), volume: t.volume };
       const fadeOut = !slot.fade ? 1 : anchored ? Math.max(0, 1 - (now - slot.fade.start) / slot.fade.ms) : Math.max(0, 1 - elapsed / Math.max(1, t.stopAfterMs!));

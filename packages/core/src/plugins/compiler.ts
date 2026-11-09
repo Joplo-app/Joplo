@@ -250,7 +250,7 @@ export class PluginCompiler {
             } else if (c.action === 'play') {
               // 换曲：有 fadeMs 时旧曲换到「轨道>旧资源」键上同时淡出，与新曲交叉，中间没有静音
               if (current && c.fadeMs) media[`${key}>${current.resource}`] = { ...current, stopAfterMs: Math.min(current.stopAfterMs ?? c.fadeMs, c.fadeMs) };
-              media[key] = { plugin: c.plugin, resource: c.resource, offsetMs: c.offsetMs ?? 0, ...(c.offsetMs ? { startOffsetMs: c.offsetMs } : {}), volume: c.volume ?? 1, loop: c.loop ?? false, fadeInMs: c.fadeMs ?? 0 };
+              media[key] = { plugin: c.plugin, resource: c.resource, offsetMs: c.offsetMs ?? 0, ...(c.offsetMs !== undefined ? { startOffsetMs: c.offsetMs } : {}), volume: c.volume ?? 1, loop: c.loop ?? false, fadeInMs: c.fadeMs ?? 0 };
             } else {
               for (const k of Object.keys(media)) if (k === key || k.startsWith(`${key}>`)) {
                 if (c.fadeMs) media[k] = { ...media[k]!, stopAfterMs: Math.min(media[k]!.stopAfterMs ?? c.fadeMs, c.fadeMs) }; else delete media[k];
