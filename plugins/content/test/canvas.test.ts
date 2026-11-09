@@ -126,8 +126,8 @@ describe('narration in time estimates', () => {
       loud: flow('L', { start: '/' }).system('Caption only', set($.ui.n, 1), narrate(long)),
     });
     const p = r.project!;
-    const quiet = scenarioEstimateMs(p.scenarios['f.a.quiet']!);
-    const loud = scenarioEstimateMs(p.scenarios['f.a.loud']!);
+    const quiet = scenarioEstimateMs(p, p.scenarios['f.a.quiet']!);
+    const loud = scenarioEstimateMs(p, p.scenarios['f.a.loud']!);
     expect(quiet).toBeLessThan(voiceMs(long));
     expect(loud).toBeGreaterThanOrEqual(voiceMs(long));
   });

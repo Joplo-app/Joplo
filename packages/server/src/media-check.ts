@@ -1,4 +1,4 @@
-import { mediaResourceIds, nodeResourceIds, stepAnchorMs, type Diagnostic, type Project } from '@joplo-app/core';
+import { mediaResourceIds, nodeResourceIds, commitGapMs, type Diagnostic, type Project } from '@joplo-app/core';
 import type { LocalResourceInfo, ResourceRequest } from '@joplo-app/kit/plugin';
 import type { LocalResources } from './local-resources.ts';
 export async function inspectResources(project: Project | null, requests: ResourceRequest[], host: LocalResources) {
@@ -26,15 +26,17 @@ export function mediaDiagnostics(project: Project, info: Record<string, LocalRes
         : !run.loop && run.duration - left > 5000 && left < run.duration * .75 ? 'MUSIC_ENDS_EARLY' : undefined;
       if (code) diagnostics.push({ code, severity: 'warning', source: 'structure', at: run.at, message: `${sc.name}: music ${(length / 1000).toFixed(2)} s, starts ${(run.offset / 1000).toFixed(2)} s, scene playback ${(run.duration / 1000).toFixed(2)} s${run.loop ? '; short loop may become repetitive' : '; music ends well before this run finishes'}` });
     };
-    for (const step of sc.steps) {
+    for (const [index, step] of sc.steps.entries()) {
+      // 这一步提交之后到下一步提交（或场景播完）的计划时长：与编译期推进配乐快照用同一个函数
+      const gap = commitGapMs(project, sc.steps, index);
       const tracks = step.media ?? {};
       for (const key of [...runs.keys()]) if (!tracks[key]) finish(key);
       for (const [key, t] of Object.entries(tracks)) {
         const previous = runs.get(key);
         if (previous && (previous.resource !== t.resource || Math.abs(previous.offset + previous.duration - t.offsetMs) > 1)) finish(key);
         if (!runs.has(key)) runs.set(key, { resource: t.resource, offset: t.offsetMs, duration: 0, loop: t.loop, at: step.source });
-        runs.get(key)!.duration += Math.min(stepAnchorMs(step), t.stopAfterMs ?? Infinity);
-        if (t.stopAfterMs !== undefined && t.stopAfterMs <= stepAnchorMs(step)) finish(key);
+        runs.get(key)!.duration += Math.min(gap, t.stopAfterMs ?? Infinity);
+        if (t.stopAfterMs !== undefined && t.stopAfterMs <= gap) finish(key);
       }
     }
     for (const key of [...runs.keys()]) finish(key);

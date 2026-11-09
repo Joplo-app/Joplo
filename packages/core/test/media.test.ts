@@ -22,13 +22,13 @@ it('lowers a second plugin into deterministic media snapshots and keeps author i
  const p = r.project!, sc = p.scenarios['f.a.s']!;
  expect(requests).toHaveLength(1); expect(requests[0].input).toBe('secret-score');
  expect(JSON.stringify(p)).not.toMatch(/secret-score|local\.js|runtime\.js/);
- expect(sc.steps[1]!.media?.['fake:bgm']).toMatchObject({ offsetMs:4000, volume:.4, loop:true });
+ expect(sc.steps[1]!.media?.['fake:bgm']).toMatchObject({ offsetMs:4900, volume:.4, loop:true }); // 上一步停留 4 s + 这一步系统事件提交前的 0.9 s
  const saved = JSON.parse(JSON.stringify(p));
  const effect = fake.compile!.effect;
  fake.compile!.effect = () => { throw new Error('must not execute in player'); };
  for (let k=1;k<=3;k++) { stateAt(saved,sc.id,k); expect(mediaAt(saved,sc.id,k,0)).toEqual(sc.steps[k-1]!.media); }
- expect(mediaAt(saved,sc.id,2,250)['fake:bgm']!.offsetMs).toBe(4250);
- expect(sc.steps[2]!.media?.['fake:bgm']).toMatchObject({ offsetMs:9000, stopAfterMs:500 });
+ expect(mediaAt(saved,sc.id,2,250)['fake:bgm']!.offsetMs).toBe(5150);
+ expect(sc.steps[2]!.media?.['fake:bgm']).toMatchObject({ offsetMs:10800, stopAfterMs:500 });
  fake.compile!.effect = effect;
 });
 
@@ -96,11 +96,11 @@ it('crossfades on the generic media layer: the old track fades out under its own
   const sc = r.project!.scenarios['f.a.one']!;
   const a = sc.steps[0]!.media!['xf:bgm']!.resource;
   // 同一首再 play 一次：继续播放，不从头开始
-  expect(sc.steps[1]!.media!['xf:bgm']).toMatchObject({ resource: a, offsetMs: 4000 });
+  expect(sc.steps[1]!.media!['xf:bgm']).toMatchObject({ resource: a, offsetMs: 4900 });
   const b = sc.steps[2]!.media!;
   expect(b['xf:bgm']).toMatchObject({ offsetMs: 0, fadeInMs: 900 });
   expect(b['xf:bgm']!.resource).not.toBe(a);
-  expect(b[`xf:bgm>${a}`]).toMatchObject({ resource: a, offsetMs: 7000, stopAfterMs: 900 });
+  expect(b[`xf:bgm>${a}`]).toMatchObject({ resource: a, offsetMs: 8800, stopAfterMs: 900 });
 });
 it('a flow({ from }) chapter starts with the music of the chapter it continues', () => {
   const p = compile(chapters(), 'publish').project!;
@@ -111,7 +111,8 @@ it('a flow({ from }) chapter starts with the music of the chapter it continues',
   // 第 0 步：上一章结尾的快照向前推进上一章最后一步的停留，淡出完的旧曲已经不在
   expect(two.media!['xf:bgm']).toMatchObject({ resource: end['xf:bgm']!.resource, offsetMs: 2000 });
   expect(Object.keys(two.media!)).toEqual(['xf:bgm']);
-  expect(two.steps[0]!.media!['xf:bgm']).toMatchObject({ offsetMs: 2000 });
+  // 下一章第 1 步提交前有系统事件的 0.9 s 停顿
+  expect(two.steps[0]!.media!['xf:bgm']).toMatchObject({ offsetMs: 2900 });
   expect(two.steps[1]!.media![`xf:bgm>${end['xf:bgm']!.resource}`]).toMatchObject({ stopAfterMs: 600 });
   expect(p.scenarios['f.a.fresh']!.media).toBeUndefined();
   // 分享范围不含被接力的一章时，不留下悬空的 from
@@ -124,7 +125,7 @@ it.each([0,12000])('preserves numeric start offset %i through seek and scope; fa
  try {
   const p = compile(src,'publish').project!;
   expect(p.scenarios['f.a.s']!.steps[0]!.media!['fake:bgm']).toMatchObject({offsetMs:offset,startOffsetMs:offset,fadeInMs:800});
-  expect(mediaAt(p,'f.a.s',2,250)['fake:bgm']!.offsetMs).toBe(offset+4250);
+  expect(mediaAt(p,'f.a.s',2,250)['fake:bgm']!.offsetMs).toBe(offset+5150);
   expect(scopeProject(p,['f.a.s']).project.scenarios['f.a.s']!.steps[0]!.media!['fake:bgm']!.offsetMs).toBe(offset);
  } finally { fake.compile!.effect=original; }
 });

@@ -10,6 +10,7 @@ import { diagramsIn, isDiagramRoot, layoutFor, graphStructure, sequenceStructure
 import { NodeData, FrameData, type Trace } from './schema.ts';
 import { advanceStates } from './state.ts';
 import { machineStates } from './machine.ts';
+import { componentLabels, inspectFields } from './inspect.ts';
 
 export { trace } from './effects.ts';
 export * from './components.ts';
@@ -19,6 +20,28 @@ const required = new Set(['Diagram.Node', 'StateMachine.State', 'Sequence.Actor'
 const cleanChild = (c: JChild): JChild => Array.isArray(c) ? c.map(cleanChild) : isNode(c) ? clean(c) : c;
 const clean = (n: JNode): JNode => ({ ...n, props: n.props ?? {}, children: (n.children ?? []).map(cleanChild) });
 const all = (n: PluginIRNode): PluginIRNode[] => [n, ...(n.children ?? []).flatMap(all)];
+/** 小点沿连线走一圈的时长（毫秒）：每秒 260 像素、至少 0.9 秒。运行时画小点与编译期声明这一步的停留用同一个算法。 */
+export const dotLapSeconds = (length: number) => Math.max(0.9, length / 260);
+/**
+ * 这一步 active 连线上的小点至少跑完一圈（再留 0.2 秒）要多久：连线长度取编译期布局的折线长度
+ * （圆角让实际路径略短，所以只会多等一点）。没有布局或没有连线时为 0。
+ */
+function dotLapMs(roots: readonly PluginIRNode[], edgeIds: string[]): number {
+  if (!edgeIds.length) return 0;
+  let longest = 0;
+  for (const root of roots) for (const node of all(root)) {
+    if (!isDiagramRoot(node.type)) continue;
+    const layout = (node.ext?.diagram as { layout?: { edges?: Record<string, { points: { x: number; y: number }[] }>; messages?: Record<string, { points: { x: number; y: number }[] }> } } | undefined)?.layout;
+    for (const id of edgeIds) {
+      const points = (layout?.edges?.[id] ?? layout?.messages?.[id])?.points;
+      if (!points || points.length < 2) continue;
+      let length = 0;
+      for (let i = 1; i < points.length; i++) length += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y);
+      longest = Math.max(longest, length);
+    }
+  }
+  return longest ? Math.round(dotLapSeconds(longest) * 1000) + 200 : 0;
+}
 const hooks: PluginCompileHooks = {
   node(raw, { ids, report }) {
     const n = clean(raw);
@@ -61,6 +84,7 @@ const hooks: PluginCompileHooks = {
     const previous = ctx.data as { traces?: Trace[]; traceScenes?: string[] } | undefined;
     const owner = ctx.scenes.find(s => diagramsIn(s.root as SceneNode).some(d => (p.ids as string[]).every(id => d.nodes.has(id) || d.edges.some(e => e.id === id))));
     return {
+      ...(t.mode === 'ok' ? { holdMs: dotLapMs(ctx.roots, t.edges.map(e => e.id)) } : {}),
       data: { traces: [...previous?.traces ?? [], t], traceScenes: [...previous?.traceScenes ?? [], owner!.id] },
       targets: t.mode === 'skip' ? undefined : t.targets ?? t.nodes,
       references: [...t.nodes, ...t.edges.map(e => e.id), ...t.groups ?? [], ...t.errorGroups ?? [], ...t.targets ?? []],
@@ -90,6 +114,6 @@ const hooks: PluginCompileHooks = {
 };
 export default /* @__PURE__ */ definePlugin({ skillTopics: { patterns: { description: 'Recipes and individual pitfalls', body: patterns } }, packageName: '@joplo-app/plugin-diagram',
   id: 'diagram', title: 'Diagrams', version: packageInfo.version, runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url), skill,
-  components: Object.fromEntries(Object.entries(docs).map(([name, doc]) => [name, { doc, example: examples[name], catalogFamily: !name.includes('.'), traits: { text: ['label', 'description', 'name', 'value'] }, selfEvident: true, ...(required.has(name) ? { needsId: true } : {}) }])),
+  components: Object.fromEntries(Object.entries(docs).map(([name, doc]) => [name, { ...(componentLabels[name] ? { label: componentLabels[name] } : {}), ...(inspectFields[name] ? { inspect: inspectFields[name] } : {}), doc, example: examples[name], catalogFamily: !name.includes('.'), traits: { text: ['label', 'description', 'name', 'value'] }, selfEvident: true, ...(required.has(name) ? { needsId: true } : {}) }])),
   data: dataSpec, compile: hooks, schemas: { node: NodeData, step: FrameData },
 });

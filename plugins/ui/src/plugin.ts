@@ -1,3 +1,5 @@
+import labels from './labels.json' with { type: 'json' };
+import type { PluginText } from '@joplo-app/kit/plugin';
 import packageInfo from './version.json' with { type: 'json' };
 import { skill, patterns, componentGuide } from './guide.ts';
 import { definePlugin, type ElementTraits, type PluginComponentSpec, type PluginIRNode } from '@joplo-app/kit/plugin';
@@ -46,6 +48,8 @@ const traits = (name: string): ElementTraits => ({
   ...(name === 'Phone' ? {childWidth:{value:390,when:{prop:'landscape',value:true,width:772}}} : {}),
 });
 export const components: Record<string, PluginComponentSpec> = Object.fromEntries(COMPONENT_TYPES.map(name=>[name,{
+  // 看板检查抽屉里给人看的组件名（各语言），只进 dev IR
+  ...((labels as Record<string, PluginText>)[name] ? {label:(labels as Record<string, PluginText>)[name]} : {}),
   doc: COMPONENT_DOCS[name],
   ...(COMPONENT_EXAMPLES[name] ? {example:COMPONENT_EXAMPLES[name]} : {}),
   ...(HTML_TAGS.includes(name) ? {intrinsic:name} : {}),

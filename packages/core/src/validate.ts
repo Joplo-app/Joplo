@@ -146,7 +146,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
       // 叙事（D67）：封面说明 30 字以内（D61）；一个场景讲一件事，太长时拆开
       const dl = captionLength(sc.description);
       if (dl > DESCRIPTION_MAX) emit('warning', 'DESCRIPTION_TOO_LONG', `flow description (the scenario cover text) is ${dl} units (recommended maximum: ${DESCRIPTION_MAX}; CJK characters count as 1 each, all others as 0.5): "${sc.description}". Say in one sentence what this scenario shows; the cover clips longer text`, sc.source, sr);
-      const ms = scenarioEstimateMs(sc);
+      const ms = scenarioEstimateMs(p, sc);
       if (ms > SCENARIO_MS_MAX) emit('info', 'SCENARIO_TOO_LONG', `Scenario "${sc.name}" plays about ${Math.round(ms / 1000)} s at 1× (${sc.steps.length} steps; recommended maximum: ${SCENARIO_MS_MAX / 1000} s). One scenario tells one thing: split it into scenarios (for example the happy path and each recovery), or branch with fork(); run npx joplo outline to see the pacing`, sc.source, sr);
       for (const st of sc.steps) {
         const value = { ...st, optionId: sc.optionId };

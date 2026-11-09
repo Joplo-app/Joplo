@@ -1,7 +1,7 @@
 import type { PluginDataSpec, ElementTraits } from '@joplo-app/kit/plugin';
 export const COMPONENT_TYPES = ['Custom', '#text', '#fragment'] as const;
 export type ComponentType = (typeof COMPONENT_TYPES)[number];
-export type ComponentInfo = { interactive?: boolean; parent?: string; needsId?: boolean; selfEvident?: boolean; traits?: ElementTraits };
+export type ComponentInfo = { label?: import('@joplo-app/kit/plugin').PluginText; inspect?: import('@joplo-app/kit/plugin').PluginInspectField[]; interactive?: boolean; parent?: string; needsId?: boolean; selfEvident?: boolean; traits?: ElementTraits };
 export const JOPLO_PROPS = ['id', 'when', 'disabledReason', 'unmodeled', 'note', 'redact'] as const;
 // ---------- 插件组件（D86）----------
 /** 插件组件的类型名：`<插件 id>:<组件名>`（例如 scene3d:Target）。目录组件的名字里没有冒号。 */

@@ -1,4 +1,4 @@
-import { ElementTraitsSchema } from './traits.ts';
+import { ElementTraitsSchema, PluginInspectFieldSchema, PluginTextSchema } from './traits.ts';
 import type { ElementTraits } from '@joplo-app/kit/plugin';
 /**
  * Joplo IR（schemaVersion 2）：由 TSX 源文件编译得到的中间表示，不是作者直接编辑的格式。
@@ -269,7 +269,20 @@ export const Route = z.strictObject({
   source: Source,
 });
 
+/**
+ * 作品的形态（D102）：demo = 功能演示（功能 → 方案 → 情况 × 场景，带设计评审）；film = 影片（影片 → 章节 → 步骤，对标视频创作）。
+ * IR 里两种形态共用 Feature / Option / Scenario 这套容器：影片是一个 Feature、恰好一个 Option、章节就是 Scenario。
+ * 以后新增形态（例如交互作品）在这里加一个值；任何形态都经 works.ts 的投影得到首页卡片与封面。
+ */
+export const WORK_KINDS = ['demo', 'film'] as const;
+
 export const Feature = z.strictObject({
+  /** 形态；缺省 = demo。影片由 film() 创作入口编译而来。发布站保留。 */
+  kind: z.enum(WORK_KINDS).optional(),
+  /** 影片的观众（film({ audience })）：给谁看的一句话；功能演示用 roles 表达“面向谁”。发布站保留。 */
+  audience: z.string().min(1).optional(),
+  /** 草稿（film({ draft: true })）：只在本地看板里，发布、评审版与分享都不带；只出现在 dev IR。 */
+  draft: z.literal(true).optional(),
   id: Id,
   name: z.string().min(1),
   goal: z.string().min(1),
@@ -410,7 +423,7 @@ export const Project = z.strictObject({
     id: z.string().min(1),
     title: z.string(),
     version: z.string().optional(),
-    components: z.record(z.string(), z.strictObject({ interactive: z.boolean().optional(), parent: z.string().optional(), needsId: z.boolean().optional(), selfEvident: z.boolean().optional(), traits: ElementTraitsSchema.optional() })),
+    components: z.record(z.string(), z.strictObject({ label: PluginTextSchema.optional(), inspect: z.array(PluginInspectFieldSchema).optional(), interactive: z.boolean().optional(), parent: z.string().optional(), needsId: z.boolean().optional(), selfEvident: z.boolean().optional(), traits: ElementTraitsSchema.optional() })),
   })).optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),

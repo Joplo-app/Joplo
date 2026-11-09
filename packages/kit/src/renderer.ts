@@ -1,4 +1,12 @@
-/** Browser renderer services supplied by the host, shared by React content packages. */
+/**
+ * 渲染服务（浏览器端，由宿主注入）——稳定层。
+ *
+ * 任何插件的运行时都可以依赖这里的导出：读渲染上下文与引擎时钟、给根元素加上引擎要的属性、渲染子节点、
+ * 取属性的当前值、量元素位置。改动这里的签名要升插件接口版本（PLUGIN_API_VERSION）。
+ *
+ * 只给仓库内标准库（ui / diagram / content）用的服务（手绘描边、响应式取值、选项与分栏推导、外观）在
+ * `@joplo-app/kit/renderer-internal`，不保证兼容，第三方与二方插件不要依赖。
+ */
 import type { CSSProperties, ReactNode, ComponentType } from 'react';
 import type { ActionDispatch, EngineFrame, ActionPresentation, PluginIRNode, PluginState } from './plugin.ts';
 export type NodeProps = { node: PluginIRNode; p: Record<string, unknown>; disabled: boolean; children: ReactNode };
@@ -40,33 +48,20 @@ export type RendererServices = {
 const KEY = Symbol.for('joplo.renderer.services.v2');
 const global = globalThis as typeof globalThis & { [KEY]?: RendererServices };
 export function registerRendererServices(services: RendererServices): void { global[KEY] = Object.freeze(services); }
-const host = (): RendererServices => { if (!global[KEY]) throw new Error('Joplo renderer services are not initialized'); return global[KEY]; };
+/** 宿主注入的全部服务。插件不要直接用它：稳定层从本模块导入，内部层从 renderer-internal 导入。 */
+export const rendererHost = (): RendererServices => { if (!global[KEY]) throw new Error('Joplo renderer services are not initialized'); return global[KEY]; };
+const host = rendererHost;
 export const useCtx = () => host().useCtx();
 export const useEngineFrame = (enabled = true) => host().useEngineFrame(enabled);
 export const useI18n = <Messages extends Record<string, unknown>>() => host().useI18n() as { t: { stage: Messages } };
-export const useR: RendererServices['useR'] = (...args) => host().useR(...args);
 export const useRoot: RendererServices['useRoot'] = (...args) => host().useRoot(...args);
 export const useRootAttrs: RendererServices['useRootAttrs'] = (...args) => host().useRootAttrs(...args);
-export const useStroke = () => host().useStroke();
 // Function components delegate to the host's identical React context, adding no DOM wrapper.
 export const RenderNode = (p: { node: PluginIRNode }): ReactNode => (host().RenderNode as (p: { node: PluginIRNode }) => ReactNode)(p);
-export const Rough = (p: any): ReactNode => (host().Rough as (p: any) => ReactNode)(p);
-export const RoughPath = (p: any): ReactNode => (host().RoughPath as (p: any) => ReactNode)(p);
-export const roundRectPath: RendererServices['roundRectPath'] = (...args) => host().roundRectPath(...args);
 export const rectOf: RendererServices['rectOf'] = (...args) => host().rectOf(...args);
 export const resolveProps: RendererServices['resolveProps'] = (...args) => host().resolveProps(...args);
 export const isSelfVisible: RendererServices['isSelfVisible'] = (...args) => host().isSelfVisible(...args);
 export const walkNodes: RendererServices['walkNodes'] = (...args) => host().walkNodes(...args);
-
-export const RendererContextProvider = (props: {value: Pick<RendererContext, 'width'|'dialogLayer'>; children?: ReactNode}): ReactNode => (host().RendererContextProvider as (p: typeof props)=>ReactNode)(props);
-export const useLook = () => host().useLook();
-export const atWidth: RendererServices['atWidth'] = (...args) => host().atWidth(...args);
-export const childWidth: RendererServices['childWidth'] = (...args) => host().childWidth(...args);
-export const choicesOf: RendererServices['choicesOf'] = (...args) => host().choicesOf(...args);
-export const layoutRegions: RendererServices['layoutRegions'] = (...args) => host().layoutRegions(...args);
-export const resolveValue: RendererServices['resolveValue'] = (...args) => host().resolveValue(...args);
-export const styleOf: RendererServices['styleOf'] = (...args) => host().styleOf(...args);
-
 export const nodeLabel: RendererServices['nodeLabel'] = (...args) => host().nodeLabel(...args);
 
 /** Clocked drawing primitives provided by the host; no plugin animation timers. */

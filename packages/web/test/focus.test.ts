@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SCHEMA_VERSION, holdMsOf, type PlayState, type Project, type Scenario } from '@joplo-app/core';
+import { SCHEMA_VERSION, stepPlan, type PlayState, type Project, type Scenario } from '@joplo-app/core';
 import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
 import { Stage } from '../src/renderer/Stage';
 import { badgeCenter, placeCallout, spotlightHoles, spotlightPath, visibleRegion } from '../src/renderer/cue-math';
@@ -102,12 +102,10 @@ describe('呈现层不拦截点击（不变量 3）', () => {
       expect(html.match(/data-jid="secret"/g)).toHaveLength(1);
     }
   });
-  it('hold：自动播放的最短停留按速度缩放；封面时长计入 hold', () => {
-    expect(holdMsOf({ hold: 5000 })).toBe(5000);
-    expect(holdMsOf({ hold: 5000 }, 1.5)).toBe(3333);
-    expect(holdMsOf({}, 1)).toBe(0);
-    expect(holdMsOf(undefined)).toBe(0);
+  it('hold：时间计划的停留不短于 hold（引擎时间，倍速由时钟缩放）；封面时长计入 hold', () => {
     const s = project.scenarios.s as Scenario;
+    const held = s.steps.find((st) => st.hold !== undefined)!;
+    expect(stepPlan(project, held).dwellMs).toBeGreaterThanOrEqual(held.hold!);
     expect(scenarioMs(project, s)).toBeGreaterThanOrEqual(5000);
     expect(scenarioMs(project, { ...s, steps: s.steps.map((st) => ({ ...st, hold: undefined })) })).toBeLessThan(5000);
   });

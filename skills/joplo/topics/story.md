@@ -32,7 +32,7 @@ Backend behind the same feature: put a diagram component in its own layer and .s
 - Audience: who watches (product review, design review, a customer, engineers) and what they must decide afterward.
 - One to three points: what viewers must believe after watching. Each point becomes a scenario or an A/B comparison, never a single step.
 - Scenario list, one line per scenario: Given (who, where, starting state) → When (the user's actions) → Then (the visible result), plus how it opens and how it ends.
-- Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate.
+- Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate. An estimate is the sum of each step's time plan: the action demonstration (cursor travel, press, typing or a 0.9 s system pause) plus the longer of its stay and its estimated narration, the same plan autoplay runs.
 - Unsure how to frame it? Offer two or three one-line framings and let the user pick.
 - Recreating an existing video, GIF or screen recording: read it before planning. Extract frames into contact sheets (for example ffmpeg -i ref.gif -vf "fps=1,tile=3x3" sheet%02d.png, written outside the project) and list its chapters, the states each chapter passes through and every on-screen sentence; those become cases, steps and narration. Map the reference's own chrome to the player's instead of redrawing it: its chapter label → case title and the player's step title, its bottom progress → the player's chapter list, its key badge → the host key record after .press(), its spoken captions → narrate()/say(). Ask about anything the reference does not show (chapters cut off, unseen states) instead of inventing it; replace third-party logos with neutral shapes.
 
@@ -114,4 +114,4 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.4.1 sha256:e6ce32a6e780e14d06f1439fdfe9be94ae87d93e8ddc6fbbf783edc11a1d64b6 -->
+<!-- joplo-skill 0.4.1 sha256:d81113613db03fe1b7f2ece8d97cf74b117b617c1cedb1af05678f6c7f5e6f0e -->

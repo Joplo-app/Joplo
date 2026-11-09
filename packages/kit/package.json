@@ -12,6 +12,7 @@
     "./plugin": "./src/plugin.ts",
     "./package.json": "./package.json",
     "./renderer": "./src/renderer.ts",
+    "./renderer-internal": "./src/renderer-internal.ts",
     "./renderer-style": "./src/renderer-style.ts"
   },
   "files": [
@@ -51,6 +52,10 @@
       "./renderer": {
         "types": "./dist/renderer.d.ts",
         "default": "./dist/renderer.js"
+      },
+      "./renderer-internal": {
+        "types": "./dist/renderer-internal.d.ts",
+        "default": "./dist/renderer-internal.js"
       },
       "./renderer-style": {
         "types": "./dist/renderer-style.d.ts",

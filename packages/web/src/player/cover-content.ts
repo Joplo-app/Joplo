@@ -1,14 +1,12 @@
 import { stepCaption } from '../i18n/step-caption';
 import { en, type Dictionary } from '../i18n/en';
-import { stepDwell, voiceMs } from '../runtime/pace';
-import { holdMsOf } from '@joplo-app/core/runtime';
 /**
  * 场景封面（D61，纯函数）：第 0 步不再是“初始状态”，而是一张封面。内容只由 IR 推导：
  * 所属功能名 · 方案名、flow 的标题与 description、「约 N 步 · 约 M 秒」、出场角色。
- * 时长逐步调用 pace.ts 的 stepDwell 再求和（与演示控制器用同一份文字，见 dwellTexts）；参数在 pace.ts 里调整，这里不写死。
- * 估算不含鼠标移动、逐字输入与连线小点，所以写「约」。
+ * 时长是每一步时间计划（core 的 stepPlan，与演示控制器同一份：操作演示 + 停留与朗读估算中较长者）之和，文字用当前语言的字幕（dwellTexts）。
+ * 朗读是估算、切层引导只在播放时才知道，所以写「约」。
  */
-import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, streamPlan, type Project, type RoleInfo, type Scenario, type Step } from '@joplo-app/core/runtime';
+import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, scenarioPlanMs, type Project, type RoleInfo, type Scenario, type Step } from '@joplo-app/core/runtime';
 
 export type Duration = { unit: 's' | 'min'; value: number };
 
@@ -40,11 +38,9 @@ export function dwellTexts(step: Step, i18n: Dictionary = en): (string | null | 
   return [stepCaption(step, i18n), step.explain, ...(step.action.type === 'card' ? [step.action.sub, ...(step.action.points ?? [])] : [])];
 }
 
-/** 整个场景按 1× 速度播放大约多久（毫秒）：每一步的 stepDwell 之和。 */
-export function scenarioMs(_project: Project, scenario: Scenario, i18n: Dictionary = en): number {
-  // hold（D70）：作者要求这一步至少停这么久
-  // 有旁白 / 台词的步骤按朗读估算（读完才进下一步），封面上的“约 M 秒”与带声音的真实时长一致
-  return scenario.steps.reduce((sum, step) => sum + Math.max(holdMsOf(step), voiceMs(step.narrate ?? step.say), stepDwell({ texts: dwellTexts(step, i18n), paced: step.hold !== undefined, cameraMoved: step.shots.length > 0 || !!step.directorLayer, streamMs: Math.max(0, ...streamPlan(step, null).map((x) => x.ms)) })), 0);
+/** 整个场景按 1× 速度播放大约多久（毫秒）：每一步时间计划的合计之和。 */
+export function scenarioMs(project: Project, scenario: Scenario, i18n: Dictionary = en): number {
+  return scenarioPlanMs(project, scenario.steps, (step) => dwellTexts(step, i18n));
 }
 
 /** 取整成好读的数：10 秒以内按秒向上取整，一分钟以内按 5 秒取整，再长按分钟四舍五入。 */

@@ -12,7 +12,7 @@ import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef, PluginDef } from '@joplo-app/kit';
 import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, PAGE_LAYER, isInteractiveType, matchChoice, nodeLabel, pluginSpec, splitPluginType, type PluginInfo } from './catalog.ts';
 import { HOLD_MAX_SECONDS, HOLD_MIN_SECONDS, inShotFrame } from './focus.ts';
-import { cameraAt, choicesOf, commonPrefix, stateAt } from './player.ts';
+import { cameraOf, choicesOf, commonPrefix, replayTo } from './player.ts';
 import { Action, Effect, CALLOUT_SIDES, LAYER_ICONS, Project, SCHEMA_VERSION, type Callout, type Cue, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage } from './schema.ts';
 import type { Diagnostic } from './result.ts';
 import { schemaDiagnostics } from './schema-issues.ts';
@@ -359,212 +359,9 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         else pendingFrom.set(sid, { from: `${qid}.${fl.opts.from}`, state: fl.opts.state, layer: fl.opts.layer, at: fl.source });
       }
       const stepKeys = new Set<string>();
-      const steps: Step[] = fl.steps.map((st: StepDef, i: number): Step => {
-        if (st.key !== undefined) {
-          if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(st.key)) err('STEP_KEY_INVALID', 'Step key must start with a letter and contain at most 64 letters, digits, underscores or hyphens', st.source);
-          if (stepKeys.has(st.key)) err('STEP_KEY_DUPLICATE', `Duplicate step key ${st.key} in ${sid}; use a distinct key for each action`, st.source);
-          stepKeys.add(st.key);
-        }
-        const effects: Step['effects'] = [];
-        const ruleIds: string[] = [];
-        const explains: string[] = [];
-        const says: string[] = [];
-        let sayRole: string | null = null;
-        const narrates: string[] = [];
-        /** 插件效果声明的最短停留（D98）：同一步取最大值。 */
-        let effectHoldMs = 0;
-        const ext: Record<string, unknown> = {};
-        const references: string[] = [];
-        const pluginFocus: string[] = [];
-        const directorTargets: string[] = [];
-        const forks: Step['forks'] = [];
-        const marks: Step['marks'] = [];
-        /** 每个插件效果贡献的节点（作为镜头目标，与 shot 合并）。 */
-        const pluginTargets = new Map<EffectDef, string[]>();
-        for (const e of st.effects as EffectDef[]) {
-          if (e.type === 'go') {
-            if (!ctxRoutes.has(e.route)) err('UNKNOWN_ROUTE', `go("${e.route}") navigates to an unknown route`, st.source);
-            effects.push({ type: 'navigate', sceneId: sceneOf(e.route) });
-          } else if (e.type === 'uses') {
-            for (const r of e.rules) {
-              const q = ruleQid(r, st.source);
-              if (q) ruleIds.push(q);
-            }
-          } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
-          else if (e.type === 'stream') {
-            if (e.pace !== undefined && e.pace !== 'voice') err('STREAM_PACE_INVALID', `stream() pace must be 'voice' (got ${JSON.stringify(e.pace)}); omit it to stream at model-output speed`, st.source);
-            effects.push({ type: 'stream', path: e.path, value: e.value, ...(e.pace === 'voice' ? { pace: 'voice' as const } : {}) });
-          }
-          else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
-          else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold') continue; // 镜头与焦点提示不是状态变化，下面单独归类
-          else if (e.type === 'say') {
-            if (e.role !== undefined) {
-              if (typeof e.role !== 'string' || !roleKeys.has(e.role)) err('ROLE_UNKNOWN', `say() role "${String(e.role)}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ' (feature.roles must use { key: role(\'Name\') })'}`, st.source);
-              else if (sayRole !== null && sayRole !== e.role) err('SAY_ROLE_CONFLICT', `One step has say() lines from two roles ("${sayRole}" and "${e.role}"); split them into two steps`, st.source);
-              else sayRole = e.role;
-            }
-            if (typeof e.text === 'string' && e.text.trim()) says.push(e.text.trim());
-            else err('SAY_EMPTY', 'say() needs the line the character speaks, for example say(\'I can make it!\'). Remove it to read the caption instead', st.source);
-          } else if (e.type === 'narrate') {
-            if (typeof e.text === 'string' && e.text.trim()) narrates.push(e.text.trim());
-            else err('NARRATE_EMPTY', 'narrate() needs the narrator\'s words, for example narrate(\'She sends Ajie the plan as a link, so he needs no app.\'). Remove it to read say() or the caption instead', st.source);
-          } else if (e.type === 'explain') {
-            if (e.text.trim()) explains.push(e.text.trim());
-          } else if (e.type === 'plugin') {
-            const lowered = host.effect(e, effectRoots.filter(scene => scene.layer || scene.id === sceneOf(stepRouteBefore(fl.steps, i + 1, start))), ext[e.plugin], st.source);
-            if (lowered) {
-              effects.push(...(lowered.writes ?? []).map(w => ({ type: 'set' as const, path: w.path, value: w.value })));
-              if (lowered.directorTarget) directorTargets.push(lowered.directorTarget);
-              if (lowered.holdMs) effectHoldMs = Math.max(effectHoldMs, lowered.holdMs);
-              if (lowered.media?.length) { const key = `${sid}#${i + 1}`; host.mediaCommands.set(key, [...(host.mediaCommands.get(key) ?? []), ...lowered.media]); }
-              if (lowered.data !== undefined) ext[e.plugin] = lowered.data;
-              if (lowered.targets?.length) {
-                pluginTargets.set(e, lowered.targets);
-                pluginFocus.push(...lowered.targets);
-              }
-              references.push(...lowered.references ?? []);
-            }
-          }
-          else if (e.type === 'complete') effects.push({ type: 'complete', text: e.text, outcome: e.outcome });
-          else err('EFFECT_INVALID', 'Unknown step effect; use a documented effect helper instead of constructing effect objects', st.source);
-        }
-        const sceneBefore = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i, start)));
-        const sceneAfter = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i + 1, start)));
-        const actionTarget = 'target' in st.action ? st.action.target : null;
-        validateNewAction(st.action, hasLayers ? layerScenes.map(l => l.scene) : sceneBefore ? [sceneBefore] : [], out as Project, (code, message) => err(code, message, st.source));
-        for (const e of st.effects) {
-          if (e.type === 'fork') {
-            if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `Fork target "${e.scenario}" must be another scenario key in the same option`, st.source);
-            else if (e.label.trim()) forks.push({ label: e.label.trim(), scenarioId: `${qid}.${e.scenario}`, at: 0 });
-          }
-          if (e.type === 'mark') {
-            const exists = hasLayers ? layersWith(e.target).length > 0 : !!sceneAfter && !!findIn(sceneAfter.root, e.target);
-            if (!exists) err('MARK_UNKNOWN', `mark("${e.target}") target is not in ${hasLayers ? 'any layer' : 'the stage for this step'}`, st.source);
-            else marks.push({ target: e.target, kind: e.kindOf, ...(e.note ? { note: e.note } : {}) });
-          }
-        }
-
-        // 焦点提示（D70）：spotlight / highlight / numbered / callout / hold。目标与 mark 同样解析：有层级时在任一层，否则在这一步的路径页面
-        const focusLayers = (id: string): string[] => (hasLayers ? layersWith(id) : sceneAfter && findIn(sceneAfter.root, id) ? [PAGE_LAYER] : []);
-        const where = hasLayers ? 'any layer' : 'the stage for this step';
-        const cueMap = new Map<Cue['kind'], string[]>();
-        const callouts: Callout[] = [];
-        /** 焦点提示的目标（按效果顺序）：决定导演层，并判断要不要退回整层镜头。 */
-        const focusTargets: string[] = [];
-        let holdMs: number | undefined;
-        const CUE_FN = { spotlight: 'spotlight', highlight: 'highlight', number: 'numbered' } as const;
-        for (const e of st.effects as EffectDef[]) {
-          if (e.type === 'cue') {
-            const fn = CUE_FN[e.cue] ?? e.cue;
-            if (!e.targets.length) err('FOCUS_UNKNOWN', `${fn}() requires at least one element id, for example ${fn}('quota_alert')`, st.source);
-            for (const id of e.targets) {
-              if (!focusLayers(id).length) { err('FOCUS_UNKNOWN', `${fn}("${id}") target is not in ${where}`, st.source); continue; }
-              const list = cueMap.get(e.cue) ?? [];
-              if (!list.includes(id)) list.push(id);
-              cueMap.set(e.cue, list);
-              if (!focusTargets.includes(id)) focusTargets.push(id);
-            }
-          } else if (e.type === 'callout') {
-            const text = typeof e.text === 'string' ? e.text.trim() : '';
-            if (!focusLayers(e.target).length) err('FOCUS_UNKNOWN', `callout("${e.target}", …) target is not in ${where}`, st.source);
-            else if (!text) err('CALLOUT_EMPTY', `callout("${e.target}", …) needs one short sentence, for example callout('${e.target}', 'Share after generation')`, st.source);
-            else if (e.side !== undefined && !(CALLOUT_SIDES as readonly string[]).includes(e.side)) err('CALLOUT_SIDE_INVALID', `callout("${e.target}", …, { side: ${JSON.stringify(e.side)} }) must be one of ${CALLOUT_SIDES.join(', ')}, or omitted to pick automatically`, st.source);
-            else {
-              callouts.push({ target: e.target, text, ...(e.side ? { side: e.side } : {}) });
-              if (!focusTargets.includes(e.target)) focusTargets.push(e.target);
-            }
-          } else if (e.type === 'hold') {
-            const sec = e.seconds;
-            if (typeof sec !== 'number' || !Number.isFinite(sec) || sec < HOLD_MIN_SECONDS || sec > HOLD_MAX_SECONDS)
-              err('HOLD_INVALID', `hold(${String(sec)}) must be between ${HOLD_MIN_SECONDS} and ${HOLD_MAX_SECONDS} seconds`, st.source);
-            else holdMs = Math.max(holdMs ?? 0, Math.round(sec * 1000));
-          }
-        }
-        const cues: Cue[] = [...cueMap].map(([kind, targets]) => ({ kind, targets }));
-
-        // 镜头：每个 id 在包含它的层级里解析；第一个 shot 的第一个元素所在层级就是这一步的导演层。
-        // 没有声明 layers 的方案：在路径页面里聚焦（伪层级 @page）。
-        const perLayer = new Map<string, string[]>();
-        let directorLayer: string | null = null;
-        for (const e of st.effects as EffectDef[]) {
-          if (e.type !== 'shot' && !pluginTargets.has(e)) continue;
-          const fromPlugin = e.type !== 'shot';
-          const targets = e.type === 'shot' ? e.targets : pluginTargets.get(e)!;
-          if (targets.length === 0) {
-            // shot()：导演所在层回到整体（不推近）
-            const lk = hasLayers ? DIRECTOR_LAYER : PAGE_LAYER;
-            if (!perLayer.has(lk)) perLayer.set(lk, []);
-          }
-          for (const id of targets) {
-            const where = hasLayers ? layersWith(id) : [sceneAfter, sceneBefore].some((sc) => sc && findIn(sc.root, id)) ? [PAGE_LAYER] : [];
-            if (!where.length) {
-              if (fromPlugin) continue; // 插件目标已经校验过；不在这一步的画面里时不移动镜头
-              err('SHOT_UNKNOWN', hasLayers ? `shot("${id}") references an element absent from all layers (layers: ${Object.keys(layers).join(', ')})` : `shot("${id}") references an element absent from this step's stage (${sceneAfter?.route ?? sceneBefore?.route ?? '?'})`, st.source);
-              continue;
-            }
-            for (const lk of where) {
-              const list = perLayer.get(lk) ?? [];
-              if (!list.includes(id)) list.push(id);
-              perLayer.set(lk, list);
-              directorLayer ??= lk;
-            }
-          }
-        }
-        // 插件的导演目标只选择层，不自动加入聚焦框或推进视角。
-        if (hasLayers && !directorLayer && directorTargets.length) directorLayer = layersWith(directorTargets[0]!)[0] ?? null;
-        // 没写 shot、写了焦点提示（D70）：导演切到第一个提示目标所在的层（提示要被看见）
-        if (hasLayers && !directorLayer && focusTargets.length) directorLayer = layersWith(focusTargets[0]!)[0] ?? null;
-        // 没写 shot 的操作步骤：导演切到操作目标所在的层（播放时观众看得到要点的东西）
-        if (hasLayers && !directorLayer && actionTarget) directorLayer = layersWith(actionTarget)[0] ?? null;
-        // 换人的过渡卡（D56）：卡片后面导演切到这个人的层级（卡片淡出时已经是 TA 的画面）
-        if (st.action.type === 'card' && st.action.role !== undefined) {
-          const r = st.action.role;
-          if (!roleKeys.has(r)) err('ROLE_UNKNOWN', `card("${st.action.title}") role "${r}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ''}`, st.source);
-          else if (hasLayers && !directorLayer) directorLayer = Object.entries(layers).find(([, l]) => l.role === r)?.[0] ?? null;
-        }
-        // 焦点提示不推近镜头（D70）：目标不在这一层当前镜头里（inShotFrame：镜头目标本身、它的子元素，或 D69 取景一定带上的
-        // 父分组 / 时序图两端参与者）时，这一步补一个整层镜头，
-        // 免得提示落在画面外；这一步自己写了这一层的 shot 时以 shot 为准（目标在 shot 外由 check 的 FOCUS_CONFLICT 提示）
-        const dirAfter = directorLayer ?? director;
-        for (const id of focusTargets) {
-          const ls = focusLayers(id);
-          const lk = ls.includes(dirAfter) ? dirAfter : ls[0];
-          if (!lk || perLayer.has(lk) || (perLayer.has(DIRECTOR_LAYER) && lk === dirAfter)) continue;
-          const now = frame.get(lk) ?? [];
-          const scene = hasLayers ? layerScenes.find((l) => l.key === lk)?.scene : sceneAfter;
-          if (now.length && !(scene && inShotFrame(scene.root, id, now))) perLayer.set(lk, []);
-        }
-        const shots = [...perLayer].map(([layer, targets]) => ({ layer, targets }));
-        if (directorLayer) director = directorLayer;
-        for (const s of shots) frame.set(s.layer === DIRECTOR_LAYER ? director : s.layer, [...s.targets]);
-        const generated = st.caption === undefined ? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore, out as Project) : null;
-        return {
-          id: `${sid}#${i + 1}`,
-          ...(st.key !== undefined ? { key: st.key } : {}),
-          kind: st.kind,
-          action: st.action,
-          caption: st.caption ?? generated!.caption,
-          ...(generated?.captionAuto ? { captionAuto: generated.captionAuto } : {}),
-          effects,
-          ruleIds: strip ? [] : ruleIds,
-          shots,
-          directorLayer,
-          ...(explains.length ? { explain: explains.join('\n') } : {}),
-          ...(Object.keys(ext).length ? { ext } : {}),
-          ...(references.length ? { references: [...new Set(references)] } : {}),
-          ...(pluginFocus.length ? { focusTargets: [...new Set(pluginFocus)] } : {}),
-          forks,
-          marks,
-          ...(cues.length ? { cues } : {}),
-          ...(callouts.length ? { callouts } : {}),
-          ...(holdMs !== undefined ? { hold: holdMs } : {}),
-          ...(effectHoldMs > 0 ? { effectHold: effectHoldMs } : {}),
-          ...(says.length ? { say: says.join(' ') } : {}),
-          ...(says.length && sayRole ? { sayRole } : {}),
-          ...(narrates.length ? { narrate: narrates.join(' ') } : {}),
-          ...(st.source ? { source: rel(st.source) } : {}),
-        };
-      });
+      const stepContext: StepContext = { err, rel, strip, host, out, qid, def, ctxRoutes, sceneOf, sceneFor, ruleQid, roleKeys, hasLayers, layers, layerScenes, layersWith, layerSceneWith, effectRoots, skey, sid, fl, start, stepKeys, frame, director };
+      const steps: Step[] = fl.steps.map((st: StepDef, i: number): Step => lowerStep(stepContext, st, i));
+      director = stepContext.director;
       // 结局（D65）：flow 的 outcome 优先；没写时取 done(…, outcome) 的第二个参数（cancelled 记为 other）
       const doneOutcome = [...fl.steps].reverse().flatMap((st) => [...st.effects].reverse()).find((e): e is Extract<EffectDef, { type: 'complete' }> => e.type === 'complete')?.outcome;
       const fromDone = doneOutcome === undefined ? undefined : doneOutcome === 'cancelled' ? 'other' : doneOutcome;
@@ -680,9 +477,9 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       const prev = out.scenarios[p.from];
       if (!target || !prev) return false;
       try {
-        const end = stateAt(out as Project, p.from, prev.steps.length);
+        const end = replayTo(out as Project, p.from, prev.steps.length);
         const hasLayers = Object.keys(out.options[target.optionId]?.layers ?? {}).length > 0;
-        const layer = p.layer ?? (hasLayers ? cameraAt(out as Project, p.from, prev.steps.length).directorLayer : undefined);
+        const layer = p.layer ?? (hasLayers ? cameraOf(out as Project, p.from, prev.steps.length).directorLayer : undefined);
         const merged = mergeState({ ui: end.ui as never, data: end.data as never, inputs: end.inputs as never }, p.state);
         target.initial = { sceneId: end.sceneId, ui: merged.ui, data: merged.data, inputs: merged.inputs, ...(layer ? { layer } : {}) };
         target.from = p.from;
@@ -704,6 +501,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
 
   // ---------- 8. 发布视图与评审版：去掉设计备注与源位置 ----------
   if (strip) {
+    // 组件的显示名与检查抽屉信息只给本地看板用
+    for (const info of Object.values(plugins)) for (const c of Object.values(info.components)) { delete c.label; delete c.inspect; }
     for (const s of Object.values(out.scenes) as Scene[]) stripNotes(s.root);
     stripSources(out);
   }
@@ -793,6 +592,257 @@ function localeDiagnostics(project: Project, src: AuthoringProject, diags: Diagn
 // ---------- 帮助函数 ----------
 
 /** 角色的颜色（D56）：没写 color 时按声明顺序取。 */
+/** 单步降级需要的场景级上下文：由 compile() 在编译每个场景时准备，lowerStep 只读（导演层 director 除外，它随步骤推进）。 */
+type StepContext = {
+  /** 报错（定位到作者源位置）。 */
+  err: (code: string, message: string, at?: string, ref?: Diagnostic['ref']) => unknown;
+  rel: (s?: string) => string | undefined;
+  /** 发布 / 评审版：去掉创作侧信息。 */
+  strip: boolean;
+  host: PluginCompiler;
+  /** 正在生成的 IR（规则、场景等已编译的部分可查）。 */
+  out: Record<string, any>;
+  /** 方案：限定 id、定义、可见路径、路径 → 画面 id。 */
+  qid: string;
+  def: OptionDef & { file: string };
+  ctxRoutes: Set<string>;
+  sceneOf: (path: string) => string;
+  sceneFor: Map<string, Scene>;
+  ruleQid: (key: string, at?: string) => string | null;
+  roleKeys: Set<string>;
+  /** 层级（T-layers）：每层一个独立画面。 */
+  hasLayers: boolean;
+  layers: Record<string, { title: string; sceneId: string; role?: string; icon?: LayerIcon }>;
+  layerScenes: { key: string; scene: Scene }[];
+  layersWith: (id: string) => string[];
+  layerSceneWith: (id: string) => Scene | undefined;
+  /** 插件效果能看到的画面。 */
+  effectRoots: Scene[];
+  /** 场景：键、限定 id、定义、起始路径、已用过的步骤键、各层当前镜头。 */
+  skey: string;
+  sid: string;
+  fl: NonNullable<OptionDef['scenarios']>[string];
+  start: string;
+  stepKeys: Set<string>;
+  frame: Map<string, string[]>;
+  /** 导演层：读入这一步之前的，写回这一步之后的。 */
+  director: string;
+};
+/**
+ * 把作者写的一步降级成 IR 的一步：效果归类（状态变化、朗读、镜头、焦点提示、标注、分叉、插件效果）、目标与引用校验、
+ * 自动字幕、这一步的镜头与导演层。场景级的上下文（路径、层级、已累积的镜头）经 StepContext 传入；
+ * 导演层随步骤推进，写回 c.director。
+ */
+function lowerStep(c: StepContext, st: StepDef, i: number): Step {
+  const { err, rel, strip, host, out, qid, def, ctxRoutes, sceneOf, sceneFor, ruleQid, roleKeys, hasLayers, layers, layerScenes, layersWith, layerSceneWith, effectRoots, skey, sid, fl, start, stepKeys, frame } = c;
+  let director = c.director;
+    if (st.key !== undefined) {
+      if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(st.key)) err('STEP_KEY_INVALID', 'Step key must start with a letter and contain at most 64 letters, digits, underscores or hyphens', st.source);
+      if (stepKeys.has(st.key)) err('STEP_KEY_DUPLICATE', `Duplicate step key ${st.key} in ${sid}; use a distinct key for each action`, st.source);
+      stepKeys.add(st.key);
+    }
+    const effects: Step['effects'] = [];
+    const ruleIds: string[] = [];
+    const explains: string[] = [];
+    const says: string[] = [];
+    let sayRole: string | null = null;
+    const narrates: string[] = [];
+    /** 插件效果声明的最短停留（D98）：同一步取最大值。 */
+    let effectHoldMs = 0;
+    const ext: Record<string, unknown> = {};
+    const references: string[] = [];
+    const pluginFocus: string[] = [];
+    const directorTargets: string[] = [];
+    const forks: Step['forks'] = [];
+    const marks: Step['marks'] = [];
+    /** 每个插件效果贡献的节点（作为镜头目标，与 shot 合并）。 */
+    const pluginTargets = new Map<EffectDef, string[]>();
+    for (const e of st.effects as EffectDef[]) {
+      if (e.type === 'go') {
+        if (!ctxRoutes.has(e.route)) err('UNKNOWN_ROUTE', `go("${e.route}") navigates to an unknown route`, st.source);
+        effects.push({ type: 'navigate', sceneId: sceneOf(e.route) });
+      } else if (e.type === 'uses') {
+        for (const r of e.rules) {
+          const q = ruleQid(r, st.source);
+          if (q) ruleIds.push(q);
+        }
+      } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
+      else if (e.type === 'stream') {
+        if (e.pace !== undefined && e.pace !== 'voice') err('STREAM_PACE_INVALID', `stream() pace must be 'voice' (got ${JSON.stringify(e.pace)}); omit it to stream at model-output speed`, st.source);
+        effects.push({ type: 'stream', path: e.path, value: e.value, ...(e.pace === 'voice' ? { pace: 'voice' as const } : {}) });
+      }
+      else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
+      else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold') continue; // 镜头与焦点提示不是状态变化，下面单独归类
+      else if (e.type === 'say') {
+        if (e.role !== undefined) {
+          if (typeof e.role !== 'string' || !roleKeys.has(e.role)) err('ROLE_UNKNOWN', `say() role "${String(e.role)}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ' (feature.roles must use { key: role(\'Name\') })'}`, st.source);
+          else if (sayRole !== null && sayRole !== e.role) err('SAY_ROLE_CONFLICT', `One step has say() lines from two roles ("${sayRole}" and "${e.role}"); split them into two steps`, st.source);
+          else sayRole = e.role;
+        }
+        if (typeof e.text === 'string' && e.text.trim()) says.push(e.text.trim());
+        else err('SAY_EMPTY', 'say() needs the line the character speaks, for example say(\'I can make it!\'). Remove it to read the caption instead', st.source);
+      } else if (e.type === 'narrate') {
+        if (typeof e.text === 'string' && e.text.trim()) narrates.push(e.text.trim());
+        else err('NARRATE_EMPTY', 'narrate() needs the narrator\'s words, for example narrate(\'She sends Ajie the plan as a link, so he needs no app.\'). Remove it to read say() or the caption instead', st.source);
+      } else if (e.type === 'explain') {
+        if (e.text.trim()) explains.push(e.text.trim());
+      } else if (e.type === 'plugin') {
+        const lowered = host.effect(e, effectRoots.filter(scene => scene.layer || scene.id === sceneOf(stepRouteBefore(fl.steps, i + 1, start))), ext[e.plugin], st.source);
+        if (lowered) {
+          effects.push(...(lowered.writes ?? []).map(w => ({ type: 'set' as const, path: w.path, value: w.value })));
+          if (lowered.directorTarget) directorTargets.push(lowered.directorTarget);
+          if (lowered.holdMs) effectHoldMs = Math.max(effectHoldMs, lowered.holdMs);
+          if (lowered.media?.length) { const key = `${sid}#${i + 1}`; host.mediaCommands.set(key, [...(host.mediaCommands.get(key) ?? []), ...lowered.media]); }
+          if (lowered.data !== undefined) ext[e.plugin] = lowered.data;
+          if (lowered.targets?.length) {
+            pluginTargets.set(e, lowered.targets);
+            pluginFocus.push(...lowered.targets);
+          }
+          references.push(...lowered.references ?? []);
+        }
+      }
+      else if (e.type === 'complete') effects.push({ type: 'complete', text: e.text, outcome: e.outcome });
+      else err('EFFECT_INVALID', 'Unknown step effect; use a documented effect helper instead of constructing effect objects', st.source);
+    }
+    const sceneBefore = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i, start)));
+    const sceneAfter = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i + 1, start)));
+    const actionTarget = 'target' in st.action ? st.action.target : null;
+    validateNewAction(st.action, hasLayers ? layerScenes.map(l => l.scene) : sceneBefore ? [sceneBefore] : [], out as Project, (code, message) => err(code, message, st.source));
+    for (const e of st.effects) {
+      if (e.type === 'fork') {
+        if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `Fork target "${e.scenario}" must be another scenario key in the same option`, st.source);
+        else if (e.label.trim()) forks.push({ label: e.label.trim(), scenarioId: `${qid}.${e.scenario}`, at: 0 });
+      }
+      if (e.type === 'mark') {
+        const exists = hasLayers ? layersWith(e.target).length > 0 : !!sceneAfter && !!findIn(sceneAfter.root, e.target);
+        if (!exists) err('MARK_UNKNOWN', `mark("${e.target}") target is not in ${hasLayers ? 'any layer' : 'the stage for this step'}`, st.source);
+        else marks.push({ target: e.target, kind: e.kindOf, ...(e.note ? { note: e.note } : {}) });
+      }
+    }
+
+    // 焦点提示（D70）：spotlight / highlight / numbered / callout / hold。目标与 mark 同样解析：有层级时在任一层，否则在这一步的路径页面
+    const focusLayers = (id: string): string[] => (hasLayers ? layersWith(id) : sceneAfter && findIn(sceneAfter.root, id) ? [PAGE_LAYER] : []);
+    const where = hasLayers ? 'any layer' : 'the stage for this step';
+    const cueMap = new Map<Cue['kind'], string[]>();
+    const callouts: Callout[] = [];
+    /** 焦点提示的目标（按效果顺序）：决定导演层，并判断要不要退回整层镜头。 */
+    const focusTargets: string[] = [];
+    let holdMs: number | undefined;
+    const CUE_FN = { spotlight: 'spotlight', highlight: 'highlight', number: 'numbered' } as const;
+    for (const e of st.effects as EffectDef[]) {
+      if (e.type === 'cue') {
+        const fn = CUE_FN[e.cue] ?? e.cue;
+        if (!e.targets.length) err('FOCUS_UNKNOWN', `${fn}() requires at least one element id, for example ${fn}('quota_alert')`, st.source);
+        for (const id of e.targets) {
+          if (!focusLayers(id).length) { err('FOCUS_UNKNOWN', `${fn}("${id}") target is not in ${where}`, st.source); continue; }
+          const list = cueMap.get(e.cue) ?? [];
+          if (!list.includes(id)) list.push(id);
+          cueMap.set(e.cue, list);
+          if (!focusTargets.includes(id)) focusTargets.push(id);
+        }
+      } else if (e.type === 'callout') {
+        const text = typeof e.text === 'string' ? e.text.trim() : '';
+        if (!focusLayers(e.target).length) err('FOCUS_UNKNOWN', `callout("${e.target}", …) target is not in ${where}`, st.source);
+        else if (!text) err('CALLOUT_EMPTY', `callout("${e.target}", …) needs one short sentence, for example callout('${e.target}', 'Share after generation')`, st.source);
+        else if (e.side !== undefined && !(CALLOUT_SIDES as readonly string[]).includes(e.side)) err('CALLOUT_SIDE_INVALID', `callout("${e.target}", …, { side: ${JSON.stringify(e.side)} }) must be one of ${CALLOUT_SIDES.join(', ')}, or omitted to pick automatically`, st.source);
+        else {
+          callouts.push({ target: e.target, text, ...(e.side ? { side: e.side } : {}) });
+          if (!focusTargets.includes(e.target)) focusTargets.push(e.target);
+        }
+      } else if (e.type === 'hold') {
+        const sec = e.seconds;
+        if (typeof sec !== 'number' || !Number.isFinite(sec) || sec < HOLD_MIN_SECONDS || sec > HOLD_MAX_SECONDS)
+          err('HOLD_INVALID', `hold(${String(sec)}) must be between ${HOLD_MIN_SECONDS} and ${HOLD_MAX_SECONDS} seconds`, st.source);
+        else holdMs = Math.max(holdMs ?? 0, Math.round(sec * 1000));
+      }
+    }
+    const cues: Cue[] = [...cueMap].map(([kind, targets]) => ({ kind, targets }));
+
+    // 镜头：每个 id 在包含它的层级里解析；第一个 shot 的第一个元素所在层级就是这一步的导演层。
+    // 没有声明 layers 的方案：在路径页面里聚焦（伪层级 @page）。
+    const perLayer = new Map<string, string[]>();
+    let directorLayer: string | null = null;
+    for (const e of st.effects as EffectDef[]) {
+      if (e.type !== 'shot' && !pluginTargets.has(e)) continue;
+      const fromPlugin = e.type !== 'shot';
+      const targets = e.type === 'shot' ? e.targets : pluginTargets.get(e)!;
+      if (targets.length === 0) {
+        // shot()：导演所在层回到整体（不推近）
+        const lk = hasLayers ? DIRECTOR_LAYER : PAGE_LAYER;
+        if (!perLayer.has(lk)) perLayer.set(lk, []);
+      }
+      for (const id of targets) {
+        const where = hasLayers ? layersWith(id) : [sceneAfter, sceneBefore].some((sc) => sc && findIn(sc.root, id)) ? [PAGE_LAYER] : [];
+        if (!where.length) {
+          if (fromPlugin) continue; // 插件目标已经校验过；不在这一步的画面里时不移动镜头
+          err('SHOT_UNKNOWN', hasLayers ? `shot("${id}") references an element absent from all layers (layers: ${Object.keys(layers).join(', ')})` : `shot("${id}") references an element absent from this step's stage (${sceneAfter?.route ?? sceneBefore?.route ?? '?'})`, st.source);
+          continue;
+        }
+        for (const lk of where) {
+          const list = perLayer.get(lk) ?? [];
+          if (!list.includes(id)) list.push(id);
+          perLayer.set(lk, list);
+          directorLayer ??= lk;
+        }
+      }
+    }
+    // 插件的导演目标只选择层，不自动加入聚焦框或推进视角。
+    if (hasLayers && !directorLayer && directorTargets.length) directorLayer = layersWith(directorTargets[0]!)[0] ?? null;
+    // 没写 shot、写了焦点提示（D70）：导演切到第一个提示目标所在的层（提示要被看见）
+    if (hasLayers && !directorLayer && focusTargets.length) directorLayer = layersWith(focusTargets[0]!)[0] ?? null;
+    // 没写 shot 的操作步骤：导演切到操作目标所在的层（播放时观众看得到要点的东西）
+    if (hasLayers && !directorLayer && actionTarget) directorLayer = layersWith(actionTarget)[0] ?? null;
+    // 换人的过渡卡（D56）：卡片后面导演切到这个人的层级（卡片淡出时已经是 TA 的画面）
+    if (st.action.type === 'card' && st.action.role !== undefined) {
+      const r = st.action.role;
+      if (!roleKeys.has(r)) err('ROLE_UNKNOWN', `card("${st.action.title}") role "${r}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ''}`, st.source);
+      else if (hasLayers && !directorLayer) directorLayer = Object.entries(layers).find(([, l]) => l.role === r)?.[0] ?? null;
+    }
+    // 焦点提示不推近镜头（D70）：目标不在这一层当前镜头里（inShotFrame：镜头目标本身、它的子元素，或 D69 取景一定带上的
+    // 父分组 / 时序图两端参与者）时，这一步补一个整层镜头，
+    // 免得提示落在画面外；这一步自己写了这一层的 shot 时以 shot 为准（目标在 shot 外由 check 的 FOCUS_CONFLICT 提示）
+    const dirAfter = directorLayer ?? director;
+    for (const id of focusTargets) {
+      const ls = focusLayers(id);
+      const lk = ls.includes(dirAfter) ? dirAfter : ls[0];
+      if (!lk || perLayer.has(lk) || (perLayer.has(DIRECTOR_LAYER) && lk === dirAfter)) continue;
+      const now = frame.get(lk) ?? [];
+      const scene = hasLayers ? layerScenes.find((l) => l.key === lk)?.scene : sceneAfter;
+      if (now.length && !(scene && inShotFrame(scene.root, id, now))) perLayer.set(lk, []);
+    }
+    const shots = [...perLayer].map(([layer, targets]) => ({ layer, targets }));
+    if (directorLayer) director = directorLayer;
+    for (const s of shots) frame.set(s.layer === DIRECTOR_LAYER ? director : s.layer, [...s.targets]);
+    const generated = st.caption === undefined ? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore, out as Project) : null;
+    c.director = director;
+        return {
+      id: `${sid}#${i + 1}`,
+      ...(st.key !== undefined ? { key: st.key } : {}),
+      kind: st.kind,
+      action: st.action,
+      caption: st.caption ?? generated!.caption,
+      ...(generated?.captionAuto ? { captionAuto: generated.captionAuto } : {}),
+      effects,
+      ruleIds: strip ? [] : ruleIds,
+      shots,
+      directorLayer,
+      ...(explains.length ? { explain: explains.join('\n') } : {}),
+      ...(Object.keys(ext).length ? { ext } : {}),
+      ...(references.length ? { references: [...new Set(references)] } : {}),
+      ...(pluginFocus.length ? { focusTargets: [...new Set(pluginFocus)] } : {}),
+      forks,
+      marks,
+      ...(cues.length ? { cues } : {}),
+      ...(callouts.length ? { callouts } : {}),
+      ...(holdMs !== undefined ? { hold: holdMs } : {}),
+      ...(effectHoldMs > 0 ? { effectHold: effectHoldMs } : {}),
+      ...(says.length ? { say: says.join(' ') } : {}),
+      ...(says.length && sayRole ? { sayRole } : {}),
+      ...(narrates.length ? { narrate: narrates.join(' ') } : {}),
+      ...(st.source ? { source: rel(st.source) } : {}),
+    };
+}
+
 export const ROLE_COLORS = ['#E8590C', '#1971C2', '#2F9E44', '#9C36B5', '#C2255C', '#0C8599'] as const;
 
 function rolesOf(roles: FeatureDef['roles']): { id?: string; name: string; desc: string; color: string }[] {

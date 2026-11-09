@@ -7,6 +7,8 @@ export function bindEngineAnimations(root: HTMLElement, clock: ClockSource): () 
   owners.set(root, root);
   const starts = new WeakMap<Animation, number>();
   const finished = new WeakSet<Animation>();
+  // 带声明式动画的 SVG：只在子树结构变化后重新找一次，不在每个时钟帧扫整棵树
+  let animatedSvgs: SVGSVGElement[] | null = null;
   const sample = () => {
     const now = clock.getSnapshot().timeMs;
     for (const animation of root.getAnimations?.({ subtree: true }) ?? []) {
@@ -22,12 +24,11 @@ export function bindEngineAnimations(root: HTMLElement, clock: ClockSource): () 
       } catch { /* An animation can be removed between the layout pass and this sample. */ }
     }
     // Declarative SVG animation uses the same stage clock (e.g. path-following dots).
-    for (const svg of root.querySelectorAll<SVGSVGElement>('svg')) if (ownerOf(svg) === root && svg.querySelector('animate,animateMotion,animateTransform')) {
-      svg.pauseAnimations?.(); svg.setCurrentTime?.(clock.getSnapshot().elapsedMs / 1000);
-    }
+    animatedSvgs ??= [...root.querySelectorAll<SVGSVGElement>('svg')].filter((svg) => ownerOf(svg) === root && svg.querySelector('animate,animateMotion,animateTransform'));
+    for (const svg of animatedSvgs) { svg.pauseAnimations?.(); svg.setCurrentTime?.(clock.getSnapshot().elapsedMs / 1000); }
   };
   const unsubscribe = clock.subscribe(sample);
-  const observer = typeof MutationObserver === 'undefined' ? null : new MutationObserver(sample);
+  const observer = typeof MutationObserver === 'undefined' ? null : new MutationObserver((records) => { if (records.some((r) => r.type === 'childList')) animatedSvgs = null; sample(); });
   observer?.observe(root, { subtree: true, attributes: true, attributeFilter: ['class', 'style'], childList: true });
   root.addEventListener('animationstart', sample, true);
   root.addEventListener('transitionrun', sample, true);

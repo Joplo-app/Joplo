@@ -26,7 +26,8 @@ describe('one real Joplo design workspace', () => {
     for (const id of original.featureIds) expect(dev.features[id], id).toBeDefined();
     for (const id of original.options) expect(dev.options[id], id).toBeDefined();
     for (const id of original.scenarios) expect(dev.scenarios[id], id).toBeDefined();
-    expect(dev.featureIds).toEqual(order);
+    // film_form（影片形态）是待确认的原型：还没有选定方案，所以只在本地看板里，不进发布（下面的发布清单仍是 order）
+    expect(dev.featureIds).toEqual([...order, 'film_form']);
   });
   it('publishes every feature with a visible design journey while keeping unpicked alternatives private', () => {
     expect(published.featureIds).toEqual(order);

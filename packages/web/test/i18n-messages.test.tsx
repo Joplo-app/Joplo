@@ -11,6 +11,10 @@ import { locales } from '../src/i18n/locale';
 import { plural, number, list } from '../src/i18n/format';
 import { noticeView } from '../src/player/states';
 import { typeLabel } from '../src/board/labels';
+import uiPlugin from '@joplo-app/plugin-ui';
+// 组件的显示名来自插件清单（dev IR 的 project.plugins），看板自己不带任何组件名
+const uiPlugins = { ui: { id: 'ui', title: uiPlugin.title, components: Object.fromEntries(Object.entries(uiPlugin.components).map(([name, c]) => [name, { ...(c.label ? { label: c.label } : {}) }])) } };
+
 import { appearanceMessage } from '../src/board/appearance-model';
 import { exportImage, startVideo } from '../src/runtime/dev-client';
 
@@ -36,9 +40,12 @@ describe('deferred messages', () => {
     expect(translate(error, zh)).toBe('导出图片失败：页面没有本地令牌');
   });
   it('shows component names alone in English and localized descriptions elsewhere', () => {
-    expect(typeLabel('Thinking', boardEnglish, 'en')).toBe('Thinking');
-    expect(typeLabel('Thinking', zh, 'zh-CN')).toBe('Thinking（思考过程）');
-    expect(typeLabel('Unknown', zh, 'zh-CN')).toBe('Unknown');
+    expect(typeLabel('ui:Thinking', uiPlugins, boardEnglish, 'en')).toBe('ui:Thinking');
+    expect(typeLabel('ui:Thinking', uiPlugins, zh, 'zh-CN')).toBe('ui:Thinking（思考过程）');
+    // 没启用的插件、没声明名字的组件：只显示类型名
+    expect(typeLabel('ui:Thinking', undefined, zh, 'zh-CN')).toBe('ui:Thinking');
+    expect(typeLabel('ui:Unknown', uiPlugins, zh, 'zh-CN')).toBe('ui:Unknown');
+    expect(typeLabel('#text', uiPlugins, zh, 'zh-CN')).toBe(zh.board.componentTypeName('#text', zh.board.text2));
   });
 });
 

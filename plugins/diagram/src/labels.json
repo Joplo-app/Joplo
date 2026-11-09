@@ -1,0 +1,50 @@
+{
+ "Diagram": {
+  "en": "Diagram",
+  "zh-CN": "架构图",
+  "zh-TW": "圖表",
+  "ja": "図",
+  "ko": "다이어그램",
+  "de": "Schaubild",
+  "fr": "Diagramme",
+  "es": "Diagrama",
+  "pt-BR": "Diagrama",
+  "ru": "Диаграмма"
+ },
+ "Diagram.Edge": {
+  "en": "Diagram edge",
+  "zh-CN": "架构图连线",
+  "zh-TW": "圖表連線",
+  "ja": "図のエッジ",
+  "ko": "다이어그램 연결선",
+  "de": "Schaubildkante",
+  "fr": "Arête de diagramme",
+  "es": "Arista de diagrama",
+  "pt-BR": "Aresta de diagrama",
+  "ru": "Ребро диаграммы"
+ },
+ "Diagram.Group": {
+  "en": "Diagram group",
+  "zh-CN": "架构图分组",
+  "zh-TW": "圖表群組",
+  "ja": "図のグループ",
+  "ko": "다이어그램 그룹",
+  "de": "Schaubildgruppe",
+  "fr": "Groupe de diagramme",
+  "es": "Grupo de diagrama",
+  "pt-BR": "Grupo de diagrama",
+  "ru": "Группа диаграммы"
+ },
+ "Diagram.Node": {
+  "en": "Diagram node",
+  "zh-CN": "架构图节点",
+  "zh-TW": "圖表節點",
+  "ja": "図のノード",
+  "ko": "다이어그램 노드",
+  "de": "Schaubildknoten",
+  "fr": "Nœud de diagramme",
+  "es": "Nodo de diagrama",
+  "pt-BR": "Nó de diagrama",
+  "ru": "Узел диаграммы"
+ }
+}

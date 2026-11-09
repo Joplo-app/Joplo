@@ -510,3 +510,42 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 - canvas / WebGL 插件在真实指针移动时用 `ctx.hover?.(targetId)` 报告射线命中的元素，离开、开始拖动时传 `null`。宿主查当前脚本/自由反应的声明时长，统一处理停留、离开取消、重置与继续；播放中的 hover 不暂停也不执行。插件不自建时间线或猜测作者的停留阈值。此可选服务不序列化进 IR。
 - `ctx.act(id, { type:'drag', to:{x,y} })` 的点必须是舞台坐标；宿主会按该源元素已声明的目标锚点，把落在 DOM drop zone 中的点转换为目标 id。3D 与普通页面目标共用仲裁；不可见/零尺寸锚点不能接住拖拽。
 - `flow({ autoplay:false })` → `scenario.autoplay`（可选布尔）随编译、发布和范围投影保留 → 发布站顺序选择器跳过它。默认/true 保持旧行为。支线仍在章节列表、深链和 fork 中可访问；手动播放支线结束后停下。返回主线的 fork 不会隐式改变主线的播放资格。
+
+## 18. D101：统一时间计划、单一时钟驱动与契约分层
+
+本节记录 D101 新增或改变的字段与接口的端到端流向（写入点 → 存储 → 读取点 → 消费者）。
+
+### 步骤时间计划
+
+- 写入点：没有新的存储字段。`stepPlan(project, step, opts)`（`packages/core/src/step-plan.ts`）由 IR 里已有的 `Step.action`、`hold`、`effectHold`、`caption` / `explain`、`shots` / `directorLayer`、`effects`（stream）、`narrate` / `say`，以及 `project.plugins[*].actions[*].durationMs` 推导。
+- 读取点与消费者：
+  - 演示控制器 `DemoController.runStep` / `dwellOn`（`packages/web/src/runtime/demo.ts`）：按 `cursorMs`、`rippleMs`、`gestureMs`、`settleMs`、`dwellMs` 依次等引擎时间；
+  - 封面 `scenarioMs`（`packages/web/src/player/cover-content.ts`）与 `scenarioEstimateMs`（`packages/core/src/outline.ts`，`joplo outline` 与 `SCENARIO_TOO_LONG`）：`scenarioPlanMs` 求和；
+  - 配乐锚点：`PluginCompiler.frames`（`packages/core/src/plugins/compiler.ts`）用 `commitGapMs` 推进 `Step.media` / `Scenario.media` 快照；`mediaDiagnostics`（`packages/server/src/media-check.ts`）用同一个函数量连续播放区间。
+- 效果时长：插件 `effect` 钩子返回 `holdMs` → 编译器校验 → `Step.effectHold`（同一步取最大）→ `stepPlan().dwellMs`。diagram 的 `trace()`（`plugins/diagram/src/plugin.ts` 的 `dotLapMs`）按 `node.ext.diagram.layout` 里连线的折线长度声明；运行时 `MovingDot` 用同一个 `max(0.9, 长度 / 260)` 秒。
+
+### 引擎时钟
+
+- 写入点：`DemoController.tickClock` → `EngineClock.update`；帧驱动 `scheduleFrame` 只在时钟运行时排下一帧。
+- 读取点：`wait()`（订阅）、`useEngineFrame()`（逐帧呈现器）、`coarseFrame`（舞台）、`bindEngineAnimations`（CSS / WAAPI / SVG 动画采样）、`useMedia`（只读快照，不再推进时钟）。
+
+### 场景时间线缓存
+
+- 写入点：`timelineState`（`packages/core/src/playback.ts`）按需往后回放并缓存在 `WeakMap<Project, Map<场景 id, Timeline>>`；`timelineMemo` 挂同一条时间线上的派生结果（镜头）。
+- 作废：场景对象、`steps` 数组或 `initial` 对象被换掉；项目对象被换掉（热更新、换语言）。
+- 读取点：`stateAt`（返回副本）、`timelineStates`（焦点时间线）、`changedAt`、`cameraAt`。编译器用不缓存的 `replayTo` / `cameraOf`。
+
+### 组件显示名与检查信息
+
+- 写入点：`PluginComponentSpec.label` / `inspect`（`packages/kit/src/plugin.ts`）；ui 的名字在 `plugins/ui/src/labels.json`，diagram 在 `plugins/diagram/src/labels.json` 与 `inspect.ts`。
+- 存储：`PluginCompiler` 校验（`PluginTextSchema` / `PluginInspectFieldSchema`）后写进 `project.plugins[id].components[name]`；`compile()` 在发布与评审模式删掉这两个字段。
+- 读取点与消费者：看板 `typeLabel`（`packages/web/src/board/labels.ts`）与 `InspectDrawer`（按 `inspect` 显示属性的当前值）。
+
+### 资源元数据提示
+
+- 写入点：`compileProject`（`packages/server/src/project.ts`）每次检查后按「插件、编译器、输入」记下元数据（进程内，按项目目录）。
+- 读取点：下一次编译经 `CompileOptions.resourceInfoFor` 交给 `PluginCompiler.infoOf` → `effect` 钩子的 `ctx.resourceInfo`。检查结果与提示不一致时照旧带 `resourceInfo` 编译第二遍。
+
+### 契约分层
+
+- 稳定层：`@joplo-app/kit/renderer`、`PublicTraits`。内部层：`@joplo-app/kit/renderer-internal`、`StandardLibraryTraits`。守护测试在 `packages/core/test/ui-plugin.test.ts`。

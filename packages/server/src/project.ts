@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ResourceRequest } from '@joplo-app/kit/plugin';
+import type { LocalResourceInfo, ResourceRequest } from '@joplo-app/kit/plugin';
 import { inspectResources, mediaDiagnostics } from './media-check.ts';
 import { LocalResources, referencedResources } from './local-resources.ts';
 import { isPluginDef } from '@joplo-app/kit/plugin';
@@ -88,10 +88,15 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
   // Enabled plugins derive their own layout and drawing snapshots; the host schedules resources.
   const requests: ResourceRequest[] = [];
   const entries = Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).filter(p => p.local).map(p => [p.id, p.local!]));
-  const resources = { requests, host: new LocalResources(projectDir, entries, Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).map(p => [p.id, p.keys ?? []]))) };
-  const first = compile(loaded.authoring, mode, { onResource: request => requests.push(request) });
+  const resources = { requests, host: resourceHost(projectDir, entries, Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).map(p => [p.id, p.keys ?? []]))) };
+  // 资源元数据（时长、marker）要先编译一遍才知道有哪些资源、再异步检查。上一次检查到的元数据按请求内容记着，
+  // 这一遍直接用上；检查结果没变就不再编译第二遍（热更新时绝大多数如此）。
+  const known = knownInfo.get(projectDir) ?? new Map<string, LocalResourceInfo>();
+  const first = compile(loaded.authoring, mode, { onResource: request => requests.push(request), resourceInfoFor: request => known.get(requestKey(request)) });
   const inspected = await inspectResources(first.project, requests, resources.host);
-  const r = Object.keys(inspected.resourceInfo).length ? compile(loaded.authoring, mode, { resourceInfo: inspected.resourceInfo }) : first;
+  const unchanged = requests.every(request => JSON.stringify(known.get(requestKey(request))) === JSON.stringify(inspected.resourceInfo[request.id]));
+  knownInfo.set(projectDir, new Map(requests.flatMap(request => inspected.resourceInfo[request.id] ? [[requestKey(request), inspected.resourceInfo[request.id]!] as const] : [])));
+  const r = unchanged ? first : compile(loaded.authoring, mode, { resourceInfo: inspected.resourceInfo });
   diagnostics.push(...inspected.diagnostics, ...(r.project ? mediaDiagnostics(r.project, inspected.resourceInfo) : []));
   const missing = Object.keys(r.project?.plugins ?? {}).filter((id) => !pluginRuntimes[id]);
   const extra: Diagnostic[] = missing.map((id) => ({ severity: 'error', code: 'PLUGIN_RUNTIME_MISSING', message: `Plugin ${id}: runtime file not found; reinstall the plugin package`, source: 'reference', at: `${loaded.authoring!.config.file}:1:1` }));
@@ -100,6 +105,40 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
     if (result.diagnostic) diagnostics.push(result.diagnostic);
   }
   return { project: extra.length ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes, resources };
+}
+
+const requestKey = (request: { plugin: string; compiler: string; input: string }) => JSON.stringify([request.plugin, request.compiler, request.input]);
+/** 项目目录 → 上一次编译检查到的资源元数据（按请求内容）。只是让第一遍编译用得上的提示；每次编译仍会重新检查并核对。 */
+const knownInfo = new Map<string, Map<string, LocalResourceInfo>>();
+/**
+ * 项目目录 → 本机资源宿主。打包插件的本机入口、在子进程里读取编译器描述都只做一次，热更新时复用；
+ * 插件入口文件或密钥声明变了（路径、修改时间、大小）就换一个新的。
+ */
+const hosts = new Map<string, { signature: string; host: LocalResources }>();
+function resourceHost(projectDir: string, entries: Record<string, string>, keys: ConstructorParameters<typeof LocalResources>[2]): LocalResources {
+  // 入口所在目录里的源文件都算进签名（入口会 import 同目录的模块）；不进 node_modules，最多看 400 个文件
+  const stamp = (entry: string) => {
+    const out: string[] = [];
+    const walk = (dir: string) => {
+      let names: fs.Dirent[] = [];
+      try { names = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const d of names.sort((a, b) => a.name.localeCompare(b.name))) {
+        if (out.length >= 400 || d.name === 'node_modules' || d.name.startsWith('.')) continue;
+        const file = path.join(dir, d.name);
+        if (d.isDirectory()) walk(file);
+        else { try { const s = fs.statSync(file); out.push(`${file}:${s.mtimeMs}:${s.size}`); } catch { /* removed meanwhile */ } }
+      }
+    };
+    if (!fs.existsSync(entry)) return ['missing'];
+    walk(path.dirname(entry));
+    return out;
+  };
+  const signature = JSON.stringify([Object.entries(entries).sort(([a], [b]) => a.localeCompare(b)).map(([id, file]) => [id, file, stamp(file)]), keys]);
+  const hit = hosts.get(projectDir);
+  if (hit?.signature === signature) return hit.host;
+  const host = new LocalResources(projectDir, entries, keys);
+  hosts.set(projectDir, { signature, host });
+  return host;
 }
 
 /** 让项目源文件在下次载入时重新转译、重新求值。 */

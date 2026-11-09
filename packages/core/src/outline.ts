@@ -5,11 +5,9 @@
  * 估算按 1× 速度、用 IR 里的英文字幕兜底，不含鼠标移动与逐字输入，所以只是“约”。
  */
 import { orderedFeatures } from './features.ts';
-import { holdMsOf } from './focus.ts';
-import { streamPlan } from './player.ts';
-import { stepDwell, voiceMs } from './pace.ts';
+import { scenarioPlanMs } from './step-plan.ts';
 import { JoploError } from './result.ts';
-import type { Coverage, Project, Scenario, Step } from './schema.ts';
+import type { Coverage, Project, Scenario } from './schema.ts';
 
 export type OutlineCase = {
   id: string;
@@ -41,17 +39,9 @@ export type OutlineOption = { id: string; key: string; name: string; picked: boo
 export type OutlineFeature = { id: string; name: string; goal: string; roles: string[]; pick: string | null; cases: OutlineCase[]; options: OutlineOption[] };
 export type Outline = { name: string; mode: Project['mode']; features: OutlineFeature[] };
 
-/** 一步停留时要读的文字：说明、explain，过渡卡再加副标题与要点（与看板封面的估算同一口径）。 */
-export function stepTexts(step: Step): (string | undefined)[] {
-  return [step.caption, step.explain, ...(step.action.type === 'card' ? [step.action.sub, ...(step.action.points ?? [])] : [])];
-}
-
-/** 一个场景按 1× 自动播放大约多久（毫秒）：每一步取 hold、阅读停留（stepDwell）与旁白朗读估算（narrate / say）中最长的，再求和。 */
-export function scenarioEstimateMs(scenario: Pick<Scenario, 'steps'>): number {
-  return scenario.steps.reduce(
-    (sum, step) => sum + Math.max(holdMsOf(step), voiceMs(step.narrate ?? step.say), stepDwell({ texts: stepTexts(step), paced: step.hold !== undefined, cameraMoved: step.shots.length > 0 || !!step.directorLayer, streamMs: Math.max(0, ...streamPlan(step, null).map((x) => x.ms)) })),
-    0,
-  );
+/** 一个场景按 1× 自动播放大约多久（毫秒）：每一步的时间计划（stepPlan：操作演示 + 停留与朗读估算中较长者）之和。 */
+export function scenarioEstimateMs(project: Pick<Project, 'plugins'>, scenario: Pick<Scenario, 'steps'>): number {
+  return scenarioPlanMs(project, scenario.steps);
 }
 
 export function outline(project: Project, opts: { optionId?: string } = {}): Outline {
@@ -81,7 +71,7 @@ export function outline(project: Project, opts: { optionId?: string } = {}): Out
           name: s.name,
           description: s.description,
           steps: s.steps.length,
-          ms: scenarioEstimateMs(s),
+          ms: scenarioEstimateMs(project, s),
           cards: s.steps.filter((st) => st.action.type === 'card').length,
           opening: s.steps[0]?.action.type === 'card',
           ending: s.steps.length > 0 && s.steps.at(-1)!.action.type === 'card',

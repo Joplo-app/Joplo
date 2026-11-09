@@ -16,6 +16,8 @@ export * from './review.ts';
 export * from './scope.ts';
 export * from './agent-skill.ts';
 export * from './pace.ts';
+export * from './step-plan.ts';
+export * from './works.ts';
 export * from './outline.ts';
 export * from './voice.ts';
 export * from './content-i18n.ts';

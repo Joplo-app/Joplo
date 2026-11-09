@@ -25,34 +25,65 @@ export const PLUGIN_API_VERSION = 2 as const;
 const ID = /^[a-z][a-z0-9-]*$/;
 const NAME = /^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)*$/;
 
-/** Serializable element behavior. The compiler copies it to nodes; playback reads only IR. */
-export type ElementTraits = {
-  /** Native local value behavior; never writes timeline state. */
-  native?: { action: 'type' | 'toggle' | 'select'; prop: string; deselect?: boolean };
+/**
+ * 元素特性——稳定层：任何插件都可以声明。编译器把它抄到节点上，播放只读 IR。
+ * 改动这里的字段要升插件接口版本（PLUGIN_API_VERSION）。
+ */
+export type PublicTraits = {
+  /** 显示用的属性：参与翻译、自动字幕与元素的显示名。 */
+  text?: string[];
+  /** 嵌套在属性里的显示文字的路径；* 表示数组的每一项或对象的每个值。 */
+  textPaths?: string[][];
+  /** 自己表现状态变化，不叠加自动 reveal。 */
+  selfEvident?: boolean;
+  /** 观众可以拖动（自由体验里跟随指针；脚本的 drag 步骤照常演示）。 */
   draggable?: boolean;
+  /** 悬停是一种有意义的操作（hover 步骤、自由体验里的悬停反应）。 */
   hover?: boolean;
+  /** 组件原生的本机取值行为（输入、开关、选择）：只改观众本机的游玩层，不写时间线状态。 */
+  native?: { action: 'type' | 'toggle' | 'select'; prop: string; deselect?: boolean };
+  /** 接受 type / toggle / select 步骤的输入类元素：single = 一个值，multiple = 多选。 */
+  input?: 'single' | 'multiple';
+  /** 自带外框的容器（窗口、设备、编辑器）：镜头对准里面的元素时，取景以这个外框为界。 */
+  frame?: boolean;
+};
+
+/**
+ * 元素特性——标准库内部层：把标准 UI 组件原来写在引擎里的行为（选项推导、面板门控、分栏折叠、子视口宽度、
+ * 禁用外观、输入类别）改成清单数据后的形状。只有仓库内与引擎同版本发布的标准库（ui / diagram / content）使用，
+ * 字段会跟着标准库的需要变，不保证兼容；第三方与二方插件不要依赖。
+ */
+export type StandardLibraryTraits = {
   /** Visibility of a panel selected by an ancestor value control. */
   selectionGate?: { owner: string; item?: string; value: string; fallbackFirst?: boolean };
-  input?: 'single' | 'multiple';
-  frame?: boolean;
   disabledPresentation?: boolean;
   /** First defined property controls visibility of this node and its descendants. */
   gate?: string[];
   choices?: { prop: string } | { descendants: string[]; value?: string; label?: string; labelChild?: string } | { range: string };
   toggleCaption?: 'check';
-  selfEvident?: boolean;
   /** Region names are arbitrary plugin-owned properties on the layout node. */
   layout?: Record<string, { size: string; defaultSize: number; breakpoint?: boolean }>;
   region?: string;
   childWidth?: { value: number; when?: { prop: string; value: string | number | boolean; width: number } };
-  /** Display properties; nested item values retain their identity semantics. */
-  text?: string[];
-  /** Exact nested display strings; * selects array items or object values. */
-  textPaths?: string[][];
 };
+
+/** 编译器与 IR 里的元素特性 = 稳定层 + 标准库内部层。 */
+export type ElementTraits = PublicTraits & StandardLibraryTraits;
+
+/** 给人看的文字：英文，或「语言 → 文字」（必须有 en；看板按界面语言取，没有时退回 en）。 */
+export type PluginText = string | Record<string, string>;
+/**
+ * 看板检查抽屉里这个组件的一行专属信息：把几个属性的当前值连起来显示。
+ * values：属性值 → 显示文字（例如状态名）；flags：某个布尔属性为 true 时追加的文字；fallback：属性没写时当作哪个值。
+ */
+export type PluginInspectField = { label: PluginText; props: string[]; join?: string; values?: Record<string, PluginText>; flags?: Record<string, PluginText>; fallback?: string };
 
 /** 插件组件的声明：编译、检查、技能都只读这里，不执行运行时代码。 */
 export type PluginComponentSpec = {
+  /** 看板里给人看的组件名（检查抽屉）。只进 dev IR，发布与评审版不带。 */
+  label?: PluginText;
+  /** 检查抽屉里的专属信息行。只进 dev IR。 */
+  inspect?: PluginInspectField[];
   /** 一行用法（`npx joplo skill <插件>` 列出），例如 'focus, height; root of a 3D scene'。 */
   doc: string;
   example?: string;
