@@ -315,7 +315,7 @@ test('Pro share --review 不覆盖主链接：评审版另存 review 记录，�
   await writeRecord({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/' });
   expect((await cli(['share', '--private',  project, '--review'])).code).toBe(0);
   expect(calls.filter(c => c.path === '/api/v1/shares').map(c => c.body.replaceShareId)).toEqual(['Main123456', undefined]);
-  expect(await record()).toEqual({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
+  expect(await record()).toEqual({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', passwordProtected: false, review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/', passwordProtected: false } });
   calls = [];
   expect((await cli(['share', '--private',  project, '--review'])).code).toBe(0);
   expect(calls.filter(c => c.path === '/api/v1/shares').map(c => c.body.replaceShareId)).toEqual(['Main123456', 'Abc1234567']);
@@ -325,7 +325,7 @@ test('Pro share --review 不覆盖主链接：评审版另存 review 记录，�
   expect((await cli(['share', '--private', '--no-review',  project])).code).toBe(0);
   expect(createBody().replaceShareId).toBe('Main123456');
   expect(createBody().review.mode).toBe('publish');
-  expect(await record()).toEqual({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
+  expect(await record()).toEqual({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', passwordProtected: false, review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/', passwordProtected: false } });
   // --new 两种都不带 replaceShareId
   calls = []; responses.clear();
   expect((await cli(['share', '--private',  project, '--review', '--new'])).code).toBe(0);
@@ -337,12 +337,12 @@ test('只有评审版记录时普通 share 新建主链接；其他 server 的�
   await writeRecord({ server: base, review: { shareId: 'Rev1234567', url: base + '/s/Rev1234567/' } });
   expect((await cli(['share', '--private', '--no-review',  project])).code).toBe(0);
   expect(createBody().replaceShareId).toBeUndefined();
-  expect(await record()).toEqual({ server: base, shareId: 'Abc1234567', url: base + '/s/Abc1234567/', review: { shareId: 'Rev1234567', url: base + '/s/Rev1234567/' } });
+  expect(await record()).toEqual({ server: base, shareId: 'Abc1234567', url: base + '/s/Abc1234567/', passwordProtected: false, review: { shareId: 'Rev1234567', url: base + '/s/Rev1234567/', passwordProtected: false } });
   await writeRecord({ server: 'https://other.example', shareId: 'Old1234567', url: 'https://other.example/s/Old1234567/', review: { shareId: 'Rev1234567', url: 'https://other.example/s/Rev1234567/' } });
   calls = [];
   expect((await cli(['share', '--private',  project, '--review'])).code).toBe(0);
   expect(createBody().replaceShareId).toBeUndefined();
-  expect(await record()).toEqual({ server: base, shareId: 'Abc1234567', url: base + '/s/Abc1234567/', review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
+  expect(await record()).toEqual({ server: base, shareId: 'Abc1234567', url: base + '/s/Abc1234567/', passwordProtected: false, review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/', passwordProtected: false } });
 });
 
 test('feedback 默认读评审分享，没有时读主分享；--share 仍可指定', async () => {
@@ -406,7 +406,7 @@ test('share --scenario：构建带范围；清单只含范围内；标题带场�
   expect(r.json().data.scope).toMatchObject({ key: 'f.a.main', scenarios: ['f.a.main'] });
   const record = JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'));
   expect(record.shareId).toBe('Main123456');
-  expect(record.scoped).toEqual({ 'f.a.main': { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
+  expect(record.scoped).toEqual({ 'f.a.main': { shareId: 'Abc1234567', url: base + '/s/Abc1234567/', passwordProtected: false } });
 });
 
 test('Pro 重新分享同一范围：只替换这个范围的分享，不用主链接', async () => {

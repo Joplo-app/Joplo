@@ -16,7 +16,7 @@ export const CLOUD_EVENT = 'joplo:cloud';
 
 export type CloudVisibility = 'public' | 'private';
 export type CloudPortfolio = { workUrl: string | null; profileUrl: string | null; needsUsername: boolean; setupPath: string };
-export type CloudLinks = { main: { visibility?: CloudVisibility } | null; scoped?: Record<string, { visibility?: CloudVisibility }> };
+export type CloudLinks = { main: { visibility?: CloudVisibility; passwordProtected?: boolean } | null; scoped?: Record<string, { visibility?: CloudVisibility; passwordProtected?: boolean }> };
 export type CloudAccount =
   | {
       signedIn: true;
@@ -76,9 +76,9 @@ export type CloudStorage = { usedBytes: number; quotaBytes: number };
 export type CloudStorageFull = { usedBytes?: number; quotaBytes?: number; shareBytes?: number; replacedBytes?: number; manageUrl: string; upgradeUrl: string };
 
 /** 范围：都为空 = 整个项目（D75）。 */
-export type CloudPublishRequest = { visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; features?: string[] };
+export type CloudPublishRequest = { password?: string | null; visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; features?: string[] };
 
-export type CloudPublishResult = { mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）。 */ storage?: CloudStorage & { shareBytes: number } };
+export type CloudPublishResult = { passwordProtected?: boolean; mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）。 */ storage?: CloudStorage & { shareBytes: number } };
 
 /** CLI 实现：account 只读本机登录（必要时问一次云端套餐）；publish 就是 share()，progress 是它写给终端的每一行。 */
 export type CloudBridge = {
@@ -90,12 +90,12 @@ export type CloudBridge = {
 };
 
 /** 发布失败：code 来自 CLI（AUTH_REQUIRED、NOT_FOUND、NETWORK…）；需要登录时带 loginCommand。 */
-export type CloudJobError = { code: string; message: string; loginCommand?: string; /** 容量不足时的数字与链接（C27）。 */ storage?: CloudStorageFull };
+export type CloudJobError = { code: string; message: string; loginCommand?: string; upgradeUrl?: string; /** 容量不足时的数字与链接（C27）。 */ storage?: CloudStorageFull };
 
 export type CloudJob = {
   id: string;
   state: 'running' | 'done' | 'failed';
-  request: CloudPublishRequest;
+  request: Omit<CloudPublishRequest, 'password'>;
   startedAt: number;
   /** 进度：CLI 写给终端的行（英文，页面按开头识别阶段）。 */
   lines: string[];
@@ -162,13 +162,17 @@ export class CloudHub {
     if (!b.ok) return true;
     let request: CloudPublishRequest;
     try {
-      const body = (b.body ?? {}) as { scenarios?: unknown; features?: unknown; visibility?: unknown; review?: unknown };
+      const body = (b.body ?? {}) as { scenarios?: unknown; features?: unknown; visibility?: unknown; review?: unknown; password?: unknown };
       const scenarios = strings(body.scenarios, 'scenarios');
       const features = strings(body.features, 'features');
       if (body.visibility !== 'public' && body.visibility !== 'private') throw new Error('Choose visibility: public / private');
       if (typeof body.review !== 'boolean') throw new Error('Choose review: true / false');
       if (body.visibility === 'public' && (scenarios?.length || features?.length)) throw new Error('Scoped shares must be private');
-      request = { visibility: body.visibility, review: body.review, ...(scenarios?.length ? { scenarios } : {}), ...(features?.length ? { features } : {}) };
+      if (body.password !== undefined) {
+        if (body.visibility !== 'private') throw new Error('Passwords require a private share');
+        if (body.password !== null && (typeof body.password !== 'string' || Array.from(body.password).length < 8 || Array.from(body.password).length > 128)) throw new Error('Access password must contain 8–128 characters');
+      }
+      request = { ...(body.password !== undefined ? { password: body.password as string | null } : {}), visibility: body.visibility, review: body.review, ...(scenarios?.length ? { scenarios } : {}), ...(features?.length ? { features } : {}) };
     } catch (e) {
       return ctx.send(400, { error: { code: 'USAGE', message: e instanceof Error ? e.message : String(e) } }), true;
     }
@@ -179,28 +183,32 @@ export class CloudHub {
   }
 
   private start(projectId: string, dir: string, request: CloudPublishRequest): CloudJob {
-    const job: CloudJob = { id: `c${++this.seq}`, state: 'running', request, startedAt: Date.now(), lines: [] };
+    const { password, ...safeRequest } = request;
+    const redact = (text: string) => typeof password === 'string' && password ? text.split(password).join('[REDACTED]') : text;
+    const safe = <T,>(value: T): T => JSON.parse(JSON.stringify(value, (_key, v: unknown) => typeof v === 'string' ? redact(v) : v)) as T;
+    const job: CloudJob = { id: `c${++this.seq}`, state: 'running', request: safe(safeRequest), startedAt: Date.now(), lines: [] };
     this.jobs.set(projectId, job);
     const push = () => this.emit(projectId, job);
     push();
     void this.bridge!
       .publish(dir, request, (line) => {
-        job.lines = [...job.lines, line].slice(-MAX_LINES);
+        job.lines = [...job.lines, redact(line)].slice(-MAX_LINES);
         push();
       })
       .then((result) => {
         job.state = 'done';
-        job.result = result;
+        job.result = safe(result);
       })
       .catch((e: unknown) => {
-        const err = e as { code?: unknown; message?: unknown; loginCommand?: unknown; storage?: unknown };
+        const err = e as { code?: unknown; message?: unknown; loginCommand?: unknown; storage?: unknown; upgradeUrl?: unknown };
         job.state = 'failed';
-        job.error = {
+        job.error = safe({
           code: typeof err.code === 'string' ? err.code : 'INTERNAL',
           message: typeof err.message === 'string' ? err.message : String(e),
           ...(typeof err.loginCommand === 'string' ? { loginCommand: err.loginCommand } : {}),
           ...(err.storage && typeof err.storage === 'object' ? { storage: err.storage as CloudStorageFull } : {}),
-        };
+          ...(typeof err.upgradeUrl === 'string' ? { upgradeUrl: err.upgradeUrl } : {}),
+        });
       })
       .finally(push);
     return job;

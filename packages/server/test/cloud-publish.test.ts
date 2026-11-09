@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createHub, type Hub } from '../src/dev.ts';
-import type { CloudBridge, CloudPublishRequest } from '../src/cloud.ts';
+import { CloudHub, type CloudBridge, type CloudPublishRequest } from '../src/cloud.ts';
 
 const minimal = () => {
   const d = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-cloud-')));
@@ -128,4 +128,46 @@ describe('发布到云端接口', () => {
     expect(r.body.error.message).toMatch(/joplo dev again/);
     expect((await req(port, { path: `/__joplo/p/${id}/cloud/publish`, headers: t })).body).toEqual({ available: false, job: null });
   }, 60_000);
+});
+
+
+it('密码只在 POST → bridge 内存传递，任务 GET、推送、错误、进度和项目文件不含明文', async () => {
+  const password='server-test-only-秘密-42';
+  let seen: CloudPublishRequest | undefined;
+  const {port,id,j,t,dir,until}=await start({
+    account:async()=>({signedIn:true,server:'s',email:'e',plan:'pro'}),
+    publish:async(_d,r,progress)=>{ seen=r; progress('remote echoed '+r.password); throw new Error('remote echoed '+r.password); },
+  });
+  const url=`/__joplo/p/${id}/cloud/publish`;
+  const post=await req(port,{method:'POST',path:url,headers:j,body:JSON.stringify({visibility:'private',review:false,password})});
+  expect(post.status).toBe(202); expect(JSON.stringify(post.body)).not.toContain(password);
+  await until(async()=>(await req(port,{path:url,headers:t})).body.job?.state==='failed');
+  expect(seen?.password).toBe(password);
+  for(const path of [url,`/__joplo/p/${id}/cloud/links`,'/__joplo/cloud/account',`/__joplo/p/${id}/ir`]) {
+    expect(JSON.stringify((await req(port,{path,headers:t})).body)).not.toContain(password);
+  }
+  const scan=(d:string)=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){if(e.isDirectory())scan(path.join(d,e.name));else expect(fs.readFileSync(path.join(d,e.name),'utf8')).not.toContain(password);}};
+  scan(dir);
+  for(const body of [{visibility:'public',review:false,password},{visibility:'private',review:false,password:'short'},{visibility:'private',review:false,password:42}]) {
+    expect((await req(port,{method:'POST',path:url,headers:j,body:JSON.stringify(body)})).status).toBe(400);
+  }
+},60_000);
+
+
+it('CloudHub 的推送快照剔除密码，含 JSON 转义字符的错误/结果也脱敏', async () => {
+  const password='test-only-"\\-password';
+  const events:string[]=[];
+  const hub=new CloudHub({account:async()=>({signedIn:false,server:'s',loginCommand:'login'}),publish:async(_d,r,progress)=>{
+    expect(r.password).toBe(password); progress(password);
+    return {shareId:'Abc1234567',url:'https://x/'+password,expiresAt:null,version:1,plan:'pro'};
+  }},(_id,job)=>events.push(JSON.stringify(job)));
+  let body:unknown;
+  await hub.handleProject('p','/unused','publish',{method:'POST'} as http.IncomingMessage,{
+    guardWrite:()=>true,jsonBody:async()=>({ok:true,body:{visibility:'private',review:false,password}}),send:(_s,b)=>{body=b;},
+  });
+  await hub.settled('p');
+  for(const value of [...events,JSON.stringify(body)]) {
+    expect(value).not.toContain(JSON.stringify(password).slice(1,-1));
+    expect(JSON.parse(value).request ?? JSON.parse(value).job.request).not.toHaveProperty('password');
+  }
 });

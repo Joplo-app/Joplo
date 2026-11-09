@@ -498,7 +498,7 @@ export async function requestClip(projectId: string, locale: Locale, segment: Vo
 /** 与 @joplo-app/server 的 CloudAccount / CloudJob 一致（页面只拿到邮箱和套餐，令牌留在本机进程）。 */
 export type CloudVisibility = 'public' | 'private';
 export type CloudPortfolio = { workUrl: string | null; profileUrl: string | null; needsUsername: boolean; setupPath: string };
-export type CloudLinks = { main: { visibility?: CloudVisibility } | null; scoped?: Record<string, { visibility?: CloudVisibility }> };
+export type CloudLinks = { main: { visibility?: CloudVisibility; passwordProtected?: boolean } | null; scoped?: Record<string, { visibility?: CloudVisibility; passwordProtected?: boolean }> };
 export type CloudAccount =
   | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; storage?: CloudStorage; username?: string | null; portfolioUrl?: string | null; /** 托管朗读额度（D85）；旧云端或连不上时没有。 */ voice?: VoiceQuota }
   | { signedIn: false; server: string; loginCommand: string; message?: string };
@@ -509,15 +509,15 @@ export type CloudBorrowed =
   | { kind: 'element'; featureId: string; featureName: string; optionId: string; elementId: string; route: string; refs: string[]; scenarios: string[] }
   | { kind: 'page'; featureId: string; featureName: string; optionId: string; route: string; scenarios: string[] };
 export type CloudScope = { key: string; scenarios: string[]; features: string[]; borrowed: CloudBorrowed[] };
-export type CloudPublishRequest = { visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; features?: string[] };
+export type CloudPublishRequest = { password?: string | null; visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; features?: string[] };
 export type CloudJob = {
   id: string;
   state: 'running' | 'done' | 'failed';
-  request: CloudPublishRequest;
+  request: Omit<CloudPublishRequest, 'password'>;
   startedAt: number;
   lines: string[];
-  result?: { mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope; storage?: CloudStorage & { shareBytes: number } };
-  error?: { code: string; message: string; loginCommand?: string; storage?: CloudStorageFull };
+  result?: { passwordProtected?: boolean; mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope; storage?: CloudStorage & { shareBytes: number } };
+  error?: { code: string; message: string; loginCommand?: string; upgradeUrl?: string; storage?: CloudStorageFull };
 };
 
 /** 账号：available = false 表示这个看板进程不能发布（旧版 CLI 启动的）。 */

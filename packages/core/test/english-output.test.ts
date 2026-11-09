@@ -6,6 +6,8 @@ import ts from 'typescript';
 const root = resolve(import.meta.dirname, '../../..');
 const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef]/u;
 const whitelist: readonly (readonly [string, string, string])[] = [
+  ['packages/cli/src/share-messages.ts', "export const PASSWORD_PROTECTED = '已加密 (Password protected)';", 'D85 password task explicitly requires the success label 已加密.'],
+  ['packages/cli/src/share-messages.ts', "export const PASSWORD_UNSUPPORTED = 'Joplo Cloud 还不支持密码查看，请稍后再试';", 'D85 password task explicitly requires this compatibility message.'],
   ['packages/cli/src/cloud-embed.ts', "const LABEL = 'Joplo 演示';", 'Fixed label from the cloud embed contract, shared verbatim with the share Worker and console; it is embed content, not CLI interface text.'],
   ['packages/core/src/agent-skill.ts', "const ZH_JOPLO = '功能原型、可交互演示、方案对比、给产品 / 设计 / 评审看的演示';", 'Chinese trigger keywords inside the agent skill description (D64); agents match them against Chinese requests, they are not CLI interface text.'],
   ['packages/core/src/agent-skill.ts', "const ZH_FEEDBACK = '本地评审、监听反馈、确认方案、评审有结论了、按评审意见修改演示';", 'Chinese trigger keywords inside the joplo-feedback skill description (D64); matching text, not CLI interface text.'],

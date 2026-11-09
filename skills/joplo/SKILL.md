@@ -76,6 +76,7 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - Public portfolio work and the always-private review version are two separate links: give reviewers data.review.url, the audience data.url. See npx joplo skill publish.
 - Required: before every share, ask the user public or private AND whether to also publish a review version. Never choose for them or reuse a previous choice; CI must pin both flags in its workflow. See npx joplo skill publish.
 - Public shares enter the portfolio and search engines: write the project name, description, and feature goals as search-result content; exclude unpublished information. See npx joplo skill publish.
+- Never invent or set an access password for the user: ask them to type it in their own terminal or set JOPLO_SHARE_PASSWORD; never put passwords in command history, files, or conversation summaries. Private Pro shares accept --password; omit both password flags to preserve protection. See npx joplo skill publish.
 - Never share or deploy without the user's go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself. See npx joplo skill publish.
 - Joplo Cloud narration spends the user's characters: run npx joplo voice --dry-run and tell them the estimate before a large batch; on TTS_QUOTA_EXCEEDED (exit 7) keep what was made, pass on error.details.usageUrl, and never retry in a loop or buy for them. See npx joplo skill publish.
 - AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json. See npx joplo skill publish.
@@ -95,6 +96,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - selection: Edit only the element selected by the user in the board
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
-- publish: pick, build, explicit public/private and review choices, portfolios and SEO, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
+- publish: pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.17 sha256:eb503d476addcf8af0a682e3fb1840c464dcb62ec4db2dbcc88b5e6adb296c67 -->
+<!-- joplo-skill 0.2.17 sha256:65445904444dde804bb7c1a0d87add92842667920488085a738e35143aa4ddaa -->

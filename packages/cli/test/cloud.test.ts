@@ -174,7 +174,7 @@ test('share 只上传 missing、保留签名 headers、412 成功、finalize 重
   expect(puts[0]!.headers).toMatchObject({ 'content-type': 'application/octet-stream', 'content-length': '6', 'if-none-match': '*', 'x-amz-checksum-sha256': Buffer.from(hash, 'hex').toString('base64') });
   expect(puts[0]!.headers.authorization).toBeUndefined(); expect(puts[0]!.headers['x-joplo-client']).toBeUndefined();
   expect(calls.filter(c => c.path.endsWith('/finalize')).map(c => c.body)).toEqual([{ uploadId: 'upload-1' }, { uploadId: 'upload-1' }]);
-  expect(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'))).toEqual({ server: base, shareId: r.json().data.shareId, url: r.json().data.url });
+  expect(JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'))).toEqual({ server: base, shareId: r.json().data.shareId, url: r.json().data.url, passwordProtected: false });
   expect(r.json().data.expiresAt).toBe('2026-11-05T12:00:00.000Z'); await expect(stat(build.mock.calls[0]![0].outDir!)).rejects.toThrow();
 });
 test.each([['free', false, true, true], ['free', true, true, false], ['pro', false, true, true], ['pro', true, true, false], ['pro', false, false, false]] as const)('replaceShareId plan=%s new=%s sameServer=%s（C27：免费账号也更新同一个链接）', async (p, fresh, sameServer, replace) => {
@@ -617,7 +617,7 @@ test('E1 share --format json 的 data.embed 与契约逐字一致；文本输出
     markdown: `[![Joplo 演示 · Say "hi" <now> \\[x\\]](${page}badge.svg)](${page})`,
     badge: `${page}badge.svg`, preview: `${page}preview.png`,
   });
-  expect(Object.keys(r.json().data).sort()).toEqual(['embed', 'expiresAt', 'shareId', 'url', 'version']);
+  expect(Object.keys(r.json().data).sort()).toEqual(['embed', 'expiresAt', 'passwordProtected', 'shareId', 'url', 'version']);
   r = await cli(['share', '--private', '--no-review',  project]); expect(r.code).toBe(0);
   const lines = r.stdout.trim().split('\n');
   expect(lines[0]).toBe(`Published ${page}`);

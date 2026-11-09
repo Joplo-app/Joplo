@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createServer, type IncomingMessage } from 'node:http';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { compile, type Project } from '@joplo-app/core';
@@ -28,6 +28,7 @@ let devIr: Project;
 let portfolio: unknown, visibility: unknown;
 let plan: 'free' | 'pro', rejectReview: number;
 let strictVisibility: boolean;
+let reviewErrorMessage: string | undefined;
 const browser = vi.fn(async () => true);
 const files = { 'index.html': '<html><script type="application/json" id="joplo-ir">{"project":{"mode":"publish","features":{},"options":{},"scenarios":{}}}</script></html>', 'assets/a.css': 'body{}' };
 let built: Record<string, string>;
@@ -41,7 +42,7 @@ const checkProject = vi.fn(async (): Promise<any> => ({ name: 'Fixture', diagnos
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'joplo-review-cli-')); home = join(root, 'home'); project = join(root, 'project');
-  await mkdir(project); calls = []; responses = new Map(); portfolio = undefined; visibility = undefined; plan = 'free'; rejectReview = 0; strictVisibility = false; built = { ...files }; build.mockReset(); build.mockImplementation(buildFiles); checkProject.mockClear(); browser.mockClear();
+  await mkdir(project); calls = []; responses = new Map(); portfolio = undefined; visibility = undefined; plan = 'free'; rejectReview = 0; strictVisibility = false; reviewErrorMessage = undefined; built = { ...files }; build.mockReset(); build.mockImplementation(buildFiles); checkProject.mockClear(); browser.mockClear();
   devIr = compile(reviewSource(), 'dev').project!;
   server = createServer(async (req, res) => {
     const chunks: Buffer[] = []; for await (const c of req) chunks.push(c);
@@ -52,9 +53,11 @@ beforeEach(async () => {
     const r = responses.get(path); if (r) return send(r.body, r.status);
     if (path === '/api/v1/me') return send({ user, plan, limits, credential: req.headers.authorization === `Bearer ${apiKey}` ? { kind: 'api_key', name: 'team-invite CI', prefix: 'jpk_A1b2', scopes: ['shares:publish', 'feedback:read'], expiresAt: '2027-02-04T00:00:00.000Z' } : { kind: 'device' } });
     if (path === '/api/v1/shares') {
+      // 密码契约：更新当前公开的分享时，设置和移除密码都必须同时明确改为私密。
+      if (body.password !== undefined && body.replaceShareId && visibility === 'public' && body.visibility !== 'private') return send({ code: 'BAD_REQUEST', message: 'Password changes on public shares require visibility: private' }, 400);
       // 旧版 SaaS：严格校验，不认识 review 字段时 400（没有创建任何记录）
       if (strictVisibility && body.visibility !== undefined) return send({ code: 'BAD_REQUEST', message: 'Unknown field visibility' }, 400);
-      if (rejectReview && body.review !== undefined) return send({ code: 'BAD_REQUEST' }, rejectReview);
+      if (rejectReview && body.review !== undefined) return send({ code: 'BAD_REQUEST', ...(reviewErrorMessage ? { message: reviewErrorMessage } : {}) }, rejectReview);
       return send({ shareId: body.review?.mode === 'review' ? 'Rev1234567' : 'Abc1234567', uploadId: 'u1', missing: [] });
     }
     if (/^\/api\/v1\/shares\/[A-Za-z0-9]{10}\/finalize$/.test(path)) return send({ shareId: path.split('/')[4], url: base + '/s/' + path.split('/')[4] + '/', expiresAt: null, version: 1, visibility: path.includes('Rev1234567') ? 'private' : visibility, portfolio });
@@ -67,11 +70,11 @@ beforeEach(async () => {
 });
 afterEach(async () => { server.closeAllConnections(); await new Promise<void>(r => server.close(() => r())); await rm(root, { recursive: true, force: true }); });
 
-async function cli(args: string[], env: NodeJS.ProcessEnv = {}, interactive = false, choose?: (question: string, choices: readonly string[], initial: number) => Promise<number>) {
+async function cli(args: string[], env: NodeJS.ProcessEnv = {}, interactive = false, choose?: (question: string, choices: readonly string[], initial: number) => Promise<number>, readPassword?: (question: string) => Promise<string>) {
   let stdout = '', stderr = '';
   const code = await runCli(args, { stdout: s => stdout += s, stderr: s => stderr += s, cliVersion: '0.1.3',
     loadServer: async () => ({ buildSite: build, startDev: async () => ({ url: 'http://localhost:4790', attached: true }) }),
-    cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base, ...env }, interactive, choose, openBrowser: browser, sleep: async () => undefined, now: () => 0, check: checkProject } });
+    cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base, ...env }, interactive, choose, readPassword, openBrowser: browser, sleep: async () => undefined, now: () => 0, check: checkProject } });
   for (const secret of [token, apiKey]) expect(stdout + stderr).not.toContain(secret);
   return { code, stdout, stderr, json: () => JSON.parse(stdout) };
 }
@@ -246,4 +249,150 @@ test('看板范围评审：仅评审结果携带 mode，不误显示为普通分
   const result = await boardPublish({ visibility: 'private', review: true, features: ['g'] });
   expect(result).toMatchObject({ mode: 'review', url: `${base}/s/Rev1234567/`, visibility: 'private' });
   expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
+});
+
+
+const password = 'test-only-密🔐码-42';
+test.each([
+  { operation: '设置', flags: ['--password', password], value: password },
+  { operation: '移除', flags: ['--no-password'], value: null },
+])('无本地记录时 --update 公开链接并操作密码，必须显式改为私密：$operation', async ({ flags, value }) => {
+  await login(); plan = 'pro'; visibility = 'public';
+  await expect(readFile(join(project, '.joplo/cloud.json'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  const r = await cli(['share', project, '--update', `${base}/s/Abc1234567/`, '--private', '--no-review', ...flags, '--json']);
+  expect(r.code, r.stdout).toBe(0);
+  expect(createBody()).toMatchObject({ replaceShareId: 'Abc1234567', visibility: 'private', password: value });
+  expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
+  expect(r.stdout + r.stderr).not.toContain(password);
+  await scanFiles(root);
+});
+
+test.each([password, null])('看板明确操作密码（%s）时，新建和未知可见性的更新均显式发送私密', async value => {
+  await login(); plan = 'pro';
+  // 先新建，再模拟云端已公开、本地旧记录却没有 visibility 的更新。
+  await boardPublish({ visibility: 'private', review: false, password: value });
+  expect(createBody()).toMatchObject({ visibility: 'private', password: value });
+  expect(createBody()).not.toHaveProperty('replaceShareId');
+  await saveRecord(recordLink('Abc1234567'));
+  visibility = 'public'; calls = [];
+  await boardPublish({ visibility: 'private', review: false, password: value });
+  expect(createBody()).toMatchObject({ replaceShareId: 'Abc1234567', visibility: 'private', password: value });
+  expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
+  await scanFiles(root);
+});
+
+async function scanFiles(dir: string): Promise<void> {
+  for (const e of await readdir(dir, { withFileTypes: true })) {
+    if (e.isDirectory()) await scanFiles(join(dir, e.name));
+    else expect(await readFile(join(dir, e.name), 'utf8')).not.toContain(password);
+  }
+}
+test('密码设置、保持、去掉：只在明确请求时发送，stdout/JSON/记录及构建参数无明文', async () => {
+  await login(); plan = 'pro';
+  const final = '/api/v1/shares/Abc1234567/finalize';
+  const published = { shareId:'Abc1234567', url:base+'/s/Abc1234567/', expiresAt:null, version:1, passwordProtected:true };
+  responses.set(final, { body:published });
+  let r = await cli(['share',project,'--private','--no-review','--password','--json'], {JOPLO_SHARE_PASSWORD:password});
+  expect(r.code,r.stdout).toBe(0); expect(createBody().password).toBe(password);
+  expect(r.json().data.passwordProtected).toBe(true); expect(r.stdout+r.stderr).not.toContain(password);
+  expect(JSON.parse(await readFile(join(project,'.joplo/cloud.json'),'utf8')).passwordProtected).toBe(true);
+  expect(JSON.stringify(build.mock.calls)).not.toContain(password);
+  await scanFiles(root);
+  calls=[]; r=await cli(['share',project,'--private','--no-review'], {JOPLO_SHARE_PASSWORD:password});
+  expect(r.code).toBe(0); expect(createBody()).not.toHaveProperty('password'); expect(r.stdout).toContain('已加密');
+  calls=[]; responses.set(final, {body:{...published,passwordProtected:false}});
+  r=await cli(['share',project,'--private','--no-review','--no-password','--json']);
+  expect(r.code).toBe(0); expect(createBody().password).toBeNull(); expect(r.json().data.passwordProtected).toBe(false);
+  await scanFiles(root);
+});
+test('密码只能用于私密普通分享；无效输入、非交互缺值、冲突与 PR/对比均退出 2 且无网络', async () => {
+  for (const flags of [
+    ['--public','--no-review','--password',password], ['--public','--no-review','--no-password'],
+    ['--private','--no-review','--password'], ['--private','--no-review','--password','short'],
+    ['--private','--no-review','--password','🔐'.repeat(129)],
+    ['--private','--no-review','--password',password,'--no-password'],
+    ['--private','--no-review','--password',password,'--pr','1'],
+    ['--private','--no-review','--no-password','--pr','1'],
+  ]) {
+    const r=await cli(['share',project,...flags,'--json']); expect(r.code,r.stdout).toBe(2);
+    expect(r.stdout+r.stderr).not.toContain(password);
+  }
+  expect((await cli(['diff','publish',project,'--password',password,'--format=json'])).code).toBe(2);
+  expect(calls).toEqual([]); expect(build).not.toHaveBeenCalled();
+});
+test('Unicode 密码按码点计数，显式参数优先于环境变量，旧 Cloud 缺字段按 false', async () => {
+  await login(); const r=await cli(['share',project,'--private','--no-review','--password','🔐'.repeat(8),'--json'], {JOPLO_SHARE_PASSWORD:password});
+  expect(r.code,r.stdout).toBe(0); expect(createBody().password).toBe('🔐'.repeat(8)); expect(r.json().data.passwordProtected).toBe(false);
+});
+test('旧 Cloud 拒绝 password 时提示不支持，不重试删除 review；403 使用服务端升级路径', async () => {
+  await login();
+  responses.set('/api/v1/shares',{status:400,body:{code:'BAD_REQUEST',message:'Unrecognized key: password '+password}});
+  let r=await cli(['share',project,'--private','--no-review','--password',password,'--json']);
+  expect(r.code).toBe(1); expect(r.json().error.message).toContain('Joplo Cloud 还不支持密码查看');
+  expect(r.stdout+r.stderr).not.toContain(password); expect(calls.filter(c=>c.path==='/api/v1/shares')).toHaveLength(1);
+  responses.set('/api/v1/shares',{status:403,body:{code:'PLAN_REQUIRED',data:{upgradePath:'/upgrade/pro'}}});
+  r=await cli(['share',project,'--private','--no-review','--password',password,'--json']);
+  expect(r.code).toBe(1); expect(r.json().error.code).toBe('PLAN_REQUIRED'); expect(r.json().error.message).toContain(base+'/upgrade/pro');
+});
+test('评审版与主分享用相同密码，bridge 结果/记录无明文', async () => {
+  await login(); plan='pro';
+  const {cloudBridge}=await import('../src/cloud-bridge.ts');
+  const bridge=cloudBridge({version:'0.2.17',build:build as never,render:async()=>async()=>undefined,deps:{env:{JOPLO_HOME:home,JOPLO_CLOUD_URL:base},check:checkProject,sharedVoice:async()=>undefined}});
+  const lines:string[]=[];
+  const result=await bridge.publish(project,{visibility:'private',review:true,password},s=>lines.push(s));
+  expect(calls.filter(c=>c.path==='/api/v1/shares').map(c=>c.body.password)).toEqual([password,password]);
+  expect(lines.join(' ')).toContain('same password'); expect(JSON.stringify({result,lines})).not.toContain(password);
+  await scanFiles(root);
+});
+
+
+test('TTY 省略值隐藏输入并确认一次；不一致则取消；CI/JSON 不读取终端', async () => {
+  await login();
+  const read=vi.fn(async()=>password);
+  let r=await cli(['share',project,'--private','--no-review','--password'],{},true,undefined,read);
+  expect(r.code,r.stderr).toBe(0); expect(read).toHaveBeenCalledTimes(2); expect(createBody().password).toBe(password);
+  expect(r.stdout+r.stderr).not.toContain(password);
+  calls=[]; const mismatch=vi.fn().mockResolvedValueOnce(password).mockResolvedValueOnce('different-password');
+  r=await cli(['share',project,'--private','--no-review','--password'],{},true,undefined,mismatch);
+  expect(r.code).toBe(2); expect(calls).toEqual([]); expect(r.stdout+r.stderr).not.toContain(password);
+  read.mockClear();
+  for (const [flags,env] of [[[],{CI:'1',JOPLO_SHARE_PASSWORD:password}],[['--json'],{JOPLO_SHARE_PASSWORD:password}]] as const) {
+    r=await cli(['share',project,'--private','--no-review','--password',...flags],env,true,undefined,read);
+    expect(r.code,r.stdout).toBe(0); expect(createBody().password).toBe(password);
+  }
+  expect(read).not.toHaveBeenCalled();
+});
+test('远端把含引号/反斜线密码放进返回字段时，拒绝写盘与输出；解析失败也脱敏', async () => {
+  await login(); const secret='test-only-"\\-password';
+  responses.set('/api/v1/shares/Abc1234567/finalize',{body:{shareId:'Abc1234567',url:base+'/s/Abc1234567/',version:1,expiresAt:null,portfolio:{workUrl:'https://show.example/work',profileUrl:null,needsUsername:true,setupPath:'/settings/'+secret}}});
+  const r=await cli(['share',project,'--private','--no-review','--password',secret,'--json']);
+  expect(r.code).toBe(1); expect(r.json().error.code).toBe('INVALID_RESPONSE');
+  expect(r.stdout+r.stderr).not.toContain(secret); expect(r.stdout+r.stderr).not.toContain(JSON.stringify(secret).slice(1,-1));
+  await expect(readFile(join(project,'.joplo/cloud.json'),'utf8')).rejects.toThrow();
+});
+
+
+test('密码与协议字段名前缀相同时仍输出合法 JSON 和 passwordProtected 布尔值', async()=>{
+ await login(); responses.set('/api/v1/shares/Abc1234567/finalize',{body:{shareId:'Abc1234567',url:base+'/s/Abc1234567/',version:1,expiresAt:null,passwordProtected:true}});
+ const r=await cli(['share',project,'--private','--no-review','--password','password','--json']);
+ expect(r.code,r.stdout).toBe(0); expect(r.json().data.passwordProtected).toBe(true); expect(r.json().data).not.toHaveProperty('password');
+});
+
+
+test('保留 #37 私密分享对旧 strict review 字段的兼容重试，密码字段不会被丢弃', async()=>{
+ await login(); rejectReview=400; reviewErrorMessage='Unrecognized key: review';
+ for(const flags of [[],['--password',password]]) {
+   calls=[];
+   const r=await cli(['share',project,'--private','--no-review',...flags,'--json']);
+   expect(r.code,r.stdout).toBe(0);
+   const bodies=calls.filter(c=>c.path==='/api/v1/shares').map(c=>c.body);
+   expect(bodies).toHaveLength(2); expect(bodies[0]).toHaveProperty('review'); expect(bodies[1]).not.toHaveProperty('review');
+   if(flags.length) {
+     expect(bodies.map(b=>b.password)).toEqual([password,password]);
+     expect(bodies.map(b=>b.visibility)).toEqual(['private','private']);
+   } else for(const body of bodies) {
+     expect(body).not.toHaveProperty('password');
+     expect(body).not.toHaveProperty('visibility');
+   }
+ }
 });
