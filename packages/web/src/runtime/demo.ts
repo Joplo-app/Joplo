@@ -107,7 +107,7 @@ export type Snapshot = {
   /**
    * 流式输出（D56）：播放（自动或下一步）刚提交第 position 步时，这一步 stream 的文字逐字出现，speed 是当时的速度。
    * 任何别的方式改变状态（跳转、上一步、重置、热更新）都清空它，所以跳到某一步时直接显示全文。
-   * plan（D98）：提交时用提交前的状态算好的出字计划（接着往后写时原有的字不重出；pace: 'voice' 跟着朗读出字）。
+   * plan（D100）：提交时用提交前的状态算好的出字计划（接着往后写时原有的字不重出；pace: 'voice' 跟着朗读出字）。
    * voice：这一步的朗读读到哪了（0–1；没在读这一步、或不知道时为 null），pace: 'voice' 的字优先对齐它，没有时按估算时长。
    */
   streamAt: { position: number; speed: number; plan: StreamPlan[]; voice: () => number | null } | null;
@@ -655,7 +655,7 @@ export class DemoController {
           paced: step.hold !== undefined,
           cameraMoved: step.shots.length > 0 || !!step.directorLayer,
           dotMs: this.activeDotMs(),
-          // 流式输出（D98）：刚提交的这一步用提交时算好的计划；否则按整段估算
+          // 流式输出（D100）：刚提交的这一步用提交时算好的计划；否则按整段估算
           streamMs: Math.max(0, ...(this.snap.streamAt?.position === index + 1 ? this.snap.streamAt.plan : streamPlan(step, null)).map((x) => x.ms)),
         }));
     const elapsed = Math.max(0, Math.round(this.clock.rawTime - this.committedAt));
@@ -1062,7 +1062,7 @@ export class DemoController {
     if (!p || !st) return false;
     try {
       const next = applyStep(p, getScenario(p, sc.id), st);
-      // 出字计划要用提交前的状态（D98）：接着往后写时，原来就有的字不重新出
+      // 出字计划要用提交前的状态（D100）：接着往后写时，原来就有的字不重新出
       const plan = stream ? streamPlan(sc.steps[st.position], st) : [];
       const n = this.snap.notice;
       // 推进后，锚定在元素上的就地提示（禁用原因、未覆盖、越序）已过时，关闭它。

@@ -572,7 +572,7 @@ export function streamsOf(step: Step | undefined): { path: string; value: string
 export type StreamPlan = { path: string; value: string; keep: number; ms: number; pace?: 'voice' };
 
 /**
- * 这一步的流式输出怎么出字（D56，D98）。prev 是这一步之前的状态；不知道时传 null（整段重新出，用于估算）。
+ * 这一步的流式输出怎么出字（D56，D100）。prev 是这一步之前的状态；不知道时传 null（整段重新出，用于估算）。
  * - 接着往后写：新值以原来的值开头时，原有的字直接显示，只有新加的字逐字出现；
  * - pace: 'voice'：新加的字在这一步朗读（narrate ?? say）的估算时长里出完，读到哪写到哪；没有朗读时退回按字数。
  */

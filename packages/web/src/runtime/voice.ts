@@ -19,7 +19,7 @@ export interface Narration {
   resume(): void;
   cancel(): void;
   /**
-   * 读到哪了（D98）：0–1 = 这句话已经读出的比例，读完、出错、被取消时为 1；不知道时为 null（浏览器没给字词边界）。
+   * 读到哪了（D100）：0–1 = 这句话已经读出的比例，读完、出错、被取消时为 1；不知道时为 null（浏览器没给字词边界）。
    * 跟着朗读出字的 stream(…, { pace: 'voice' }) 用它对齐真实声音；没有这个方法或返回 null 时按估算时长出字。
    */
   progress?(): number | null;

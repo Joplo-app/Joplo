@@ -168,7 +168,7 @@ export const toast = Object.assign((text: string): EffectDef => ({ kind: 'effect
  * 流式输出（D56）：和 set 一样把文字写进状态，播放到这一步时绑定它的文字逐字出现（像模型在输出）。
  * 跳到这一步、截图、发布站静态查看时直接显示全文。自动播放会等输出完再进下一步。
  *   .system('助手回复', stream($.ui.reply, '周六晴，推荐去白河营地……'))
- * 接着往后写（D98）：新值以原来的值开头时，原有的字直接显示，只有新加的字逐字出现（语音转写、日志追加）。
+ * 接着往后写（D100）：新值以原来的值开头时，原有的字直接显示，只有新加的字逐字出现（语音转写、日志追加）。
  * opts.pace: 'voice'：新加的字跟着这一步的朗读（narrate / say）出，读到哪写到哪；默认按模型输出的速度。
  *   .system('说', '“日程安排。”', stream($.ui.spoken, '附上新的日程安排。', { pace: 'voice' }), say('日程安排。', { role: 'me' }))
  */
@@ -217,7 +217,7 @@ export const narrate = (text: string): EffectDef => ({ kind: 'effect', type: 'na
  * 角色台词（D74）：这一步里角色亲口说的话，用这个角色的声音读（feature.roles 与层级的 role；没有角色时用旁白的声音）。
  * 写第一人称、像真人说话：.click('can_go', '阿杰回复：我能去', say('我能去！'))。
  * 同一步写了 narrate() 时只读旁白。讲解、过渡、总结请用 narrate()。
- * opts.role（D98）：写明是谁在说（feature.roles 的键）。系统步骤没有“操作的人”，要角色的声音时必须写；
+ * opts.role（D100）：写明是谁在说（feature.roles 的键）。系统步骤没有“操作的人”，要角色的声音时必须写；
  * 操作步骤写了也以它为准：.system('说', '“帮我写一封”', say('帮我写一封', { role: 'me' }))。
  */
 export const say = (text: string, opts: { role?: string } = {}): EffectDef => ({ kind: 'effect', type: 'say', text, ...(opts.role !== undefined ? { role: opts.role } : {}) });

@@ -81,7 +81,7 @@ describe('speakerOf（字幕里的说话人）', () => {
     expect(speakerOf(p, sid, 3)).toBeNull(); // 系统事件
     expect(speakerOf(p, sid, 5)).toMatchObject({ id: 'ajie', name: '阿杰', color: '#1971C2' });
   });
-  it("say(…, { role })：系统步骤也显示写明的那个人（D98，与朗读同一规则）；没写角色的系统步骤仍没有", () => {
+  it("say(…, { role })：系统步骤也显示写明的那个人（D100，与朗读同一规则）；没写角色的系统步骤仍没有", () => {
     const q = build({ sayRole: true });
     expect(speakerOf(q, sid, 6)).toMatchObject({ id: 'ajie', name: '阿杰' });
     expect(spokenSubtitleFor(q.scenarios[sid], 6, null, zh, q)).toMatchObject({ text: '我带帐篷。', source: 'say', speaker: { name: '阿杰' } });

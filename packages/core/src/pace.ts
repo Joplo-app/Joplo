@@ -49,7 +49,7 @@ export function rawReadingMs(...texts: (string | null | undefined)[]): number {
  * 这一步提交之后至少停留多久（毫秒）。
  * text：说明与解说；cameraMoved：这一步镜头有变化（切层或换焦点）；dotMs：本步 active 连线上小点跑一圈的最长时间（没有为 0）。
  */
-export function stepDwell(o: { texts: (string | null | undefined)[]; speed?: number; cameraMoved?: boolean; dotMs?: number; /** 本步流式输出的文字（D56）：等它们出完再加阅读时间。 */ streams?: string[]; /** 已经算好的流式输出时长（1×，见 player 的 streamPlan，D98）：给了就用它，不再按 streams 的字数算。 */ streamMs?: number; /** 作者写了 hold（D92）：节奏由作者掌握，阅读时间不套 3 秒下限（仍按字数）。 */ paced?: boolean }): number {
+export function stepDwell(o: { texts: (string | null | undefined)[]; speed?: number; cameraMoved?: boolean; dotMs?: number; /** 本步流式输出的文字（D56）：等它们出完再加阅读时间。 */ streams?: string[]; /** 已经算好的流式输出时长（1×，见 player 的 streamPlan，D100）：给了就用它，不再按 streams 的字数算。 */ streamMs?: number; /** 作者写了 hold（D92）：节奏由作者掌握，阅读时间不套 3 秒下限（仍按字数）。 */ paced?: boolean }): number {
   const speed = o.speed && o.speed > 0 ? o.speed : 1;
   const read = (o.paced ? rawReadingMs(...o.texts) : readingMs(...o.texts)) / speed;
   const cam = o.cameraMoved ? CAMERA_MS + SETTLE : 0;
@@ -76,7 +76,7 @@ export function voiceMs(text: string | null | undefined, speed = 1): number {
 }
 
 /**
- * 跟着朗读出字（stream pace: 'voice'，D98）：一句话读完大约要多久（1×，不含换气），整段至少 STREAM_MIN。
+ * 跟着朗读出字（stream pace: 'voice'，D100）：一句话读完大约要多久（1×，不含换气），整段至少 STREAM_MIN。
  * 用 voiceMs 的同一套估算，所以没开声音、或声音还没生成时，字出完的时间也和朗读估算一致。
  */
 export function voicePacedMs(line: string | null | undefined): number {
