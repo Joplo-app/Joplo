@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Joplo 插件示例项目：用 joplo-plugin-scene3d 做可交互的 3D 智能家居演示",
   "dependencies": {
-    "joplo-plugin-scene3d": "workspace:*"
+    "joplo-plugin-scene3d": "workspace:*",
+    "@joplo-app/plugin-alda": "workspace:*"
   },
   "devDependencies": {
     "@joplo-app/kit": "workspace:*"

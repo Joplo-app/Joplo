@@ -32,6 +32,7 @@ export function createBoardJa(locale: Locale = 'ja') {
       cloudSetupUsername: "ユーザー名を設定",
       cloudVisibility: "公開範囲",
 
+      mediaUnavailable: "音楽を利用できません · 再生は続きます",
       localReviewMoveHint: "クリックでフィードバック、ドラッグで移動。矢印キーで微調整。",
       localReviewApprovedDraft: "このレビューは別の画面で承認されました。未送信の下書きはコピーできるよう保持されています。",
       localReviewTitle: "フィードバックとレビュー",

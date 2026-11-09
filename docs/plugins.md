@@ -1,6 +1,6 @@
 # Joplo 插件架构：纯粹的引擎 + 可插拔的内容形态（D87）
 
-> 状态：阶段 0 与阶段 1-A 已实现：v1 叶子组件兼容；v2 编译钩子、效果快照、元素特性与 React/容器运行时；第一方 `plugins/diagram` 默认启用。阶段 1-A 的接口与数据流见第 10 节。
+> 状态：阶段 0、阶段 1-A 与阶段 1-B 已实现：v1 叶子组件兼容；v2 编译钩子、效果快照、元素特性与 React/容器运行时；第一方 `plugins/diagram` 默认启用。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节。
 > 目标形态：Joplo 只是**构建与调度引擎**，负责把不同形态的内容串成一个可播放、可评审、可发布的作品；
 > UI 组件、Diagram、Canvas、3D、Alda BGM、朗读供应商、主题……都是插件。
 
@@ -181,3 +181,57 @@ diagram 的独立包交付已完成；阶段 1 的其他扩展点、其他第一
 - 图表缓存、状态机快照按合格舞台 id 寻址，元素 id 仍只要求在同一舞台唯一。裁剪节点后会同步裁剪结构/布局副本、场景和步骤快照；保留可见元素原有坐标，不调用插件代码重新布局。
 - feature-diff 比较 scenario.ext 和 step.ext。对 b817425 的真实旧公开 IR，先严格适配裸名及 layout，再走公开数据检查；不丢弃 note/source 等私有字段来伪装兼容。适配用于历史对比，不是浏览器补算旧 trace 的回退。
 - 验收必须覆盖公开包的 tsconfig.build、七包构建、tarball 和不含工作区开发依赖的安装；不能仅凭 pnpm typecheck / pnpm test 宣布发布正确。
+
+## 11. 阶段 1-B：媒体轨道与本机资源（已实现）
+
+第一方 `@joplo-app/plugin-alda` 与其他七包同版本，**不是标准默认插件**。作者安装后在 `config.plugins` 写 `alda(scores)`；`scores` 是项目 `music.ts` 中的命名文本字符串，步骤通过 `music.play(name, { fadeMs, loop, volume })` / `music.stop({ fadeMs })` 使用。技能正文归插件 `src/guide.ts`，在启用它的项目中读取 `joplo skill alda`。`examples/smart-home-3d` 的三个场景各自第一步播放，`done` 所在步骤淡出。
+
+### Node 本机能力
+
+- `PluginDef.local` 指向 Node 入口；默认导出 `PluginLocal`：`compilers[name] = { version, mime, compile(input, { directory, maxBytes }) }`。返回 `Uint8Array`，临时文件只能写入宿主提供的工作目录。
+- effect 钩子通过 `ctx.resource({ compiler, input })` 登记请求并取得不透明资源 id，再由原有 effect 宿主物化、校验返回的 `media` 命令。请求表与 local 路径只在 `CompileOutcome.resources`，不进入 IR，也不使用公开 ext 槽位传递源码。
+- `LocalResources` 将本机入口及依赖打成 Node 模块，放在项目 `.joplo/resources/`；独立子进程执行编译，硬超时 30 秒，输出上限 8 MiB。Alda 供应商另在 25 秒停止自身命令，失败提供可读信息。macOS/Linux 超时结束整个进程组；临时目录始终清理。
+- 缓存键为 SHA-256(plugin id、compiler id、含 version 声明的编译器代码、精确输入文本)。代码变化也失效，不对文本空白做归一化。成功产物原子写入缓存；内存请求合并与磁盘租约分别覆盖同进程和跨进程并发，已有产物不再编译。失败不持久缓存，修复工具或源码后可重试。
+- 看板首次播放需要资源时，向带 token 的 `POST /__joplo/p/:id/resources/:resource` 请求；只可请求当前已编译项目登记的资源，不能向接口提交任意文本或本机入口。`build/share` 先裁剪范围，再生成该范围实际引用的资源。
+- 缺工具、语法错误、超时、产物过大分别通过 `LOCAL_RESOURCE_FAILED` / `LOCAL_RESOURCE_TIMEOUT` / `LOCAL_RESOURCE_TOO_LARGE` warning 降级；`at` 锚定作者 play 步骤的源文件:行:列，供应商信息可附配乐文本中的行号。看板通过独立的 joplo:diagnostics 事件更新 warning 横幅，不替换 IR、不重置时钟；成功重试清除对应 warning，旧编译版本的异步结果不覆盖新版本。构建把 warning 放进结果，项目其余内容继续播放。
+
+### 通用媒体契约与时钟
+
+effect 返回可选的 `media` 有序命令列表：
+
+```ts
+{ track: 'bgm', action: 'play', resource, volume: .2, loop: true, fadeMs: 800 }
+{ track: 'bgm', action: 'stop', fadeMs: 1000 }
+```
+
+`track` 是插件内的小写 id；宿主补命名空间，不允许插件引用别家登记的资源。音量范围 0–1，淡入淡出范围 0–30000ms。宿主在现有 `PluginCompiler.frames` 回放中累计完整媒体状态，不把命令、作者效果或本机代码交给播放器。
+
+每个场景初始静音。第一步媒体位置从 0 开始；后续步骤锚点按上一步的 `hold` 推进，没有显式 hold 时为 3000ms。每步的 `offsetMs` 固定在 IR 中，多语言不会重算；步内按 DemoController 的引擎时钟与速度推进，暂停冻结，跳入/回放按该步锚点对齐。朗读或交互可能让某步停留更久，因此切步会重新对齐，而不是把不确定的等待时间累加进后续位置。需要精确乐句节奏时显式写 `hold`。同步音频调度以 80ms 为重对齐阈值。
+
+浏览器插件可提供 `runtime.media({ audio, destination, bytes })`，返回 `update({ offsetMs, playing, speed, loop, volume })` / `destroy()`；只负责解析产物和发声，不执行编译期语义。宿主掌管用户手势门槛、现有声音开关、暂停/继续、场景卸载、淡入淡出与旁白期间 25% ducking。异步加载后若场景已离开立即销毁驱动。媒体 hook 仅挂在交互播放器，静态视图、缩略图、截图不挂载声音。
+
+Alda 的 MIDI 解析、节奏/音高、近似 GM 乐器音色与 WebAudio 振荡器调度全部归插件。钢琴使用敲击包络、自然衰减和逐渐变暗的泛音；风琴持续、弦乐/铜管慢起音。跳入半个音符时按谱面时间取包络和亮度，不重新敲击。支持 SMF 0/1、PPQN、tempo、running status、program、sustain 与末尾休止符；无音色库下载。单音保留可听增益，和弦在插件混音总线压缩留余量；示例以谱面 vol 70、轨道 volume .45 起步，最终输出同时验证旁白期间与间隙，避免谱面/合成器/轨道/ducking 多层衰减到听不见。内核和浏览器媒体宿主没有供应商分支；第二个 fake WAV 插件覆盖相同路径。
+
+### 新字段的端到端流向
+
+| 字段 / 槽位 | 写入点 → 存储 | 读取点 → 消费者 |
+|---|---|---|
+| `PluginDef.local` | 插件 author 入口声明 → 仅 Node 的 `CompileOutcome.resources.host` | `LocalResources` → Node 编译子进程；不进入 IR/发布站 |
+| `ctx.resource` 请求的 `id/plugin/compiler/input/source` | effect 回调 → 宿主物化请求 → `CompileOptions.onResource` → Node 请求表 | 看板资源端点 / `inlineResources` → 缓存和供应商；源码、source 与本机入口不发布 |
+| effect 输出 `media` 命令 | 原有 effect 宿主物化/校验 → `PluginCompiler.mediaCommands` 临时表 | 原有 frames 回放 → 完整快照；命令本身不存 IR |
+| `scenario.media` | frames 写第 0 步空快照 → IR（无媒体的旧项目省略） | `mediaAt` / `useMedia` → 初始静音 |
+| `step.media[plugin:track]` | frames 累计与降级 → IR | `mediaAt`、`useMedia` / `MediaEngine` → 浏览器插件驱动 |
+| 快照 `plugin/resource` | effect 所属插件与登记资源 → 命名空间快照 | 运行时注册表选媒体驱动、`mediaAssets` 选字节；范围裁剪据 resource 选产物 |
+| 快照 `offsetMs/volume/loop/fadeInMs/stopAfterMs` | play/stop 与前一步 hold → frames | 引擎步内时钟推进 offset；宿主增益包络和 ducking（跨步淡出同步缩放 volume 与剩余 stopAfterMs）；插件循环、定位与倍速合成 |
+| `project.mediaAssets[id]` | 看板写本机资源端点 URL；build 在 scope 后写 `data:<mime>;base64,...` → IR | 媒体宿主取 bytes；发布站直接解码内联数据，不 fetch，不需要网络或作者机器 |
+| `runtime.media` | 插件 browser 入口 → 现有运行时注册表 / 发布内联脚本 | 媒体宿主 factory/update/destroy；与组件注册复用同一个插件运行时机制 |
+
+`scopeProject` 同步裁剪 mediaAssets；翻译仅处理既有文本声明，媒体字段不参与翻译。公开数据只有播放快照、MIDI/其他编译产物与运行时代码，**不公开配乐源文本**。项目中的文本仍由 Git 管理，`.joplo` 缓存与二进制不提交。
+
+### 验证与已知边界
+
+- core `media.test.ts`：fake 插件效果降级、纯快照跳入、范围裁剪、翻译不变性与供应商边界守护。
+- server `local-resources.test.ts` / `media-build.test.ts`：缓存/版本/精确输入、同进程及跨进程并发、四类失败、本机按需 API 与诊断、真实 fake WAV 的范围构建、内联与源码隔离。
+- web `media.test.ts` / `midi.test.ts` / `voice.test.ts`：手势门槛、生命周期、旁白压低、停播淡出、MIDI 节奏音高/休止、引擎时钟、暂停/倍速及 <100ms 步边界验证。
+- 发布集合：kit → plugin-diagram → plugin-alda → core → web → server → cli → joplo；八包 smoke 另外直接载入可选插件 author/local/runtime 出口。Alda 不成为默认依赖或默认配置。
+- 已知边界：视频导出暂不混入媒体轨道；SMF format 2 / SMPTE 不支持，GM 乐器只是近似振荡器音色。Alda 本机编译在发布后不可补做；漏配工具时修复后重新 build/share。

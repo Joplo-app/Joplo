@@ -300,18 +300,25 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
 
   /**
    * 插件运行时由看板的 Vite 服务以 /@fs/ 提供（D86）。dist 形态的 fs.allow 只有 @joplo-app/web：
-   * 把项目目录（npm 安装的插件与它的依赖在 node_modules 里）和插件包目录加进去。source 形态默认允许整个工作区。
+   * 把项目目录（npm 安装的插件与它的依赖在 node_modules 里）和插件包目录加进去。source 形态也可能打开工作区外的项目，同样补齐其显式启用的插件目录。
    */
   function allowPluginFiles(projectDir: string, runtimes: string[]) {
-    if (web.mode !== 'dist' || !server) return;
+    if (!server) return;
     const allow = server.config.server.fs.allow as string[];
     for (const dir of [projectDir, ...runtimes.map(packageRootOf)]) if (!allow.some((a) => dir === a || dir.startsWith(a + path.sep))) allow.push(dir);
   }
+
+  const localResources = new Map<string, NonNullable<Awaited<ReturnType<typeof compileProject>>['resources']>>();
+
+  const resourceWarnings = new Map<string, Map<string, Diagnostic>>();
 
   async function recompile(slot: ProjectSlot) {
     const loader = slot.loader!;
     invalidateProjectModules(loader, slot.dir);
     const out = await compileProject(loader, slot.dir, 'dev');
+    if (out.resources) localResources.set(slot.id, out.resources);
+    resourceWarnings.set(slot.id, new Map());
+    if (out.project && out.resources?.requests.length) out.project.mediaAssets = Object.fromEntries(out.resources.requests.map(r => [r.id, `/__joplo/p/${encodeURIComponent(slot.id)}/resources/${encodeURIComponent(r.id)}`]));
     const prev = slot.payload;
     const plugins = Object.keys(out.pluginRuntimes).length ? out.pluginRuntimes : null;
     if (plugins) allowPluginFiles(slot.dir, Object.values(plugins));
@@ -533,6 +540,24 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       req.url = `/__open-in-editor?file=${encodeURIComponent(`${file}:${m[2]}:${m[3] ?? 1}`)}`;
       req.method = 'GET';
       return 'next' as const;
+    }
+    if (rest.startsWith('resources/') && method === 'POST') {
+      if (!guardWrite(req, res)) return;
+      const slot = await ensure(id), local = localResources.get(id);
+      const request = local?.requests.find(r => r.id === rest.slice('resources/'.length));
+      if (!request || !local) return sendJson(res, 404, { error: 'Unknown resource' });
+      const version = slot.payload.version;
+      const result = await local.host.ensure(request);
+      if (slot.payload.version === version) {
+        const warnings = resourceWarnings.get(id)!;
+        if (result.diagnostic) warnings.set(request.id, result.diagnostic); else warnings.delete(request.id);
+        const diagnostics = [...slot.payload.diagnostics.filter(d => !d.code.startsWith('LOCAL_RESOURCE_')), ...warnings.values()];
+        if (JSON.stringify(diagnostics) !== JSON.stringify(slot.payload.diagnostics)) {
+          slot.payload = { ...slot.payload, diagnostics };
+          server?.ws.send({ type: 'custom', event: 'joplo:diagnostics', data: { projectId: id, version, diagnostics } });
+        }
+      }
+      return sendJson(res, 200, result);
     }
     if (rest === 'voice' || rest.startsWith('voice/')) {
       const slot = await ensure(id);

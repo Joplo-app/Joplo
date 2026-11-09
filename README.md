@@ -21,6 +21,8 @@ Author pages and flows in TSX, review them in the local **Board**, then build a 
 
 ![Joplo Board](docs/screenshots/board-play-initial.png)
 
+Optional background music: install `@joplo-app/plugin-alda` at your Joplo version, enable `alda(scores)` in `config.plugins`, then read `npx joplo skill alda` in the project. Scores stay as text; build/share includes offline MIDI playback. See [media and local plugin resources](docs/plugins.md#11-阶段-1-b媒体轨道与本机资源已实现).
+
 ## Quick start
 
 Requires Node.js 22 or later and npm.

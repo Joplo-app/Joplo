@@ -1,7 +1,7 @@
 import { type Text } from '../i18n/messages';
 /** 看板的数据钩子：项目列表、某个项目的 IR（首次载入 + 热更新，只应用版本号更大的结果）。 */
 import { useCallback, useEffect, useState } from 'react';
-import { fetchIR, fetchProjects, subscribeIR, subscribeProjects, type DevPayload, type ProjectSummary } from '../runtime/dev-client';
+import { fetchIR, fetchProjects, subscribeIR, subscribeProjects, subscribeDiagnostics, withDiagnostics, type DevPayload, type ProjectSummary } from '../runtime/dev-client';
 
 export function useProjects(): { list: ProjectSummary[] | null; error: Text | null; refresh: () => void } {
   const [list, setList] = useState<ProjectSummary[] | null>(null);
@@ -37,6 +37,9 @@ export function useProjectIR(projectId: string | null): IRState {
       setS((prev) => ({ ...prev, payload: p, error: null }));
       (window as unknown as { __JOPLO_VERSION__?: number }).__JOPLO_VERSION__ = p.version;
     };
+    const offDiagnostics = subscribeDiagnostics(projectId, update => {
+      if (alive) setS(prev => ({ ...prev, payload: withDiagnostics(prev.payload, update) }));
+    });
     const off = subscribeIR(projectId, apply, (live) => alive && setS((prev) => ({ ...prev, live })));
     void fetchIR(projectId).then((r) => {
       if (!alive) return;
@@ -46,6 +49,7 @@ export function useProjectIR(projectId: string | null): IRState {
     return () => {
       alive = false;
       off();
+      offDiagnostics();
     };
   }, [projectId]);
   return s;

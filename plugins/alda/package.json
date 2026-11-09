@@ -1,0 +1,52 @@
+{
+  "name": "@joplo-app/plugin-alda",
+  "version": "0.2.17",
+  "type": "module",
+  "joplo": {
+    "api": 2
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./local": "./src/local.ts",
+    "./runtime": "./src/runtime.ts",
+    "./guide": "./src/guide.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@joplo-app/kit": "workspace:*"
+  },
+  "description": "Joplo optional text-authored background music and offline MIDI synthesis",
+  "license": "PolyForm-Shield-1.0.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs",
+    "prepublishOnly": "node ../../scripts/build-package.mjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./local": {
+        "types": "./dist/local.d.ts",
+        "default": "./dist/local.js"
+      },
+      "./runtime": {
+        "types": "./dist/runtime.d.ts",
+        "default": "./dist/runtime.js"
+      },
+      "./guide": {
+        "types": "./dist/guide.d.ts",
+        "default": "./dist/guide.js"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

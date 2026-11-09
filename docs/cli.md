@@ -190,6 +190,8 @@ Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结�
 
 `guide` 与 `skill authoring` 完全相同。读取主题不加载服务端，也不执行作者项目，输出无颜色文本。
 
+`plugins` 主题也说明通用本机资源编译器与媒体轨道。可选 `@joplo-app/plugin-alda` 需要先安装并在项目 `config.plugins` 中显式启用，然后在该项目目录运行 `npx joplo skill alda`；不要把项目路径作为读取主题的第二参数（该参数只供 install 使用）。技能说明配乐文本、步骤 play/stop、缓存、warning 恢复和离线验证。`check` 不执行本机编译器；看板首次需要声音时生成，`build/share` 在范围裁剪后生成，失败 warning 保留在看板/构建结果，其他演示内容继续可用。
+
 ### skill install
 
 写入两个技能 `.claude/skills/joplo/SKILL.md` 与 `.claude/skills/joplo-feedback/SKILL.md`，内容与仓库根目录的官方技能 `skills/` 逐字相同（同一份模板生成，D64）。`joplo` 负责创作演示和启动评审交接；`joplo-feedback` 负责本地／Share 的接收、及时回执、恢复以及按授权修改源码。完整使用指南和最佳实践通过 `npx joplo skill review` 按需读取，包括后台进程不会自动唤醒 Agent 的边界；不能挂起监听后结束响应却声称仍实时接收。AGENTS.md 已存在时更新 Joplo 托管段；不存在时仅在显式传 `--agents-md` 后创建。

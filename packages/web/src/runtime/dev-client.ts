@@ -104,6 +104,18 @@ export function subscribeIR(projectId: string, cb: (p: DevPayload) => void, onCo
   };
 }
 
+/** Diagnostic-only updates must not replace IR or interrupt playback. */
+export type DiagnosticsUpdate = { projectId: string; version: number; diagnostics: Diagnostic[] };
+export function withDiagnostics(payload: DevPayload | null, update: DiagnosticsUpdate): DevPayload | null {
+  return payload?.version === update.version ? { ...payload, diagnostics: update.diagnostics } : payload;
+}
+export function subscribeDiagnostics(projectId: string, cb: (update: DiagnosticsUpdate) => void): () => void {
+  const h = hot(); if (!h) return () => undefined;
+  const handler = (update: DiagnosticsUpdate) => { if (update.projectId === projectId) cb(update); };
+  h.on('joplo:diagnostics', handler);
+  return () => h.off('joplo:diagnostics', handler);
+}
+
 /** 订阅项目列表变化（再次 joplo dev 注册、编译状态变化、移除）。 */
 export function subscribeProjects(cb: (list: ProjectSummary[]) => void): () => void {
   const h = hot();

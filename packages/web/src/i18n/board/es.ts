@@ -32,6 +32,7 @@ export function createBoardEs(locale: Locale = 'es') {
       cloudSetupUsername: "Configurar nombre de usuario",
       cloudVisibility: "Visibilidad",
 
+      mediaUnavailable: "Música no disponible · La reproducción continúa",
       localReviewMoveHint: "Haz clic para comentar; arrastra para mover. Ajusta la posición con las flechas.",
       localReviewApprovedDraft: "Esta revisión se confirmó en otra página. El borrador sin enviar se conserva para que puedas copiarlo.",
       localReviewTitle: "Comentarios y revisión",

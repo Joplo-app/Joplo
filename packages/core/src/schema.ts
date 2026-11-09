@@ -159,7 +159,13 @@ export const Cue = z.strictObject({ kind: z.enum(CUE_KINDS), targets: z.array(z.
 export const CALLOUT_SIDES = ['top', 'right', 'bottom', 'left'] as const;
 export const Callout = z.strictObject({ target: z.string().min(1), text: z.string().min(1), side: z.enum(CALLOUT_SIDES).optional() });
 
+export const MediaSnapshot = z.record(z.string(), z.strictObject({
+  plugin: z.string().min(1), resource: z.string().min(1), offsetMs: z.number().nonnegative(),
+  volume: z.number().min(0).max(1), loop: z.boolean(), fadeInMs: z.number().nonnegative(), stopAfterMs: z.number().nonnegative().optional(),
+}));
+
 export const Step = z.strictObject({
+  media: MediaSnapshot.optional(),
   /** 历史 IR 兼容输入；当前编译器不生成。 */
   traces: z.array(LegacyTraceSchema).optional(),
   id: Qid,
@@ -206,6 +212,7 @@ export const Step = z.strictObject({
 });
 
 export const Scenario = z.strictObject({
+  media: MediaSnapshot.optional(),
   ext: z.record(z.string(), Json).optional(),
   id: Qid,
   optionId: Qid,
@@ -363,6 +370,7 @@ export const Project = z.strictObject({
   autoFocus: z.boolean().optional(),
   voiceConfig: VoiceConfig.optional(),
   voiceIndex: VoiceIndex.optional(),
+  mediaAssets: z.record(z.string(), z.string()).optional(),
   /** 作者内容多语言（D84）：只有 config 写了 locales 才有。messages 只含非默认语言、这份 IR 用得到的译文；stale 只在 dev IR。 */
   i18n: ContentI18nSchema.optional(),
   /** 启用的插件（D86）：插件 id → 名称、版本与组件声明（可操作、父组件）。运行时代码不在 IR 里，由看板 / 发布站另外载入。 */

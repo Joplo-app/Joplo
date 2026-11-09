@@ -1,3 +1,4 @@
+import { inlineResources } from './local-resources.ts';
 import sharedModules from '@joplo-app/web/shared-modules.json' with { type: 'json' };
 import { standardPlugins } from '@joplo-app/core/node';
 /**
@@ -138,6 +139,11 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     const r = scopeProject(project, resolveScope(project, opts.scope, mode), mode);
     project = r.project;
     scope = r.info;
+  }
+  if (compiled.resources) {
+    const resources = await inlineResources(project, compiled.resources.requests, compiled.resources.host);
+    if (Object.keys(resources.assets).length) project = { ...project, mediaAssets: resources.assets };
+    compiled.diagnostics.push(...resources.diagnostics);
   }
   const inline: { project: Record<string, unknown>; home: string | null; scoped?: true } = publishPayload(project, compiled.home);
   if (scope) inline.scoped = true;

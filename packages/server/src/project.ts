@@ -4,6 +4,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import type { ResourceRequest } from '@joplo-app/kit/plugin';
+import { LocalResources } from './local-resources.ts';
 import { isPluginDef } from '@joplo-app/kit/plugin';
 import { compile, type CompileMode, type Diagnostic, type Project } from '@joplo-app/core';
 import { discoverFiles, elkLayout, loadAuthoring, enabledPlugins, standardPlugins } from '@joplo-app/core/node';
@@ -18,6 +20,7 @@ export type CompileOutcome = {
   home: string | null;
   /** 启用的插件（D86）：插件 id → 运行时入口的绝对路径（看板按它载入，build 按它打包）。 */
   pluginRuntimes: Record<string, string>;
+  resources?: { requests: ResourceRequest[]; host: LocalResources };
 };
 
 /** config({ plugins }) 里每个插件的运行时入口（编译器另外校验清单；这里只取存在的文件）。 */
@@ -82,10 +85,13 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
   const pluginRuntimes = pluginRuntimesOf(loaded.authoring.config.plugins);
   if (diagnostics.some((d) => d.severity === 'error')) return { project: null, diagnostics, home, pluginRuntimes };
   // 图表布局在编译期由 ELK 算好写进 IR（D69）：看板与发布站只渲染
-  const r = compile(loaded.authoring, mode, { layout: elkLayout });
+  const requests: ResourceRequest[] = [];
+  const entries = Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).filter(p => p.local).map(p => [p.id, p.local!]));
+  const resources = { requests, host: new LocalResources(projectDir, entries) };
+  const r = compile(loaded.authoring, mode, { layout: elkLayout, onResource: request => requests.push(request) });
   const missing = Object.keys(r.project?.plugins ?? {}).filter((id) => !pluginRuntimes[id] && !standardPlugins.some(p => p.id === id));
   const extra: Diagnostic[] = missing.map((id) => ({ severity: 'error', code: 'PLUGIN_RUNTIME_MISSING', message: `Plugin ${id}: runtime file not found; reinstall the plugin package`, source: 'reference', at: `${loaded.authoring!.config.file}:1:1` }));
-  return { project: extra.length ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes };
+  return { project: extra.length ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes, resources };
 }
 
 /** 让项目源文件在下次载入时重新转译、重新求值。 */

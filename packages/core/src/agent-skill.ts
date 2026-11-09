@@ -22,7 +22,7 @@ export const SKILL_TOPICS = [
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
   { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
   { name: 'publish', description: 'pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)' },
-  { name: 'plugins', description: 'Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks' },
+  { name: 'plugins', description: 'Media tracks, local text-to-resource compilers, cached offline publishing; Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks' },
 ] as const;
 
 /** 心智模型：所有入口最先读到的几句话。 */
@@ -72,6 +72,7 @@ export const PITFALLS = [
   ['Label illustrative numbers on screen and keep them apart from sourced facts; bars start at zero and lengths stay proportional', 'content'],
   ['HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it', 'check'],
   ['Judge a scenario from its storyboard, not from check alone: npx joplo render --scenario-id <id> --sheet --out board.png shows every step with its caption and narration in one image', 'content'],
+  ['For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings', 'plugins'],
   ['Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components', 'plugins'],
 ] as const satisfies readonly (readonly [string, string])[];
 

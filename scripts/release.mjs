@@ -22,8 +22,8 @@ import zlib from 'node:zlib';
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
-export const PACKAGES = ['kit', 'plugin-diagram', 'core', 'web', 'server', 'cli', 'joplo'];
-export const packageDir = (name, root = REPO) => path.join(root, name === 'plugin-diagram' ? 'plugins/diagram' : `packages/${name}`);
+export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'core', 'web', 'server', 'cli', 'joplo'];
+export const packageDir = (name, root = REPO) => path.join(root, name.startsWith('plugin-') ? `plugins/${name.slice(7)}` : `packages/${name}`);
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const LICENSE_PLACEHOLDER = 'UNLICENSED';
 
@@ -60,9 +60,11 @@ function version(root, v) {
     fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
   }
   // Runtime version metadata must not pull the workspace manifest into browser bundles.
-  const pluginVersion = path.join(packageDir('plugin-diagram', root), 'src/version.json');
+  for (const name of ['plugin-diagram', 'plugin-alda']) {
+  const pluginVersion = path.join(packageDir(name, root), 'src/version.json');
   fs.mkdirSync(path.dirname(pluginVersion), { recursive: true });
   fs.writeFileSync(pluginVersion, JSON.stringify({ version: v }, null, 2) + '\n');
+  }
   log(`✓ ${pkgs.map(([, p]) => p.name).join('、')} → ${v}`);
   // 官方 Agent 技能带版本标记（D64）：随版本一起重新生成，scripts/test/skills.test.ts 保证与 skill install 逐字一致
   const skills = spawnSync(process.execPath, ['--import', 'tsx', path.join(REPO, 'scripts/build-skills.ts'), '--root', root], { cwd: REPO, encoding: 'utf8' });
@@ -154,7 +156,7 @@ function pack() {
   const v = [...versions][0];
 
   log('— 构建公开包（含第一方插件，按依赖顺序）');
-  run('pnpm', ['-r', '--filter', './packages/*', '--filter', './plugins/diagram', 'run', 'build'], { cwd: REPO });
+  run('pnpm', ['-r', '--filter', './packages/*', '--filter', './plugins/*', 'run', 'build'], { cwd: REPO });
 
   log('— 打包到 release/');
   fs.rmSync(RELEASE, { recursive: true, force: true });
@@ -320,18 +322,27 @@ async function smoke() {
     fs.writeFileSync(pageFile, addSmokeClassName(fs.readFileSync(pageFile, 'utf8')));
 
     // 3. npm install：registry 上还没有这些版本，改用 tarball（版本号已在上面断言）
-    pkg.devDependencies = { joplo: tgz.joplo, '@joplo-app/kit': tgz['@joplo-app/kit'] };
+    pkg.devDependencies = { joplo: tgz.joplo, '@joplo-app/kit': tgz['@joplo-app/kit'], '@joplo-app/plugin-alda': tgz['@joplo-app/plugin-alda'] };
     pkg.overrides = overrides;
     fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
     sh(npm, ['install', ...npmFlags], project);
     const joplo = path.join(project, 'node_modules/.bin/joplo');
     assert(fs.realpathSync(joplo) === fs.realpathSync(path.join(project, 'node_modules/joplo/bin/joplo.cjs')), '项目的 .bin/joplo 应指向 joplo 入口包');
-    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/server', '@joplo-app/web']) {
+    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/server', '@joplo-app/web']) {
       const p = path.join(project, 'node_modules', n);
       assert(fs.existsSync(p) && !fs.lstatSync(p).isSymbolicLink(), `${n} 应从 tarball 安装（不是链接）`);
       assert(readJson(path.join(p, 'package.json')).version === v, `${n} 版本应为 ${v}`);
     }
     assert(!fs.existsSync(path.join(project, 'node_modules/playwright')), 'playwright 不应被默认安装');
+
+    // Optional plugin is installed explicitly; its author/local/runtime exports must work without workspace tools.
+    const probe = sh(process.execPath, ['--input-type=module', '-e', `
+      import alda, { music } from '@joplo-app/plugin-alda';
+      import local from '@joplo-app/plugin-alda/local';
+      import runtime from '@joplo-app/plugin-alda/runtime';
+      const p = alda({ theme: 'piano: c4' });
+      if (p.id !== 'alda' || !p.local.endsWith('/local.js') || !p.skill.includes('music.play') || !local.compilers.midi.version || !runtime.media || music.play('theme').plugin !== 'alda') process.exit(1);
+    `], project);
 
     // 4. check
     const check = sh(joplo, ['check'], project);

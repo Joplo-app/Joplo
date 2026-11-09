@@ -79,9 +79,7 @@ export function pluginSkillTopic(p: PluginSkillSource): string {
   return [
     `# Joplo plugin ${p.id}: ${p.title}${p.version ? ` ${p.version}` : ''}`,
     ...(p.description ? ['', p.description] : []),
-    '',
-    'Components (import the JSX markers from the package; element types below):',
-    ...comps,
+    ...(comps.length ? ['', 'Components (import the JSX markers from the package; element types below):', ...comps] : []),
     ...(p.skill?.trim() ? ['', p.skill.trim()] : []),
     '',
     'General plugin rules: npx joplo skill plugins',
@@ -261,7 +259,18 @@ Declare display text in data.node.text / data.step.text as segment paths (for ex
 
 Keep each stage's records under its qualified scene identity so scope rules can project them safely. Element ids are local to a stage. frame receives scenes with their qualified ids; use ctx.frame.sceneId in the renderer to select the matching snapshot. Initial snapshots participate in feature diff as well as step snapshots. Historical public IR is strictly adapted for comparison; private notes and unknown layout fields are still rejected.
 
-When maintaining the Joplo repository, run pnpm build:packages and test the seven tarballs in a clean install. Workspace typecheck alone misses publishing rootDir and dependency failures. @joplo-app/plugin-diagram is a published package at the same version as Joplo, with dist JavaScript and declarations, and is included in the release package list. Core imports its public subpaths; kit keeps compatible author markers without depending on the plugin. Browser rendering helpers come from @joplo-app/kit/renderer and renderer-style; Node frame hooks use the injected resolveProps service instead of importing core internals. The React bridge reads the web package's shipped shared-modules.json and intercepts module resolution before installed packages, so plugins use the host instance whether or not they install their own React. Production build does not require React as a web development dependency. Use frame.animate=false for a deterministic final frame and ctx.hold() while assets load.
+When maintaining the Joplo repository, run pnpm build:packages and test the eight tarballs in a clean install. Workspace typecheck alone misses publishing rootDir and dependency failures. @joplo-app/plugin-diagram is a published package at the same version as Joplo, with dist JavaScript and declarations, and is included in the release package list. Core imports its public subpaths; kit keeps compatible author markers without depending on the plugin. Browser rendering helpers come from @joplo-app/kit/renderer and renderer-style; Node frame hooks use the injected resolveProps service instead of importing core internals. The React bridge reads the web package's shipped shared-modules.json and intercepts module resolution before installed packages, so plugins use the host instance whether or not they install their own React. Production build does not require React as a web development dependency. Use frame.animate=false for a deterministic final frame and ctx.hold() while assets load.
+
+## Local resources and media tracks (API v2)
+A plugin can declare local: new URL('./local.js', import.meta.url). This Node-only module exports { compilers: { name: { version, mime, compile(input, { directory, maxBytes }) } } }; compile returns Uint8Array. Use only the supplied temporary directory for intermediates and return artifact bytes. Runtime imports must never import this module or the author entry.
+
+In compile.effect, call ctx.resource({ compiler: 'name', input: 'source text' }) and return media: [{ track: 'bgm', action: 'play', resource, volume: .2, loop: true, fadeMs: 800 }]. Stop with { track: 'bgm', action: 'stop', fadeMs: 1000 }. Track names are plugin-local lowercase ids. The host lowers ordered commands into step.media snapshots; inputs and local entry paths stay outside IR. The browser runtime's optional media({ audio, destination, bytes }) creates a driver with update({ offsetMs, playing, speed, loop, volume }) and destroy(). Only synthesize/render bytes; never execute effect compilers or advance business state in the browser.
+
+Step anchors advance by the previous step's hold, or 3000ms when absent. Within a step, the engine clock advances at playback speed and freezes on pause; jumps and replay re-anchor to the same snapshot. Use explicit hold for musical pacing. Waiting for narration can extend a step, but cannot change the next step's fixed audio anchor. Content translations do not change the music timeline. Each scenario starts silent; write play on its first step and stop at its ending.
+
+The board compiles lazily on playback demand. Build/share first applies scope, then compiles referenced resources and inlines data URLs for offline file:// playback. Cache keys include compiler version/code and exact input; concurrent requests share work. Missing tools, compile errors, timeout (30 seconds), and output over 8 MiB become located warning diagnostics, not broken demos. Fix the reported cause and replay/rebuild; a published site cannot invoke local compilers. No source text, local paths, skill or local entry belongs in public slots.
+
+Sound shares the existing switch, requires a trusted viewer gesture, pauses with playback and ducks to 25% during narration. Screenshots/static views remain silent. Video export does not mix these tracks yet. For the optional first-party music package, install @joplo-app/plugin-alda at the Joplo version, enable alda(scores), then read npx joplo skill alda in that project.
 
 ## Use a plugin
 1. Install it next to @joplo-app/kit: npm install joplo-plugin-scene3d (or pnpm add / yarn add).
@@ -523,6 +532,7 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
 - Put long notes in a separate explanation layer, such as why: layer('Design rationale', <Why/>), then switch to it with a shot.
 
 ## Shots and the director
+- Background music should leave room for the story: use a sparse, quiet loop from an explicitly enabled media plugin, start it on the first step and fade it out alongside done(). Keep scores as text, avoid committing compiled audio/cache, and verify the published file:// site after a viewer click. Score, synthesizer, track and ducking gains multiply: calibrate the final output during and between narration, not just an upstream oscillator, and avoid turning every layer down. The sound switch controls both narration and music; see plugins and the enabled plugin's skill.
 - Write shot(...ids) in a step. Targets can be components, cards, buttons, or plugin elements. Framing keeps context: see "Frame with shot" in diagram.
 - Each id resolves in the layer containing it. The same id can affect multiple layers; the first shot determines the director layer.
 - Example: .click('app_send', shot('msg_user'), shot('app', 'biz')) follows the client view first, then sets a backend shot.
@@ -793,6 +803,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 ## Common codes → fixes
 - UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
 - UNKNOWN_PLUGIN / PLUGIN_PARENT / PLUGIN_INVALID / PLUGIN_DUPLICATE / PLUGIN_RUNTIME_MISSING: plugin components need their package in config({ plugins: [...] }) once, written inside the parent named in the message; a missing runtime means reinstall the package (npx joplo skill plugins).
+- LOCAL_RESOURCE_FAILED / LOCAL_RESOURCE_TIMEOUT / LOCAL_RESOURCE_TOO_LARGE: an optional local resource could not compile. Playback continues without it; the board shows the source location and reason without resetting the timeline. Repair the native tool/input and retry playback or build; successful retry clears the warning. check does not execute native tools, so verify actual playback/build too (plugins).
 - PLUGIN_DATA_INVALID: plugin output failed its JSON/schema contract, or the complete published IR exceeds depth 100 after shared references are expanded (root depth 0, including primitive leaves). For depth errors, flatten the cache or replace nested objects with string ids, then rebuild and verify that the published output can be compared with itself. See npx joplo skill plugins for the output contract.
 - MISSING_ID / DUPLICATE_ID: Give interactive elements stable ids unique within the stage; update step references.
 - FUNCTION_PROP: Replace onClick and other callbacks with flow steps and state effects.

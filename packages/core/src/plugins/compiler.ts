@@ -1,3 +1,5 @@
+import { advanceMedia } from '../media.ts';
+import type { MediaCommand, MediaSnapshot, ResourceRequest } from '@joplo-app/kit/plugin';
 import { jsonData, snapshot, object, strings, syncResult, authoringData, materialize, errorMessage } from './data.ts';
 /** Node-side plugin host. Callbacks never enter IR or the player. */
 import { isNode, type JNode } from '@joplo-app/kit/node';
@@ -9,11 +11,24 @@ import type { PluginInfo } from '../catalog.ts';
 import type { GraphLayoutEngine } from '@joplo-app/plugin-diagram/model';
 
 export const standardPlugins: readonly PluginDef[] = [standard];
-export type CompileOptions = { layout?: GraphLayoutEngine; pluginOptions?: Record<string, Record<string, unknown>> };
+export type CompileOptions = { layout?: GraphLayoutEngine; onResource?: (request: ResourceRequest) => void; pluginOptions?: Record<string, Record<string, unknown>> };
 export function enabledPlugins(configured: unknown): unknown[] {
   return [...standardPlugins, ...(Array.isArray(configured) ? configured : [])];
 }
+function validMediaCommand(value: unknown, plugin: string, owners: ReadonlyMap<string, string>): boolean {
+  if (!object(value) || typeof value.track !== 'string' || !/^[a-z][a-z0-9-]*$/.test(value.track)) return false;
+  if (value.fadeMs !== undefined && (typeof value.fadeMs !== 'number' || value.fadeMs < 0 || value.fadeMs > 30000)) return false;
+  if (value.action === 'stop') return Object.keys(value).every(k => ['track', 'action', 'fadeMs'].includes(k));
+  if (value.action !== 'play' || typeof value.resource !== 'string' || owners.get(value.resource) !== plugin) return false;
+  return Object.keys(value).every(k => ['track', 'action', 'resource', 'volume', 'loop', 'fadeMs'].includes(k))
+    && (value.volume === undefined || typeof value.volume === 'number' && value.volume >= 0 && value.volume <= 1)
+    && (value.loop === undefined || typeof value.loop === 'boolean');
+}
+
 export class PluginCompiler {
+  readonly mediaCommands = new Map<string, (MediaCommand & { plugin: string })[]>();
+  private resourceIds = new Map<string, string>();
+  private resourceOwners = new Map<string, string>();
   readonly defs = new Map<string, PluginDef>();
   readonly info: Record<string, PluginInfo> = {};
   constructor(configured: unknown, private report: PluginReport, source?: string, private options: CompileOptions = {}) {
@@ -91,17 +106,30 @@ export class PluginCompiler {
     const p = this.defs.get(effect.plugin);
     if (!p?.compile?.effect) { this.report('PLUGIN_EFFECT_UNKNOWN', `Plugin ${effect.plugin} has no effect compiler for ${effect.name}`, source); return undefined; }
     return this.run(p, 'effect', source, () => {
-      const result = this.output(p, p.compile!.effect!(snapshot(effect), { roots: snapshot(scenes.map(s => s.root)), scenes: snapshot(scenes.map(s => ({ id: s.id, root: s.root }))), data: snapshot(data), source, report: this.report }), source);
+      const result = this.output(p, p.compile!.effect!(snapshot(effect), { roots: snapshot(scenes.map(s => s.root)), scenes: snapshot(scenes.map(s => ({ id: s.id, root: s.root }))), data: snapshot(data), source, report: this.report, resource: request => {
+        request = materialize(request);
+        if (!request || typeof request.compiler !== 'string' || !/^[a-z][a-z0-9-]*$/.test(request.compiler) || typeof request.input !== 'string' || Object.keys(request).some(k => k !== 'compiler' && k !== 'input')) throw new Error('resource requires compiler and text input');
+        const key = JSON.stringify([p.id, request.compiler, request.input]);
+        let id = this.resourceIds.get(key);
+        if (!id) { id = `resource-${this.resourceIds.size}`; this.resourceIds.set(key, id); this.resourceOwners.set(id, p.id); this.options.onResource?.({ id, plugin: p.id, compiler: request.compiler, input: request.input, ...(source ? { source } : {}) }); }
+        return id;
+      } }), source);
       if (result === undefined) return;
-      if (!object(result) || Object.keys(result).some(k => !['data', 'targets', 'references'].includes(k)) || result.targets !== undefined && !strings(result.targets) || result.references !== undefined && !strings(result.references)) { this.invalid(p, source); return; }
+      if (!object(result) || Object.keys(result).some(k => !['data', 'targets', 'references', 'media'].includes(k)) || result.targets !== undefined && !strings(result.targets) || result.references !== undefined && !strings(result.references)) { this.invalid(p, source); return; }
+      if (result.media !== undefined && (!Array.isArray(result.media) || result.media.some(c => !validMediaCommand(c, p.id, this.resourceOwners)))) {
+        this.invalid(p, source); return;
+      }
+      const media = result.media?.map(c => ({ ...c, plugin: p.id }));
       const value = result.data === undefined ? undefined : this.envelope(p, result.data, source);
-      return { ...(value !== undefined ? { data: value } : {}), ...(result.targets ? { targets: [...result.targets] } : {}), ...(result.references ? { references: [...result.references] } : {}) };
+      return { ...(media ? { media } : {}), ...(value !== undefined ? { data: value } : {}), ...(result.targets ? { targets: [...result.targets] } : {}), ...(result.references ? { references: [...result.references] } : {}) };
     });
   }
   frames(project: Project): void {
     for (const sc of Object.values(project.scenarios)) {
       const scenes = Object.values(project.scenes).filter(s => s.optionId === sc.optionId || s.optionId == null).map(s => ({ id: s.id, root: s.root }));
       const roots = scenes.map(s => s.root);
+      const hasMedia = sc.steps.some(step => this.mediaCommands.has(step.id));
+      let media: MediaSnapshot = {};
       let previousState: PlayState | undefined;
       let state = initialState(project, sc.id);
       let previousData: Record<string, unknown> = {};
@@ -112,6 +140,15 @@ export class PluginCompiler {
         }
         const target = i ? sc.steps[i - 1]! : sc;
         const ext = { ...target.ext };
+        if (i) {
+          media = advanceMedia(media, i > 1 ? (sc.steps[i - 2]!.hold ?? 3000) : 0);
+          for (const c of this.mediaCommands.get(sc.steps[i - 1]!.id) ?? []) {
+            const key = `${c.plugin}:${c.track}`;
+            if (c.action === 'play') media[key] = { plugin: c.plugin, resource: c.resource, offsetMs: 0, volume: c.volume ?? 1, loop: c.loop ?? false, fadeInMs: c.fadeMs ?? 0 };
+            else if (media[key]) { if (c.fadeMs) media[key] = { ...media[key]!, stopAfterMs: c.fadeMs }; else delete media[key]; }
+          }
+        }
+        if (hasMedia) target.media = structuredClone(media);
         for (const p of this.defs.values()) {
           if (p.compile?.frame) {
             const value = this.run(p, 'frame', target.source, () => this.output(p, p.compile!.frame!({ roots: snapshot(roots), scenes: snapshot(scenes), state: snapshot(state), previousState: snapshot(previousState), resolveProps: (node, previous) => resolveProps(node, snapshot(previous && previousState ? previousState : state)), data: snapshot(target.ext?.[p.id]), previousData: snapshot(previousData[p.id]), position: i, report: this.report }), target.source));

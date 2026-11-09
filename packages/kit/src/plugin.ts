@@ -56,10 +56,20 @@ export type PluginCompileHooks = {
   /** 每个根节点的静态派生数据，错误由宿主隔离。 */
   derive?: (node: Readonly<PluginIRNode>, ctx: { viewport: 'desktop' | 'mobile'; report: PluginReport; options: Readonly<Record<string, unknown>> }) => PluginDerived | void;
   /** 一个作者效果降级为该插件的数据及内核镜头/引用原语。data 是同一步之前的降级结果。 */
-  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; data: unknown; report: PluginReport; source?: string }) => { data?: unknown; targets?: string[]; references?: string[] } | void;
+  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; data: unknown; report: PluginReport; source?: string; resource: (request: { compiler: string; input: string }) => string }) => { data?: unknown; targets?: string[]; references?: string[]; media?: MediaCommand[] } | void;
   /** 编译器回放基础效果后，计算第 0 步及每一步的完整绘制快照。 */
   frame?: (ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; state: PluginState; previousState?: PluginState; resolveProps: (node: PluginIRNode, previous?: boolean) => Record<string, unknown>; data: unknown; previousData: unknown; position: number; report: PluginReport }) => unknown;
 };
+/** Author-only requests never enter IR. Local compilers run in a bounded Node process. */
+export type ResourceRequest = { id: string; plugin: string; compiler: string; input: string; source?: string };
+export type LocalCompiler = { version: string; mime: string; compile(input: string, ctx: { directory: string; maxBytes: number }): Promise<Uint8Array> | Uint8Array };
+export type PluginLocal = { compilers: Record<string, LocalCompiler> };
+export type MediaCommand = { track: string; action: 'play'; resource: string; volume?: number; loop?: boolean; fadeMs?: number } | { track: string; action: 'stop'; fadeMs?: number };
+/** Full state at a step boundary; elapsed time is in unscaled engine milliseconds. */
+export type MediaSnapshot = Record<string, { plugin: string; resource: string; offsetMs: number; volume: number; loop: boolean; fadeInMs: number; stopAfterMs?: number }>;
+export type MediaDriver = { update(frame: { offsetMs: number; volume: number; loop: boolean; speed: number; playing: boolean }): void; destroy(): void };
+export type MediaFactory = (ctx: { audio: AudioContext; destination: AudioNode; bytes: Uint8Array }) => MediaDriver | Promise<MediaDriver>;
+
 export type PluginDataSchema = { safeParse(value: unknown): { success: boolean; error?: { message: string } } };
 
 /** Paths are segment arrays; * visits array items/object values, never their keys. */
@@ -89,6 +99,8 @@ export type PluginDef = {
   skill?: string;
   /** 运行时入口的绝对路径（definePlugin 接受 `new URL('./runtime.js', import.meta.url)`）。 */
   runtime: string;
+  /** Node-only entry; excluded from browser bundles and IR. */
+  local?: string;
 };
 
 function fileOf(u: string | URL): string {
@@ -99,14 +111,14 @@ function fileOf(u: string | URL): string {
 }
 
 /** 插件入口：返回清单与编译钩子。id、组件名、接口版本不对时直接抛错（启用插件时就能看到）。 */
-export function definePlugin(p: Omit<PluginDef, 'kind' | 'runtime' | 'apiVersion'> & { apiVersion?: 1 | typeof PLUGIN_API_VERSION; runtime: string | URL }): PluginDef {
+export function definePlugin(p: Omit<PluginDef, 'kind' | 'runtime' | 'apiVersion' | 'local'> & { apiVersion?: 1 | typeof PLUGIN_API_VERSION; runtime: string | URL; local?: string | URL }): PluginDef {
   if (!ID.test(p.id)) throw new Error(`Joplo plugin id "${p.id}" must be lowercase letters, digits, and -, starting with a letter`);
   if (p.apiVersion !== undefined && p.apiVersion !== 1 && p.apiVersion !== PLUGIN_API_VERSION) throw new Error(`Joplo plugin ${p.id} targets plugin API ${p.apiVersion}; this Joplo supports ${PLUGIN_API_VERSION}`);
   for (const [name, spec] of Object.entries(p.components)) {
     if (!NAME.test(name)) throw new Error(`Joplo plugin ${p.id}: component name "${name}" must be PascalCase (dots for compound parts)`);
     if (spec.parent !== undefined && !p.components[spec.parent]) throw new Error(`Joplo plugin ${p.id}: ${name}.parent "${spec.parent}" is not a component of this plugin`);
   }
-  return { ...p, kind: 'plugin', apiVersion: PLUGIN_API_VERSION, runtime: fileOf(p.runtime) };
+  return { ...p, kind: 'plugin', apiVersion: PLUGIN_API_VERSION, runtime: fileOf(p.runtime), local: p.local ? fileOf(p.local) : undefined };
 }
 
 export const isPluginDef = (v: unknown): v is PluginDef => typeof v === 'object' && v !== null && (v as PluginDef).kind === 'plugin' && typeof (v as PluginDef).id === 'string';
@@ -184,9 +196,9 @@ export type ComponentInstance = { update(ctx: ComponentCtx): void; destroy(): vo
 export type RuntimeComponent =
   | { mount(el: HTMLElement, ctx: ComponentCtx): ComponentInstance; react?: never }
   | { react: (props: { ctx: ComponentCtx }) => any; mount?: never };
-export type PluginRuntime = { id: string; apiVersion: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent> };
+export type PluginRuntime = { id: string; apiVersion: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; media?: MediaFactory };
 
 /** 插件运行时：mount 适配框架无关渲染；react 接收 ctx，由宿主 React 树渲染。 */
-export function defineRuntime(r: { id: string; apiVersion?: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent> }): PluginRuntime {
+export function defineRuntime(r: { id: string; apiVersion?: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; media?: MediaFactory }): PluginRuntime {
   return { ...r, apiVersion: PLUGIN_API_VERSION };
 }

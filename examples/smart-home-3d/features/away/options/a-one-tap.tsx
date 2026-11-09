@@ -1,3 +1,4 @@
+import { music } from '@joplo-app/plugin-alda';
 import { $, done, explain, flow, option, set, spotlight, toast, undecided, uses } from '@joplo-app/kit';
 import { Alert, Badge, Button, Divider, Group, Loader, Stack, Switch, Text, Title } from '@joplo-app/kit/ui';
 
@@ -62,27 +63,30 @@ export default option({
 
   scenarios: {
     leave: flow('门窗关好，一键离家', { cases: ['happy'], expected: '灯、空调、电视依次关闭，入户门上锁' })
+      .system('轻柔配乐开始', music.play('theme', { fadeMs: 900, loop: true, volume: .45 }))
       .click('btn_away', '出门前点「一键离家」：先检查门窗，都关好了', set($.ui.leaving, true), uses('check_first'))
       .system('关闭落地灯', '落地灯关闭', set($.data.lamp, false), set($.ui.focus, 'lamp'))
       .system('关闭空调', '空调关闭', set($.data.ac, false), set($.ui.focus, 'ac'))
       .system('关闭电视和音箱', '电视和音箱关闭', set($.data.tv, false), set($.data.speaker, false), set($.ui.focus, 'tv'))
       .system('入户门上锁', '入户门上锁，离家完成', ...locked, set($.ui.focus, 'door'), toast.success('已离家'))
-      .system('回到全景', '全屋设备都已关闭', set($.ui.focus, null), done('出门只需要点一下')),
+      .system('回到全景', '全屋设备都已关闭', set($.ui.focus, null), music.stop({ fadeMs: 1000 }), done('出门只需要点一下')),
 
     window_open: flow('客厅窗没关，先在 3D 里关上', {
       cases: ['window_open'], mock: '模拟客厅窗开着',
       state: { data: { windowOpen: true, windowText: '未关', windowColor: 'orange' } },
       expected: '不直接离家：3D 画面推近到开着的窗，关好后再离家成功',
     })
+      .system('轻柔配乐开始', music.play('theme', { fadeMs: 900, loop: true, volume: .45 }))
       .click('btn_away', '点「一键离家」：检查发现客厅窗还开着', set($.ui.windowAlert, true), set($.ui.focus, 'window'), uses('check_first'))
       .click('window', '直接点 3D 画面里的窗户，把它关上', set($.data.windowOpen, false), set($.data.windowText, '已关'), set($.data.windowColor, 'green'), set($.ui.windowAlert, false),
         explain('3D 画面里点的是同一个“窗户”元素：步骤、镜头、提示都按它定位'))
       .click('btn_away', '再点「一键离家」', set($.ui.leaving, true), set($.ui.focus, null))
-      .system('关闭设备并上锁', '设备关闭，入户门上锁', ...allOff, ...locked, toast.success('已离家'), done('没关好的窗被找到并关上，然后顺利离家')),
+      .system('关闭设备并上锁', '设备关闭，入户门上锁', ...allOff, ...locked, toast.success('已离家'), music.stop({ fadeMs: 1000 }), done('没关好的窗被找到并关上，然后顺利离家')),
 
     manual: flow('在 3D 画面和 App 里控制设备', { cases: ['manual'], expected: '两边任一处操作，另一边同步变化', start: '/' })
+      .system('轻柔配乐开始', music.play('theme', { fadeMs: 900, loop: true, volume: .45 }))
       .click('lamp', '点 3D 画面里的落地灯关掉它，App 开关同步关闭', set($.data.lamp, false), set($.ui.focus, 'lamp'), uses('in_sync'), spotlight('sw_lamp'))
       .click('sw_ac', '反过来，在 App 里关掉空调：3D 画面里的空调同步熄灭', set($.data.ac, false), set($.ui.focus, 'ac'), uses('in_sync'))
-      .system('回到全景', '两边始终是同一份设备状态', set($.ui.focus, null), done('App 和 3D 画面显示同一份状态')),
+      .system('回到全景', '两边始终是同一份设备状态', set($.ui.focus, null), music.stop({ fadeMs: 1000 }), done('App 和 3D 画面显示同一份状态')),
   },
 });

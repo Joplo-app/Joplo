@@ -15,7 +15,7 @@
     "web:serve": "tsx packages/server/scripts/serve.ts",
     "docs:screenshots": "tsx packages/server/scripts/render-docs.ts",
     "skills:build": "tsx scripts/build-skills.ts",
-    "build:packages": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/diagram\" run build",
+    "build:packages": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" run build",
     "release:version": "node scripts/release.mjs version",
     "release:pack": "node scripts/release.mjs pack",
     "release:smoke": "node scripts/release.mjs smoke",

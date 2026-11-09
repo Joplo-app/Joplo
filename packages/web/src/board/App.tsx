@@ -152,6 +152,16 @@ function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpen
   );
 }
 
+function ResourceWarnings({ list }: { list: Diagnostic[] }) {
+  const { t } = useBoardI18n();
+  const warnings = list.filter(d => d.severity === 'warning' && d.code.startsWith('LOCAL_RESOURCE_'));
+  if (!warnings.length) return null;
+  return <div role="status" className="max-h-[25%] shrink-0 overflow-y-auto rounded-[8px] border-l-4 border-jb-ink bg-jb-subtle px-3 py-2 font-jb text-[13px]" data-testid="resource-warnings">
+    <div className="flex items-center gap-2 font-semibold"><VolumeX className="size-4" aria-hidden />{t.board.mediaUnavailable}</div>
+    <ul className="mt-1 space-y-1">{warnings.map((d, i) => <li key={i} className="break-words"><code className="font-jb-mono">{d.at}</code> <span className="text-jb-muted">{d.message}</span></li>)}</ul>
+  </div>;
+}
+
 /** 编译出错横幅（D55）：舞台上沿的红边横幅，写错误数和第一条 文件:行；可展开全部；修好保存后自动消失。 */
 function DiagnosticsBanner({ list }: { list: Diagnostic[] }) {
   const { t: i18n, locale } = useBoardI18n();
@@ -262,7 +272,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
     const p = ir.payload;
     if (!p?.project) return;
     if (p.ok || !ctl.getSnapshot().project) ctl.setProject(viewProject(p.project, contentLocale, locale), p.version, p.home);
-  }, [ir.payload, ctl, contentLocale, locale]);
+  }, [ir.payload?.version, ir.payload?.ok, ctl, contentLocale, locale]);
 
   const project = snap.project;
   // 标签页标题与 favicon 状态点（D55）：“功能 · 项目”；编译出错加 ✕ 和红点；导出中写进度、黄点
@@ -397,6 +407,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   const banner = (
     <>
       {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : null}
+      {ir.payload?.ok ? <ResourceWarnings list={ir.payload.diagnostics} /> : null}
       {gap && option && gb ? (
         <div role="status" className="flex shrink-0 flex-col gap-2 rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface px-4 py-3 font-jb" data-testid="gap-notice" data-status={gap.status}>
           <div className="flex items-center gap-2 text-[14px] font-semibold">

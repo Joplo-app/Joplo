@@ -400,6 +400,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           } else if (e.type === 'plugin') {
             const lowered = host.effect(e, effectRoots.filter(scene => scene.layer || scene.id === sceneOf(stepRouteBefore(fl.steps, i + 1, start))), ext[e.plugin], st.source);
             if (lowered) {
+              if (lowered.media?.length) { const key = `${sid}#${i + 1}`; host.mediaCommands.set(key, [...(host.mediaCommands.get(key) ?? []), ...lowered.media]); }
               if (lowered.data !== undefined) ext[e.plugin] = lowered.data;
               if (lowered.targets?.length) {
                 pluginTargets.set(e, lowered.targets);

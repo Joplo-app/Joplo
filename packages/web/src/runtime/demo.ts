@@ -180,7 +180,9 @@ export class DemoController {
   /** 最近一次服务端确认的选中（写入失败时回滚到它）。 */
   private confirmed: Selection | null = null;
   /** 播放速度（0.5 / 1 / 1.5，T-director2）：缩放动画与停留时长；镜头过渡与连线小点一圈不缩放。 */
-  speed = 1;
+  private playbackSpeed = 1;
+  get speed() { return this.playbackSpeed; }
+  set speed(value: number) { this.mediaElapsed(); this.playbackSpeed = Number.isFinite(value) && value > 0 ? value : 1; }
   /** 最近一次提交的时刻：停留时长从这里算起。 */
   private committedAt = 0;
   reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
@@ -198,7 +200,18 @@ export class DemoController {
   };
   getSnapshot = () => this.snap;
 
+  private mediaLast: number | null = null;
+  private mediaTime = 0;
+  /** Integrate the engine clock; every committed/jumped step has its own fixed IR anchor. */
+  mediaElapsed(now = performance.now()): number {
+    if (this.mediaLast !== null && this.snap.playing && !this.snap.paused) this.mediaTime += Math.max(0, now - this.mediaLast) * this.speed;
+    this.mediaLast = now;
+    return this.mediaTime;
+  }
+
   private set(patch: Partial<Snapshot>) {
+    this.mediaElapsed();
+    if (patch.state !== undefined && (patch.state?.position !== this.snap.state?.position || patch.state?.sceneId !== this.snap.state?.sceneId) || patch.scenarioId !== undefined && patch.scenarioId !== this.snap.scenarioId) this.mediaTime = 0;
     // 状态被替换但不是播放提交的：不再逐字输出（跳到某一步直接显示全文）
     if (patch.state !== undefined && patch.streamAt === undefined && patch.state !== this.snap.state) patch = { ...patch, streamAt: null };
     this.snap = { ...this.snap, ...patch };
@@ -392,6 +405,7 @@ export class DemoController {
     const p = this.snap.project;
     if (!p || !p.scenarios[scenarioId]) return;
     this.stop();
+    this.mediaTime = 0;
     const sc = p.scenarios[scenarioId]!;
     const r = this.safeStateAt(p, scenarioId, Math.max(0, Math.min(position, sc.steps.length)));
     const featureId = p.options[sc.optionId]?.featureId ?? this.snap.featureId;
@@ -432,6 +446,7 @@ export class DemoController {
     const sc = this.scenario();
     if (!p || !sc || this.snap.view !== 'stage') return;
     this.stop();
+    this.mediaTime = 0;
     const r = this.safeStateAt(p, sc.id, Math.max(0, Math.min(position, sc.steps.length)));
     this.set({ state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: message ? { kind: 'info', text: message } : null });
     if (message) this.autoClear();
