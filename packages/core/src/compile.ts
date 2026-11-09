@@ -152,8 +152,10 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     }
   }
   // 只使用 stage / layers 的独立作品从空白画面开始；写了 on / routes 就复用项目页面。
-  const blankRoute: RouteEntry = { path: '/', page: { kind: 'page', title: 'Work stage', layout: false, tree: createNode('#fragment', {}), file: '' } };
-  if (!baseRoutes.size && works.size) baseRoutes.set('/', blankRoute);
+  // IR 的页面标题与画面名要求非空字符串；纯空白保持无可见文字，也不会成为作者翻译项。
+  const blankRoute: RouteEntry = { path: '/', page: { kind: 'page', title: ' ', layout: false, tree: createNode('#fragment', {}), file: '' } };
+  const hasAddedRoot = [...addedRoutes.values()].some(r => r.path === '/' && included.some(o => o.qid === r.addedBy!.qid));
+  if (works.size && !baseRoutes.has('/') && !hasAddedRoot) baseRoutes.set('/', blankRoute);
   /** 在给定方案上下文（null = 发布视图）中可见的路径。 */
   const routesIn = (ctx: Opt | null): RouteEntry[] => {
     if (ctx && isolated(ctx.fid)) return [blankRoute];
@@ -167,7 +169,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   };
 
   const layoutOf = (page: PageDef): string | null => (page.layout === false ? null : (page.layout ?? src.config.layout ?? null));
-  for (const r of [...baseRoutes.values(), ...(works.size ? [blankRoute] : []), ...[...addedRoutes.values()].filter((r) => included.some((o) => o.qid === r.addedBy!.qid))]) {
+  for (const r of [...baseRoutes.values(), ...[...addedRoutes.values()].filter((r) => included.some((o) => o.qid === r.addedBy!.qid))]) {
     const lid = layoutOf(r.page);
     if (lid && !src.layouts[lid]) err('UNKNOWN_LAYOUT', `Page ${r.path} uses an unknown layout "${lid}"`, r.page.source);
     if (out.routes[r.path]) continue;
