@@ -26,6 +26,13 @@ export const patterns = `# UI recipes and pitfalls
 ## A prompt the audience can actually edit
 PromptInput renders a native textarea. Arbitrary text is disposable exploration and follows the same first-input pause, bound value synchronization and reset/resume rules as other text fields. Captures and disabled prompts remain read-only. Keep submission in a declared click/press step or free reaction; editing alone does not call a model or send anything. Test a non-script phrase with a real keyboard, because replayed .type() does not prove that audience input works.
 
+## Readable period interfaces
+Make the working interface the subject: enlarge input text, action targets and visible results together, rather than using a large year beside a tiny window. A compact chapter label and one source line can carry context; keep the full attribution/license inventory with the assets.
+
+For a collected CSS device frame, retain only licensed generic shell parts and record the adaptations; a later frame library is not evidence of a historical model. When CSS or fonts are embedded into an offline export, retain the applicable full license notices in that exported asset as well as in the repository. Scope and match the original selector specificity when resizing a speaker or button, otherwise an apparently correct override can lose to a library descendant rule. Use the rendered control dimensions to verify the override.
+
+HTML text nodes may be wrapped in spans by this renderer. Avoid blanket descendant-span hiding to remove one note: it can also hide the main text. Remove the unwanted note from the authored tree or give that specific element a class. Device children with z-index can also overpaint a later sibling: give a transition scrim and its focal object explicit stacking levels and inspect the real pixels.
+
 ## Styling a collected interface library
 Vendor only the required, redistributable CSS primitives; scope them under an authored root class. Exclude unverified bundled fonts, icon files and logos rather than treating the stylesheet's license as permission for all assets. Record the exact extraction and selector changes alongside retained licenses.
 

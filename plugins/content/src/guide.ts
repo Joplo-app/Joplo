@@ -101,6 +101,15 @@ export const patterns = `# content recipes and pitfalls
 - Reuse a motion key for the same subject's wrapper across arrangements. For a subject entering a device, establish the device first or in the same step, then shrink and move the subject into its screen. Keep the ending actionable through real forks or controls.
 - Match-cut the subject at a chapter boundary while changing its background and sound in that same scripted step. The input stays concrete: click the object, drag it to a visible destination, or choose an explicitly labeled branch. Avoid a slide of historical bullet points.
 
+## Shot grammar for a playable short film
+Give each chapter a visual arc: establish the whole interface/device, move in on the meaningful input or action, show its result, then pull back. Keep chapter numbers and explanations subordinate to the working surface. Judge text at its final painted size, including Canvas scale and camera zoom, rather than the font-size declaration alone.
+
+Use camera ids for the object that matters. Framing a wide window rarely produces a button close-up; frame the button for anticipation and button plus receipt for the result. Keep those targets inside one visual cluster. A deliberate crop is useful; a required action cropped out of the current frame is a broken shot.
+
+When a whole-stage camera would collide with navigation or titles, put Canvas in a separately sized parent and choose its view to match that picture region. Leave controls in the surrounding layout. screen is appropriate for overlays within the same Canvas view, but cannot reserve space outside that view or change the camera's framing budget.
+
+A recurring object can leave its interface and land in a brief central arrangement before the next chapter catches it. Reuse the same motion key with exclusive when conditions, keep the transfer above device children with explicit stacking, and return the camera wide at the transfer. This creates a visible storyboard beat as well as a real flight; extra title cards do not. Verify a mid-flight frame in playback because static sheets show only the declared endpoints.
+
 ## A continuous object inside playable chapter interfaces
 Use one motion key for the recurring object and distinct element ids for its location in each mutually exclusive arrangement. Keep exactly one visible instance. Each interface should contain a real native input or declared local reaction: the same picture must make sense both during playback and after the viewer pauses.
 

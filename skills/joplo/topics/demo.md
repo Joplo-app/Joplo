@@ -41,6 +41,11 @@ Start playback before testing stage gestures: covers and transition cards intent
 - A discrete draggable timeline can snap to named endpoint elements. Pair each endpoint with a labeled click alternative. This demonstrates declared choices, not a continuously calculated simulation.
 - Test each interaction at two positions: immediately before its scripted action (it should advance once and stop), and somewhere it is only a free reaction (timeline state must stay unchanged). Then test reset, resumed playback, and a branch's Cancel/Confirm separately.
 
+## Film framing and control space
+Keep authored navigation outside a transforming picture: use an independently sized visual region from the installed plugin, with the chapter selector, credits and drag affordance in the surrounding stage layout. A camera close-up must not enlarge or move the controls viewers need to pause, seek or recover.
+
+The host can draw an input/keyboard record after a type/press step, and toasts can move it upward. Reserve a clear band for those host overlays, then inspect the type step in both render --sheet and live playback. Do not infer safety from the authored tree alone or hide host overlays with project CSS. A camera can intentionally crop contextual menus during a close-up; the current action and its result still need to be visible and reachable.
+
 ## Frames, deep links and verification
 - outline lists scenario and step ids. Use those ids in render/export; a deep link chooses where viewing starts and is not an access boundary.
 - joplo render --scenario-id <id> --step-id <id> --out frame.png renders timeline state. --sheet --columns 3 renders every step with captions/narration; inspect transitions with actual playback as well.
@@ -61,4 +66,4 @@ A project theme is themes/<name>.css selected by config({ theme: '<name>' }). De
 - Custom themes live in themes/<name>.css and define --jp-* tokens; do not change authored data to recolor a view. For component-specific layout, motion and visual variables, read its installed plugin skill.
 
 Related topics: authoring, plugins, focus, review, publish
-<!-- joplo-skill 0.3.0 sha256:67223e56c0a86f306a176205ad687c697da5ec58333fb6b46f6e08e2eee55e3c -->
+<!-- joplo-skill 0.3.0 sha256:389451a541423f50b943312a41a27504470a9ba7c27a83193cd806b94b6fc1ab -->
