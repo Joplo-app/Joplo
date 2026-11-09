@@ -60,9 +60,6 @@ const unchanged: Record<string, { locales: readonly Locale[]; reason: string; va
   "board.link": { locales: ["pt-BR"], reason: "Link is the established Brazilian Portuguese term." },
   "player.chapterNo": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Two-digit chapter number (D102); Intl handles the digits." },
   "player.clock": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Clock-style m:ss duration (D102); Intl handles the digits." },
-  "player.film": { locales: ["fr", "de"], reason: "Film is also the French and German noun." },
-  "site.films": { locales: ["fr"], reason: "Films is also the French plural." },
-  "board.films": { locales: ["fr"], reason: "Films is also the French plural." },
 };
 const leaves = (value: object): Record<string, unknown> => Object.fromEntries(Object.entries(value).flatMap(([ns,entries])=>Object.entries(entries).map(([key,v])=>[`${ns}.${key}`,v])));
 const args = new Map<string, string[]>();

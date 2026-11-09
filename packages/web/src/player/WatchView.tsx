@@ -16,8 +16,14 @@ import type { SpokenSubtitle } from './subtitle-content';
 import { phoneLayout } from './watch';
 import { ROTATED_ATTR } from '../renderer/rect';
 
-/** no：影片（D102）章节的两位编号，支线为 null；功能演示的场景没有这个字段。steps：右侧小字（场景写步数，影片写时长）。 */
-export type Chapter = { id: string; name: string; current: boolean; steps: string; no?: string | null };
+/**
+ * 列表里的一项。steps：右侧小字（功能的场景写步数，按能力分组时写时长）。
+ * 按能力分组（D102 修订，传了 naming）时：no = 章节的两位编号（independent 与支线为 null），side = 不在连续播放顺序里。
+ */
+export type Chapter = { id: string; name: string; current: boolean; steps: string; no?: string | null; side?: boolean };
+
+/** 切片的叫法（D102 修订，只看 Entry.sequencing）：chapters = 章节（编号）、scenarios = 场景；不传时与以前一样（一组，叫“章节”）。 */
+export type SliceNaming = 'chapters' | 'scenarios';
 
 /** 视口尺寸与是否是手机（粗指针、短边 < 600）；enabled = false 时总是 null。 */
 export function usePhoneLayout(enabled: boolean) {
@@ -50,6 +56,7 @@ type Props = {
   title: string;
   brand: ReactNode;
   chapters: Chapter[];
+  naming?: SliceNaming;
   onChapter: (id: string) => void;
   /** 最后一章播完：从第一章重新看。 */
   onRestart: () => void;
@@ -115,13 +122,19 @@ export function WatchView(p: Props) {
   const playing = snap.playing && !snap.paused;
   const chapterIndex = p.chapters.findIndex((c) => c.current);
   const isLast = chapterIndex === p.chapters.length - 1;
-  // 影片：“第 n / N 章”只数有编号的章节，支线写“支线”；功能演示按列表位置（不变）
-  const numbered = p.chapters.filter((c) => c.no);
-  const film = p.chapters.some((c) => c.no !== undefined);
+    // 按能力分组时：顺序里的一组、支线一组；“第 n / N 章（个场景）”只数顺序里的，支线写“支线”。不传 naming 时与以前一样
+  const grouped = !!p.naming;
+  const main = p.chapters.filter((c) => !c.side);
   const cur = p.chapters[chapterIndex];
   const finished = !!scenario && !snap.playing && total > 0 && (!!snap.state?.completed || pos >= total) && isLast;
   const progress = total ? Math.round((pos / total) * 100) : 0;
-  const chapterLabel = chapterIndex < 0 ? '' : !film ? i18n.player.watchChapterOf(chapterIndex + 1, p.chapters.length) : cur?.no ? i18n.player.watchChapterOf(numbered.indexOf(cur) + 1, numbered.length) : i18n.player.sideChapter;
+  const chapterLabel = chapterIndex < 0 || !cur
+    ? ''
+    : !grouped
+      ? i18n.player.watchChapterOf(chapterIndex + 1, p.chapters.length)
+      : cur.side
+        ? (p.naming === 'chapters' ? i18n.player.sideChapter : i18n.player.sideScenarios)
+        : (p.naming === 'chapters' ? i18n.player.watchChapterOf : i18n.player.watchScenarioOf)(main.indexOf(cur) + 1, main.length);
   // 封面、过渡卡这一步没有字幕（画面上已经是大字）：竖屏时显示“第几章 · 章节名”，不让字幕区空着
   const spoken = p.subtitle?.text ?? '';
   const caption = spoken || (scenario ? [chapterLabel, scenario.name].filter(Boolean).join(' · ') : '');
@@ -182,9 +195,11 @@ export function WatchView(p: Props) {
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto border-t border-jb-line px-2 pb-6 pt-2" data-testid="watch-chapters">
-        {/* 影片（D102）：有编号的章节一组、支线一组（标题写“支线”）；功能演示是一组（不变） */}
-        {(film ? [{ key: 'main', title: i18n.player.watchChapters, list: numbered }, { key: 'side', title: i18n.player.sideChapters, list: p.chapters.filter((c) => !c.no) }] : [{ key: 'main', title: i18n.player.watchChapters, list: p.chapters }])
-          .filter((g) => g.key === 'main' || g.list.length > 0)
+        {/* 按能力分组（D102 修订）：顺序里的一组、支线一组；不传 naming 时是一组（与以前一样） */}
+        {(grouped
+          ? [{ key: 'main', title: p.naming === 'chapters' ? i18n.player.watchChapters : i18n.site.scenarios, list: main }, { key: 'side', title: p.naming === 'chapters' ? i18n.player.sideChapters : i18n.player.sideScenarios, list: p.chapters.filter((c) => c.side) }]
+          : [{ key: 'main', title: i18n.player.watchChapters, list: p.chapters }])
+          .filter((g) => (grouped ? g.list.length > 0 : true))
           .map((g) => {
             const body = (
               <>
@@ -202,11 +217,11 @@ export function WatchView(p: Props) {
                       data-testid={`watch-chapter-${c.id}`}
                     >
                       {c.no ? (
-                        <span className="w-5 shrink-0 font-jb-mono text-[12px] font-bold text-jb-muted" data-testid="chapter-no">{c.no}</span>
+                        <span className="w-5 shrink-0 font-jb-mono text-[12px] font-bold text-jb-muted" data-testid="slice-no">{c.no}</span>
                       ) : (
                         <CirclePlay className={cn('size-4 shrink-0', c.current ? 'text-jb-fg' : 'text-jb-muted')} aria-hidden />
                       )}
-                      <span className={cn('min-w-0 flex-1', film && '[overflow-wrap:anywhere]')}>{c.name}</span>
+                      <span className={cn('min-w-0 flex-1', grouped && '[overflow-wrap:anywhere]')}>{c.name}</span>
                       <span className="shrink-0 text-[11px] font-normal text-jb-faint">{c.steps}</span>
                     </button>
                   </li>
