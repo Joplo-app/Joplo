@@ -20,17 +20,21 @@ describe('D92 content transitions in a real browser', () => {
     const write = (name: string, source: string) => { const file = path.join(root, name); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, source); };
     installFixturePlugins(root);
     write('joplo.config.ts', fixtureConfigSource(`import {config} from '@joplo-app/kit';export default config({name:'Transitions',theme:'room',autoFocus:false});`));
-    write('themes/room.css', `.room{position:absolute;inset:0;font-family:serif}.room .panel{position:absolute;left:100px;top:120px;width:400px;height:200px;font-size:31px;color:rgb(10,20,30);background:rgb(200,100,50);padding:12px;border:3px solid rgb(1,2,3)}.room .panel.next{left:600px;background:rgb(50,100,200)}.room .panel .label{font-size:17px;letter-spacing:2px}.row{position:absolute;left:100px;top:500px;display:flex;gap:10px}.chip{display:inline-block;padding:4px 10px;background:#ddd}.spot{position:absolute;left:900px;top:600px;width:100px;height:60px;background:#333}`);
+    write('themes/room.css', `.room{position:absolute;inset:0;font-family:serif}.room .panel{position:absolute;left:100px;top:120px;width:400px;height:200px;font-size:31px;color:rgb(10,20,30);background:rgb(200,100,50);padding:12px;border:3px solid rgb(1,2,3)}.room .panel.next{left:600px;background:rgb(50,100,200)}.room .panel .label{font-size:17px;letter-spacing:2px}.row{position:absolute;left:100px;top:500px;display:flex;gap:10px}.chip{display:inline-block;padding:4px 10px;background:#ddd}.spot{position:absolute;left:900px;top:600px;width:100px;height:60px;background:#333}.bar{position:absolute;left:0;top:1300px;width:2560px;height:220px;background:#eee}.yr{position:absolute;top:0;width:300px;height:60px;font-size:40px}.scrub{position:absolute!important;top:90px;width:200px;height:70px}`);
     write('routes/page.tsx', `import {page,$,eq} from '@joplo-app/kit';import {Canvas} from '@joplo-app/plugin-content';import {Button} from '@joplo-app/plugin-ui';export default page({title:'Room',layout:false},<div style={{position:'relative',width:1280,height:800}}><Canvas w={1280} h={800} drift={false}><div className="room"><section id="old" className="panel" when={eq($.ui.era,'a')} exit="fade" exitMs={1200} enter="rise"><p className="label">Old era</p>Old</section><section id="new" className="panel next" when={eq($.ui.era,'b')} enter="zoom" enterMs={1200} exit="iris">New</section><div id="row" className="row"><span id="t" className="chip" when={$.ui.on} enter="shrink" exit="shrink" exitMs={450}>T</span><span id="u" className="chip">U</span></div><div id="spot" className="spot" /><div id="spot2" className="spot" style={{left:100,top:600}} /></div></Canvas><Button id="poke">Poke</Button></div>);`);
+    // U1：缩放的 Canvas（2560×1600 设计尺寸放进 1280×800）屏幕层上的时间轴：年份标签在上，游标在下一行
+    write('routes/scrub/page.tsx', `import {page,$} from '@joplo-app/kit';import {Canvas} from '@joplo-app/plugin-content';import {Button} from '@joplo-app/plugin-ui';export default page({title:'Scrub',layout:false},<div style={{position:'relative',width:1280,height:800}}><Canvas w={2560} h={1600} view={[2560,1600]} drift={false}><div className="room" /><div screen className="bar"><div id="year_a" className="yr" style={{left:200}}>A</div><div id="year_b" className="yr" style={{left:1400}}>B</div><Button id="scrubber" className="scrub" style={{left:$.ui.sx}} motion="cursor">drag</Button></div></Canvas></div>);`);
     write('routes/other/page.tsx', `import {page} from '@joplo-app/kit';export default page({title:'Other',layout:false},<div id="elsewhere">Elsewhere</div>);`);
     write('features/f/feature.ts', `import{feature}from'@joplo-app/kit';export default feature({name:'F',goal:'G',cases:{},pick:'a'});`);
     const toggles = Array.from({ length: 10 }, (_, i) => `.system('t${i}','Toggle ${i}',set($.ui.on,${i % 2 === 1}))`).join('');
-    write('features/f/options/a.tsx', `import{$,option,flow,free,set,hold}from'@joplo-app/kit';import{camera}from'@joplo-app/plugin-content';export default option({name:'A',idea:'I',state:{ui:{era:'a',on:true,poked:false}},free:{poke:free.click('poke',set($.ui.poked,true))},scenarios:{
+    write('features/f/options/a.tsx', `import{$,option,flow,free,set,hold}from'@joplo-app/kit';import{camera}from'@joplo-app/plugin-content';export default option({name:'A',idea:'I',state:{ui:{era:'a',on:true,poked:false,sx:200}},free:{poke:free.click('poke',set($.ui.poked,true))},scenarios:{
       swap:flow('Swap').system('swap','To new',set($.ui.era,'b'),hold(5)).system('back','Back',set($.ui.era,'a'),hold(5)),
       toggle:flow('Toggle')${toggles},
       drift:flow('Drift').system('look','Look',camera('spot',{ms:300,drift:{zoom:1.25,ms:1500}}),hold(10)).system('away','Away',camera('spot2',{ms:300})),
       leave:flow('Leave').system('go','Go',set($.ui.era,'b')),
       other:flow('Other',{start:'/other'}).system('x','X'),
+      scrubA:flow('Scrub A',{start:'/scrub',actionEntry:'after'}).drag('scrubber','year_a','To A',set($.ui.sx,200),hold(5)).system('later','Later',hold(5)),
+      scrubB:flow('Scrub B',{start:'/scrub',actionEntry:'after'}).drag('scrubber','year_b','To B',set($.ui.sx,1400),hold(5)),
     }});`);
     write('harness.ts', `import ${JSON.stringify(path.join(REPO, 'packages/web/src/index.css'))};import{createElement as h,useSyncExternalStore}from'react';import{createRoot}from'react-dom/client';import{projectThemes}from'@joplo-app/core';import{Stage}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/Stage.tsx'))};import{ThemeStyles}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/ThemeStyles.tsx'))};import{DemoController}from ${JSON.stringify(path.join(REPO, 'packages/web/src/runtime/demo.ts'))};import{loadPluginRuntimes}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/plugins.ts'))};let project,ctl;window.fixtureAnimate=true;function App(){const s=useSyncExternalStore(ctl.subscribe,ctl.getSnapshot);return h('div',{},h(ThemeStyles,{themes:projectThemes(project)}),h(Stage,{project,state:s.state,theme:project.theme,mode:'demo',animate:window.fixtureAnimate,playground:s.playground,freeMode:s.freeMode,clock:ctl.clock,epoch:s.epoch,activeStep:s.activeStep,onStageInput:explore=>ctl.stageInput(explore),onAction:(a,n)=>void ctl.act(a,n),stageRef:node=>ctl.setStageEl(node)}));}window.fixtureStart=async(p,urls)=>{project=p;await loadPluginRuntimes(urls);ctl=new DemoController();ctl.reducedMotion=true;ctl.setProject(p,1);ctl.setScenario('f.a.swap');window.fixtureCtl=ctl;const el=document.createElement('div');document.body.replaceChildren(el);window.fixtureRoot=createRoot(el);window.fixtureRender=()=>window.fixtureRoot.render(h(App));window.fixtureRender();};`);
     write('fixture.html', `<!doctype html><style>body{margin:0}</style><script type="module">import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>type=>type;window.__vite_plugin_react_preamble_installed__=true;await import('./harness.ts');</script>`);
@@ -50,7 +54,7 @@ describe('D92 content transitions in a real browser', () => {
   const frame = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   const ghosts = () => page.locator('[data-jghost]').count();
   async function at(s: string, position = 0) {
-    await page.evaluate(({ s, position }) => { const c = (window as any).fixtureCtl; c.stop(); c.setScenario('f.a.' + s, position, { quiet: true }); }, { s, position });
+    await page.evaluate(({ s, position }) => { const c = (window as any).fixtureCtl; c.stop(); c.speed = 1; c.setScenario('f.a.' + s, position, { quiet: true }); }, { s, position });
     await frame();
   }
   /** 播放到第 n 步刚提交（暂停之前不再推进）。 */
@@ -144,6 +148,69 @@ describe('D92 content transitions in a real browser', () => {
     await frame();
     expect(await ids()).toEqual(['t', 'u']);
     expect(errors).toEqual([]);
+  });
+
+  // U1：可拖动的源在播放中 / 自由体验中都能真的拖：跟手、松手判定落点、取消回弹，不残留样式与监听器
+  async function scrubberDown() {
+    const box = (await page.locator('[data-jid="scrubber"]').boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    return box;
+  }
+  const leftovers = () => page.evaluate(() => { const el = document.querySelector('[data-jid="scrubber"]') as HTMLElement; return { translate: el.style.translate, pe: el.style.pointerEvents, dragging: document.querySelectorAll('[data-jdragging]').length }; });
+  it('U1 the dragged source follows the pointer, ignores itself in hit tests, and a release near the destination row resolves it (cross-scenario prompt)', async () => {
+    await at('scrubA');
+    await page.evaluate(() => { const c = (window as any).fixtureCtl; c.speed = 0.25; void c.play(); });
+    const start = await scrubberDown();
+    expect(await page.evaluate(() => (window as any).fixtureCtl.getSnapshot().paused)).toBe(true);
+    const b = (await page.locator('[data-jid="year_b"]').boundingBox())!;
+    // 水平拖到 B 的正下方（游标所在的那一行，不在 B 的标签框里）
+    await page.mouse.move(b.x + b.width / 2, start.y + start.height / 2, { steps: 10 });
+    const mid = (await page.locator('[data-jid="scrubber"]').boundingBox())!;
+    expect(Math.abs(mid.x + mid.width / 2 - (b.x + b.width / 2))).toBeLessThan(3);
+    expect(await page.evaluate(() => document.querySelectorAll('[data-jdragging]').length)).toBe(1);
+    await page.mouse.up();
+    await frame();
+    const snap = await page.evaluate(() => { const s = (window as any).fixtureCtl.getSnapshot(); return { prompt: s.switchPrompt?.map((c: any) => c.scenarioId), sc: s.state.scenarioId }; });
+    expect(snap).toEqual({ prompt: ['f.a.scrubB'], sc: 'f.a.scrubA' });
+    expect(await leftovers()).toEqual({ translate: '', pe: '', dragging: 0 });
+    await page.evaluate(() => (window as any).fixtureCtl.confirmSwitch(0));
+    await frame();
+    expect(await page.evaluate(() => { const s = (window as any).fixtureCtl.getSnapshot(); return [s.state.scenarioId, s.state.position]; })).toEqual(['f.a.scrubB', 1]);
+  });
+  it('U1 a drop onto the next scripted destination advances; a drop far from every destination snaps back without changing state', async () => {
+    await at('scrubA');
+    await page.evaluate(() => { const c = (window as any).fixtureCtl; c.speed = 0.25; void c.play(); });
+    let start = await scrubberDown();
+    await page.mouse.move(start.x + 400, start.y - 250, { steps: 8 });
+    await page.mouse.up();
+    await frame();
+    expect(await page.evaluate(() => { const s = (window as any).fixtureCtl.getSnapshot(); return [s.state.position, !!s.switchPrompt]; })).toEqual([0, false]);
+    expect(await page.locator('[data-jid="scrubber"]').boundingBox()).toEqual(start);
+    expect(await leftovers()).toEqual({ translate: '', pe: '', dragging: 0 });
+    start = await scrubberDown();
+    const a = (await page.locator('[data-jid="year_a"]').boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2 + 15, start.y + start.height / 2, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForFunction(() => (window as any).fixtureCtl.getSnapshot().state.position === 1);
+  });
+  it('U1 Escape or pointercancel mid-drag snaps back with no action and no leftovers', async () => {
+    await at('scrubA');
+    const start = await scrubberDown();
+    const b = (await page.locator('[data-jid="year_b"]').boundingBox())!;
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 6 });
+    await page.keyboard.press('Escape');
+    expect(await leftovers()).toEqual({ translate: '', pe: '', dragging: 0 });
+    await page.mouse.up();
+    await frame();
+    expect(await page.evaluate(() => { const s = (window as any).fixtureCtl.getSnapshot(); return [s.state.scenarioId, s.state.position, !!s.switchPrompt]; })).toEqual(['f.a.scrubA', 0, false]);
+    expect(await page.locator('[data-jid="scrubber"]').boundingBox()).toEqual(start);
+    await scrubberDown();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 6 });
+    await page.evaluate(() => document.querySelector('[data-joplo-stage]')!.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 1 })));
+    expect(await leftovers()).toEqual({ translate: '', pe: '', dragging: 0 });
+    await page.mouse.up();
+    expect(await page.evaluate(() => !!(window as any).fixtureCtl.getSnapshot().switchPrompt)).toBe(false);
   });
 
   it('F2 drift runs on the engine clock after the camera settles, freezes on pause, and continues from the actual position', async () => {

@@ -398,7 +398,8 @@ export const observe: PluginObserve = (root) => {
           const prev = previous.get(key);
           seen.set(key, r);
           if (!context.frame.animate) { for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); }
-          if (!prev || !context.frame.animate || context.frame.playground) continue;
+          // 跳转、停止后的提交与静态画面直接显示新布局（D92）：变形飞行只属于连续播放
+          if (!prev || !context.frame.animate || context.frame.playground || quiet) { if (quiet) for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); continue; }
           if (Math.abs(prev.x - r.x) < 0.5 && Math.abs(prev.y - r.y) < 0.5 && Math.abs(prev.w - r.w) < 0.5 && Math.abs(prev.h - r.h) < 0.5) continue;
           const dx = prev.x + prev.w / 2 - (r.x + r.w / 2);
           const dy = prev.y + prev.h / 2 - (r.y + r.h / 2);

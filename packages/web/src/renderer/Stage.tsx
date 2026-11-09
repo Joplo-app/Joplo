@@ -2,7 +2,7 @@ import { useScrollState } from './scroll-state';
 import { useEngineAnimations } from './engine-animations';
 import { EngineClockContext } from './engine-motion';
 import { playgroundState, type Playground, type Action } from '@joplo-app/core/runtime';
-import { editableTarget, inputOwner, hoverAction, HoverIntent, resolveDropTarget } from '../runtime/input';
+import { editableTarget, inputOwner, hoverAction, HoverIntent, resolveDropTarget, dropTarget } from '../runtime/input';
 import type { ClockSource, ClockFrame } from '../runtime/clock';
 import type { ActionPresentation } from '@joplo-app/kit/plugin';
 import { projectThemes } from '@joplo-app/core/runtime';
@@ -272,7 +272,26 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     };
   }, [zoomOn, !!onStageInput, inspectMode]);
   // 拖动平移：移动超过 4px 才算拖动，之后的 click 不当作点击元素
-  const drag = useRef<{ x: number; y: number; v: View; moved: boolean; id: number; target?: string; scroll?: {element:HTMLElement;x:number;y:number} } | null>(null);
+  const drag = useRef<{ x: number; y: number; v: View; moved: boolean; id: number; target?: string; scroll?: {element:HTMLElement;x:number;y:number}; source?: { el: HTMLElement; scale: number; translate: string; pointerEvents: string } } | null>(null);
+  /**
+   * 拖动一个声明过的源（D92 U1）：元素按自己的本地坐标跟着指针走（含 Canvas / 镜头缩放），拖动中对命中测试透明，
+   * 结束（松手、Esc、pointercancel、丢失捕获、卸载）时一律回到原样：内联样式还原、data-jdragging 移除。
+   */
+  const releaseSource = () => {
+    const src = drag.current?.source;
+    if (!src) return;
+    src.el.style.translate = src.translate;
+    src.el.style.pointerEvents = src.pointerEvents;
+    src.el.removeAttribute('data-jdragging');
+    drag.current!.source = undefined;
+  };
+  const cancelDrag = () => { releaseSource(); drag.current = null; };
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape' && drag.current?.source) { e.preventDefault(); suppressClick.current = true; cancelDrag(); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => { window.removeEventListener('keydown', onKey, true); cancelDrag(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const suppressClick = useRef(false);
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if ((!zoomOn && !onAction) || e.button !== 0 || e.altKey || inspectMode) return;
@@ -297,7 +316,17 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     if (!d.moved) {
       d.moved = true;
       el.setPointerCapture?.(d.id);
+      const source = d.target ? el.querySelector<HTMLElement>(`[data-jid="${CSS.escape(d.target)}"]`) : null;
+      if (source) {
+        // 被抓起的元素不再播放自己的变形飞行；本地坐标 = 屏幕位移 ÷ 它此刻的总缩放
+        for (const a of source.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel();
+        const scale = source.getBoundingClientRect().width / (source.offsetWidth || 1) || 1;
+        d.source = { el: source, scale, translate: source.style.translate, pointerEvents: source.style.pointerEvents };
+        source.style.pointerEvents = 'none';
+        source.setAttribute('data-jdragging', '');
+      }
     }
+    if (d.source) d.source.el.style.translate = `${(e.clientX - d.x) / d.source.scale}px ${(e.clientY - d.y) / d.source.scale}px`;
     if (d.scroll) { scrollIntentUntil.current = e.timeStamp + 500; d.scroll.element.scrollLeft = d.scroll.x - dx; d.scroll.element.scrollTop = d.scroll.y - dy; }
     else if (!d.target) setClamped({ k: d.v.k, tx: d.v.tx + dx, ty: d.v.ty + dy });
   };
@@ -306,13 +335,18 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     if (d?.moved) {
       suppressClick.current = true;
       if (d.target && e.type !== 'pointercancel') {
-        const destinations = new Set(gestureActions.flatMap(a => a.type === 'drag' && a.target === d.target && typeof a.to === 'string' ? [a.to] : []));
-        let hit = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-        while (hit && !destinations.has(hit.dataset.jid ?? '')) hit = hit.parentElement;
-        const to = hit?.dataset.jid ?? toFramePoint(e.clientX, e.clientY);
-        onAction?.({ type: 'drag', target: d.target, to });
+        const ids = gestureActions.flatMap(a => a.type === 'drag' && a.target === d.target && typeof a.to === 'string' ? [a.to] : []);
+        const pointOnly = gestureActions.some(a => a.type === 'drag' && a.target === d.target && typeof a.to !== 'string');
+        const dragged = d.source?.el.getBoundingClientRect() ?? null;
+        const boxes = ids.flatMap(id => { const el = rootRef.current?.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`); return el ? [{ id, r: el.getBoundingClientRect() }] : []; });
+        const stagePx = rootRef.current ? rectOf(rootRef.current).width / (rootRef.current.offsetWidth || 1) : 1;
+        const to = dropTarget({ x: e.clientX, y: e.clientY }, dragged, boxes, 48 * stagePx) ?? (pointOnly ? toFramePoint(e.clientX, e.clientY) : null);
+        releaseSource();
+        // 没落在任何声明的目标上（也不接受坐标落点）：回到原位，不改状态
+        if (to !== null) onAction?.({ type: 'drag', target: d.target, to });
       }
     }
+    releaseSource();
     drag.current = null;
   };
 
@@ -428,6 +462,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
           if (a?.type === 'hover') { const input = hoverAction(a.target, 0, a.ms, 'touch'); if (input) onAction(input); suppressClick.current = true; }
         }}
         onPointerCancel={onPointerUp}
+        onLostPointerCapture={() => { if (drag.current?.source) { suppressClick.current = true; cancelDrag(); } }}
         onClickCapture={(e) => {
           if (!suppressClick.current) return;
           suppressClick.current = false;

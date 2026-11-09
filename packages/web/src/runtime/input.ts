@@ -51,3 +51,28 @@ export function resolveDropTarget(
   }
   return point;
 }
+
+type Rect = { left: number; top: number; right: number; bottom: number };
+/**
+ * 拖动松手落在哪个声明的目标上（D92 U1，屏幕坐标）：
+ * 1) 指针所在的目标；2) 与被拖元素重叠面积最大的目标；3) 指针 radius 以内最近的目标（时间轴上游标那一行与年份标签不重叠）。
+ * 都没有时返回 null：调用方让元素回到原位、不改状态。
+ */
+export function dropTarget(point: { x: number; y: number }, dragged: Rect | null, targets: readonly { id: string; r: Rect }[], radius: number): string | null {
+  const inside = targets.find(t => point.x >= t.r.left && point.x <= t.r.right && point.y >= t.r.top && point.y <= t.r.bottom);
+  if (inside) return inside.id;
+  if (dragged) {
+    let best: { id: string; area: number } | null = null;
+    for (const t of targets) {
+      const w = Math.min(dragged.right, t.r.right) - Math.max(dragged.left, t.r.left), h = Math.min(dragged.bottom, t.r.bottom) - Math.max(dragged.top, t.r.top);
+      if (w > 0 && h > 0 && (!best || w * h > best.area)) best = { id: t.id, area: w * h };
+    }
+    if (best) return best.id;
+  }
+  let near: { id: string; d: number } | null = null;
+  for (const t of targets) {
+    const dx = Math.max(t.r.left - point.x, 0, point.x - t.r.right), dy = Math.max(t.r.top - point.y, 0, point.y - t.r.bottom), d = Math.hypot(dx, dy);
+    if (d <= radius && (!near || d < near.d)) near = { id: t.id, d };
+  }
+  return near?.id ?? null;
+}

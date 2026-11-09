@@ -509,3 +509,6 @@
   outline: 2px solid color-mix(in srgb, var(--jp-accent) 50%, transparent);
   outline-offset: 2px;
 }
+/* 声明过的拖动源（D92 U1）：触摸时由舞台处理拖动而不是滚动页面；拖动中跟手并浮在上层 */
+.jstage[data-mode='demo'] [data-jdraggable] { touch-action: none; cursor: grab; }
+.jstage [data-jdragging] { cursor: grabbing; z-index: 50; }
