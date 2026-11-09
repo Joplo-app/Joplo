@@ -574,7 +574,7 @@ npx joplo resources                 # 逐项确认
 npx joplo resources --allow-spend   # 已获得用户授权时的非交互调用
 ```
 
-check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同名 JSON 提交 Git，队友和 CI 不需要 Key；丢失输出时先从 Git 恢复。超时/断网后重新运行 resources 续查已记录 task_id；unknown/creating 日志必须先从供应商任务历史恢复，不能删日志盲重试。Key 在看板 Voice → 管理密钥 → Tripo 保存（本机 0600），或使用 TRIPO_API_KEY，不写项目配置。版本对应详细用法：`joplo skill tripo`、`joplo skill scene3d/models`。
+check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同名 JSON 提交 Git，队友和 CI 不需要 Key；丢失输出时先从 Git 恢复。超时/断网后重新运行 resources 续查已记录 task_id；unknown/creating 日志必须先从供应商任务历史恢复，不能删日志盲重试。Key 在看板 Voice → 管理密钥 → Tripo 保存（本机 0600），或使用 TRIPO_API_KEY，不写项目配置。版本对应详细用法：`joplo skill scene3d/generation`、`joplo skill scene3d/models`。
 
 ### 检查含可选支线的短片
 

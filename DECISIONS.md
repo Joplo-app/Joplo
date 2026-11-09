@@ -530,3 +530,14 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
 - 创建前写 journal，收到 task_id 立即落盘；断网继续查同一任务，不明结果不重复创建。失败退款由供应商确认，本地超时不等于退款。
 - 可复用实践：先找 CC0/公有领域素材，再用原创风格生成补缺；网页 10k–50k 面，优先低面数/明确 face_limit；完整纹理 GLB 必须验证看板、截图和 file://，不能只凭下载成功交付。
 - 字段、文件及读取/消费端的完整路径见 docs/plugins.md 第 17 节；供应商参数/费用细节放插件技能，不让引擎绑定具体组件。
+
+包归属已由 D91 修改。
+
+## D91 · Tripo 并进 3D 插件，通用插件密钥，默认不含 3D（2026-11-09）
+
+用户决定：“为什么会有一个单独的 Tripo 插件？我还是希望默认不要有。”选择并进 3D 插件。
+
+- 公开发布 @joplo-app/plugin-3d（plugins/3d），统一 0.3.0；包含 three.js 场景、GLB 渲染及可选 /local Tripo 生成，删除独立生成包。作者 model() 按用途命名，不引入供应商注册表。插件 id 继续使用 scene3d，作为同一个插件的组件、动作、技能与本机资源命名空间，不提供旧包别名。
+- 默认 starter 不安装或启用 3D；有空间表达需要时显式安装，加入 config.plugins，再 skill install 同步版本技能。
+- 引擎不含供应商专用凭证逻辑。插件 keys 声明 id/title/description/url/env；宿主读取当前项目启用清单，Voice 管理密钥通用展示，带令牌/Origin 保护的项目接口保存到 JOPLO_HOME/plugins/<plugin>/keys/<key>.json（默认 ~/.joplo，0600）。环境变量优先；只在本机授权生成时通过 stdin 将本插件的声明值交给 ctx.keys，元数据进程不取密钥，子进程不继承账户环境变量。密钥不进 IR、站点、缓存或诊断。插件仍是可信本机代码，不声称提供任意代码的文件系统沙箱。
+- 持久模型继续只按规范化请求 JSON 的 SHA-256 命名，包名及插件 id 不参与。既有 GLB 和溯源 JSON 原样保留；代码移动、插件 id 归并不得触发付费。check/build/render 只读输出，resources 仍须逐项确认或 --allow-spend；unknown journal 仍先恢复原任务。

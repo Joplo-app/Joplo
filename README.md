@@ -262,7 +262,7 @@ The template explicitly enables `@joplo-app/plugin-content`, which provides `con
 
 Standard UI and HTML are provided by `@joplo-app/plugin-ui`: import markers directly from that package and explicitly enable it in config.plugins. IR uses `ui:Button` / `ui:div`. `joplo components` reads enabled plugin manifests; `joplo skill ui/components` provides the full UI guide. Import diagram components and trace from `@joplo-app/plugin-diagram`. See [plugin contracts](docs/plugins.md).
 
-GLB 资源与生成：`asset('./model.glb')` 支持离线模型；scene3d 的 `Model` 用法见 `joplo skill scene3d/models`。可选 `@joplo-app/plugin-tripo` 通过 `joplo resources --dry-run` 估算、明确确认后生成，模型与元数据进 Git，Key 仅留本机。详见 [插件资源契约](docs/plugins.md#17-p1-eglb-与显式付费的持久资源)。
+GLB 资源与生成：`asset('./model.glb')` 支持离线模型；scene3d 的 `Model` 用法见 `joplo skill scene3d/models`。可选 `@joplo-app/plugin-3d` 通过 `joplo resources --dry-run` 估算、明确确认后生成，模型与元数据进 Git，Key 仅留本机。详见 [插件资源契约](docs/plugins.md#17-p1-eglb-与显式付费的持久资源)。
 
 ### A journey through one apple
 

@@ -7,7 +7,7 @@
 | `@joplo-app/kit` | 创作 API、组件标记与 JSX 运行时 |
 | `@joplo-app/plugin-diagram` | 图表、状态机、时序图的编译与运行时、技能及声明 |
 | `@joplo-app/plugin-alda` | 可选配乐插件、本机 MIDI 编译、离线合成及技能 |
-| `@joplo-app/plugin-tripo` | 可选 3D 生成插件、费用确认、项目 GLB 与任务恢复技能 |
+| `@joplo-app/plugin-3d` | 3D 场景与 GLB、可选 Tripo 本机生成、费用确认及任务恢复技能 |
 | `@joplo-app/plugin-content` | 默认讲解内容插件、设计画布、取景、FLIP、studio 主题与技能 |
 | `@joplo-app/plugin-ui` | 默认 UI 与 HTML 词汇、绘制及组件指南 |
 | `@joplo-app/core` | 编译、校验与播放器 |
@@ -16,7 +16,7 @@
 | `@joplo-app/cli` | 命令实现 |
 | `joplo` | Node 版本检查与命令转发入口 |
 
-`joplo-plugin-scene3d` 是 `private: true` 的仓库示例插件，不在上述 npm 发布集合中，保留自身的 0.1.0 版本。十一份公开 tarball（含 `@joplo-app/plugin-tripo`）统一为 0.3.0；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
+默认模板不安装 3D 插件，项目按需显式安装并启用。十一份公开 tarball（含 `@joplo-app/plugin-3d`）统一为 0.3.0；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
 
 `release:version` 同步插件的轻量 `src/version.json`，运行时只读取版本，避免把整个开发 manifest 带进浏览器。
 
@@ -70,7 +70,7 @@ CI 不存 npm token，用 GitHub OIDC 向 npm 证明身份（[npm 文档](https:
 
 ```sh
 npm login
-for p in @joplo-app/kit @joplo-app/plugin-diagram @joplo-app/plugin-alda @joplo-app/plugin-tripo @joplo-app/plugin-content @joplo-app/plugin-ui @joplo-app/core @joplo-app/web @joplo-app/server @joplo-app/cli joplo; do
+for p in @joplo-app/kit @joplo-app/plugin-diagram @joplo-app/plugin-alda @joplo-app/plugin-3d @joplo-app/plugin-content @joplo-app/plugin-ui @joplo-app/core @joplo-app/web @joplo-app/server @joplo-app/cli joplo; do
   npm trust github "$p" --repo Joplo-app/Joplo --file release.yml --allow-publish -y
 done
 npm trust list joplo                # 确认配置
@@ -117,7 +117,7 @@ git push origin v0.3.0
 0.2.4 漏发了 core、0.2.6 漏发了 web：以前每个包 publish 前各自运行 prepublishOnly 构建，web 构建最慢，排在中间的包常在用户输入 OTP 之后失败。现在 `pnpm release:publish --tag latest` 分三步：
 
 1. 一次性构建并打包全部包到 `release/`（构建或任何 tarball 检查失败时一个包都不发）。
-2. 按依赖顺序（kit → plugin-diagram → plugin-alda → plugin-tripo → plugin-content → plugin-ui → core → web → server → cli → joplo）逐个处理：先直接查询 registry（绕过本地缓存），已有这个版本就跳过；否则 `npm publish release/<包>.tgz --access public --tag <标签>`。任何一个包失败（包括查询 registry 失败）立刻停止，不再发后面的包，列出本次已发布、registry 上原本就有、还没发布的包，以非 0 退出。
+2. 按依赖顺序（kit → plugin-diagram → plugin-alda → plugin-3d → plugin-content → plugin-ui → core → web → server → cli → joplo）逐个处理：先直接查询 registry（绕过本地缓存），已有这个版本就跳过；否则 `npm publish release/<包>.tgz --access public --tag <标签>`。任何一个包失败（包括查询 registry 失败）立刻停止，不再发后面的包，列出本次已发布、registry 上原本就有、还没发布的包，以非 0 退出。
 3. 全部处理完后运行 `release:verify`，用它的结果作为整体退出码；通过时最后一行打印打 tag 的命令。
 
 中途失败后，处理登录、网络或 2FA 问题，再重跑同一条命令即可；已存在的版本会跳过，不必重发，也不必仅为重试增加版本号。实现见 [release.mjs](../scripts/release.mjs) 的 `publishRelease`，测试用替身注入打包、registry、npm publish 与 verify（scripts/test/release.test.ts）。
