@@ -19,6 +19,7 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 ## Write a plugin
 - Export definePlugin({ id, packageName, title, version, components, skill, skillTopics?, runtime, compile?, properties?, themes?, actions?, data?, schemas?, local? }) from @joplo-app/kit/plugin. Ship compiled JS and declarations; runtime and optional local entries are URLs resolved relative to the package.
 - components maps names to doc/example, interaction and declarative traits. Export pluginComponent(manifest, name) markers from this package. Intrinsic tag ownership is explicit and unique. No kit component forwarding or bare-name adapters.
+- Runtime CSS imports and emitted local assets are bundled with the plugin: CSS is installed as a per-plugin style sheet, and local URLs become typed data URLs, including CSS images/fonts and imports above the normal inline threshold. Exercise source dev, npm prebuilt dev and offline file:// with real asset loading checks; a successful JS import alone does not prove styles or textures were delivered. Generated asset references that cannot be resolved fail explicitly.
 - Verify both source development and the installed production package in a real browser. A prebuilt host must share its own React instance with dynamic plugin modules; serving a raw CommonJS dependency URL is not sufficient. Production dev and offline publish use the same bundling/shared-module contract.
 - skill is the entry guide: when to use, how to enable/import, the smallest correct example, success checks, pitfalls and recovery. skillTopics maps topic keys to { description, body }; installed references and CLI topics come from this exact version. Do not put private project data or credentials in guides.
 - Node hooks normalize/derive/frame/effect/validate trusted author data. Outputs must be finite JSON within supported depth/size, immutable across calls, identity-safe, and serializable. Functions/prototypes/cycles are rejected. Hooks and source instructions are never shipped as runtime IR.
@@ -42,4 +43,4 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.2.18 sha256:cdeefbab1e6bd6152bb100607ef15e1d6dde9552a21aeb5b4a897aa519af5562 -->
+<!-- joplo-skill 0.2.18 sha256:631e8c32c27eabb9c194e0246c63187d538a6a1f92746c50b61bdd6b5723ee46 -->

@@ -442,3 +442,24 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 这不是数据库迁移，不改用户凭证、分享可见性、评审权限或已有静态站。格式不明、无 runtime 能力标记等输入仍失败关闭；这些是数据完整性边界，不能当成兼容代码一起删。技能 SHA 保护与旧生成文件自动更新也保留，承担 D64 的编辑保护契约。
 
 模板错误应先修来源或用 `--template <本地路径>` 重试。依赖未安装时可先读模板技能；完成 npm install 后必须运行 skill install 和 check，不能把“模板复制成功”当成插件加载成功。插件技能删改保护触发时先读 --diff；不要用 --force 掩盖用户修改。
+
+
+## 16. 统一评审 P1 修复（FIX-BR）
+
+- BR-1：publishPayload 保留已经编译和 scope 裁剪的 option.free；普通/评审发布共用此路径。范围外舞台的反应仍先被过滤，不恢复作者源码字段；浏览器自由点击改变本机体验层，重置后还原，时间线不变。
+- BR-2：插件打包消费 JS chunk 之外的 OutputAsset。CSS 合并后随 runtime 注入，图片、字体和其他本地静态资源按 MIME 内联成 data URL；不论原资源大小或显式 no-inline，最终 npm dev 与发布站都自包含。未消费的生成资源 URL 明确报 EXPORT_FAILED，不再静默成功。脚本仍通过宿主共享 React；插件承担自身 CSS 选择器范围的约定。
+- BR-3：舞台保存脚本滚动目标的初始 DOM 偏移；跳转时恢复基线并应用当前步骤前缀的最后滚动动作。基线跨同舞台场景切换保留，断开的 DOM 元素清理；epoch 重置后重新投影。已应用目标不在 MutationObserver/动画帧中重复重置，游玩期间保留本机滚动，退出/重置按当前时间线恢复。
+
+| 写入点 → 存储 | 读取点 → 消费者 |
+| --- | --- |
+| option.free 作者声明 → compile 的 options.free → scopeProject 按保留舞台过滤 → publishPayload options.free | 内联 IR → 普通/评审/嵌入播放器的 arbitrateAction → 本机 playground effects；不回写 timeline |
+| Vite OutputAsset 与保留的生成资源 base → inlinePluginAssets 内存资源映射 | JS/CSS 中的本地资源引用改写成带 MIME 的 data URL → 浏览器图片、字体与 CSS 资源载入；无需额外资源端点或磁盘清单 |
+| CSS OutputAsset → 合并、资源改写后的 CSS 字符串 → runtime JS 的样式安装块 | 发布 factory 或 npm dev module 执行 → style#joplo-plugin-style:<id>.textContent；相同插件更新替换内容，不重复插入样式表 |
+| useScrollState 的初始目标 DOM 偏移 → baseline Map（元素生命周期内）、free 进入前 saved Map | scenario/position/epoch 变更与迟挂载目标观察 → 恢复初值、应用前缀最后滚动；不修改 IR 或逐帧覆盖正在演示的中间位置 |
+
+技能同步：demo/publish 交付验证强调在真实发布页测试声明反应；demo 补回退、重置和同舞台场景滚动验证；plugins 补 CSS/静态资源三路径验收。Alda 与 check 如实说明尚未修复的失败重播恢复边界。
+
+## 已知问题（统一评审保留的 P2）
+
+- BR-4 / P2：媒体资源首次请求或 driver 创建失败后，普通暂停/重播仍复用空 slot，修好工具也可能不再请求；影响本页音轨恢复，可先切场景、关开声音或重载；建议失败时清理 slot，并在明确重播/重试或有退避的恢复动作重建，避免 RAF 无限制重试。本轮仅记录，未修改媒体代码。
+- BR-5 / P2：视频导出 WebM 仅含视频流，没有 BGM/音频合成链路；交互 build/share 的音轨不受此限制，视频文件不能当作影音一致性交付证据；建议按同一引擎时钟记录锚点并离线渲染/混音/mux，或统一捕获 WebAudio MediaStream 与画面，同时处理解锁、同步及收尾。本轮仅记录，未补音轨。

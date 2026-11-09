@@ -4,6 +4,7 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 
 ## Playback and free exploration
 - The first picture-changing input while playing pauses and applies the same input. Matching the next script action advances once and stays stopped, including before a following system step. It behaves like manual pause followed by that input.
+- Declared option.free reactions remain available in build/share and review publications after scope filtering. Verify a non-scripted action in the actual published site, then reset; local effects must disappear without changing timeline state.
 - Arbitration: exact next action → reachable other scenario on the same stage (confirm first) → declared free reaction/native local behavior → existing hint. Type, value, target and plugin payload all matter; a bare click cannot complete a typing action.
 - Blank/noninteractive clicks only pause, with no local-change notice. Covers/transition cards remain inert. Hover never pauses; while paused it matches normally. Touch tap completing hover follows the click rule.
 - Pointerdown pauses immediately and the same drag continues. A declared element drag owns its pointer before stage pan or plugin orbit. The first wheel event pauses and scrolls; keep the burst/inertia in its scroll container before stage zoom.
@@ -12,6 +13,7 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - Use native controls from installed plugins and read their skills for supported edits. Use option.free for declared secondary reactions; keep lasting results in scripted effects. Test actual inputs, not only autoplay.
 
 ## Actions and the shared clock
+- Scripted scroll is a timeline projection: returning to an earlier step, resetting, or switching scenarios on the same stage restores the initial scroll baseline and applies only the selected prefix. Test 0 → scrolled step → 0 and a scenario without scrolling. Pausing an in-flight scroll keeps its intermediate position; ordinary render frames must not reset it.
 - .drag(target, destination) accepts an element id or stage pixel point; .scroll(target, destination) accepts an element id or content offset. Declare the correct source and endpoint.
 - .hover(target, ms) expresses a dwell; .act(name, target, data) uses the enabled plugin's data-only contract. Read its installed skill for field types, ranges, matching tolerance and presentation duration.
 - Engine frames expose clock time, speed, running/paused state and gesture progress. Presenters sample it; independent timers must not drive the timeline. Pausing freezes cursor, gestures, media, text and plugin animation together.
@@ -44,4 +46,4 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - Custom themes live in themes/<name>.css and define --jp-* tokens; do not change authored data to recolor a view. For component-specific layout, motion and visual variables, read its installed plugin skill.
 
 Related topics: authoring, plugins, focus, review, publish
-<!-- joplo-skill 0.2.18 sha256:2d0a559bb50977e3e663101ae43548ade9b891a6e62392e2e346bb2d86f4b553 -->
+<!-- joplo-skill 0.2.18 sha256:ab41e42a931fd06e63c760afd447dfa0e7e74ae4ff6abdd026c8a6b1abf3334e -->

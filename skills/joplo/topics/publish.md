@@ -32,6 +32,8 @@ Use your own Wrangler environment and account in the project directory:
 
 `npx wrangler deploy --assets dist`
 Provide the site name and compatibility date through Wrangler project configuration. Handle access control in deployment.
+
+Publication retains option.free reactions after scope filtering. Verify them in the actual built/shared player: the local response must work, reset must discard it, and scripted timeline state must remain unchanged. A compiler-only replay test does not verify this delivery boundary.
 Deploy only dist output, not author source files. MCP, comments, and collaboration are planned separately.
 
 ## Cloud sharing
@@ -134,4 +136,4 @@ For local comparisons and PR CI, read npx joplo skill diff. It compares two real
 - --ref works only together with --applied. --applied is idempotent; text output without --format json ends with a Next: line listing the ids.
 
 Related topics: diff, demo, review, plugins
-<!-- joplo-skill 0.2.18 sha256:47e8dc7a420e9fcff3deb6822da2c22bbde894b13708a6281b3742fd295c2023 -->
+<!-- joplo-skill 0.2.18 sha256:fac62c5565866ba24b292258d2a358072bcf7f32443b5ccbf74e5a801f132dc6 -->

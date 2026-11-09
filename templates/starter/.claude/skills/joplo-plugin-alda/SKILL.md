@@ -33,7 +33,7 @@ The board compiles on first playback demand. Build/share compiles only reference
 
 Verify with joplo check, then build and click Play with sound enabled. Sound requires a viewer gesture; thumbnails/screenshots stay silent. Pause, resume, jump and speed use the engine clock; narration ducks music to 25%. The offline synthesizer approximates instruments without downloading soundfonts. Piano uses a struck attack, decaying amplitude and darkening harmonics; organ sustains, while strings/brass use slower attacks. Envelope and brightness are sampled at the note's score-time age, so pausing/seeking into a held note does not strike it again. It supports standard MIDI format 0/1 with PPQN tempo, note, program and sustain events, not SMPTE or format 2.
 
-If silent, check the sound switch and local warnings at the play step's source file:line. Missing Alda, score syntax, timeout (30s) or output over 8MiB produces a warning and leaves the rest of the demo playable. Fix the score/tool and retry playback or build. Alda errors include the score line; the diagnostic anchor is the author play step. Named score typos also warn. Published sites cannot regenerate missing music: rebuild on the author machine.
+If silent, check the sound switch and local warnings at the play step's source file:line. Missing Alda, score syntax, timeout (30s) or output over 8MiB produces a warning and leaves the rest of the demo playable. Fix the score/tool and retry build. For playback, first switch scenarios, toggle sound off/on, or reload the page, then play: a failed media slot currently survives ordinary pause/play and may not retry by itself. Alda errors include the score line; the diagnostic anchor is the author play step. Named score typos also warn. Published sites cannot regenerate missing music: rebuild on the author machine.
 
 Start around score (vol 70) and track volume .3–.5, then listen in the actual player. Score velocity, synthesis gain, track volume and narration ducking multiply: reducing all of them at once can make music effectively inaudible even when AudioContext is running. Check the final output after the track gain, both during and between narration; an upstream oscillator alone does not prove audible output. The synthesizer keeps per-note gain audible and uses a mix compressor for chord headroom. Use a sparse phrase, loop it, and fade out with the ending. Leave room for narration rather than increasing music volume. Video export does not mix the media track in this version; use interactive build/share for sound.
 
@@ -43,4 +43,4 @@ General engine contracts: npx joplo skill plugins
 ## Installed references
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.2.18 sha256:c36e126de23d3316a56baad3caa374de1acc51db392d07ba18b4f3239e53e270 -->
+<!-- joplo-skill 0.2.18 sha256:cb6f3cc7a10cf25f18ca56725e70de06dfe4b58bb4ecaaabe2135c85c61e4859 -->

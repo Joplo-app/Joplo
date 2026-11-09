@@ -217,6 +217,7 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 
 ## Playback and free exploration
 - The first picture-changing input while playing pauses and applies the same input. Matching the next script action advances once and stays stopped, including before a following system step. It behaves like manual pause followed by that input.
+- Declared option.free reactions remain available in build/share and review publications after scope filtering. Verify a non-scripted action in the actual published site, then reset; local effects must disappear without changing timeline state.
 - Arbitration: exact next action → reachable other scenario on the same stage (confirm first) → declared free reaction/native local behavior → existing hint. Type, value, target and plugin payload all matter; a bare click cannot complete a typing action.
 - Blank/noninteractive clicks only pause, with no local-change notice. Covers/transition cards remain inert. Hover never pauses; while paused it matches normally. Touch tap completing hover follows the click rule.
 - Pointerdown pauses immediately and the same drag continues. A declared element drag owns its pointer before stage pan or plugin orbit. The first wheel event pauses and scrolls; keep the burst/inertia in its scroll container before stage zoom.
@@ -225,6 +226,7 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - Use native controls from installed plugins and read their skills for supported edits. Use option.free for declared secondary reactions; keep lasting results in scripted effects. Test actual inputs, not only autoplay.
 
 ## Actions and the shared clock
+- Scripted scroll is a timeline projection: returning to an earlier step, resetting, or switching scenarios on the same stage restores the initial scroll baseline and applies only the selected prefix. Test 0 → scrolled step → 0 and a scenario without scrolling. Pausing an in-flight scroll keeps its intermediate position; ordinary render frames must not reset it.
 - .drag(target, destination) accepts an element id or stage pixel point; .scroll(target, destination) accepts an element id or content offset. Declare the correct source and endpoint.
 - .hover(target, ms) expresses a dwell; .act(name, target, data) uses the enabled plugin's data-only contract. Read its installed skill for field types, ranges, matching tolerance and presentation duration.
 - Engine frames expose clock time, speed, running/paused state and gesture progress. Presenters sample it; independent timers must not drive the timeline. Pausing freezes cursor, gestures, media, text and plugin animation together.
@@ -411,7 +413,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID / PLUGIN_ACTION_INVALID: check the action shape, enabled plugin declaration, exact payload fields/ranges, allowed target type, and drag/scroll endpoint. Read the plugin skill; keep endpoints in the current stage, then rerun check.
 - UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
 - UNKNOWN_PLUGIN / PLUGIN_PARENT / PLUGIN_INVALID / PLUGIN_DUPLICATE / PLUGIN_RUNTIME_MISSING: plugin components need their package in config({ plugins: [...] }) once, written inside the parent named in the message; a missing runtime means reinstall the package (npx joplo skill plugins).
-- LOCAL_RESOURCE_FAILED / LOCAL_RESOURCE_TIMEOUT / LOCAL_RESOURCE_TOO_LARGE: an optional local resource could not compile. Playback continues without it; the board shows the source location and reason without resetting the timeline. Repair the native tool/input and retry playback or build; successful retry clears the warning. check does not execute native tools, so verify actual playback/build too (plugins).
+- LOCAL_RESOURCE_FAILED / LOCAL_RESOURCE_TIMEOUT / LOCAL_RESOURCE_TOO_LARGE: an optional local resource could not compile. Playback continues without it; the board shows the source location and reason without resetting the timeline. Repair the native tool/input and retry build; for playback, switch scenarios, toggle sound off/on, or reload first. A failed media slot currently survives a simple pause/play, so that alone may not retry resource generation. Successful regeneration clears the warning. check does not execute native tools, so verify actual playback/build too (plugins).
 - PLUGIN_DATA_INVALID: plugin output failed its JSON/schema contract, or the complete published IR exceeds depth 100 after shared references are expanded (root depth 0, including primitive leaves). For depth errors, flatten the cache or replace nested objects with string ids, then rebuild and verify that the published output can be compared with itself. See npx joplo skill plugins for the output contract.
 - MISSING_ID / DUPLICATE_ID: Give interactive elements stable ids unique within the stage; update step references.
 - FUNCTION_PROP: Replace onClick and other callbacks with flow steps and state effects.
@@ -657,6 +659,8 @@ Use your own Wrangler environment and account in the project directory:
 
 \`npx wrangler deploy --assets dist\`
 Provide the site name and compatibility date through Wrangler project configuration. Handle access control in deployment.
+
+Publication retains option.free reactions after scope filtering. Verify them in the actual built/shared player: the local response must work, reset must discard it, and scripted timeline state must remain unchanged. A compiler-only replay test does not verify this delivery boundary.
 Deploy only dist output, not author source files. MCP, comments, and collaboration are planned separately.
 
 ## Cloud sharing
@@ -779,6 +783,7 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 ## Write a plugin
 - Export definePlugin({ id, packageName, title, version, components, skill, skillTopics?, runtime, compile?, properties?, themes?, actions?, data?, schemas?, local? }) from @joplo-app/kit/plugin. Ship compiled JS and declarations; runtime and optional local entries are URLs resolved relative to the package.
 - components maps names to doc/example, interaction and declarative traits. Export pluginComponent(manifest, name) markers from this package. Intrinsic tag ownership is explicit and unique. No kit component forwarding or bare-name adapters.
+- Runtime CSS imports and emitted local assets are bundled with the plugin: CSS is installed as a per-plugin style sheet, and local URLs become typed data URLs, including CSS images/fonts and imports above the normal inline threshold. Exercise source dev, npm prebuilt dev and offline file:// with real asset loading checks; a successful JS import alone does not prove styles or textures were delivered. Generated asset references that cannot be resolved fail explicitly.
 - Verify both source development and the installed production package in a real browser. A prebuilt host must share its own React instance with dynamic plugin modules; serving a raw CommonJS dependency URL is not sufficient. Production dev and offline publish use the same bundling/shared-module contract.
 - skill is the entry guide: when to use, how to enable/import, the smallest correct example, success checks, pitfalls and recovery. skillTopics maps topic keys to { description, body }; installed references and CLI topics come from this exact version. Do not put private project data or credentials in guides.
 - Node hooks normalize/derive/frame/effect/validate trusted author data. Outputs must be finite JSON within supported depth/size, immutable across calls, identity-safe, and serializable. Functions/prototypes/cycles are rejected. Hooks and source instructions are never shipped as runtime IR.

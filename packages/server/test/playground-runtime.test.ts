@@ -30,7 +30,7 @@ describe('D88 real browser input and clock',()=>{
     write('routes/page.tsx',`import {page,$} from '@joplo-app/kit';import { Stack, Group, Button, Text, TextInput, Switch, Checkbox, Radio, Select, SegmentedControl, Tabs, Accordion, ScrollArea, Box } from '@joplo-app/plugin-ui';import {Widget} from '../probe';export default page({title:'Fixture'},<Stack gap="xs" p="md"><Group><Button id="next">Next</Button><Button id="other">Other scene</Button><Button id="avatar">Profile</Button><Text id="profile" when={$.ui.profile}>Profile open</Text></Group><Group><TextInput id="name" label="Name" value={$.ui.name}/><Switch id="lamp" label="Lamp" checked={$.data.lamp}/><Checkbox id="check" label="Check"/><Select id="select" label="Select" defaultValue="a" data={[{value:'a',label:'Alpha'},{value:'b',label:'Beta'}]}/><SegmentedControl id="segments" defaultValue="a" data={['a','b']}/></Group><Group><Tabs id="tabs" defaultValue="a"><Tabs.List><Tabs.Tab id="tab_a" value="a">Tab A</Tabs.Tab><Tabs.Tab id="tab_b" value="b">Tab B</Tabs.Tab></Tabs.List><Tabs.Panel value="a">Panel A</Tabs.Panel><Tabs.Panel value="b">Panel B</Tabs.Panel></Tabs><Radio.Group id="radio" defaultValue="a"><Radio id="radio_a" value="a" label="Radio A"/><Radio id="radio_b" value="b" label="Radio B"/></Radio.Group><Accordion id="accordion"><Accordion.Item value="details"><Accordion.Control id="expand">Expand</Accordion.Control><Accordion.Panel>Expanded detail</Accordion.Panel></Accordion.Item></Accordion></Group><Group><Button id="tile">Drag tile</Button><Box id="drop" w={160} h={60}>Drop zone</Box><Button id="help">Hover help</Button><Widget id="widget"/></Group><ScrollArea id="list" h={100} w={300}><Box h={500}>Scrollable area</Box><Text id="last">Last row</Text></ScrollArea></Stack>);`);
     write('routes/spatial/page.tsx',`import {page} from '@joplo-app/kit';import {Scene3D} from 'joplo-plugin-scene3d';export default page({title:'Spatial'},<Scene3D id="home" height={400} azimuth={45} elevation={32}><Scene3D.Object id="floor" shape="floor" size={[8,0.1,6]}/><Scene3D.Object id="cube" shape="box" size={[2,2,1]} /></Scene3D>);`);
     write('features/f/feature.ts',`import{feature}from'@joplo-app/kit';export default feature({name:'F',goal:'G',cases:{},pick:'a'});`);
-    write('features/f/options/a.tsx',`import{$,option,flow,free,set}from'@joplo-app/kit';export default option({name:'A',idea:'I',state:{ui:{name:''},data:{lamp:true}},free:{profile:free.click('avatar',set($.ui.profile,true))},scenarios:{spatial:flow('Spatial',{start:'/spatial'}).act('scene3d:rotate','home',{azimuth:90,elevation:32}),main:flow('Main').click('next').type('name','Ada').toggle('lamp',false).drag('tile','drop',set($.ui.dragged,true)).hover('help',120,set($.ui.hovered,true)).scroll('list','last').act('probe:turn','widget',{angle:90}),other:flow('Other').click('other'),coordinates:flow('Coordinates').drag('tile',{x:900,y:650}),hover:flow('Hover').hover('help',120),plugin:flow('Plugin').act('probe:turn','widget',{angle:90})}});`);
+    write('features/f/options/a.tsx',`import{$,option,flow,free,set}from'@joplo-app/kit';export default option({name:'A',idea:'I',state:{ui:{name:''},data:{lamp:true}},free:{profile:free.click('avatar',set($.ui.profile,true))},scenarios:{rewind:flow('Rewind').scroll('list',{x:0,y:300}).scroll('list',{x:0,y:150}),plain:flow('Plain').system('Stay'),spatial:flow('Spatial',{start:'/spatial'}).act('scene3d:rotate','home',{azimuth:90,elevation:32}),main:flow('Main').click('next').type('name','Ada').toggle('lamp',false).drag('tile','drop',set($.ui.dragged,true)).hover('help',120,set($.ui.hovered,true)).scroll('list','last').act('probe:turn','widget',{angle:90}),other:flow('Other').click('other'),coordinates:flow('Coordinates').drag('tile',{x:900,y:650}),hover:flow('Hover').hover('help',120),plugin:flow('Plugin').act('probe:turn','widget',{angle:90})}});`);
     write('harness.ts',`import ${JSON.stringify(path.join(REPO,'packages/web/src/index.css'))};import{createElement as h,useSyncExternalStore}from'react';import{createRoot}from'react-dom/client';import{projectThemes}from'@joplo-app/core';import{Stage}from ${JSON.stringify(path.join(REPO,'packages/web/src/renderer/Stage.tsx'))};import{ThemeStyles}from ${JSON.stringify(path.join(REPO,'packages/web/src/renderer/ThemeStyles.tsx'))};import{DemoController}from ${JSON.stringify(path.join(REPO,'packages/web/src/runtime/demo.ts'))};import{Overlay}from ${JSON.stringify(path.join(REPO,'packages/web/src/player/Overlay.tsx'))};import{PlaygroundNotice}from ${JSON.stringify(path.join(REPO,'packages/web/src/player/PlaygroundNotice.tsx'))};import{loadPluginRuntimes}from ${JSON.stringify(path.join(REPO,'packages/web/src/renderer/plugins.ts'))};let project,ctl,el,stage;function App(){const s=useSyncExternalStore(ctl.subscribe,ctl.getSnapshot);return h('div',{},h(ThemeStyles,{themes:projectThemes(project)}),h(Stage,{project,state:s.state,theme:project.theme,mode:'demo',animate:true,playground:s.playground,freeMode:s.freeMode,clock:ctl.clock,gesture:s.gesture,epoch:s.epoch,preview:s.preview,activeStep:s.activeStep,onStageInput:explore=>ctl.stageInput(explore),onAction:(a,n)=>void ctl.act(a,n),onNodeClick:(id,pt,o)=>void ctl.clickNode(id,pt,o),stageRef:node=>{stage=node;ctl.setStageEl(node);},zoom:{resetKey:String(s.epoch)},overlay:h(Overlay,{snap:s,stage,nextTargetId:null,setCursorEl:ctl.setCursorEl,onBackToDemo:()=>{},onDismiss:()=>{}})}),h('button',{id:'play',onClick:()=>ctl.togglePlay()},'Playback'),h('button',{id:'jump',onClick:()=>ctl.goto(0)},'Jump'),s.freeMode?h(PlaygroundNotice,{ctl,snap:s}):null);}window.fixtureStart=async(p,urls)=>{project=p;await loadPluginRuntimes(urls);ctl=new DemoController();ctl.setProject(p,1);ctl.setScenario('f.a.main');window.fixtureCtl=ctl;el=document.createElement('div');el.id='fixture';document.body.replaceChildren(el);createRoot(el).render(h(App));};`);
     write('fixture.html',`<!doctype html><style>body{margin:0}</style><script type="module">import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>type=>type;window.__vite_plugin_react_preamble_installed__=true;await import('./harness.ts');</script>`);
     server=await createDev({projectDir:root,port:0,watch:false,log:()=>undefined});
@@ -243,6 +243,60 @@ describe('D88 real browser input and clock',()=>{
       expect(await embedded.getByTestId('embed-bar').locator('[data-joplo-stage]').count()).toBe(0);
       expect(requests).toEqual([]);
     } finally {await offline.close();}
+  },120000);
+
+  it('BR-3 scripted scroll restores earlier prefixes, reset, same-stage scenarios and local exploration',async()=>{
+    const offset=()=>page.locator('[data-jid="list"]').evaluate(el=>Math.max(el.scrollTop,...[...el.querySelectorAll('*')].map(e=>e.scrollTop)));
+    const jump=async(n:number)=>{await page.evaluate(n=>(window as any).fixtureCtl.goto(n),n);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));};
+    await at('rewind',0);expect(await offset()).toBe(0);
+    await jump(1);expect(await offset()).toBe(300);
+    await jump(2);expect(await offset()).toBe(150);
+    await jump(1);expect(await offset()).toBe(300);
+    await jump(0);expect(await offset()).toBe(0);
+    await jump(1);await at('plain',0);expect(await offset()).toBe(0);
+    await at('rewind',1);await page.locator('[data-jid="list"]').hover();await page.mouse.wheel(0,60);
+    await page.waitForFunction(()=>(window as any).fixtureCtl.getSnapshot().freeMode===true);
+    await expect.poll(offset).toBeGreaterThan(300);
+    await page.evaluate(()=>(window as any).fixtureCtl.resetPlayground());
+    await page.waitForFunction(()=>document.querySelector('[data-jid="list"]')!.scrollTop===300);
+    await jump(0);expect(await offset()).toBe(0);
+    await page.locator('[data-jid="list"]').hover();await page.mouse.wheel(0,60);
+    await page.waitForFunction(()=>(window as any).fixtureCtl.getSnapshot().freeMode===true);
+    await page.waitForFunction(()=>document.querySelector('[data-jid="list"]')!.scrollTop>0);
+    await at('plain',0);expect(await offset()).toBe(0);
+  });
+
+  it('BR-3 scripted scroll animation keeps intermediate positions and reset returns to baseline',async()=>{
+    await at('rewind',0);
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.speed=0.25;void c.play();});
+    await page.waitForFunction(()=>{const y=document.querySelector('[data-jid="list"]')!.scrollTop;return y>20&&y<250;});
+    await page.evaluate(()=>(window as any).fixtureCtl.pause());
+    const y=await page.locator('[data-jid="list"]').evaluate(el=>el.scrollTop);
+    await page.evaluate(()=>{const n=document.createElement('i');n.textContent='Mutation';document.querySelector('[data-jid="drop"]')!.append(n);});
+    await page.waitForTimeout(100);
+    expect(await page.locator('[data-jid="list"]').evaluate(el=>el.scrollTop)).toBe(y);
+    await page.evaluate(()=>(window as any).fixtureCtl.reset());
+    await page.waitForFunction(()=>document.querySelector('[data-jid="list"]')!.scrollTop===0);
+    expect((await snapshot()).state.position).toBe(0);
+  });
+
+  it.each([false,true])('BR-1 scoped file:// publication retains declared free clicks (review=%s)',async review=>{
+    const out=path.join(root,`free-publish-${review}`);
+    await buildSite({projectDir:root,outDir:out,review,scope:{scenarios:['f.a.plugin']},home:path.join(root,'home')});
+    const context=await browser.newContext({viewport:{width:1440,height:1000},offline:true});
+    const viewer=await context.newPage();const failures:string[]=[];viewer.on('pageerror',e=>failures.push(e.message));
+    try{
+      await viewer.goto(pathToFileURL(path.join(out,'index.html')).href+'#/f/f?s=f.a.plugin&step=1');
+      await viewer.waitForSelector('[data-jid="avatar"]');
+      const timeline=await viewer.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__));
+      await viewer.locator('[data-jid="avatar"]').click();
+      await expect.poll(()=>viewer.locator('[data-jid="profile"]').count()).toBe(1);
+      expect(await viewer.locator('[data-jid="profile"]').innerText()).toBe('Profile open');
+      expect(await viewer.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__))).toBe(timeline);
+      await viewer.getByTestId('playground-reset').click();
+      await expect.poll(()=>viewer.locator('[data-jid="profile"]').count()).toBe(0);
+      expect(failures).toEqual([]);
+    }finally{await context.close();}
   },120000);
 
 });

@@ -1,4 +1,5 @@
 import { inlineResources } from './local-resources.ts';
+import { inlinePluginAssets, PLUGIN_ASSET_BASE } from './plugin-assets.ts';
 import sharedModules from '@joplo-app/web/shared-modules.json' with { type: 'json' };
 /**
  * `joplo build`：静态发布站。
@@ -35,7 +36,7 @@ export function publishPayload(project: Project, home: string | null): { project
   // voiceConfig（D74）：profile 名与音色属于作者本机的设置，发布站只需要 build 写进的 voiceIndex
   const { rules: _r, cases: _c, issues: _i, voiceConfig: _v, ...rest } = project;
   const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, { id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick }]));
-  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {} }]));
+  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {}, ...(o.free ? {free:o.free} : {}) }]));
   const scenarios = Object.fromEntries(
     Object.entries(project.scenarios).map(([id, s]) => {
       const { caseIds: _ci, ...sr } = s;
@@ -279,6 +280,7 @@ export async function bundlePluginRuntimes(runtimes: Record<string, string>, pro
       configFile: false,
       envDir: false,
       root: path.dirname(file),
+      base: PLUGIN_ASSET_BASE,
       mode: 'production',
       logLevel: 'error',
       resolve: { alias: kitAliases(web, projectDir) },
@@ -291,12 +293,14 @@ export async function bundlePluginRuntimes(runtimes: Record<string, string>, pro
         resolveId: (src) => src === 'joplo-plugin-entry' ? entry : shared.includes(src) ? `\0joplo-shared:${src}` : null,
         load: (resolved) => (resolved.startsWith('\0joplo-shared:') ? bridge(resolved.slice('\0joplo-shared:'.length)) : resolved === entry ? `import runtime from ${JSON.stringify(file)};\n${mode === 'module' ? 'export default runtime;' : '(globalThis.__JOPLO_PLUGINS__ ??= []).push(runtime);'}\n` : null),
       }],
-      build: { write: false, minify: true, sourcemap: false, modulePreload: false, reportCompressedSize: false, emptyOutDir: false, rolldownOptions: { input: 'joplo-plugin-entry', ...(mode === 'module' ? {preserveEntrySignatures:'strict' as const} : {}), output: { format: 'es', codeSplitting: false } } },
+      build: { write: false, assetsInlineLimit: 0, cssCodeSplit: false, minify: true, sourcemap: false, modulePreload: false, reportCompressedSize: false, emptyOutDir: false, rolldownOptions: { input: 'joplo-plugin-entry', ...(mode === 'module' ? {preserveEntrySignatures:'strict' as const} : {}), output: { format: 'es', codeSplitting: false } } },
     })) as Rollup.RollupOutput | Rollup.RollupOutput[];
-    const chunks = (Array.isArray(r) ? r : [r]).flatMap((o) => o.output).filter((x): x is Rollup.OutputChunk => x.type === 'chunk');
+    const output=(Array.isArray(r)?r:[r]).flatMap(o=>o.output);
+    const chunks=output.filter((x):x is Rollup.OutputChunk=>x.type==='chunk');
     if (chunks.length !== 1) throw new JoploError('EXPORT_FAILED', `Plugin ${id}: expected one bundled runtime file, got ${chunks.length}`);
+    const code=inlinePluginAssets(id,chunks[0]!.code,output.filter((x):x is Rollup.OutputAsset=>x.type==='asset'));
     // Defer evaluation until the host has initialized its shared React instance.
-    out.push(mode === 'module' ? chunks[0]!.code : `(globalThis.__JOPLO_PLUGIN_FACTORIES__ ??= []).push({id:${JSON.stringify(id)},load:()=>{\n${chunks[0]!.code}\n}});`);
+    out.push(mode === 'module' ? code : `(globalThis.__JOPLO_PLUGIN_FACTORIES__ ??= []).push({id:${JSON.stringify(id)},load:()=>{\n${code}\n}});`);
   }
   return out;
 }
