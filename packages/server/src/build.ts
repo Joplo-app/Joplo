@@ -1,3 +1,4 @@
+import { publishCssContent } from './publish-css.ts';
 import { binaryAssets, extractSiteAssets } from './binary-assets.ts';
 import { inlineResources } from './local-resources.ts';
 import { inlinePluginAssets, PLUGIN_ASSET_BASE } from './plugin-assets.ts';
@@ -7,7 +8,7 @@ import sharedModules from '@joplo-app/web/shared-modules.json' with { type: 'jso
  *
  * 1. 用 Vite（中间件模式，不监听端口）ssrLoadModule 载入项目，compile(…, 'publish')：只含选定方案，
  *    已去掉规则、情况、问题、备注、源路径（D33）。这里再去掉 IR 中创作侧的空字段与约束、角色。
- * 2. vite build 发布站入口（packages/web/site.html），Tailwind 以项目目录为 @source。
+ * 2. vite build 发布站入口（packages/web/site.html），Tailwind 只扫描最终公开载荷的字符串与播放器样式来源。
  * 3. 后处理：IR 内联到 index.html；入口脚本内联为 <script type="module">、去掉 crossorigin，
  *    这样直接双击 index.html（file://）也能离线运行。产物是普通静态目录，可 `wrangler deploy --assets` 或任何静态托管发布。
  *
@@ -180,13 +181,17 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
 
   // 2. vite build 到临时目录
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-build-'));
+  const cssSources = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-public-css-'));
+  const publicCssSource = path.join(cssSources, 'public-ir.html');
   let voiceReport: BuildResult['voice'];
   // React 与 plugin-react 依据 NODE_ENV 判断生产构建（测试运行器会把它设为 test）；构建期间强制 production。
   const prevEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   try {
-    if (web.mode === 'dist') await stageDistSite(web, projectDir, staging);
-    else await buildSourceSite(web, projectDir, staging);
+    // 内容文件与 Vite outDir 分离，避免 emptyOutDir 在扫描前删除它；永不复制进产物。
+    fs.writeFileSync(publicCssSource, publishCssContent(inline.project), { mode: 0o600 });
+    if (web.mode === 'dist') await stageDistSite(web, projectDir, staging, publicCssSource);
+    else await buildSourceSite(web, projectDir, staging, publicCssSource);
 
     // 朗读（D74）：当前声音已生成的音频拷进 voice/，IR 带上 voiceIndex；Key 不进产物
     const store = new ProfileStore(opts.home ?? joploHome());
@@ -232,6 +237,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     if (prevEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = prevEnv;
     fs.rmSync(staging, { recursive: true, force: true });
+    fs.rmSync(cssSources, { recursive: true, force: true });
   }
   return {
     outDir,
@@ -246,7 +252,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
 }
 
 /** 仓库里：直接编译 packages/web 的发布站入口。 */
-async function buildSourceSite(web: SourceWeb, projectDir: string, staging: string) {
+async function buildSourceSite(web: SourceWeb, projectDir: string, staging: string, publicCssSource: string) {
   const { default: react } = await import('@vitejs/plugin-react');
   await viteBuild({
     configFile: false,
@@ -257,7 +263,7 @@ async function buildSourceSite(web: SourceWeb, projectDir: string, staging: stri
     logLevel: 'error',
     resolve: { alias: [{ find: /^@joplo-app\/core(?:\/runtime)?$/, replacement: path.join(web.webDir, 'src/site/core-lite.ts') }, ...kitAliases(web, projectDir)] },
     define: { 'process.env.NODE_ENV': '"production"' },
-    plugins: [joploProjectPlugin(projectDir, web), react(), tailwindcss()],
+    plugins: [joploProjectPlugin(projectDir, web, publicCssSource), react(), tailwindcss()],
     build: {
       minify: true,
       sourcemap: false,
@@ -273,7 +279,7 @@ async function buildSourceSite(web: SourceWeb, projectDir: string, staging: stri
 }
 
 /** 从 npm 安装时：复制预构建的发布站，单独编译作者 className 的 CSS 并在 site.html 里引用。 */
-export async function stageDistSite(web: DistWeb, projectDir: string, staging: string) {
+export async function stageDistSite(web: DistWeb, projectDir: string, staging: string, publicCssSource: string) {
   for (const rel of web.siteFiles) {
     const to = path.join(staging, rel);
     fs.mkdirSync(path.dirname(to), { recursive: true });
@@ -288,7 +294,7 @@ export async function stageDistSite(web: DistWeb, projectDir: string, staging: s
       base: './',
       mode: 'production',
       logLevel: 'error',
-      plugins: [joploProjectPlugin(projectDir, web), tailwindcss()],
+      plugins: [joploProjectPlugin(projectDir, web, publicCssSource), tailwindcss()],
       build: { outDir: cssOut, emptyOutDir: true, minify: true, sourcemap: false, reportCompressedSize: false, write: true, rolldownOptions: { input: { project: web.projectCss } } },
     })) as Rollup.RollupOutput | Rollup.RollupOutput[];
     const files = (Array.isArray(out) ? out : [out]).flatMap((o) => o.output.map((x) => x.fileName)).filter((f) => f.endsWith('.css'));
