@@ -399,6 +399,31 @@ Divider inside Menu.Dropdown
 ## Placeholder
 label, h; placeholder for images, charts, etc.
 
+## Board
+dots (dotted paper, default true); a whiteboard: place screens, notes and arrows on it with pos="absolute" top / left (design px). Put it inside content:Canvas to move the camera between screens
+
+```tsx
+<Canvas w={2400} h={1400}>
+  <Board>
+    <BrowserWindow id="login" label="1. Sign in" url="app.com/login" pos="absolute" top={200} left={120} w={520} h={400}>
+      <Stack p="lg"><TextInput id="email" label="Email" /><Button id="send">Send link</Button></Stack>
+    </BrowserWindow>
+    <BrowserWindow id="sent" label="2. Check email" pos="absolute" top={200} left={800} w={520} h={400} when={$.ui.sent}>…</BrowserWindow>
+    <Arrow id="a_send" from="send" to="sent" label="send" when={$.ui.sent} />
+    <Note id="n_privacy" pos="absolute" top={660} left={140} color="pink">Unknown email? Still say "sent"</Note>
+  </Board>
+</Canvas>
+```
+
+## BrowserWindow
+url, label (caption above the frame, e.g. "1. Sign in"), w, h; a browser window frame for one screen on a Board; children are its page
+
+## Note
+color (yellow default; pink, blue, green, gray), rotate (degrees, default -2), w; a sticky note that stays on the Board; children = text
+
+## Arrow
+from, to (ids of elements on the same Board), label, bend (-1…1, default 0.25), dashed, color; a persistent arrow between two elements; direct child of Board, reveal it with when
+
 ## Button
 variant: filled|light|outline|subtle|default|white, color, size, fullWidth, loading, leftSection / rightSection (character)
 
@@ -487,4 +512,4 @@ data: string[] | [{ value, label, icon?, badge? }], value / defaultValue, aria-l
 </Stack>
 // steps: .select('tabs', 'trips', go('/trips'))
 ```
-<!-- joplo-skill 0.3.0 sha256:5173f83edd4b35359319843fd847012d788910dd7bc1d39821ff070e2ffea19a -->
+<!-- joplo-skill 0.3.0 sha256:ad699fadea2fbcef8e18e38d92b2caa00f9bf431621b10954d1cf8e26887d1b0 -->
