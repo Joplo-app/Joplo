@@ -595,12 +595,24 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       return 'next' as const;
     }
     if (rest.startsWith('binary/') && method === 'GET') {
-      const slot = await ensure(id), match = /^binary\/([a-f0-9]{64})\.(glb|audio)$/.exec(rest);
+      const slot = await ensure(id), match = /^binary\/([a-f0-9]{64})\.(glb|audio|mp4|webm|json)$/.exec(rest);
       if (!match) return sendJson(res,404,{error:'Unknown binary asset'});
       const file = path.join(slot.dir,'.joplo','binary',match[1]!);
       if (!fs.existsSync(file)) return sendJson(res,404,{error:'Missing binary asset'});
-      res.setHeader('Content-Type',match[2] === 'glb' ? 'model/gltf-binary' : 'application/octet-stream');
-      res.end(fs.readFileSync(file)); return;
+      const type = ({ glb: 'model/gltf-binary', mp4: 'video/mp4', webm: 'video/webm', json: 'application/json' } as Record<string, string>)[match[2]!] ?? 'application/octet-stream';
+      res.setHeader('Content-Type', type);
+      res.setHeader('Accept-Ranges', 'bytes');
+      const bytes = fs.readFileSync(file);
+      // 视频拖动（D96 媒体插件）：单段 Range
+      const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
+      if (range && (range[1] || range[2])) {
+        const start = range[1] ? Number(range[1]) : Math.max(0, bytes.length - Number(range[2]));
+        const end = range[1] && range[2] ? Math.min(bytes.length - 1, Number(range[2])) : bytes.length - 1;
+        if (start > end || start >= bytes.length) { res.statusCode = 416; res.setHeader('Content-Range', `bytes */${bytes.length}`); res.end(); return; }
+        res.statusCode = 206; res.setHeader('Content-Range', `bytes ${start}-${end}/${bytes.length}`);
+        res.end(bytes.subarray(start, end + 1)); return;
+      }
+      res.end(bytes); return;
     }
     if (rest.startsWith('resources/') && method === 'POST') {
       if (!guardWrite(req, res)) return;

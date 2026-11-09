@@ -15,6 +15,10 @@ const MIME: Record<string, string> = {
   webp: 'image/webp',
   avif: 'image/avif',
   svg: 'image/svg+xml',
+  // 媒体插件（D96 / D98）：视频片段与 Lottie 动画 JSON
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  json: 'application/json',
 };
 
 /** 单个文件的上限：再大会拖慢看板加载并撑大发布包，应先压缩。 */

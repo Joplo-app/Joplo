@@ -621,3 +621,8 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
 - **放弃 file://**：构建产物只保证通过 HTTP 打开（Cloud 分享、任意静态服务器）。新增 `npx joplo preview [dir]` 在本机起静态服务器预览构建结果。原先“发布物自包含、file:// 离线可开”的约定（D87 等）由此修订。
 - **Cloud 端**：joplo-cloud 配套加入视频（.mp4 / .webm）与 GLB 等类型及单文件上限，两个 PR 一起合并。
 - **Cloud 端（joplo-cloud C28）**：沙箱分享页原本 `connect-src 'none'`，配乐、GLB、Lottie 要 fetch 字节。用户选择“素材文件开放读取”：只有 `assets/<64 位哈希>.<扩展名>` 返回不带凭证的 CORS（*），分享文档 CSP 的 connect-src 只放开到本分享自己的路径；密码授权在路径里，素材仍受保护。契约新增 avif / mp4 / webm，Worker 对视频支持 Range。
+- **2026-11-09 代码插件与媒体插件原型**（用户：“好，继续吧”）。按 D96 先在主仓库做（`plugins/code`、`plugins/media`，private，0.1.0），确认后迁到 `Joplo-app/plugins`。
+  - 代码插件 `@joplo-app/plugin-code`：`<Editor>` + `typeCode / editCode / highlightLines`。effect 记下这一步的操作并给 holdMs（D98），frame 在上一步快照上应用，得到每一步的完整快照；Shiki 4.6.0 在编译期着色（同步 API + JS 正则引擎），浏览器不带语法库。示例 `examples/code-change`。
+  - 媒体插件 `@joplo-app/plugin-media`：`<Video>` / `<Lottie>` + `playClip`。MP4 时长读 mvhd、Lottie 读 fr/ip/op 给 holdMs；WebM 必须写 to。运行时按引擎时间定位画面，静态画面定位到终点帧并等解码（ctx.hold）。lottie-web 5.13.0（MIT）只用 lottie_light（SVG）。视频一律静音（通用媒体层只混音频）；GIF 不做组件（浏览器自己的时钟，不能暂停 / 定位），用 ui Image 或转成 MP4。示例 `examples/media-upload`（素材本地生成）。
+  - 示例反推的引擎改动：插件效果的 references 算这一步的焦点对象（否则只改插件画面的步骤被误报 FOCUS_IDLE）；asset() 支持 mp4 / webm / json；看板本机素材地址支持视频与 JSON，并对视频支持 Range。
+  - 已知局限：编辑器 / 片段状态按场景计，flow({ from }) 接力不继承上一章的代码与播放位置；没写 from 的 playClip 按“从头”估 holdMs（偏长、不会被切走）；编辑器的行不能被镜头 / callout 单独指向。
