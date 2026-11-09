@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { defineRuntime } from '@joplo-app/kit/plugin';
 import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
-import { resolveProps, isSelfVisible, walkNodes } from '@joplo-app/kit/renderer';
+import { resolveProps, isSelfVisible, useEngineFrame, walkNodes } from '@joplo-app/kit/renderer';
 import { AnimatePresence } from 'motion/react';
 import { motion } from '@joplo-app/kit/renderer';
 import { useI18n, useCtx as useHostCtx, useR, useRoot, useRootAttrs, RenderNode, Rough, RoughPath, roundRectPath, useStroke, type NodeProps } from '@joplo-app/kit/renderer';
@@ -411,7 +411,9 @@ function DiagramNode({ node, p }: NodeProps) {
 function MovingDot({ d, color, animate: anim, reverse = false }: { d: string; color: string; animate: boolean; reverse?: boolean }) {
   const pathRef = useRef<SVGPathElement>(null);
   const dotRef = useRef<SVGCircleElement>(null);
-  const { clock } = useCtx();
+  const { clock: coarse } = useCtx();
+  // 小点逐帧沿线移动：只有这里订阅每一帧（D99）
+  const clock = useEngineFrame(anim && !!coarse) ?? coarse;
   useEffect(() => {
     const path = pathRef.current;
     const dot = dotRef.current;

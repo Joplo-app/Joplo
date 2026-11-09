@@ -626,3 +626,12 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 媒体插件 `@joplo-app/plugin-media`：`<Video>` / `<Lottie>` + `playClip`。MP4 时长读 mvhd、Lottie 读 fr/ip/op 给 holdMs；WebM 必须写 to。运行时按引擎时间定位画面，静态画面定位到终点帧并等解码（ctx.hold）。lottie-web 5.13.0（MIT）只用 lottie_light（SVG）。视频一律静音（通用媒体层只混音频）；GIF 不做组件（浏览器自己的时钟，不能暂停 / 定位），用 ui Image 或转成 MP4。示例 `examples/media-upload`（素材本地生成）。
   - 示例反推的引擎改动：插件效果的 references 算这一步的焦点对象（否则只改插件画面的步骤被误报 FOCUS_IDLE）；asset() 支持 mp4 / webm / json；看板本机素材地址支持视频与 JSON，并对视频支持 Range。
   - 已知局限：编辑器 / 片段状态按场景计，flow({ from }) 接力不继承上一章的代码与播放位置；没写 from 的 playClip 按“从头”估 holdMs（偏长、不会被切走）；编辑器的行不能被镜头 / callout 单独指向。
+## D99 · 播放时只有逐帧的呈现器跟着时钟重渲染（2026-11-09）
+
+来源：用户重做 examples/midterms-2026（一张 3840×2400 的画布，约 1000 个元素）后反馈“效果还可以，但是看着很卡”。实测（无头 Chrome，同一段播放 15 秒）约 20 fps，CPU 剖析显示时间几乎都在 React 重渲染：舞台用 useSyncExternalStore 订阅每一帧时钟，渲染上下文每帧换新对象，整棵树每帧重渲染。
+
+- **舞台与普通节点**订阅粗粒度时钟（coarseFrame）：对象只在“运行 / 暂停 / 倍速”变化时更换，timeMs / elapsedMs / rawMs 是读取时的实时值。插件拿到的 frame.clock、useCtx().clock 都是它。
+- **逐帧的呈现器自己订阅**：新增渲染服务 useEngineFrame()（@joplo-app/kit/renderer）。content Canvas（镜头）、diagram 连线上移动的小点、逐字出现的文字用它；命令式 mount/update 组件（3D）由宿主逐帧订阅，update 照常每帧调用。Canvas 用 useMemo 固定世界与屏幕层子树，镜头每帧移动时子树不重渲染，状态变化仍经渲染上下文传到各节点。
+- **结果**：同一段播放约 52 fps，中位帧时间 16.7ms；剩余卡顿在换步时的整树更新（看板为开发版 React）。
+- **插件契约**：在渲染里读 clock.timeMs、或把它当 effect 依赖来驱动动画，而不调用 useEngineFrame()，动画会停住。技能 plugins 主题已写明。
+

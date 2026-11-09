@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defineRuntime, type ComponentCtx, type PluginObserve } from '@joplo-app/kit/plugin';
-import { useRoot } from '@joplo-app/kit/renderer';
+import { useEngineFrame, useRoot } from '@joplo-app/kit/renderer';
 import type { ContentFrame } from './plugin.ts';
 const stillCss = '.jstage[data-jstill] [data-jcanvas],.jstage[data-jstill] [data-jcanvas] *{transition:none!important;animation-delay:0s!important;animation-duration:0s!important}';
 
@@ -119,6 +119,8 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
   const node = context.model;
   const p = context.node.props;
   const ctx = context.frame;
+  // 镜头逐帧移动：只有画布本身订阅每一帧；世界里的子树用 useMemo 固定，不跟着每帧重渲染（D99）
+  useEngineFrame(!!ctx.clock && ctx.animate);
   // screen 子元素固定在屏幕上（设计尺寸，随画布缩放，不随镜头动）：章节标记、来源、封面、行动号召
   const kids = node.children ?? [];
   const onScreen = kids.filter((c) => c.props?.screen === true);
@@ -200,6 +202,11 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
     w.dataset.flightMs = String(flight.ms);
     w.dataset.flightEase = flight.ease;
   });
+  // 子树只随节点模型变化；状态变化仍经渲染上下文传到各个节点
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const worldKids = useMemo(() => context.renderChildren(inWorld), [node]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const screenKids = useMemo(() => onScreen.map((c) => <div key={c.id} style={{ pointerEvents: 'auto' }}>{context.renderChildren([c])}</div>), [node]);
   const s = box.w && box.h ? Math.min(box.w / view.w, box.h / view.h) : 0;
   const ox = (box.w - view.w * s) / 2;
   const oy = (box.h - view.h * s) / 2;
@@ -219,11 +226,11 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
             transition: !timed && ctx.animate && !clock ? `transform ${ms}ms ${CAMERA_EASE}` : 'none',
           }}
         >
-          {context.renderChildren(inWorld)}
+          {worldKids}
         </div>
         {onScreen.length ? (
           <div data-jcanvas-screen="" style={{ position: 'absolute', left: ox, top: oy, width: view.w, height: view.h, transformOrigin: '0 0', transform: `scale(${s})`, visibility: s ? 'visible' : 'hidden', pointerEvents: 'none' }}>
-            {onScreen.map((c) => <div key={c.id} style={{ pointerEvents: 'auto' }}>{context.renderChildren([c])}</div>)}
+            {screenKids}
           </div>
         ) : null}
       </div>

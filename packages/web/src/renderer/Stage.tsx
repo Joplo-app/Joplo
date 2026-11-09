@@ -3,7 +3,7 @@ import { useEngineAnimations } from './engine-animations';
 import { EngineClockContext } from './engine-motion';
 import { playgroundState, type Playground, type Action } from '@joplo-app/core/runtime';
 import { editableTarget, inputOwner, hoverAction, HoverIntent, resolveDropTarget, dropTarget } from '../runtime/input';
-import type { ClockSource, ClockFrame } from '../runtime/clock';
+import { coarseFrame, type ClockSource, type ClockFrame } from '../runtime/clock';
 import type { ActionPresentation } from '@joplo-app/kit/plugin';
 import { projectThemes } from '@joplo-app/core/runtime';
 import { useI18n } from '../i18n/context';
@@ -121,7 +121,8 @@ function scrollsItself(target: EventTarget | null, root: HTMLElement, dy: number
 
 export function Stage({ project, state, theme, mode, selectedId = null, preview = null, activeStep = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false, font = null, stroke: strokeOverride = null, stream = null, playground = null, freeMode = false, clock, gesture = null, onStageInput, onAction, inputs = 0 }: StageProps) {
   const { t: i18n } = useI18n();
-  const frame = useSyncExternalStore((clock ?? noClock).subscribe, (clock ?? noClock).getSnapshot, noClock.getSnapshot);
+  // 只在运行 / 暂停 / 倍速变化时重渲染整个舞台；逐帧的呈现器自己订阅 useEngineFrame()
+  const frame = useSyncExternalStore((clock ?? noClock).subscribe, () => coarseFrame(clock ?? noClock), noClock.getSnapshot);
   const viewState = useMemo(() => mode === 'demo' ? playgroundState(state, playground) : state, [state, playground, mode]);
   // A viewer edit owns that input while exploring. Keep the frozen script preview
   // intact in the controller so reset/resume can restore it without losing progress.
