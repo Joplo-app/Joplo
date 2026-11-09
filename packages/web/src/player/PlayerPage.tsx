@@ -1,4 +1,5 @@
 import { AuthorLink, type Author } from '../site/author';
+import { projectThemes } from '@joplo-app/core';
 import { useTopbarMeasurements } from './topbar-fit';
 import { LanguageMenu } from './LanguageMenu';
 import { localeNames } from '../i18n/locale';
@@ -623,7 +624,7 @@ export function PlayerPage(p: PlayerPageProps) {
   const [barRowRef, barRowW] = useWidth(1200);
   const hasStage = !!(state && shownScene);
   // 外观（D55）：舞台、字幕、手机外框用同一套（线条落到 rough / clean，字体覆盖 --jp-font）
-  const look = resolveLook({ theme: p.theme, font: p.font ?? null, stroke: p.stroke ?? null }, project.themes ?? {}, i18n);
+  const look = resolveLook({ theme: p.theme, font: p.font ?? null, stroke: p.stroke ?? null }, projectThemes(project), i18n);
 
   const zoomIn = () => zoomApi.current?.zoomBy(1.25);
   const zoomOut = () => zoomApi.current?.zoomBy(1 / 1.25);

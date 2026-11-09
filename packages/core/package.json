@@ -19,7 +19,8 @@
   "dependencies": {
     "@joplo-app/kit": "workspace:*",
     "zod": "4.6.7",
-    "@joplo-app/plugin-diagram": "workspace:*"
+    "@joplo-app/plugin-diagram": "workspace:*",
+    "@joplo-app/plugin-content": "workspace:*"
   },
   "engines": {
     "node": ">=22"

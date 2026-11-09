@@ -46,3 +46,7 @@ release/
 .done-*
 .blocked-*
 .review-*
+
+# Local browser verification artifacts
+output/playwright/
+.playwright-cli/

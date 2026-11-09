@@ -501,11 +501,3 @@
   border-radius: 4px;
   box-shadow: 0 0 0 6px color-mix(in srgb, #e03131 18%, transparent);
 }
-
-/* 画布（讲解片）：静态画面（截图、缩略图、跳到某一步）直接显示终态，作者写的 CSS 动画与过渡不播放 */
-.jstage[data-jstill] [data-jcanvas],
-.jstage[data-jstill] [data-jcanvas] * {
-  transition: none !important;
-  animation-delay: 0s !important;
-  animation-duration: 0s !important;
-}

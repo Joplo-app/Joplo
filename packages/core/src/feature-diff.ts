@@ -1,3 +1,4 @@
+import { projectThemes } from './themes.ts';
 import { jsonData } from './plugins/data.ts';
 import { adaptPublicInput } from './plugins/legacy.ts';
 /** Public feature comparison. Positional ids are addresses, never cross-version identities. */
@@ -192,7 +193,7 @@ export function featureDiff(before: unknown, after: unknown, source: { baseSha?:
       const bo = b.options[old.optionId], bf = b.features[bo!.featureId];
       if (canonical([old.initial, old.ext]) !== canonical([next.initial, next.ext])) reasons.push('initial-state');
       if (canonical(sceneInputs(b, old)) !== canonical(sceneInputs(a, next))) reasons.push('scenes');
-      if (canonical([b.theme, b.themes, b.autoFocus]) !== canonical([a.theme, a.themes, a.autoFocus])) reasons.push('theme');
+      if (canonical([b.theme, projectThemes(b), b.autoFocus]) !== canonical([a.theme, projectThemes(a), a.autoFocus])) reasons.push('theme');
       if (canonical([bo?.layers, bf?.roles]) !== canonical([option?.layers, feature.roles])) reasons.push('layers-roles');
       if (canonical([old.name, old.description, old.expected, old.mock, bf?.name, bf?.goal, bo?.name, bo?.idea]) !== canonical([next.name, next.description, next.expected, next.mock, feature.name, feature.goal, option?.name, option?.idea])) reasons.push('description');
       status = steps.some(st => st.status === 'uncertain') ? 'uncertain' : reasons.length || steps.some(st => st.status !== 'unchanged') ? 'modified' : 'unchanged';
@@ -202,7 +203,7 @@ export function featureDiff(before: unknown, after: unknown, source: { baseSha?:
     if (group !== 'unchanged' && result.summary[group].length < 100) result.summary[group].push(`${feature.name} / ${s.name}`.slice(0, 200));
   }
   // Project metadata / unused shared scenes still changed even when no scenario can display it.
-  if (canonical([b.name, b.description, b.features, b.options, b.scenes, b.theme, b.themes, b.routes, b.featureIds, b.autoFocus]) !== canonical([a.name, a.description, a.features, a.options, a.scenes, a.theme, a.themes, a.routes, a.featureIds, a.autoFocus])) result.reasons.push('project-presentation');
+  if (canonical([b.name, b.description, b.features, b.options, b.scenes, b.theme, projectThemes(b), b.routes, b.featureIds, b.autoFocus]) !== canonical([a.name, a.description, a.features, a.options, a.scenes, a.theme, projectThemes(a), a.routes, a.featureIds, a.autoFocus])) result.reasons.push('project-presentation');
   result.status = result.scenarios.some(s => s.status === 'uncertain') ? 'uncertain' : result.reasons.length || result.scenarios.some(s => s.status !== 'unchanged') ? 'changed' : 'unchanged';
   return FeatureDiffManifest.parse(result);
 }

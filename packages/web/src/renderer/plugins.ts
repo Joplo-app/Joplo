@@ -15,8 +15,8 @@ import { standardRuntimes } from './plugins/standard';
  * 不变量：同一个插件 id 只注册一次（热更新换地址时重新载入并替换）；接口版本不一致时不注册，记录原因，
  * 舞台把它的组件画成带说明的占位框，演示其余部分照常播放。
  */
-import { useSyncExternalStore } from 'react';
-import type { PluginRuntime } from '@joplo-app/kit/plugin';
+import { useLayoutEffect, useRef, useSyncExternalStore, type RefObject } from 'react';
+import type { PluginRuntime, PluginObservation, PluginObserver, PluginObserve } from '@joplo-app/kit/plugin';
 
 export const PLUGIN_API_VERSION = 2;
 
@@ -101,4 +101,44 @@ const subscribe = (l: () => void) => {
 export function usePluginStatus(id: string): PluginStatus {
   useSyncExternalStore(subscribe, () => version, () => version);
   return pluginStatus(id);
+}
+
+/** Observers see committed stage DOM, including all host-owned anchors. Failures are isolated to one observer. */
+export function usePluginObservers(root: RefObject<HTMLElement | null>, ids: readonly string[], context: PluginObservation): void {
+  useSyncExternalStore(subscribe, () => version, () => version);
+  const active = useRef(new Map<string, { factory: PluginObserve; root: HTMLElement; key: string; instance?: PluginObserver }>());
+  const destroy = (record: { instance?: PluginObserver }) => {
+    try { record.instance?.destroy(); } catch (error) { console.warn('Joplo plugin observer cleanup failed', error); }
+  };
+  useLayoutEffect(() => () => { for (const record of active.current.values()) destroy(record); active.current.clear(); }, []);
+  useLayoutEffect(() => {
+    const el = root.current;
+    const key = `${context.frame.scenarioId}:${context.frame.sceneId}`;
+    for (const [id, record] of active.current) {
+      const state = pluginStatus(id);
+      if (!ids.includes(id) || state.state !== 'ready' || state.runtime.observe !== record.factory || record.root !== el || record.key !== key) {
+        destroy(record); active.current.delete(id);
+      }
+    }
+    if (!el) return;
+    for (const id of ids) {
+      const state = pluginStatus(id);
+      const factory = state.state === 'ready' ? state.runtime.observe : undefined;
+      if (!factory) continue;
+      let record = active.current.get(id);
+      try {
+        if (!record) {
+          record = { factory, root: el, key };
+          active.current.set(id, record);
+          record.instance = factory(el, context);
+        }
+        record.instance?.update(context);
+      } catch (error) {
+        // A failed instance stays disabled until scene/runtime changes; no repeated update crash loop.
+        destroy(record ?? {});
+        if (record) record.instance = undefined;
+        console.warn(`Joplo plugin ${id} observer failed`, error);
+      }
+    }
+  });
 }

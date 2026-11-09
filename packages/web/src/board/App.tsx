@@ -1,3 +1,4 @@
+import { projectThemes } from '@joplo-app/core';
 import { LanguageMenu } from '../player/LanguageMenu';
 import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/board/messages';
@@ -213,7 +214,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   const ctl = useMemo(() => new DemoController(selectionWriter(projectId)), [projectId]);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
   // 外观（D51 / D55）：本项目 > 所有项目 > 项目 config；在外观浮层里改，立即生效；悬停时临时预览
-  const a = useAppearance(projectId, ir.payload?.project?.theme ?? 'sketch', ir.payload?.project?.themes ?? {});
+  const a = useAppearance(projectId, ir.payload?.project?.theme ?? 'sketch', projectThemes(ir.payload?.project));
   const theme = a.look.theme;
   const [drawer, setDrawer] = useState(false);
   const [flash, setFlash] = useFlash();
@@ -435,7 +436,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   const selection = snap.selection;
   return (
     <ContentContext.Provider value={contentInfo}>
-      <ThemeStyles themes={project.themes} />
+      <ThemeStyles themes={projectThemes(project)} />
       <PlayerPage
         ctl={ctl}
         snap={snap}

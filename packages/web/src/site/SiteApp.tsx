@@ -1,3 +1,4 @@
+import { projectThemes } from '@joplo-app/core';
 import { tabTitle } from '../player/states';
 import { LanguageMenu } from '../player/LanguageMenu';
 import { useBoardLayout } from '../player/PlayerPage';
@@ -103,7 +104,7 @@ function SiteHome({ project, onView, author }: { author?: Author | null; project
   const look = { theme: project.theme, font: null, stroke: null };
   return (
     <div className="flex h-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg" data-testid="site-home">
-      <ThemeStyles themes={project.themes} />
+      <ThemeStyles themes={projectThemes(project)} />
       <TopBar right={<><AuthorLink author={author} /><LanguageMenu iconOnly={L.languageIconOnly} /></>}>
         <Brand href={JOPLO_SITE_URL} />
         <span aria-hidden className="h-5 w-px shrink-0 bg-jb-line" />
@@ -220,7 +221,7 @@ function SitePlayer({ project, play, navigate, branding, author }: { project: Pr
   const scs = scenariosOf(project, resolved.optionId);
   return (
     <>
-    <ThemeStyles themes={project.themes} />
+    <ThemeStyles themes={projectThemes(project)} />
     <PlayerPage
       ctl={ctl}
       snap={snap}

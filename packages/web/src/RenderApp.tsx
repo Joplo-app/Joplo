@@ -1,3 +1,4 @@
+import { projectThemes } from '@joplo-app/core';
 import { m } from './i18n/board/messages';
 import { translate, type Text } from './i18n/messages';
 import { useBoardI18n } from './i18n/board/context';
@@ -135,7 +136,7 @@ export function RenderApp() {
   const vp = VIEWPORTS[viewport];
   const framed = (stageNode: ReactNode) =>
     viewport === 'mobile' ? (
-      <ThemeContext.Provider value={{ theme, stroke: resolveLook({ theme, font, stroke }, data.project.themes ?? {}, i18n).stroke, font, registry }}>
+      <ThemeContext.Provider value={{ theme, stroke: resolveLook({ theme, font, stroke }, projectThemes(data.project), i18n).stroke, font, registry }}>
         <PhoneFrame width={vp.width} height={vp.height} seed="stage-phone">
           {stageNode}
         </PhoneFrame>
@@ -171,7 +172,7 @@ export function RenderApp() {
   const fhStage = fh - SUBTITLE_HEIGHT;
   const wrap = (stageNode: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null = null) => (
     <>
-      <ThemeStyles themes={data.project.themes} />
+      <ThemeStyles themes={projectThemes(data.project)} />
       {wrapInner(stageNode, sub, c)}
     </>
   );

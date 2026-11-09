@@ -24,16 +24,6 @@ export type JoploProps = {
   note?: string;
   /** 敏感信息（D70）：内容模糊显示、布局不变；可以写条件（redact={not($.ui.revealed)}），点“显示”后再看清。 */
   redact?: boolean | Bind | CondExpr;
-  /**
-   * 变形键（magic move）：两步之间位置或大小变了的元素，从旧位置平滑移到新位置；同一个键的元素换了容器（一个隐藏、另一个出现）
-   * 也会从旧元素的位置飞过来。只在 <Canvas> 里生效。motionDelay 是这个元素的延迟毫秒数（错峰）。
-   */
-  motion?: string;
-  motionDelay?: number;
-  /** 这个元素飞行的毫秒数（默认 900）。 */
-  motionMs?: number;
-  /** <Canvas> 的直接子元素：固定在屏幕上（按 view 坐标），不随镜头移动。 */
-  screen?: boolean;
   visibleFrom?: Size;
   hiddenFrom?: Size;
   /** 逃生口：Tailwind 类名。优先使用布局组件与样式属性。 */
@@ -157,12 +147,6 @@ export const Artifact = Object.assign(c('Artifact'), { Ref: c('Artifact.Ref') })
 export const Terminal = Object.assign(c('Terminal'), { Command: c('Terminal.Command'), Output: c('Terminal.Output'), Input: c('Terminal.Input') });
 /** 手机外框：子节点按手机宽度排版。页面写 viewport: 'mobile' 时舞台会自动套上，不用写它。 */
 export const Phone = c('Phone');
-/**
- * 画布（讲解片、动态图形）：按设计尺寸 view（默认 1280×800）等比缩放进层里，不重排；里面是一张 w×h 的世界，子元素用设计像素摆放。
- * 镜头用步骤里的 camera('元素', …) 推拉摇；带 motion 键的元素换位置、换容器时自动从旧位置飞到新位置。
- *   <Canvas w={2560} h={1600}>…</Canvas>
- */
-export const Canvas = c('Canvas');
 
 // ---------- 关系类图表（Joplo 自有，D41 / D69） ----------
 /** 节点 kind（决定图标与外形）。 */

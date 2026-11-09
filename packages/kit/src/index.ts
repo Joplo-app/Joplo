@@ -147,20 +147,16 @@ export type EffectDef =
   | { kind: 'effect'; type: 'callout'; target: string; text: string; side?: CalloutSide }
   | { kind: 'effect'; type: 'hold'; seconds: number }
   | { kind: 'effect'; type: 'say'; text: string }
-  | { kind: 'effect'; type: 'narrate'; text: string }
-  | { kind: 'effect'; type: 'camera'; targets: string[]; pad?: number; zoom?: number; ms?: number };
+  | { kind: 'effect'; type: 'narrate'; text: string };
 
 /** 标注气泡放在目标的哪一侧；不写时自动选画面里放得下的一侧（右、左、下、上）。 */
 export type CalloutSide = 'top' | 'right' | 'bottom' | 'left';
 
 const pathOf = (b: Bind | string): string => (isBind(b) ? bindPath(b) : b);
 export const set = (target: Bind, value: Json): EffectDef => ({ kind: 'effect', type: 'set', path: pathOf(target), value });
-/**
- * 一次改多处：patch($.data, { cam: 'chat', score: 3 }) 等于对每个键各写一个 set()。
- * 嵌套对象整体替换（与 set 相同）；步骤参数里直接展开数组即可：.system('…', patch($.data, {…}), hold(3))。
- */
+/** Several ordinary set effects. Values replace whole nested objects; accepts the namespace or a nested bind. */
 export const patch = (target: Bind | Record<string, unknown>, values: Record<string, Json>): EffectDef[] =>
-  Object.entries(values).map(([k, v]) => ({ kind: 'effect', type: 'set', path: `${pathOf(target as Bind)}.${k}`, value: v }));
+  Object.entries(values).map(([key, value]) => ({ kind: 'effect', type: 'set', path: `${pathOf(target as Bind)}.${key}`, value }));
 export const push = (target: Bind, value: Json): EffectDef => ({ kind: 'effect', type: 'append', path: pathOf(target), value });
 /** 与 sonner 一致：toast('…')、toast.success('…')、toast.error('…')。 */
 export const toast = Object.assign((text: string): EffectDef => ({ kind: 'effect', type: 'toast', text, tone: 'info' }), {
@@ -191,20 +187,6 @@ export const uses = (...rules: string[]): EffectDef => ({ kind: 'effect', type: 
  * 没有声明 layers 的方案：shot 在路径页面里聚焦。
  */
 export const shot = (...targets: string[]): EffectDef => ({ kind: 'effect', type: 'shot', targets });
-
-/** camera() 的选项：pad 取景留白（设计像素，默认 48）；zoom 最大放大倍数（默认 3）；ms 镜头运动时长（默认 1200）。 */
-export type CameraOpts = { pad?: number; zoom?: number; ms?: number };
-/**
- * 画布镜头：<Canvas> 里的镜头对准这些元素（取它们合起来的范围，按画布的设计尺寸等比放进画面），平滑推、拉、摇，不画焦点框。
- * 镜头位置会保留到下一次 camera()；camera() 不带元素 = 回到整张画布。导演会切到目标所在的层。
- *   .system('读入', camera('tape', 'machine'))
- *   .system('全景', camera({ ms: 2000 }))
- */
-export const camera = (...args: (string | CameraOpts)[]): EffectDef => {
-  const targets = args.filter((a): a is string => typeof a === 'string');
-  const o = Object.assign({}, ...args.filter((a) => typeof a === 'object' && a !== null)) as CameraOpts;
-  return { kind: 'effect', type: 'camera', targets, ...(o.pad !== undefined ? { pad: o.pad } : {}), ...(o.zoom !== undefined ? { zoom: o.zoom } : {}), ...(o.ms !== undefined ? { ms: o.ms } : {}) };
-};
 
 /**
  * 解说：这一步补充的一句话，显示在画面下方字幕区的第二行（说明下方、小一号）；建议不超过 48 个字（check 会提示）。
@@ -286,7 +268,6 @@ export type LayerDef = { kind: 'layer'; title: string; tree: JNode | JNode[]; vi
 /** opts.role：这一层是谁的画面（feature.roles 的键，D56）；画面角落显示这个人的名牌，层级标签带上头像。 */
 export const layer = (title: string, tree: JNode | JNode[], opts: { viewport?: 'desktop' | 'mobile'; role?: string; icon?: LayerIcon } = {}): LayerDef => ({ kind: 'layer', title, tree, ...opts, source: callsite() });
 
-/** 步骤参数：字符串是字幕（可省略，省略时自动生成），其余是效果。 */
 /** 步骤参数：字幕、效果，或一组效果（patch() 返回数组，直接传入即可）。 */
 export type StepArg = string | EffectDef | readonly EffectDef[];
 
@@ -326,7 +307,7 @@ export type FlowOpts = {
   /** 在 option.state 之上覆盖的初始状态。 */
   state?: StateInit;
   /**
-   * 接着另一个场景演（同一方案的场景键）：初始状态 = 那个场景最后一步之后的状态（路径、ui / data / inputs、画布镜头、导演层），
+   * 接着另一个场景演（同一方案的场景键）：初始状态 = 那个场景最后一步之后的状态（路径、ui / data / inputs、导演层），
    * 再叠上这里的 state。讲解片的章节、长流程的分段都用它，每一段从上一段结尾的画面开始，不用手抄状态。
    */
   from?: string;

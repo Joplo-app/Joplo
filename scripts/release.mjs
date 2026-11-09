@@ -22,7 +22,7 @@ import zlib from 'node:zlib';
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
-export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'core', 'web', 'server', 'cli', 'joplo'];
+export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-content', 'core', 'web', 'server', 'cli', 'joplo'];
 export const packageDir = (name, root = REPO) => path.join(root, name.startsWith('plugin-') ? `plugins/${name.slice(7)}` : `packages/${name}`);
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const LICENSE_PLACEHOLDER = 'UNLICENSED';
@@ -60,7 +60,7 @@ function version(root, v) {
     fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
   }
   // Runtime version metadata must not pull the workspace manifest into browser bundles.
-  for (const name of ['plugin-diagram', 'plugin-alda']) {
+  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-content']) {
   const pluginVersion = path.join(packageDir(name, root), 'src/version.json');
   fs.mkdirSync(path.dirname(pluginVersion), { recursive: true });
   fs.writeFileSync(pluginVersion, JSON.stringify({ version: v }, null, 2) + '\n');
@@ -322,13 +322,13 @@ async function smoke() {
     fs.writeFileSync(pageFile, addSmokeClassName(fs.readFileSync(pageFile, 'utf8')));
 
     // 3. npm install：registry 上还没有这些版本，改用 tarball（版本号已在上面断言）
-    pkg.devDependencies = { joplo: tgz.joplo, '@joplo-app/kit': tgz['@joplo-app/kit'], '@joplo-app/plugin-alda': tgz['@joplo-app/plugin-alda'] };
+    pkg.devDependencies = { joplo: tgz.joplo, '@joplo-app/kit': tgz['@joplo-app/kit'], '@joplo-app/plugin-alda': tgz['@joplo-app/plugin-alda'], '@joplo-app/plugin-content': tgz['@joplo-app/plugin-content'] };
     pkg.overrides = overrides;
     fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
     sh(npm, ['install', ...npmFlags], project);
     const joplo = path.join(project, 'node_modules/.bin/joplo');
     assert(fs.realpathSync(joplo) === fs.realpathSync(path.join(project, 'node_modules/joplo/bin/joplo.cjs')), '项目的 .bin/joplo 应指向 joplo 入口包');
-    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/server', '@joplo-app/web']) {
+    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-content', '@joplo-app/server', '@joplo-app/web']) {
       const p = path.join(project, 'node_modules', n);
       assert(fs.existsSync(p) && !fs.lstatSync(p).isSymbolicLink(), `${n} 应从 tarball 安装（不是链接）`);
       assert(readJson(path.join(p, 'package.json')).version === v, `${n} 版本应为 ${v}`);
@@ -343,6 +343,21 @@ async function smoke() {
       const p = alda({ theme: 'piano: c4' });
       if (p.id !== 'alda' || !p.local.endsWith('/local.js') || !p.skill.includes('music.play') || !local.compilers.midi.version || !runtime.media || music.play('theme').plugin !== 'alda') process.exit(1);
     `], project);
+
+    sh(process.execPath, ['--input-type=module', '-e', `
+      import content, { Canvas, camera } from '@joplo-app/plugin-content';
+      import runtime from '@joplo-app/plugin-content/runtime';
+      import { skill } from '@joplo-app/plugin-content/guide';
+      import { config, feature, flow, option, page } from '@joplo-app/kit';
+      import { jsx } from '@joplo-app/kit/jsx-runtime';
+      import { compile, stateAt } from '@joplo-app/core';
+      if (content.id !== 'content' || typeof Canvas !== 'function' || camera('target').plugin !== 'content' || !content.themes.studio || !runtime.observe || !runtime.components.Canvas.react || !skill.includes('motion')) process.exit(1);
+      const file = '/smoke/source.tsx';
+      const r = compile({ root:'/smoke', config:{...config({name:'Content smoke',theme:'content:studio'}),file}, layouts:{}, routes:{'/':{...page({title:'World'},jsx(Canvas,{children:jsx('div',{id:'target',motion:'piece',children:'Target'})})),file}}, features:{f:{def:{...feature({name:'F',goal:'G',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'I',scenarios:{s:flow('S',{start:'/'}).system('Aim',camera('target'))}}),file}}}} }, 'publish');
+      if (!r.project || r.diagnostics.some(d=>d.severity==='error') || stateAt(r.project,'f.a.s',1).ui.__plugins.content.camera.targets[0] !== 'target' || !r.project.scenarios['f.a.s'].steps[0].ext.content) process.exit(1);
+    `], project);
+    const contentGuide = sh(joplo, ['skill', 'content'], project);
+    assert(contentGuide.stdout.includes('content:studio') && contentGuide.stdout.includes('camera('), 'Installed content guide must match its plugin API');
 
     // 4. check
     const check = sh(joplo, ['check'], project);

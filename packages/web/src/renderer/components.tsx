@@ -116,6 +116,10 @@ export function useRootAttrs(node: SceneNode, disabled = false) {
 function rootAttrsOf(node: SceneNode, ctx: Pick<RenderCtx, 'state' | 'selectedId' | 'plugins'>, disabled: boolean) {
   const interactive = isInteractiveType(node.type, ctx.plugins);
   return {
+    ...Object.fromEntries(Object.values(ctx.plugins ?? {}).flatMap(plugin => Object.entries(plugin.properties ?? {}).flatMap(([key, spec]) => {
+      const value = node.props?.[key];
+      return spec.attribute && value !== undefined ? [[spec.attribute, String(value)]] : [];
+    }))),
     'data-jid': node.id,
     'data-jtype': node.type,
     ...(node.framing?.kind ? { 'data-jframe': node.framing.kind } : {}),
@@ -129,10 +133,6 @@ function rootAttrsOf(node: SceneNode, ctx: Pick<RenderCtx, 'state' | 'selectedId
     // 敏感信息（D70）：内容模糊显示，布局不变（index.css）
     ...(node.redact === true || (node.redact && typeof node.redact === 'object' && evaluateCondition(node.redact, ctx.state)) ? { 'data-jredact': '' } : {}),
     ...(ctx.selectedId === node.id ? { 'data-jselected': '' } : {}),
-    // 变形键（Canvas 里的 magic move）：两步之间位置变了、或同键元素换了容器时，从旧位置飞到新位置
-    ...(typeof node.props?.motion === 'string' && node.props.motion ? { 'data-jmotion': node.props.motion } : {}),
-    ...(typeof node.props?.motionDelay === 'number' ? { 'data-jmotion-delay': String(node.props.motionDelay) } : {}),
-    ...(typeof node.props?.motionMs === 'number' ? { 'data-jmotion-ms': String(node.props.motionMs) } : {}),
   };
 }
 
@@ -2044,7 +2044,7 @@ function Phone({ node, p, children }: NodeProps) {
   );
 }
 
-// ============ 画布（讲解片 / 动态图形）：设计舞台等比缩放 + camera() 镜头 + motion 变形 =====// ============ Joplo ============
+// ============ Joplo ============
 
 function Placeholder({ node, p }: NodeProps) {
   const { t: i18n } = useI18n();
@@ -2585,7 +2585,6 @@ const IMPL: Record<ComponentType, (props: NodeProps) => ReactNode> = {
   'Terminal.Command': TerminalCommand,
   'Terminal.Output': TerminalOutput,
   Phone,
-  Canvas,
   ...(Object.fromEntries(HTML_TAGS.map((t) => [t, htmlImpl(t)])) as Record<HtmlTag, (props: NodeProps) => ReactNode>),
   Placeholder,
   Custom,

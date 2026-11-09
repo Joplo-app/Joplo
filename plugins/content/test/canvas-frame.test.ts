@@ -1,6 +1,6 @@
 /** 画布镜头取景（canvasFrame）：目标范围等比放进设计视口、居中，放大不超过 zoom。 */
 import { describe, expect, it } from 'vitest';
-import { canvasFrame } from '../src/renderer/components';
+import { canvasFrame } from '../src/runtime.tsx';
 
 describe('canvasFrame', () => {
   const view = { w: 1280, h: 800 };

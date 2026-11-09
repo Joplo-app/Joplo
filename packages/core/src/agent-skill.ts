@@ -11,9 +11,9 @@
 export const SKILL_TOPICS = [
   { name: 'authoring', description: 'Mental model, first steps, page / option / flow syntax, when conditions, a form example' },
   { name: 'story', description: 'Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos' },
-  { name: 'content', description: 'Explainers, tutorials, and news-explainer videos: package and plan, hook, one world with Canvas, camera(), motion morphs, chapters with flow({ from }), narration, sources, review' },
   { name: 'demo', description: 'Layers, shots, captions, full-height layout, custom motion and data graphics, deep links, and screenshots' },
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
+  { name: 'content', description: 'Default first-party content plugin: continuous visual explainers, chapters, design worlds and review practices' },
   { name: 'diagram', description: 'Default first-party diagram plugin: architecture, sequence and state diagrams, groups, compiled traces and framing' },
   { name: 'components', description: 'Component catalog, supported HTML tags, line breaks, props, and real images' },
   { name: 'cases', description: 'Case dimensions: ask the user before starting' },
@@ -22,7 +22,7 @@ export const SKILL_TOPICS = [
   { name: 'review', description: 'Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery' },
   { name: 'diff', description: 'Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication' },
   { name: 'publish', description: 'pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)' },
-  { name: 'plugins', description: 'Media tracks, local text-to-resource compilers, cached offline publishing; Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks' },
+  { name: 'plugins', description: 'Universal properties, plugin themes, state writes and director targets; Media tracks, local text-to-resource compilers, cached offline publishing; Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks' },
 ] as const;
 
 /** 心智模型：所有入口最先读到的几句话。 */
@@ -64,14 +64,8 @@ export const PITFALLS = [
   ['AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json', 'publish'],
   ['Playing a demo never generates Joplo Cloud narration (it would spend characters): steps without audio use the browser voice until the user clicks Generate missing audio or you run npx joplo voice with their go-ahead', 'publish'],
   ['Re-sharing with the default voice keeps valid local clips plus reusable published clips, even when their voices differ (automatic captions must still match current text in the clip language; stale audio is excluded); an old custom provider named cloud stays unsupported until the user explicitly chooses official Joplo Cloud (use voice.profile: \'Joplo Cloud\' when config owns the selection)', 'publish'],
-  ['Explainers that read as slides: one board per chapter, title cards, bullet cards, panels fading in and out. Build one <Canvas> world instead, keep objects with motion keys so they morph between steps, and move camera() between them', 'content'],
-  ['Moving the view with shot() in an explainer draws a pulsing focus ring and caps UI zoom at 1.25×; inside a <Canvas> use camera(\'id\', …), which frames by content and does not draw a ring', 'content'],
-  ['Chapters that should continue the last frame: write flow({ from: \'previousKey\' }) instead of copying state by hand; scenarios with only system steps stay on the first layer unless a camera(), shot, or cue moves the director (or flow({ layer }))', 'content'],
-  ['The share preview is the first scenario\'s first frame: design it as a thumbnail (a screen poster in the Canvas that the first step fades out), not an empty screen', 'content'],
-  ['outline and the cover estimate narration at about 4.5 CJK characters per second; a chapter whose narrate() lines total more than about 400 characters runs past 90 s', 'content'],
-  ['Label illustrative numbers on screen and keep them apart from sourced facts; bars start at zero and lengths stay proportional', 'content'],
   ['HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it', 'check'],
-  ['Judge a scenario from its storyboard, not from check alone: npx joplo render --scenario-id <id> --sheet --out board.png shows every step with its caption and narration in one image', 'content'],
+  ['For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, and verify playback before claiming it works', 'content'],
   ['For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings', 'plugins'],
   ['Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components', 'plugins'],
 ] as const satisfies readonly (readonly [string, string])[];
@@ -95,6 +89,7 @@ function joploBody(): string {
     '',
     '## When to use',
     '- The user wants to think a feature through before building it: a prototype, a clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.',
+    '- The user wants a visual explainer with a continuous scene and narrated chapters: read npx joplo skill content.',
     '- The user wants to compare how a feature changed between two versions or in a PR (see npx joplo skill diff).',
     '- The user wants an explainer, tutorial, science piece, or news explainer that plays like a video (narration, chapters, animated graphics): read npx joplo skill content first.',
     '',

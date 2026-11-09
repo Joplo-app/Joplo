@@ -1,21 +1,22 @@
 /**
  * 讲解片原语：<Canvas> 的 camera()、flow({ from, layer })、patch()、旁白计入时长估算。
  * 不变量：
- * 1. camera() 只是状态（ui.__camera），跨步保留；回放、跳到任意一步结果相同；导演切到目标所在的层。
+ * 1. camera() 只是状态（ui.__plugins.content.camera），跨步保留；回放、跳到任意一步结果相同；导演切到目标所在的层。
  * 2. from 接力的场景，初始状态 = 被接场景最后一步之后的状态（路径、ui / data / inputs、导演层），再叠上本场景的 state；链式接力按依赖解析，成环报错。
  * 3. patch() 等价于逐个 set()；步骤参数可以直接传效果数组。
  * 4. 带旁白的步骤，估算时长按朗读计；没有旁白的项目估算不变。
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/kit/ui';
-import { $, camera, config, feature, flow, go, layer, narrate, option, page, patch, set, spotlight, type Flow } from '@joplo-app/kit';
+import { Canvas, camera } from '../src/plugin.ts';
+import { $, config, feature, flow, go, layer, narrate, option, page, patch, set, spotlight, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { cameraAt, compile, scenarioEstimateMs, stateAt, voiceMs, type AuthoringProject } from '../src/index.ts';
+import { cameraAt, compile, scenarioEstimateMs, stateAt, voiceMs, type AuthoringProject } from '@joplo-app/core';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 
-const world = () => h(ui.Canvas, { w: 2560, h: 1600 },
+const world = () => h(Canvas, { w: 2560, h: 1600 },
   h('div', { id: 'chat', style: { position: 'absolute', left: 60, top: 60, width: 1180, height: 700 } }, h(ui.Button, { id: 'send' }, 'Send')),
   h('div', { id: 'tape', style: { position: 'absolute', left: 120, top: 960 } },
     h('span', { motion: 'tok_0', when: $.ui.onTape }, '4912')),
@@ -53,9 +54,9 @@ describe('camera()', () => {
     const p = r.project!;
     const sc = p.scenarios['f.a.one']!;
     expect(sc.steps[0]!.directorLayer).toBe('world');
-    expect(stateAt(p, sc.id, 1).ui.__camera).toEqual({ targets: ['chat'], pad: 80 });
-    expect(stateAt(p, sc.id, 2).ui.__camera).toEqual({ targets: ['chat'], pad: 80 });
-    expect(stateAt(p, sc.id, 3).ui.__camera).toEqual({ targets: [] });
+    expect(stateAt(p, sc.id, 1).ui.__plugins).toEqual({ content: { camera: { targets: ['chat'], pad: 80 } } });
+    expect(stateAt(p, sc.id, 2).ui.__plugins).toEqual({ content: { camera: { targets: ['chat'], pad: 80 } } });
+    expect(stateAt(p, sc.id, 3).ui.__plugins).toEqual({ content: { camera: { targets: [] } } });
     expect(cameraAt(p, sc.id, 2).directorLayer).toBe('world');
   });
   it('rejects unknown targets and invalid options', () => {
@@ -74,9 +75,9 @@ describe('flow({ from, layer })', () => {
     });
     expect(errorCodes(r)).toEqual([]);
     const p = r.project!;
-    expect(p.scenarios['f.a.b']!.initial.ui).toMatchObject({ n: 1, __camera: { targets: ['chat'] } });
+    expect(p.scenarios['f.a.b']!.initial.ui).toMatchObject({ n: 1, __plugins: { content: { camera: { targets: ['chat'] } } } });
     expect(p.scenarios['f.a.b']!.initial.layer).toBe('world');
-    expect(p.scenarios['f.a.c']!.initial.ui).toMatchObject({ n: 2, onTape: true, chapter: '03', __camera: { targets: ['tape'] } });
+    expect(p.scenarios['f.a.c']!.initial.ui).toMatchObject({ n: 2, onTape: true, chapter: '03', __plugins: { content: { camera: { targets: ['tape'] } } } });
     expect(cameraAt(p, 'f.a.c', 0).directorLayer).toBe('world');
   });
   it('reports unknown targets and cycles', () => {
@@ -86,6 +87,12 @@ describe('flow({ from, layer })', () => {
       a: flow('A', { from: 'b' }).system('x', set($.ui.n, 1)),
       b: flow('B', { from: 'a' }).system('y', set($.ui.n, 2)),
     }))).toContain('FROM_CYCLE');
+  });
+  it('reports a predecessor whose steps cannot replay', () => {
+    expect(errorCodes(build({
+      a: flow('A', { start: '/' }).click('not_here'),
+      b: flow('B', { from: 'a' }).system('Continue', set($.ui.n, 1)),
+    }))).toContain('FROM_FAILED');
   });
   it('layer sets the starting director layer and is validated', () => {
     const r = build({ a: flow('A', { start: '/', layer: 'world' }).system('x', set($.ui.n, 1)) });

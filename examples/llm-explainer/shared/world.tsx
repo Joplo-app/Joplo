@@ -1,3 +1,4 @@
+import { Canvas } from '@joplo-app/plugin-content';
 /**
  * 整支片子只有这一张画布（<Canvas>）：聊天窗、纸带、模型、概率条 / 抽签带、温度旋钮、计分板、四个问题标签。
  *
@@ -8,7 +9,7 @@
  * - 镜头在步骤里写 camera('元素', …)，按这些元素的范围取景；章节标记、来源、封面、片尾号召是 screen 元素，不随镜头动。
  */
 import { $, and, eq, neq, notEmpty, oneOf, type CondExpr } from '@joplo-app/kit';
-import { Button, Canvas, PromptInput } from '@joplo-app/kit/ui';
+import { Button, PromptInput } from '@joplo-app/kit/ui';
 import { ANSWER_PROBS, ANSWER_TOKENS, BIRTHDAY_A, BIRTHDAY_Q, DATES, namesAt, PROMPT, PROMPT_IDS, PROMPT_TOKENS, STEPS, type Cand } from './data.ts';
 import { C, tokenColor } from './palette.ts';
 import { Poster } from './poster.tsx';

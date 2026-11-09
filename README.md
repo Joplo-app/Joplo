@@ -74,13 +74,14 @@ Read only the guidance the current task needs:
 npx joplo skill
 npx joplo skill authoring
 npx joplo skill story
+npx joplo skill content
 npx joplo skill cases
 npx joplo skill demo
 npx joplo skill review
 npx joplo skill install --agents-md
 ```
 
-The thirteen topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `content` (explainers, tutorials, and news explainers that play like a video: one `Canvas` world, `camera()`, morphing objects, chapters that continue with `flow({ from })`), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, `review` (local listening, Share polling, prompt acknowledgement, version isolation, recovery, and best practices), `diff` (compare feature changes across builds and in PR CI), and `publish` (build, share, embed, review choices, portfolios and SEO, Pro passwords, narration (Joplo Cloud characters, keys, joplo voice)). `npx joplo components <Name>` prints the props and an example for one component. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
+Topics include `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `content` (explainers, tutorials, and news explainers that play like a video: the default content plugin’s `Canvas` world, `camera()`, morphing objects, chapters that continue with `flow({ from })`), `plugins` (extension contracts), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, `review` (local listening, Share polling, prompt acknowledgement, version isolation, recovery, and best practices), `diff` (compare feature changes across builds and in PR CI), and `publish` (build, share, embed, review choices, portfolios and SEO, Pro passwords, narration (Joplo Cloud characters, keys, joplo voice)). `npx joplo components <Name>` prints the props and an example for one component. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
 
 Use a second terminal while the Board is running:
 
@@ -253,3 +254,5 @@ Joplo accepts issues, not pull requests. Report bugs and request features in [is
 ## License
 
 [PolyForm Shield 1.0.0](LICENSE). Anyone can use Joplo for free, including at companies and for commercial work; you may not use it to provide a product that competes with Joplo or Joplo Cloud. See [COMMERCIAL.md](COMMERCIAL.md). Versions 0.2.15 and earlier were released under Apache-2.0. Bundled fonts use [SIL OFL 1.1](packages/web/src/fonts/OFL.txt).
+
+The default `@joplo-app/plugin-content` provides `content:Canvas`, `camera()`, FLIP properties and the `content:studio` theme. Import its authoring API directly from the package; declare it at the Joplo version in your project dependencies. `npx joplo skill content` covers continuous visual explainers; see [llm-explainer](examples/llm-explainer) and the [plugin contracts](docs/plugins.md). Use `flow({ from })` for chapter continuity and `joplo render --sheet --columns 3` for storyboards.

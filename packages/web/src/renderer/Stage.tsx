@@ -1,3 +1,4 @@
+import { projectThemes } from '@joplo-app/core';
 import { useI18n } from '../i18n/context';
 /**
  * 舞台：在固定尺寸的画框里渲染当前画面。弹窗、Toast、演示覆盖层都在画框内部分层，
@@ -15,6 +16,7 @@ import { RenderContext, RenderNode, type RenderMode, type StreamingCtx } from '.
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from './appearance';
 import { rectOf } from './rect';
+import { usePluginObservers } from './plugins';
 
 export const VIEWPORTS = VIEWPORT_SIZE;
 export type Viewport = keyof typeof VIEWPORTS;
@@ -106,7 +108,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);
   // 外观（D51 / D55）：线条缺省由主题的 --jp-stroke 决定（内置主题或项目 themes/<name>.css），可以单独覆盖；字体覆盖写成 --jp-font
-  const look = useMemo(() => resolveLook({ theme, font, stroke: strokeOverride }, project.themes ?? {}, i18n), [theme, font, strokeOverride, project.themes]);
+  const look = useMemo(() => resolveLook({ theme, font, stroke: strokeOverride }, projectThemes(project), i18n), [theme, font, strokeOverride, project.themes, project.plugins]);
   const stroke = look.stroke;
   // 流式输出（D56）：只由 IR 与当前位置推导，截图、视频、发布站一致。
   // 过渡卡与场景封面（D61）不在舞台里画：由调用方用幕布（Curtain）盖在整个舞台区域上，不进设备外框；
@@ -141,6 +143,9 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
   const cam = useCamera(camera, { width: vp.width, height: vp.height, animate, deps: [state, scene], user, establish: project.autoFocus !== false });
+  usePluginObservers(rootRef, Object.keys(project.plugins ?? {}), {
+    frame: { mode, animate, scenarioId: state.scenarioId, sceneId: shownId, position: state.position, focus: camera?.targets ?? null, nextTarget: nextTargetId, selectedId, theme }, ext: ext ?? {},
+  });
   const zoomOn = !!zoom;
   /** 当前视图（用户的，或镜头此刻的目标视图），在它上面继续缩放平移，并把内容夹在画面里。 */
   const setClamped = (v: View) => {

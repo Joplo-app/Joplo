@@ -5,12 +5,13 @@ import { jsonData, snapshot, object, strings, syncResult, authoringData, materia
 import { isNode, type JNode } from '@joplo-app/kit/node';
 import { PLUGIN_API_VERSION, type PluginDef, type PluginEffectDef, type PluginReport } from '@joplo-app/kit/plugin';
 import standard from '@joplo-app/plugin-diagram';
+import content from '@joplo-app/plugin-content';
 import { initialState, applyStep, resolveProps, type PlayState } from '../player.ts';
 import type { Scene, SceneNode, Project } from '../schema.ts';
 import type { PluginInfo } from '../catalog.ts';
 import type { GraphLayoutEngine } from '@joplo-app/plugin-diagram/model';
 
-export const standardPlugins: readonly PluginDef[] = [standard];
+export const standardPlugins: readonly PluginDef[] = [standard, content];
 export type CompileOptions = { layout?: GraphLayoutEngine; onResource?: (request: ResourceRequest) => void; pluginOptions?: Record<string, Record<string, unknown>> };
 export function enabledPlugins(configured: unknown): unknown[] {
   return [...standardPlugins, ...(Array.isArray(configured) ? configured : [])];
@@ -26,6 +27,8 @@ function validMediaCommand(value: unknown, plugin: string, owners: ReadonlyMap<s
 }
 
 export class PluginCompiler {
+  readonly themes: Record<string, string> = {};
+  readonly properties = new Map<string, { plugin: PluginDef; spec: import('@joplo-app/kit/plugin').PluginPropertySpec }>();
   readonly mediaCommands = new Map<string, (MediaCommand & { plugin: string })[]>();
   private resourceIds = new Map<string, string>();
   private resourceOwners = new Map<string, string>();
@@ -39,7 +42,30 @@ export class PluginCompiler {
       if (this.defs.has(p.id)) { report('PLUGIN_DUPLICATE', `Plugin ${p.id} is enabled twice in config({ plugins })`, source); continue; }
       if (p.apiVersion !== 1 && p.apiVersion !== PLUGIN_API_VERSION) { report('PLUGIN_INVALID', `Plugin ${p.id} targets API ${p.apiVersion}; supported: 1, ${PLUGIN_API_VERSION}`, source); continue; }
       this.defs.set(p.id, p);
-      this.info[p.id] = { ...(p.data ? { data: this.envelope(p, p.data, source) as PluginInfo['data'] } : {}), id: p.id, title: p.title, ...(p.version ? { version: p.version } : {}), components: Object.fromEntries(Object.entries(p.components).map(([name, c]) => [name, { ...(c?.interactive ? { interactive: true } : {}), ...(c?.parent ? { parent: c.parent } : {}), ...(c?.needsId ? { needsId: true } : {}), ...(c?.selfEvident ? { selfEvident: true } : {}) }])) };
+      const properties = this.envelope(p, p.properties ?? {}, source);
+      if (!object(properties)) { this.invalid(p, source); continue; }
+      for (const [key, spec] of Object.entries(properties)) {
+        if (!/^[A-Za-z][A-Za-z0-9]*$/.test(key) || ['id', 'children', 'style', 'className', 'when', 'disabled', 'redact', 'note'].includes(key)
+          || !object(spec) || !['string', 'number', 'boolean'].includes(String(spec.type))
+          || Object.keys(spec).some(k => !['type', 'attribute', 'min', 'max', 'nonempty'].includes(k))
+          || spec.attribute !== undefined && (typeof spec.attribute !== 'string' || !spec.attribute.startsWith(`data-jp-${p.id}-`) || !/^data-jp-[a-z0-9-]+$/.test(spec.attribute))
+          || ['min', 'max'].some(k => spec[k] !== undefined && (spec.type !== 'number' || typeof spec[k] !== 'number'))
+          || spec.nonempty !== undefined && (spec.type !== 'string' || typeof spec.nonempty !== 'boolean')
+          || typeof spec.min === 'number' && typeof spec.max === 'number' && spec.min > spec.max) {
+          this.report('PLUGIN_PROPERTY_INVALID', `Plugin ${p.id}: invalid declaration for property ${key}`, source); continue;
+        }
+        if (this.properties.has(key) || spec.attribute && [...this.properties.values()].some(v => v.spec.attribute === spec.attribute)) {
+          this.report('PLUGIN_PROPERTY_CONFLICT', `Plugin ${p.id}: property ${key} or its DOM attribute is already registered`, source); continue;
+        }
+        this.properties.set(key, { plugin: p, spec: spec as import('@joplo-app/kit/plugin').PluginPropertySpec });
+      }
+      const themes = this.envelope(p, p.themes ?? {}, source);
+      if (!object(themes)) this.invalid(p, source);
+      else for (const [name, css] of Object.entries(themes)) {
+        if (!/^[a-z][a-z0-9-]*$/.test(name) || typeof css !== 'string') this.report('PLUGIN_THEME_INVALID', `Plugin ${p.id}: themes need lowercase names and CSS strings`, source);
+        else this.themes[`${p.id}:${name}`] = css;
+      }
+      this.info[p.id] = { ...(object(themes) && Object.keys(themes).length ? { themes: themes as Record<string, string> } : {}), ...(Object.keys(properties).length ? { properties: properties as NonNullable<PluginInfo['properties']> } : {}), ...(p.data ? { data: this.envelope(p, p.data, source) as PluginInfo['data'] } : {}), id: p.id, title: p.title, ...(p.version ? { version: p.version } : {}), components: Object.fromEntries(Object.entries(p.components).map(([name, c]) => [name, { ...(c?.interactive ? { interactive: true } : {}), ...(c?.parent ? { parent: c.parent } : {}), ...(c?.needsId ? { needsId: true } : {}), ...(c?.selfEvident ? { selfEvident: true } : {}) }])) };
     }
   }
   private run<T>(p: PluginDef, hook: string, at: string | undefined, fn: () => T): T | undefined {
@@ -50,10 +76,20 @@ export class PluginCompiler {
     try { return materialize(synchronous, authoring ? 'authoring' : 'hook'); }
     catch (e) { this.report('PLUGIN_DATA_INVALID', `Plugin ${p.id}: ${errorMessage(e)}`, at); return undefined; }
   }
+  private validateProperties(node: JNode): void {
+    for (const [key, { plugin, spec }] of this.properties) {
+      const value = node.props[key];
+      if (value === undefined) continue;
+      if (typeof value !== spec.type || typeof value === 'number' && (!Number.isFinite(value) || spec.min !== undefined && value < spec.min || spec.max !== undefined && value > spec.max)
+        || spec.nonempty && typeof value === 'string' && !value.trim())
+        this.report('PLUGIN_PROPERTY_INVALID', `Plugin ${plugin.id}: ${key} requires a literal ${spec.type}${spec.min !== undefined ? ` >= ${spec.min}` : ''}${spec.max !== undefined ? ` <= ${spec.max}` : ''}${spec.nonempty ? ' (nonempty)' : ''}`, node.source);
+    }
+  }
   node(node: JNode, ids: ReadonlyMap<string, string | undefined>): JNode {
     const p = this.defs.get(node.type.split(':')[0]!);
     if (!p) {
       for (const def of this.defs.values()) if (def.legacyTypes?.[node.type]) this.report('PLUGIN_LEGACY_TYPE', `Legacy component ${node.type}: recompile with the current kit; use ${def.legacyTypes[node.type]} in IR`, node.source);
+      this.validateProperties(node);
       return node;
     }
     const result = this.run(p, 'node', node.source, () => {
@@ -66,7 +102,9 @@ export class PluginCompiler {
       // Only this node's type/props can be normalized; children already have checked identities.
       return { ...node, type: n.type, props: n.props };
     });
-    return result ?? node;
+    const normalized = result ?? node;
+    this.validateProperties(normalized);
+    return normalized;
   }
   derive(scene: Scene): void {
     const visit = (node: SceneNode) => {
@@ -115,13 +153,17 @@ export class PluginCompiler {
         return id;
       } }), source);
       if (result === undefined) return;
-      if (!object(result) || Object.keys(result).some(k => !['data', 'targets', 'references', 'media'].includes(k)) || result.targets !== undefined && !strings(result.targets) || result.references !== undefined && !strings(result.references)) { this.invalid(p, source); return; }
+      if (!object(result) || Object.keys(result).some(k => !['data', 'targets', 'references', 'media', 'writes', 'directorTarget'].includes(k)) || result.targets !== undefined && !strings(result.targets) || result.references !== undefined && !strings(result.references)) { this.invalid(p, source); return; }
       if (result.media !== undefined && (!Array.isArray(result.media) || result.media.some(c => !validMediaCommand(c, p.id, this.resourceOwners)))) {
         this.invalid(p, source); return;
       }
+      if (result.writes !== undefined && (!Array.isArray(result.writes) || result.writes.some(w => !object(w) || Object.keys(w).some(k => k !== 'path' && k !== 'value') || !Object.hasOwn(w, 'value') || typeof w.path !== 'string' || !/^(ui|data|inputs)(\.[A-Za-z0-9_-]+)+$/.test(w.path) || w.path.split('.').some(k => ['__proto__', 'prototype', 'constructor'].includes(k))))) { this.invalid(p, source); return; }
+      if (result.directorTarget !== undefined && (typeof result.directorTarget !== 'string' || !result.directorTarget)) { this.invalid(p, source); return; }
+      const writes = result.writes === undefined ? undefined : this.envelope(p, result.writes, source) as typeof result.writes;
+      if (result.writes !== undefined && writes === undefined) return;
       const media = result.media?.map(c => ({ ...c, plugin: p.id }));
       const value = result.data === undefined ? undefined : this.envelope(p, result.data, source);
-      return { ...(media ? { media } : {}), ...(value !== undefined ? { data: value } : {}), ...(result.targets ? { targets: [...result.targets] } : {}), ...(result.references ? { references: [...result.references] } : {}) };
+      return { ...(writes ? { writes } : {}), ...(result.directorTarget ? { directorTarget: result.directorTarget } : {}), ...(media ? { media } : {}), ...(value !== undefined ? { data: value } : {}), ...(result.targets ? { targets: [...result.targets] } : {}), ...(result.references ? { references: [...result.references] } : {}) };
     });
   }
   frames(project: Project): void {

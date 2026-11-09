@@ -5,11 +5,12 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as ui from '@joplo-app/kit/ui';
+import { Canvas, camera } from '../src/plugin.ts';
 import { config, feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
-import { I18nProvider } from '../src/i18n/context';
-import { Stage } from '../src/renderer/Stage';
+import { I18nProvider } from '../../../packages/web/src/i18n/context';
+import { Stage } from '../../../packages/web/src/renderer/Stage';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
@@ -28,17 +29,22 @@ function build(tree: unknown): Project {
   return r.project!;
 }
 const html = (p: Project) => renderToStaticMarkup(<I18nProvider explicit="en"><Stage project={p} state={stateAt(p, 'f.a.happy', 0)} theme="sketch" mode="render" animate={false} /></I18nProvider>);
-const canvasRoot = (out: string) => out.match(/<div[^>]*data-jtype="Canvas"[^>]*>/)?.[0] ?? '';
+const canvasRoot = (out: string) => out.match(/<div[^>]*data-jtype="content:Canvas"[^>]*>/)?.[0] ?? '';
 
 describe('<Canvas> sizing', () => {
   it('keeps the view aspect ratio so an auto-height parent does not collapse it', () => {
-    const out = html(build(h(ui.Stack, { p: 'lg' }, h(ui.Text, { id: 't' }, 'title'), h(ui.Canvas, { id: 'cv', w: 2560, h: 1600 }, h('div', { id: 'a' }, 'A')))));
+    const out = html(build(h(ui.Stack, { p: 'lg' }, h(ui.Text, { id: 't' }, 'title'), h(Canvas, { id: 'cv', w: 2560, h: 1600 }, h('div', { id: 'a' }, 'A')))));
     const root = canvasRoot(out);
     expect(root).toMatch(/aspect-ratio:1280 \/ 800/);
     expect(root).toMatch(/width:100%/);
   });
+  it('keeps direct text children when splitting world and screen children', () => {
+    const out = html(build(h(Canvas, { id: 'cv' }, 'Direct world text', h('div', { id: 'overlay', screen: true }, 'Fixed overlay'))));
+    expect(out).toContain('Direct world text');
+    expect(out).toMatch(/data-jcanvas-screen[\s\S]*Fixed overlay/);
+  });
   it('uses a custom view for the ratio', () => {
-    const root = canvasRoot(html(build(h(ui.Canvas, { id: 'cv', view: [1920, 1080] }, h('div', { id: 'a' }, 'A')))));
+    const root = canvasRoot(html(build(h(Canvas, { id: 'cv', view: [1920, 1080] }, h('div', { id: 'a' }, 'A')))));
     expect(root).toMatch(/aspect-ratio:1920 \/ 1080/);
   });
 });

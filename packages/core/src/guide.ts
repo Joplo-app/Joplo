@@ -10,7 +10,7 @@ export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
 const related: Record<SkillTopic, readonly SkillTopic[]> = {
   authoring: ['story', 'demo', 'focus', 'diagram', 'components', 'cases', 'check', 'selection', 'review', 'publish', 'diff'],
   story: ['authoring', 'cases', 'content', 'demo', 'focus', 'check'],
-  content: ['story', 'demo', 'focus', 'components', 'check', 'publish'],
+  content: ['story', 'demo', 'focus', 'components', 'check', 'publish', 'plugins'],
   demo: ['story', 'content', 'focus', 'authoring', 'diagram', 'components', 'check', 'review', 'publish'],
   focus: ['demo', 'content', 'diagram', 'check', 'authoring'],
   diagram: ['demo', 'focus', 'components', 'check'],
@@ -170,80 +170,6 @@ function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
 }
 
 const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
-  content: `# Joplo content production: content
-
-For explainers, tutorials, science and news-explainer pieces that should feel like a good video, not a deck: the viewer watches a world change while a voice explains it.
-Same machinery as demos: a feature is the episode, each case a chapter, each scenario plays one chapter (the published site plays them back to back), narrate() is the voice-over. Research and sources: docs/research/content-production.md. Full example: examples/llm-explainer.
-
-## 1. Required before TSX: package and plan (show it to the user)
-- One thing the viewer should be able to repeat afterwards, in one sentence.
-- Package first: the title asks the question; a thumbnail line of at most five words gives the surprising answer (complement the title, never repeat it); flow({ description }) is the cover sentence. The share preview is the first scenario's first frame, so design that frame as a thumbnail: one big line, one focal object, high contrast.
-- Offer two or three framings that differ in device (one running example, misconception then correction, a number made tangible, before and after); put your recommendation first with a reason; build after the user picks.
-- Chapters: one question per chapter. Case titles are numbered questions ('01 What does it actually read?'); expected is what the viewer can now say. List every point from the source material and map each to a chapter or drop it on purpose.
-- One running example through every chapter (the same prompt, person, or data set), so each chapter builds on what the viewer already saw.
-- Write the script as one line per step: ears (narrate), eyes (what changes on stage), source. Adjacent steps should connect with 'but' or 'so'; a chain of 'and then' is flat.
-- Budget: narration reads about 4.5 CJK characters (2.5 English words) per second; 45–90 s per chapter. npx joplo outline counts narration in its estimates.
-
-## 2. Hook (first chapter, 20–35 s)
-- Beat 1: a familiar scene that pays off the thumbnail. Never a logo, an agenda, or a definition first.
-- Beat 2: the twist, shown on stage (the answer splits into pieces with probabilities, a name changes on the second try).
-- Beat 3: pull back and name the questions the episode answers. Pin each question where it will be answered, and close every loop later.
-
-## 3. Not slides: one world, continuous objects, a moving camera (the core)
-Failure mode, even with nice graphics: one board per chapter (big title, panels, footer), chapter title cards, cards of bullets, things fading in and out. Viewers read it as a deck. Instead:
-- One layer holding one <Canvas w={2560} h={1600}> world (the default view is 1280×800, scaled to fit, never re-laid out; in a container without a height it sizes itself from the view ratio, and render warns 'Canvas has no size' if it still has none). Place a few containers absolutely in design pixels; lay out inside them with flex.
-- Objects keep their identity: give each one motion="key". Write each arrangement as static JSX switched with when, reusing the same key; between steps Joplo flies the object from its old place and size to the new one, also across containers. Morph, never replace: the question's words split into tokens, flip into ids, then fly onto a tape; bars rearrange into a lottery strip.
-- Camera: camera('id', …) frames those elements (Joplo measures them, adds pad, caps zoom); camera() shows the whole canvas. Establish wide, push in on detail, pull back for the payoff. Object flights in the same step follow the camera's timing, so both land together.
-- Chapters continue: flow({ from: 'previousKey' }) starts from the previous chapter's last frame (state, camera, director layer). patch($.ui, { … }) changes several values in one step.
-- screen children of the Canvas stay fixed on screen: chapter label, source line, poster, end card.
-- Takeaways land on objects (a pinned question flips to '✓ answer'); the recap is a pull back to the whole world. Use .card() only when nothing on stage can carry the moment.
-\`\`\`tsx
-<Canvas w={2560} h={1600}>
-  <div id="tape" style={{ position: 'absolute', left: 120, top: 960, display: 'flex', gap: 8 }}>
-    {IDS.map((t, i) => <span when={eq($.ui.at, 'tape')} motion={\`tok_\${i}\`} style={{ background: COLORS[i] }}>{t}</span>)}
-  </div>
-  <div screen style={{ position: 'absolute', left: 20, top: 16 }}>{$.ui.chapter}</div>
-</Canvas>
-flow('What does it read?', { from: 'hook' })
-  .system('Split', 'Nine characters, seven pieces', patch($.ui, { mode: 'split' }), camera('bubble', { pad: 160 }))
-  .system('To the tape', 'It reads these numbers', patch($.ui, { at: 'tape' }), camera('tape', 'meter'))
-\`\`\`
-- Anti-deck test: three or more steps that only show or hide whole panels, or a frame that is mostly text, means rebuild those steps as objects that move or change.
-
-## 4. Choose the information shape, then the picture
-- A number landing; before and after; ranking (bars from zero, length proportional); part of a whole (a strip whose segment widths are the shares); a process (one object going around a loop); misconception then fact; a timeline; a place (tiles or a simple map).
-- Similar sentences get different pictures. Labels sit on the thing they name; no legends when a direct label fits.
-- Compute numbers in TS from one source (for example probabilities from one set of scores) so every number on screen agrees. Label illustrative numbers on screen ('illustrative'), separate from sourced facts.
-
-## 5. Motion and layout numbers
-- Camera moves 1–1.5 s, ease in-out. Object flights 0.9 s ease-out; stagger 60–120 ms (motionDelay); slow a landing pointer to 1.5–2 s (motionMs).
-- One primary motion per step; text that is being read does not move.
-- Entrances: put @keyframes and classes in themes/<name>.css and use className (staggered with animationDelay). Screenshots, thumbnails, and jumps show the end state. For a typewriter reveal give each character a short linear fade (about 80 ms) with its own delay; a 1 ms steps(1) animation can stay stuck invisible in Chromium.
-- One accent color with a fixed meaning; color means the same thing in every chapter.
-- Size text for the frame you show: about 28 design px is the floor at 1× zoom; a wide shot at 0.5× needs 40 or more, or enlarge the labels for that shot (a bigger variant under the same motion key).
-- Frame by content (camera ids), not by guessed coordinates. Lay the world out as shot-sized clusters of roughly 16:10 (a machine with its output bars and strip, a chat with its bubbles); a cluster much wider than that leaves half the frame empty however you aim.
-- Same subject, same frame: keep one camera for consecutive steps about the same cluster; frame what stays on stage (not a container that has just emptied).
-
-## 6. Narration, captions, numbers
-- Caption: what the eye needs, ideally at most 16 CJK characters (24 is the hard limit). narrate(): what a presenter says, one or two sentences (rules: story section 6).
-- One number per step, rounded and written as spoken; translate numbers ('one chance in 365'). Pointing words are fine ('look at the dashed line').
-- When narration is on, keep on-stage text to labels; do not put the narrated sentence on screen too.
-
-## 7. Facts and sources
-- All facts in one data module with source and date; a source line (screen element) per chapter; name studies in narration ('OpenAI, in a 2025 paper, explains …').
-- Say only what the source says. Bars start at zero. Separate illustrative values from facts on screen.
-- Images: licensed or public domain, credited, CREDITS file next to them (story section 7).
-
-## 8. Ending
-- Pull back to the whole world: every pinned question now shows its answer. Then one concrete action the viewer can take right away, as a screen element. Stop once the value lands; no 'thanks for watching'.
-
-## 9. Required: review before handing over
-- npx joplo check until 0 errors. HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it.
-- Storyboard every chapter: npx joplo render --scenario-id <id> --sheet --out board.png prints every step in one image with its caption and narration. Read it frame by frame and assume the first one has problems: half-empty frames, objects cut at the edge, labels overlapping, text too small in wide shots, the chapter label covering content. Fix, then storyboard again.
-- Play each chapter in the board with Voice on: flights and camera land together, nothing leaves the frame mid-flight, narration finishes before the next step.
-- Evidence, not belief: 'it plays' needs check 0 errors plus a run in the board; 'it looks right' needs the rendered frames; 'it is clear' needs captions-only and frames-only passes that both tell the story.
-- Tell the user what you could not verify (a real voice on a phone, other window sizes).`,
-
   plugins: `# Joplo plugins: plugins
 
 Plugins are npm packages maintained outside Joplo. They add components (for example an interactive 3D scene) that the Joplo engine schedules like catalog components: flow steps click their elements, state bindings drive them, and the camera, cues, marks, captions, narration, screenshots, video export, build, and share all work unchanged.
@@ -259,7 +185,16 @@ Declare display text in data.node.text / data.step.text as segment paths (for ex
 
 Keep each stage's records under its qualified scene identity so scope rules can project them safely. Element ids are local to a stage. frame receives scenes with their qualified ids; use ctx.frame.sceneId in the renderer to select the matching snapshot. Initial snapshots participate in feature diff as well as step snapshots. Historical public IR is strictly adapted for comparison; private notes and unknown layout fields are still rejected.
 
-When maintaining the Joplo repository, run pnpm build:packages and test the eight tarballs in a clean install. Workspace typecheck alone misses publishing rootDir and dependency failures. @joplo-app/plugin-diagram is a published package at the same version as Joplo, with dist JavaScript and declarations, and is included in the release package list. Core imports its public subpaths; kit keeps compatible author markers without depending on the plugin. Browser rendering helpers come from @joplo-app/kit/renderer and renderer-style; Node frame hooks use the injected resolveProps service instead of importing core internals. The React bridge reads the web package's shipped shared-modules.json and intercepts module resolution before installed packages, so plugins use the host instance whether or not they install their own React. Production build does not require React as a web development dependency. Use frame.animate=false for a deterministic final frame and ctx.hold() while assets load.
+When maintaining the Joplo repository, run pnpm build:packages and test the nine tarballs in a clean install. Workspace typecheck alone misses publishing rootDir and dependency failures. @joplo-app/plugin-diagram is a published package at the same version as Joplo, with dist JavaScript and declarations, and is included in the release package list. Core imports its public subpaths; kit keeps compatible author markers without depending on the plugin. Browser rendering helpers come from @joplo-app/kit/renderer and renderer-style; Node frame hooks use the injected resolveProps service instead of importing core internals. The React bridge reads the web package's shipped shared-modules.json and intercepts module resolution before installed packages, so plugins use the host instance whether or not they install their own React. Production build does not require React as a web development dependency. Use frame.animate=false for a deterministic final frame and ctx.hold() while assets load.
+
+## Universal properties, observers and themes (API v2)
+Declare properties: { badge: { type: 'string', nonempty: true, attribute: 'data-jp-probe-badge' } } on a plugin with id probe. These literal props can appear on any host or plugin element. Types are string/number/boolean; numbers can declare min/max. Bindings are rejected. Attribute names must use data-jp-<plugin id>-; duplicate property/attribute ownership reports PLUGIN_PROPERTY_CONFLICT, invalid declarations/values report PLUGIN_PROPERTY_INVALID. Fix the declaration or author value and run check again. The host preserves node.props and exposes declared attributes on DOM anchors, including ctx.node.attrs and child anchors.
+
+An optional runtime.observe(root, { frame, ext }) returns { update(context), destroy() }. It sees committed DOM after child layout effects, including ordinary host components, and runs on layout commits; caches belong to that stage instance. Clear animations in destroy and when frame.animate=false. Scene/scenario/runtime changes recreate the observer; a failing observer is disabled until then. This is drawing-only: it cannot implement business state or effect lowering. A visual cache is not a source of truth for deep links.
+
+Declare themes: { night: ':root { --jp-ink: #ddeeff; }' } in the author manifest, then select config({ theme: 'probe:night' }). The host validates CSS strings/names, stores them in project.plugins[probe].themes, and projectThemes combines namespaced plugin CSS with project themes. Existing scoped theme injection serves the board, export and offline site. No local CSS path enters IR. PLUGIN_THEME_INVALID means an invalid name or non-string source; THEME_UNKNOWN means the chosen namespace/name is unavailable.
+
+Effect compilers may return writes: [{ path: 'ui.probe.value', value: 1 }] and directorTarget: 'elementId'. The host validates JSON and safe ui/data/inputs paths, lowers writes in author order to ordinary set effects, and uses directorTarget to select a layer without creating a focus ring. Include element references for scoped publishing. Plugin frame hooks then produce complete snapshots, after flow({ from }) has resolved; browser observers only read them.
 
 ## Local resources and media tracks (API v2)
 A plugin can declare local: new URL('./local.js', import.meta.url). This Node-only module exports { compilers: { name: { version, mime, compile(input, { directory, maxBytes }) } } }; compile returns Uint8Array. Use only the supplied temporary directory for intermediates and return artifact bytes. Runtime imports must never import this module or the author entry.
@@ -386,7 +321,7 @@ A character speaking: .click('can_go', 'Ajie replies: I can go', say('Count me i
 Check: read every line aloud in order without looking at the screen. It should sound like one person telling one story, briskly.
 
 ## 7. Explainers and news-style demos (a topic, not a product)
-When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets. The full method (package, hook, one Canvas world, camera, morphing objects, chapters with from, review): npx joplo skill content.
+When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets. The full method (package, hook, a continuous world, morphing objects, chapters with from, review): npx joplo skill content.
 - Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. One chapter per scenario, one case per chapter; the published site plays them back to back with an Up next countdown, like one video.
 - Case titles are what viewers read in the board sidebar: for an explainer write them as numbered chapter headlines ('01 What is on the ballot?'), not acceptance criteria; name the option after the style ('Dark quick-cut'), not 'A'.
 - Graphics that carry the story: a seat chart filling up, a tile map recoloring, bars growing or flipping, a document flying between two sides and getting stamped. Build them from divs with style bound to state (demo: Custom motion) and real photos (components: Real images).
@@ -441,7 +376,7 @@ Use the actual source and decisions as evidence. Label reconstructed history and
 - state: { ui: { ready: false }, data: {}, inputs: {} }: initial option state.
 - scenarios: { happy: flow('Success', { cases: ['happy'], start: '/members' }).click('invite', done('Completed')) }.
 - flow(name, { cases?, start?, state?, from?, layer?, description?, expected?, mock?, outcome? }): state overrides the option's initial state; description and expected describe the scenario.
-- from: 'otherKey' starts from the end of another scenario of the same option (its route, state, canvas camera, and director layer), then applies state on top: chapters of one story, long flows in parts. Its steps are checked against that ending page and layer, so do not also write start. layer: 'key' sets the starting layer.
+- from: 'otherKey' continues the final route, ui/data/inputs and director layer of another scenario in the same option; state overrides that result. Step checks and automatic captions use that ending page and layer. Dependency order does not change chapter order. Do not combine from with start. layer: 'key' overrides the starting director layer.
 - outcome: 'success' | 'failure' | 'denied' | 'other' is the board's result badge ("Mock failure"). Without it, the badge follows done's second argument, else success. mock: 'Mock: link expired' replaces the badge text.
 - See cases for case and coverage declarations; publish for pick and publishing.
 
@@ -450,8 +385,8 @@ Use the actual source and decisions as evidence. Label reconstructed history and
 - .toggle(id, boolean, ...args); .back(...args); .system('Mock event', ...args).
 - .press('⌘K', ...args) / .press('Enter'): a targetless user keyboard step. The default caption describes pressing ⌘K; effects work like ordinary steps.
 - String args are optional captions; other args are effects. All methods are chainable.
-- set($.ui.ready, true): replace state; push($.data.rows, row): append an array item; patch($.ui, { ready: true, mode: 'code' }): several set()s in one argument.
-- camera('id', …, { pad?, zoom?, ms? }): move the camera of a <Canvas> to frame those elements (camera() = whole canvas); see content.
+- patch($.ui, { ready: true, mode: 'code' }): several set() effects; step arguments and card() accept effect arrays. Nested values are replaced, not deep-merged.
+- set($.ui.ready, true): replace state; push($.data.rows, row): append an array item.
 - toast('Message') / toast.success/error/info('Message'): a message for the current step.
 - go('/members'): change route within the current option; back returns to the previous route.
 - done('Result', 'success'|'failure'|'cancelled'): end the scenario; default is success. It also sets the result badge (cancelled shows as other) unless flow({ outcome }) is written; if both are written they must agree, otherwise check warns OUTCOME_MISMATCH.
@@ -576,6 +511,7 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
 - Published site: <site>/#/f/<feature>?s=<scenario>&step=<n>&l=<layer>. Embeds use ?embed=1&scenario=<scenario>&autoplay=1 (see publish).
 - Ids are qualified: option invite.a-modal, case invite.no_permission, scenario invite.a-modal.happy. step=n is the state after n steps (0 = initial). l is the layer key from layers: { … }; it pins that layer and turns Follow director off, so later steps do not switch layers. Omit l to follow the director.
 - Other parameters (layer=, option=, scenario= in the hash) are ignored; the board logs a console warning naming them.
+- Storyboard every step: npx joplo render --scenario-id <id> --sheet --columns 3 --out board.png (1–6 columns, includes initial frame, captions and narration). Time estimates in outline and the cover include narration; autoplay still waits for actual speech.
 - Screenshot one step: npx joplo render --scenario-id invite.a-modal.happy --step-id 'invite.a-modal.happy#2' --out shot.png. It waits for fonts, layout, and the camera.
 - Storyboard a whole scenario: npx joplo render --scenario-id invite.a-modal.happy --sheet --out board.png (every step in one image with captions and narration; --columns 1–6).
 - render needs the Joplo export component (Playwright + Chromium, about 100 MB, installed once under ~/.joplo, never into the project). Without it render exits 4 with EXPORT_COMPONENT_MISSING and downloads nothing. It is a large download, so confirm with the user, then run npx joplo setup export (npx joplo setup export --status checks without installing). Writing demos, dev, check, build, and share do not need it.
@@ -604,8 +540,8 @@ What viewers look at in each step, and the lighter forms (spotlight, highlight, 
 - Keyboard history: type reuses character-by-character preview during playback; press shows keycaps. Static views show only the latest input/keypress; other steps clear it. Empty keys are hidden.
   Example: .type('prompt', 'Plan a weekend camping trip').press('Enter', set($.ui.asked, true)). Chords such as '⌘K' split into two keycaps automatically.
 
-## Canvas: one world, a free camera, morphing objects
-- For explainers and motion graphics, put one <Canvas w={2560} h={1600}> in a layer: a 1280×800 design view scaled to fit, children in design pixels. camera('id', …) frames elements by their size (no focus ring, zoom up to 3× by default); elements with the same motion="key" fly between arrangements and containers; screen children stay fixed on screen. Recipe and review: npx joplo skill content.
+## Continuous visual explainers
+- Use the default content plugin for continuous design worlds, object motion, and content framing; read npx joplo skill content for its APIs and review workflow.
 
 ## Custom motion with style bindings
 - For news-style graphics (a seat chart filling up, a bar growing, a document flying across), bind style values to state and give them a CSS transition: <div id="paper" style={{ left: $.data.paperX, transition: 'left 1.2s ease' }}/>. A step that set()s a new value animates the element.
@@ -649,6 +585,7 @@ const plan = (f: ReturnType<typeof start>) =>
     .system('Brain reasoning', 'Brain calls Bedrock to plan the next step', trace('brain', 'llm'));
 \`\`\`
 The example also covers insufficient quota, dangerous tool confirmation, client disconnection, and billing retries. Choose scenarios for the requirements; include more than the main flow.`,
+  content: standardGuides.content,
   diagram: standardGuides.diagram!,
   focus: `# Joplo focus: focus
 
@@ -699,7 +636,7 @@ With layers, a cue switches the director to its target's layer when the step has
 - shot() on a layer whose next step clicks outside the framed area → the click target is off screen (render warns "Outside frame"). When the whole layer fits one screen, use highlight / spotlight instead of shot.
 - numbered() on items that already print their own numbers → two sets of badges; spotlight the group instead.
 - Rings everywhere: if everything is highlighted, nothing is.
-- shot() to travel around an explainer → a pulsing ring around each target and at most 1.25× on UI; inside a <Canvas> use camera('id', …), which frames by content without a ring (see content).
+- For traveling inside an explainer world, read npx joplo skill content; its camera differs from the host focus hints.
 
 ## Example
 \`\`\`tsx
@@ -837,10 +774,9 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - CALLOUT_TOO_LONG (warning): callout text over about 24 units (same count as captions). Say the reason in a few words; move the rest to explain().
 - FOCUS_IDLE (info): three or more system steps in a row change nothing on stage. Merge them, or show what happens (set() visible state, highlight, callout, shot).
 - INVALID_REDACT / AUTOFOCUS_INVALID: redact takes true/false or a condition (redact={not($.ui.revealed)}); config({ autoFocus }) takes true or false.
-- LAYER_UNKNOWN: Invalid layer key or missing content, or flow({ layer }) names a layer the option does not declare. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
-- CAMERA_UNKNOWN / CAMERA_INVALID: camera() targets must exist in a layer (put them inside a <Canvas>); pad 0–2000, zoom 0.1–10, ms 0–10000. See content.
-- FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: flow({ from }) must name another scenario key of the same option, must not loop back, and that scenario must replay without errors (fix it first).
-- FROM_WITH_START: a scenario with from starts where the other one ended (its route and layer); remove start, or remove from to start fresh. Step checks and auto captions already use that ending page.
+- FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: from must name another scenario key in the same option, the dependency must not loop, and the preceding scenario must replay successfully. Fix that scenario first.
+- FROM_WITH_START: from already determines the starting route; remove start or start a separate story.
+- LAYER_UNKNOWN: Invalid layer key, missing content, or flow({ layer }) names no declared layer. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
 ${standardChecks}
 - THEME_UNKNOWN: config({ theme }) names neither a built-in nor themes/<name>.css. Use a built-in or add that CSS file; see Write a theme in demo.
 - ELEMENT_PROP: A component prop contains JSX. Use strings for icons, such as leftSection="+", and children for content.

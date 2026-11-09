@@ -55,8 +55,8 @@ export type PluginCompileHooks = {
   node?: (node: Readonly<JNode>, ctx: { ids: ReadonlyMap<string, string | undefined>; report: PluginReport }) => JNode | void;
   /** 每个根节点的静态派生数据，错误由宿主隔离。 */
   derive?: (node: Readonly<PluginIRNode>, ctx: { viewport: 'desktop' | 'mobile'; report: PluginReport; options: Readonly<Record<string, unknown>> }) => PluginDerived | void;
-  /** 一个作者效果降级为该插件的数据及内核镜头/引用原语。data 是同一步之前的降级结果。 */
-  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; data: unknown; report: PluginReport; source?: string; resource: (request: { compiler: string; input: string }) => string }) => { data?: unknown; targets?: string[]; references?: string[]; media?: MediaCommand[] } | void;
+  /** 一个作者效果降级为数据及内核原语。targets 贡献普通取景；directorTarget 只选择层。writes 按作者顺序生成 set；data 是同一步之前的降级结果。 */
+  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; data: unknown; report: PluginReport; source?: string; resource: (request: { compiler: string; input: string }) => string }) => { data?: unknown; targets?: string[]; references?: string[]; writes?: PluginWrite[]; directorTarget?: string; media?: MediaCommand[] } | void;
   /** 编译器回放基础效果后，计算第 0 步及每一步的完整绘制快照。 */
   frame?: (ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; state: PluginState; previousState?: PluginState; resolveProps: (node: PluginIRNode, previous?: boolean) => Record<string, unknown>; data: unknown; previousData: unknown; position: number; report: PluginReport }) => unknown;
 };
@@ -80,7 +80,21 @@ export type PluginScopeRule = {
 export type PluginSlotSpec = { text?: string[][]; scope?: 'global' | PluginScopeRule[] };
 export type PluginDataSpec = { node?: PluginSlotSpec; step?: PluginSlotSpec };
 
+/** Literal properties on any author element; DOM names must belong to this plugin's data-jp-<id>- namespace. */
+export type PluginPropertySpec = {
+  type: 'string' | 'number' | 'boolean';
+  attribute?: string;
+  min?: number;
+  max?: number;
+  nonempty?: boolean;
+};
+export type PluginWrite = { path: string; value: unknown };
+
 export type PluginDef = {
+  /** Theme name → CSS source. Host publishes them as <plugin>:<name>. */
+  themes?: Record<string, string>;
+  /** Compile-time literal properties; copied to resolved DOM anchors by the host. */
+  properties?: Record<string, PluginPropertySpec>;
   kind: 'plugin';
   data?: PluginDataSpec;
   compile?: PluginCompileHooks;
@@ -181,8 +195,8 @@ export type ComponentCtx = {
   model: PluginIRNode;
   /** 当前步骤编译好的插件快照（第 0 步取 scenario.ext）。 */
   ext: Readonly<Record<string, unknown>>;
-  /** React 容器可直接返回子节点；传入 container 时由宿主 portal 渲染。 */
-  renderChildren: (nodes?: readonly PluginNode[], container?: Element) => any;
+  /** React 容器可直接返回子节点；nodes 按 id 选择 model 子树（含文本节点）；传入 container 时由宿主 portal 渲染。 */
+  renderChildren: (nodes?: readonly Pick<PluginNode, 'id'>[], container?: Element) => any;
   frame: PluginFrame;
   /** 读取主题变量，例如 css('--jp-ink')、css('--jp-accent')。 */
   css: (name: string) => string;
@@ -196,9 +210,13 @@ export type ComponentInstance = { update(ctx: ComponentCtx): void; destroy(): vo
 export type RuntimeComponent =
   | { mount(el: HTMLElement, ctx: ComponentCtx): ComponentInstance; react?: never }
   | { react: (props: { ctx: ComponentCtx }) => any; mount?: never };
-export type PluginRuntime = { id: string; apiVersion: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; media?: MediaFactory };
+/** Runs after the host commits a stage layout. Read-only drawing data, never state transitions. */
+export type PluginObservation = { frame: PluginFrame; ext: Readonly<Record<string, unknown>> };
+export type PluginObserver = { update(context: PluginObservation): void; destroy(): void };
+export type PluginObserve = (root: HTMLElement, context: PluginObservation) => PluginObserver;
+export type PluginRuntime = { id: string; apiVersion: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; media?: MediaFactory; observe?: PluginObserve };
 
 /** 插件运行时：mount 适配框架无关渲染；react 接收 ctx，由宿主 React 树渲染。 */
-export function defineRuntime(r: { id: string; apiVersion?: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; media?: MediaFactory }): PluginRuntime {
+export function defineRuntime(r: { id: string; apiVersion?: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; media?: MediaFactory; observe?: PluginObserve }): PluginRuntime {
   return { ...r, apiVersion: PLUGIN_API_VERSION };
 }

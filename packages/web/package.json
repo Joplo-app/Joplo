@@ -37,7 +37,8 @@
     "tailwindcss": "4.3.4",
     "typescript": "6.0.3",
     "vite": "8.3.5",
-    "@joplo-app/plugin-diagram": "workspace:*"
+    "@joplo-app/plugin-diagram": "workspace:*",
+    "@joplo-app/plugin-content": "workspace:*"
   },
   "engines": {
     "node": ">=22"

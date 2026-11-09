@@ -1,4 +1,5 @@
-import { $, callout, camera, done, flow, hold, layer, narrate, option, patch } from '@joplo-app/kit';
+import { camera } from '@joplo-app/plugin-content';
+import { $, callout, done, flow, hold, layer, narrate, option, patch } from '@joplo-app/kit';
 import { BIRTHDAY_Q, PROMPT, SRC } from '../../../shared/data.ts';
 import { C } from '../../../shared/palette.ts';
 import { WorldLayer } from '../../../shared/world.tsx';

@@ -1,6 +1,6 @@
 # Joplo 插件架构：纯粹的引擎 + 可插拔的内容形态（D87）
 
-> 状态：阶段 0、阶段 1-A 与阶段 1-B 已实现：v1 叶子组件兼容；v2 编译钩子、效果快照、元素特性与 React/容器运行时；第一方 `plugins/diagram` 默认启用。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节。
+> 状态：阶段 0、阶段 1-A、阶段 1-B 与阶段 1-C 已实现：v1 叶子组件兼容；v2 编译钩子、效果快照、元素特性与 React/容器运行时；第一方 `plugins/diagram` 默认启用。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节，通用属性、插件主题与讲解内容见第 12 节。
 > 目标形态：Joplo 只是**构建与调度引擎**，负责把不同形态的内容串成一个可播放、可评审、可发布的作品；
 > UI 组件、Diagram、Canvas、3D、Alda BGM、朗读供应商、主题……都是插件。
 
@@ -235,3 +235,63 @@ Alda 的 MIDI 解析、节奏/音高、近似 GM 乐器音色与 WebAudio 振荡
 - web `media.test.ts` / `midi.test.ts` / `voice.test.ts`：手势门槛、生命周期、旁白压低、停播淡出、MIDI 节奏音高/休止、引擎时钟、暂停/倍速及 <100ms 步边界验证。
 - 发布集合：kit → plugin-diagram → plugin-alda → core → web → server → cli → joplo；八包 smoke 另外直接载入可选插件 author/local/runtime 出口。Alda 不成为默认依赖或默认配置。
 - 已知边界：视频导出暂不混入媒体轨道；SMF format 2 / SMPTE 不支持，GM 乐器只是近似振荡器音色。Alda 本机编译在发布后不可补做；漏配工具时修复后重新 build/share。
+
+## 12. 阶段 1-C：讲解内容、通用属性与插件主题（已实现）
+
+`@joplo-app/plugin-content` 是默认启用的第一方插件，版本与其他八包一致。直接导入时在项目依赖声明该包；不重复加入 `config.plugins`。作者从它导入 `Canvas / camera`，从 kit 导入通用 `flow / patch / narrate / hold`。IR 类型为 `content:Canvas`，主题为 `content:studio`；技能正文在 `plugins/content/src/guide.ts`，`joplo skill content` 通过标准技能路由读取。PR #35 **未合并**：仅读取 8284901、0fcb8f5 及远端分支最终内容，示例仅调整导入和主题配置。
+
+### 通用属性与布局观察
+
+插件可在任意元素上贡献字面量属性：
+
+```ts
+properties: {
+  badge: { type: 'string', nonempty: true, attribute: 'data-jp-probe-badge' },
+  weight: { type: 'number', min: 0, max: 10, attribute: 'data-jp-probe-weight' },
+  pinned: { type: 'boolean' },
+}
+```
+
+- 宿主校验声明、类型、有限数字和上下界；声明不允许绑定、保留属性或覆盖宿主 DOM 锚点。`attribute` 必须在 `data-jp-<plugin id>-` 命名空间，省略时仅保留 props。不同插件声明同名属性或重复 DOM 属性报 `PLUGIN_PROPERTY_CONFLICT`；无效声明 / 作者值报 `PLUGIN_PROPERTY_INVALID`，指向作者位置。
+- 属性留在普通 `node.props`，不增加专用节点字段。渲染宿主只按元数据映射成字符串 DOM 属性：普通组件根、插件组件根、`ctx.node.attrs` 与子锚点一致。`false` 和 `0` 也保留。
+- `runtime.observe(root, { frame, ext })` 可创建 `{ update(context), destroy() }`。宿主在子组件提交布局后调用 update，根限制为当前舞台。场景、舞台或运行时变化时销毁重建，卸载必清理；失败只禁用该实例，直到生命周期变化再尝试。观察器只绘制，不承担业务状态推进。首次载入后的布局、普通步骤、静态跳转均可观察。
+- content 声明 `motion / motionDelay / motionMs / screen`。FLIP 观察器按设计坐标缓存同键物体的旧位置与尺寸；使用独立 translate/scale，保留作者 transform。镜头和物体同一步移动时共用时长、缓动；`motionMs=0` 是显式直达。`animate=false` 取消未完成的 FLIP；插件自己的静态 CSS 让作者动画与过渡直接展示终态。截图不会播放 FLIP。
+- `screen` 仅分离 Canvas 的直接子元素；两组子元素仍由宿主 `ctx.renderChildren` 按 model 节点 id 渲染，保留直接文本子节点。宿主不知道这些属性的名称或含义。第二个无组件 fake 插件也能给普通 Text/div 透传属性、读取提交后的 DOM 和当前步骤，证明接口不依赖 content 容器。
+
+### 插件主题 CSS
+
+`PluginDef.themes` 为插件内主题名到 CSS 字符串的映射，名字只接受小写字母开头的字母 / 数字 / 连字符。IR 存在 `project.plugins[id].themes`，选择名为 `<id>:<name>`；错误报 `PLUGIN_THEME_INVALID` 或 `THEME_UNKNOWN`。它不存本机 CSS 路径，不需要浏览器动态 import CSS。
+
+`projectThemes(project)` 合成命名空间插件主题和作者主题，后者同名时优先。原 `project.themes` 继续只代表作者 CSS，旧项目和测试不变。看板主题列表、Stage 外观、render、封面与发布站统一使用这个合成入口，再走现有 `scopeThemeCss / ThemeStyles`。feature-diff 和本地评审签名也计入插件主题。第二个 fake 插件的 `probe:night` 经相同流程在真实 Chromium 生效。发布物自含 CSS，可在 file:// 下使用。
+
+### 效果降级和通用接力
+
+`compile.effect` 可返回 `writes: [{ path, value }]` 与 `directorTarget`。writes 是有限无环 JSON，路径只允许安全的 `ui / data / inputs` 子路径（拒绝原型污染段），按作者顺序降成普通 `set`；与其他内核效果保持顺序。directorTarget 只在没有显式 shot 的导演选择时选目标所在层，优先于 cue / 操作目标，不产生镜头框。需要范围发布的 id 同时放在 references。播放器始终只读普通 effects、directorLayer、shots 和 ext，不执行 compile 钩子。
+
+content 的 camera 工厂产生插件效果信封，插件校验 `CAMERA_UNKNOWN / CAMERA_INVALID`，写 `ui.__plugins.content.camera`，并在 frame 钩子输出每个舞台完整的取景快照（初始帧也有）。PR #35 示例的初始 `ui.__camera` 仅由插件兼容读取；后续新状态优先。Canvas 运行时只读编译快照，按目标 DOM 的 offset 布局范围取景；没有目标时看完整世界，默认视口 1280×800、默认 pad 48、zoom 上限 3、运动 1200ms。父容器没有高度时使用 view 的 aspect-ratio 撑开。任意一步直达与从头播放到该步，最终画面相同。
+
+引擎迁入 `flow({ from, layer })`、`patch()`、步骤效果数组、旁白时长估算与分镜。接力先按依赖决定逐步校验使用的路径 / 导演层，再回放前章结尾叠加本章 state，最后生成插件快照；IR 保持声明顺序。from 不存入公开 IR；只有最终初始状态和可选 `initial.layer`。错误为 `FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED / FROM_WITH_START / LAYER_UNKNOWN`。分镜含初始画面与每一步，标注字幕和旁白，告警带步号前缀；`--columns` 控制 1–6 列。
+
+### 新字段与槽位的端到端流向
+
+| 字段 / 槽位 | 写入点 → 存储 | 读取点 → 消费者 |
+|---|---|---|
+| `PluginDef.properties[name].{type,min,max,nonempty,attribute}` | Node 清单 → 宿主校验 → `project.plugins[id].properties` | 编译节点值检查；rootAttrsOf → 宿主 / 插件 DOM 锚点；浏览器不携带校验函数 |
+| 任意元素的声明属性 | 作者 JSX → 普通 `node.props` | 宿主按声明映射 `data-jp-<id>-*`；插件容器与观察器读取；不进入内核条件分支 |
+| `PluginDef.themes[name]` | CSS 字符串 → `project.plugins[id].themes[name]` | `projectThemes` → 带命名空间的主题目录 → ThemeStyles / 外观 / diff / 本地评审；build 内联、file:// 无网络 |
+| effect `writes[].{path,value}` | Node 插件 → 宿主物化及路径 / JSON 校验 | `step.effects` 的普通 set → stateAt、接力及编译 frame；writes 信封不发布 |
+| effect `directorTarget` | Node 插件 → 临时目标列表 | 层寻址 → 既有 `step.directorLayer`；不加入 shots/focusTargets；配套 references 进入范围裁剪 |
+| `ui.__plugins.content.camera` | content effect → 普通 set 状态 | 仅 content frame 读取；通用 flow 接力只传递普通状态；播放器不知道键含义 |
+| `scenario.ext.content.scenes[sceneId].camera`、`step.ext.content.scenes[sceneId].camera` | content frame 在接力之后生成 → 插件 schema 校验 | Stage 取对应初始 / 步骤 ext → ComponentCtx.ext → Canvas 根据 targets/pad/zoom/ms 绘制；scope 按 scene / element 裁剪 targets；无可翻译文本 |
+| 插件内 `world.dataset.flightMs/flightEase` | Canvas 布局效果按本次取景变化写入 DOM | content observe 在宿主提交布局后读取，FLIP 与镜头同步；仅插件运行时数据，不进 IR |
+| `runtime.observe`、`PluginObservation.{frame,ext}` | 插件浏览器入口 → 注册表 | Stage 提交布局 → update；卸载 / 场景变化 / 热更新 → destroy；仅存在浏览器，不存 IR |
+| `data-jreport-viewport` / `data-jreport-surface` | 任意插件绘制的 DOM 能力标记 | render 的通用报告：平移视口内仅检查下一目标出画、报告零尺寸表面；引擎不含组件名 |
+| `FlowOpts.from/layer` → `Scenario.initial.layer` | 作者接力声明 → 依赖编译 / 结尾回放 → 初始 state 与 layer | initialState / cameraAt / 插件初始快照；from 与作者声明不进入 IR |
+| `SheetOptions.{columns,cellWidth}` / `SheetResult.{path,steps,warnings}` | CLI --sheet/--columns 或 server API → renderSheet | 原 render 路由逐步截图 → 网格 PNG；无新增项目 IR 字段 |
+
+### 证据与边界
+
+- PR #35 的三个测试文件迁入 `plugins/content/test`；通用扩展、生命周期、深链一致性与静态取消动画另有 Node / SSR / 真实 Chromium 覆盖。content 守护递归检查 core、renderer、player，包括插件宿主目录；不改变 P2-11 记录的其他族历史边界。
+- llm-explainer 与 0fcb8f5 的 check diagnostics 完全相同（0 error、0 warning、1 HAPPY_PATH_ONLY info）。14 个关键 render 截图覆盖五章、封面、接力起点、对象飞行、推拉与收尾；PNG 字节相同，像素差比例及平均绝对差均为 0。原图、哈希和日志在本地 `output/playwright/p1-c/`，验收汇总在 `.done-P1-C`，不发布会话产物。
+- 本阶段保持原示例视觉和内容，未重新设计素材或叙事。技能沉淀：同物体贯穿章节、镜头与 FLIP 同步、screen 覆盖层、无高度容器恢复、静态动画取消、接力在快照前解析、分镜与实际播放分别验证、示意数字与事实来源分开。
+- 通用属性当前只接收字面量；插件观察器是可信的 npm 绘制代码，与页面同域，不是沙箱。音乐视频混音、逐词旁白同步、素材剪辑与地图组件仍不在本阶段范围内。

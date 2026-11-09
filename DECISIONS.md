@@ -430,6 +430,12 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 顺序：容量计费（作品集的前提）→ 作品集、公开与私密、强制选择、自动 SEO、密码查看 → 托管朗读（可并行）。看板与网页的新界面先画原型再实现。
   - **第一阶段（容量计费）已确认的细节**（2026-11-08，原型 `examples/joplo` 的 storage_quota，用户在看板确认方案 B 并回复“可以”）：发布浮层平时只在账号下写一行“已用 / 上限 · 链接永久有效”，用到八成才出现黄色用量条与提醒（免费版给管理与升级两个入口，Pro 只给管理），放不下时红色提示写清差多少、已有链接不受影响。免费账号也更新同一个链接（`--new` 与 PR 预览照旧新建）。放不放得下在构建完、上传前由 Cloud 判断，更新只按新旧版本的差额，变小的更新总是允许。CLI 超出时以 `QUOTA_EXCEEDED`（`details.kind = "storage"`）、退出码 6 结束；线上协议是 413 `STORAGE_FULL`（`QUOTA_EXCEEDED` 固定 429，旧 CLI 收到会重试）。上线顺序：Cloud 先于 CLI。实现：Joplo #33、joplo-cloud #29。
 
+- D86 讲解内容原语（2026-11-08）：**以插件形式实现，PR #35 未合并**。实现依据为该远端分支的 8284901 与 0fcb8f5；在 D87 阶段 1-C 按引擎 / 内容插件拆开移植，保留原分支和 PR。
+  - 通用引擎：`flow({ from, layer })` 接力同一方案内场景的结尾路径、ui/data/inputs 与导演层，叠加本场景 state；按依赖编译、保持声明顺序，诊断 `FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED / FROM_WITH_START / LAYER_UNKNOWN`。先解析接力，再生成插件初始和逐步快照。
+  - 通用引擎：`patch(target, values)` 生成多个 set，步骤和 card 接受效果数组；outline、封面、SCENARIO_TOO_LONG 计入旁白估算；`render --sheet --columns` 输出初始帧及全部步骤、字幕和旁白。
+  - 默认第一方 `@joplo-app/plugin-content`：`content:Canvas` 按设计尺寸等比缩放，世界与固定 screen 层；子元素经宿主 `renderChildren`。`camera()` 在 Node 编译期降级为普通状态写入、引用和导演目标，并写完整绘制快照；播放器不执行插件语义。`motion / motionDelay / motionMs / screen` 走通用属性声明；插件观察步骤布局做 FLIP，静态帧取消过渡并直达终点。
+  - `content:studio` CSS 和 content 技能正文归插件；`npx joplo skill content` 保留。示例 `examples/llm-explainer` 只改必要导入和主题配置，保留原有初始镜头写法（由插件兼容，不进入引擎）。字段、边界与证据见 `docs/plugins.md` 第 12 节。
+
 - D87 插件平台：Joplo 是纯粹的构建与调度引擎，内容形态都是插件（2026-11-08，来源：用户：“Joplo 的核心是提供调度的引擎”“社区可以提供更好的组件”“Agent 使用的时候就是装一个 npm 包，需要提供的是如何使用的 Skill，和相关的组件，Joplo 的调度引擎可以使用这些组件/功能”“alda diagram 这些东西都可以拆走，joplo 只是一个纯粹的构建引擎，能够串联不同的形态的内容”；编号避开 D86（另一分支的讲解内容原语））。设计见 `docs/plugins.md`。
   - 内核只保留所有形态共有的东西：故事模型（功能 / 方案 / 情况 / 场景 / 步骤、规则与评审）、时间线与状态机、导演与节奏、寻址与检查、输出管线（看板、截图视频、build / share、多语言、范围分享）、插件宿主。内核里不出现组件名。
   - 插件是 npm 包（也可以是私有包或项目内目录）：创作入口（Node，`definePlugin` 清单、JSX 标记、效果工厂、技能）、运行时（浏览器，只负责画和发声）、可选的本机能力（Node，只在作者机器，例如 Alda 编译）。Agent 的用法：安装 → `config({ plugins })` → `npx joplo skill <插件>` → 导入组件。
@@ -447,6 +453,7 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - 阶段 1-A 第二轮复审修正：scene-domain items 显式解析唯一舞台并传给子规则；无所属舞台的元素规则失败关闭，最终 traces 归入对应 scenes 槽位。四类钩子返回值先物化，拒绝访问器；每个最终槽位统一验证自身 schema，含 frame 未覆盖的 effect 数据，发布清理不再改动槽位内容。P2-11 仍延后。
   - 阶段 1-A 第三轮复审修正：物化器只缓存原对象描述符，共享引用按每条路径展开成独立副本；根深度为 0，包含原始值叶子的最大路径深度为 100。发布返回成功前校验完整 IR 外层深度，防止槽位局部合格但序列化后的发布物无法被自身 diff 读取。
   - 阶段 1-B 已实现：可选第一方 `@joplo-app/plugin-alda`（与其他包同版本）通过显式 `alda(scores)` 启用，配乐保存在项目 `music.ts` 的命名文本中，步骤 `music.play/stop` 经既有 effect/frames 宿主降级为媒体快照。新增通用 Node local 入口与文本资源编译器，Node 请求表不进 IR；缓存按编译器版本/代码与精确输入 SHA-256，合并同进程及跨进程请求；四类本机失败 warning 降级。发布先 scope 再内联产物，明确不公开配乐源文本。浏览器媒体宿主只认快照与引擎时钟，负责手势/开关、暂停、跳转、倍速、淡入淡出与旁白 25% ducking；MIDI 解析及离线合成全部在插件。每步锚点按上一步 hold（缺省 3000ms）推进，额外朗读/交互等待不改变后续锚点；这个确定性规则同时用于跳入和连续播放。八包发布，smart-home-3d 已示范；字段流向与测试见 docs/plugins.md 第 11 节。视频导出暂不混音，GM 音色近似，SMF 2 / SMPTE 未支持。
+  - 阶段 1-C 已实现：新增默认标准 `@joplo-app/plugin-content`，与其他八包统一版本并纳入九包发布集合。通用属性声明校验并透传所有 DOM 锚点，运行时 observe 在舞台提交布局后观察，按舞台/场景和运行时管理生命周期；插件主题保存在自身 IR 元数据并经 projectThemes 合成，作者 themes 字段保持原语义。第二个假插件与真实 Chromium 测试验证属性、主题、观察器及状态写入/导演目标；讲解源码守护覆盖 core 和渲染/播放宿主（包括 plugins 子目录）。PR #35 的 llm-explainer 诊断一致，14 个关键步骤 render PNG 字节一致；详细验证见 `.done-P1-C`。
   - 已知 P2-11（用户明确延后）：源码守护仍整体豁免 plugins 目录，浏览器边界检查仅覆盖两个文件的直接依赖，尚无传递依赖守护；本轮不修。
 
 ## Working assumptions

@@ -239,7 +239,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   // 主题（D51）：config.theme 必须是内置主题或 themes/<name>.css
   {
     const t = src.config.theme ?? 'sketch';
-    const authorThemes = Object.keys(src.themes ?? {});
+    const authorThemes = [...Object.keys(out.themes), ...Object.keys(host.themes)];
     if (!(BUILTIN_THEMES as readonly string[]).includes(t) && !authorThemes.includes(t))
       err('THEME_UNKNOWN', `config({ theme: '${t}' }) is not a built-in theme (${BUILTIN_THEMES.join(', ')}), and the project has no themes/${t}.css${authorThemes.length ? ` (author themes: ${authorThemes.join(', ')})` : ''}`, src.config.source ?? `${src.config.file}:1:1`);
   }
@@ -372,6 +372,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const ext: Record<string, unknown> = {};
         const references: string[] = [];
         const pluginFocus: string[] = [];
+        const directorTargets: string[] = [];
         const forks: Step['forks'] = [];
         const marks: Step['marks'] = [];
         /** 每个插件效果贡献的节点（作为镜头目标，与 shot 合并）。 */
@@ -388,7 +389,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
           else if (e.type === 'stream') effects.push({ type: 'stream', path: e.path, value: e.value });
           else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
-          else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold' || e.type === 'camera') continue; // 镜头与焦点提示不是状态变化，下面单独归类
+          else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold') continue; // 镜头与焦点提示不是状态变化，下面单独归类
           else if (e.type === 'say') {
             if (typeof e.text === 'string' && e.text.trim()) says.push(e.text.trim());
             else err('SAY_EMPTY', 'say() needs the line the character speaks, for example say(\'I can make it!\'). Remove it to read the caption instead', st.source);
@@ -400,6 +401,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           } else if (e.type === 'plugin') {
             const lowered = host.effect(e, effectRoots.filter(scene => scene.layer || scene.id === sceneOf(stepRouteBefore(fl.steps, i + 1, start))), ext[e.plugin], st.source);
             if (lowered) {
+              effects.push(...(lowered.writes ?? []).map(w => ({ type: 'set' as const, path: w.path, value: w.value })));
+              if (lowered.directorTarget) directorTargets.push(lowered.directorTarget);
               if (lowered.media?.length) { const key = `${sid}#${i + 1}`; host.mediaCommands.set(key, [...(host.mediaCommands.get(key) ?? []), ...lowered.media]); }
               if (lowered.data !== undefined) ext[e.plugin] = lowered.data;
               if (lowered.targets?.length) {
@@ -414,18 +417,6 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const sceneBefore = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i, start)));
         const sceneAfter = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i + 1, start)));
         const actionTarget = 'target' in st.action ? st.action.target : null;
-        /** 画布镜头（camera()）：状态里记一份 ui.__camera，<Canvas> 按它取景；导演切到第一个目标所在的层。 */
-        const cameraTargets: string[] = [];
-        for (const e of st.effects as EffectDef[]) {
-          if (e.type !== 'camera') continue;
-          const bad = (k: string, v: unknown, lo: number, hi: number) => v !== undefined && (typeof v !== 'number' || !Number.isFinite(v) || v < lo || v > hi) ? `${k} must be a number from ${lo} to ${hi}` : null;
-          const problem = bad('pad', e.pad, 0, 2000) ?? bad('zoom', e.zoom, 0.1, 10) ?? bad('ms', e.ms, 0, 10_000);
-          if (problem) { err('CAMERA_INVALID', `camera(…): ${problem}`, st.source); continue; }
-          const missing = e.targets.filter((id) => (hasLayers ? !layersWith(id).length : !(sceneAfter && findIn(sceneAfter.root, id))));
-          if (missing.length) { err('CAMERA_UNKNOWN', `camera(${missing.map((m) => JSON.stringify(m)).join(', ')}) target is not in ${hasLayers ? 'any layer' : 'the stage for this step'}; aim it at elements inside a <Canvas>`, st.source); continue; }
-          for (const id of e.targets) if (!cameraTargets.includes(id)) cameraTargets.push(id);
-          effects.push({ type: 'set', path: 'ui.__camera', value: { targets: [...e.targets], ...(e.pad !== undefined ? { pad: e.pad } : {}), ...(e.zoom !== undefined ? { zoom: e.zoom } : {}), ...(e.ms !== undefined ? { ms: e.ms } : {}) } });
-        }
         for (const e of st.effects) {
           if (e.type === 'fork') {
             if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `Fork target "${e.scenario}" must be another scenario key in the same option`, st.source);
@@ -504,8 +495,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
             }
           }
         }
-        // 画布镜头：导演切到镜头目标所在的层（优先于焦点提示与操作目标）
-        if (hasLayers && !directorLayer && cameraTargets.length) directorLayer = layersWith(cameraTargets[0]!)[0] ?? null;
+        // 插件的导演目标只选择层，不自动加入聚焦框或推进视角。
+        if (hasLayers && !directorLayer && directorTargets.length) directorLayer = layersWith(directorTargets[0]!)[0] ?? null;
         // 没写 shot、写了焦点提示（D70）：导演切到第一个提示目标所在的层（提示要被看见）
         if (hasLayers && !directorLayer && focusTargets.length) directorLayer = layersWith(focusTargets[0]!)[0] ?? null;
         // 没写 shot 的操作步骤：导演切到操作目标所在的层（播放时观众看得到要点的东西）
@@ -631,6 +622,39 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     }
   }
 
+  // flow({ from }) 接力：初始状态 = 被接的场景最后一步之后的状态（路径、ui / data / inputs、导演层），再叠上本场景写的 state。
+  // 链式接力按依赖顺序解析；成环或被接的场景回放失败时报错。
+  if (pendingFrom.size) {
+    const done = new Set<string>();
+    const visiting = new Set<string>();
+    const resolve = (sid: string): boolean => {
+      const p = pendingFrom.get(sid);
+      if (!p || done.has(sid)) return true;
+      if (visiting.has(sid)) { err('FROM_CYCLE', `Scenario ${sid} continues from itself through flow({ from }); break the cycle`, p.at); return false; }
+      visiting.add(sid);
+      const ok = resolve(p.from);
+      visiting.delete(sid);
+      if (!ok) return false;
+      const target = out.scenarios[sid];
+      const prev = out.scenarios[p.from];
+      if (!target || !prev) return false;
+      try {
+        const end = stateAt(out as Project, p.from, prev.steps.length);
+        const hasLayers = Object.keys(out.options[target.optionId]?.layers ?? {}).length > 0;
+        const layer = p.layer ?? (hasLayers ? cameraAt(out as Project, p.from, prev.steps.length).directorLayer : undefined);
+        const merged = mergeState({ ui: end.ui as never, data: end.data as never, inputs: end.inputs as never }, p.state);
+        target.initial = { sceneId: end.sceneId, ui: merged.ui, data: merged.data, inputs: merged.inputs, ...(layer ? { layer } : {}) };
+      } catch (e) {
+        err('FROM_FAILED', `Scenario ${sid} continues from ${p.from}, which does not replay: ${(e as Error).message}`, p.at);
+        return false;
+      }
+      done.add(sid);
+      return true;
+    };
+    for (const sid of pendingFrom.keys()) resolve(sid);
+    if (diags.some((d) => d.severity === 'error')) return { project: null, diagnostics: diags };
+  }
+
   // 逐步派生数据只在编译期计算，播放器读取快照。
   if (!diags.some(d => d.severity === 'error')) host.frames(out as Project);
 
@@ -650,38 +674,6 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     return { project: null, diagnostics: diags };
   }
   let project = pruneMessages(parsed.data);
-  // flow({ from }) 接力：初始状态 = 被接的场景最后一步之后的状态（路径、ui / data / inputs、导演层），再叠上本场景写的 state。
-  // 链式接力按依赖顺序解析；成环或被接的场景回放失败时报错。
-  if (pendingFrom.size) {
-    const done = new Set<string>();
-    const visiting = new Set<string>();
-    const resolve = (sid: string): boolean => {
-      const p = pendingFrom.get(sid);
-      if (!p || done.has(sid)) return true;
-      if (visiting.has(sid)) { err('FROM_CYCLE', `Scenario ${sid} continues from itself through flow({ from }); break the cycle`, p.at); return false; }
-      visiting.add(sid);
-      const ok = resolve(p.from);
-      visiting.delete(sid);
-      if (!ok) return false;
-      const target = project.scenarios[sid];
-      const prev = project.scenarios[p.from];
-      if (!target || !prev) return false;
-      try {
-        const end = stateAt(project, p.from, prev.steps.length);
-        const hasLayers = Object.keys(project.options[target.optionId]?.layers ?? {}).length > 0;
-        const layer = p.layer ?? (hasLayers ? cameraAt(project, p.from, prev.steps.length).directorLayer : undefined);
-        const merged = mergeState({ ui: end.ui as never, data: end.data as never, inputs: end.inputs as never }, p.state);
-        target.initial = { sceneId: end.sceneId, ui: merged.ui, data: merged.data, inputs: merged.inputs, ...(layer ? { layer } : {}) };
-      } catch (e) {
-        err('FROM_FAILED', `Scenario ${sid} continues from ${p.from}, which does not replay: ${(e as Error).message}`, p.at);
-        return false;
-      }
-      done.add(sid);
-      return true;
-    };
-    for (const sid of pendingFrom.keys()) resolve(sid);
-    if (diags.some((d) => d.severity === 'error')) return { project: null, diagnostics: diags };
-  }
   if (mode === 'dev' && project.i18n) {
     const stale = localeDiagnostics(project, src, diags);
     project.i18n = { ...project.i18n, stale };

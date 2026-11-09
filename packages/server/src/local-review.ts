@@ -1,3 +1,4 @@
+import { projectThemes } from '@joplo-app/core';
 import crypto from 'node:crypto';
 import { JoploError, LOCAL_REVIEW_MAX_EVENTS, LOCAL_REVIEW_MAX_FILE_BYTES, LocalReviewSession, localReviewStatus, stateAt, type LocalReviewContext, type LocalReviewEvent, type LocalReviewLocation, type LocalReviewState, type LocalReviewWrite, type Project } from '@joplo-app/core';
 import { localReviewFile, localReviewWatcherCount, writeLocalReview } from '@joplo-app/core/node';
@@ -13,7 +14,7 @@ export function localReviewRevision(project: Project, optionId: string): string 
   const feature = project.features[option.featureId];
   const own = <T extends { optionId?: string | null; featureId?: string }>(values: Record<string, T>) =>
     Object.fromEntries(Object.entries(values).filter(([, v]) => v.optionId === optionId || (v.optionId == null && (v.featureId == null || v.featureId === option.featureId))));
-  const value = { name: project.name, description: project.description, theme: project.theme, themes: project.themes, autoFocus: project.autoFocus,
+  const value = { name: project.name, description: project.description, theme: project.theme, themes: projectThemes(project), autoFocus: project.autoFocus,
     feature, option, scenes: own(project.scenes), scenarios: own(project.scenarios), rules: own(project.rules), issues: own(project.issues),
     cases: Object.fromEntries(Object.entries(project.cases).filter(([, c]) => c.featureId === option.featureId)),
   };

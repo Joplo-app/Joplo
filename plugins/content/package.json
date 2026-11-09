@@ -1,0 +1,54 @@
+{
+  "name": "@joplo-app/plugin-content",
+  "version": "0.2.17",
+  "type": "module",
+  "joplo": {
+    "api": 2
+  },
+  "exports": {
+    ".": "./src/plugin.ts",
+    "./runtime": "./src/runtime.tsx",
+    "./guide": "./src/guide.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "zod": "4.6.7",
+    "@joplo-app/kit": "workspace:*",
+    "react": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "react-dom": "19.3.1",
+    "@types/react-dom": "^19.3.0"
+  },
+  "description": "Joplo first-party visual explainers, camera and motion",
+  "license": "PolyForm-Shield-1.0.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs",
+    "prepublishOnly": "node ../../scripts/build-package.mjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/plugin.d.ts",
+        "default": "./dist/plugin.js"
+      },
+      "./runtime": {
+        "types": "./dist/runtime.d.ts",
+        "default": "./dist/runtime.js"
+      },
+      "./guide": {
+        "types": "./dist/guide.d.ts",
+        "default": "./dist/guide.js"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

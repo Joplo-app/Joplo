@@ -375,6 +375,8 @@ export const Project = z.strictObject({
   i18n: ContentI18nSchema.optional(),
   /** 启用的插件（D86）：插件 id → 名称、版本与组件声明（可操作、父组件）。运行时代码不在 IR 里，由看板 / 发布站另外载入。 */
   plugins: z.record(z.string(), z.strictObject({
+    themes: z.record(z.string(), z.string()).optional(),
+    properties: z.record(z.string(), z.strictObject({ type: z.enum(['string', 'number', 'boolean']), attribute: z.string().regex(/^data-jp-[a-z0-9-]+$/).optional(), min: z.number().optional(), max: z.number().optional(), nonempty: z.boolean().optional() })).optional(),
     data: DataSpec.optional(),
     id: z.string().min(1),
     title: z.string(),

@@ -12,6 +12,7 @@ Options and cases are compared in the local board; only the picked option is pub
 
 ## When to use
 - The user wants to think a feature through before building it: a prototype, a clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.
+- The user wants a visual explainer with a continuous scene and narrated chapters: read npx joplo skill content.
 - The user wants to compare how a feature changed between two versions or in a PR (see npx joplo skill diff).
 - The user wants an explainer, tutorial, science piece, or news explainer that plays like a video (narration, chapters, animated graphics): read npx joplo skill content first.
 
@@ -84,14 +85,8 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json. See npx joplo skill publish.
 - Playing a demo never generates Joplo Cloud narration (it would spend characters): steps without audio use the browser voice until the user clicks Generate missing audio or you run npx joplo voice with their go-ahead. See npx joplo skill publish.
 - Re-sharing with the default voice keeps valid local clips plus reusable published clips, even when their voices differ (automatic captions must still match current text in the clip language; stale audio is excluded); an old custom provider named cloud stays unsupported until the user explicitly chooses official Joplo Cloud (use voice.profile: 'Joplo Cloud' when config owns the selection). See npx joplo skill publish.
-- Explainers that read as slides: one board per chapter, title cards, bullet cards, panels fading in and out. Build one <Canvas> world instead, keep objects with motion keys so they morph between steps, and move camera() between them. See npx joplo skill content.
-- Moving the view with shot() in an explainer draws a pulsing focus ring and caps UI zoom at 1.25×; inside a <Canvas> use camera('id', …), which frames by content and does not draw a ring. See npx joplo skill content.
-- Chapters that should continue the last frame: write flow({ from: 'previousKey' }) instead of copying state by hand; scenarios with only system steps stay on the first layer unless a camera(), shot, or cue moves the director (or flow({ layer })). See npx joplo skill content.
-- The share preview is the first scenario's first frame: design it as a thumbnail (a screen poster in the Canvas that the first step fades out), not an empty screen. See npx joplo skill content.
-- outline and the cover estimate narration at about 4.5 CJK characters per second; a chapter whose narrate() lines total more than about 400 characters runs past 90 s. See npx joplo skill content.
-- Label illustrative numbers on screen and keep them apart from sourced facts; bars start at zero and lengths stay proportional. See npx joplo skill content.
 - HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it. See npx joplo skill check.
-- Judge a scenario from its storyboard, not from check alone: npx joplo render --scenario-id <id> --sheet --out board.png shows every step with its caption and narration in one image. See npx joplo skill content.
+- For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, and verify playback before claiming it works. See npx joplo skill content.
 - For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings. See npx joplo skill plugins.
 - Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components. See npx joplo skill plugins.
 
@@ -99,9 +94,9 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.
 - authoring: Mental model, first steps, page / option / flow syntax, when conditions, a form example
 - story: Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos
-- content: Explainers, tutorials, and news-explainer videos: package and plan, hook, one world with Canvas, camera(), motion morphs, chapters with flow({ from }), narration, sources, review
 - demo: Layers, shots, captions, full-height layout, custom motion and data graphics, deep links, and screenshots
 - focus: Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
+- content: Default first-party content plugin: continuous visual explainers, chapters, design worlds and review practices
 - diagram: Default first-party diagram plugin: architecture, sequence and state diagrams, groups, compiled traces and framing
 - components: Component catalog, supported HTML tags, line breaks, props, and real images
 - cases: Case dimensions: ask the user before starting
@@ -110,6 +105,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
-- plugins: Media tracks, local text-to-resource compilers, cached offline publishing; Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
+- plugins: Universal properties, plugin themes, state writes and director targets; Media tracks, local text-to-resource compilers, cached offline publishing; Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.18 sha256:5f2eccf4d05cdd0a5d7c38cdf2bc9a3fb41b3b96f2a150868de80582850d7852 -->
+<!-- joplo-skill 0.2.18 sha256:80ee684fff6e0203f07edf41cb450b4ca6f194d494dd5c5a402710fd1581984d -->
