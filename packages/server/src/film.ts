@@ -218,7 +218,10 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
       files.push(file);
     }
     await ctx.close();
-    return { path: files[0]!, files, durationMs, sampleMs, every, samples: samples.length, cuts, stills, boundaries, maxDiff: round(Math.max(0, ...samples.map((s) => s.diff))), warnings: [] };
+    const result: FilmResult = { path: files[0]!, files, durationMs, sampleMs, every, samples: samples.length, cuts, stills, boundaries, maxDiff: round(Math.max(0, ...samples.map((s) => s.diff))), warnings: [] };
+    // 完整的判读数据（每一步提交前后的最大帧差、硬切、静止）放在胶片条旁边，评审时可以引用具体数字
+    fs.writeFileSync(out.replace(/(\.png)?$/i, '.json'), JSON.stringify({ ...result, frames: samples.map(({ jpg: _jpg, ...rest }) => rest) }, null, 1));
+    return result;
   } finally {
     await browser?.close().catch(() => undefined);
     await server.close();

@@ -17,6 +17,7 @@ export const camera = (...args: (string | CameraOpts)[]) => {
   return pluginEffect('content', 'camera', { targets, ...options });
 };
 export const DriftSchema = z.union([z.literal(false), z.number().min(.5).max(2), z.strictObject({ zoom: z.number().min(.5).max(2).optional(), x: z.number().min(-2000).max(2000).optional(), y: z.number().min(-2000).max(2000).optional(), ms: z.number().min(500).max(60000).optional() })]);
+const Safe = z.tuple([z.number().min(0).max(2000), z.number().min(0).max(2000), z.number().min(0).max(2000), z.number().min(0).max(2000)]);
 const Camera = z.strictObject({ targets: z.array(z.string()), pad: z.number().min(0).max(2000).optional(), zoom: z.number().min(.1).max(10).optional(), ms: z.number().min(0).max(10000).optional(), drift: DriftSchema.optional() });
 const Frame = z.strictObject({ scenes: z.record(z.string(), z.strictObject({ camera: Camera })) });
 export type ContentFrame = z.infer<typeof Frame>;
@@ -24,7 +25,7 @@ const all = (n: PluginIRNode): PluginIRNode[] => [n, ...(n.children ?? []).flatM
 const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes and individual pitfalls', body: patterns } }, packageName: '@joplo-app/plugin-content',
   id: 'content', title: 'Visual explainers', version: packageInfo.version,
   runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
-  components: { Canvas: { doc: 'w, h, view=[1280,800], drift?; scaled design world with fixed screen children; drift = default camera drift for every camera() step', selfEvident: true } },
+  components: { Canvas: { doc: 'w, h, view=[1280,800], drift?, safe?=[top,right,bottom,left]; scaled design world with fixed screen children; drift = default camera drift; safe = the view area not covered by screen chrome, where targeted camera() frames land', selfEvident: true } },
   properties: {
     motion: { type: 'string', nonempty: true, attribute: 'data-jp-content-motion' },
     motionDelay: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-motion-delay' },
@@ -42,9 +43,9 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
   data: { step: { scope: [{ path: ['scenes'], kind: 'map', domain: 'scene', children: [{ path: ['camera', 'targets'], kind: 'values', domain: 'element' }] }] } },
   compile: {
     node(node, ctx) {
-      if (node.type !== 'content:Canvas' || node.props.drift === undefined) return;
-      const parsed = DriftSchema.safeParse(node.props.drift);
-      if (!parsed.success) ctx.report('CAMERA_INVALID', `<Canvas drift>: use false, a zoom factor 0.5–2 (e.g. 1.04), or { zoom 0.5–2, x/y −2000–2000 design px, ms 500–60000 }`, node.source);
+      if (node.type !== 'content:Canvas') return;
+      if (node.props.drift !== undefined && !DriftSchema.safeParse(node.props.drift).success) ctx.report('CAMERA_INVALID', `<Canvas drift>: use false, a zoom factor 0.5–2 (e.g. 1.04), or { zoom 0.5–2, x/y −2000–2000 design px, ms 500–60000 }`, node.source);
+      if (node.props.safe !== undefined && !Safe.safeParse(node.props.safe).success) ctx.report('CAMERA_INVALID', `<Canvas safe>: use [top, right, bottom, left] in design px (each 0–2000), the part of the view your screen chrome covers`, node.source);
     },
     effect(effect, ctx) {
       if (effect.name !== 'camera') { ctx.report('PLUGIN_EFFECT_UNKNOWN', `Unknown content effect ${effect.name}`, ctx.source); return; }

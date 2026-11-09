@@ -7,7 +7,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import { Canvas, camera, TRANSITIONS } from '../src/plugin.ts';
-import { cameraAt, drifted, driftOf, bezier, DEFAULT_DRIFT, jumpedSince, AWAY, type CameraSegment } from '../src/runtime.tsx';
+import { cameraAt, canvasFrame, drifted, driftOf, bezier, safeOf, DEFAULT_DRIFT, jumpedSince, AWAY, type CameraSegment } from '../src/runtime.tsx';
 import { $, feature, flow, option, page, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '@joplo-app/core';
@@ -52,8 +52,10 @@ describe('drift', () => {
     for (const drift of [3, 0.2, { zoom: 1.1, ms: 10 }, { spin: 1 }, 'slow'])
       expect(errors(build(canvas({}), { one: flow('One', { start: '/' }).system('Look', camera('a', { drift } as never)) })).map(d => d.code)).toEqual(['CAMERA_INVALID']);
   });
-  it('<Canvas drift> is validated at compile time', () => {
-    expect(errors(build(canvas({ drift: 1.04 })))).toEqual([]);
+  it('<Canvas drift> and <Canvas safe> are validated at compile time', () => {
+    expect(errors(build(canvas({ drift: 1.04, safe: [86, 0, 190, 0] })))).toEqual([]);
+    expect(errors(build(canvas({ safe: [86, 0, 190] }))).map(d => d.code)).toEqual(['CAMERA_INVALID']);
+    expect(errors(build(canvas({ safe: [-1, 0, 0, 0] }))).map(d => d.code)).toEqual(['CAMERA_INVALID']);
     expect(errors(build(canvas({ drift: false })))).toEqual([]);
     expect(errors(build(canvas({ drift: { zoom: 9 } }))).map(d => d.code)).toEqual(['CAMERA_INVALID']);
   });
@@ -89,6 +91,17 @@ describe('camera segments on the engine clock', () => {
     const now = cameraAt(seg, 3500, view);
     const next: CameraSegment = { from: now, to: a, start: 3500, ms: 800, drift: null };
     expect(cameraAt(next, 3500, view)).toEqual(now);
+  });
+  it('targeted frames land inside the safe area; drift zooms around the safe-area centre', () => {
+    const safe = safeOf([80, 0, 200, 0]);
+    const f = canvasFrame({ x: 100, y: 100, w: 200, h: 100 }, view, 10, safe);
+    expect(f.k).toBeCloseTo(5.2, 6); // (800 − 280) / 100
+    expect(100 * f.k + f.ty).toBeCloseTo(80, 6); // 目标上沿贴住安全区上沿
+    expect((100 + 100) * f.k + f.ty).toBeCloseTo(600, 6);
+    expect(safeOf('x')).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+    const lens = { ...view, cx: 640, cy: 340 };
+    const d = drifted(f, { zoom: 1.2, x: 0, y: 0, ms: 1 }, 1, lens);
+    expect((340 - d.ty) / d.k).toBeCloseTo((340 - f.ty) / f.k, 6);
   });
   it('bezier matches its end points and is monotonic for the camera curve', () => {
     const e = bezier(.65, 0, .35, 1);

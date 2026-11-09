@@ -23,13 +23,21 @@ const MOTION_MS = 900;
 type DriftSpec = { zoom: number; x: number; y: number; ms: number };
 type CanvasCamera = { targets?: string[]; pad?: number; zoom?: number; ms?: number; drift?: unknown };
 const numOr = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : d);
-/** 默认漂移（D92）：画面永远不在数学意义上静止——落定后 9 秒内再推近 2%，非匀速、有终点。 */
-export const DEFAULT_DRIFT: DriftSpec = { zoom: 1.02, x: 0, y: 0, ms: 9000 };
+/** 默认漂移（D92）：画面永远不在数学意义上静止——落定后 8 秒内再推近 4%（约 0.5%/s），非匀速、有终点。 */
+export const DEFAULT_DRIFT: DriftSpec = { zoom: 1.04, x: 0, y: 0, ms: 8000 };
 
-/** 镜头取景：把 r 等比放进 view，居中；k 不超过 zoom。 */
-export function canvasFrame(r: Box, view: { w: number; h: number }, zoom = 3): { k: number; tx: number; ty: number } {
-  const k = Math.min(view.w / Math.max(1, r.w), view.h / Math.max(1, r.h), zoom);
-  return { k, tx: (view.w - r.w * k) / 2 - r.x * k, ty: (view.h - r.h * k) / 2 - r.y * k };
+/** 安全区（D92）：view 里不被固定屏幕层（标题、时间轴）盖住的部分；[上, 右, 下, 左] 设计像素。 */
+export type Safe = { top: number; right: number; bottom: number; left: number };
+const NO_SAFE: Safe = { top: 0, right: 0, bottom: 0, left: 0 };
+export function safeOf(v: unknown): Safe {
+  if (!Array.isArray(v) || v.length !== 4 || v.some((n) => typeof n !== 'number' || !Number.isFinite(n) || n < 0)) return NO_SAFE;
+  return { top: v[0], right: v[1], bottom: v[2], left: v[3] };
+}
+/** 镜头取景：把 r 等比放进 view 的安全区，居中；k 不超过 zoom。 */
+export function canvasFrame(r: Box, view: { w: number; h: number }, zoom = 3, safe: Safe = NO_SAFE): { k: number; tx: number; ty: number } {
+  const w = Math.max(1, view.w - safe.left - safe.right), h = Math.max(1, view.h - safe.top - safe.bottom);
+  const k = Math.min(w / Math.max(1, r.w), h / Math.max(1, r.h), zoom);
+  return { k, tx: safe.left + (w - r.w * k) / 2 - r.x * k, ty: safe.top + (h - r.h * k) / 2 - r.y * k };
 }
 
 type Frame = { k: number; tx: number; ty: number };
@@ -63,17 +71,18 @@ const cameraEase = bezier(.65, 0, .35, 1);
 /** 漂移的曲线：起步与收尾都是零速度（接在镜头落定之后不顿挫，到终点自然停下），不是匀速。 */
 const driftEase = bezier(.37, 0, .63, 1);
 
-/** 在 view 中心保持不动的前提下，把取景 f 推近 zoom 倍、平移 (x, y)（设计坐标）。 */
-export function drifted(f: Frame, d: DriftSpec, q: number, view: { w: number; h: number }): Frame {
+/** 在画面中心（有安全区时是安全区中心）保持不动的前提下，把取景 f 推近 zoom 倍、平移 (x, y)（设计坐标）。 */
+export function drifted(f: Frame, d: DriftSpec, q: number, view: { w: number; h: number; cx?: number; cy?: number }): Frame {
   const z = 1 + (d.zoom - 1) * q;
-  const cx = (view.w / 2 - f.tx) / f.k + d.x * q;
-  const cy = (view.h / 2 - f.ty) / f.k + d.y * q;
+  const ox = view.cx ?? view.w / 2, oy = view.cy ?? view.h / 2;
+  const cx = (ox - f.tx) / f.k + d.x * q;
+  const cy = (oy - f.ty) / f.k + d.y * q;
   const k = f.k * z;
-  return { k, tx: view.w / 2 - cx * k, ty: view.h / 2 - cy * k };
+  return { k, tx: ox - cx * k, ty: oy - cy * k };
 }
 
 /** 镜头在引擎时间 t 的实际取景（含漂移）。 */
-export function cameraAt(seg: CameraSegment, t: number, view: { w: number; h: number }): Frame {
+export function cameraAt(seg: CameraSegment, t: number, view: { w: number; h: number; cx?: number; cy?: number }): Frame {
   const p = seg.ms > 0 ? Math.max(0, Math.min(1, (t - seg.start) / seg.ms)) : 1;
   if (p < 1) {
     const e = cameraEase(p);
@@ -117,7 +126,10 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
   const viewArr = Array.isArray(p.view) ? p.view : [];
   const view = { w: numOr(viewArr[0], 1280), h: numOr(viewArr[1], 800) };
   const world = { w: numOr(p.w, view.w), h: numOr(p.h, view.h) };
-  const { w: _w, h: _h, view: _v, drift: canvasDrift, ...rest } = p;
+  const { w: _w, h: _h, view: _v, drift: canvasDrift, safe: safeProp, ...rest } = p;
+  const safe = safeOf(safeProp);
+  // 漂移围绕安全区中心（被叠层盖住的部分不算画面中心）
+  const lensView = { ...view, cx: safe.left + (view.w - safe.left - safe.right) / 2, cy: safe.top + (view.h - safe.top - safe.bottom) / 2 };
   // 父元素给了高度（层、h="100%"）时铺满；没给高度时 height: 100% 解析为 auto，aspect-ratio 按 view 的比例撑开，不会塌成 0
   const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: '100%', aspectRatio: `${view.w} / ${view.h}`, overflow: 'hidden' } });
   const outer = useRef<HTMLDivElement>(null);
@@ -162,7 +174,7 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
         const y0 = Math.min(...boxes.map((b) => b.y)) - pad;
         const x1 = Math.max(...boxes.map((b) => b.x + b.w)) + pad;
         const y1 = Math.max(...boxes.map((b) => b.y + b.h)) + pad;
-        next = canvasFrame({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, view, cam?.zoom ?? 3);
+        next = canvasFrame({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, view, cam?.zoom ?? 3, safe);
       }
     }
     const drift = timed ? driftOf(cam?.drift, canvasDrift) : null;
@@ -175,7 +187,7 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
       driftKey.current = dk;
       // 跳转（resetKey 变了）、截图与静态画面：直接落定在新取景；播放中：从当前实际位置（含漂移）出发
       const glide = timed && camMoves && !jumped;
-      const from = glide ? cameraAt(seg.current, now, view) : next;
+      const from = glide ? cameraAt(seg.current, now, lensView) : next;
       seg.current = { from, to: next, start: now, ms: glide ? cam?.ms ?? 1200 : 0, drift };
       redraw((n) => n + 1);
     }
@@ -187,7 +199,7 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
   const s = box.w && box.h ? Math.min(box.w / view.w, box.h / view.h) : 0;
   const ox = (box.w - view.w * s) / 2;
   const oy = (box.h - view.h * s) / 2;
-  const frame = timed ? cameraAt(seg.current, now, view) : seg.current.to;
+  const frame = timed ? cameraAt(seg.current, now, lensView) : seg.current.to;
   const ms = cam?.ms ?? 1200;
   return (
     <div {...root}>
@@ -369,7 +381,8 @@ export const observe: PluginObserve = (root) => {
           animation.effect = flight.effect; flight.release = lift(flight.el, flight.world);
         }
       }
-      const worlds = [...root.querySelectorAll<HTMLElement>('[data-jcanvas-world]')];
+      // 画布世界与固定屏幕层（screen 子元素：时间轴、角标）都是“表面”：进退场与变形在两者里都生效，镜头只动世界
+      const worlds = [...root.querySelectorAll<HTMLElement>('[data-jcanvas-world],[data-jcanvas-screen]')];
       for (const w of layouts.keys()) if (!worlds.includes(w)) { cancel(w); layouts.delete(w); exitBoxes.delete(w); watchers.get(w)?.disconnect(); watchers.delete(w); }
       for (const w of worlds) {
         const fresh = !layouts.has(w);

@@ -712,7 +712,22 @@ export class DemoController {
   private async waitNarration(gen: number): Promise<boolean> {
     const n = this.narrating;
     if (!n) return gen === this.gen;
+    // 等声音时引擎时钟照常走（D92）：镜头漂移、进退场与逐字输出都由它驱动，不能因为“只在等旁白”就冻住画面
+    let reading = true;
+    void n.done.then(() => { reading = false; });
+    const ticking = (async () => {
+      while (reading && gen === this.gen) {
+        this.tickClock();
+        await new Promise<void>((resolve) => {
+          const done = () => { clearTimeout(timer); this.cancelWaiters = this.cancelWaiters.filter((f) => f !== done); resolve(); };
+          const timer = setTimeout(done, 16);
+          this.cancelWaiters.push(done);
+        });
+      }
+    })();
     await Promise.race([n.done, new Promise<void>((r) => this.cancelWaiters.push(r))]);
+    reading = false;
+    await ticking;
     if (gen !== this.gen) return false;
     return this.wait(VOICE_BREATH_MS, gen);
   }
