@@ -27,6 +27,13 @@ export const CLOUD_MESSAGES = {
   CONFLICT: 'Another publication is in progress or upload preparation failed. Run joplo share again later',
   INVALID_RESPONSE: 'Invalid cloud response. Check the server address or update the CLI',
   AUTH_DENIED: 'Login authorization was denied. Run npx joplo login again',
+  /** 托管朗读（D85）额度不够（402）；CLI 以退出码 7 结束。 */
+  TTS_QUOTA_EXCEEDED: 'Not enough Joplo Cloud narration characters. Buy a top-up pack in the console (Usage)',
+  EMAIL_UNVERIFIED: 'Verify your email (or sign in with GitHub) to use Joplo Cloud narration',
+  /** 选用的声音来源不再支持（D85：AiHubMix、OpenAI 兼容、自定义 HTTP）。 */
+  VOICE_UNSUPPORTED: 'This voice source is no longer supported. Switch to Joplo Cloud narration, OpenAI or ElevenLabs',
+  /** joplo voice：没有可用的声音来源（没登录、没选、缺 Key）。 */
+  VOICE_NO_SOURCE: 'No voice source can generate audio for this project. Sign in with npx joplo login for Joplo Cloud narration, or add an OpenAI / ElevenLabs key in the board',
 } as const;
 export type CloudCode = keyof typeof CLOUD_MESSAGES;
 export class CloudError extends Error {

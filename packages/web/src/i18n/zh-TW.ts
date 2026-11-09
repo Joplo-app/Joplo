@@ -1,3 +1,4 @@
+import { autoCaptionMessages } from '@joplo-app/core';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -6,15 +7,7 @@ import type { Dictionary } from './en';
 export function createZhTW(locale: Locale = 'zh-TW') {
   return defineDictionary<Dictionary>()({
     player: {
-      autoClick: (label: string) => `點選「${value(label, locale)}」`,
-      autoType: (label: string, text: string) => `在「${value(label, locale)}」輸入「${value(text, locale)}」`,
-      autoSelect: (label: string, text: string) => `在「${value(label, locale)}」選擇「${value(text, locale)}」`,
-      autoCheck: (label: string) => `勾選「${value(label, locale)}」`,
-      autoUncheck: (label: string) => `取消勾選「${value(label, locale)}」`,
-      autoSwitchOn: (label: string) => `開啟「${value(label, locale)}」`,
-      autoSwitchOff: (label: string) => `關閉「${value(label, locale)}」`,
-      autoBack: "返回上一頁",
-      autoPress: (keys: string) => keys.trim() ? `按下 ${value(keys, locale)}` : "按下按鍵",
+      ...autoCaptionMessages('zh-TW'),
       mockSuccess: "模擬成功",
       mockFailure: "模擬失敗",
       mockDenied: "模擬無權限",
@@ -30,6 +23,7 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       turnNarrationOn: "開啟旁白",
       turnNarrationOff: "關閉旁白",
       readingAloud: "正在朗讀",
+      browserVoiceFallback: "瀏覽器朗讀",
       waitingForNarration: "等待旁白讀完",
       narrationAvailable: "這個示範有旁白",
       transition: "轉場",

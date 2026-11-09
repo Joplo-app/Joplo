@@ -44,6 +44,7 @@ Keep the Board process running. Edit the generated TSX files and watch the demo 
 - **Terminal and Phone:** model command-line interactions with `Terminal`; mobile pages use a `Phone` frame. Each page targets one device.
 - **Themes:** choose from nine built-ins or add `themes/<name>.css`. Board settings can apply a Theme to one project or all projects.
 - **Exports:** export the current step as an image or record a whole scenario locally. The Published site supports image export, Layers, Director, and fullscreen playback.
+- **Narration:** steps can be read aloud during autoplay. Voice sources are the browser voice, Joplo Cloud narration (sign in with `npx joplo login`, no API key; billed in characters, the default once you are signed in), and official OpenAI or ElevenLabs with your own key. Generate audio in the Board or with `npx joplo voice` (`--dry-run` estimates the characters first); `npx joplo whoami` shows what is left, and the Board home shows storage and narration usage. Generated audio ships with build and share; updating a share with the default source keeps both valid new local clips and reusable published clips, even with different voices. See [Narration](docs/web.md#朗读d74).
 - **Share and embed:** `npx joplo share` uploads the Published site and prints a README badge; the same link also serves a preview image and a lightweight embedded player for docs and blogs. See [Share and embed](#share-and-embed).
 
 ## Work with an agent
@@ -77,7 +78,7 @@ npx joplo skill review
 npx joplo skill install --agents-md
 ```
 
-The twelve topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, `review` (local listening, Share polling, prompt acknowledgement, version isolation, recovery, and best practices), `diff` (compare feature changes across builds and in PR CI), and `publish` (build, share, embed, review versions). `npx joplo components <Name>` prints the props and an example for one component. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
+The twelve topics are `authoring`, `story` (plan a demo, a PM's view of roles, goals, cases, and expected results, and how to write captions), `demo`, `focus` (where viewers look in each step: defaults, spotlight, highlight, callout, numbered, hold, redact), `diagram` (grouped architecture, sequence, and state diagrams, and shot framing), `components`, `cases`, `check`, `selection`, `review` (local listening, Share polling, prompt acknowledgement, version isolation, recovery, and best practices), `diff` (compare feature changes across builds and in PR CI), and `publish` (build, share, embed, review versions, narration). `npx joplo components <Name>` prints the props and an example for one component. Each is under 150 lines. `npx joplo skill` starts with the mental model and the start order; user-edited skill files are protected. `guide` is an alias for `skill authoring`.
 
 Use a second terminal while the Board is running:
 

@@ -98,7 +98,8 @@ export type Snapshot = {
    * 朗读（D74）：第 position 步正在读（source：音频 / 浏览器朗读）；waiting = 画面停留已到、还在等声音读完。
    * 读完、被取消（跳转、上一步、手动下一步、停止）时为 null。
    */
-  narration: { position: number; source: NarrationSource; waiting: boolean } | null;
+  /** fallback：选了声音来源、这一步却用浏览器朗读（没有音频、额度不够），字幕区标“浏览器朗读”。 */
+  narration: { position: number; source: NarrationSource; waiting: boolean; fallback?: boolean } | null;
 };
 
 export const TIMING = {
@@ -634,7 +635,7 @@ export class DemoController {
     const n = this.narrator.speak(line.text, line.role, this.speed);
     if (!n) return;
     this.narrating = n;
-    this.set({ narration: { position, source: n.source, waiting: false } });
+    this.set({ narration: { position, source: n.source, waiting: false, ...(n.source === 'browser' && this.narrator.hasVoice(line.role) ? { fallback: true } : {}) } });
     void n.done.then(() => {
       if (this.narrating !== n) return;
       this.narrating = null;

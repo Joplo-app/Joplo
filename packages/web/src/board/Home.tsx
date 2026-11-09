@@ -9,6 +9,7 @@ import { useBoardI18n } from '../i18n/board/context';
  * - 右侧：项目名、说明、路径与“N 个功能 · 已选定 a / n”、右上角编译状态；功能卡片整张可点（Enter 也可以），带缩略图
  *   （Stage 的 render 模式渲染选定方案第一个场景的初始画面，进入视口才渲染）、选定方案、方案数和覆盖小结。
  *   编译出错时列出 `文件:行` 与说明（修好后自动刷新）；目录不存在时可以从列表移除（只删记录，不删文件）。
+ * - 左栏最底下：Joplo Cloud 账号卡片（D85，CloudAccountCard.tsx）：套餐、邮箱、空间与朗读用量、“用量与音色 ↗”；没登录给登录命令。
  * - 没有任何项目时：标志、一句话、三条可复制的开始命令。
  * 视图计算在 home-model.ts。
  */
@@ -29,6 +30,7 @@ import { useProjectIR } from './hooks';
 import { useBoardSettings } from './useSettings';
 import { effectiveAppearance } from './appearance-model';
 import { featureCards, moveSelection, projectBadge, projectMeta, shortPath, type FeatureCard } from './home-model';
+import { HomeCloudCard } from './CloudAccountCard';
 
 export function Home({
   projects,
@@ -114,6 +116,8 @@ export function Home({
             <span className="text-[12px] text-jb-muted">{i18n.board.addAProjectRunInItsDirectory}</span>
             <CopyLine text="npx joplo dev" onCopy={copy} />
           </div>
+          {/* Joplo Cloud 账号卡片（D85 方案 A）：空间与朗读用量；没登录给登录命令 */}
+          <HomeCloudCard />
         </aside>
         <main className="min-w-0 flex-1 overflow-y-auto px-10 py-8">
           {projects && projects.length === 0 ? <Empty onCopy={copy} /> : selected ? <ProjectPanel key={selected.id} summary={selected} onView={onView} /> : null}

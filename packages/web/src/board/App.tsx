@@ -54,7 +54,7 @@ import { themeCatalog } from '../renderer/themes';
 import { ThemeStyles } from '../renderer/ThemeStyles';
 import type { Look } from '../renderer/appearance';
 import { AppearanceButton, AppearancePopover } from './Appearance';
-import { VoiceButton, VoicePopover, VoiceProfilesDialog, useVoice } from './Voice';
+import { VoiceButton, VoiceKeysDialog, VoicePopover, useVoice } from './Voice';
 import { contentMenuRows, viewProject, type ContentInfo } from '../i18n/content';
 import { ContentContext } from '../i18n/content-context';
 import { contentLocaleFor } from '@joplo-app/core';
@@ -538,7 +538,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
               />
             ) : null}
             <VoicePopover api={voice} open={voiceOpen} anchor={voiceAnchor} onClose={() => setVoiceOpen(false)} onManage={() => (setVoiceOpen(false), setProvidersOpen(true))} />
-            <VoiceProfilesDialog api={voice} open={providersOpen} onClose={() => setProvidersOpen(false)} canSelect={voice.state?.source !== 'config'} />
+            <VoiceKeysDialog api={voice} open={providersOpen} onClose={() => setProvidersOpen(false)} />
             <CloudPublishPopover model={cloud} ctx={{ featureId: play.featureId, scenarioId: scenario?.id ?? null }} names={{ feature: feature.name, scenario: scenario?.name ?? null }} picks={cloudPicks(project, { featureId: play.featureId, scenarioId: scenario?.id ?? null })} onFlash={setFlash} />
             <AppearancePopover open={a.open} anchor={a.anchor} onClose={() => a.setOpen(false)} scope="project" projectId={projectId} configTheme={project.theme ?? 'sketch'} catalog={a.catalog} settings={a.settings} look={a.saved} save={a.save} onPreview={a.setPreview} onFlash={setFlash} copy={copyText} />
           </>

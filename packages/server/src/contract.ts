@@ -47,6 +47,11 @@ export type BuildOptions = {
    * （同样的文字和声音）下载进本机缓存后照常打包，不重新生成；本机没有声音供应商时按分享里的声音指纹带上。
    */
   sharedVoice?: { index: VoiceIndex; fetch: (file: string) => Promise<Uint8Array | null> };
+  /**
+   * 项目没选过声音来源、config 也没写时用哪个（D85）：CLI 已登录 Joplo Cloud 时传 'cloud'（与看板同一规则），
+   * 这样看板里默认用 cloud 生成的音频也会带上。缺省 null：只用看板里选过的（与原来一致）。
+   */
+  voiceDefault?: string | null;
 };
 /** 静态发布站：只含选定方案（compile 的 publish 模式），离线可打开，可直接 `wrangler deploy`。 */
 /**

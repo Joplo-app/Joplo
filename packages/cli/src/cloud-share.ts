@@ -127,7 +127,7 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     const before = await readShareRecord(project, client.server);
     const beforeLink = updateLink ?? (scenarioIds ? before.scoped?.[scopeKey(scenarioIds, reviewMode)] : before[reviewMode === 'review' ? 'review' : 'main']);
     const sharedVoice = beforeLink ? await (client.deps.sharedVoice ?? previousShareVoice)(beforeLink.url) : undefined;
-    const built = await build({ projectDir: project, outDir: join(staging, 'site'), ...(reviewMode === 'review' ? { review: true } : {}), ...(scenarioIds ? { scope: { scenarios: scenarioIds } } : {}), ...(sharedVoice ? { sharedVoice } : {}) });
+    const built = await build({ projectDir: project, outDir: join(staging, 'site'), ...(reviewMode === 'review' ? { review: true } : {}), ...(scenarioIds ? { scope: { scenarios: scenarioIds } } : {}), ...(sharedVoice ? { sharedVoice } : {}), voiceDefault: 'cloud' });
     if (built.diagnostics.some(d => d.severity === 'error')) throw new JoploError('EXPORT_FAILED', 'The build contains errors; nothing uploaded', { diagnostics: built.diagnostics });
     // 范围分享必须真的裁剪过（旧版 @joplo-app/server 会忽略 scope，产物里是整个项目）：产物里的场景只能是范围内的
     if (scenarioIds) {

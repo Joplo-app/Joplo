@@ -15,8 +15,56 @@ import type { ScopeInfo } from '@joplo-app/core';
 export const CLOUD_EVENT = 'joplo:cloud';
 
 export type CloudAccount =
-  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; /** 账号容量（C27）；云端连不上或旧云端时没有。 */ storage?: CloudStorage }
+  | {
+      signedIn: true;
+      server: string;
+      email: string;
+      plan: 'free' | 'pro' | null;
+      /** 账号容量（C27）；云端连不上或旧云端时没有。 */
+      storage?: CloudStorage;
+      /** 托管朗读额度（D85，`GET /api/v1/voice` 的 quota）；云端连不上或旧云端（404）时没有。 */
+      voice?: VoiceQuota;
+    }
   | { signedIn: false; server: string; loginCommand: string; message?: string };
+
+/** 托管朗读额度（D85，与 Cloud 契约 `GET /api/v1/voice` 的 quota 一致）：免费是一次性的体验额度（trial），Pro 按月（month）。字数 = Array.from(文字).length。 */
+export type VoiceQuota = {
+  plan: string;
+  period: 'trial' | 'month';
+  allowanceChars: number;
+  usedChars: number;
+  remainingChars: number;
+  /** 本月额度的重置时间（ISO）；体验额度为 null。 */
+  resetsAt: string | null;
+  /** 加油包：各自剩余与到期时间。 */
+  packs: { remainingChars: number; expiresAt: string }[];
+  /** 当月（或体验）剩余 + 加油包剩余。看板与 CLI 显示的“剩 N 字”就是它。 */
+  totalRemainingChars: number;
+};
+/** Joplo 音色（Cloud 固定 6 个，都是多语言）：labels / samples 按界面语言（10 种之一）。 */
+export type CloudVoice = { id: string; gender: 'female' | 'male'; labels: Record<string, string>; samples: Record<string, string> };
+/** `GET /api/v1/voice` 去掉 quota 之后的部分：音色表、每种语言的推荐音色、默认音色。 */
+export type CloudVoiceCatalog = { model: string; voices: CloudVoice[]; recommended: Record<string, string[]>; defaultVoice: string };
+export type CloudVoiceInfo = CloudVoiceCatalog & { quota: VoiceQuota };
+/**
+ * 托管朗读的状态：没登录时给登录命令；已登录时 voice 是 `GET /api/v1/voice` 的内容，云端连不上或旧云端（404）时为 null（看板退回浏览器朗读）。
+ */
+export type CloudVoiceStatus =
+  | { signedIn: false; server: string; loginCommand: string }
+  | { signedIn: true; server: string; voice: CloudVoiceInfo | null };
+/** `POST /api/v1/voice/speech` 的请求：locale 是内容语言（D84，不知道时不带），project 是项目名（控制台明细用）。 */
+export type CloudSpeechRequest = { text: string; voice: string; locale?: string; project?: string };
+/** 合成结果：音频与响应头（X-Joplo-Chars-Charged / -Remaining、X-Joplo-Cache、X-Joplo-Audio-Sha256），头缺失或不合法时为 null。 */
+export type CloudSpeechResult = { audio: Uint8Array; contentType: string; charged: number | null; remaining: number | null; cache: 'hit' | 'miss' | null; sha256: string | null };
+/**
+ * 托管朗读（D85）的 CLI 一侧：看板与 `joplo voice` 共用。server 包不依赖 CLI，由 CLI 注入（与 publish 一样）。
+ * speech 失败时抛 `{ code, message, data? }`：TTS_QUOTA_EXCEEDED（data: neededChars / remainingChars / usageUrl）、AUTH_REQUIRED、AUTH_EXPIRED、
+ * EMAIL_UNVERIFIED、FORBIDDEN、RATE_LIMITED、TTS_UNAVAILABLE、BAD_REQUEST、NOT_FOUND（旧云端）、NETWORK。
+ */
+export type CloudVoiceBridge = {
+  status(): Promise<CloudVoiceStatus>;
+  speech(req: CloudSpeechRequest): Promise<CloudSpeechResult>;
+};
 /** 账号容量（C27）：已用 / 上限，字节。 */
 export type CloudStorage = { usedBytes: number; quotaBytes: number };
 /** 容量不足（QUOTA_EXCEEDED，kind: storage）：数字可能缺；两个链接已拼好当前 server。 */
@@ -31,6 +79,8 @@ export type CloudPublishResult = { shareId: string; url: string; expiresAt: stri
 export type CloudBridge = {
   account(): Promise<CloudAccount>;
   publish(projectDir: string, request: CloudPublishRequest, progress: (line: string) => void): Promise<CloudPublishResult>;
+  /** 托管朗读（D85）；旧 CLI 没有这一项时看板只用浏览器朗读与自带 Key 的供应商。 */
+  voice?: CloudVoiceBridge;
 };
 
 /** 发布失败：code 来自 CLI（AUTH_REQUIRED、NOT_FOUND、NETWORK…）；需要登录时带 loginCommand。 */

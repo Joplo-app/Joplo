@@ -18,3 +18,5 @@ export * from '../../../core/src/focus.ts';
 export * from '../../../core/src/voice.ts';
 /** 作者内容多语言（D84）：把 IR 换成内容语言、内容语言的退回，纯函数（只引用 schema 的类型）。 */
 export * from '../../../core/src/content-i18n.ts';
+
+export { autoCaptionMessages } from '../../../core/src/auto-caption.ts';

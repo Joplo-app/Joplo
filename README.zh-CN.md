@@ -44,6 +44,7 @@ npx joplo dev --open
 - **Terminal 与 Phone**：用 `Terminal` 表达命令行交互；手机页面使用 `Phone` 外框。每个页面只面向一种设备。
 - **主题 Themes**：九个内置主题，也可添加 `themes/<name>.css`；看板设置可对当前项目或所有项目应用主题。
 - **导出**：导出当前步骤图片，或在本地录制整个场景。发布站支持图片导出、层级、导演与全屏播放。
+- **朗读**：自动播放时把每一步读出来。声音来源有浏览器朗读、Joplo Cloud 朗读（`npx joplo login` 登录即用，不用配 Key，按字数计费，登录后默认用它），以及自带 Key 的官方 OpenAI、ElevenLabs。在看板里生成音频，或用 `npx joplo voice`（`--dry-run` 先估算字数）；`npx joplo whoami` 显示还剩多少字，看板首页显示空间与朗读用量。生成的音频随 build 和分享带上，见[朗读](docs/web.md#朗读d74)。
 - **分享与嵌入**：`npx joplo share` 上传发布站并打印 README 徽章；同一个链接还提供预览图和给文档、博客用的精简嵌入播放器，见[分享与嵌入](#分享与嵌入)。
 
 ## 与 Agent 配合
@@ -77,7 +78,7 @@ npx joplo skill review
 npx joplo skill install --agents-md
 ```
 
-十二个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`focus`（每一步看哪里：默认焦点、聚光、强调、标注、编号、停留、遮挡）、`diagram`（分组的架构图、时序图、状态机与镜头取景）、`components`、`cases`、`check`、`selection`、`review`（本地监听、Share 轮询、快速回执、版本隔离、恢复与最佳实践）、`diff`（跨版本与 PR CI 中的功能差异）、`publish`（构建、分享、嵌入、评审版），每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
+十二个主题为 `authoring`、`story`（先规划再动手、用 PM 视角写角色 / 目标 / 情况与期望结果、字幕写法）、`demo`、`focus`（每一步看哪里：默认焦点、聚光、强调、标注、编号、停留、遮挡）、`diagram`（分组的架构图、时序图、状态机与镜头取景）、`components`、`cases`、`check`、`selection`、`review`（本地监听、Share 轮询、快速回执、版本隔离、恢复与最佳实践）、`diff`（跨版本与 PR CI 中的功能差异）、`publish`（构建、分享、嵌入、评审版、朗读），每个少于 150 行。`npx joplo components <名字>` 输出单个组件的属性与示例。`npx joplo skill` 开头先讲心智模型和起步顺序；用户改过的技能文件受保护。`guide` 是 `skill authoring` 的别名。
 
 看板运行时，在另一个终端执行：
 

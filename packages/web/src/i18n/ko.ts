@@ -1,3 +1,4 @@
+import { autoCaptionMessages } from '@joplo-app/core';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -6,15 +7,7 @@ import type { Dictionary } from './en';
 export function createKo(locale: Locale = 'ko') {
   return defineDictionary<Dictionary>()({
     player: {
-      autoClick: (label: string) => `“${value(label, locale)}” 클릭`,
-      autoType: (label: string, text: string) => `“${value(label, locale)}”에 “${value(text, locale)}” 입력`,
-      autoSelect: (label: string, text: string) => `“${value(label, locale)}”에서 “${value(text, locale)}” 선택`,
-      autoCheck: (label: string) => `“${value(label, locale)}” 체크`,
-      autoUncheck: (label: string) => `“${value(label, locale)}” 체크 해제`,
-      autoSwitchOn: (label: string) => `“${value(label, locale)}” 켜기`,
-      autoSwitchOff: (label: string) => `“${value(label, locale)}” 끄기`,
-      autoBack: "이전 페이지로",
-      autoPress: (keys: string) => keys.trim() ? `${value(keys, locale)} 누르기` : "키 누르기",
+      ...autoCaptionMessages('ko'),
       mockSuccess: "모의 성공",
       mockFailure: "모의 실패",
       mockDenied: "모의 권한 거부",
@@ -30,6 +23,7 @@ export function createKo(locale: Locale = 'ko') {
       turnNarrationOn: "내레이션 켜기",
       turnNarrationOff: "내레이션 끄기",
       readingAloud: "읽는 중",
+      browserVoiceFallback: "브라우저 낭독",
       waitingForNarration: "내레이션이 끝나기를 기다리는 중",
       narrationAvailable: "이 데모에는 내레이션이 있습니다",
       transition: "전환",

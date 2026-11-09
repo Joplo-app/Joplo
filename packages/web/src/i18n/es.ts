@@ -1,3 +1,4 @@
+import { autoCaptionMessages } from '@joplo-app/core';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -6,15 +7,7 @@ import type { Dictionary } from './en';
 export function createEs(locale: Locale = 'es') {
   return defineDictionary<Dictionary>()({
     player: {
-      autoClick: (label: string) => `Haz clic en «${value(label, locale)}»`,
-      autoType: (label: string, text: string) => `Escribe «${value(text, locale)}» en «${value(label, locale)}»`,
-      autoSelect: (label: string, text: string) => `Elige «${value(text, locale)}» en «${value(label, locale)}»`,
-      autoCheck: (label: string) => `Marca «${value(label, locale)}»`,
-      autoUncheck: (label: string) => `Desmarca «${value(label, locale)}»`,
-      autoSwitchOn: (label: string) => `Activa «${value(label, locale)}»`,
-      autoSwitchOff: (label: string) => `Desactiva «${value(label, locale)}»`,
-      autoBack: "Vuelve atrás",
-      autoPress: (keys: string) => keys.trim() ? `Pulsa ${value(keys, locale)}` : "Pulsa una tecla",
+      ...autoCaptionMessages('es'),
       mockSuccess: "Éxito simulado",
       mockFailure: "Fallo simulado",
       mockDenied: "Acceso denegado simulado",
@@ -30,6 +23,7 @@ export function createEs(locale: Locale = 'es') {
       turnNarrationOn: "Activar la narración",
       turnNarrationOff: "Desactivar la narración",
       readingAloud: "Leyendo en voz alta",
+      browserVoiceFallback: "Voz del navegador",
       waitingForNarration: "Esperando a que termine la narración",
       narrationAvailable: "Esta demo tiene narración",
       transition: "Transición",

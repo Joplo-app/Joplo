@@ -18,8 +18,8 @@ beforeEach(() => {
 });
 afterEach(() => { for (const d of [home, proj, out]) fs.rmSync(d, { recursive: true, force: true }); });
 
-const openai = (): VoiceProfile => ({ ...PRESETS[0]!, id: 'openai', preset: 'openai' });
-const eleven = (): VoiceProfile => ({ ...PRESETS[1]!, id: 'elevenlabs', preset: 'elevenlabs' });
+const openai = (): VoiceProfile => ({ ...PRESETS.find((p) => p.id === 'openai')!, id: 'openai', preset: 'openai' });
+const eleven = (): VoiceProfile => ({ ...PRESETS.find((p) => p.id === 'elevenlabs')!, id: 'elevenlabs', preset: 'elevenlabs' });
 
 /** 两步：中文原文 + 英文译文。 */
 function project(): Project {

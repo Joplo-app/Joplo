@@ -151,8 +151,8 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     // 朗读（D74）：当前声音已生成的音频拷进 voice/，IR 带上 voiceIndex；Key 不进产物
     const store = new ProfileStore(opts.home ?? joploHome());
     // 重新发布（D84）：先从上一次的分享沿用本机没有的音频（同样的文字与声音），不重新生成
-    const reused = opts.sharedVoice ? await reuseSharedVoice(projectDir, project, opts.sharedVoice, store) : 0;
-    const voice = bundleVoice(projectDir, project, staging, store, undefined, opts.sharedVoice?.index);
+    const reused = opts.sharedVoice ? await reuseSharedVoice(projectDir, project, opts.sharedVoice, store, undefined, opts.voiceDefault) : 0;
+    const voice = bundleVoice(projectDir, project, staging, store, undefined, opts.sharedVoice?.index, opts.voiceDefault);
     if (reused) voice.report.reused = reused;
     // 朗读角色只留范围内功能的（scopeProject 对 voiceIndex 的同一规则；bundleVoice 按声音配置生成全部角色）
     if (voice.index) inline.project.voiceIndex = scope ? scopeProject({ ...project, voiceIndex: voice.index }, scope.scenarios).project.voiceIndex : voice.index;

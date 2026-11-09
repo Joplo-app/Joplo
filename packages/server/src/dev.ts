@@ -405,6 +405,8 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
 
   // 朗读（D74）：声音供应商 profile（本机）与项目音频缓存；状态变化推 joplo:voice
   const voiceHub = new VoiceHub(opts.home ?? joploHome(), {
+    // 托管朗读（D85）：CLI 注入的登录与合成；旧 CLI 没有时只用浏览器朗读与自带 Key 的供应商
+    cloud: opts.cloud?.voice,
     emit: (projectId, state) => {
       if (!closed) server?.ws.send({ type: 'custom', event: VOICE_EVENT, data: { projectId, state } });
     },

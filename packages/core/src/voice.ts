@@ -82,7 +82,19 @@ export function clipKey(fingerprint: string, text: string): string {
   return `c${cyrb53(s, 1).toString(16).padStart(14, '0')}${cyrb53(s, 7).toString(16).padStart(14, '0')}`;
 }
 
-/** 某个角色（null = 旁白）用哪个声音指纹；角色没有单独的声音时用旁白的。 */
-export function voiceFingerprint(voices: { narrator: string | null; roles: Record<string, string> }, roleId: string | null): string | null {
+/** 某个角色（null = 旁白）的声音；传文字时优先该语言索引中的片段覆盖，再用角色 / 旁白指纹。 */
+export function voiceFingerprint(voices: { narrator: string | null; roles: Record<string, string>; overrides?: Record<string, string> }, roleId: string | null, text?: string): string | null {
+  if (text !== undefined) {
+    const override = voices.overrides?.[clipKey(roleId ?? '', text)];
+    if (override) return override;
+  }
   return (roleId ? voices.roles[roleId] : undefined) ?? voices.narrator;
+}
+
+/**
+ * 托管朗读的计费字数（D85，与 Cloud 一致）：规整空白后的朗读文字按 Array.from 计（一个 emoji、一个汉字都算 1 个字）。
+ * 看板的“约 X 字”、`joplo voice --dry-run` 的估算与服务端的扣费用同一个算法。
+ */
+export function spokenChars(text: string): number {
+  return Array.from(text.replace(/\s+/g, ' ').trim()).length;
 }

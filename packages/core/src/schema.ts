@@ -373,8 +373,10 @@ export const VoiceIndex = z.strictObject({
   narrator: z.string().min(1).nullable(),
   roles: z.record(z.string(), z.string().min(1)).default({}),
   clips: z.record(z.string(), z.string().min(1)).default({}),
+  /** 混合来源更新：clipKey(角色 id 或空串, 文字) → 实际声音指纹；音频键仍使用真实指纹。 */
+  overrides: z.record(z.string(), z.string().min(1)).optional(),
   /** 内容语言（D84）→ 这种语言的旁白与角色指纹；没有的语言用上面的默认声音。 */
-  locales: z.record(z.string(), z.strictObject({ narrator: z.string().min(1).nullable(), roles: z.record(z.string(), z.string().min(1)).default({}) })).optional(),
+  locales: z.record(z.string(), z.strictObject({ narrator: z.string().min(1).nullable(), roles: z.record(z.string(), z.string().min(1)).default({}), overrides: z.record(z.string(), z.string().min(1)).optional() })).optional(),
 });
 
 export const Project = z.strictObject({

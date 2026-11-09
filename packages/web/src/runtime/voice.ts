@@ -20,7 +20,7 @@ export interface Narration {
   cancel(): void;
 }
 
-export type VoiceLookup = { narrator: string | null; roles: Record<string, string>; clips: Record<string, string> };
+export type VoiceLookup = { narrator: string | null; roles: Record<string, string>; clips: Record<string, string>; overrides?: Record<string, string> };
 
 /** 浏览器能用的朗读声音（可能异步加载）。 */
 export function browserVoices(): SpeechSynthesisVoice[] {
@@ -248,7 +248,7 @@ export class Narrator {
     const t = text.trim();
     if (!this.enabled || !t) return null;
     const browser = () => speakBrowser(t, { speed, lang: speechLang(t, this.locale), voiceURI: this.browserVoice });
-    const fp = this.lookup ? voiceFingerprint(this.lookup, role) : null;
+    const fp = this.lookup ? voiceFingerprint(this.lookup, role, t) : null;
     const url = fp ? this.lookup!.clips[clipKey(fp, t)] : undefined;
     if (url) return playClip(url, { speed, onFail: browser });
     const pending = fp ? this.ensure?.(t, role) : null;
@@ -263,9 +263,14 @@ export class Narrator {
     void this.ensure?.(t, role)?.catch(() => null);
   }
 
+  /** 选了声音来源（有这个角色的声音指纹）：这时用浏览器朗读就是“兜底”，字幕区标出来（额度不够、没生成、云端连不上）。 */
+  hasVoice(role: string | null): boolean {
+    return !!this.lookup && !!voiceFingerprint(this.lookup, role);
+  }
+
   /** 这段文字有没有现成的音频（看板浮层统计用）。 */
   hasClip(text: string, role: string | null): boolean {
-    const fp = this.lookup ? voiceFingerprint(this.lookup, role) : null;
+    const fp = this.lookup ? voiceFingerprint(this.lookup, role, text) : null;
     return !!fp && !!this.lookup!.clips[clipKey(fp, text.trim())];
   }
 

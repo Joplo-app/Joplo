@@ -874,6 +874,7 @@ function SubtitleSlot({ content, theme, font, explainInTip, onFork, narration }:
         <span className="pointer-events-none absolute left-3 top-1/2 inline-flex h-7 -translate-y-1/2 items-center gap-1.5 rounded-full border-[1.5px] border-jb-ink bg-jb-selected px-2.5 font-jb text-[13px] font-semibold text-jb-fg shadow-sm" data-testid="narrating" data-waiting={reading.waiting ? '1' : undefined} aria-live="polite">
           <AudioLines className="size-4 animate-pulse" aria-hidden />
           <span>{reading.waiting ? i18n.player.waitingForNarration : i18n.player.readingAloud}</span>
+          {reading.fallback ? <span className="rounded-full bg-jb-sunken px-1.5 text-[11.5px] font-medium text-jb-muted" data-testid="narrating-browser">{i18n.player.browserVoiceFallback}</span> : null}
         </span>
       ) : null}
       {tipNode}

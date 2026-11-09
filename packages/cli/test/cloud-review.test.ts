@@ -90,7 +90,7 @@ const createBody = () => calls.find(c => c.path === '/api/v1/shares')!.body;
 test('普通 share：构建参数不变（没有 review），请求体带 publish 清单，清单不在上传文件里', async () => {
   await login();
   const r = await cli(['share', project, '--format=json']); expect(r.code, r.stdout).toBe(0);
-  expect(build.mock.calls[0]![0]).toEqual({ projectDir: project, outDir: expect.any(String) });
+  expect(build.mock.calls[0]![0]).toEqual({ projectDir: project, outDir: expect.any(String), voiceDefault: 'cloud' });
   const body = createBody();
   expect(body.review).toMatchObject({ v: 1, mode: 'publish' });
   expect(body.review.features.map((f: any) => f.id)).toEqual(['f']);
@@ -396,7 +396,7 @@ test('share --scenario：构建带范围；清单只含范围内；标题带场�
   await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/' }));
   build.mockImplementationOnce(scopedBuild([{ kind: 'element', featureId: 'g', featureName: 'Audit', optionId: 'g.a', elementId: 'seat', route: '/', refs: ['seat'], scenarios: ['f.a.main'] }]));
   const r = await cli(['share', project, '--scenario', 'f.a.main', '--format=json']); expect(r.code, r.stdout).toBe(0);
-  expect(build.mock.calls[0]![0]).toEqual({ projectDir: project, outDir: expect.any(String), scope: { scenarios: ['f.a.main'] } });
+  expect(build.mock.calls[0]![0]).toEqual({ projectDir: project, outDir: expect.any(String), scope: { scenarios: ['f.a.main'] }, voiceDefault: 'cloud' });
   const body = createBody();
   expect(body.title).toBe('Fixture · Main');
   expect(body.review.features.map((f: any) => f.id)).toEqual(['f']);

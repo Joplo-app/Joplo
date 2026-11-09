@@ -24,3 +24,4 @@ export * from './local-review.ts';
 
 export * from './feature-diff.ts';
 export * from './step-identity.ts';
+export * from './auto-caption.ts';

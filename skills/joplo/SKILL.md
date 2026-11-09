@@ -73,6 +73,10 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - Deep links use short params ?o=&c=&s=&step=&l= (l is the layer key and pins that layer, so later steps stop switching layers; layer= is ignored); wait for rendering before screenshots. See npx joplo skill demo.
 - Rules you assume stay origin ai_assumption, status pending; never mark them confirmed for the user. See npx joplo skill cases.
 - Never share or deploy without the user's go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself. See npx joplo skill publish.
+- Joplo Cloud narration spends the user's characters: run npx joplo voice --dry-run and tell them the estimate before a large batch; on TTS_QUOTA_EXCEEDED (exit 7) keep what was made, pass on error.details.usageUrl, and never retry in a loop or buy for them. See npx joplo skill publish.
+- AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json. See npx joplo skill publish.
+- Playing a demo never generates Joplo Cloud narration (it would spend characters): steps without audio use the browser voice until the user clicks Generate missing audio or you run npx joplo voice with their go-ahead. See npx joplo skill publish.
+- Re-sharing with the default voice keeps valid local clips plus reusable published clips, even when their voices differ (automatic captions must still match current text in the clip language; stale audio is excluded); an old custom provider named cloud stays unsupported until the user explicitly chooses official Joplo Cloud (use voice.profile: 'Joplo Cloud' when config owns the selection). See npx joplo skill publish.
 
 ## Reference
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists them with line counts.
@@ -87,6 +91,6 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - selection: Edit only the element selected by the user in the board
 - review: Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
-- publish: pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages
+- publish: pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.17 sha256:f8ace797fd50241c6a255ee54ebb0138dea47c2295fc03c9637ddffff8806826 -->
+<!-- joplo-skill 0.2.17 sha256:69d2ef8f12413c8e74e2aedbccd75710d600b59a5f5e1462c77c20f4378e3585 -->

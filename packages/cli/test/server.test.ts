@@ -4,7 +4,8 @@ import { runCli } from '../src/cli.ts';
 async function run(args: string[], server: Record<string, unknown> = {}) {
   let stdout = '', stderr = '';
   const loadServer = vi.fn(async () => server);
-  const code = await runCli(args, { stdout: s => { stdout += s; }, stderr: s => { stderr += s; }, loadServer });
+  // 不读本机真实登录：build 按“已登录就默认 cloud”（D85）决定 voiceDefault
+  const code = await runCli(args, { stdout: s => { stdout += s; }, stderr: s => { stderr += s; }, loadServer, cloud: { env: { JOPLO_HOME: resolve('.no-such-joplo-home') } } });
   return { code, stdout, stderr, loadServer };
 }
 test.each([
@@ -22,7 +23,7 @@ test('动态 import 失败说明服务端不可用', async () => {
 test('dev 参数与日志输出', async () => {
   const startDev = vi.fn(async (opts: any) => { opts.log('服务日志'); return { url: 'http://127.0.0.1:12345', close: async () => {} }; });
   const r = await run(['dev', 'project', '--port', '12345', '--open'], { startDev });
-  expect(r.code).toBe(0); expect(startDev).toHaveBeenCalledWith({ projectDir: resolve('project'), port: 12345, open: true, log: expect.any(Function), cloud: { account: expect.any(Function), publish: expect.any(Function) } });
+  expect(r.code).toBe(0); expect(startDev).toHaveBeenCalledWith({ projectDir: resolve('project'), port: 12345, open: true, log: expect.any(Function), cloud: { account: expect.any(Function), publish: expect.any(Function), voice: { status: expect.any(Function), speech: expect.any(Function) } } });
   expect(r.stdout).toBe('http://127.0.0.1:12345\n');
   // stdout stays the URL only; stderr tells agents the one command that follows every review round of this project.
   expect(r.stderr).toBe('服务日志\nAgents: stream reviewer feedback from this board with\n  npx joplo feedback watch project --local --follow --json\nIf you end your response while the user tests and your host wakes you when a background command ends, add --once (it prints how to resume with --since).\n');
@@ -32,7 +33,7 @@ test('dev 参数与日志输出', async () => {
 test.each(['--out-dir', '--out'])('build 参数 %s', async (flag) => {
   const buildSite = vi.fn(async () => ({ outDir: resolve('output'), files: ['index.html'], routes: ['/'], scenarios: [], diagnostics: [] }));
   const r = await run(['build', 'project', flag, 'output', '--overwrite'], { buildSite });
-  expect(r.code).toBe(0); expect(buildSite).toHaveBeenCalledWith({ projectDir: resolve('project'), outDir: resolve('output'), overwrite: true });
+  expect(r.code).toBe(0); expect(buildSite).toHaveBeenCalledWith({ projectDir: resolve('project'), outDir: resolve('output'), overwrite: true, voiceDefault: null });
 });
 test('render 参数', async () => {
   const renderStep = vi.fn(async () => ({ path: resolve('a.png'), elements: [], warnings: [] }));
