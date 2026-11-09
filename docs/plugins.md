@@ -471,7 +471,7 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 
 ### 通用插件密钥（D91）
 
-插件 `keys: [{id,title,description,url,env}]` 只声明元数据 → compileProject 读取 config.plugins 并交给 LocalResources（不复制进 IR）→ 看板 `GET /__joplo/p/<project>/plugin-keys` 仅返回声明/存在状态 → Voice 管理密钥按声明展示 → `PUT /__joplo/p/<project>/plugin-keys/<plugin>/<key>` 校验当前声明、令牌和 Origin → PluginKeyStore 原子写入本机 0600 文件，支持删除。未启用插件或未声明 key 返回 404；编译失败清除旧声明。
+插件 `keys: [{id,title,description,url,env}]` 只声明元数据 → compileProject 读取 config.plugins 并交给 LocalResources（不复制进 IR）→ 看板 `GET /__joplo/p/<project>/plugin-keys` 仅返回声明/存在状态 → Voice 管理密钥按声明展示 → `PUT /__joplo/p/<project>/plugin-keys/<plugin>/<key>` 校验当前声明、令牌和 Origin → PluginKeyStore 原子写入本机 0600 文件，支持删除。插件查找只接受声明对象的自有属性，未启用插件或未声明 key（包括与对象继承属性同名的输入）返回 404 且不落盘；编译失败清除旧声明。所有调用方共用的 JSON 解析器在畸形正文时只返回固定的 400 / USAGE，不回传或记录 SyntaxError 原文、正文片段；凭证客户端用 JSON.stringify 构造请求，不能把正文复制到日志中。
 
 生成时，宿主优先读取声明的环境变量，再读取该插件自己的本机文件；只通过 stdin 将当前插件的值传入 `compile(input, {keys,...})`。不向其他插件传值，不传密钥目录；metadata/estimate 子进程不取密钥。子进程只继承 PATH/临时目录等系统环境，避免环境凭证跨插件泄漏；stderr 不透传，已知密钥从诊断中删去，含密钥的资源输出拒绝缓存/发布。插件依然是可信本机代码，进程隔离不等于文件系统沙箱；插件必须遵守不读取其他凭证、不输出密钥的契约。
 

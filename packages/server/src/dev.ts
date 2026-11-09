@@ -499,8 +499,10 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     if (raw.tooLarge) return sendJson(res, 413, { error: { code: 'USAGE', message: `Request body is too large (limit: ${MAX_BODY} bytes)` } }), { ok: false };
     try {
       return { ok: true, body: JSON.parse(raw.text) };
-    } catch (e) {
-      return sendJson(res, 400, { error: { code: 'USAGE', message: `Request body is not valid JSON: ${e instanceof Error ? e.message : String(e)}` } }), { ok: false };
+    } catch {
+      // SyntaxError messages can include request fragments, including unsaved credentials.
+      // Keep the shared parser safe for every caller; never return or log the original error.
+      return sendJson(res, 400, { error: { code: 'USAGE', message: 'Request body is not valid JSON' } }), { ok: false };
     }
   };
   const fail = (res: http.ServerResponse, e: unknown) => {
@@ -517,7 +519,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       const declarations = localResources.get(id)?.host.keys ?? {};
       if (rest === 'plugin-keys' && method === 'GET') return sendJson(res, 200, Object.entries(declarations).flatMap(([plugin, keys]) => keys.map(key => pluginKeys.status(plugin,key))));
       const match = /^plugin-keys\/([a-z][a-z0-9-]*)\/([a-z][a-z0-9-]*)$/.exec(rest);
-      const declaration = match ? declarations[match[1]!]?.find(key => key.id === match[2]) : undefined;
+      const declaration = match && Object.hasOwn(declarations, match[1]!) ? declarations[match[1]!]!.find(key => key.id === match[2]) : undefined;
       if (!match || !declaration) return sendJson(res,404,{error:{code:'NOT_FOUND',message:'Plugin key is not declared by this project'}});
       if (method === 'PUT') {
         const parsed = await jsonBody(req,res); if (!parsed.ok) return;
