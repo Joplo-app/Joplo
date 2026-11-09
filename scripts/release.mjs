@@ -23,7 +23,7 @@ import { writeSkillReadingDemo, verifySkillReadingBrowser } from './skill-readin
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
-export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-content', 'plugin-ui', 'core', 'web', 'server', 'cli', 'joplo'];
+export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-tripo', 'plugin-content', 'plugin-ui', 'core', 'web', 'server', 'cli', 'joplo'];
 export const packageDir = (name, root = REPO) => path.join(root, name.startsWith('plugin-') ? `plugins/${name.slice(7)}` : `packages/${name}`);
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const LICENSE_PLACEHOLDER = 'UNLICENSED';
@@ -61,7 +61,7 @@ function version(root, v) {
     fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
   }
   // Runtime version metadata must not pull the workspace manifest into browser bundles.
-  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-content', 'plugin-ui']) {
+  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-tripo', 'plugin-content', 'plugin-ui']) {
   const pluginVersion = path.join(packageDir(name, root), 'src/version.json');
   fs.mkdirSync(path.dirname(pluginVersion), { recursive: true });
   fs.writeFileSync(pluginVersion, JSON.stringify({ version: v }, null, 2) + '\n');
@@ -326,12 +326,13 @@ async function smoke() {
     // 3. npm install：registry 上还没有这些版本，改用 tarball（版本号已在上面断言）
     for(const name of ['joplo','@joplo-app/kit',...['ui','diagram','content','alda'].map(p=>`@joplo-app/plugin-${p}`)])assert(pkg.devDependencies[name]===v,`Template must pin ${name} to ${v}`);
     pkg.devDependencies = Object.fromEntries(Object.keys(pkg.devDependencies).map(name=>[name,tgz[name]??pkg.devDependencies[name]]));
+    pkg.devDependencies['@joplo-app/plugin-tripo'] = tgz['@joplo-app/plugin-tripo'];
     pkg.overrides = overrides;
     fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
     sh(npm, ['install', ...npmFlags], project);
     const joplo = path.join(project, 'node_modules/.bin/joplo');
     assert(fs.realpathSync(joplo) === fs.realpathSync(path.join(project, 'node_modules/joplo/bin/joplo.cjs')), '项目的 .bin/joplo 应指向 joplo 入口包');
-    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-content', '@joplo-app/plugin-ui', '@joplo-app/server', '@joplo-app/web']) {
+    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-tripo', '@joplo-app/plugin-content', '@joplo-app/plugin-ui', '@joplo-app/server', '@joplo-app/web']) {
       const p = path.join(project, 'node_modules', n);
       assert(fs.existsSync(p) && !fs.lstatSync(p).isSymbolicLink(), `${n} 应从 tarball 安装（不是链接）`);
       assert(readJson(path.join(p, 'package.json')).version === v, `${n} 版本应为 ${v}`);
@@ -340,6 +341,10 @@ async function smoke() {
 
     // Optional plugin is installed explicitly; its author/local/runtime exports must work without workspace tools.
     const probe = sh(process.execPath, ['--input-type=module', '-e', `
+      import tripo, {model} from '@joplo-app/plugin-tripo';
+      import tripoLocal from '@joplo-app/plugin-tripo/local';
+      import tripoRuntime from '@joplo-app/plugin-tripo/runtime';
+      if (tripo.id !== 'tripo' || !tripo.local.endsWith('/local.js') || model('A red apple').kind !== 'local-resource' || !tripoLocal.compilers.glb.persistent || tripoRuntime.id !== 'tripo') process.exit(1);
       import alda, { music } from '@joplo-app/plugin-alda';
       import local from '@joplo-app/plugin-alda/local';
       import runtime from '@joplo-app/plugin-alda/runtime';

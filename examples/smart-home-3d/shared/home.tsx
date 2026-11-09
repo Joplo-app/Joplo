@@ -1,3 +1,4 @@
+import { apple } from './models.ts';
 import { $ } from '@joplo-app/kit';
 import { Scene3D } from 'joplo-plugin-scene3d';
 
@@ -13,6 +14,7 @@ export const Home = ({ explore = false }: { explore?: boolean } = {}) => (
     <Scene3D.Object id="rug" shape="box" at={[-1.4, 0, -1.1]} size={[2.6, 0.02, 1.8]} color="line" />
     <Scene3D.Object id="sofa" shape="sofa" at={[-1.4, 0, -2.4]} size={[2.2, 0.8, 0.9]} color="info" />
     <Scene3D.Object id="table" shape="table" at={[-1.4, 0, -1.0]} size={[1.1, 0.42, 0.6]} />
+    <Scene3D.Model id="apple" src={apple} at={[-1.4, 0.45, -1.0]} size={[0.36, 0.36, 0.36]} label="桌上的苹果" outline={false} />
     <Scene3D.Object id="tv" shape="tv" at={[-3.96, 1.45, -1.1]} rotate={90} lit={$.data.tv} label="电视" />
     <Scene3D.Object id="ac" shape="ac" at={[0.9, 2.35, -2.95]} lit={$.data.ac} label="空调" showLabel />
     <Scene3D.Target id="lamp" shape="lamp" at={[0.6, 0, -2.4]} lit={$.data.lamp} label="落地灯" />

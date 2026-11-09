@@ -1,0 +1,30 @@
+import { it, expect } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { LocalResources, inlineResources } from '../src/local-resources.ts';
+import { normalize } from '../../../plugins/tripo/src/request.ts';
+import { modelPath } from '../../../plugins/tripo/src/local.ts';
+import { nodeResourceIds, pruneMediaAssets, resolveResourceProps } from '@joplo-app/core';
+const request=normalize({prompt:'Original test apple'});
+it('persistent host reads committed GLB with a fetch that fails; code updates do not regenerate or hide deleted outputs',async()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'persistent-glb-')),entry=path.join(root,'local.ts');
+  const code=`import local from ${JSON.stringify(path.resolve('plugins/tripo/src/local.ts'))};export default {compilers:{glb:{...local.compilers.glb,compile(input,ctx){globalThis.fetch=()=>{throw new Error('NETWORK FORBIDDEN')};return local.compilers.glb.compile(input,ctx);}}}};`;
+  fs.writeFileSync(entry,code);
+  const file=modelPath(root,request);fs.mkdirSync(path.dirname(file),{recursive:true});
+  const b=Buffer.alloc(24);b.write('glTF');b.writeUInt32LE(2,4);b.writeUInt32LE(24,8);b.writeUInt32LE(4,12);b.writeUInt32LE(0x4e4f534a,16);b.write('{}  ',20);fs.writeFileSync(file,b);
+  const req={id:'model',plugin:'tripo',compiler:'glb',input:JSON.stringify(request)};
+  const host=new LocalResources(root,{tripo:entry});
+  expect((await host.ensure(req)).url).toContain('data:model/gltf-binary;');
+  fs.appendFileSync(entry,'\n// compiler changed');
+  expect((await new LocalResources(root,{tripo:entry}).ensure(req)).url).toContain('data:model/gltf-binary;');
+  const project:any={scenarios:{},scenes:{s:{root:{props:{src:'joplo-resource:model'}}}}};
+  const inline=await inlineResources(project,[req],host);expect(inline.diagnostics).toEqual([]);expect(Object.keys(inline.assets)).toEqual(['model']);expect(JSON.stringify(inline)).not.toContain('Original test apple');
+  fs.rmSync(file);expect((await host.ensure(req)).diagnostic?.code).toBe('LOCAL_RESOURCE_SPEND_REQUIRED');
+  fs.rmSync(root,{recursive:true,force:true});
+});
+it('scope retains referenced node resources and runtime resolves IDs without publishing private input',()=>{
+  const project:any={scenarios:{},scenes:{s:{root:{props:{src:'joplo-resource:model'}}}},mediaAssets:{model:'data:model/gltf-binary;base64,AAAA',private:'private'}};
+  expect([...nodeResourceIds(project)]).toEqual(['model']);expect(pruneMediaAssets(project).mediaAssets).toEqual({model:project.mediaAssets.model});
+  expect(resolveResourceProps(project.scenes.s.root.props,project.mediaAssets)).toEqual({src:project.mediaAssets.model});
+});

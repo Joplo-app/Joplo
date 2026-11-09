@@ -8,7 +8,12 @@ Joplo compiles trusted TS/TSX into deterministic scenes and schedules their play
 3. Create one feature, one option and a runnable scenario. Run check, inspect the rendered frames, then test the real inputs.
 4. Required before handing a development round to the user: read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json. A running board alone does not receive feedback for the agent.
 
-## Model and files
+## Binary assets
+- asset('./file.glb') embeds a self-contained GLB; MP3/WAV/OGG/M4A/FLAC are supported too. Paths are relative to the calling source file. Images retain a 2 MB limit; binary files have a 50 MB limit. Dev serves binary bytes by content hash; published builds embed them for file://.
+- Prefer existing CC0 assets and public-domain reference images, then use a generation plugin to fill gaps in an original style. Read the enabled plugin's skill before generation. Commit persistent artifacts and metadata; never put API keys in project source.
+- npx joplo resources --dry-run lists missing persistent resources and estimated credits. Interactive resources confirms each item; unattended generation requires --allow-spend. check/build/render remain offline for these artifacts. Missing or corrupt output gives diagnostics, not an implicit paid retry. Keep large GLB files below 5 MB where possible and inspect MODEL_SIZE warnings before sharing.
+
+## Structure and files
 - joplo.config.ts exports config({ name, plugins, layout?, home?, theme?, autoFocus?, voice?, locales? }). plugins is explicit; installation alone does not enable a plugin.
 - layouts/<id>.tsx exports layout(tree). Outlet places the current page; Slot declares a named insertion point. Those are engine composition primitives.
 - routes/**/page.tsx exports page({ title, layout?, viewport? }, tree). The directory determines its route. Set layout: false to opt out of the shared layout.
@@ -59,4 +64,4 @@ Declare both success and recovery cases in the feature. View code belongs to the
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.3.0 sha256:ea1b9e147658320db652e1dbf343dcc8950996078dfce1ecc9c8ce7480e733f7 -->
+<!-- joplo-skill 0.3.0 sha256:d80252878e0aa6d51672018077a233415f6df5674e57a8ce51016eff49f68600 -->

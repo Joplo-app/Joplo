@@ -1,6 +1,6 @@
 # Joplo 插件架构：纯粹的引擎 + 可插拔的内容形态（D87）
 
-> 状态：阶段 0、阶段 1-A/B/C/D 与阶段 2 已实现（阶段 2 字段与边界见第 13 节）：API v2 编译钩子、效果快照、元素特性与 React/容器运行时；D89 起引擎不隐式启用任何插件，标准库由版本化 starter 显式声明。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节，通用属性、插件主题与讲解内容见第 12 节。
+> 状态：阶段 0、阶段 1-A/B/C/D/E 与阶段 2 已实现（阶段 2 字段与边界见第 13 节）：API v2 编译钩子、效果快照、元素特性与 React/容器运行时；D89 起引擎不隐式启用任何插件，标准库由版本化 starter 显式声明。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节，通用属性、插件主题与讲解内容见第 12 节。
 > 目标形态：Joplo 只是**构建与调度引擎**，负责把不同形态的内容串成一个可播放、可评审、可发布的作品；
 > UI 组件、Diagram、Canvas、3D、Alda BGM、朗读供应商、主题……都是插件。
 
@@ -463,3 +463,27 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 
 - BR-4 / P2：媒体资源首次请求或 driver 创建失败后，普通暂停/重播仍复用空 slot，修好工具也可能不再请求；影响本页音轨恢复，可先切场景、关开声音或重载；建议失败时清理 slot，并在明确重播/重试或有退避的恢复动作重建，避免 RAF 无限制重试。本轮仅记录，未修改媒体代码。
 - BR-5 / P2：视频导出 WebM 仅含视频流，没有 BGM/音频合成链路；交互 build/share 的音轨不受此限制，视频文件不能当作影音一致性交付证据；建议按同一引擎时钟记录锚点并离线渲染/混音/mux，或统一捕获 WebAudio MediaStream 与画面，同时处理解锁、同步及收尾。本轮仅记录，未补音轨。
+## 17. P1-E：GLB 与显式付费的持久资源
+
+`scene3d:Model` 用 `src={asset('./model.glb')}` 或 `src={model({prompt: '…'})}` 引用资源。GLTFLoader + 内置 MeshoptDecoder 读取自包含 GLB；模型共享场景锚点、标签、focus、主题描边、状态 tint/lit、点击与拖拽/旋转仲裁。`size` 等比装入包围盒，`at` 为底部中心。纹理模型建议 `outline={false}`。加载以 `ctx.hold()` 保持导出等待，成功首帧、失败、源切换、卸载均释放；失败可见 `MODEL_LOAD_FAILED` 占位。
+
+`@joplo-app/plugin-tripo` 是可选第一方插件（需显式安装/启用），没有浏览器网络能力。作者 `model()` 返回通用 `localResource()` 标记。CLI `joplo resources --dry-run` 显示估计 credits；交互终端逐项确认，非交互默认拒绝、必须明确 `--allow-spend`。check/build/render 从不带这个许可。持久资源先读项目文件，再检查许可和 Key，已有模型不会请求 Tripo。
+
+### 新字段与文件的数据流（E5）
+
+| 字段 / 文件 | 写入 → 存储 → 读取 → 消费者 |
+| --- | --- |
+| `localResource(plugin, compiler, input)` | 插件作者工厂 → 源码求值的标记 → PluginCompiler 提取 → 仅 Node 的 `ResourceRequest`；IR 中只留下 `joplo-resource:<id>` |
+| `LocalCompiler.persistent / estimate` | 插件 local 清单 → 本机编译模块 → LocalResources.describe → CLI 每项费用提示、持久产物策略 |
+| `projectDir / home / allowSpend` | 宿主调用 → 子进程 stdin 内存 → 本机 compile 上下文 → 项目产物定位、本机凭证读取和生成许可；不进 IR |
+| `assets/models/<hash>.glb` | Tripo 下载（不带 Authorization）、验证、原子 rename → 项目/Git → 本机编译器离线读取 → 场景 GLTFLoader |
+| 同名 `.json` | 创建前记录 `status:creating`，收到响应立即保存 `task_id`，完成后记录时间/实际 credits → 项目/Git → 重试续查；`prompt/model/参数/image_sha256` 用于溯源，临时签名 URL/Key/参考图字节不写入 |
+| `.glb.lock` | 生成进程原子创建 → 临时项目锁（忽略 Git）→ 生成进程检查 owner 存活 → 防止并发付费；完成删除，崩溃后按 PID 回收 |
+| `project.mediaAssets` | 构建填充资源 ID→data URI；看板替换为哈希 URL → IR 的公共资源表 → RenderContext.assets → 插件已解析 props；同一资源只内嵌一次，scope 删除未引用资源 |
+| `.joplo/binary/<content-hash>` | 看板编译提取二进制 → 本机缓存 → 只允许 64 位哈希的 GET 文件服务 → 浏览器模型/音频；发布站直接内嵌，不依赖绝对路径或本机服务 |
+| `~/.joplo/tripo.json` | Voice 管理密钥卡片密码输入 → 带 Origin/令牌保护的 PUT → 0600 原子文件 → Node-only local 编译器；GET 仅返回保存/环境变量存在状态；环境变量 TRIPO_API_KEY 优先，JOPLO_HOME 可覆盖目录 |
+| `MODEL_SIZE` | 构建扫描唯一 GLB 的二进制大小 → diagnostics → CLI/看板报告；超过 5 MB 警告，二进制最大 50 MB，图片仍为 2 MB |
+
+任务 API 固定 `https://openapi.tripo3d.ai/v3`；参考图通过 `/files` 上传。只对明确 429 退避重试创建；丢失响应或服务器结果不明时保留 unknown 日志并停止，要求从 Tripo 历史恢复 task_id。轮询/下载失败保留 task_id；超时不是退款。失败/取消由 Tripo 退回冻结 credits，不自动重新创建。Key/供应商原始错误/临时 URL 不进入日志或发布物。
+
+参数白名单固定 H 系列 `v3.1-20260211` 和已核实计费选项；扩展版本前核实费用。真实预算与生成批准由调用者控制，`--allow-spend` 不代表自动购买额度。已知限制：不支持 Draco/KTX2、外部纹理/缓冲文件；不提供网页生成按钮，生成通过 CLI 明确确认。官方契约：[生成](https://developers.tripo3d.ai/zh/docs/generation-text-to-model/standard)、[上传](https://developers.tripo3d.ai/zh/docs/files)、[计费/退款](https://developers.tripo3d.ai/zh/docs/billing)。

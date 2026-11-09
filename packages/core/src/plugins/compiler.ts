@@ -111,7 +111,23 @@ export class PluginCompiler {
         this.report('PLUGIN_PROPERTY_INVALID', `Plugin ${plugin.id}: ${key} requires a literal ${spec.type}${spec.min !== undefined ? ` >= ${spec.min}` : ''}${spec.max !== undefined ? ` <= ${spec.max}` : ''}${spec.nonempty ? ' (nonempty)' : ''}`, node.source);
     }
   }
+  private resourceProps(value: unknown, source?: string): unknown {
+    if (Array.isArray(value)) return value.map(v => this.resourceProps(v, source));
+    if (!object(value)) return value;
+    if (value.kind === 'local-resource') {
+      const { plugin, compiler, input } = value;
+      if (typeof plugin !== 'string' || !this.defs.get(plugin)?.local || typeof compiler !== 'string' || !/^[a-z][a-z0-9-]*$/.test(compiler) || typeof input !== 'string') {
+        this.report('LOCAL_RESOURCE_INVALID', 'Enable the resource plugin in config.plugins and supply a compiler with text input', source); return '';
+      }
+      const key = JSON.stringify([plugin, compiler, input]);
+      let id = this.resourceIds.get(key);
+      if (!id) { id = `resource-${this.resourceIds.size}`; this.resourceIds.set(key, id); this.resourceOwners.set(id, plugin); this.options.onResource?.({ id, plugin, compiler, input, source }); }
+      return `joplo-resource:${id}`;
+    }
+    return { ...value, ...Object.fromEntries(Object.entries(value).map(([k,v]) => [k, this.resourceProps(v, source)])) };
+  }
   node(node: JNode, ids: ReadonlyMap<string, string | undefined>): JNode {
+    node = { ...node, props: this.resourceProps(node.props, node.source) as JNode['props'] };
     const p = this.defs.get(node.type.split(':')[0]!);
     if (!p) {
       this.validateProperties(node);

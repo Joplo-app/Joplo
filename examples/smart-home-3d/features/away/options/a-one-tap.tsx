@@ -62,6 +62,10 @@ export default option({
   },
 
   scenarios: {
+    model: flow('观察桌上的真实 3D 苹果', { start: '/', expected: '点击苹果定位，旋转视角观察；模型离线可用' })
+      .click('apple', '点一下桌上的苹果，看看真实 GLB 模型', set($.ui.focus, 'apple'))
+      .system('回到客厅', set($.ui.focus, null), done('GLB 与房间物件共享焦点、标签和交互')),
+
     leave: flow('门窗关好，一键离家', { cases: ['happy'], expected: '灯、空调、电视依次关闭，入户门上锁' })
       .system('轻柔配乐开始', music.play('theme', { fadeMs: 900, loop: true, volume: .45 }))
       .click('btn_away', '出门前点「一键离家」：先检查门窗，都关好了', set($.ui.leaving, true), uses('check_first'))

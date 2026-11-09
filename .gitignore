@@ -50,3 +50,6 @@ release/
 # Local browser verification artifacts
 output/playwright/
 .playwright-cli/
+
+# Temporary model generation leases; GLB and JSON receipts are committed
+**/assets/models/*.glb.lock

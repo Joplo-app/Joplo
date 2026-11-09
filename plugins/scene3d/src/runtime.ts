@@ -9,6 +9,7 @@
  * - 颜色读主题变量（--jp-*），主题变化时重新上色；描边用墨色线条，和手绘 / 线框主题一致。
  */
 import * as THREE from 'three';
+import { loadModel, disposeModel } from './model.ts';
 import { defineRuntime, type ComponentCtx, type ComponentInstance, type PluginNode } from '@joplo-app/kit/plugin';
 
 type Vec3 = [number, number, number];
@@ -93,12 +94,17 @@ function toonGradient(): THREE.DataTexture {
 }
 
 /** glow：亮起时的自发光颜色；tint：亮起时底色渐变到的颜色（灯罩）。 */
-type Paint = { mat: THREE.MeshToonMaterial | THREE.LineBasicMaterial; role: Role | string; glow?: Role; tint?: Role };
+type Paint = { mat: THREE.MeshToonMaterial | THREE.MeshStandardMaterial | THREE.LineBasicMaterial; role: Role | string; glow?: Role; tint?: Role };
 
 /** 一个子元素在场景里的样子。 */
 type Item = {
+  release?: () => void;
+  cancelled?: boolean;
+  loaded?: THREE.Object3D;
+  status?: HTMLDivElement;
   id: string;
   key: string;
+  src?: unknown;
   node: PluginNode;
   group: THREE.Group;
   meshes: THREE.Mesh[];
@@ -245,12 +251,12 @@ class SceneView implements ComponentInstance {
   private sync(children: PluginNode[]): void {
     const seen = new Set<string>();
     for (const n of children) {
-      if (n.name !== 'Object' && n.name !== 'Target') continue;
+      if (n.name !== 'Object' && n.name !== 'Target' && n.name !== 'Model') continue;
       seen.add(n.id);
       const shape = typeof n.props.shape === 'string' && PRESET[n.props.shape] ? n.props.shape : 'box';
-      const key = JSON.stringify([shape, n.props.at, n.props.size, n.props.rotate, n.props.color]);
+      const key = JSON.stringify([shape, n.props.at, n.props.size, n.props.rotate, n.props.color, n.props.outline]);
       let it = this.items.get(n.id);
-      if (it && it.key !== key) {
+      if (it && (it.key !== key || it.src !== n.props.src)) {
         this.dispose(it);
         this.items.delete(n.id);
         it = undefined;
@@ -258,6 +264,7 @@ class SceneView implements ComponentInstance {
       if (!it) {
         it = this.build(n, shape, key);
         this.items.set(n.id, it);
+        if (n.name === 'Model') this.load(it);
         // 新出现的物体：第一次就在终点（不从 0 长出来），之后的显示 / 隐藏才过渡
         it.cur = { lit: n.props.lit ? 1 : 0, open: n.props.open ? 1 : 0, show: n.visible ? 1 : 0, fade: n.disabled ? 1 : 0 };
       }
@@ -267,7 +274,7 @@ class SceneView implements ComponentInstance {
       for (const a of [...it.anchor.attributes]) if (a.name.startsWith('data-') || a.name.startsWith('aria-')) it.anchor.removeAttribute(a.name);
       for (const [k, v] of Object.entries(n.attrs)) it.anchor.setAttribute(k, v);
       const text = typeof n.props.label === 'string' ? n.props.label : '';
-      const wantLabel = !!text && (n.name === 'Target' || n.props.showLabel === true);
+      const wantLabel = !!text && (n.interactive || n.props.showLabel === true);
       if (wantLabel && !it.label) {
         it.label = document.createElement('div');
         it.label.style.cssText = 'position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font:500 12px/1.4 var(--jp-font);color:var(--jp-ink);background:var(--jp-surface);border:1px solid var(--jp-line-strong);border-radius:4px;padding:1px 7px;transition:opacity .25s';
@@ -445,7 +452,7 @@ class SceneView implements ComponentInstance {
     const anchor = document.createElement('div');
     anchor.style.cssText = 'position:absolute;pointer-events:none';
     this.overlay.append(anchor);
-    const it: Item = { id: n.id, key, node: n, group, meshes, edges, paints, hinge, hingeSign, light, halo, cur: { lit: 0, open: 0, show: 1, fade: 0 }, goal: { lit: 0, open: 0, show: 1, fade: 0 }, anchor, label: null };
+    const it: Item = { id: n.id, key, src: n.props.src, node: n, group, meshes, edges, paints, hinge, hingeSign, light, halo, cur: { lit: 0, open: 0, show: 1, fade: 0 }, goal: { lit: 0, open: 0, show: 1, fade: 0 }, anchor, label: null };
     this.repaint(it);
     return it;
   }
@@ -455,14 +462,59 @@ class SceneView implements ComponentInstance {
       if (p.role === 'halo') (p.mat as unknown as THREE.SpriteMaterial).color.copy(this.palette.warn);
       else if (p.mat instanceof THREE.LineBasicMaterial) p.mat.color.copy(this.palette.ink);
       else {
-        p.mat.color.copy(this.color(p.role));
+        if (p.role !== 'original') p.mat.color.copy(this.color(p.role));
         if (p.glow) p.mat.emissive.copy(this.palette[p.glow]);
       }
     }
     if (it.light) it.light.color.copy(this.palette.warn);
   }
 
+  private load(it: Item): void {
+    const release = this.ctx.hold(); let released = false;
+    it.release = () => { if (!released) { released = true; release(); } };
+    const status = document.createElement('div');
+    status.textContent = 'Loading 3D model…'; status.setAttribute('role','status');
+    status.style.cssText = 'position:absolute;left:12px;top:12px;padding:6px 10px;background:var(--jp-surface);color:var(--jp-ink);border:1px solid var(--jp-line);font:12px var(--jp-font)';
+    this.overlay.append(status); it.status = status;
+    void loadModel(it.node.props.src).then(model => {
+      if (it.cancelled) { disposeModel(model); return; }
+      // Replace the visible loading box, retaining the stable item and its anchors.
+      for (const mesh of it.meshes) { mesh.removeFromParent(); mesh.geometry.dispose(); }
+      for (const edge of it.edges) { edge.removeFromParent(); edge.geometry.dispose(); }
+      for (const paint of it.paints) paint.mat.dispose();
+      it.meshes = []; it.edges = []; it.paints = [];
+      const box = new THREE.Box3().setFromObject(model), dimensions = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+      const size = vec(it.node.props.size, [1,1,1]);
+      const scale = Math.min(...size.map((v,i) => dimensions.getComponent(i) > 1e-8 ? v / dimensions.getComponent(i) : Infinity));
+      if (!Number.isFinite(scale) || scale <= 0) { disposeModel(model); throw new Error('Empty model geometry'); }
+      model.position.sub(new THREE.Vector3(center.x,box.min.y,center.z));
+      const normalized = new THREE.Group(); normalized.add(model); normalized.scale.setScalar(scale); it.group.add(normalized); it.loaded = normalized;
+      model.traverse(object => {
+        if (!(object instanceof THREE.Mesh)) return;
+        object.userData.itemId = it.id; it.meshes.push(object);
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+          if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshToonMaterial) it.paints.push({mat:material,role:typeof it.node.props.color === 'string' ? it.node.props.color : 'original',glow:'warn'});
+        }
+        if (it.node.props.outline !== false) {
+          const material = new THREE.LineBasicMaterial({transparent:true});
+          const edges = new THREE.LineSegments(new THREE.EdgesGeometry(object.geometry,28),material);
+          object.add(edges); it.edges.push(edges); it.paints.push({mat:material,role:'ink'});
+        }
+      });
+      status.remove(); it.status = undefined;
+      this.repaint(it);
+      if (!this.userMoved) { this.view = this.frameFor(this.focusId(),String(this.ctx.node.props.view ?? 'iso')); this.tween = null; }
+      this.tick(this.ctx.frame.clock?.timeMs ?? 0, false);
+    }).catch(() => {
+      if (it.cancelled) return;
+      status.textContent = `${it.node.label || it.id}: model unavailable. Restore a valid GLB or run joplo resources.`;
+      status.dataset.joploDiagnostic = 'MODEL_LOAD_FAILED'; status.setAttribute('role','alert');
+    }).finally(() => it.release?.());
+  }
+
   private dispose(it: Item): void {
+    it.cancelled = true; it.release?.(); it.status?.remove();
+    if (it.loaded) disposeModel(it.loaded);
     this.world.remove(it.group);
     for (const m of it.meshes) m.geometry.dispose();
     for (const e of it.edges) e.geometry.dispose();

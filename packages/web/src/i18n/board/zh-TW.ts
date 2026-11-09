@@ -410,7 +410,7 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       voiceLoginBrowser: "沒登入時用瀏覽器朗讀。",
       voiceManageKeys: "管理金鑰…",
       voiceKeysTitle: "金鑰",
-      voiceKeysHint: (file: Value) => `只用於 OpenAI 和 ElevenLabs。儲存在這台電腦上（${value(file, locale)}），所有專案共用；不會寫進專案，也不會隨分享上傳。`,
+      voiceKeysHint: (file: Value) => `儲存在這台電腦上（${value(file, locale)}），所有專案共用；不會寫進專案，也不會隨分享上傳。`,
       voiceLegacyTitle: "以前的聲音來源",
       voiceRemoveKey: "刪除金鑰",
       cloudCardNarration: "朗讀",

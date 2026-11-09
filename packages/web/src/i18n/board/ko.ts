@@ -410,7 +410,7 @@ export function createBoardKo(locale: Locale = 'ko') {
       voiceLoginBrowser: "그 전까지는 브라우저로 낭독합니다.",
       voiceManageKeys: "키 관리…",
       voiceKeysTitle: "API 키",
-      voiceKeysHint: (file: Value) => `OpenAI와 ElevenLabs 전용입니다. 이 컴퓨터(${value(file, locale)})에 저장되어 모든 프로젝트가 함께 씁니다. 프로젝트나 공유에는 기록되지 않습니다.`,
+      voiceKeysHint: (file: Value) => `이 컴퓨터(${value(file, locale)})에 저장되어 모든 프로젝트가 함께 씁니다. 프로젝트나 공유에는 기록되지 않습니다.`,
       voiceLegacyTitle: "이전 음성 소스",
       voiceRemoveKey: "키 삭제",
       cloudCardNarration: "낭독",

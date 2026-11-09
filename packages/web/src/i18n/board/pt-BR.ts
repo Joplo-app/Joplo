@@ -410,7 +410,7 @@ export function createBoardPtBR(locale: Locale = 'pt-BR') {
       voiceLoginBrowser: "Até lá, as etapas usam a voz do navegador.",
       voiceManageKeys: "Gerenciar chaves…",
       voiceKeysTitle: "Chaves de API",
-      voiceKeysHint: (file: Value) => `Só para OpenAI e ElevenLabs. Salvas neste computador (${value(file, locale)}) para todos os projetos; nunca gravadas em um projeto nem compartilhadas.`,
+      voiceKeysHint: (file: Value) => `Salvas neste computador (${value(file, locale)}) para todos os projetos; nunca gravadas em um projeto nem compartilhadas.`,
       voiceLegacyTitle: "Fontes de voz antigas",
       voiceRemoveKey: "Remover chave",
       cloudCardNarration: "Narração",

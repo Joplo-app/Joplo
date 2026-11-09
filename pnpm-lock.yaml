@@ -293,6 +293,9 @@ importers:
       '@joplo-app/plugin-alda':
         specifier: workspace:*
         version: link:../../plugins/alda
+      '@joplo-app/plugin-tripo':
+        specifier: workspace:*
+        version: link:../../plugins/tripo
       joplo-plugin-scene3d:
         specifier: workspace:*
         version: link:../../plugins/scene3d
@@ -505,6 +508,12 @@ importers:
       '@types/three':
         specifier: 0.187.0
         version: 0.187.0
+
+  plugins/tripo:
+    dependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
 
   plugins/ui:
     dependencies:

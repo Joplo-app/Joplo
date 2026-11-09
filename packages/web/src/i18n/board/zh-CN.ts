@@ -427,7 +427,7 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       voiceLoginBrowser: "没登录时用浏览器朗读。",
       voiceManageKeys: "管理密钥…",
       voiceKeysTitle: "密钥",
-      voiceKeysHint: (file: Value) => `只用于 OpenAI 和 ElevenLabs。保存在这台电脑上（${value(file, locale)}），所有项目共用；不会写进项目，也不会随分享上传。`,
+      voiceKeysHint: (file: Value) => `保存在这台电脑上（${value(file, locale)}），所有项目共用；不会写进项目，也不会随分享上传。`,
       voiceLegacyTitle: "以前的声音来源",
       voiceRemoveKey: "删除密钥",
       cloudCardNarration: "朗读",

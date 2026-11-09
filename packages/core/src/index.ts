@@ -24,7 +24,7 @@ export * from './local-review.ts';
 export * from './feature-diff.ts';
 export * from './step-identity.ts';
 export * from './auto-caption.ts';
-export { mediaAt, advanceMedia, mediaResourceIds, pruneMediaAssets } from './media.ts';
+export { nodeResourceIds, resolveResourceProps, mediaAt, advanceMedia, mediaResourceIds, pruneMediaAssets } from './media.ts';
 
 export { projectThemes } from './themes.ts';
 

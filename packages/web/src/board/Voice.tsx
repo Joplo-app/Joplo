@@ -32,6 +32,8 @@ import { copyText } from '../player/util';
 import type { DemoController } from '../runtime/demo';
 import { Narrator, browserVoices } from '../runtime/voice';
 import {
+  tripoKey,
+  type TripoKeyState,
   deleteVoiceProfile,
   fetchVoiceProfiles,
   fetchVoiceState,
@@ -556,6 +558,7 @@ export function VoiceKeysDialog({ api, open, onClose }: { api: VoiceApi; open: b
           {keyed.map((p) => (
             <KeyRow key={p.id} p={p} api={api} />
           ))}
+          <TripoKeyRow />
           {legacy.length ? (
             <section className="flex flex-col gap-2 border-t border-jb-line pt-3" data-testid="voice-legacy">
               <div className="text-[12px] font-semibold text-jb-muted">{i18n.board.voiceLegacyTitle}</div>
@@ -620,4 +623,23 @@ function KeyRow({ p, api }: { p: VoiceProfileView; api: VoiceApi }) {
       </div>
     </section>
   );
+}
+
+/** Uses the same local-key card, labels, password field and save/remove flow as voice providers. */
+function TripoKeyRow() {
+  const { t: i18n } = useBoardI18n();
+  const [state,setState] = useState<TripoKeyState | null>(null), [key,setKey] = useState(''), [busy,setBusy] = useState(false), [message,setMessage] = useState<Text | null>(null);
+  useEffect(()=>{ let alive=true; void tripoKey().then(v=>{if(alive)setState(v);}).catch(()=>{if(alive)setMessage('Tripo key settings unavailable');}); return ()=>{alive=false;}; },[]);
+  const save = async (value:string|null) => {
+    setBusy(true); setMessage(null);
+    try {setState(await tripoKey(value)); setKey(''); setMessage(i18n.board.voiceSaved);}
+    catch {setMessage('Tripo key could not be saved');} finally {setBusy(false);}
+  };
+  return <section className="flex flex-col gap-2 rounded-[10px] border border-jb-line p-3" data-testid="tripo-key">
+    <div className="flex items-center justify-between gap-2"><span className="text-[14px] font-semibold">Tripo · 3D</span><span className="text-[11.5px] text-jb-muted">{state?.envSet ? i18n.board.voiceKeyFromEnv('TRIPO_API_KEY') : state?.saved ? i18n.board.voiceKeySaved : i18n.board.voiceNoKeyBadge}</span></div>
+    <Label text={i18n.board.voiceApiKey} hint={i18n.board.voiceKeyEnv('TRIPO_API_KEY')}><input className={field} type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} data-testid="tripo-key-input" /></Label>
+    <p className="text-[12px] text-jb-muted">{i18n.board.voiceKeysHint(state?.file ?? '~/.joplo/tripo.json')}</p>
+    {message ? <p className="text-[12px] text-jb-muted"><LocalText value={message}/></p> : null}
+    <div className="flex flex-wrap items-center justify-end gap-2">{state?.saved ? <Btn label={i18n.board.voiceRemoveKey} size={28} variant="ghost" disabled={busy} onClick={()=>void save(null)} data-testid="tripo-key-remove" /> : null}<Btn label={i18n.board.voiceSave} size={28} variant="primary" disabled={busy || !key.trim()} onClick={()=>void save(key.trim())} data-testid="tripo-key-save" /></div>
+  </section>;
 }

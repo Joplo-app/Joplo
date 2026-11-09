@@ -4,7 +4,7 @@ import { registerRendererServices } from '@joplo-app/kit/renderer';
 import { useI18n } from '../i18n/context';
 import { Component, createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type ComponentType as ReactComponentType, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { disabledReasonOf, isInteractiveType, splitPluginType, type PluginTable, atWidth, childWidth, choicesOf, layoutRegions, evaluateCondition, isNodeDisabled, isSelfVisible, nodeLabel, resolveProps, resolveValue, walkNodes, type ComponentType, type StateChange, type PlayState, type Scene, type SceneNode } from '@joplo-app/core/runtime';
+import { resolveResourceProps, disabledReasonOf, isInteractiveType, splitPluginType, type PluginTable, atWidth, childWidth, choicesOf, layoutRegions, evaluateCondition, isNodeDisabled, isSelfVisible, nodeLabel, resolveProps, resolveValue, walkNodes, type ComponentType, type StateChange, type PlayState, type Scene, type SceneNode } from '@joplo-app/core/runtime';
 import { cn } from '@/lib/utils';
 import { streamMs } from '../runtime/pace';
 import { Rough, RoughPath, ThemeContext, roundRectPath, useStroke } from './rough';
@@ -16,6 +16,7 @@ import type { ComponentCtx, ComponentInstance, PluginNode } from '@joplo-app/kit
 export type RenderMode = 'review' | 'demo' | 'render';
 
 export type RenderCtx = {
+  assets?: Readonly<Record<string,string>>;
   act?: ActionDispatch;
   interactive?: boolean;
   draggable?: ReadonlySet<string>;
@@ -162,7 +163,7 @@ function PluginHost({ node, p }: NodeProps) {
     id: n.id,
     type: n.type,
     name: splitPluginType(n.type)?.name ?? n.type,
-    props: resolveProps(n, ctx.state),
+    props: resolveResourceProps(resolveProps(n, ctx.state), ctx.assets ?? {}),
     label: nodeLabel(n),
     visible: isSelfVisible(n, ctx.state, ctx.width),
     disabled: isNodeDisabled(n, ctx.state),
