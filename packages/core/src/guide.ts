@@ -792,7 +792,7 @@ When the user points to a stage element, read selection first for its exact loca
 Use for an active review, a receipt test, resuming a listener, or applying review conclusions. Local reviews do not require Cloud login or a share. The joplo-feedback skill covers the full receive-and-apply workflow.
 
 ## Local quick start
-Run dev and the follower in separate long-running shell sessions. joplo dev prints the board URL on stdout and this exact follow command on stderr:
+Required after every round of development: start the follower before handing the board URL to the user, even for small changes; never end your response without a running watcher (use --once). Run dev and the follower in separate long-running shell sessions. joplo dev prints the board URL on stdout and this exact follow command on stderr:
 
     npx joplo dev ./demo
     npx joplo feedback watch ./demo --local --follow --json

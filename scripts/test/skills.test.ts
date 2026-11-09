@@ -60,7 +60,8 @@ test('joplo 的 description 覆盖中英文触发词，可在没有 joplo.config
   expect(order.every(i => i >= 0)).toBe(true);
   expect(order).toEqual([...order].sort((a, b) => a - b));
   const pitfalls = body.split('\n').filter(l => l.startsWith('- ') && l.includes('See npx joplo skill '));
-  expect(pitfalls.length).toBeGreaterThanOrEqual(5); expect(pitfalls.length).toBeLessThanOrEqual(8);
+  // 常见坑不设上限（用户 2026-11-08：省 token 反而会让 Agent 犯错），只要求至少覆盖这几类
+  expect(pitfalls.length).toBeGreaterThanOrEqual(5);
   expect(body).toContain('npx joplo skill <topic>');
   const ffm = frontmatter(feedback!);
   for (const word of ['review', '评审']) expect(ffm.description).toContain(word);

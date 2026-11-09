@@ -35,7 +35,7 @@ Run dev and the follower in separate long-running shells. dev keeps the board li
 4. With minimal code, write one happy path and one error-and-recovery scenario.
 5. Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.
 6. Extend to every option and every case agreed with the user; run check until 0 errors.
-7. Before handing off for review, read npx joplo skill review. Keep npx joplo feedback watch [dir] --local --follow --json running in its own shell (joplo dev prints this exact command), then give the user the board URL dev printed. While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. If you end your response while they test, add --once so the watcher exits (and wakes a host that resumes on background exit) on the first event, then resume with --since. Receive and apply review results with the joplo-feedback skill.
+7. Required after every round of development: before handing off, read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json in its own shell (joplo dev prints this exact command); only then give the user the board URL dev printed. Never hand off with only a URL, and never end your response without a running watcher (use --once below). While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. If you end your response while they test, add --once so the watcher exits (and wakes a host that resumes on background exit) on the first event, then resume with --since. Receive and apply review results with the joplo-feedback skill.
 8. Only when the user asks to share or publish: npx joplo share --format json publishes picked options; npx joplo share --review publishes every option for reviewers. Confirming an option in the board is not a publish request. To share part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items.
 
 ## Show the product, not slides
@@ -47,6 +47,7 @@ Every step is an action on the product and a visible change it causes. If a step
 - Cards only open, close, jump in time, or switch roles; text that explains belongs in captions and explain(). Worked example: npx joplo skill story.
 
 ## Review live with the user
+Required: whenever you finish a round of development the user will look at, start the follower below before handing off, even for small changes and even if the user did not ask for a review. A hand-off without a running watcher loses their feedback.
 The user reviews in the board: they click through scenarios, write comments with the board's native feedback icon, and may confirm (approve) an option. You receive each event the moment it is saved.
 1. Start npx joplo feedback watch <dir> --local --follow --json in its own long-running shell (joplo dev prints this exact command; the board's feedback panel can copy it too). One follower covers every option of the project and attaches by itself to the new round each source edit opens.
 2. Then give the user the board URL that dev printed (do not assume port 4790) and point them to the native feedback icon. If they want to drive the UI themselves, only give the link.
@@ -63,6 +64,7 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - Comparing versions or a PR: read npx joplo skill diff. Preserve stable .key() identities, treat repeated candidates as uncertain, and build two real publish versions. If an embedded player changes scenario independently, use Realign and wait for both target positions before resuming. Use prepare → uncredentialed build → trusted publish only within the user's authorized scope.
 
 ## Common pitfalls
+- Finishing development is not the end: always start npx joplo feedback watch [dir] --local --follow --json (add --once if you will end your response) before you give the user the board URL, and keep receiving their feedback. See npx joplo skill review.
 - when takes a condition, not a boolean: when={eq($.ui.mode, 'code')}, never when={mode === 'code'}; for values known while writing use {flag && <X/>}. See npx joplo skill authoring.
 - Only catalog components and the listed HTML tags exist; <br/> is UNKNOWN_COMPONENT, so write 'Line 1\nLine 2' inside <Text>. See npx joplo skill components.
 - Every interactive element needs a flow step, disabled={true} with disabledReason, or unmodeled; otherwise check warns UNBOUND_INTERACTIVE. See npx joplo skill check.
@@ -87,4 +89,4 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - diff: Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - publish: pick, build, share, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.17 sha256:990d1505a35cc700d730648ee03fb100acebe42e2ff30473fa44242fe0b476f7 -->
+<!-- joplo-skill 0.2.17 sha256:54cb7d3fa667f0855e4457a8018ff8294e2277e7b188ef7d55d15415ef54ff4e -->

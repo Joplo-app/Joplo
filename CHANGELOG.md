@@ -1,5 +1,9 @@
 # 更新日志
 
+## 未发布
+
+- 官方技能 `joplo` 与 `joplo-feedback`：每轮开发完成后必须先启动 `joplo feedback watch --local --follow`（要结束回复时加 `--once`）再把看板地址交给用户，不再只给链接；这一条也列进常见坑。常见坑不再限制条数。
+
 ## 0.2.17
 
 - 作者内容多语言：源文件照常用一种语言写，`npx joplo i18n add <语言>` 生成 `locales/<语言>.json`（原文 → 译文），由 Agent 填写译文；`check` 报出缺失、过期（附最接近的旧条目）和没人用的译文。
