@@ -211,7 +211,7 @@ effect 返回可选的 `media` 有序命令列表：
 
 浏览器插件可提供 `runtime.media({ audio, destination, bytes })`，返回 `update({ offsetMs, playing, speed, loop, volume })` / `destroy()`；只负责解析产物和发声，不执行编译期语义。宿主掌管用户手势门槛、现有声音开关、暂停/继续、场景卸载、淡入淡出与旁白期间 25% ducking。异步加载后若场景已离开立即销毁驱动。媒体 hook 挂在交互播放器和视频录制路由；静态视图、缩略图、截图不挂载声音。标准音频由宿主 audio-media.ts 解码和播放；插件没有 runtime.media 时自动使用它。
 
-Alda 在本机用固定 GM SoundFont 渲染 FLAC，不再向浏览器发 MIDI。`music.play(name,{from:'chapter'})` 的 marker 经 Alda parse 得到数字偏移；未知 marker 在本机检查可用时编译 error，缺 Alda warning 并继续其它检查。check 输出乐长、各声部音符数和 marker 时间，并按连续播放区间提醒提前静音或过短循环。详细选型/许可、音色预安装、循环尾音/接缝、体积预算、字段流向和 F 合并范围见 [SoundFont 配乐管线](music-rendering.md)。
+Alda 在本机用固定 GM SoundFont 渲染 MP3 96kbps（FLAC 仅本机母版），不再向浏览器发 MIDI。`music.play(name,{from:'chapter'})` 的 marker 经 Alda parse 得到数字偏移；未知 marker 在本机检查可用时编译 error，缺 Alda warning 并继续其它检查。check 输出乐长、各声部音符数和 marker 时间，并按连续播放区间提醒提前静音或过短循环。详细选型/许可、音色预安装、循环尾音/接缝、体积预算、字段流向和 F 合并范围见 [SoundFont 配乐管线](music-rendering.md)。
 
 ### 新字段的端到端流向
 
@@ -233,7 +233,7 @@ Alda 在本机用固定 GM SoundFont 渲染 FLAC，不再向浏览器发 MIDI。
 
 - core `media.test.ts`：fake 插件效果降级、纯快照跳入、范围裁剪、翻译不变性与供应商边界守护。
 - server `local-resources.test.ts` / `media-build.test.ts`：缓存/版本/精确输入、同进程及跨进程并发、四类失败、本机按需 API 与诊断、真实 fake WAV 的范围构建、内联与源码隔离。
-- web `media.test.ts` / `audio-media.test.ts` / `voice.test.ts`，plugin-alda `audio.test.ts`：手势门槛、生命周期、旁白压低、停播淡出、FLAC 样本数/无损PCM/循环接缝、引擎时钟、暂停/倍速及 <100ms 步边界验证。
+- web `media.test.ts` / `audio-media.test.ts` / `voice.test.ts`，plugin-alda `audio.test.ts`：手势门槛、生命周期、旁白压低、停播淡出、本机 FLAC 母版、MP3 数字裁剪/循环接缝与有界 PCM 缓存、引擎时钟、暂停/倍速及 <100ms 步边界验证。
 - 发布集合：统一版本十一个包；smoke 另外直接载入可选插件 author/local/runtime 出口。starter 显式启用 Alda，纯引擎不隐式装载插件。smoke 在有 Alda2.4.8 时实际渲染；否则明确打印 SKIP，不能把它称为音频验证通过。
 - 已知边界：通用媒体轨道已接入视频混音，旧的浏览器 Web Speech 旁白尚不可录音；本任务不实现跨章继承或交叉淡化。Alda 本机编译在发布后不可补做；漏配工具时修复后重新 build/share。
 

@@ -11,7 +11,7 @@ export default feature({
     missing: { title: 'marker 名拼错后修复', dimension: 'input', expected: '编译 error 锚定 play 步骤；修复后 check 通过，其他结构检查仍可运行' },
   },
   rules: {
-    rendered: rule('本机 Alda → SoundFont → FLAC；站点只有音频字节和署名，不带谱子、音色文件或作者路径。来源 D93。', {origin:'user',status:'confirmed',cases:['marker','offline']}),
+    rendered: rule('本机 Alda → SoundFont → MP3 96kbps（FLAC 仅本机母版）；站点只有音频字节和署名，不带谱子、音色文件或作者路径。来源 D93。', {origin:'user',status:'confirmed',cases:['marker','offline']}),
     timing: rule('from 由本机检查解析为毫秒，IR 只有数字；当前 host 不在此功能中新增跨章继承或交叉淡化。来源 D93 与实现边界。', {origin:'code_observed',status:'confirmed',cases:['marker','missing']}),
     recovery: rule('未知 marker 在检查器可用时阻止编译；缺 Alda 只告警，继续其他检查。联网取得音色缓存不等于上传或发布。来源 D93。', {origin:'code_observed',status:'confirmed',cases:['offline','missing']}),
   },

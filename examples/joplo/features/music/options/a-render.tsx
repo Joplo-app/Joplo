@@ -8,7 +8,7 @@ export default option({
   state: { ui: { checked: false, built: false, offline: false, ready: false, wrong: false, fixed: false } },
   on: { '/distribution/terminal': { lines: [
     <Cmd id="music_check" when={$.ui.checked} cmd="npx joplo check" out={'MUSIC_SCORE film: 24.000 s; piano=16, percussion=32\nmarkers %opening=0.000 s, %chapter=12.000 s\n0 error · 示例输出，按实际曲式核对'} />,
-    <Cmd id="music_build" when={$.ui.built} cmd="npx joplo build" out={'MEDIA_ASSET: FLAC 字节数与时长\ncredits.txt: FluidR3Mono GM · MIT\n源谱、SoundFont 和本机路径不进入站点'} />,
+    <Cmd id="music_build" when={$.ui.built} cmd="npx joplo build" out={'MEDIA_ASSET: MP3 96kbps 字节数与时长\nMEDIA_BUDGET / SITE_BUDGET: 音频与整站预算\ncredits.txt + music-LICENSE.txt: FluidR3Mono GM · MIT\n源谱、SoundFont 和本机路径不进入站点'} />,
     <Cmd id="music_offline" when={$.ui.offline} cmd="npx joplo build" tone="error" out={'SoundFont cache missing or invalid; download failed (offline).\n联网预安装，或复制经校验的 soundfonts/<hash>/（含 LICENSE.md）。\n其他画面仍可构建；缺失的音乐不能在发布站补做。'} />,
     <Cmd id="music_ready" when={$.ui.ready} cmd={recover} out={'音色与许可 SHA-256 校验后保存在 JOPLO_HOME。\n再次构建复用缓存，不要求观众安装软件。'} />,
     <Cmd id="music_wrong" when={$.ui.wrong} cmd="npx joplo check" tone="error" out={'error MUSIC_MARKER_MISSING\nmusic.play 的 from 指向不存在的 %chpater\n这是检查结果示意；实际诊断包含作者文件与行号。'} />,

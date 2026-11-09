@@ -1,7 +1,7 @@
 # Joplo diagnostics: check
 
 ## Music checks
-Referenced music is inspected by its enabled plugin on the author machine: duration, part note counts and marker times. Compare these with chapter holds; short loops over long scenes and music ending early warn. Unknown start markers are errors when the local inspector is available. Missing local tools warn without blocking unrelated checks; this is not proof that sound was rendered. Build reports each audio asset's bytes and duration. Listen to playback/export; when only measurements were possible, report LUFS/peak and explicitly say not verified by human listening. Read the enabled music plugin's skill for composition and recovery.
+Referenced music is inspected by its enabled plugin on the author machine: duration, part note counts and marker times. Compare these with chapter holds; short loops over long scenes and music ending early warn. Unknown start markers are errors when the local inspector is available. Missing local tools warn without blocking unrelated checks; this is not proof that sound was rendered. Build reports each audio asset's bytes/duration, aggregate raw and embedded bytes, and complete site size. Check publication and decoded-memory budgets in the enabled plugin guide; a compressed file's size does not represent PCM memory. Sound-library attribution is cached with the artifact; missing required attribution blocks publication even when score inspection is unavailable. Listen to playback/export; when only measurements were possible, report LUFS/peak and explicitly say not verified by human listening. Read the enabled music plugin's skill for composition and recovery.
 
 
 STEP_KEY_INVALID: use a letter followed by up to 63 letters/digits/underscores/hyphens. STEP_KEY_DUPLICATE: each step key must be unique within its scenario; keep the same key only for the same action across versions. See diff for identity guidance.
@@ -103,4 +103,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.3.0 sha256:07f1f6ddcdd89e9c869f0c66d6d676ec12a9009ae73696f30d104124242a2ae0 -->
+<!-- joplo-skill 0.3.0 sha256:99c6e24eaeb6ba1a696c29dc18c918707c049f92c78906af743c2548a331408e -->
