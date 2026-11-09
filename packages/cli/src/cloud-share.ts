@@ -1,3 +1,5 @@
+import { PUBLIC_UNSUPPORTED } from './share-messages.ts';
+import { shareChoices } from './share-choice.ts';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -46,9 +48,22 @@ export async function manifest(dir: string): Promise<{ files: File[]; blobs: Map
  * 范围分享（D75）每个范围一条，记在 `scoped: { <范围键>: { shareId, url } }`，也不覆盖主链接和评审链接。
  * 旧格式（没有 review / scoped）照常读取；属于其他 server 的记录视为空，下次写入时整体替换。
  */
-export type ShareLink = { shareId: string; url: string };
+export type Visibility = 'public' | 'private';
+export type Portfolio = { workUrl: string | null; profileUrl: string | null; needsUsername: boolean; setupPath: string };
+export type ShareLink = { shareId: string; url: string; visibility?: Visibility };
+export function readPortfolio(value: unknown): Portfolio | undefined {
+  const p = object(value);
+  if (typeof p.needsUsername !== 'boolean' || typeof p.setupPath !== 'string' || !/^\/(?!\/)[^\s\\]*$/.test(p.setupPath)) return;
+  const url = (v: unknown) => {
+    if (v === null) return true;
+    if (typeof v !== 'string') return false;
+    try { const u = new URL(v); return ['https:', 'http:'].includes(u.protocol) && !u.username && !u.password; } catch { return false; }
+  };
+  if (!url(p.workUrl) || !url(p.profileUrl)) return;
+  return { workUrl: p.workUrl as string | null, profileUrl: p.profileUrl as string | null, needsUsername: p.needsUsername, setupPath: p.setupPath };
+}
 export type ShareRecord = { main: ShareLink | null; review: ShareLink | null; scoped?: Record<string, ShareLink> };
-const link = (v: unknown): ShareLink | null => { const o = object(v); return shareId(o.shareId) && typeof o.url === 'string' ? { shareId: o.shareId, url: o.url } : null; };
+const link = (v: unknown): ShareLink | null => { const o = object(v); return shareId(o.shareId) && typeof o.url === 'string' ? { shareId: o.shareId, url: o.url, ...(['public', 'private'].includes(String(o.visibility)) ? { visibility: o.visibility as Visibility } : {}) } : null; };
 const validKey = (key: string) => key.length > 0 && key.length <= 4096;
 const links = (v: unknown): Record<string, ShareLink> => Object.fromEntries(Object.entries(object(v)).map(([key, x]) => [key, link(x)] as const).filter((e): e is [string, ShareLink] => e[1] !== null && validKey(e[0])));
 export async function readShareRecord(project: string, server: string): Promise<ShareRecord> {
@@ -61,15 +76,15 @@ export async function readShareRecord(project: string, server: string): Promise<
 }
 const recordJson = (server: string, r: ShareRecord) => ({
   server,
-  ...(r.main ? { shareId: r.main.shareId, url: r.main.url } : {}),
-  ...(r.review ? { review: { shareId: r.review.shareId, url: r.review.url } } : {}),
-  ...(r.scoped && Object.keys(r.scoped).length ? { scoped: Object.fromEntries(Object.entries(r.scoped).map(([key, l]) => [key, { shareId: l.shareId, url: l.url }])) } : {}),
+  ...(r.main ? r.main : {}),
+  ...(r.review ? { review: r.review } : {}),
+  ...(r.scoped && Object.keys(r.scoped).length ? { scoped: Object.fromEntries(Object.entries(r.scoped).map(([key, l]) => [key, l])) } : {}),
 });
 
-export type ShareResult = { shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）；旧服务器不返回。 */ storage?: { usedBytes: number; quotaBytes: number; shareBytes: number } };
+export type ShareResult = { visibility?: Visibility; portfolio?: Portfolio; review?: ShareResult; shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）；旧服务器不返回。 */ storage?: { usedBytes: number; quotaBytes: number; shareBytes: number } };
 /** scenarios / features：按场景保密分享（D75，`--scenario` / `--feature`），可以一起用；都不写时分享整个项目。 */
 /** update（D84）：要更新的已有分享的链接；没有 .joplo/cloud.json 时（例如换了一台电脑）用它指定，并从它沿用朗读音频。 */
-export type ShareOptions = { new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[]; update?: string };
+export type ShareOptions = { public?: boolean; private?: boolean; new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[]; update?: string };
 
 /** `--update <链接>`：分享页链接，路径里有 /s/<10 位分享 id>。 */
 export function parseUpdateLink(v: string): ShareLink {
@@ -80,9 +95,50 @@ export function parseUpdateLink(v: string): ShareLink {
   return { shareId: m[1]!, url: `${u.origin}${u.pathname.slice(0, m.index)}/s/${m[1]}/` };
 }
 export async function share(client: CloudClient, dir: string, opts: ShareOptions, build: typeof buildSite, render: () => Promise<RenderPreview> = async () => { throw new Error('this @joplo-app/server cannot render screenshots'); }): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
+  const choices = await shareChoices(client, opts);
   if (opts.title !== undefined && (!opts.title.trim() || opts.title.trim().length > 200)) throw new JoploError('USAGE', '--title must contain 1-200 characters');
   if ((opts.repo !== undefined || opts.sha !== undefined) && opts.pr === undefined) throw new JoploError('USAGE', '--repo and --sha apply only with --pr <number>');
   if (opts.update !== undefined && (opts.new || opts.pr !== undefined)) throw new JoploError('USAGE', '--update cannot be combined with --new or --pr');
+  if (opts.update !== undefined) parseUpdateLink(opts.update);
+  let checked: Awaited<ReturnType<typeof checkWithProject>> | undefined;
+  let mainOptions = { ...opts, review: false };
+  if (choices.review) {
+    checked = await (client.deps.check ?? checkWithProject)(resolve(dir)) as Awaited<ReturnType<typeof checkWithProject>>;
+    if (checked.summary.error) throw new JoploError('INVALID_SCHEMA', `Project validation failed: ${checked.summary.error} error`, { diagnostics: checked.diagnostics });
+    if (!checked.project) throw new JoploError('UNSUPPORTED_ACTION', 'share --review needs the compiled project to build the review manifest');
+    const request = { scenarios: opts.scenarios ?? [], features: opts.features ?? [] };
+    const ids = hasScope(request) ? resolveScope(checked.project, request, 'review') : undefined;
+    assertReviewManifestSize(reviewManifest(ids ? scopeProject(checked.project, ids, 'review').project : checked.project, 'review'));
+    if (ids) {
+      // 先按 review 校验完整范围，再筛选普通版：未选方案只能出现在独立私密评审里。
+      const project = checked.project;
+      const picked = ids.filter(id => {
+        const option = project.options[project.scenarios[id]!.optionId];
+        return option && project.features[option.featureId]?.pick === option.id;
+      });
+      if (!picked.length) {
+        client.warn('The scope has no picked scenarios. Publishing only the private review version; the ordinary share and --update target are unchanged.');
+        return publishShare(client, dir, { ...opts, review: true, update: undefined }, 'private', build, render, checked);
+      }
+      mainOptions = { ...mainOptions, scenarios: picked, features: [] };
+    }
+  }
+  const result = await publishShare(client, dir, mainOptions, choices.visibility, build, render, checked);
+  if (choices.review) {
+    // 两条独立链接：主分享先成功并持久化；评审失败时保留主链接并给出恢复入口。
+    try {
+      const reviewed = await publishShare(client, dir, { ...opts, review: true, update: undefined }, 'private', build, render, checked);
+      result.result.review = reviewed.result;
+      if (reviewed.result.storage) result.result.storage = reviewed.result.storage;
+    } catch (e) {
+      client.warn(`The main share is already published: ${result.result.url}. The review publication failed; rerun with the same visibility and --review to retry.`);
+      throw e;
+    }
+  }
+  return result;
+}
+
+async function publishShare(client: CloudClient, dir: string, opts: ShareOptions, visibility: Visibility, build: typeof buildSite, render: () => Promise<RenderPreview>, prechecked?: Awaited<ReturnType<typeof checkWithProject>>): Promise<{ result: ShareResult; plan: 'free' | 'pro' }> {
   const updateLink = opts.update !== undefined ? parseUpdateLink(opts.update) : undefined;
   const project = resolve(dir);
   // PR 信息在任何请求、登录和构建之前补全并校验（契约 8.5）
@@ -98,7 +154,7 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
   }
   const accessToken = auth.token;
   client.warn('Checking the project...');
-  const checked = await (client.deps.check ?? checkWithProject)(project);
+  const checked = prechecked ?? await (client.deps.check ?? checkWithProject)(project);
   if (checked.summary.error) throw new JoploError('INVALID_SCHEMA', `Project validation failed: ${checked.summary.error} error`, { diagnostics: checked.diagnostics });
   // 评审清单（契约 8.1）：从 dev IR 生成，只放进请求体，不作为文件上传。
   // 超过 512 KiB 时：--review 在构建和请求之前失败；普通发布只警告并省略清单（字段可选），发布照常进行
@@ -161,10 +217,14 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     const firstName = scenarioIds && checked.project ? checked.project.scenarios[scenarioIds[0]!]?.name : undefined;
     const defaultTitle = scenarioIds ? `${checked.name} · ${scenarioIds.length === 1 && firstName ? firstName : `${scenarioIds.length} scenarios`}` : checked.name;
     const title = (opts.title ?? defaultTitle).trim().slice(0, 200);
-    const create = (withReview: boolean) => client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}), ...(withReview && review ? { review } : {}), ...(pr ? { pr } : {}) }), { create: true });
+    // 记录只用于 wire 兼容，不替用户选择：仅已知 public → private 的更新需要显式取消公开。
+    const known = [record.main, record.review, ...Object.values(record.scoped ?? {})].find(l => l?.shareId === replaceShareId);
+    const sendVisibility = visibility === 'public' || !!replaceShareId && known?.visibility === 'public';
+    const create = (withReview: boolean) => client.retry(() => client.request('/api/v1/shares', accessToken, { title, files, ...(replaceShareId ? { replaceShareId } : {}), ...(withReview && review ? { review } : {}), ...(pr ? { pr } : {}), ...(sendVisibility ? { visibility } : {}) }), { create: true });
     let prepared: Record<string, unknown>;
     try { prepared = await create(true); }
     catch (e) {
+      if (e instanceof CloudError && e.status === 400 && sendVisibility && object(e.details).unknownVisibility) throw new CloudError('BAD_REQUEST', PUBLIC_UNSUPPORTED, undefined, undefined, 400);
       // 发布顺序容错（契约 8.1）：旧版 SaaS 拒绝 review 字段时返回 400，此时没有创建任何记录；普通发布去掉清单重试一次。
       // 只认真正的 400（413/422 等不重试），--review 没有清单没有意义，照常报错。
       if (!(e instanceof CloudError && e.code === 'BAD_REQUEST' && e.status === 400 && review && reviewMode === 'publish')) throw e;
@@ -176,7 +236,7 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     const url = published.url;
     // PR 预览是独立链接，不写记录；其余只更新本次的那一项（主链接或评审版），保留另一项
     if (!pr) {
-      const next: ShareRecord = key ? { ...record, scoped: { ...record.scoped, [key]: { shareId: published.shareId, url } } } : { ...record, [slot]: { shareId: published.shareId, url } };
+      const next: ShareRecord = key ? { ...record, scoped: { ...record.scoped, [key]: { shareId: published.shareId, url, ...(published.visibility ? { visibility: published.visibility } : {}) } } } : { ...record, [slot]: { shareId: published.shareId, url, ...(published.visibility ? { visibility: published.visibility } : {}) } };
       try { await atomicJson(join(project, '.joplo/cloud.json'), recordJson(client.server, next)); }
       catch {
         client.warn('Could not save the share record. The next publication will not update this link');
@@ -185,7 +245,7 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
       }
     }
     const prComment = pr ? readPrComment(final.pr ?? prepared.pr) : undefined;
-    return { result: { ...published, embed: embedSnippets(published.url, title), ...(reviewMode === 'review' ? { mode: 'review' as const } : {}), ...(pr ? { pr: prComment ?? null } : {}), ...(built.scope ? { scope: built.scope } : {}), ...(readStorage(final.storage, ['shareBytes']) ? { storage: readStorage(final.storage, ['shareBytes'])! } : {}) }, plan: account.plan };
+    return { result: { ...published, ...(readPortfolio(final.portfolio) ? { portfolio: readPortfolio(final.portfolio) } : {}), embed: embedSnippets(published.url, title), ...(reviewMode === 'review' ? { mode: 'review' as const } : {}), ...(pr ? { pr: prComment ?? null } : {}), ...(built.scope ? { scope: built.scope } : {}), ...(readStorage(final.storage, ['shareBytes']) ? { storage: readStorage(final.storage, ['shareBytes'])! } : {}) }, plan: account.plan };
   } finally { try { await rm(staging, { recursive: true, force: true }); } finally { temporary.release(); } }
 }
 
@@ -275,7 +335,7 @@ export async function uploadPreparedFiles(client: CloudClient, accessToken: stri
   const final = await client.retry(() => client.request(`/api/v1/shares/${prepared.shareId}/finalize`, accessToken, { uploadId: prepared.uploadId }));
   if (!shareId(final.shareId) || final.shareId !== prepared.shareId || !Number.isSafeInteger(final.version) || Number(final.version) < 1 || !(final.expiresAt === null || typeof final.expiresAt === 'string' && Number.isFinite(Date.parse(final.expiresAt)))) throw new CloudError('INVALID_RESPONSE');
   const url = httpUrl(final.url);
-  const published = { shareId: final.shareId, url, expiresAt: final.expiresAt as string | null, version: final.version as number };
+  const published = { shareId: final.shareId, url, expiresAt: final.expiresAt as string | null, version: final.version as number, ...(['public', 'private'].includes(String(final.visibility)) ? { visibility: final.visibility as Visibility } : {}) };
   if (JSON.stringify(published).includes(accessToken)) throw new CloudError('INVALID_RESPONSE');
   return { published, final };
 }

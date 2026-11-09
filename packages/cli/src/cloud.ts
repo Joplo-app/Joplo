@@ -20,7 +20,7 @@ export type Auth = { token: string; source: 'session' | 'api_key' };
 export type ApiKeyInfo = { name: string | null; prefix: string | null; scopes: string[] | null; expiresAt: string | null };
 /** 账号容量（C27）：已用 / 上限（字节）；旧服务器不返回时为 undefined。 */
 export type StorageUsage = { usedBytes: number; quotaBytes: number };
-export type Account = { user: { id: string; email: string; name: string }; plan: 'free' | 'pro'; limits: { maxUploadBytes: number; maxTotalBytes: number; maxFiles: number; publishesPerHour: number | null }; storage?: StorageUsage; apiKey?: ApiKeyInfo };
+export type Account = { user: { id: string; email: string; name: string }; plan: 'free' | 'pro'; limits: { maxUploadBytes: number; maxTotalBytes: number; maxFiles: number; publishesPerHour: number | null }; storage?: StorageUsage; username?: string | null; portfolioUrl?: string | null; apiKey?: ApiKeyInfo };
 /** 服务器给的容量合法时才采纳（非负安全整数）；extra 是额外要求的字段（例如 finalize 的 shareBytes）。 */
 export function readStorage<K extends string = never>(value: unknown, extra: readonly K[] = []): (StorageUsage & Record<K, number>) | undefined {
   if (!value || typeof value !== 'object') return undefined;
@@ -44,6 +44,7 @@ export function readApiKeyInfo(value: unknown): ApiKeyInfo {
 }
 /** 可替换时钟与系统边界；只有交互式跨服务器替换凭证时才读取确认输入。 */
 export type CloudDependencies = {
+  choose?: (question: string, choices: readonly string[], initial: number) => Promise<number>;
   env?: NodeJS.ProcessEnv; format?: string; interactive?: boolean; confirm?: (question: string) => Promise<boolean>; openBrowser?: (url: string) => Promise<boolean>;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<unknown>; now?: () => number;
   /** 测试替身：重新发布时读上一次分享的朗读音频（D84）；缺省 previousShareVoice。 */
@@ -324,7 +325,9 @@ export class CloudClient {
         const details = readSizeDetails(data.data ?? data.details, token);
         if (details) throw sizeError(details);
       }
-      throw new CloudError(code, undefined, undefined, undefined, response.status);
+      // 只保留协议识别结果，不回显可能含密钥的远端错误正文。
+      const unknownVisibility = response.status === 400 && /visibility|unrecogni[sz]ed|unknown (?:key|field)|additional propert/i.test(JSON.stringify(data));
+      throw new CloudError(code, undefined, unknownVisibility ? { unknownVisibility: true } : undefined, undefined, response.status);
     }
     return data;
   }
@@ -332,6 +335,8 @@ export class CloudClient {
     const d = await this.request('/api/v1/me', token), u = object(d.user), l = object(d.limits);
     if (!nonempty(u.id) || !nonempty(u.email) || typeof u.name !== 'string' || !['free', 'pro'].includes(String(d.plan)) || !Number.isSafeInteger(l.maxUploadBytes) || Number(l.maxUploadBytes) < 0 || !Number.isSafeInteger(l.maxTotalBytes) || Number(l.maxTotalBytes) < 0 || !Number.isSafeInteger(l.maxFiles) || Number(l.maxFiles) < 1 || !(l.publishesPerHour === null || Number.isSafeInteger(l.publishesPerHour) && Number(l.publishesPerHour) >= 0)) throw new CloudError('INVALID_RESPONSE');
     const account: Account = { user: { id: u.id, email: u.email, name: u.name }, plan: d.plan as Account['plan'], limits: { maxUploadBytes: l.maxUploadBytes as number, maxTotalBytes: l.maxTotalBytes as number, maxFiles: l.maxFiles as number, publishesPerHour: l.publishesPerHour as number | null }, ...(readStorage(d.storage) ? { storage: readStorage(d.storage) } : {}) };
+    if (d.username === null || typeof d.username === 'string') account.username = d.username;
+    if (d.portfolioUrl === null || typeof d.portfolioUrl === 'string') account.portfolioUrl = d.portfolioUrl;
     // 用 API Key 调用时附上 Key 的展示信息（服务端没给的字段为 null；前缀缺省时用本地 Key 的前 8 位）
     if (token.startsWith('jpk_')) {
       const info = readApiKeyInfo(d.credential);

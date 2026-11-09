@@ -291,18 +291,18 @@ const Author = () => (
         <Terminal.Command when={$.ui.tCheck1}>npx joplo check</Terminal.Command>
         <Terminal.Output when={$.ui.tCheck1} tone="ok">{'0 errors · 内容语言：zh-CN（原文）、en 32/32、ja 32/32'}</Terminal.Output>
 
-        <Terminal.Command when={$.ui.tShare}>npx joplo share</Terminal.Command>
+        <Terminal.Command when={$.ui.tShare}>npx joplo share --private --no-review</Terminal.Command>
         <Terminal.Output when={$.ui.tShare}>{'构建：1 个功能 · 3 种语言 · 9 段声音（各语言 3 段）'}</Terminal.Output>
         <Terminal.Output id="t_links" when={$.ui.tShare} tone="ok">{'https://joplo.app/s/k3x9q（7 天有效）\n观众自动看到自己的语言；想指定语言：…/s/k3x9q?lang=ja'}</Terminal.Output>
 
         <Terminal.Command when={$.ui.tStaleCheck}>npx joplo check</Terminal.Command>
         <Terminal.Output id="t_stale" when={$.ui.tStaleCheck} tone="warn">{'locales/ja.json  warning  I18N_STALE  缺「邀请同事」，最接近的旧条目：\n"邀请成员": "メンバーを招待"（原文改过）\nlocales/en.json  warning  I18N_STALE  同上，共 2 条'}</Terminal.Output>
-        <Terminal.Command when={$.ui.tStaleShare}>npx joplo share</Terminal.Command>
+        <Terminal.Command when={$.ui.tStaleShare}>npx joplo share --private --no-review</Terminal.Command>
         <Terminal.Output id="t_staleshare" when={$.ui.tStaleShare} tone="warn">{'提醒：en、ja 各 1 条过期，观众会看到这一句的中文原文；照常发布'}</Terminal.Output>
         <Terminal.Command when={$.ui.tFixed}>npx joplo check</Terminal.Command>
         <Terminal.Output when={$.ui.tFixed} tone="ok">{'0 errors · en 32/32、ja 32/32'}</Terminal.Output>
 
-        <Terminal.Command when={$.ui.tCache}>npx joplo share</Terminal.Command>
+        <Terminal.Command when={$.ui.tCache}>npx joplo share --private --no-review</Terminal.Command>
         <Terminal.Output when={$.ui.tCache}>{'本机：没有语音供应商，也没有生成过的音频'}</Terminal.Output>
         <Terminal.Output id="t_cache" when={$.ui.tCache} tone="ok">{'声音：9 段都在这个分享里（缓存键相同），沿用，不生成也不上传'}</Terminal.Output>
         <Terminal.Output id="t_cachedone" when={$.ui.tCacheDone} tone="ok">{'上传 2 个改过的文件\nhttps://joplo.app/s/k3x9q 已更新，链接不变'}</Terminal.Output>
@@ -319,7 +319,7 @@ const Arch = () => (
     <Diagram id="arch" h="100%" direction="right">
       <Diagram.Group id="g_local" label="作者电脑" icon="lock" tone="orange">
         <Diagram.Node id="local" label="本机音频" kind="storage" description="作者自己管理" />
-        <Diagram.Node id="cli" label="joplo share" kind="service" description="打包内容和声音" />
+        <Diagram.Node id="cli" label="joplo share --private --no-review" kind="service" description="打包内容和声音" />
       </Diagram.Group>
       <Diagram.Group id="g_share" label="分享里的作品（云上只有这些）" icon="cloud" tone="green">
         <Diagram.Node id="loc" label="原型 + 译文" kind="storage" description="原文 → 译文" />

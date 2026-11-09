@@ -63,11 +63,14 @@ describe('发布到云端接口', () => {
     const acct = await req(port, { path: '/__joplo/cloud/account', headers: t });
     expect(acct.body).toEqual({ available: true, account: { signedIn: true, server: 'https://cloud.joplo.app', email: 'a@b.c', plan: 'free' } });
     const url = `/__joplo/p/${id}/cloud/publish`;
-    expect((await req(port, { method: 'POST', path: url, headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(403);
-    expect((await req(port, { method: 'POST', path: url, headers: { ...j, origin: 'http://evil.example' }, body: '{}' })).status).toBe(403);
-    expect((await req(port, { method: 'POST', path: url, headers: t, body: '{}' })).status).toBe(415);
+    expect((await req(port, { method: 'POST', path: url, headers: { 'content-type': 'application/json' }, body: JSON.stringify({visibility:'private',review:false}) })).status).toBe(403);
+    expect((await req(port, { method: 'POST', path: url, headers: { ...j, origin: 'http://evil.example' }, body: JSON.stringify({visibility:'private',review:false}) })).status).toBe(403);
+    expect((await req(port, { method: 'POST', path: url, headers: t, body: JSON.stringify({visibility:'private',review:false}) })).status).toBe(415);
     expect((await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({ scenarios: 'a.b.c' }) })).status).toBe(400);
     expect((await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({ features: [1] }) })).status).toBe(400);
+    for (const body of [{}, {visibility:'public'}, {visibility:'private',review:'false'}, {visibility:'public',review:false,scenarios:['f.a.main']}]) {
+      expect((await req(port,{method:'POST',path:url,headers:j,body:JSON.stringify(body)})).status).toBe(400);
+    }
     expect(calls).toEqual([]);
     expect((await req(port, { path: url })).status).toBe(403);
   }, 60_000);
@@ -87,17 +90,17 @@ describe('发布到云端接口', () => {
       },
     });
     const url = `/__joplo/p/${id}/cloud/publish`;
-    const first = await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({ scenarios: ['f.a.main'] }) });
+    const first = await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({ scenarios: ['f.a.main'], visibility:'private',review:false }) });
     expect(first.status).toBe(202);
     expect(first.body.job).toMatchObject({ state: 'running', request: { scenarios: ['f.a.main'] } });
-    const again = await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({}) });
+    const again = await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({visibility:'private',review:false}) });
     expect(again.body.job.id).toBe(first.body.job.id);
     release();
     await until(async () => (await req(port, { path: url, headers: t })).body.job?.state === 'done');
     const done = (await req(port, { path: url, headers: t })).body.job;
     expect(done.lines).toEqual(['Checking the project...', 'Upload complete. Finalizing publication...']);
     expect(done.result).toMatchObject({ url: 'https://x/s/Abc1234567', version: 2, scope: { key: 'f.a.main' } });
-    expect(calls).toEqual([{ dir, r: { scenarios: ['f.a.main'] } }]);
+    expect(calls).toEqual([{ dir, r: { scenarios: ['f.a.main'], visibility:'private',review:false } }]);
   }, 60_000);
 
   it('失败带 code 与 loginCommand；可以再发起新的任务', async () => {
@@ -110,17 +113,17 @@ describe('发布到云端接口', () => {
       },
     });
     const url = `/__joplo/p/${id}/cloud/publish`;
-    await req(port, { method: 'POST', path: url, headers: j, body: '{}' });
+    await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({visibility:'private',review:false}) });
     await until(async () => (await req(port, { path: url, headers: t })).body.job?.state === 'failed');
     expect((await req(port, { path: url, headers: t })).body.job.error).toEqual({ code: 'AUTH_REQUIRED', message: 'Sharing requires a free Joplo account. Run npx joplo login', loginCommand: 'npx joplo login --server https://c.example' });
-    expect((await req(port, { method: 'POST', path: url, headers: j, body: '{}' })).status).toBe(202);
+    expect((await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({visibility:'private',review:false}) })).status).toBe(202);
     await until(async () => n === 2);
   }, 60_000);
 
   it('没有 bridge（旧版 CLI 启动的看板）：account 不可用，POST 409', async () => {
     const { port, id, j, t } = await start();
     expect((await req(port, { path: '/__joplo/cloud/account', headers: t })).body).toEqual({ available: false });
-    const r = await req(port, { method: 'POST', path: `/__joplo/p/${id}/cloud/publish`, headers: j, body: '{}' });
+    const r = await req(port, { method: 'POST', path: `/__joplo/p/${id}/cloud/publish`, headers: j, body: JSON.stringify({visibility:'private',review:false}) });
     expect(r.status).toBe(409);
     expect(r.body.error.message).toMatch(/joplo dev again/);
     expect((await req(port, { path: `/__joplo/p/${id}/cloud/publish`, headers: t })).body).toEqual({ available: false, job: null });

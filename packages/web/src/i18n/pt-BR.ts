@@ -218,6 +218,7 @@ export function createPtBR(locale: Locale = 'pt-BR') {
       themeCssComment: (p0: Value, p1: Value, p2: Value) => `/* Tema ${value(p0, locale)}${value(p1, locale)} */\n${value(p2, locale)}`,
     },
     site: {
+      authorMoreWorks: (name: string) => `${name} · Mais obras ↗`,
       prototypeTitle: (name: string) => `${value(name, locale)} · Protótipo conceitual`,
       scenarioCount: (n: number) => plural(Number(n), { one: "# cenário", other: "# cenários" }, locale),
       itemCount: (n: number) => `${number(n, locale)}`,

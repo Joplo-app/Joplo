@@ -239,3 +239,12 @@ describe('禁止网络与存储（CSP sandbox + connect-src none）', () => {
     expect(files.filter((f) => f.startsWith('board/') || f === 'runtime/dev-client.ts')).toEqual([]);
   });
 });
+
+it('作者标记只给普通分享页，嵌入即使传入作者也不显示', () => {
+  vi.stubGlobal('location', { hash: '#/', search: '', href: 'https://joplo.app/s/Abc1234567/' });
+  const author={name:'Example author',url:'https://show.joplo.app/@example'};
+  const page=(search: string)=>renderToStaticMarkup(<I18nProvider explicit="en"><SiteApp data={{project:published(),home:null}} search={search} author={author} /></I18nProvider>);
+  expect(page('')).toContain('Example author · More works');
+  expect(page('?embed=1')).not.toContain('author-link');
+  expect(page('?embed=1&review=1')).not.toContain('author-link');
+});

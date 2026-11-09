@@ -4,6 +4,18 @@ import { value, number, plural, type Value } from '../format';
 export function createBoardEn(locale: Locale = 'en') {
   return {
     board: {
+      cloudLinksFailed: "Couldn't read the existing share links. Publishing is paused. Try again.",
+      cloudPublic: "Public",
+      cloudPrivate: "Private",
+      cloudPublicNote: "Public: added to show.joplo.app/@username and indexed by search engines.",
+      cloudPrivateNote: "Private: only people with the link can view.",
+      cloudPrivateOnly: "Scoped shares and PR previews are private to protect other work.",
+      cloudAlsoReview: "Also publish a review version",
+      cloudReviewNote: "The review link contains all options and is always private.",
+      cloudPortfolioWork: "View portfolio work",
+      cloudSetupUsername: "Set up username",
+      cloudVisibility: "Visibility",
+
       localReviewMoveHint: "Click for feedback; drag to move. Arrow keys adjust the position.",
       localReviewApprovedDraft: "This review was confirmed elsewhere. Your unsent draft is kept here for copying.",
       localReviewTitle: "Feedback & review",

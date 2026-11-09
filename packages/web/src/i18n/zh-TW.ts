@@ -218,6 +218,7 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       themeCssComment: (p0: Value, p1: Value, p2: Value) => `/* 佈景主題 ${value(p0, locale)}${value(p1, locale)} */\n${value(p2, locale)}`,
     },
     site: {
+      authorMoreWorks: (name: string) => `${name} · 更多作品 ↗`,
       prototypeTitle: (name: string) => `${value(name, locale)} · 概念原型`,
       scenarioCount: (n: number) => plural(Number(n), { other: "# 個情境" }, locale),
       itemCount: (n: number) => `${number(n, locale)}`,

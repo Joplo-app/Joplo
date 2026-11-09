@@ -6,6 +6,18 @@ import type { BoardDictionary } from './en';
 export function createBoardRu(locale: Locale = 'ru') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudLinksFailed: "Не удалось прочитать существующие ссылки. Публикация приостановлена. Повторите попытку.",
+      cloudPublic: "Публично",
+      cloudPrivate: "Приватно",
+      cloudPublicNote: "Публично: работа попадёт в show.joplo.app/@имя и поисковые системы.",
+      cloudPrivateNote: "Приватно: просмотр только по ссылке.",
+      cloudPrivateOnly: "Ограниченные публикации и превью PR всегда приватны для защиты других данных.",
+      cloudAlsoReview: "Также опубликовать версию для рецензии",
+      cloudReviewNote: "Ссылка для рецензии содержит все варианты и всегда приватна.",
+      cloudPortfolioWork: "Посмотреть работу",
+      cloudSetupUsername: "Задать имя пользователя",
+      cloudVisibility: "Видимость",
+
       localReviewMoveHint: "Нажмите для отзыва, перетащите для перемещения. Стрелки уточняют положение.",
       localReviewApprovedDraft: "Эта проверка подтверждена в другом окне. Неотправленный черновик сохранён, его можно скопировать.",
       localReviewTitle: "Отзывы и проверка",

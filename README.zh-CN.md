@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://joplo.app/s/dn1MWCcnDW/"><img src="https://joplo.app/s/dn1MWCcnDW/badge.svg" alt="Joplo 演示：Joplo 的真实设计过程"></a><br>
-  <sub>☝️ 这就是 Joplo 徽章：点开就能播放 Joplo 自己的设计过程，由 CI 用 <code>joplo share</code> 发布。</sub>
+  <sub>☝️ 这就是 Joplo 徽章：点开就能播放 Joplo 自己的设计过程，由可信 CI 发布。</sub>
 </p>
 
 <p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
@@ -45,7 +45,7 @@ npx joplo dev --open
 - **主题 Themes**：九个内置主题，也可添加 `themes/<name>.css`；看板设置可对当前项目或所有项目应用主题。
 - **导出**：导出当前步骤图片，或在本地录制整个场景。发布站支持图片导出、层级、导演与全屏播放。
 - **朗读**：自动播放时把每一步读出来。声音来源有浏览器朗读、Joplo Cloud 朗读（`npx joplo login` 登录即用，不用配 Key，按字数计费，登录后默认用它），以及自带 Key 的官方 OpenAI、ElevenLabs。在看板里生成音频，或用 `npx joplo voice`（`--dry-run` 先估算字数）；`npx joplo whoami` 显示还剩多少字，看板首页显示空间与朗读用量。生成的音频随 build 和分享带上，见[朗读](docs/web.md#朗读d74)。
-- **分享与嵌入**：`npx joplo share` 上传发布站并打印 README 徽章；同一个链接还提供预览图和给文档、博客用的精简嵌入播放器，见[分享与嵌入](#分享与嵌入)。
+- **分享与嵌入**：`npx joplo share --private --no-review` 上传发布站并打印 README 徽章；同一个链接还提供预览图和给文档、博客用的精简嵌入播放器，见[分享与嵌入](#分享与嵌入)。
 
 ## 与 Agent 配合
 
@@ -137,11 +137,11 @@ build 只发布选定方案。发布站与看板共用演示页布局，保留�
 
 ## 分享与嵌入
 
-不想自己托管时，`joplo share` 会检查、构建并把发布站上传到 Joplo Cloud，然后打印把演示放到别人面前所需的一切：
+不想自己托管时，`joplo share --private --no-review` 会检查、构建并把发布站上传到 Joplo Cloud，然后打印把演示放到别人面前所需的一切：
 
 ```sh
 npx joplo login          # 只需一次
-npx joplo share
+npx joplo share --private --no-review
 ```
 
 ```text
@@ -172,7 +172,7 @@ More embed options: https://cloud.joplo.app/shares/<share-id>
 - 嵌入播放器不发网络请求、不依赖存储。GitHub 会过滤 Markdown 里的 iframe，README 里请用徽章。
 - `--scenario <id>`、`--feature <id>` 只分享项目的一部分；范围外的内容在构建时就被裁掉，不是隐藏。
 - 链接永久有效，免费账号也一样；限制的是账号空间（免费 100 MB、Pro 5 GB，按所有在线分享的原始大小计算），`share` 会打印用了多少。再次 share 更新同一个链接，已经贴出去的徽章和嵌入会跟着更新。
-- CI 中设置 `JOPLO_API_KEY`，用 `npx joplo share --new --pr <number> --format json` 发布 PR 预览。Agent 应原样使用 `data.embed.markdown` / `data.embed.iframe`，不要自己拼地址。
+- CI 中设置 `JOPLO_API_KEY`，用 `npx joplo share --private --no-review --new --pr <number> --format json` 发布 PR 预览。Agent 应原样使用 `data.embed.markdown` / `data.embed.iframe`，不要自己拼地址。
 
 预览图需要可选的导出组件（`npx joplo setup export`）；没有时 share 照常成功，分享页使用通用卡片。详见 [CLI 文档的 share](docs/cli.md#share) 和[嵌入模式](docs/web.md#嵌入模式)。
 
@@ -245,3 +245,9 @@ Joplo 接受 issue，不接受 pull request。bug 和功能需求请在 [issue](
 ## 许可证
 
 [PolyForm Shield 1.0.0](LICENSE)。任何人都可以免费使用 Joplo，包括在公司里和商业项目中使用；不得用它提供与 Joplo 或 Joplo Cloud 竞争的产品，详见 [COMMERCIAL.md](COMMERCIAL.md)。0.2.15 及更早的版本以 Apache-2.0 发布。随包字体使用 [SIL OFL 1.1](packages/web/src/fonts/OFL.txt)。
+
+### 分享可见性与作品集
+
+每次发布都必须选择 `--public` / `--private` 与 `--review` / `--no-review`；Agent 发布前先问用户两件事，不能代选。CI 在 workflow 固定参数；非交互缺项退出 2，交互终端逐项按键确认。公开进入 `show.joplo.app/@用户名` 作品集并被搜索引擎收录，项目名、简介与目标应适合搜索结果，不能包含未公开信息。私密只有拿到链接的人能看。
+
+`--review` 同时发布主分享和包含所有方案、可评论的独立私密评审链接：JSON 分别为 `data.url` 和 `data.review.url`。范围内没有 picked 场景时，仅发布私密评审版（`data.mode: "review"`，链接为 `data.url`），普通分享不更新。PR 预览与范围分享只能私密；对比发布始终私密、不支持评审版。看板发布浮层提供同样的选择，新建整项目默认公开，更新沿用当前可见性（旧记录按私密）。公开结果给出作品详情或设置用户名入口；官方分享的播放器顶栏和结束画面有“作者 · 更多作品”，本地构建、导出和嵌入不显示。

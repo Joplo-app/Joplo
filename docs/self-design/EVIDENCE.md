@@ -171,3 +171,9 @@
 - 持续迭代时，先在此项目新增/调整真实 Feature 的方案与场景，再根据用户反馈更新同一份源文件；决定理由与 commit 保持可追溯。不要每次新建另一套 `joplo-xxx` 项目。
 - 本次未访问生产服务、未发布任何分享。证据盘点后补入 `workbench_origin`：保留三种原生方案，B 的公开回放中可操作地比较 A/B/C，并说明 D32 与 D39 的先后关系。
 - 局部验证：统一项目 `joplo check` 为 0 error（其他历史/待定方案有 warning/info）；`tsc -p examples/joplo/tsconfig.json --noEmit` 通过；实际 `joplo render` 检查 B.history 第 7 步的 C 标注布局与第 9 步的采用/后续替代画面。最终跨 Feature 集成、全仓 gates 与公开产物验收由协调者执行。
+
+### share_visibility：发布前选择公开还是私密
+
+- 依据：D85 的公开与私密、CLI 强制选择、作品集与自动 SEO 决定（决策分支 `DJJ/decision-capacity-show-tts`），以及本轮 D85 第二阶段客户端任务契约。
+- 新增原生 Feature `share_visibility` / Option `a-explicit`：整项目公开、私密加独立评审版、范围只能私密、更新已有私密链接。它是按当前已决定行为制作的演示，不是历史评审记录，也不代表云端已上线。已有 Feature IDs 不变。
+- 该任务不做密码分享；Pen 工具因未打开设计文档不可用，画面沿用既有发布浮层与原生组件。实际浏览器/移动端手动检查清单在 PR 与 docs/web.md，未运行浏览器 E2E。

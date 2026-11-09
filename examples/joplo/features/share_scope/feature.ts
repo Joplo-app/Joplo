@@ -11,8 +11,8 @@ export default feature({
   },
   cases: {
     deep_link: { title: '现在：发场景深链接', dimension: 'permission', priority: 'high', expected: '（现状）链接停在这个场景，但对方能切到其他功能，源码里也能搜到账单的新定价' },
-    scenario: { title: '只分享一个场景', dimension: 'main', priority: 'high', expected: 'joplo share --scenario 后，分享里只有这个场景；打开直接进演示，没有功能切换，源码里搜不到其他功能' },
-    feature: { title: '只分享一个功能', dimension: 'main', expected: 'joplo share --feature 后，分享里是这个功能选定方案的全部场景，其他功能都不在' },
+    scenario: { title: '只分享一个场景', dimension: 'main', priority: 'high', expected: 'joplo share --private --no-review --scenario 后，分享里只有这个场景；打开直接进演示，没有功能切换，源码里搜不到其他功能' },
+    feature: { title: '只分享一个功能', dimension: 'main', expected: 'joplo share --private --no-review --feature 后，分享里是这个功能选定方案的全部场景，其他功能都不在' },
     borrowed: { title: '场景用到了别的功能堆进来的元素', dimension: 'consistency', priority: 'high', expected: '只带上被引用的那个元素，不带那个功能的名字、场景和其他元素；终端写明带了什么，作者自己判断' },
     reshare: { title: '改了之后重新分享', dimension: 'lifecycle', expected: '同一个范围更新原来的链接，主链接和评审链接不变' },
     bad_id: { title: '场景 id 写错', dimension: 'input', expected: '报错并列出可选的场景 id，什么都不上传' },

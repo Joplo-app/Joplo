@@ -16,8 +16,8 @@ import { Btn } from '../player/controls';
 import { Popover } from '../player/popover';
 import { copyText } from '../player/util';
 import type { Text } from '../i18n/messages';
-import { fetchCloudAccount, fetchCloudJob, startCloudPublish, subscribeCloud, type CloudAccount, type CloudJob, type CloudStorage, type CloudStorageFull } from '../runtime/dev-client';
-import { CLOUD_STAGES, cloudNotes, cloudRequest, cloudStage, cloudUnpicked, defaultChoice, formatStorage, needsLogin, storageFull, storageView, type CloudContext, type CloudPicks, type CloudScopeChoice } from './cloud-model';
+import { fetchCloudLinks, fetchCloudAccount, fetchCloudJob, startCloudPublish, subscribeCloud, type CloudLinks, type CloudVisibility, type CloudPortfolio, type CloudAccount, type CloudJob, type CloudStorage, type CloudStorageFull } from '../runtime/dev-client';
+import { CLOUD_STAGES, cloudNotes, cloudRequest, cloudStage, cloudUnpicked, defaultChoice, defaultVisibility, formatStorage, needsLogin, storageFull, storageView, type CloudContext, type CloudPicks, type CloudScopeChoice } from './cloud-model';
 
 type AccountState = { loading: boolean; available: boolean; account: CloudAccount | null; error: Text | null };
 
@@ -26,6 +26,11 @@ export function useCloudPublish(projectId: string) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [acct, setAcct] = useState<AccountState>({ loading: false, available: true, account: null, error: null });
   const [job, setJob] = useState<CloudJob | null>(null);
+  const [links, setLinks] = useState<CloudLinks>({ main: null });
+  const [linksReady, setLinksReady] = useState(false);
+  const [linksError, setLinksError] = useState<Text | null>(null);
+  const [linksAttempt, setLinksAttempt] = useState(0);
+  const retryLinks = useCallback(() => setLinksAttempt(n => n + 1), []);
   const [startError, setStartError] = useState<Text | null>(null);
 
   useEffect(() => {
@@ -46,20 +51,29 @@ export function useCloudPublish(projectId: string) {
   }, []);
 
   useEffect(() => {
-    if (open) void refresh();
-  }, [open, refresh]);
+    let alive = true;
+    setLinksReady(false);
+    setLinksError(null);
+    if (open) {
+      void refresh();
+      void fetchCloudLinks(projectId)
+        .then((next) => { if (alive) { setLinks(next); setLinksReady(true); } })
+        .catch(() => { if (alive) setLinksError(m.board.cloudLinksFailed); });
+    }
+    return () => { alive = false; };
+  }, [open, refresh, projectId, job?.state, linksAttempt]);
 
   const publish = useCallback(
-    async (ctx: CloudContext, choice: CloudScopeChoice) => {
+    async (ctx: CloudContext, choice: CloudScopeChoice, visibility: CloudVisibility, review: boolean) => {
       setStartError(null);
-      const r = await startCloudPublish(projectId, cloudRequest(choice, ctx));
+      const r = await startCloudPublish(projectId, { ...cloudRequest(choice, ctx), visibility, review });
       if (r.ok) setJob(r.job);
       else setStartError(r.message);
     },
     [projectId],
   );
 
-  return { open, setOpen, anchor, setAnchor, acct, refresh, job, publish, startError, running: job?.state === 'running' };
+  return { open, setOpen, anchor, setAnchor, acct, refresh, job, links, linksReady, linksError, retryLinks, publish, startError, running: job?.state === 'running' };
 }
 export type CloudPublishModel = ReturnType<typeof useCloudPublish>;
 
@@ -180,7 +194,7 @@ function Progress({ job }: { job: CloudJob }) {
   );
 }
 
-function Result({ job, onFlash }: { job: CloudJob & { result: NonNullable<CloudJob['result']> }; onFlash: (n: React.ReactNode) => void }) {
+function Result({ job, onFlash, server }: { job: CloudJob & { result: NonNullable<CloudJob['result']> }; onFlash: (n: React.ReactNode) => void; server: string }) {
   const { t: i18n, locale } = useBoardI18n();
   const r = job.result;
   const borrowed = r.scope?.borrowed ?? [];
@@ -198,6 +212,7 @@ function Result({ job, onFlash }: { job: CloudJob & { result: NonNullable<CloudJ
         {expires ? i18n.board.cloudExpiresAt(expires) : i18n.board.cloudPermanentLink}
         {r.storage ? ` · ${i18n.board.cloudThisShareSize(formatStorage(r.storage.shareBytes))}` : ''}
       </p>
+      <PublicationLinks result={r} server={server} />
       {borrowed.length ? (
         <div className="flex flex-col gap-1 rounded-[8px] border border-[#E0AE00] bg-jb-selected px-3 py-2" data-testid="cloud-borrowed">
           <div className="text-[13px] font-semibold">{i18n.board.cloudBorrowedTitle}</div>
@@ -220,17 +235,56 @@ function Result({ job, onFlash }: { job: CloudJob & { result: NonNullable<CloudJ
   );
 }
 
+/** 可见性和评审是这次发布的明确选择；范围限制始终优先。 */
+export function VisibilityFields({ visibility, review, onVisibility, onReview, disabled, restricted }: { visibility: CloudVisibility; review: boolean; onVisibility: (v: CloudVisibility) => void; onReview: (v: boolean) => void; disabled: boolean; restricted: boolean }) {
+  const { t: i18n } = useBoardI18n();
+  return <div className="flex flex-col gap-2" data-testid="cloud-choices">
+    <fieldset disabled={disabled} className="flex flex-col gap-1.5">
+      <legend className="text-[12px] font-semibold text-jb-muted">{i18n.board.cloudVisibility}</legend>
+      <div className="flex gap-4">
+        {(['public', 'private'] as const).map((v) => <label key={v} className="flex min-h-8 items-center gap-2 text-[13px]">
+          <input type="radio" name="cloud-visibility" value={v} disabled={disabled || (v === 'public' && restricted)} checked={visibility === v} onChange={() => onVisibility(v)} className="accent-[var(--jb-cloud)]" />
+          {v === 'public' ? i18n.board.cloudPublic : i18n.board.cloudPrivate}
+        </label>)}
+      </div>
+      <p className="text-[12px] leading-[1.5] text-jb-faint">{restricted ? i18n.board.cloudPrivateOnly : visibility === 'public' ? i18n.board.cloudPublicNote : i18n.board.cloudPrivateNote}</p>
+    </fieldset>
+    <label className="flex min-h-8 items-center gap-2 text-[13px]"><input type="checkbox" checked={review} disabled={disabled} onChange={(e) => onReview(e.target.checked)} className="accent-[var(--jb-cloud)]" />{i18n.board.cloudAlsoReview}</label>
+    {review ? <p className="text-[12px] text-jb-faint">{i18n.board.cloudReviewNote}</p> : null}
+  </div>;
+}
+
+export function PublicationLinks({ result, server }: { result: { mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string } }; server: string }) {
+  const { t: i18n } = useBoardI18n();
+  const p = result.portfolio;
+  return <div className="flex flex-col gap-1 text-[12px]" data-testid="cloud-publication-links">
+    <span>{result.visibility === 'public' ? i18n.board.cloudPublic : i18n.board.cloudPrivate}</span>
+    {result.mode === 'review' ? <p>{i18n.board.cloudReviewNote}</p> : null}
+    {result.visibility === 'public' && p && (p.needsUsername || p.workUrl) ? <a href={p.needsUsername ? `${server}${p.setupPath}` : p.workUrl!} target="_blank" rel="noopener noreferrer" className="jb-focus text-jb-cloud hover:underline">{p.needsUsername ? i18n.board.cloudSetupUsername : i18n.board.cloudPortfolioWork}</a> : null}
+    {result.review ? <a href={result.review.url} target="_blank" rel="noopener noreferrer" className="jb-focus text-jb-cloud hover:underline">{i18n.board.cloudAlsoReview} · {i18n.board.cloudPrivate}</a> : null}
+  </div>;
+}
+
 export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { model: CloudPublishModel; ctx: CloudContext; names: { feature: string; scenario: string | null }; picks: CloudPicks; onFlash: (n: React.ReactNode) => void }) {
   const { t: i18n } = useBoardI18n();
   const { acct, job } = model;
   const [choice, setChoice] = useState<CloudScopeChoice>(() => defaultChoice(ctx));
+  const [visibility, setVisibility] = useState<CloudVisibility>('public');
+  const [review, setReview] = useState(false);
+  const restricted = choice !== 'project' || !!ctx.pr;
+  const key = choice === 'scenario' && ctx.scenarioId ? ctx.scenarioId : [...(ctx.featureScenarioIds ?? [])].sort().join(',');
+  const previous = choice === 'project' ? model.links.main : model.links.scoped?.[key] ?? null;
+  const previousValue = previous ? previous.visibility ?? 'private' : 'new';
+  useEffect(() => {
+    if (model.open) setVisibility(restricted ? 'private' : defaultVisibility(previousValue === 'new' ? null : { visibility: previousValue }));
+  }, [model.open, restricted, choice, key, previousValue]);
   const [stillOut, setStillOut] = useState(false);
   // 换了场景 / 功能且当前选项不可用时，回到默认
   useEffect(() => {
     if (choice === 'scenario' && !ctx.scenarioId) setChoice('feature');
   }, [ctx.scenarioId, choice]);
   useEffect(() => {
-    if (!model.open) setStillOut(false);
+    if (!model.open) { setStillOut(false); setReview(false); }
   }, [model.open]);
 
   const check = async () => {
@@ -258,8 +312,8 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
     body = <LoginBlock command={command} message={signedOut?.message ?? job?.error?.message} onCheck={() => void check()} checking={acct.loading} stillOut={stillOut} />;
   } else {
     const running = job?.state === 'running';
-    // 发布只包含确认过的方案：所选范围里没有时先说清楚、给出下一步，不让作者点了发布才看到英文报错
-    const unpicked = cloudUnpicked(choice, ctx, picks);
+    // 普通版只包含已选方案；评审允许未选方案，空普通范围由 CLI 仅发布私密评审。
+    const unpicked = review ? null : cloudUnpicked(choice, ctx, picks);
     body = (
       <div className="flex flex-col gap-3">
         {account?.signedIn ? (
@@ -276,11 +330,18 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
             full={job?.state === 'failed' && !!job.error?.storage}
           />
         ) : null}
+        {model.linksError ? (
+          <div role="alert" className="flex flex-col gap-2 text-[12px] text-jb-danger" data-testid="cloud-links-error">
+            <LocalText value={model.linksError} />
+            <Btn icon={<RotateCw className="size-4" />} label={i18n.board.cloudTryAgain} onClick={model.retryLinks} className="self-start" data-testid="cloud-links-retry" />
+          </div>
+        ) : null}
         <div className="flex flex-col gap-1.5">
           <div className="text-[12px] font-semibold tracking-[0.5px] text-jb-muted">{i18n.board.cloudScope}</div>
-          <ScopeRadio value={choice} onChange={setChoice} ctx={ctx} names={names} disabled={running} />
+          <ScopeRadio value={choice} onChange={setChoice} ctx={ctx} names={names} disabled={running || !model.linksReady} />
           <p className="text-[12px] leading-[1.45] text-jb-faint">{i18n.board.cloudScopeNote}</p>
         </div>
+        <VisibilityFields visibility={restricted ? 'private' : visibility} review={review} onVisibility={setVisibility} onReview={setReview} disabled={running || !model.linksReady} restricted={restricted} />
         {unpicked && !running ? (
           <div className="flex flex-col gap-1 rounded-[8px] border border-jb-accent bg-jb-selected px-3 py-2" data-testid="cloud-unpicked" data-scope={unpicked}>
             <div className="text-[13px] font-semibold">{i18n.board.cloudNotPickedTitle}</div>
@@ -291,7 +352,7 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
           </div>
         ) : null}
         {running && job ? <Progress job={job} /> : null}
-        {job?.state === 'done' && job.result ? <Result job={job as CloudJob & { result: NonNullable<CloudJob['result']> }} onFlash={onFlash} /> : null}
+        {job?.state === 'done' && job.result ? <Result job={job as CloudJob & { result: NonNullable<CloudJob['result']> }} onFlash={onFlash} server={account?.server ?? 'https://cloud.joplo.app'} /> : null}
         {job?.state === 'failed' && job.error?.storage && !unpicked ? <StorageFull full={job.error.storage} plan={account?.signedIn ? account.plan : null} /> : null}
         {job?.state === 'failed' && job.error && !job.error.storage && !unpicked ? (
           <div className="flex flex-col gap-1 rounded-[8px] border border-jb-danger bg-jb-danger-bg px-3 py-2" data-testid="cloud-error">
@@ -302,13 +363,13 @@ export function CloudPublishPopover({ model, ctx, names, picks, onFlash }: { mod
         {model.startError ? <p className="text-[12px] text-jb-danger"><LocalText value={model.startError} /></p> : null}
         <button
           type="button"
-          disabled={running || !!unpicked}
-          onClick={() => void model.publish(ctx, choice)}
+          disabled={running || !model.linksReady || !!unpicked}
+          onClick={() => void model.publish(ctx, choice, restricted ? 'private' : visibility, review)}
           className="jb-focus inline-flex h-9 items-center justify-center gap-2 rounded-[8px] bg-jb-cloud px-4 font-jb text-[14px] font-semibold text-jb-on-cloud hover:bg-jb-cloud-hover disabled:opacity-60"
           data-testid="cloud-publish"
         >
           {running ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />}
-          {running ? i18n.board.cloudPublishing : job?.state === 'done' ? i18n.board.cloudPublishAgain : job?.state === 'failed' ? i18n.board.cloudTryAgain : i18n.board.cloudPublishButton}
+          {model.linksError ? i18n.board.cloudPublishButton : !model.linksReady ? i18n.board.cloudStageChecking : running ? i18n.board.cloudPublishing : job?.state === 'done' ? i18n.board.cloudPublishAgain : job?.state === 'failed' ? i18n.board.cloudTryAgain : i18n.board.cloudPublishButton}
         </button>
       </div>
     );

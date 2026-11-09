@@ -6,6 +6,18 @@ import type { BoardDictionary } from './en';
 export function createBoardPtBR(locale: Locale = 'pt-BR') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudLinksFailed: "Não foi possível ler os links de compartilhamento existentes. A publicação está pausada. Tente novamente.",
+      cloudPublic: "Público",
+      cloudPrivate: "Privado",
+      cloudPublicNote: "Público: adicionado a show.joplo.app/@usuário e indexado por mecanismos de busca.",
+      cloudPrivateNote: "Privado: só quem tem o link pode ver.",
+      cloudPrivateOnly: "Compartilhamentos limitados e prévias de PR são privados para proteger o conteúdo.",
+      cloudAlsoReview: "Publicar também uma versão de revisão",
+      cloudReviewNote: "O link de revisão inclui todas as opções e é sempre privado.",
+      cloudPortfolioWork: "Ver obra",
+      cloudSetupUsername: "Definir nome de usuário",
+      cloudVisibility: "Visibilidade",
+
       localReviewMoveHint: "Clique para comentar; arraste para mover. Ajuste a posição com as setas.",
       localReviewApprovedDraft: "Esta revisão foi confirmada em outra página. Seu rascunho não enviado foi mantido para você copiar.",
       localReviewTitle: "Comentários e revisão",

@@ -63,9 +63,9 @@ beforeEach(async () => {
     if (path === '/api/v1/shares') {
       // 旧版 SaaS：严格校验，不认识 review 字段时 400（没有创建任何记录）
       if (rejectReview && body.review !== undefined) return send({ code: 'BAD_REQUEST' }, rejectReview);
-      return send({ shareId: 'Abc1234567', uploadId: 'u1', missing: [] });
+      return send({ shareId: body.replaceShareId ?? 'Abc1234567', uploadId: 'u1', missing: [] });
     }
-    if (path === '/api/v1/shares/Abc1234567/finalize') return send({ shareId: 'Abc1234567', url: base + '/s/Abc1234567/', expiresAt: '2026-11-06T12:00:00.000Z', version: 1 });
+    if (/^\/api\/v1\/shares\/[A-Za-z0-9]{10}\/finalize$/.test(path)) return send({ shareId: path.split('/')[4], url: base + '/s/' + path.split('/')[4] + '/', expiresAt: '2026-11-06T12:00:00.000Z', version: 1 });
     if (path === '/api/v1/shares/Abc1234567/feedback') return send(feedback);
     if (path === '/api/v1/shares/Abc1234567/feedback/applied') return send({ applied: body.decisionIds });
     send({ code: 'NOT_FOUND' }, 404);
@@ -89,7 +89,7 @@ const createBody = () => calls.find(c => c.path === '/api/v1/shares')!.body;
 // ---------- 评审清单与评审版 ----------
 test('普通 share：构建参数不变（没有 review），请求体带 publish 清单，清单不在上传文件里', async () => {
   await login();
-  const r = await cli(['share', project, '--format=json']); expect(r.code, r.stdout).toBe(0);
+  const r = await cli(['share', '--private', '--no-review',  project, '--format=json']); expect(r.code, r.stdout).toBe(0);
   expect(build.mock.calls[0]![0]).toEqual({ projectDir: project, outDir: expect.any(String), voiceDefault: 'cloud' });
   const body = createBody();
   expect(body.review).toMatchObject({ v: 1, mode: 'publish' });
@@ -103,35 +103,36 @@ test('普通 share：构建参数不变（没有 review），请求体带 publis
 
 test('share --review：构建评审版，清单 mode=review 含所有方案；输出标明评审版', async () => {
   await login();
-  const r = await cli(['share', project, '--review', '--format=json']); expect(r.code, r.stdout).toBe(0);
-  expect(build.mock.calls[0]![0]).toMatchObject({ review: true });
-  const body = createBody();
+  const r = await cli(['share', '--private',  project, '--review', '--format=json']); expect(r.code, r.stdout).toBe(0);
+  expect(build.mock.calls[1]![0]).toMatchObject({ review: true });
+  const body = calls.filter(c => c.path === '/api/v1/shares')[1]!.body;
   expect(body.review.mode).toBe('review');
   expect(body.review.features.map((f: any) => f.id)).toEqual(['f', 'g']);
   expect(body.review.scenarios.map((s: any) => s.id)).toEqual(['f.a.main', 'f.b.only', 'g.a.view']);
-  expect(r.json().data.mode).toBe('review');
-  const text = await cli(['share', project, '--review']);
+  expect(r.json().data.review.mode).toBe('review');
+  const text = await cli(['share', '--private',  project, '--review']);
   expect(text.stdout).toContain('Published the review version');
 });
 
-test('share --review 遇到不支持评审版的旧 server（产物仍是 publish IR）时失败，不上传', async () => {
+test('share --review 遇到不支持评审版的旧 server：主分享成功，评审不上传，提示主链接与重试', async () => {
   await login();
-  build.mockImplementationOnce(async ({ outDir }: { outDir?: string }) => {
+  build.mockImplementationOnce(build.getMockImplementation()!).mockImplementationOnce(async ({ outDir }: { outDir?: string }) => {
     for (const [p, content] of Object.entries(built)) { await mkdir(join(outDir!, p, '..'), { recursive: true }); await writeFile(join(outDir!, p), content); }
     return { outDir: outDir!, files: Object.keys(built), diagnostics: [], routes: [], scenarios: [] };
   });
-  const r = await cli(['share', project, '--review', '--format=json']);
+  const r = await cli(['share', '--private',  project, '--review', '--format=json']);
   expect(r.code).toBe(1); expect(r.json().error.code).toBe('UNSUPPORTED_ACTION');
-  expect(calls.some(c => c.path === '/api/v1/shares')).toBe(false);
+  expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
+  expect(r.stderr).toContain('The main share is already published:');
 });
 
 test('评审清单超过 512 KiB：--review 在构建和任何请求之前失败；普通 share 只警告并省略清单，照常发布', async () => {
   await login();
   for (let i = 0; i < 400; i++) devIr.rules[`f.r${i}`] = { id: `f.r${i}`, featureId: 'f', text: '规'.repeat(REVIEW_LIMITS.text.rule), origin: 'user', confirmation: 'pending', caseIds: [], elementIds: [] };
-  let r = await cli(['share', project, '--review', '--format=json']);
+  let r = await cli(['share', '--private',  project, '--review', '--format=json']);
   expect(r.code).toBe(1); expect(r.json().error).toMatchObject({ code: 'EXPORT_FAILED' }); expect(r.stdout).toContain('512 KiB');
   expect(calls).toEqual([]); expect(build).not.toHaveBeenCalled();
-  r = await cli(['share', project, '--format=json']);
+  r = await cli(['share', '--private', '--no-review',  project, '--format=json']);
   expect(r.code, r.stdout).toBe(0); expect(r.stderr).toContain('review manifest');
   expect(createBody().review).toBeUndefined();
 });
@@ -151,10 +152,10 @@ test('API Key 缺少权限（403 FORBIDDEN）：说明是 Key 的权限范围，
 test('检查替身不给 IR 时（旧调用方）普通 share 不带 review 字段，--review 报错', async () => {
   await login();
   checkProject.mockResolvedValue({ name: 'Fixture', diagnostics: [], summary: { error: 0, warning: 0, info: 0 }, verification: {} });
-  expect((await cli(['share', project])).code).toBe(0);
+  expect((await cli(['share', '--private', '--no-review',  project])).code).toBe(0);
   expect(createBody().review).toBeUndefined();
   calls = [];
-  const r = await cli(['share', project, '--review', '--format=json']);
+  const r = await cli(['share', '--private',  project, '--review', '--format=json']);
   expect(r.json().error.code).toBe('UNSUPPORTED_ACTION'); expect(calls).toEqual([]);
   checkProject.mockReset(); checkProject.mockImplementation(async () => ({ name: 'Fixture', diagnostics: [], summary: { error: 0, warning: 0, info: 0 }, verification: {}, project: devIr }));
 });
@@ -169,7 +170,7 @@ async function credentialsTrap() {
 test('JOPLO_API_KEY：share、whoami、feedback 都用 Bearer <key>，不读写 credentials.json，不打开浏览器', async () => {
   const mtime = await credentialsTrap();
   await mkdir(join(project, '.joplo')); await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, shareId: 'Abc1234567', url: base + '/s/Abc1234567/' }));
-  for (const args of [['share', project, '--format=json'], ['whoami', '--format=json'], ['feedback', project, '--format=json'], ['feedback', project, '--applied', 'd1']]) {
+  for (const args of [['share', '--private', '--no-review',  project, '--format=json'], ['whoami', '--format=json'], ['feedback', project, '--format=json'], ['feedback', project, '--applied', 'd1']]) {
     const r = await cli(args, { JOPLO_API_KEY: apiKey }, true);
     expect(r.code, `${args.join(' ')}\n${r.stdout}${r.stderr}`).toBe(0);
     expect(r.stderr).not.toMatch(/credentials/i);
@@ -224,15 +225,15 @@ test('JOPLO_API_KEY：无效或过期返回 AUTH_EXPIRED，指向 API Key 设置
 // ---------- --pr ----------
 test('--pr 不在 Actions 里且没有 --repo：USAGE，不登录、不构建、不发请求', async () => {
   await login();
-  const r = await cli(['share', project, '--pr', '42', '--format=json']);
+  const r = await cli(['share', '--private', '--no-review',  project, '--pr', '42', '--format=json']);
   expect(r.code).toBe(2); expect(r.json().error).toMatchObject({ code: 'USAGE' }); expect(r.json().error.message).toContain('--repo owner/name');
   expect(calls).toEqual([]); expect(build).not.toHaveBeenCalled(); expect(checkProject).not.toHaveBeenCalled();
   for (const bad of [['--repo', 'not a repo'], ['--repo', 'o/..']]) {
-    const b = await cli(['share', project, '--pr', '42', ...bad, '--sha', sha, '--format=json']);
+    const b = await cli(['share', '--private', '--no-review',  project, '--pr', '42', ...bad, '--sha', sha, '--format=json']);
     expect(b.code).toBe(2);
   }
-  expect((await cli(['share', project, '--pr', '0'])).code).toBe(2);
-  expect((await cli(['share', project, '--repo', 'o/r'])).code).toBe(2);
+  expect((await cli(['share', '--private', '--no-review',  project, '--pr', '0'])).code).toBe(2);
+  expect((await cli(['share', '--private', '--no-review',  project, '--repo', 'o/r'])).code).toBe(2);
   expect(calls).toEqual([]);
 });
 
@@ -243,13 +244,13 @@ const actionsEnv = async (event: unknown) => {
 test('--pr 在 GitHub Actions 里：repo、PR head、runUrl 从环境补全；不写 cloud.json；skipped 时打印原因和安装地址', async () => {
   responses.set('/api/v1/shares/Abc1234567/finalize', { body: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/', expiresAt: null, version: 1, pr: { comment: 'skipped', reason: 'app_not_installed', installUrl: 'https://cloud.joplo.app/settings/github' } } });
   const env = await actionsEnv({ pull_request: { number: 42, head: { sha: headSha } } });
-  const r = await cli(['share', project, '--new', '--pr', '42'], env);
+  const r = await cli(['share', '--private', '--no-review',  project, '--new', '--pr', '42'], env);
   expect(r.code, r.stdout + r.stderr).toBe(0);
   expect(createBody().pr).toEqual({ provider: 'github', repo: 'acme/app', number: 42, headSha, runUrl: 'https://github.com/acme/app/actions/runs/123456' });
   expect(r.stdout).toMatch(/PR comment skipped: .*not installed.*https:\/\/cloud\.joplo\.app\/settings\/github/);
   expect(r.stdout.split('\n').filter(l => l.startsWith('PR comment'))).toHaveLength(1);
   await expect(stat(join(project, '.joplo/cloud.json'))).rejects.toThrow();
-  const j = await cli(['share', project, '--new', '--pr', '42', '--format=json'], env);
+  const j = await cli(['share', '--private', '--no-review',  project, '--new', '--pr', '42', '--format=json'], env);
   expect(j.json().data.pr).toEqual({ comment: 'skipped', reason: 'app_not_installed', installUrl: 'https://cloud.joplo.app/settings/github' });
 });
 
@@ -312,36 +313,36 @@ const writeRecord = async (v: unknown) => { await mkdir(join(project, '.joplo'),
 test('Pro share --review 不覆盖主链接：评审版另存 review 记录，只用 review.shareId 作 replaceShareId；普通 share 只用主 shareId', async () => {
   plan = 'pro'; await login();
   await writeRecord({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/' });
-  expect((await cli(['share', project, '--review'])).code).toBe(0);
-  expect(createBody().replaceShareId).toBeUndefined();
+  expect((await cli(['share', '--private',  project, '--review'])).code).toBe(0);
+  expect(calls.filter(c => c.path === '/api/v1/shares').map(c => c.body.replaceShareId)).toEqual(['Main123456', undefined]);
   expect(await record()).toEqual({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
   calls = [];
-  expect((await cli(['share', project, '--review'])).code).toBe(0);
-  expect(createBody().replaceShareId).toBe('Abc1234567');
+  expect((await cli(['share', '--private',  project, '--review'])).code).toBe(0);
+  expect(calls.filter(c => c.path === '/api/v1/shares').map(c => c.body.replaceShareId)).toEqual(['Main123456', 'Abc1234567']);
   calls = [];
   responses.set('/api/v1/shares', { body: { shareId: 'Main123456', uploadId: 'u1', missing: [] } });
   responses.set('/api/v1/shares/Main123456/finalize', { body: { shareId: 'Main123456', url: base + '/s/Main123456/', expiresAt: null, version: 2 } });
-  expect((await cli(['share', project])).code).toBe(0);
+  expect((await cli(['share', '--private', '--no-review',  project])).code).toBe(0);
   expect(createBody().replaceShareId).toBe('Main123456');
   expect(createBody().review.mode).toBe('publish');
   expect(await record()).toEqual({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
   // --new 两种都不带 replaceShareId
   calls = []; responses.clear();
-  expect((await cli(['share', project, '--review', '--new'])).code).toBe(0);
+  expect((await cli(['share', '--private',  project, '--review', '--new'])).code).toBe(0);
   expect(createBody().replaceShareId).toBeUndefined();
 });
 
 test('只有评审版记录时普通 share 新建主链接；其他 server 的旧记录被整体替换', async () => {
   plan = 'pro'; await login();
   await writeRecord({ server: base, review: { shareId: 'Rev1234567', url: base + '/s/Rev1234567/' } });
-  expect((await cli(['share', project])).code).toBe(0);
+  expect((await cli(['share', '--private', '--no-review',  project])).code).toBe(0);
   expect(createBody().replaceShareId).toBeUndefined();
   expect(await record()).toEqual({ server: base, shareId: 'Abc1234567', url: base + '/s/Abc1234567/', review: { shareId: 'Rev1234567', url: base + '/s/Rev1234567/' } });
   await writeRecord({ server: 'https://other.example', shareId: 'Old1234567', url: 'https://other.example/s/Old1234567/', review: { shareId: 'Rev1234567', url: 'https://other.example/s/Rev1234567/' } });
   calls = [];
-  expect((await cli(['share', project, '--review'])).code).toBe(0);
+  expect((await cli(['share', '--private',  project, '--review'])).code).toBe(0);
   expect(createBody().replaceShareId).toBeUndefined();
-  expect(await record()).toEqual({ server: base, review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
+  expect(await record()).toEqual({ server: base, shareId: 'Abc1234567', url: base + '/s/Abc1234567/', review: { shareId: 'Abc1234567', url: base + '/s/Abc1234567/' } });
 });
 
 test('feedback 默认读评审分享，没有时读主分享；--share 仍可指定', async () => {
@@ -362,7 +363,7 @@ test('feedback 默认读评审分享，没有时读主分享；--share 仍可指
 
 test('服务端因 review 字段返回 400：普通 share 去掉 review 重试一次并提示；--review 仍报错；其他状态不重试', async () => {
   await login(); rejectReview = 400;
-  let r = await cli(['share', project, '--format=json']);
+  let r = await cli(['share', '--private', '--no-review',  project, '--format=json']);
   expect(r.code, r.stdout).toBe(0);
   const creates = calls.filter(c => c.path === '/api/v1/shares');
   expect(creates).toHaveLength(2);
@@ -370,12 +371,12 @@ test('服务端因 review 字段返回 400：普通 share 去掉 review 重试�
   expect({ ...creates[1]!.body, review: undefined }).toEqual({ ...creates[0]!.body, review: undefined });
   expect(r.stderr.split('\n').filter(l => /review manifest/i.test(l))).toHaveLength(1);
   calls = [];
-  r = await cli(['share', project, '--review', '--format=json']);
+  r = await cli(['share', '--private',  project, '--review', '--format=json']);
   expect(r.code).toBe(1); expect(r.json().error.code).toBe('BAD_REQUEST');
-  expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
+  expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(3);
   for (const status of [413, 422, 403]) {
     calls = []; rejectReview = status;
-    r = await cli(['share', project, '--format=json']);
+    r = await cli(['share', '--private', '--no-review',  project, '--format=json']);
     expect(r.code, String(status)).not.toBe(0);
     expect(calls.filter(c => c.path === '/api/v1/shares'), String(status)).toHaveLength(1);
   }
@@ -395,7 +396,7 @@ test('share --scenario：构建带范围；清单只含范围内；标题带场�
   await mkdir(join(project, '.joplo'), { recursive: true });
   await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/' }));
   build.mockImplementationOnce(scopedBuild([{ kind: 'element', featureId: 'g', featureName: 'Audit', optionId: 'g.a', elementId: 'seat', route: '/', refs: ['seat'], scenarios: ['f.a.main'] }]));
-  const r = await cli(['share', project, '--scenario', 'f.a.main', '--format=json']); expect(r.code, r.stdout).toBe(0);
+  const r = await cli(['share', '--private', '--no-review',  project, '--scenario', 'f.a.main', '--format=json']); expect(r.code, r.stdout).toBe(0);
   expect(build.mock.calls[0]![0]).toEqual({ projectDir: project, outDir: expect.any(String), scope: { scenarios: ['f.a.main'] }, voiceDefault: 'cloud' });
   const body = createBody();
   expect(body.title).toBe('Fixture · Main');
@@ -413,7 +414,7 @@ test('Pro 重新分享同一范围：只替换这个范围的分享，不用主�
   await mkdir(join(project, '.joplo'), { recursive: true });
   await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', scoped: { 'f.a.main': { shareId: 'Scop123456', url: base + '/s/Scop123456/' } } }));
   build.mockImplementationOnce(scopedBuild());
-  const r = await cli(['share', project, '--feature', 'f', '--format=json']); expect(r.code, r.stdout).toBe(0);
+  const r = await cli(['share', '--private', '--no-review',  project, '--feature', 'f', '--format=json']); expect(r.code, r.stdout).toBe(0);
   // --feature f = 选定方案 a 的全部场景 = f.a.main，与上次是同一个范围
   expect(createBody().replaceShareId).toBe('Scop123456');
   const record = JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'));
@@ -422,19 +423,19 @@ test('Pro 重新分享同一范围：只替换这个范围的分享，不用主�
 
 test('写错场景、没选定方案：在构建和任何云端请求之前失败', async () => {
   await login();
-  let r = await cli(['share', project, '--scenario', 'f.main', '--format=json']);
+  let r = await cli(['share', '--private', '--no-review',  project, '--scenario', 'f.main', '--format=json']);
   expect(r.code).toBe(1); expect(r.json().error.code).toBe('NOT_FOUND'); expect(r.stdout).toContain('f.a.main');
   // 没选定方案属于用法错误（USAGE，退出码 2）
-  r = await cli(['share', project, '--scenario', 'f.b.only', '--format=json']);
+  r = await cli(['share', '--private', '--no-review',  project, '--scenario', 'f.b.only', '--format=json']);
   expect(r.code).toBe(2); expect(r.json().error.message).toMatch(/not the picked option/);
-  r = await cli(['share', project, '--feature', 'g', '--format=json']);
+  r = await cli(['share', '--private', '--no-review',  project, '--feature', 'g', '--format=json']);
   expect(r.code).toBe(2); expect(r.json().error.message).toMatch(/no picked option/);
   expect(build).not.toHaveBeenCalled(); expect(calls).toEqual([]);
 });
 
 test('范围分享遇到忽略 scope 的旧 server（产物里有范围外场景）：失败，不上传', async () => {
   await login();
-  const r = await cli(['share', project, '--scenario', 'f.a.main', '--format=json']);
+  const r = await cli(['share', '--private', '--no-review',  project, '--scenario', 'f.a.main', '--format=json']);
   expect(r.code).toBe(1); expect(r.json().error.code).toBe('UNSUPPORTED_ACTION');
   expect(calls.some(c => c.path === '/api/v1/shares')).toBe(false);
 });

@@ -1,3 +1,4 @@
+import { USERNAME_SETUP } from './share-messages.ts';
 import { Command, CommanderError, Option } from 'commander';
 import { formatBytes, terminalText } from './cloud-error.ts';
 import type { CloudDependencies } from './cloud.ts';
@@ -162,13 +163,16 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     });
   cloudCommand('share').description('Check, build, and publish to the cloud').argument('[dir]', 'Project directory', '.').addOption(format())
     .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)')
-    .option('--review', 'Publish the review version: every option of every feature (rules and questions still stay out of the uploaded files)')
+    .option('--public', 'Publish publicly: portfolio and search engines').option('--private', 'Only people with the link can view')
+    .option('--review', 'Also publish a private review link containing every option').option('--no-review', 'Do not publish a review version').option('--json', 'Print structured JSON (non-interactive)')
     .option('--pr <number>', 'Attach a GitHub pull request (PR preview); repo, commit, and run URL come from GitHub Actions', integer('pr', 2147483647))
     .option('--repo <owner/name>', 'Repository for --pr outside GitHub Actions').option('--sha <commit>', 'Commit for --pr (defaults to the PR head or git HEAD)')
     .option('--scenario <id>', 'Share only this scenario; repeatable. Other features, scenarios, and pages are left out of the uploaded files (D75)', collect, [])
     .option('--feature <id>', "Share only this feature's scenarios (picked option; every option with --review); repeatable", collect, [])
     .option('--update <link>', 'Update this existing share (its link, for example from another computer without .joplo/cloud.json) and reuse its narration audio (D84)')
     .action(async (dir, opts) => {
+      if (opts.json) opts.format = 'json';
+      if (args.includes('--review') && args.includes('--no-review')) throw new JoploError('USAGE', '--review and --no-review are mutually exclusive');
       const client = await cloudClient(opts.server, opts.format);
       const { share } = await import('./cloud-share.ts');
       const published = await share(client, dir, { ...opts, scenarios: opts.scenario, features: opts.feature }, async options => (await serverFunction('buildSite'))(options), () => serverFunction('renderStep'));
@@ -179,6 +183,13 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         if (scope) line(`Scope: ${scope.scenarios.length} scenario(s): ${scope.scenarios.join(', ')}. The main link and the review link are unchanged`);
         if (published.result.pr) { const { prCommentLine } = await import('./cloud-pr.ts'); const note = prCommentLine(published.result.pr, client.server); if (note) line(note); }
         // C27：免费分享不再过期；改为告诉作者账号用了多少空间
+        if (published.result.review) line(`Published the review version ${published.result.review.url} (private)`);
+        if (published.result.visibility) line(`Visibility: ${published.result.visibility}`);
+        if (published.result.visibility === 'public') {
+          const p = published.result.portfolio;
+          if (p?.needsUsername) line(`${USERNAME_SETUP}${client.server}${p.setupPath}`);
+          else if (p?.workUrl) line(`Portfolio: ${terminalText(p.workUrl)}`);
+        }
         if (published.result.storage) line(`Storage: ${formatBytes(published.result.storage.usedBytes)} of ${formatBytes(published.result.storage.quotaBytes)} used (this share: ${formatBytes(published.result.storage.shareBytes)})`);
         line(`Add to README: ${terminalText(published.result.embed.markdown)}\nMore embed options: ${client.server}/shares/${published.result.shareId}`);
       }
@@ -375,13 +386,13 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   catch (e) {
     if (e instanceof CommanderError && ['commander.helpDisplayed', 'commander.help', 'commander.version'].includes(e.code)) return 0;
     const f = failure(e instanceof CommanderError ? new JoploError('USAGE', e.message) : e);
-    const wantsJson = args.some((arg, i) => arg === '--format=json' || arg === '--format' && args[i + 1] === 'json');
+    const wantsJson = args.includes('--json') || args.some((arg, i) => arg === '--format=json' || arg === '--format' && args[i + 1] === 'json');
     if (args[0] === 'review' || args[0] === 'feedback' && (args.includes('watch') || args.includes('list'))) stderr((args.includes('--json') || wantsJson ? JSON.stringify(f) : `${f.error.code}  ${f.error.message.split('\n').map(line => terminalText(line)).join('\n')}`) + '\n');
     else if (wantsJson) json(f); else line(`${f.error.code}  ${oneLine(terminalText(f.error.message))}`);
     // 6：账号容量不足（C27），与 QUOTA_EXCEEDED 的其他种类（每小时限额，可以稍后重试）区分
     const storageFull = f.error.code === 'QUOTA_EXCEEDED' && (f.error.details as { kind?: unknown } | undefined)?.kind === 'storage';
     // 7：Joplo Cloud 朗读额度不够（D85，joplo voice）；已生成的音频保留
-    return f.error.code === 'USAGE' ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : f.error.code === 'EXPORT_COMPONENT_MISSING' ? 4 : storageFull ? 6 : f.error.code === 'TTS_QUOTA_EXCEEDED' ? 7 : 1;
+    return ['USAGE', 'CHOICE_REQUIRED'].includes(f.error.code) ? 2 : ['AUTH_REQUIRED', 'AUTH_EXPIRED'].includes(f.error.code) ? 3 : f.error.code === 'EXPORT_COMPONENT_MISSING' ? 4 : storageFull ? 6 : f.error.code === 'TTS_QUOTA_EXCEEDED' ? 7 : 1;
   }
   return exitCode;
 }

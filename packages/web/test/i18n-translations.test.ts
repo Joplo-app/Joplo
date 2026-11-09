@@ -7,6 +7,7 @@ import { locales, type Locale } from '../src/i18n/locale';
 
 // Exact keys and locale scopes only; additions require a reason. No blanket namespace exceptions.
 const unchanged: Record<string, { locales: readonly Locale[]; reason: string; values?: readonly string[] }> = {
+  "board.cloudPublic": { locales: ["fr"], reason: "Public is also the French adjective." },
   "player.speedValue": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Numeric speed and multiplication sign; Intl handles formatting." },
   "player.number": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Numeric formatter; no translatable words." },
   "player.list": { locales: ["zh-CN", "zh-TW", "ja", "ko", "es", "fr", "de", "pt-BR", "ru"], reason: "Intl list formatting; empty and single-item lists have no connective." },

@@ -275,7 +275,7 @@ const Author = () => (
     </Grid.Col>
     <Grid.Col span={6}>
       <Terminal id="t_term" title="终端 · examples/invite" h="100%">
-        <Terminal.Command when={$.ui.tShare}>npx joplo share</Terminal.Command>
+        <Terminal.Command when={$.ui.tShare}>npx joplo share --private --no-review</Terminal.Command>
         <Terminal.Output when={$.ui.tShare}>构建：1 个功能 · 3 段声音（186 KB）</Terminal.Output>
         <Terminal.Output id="t_stale" when={$.ui.tShare} tone="warn">第 2 段声音过期（字幕改过），观众端这一步用浏览器朗读；想补上：在看板点「生成」</Terminal.Output>
         <Terminal.Output id="t_upload" when={$.ui.tShared} tone="ok">{'上传 4 个新文件（含 2 段声音），其余已在云端；Key 不上传\nhttps://joplo.app/s/k3x9q（1 小时有效）'}</Terminal.Output>
@@ -313,7 +313,7 @@ const Arch = () => (
       <Diagram.Edge from="key" to="gen" label="Key" />
       <Diagram.Edge from="gen" to="prov" label="文字 + 音色" />
       <Diagram.Edge from="prov" to="files" label="音频（写进缓存）" />
-      <Diagram.Edge from="files" to="r2" label="joplo share（不含 Key）" />
+      <Diagram.Edge from="files" to="r2" label="joplo share --private --no-review（不含 Key）" />
       <Diagram.Edge from="player" to="narr" label="这一步的旁白" />
       <Diagram.Edge from="narr" to="files" label="看板：有音频时" />
       <Diagram.Edge from="narr" to="r2" label="分享页：有音频时" />

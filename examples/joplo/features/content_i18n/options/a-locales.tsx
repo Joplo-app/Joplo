@@ -39,9 +39,9 @@ export default withDesignRecord(option({
       .system('第 3 步', '读完第 3 步，日语版完整播完', ...step(3, 'ja', 'zh'), ...speak(100),
         done('加一种语言，原型、字幕、旁白一起有了')),
 
-    viewer_auto: flow('由纪打开链接，直接是日语', { cases: ['viewer_auto'], start: '/i18n', state: { ui: jaReady() }, description: '同一个链接，每个人看到自己的语言', expected: '照常 joplo share；日语浏览器打开同一个链接，界面、内容、旁白都是日语，不用选' })
+    viewer_auto: flow('由纪打开链接，直接是日语', { cases: ['viewer_auto'], start: '/i18n', state: { ui: jaReady() }, description: '同一个链接，每个人看到自己的语言', expected: '照常 joplo share --private --no-review；日语浏览器打开同一个链接，界面、内容、旁白都是日语，不用选' })
       .card('把演示发给由纪', { sub: '林舟只发一个链接，不为每种语言单独发布' })
-      .type('t_in', 'npx joplo share', '林舟像平时一样分享', shot('t_term'))
+      .type('t_in', 'npx joplo share --private --no-review', '林舟像平时一样分享', shot('t_term'))
       .press('Enter', '三种语言和各自的声音一起发布', set($.inputs.t_in, ''), set(ui.tShare, true), highlight('t_links'), uses('viewer_order'))
       .card('现在是由纪', { role: 'yuki', sub: '她的浏览器是日语，打开林舟发来的链接' })
       .system('打开链接', '界面和内容都是日语，不用选', ...siteOpen('joplo.app/s/k3x9q', 'ブラウザの言語：日本語'), ...chrome('ja'), ...content('ja'), set(ui.caption, 'チーム招待：同僚をスペースに招く'), shot('s_root'), highlight('s_url'), uses('ui_follows_viewer', 'language_only'))
@@ -66,14 +66,14 @@ export default withDesignRecord(option({
       .press('Enter', '两种语言各有 1 条过期', set($.inputs.t_in, ''), set(ui.tStaleCheck, true), set(ui.enStatus, '1 条过期'), set(ui.jaStatus, '1 条过期'), set(ui.jaColor, 'orange'), shot('t_term'), highlight('t_stale'), uses('check_stale', 'source_key'))
       .click('b_lang', '看板的语言菜单也标出来了', set(ui.langOpen, true), shot('b_root'), highlight('b_m_ja'))
       .click('b_m_ja', '日语预览里，过期那句显示原文', set(ui.langOpen, false), set(ui.bLangLabel, '日本語'), ...content('ja'), set(ui.cInvite, '邀请同事'), set(ui.caption, 'チーム招待：同僚をスペースに招く'), set(ui.staleShown, true), spotlight('b_pc_invite'), callout('b_pc_stalemark', '只在看板里标出', { side: 'left' }))
-      .type('t_in', 'npx joplo share', '这时分享也不会卡住')
+      .type('t_in', 'npx joplo share --private --no-review', '这时分享也不会卡住')
       .press('Enter', '照常发布，只提醒这一句', set($.inputs.t_in, ''), set(ui.tStaleShare, true), shot('t_term'), highlight('t_staleshare'))
       .system('Agent 更新译文', '照着旧条目改，两条一起更新', set(ui.jsonState, 'updated'), set(ui.tFixed, true), set(ui.enStatus, '32/32'), set(ui.jaStatus, '32/32'), set(ui.jaColor, ''), set(ui.cInvite, '同僚を招待'), set(ui.staleShown, false), shot('a_json'), highlight('a_json'),
         done('过期的译文被找出来，更新后 check 通过')),
 
     cloud_cache: flow('换一台电脑重新发布', { cases: ['cloud_cache'], start: '/i18n', state: { ui: { ...jaReady(), termTitle: '终端 · 家里的笔记本' } }, description: '分享里已有的声音直接沿用', expected: '这台电脑没配语音供应商，也没有本地音频；重新发布同一个分享时，分享里已有的音频直接沿用' })
       .card('林舟在家里改了一个字', { sub: '这台笔记本没配语音供应商，也没生成过音频' })
-      .type('t_in', 'npx joplo share', '林舟重新发布同一个分享', shot('t_term'))
+      .type('t_in', 'npx joplo share --private --no-review', '林舟重新发布同一个分享', shot('t_term'))
       .press('Enter', '9 段声音都已经在分享里', set($.inputs.t_in, ''), set(ui.tCache, true), highlight('t_cache'), uses('cloud_cache', 'reuse_index'))
       .system('沿用已发布的音频', '缓存键相同，不生成也不上传', shot('arch'), trace('cli', 'share_audio'), highlight('share_audio'))
       .system('发布完成', '只传了改过的文件，链接不变', set(ui.tCacheDone, true), shot('t_term'), highlight('t_cachedone'),

@@ -44,7 +44,7 @@ test('没登录：account 给出登录命令；publish 报 AUTH_REQUIRED 带同�
   const b = bridge({ JOPLO_CLOUD_URL: base });
   expect(await b.account()).toEqual({ signedIn: false, server: base, loginCommand: `JOPLO_HOME=${home} npx joplo login --server ${base}` });
   const lines: string[] = [];
-  await expect(b.publish(project, {}, l => lines.push(l))).rejects.toMatchObject({ code: 'AUTH_REQUIRED', loginCommand: `JOPLO_HOME=${home} npx joplo login --server ${base}` });
+  await expect(b.publish(project, {visibility: 'private', review: false}, l => lines.push(l))).rejects.toMatchObject({ code: 'AUTH_REQUIRED', loginCommand: `JOPLO_HOME=${home} npx joplo login --server ${base}` });
   expect(build).not.toHaveBeenCalled();
   expect(browser).not.toHaveBeenCalled();
 });

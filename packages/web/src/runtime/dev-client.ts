@@ -496,8 +496,11 @@ export async function requestClip(projectId: string, locale: Locale, segment: Vo
 
 // ---------- 直接发布到云端（D76） ----------
 /** 与 @joplo-app/server 的 CloudAccount / CloudJob 一致（页面只拿到邮箱和套餐，令牌留在本机进程）。 */
+export type CloudVisibility = 'public' | 'private';
+export type CloudPortfolio = { workUrl: string | null; profileUrl: string | null; needsUsername: boolean; setupPath: string };
+export type CloudLinks = { main: { visibility?: CloudVisibility } | null; scoped?: Record<string, { visibility?: CloudVisibility }> };
 export type CloudAccount =
-  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; storage?: CloudStorage; /** 托管朗读额度（D85）；旧云端或连不上时没有。 */ voice?: VoiceQuota }
+  | { signedIn: true; server: string; email: string; plan: 'free' | 'pro' | null; storage?: CloudStorage; username?: string | null; portfolioUrl?: string | null; /** 托管朗读额度（D85）；旧云端或连不上时没有。 */ voice?: VoiceQuota }
   | { signedIn: false; server: string; loginCommand: string; message?: string };
 /** 账号容量（C27），字节。 */
 export type CloudStorage = { usedBytes: number; quotaBytes: number };
@@ -506,14 +509,14 @@ export type CloudBorrowed =
   | { kind: 'element'; featureId: string; featureName: string; optionId: string; elementId: string; route: string; refs: string[]; scenarios: string[] }
   | { kind: 'page'; featureId: string; featureName: string; optionId: string; route: string; scenarios: string[] };
 export type CloudScope = { key: string; scenarios: string[]; features: string[]; borrowed: CloudBorrowed[] };
-export type CloudPublishRequest = { scenarios?: string[]; features?: string[] };
+export type CloudPublishRequest = { visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; features?: string[] };
 export type CloudJob = {
   id: string;
   state: 'running' | 'done' | 'failed';
   request: CloudPublishRequest;
   startedAt: number;
   lines: string[];
-  result?: { shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope; storage?: CloudStorage & { shareBytes: number } };
+  result?: { mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: CloudScope; storage?: CloudStorage & { shareBytes: number } };
   error?: { code: string; message: string; loginCommand?: string; storage?: CloudStorageFull };
 };
 
@@ -531,6 +534,23 @@ export async function fetchCloudAccount(): Promise<{ ok: true; available: boolea
   } catch (e) {
     return { ok: false, message: m.board.couldNotConnectToJoploDev(errMsg(e)) };
   }
+}
+
+/** 读取分享历史。失败必须与“没有链接”区分，避免更新预选为公开。 */
+export async function fetchCloudLinks(projectId: string): Promise<CloudLinks> {
+  const headers = writeHeaders(false);
+  if (!headers) throw new MessageError(m.board.thisPageHasNoLocalTokenOpenItThrough);
+  const res = await fetch(`/__joplo/p/${enc(projectId)}/cloud/links`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error(await readError(res));
+  const body = await res.json();
+  // 只有成功读到明确的空记录才能按新建处理；错误/旧接口响应不能悄悄变成公开预选。
+  const main = body?.links?.main;
+  if (!body?.links || typeof body.links !== 'object' || !('main' in body.links)
+    || !(main === null || typeof main === 'object' && !Array.isArray(main)
+      && (main.visibility === undefined || main.visibility === 'private' || main.visibility === 'public'))) {
+    throw new MessageError(m.board.cloudLinksFailed);
+  }
+  return body.links;
 }
 
 /** 当前发布任务（没有时 null）。 */

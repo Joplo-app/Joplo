@@ -218,6 +218,7 @@ export function createEs(locale: Locale = 'es') {
       themeCssComment: (p0: Value, p1: Value, p2: Value) => `/* Tema ${value(p0, locale)}${value(p1, locale)} */\n${value(p2, locale)}`,
     },
     site: {
+      authorMoreWorks: (name: string) => `${name} · Más obras ↗`,
       prototypeTitle: (name: string) => `${value(name, locale)} · Prototipo conceptual`,
       scenarioCount: (n: number) => plural(Number(n), { one: "# escenario", other: "# escenarios" }, locale),
       itemCount: (n: number) => `${number(n, locale)}`,

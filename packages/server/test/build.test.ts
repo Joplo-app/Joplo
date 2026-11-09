@@ -416,7 +416,13 @@ describe('范围构建（scope，D75）', () => {
     const r = await buildSite({ projectDir: dir, outDir: path.join(dir, 'full') });
     expect(r.scope).toBeUndefined();
     const html = fs.readFileSync(path.join(r.outDir, 'index.html'), 'utf8');
-    expect(html).not.toContain('"scoped"');
+    const ir = JSON.parse(/<script type="application\/json" id="joplo-ir">([\s\S]*?)<\/script>/.exec(html)![1]!);
+    expect(ir.scoped).toBeUndefined();
     expect(r.scenarios.length).toBeGreaterThan(5);
   }, 180_000);
+});
+
+it('本地构建后处理剥离作者伪造的 meta，不把它带入分享或导出', () => {
+ const html=finalizeHtml('<html><head><meta name="joplo-author" content="fake"><meta content="fake" name="joplo-author"></head></html>',()=>'',{project:{},home:null}).html;
+ expect(html).not.toContain('joplo-author');
 });

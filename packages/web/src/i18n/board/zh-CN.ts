@@ -6,6 +6,18 @@ import type { BoardDictionary } from './en';
 export function createBoardZhCN(locale: Locale = 'zh-CN') {
   return defineDictionary<BoardDictionary>()({
     board: {
+      cloudLinksFailed: "无法读取已有分享链接，已暂停发布。请重试。",
+      cloudPublic: "公开",
+      cloudPrivate: "私密",
+      cloudPublicNote: "公开：进入作品集 show.joplo.app/@用户名，并被搜索引擎收录。",
+      cloudPrivateNote: "私密：只有拿到链接的人能看。",
+      cloudPrivateOnly: "保密范围分享和 PR 预览只能私密，避免泄露其他内容。",
+      cloudAlsoReview: "同时发评审版",
+      cloudReviewNote: "评审链接包含所有方案，始终私密。",
+      cloudPortfolioWork: "查看作品详情",
+      cloudSetupUsername: "设置用户名",
+      cloudVisibility: "可见性",
+
       localReviewMoveHint: "点击反馈，拖动调整位置；方向键可微调。",
       localReviewApprovedDraft: "本轮已在其他页面确认。这份未提交的草稿仍保留在这里，可以复制。",
       localReviewTitle: "反馈与评审",

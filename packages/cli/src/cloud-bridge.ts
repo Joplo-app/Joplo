@@ -104,7 +104,7 @@ export function cloudBridge(opts: BridgeOptions): CloudBridge {
       try {
         // 朗读额度（D85）与账号一起取；旧云端（404）或这一项出错时只是不显示
         const [me, v] = await Promise.all([c.me(auth.token), fetchVoiceInfo(c, auth.token).catch(() => null)]);
-        return { signedIn: true, server: c.server, email: me.user.email, plan: me.plan, ...(me.storage ? { storage: me.storage } : {}), ...(v ? { voice: v.quota } : {}) };
+        return { signedIn: true, server: c.server, email: me.user.email, plan: me.plan, ...(me.storage ? { storage: me.storage } : {}), ...(v ? { voice: v.quota } : {}), ...(me.username !== undefined ? { username: me.username } : {}), ...(me.portfolioUrl !== undefined ? { portfolioUrl: me.portfolioUrl } : {}) };
       } catch (e) {
         if (e instanceof CloudError && AUTH_CODES.has(e.code)) return signedOut(e.message, fixOf(e, c.server));
         // 云端暂时连不上：仍然算已登录（发布时再报网络错误），邮箱用本机登录里记的
@@ -113,14 +113,19 @@ export function cloudBridge(opts: BridgeOptions): CloudBridge {
       }
     },
 
+    async links(projectDir) {
+      const { readShareRecord } = await import('./cloud-share.ts');
+      return readShareRecord(projectDir, client(() => undefined, new Set()).server);
+    },
+
     async publish(projectDir: string, request: CloudPublishRequest, progress: (line: string) => void): Promise<CloudPublishResult> {
       const secrets = new Set<string>();
       const redact = redactor(secrets);
       const c = client((line) => progress(redact(line)), secrets);
       try {
         const { share } = await import('./cloud-share.ts');
-        const { result, plan } = await share(c, projectDir, { ...(request.scenarios?.length ? { scenarios: request.scenarios } : {}), ...(request.features?.length ? { features: request.features } : {}) }, opts.build, opts.render);
-        return { shareId: result.shareId, url: result.url, expiresAt: result.expiresAt, version: result.version, plan, ...(result.scope ? { scope: result.scope } : {}), ...(result.storage ? { storage: result.storage } : {}) };
+        const { result, plan } = await share(c, projectDir, { public: request.visibility === 'public', private: request.visibility === 'private', review: request.review, ...(request.scenarios?.length ? { scenarios: request.scenarios } : {}), ...(request.features?.length ? { features: request.features } : {}) }, opts.build, opts.render);
+        return { shareId: result.shareId, url: result.url, expiresAt: result.expiresAt, version: result.version, plan, ...(result.scope ? { scope: result.scope } : {}), ...(result.storage ? { storage: result.storage } : {}), ...(result.mode ? { mode: result.mode } : {}), ...(result.visibility ? { visibility: result.visibility } : {}), ...(result.portfolio ? { portfolio: result.portfolio } : {}), ...(result.review ? { review: { url: result.review.url, shareId: result.review.shareId } } : {}) };
       } catch (e) {
         const code = e instanceof CloudError || e instanceof JoploError ? e.code : 'INTERNAL';
         // 检查没过：带上第一条错误的位置，看板里直接能看到改哪里
