@@ -6,13 +6,14 @@ import { en, type Dictionary } from '../i18n/en';
  * 时长是每一步时间计划（core 的 stepPlan，与演示控制器同一份：操作演示 + 停留与朗读估算中较长者）之和，文字用当前语言的字幕（dwellTexts）。
  * 朗读是估算、切层引导只在播放时才知道，所以写「约」。
  *
- * 影片（D102）：形态的判断在这里（Entry 能力），播放器、嵌入与截图页（RenderApp）都只按 film 字段画。
- * - 第一章（顺序里的第一个切片）的第 0 步是影片封面：标题、简介、给谁看、「N 章 · 约 M」；
- * - 从中间某一章打开时是这一章的封面：「第 n 章 · 影片标题」、章节标题与 description；支线不编号。
- * 影片封面的标题、简介、给谁看与时长只从 Entry 取（Entry.ms / EntrySlice.ms），不另算。功能演示的封面不变（film = null）。
+ * 独立作品（D102 修订，Entry.featureId === null）：能力的判断在这里，播放器、嵌入与截图页（RenderApp）都只按 entry 字段画。
+ * - 顺序里第一个切片的第 0 步是作品封面：标题、简介、给谁看、「N 章 · 约 M」或「N 个场景 · 约 M」；
+ * - 从中间某个切片打开时是这个切片的封面：linear 写「第 n 章 · 作品标题」（支线写「支线」），independent 只写作品标题；
+ *   再加切片标题与它自己的 description。
+ * 标题、简介、给谁看与时长只从 Entry 取（Entry.ms / EntrySlice.ms），不另算。挂了功能的条目（无论切片是不是章节）封面不变（entry = null）。
  */
 import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, scenarioPlanMs, entryOf, type Project, type RoleInfo, type Scenario, type Step, type Entry } from '@joplo-app/core/runtime';
-import { chapterNumber, filmMetaText, firstSlice } from './work-view';
+import { chapterNumber, entryMetaText, firstSlice, isLinear } from './work-view';
 
 export type Duration = { unit: 's' | 'min'; value: number };
 
@@ -32,31 +33,37 @@ export type CoverContent = {
   duration: Duration;
   /** 出场角色（导演层的角色与换人的过渡卡），按功能里声明的顺序；没有角色的项目为空。 */
   roles: RoleInfo[];
-  /** 影片的封面信息；功能演示为 null（外观不变）。 */
-  film: FilmCover | null;
+  /** 独立作品的封面信息；挂了功能的条目为 null（外观不变）。 */
+  entry: EntryCover | null;
 };
 
-/** 影片封面（at = film，第一章）或章节封面（at = chapter，从中间某一章打开）。 */
-export type FilmCover = {
-  at: 'film' | 'chapter';
-  /** 影片标题、简介、给谁看（Entry）。 */
+/** 独立作品的封面（at = entry，顺序里的第一个切片）或切片封面（at = slice，从中间某个切片打开）。 */
+export type EntryCover = {
+  at: 'entry' | 'slice';
+  /** 切片是不是章节（Entry.sequencing = linear）：决定小字写「第 n 章」还是只写作品标题。 */
+  linear: boolean;
+  /** 作品标题、简介、给谁看（Entry）。 */
   title: string;
   summary: string | null;
   audience: string | null;
-  /** 「5 章 · 约 4 分 40 秒」（filmMetaText）。 */
+  /** 「5 章 · 约 4 分 40 秒」/「3 个场景 · 约 40 秒」（entryMetaText）。 */
   meta: string;
-  /** 章节在播放顺序里的编号（1 起）；影片封面与支线为 null。 */
+  /** linear 时切片在播放顺序里的编号（1 起）；independent 与支线为 null。 */
   chapter: number | null;
+  /** 这个切片在不在连续播放顺序里（支线为 false）。 */
+  inSequence: boolean;
 };
 
-function filmCover(work: Entry, scenarioId: string, i18n: Dictionary): FilmCover {
+function entryCover(entry: Entry, scenarioId: string, i18n: Dictionary): EntryCover {
   return {
-    at: work.sequencing !== 'linear' || firstSlice(work)?.id === scenarioId ? 'film' : 'chapter',
-    title: work.title,
-    summary: work.summary.trim() || null,
-    audience: work.audience,
-    meta: filmMetaText(work, i18n),
-    chapter: chapterNumber(work, scenarioId),
+    at: firstSlice(entry)?.id === scenarioId ? 'entry' : 'slice',
+    linear: isLinear(entry),
+    title: entry.title,
+    summary: entry.summary.trim() || null,
+    audience: entry.audience,
+    meta: entryMetaText(entry, i18n),
+    chapter: chapterNumber(entry, scenarioId),
+    inSequence: entry.slices.find((s) => s.id === scenarioId)?.inSequence ?? false,
   };
 }
 
@@ -104,22 +111,24 @@ export function coverFor(project: Project, scenarioId: string | null | undefined
   if (!sc || sc.steps.length === 0) return null;
   const opt = project.options[sc.optionId];
   const feat = opt ? project.features[opt.featureId] : undefined;
-  const work = feat && (entryOf(project, feat.id)?.featureId === null || entryOf(project, feat.id)?.sequencing === 'linear') ? entryOf(project, feat.id) : null;
-  const film = work ? filmCover(work, sc.id, i18n) : null;
-  // 影片：时长只读 Entry（影片封面 = 顺序里各章之和，章节封面 = 这一章）；说明只用章节自己的 description
+  // 只问能力：没有挂功能的条目（独立作品）用作品封面；挂了功能的条目保持 D61 场景封面
+  const found = feat ? entryOf(project, feat.id) : null;
+  const work = found && found.featureId === null && found.workId === sc.optionId ? found : null;
+  const cover = work ? entryCover(work, sc.id, i18n) : null;
+  // 时长只读 Entry（作品封面 = 顺序里各切片之和，切片封面 = 这一个）；说明只用切片自己的 description
   const slice = work?.slices.find((s) => s.id === sc.id);
-  const ms = film ? (film.at === 'film' ? work!.ms : (slice?.ms ?? 0)) : scenarioMs(project, sc, i18n);
+  const ms = cover ? (cover.at === 'entry' ? work!.ms : (slice?.ms ?? 0)) : scenarioMs(project, sc, i18n);
   return {
     scenarioId: sc.id,
     feature: feat?.name ?? null,
     option: opt?.name ?? null,
     title: sc.name,
-    ...(film ? describe((sc.description ?? '').trim(), '') : describe((sc.description ?? '').trim(), (feat?.goal ?? '').trim())),
+    ...(cover ? describe((sc.description ?? '').trim(), '') : describe((sc.description ?? '').trim(), (feat?.goal ?? '').trim())),
     steps: sc.steps.length,
     ms,
     duration: approxDuration(ms),
     roles: rolesIn(project, sc),
-    film,
+    entry: cover,
   };
 }
 

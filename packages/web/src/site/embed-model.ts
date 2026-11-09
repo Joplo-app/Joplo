@@ -6,12 +6,13 @@
  * - 默认显示封面、不自动播放；只有 `autoplay` 恰好是 `1` 才跳过封面直接播放；
  * - `scenario` 写错（不存在、为空）时从默认场景开始，访客看不到报错；未知参数忽略；
  * - 只有 `review` 恰好是 `1` 才是评审模式（review-bridge.ts）。
- * - 影片（D102，形态只看 Entry 能力）：没指定场景时从播放顺序里的第一章开始；切换菜单里的章节带两位编号，支线不编号；
- *   封面写影片标题与「影片 · N 章 · 约 M」。功能演示的封面与菜单不变。
+ * - 能力（D102 修订，只看 Entry）：切片是章节（sequencing linear）时，没指定场景就从播放顺序里的第一章开始，
+ *   切换菜单里的章节带两位编号（支线不编号），封面写“N 章”；独立作品（featureId = null）的封面写作品标题与
+ *   「N 章 · 约 M」/「N 个场景 · 约 M」。挂了功能、切片独立的条目，封面与菜单与以前一样。
  */
-import { embedScenarioIds, embedStartScenario, entryOf, type Project } from '@joplo-app/core/runtime';
+import { embedScenarioIds, embedStartScenario, entryOf, type Entry, type Project } from '@joplo-app/core/runtime';
 import { en, type Dictionary } from '../i18n/en';
-import { filmMetaText, filmOfScenario, firstSlice, sliceLabel } from '../player/work-view';
+import { entryMetaText, entryOfScenario, firstSlice, isLinear, sliceLabel } from '../player/work-view';
 import { siteHash } from '../runtime/route';
 import { isFullscreenKey } from '../player/fullscreen';
 
@@ -36,39 +37,59 @@ export function embedInitial(project: Project, params: EmbedParams): { scenarioI
   // 评审模式（评审版含所有方案）：scenario 可以指向任何方案的场景；普通嵌入只认可播放列表里的场景
   const any = params.review && params.scenario && Object.prototype.hasOwnProperty.call(project.scenarios ?? {}, params.scenario) ? params.scenario : null;
   const start = any ?? embedStartScenario(project, params.scenario);
-  // 没指定（或写错）场景、默认落在一支影片上时：从它的第一章开始（影片封面画在这里）
+  // 没指定（或写错）场景、默认落在章节上时：从播放顺序里的第一章开始（封面画在这里）
   const asked = !!any || (!!params.scenario && start === params.scenario);
-  const film = !asked && start ? filmOfScenario(project, start) : null;
-  return { scenarioId: (film ? firstSlice(film)?.id : null) ?? start, covered: !params.autoplay };
+  const entry = !asked && start ? entryOfScenario(project, start) : null;
+  return { scenarioId: (entry && isLinear(entry) ? firstSlice(entry)?.id : null) ?? start, covered: !params.autoplay };
 }
 
-/** 场景切换菜单：多个功能时写“功能 · 场景”，只有一个功能时只写场景名。影片的章节写“01 · 标题”（支线不编号），按播放顺序。 */
+/** 场景切换菜单：多个条目时写“条目 · 场景”，只有一个时只写场景名。章节写“01 · 标题”（支线不编号），按播放顺序。 */
 export function embedScenarioItems(project: Project, currentId: string | null, i18n: Dictionary = en): { id: string; label: string; current: boolean }[] {
   const ids = embedScenarioIds(project);
   const features = new Set(ids.map((id) => project.options[project.scenarios[id]!.optionId]?.featureId));
-  const films = new Map([...features].flatMap((fid) => (fid && entryOf(project, fid)?.sequencing === 'linear' ? [[fid, entryOf(project, fid)!] as const] : [])));
-  // 影片的章节按 Entry 的切片顺序（顺序里的章节在前、支线在后）；功能演示保持原来的顺序
-  const order = films.size ? ids.map((id, i) => [id, i] as const).sort(([a, i], [b, j]) => {
+  const linearEntries = new Map(
+    [...features].flatMap((fid): (readonly [string, Entry])[] => {
+      const entry = fid ? entryOf(project, fid) : null;
+      return entry && isLinear(entry) ? [[entry.id, entry] as const] : [];
+    }),
+  );
+  // 章节按 Entry 的切片顺序（顺序里的章节在前、支线在后）；切片独立的条目保持原来的顺序
+  const order = linearEntries.size ? ids.map((id, i) => [id, i] as const).sort(([a, i], [b, j]) => {
     const fa = project.options[project.scenarios[a]!.optionId]?.featureId ?? '';
     const fb = project.options[project.scenarios[b]!.optionId]?.featureId ?? '';
-    if (fa !== fb || !films.has(fa)) return i - j;
-    const w = films.get(fa)!;
+    if (fa !== fb || !linearEntries.has(fa)) return i - j;
+    const w = linearEntries.get(fa)!;
     return w.slices.findIndex((s) => s.id === a) - w.slices.findIndex((s) => s.id === b);
   }).map(([id]) => id) : ids;
   return order.map((id) => {
     const s = project.scenarios[id]!;
     const fid = project.options[s.optionId]?.featureId ?? '';
     const f = project.features[fid];
-    const film = films.get(fid);
-    const name = film ? sliceLabel(film, id, s.name, i18n) : s.name;
+    const linear = linearEntries.get(fid);
+    const name = linear ? sliceLabel(linear, id, s.name, i18n) : s.name;
     return { id, label: features.size > 1 && f ? `${f.name} · ${name}` : name, current: id === currentId };
   });
 }
 
-/** 嵌入封面上影片的文字（D102）：标题、「影片 · N 章 · 约 M」、播放按钮；起始场景属于功能演示时为 null（封面不变）。 */
-export function embedFilmCover(project: Project, scenarioId: string | null, i18n: Dictionary = en): { title: string; meta: string; play: string } | null {
-  const work = filmOfScenario(project, scenarioId);
-  return work ? { title: work.title, meta: `${i18n.player.film} · ${filmMetaText(work, i18n)}`, play: i18n.site.embedPlayFilm } : null;
+/** 控制条上当前切片的名字：linear 顺序里的章节「01 · 标题」；其余为 null（调用方照旧写场景名）。 */
+export function embedSliceName(project: Project, scenarioId: string | null, i18n: Dictionary = en): string | null {
+  const entry = entryOfScenario(project, scenarioId);
+  const sc = scenarioId ? project.scenarios[scenarioId] : undefined;
+  return entry && sc && isLinear(entry) ? sliceLabel(entry, sc.id, sc.name, i18n) : null;
+}
+
+/**
+ * 嵌入封面的文字（D102 修订）：
+ * - 起始切片属于独立作品：作品标题、「N 章 · 约 M」/「N 个场景 · 约 M」、「播放」；
+ * - 挂了功能：项目名、「可点击的原型演示 · N 个场景」，切片全是章节时写“N 章”；「播放演示」（与以前一样）。
+ */
+export function embedCover(project: Project, scenarioId: string | null, i18n: Dictionary = en): { title: string; meta: string; play: string } {
+  const entry = entryOfScenario(project, scenarioId);
+  if (entry && entry.featureId === null) return { title: entry.title, meta: entryMetaText(entry, i18n), play: i18n.site.embedPlay };
+  const ids = embedScenarioIds(project);
+  const owners = new Set(ids.map((id) => entryOfScenario(project, id)));
+  const chapters = owners.size > 0 && [...owners].every((e) => !!e && isLinear(e));
+  return { title: project.name, meta: chapters ? i18n.site.embedCoverMetaChapters(ids.length) : i18n.site.embedCoverMeta(ids.length), play: i18n.site.embedPlayDemo };
 }
 
 /** 步骤进度（0–1）：位置 / 步数；没有步骤时为 0。 */

@@ -15,7 +15,7 @@ import { useReviewDrag } from './useReviewDrag';
 export function LocalReview({ projectId, project, optionId, context, version, enabled, completed, onOpen, approvable = true }: {
   projectId: string; project: Project; optionId: string; context: LocalReviewLocation | null;
   version: number; enabled: boolean; completed: boolean; onOpen: () => void;
-  /** 能否“确认方案”：影片（D102）没有方案这一层，只留反馈，不出确认按钮。 */
+  /** 能否“确认方案”：独立作品（D102 修订，entry.featureId === null）没有方案这一层，只留反馈，不出确认按钮。 */
   approvable?: boolean;
 }) {
   const { t } = useBoardI18n();

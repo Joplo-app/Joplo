@@ -2,7 +2,7 @@
 
 `en.ts` 是共用词典唯一源，包含 `player`（播放控件、字幕、通知）、`stage`（渲染器默认文字、内置主题名称）、`site`（观众侧首页、嵌入模式 `?embed=1` 与评审模式 `?embed=1&review=1`）。`board/en.ts` 是创作侧唯一源，包含看板、检查器、外观、导出状态。发布站禁止运行时导入 `board/`；DemoController 的创作侧通知通过 type-only schema + `reference` 保存消息键，发布站不带这些文案。
 
-当前源词典共 **646 个叶子键**：player 151（其中 4 个是 D61 场景封面 `cover*`，1 个是 D67 的 `forRoles`）、stage 50、site 29（其中 9 个是发布站嵌入模式 `embed*`，2 个是评审模式 `reviewPick*`）、board 416（包括数字／列表格式化函数；其中 13 个是 D66 导出组件的安装卡 `exportSetup*` 等，4 个是 D67 情况的优先级与期望结果，41 个是 D76 发布到 Joplo Cloud 的 `cloud*`）。
+当前源词典共 **780 个叶子键**：player 188（其中 4 个是 D61 场景封面 `cover*`，1 个是 D67 的 `forRoles`，12 个是 D102 修订的切片叫法与编号：`chapterNo` / `clock`、`chapterCount` / `sideChapterCount` / `chaptersAbout` / `chapterKicker` / `sideChapter(s)`、`scenariosAbout` / `sideScenarioCount` / `sideScenarios`、`watchScenarioOf`）、stage 52、site 39（其中 9 个是发布站嵌入模式 `embed*`，2 个是评审模式 `reviewPick*`，5 个是 D102 修订的 `works` / `watch` / `watchFor` / `embedPlay` / `embedCoverMetaChapters`）、board 501（包括数字／列表格式化函数；其中 13 个是 D66 导出组件的安装卡 `exportSetup*` 等，4 个是 D67 情况的优先级与期望结果，41 个是 D76 发布到 Joplo Cloud 的 `cloud*`，10 个是 D102 修订的条目下拉、作品左栏、审片命令与空状态）。D102 修订的文案按能力命名（章节 / 场景 / 作品 / 草稿），没有“影片 / 功能演示”这类形态类别。
 
 十种语言均有完整的共用与 board 词典，通过两个 `dictionaries.ts` 注册。没有英文回退或新增运行时依赖，数字、列表和复数按各自 locale 格式化。
 

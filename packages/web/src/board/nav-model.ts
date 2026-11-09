@@ -1,4 +1,5 @@
 import { orderedFeatures, entriesOf, type Entry } from '@joplo-app/core/runtime';
+import { isLinear } from '../player/work-view';
 import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 看板左栏与顶栏下拉的视图模型（纯函数，创作侧，不进发布站）：方案字母与名字、缺口统计、其他方案的小标、
@@ -99,37 +100,43 @@ export function featureMenu(project: Project, currentFeatureId: string | null, i
   });
 }
 
-/** 顶栏作品下拉的一项（D102）：分组标题，或一个作品（名字、右侧摘要、是否当前）。 */
+/** 顶栏条目下拉的一项（D102 修订）：分组标题，或一个条目（名字、右侧摘要、是否当前、挂着的功能、草稿）。 */
 export type WorkMenuEntry = { id: string; heading: string } | { id: string; name: string; hint: string; current: boolean; featureId: string | null; draft: boolean };
 
-/** 影片在下拉里的摘要：「5 章 · 4:40」，草稿再加「草稿 · 不发布」。时长就是 Entry.ms。 */
-export function filmMenuHint(work: Entry, i18n: BoardMessages = boardEnglish): string {
-  const seq = work.slices.filter((s) => s.inSequence).length;
-  const size = seq > 0 ? i18n.board.filmMenuHint(seq, i18n.player.clock(work.ms)) : work.slices.length ? i18n.player.sideChapterCount(work.slices.length) : i18n.player.chapterCount(0);
-  return work.draft ? `${size} · ${i18n.board.draftNotPublished}` : size;
+/** 独立作品在下拉里的摘要（按能力）：「5 章 · 4:40」/「3 个场景 · 0:40」，草稿再加「草稿 · 不发布」。时长就是 Entry.ms。 */
+export function entryMenuHint(entry: Entry, i18n: BoardMessages = boardEnglish): string {
+  const linear = isLinear(entry);
+  const seq = entry.slices.filter((s) => s.inSequence).length;
+  const time = i18n.player.clock(entry.ms);
+  const size = seq > 0
+    ? (linear ? i18n.board.chaptersClock(seq, time) : i18n.board.scenariosClock(seq, time))
+    : entry.slices.length
+      ? (linear ? i18n.player.sideChapterCount(entry.slices.length) : i18n.player.sideScenarioCount(entry.slices.length))
+      : linear ? i18n.player.chapterCount(0) : i18n.site.scenarioCount(0);
+  return entry.draft ? `${size} · ${i18n.board.draftNotPublished}` : size;
 }
 
 /**
- * 顶栏「作品 ▾」（D102）：按形态分两组，先影片后功能演示；只有一种形态时不出分组标题。
- * 功能演示的一项与原来的 featureMenu 完全相同（选定方案与缺口数），所以只有功能演示的项目下拉不变。
+ * 顶栏「条目 ▾」（D102 修订）：分两组，先“作品”（独立作品）后“功能”；只有一组时不出分组标题。
+ * 功能的一项与原来的 featureMenu 完全相同（选定方案与缺口数），所以只有功能的项目下拉与以前一样。
  */
 export function workMenu(project: Project, currentFeatureId: string | null, i18n: BoardMessages = boardEnglish): WorkMenuEntry[] {
-  const works = new Map(entriesOf(project).map((w) => [w.id, w]));
-  const films = [...works.values()].filter((w) => w.featureId === null).map((w) => ({ id: w.id, name: w.title, hint: filmMenuHint(w, i18n), current: w.id === currentFeatureId, featureId: null, draft: w.draft }));
-  const demos = featureMenu(project, currentFeatureId, i18n).filter((f) => works.get(f.id)?.featureId !== null).map((f) => ({ ...f, featureId: f.id, draft: false }));
-  if (!films.length || !demos.length) return [...films, ...demos];
-  return [{ id: 'films', heading: i18n.board.films }, ...films, { id: 'demos', heading: i18n.board.featureDemos }, ...demos];
+  const entries = new Map(entriesOf(project).map((e) => [e.id, e]));
+  const works = [...entries.values()].filter((e) => e.featureId === null).map((e) => ({ id: e.id, name: e.title, hint: entryMenuHint(e, i18n), current: e.id === currentFeatureId, featureId: null, draft: e.draft }));
+  const features = featureMenu(project, currentFeatureId, i18n).filter((f) => entries.get(f.id)?.featureId != null).map((f) => ({ ...f, featureId: f.id, draft: false }));
+  if (!works.length || !features.length) return [...works, ...features];
+  return [{ id: 'works', heading: i18n.site.works }, ...works, { id: 'features', heading: i18n.site.features }, ...features];
 }
 
-/** 审片命令（D102 方案 A）：整支影片的胶片条（硬切与静止），从播放顺序里的第一章开始接力。没有章节时 null。 */
-export function filmReviewCommand(work: Entry): string | null {
-  if (work.sequencing !== 'linear') return null;
-  const first = work.slices.find((s) => s.inSequence) ?? work.slices[0];
+/** 审片命令（D102 方案 A，只有切片是章节时）：整组章节的胶片条（硬切与静止），从播放顺序里的第一章开始接力。没有切片时 null。 */
+export function reviewStripCommand(entry: Entry): string | null {
+  if (!isLinear(entry)) return null;
+  const first = entry.slices.find((s) => s.inSequence) ?? entry.slices[0];
   return first ? `npx joplo render --film --chain --scenario-id ${first.id}` : null;
 }
 
-/** 空影片的提示里写哪个文件：影片源码的相对路径（Feature.source 去掉行列）；没有时按约定写 works/<键>.tsx。 */
-export function filmFile(project: Pick<Project, 'features'>, featureId: string): string {
+/** 空作品的提示里写哪个文件：作品源码的相对路径（Feature.source 去掉行列）；没有时按约定写 works/<键>.tsx。 */
+export function workFile(project: Pick<Project, 'features'>, featureId: string): string {
   const src = project.features[featureId]?.source ?? '';
   const file = src.replace(/:\d+:\d+$/, '');
   return file || `works/${featureId}.tsx`;

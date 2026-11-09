@@ -3,7 +3,7 @@
  *
  * - resolvePlay：从 URL 算出要播放的方案、场景、位置。情况 c 优先：播放当前方案里覆盖它的第一个场景；
  *   方案没有表达它（覆盖状态不是“已表达”）时返回 gap，画面静态展示方案的页面。
- *   没写场景时：功能演示取方案的第一个场景；影片（D102）取播放顺序里的第一章（影片封面画在它的第 0 步）。
+ *   没写场景时：切片独立时取方案的第一个场景；切片是章节（Entry.sequencing = linear）时取播放顺序里的第一章（封面画在它的第 0 步）。
  * - usePlaySync：URL 变化 → 控制器定位（不弹“已切换”提示）；控制器的场景 / 位置变化 → 写回 URL（replaceState）。
  *   两个方向都只在不一致时动作，所以不会来回触发。
  */
@@ -12,7 +12,7 @@ import { entryOf, type Coverage, type Project, type Scenario } from '@joplo-app/
 import type { DemoController, Snapshot } from '../runtime/demo';
 import type { PlayRoute } from '../runtime/route';
 import { optionsOf, scenariosOf } from '../runtime/views';
-import { firstSlice } from './work-view';
+import { firstSlice, isLinear } from './work-view';
 
 export type Resolved = {
   ok: boolean;
@@ -42,7 +42,11 @@ export function resolvePlay(project: Project, play: PlayRoute): Resolved {
     const byCase = ids[0] ?? scs.find((s) => s.caseIds.includes(caseId))?.id ?? null;
     if (cov?.status === 'expressed' && byCase) scenarioId = byCase;
     else gap = { status: cov?.status ?? 'none', basis: cov?.basis, ...(cov?.reason ? { reason: cov.reason } : {}) };
-  } else scenarioId = (entryOf(project, f.id)?.sequencing === 'linear' ? firstSlice(entryOf(project, f.id)!)?.id : null) ?? scs[0]?.id ?? null;
+  } else {
+    // 章节从播放顺序里的第一章开始；只认播放用的那件作品（看板里切到功能的其他方案时用那个方案自己的第一个场景）
+    const entry = entryOf(project, f.id);
+    scenarioId = (entry && entry.workId === optionId && isLinear(entry) ? firstSlice(entry)?.id : null) ?? scs[0]?.id ?? null;
+  }
   const total = scenarioId ? project.scenarios[scenarioId]!.steps.length : 0;
   const step = Math.max(0, Math.min(play.step ?? 0, total));
   return { ok: true, optionId, scenarioId, step, caseId, gap };

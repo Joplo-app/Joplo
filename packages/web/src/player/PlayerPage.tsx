@@ -26,7 +26,7 @@ import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
 import { Subtitle } from './Subtitle';
 import { isFullscreenKey, useFullscreen, useIdleVisible } from './fullscreen';
-import { UpNextCard, usePhoneLayout, WatchView, type Chapter } from './WatchView';
+import { UpNextCard, usePhoneLayout, WatchView, type Chapter, type SliceNaming } from './WatchView';
 import { spokenSubtitleFor, stepTitleFor } from './subtitle-content';
 import { StepTitle } from './StepTitle';
 import { coverFor, coverShown } from './cover-content';
@@ -482,7 +482,7 @@ export type PlayerPageProps = {
    * 发布站：在手机上像看视频一样看（mobile_watch）。传入时，设备是手机就换成 WatchView（竖屏播放页 / 横屏沉浸）；
    * 电脑和平板不受影响。chapters 是选定方案的场景（按顺序）。
    */
-  watch?: { title: string; chapters: Chapter[]; onChapter: (id: string) => void; onRestart: () => void };
+  watch?: { title: string; chapters: Chapter[]; naming?: SliceNaming; onChapter: (id: string) => void; onRestart: () => void };
 };
 
 export function PlayerPage(p: PlayerPageProps) {
@@ -753,6 +753,7 @@ export function PlayerPage(p: PlayerPageProps) {
         title={p.watch.title}
         brand={<Brand onClick={p.onBrand} href={p.brandHref} />}
         chapters={p.watch.chapters}
+        naming={p.watch.naming}
         onChapter={p.watch.onChapter}
         onRestart={p.watch.onRestart}
         author={<AuthorLink author={p.author} />}
