@@ -289,6 +289,12 @@ content 的 camera 工厂产生插件效果信封，插件校验 `CAMERA_UNKNOWN
 | `data-jreport-viewport` / `data-jreport-surface` | 任意插件绘制的 DOM 能力标记 | render 的通用报告：平移视口内仅检查下一目标出画、报告零尺寸表面；引擎不含组件名 |
 | `FlowOpts.from/layer` → `Scenario.initial.layer` | 作者接力声明 → 依赖编译 / 结尾回放 → 初始 state 与 layer | initialState / cameraAt / 插件初始快照；from 与作者声明不进入 IR |
 | `SheetOptions.{columns,cellWidth}` / `SheetResult.{path,steps,warnings}` | CLI --sheet/--columns 或 server API → renderSheet | 原 render 路由逐步截图 → 网格 PNG；无新增项目 IR 字段 |
+| `PluginDef.properties[name].values`（D92） | Node 清单 → 宿主声明校验（仅字符串属性） | 编译节点值必须是其中之一，否则 PLUGIN_PROPERTY_INVALID 并列出可选值；`project.plugins[id].properties` 原样携带 |
+| content 属性 `enter/exit`、`enterMs/enterDelay/exitMs/exitDelay`（D92） | 作者 JSX 字面量 → 声明属性校验 → 节点 props → `data-jp-content-enter*` / `-exit*` | content observe：新出现的节点按 enter 播放；MutationObserver 在提交后同步取到被移除的子树，按 exit 克隆幽灵放回原父元素原位置、按上一次提交缓存的布局绝对定位；动画交给引擎时钟采样；跳转 / 自由体验 / 停止 / 静态 / 卸载时落定 |
+| `camera(…, { drift })`、`<Canvas drift>`、`<Canvas safe>`（D92） | 作者 → content effect / node 钩子校验（CAMERA_INVALID）→ drift 随镜头状态写入 `step.ext.content.scenes[sceneId].camera.drift`；Canvas 的 drift / safe 是节点 props | Canvas 用 `frame.clock.timeMs` 逐帧计算镜头段（从实际取景出发 → 落定 → 漂移到终点）；`frame.animate=false` 显示落定取景；safe 只影响带目标的取景与漂移中心 |
+| `Scenario.from`（D92） | 编译 from 接力 → IR；scope 裁掉范围外的 from | 编译期媒体快照继承；演示控制器连续播放时一镜到底（不倒计时、不 stop、不换 epoch） |
+| 媒体快照 `<plugin>:<track>>[资源]` 淡出键（D92） | 编译期：换曲且有 fadeMs 时旧曲移到该键并带 stopAfterMs | MediaEngine 把旧槽位挪到淡出键继续播；同一 seek 内偏移跟随引擎时钟；`Snapshot.seek` 变化才按快照重新定位 |
+| `FilmOptions` / `FilmResult`、`VideoOptions` / `VideoResult`（D92） | CLI `render --film/--video` 或 server API → renderFilm / renderVideo | 渲染路由 `record=1&chain=1&voice=estimate`；胶片条 PNG + JSON、webm；无新增项目 IR 字段 |
 
 ### 证据与边界
 

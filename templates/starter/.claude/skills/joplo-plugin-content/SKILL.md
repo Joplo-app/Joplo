@@ -54,6 +54,14 @@ flow('What does it read?', { from: 'hook' })
 ```
 - Anti-deck test: three or more steps that only show or hide whole panels, or a frame that is mostly text, means rebuild those steps as objects that move or change.
 
+## 3b. Transitions, drift and the safe area
+- enter / exit on any element inside the Canvas (world or screen layer): fade, rise, zoom, shrink, wipe, iris. Timing: enterMs / enterDelay / exitMs / exitDelay (0–10000 ms literals; defaults 600 / 450). Each preset is an "away" pose: enter goes away → the element's own look, exit goes own look → away. So rise enters from below and exits sinking back; zoom lands from slightly larger and exits flying toward the camera; shrink grows from smaller and exits receding; wipe reveals left → right; iris opens from the centre. Set transform-origin in CSS to say where zoom/shrink grow from (a menu from its taskbar, a bubble from its tail).
+- enter plays when an element first appears (a new DOM node) during playback; exit plays when when becomes false: a non-interactive ghost copy keeps the last look and animates out, then disappears. Put enter + exit on two exclusive siblings in the same step for a crossfade. A same-motion-key element that flies (FLIP) never also enters or leaves.
+- Pick by meaning: fade for a whole-world swap under cover, rise for things that come from below (menus from a taskbar, keyboards, receipts), shrink for windows opening, zoom for something punching toward the viewer, wipe for typed/printed results, iris for a reveal from a point. Keep two or three per piece; do not give every element the same entrance.
+- camera(…, { drift }) keeps the camera moving after it lands: a number = zoom factor reached over ms (default 8000), or { zoom, x, y, ms } with x/y in design px; false stops it. <Canvas drift={…}> sets the default for every step; without either, a subtle 4 % / 8 s push applies. Drift eases in and out and stops at its end point; it freezes on pause, records in video, and screenshots/deep links show the settled frame without drift. The next camera move starts from where the drifting camera actually is.
+- <Canvas safe={[top, right, bottom, left]}> (design px) is the part of the view your screen-layer chrome covers. Targeted camera() frames fit inside the rest, and drift zooms around its centre; camera() with no ids still shows the whole world full-bleed.
+- UI life inside one interface (a caret blink, a stepped menu drop) can be CSS @keyframes in the project theme: the engine clock samples them, pause freezes them, static frames show their end state.
+
 ## 4. Choose the information shape, then the picture
 - A number landing; before and after; ranking (bars from zero, length proportional); part of a whole (a strip whose segment widths are the shares); a process (one object going around a loop); misconception then fact; a timeline; a place (tiles or a simple map).
 - Similar sentences get different pictures. Labels sit on the thing they name; no legends when a direct label fits.
@@ -62,7 +70,7 @@ flow('What does it read?', { from: 'hook' })
 ## 5. Motion and layout numbers
 - Camera moves 1–1.5 s, ease in-out. Object flights 0.9 s ease-out; stagger 60–120 ms (motionDelay); slow a landing pointer to 1.5–2 s (motionMs).
 - One primary motion per step; text that is being read does not move.
-- Entrances: put @keyframes and classes in themes/<name>.css and use className (staggered with animationDelay). Screenshots, thumbnails, and jumps show the end state. For a typewriter reveal give each character a short linear fade (about 80 ms) with its own delay; a 1 ms steps(1) animation can stay stuck invisible in Chromium.
+- Entrances and exits: use enter / exit (section 3b); for effects the presets do not cover put @keyframes and classes in themes/<name>.css and use className (staggered with animationDelay). Screenshots, thumbnails, and jumps show the end state. For a typewriter reveal give each character a short linear fade (about 80 ms) with its own delay; a 1 ms steps(1) animation can stay stuck invisible in Chromium.
 - One accent color with a fixed meaning; color means the same thing in every chapter.
 - Size text for the frame you show: about 28 design px is the floor at 1× zoom; a wide shot at 0.5× needs 40 or more, or enlarge the labels for that shot (a bigger variant under the same motion key).
 - Frame by content (camera ids), not by guessed coordinates. Lay the world out as shot-sized clusters of roughly 16:10 (a machine with its output bars and strip, a chat with its bubbles); a cluster much wider than that leaves half the frame empty however you aim.
@@ -84,13 +92,15 @@ flow('What does it read?', { from: 'hook' })
 ## 9. Required: review before handing over
 - npx joplo check until 0 errors. HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it.
 - Storyboard every chapter: npx joplo render --scenario-id <id> --sheet --out board.png prints every step in one image with its caption and narration. Read it frame by frame and assume the first one has problems: half-empty frames, objects cut at the edge, labels overlapping, text too small in wide shots, the chapter label covering content. Fix, then storyboard again.
+- Film-strip every chain of chapters: npx joplo render <dir> --scenario-id <first> --film --chain --out film.png. Fix every red CUT (one-frame full-screen change) unless it is your one deliberate cut, and every grey STILL (no visible change for ≥ 1.5 s). The storyboard cannot show either. Engine checklist: npx joplo skill demo, "Make it play like a film".
 - Play each chapter in the board with Voice on: flights and camera land together, nothing leaves the frame mid-flight, narration finishes before the next step.
 - Evidence, not belief: 'it plays' needs check 0 errors plus a run in the board; 'it looks right' needs the rendered frames; 'it is clear' needs captions-only and frames-only passes that both tell the story.
 - Tell the user what you could not verify (a real voice on a phone, other window sizes).
 
 ## Diagnostics and recovery
-- CAMERA_UNKNOWN: the id must exist in a current layer or stage; frame elements inside this Canvas. CAMERA_INVALID: pad 0–2000, zoom 0.1–10, ms 0–10000, finite numbers only.
-- PLUGIN_PROPERTY_INVALID: motion is a nonempty string; motionDelay/motionMs are finite numbers 0–10000; screen is boolean. These universal properties are literals, not state bindings. Use separate same-key elements with when for a flight between containers.
+- CAMERA_UNKNOWN: the id must exist in a current layer or stage; frame elements inside this Canvas. CAMERA_INVALID: pad 0–2000, zoom 0.1–10, ms 0–10000, drift false | 0.5–2 | { zoom 0.5–2, x/y −2000–2000, ms 500–60000 }, finite numbers only; <Canvas drift> takes the same values and <Canvas safe> is four numbers 0–2000.
+- PLUGIN_PROPERTY_INVALID: motion is a nonempty string; motionDelay/motionMs/enterMs/enterDelay/exitMs/exitDelay are finite numbers 0–10000; screen is boolean; enter/exit are one of fade, rise, zoom, shrink, wipe, iris. These universal properties are literals, not state bindings. Use separate same-key elements with when for a flight between containers.
+- Exit ghosts appear only during playback, never in screenshots, thumbnails, deep links, reduced motion or after a jump. They settle instantly (enter jumps to its end, ghosts vanish) on a jump, stop, scene change and the viewer's first free input, so a click during a transition always acts on the final picture. Ghosts carry no id: camera, hints and Alt-click never target them.
 - Give each visible object one motion key. Hidden previous locations remain available for a later same-key arrival. Avoid duplicate simultaneously visible keys. Independent translate/scale keeps the author's transform intact.
 - Cross-container flights temporarily lift clipping ancestors inside the world and restore their overflow at finish/cancel. During playground edits the flight yields its visual transform to the final usable layout while preserving its animation/time anchor for resume. Do not globally remove device clipping or duplicate the animated control to make it clickable; test first input during a flight.
 - Keep camera and FLIP duration together when both move; motionMs explicitly overrides duration, including 0. animate=false cancels an existing flight and renders the final layout.
@@ -108,4 +118,4 @@ General engine contracts: npx joplo skill plugins
 - [patterns](./topics/patterns.md): Recipes and individual pitfalls
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.3.0 sha256:7037eeacd45fa0c56b2bb91946441b25dc1df377f63cbfa7ae5bc1d1fa8b1a73 -->
+<!-- joplo-skill 0.3.0 sha256:cf2eb8bbdc5d178f393d0555e5c978cd100978a73af9abf860d8e5bfbcdc5094 -->

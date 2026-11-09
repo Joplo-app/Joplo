@@ -30,6 +30,8 @@ npx joplo render [dir] --scenario-id <qid> --out <file> \
   [--step-id <qid>] [--theme <theme>] \
   [--width <pixels> --height <pixels>] [--scale <scale>] [--overwrite]
 npx joplo render [dir] --scenario-id <qid> --out <file> --sheet [--columns <n>] [--theme <theme>] [--overwrite]
+npx joplo render [dir] --scenario-id <qid> --out <file.png> --film [--chain] [--every <ms>] [--columns <n>] [--frames <dir>] [--format text|json] [--overwrite]
+npx joplo render [dir] --scenario-id <qid> --out <file.webm> --video [--chain] [--overwrite]
 ```
 
 可省略的 dir 默认为当前目录。`render` 的 scenario-id、out 必填。主输出和帮助写 stdout，服务日志、截图告警和项目依赖版本提示写 stderr；用法错误或缺少分享选择（CHOICE_REQUIRED）退出 2，领域或执行失败退出 1，云端需要登录（AUTH_REQUIRED / AUTH_EXPIRED）退出 3，账号空间不够（share）退出 6，Joplo Cloud 朗读额度不够（voice，`TTS_QUOTA_EXCEEDED`）退出 7，成功退出 0。
@@ -238,8 +240,14 @@ npx joplo build
 | `--width <pixels>` / `--height <pixels>` | 截图输出宽高，必须同时给出正整数；按比例容纳页面，不改变页面自己的 viewport 或响应式断点 |
 | `--scale <scale>` | 有限正数，像素倍率 |
 | `--overwrite` | 允许覆盖已有截图；仍不得覆盖项目源码或 `.joplo/` |
-| `--sheet` | 分镜：把场景从初始画面到最后一步逐步截图，拼成一张网格图，每格下面写步号、字幕与旁白（`narrate`，没有时为 `say`）；各步的截图告警加 `Step n:` 前缀写到 stderr。不能与 `--step-id`、`--width`、`--height` 同用 |
-| `--columns <n>` | 分镜每行几格（1–6，默认 3），只配合 `--sheet` |
+| `--sheet` | 分镜：把场景从初始画面到最后一步逐步截图，拼成一张网格图，每格下面写步号、字幕与旁白（`narrate`，没有时为 `say`）；各步的截图告警加 `Step n:` 前缀写到 stderr。不能与 `--step-id`、`--width`、`--height` 同用。分镜只有每一步落定后的画面，看不出硬切与静止；运动用 `--film` 检查 |
+| `--columns <n>` | 分镜每行几格（1–6，默认 3）；胶片条每行几格（默认 8） |
+| `--film` | 胶片条（D92）：用渲染路由的录制模式真实播放场景，Playwright 假时钟按引擎时间逐帧定格（约 50 ms 一帧算相邻帧差），每 `--every` 毫秒取一格；每格标时间、步号、本格最大相邻帧差。红框 = 单帧整屏突变（硬切），灰框 = 至少 1.5 s 没有可见变化（静止）。每个场景一页（多页时文件名加 `-1`、`-2`…），旁边写 `<out>.json`（全部帧的差值、硬切、静止、每次提交前后的最大帧差）。stdout 打印文件路径、时长、换章处的最大帧差以及每个 `CUT` / `STILL`。旁白按估算时长“读”（不出声、不调用朗读服务），停留与开着朗读的发布站一致 |
+| `--video` | 视频：同一录制模式按真实时间录 webm（与看板导出同一个录制器；不含声音） |
+| `--chain` | 配合 `--film` / `--video`：放完接着放同一方案的下一个场景（发布站连续播放的顺序），直到最后一个；`flow({ from })` 接力的章节一镜到底 |
+| `--every <ms>` | 胶片条每格的间隔（默认 250） |
+| `--frames <dir>` | 胶片条的每一格另存为 JPEG，便于全尺寸检查可疑的一帧 |
+| `--format json` | 胶片条结果以 JSON 输出到 stdout |
 
 render 需要**导出组件**（Playwright + Chromium，见下方 `setup export`）。写演示、dev、check、build、share 都不需要它；本地看板的图片和视频导出、share 的预览图需要。没有时：
 

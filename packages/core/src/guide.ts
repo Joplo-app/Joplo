@@ -57,7 +57,7 @@ Joplo compiles trusted TS/TSX into deterministic scenes and schedules their play
 ## Start from the project
 1. Run npx joplo init <dir>, install its dependencies, then npx joplo skill install. In the Joplo source monorepo, initialize with --template ./templates/starter and use the monorepo workspace protocol for local package dependencies before installing; external projects keep pinned published versions. The starter supplies its own plugin choices; a custom project may choose different ones.
 2. Read the installed engine skill and .claude/skills/joplo-plugins/SKILL.md. Read each relevant plugin's entry and component/recipe topics. npx joplo skill lists what this config enables.
-3. Create one feature, one option and a runnable scenario. Run check, inspect the rendered frames, then test the real inputs.
+3. Create one feature, one option and a runnable scenario. Run check, inspect the rendered frames, then test the real inputs. For a short film or explainer that should feel like a video, also run the motion review in npx joplo skill demo ("Make it play like a film") — static frames cannot show hard cuts or frozen pictures.
 4. Required before handing a development round to the user: read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json. A running board alone does not receive feedback for the agent.
 
 ## Binary assets
@@ -270,6 +270,18 @@ Start playback before testing stage gestures: covers and transition cards intent
 - A step's hold controls dwell; narration may extend waiting. The engine estimates spoken time and sequences chapters. Keep a long story in smaller scenarios with from, retaining the previous final state.
 - Transition cards mark a real opening/ending/time shift. Most information should change on the view, not arrive as a text deck. Read story and the installed visual plugins' recipes.
 - Media is provided by an explicitly configured plugin. A viewer gesture unlocks sound; pause/resume/speed share the clock and narration ducks background audio. Static frames stay silent. Read the plugin skill for resources and production limits.
+- Media continuity is engine behavior for every media plugin: a track keeps playing across steps on the engine clock (it only re-seeks on a jump, reset or non-relay chapter change); playing the same resource again continues it; playing a different one with fadeMs crossfades (old out, new in, no silence); a from chapter starts with the music its previous chapter ended with.
+
+## Make it play like a film, not slides (Required for video-like pieces)
+Viewers call a piece "a slide deck" when pictures swap in one frame and then sit still. The static storyboard cannot show either problem, so it never proves the piece moves well.
+- No hard cuts. Every chapter/era/scene seam needs a transition the viewer can follow: carry one object across (a match cut through the subject: push in until it fills the frame, swap the world behind it, pull back), morph a shared object, crossfade layers, or move the camera over the swap. One deliberate cut is a signature move; more than that is a deck. A scene change must not reset all visual context.
+- No dead frames. Nothing on screen may be completely still for more than about 1.5 s; a still composition lasts at most about 3.5 s, and something changes at element level every 2–2.5 s. During reading holds keep a slow, eased camera drift with an end point (constant-speed motion reads as a screensaver). Use the installed visual plugin's drift and enter/exit transitions; read its recipes.
+- One main motion per beat; most beats 2–3 s. hold(seconds) is the author's pacing: a step with hold no longer gets the 3 s reading floor (caption reading time per character and narration still extend it). System steps show their event for about 0.9 s before committing; narration waits keep the engine clock (and therefore drift and transitions) running.
+- Anti-deck gate: before building, write one line per beat — the main moving object, its start → end state, and the verb (push, morph, rise, swap…). If most beats are only fades or panels appearing, redesign them. A contact sheet that reads like slide thumbnails fails.
+- Chapters: chain them with flow({ from }); sequential playback of a from chapter continues in the same shot (no countdown, no reset, music keeps playing). Bring the next chapter's music in on the beat before the visual swap (play the next score with fadeMs; the old track fades out under it — a J-cut). Play the same score again to keep it going. Stop music only at the real ending.
+- Required review: run npx joplo render <dir> --scenario-id <first chapter> --film --chain --out film.png and read every page (one per chapter; red = one-frame full-screen change, grey = nothing visible changed for ≥ 1.5 s). The CLI prints every CUT and STILL with time and step; film.json beside it has the largest adjacent-frame change around every step. Fix every CUT that is not a deliberate signature and every STILL, then film again. Also record --video (real time) and watch it once start to end. Cells are samples on the engine clock; check a suspicious moment with --frames <dir> at full size before changing code — fine textures (1-px checkers, hairlines) shimmer as moiré under zoom or drift and show up as cuts.
+- Review as a picky viewer, not the author: list issues with time code, evidence (frame/metric), impact, severity (blocker / major / minor / note) and verdict (APPROVE / APPROVE_WITH_NOTES / REVISE). Check mechanics first (cuts, stills, overlaps, cropped text), then meaning, then taste; "not cinematic enough" without evidence is not a finding. Do at least two rounds of film → issues → fix, and finish one chapter seam to delivery quality before copying the technique to the others.
+- Static frames (render, --sheet, thumbnails, deep links) show settled pictures: no drift, no half-finished transitions. That is deliberate and is why the film strip is the motion check.
 
 ## Authoring an exploration beside the film
 - Share the same state patch between a scripted action and its free reaction; put camera, media and completion effects only in the scripted step. Do not filter an arbitrary effect array by hand: patch() itself returns an array of writes.
@@ -277,13 +289,13 @@ Start playback before testing stage gestures: covers and transition cards intent
 - Test each interaction at two positions: immediately before its scripted action (it should advance once and stop), and somewhere it is only a free reaction (timeline state must stay unchanged). Then test reset, resumed playback, and a branch's Cancel/Confirm separately.
 
 ## Film framing and control space
-Keep authored navigation outside a transforming picture: use an independently sized visual region from the installed plugin, with the chapter selector, credits and drag affordance in the surrounding stage layout. A camera close-up must not enlarge or move the controls viewers need to pause, seek or recover.
+A camera close-up must not enlarge or move the controls viewers need to pause, seek or recover. Either keep authored navigation outside the transforming picture (an independently sized visual region with the chapter selector, credits and drag affordance in the surrounding layout), or use the installed visual plugin's fixed screen layer for full-bleed chrome over the moving picture and give the camera a safe area so targeted framings avoid it. Read that plugin's recipes.
 
 The host can draw an input/keyboard record after a type/press step, and toasts can move it upward. Reserve a clear band for those host overlays, then inspect the type step in both render --sheet and live playback. Do not infer safety from the authored tree alone or hide host overlays with project CSS. A camera can intentionally crop contextual menus during a close-up; the current action and its result still need to be visible and reachable.
 
 ## Frames, deep links and verification
 - outline lists scenario and step ids. Use those ids in render/export; a deep link chooses where viewing starts and is not an access boundary.
-- joplo render --scenario-id <id> --step-id <id> --out frame.png renders timeline state. --sheet --columns 3 renders every step with captions/narration; inspect transitions with actual playback as well.
+- joplo render --scenario-id <id> --step-id <id> --out frame.png renders timeline state. --sheet --columns 3 renders every step with captions/narration (settled frames only). --film [--chain] [--every 250] samples real playback on the engine clock for motion review; --video records a webm. Both need the export component (npx joplo setup).
 - A full-size render can pass while a shorter board clips the input area. Check the actual visible hitbox with real pointer input in the board and the built site; DOM text existing is not proof it can be used.
 - Fixed render dimensions are a capture size; viewport belongs to page/layer. In a browser wait for fonts and [data-jcamera][data-camera-settled="1"] plus two animation frames. Do not mistake DOM progress for painted pixels.
 - Test first input, drag, wheel, hover, keyboard, confirmation cancel/confirm, reset and resumed playback. Compare restored frames and direct jumps with pristine script frames. Explain unverified devices or audio behavior.
@@ -576,6 +588,9 @@ Required after every round of development: start the follower before handing the
 - approved is a confirmation for that exact option version. An exact-session watch prints it and exits 0; the follower prints it and keeps going. This records the user's review decision, not that feedback has been implemented. Update pick/source only as authorized by the user's task; approval does not authorize publishing.
 - Source changes close the old round (closed, source_changed) and start a new one after compilation. The follower moves on by itself; an exact-session watch exits 1, never 0, and you list again to select the new session. A stopped process without an approval also fails.
 - Records live under the real project path in .joplo/reviews/ and remain local. Distinct instances and worktrees never share session identities. Local feedback is never uploaded automatically.
+
+## Before a video-like piece goes to reviewers
+Required: run the film strip check from npx joplo skill demo ("Make it play like a film, not slides") — npx joplo render <dir> --scenario-id <first chapter> --film --chain — and fix every unexplained CUT and STILL first. Reviewers judge motion; a storyboard that looks fine can still play like a slide deck. Report the remaining cuts/stills you kept on purpose and what you could not verify (sound, real devices).
 
 ## Respond to events before doing the work
 | Event / outcome | Agent behavior |

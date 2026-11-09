@@ -22,6 +22,9 @@ Required after every round of development: start the follower before handing the
 - Source changes close the old round (closed, source_changed) and start a new one after compilation. The follower moves on by itself; an exact-session watch exits 1, never 0, and you list again to select the new session. A stopped process without an approval also fails.
 - Records live under the real project path in .joplo/reviews/ and remain local. Distinct instances and worktrees never share session identities. Local feedback is never uploaded automatically.
 
+## Before a video-like piece goes to reviewers
+Required: run the film strip check from npx joplo skill demo ("Make it play like a film, not slides") — npx joplo render <dir> --scenario-id <first chapter> --film --chain — and fix every unexplained CUT and STILL first. Reviewers judge motion; a storyboard that looks fine can still play like a slide deck. Report the remaining cuts/stills you kept on purpose and what you could not verify (sound, real devices).
+
 ## Respond to events before doing the work
 | Event / outcome | Agent behavior |
 | --- | --- |
@@ -67,4 +70,4 @@ Example, scoped to one known option:
 - Authentication failures (exit 3) need the correct owner login/API key; never silently switch accounts. Invalid responses, quota errors and missing shares are failures, not approval. If the project CLI lacks these commands, check its version before changing the environment.
 
 Related topics: selection, check, publish
-<!-- joplo-skill 0.3.0 sha256:e0b0dfc7bcb8ebcb558b37f7c210357168a76e56a22e08f89d196b577235d321 -->
+<!-- joplo-skill 0.3.0 sha256:e9d4d19fbe30a18e48053fb12427804da986c8df645cdf8097cb842163ecd241 -->
