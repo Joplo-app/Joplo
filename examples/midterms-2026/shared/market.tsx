@@ -101,7 +101,7 @@ function BigFact({ id, big, text }: { id: string; big: string; text: string }) {
 
 export function AiLayer() {
   return (
-    <Frame kicker="第四部分 · AI 和股市" title={<>AI 股：<Hl tone="red">云巨头涨</Hl>，<Hl tone="gold">卖铲子的跌</Hl></>} source="个股为 10/30→11/6 周涨跌（The Glass Desk 周报汇总）；公投统计：Ballotpedia（经《科学美国人》）；高盛估计经 NBC 引述。红涨绿跌。">
+    <Frame kicker="第四部分 · AI 和股市" title={<>AI 股：<Hl tone="red">云巨头涨，</Hl><Hl tone="gold">卖铲子的跌</Hl></>} source="个股为 10/30→11/6 周涨跌（The Glass Desk 周报汇总）；公投统计：Ballotpedia（经《科学美国人》）；高盛估计经 NBC 引述。红涨绿跌。">
       <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 330px', gap: 30 }}>
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <DivergingBars id="ai_bars" rows={AI_ROWS} bind={$.data.ai} labelWidth={120} rowHeight={40} />
