@@ -11,7 +11,7 @@ import { isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '
 import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef } from '@joplo-app/kit';
 import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, INTERACTIVE_TYPES, PAGE_LAYER, matchChoice, nodeLabel } from './catalog.ts';
 import { HOLD_MAX_SECONDS, HOLD_MIN_SECONDS, inShotFrame } from './focus.ts';
-import { choicesOf, commonPrefix } from './player.ts';
+import { cameraAt, choicesOf, commonPrefix, stateAt } from './player.ts';
 import { CALLOUT_SIDES, LAYER_ICONS, Project, SCHEMA_VERSION, type Callout, type Cue, type LayerIcon, type SceneNode, type Scene, type Scenario, type Step, type Coverage, type Trace } from './schema.ts';
 import type { Diagnostic } from './result.ts';
 import { schemaDiagnostics } from './schema-issues.ts';
@@ -67,6 +67,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     diags.push({ severity, code, message, source: 'structure', ...(at ? { at: rel(at) } : {}) });
   };
 
+  /** flow({ from }) 接力：所有场景编译完后，按回放结果替换初始状态（见文末）。 */
+  const pendingFrom = new Map<string, { from: string; state: OptionDef['state']; layer: string | undefined; at: string | undefined }>();
   const out: Record<string, any> = {
     schemaVersion: SCHEMA_VERSION,
     name: src.config.name,
@@ -389,9 +391,31 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     };
 
     const scenarioIds: Record<string, string[]> = {};
-    for (const [skey, fl] of Object.entries(def.scenarios ?? {})) {
+    // flow({ from }) 接力：按依赖顺序编译，被接的场景先编译，记下它结尾的路径与导演层；
+    // 接力场景的逐步校验（页面里找目标、焦点提示、镜头、自动字幕）都从那里开始，而不是默认起点
+    const scenarioDefs = def.scenarios ?? {};
+    const orderedKeys: string[] = [];
+    {
+      const placed = new Set<string>();
+      const place = (k: string, seen: Set<string>) => {
+        if (placed.has(k) || seen.has(k)) return;
+        seen.add(k);
+        const dep = scenarioDefs[k]?.opts.from;
+        if (dep !== undefined && dep !== k && Object.hasOwn(scenarioDefs, dep)) place(dep, seen);
+        placed.add(k);
+        orderedKeys.push(k);
+      };
+      for (const k of Object.keys(scenarioDefs)) place(k, new Set());
+    }
+    /** 每个场景编译完之后的结尾：路径（按 go / back 推算）与导演层。 */
+    const scenarioEnd = new Map<string, { route: string; director: string }>();
+    for (const skey of orderedKeys) {
+      const fl = scenarioDefs[skey]!;
       const sid = `${qid}.${skey}`;
-      const start = fl.opts.start ?? touched[0] ?? src.config.home ?? [...ctxRoutes][0];
+      const fromEnd = fl.opts.from !== undefined && fl.opts.from !== skey ? scenarioEnd.get(fl.opts.from) : undefined;
+      if (fl.opts.from !== undefined && fl.opts.start !== undefined)
+        err('FROM_WITH_START', `flow({ from: ${JSON.stringify(fl.opts.from)}, start: ${JSON.stringify(fl.opts.start)} }): a scenario that continues another starts where that one ended; remove start (or remove from to start fresh)`, fl.source);
+      const start = fromEnd?.route ?? fl.opts.start ?? touched[0] ?? src.config.home ?? [...ctxRoutes][0];
       if (!start || !ctxRoutes.has(start)) {
         err('UNKNOWN_ROUTE', `Scenario ${sid} starts at unknown route ${start ?? '(none)'}`, fl.source);
         continue;
@@ -402,7 +426,15 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       }
       // 镜头状态（与 player.cameraAt 同一规则，逐步累积）：判断焦点提示的目标在不在当前镜头里（D70）
       const frame = new Map<string, string[]>();
-      let director = hasLayers ? Object.keys(layers)[0]! : PAGE_LAYER;
+      let director = fromEnd?.director ?? (hasLayers ? Object.keys(layers)[0]! : PAGE_LAYER);
+      if (fl.opts.layer !== undefined) {
+        if (!hasLayers || !Object.hasOwn(layers, fl.opts.layer)) err('LAYER_UNKNOWN', `flow({ layer: ${JSON.stringify(fl.opts.layer)} }) is not a layer of option ${qid}${hasLayers ? ` (layers: ${Object.keys(layers).join(', ')})` : '; this option declares no layers'}`, fl.source);
+        else director = fl.opts.layer;
+      }
+      if (fl.opts.from !== undefined) {
+        if (!Object.hasOwn(def.scenarios ?? {}, fl.opts.from) || fl.opts.from === skey) err('FROM_UNKNOWN', `flow({ from: ${JSON.stringify(fl.opts.from)} }) must name another scenario key of option ${qid} (available: ${Object.keys(def.scenarios ?? {}).filter((k) => k !== skey).join(', ') || 'none'})`, fl.source);
+        else pendingFrom.set(sid, { from: `${qid}.${fl.opts.from}`, state: fl.opts.state, layer: fl.opts.layer, at: fl.source });
+      }
       const stepKeys = new Set<string>();
       const steps: Step[] = fl.steps.map((st: StepDef, i: number): Step => {
         if (st.key !== undefined) {
@@ -432,7 +464,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
           else if (e.type === 'stream') effects.push({ type: 'stream', path: e.path, value: e.value });
           else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
-          else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold') continue; // 镜头与焦点提示不是状态变化，下面单独归类
+          else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold' || e.type === 'camera') continue; // 镜头与焦点提示不是状态变化，下面单独归类
           else if (e.type === 'say') {
             if (typeof e.text === 'string' && e.text.trim()) says.push(e.text.trim());
             else err('SAY_EMPTY', 'say() needs the line the character speaks, for example say(\'I can make it!\'). Remove it to read the caption instead', st.source);
@@ -454,6 +486,18 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const sceneBefore = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i, start)));
         const sceneAfter = sceneFor.get(sceneOf(stepRouteBefore(fl.steps, i + 1, start)));
         const actionTarget = 'target' in st.action ? st.action.target : null;
+        /** 画布镜头（camera()）：状态里记一份 ui.__camera，<Canvas> 按它取景；导演切到第一个目标所在的层。 */
+        const cameraTargets: string[] = [];
+        for (const e of st.effects as EffectDef[]) {
+          if (e.type !== 'camera') continue;
+          const bad = (k: string, v: unknown, lo: number, hi: number) => v !== undefined && (typeof v !== 'number' || !Number.isFinite(v) || v < lo || v > hi) ? `${k} must be a number from ${lo} to ${hi}` : null;
+          const problem = bad('pad', e.pad, 0, 2000) ?? bad('zoom', e.zoom, 0.1, 10) ?? bad('ms', e.ms, 0, 10_000);
+          if (problem) { err('CAMERA_INVALID', `camera(…): ${problem}`, st.source); continue; }
+          const missing = e.targets.filter((id) => (hasLayers ? !layersWith(id).length : !(sceneAfter && findIn(sceneAfter.root, id))));
+          if (missing.length) { err('CAMERA_UNKNOWN', `camera(${missing.map((m) => JSON.stringify(m)).join(', ')}) target is not in ${hasLayers ? 'any layer' : 'the stage for this step'}; aim it at elements inside a <Canvas>`, st.source); continue; }
+          for (const id of e.targets) if (!cameraTargets.includes(id)) cameraTargets.push(id);
+          effects.push({ type: 'set', path: 'ui.__camera', value: { targets: [...e.targets], ...(e.pad !== undefined ? { pad: e.pad } : {}), ...(e.zoom !== undefined ? { zoom: e.zoom } : {}), ...(e.ms !== undefined ? { ms: e.ms } : {}) } });
+        }
         for (const e of st.effects) {
           if (e.type === 'fork') {
             if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `Fork target "${e.scenario}" must be another scenario key in the same option`, st.source);
@@ -532,6 +576,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
             }
           }
         }
+        // 画布镜头：导演切到镜头目标所在的层（优先于焦点提示与操作目标）
+        if (hasLayers && !directorLayer && cameraTargets.length) directorLayer = layersWith(cameraTargets[0]!)[0] ?? null;
         // 没写 shot、写了焦点提示（D70）：导演切到第一个提示目标所在的层（提示要被看见）
         if (hasLayers && !directorLayer && focusTargets.length) directorLayer = layersWith(focusTargets[0]!)[0] ?? null;
         // 没写 shot 的操作步骤：导演切到操作目标所在的层（播放时观众看得到要点的东西）
@@ -595,12 +641,20 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         description: fl.opts.description ?? '',
         caseIds: strip ? [] : (fl.opts.cases ?? []).filter((c) => fdef.cases?.[c]).map((c) => `${fid}.${c}`),
         mock: { label: fl.opts.mock ?? MOCK_LABEL[outcome], outcome, ...(fl.opts.mock === undefined ? { auto: true as const } : {}) },
-        initial: { sceneId: sceneOf(start), ui: state.ui, data: state.data, inputs: state.inputs },
+        initial: { sceneId: sceneOf(start), ui: state.ui, data: state.data, inputs: state.inputs, ...(hasLayers && fl.opts.layer !== undefined && Object.hasOwn(layers, fl.opts.layer) ? { layer: fl.opts.layer } : {}) },
         steps,
         expected: fl.opts.expected ?? '',
         ...(fl.source ? { source: rel(fl.source) } : {}),
       };
       out.scenarios[sid] = sc;
+      scenarioEnd.set(skey, { route: stepRouteBefore(fl.steps, fl.steps.length, start), director });
+    }
+
+    // 按依赖顺序编译后，恢复作者声明的顺序（发布站按它当章节播放，情况里的场景列表也按它排）
+    {
+      const declared = Object.keys(scenarioDefs).map((k) => `${qid}.${k}`);
+      for (const id of declared) if (Object.hasOwn(out.scenarios, id)) { const v = out.scenarios[id]; delete out.scenarios[id]; out.scenarios[id] = v; }
+      for (const list of Object.values(scenarioIds)) list.sort((a, b) => declared.indexOf(a) - declared.indexOf(b));
     }
 
     // 所有场景完成后再解析分叉（允许向后声明的场景），不把创作信息参与前缀比较。
@@ -672,6 +726,38 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     return { project: null, diagnostics: diags };
   }
   const project = pruneMessages(parsed.data);
+  // flow({ from }) 接力：初始状态 = 被接的场景最后一步之后的状态（路径、ui / data / inputs、导演层），再叠上本场景写的 state。
+  // 链式接力按依赖顺序解析；成环或被接的场景回放失败时报错。
+  if (pendingFrom.size) {
+    const done = new Set<string>();
+    const visiting = new Set<string>();
+    const resolve = (sid: string): boolean => {
+      const p = pendingFrom.get(sid);
+      if (!p || done.has(sid)) return true;
+      if (visiting.has(sid)) { err('FROM_CYCLE', `Scenario ${sid} continues from itself through flow({ from }); break the cycle`, p.at); return false; }
+      visiting.add(sid);
+      const ok = resolve(p.from);
+      visiting.delete(sid);
+      if (!ok) return false;
+      const target = project.scenarios[sid];
+      const prev = project.scenarios[p.from];
+      if (!target || !prev) return false;
+      try {
+        const end = stateAt(project, p.from, prev.steps.length);
+        const hasLayers = Object.keys(project.options[target.optionId]?.layers ?? {}).length > 0;
+        const layer = p.layer ?? (hasLayers ? cameraAt(project, p.from, prev.steps.length).directorLayer : undefined);
+        const merged = mergeState({ ui: end.ui as never, data: end.data as never, inputs: end.inputs as never }, p.state);
+        target.initial = { sceneId: end.sceneId, ui: merged.ui, data: merged.data, inputs: merged.inputs, ...(layer ? { layer } : {}) };
+      } catch (e) {
+        err('FROM_FAILED', `Scenario ${sid} continues from ${p.from}, which does not replay: ${(e as Error).message}`, p.at);
+        return false;
+      }
+      done.add(sid);
+      return true;
+    };
+    for (const sid of pendingFrom.keys()) resolve(sid);
+    if (diags.some((d) => d.severity === 'error')) return { project: null, diagnostics: diags };
+  }
   if (mode === 'dev' && project.i18n) {
     const stale = localeDiagnostics(project, src, diags);
     project.i18n = { ...project.i18n, stale };

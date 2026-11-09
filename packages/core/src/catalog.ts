@@ -31,6 +31,8 @@ const STRUCTURE = [
   'ChatMessage', 'ToolCall', 'Thinking', 'Artifact', 'Email', 'DataCard', 'StateFlow',
   // 设备外框（Joplo 自有）：终端与手机
   'Terminal', 'Terminal.Command', 'Terminal.Output', 'Phone',
+  // 画布（Joplo 自有）：讲解片与动态图形，设计尺寸等比缩放 + camera() 镜头 + motion 变形
+  'Canvas',
   // 关系类图表（Joplo 自有，D41 / D69）：布局在编译期算好；节点与连线的状态由 flow 步骤的 trace() 推算
   'Diagram', 'Diagram.Group', 'Diagram.Node', 'Diagram.Edge',
   'StateMachine', 'StateMachine.Group', 'StateMachine.State', 'StateMachine.Transition',
@@ -74,7 +76,7 @@ export const VALUE_TYPES: ReadonlySet<string> = new Set<string>([
 export const GATED_CONTAINERS: ReadonlySet<string> = new Set<string>(['Modal', 'Drawer', 'Menu.Dropdown']);
 
 /** Joplo 在 Mantine 属性之外追加的属性，编译器会从 props 中取出，放到节点字段上。 */
-export const JOPLO_PROPS = ['id', 'when', 'disabledReason', 'unmodeled', 'note', 'redact'] as const;
+export const JOPLO_PROPS = ['id', 'when', 'disabledReason', 'unmodeled', 'note', 'redact', 'motion', 'motionDelay', 'motionMs', 'screen'] as const;
 
 /**
  * 每个组件一行常用属性提示（`joplo skill components` 由此生成）。所有组件另外都接受：
@@ -164,6 +166,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'Sequence.Block': "label, kind: 'alt'|'opt'|'loop'|'par'|'break'|'critical' (default opt); fragment box around the messages inside it; nestable",
   'Terminal.Command': 'prompt (default "$"); command text in children',
   'Terminal.Output': "tone: 'plain'|'ok'|'warn'|'error' (default plain); output text in children (preserves newlines)",
+  Canvas: 'w, h (world size in design pixels, default the view), view ([width, height] design screen, default [1280, 800]), bg; a fixed-size design stage scaled to fit the layer (never re-laid out); children are placed in design pixels (style={{ position: "absolute", left, top }} or ordinary layout); move the camera with camera(…ids) in steps; elements with motion="key" fly from their old place to the new one between steps (motionDelay / motionMs per element); a direct child with screen stays fixed on screen in view coordinates (chapter labels, sources, a poster, an end card)',
   Phone: 'scale (visual scale, default 1), h (screen height, default 844), landscape (turned sideways: content 772 × 358, notch on the left; use it for video-style or landscape mobile screens); phone frame, children laid out at mobile width 390 with breakpoints based on that width; viewport: "mobile" on a page adds it automatically; do not add Phone explicitly',
   div: 'HTML fallback; prefer Box/Stack/Group',
   span: 'HTML fallback; prefer Text span',
@@ -235,6 +238,14 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
  * 只给最容易写错、或需要和步骤配合的组件；其余组件看 COMPONENT_DOCS 的一行提示就够。
  */
 export const COMPONENT_EXAMPLES: Partial<Record<ComponentType, string>> = {
+  Canvas: `// layer('World', <Canvas w={2560} h={1600}>…</Canvas>): one world for the whole explainer
+<Canvas w={2560} h={1600}>
+  <div id="chat" style={{ position: 'absolute', left: 60, top: 60, width: 1180, height: 700 }}>…</div>
+  <div id="tape" style={{ position: 'absolute', left: 120, top: 960, display: 'flex', gap: 8 }}>
+    <span motion="tok_0" when={eq($.ui.at, 'tape')}>4912</span>
+  </div>
+</Canvas>
+// steps: .system('Zoom in', camera('chat')), .system('To the tape', set($.ui.at, 'tape'), camera('tape'))`,
   EmptyState: `<EmptyState icon="✉" title="No members yet" description="Invite teammates to start working together">
   <Button id="invite_first">Invite members</Button>
 </EmptyState>`,

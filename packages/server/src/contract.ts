@@ -87,3 +87,7 @@ export type RenderOptions = {
 export type RenderedElement = { id: string; type: string; label: string; visible: boolean; disabled: boolean; at: string | null; box: { x: number; y: number; width: number; height: number } };
 export type RenderResult = { path: string; sceneId: string; position: number; scale: number; elements: RenderedElement[]; warnings: string[] };
 export declare function renderStep(opts: RenderOptions): Promise<RenderResult>;
+/** 分镜（storyboard）：一个场景的每一步拼成一张图，每格下面是步号、字幕与旁白。 */
+export type SheetOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope'> & { /** 每行几格，默认 3。 */ columns?: number; /** 每格宽度（像素），默认 480。 */ cellWidth?: number };
+export type SheetResult = { path: string; steps: number; warnings: string[] };
+export declare function renderSheet(opts: SheetOptions): Promise<SheetResult>;

@@ -1,0 +1,44 @@
+/**
+ * <Canvas> 在任何合法父容器里都可见：父元素没给高度（Stack、页面里普通的块）时，按 view 的宽高比撑开，
+ * 不会因为 height: 100% 解析成 0 而整块消失；父元素给了高度（层、h="100%"）时照常铺满。
+ */
+import { describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import * as ui from '@joplo-app/kit/ui';
+import { config, feature, flow, option, page } from '@joplo-app/kit';
+import { jsx } from '@joplo-app/kit/jsx-runtime';
+import { compile, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
+import { I18nProvider } from '../src/i18n/context';
+import { Stage } from '../src/renderer/Stage';
+
+const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
+const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
+
+function build(tree: unknown): Project {
+  const opt = option({ name: 'A', idea: 'i', routes: { '/c': page({ title: 'P' }, tree as never) }, scenarios: { happy: flow('一次', { start: '/c' }) } });
+  const src: AuthoringProject = {
+    root: '/p',
+    config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
+    layouts: {},
+    routes: { '/': { ...page({ title: 'P', layout: false }, h(ui.Text, { id: 'n' }, 'x')), ...F('routes/page.tsx') } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+  };
+  const r = compile(src, 'dev');
+  expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+  return r.project!;
+}
+const html = (p: Project) => renderToStaticMarkup(<I18nProvider explicit="en"><Stage project={p} state={stateAt(p, 'f.a.happy', 0)} theme="sketch" mode="render" animate={false} /></I18nProvider>);
+const canvasRoot = (out: string) => out.match(/<div[^>]*data-jtype="Canvas"[^>]*>/)?.[0] ?? '';
+
+describe('<Canvas> sizing', () => {
+  it('keeps the view aspect ratio so an auto-height parent does not collapse it', () => {
+    const out = html(build(h(ui.Stack, { p: 'lg' }, h(ui.Text, { id: 't' }, 'title'), h(ui.Canvas, { id: 'cv', w: 2560, h: 1600 }, h('div', { id: 'a' }, 'A')))));
+    const root = canvasRoot(out);
+    expect(root).toMatch(/aspect-ratio:1280 \/ 800/);
+    expect(root).toMatch(/width:100%/);
+  });
+  it('uses a custom view for the ratio', () => {
+    const root = canvasRoot(html(build(h(ui.Canvas, { id: 'cv', view: [1920, 1080] }, h('div', { id: 'a' }, 'A')))));
+    expect(root).toMatch(/aspect-ratio:1920 \/ 1080/);
+  });
+});

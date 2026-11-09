@@ -11,7 +11,7 @@ import path from 'node:path';
 import type { Browser } from 'playwright-core';
 import { JoploError, SUBTITLE_HEIGHT, VIEWPORT_SIZE, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, scopeProject, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
 import { exportLocale } from './locale.ts';
-import type { RenderOptions, RenderResult, RenderedElement } from './contract.ts';
+import type { RenderOptions, RenderResult, RenderedElement, SheetOptions, SheetResult } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';
 import { joploHome } from './home.ts';
@@ -156,6 +156,81 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     const warnings = [...report.warnings];
     if (nextTargetId && findNode(scene, nextTargetId) && !elements.find((e) => e.id === nextTargetId && e.visible)) warnings.push(`Next action target ${nextTargetId} is not visible in the stage`);
     return { path: out, sceneId: scene.id, position, elements, warnings, scale: opts.scale ?? 1 };
+  } finally {
+    await browser?.close().catch(() => undefined);
+    await server.close();
+  }
+}
+
+const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+/**
+ * 分镜（storyboard）：一个场景从初始画面到最后一步，每一步截一张（与 renderStep 同一渲染路由），
+ * 拼成网格；每格下面写步号、字幕、旁白（narrate，没有时是台词 say）。Agent 一张图看完整场的画面与节奏，
+ * 检查空镜、出画、遮挡、字太小，再对照旁白读一遍。告警按步号前缀汇总。
+ */
+export async function renderSheet(opts: SheetOptions): Promise<SheetResult> {
+  const projectDir = realProjectDir(opts.projectDir);
+  const out = path.resolve(opts.out);
+  assertNotProjectData(projectDir, out);
+  if (fs.existsSync(out) && !opts.overwrite) throw new JoploError('USAGE', `Output file already exists: ${out}. To overwrite, pass overwrite: true (CLI: --overwrite)`);
+  const columns = Math.max(1, Math.min(6, Math.round(opts.columns ?? 3)));
+  const cellWidth = Math.max(240, Math.min(1280, Math.round(opts.cellWidth ?? 480)));
+  const playwright = await loadPlaywright({ home: joploHome(), projectDir });
+  const server = await createDev({ projectDir, port: 0, watch: false, log: () => undefined });
+  let browser: Browser | null = null;
+  try {
+    const payload = server.payload();
+    if (!payload.project) {
+      const errs = payload.diagnostics.filter((d) => d.severity === 'error');
+      throw new JoploError('INVALID_SCHEMA', `Project compilation failed: ${errs.map((d) => `${d.at ?? ''} ${d.message}`).join('; ')}`, { diagnostics: payload.diagnostics });
+    }
+    const project = payload.project;
+    const sc = project.scenarios[opts.scenarioId];
+    if (!sc) throw new JoploError('NOT_FOUND', `Scenario does not exist: ${opts.scenarioId} (available: ${Object.keys(project.scenarios).join(', ') || 'none'})`);
+    if (opts.content !== undefined && !project.i18n?.locales.includes(opts.content))
+      throw new JoploError('USAGE', project.i18n ? `--content ${opts.content} is not in config locales (${project.i18n.locales.join(', ')})` : `--content needs config({ locales }); this project has a single language`);
+    const theme = opts.theme ?? project.theme ?? 'sketch';
+    browser = await launch(playwright);
+    const cells: { png: string; label: string; caption: string; voice: string }[] = [];
+    const warnings: string[] = [];
+    for (let position = 0; position <= sc.steps.length; position++) {
+      const state: PlayState = stateAt(project, sc.id, position);
+      const scene = project.scenes[displaySceneId(project, sc.id, position)]!;
+      const stage = STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];
+      const next = state.completed ? undefined : sc.steps[position];
+      const nextTargetId = next && 'target' in next.action ? next.action.target : null;
+      const page = await browser.newPage({ viewport: { width: stage.width, height: stage.height + SUBTITLE_HEIGHT }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
+      const q = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, locale: opts.locale, content: opts.content, font: opts.font, stroke: opts.stroke });
+      await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => (window as unknown as { __JOPLO_READY__?: boolean }).__JOPLO_READY__ === true, null, { timeout: 60000 });
+      const err = await page.evaluate(() => (window as unknown as { __JOPLO_ERROR__?: string | null }).__JOPLO_ERROR__ ?? null);
+      if (err) throw new JoploError('RENDER_FAILED', `Render route reported an error at step ${position}: ${err}`);
+      const report = (await page.evaluate(`(${COLLECT_REPORT})(${JSON.stringify({ nextTargetId, theme })})`)) as PageReport;
+      for (const w of report.warnings) warnings.push(`Step ${position}: ${w}`);
+      const png = await page.locator('[data-jrender]').screenshot({ type: 'png', animations: 'disabled' });
+      await page.close();
+      const step = position > 0 ? sc.steps[position - 1] : undefined;
+      cells.push({
+        png: png.toString('base64'),
+        label: position === 0 ? '0 · start' : `${position} · ${step!.kind}`,
+        caption: step?.caption ?? sc.description ?? sc.name,
+        voice: step?.narrate ?? step?.say ?? '',
+      });
+    }
+    const html = `<!doctype html><meta charset="utf-8"><style>
+      body{margin:0;padding:24px;background:#16181d;color:#e8e8ea;font:14px/1.45 -apple-system,"PingFang SC","Noto Sans SC",system-ui,sans-serif}
+      h1{font-size:18px;margin:0 0 16px} .grid{display:grid;grid-template-columns:repeat(${columns},${cellWidth}px);gap:18px}
+      .cell img{width:100%;display:block;border-radius:6px;border:1px solid #2c2f38} .meta{padding:6px 2px 0}
+      .n{color:#ffb020;font-weight:700} .cap{font-weight:600} .voice{color:#a0a4b0;margin-top:2px}
+    </style><h1>${esc(sc.name)} · ${esc(sc.id)} · ${sc.steps.length} steps</h1><div class="grid">${cells.map((c) => `<div class="cell"><img src="data:image/png;base64,${c.png}"><div class="meta"><span class="n">${esc(c.label)}</span> <span class="cap">${esc(c.caption)}</span>${c.voice ? `<div class="voice">${esc(c.voice)}</div>` : ''}</div></div>`).join('')}</div>`;
+    const sheet = await browser.newPage({ viewport: { width: columns * cellWidth + (columns - 1) * 18 + 48, height: 800 }, deviceScaleFactor: 1 });
+    await sheet.setContent(html, { waitUntil: 'load' });
+    const png = await sheet.screenshot({ type: 'png', fullPage: true });
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    if (opts.overwrite) fs.writeFileSync(out, png);
+    else fs.writeFileSync(out, png, { flag: 'wx' });
+    return { path: out, steps: sc.steps.length, warnings };
   } finally {
     await browser?.close().catch(() => undefined);
     await server.close();

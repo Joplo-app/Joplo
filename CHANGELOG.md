@@ -17,6 +17,11 @@
 - Joplo Cloud 朗读：登录后不用配 Key 就能给演示配旁白，没选过声音来源的项目登录后默认用它。看板声音浮层把它排在第一，写着还剩多少字；生成按钮写这次约用多少字、下面写生成后还剩多少；音色可以试听（不扣字数）。额度不够时停下，已生成的保留，剩下的步骤用浏览器朗读并在字幕区标出，浮层给「买加油包 ↗」。新增 `npx joplo voice`（生成缺少的音频，`--dry-run` 只估算），额度不够时以 `TTS_QUOTA_EXCEEDED`、退出码 7 结束；`joplo whoami` 显示朗读剩余。需要 Joplo Cloud 同步上线（C27）。
 - 声音来源只留官方的：Joplo Cloud 朗读、OpenAI、ElevenLabs（接口地址固定）和浏览器朗读。去掉 AiHubMix 预设、可改地址的 OpenAI 兼容和自定义 HTTP，不再读 `AIHUBMIX_API_KEY`；本机已有的这类配置标为「不再支持」，已生成的音频照常播放、照常随 build 和分享带上，`joplo voice` 报 `VOICE_UNSUPPORTED` 并提示换用。「管理供应商」改为只管 OpenAI / ElevenLabs 密钥的「管理密钥」。
 - 看板首页左栏底部新增 Joplo Cloud 账号卡片：套餐、邮箱、空间与朗读用量，「用量与音色 ↗」打开控制台；没登录时给登录命令。
+- 做讲解片更顺手（D86）：新组件 `<Canvas>` 是按设计尺寸等比缩放的画布，镜头用步骤里的 `camera('元素', …)` 推拉摇（按内容取景、不画焦点框）；元素加 `motion` 键，换位置或换容器时自动从旧位置飞过去；`screen` 元素固定在屏幕上。
+- `flow({ from: '上一章' })` 从另一个场景结尾的画面接着演，`flow({ layer })` 指定起始层；`patch($.ui, { … })` 一步改多处。
+- `joplo render --sheet` 一条命令出整场分镜：每一步一格，带字幕和旁白。
+- outline、场景封面的“约 M 秒”和 `SCENARIO_TOO_LONG` 把旁白朗读时间算进去。
+- 新技能主题 `npx joplo skill content`：讲解、教程、资讯解读类内容的做法；新示例 `examples/llm-explainer`《大模型是怎么“写”出一句话的？》。
 
 ## 0.2.17
 

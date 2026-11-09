@@ -11,6 +11,7 @@
 export const SKILL_TOPICS = [
   { name: 'authoring', description: 'Mental model, first steps, page / option / flow syntax, when conditions, a form example' },
   { name: 'story', description: 'Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos' },
+  { name: 'content', description: 'Explainers, tutorials, and news-explainer videos: package and plan, hook, one world with Canvas, camera(), motion morphs, chapters with flow({ from }), narration, sources, review' },
   { name: 'demo', description: 'Layers, shots, captions, full-height layout, custom motion and data graphics, deep links, and screenshots' },
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
   { name: 'diagram', description: 'Architecture, sequence and state diagrams: domain groups, automatic layout, traces, shot framing' },
@@ -62,15 +63,23 @@ export const PITFALLS = [
   ['AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json', 'publish'],
   ['Playing a demo never generates Joplo Cloud narration (it would spend characters): steps without audio use the browser voice until the user clicks Generate missing audio or you run npx joplo voice with their go-ahead', 'publish'],
   ['Re-sharing with the default voice keeps valid local clips plus reusable published clips, even when their voices differ (automatic captions must still match current text in the clip language; stale audio is excluded); an old custom provider named cloud stays unsupported until the user explicitly chooses official Joplo Cloud (use voice.profile: \'Joplo Cloud\' when config owns the selection)', 'publish'],
+  ['Explainers that read as slides: one board per chapter, title cards, bullet cards, panels fading in and out. Build one <Canvas> world instead, keep objects with motion keys so they morph between steps, and move camera() between them', 'content'],
+  ['Moving the view with shot() in an explainer draws a pulsing focus ring and caps UI zoom at 1.25×; inside a <Canvas> use camera(\'id\', …), which frames by content and does not draw a ring', 'content'],
+  ['Chapters that should continue the last frame: write flow({ from: \'previousKey\' }) instead of copying state by hand; scenarios with only system steps stay on the first layer unless a camera(), shot, or cue moves the director (or flow({ layer }))', 'content'],
+  ['The share preview is the first scenario\'s first frame: design it as a thumbnail (a screen poster in the Canvas that the first step fades out), not an empty screen', 'content'],
+  ['outline and the cover estimate narration at about 4.5 CJK characters per second; a chapter whose narrate() lines total more than about 400 characters runs past 90 s', 'content'],
+  ['Label illustrative numbers on screen and keep them apart from sourced facts; bars start at zero and lengths stay proportional', 'content'],
+  ['HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it', 'check'],
+  ['Judge a scenario from its storyboard, not from check alone: npx joplo render --scenario-id <id> --sheet --out board.png shows every step with its caption and narration in one image', 'content'],
 ] as const satisfies readonly (readonly [string, string])[];
 
 /** 中文触发词：技能 description 里的匹配文本，不是 CLI 界面文案（english-output 测试的白名单）。 */
-const ZH_JOPLO = '功能原型、可交互演示、方案对比、给产品 / 设计 / 评审看的演示';
+const ZH_JOPLO = '功能原型、可交互演示、方案对比、给产品 / 设计 / 评审看的演示、讲解视频、科普、教程、资讯解读';
 const ZH_FEEDBACK = '本地评审、监听反馈、确认方案、评审有结论了、按评审意见修改演示';
 
 export type AgentSkill = { name: string; description: string; body: string };
 
-const JOPLO_DESCRIPTION = `Build clickable, replayable feature demos with Joplo (scripted scenarios in TSX, viewed in a local board) when the user wants a feature prototype, an interactive or clickable demo, an A/B comparison of options or edge cases, or a demo for product, design, or review (${ZH_JOPLO}), including in a repo without joplo.config.ts, but not for slide decks or PPT.`;
+const JOPLO_DESCRIPTION = `Build clickable, replayable feature demos with Joplo (scripted scenarios in TSX, viewed in a local board) when the user wants a feature prototype, an interactive or clickable demo, an A/B comparison of options or edge cases, or a demo for product, design, or review, or a narrated explainer, tutorial, or news-explainer piece that should play like a video (${ZH_JOPLO}), including in a repo without joplo.config.ts, but not for slide decks, PPT, or editing real video footage.`;
 const FEEDBACK_DESCRIPTION = `Receive and apply Joplo review feedback when the user wants to test a local demo, start or resume a feedback listener (npx joplo feedback watch --local --follow), confirm an option, monitor a Share review, or implement review conclusions (${ZH_FEEDBACK}); covers local live events and Cloud polling, without requiring a share for local review.`;
 
 const list = (items: readonly string[]) => items.map((s, i) => `${i + 1}. ${s}`);
@@ -84,11 +93,13 @@ function joploBody(): string {
     '## When to use',
     '- The user wants to think a feature through before building it: a prototype, a clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.',
     '- The user wants to compare how a feature changed between two versions or in a PR (see npx joplo skill diff).',
+    '- The user wants an explainer, tutorial, science piece, or news explainer that plays like a video (narration, chapters, animated graphics): read npx joplo skill content first.',
     '',
     '## When not to use',
     '- Production UI code or real backends: Joplo demos are scripted; nothing runs real logic.',
     '- Demos where viewers must type their own free input.',
-    '- Slide decks, pitch decks, or text-and-bullet presentations with no product behavior to show: use a slides tool instead.',
+    '- Slide decks, pitch decks, or text-and-bullet presentations with no product behavior or animated explanation to show: use a slides tool instead.',
+    '- Editing real video footage, music videos, or soundtracks: Joplo has no video clips, music, or sound effects.',
     '',
     '## Quick start',
     '```sh',

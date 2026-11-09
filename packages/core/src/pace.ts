@@ -54,3 +54,18 @@ export function stepDwell(o: { texts: (string | null | undefined)[]; speed?: num
   const streamed = longest ? longest + Math.max(MIN_DWELL / speed, read / 2) : 0;
   return Math.round(Math.max(read, cam, dots, streamed));
 }
+
+/** 朗读估算（旁白 / 台词）：中日韩约每秒 4.5 字、拉丁文字约每秒 13 个非空白字符（约 2.5 词），读完再留 0.45 秒换气。 */
+export const VOICE_CJK_MS = 220;
+export const VOICE_LATIN_MS = 75;
+const VOICE_EST_BREATH_MS = 450;
+/** 一段旁白大约读多久（毫秒，1×）；没有文字时为 0。自动播放以真实读完为准，这个只用于封面、outline 与 check 的估算。 */
+export function voiceMs(text: string | null | undefined, speed = 1): number {
+  if (!text) return 0;
+  let ms = 0;
+  for (const ch of text) {
+    if (/[\s\p{P}]/u.test(ch)) continue;
+    ms += (ch.codePointAt(0) ?? 0) > 0x2e80 ? VOICE_CJK_MS : VOICE_LATIN_MS;
+  }
+  return ms ? Math.round((ms + VOICE_EST_BREATH_MS) / (speed > 0 ? speed : 1)) : 0;
+}
