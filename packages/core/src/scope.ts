@@ -1,3 +1,4 @@
+import { assertExportableFeature, localOnlyOptions, localOnlyElementIds } from './publication.ts';
 import { pruneMediaAssets } from './media.ts';
 import { scopePluginData } from './plugin-data.ts';
 /**
@@ -47,8 +48,9 @@ function demoOrder(project: Project): string[] {
 
 /** 在给定模式下可分享的场景：publish 只有各功能选定方案的场景。 */
 function shareable(project: Project, mode: ScopeMode): string[] {
+  const local = localOnlyOptions(project);
   const picked = new Set(orderedFeatures(project).map((f) => f.pick).filter((p): p is string => !!p));
-  return Object.values(project.scenarios).filter((s) => mode === 'review' || picked.has(s.optionId)).map((s) => s.id);
+  return Object.values(project.scenarios).filter((s) => !local.has(s.optionId) && (mode === 'review' || picked.has(s.optionId))).map((s) => s.id);
 }
 
 function listLines(project: Project, ids: string[]): string {
@@ -68,12 +70,14 @@ export function resolveScope(project: Project, request: ScopeRequest, mode: Scop
       const known = orderedFeatures(project).map((x) => x.id).join(', ') || 'none';
       throw new JoploError('NOT_FOUND', `Unknown feature "${fid}"${mode === 'publish' ? ', or it has no picked option' : ''}. Features: ${known}`, { details: { scope: 'feature', id: fid } });
     }
+    assertExportableFeature(project, fid);
     const opts = mode === 'review' ? f.optionIds : f.pick ? [f.pick] : [];
     if (!opts.length) throw new JoploError('USAGE', `Feature "${fid}" has no picked option, so nothing of it is published. Pick an option (feature.pick), or share the review version (--review)`, { details: { scope: 'feature', id: fid } });
     for (const s of Object.values(project.scenarios)) if (opts.includes(s.optionId)) out.add(s.id);
   }
   for (const sid of request.scenarios ?? []) {
     const s = project.scenarios[sid];
+    if (s) assertExportableFeature(project, project.options[s.optionId]?.featureId ?? '');
     if (s && ok.has(sid)) { out.add(sid); continue; }
     if (s) {
       const o = project.options[s.optionId];
@@ -114,8 +118,17 @@ function idsIn(n: SceneNode, out: string[] = []): string[] {
  * 裁剪到给定场景（先用 resolveScope 解析）。返回新的 IR（输入不变）和范围说明。
  */
 export function scopeProject(project: Project, scenarioIds: readonly string[], mode: ScopeMode = project.mode === 'review' ? 'review' : 'publish'): { project: Project; info: ScopeInfo } {
+  const local = localOnlyOptions(project);
+  const privateElements = localOnlyElementIds(project, local);
+  for (const id of scenarioIds) {
+    const s = project.scenarios[id];
+    if (s) assertExportableFeature(project, project.options[s.optionId]?.featureId ?? '');
+    if (s?.from && local.has(project.scenarios[s.from]?.optionId ?? '')) throw new JoploError('USAGE', 'A shared slice cannot continue a draft or empty work');
+  }
   const S = new Set(scenarioIds.filter((id) => project.scenarios[id]));
   if (!S.size) throw new JoploError('USAGE', 'The scope has no scenarios; nothing to share');
+  for (const sid of S) if (project.scenarios[sid]!.steps.some(st => stepRefs(st).some(id => privateElements.has(id))))
+    throw new JoploError('USAGE', 'A shared slice cannot reference draft or private elements');
   const O = new Set([...S].map((id) => project.scenarios[id]!.optionId));
   const F = new Set([...O].map((id) => project.options[id]?.featureId).filter((f): f is string => !!f));
 
@@ -131,6 +144,8 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
   const sceneBy = new Map<string, Set<string>>();
   const useScene = (id: string, sid: string) => {
     if (!project.scenes[id]) return;
+    const scene = project.scenes[id]!;
+    if (local.has(scene.optionId ?? '') || local.has(project.routes[scene.route]?.addedBy ?? '')) throw new JoploError('USAGE', 'A shared slice cannot use a draft or empty work page');
     const set = sceneBy.get(id) ?? new Set<string>();
     set.add(sid);
     sceneBy.set(id, set);
@@ -153,6 +168,10 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
     return { ...rest, ...(from !== undefined && O.has(from) ? { from } : {}), ...(children ? { children: children.map(strip) } : {}) } as SceneNode;
   };
   const prune = (n: SceneNode, scene: Scene, users: Set<string>): SceneNode | null => {
+    if (n.from && local.has(n.from)) {
+      if (idsIn(n).some(id => refBy.has(id))) throw new JoploError('USAGE', 'A shared slice cannot borrow draft or private elements');
+      return null;
+    }
     if (n.from !== undefined && !O.has(n.from)) {
       const ids = idsIn(n);
       const refs = ids.filter((id) => refBy.has(id));
@@ -169,7 +188,9 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
   for (const [id, scene] of Object.entries(project.scenes)) {
     const users = sceneBy.get(id);
     if (!users) continue;
-    scenes[id] = { ...scene, root: prune(scene.root, scene, users) ?? scene.root };
+    const root = prune(scene.root, scene, users);
+    if (!root && local.has(scene.root.from ?? '')) throw new JoploError('USAGE', 'A shared slice cannot use a draft or private stage');
+    scenes[id] = { ...scene, root: root ?? scene.root };
   }
 
   // 路径：只留用得到的画面的路径；别的功能新增的页面按借用保留
@@ -243,7 +264,7 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
     ...(featureIds ? { featureIds } : {}),
     cases: Object.fromEntries(Object.entries(project.cases).filter(([, c]) => F.has(c.featureId))),
     options,
-    rules: Object.fromEntries(Object.entries(project.rules).filter(([, r]) => inF(r))),
+    rules: Object.fromEntries(Object.entries(project.rules).filter(([, r]) => inF(r)).map(([id, r]) => [id, { ...r, elementIds: r.elementIds.filter(element => !privateElements.has(element)) }])),
     scenes,
     scenarios,
     issues: Object.fromEntries(Object.entries(project.issues).filter(([, i]) => inF(i))),

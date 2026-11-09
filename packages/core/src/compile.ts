@@ -74,6 +74,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   const lowered = lowerWorks(src, mode, report);
   src = lowered.source;
   const works = lowered.works;
+  const localOnly = (fid: string) => works.has(fid) && (works.get(fid)!.draft === true || !Object.keys(works.get(fid)!.scenarios).length);
   const isolated = (fid: string) => works.has(fid) && works.get(fid)!.on === undefined && works.get(fid)!.routes === undefined;
   if (diags.some(d => d.severity === 'error')) return { project: null, diagnostics: diags };
 
@@ -154,7 +155,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   // 只使用 stage / layers 的独立作品从空白画面开始；写了 on / routes 就复用项目页面。
   // IR 的页面标题与画面名要求非空字符串；纯空白保持无可见文字，也不会成为作者翻译项。
   const blankRoute: RouteEntry = { path: '/', page: { kind: 'page', title: ' ', layout: false, tree: createNode('#fragment', {}), file: '' } };
-  const hasAddedRoot = [...addedRoutes.values()].some(r => r.path === '/' && included.some(o => o.qid === r.addedBy!.qid));
+  const hasAddedRoot = [...addedRoutes.values()].some(r => r.path === '/' && !localOnly(r.addedBy!.fid) && included.some(o => o.qid === r.addedBy!.qid));
   if (works.size && !baseRoutes.has('/') && !hasAddedRoot) baseRoutes.set('/', blankRoute);
   /** 在给定方案上下文（null = 发布视图）中可见的路径。 */
   const routesIn = (ctx: Opt | null): RouteEntry[] => {
@@ -162,6 +163,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const added = [...addedRoutes.values()].filter((r) => {
       const by = r.addedBy!;
       if (ctx && by.qid === ctx.qid) return true;
+      if (localOnly(by.fid)) return false;
       if (ctx && by.fid === ctx.fid) return false; // 同功能的其他方案
       return picked.get(by.fid)?.qid === by.qid;
     });
@@ -213,7 +215,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   // ---------- 4. 画面合成 ----------
   const contributionsFor = (ctx: Opt | null): Opt[] => {
     if (ctx && isolated(ctx.fid)) return [ctx];
-    const list = [...picked.values()].filter((o) => !ctx || o.fid !== ctx.fid);
+    const list = [...picked.values()].filter((o) => !localOnly(o.fid) && (!ctx || o.fid !== ctx.fid));
     if (ctx) list.push(ctx);
     return list;
   };

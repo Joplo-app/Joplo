@@ -8,8 +8,8 @@
  * - 上限：字符串按 Unicode 码点截断（末尾 “…”），数组超出部分丢弃，id 永不截断（Qid ≤ 256、Id ≤ 64 由 schema 保证）；
  *   截断后序列化仍超过 512 KiB 时 assertReviewManifestSize 报错（share 在发任何请求之前失败），不静默丢内容。
  */
+import { localOnlyOptions, localOnlyElementIds, withoutLocalContributions } from './publication.ts';
 import { nodeLabel } from './catalog.ts';
-import { entryOf } from './entries.ts';
 import { orderedFeatures } from './features.ts';
 import { JoploError } from './result.ts';
 import type { Project, SceneNode } from './schema.ts';
@@ -66,6 +66,8 @@ export function clipText(text: string, max: number): string {
 
 export function reviewManifest(project: Project, mode: ReviewManifestMode): ReviewManifest {
   if (project.mode !== 'dev') throw new JoploError('USAGE', `The review manifest needs the dev IR (rules and questions); got a ${project.mode} IR`);
+  const local = localOnlyOptions(project);
+  const privateElements = localOnlyElementIds(project, local);
   const L = REVIEW_LIMITS;
   const T = L.text;
   const features: ReviewManifest['features'] = [];
@@ -74,7 +76,7 @@ export function reviewManifest(project: Project, mode: ReviewManifestMode): Revi
   const included = new Set<string>();
   for (const f of orderedFeatures(project)) {
     // 清单读取 dev IR；草稿仍不能随普通分享或评审版上传。
-    if (entryOf(project, f.id)?.featureId === null && f.draft === true) continue;
+    if (f.optionIds.some(id => local.has(id))) continue;
     const optionIds = (mode === 'publish' ? (f.pick ? [f.pick] : []) : f.optionIds).filter((id) => project.options[id]);
     if (mode === 'publish' && !optionIds.length) continue;
     for (const id of optionIds) included.add(id);
@@ -91,7 +93,7 @@ export function reviewManifest(project: Project, mode: ReviewManifestMode): Revi
       rules: Object.values(project.rules)
         .filter((r) => r.featureId === f.id && inScope(r.optionId))
         .slice(0, L.rules)
-        .map((r) => ({ id: r.id, optionId: r.optionId ?? null, text: clipText(r.text, T.rule), origin: r.origin, confirmation: r.confirmation, elementIds: r.elementIds.slice(0, L.elementIds) })),
+        .map((r) => ({ id: r.id, optionId: r.optionId ?? null, text: clipText(r.text, T.rule), origin: r.origin, confirmation: r.confirmation, elementIds: r.elementIds.filter(id => !privateElements.has(id)).slice(0, L.elementIds) })),
       questions: Object.values(project.issues)
         .filter((q) => q.featureId === f.id && inScope(q.optionId))
         .slice(0, L.questions)
@@ -117,7 +119,13 @@ export function reviewManifest(project: Project, mode: ReviewManifestMode): Revi
     if (n.type !== '#text' && AUTHOR_ELEMENT_ID.test(n.id) && !elements.has(n.id)) elements.set(n.id, clipText(nodeLabel(n), T.label));
     for (const c of n.children ?? []) visit(c);
   };
-  for (const scene of Object.values(project.scenes)) if (scene.optionId === null || included.has(scene.optionId)) visit(scene.root);
+  for (const scene of Object.values(project.scenes)) {
+    if (scene.optionId !== null && !included.has(scene.optionId)) continue;
+    const owner = project.routes[scene.route]?.addedBy;
+    if (owner && local.has(owner)) continue;
+    const root = withoutLocalContributions(scene.root, local);
+    if (root) visit(root);
+  }
 
   return {
     v: REVIEW_MANIFEST_VERSION,

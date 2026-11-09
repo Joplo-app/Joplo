@@ -138,6 +138,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
         for (const id of opts.scope?.features ?? []) {
           const entry = entryOf(dev.project, id);
           if (!entry) throw new JoploError('NOT_FOUND', `Unknown work "${id}". Works: ${entriesOf(dev.project).map(e => e.id).join(', ') || 'none'}`);
+          if (entry.featureId === null && !entry.slices.length) throw new JoploError('USAGE', `Work "${id}" has no slices and cannot be published or reviewed. Add at least one flow() or chapter() in scenarios`);
           if (entry.draft) throw new JoploError('USAGE', `Work "${id}" is a draft and cannot be published or reviewed. Remove draft: true when it is ready`);
         }
         for (const id of opts.scope?.scenarios ?? []) {
@@ -156,8 +157,8 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     const errs = compiled.diagnostics.filter((d) => d.severity === 'error');
     throw new JoploError('EXPORT_FAILED', `Project compilation failed; no published site was generated: \n${errs.map((d) => `${d.at ?? ''}  ${d.message}`).join('\n')}`, { diagnostics: compiled.diagnostics });
   }
-  if (!entriesOf(compiled.project).length && compiled.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED'))
-    throw new JoploError('USAGE', 'There is no picked option or publishable work. All standalone works are drafts; remove draft: true when ready', { diagnostics: compiled.diagnostics });
+  if (!entriesOf(compiled.project).length && compiled.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED' || d.code === 'WORK_EMPTY'))
+    throw new JoploError('USAGE', compiled.diagnostics.some(d => d.code === 'WORK_EMPTY') ? 'There is no picked option or publishable work. Add at least one flow() or chapter() to an empty work before building' : 'There is no picked option or publishable work. All standalone works are drafts; remove draft: true when ready', { diagnostics: compiled.diagnostics });
   // 按场景保密分享（D75）：先裁剪 IR，再生成产物；写错范围在写任何文件之前报错
   let project = compiled.project;
   let scope: ScopeInfo | undefined;

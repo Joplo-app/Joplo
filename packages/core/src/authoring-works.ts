@@ -44,8 +44,10 @@ export function lowerWorks(src: AuthoringProject, mode: CompileMode, report: Rep
       for (const st of slice.steps) for (const effect of st.effects) if (effect.type === 'uses')
         report('WORK_FEATURE_ONLY', `Work ${key} slice "${sliceKey}" cannot use uses(). Remove uses(), or use an option under a feature with rules`, st.source ?? slice.source ?? at);
     }
-    if (!Object.keys(f.scenarios).length)
-      report('WORK_EMPTY', `Work "${f.title}" has no slices. Add scenarios: { opening: chapter('Opening').system('Begin', narrate('Your opening line')) }`, at, 'info');
+    if (!Object.keys(f.scenarios).length) {
+      report('WORK_EMPTY', `Work "${f.title}" has no slices${mode === 'dev' ? '' : ' and was not published or reviewed'}. Add scenarios: { opening: chapter('Opening').system('Begin', narrate('Your opening line')) }`, at, 'info');
+      if (mode !== 'dev') continue;
+    }
     works.set(key, f);
     features[key] = {
       def: { kind: 'feature', name: f.title, goal: f.summary, cases: {}, pick: 'main', roles: f.roles, order: f.order, source: f.source, file: f.file },

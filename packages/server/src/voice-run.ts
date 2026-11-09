@@ -52,6 +52,7 @@ export function projectSegments(project: Project): Segment[] {
   const out: Segment[] = [];
   for (const sc of Object.values(project.scenarios)) {
     const fid = project.options[sc.optionId]?.featureId;
+    if (fid && project.features?.[fid]?.draft) continue;
     const pick = fid ? (project.features?.[fid] as { pick?: string | null } | undefined)?.pick : null;
     // 选定方案的 id 可能是 “功能.方案” 或只有方案名：两种都认
     if (!(picked.has(sc.optionId) || (pick && sc.optionId === `${fid}.${pick}`))) continue;
