@@ -118,3 +118,13 @@ it('a flow({ from }) chapter starts with the music of the chapter it continues',
   expect(scopeProject(p, ['f.a.two'], 'publish').project.scenarios['f.a.two']!.from).toBeUndefined();
   expect(scopeProject(p, ['f.a.one', 'f.a.two'], 'publish').project.scenarios['f.a.two']!.from).toBe('f.a.one');
 });
+it.each([0,12000])('preserves numeric start offset %i through seek and scope; fades from the play boundary', offset => {
+ const src = source(), original = fake.compile!.effect;
+ fake.compile!.effect = (e,c) => ({media:[{track:'bgm',action:'play',resource:c.resource({compiler:'wav',input:String(e.payload)}),offsetMs:offset,fadeMs:800}]});
+ try {
+  const p = compile(src,'publish').project!;
+  expect(p.scenarios['f.a.s']!.steps[0]!.media!['fake:bgm']).toMatchObject({offsetMs:offset,startOffsetMs:offset,fadeInMs:800});
+  expect(mediaAt(p,'f.a.s',2,250)['fake:bgm']!.offsetMs).toBe(offset+4250);
+  expect(scopeProject(p,['f.a.s']).project.scenarios['f.a.s']!.steps[0]!.media!['fake:bgm']!.offsetMs).toBe(offset);
+ } finally { fake.compile!.effect=original; }
+});

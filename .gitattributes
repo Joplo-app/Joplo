@@ -1,0 +1,2 @@
+# Verified upstream license bytes: preserve original CRLF and spacing for SHA-256.
+plugins/alda/src/soundfont-license.txt -text -whitespace

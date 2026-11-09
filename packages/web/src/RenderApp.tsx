@@ -22,6 +22,7 @@ import { useBoardI18n } from './i18n/board/context';
 import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, stateAt, type AppearanceFont, type AppearanceStroke, type PlayState, type Project } from '@joplo-app/core/runtime';
 import { fetchIR } from './runtime/dev-client';
+import { useMedia } from './runtime/useMedia';
 import { DemoController } from './runtime/demo';
 import { Stage, VIEWPORTS, type Viewport } from './renderer/Stage';
 import { viewportDecoration } from './renderer/plugins';
@@ -53,7 +54,7 @@ type W = {
   __JOPLO_READY__?: boolean;
   __JOPLO_STATE__?: PlayState | null;
   __JOPLO_ERROR__?: string | null;
-  __JOPLO_RECORD__?: { play(): void; progress: RecordProgress };
+  __JOPLO_RECORD__?: { play(): Promise<void>; stopAudio(): Promise<{ data: string } | null>; calibrate():Promise<boolean>; progress: RecordProgress };
 };
 
 export type RecordProgress = { step: number; done: boolean; error: string | null; scenarioId: string | null; position: number; activeStep: number | null };
@@ -100,6 +101,7 @@ export function RenderApp() {
   const frame = params.get('frame') === '1';
   const record = params.get('record') === '1';
   const chain = params.get('chain') === '1';
+  const captureAudio = params.get('audio') !== '0';
   const voiceEstimate = params.get('voice') === 'estimate';
   // 可选的截图尺寸（renderStep 的 viewport）：只决定画布大小，舞台宽度仍是页面自己的 viewport（D44）
   const w = Number(params.get('w'));
@@ -236,7 +238,7 @@ export function RenderApp() {
       </div>
     );
   };
-  if (record) return <RecordStage project={data.project} scenarioId={scenarioId} chain={chain} voiceEstimate={voiceEstimate} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} />;
+  if (record) return <RecordStage project={data.project} scenarioId={scenarioId} chain={chain} captureAudio={captureAudio} voiceEstimate={voiceEstimate} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} />;
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
   const plan = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null);
@@ -259,7 +261,7 @@ export function RenderApp() {
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
-function RecordStage({ project, scenarioId, chain, voiceEstimate, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; chain: boolean; voiceEstimate: boolean; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null) => ReactNode }) {
+function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; chain: boolean; captureAudio: boolean; voiceEstimate: boolean; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null) => ReactNode }) {
   const { t: i18n } = useBoardI18n();
 
   const ctl = useMemo(() => {
@@ -276,6 +278,15 @@ function RecordStage({ project, scenarioId, chain, voiceEstimate, theme, font, s
     return c;
   }, [project, scenarioId, chain, voiceEstimate]);
   ctl.i18n = i18n;
+  const media = useMedia(ctl, project, captureAudio);
+  const recordingAssets = useMemo(() => {
+    const sc = project.scenarios[scenarioId];
+    const sequence = chain ? playSequence(project, sc?.optionId ?? null) : [scenarioId];
+    const at = sequence.indexOf(scenarioId);
+    const chapters = (at >= 0 ? sequence.slice(at) : [scenarioId]).map(id => project.scenarios[id]);
+    const ids = new Set(chapters.flatMap(chapter => [chapter, ...(chapter?.steps ?? [])].flatMap(s => Object.values(s?.media ?? {}).map(t => t.resource))));
+    return Object.fromEntries([...ids].filter(id => project.mediaAssets?.[id]).map(id => [id, project.mediaAssets![id]!]));
+  }, [project, scenarioId, chain]);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
   const [started, setStarted] = useState(false);
@@ -286,11 +297,17 @@ function RecordStage({ project, scenarioId, chain, voiceEstimate, theme, font, s
     const total = current?.steps.length ?? 0;
     w.__JOPLO_STATE__ = snap.state;
     w.__JOPLO_RECORD__ = {
-      play: () => {
+      play: async () => {
+        if (captureAudio && Object.keys(recordingAssets).length) {
+          if (!media.current) throw new Error('Recording media engine is not ready');
+          await media.current.startCapture(recordingAssets,project.mediaInfo);
+        }
         setStarted(true);
         if (total === 0) return;
         void ctl.play();
       },
+      calibrate: () => media.current?.calibrate() ?? Promise.resolve(false),
+      stopAudio: () => media.current?.endCapture() ?? Promise.resolve(null),
       progress: {
         step: snap.state?.position ?? 0,
         done: started && !snap.playing && !snap.upNext && (total === 0 || !!snap.state?.completed || (snap.state?.position ?? 0) >= total || !!snap.playbackError),
@@ -298,7 +315,7 @@ function RecordStage({ project, scenarioId, chain, voiceEstimate, theme, font, s
         scenarioId: snap.scenarioId, position: snap.state?.position ?? 0, activeStep: snap.activeStep,
       },
     };
-  }, [snap, started, ctl, project, scenarioId]);
+  }, [snap, started, ctl, project, scenarioId, recordingAssets, media, captureAudio]);
 
   const next = ctl.nextStep();
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;

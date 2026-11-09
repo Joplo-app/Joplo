@@ -173,7 +173,7 @@ export const CALLOUT_SIDES = ['top', 'right', 'bottom', 'left'] as const;
 export const Callout = z.strictObject({ target: z.string().min(1), text: z.string().min(1), side: z.enum(CALLOUT_SIDES).optional() });
 
 export const MediaSnapshot = z.record(z.string(), z.strictObject({
-  plugin: z.string().min(1), resource: z.string().min(1), offsetMs: z.number().nonnegative(),
+  plugin: z.string().min(1), resource: z.string().min(1), offsetMs: z.number().nonnegative(), startOffsetMs: z.number().nonnegative().optional(),
   volume: z.number().min(0).max(1), loop: z.boolean(), fadeInMs: z.number().nonnegative(), stopAfterMs: z.number().nonnegative().optional(),
 }));
 
@@ -379,6 +379,9 @@ export const VoiceIndex = z.strictObject({
   locales: z.record(z.string(), z.strictObject({ narrator: z.string().min(1).nullable(), roles: z.record(z.string(), z.string().min(1)).default({}), overrides: z.record(z.string(), z.string().min(1)).optional() })).optional(),
 });
 
+/** Only calibrated numeric playback data may cross the author/public boundary. */
+export const AudioRegionSchema = z.strictObject({ sourceSampleRate:z.number().positive(), cycleFrames:z.number().int().positive(), contentStartFrame:z.number().int().nonnegative(), contentFrames:z.number().int().positive(), decodedFrames:z.number().int().positive(), encoderDelayFrames:z.number().int().nonnegative(), paddingFrames:z.number().int().nonnegative(), channels:z.number().int().min(1).max(2) }).refine(v=>v.contentStartFrame+v.contentFrames<=v.decodedFrames&&v.cycleFrames<=v.contentFrames, 'Audio region exceeds decoded samples');
+
 export const Project = z.strictObject({
   schemaVersion: z.literal(SCHEMA_VERSION),
   name: z.string().min(1),
@@ -390,6 +393,7 @@ export const Project = z.strictObject({
   voiceConfig: VoiceConfig.optional(),
   voiceIndex: VoiceIndex.optional(),
   mediaAssets: z.record(z.string(), z.string()).optional(),
+  mediaInfo: z.record(z.string(), AudioRegionSchema).optional(),
   /** 作者内容多语言（D84）：只有 config 写了 locales 才有。messages 只含非默认语言、这份 IR 用得到的译文；stale 只在 dev IR。 */
   i18n: ContentI18nSchema.optional(),
   /** 启用的插件（D86）：插件 id → 名称、版本与组件声明（可操作、父组件）。运行时代码不在 IR 里，由看板 / 发布站另外载入。 */

@@ -141,10 +141,13 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     project = r.project;
     scope = r.info;
   }
+  let mediaCredits: string[] = [], mediaLicenses:string[]=[];
   if (compiled.resources) {
     const resources = await inlineResources(project, compiled.resources.requests, compiled.resources.host);
-    if (Object.keys(resources.assets).length) project = { ...project, mediaAssets: resources.assets };
+    if (Object.keys(resources.assets).length) project = { ...project, mediaAssets: resources.assets,mediaInfo:resources.audioInfo };
     compiled.diagnostics.push(...resources.diagnostics);
+    mediaCredits = resources.credits;mediaLicenses=resources.licenses;
+    if(resources.diagnostics.some(d=>d.severity==='error'))throw new JoploError('EXPORT_FAILED','Audio attribution is incomplete; no site was published',{diagnostics:resources.diagnostics});
   }
   binaryAssets(project, {diagnostics:compiled.diagnostics});
   const inline: { project: Record<string, unknown>; home: string | null; scoped?: true } = publishPayload(project, compiled.home);
@@ -178,12 +181,20 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     // 插件运行时（D86）：每个打成一个文件，内联在入口脚本之前（file:// 也能打开）；只打包 IR 里用到的插件
     const used = Object.fromEntries(Object.entries(compiled.pluginRuntimes).filter(([id]) => project.plugins?.[id]));
     const pluginCode = await bundlePluginRuntimes(used, projectDir, web);
-    const withPlugins = injectPluginScripts(html, pluginCode);
+    let withPlugins = injectPluginScripts(html, pluginCode);
+    if (mediaCredits.length) {
+      if(mediaLicenses.length)fs.writeFileSync(path.join(staging,'music-LICENSE.txt'),mediaLicenses.join('\n\n'));
+      fs.writeFileSync(path.join(staging, 'credits.txt'), `Music sound libraries\n\n${mediaCredits.join('\n\n')}\n`);
+      withPlugins = withPlugins.replace('</head>', '<link rel="license" href="./credits.txt" title="Music credits"></head>');
+    }
     fs.writeFileSync(path.join(staging, 'index.html'), withPlugins.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));
 
     // D59: scan every staged text artifact, then retain only font subsets its content needs.
     subsetSiteFonts(staging, web);
 
+    const siteBytes=listFiles(staging).reduce((n,f)=>n+fs.statSync(path.join(staging,f)).size,0);
+    compiled.diagnostics.push({severity:'info',source:'structure',code:'SITE_BUDGET',message:`Complete site: ${siteBytes} bytes (including embedded audio, fonts, models and narration)`});
+    if(siteBytes>=18*1024*1024)compiled.diagnostics.push({severity:'warning',source:'structure',code:'SITE_BUDGET_LARGE',message:'Site approaches the documented Free 20 MiB single-upload budget (18 MiB warning); actual account limits come from the service'});
     // 4. 写入目标目录
     if (fs.existsSync(outDir)) fs.rmSync(outDir, { recursive: true, force: true });
     fs.mkdirSync(path.dirname(outDir), { recursive: true });

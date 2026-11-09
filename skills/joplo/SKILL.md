@@ -99,11 +99,11 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - [demo](./topics/demo.md): Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots
 - [focus](./topics/focus.md): Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
 - [cases](./topics/cases.md): Case dimensions: ask the user before starting
-- [check](./topics/check.md): Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line
+- [check](./topics/check.md): Read diagnostics, music duration/markers and timing warnings, UNBOUND_INTERACTIVE, and fix the indicated file and line
 - [selection](./topics/selection.md): Edit only the element selected by the user in the board
 - [review](./topics/review.md): Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - [diff](./topics/diff.md): Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
 - [publish](./topics/publish.md): pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 - [plugins](./topics/plugins.md): Data-only action contracts, native local behavior, engine-clock presenters; Universal properties, plugin themes, state writes and director targets; Binary assets, explicit paid resource generation, persistent artifacts, media tracks and offline publishing; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.3.0 sha256:d0fd663d1c55d15de0acc58d697a715e97ef38ab69e1c8afe54c83afda9df499 -->
+<!-- joplo-skill 0.3.0 sha256:e61a80f31f6a72465073709d4e8f05e14338feddb0a886aeacdd311ac92503d2 -->

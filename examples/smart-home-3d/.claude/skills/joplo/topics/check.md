@@ -1,5 +1,9 @@
 # Joplo diagnostics: check
 
+## Music checks
+Referenced music is inspected by its enabled plugin on the author machine: duration, part note counts and marker times. Compare these with chapter holds; short loops over long scenes and music ending early warn. Unknown start markers are errors when the local inspector is available. Missing local tools warn without blocking unrelated checks; this is not proof that sound was rendered. Build reports each audio asset's bytes/duration, aggregate raw and embedded bytes, and complete site size. Check publication and decoded-memory budgets in the enabled plugin guide; a compressed file's size does not represent PCM memory. Sound-library attribution is cached with the artifact; missing required attribution blocks publication even when score inspection is unavailable. Listen to playback/export; when only measurements were possible, report LUFS/peak and explicitly say not verified by human listening. Read the enabled music plugin's skill for composition and recovery.
+
+
 STEP_KEY_INVALID: use a letter followed by up to 63 letters/digits/underscores/hyphens. STEP_KEY_DUPLICATE: each step key must be unique within its scenario; keep the same key only for the same action across versions. See diff for identity guidance.
 
 Run npx joplo check [dir]. Use --option feature.option to narrow structure checks and replay; --format json gives machine output.
@@ -99,4 +103,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.3.0 sha256:b369e3d32d7695ecaec7202cd3f0f433a06e5c4b5463ed959f4bd26b93666d7f -->
+<!-- joplo-skill 0.3.0 sha256:99c6e24eaeb6ba1a696c29dc18c918707c049f92c78906af743c2548a331408e -->

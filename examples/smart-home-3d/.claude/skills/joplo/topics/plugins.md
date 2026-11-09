@@ -1,5 +1,9 @@
 # Joplo plugins: plugins
 
+## Rendered background music
+Music plugins compile text into compressed audio on the author machine. A lightweight resource inspection pass supplies marker times before final compilation; author marker names become numeric media offsets, used identically by normal playback, jumping and deep links. The generic media layer decodes audio, follows the engine clock, pauses/seeks/changes speed, fades, ducks under narration and records its mix during video export. Static screenshots remain silent. Plugins supply audio bytes, not a separate player. Sound banks, score source, local code and paths stay out of published sites; only referenced audio and credits ship. First rendering may download a pinned, verified sound bank; prepare its cache on an online author machine before offline work. Read the enabled music plugin's guide for its bank, license, composition and installation command.
+
+
 The engine supplies authoring, compilation, state, scheduling and host services. It loads only config.plugins; no component or media library is implicitly installed or enabled. A template is one explicit choice of packages, not an engine default.
 
 ## Discover and use
@@ -53,4 +57,4 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.3.0 sha256:557506f41313e52c2c7a9afa7127f03a9cb3e0c04b2f37b6bd9135a727b0b01f -->
+<!-- joplo-skill 0.3.0 sha256:e8da5ce653ffc359dcd0552bb385c67ed63f8dba9a126ed6976eeedd22cb2616 -->

@@ -271,7 +271,7 @@ Start playback before testing stage gestures: covers and transition cards intent
 - A step's hold controls dwell; narration may extend waiting. The engine estimates spoken time and sequences chapters. Keep a long story in smaller scenarios with from, retaining the previous final state.
 - Transition cards mark a real opening/ending/time shift. Most information should change on the view, not arrive as a text deck. Read story and the installed visual plugins' recipes.
 - Media is provided by an explicitly configured plugin. A viewer gesture unlocks sound; pause/resume/speed share the clock and narration ducks background audio. Static frames stay silent. Read the plugin skill for resources and production limits.
-- Media continuity is engine behavior for every media plugin: a track keeps playing across steps on the engine clock (it only re-seeks on a jump, reset or non-relay chapter change); playing the same resource again continues it; playing a different one with fadeMs crossfades (old out, new in, no silence); a from chapter starts with the music its previous chapter ended with.
+- Media continuity is engine behavior for every media plugin: a track keeps playing across steps on the engine clock (it only re-seeks on a jump, reset or non-relay chapter change); playing the same resource again continues it; playing a different one with fadeMs crossfades (old out, new in, no silence); a from chapter starts with the music its previous chapter ended with. Explicit marker seeks reposition that track (even at 0ms) and start its fade from the marker, while ordinary steps/relay chapters preserve its driver. Overlapping outgoing/incoming audio both count toward the decoded-memory budget; the host applies fade/volume/narration ducking once. Video chain export records that same mix; film strips skip audio.
 
 ## Make it play like a film, not slides (Required for video-like pieces)
 Viewers call a piece "a slide deck" when pictures swap in one frame and then sit still. The static storyboard cannot show either problem, so it never proves the piece moves well.
@@ -449,6 +449,10 @@ Coverage status values: \`expressed\`, \`undecided\`, \`missing\`, \`not_applica
 See authoring for flow and rule syntax; check for locating coverage diagnostics.
 No mobile example yet; create a separate demo when mobile is needed (D44).`,
   check: `# Joplo diagnostics: check
+
+## Music checks
+Referenced music is inspected by its enabled plugin on the author machine: duration, part note counts and marker times. Compare these with chapter holds; short loops over long scenes and music ending early warn. Unknown start markers are errors when the local inspector is available. Missing local tools warn without blocking unrelated checks; this is not proof that sound was rendered. Build reports each audio asset's bytes/duration, aggregate raw and embedded bytes, and complete site size. Check publication and decoded-memory budgets in the enabled plugin guide; a compressed file's size does not represent PCM memory. Sound-library attribution is cached with the artifact; missing required attribution blocks publication even when score inspection is unavailable. Listen to playback/export; when only measurements were possible, report LUFS/peak and explicitly say not verified by human listening. Read the enabled music plugin's skill for composition and recovery.
+
 
 STEP_KEY_INVALID: use a letter followed by up to 63 letters/digits/underscores/hyphens. STEP_KEY_DUPLICATE: each step key must be unique within its scenario; keep the same key only for the same action across versions. See diff for identity guidance.
 
@@ -823,6 +827,10 @@ For local comparisons and PR CI, read npx joplo skill diff. It compares two real
 - --ref works only together with --applied. --applied is idempotent; text output without --format json ends with a Next: line listing the ids.
 `,
   plugins: `# Joplo plugins: plugins
+
+## Rendered background music
+Music plugins compile text into compressed audio on the author machine. A lightweight resource inspection pass supplies marker times before final compilation; author marker names become numeric media offsets, used identically by normal playback, jumping and deep links. The generic media layer decodes audio, follows the engine clock, pauses/seeks/changes speed, fades, ducks under narration and records its mix during video export. Static screenshots remain silent. Plugins supply audio bytes, not a separate player. Sound banks, score source, local code and paths stay out of published sites; only referenced audio and credits ship. First rendering may download a pinned, verified sound bank; prepare its cache on an online author machine before offline work. Read the enabled music plugin's guide for its bank, license, composition and installation command.
+
 
 The engine supplies authoring, compilation, state, scheduling and host services. It loads only config.plugins; no component or media library is implicitly installed or enabled. A template is one explicit choice of packages, not an engine default.
 
