@@ -128,3 +128,22 @@ it('an anchored fade continues smoothly when the step is shorter than its hold, 
   expect(mock.factory).toHaveBeenCalledTimes(2);
   engine.destroy();
 });
+it('keeps forty full-minute PCM buffers within budget and rejects a long cue before decoding',async()=>{
+ const decode=vi.fn().mockImplementation(async()=>({duration:60,length:2880000,numberOfChannels:2,sampleRate:48000}));
+ class Device extends FakeAudio {sampleRate=48000;decodeAudioData=decode;createBufferSource(){return {playbackRate:{value:1},connect:vi.fn(),disconnect:vi.fn(),start:vi.fn(),stop:vi.fn()};}}
+ vi.stubGlobal('AudioContext',Device);const previous=mock.factory;mock.factory=undefined as any;
+ const engine=new MediaEngine();engine.unlock();
+ for(let i=0;i<40;i++){const url='data:audio/mpeg;base64,'+btoa(String(i));engine.update(snapshot,{r:url},{...frame,identity:String(i)});await new Promise(r=>setTimeout(r,0));}
+ expect(engine.status().cache.pcm.bytes).toBeLessThanOrEqual(32*1024*1024);expect(engine.status().cache.pcm.entries).toBe(1);
+ expect(engine.status().cache.encoded.entries).toBeLessThanOrEqual(32);expect(decode).toHaveBeenCalledTimes(40);
+ engine.update(snapshot,{r:'data:audio/mpeg;base64,YWJj'},{...frame,identity:'long'},{r:{sourceSampleRate:48000,decodedFrames:28800000,contentFrames:28800000,cycleFrames:28800000,contentStartFrame:0,encoderDelayFrames:0,paddingFrames:0,channels:2}});
+ await new Promise(r=>setTimeout(r,0));expect(decode).toHaveBeenCalledTimes(40);engine.destroy();expect(engine.status().cache.pcm.bytes).toBe(0);mock.factory=previous;
+});
+it('does not retain final asynchronous recorder chunks after destroy',async()=>{
+ const stopped=vi.fn();
+ class Device extends FakeAudio {createConstantSource(){return {offset:{value:0},connect:vi.fn(),start:vi.fn(),stop:stopped,disconnect:vi.fn()};}createMediaStreamDestination(){return {stream:{getTracks:()=>[{stop:stopped}]}};}}
+ class Recorder {state='recording';mimeType='audio/webm';ondataavailable:any;start(){}stop(){this.state='inactive';queueMicrotask(()=>this.ondataavailable?.({data:new Blob(['late chunk'])}));}}
+ vi.stubGlobal('AudioContext',Device);vi.stubGlobal('MediaRecorder',Recorder);
+ const engine=new MediaEngine();await engine.startCapture({});engine.destroy();await Promise.resolve();
+ expect((engine as any).chunks).toEqual([]);expect(stopped).toHaveBeenCalledTimes(2);
+});

@@ -3,6 +3,9 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import type { LocalResourceInfo, PluginLocal } from '@joplo-app/kit/plugin';
 import { soundfont, SOUNDFONT, credit } from './soundfont.ts';
+import { createHash, randomUUID } from 'node:crypto';
+import { encodeMusic, MP3_VERSION } from './mp3.ts';
+import license from './soundfont-license.ts';
 import { encodeFlac, renderPCM, RENDER_VERSION } from './render.ts';
 export const installSoundfont = async () => { await soundfont(); console.log(`Installed ${SOUNDFONT.name}; SHA-256 ${SOUNDFONT.sha256}`); };
 function request(input: string): { score: string; loop: boolean } {
@@ -29,7 +32,7 @@ export async function inspectScore(score: string, directory: string): Promise<Lo
   return { durationMs, parts, markers: parsed.markers, credit };
 }
 export default { compilers: { audio: {
-  version: `alda-2.4.8-${RENDER_VERSION}-${SOUNDFONT.sha256}`, mime: 'audio/flac', timeoutMs: 180000,
+  requiresAttribution:true, version: `alda-2.4.8-${RENDER_VERSION}-${SOUNDFONT.sha256}-${MP3_VERSION}`, mime: 'audio/mpeg', timeoutMs: 180000,
   async inspect(input, ctx) { return inspectScore(request(input).score, ctx.directory); },
   async compile(input, ctx) {
     const { score, loop } = request(input);
@@ -39,8 +42,12 @@ export default { compilers: { audio: {
     const output = path.join(ctx.directory, 'score.mid');
     await run(['export', '-f', path.join(ctx.directory, 'score.alda'), '-o', output], ctx.directory);
     const pcm = await renderPCM(await fs.readFile(output), await soundfont(ctx.home), info.durationMs!, loop);
-    const bytes = await encodeFlac(pcm);
+    const master=await encodeFlac(pcm);
+    const masters=path.join(ctx.projectDir??ctx.directory,'.joplo','music-masters');await fs.mkdir(masters,{recursive:true});
+    const key=createHash('sha256').update(JSON.stringify([score,loop,RENDER_VERSION,SOUNDFONT.sha256])).digest('hex');
+    const tmp=path.join(masters,`${key}.${randomUUID()}.tmp`);await fs.writeFile(tmp,master);await fs.rename(tmp,path.join(masters,`${key}.flac`));
+    const {bytes,audio}=await encodeMusic(pcm,Math.round(info.durationMs!*44100/1000),loop);
     if (bytes.length > ctx.maxBytes) throw Object.assign(new Error('Rendered audio exceeds resource size limit'), { code: 'LOCAL_RESOURCE_TOO_LARGE' });
-    return bytes;
+    return {bytes,audio,credit,license};
   },
 } } } satisfies PluginLocal;

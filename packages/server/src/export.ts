@@ -17,6 +17,7 @@
  *
  * 字段流向：job（写入点：这里的 runJob）→ jobs Map（存储）→ SSE / GET（读取点）→ 看板的导出视频弹窗（消费者）。
  */
+import { recordedCalibration } from './media-calibration.ts';
 import { muxRecordedAudio } from './media-mux.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -141,7 +142,6 @@ export function defaultRecorder(load: (projectDir: string) => Promise<Playwright
     const tmp = fs.mkdtempSync(path.join(path.dirname(out), '.rec-'));
     try {
       const ctx = await browser.newContext({ viewport: size, deviceScaleFactor: 1, recordVideo: { dir: tmp, size } });
-      const videoStarted = Date.now();
       const page = await ctx.newPage();
       await page.goto(url, { waitUntil: 'domcontentloaded' });
       await waitReady(page);
@@ -158,12 +158,18 @@ export function defaultRecorder(load: (projectDir: string) => Promise<Playwright
         await page.waitForTimeout(150);
       }
       await page.waitForTimeout(900); // 停留在结果画面
-      const audio = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { stopAudio?(): Promise<{data:string;started:number}|null> } }).__JOPLO_RECORD__.stopAudio?.() ?? null);
+      const calibrated=await page.evaluate(()=> (window as unknown as {__JOPLO_RECORD__:{calibrate?():Promise<boolean>}}).__JOPLO_RECORD__.calibrate?.()??false);
+      const audio = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { stopAudio?(): Promise<{data:string}|null> } }).__JOPLO_RECORD__.stopAudio?.() ?? null);
       const video = page.video();
       await ctx.close();
       if (!video) throw new JoploError('EXPORT_FAILED', 'The browser did not generate a video');
       await video.saveAs(out);
-      if (audio) await muxRecordedAudio(out, Buffer.from(audio.data, 'base64'), (audio.started - videoStarted) / 1000);
+      if (audio) {
+        if(!calibrated)throw new Error('Audio/video calibration unavailable');
+        const analysis=await browser.newContext();const probe=await analysis.newPage();await probe.goto(url,{waitUntil:'domcontentloaded'});
+        try {const bytes=Buffer.from(audio.data,'base64');const timing=await recordedCalibration(probe,out,bytes);await muxRecordedAudio(out,bytes,timing.offsetSeconds,{videoEnd:timing.videoPTS,audioEnd:timing.audioPTS});}
+        finally{await analysis.close();}
+      }
     } finally {
       await browser.close().catch(() => undefined);
       fs.rmSync(tmp, { recursive: true, force: true });

@@ -77,3 +77,24 @@ it('inspects metadata without rendering, caches success, and invalidates the Sou
  expect(changed.url).not.toBe(rendered.url);
  expect(fs.readFileSync(path.join(x.dir,'renders'),'utf8')).toBe('xx');
 });
+it('recovers artifact credits without score inspection and refuses an unattributed cached artifact',async()=>{
+ const x=setup();
+ fs.writeFileSync(x.entry,`import fs from 'node:fs';export default {compilers:{wav:{version:'artifact-v1',mime:'audio/mpeg',requiresAttribution:true,inspect(){if(fs.existsSync(${JSON.stringify(path.join(x.dir,'no-alda'))}))throw new Error('Alda unavailable');return {durationMs:1000}},compile(){return {bytes:new Uint8Array([1,2,3]),credit:'Bank authors',license:'Full MIT text'}}}}};`);
+ const project:any={scenarios:{s:{steps:[{media:{bgm:{resource:'asset'}}}]}}};
+ const first=await inlineResources(project,[x.req],x.host);expect(first.credits).toEqual(['Bank authors']);
+ for(const f of fs.readdirSync(path.join(x.dir,'.joplo/resources')).filter(f=>f.endsWith('.info.json')))fs.unlinkSync(path.join(x.dir,'.joplo/resources',f));
+ fs.writeFileSync(path.join(x.dir,'no-alda'),'');
+ const cached=await inlineResources(project,[x.req],new LocalResources(x.dir,{fake:x.entry}));
+ expect(cached.assets.asset).toBe(first.assets.asset);expect(cached.licenses).toContain('Full MIT text');
+ expect(cached.diagnostics.some(d=>d.code==='LOCAL_RESOURCE_INSPECTION_FAILED')).toBe(true);
+ for(const f of fs.readdirSync(path.join(x.dir,'.joplo/resources')).filter(f=>f.endsWith('.json'))){const p=path.join(x.dir,'.joplo/resources',f);const v=JSON.parse(fs.readFileSync(p,'utf8'));if(v.url){delete v.credit;fs.writeFileSync(p,JSON.stringify(v));}}
+ const refused=await inlineResources(project,[x.req],new LocalResources(x.dir,{fake:x.entry}));
+ expect(refused.assets).toEqual({});expect(refused.diagnostics).toContainEqual(expect.objectContaining({severity:'error',code:'LOCAL_RESOURCE_ATTRIBUTION_MISSING'}));
+});
+it('rejects corrupt cached envelopes and regenerates instead of returning unchecked data',async()=>{
+ const x=setup();const first=await x.host.ensure(x.req);expect(first.url).toBeTypeOf('string');
+ const file=fs.readdirSync(path.join(x.dir,'.joplo/resources')).find(f=>f.endsWith('.json'))!;
+ const cache=path.join(x.dir,'.joplo/resources',file);const value=JSON.parse(fs.readFileSync(cache,'utf8'));
+ fs.writeFileSync(cache,JSON.stringify({...value,url:123}));
+ expect((await new LocalResources(x.dir,{fake:x.entry}).ensure(x.req)).url).toBe(first.url);
+});

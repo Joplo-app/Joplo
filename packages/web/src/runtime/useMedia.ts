@@ -19,7 +19,7 @@ export function useMedia(ctl: DemoController, project: Project | null, enabled: 
       const media = (position ? sc?.steps[position - 1]?.media : sc?.media) ?? {};
       // identity = 跳转计数 seek（D92）：跳转、重置、换章（非接力）时才重新定位；逐步提交、接力的下一章、暂停 → 继续都连续播放
       const elapsedMs = ctl.mediaElapsed();
-      engine.update(media, current.current.project?.mediaAssets ?? {}, { playing: s.view === 'stage' && s.playing && !s.paused, enabled: current.current.enabled, speed: ctl.speed, elapsedMs, timeMs: ctl.clock.getSnapshot().timeMs, duck: !!s.narration, identity: `${s.seek}` });
+      engine.update(media, current.current.project?.mediaAssets ?? {}, { playing: s.view === 'stage' && s.playing && !s.paused, enabled: current.current.enabled, speed: ctl.speed, elapsedMs, timeMs: ctl.clock.getSnapshot().timeMs, duck: !!s.narration, identity: `${s.seek}` },current.current.project?.mediaInfo);
       (window as unknown as Record<string, unknown>).__JOPLO_MEDIA__ = engine.status();
       raf = requestAnimationFrame(tick);
     };

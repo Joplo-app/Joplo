@@ -101,7 +101,10 @@ export type ResourceRequest = { id: string; plugin: string; compiler: string; in
 export const localResource = (plugin: string, compiler: string, input: string) => ({ kind: 'local-resource' as const, plugin, compiler, input });
 /** Inspection runs only on the author machine; none of this metadata is automatically published. */
 export type LocalResourceInfo = { durationMs?: number; markers?: Record<string, number>; parts?: Record<string, number>; credit?: string };
-export type LocalCompiler = { version: string; mime: string; timeoutMs?: number; inspect?: (input: string, ctx: { directory: string }) => Promise<LocalResourceInfo>; persistent?: boolean; estimate?: (input: string) => { credits: number }; compile(input: string, ctx: { directory: string; projectDir?: string; keys: Readonly<Record<string, string>>; home?: string; allowSpend?: boolean; maxBytes: number }): Promise<Uint8Array> | Uint8Array };
+/** Numeric decoded-audio region; encoded guard/delay/padding never count as music time. */
+export type AudioRegion = { sourceSampleRate:number; cycleFrames:number; contentStartFrame:number; contentFrames:number; decodedFrames:number; encoderDelayFrames:number; paddingFrames:number; channels:number };
+export type LocalArtifact = { bytes:Uint8Array; audio?:AudioRegion; credit?:string; license?:string };
+export type LocalCompiler = { requiresAttribution?:boolean; version: string; mime: string; timeoutMs?: number; inspect?: (input: string, ctx: { directory: string }) => Promise<LocalResourceInfo>; persistent?: boolean; estimate?: (input: string) => { credits: number }; compile(input: string, ctx: { directory: string; projectDir?: string; keys: Readonly<Record<string, string>>; home?: string; allowSpend?: boolean; maxBytes: number }): Promise<Uint8Array | LocalArtifact> | Uint8Array | LocalArtifact };
 /** Local-only credential metadata. Never put secret values in this declaration. */
 export type PluginKey = { id: string; title: string; description: string; url: string; env: string };
 export type PluginLocal = { compilers: Record<string, LocalCompiler> };
@@ -109,7 +112,7 @@ export type MediaCommand = { track: string; action: 'play'; resource: string; of
 /** Full state at a step boundary; elapsed time is in unscaled engine milliseconds. */
 export type MediaSnapshot = Record<string, { plugin: string; resource: string; offsetMs: number; startOffsetMs?: number; volume: number; loop: boolean; fadeInMs: number; stopAfterMs?: number }>;
 export type MediaDriver = { update(frame: { offsetMs: number; volume: number; loop: boolean; speed: number; playing: boolean }): void; destroy(): void };
-export type MediaFactory = (ctx: { audio: AudioContext; destination: AudioNode; bytes: Uint8Array }) => MediaDriver | Promise<MediaDriver>;
+export type MediaFactory = (ctx: { audio: AudioContext; destination: AudioNode; bytes: Uint8Array; audioInfo?:AudioRegion }) => MediaDriver | Promise<MediaDriver>;
 
 export type PluginDataSchema = { safeParse(value: unknown): { success: boolean; error?: { message: string } } };
 

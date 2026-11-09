@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import { Input, ALL_FORMATS, BufferSource, BufferTarget, Output, WebMOutputFormat, EncodedPacketSink, EncodedAudioPacketSource, EncodedVideoPacketSource } from 'mediabunny';
 /** Packet copy only (VP8/VP9 and Opus): no native codec, ffmpeg executable, decode or re-encode. */
-export async function muxRecordedAudio(videoFile: string, audio: Uint8Array, offsetSeconds: number) {
+export async function muxRecordedAudio(videoFile: string, audio: Uint8Array, offsetSeconds: number, trim?:{videoEnd:number;audioEnd:number}) {
   const video = new Input({ formats: ALL_FORMATS, source: new BufferSource(await fs.readFile(videoFile)) });
   const sound = new Input({ formats: ALL_FORMATS, source: new BufferSource(audio) });
   try {
@@ -15,12 +15,12 @@ export async function muxRecordedAudio(videoFile: string, audio: Uint8Array, off
     await output.start();
     const copyVideo = async () => {
       const decoderConfig = await v.getDecoderConfig(); if (!decoderConfig) throw new Error('Missing video decoder configuration');
-      for await (const packet of new EncodedPacketSink(v).packets()) await vs.add(packet, { decoderConfig });
+      for await (const packet of new EncodedPacketSink(v).packets()) {if(trim&&packet.timestamp>=trim.videoEnd)break;await vs.add(packet,{decoderConfig});}
       vs.close();
     };
     const copyAudio = async () => {
       const decoderConfig = await a.getDecoderConfig(); if (!decoderConfig) throw new Error('Missing audio decoder configuration');
-      for await (const packet of new EncodedPacketSink(a).packets()) await as.add(packet.clone({ timestamp: packet.timestamp + Math.max(0, offsetSeconds) }), { decoderConfig });
+      for await (const packet of new EncodedPacketSink(a).packets()) {if(trim&&packet.timestamp+packet.duration>trim.audioEnd)break;if(packet.timestamp+offsetSeconds<0)continue;await as.add(packet.clone({timestamp:packet.timestamp+offsetSeconds}),{decoderConfig});}
       as.close();
     };
     await Promise.all([copyVideo(), copyAudio()]); await output.finalize();

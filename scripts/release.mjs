@@ -367,12 +367,13 @@ async function smoke() {
           const input=JSON.stringify({score:'piano: (tempo! 120) %start o3 c2/e2/g2 | %end r2 | midi-percussion: @start o2 c4 c+4 @end r2',loop:true});
           const info=await local.compilers.audio.inspect(input,{directory});
           if(info.markers.end!==1000 || info.durationMs!==2000 || !Object.values(info.parts).every(n=>n>0))throw new Error('Music inspection failed');
-          const bytes=await local.compilers.audio.compile(input,{directory,maxBytes:8*1024*1024});
-          if(Buffer.from(bytes).toString('ascii',0,4)!=='fLaC' || bytes.length<1024)throw new Error('Real SoundFont render failed');
+          const artifact=await local.compilers.audio.compile(input,{directory,maxBytes:8*1024*1024});
+          const bytes=artifact.bytes;
+          if(!(bytes instanceof Uint8Array)||bytes[0]!==255||(bytes[1]&224)!==224||bytes.length<1024||artifact.audio.sourceSampleRate!==32000||artifact.audio.cycleFrames!==64000||!artifact.credit||!artifact.license.includes('MIT'))throw new Error('Real SoundFont render failed');
           console.log('Real SoundFont render:',bytes.length,'bytes,',info.durationMs,'ms');
         } finally {await fs.rm(directory,{recursive:true,force:true});}
       `], project, { timeout: 180000 });
-      log('  ✓ installed plugin: real MIDI → SoundFont → FLAC rendering');
+      log('  ✓ installed plugin: real MIDI → SoundFont → MP3 96kbps rendering');
     } else log('  SKIP real SoundFont rendering: Alda 2.4.8 is unavailable; install it and rerun release:smoke. Plugin imports were checked, audio rendering was not.');
 
     sh(process.execPath, ['--input-type=module', '-e', `

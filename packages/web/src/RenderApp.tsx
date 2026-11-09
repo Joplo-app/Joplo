@@ -54,7 +54,7 @@ type W = {
   __JOPLO_READY__?: boolean;
   __JOPLO_STATE__?: PlayState | null;
   __JOPLO_ERROR__?: string | null;
-  __JOPLO_RECORD__?: { play(): Promise<void>; stopAudio(): Promise<{ data: string; started: number } | null>; progress: RecordProgress };
+  __JOPLO_RECORD__?: { play(): Promise<void>; stopAudio(): Promise<{ data: string } | null>; calibrate():Promise<boolean>; progress: RecordProgress };
 };
 
 export type RecordProgress = { step: number; done: boolean; error: string | null; scenarioId: string | null; position: number; activeStep: number | null };
@@ -296,12 +296,13 @@ function RecordStage({ project, scenarioId, chain, voiceEstimate, theme, font, s
       play: async () => {
         if (Object.keys(recordingAssets).length) {
           if (!media.current) throw new Error('Recording media engine is not ready');
-          await media.current.startCapture(recordingAssets);
+          await media.current.startCapture(recordingAssets,project.mediaInfo);
         }
         setStarted(true);
         if (total === 0) return;
         void ctl.play();
       },
+      calibrate: () => media.current?.calibrate() ?? Promise.resolve(false),
       stopAudio: () => media.current?.endCapture() ?? Promise.resolve(null),
       progress: {
         step: snap.state?.position ?? 0,

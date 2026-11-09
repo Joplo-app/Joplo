@@ -17,7 +17,7 @@ export function pruneMediaAssets<T extends Project>(project: T): T {
   if (!project.mediaAssets) return project;
   const used = mediaResourceIds(project);
   for(const id of nodeResourceIds(project)) used.add(id);
-  return { ...project, mediaAssets: Object.fromEntries(Object.entries(project.mediaAssets).filter(([id]) => used.has(id))) };
+  return { ...project, ...(project.mediaInfo ? {mediaInfo:Object.fromEntries(Object.entries(project.mediaInfo).filter(([id])=>used.has(id)))} : {}), mediaAssets: Object.fromEntries(Object.entries(project.mediaAssets).filter(([id]) => used.has(id))) };
 }
 
 /** Node-local references are data only; the input and compiler stay on the author machine. */

@@ -1,0 +1,45 @@
+Author-side MP3 tools (not included in published listening sites)
+
+@breezystack/lamejs 1.2.7 (LAME JavaScript port), LGPL-3.0
+LAME project: https://lame.sourceforge.net/
+Exact source: https://github.com/gideonstele/lamejs/tree/1fb0ef5fa177413107e2e107d054a9b994e3f79c
+Upstream npm tarball: https://registry.npmjs.org/@breezystack/lamejs/-/lamejs-1.2.7.tgz
+Unmodified, separately replaceable Node dependency; Joplo's resampling, probing
+and playback-region logic is outside LAME. See licenses/LGPL-3.0.txt and
+licenses/GPL-3.0.txt. The package's original LICENSE is retained by npm.
+Recipients may replace/modify this library and reverse engineer the combined
+work to debug those modifications as permitted by the LGPL. Joplo's license
+does not restrict those rights. Any redistributed library modifications must
+retain the applicable LGPL terms and provide corresponding source.
+
+mpg123-decoder 1.0.3, wasm-audio-decoders/common 9.0.7
+Copyright 2021-2025 Ethan Halsall. Original JavaScript: MIT.
+Exact build/source repository:
+https://github.com/eshaz/wasm-audio-decoders/tree/8f2428c1cd96b54dab74836c8471ff75fe35cbee
+The repository includes build instructions and pinned decoding-library git
+submodules; it is the corresponding-source entry point for its WASM binary.
+libmpg123 is LGPL-2.1 (https://www.mpg123.de/); see licenses/LGPL-2.1.txt.
+These are unmodified, separately replaceable author-side npm dependencies.
+Upstream also uses zlib/puff for WASM decompression (zlib license):
+https://github.com/madler/zlib/tree/master/contrib/puff
+
+MIT permission notice for wasm-audio-decoders original source:
+Copyright 2021-2025 Ethan Halsall
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+FluidR3Mono GM bank: see soundfont-license.txt. Its attribution and full
+license travel with cached audio artifacts into credits.txt/music-LICENSE.txt.
