@@ -1,4 +1,4 @@
-import { binaryAssets } from './binary-assets.ts';
+import { binaryAssets, extractSiteAssets } from './binary-assets.ts';
 import { inlineResources } from './local-resources.ts';
 import { inlinePluginAssets, PLUGIN_ASSET_BASE } from './plugin-assets.ts';
 import sharedModules from '@joplo-app/web/shared-modules.json' with { type: 'json' };
@@ -173,6 +173,10 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     if (voice.index) inline.project.voiceIndex = scope ? scopeProject({ ...project, voiceIndex: voice.index }, scope.scenarios).project.voiceIndex : voice.index;
     voiceReport = voice.report;
 
+    // 素材写成独立文件（D98）：IR 里的图片、模型、音频、视频 data URL → assets/<sha256>.<ext>，页面按相对路径引用；
+    // 构建产物只保证通过 HTTP 打开（Cloud 分享、joplo preview、任意静态服务器），不再支持 file:// 双击。
+    inline.project = extractSiteAssets(inline.project, { directory: path.join(staging, 'assets'), prefix: './assets/' }).value;
+
     // 3. 后处理
     const siteHtml = path.join(staging, 'site.html');
     const { html, inlined } = finalizeHtml(fs.readFileSync(siteHtml, 'utf8'), (rel) => fs.readFileSync(path.join(staging, rel), 'utf8'), inline, stepIdentity(project));
@@ -193,7 +197,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     subsetSiteFonts(staging, web);
 
     const siteBytes=listFiles(staging).reduce((n,f)=>n+fs.statSync(path.join(staging,f)).size,0);
-    compiled.diagnostics.push({severity:'info',source:'structure',code:'SITE_BUDGET',message:`Complete site: ${siteBytes} bytes (including embedded audio, fonts, models and narration)`});
+    compiled.diagnostics.push({severity:'info',source:'structure',code:'SITE_BUDGET',message:`Complete site: ${siteBytes} bytes (including asset files, fonts and narration)`});
     if(siteBytes>=18*1024*1024)compiled.diagnostics.push({severity:'warning',source:'structure',code:'SITE_BUDGET_LARGE',message:'Site approaches the documented Free 20 MiB single-upload budget (18 MiB warning); actual account limits come from the service'});
     // 4. 写入目标目录
     if (fs.existsSync(outDir)) fs.rmSync(outDir, { recursive: true, force: true });

@@ -22,6 +22,8 @@ export const CONTENT_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
   // 朗读音频（D74，build 写进 voice/）；云端分享契约需同时接受这些类型
   '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.flac': 'audio/flac', '.m4a': 'audio/mp4', '.aac': 'audio/aac',
+  // 发布素材独立文件（D98）：图片 / 模型 / 视频都是 assets/<sha256>.<ext>；Joplo Cloud 的分享契约同步接受这些类型
+  '.avif': 'image/avif', '.glb': 'model/gltf-binary', '.mp4': 'video/mp4', '.webm': 'video/webm',
 };
 type File = { path: string; sha256: string; size: number; contentType: string };
 const shareId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9]{10}$/.test(v);

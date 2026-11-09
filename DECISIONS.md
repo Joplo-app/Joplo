@@ -620,3 +620,4 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
 - **素材独立文件**：build 不再把素材 base64 内联进 index.html，而是写成 `assets/<sha256>.<扩展名>`，页面按相对路径引用。Cloud 分享沿用按内容哈希去重的多文件上传，同一素材跨版本只传一次；容量按实际字节计费（D85）。
 - **放弃 file://**：构建产物只保证通过 HTTP 打开（Cloud 分享、任意静态服务器）。新增 `npx joplo preview [dir]` 在本机起静态服务器预览构建结果。原先“发布物自包含、file:// 离线可开”的约定（D87 等）由此修订。
 - **Cloud 端**：joplo-cloud 配套加入视频（.mp4 / .webm）与 GLB 等类型及单文件上限，两个 PR 一起合并。
+- **Cloud 端（joplo-cloud C28）**：沙箱分享页原本 `connect-src 'none'`，配乐、GLB、Lottie 要 fetch 字节。用户选择“素材文件开放读取”：只有 `assets/<64 位哈希>.<扩展名>` 返回不带凭证的 CORS（*），分享文档 CSP 的 connect-src 只放开到本分享自己的路径；密码授权在路径里，素材仍受保护。契约新增 avif / mp4 / webm，Worker 对视频支持 Range。

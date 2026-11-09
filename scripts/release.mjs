@@ -518,7 +518,7 @@ async function smoke() {
       const optionId = Object.keys(ir.project.options)[0];
       assert(sceneId && optionId, '找不到包含按钮 start 的画面');
       await verifySkillReadingBrowser(REPO,project,`http://127.0.0.1:${port}/#/${pid}/f/example?s=example.a.happy&step=0`);
-      log('  ✓ Installed skills → ui + diagram + content → check → dev Chromium → file:// offline steps 1/2/1');
+      log('  ✓ Installed skills → ui + diagram + content → check → dev Chromium → built site over HTTP steps 1/2/1');
       const body = JSON.stringify({ selection: { optionId, scenarioId: null, position: 0, sceneId, nodeId: 'start' } });
       const put = await request(port, { method: 'PUT', path: `/__joplo/p/${pid}/selection`, body, headers: { origin: `http://127.0.0.1:${port}`, 'content-type': 'application/json', 'x-joplo-token': token, 'content-length': Buffer.byteLength(body) } });
       assert(put.status === 200, `PUT selection 返回 ${put.status}：${put.text}`);

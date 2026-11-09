@@ -69,7 +69,7 @@ The host can draw an input/keyboard record after a type/press step, and toasts c
 - For layout, visual motion, shapes, charts and component APIs use the installed plugin skills. The engine has no built-in component vocabulary.
 
 ## Write a theme
-A project theme is themes/<name>.css selected by config({ theme: '<name>' }). Define --jp-bg, --jp-ink, --jp-surface and --jp-font; set --jp-stroke: clean for ordinary CSS borders (omitting it inherits hand-drawn strokes). Scope ordinary selectors to an authored root class so third-party libraries do not recolor the player. Include required font bytes as data URLs or use an already installed platform font; remote CSS/font URLs are not an offline asset pipeline. Verify computed styles and file:// playback. Component defaults and styling recipes belong to the owning plugin.
+A project theme is themes/<name>.css selected by config({ theme: '<name>' }). Define --jp-bg, --jp-ink, --jp-surface and --jp-font; set --jp-stroke: clean for ordinary CSS borders (omitting it inherits hand-drawn strokes). Scope ordinary selectors to an authored root class so third-party libraries do not recolor the player. Include required font bytes as data URLs or use an already installed platform font; remote CSS/font URLs are not an offline asset pipeline. Verify computed styles in the board and in the built site (npx joplo preview). Component defaults and styling recipes belong to the owning plugin.
 
 ## Branches, annotations and appearance
 - fork(label, scenarioKey) adds a labeled route to another scenario; it does not silently branch automatic playback. Feature diffs report action-entry and autoplay policy changes separately, even when their static pictures are identical. Mark the optional destination flow with autoplay:false so sequential playback skips it; fork alone is a navigation choice, not an autoplay exclusion. Return links to main chapters must not mark those chapters optional.
@@ -80,4 +80,4 @@ A project theme is themes/<name>.css selected by config({ theme: '<name>' }). De
 - Custom themes live in themes/<name>.css and define --jp-* tokens; do not change authored data to recolor a view. For component-specific layout, motion and visual variables, read its installed plugin skill.
 
 Related topics: authoring, plugins, focus, review, publish
-<!-- joplo-skill 0.3.0 sha256:297eb4850ddfc6301be3fb2117e9e7f76959c9bd0394912466e2a36a8fa5f880 -->
+<!-- joplo-skill 0.3.0 sha256:7b57d58912ffa4598a8a299873ba81e97d993f44dc57a35413f2074ea355403f -->

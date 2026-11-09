@@ -61,7 +61,7 @@ Joplo compiles trusted TS/TSX into deterministic scenes and schedules their play
 4. Required before handing a development round to the user: read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json. A running board alone does not receive feedback for the agent.
 
 ## Binary assets
-- asset('./file.glb') embeds a self-contained GLB; MP3/WAV/OGG/M4A/FLAC are supported too. Paths are relative to the calling source file. Images retain a 2 MB limit; binary files have a 50 MB limit. Dev serves binary bytes by content hash; published builds embed them for file://.
+- asset('./file.glb') embeds a self-contained GLB; MP3/WAV/OGG/M4A/FLAC are supported too. Paths are relative to the calling source file. Images retain a 2 MB limit; binary files have a 50 MB limit. Dev serves binary bytes by content hash; npx joplo build writes every asset as its own file (assets/<hash>.<ext>), so the built site must be opened over HTTP: npx joplo preview, a share, or any static server. Double-clicking index.html (file://) is not supported.
 - Prefer existing CC0 assets and public-domain reference images, then use a generation plugin to fill gaps in an original style. Read the enabled plugin's skill before generation. Commit persistent artifacts and metadata; never put API keys in project source.
 - npx joplo resources --dry-run lists missing persistent resources and estimated credits. Interactive resources confirms each item; unattended generation requires --allow-spend. check/build/render remain offline for these artifacts. Missing or corrupt output gives diagnostics, not an implicit paid retry. Keep large GLB files below 5 MB where possible and inspect MODEL_SIZE warnings before sharing.
 
@@ -304,7 +304,7 @@ The host can draw an input/keyboard record after a type/press step, and toasts c
 - For layout, visual motion, shapes, charts and component APIs use the installed plugin skills. The engine has no built-in component vocabulary.
 
 ## Write a theme
-A project theme is themes/<name>.css selected by config({ theme: '<name>' }). Define --jp-bg, --jp-ink, --jp-surface and --jp-font; set --jp-stroke: clean for ordinary CSS borders (omitting it inherits hand-drawn strokes). Scope ordinary selectors to an authored root class so third-party libraries do not recolor the player. Include required font bytes as data URLs or use an already installed platform font; remote CSS/font URLs are not an offline asset pipeline. Verify computed styles and file:// playback. Component defaults and styling recipes belong to the owning plugin.
+A project theme is themes/<name>.css selected by config({ theme: '<name>' }). Define --jp-bg, --jp-ink, --jp-surface and --jp-font; set --jp-stroke: clean for ordinary CSS borders (omitting it inherits hand-drawn strokes). Scope ordinary selectors to an authored root class so third-party libraries do not recolor the player. Include required font bytes as data URLs or use an already installed platform font; remote CSS/font URLs are not an offline asset pipeline. Verify computed styles in the board and in the built site (npx joplo preview). Component defaults and styling recipes belong to the owning plugin.
 
 ## Branches, annotations and appearance
 - fork(label, scenarioKey) adds a labeled route to another scenario; it does not silently branch automatic playback. Feature diffs report action-entry and autoplay policy changes separately, even when their static pictures are identical. Mark the optional destination flow with autoplay:false so sequential playback skips it; fork alone is a navigation choice, not an autoplay exclusion. Return links to main chapters must not mark those chapters optional.
@@ -700,7 +700,7 @@ Compare cases and options in the board, then decide which option to publish for 
 - Pages and layouts compose the whole product; picked options add elements to routes or add routes.
 
 ## build
-- Run npx joplo check in the author project, then npx joplo build.
+- Run npx joplo check in the author project, then npx joplo build, then npx joplo preview to open the built site over HTTP (assets are separate files; file:// is not supported).
 - Default output: dist/. Set --out-dir <dir> to change it.
 - Nonempty output directories are rejected. After confirming the old output can be discarded, pass --overwrite to clear and rebuild.
 - The published site contains only feature names, goals, scenario demos, step captions, and the overall layout.
@@ -856,7 +856,7 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 ## Write a plugin
 - Export definePlugin({ id, packageName, title, version, components, skill, skillTopics?, runtime, compile?, properties?, themes?, actions?, data?, schemas?, local?, keys? }) from @joplo-app/kit/plugin. Ship compiled JS and declarations; runtime and optional local entries are URLs resolved relative to the package.
 - components maps names to doc/example, interaction and declarative traits. Export pluginComponent(manifest, name) markers from this package. Intrinsic tag ownership is explicit and unique. No kit component forwarding or bare-name adapters.
-- Runtime CSS imports and emitted local assets are bundled with the plugin: CSS is installed as a per-plugin style sheet, and local URLs become typed data URLs, including CSS images/fonts and imports above the normal inline threshold. Exercise source dev, npm prebuilt dev and offline file:// with real asset loading checks; a successful JS import alone does not prove styles or textures were delivered. Generated asset references that cannot be resolved fail explicitly.
+- Runtime CSS imports and emitted local assets are bundled with the plugin: CSS is installed as a per-plugin style sheet, and local URLs become typed data URLs, including CSS images/fonts and imports above the normal inline threshold. Exercise source dev, npm prebuilt dev and the built site served by npx joplo preview (no other network) with real asset loading checks; a successful JS import alone does not prove styles or textures were delivered. Generated asset references that cannot be resolved fail explicitly.
 - Verify both source development and the installed production package in a real browser. A prebuilt host must share its own React instance with dynamic plugin modules; serving a raw CommonJS dependency URL is not sufficient. Production dev and offline publish use the same bundling/shared-module contract.
 - skill is the entry guide: when to use, how to enable/import, the smallest correct example, success checks, pitfalls and recovery. skillTopics maps topic keys to { description, body }; installed references and CLI topics come from this exact version. Do not put private project data or credentials in guides.
 - Node hooks normalize/derive/frame/effect/validate trusted author data. Outputs must be finite JSON within supported depth/size, immutable across calls, identity-safe, and serializable. Functions/prototypes/cycles are rejected. Hooks and source instructions are never shipped as runtime IR.
@@ -872,7 +872,7 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 - frame contains resolved state, drawing snapshot, animate, clock/gesture, local playground and reset epoch. animate=false renders final layout; use ctx.hold while required assets load. Stop handled gesture propagation where ownership requires it.
 - Use @joplo-app/kit/renderer and renderer-style services instead of internal source imports. Share React through the published bridge; clean up observers/listeners and animation on destroy.
 - properties declares literal types, constraints and namespaced DOM attributes. Attributes propagate to every anchor. An observe instance is local to a stage/runtime and updates after layout; switching/unmount destroys it. Exceptions disable that instance, not the engine.
-- themes is named CSS; the engine namespaces it by plugin id. Keep visual semantics in the plugin. Same deterministic snapshot must draw identically in board, file://, render and video.
+- themes is named CSS; the engine namespaces it by plugin id. Keep visual semantics in the plugin. Same deterministic snapshot must draw identically in board, built site, render and video.
 - data declares text and scope projections for node/step slots. Missing projection stops scoped publication; never leave cut content merely hidden in DOM. Translation changes only declared display paths, not ids, colors or structural values.
 
 ## Local resources and media
@@ -883,8 +883,8 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 - Local credential clients must serialize requests with JSON.stringify and never log request bodies. Malformed JSON returns a fixed 400 USAGE message without request excerpts; correct serialization locally without copying the secret into diagnostics. A 404 means the plugin/key pair is not declared by the current project: reload its enabled declarations and use an existing card instead of guessing identities.
 - Release ctx.hold on success, error, superseded requests and unmount, after drawing the ready frame. Recheck scope before inlining assets; unused resources must not ship.
 - Step effects can emit play/stop commands for named tracks. Replay uses fixed step anchors and one engine clock; jumping/replaying resets to the same snapshot. Pause, speed, fade and narration ducking are host behavior, synthesis belongs to the plugin.
-- Free reactions are playback data: public payloads retain option.free after scope filtering, while authoring notes and source positions are stripped. Validate the actual built file:// site with arbitrary input and a secondary reaction; replay-only tests cannot detect a dropped free map.
-- Scope before inlining media. Build embeds validated resources and plugin runtimes; file:// must work without network. Video mixing capability is separate from playback support—state its actual limit.
+- Free reactions are playback data: public payloads retain option.free after scope filtering, while authoring notes and source positions are stripped. Validate the actual built site (npx joplo preview) with arbitrary input and a secondary reaction; replay-only tests cannot detect a dropped free map.
+- Scope before writing media. Build writes validated resources as separate asset files (assets/<hash>.<ext>, uploaded once per content by share) and inlines plugin runtimes; the site needs HTTP but no other network. In runtimes, accept asset URLs with embeddedAsset(src, kind) from @joplo-app/kit/plugin instead of testing for data: URLs. Video mixing capability is separate from playback support—state its actual limit.
 
 ## Verify the package
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.`,

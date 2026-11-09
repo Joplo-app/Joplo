@@ -9,7 +9,7 @@ Compare cases and options in the board, then decide which option to publish for 
 - Pages and layouts compose the whole product; picked options add elements to routes or add routes.
 
 ## build
-- Run npx joplo check in the author project, then npx joplo build.
+- Run npx joplo check in the author project, then npx joplo build, then npx joplo preview to open the built site over HTTP (assets are separate files; file:// is not supported).
 - Default output: dist/. Set --out-dir <dir> to change it.
 - Nonempty output directories are rejected. After confirming the old output can be discarded, pass --overwrite to clear and rebuild.
 - The published site contains only feature names, goals, scenario demos, step captions, and the overall layout.
@@ -138,4 +138,4 @@ For local comparisons and PR CI, read npx joplo skill diff. It compares two real
 - --ref works only together with --applied. --applied is idempotent; text output without --format json ends with a Next: line listing the ids.
 
 Related topics: diff, demo, review, plugins
-<!-- joplo-skill 0.3.0 sha256:12a3fffbec252ffc22e49763e3481ca125f0c30d7fabc8843991db18db89a45b -->
+<!-- joplo-skill 0.3.0 sha256:3f5be2ece0dbd1c7d2d1541026e7e8ede4c576402a572cf739d0c222269c54d8 -->

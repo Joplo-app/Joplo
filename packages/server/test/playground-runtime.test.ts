@@ -5,8 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
 import { buildSite } from '../src/build.ts';
+import { startPreview } from '../src/preview.ts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { createDev } from '../src/dev.ts';
@@ -210,11 +210,13 @@ describe('D88 real browser input and clock',()=>{
 
   it('ships native/free arbitration in the real offline embed, with controls outside Stage',async()=>{
     const out=path.join(root,'published');await buildSite({projectDir:root,outDir:out,home:path.join(root,'home')});
+    // D98：发布站通过本机预览服务器打开；除了它自己的地址，网络请求一律拦下并记下
+    const site=await startPreview({dir:out});
     const offline=await browser.newContext({viewport:{width:1280,height:900}});const requests:string[]=[];
-    await offline.route(/^https?:/,route=>{requests.push(route.request().url());return route.abort();});
+    await offline.route(u=>/^https?:/.test(u.href)&&!u.href.startsWith(site.url),route=>{requests.push(route.request().url());return route.abort();});
     const embedded=await offline.newPage();
     try {
-      await embedded.goto(pathToFileURL(path.join(out,'index.html')).href+'?embed=1&scenario=f.a.plugin');
+      await embedded.goto(site.url+'index.html?embed=1&scenario=f.a.plugin');
       await embedded.waitForSelector('[data-jid="check"] [role="checkbox"]');
       const field=embedded.locator('[data-jid="check"] [role="checkbox"]');
       expect(await field.evaluate(el=>!!el.closest('[inert]'))).toBe(true);
@@ -242,7 +244,7 @@ describe('D88 real browser input and clock',()=>{
       expect(await embedded.getByTestId('playground-notice').count()).toBe(0);
       expect(await embedded.getByTestId('embed-bar').locator('[data-joplo-stage]').count()).toBe(0);
       expect(requests).toEqual([]);
-    } finally {await offline.close();}
+    } finally {await offline.close();await site.close();}
   },120000);
 
   it('BR-3 scripted scroll restores earlier prefixes, reset, same-stage scenarios and local exploration',async()=>{
@@ -280,13 +282,15 @@ describe('D88 real browser input and clock',()=>{
     expect((await snapshot()).state.position).toBe(0);
   });
 
-  it.each([false,true])('BR-1 scoped file:// publication retains declared free clicks (review=%s)',async review=>{
+  it.each([false,true])('BR-1 scoped publication (served over HTTP, D98) retains declared free clicks (review=%s)',async review=>{
     const out=path.join(root,`free-publish-${review}`);
     await buildSite({projectDir:root,outDir:out,review,scope:{scenarios:['f.a.plugin']},home:path.join(root,'home')});
-    const context=await browser.newContext({viewport:{width:1440,height:1000},offline:true});
+    const site=await startPreview({dir:out});
+    const context=await browser.newContext({viewport:{width:1440,height:1000}});
+    await context.route(u=>/^https?:/.test(u.href)&&!u.href.startsWith(site.url),route=>route.abort());
     const viewer=await context.newPage();const failures:string[]=[];viewer.on('pageerror',e=>failures.push(e.message));
     try{
-      await viewer.goto(pathToFileURL(path.join(out,'index.html')).href+'#/f/f?s=f.a.plugin&step=1');
+      await viewer.goto(site.url+'index.html#/f/f?s=f.a.plugin&step=1');
       await viewer.waitForSelector('[data-jid="avatar"]');
       const timeline=await viewer.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__));
       await viewer.locator('[data-jid="avatar"]').click();
@@ -297,7 +301,7 @@ describe('D88 real browser input and clock',()=>{
       await viewer.getByTestId('ctl-reset').click();
       await expect.poll(()=>viewer.locator('[data-jid="profile"]').count()).toBe(0);
       expect(failures).toEqual([]);
-    }finally{await context.close();}
+    }finally{await context.close();await site.close();}
   },120000);
 
 });

@@ -42,7 +42,12 @@ it('publishes scoped fake WAV artifacts offline without author text, paths or lo
     const html=fs.readFileSync(path.join(result.outDir,'index.html'),'utf8');
     const p=JSON.parse(/id="joplo-ir">([\s\S]*?)<\/script>/.exec(html)![1]!).project;
     expect(Object.keys(p.mediaAssets)).toHaveLength(1);
-    expect(Object.values(p.mediaAssets)[0]).toMatch(/^data:audio\/wav;base64,UklGR/);
+    // D98：素材是独立文件 assets/<sha256>.wav，页面按相对路径引用；文件内容就是编译出的 WAV
+    const wav=Object.values(p.mediaAssets)[0] as string;
+    expect(wav).toMatch(/^\.\/assets\/[0-9a-f]{64}\.wav$/);
+    expect(fs.readFileSync(path.join(result.outDir,wav)).subarray(0,4).toString('latin1')).toBe('RIFF');
+    // 范围外 / 私有内容也不能出现在写出的素材文件里
+    for(const file of fs.readdirSync(path.join(result.outDir,'assets')))for(const forbidden of ['PRIVATE_SCORE_ALPHA','PRIVATE_SCORE_BETA','PRIVATE_LOCAL_IMPLEMENTATION'])expect(fs.readFileSync(path.join(result.outDir,'assets',file),'latin1')).not.toContain(forbidden);
     expect(Object.keys(p.scenarios)).toEqual(['f.a.a']);
     for(const forbidden of ['PRIVATE_SCORE_ALPHA','PRIVATE_SCORE_BETA','PRIVATE_LOCAL_IMPLEMENTATION','PRIVATE_SOUNDFONT_BYTES','private.sf3',dir,'local.ts'])expect(html).not.toContain(forbidden);
     expect(fs.readdirSync(path.join(dir,'.joplo/resources')).filter(f=>f.endsWith('.json'))).toHaveLength(1);

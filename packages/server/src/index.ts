@@ -9,6 +9,7 @@
 export type { BuildOptions, BuildResult, CloudAccount, CloudBridge, CloudJob, CloudJobError, CloudPublishRequest, CloudPublishResult, DevHandle, DevOptions, RenderOptions, RenderResult, RenderedElement } from './contract.ts';
 export { startDev } from './dev.ts';
 export { buildSite } from './build.ts';
+export { startPreview, SITE_CONTENT_TYPES, type PreviewHandle } from './preview.ts';
 export { generateProjectVoice, type VoiceRunOptions, type VoiceRunResult } from './voice-run.ts';
 export type { CloudSpeechRequest, CloudSpeechResult, CloudVoice, CloudVoiceBridge, CloudVoiceCatalog, CloudVoiceInfo, CloudVoiceStatus, VoiceQuota } from './cloud.ts';
 export { renderSheet, renderStep } from './render.ts';

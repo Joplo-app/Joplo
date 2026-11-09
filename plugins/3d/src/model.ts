@@ -1,13 +1,15 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { embeddedAsset } from '@joplo-app/kit/plugin';
 export function modelStructureKey(props: Record<string, unknown>): string {
   return JSON.stringify([props.at, props.size, props.rotate, props.outline]);
 }
 /** Parse self-contained GLB bytes; no external buffer/texture or decoder requests. */
 export async function loadModel(src: unknown): Promise<THREE.Group> {
-  if (typeof src !== 'string' || !/^(data:model\/gltf-binary;base64,|\/__joplo\/p\/[^/]+\/binary\/)/.test(src)) throw new Error('Use asset(GLB) or a compiled local model resource');
-  const response = await fetch(src,{signal:AbortSignal.timeout(30000)});
+  const url = embeddedAsset(src, 'model');
+  if (!url) throw new Error('Use asset(GLB) or a compiled local model resource');
+  const response = await fetch(url,{signal:AbortSignal.timeout(30000)});
   if (!response.ok) throw new Error('Model unavailable');
   const bytes = await response.arrayBuffer(), view = new DataView(bytes);
   if (bytes.byteLength < 24 || view.getUint32(0,true) !== 0x46546c67 || view.getUint32(4,true) !== 2 || view.getUint32(8,true) !== bytes.byteLength || view.getUint32(16,true) !== 0x4e4f534a) throw new Error('Invalid GLB');

@@ -9,7 +9,7 @@ Joplo compiles trusted TS/TSX into deterministic scenes and schedules their play
 4. Required before handing a development round to the user: read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json. A running board alone does not receive feedback for the agent.
 
 ## Binary assets
-- asset('./file.glb') embeds a self-contained GLB; MP3/WAV/OGG/M4A/FLAC are supported too. Paths are relative to the calling source file. Images retain a 2 MB limit; binary files have a 50 MB limit. Dev serves binary bytes by content hash; published builds embed them for file://.
+- asset('./file.glb') embeds a self-contained GLB; MP3/WAV/OGG/M4A/FLAC are supported too. Paths are relative to the calling source file. Images retain a 2 MB limit; binary files have a 50 MB limit. Dev serves binary bytes by content hash; npx joplo build writes every asset as its own file (assets/<hash>.<ext>), so the built site must be opened over HTTP: npx joplo preview, a share, or any static server. Double-clicking index.html (file://) is not supported.
 - Prefer existing CC0 assets and public-domain reference images, then use a generation plugin to fill gaps in an original style. Read the enabled plugin's skill before generation. Commit persistent artifacts and metadata; never put API keys in project source.
 - npx joplo resources --dry-run lists missing persistent resources and estimated credits. Interactive resources confirms each item; unattended generation requires --allow-spend. check/build/render remain offline for these artifacts. Missing or corrupt output gives diagnostics, not an implicit paid retry. Keep large GLB files below 5 MB where possible and inspect MODEL_SIZE warnings before sharing.
 
@@ -73,4 +73,4 @@ For a long story use from to inherit the previous ending. An action-driven navig
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.3.0 sha256:ec0621b103c006cbb5807a2ced0a05e69510b4f26b762a1b157dc0dbf7314cd3 -->
+<!-- joplo-skill 0.3.0 sha256:6e5b505c4f8424018607d4078fa748a30728a73e255a4c0c0da9b74a2031a437 -->
