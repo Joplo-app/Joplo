@@ -4,35 +4,52 @@ import { definePlugin, pluginComponent, pluginEffect, type PluginIRNode } from '
 import { studio } from './theme.ts';
 import { skill, patterns } from './guide.ts';
 
-export type CameraOpts = { pad?: number; zoom?: number; ms?: number };
+/** 进退场预设（D92）：每个预设是一个“离场姿态”，进场 = 离场姿态 → 原样，退场 = 原样 → 离场姿态。 */
+export const TRANSITIONS = ['fade', 'rise', 'zoom', 'shrink', 'wipe', 'iris'] as const;
+export type Transition = (typeof TRANSITIONS)[number];
+/** 镜头漂移（D92）：落定后继续缓慢推近 / 拉远 / 平移，有终点、非匀速。数字 = 在 ms 内再推近到这个倍数。 */
+export type Drift = number | false | { zoom?: number; x?: number; y?: number; ms?: number };
+export type CameraOpts = { pad?: number; zoom?: number; ms?: number; drift?: Drift };
 /** Move within the design world; no ids restores the whole world. This factory has no player semantics. */
 export const camera = (...args: (string | CameraOpts)[]) => {
   const targets = args.filter((arg): arg is string => typeof arg === 'string');
   const options = Object.assign({}, ...args.filter(arg => typeof arg === 'object' && arg !== null)) as CameraOpts;
   return pluginEffect('content', 'camera', { targets, ...options });
 };
-const Camera = z.strictObject({ targets: z.array(z.string()), pad: z.number().min(0).max(2000).optional(), zoom: z.number().min(.1).max(10).optional(), ms: z.number().min(0).max(10000).optional() });
+export const DriftSchema = z.union([z.literal(false), z.number().min(.5).max(2), z.strictObject({ zoom: z.number().min(.5).max(2).optional(), x: z.number().min(-2000).max(2000).optional(), y: z.number().min(-2000).max(2000).optional(), ms: z.number().min(500).max(60000).optional() })]);
+const Camera = z.strictObject({ targets: z.array(z.string()), pad: z.number().min(0).max(2000).optional(), zoom: z.number().min(.1).max(10).optional(), ms: z.number().min(0).max(10000).optional(), drift: DriftSchema.optional() });
 const Frame = z.strictObject({ scenes: z.record(z.string(), z.strictObject({ camera: Camera })) });
 export type ContentFrame = z.infer<typeof Frame>;
 const all = (n: PluginIRNode): PluginIRNode[] => [n, ...(n.children ?? []).flatMap(all)];
 const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes and individual pitfalls', body: patterns } }, packageName: '@joplo-app/plugin-content',
   id: 'content', title: 'Visual explainers', version: packageInfo.version,
   runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
-  components: { Canvas: { doc: 'w, h, view=[1280,800]; scaled design world with fixed screen children', selfEvident: true } },
+  components: { Canvas: { doc: 'w, h, view=[1280,800], drift?; scaled design world with fixed screen children; drift = default camera drift for every camera() step', selfEvident: true } },
   properties: {
     motion: { type: 'string', nonempty: true, attribute: 'data-jp-content-motion' },
     motionDelay: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-motion-delay' },
     motionMs: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-motion-ms' },
     screen: { type: 'boolean', attribute: 'data-jp-content-screen' },
+    enter: { type: 'string', values: [...TRANSITIONS], attribute: 'data-jp-content-enter' },
+    enterMs: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-enter-ms' },
+    enterDelay: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-enter-delay' },
+    exit: { type: 'string', values: [...TRANSITIONS], attribute: 'data-jp-content-exit' },
+    exitMs: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-exit-ms' },
+    exitDelay: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-exit-delay' },
   },
   themes: { studio }, skill,
   schemas: { step: Frame },
   data: { step: { scope: [{ path: ['scenes'], kind: 'map', domain: 'scene', children: [{ path: ['camera', 'targets'], kind: 'values', domain: 'element' }] }] } },
   compile: {
+    node(node, ctx) {
+      if (node.type !== 'content:Canvas' || node.props.drift === undefined) return;
+      const parsed = DriftSchema.safeParse(node.props.drift);
+      if (!parsed.success) ctx.report('CAMERA_INVALID', `<Canvas drift>: use false, a zoom factor 0.5–2 (e.g. 1.04), or { zoom 0.5–2, x/y −2000–2000 design px, ms 500–60000 }`, node.source);
+    },
     effect(effect, ctx) {
       if (effect.name !== 'camera') { ctx.report('PLUGIN_EFFECT_UNKNOWN', `Unknown content effect ${effect.name}`, ctx.source); return; }
       const parsed = Camera.safeParse(effect.payload);
-      if (!parsed.success) { ctx.report('CAMERA_INVALID', `camera(…): targets must be strings; pad 0–2000, zoom 0.1–10, ms 0–10000 (${parsed.error.issues.map(i => i.message).join('; ')})`, ctx.source); return; }
+      if (!parsed.success) { ctx.report('CAMERA_INVALID', `camera(…): targets must be strings; pad 0–2000, zoom 0.1–10, ms 0–10000, drift false | 0.5–2 | { zoom 0.5–2, x/y −2000–2000, ms 500–60000 } (${parsed.error.issues.map(i => i.message).join('; ')})`, ctx.source); return; }
       const value = parsed.data;
       const nodes = ctx.roots.flatMap(all);
       const missing = value.targets.filter(id => !nodes.some(n => n.id === id));

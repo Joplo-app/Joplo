@@ -47,7 +47,8 @@ export class PluginCompiler {
       for (const [key, spec] of Object.entries(properties)) {
         if (!/^[A-Za-z][A-Za-z0-9]*$/.test(key) || ['id', 'children', 'style', 'className', 'when', 'disabled', 'redact', 'note'].includes(key)
           || !object(spec) || !['string', 'number', 'boolean'].includes(String(spec.type))
-          || Object.keys(spec).some(k => !['type', 'attribute', 'min', 'max', 'nonempty'].includes(k))
+          || Object.keys(spec).some(k => !['type', 'attribute', 'min', 'max', 'nonempty', 'values'].includes(k))
+          || spec.values !== undefined && (spec.type !== 'string' || !Array.isArray(spec.values) || !spec.values.length || spec.values.some(v => typeof v !== 'string' || !v))
           || spec.attribute !== undefined && (typeof spec.attribute !== 'string' || !spec.attribute.startsWith(`data-jp-${p.id}-`) || !/^data-jp-[a-z0-9-]+$/.test(spec.attribute))
           || ['min', 'max'].some(k => spec[k] !== undefined && (spec.type !== 'number' || typeof spec[k] !== 'number'))
           || spec.nonempty !== undefined && (spec.type !== 'string' || typeof spec.nonempty !== 'boolean')
@@ -107,8 +108,9 @@ export class PluginCompiler {
       const value = node.props[key];
       if (value === undefined) continue;
       if (typeof value !== spec.type || typeof value === 'number' && (!Number.isFinite(value) || spec.min !== undefined && value < spec.min || spec.max !== undefined && value > spec.max)
-        || spec.nonempty && typeof value === 'string' && !value.trim())
-        this.report('PLUGIN_PROPERTY_INVALID', `Plugin ${plugin.id}: ${key} requires a literal ${spec.type}${spec.min !== undefined ? ` >= ${spec.min}` : ''}${spec.max !== undefined ? ` <= ${spec.max}` : ''}${spec.nonempty ? ' (nonempty)' : ''}`, node.source);
+        || spec.nonempty && typeof value === 'string' && !value.trim()
+        || spec.values && !spec.values.includes(value as string))
+        this.report('PLUGIN_PROPERTY_INVALID', `Plugin ${plugin.id}: ${key} requires a literal ${spec.type}${spec.min !== undefined ? ` >= ${spec.min}` : ''}${spec.max !== undefined ? ` <= ${spec.max}` : ''}${spec.nonempty ? ' (nonempty)' : ''}${spec.values ? ` (one of ${spec.values.join(', ')})` : ''}`, node.source);
     }
   }
   private resourceProps(value: unknown, source?: string): unknown {

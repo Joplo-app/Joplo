@@ -396,7 +396,7 @@ export const Project = z.strictObject({
   plugins: z.record(z.string(), z.strictObject({
     actions: z.record(z.string(), PluginAction).optional(),
     themes: z.record(z.string(), z.string()).optional(),
-    properties: z.record(z.string(), z.strictObject({ type: z.enum(['string', 'number', 'boolean']), attribute: z.string().regex(/^data-jp-[a-z0-9-]+$/).optional(), min: z.number().optional(), max: z.number().optional(), nonempty: z.boolean().optional() })).optional(),
+    properties: z.record(z.string(), z.strictObject({ type: z.enum(['string', 'number', 'boolean']), attribute: z.string().regex(/^data-jp-[a-z0-9-]+$/).optional(), min: z.number().optional(), max: z.number().optional(), nonempty: z.boolean().optional(), values: z.array(z.string()).optional() })).optional(),
     data: DataSpec.optional(),
     id: z.string().min(1),
     title: z.string(),

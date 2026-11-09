@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { defineRuntime, type ComponentCtx, type PluginObserve } from '@joplo-app/kit/plugin';
 import { useRoot } from '@joplo-app/kit/renderer';
 import type { ContentFrame } from './plugin.ts';
@@ -20,14 +20,91 @@ function offsetIn(el: HTMLElement, root: HTMLElement): Box | null {
 const CAMERA_EASE = 'cubic-bezier(.65,0,.35,1)';
 const MOTION_EASE = 'cubic-bezier(.2,.8,.2,1)';
 const MOTION_MS = 900;
-type CanvasCamera = { targets?: string[]; pad?: number; zoom?: number; ms?: number };
+type DriftSpec = { zoom: number; x: number; y: number; ms: number };
+type CanvasCamera = { targets?: string[]; pad?: number; zoom?: number; ms?: number; drift?: unknown };
 const numOr = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : d);
+/** 默认漂移（D92）：画面永远不在数学意义上静止——落定后 9 秒内再推近 2%，非匀速、有终点。 */
+export const DEFAULT_DRIFT: DriftSpec = { zoom: 1.02, x: 0, y: 0, ms: 9000 };
 
 /** 镜头取景：把 r 等比放进 view，居中；k 不超过 zoom。 */
 export function canvasFrame(r: Box, view: { w: number; h: number }, zoom = 3): { k: number; tx: number; ty: number } {
   const k = Math.min(view.w / Math.max(1, r.w), view.h / Math.max(1, r.h), zoom);
   return { k, tx: (view.w - r.w * k) / 2 - r.x * k, ty: (view.h - r.h * k) / 2 - r.y * k };
 }
+
+type Frame = { k: number; tx: number; ty: number };
+/** 镜头的一段：从 from 用 ms 缓动到 to，然后按 drift 继续漂移。时间都是引擎时间（暂停冻结、导出可录）。 */
+export type CameraSegment = { from: Frame; to: Frame; start: number; ms: number; drift: DriftSpec | null };
+
+/** cubic-bezier(x1,y1,x2,y2) 的 y(x)：牛顿迭代 + 二分兜底。 */
+export function bezier(x1: number, y1: number, x2: number, y2: number) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const sx = (t: number) => ((ax * t + bx) * t + cx) * t;
+  const sy = (t: number) => ((ay * t + by) * t + cy) * t;
+  return (x: number) => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 6; i++) {
+      const d = (3 * ax * t + 2 * bx) * t + cx;
+      const e = sx(t) - x;
+      if (Math.abs(e) < 1e-6) return sy(t);
+      if (Math.abs(d) < 1e-6) break;
+      t -= e / d;
+    }
+    let lo = 0, hi = 1;
+    t = x;
+    for (let i = 0; i < 30; i++) { const v = sx(t); if (Math.abs(v - x) < 1e-6) break; if (v < x) lo = t; else hi = t; t = (lo + hi) / 2; }
+    return sy(t);
+  };
+}
+const cameraEase = bezier(.65, 0, .35, 1);
+/** 漂移的曲线：起步与收尾都是零速度（接在镜头落定之后不顿挫，到终点自然停下），不是匀速。 */
+const driftEase = bezier(.37, 0, .63, 1);
+
+/** 在 view 中心保持不动的前提下，把取景 f 推近 zoom 倍、平移 (x, y)（设计坐标）。 */
+export function drifted(f: Frame, d: DriftSpec, q: number, view: { w: number; h: number }): Frame {
+  const z = 1 + (d.zoom - 1) * q;
+  const cx = (view.w / 2 - f.tx) / f.k + d.x * q;
+  const cy = (view.h / 2 - f.ty) / f.k + d.y * q;
+  const k = f.k * z;
+  return { k, tx: view.w / 2 - cx * k, ty: view.h / 2 - cy * k };
+}
+
+/** 镜头在引擎时间 t 的实际取景（含漂移）。 */
+export function cameraAt(seg: CameraSegment, t: number, view: { w: number; h: number }): Frame {
+  const p = seg.ms > 0 ? Math.max(0, Math.min(1, (t - seg.start) / seg.ms)) : 1;
+  if (p < 1) {
+    const e = cameraEase(p);
+    return { k: seg.from.k + (seg.to.k - seg.from.k) * e, tx: seg.from.tx + (seg.to.tx - seg.from.tx) * e, ty: seg.from.ty + (seg.to.ty - seg.from.ty) * e };
+  }
+  if (!seg.drift) return seg.to;
+  const q = driftEase(Math.max(0, Math.min(1, (t - seg.start - seg.ms) / seg.drift.ms)));
+  return q > 0 ? drifted(seg.to, seg.drift, q, view) : seg.to;
+}
+
+/** camera(…, { drift }) 优先，其次 <Canvas drift>，都没写时用 DEFAULT_DRIFT；false 关闭。 */
+export function driftOf(camera: unknown, canvas: unknown): DriftSpec | null {
+  const v = camera !== undefined ? camera : canvas !== undefined ? canvas : DEFAULT_DRIFT;
+  if (v === false || v === null) return null;
+  if (typeof v === 'number') return Number.isFinite(v) && v !== 1 ? { ...DEFAULT_DRIFT, zoom: v } : null;
+  if (typeof v !== 'object') return null;
+  const o = v as Partial<DriftSpec>;
+  const d = { zoom: typeof o.zoom === 'number' ? o.zoom : 1, x: typeof o.x === 'number' ? o.x : 0, y: typeof o.y === 'number' ? o.y : 0, ms: typeof o.ms === 'number' && o.ms > 0 ? o.ms : DEFAULT_DRIFT.ms };
+  return d.zoom === 1 && !d.x && !d.y ? null : d;
+}
+type Mark = { resetKey?: string; scenarioId: string; position: number; playground: boolean };
+/**
+ * 跳转（深链、上一步、重置、换章）还是“暂停 → 继续”？两者都会换 resetKey；继续播放时场景与步数不变、之前也没有自由体验。
+ * 跳转时画面直接落定，继续时进退场与漂移接着走（D92）。
+ */
+export function jumpedSince(last: Mark | null, f: { resetKey?: string; scenarioId: string; position: number; playground?: boolean }): boolean {
+  if (!last || last.resetKey === f.resetKey) return false;
+  return !(last.scenarioId === f.scenarioId && last.position === f.position && !last.playground);
+}
+const markOf = (f: { resetKey?: string; scenarioId: string; position: number; playground?: boolean }): Mark => ({ resetKey: f.resetKey, scenarioId: f.scenarioId, position: f.position, playground: !!f.playground });
+const same = (a: Frame, b: Frame) => Math.abs(a.k - b.k) <= 1e-4 && Math.abs(a.tx - b.tx) <= 0.5 && Math.abs(a.ty - b.ty) <= 0.5;
 
 function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
   const node = context.model;
@@ -40,7 +117,7 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
   const viewArr = Array.isArray(p.view) ? p.view : [];
   const view = { w: numOr(viewArr[0], 1280), h: numOr(viewArr[1], 800) };
   const world = { w: numOr(p.w, view.w), h: numOr(p.h, view.h) };
-  const { w: _w, h: _h, view: _v, ...rest } = p;
+  const { w: _w, h: _h, view: _v, drift: canvasDrift, ...rest } = p;
   // 父元素给了高度（层、h="100%"）时铺满；没给高度时 height: 100% 解析为 auto，aspect-ratio 按 view 的比例撑开，不会塌成 0
   const root = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: '100%', aspectRatio: `${view.w} / ${view.h}`, overflow: 'hidden' } });
   const outer = useRef<HTMLDivElement>(null);
@@ -58,9 +135,15 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
   // 镜头：编译好的当前舞台取景快照；目标不在这张画布里时看整张画布
   const cam = (context.ext.content as ContentFrame | undefined)?.scenes[ctx.sceneId]?.camera as CanvasCamera | undefined;
   const whole = canvasFrame({ x: 0, y: 0, ...world }, view, Infinity);
-  const [frame, setFrame] = useState(whole);
-  const frameRef = useRef(whole);
-  const lastBox = useRef(box);
+  const clock = ctx.clock;
+  // 引擎时钟驱动（D92）：镜头的每一段从“此刻实际的取景”出发，落定后按 drift 漂移；没有时钟的宿主退回 CSS 过渡、不漂移
+  const timed = !!clock && ctx.animate;
+  const now = clock?.timeMs ?? 0;
+  const seg = useRef<CameraSegment>({ from: whole, to: whole, start: now, ms: 0, drift: null });
+  const [, redraw] = useState(0);
+  const lastMark = useRef<Mark | null>(null);
+  const target = useRef<Frame>(whole);
+  const driftKey = useRef('');
   useLayoutEffect(() => {
     const w = worldRef.current;
     if (!w) return;
@@ -82,19 +165,29 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
         next = canvasFrame({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, view, cam?.zoom ?? 3);
       }
     }
-    const camMoves = Math.abs(frameRef.current.k - next.k) > 1e-4 || Math.abs(frameRef.current.tx - next.tx) > 0.5 || Math.abs(frameRef.current.ty - next.ty) > 0.5;
-    if (camMoves) { frameRef.current = next; setFrame(next); }
+    const drift = timed ? driftOf(cam?.drift, canvasDrift) : null;
+    const dk = JSON.stringify(drift);
+    const camMoves = !same(target.current, next);
+    const jumped = jumpedSince(lastMark.current, ctx);
+    lastMark.current = markOf(ctx);
+    if (camMoves || jumped || dk !== driftKey.current || !timed && seg.current.drift) {
+      target.current = next;
+      driftKey.current = dk;
+      // 跳转（resetKey 变了）、截图与静态画面：直接落定在新取景；播放中：从当前实际位置（含漂移）出发
+      const glide = timed && camMoves && !jumped;
+      const from = glide ? cameraAt(seg.current, now, view) : next;
+      seg.current = { from, to: next, start: now, ms: glide ? cam?.ms ?? 1200 : 0, drift };
+      redraw((n) => n + 1);
+    }
     // 镜头同一步也在动：变形用镜头的时长与缓动，两者同步落定（否则屏幕上的轨迹会先冲过头再折回）
     const flight = camMoves && ctx.animate ? { ms: cam?.ms ?? 1200, ease: CAMERA_EASE } : { ms: MOTION_MS, ease: MOTION_EASE };
     w.dataset.flightMs = String(flight.ms);
     w.dataset.flightEase = flight.ease;
-
   });
   const s = box.w && box.h ? Math.min(box.w / view.w, box.h / view.h) : 0;
   const ox = (box.w - view.w * s) / 2;
   const oy = (box.h - view.h * s) / 2;
-  const resized = lastBox.current.w !== box.w || lastBox.current.h !== box.h;
-  useEffect(() => { lastBox.current = box; });
+  const frame = timed ? cameraAt(seg.current, now, view) : seg.current.to;
   const ms = cam?.ms ?? 1200;
   return (
     <div {...root}>
@@ -107,7 +200,7 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
             position: 'absolute', left: 0, top: 0, width: world.w, height: world.h, transformOrigin: '0 0',
             visibility: s ? 'visible' : 'hidden',
             transform: `translate(${ox + frame.tx * s}px, ${oy + frame.ty * s}px) scale(${frame.k * s})`,
-            transition: ctx.animate && !resized ? `transform ${ms}ms ${CAMERA_EASE}` : 'none',
+            transition: !timed && ctx.animate && !clock ? `transform ${ms}ms ${CAMERA_EASE}` : 'none',
           }}
         >
           {context.renderChildren(inWorld)}
@@ -120,6 +213,43 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
       </div>
     </div>
   );
+}
+
+/**
+ * 进退场（D92）：每个预设是一个“离场姿态”。进场从离场姿态回到元素自己的样子，退场从元素自己的样子走到离场姿态；
+ * 用单个关键帧（另一端是元素的底层样式），不覆盖作者自己的 opacity / transform。
+ */
+export const AWAY: Record<string, Keyframe> = {
+  fade: { opacity: 0 },
+  rise: { opacity: 0, translate: '0 18%' },
+  zoom: { opacity: 0, scale: '1.16' },
+  shrink: { opacity: 0, scale: '.84' },
+  wipe: { clipPath: 'inset(0 100% 0 0)' },
+  iris: { clipPath: 'circle(0% at 50% 50%)' },
+};
+const ENTER_EASE = 'cubic-bezier(.16,1,.3,1)';
+const EXIT_EASE = 'cubic-bezier(.55,0,.75,.2)';
+const ENTER_MS = 600;
+const EXIT_MS = 450;
+const msOf = (v: string | undefined, d: number) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Math.max(0, Number(v)));
+/** 幽灵不带身份：不能被镜头、FLIP、检查、提示、无障碍树或键盘找到。 */
+const IDENTITY = ['id', 'name', 'for', 'tabindex', 'autofocus', 'contenteditable', 'data-jid', 'data-jinteractive', 'data-jhover'];
+function strip(el: Element) {
+  for (const n of [el, ...el.querySelectorAll('*')]) {
+    for (const a of IDENTITY) n.removeAttribute(a);
+    for (const a of [...n.getAttributeNames()]) if (a.startsWith('data-jp-content-')) n.removeAttribute(a);
+  }
+}
+/** 克隆不带表单的实时值与画布像素：从（已卸载的）原元素抄过来，外观与移除前一致。 */
+function copyLive(from: Element, to: Element) {
+  const a = [from, ...from.querySelectorAll('*')], b = [to, ...to.querySelectorAll('*')];
+  a.forEach((src, i) => {
+    const dst = b[i];
+    if (!dst) return;
+    if (src instanceof HTMLInputElement && dst instanceof HTMLInputElement) { dst.value = src.value; dst.checked = src.checked; }
+    else if ((src instanceof HTMLTextAreaElement || src instanceof HTMLSelectElement) && (dst instanceof HTMLTextAreaElement || dst instanceof HTMLSelectElement)) dst.value = src.value;
+    else if (src instanceof HTMLCanvasElement && dst instanceof HTMLCanvasElement) { try { dst.getContext('2d')?.drawImage(src, 0, 0); } catch { /* tainted / zero-size */ } }
+  });
 }
 
 /** One observer per stage: cache only design-space layouts, never player state. */
@@ -146,8 +276,89 @@ export const observe: PluginObserve = (root) => {
   const flights = new Map<Animation, { el: HTMLElement; world: HTMLElement; effect: AnimationEffect | null; release: (() => void) | null }>();
   const forget = (a: Animation) => { flights.get(a)?.release?.(); flights.delete(a); };
   const cancel = (w: HTMLElement) => { for (const el of w.querySelectorAll<HTMLElement>('[data-jp-content-motion]')) for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); };
+
+  // ---- 进退场（D92）----
+  // 退场的幽灵：被 React 移除的元素的克隆，放回原来的父元素、原来的位置（同样的选择器上下文），绝对定位在移除前的布局上，
+  // 播完退场动画就删掉。React 只操作它自己创建的节点，幽灵不在它的树里。
+  const ghosts = new Map<Element, Animation | null>();
+  const entering = new Set<Animation>();
+  const exitBoxes = new Map<HTMLElement, Map<HTMLElement, Box>>();
+  const present = new WeakSet<Element>();
+  const watchers = new Map<HTMLElement, MutationObserver>();
+  let quiet = true;
+  let last: Mark | null = null;
+  const drop = (outer: Element) => { ghosts.delete(outer); outer.remove(); };
+  /** 落定：进场直接到终态、幽灵立刻消失（跳转、自由体验、停止、截图、组件卸载）。 */
+  const settle = () => {
+    for (const [outer, a] of [...ghosts]) { a?.cancel(); drop(outer); }
+    for (const a of [...entering]) { entering.delete(a); a.cancel(); }
+  };
+  const ghostOf = (el: HTMLElement, removed: HTMLElement, parent: Node, next: Node | null, world: HTMLElement) => {
+    const box = exitBoxes.get(world)?.get(el);
+    const kind = el.dataset.jpContentExit ?? '';
+    if (!box || !AWAY[kind] || typeof el.animate !== 'function') return;
+    // 同一个 motion 键在新画面里还在：交给 FLIP（以变形为准，不叠加退场）
+    const key = el.dataset.jpContentMotion;
+    if (key && world.querySelector(`[data-jp-content-motion="${CSS.escape(key)}"]`)) return;
+    if (!(parent instanceof HTMLElement) || !parent.isConnected || !world.contains(parent)) return;
+    const ghost = el.cloneNode(true) as HTMLElement;
+    copyLive(el, ghost);
+    let outer: HTMLElement = ghost;
+    // 一起被移除的祖先（el 在被移除的子树里面）：只留 display: contents 的外壳，选择器与继承的样式照旧，不产生盒子
+    for (let a = el === removed ? null : el.parentElement; a; a = a === removed ? null : a.parentElement) {
+      const shell = a.cloneNode(false) as HTMLElement;
+      shell.style.setProperty('display', 'contents', 'important');
+      shell.append(outer);
+      outer = shell;
+    }
+    strip(outer);
+    outer.setAttribute('data-jghost', '');
+    outer.setAttribute('aria-hidden', 'true');
+    outer.inert = true;
+    const put = (k: string, v: string) => ghost.style.setProperty(k, v, 'important');
+    put('position', 'absolute'); put('left', '0px'); put('top', '0px'); put('margin', '0px'); put('box-sizing', 'border-box');
+    put('width', `${box.w}px`); put('height', `${box.h}px`); put('pointer-events', 'none');
+    parent.insertBefore(outer, next && next.parentNode === parent ? next : null);
+    const origin = offsetIn(ghost, world);
+    if (!origin) { outer.remove(); return; }
+    put('left', `${box.x - origin.x}px`); put('top', `${box.y - origin.y}px`);
+    const anim = ghost.animate([{ ...AWAY[kind], offset: 1 }], { duration: msOf(el.dataset.jpContentExitMs, EXIT_MS), delay: msOf(el.dataset.jpContentExitDelay, 0), easing: EXIT_EASE, fill: 'forwards' });
+    anim.id = 'jexit';
+    ghosts.set(outer, anim);
+    const done = () => { if (ghosts.get(outer) === anim) drop(outer); };
+    anim.addEventListener('finish', done, { once: true });
+    anim.addEventListener('cancel', done, { once: true });
+  };
+  const handle = (records: MutationRecord[], world: HTMLElement) => {
+    for (const r of records) for (const n of r.removedNodes) {
+      if (!(n instanceof HTMLElement) || n.isConnected || ghosts.has(n) || n.hasAttribute('data-jghost') || quiet) continue;
+      const marked = [...(n.hasAttribute('data-jp-content-exit') ? [n] : []), ...n.querySelectorAll<HTMLElement>('[data-jp-content-exit]')];
+      for (const el of marked) {
+        let outermost = true;
+        for (let a = el === n ? null : el.parentElement; a; a = a === n ? null : a.parentElement) if (a.hasAttribute('data-jp-content-exit')) { outermost = false; break; }
+        if (outermost) ghostOf(el, n, r.target, r.nextSibling, world);
+      }
+    }
+  };
+  const watch = (w: HTMLElement) => {
+    if (watchers.has(w) || typeof MutationObserver === 'undefined') return;
+    const mo = new MutationObserver((records) => handle(records, w));
+    mo.observe(w, { childList: true, subtree: true });
+    watchers.set(w, mo);
+  };
+
   return {
     update(context) {
+      const f = context.frame;
+      const running = !f.clock || f.clock.running;
+      const jumped = jumpedSince(last, f);
+      quiet = !f.animate || !!f.playground || !running || jumped;
+      // 暂停：保持冻结（引擎时钟不走）；其余安静的情况一律落定
+      if (!f.animate || f.playground || jumped || (!running && !f.clock?.paused)) settle();
+      last = markOf(f);
+      // 这次提交里被移除的节点同步处理：此刻的布局缓存还是移除前的
+      for (const [w, mo] of watchers) handle(mo.takeRecords(), w);
+      for (const [outer] of ghosts) if (!outer.isConnected) ghosts.delete(outer);
       for (const [animation, flight] of flights) {
         if (!context.frame.animate || !root.contains(flight.el)) { animation.cancel(); forget(animation); continue; }
         if (context.frame.playground && animation.effect) {
@@ -159,8 +370,10 @@ export const observe: PluginObserve = (root) => {
         }
       }
       const worlds = [...root.querySelectorAll<HTMLElement>('[data-jcanvas-world]')];
-      for (const w of layouts.keys()) if (!worlds.includes(w)) { cancel(w); layouts.delete(w); }
+      for (const w of layouts.keys()) if (!worlds.includes(w)) { cancel(w); layouts.delete(w); exitBoxes.delete(w); watchers.get(w)?.disconnect(); watchers.delete(w); }
       for (const w of worlds) {
+        const fresh = !layouts.has(w);
+        watch(w);
         const previous = layouts.get(w) ?? new Map<string, Box>();
         const flight = { ms: Number(w.dataset.flightMs ?? MOTION_MS), ease: w.dataset.flightEase ?? MOTION_EASE };
         // 2) 变形（FLIP）：同一个 motion 键的布局位置变了 → 从旧位置、旧大小补间到新位置
@@ -189,10 +402,40 @@ export const observe: PluginObserve = (root) => {
           anim.addEventListener('finish', () => forget(anim), { once: true });
           anim.addEventListener('cancel', () => forget(anim), { once: true });
         }
+        // 3) 进场：第一次出现的元素（新的 DOM 节点）。画布刚出现、安静的提交、FLIP 接管的同键元素都不播
+        for (const el of w.querySelectorAll<HTMLElement>('[data-jp-content-enter]')) {
+          if (present.has(el)) continue;
+          present.add(el);
+          const kind = el.dataset.jpContentEnter ?? '';
+          if (fresh || quiet || !AWAY[kind] || typeof el.animate !== 'function' || el.closest('[data-jghost]')) continue;
+          const key = el.dataset.jpContentMotion;
+          if (key && previous.has(key)) continue;
+          const anim = el.animate([{ ...AWAY[kind], offset: 0 }], { duration: msOf(el.dataset.jpContentEnterMs, ENTER_MS), delay: msOf(el.dataset.jpContentEnterDelay, 0), easing: ENTER_EASE, fill: 'backwards' });
+          anim.id = 'jenter';
+          entering.add(anim);
+          anim.addEventListener('finish', () => entering.delete(anim), { once: true });
+          anim.addEventListener('cancel', () => entering.delete(anim), { once: true });
+        }
+        // 4) 退场要用的布局：每次提交后记下带 exit 的元素此刻的位置大小（被移除时它已经量不到了）
+        const boxes = new Map<HTMLElement, Box>();
+        for (const el of w.querySelectorAll<HTMLElement>('[data-jp-content-exit]')) {
+          if (el.closest('[data-jghost]')) continue;
+          const b = offsetIn(el, w);
+          if (b) boxes.set(el, b);
+        }
+        exitBoxes.set(w, boxes);
         if (!context.frame.playground) layouts.set(w, seen);
       }
     },
-    destroy() { for (const [animation] of flights) { animation.cancel(); forget(animation); } for (const w of layouts.keys()) cancel(w); layouts.clear(); },
+    destroy() {
+      settle();
+      for (const mo of watchers.values()) mo.disconnect();
+      watchers.clear();
+      for (const [animation] of flights) { animation.cancel(); forget(animation); }
+      for (const w of layouts.keys()) cancel(w);
+      layouts.clear();
+      exitBoxes.clear();
+    },
   };
 };
 

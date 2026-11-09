@@ -126,6 +126,8 @@ export type PluginPropertySpec = {
   min?: number;
   max?: number;
   nonempty?: boolean;
+  /** 字符串属性的可选值（预设名，D92）：作者写了别的值时 check 报 PLUGIN_PROPERTY_INVALID 并列出可选值。 */
+  values?: string[];
 };
 export type PluginWrite = { path: string; value: unknown };
 

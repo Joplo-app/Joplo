@@ -1,0 +1,172 @@
+import { installFixturePlugins, fixtureConfigSource } from '../../../scripts/test/fixtures.ts';
+/**
+ * D92 浏览器证据：content 的进场 / 退场（幽灵）与镜头漂移，走生产的 Stage、演示控制器与引擎时钟。
+ * G1 幽灵外观与移除前一致；G2 幽灵没有身份、不可交互；G3 暂停冻结、静态画面不产生；G4 一定会被移除；G5 不破坏 React。
+ */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { chromium, type Browser, type Page } from 'playwright';
+import { createDev } from '../src/dev.ts';
+import { launch } from '../src/render.ts';
+
+const REPO = path.resolve(import.meta.dirname, '../../..');
+describe('D92 content transitions in a real browser', () => {
+  let root: string, server: Awaited<ReturnType<typeof createDev>>, browser: Browser, page: Page;
+  const errors: string[] = [];
+  beforeAll(async () => {
+    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-transitions-')));
+    const write = (name: string, source: string) => { const file = path.join(root, name); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, source); };
+    installFixturePlugins(root);
+    write('joplo.config.ts', fixtureConfigSource(`import {config} from '@joplo-app/kit';export default config({name:'Transitions',theme:'room',autoFocus:false});`));
+    write('themes/room.css', `.room{position:absolute;inset:0;font-family:serif}.room .panel{position:absolute;left:100px;top:120px;width:400px;height:200px;font-size:31px;color:rgb(10,20,30);background:rgb(200,100,50);padding:12px;border:3px solid rgb(1,2,3)}.room .panel.next{left:600px;background:rgb(50,100,200)}.room .panel .label{font-size:17px;letter-spacing:2px}.row{position:absolute;left:100px;top:500px;display:flex;gap:10px}.chip{display:inline-block;padding:4px 10px;background:#ddd}.spot{position:absolute;left:900px;top:600px;width:100px;height:60px;background:#333}`);
+    write('routes/page.tsx', `import {page,$,eq} from '@joplo-app/kit';import {Canvas} from '@joplo-app/plugin-content';import {Button} from '@joplo-app/plugin-ui';export default page({title:'Room',layout:false},<div style={{position:'relative',width:1280,height:800}}><Canvas w={1280} h={800} drift={false}><div className="room"><section id="old" className="panel" when={eq($.ui.era,'a')} exit="fade" exitMs={1200} enter="rise"><p className="label">Old era</p>Old</section><section id="new" className="panel next" when={eq($.ui.era,'b')} enter="zoom" enterMs={1200} exit="iris">New</section><div id="row" className="row"><span id="t" className="chip" when={$.ui.on} enter="shrink" exit="shrink" exitMs={450}>T</span><span id="u" className="chip">U</span></div><div id="spot" className="spot" /><div id="spot2" className="spot" style={{left:100,top:600}} /></div></Canvas><Button id="poke">Poke</Button></div>);`);
+    write('routes/other/page.tsx', `import {page} from '@joplo-app/kit';export default page({title:'Other',layout:false},<div id="elsewhere">Elsewhere</div>);`);
+    write('features/f/feature.ts', `import{feature}from'@joplo-app/kit';export default feature({name:'F',goal:'G',cases:{},pick:'a'});`);
+    const toggles = Array.from({ length: 10 }, (_, i) => `.system('t${i}','Toggle ${i}',set($.ui.on,${i % 2 === 1}))`).join('');
+    write('features/f/options/a.tsx', `import{$,option,flow,free,set,hold}from'@joplo-app/kit';import{camera}from'@joplo-app/plugin-content';export default option({name:'A',idea:'I',state:{ui:{era:'a',on:true,poked:false}},free:{poke:free.click('poke',set($.ui.poked,true))},scenarios:{
+      swap:flow('Swap').system('swap','To new',set($.ui.era,'b'),hold(5)).system('back','Back',set($.ui.era,'a'),hold(5)),
+      toggle:flow('Toggle')${toggles},
+      drift:flow('Drift').system('look','Look',camera('spot',{ms:300,drift:{zoom:1.25,ms:1500}}),hold(10)).system('away','Away',camera('spot2',{ms:300})),
+      leave:flow('Leave').system('go','Go',set($.ui.era,'b')),
+      other:flow('Other',{start:'/other'}).system('x','X'),
+    }});`);
+    write('harness.ts', `import ${JSON.stringify(path.join(REPO, 'packages/web/src/index.css'))};import{createElement as h,useSyncExternalStore}from'react';import{createRoot}from'react-dom/client';import{projectThemes}from'@joplo-app/core';import{Stage}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/Stage.tsx'))};import{ThemeStyles}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/ThemeStyles.tsx'))};import{DemoController}from ${JSON.stringify(path.join(REPO, 'packages/web/src/runtime/demo.ts'))};import{loadPluginRuntimes}from ${JSON.stringify(path.join(REPO, 'packages/web/src/renderer/plugins.ts'))};let project,ctl;window.fixtureAnimate=true;function App(){const s=useSyncExternalStore(ctl.subscribe,ctl.getSnapshot);return h('div',{},h(ThemeStyles,{themes:projectThemes(project)}),h(Stage,{project,state:s.state,theme:project.theme,mode:'demo',animate:window.fixtureAnimate,playground:s.playground,freeMode:s.freeMode,clock:ctl.clock,epoch:s.epoch,activeStep:s.activeStep,onStageInput:explore=>ctl.stageInput(explore),onAction:(a,n)=>void ctl.act(a,n),stageRef:node=>ctl.setStageEl(node)}));}window.fixtureStart=async(p,urls)=>{project=p;await loadPluginRuntimes(urls);ctl=new DemoController();ctl.reducedMotion=true;ctl.setProject(p,1);ctl.setScenario('f.a.swap');window.fixtureCtl=ctl;const el=document.createElement('div');document.body.replaceChildren(el);window.fixtureRoot=createRoot(el);window.fixtureRender=()=>window.fixtureRoot.render(h(App));window.fixtureRender();};`);
+    write('fixture.html', `<!doctype html><style>body{margin:0}</style><script type="module">import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>type=>type;window.__vite_plugin_react_preamble_installed__=true;await import('./harness.ts');</script>`);
+    server = await createDev({ projectDir: root, port: 0, watch: false, log: () => undefined });
+    expect(server.payload().diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    browser = await launch({ chromium }); page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    page.on('pageerror', e => errors.push(e.message));
+    page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+    await page.goto(`${server.url}@fs/${root}/fixture.html`);
+    await page.waitForFunction(() => typeof (window as any).fixtureStart === 'function');
+    const payload = server.payload();
+    await page.evaluate(({ project, urls }) => (window as any).fixtureStart(project, urls), { project: payload.project, urls: payload.plugins });
+    await page.waitForSelector('[data-jid="old"]');
+  }, 120000);
+  afterAll(async () => { await page?.evaluate(() => (window as any).fixtureCtl?.stop()).catch(() => {}); await browser?.close(); await server?.close(); if (root) fs.rmSync(root, { recursive: true, force: true }); });
+
+  const frame = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const ghosts = () => page.locator('[data-jghost]').count();
+  async function at(s: string, position = 0) {
+    await page.evaluate(({ s, position }) => { const c = (window as any).fixtureCtl; c.stop(); c.setScenario('f.a.' + s, position, { quiet: true }); }, { s, position });
+    await frame();
+  }
+  /** 播放到第 n 步刚提交（暂停之前不再推进）。 */
+  async function playTo(n: number, opts: { fast?: boolean } = {}) {
+    await page.evaluate(fast => { const c = (window as any).fixtureCtl; void c.play(fast ? { fast: () => true } : {}); }, !!opts.fast);
+    await page.waitForFunction(n => (window as any).fixtureCtl.getSnapshot().state.position >= n, n, { timeout: 8000 });
+  }
+  const style = (sel: string) => page.evaluate(sel => {
+    const el = document.querySelector(sel) as HTMLElement; const c = getComputedStyle(el); const label = el.querySelector('.label') as HTMLElement | null;
+    const r = el.getBoundingClientRect();
+    return { rect: [r.x, r.y, r.width, r.height].map(v => Math.round(v * 10) / 10), font: c.fontSize, color: c.color, bg: c.backgroundColor, border: c.borderTopWidth, padding: c.paddingLeft, family: c.fontFamily, label: label ? getComputedStyle(label).fontSize + '/' + getComputedStyle(label).letterSpacing : null };
+  }, sel);
+
+  it('G1/G2 the exit ghost matches the removed element and has no identity; enter and exit cross in the same step', async () => {
+    await at('swap');
+    const before = await style('[data-jid="old"]');
+    await playTo(1);
+    await page.evaluate(() => (window as any).fixtureCtl.pause(false));
+    expect(await ghosts()).toBe(1);
+    const ghost = await style('[data-jghost]');
+    // G1：同样的选择器上下文、同样的位置大小（暂停在退场刚开始，opacity 之外完全一致）
+    expect(ghost).toEqual(before);
+    // G2：inert + aria-hidden，没有 id / data-jid / motion / 进退场属性
+    const id = await page.evaluate(() => { const g = document.querySelector('[data-jghost]') as HTMLElement; return { inert: g.inert, aria: g.getAttribute('aria-hidden'), ids: g.querySelectorAll('[id],[data-jid],[data-jp-content-motion]').length + (g.id || g.dataset.jid ? 1 : 0), attrs: [g, ...g.querySelectorAll('*')].some(n => n.getAttributeNames().some(a => a.startsWith('data-jp-content-'))) }; });
+    expect(id).toEqual({ inert: true, aria: 'true', ids: 0, attrs: false });
+    // 新元素同时在进场：交叉转场
+    expect(await page.evaluate(() => document.querySelector('[data-jid="new"]')!.getAnimations().some(a => a.id === 'jenter'))).toBe(true);
+    await page.evaluate(() => (window as any).fixtureCtl.resume());
+  });
+
+  it('G3 pause freezes the transition on the engine clock; G4 a finished exit removes its ghost', async () => {
+    await at('swap');
+    await playTo(1);
+    await page.waitForTimeout(250);
+    await page.evaluate(() => (window as any).fixtureCtl.pause(false));
+    const read = () => page.evaluate(() => ({ g: Number(getComputedStyle(document.querySelector('[data-jghost]')!).opacity), n: getComputedStyle(document.querySelector('[data-jid="new"]')!).scale }));
+    const a = await read(); await page.waitForTimeout(500); const b = await read();
+    expect(a).toEqual(b);
+    expect(a.g).toBeGreaterThan(0); expect(a.g).toBeLessThan(1);
+    await page.evaluate(() => (window as any).fixtureCtl.resume());
+    await page.waitForFunction(() => !document.querySelector('[data-jghost]'), null, { timeout: 4000 });
+    expect(await page.evaluate(() => document.getAnimations().filter(x => x.id === 'jexit' || x.id === 'jenter').length)).toBe(0);
+  });
+
+  it('G4 a jump, the first free input, stopping and leaving the scene all settle immediately', async () => {
+    for (const settleBy of ['jump', 'free', 'stop', 'scene'] as const) {
+      await at('swap');
+      await playTo(1);
+      expect(await ghosts()).toBe(1);
+      if (settleBy === 'jump') await page.evaluate(() => (window as any).fixtureCtl.goto(0));
+      if (settleBy === 'free') await page.locator('[data-jid="poke"]').click();
+      if (settleBy === 'stop') await page.evaluate(() => (window as any).fixtureCtl.stop());
+      if (settleBy === 'scene') await page.evaluate(() => { const c = (window as any).fixtureCtl; c.stop(); c.setScenario('f.a.other'); });
+      await frame();
+      expect([settleBy, await ghosts()]).toEqual([settleBy, 0]);
+      expect(await page.evaluate(() => document.getAnimations().filter(x => x.id === 'jexit' || x.id === 'jenter').length)).toBe(0);
+      if (settleBy === 'free') {
+        // 转场中第一下操作：先落定到终态，再处理输入
+        expect(await page.evaluate(() => getComputedStyle(document.querySelector('[data-jid="new"]')!).scale)).toBe('none');
+        expect(await page.evaluate(() => (window as any).fixtureCtl.getSnapshot().playground?.effects)).toEqual([{ type: 'set', path: 'ui.poked', value: true }]);
+      }
+    }
+  });
+
+  it('G3 static frames (animate=false) never create ghosts or enter animations', async () => {
+    await page.evaluate(() => { (window as any).fixtureAnimate = false; (window as any).fixtureRender(); });
+    await at('swap');
+    await page.evaluate(() => (window as any).fixtureCtl.goto(1));
+    await at('leave');
+    await playTo(1);
+    expect(await ghosts()).toBe(0);
+    expect(await page.evaluate(() => document.getAnimations().filter(x => x.id === 'jexit' || x.id === 'jenter').length)).toBe(0);
+    await page.evaluate(() => { (window as any).fixtureAnimate = true; (window as any).fixtureRender(); });
+    await frame();
+  });
+
+  it('G5 ten quick toggles keep the React-managed DOM exactly as React expects, then ghosts drain', async () => {
+    errors.length = 0;
+    await at('toggle');
+    await playTo(10, { fast: true });
+    await page.waitForFunction(() => !(window as any).fixtureCtl.getSnapshot().playing, null, { timeout: 8000 });
+    await page.waitForFunction(() => !document.querySelector('[data-jghost]'), null, { timeout: 4000 });
+    const ids = () => page.evaluate(() => [...document.querySelector('[data-jid="row"]')!.children].map(c => (c as HTMLElement).dataset.jid ?? 'ghost'));
+    // 最后一步 on=true：T 与 U 都在，顺序与 JSX 一致，没有残留节点
+    expect(await ids()).toEqual(['t', 'u']);
+    // React 还能继续正常插入、删除
+    await page.evaluate(() => (window as any).fixtureCtl.goto(9));
+    await frame();
+    expect(await ids()).toEqual(['u']);
+    await page.evaluate(() => (window as any).fixtureCtl.goto(10));
+    await frame();
+    expect(await ids()).toEqual(['t', 'u']);
+    expect(errors).toEqual([]);
+  });
+
+  it('F2 drift runs on the engine clock after the camera settles, freezes on pause, and continues from the actual position', async () => {
+    await at('drift');
+    const scale = () => page.evaluate(() => { const t = (document.querySelector('[data-jcanvas-world]') as HTMLElement).style.transform; return Number(/scale\(([^)]+)\)/.exec(t)![1]); });
+    const settled = await (async () => { await playTo(1); await page.waitForTimeout(350); return scale(); })();
+    await page.waitForTimeout(500);
+    const later = await scale();
+    expect(later).toBeGreaterThan(settled);
+    await page.evaluate(() => (window as any).fixtureCtl.pause(false));
+    const p1 = await scale(); await page.waitForTimeout(400); const p2 = await scale();
+    expect(p2).toBe(p1);
+    // 继续播放：不回跳到落定位置
+    await page.evaluate(() => (window as any).fixtureCtl.resume());
+    await frame();
+    expect(await scale()).toBeGreaterThanOrEqual(p1);
+    // 跳回这一步（深链）：落定取景，不带漂移；没在播放时保持不动
+    await page.evaluate(() => { const c = (window as any).fixtureCtl; c.stop(); c.goto(0); });
+    await frame();
+    await page.evaluate(() => (window as any).fixtureCtl.goto(1));
+    await frame();
+    const deep = await scale(); await page.waitForTimeout(300);
+    expect(await scale()).toBe(deep);
+    expect(deep).toBeLessThan(later);
+  });
+});
