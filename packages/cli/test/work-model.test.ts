@@ -102,5 +102,6 @@ test('技能用作品与能力教创作，诊断逐条可恢复，常见坑仍�
   expect(patterns).toContain('another work'); expect(patterns).toContain('draft: true');
   for (const text of ['Freeze the previous dev IR', 'stateAt', 'from: null', 'config.voice.roles', 'helper named chapter', 'not every identical string', 'Slot-only/empty wrapper', 'complete sentence unique']) expect(skill).toContain(text);
   for (const text of ['Cross-container flights', 'Known limits', 'zero-sized parent', 'screen only separates']) expect(skill).toContain(text);
+  expect(skillTopic('story')).not.toMatch(/one case per chapter|numbered chapter headlines|chapters with from/);
   expect(agentSkills()[0]!.body).not.toMatch(/--option|--feature/);
 });

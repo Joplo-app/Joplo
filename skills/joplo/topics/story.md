@@ -93,9 +93,9 @@ A character speaking: .click('can_go', 'Ajie replies: I can go', say('Count me i
 Check: read every line aloud in order without looking at the screen. It should sound like one person telling one story, briskly.
 
 ## 7. Explainers and news-style demos (a topic, not a product)
-When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets. The full method (package, hook, a continuous world, morphing objects, chapters with from, review): the installed explainer plugin skill.
-- Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. One chapter per scenario, one case per chapter; the published site plays them back to back with an Up next countdown, like one video.
-- Case titles are what viewers read in the board sidebar: for an explainer write them as numbered chapter headlines ('01 What is on the ballot?'), not acceptance criteria; name the option after the style ('Dark quick-cut'), not 'A'.
+When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets. The full method (package, hook, a continuous world, morphing objects, work()/chapter() default continuation, review): the installed explainer plugin skill.
+- Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. Write one chapter() slice per question under work().scenarios; the published site plays continuing chapters back to back without a countdown, like one video.
+- Chapter titles are what viewers read in the sidebar: write a question ('What is on the ballot?'), with expected describing what the viewer can now explain. The UI adds chapter numbers; standalone works need no option or cases.
 - Graphics that carry the story: a seat chart filling up, a tile map recoloring, bars growing or flipping, a document flying between two sides and getting stamped. Build them from divs with style bound to state (demo: Custom motion) and real photos (components: Real images).
 - Facts: keep every number in one data module with its source and as-of time, show a source line on each graphic, separate called or projected results from final ones, and leave out what you cannot verify rather than hedging on screen.
 - Collect assets before drawing complex visuals: list the needed interface primitives, fonts, icons and sounds; prefer suitable reusable libraries or licensed assets over hand-built SVG or models. Keep redistributable files in assets/ and record each source URL, author, license and modifications in assets/SOURCES.md; retain license files and show attribution where required. A library license does not automatically establish the license of its bundled fonts, logos or samples. Scope third-party styles and embed required assets for offline playback.
@@ -117,4 +117,4 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.4.1 sha256:aad117dbc49e1fefee15d155fc267371e7e68b08ca63e566f41f74200a098e73 -->
+<!-- joplo-skill 0.4.1 sha256:c2de3b70d7bf1a392296c38230ef9daedfecd1fb68b1e0eeb98905ae76bb9e71 -->

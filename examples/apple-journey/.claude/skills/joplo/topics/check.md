@@ -56,7 +56,7 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - CARD_TEXT_TOO_LONG (info): a transition card's sub is over 48 units, a point over 24, or more than 4 points. Keep one sentence and a few short points; move details into steps.
 - SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.
 - HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior. This applies only to feature review; standalone explainers use work()/chapter() and have no cases.
-- ROLE_UNKNOWN: A layer, card or say() role is not in feature.roles. Declare roles as { key: role('Name') }; see demo.
+- ROLE_UNKNOWN: A layer, card or say() role is not in the work or feature roles. Declare roles as { key: role('Name') }; see demo.
 - ICON_UNKNOWN: A layer icon is not a preset. Use one of window, browser, mobile, desktop, terminal, chat, agent, server, data, email, doc, flow; see demo.
 - FORK_UNKNOWN: fork must target another scenario key in the same option; it cannot reference itself.
 - MARK_UNKNOWN: The mark target is absent from this step's route stage (after go() and back() in earlier steps) or, with layers, from every layer. Check the element id; currently hidden targets are valid references.
@@ -112,4 +112,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.4.1 sha256:52b4b7b49e1b762f4d9fc4169378ea4d061f95e1524ea1917b339181b4ebe3b6 -->
+<!-- joplo-skill 0.4.1 sha256:eab435230d353b215337bc912e1c65b777c5a0eb016e893b15fc82c20690a7f1 -->
