@@ -175,6 +175,9 @@ importers:
       '@joplo-app/plugin-content':
         specifier: workspace:*
         version: link:plugins/content
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:plugins/ui
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
@@ -243,6 +246,9 @@ importers:
       '@joplo-app/plugin-diagram':
         specifier: workspace:*
         version: link:../../plugins/diagram
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -310,6 +316,9 @@ importers:
       '@joplo-app/plugin-diagram':
         specifier: workspace:*
         version: link:../../plugins/diagram
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
       '@tailwindcss/vite':
         specifier: 4.3.4
         version: 4.3.4(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
@@ -418,6 +427,34 @@ importers:
       '@types/three':
         specifier: 0.187.0
         version: 0.187.0
+
+  plugins/ui:
+    dependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      clsx:
+        specifier: 2.1.1
+        version: 2.1.1
+      motion:
+        specifier: 14.9.1
+        version: 14.9.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
+      tailwind-merge:
+        specifier: 3.7.0
+        version: 3.7.0
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
 
 packages:
 

@@ -7,7 +7,7 @@
  * redact（布尔或条件：内容模糊显示，用于密钥、隐私信息，D70）。
  * 行为（点击后发生什么）不写在组件上，写在 option 的 flow 步骤里。浮层用 Modal / Drawer 的 opened={$.ui.x} 控制。
  *
- * 组件清单与 @joplo-app/core 的 COMPONENT_TYPES 一一对应（core/test/catalog.test.ts 检查）。
+ * 组件清单与 @joplo-app/plugin-ui 的目录及其他默认插件一一对应（core/test/catalog.test.ts 检查）。
  */
 import { component, type Bind, type CondExpr, type JChild } from './node.ts';
 
@@ -34,7 +34,7 @@ export type JoploProps = {
 export type { Responsive };
 type C = (props: JoploProps) => any;
 
-const c = (name: string): C => component(name) as unknown as C;
+const c = (name: string): C => component(name === 'Custom' || name.includes(':') ? name : `ui:${name}`) as unknown as C;
 
 // ---------- 布局 ----------
 export const AppShell = Object.assign(c('AppShell'), {

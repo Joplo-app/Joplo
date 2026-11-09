@@ -1,0 +1,21 @@
+/** Browser-safe engine entry: IR, state, focus and projection; no compiler or plugin author entries. */
+export * from './catalog.ts';
+export type * from './schema.ts';
+export * from './result.ts';
+export * from './player.ts';
+export * from './focus.ts';
+export type { Selection } from './selection.ts';
+export * from './embed.ts';
+export * from './features.ts';
+export * from './review.ts';
+export * from './scope.ts';
+export * from './pace.ts';
+export * from './outline.ts';
+export * from './voice.ts';
+export * from './content-i18n.ts';
+export * from './local-review.ts';
+export type * from './step-identity.ts';
+export { mediaAt, mediaResourceIds } from './media.ts';
+export { projectThemes } from './themes.ts';
+export type { FeatureDiffManifest, DiffScenario, DiffStep } from './feature-diff.ts';
+export { autoCaptionMessages, automaticCaption } from './auto-caption.ts';

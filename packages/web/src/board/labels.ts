@@ -1,7 +1,7 @@
 import type { Locale } from '../i18n/locale';
 import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /** 看板（创作侧）专用的中文标签与芯片样式。不进入发布站。 */
-import type { Coverage, Rule } from '@joplo-app/core';
+import type { Coverage, Rule } from '@joplo-app/core/runtime';
 
 export const COVERAGE_LABEL = (i18n: BoardMessages = boardEnglish): Record<Coverage['status'], { text: string; cls: string; hint: string }> => ({
   expressed: { text: i18n.board.covered, cls: 'border-[#1c5fb8] bg-[#eef4ff] text-[#1c5fb8]', hint: i18n.board.aDemoScenarioCoversThisCaseThisDoesNot },

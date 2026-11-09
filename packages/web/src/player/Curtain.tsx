@@ -11,7 +11,7 @@ import { useI18n } from '../i18n/context';
  */
 import { AnimatePresence, motion } from 'motion/react';
 import { ListOrdered, Play, Timer, Users } from 'lucide-react';
-import { cardAt, roleOf, type CardAction, type Project, type RoleInfo } from '@joplo-app/core';
+import { cardAt, roleOf, type CardAction, type Project, type RoleInfo } from '@joplo-app/core/runtime';
 import type { CoverContent } from './cover-content';
 import { fontStyle, type AppearanceFont } from '../renderer/appearance';
 import type { StageTheme } from '../renderer/rough';

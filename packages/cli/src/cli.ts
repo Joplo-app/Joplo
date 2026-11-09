@@ -303,8 +303,10 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       if (!r.outline || r.summary.error) exitCode = 1;
     });
   program.command('components').description('List catalog components, or show props and an example for the named ones (same catalog as joplo skill components)')
-    .argument('[names...]', 'Component names, for example EmptyState Menu').action((names: string[]) => {
-      stdout(names.length ? componentDetails(names) : skillTopic('components', COMPONENT_DOCS));
+    .argument('[names...]', 'Component names, for example EmptyState Menu').action(async (names: string[]) => {
+      const {plugins,error} = await projectPlugins('.');
+      if (error) throw new JoploError('USAGE', `Could not read enabled plugins: ${error}`);
+      stdout(names.length ? componentDetails(names, plugins) : skillTopic('components', COMPONENT_DOCS, plugins));
     });
   program.command('selection').argument('[dir]', 'Project directory', '.').addOption(format()).action(async (dir, opts) => {
     const data = await readSelection(dir);
@@ -333,7 +335,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         const plugin = topic === undefined ? null : findPluginTopic(topic, plugins);
         if (plugin) stdout(pluginSkillTopic(plugin));
         else if (topic === undefined) stdout(`${skillIndex(await readCliVersion(), COMPONENT_DOCS)}${pluginSkillIndex(plugins)}${note}`);
-        else stdout(skillTopic(topic, COMPONENT_DOCS));
+        else stdout(skillTopic(topic, COMPONENT_DOCS, plugins));
       }
     });
   program.command('guide').description('Compatibility alias for joplo skill authoring').action(() => { stdout(guide()); });

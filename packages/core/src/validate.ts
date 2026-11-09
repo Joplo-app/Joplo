@@ -125,8 +125,8 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
         const r = { kind: 'element', id: n.id, optionId: n.from ?? s.optionId ?? undefined };
         if (ids.has(n.id)) emit('error', 'DUPLICATE_ELEMENT', `Duplicate element ID in stage: ${n.id}`, n.source, r, 'reference');
         ids.add(n.id);
-        // Indicator 的 disabled 只是隐藏角标（Mantine 的含义），不是“不能用”，不要求原因
-        if (n.disabled !== undefined && n.disabled !== false && !n.disabledReason?.trim() && n.type !== 'Indicator') emit('warning', 'DISABLED_WITHOUT_REASON', `Disabled element has no reason: ${n.id}. Add disabledReason="…" (for example disabledReason="Only admins can invite"), or bind it to state like disabled: disabledReason={$.ui.sendHint}`, n.source, r);
+        // Plugins may declare disabled as presentation-only, which requires no unavailability reason.
+        if (n.disabled !== undefined && n.disabled !== false && !n.disabledReason?.trim() && !n.traits?.disabledPresentation) emit('warning', 'DISABLED_WITHOUT_REASON', `Disabled element has no reason: ${n.id}. Add disabledReason="…" (for example disabledReason="Only admins can invite"), or bind it to state like disabled: disabledReason={$.ui.sendHint}`, n.source, r);
         if (isInteractiveType(n.type, project.plugins) && !bound.has(identity(n)) && !(n.disabled === true && n.disabledReason?.trim()) && !n.unmodeled) emit('warning', 'UNBOUND_INTERACTIVE', `Interactive element has no demo step: ${n.id}; bind a step, disable with a reason, or mark unmodeled`, n.source, r);
       });
     }

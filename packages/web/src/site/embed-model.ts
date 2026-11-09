@@ -7,7 +7,7 @@
  * - `scenario` 写错（不存在、为空）时从默认场景开始，访客看不到报错；未知参数忽略；
  * - 只有 `review` 恰好是 `1` 才是评审模式（review-bridge.ts）。
  */
-import { embedScenarioIds, embedStartScenario, type Project } from '@joplo-app/core';
+import { embedScenarioIds, embedStartScenario, type Project } from '@joplo-app/core/runtime';
 import { siteHash } from '../runtime/route';
 import { isFullscreenKey } from '../player/fullscreen';
 

@@ -1,4 +1,4 @@
-import { projectThemes } from '@joplo-app/core';
+import { projectThemes } from '@joplo-app/core/runtime';
 import { useI18n } from '../i18n/context';
 /**
  * 舞台：在固定尺寸的画框里渲染当前画面。弹窗、Toast、演示覆盖层都在画框内部分层，
@@ -11,7 +11,7 @@ import { keyboardAt } from './story-data';
 import { CameraLayer, contentBounds, useCamera, type CameraSpec } from './camera';
 import { clampPan, wheelFactor, zoomAt, type View } from './camera-math';
 import { AnimatePresence, motion } from 'motion/react';
-import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, focusAt, streamsOf, type PlayState, type Project, type Toast } from '@joplo-app/core';
+import { VIEWPORT_SIZE, changedAt, marksAt, cardAt, focusAt, streamsOf, type PlayState, type Project, type Toast } from '@joplo-app/core/runtime';
 import { RenderContext, RenderNode, type RenderMode, type StreamingCtx } from './components';
 import { Rough, ThemeContext, type RoughRegistry, type StageTheme } from './rough';
 import { resolveLook, type AppearanceFont, type AppearanceStroke } from './appearance';

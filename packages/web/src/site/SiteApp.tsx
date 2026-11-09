@@ -1,4 +1,4 @@
-import { projectThemes } from '@joplo-app/core';
+import { projectThemes } from '@joplo-app/core/runtime';
 import { tabTitle } from '../player/states';
 import { LanguageMenu } from '../player/LanguageMenu';
 import { useBoardLayout } from '../player/PlayerPage';
@@ -18,7 +18,7 @@ import { ContentFallbackNotice } from './ContentNotice';
  *   （字体、线条暂不发布）。只消费 publish 模式的 IR；没有写接口。hash 路由，file:// 可直接打开。
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { orderedFeatures, type Project } from '@joplo-app/core';
+import { orderedFeatures, type Project } from '@joplo-app/core/runtime';
 import { DemoController } from '../runtime/demo';
 import { isLocalHost, parseSiteHash, siteHash, warnUnknownPlayParams, type PlayRoute, type SiteRoute } from '../runtime/route';
 import { scenariosOf } from '../runtime/views';
@@ -29,7 +29,7 @@ import { ArrowRight, CirclePlay, Link } from 'lucide-react';
 import { Btn } from '../player/controls';
 import { JoploMark } from '../player/JoploMark';
 import { StageThumb } from '../player/StageThumb';
-import { displaySceneId } from '@joplo-app/core';
+import { displaySceneId } from '@joplo-app/core/runtime';
 import { siteScenarioRows } from './site-model';
 import { EmbedApp } from './EmbedApp';
 import { parseEmbedParams } from './embed-model';

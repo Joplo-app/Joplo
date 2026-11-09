@@ -212,7 +212,7 @@ async function buildSourceSite(web: SourceWeb, projectDir: string, staging: stri
     base: './',
     mode: 'production',
     logLevel: 'error',
-    resolve: { alias: [{ find: /^@joplo-app\/core$/, replacement: path.join(web.webDir, 'src/site/core-lite.ts') }, ...kitAliases(web, projectDir)] },
+    resolve: { alias: [{ find: /^@joplo-app\/core(?:\/runtime)?$/, replacement: path.join(web.webDir, 'src/site/core-lite.ts') }, ...kitAliases(web, projectDir)] },
     define: { 'process.env.NODE_ENV': '"production"' },
     plugins: [joploProjectPlugin(projectDir, web), react(), tailwindcss()],
     build: {

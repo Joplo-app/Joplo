@@ -1,4 +1,5 @@
-import { mapSlotTexts } from './plugin-data.ts';
+import { pluginSpec } from './catalog.ts';
+import { mapSlotTexts, mapTextPaths } from './plugin-data.ts';
 /**
  * 作者内容多语言（D84）：源文件用默认语言写，译文放在 `locales/<语言>.json`（原文 → 译文）。
  *
@@ -32,7 +33,6 @@ const STRUCTURAL = new Set(['from', 'to', 'accessor', 'target', 'href', 'src', '
 const ITEM_VALUE = 'value';
 
 /** 显示文字的属性：收集时不跳过单个英文词（英文项目的按钮名就是一个词）。其余属性里的单个 ASCII 词多半是枚举（sm、blue），不收。 */
-const DISPLAY_PROPS = new Set(['text', 'label', 'title', 'description', 'placeholder', 'aria-label', 'alt', 'error', 'hint', 'caption', 'message', 'content', 'subtitle', 'tooltip', 'leftSection', 'rightSection', 'name', 'value', 'data', 'records', 'labels', 'emptyText', 'actionLabel', 'sub', 'badge', 'status', 'items']);
 /** 每一行都是邮箱或网址：不翻译。 */
 const addressLike = (s: string) => s.split('\n').every((l) => /^\s*([^\s@]+@[^\s@]+|https?:\/\/\S+)\s*$/.test(l));
 
@@ -67,8 +67,8 @@ function mapNode(n: SceneNode, visit: Visit, plugins: Project['plugins']): Scene
   const out: SceneNode = { ...n, ...(n.ext ? { ext: mapSlotTexts(n.ext, plugins, 'node', s => visit(s, 'text', n.source)) } : {}) };
   if (n.props) {
     const props: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(n.props)) props[k] = STRUCTURAL.has(k) ? v : mapDeep(v, (s, _p, itemValue) => visit(s, DISPLAY_PROPS.has(k) && !itemValue ? 'text' : 'prop', n.source), '');
-    out.props = props;
+    for (const [k, v] of Object.entries(n.props)) props[k] = STRUCTURAL.has(k) || !(n.type === '#text' && k === 'text' || pluginSpec(plugins, n.type)?.traits?.text?.includes(k)) ? v : mapDeep(v, (s, _p, itemValue) => visit(s, !itemValue ? 'text' : 'prop', n.source), '');
+    out.props = mapTextPaths(props, pluginSpec(plugins, n.type)?.traits?.textPaths ?? [], s => isBinding(s) ? s : visit(s, 'text', n.source)) as Record<string, unknown>;
   }
   if (n.children) out.children = n.children.map((c) => mapNode(c, visit, plugins));
   if (n.when) out.when = mapCondition(n.when, visit);

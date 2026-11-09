@@ -1,6 +1,6 @@
 import { en, type Dictionary } from '../i18n/en';
 /**
- * 主题（D51）：一个主题就是一段 CSS。Joplo 约定一组 CSS 变量（--jp-*），渲染器、插件内容、Terminal、Phone、高光与字幕
+ * 主题（D51）：一个主题就是一段 CSS。Joplo 约定一组 CSS 变量（--jp-*），渲染器、插件内容、Terminal、设备外框、高光与字幕
  * 都只读这些变量；主题也可以写普通选择器做细调。主题 CSS 自动限定在舞台范围内（scopeThemeCss），不影响看板本身。
  *
  * 变量（THEME_VARS）：

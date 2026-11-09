@@ -1,6 +1,6 @@
 import { stepCaption } from '../i18n/step-caption';
 import { en, type Dictionary } from '../i18n/en';
-import type { LayerIcon } from '@joplo-app/core';
+import type { LayerIcon } from '@joplo-app/core/runtime';
 /**
  * 演示页布局（D55，纯函数）：断点、播放坞宽度、时间线格子、层级标签。
  *

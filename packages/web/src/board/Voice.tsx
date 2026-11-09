@@ -23,7 +23,7 @@ import { useI18n } from '../i18n/context';
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AudioLines, Check, Copy, KeyRound, Loader2, Play, Square, Volume2, VolumeX, X } from 'lucide-react';
-import { speakerRoleAt, spokenLine, type Project } from '@joplo-app/core';
+import { speakerRoleAt, spokenLine, type Project } from '@joplo-app/core/runtime';
 import { stepCaption } from '../i18n/step-caption';
 import { cn } from '@/lib/utils';
 import { Btn, Switch } from '../player/controls';

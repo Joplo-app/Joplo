@@ -1,3 +1,5 @@
+import { sampleRoute } from './geometry.ts';
+export { sampleRoute } from './geometry.ts';
 /**
  * 架构图 / 状态机的布局（D69）：ELK layered + 层级处理（hierarchyHandling = INCLUDE_CHILDREN），正交走线。
  *
@@ -549,17 +551,6 @@ function finish(s: GraphStructure, l: { nodes: Record<string, Box>; groups: Reco
 }
 
 /** 沿折线每 4px 取一个点。 */
-export function sampleRoute(points: Point[], step = 4): Point[] {
-  const out: Point[] = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i]!;
-    const b = points[i + 1]!;
-    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step));
-    for (let k = 0; k <= n; k++) out.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
-  }
-  return out;
-}
-
 /** 分组标题：在分组顶部标题条里，从左往右找一个没有连线穿过的位置；都有时取穿过最少的。 */
 export function placeTitles(s: GraphStructure, groups: Record<string, Box>, edges: GraphLayout['edges']): Record<string, Box> {
   const samples = Object.values(edges).flatMap((e) => sampleRoute(e.points));

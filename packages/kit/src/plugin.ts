@@ -22,12 +22,40 @@ import type { JoploProps } from './ui.ts';
 export const PLUGIN_API_VERSION = 2 as const;
 
 const ID = /^[a-z][a-z0-9-]*$/;
-const NAME = /^[A-Z][A-Za-z0-9]*(\.[A-Z][A-Za-z0-9]*)*$/;
+const NAME = /^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)*$/;
+
+/** Serializable element behavior. The compiler copies it to nodes; playback reads only IR. */
+export type ElementTraits = {
+  input?: 'single' | 'multiple';
+  frame?: boolean;
+  disabledPresentation?: boolean;
+  /** First defined property controls visibility of this node and its descendants. */
+  gate?: string[];
+  choices?: { prop: string } | { descendants: string[]; value?: string; label?: string; labelChild?: string } | { range: string };
+  toggleCaption?: 'check';
+  selfEvident?: boolean;
+  /** Region names are arbitrary plugin-owned properties on the layout node. */
+  layout?: Record<string, { size: string; defaultSize: number; breakpoint?: boolean }>;
+  region?: string;
+  childWidth?: { value: number; when?: { prop: string; value: string | number | boolean; width: number } };
+  /** Display properties; nested item values retain their identity semantics. */
+  text?: string[];
+  /** Exact nested display strings; * selects array items or object values. */
+  textPaths?: string[][];
+};
 
 /** 插件组件的声明：编译、检查、技能都只读这里，不执行运行时代码。 */
 export type PluginComponentSpec = {
   /** 一行用法（`npx joplo skill <插件>` 列出），例如 'focus, height; root of a 3D scene'。 */
   doc: string;
+  example?: string;
+  /** Condense compound parts into one family row in the components overview. */
+  catalogFamily?: boolean;
+  /** Direct JSX string tags mapped to this component by the compiler. */
+  intrinsic?: string;
+  traits?: ElementTraits;
+  /** Compile-time property forwarding, stopping at a nested owner of the same type. */
+  inherit?: { target: string; props: string[] }[];
   /** 可操作：必须有 id，并且要有演示步骤、禁用原因或 unmodeled（和 Button 一样）。 */
   interactive?: boolean;
   /** 必须具有作者 id（不要求可操作）。 */
@@ -43,6 +71,7 @@ export type PluginReport = (code: string, message: string, at?: string, severity
 export type PluginIRNode = {
   id: string; type: string; props?: Record<string, unknown>; children?: PluginIRNode[]; source?: string;
   ext?: Record<string, unknown>;
+  traits?: ElementTraits;
   framing?: { include?: string[]; kind?: 'root' | 'group' | 'block' | 'content' | 'edge' | 'row' };
 };
 export type PluginEffectDef = { kind: 'effect'; type: 'plugin'; plugin: string; name: string; payload: unknown };
@@ -129,7 +158,7 @@ export function definePlugin(p: Omit<PluginDef, 'kind' | 'runtime' | 'apiVersion
   if (!ID.test(p.id)) throw new Error(`Joplo plugin id "${p.id}" must be lowercase letters, digits, and -, starting with a letter`);
   if (p.apiVersion !== undefined && p.apiVersion !== 1 && p.apiVersion !== PLUGIN_API_VERSION) throw new Error(`Joplo plugin ${p.id} targets plugin API ${p.apiVersion}; this Joplo supports ${PLUGIN_API_VERSION}`);
   for (const [name, spec] of Object.entries(p.components)) {
-    if (!NAME.test(name)) throw new Error(`Joplo plugin ${p.id}: component name "${name}" must be PascalCase (dots for compound parts)`);
+    if (!NAME.test(name) || /^[a-z]/.test(name) && spec.intrinsic !== name) throw new Error(`Joplo plugin ${p.id}: component name "${name}" must be PascalCase (dots for compound parts)`);
     if (spec.parent !== undefined && !p.components[spec.parent]) throw new Error(`Joplo plugin ${p.id}: ${name}.parent "${spec.parent}" is not a component of this plugin`);
   }
   return { ...p, kind: 'plugin', apiVersion: PLUGIN_API_VERSION, runtime: fileOf(p.runtime), local: p.local ? fileOf(p.local) : undefined };
@@ -214,9 +243,15 @@ export type RuntimeComponent =
 export type PluginObservation = { frame: PluginFrame; ext: Readonly<Record<string, unknown>> };
 export type PluginObserver = { update(context: PluginObservation): void; destroy(): void };
 export type PluginObserve = (root: HTMLElement, context: PluginObservation) => PluginObserver;
-export type PluginRuntime = { id: string; apiVersion: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; media?: MediaFactory; observe?: PluginObserve };
+/** Browser-only viewport decoration; no playback state or authoring code. */
+export type ViewportDecoration = {
+  insets: {x:number;y:number};
+  size(width:number,height:number):{width:number;height:number};
+  react: import('react').ComponentType<{width:number;height:number;scale?:number;seed?:string;children?:import('react').ReactNode}>;
+};
+export type PluginRuntime = { id: string; apiVersion: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; viewports?: Record<string, ViewportDecoration>; media?: MediaFactory; observe?: PluginObserve };
 
 /** 插件运行时：mount 适配框架无关渲染；react 接收 ctx，由宿主 React 树渲染。 */
-export function defineRuntime(r: { id: string; apiVersion?: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; media?: MediaFactory; observe?: PluginObserve }): PluginRuntime {
+export function defineRuntime(r: { id: string; apiVersion?: 1 | typeof PLUGIN_API_VERSION; components: Record<string, RuntimeComponent>; viewports?: Record<string, ViewportDecoration>; media?: MediaFactory; observe?: PluginObserve }): PluginRuntime {
   return { ...r, apiVersion: PLUGIN_API_VERSION };
 }

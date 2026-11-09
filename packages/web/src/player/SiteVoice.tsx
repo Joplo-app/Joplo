@@ -7,7 +7,7 @@ import { useMedia } from '../runtime/useMedia';
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
-import type { Project } from '@joplo-app/core';
+import type { Project } from '@joplo-app/core/runtime';
 import { useI18n } from '../i18n/context';
 import type { DemoController } from '../runtime/demo';
 import { Narrator } from '../runtime/voice';

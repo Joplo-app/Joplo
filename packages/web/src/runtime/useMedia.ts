@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { Project } from '@joplo-app/core';
+import type { Project } from '@joplo-app/core/runtime';
 import type { DemoController } from './demo';
 import { MediaEngine } from './media';
 /** Mounted only by interactive players, never Stage thumbnails or render routes. */

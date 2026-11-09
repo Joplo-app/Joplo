@@ -15,7 +15,7 @@ export const SKILL_TOPICS = [
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
   { name: 'content', description: 'Default first-party content plugin: continuous visual explainers, chapters, design worlds and review practices' },
   { name: 'diagram', description: 'Default first-party diagram plugin: architecture, sequence and state diagrams, groups, compiled traces and framing' },
-  { name: 'components', description: 'Component catalog, supported HTML tags, line breaks, props, and real images' },
+  { name: 'components', description: 'Enabled plugin component catalog, namespaced UI/HTML, props, examples, and real images' },
   { name: 'cases', description: 'Case dimensions: ask the user before starting' },
   { name: 'check', description: 'Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line' },
   { name: 'selection', description: 'Edit only the element selected by the user in the board' },
@@ -67,6 +67,7 @@ export const PITFALLS = [
   ['HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it', 'check'],
   ['For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, and verify playback before claiming it works', 'content'],
   ['For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings', 'plugins'],
+  ['Default UI and HTML belong to the ui plugin; keep kit/ui imports and author TSX, use ui: names only in IR and diagnostics. Recompile old bare-name IR before comparing versions', 'components'],
   ['Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components', 'plugins'],
 ] as const satisfies readonly (readonly [string, string])[];
 

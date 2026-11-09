@@ -59,7 +59,7 @@ describe('呈现层不拦截点击（不变量 3）', () => {
   });
   const scene = {
     id: 'sc', optionId: null, route: '/', name: 'x', viewport: 'desktop',
-    root: { id: 'root', type: 'Stack', children: [{ id: 'key', type: 'Code', redact: { falsy: 'ui.revealed' }, children: [{ id: '_t', type: '#text', props: { text: 'sk-live' } }] }, { id: 'go', type: 'Button', children: [{ id: '_g', type: '#text', props: { text: 'Go' } }] }] },
+    root: { id: 'root', type: 'ui:Stack', children: [{ id: 'key', type: 'ui:Code', redact: { falsy: 'ui.revealed' }, children: [{ id: '_t', type: '#text', props: { text: 'sk-live' } }] }, { id: 'go', type: 'ui:Button', children: [{ id: '_g', type: '#text', props: { text: 'Go' } }] }] },
   };
   const sc = { id: 's', optionId: 'o', name: 's', description: '', caseIds: [], mock: { label: 'ok', outcome: 'success' }, initial: { sceneId: 'sc', ui: {}, data: {}, inputs: {} }, expected: '',
     steps: [{ id: 's#1', kind: 'system', action: { type: 'event', name: 'e' }, caption: 'e', effects: [], ruleIds: [], shots: [], directorLayer: null, traces: [], forks: [], marks: [], cues: [{ kind: 'spotlight', targets: ['key'] }], callouts: [{ target: 'go', text: '点这里' }], hold: 5000 }] };

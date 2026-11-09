@@ -9,7 +9,7 @@
  * - edgePath / arrowHead / pointAt：折线 → SVG 路径。
  */
 import { GROUP_FONT, DESC_FONT, EDGE_FONT, NODE_FONT, START, textWidth, type Box, type GraphLayout, type GraphStructure, type Point, type SequenceLayout, type SequenceStructure } from './model.ts';
-import { sampleRoute } from './graph-layout.ts';
+import { sampleRoute } from './geometry.ts';
 import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
 import type { DiagramStates } from './state.ts';
 

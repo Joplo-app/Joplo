@@ -1,5 +1,5 @@
 import { AuthorLink, type Author } from '../site/author';
-import { projectThemes } from '@joplo-app/core';
+import { projectThemes } from '@joplo-app/core/runtime';
 import { useTopbarMeasurements } from './topbar-fit';
 import { LanguageMenu } from './LanguageMenu';
 import { localeNames } from '../i18n/locale';
@@ -20,7 +20,7 @@ import { en, type Dictionary } from '../i18n/en';
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AppWindow, Bot, ChevronLeft, ChevronRight, ChevronsUpDown, Clapperboard, Database, FileText, Globe, Mail, MessageSquare, Monitor, Server, Smartphone, SquareTerminal, Workflow, GitFork, Cog, Ellipsis, Expand, Film, Gauge, Maximize, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Share, Shrink } from 'lucide-react';
-import { roleOfScene, stepTouchesLayer, type LayerIcon, type Project, type RoleInfo, type Scenario } from '@joplo-app/core';
+import { roleOfScene, stepTouchesLayer, type LayerIcon, type Project, type RoleInfo, type Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
 import { Subtitle } from './Subtitle';

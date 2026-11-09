@@ -15,7 +15,7 @@ import { SCHEMA_VERSION, type PlayState, type Project } from '@joplo-app/core';
 import { FONT_STACKS, appearanceFromParams, fontStack, resolveLook } from '../src/renderer/appearance';
 import { themeCatalog } from '../src/renderer/themes';
 import { Stage } from '../src/renderer/Stage';
-import { PhoneFrame } from '../src/renderer/components';
+import { PhoneFrame } from '../../../plugins/ui/src/runtime.tsx';
 import { ThemeContext } from '../src/renderer/rough';
 import { Subtitle } from '../src/player/Subtitle';
 import { appearanceLabel, applyAppearance, effectiveAppearance, isCellSelected, paletteCells, resetAppearance, setAsDefault, themeLine, themeSwatch, themeToWrite } from '../src/board/appearance-model';
@@ -126,7 +126,7 @@ describe('消费者', () => {
     expect(appearanceFromParams(new URLSearchParams(''))).toEqual({ font: null, stroke: null });
   });
 
-  const scene = { id: 'sc', optionId: null, route: '/', name: 'x', viewport: 'desktop', root: { id: 'root', type: 'Stack', props: {}, children: [{ id: 't', type: '#text', props: { text: '你好' } }] } };
+  const scene = { id: 'sc', optionId: null, route: '/', name: 'x', viewport: 'desktop', root: { id: 'root', type: 'ui:Stack', props: {}, children: [{ id: 't', type: '#text', props: { text: '你好' } }] } };
   const project = { schemaVersion: SCHEMA_VERSION, name: 'p', description: '', theme: 'sketch', themes: {}, mode: 'dev', routes: {}, features: {}, cases: {}, options: {}, rules: {}, scenes: { sc: scene }, scenarios: {}, issues: {} } as unknown as Project;
   const state: PlayState = { scenarioId: '', position: 0, sceneId: 'sc', ui: {}, data: {}, inputs: {}, toasts: [], completed: null, sceneStack: [] };
   it('舞台根节点：data-theme、data-stroke（覆盖主题的线条）、--jp-font（覆盖主题的字体）', () => {

@@ -13,7 +13,7 @@ export type ProjectPlugins = { plugins: PluginDef[]; error: string | null };
 export async function projectPlugins(dir = '.'): Promise<ProjectPlugins> {
   const root = resolve(dir);
   const file = ['joplo.config.ts', 'joplo.config.tsx'].map((f) => join(root, f)).find((f) => existsSync(f));
-  if (!file) return { plugins: [], error: null };
+  if (!file) return { plugins: enabledPlugins(undefined).filter(isPluginDef), error: null };
   try {
     const tsconfig = join(root, 'tsconfig.json');
     const mod = (await tsImport(file, { parentURL: import.meta.url, tsconfig: existsSync(tsconfig) ? tsconfig : false })) as { default?: { plugins?: unknown } };

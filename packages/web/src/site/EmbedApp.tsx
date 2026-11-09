@@ -1,4 +1,4 @@
-import { projectThemes } from '@joplo-app/core';
+import { projectThemes } from '@joplo-app/core/runtime';
 /**
  * 发布站的嵌入模式（`?embed=1`，云端嵌入契约 · 方案 A「大播放按钮」）：给博客等第三方页面的 iframe 用的精简播放器。
  *
@@ -16,7 +16,7 @@ import { projectThemes } from '@joplo-app/core';
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ChevronLeft, ChevronRight, Expand, ExternalLink, ListVideo, Pause, Play, Shrink } from 'lucide-react';
-import type { Project } from '@joplo-app/core';
+import type { Project } from '@joplo-app/core/runtime';
 import { DemoController } from '../runtime/demo';
 import { Stage } from '../renderer/Stage';
 import { ThemeStyles } from '../renderer/ThemeStyles';

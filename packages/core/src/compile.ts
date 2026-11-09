@@ -222,7 +222,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       }
     }
     const base = tree as JNode;
-    const rootJ: JNode = { ...base, type: base.type === '#fragment' ? 'div' : base.type, children: [...base.children, ...overlays] };
+    const rootJ: JNode = { ...base, type: base.type, children: [...base.children, ...overlays] };
     const ids = new Map<string, string | undefined>();
     const root = toSceneNode(rootJ, 'root', ids, nodeCtx, null);
     const scene: Scene = { id: sceneId, optionId: ctx?.qid ?? null, route: route.path, name: `${page.title}${ctx ? ` · ${ctx.def.name}` : ''}`, viewport: page.viewport ?? 'desktop', root };
@@ -290,7 +290,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         err('LAYER_UNKNOWN', `Layer "${ld.title}" has no content: layer(title, <Page />)`, at);
         continue;
       }
-      const rootJ: JNode = nodes.length === 1 ? nodes[0]! : { ...nodes[0]!, type: 'div', props: {}, children: nodes };
+      const rootJ: JNode = nodes.length === 1 ? nodes[0]! : { ...nodes[0]!, type: '#fragment', props: {}, children: nodes };
       const ids = new Map<string, string | undefined>();
       const root = toSceneNode(rootJ, `layer_${lk}`, ids, nodeCtx, null);
       const sceneId = `${qid}~${lk}`;
@@ -825,7 +825,8 @@ type NodeCtx = { host: PluginCompiler; plugins: Record<string, PluginInfo>; repo
 function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | undefined>, nc: NodeCtx, parentType: string | null): SceneNode {
   const { report: err, rel } = nc;
   n = { ...n, props: n.props ?? {}, children: n.children ?? [] };
-  if (n.type === 'Menu') n = menuWithOpened(n);
+  n = { ...n, type: nc.host.intrinsic.get(n.type) ?? n.type };
+  n = inheritProps(n, nc.host.inherits.get(n.type) ?? []);
   const children: SceneNode[] = flatten(n.children).map((c, i) =>
     isNode(c) ? toSceneNode(c, `${fallbackId}_${i}`, ids, nc, n.type) : textNode(c, `${fallbackId}_${i}`),
   );
@@ -845,7 +846,7 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   if (interactive && typeof rawId !== 'string') err('MISSING_ID', `Interactive component <${n.type}> "${labelOf(n)}" requires an id for steps and selection`, at);
   const spec = pluginSpec(nc.plugins, n.type);
   if (spec?.needsId && typeof rawId !== 'string' && !interactive) err('MISSING_ID', `<${n.type}> "${labelOf(n)}" requires an id`, at);
-  if (n.type === 'Image') checkImage(n, err);
+
   const id = typeof rawId === 'string' ? rawId : `_${fallbackId}`;
   if (ids.has(id)) err('DUPLICATE_ID', `Duplicate id "${id}" in the same stage (other location: ${rel(ids.get(id)) ?? 'unknown'})`, at);
   ids.set(id, at);
@@ -864,6 +865,10 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
     props[k] = toPropValue(v);
   }
   const node: SceneNode = { id, type: n.type };
+  if (spec?.traits) {
+    const { text: _text, textPaths: _paths, ...runtime } = spec.traits;
+    if (Object.keys(runtime).length) node.traits = runtime;
+  }
   if (Object.keys(props).length) node.props = props;
   if (children.length) node.children = children;
   if (when !== undefined) node.when = toCondition(when) as SceneNode['when'];
@@ -886,34 +891,21 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   return node;
 }
 
-/**
- * <Image>：只画内嵌的图片（asset() 生成的 data:image/… URI），本地看板、build、share 都带着它，不依赖外网。
- * 网址或文件路径不会去加载：画成占位，并提示用 asset() 内嵌；状态绑定在运行时取值，不在这里判断。
- */
-const IMAGE_FITS = ['cover', 'contain'];
-function checkImage(n: JNode, err: ErrFn): void {
-  const { src, fit } = n.props as Record<string, unknown>;
-  if (typeof src === 'string' && src && !src.startsWith('data:image/'))
-    err('IMAGE_PLACEHOLDER', `<Image src="${src.length > 60 ? `${src.slice(0, 57)}...` : src}"> is drawn as a placeholder: only embedded images are shown. Put the file in the project and write src={asset('./photo.jpg')} (path relative to this file; import asset from @joplo-app/kit)`, n.source, 'warning');
-  if (fit !== undefined && !(typeof fit === 'string' && IMAGE_FITS.includes(fit)))
-    err('INVALID_IMAGE_FIT', `<Image> fit="${String(fit)}" is not supported (available: ${IMAGE_FITS.join(', ')})`, n.source);
-}
-
-/**
- * Menu（D68）：opened 写在 Menu 上（与 Mantine 一致），可见性由 Menu.Dropdown 门控（GATED_CONTAINERS）。
- * 把 Menu 的 opened 抄到它自己的 Menu.Dropdown 上（不进嵌套的另一个 Menu；Dropdown 自己写了 opened 时不覆盖）。
- * Menu 没写 opened 时下拉保持关闭。
- */
-function menuWithOpened(menu: JNode): JNode {
-  const opened = menu.props.opened;
-  if (opened === undefined) return menu;
-  const visit = (c: JChild): JChild => {
-    if (Array.isArray(c)) return c.map(visit);
-    if (!isNode(c) || c.type === 'Menu') return c;
-    if (c.type === 'Menu.Dropdown') return c.props.opened === undefined ? { ...c, props: { ...c.props, opened } } : c;
-    return { ...c, children: c.children.map(visit) };
+/** Forward declared properties before descending; nested owners establish their own scope. */
+function inheritProps(owner: JNode, declarations: { target: string; props: string[] }[]): JNode {
+  if (!declarations.length) return owner;
+  const visit = (child: JChild): JChild => {
+    if (Array.isArray(child)) return child.map(visit);
+    if (!isNode(child) || child.type === owner.type) return child;
+    const spec = declarations.find(d => d.target === child.type);
+    if (spec) {
+      const props = { ...child.props };
+      for (const key of spec.props) if (props[key] === undefined && owner.props[key] !== undefined) props[key] = owner.props[key];
+      return { ...child, props };
+    }
+    return { ...child, children: child.children.map(visit) };
   };
-  return { ...menu, children: menu.children.map(visit) };
+  return { ...owner, children: owner.children.map(visit) };
 }
 
 /** 展开数组与 Fragment（含插槽展开后的 Fragment），丢弃 null/布尔。 */
@@ -990,7 +982,7 @@ function autoCaption(st: StepDef, scene: Scene | undefined): Pick<Step, 'caption
       return result('select', `Select “${value}” in “${label}”`, { value });
     }
     case 'toggle': {
-      const kind = node?.type === 'Checkbox' ? (a.value ? 'check' : 'uncheck') : (a.value ? 'switch_on' : 'switch_off');
+      const kind = node?.traits?.toggleCaption === 'check' ? (a.value ? 'check' : 'uncheck') : (a.value ? 'switch_on' : 'switch_off');
       const verb = { check: 'Check', uncheck: 'Uncheck', switch_on: 'Turn on', switch_off: 'Turn off' }[kind];
       return result(kind, `${verb} “${label}”`);
     }

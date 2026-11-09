@@ -44,7 +44,7 @@ describe('plugin API v2', () => {
 });
 
 it('keeps content-family code out of core and the rendering host', () => {
-  const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? e.name === 'plugins' ? [] : files(join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : []);
+  const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? files(join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : []);
   const forbidden = /\b(?:Diagram|StateMachine|Sequence|diagramStateAt|resolveTrace|DIAGRAM_[A-Z_]+)\b/;
   const hits = ['packages/core/src', 'packages/web/src/renderer'].flatMap(files).filter(f => forbidden.test(readFileSync(f, 'utf8')));
   expect(hits).toEqual([]);

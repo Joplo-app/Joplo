@@ -39,9 +39,7 @@ const GROUP_SEL = '[data-jframe="group"],[data-jframe="block"]';
  * 界面元素的上下文：最近的“有框容器”（卡片、面板、弹窗、提示、表格、侧栏等）。
  * 推近到一张卡片时，它所在的面板也留在画面里（D69：截图里“放大一张卡片、旁边全被裁掉”的情况）。
  */
-const FRAME_SEL = ['Card', 'Paper', 'Modal', 'Drawer', 'Alert', 'Notification', 'Email', 'DataCard', 'StateFlow', 'Artifact', 'Terminal', 'ChatMessage', 'Table', 'DataTable', 'Accordion.Item', 'Tabs.Panel', 'AppShell.Navbar', 'AppShell.Aside', 'AppShell.Header', 'AppShell.Footer']
-  .map((t) => `[data-jtype="${t}"]`)
-  .join(',') + ',[data-jframe="root"]';
+const FRAME_SEL = '[data-jframe-container],[data-jframe="root"]';
 
 /**
  * 图表元素一定要带上的归属信息（D69）：节点 / 分组 / 状态是最内层父分组的标题，时序图的消息是两端参与者的头部。

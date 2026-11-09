@@ -19,7 +19,7 @@ describe('P1-A review regressions', () => {
   it('rechecks identities after derive, even if trusted code changes an external scene reference', async () => {
     const { PluginCompiler } = await import('../src/plugins/compiler.ts');
     const scene: any = { id: 'stage', optionId: null, route: '/', name: 'Stage', viewport: 'desktop', root: { id: 'root', type: 'probe:Item' } };
-    const p = plugin({ derive() { scene.root.children = [{ id: 'same', type: 'Text' }, { id: 'same', type: 'Text' }]; } });
+    const p = plugin({ derive() { scene.root.children = [{ id: 'same', type: 'ui:Text' }, { id: 'same', type: 'ui:Text' }]; } });
     const codes: string[] = [];
     new PluginCompiler([p], code => { codes.push(code); }).derive(scene);
     expect(codes).toContain('DUPLICATE_ID');
@@ -65,7 +65,7 @@ describe('P1-A review regressions', () => {
   });
   it.each([
     { frame(ctx: any) { ctx.state.data.injected = 'hook'; return {}; } },
-    { derive(n: any) { n.children = [{ id: 'same', type: 'Text' }, { id: 'same', type: 'Text' }]; } },
+    { derive(n: any) { n.children = [{ id: 'same', type: 'ui:Text' }, { id: 'same', type: 'ui:Text' }]; } },
     { derive(n: any) { n.ext = { other: { unchecked: true } }; } },
   ])('isolates live state, identity and other namespaces', hooks => {
     const p = plugin(hooks);
@@ -99,8 +99,8 @@ describe('P1-A review regressions', () => {
     const p = plugin({ derive: (node: any) => ({ data: { rows: rows(node) } }), frame: ({ scenes }: any) => ({ byScene: Object.fromEntries(scenes.map((s: any) => [s.id, { rows: rows(s.root) }])) }) }, {
       data: { node: { text: [['rows', '*', 'text']], scope: [rule] }, step: { text: [['byScene', '*', 'rows', '*', 'text']], scope: [{ path: ['byScene'], kind: 'map', domain: 'scene', children: [rule] }] } },
     });
-    const s = source(h(pluginComponent(p, 'Item'), { id: 'root', children: [h('Text', { id: 'public', label: 'Public' }), h(Slot, { name: 'foreign' })] }), [p]);
-    s.features.g = { def: { ...feature({ name: 'G', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'G', idea: 'g', on: { '/': { foreign: h('Text', { id: 'cut', label: 'SECRET-CACHE-LABEL', children: 'SECRET-CACHE-LABEL' }) } }, scenarios: { s: flow('G', { start: '/' }).system('G') } }), file } } };
+    const s = source(h(pluginComponent(p, 'Item'), { id: 'root', children: [h('ui:Text', { id: 'public', label: 'Public' }), h(Slot, { name: 'foreign' })] }), [p]);
+    s.features.g = { def: { ...feature({ name: 'G', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'G', idea: 'g', on: { '/': { foreign: h('ui:Text', { id: 'cut', label: 'SECRET-CACHE-LABEL', children: 'SECRET-CACHE-LABEL' }) } }, scenarios: { s: flow('G', { start: '/' }).system('G') } }), file } } };
     const r = compile(s, 'publish');
     expect(r.diagnostics).toEqual([]);
     expect(JSON.stringify(r.project!.scenarios['f.a.s']!.ext)).toContain('SECRET-CACHE-LABEL');

@@ -12,7 +12,7 @@ import { en, type Dictionary } from '../i18n/en';
  * - 右侧：平时是弱化的进度「n / m」（读屏用完整的“第 n / 共 m 步”）；场景完成后是“场景完成 · 模拟成功”这类结果。
  * - 高度按内容自适应：只有一行时与没有内容时一样高（版面不跳）。
  */
-import { cameraAt, forksOf, layersOf, roleOfScene, type PlayState, type Project, type RoleInfo, type Scenario } from '@joplo-app/core';
+import { cameraAt, forksOf, layersOf, roleOfScene, type PlayState, type Project, type RoleInfo, type Scenario } from '@joplo-app/core/runtime';
 
 export const SUBTITLE_CAPTION_PX = 22;
 export const SUBTITLE_EXPLAIN_PX = 16;

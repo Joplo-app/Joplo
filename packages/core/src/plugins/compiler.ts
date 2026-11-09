@@ -1,3 +1,5 @@
+import ui from '@joplo-app/plugin-ui';
+import { ElementTraitsSchema, InheritSchema } from '../traits.ts';
 import { advanceMedia } from '../media.ts';
 import type { MediaCommand, MediaSnapshot, ResourceRequest } from '@joplo-app/kit/plugin';
 import { jsonData, snapshot, object, strings, syncResult, authoringData, materialize, errorMessage } from './data.ts';
@@ -11,7 +13,7 @@ import type { Scene, SceneNode, Project } from '../schema.ts';
 import type { PluginInfo } from '../catalog.ts';
 import type { GraphLayoutEngine } from '@joplo-app/plugin-diagram/model';
 
-export const standardPlugins: readonly PluginDef[] = [standard, content];
+export const standardPlugins: readonly PluginDef[] = [ui, standard, content];
 export type CompileOptions = { layout?: GraphLayoutEngine; onResource?: (request: ResourceRequest) => void; pluginOptions?: Record<string, Record<string, unknown>> };
 export function enabledPlugins(configured: unknown): unknown[] {
   return [...standardPlugins, ...(Array.isArray(configured) ? configured : [])];
@@ -27,6 +29,8 @@ function validMediaCommand(value: unknown, plugin: string, owners: ReadonlyMap<s
 }
 
 export class PluginCompiler {
+  readonly intrinsic = new Map<string, string>();
+  readonly inherits = new Map<string, { target: string; props: string[] }[]>();
   readonly themes: Record<string, string> = {};
   readonly properties = new Map<string, { plugin: PluginDef; spec: import('@joplo-app/kit/plugin').PluginPropertySpec }>();
   readonly mediaCommands = new Map<string, (MediaCommand & { plugin: string })[]>();
@@ -65,7 +69,25 @@ export class PluginCompiler {
         if (!/^[a-z][a-z0-9-]*$/.test(name) || typeof css !== 'string') this.report('PLUGIN_THEME_INVALID', `Plugin ${p.id}: themes need lowercase names and CSS strings`, source);
         else this.themes[`${p.id}:${name}`] = css;
       }
-      this.info[p.id] = { ...(object(themes) && Object.keys(themes).length ? { themes: themes as Record<string, string> } : {}), ...(Object.keys(properties).length ? { properties: properties as NonNullable<PluginInfo['properties']> } : {}), ...(p.data ? { data: this.envelope(p, p.data, source) as PluginInfo['data'] } : {}), id: p.id, title: p.title, ...(p.version ? { version: p.version } : {}), components: Object.fromEntries(Object.entries(p.components).map(([name, c]) => [name, { ...(c?.interactive ? { interactive: true } : {}), ...(c?.parent ? { parent: c.parent } : {}), ...(c?.needsId ? { needsId: true } : {}), ...(c?.selfEvident ? { selfEvident: true } : {}) }])) };
+      const checked: Record<string, import('@joplo-app/kit/plugin').ElementTraits> = {};
+      for (const [name, c] of Object.entries(p.components)) {
+        const type = `${p.id}:${name}`;
+        if (c.traits !== undefined) {
+          const parsed = ElementTraitsSchema.safeParse(this.envelope(p, c.traits, source));
+          if (!parsed.success) report('PLUGIN_TRAITS_INVALID', `Plugin ${p.id}: invalid traits for ${name}: ${parsed.error.message}`, source);
+          else checked[name] = parsed.data;
+        }
+        if (c.inherit !== undefined) {
+          const parsed = InheritSchema.safeParse(this.envelope(p, c.inherit, source));
+          if (!parsed.success) report('PLUGIN_TRAITS_INVALID', `Plugin ${p.id}: invalid property inheritance for ${name}`, source);
+          else this.inherits.set(type, parsed.data);
+        }
+        if (c.intrinsic !== undefined) {
+          if (!/^[a-z][a-z0-9]*$/.test(c.intrinsic) || this.intrinsic.has(c.intrinsic)) report('PLUGIN_TRAITS_INVALID', `Plugin ${p.id}: invalid or duplicate intrinsic ${c.intrinsic}`, source);
+          else this.intrinsic.set(c.intrinsic, type);
+        }
+      }
+      this.info[p.id] = { ...(object(themes) && Object.keys(themes).length ? { themes: themes as Record<string, string> } : {}), ...(Object.keys(properties).length ? { properties: properties as NonNullable<PluginInfo['properties']> } : {}), ...(p.data ? { data: this.envelope(p, p.data, source) as PluginInfo['data'] } : {}), id: p.id, title: p.title, ...(p.version ? { version: p.version } : {}), components: Object.fromEntries(Object.entries(p.components).map(([name, c]) => [name, { ...(checked[name] ? {traits:checked[name]} : {}), ...(c?.interactive ? { interactive: true } : {}), ...(c?.parent ? { parent: c.parent } : {}), ...(c?.needsId ? { needsId: true } : {}), ...(c?.selfEvident ? { selfEvident: true } : {}) }])) };
     }
   }
   private run<T>(p: PluginDef, hook: string, at: string | undefined, fn: () => T): T | undefined {

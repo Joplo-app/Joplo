@@ -3,7 +3,7 @@
  * 只做低保真近似：间距、字号、圆角用 Mantine 默认刻度；颜色映射到一组柔和的调色板。
  */
 import type { CSSProperties } from 'react';
-import { atWidth } from '@joplo-app/core';
+import { atWidth } from '@joplo-app/core/runtime';
 
 export * from '@joplo-app/kit/renderer-style';
 import { SPACING, FONT, RADIUS, INK, INK2, SOFT, DIMMED, BG, SURFACE, SUBTLE, LINE, LINE_STRONG, ACCENT, INFO, OK, WARN, DANGER, MONO, onFill, tint, color, light, space, spaceNum, dim, fontSize, radius, TITLE_SIZE } from '@joplo-app/kit/renderer-style';

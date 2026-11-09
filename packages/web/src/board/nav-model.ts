@@ -1,10 +1,10 @@
-import { orderedFeatures } from '@joplo-app/core';
+import { orderedFeatures } from '@joplo-app/core/runtime';
 import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 看板左栏与顶栏下拉的视图模型（纯函数，创作侧，不进发布站）：方案字母与名字、缺口统计、其他方案的小标、
  * 情况行的悬停卡片、缺口汇总命令、功能下拉。
  */
-import type { Coverage, Option, Project } from '@joplo-app/core';
+import type { Coverage, Option, Project } from '@joplo-app/core/runtime';
 import { optionsOf, shortName } from '../runtime/views';
 import { coverageMark, type CoverageStatus } from '../player/status';
 

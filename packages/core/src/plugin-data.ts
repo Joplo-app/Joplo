@@ -21,9 +21,13 @@ function values(value: unknown, path: readonly string[], required: boolean): unk
   if (required) throw new JoploError('PLUGIN_SCOPE_UNSUPPORTED', 'Missing scene identity in a stage ownership path');
   return [];
 }
+/** Shared path projection for slot text and declared component display properties. */
+export function mapTextPaths(value: unknown, paths: readonly (readonly string[])[], visit: (s: string) => string): unknown {
+  return paths.reduce((v, path) => atPath(v, path, s => typeof s === 'string' ? visit(s) : s), value);
+}
 export function mapSlotTexts(ext: Record<string, unknown> | undefined, plugins: Table, slot: 'node' | 'step', visit: (s: string) => string): Record<string, unknown> | undefined {
   if (!ext) return ext;
-  return Object.fromEntries(Object.entries(ext).map(([id, value]) => [id, (plugins?.[id]?.data?.[slot]?.text ?? []).reduce((v, path) => atPath(v, path, s => typeof s === 'string' ? visit(s) : s), value)]));
+  return Object.fromEntries(Object.entries(ext).map(([id, value]) => [id, mapTextPaths(value, plugins?.[id]?.data?.[slot]?.text ?? [], visit)]));
 }
 export function scopePluginData(project: Project): Project {
   const ids = new Map<string, Set<string>>();

@@ -1,4 +1,4 @@
-import type { Step, Scenario, Project, Selection } from '@joplo-app/core';
+import type { Step, Scenario, Project, Selection } from '@joplo-app/core/runtime';
 import { en, type Dictionary } from './en';
 import { m, type Text } from './messages';
 

@@ -10,7 +10,7 @@
  */
 import { useContext, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { motion } from 'motion/react';
-import type { FocusState } from '@joplo-app/core';
+import type { FocusState } from '@joplo-app/core/runtime';
 import type { Box } from './camera-math';
 import { ownershipEls } from './camera';
 import { markBox } from './marks-math';

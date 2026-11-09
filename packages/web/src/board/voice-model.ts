@@ -2,7 +2,7 @@
  * 看板朗读（D74 / D85）的纯函数：一个方案要读哪些段、已有几段音频、这次约用多少字、声音来源的顺序与音色的显示。
  * 段落的文字用当前界面语言的字幕（自动字幕在网页里本地化），与播放时 DemoController 读的完全一致。
  */
-import { speakerRoleAt, spokenChars, spokenLine, type Project } from '@joplo-app/core';
+import { speakerRoleAt, spokenChars, spokenLine, type Project } from '@joplo-app/core/runtime';
 import type { Dictionary } from '../i18n/en';
 import { stepCaption } from '../i18n/step-caption';
 import type { VoiceChoiceView, VoiceCloudView, VoiceProfileView, VoiceSegment, VoiceState } from '../runtime/dev-client';

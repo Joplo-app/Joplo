@@ -14,7 +14,7 @@ import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, isNodeVisible, replay, stateAt, validate, type AuthoringProject, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../src/i18n/context';
 import { Stage } from '../src/renderer/Stage';
-import { chartModel, diffTone, menuPlacement, notificationPlacement, selectedIds } from '../src/renderer/components';
+import { chartModel, diffTone, menuPlacement, notificationPlacement, selectedIds } from '../../../plugins/ui/src/runtime.tsx';
 import { CaseNav } from '../src/board/CaseNav';
 import { caseBrief, gapsOf, rolesOfFeature } from '../src/board/nav-model';
 import { SiteApp } from '../src/site/SiteApp';

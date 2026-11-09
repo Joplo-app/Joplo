@@ -1,6 +1,6 @@
 # Joplo 插件架构：纯粹的引擎 + 可插拔的内容形态（D87）
 
-> 状态：阶段 0、阶段 1-A、阶段 1-B 与阶段 1-C 已实现：v1 叶子组件兼容；v2 编译钩子、效果快照、元素特性与 React/容器运行时；第一方 `plugins/diagram` 默认启用。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节，通用属性、插件主题与讲解内容见第 12 节。
+> 状态：阶段 0、阶段 1-A/B/C 与阶段 2 已实现（阶段 2 字段与边界见第 13 节）：v1 叶子组件兼容；v2 编译钩子、效果快照、元素特性与 React/容器运行时；第一方 `plugins/diagram` 默认启用。阶段 1-A 的接口与数据流见第 10 节，媒体轨道与本机资源见第 11 节，通用属性、插件主题与讲解内容见第 12 节。
 > 目标形态：Joplo 只是**构建与调度引擎**，负责把不同形态的内容串成一个可播放、可评审、可发布的作品；
 > UI 组件、Diagram、Canvas、3D、Alda BGM、朗读供应商、主题……都是插件。
 
@@ -13,7 +13,7 @@
 | 演示必须可复现（截图、视频、深链、评审定位） | 同一份 IR、同一步，永远是同一个画面 | 业务状态只由步骤推进；插件不能改状态 |
 | 发布站离线可播放（file://、静态托管） | 观众没有作者的电脑、工具和网络 | 发布物自包含：IR + 编译后的运行时 + 生成好的资源 |
 | 私有项目 | 公司组件、私有仓库 | 源码与本机能力不进发布物；私有插件不能误发公开分享 |
-| 已有项目不能坏 | 现有示例、已发布的分享 | 内置词汇名字不变，旧 IR 照常播放 |
+| 已有项目不能坏 | 现有示例、已发布的分享 | 作者 TSX 不变；新 IR 使用命名空间，旧分享保留其原运行时 |
 
 ## 2. 引擎是什么（内核，不拆）
 
@@ -162,7 +162,7 @@ v2 运行时组件选择 `{ mount }` 或 `{ react: ({ ctx }) => … }`。React �
 
 ### 维护与验证
 
-- 已知 P2-11（本轮暂不修）：源码守护仍整体豁免 plugins 目录，浏览器检查只覆盖两个入口文件的直接依赖；尚不能防止专用语义经宿主目录或传递依赖回流。
+- 阶段 1 的历史 P2-11（阶段 2 已修，见第 13 节）：源码守护仍整体豁免 plugins 目录，浏览器检查只覆盖两个入口文件的直接依赖；尚不能防止专用语义经宿主目录或传递依赖回流。
 - Node 边界、降级、快照与旧 IR：core plugin-v2、trace、diagram-compile、integration-028 测试。
 - React 共享打包：server plugin-v2；容器与画面：web plugin-v2、diagram-v2、integration-028。
 - diagram 技能的权威正文现在是 `plugins/diagram/src/guide.ts`，core guide 只路由及组合通用主题；仍运行 `pnpm skills:build`，并实际检查 `joplo skill diagram` / `plugins`。
@@ -295,3 +295,45 @@ content 的 camera 工厂产生插件效果信封，插件校验 `CAMERA_UNKNOWN
 - llm-explainer 与 0fcb8f5 的 check diagnostics 完全相同（0 error、0 warning、1 HAPPY_PATH_ONLY info）。14 个关键 render 截图覆盖五章、封面、接力起点、对象飞行、推拉与收尾；PNG 字节相同，像素差比例及平均绝对差均为 0。原图、哈希和日志在本地 `output/playwright/p1-c/`，验收汇总在 `.done-P1-C`，不发布会话产物。
 - 本阶段保持原示例视觉和内容，未重新设计素材或叙事。技能沉淀：同物体贯穿章节、镜头与 FLIP 同步、screen 覆盖层、无高度容器恢复、静态动画取消、接力在快照前解析、分镜与实际播放分别验证、示意数字与事实来源分开。
 - 通用属性当前只接收字面量；插件观察器是可信的 npm 绘制代码，与页面同域，不是沙箱。音乐视频混音、逐词旁白同步、素材剪辑与地图组件仍不在本阶段范围内。
+
+## 13. 阶段 2：默认 UI 插件与无组件词汇内核（D87）
+
+标准 UI 与 HTML 兜底由 `@joplo-app/plugin-ui` 提供，与其他九包统一版本，默认启用。作者仍从 `@joplo-app/kit/ui` 导入并写 `<Button>`；kit 的兼容标记产生 `ui:Button`，已有命名空间标记保持原样。HTML 直接写 `<div>`，由启用插件的 `intrinsic` 声明编译为 `ui:div`。HTML 与 UI 共用 `ui:` 命名空间，不另设隐式内置词汇。`Custom`、`#text`、`#fragment`、Slot/Outlet 展开和通用 Joplo 属性仍归内核。
+
+UI 的目录、属性提示、示例、资源检查和 React 实现在 `plugins/ui/src`。`joplo components`、`joplo components <名称>` 和 `joplo skill components` 从当前项目启用插件的清单生成；无项目时使用默认插件。名称可用唯一的短名或完整命名空间；短名冲突时使用完整名称。组件示例保持作者 TSX 写法，不能把 IR 类型名直接当成 JSX 标签。`catalogFamily` 只控制技能目录中复合家族的折叠，详情命令仍展开所有子组件。
+
+### 数据声明与消费者
+
+`PluginComponentSpec.traits` 经严格 schema 校验。无效字段、非有限尺寸和错误枚举报 `PLUGIN_TRAITS_INVALID`；不是静默忽略。编译器把播放所需特性复制到 `node.traits`，显示属性声明保存在 `project.plugins[id].components[name].traits.{text,textPaths}`，避免给每个节点重复存文本属性表。任何播放路径只读 IR，不回调插件编译器。
+
+| 字段 / 能力 | 写入点 → 存储 | 读取点 → 消费者 |
+|---|---|---|
+| `interactive`、`needsId`、`selfEvident` | 插件清单 → `PluginCompiler.info` → `project.plugins.*.components` | 编译/validate 的 id 与交互诊断；explainClick 与 DOM 可操作锚点；focus 的默认揭晓策略。沿用 v2 字段 |
+| `traits.input` (`single` / `multiple`) | 清单 → `node.traits` | `checkStep` 判断输入目标；`selectedValue` 处理多值切换；type/toggle/select 写 `state.inputs[id]` |
+| `traits.gate` | 属性优先级列表 → `node.traits.gate` | `isSelfVisible` 读取第一个非 undefined 属性、解析绑定；isNodeVisible、visibleIds 和 RenderNode 共用它；false 不被后备属性覆盖 |
+| `traits.choices` | 属性、后代类型与 value/label/labelChild、或数值范围声明 → `node.traits.choices` | `choicesOf` → 编译期自动字幕、播放选项校验与 label/value 匹配、插件绘制；缺少可枚举项时保持原有不限制语义 |
+| `traits.toggleCaption` | 清单 → `node.traits.toggleCaption` | 编译器自动字幕选择 check/uncheck；写入既有 `captionAuto`；播放器不认识具体输入组件 |
+| `traits.selfEvident` | 清单 → `node.traits.selfEvident` | focus 排除自带状态反馈的元素，避免重复 reveal |
+| `inherit[].{target,props}` | 清单 → Node 宿主的已校验继承表 | 编译器递归子节点之前抄写指定属性；显式子属性优先、嵌套同类型拥有者建立新边界；结果只存普通 `node.props`，继承规则不进发布 IR |
+| `traits.layout`、`traits.region` | 任意区域名与尺寸/断点声明 → 对应节点 traits | `layoutRegions` 解析绑定、断点、mobile/desktop 折叠；播放器、focus 和 UI 插件共同读取，宽度与可见性一致 |
+| `traits.childWidth` | 缺省宽度与属性条件覆盖 → `node.traits.childWidth` | `childWidth` → 可见性遍历及 UI 设备内部的渲染上下文；屏幕外节点继续使用外部宽度 |
+| `traits.frame` | 插件对有框容器的声明 → `node.traits.frame` | 宿主输出 `data-jframe-container` → camera 的通用上下文取景；不干扰图表已有 `data-jframe` 身份 |
+| `traits.disabledPresentation` | 清单 → `node.traits` | validate 不把仅控制外观的 disabled 误报为缺少不可用原因；不会自动把普通操作元素豁免 |
+| `traits.text` / `traits.textPaths` | 每个组件的显示属性、嵌套文本路径（`*` 匹配数组项/对象值）→ `project.plugins.*.components.*.traits` | collectMessages/localizeProject/pruneMessages 只处理声明显示属性；`#text`、通用 disabledReason 和状态/条件仍由内核处理；枚举不会因碰巧同文而翻译；表格只翻译列标题、不把 badge 颜色映射当作文本；既有 diagram 和 scene3d 显式声明其标签文字 |
+| `intrinsic` | 清单 → 编译期 tag → type 注册表 | JSX HTML 原始标签在编译时变为 `ui:*`；未声明标签仍报 UNKNOWN_COMPONENT；映射表不进 IR |
+| `example`、`catalogFamily` | 清单 → Node 技能目录 | components/skill 输出属性、行为分组、示例与复合家族；不存 IR，不进浏览器 |
+| 图片资源检查 | UI 的既有 `compile.node` 钩子 | 检查嵌入资源与 fit，产生 IMAGE_PLACEHOLDER/INVALID_IMAGE_FIT；图片数据仍是普通 props.src，浏览器仅绘制内嵌图片；没有新增只声明不消费的资产字段 |
+| `runtime.viewports[name]` | 浏览器插件注册 `{insets,size,react}` | StageViewport/RenderApp 按 viewport 能力取外框、计算缩放和焦点偏移；只负责绘制，不改变状态；无注册时退回普通舞台 |
+| SDK 共享服务 | 宿主注册 `layoutRegions/choicesOf/childWidth/resolveValue/styleOf/nodeLabel/useLook/RendererContextProvider` | UI runtime 调用同一份宿主纯函数、主题和上下文；局部 Provider 仅覆盖 width/dialogLayer；无反向 core/web 源码导入 |
+
+### 历史输入、浏览器边界与发布
+
+- `check` 对旧 UI 裸名给 `PLUGIN_LEGACY_TYPE` 和目标 `ui:*` 提示。真实 `237f0a6` 发布 IR 固定为历史测试夹具；新 feature-diff 明确返回不兼容，要求用当前 kit 重建两边。旧分享继续使用随发布物携带的旧运行时；不让新播放器猜测缺失的语义数据。
+- P2-11 已修：组件词汇守护递归扫描 core、渲染和播放宿主，包含 `plugins/` 子目录。只有精确的作者技能正文文件作为文档例外；不再豁免整个目录。AST 守护检查组件类型字面量，避免把几何 `Box` 类型、英文动词或播放控制栏的同名控件误认为内容词汇。
+- 另一守护从浏览器入口和所有第一方运行时追踪可执行 import、re-export 和字面量动态 import 的传递依赖；类型引用被擦除。禁止编译器、插件创作入口、技能、历史适配器、本机能力和布局/状态计算模块进入这张图。Diagram 的路径采样已从布局模块拆到纯绘图 geometry 模块。
+- web 使用 `@joplo-app/core/runtime`。发布站既有 core-lite 别名同时覆盖该入口，避免带入看板用的运行时 schema。UI 与其他第一方运行时经同一个注册表和 PluginHost，React 继续共享；子树数据按需物化，避免每个 UI 节点重复展开所有后代。
+- 十包 release/version/pack/smoke 覆盖 plugin-ui 的 author/runtime/catalog/guide 出口，默认 init 无需额外配置。版本元数据读取自身 version.json，发布脚本同步更新；不依赖工作区文件或作者机器路径。smoke 会直接导入 UI runtime；其 react-dom 属于正式运行依赖，不能仅靠开发依赖或预构建网页掩盖缺包。
+
+### Cordis 的参考价值（本阶段不引入依赖）
+
+参考 [Cordis 仓库](https://github.com/cordiverse/cordis)及其链接的[入门文档](https://deepseek-harness.github.io/deepseek-harness/reference/cordis-primer)：上下文提供服务、显式 inject 依赖、注册具有对应 disposer，适合检查 Joplo 宿主服务和运行时生命周期的边界。Joplo 的确定性业务语义仍须编译为 IR；动态服务容器不能替代该协议。当前 P2 沿用已有 v2 扩展点；若后续作者端出现真实的服务依赖、热重载需求，再独立验证 Cordis 的收益与成本。上游目前声明 API 尚不稳定，本文不把尚未引入的机制描述成已实现功能。

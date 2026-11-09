@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Loader2, MessageSquare, Send, X } from 'lucide-react';
-import { LOCAL_REVIEW_MAX_BODY, localReviewStatus, type LocalReviewLocation, type LocalReviewState, type LocalReviewWrite, type Project } from '@joplo-app/core';
+import { LOCAL_REVIEW_MAX_BODY, localReviewStatus, type LocalReviewLocation, type LocalReviewState, type LocalReviewWrite, type Project } from '@joplo-app/core/runtime';
 import { Btn } from '../player/controls';
 import { Popover } from '../player/popover';
 import { copyText } from '../player/util';

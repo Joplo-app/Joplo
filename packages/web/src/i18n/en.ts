@@ -1,4 +1,4 @@
-import { autoCaptionMessages } from '@joplo-app/core';
+import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
 

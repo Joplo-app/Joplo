@@ -63,7 +63,7 @@ it('keeps stable keys outside strict legacy playback Project and validates ident
   expect(() => readFeatureDiffBuild(html + html)).toThrow(/Expected one/);
 });
 
-it('ordinary new published payload passes actual pinned Core 0.2.10 strict Reader', async () => {
+it('namespaced UI payload explicitly exceeds the old reader while its own runtime and stable identities remain valid', async () => {
   const { Project: LegacyProject } = await import('@joplo-app/core-legacy');
   const { publishPayload, finalizeHtml } = await import('../src/build.ts');
   const { stepIdentity, readFeatureDiffBuild } = await import('@joplo-app/core');
@@ -73,7 +73,7 @@ it('ordinary new published payload passes actual pinned Core 0.2.10 strict Reade
   const html = finalizeHtml('<head></head>', () => '', payload, stepIdentity(project)).html;
   const oldInput = JSON.parse(/id="joplo-ir">([\s\S]*?)<\/script>/.exec(html)![1]!).project;
   const read = LegacyProject.safeParse(oldInput);
-  expect(read.success, JSON.stringify(read)).toBe(true);
+  expect(read.success).toBe(false);
   expect((readFeatureDiffBuild(html) as any).scenarios['invite.main.send'].steps[0].key).toBe('open');
 });
 

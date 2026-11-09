@@ -142,3 +142,9 @@ export function usePluginObservers(root: RefObject<HTMLElement | null>, ids: rea
     }
   });
 }
+
+/** Viewport decoration supplied by an enabled runtime. */
+export function viewportDecoration(name: string) {
+  for (const entry of status.values()) if (entry.state === 'ready' && entry.runtime.viewports?.[name]) return entry.runtime.viewports[name];
+  return undefined;
+}

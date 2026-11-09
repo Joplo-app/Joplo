@@ -2,7 +2,7 @@ import { standardDocs } from '../src/plugins/standard-catalog.ts';
 import { expect, test } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
-import { COMPONENT_DOCS, COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../src/catalog.ts';
+import { COMPONENT_DOCS, COMPONENT_TYPES, INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS } from '../../../plugins/ui/src/catalog.ts';
 import { componentDetails, guide, skillIndex, skillTopic, SKILL_TOPICS } from '../src/guide.ts';
 
 const topics = ['authoring', 'story', 'demo', 'focus', 'content', 'diagram', 'components', 'cases', 'check', 'selection', 'review', 'diff', 'publish', 'plugins'] as const;
@@ -34,13 +34,13 @@ test('components 取自真实目录与三种行为集合，未知 docs 不增加
   const html = new Set(['div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'main', 'section', 'header', 'footer', 'nav', 'aside', 'ul', 'ol', 'li', 'strong', 'em', 'small', 'code', 'a']);
   // 图表家族（D69）各占一行：根组件后面列出它的子组件，细节在 diagram 主题
   const family = /^(Diagram|StateMachine|Sequence)\./;
-  for (const name of COMPONENT_TYPES.filter(name => !name.startsWith('#') && !html.has(name) && !family.test(name) && !['Diagram', 'StateMachine', 'Sequence'].includes(name))) expect(output).toContain(`- ${name}\n`);
+  for (const name of COMPONENT_TYPES.filter(name => !name.startsWith('#') && !html.has(name) && !family.test(name) && !['Diagram', 'StateMachine', 'Sequence'].includes(name))) expect(output).toContain(`- ui:${name}\n`);
   for (const root of ['diagram:Diagram', 'diagram:StateMachine', 'diagram:Sequence']) expect(output).toContain(`- ${[root, ...Object.keys(standardDocs).filter(n => n.startsWith(`${root}.`))].join(', ')}\n`);
   const htmlLine = output.split('\n').find(l => l.startsWith('- Supported HTML tags: '))!;
-  for (const tag of html) expect(htmlLine).toMatch(new RegExp(`[ ,]${tag}[ ,(]`));
+  for (const tag of html) expect(htmlLine).toMatch(new RegExp(`[ ,]ui:${tag}[ ,(]`));
   for (const set of [INTERACTIVE_TYPES, VALUE_TYPES, GATED_CONTAINERS]) for (const name of set) expect(output).toContain(name);
   const withDocs = skillTopic('components', { Button: 'variant / size\n下一行', Bogus: '不应输出' });
-  expect(withDocs).toContain('- Button: variant / size 下一行');
+  expect(withDocs).toContain('- ui:Button: variant / size 下一行');
   expect(withDocs).not.toContain('Bogus');
   expect(withDocs.trimEnd().split('\n').length).toBeLessThan(150);
 });
@@ -171,7 +171,7 @@ test('story（D67）：先规划再动手、PM 视角对应现有字段、字幕
 });
 test('componentDetails（npx joplo components <名字>）：含子组件、行为分组与示例；名字不分大小写；未知名字给出最接近的', () => {
   const menu = componentDetails(['menu']);
-  for (const text of ['# Menu', '- Menu: ', '- Menu.Item: ', 'interactive', '- Menu.Dropdown: ', 'shown only while opened', '```tsx', '<Menu opened={$.ui.rowMenu}']) expect(menu, text).toContain(text);
+  for (const text of ['# ui:Menu', '- ui:Menu: ', '- ui:Menu.Item: ', 'interactive', '- ui:Menu.Dropdown: ', 'shown only while opened', '```tsx', '<Menu opened={$.ui.rowMenu}']) expect(menu, text).toContain(text);
   expect(componentDetails(['TabBar'])).toContain('value: type / select / toggle write to it');
   expect(componentDetails(['Text'])).not.toContain('```tsx');
   // 集成 0.2.8：图表家族（D69）同样有子组件与示例
@@ -180,7 +180,7 @@ test('componentDetails（npx joplo components <名字>）：含子组件、行�
     expect(out, root).toContain('```tsx');
     expect(out, root).toContain(`- ${['Diagram', 'StateMachine', 'Sequence'].includes(root) ? `diagram:${root}` : root}.`);
   }
-  expect(() => componentDetails(['Menuu'])).toThrow(/Did you mean Menu\?/);
+  expect(() => componentDetails(['Menuu'])).toThrow(/Did you mean ui:Menu\?/);
   expect(() => componentDetails([''])).toThrow(/Unknown component/);
 });
 

@@ -1,4 +1,4 @@
-import type { AppearanceFont } from '@joplo-app/core';
+import type { AppearanceFont } from '@joplo-app/core/runtime';
 
 const loads = new WeakMap<Document, { promise: Promise<void>; link: HTMLLinkElement; resolve: () => void }>();
 function unloadWenKai(doc: Document): void {

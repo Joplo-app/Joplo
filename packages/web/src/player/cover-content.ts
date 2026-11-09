@@ -1,14 +1,14 @@
 import { stepCaption } from '../i18n/step-caption';
 import { en, type Dictionary } from '../i18n/en';
 import { stepDwell, voiceMs } from '../runtime/pace';
-import { holdMsOf } from '@joplo-app/core';
+import { holdMsOf } from '@joplo-app/core/runtime';
 /**
  * 场景封面（D61，纯函数）：第 0 步不再是“初始状态”，而是一张封面。内容只由 IR 推导：
  * 所属功能名 · 方案名、flow 的标题与 description、「约 N 步 · 约 M 秒」、出场角色。
  * 时长逐步调用 pace.ts 的 stepDwell 再求和（与演示控制器用同一份文字，见 dwellTexts）；参数在 pace.ts 里调整，这里不写死。
  * 估算不含鼠标移动、逐字输入与连线小点，所以写「约」。
  */
-import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, streamsOf, type Project, type RoleInfo, type Scenario, type Step } from '@joplo-app/core';
+import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, streamsOf, type Project, type RoleInfo, type Scenario, type Step } from '@joplo-app/core/runtime';
 
 export type Duration = { unit: 's' | 'min'; value: number };
 

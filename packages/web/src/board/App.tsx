@@ -1,4 +1,4 @@
-import { projectThemes } from '@joplo-app/core';
+import { projectThemes } from '@joplo-app/core/runtime';
 import { LanguageMenu } from '../player/LanguageMenu';
 import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/board/messages';
@@ -25,7 +25,7 @@ function setFavicon(href: string) {
   }
   if (link.href !== href) link.href = href;
 }
-import { VIEWPORT_SIZE, type Diagnostic } from '@joplo-app/core';
+import { VIEWPORT_SIZE, type Diagnostic } from '@joplo-app/core/runtime';
 import { DemoController } from '../runtime/demo';
 import { exportImage, openInEditor, selectionWriter } from '../runtime/dev-client';
 import { boardHash, parseBoardHash, warnUnknownPlayParams, type BoardRoute, type PlayRoute } from '../runtime/route';
@@ -58,7 +58,7 @@ import { AppearanceButton, AppearancePopover } from './Appearance';
 import { VoiceButton, VoiceKeysDialog, VoicePopover, useVoice } from './Voice';
 import { contentMenuRows, viewProject, type ContentInfo } from '../i18n/content';
 import { ContentContext } from '../i18n/content-context';
-import { contentLocaleFor } from '@joplo-app/core';
+import { contentLocaleFor } from '@joplo-app/core/runtime';
 import { effectiveAppearance } from './appearance-model';
 import { loadWenKai } from './font-loading';
 

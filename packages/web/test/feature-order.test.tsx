@@ -19,7 +19,7 @@ const at = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:3:1` });
 function project(mode: 'dev' | 'publish') {
   const src: AuthoringProject = {
     root: '/p', config: { ...config({ name: 'Order' }), ...at('joplo.config.ts') }, layouts: {},
-    routes: { '/': { ...page({ title: 'Home' }, jsx('Text', { children: 'Home' })), ...at('routes/page.tsx') } },
+    routes: { '/': { ...page({ title: 'Home' }, jsx('ui:Text', { children: 'Home' })), ...at('routes/page.tsx') } },
     features: Object.fromEntries(([['a', undefined], ['item10', 1], ['z', 0], ['item9', 1]] as const).map(([id, order]) => {
       const fid = String(id);
       return [fid, {

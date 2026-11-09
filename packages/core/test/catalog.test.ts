@@ -1,3 +1,4 @@
+import { COMPONENT_DOCS, COMPONENT_TYPES, GATED_CONTAINERS, INTERACTIVE_TYPES, VALUE_TYPES } from '../../../plugins/ui/src/catalog.ts';
 import { standardDocs } from '../src/plugins/standard-catalog.ts';
 /**
  * 组件目录（D35 Mantine）：目录是唯一来源；Modal/Drawer 门控、响应式与断点、AppShell 收起、
@@ -9,11 +10,6 @@ import { config, feature, flow, layout, option, page, set, $, Outlet, Slot } fro
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { COMPONENT } from '@joplo-app/kit/node';
 import {
-  COMPONENT_DOCS,
-  COMPONENT_TYPES,
-  GATED_CONTAINERS,
-  INTERACTIVE_TYPES,
-  VALUE_TYPES,
   atWidth,
   compile,
   explainClick,
@@ -36,10 +32,10 @@ const kitExport = (name: string): unknown => name.split('.').reduce<any>((o, k) 
 describe('目录是唯一来源', () => {
   it('COMPONENT_TYPES 与 @joplo-app/kit/ui 的导出一一对应（复合组件用点语法）', () => {
     for (const t of COMPONENT_TYPES) {
-      if (t === '#text' || HTML.has(t)) continue;
+      if (HTML.has(t)) continue;
       const fn = kitExport(t) as Record<symbol, unknown> | undefined;
       expect(fn, `kit 缺少 ${t}`).toBeTypeOf('function');
-      expect(fn![COMPONENT], `kit 的 ${t} 标记名不一致`).toBe(t);
+      expect(fn![COMPONENT], `kit 的 ${t} 标记名不一致`).toBe(`ui:${t}`);
     }
     // 反向：kit 的每个组件（含子组件）都在目录里
     const names: string[] = [];
@@ -52,7 +48,7 @@ describe('目录是唯一来源', () => {
       }
     };
     walk(ui as unknown as Record<string, unknown>, '');
-    for (const n of names) expect([...COMPONENT_TYPES, ...Object.keys(standardDocs)], `kit 导出了目录外的 ${n}`).toContain(n);
+    for (const n of names) expect(['Custom', ...COMPONENT_TYPES.map(n=>`ui:${n}`), ...Object.keys(standardDocs)], `kit 导出了目录外的 ${n}`).toContain(n);
   });
 
   it('COMPONENT_DOCS 覆盖每个组件且只覆盖目录内的组件；交互、值类型、门控集合都在目录内', () => {
@@ -149,9 +145,9 @@ describe('Mantine 语义（编译 + 播放器）', () => {
   it('复合组件编译出点语法的节点类型', () => {
     const p = build();
     const root = p.scenes['f.a@/']!.root;
-    expect(root.type).toBe('AppShell');
-    expect(root.children!.map((c) => c.type)).toEqual(['AppShell.Header', 'AppShell.Navbar', 'AppShell.Main', 'Modal']);
-    expect(root.children![3]!.children!.find((c) => c.id === 'plan')!.type).toBe('Radio.Group');
+    expect(root.type).toBe('ui:AppShell');
+    expect(root.children!.map((c) => c.type)).toEqual(['ui:AppShell.Header', 'ui:AppShell.Navbar', 'ui:AppShell.Main', 'ui:Modal']);
+    expect(root.children![3]!.children!.find((c) => c.id === 'plan')!.type).toBe('ui:Radio.Group');
   });
 
   it('Modal 用 opened 门控；Drawer 兼容旧写法 open', () => {
@@ -266,7 +262,7 @@ describe('设备外框：Terminal 与 Phone', () => {
     expect(INTERACTIVE_TYPES.has('Phone') || INTERACTIVE_TYPES.has('Terminal')).toBe(false);
     const p = buildDevices();
     const term = p.scenes['f.a@/']!.root.children!.find((c) => c.id === 'term')!;
-    expect(term.children!.map((c) => c.type)).toEqual(['Terminal.Command', 'Terminal.Output', 'Terminal.Input']);
+    expect(term.children!.map((c) => c.type)).toEqual(['ui:Terminal.Command', 'ui:Terminal.Output', 'ui:Terminal.Input']);
   });
 
   it('type 动作写入 Terminal.Input；自动字幕读 placeholder', () => {

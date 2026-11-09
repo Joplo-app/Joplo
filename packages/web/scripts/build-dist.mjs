@@ -60,7 +60,7 @@ await build(common({
 
 // 2. 发布站：与 server 的 buildSite 同样的选项（单个入口脚本，便于内联成 file:// 可打开的页面）
 const siteOut = await build(common({
-  resolve: { alias: [{ find: /^@joplo-app\/core$/, replacement: path.join(SRC, 'site/core-lite.ts') }, { find: /^@\//, replacement: SRC + '/' }] },
+  resolve: { alias: [{ find: /^@joplo-app\/core(?:\/runtime)?$/, replacement: path.join(SRC, 'site/core-lite.ts') }, { find: /^@\//, replacement: SRC + '/' }] },
   build: {
     outDir: APP,
     emptyOutDir: false,

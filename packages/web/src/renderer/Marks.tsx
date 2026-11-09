@@ -1,6 +1,6 @@
 /** 本步标注画在镜头内：内容与字号变化后重新测量，绝不为缺失目标生成原点占位。 */
 import { useContext, useLayoutEffect, useState, type RefObject } from 'react';
-import type { Mark } from '@joplo-app/core';
+import type { Mark } from '@joplo-app/core/runtime';
 import { finalRect } from './camera';
 import type { Box } from './camera-math';
 import { markBox, markGeometry } from './marks-math';

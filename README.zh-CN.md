@@ -249,6 +249,8 @@ Joplo 接受 issue，不接受 pull request。bug 和功能需求请在 [issue](
 
 默认标准插件 `@joplo-app/plugin-content` 提供 `content:Canvas`、`camera()`、FLIP 通用属性与 `content:studio` 主题。直接导入其创作 API 时，将同版本插件声明为项目依赖。`npx joplo skill content` 介绍连续讲解内容的做法，示例见 [llm-explainer](examples/llm-explainer)，契约见 [插件架构](docs/plugins.md)。章节用 `flow({ from })` 接力，分镜用 `joplo render --sheet --columns 3`。
 
+标准 UI 和 HTML 兜底默认由 `@joplo-app/plugin-ui` 提供：作者继续从 `@joplo-app/kit/ui` 导入，IR 使用 `ui:Button` / `ui:div`。`joplo components` 与 `joplo skill components` 按启用插件生成目录；旧裸名 IR 需重新编译，已发布分享自带其原运行时。见[插件契约](docs/plugins.md#13-阶段-2默认-ui-插件与无组件词汇内核d87)。
+
 ### 分享可见性与作品集
 
 每次发布都必须选择 `--public` / `--private` 与 `--review` / `--no-review`；Agent 发布前先问用户两件事，不能代选。CI 在 workflow 固定参数；非交互缺项退出 2，交互终端逐项按键确认。公开进入 `show.joplo.app/@用户名` 作品集并被搜索引擎收录，项目名、简介与目标应适合搜索结果，不能包含未公开信息。私密只有拿到链接的人能看。

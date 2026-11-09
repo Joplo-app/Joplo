@@ -100,8 +100,8 @@ test('components：不带名字等于 skill components；带名字输出示例�
   expect(all.out).toBe(skillTopic('components', COMPONENT_DOCS));
   const two = await run(['components', 'EmptyState', 'datatable']);
   expect(two.code).toBe(0);
-  expect(two.out).toContain('# EmptyState');
-  expect(two.out).toContain('# DataTable');
+  expect(two.out).toContain('# ui:EmptyState');
+  expect(two.out).toContain('# ui:DataTable');
   expect(two.out).toContain('selectedRecords={$.ui.selected}');
   const bad = await run(['components', 'Toastt']);
   expect(bad.code).toBe(2);

@@ -1,4 +1,4 @@
-import type { Mark } from '@joplo-app/core';
+import type { Mark } from '@joplo-app/core/runtime';
 import { visibleRect, type Box } from './camera-math';
 
 /** 屏幕矩形 → 内容坐标；仅取裁切祖先与当前舞台内可见的部分。 */

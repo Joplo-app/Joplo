@@ -135,16 +135,17 @@ describe('DemoController.autoNext：自动播放时接着播下一个场景', ()
 
 describe('Phone landscape：横放的手机外框（画 mobile_watch 原型用到的正式组件能力）', () => {
   it('内容区 772×358；外框尺寸按横放的安全区计算；core 的子区域宽度按横屏宽度算', async () => {
-    const { phoneFrameSize } = await import('../src/renderer/components');
-    const { childWidth, PHONE_LANDSCAPE } = await import('@joplo-app/core');
+    const { phoneFrameSize, PHONE_LANDSCAPE } = await import('../../../plugins/ui/src/runtime.tsx');
+    const {components} = await import('../../../plugins/ui/src/plugin.ts');
+    const { childWidth } = await import('@joplo-app/core');
     expect(PHONE_LANDSCAPE).toEqual({ width: 772, height: 358 });
     const land = phoneFrameSize(772, 358, true);
     const port = phoneFrameSize(390, 844);
     expect(land.width).toBeGreaterThan(land.height);
     expect(port.height).toBeGreaterThan(port.width);
-    expect(childWidth('Phone', 1280, { landscape: true })).toBe(772);
-    expect(childWidth('Phone', 1280)).toBe(390);
-    expect(childWidth('Stack', 1280, { landscape: true })).toBe(1280);
+    expect(childWidth({traits:components.Phone!.traits}, 1280, { landscape: true })).toBe(772);
+    expect(childWidth({traits:components.Phone!.traits}, 1280)).toBe(390);
+    expect(childWidth({}, 1280, { landscape: true })).toBe(1280);
   });
 });
 

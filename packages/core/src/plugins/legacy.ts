@@ -1,4 +1,5 @@
-export { adaptLegacyPublic as adaptPublicInput } from '@joplo-app/plugin-diagram/legacy';
+import { adaptLegacyPublic } from '@joplo-app/plugin-diagram/legacy';
+export function adaptPublicInput(value: unknown): unknown { return adaptLegacyPublic(value); }
 /** Compatibility input only; new compiler outputs use namespaced slots. */
 export { Trace as LegacyTraceSchema } from '@joplo-app/plugin-diagram/schema';
 import { standardAliases } from './standard-catalog.ts';

@@ -13,7 +13,7 @@ import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
  */
 import { useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, X } from 'lucide-react';
-import { disabledReasonOf, findNode, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@joplo-app/core';
+import { disabledReasonOf, findNode, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@joplo-app/core/runtime';
 import type { SelectionSync } from '../runtime/demo';
 import { optionOfNode, scenariosOf, shortName } from '../runtime/views';
 import { cn } from '@/lib/utils';

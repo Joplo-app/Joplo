@@ -1,0 +1,1763 @@
+{
+  "schemaVersion": 2,
+  "name": "智能家居：一键离家",
+  "description": "Joplo 插件示例：3D 场景插件（joplo-plugin-scene3d）。画面左边是家里的 3D 场景，右边是 App；步骤可以点 3D 里的物体，状态同时驱动 App 和 3D 画面。",
+  "theme": "sketch",
+  "plugins": {
+    "diagram": {
+      "data": {
+        "node": {
+          "text": [
+            [
+              "structure",
+              "nodes",
+              "*",
+              "label"
+            ],
+            [
+              "structure",
+              "nodes",
+              "*",
+              "description"
+            ],
+            [
+              "structure",
+              "groups",
+              "*",
+              "label"
+            ],
+            [
+              "structure",
+              "groups",
+              "*",
+              "description"
+            ],
+            [
+              "structure",
+              "actors",
+              "*",
+              "label"
+            ],
+            [
+              "structure",
+              "actors",
+              "*",
+              "description"
+            ],
+            [
+              "structure",
+              "messages",
+              "*",
+              "label"
+            ],
+            [
+              "structure",
+              "messages",
+              "*",
+              "description"
+            ],
+            [
+              "structure",
+              "edges",
+              "*",
+              "label"
+            ],
+            [
+              "structure",
+              "edges",
+              "*",
+              "description"
+            ],
+            [
+              "structure",
+              "blocks",
+              "*",
+              "label"
+            ],
+            [
+              "structure",
+              "blocks",
+              "*",
+              "description"
+            ]
+          ],
+          "scope": [
+            {
+              "path": [
+                "structure",
+                "nodes"
+              ],
+              "kind": "items",
+              "references": [
+                [
+                  "id"
+                ]
+              ]
+            },
+            {
+              "path": [
+                "structure",
+                "groups"
+              ],
+              "kind": "items",
+              "references": [
+                [
+                  "id"
+                ]
+              ]
+            },
+            {
+              "path": [
+                "structure",
+                "actors"
+              ],
+              "kind": "items",
+              "references": [
+                [
+                  "id"
+                ]
+              ]
+            },
+            {
+              "path": [
+                "structure",
+                "blocks"
+              ],
+              "kind": "items",
+              "references": [
+                [
+                  "id"
+                ]
+              ]
+            },
+            {
+              "path": [
+                "structure",
+                "edges"
+              ],
+              "kind": "items",
+              "references": [
+                [
+                  "id"
+                ],
+                [
+                  "from"
+                ],
+                [
+                  "to"
+                ]
+              ]
+            },
+            {
+              "path": [
+                "structure",
+                "messages"
+              ],
+              "kind": "items",
+              "references": [
+                [
+                  "id"
+                ],
+                [
+                  "from"
+                ],
+                [
+                  "to"
+                ]
+              ]
+            },
+            {
+              "path": [
+                "layout",
+                "nodes"
+              ],
+              "kind": "map"
+            },
+            {
+              "path": [
+                "layout",
+                "groups"
+              ],
+              "kind": "map"
+            },
+            {
+              "path": [
+                "layout",
+                "titles"
+              ],
+              "kind": "map"
+            },
+            {
+              "path": [
+                "layout",
+                "actors"
+              ],
+              "kind": "map"
+            },
+            {
+              "path": [
+                "layout",
+                "lifelines"
+              ],
+              "kind": "map"
+            },
+            {
+              "path": [
+                "layout",
+                "messages"
+              ],
+              "kind": "map"
+            },
+            {
+              "path": [
+                "layout",
+                "blocks"
+              ],
+              "kind": "map"
+            },
+            {
+              "path": [
+                "layout",
+                "blockTitles"
+              ],
+              "kind": "map"
+            },
+            {
+              "path": [
+                "layout",
+                "starts"
+              ],
+              "kind": "map"
+            },
+            {
+              "path": [
+                "layout",
+                "edges"
+              ],
+              "kind": "map",
+              "prefix": "__start:"
+            }
+          ]
+        },
+        "step": {
+          "scope": [
+            {
+              "path": [
+                "scenes"
+              ],
+              "kind": "map",
+              "domain": "scene",
+              "children": [
+                {
+                  "path": [
+                    "states"
+                  ],
+                  "kind": "map"
+                },
+                {
+                  "path": [
+                    "now"
+                  ],
+                  "kind": "values"
+                },
+                {
+                  "path": [
+                    "machines"
+                  ],
+                  "kind": "map",
+                  "children": [
+                    {
+                      "path": [
+                        "states"
+                      ],
+                      "kind": "map"
+                    },
+                    {
+                      "path": [
+                        "current"
+                      ],
+                      "kind": "reference"
+                    }
+                  ]
+                },
+                {
+                  "path": [
+                    "traces"
+                  ],
+                  "kind": "items",
+                  "references": [
+                    [
+                      "nodes",
+                      "*"
+                    ],
+                    [
+                      "edges",
+                      "*",
+                      "id"
+                    ],
+                    [
+                      "groups",
+                      "*"
+                    ],
+                    [
+                      "errorGroups",
+                      "*"
+                    ],
+                    [
+                      "targets",
+                      "*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "id": "diagram",
+      "title": "Diagrams",
+      "version": "0.2.17",
+      "components": {
+        "Diagram": {
+          "selfEvident": true
+        },
+        "Diagram.Group": {
+          "selfEvident": true
+        },
+        "Diagram.Node": {
+          "needsId": true,
+          "selfEvident": true
+        },
+        "Diagram.Edge": {
+          "selfEvident": true
+        },
+        "StateMachine": {
+          "selfEvident": true
+        },
+        "StateMachine.Group": {
+          "selfEvident": true
+        },
+        "StateMachine.State": {
+          "needsId": true,
+          "selfEvident": true
+        },
+        "StateMachine.Transition": {
+          "selfEvident": true
+        },
+        "Sequence": {
+          "selfEvident": true
+        },
+        "Sequence.Group": {
+          "selfEvident": true
+        },
+        "Sequence.Actor": {
+          "needsId": true,
+          "selfEvident": true
+        },
+        "Sequence.Message": {
+          "selfEvident": true
+        },
+        "Sequence.Block": {
+          "selfEvident": true
+        }
+      }
+    },
+    "content": {
+      "themes": {
+        "studio": "/* 讲解类视频风格：深靛蓝舞台、暖白文字、一个琥珀色强调色、无手绘描边。 */\n:root {\n  --jp-font: \"PingFang SC\", \"Noto Sans SC\", \"Inter\", \"Helvetica Neue\", system-ui, sans-serif;\n  --jp-font-mono: \"JetBrains Mono\", \"SF Mono\", ui-monospace, monospace;\n  --jp-ink: #f3f1ec;\n  --jp-bg: #0d1020;\n  --jp-surface: #161a30;\n  --jp-subtle: #1c2140;\n  --jp-muted: #9aa3c0;\n  --jp-faint: #5c6485;\n  --jp-line: #262c4d;\n  --jp-line-strong: #3a4270;\n  --jp-border: #2e355c;\n  --jp-accent: #ffb020;\n  --jp-select: #ffb020;\n  --jp-info: #5b8cff;\n  --jp-ok: #34d399;\n  --jp-warn: #ffb020;\n  --jp-danger: #ff6b6b;\n  --jp-radius: 10px;\n  --jp-shadow: 0 12px 32px rgba(0, 0, 0, .45);\n  --jp-stroke: clean;\n}\n\n/* 出场动画（作者元素用 className 引用）：静态画面里 Joplo 会直接显示终态 */\n@keyframes x-pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }\n@keyframes x-fade { from { opacity: 0; } to { opacity: 1; } }\n@keyframes x-flip { from { transform: perspective(600px) rotateY(90deg); } to { transform: none; } }\n@keyframes x-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }\n.x-pop { animation: x-pop 500ms cubic-bezier(.2, .8, .2, 1) both; }\n.x-fade { animation: x-fade 600ms ease both; }\n.x-flip { animation: x-flip 650ms cubic-bezier(.2, .8, .2, 1) both; }\n.x-rise { animation: x-rise 600ms cubic-bezier(.2, .8, .2, 1) both; }\n/* 逐字出现：每个字一个 x-type，animation-delay 按序号错开 */\n.x-type { animation: x-fade 80ms linear both; }\n"
+      },
+      "properties": {
+        "motion": {
+          "type": "string",
+          "attribute": "data-jp-content-motion",
+          "nonempty": true
+        },
+        "motionDelay": {
+          "type": "number",
+          "attribute": "data-jp-content-motion-delay",
+          "min": 0,
+          "max": 10000
+        },
+        "motionMs": {
+          "type": "number",
+          "attribute": "data-jp-content-motion-ms",
+          "min": 0,
+          "max": 10000
+        },
+        "screen": {
+          "type": "boolean",
+          "attribute": "data-jp-content-screen"
+        }
+      },
+      "data": {
+        "step": {
+          "scope": [
+            {
+              "path": [
+                "scenes"
+              ],
+              "kind": "map",
+              "domain": "scene",
+              "children": [
+                {
+                  "path": [
+                    "camera",
+                    "targets"
+                  ],
+                  "kind": "values",
+                  "domain": "element"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "id": "content",
+      "title": "Visual explainers",
+      "version": "0.2.17",
+      "components": {
+        "Canvas": {
+          "selfEvident": true
+        }
+      }
+    },
+    "scene3d": {
+      "id": "scene3d",
+      "title": "3D scene",
+      "version": "0.1.0",
+      "components": {
+        "Scene": {},
+        "Object": {
+          "parent": "Scene"
+        },
+        "Target": {
+          "interactive": true,
+          "parent": "Scene"
+        }
+      }
+    },
+    "alda": {
+      "id": "alda",
+      "title": "Alda background music",
+      "version": "0.2.17",
+      "components": {}
+    }
+  },
+  "themes": {},
+  "mode": "publish",
+  "routes": {
+    "/": {
+      "path": "/",
+      "title": "我的家",
+      "layout": null,
+      "slots": [
+        "panel",
+        "scene"
+      ]
+    }
+  },
+  "features": {
+    "away": {
+      "id": "away",
+      "name": "一键离家",
+      "goal": "出门时点一下，灯、空调、电视自动关闭，门自动上锁；门窗没关好时告诉你是哪一扇，并能直接在家里的 3D 画面上关上",
+      "roles": [
+        {
+          "name": "住户",
+          "desc": "",
+          "color": "#E8590C"
+        }
+      ],
+      "optionIds": [
+        "away.a-one-tap"
+      ],
+      "pick": "away.a-one-tap"
+    }
+  },
+  "featureIds": [
+    "away"
+  ],
+  "options": {
+    "away.a-one-tap": {
+      "id": "away.a-one-tap",
+      "featureId": "away",
+      "key": "a-one-tap",
+      "name": "A · 一键离家 + 3D 定位",
+      "idea": "App 上一个「一键离家」按钮；离家前先检查门窗，没关好的在 3D 画面里定位，点它就能关上",
+      "routes": [
+        "/"
+      ],
+      "coverage": {},
+      "layers": {}
+    }
+  },
+  "scenes": {
+    "@/": {
+      "id": "@/",
+      "optionId": null,
+      "route": "/",
+      "name": "我的家",
+      "viewport": "desktop",
+      "root": {
+        "id": "_root",
+        "type": "Group",
+        "props": {
+          "gap": "lg",
+          "p": "lg",
+          "h": "100%",
+          "align": "stretch",
+          "wrap": "nowrap"
+        },
+        "children": [
+          {
+            "id": "_root_0",
+            "type": "Box",
+            "props": {
+              "flex": 1
+            },
+            "children": [
+              {
+                "id": "_root_0_0",
+                "type": "Paper",
+                "props": {
+                  "withBorder": true,
+                  "p": 0,
+                  "h": "100%"
+                },
+                "children": [
+                  {
+                    "id": "home",
+                    "type": "scene3d:Scene",
+                    "props": {
+                      "height": 704,
+                      "focus": "$ui.focus",
+                      "label": "客厅与玄关"
+                    },
+                    "children": [
+                      {
+                        "id": "floor",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "floor",
+                          "size": [
+                            8,
+                            0.1,
+                            6
+                          ]
+                        }
+                      },
+                      {
+                        "id": "wall_back",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "wall",
+                          "at": [
+                            0,
+                            1.4,
+                            -3.05
+                          ],
+                          "size": [
+                            8,
+                            2.8,
+                            0.1
+                          ]
+                        }
+                      },
+                      {
+                        "id": "wall_left",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "wall",
+                          "at": [
+                            -4.05,
+                            1.4,
+                            0
+                          ],
+                          "size": [
+                            0.1,
+                            2.8,
+                            6
+                          ]
+                        }
+                      },
+                      {
+                        "id": "rug",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "box",
+                          "at": [
+                            -1.4,
+                            0,
+                            -1.1
+                          ],
+                          "size": [
+                            2.6,
+                            0.02,
+                            1.8
+                          ],
+                          "color": "line"
+                        }
+                      },
+                      {
+                        "id": "sofa",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "sofa",
+                          "at": [
+                            -1.4,
+                            0,
+                            -2.4
+                          ],
+                          "size": [
+                            2.2,
+                            0.8,
+                            0.9
+                          ],
+                          "color": "info"
+                        }
+                      },
+                      {
+                        "id": "table",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "table",
+                          "at": [
+                            -1.4,
+                            0,
+                            -1
+                          ],
+                          "size": [
+                            1.1,
+                            0.42,
+                            0.6
+                          ]
+                        }
+                      },
+                      {
+                        "id": "tv",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "tv",
+                          "at": [
+                            -3.96,
+                            1.45,
+                            -1.1
+                          ],
+                          "rotate": 90,
+                          "lit": "$data.tv",
+                          "label": "电视"
+                        }
+                      },
+                      {
+                        "id": "ac",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "ac",
+                          "at": [
+                            0.9,
+                            2.35,
+                            -2.95
+                          ],
+                          "lit": "$data.ac",
+                          "label": "空调",
+                          "showLabel": true
+                        }
+                      },
+                      {
+                        "id": "lamp",
+                        "type": "scene3d:Target",
+                        "props": {
+                          "shape": "lamp",
+                          "at": [
+                            0.6,
+                            0,
+                            -2.4
+                          ],
+                          "lit": "$data.lamp",
+                          "label": "落地灯"
+                        }
+                      },
+                      {
+                        "id": "window",
+                        "type": "scene3d:Target",
+                        "props": {
+                          "shape": "window",
+                          "at": [
+                            2.4,
+                            1.5,
+                            -2.97
+                          ],
+                          "size": [
+                            1.6,
+                            1.2,
+                            0.08
+                          ],
+                          "open": "$data.windowOpen",
+                          "label": "客厅窗"
+                        }
+                      },
+                      {
+                        "id": "plant",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "plant",
+                          "at": [
+                            3.4,
+                            0,
+                            -2.4
+                          ]
+                        }
+                      },
+                      {
+                        "id": "speaker",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "speaker",
+                          "at": [
+                            -2.9,
+                            0,
+                            -2.6
+                          ],
+                          "lit": "$data.speaker"
+                        }
+                      },
+                      {
+                        "id": "door",
+                        "type": "scene3d:Object",
+                        "props": {
+                          "shape": "door",
+                          "at": [
+                            -3.98,
+                            0,
+                            2
+                          ],
+                          "rotate": 90,
+                          "label": "$data.doorLabel",
+                          "showLabel": true
+                        }
+                      }
+                    ],
+                    "from": "away.a-one-tap"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "_root_1",
+            "type": "Paper",
+            "props": {
+              "withBorder": true,
+              "p": "lg",
+              "w": 360
+            },
+            "children": [
+              {
+                "id": "_root_1_0",
+                "type": "Stack",
+                "props": {
+                  "gap": "md",
+                  "h": "100%"
+                },
+                "children": [
+                  {
+                    "id": "_root_1_0_0",
+                    "type": "Stack",
+                    "props": {
+                      "gap": 2
+                    },
+                    "children": [
+                      {
+                        "id": "_root_1_0_0_0",
+                        "type": "Title",
+                        "props": {
+                          "order": 3
+                        },
+                        "children": [
+                          {
+                            "id": "_root_1_0_0_0_0",
+                            "type": "#text",
+                            "props": {
+                              "text": "我的家"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "_root_1_0_0_1",
+                        "type": "Text",
+                        "props": {
+                          "size": "sm",
+                          "c": "dimmed"
+                        },
+                        "children": [
+                          {
+                            "id": "_root_1_0_0_1_0",
+                            "type": "#text",
+                            "props": {
+                              "text": "客厅 · 玄关"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "_root_1_0_1",
+                    "type": "Divider"
+                  },
+                  {
+                    "id": "sw_lamp",
+                    "type": "Switch",
+                    "props": {
+                      "label": "落地灯",
+                      "checked": "$data.lamp"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "sw_ac",
+                    "type": "Switch",
+                    "props": {
+                      "label": "空调",
+                      "description": "26°C · 制冷",
+                      "checked": "$data.ac"
+                    }
+                  },
+                  {
+                    "id": "sw_tv",
+                    "type": "Switch",
+                    "props": {
+                      "label": "电视",
+                      "checked": "$data.tv"
+                    },
+                    "unmodeled": true
+                  },
+                  {
+                    "id": "_root_1_0_5",
+                    "type": "Group",
+                    "props": {
+                      "justify": "space-between"
+                    },
+                    "children": [
+                      {
+                        "id": "_root_1_0_5_0",
+                        "type": "Text",
+                        "children": [
+                          {
+                            "id": "_root_1_0_5_0_0",
+                            "type": "#text",
+                            "props": {
+                              "text": "客厅窗"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "_root_1_0_5_1",
+                        "type": "Badge",
+                        "props": {
+                          "color": "$data.windowColor",
+                          "variant": "light"
+                        },
+                        "children": [
+                          {
+                            "id": "_root_1_0_5_1_0",
+                            "type": "#text",
+                            "props": {
+                              "text": "$data.windowText"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "_root_1_0_6",
+                    "type": "Group",
+                    "props": {
+                      "justify": "space-between"
+                    },
+                    "children": [
+                      {
+                        "id": "_root_1_0_6_0",
+                        "type": "Text",
+                        "children": [
+                          {
+                            "id": "_root_1_0_6_0_0",
+                            "type": "#text",
+                            "props": {
+                              "text": "入户门"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "_root_1_0_6_1",
+                        "type": "Badge",
+                        "props": {
+                          "color": "gray",
+                          "variant": "light"
+                        },
+                        "children": [
+                          {
+                            "id": "_root_1_0_6_1_0",
+                            "type": "#text",
+                            "props": {
+                              "text": "$data.doorText"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "_root_1_0_7",
+                    "type": "Divider"
+                  },
+                  {
+                    "id": "alert_window",
+                    "type": "Alert",
+                    "props": {
+                      "color": "orange",
+                      "title": "客厅窗还开着"
+                    },
+                    "children": [
+                      {
+                        "id": "_root_1_0_8_0",
+                        "type": "#text",
+                        "props": {
+                          "text": "关好后才能离家。可以直接点 3D 画面里的窗户把它关上。"
+                        }
+                      }
+                    ],
+                    "when": {
+                      "truthy": "ui.windowAlert"
+                    }
+                  },
+                  {
+                    "id": "spin_away",
+                    "type": "Group",
+                    "props": {
+                      "gap": "xs"
+                    },
+                    "children": [
+                      {
+                        "id": "_root_1_0_9_0",
+                        "type": "Loader",
+                        "props": {
+                          "size": "sm"
+                        }
+                      },
+                      {
+                        "id": "_root_1_0_9_1",
+                        "type": "Text",
+                        "props": {
+                          "size": "sm"
+                        },
+                        "children": [
+                          {
+                            "id": "_root_1_0_9_1_0",
+                            "type": "#text",
+                            "props": {
+                              "text": "正在离家：关闭设备…"
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "when": {
+                      "truthy": "ui.leaving"
+                    }
+                  },
+                  {
+                    "id": "alert_away",
+                    "type": "Alert",
+                    "props": {
+                      "color": "green",
+                      "title": "已离家"
+                    },
+                    "children": [
+                      {
+                        "id": "_root_1_0_10_0",
+                        "type": "#text",
+                        "props": {
+                          "text": "灯、空调、电视已关闭，入户门已上锁。"
+                        }
+                      }
+                    ],
+                    "when": {
+                      "truthy": "ui.away"
+                    }
+                  },
+                  {
+                    "id": "btn_away",
+                    "type": "Button",
+                    "props": {
+                      "size": "lg",
+                      "fullWidth": true
+                    },
+                    "children": [
+                      {
+                        "id": "_root_1_0_11_0",
+                        "type": "#text",
+                        "props": {
+                          "text": "一键离家"
+                        }
+                      }
+                    ],
+                    "disabled": {
+                      "truthy": "ui.away"
+                    },
+                    "disabledReason": "已经是离家状态"
+                  }
+                ],
+                "from": "away.a-one-tap"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "scenarios": {
+    "away.a-one-tap.leave": {
+      "media": {},
+      "id": "away.a-one-tap.leave",
+      "optionId": "away.a-one-tap",
+      "name": "门窗关好，一键离家",
+      "description": "",
+      "mock": {
+        "label": "Mock success",
+        "outcome": "success",
+        "auto": true
+      },
+      "initial": {
+        "sceneId": "@/",
+        "ui": {
+          "focus": null,
+          "windowAlert": false,
+          "leaving": false,
+          "away": false
+        },
+        "data": {
+          "lamp": true,
+          "ac": true,
+          "tv": true,
+          "speaker": true,
+          "windowOpen": false,
+          "windowText": "已关",
+          "windowColor": "green",
+          "doorLabel": "入户门 · 未上锁",
+          "doorText": "未上锁"
+        },
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 0,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.leave#1",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "轻柔配乐开始"
+          },
+          "caption": "轻柔配乐开始",
+          "effects": [],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 3000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.leave#2",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "btn_away"
+          },
+          "caption": "出门前点「一键离家」：先检查门窗，都关好了",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.leaving",
+              "value": true
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 6000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.leave#3",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "关闭落地灯"
+          },
+          "caption": "落地灯关闭",
+          "effects": [
+            {
+              "type": "set",
+              "path": "data.lamp",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "ui.focus",
+              "value": "lamp"
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 9000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.leave#4",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "关闭空调"
+          },
+          "caption": "空调关闭",
+          "effects": [
+            {
+              "type": "set",
+              "path": "data.ac",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "ui.focus",
+              "value": "ac"
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 12000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.leave#5",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "关闭电视和音箱"
+          },
+          "caption": "电视和音箱关闭",
+          "effects": [
+            {
+              "type": "set",
+              "path": "data.tv",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "data.speaker",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "ui.focus",
+              "value": "tv"
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 15000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.leave#6",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "入户门上锁"
+          },
+          "caption": "入户门上锁，离家完成",
+          "effects": [
+            {
+              "type": "set",
+              "path": "data.doorLabel",
+              "value": "入户门 · 已上锁"
+            },
+            {
+              "type": "set",
+              "path": "data.doorText",
+              "value": "已上锁"
+            },
+            {
+              "type": "set",
+              "path": "ui.leaving",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "ui.away",
+              "value": true
+            },
+            {
+              "type": "set",
+              "path": "ui.focus",
+              "value": "door"
+            },
+            {
+              "type": "toast",
+              "text": "已离家",
+              "tone": "success"
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 18000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900,
+              "stopAfterMs": 1000
+            }
+          },
+          "id": "away.a-one-tap.leave#7",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "回到全景"
+          },
+          "caption": "全屋设备都已关闭",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.focus",
+              "value": null
+            },
+            {
+              "type": "complete",
+              "text": "出门只需要点一下",
+              "outcome": "success"
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        }
+      ],
+      "expected": "灯、空调、电视依次关闭，入户门上锁",
+      "caseIds": []
+    },
+    "away.a-one-tap.window_open": {
+      "media": {},
+      "id": "away.a-one-tap.window_open",
+      "optionId": "away.a-one-tap",
+      "name": "客厅窗没关，先在 3D 里关上",
+      "description": "",
+      "mock": {
+        "label": "模拟客厅窗开着",
+        "outcome": "success"
+      },
+      "initial": {
+        "sceneId": "@/",
+        "ui": {
+          "focus": null,
+          "windowAlert": false,
+          "leaving": false,
+          "away": false
+        },
+        "data": {
+          "lamp": true,
+          "ac": true,
+          "tv": true,
+          "speaker": true,
+          "windowOpen": true,
+          "windowText": "未关",
+          "windowColor": "orange",
+          "doorLabel": "入户门 · 未上锁",
+          "doorText": "未上锁"
+        },
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 0,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.window_open#1",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "轻柔配乐开始"
+          },
+          "caption": "轻柔配乐开始",
+          "effects": [],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 3000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.window_open#2",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "btn_away"
+          },
+          "caption": "点「一键离家」：检查发现客厅窗还开着",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.windowAlert",
+              "value": true
+            },
+            {
+              "type": "set",
+              "path": "ui.focus",
+              "value": "window"
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 6000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.window_open#3",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "window"
+          },
+          "caption": "直接点 3D 画面里的窗户，把它关上",
+          "effects": [
+            {
+              "type": "set",
+              "path": "data.windowOpen",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "data.windowText",
+              "value": "已关"
+            },
+            {
+              "type": "set",
+              "path": "data.windowColor",
+              "value": "green"
+            },
+            {
+              "type": "set",
+              "path": "ui.windowAlert",
+              "value": false
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "explain": "3D 画面里点的是同一个“窗户”元素：步骤、镜头、提示都按它定位",
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 9000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.window_open#4",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "btn_away"
+          },
+          "caption": "再点「一键离家」",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.leaving",
+              "value": true
+            },
+            {
+              "type": "set",
+              "path": "ui.focus",
+              "value": null
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 12000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900,
+              "stopAfterMs": 1000
+            }
+          },
+          "id": "away.a-one-tap.window_open#5",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "关闭设备并上锁"
+          },
+          "caption": "设备关闭，入户门上锁",
+          "effects": [
+            {
+              "type": "set",
+              "path": "data.lamp",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "data.ac",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "data.tv",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "data.speaker",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "data.doorLabel",
+              "value": "入户门 · 已上锁"
+            },
+            {
+              "type": "set",
+              "path": "data.doorText",
+              "value": "已上锁"
+            },
+            {
+              "type": "set",
+              "path": "ui.leaving",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "ui.away",
+              "value": true
+            },
+            {
+              "type": "toast",
+              "text": "已离家",
+              "tone": "success"
+            },
+            {
+              "type": "complete",
+              "text": "没关好的窗被找到并关上，然后顺利离家",
+              "outcome": "success"
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        }
+      ],
+      "expected": "不直接离家：3D 画面推近到开着的窗，关好后再离家成功",
+      "caseIds": []
+    },
+    "away.a-one-tap.manual": {
+      "media": {},
+      "id": "away.a-one-tap.manual",
+      "optionId": "away.a-one-tap",
+      "name": "在 3D 画面和 App 里控制设备",
+      "description": "",
+      "mock": {
+        "label": "Mock success",
+        "outcome": "success",
+        "auto": true
+      },
+      "initial": {
+        "sceneId": "@/",
+        "ui": {
+          "focus": null,
+          "windowAlert": false,
+          "leaving": false,
+          "away": false
+        },
+        "data": {
+          "lamp": true,
+          "ac": true,
+          "tv": true,
+          "speaker": true,
+          "windowOpen": false,
+          "windowText": "已关",
+          "windowColor": "green",
+          "doorLabel": "入户门 · 未上锁",
+          "doorText": "未上锁"
+        },
+        "inputs": {}
+      },
+      "steps": [
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 0,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.manual#1",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "轻柔配乐开始"
+          },
+          "caption": "轻柔配乐开始",
+          "effects": [],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 3000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.manual#2",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "lamp"
+          },
+          "caption": "点 3D 画面里的落地灯关掉它，App 开关同步关闭",
+          "effects": [
+            {
+              "type": "set",
+              "path": "data.lamp",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "ui.focus",
+              "value": "lamp"
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "cues": [
+            {
+              "kind": "spotlight",
+              "targets": [
+                "sw_lamp"
+              ]
+            }
+          ],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 6000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900
+            }
+          },
+          "id": "away.a-one-tap.manual#3",
+          "kind": "user",
+          "action": {
+            "type": "click",
+            "target": "sw_ac"
+          },
+          "caption": "反过来，在 App 里关掉空调：3D 画面里的空调同步熄灭",
+          "effects": [
+            {
+              "type": "set",
+              "path": "data.ac",
+              "value": false
+            },
+            {
+              "type": "set",
+              "path": "ui.focus",
+              "value": "ac"
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        },
+        {
+          "media": {
+            "alda:bgm": {
+              "plugin": "alda",
+              "resource": "resource-0",
+              "offsetMs": 9000,
+              "volume": 0.45,
+              "loop": true,
+              "fadeInMs": 900,
+              "stopAfterMs": 1000
+            }
+          },
+          "id": "away.a-one-tap.manual#4",
+          "kind": "system",
+          "action": {
+            "type": "event",
+            "name": "回到全景"
+          },
+          "caption": "两边始终是同一份设备状态",
+          "effects": [
+            {
+              "type": "set",
+              "path": "ui.focus",
+              "value": null
+            },
+            {
+              "type": "complete",
+              "text": "App 和 3D 画面显示同一份状态",
+              "outcome": "success"
+            }
+          ],
+          "shots": [],
+          "directorLayer": null,
+          "forks": [],
+          "marks": [],
+          "ruleIds": []
+        }
+      ],
+      "expected": "两边任一处操作，另一边同步变化",
+      "caseIds": []
+    }
+  },
+  "mediaAssets": {
+    "resource-0": "data:audio/midi;base64,TVRoZAAAAAYAAAABAIBNVHJrAAABJAD/UQMMtzUAwAAAsAtkAApAAJA8WYFagDxZJpBAWYFagEBZJpBDWYFagENZJpBAWYFagEBZJpBFWYFagEVZJpBAWYFagEBZJpBDWYFagENZJpBAWYFagEBZJpBBWYFagEFZJpBFWYFagEVZJpBIWYFagEhZJpBFWYFagEVZJpBDWYFagENZJpA+WYFagD5ZJpBAWYFagEBZgiaQPFmBWoA8WSaQQFmBWoBAWSaQQ1mBWoBDWSaQQFmBWoBAWSaQRVmBWoBFWSaQQFmBWoBAWSaQQ1mBWoBDWSaQQFmBWoBAWSaQQVmBWoBBWSaQRVmBWoBFWSaQQ1mBWoBDWSaQQFmBWoBAWSaQPlmBWoA+WSaQQ1mBWoBDWSaQPFmDM4A8WQD/LwA="
+  }
+}

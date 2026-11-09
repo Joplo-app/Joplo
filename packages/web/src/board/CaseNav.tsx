@@ -9,7 +9,7 @@ import { useBoardI18n } from '../i18n/board/context';
  *   缺口汇总加上缺失里的高优先级数。
  * 视图计算在 nav-model.ts（纯函数）。创作侧信息，只由看板传给 PlayerPage 的 nav，不进发布站。
  */
-import type { Project } from '@joplo-app/core';
+import type { Project } from '@joplo-app/core/runtime';
 import { optionsOf, scenariosOf } from '../runtime/views';
 import { Popover, useHoverCard, useTip } from '../player/popover';
 import { StatusIcon } from '../player/StatusIcon';

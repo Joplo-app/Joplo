@@ -242,13 +242,13 @@ describe('发布产物是完整的 IR（只缺有意去掉的创作侧字段）'
         const features = Object.values(payload.features as Record<string, { goal?: string; roles?: unknown }>);
         expect(features.some((f) => !!f.goal && f.roles !== undefined)).toBe(true);
         // 产品界面组件（D68）：Menu 的 opened 抄到 Menu.Dropdown
-        expect(nodes.some((n) => n.type === 'Menu.Dropdown' && (n.props as Record<string, unknown> | undefined)?.opened !== undefined)).toBe(true);
+        expect(nodes.some((n) => n.type === 'ui:Menu.Dropdown' && (n.props as Record<string, unknown> | undefined)?.opened !== undefined)).toBe(true);
       }
     }, 120_000);
   }
 
   it('样板没用到的演示字段（redact、autoFocus）同样原样保留', () => {
-    const scene = { id: 'o~v', optionId: 'f.a', route: '/', name: 'v', viewport: 'desktop', layer: 'v', root: { id: 'root', type: 'Stack', props: {}, children: [{ id: 'key', type: 'Code', props: {}, redact: { op: 'not', path: 'ui.shown' }, children: [] }] } };
+    const scene = { id: 'o~v', optionId: 'f.a', route: '/', name: 'v', viewport: 'desktop', layer: 'v', root: { id: 'root', type: 'ui:Stack', props: {}, children: [{ id: 'key', type: 'ui:Code', props: {}, redact: { op: 'not', path: 'ui.shown' }, children: [] }] } };
     const p = { name: 'T', autoFocus: false, routes: {}, scenes: { 'o~v': scene }, features: {}, options: {}, scenarios: {}, rules: {}, cases: {}, issues: [] } as unknown as Parameters<typeof publishPayload>[0];
     const out = JSON.parse(JSON.stringify(publishPayload(p, null).project));
     expect(out.autoFocus).toBe(false);
@@ -314,7 +314,7 @@ describe('renderStep', () => {
     expect(r.position).toBe(1);
     expect(r.sceneId).toBe('invite.a-modal@/members');
     const send = r.elements.find((e) => e.id === 'btn_send')!;
-    expect(send).toMatchObject({ visible: true, disabled: false, type: 'Button' });
+    expect(send).toMatchObject({ visible: true, disabled: false, type: 'ui:Button' });
     expect(send.at).toMatch(/^features\/invite\/options\/a-modal\.tsx:\d+:\d+$/);
     const alert = r.elements.find((e) => e.id === 'alert_send_error')!;
     expect(alert.visible).toBe(false);

@@ -1,4 +1,6 @@
-import { LegacyTraceSchema } from './plugins/legacy.ts';
+import { ElementTraitsSchema } from './traits.ts';
+import type { ElementTraits } from '@joplo-app/kit/plugin';
+import { Trace as LegacyTraceSchema } from '@joplo-app/plugin-diagram/schema';
 /**
  * Joplo IR（schemaVersion 2）：由 TSX 源文件编译得到的中间表示，不是作者直接编辑的格式。
  * 权威源是项目文件夹里的 TSX/TS 文件（ADR-0002）；渲染器、播放器、校验器、构建只消费这里的 IR。
@@ -70,6 +72,7 @@ export type SceneNode = {
   /** 目录组件，或插件组件 `<插件 id>:<组件名>`（D86）。 */
   type: string;
   /** Mantine 属性原样保留（可含响应式对象 { base, md }）；值可以是字面量或 `$ui.x` / `$data.x` / `$inputs.x` 整值绑定。 */
+  traits?: ElementTraits;
   props?: Record<string, unknown>;
   children?: SceneNode[];
   when?: Condition;
@@ -92,6 +95,7 @@ export const SceneNode: z.ZodType<SceneNode> = z.lazy(() =>
   z.strictObject({
     id: z.string().min(1),
     type: z.union([z.enum(COMPONENT_TYPES), z.string().regex(PLUGIN_TYPE) as unknown as z.ZodType<PluginComponentType>]),
+    traits: ElementTraitsSchema.optional(),
     props: z.record(z.string(), Json).optional(),
     children: z.array(SceneNode).optional(),
     when: Condition.optional(),
@@ -381,7 +385,7 @@ export const Project = z.strictObject({
     id: z.string().min(1),
     title: z.string(),
     version: z.string().optional(),
-    components: z.record(z.string(), z.strictObject({ interactive: z.boolean().optional(), parent: z.string().optional(), needsId: z.boolean().optional(), selfEvident: z.boolean().optional() })),
+    components: z.record(z.string(), z.strictObject({ interactive: z.boolean().optional(), parent: z.string().optional(), needsId: z.boolean().optional(), selfEvident: z.boolean().optional(), traits: ElementTraitsSchema.optional() })),
   })).optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),

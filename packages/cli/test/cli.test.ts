@@ -134,7 +134,7 @@ test.each([['true', 'true'], ['false', 'false'], ["'code' as any", '"code"']])('
   expect(diag.affects).toHaveLength(2);
   expect(out.data.summary.error).toBe(1);
   const text2 = await cli(['check', d]);
-  expect(text2.stdout).toMatch(new RegExp(`^${option}:${line}:\\d+  error  INVALID_CONDITION  <Alert> when received a plain`, 'm'));
+  expect(text2.stdout).toMatch(new RegExp(`^${option}:${line}:\\d+  error  INVALID_CONDITION  <ui:Alert> when received a plain`, 'm'));
   expect(text2.stdout).not.toContain('joplo.config.ts:1:1');
   expect(text2.stdout).toMatch(/^1 error, /m);
 });
@@ -145,6 +145,6 @@ test('其他结构错误也指向作者元素并合并（不是 joplo.config.ts:
   const r = await cli(['check', d, '--format', 'json']);
   const ds = JSON.parse(r.stdout).diagnostics.filter((x: { code: string }) => x.code === 'INVALID_SCHEMA');
   expect(ds.length, r.stdout).toBeGreaterThanOrEqual(1);
-  for (const x of ds) { expect(x.at).toMatch(new RegExp(`^${option}:${line}:`)); expect(x.message).toMatch(/^<Alert> when/); }
+  for (const x of ds) { expect(x.at).toMatch(new RegExp(`^${option}:${line}:`)); expect(x.message).toMatch(/^<ui:Alert> when/); }
   expect(new Set(ds.map((x: { message: string }) => x.message)).size).toBe(ds.length);
 });

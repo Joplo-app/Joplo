@@ -22,7 +22,7 @@ import zlib from 'node:zlib';
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
-export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-content', 'core', 'web', 'server', 'cli', 'joplo'];
+export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-content', 'plugin-ui', 'core', 'web', 'server', 'cli', 'joplo'];
 export const packageDir = (name, root = REPO) => path.join(root, name.startsWith('plugin-') ? `plugins/${name.slice(7)}` : `packages/${name}`);
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const LICENSE_PLACEHOLDER = 'UNLICENSED';
@@ -60,7 +60,7 @@ function version(root, v) {
     fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
   }
   // Runtime version metadata must not pull the workspace manifest into browser bundles.
-  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-content']) {
+  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-content', 'plugin-ui']) {
   const pluginVersion = path.join(packageDir(name, root), 'src/version.json');
   fs.mkdirSync(path.dirname(pluginVersion), { recursive: true });
   fs.writeFileSync(pluginVersion, JSON.stringify({ version: v }, null, 2) + '\n');
@@ -328,7 +328,7 @@ async function smoke() {
     sh(npm, ['install', ...npmFlags], project);
     const joplo = path.join(project, 'node_modules/.bin/joplo');
     assert(fs.realpathSync(joplo) === fs.realpathSync(path.join(project, 'node_modules/joplo/bin/joplo.cjs')), '项目的 .bin/joplo 应指向 joplo 入口包');
-    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-content', '@joplo-app/server', '@joplo-app/web']) {
+    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-content', '@joplo-app/plugin-ui', '@joplo-app/server', '@joplo-app/web']) {
       const p = path.join(project, 'node_modules', n);
       assert(fs.existsSync(p) && !fs.lstatSync(p).isSymbolicLink(), `${n} 应从 tarball 安装（不是链接）`);
       assert(readJson(path.join(p, 'package.json')).version === v, `${n} 版本应为 ${v}`);
@@ -358,6 +358,24 @@ async function smoke() {
     `], project);
     const contentGuide = sh(joplo, ['skill', 'content'], project);
     assert(contentGuide.stdout.includes('content:studio') && contentGuide.stdout.includes('camera('), 'Installed content guide must match its plugin API');
+
+    // Default UI must work solely from production tarballs, including runtime and catalog exports.
+    sh(process.execPath, ['--input-type=module', '-e', `
+      import ui from '@joplo-app/plugin-ui';
+      import runtime from '@joplo-app/plugin-ui/runtime';
+      import { COMPONENT_TYPES } from '@joplo-app/plugin-ui/catalog';
+      import { skill } from '@joplo-app/plugin-ui/guide';
+      import { TextInput } from '@joplo-app/kit/ui';
+      import { config, feature, flow, option, page } from '@joplo-app/kit';
+      import { jsx } from '@joplo-app/kit/jsx-runtime';
+      import { compile, stateAt } from '@joplo-app/core';
+      if (!ui.runtime.endsWith('/runtime.js') || !skill.includes('ui:') || COMPONENT_TYPES.some(name => !runtime.components[name]?.react) || !runtime.viewports.mobile) process.exit(1);
+      const file='/smoke/source.tsx';
+      const r=compile({root:'/smoke',config:{...config({name:'UI smoke'}),file},layouts:{},routes:{'/':{...page({title:'UI'},jsx('div',{children:jsx(TextInput,{id:'field'})})),file}},features:{f:{def:{...feature({name:'F',goal:'G',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'I',scenarios:{s:flow('S',{start:'/'}).type('field','value')}}),file}}}}},'publish');
+      if (!r.project || Object.values(r.project.scenes).some(s=>s.root.type!=='ui:div') || stateAt(r.project,'f.a.s',1).inputs.field!=='value') process.exit(1);
+    `], project);
+    const uiGuide=sh(joplo,['components','Button'],project);
+    assert(uiGuide.stdout.includes('ui:Button') && uiGuide.stdout.includes('interactive'), 'Installed default UI catalog must come from the plugin');
 
     // 4. check
     const check = sh(joplo, ['check'], project);

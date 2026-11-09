@@ -8,7 +8,7 @@ import { m } from '../i18n/board/messages';
  * - 推送：Vite HMR 自定义事件 `joplo:ir`（带 projectId，只接收当前项目的）与 `joplo:projects`（列表变化）。
  * - 写：选中、移除项目、打开编辑器、导出 —— 都带本地令牌（页面 meta），服务端另校验 Origin。
  */
-import type { AppearanceFont, AppearanceStroke, Diagnostic, Project, Selection, LocalReviewState, LocalReviewWrite } from '@joplo-app/core';
+import type { AppearanceFont, AppearanceStroke, Diagnostic, Project, Selection, LocalReviewState, LocalReviewWrite } from '@joplo-app/core/runtime';
 import type { SelectionInput, SelectionWriteResult } from './demo';
 import { loadPluginRuntimes } from '../renderer/plugins';
 

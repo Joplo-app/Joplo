@@ -2,7 +2,7 @@ import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /**
  * 看板首页的视图模型（D55「首页」，纯函数）：项目路径缩写、项目徽标、↑↓ 移动选中、项目摘要、功能卡片。
  */
-import { displaySceneId, orderedFeatures, type Project } from '@joplo-app/core';
+import { displaySceneId, orderedFeatures, type Project } from '@joplo-app/core/runtime';
 import type { ProjectSummary } from '../runtime/dev-client';
 import { optionsOf, scenariosOf } from '../runtime/views';
 import { gapsOf, optionLabel } from './nav-model';

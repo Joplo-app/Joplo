@@ -3,7 +3,7 @@ import { dataSpec } from './data-spec.ts';
 import { definePlugin, type PluginCompileHooks, type PluginIRNode } from '@joplo-app/kit/plugin';
 import { isNode, type JNode, type JChild } from '@joplo-app/kit/node';
 import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
-import { docs } from './catalog.ts';
+import { docs, examples } from './catalog.ts';
 import { skill } from './guide.ts';
 import { checkDiagramRoot, resolveTrace } from './compile-helpers.ts';
 import { diagramsIn, isDiagramRoot, layoutFor, graphStructure, sequenceStructure, type GraphLayoutEngine } from './model-index.ts';
@@ -89,7 +89,7 @@ const hooks: PluginCompileHooks = {
 };
 export default /* @__PURE__ */ definePlugin({
   id: 'diagram', title: 'Diagrams', version: packageInfo.version, runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url), skill,
-  components: Object.fromEntries(Object.entries(docs).map(([name, doc]) => [name, { doc, selfEvident: true, ...(required.has(name) ? { needsId: true } : {}) }])),
+  components: Object.fromEntries(Object.entries(docs).map(([name, doc]) => [name, { doc, example: examples[name], catalogFamily: !name.includes('.'), traits: { text: ['label', 'description', 'name', 'value'] }, selfEvident: true, ...(required.has(name) ? { needsId: true } : {}) }])),
   legacyTypes: Object.fromEntries(Object.keys(docs).map(name => [name, `diagram:${name}`])),
   data: dataSpec, compile: hooks, schemas: { node: NodeData, step: FrameData },
 });

@@ -17,7 +17,7 @@ function source(): AuthoringProject {
   }));
   return {
     root: '/p', config: { ...config({ name: 'Order' }), ...at('joplo.config.ts') }, layouts: {},
-    routes: { '/': { ...page({ title: 'Home' }, jsx('Text', { children: 'Home' })), ...at('routes/page.tsx') } }, features,
+    routes: { '/': { ...page({ title: 'Home' }, jsx('ui:Text', { children: 'Home' })), ...at('routes/page.tsx') } }, features,
   };
 }
 

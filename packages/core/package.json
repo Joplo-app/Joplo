@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./node": "./src/node.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./runtime": "./src/runtime.ts"
   },
   "files": [
     "dist"
@@ -20,7 +21,8 @@
     "@joplo-app/kit": "workspace:*",
     "zod": "4.6.7",
     "@joplo-app/plugin-diagram": "workspace:*",
-    "@joplo-app/plugin-content": "workspace:*"
+    "@joplo-app/plugin-content": "workspace:*",
+    "@joplo-app/plugin-ui": "workspace:*"
   },
   "engines": {
     "node": ">=22"
@@ -36,7 +38,11 @@
         "types": "./dist/node.d.ts",
         "default": "./dist/node.js"
       },
-      "./package.json": "./package.json"
+      "./package.json": "./package.json",
+      "./runtime": {
+        "types": "./dist/runtime.d.ts",
+        "default": "./dist/runtime.js"
+      }
     }
   },
   "repository": {

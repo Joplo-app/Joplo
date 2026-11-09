@@ -13,9 +13,9 @@ const plugin = definePlugin({
   description: 'Interactive 3D scenes (three.js): steps click objects, state drives lights, doors, windows, and the camera',
   runtime: new URL('./runtime.ts', import.meta.url),
   components: {
-    Scene: { doc: 'height (px, default 420), focus (child id or null: the 3D camera frames it), view ("iso" | "front" | "top"), label; root of a 3D scene, viewers drag to orbit' },
-    Object: { parent: 'Scene', doc: `shape (${SHAPES}), at [x, y, z], size [w, h, d], rotate (degrees around the vertical axis), color, lit, open, label, showLabel; decorative or state-driven object` },
-    Target: { parent: 'Scene', interactive: true, doc: 'same props as Object; an object viewers click (steps: .click(id)); always shows its label' },
+    Scene: { traits: { text: ['label'] }, doc: 'height (px, default 420), focus (child id or null: the 3D camera frames it), view ("iso" | "front" | "top"), label; root of a 3D scene, viewers drag to orbit' },
+    Object: { parent: 'Scene', traits: { text: ['label'] }, doc: `shape (${SHAPES}), at [x, y, z], size [w, h, d], rotate (degrees around the vertical axis), color, lit, open, label, showLabel; decorative or state-driven object` },
+    Target: { parent: 'Scene', interactive: true, traits: { text: ['label'] }, doc: 'same props as Object; an object viewers click (steps: .click(id)); always shows its label' },
   },
   skill: `## When to use
 A spatial product: smart home, retail shelf, factory line, data center, venue map, a physical device. The 3D view shows where things are and what changed; the rest of the screen (app UI, captions) stays normal Joplo components. Prefer ordinary components when space does not matter.

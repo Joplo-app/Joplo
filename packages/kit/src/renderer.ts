@@ -2,8 +2,23 @@
 import type { CSSProperties, ReactNode, ComponentType } from 'react';
 import type { PluginIRNode, PluginState } from './plugin.ts';
 export type NodeProps = { node: PluginIRNode; p: Record<string, unknown>; disabled: boolean; children: ReactNode };
-export type RendererContext = { scene: { id: string }; state: PluginState; width: number; animate: boolean; selectedId: string | null; focus?: string[] | null; ext?: Readonly<Record<string, unknown>> };
+export type RendererContext = { scene: { id: string; route: string }; state: PluginState; width: number; animate: boolean; selectedId: string | null; focus?: string[] | null; ext?: Readonly<Record<string, unknown>>;
+  stage?: HTMLElement | null; dialogLayer: HTMLElement | null;
+  preview: {nodeId:string;text:string}|null;
+  mode: 'review'|'demo'|'render';
+  changed?: readonly {path:string;before:unknown;after:unknown}[];
+};
 export type RendererServices = {
+  RendererContextProvider: ComponentType<{value: Pick<RendererContext, 'width'|'dialogLayer'>; children?: ReactNode}>;
+  useLook(): {theme:string;font:string|null;style: Record<string,string>|undefined};
+  atWidth(value:unknown,width:number):unknown;
+  childWidth(node:PluginIRNode,width:number,props?:Record<string,unknown>):number;
+  choicesOf(node:PluginIRNode,state:PluginState): {value:string;label:string}[]|null;
+  layoutRegions(node:PluginIRNode,state:PluginState,width:number):Record<string,{size:number;collapsed:boolean;mobile:boolean}|null>;
+  resolveValue(value:unknown,state:PluginState):unknown;
+  styleOf(props:Record<string,unknown>,width:number):CSSProperties;
+
+  nodeLabel(node:PluginIRNode):string;
   useCtx(): RendererContext;
   useI18n(): { t: { stage: Record<string, unknown> } };
   useR(p: Record<string, unknown>): (key: string) => unknown;
@@ -38,3 +53,14 @@ export const rectOf: RendererServices['rectOf'] = (...args) => host().rectOf(...
 export const resolveProps: RendererServices['resolveProps'] = (...args) => host().resolveProps(...args);
 export const isSelfVisible: RendererServices['isSelfVisible'] = (...args) => host().isSelfVisible(...args);
 export const walkNodes: RendererServices['walkNodes'] = (...args) => host().walkNodes(...args);
+
+export const RendererContextProvider = (props: {value: Pick<RendererContext, 'width'|'dialogLayer'>; children?: ReactNode}): ReactNode => (host().RendererContextProvider as (p: typeof props)=>ReactNode)(props);
+export const useLook = () => host().useLook();
+export const atWidth: RendererServices['atWidth'] = (...args) => host().atWidth(...args);
+export const childWidth: RendererServices['childWidth'] = (...args) => host().childWidth(...args);
+export const choicesOf: RendererServices['choicesOf'] = (...args) => host().choicesOf(...args);
+export const layoutRegions: RendererServices['layoutRegions'] = (...args) => host().layoutRegions(...args);
+export const resolveValue: RendererServices['resolveValue'] = (...args) => host().resolveValue(...args);
+export const styleOf: RendererServices['styleOf'] = (...args) => host().styleOf(...args);
+
+export const nodeLabel: RendererServices['nodeLabel'] = (...args) => host().nodeLabel(...args);

@@ -11,7 +11,7 @@ import type { Options } from 'roughjs/bin/core';
 export type StageTheme = string;
 export type { StrokeMode } from './themes';
 import type { StrokeMode } from './themes';
-import type { AppearanceFont } from '@joplo-app/core';
+import type { AppearanceFont } from '@joplo-app/core/runtime';
 
 /** FNV-1a 32 位哈希，映射为正整数种子。 */
 export function seedOf(id: string): number {

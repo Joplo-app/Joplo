@@ -3,7 +3,7 @@ import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
  * 看板（创作侧）的状态与细节（D55「细节与状态 v1」，纯函数）：场景完成后的“下一个情况”、缺口横幅、编译出错横幅、
  * 导出视频的进度。不进发布站。
  */
-import type { Diagnostic, Project } from '@joplo-app/core';
+import type { Diagnostic, Project } from '@joplo-app/core/runtime';
 import type { VideoJob } from '../runtime/dev-client';
 import { optionsOf } from '../runtime/views';
 import { gapCommand, letterOf, statusOf } from './nav-model';

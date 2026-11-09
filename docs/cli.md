@@ -557,3 +557,5 @@ npx joplo diff publish <diff-site> --prepared comparison.json --repo owner/name 
 本地 diff 从两份真实 `joplo build` 产物生成根 viewer、before/、after/ 和 feature-diff.json；新增／删除单栏、修改双栏。原序号 ID 保持兼容，作者为前一步追加 `.key('stable-action')` 提供稳定身份；重复候选明确 uncertain。公开身份独立于旧播放 IR，普通分享不要求 Cloud 放宽 schema。
 
 prepare 的返回基线是权威值；用它编译旧版，不能继续使用候选 merge-base。发布前校验 receipt 与 manifest、两版实际 IR、summary 和文件 hash，复用上传／finalize，永远新建 comparison Share。publish 不构建、不执行 PR 代码、不附私有 review、不替换普通分享。安全 CI、错误码、Agent 路由限制和 fixture 见 [功能差异指南](feature-diff/README.md)；按需运行 `npx joplo skill diff`。
+
+组件目录由启用插件生成：`joplo components` / `joplo skill components` 列出 UI、HTML 兜底与其他插件；`joplo components ui:Button` 或唯一短名 `Button` 输出属性和例子。作者 TSX 导入方式不变；旧裸名 IR 的 check 会提示重编译，feature-diff 明确报告不兼容。

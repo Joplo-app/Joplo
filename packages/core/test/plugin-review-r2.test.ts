@@ -20,9 +20,9 @@ function source(p: ReturnType<typeof plugin>, effects: any[] = []): AuthoringPro
 const rows = (root: any): any[] => [...(root.props?.label ? [{ id: root.id, text: root.props.label }] : []), ...(root.children ?? []).flatMap(rows)];
 function stageSource(p: ReturnType<typeof plugin>) {
   const s = source(p);
-  s.routes['/other'] = { ...page({ title: 'Other' }, h('Text', { id: 'secret', label: 'ALLOWED-TEXT' })), file };
+  s.routes['/other'] = { ...page({ title: 'Other' }, h('ui:Text', { id: 'secret', label: 'ALLOWED-TEXT' })), file };
   s.features.h = { def: { ...feature({ name: 'H', goal: 'h', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'H', idea: 'h', on: {}, scenarios: { s: flow('Other', { start: '/other' }).system('Other') } }), file } } };
-  s.features.g = { def: { ...feature({ name: 'G', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'G', idea: 'g', on: { '/': { contrib: h('Text', { id: 'secret', label: 'OMITTED-SECRET-TEXT', children: h('Text', { id: 'omitted_only', label: 'OMITTED-ONLY-TEXT' }) }) } }, scenarios: { s: flow('Private', { start: '/' }).system('Private') } }), file } } };
+  s.features.g = { def: { ...feature({ name: 'G', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'G', idea: 'g', on: { '/': { contrib: h('ui:Text', { id: 'secret', label: 'OMITTED-SECRET-TEXT', children: h('ui:Text', { id: 'omitted_only', label: 'OMITTED-ONLY-TEXT' }) }) } }, scenarios: { s: flow('Private', { start: '/' }).system('Private') } }), file } } };
   return s;
 }
 

@@ -5,7 +5,7 @@
  * 位置（position）语义：0 = 场景初始状态；k = 已执行前 k 个步骤之后的状态。
  * “上一步”通过从初始状态重放到 k-1 实现，因此恢复的是业务可见状态，而不是撤销动画。
  */
-import { DIRECTOR_LAYER, GATED_CONTAINERS, PAGE_LAYER, isInteractiveType, VALUE_TYPES, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
+import { DIRECTOR_LAYER, PAGE_LAYER, isInteractiveType, VIEWPORT_SIZE, atWidth, childWidth, breakpointPx, choicesFromData, hiddenAtWidth, matchChoice, nodeLabel, type Choice } from './catalog.ts';
 import type { Condition, LayerIcon, Project, Scenario, Scene, SceneNode, Step } from './schema.ts';
 import { JoploError, type Diagnostic } from './result.ts';
 
@@ -74,7 +74,7 @@ const BINDING = /^\$((?:ui|data|inputs)(?:\.[A-Za-z0-9_-]+)*)$/;
 
 /**
  * 属性值若是 `$ui.x` 形式的整值绑定，则从状态读取；对象与数组逐项解析
- * （例如 AppShell 的 navbar={{ collapsed: { mobile: $.ui.navClosed } }}）；其余原样返回。
+ * （例如 declared element 的 navbar={{ collapsed: { mobile: $.ui.navClosed } }}）；其余原样返回。
  */
 export function resolveValue(value: unknown, state: Pick<PlayState, 'ui' | 'data' | 'inputs'>): unknown {
   if (typeof value === 'string') {
@@ -126,58 +126,39 @@ export function sceneWidth(scene: Pick<Scene, 'viewport'>): number {
 }
 
 /**
- * 节点自身是否显示：when、Modal / Drawer 的 opened（兼容旧写法 open），
+ * 节点自身是否显示：when、declared element 的 opened（兼容旧写法 open），
  * 以及给定舞台宽度时的 visibleFrom / hiddenFrom。
  */
 export function isSelfVisible(node: SceneNode, state: PlayState, width?: number): boolean {
   if (node.when && !evaluateCondition(node.when, state)) return false;
-  if (GATED_CONTAINERS.has(node.type)) {
-    const opened = node.props?.opened !== undefined ? node.props.opened : node.props?.open;
+  if (node.traits?.gate) {
+    const opened = node.traits.gate.map(key => node.props?.[key]).find(v => v !== undefined);
     if (!resolveValue(opened, state)) return false;
   }
   if (width !== undefined && hiddenAtWidth(node.props, width)) return false;
   return true;
 }
 
-export type ShellRegion = { size: number; collapsed: boolean };
-export type ShellLayout = { header: ShellRegion | null; footer: ShellRegion | null; navbar: ShellRegion | null; aside: ShellRegion | null; padding: unknown; mobile: { navbar: boolean; aside: boolean } };
-
-/**
- * AppShell 在给定舞台宽度下的布局：窄于 navbar/aside 的 breakpoint 时为“移动布局”，
- * 默认收起（collapsed.mobile 未写时视为 true，写 false 或绑定为假时展开）；宽于断点时按 collapsed.desktop（默认展开）。
- * 渲染器与播放器共用，保证“看得见”和“能操作”一致。
- */
-export function appShellLayout(props: Record<string, unknown> | undefined, state: Pick<PlayState, 'ui' | 'data' | 'inputs'>, width: number): ShellLayout {
-  const p = props ?? {};
-  const obj = (v: unknown): Record<string, unknown> | null => {
-    const r = resolveValue(atWidth(v, width), state);
-    return r && typeof r === 'object' && !Array.isArray(r) ? (r as Record<string, unknown>) : null;
-  };
-  const num = (v: unknown, d: number) => {
-    const x = atWidth(resolveValue(v, state), width);
-    return typeof x === 'number' && Number.isFinite(x) ? x : typeof x === 'string' && /^\d+(px)?$/.test(x) ? Number.parseInt(x, 10) : d;
-  };
-  const bar = (key: 'header' | 'footer'): ShellRegion | null => {
-    const o = obj(p[key]);
-    if (!o) return null;
-    return { size: num(o.height, 60), collapsed: Boolean(resolveValue(o.collapsed, state)) };
-  };
-  const mobile = { navbar: false, aside: false };
-  const side = (key: 'navbar' | 'aside'): ShellRegion | null => {
-    const o = obj(p[key]);
-    if (!o) return null;
-    const bp = breakpointPx(o.breakpoint);
-    const isMobile = bp !== null && width < bp;
-    mobile[key] = isMobile;
-    const col = resolveValue(o.collapsed, state);
-    const c = col && typeof col === 'object' ? (col as Record<string, unknown>) : {};
-    const collapsed = isMobile ? (c.mobile === undefined ? true : Boolean(c.mobile)) : Boolean(c.desktop);
-    return { size: num(o.width, key === 'navbar' ? 260 : 300), collapsed };
-  };
-  return { header: bar('header'), footer: bar('footer'), navbar: side('navbar'), aside: side('aside'), padding: p.padding, mobile };
+export type LayoutRegion = { size: number; collapsed: boolean; mobile: boolean };
+/** Declarative layout regions share the same width/state interpretation in drawing and playback. */
+export function layoutRegions(node: SceneNode, state: Pick<PlayState, 'ui' | 'data' | 'inputs'>, width: number): Record<string, LayoutRegion | null> {
+  const regions: Record<string, LayoutRegion | null> = {};
+  for (const [key, spec] of Object.entries(node.traits?.layout ?? {})) {
+    const value = resolveValue(atWidth(node.props?.[key], width), state);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) { regions[key] = null; continue; }
+    const props = value as Record<string, unknown>;
+    const bp = spec.breakpoint ? breakpointPx(props.breakpoint) : null;
+    const mobile = bp !== null && width < bp;
+    const collapsed = resolveValue(props.collapsed, state);
+    const config = collapsed && typeof collapsed === 'object' ? collapsed as Record<string, unknown> : {};
+    const rawSize = atWidth(resolveValue(props[spec.size], state), width);
+    const size = typeof rawSize === 'number' && Number.isFinite(rawSize) ? rawSize : typeof rawSize === 'string' && /^\d+(px)?$/.test(rawSize) ? Number.parseInt(rawSize, 10) : spec.defaultSize;
+    regions[key] = { size, mobile, collapsed: spec.breakpoint ? (mobile ? config.mobile === undefined || Boolean(config.mobile) : Boolean(config.desktop)) : Boolean(collapsed) };
+  }
+  return regions;
 }
 
-/** 节点在画面中是否可见：自身与所有祖先都可见；按画面宽度计算断点与 AppShell 收起。 */
+/** 节点在画面中是否可见：自身与所有祖先都可见；按画面宽度计算断点与 declared element 收起。 */
 export function isNodeVisible(scene: Scene, nodeId: string, state: PlayState, width: number = sceneWidth(scene)): boolean {
   const hit = findNode(scene, nodeId);
   if (!hit) return false;
@@ -186,65 +167,40 @@ export function isNodeVisible(scene: Scene, nodeId: string, state: PlayState, wi
   let w = width;
   for (const n of [...hit.ancestors, hit.node]) {
     if (!isSelfVisible(n, state, w)) return false;
-    if (n.type === 'AppShell') {
+    if (n.traits?.layout) {
       shell = n;
       shellWidth = w;
     }
-    if (shell && (n.type === 'AppShell.Navbar' || n.type === 'AppShell.Aside')) {
-      const l = appShellLayout(shell.props, state, shellWidth);
-      const r = n.type === 'AppShell.Navbar' ? l.navbar : l.aside;
+    if (shell && n.traits?.region) {
+      const r = layoutRegions(shell, state, shellWidth)[n.traits.region];
       if (r?.collapsed) return false;
     }
-    w = childWidth(n.type, w, n.props);
+    w = childWidth(n, w, resolveProps(n, state));
   }
   return true;
 }
 
-/**
- * 可选项：Select / MultiSelect / SegmentedControl 读 data；Radio.Group 读子 Radio；Tabs 读 Tabs.Tab；
- * Accordion 读 Accordion.Item；Pagination 为 1..total。没有可枚举选项时返回 null（select 动作不做限制）。
- */
+/** Enumerate declared data, descendant values, or a numeric range. No declaration means unconstrained input. */
 export function choicesOf(node: SceneNode, state: Pick<PlayState, 'ui' | 'data' | 'inputs'>): Choice[] | null {
-  const text = (n: SceneNode): string => (n.type === '#text' ? String(resolveValue(n.props?.text, state) ?? '') : (n.children ?? []).map(text).join(''));
-  /** 按文档顺序取指定类型的子孙（Radio 与 Radio.Card 混写时保持书写顺序）。 */
-  const desc = (types: readonly string[]): SceneNode[] => {
-    const out: SceneNode[] = [];
-    walkNodes(node, (n) => {
-      if (n !== node && types.includes(n.type)) out.push(n);
-    });
-    return out;
-  };
+  const spec = node.traits?.choices;
+  if (!spec) return null;
   const p = node.props ?? {};
-  switch (node.type) {
-    case 'Select':
-    case 'MultiSelect':
-    case 'SegmentedControl':
-    case 'TabBar': {
-      const c = choicesFromData(resolveValue(p.data, state));
-      return c.length ? c : null;
-    }
-    case 'Radio.Group':
-    case 'Tabs':
-    case 'Accordion': {
-      const items = node.type === 'Radio.Group' ? ['Radio', 'Radio.Card'] : node.type === 'Tabs' ? ['Tabs.Tab'] : ['Accordion.Item'];
-      const c = desc(items)
-        .filter((n) => n.props?.value !== undefined)
-        .map((n) => {
-          const value = String(resolveValue(n.props!.value, state));
-          const lbl = n.props?.label;
-          const control = node.type === 'Accordion' ? (n.children ?? []).find((x) => x.type === 'Accordion.Control') : n;
-          const t = typeof lbl === 'string' ? lbl : control ? text(control).trim() : '';
-          return { value, label: t || value };
-        });
-      return c.length ? c : null;
-    }
-    case 'Pagination': {
-      const total = Number(resolveValue(p.total, state));
-      return Number.isInteger(total) && total > 0 ? Array.from({ length: total }, (_, i) => ({ value: String(i + 1), label: String(i + 1) })) : null;
-    }
-    default:
-      return null;
+  if ('prop' in spec) { const choices = choicesFromData(resolveValue(p[spec.prop], state)); return choices.length ? choices : null; }
+  if ('range' in spec) {
+    const total = Number(resolveValue(p[spec.range], state));
+    return Number.isInteger(total) && total > 0 ? Array.from({ length: total }, (_, i) => ({ value: String(i+1), label: String(i+1) })) : null;
   }
+  const text = (n: SceneNode): string => n.type === '#text' ? String(resolveValue(n.props?.text, state) ?? '') : (n.children ?? []).map(text).join('');
+  const choices: Choice[] = [];
+  walkNodes(node, n => {
+    if (n === node || !spec.descendants.includes(n.type) || n.props?.[spec.value ?? 'value'] === undefined) return;
+    const value = String(resolveValue(n.props[spec.value ?? 'value'], state));
+    const label = n.props[spec.label ?? 'label'];
+    const control = spec.labelChild ? n.children?.find(c => c.type === spec.labelChild) : n;
+    const display = typeof label === 'string' ? label : control ? text(control).trim() : '';
+    choices.push({value, label:display || value});
+  });
+  return choices.length ? choices : null;
 }
 
 export function isNodeDisabled(node: SceneNode, state: PlayState): boolean {
@@ -327,7 +283,7 @@ function checkStepInner(project: Project, scenario: Scenario, state: PlayState, 
     return { severity: 'error', code: 'TARGET_DISABLED', message: `Step ${step.id} target "${nodeLabel(node)}" is currently disabled`, source: 'replay', ref };
   if (a.type === 'click' && !isInteractiveType(node.type, project.plugins))
     return { severity: 'error', code: 'NOT_INTERACTIVE', message: `Step ${step.id} clicks ${node.type} "${nodeLabel(node)}", which is not interactive`, source: 'replay', ref };
-  if (a.type !== 'click' && !VALUE_TYPES.has(node.type))
+  if (a.type !== 'click' && !node.traits?.input)
     return { severity: 'error', code: 'NOT_A_FIELD', message: `Step ${step.id} ${a.type} action target ${node.type} cannot accept input`, source: 'replay', ref };
   if (a.type === 'select') {
     const choices = choicesOf(node, state);
@@ -343,7 +299,7 @@ function checkStepInner(project: Project, scenario: Scenario, state: PlayState, 
   return null;
 }
 
-/** select 动作写入的值：匹配到选项时存 value（动作可写 value 或 label）；MultiSelect 切换数组中的一项。 */
+/** select 动作写入的值：匹配到选项时存 value（动作可写 value 或 label）；declared element 切换数组中的一项。 */
 function selectedValue(project: Project, state: PlayState, target: string, raw: string): unknown {
   const sc = project.scenarios[state.scenarioId];
   const scene = sc ? sceneOfTarget(project, sc, state, target) : project.scenes[state.sceneId];
@@ -351,7 +307,7 @@ function selectedValue(project: Project, state: PlayState, target: string, raw: 
   if (!node) return raw;
   const choices = choicesOf(node, state);
   const value = (choices && matchChoice(choices, raw)?.value) ?? raw;
-  if (node.type !== 'MultiSelect') return value;
+  if (node.traits?.input !== 'multiple') return value;
   const cur = state.inputs[target] ?? resolveValue(node.props?.value ?? node.props?.defaultValue, state);
   const list = Array.isArray(cur) ? cur.map(String) : [];
   return list.includes(value) ? list.filter((x) => x !== value) : [...list, value];

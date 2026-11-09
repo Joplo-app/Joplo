@@ -1,4 +1,4 @@
-import { projectThemes } from '@joplo-app/core';
+import { projectThemes } from '@joplo-app/core/runtime';
 import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/board/messages';
 import { translate, type Text } from '../i18n/messages';
@@ -16,7 +16,7 @@ import { useBoardI18n } from '../i18n/board/context';
  */
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, Copy, FolderX } from 'lucide-react';
-import type { Diagnostic, Project } from '@joplo-app/core';
+import type { Diagnostic, Project } from '@joplo-app/core/runtime';
 import { removeProject, type ProjectSummary } from '../runtime/dev-client';
 import { Brand, TopBar } from '../player/PlayerPage';
 import { JoploMark } from '../player/JoploMark';

@@ -1,8 +1,9 @@
+import { standardComponents } from './plugins/standard-catalog.ts';
 import { MENTAL_MODEL, SKILL_TOPICS, START_ORDER } from './agent-skill.ts';
-import { COMPONENT_DOCS, COMPONENT_EXAMPLES, COMPONENT_TYPES, GATED_CONTAINERS, HTML_TAGS, INTERACTIVE_TYPES, JOPLO_PROPS, VALUE_TYPES, type ComponentType } from './catalog.ts';
+import { JOPLO_PROPS } from './catalog.ts';
 import { JoploError } from './result.ts';
 import { LAYER_ICONS } from './schema.ts';
-import { standardGuides, standardDocs, standardExamples, standardAliases, standardChecks } from './plugins/standard-catalog.ts';
+import { standardGuides, standardDocs, standardExamples, standardChecks } from './plugins/standard-catalog.ts';
 
 export { SKILL_TOPICS };
 export type SkillTopic = (typeof SKILL_TOPICS)[number]['name'];
@@ -47,15 +48,15 @@ export function nearestSkillTopic(input: string): SkillTopic {
 }
 
 /** docs 是组件目录提供的可选一行提示，不在这里维护另一份组件或属性清单。 */
-export function skillTopic(topic: string, docs?: Readonly<Record<string, string>> | null): string {
+export function skillTopic(topic: string, docs?: Readonly<Record<string, string>> | null, plugins?: readonly PluginSkillSource[]): string {
   if (!SKILL_TOPICS.some(t => t.name === topic)) throw new JoploError('USAGE', `Unknown topic "${topic}". Did you mean ${nearestSkillTopic(String(topic))}?\nRun npx joplo skill to list all topics.`);
   const name = topic as SkillTopic;
-  const body = name === 'components' ? componentTopic(docs ?? undefined) : CONTENT[name];
+  const body = name === 'components' ? componentTopic(docs ?? undefined, plugins) : CONTENT[name];
   return `${body.trimEnd()}\n\nRelated topics: ${related[name].join(', ')}\n`;
 }
 
 /** 插件（D86）在 skill 里的样子：只用清单里的数据（名称、组件声明、技能正文）。 */
-export type PluginSkillSource = { id: string; title: string; version?: string; description?: string; components: Record<string, { doc: string; interactive?: boolean; parent?: string }>; skill?: string };
+export type PluginSkillSource = { id: string; title: string; version?: string; description?: string; components: Record<string, import('@joplo-app/kit/plugin').PluginComponentSpec>; skill?: string };
 
 /** `npx joplo skill` 总览末尾：本项目启用的插件。主题名被内置主题占用时用 plugin:<id>。 */
 export function pluginSkillIndex(plugins: readonly PluginSkillSource[]): string {
@@ -90,19 +91,24 @@ export function pluginSkillTopic(p: PluginSkillSource): string {
 /** 兼容旧入口：与 joplo skill authoring 输出完全相同。 */
 export function guide(): string { return skillTopic('authoring'); }
 
-/** HTML 兜底标签不单独列在目录里（它们在 “HTML tags” 一行里，且一律建议改用组件）。 */
-const HTML_SET: ReadonlySet<string> = new Set(HTML_TAGS);
-
+const kernelComponents = { Custom: {doc:'kind; component absent from the catalog, rendered as a labeled placeholder box'} };
+export const COMPONENT_DOCS = {...standardDocs,Custom:kernelComponents.Custom.doc};
+export const COMPONENT_EXAMPLES = standardExamples;
 /**
  * `npx joplo components <名字…>`（D68）：所列组件（含它的子组件，例如 Menu → Menu.Item）的属性提示、行为分组和示例。
  * 名字不区分大小写；不认识的名字报 USAGE 并给出最接近的名字。
  */
-export function componentDetails(names: readonly string[]): string {
-  const all = [...COMPONENT_TYPES, ...Object.keys(standardDocs)].filter(n => !n.startsWith('#'));
+function inventory(plugins?: readonly PluginSkillSource[]): Record<string, import('@joplo-app/kit/plugin').PluginComponentSpec> {
+  return {...kernelComponents, ...(plugins ? Object.fromEntries(plugins.flatMap(p => Object.entries(p.components).map(([name,c])=>[`${p.id}:${name}`,c]))) : standardComponents)};
+}
+export function componentDetails(names: readonly string[], plugins?: readonly PluginSkillSource[]): string {
+  const components = inventory(plugins);
+  const all = Object.keys(components);
+
   const out: string[] = [];
   for (const raw of names) {
-    const alias = Object.keys(standardAliases).find(k => k.toLowerCase() === String(raw).toLowerCase());
-    const input = alias ? standardAliases[alias]! : raw;
+    const aliases = all.filter(n => n.split(':')[1]?.toLowerCase() === String(raw).toLowerCase());
+    const input = aliases.length === 1 ? aliases[0]! : raw;
     const hit = all.find((n) => n.toLowerCase() === String(input).toLowerCase());
     if (!hit) {
       const near = [...all].sort((a, b) => distance(String(raw).toLowerCase(), a.toLowerCase()) - distance(String(raw).toLowerCase(), b.toLowerCase()))[0];
@@ -111,10 +117,10 @@ export function componentDetails(names: readonly string[]): string {
     const family = [hit, ...all.filter((n) => n.startsWith(`${hit}.`))];
     out.push(`# ${hit}`);
     for (const n of family) {
-      const groups = [INTERACTIVE_TYPES.has(n) ? 'interactive: requires id and a step, disabled + disabledReason, or unmodeled' : '', VALUE_TYPES.has(n) ? 'value: type / select / toggle write to it' : '', GATED_CONTAINERS.has(n) ? 'shown only while opened' : ''].filter(Boolean);
-      out.push(`- ${n}: ${({ ...COMPONENT_DOCS, ...standardDocs } as Record<string, string>)[n]!.replace(/\s+/g, ' ').trim()}${groups.length ? ` [${groups.join('; ')}]` : ''}`);
+      const groups = [components[n]?.interactive ? 'interactive: requires id and a step, disabled + disabledReason, or unmodeled' : '', components[n]?.traits?.input ? 'value: type / select / toggle write to it' : '', components[n]?.traits?.gate ? `shown only while ${components[n]!.traits!.gate!.join(' / ')}` : ''].filter(Boolean);
+      out.push(`- ${n}: ${components[n]!.doc.replace(/\s+/g, ' ').trim()}${groups.length ? ` [${groups.join('; ')}]` : ''}`);
     }
-    const ex = ({ ...COMPONENT_EXAMPLES, ...standardExamples } as Record<string, string>)[hit];
+    const ex = components[hit]!.example ?? standardExamples[hit];
     if (ex) out.push('', '```tsx', ex, '```');
     out.push('');
   }
@@ -125,18 +131,24 @@ export function componentDetails(names: readonly string[]): string {
 /** 图表家族（D69）在 components 里各占一行（根组件 + 子组件名），细节在 npx joplo skill diagram。 */
 const PLUGIN_PART = /^[^:]+:[^.]+\./;
 
-function componentTopic(docs: Readonly<Record<string, string>> = {}): string {
-  const names = [...COMPONENT_TYPES, ...Object.keys(standardDocs)].filter(name => !name.startsWith('#') && !HTML_SET.has(name) && !PLUGIN_PART.test(name));
-  const family = (root: string) => [root, ...Object.keys(standardDocs).filter(n => n.startsWith(`${root}.`))].join(', ');
+function componentTopic(docs: Readonly<Record<string, string>> = {}, plugins?: readonly PluginSkillSource[]): string {
+  const components = inventory(plugins);
+  const HTML_TAGS = Object.entries(components).filter(([,c])=>c.intrinsic).map(([name])=>name);
+  const HTML_SET = new Set(HTML_TAGS);
+  const INTERACTIVE_TYPES = new Set(Object.entries(components).filter(([,c])=>c.interactive).map(([name])=>name));
+  const VALUE_TYPES = new Set(Object.entries(components).filter(([,c])=>c.traits?.input).map(([name])=>name));
+  const GATED_CONTAINERS = new Set(Object.entries(components).filter(([,c])=>c.traits?.gate).map(([name])=>name));
+  const names = Object.keys(components).filter(name => !HTML_SET.has(name) && (!PLUGIN_PART.test(name) || !components[name.split('.')[0]!]?.catalogFamily));
+  const family = (root: string) => [root, ...Object.keys(components).filter(n => n.startsWith(`${root}.`))].join(', ');
   const line = (name: string) => {
-    const label = name.includes(':') && !name.includes('.') ? family(name) : name;
-    return `- ${label}${Object.hasOwn(docs, name) && docs[name]?.trim() ? `: ${docs[name]!.replace(/\s+/g, ' ').trim()}` : ''}`;
+    const label = components[name]?.catalogFamily ? family(name) : name;
+    return `- ${label}${(plugins ? components[name]?.doc : (docs[name] ?? docs[name.split(':')[1]!]))?.trim() ? `: ${(plugins ? components[name]!.doc : (docs[name] ?? docs[name.split(':')[1]!])!).replace(/\s+/g, ' ').trim()}` : ''}`;
   };
-  const listed = (set: ReadonlySet<string>) => names.filter(name => set.has(name)).join(', ');
+  const listed = (set: ReadonlySet<string>) => Object.keys(components).filter(name => set.has(name)).join(', ');
   return [
     '# Joplo components: components',
     '',
-    'Import components from @joplo-app/kit/ui. Names below come from the current compiler catalog; do not invent components.',
+    'Import components from @joplo-app/kit/ui. Names below come from enabled plugin manifests; TSX imports stay unchanged. UI and HTML fallback IR types use ui:. Do not invent components.',
     'Prop hints follow names when available; otherwise only names are listed. Write HTML tags directly in JSX; do not import them from ui.',
     '',
     '## HTML tags and line breaks',
@@ -175,9 +187,9 @@ const CONTENT: Record<Exclude<SkillTopic, 'components'>, string> = {
 Plugins are npm packages maintained outside Joplo. They add components (for example an interactive 3D scene) that the Joplo engine schedules like catalog components: flow steps click their elements, state bindings drive them, and the camera, cues, marks, captions, narration, screenshots, video export, build, and share all work unchanged.
 
 ## Standard plugins and API v2
-Standard plugins are enabled without config.plugins; third-party plugins still require explicit opt-in. The diagram topic comes from the first-party package. Existing kit imports stay valid; compiled component names use the plugin namespace.
+UI, HTML fallback, diagram and explainer standard plugins are enabled without config.plugins; third-party plugins still require explicit opt-in. The diagram topic comes from the first-party package. Existing kit imports stay valid; compiled component names use the plugin namespace.
 
-Node hooks validate/normalize nodes, derive geometry and lower effects. Inputs are copied and deeply frozen: node hooks return normalized props; derive returns { data, framing } rather than mutating a node. frame cannot change playback state. Hooks and schemas must return synchronously. The host materializes every hook result into its own data before validation; accessors and toJSON methods are rejected, so return ordinary data properties. Node normalization preserves authoring bindings as stable markers. Slot outputs must be finite, acyclic JSON. Shared references are expanded into independent copies, not retained as aliases. The depth limit is 100 along every expanded path, including primitive leaves (root depth 0); the complete published IR must also fit, including scene/step/ext wrappers. If PLUGIN_DATA_INVALID reports depth, flatten the data or use string ids instead of nested object references, then rebuild and compare the serialized publish output with itself. Every final slot is checked against its own plugin schema, including effect data when frame returns undefined; no schema means PLUGIN_DATA_INVALID. Publication strips core source metadata but leaves schema-owned slot fields intact. Per-step data is computed before playback; the player never invokes hooks. A plugin exception reports PLUGIN_HOOK_FAILED with the author location; fix the plugin or its props, then run check again. PLUGIN_DATA_INVALID means invalid output data, a failed slot schema, or excessive published IR depth; PLUGIN_EFFECT_UNKNOWN means the effect has no enabled compiler. PLUGIN_LEGACY_TYPE means old IR or bare names: recompile the original TSX using the current kit instead of editing generated JSON.
+Component declarations provide input, gate, choices, layout/region, childWidth, frame, disabledPresentation and text/textPaths traits; inherit copies props during compilation, and intrinsic maps JSX string tags. Check validates declarations; playback only reads copied IR. Components and skill catalogs read the enabled manifests. Read npx joplo skill ui for default UI migration and recovery guidance. Node hooks validate/normalize nodes, derive geometry and lower effects. Inputs are copied and deeply frozen: node hooks return normalized props; derive returns { data, framing } rather than mutating a node. frame cannot change playback state. Hooks and schemas must return synchronously. The host materializes every hook result into its own data before validation; accessors and toJSON methods are rejected, so return ordinary data properties. Node normalization preserves authoring bindings as stable markers. Slot outputs must be finite, acyclic JSON. Shared references are expanded into independent copies, not retained as aliases. The depth limit is 100 along every expanded path, including primitive leaves (root depth 0); the complete published IR must also fit, including scene/step/ext wrappers. If PLUGIN_DATA_INVALID reports depth, flatten the data or use string ids instead of nested object references, then rebuild and compare the serialized publish output with itself. Every final slot is checked against its own plugin schema, including effect data when frame returns undefined; no schema means PLUGIN_DATA_INVALID. Publication strips core source metadata but leaves schema-owned slot fields intact. Per-step data is computed before playback; the player never invokes hooks. A plugin exception reports PLUGIN_HOOK_FAILED with the author location; fix the plugin or its props, then run check again. PLUGIN_DATA_INVALID means invalid output data, a failed slot schema, or excessive published IR depth; PLUGIN_EFFECT_UNKNOWN means the effect has no enabled compiler. PLUGIN_LEGACY_TYPE means old IR or bare names: recompile the original TSX using the current kit instead of editing generated JSON.
 
 React runtimes use the host's React instance in both the board and exported sites. React containers can call ctx.renderChildren(nodes, container) to create a portal, or ctx.renderChildren() for their direct children. Read ctx.ext for the current compiled snapshot; use ctx.click for interactions. Do not update business state in a renderer. Keep private authoring text, source locations and local paths out of plugin slots: they are public playback data.
 

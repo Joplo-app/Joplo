@@ -10,7 +10,7 @@ import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../src/i18n/context';
 import { Stage } from '../src/renderer/Stage';
-import { embeddedImage } from '../src/renderer/components';
+import { embeddedImage } from '../../../plugins/ui/src/runtime.tsx';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });

@@ -10,7 +10,7 @@ export function fitStage(avail: { w: number; h: number }, frame: { width: number
  * 电脑页面的舞台铺满可用区域（T-stage）：不再把固定 1280×800 的画框按比例缩进去、在两侧留出空白，
  * 而是按可用区域的宽高比决定舞台的逻辑尺寸——设计宽度 base.width（1280）对齐可用宽度，高度随可用区域；
  * 缩放限制在 0.35–1.5 倍（超出时逻辑宽度相应变化，仍然铺满）；可用区域很矮时逻辑高度至少 minH，按高度缩放。
- * 镜头、聚焦小图、「适应画面」都按这个舞台尺寸计算。手机页面不用它（固定在 Phone 外框里，见 fitStage）。
+ * 镜头、聚焦小图、「适应画面」都按这个舞台尺寸计算。手机页面不用它（固定在 设备外框 外框里，见 fitStage）。
  */
 export function fillStage(avail: { w: number; h: number }, base: { width: number; height: number }, minH = 360): { width: number; height: number; scale: number } {
   const w = Math.max(1, avail.w);

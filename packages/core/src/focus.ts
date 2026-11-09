@@ -13,13 +13,13 @@
  *   caption  画面上没有新东西，只看字幕（source = none）。
  *
  * 呈现：作者写的提示原样给出；默认只有“结果揭晓”（reveal）：本步新出现或变化、观众容易错过的元素轻轻脉冲一次，
- * 不移动镜头、不压暗、不拦截点击。克制规则：弹窗 / 抽屉自带遮罩不提示；DataCard / StateFlow 自己会突出变化；
+ * 不移动镜头、不压暗、不拦截点击。克制规则：弹窗 / 抽屉自带遮罩不提示；自行显示变化的元素 自己会突出变化；
  * 一次变化超过 REVEAL_MAX 处不提示（整块都变了，让观众自己看）；作者写了任何焦点时不加默认提示；换页、换层不提示；
  * 同一个元素连续变化、或往同一个容器里连续追加（终端、聊天记录一行行出现）时，只在第一次提示。
  * config({ autoFocus: false }) 关掉默认呈现（reveal 恒为空）；焦点对象仍照常推导，check 用它判断“长时间没有焦点”。
  */
-import { DIRECTOR_LAYER, GATED_CONTAINERS, PAGE_LAYER, childWidth, pluginSpec, type PluginTable } from './catalog.ts';
-import { appShellLayout, applyStep, cameraAt, initialState, isNodeDisabled, isSelfVisible, layersOf, resolveProps, sceneWidth, type PlayState } from './player.ts';
+import { DIRECTOR_LAYER, PAGE_LAYER, childWidth, pluginSpec, type PluginTable } from './catalog.ts';
+import { layoutRegions, applyStep, cameraAt, initialState, isNodeDisabled, isSelfVisible, layersOf, resolveProps, sceneWidth, type PlayState } from './player.ts';
 import type { Callout, Project, Scene, SceneNode, Step } from './schema.ts';
 
 export const HOLD_MIN_SECONDS = 0.5;
@@ -27,9 +27,7 @@ export const HOLD_MAX_SECONDS = 30;
 /** 默认揭晓最多提示几处；更多时不提示。 */
 export const REVEAL_MAX = 3;
 /** 自带遮罩、出现时本身就是焦点的浮层：默认揭晓不再画提示。 */
-const SELF_EVIDENT: ReadonlySet<string> = GATED_CONTAINERS;
 /** 自己会突出本步变化的组件（D56）。 */
-const SELF_CHANGING: ReadonlySet<string> = new Set(['DataCard', 'StateFlow']);
 export type FocusSubject = 'cover' | 'card' | 'scene' | 'elements' | 'toast' | 'caption';
 export type FocusState = {
   /** 观众此刻该看的东西。 */
@@ -56,20 +54,19 @@ const EMPTY = (layer: string, subject: FocusSubject = 'caption'): FocusState => 
 type Vis = Pick<PlayState, 'ui' | 'data' | 'inputs'>;
 
 /**
- * 画面里此刻可见的元素 id（与 isNodeVisible 同一套规则：when、浮层 opened、断点、AppShell 收起），一次自上而下算完。
+ * 画面里此刻可见的元素 id（与 isNodeVisible 同一套规则：when、浮层 opened、断点、layout 收起），一次自上而下算完。
  */
 export function visibleIds(scene: Scene, state: Vis, width: number = sceneWidth(scene)): Set<string> {
   const out = new Set<string>();
   const ps = state as PlayState;
   const rec = (n: SceneNode, w: number, shell: { node: SceneNode; width: number } | null) => {
     if (!isSelfVisible(n, ps, w)) return;
-    const sh = n.type === 'AppShell' ? { node: n, width: w } : shell;
-    if (sh && (n.type === 'AppShell.Navbar' || n.type === 'AppShell.Aside')) {
-      const l = appShellLayout(sh.node.props, state, sh.width);
-      if ((n.type === 'AppShell.Navbar' ? l.navbar : l.aside)?.collapsed) return;
+    const sh = n.traits?.layout ? { node: n, width: w } : shell;
+    if (sh && n.traits?.region) {
+      if (layoutRegions(sh.node, state, sh.width)[n.traits.region]?.collapsed) return;
     }
     out.add(n.id);
-    const cw = childWidth(n.type, w, n.props);
+    const cw = childWidth(n, w, resolveProps(n, state));
     for (const c of n.children ?? []) rec(c, cw, sh);
   };
   rec(scene.root, width, null);
@@ -84,7 +81,7 @@ function changedElements(scene: Scene, before: PlayState, after: PlayState, plug
   const va = visibleIds(scene, after);
   const hits: Hit[] = [];
   const parents = new Map<string, string | null>();
-  const add = (n: SceneNode | null, appended: boolean) => { if (n && !hits.some((h) => h.id === n.id)) hits.push({ id: n.id, type: n.type, selfEvident: pluginSpec(plugins, n.type)?.selfEvident, parent: parents.get(n.id) ?? null, appended: appended && n.type !== '#text' }); };
+  const add = (n: SceneNode | null, appended: boolean) => { if (n && !hits.some((h) => h.id === n.id)) hits.push({ id: n.id, type: n.type, selfEvident: n.traits?.selfEvident || pluginSpec(plugins, n.type)?.selfEvident, parent: parents.get(n.id) ?? null, appended: appended && n.type !== '#text' }); };
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const rec = (n: SceneNode, parent: SceneNode | null) => {
     parents.set(n.id, parent?.id ?? null);
@@ -210,7 +207,7 @@ export function focusTimeline(project: Project, scenarioId: string): FocusState[
     // 连续性：同一个元素上一步刚变过；或者往上一步刚追加过的同一个容器里再追加（终端、聊天记录一行行出现）。
     // 观众已经在看那里，不再重复提示
     const repeated = (h: Hit) => lastChanged.has(h.id) || (h.appended && !!h.parent && lastChanged.has(`^${h.parent}`));
-    const shown = hits.filter((h) => !SELF_EVIDENT.has(h.type) && !SELF_CHANGING.has(h.type) && !h.selfEvident && !repeated(h));
+    const shown = hits.filter((h) => !h.selfEvident && !repeated(h));
     if (auto && shown.length <= REVEAL_MAX) f.reveal = shown.map((h) => h.id);
   }
   byScenario.set(scenarioId, out);

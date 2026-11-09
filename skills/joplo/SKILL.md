@@ -88,6 +88,7 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it. See npx joplo skill check.
 - For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, and verify playback before claiming it works. See npx joplo skill content.
 - For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings. See npx joplo skill plugins.
+- Default UI and HTML belong to the ui plugin; keep kit/ui imports and author TSX, use ui: names only in IR and diagnostics. Recompile old bare-name IR before comparing versions. See npx joplo skill components.
 - Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components. See npx joplo skill plugins.
 
 ## Reference
@@ -98,7 +99,7 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - focus: Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
 - content: Default first-party content plugin: continuous visual explainers, chapters, design worlds and review practices
 - diagram: Default first-party diagram plugin: architecture, sequence and state diagrams, groups, compiled traces and framing
-- components: Component catalog, supported HTML tags, line breaks, props, and real images
+- components: Enabled plugin component catalog, namespaced UI/HTML, props, examples, and real images
 - cases: Case dimensions: ask the user before starting
 - check: Read diagnostics, UNBOUND_INTERACTIVE, and fix the indicated file and line
 - selection: Edit only the element selected by the user in the board
@@ -107,4 +108,4 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - publish: pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 - plugins: Universal properties, plugin themes, state writes and director targets; Media tracks, local text-to-resource compilers, cached offline publishing; Default standard plugins and third-party packages; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.18 sha256:80ee684fff6e0203f07edf41cb450b4ca6f194d494dd5c5a402710fd1581984d -->
+<!-- joplo-skill 0.2.18 sha256:fc975761378ccc0463db99b3e17c1266c76e0f950419378201834ab57ed3dec5 -->
