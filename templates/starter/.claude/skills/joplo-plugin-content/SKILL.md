@@ -9,15 +9,32 @@ Author package: @joplo-app/plugin-content
 # Joplo content production: content
 
 For explainers, tutorials, science and news-explainer pieces that should feel like a good video, not a deck: the viewer watches a world change while a voice explains it.
-Same machinery as demos: a feature is the episode, each case a chapter, each scenario plays one chapter (the published site plays them back to back), narrate() is the voice-over. Full example: examples/llm-explainer.
+Author one standalone work in works/<key>.tsx with work(); put chapter() slices under scenarios and narrate() in their steps. Chapters continue in declaration order by default. Works have covers and enter the project home page; no feature, option, cases or pick is needed. Full example: examples/llm-explainer.
 
-Install @joplo-app/plugin-content at the Joplo version; import content and add it to config.plugins. Import { Canvas, camera } from this package; keep flow, patch, narrate and hold from @joplo-app/kit. Use theme: 'content:studio' for the bundled CSS. No plugin is implicitly enabled.
+Install @joplo-app/plugin-content at the Joplo version; import content and add it to config.plugins. Import { Canvas, camera } from this package; keep work, chapter, patch, narrate and hold from @joplo-app/kit. Use theme: 'content:studio' for the bundled CSS. No plugin is implicitly enabled.
+
+## Minimal work
+In a project with content enabled in config.plugins (and the starter's type: module / JSX tsconfig):
+```tsx
+// works/explainer.tsx
+import { work, chapter, narrate } from '@joplo-app/kit';
+import { Canvas } from '@joplo-app/plugin-content';
+export default work({ title: 'A request in motion', summary: 'Follow one request',
+  stage: <Canvas w={1280} h={800} />,
+  scenarios: {
+    arrival: chapter('A request arrives', { expected: 'Understand where it starts' })
+      .system('Arrive', narrate('A request arrives.')),
+    response: chapter('The worker responds').system('Respond', narrate('The worker replies.')),
+  },
+});
+```
+This is the authoring skeleton; add a visible subject and real changing state before reviewing the film. stage/layers needs no routes/ directory. Use on/routes explicitly when reusing product pages. WORK_INVALID means repair the required fields or slice builders; WORK_SLICES_MIXED means use chapter() consistently; FROM_UNKNOWN lists valid keys; WORK_EMPTY means add your first slice. Keep render/deep-link ids from outline JSON (currently three segments), while --work takes the public entry key.
 
 ## 1. Before TSX: package and plan within the agreed scope
 - One thing the viewer should be able to repeat afterwards, in one sentence.
-- Package first: the title asks the question; a thumbnail line of at most five words gives the surprising answer (complement the title, never repeat it); flow({ description }) is the cover sentence. The share preview is the first scenario's first frame, so design that frame as a thumbnail: one big line, one focal object, high contrast.
+- Package first: the title asks the question; a thumbnail line of at most five words gives the surprising answer (complement the title, never repeat it); chapter({ description }) is the cover sentence. The share preview is the first scenario's first frame, so design that frame as a thumbnail: one big line, one focal object, high contrast.
 - If the framing is unresolved, offer two or three devices (one running example, misconception then correction, a number made tangible, before and after) with a recommendation. Reuse an already agreed design; do not repeat approval rounds the user has waived.
-- Chapters: one question per chapter. Case titles are numbered questions ('01 What does it actually read?'); expected is what the viewer can now say. List every point from the source material and map each to a chapter or drop it on purpose.
+- Chapters: one question per chapter. Chapter titles are questions ('What does it actually read?'); the UI adds their numbers automatically. chapter({ expected }) is what the viewer can now say. List every point from the source material and map each to a chapter or drop it on purpose.
 - One running example through every chapter (the same prompt, person, or data set), so each chapter builds on what the viewer already saw.
 - Write the script as one line per step: ears (narrate), eyes (what changes on stage), source. Adjacent steps should connect with 'but' or 'so'; a chain of 'and then' is flat.
 - Budget: narration reads about 4.5 CJK characters (2.5 English words) per second; 45–90 s per chapter. About 400 CJK characters can already exceed 90 seconds. npx joplo outline counts narration in its estimates.
@@ -37,8 +54,8 @@ Failure mode, even with nice graphics: one board per chapter (big title, panels,
 - shot() draws the host focus ring and caps UI zoom at 1.25×; use camera() for traveling inside a Canvas without that ring.
 - When another plugin effect also suggests host focus (for example a diagram trace inside a Canvas), use an explicit shot() for the whole director layer if the Canvas camera should own the framing. Otherwise host zoom and Canvas zoom can multiply and push nearby text out of view. Verify the actual visible bounds in playback, not only DOM text.
 - Camera: camera('id', …) frames those elements (Joplo measures them, adds pad, caps zoom); camera() shows the whole canvas. Establish wide, push in on detail, pull back for the payoff. Object flights in the same step follow the camera's timing, so both land together.
-- Chapters continue: flow({ from: 'previousKey' }) starts from the previous chapter's last frame (state, camera, director layer). patch($.ui, { … }) changes several values in one step.
-- System-only chapters stay on the initial director layer unless camera(), shot(), a cue, or flow({ layer }) selects another layer. Continuing from a chapter inherits its final layer; do not copy its state by hand.
+- Chapters continue: chapter() starts from the previous chapter's last frame (state, camera, director layer) by default. Only use from: null to restart, or from: 'sliceKey' for another predecessor; keep all slices chapter() within this work. patch($.ui, { … }) changes several values in one step.
+- System-only chapters stay on the initial director layer unless camera(), shot(), a cue, or chapter({ layer }) selects another layer. Continuing from a chapter inherits its final layer; do not copy its state by hand.
 - screen children of the Canvas stay fixed on screen: chapter label, source line, poster, end card.
 - Takeaways land on objects (a pinned question flips to '✓ answer'); the recap is a pull back to the whole world. Use .card() only when nothing on stage can carry the moment.
 ```tsx
@@ -48,7 +65,7 @@ Failure mode, even with nice graphics: one board per chapter (big title, panels,
   </div>
   <div screen style={{ position: 'absolute', left: 20, top: 16 }}>{$.ui.chapter}</div>
 </Canvas>
-flow('What does it read?', { from: 'hook' })
+chapter('What does it read?')
   .system('Split', 'Nine characters, seven pieces', patch($.ui, { mode: 'split' }), camera('bubble', { pad: 160 }))
   .system('To the tape', 'It reads these numbers', patch($.ui, { at: 'tape' }), camera('tape', 'meter'))
 ```
@@ -90,12 +107,21 @@ flow('What does it read?', { from: 'hook' })
 - Pull back to the whole world: every pinned question now shows its answer. Then one concrete action the viewer can take right away, as a screen element. Stop once the value lands; no 'thanks for watching'.
 
 ## 9. Required: review before handing over
-- npx joplo check until 0 errors. HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it.
+- npx joplo check until 0 errors, then npx joplo outline --work <key>: verify the chapter order, step counts and estimated duration. Standalone works do not run feature coverage or HAPPY_PATH_ONLY checks.
 - Storyboard every chapter: npx joplo render --scenario-id <id> --sheet --out board.png prints every step in one image with its caption and narration. Read it frame by frame and assume the first one has problems: half-empty frames, objects cut at the edge, labels overlapping, text too small in wide shots, the chapter label covering content. Fix, then storyboard again.
 - Film-strip every chain of chapters: npx joplo render <dir> --scenario-id <first> --film --chain --out film.png. Fix every red CUT (one-frame full-screen change) unless it is your one deliberate cut, and every grey STILL (no visible change for ≥ 1.5 s). The storyboard cannot show either. Engine checklist: npx joplo skill demo, "Make it play like a film".
 - Play each chapter in the board with Voice on: flights and camera land together, nothing leaves the frame mid-flight, narration finishes before the next step.
 - Evidence, not belief: 'it plays' needs check 0 errors plus a run in the board; 'it looks right' needs the rendered frames; 'it is clear' needs captions-only and frames-only passes that both tell the story.
 - Tell the user what you could not verify (a real voice on a phone, other window sizes).
+
+## Migrating an existing script safely
+- Freeze the previous dev IR before moving files. Compare all steps, plugin drawing/media snapshots and every stateAt position after migration; a flow-to-chapter rename does not prove the same continuous state, motion or sound.
+- A chapter that previously began independently needs from: null. Default continuation carries the previous ui/data/inputs and running music; use it only when the next chapter should inherit that ending.
+- Put audience descriptions from feature.roles into audience. Preserve real role() speakers, the role keys used by say(), and config.voice.roles together; verify the chosen voices in playback.
+- If the project already has a helper named chapter, rename that helper before importing chapter from the kit.
+- Remove manual numbering from the chapter title itself, not every identical string. A transition card or caption may still use the old source text; let i18n missing/stale/unused diagnostics determine which translation keys need changing.
+- Inspect a path page before deleting it. A Slot-only/empty wrapper can be removed for stage/layers; reuse actual picture content through explicit on or the work's routes.
+- To prove a draft did not publish, search all build artifacts for one complete sentence unique to the old work and absent as a substring of current copy. Keep the old work locally with draft: true; do not rely on the published menu alone.
 
 ## Diagnostics and recovery
 - CAMERA_UNKNOWN: the id must exist in a current layer or stage; frame elements inside this Canvas. CAMERA_INVALID: pad 0–2000, zoom 0.1–10, ms 0–10000, drift false | 0.5–2 | { zoom 0.5–2, x/y −2000–2000, ms 500–60000 }, finite numbers only; <Canvas drift> takes the same values and <Canvas safe> is four numbers 0–2000.
@@ -107,8 +133,8 @@ flow('What does it read?', { from: 'hook' })
 - Keep camera and FLIP duration together when both move; motionMs explicitly overrides duration, including 0. animate=false cancels an existing flight and renders the final layout.
 - A Canvas with no parent height uses its view aspect ratio; with an explicit parent height it fills that parent. A zero-sized parent still needs a layout fix; render reports the measured surface.
 - screen only separates direct Canvas children into the fixed overlay. Nested screen props remain ordinary descendants.
-- One world per continuous chapter; use flow({ from }) to avoid manually copied end states. The initial frame and every step contain complete compiled drawing snapshots; deep links do not replay plugin logic.
-- HAPPY_PATH_ONLY is expected for a main-flow explainer. Do not invent product failures solely to silence it. Review every storyboard and verify animation separately from static renders.
+- One world per continuous chapter; use chapter() default continuation to avoid manually copied end states. The initial frame and every step contain complete compiled drawing snapshots; deep links do not replay plugin logic.
+- HAPPY_PATH_ONLY belongs to feature review. If an explainer receives it, move the piece to works/<key>.tsx with work()/chapter() and remove its artificial cases; do not invent product failures. Review every storyboard and verify animation separately from static renders.
 
 - npx joplo skill content/patterns: Recipes and individual pitfalls
 
@@ -119,4 +145,4 @@ General engine contracts: npx joplo skill plugins
 - [patterns](./topics/patterns.md): Recipes and individual pitfalls
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.4.1 sha256:68beecf9fd742d6ea31583df77b00024624559e62df04db006c5dd9941d9ddcc -->
+<!-- joplo-skill 0.4.1 sha256:ce6828b4f9a074b47c10dc344742d6abb947c2dfe5488f280fc7900ad5468dfb -->

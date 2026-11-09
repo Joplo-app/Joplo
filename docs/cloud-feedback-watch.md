@@ -9,7 +9,7 @@
 ```sh
 joplo feedback watch ./demo --local --follow --json
 joplo feedback watch ./demo --local --session <id> --json
-joplo feedback watch --share Abc1234567 --option invite.a-modal --interval 15 --json
+joplo feedback watch --share Abc1234567 --work invite.a-modal --interval 15 --json
 ```
 
 本地仍直接观察持久文件，Share 使用普通 GET 轮询。首次立即请求，成功后默认等待 15 秒；可选 10–30 整数秒。网络错误退避，鉴权／权限／配额错误明确结束；中断会取消在途请求和等待。本地的 `review list/watch` 作为兼容入口保留，原有云端 `feedback` 单次读取和 `--applied` 也不变。

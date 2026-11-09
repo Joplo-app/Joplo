@@ -13,7 +13,7 @@ Required after every round of development: start the follower before handing the
 ## Local review: feedback without leaving the board
 - The native feedback icon is draggable and remembers its relative position. Its floating panel never resizes the stage. Reviewers can type persistent review feedback here (prototype input is disposable exploration), or confirm without writing feedback. Point them to this native control, not a simulated icon inside the demo.
 - Each successful option revision is its own review round (session). The follower streams all of them: stdout is NDJSON, one event per line, each with sessionId, optionId and eventId; diagnostics go to stderr. Approving one option does not stop it. It exits 1 when the board stops (restart dev and run it again) and 130 on Ctrl+C. On restart it replays the open rounds, so deduplicate by eventId.
-- Exact-session mode is for waiting on one option version or resuming from a cursor: npx joplo feedback list [dir] --local --json (--all includes completed/stopped sessions, --option <qualified-id> filters), then npx joplo feedback watch [dir] --local --session <id> --json. Without --session or --follow, exactly one active match is required; never guess between multiple instances.
+- Exact-session mode is for waiting on one option version or resuming from a cursor: npx joplo feedback list [dir] --local --json (--all includes completed/stopped sessions, --work <qualified-id> filters), then npx joplo feedback watch [dir] --local --session <id> --json. Without --session or --follow, exactly one active match is required; never guess between multiple instances.
 - During an active review, read background output with short tool waits (about 1–5 seconds) and acknowledge feedback as it arrives. Do not wait for approved or process exit: a long output-read window can delay the agent's response even though the CLI emitted feedback immediately. A background shell alone is not an agent wake-up mechanism; stay in the active receive loop while the user is testing.
 - Ending your response while the user tests: if your host wakes you when a background command finishes (a host configured to resume on process exit does), run npx joplo feedback watch [dir] --local --follow --once --json in the background. It exits 0 on the first feedback or approval, which resumes you; handle it, then run it again with --since <createdAt of the last handled event> (the exit message prints this exact command), so nothing is replayed or lost while you work.
 - Do not finish your response and claim continued live reception unless the host supports a notification that resumes the agent. If you need to yield without that capability, tell the user. Before starting another task, drain and acknowledge any pending output; during longer work, keep checking the existing listener until the review ends or the user stops it.
@@ -50,7 +50,7 @@ Keep projectDir, the shell handle, and the eventIds you handled in the task cont
 Never carry an old seq to a new session, delete review records to reset one, or treat process shutdown as acceptance. For a finished review, explicit --session can replay its saved events even if its server stopped.
 
 ## Share: poll feedback through the same CLI
-- npx joplo feedback watch --share <id> --option <feature.option> --json [--interval 15] [--version <n>] [--server <url>]. Requires the owner's login or an API key with feedback:read. The target option is required; public viewing does not make the owner's feedback API anonymous.
+- npx joplo feedback watch --share <id> --work <feature.option> --json [--interval 15] [--version <n>] [--server <url>]. Requires the owner's login or an API key with feedback:read. The target option is required; public viewing does not make the owner's feedback API anonymous.
 - Poll immediately, then every 15 seconds by default; --interval accepts integer seconds from 10 to 30. Requests are sequential; transient network errors back off up to 30 seconds, and Ctrl+C cancels requests as well as waits.
 - Pin the first returned share version unless --version is given. A replacement version emits closed and exits 1; it never silently switches versions. Only a matching current-version owner pick becomes approved and exits 0; votes, rule confirmations, other options, and older decisions cannot end this watch.
 - source=cloud events share the feedback/approved/decision/closed vocabulary. Deduplicate by eventId (stable across restarts); Cloud has no local seq or --after cursor. Missing route/source data stays null rather than being guessed.
@@ -59,7 +59,7 @@ Never carry an old seq to a new session, delete review records to reset one, or 
 
 Example, scoped to one known option:
 
-    npx joplo feedback watch --share <share-id> --option invite.a-modal --interval 15 --json
+    npx joplo feedback watch --share <share-id> --work invite.a-modal --interval 15 --json
 
 ## Best practices and boundaries
 - Separate transport timing from agent response timing: Cloud requests are 10–30 seconds apart; local event output is immediate. During active testing, read either shell with short tool waits instead of buffering until it exits. A background process alone does not wake an idle agent.
@@ -70,4 +70,4 @@ Example, scoped to one known option:
 - Authentication failures (exit 3) need the correct owner login/API key; never silently switch accounts. Invalid responses, quota errors and missing shares are failures, not approval. If the project CLI lacks these commands, check its version before changing the environment.
 
 Related topics: selection, check, publish
-<!-- joplo-skill 0.3.0 sha256:e9d4d19fbe30a18e48053fb12427804da986c8df645cdf8097cb842163ecd241 -->
+<!-- joplo-skill 0.4.1 sha256:caaf8b5a2fabcadd2a92d2e50a78ac1e655207f47e4954f4e73925bc2d4728d5 -->

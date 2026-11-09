@@ -7,10 +7,10 @@ import type { CloudClient } from './cloud.ts';
 import { writeFeedbackEvent, type FeedbackStreamEvent, type FeedbackStreamIo } from './feedback-stream.ts';
 
 export const DEFAULT_FEEDBACK_POLL_SECONDS = 15;
-export type CloudFeedbackWatchOptions = { option: string; version?: number; interval?: number; json?: boolean };
+export type CloudFeedbackWatchOptions = { option: string; work?: string; version?: number; interval?: number; json?: boolean };
 export function validateCloudWatchOptions(options: CloudFeedbackWatchOptions): void {
   if (!/^[A-Za-z][\w-]{0,63}\.[A-Za-z][\w-]{0,63}$/.test(options.option ?? ''))
-    throw new JoploError('USAGE', 'Cloud feedback watch requires --option <feature.option> so another option cannot finish this review');
+    throw new JoploError('USAGE', 'Cloud feedback watch requires --work <key|feature.option> so another work cannot finish this review');
   const interval = options.interval ?? DEFAULT_FEEDBACK_POLL_SECONDS;
   if (!Number.isInteger(interval) || interval < 10 || interval > 30) throw new JoploError('USAGE', 'interval must be an integer from 10 to 30 seconds');
   if (options.version !== undefined && (!Number.isSafeInteger(options.version) || options.version < 1)) throw new JoploError('USAGE', 'version must be a positive integer');
@@ -53,7 +53,7 @@ export async function watchCloudFeedback(client: CloudClient, shareId: string, o
   let binding: CloudReviewBinding | null = null;
   let failures = 0;
   const seen = new Set<string>();
-  io.err(`Polling ${terminalText(client.server)} share ${shareId} / ${options.option} every ${intervalMs / 1000}s. Ctrl+C stops only this watcher.\n`);
+  io.err(`Polling ${terminalText(client.server)} share ${shareId} / ${options.work ?? options.option} every ${intervalMs / 1000}s. Ctrl+C stops only this watcher.\n`);
   io.err('The current Cloud API exposes unresolved comments and unapplied decisions, not complete event history. Records resolved/applied between polls may be missed.\n');
   try {
     for (;;) {
@@ -76,22 +76,22 @@ export async function watchCloudFeedback(client: CloudClient, shareId: string, o
       version ??= feedback.share.version;
       if (!binding) {
         binding = { server: client.server, shareId, optionId: options.option, version };
-        io.err(`Bound to ${shareId} / ${options.option} at version ${version}.\n`);
+        io.err(`Bound to ${shareId} / ${options.work ?? options.option} at version ${version}.\n`);
       }
       if (feedback.share.version !== version) {
         const meta = cloudReviewIdentity(binding);
-        writeFeedbackEvent({ ...meta, type: 'closed', eventId: `${meta.sessionId}:version-changed:${feedback.share.version}`, createdAt: new Date(client.now()).toISOString(), reason: 'source_changed' }, !!options.json, io);
+        writeFeedbackEvent({ ...meta, type: 'closed', eventId: `${meta.sessionId}:version-changed:${feedback.share.version}`, createdAt: new Date(client.now()).toISOString(), reason: 'source_changed' }, !!options.json, io, id => id === options.option ? options.work ?? id : id);
         io.err(`Share version changed from ${version} to ${feedback.share.version}. Review the new version and start a new watcher.\n`);
         return 1;
       }
       const events = cloudFeedbackEvents(feedback, binding);
       for (const event of events) {
         if (seen.has(event.eventId)) continue;
-        writeFeedbackEvent(event, !!options.json, io);
+        writeFeedbackEvent(event, !!options.json, io, id => id === options.option ? options.work ?? id : id);
         seen.add(event.eventId);
       }
       if (events.some(e => e.type === 'approved')) {
-        io.err(`Option ${options.option} approved for share version ${version}. Watch completed.\n`);
+        io.err(`${options.work && !options.work.includes('.') ? 'Work' : 'Option'} ${options.work ?? options.option} approved for share version ${version}. Watch completed.\n`);
         return 0;
       }
       await client.sleep(intervalMs, signal);

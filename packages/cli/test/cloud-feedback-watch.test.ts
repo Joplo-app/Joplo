@@ -52,7 +52,7 @@ describe('cloud snapshot polling', () => {
     expect(request).not.toHaveBeenCalled();
   });
   it('requires a target option and never adopts approval of another option, feature, or version', async () => {
-    expect(() => validateCloudWatchOptions({ option: '' })).toThrow(/requires --option/);
+    expect(() => validateCloudWatchOptions({ option: '' })).toThrow(/requires --work/);
     const foreign = snapshot([comment('old', { version: 2 }), comment('other', { scenario: 'f.b.main' }), comment('collision', { scenario: 'f.ab.main' })],
       [decision('old', { version: 2 }), decision('other', { targetId: 'f.b' }), decision('another', { featureId: 'g', targetId: 'g.a' })]);
     const { client, waits } = fixture([foreign, snapshot([comment('mine')], [decision('mine', { targetId: 'f.a' })])]);
@@ -118,7 +118,7 @@ it('Ctrl+C aborts an in-flight HTTP request instead of waiting for its timeout',
 it('the unified CLI rejects incompatible modes before auth and streams cloud events on stdout', async () => {
   const invalid = [
     ['--local', '--share', shareId], ['--local', '--version', '2'], ['--local', '--interval', '15'], ['--share', shareId],
-    ['--share', shareId, '--option', 'f.a', '--after', '1'], ['--share', shareId, '--option', 'f.a', '--interval', '9'],
+    ['--share', shareId, '--work', 'f.a', '--after', '1'], ['--share', shareId, '--work', 'f.a', '--interval', '9'],
   ];
   for (const flags of invalid) {
     const io = capture();
@@ -130,10 +130,18 @@ it('the unified CLI rejects incompatible modes before auth and streams cloud eve
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   try {
     const io = capture();
-    expect(await runCli(['feedback', 'watch', '--share', shareId, '--option', 'f.a', '--server', base, '--json'], {
+    expect(await runCli(['feedback', 'watch', '--share', shareId, '--work', 'f.a', '--server', base, '--json'], {
       stdout: io.io.out, stderr: io.io.err, cloud: { env: { JOPLO_API_KEY: key } },
     })).toBe(0);
     expect(io.events().map(e => e.type)).toEqual(['feedback', 'approved']);
     expect(io.out + io.err).not.toContain(key);
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
+});
+
+it('独立作品通过内部播放 id 绑定反馈，面向人的监听与确认输出只用作品键', async () => {
+  const { client } = fixture([snapshot([], [decision('d1', { featureId: 'demo', targetId: 'demo.main' })])]);
+  const io = capture();
+  expect(await watchCloudFeedback(client, shareId, { option: 'demo.main', work: 'demo' }, io.io)).toBe(0);
+  expect(io.out + io.err).not.toContain('demo.main');
+  expect(io.err).toContain('Work demo approved');
 });

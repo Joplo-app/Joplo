@@ -1,5 +1,7 @@
 # Joplo case checklist: cases
 
+This topic applies only to works attached to a feature. Standalone work() has no cases, coverage or uses(); use chapter expected for what viewers should understand.
+
 Before starting, read user requirements and project material. Use these dimensions to find gaps; ask only key questions that change the design.
 Record unanswered items as question or rules with status `pending`. Do not confirm AI assumptions on the user's behalf.
 
@@ -62,6 +64,7 @@ Pick relevant cases to ask the user before starting. Do not include every preset
 - A rule the user stated in this conversation is origin: 'user', status: 'confirmed'; a rule you inferred stays ai_assumption, pending.
 
 ## Declare coverage without a scenario
+Coverage applies only to works attached to a feature.
 Coverage status values: `expressed`, `undecided`, `missing`, `not_applicable`, `excluded`.
 - option.coverage: { case_key: undecided('Why this is undecided') }.
 - missing('What is missing'): leave the gap explicit; do not pretend it is `expressed`.
@@ -73,4 +76,4 @@ See authoring for flow and rule syntax; check for locating coverage diagnostics.
 No mobile example yet; create a separate demo when mobile is needed (D44).
 
 Related topics: story, authoring, check
-<!-- joplo-skill 0.3.0 sha256:62db7310635fba671f8304a672e0bf6f4d4ea7d914ce5116559ebbb872b1a621 -->
+<!-- joplo-skill 0.4.1 sha256:751900ae0c1fc075f938b38c5baf911457253efd049776e0f66a26d4dcc65545 -->

@@ -8,7 +8,7 @@ import { terminalText } from './cloud-error.ts';
 import { localFeedbackEvent, writeFeedbackEvent, type FeedbackStreamIo } from './feedback-stream.ts';
 const terminalLines = (text: string) => text.split('\n').map(line => terminalText(line)).join('\n');
 
-export type ReviewFilter = { session?: string; option?: string; all?: boolean };
+export type ReviewFilter = { session?: string; option?: string; all?: boolean; labels?: Record<string, string> };
 export function reviewSessions(dir: string, filter: ReviewFilter = {}): LocalReviewSession[] {
   const root = fs.realpathSync(path.resolve(dir));
   return (filter.session ? [readLocalReview(root, filter.session)] : listLocalReviews(root))
@@ -20,8 +20,8 @@ export function reviewSummary(session: LocalReviewSession) {
     optionId: session.optionId, revision: session.revision, status: localReviewStatus(session), alive: localReviewOwnerAlive(session),
     events: session.events.length, createdAt: session.createdAt, url: session.url };
 }
-export function reviewLine(s: LocalReviewSession): string {
-  return terminalText(`${s.id}  ${localReviewStatus(s)}  ${s.optionId}  ${s.projectDir}  ${s.url}`);
+export function reviewLine(s: LocalReviewSession, labels: Record<string, string> = {}): string {
+  return terminalText(`${s.id}  ${localReviewStatus(s)}  ${labels[s.optionId] ?? s.optionId}  ${s.projectDir}  ${s.url}`);
 }
 
 /** fs.watch 唤醒 + 500ms 校验兜底。每个监听器持有自己的游标，不会“消费掉”别人的事件。 */
@@ -29,11 +29,11 @@ export async function watchLocalReview(dir: string, opts: ReviewFilter & { after
   const root = fs.realpathSync(path.resolve(dir));
   const matches = reviewSessions(root, opts);
   if (!matches.length) throw new JoploError('NOT_FOUND', 'No matching local review. Run joplo dev, then joplo review list in this project');
-  if (matches.length !== 1) throw new JoploError('USAGE', `Multiple local reviews match. Pass --session <id> (or --option <id>):\n${matches.map(reviewLine).join('\n')}`);
+  if (matches.length !== 1) throw new JoploError('USAGE', `Multiple local reviews match. Pass --session <id> (or --work <id>):\n${matches.map(s => reviewLine(s, opts.labels)).join('\n')}`);
   const first = matches[0]!;
   let cursor = opts.after ?? 0;
   if (!Number.isSafeInteger(cursor) || cursor < 0 || cursor > first.events.length) throw new JoploError('USAGE', `after must be an integer from 0 to ${first.events.length}`);
-  io.err(terminalLines(`Watching ${first.id} · ${first.optionId}\nProject: ${root}\nInstance: ${first.instanceId}\nRevision: ${first.revision}\nReview: ${first.url}\n`) + 'Feedback streams to stdout; approval ends this command. Ctrl+C stops only the watcher.\n');
+  io.err(terminalLines(`Watching ${first.id} · ${opts.labels?.[first.optionId] ?? first.optionId}\nProject: ${root}\nInstance: ${first.instanceId}\nRevision: ${first.revision}\nReview: ${first.url}\n`) + 'Feedback streams to stdout; approval ends this command. Ctrl+C stops only the watcher.\n');
 
   const file = localReviewFile(root, first.id);
   const lease = path.join(localReviewWatcherDir(root, first.id), `${crypto.randomUUID()}.json`);
@@ -65,7 +65,7 @@ export async function watchLocalReview(dir: string, opts: ReviewFilter & { after
           if (s.instanceId !== first.instanceId || s.revision !== first.revision || s.optionId !== first.optionId || s.ownerPid !== first.ownerPid || s.events.length < cursor || (previousRequest && s.events[cursor - 1]?.requestId !== previousRequest))
             throw new JoploError('INVALID_SCHEMA', 'Review identity or event history changed unexpectedly; refusing to switch sessions');
           for (const e of s.events.slice(cursor)) {
-            writeFeedbackEvent(localFeedbackEvent(s, e), !!opts.json, io);
+            writeFeedbackEvent(localFeedbackEvent(s, e), !!opts.json, io, id => opts.labels?.[id] ?? id);
             cursor = e.seq;
             previousRequest = e.requestId;
           }
@@ -133,7 +133,7 @@ export async function followLocalReviews(dir: string, opts: ReviewFilter & { aft
     tracked.set(s.id, { session: s, cursor: 0, previousRequest: null, stamp: '', lease: path.join(localReviewWatcherDir(root, s.id), `${crypto.randomUUID()}.json`) });
   };
   initial.forEach(track);
-  io.err(terminalLines(`Following ${initial.length} review round(s) in ${root}\n${initial.map(s => `  ${s.optionId}  ${s.url}`).join('\n')}\n`)
+  io.err(terminalLines(`Following ${initial.length} review round(s) in ${root}\n${initial.map(s => `  ${opts.labels?.[s.optionId] ?? s.optionId}  ${s.url}`).join('\n')}\n`)
     + (opts.once
       ? 'Exits as soon as new feedback or an approval arrives (--once), so a host that wakes the agent when a background command ends delivers it.\n'
       : 'New rounds after source edits and other options are picked up automatically. Feedback streams to stdout; Ctrl+C stops only the watcher.\n'));
@@ -165,7 +165,7 @@ export async function followLocalReviews(dir: string, opts: ReviewFilter & { aft
       for (const e of s.events.slice(t.cursor)) {
         // --since：已经处理过的事件（重新启动时会重放开着的轮次）只推进游标，不再输出
         if (since === null || Date.parse(e.createdAt) > since) {
-          writeFeedbackEvent(localFeedbackEvent(s, e), !!opts.json, io);
+          writeFeedbackEvent(localFeedbackEvent(s, e), !!opts.json, io, id => opts.labels?.[id] ?? id);
           // --once 只为评审人的动作退出：feedback / approved。改源码带来的 closed 是 Agent 自己的工作，照常输出但不唤醒
           if (e.type === 'feedback' || e.type === 'approved') emitted.push({ createdAt: e.createdAt });
         }

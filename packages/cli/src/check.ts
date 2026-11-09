@@ -1,3 +1,4 @@
+import { resolveWorkId } from './work.ts';
 import { existsSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -39,7 +40,8 @@ export async function checkWithProject(dir: string, optionId?: string): Promise<
       if (result.diagnostic) resourceDiagnostics.push(result.diagnostic);
     }
   }
-  const validated = compiled?.project ? validate(compiled.project, { optionId, mode: 'all' }) : null;
+  const selected = optionId && compiled?.project ? resolveWorkId(compiled.project, optionId) : undefined;
+  const validated = compiled?.project ? validate(compiled.project, { optionId: selected, mode: 'all' }) : null;
   // 编译器也会为同一布局的每份画面输出相同诊断；在 CLI 边界统一去重。
   const seen = new Set<string>();
   const diagnostics: Diagnostic[] = [...resourceDiagnostics, ...loaded.diagnostics, ...(compiled?.diagnostics ?? []), ...(validated?.diagnostics ?? [])].map(d => ({ ...d, at: d.at ?? 'joplo.config.ts:1:1' })).filter(d => {

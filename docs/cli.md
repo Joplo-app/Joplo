@@ -7,25 +7,25 @@
 ```sh
 npx joplo init [dir] [--template <spec>] [--name <name>] [--keep] [--no-skill]
 npx joplo dev [dir] [--port <port>] [--open]
-npx joplo check [dir] [--format text|json] [--option <qid>]
-npx joplo outline [dir] [--format text|json] [--option <qid>]
+npx joplo check [dir] [--format text|json] [--work <qid>]
+npx joplo outline [dir] [--format text|json] [--work <qid>]
 npx joplo selection [dir] [--format text|json]
 npx joplo skill [topic]
 npx joplo components [name…]
 npx joplo skill install [dir] [--force] [--diff] [--agents-md]
-npx joplo build [dir] [--out-dir <dir>] [--overwrite] [--scenario <id>]… [--feature <id>]…
+npx joplo build [dir] [--out-dir <dir>] [--overwrite] [--scenario <id>]… [--work <id>]…
 npx joplo login [--no-browser] [--format text|json] [--server <url>]
 npx joplo logout [--server <url>]
 npx joplo whoami [--format text|json] [--server <url>]
 npx joplo voice [dir] [--dry-run] [--locale <lang>]… [--format text|json] [--server <url>]
 npx joplo share [dir] (--public | --private) (--review | --no-review) [--format text|json] [--new] [--title <title>] [--json] [--password [<值>] | --no-password] \
-  [--scenario <id>]… [--feature <id>]… \
+  [--scenario <id>]… [--work <id>]… \
   [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
 npx joplo feedback [dir] [--share <id>] [--format text|json] [--server <url>]
 npx joplo feedback [dir] --applied <决定 id,…> [--ref <源码版本>] [--share <id>] [--format text|json]
-npx joplo feedback list [dir] --local [--json] [--all] [--option <功能.方案>]
+npx joplo feedback list [dir] --local [--json] [--all] [--work <功能.方案>]
 npx joplo feedback watch [dir] --local [--session <id> | --follow] [--after <序号>] [--json]
-npx joplo feedback watch --share <id> --option <功能.方案> [--version <版本>] [--interval 15] [--json] [--server <url>]
+npx joplo feedback watch --share <id> --work <功能.方案> [--version <版本>] [--interval 15] [--json] [--server <url>]
 npx joplo render [dir] --scenario-id <qid> --out <file> \
   [--step-id <qid>] [--theme <theme>] \
   [--width <pixels> --height <pixels>] [--scale <scale>] [--overwrite]
@@ -69,12 +69,19 @@ npx joplo dev --open
 
 首页可切换项目与功能；源文件变化只重新编译对应项目，保存后热更新。编译出错时显示诊断，并保留上一次成功的画面；修复后恢复。界面和交互见[看板文档](web.md)。
 
+## 作品、切片与范围
+项目是作品集：作品 → 切片 → 步骤。比较方案、列情况、做设计决定用 `feature()` + `option()`；讲解片、资讯和产品片用 `works/<key>.tsx` 的 `work()` + `chapter()`，两者可以共存。章节默认接续上一章，编号由界面和 outline 自动生成；`flow()` 用于独立场景。所有作品都有封面并进入首页。
+
+`check` / `outline` / `feedback list|watch` 的 `--work` 接受独立作品键或限定方案 id；`build` / `share` 的 `--work` 接受条目键（独立作品或功能），只发一件，功能普通版取选定方案、评审版取全部方案。没有旧参数别名。独立作品无需 pick；`draft: true` 不进普通版或评审版，输出 `WORK_DRAFT_SKIPPED`，显式选择草稿时报错。只有草稿时先完成一件作品再发布。
+
+outline 按条目分组：独立作品显示标题、切片数、总时长，每行显示键、标题、步数和时长；章节有自动编号，草稿带 `(draft)`。JSON 每个条目含 `standalone`、`sequencing`、`draft`；渲染与深链仍复制 JSON 中的三段 scenario id。check 文本与 JSON 的诊断指向 `works/<key>.tsx:行:列`。构建/分享摘要列作品键与标题，并列明跳过的草稿。最小示例与恢复方法见 `npx joplo skill authoring`、`check` 和 `content`。
+
 ## check
 
 使用项目 tsconfig，经 tsx `tsImport` → core `loadAuthoring` → `compile(..., 'dev')` → `validate(..., { mode: 'all' })`；回放由 player 的 `replay()` 执行。源文件会在本机加载。
 
 - `--format text|json`：默认 text。
-- `--option <qid>`：仅校验指定方案的结构和回放，例如 `invite.a-modal`；整个项目仍须编译。
+- `--work <id>`：接受独立作品键或限定方案 id，仅校验这件作品的结构和回放，例如 `invite.a-modal`；整个项目仍须编译。
 
 ```text
 features/invite/options/a-modal.tsx:24:16  warning  CASE_NOT_COVERED  Case is not yet Covered: invite.happy 正常发出邀请并被接受
@@ -107,7 +114,7 @@ check: 0 error, 9 warning, 5 info (warning OUTCOME_MISMATCH ×1, warning CASE_NO
 
 - 情况一行：键、维度、优先级、每个方案的覆盖、标题 → 期望结果（case.expected，没写时提示）。这是 PM 视角的验收矩阵：标题是 Given，期望结果是 Then。
 - 场景一行：键、名字、步数与估算时长（1×，与自动播放同一份 stepDwell，并计入 hold 最短停留；不含鼠标移动与逐字输入）、结局、是否以过渡卡开场 / 收尾、覆盖的情况。
-- `--option <qid>` 只看一个方案；不存在时 USAGE（退出 2）。有 error 时退出 1：能编译出 IR 时照常输出大纲，编译不出时只写错误数。
+- `--work <id>` 只看一件独立作品（键）或功能下面的方案（`功能.方案`）；不存在时 USAGE（退出 2）。有 error 时退出 1：能编译出 IR 时照常输出大纲，编译不出时只写错误数。
 - `--format json`：`data.outline = { name, mode, features: [{ id, name, goal, roles, pick, cases: [{ id, key, title, dimension, priority, expected, coverage: { 方案 id: 状态 } }], options: [{ id, key, name, picked, ms, missing, undecided, scenarios: [{ id, key, name, description, steps, ms, cards, opening, ending, outcome, caseIds }] }] }] }`，`data.summary` 是 check 的汇总；失败时是 `ok: false` 信封，`data.outline` 为 null。
 
 ## components
@@ -139,7 +146,7 @@ npx joplo feedback watch [dir] --local --session <id> --after 3 --json
 
 `--follow` 跟住整个项目：所有方案的进行中会话，以及之后新开的会话（改源码后的新一轮、新方案）。事件格式与单会话相同，靠 `sessionId`、`optionId`、`eventId` 区分；某个方案 `approved` 不结束监听。所有会话的看板进程都停止后输出提示并退出 1，Ctrl+C 退出 130。启动时没有存活的进行中会话退出（NOT_FOUND）；不能与 `--session`、`--after` 同用。启动时重放进行中会话的已有事件，消费者按 `eventId` 去重。正在跟的每个会话都写监听租约，看板显示 Agent 在线。
 
-需要等待某一个方案版本确认、或按游标补收时，使用精确会话：每个方案版本有独立会话。`list` 默认列出存活实例的未结束会话；`--all` 查看历史，`--option <功能.方案>` 筛选。`watch` 可省略 `--session`，但必须只有一个匹配的活跃会话；有多个时退出 2，列出候选，绝不自动选择“最新”实例。显式会话也始终限定在给定项目目录里，目录按真实路径解析，worktree 分别处理。
+需要等待某一个方案版本确认、或按游标补收时，使用精确会话：每个方案版本有独立会话。`list` 默认列出存活实例的未结束会话；`--all` 查看历史，`--work <功能.方案>` 筛选。`watch` 可省略 `--session`，但必须只有一个匹配的活跃会话；有多个时退出 2，列出候选，绝不自动选择“最新”实例。显式会话也始终限定在给定项目目录里，目录按真实路径解析，worktree 分别处理。
 
 `--json` 的 stdout 是 NDJSON，一行一个事件。状态与错误只写 stderr；不带 `--json` 时输出人可读文本。事件共有字段为 `sessionId`、`instanceId`、`projectDir`、`featureId`、`optionId`、`revision`、`seq`、`requestId`、`createdAt`：
 
@@ -161,12 +168,12 @@ npx joplo feedback watch ./my-demo --local --follow --json
 npx joplo feedback watch ./my-demo --local --session <id> --json
 
 # Share 普通 GET 轮询，不需要 SSE 或 WebSocket
-npx joplo feedback watch --share Abc1234567 --option invite.a-modal --interval 15 --json
+npx joplo feedback watch --share Abc1234567 --work invite.a-modal --interval 15 --json
 ```
 
 Share 立即读取一次，随后默认每 15 秒轮询；`--interval` 接受 10–30 之间的整数秒，请求完成后再计时，不重叠发送。网络错误按原间隔退避到最多 30 秒；鉴权、权限、找不到分享、配额和响应格式错误会结束命令。Ctrl+C / SIGTERM 会中止在途请求与等待，退出 130。
 
-Cloud 必须指定 `--share` 和 `--option`，避免另一个方案的确认结束监听。`--version` 可显式指定版本，否则锁定首次响应中的分享版本；分享更新时输出 `closed/source_changed` 并退出 1。只有该版本、该方案的作者 `pick` 决定映射为 `approved` 并退出 0；投票、规则确认、其他方案或旧版本决定都不会结束监听。不把 Cloud 的确认写入本地会话，也不自动标记决定 `applied`。
+Cloud 必须指定 `--share` 和 `--work`，避免另一个方案的确认结束监听。`--version` 可显式指定版本，否则锁定首次响应中的分享版本；分享更新时输出 `closed/source_changed` 并退出 1。只有该版本、该方案的作者 `pick` 决定映射为 `approved` 并退出 0；投票、规则确认、其他方案或旧版本决定都不会结束监听。不把 Cloud 的确认写入本地会话，也不自动标记决定 `applied`。
 
 本地和 Cloud 输出统一的 `source`、`eventId`、`sessionId`、`featureId`、`optionId`、`revision`、`createdAt` 及 `type`。`feedback` 携带 `body/context`，`approved` 表示确认，Cloud 的其他决定为 `decision`，监听目标失效为 `closed`。本地继续保留 `seq`、`requestId`、`instanceId`、`projectDir`；Cloud 携带 `server`、`shareId`、`version`，没有可伪造的 `seq`，也暂不接受 `--after`。Cloud 的页面路径与源码位置当前接口不提供，输出 null，保留已有的场景、步骤和元素信息。
 
@@ -221,7 +228,7 @@ npx joplo build
 
 - `--out-dir <dir>`：默认项目 dist；显式相对路径按命令当前目录解析。
 - `--overwrite`：确认原产物可清空后允许重建非空目录；不允许清空项目自身、上级目录或 `.joplo/`。
-- `--scenario <id>` / `--feature <id>`（可重复，D75）：只构建这些场景（功能 = 选定方案的全部场景），范围与 `share --scenario` 相同，方便在本地检查分享出去的产物。输出多一行 `Scope: …`，借用了别的功能的内容时每项一行 `Borrowed from another feature: …`。规则见下方「按场景保密分享」。
+- `--scenario <id>` / `--work <id>`（可重复，D75）：只构建这些场景（功能 = 选定方案的全部场景），范围与 `share --scenario` 相同，方便在本地检查分享出去的产物。输出多一行 `Scope: …`，借用了别的功能的内容时每项一行 `Borrowed from another feature: …`。规则见下方「按场景保密分享」。
 
 产物是静态站（素材是 `assets/` 下的独立文件，须通过 HTTP 打开：`npx joplo preview`、分享或任意静态托管；不支持 file:// 双击，D98），含场景、字幕、层级、镜头、调用链与主题，去掉规则、情况、问题、备注及源位置。
 
@@ -254,7 +261,7 @@ npx joplo preview [dir] [--port <port>]
 | `--columns <n>` | 分镜每行几格（1–6，默认 3）；胶片条每行几格（默认 8） |
 | `--film` | 胶片条（D92）：用渲染路由的录制模式真实播放场景，Playwright 假时钟按引擎时间逐帧定格（约 50 ms 一帧算相邻帧差），每 `--every` 毫秒取一格；每格标时间、步号、本格最大相邻帧差。红框 = 单帧整屏突变（硬切），灰框 = 至少 1.5 s 没有可见变化（静止）。每个场景一页（多页时文件名加 `-1`、`-2`…），旁边写 `<out>.json`（全部帧的差值、硬切、静止、每次提交前后的最大帧差）。stdout 打印文件路径、时长、换章处的最大帧差以及每个 `CUT` / `STILL`。旁白按估算时长“读”（不出声、不调用朗读服务），停留与开着朗读的发布站一致 |
 | `--video` | 视频：同一录制模式按真实时间录 webm（与看板导出同一个录制器；不含声音） |
-| `--chain` | 配合 `--film` / `--video`：放完接着放同一方案的下一个场景（发布站连续播放的顺序），直到最后一个；`flow({ from })` 接力的章节一镜到底 |
+| `--chain` | 配合 `--film` / `--video`：放完接着放同一方案的下一个场景（发布站连续播放的顺序），直到最后一个；`chapter()` 接力的章节一镜到底 |
 | `--every <ms>` | 胶片条每格的间隔（默认 250） |
 | `--frames <dir>` | 胶片条的每一格另存为 JPEG，便于全尺寸检查可疑的一帧 |
 | `--format json` | 胶片条结果以 JSON 输出到 stdout |
@@ -378,7 +385,7 @@ npx joplo voice --locale ja          # 只做一种内容语言（必须在 conf
 
 公开会进入 `show.joplo.app/@用户名` 作品集并被搜索引擎收录。项目名、简介与功能目标应写成希望出现在搜索结果里的样子，不要包含未公开的信息。私密只有拿到链接的人能看；需要访问密码时，使用下方的密码查看（Pro）。
 
-PR 预览（`--pr`）与按场景/功能保密分享（`--scenario` / `--feature`）隐含私密，不要求可见性参数；显式 `--public` 在本地退出 2。仍须选择是否同时发评审版。对比使用 `diff publish`，始终私密且不支持评审版，不要求上述两项。
+PR 预览（`--pr`）与按场景/功能保密分享（`--scenario` / `--work`）隐含私密，不要求可见性参数；显式 `--public` 在本地退出 2。仍须选择是否同时发评审版。对比使用 `diff publish`，始终私密且不支持评审版，不要求上述两项。
 
 `--review` 先发布主分享，再发布包含所有方案、可评论的独立私密评审链接。JSON 的主链接为 `data.url`，评审链接为 `data.review.url`（其 `mode` 为 review）；文本分行显示。范围分享先按评审模式校验，再分别取普通版的 picked 子集和评审版的全部请求范围，分别记录范围键。如果请求范围没有 picked 场景（例如未选方案 B，或尚未 pick 的功能），只发布私密评审版：`data.mode = "review"`、`data.url` 就是评审链接，没有 `data.review`；主分享与 `--update` 的普通目标均不更新。评审版不进入作品集。第二次发布失败时主分享可能已上线且已记入记录：stderr 给出主链接，重试时沿用同样选择，不加 `--new`。
 
@@ -421,12 +428,12 @@ npx joplo share --private --no-review
 npx joplo share --private --no-review examples/invite --title '邀请流程' --format json
 npx joplo share --private --no-review --new
 npx joplo share --private --no-review --scenario invite.a-modal.success     # 只分享一个场景（D75）
-npx joplo share --private --no-review --feature invite                      # 只分享一个功能
+npx joplo share --private --no-review --work invite                      # 只分享一个功能
 ```
 
 ### 按场景保密分享（D75）
 
-`--scenario <场景 id>`（可重复）只分享这些场景；`--feature <功能 id>`（可重复）= 这个功能选定方案的全部场景（带 `--review` 时是全部方案的场景）；两者可以一起用。不写时分享整个项目，行为不变。看板「导出 ▾」里的「发布到 Joplo Cloud」走同一条路径（D76，见 [web.md](web.md)）。
+`--scenario <场景 id>`（可重复）只分享这些场景；`--work <条目 id>`（可重复）= 一件独立作品或一个功能选定方案的全部切片（带 `--review` 时是全部方案的场景）；两者可以一起用。不写时分享整个项目，行为不变。看板「导出 ▾」里的「发布到 Joplo Cloud」走同一条路径（D76，见 [web.md](web.md)）。
 
 - **保密靠构建时裁剪**，不是隐藏导航：上传的所有文件（内联 IR 的 index.html、voice/、`_joplo/preview.png`）和评审清单里都没有范围外功能、方案、场景的 id、名字、目标、角色、说明和步骤文字。深链接 `#/f/<功能>?s=<场景>` 和嵌入的 `scenario=` 只决定从哪里开始看，不算保密。
 - 保留：范围内场景及其方案、功能；场景用得到的画面（起始画面、`go()` 能到的画面、方案的层级画面）和这些画面的路径。去掉：范围外的分叉、规则、情况、问题，以及**项目说明**（常常概述所有功能）；项目名保留。
@@ -460,7 +467,7 @@ npx joplo share --private --no-review --feature invite                      # �
 - PR 预览是独立链接：不发送 replaceShareId，也不写 `.joplo/cloud.json`（不覆盖本项目的主链接和评审版记录，之后的普通 share、--review 与 feedback 仍用原来的记录）。CI 推荐 `npx joplo share --private --no-review --new --pr <number> --format json`；fork 来的 PR 拿不到 secrets，工作流应跳过发布，不推荐 `pull_request_target`。
 - finalize 响应里的 `pr: {comment, reason?, installUrl?}` 原样（白名单字段）放进 `data.pr`；`comment: "skipped"` 时文本输出一行 “PR comment skipped: <原因>. Install the Joplo GitHub App to comment on pull requests: <installUrl 或 <server>/settings/github>”，`failed` 时说明评论失败但已发布。服务端没返回时 `data.pr` 为 null。
 
-JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, passwordProtected, embed}`（`--review` 时另有 `review: {…, mode: "review"}`，`--pr` 时另有 `pr`，`--scenario` / `--feature` 时另有 `scope`），`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
+JSON 成功的 `data` 为 `{shareId, url, expiresAt, version, passwordProtected, embed}`（`--review` 时另有 `review: {…, mode: "review"}`，`--pr` 时另有 `pr`，`--scenario` / `--work` 时另有 `scope`），`expiresAt: null` 表示永久。进度写 stderr，stdout 只有一个结果信封；Agent 应读取 `data.url` 和 `data.expiresAt`。
 
 `data.embed` 与云端控制台、分享页 Worker 用同一套格式（`<分享页>` 为 `data.url`，规范成以 `/` 结尾）：
 

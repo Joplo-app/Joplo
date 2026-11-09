@@ -38,7 +38,7 @@ export type BuildOptions = {
   /** 本机目录（缺省 JOPLO_HOME 或 ~/.joplo）：读声音供应商 profile（D74）；测试指向临时目录。 */
   home?: string;
   /**
-   * 按场景保密分享（D75，`--scenario` / `--feature`）：构建时把 IR 裁剪到这些场景，产物里不出现范围外的功能、方案、场景。
+   * 按场景保密分享（D75，`--scenario` / `--work`）：构建时把 IR 裁剪到这些场景，产物里不出现范围外的功能、方案、场景。
    * 缺省（或两个数组都为空）时与原来完全一致。写错场景 / 功能时报错，不写任何文件。
    */
   scope?: ScopeRequest;
@@ -58,7 +58,7 @@ export type BuildOptions = {
  * voice（D74）：带上的朗读音频。clips = 片段数；bytes = 新写入的字节；missing = 当前声音下还没有音频的步骤数（观众端这些步骤用浏览器朗读）；
  * profile = 选用的声音供应商名。没有选用供应商、也没有音频时省略。
  */
-export type BuildResult = { outDir: string; files: string[]; routes: string[]; scenarios: string[]; diagnostics: Diagnostic[]; voice?: { clips: number; bytes: number; missing: number; profile: string | null; reused?: number; locales?: Record<string, { missing: number }> }; /** 有 scope 时：范围与借用了哪些别的功能的内容（D75）。 */ scope?: ScopeInfo };
+export type BuildResult = { entries?: { id: string; title: string; slices: number; sequencing: 'linear' | 'independent' }[]; outDir: string; files: string[]; routes: string[]; scenarios: string[]; diagnostics: Diagnostic[]; voice?: { clips: number; bytes: number; missing: number; profile: string | null; reused?: number; locales?: Record<string, { missing: number }> }; /** 有 scope 时：范围与借用了哪些别的功能的内容（D75）。 */ scope?: ScopeInfo };
 export declare function buildSite(opts: BuildOptions): Promise<BuildResult>;
 
 export type RenderOptions = {

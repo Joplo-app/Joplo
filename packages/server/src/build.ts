@@ -23,7 +23,7 @@ import os from 'node:os';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { build as viteBuild, createServer, type Rollup } from 'vite';
-import { stepIdentity, type StepIdentity, hasScope, JoploError, orderedFeatures, pruneMessages, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
+import { stepIdentity, type StepIdentity, hasScope, JoploError, entriesOf, entryOf, orderedFeatures, pruneMessages, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
@@ -38,7 +38,7 @@ export function publishPayload(project: Project, home: string | null): { project
   const { rules: _r, cases: _c, issues: _i, voiceConfig: _v, ...rest } = project;
   const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, {
     id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick,
-    // 形态与观众属于公开内容；只复制已有字段，保持旧功能演示的载荷逐字节不变。draft 仍只属于 dev。
+    // 作品能力与观众属于公开内容；只复制已有字段，保持旧功能演示的载荷逐字节不变。draft 仍只属于 dev。
     ...(f.standalone !== undefined ? { standalone: f.standalone } : {}),
     ...(f.audience !== undefined ? { audience: f.audience } : {}),
   }]));
@@ -130,6 +130,24 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   let compiled: Awaited<ReturnType<typeof compileProject>>;
   try {
     compiled = await compileProject(loader, projectDir, opts.review === true ? 'review' : 'publish');
+    // 发布编译已跳过草稿与未选功能；范围的公开校验需要原始条目，避免误报不存在。
+    if (opts.scope?.features?.length || opts.scope?.scenarios?.length && compiled.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED')) {
+      const dev = await compileProject(loader, projectDir, 'dev');
+      if (dev.project) {
+        for (const id of opts.scope?.features ?? []) {
+          const entry = entryOf(dev.project, id);
+          if (!entry) throw new JoploError('NOT_FOUND', `Unknown work "${id}". Works: ${entriesOf(dev.project).map(e => e.id).join(', ') || 'none'}`);
+          if (entry.draft) throw new JoploError('USAGE', `Work "${id}" is a draft and cannot be published or reviewed. Remove draft: true when it is ready`);
+        }
+        for (const id of opts.scope?.scenarios ?? []) {
+          const slice = dev.project.scenarios[id];
+          const entry = slice && entryOf(dev.project, dev.project.options[slice.optionId]?.featureId);
+          if (entry?.draft) throw new JoploError('USAGE', `Work "${entry.id}" is a draft and cannot be published or reviewed. Remove draft: true when it is ready`);
+        }
+        // 同时保留原有功能未选定、场景拼错与空范围的恢复提示。
+        resolveScope(dev.project, opts.scope!, opts.review === true ? 'review' : 'publish');
+      }
+    }
   } finally {
     await loader.close();
   }
@@ -137,6 +155,8 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     const errs = compiled.diagnostics.filter((d) => d.severity === 'error');
     throw new JoploError('EXPORT_FAILED', `Project compilation failed; no published site was generated: \n${errs.map((d) => `${d.at ?? ''}  ${d.message}`).join('\n')}`, { diagnostics: compiled.diagnostics });
   }
+  if (!entriesOf(compiled.project).length && compiled.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED'))
+    throw new JoploError('USAGE', 'There is no picked option or publishable work. All standalone works are drafts; remove draft: true when ready', { diagnostics: compiled.diagnostics });
   // 按场景保密分享（D75）：先裁剪 IR，再生成产物；写错范围在写任何文件之前报错
   let project = compiled.project;
   let scope: ScopeInfo | undefined;
@@ -219,6 +239,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     routes: Object.keys(project.routes).sort(),
     scenarios: Object.keys(project.scenarios),
     diagnostics: compiled.diagnostics,
+    ...(entriesOf(project).some(e => e.featureId === null || e.sequencing === 'linear') ? { entries: entriesOf(project).map(e => ({ id: e.id, title: e.title, slices: e.slices.length, sequencing: e.sequencing })) } : {}),
     ...(voiceReport && (voiceReport.clips || voiceReport.profile) ? { voice: voiceReport } : {}),
     ...(scope ? { scope } : {}),
   };

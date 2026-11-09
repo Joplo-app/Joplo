@@ -1,5 +1,7 @@
 # Joplo storytelling and planning: story
 
+The PM lens, cases and coverage in this topic apply only to works attached to a feature. General storytelling also applies to standalone work()/chapter() pieces; those do not need review cases.
+
 A demo is a short story a viewer follows without you: who wants what, what gets in the way, what the product does, and the visible result.
 It is not a feature tour. Plan it in a few lines before writing TSX, show the plan to the user, then build. Sources: docs/research/storytelling-and-demos.md.
 
@@ -34,9 +36,10 @@ Backend behind the same feature: put a diagram component in its own layer and .s
 - Scenario list, one line per scenario: Given (who, where, starting state) → When (the user's actions) → Then (the visible result), plus how it opens and how it ends.
 - Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate. An estimate is the sum of each step's time plan: the action demonstration (cursor travel, press, typing or a 0.9 s system pause) plus the longer of its stay and its estimated narration, the same plan autoplay runs.
 - Unsure how to frame it? Offer two or three one-line framings and let the user pick.
-- Recreating an existing video, GIF or screen recording: read it before planning. Extract frames into contact sheets (for example ffmpeg -i ref.gif -vf "fps=1,tile=3x3" sheet%02d.png, written outside the project) and list its chapters, the states each chapter passes through and every on-screen sentence; those become cases, steps and narration. Map the reference's own chrome to the player's instead of redrawing it: its chapter label → case title and the player's step title, its bottom progress → the player's chapter list, its key badge → the host key record after .press(), its spoken captions → narrate()/say(). Ask about anything the reference does not show (chapters cut off, unseen states) instead of inventing it; replace third-party logos with neutral shapes.
+- Recreating an existing video, GIF or screen recording: read it before planning. Extract frames into contact sheets (for example ffmpeg -i ref.gif -vf "fps=1,tile=3x3" sheet%02d.png, written outside the project) and list its chapters, the states each chapter passes through and every on-screen sentence; those become slices, steps and narration (shared cases only for feature review). Map the reference's own chrome to the player's instead of redrawing it: its chapter label → chapter title (case title in feature review) and the player's step title, its bottom progress → the player's chapter list, its key badge → the host key record after .press(), its spoken captions → narrate()/say(). Ask about anything the reference does not show (chapters cut off, unseen states) instead of inventing it; replace third-party logos with neutral shapes.
 
 ## 3. PM lens: from a need to roles, goal, cases, and scenarios
+This PM method applies only to works attached to a feature. For a standalone work, plan audience, takeaway and chapters with work()/chapter(); do not invent cases, coverage or rules.
 Joplo already has the parts of a user story; fill them in that spirit.
 - roles: who it is for, specific ('Workspace admin', 'Invited teammate'), not 'User'. Use role('Name', { desc }) keys when layers or cards belong to a person; plain names are fine otherwise.
 - goal (the I want + so that): one sentence, who can do what and why, independent of the solution so options A/B are two answers to it.
@@ -107,11 +110,11 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Explicitly distinguish the main sequence from optional branches and return paths. A closing menu may return to earlier chapters without making those chapters optional; verify autoplay order in the published player.
 
 ## 8. Before handing over
-- npx joplo outline: per feature, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
+- npx joplo outline: per entry, standalone slices and duration; for features, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
 - npx joplo check: CAPTION_TOO_LONG, EXPLAIN_TOO_LONG, DESCRIPTION_TOO_LONG, CARD_TEXT_TOO_LONG, SCENARIO_TOO_LONG, HAPPY_PATH_ONLY, CASE_NOT_COVERED (names the expected result).
 - Read only the captions from start to end: do they tell the story? Then look only at key frames (npx joplo render --step-id …): does the screen show it without captions?
 - If the key frames look like slide thumbnails (mostly cards, bullet points, or a screen that never changes), rebuild those steps as actions and visible changes (section 1).
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.4.1 sha256:d81113613db03fe1b7f2ece8d97cf74b117b617c1cedb1af05678f6c7f5e6f0e -->
+<!-- joplo-skill 0.4.1 sha256:aad117dbc49e1fefee15d155fc267371e7e68b08ca63e566f41f74200a098e73 -->

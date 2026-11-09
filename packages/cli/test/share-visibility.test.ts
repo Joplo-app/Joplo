@@ -212,7 +212,7 @@ const scopedBuild = async ({ outDir, scope, review }: { outDir: string; scope?: 
   return { outDir, files: ['index.html'], diagnostics: [], routes: [], scenarios: ids,
     scope: { key: `${review ? 'review:' : ''}${[...ids].sort().join(',')}`, scenarios: ids, features: ['f'], borrowed: [] } };
 };
-test.each([['--scenario', 'f.b.only'], ['--feature', 'g']] as const)('范围评审 %s %s：没有 picked 内容时只发私密评审，保留普通记录', async (flag, id) => {
+test.each([['--scenario', 'f.b.only'], ['--work', 'g']] as const)('范围评审 %s %s：没有 picked 内容时只发私密评审，保留普通记录', async (flag, id) => {
   await login(); await saveRecord(recordLink('Main123456', 'private'));
   build.mockImplementationOnce(scopedBuild as never);
   const r = await cli(['share', project, '--private', '--review', flag, id, '--json']);
@@ -224,7 +224,7 @@ test.each([['--scenario', 'f.b.only'], ['--feature', 'g']] as const)('范围评�
 });
 test('混合范围评审：普通版只含 picked 子集，评审版包含完整范围，分别记录各自范围', async () => {
   await login(); build.mockImplementationOnce(scopedBuild as never).mockImplementationOnce(scopedBuild as never);
-  const r = await cli(['share', project, '--review', '--feature', 'f', '--feature', 'g', '--json']);
+  const r = await cli(['share', project, '--review', '--work', 'f', '--work', 'g', '--json']);
   expect(r.code, r.stdout).toBe(0);
   const creates = calls.filter(c => c.path === '/api/v1/shares'); expect(creates).toHaveLength(2);
   expect(creates[0]!.body.review.scenarios.map((s: any) => s.id)).toEqual(['f.a.main']);

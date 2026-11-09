@@ -692,3 +692,5 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
 - 不再有 `film()`、`films/`、`Feature.kind`：独立作品用 `work()`，章节用 `chapter()`；内部用 `Feature.standalone` 与 `Option.sequencing` 表达，外面只经 `entries.ts` 的投影读能力。功能下面的方案这一轮仍用 `option()`。
 - 已知的债：独立作品的切片 id 带固定的 `.main.`（内部重构时变两段，届时旧深链失效）；`option()` 并成 `work()`、`Option` → `Work`、评审信息从作品移到功能，留到内部重构。
 - 契约：`docs/work-model.md`（取代 `docs/film-form.md`）。上文 D102 里关于 `film()` / `kind` / “待用户决定”的写法以本段为准；重做一版用“另一支作品 + `draft: true`”、内容示例全部迁移、看板只放复制胶片条命令、`joplo init` 暂不提供第二个模板，是没有再问用户、按原型定的。
+
+- **D102 CLI / 技能已实现（work-cli）**：check、outline、feedback 的选择参数统一为 `--work`（独立作品键或限定方案 id）；build/share 的 `--work` 按条目限制发布范围，草稿明确拒绝，摘要列作品与跳过原因。outline 按作品与章节能力输出，功能演示正文保持兼容；引擎与内容技能、CLI 文档和原型记录已按 `work()` / `chapter()`、`works/` 与能力组合更新，设计记录选定 `a-chapters`。内部容器与云端 IR 解析升级不在这项实现中。

@@ -35,7 +35,7 @@ test('原样 check、缺省目录、text 和 DomainResult JSON 输出', async ()
   const r = await cli(['check'], d);
   expect(r.code).toBe(0); expect(r.stderr).toBe(''); expect(r.stdout).toMatch(/0 error/);
   expect(r.stdout).toMatch(/features\/invite\/options\/a-modal\.tsx:\d+:\d+  info  PENDING_AI_ASSUMPTION/);
-  const json = await cli(['check', d, '--format', 'json', '--option', 'invite.a-modal']);
+  const json = await cli(['check', d, '--format', 'json', '--work', 'invite.a-modal']);
   expect(json.code).toBe(0);
   expect(JSON.parse(json.stdout)).toMatchObject({ ok: true, data: { summary: { error: 0 }, verification: { 'invite.a-modal': 'replay_ok' } } });
   expect(Object.keys(JSON.parse(json.stdout).data.verification)).toEqual(['invite.a-modal']);
@@ -51,7 +51,7 @@ test.each([
   ['CASE_NOT_COVERED', feature, (s: string) => s.replace('cases: {', "cases: {\n    new_case: '新增情况',"), 'export default feature(', 0],
 ] as const)('%s 包含正确文件及行号', async (code, file, change, needle, exit) => {
   const d = await temp(); const text = await edit(d, file, change);
-  const r = await cli(['check', d, '--format', 'json', '--option', 'invite.a-modal']);
+  const r = await cli(['check', d, '--format', 'json', '--work', 'invite.a-modal']);
   expect(r.code, r.stdout + r.stderr).toBe(exit);
   const ds = JSON.parse(r.stdout).diagnostics;
   const expectedFile = code === 'CASE_NOT_COVERED' ? option : file;
@@ -106,7 +106,7 @@ test('init 缺省名称，engine skill 与 help 主输出走 stdout', async () =
   const h = await cli(['--help']); expect(h.stdout).toContain('check'); expect(h.stderr).toBe('');
 });
 test.each([
-  ['check', '--format', 'xml'], ['check', '--option', 'absent'], ['dev', '--port', '0'], ['dev', '--port', 'abc'],
+  ['check', '--format', 'xml'], ['check', '--work', 'absent'], ['dev', '--port', '0'], ['dev', '--port', 'abc'],
   ['render', '--scenario-id', 's', '--out', 'a.png', '--width', '100'],
   ['render', '--scenario-id', 's', '--out', 'a.png', '--scale', '0'],
   ['render', '--scenario-id', 's', '--out', 'a.png', '--width', '-1', '--height', '100'],
