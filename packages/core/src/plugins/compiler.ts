@@ -1,6 +1,7 @@
 import { PluginAction } from '../schema.ts';
 import { ElementTraitsSchema, InheritSchema } from '../traits.ts';
 import { advanceMedia } from '../media.ts';
+import { stepAnchorMs } from '../focus.ts';
 import type { MediaCommand, MediaSnapshot, ResourceRequest, LocalResourceInfo } from '@joplo-app/kit/plugin';
 import { jsonData, snapshot, object, strings, syncResult, authoringData, materialize, errorMessage } from './data.ts';
 /** Node-side plugin host. Callbacks never enter IR or the player. */
@@ -197,17 +198,19 @@ export class PluginCompiler {
         return id;
       } }), source);
       if (result === undefined) return;
-      if (!object(result) || Object.keys(result).some(k => !['data', 'targets', 'references', 'media', 'writes', 'directorTarget'].includes(k)) || result.targets !== undefined && !strings(result.targets) || result.references !== undefined && !strings(result.references)) { this.invalid(p, source); return; }
+      if (!object(result) || Object.keys(result).some(k => !['data', 'targets', 'references', 'media', 'writes', 'directorTarget', 'holdMs'].includes(k)) || result.targets !== undefined && !strings(result.targets) || result.references !== undefined && !strings(result.references)) { this.invalid(p, source); return; }
       if (result.media !== undefined && (!Array.isArray(result.media) || result.media.some(c => !validMediaCommand(c, p.id, this.resourceOwners)))) {
         this.invalid(p, source); return;
       }
       if (result.writes !== undefined && (!Array.isArray(result.writes) || result.writes.some(w => !object(w) || Object.keys(w).some(k => k !== 'path' && k !== 'value') || !Object.hasOwn(w, 'value') || typeof w.path !== 'string' || !/^(ui|data|inputs)(\.[A-Za-z0-9_-]+)+$/.test(w.path) || w.path.split('.').some(k => ['__proto__', 'prototype', 'constructor'].includes(k))))) { this.invalid(p, source); return; }
       if (result.directorTarget !== undefined && (typeof result.directorTarget !== 'string' || !result.directorTarget)) { this.invalid(p, source); return; }
+      // 效果时长（D98）：这一步至少停留多久（引擎毫秒，0–60000）
+      if (result.holdMs !== undefined && (typeof result.holdMs !== 'number' || !Number.isFinite(result.holdMs) || result.holdMs < 0 || result.holdMs > 60_000)) { this.invalid(p, source); return; }
       const writes = result.writes === undefined ? undefined : this.envelope(p, result.writes, source) as typeof result.writes;
       if (result.writes !== undefined && writes === undefined) return;
       const media = result.media?.map(c => ({ ...c, plugin: p.id }));
       const value = result.data === undefined ? undefined : this.envelope(p, result.data, source);
-      return { ...(writes ? { writes } : {}), ...(result.directorTarget ? { directorTarget: result.directorTarget } : {}), ...(media ? { media } : {}), ...(value !== undefined ? { data: value } : {}), ...(result.targets ? { targets: [...result.targets] } : {}), ...(result.references ? { references: [...result.references] } : {}) };
+      return { ...(writes ? { writes } : {}), ...(result.directorTarget ? { directorTarget: result.directorTarget } : {}), ...(result.holdMs ? { holdMs: Math.round(result.holdMs) } : {}), ...(media ? { media } : {}), ...(value !== undefined ? { data: value } : {}), ...(result.targets ? { targets: [...result.targets] } : {}), ...(result.references ? { references: [...result.references] } : {}) };
     });
   }
   frames(project: Project): void {
@@ -226,7 +229,7 @@ export class PluginCompiler {
       const scenes = Object.values(project.scenes).filter(s => s.optionId === sc.optionId || s.optionId == null).map(s => ({ id: s.id, root: s.root }));
       const roots = scenes.map(s => s.root);
       const prev = sc.from ? project.scenarios[sc.from] : undefined;
-      let media: MediaSnapshot = prev && ended.has(prev.id) ? advanceMedia(ended.get(prev.id)!, prev.steps.length ? prev.steps[prev.steps.length - 1]!.hold ?? 3000 : 0) : {};
+      let media: MediaSnapshot = prev && ended.has(prev.id) ? advanceMedia(ended.get(prev.id)!, prev.steps.length ? stepAnchorMs(prev.steps[prev.steps.length - 1]!) : 0) : {};
       const hasMedia = Object.keys(media).length > 0 || sc.steps.some(step => this.mediaCommands.has(step.id));
       let previousState: PlayState | undefined;
       let state = initialState(project, sc.id);
@@ -239,7 +242,7 @@ export class PluginCompiler {
         const target = i ? sc.steps[i - 1]! : sc;
         const ext = { ...target.ext };
         if (i) {
-          media = advanceMedia(media, i > 1 ? (sc.steps[i - 2]!.hold ?? 3000) : 0);
+          media = advanceMedia(media, i > 1 ? stepAnchorMs(sc.steps[i - 2]!) : 0);
           for (const c of this.mediaCommands.get(sc.steps[i - 1]!.id) ?? []) {
             const key = `${c.plugin}:${c.track}`;
             const current = media[key];

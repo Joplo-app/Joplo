@@ -92,7 +92,7 @@ export type PluginCompileHooks = {
   /** 每个根节点的静态派生数据，错误由宿主隔离。 */
   derive?: (node: Readonly<PluginIRNode>, ctx: { viewport: 'desktop' | 'mobile'; report: PluginReport; options: Readonly<Record<string, unknown>> }) => PluginDerived | void;
   /** 一个作者效果降级为数据及内核原语。targets 贡献普通取景；directorTarget 只选择层。writes 按作者顺序生成 set；data 是同一步之前的降级结果。 */
-  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; data: unknown; report: PluginReport; source?: string; resourceInfo: (id: string) => LocalResourceInfo | undefined; resource: (request: { compiler: string; input: string }) => string }) => { data?: unknown; targets?: string[]; references?: string[]; writes?: PluginWrite[]; directorTarget?: string; media?: MediaCommand[] } | void;
+  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; data: unknown; report: PluginReport; source?: string; resourceInfo: (id: string) => LocalResourceInfo | undefined; resource: (request: { compiler: string; input: string }) => string }) => { data?: unknown; targets?: string[]; references?: string[]; writes?: PluginWrite[]; directorTarget?: string; media?: MediaCommand[]; /** 这一步至少停留多久（引擎毫秒，0–60000，D98）：逐字打代码、播放片段等比阅读更长的效果。 */ holdMs?: number } | void;
   /** 编译器回放基础效果后，计算第 0 步及每一步的完整绘制快照。 */
   frame?: (ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; state: PluginState; previousState?: PluginState; resolveProps: (node: PluginIRNode, previous?: boolean) => Record<string, unknown>; data: unknown; previousData: unknown; position: number; report: PluginReport }) => unknown;
 };
@@ -135,6 +135,26 @@ export type PluginPropertySpec = {
   values?: string[];
 };
 export type PluginWrite = { path: string; value: unknown };
+
+/** 发布素材（D98）：构建时 IR 里的 data URL 素材写成 ./assets/<sha256>.<扩展名>，页面按相对路径引用。 */
+export const SITE_ASSET_PREFIX = './assets/';
+const ASSET_KIND_EXT: Record<string, string[]> = { image: ['png', 'jpg', 'gif', 'webp', 'svg', 'avif'], model: ['glb'], audio: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'], video: ['mp4', 'webm'], json: ['json'] };
+const ASSET_KIND_MIME: Record<string, RegExp> = { image: /^image\//, model: /^model\/gltf-binary$/, audio: /^audio\//, video: /^video\//, json: /^application\/json$/ };
+/**
+ * src 是不是作者用 asset() 嵌入的素材（不是随手写的远程地址）：data URL、看板的本机素材地址（/__joplo/p/<项目>/binary/…），
+ * 或构建产物里的素材文件（./assets/<sha256>.<扩展名>）。kind 限定类型。是就原样返回 src，否则 null。
+ */
+export function embeddedAsset(src: unknown, kind?: 'image' | 'model' | 'audio' | 'video' | 'json'): string | null {
+  if (typeof src !== 'string' || !src) return null;
+  const data = /^data:([a-z0-9.+/-]+)[;,]/i.exec(src);
+  if (data) return !kind || ASSET_KIND_MIME[kind]!.test(data[1]!.toLowerCase()) ? src : null;
+  const file = /^(?:\.\/assets\/[0-9a-f]{64}|\/__joplo\/p\/[^/]+\/binary\/[0-9a-f]{64})\.([a-z0-9]+)$/.exec(src);
+  if (!file) return null;
+  const ext = file[1]!;
+  if (src.startsWith('/__joplo/') && ext === 'audio') return !kind || kind === 'audio' ? src : null;
+  return !kind || ASSET_KIND_EXT[kind]!.includes(ext) ? src : null;
+}
+
 
 /** Data-only action contract. Payload fields are exact; numeric tolerance is used only for gestures. */
 export type PluginActionSpec = {

@@ -370,6 +370,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         const explains: string[] = [];
         const says: string[] = [];
         const narrates: string[] = [];
+        /** 插件效果声明的最短停留（D98）：同一步取最大值。 */
+        let effectHoldMs = 0;
         const ext: Record<string, unknown> = {};
         const references: string[] = [];
         const pluginFocus: string[] = [];
@@ -404,6 +406,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
             if (lowered) {
               effects.push(...(lowered.writes ?? []).map(w => ({ type: 'set' as const, path: w.path, value: w.value })));
               if (lowered.directorTarget) directorTargets.push(lowered.directorTarget);
+              if (lowered.holdMs) effectHoldMs = Math.max(effectHoldMs, lowered.holdMs);
               if (lowered.media?.length) { const key = `${sid}#${i + 1}`; host.mediaCommands.set(key, [...(host.mediaCommands.get(key) ?? []), ...lowered.media]); }
               if (lowered.data !== undefined) ext[e.plugin] = lowered.data;
               if (lowered.targets?.length) {
@@ -546,6 +549,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
           ...(cues.length ? { cues } : {}),
           ...(callouts.length ? { callouts } : {}),
           ...(holdMs !== undefined ? { hold: holdMs } : {}),
+          ...(effectHoldMs > 0 ? { effectHold: effectHoldMs } : {}),
           ...(says.length ? { say: says.join(' ') } : {}),
           ...(narrates.length ? { narrate: narrates.join(' ') } : {}),
           ...(st.source ? { source: rel(st.source) } : {}),

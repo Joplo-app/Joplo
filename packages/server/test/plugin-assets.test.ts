@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {afterAll,beforeAll,expect,it,vi} from 'vitest';
 import {chromium,type Browser} from 'playwright';
 import {buildSite} from '../src/build.ts';
+import {startPreview} from '../src/preview.ts';
 import {createDev} from '../src/dev.ts';
 import * as webAssets from '../src/web-assets.ts';
 import {launch,renderQuery} from '../src/render.ts';
@@ -31,8 +31,10 @@ beforeAll(async()=>{
  expect(server.payload().diagnostics.filter(d=>d.severity==='error')).toEqual([]);
 },120000);
 afterAll(async()=>{await browser?.close();await server?.close();if(root)fs.rmSync(root,{recursive:true,force:true});});
-async function verify(url:string,offline=false){
- const context=await browser.newContext({offline,viewport:{width:1280,height:900}}),page=await context.newPage(),errors:string[]=[];
+async function verify(url:string,isolated=false){
+ // isolated（D98）：发布站通过本机预览服务器打开，除了它自己的地址之外不许有任何网络请求
+ const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage(),errors:string[]=[];
+ if(isolated){const origin=new URL(url).origin;await context.route(u=>u.origin!==origin&&/^https?:/.test(u.href),r=>{errors.push('network:'+r.request().url());return r.abort();});}
  page.on('pageerror',e=>errors.push(e.message));page.on('requestfailed',r=>errors.push(r.url()));
  try{
   await page.goto(url);await page.waitForSelector('.br-assets');
@@ -63,7 +65,8 @@ it('BR-2 prebuilt dev runtime endpoint retains CSS and large imported assets',as
   await verify(dist.url);
  }finally{mock.mockRestore();await dist?.close();}
 },120000);
-it('BR-2 publish file:// retains plugin CSS and every emitted asset with no network',async()=>{
+it('BR-2 published site (served over HTTP, D98) retains plugin CSS and every emitted asset with no other network',async()=>{
  const out=path.join(root,'site');await buildSite({projectDir:root,outDir:out,home:path.join(root,'home')});
- await verify(pathToFileURL(path.join(out,'index.html')).href+'#/f/f?s=f.a.s&step=1',true);
+ const site=await startPreview({dir:out});
+ try{await verify(site.url+'index.html#/f/f?s=f.a.s&step=1',true);}finally{await site.close();}
 },120000);

@@ -215,6 +215,8 @@ export const Step = z.strictObject({
   callouts: z.array(Callout).optional(),
   /** 自动播放时这一步至少停留的毫秒数（D70，来自 hold；未按速度缩放）；没有时省略。 */
   hold: z.number().int().positive().max(30_000).optional(),
+  /** 插件效果声明的最短停留（D98，毫秒、未按速度缩放）：同一步各效果 holdMs 的最大值；没有时省略。 */
+  effectHold: z.number().int().positive().max(60_000).optional(),
   /** 角色台词（D74，来自 say()，多个按空格连接）：用这一步角色的声音读；没有时省略。发布站保留。 */
   say: z.string().min(1).optional(),
   /** 旁白（D74，来自 narrate()）：用旁白的声音读，优先于台词和字幕；没有时省略。发布站保留。 */

@@ -4,7 +4,7 @@ import { AnimatePresence } from 'motion/react';
 import { motion } from '@joplo-app/kit/renderer';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { defineRuntime, type PluginIRNode as SceneNode, type PluginState as PlayState } from '@joplo-app/kit/plugin';
+import { defineRuntime, embeddedAsset, type PluginIRNode as SceneNode, type PluginState as PlayState } from '@joplo-app/kit/plugin';
 import { useCtx, useI18n as useHostI18n, useR, useRoot, useRootAttrs, useStroke, useLook, RenderNode, RendererContextProvider, Rough, RoughPath, roundRectPath, rectOf, nodeLabel, resolveProps, resolveValue, isSelfVisible, walkNodes, atWidth, childWidth, choicesOf, layoutRegions, styleOf, type NodeProps } from '@joplo-app/kit/renderer';
 import { ACCENT, BG, DANGER, onFill, DIMMED, FONT, INFO, INK, INK2, LINE, LINE_STRONG, MONO, OK, SOFT, SPACING, SUBTLE, SURFACE, TITLE_SIZE, WARN, color, dim, fontSize, light, radius, space, spaceNum, tint } from '@joplo-app/kit/renderer-style';
 import { changeFor, dataRows, displayData, stateFlowItems } from './story-data.ts';
@@ -469,7 +469,8 @@ function Avatar({ node, p, children }: NodeProps) {
 }
 
 /** 内嵌的图片（asset() 生成的 data:image/… URI）才真正画出来；网址、路径不去加载（编译期会提示），仍画占位。 */
-export const embeddedImage = (src: unknown): string | null => (typeof src === 'string' && src.startsWith('data:image/') ? src : null);
+/** 嵌入的图片：asset() 的 data URL，或发布产物里的素材文件（D98）；远程地址仍画占位。 */
+export const embeddedImage = (src: unknown): string | null => embeddedAsset(src, 'image');
 
 function ImageBox({ node, p }: NodeProps) {
   const { t: i18n } = useI18n();

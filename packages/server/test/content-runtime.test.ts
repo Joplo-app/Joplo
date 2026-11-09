@@ -3,8 +3,8 @@ import { fixtureConfigSource } from '../../../scripts/test/fixtures.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { buildSite } from '../src/build.ts';
+import { startPreview } from '../src/preview.ts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { createDev } from '../src/dev.ts';
@@ -86,14 +86,16 @@ let reactRoot, project; window.fixtureStart=async(p,urls)=>{project=p;await load
     const outDir = path.join(root, 'offline-site');
     const built = await buildSite({ projectDir: path.join(REPO, 'examples/llm-explainer'), outDir });
     expect(built.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
-    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce', offline: true });
+    // D98：发布站通过本机预览服务器打开；除了它自己的地址，不许有任何网络请求
+    const site = await startPreview({ dir: outDir });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
     try {
       const offline = await context.newPage();
       const failures: string[] = [], network: string[] = [];
       offline.on('pageerror', e => failures.push(e.message));
       offline.on('requestfailed', r => failures.push(r.url()));
-      offline.on('request', r => { if (/^https?:/.test(r.url())) network.push(r.url()); });
-      await offline.goto(pathToFileURL(path.join(outDir, 'index.html')).href + '#/f/llm?s=llm.a-studio.tokens&step=2');
+      offline.on('request', r => { if (/^https?:/.test(r.url()) && !r.url().startsWith(site.url)) network.push(r.url()); });
+      await offline.goto(site.url + 'index.html#/f/llm?s=llm.a-studio.tokens&step=2');
       await offline.waitForSelector('[data-jcanvas-world]');
       await offline.evaluate(() => document.fonts.ready);
       const transform = await offline.locator('[data-jcanvas-world]').evaluate(el => (el as HTMLElement).style.transform);
@@ -109,7 +111,7 @@ let reactRoot, project; window.fixtureStart=async(p,urls)=>{project=p;await load
       expect(network).toEqual([]);
       const scripts = await offline.locator('script:not([type="application/json"])').allTextContents();
       expect(scripts.join('\n')).not.toMatch(/CAMERA_UNKNOWN|CAMERA_INVALID|Required: review before handing over/);
-    } finally { await context.close(); }
+    } finally { await context.close(); await site.close(); }
   }, 120000);
   it('renders a two-column storyboard with every step, initial frame and narration', async () => {
     // renderSheet resolves the existing project Playwright package; no browser installation.

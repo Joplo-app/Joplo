@@ -223,9 +223,19 @@ npx joplo build
 - `--overwrite`：确认原产物可清空后允许重建非空目录；不允许清空项目自身、上级目录或 `.joplo/`。
 - `--scenario <id>` / `--feature <id>`（可重复，D75）：只构建这些场景（功能 = 选定方案的全部场景），范围与 `share --scenario` 相同，方便在本地检查分享出去的产物。输出多一行 `Scope: …`，借用了别的功能的内容时每项一行 `Borrowed from another feature: …`。规则见下方「按场景保密分享」。
 
-产物是可离线打开的静态站，含场景、字幕、层级、镜头、调用链与主题，去掉规则、情况、问题、备注及源位置。
+产物是静态站（素材是 `assets/` 下的独立文件，须通过 HTTP 打开：`npx joplo preview`、分享或任意静态托管；不支持 file:// 双击，D98），含场景、字幕、层级、镜头、调用链与主题，去掉规则、情况、问题、备注及源位置。
 
 朗读（D74 / D85）：选用了声音来源时（项目没选过、config 也没写时，已登录 Joplo Cloud 就按 Joplo Cloud 朗读，只读本机登录、不联网），当前声音已生成的音频拷进 `voice/`（同一步、同一声音、同一语言只带最新一段），IR 带上 `voiceIndex`；Key 和 `voice` 配置都不进产物。输出多一行 `Narration: N audio clip(s) from <供应商> (… KB) included`；还有步骤没有当前文字的音频时一并说明，这些步骤在发布站用观众浏览器朗读，不影响构建。没有选用供应商时不输出这一行。不再支持的旧 profile（AiHubMix、OpenAI 兼容、自定义 HTTP）已生成的音频照常带上。音频在看板里生成，或用 [`joplo voice`](#voice)（见[看板文档](web.md#朗读d74)）。界面与本地演示页共用布局。部署见 publish 主题；发布站边界见[看板文档](web.md#发布站)。
+
+## preview
+
+```sh
+npx joplo preview [dir] [--port <port>]
+```
+
+在本机用只读静态服务器打开构建产物（D98）。`dir` 可以是构建输出目录，也可以是项目目录（用它的 `dist/`）。默认端口 4799，被占用时换一个空闲端口；只监听 127.0.0.1，不出目录，支持 Range（视频、音频拖动）。stdout 只有地址，Ctrl+C 停止。
+
+构建产物的素材是 `assets/<sha256>.<ext>` 独立文件，配乐、模型这类需要读取字节的素材在 file:// 下读不到，所以发布站只保证通过 HTTP 打开。
 
 ## render
 

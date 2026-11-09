@@ -244,7 +244,13 @@ export function focusAt(project: Project, scenarioId: string | null | undefined,
 }
 
 /** 自动播放时这一步至少停留多久（毫秒，已按速度缩放；0 = 没写 hold）。 */
-export function holdMsOf(step: Pick<Step, 'hold'> | undefined, speed = 1): number {
-  const ms = step?.hold ?? 0;
+export function holdMsOf(step: Pick<Step, 'hold' | 'effectHold'> | undefined, speed = 1): number {
+  // 作者的 hold 与插件效果时长（D98）取较大值
+  const ms = Math.max(step?.hold ?? 0, step?.effectHold ?? 0);
   return ms > 0 ? Math.round(ms / (speed > 0 ? speed : 1)) : 0;
+}
+
+/** 媒体锚点（配乐跳转、接力）按每步推进的时长：作者 hold（缺省 3000）与效果时长（D98）取较大值，未按速度缩放。 */
+export function stepAnchorMs(step: Pick<Step, 'hold' | 'effectHold'>): number {
+  return Math.max(step.hold ?? 3000, step.effectHold ?? 0);
 }

@@ -67,7 +67,7 @@ The loader supports embedded textures and meshopt geometry compression without e
 - For a whole-object flight or drop, animate a stable wrapper with the content plugin's motion property. Changing a model's structural at/size/src rebuilds it; do not expect vertex morphs or physical gravity. Keep a static frame target so screenshots and direct jumps still match.
 - Check mouse rotation, keyboard arrows, a declared object drag, hover, and a click independently. A declared model drag takes priority over orbit; drag empty canvas to rotate that scene. Reset/play discard local orbit, but snapshots always read scripted angles.
 
-Keep web geometry around 10k–50k faces and GLB below 5 MB. Inspect actual GLB accessor/index counts and bytes; a generation parameter alone is not proof of the exported budget. Models above 5 MB warn, above 50 MB fail. Check the initial frame and a focused frame, then open the build via file:// with networking disabled. A GLB download succeeding alone does not prove texture, anchoring or camera fit.
+Keep web geometry around 10k–50k faces and GLB below 5 MB. Inspect actual GLB accessor/index counts and bytes; a generation parameter alone is not proof of the exported budget. Models above 5 MB warn, above 50 MB fail. Check the initial frame and a focused frame, then open the build with npx joplo preview and no other network. A GLB download succeeding alone does not prove texture, anchoring or camera fit.
 `;
 
 export const generationGuide = `## When to use

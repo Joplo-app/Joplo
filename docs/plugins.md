@@ -11,7 +11,7 @@
 | 内容形态会持续增加，而且由别人维护 | 3D、音乐、地图、讲解画布、公司自己的设计系统 | 引擎不认识任何具体形态；新形态不改 core |
 | Agent 是主要作者，省 token（D25） | Agent 装一个包、读一份技能就能写 | 每个插件自带技能；`npx joplo skill` 汇总 |
 | 演示必须可复现（截图、视频、深链、评审定位） | 同一份 IR、同一步，永远是同一个画面 | 时间线状态只由步骤推进；游玩层不回写时间线 |
-| 发布站离线可播放（file://、静态托管） | 观众没有作者的电脑、工具和网络 | 发布物自包含：IR + 编译后的运行时 + 生成好的资源 |
+| 发布站不依赖作者的电脑和第三方网络（静态托管、Cloud 分享；D98 起不再支持 file://） | 观众没有作者的电脑、工具和网络 | 发布物自带一切：IR + 编译后的运行时 + 生成好的资源（素材是 assets/ 下的独立文件） |
 | 私有项目 | 公司组件、私有仓库 | 源码与本机能力不进发布物；私有插件不能误发公开分享 |
 | 已有项目不能坏 | 现有示例、已发布的分享 | 作者 TSX 不变；新 IR 使用命名空间，旧分享保留其原运行时 |
 
@@ -279,7 +279,7 @@ content 的 camera 工厂产生插件效果信封，插件校验 `CAMERA_UNKNOWN
 |---|---|---|
 | `PluginDef.properties[name].{type,min,max,nonempty,attribute}` | Node 清单 → 宿主校验 → `project.plugins[id].properties` | 编译节点值检查；rootAttrsOf → 宿主 / 插件 DOM 锚点；浏览器不携带校验函数 |
 | 任意元素的声明属性 | 作者 JSX → 普通 `node.props` | 宿主按声明映射 `data-jp-<id>-*`；插件容器与观察器读取；不进入内核条件分支 |
-| `PluginDef.themes[name]` | CSS 字符串 → `project.plugins[id].themes[name]` | `projectThemes` → 带命名空间的主题目录 → ThemeStyles / 外观 / diff / 本地评审；build 内联、file:// 无网络 |
+| `PluginDef.themes[name]` | CSS 字符串 → `project.plugins[id].themes[name]` | `projectThemes` → 带命名空间的主题目录 → ThemeStyles / 外观 / diff / 本地评审；build 内联、发布站除自身外无网络 |
 | effect `writes[].{path,value}` | Node 插件 → 宿主物化及路径 / JSON 校验 | `step.effects` 的普通 set → stateAt、接力及编译 frame；writes 信封不发布 |
 | effect `directorTarget` | Node 插件 → 临时目标列表 | 层寻址 → 既有 `step.directorLayer`；不加入 shots/focusTargets；配套 references 进入范围裁剪 |
 | `ui.__plugins.content.camera` | content effect → 普通 set 状态 | 仅 content frame 读取；通用 flow 接力只传递普通状态；播放器不知道键含义 |

@@ -197,8 +197,8 @@ test.each([[['--update', 'not a link']], [['--update', 'https://joplo.app/x/abc'
 });
 test('交互 share 自动登录后继续发布', async () => { expect((await cli(['share', '--private', '--no-review',  project], { interactive: true })).code).toBe(0); expect(browser).toHaveBeenCalledOnce(); expect(calls.some(c => c.path.endsWith('/finalize'))).toBe(true); });
 test('白名单外文件与不安全路径在上传前列出并拒绝', async () => {
-  await credentials(); files = { ...files, 'assets/movie.mp4': 'video', 'assets/readme.bin': 'binary', 'assets/a%20.png': 'png' };
-  const r = await cli(['share', '--private', '--no-review',  project, '--format=json']); expect(r.code).toBe(1); for (const name of ['movie.mp4', 'readme.bin', 'a%20.png']) expect(r.stdout).toContain(name); expect(calls).toEqual([]);
+  await credentials(); files = { ...files, 'assets/movie.mov': 'video', 'assets/readme.bin': 'binary', 'assets/a%20.png': 'png' };
+  const r = await cli(['share', '--private', '--no-review',  project, '--format=json']); expect(r.code).toBe(1); for (const name of ['movie.mov', 'readme.bin', 'a%20.png']) expect(r.stdout).toContain(name); expect(calls).toEqual([]);
 });
 test.each([[401, 'AUTH_EXPIRED'], [403, 'PLAN_REQUIRED'], [413, 'TOO_LARGE'], [429, 'QUOTA_EXCEEDED'], [426, 'CLIENT_OUTDATED'], [503, 'NETWORK']] as const)('share %s %s 使用结果信封且不回显服务端正文', async (status, code) => {
   await credentials(); fail = { path: '/api/v1/shares', status, code, ...(code === 'TOO_LARGE' ? { details: { kind: 'upload', maxBytes: 5, actualBytes: 6, largestFiles: [{ path: 'assets/site.css', size: 6 }] } } : {}) }; const r = await cli(['share', '--private', '--no-review',  project, '--format=json']); expect(r.code).toBe(code === 'AUTH_EXPIRED' ? 3 : 1); expect(r.json().error.code).toBe(code);

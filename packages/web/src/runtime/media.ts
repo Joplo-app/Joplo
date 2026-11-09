@@ -54,6 +54,12 @@ export class MediaEngine {
   };
   private bytes(url:string) {
     return this.encoded.acquire(url,async()=>{
+      // 发布站（D98）：素材是独立文件，按相对路径 GET 取字节；看板的本机资源接口（/__joplo/…）返回 data URL
+      if(!url.startsWith('data:')&&!url.startsWith('/__joplo/')){
+        const res=await fetch(url);if(!res.ok)throw new Error('Music resource unavailable');
+        const bytes=new Uint8Array(await res.arrayBuffer());
+        return {value:{bytes,audio:undefined},bytes:bytes.byteLength};
+      }
       const result=url.startsWith('data:')?{url}:await(await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-joplo-token':document.querySelector<HTMLMetaElement>('meta[name="joplo-token"]')?.content??''},body:'{}'})).json();
       const data=result.url;
       if(typeof data!=='string'||!/^data:[^;,]+;base64,/.test(data))throw new Error('Music resource unavailable');

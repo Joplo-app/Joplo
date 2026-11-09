@@ -63,7 +63,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   let exitCode = 0;
   const serverPackage = '@joplo-app/server';
   const loadServer = deps.loadServer ?? (() => import(serverPackage));
-  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'renderStep' | 'renderSheet' | 'renderFilm' | 'renderVideo' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime' | 'generateProjectVoice' | 'generateResources'>(name: K): Promise<typeof Server[K]> {
+  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'startPreview' | 'renderStep' | 'renderSheet' | 'renderFilm' | 'renderVideo' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime' | 'generateProjectVoice' | 'generateResources'>(name: K): Promise<typeof Server[K]> {
     let module: Record<string, unknown>;
     try { module = await loadServer(); }
     catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server cannot load ${name}: ${e instanceof Error ? e.message : String(e)}`); }
@@ -387,6 +387,18 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       else line(r.summary);
       exitCode = r.code;
     });
+  // 预览构建产物（D98）：素材是独立文件，只保证通过 HTTP 打开；dir 可以是构建输出目录，或项目目录（用它的 dist/）
+  program.command('preview').argument('[dir]', 'Built site directory, or a project directory (uses its dist/)', '.').option('--port <port>', 'Port (default: 4799; a free port if taken)', integer('port', 65535)).action(async (dir, opts) => {
+    const startPreview = await serverFunction('startPreview');
+    const base = resolve(dir);
+    const { existsSync } = await import('node:fs');
+    const site = existsSync(resolve(base, 'index.html')) ? base : resolve(base, 'dist');
+    let handle;
+    try { handle = await startPreview({ dir: site, port: opts.port ?? 4799 }); }
+    catch (e) { if (opts.port === undefined && (e as { code?: string }).code === 'EADDRINUSE') handle = await startPreview({ dir: site, port: 0 }); else throw e; }
+    line(handle.url);
+    stderr(`Serving ${site} (read-only). Press Ctrl+C to stop.\n`);
+  });
   program.command('render').argument('[dir]', 'Project directory', '.').requiredOption('--scenario-id <qid>', 'Scenario ID').option('--step-id <qid>', 'Position after this step; defaults to the initial state')
     .option('--theme <theme>', 'Theme: built-in (sketch, clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast) or project themes/<name>.css; defaults to the project theme').requiredOption('--out <file>', 'Screenshot file')
     .option('--width <pixels>', 'Screenshot width (stage width follows the page viewport); requires height', integer('width')).option('--height <pixels>', 'Screenshot height; requires width', integer('height'))
