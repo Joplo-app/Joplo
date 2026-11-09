@@ -1,4 +1,4 @@
-import { mediaResourceIds, nodeResourceIds, type Diagnostic, type Project } from '@joplo-app/core';
+import { mediaResourceIds, nodeResourceIds, stepAnchorMs, type Diagnostic, type Project } from '@joplo-app/core';
 import type { LocalResourceInfo, ResourceRequest } from '@joplo-app/kit/plugin';
 import type { LocalResources } from './local-resources.ts';
 export async function inspectResources(project: Project | null, requests: ResourceRequest[], host: LocalResources) {
@@ -33,8 +33,8 @@ export function mediaDiagnostics(project: Project, info: Record<string, LocalRes
         const previous = runs.get(key);
         if (previous && (previous.resource !== t.resource || Math.abs(previous.offset + previous.duration - t.offsetMs) > 1)) finish(key);
         if (!runs.has(key)) runs.set(key, { resource: t.resource, offset: t.offsetMs, duration: 0, loop: t.loop, at: step.source });
-        runs.get(key)!.duration += Math.min(step.hold ?? 3000, t.stopAfterMs ?? Infinity);
-        if (t.stopAfterMs !== undefined && t.stopAfterMs <= (step.hold ?? 3000)) finish(key);
+        runs.get(key)!.duration += Math.min(stepAnchorMs(step), t.stopAfterMs ?? Infinity);
+        if (t.stopAfterMs !== undefined && t.stopAfterMs <= stepAnchorMs(step)) finish(key);
       }
     }
     for (const key of [...runs.keys()]) finish(key);

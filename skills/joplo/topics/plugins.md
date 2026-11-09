@@ -31,7 +31,8 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 - skill is the entry guide: when to use, how to enable/import, the smallest correct example, success checks, pitfalls and recovery. skillTopics maps topic keys to { description, body }; installed references and CLI topics come from this exact version. Do not put private project data or credentials in guides.
 - Node hooks normalize/derive/frame/effect/validate trusted author data. Outputs must be finite JSON within supported depth/size, immutable across calls, identity-safe, and serializable. Functions/prototypes/cycles are rejected. Hooks and source instructions are never shipped as runtime IR.
 - derive runs once for every node of your plugin and sees only that node's subtree. Validate references between elements (an arrow's from/to, a mark's target) from the container that holds them all, and return early for other nodes; validating at the referring node reports every target as unknown.
-- Effect compilers return declarative writes, references, optional directorTarget, media commands and derived data. Preserve source ordering. Native behavior, choices, gates, text paths and action matching are manifest declarations, not host branches for a component name.
+- Effect compilers return declarative writes, references, optional directorTarget, media commands, derived data and optional holdMs. Preserve source ordering.
+- holdMs (0–60000, engine ms) is how long the step must at least stay for this effect: a code typing run, a clip, a Lottie. The host takes the largest holdMs of the step and the author's hold() for autoplay, cover and outline durations and media anchors. Derive it from the content (characters × per-character time, the clip's duration from resourceInfo), never a guess; animate by the engine clock so pause and speed match. It does not remove the reading-time floor; only the author's hold() does. Native behavior, choices, gates, text paths and action matching are manifest declarations, not host branches for a component name.
 - actions declares field types/ranges/tolerances, targets, caption and duration. Runtime recognizers use ctx.act; frame.gesture and frame.clock present the same action. Do not accumulate private timeline time or advance state from a drawing callback.
 
 ## Runtime and projection
@@ -59,4 +60,4 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.3.0 sha256:de44e773347bbfe7c318215e3c078017cde0683835068a000055d65ddb6db997 -->
+<!-- joplo-skill 0.3.0 sha256:11902fe491f4238643013c475ea957e3aa8f0e9f81a1ef72d04d7272ff727fbf -->

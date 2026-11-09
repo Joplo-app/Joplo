@@ -92,7 +92,7 @@ export type PluginCompileHooks = {
   /** 每个根节点的静态派生数据，错误由宿主隔离。 */
   derive?: (node: Readonly<PluginIRNode>, ctx: { viewport: 'desktop' | 'mobile'; report: PluginReport; options: Readonly<Record<string, unknown>> }) => PluginDerived | void;
   /** 一个作者效果降级为数据及内核原语。targets 贡献普通取景；directorTarget 只选择层。writes 按作者顺序生成 set；data 是同一步之前的降级结果。 */
-  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; data: unknown; report: PluginReport; source?: string; resourceInfo: (id: string) => LocalResourceInfo | undefined; resource: (request: { compiler: string; input: string }) => string }) => { data?: unknown; targets?: string[]; references?: string[]; writes?: PluginWrite[]; directorTarget?: string; media?: MediaCommand[] } | void;
+  effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; data: unknown; report: PluginReport; source?: string; resourceInfo: (id: string) => LocalResourceInfo | undefined; resource: (request: { compiler: string; input: string }) => string }) => { data?: unknown; targets?: string[]; references?: string[]; writes?: PluginWrite[]; directorTarget?: string; media?: MediaCommand[]; /** 这一步至少停留多久（引擎毫秒，0–60000，D98）：逐字打代码、播放片段等比阅读更长的效果。 */ holdMs?: number } | void;
   /** 编译器回放基础效果后，计算第 0 步及每一步的完整绘制快照。 */
   frame?: (ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; state: PluginState; previousState?: PluginState; resolveProps: (node: PluginIRNode, previous?: boolean) => Record<string, unknown>; data: unknown; previousData: unknown; position: number; report: PluginReport }) => unknown;
 };
