@@ -1,7 +1,7 @@
 {
   "name": "@joplo-app/server",
-  "version": "0.2.18",
-  "description": "Joplo \u672c\u5730\u670d\u52a1\uff1adev \u770b\u677f\u3001build \u53d1\u5e03\u7ad9\u3001render \u622a\u56fe",
+  "version": "0.3.0",
+  "description": "Joplo 本地服务：dev 看板、build 发布站、render 截图",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "exports": {

@@ -1,6 +1,6 @@
 {
   "name": "joplo",
-  "version": "0.2.18",
+  "version": "0.3.0",
   "description": "Joplo 命令入口：npx joplo init / dev / check / build。转发到项目内安装的 @joplo-app/cli",
   "license": "PolyForm-Shield-1.0.0",
   "bin": {

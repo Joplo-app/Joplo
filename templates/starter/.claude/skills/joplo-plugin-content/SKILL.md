@@ -3,7 +3,7 @@ name: joplo-plugin-content
 description: "Use the Visual explainers plugin in Joplo; read its entry, component recipes and recovery rules for this project."
 ---
 
-# Joplo plugin content: Visual explainers 0.2.18
+# Joplo plugin content: Visual explainers 0.3.0
 
 Author package: @joplo-app/plugin-content
 # Joplo content production: content
@@ -104,4 +104,4 @@ General engine contracts: npx joplo skill plugins
 - [patterns](./topics/patterns.md): Recipes and individual pitfalls
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.2.18 sha256:391f2588ecd6920fc702955d3ae2503e384609126047ad79786cc0017c241e05 -->
+<!-- joplo-skill 0.3.0 sha256:49c7093c575066e9a732f9d3f6db31373f4c31260622394fdfb6caf84f25c56f -->

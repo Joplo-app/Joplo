@@ -1,7 +1,7 @@
 {
   "name": "@joplo-app/core",
-  "version": "0.2.18",
-  "description": "Joplo \u7f16\u8bd1\u5668\u3001\u6821\u9a8c\u5668\u4e0e\u64ad\u653e\u5668\uff08IR v2\uff09",
+  "version": "0.3.0",
+  "description": "Joplo 编译器、校验器与播放器（IR v2）",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "exports": {

@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/web",
-  "version": "0.2.18",
+  "version": "0.3.0",
   "description": "Joplo 看板与发布站的预构建资源（含手绘字体，SIL OFL 1.1）",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",

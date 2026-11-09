@@ -46,4 +46,4 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 - Custom themes live in themes/<name>.css and define --jp-* tokens; do not change authored data to recolor a view. For component-specific layout, motion and visual variables, read its installed plugin skill.
 
 Related topics: authoring, plugins, focus, review, publish
-<!-- joplo-skill 0.2.18 sha256:ab41e42a931fd06e63c760afd447dfa0e7e74ae4ff6abdd026c8a6b1abf3334e -->
+<!-- joplo-skill 0.3.0 sha256:ab41e42a931fd06e63c760afd447dfa0e7e74ae4ff6abdd026c8a6b1abf3334e -->

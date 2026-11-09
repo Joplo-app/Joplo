@@ -59,4 +59,4 @@ Declare both success and recovery cases in the feature. View code belongs to the
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.2.18 sha256:ea1b9e147658320db652e1dbf343dcc8950996078dfce1ecc9c8ce7480e733f7 -->
+<!-- joplo-skill 0.3.0 sha256:ea1b9e147658320db652e1dbf343dcc8950996078dfce1ecc9c8ce7480e733f7 -->

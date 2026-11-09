@@ -43,4 +43,4 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.2.18 sha256:631e8c32c27eabb9c194e0246c63187d538a6a1f92746c50b61bdd6b5723ee46 -->
+<!-- joplo-skill 0.3.0 sha256:631e8c32c27eabb9c194e0246c63187d538a6a1f92746c50b61bdd6b5723ee46 -->

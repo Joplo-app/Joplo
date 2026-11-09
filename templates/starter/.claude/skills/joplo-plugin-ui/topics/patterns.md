@@ -132,4 +132,4 @@ From focus:
 Common pitfall: Only catalog components and the listed HTML tags exist; <br/> is UNKNOWN_COMPONENT, so write 'Line 1\nLine 2' inside <Text>
 
 Common pitfall: UI and HTML belong to this plugin: import author markers directly from @joplo-app/plugin-ui, explicitly enable ui in config.plugins, and read ui/components. The engine has no bare-name or old-IR compatibility layer.
-<!-- joplo-skill 0.2.18 sha256:b23f35fd770ce82727c99ada229b223a8673caaa6a6786e31297a468c3cfea85 -->
+<!-- joplo-skill 0.3.0 sha256:b23f35fd770ce82727c99ada229b223a8673caaa6a6786e31297a468c3cfea85 -->

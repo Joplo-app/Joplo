@@ -102,4 +102,4 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - [publish](./topics/publish.md): pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 - [plugins](./topics/plugins.md): Data-only action contracts, native local behavior, engine-clock presenters; Universal properties, plugin themes, state writes and director targets; Media tracks, local text-to-resource compilers, cached offline publishing; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.2.18 sha256:0dba3238202ae7fe37b35831a97ee22b7a8e1c5b73cb39a1c8c1c90041c1ef59 -->
+<!-- joplo-skill 0.3.0 sha256:0dba3238202ae7fe37b35831a97ee22b7a8e1c5b73cb39a1c8c1c90041c1ef59 -->
