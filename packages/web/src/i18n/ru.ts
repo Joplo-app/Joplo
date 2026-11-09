@@ -1,4 +1,4 @@
-import { autoCaptionMessages } from '@joplo-app/core';
+import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createRu(locale: Locale = 'ru') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `Свободный режим · Нажмите воспроизведение`,
+      freeChangesDiscarded: `Изменения не сохранятся`,
+      freeReset: `Сбросить`,
+      freeSwitchPrompt: (name: string) => `Перейти к «${name}»?`,
+      freeSwitchDescription: `Начнётся прямо перед этим действием. Изменения свободного режима будут отменены.`,
+      freeSwitchConfirm: `Сменить сценарий`,
+      freeSwitchCancel: `Остаться здесь`,
       ...autoCaptionMessages('ru'),
       mockSuccess: "Имитация успеха",
       mockFailure: "Имитация ошибки",
@@ -206,6 +213,8 @@ export function createRu(locale: Locale = 'ru') {
       thisDiagramHasNoNodesYet: "В этой диаграмме ещё нет узлов",
       placeholder: "Заполнитель",
       customComponent: "Свой компонент: ",
+      pluginLoading: "Загрузка плагина ",
+      pluginUnavailable: "Плагин недоступен: ",
       unnamed: "Без имени",
       placeholderSuffix: "(Заполнитель)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "Компонент вне каталога. Демо следует объявленным ID элементов и состояниям.",

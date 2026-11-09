@@ -8,10 +8,10 @@
  * 所有层共享同一份状态，由场景步骤驱动。
  */
 import { $, and, eq, layer, neq, not, set, type Bind, type EffectDef } from '@joplo-app/kit';
-import {
-  ActionIcon, Alert, Anchor, Avatar, Badge, Box, Breadcrumbs, Button, Code, Diagram, EmptyState, Grid, Group, KeyValue, Menu, Modal, NavLink, Paper,
-  PasswordInput, Progress, Select, Stack, StateFlow, Switch, Terminal, Text, TextInput, Title,
-} from '@joplo-app/kit/ui';
+import { ActionIcon, Alert, Anchor, Avatar, Badge, Box, Breadcrumbs, Button, Code, EmptyState, Grid, Group, KeyValue, Menu, Modal, NavLink, Paper, PasswordInput, Progress, Select, Stack, StateFlow, Switch, Terminal, Text, TextInput, Title } from '@joplo-app/plugin-ui'; import { Diagram } from '@joplo-app/plugin-diagram';
+
+
+
 
 const ui = $.ui as unknown as Record<string, Bind>;
 

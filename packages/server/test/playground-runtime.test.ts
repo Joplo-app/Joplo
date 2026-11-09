@@ -1,0 +1,302 @@
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
+import { fixtureConfigSource } from '../../../scripts/test/fixtures.ts';
+/** D88 browser evidence: real pointer/key events through the production Stage and controller. */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+import { buildSite } from '../src/build.ts';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { chromium, type Browser, type Page } from 'playwright';
+import { createDev } from '../src/dev.ts';
+import { launch } from '../src/render.ts';
+
+const REPO=path.resolve(import.meta.dirname,'../../..');
+const hash=(b:Buffer)=>createHash('sha256').update(b).digest('hex');
+describe('D88 real browser input and clock',()=>{
+  let root:string, server:Awaited<ReturnType<typeof createDev>>, browser:Browser, page:Page;
+  const errors:string[]=[];
+  beforeAll(async()=>{
+    root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'joplo-playground-')));
+    fs.mkdirSync(path.join(root,'node_modules/@joplo-app'),{recursive:true});
+    for(const name of ['core','kit'])fs.symlinkSync(path.join(REPO,'packages',name),path.join(root,'node_modules/@joplo-app',name));
+    fs.symlinkSync(path.join(REPO,'plugins/scene3d'),path.join(root,'node_modules/joplo-plugin-scene3d'));
+    const write=(name:string,source:string)=>{const file=path.join(root,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,source);};
+    installFixturePlugins(root);
+    write('joplo.config.ts',fixtureConfigSource(`import {config} from '@joplo-app/kit';import probe from './probe.ts';import scene3d from 'joplo-plugin-scene3d';export default config({name:'D88 fixture',theme:'clean',autoFocus:false,plugins:[probe,scene3d]});`));
+    write('probe.ts',`import {definePlugin,pluginComponent} from '@joplo-app/kit/plugin';const p=definePlugin({id:'probe',title:'Probe',runtime:new URL('./runtime.ts',import.meta.url),components:{Widget:{doc:'test',interactive:true}},actions:{turn:{caption:'Turn {label}',durationMs:900,fields:{angle:{type:'number',min:0,max:180,tolerance:2}},targets:['probe:Widget']}}});export const Widget=pluginComponent(p,'Widget');export default p;`);
+    write('runtime.ts',`import {defineRuntime} from '@joplo-app/kit/plugin';export default defineRuntime({id:'probe',components:{Widget:{mount(el,ctx){let latest=ctx;const button=document.createElement('button');button.textContent='Turn widget';button.onclick=e=>{e.stopPropagation();latest.act?.(latest.node.id,{type:'plugin',name:'probe:turn',data:{angle:90}});};el.append(button);const draw=c=>{latest=c;el.dataset.clock=String(c.frame.clock?.timeMs??0);const g=c.frame.gesture;el.dataset.progress=String(g?.action.type==='plugin'?g.progress:0);};draw(ctx);return{update:draw,destroy(){el.replaceChildren();}};}}}});`);
+    write('routes/page.tsx',`import {page,$} from '@joplo-app/kit';import { Stack, Group, Button, Text, TextInput, Switch, Checkbox, Radio, Select, SegmentedControl, Tabs, Accordion, ScrollArea, Box } from '@joplo-app/plugin-ui';import {Widget} from '../probe';export default page({title:'Fixture'},<Stack gap="xs" p="md"><Group><Button id="next">Next</Button><Button id="other">Other scene</Button><Button id="avatar">Profile</Button><Text id="profile" when={$.ui.profile}>Profile open</Text></Group><Group><TextInput id="name" label="Name" value={$.ui.name}/><Switch id="lamp" label="Lamp" checked={$.data.lamp}/><Checkbox id="check" label="Check"/><Select id="select" label="Select" defaultValue="a" data={[{value:'a',label:'Alpha'},{value:'b',label:'Beta'}]}/><SegmentedControl id="segments" defaultValue="a" data={['a','b']}/></Group><Group><Tabs id="tabs" defaultValue="a"><Tabs.List><Tabs.Tab id="tab_a" value="a">Tab A</Tabs.Tab><Tabs.Tab id="tab_b" value="b">Tab B</Tabs.Tab></Tabs.List><Tabs.Panel value="a">Panel A</Tabs.Panel><Tabs.Panel value="b">Panel B</Tabs.Panel></Tabs><Radio.Group id="radio" defaultValue="a"><Radio id="radio_a" value="a" label="Radio A"/><Radio id="radio_b" value="b" label="Radio B"/></Radio.Group><Accordion id="accordion"><Accordion.Item value="details"><Accordion.Control id="expand">Expand</Accordion.Control><Accordion.Panel>Expanded detail</Accordion.Panel></Accordion.Item></Accordion></Group><Group><Button id="tile">Drag tile</Button><Box id="drop" w={160} h={60}>Drop zone</Box><Button id="help">Hover help</Button><Widget id="widget"/></Group><ScrollArea id="list" h={100} w={300}><Box h={500}>Scrollable area</Box><Text id="last">Last row</Text></ScrollArea></Stack>);`);
+    write('routes/spatial/page.tsx',`import {page} from '@joplo-app/kit';import {Scene3D} from 'joplo-plugin-scene3d';export default page({title:'Spatial'},<Scene3D id="home" height={400} azimuth={45} elevation={32}><Scene3D.Object id="floor" shape="floor" size={[8,0.1,6]}/><Scene3D.Object id="cube" shape="box" size={[2,2,1]} /></Scene3D>);`);
+    write('features/f/feature.ts',`import{feature}from'@joplo-app/kit';export default feature({name:'F',goal:'G',cases:{},pick:'a'});`);
+    write('features/f/options/a.tsx',`import{$,option,flow,free,set}from'@joplo-app/kit';export default option({name:'A',idea:'I',state:{ui:{name:''},data:{lamp:true}},free:{profile:free.click('avatar',set($.ui.profile,true))},scenarios:{rewind:flow('Rewind').scroll('list',{x:0,y:300}).scroll('list',{x:0,y:150}),plain:flow('Plain').system('Stay'),spatial:flow('Spatial',{start:'/spatial'}).act('scene3d:rotate','home',{azimuth:90,elevation:32}),main:flow('Main').click('next').type('name','Ada').toggle('lamp',false).drag('tile','drop',set($.ui.dragged,true)).hover('help',120,set($.ui.hovered,true)).scroll('list','last').act('probe:turn','widget',{angle:90}),other:flow('Other').click('other'),coordinates:flow('Coordinates').drag('tile',{x:900,y:650}),hover:flow('Hover').hover('help',120),plugin:flow('Plugin').act('probe:turn','widget',{angle:90})}});`);
+    write('harness.ts',`import ${JSON.stringify(path.join(REPO,'packages/web/src/index.css'))};import{createElement as h,useSyncExternalStore}from'react';import{createRoot}from'react-dom/client';import{projectThemes}from'@joplo-app/core';import{Stage}from ${JSON.stringify(path.join(REPO,'packages/web/src/renderer/Stage.tsx'))};import{ThemeStyles}from ${JSON.stringify(path.join(REPO,'packages/web/src/renderer/ThemeStyles.tsx'))};import{DemoController}from ${JSON.stringify(path.join(REPO,'packages/web/src/runtime/demo.ts'))};import{Overlay}from ${JSON.stringify(path.join(REPO,'packages/web/src/player/Overlay.tsx'))};import{PlaygroundNotice}from ${JSON.stringify(path.join(REPO,'packages/web/src/player/PlaygroundNotice.tsx'))};import{loadPluginRuntimes}from ${JSON.stringify(path.join(REPO,'packages/web/src/renderer/plugins.ts'))};let project,ctl,el,stage;function App(){const s=useSyncExternalStore(ctl.subscribe,ctl.getSnapshot);return h('div',{},h(ThemeStyles,{themes:projectThemes(project)}),h(Stage,{project,state:s.state,theme:project.theme,mode:'demo',animate:true,playground:s.playground,freeMode:s.freeMode,clock:ctl.clock,gesture:s.gesture,epoch:s.epoch,preview:s.preview,activeStep:s.activeStep,onStageInput:explore=>ctl.stageInput(explore),onAction:(a,n)=>void ctl.act(a,n),onNodeClick:(id,pt,o)=>void ctl.clickNode(id,pt,o),stageRef:node=>{stage=node;ctl.setStageEl(node);},zoom:{resetKey:String(s.epoch)},overlay:h(Overlay,{snap:s,stage,nextTargetId:null,setCursorEl:ctl.setCursorEl,onBackToDemo:()=>{},onDismiss:()=>{}})}),h('button',{id:'play',onClick:()=>ctl.togglePlay()},'Playback'),h('button',{id:'jump',onClick:()=>ctl.goto(0)},'Jump'),s.freeMode?h(PlaygroundNotice,{ctl,snap:s}):null);}window.fixtureStart=async(p,urls)=>{project=p;await loadPluginRuntimes(urls);ctl=new DemoController();ctl.setProject(p,1);ctl.setScenario('f.a.main');window.fixtureCtl=ctl;el=document.createElement('div');el.id='fixture';document.body.replaceChildren(el);createRoot(el).render(h(App));};`);
+    write('fixture.html',`<!doctype html><style>body{margin:0}</style><script type="module">import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>type=>type;window.__vite_plugin_react_preamble_installed__=true;await import('./harness.ts');</script>`);
+    server=await createDev({projectDir:root,port:0,watch:false,log:()=>undefined});
+    expect(server.payload().diagnostics.filter(d=>d.severity==='error')).toEqual([]);
+    browser=await launch({chromium});page=await browser.newPage({viewport:{width:1280,height:1000}});page.on('pageerror',e=>errors.push(e.message));
+    await open(page);
+  },120000);
+  async function open(p:Page){await p.goto(`${server.url}@fs/${root}/fixture.html`);await p.waitForFunction(()=>typeof(window as any).fixtureStart==='function');const payload=server.payload();await p.evaluate(({project,urls})=>(window as any).fixtureStart(project,urls),{project:payload.project,urls:payload.plugins});await p.waitForSelector('[data-jid="widget"] button');}
+  afterAll(async()=>{await page?.evaluate(()=>(window as any).fixtureCtl?.stop()).catch(()=>{});await browser?.close();await server?.close();if(root)fs.rmSync(root,{recursive:true,force:true});});
+  async function at(s='main',position=0){await page.evaluate(({s,position})=>{const c=(window as any).fixtureCtl;c.speed=1;c.reducedMotion=false;c.setScenario('f.a.'+s,position);},{s,position});await page.mouse.move(1270,950);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));}
+  const snapshot=()=>page.evaluate(()=>{const c=(window as any).fixtureCtl,s=c.getSnapshot();return{state:s.state,freeMode:s.freeMode,layer:s.playground,paused:s.paused,playing:s.playing,progress:s.gesture?.progress,prompt:s.switchPrompt,time:c.clock.time};});
+  async function position(n:number){await page.waitForFunction(n=>(window as any).fixtureCtl.getSnapshot().state.position===n,n,{timeout:3000}).catch(async()=>{await page.screenshot({path:path.join(REPO,'output/playwright/p1d-input-failure.png')});throw new Error(`Expected position ${n}: ${JSON.stringify(await snapshot())}`);});}
+
+
+  async function playing(s='main', pos=0) {
+    await at(s,pos);
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.speed=0.25;void c.play();});
+  }
+  it('J2 blank/noninteractive clicks pause silently',async()=>{
+    for(const target of ['[data-joplo-stage]','[data-jid="drop"]']) {
+      await playing();
+      await page.locator(target).click({position:target==='[data-joplo-stage]'?{x:1100,y:700}:{x:20,y:20}});
+      expect(await snapshot()).toMatchObject({paused:true,freeMode:false,layer:null,state:{position:0}});
+      expect(await page.getByTestId('playground-notice').count()).toBe(0);
+    }
+  });
+  it('J3 moving over hover targets does not pause, but paused hover still matches',async()=>{
+    await playing('hover');await page.locator('[data-jid="help"]').hover();await page.waitForTimeout(180);
+    expect(await snapshot()).toMatchObject({playing:true,paused:false,state:{position:0}});
+    await page.evaluate(()=>(window as any).fixtureCtl.pause());
+    await page.mouse.move(1270,950);await page.locator('[data-jid="help"]').hover();await position(1);
+  });
+  it('J4 first pointerdown pauses and the same drag completes',async()=>{
+    await playing('main',3);
+    const a=await page.locator('[data-jid="tile"]').boundingBox(),b=await page.locator('[data-jid="drop"]').boundingBox();
+    await page.mouse.move(a!.x+a!.width/2,a!.y+a!.height/2);await page.mouse.down();
+    expect((await snapshot()).paused).toBe(true);
+    await page.mouse.move(b!.x+b!.width/2,b!.y+b!.height/2,{steps:8});await page.mouse.up();await position(4);
+    expect((await snapshot()).playing).toBe(false);
+  });
+  it('J4 first wheel and subsequent inertia scroll without leaking to zoom',async()=>{
+    await playing('plugin');
+    const node=page.locator('[data-jid="list"]');await node.hover();await page.mouse.wheel(0,80);
+    await page.waitForFunction(()=>[...document.querySelectorAll('[data-jid="list"], [data-jid="list"] *')].some(el=>el.scrollTop>0));
+    expect((await snapshot()).paused).toBe(true);
+    const before=await node.evaluate(el=>Math.max(el.scrollTop,...[...el.querySelectorAll('*')].map(n=>n.scrollTop)));
+    await page.mouse.wheel(0,800);await page.waitForTimeout(100);await page.mouse.wheel(0,50);await page.waitForTimeout(100);
+    expect(await node.evaluate(el=>Math.max(el.scrollTop,...[...el.querySelectorAll('*')].map(n=>n.scrollTop)))).toBeGreaterThan(before);
+    expect(await page.locator('[data-joplo-stage]').getAttribute('data-user-zoom')).toBeNull();
+  });
+  it('J1/J5 first editing key is preserved and controls still pause/resume',async()=>{
+    await at('plugin');const field=page.getByRole('textbox',{name:'Name',exact:true});await field.focus();
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.speed=0.25;void c.play();});
+    await page.keyboard.press('A');expect(await field.inputValue()).toBe('A');expect((await snapshot()).paused).toBe(true);
+    await page.keyboard.press('Space');await page.keyboard.press('ArrowLeft');expect(await field.inputValue()).toBe('A ');
+    expect((await snapshot()).paused).toBe(true);
+    await page.locator('#play').click();expect((await snapshot()).paused).toBe(false);
+    await page.locator('#play').click();expect((await snapshot()).paused).toBe(true);
+  });
+
+  it('J1 first typed value takes precedence over a frozen scripted typing preview',async()=>{
+    await playing('main',1);
+    await page.waitForFunction(()=>!!(window as any).fixtureCtl.getSnapshot().preview?.text);
+    const field=page.getByRole('textbox',{name:'Name',exact:true});await field.fill('local edit');
+    expect(await field.inputValue()).toBe('local edit');expect((await snapshot()).paused).toBe(true);
+    expect((await snapshot()).state.position).toBe(1);
+    await page.locator('#play').click();await page.evaluate(()=>(window as any).fixtureCtl.pause());
+    expect(await field.inputValue()).not.toBe('local edit');expect((await snapshot()).layer).toBeNull();
+  },15000);
+
+  it('J1 first select/free/plugin/cross-scene inputs keep their normal priority',async()=>{
+    await playing('plugin');await page.locator('[data-jid="segments"] [role="radio"]').last().click();
+    expect(await snapshot()).toMatchObject({paused:true,layer:{effects:[{path:'inputs.segments',value:'b'}]}});
+    await playing('plugin');await page.getByRole('button',{name:'Profile',exact:true}).click();
+    expect(await page.getByText('Profile open',{exact:true}).isVisible()).toBe(true);expect((await snapshot()).paused).toBe(true);
+    await playing('main');await page.getByRole('button',{name:'Other scene',exact:true}).click();
+    expect((await snapshot()).prompt).toHaveLength(1);expect((await snapshot()).state.scenarioId).toBe('f.a.main');
+    await playing('plugin');await page.getByRole('button',{name:'Turn widget',exact:true}).click();await position(1);expect((await snapshot()).playing).toBe(false);
+  });
+
+  it('J1/J4 first 3D orbit drag and arrow key pause and reach the recognizer',async()=>{
+    await playing('spatial');const canvas=page.locator('[data-jid="home"] canvas');
+    await canvas.waitFor({state:'visible'});
+    await page.waitForFunction(()=>((window as any).fixtureCtl.getSnapshot().gesture?.progress??0)>0.1);
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl,act=c.act.bind(c);(window as any).inputs=[];c.act=(...args:any[])=>{(window as any).inputs.push(args[0]);return act(...args);};});
+    const box=await canvas.boundingBox();await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);await page.mouse.down();
+    expect((await snapshot()).paused).toBe(true);
+    const before=await canvas.screenshot();await page.mouse.move(box!.x+box!.width/2+60,box!.y+box!.height/2+20,{steps:8});await page.mouse.up();
+    expect(hash(await canvas.screenshot())).not.toBe(hash(before));
+    const actions=await page.evaluate(()=>(window as any).inputs);expect(actions).toHaveLength(1);expect(actions[0]).toMatchObject({type:'plugin',name:'scene3d:rotate',target:'home'});
+    await page.evaluate(()=>(window as any).fixtureCtl.resetPlayground());expect(hash(await canvas.screenshot())).toBe(hash(before));
+    await playing('spatial');await canvas.focus();await page.keyboard.press('ArrowRight');
+    expect((await snapshot()).paused).toBe(true);
+    expect((await page.evaluate(()=>(window as any).inputs)).at(-1)).toMatchObject({type:'plugin',name:'scene3d:rotate',target:'home'});
+  },15000);
+
+  it('J7 first matching click advances exactly once and does not autoplay the next step',async()=>{
+    await playing();await page.getByRole('button',{name:'Next',exact:true}).click();await position(1);
+    await page.waitForTimeout(150);expect(await snapshot()).toMatchObject({playing:false,state:{position:1}});
+  });
+
+  it('native UI behavior and editing keys stay local; cross-scenario requires confirmation',async()=>{
+    await at();const before=(await snapshot()).state;
+    await page.locator('[data-jid="tabs"] [data-jid="tab_b"]').click();expect(await page.getByText('Panel B',{exact:true}).isVisible()).toBe(true);
+    await page.getByRole('button',{name:'Expand',exact:true}).click();expect(await page.getByText('Expanded detail',{exact:true}).isVisible()).toBe(true);
+    await page.getByRole('textbox',{name:'Name',exact:true}).fill('local');await page.keyboard.press('Space');await page.keyboard.press('ArrowLeft');expect(await page.getByRole('textbox',{name:'Name',exact:true}).inputValue()).toBe('local ');
+    await page.locator('[data-jid="lamp"]').click();expect(await page.locator('[data-jid="lamp"] [role="switch"] > span').evaluate(el=>getComputedStyle(el).left)).toBe('2px');await page.locator('[data-jid="check"]').click();await page.locator('[data-jid="radio_b"]').click();
+    await page.locator('[data-jid="segments"] [role="radio"]').last().click();
+    await page.locator('[data-jid="select"] [role="combobox"]').click();await page.getByRole('option',{name:'Beta',exact:true}).click();
+    await page.getByRole('button',{name:'Profile',exact:true}).click();expect(await page.getByText('Profile open',{exact:true}).isVisible()).toBe(true);
+    expect((await snapshot()).state).toEqual(before);expect((await snapshot()).playing).toBe(false);
+    await page.getByRole('button',{name:'Other scene',exact:true}).click();expect((await snapshot()).state.scenarioId).toBe('f.a.main');expect((await snapshot()).prompt).toHaveLength(1);
+    await page.getByRole('button',{name:'Stay here',exact:true}).click();expect((await snapshot()).layer).not.toBeNull();
+    await page.getByRole('button',{name:'Other scene',exact:true}).click();await page.getByRole('button',{name:'Switch to “Other”?',exact:false}).click();
+    expect((await snapshot()).state).toMatchObject({scenarioId:'f.a.other',position:0});expect((await snapshot()).layer).toBeNull();
+  },20000);
+  it('real typing, toggle, drag, hover, scroll and plugin recognizer advance only the matching step',async()=>{
+    await at('main',1);await page.getByRole('textbox',{name:'Name',exact:true}).fill('A');await position(1);
+    await page.getByRole('textbox',{name:'Name',exact:true}).fill('Ada');await position(2);
+    await page.locator('[data-jid="lamp"]').click();await position(3);
+    await page.locator('[data-jid="tile"]').dragTo(page.locator('[data-jid="drop"]'));await position(4);
+    await page.locator('[data-jid="help"]').hover();await position(5);
+    await page.locator('[data-jid="list"]').hover();await page.mouse.wheel(0,800);await position(6);
+    await page.getByRole('button',{name:'Turn widget',exact:true}).click();await position(7);
+    expect((await snapshot()).state.ui).toMatchObject({dragged:true,hovered:true});
+  },20000);
+  it('coordinate drag owns its pointer instead of stage pan; touch hover degrades to tap',async()=>{
+    await at('coordinates');const box=await page.locator('[data-jid="tile"]').boundingBox();expect(box).not.toBeNull();
+    await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);await page.mouse.down();await page.mouse.move(900,650,{steps:8});await page.mouse.up();await position(1);
+    expect(await page.locator('[data-joplo-stage]').getAttribute('data-user-zoom')).toBeNull();
+    const touch=await browser.newPage({viewport:{width:1280,height:1000},hasTouch:true});await open(touch);
+    await touch.evaluate(()=>{const c=(window as any).fixtureCtl;c.setScenario('f.a.hover',0);c.speed=0.25;void c.play();});await touch.locator('[data-jid="help"]').tap();await touch.waitForFunction(()=>(window as any).fixtureCtl.getSnapshot().state.position===1);await touch.close();
+  });
+  it('J1 first input pauses and applies; plugin presentation/cursor freeze and resume from the same engine time',async()=>{
+    await at('plugin');await page.evaluate(()=>{void(window as any).fixtureCtl.play();});
+    await page.waitForFunction(()=>Number(document.querySelector('[data-jid="widget"]')?.getAttribute('data-progress'))>0.1);
+    const before=(await snapshot()).state;await page.locator('[data-jid="check"]').click();await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const frozen=await snapshot();
+    expect(frozen.paused).toBe(true);expect(frozen.layer).not.toBeNull();expect(frozen.state).toEqual(before);
+    const drawing=await page.locator('[data-jid="widget"]').getAttribute('data-progress');const cursor=await page.locator('[data-joverlay="cursor"]').getAttribute('style');
+    await page.waitForTimeout(200);expect((await snapshot()).time).toBe(frozen.time);expect(await page.locator('[data-jid="widget"]').getAttribute('data-progress')).toBe(drawing);expect(await page.locator('[data-joverlay="cursor"]').getAttribute('style')).toBe(cursor);
+    await page.locator('#play').click();await position(1);await page.evaluate(()=>(window as any).fixtureCtl.stop());
+  });
+  it('play discards every local edit: restored pixels equal a pristine scripted frame',async()=>{
+    const start=async(local:boolean)=>{
+      await at('main',1);
+      if(local){await page.getByRole('textbox',{name:'Name',exact:true}).fill('scratch');await page.locator('[data-jid="check"]').click();await page.getByRole('button',{name:'Profile',exact:true}).click();await page.locator('[data-jid="list"]').hover();await page.mouse.wheel(0,700);}
+      await page.mouse.move(1270,950);await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.reducedMotion=true;void c.play();c.pause();});
+      await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+      return page.locator('[data-joplo-stage]').screenshot();
+    };
+    const pristine=await start(false),restored=await start(true);
+    fs.mkdirSync(path.join(REPO,'output/playwright'),{recursive:true});fs.writeFileSync(path.join(REPO,'output/playwright/p1d-play-pristine.png'),pristine);fs.writeFileSync(path.join(REPO,'output/playwright/p1d-play-restored.png'),restored);
+    expect(hash(restored)).toBe(hash(pristine));expect((await snapshot()).layer).toBeNull();expect(errors).toEqual([]);
+  });
+  it('discarding a local pan restores the frozen scripted camera geometry',async()=>{
+    await at('main',1);await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.reducedMotion=true;void c.play();c.pause();});
+    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    const camera=page.locator('[data-joplo-stage] > div').first();
+    const original=await camera.evaluate(el=>({matrix:getComputedStyle(el).transform,box:JSON.stringify(el.getBoundingClientRect())}));
+    const pristine=await page.locator('[data-joplo-stage]').screenshot();
+    await page.mouse.move(900,700);await page.mouse.down();await page.mouse.move(960,740,{steps:5});await page.mouse.up();
+    expect(await page.locator('[data-joplo-stage]').getAttribute('data-user-zoom')).not.toBeNull();
+    await page.locator('#play').click();await page.evaluate(()=>(window as any).fixtureCtl.pause());await page.mouse.move(1270,950);
+    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    expect(await camera.evaluate(el=>({matrix:getComputedStyle(el).transform,box:JSON.stringify(el.getBoundingClientRect())}))).toEqual(original);
+    expect(await page.locator('[data-joplo-stage]').getAttribute('data-user-zoom')).toBeNull();
+    const restored=await page.locator('[data-joplo-stage]').screenshot();
+    // Chromium can round an antialiased corner by one gray level after a transform.
+    // Any geometric/content difference exceeds this strict per-channel tolerance.
+    const difference=await page.evaluate(async({a,b})=>{
+      const decode=async(s:string)=>{const image=new Image();image.src='data:image/png;base64,'+s;await image.decode();const c=document.createElement('canvas');c.width=image.width;c.height=image.height;const ctx=c.getContext('2d')!;ctx.drawImage(image,0,0);return ctx.getImageData(0,0,c.width,c.height).data;};
+      const x=await decode(a),y=await decode(b);let max=0,count=0;for(let i=0;i<x.length;i+=4){let different=false;for(let j=0;j<3;j++){const delta=Math.abs(x[i+j]!-y[i+j]!);max=Math.max(max,delta);different ||= delta>0;}if(different)count++;}return{max,count};
+    },{a:pristine.toString('base64'),b:restored.toString('base64')});
+    expect(difference.max).toBeLessThanOrEqual(1);expect(difference.count).toBeLessThan(100);
+    fs.writeFileSync(path.join(REPO,'output/playwright/p1d-pan-comparison.json'),JSON.stringify(difference));
+  });
+
+  it('ships native/free arbitration in the real offline embed, with controls outside Stage',async()=>{
+    const out=path.join(root,'published');await buildSite({projectDir:root,outDir:out,home:path.join(root,'home')});
+    const offline=await browser.newContext({viewport:{width:1280,height:900}});const requests:string[]=[];
+    await offline.route(/^https?:/,route=>{requests.push(route.request().url());return route.abort();});
+    const embedded=await offline.newPage();
+    try {
+      await embedded.goto(pathToFileURL(path.join(out,'index.html')).href+'?embed=1&scenario=f.a.plugin');
+      await embedded.waitForSelector('[data-jid="check"] [role="checkbox"]');
+      const field=embedded.locator('[data-jid="check"] [role="checkbox"]');
+      expect(await field.evaluate(el=>!!el.closest('[inert]'))).toBe(true);
+      const coveredState=await embedded.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__));
+      const box=await field.boundingBox();await embedded.mouse.click(box!.x+box!.width/2,box!.y+box!.height/2);
+      expect(await field.getAttribute('aria-checked')).toBe('false');expect(await embedded.getByTestId('playground-notice').count()).toBe(0);
+      expect(await embedded.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__))).toBe(coveredState);
+      await embedded.locator('body').click({position:{x:1,y:1}});await embedded.keyboard.press('Space');
+      await embedded.waitForFunction(()=>(window as any).__JOPLO_UI__?.playing===true);
+      await embedded.evaluate(()=>(document.activeElement as HTMLElement)?.blur());await embedded.keyboard.press('Space');
+      await embedded.waitForFunction(()=>(window as any).__JOPLO_UI__?.paused===true);
+      await embedded.keyboard.press('Space');await embedded.waitForFunction(()=>(window as any).__JOPLO_UI__?.paused===false);
+
+      await field.click();await embedded.waitForFunction(()=>(window as any).__JOPLO_UI__?.paused===true);
+      expect(await field.getAttribute('aria-checked')).toBe('true');
+      const timeline=await embedded.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__));
+      await field.click();expect(await field.getAttribute('aria-checked')).toBe('false');
+      expect(await embedded.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__))).toBe(timeline);
+      expect(await embedded.getByTestId('playground-notice').isVisible()).toBe(true);
+      await embedded.getByTestId('playground-reset').focus();await embedded.keyboard.press('Enter');
+      expect(await field.getAttribute('aria-checked')).toBe('false');
+      await field.click();await embedded.getByTestId('embed-toggle').click();
+      await embedded.waitForFunction(()=>(window as any).__JOPLO_UI__?.paused===false);
+      expect(await field.getAttribute('aria-checked')).toBe('false');
+      expect(await embedded.getByTestId('playground-notice').count()).toBe(0);
+      expect(await embedded.getByTestId('embed-bar').locator('[data-joplo-stage]').count()).toBe(0);
+      expect(requests).toEqual([]);
+    } finally {await offline.close();}
+  },120000);
+
+  it('BR-3 scripted scroll restores earlier prefixes, reset, same-stage scenarios and local exploration',async()=>{
+    const offset=()=>page.locator('[data-jid="list"]').evaluate(el=>Math.max(el.scrollTop,...[...el.querySelectorAll('*')].map(e=>e.scrollTop)));
+    const jump=async(n:number)=>{await page.evaluate(n=>(window as any).fixtureCtl.goto(n),n);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));};
+    await at('rewind',0);expect(await offset()).toBe(0);
+    await jump(1);expect(await offset()).toBe(300);
+    await jump(2);expect(await offset()).toBe(150);
+    await jump(1);expect(await offset()).toBe(300);
+    await jump(0);expect(await offset()).toBe(0);
+    await jump(1);await at('plain',0);expect(await offset()).toBe(0);
+    await at('rewind',1);await page.locator('[data-jid="list"]').hover();await page.mouse.wheel(0,60);
+    await page.waitForFunction(()=>(window as any).fixtureCtl.getSnapshot().freeMode===true);
+    await expect.poll(offset).toBeGreaterThan(300);
+    await page.evaluate(()=>(window as any).fixtureCtl.resetPlayground());
+    await page.waitForFunction(()=>document.querySelector('[data-jid="list"]')!.scrollTop===300);
+    await jump(0);expect(await offset()).toBe(0);
+    await page.locator('[data-jid="list"]').hover();await page.mouse.wheel(0,60);
+    await page.waitForFunction(()=>(window as any).fixtureCtl.getSnapshot().freeMode===true);
+    await page.waitForFunction(()=>document.querySelector('[data-jid="list"]')!.scrollTop>0);
+    await at('plain',0);expect(await offset()).toBe(0);
+  });
+
+  it('BR-3 scripted scroll animation keeps intermediate positions and reset returns to baseline',async()=>{
+    await at('rewind',0);
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.speed=0.25;void c.play();});
+    await page.waitForFunction(()=>{const y=document.querySelector('[data-jid="list"]')!.scrollTop;return y>20&&y<250;});
+    await page.evaluate(()=>(window as any).fixtureCtl.pause());
+    const y=await page.locator('[data-jid="list"]').evaluate(el=>el.scrollTop);
+    await page.evaluate(()=>{const n=document.createElement('i');n.textContent='Mutation';document.querySelector('[data-jid="drop"]')!.append(n);});
+    await page.waitForTimeout(100);
+    expect(await page.locator('[data-jid="list"]').evaluate(el=>el.scrollTop)).toBe(y);
+    await page.evaluate(()=>(window as any).fixtureCtl.reset());
+    await page.waitForFunction(()=>document.querySelector('[data-jid="list"]')!.scrollTop===0);
+    expect((await snapshot()).state.position).toBe(0);
+  });
+
+  it.each([false,true])('BR-1 scoped file:// publication retains declared free clicks (review=%s)',async review=>{
+    const out=path.join(root,`free-publish-${review}`);
+    await buildSite({projectDir:root,outDir:out,review,scope:{scenarios:['f.a.plugin']},home:path.join(root,'home')});
+    const context=await browser.newContext({viewport:{width:1440,height:1000},offline:true});
+    const viewer=await context.newPage();const failures:string[]=[];viewer.on('pageerror',e=>failures.push(e.message));
+    try{
+      await viewer.goto(pathToFileURL(path.join(out,'index.html')).href+'#/f/f?s=f.a.plugin&step=1');
+      await viewer.waitForSelector('[data-jid="avatar"]');
+      const timeline=await viewer.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__));
+      await viewer.locator('[data-jid="avatar"]').click();
+      await expect.poll(()=>viewer.locator('[data-jid="profile"]').count()).toBe(1);
+      expect(await viewer.locator('[data-jid="profile"]').innerText()).toBe('Profile open');
+      expect(await viewer.evaluate(()=>JSON.stringify((window as any).__JOPLO_STATE__))).toBe(timeline);
+      await viewer.getByTestId('playground-reset').click();
+      await expect.poll(()=>viewer.locator('[data-jid="profile"]').count()).toBe(0);
+      expect(failures).toEqual([]);
+    }finally{await context.close();}
+  },120000);
+
+});

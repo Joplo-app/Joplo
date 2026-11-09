@@ -1,3 +1,4 @@
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
 /** buildSite：拒绝覆盖、只发布选定方案、HTML 后处理；renderStep：截图 + 带 at 的元素索引 + 告警。 */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,7 +16,8 @@ import { pickedExample } from './picked-example.ts';
 const EXAMPLE = path.resolve(import.meta.dirname, '../../../examples/invite');
 const copy = () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-build-t-'));
-  fs.cpSync(EXAMPLE, d, { recursive: true });
+  fs.cpSync(EXAMPLE, d, { recursive: true, filter: s => !/[/\\](node_modules|dist|exports|\.joplo)([/\\]|$)/.test(s.slice(EXAMPLE.length)) });
+  installFixturePlugins(d);
   return fs.realpathSync(d);
 };
 
@@ -231,9 +233,9 @@ describe('发布产物是完整的 IR（只缺有意去掉的创作侧字段）'
       }
       if (name === 'agent-arch') {
         // 关系类图表 v2（D69）：编译期布局、trace 经过的分组、时序图的镜头目标
-        const kinds = new Set(nodes.flatMap((n) => (n.layout ? [(n.layout as { kind: string }).kind] : [])));
+        const kinds = new Set(nodes.flatMap((n) => ((n.ext as any)?.diagram?.layout ? [(n.ext as any).diagram.layout.kind] : [])));
         expect([...kinds].sort()).toEqual(['graph', 'sequence']);
-        const traces = steps.flatMap((st) => (st.traces as Record<string, unknown>[] | undefined) ?? []);
+        const traces = steps.flatMap((st) => Object.values((st.ext as any)?.diagram?.scenes ?? {}).flatMap((scene: any) => scene.traces as Record<string, unknown>[]));
         expect(traces.some((t) => Array.isArray(t.groups) && t.groups.length)).toBe(true);
         expect(traces.some((t) => Array.isArray(t.targets) && t.targets.length)).toBe(true);
       }
@@ -242,13 +244,13 @@ describe('发布产物是完整的 IR（只缺有意去掉的创作侧字段）'
         const features = Object.values(payload.features as Record<string, { goal?: string; roles?: unknown }>);
         expect(features.some((f) => !!f.goal && f.roles !== undefined)).toBe(true);
         // 产品界面组件（D68）：Menu 的 opened 抄到 Menu.Dropdown
-        expect(nodes.some((n) => n.type === 'Menu.Dropdown' && (n.props as Record<string, unknown> | undefined)?.opened !== undefined)).toBe(true);
+        expect(nodes.some((n) => n.type === 'ui:Menu.Dropdown' && (n.props as Record<string, unknown> | undefined)?.opened !== undefined)).toBe(true);
       }
     }, 120_000);
   }
 
   it('样板没用到的演示字段（redact、autoFocus）同样原样保留', () => {
-    const scene = { id: 'o~v', optionId: 'f.a', route: '/', name: 'v', viewport: 'desktop', layer: 'v', root: { id: 'root', type: 'Stack', props: {}, children: [{ id: 'key', type: 'Code', props: {}, redact: { op: 'not', path: 'ui.shown' }, children: [] }] } };
+    const scene = { id: 'o~v', optionId: 'f.a', route: '/', name: 'v', viewport: 'desktop', layer: 'v', root: { id: 'root', type: 'ui:Stack', props: {}, children: [{ id: 'key', type: 'ui:Code', props: {}, redact: { op: 'not', path: 'ui.shown' }, children: [] }] } };
     const p = { name: 'T', autoFocus: false, routes: {}, scenes: { 'o~v': scene }, features: {}, options: {}, scenarios: {}, rules: {}, cases: {}, issues: [] } as unknown as Parameters<typeof publishPayload>[0];
     const out = JSON.parse(JSON.stringify(publishPayload(p, null).project));
     expect(out.autoFocus).toBe(false);
@@ -314,7 +316,7 @@ describe('renderStep', () => {
     expect(r.position).toBe(1);
     expect(r.sceneId).toBe('invite.a-modal@/members');
     const send = r.elements.find((e) => e.id === 'btn_send')!;
-    expect(send).toMatchObject({ visible: true, disabled: false, type: 'Button' });
+    expect(send).toMatchObject({ visible: true, disabled: false, type: 'ui:Button' });
     expect(send.at).toMatch(/^features\/invite\/options\/a-modal\.tsx:\d+:\d+$/);
     const alert = r.elements.find((e) => e.id === 'alert_send_error')!;
     expect(alert.visible).toBe(false);
@@ -326,7 +328,7 @@ describe('renderStep', () => {
 
   it('Toast 场景（线框主题）与跨路径场景都能渲染（托管运行时）；未知场景报 NOT_FOUND；不能写到源文件或 .joplo/', async () => {
     // 托管运行时：<JOPLO_HOME>/runtime/playwright-<版本>/，项目里不再有 playwright
-    fs.rmSync(path.join(dir, 'node_modules'), { recursive: true, force: true });
+    fs.rmSync(path.join(dir, 'node_modules/playwright'), { recursive: true, force: true });
     const p = runtimePaths(home);
     fs.mkdirSync(path.join(p.dir, 'node_modules'), { recursive: true });
     fs.symlinkSync(fs.realpathSync(path.join(SERVER_MODULES, 'playwright-core')), path.join(p.dir, 'node_modules/playwright-core'), 'junction');
@@ -353,7 +355,8 @@ describe('范围构建（scope，D75）', () => {
   let dir: string;
   beforeAll(() => {
     dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-scope-t-')));
-    fs.cpSync(BOARD, dir, { recursive: true });
+    fs.cpSync(BOARD, dir, { recursive: true, filter: s => !/[/\\](node_modules|dist|exports|\.joplo)([/\\]|$)/.test(s.slice(BOARD.length)) });
+  installFixturePlugins(dir);
   });
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 

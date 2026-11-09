@@ -1,10 +1,11 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * T-director3 中保留下来的纯函数：镜头时序（cameraPosition）与导演层的选取（协调者报告的 agent-arch 第 10 步）。
  * 解说卡已改为画面下方的字幕区（见 subtitle.test.ts）。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, layer, option, page, set, shot, $ } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
+import { feature, flow, layer, option, page, set, shot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, type AuthoringProject } from '@joplo-app/core';
 import { cameraFor, cameraPosition } from '../src/player/cameraFor';
@@ -16,7 +17,7 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 function arch() {
   const home = page({ title: 'A', layout: false }, h(ui.Text, { id: 'note' }, '路径页面'));
   const client = h(ui.Stack, null, h(ui.ToolCall, { id: 'tc_sheet', title: 'make_sheet' }, '生成'), h(ui.Button, { id: 'send' }, '发送'));
-  const backend = h(ui.Diagram, { id: 'arch' }, h(ui.Diagram.Node, { id: 'biz', label: 'Biz' }), h(ui.Diagram.Node, { id: 'sandbox', label: '沙箱' }), h(ui.Diagram.Edge, { id: 'e', from: 'biz', to: 'sandbox' }));
+  const backend = h(uiDiagram.Diagram, { id: 'arch' }, h(uiDiagram.Diagram.Node, { id: 'biz', label: 'Biz' }), h(uiDiagram.Diagram.Node, { id: 'sandbox', label: '沙箱' }), h(uiDiagram.Diagram.Edge, { id: 'e', from: 'biz', to: 'sandbox' }));
   const opt = option({
     name: 'A',
     idea: 'i',

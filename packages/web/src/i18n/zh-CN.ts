@@ -1,4 +1,4 @@
-import { autoCaptionMessages } from '@joplo-app/core';
+import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, type Value } from './format';
@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createZhCN(locale: Locale = 'zh-CN') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `自由体验中 · 按播放继续`,
+      freeChangesDiscarded: `改动不会保留`,
+      freeReset: `重置`,
+      freeSwitchPrompt: (name: string) => `切到「${name}」场景？`,
+      freeSwitchDescription: `从这个操作之前开始，当前体验改动会丢弃。`,
+      freeSwitchConfirm: `切换场景`,
+      freeSwitchCancel: `留在这里`,
       ...autoCaptionMessages('zh-CN'),
       mockSuccess: '模拟成功',
       mockFailure: '模拟失败',
@@ -224,6 +231,8 @@ export function createZhCN(locale: Locale = 'zh-CN') {
       thisDiagramHasNoNodesYet: "架构图还没有节点",
       placeholder: "占位",
       customComponent: "自定义组件：",
+      pluginLoading: "正在载入插件 ",
+      pluginUnavailable: "插件无法使用：",
       unnamed: "未命名",
       placeholderSuffix: "（占位）",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "目录中没有的组件，按声明的元素 ID 与状态演示",

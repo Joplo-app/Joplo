@@ -1,3 +1,5 @@
+import { pruneMediaAssets } from './media.ts';
+import { scopePluginData } from './plugin-data.ts';
 /**
  * 按场景保密分享（D75）：把编译好的 IR 裁剪到若干场景。
  *
@@ -93,11 +95,12 @@ export function resolveScope(project: Project, request: ScopeRequest, mode: Scop
 export function stepRefs(st: Step): string[] {
   const out: string[] = [];
   if ('target' in st.action) out.push(st.action.target);
+  if ((st.action.type === 'drag' || st.action.type === 'scroll') && typeof st.action.to === 'string') out.push(st.action.to);
   for (const s of st.shots) out.push(...s.targets);
   for (const m of st.marks) out.push(m.target);
   for (const c of st.cues ?? []) out.push(...c.targets);
   for (const c of st.callouts ?? []) out.push(c.target);
-  for (const t of st.traces) out.push(...t.nodes, ...t.edges.map((e) => e.id), ...(t.groups ?? []), ...(t.errorGroups ?? []), ...(t.targets ?? []));
+  out.push(...st.references ?? []);
   return out;
 }
 
@@ -204,7 +207,12 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
         .filter(([cid]) => F.has(project.cases[cid]?.featureId ?? cid.split('.')[0] ?? ''))
         .map(([cid, c]) => [cid, { ...c, scenarioIds: c.scenarioIds.filter((x) => S.has(x)) }]),
     );
-    options[id] = { ...o, coverage };
+    const retained = new Set(Object.values(scenes).filter(s => s.optionId === id || s.optionId === null).flatMap(s => idsIn(s.root)));
+    const free = o.free ? Object.fromEntries(Object.entries(o.free).filter(([, reaction]) => {
+      const a = reaction.action;
+      return 'target' in a && retained.has(a.target) && (!('to' in a) || typeof a.to !== 'string' || retained.has(a.to));
+    })) : undefined;
+    options[id] = { ...o, coverage, ...(free ? { free } : {}) };
   }
   const features: Project['features'] = {};
   for (const f of orderedFeatures(project)) {
@@ -243,7 +251,7 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
   };
   const ids = Object.keys(scenarios);
   // 译文只留范围内用得到的（D84）：别的功能的文字不随范围分享出去
-  return { project: pruneMessages(out), info: { key: scopeKey(ids, mode), scenarios: ids, features: Object.keys(features), borrowed: merged } };
+  return { project: pruneMediaAssets(pruneMessages(scopePluginData(out))), info: { key: scopeKey(ids, mode), scenarios: ids, features: Object.keys(features), borrowed: merged } };
 }
 
 /** 一条借用的说明（英文，CLI 与看板共用）。 */

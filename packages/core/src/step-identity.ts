@@ -1,4 +1,4 @@
-/** Stable author identities are separate from public playback IR for strict legacy readers. */
+/** Stable author identities are separate from public playback IR to keep author identity metadata separate from runtime state. */
 import { z } from 'zod';
 import { Id, Project, Qid, SCHEMA_VERSION } from './schema.ts';
 import { JoploError } from './result.ts';

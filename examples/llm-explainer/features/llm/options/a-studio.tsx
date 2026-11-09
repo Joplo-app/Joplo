@@ -1,4 +1,5 @@
-import { $, callout, camera, done, flow, hold, layer, narrate, option, patch } from '@joplo-app/kit';
+import { camera } from '@joplo-app/plugin-content';
+import { $, callout, done, flow, hold, layer, narrate, option, patch } from '@joplo-app/kit';
 import { BIRTHDAY_Q, PROMPT, SRC } from '../../../shared/data.ts';
 import { C } from '../../../shared/palette.ts';
 import { WorldLayer } from '../../../shared/world.tsx';
@@ -115,7 +116,7 @@ export default option({
   layers: { world: layer('世界', <WorldLayer />, { icon: 'flow' }) },
   state: {
     ui: {
-      __camera: { targets: ['chat'] }, poster: 1, asked: false, ans: 'hidden', ansFlip: false, pAt: 'bubble', pMode: 'plain',
+      __plugins: { content: { camera: { targets: ['chat'] } } }, poster: 1, asked: false, ans: 'hidden', ansFlip: false, pAt: 'bubble', pMode: 'plain',
       tag0: 'hidden', tag1: 'hidden', tag2: 'hidden', tag3: 'hidden', overview: false,
       ...machIdle, machOp: 0, scan: '40px', bars: 'none', out: 0, outFlip: false, meter: '', rail: false, ptr: 'none', dial: 'none', hints: false,
       q2: false, tips: false, score: 'none', hudN: '', hudT: '', src: '', cta: false,

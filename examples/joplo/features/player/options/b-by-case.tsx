@@ -1,7 +1,7 @@
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
 import { $, done, eq, flow, go, not, option, set, uses } from '@joplo-app/kit';
-import { Alert, Badge, Code, Divider, Group, NavLink, SegmentedControl, Stack, Text } from '@joplo-app/kit/ui';
+import { Alert, Badge, Code, Divider, Group, NavLink, SegmentedControl, Stack, Text } from '@joplo-app/plugin-ui';
 
 import { header, main, overlay, playerState, sharedScenarios } from '../../../shared/board/player.tsx';
 

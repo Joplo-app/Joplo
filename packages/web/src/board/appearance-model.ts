@@ -9,7 +9,7 @@ import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
  *   写到 PUT /__joplo/settings；服务端 normalizeSettings 再校验一遍。
  * - 配色格 paletteCells：sketch 与 clean 配色相同，合并为一格「纸白」；8 格内置 + 作者主题（标 *）。
  */
-import { isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke } from '@joplo-app/core';
+import { isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke } from '@joplo-app/core/runtime';
 import { parseThemeVars, settingValue, type ThemeInfo } from '../renderer/themes';
 import type { Look } from '../renderer/appearance';
 import type { BoardSettings } from '../runtime/dev-client';

@@ -23,7 +23,7 @@ const eleven = (): VoiceProfile => ({ ...PRESETS.find((p) => p.id === 'elevenlab
 
 /** 两步：中文原文 + 英文译文。 */
 function project(): Project {
-  const step = (id: string, caption: string) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, traces: [], forks: [], marks: [] });
+  const step = (id: string, caption: string) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, forks: [], marks: [] });
   return {
     schemaVersion: 2, name: 'T', mode: 'publish',
     i18n: { default: 'zh-CN', locales: ['zh-CN', 'en'], messages: { en: { 一: 'One', 二: 'Two' } } },

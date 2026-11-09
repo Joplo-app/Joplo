@@ -8,10 +8,12 @@ import { m } from '../i18n/board/messages';
  * - 推送：Vite HMR 自定义事件 `joplo:ir`（带 projectId，只接收当前项目的）与 `joplo:projects`（列表变化）。
  * - 写：选中、移除项目、打开编辑器、导出 —— 都带本地令牌（页面 meta），服务端另校验 Origin。
  */
-import type { AppearanceFont, AppearanceStroke, Diagnostic, Project, Selection, LocalReviewState, LocalReviewWrite } from '@joplo-app/core';
+import type { AppearanceFont, AppearanceStroke, Diagnostic, Project, Selection, LocalReviewState, LocalReviewWrite } from '@joplo-app/core/runtime';
 import type { SelectionInput, SelectionWriteResult } from './demo';
+import { loadPluginRuntimes } from '../renderer/plugins';
 
-export type DevPayload = { projectId?: string; version: number; ok: boolean; project: Project | null; diagnostics: Diagnostic[]; home: string | null };
+/** plugins（D86）：插件 id → 运行时地址（源码 Vite /@fs/… 或预构建看板的打包模块端点）；收到即载入（renderer/plugins.ts）。 */
+export type DevPayload = { projectId?: string; version: number; ok: boolean; project: Project | null; diagnostics: Diagnostic[]; home: string | null; plugins?: Record<string, string> };
 
 export type ProjectSummary = {
   id: string;
@@ -69,7 +71,9 @@ export async function fetchIR(projectId: string): Promise<DevPayload | { error: 
   try {
     const res = await fetch(`/__joplo/p/${enc(projectId)}/ir`, { cache: 'no-store' });
     if (!res.ok) return { error: await readError(res), status: res.status };
-    return (await res.json()) as DevPayload;
+    const payload = (await res.json()) as DevPayload;
+    await loadPluginRuntimes(payload.plugins);
+    return payload;
   } catch (e) {
     return { error: m.board.couldNotConnectToJoploDev(errMsg(e)) };
   }
@@ -82,8 +86,11 @@ const hot = (): Hot | null => (import.meta.hot as unknown as Hot | undefined) ??
 export function subscribeIR(projectId: string, cb: (p: DevPayload) => void, onConnection?: (connected: boolean) => void): () => void {
   const h = hot();
   if (!h) return () => undefined;
+  let revision=0,closed=false;
   const handler = (p: DevPayload) => {
-    if (p.projectId === projectId) cb(p);
+    if (p.projectId !== projectId) return;
+    const current=++revision;
+    void loadPluginRuntimes(p.plugins).then(()=>{if(!closed&&current===revision)cb(p);});
   };
   const up = () => onConnection?.(true);
   const down = () => onConnection?.(false);
@@ -92,10 +99,23 @@ export function subscribeIR(projectId: string, cb: (p: DevPayload) => void, onCo
   h.on('vite:ws:disconnect', down);
   onConnection?.(true);
   return () => {
+    closed=true;
     h.off('joplo:ir', handler);
     h.off('vite:ws:connect', up);
     h.off('vite:ws:disconnect', down);
   };
+}
+
+/** Diagnostic-only updates must not replace IR or interrupt playback. */
+export type DiagnosticsUpdate = { projectId: string; version: number; diagnostics: Diagnostic[] };
+export function withDiagnostics(payload: DevPayload | null, update: DiagnosticsUpdate): DevPayload | null {
+  return payload?.version === update.version ? { ...payload, diagnostics: update.diagnostics } : payload;
+}
+export function subscribeDiagnostics(projectId: string, cb: (update: DiagnosticsUpdate) => void): () => void {
+  const h = hot(); if (!h) return () => undefined;
+  const handler = (update: DiagnosticsUpdate) => { if (update.projectId === projectId) cb(update); };
+  h.on('joplo:diagnostics', handler);
+  return () => h.off('joplo:diagnostics', handler);
 }
 
 /** 订阅项目列表变化（再次 joplo dev 注册、编译状态变化、移除）。 */

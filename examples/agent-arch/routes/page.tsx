@@ -1,5 +1,5 @@
 import { page, Slot } from '@joplo-app/kit';
-import { Grid, Stack, Title } from '@joplo-app/kit/ui';
+import { Grid, Stack, Title } from '@joplo-app/plugin-ui';
 
 /** 左：客户端；右：架构图；下：核心块说明。 */
 export default page(

@@ -33,8 +33,7 @@
     const cx = r.left + r.width / 2;
     const cy = r.top + r.height / 2;
     if (cx < sr.left || cx > sr.right || cy < sr.top || cy > sr.bottom) {
-      // 画布（Canvas）里的元素被镜头移出画面是常态：只在它是下一步要操作的目标时才提示
-      if (el.closest('[data-jcanvas-world]') && el.dataset.jid !== args.nextTargetId) return;
+      if (el.closest('[data-jreport-viewport]') && el.dataset.jid !== args.nextTargetId) return;
       warnings.push(`Outside frame: "${e.label}"(${e.id}) has its center outside the frame`);
       return;
     }
@@ -45,6 +44,9 @@
     }
     const hit = document.elementFromPoint(cx, cy);
     if (hit && (hit === el || el.contains(hit))) return;
+    // 插件组件（D86）的锚点在插件自己的画布上方、不接收指针：被同一个插件根里的画布“盖住”是预期的，命中由插件自己判断
+    const pluginRoot = el.closest('[data-jplugin]');
+    if (pluginRoot && hit && pluginRoot.contains(hit)) return;
     // 弹窗打开时，背景被遮罩或弹窗面板覆盖是预期的层次，不算遮挡（窄屏下面板常盖住背景按钮）
     if ((hit?.closest('[data-jbackdrop]') || (dialogOpen && hit?.closest('[role="dialog"]'))) && !el.closest('[role="dialog"]')) return;
     warnings.push(`Occluded: "${e.label}"(${e.id}) has its center covered by ${hit ? name(hit) : 'content outside the frame'}`);
@@ -53,9 +55,9 @@
   if (offViewport.length)
     warnings.push(`Outside viewport: viewport ${vw}×${vh} is smaller than the stage; ${offViewport.length} interactive elements have centers outside the viewport; occlusion checks skipped (${offViewport.join(', ')})`);
 
-  // 1b. 画布（Canvas）没有尺寸：放在没有宽 / 高的容器里时整块不可见
-  stage.querySelectorAll('[data-jcanvas]').forEach((c) => {
-    if (c.clientWidth < 1 || c.clientHeight < 1) warnings.push(`Canvas has no size: ${name(c)} is ${c.clientWidth}×${c.clientHeight}px, so nothing in it is visible; give its container a width and height (h="100%" in a layer) or let it size from its view ratio`);
+  // Plugins can mark a measured render surface and a panning viewport without adding family names to the host.
+  stage.querySelectorAll('[data-jreport-surface]').forEach((surface) => {
+    if (surface.clientWidth < 1 || surface.clientHeight < 1) warnings.push(`${surface.dataset.jreportSurface} has no size: ${name(surface)} is ${surface.clientWidth}×${surface.clientHeight}px; give its container a width and height`);
   });
 
   // 2. 标签文字溢出

@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 演示的表达能力（D56）：过渡卡 card()、角色 role() + layer({ role })、流式输出 stream()。
  * 不变量：
@@ -7,8 +8,8 @@
  * - 角色引用写错时 check 报 ROLE_UNKNOWN；发布站保留角色和卡片（它们是演示内容）。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, layer, option, page, role, set, stream, Slot, $ } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, layer, option, page, role, set, stream, Slot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { ROLE_COLORS, cameraAt, cardAt, compile, replay, roleOf, roleOfScene, stateAt, streamsOf, type AuthoringProject } from '../src/index.ts';
 

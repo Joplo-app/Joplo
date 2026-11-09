@@ -51,7 +51,7 @@ describe('static diff bundle', () => {
   });
 });
 
-it('keeps stable keys outside strict legacy playback Project and validates identity references', async () => {
+it('keeps stable author keys outside playback Project and validates identity references', async () => {
   const { publishPayload, finalizeHtml } = await import('../src/build.ts');
   const { stepIdentity, readFeatureDiffBuild } = await import('@joplo-app/core');
   const p = diffProject(); p.scenarios['invite.main.send']!.steps[0]!.key = 'open';
@@ -63,19 +63,6 @@ it('keeps stable keys outside strict legacy playback Project and validates ident
   expect(() => readFeatureDiffBuild(html + html)).toThrow(/Expected one/);
 });
 
-it('ordinary new published payload passes actual pinned Core 0.2.10 strict Reader', async () => {
-  const { Project: LegacyProject } = await import('@joplo-app/core-legacy');
-  const { publishPayload, finalizeHtml } = await import('../src/build.ts');
-  const { stepIdentity, readFeatureDiffBuild } = await import('@joplo-app/core');
-  const project = diffProject(); project.scenarios['invite.main.send']!.steps[0]!.key = 'open';
-  expect(LegacyProject.safeParse(project).success).toBe(false); // Proves this is the strict old reader.
-  const payload = publishPayload(project, null);
-  const html = finalizeHtml('<head></head>', () => '', payload, stepIdentity(project)).html;
-  const oldInput = JSON.parse(/id="joplo-ir">([\s\S]*?)<\/script>/.exec(html)![1]!).project;
-  const read = LegacyProject.safeParse(oldInput);
-  expect(read.success, JSON.stringify(read)).toBe(true);
-  expect((readFeatureDiffBuild(html) as any).scenarios['invite.main.send'].steps[0].key).toBe('open');
-});
 
 it('rejects old runtime capability explicitly instead of showing a cover as initial-state comparison', async () => {
   const beforeDir = await site('b'), afterDir = await site('a');

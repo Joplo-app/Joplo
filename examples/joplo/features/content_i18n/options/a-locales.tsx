@@ -1,6 +1,6 @@
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
-import { $, callout, done, flow, highlight, option, set, shot, spotlight, trace, uses, type Bind } from '@joplo-app/kit';
+import { $, callout, done, flow, highlight, option, set, shot, spotlight, uses, type Bind } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 
 import { chrome, content, initialUi, layers, speak, step } from '../../../shared/i18n/i18n.tsx';
 

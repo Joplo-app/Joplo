@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * D74 朗读（网页）：
  * - 控制器：自动播放每一步停留 = max(画面停留, 声音读完 + 换气)；暂停时声音一起暂停；手动下一步立刻停掉当前声音；
@@ -5,9 +6,9 @@
  * - 镜头：手机层等画面被缩小时，界面元素推近到文字看得清（最多 3 倍）；
  * - 看板：旁白语言识别、预设音色排序。
  */
-import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, narrate, option, page, say } from '@joplo-app/kit';
+import { describe, expect, it, vi } from 'vitest';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, narrate, option, page, say } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { VOICE_BREATH_MS, compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController, TIMING } from '../src/runtime/demo';
@@ -260,4 +261,38 @@ describe('额度不够 / 没有音频时用浏览器朗读，字幕区标出（D
     expect(c.getSnapshot().narration?.fallback).toBeUndefined();
     c.pause();
   });
+});
+
+it('media clock freezes on pause, scales with speed, and reanchors identically on replay and jumps', async () => {
+  const { c } = setup();
+  c.narrator = null;
+  const sc = c.getSnapshot().project!.scenarios['f.a.s']!;
+  sc.steps[0]!.media = { 'fake:bgm': { plugin: 'fake', resource: 'r', offsetMs: 0, loop: true, volume: .3, fadeInMs: 0 } };
+  sc.steps[1]!.media = { 'fake:bgm': { ...sc.steps[0]!.media['fake:bgm']!, offsetMs: 3000 } };
+  let reached = false, atBoundary = Infinity;
+  const off = c.subscribe(() => {
+    if (!reached && c.getSnapshot().state?.position === 2) {
+      reached = true; c.pause(); atBoundary = c.mediaElapsed();
+    }
+  });
+  const play = c.play();
+  await until(() => reached);
+  off();
+  expect(atBoundary).toBeLessThan(100);
+  const snapshot = sc.steps[1]!.media;
+  let now = performance.now();
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+  now += 60;
+  expect(c.mediaElapsed()).toBeCloseTo(atBoundary, 0);
+  c.speed = 2;
+  c.resume();
+  const start = c.mediaElapsed();
+  now += 50;
+  expect(c.mediaElapsed() - start).toBe(100);
+  c.goto(2);
+  expect(c.mediaElapsed()).toBe(0);
+  expect(c.getSnapshot().project!.scenarios['f.a.s']!.steps[1]!.media).toEqual(snapshot);
+  c.goto(2); expect(c.mediaElapsed()).toBe(0);
+  c.setScenario('f.a.s', 0); expect(c.mediaElapsed()).toBe(0);
+  c.stop(); clock.mockRestore(); await play;
 });

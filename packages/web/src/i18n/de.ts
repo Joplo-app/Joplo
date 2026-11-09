@@ -1,4 +1,4 @@
-import { autoCaptionMessages } from '@joplo-app/core';
+import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createDe(locale: Locale = 'de') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `Freies Ausprobieren · Mit Wiedergabe fortsetzen`,
+      freeChangesDiscarded: `Änderungen werden nicht gespeichert`,
+      freeReset: `Zurücksetzen`,
+      freeSwitchPrompt: (name: string) => `Zu „${name}“ wechseln?`,
+      freeSwitchDescription: `Beginnt direkt vor dieser Aktion. Änderungen beim Ausprobieren werden verworfen.`,
+      freeSwitchConfirm: `Szenario wechseln`,
+      freeSwitchCancel: `Hier bleiben`,
       ...autoCaptionMessages('de'),
       mockSuccess: "Simulierter Erfolg",
       mockFailure: "Simulierter Fehler",
@@ -206,6 +213,8 @@ export function createDe(locale: Locale = 'de') {
       thisDiagramHasNoNodesYet: "Dieses Diagramm hat noch keine Knoten",
       placeholder: "Platzhalter",
       customComponent: "Eigene Komponente: ",
+      pluginLoading: "Plugin wird geladen: ",
+      pluginUnavailable: "Plugin nicht verfügbar: ",
       unnamed: "Unbenannt",
       placeholderSuffix: "(Platzhalter)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "Komponente außerhalb des Katalogs. Die Demo folgt ihren deklarierten Element-IDs und Zuständen.",

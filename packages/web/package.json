@@ -1,15 +1,17 @@
 {
   "name": "@joplo-app/web",
-  "version": "0.2.18",
+  "version": "0.3.0",
   "description": "Joplo 看板与发布站的预构建资源（含手绘字体，SIL OFL 1.1）",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "exports": {
     "./package.json": "./package.json",
-    "./manifest.json": "./dist/manifest.json"
+    "./manifest.json": "./dist/manifest.json",
+    "./shared-modules.json": "./shared-modules.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "shared-modules.json"
   ],
   "scripts": {
     "dev": "vite",
@@ -19,6 +21,7 @@
   },
   "devDependencies": {
     "@joplo-app/core": "workspace:*",
+    "@joplo-app/kit": "workspace:*",
     "@tailwindcss/vite": "4.3.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

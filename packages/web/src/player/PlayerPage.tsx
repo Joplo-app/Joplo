@@ -1,4 +1,6 @@
 import { AuthorLink, type Author } from '../site/author';
+import { PlaygroundNotice } from './PlaygroundNotice';
+import { projectThemes } from '@joplo-app/core/runtime';
 import { useTopbarMeasurements } from './topbar-fit';
 import { LanguageMenu } from './LanguageMenu';
 import { localeNames } from '../i18n/locale';
@@ -19,7 +21,7 @@ import { en, type Dictionary } from '../i18n/en';
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AppWindow, Bot, ChevronLeft, ChevronRight, ChevronsUpDown, Clapperboard, Database, FileText, Globe, Mail, MessageSquare, Monitor, Server, Smartphone, SquareTerminal, Workflow, GitFork, Cog, Ellipsis, Expand, Film, Gauge, Maximize, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Share, Shrink } from 'lucide-react';
-import { roleOfScene, stepTouchesLayer, type LayerIcon, type Project, type RoleInfo, type Scenario } from '@joplo-app/core';
+import { roleOfScene, stepTouchesLayer, type LayerIcon, type Project, type RoleInfo, type Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { Stage, type ZoomApi } from '../renderer/Stage';
 import { Subtitle } from './Subtitle';
@@ -569,7 +571,7 @@ export function PlayerPage(p: PlayerPageProps) {
       if (e.key === 'Alt') setAltDown(e.type === 'keydown' && !!p.onInspect);
       if (e.type !== 'keydown') return;
       const t = e.target as HTMLElement;
-      if (t.closest('input,textarea,select,[contenteditable],[data-joplo-stage],[role="menu"],[role="dialog"],[role="tablist"],[role="radiogroup"]')) return;
+      if (t.closest('input,textarea,select,[contenteditable],[data-joplo-stage],[data-testid="playground-notice"],[role="menu"],[role="dialog"],[role="tablist"],[role="radiogroup"]')) return;
       if (e.metaKey || e.ctrlKey) return;
       if (e.key === '?') {
         e.preventDefault();
@@ -623,7 +625,7 @@ export function PlayerPage(p: PlayerPageProps) {
   const [barRowRef, barRowW] = useWidth(1200);
   const hasStage = !!(state && shownScene);
   // 外观（D55）：舞台、字幕、手机外框用同一套（线条落到 rough / clean，字体覆盖 --jp-font）
-  const look = resolveLook({ theme: p.theme, font: p.font ?? null, stroke: p.stroke ?? null }, project.themes ?? {}, i18n);
+  const look = resolveLook({ theme: p.theme, font: p.font ?? null, stroke: p.stroke ?? null }, projectThemes(project), i18n);
 
   const zoomIn = () => zoomApi.current?.zoomBy(1.25);
   const zoomOut = () => zoomApi.current?.zoomBy(1 / 1.25);
@@ -647,7 +649,9 @@ export function PlayerPage(p: PlayerPageProps) {
     <div className="relative flex min-h-0 flex-1 flex-col" onMouseMove={inspecting ? onInspectHover : undefined} onMouseLeave={() => setHoverBox(null)}>
       {hasStage ? (
         <StageViewport
+          clock={ctl.clock}
           video={video}
+          playground={!curtainOn && snap.freeMode ? <PlaygroundNotice ctl={ctl} snap={snap} /> : undefined}
           watermark={p.watermark}
           viewport={device}
           theme={p.theme}
@@ -665,6 +669,12 @@ export function PlayerPage(p: PlayerPageProps) {
               viewportOverride={device === 'mobile' ? null : size}
               project={project}
               state={state!}
+              playground={snap.playground}
+              freeMode={snap.freeMode}
+              clock={ctl.clock}
+              gesture={snap.gesture}
+              onStageInput={explore => ctl.stageInput(explore)}
+              onAction={(action, native) => { void ctl.act(action, native); }}
               theme={p.theme}
               font={p.font ?? null}
               stroke={p.stroke ?? null}

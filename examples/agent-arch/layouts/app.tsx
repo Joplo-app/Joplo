@@ -1,5 +1,5 @@
 import { layout, Outlet, Slot } from '@joplo-app/kit';
-import { AppShell, Group, Text, Title } from '@joplo-app/kit/ui';
+import { AppShell, Group, Text, Title } from '@joplo-app/plugin-ui';
 
 export default layout(
   <AppShell header={{ height: 52 }} padding="md">

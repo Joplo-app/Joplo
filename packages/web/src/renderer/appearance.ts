@@ -5,10 +5,10 @@ import { en, type Dictionary } from '../i18n/en';
  * 渲染路由（导出图片、视频与 renderStep 的 URL 参数 font / stroke）。只读 --jp-*，不涉及看板 Token。
  * 手写体使用离线的 Excalifont + 霞鹜漫黑；文楷仅在看板选中时从 CDN 加载，失败时用系统楷体。
  */
-import { isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke } from '@joplo-app/core';
+import { isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke } from '@joplo-app/core/runtime';
 import { strokeOfTheme, type StrokeMode } from './themes';
 
-export type { AppearanceFont, AppearanceStroke } from '@joplo-app/core';
+export type { AppearanceFont, AppearanceStroke } from '@joplo-app/core/runtime';
 /** 一套外观：theme 必有；font / stroke 为 null = 跟随主题。 */
 export type Look = { theme: string; font: AppearanceFont | null; stroke: AppearanceStroke | null };
 

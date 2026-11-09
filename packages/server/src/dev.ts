@@ -13,6 +13,7 @@
  * 端口被占用时直接报错（strictPort），不静默换端口。
  */
 import { spawn } from 'node:child_process';
+import { bundlePluginRuntimes } from './build.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import type http from 'node:http';
@@ -31,6 +32,16 @@ import { SelectionBody, readSelection, resolveSelection, writeSelection } from '
 import { IGNORED_DIRS, cssSourcePlugin, isProjectSource, joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
 import type { DistWeb, WebAssets } from './web-assets.ts';
 
+/** 文件绝对路径 → Vite 的 /@fs/ 地址。 */
+const fsUrl = (abs: string) => `/@fs${abs.split(path.sep).join('/').replace(/^(?!\/)/, '/')}`;
+/** 离文件最近的 package.json 所在目录（插件包根目录）；没有时用文件所在目录。 */
+function packageRootOf(file: string): string {
+  for (let d = path.dirname(file); ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, 'package.json'))) return d;
+    if (path.dirname(d) === d) return path.dirname(file);
+  }
+}
+
 /** 推给看板的编译结果。`project` 始终是最近一次成功的 IR；`ok=false` 时看板显示错误列表、保留画面。 */
 export type DevPayload = {
   version: number;
@@ -38,6 +49,8 @@ export type DevPayload = {
   project: Project | null;
   diagnostics: Diagnostic[];
   home: string | null;
+  /** 插件（D86）：插件 id → 运行时地址（本服务以 /@fs/<绝对路径> 提供，Vite 负责转译与依赖解析）。 */
+  plugins?: Record<string, string>;
 };
 
 /** 首页项目列表的一行。status：idle 未编译、compiling 首次编译中、ok、error（编译出错）、missing（目录不存在）。 */
@@ -183,6 +196,7 @@ export type ProjectSlot = {
   loader: ViteDevServer | null;
   ready: Promise<void>;
   payload: DevPayload;
+  runtimeModules: Map<string,string>;
   compiling: boolean;
   closed: boolean;
   running: Promise<void> | null;
@@ -277,7 +291,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       root: slot.dir,
       appType: 'custom',
       customLogger: makeLogger(log),
-      resolve: { alias: kitAliases(web, slot.dir) },
+      resolve: { dedupe: ['react', 'react-dom'], alias: kitAliases(web, slot.dir) },
       plugins: [joploProjectPlugin(slot.dir, web)],
       // 只在服务端载入模块：不开 HMR、不开 WebSocket（多个项目同时运行时不能争用端口）、不监听
       server: { middlewareMode: true, hmr: false, ws: false, watch: null },
@@ -286,12 +300,47 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     });
   }
 
+  /**
+   * 插件运行时由看板的 Vite 服务以 /@fs/ 提供（D86）。dist 形态的 fs.allow 只有 @joplo-app/web：
+   * 把项目目录（npm 安装的插件与它的依赖在 node_modules 里）和插件包目录加进去。source 形态也可能打开工作区外的项目，同样补齐其显式启用的插件目录。
+   */
+  function allowPluginFiles(projectDir: string, runtimes: string[]) {
+    if (!server) return;
+    const allow = server.config.server.fs.allow as string[];
+    for (const dir of [projectDir, ...runtimes.map(packageRootOf)]) if (!allow.some((a) => dir === a || dir.startsWith(a + path.sep))) allow.push(dir);
+  }
+
+  const localResources = new Map<string, NonNullable<Awaited<ReturnType<typeof compileProject>>['resources']>>();
+
+  const resourceWarnings = new Map<string, Map<string, Diagnostic>>();
+
   async function recompile(slot: ProjectSlot) {
     const loader = slot.loader!;
     invalidateProjectModules(loader, slot.dir);
     const out = await compileProject(loader, slot.dir, 'dev');
+    if (out.resources) localResources.set(slot.id, out.resources);
+    resourceWarnings.set(slot.id, new Map());
+    if (out.project && out.resources?.requests.length) out.project.mediaAssets = Object.fromEntries(out.resources.requests.map(r => [r.id, `/__joplo/p/${encodeURIComponent(slot.id)}/resources/${encodeURIComponent(r.id)}`]));
     const prev = slot.payload;
-    slot.payload = { version: prev.version + 1, ok: out.project !== null, project: out.project ?? prev.project, diagnostics: out.diagnostics, home: out.home ?? prev.home };
+    const plugins=out.pluginRuntimes;
+    let runtimeUrls:Record<string,string>={};
+    if(web.mode==='dist'&&out.project){
+      // A prebuilt board owns React. Bundle npm/CommonJS dependencies and bridge
+      // React to that exact host instance, just as the file:// publish path does.
+      const ids=Object.keys(plugins).sort();
+      const modules=await bundlePluginRuntimes(plugins,slot.dir,web,'module');
+      const next=new Map<string,string>();
+      ids.forEach((id,i)=>{
+        const code=modules[i]!;
+        const key=`${id}-${crypto.createHash('sha256').update(code).digest('hex').slice(0,20)}.js`;
+        next.set(key,code);runtimeUrls[id]=`/__joplo/p/${encodeURIComponent(slot.id)}/runtime/${key}`;
+      });
+      slot.runtimeModules=next;
+    }else if(web.mode==='source'){
+      allowPluginFiles(slot.dir,Object.values(plugins));
+      runtimeUrls=Object.fromEntries(Object.entries(plugins).map(([id,f])=>[id,fsUrl(f)]));
+    }
+    slot.payload = { version: prev.version + 1, ok: out.project !== null, project: out.project ?? prev.project, diagnostics: out.diagnostics, home: out.home ?? prev.home, plugins: out.project ? runtimeUrls : prev.plugins ?? runtimeUrls };
     const errors = out.diagnostics.filter((d) => d.severity === 'error');
     if (errors.length) log(`[joplo] ${path.basename(slot.dir)} compilation failed (${errors.length}): ${errors.map((d) => `${d.at ?? ''} ${d.message}`).join('; ').slice(0, 400)}`);
     if (out.project && out.project.name) registry.rename(slot.dir, out.project.name);
@@ -336,6 +385,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       loader: null,
       ready: Promise.resolve(),
       payload: { version: 0, ok: false, project: null, diagnostics: [], home: null },
+      runtimeModules: new Map(),
       compiling: true,
       closed: false,
       running: null,
@@ -465,6 +515,11 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       if (!input.success) throw new JoploError('USAGE', 'Invalid review request: include a sessionId, requestId, type, and page context for feedback (1–10000 characters)');
       return sendJson(res, 200, reviewHub.write(slot.dir, slot.payload.project, input.data));
     }
+    if(rest.startsWith('runtime/')&&method==='GET'){
+      const slot=await ensure(id),code=slot.runtimeModules.get(rest.slice('runtime/'.length));
+      if(code===undefined)throw new JoploError('NOT_FOUND','Plugin runtime is not available for this project revision');
+      res.writeHead(200,{'content-type':'text/javascript; charset=utf-8','cache-control':'no-cache','x-content-type-options':'nosniff'});res.end(code);return;
+    }
     if (rest === 'ir' && method === 'GET') {
       const slot = await ensure(id);
       return sendJson(res, 200, { projectId: id, ...slot.payload });
@@ -509,6 +564,24 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       req.url = `/__open-in-editor?file=${encodeURIComponent(`${file}:${m[2]}:${m[3] ?? 1}`)}`;
       req.method = 'GET';
       return 'next' as const;
+    }
+    if (rest.startsWith('resources/') && method === 'POST') {
+      if (!guardWrite(req, res)) return;
+      const slot = await ensure(id), local = localResources.get(id);
+      const request = local?.requests.find(r => r.id === rest.slice('resources/'.length));
+      if (!request || !local) return sendJson(res, 404, { error: 'Unknown resource' });
+      const version = slot.payload.version;
+      const result = await local.host.ensure(request);
+      if (slot.payload.version === version) {
+        const warnings = resourceWarnings.get(id)!;
+        if (result.diagnostic) warnings.set(request.id, result.diagnostic); else warnings.delete(request.id);
+        const diagnostics = [...slot.payload.diagnostics.filter(d => !d.code.startsWith('LOCAL_RESOURCE_')), ...warnings.values()];
+        if (JSON.stringify(diagnostics) !== JSON.stringify(slot.payload.diagnostics)) {
+          slot.payload = { ...slot.payload, diagnostics };
+          server?.ws.send({ type: 'custom', event: 'joplo:diagnostics', data: { projectId: id, version, diagnostics } });
+        }
+      }
+      return sendJson(res, 200, result);
     }
     if (rest === 'voice' || rest.startsWith('voice/')) {
       const slot = await ensure(id);
@@ -617,7 +690,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     appType: 'spa',
     clearScreen: false,
     customLogger: makeLogger(log),
-    resolve: { alias: web.mode === 'source' ? kitAliases(web, web.webDir) : [] },
+    resolve: { dedupe: ['react', 'react-dom'], alias: web.mode === 'source' ? kitAliases(web, web.webDir) : [] },
     plugins: [cssSourcePlugin(activeDirs, web), boardPlugin, ...(await webPlugins(web))],
     // dist 形态不往 node_modules 里写缓存（可能只读，或被多个项目共享）
     cacheDir: web.mode === 'dist' ? path.join(opts.home ?? path.join(process.cwd(), '.joplo'), 'vite') : path.join(web.webDir, 'node_modules/.vite-joplo'),

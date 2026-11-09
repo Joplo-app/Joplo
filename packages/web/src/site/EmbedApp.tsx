@@ -1,3 +1,5 @@
+import { PlaygroundNotice } from '../player/PlaygroundNotice';
+import { projectThemes } from '@joplo-app/core/runtime';
 /**
  * 发布站的嵌入模式（`?embed=1`，云端嵌入契约 · 方案 A「大播放按钮」）：给博客等第三方页面的 iframe 用的精简播放器。
  *
@@ -15,7 +17,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ChevronLeft, ChevronRight, Expand, ExternalLink, ListVideo, Pause, Play, Shrink } from 'lucide-react';
-import type { Project } from '@joplo-app/core';
+import type { Project } from '@joplo-app/core/runtime';
 import { DemoController } from '../runtime/demo';
 import { Stage } from '../renderer/Stage';
 import { ThemeStyles } from '../renderer/ThemeStyles';
@@ -100,7 +102,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
   const shownScene = state ? project.scenes[plan.sceneId ?? state.sceneId] : undefined;
   const device = shownScene?.viewport === 'mobile' ? 'mobile' : 'desktop';
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, true), [ctl, plan.sceneId]);
-  const look = resolveLook({ theme: project.theme, font: null, stroke: null }, project.themes ?? {}, i18n);
+  const look = resolveLook({ theme: project.theme, font: null, stroke: null }, projectThemes(project), i18n);
   const subtitle = subtitleFor(scenario, pos, snap.activeStep, state?.completed ?? null, i18n, project);
   // 场景封面（D61）：嵌入自己的封面（covered）显示时不叠第二层；之后回到第 0 步时与发布站一样是场景封面
   const cover = !params.diff && !covered && coverShown(scenario, pos, snap.playing, snap.activeStep) ? coverFor(project, scenario?.id, i18n) : null;
@@ -267,7 +269,7 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
 
   return (
     <div ref={rootRef} tabIndex={-1} className="relative flex h-full w-full flex-col overflow-hidden bg-jb-app font-jb text-jb-fg outline-none" data-testid="embed" data-covered={covered ? '' : undefined} data-fullscreen={full ? '' : undefined}>
-      <ThemeStyles themes={project.themes} />
+      <ThemeStyles themes={projectThemes(project)} />
       <main
         ref={mainRef}
         className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden', picking && 'cursor-crosshair')}
@@ -280,12 +282,19 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
         {scenario && state && shownScene ? (
           // 封面显示时画面只是背景：inert，Tab 不会落到被遮住的原型元素上
           <div className="flex min-h-0 flex-1 flex-col" inert={covered || undefined} data-testid="embed-stage">
-          <StageViewport viewport={device} theme={project.theme} stroke={look.stroke} font={look.font} notice={covered ? null : snap.notice} onDismiss={() => ctl.dismissNotice()} onBack={() => ctl.backToDemo()} curtainUp={curtainOn} curtain={(size) => <Curtain project={project} scenarioId={scenario.id} position={pos} cover={cover} onStart={() => void ctl.play({ fromStart: true })} theme={project.theme} font={look.font} width={size.width} height={size.height} animate={!ctl.reducedMotion} />}>
+          <StageViewport clock={ctl.clock} playground={!covered && !curtainOn && snap.freeMode ? <PlaygroundNotice ctl={ctl} snap={snap} /> : undefined} viewport={device} theme={project.theme} stroke={look.stroke} font={look.font} notice={covered ? null : snap.notice} onDismiss={() => ctl.dismissNotice()} onBack={() => ctl.backToDemo()} curtainUp={curtainOn} curtain={(size) => <Curtain project={project} scenarioId={scenario.id} position={pos} cover={cover} onStart={() => void ctl.play({ fromStart: true })} theme={project.theme} font={look.font} width={size.width} height={size.height} animate={!ctl.reducedMotion} />}>
             {(size) => (
               <Stage
                 viewportOverride={device === 'mobile' ? null : size}
                 project={project}
                 state={state}
+                playground={snap.playground}
+                freeMode={snap.freeMode}
+                clock={ctl.clock}
+                gesture={snap.gesture}
+                inspect={picking}
+                onStageInput={explore => ctl.stageInput(explore)}
+                onAction={(action, native) => { void ctl.act(action, native); }}
                 theme={project.theme}
                 camera={camera}
                 sceneId={plan.sceneId}

@@ -1,4 +1,4 @@
-import { autoCaptionMessages } from '@joplo-app/core';
+import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createEs(locale: Locale = 'es') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `Exploración libre · Reproducir para continuar`,
+      freeChangesDiscarded: `Los cambios no se guardarán`,
+      freeReset: `Restablecer`,
+      freeSwitchPrompt: (name: string) => `¿Cambiar a «${name}»?`,
+      freeSwitchDescription: `Comienza justo antes de esta acción. Se descartarán los cambios de la exploración.`,
+      freeSwitchConfirm: `Cambiar de escenario`,
+      freeSwitchCancel: `Quedarse aquí`,
       ...autoCaptionMessages('es'),
       mockSuccess: "Éxito simulado",
       mockFailure: "Fallo simulado",
@@ -206,6 +213,8 @@ export function createEs(locale: Locale = 'es') {
       thisDiagramHasNoNodesYet: "Este diagrama aún no tiene nodos",
       placeholder: "Marcador de posición",
       customComponent: "Componente personalizado: ",
+      pluginLoading: "Cargando complemento ",
+      pluginUnavailable: "Complemento no disponible: ",
       unnamed: "Sin nombre",
       placeholderSuffix: "(Marcador de posición)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "Componente fuera del catálogo. La demo sigue sus ID de elementos y estados declarados.",

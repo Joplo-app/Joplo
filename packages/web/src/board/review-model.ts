@@ -1,4 +1,4 @@
-import { LocalReviewLocation, type LocalReviewSession, type Project } from '@joplo-app/core';
+import { LocalReviewLocation, type LocalReviewSession, type Project } from '@joplo-app/core/runtime';
 
 export type ReviewDraft = { sessionId: string; text: string; context: LocalReviewLocation; pageTitle: string; scenarioName: string | null; requestId?: string };
 export function captureReviewDraft(session: LocalReviewSession, project: Project, context: LocalReviewLocation, text = ''): ReviewDraft {

@@ -37,7 +37,7 @@ const seed = (cache: VoiceCache, fp: string, stepId: string, text: string, local
 };
 
 function project(i18n = false): Project {
-  const step = (id: string, caption: string) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, traces: [], forks: [], marks: [] });
+  const step = (id: string, caption: string) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, forks: [], marks: [] });
   return {
     schemaVersion: 2, name: 'T', mode: 'publish', routes: {}, features: {},
     ...(i18n ? { i18n: { default: 'zh-CN', locales: ['zh-CN', 'en'], messages: { en: { 一: 'One', 二: 'Two' } } } } : {}),

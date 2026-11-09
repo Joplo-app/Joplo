@@ -1,4 +1,4 @@
-import { autoCaptionMessages } from '@joplo-app/core';
+import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createKo(locale: Locale = 'ko') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `자유 체험 중 · 재생으로 계속`,
+      freeChangesDiscarded: `변경 사항은 저장되지 않습니다`,
+      freeReset: `초기화`,
+      freeSwitchPrompt: (name: string) => `“${name}” 시나리오로 전환할까요?`,
+      freeSwitchDescription: `이 동작 직전부터 시작합니다. 체험 중 변경 사항은 삭제됩니다.`,
+      freeSwitchConfirm: `시나리오 전환`,
+      freeSwitchCancel: `여기에 머물기`,
       ...autoCaptionMessages('ko'),
       mockSuccess: "모의 성공",
       mockFailure: "모의 실패",
@@ -206,6 +213,8 @@ export function createKo(locale: Locale = 'ko') {
       thisDiagramHasNoNodesYet: "이 다이어그램에는 아직 노드가 없습니다",
       placeholder: "자리 표시자",
       customComponent: "사용자 컴포넌트: ",
+      pluginLoading: "플러그인 불러오는 중: ",
+      pluginUnavailable: "플러그인을 사용할 수 없음: ",
       unnamed: "이름 없음",
       placeholderSuffix: "(자리 표시자)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "목록에 없는 컴포넌트입니다. 데모는 선언된 요소 ID와 상태를 따릅니다.",

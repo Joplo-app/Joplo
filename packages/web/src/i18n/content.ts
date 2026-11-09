@@ -6,7 +6,7 @@
  *   让舞台、字幕、时间线、朗读都是同一种语言。没有 i18n 的项目原样返回（行为不变）。
  * - 朗读的声音：voiceIndex.locales[内容语言]（发布站）或 VoiceState.byLocale[内容语言]（看板），没有时用默认声音。
  */
-import { contentLocaleFor, localizeProject, collectMessages, type Project, type VoiceIndex } from '@joplo-app/core';
+import { contentLocaleFor, localizeProject, collectMessages, type Project, type VoiceIndex } from '@joplo-app/core/runtime';
 import { dictionary } from './dictionaries';
 import { isLocale, matchLocale, type Locale } from './locale';
 import { stepCaption } from './step-caption';

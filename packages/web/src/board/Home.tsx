@@ -1,3 +1,4 @@
+import { projectThemes } from '@joplo-app/core/runtime';
 import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/board/messages';
 import { translate, type Text } from '../i18n/messages';
@@ -15,7 +16,7 @@ import { useBoardI18n } from '../i18n/board/context';
  */
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, Copy, FolderX } from 'lucide-react';
-import type { Diagnostic, Project } from '@joplo-app/core';
+import type { Diagnostic, Project } from '@joplo-app/core/runtime';
 import { removeProject, type ProjectSummary } from '../runtime/dev-client';
 import { Brand, TopBar } from '../player/PlayerPage';
 import { JoploMark } from '../player/JoploMark';
@@ -187,9 +188,9 @@ function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (p
   const { settings } = useBoardSettings();
   const p = ir.payload;
   const project = p?.project ?? null;
-  const key = JSON.stringify(project?.themes ?? {});
+  const key = JSON.stringify(projectThemes(project));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const names = useMemo(() => themeCatalog(project?.themes ?? {}, i18n).map((t) => t.name), [key, i18n]);
+  const names = useMemo(() => themeCatalog(projectThemes(project), i18n).map((t) => t.name), [key, i18n]);
   if (summary.status === 'missing')
     return (
       <div className="flex max-w-[640px] flex-col gap-3 rounded-[10px] border border-jb-line bg-jb-surface p-5" data-testid="home-missing">
@@ -211,7 +212,7 @@ function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (p
   const status = !p.ok ? { dot: 'bg-jb-danger', text: i18n.board.compilationErrorCount(p.diagnostics.filter((d) => d.severity === 'error').length) } : ir.live ? { dot: 'bg-jb-ok', text: i18n.board.compiledLiveReloadOn } : { dot: 'bg-jb-ok', text: i18n.board.compiled };
   return (
     <div className="flex max-w-[1120px] flex-col gap-5" data-testid="home-project">
-      {project ? <ThemeStyles themes={project.themes} /> : null}
+      {project ? <ThemeStyles themes={projectThemes(project)} /> : null}
       <header className="flex items-start gap-6">
         <div className="min-w-0 flex-1">
           <h1 className="text-[24px] font-bold leading-8" data-testid="project-name">

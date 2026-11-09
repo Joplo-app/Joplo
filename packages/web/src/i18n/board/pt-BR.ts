@@ -32,6 +32,7 @@ export function createBoardPtBR(locale: Locale = 'pt-BR') {
       cloudSetupUsername: "Definir nome de usuário",
       cloudVisibility: "Visibilidade",
 
+      mediaUnavailable: "Música indisponível · A reprodução continua",
       localReviewMoveHint: "Clique para comentar; arraste para mover. Ajuste a posição com as setas.",
       localReviewApprovedDraft: "Esta revisão foi confirmada em outra página. Seu rascunho não enviado foi mantido para você copiar.",
       localReviewTitle: "Comentários e revisão",

@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 真实图片：asset() 把项目里的图片内嵌成 data URI；<Image> 只画内嵌的图片，其他 src 退回占位并给出提示。
  */
@@ -5,8 +6,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { asset, config, feature, flow, layer, option, page } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { asset, feature, flow, layer, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '../src/index.ts';
 

@@ -1,11 +1,12 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 视角层级与导演镜头（D43 / T-layers：每层是独立画面）、一屏放下、每页只有一种设备（D44）中能抽成纯函数的部分：
  * 镜头拟合 fitCamera、可见矩形 visibleRect、滚动露出 revealScroll、舞台缩放 fitStage、镜头计划 cameraFor、URL 解析。
  * 界面效果（页面不滚动、⌥+单击命中、动画）由用户在浏览器里检查，见交付说明里的清单。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, layer, option, page, set, shot, $ } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
+import { feature, flow, layer, option, page, set, shot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { PAGE_LAYER, compile, displaySceneId, type AuthoringProject } from '@joplo-app/core';
 import { CAMERA_PAD, MAX_ZOOM, MIN_NODE_PX, NODE_FONT_PX, fitCamera, highlightRect, project, revealScroll, union, visibleRect, type Box } from '../src/renderer/camera-math';
@@ -128,7 +129,7 @@ function director() {
   const home = page({ title: '导演', layout: false }, h(ui.Text, { id: 'route_only' }, '路径页面'));
   // 每层是独立画面：自己的 JSX 树，按自己的布局占满舞台
   const client = h(ui.Paper, { id: 'client_panel' }, h(ui.Button, { id: 'send' }, '发送'), h(ui.Text, { id: 'msg' }, '你好'));
-  const arch = h(ui.Diagram, { id: 'arch' }, h(ui.Diagram.Node, { id: 'biz', label: 'Biz' }), h(ui.Diagram.Node, { id: 'billing', label: 'Billing' }));
+  const arch = h(uiDiagram.Diagram, { id: 'arch' }, h(uiDiagram.Diagram.Node, { id: 'biz', label: 'Biz' }), h(uiDiagram.Diagram.Node, { id: 'billing', label: 'Billing' }));
   const opt = option({
     name: 'A',
     idea: 'i',

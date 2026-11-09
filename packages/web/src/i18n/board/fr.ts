@@ -32,6 +32,7 @@ export function createBoardFr(locale: Locale = 'fr') {
       cloudSetupUsername: "Choisir un nom utilisateur",
       cloudVisibility: "Visibilité",
 
+      mediaUnavailable: "Musique indisponible · La lecture continue",
       localReviewMoveHint: "Cliquez pour commenter ; faites glisser pour déplacer. Ajustez avec les flèches.",
       localReviewApprovedDraft: "Cette revue a été confirmée ailleurs. Votre brouillon non envoyé est conservé pour être copié.",
       localReviewTitle: "Commentaires et revue",

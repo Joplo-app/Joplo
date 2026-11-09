@@ -3,7 +3,8 @@ import { Command, CommanderError, Option } from 'commander';
 import { formatBytes, terminalText } from './cloud-error.ts';
 import type { CloudDependencies } from './cloud.ts';
 import { resolve } from 'node:path';
-import { COMPONENT_DOCS, componentDetails, guide, JoploError, skillIndex, skillTopic } from '@joplo-app/core';
+import { componentIndex, componentDetails, findPluginTopic, JoploError, pluginSkillIndex, pluginSkillTopic, skillIndex, skillTopic } from '@joplo-app/core';
+import { projectPlugins } from './plugins.ts';
 import type * as Server from '@joplo-app/server';
 import { check } from './check.ts';
 import { initProject, initSummary } from './init.ts';
@@ -83,22 +84,6 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     try { exitCode = await run(ac.signal); }
     finally { process.off('SIGINT', stop); process.off('SIGTERM', stop); }
   };
-  const review = program.command('review').description('Read and watch local review sessions (no cloud account required)');
-  review.command('list').argument('[dir]', 'Project directory', '.').option('--json', 'Print JSON').option('--all', 'Include approved, closed, and stopped sessions').option('--option <id>', 'Filter by qualified option id')
-    .action(async (dir, opts) => {
-      const { reviewSessions, reviewSummary, reviewLine } = await import('./local-review.ts');
-      const sessions = reviewSessions(dir, opts);
-      if (opts.json) json(sessions.map(reviewSummary));
-      else if (!sessions.length) line('No active reviews. Run joplo dev in this project, or use --all for history.');
-      else sessions.forEach(s => line(reviewLine(s)));
-    });
-  review.command('watch').argument('[dir]', 'Project directory', '.').option('--session <id>', 'Bind to this exact review session').option('--option <id>', 'Filter by qualified option id; fails if multiple instances match')
-    .option('--after <seq>', 'Resume after this event sequence number', cursor, 0).option('--json', 'Stream one JSON event per line (NDJSON)')
-    .option('--follow', 'Follow every option and every new round of this project until the board stops')
-    .action(async (dir, opts) => {
-      const { watchLocalReview, followLocalReviews } = await import('./local-review.ts');
-      await withWatchSignal(signal => (opts.follow ? followLocalReviews : watchLocalReview)(dir, opts, { out: stdout, err: stderr }, signal));
-    });
   const cloudClient = async (server?: string, format?: string) => {
     const { CloudClient } = await import('./cloud.ts');
     return new CloudClient(server, deps.cliVersion ?? await readCliVersion(), s => stderr(s + '\n'), s => secrets.add(s), { ...deps.cloud, format });
@@ -301,9 +286,11 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       // 与 check 一致：有 error 时退出 1（大纲照常输出，编译不出 IR 时只写错误数）
       if (!r.outline || r.summary.error) exitCode = 1;
     });
-  program.command('components').description('List catalog components, or show props and an example for the named ones (same catalog as joplo skill components)')
-    .argument('[names...]', 'Component names, for example EmptyState Menu').action((names: string[]) => {
-      stdout(names.length ? componentDetails(names) : skillTopic('components', COMPONENT_DOCS));
+  program.command('components').description('List catalog components, or show props and an example for the named ones from config.plugins')
+    .argument('[names...]', 'Component names, use the full plugin namespace if ambiguous').action(async (names: string[]) => {
+      const {plugins,error} = await projectPlugins('.');
+      if (error) throw new JoploError('USAGE', `Could not read enabled plugins: ${error}`);
+      stdout(names.length ? componentDetails(names, plugins) : componentIndex(plugins));
     });
   program.command('selection').argument('[dir]', 'Project directory', '.').addOption(format()).action(async (dir, opts) => {
     const data = await readSelection(dir);
@@ -311,11 +298,12 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (opts.format === 'json') json(result(resolve(dir), summary, data));
     else { line(summary); for (const l of data.lines) line(`${l.number} | ${l.text}`); if (data.note) line(data.note); }
   });
-  program.command('init').argument('<dir>').option('--name <name>', 'Project name (defaults to directory name)').option('--keep', 'Add missing files in a nonempty directory; preserve existing files')
+  program.command('init').argument('[dir]', 'Project directory', '.').option('--name <name>', 'Project name (defaults to directory name)').option('--keep', 'Add missing files in a nonempty directory; preserve existing files')
+    .option('--template <spec>', 'Local directory or github:owner/repo[/subdir][#ref]; default is the CLI version tag')
     .option('--no-skill', 'Do not install the agent skills (.claude/skills/joplo*, AGENTS.md block)')
-    .action(async (dir, opts) => { for (const l of initSummary(await initProject(dir, opts.name, { keep: opts.keep, skill: opts.skill }))) line(l); });
+    .action(async (dir, opts) => { for (const l of initSummary(await initProject(dir, opts.name, { keep: opts.keep, skill: opts.skill, template: opts.template }))) line(l); });
   program.command('skill').description('Read agent usage on demand or install a usage pointer')
-    .argument('[topic]', 'authoring/demo/components/cases/check/selection/publish, or install')
+    .argument('[topic]', 'authoring/demo/cases/check/review/publish/plugins, a plugin[/topic], or install')
     .argument('[dir]', 'Target project directory for install')
     .option('--force', 'Overwrite a modified SKILL.md')
     .option('--diff', 'Show a unified diff without writing files')
@@ -326,10 +314,15 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         stdout(installed.output); exitCode = installed.code;
       } else {
         if (dir !== undefined || opts.force || opts.diff || opts.agentsMd) throw new JoploError('USAGE', 'dir, --force, --diff, and --agents-md apply only to joplo skill install');
-        stdout(topic === undefined ? skillIndex(await readCliVersion(), COMPONENT_DOCS) : skillTopic(topic, COMPONENT_DOCS));
+        // 插件（D86）：当前目录是 Joplo 项目时，列出 config({ plugins }) 并输出插件自己的技能
+        const { plugins, error } = await projectPlugins('.');
+        const note = error ? `Could not read plugins from joplo.config.ts: ${error}\n` : '';
+        const plugin = topic === undefined ? null : findPluginTopic(topic, plugins);
+        if (plugin) stdout(pluginSkillTopic(plugin, topic?.split('/').slice(1).join('/') || undefined));
+        else if (topic === undefined) stdout(`${skillIndex(await readCliVersion())}${pluginSkillIndex(plugins)}${note}`);
+        else stdout(skillTopic(topic));
       }
     });
-  program.command('guide').description('Compatibility alias for joplo skill authoring').action(() => { stdout(guide()); });
   program.command('dev').argument('[dir]', 'Project directory', '.').option('--port <port>', 'Port (default: 4790)', integer('port', 65535)).option('--open', 'Open the browser').action(async (dir, opts) => {
     const startDev = await serverFunction('startDev');
     // 看板直接发布到云端（D76）：把登录与 share() 注入看板进程；加入已有看板时由那个进程自己的 CLI 提供
@@ -413,7 +406,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (e instanceof CommanderError && ['commander.helpDisplayed', 'commander.help', 'commander.version'].includes(e.code)) return 0;
     const f = failure(e instanceof CommanderError ? new JoploError('USAGE', e.message) : e);
     const wantsJson = args.includes('--json') || args.some((arg, i) => arg === '--format=json' || arg === '--format' && args[i + 1] === 'json');
-    if (args[0] === 'review' || args[0] === 'feedback' && (args.includes('watch') || args.includes('list'))) stderr((args.includes('--json') || wantsJson ? JSON.stringify(f) : `${f.error.code}  ${f.error.message.split('\n').map(line => terminalText(line)).join('\n')}`) + '\n');
+    if (args[0] === 'feedback' && (args.includes('watch') || args.includes('list'))) stderr((args.includes('--json') || wantsJson ? JSON.stringify(f) : `${f.error.code}  ${f.error.message.split('\n').map(line => terminalText(line)).join('\n')}`) + '\n');
     else if (wantsJson) json(f); else line(`${f.error.code}  ${oneLine(terminalText(f.error.message))}`);
     // 6：账号容量不足（C27），与 QUOTA_EXCEEDED 的其他种类（每小时限额，可以稍后重试）区分
     const storageFull = f.error.code === 'QUOTA_EXCEEDED' && (f.error.details as { kind?: unknown } | undefined)?.kind === 'storage';

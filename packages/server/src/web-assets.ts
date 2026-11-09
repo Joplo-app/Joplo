@@ -112,7 +112,7 @@ export function findPackageJson(dir: string, name: string): string | null {
   }
 }
 
-const KIT_SUBPATHS = ['ui', 'node', 'jsx-runtime', 'jsx-dev-runtime'] as const;
+const KIT_SUBPATHS = ['node', 'plugin', 'jsx-runtime', 'jsx-dev-runtime'] as const;
 
 /**
  * 项目源文件里的 `@joplo-app/kit` 怎样解析：
@@ -123,7 +123,7 @@ export function kitAliases(web: WebAssets, projectDir: string): Alias[] {
   if (web.mode === 'source')
     return [
       { find: /^@joplo-app\/kit$/, replacement: path.join(web.kitSrc, 'index.ts') },
-      { find: /^@joplo-app\/kit\/(ui|node|jsx-runtime|jsx-dev-runtime)$/, replacement: path.join(web.kitSrc, '$1.ts') },
+      { find: /^@joplo-app\/kit\/(node|plugin|jsx-runtime|jsx-dev-runtime)$/, replacement: path.join(web.kitSrc, '$1.ts') },
       { find: /^@\//, replacement: path.join(web.webDir, 'src') + '/' },
     ];
   if (findPackageJson(projectDir, '@joplo-app/kit')) return [];
@@ -133,6 +133,6 @@ export function kitAliases(web: WebAssets, projectDir: string): Alias[] {
   const ext = path.extname(main);
   return [
     { find: /^@joplo-app\/kit$/, replacement: main },
-    { find: /^@joplo-app\/kit\/(ui|node|jsx-runtime|jsx-dev-runtime)$/, replacement: path.join(path.dirname(main), `$1${ext}`) },
+    { find: /^@joplo-app\/kit\/(node|plugin|jsx-runtime|jsx-dev-runtime)$/, replacement: path.join(path.dirname(main), `$1${ext}`) },
   ];
 }

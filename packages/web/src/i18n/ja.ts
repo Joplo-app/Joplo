@@ -1,4 +1,4 @@
-import { autoCaptionMessages } from '@joplo-app/core';
+import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createJa(locale: Locale = 'ja') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `自由に操作中 · 再生で続行`,
+      freeChangesDiscarded: `変更は保存されません`,
+      freeReset: `リセット`,
+      freeSwitchPrompt: (name: string) => `「${name}」に切り替えますか？`,
+      freeSwitchDescription: `この操作の直前から開始します。操作中の変更は破棄されます。`,
+      freeSwitchConfirm: `シナリオを切り替え`,
+      freeSwitchCancel: `ここに留まる`,
       ...autoCaptionMessages('ja'),
       mockSuccess: "模擬成功",
       mockFailure: "模擬失敗",
@@ -206,6 +213,8 @@ export function createJa(locale: Locale = 'ja') {
       thisDiagramHasNoNodesYet: "この図にはまだノードがありません",
       placeholder: "プレースホルダー",
       customComponent: "カスタムコンポーネント：",
+      pluginLoading: "プラグインを読み込み中: ",
+      pluginUnavailable: "プラグインを使用できません: ",
       unnamed: "名前なし",
       placeholderSuffix: "（プレースホルダー）",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "カタログ外のコンポーネントです。デモは宣言された要素 ID と状態に従います。",

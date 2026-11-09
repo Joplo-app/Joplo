@@ -7,9 +7,9 @@
  * 所有层共享同一份状态，由场景步骤驱动。
  */
 import { $, eq, layer, neq, or, set, type Bind, type EffectDef } from '@joplo-app/kit';
-import {
-  Alert, Avatar, Badge, Box, Button, Code, Grid, Group, Menu, NavLink, Paper, Stack, Terminal, Text, TextInput, Title,
-} from '@joplo-app/kit/ui';
+import { Alert, Avatar, Badge, Box, Button, Code, Grid, Group, Menu, NavLink, Paper, Stack, Terminal, Text, TextInput, Title } from '@joplo-app/plugin-ui';
+
+
 
 const ui = $.ui as unknown as Record<string, Bind>;
 

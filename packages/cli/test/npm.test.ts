@@ -1,10 +1,11 @@
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
 /**
  * npm 分发相关的 CLI 行为（D36）：包管理器识别、init 写入的 package.json / tsconfig、
  * 下一步命令、不覆盖已有文件、项目内 @joplo-app/kit 与 CLI 版本不一致时的提示。
  */
 import { afterEach, describe, expect, test } from 'vitest';
 import { mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { detectPackageManager, pmCommands } from '../src/pm.ts';
 import { cliVersion, projectNotes } from '../src/startup.ts';
@@ -147,15 +148,17 @@ describe('init 安装 Agent 技能（等同于对新项目运行 skill install -
   test('默认写入 joplo、joplo-feedback 与 AGENTS.md 托管段，内容与 skill install / 官方技能一致；输出说明装了什么、可用 --no-skill 跳过', async () => {
     const d = join(await temp(), 'my-demo');
     const r = await initProject(d, undefined, { env: {} });
-    for (const f of skillFiles(VERSION)) expect(await readFile(skill(d, f.name))).toEqual(f.content);
+    for (const f of skillFiles(VERSION)) expect(await readFile(join(d,'.claude/skills',f.path))).toEqual(f.content);
     const agents = await readFile(join(d, 'AGENTS.md'), 'utf8');
     expect(agents.startsWith('<!-- joplo:start -->\n## Joplo\n')).toBe(true); expect(agents).toContain('<!-- joplo:end -->');
-    expect(r.skill).toMatchObject({ written: ['.claude/skills/joplo/SKILL.md', '.claude/skills/joplo-feedback/SKILL.md', 'AGENTS.md'], modified: [] });
+    expect(r.skill!.written).toEqual(expect.arrayContaining([...skillFiles(VERSION).map(f=>`.claude/skills/${f.path}`),'AGENTS.md','.claude/skills/joplo-plugin-ui/SKILL.md','.claude/skills/joplo-plugin-diagram/SKILL.md','.claude/skills/joplo-plugin-content/SKILL.md','.claude/skills/joplo-plugin-alda/SKILL.md']));
+    expect(r.skill!.modified).toEqual([]);
     const lines = initSummary(r, {});
     const line = lines.find(l => l.includes('.claude/skills/joplo'))!;
-    expect(line).toMatch(/^✓ Agent skills: \.claude\/skills\/joplo, \.claude\/skills\/joplo-feedback, AGENTS\.md/);
+    expect(line).toMatch(/^✓ Agent skills: \.claude\/skills\/joplo, \.claude\/skills\/joplo-feedback, engine references and enabled plugin skills, AGENTS\.md/);
     expect(line).toContain('--no-skill');
     expect(lines.at(-1)).toMatch(/^Next: /);
+    installFixturePlugins(d);
     // 之后再运行 skill install：已是最新
     expect((await runCli(['skill', 'install', d], { stdout: () => {}, stderr: () => {} }))).toBe(0);
     expect(await readFile(join(d, 'AGENTS.md'), 'utf8')).toBe(agents);
@@ -203,15 +206,15 @@ describe('init 安装 Agent 技能（等同于对新项目运行 skill install -
   test('已装好同版本、未修改的技能（npx skills add 的软链接安装）：跳过并说明，不改动技能文件', async () => {
     const d = await temp();
     for (const f of skillFiles(VERSION)) {
-      await mkdir(join(d, '.agents/skills', f.name), { recursive: true });
-      await writeFile(join(d, '.agents/skills', f.name, 'SKILL.md'), f.content);
-      await mkdir(join(d, '.claude/skills'), { recursive: true });
-      await symlink(`../../.agents/skills/${f.name}`, join(d, '.claude/skills', f.name));
+      await mkdir(dirname(join(d, '.agents/skills', f.path)), { recursive: true });
+      await writeFile(join(d, '.agents/skills', f.path), f.content);
     }
+    await mkdir(join(d, '.claude/skills'), { recursive: true });
+    for(const name of ['joplo','joplo-feedback'])await symlink(`../../.agents/skills/${name}`,join(d,'.claude/skills',name));
     await writeFile(join(d, 'skills-lock.json'), '{}\n');
     const before = await stat(join(d, '.agents/skills/joplo/SKILL.md'));
     const r = await initProject(d, undefined, { env: {} });
-    expect(r.skill).toMatchObject({ written: ['AGENTS.md'], modified: [], unchanged: ['.claude/skills/joplo/SKILL.md', '.claude/skills/joplo-feedback/SKILL.md'] });
+    expect(r.skill).toMatchObject({ modified: [], unchanged: skillFiles(VERSION).map(f=>`.claude/skills/${f.path}`) });
     expect((await stat(join(d, '.agents/skills/joplo/SKILL.md'))).mtimeMs).toBe(before.mtimeMs);
     const line = initSummary(r, {}).find(l => l.includes('Agent skills'))!;
     expect(line).toContain(`already installed (Joplo ${VERSION}, unchanged)`);

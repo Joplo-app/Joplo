@@ -1,5 +1,5 @@
 import { page, Slot } from '@joplo-app/kit';
-import { Stack, Title } from '@joplo-app/kit/ui';
+import { Stack, Title } from '@joplo-app/plugin-ui';
 
 /** 测试夹具（不是示例项目）：视角层级与导演镜头（D43 / T-layers：每层是独立画面）。 */
 export default page(

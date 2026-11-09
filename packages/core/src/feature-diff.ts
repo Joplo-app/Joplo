@@ -1,3 +1,5 @@
+import { projectThemes } from './themes.ts';
+import { jsonData } from './plugins/data.ts';
 /** Public feature comparison. Positional ids are addresses, never cross-version identities. */
 import { z } from 'zod';
 import { Project, type Effect, type Scenario, type Step } from './schema.ts';
@@ -44,14 +46,14 @@ export function canonical(value: unknown): string {
 const stepContent = ({ id: _id, key: _key, source: _source, ruleIds: _rules, ...rest }: Step) => rest;
 const identity = (s: Step) => {
   const a = s.action;
-  return canonical([s.kind, a.type, 'target' in a ? a.target : 'name' in a ? a.name : 'keys' in a ? a.keys : 'title' in a ? a.title : null]);
+  return canonical([s.kind, a.type, ...(a.type === 'plugin' ? [a.name] : []), 'target' in a ? a.target : 'name' in a ? a.name : 'keys' in a ? a.keys : 'title' in a ? a.title : null]);
 };
 const ref = (s: Step, index: number) => ({ id: s.id, position: index + 1, ...(s.key ? { key: s.key } : {}), caption: s.caption.slice(0, 300) });
 /** Presentation-only step fields, grouped into reader-facing reasons. Unlisted content changes fall back to 'presentation'. */
 const PRESENTATION: [string, (keyof Step)[]][] = [
   ['caption', ['caption', 'captionAuto']], ['explain', ['explain']], ['camera', ['shots', 'directorLayer']],
   ['annotations', ['marks', 'cues', 'callouts']], ['voice', ['say', 'narrate']], ['timing', ['hold']],
-  ['trace', ['traces']], ['forks', ['forks']], ['kind', ['kind']],
+  ['plugin-data', ['ext']], ['forks', ['forks']], ['kind', ['kind']],
 ];
 const KIND_ORDER = { state: 0, message: 1, outcome: 2 } as const;
 const shown = (v: unknown) => (typeof v === 'string' ? v : canonical(v)).slice(0, 200);
@@ -146,7 +148,9 @@ export function compareSteps(before: Step[], after: Step[]): DiffStep[] {
 
 /** Refuse private IR instead of projecting potentially private unknown fields into a public comparison. */
 export function readPublicProject(value: unknown): Project {
-  const parsed = Project.safeParse(value);
+  let input: unknown;
+  try { input = jsonData(value); } catch { throw new JoploError('INVALID_SCHEMA', 'Invalid public playback IR; expected finite JSON'); }
+  const parsed = Project.safeParse(input);
   if (!parsed.success) throw new JoploError('INVALID_SCHEMA', 'Invalid public playback IR; rebuild both versions with a compatible CLI');
   const p = parsed.data;
   if (p.mode !== 'publish') throw new JoploError('INVALID_SCHEMA', 'Feature diff requires two publish builds, not dev or review IR');
@@ -172,6 +176,11 @@ function sceneInputs(p: Project, s: Scenario) {
   for (const st of s.steps) for (const e of st.effects) if (e.type === 'navigate') ids.add(e.sceneId);
   return [...ids].sort().map(id => p.scenes[id] ?? { missing: id });
 }
+function actionContracts(p: Project, s: Scenario) {
+  const actions = [...s.steps.map(st => st.action), ...Object.values(p.options[s.optionId]?.free ?? {}).map(r => r.action)];
+  const names = [...new Set(actions.flatMap(a => a.type === 'plugin' ? [a.name] : []))].sort();
+  return names.map(name => { const [id, key] = name.split(':'); return [name, p.plugins?.[id!]?.actions?.[key!]]; });
+}
 export function featureDiff(before: unknown, after: unknown, source: { baseSha?: string; headSha?: string } = {}): FeatureDiffManifest {
   if ([source.baseSha, source.headSha].some(sha => sha !== undefined && !GitSha.safeParse(sha).success)) throw new JoploError('USAGE', 'Source SHAs must be normalized 40-character hexadecimal git commits');
   const base = DiffSource.parse({ sha: source.baseSha ?? null }), head = DiffSource.parse({ sha: source.headSha ?? null });
@@ -186,9 +195,11 @@ export function featureDiff(before: unknown, after: unknown, source: { baseSha?:
     let status: DiffScenario['status'] = !old ? 'added' : !next ? 'removed' : 'unchanged';
     if (old && next) {
       const bo = b.options[old.optionId], bf = b.features[bo!.featureId];
-      if (canonical(old.initial) !== canonical(next.initial)) reasons.push('initial-state');
+      if (canonical([old.initial, old.ext]) !== canonical([next.initial, next.ext])) reasons.push('initial-state');
       if (canonical(sceneInputs(b, old)) !== canonical(sceneInputs(a, next))) reasons.push('scenes');
-      if (canonical([b.theme, b.themes, b.autoFocus]) !== canonical([a.theme, a.themes, a.autoFocus])) reasons.push('theme');
+      if (canonical([b.theme, projectThemes(b), b.autoFocus]) !== canonical([a.theme, projectThemes(a), a.autoFocus])) reasons.push('theme');
+      if (canonical(bo?.free) !== canonical(option?.free)) reasons.push('free-reactions');
+      if (canonical(actionContracts(b, old)) !== canonical(actionContracts(a, next))) reasons.push('action-contracts');
       if (canonical([bo?.layers, bf?.roles]) !== canonical([option?.layers, feature.roles])) reasons.push('layers-roles');
       if (canonical([old.name, old.description, old.expected, old.mock, bf?.name, bf?.goal, bo?.name, bo?.idea]) !== canonical([next.name, next.description, next.expected, next.mock, feature.name, feature.goal, option?.name, option?.idea])) reasons.push('description');
       status = steps.some(st => st.status === 'uncertain') ? 'uncertain' : reasons.length || steps.some(st => st.status !== 'unchanged') ? 'modified' : 'unchanged';
@@ -198,7 +209,7 @@ export function featureDiff(before: unknown, after: unknown, source: { baseSha?:
     if (group !== 'unchanged' && result.summary[group].length < 100) result.summary[group].push(`${feature.name} / ${s.name}`.slice(0, 200));
   }
   // Project metadata / unused shared scenes still changed even when no scenario can display it.
-  if (canonical([b.name, b.description, b.features, b.options, b.scenes, b.theme, b.themes, b.routes, b.featureIds, b.autoFocus]) !== canonical([a.name, a.description, a.features, a.options, a.scenes, a.theme, a.themes, a.routes, a.featureIds, a.autoFocus])) result.reasons.push('project-presentation');
+  if (canonical([b.name, b.description, b.features, b.options, b.scenes, b.theme, projectThemes(b), b.routes, b.featureIds, b.autoFocus]) !== canonical([a.name, a.description, a.features, a.options, a.scenes, a.theme, projectThemes(a), a.routes, a.featureIds, a.autoFocus])) result.reasons.push('project-presentation');
   result.status = result.scenarios.some(s => s.status === 'uncertain') ? 'uncertain' : result.reasons.length || result.scenarios.some(s => s.status !== 'unchanged') ? 'changed' : 'unchanged';
   return FeatureDiffManifest.parse(result);
 }

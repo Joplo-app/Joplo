@@ -24,7 +24,7 @@ const seed = (cache: VoiceCache, fp: string, stepId: string, text: string, local
 };
 
 function project(i18n = false): Project {
-  const step = (id: string, caption: string) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, traces: [], forks: [], marks: [] });
+  const step = (id: string, caption: string) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, forks: [], marks: [] });
   return {
     schemaVersion: 2, name: 'T', mode: 'publish', routes: {}, features: {},
     ...(i18n ? { i18n: { default: 'zh-CN', locales: ['zh-CN', 'en'], messages: { en: { 一: 'One', 二: 'Two' } } } } : {}),
@@ -91,6 +91,9 @@ describe('自动字幕发布：先验证内容，再选择声音', () => {
     [{ kind: 'select', label: 'Field', value: 'Public' }, { kind: 'select', label: 'Field', value: 'Private value' }],
     [{ kind: 'press', label: '', keys: 'Enter' }, { kind: 'press', label: '', keys: 'Delete' }],
     [{ kind: 'uncheck', label: 'Flag' }, { kind: 'check', label: 'Flag' }],
+    [{ kind: 'drag', label: 'Tile', value: 'Public' }, { kind: 'drag', label: 'Tile', value: 'Private value' }],
+    [{ kind: 'hover', label: 'Public' }, { kind: 'hover', label: 'Private label' }],
+    [{ kind: 'scroll', label: 'List', value: 'Public' }, { kind: 'scroll', label: 'List', value: 'Private value' }],
   ] as [NonNullable<Step['captionAuto']>, NonNullable<Step['captionAuto']>][])('自动字幕从 %j 修改后，只有旧缓存应计 missing', (current, previous) => {
     const { p, st, store, cache, cloudFp, fallback } = setup(current);
     seed(cache, cloudFp, st.id, stepCaption({ ...st, captionAuto: previous }, dictionary('en')), 'en');
@@ -130,6 +133,14 @@ describe('自动字幕发布：先验证内容，再选择声音', () => {
     const again = bundleVoice(proj, p, tmp('joplo-auto-again-'), store, undefined, r.index!, null);
     expect(again.report).toMatchObject({ clips: 10, missing: 0 });
     for (const locale of locales) playable(again.index!, null, stepCaption(st, dictionary(locale)));
+  });
+
+  it.each(['drag', 'hover', 'scroll'] as const)('插件手势 %s 的十种字幕与朗读缓存共用当前文字', kind => {
+    const { p, st, store, cache, cloudFp, fallback } = setup({ kind, label: 'Target', value: 'Destination' });
+    for (const locale of locales) seed(cache, cloudFp, st.id, stepCaption(st, dictionary(locale)), locale);
+    const r = bundleVoice(proj, p, out, store, undefined, fallback, 'cloud');
+    expect(r.report).toMatchObject({ clips: 10, missing: 0 });
+    for (const locale of locales) playable(r.index!, null, stepCaption(st, dictionary(locale)));
   });
 
   it('作者内容语言先翻译自动字幕参数，再验证缓存；缺失按语言统计', () => {

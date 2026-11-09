@@ -1,5 +1,5 @@
 import { $, done, eq, flow, go, not, option, set, uses } from '@joplo-app/kit';
-import { Badge, Divider, Group, List, NavLink, Stack, Text } from '@joplo-app/kit/ui';
+import { Badge, Divider, Group, List, NavLink, Stack, Text } from '@joplo-app/plugin-ui';
 
 import { header, main, overlay, playerState, sharedScenarios } from '../../../shared/board/player.tsx';
 

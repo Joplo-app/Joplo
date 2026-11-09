@@ -1,3 +1,4 @@
+import { useMedia } from '../runtime/useMedia';
 /**
  * 发布站 / 嵌入的朗读开关（D74）：分享带了音频（IR 的 voiceIndex 有片段）时默认开，没有音频时默认关、观众点一下才用浏览器朗读。
  * 打开前还没有用户手势时浏览器会拒绝出声（runtime/voice.ts 按 NotAllowedError 跳过这一段，播放照常往下走）；观众按播放后就能听到。
@@ -6,7 +7,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
-import type { Project } from '@joplo-app/core';
+import type { Project } from '@joplo-app/core/runtime';
 import { useI18n } from '../i18n/context';
 import type { DemoController } from '../runtime/demo';
 import { Narrator } from '../runtime/voice';
@@ -16,7 +17,7 @@ import { siteVoiceLookup } from '../i18n/content';
 
 /** 分享里有没有 build 带上的音频。 */
 export function hasVoiceClips(project: Project | null): boolean {
-  return !!project?.voiceIndex && Object.keys(project.voiceIndex.clips).length > 0;
+  return !!project?.mediaAssets && Object.keys(project.mediaAssets).length > 0 || !!project?.voiceIndex && Object.keys(project.voiceIndex.clips).length > 0;
 }
 
 /** 朗读开关的初始值：有音频就默认开；静音（差异同步播放）时始终关。 */
@@ -29,6 +30,7 @@ export function useSiteVoice(ctl: DemoController, project: Project | null, muted
   const content = useContent();
   const narrator = useMemo(() => new Narrator(), []);
   const [on, setOnState] = useState(() => siteVoiceDefault(project, muted));
+  useMedia(ctl, project, on && !muted);
   narrator.enabled = on && !muted;
   // 内容多语言（D84）：浏览器朗读用内容语言；生成的音频用这种语言的声音（没有单独的声音时用默认声音）
   narrator.locale = content?.locale ?? locale;

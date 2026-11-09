@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nProvider } from '../src/i18n/context';

@@ -32,6 +32,7 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       cloudSetupUsername: "設定使用者名稱",
       cloudVisibility: "可見性",
 
+      mediaUnavailable: "配樂無法使用 · 示範繼續播放",
       localReviewMoveHint: "點擊提供意見，拖曳調整位置；方向鍵可微調。",
       localReviewApprovedDraft: "本輪已在其他頁面確認。這份未提交的草稿仍保留在這裡，可以複製。",
       localReviewTitle: "意見與審閱",

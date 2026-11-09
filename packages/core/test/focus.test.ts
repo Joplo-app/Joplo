@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 叙事焦点（D70）：每一步观众看哪里（focusAt，纯函数）、用什么形式呈现（spotlight / highlight / numbered / callout / hold / redact）。
  * 不变量：
@@ -10,14 +11,14 @@ import { join, resolve } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
 import { describe, expect, it } from 'vitest';
 import { loadAuthoring } from '../src/load.ts';
-import * as ui from '@joplo-app/kit/ui';
-import { $, callout, config, feature, flow, go, highlight, hold, layer, mark, not, numbered, option, page, set, shot, spotlight, toast, trace, type Flow } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
+import { $, callout, feature, flow, go, highlight, hold, layer, mark, not, numbered, option, page, set, shot, spotlight, toast, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { applyStep, cameraAt, compile, explainClick, findNode, focusAt, initialState, isNodeVisible, replay, stateAt, validate, visibleIds, walkNodes, type AuthoringProject, type Project } from '../src/index.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
-const D = ui.Diagram;
+const D = uiDiagram.Diagram;
 
 /** 聊天层：面板里有消息、按钮、提示；弹窗；行程层：行程卡片（与聊天层没有同名元素）；架构层：一张图。 */
 const chatTree = () =>

@@ -1,9 +1,10 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * D74 朗读：say() 进 IR、config({ voice }) 只进 dev IR、读什么（narrationText）、音频片段的键（clipKey）、SAY_TOO_LONG。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, narrate, option, page, say, set, $, type ConfigDef, type Flow } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, narrate, option, page, say, set, $, type ConfigDef, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { clipKey, compile, joinSpoken, narrationText, spokenLine, validate, voiceFingerprint, type AuthoringProject } from '../src/index.ts';
 

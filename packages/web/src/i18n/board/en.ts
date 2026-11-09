@@ -30,6 +30,7 @@ export function createBoardEn(locale: Locale = 'en') {
       cloudSetupUsername: "Set up username",
       cloudVisibility: "Visibility",
 
+      mediaUnavailable: "Music unavailable · Playback continues",
       localReviewMoveHint: "Click for feedback; drag to move. Arrow keys adjust the position.",
       localReviewApprovedDraft: "This review was confirmed elsewhere. Your unsent draft is kept here for copying.",
       localReviewTitle: "Feedback & review",

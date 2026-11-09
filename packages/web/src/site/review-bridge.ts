@@ -13,7 +13,7 @@
  *
  * 发布站的 `@joplo-app/core` 是 core-lite（不带 zod），所以这里手写校验。本文件是发布站里唯一使用 postMessage 的地方。
  */
-import { nodeLabel, orderedFeatures, type Project, type SceneNode } from '@joplo-app/core';
+import { nodeLabel, orderedFeatures, type Project, type SceneNode } from '@joplo-app/core/runtime';
 
 export const REVIEW_PROTOCOL = 1 as const;
 /** 作者写的元素 Id（与 IR 的 Id、Rule.elementIds 同一套）；编译器生成的 id 以 `_` 开头，不匹配。 */

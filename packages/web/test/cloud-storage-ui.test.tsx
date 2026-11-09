@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 /**
  * 发布浮层里的账号容量（C27，原型 storage_quota 方案 B）：
  * - 用量不到八成：只有一行小字“已用 … / … · 链接永久有效”，没有用量条；

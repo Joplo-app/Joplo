@@ -1,3 +1,5 @@
+import { ElementTraitsSchema } from './traits.ts';
+import type { ElementTraits } from '@joplo-app/kit/plugin';
 /**
  * Joplo IR（schemaVersion 2）：由 TSX 源文件编译得到的中间表示，不是作者直接编辑的格式。
  * 权威源是项目文件夹里的 TSX/TS 文件（ADR-0002）；渲染器、播放器、校验器、构建只消费这里的 IR。
@@ -5,12 +7,19 @@
  * 带 `source` 的对象记录其来源 `相对路径:行:列`，用于选中元素、诊断定位，让 Agent 只读写那一处。
  */
 import { z } from 'zod';
-import { COMPONENT_TYPES } from './catalog.ts';
-import type { DiagramLayout as DiagramLayoutT } from './diagram/model.ts';
+import { COMPONENT_TYPES, PLUGIN_TYPE, type PluginComponentType } from './catalog.ts';
 
 /** 层级标签的预设图标（标签压窄时靠它认出是哪一层）。不写时：手机视口 mobile，其余 window。 */
 export const LAYER_ICONS = ['window', 'browser', 'mobile', 'desktop', 'terminal', 'chat', 'agent', 'server', 'data', 'email', 'doc', 'flow'] as const;
 export type LayerIcon = (typeof LAYER_ICONS)[number];
+
+const DataPath = z.array(z.string().min(1));
+const ScopeRule: z.ZodType<import('@joplo-app/kit/plugin').PluginScopeRule> = z.lazy(() => z.strictObject({
+  path: DataPath, kind: z.enum(['map', 'items', 'values', 'reference']), domain: z.enum(['element', 'scene']).optional(),
+  prefix: z.string().optional(), references: z.array(DataPath).optional(), children: z.array(ScopeRule).optional(),
+}));
+const SlotSpec = z.strictObject({ text: z.array(DataPath).optional(), scope: z.union([z.literal('global'), z.array(ScopeRule)]).optional() });
+const DataSpec = z.strictObject({ node: SlotSpec.optional(), step: SlotSpec.optional() });
 
 export const SCHEMA_VERSION = 2 as const;
 
@@ -55,43 +64,14 @@ export const Condition: z.ZodType<Condition> = z.lazy(() =>
 ) as z.ZodType<Condition>;
 
 // ---------- 图表布局（D69）：编译期算好，渲染器只读 ----------
-const Num = z.number().finite();
-const BoxS = z.strictObject({ x: Num, y: Num, w: Num, h: Num });
-const PointS = z.strictObject({ x: Num, y: Num });
-const Boxes = z.record(z.string(), BoxS);
-export const DiagramLayoutSchema: z.ZodType<DiagramLayoutT> = z.union([
-  z.strictObject({
-    kind: z.literal('graph'),
-    engine: z.enum(['elk', 'grid']),
-    direction: z.enum(['right', 'down']).optional(),
-    width: Num,
-    height: Num,
-    nodes: Boxes,
-    groups: Boxes,
-    titles: Boxes,
-    edges: z.record(z.string(), z.strictObject({ points: z.array(PointS), label: BoxS.nullable() })),
-    starts: Boxes.optional(),
-  }),
-  z.strictObject({
-    kind: z.literal('sequence'),
-    width: Num,
-    height: Num,
-    actors: Boxes,
-    lifelines: z.record(z.string(), z.strictObject({ x: Num, y1: Num, y2: Num })),
-    messages: z.record(z.string(), z.strictObject({ points: z.array(PointS), label: BoxS.nullable(), n: z.number().int(), self: z.boolean() })),
-    groups: Boxes,
-    titles: Boxes,
-    blocks: Boxes,
-    blockTitles: Boxes,
-  }),
-]) as z.ZodType<DiagramLayoutT>;
-
 // ---------- 画面与元素 ----------
 export type SceneNode = {
   /** 可操作元素必须由作者给出；其余由编译器按位置生成（以 `_` 开头）。 */
   id: string;
-  type: (typeof COMPONENT_TYPES)[number];
+  /** 目录组件，或插件组件 `<插件 id>:<组件名>`（D86）。 */
+  type: string;
   /** Mantine 属性原样保留（可含响应式对象 { base, md }）；值可以是字面量或 `$ui.x` / `$data.x` / `$inputs.x` 整值绑定。 */
+  traits?: ElementTraits;
   props?: Record<string, unknown>;
   children?: SceneNode[];
   when?: Condition;
@@ -103,15 +83,18 @@ export type SceneNode = {
   redact?: boolean | Condition;
   /** 来自哪个功能方案（堆叠到路径上的元素）；页面和布局自身的元素没有此字段。 */
   from?: string;
-  /** 图表根节点（Diagram / StateMachine / Sequence）的布局，编译期算好（D69）；其他节点没有。 */
-  layout?: DiagramLayoutT;
+  /** 命名空间插件派生数据；只允许 JSON。 */
+  ext?: Record<string, unknown>;
+  /** 取景关联由编译钩子给出，播放器只读取。 */
+  framing?: { include?: string[]; kind?: 'root' | 'group' | 'block' | 'content' | 'edge' | 'row' };
   source?: string;
 };
 
 export const SceneNode: z.ZodType<SceneNode> = z.lazy(() =>
   z.strictObject({
     id: z.string().min(1),
-    type: z.enum(COMPONENT_TYPES),
+    type: z.union([z.enum(COMPONENT_TYPES), z.string().regex(PLUGIN_TYPE) as unknown as z.ZodType<PluginComponentType>]),
+    traits: ElementTraitsSchema.optional(),
     props: z.record(z.string(), Json).optional(),
     children: z.array(SceneNode).optional(),
     when: Condition.optional(),
@@ -121,7 +104,8 @@ export const SceneNode: z.ZodType<SceneNode> = z.lazy(() =>
     note: z.string().optional(),
     redact: z.union([z.boolean(), Condition]).optional(),
     from: z.string().optional(),
-    layout: DiagramLayoutSchema.optional(),
+    ext: z.record(z.string(), Json).optional(),
+    framing: z.strictObject({ include: z.array(z.string()).optional(), kind: z.enum(['root', 'group', 'block', 'content', 'edge', 'row']).optional() }).optional(),
     source: Source,
   }),
 ) as z.ZodType<SceneNode>;
@@ -140,8 +124,18 @@ export const Scene = z.strictObject({
 });
 
 // ---------- 步骤与场景 ----------
+const ActionPoint = z.strictObject({ x: z.number().finite(), y: z.number().finite() });
+export const PluginAction = z.strictObject({
+  caption: z.string().min(1), durationMs: z.number().finite().positive().max(30000),
+  fields: z.record(z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/).refine(k => !['__proto__', 'prototype', 'constructor'].includes(k)), z.strictObject({ type: z.enum(['string', 'number', 'boolean']), min: z.number().finite().optional(), max: z.number().finite().optional(), tolerance: z.number().finite().nonnegative().optional(), text: z.boolean().optional() }).refine(f => (f.min === undefined || f.max === undefined || f.min <= f.max) && (f.type === 'number' || f.min === undefined && f.max === undefined && f.tolerance === undefined) && (!f.text || f.type === 'string'))),
+  targets: z.array(z.string().min(1)).optional(),
+});
 export const Action = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('click'), target: Id }),
+  z.strictObject({ type: z.literal('drag'), target: Id, to: z.union([Id, ActionPoint]) }),
+  z.strictObject({ type: z.literal('hover'), target: Id, ms: z.number().finite().nonnegative().max(30000) }),
+  z.strictObject({ type: z.literal('scroll'), target: Id, to: z.union([Id, ActionPoint.refine(p => p.x >= 0 && p.y >= 0)]) }),
+  z.strictObject({ type: z.literal('plugin'), name: z.string().regex(/^[a-z][a-z0-9-]*:[a-z][a-zA-Z0-9-]*$/), target: Id, data: z.record(z.string(), Json) }),
   z.strictObject({ type: z.literal('type'), target: Id, value: z.string() }),
   z.strictObject({ type: z.literal('select'), target: Id, value: z.string() }),
   z.strictObject({ type: z.literal('toggle'), target: Id, value: z.boolean() }),
@@ -162,21 +156,6 @@ export const Effect = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('stream'), path: StatePath, value: z.string() }),
 ]);
 
-/**
- * 调用链（D48）：这一步 trace 的一条路径。nodes 按路径顺序；edges 是路径上的连线，reverse = 沿连线的 to→from 方向走。
- * mode：ok = 正常调用（本步 active，之后 ok）；fail = 失败（连线与终点节点 error）；skip = 没被调用（dim）。
- */
-export const Trace = z.strictObject({
-  mode: z.enum(['ok', 'fail', 'skip']),
-  nodes: z.array(z.string().min(1)),
-  edges: z.array(z.strictObject({ id: z.string().min(1), reverse: z.boolean().default(false) })),
-  /** 路径经过的分组（节点所在的各级分组，D69）：fail 时 errorGroups 是终点所在的分组。没有分组时省略（IR 与旧版相同）。 */
-  groups: z.array(z.string().min(1)).optional(),
-  errorGroups: z.array(z.string().min(1)).optional(),
-  /** 镜头目标：架构图 / 状态机是路径上的节点，时序图是消息（一行一行的）。旧 IR 没有，按 nodes 处理。 */
-  targets: z.array(z.string().min(1)).optional(),
-});
-
 /** 镜头（D43）：这一步在某个层级里对准哪些元素；targets 为空 = 这一层的整体。 */
 export const Shot = z.strictObject({ layer: z.string().min(1), targets: z.array(z.string().min(1)) });
 
@@ -193,16 +172,22 @@ export const Cue = z.strictObject({ kind: z.enum(CUE_KINDS), targets: z.array(z.
 export const CALLOUT_SIDES = ['top', 'right', 'bottom', 'left'] as const;
 export const Callout = z.strictObject({ target: z.string().min(1), text: z.string().min(1), side: z.enum(CALLOUT_SIDES).optional() });
 
+export const MediaSnapshot = z.record(z.string(), z.strictObject({
+  plugin: z.string().min(1), resource: z.string().min(1), offsetMs: z.number().nonnegative(),
+  volume: z.number().min(0).max(1), loop: z.boolean(), fadeInMs: z.number().nonnegative(), stopAfterMs: z.number().nonnegative().optional(),
+}));
+
 export const Step = z.strictObject({
+  media: MediaSnapshot.optional(),
   id: Qid,
-  /** Author identity, unique within a scenario. id remains the legacy playback address. */
+  /** Author identity, unique within a scenario. id remains the playback address. */
   key: Id.optional(),
   kind: z.enum(['user', 'system', 'card']),
   action: Action,
   caption: z.string().min(1),
   /** Generated caption metadata; caption remains the English fallback for tools. */
   captionAuto: z.strictObject({
-    kind: z.enum(['click', 'type', 'select', 'check', 'uncheck', 'switch_on', 'switch_off', 'back', 'press']),
+    kind: z.enum(['click', 'type', 'select', 'check', 'uncheck', 'switch_on', 'switch_off', 'back', 'press', 'drag', 'hover', 'scroll']),
     label: z.string(),
     value: z.string().optional(),
     keys: z.string().optional(),
@@ -215,8 +200,11 @@ export const Step = z.strictObject({
   directorLayer: z.string().nullable().default(null),
   /** 较长的解说（来自 explain()，多个按换行连接）：字幕区第二行显示（说明下方、小一号）；发布站保留。 */
   explain: z.string().min(1).optional(),
-  /** 这一步的调用链（来自 trace()）：Diagram 节点与连线的 state 由 diagramStateAt 从它推算；发布站保留。 */
-  traces: z.array(Trace).default([]),
+  /** 插件效果降级后的逐步快照。 */
+  ext: z.record(z.string(), Json).optional(),
+  /** 插件效果贡献的显式焦点与引用（scope 校验）。 */
+  focusTargets: z.array(z.string()).optional(),
+  references: z.array(z.string()).optional(),
   /** 分叉是演示信息，发布保留；at 在编译时比较动作与业务效果的公共前缀。 */
   forks: z.array(Fork).default([]),
   /** 本步标注，不累积，不参与状态转换。 */
@@ -235,6 +223,8 @@ export const Step = z.strictObject({
 });
 
 export const Scenario = z.strictObject({
+  media: MediaSnapshot.optional(),
+  ext: z.record(z.string(), Json).optional(),
   id: Qid,
   optionId: Qid,
   name: z.string().min(1),
@@ -301,7 +291,9 @@ export const Coverage = z.strictObject({
   basis: z.enum(['derived', 'declared']).default('declared'),
 });
 
+export const FreeReaction = z.strictObject({ action: Action, effects: z.array(Effect).default([]), source: Source });
 export const Option = z.strictObject({
+  free: z.record(Id, FreeReaction).optional(),
   id: Qid,
   featureId: Id,
   /** 文件名，例如 `a-modal`。 */
@@ -391,8 +383,20 @@ export const Project = z.strictObject({
   autoFocus: z.boolean().optional(),
   voiceConfig: VoiceConfig.optional(),
   voiceIndex: VoiceIndex.optional(),
+  mediaAssets: z.record(z.string(), z.string()).optional(),
   /** 作者内容多语言（D84）：只有 config 写了 locales 才有。messages 只含非默认语言、这份 IR 用得到的译文；stale 只在 dev IR。 */
   i18n: ContentI18nSchema.optional(),
+  /** 启用的插件（D86）：插件 id → 名称、版本与组件声明（可操作、父组件）。运行时代码不在 IR 里，由看板 / 发布站另外载入。 */
+  plugins: z.record(z.string(), z.strictObject({
+    actions: z.record(z.string(), PluginAction).optional(),
+    themes: z.record(z.string(), z.string()).optional(),
+    properties: z.record(z.string(), z.strictObject({ type: z.enum(['string', 'number', 'boolean']), attribute: z.string().regex(/^data-jp-[a-z0-9-]+$/).optional(), min: z.number().optional(), max: z.number().optional(), nonempty: z.boolean().optional() })).optional(),
+    data: DataSpec.optional(),
+    id: z.string().min(1),
+    title: z.string(),
+    version: z.string().optional(),
+    components: z.record(z.string(), z.strictObject({ interactive: z.boolean().optional(), parent: z.string().optional(), needsId: z.boolean().optional(), selfEvident: z.boolean().optional(), traits: ElementTraitsSchema.optional() })),
+  })).optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),
   /** dev = 含全部方案（本地看板）；publish = 只含选定方案，且去掉创作侧信息（D33）；review = 评审版：全部方案，同样去掉创作侧信息（D63）。 */
@@ -427,7 +431,7 @@ export type Scenario = z.infer<typeof Scenario>;
 export type Step = z.infer<typeof Step>;
 export type Action = z.infer<typeof Action>;
 export type Effect = z.infer<typeof Effect>;
-export type Trace = z.infer<typeof Trace>;
+export type FreeReaction = z.infer<typeof FreeReaction>;
 export type Shot = z.infer<typeof Shot>;
 
 export type Fork = z.infer<typeof Fork>;

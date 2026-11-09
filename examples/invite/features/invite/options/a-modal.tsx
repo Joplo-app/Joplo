@@ -1,5 +1,5 @@
 import { $, done, flow, go, not, notEmpty, option, page, rule, set, push, toast, undecided, uses } from '@joplo-app/kit';
-import { ActionIcon, Alert, Button, Center, EmptyState, Group, Loader, Menu, Modal, Notification, Select, Stack, Text, TextInput } from '@joplo-app/kit/ui';
+import { ActionIcon, Alert, Button, Center, EmptyState, Group, Loader, Menu, Modal, Notification, Select, Stack, Text, TextInput } from '@joplo-app/plugin-ui';
 
 import { members, pending } from '../sample.ts';
 

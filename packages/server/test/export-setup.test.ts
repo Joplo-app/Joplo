@@ -1,3 +1,4 @@
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
 /**
  * 看板里的导出组件（D66）：状态接口、安装接口只接受本机看板的已授权请求（不变量 ④）、进度推送、装好后继续导出；
  * 托管运行时与项目里已有的 playwright 都能导出（不变量 ⑤）；安装不改项目文件（不变量 ①）。
@@ -18,6 +19,7 @@ const SCENARIO = 'invite.a-modal.success';
 const minimal = () => {
   const d = tmp('joplo-setup-proj-');
   fs.cpSync(EXAMPLE, d, { recursive: true, filter: (s) => !/[/\\](\.joplo|dist|node_modules|exports)([/\\]|$)/.test(s.slice(EXAMPLE.length)) });
+  installFixturePlugins(d);
   fs.writeFileSync(path.join(d, 'package.json'), '{"name":"setup-demo","devDependencies":{"joplo":"0.2.6"}}\n');
   fs.writeFileSync(path.join(d, 'package-lock.json'), '{"lockfileVersion":3}\n');
   return d;

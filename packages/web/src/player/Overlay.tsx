@@ -4,7 +4,8 @@ import { useI18n } from '../i18n/context';
  * 位于画框内部（坐标即画框坐标），pointer-events 默认关闭，不影响元素命中与遮挡检查。
  */
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
+import { motion } from '../renderer/engine-motion';
 import { MousePointer2 } from 'lucide-react';
 import type { Snapshot } from '../runtime/demo';
 import { rectOf } from '../renderer/rect';

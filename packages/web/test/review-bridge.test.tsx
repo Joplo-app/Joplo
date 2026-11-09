@@ -1,3 +1,5 @@
+import '../../../scripts/test/render-fixtures.ts';
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 发布站评审模式（?embed=1&review=1，云端契约 8.2）。不变量：
  * 1. 不是评审模式（没有 review=1）时：不注册 message 监听、不发任何 postMessage；
@@ -8,8 +10,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, layer, option, page, shot } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, layer, option, page, shot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { authorElement, createReviewBridge, elementLabel, parseReviewMessage, reviewScenarios, type BridgeWindow } from '../src/site/review-bridge';

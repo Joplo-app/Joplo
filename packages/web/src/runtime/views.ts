@@ -2,7 +2,7 @@
  * 看板与发布站共用的只读视图计算：路径树（产品地图）、浏览视图的画面与状态、缺口统计。
  * 不推进业务状态；推进只在 demo.ts 里通过 core 的 applyStep / stateAt 完成。
  */
-import { orderedFeatures, nodeLabel, walkNodes, type Coverage, type Option, type PlayState, type Project, type Scenario, type Scene, type SceneNode } from '@joplo-app/core';
+import { orderedFeatures, nodeLabel, walkNodes, type Coverage, type Option, type PlayState, type Project, type Scenario, type Scene, type SceneNode } from '@joplo-app/core/runtime';
 
 export const optionsOf = (project: Project, featureId: string | null): Option[] =>
   featureId && project.features[featureId] ? project.features[featureId]!.optionIds.map((id) => project.options[id]).filter((o): o is Option => !!o) : [];

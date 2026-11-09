@@ -7,9 +7,9 @@
  * 被演示原型的文字、播放器的界面文字都放在状态里，由 content() / chrome() 按语言整体换掉。
  */
 import { $, and, eq, layer, neq, not, set, type Bind, type EffectDef } from '@joplo-app/kit';
-import {
-  ActionIcon, Alert, Anchor, Avatar, Badge, Box, Breadcrumbs, Button, Code, Diagram, Grid, Group, Menu, Paper, Progress, Stack, Terminal, Text, TextInput, Title,
-} from '@joplo-app/kit/ui';
+import { ActionIcon, Alert, Anchor, Avatar, Badge, Box, Breadcrumbs, Button, Code, Grid, Group, Menu, Paper, Progress, Stack, Terminal, Text, TextInput, Title } from '@joplo-app/plugin-ui'; import { Diagram } from '@joplo-app/plugin-diagram';
+
+
 
 const ui = $.ui as unknown as Record<string, Bind>;
 

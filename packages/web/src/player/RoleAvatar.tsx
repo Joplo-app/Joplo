@@ -1,7 +1,7 @@
 /**
  * 角色头像（D56 / D61）：角色色的圆，里面是名字的首字。字幕里的说话人、换人的过渡卡共用，与层级标签上的头像同一来源（RoleInfo）。
  */
-import type { RoleInfo } from '@joplo-app/core';
+import type { RoleInfo } from '@joplo-app/core/runtime';
 
 const initial = (name: string) => [...name.trim()][0] ?? '?';
 

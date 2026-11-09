@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 手机上像看视频一样看分享（examples/joplo mobile_watch，已确认）：
  * - 舞台按设计尺寸（1280×800）整体等比缩放，像视频一样留黑边，不按手机宽度重新排版；
@@ -5,8 +6,8 @@
  * - 自动播放时一个场景播完接着播下一个（按选定方案的场景顺序），最后一个播完停下；手动一步步看时不自动跳。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';
@@ -135,16 +136,17 @@ describe('DemoController.autoNext：自动播放时接着播下一个场景', ()
 
 describe('Phone landscape：横放的手机外框（画 mobile_watch 原型用到的正式组件能力）', () => {
   it('内容区 772×358；外框尺寸按横放的安全区计算；core 的子区域宽度按横屏宽度算', async () => {
-    const { phoneFrameSize } = await import('../src/renderer/components');
-    const { childWidth, PHONE_LANDSCAPE } = await import('@joplo-app/core');
+    const { phoneFrameSize, PHONE_LANDSCAPE } = await import('../../../plugins/ui/src/runtime.tsx');
+    const {components} = await import('../../../plugins/ui/src/plugin.ts');
+    const { childWidth } = await import('@joplo-app/core');
     expect(PHONE_LANDSCAPE).toEqual({ width: 772, height: 358 });
     const land = phoneFrameSize(772, 358, true);
     const port = phoneFrameSize(390, 844);
     expect(land.width).toBeGreaterThan(land.height);
     expect(port.height).toBeGreaterThan(port.width);
-    expect(childWidth('Phone', 1280, { landscape: true })).toBe(772);
-    expect(childWidth('Phone', 1280)).toBe(390);
-    expect(childWidth('Stack', 1280, { landscape: true })).toBe(1280);
+    expect(childWidth({traits:components.Phone!.traits}, 1280, { landscape: true })).toBe(772);
+    expect(childWidth({traits:components.Phone!.traits}, 1280)).toBe(390);
+    expect(childWidth({}, 1280, { landscape: true })).toBe(1280);
   });
 });
 

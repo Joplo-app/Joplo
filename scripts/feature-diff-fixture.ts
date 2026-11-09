@@ -12,7 +12,7 @@ for (const side of ['before', 'after']) {
   await writeFile(join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions: { jsx: 'react-jsxdev', jsxImportSource: '@joplo-app/kit', moduleResolution: 'Bundler', module: 'ESNext', target: 'ES2023' } }));
   await writeFile(join(dir, 'joplo.config.ts'), `import { config } from '@joplo-app/kit'; export default config({ name: 'Feature diff fixture', home: '/' });`);
   await writeFile(join(dir, 'features/invite/feature.ts'), `import { feature } from '@joplo-app/kit'; export default feature({ name: 'Invitations', goal: 'Preview and send an invitation', cases: {}, pick: 'main' });`);
-  await writeFile(join(dir, 'routes/page.tsx'), `import { page, $ } from '@joplo-app/kit'; import { Stack, Title, Text } from '@joplo-app/kit/ui'; export default page({ title: 'Invitation' }, <Stack p="xl"><Title>Team invitation</Title><Text>{$.ui.status}</Text><Text>{$.ui.preview}</Text></Stack>);`);
+  await writeFile(join(dir, 'routes/page.tsx'), `import { page, $ } from '@joplo-app/kit'; import { Stack, Title, Text } from '@joplo-app/plugin-ui'; export default page({ title: 'Invitation' }, <Stack p="xl"><Title>Team invitation</Title><Text>{$.ui.status}</Text><Text>{$.ui.preview}</Text></Stack>);`);
   await writeFile(join(dir, 'features/invite/options/main.tsx'), `import { option, flow, set, $, done } from '@joplo-app/kit';
 export default option({ name: 'Email', idea: 'Review before sending', state: { ui: { status: 'Ready', preview: '' } }, on: { '/': {} }, scenarios: {
   send: flow('Single invitation').system('Open', set($.ui.status, 'Draft ready')).key('open')

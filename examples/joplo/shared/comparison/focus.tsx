@@ -4,7 +4,7 @@
  * 尺寸 sm / md / lg 模拟播放器舞台被缩放后的实际字号：栏越窄，字越小。
  */
 import { $, eq, not, type Bind, type JNode } from '@joplo-app/kit';
-import { ActionIcon, Badge, Box, Button, Group, Kbd, NavLink, Paper, SegmentedControl, SimpleGrid, Stack, Text } from '@joplo-app/kit/ui';
+import { ActionIcon, Badge, Box, Button, Group, Kbd, NavLink, Paper, SegmentedControl, SimpleGrid, Stack, Text } from '@joplo-app/plugin-ui';
 
 const ui = $.ui as unknown as Record<string, Bind>;
 type Side = 'old' | 'new';

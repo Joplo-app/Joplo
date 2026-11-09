@@ -1,5 +1,5 @@
 import { $, and, empty, eq, layer, not, notEmpty, or } from '@joplo-app/kit';
-import { ActionIcon, Alert, Badge, Box, Button, Divider, Group, NavLink, Paper, Progress, SimpleGrid, Stack, Terminal, Text, Textarea, Title } from '@joplo-app/kit/ui';
+import { ActionIcon, Alert, Badge, Box, Button, Divider, Group, NavLink, Paper, Progress, SimpleGrid, Stack, Terminal, Text, Textarea, Title } from '@joplo-app/plugin-ui';
 
 const grow = { flex: 1, minHeight: 0 };
 export const initialUi = () => ({

@@ -1,20 +1,19 @@
 /**
  * 手机上像看视频一样看分享（mobile_watch，已在 examples/joplo 里确认）。只在发布站、且设备是手机时使用：
  * - 竖屏：精简顶栏；16:10 的画面（舞台按设计尺寸整体缩放，不按手机宽度重排）；完整字幕；一行控制条；章节列表；
- * - 横屏（手机横过来，或点「横屏」）：只剩画面和字幕，铺满屏幕；点一下画面显示 / 隐藏控件（约 3 秒后自动隐藏），
- *   左右滑动切到上一步 / 下一步；
+ * - 横屏（手机横过来，或点「横屏」）：舞台、字幕与独立控制条；D88 起舞台手势归原型，不再覆盖滑动切步层；
  * - 「横屏」：浏览器支持时请求全屏并锁定横向；iPhone 的 Safari 不能让网页全屏、也不能锁方向，就把画面转 90° 铺满，
  *   手机还竖着时提示把手机横过来；手机真的横过来后不再旋转。
  * 连续播放（一章接一章）由控制器的 autoNext 负责，发布站设置。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, CirclePlay, Pause, Play, RotateCcw, RectangleHorizontal, X } from 'lucide-react';
-import type { Scenario } from '@joplo-app/core';
+import type { Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import { useI18n } from '../i18n/context';
 import { cn } from '@/lib/utils';
 import type { SubtitleContent } from './subtitle-content';
-import { gestureOf, phoneLayout } from './watch';
+import { phoneLayout } from './watch';
 import { ROTATED_ATTR } from '../renderer/rect';
 
 export type Chapter = { id: string; name: string; current: boolean; steps: string };
@@ -259,116 +258,28 @@ function Immersive(p: {
 }) {
   const { t: i18n } = useI18n();
   useBlackPage(true);
-  const [shown, setShown] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
-  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const show = useCallback(() => {
-    setShown(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setShown(false), HIDE_MS);
-  }, []);
-  const flashHint = (text: string) => {
-    setHint(text);
-    if (hintTimer.current) clearTimeout(hintTimer.current);
-    hintTimer.current = setTimeout(() => setHint(null), 700);
-  };
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-      if (hintTimer.current) clearTimeout(hintTimer.current);
-    },
-    [],
-  );
-  // “把手机横过来看”只提示一会儿，不长期压在画面上
-  const [rotateHint, setRotateHint] = useState(p.rotated);
-  useEffect(() => {
-    if (!p.rotated) return setRotateHint(false);
-    setRotateHint(true);
-    const t = setTimeout(() => setRotateHint(false), HIDE_MS);
-    return () => clearTimeout(t);
-  }, [p.rotated]);
-  // 暂停时控件一直显示，方便继续
-  useEffect(() => {
-    if (!p.playing) setShown(true);
-  }, [p.playing]);
-
-  const start = useRef<{ x: number; y: number; t: number } | null>(null);
-  const onDown = (e: React.PointerEvent) => {
-    start.current = { x: e.clientX, y: e.clientY, t: performance.now() };
-  };
-  const onUp = (e: React.PointerEvent) => {
-    const s = start.current;
-    start.current = null;
-    if (!s) return;
-    // 画面转了 90°（顺时针）时，观众眼里的水平方向是屏幕的竖直方向
-    const sx = e.clientX - s.x;
-    const sy = e.clientY - s.y;
-    const g = gestureOf(p.rotated ? { dx: sy, dy: -sx, ms: performance.now() - s.t } : { dx: sx, dy: sy, ms: performance.now() - s.t });
-    if (g === 'tap') {
-      if (shown && p.playing) setShown(false);
-      else show();
-    } else if (g === 'next') {
-      void p.ctl.next();
-      flashHint(`${i18n.player.nextStep} ›`);
-    } else if (g === 'prev') {
-      p.ctl.prev();
-      flashHint(`‹ ${i18n.player.previousStep}`);
-    }
-  };
-
   const box = p.rotated
     ? { position: 'fixed' as const, left: 0, top: 0, width: p.viewport.h, height: p.viewport.w, transform: `translateX(${p.viewport.w}px) rotate(90deg)`, transformOrigin: 'top left' }
     : { position: 'fixed' as const, inset: 0 };
   return (
-    <div className="z-50 overflow-hidden bg-black font-jb text-white" style={box} data-testid="watch-immersive" data-rotated={p.rotated ? '' : undefined} {...(p.rotated ? { [ROTATED_ATTR]: '' } : {})}>
-      <div className="absolute inset-0 flex flex-col" style={p.rotated ? undefined : SAFE_ALL}>{p.stage}</div>
-      {p.caption ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 to-transparent px-[8%] pt-8 text-center text-[16px] font-semibold leading-[1.4]" style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }} data-testid="watch-immersive-caption">
-          {p.caption}
-        </div>
-      ) : null}
-      <div className="absolute inset-0 z-20 touch-none" onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={() => (start.current = null)} data-testid="watch-gesture" />
-      {hint ? <div className="pointer-events-none absolute right-6 top-1/2 z-30 -translate-y-1/2 rounded-full bg-white/90 px-3 py-1.5 text-[14px] font-semibold text-black">{hint}</div> : null}
-      {rotateHint && !shown ? (
-        <div className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-full bg-jb-accent px-3 py-1 text-[13px] font-semibold text-jb-on-accent" data-testid="watch-rotate-hint">
-          {i18n.player.watchRotateHint}
-        </div>
-      ) : null}
-      {shown ? (
-        <div className="absolute inset-0 z-30 bg-black/45" style={p.rotated ? undefined : SAFE_ALL} onClick={(e) => e.target === e.currentTarget && setShown(false)} data-testid="watch-overlay">
-          <div className="flex items-center gap-2 px-4 pt-3">
-            {p.canExit ? (
-              <button type="button" aria-label={i18n.player.watchExitLandscape} onClick={p.onExit} className="jb-focus inline-flex size-9 items-center justify-center rounded-full active:bg-white/20" data-testid="watch-exit">
-                <X className="size-5" />
-              </button>
-            ) : null}
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[14px] font-semibold">{p.title}</div>
-              <div className="text-[11px] text-white/70">{p.chapter}</div>
-            </div>
-            <div className="[&_button]:text-white">{p.voice}</div>
-          </div>
-          <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 items-center justify-center gap-10">
-            <button type="button" aria-label={i18n.player.previousStep} onClick={() => (p.ctl.prev(), show())} className="jb-focus inline-flex size-12 items-center justify-center rounded-full active:bg-white/20" data-testid="watch-imm-prev">
-              <ChevronLeft className="size-7" />
-            </button>
-            <button type="button" aria-label={p.playing ? i18n.player.pause : i18n.player.play} onClick={() => (p.ctl.togglePlay(), show())} className="jb-focus inline-flex size-16 items-center justify-center rounded-full bg-white text-black" data-testid="watch-imm-play">
-              {p.playing ? <Pause className="size-7" /> : <Play className="size-7" />}
-            </button>
-            <button type="button" aria-label={i18n.player.nextStep} onClick={() => (void p.ctl.next(), show())} className="jb-focus inline-flex size-12 items-center justify-center rounded-full active:bg-white/20" data-testid="watch-imm-next">
-              <ChevronRight className="size-7" />
-            </button>
-          </div>
-          <div className="absolute" style={{ left: 'calc(16px + env(safe-area-inset-left))', right: 'calc(16px + env(safe-area-inset-right))', bottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
-            <div className="h-1 overflow-hidden rounded-full bg-white/30">
-              <div className="h-full rounded-full bg-jb-accent transition-[width] duration-300" style={{ width: `${p.progress}%` }} />
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {p.finished ? <Finished onRestart={p.onRestart} author={p.author} dark /> : null}
-      <UpNextCard ctl={p.ctl} snap={p.snap} variant="center" />
+    <div className="z-50 flex flex-col overflow-hidden bg-black font-jb text-white" style={box} data-testid="watch-immersive" data-rotated={p.rotated ? '' : undefined} {...(p.rotated ? { [ROTATED_ATTR]: '' } : {})}>
+      <header className="flex h-11 shrink-0 items-center gap-2 px-3" style={p.rotated ? undefined : SAFE_X}>
+        {p.canExit ? <button type="button" aria-label={i18n.player.watchExitLandscape} onClick={p.onExit} className="jb-focus inline-flex size-9 items-center justify-center rounded-full active:bg-white/20" data-testid="watch-exit"><X className="size-5" /></button> : null}
+        <div className="min-w-0 flex-1 truncate text-[13px] font-semibold">{p.title} <span className="font-normal text-white/70">{p.chapter}</span></div>
+        <div className="[&_button]:text-white">{p.voice}</div>
+      </header>
+      <div className="relative flex min-h-0 flex-1 flex-col" style={p.rotated ? undefined : SAFE_X}>
+        {p.stage}
+        {p.finished ? <Finished onRestart={p.onRestart} author={p.author} dark /> : null}
+        <UpNextCard ctl={p.ctl} snap={p.snap} variant="center" />
+      </div>
+      {/* D88: playback controls are siblings of Stage; no transparent swipe layer steals prototype gestures. */}
+      <div role="toolbar" aria-label={i18n.player.playbackControls} className="flex min-h-14 shrink-0 items-center gap-3 bg-black px-3 py-2" style={p.rotated ? undefined : SAFE_X} data-testid="watch-overlay">
+        <button type="button" aria-label={i18n.player.previousStep} onClick={() => p.ctl.prev()} className="jb-focus inline-flex size-9 shrink-0 items-center justify-center rounded-full active:bg-white/20" data-testid="watch-imm-prev"><ChevronLeft className="size-6" /></button>
+        <button type="button" aria-label={p.playing ? i18n.player.pause : i18n.player.play} onClick={() => p.ctl.togglePlay()} className="jb-focus inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-black" data-testid="watch-imm-play">{p.playing ? <Pause className="size-5" /> : <Play className="size-5" />}</button>
+        <button type="button" aria-label={i18n.player.nextStep} onClick={() => void p.ctl.next()} className="jb-focus inline-flex size-9 shrink-0 items-center justify-center rounded-full active:bg-white/20" data-testid="watch-imm-next"><ChevronRight className="size-6" /></button>
+        <div className="min-w-0 flex-1"><p className="truncate text-[13px]" data-testid="watch-immersive-caption">{p.caption}</p><div className="mt-2 h-1 overflow-hidden rounded-full bg-white/30"><div className="h-full rounded-full bg-jb-accent" style={{width:`${p.progress}%`}} /></div></div>
+      </div>
     </div>
   );
 }

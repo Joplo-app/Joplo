@@ -1,3 +1,4 @@
+import { fixturePlugins } from '../../../scripts/test/fixtures.ts';
 /**
  * D67 `joplo outline` 与 D68 `joplo components`：
  * - outline 只读现有 IR（goal、roles、cases 的维度 / 优先级 / expected、覆盖、场景步数与估算时长），文字与 JSON 两种输出；
@@ -8,7 +9,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cp, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { COMPONENT_DOCS, skillTopic } from '@joplo-app/core';
+import { componentIndex } from '@joplo-app/core';
 import { runCli } from '../src/cli.ts';
 import { approx } from '../src/outline.ts';
 
@@ -95,15 +96,18 @@ test('approx：一分钟以内写秒，再长写分和秒；负数当 0', () => 
 });
 
 test('components：不带名字等于 skill components；带名字输出示例；未知名字报 USAGE', async () => {
+  const d=await project();const prev=process.cwd();
+  try { process.chdir(d);
   const all = await run(['components']);
   expect(all.code).toBe(0);
-  expect(all.out).toBe(skillTopic('components', COMPONENT_DOCS));
+  expect(all.out).toBe(componentIndex(fixturePlugins));
   const two = await run(['components', 'EmptyState', 'datatable']);
   expect(two.code).toBe(0);
-  expect(two.out).toContain('# EmptyState');
-  expect(two.out).toContain('# DataTable');
+  expect(two.out).toContain('# ui:EmptyState');
+  expect(two.out).toContain('# ui:DataTable');
   expect(two.out).toContain('selectedRecords={$.ui.selected}');
   const bad = await run(['components', 'Toastt']);
   expect(bad.code).toBe(2);
-  expect(bad.out).toMatch(/^USAGE {2}Unknown component "Toastt"/);
+  expect(bad.out).toMatch(/^USAGE {2}Component Toastt: not declared/);
+  } finally {process.chdir(prev);}
 });

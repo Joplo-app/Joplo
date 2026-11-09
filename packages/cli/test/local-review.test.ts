@@ -102,21 +102,19 @@ it('validates cursors, corrupt records, and paths before streaming', async () =>
 it('CLI errors stay on stderr and approved replay is pure NDJSON on stdout', async () => {
   const x = setup(); let out = '', err = '';
   const deps = { stdout: (s: string) => { out += s; }, stderr: (s: string) => { err += s; } };
-  expect(await runCli(['review', 'watch', x.dir, '--json'], deps)).toBe(2);
+  expect(await runCli(['feedback', 'watch', x.dir, '--local', '--json'], deps)).toBe(2);
   expect(out).toBe(''); expect(JSON.parse(err.trim()).error.code).toBe('USAGE');
   x.feedback(); x.approve(); out = ''; err = '';
-  expect(await runCli(['review', 'watch', x.dir, '--session', x.session.id, '--json'], deps)).toBe(0);
+  expect(await runCli(['feedback', 'watch', x.dir, '--local', '--session', x.session.id, '--json'], deps)).toBe(0);
   expect(out.trim().split('\n').map(l => JSON.parse(l).type)).toEqual(['feedback', 'approved']);
 });
 
-it('feedback watch --local is compatible with review watch and never needs cloud credentials', async () => {
+it('feedback watch --local never needs cloud credentials', async () => {
   const x = setup(); x.feedback(); x.approve();
-  const primary = capture(), alias = capture();
+  const primary = capture();
   expect(await runCli(['feedback', 'watch', x.dir, '--local', '--session', x.session.id, '--json'], {
     stdout: primary.io.out, stderr: primary.io.err, cloud: { env: { JOPLO_API_KEY: 'invalid-on-purpose' } },
   })).toBe(0);
-  expect(await runCli(['review', 'watch', x.dir, '--session', x.session.id, '--json'], { stdout: alias.io.out, stderr: alias.io.err })).toBe(0);
-  expect(primary.out).toBe(alias.out);
   expect(JSON.parse(primary.out.split('\n')[0]!)).toMatchObject({ source: 'local', eventId: `${x.session.id}:1` });
 });
 

@@ -4,7 +4,7 @@
  * - 演示页：播放控制右侧的声音浮层，声音来源只剩官方的；选 Joplo Cloud 朗读时显示剩余字数、可试听的音色。
  */
 import { $, and, callout, done, eq, flow, highlight, layer, narrate, not, numbered, set, shot, spotlight, uses, type Bind, type Flow } from '@joplo-app/kit';
-import { Alert, Anchor, Badge, Button, Code, Group, ListRow, NavLink, Paper, Progress, Select, Stack, Switch, Text, Title } from '@joplo-app/kit/ui';
+import { Alert, Anchor, Badge, Button, Code, Group, ListRow, NavLink, Paper, Progress, Select, Stack, Switch, Text, Title } from '@joplo-app/plugin-ui';
 
 const ui = $.ui as unknown as Record<string, Bind>;
 export type Variant = 'a' | 'b';

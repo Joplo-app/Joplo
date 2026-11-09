@@ -3,9 +3,9 @@
  * 两层共享同一份状态，由场景步骤驱动；文字用 $.ui.x 绑定，stream() 让它们逐字出现。
  */
 import { $, and, eq, layer, neq, not, notEmpty, type Bind } from '@joplo-app/kit';
-import {
-  Alert, AppShell, Artifact, Avatar, Badge, Box, Button, Card, ChatMessage, Grid, Group, Notification, Email, DataCard, StateFlow, Placeholder, PromptInput, ScrollArea, Stack, Text, Thinking, Title,
-} from '@joplo-app/kit/ui';
+import { Alert, AppShell, Artifact, Avatar, Badge, Box, Button, Card, ChatMessage, Grid, Group, Notification, Email, DataCard, StateFlow, Placeholder, PromptInput, ScrollArea, Stack, Text, Thinking, Title } from '@joplo-app/plugin-ui';
+
+
 
 const ui = $.ui as unknown as Record<string, Bind>;
 

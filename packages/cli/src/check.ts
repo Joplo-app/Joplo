@@ -3,7 +3,7 @@ import { realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
 import { compile, validate, type Diagnostic, type Project, type ValidationReport } from '@joplo-app/core';
-import { elkLayout, loadAuthoring } from '@joplo-app/core/node';
+import { loadAuthoring } from '@joplo-app/core/node';
 
 export type CheckReport = ValidationReport & { name: string };
 
@@ -19,7 +19,7 @@ export async function checkWithProject(dir: string, optionId?: string): Promise<
   const tsconfig = join(root, 'tsconfig.json');
   const loaded = await loadAuthoring(root, p => tsImport(p, { parentURL: import.meta.url, tsconfig: existsSync(tsconfig) ? tsconfig : false }));
   // 与看板同一套布局（D69）：布局失败的图表在 check 里报 DIAGRAM_LAYOUT_FAILED
-  const compiled = loaded.authoring ? compile(loaded.authoring, 'dev', { layout: elkLayout }) : null;
+  const compiled = loaded.authoring ? compile(loaded.authoring, 'dev', {}) : null;
   const validated = compiled?.project ? validate(compiled.project, { optionId, mode: 'all' }) : null;
   // 编译器也会为同一布局的每份画面输出相同诊断；在 CLI 边界统一去重。
   const seen = new Set<string>();

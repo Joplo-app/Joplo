@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 /**
  * 发布站水印（D83）：
  * - 只有页面里有 <meta name="joplo-branding" content="off">（Joplo Cloud 给 Pro 创作者的分享注入）才去掉；缺省、其他值、本地 build 一律带；

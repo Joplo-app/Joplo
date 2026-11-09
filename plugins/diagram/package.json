@@ -1,0 +1,79 @@
+{
+  "name": "@joplo-app/plugin-diagram",
+  "version": "0.3.0",
+  "type": "module",
+  "joplo": {
+    "api": 2
+  },
+  "exports": {
+    ".": "./src/plugin.ts",
+    "./effects": "./src/effects.ts",
+    "./model": "./src/model-index.ts",
+    "./node": "./src/elk.ts",
+    "./runtime": "./src/runtime.tsx",
+    "./schema": "./src/schema.ts",
+    "./catalog": "./src/catalog.ts",
+    "./guide": "./src/guide.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "elkjs": "0.12.1",
+    "zod": "4.6.7",
+    "@joplo-app/kit": "workspace:*",
+    "react": "19.3.1",
+    "motion": "14.9.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0"
+  },
+  "description": "Joplo first-party architecture, state and sequence diagrams",
+  "license": "PolyForm-Shield-1.0.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs",
+    "prepublishOnly": "node ../../scripts/build-package.mjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/plugin.d.ts",
+        "default": "./dist/plugin.js"
+      },
+      "./effects": {
+        "types": "./dist/effects.d.ts",
+        "default": "./dist/effects.js"
+      },
+      "./model": {
+        "types": "./dist/model-index.d.ts",
+        "default": "./dist/model-index.js"
+      },
+      "./node": {
+        "types": "./dist/elk.d.ts",
+        "default": "./dist/elk.js"
+      },
+      "./runtime": {
+        "types": "./dist/runtime.d.ts",
+        "default": "./dist/runtime.js"
+      },
+      "./schema": {
+        "types": "./dist/schema.d.ts",
+        "default": "./dist/schema.js"
+      },
+      "./catalog": {
+        "types": "./dist/catalog.d.ts",
+        "default": "./dist/catalog.js"
+      },
+      "./guide": {
+        "types": "./dist/guide.d.ts",
+        "default": "./dist/guide.js"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

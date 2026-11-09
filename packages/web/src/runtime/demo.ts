@@ -1,3 +1,4 @@
+import { scrollTarget, scrollPoint } from '../renderer/scroll-state';
 import { en, type Dictionary } from '../i18n/en';
 import { stepCaption, selectionLabel } from '../i18n/step-caption';
 import type { BoardDictionary } from '../i18n/board/en';
@@ -18,12 +19,13 @@ import { m } from '../i18n/messages';
  *   current（被拒绝时为 null）为准并明确提示；网络失败时回滚到上一次确认的选中。
  * - 热更新（setProject）保持功能、方案、场景、位置（越界夹到合法范围）、视图与选中。
  */
-import { animate, type AnimationPlaybackControls } from 'motion';
+import { EngineClock, gesturePoint, gestureProgress } from './clock';
+import { actionIndex, arbitrateAction, applyPlayground, pluginActionSpec, type Playground, type ActionEntry, type Action } from '@joplo-app/core/runtime';
 import { stepDwell, CAMERA_MS } from './pace';
 import { dwellTexts } from '../player/cover-content';
-import { VOICE_BREATH_MS, speakerRoleAt, spokenLine } from '@joplo-app/core';
+import { VOICE_BREATH_MS, speakerRoleAt, spokenLine } from '@joplo-app/core/runtime';
 import type { Narration, Narrator, NarrationSource } from './voice';
-import { holdMsOf, orderedFeatures, streamsOf, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core';
+import { holdMsOf, orderedFeatures, streamsOf, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core/runtime';
 import { browseSceneId, browseState, optionsOf, scenariosOf } from './views';
 
 /** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */
@@ -56,6 +58,10 @@ export type Snapshot = {
   /** 浏览视图的画面（`@<路径>`）。 */
   browseSceneId: string | null;
   state: PlayState | null;
+  playground: Playground | null;
+  freeMode: boolean;
+  switchPrompt: ActionEntry[] | null;
+  gesture: { action: Action; progress: number } | null;
   playing: boolean;
   paused: boolean;
   busy: boolean;
@@ -102,6 +108,18 @@ export type Snapshot = {
   narration: { position: number; source: NarrationSource; waiting: boolean; fallback?: boolean } | null;
 };
 
+const presentationActions = new WeakMap<Action, Action>();
+function presentAction(action: Action, progress: number) {
+  let data = presentationActions.get(action);
+  if (!data) {
+    data = structuredClone(action);
+    if ('data' in data) Object.freeze(data.data);
+    if ('to' in data && typeof data.to === 'object') Object.freeze(data.to);
+    Object.freeze(data); presentationActions.set(action, data);
+  }
+  return Object.freeze({ action: data, progress });
+}
+
 export const TIMING = {
   cursorMove: 0.55, // 秒（Motion）
   ripple: 260,
@@ -144,6 +162,10 @@ export class DemoController {
     view: 'stage',
     browseSceneId: null,
     state: null,
+    playground: null,
+    freeMode: false,
+    switchPrompt: null,
+    gesture: null,
     playing: false,
     paused: false,
     dwell: null,
@@ -167,7 +189,8 @@ export class DemoController {
   private listeners = new Set<() => void>();
   private gen = 0;
   private cancelWaiters: (() => void)[] = [];
-  private anim: AnimationPlaybackControls | null = null;
+  readonly clock = new EngineClock();
+  private indexes = new Map<string, ActionEntry[]>();
   /** 已开始动画、尚未提交的步骤下标。 */
   private inflight: { index: number } | null = null;
   private stageEl: HTMLElement | null = null;
@@ -180,7 +203,9 @@ export class DemoController {
   /** 最近一次服务端确认的选中（写入失败时回滚到它）。 */
   private confirmed: Selection | null = null;
   /** 播放速度（0.5 / 1 / 1.5，T-director2）：缩放动画与停留时长；镜头过渡与连线小点一圈不缩放。 */
-  speed = 1;
+  private playbackSpeed = 1;
+  get speed() { return this.playbackSpeed; }
+  set speed(value: number) { this.tickClock(); this.playbackSpeed = Number.isFinite(value) && value > 0 ? value : 1; this.tickClock(); }
   /** 最近一次提交的时刻：停留时长从这里算起。 */
   private committedAt = 0;
   reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
@@ -198,10 +223,19 @@ export class DemoController {
   };
   getSnapshot = () => this.snap;
 
-  private set(patch: Partial<Snapshot>) {
+  private tickClock(now = performance.now()) {
+    this.clock.update(now, { running: (this.snap.playing || this.snap.busy) && !this.snap.paused, speed: this.speed, paused: this.snap.paused });
+  }
+  /** Media and visual demonstrations sample the same clock and the same step anchor. */
+  mediaElapsed(now = performance.now()): number { this.tickClock(now); return this.clock.getSnapshot().elapsedMs; }
+
+  private set(patch: Partial<Snapshot>, sampleClock = true) {
+    if (sampleClock) this.mediaElapsed();
+    if (patch.state !== undefined && (patch.state?.position !== this.snap.state?.position || patch.state?.sceneId !== this.snap.state?.sceneId) || patch.scenarioId !== undefined && patch.scenarioId !== this.snap.scenarioId) this.clock.mark();
     // 状态被替换但不是播放提交的：不再逐字输出（跳到某一步直接显示全文）
     if (patch.state !== undefined && patch.streamAt === undefined && patch.state !== this.snap.state) patch = { ...patch, streamAt: null };
     this.snap = { ...this.snap, ...patch };
+    if (sampleClock) this.tickClock();
     if (typeof window !== 'undefined') {
       const w = window as unknown as Record<string, unknown>;
       w.__JOPLO_STATE__ = this.snap.view === 'stage' ? this.snap.state : null;
@@ -259,6 +293,7 @@ export class DemoController {
   /** 载入（或热更新）项目：保持功能、方案、场景、位置（越界夹到合法范围）、视图与选中。 */
   setProject(project: Project, version: number, home: string | null = null) {
     this.stop();
+    this.indexes.clear();
     const prev = this.snap;
     const features = orderedFeatures(project).map(f => f.id);
     let featureId = prev.featureId && project.features[prev.featureId] ? prev.featureId : null;
@@ -392,6 +427,7 @@ export class DemoController {
     const p = this.snap.project;
     if (!p || !p.scenarios[scenarioId]) return;
     this.stop();
+    this.clock.mark();
     const sc = p.scenarios[scenarioId]!;
     const r = this.safeStateAt(p, scenarioId, Math.max(0, Math.min(position, sc.steps.length)));
     const featureId = p.options[sc.optionId]?.featureId ?? this.snap.featureId;
@@ -432,6 +468,7 @@ export class DemoController {
     const sc = this.scenario();
     if (!p || !sc || this.snap.view !== 'stage') return;
     this.stop();
+    this.clock.mark();
     const r = this.safeStateAt(p, sc.id, Math.max(0, Math.min(position, sc.steps.length)));
     this.set({ state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: message ? { kind: 'info', text: message } : null });
     if (message) this.autoClear();
@@ -495,7 +532,7 @@ export class DemoController {
     this.set({ playing: true, paused: false, busy: true, cursorVisible: !this.reducedMotion, notice: null });
     const at = this.snap.state.position;
     if (opts.hold && at > 0) {
-      this.committedAt = performance.now();
+      this.committedAt = this.clock.rawTime;
       this.narrate(sc, at);
       if (!(await this.dwellOn(sc, at - 1, gen))) return;
     }
@@ -521,13 +558,13 @@ export class DemoController {
     this.set({ busy: false, dwell: null, upNext: { scenarioId: next, left: Math.ceil(this.autoNextDelay / 1000) } });
     this.skipUpNext = false;
     let remaining = this.autoNextDelay;
-    let last = performance.now();
+    this.tickClock();
+    const countdownStart = this.clock.rawTime;
     while (remaining > 0 && !this.skipUpNext) {
       await sleep(Math.min(remaining, 100));
       if (gen !== this.gen) return;
-      const now = performance.now();
-      if (!this.snap.paused) remaining -= now - last;
-      last = now;
+      this.tickClock();
+      remaining = this.autoNextDelay - (this.clock.rawTime - countdownStart);
       const left = Math.max(0, Math.ceil(remaining / 1000));
       if (this.snap.upNext && left !== this.snap.upNext.left) this.set({ upNext: { scenarioId: next, left } });
     }
@@ -568,11 +605,11 @@ export class DemoController {
           dotMs: this.activeDotMs(),
           streams: streamsOf(step).map((x) => x.value),
         }));
-    const elapsed = Math.max(0, Math.round(performance.now() - this.committedAt));
+    const elapsed = Math.max(0, Math.round(this.clock.rawTime - this.committedAt));
     this.set({ dwell: { position: index + 1, ms: Math.max(dwell, elapsed), elapsed } });
     // 朗读（D74）：停留 = max(画面停留, 声音读完 + 换气)；画面停够了、声音没读完时标出“在等声音”
     const ok2 = (await Promise.all([
-      this.wait(dwell - (performance.now() - this.committedAt), gen, true).then((ok) => {
+      this.wait(dwell - (this.clock.rawTime - this.committedAt), gen, true).then((ok) => {
         if (ok && this.narrating && this.snap.narration && !this.snap.narration.waiting) this.set({ narration: { ...this.snap.narration, waiting: true } });
         return ok;
       }),
@@ -599,22 +636,21 @@ export class DemoController {
     this.set({ activeStep: st.position });
     if (!(await this.wait(TIMING.quickStep, gen))) return false;
     if (gen !== this.gen || !this.commit(sc)) return false;
-    if (gen === this.gen) this.set({ systemEvent: null, activeStep: null, ripple: null });
+    if (gen === this.gen) this.set({ systemEvent: null, activeStep: null, ripple: null, gesture: null });
     return true;
   }
 
-  pause() {
-    if (!this.snap.playing || this.snap.paused) return;
-    this.anim?.pause();
+  pause(explore = true) {
+    if ((!this.snap.playing && !this.snap.busy) || this.snap.paused) return;
     this.narrating?.pause();
-    this.set({ paused: true });
+    this.set({ paused: true, freeMode: explore || this.snap.freeMode });
   }
 
   resume() {
     if (!this.snap.paused) return;
-    this.anim?.play();
+    this.resetPlayground(false);
     this.narrating?.resume();
-    this.set({ paused: false });
+    this.set({ paused: false, freeMode: false });
   }
 
   /** 停掉当前朗读（人的操作优先：跳转、上一步、手动下一步、停止、关闭声音）。 */
@@ -658,14 +694,13 @@ export class DemoController {
   stop() {
     this.gen++;
     this.stopNarration();
-    this.anim?.stop();
-    this.anim = null;
+    this.resetPlayground(false);
     this.inflight = null;
     const ws = this.cancelWaiters;
     this.cancelWaiters = [];
     ws.forEach((w) => w());
     if (this.snap.playing || this.snap.busy || this.snap.preview || this.snap.systemEvent || this.snap.ripple || this.snap.activeStep !== null || this.snap.leadLayer || this.snap.leadFrame || this.snap.upNext)
-      this.set({ playing: false, paused: false, busy: false, dwell: null, preview: null, systemEvent: null, ripple: null, activeStep: null, leadLayer: null, leadFrame: null, upNext: null });
+      this.set({ playing: false, paused: false, busy: false, dwell: null, preview: null, systemEvent: null, ripple: null, activeStep: null, leadLayer: null, leadFrame: null, upNext: null, gesture: null });
   }
 
   // ---------- 点击 ----------
@@ -673,40 +708,57 @@ export class DemoController {
    * 单击画面元素：按当前场景解释（推进、禁用原因、演示范围外、不是当前步骤）。
    * inspect（⌥+单击）：只检查 —— 写入选中，不操作原型。
    */
+  /** Pause before delivery; never cancel or replay the viewer's original DOM event. */
+  stageInput(explore = false): void {
+    if ((this.snap.playing || this.snap.busy) && !this.snap.paused) this.pause(explore);
+    if (explore && !this.snap.freeMode) this.set({ freeMode: true });
+  }
+  resetPlayground(keepMode = true) {
+    this.set({ playground: null, switchPrompt: null, freeMode: keepMode && this.snap.freeMode, epoch: this.snap.epoch + 1 });
+  }
+  dismissSwitch() { this.set({ switchPrompt: null }); }
+  confirmSwitch(index: number) {
+    const candidate = this.snap.switchPrompt?.[index];
+    if (candidate) this.setScenario(candidate.scenarioId, candidate.position);
+  }
   async clickNode(nodeId: string, point: { x: number; y: number }, opts: { inspect?: boolean } = {}) {
+    if (opts.inspect) return this.select(nodeId);
+    return this.act({ type: 'click', target: nodeId }, undefined, point);
+  }
+  async act(action: Action, native?: Action, point?: {x:number;y:number}) {
     const p = this.snap.project;
     const st = this.snap.state;
     if (!p || !st) return;
-    if (opts.inspect) return this.select(nodeId);
     const sc = this.scenario();
     if (this.snap.view !== 'stage' || !sc) return this.info(m.player.staticStageThisOptionDoesNotDemonstrateThisCase);
-
-    if (this.snap.playing && !this.snap.paused) return this.info(m.player.autoplayIsRunningPauseBeforeInteractingManually);
-    if (this.snap.playing) this.stop(); // 暂停中手动接管
-    else if (this.snap.busy) this.finishInflight(sc); // 上一步动画未完：先快进完成它
-
-    const cur = this.snap.state;
-    if (!cur) return;
-    let verdict: ReturnType<typeof explainClick>;
-    try {
-      verdict = explainClick(p, cur, nodeId, this.shownSceneId() ?? undefined);
-    } catch (e) {
-      this.set({ notice: { kind: 'error', text: m.player.couldNotInterpretThisClick(e instanceof Error ? e.message : String(e)) } });
-      return;
-    }
+    // Hover is passive during playback. Touch hover is preceded by pointerdown's pause.
+    if (action.type === 'hover' && (this.snap.playing || this.snap.busy) && !this.snap.paused) return;
+    this.stageInput(true);
+    let index = this.indexes.get(sc.optionId);
+    if (!index) { index = actionIndex(p, sc.optionId); this.indexes.set(sc.optionId, index); }
+    const result = arbitrateAction(p, st, action, { layer: this.snap.playground, sceneId: this.shownSceneId() ?? undefined, index, native });
+    if (result.kind === 'free') { this.set({ playground: applyPlayground(this.snap.playground, result.effects), freeMode: true, notice: null, switchPrompt: null }); return; }
+    if (result.kind === 'switch') { this.set({ switchPrompt: result.candidates, notice: null }); return; }
+    const nodeId = 'target' in action ? action.target : '';
+    const cur = this.snap.state!;
+    const verdict = result.kind === 'advance' ? { kind: 'advance' as const } : result.verdict;
     const scene = p.scenes[this.shownSceneId() ?? cur.sceneId];
     const node = scene ? findNode(scene, nodeId)?.node : null;
     const label = node ? nodeLabel(node) : m.player.element;
     switch (verdict.kind) {
       case 'advance': {
-        this.set({ notice: null });
+        const stayPaused = this.snap.paused;
+        this.stop(); // Cancel any frozen demonstration, then apply the matched scripted step exactly once.
+        this.set({ notice: null, freeMode: true });
         const gen = this.gen;
-        this.cursorPos = point;
+        this.cursorPos = point ?? ('target' in action ? this.measureCenter(action.target) : null) ?? this.cursorPos;
         this.set({ busy: true, cursorVisible: false });
-        const ok = await this.runStep(sc, gen, { moveCursor: false, clickPoint: point });
-        // 用户动作之后紧跟的系统事件自动执行（模拟请求返回）。
+        // The viewer already performed the gesture. Commit the script without replaying their typing/drag.
+        const ok = this.commit(sc, true);
+        // Interrupted playback stays at this step, including before a system response.
+        // A stopped/manual walkthrough retains its existing automatic response behavior.
         let cont = ok;
-        while (cont && gen === this.gen) {
+        while (cont && !stayPaused && gen === this.gen) {
           const nx = this.nextStep();
           if (!nx || nx.kind !== 'system') break;
           // 朗读开着时，先读完用户这一步再接系统事件（不截断）
@@ -887,7 +939,18 @@ export class DemoController {
         }
         if (pt) this.set({ ripple: { x: pt.x, y: pt.y, key: ++this.rippleKey } });
         if (!(await this.wait(TIMING.ripple, gen))) return false;
-        if (a.type === 'type') {
+        if (a.type === 'drag') {
+          const end = typeof a.to === 'string' ? this.measureCenter(a.to) : a.to;
+          const from = pt ?? this.cursorPos;
+          if (!(await this.wait(800, gen, false, progress => {
+            this.set({ gesture: presentAction(a, progress) }, false);
+            if (end) { this.cursorPos = gesturePoint(from, end, progress); if (this.cursorEl) this.cursorEl.style.transform = `translate(${this.cursorPos.x}px, ${this.cursorPos.y}px)`; }
+          }))) return false;
+        } else if (a.type === 'hover' || a.type === 'scroll' || a.type === 'plugin') {
+          const duration = a.type === 'hover' ? a.ms : a.type === 'plugin' ? pluginActionSpec(this.snap.project!, a.name)?.durationMs ?? 800 : 800;
+          const scroll = a.type === 'scroll' ? this.scrollDemo(a.target, a.to) : null;
+          if (!(await this.wait(duration, gen, false, progress => { this.set({ gesture: presentAction(a, progress) }, false); scroll?.(progress); }))) return false;
+        } else if (a.type === 'type') {
           for (let i = 1; i <= a.value.length; i++) {
             this.set({ preview: { nodeId: a.target, text: a.value.slice(0, i) } });
             if (!(await this.wait(TIMING.typeChar, gen))) return false;
@@ -905,7 +968,7 @@ export class DemoController {
     if (gen !== this.gen) return false;
     if (!this.commit(sc, true)) return false;
     if (opts.moveCursor && !reduced && !(await this.wait(TIMING.afterStep, gen))) return false;
-    if (gen === this.gen) this.set({ systemEvent: null, activeStep: null, ripple: null });
+    if (gen === this.gen) this.set({ systemEvent: null, activeStep: null, ripple: null, gesture: null });
     return true;
   }
 
@@ -919,8 +982,9 @@ export class DemoController {
       const next = applyStep(p, getScenario(p, sc.id), st);
       const n = this.snap.notice;
       // 推进后，锚定在元素上的就地提示（禁用原因、未覆盖、越序）已过时，关闭它。
-      this.committedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      this.set({ leadFrame: null, state: next, streamAt: stream && streamsOf(sc.steps[st.position]).length ? { position: next.position, speed: this.speed } : null, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
+      this.tickClock();
+      this.committedAt = this.clock.rawTime;
+      this.set({ playground: null, switchPrompt: null, leadFrame: null, state: next, streamAt: stream && streamsOf(sc.steps[st.position]).length ? { position: next.position, speed: this.speed } : null, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
       // 朗读（D74）：播放提交的一步（自动播放、下一步、点原型）才读；跳转、上一步、热更新不读
       if (stream) this.narrate(sc, next.position);
       return true;
@@ -960,6 +1024,15 @@ export class DemoController {
     return this.wait(this.reducedMotion ? 0 : TIMING.layerSwitch, gen, true);
   }
 
+  private scrollDemo(target: string, to: string | {x:number;y:number}): ((progress:number)=>void) | null {
+    const root = this.stageEl;
+    const scroller = root ? scrollTarget(root, target) : null;
+    if (!scroller) return null;
+    const start = { x: scroller.scrollLeft, y: scroller.scrollTop };
+    const end = scrollPoint(scroller, to) ?? start;
+    return progress => { const p = gesturePoint(start, end, progress); scroller.scrollLeft = p.x; scroller.scrollTop = p.y; };
+  }
+
   private measureCenter(nodeId: string): { x: number; y: number } | null {
     const root = this.stageEl;
     if (!root) return null;
@@ -971,32 +1044,36 @@ export class DemoController {
     return { x: (r.left - rr.left + r.width / 2) / s, y: (r.top - rr.top + r.height / 2) / s };
   }
 
-  private async moveCursor(to: { x: number; y: number }, gen: number): Promise<boolean> {
-    const el = this.cursorEl;
-    const from = this.cursorPos;
-    this.cursorPos = to;
-    if (!el) return true;
-    const controls = animate(el, { transform: [`translate(${from.x}px, ${from.y}px)`, `translate(${to.x}px, ${to.y}px)`] }, { duration: TIMING.cursorMove / this.speed, ease: [0.4, 0, 0.2, 1] });
-    this.anim = controls;
-    if (this.snap.paused) controls.pause();
-    await Promise.race([controls.finished ?? controls, new Promise<void>((r) => this.cancelWaiters.push(r))]);
-    if (this.anim === controls) this.anim = null;
-    return gen === this.gen;
+  private async moveCursor(to: { x: number; y: number }, gen: number, duration = TIMING.cursorMove * 1000): Promise<boolean> {
+    const from = { ...this.cursorPos };
+    return this.wait(duration, gen, false, t => {
+      this.cursorPos = gesturePoint(from, to, t);
+      if (this.cursorEl) this.cursorEl.style.transform = `translate(${this.cursorPos.x}px, ${this.cursorPos.y}px)`;
+    });
   }
 
-  /** 逻辑时钟等待：暂停期间不计时；被取消时返回 false。 */
-  /** 等待 ms 毫秒（按速度缩放；raw = 不缩放）；暂停时不计时，被取消时返回 false。 */
-  private async wait(ms: number, gen: number, raw = false): Promise<boolean> {
-    let remaining = raw ? ms : ms / (this.speed > 0 ? this.speed : 1);
-    let last = performance.now();
-    while (remaining > 0) {
-      await sleep(Math.min(remaining, 25));
-      if (gen !== this.gen) return false;
-      const now = performance.now();
-      if (!this.snap.paused) remaining -= now - last;
-      last = now;
-    }
-    return gen === this.gen;
+  /** Scheduler only: every consumer reads EngineClock; pause never advances any accumulator. */
+  private async wait(ms: number, gen: number, raw = false, frame?: (progress: number) => void): Promise<boolean> {
+    this.tickClock();
+    const start = raw ? this.clock.rawTime : this.clock.time;
+    const sample = () => {
+      if (gen === this.gen) frame?.(gestureProgress(raw ? this.clock.rawTime : this.clock.time, start, ms));
+    };
+    const unsubscribe = frame ? this.clock.subscribe(sample) : () => {};
+    sample();
+    try {
+      while (gen === this.gen) {
+        this.tickClock();
+        const now = raw ? this.clock.rawTime : this.clock.time;
+        if (gestureProgress(now, start, ms) >= 1) return true;
+        await new Promise<void>(resolve => {
+          const done = () => { clearTimeout(timer); this.cancelWaiters = this.cancelWaiters.filter(f => f !== done); resolve(); };
+          const timer = setTimeout(done, 16);
+          this.cancelWaiters.push(done);
+        });
+      }
+      return false;
+    } finally { unsubscribe(); }
   }
 
   private info(text: Text) {

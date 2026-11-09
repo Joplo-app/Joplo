@@ -6,6 +6,21 @@ import ts from 'typescript';
 const root = resolve(import.meta.dirname, '../../..');
 const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef]/u;
 const whitelist: readonly (readonly [string, string, string])[] = [
+  ['packages/cli/src/template-messages.ts', "fallback: '可使用 --template <本地路径> 离线初始化。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "invalidSpec: '模板地址无效。请使用 github:owner/repo[/子目录][#ref] 或本地目录。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "invalidPath: '模板包含不安全的路径或链接，已拒绝写入。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "noDirectory: '本地模板目录不存在或不是目录。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "empty: '模板目录为空，或指定的 GitHub 子目录不存在。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "noPackage: '模板缺少有效的 package.json。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "noConfig: '模板缺少 joplo.config.ts 或 joplo.config.tsx。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "network: '模板下载失败，请检查网络后重试。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "missing: '找不到模板仓库或版本 tag/ref；私有仓库还需要有效的 GITHUB_TOKEN 或 gh 登录。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "unauthorized: 'GitHub 令牌无效或无权读取此仓库，请检查 GITHUB_TOKEN 或重新 gh auth login。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "archive: '模板压缩包损坏或无法解压。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "tooLarge: '模板超过大小或文件数量限制。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "placeholder: '模板源码中的项目名称占位符必须放在字符串引号内。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "collision: '模板文件路径重复或与目录冲突。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "changed: '目标目录在初始化期间发生变化；本次写入已撤回，请重新运行。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
   ['packages/cli/src/share-messages.ts', "export const PASSWORD_PROTECTED = '已加密 (Password protected)';", 'D85 password task explicitly requires the success label 已加密.'],
   ['packages/cli/src/share-messages.ts', "export const PASSWORD_UNSUPPORTED = 'Joplo Cloud 还不支持密码查看，请稍后再试';", 'D85 password task explicitly requires this compatibility message.'],
   ['packages/cli/src/cloud-embed.ts', "const LABEL = 'Joplo 演示';", 'Fixed label from the cloud embed contract, shared verbatim with the share Worker and console; it is embed content, not CLI interface text.'],

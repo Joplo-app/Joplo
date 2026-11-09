@@ -32,6 +32,7 @@ export function createBoardRu(locale: Locale = 'ru') {
       cloudSetupUsername: "Задать имя пользователя",
       cloudVisibility: "Видимость",
 
+      mediaUnavailable: "Музыка недоступна · Воспроизведение продолжается",
       localReviewMoveHint: "Нажмите для отзыва, перетащите для перемещения. Стрелки уточняют положение.",
       localReviewApprovedDraft: "Эта проверка подтверждена в другом окне. Неотправленный черновик сохранён, его можно скопировать.",
       localReviewTitle: "Отзывы и проверка",

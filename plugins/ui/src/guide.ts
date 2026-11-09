@@ -1,0 +1,161 @@
+export const skill = `# Standard UI: ui
+
+Use this plugin for application interfaces, forms, overlays, navigation, data displays, device frames and HTML fallback content. Install @joplo-app/plugin-ui, import ui from it and list ui in config.plugins. The engine enables nothing implicitly.
+
+## Start and verify
+- Import author markers directly from @joplo-app/plugin-ui and write normal TSX. The compiler emits ui:Button and other namespaced types; write HTML tags directly, which compile to ui:div, ui:span, etc.
+- Read joplo skill ui/components for the enabled catalog; joplo components Menu DataTable gives props, behavior groups and runnable author snippets. If two plugins share a short name, request the full namespaced name.
+- Give interactive elements stable ids. Describe their behavior with flow steps, disabled plus disabledReason, or unmodeled. Run check, then render the affected steps; passing schema validation alone does not prove the intended screen is visible.
+
+## State and visibility
+- type / select / toggle steps write inputs[id]. Use value, checked or defaultValue for initial visuals. Paused audiences can type, change Switch/Checkbox/Radio/Select/SegmentedControl, switch Tabs and expand Accordion locally; value/checked bindings synchronize local views. Playing, jumping or Reset discards these edits. A matching next scripted action wins; an action in another reachable scenario asks to switch.
+- Select accepts the displayed label or stored value; MultiSelect toggles membership. For a bound option list, ensure the list exists before the select step.
+- Modal and Drawer use opened, only; the old open alias is not supported. Menu forwards opened to its own dropdown; an explicitly set child value wins, and a nested menu owns its own state.
+- AppShell regions and Phone child width use the same declared layout data as playback. A narrow screen can hide a target even when when is true; check the actual viewport before changing the step.
+- Image accepts embedded project assets via asset('./photo.jpg'). URLs and ordinary paths intentionally draw a placeholder; fix IMAGE_PLACEHOLDER by embedding the file. fit accepts cover or contain.
+- Display properties are declared per component for translation. Identifiers, structural values and unrelated props are not automatically display text; for custom content, declare text or exact textPaths traits in its own plugin. For nested data, target titles/labels precisely; do not translate an entire configuration object containing colors or identifiers.
+
+## Migration and recovery
+- Plugin unavailable placeholders indicate a missing or mismatched runtime: reinstall matching package versions and rerun build. The ui catalog, runtime and author markers are checked together by the release smoke test. Runtime imports must be production dependencies or explicit shared host services: a working workspace or prebuilt web bundle does not prove the package runtime can load after a clean install.
+
+Related topics: components, authoring, focus, check, plugins
+`;
+
+export const patterns = `# UI recipes and pitfalls
+
+These examples use this explicitly enabled plugin. Engine flow/state/review rules remain in the engine skill.
+
+### authoring: worked example
+\`\`\`tsx
+import { $, done, flow, option, page, set } from '@joplo-app/kit';
+import { Alert, Button, Loader, Stack, TextInput } from '@joplo-app/plugin-ui';
+const send = (name: string, cases: string[]) => flow(name, { start: '/reset', cases })
+  .type('email', 'ana@exmple.com').click('send', 'Send the reset link', set($.ui.sending, true));
+export default option({
+  name: 'A · Email link', idea: 'Send a reset link by email',
+  state: { ui: { sending: false, sent: false, emailError: '' } },
+  routes: { '/reset': page({ title: 'Reset password' }, <Stack>
+    <TextInput id="email" label="Email" error={$.ui.emailError} />
+    <Button id="send" disabled={$.ui.sending} disabledReason="Sending…">Send link</Button>
+    <Loader when={$.ui.sending} />
+    <Alert id="sent" color="green" when={$.ui.sent}>Check your inbox</Alert>
+  </Stack>) },
+  scenarios: {
+    unknown_email: send('Typo, then retry', ['unknown_email'])
+      .system('No account for this email', set($.ui.sending, false), set($.ui.emailError, 'No account with this email'))
+      .type('email', 'ana@example.com', set($.ui.emailError, ''))
+      .click('send', 'Retry', set($.ui.sending, true))
+      .system('Server accepts', set($.ui.sending, false), set($.ui.sent, true), done('Link sent after retry')),
+  },
+});
+\`\`\`
+
+From authoring:
+Native UI controls need no free declaration: Tabs, Accordion, text inputs, Switch, Checkbox, Radio, Select and SegmentedControl change local values. A bound checked/value prop updates locally too, keeping two views of the same state synchronized. Keep the scripted result in step effects; do not store audience input or credentials in the source.
+
+From authoring:
+- layouts/app.tsx: export default layout(<AppShell header={{ height: 56 }} navbar={{ width: 240, breakpoint: 'sm' }}><AppShell.Navbar>…</AppShell.Navbar><AppShell.Main><Outlet/></AppShell.Main><Slot name="overlay"/></AppShell>).
+
+From authoring:
+- asset('./photo.jpg'): reads an image next to the calling file and returns a data URI for <Image src> or a CSS backgroundImage (see components).
+
+From authoring:
+- on: { '/members': { actions: <Button id="invite">Invite</Button> } }: add elements to a slot on an existing route.
+
+From authoring:
+- routes: { '/members/new': page({ title: 'New member' }, <Stack>…</Stack>) }: add a route for this option.
+
+From authoring:
+- Props can bind: <TextInput id="email" error={$.ui.emailError}/>, <Text>{$.data.name}</Text>.
+
+From authoring:
+- Overlays: <Modal id="dlg" opened={$.ui.open} title="…">; Drawer works the same way. Only opened controls visibility.
+
+From authoring:
+- Use Stack / Group / SimpleGrid / Grid props: <Group justify="space-between">, <SimpleGrid cols={{ base: 1, md: 3 }}>.
+
+From authoring:
+- Use responsive objects { base, xs, sm, md, lg, xl }, or visibleFrom="sm" / hiddenFrom="sm". AppShell collapses navigation below navbar.breakpoint.
+
+From authoring:
+- Set input labels directly: <TextInput id="email" label="Email"/>. Auto captions use them.
+
+From demo:
+- Drag begins on a declared drag target before stage pan/plugin orbit; Enter or Space on that target provides the scripted drag alternative. Pointerdown pauses immediately and lets the same drag finish. Hover never pauses playback, but matches normally while paused; touch activates hover by tapping and follows the pause-and-apply rule. Editable input keeps its first key, Space and arrow keys. The first wheel event pauses and scrolls; keep its inertia in the scroll area before stage zoom.
+
+From demo:
+- Each page has one device, desktop by default. page({ viewport: 'mobile' }, tree) uses a Phone frame at a fixed width of 390.
+
+From demo:
+- To show a phone turned sideways (a landscape app, a video player), write <Phone landscape> in a layer: the screen is 772 × 358 with the notch on the left.
+
+From demo:
+- Each layer tab shows an icon so viewers can tell layers apart when many tabs are squeezed: layer('Terminal', <Cli/>, { icon: 'terminal' }). Presets: window, browser, mobile, desktop, terminal, chat, agent, server, data, email, doc, flow. Default: mobile for mobile layers, otherwise window.
+
+From demo:
+  <Grid h="100%"><Grid.Col span={6}><Stack h="100%"><ScrollArea style={{ flex: 1, minHeight: 0 }}>Messages</ScrollArea>
+
+From demo:
+  <Group><PromptInput id="prompt"/><Button id="send">Send</Button></Group></Stack></Grid.Col></Grid>
+
+From demo:
+- The same applies to placeholders and artifacts: use h="100%" on Placeholder; Artifact fills its container by default.
+
+From demo:
+- What gets squeezed: in an h="100%" column, a Table, DataTable, or ScrollArea shrinks to the space left and scrolls inside. Rows stay in the DOM and check passes, but viewers see fewer rows.
+
+From demo:
+- .card('Title', { sub?, points?, role? }, ...effects): one large sentence filling the stage, as a step. Use for openings, endings, time jumps, and role switches.
+
+From demo:
+- Agent UI: <Thinking title={$.ui.thought} active={$.ui.thinking} duration="6 seconds">Process</Thinking> shows thinking;
+
+From demo:
+  <Artifact title="itinerary.md" kind="doc" status={$.ui.planStatus}>Content</Artifact> is a side artifact; reference it in the conversation with <Artifact.Ref id="…"/>.
+
+From demo:
+- Email: a simple external email card. The card is not interactive; buttons in its body use ordinary steps.
+
+From demo:
+  Example: <Email from="Camping assistant" to="Ajie" subject="Itinerary updated" time="Friday 20:05">Body</Email>.
+
+From demo:
+- DataCard / StateFlow: place in a separate layer and switch to it with shot. Only these two components show this step's changes and before/after values. StateFlow marks earlier states completed according to states order.
+
+From demo:
+  Example: layer('Itinerary data', <Stack><StateFlow value={$.data.trip.status} states={['draft','shared']} labels={{ draft: 'Draft', shared: 'Shared' }}/><DataCard title="Itinerary" value={$.data.trip} fields={[{ key: 'status', label: 'Status' }]}/></Stack>).
+
+From demo:
+- Filled buttons default to --jp-ink, so changing --jp-ink also recolors body text. There is no primary-color variable yet: set the brand color on the button itself, <Button color="#e8590c">, instead of overriding inline styles.
+
+From focus:
+  Skipped on purpose: modals and drawers (their backdrop already says it), DataCard / StateFlow (they show their own change), more than 3 changes at once, a new page or layer, the same element changing again or another line appended to the same log, and any step where you wrote a focus yourself.
+
+From focus:
+- Secrets and private data: <Code redact>sk-live-…</Code>, or redact={not($.ui.revealed)} to unblur after a step. Blurred, layout unchanged, on every step.
+
+From check:
+- Group props: label, icon (client, service, model, database, queue, storage, external, tool, user, cloud, gateway, lock, network, device, box, brain), tone (gray, blue, green, orange, red, purple, teal), group (parent id). Groups nest.
+
+From check:
+- IMAGE_PLACEHOLDER: <Image src> is a URL or plain path, which is never loaded. Put the file in the project and write src={asset('./photo.jpg')}.
+
+From check:
+- INVALID_IMAGE_FIT: <Image fit> accepts cover or contain.
+
+From check:
+An element that looks usable (Button, TextInput, Select, NavLink, a, …; see components) has an id but no step in any scenario of this option. Viewers will try it; decide what happens:
+
+From focus:
+  Skipped on purpose: modals and drawers (their backdrop already says it), DataCard / StateFlow (they show their own change), more than 3 changes at once, a new page or layer, the same element changing again or another line appended to the same log, and any step where you wrote a focus yourself.
+
+From focus:
+- Secrets and private data: <Code redact>sk-live-…</Code>, or redact={not($.ui.revealed)} to unblur after a step. Blurred, layout unchanged, on every step.
+
+Common pitfall: Only catalog components and the listed HTML tags exist; <br/> is UNKNOWN_COMPONENT, so write 'Line 1\\nLine 2' inside <Text>
+
+Common pitfall: UI and HTML belong to this plugin: import author markers directly from @joplo-app/plugin-ui, explicitly enable ui in config.plugins, and read ui/components. The engine has no bare-name or old-IR compatibility layer.`;
+
+export function componentGuide(docs: Record<string,string>, examples: Record<string,string>): string {
+ return ['# UI component catalog', 'Import these markers from @joplo-app/plugin-ui; enable ui in config.plugins.', ...Object.entries(docs).map(([name,doc]) => ['## '+name, doc, ...(examples[name] ? ['', '```tsx', examples[name]!, '```'] : [])].join('\n'))].join('\n\n');
+}

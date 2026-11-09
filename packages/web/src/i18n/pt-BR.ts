@@ -1,4 +1,4 @@
-import { autoCaptionMessages } from '@joplo-app/core';
+import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createPtBR(locale: Locale = 'pt-BR') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `Exploração livre · Reproduza para continuar`,
+      freeChangesDiscarded: `As alterações não serão salvas`,
+      freeReset: `Redefinir`,
+      freeSwitchPrompt: (name: string) => `Mudar para “${name}”?`,
+      freeSwitchDescription: `Começa logo antes desta ação. As alterações da exploração serão descartadas.`,
+      freeSwitchConfirm: `Mudar de cenário`,
+      freeSwitchCancel: `Ficar aqui`,
       ...autoCaptionMessages('pt-BR'),
       mockSuccess: "Sucesso simulado",
       mockFailure: "Falha simulada",
@@ -206,6 +213,8 @@ export function createPtBR(locale: Locale = 'pt-BR') {
       thisDiagramHasNoNodesYet: "Este diagrama ainda não tem nós",
       placeholder: "Espaço reservado",
       customComponent: "Componente personalizado: ",
+      pluginLoading: "Carregando plugin ",
+      pluginUnavailable: "Plugin indisponível: ",
       unnamed: "Sem nome",
       placeholderSuffix: "(Espaço reservado)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "Componente fora do catálogo. A demo segue seus IDs de elementos e estados declarados.",

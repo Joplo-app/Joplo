@@ -32,6 +32,7 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       cloudSetupUsername: "设置用户名",
       cloudVisibility: "可见性",
 
+      mediaUnavailable: "配乐不可用 · 演示继续播放",
       localReviewMoveHint: "点击反馈，拖动调整位置；方向键可微调。",
       localReviewApprovedDraft: "本轮已在其他页面确认。这份未提交的草稿仍保留在这里，可以复制。",
       localReviewTitle: "反馈与评审",

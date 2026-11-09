@@ -32,6 +32,7 @@ export function createBoardDe(locale: Locale = 'de') {
       cloudSetupUsername: "Benutzernamen einrichten",
       cloudVisibility: "Sichtbarkeit",
 
+      mediaUnavailable: "Musik nicht verfügbar · Wiedergabe läuft weiter",
       localReviewMoveHint: "Klicken für Feedback, ziehen zum Verschieben. Mit Pfeiltasten feinjustieren.",
       localReviewApprovedDraft: "Diese Prüfung wurde an anderer Stelle bestätigt. Ihr ungesendeter Entwurf bleibt zum Kopieren erhalten.",
       localReviewTitle: "Feedback und Prüfung",

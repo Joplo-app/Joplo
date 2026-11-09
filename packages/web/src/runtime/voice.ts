@@ -7,7 +7,7 @@
  * - 倍速：音频 playbackRate、朗读 rate 都等于播放速度。
  * - 每段都有兜底计时：读完事件没来（浏览器的已知问题）时按估算时长结束，播放不会卡住。
  */
-import { clipKey, readingMs, voiceFingerprint } from '@joplo-app/core';
+import { clipKey, readingMs, voiceFingerprint } from '@joplo-app/core/runtime';
 
 export type NarrationSource = 'clip' | 'browser';
 

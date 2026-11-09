@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../../plugins/ui/src";
 @import "./fonts/fonts.css";
 @import "./fonts/MarkerGothic.css";
 
@@ -380,13 +381,13 @@
 }
 
 /* 图表里的压暗（D69 补充）：不相关的节点、连线压暗但仍可读（比一般界面元素淡得少） */
-.jstage [data-jfocus-dim] [data-jdiagram-canvas] [data-jfocus-path] > :not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]),
-.jstage [data-jfocus-dim] [data-jdiagram-canvas] > :not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]) {
+.jstage [data-jfocus-dim] [data-jframe-canvas] [data-jfocus-path] > :not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]),
+.jstage [data-jfocus-dim] [data-jframe-canvas] > :not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]) {
   filter: opacity(0.42) saturate(0.6);
 }
 /* 图表里被压暗的 redact 元素仍要模糊（集成 0.2.8：上一条会覆盖 D70 的 blur） */
-.jstage [data-jfocus-dim] [data-jdiagram-canvas] [data-jfocus-path] > [data-jredact]:not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]),
-.jstage [data-jfocus-dim] [data-jdiagram-canvas] > [data-jredact]:not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]) {
+.jstage [data-jfocus-dim] [data-jframe-canvas] [data-jfocus-path] > [data-jredact]:not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]),
+.jstage [data-jfocus-dim] [data-jframe-canvas] > [data-jredact]:not([data-jfocus-path]):not([data-jfocus]):not([data-jfocus-keep]) {
   filter: opacity(0.42) saturate(0.6) blur(5px);
 }
 
@@ -502,10 +503,9 @@
   box-shadow: 0 0 0 6px color-mix(in srgb, #e03131 18%, transparent);
 }
 
-/* 画布（讲解片）：静态画面（截图、缩略图、跳到某一步）直接显示终态，作者写的 CSS 动画与过渡不播放 */
-.jstage[data-jstill] [data-jcanvas],
-.jstage[data-jstill] [data-jcanvas] * {
-  transition: none !important;
-  animation-delay: 0s !important;
-  animation-duration: 0s !important;
+/* Plugin-declared local hover; scripted hover uses the same appearance. */
+.jstage[data-jfree] [data-jhoverable]:hover:not([data-jdisabled]),
+.jstage [data-jhoverable][data-jhover]:not([data-jdisabled]) {
+  outline: 2px solid color-mix(in srgb, var(--jp-accent) 50%, transparent);
+  outline-offset: 2px;
 }

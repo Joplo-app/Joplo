@@ -1,3 +1,5 @@
+import { EngineClockContext } from './renderer/engine-motion';
+import { projectThemes } from '@joplo-app/core/runtime';
 import { m } from './i18n/board/messages';
 import { translate, type Text } from './i18n/messages';
 import { useBoardI18n } from './i18n/board/context';
@@ -10,16 +12,18 @@ import { useBoardI18n } from './i18n/board/context';
  *   设置 window.__JOPLO_READY__ = true，并暴露 window.__JOPLO_STATE__（当前 PlayState）。
  * - 镜头（D43）：用这一步的导演镜头（cameraAt），静态截图没有动画。
  * - w/h：截图尺寸。`[data-jshot]` 是 w×h 的画布，舞台（手机页面带外框）按比例放进去。
- * - frame=1：导出图片 / 视频用，`[data-jexport]` 包住画面；手机时套上与看板相同的手机外框（PhoneFrame）。
+ * - frame=1：导出图片 / 视频用，`[data-jexport]` 包住画面；手机时套上与看板相同的手机外框（DeviceFrame）。
  * - record=1：导出视频用，带鼠标、点击波纹与字幕；window.__JOPLO_RECORD__.play() 开始自动播放，
  *   .progress = { step, done, error } 供服务端读取进度。
  */
 import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, stateAt, type AppearanceFont, type AppearanceStroke, type PlayState, type Project } from '@joplo-app/core';
+import { SUBTITLE_HEIGHT, THEME_NAME, displaySceneId, stateAt, type AppearanceFont, type AppearanceStroke, type PlayState, type Project } from '@joplo-app/core/runtime';
 import { fetchIR } from './runtime/dev-client';
 import { DemoController } from './runtime/demo';
 import { Stage, VIEWPORTS, type Viewport } from './renderer/Stage';
-import { PhoneFrame, phoneFrameSize } from './renderer/components';
+import { viewportDecoration } from './renderer/plugins';
+const phoneFrameSize = (width:number,height:number) => viewportDecoration('mobile')?.size(width,height) ?? {width,height};
+function DeviceFrame(props: {width:number;height:number;seed?:string;children?:import('react').ReactNode}) { const Frame=viewportDecoration('mobile')?.react; return Frame ? <Frame {...props}/> : <>{props.children}</>; }
 import { cameraFor } from './player/cameraFor';
 import { RoughRegistry, ThemeContext, type StageTheme } from './renderer/rough';
 import { Overlay } from './player/Overlay';
@@ -135,10 +139,10 @@ export function RenderApp() {
   const vp = VIEWPORTS[viewport];
   const framed = (stageNode: ReactNode) =>
     viewport === 'mobile' ? (
-      <ThemeContext.Provider value={{ theme, stroke: resolveLook({ theme, font, stroke }, data.project.themes ?? {}, i18n).stroke, font, registry }}>
-        <PhoneFrame width={vp.width} height={vp.height} seed="stage-phone">
+      <ThemeContext.Provider value={{ theme, stroke: resolveLook({ theme, font, stroke }, projectThemes(data.project), i18n).stroke, font, registry }}>
+        <DeviceFrame width={vp.width} height={vp.height} seed="stage-phone">
           {stageNode}
-        </PhoneFrame>
+        </DeviceFrame>
       </ThemeContext.Provider>
     ) : (
       stageNode
@@ -171,7 +175,7 @@ export function RenderApp() {
   const fhStage = fh - SUBTITLE_HEIGHT;
   const wrap = (stageNode: ReactNode, sub: SubtitleContent | null, c: CurtainSpec | null = null) => (
     <>
-      <ThemeStyles themes={data.project.themes} />
+      <ThemeStyles themes={projectThemes(data.project)} />
       {wrapInner(stageNode, sub, c)}
     </>
   );
@@ -260,10 +264,14 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
   const plan = cameraFor(project, scenarioId, cameraPosition(ctl.scenario(), snap.state?.position ?? 0, snap.activeStep), snap.leadLayer);
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, true), [ctl, plan.sceneId]);
   if (!snap.state) return null;
-  return wrap(
+  return <EngineClockContext.Provider value={ctl.clock}>{wrap(
     <Stage
       project={project}
       state={snap.state}
+      clock={ctl.clock}
+      gesture={snap.gesture}
+      activeStep={snap.activeStep}
+      stream={snap.streamAt ? { ...snap.streamAt, paused: snap.paused } : null}
       theme={theme}
       font={font}
       stroke={stroke}
@@ -284,5 +292,5 @@ function RecordStage({ project, scenarioId, theme, font, stroke, registry, setSt
     />,
     subtitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n, project),
     { scenarioId, position: snap.state.position, cover: coverShown(sc, snap.state.position, snap.playing, snap.activeStep) ? coverFor(project, scenarioId, i18n) : null, animate: true },
-  );
+  )}</EngineClockContext.Provider>;
 }

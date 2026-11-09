@@ -1,3 +1,4 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { createZhCN } from '../src/i18n/zh-CN';
 import { createBoardZhCN } from '../src/i18n/board/zh-CN';
 const zh = { ...createZhCN(), ...createBoardZhCN() };
@@ -8,8 +9,8 @@ const zh = { ...createZhCN(), ...createBoardZhCN() };
  * - 发布站左栏：选定方案的场景列表（当前场景、步数）。
  */
 import { describe, expect, it } from 'vitest';
-import * as ui from '@joplo-app/kit/ui';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
+import * as ui from '@joplo-app/plugin-ui';
+import { feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { featureCard, moveSelection, projectBadge, projectMeta, shortPath } from '../src/board/home-model';

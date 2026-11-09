@@ -4,7 +4,7 @@ import { useI18n } from '../i18n/context';
  * 电脑页面按宽度铺满、从顶部裁出上半部分；手机页面按高度放进去。不可交互（inert）。
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { VIEWPORT_SIZE, stateAt, type Project } from '@joplo-app/core';
+import { VIEWPORT_SIZE, stateAt, type Project } from '@joplo-app/core/runtime';
 import { Stage } from '../renderer/Stage';
 import type { Look } from '../renderer/appearance';
 

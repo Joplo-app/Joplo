@@ -22,16 +22,16 @@ function frontmatter(text: string): Record<string, string> {
 
 test('skills/ 与生成结果逐字一致，且没有多余的技能目录（不一致时运行 pnpm skills:build）', async () => {
   const files = skillFiles(await readCliVersion(new URL('../../packages/cli/package.json', import.meta.url)));
-  expect(files.map(f => f.name)).toEqual(['joplo', 'joplo-feedback']);
+  expect([...new Set(files.map(f => f.name))]).toEqual(['joplo', 'joplo-feedback']);
   for (const file of files) {
     const current = await readFile(join(root, 'skills', file.path)).catch(() => null);
     expect(current?.toString('utf8'), `skills/${file.path} is out of date; run pnpm skills:build`).toBe(file.content.toString('utf8'));
   }
   const dirs = (await readdir(join(root, 'skills'), { withFileTypes: true })).filter(d => d.isDirectory()).map(d => d.name).sort();
-  expect(dirs).toEqual(files.map(f => f.name).sort());
+  expect(dirs).toEqual([...new Set(files.map(f => f.name))].sort());
 });
 
-test.each(skillFiles('9.9.9').map(f => [f.name, f] as const))('%s 的 frontmatter 合法：name 小写加连字符且与目录同名，description 非空、单行、不超过 1024 字符', (name, file) => {
+test.each(skillFiles('9.9.9').filter(f=>f.path.endsWith('/SKILL.md')).map(f => [f.name, f] as const))('%s 的 frontmatter 合法：name 小写加连字符且与目录同名，description 非空、单行、不超过 1024 字符', (name, file) => {
   const text = file.content.toString('utf8');
   const fm = frontmatter(text);
   expect(Object.keys(fm).sort()).toEqual(['description', 'name']);

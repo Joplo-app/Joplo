@@ -1,4 +1,4 @@
-import { autoCaptionMessages } from '@joplo-app/core';
+import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createFr(locale: Locale = 'fr') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `Exploration libre · Lecture pour continuer`,
+      freeChangesDiscarded: `Les modifications ne seront pas conservées`,
+      freeReset: `Réinitialiser`,
+      freeSwitchPrompt: (name: string) => `Passer à « ${name} » ?`,
+      freeSwitchDescription: `Reprend juste avant cette action. Les modifications de votre exploration seront abandonnées.`,
+      freeSwitchConfirm: `Changer de scénario`,
+      freeSwitchCancel: `Rester ici`,
       ...autoCaptionMessages('fr'),
       mockSuccess: "Succès simulé",
       mockFailure: "Échec simulé",
@@ -206,6 +213,8 @@ export function createFr(locale: Locale = 'fr') {
       thisDiagramHasNoNodesYet: "Ce diagramme n’a pas encore de nœuds",
       placeholder: "Espace réservé",
       customComponent: "Composant personnalisé : ",
+      pluginLoading: "Chargement du plugin ",
+      pluginUnavailable: "Plugin indisponible : ",
       unnamed: "Sans nom",
       placeholderSuffix: "(Espace réservé)",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "Composant hors catalogue. La démo suit ses identifiants d’éléments et états déclarés.",

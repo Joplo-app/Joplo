@@ -7,7 +7,7 @@
  * - `scenario` 写错（不存在、为空）时从默认场景开始，访客看不到报错；未知参数忽略；
  * - 只有 `review` 恰好是 `1` 才是评审模式（review-bridge.ts）。
  */
-import { embedScenarioIds, embedStartScenario, type Project } from '@joplo-app/core';
+import { embedScenarioIds, embedStartScenario, type Project } from '@joplo-app/core/runtime';
 import { siteHash } from '../runtime/route';
 import { isFullscreenKey } from '../player/fullscreen';
 
@@ -74,7 +74,7 @@ export type EmbedKey = 'toggle' | 'prev' | 'next' | 'fullscreen' | null;
  * 输入框、原型画面里、按着修饰键时不处理；焦点在按钮或链接上时空格交给它自己（原生点击）。
  */
 export function embedKey(e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }, target: { closest?: (s: string) => unknown; tagName?: string } | null, covered: boolean): EmbedKey {
-  if (target?.closest?.('input,textarea,select,[contenteditable],[data-joplo-stage],[role="menu"]')) return null;
+  if (target?.closest?.('input,textarea,select,[contenteditable],[data-joplo-stage],[data-testid="playground-notice"],[role="dialog"],[role="menu"]')) return null;
   if (isFullscreenKey(e, target)) return 'fullscreen';
   if (e.metaKey || e.ctrlKey || e.altKey) return null;
   if (e.key === ' ') return target?.tagName === 'BUTTON' || target?.tagName === 'A' ? null : 'toggle';

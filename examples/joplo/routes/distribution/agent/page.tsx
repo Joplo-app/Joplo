@@ -1,5 +1,5 @@
 import { page, Slot } from '@joplo-app/kit';
-import { ActionIcon, Card, Group, PromptInput, Stack, Title } from '@joplo-app/kit/ui';
+import { ActionIcon, Card, Group, PromptInput, Stack, Title } from '@joplo-app/plugin-ui';
 
 /** Claude Code 会话：方案把消息和工具调用堆叠到 conversation 插槽。 */
 export default page(

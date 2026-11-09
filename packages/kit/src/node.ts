@@ -13,6 +13,8 @@ export type CondExpr = { readonly $cond: unknown };
 export type JNode = {
   readonly [NODE]: true;
   type: string;
+  /** Author-only package provenance for missing-plugin diagnostics. */
+  packageName?: string;
   props: Record<string, unknown>;
   children: JChild[];
   /** jsxDEV 提供的源位置（绝对路径:行:列），编译器会改成项目相对路径。 */
@@ -21,14 +23,15 @@ export type JNode = {
 export type JChild = JNode | string | number | boolean | null | undefined | Bind | JChild[];
 
 /** 目录组件的标记函数。 */
-export type ComponentMarker = ((props: Record<string, unknown>) => never) & { readonly [COMPONENT]: string };
+export type ComponentMarker = ((props: Record<string, unknown>) => never) & { readonly [COMPONENT]: string; readonly packageName?: string };
 
-export function component(name: string): ComponentMarker {
+export function component(name: string, packageName?: string): ComponentMarker {
   const fn = (() => {
     throw new Error(`${name} is a Joplo component marker and can only be used in JSX`);
   }) as unknown as ComponentMarker;
   Object.defineProperty(fn, COMPONENT, { value: name });
   Object.defineProperty(fn, 'displayName', { value: name });
+  if (packageName) Object.defineProperty(fn, 'packageName', { value: packageName });
   return fn;
 }
 
@@ -37,6 +40,7 @@ export const isBind = (v: unknown): v is Bind => (typeof v === 'object' || typeo
 export const bindPath = (b: Bind): string => b[BIND];
 
 export const Fragment = component('#fragment');
+export const Custom = component('Custom');
 /** 布局或页面中的插槽：方案把元素堆叠到这里。 */
 export const Slot = component('#slot') as unknown as (props: { name: string }) => JNode;
 /** 布局中页面内容的位置。 */
@@ -53,7 +57,7 @@ export function createNode(type: unknown, rawProps: Record<string, unknown> | nu
   if (typeof type === 'string') return mk(type, props, children, src);
   if (typeof type === 'function') {
     const name = (type as Partial<ComponentMarker>)[COMPONENT];
-    if (name) return mk(name, props, children, src);
+    if (name) return { ...mk(name, props, children, src), ...((type as ComponentMarker).packageName ? { packageName: (type as ComponentMarker).packageName } : {}) };
     // 作者自定义的函数组件：收集时展开
     const out = (type as (p: Record<string, unknown>) => unknown)({ ...props, children });
     if (isNode(out)) {

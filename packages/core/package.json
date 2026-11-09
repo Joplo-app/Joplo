@@ -1,13 +1,14 @@
 {
   "name": "@joplo-app/core",
-  "version": "0.2.18",
+  "version": "0.3.0",
   "description": "Joplo 编译器、校验器与播放器（IR v2）",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./node": "./src/node.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./runtime": "./src/runtime.ts"
   },
   "files": [
     "dist"
@@ -18,7 +19,6 @@
   },
   "dependencies": {
     "@joplo-app/kit": "workspace:*",
-    "elkjs": "0.12.1",
     "zod": "4.6.7"
   },
   "engines": {
@@ -35,7 +35,11 @@
         "types": "./dist/node.d.ts",
         "default": "./dist/node.js"
       },
-      "./package.json": "./package.json"
+      "./package.json": "./package.json",
+      "./runtime": {
+        "types": "./dist/runtime.d.ts",
+        "default": "./dist/runtime.js"
+      }
     }
   },
   "repository": {

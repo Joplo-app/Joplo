@@ -3,7 +3,7 @@ import { en, type Dictionary } from '../i18n/en';
  * 覆盖状态的标记（D55 不变量 7：颜色不单独表意）：每种状态 = 图标 + 中文名；左栏只放图标时，名字写在悬停提示和 aria-label 里。
  * 已表达 ✓ circle-check / 缺失 ✕ circle-x / 待决定 circle-dashed / 不适用 circle-minus。
  */
-import type { Coverage } from '@joplo-app/core';
+import type { Coverage } from '@joplo-app/core/runtime';
 
 export type CoverageStatus = Coverage['status'] | 'none';
 export type MarkTone = 'ok' | 'danger' | 'pending' | 'na';

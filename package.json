@@ -15,7 +15,7 @@
     "web:serve": "tsx packages/server/scripts/serve.ts",
     "docs:screenshots": "tsx packages/server/scripts/render-docs.ts",
     "skills:build": "tsx scripts/build-skills.ts",
-    "build:packages": "pnpm -r --filter \"./packages/*\" run build",
+    "build:packages": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" run build",
     "release:version": "node scripts/release.mjs version",
     "release:pack": "node scripts/release.mjs pack",
     "release:smoke": "node scripts/release.mjs smoke",
@@ -23,11 +23,15 @@
     "release:verify": "node scripts/release.mjs verify"
   },
   "devDependencies": {
+    "@joplo-app/core": "workspace:*",
+    "@joplo-app/kit": "workspace:*",
+    "@joplo-app/plugin-alda": "workspace:*",
+    "@joplo-app/plugin-content": "workspace:*",
+    "@joplo-app/plugin-diagram": "workspace:*",
+    "@joplo-app/plugin-ui": "workspace:*",
     "@types/node": "^24.0.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vitest": "5.1.0",
-    "@joplo-app/kit": "workspace:*",
-    "@joplo-app/core": "workspace:*"
+    "vitest": "5.1.0"
   }
 }

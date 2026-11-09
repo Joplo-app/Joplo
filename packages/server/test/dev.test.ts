@@ -1,3 +1,4 @@
+import { fixtureConfigSource } from '../../../scripts/test/fixtures.ts';
 /**
  * startDev（createDev）：编译、热更新、错误定位、安全校验、选中写入、端口占用。都在临时副本上运行，随机端口。
  */
@@ -182,7 +183,7 @@ describe('startDev 边界输入', () => {
 
   it('只有配置、没有路径/功能的空项目也能编译', async () => {
     const d = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-min-'));
-    fs.writeFileSync(path.join(d, 'joplo.config.ts'), "import { config } from '@joplo-app/kit';\nexport default config({ name: '空项目' });\n");
+    fs.writeFileSync(path.join(d, 'joplo.config.ts'), fixtureConfigSource("import { config } from '@joplo-app/kit';\nexport default config({ name: '空项目' });\n"));
     const h = await createDev({ projectDir: d, port: 0, log: () => undefined });
     try {
       expect(h.payload()).toMatchObject({ ok: true, home: null });

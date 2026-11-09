@@ -1,0 +1,10 @@
+import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
+type Step = { ext?: Record<string, unknown> };
+import type { DiagramLayout, GraphStructure, SequenceStructure } from './model.ts';
+import type { Trace } from './schema.ts';
+import type { DiagramStates } from './state.ts';
+export type NodeData = { layout: DiagramLayout; structure: GraphStructure | SequenceStructure };
+export type SceneFrame = { traces: Trace[]; states: DiagramStates; now: string[]; machines: Record<string, { current: string | null; states: DiagramStates }> };
+export type Frame = { scenes: Record<string, SceneFrame> };
+export const nodeData = (node: SceneNode) => node.ext?.diagram as NodeData | undefined;
+export const frameData = (step: Pick<Step, 'ext'>) => step.ext?.diagram as Frame | undefined;

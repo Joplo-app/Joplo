@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { skillTopic } from '../src/guide.ts';
-import { COMPONENT_DOCS } from '../src/catalog.ts';
+import { COMPONENT_DOCS } from '../../../plugins/ui/src/catalog.ts';
 import { en } from '../../web/src/i18n/en.ts';
 import { boardEn } from '../../web/src/i18n/board/en.ts';
 

@@ -1,6 +1,6 @@
 # 推送 v* tag 时发布（见 docs/release.md「标准步骤」，D72 / D73）：
-# 检查 tag 与六个包的版本一致、tag 指向 main 上的提交 → 完整检查 → smoke
-# → 用 npm Trusted Publishing（OIDC，无 token、无 OTP）发布六个包并 verify
+# 检查 tag 与十个包的版本一致、tag 指向 main 上的提交 → 完整检查 → smoke
+# → 用 npm Trusted Publishing（OIDC，无 token、无 OTP）发布十个包并 verify
 # → 用上一个 tag 以来的 feat / fix / perf 提交生成 GitHub Release（scripts/commits.mjs notes）。
 # 中途失败：修好后在这次运行上 Re-run，或 gh workflow run release.yml --ref v<版本>；已发布的包会跳过。
 # 文件名 release.yml 写在 npm 的受信任发布方配置里，改名要同步改 npm 配置。
@@ -39,6 +39,9 @@ jobs:
             echo "::error::tag $TAG 与 packages/*/package.json 的版本 $v 不一致：先 pnpm release:version ${TAG#v} 并提交，再在那个提交上打 tag"
             exit 1
           fi
+          for file in templates/starter/package.json templates/starter/joplo.config.ts templates/starter/.claude/skills/.joplo-plugins.json; do
+            git cat-file -e "$GITHUB_SHA:$file" || { echo "::error::Release tag is missing $file"; exit 1; }
+          done
           git fetch -q origin main
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "::error::$TAG 指向的提交不在 main 上：先把版本提交推到 main，再打 tag"
@@ -59,6 +62,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm --filter @joplo-app/server exec playwright install --with-deps chromium
       - run: pnpm release:smoke
 
       - name: Publish to npm

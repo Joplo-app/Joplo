@@ -11,9 +11,11 @@
  */
 import { bindPath, callsite, isBind, type Bind, type CondExpr, type JNode } from './node.ts';
 
-export { $, and, empty, eq, Fragment, neq, not, notEmpty, oneOf, or, Outlet, Slot } from './node.ts';
+export { Custom, $, and, empty, eq, Fragment, neq, not, notEmpty, oneOf, or, Outlet, Slot } from './node.ts';
 export type { Bind, CondExpr, JNode } from './node.ts';
 export { asset } from './asset.ts';
+import type { PluginDef } from './plugin.ts';
+export type { PluginDef } from './plugin.ts';
 
 type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
 export type StateInit = { ui?: Record<string, Json>; data?: Record<string, Json>; inputs?: Record<string, Json> };
@@ -41,7 +43,8 @@ export type VoiceConfig = {
  * locales（D84）：内容语言，第一个是源文件的语言（默认语言），其余的译文在 locales/<语言>.json（原文 → 译文）。
  * 可选：en、zh-CN、zh-TW、ja、ko、es、fr、de、pt-BR、ru。加一种语言：npx joplo i18n add <语言>。
  */
-export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; autoFocus?: boolean; voice?: VoiceConfig; locales?: string[]; source?: string };
+/** plugins（D86）：启用的插件（npm 包的默认导出，`import scene3d from 'joplo-plugin-scene3d'`）；用法见 npx joplo skill <插件 id>。 */
+export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; autoFocus?: boolean; voice?: VoiceConfig; locales?: string[]; plugins?: PluginDef[]; source?: string };
 export const config = (c: Omit<ConfigDef, 'kind' | 'source'>): ConfigDef => ({ kind: 'config', ...c, source: callsite() });
 
 export type LayoutDef = { kind: 'layout'; tree: JNode; source?: string };
@@ -136,7 +139,7 @@ export type EffectDef =
   | { kind: 'effect'; type: 'uses'; rules: string[] }
   | { kind: 'effect'; type: 'shot'; targets: string[] }
   | { kind: 'effect'; type: 'explain'; text: string }
-  | { kind: 'effect'; type: 'trace'; ids: string[]; mode: 'ok' | 'fail' | 'skip' }
+  | import('./plugin.ts').PluginEffectDef
   | { kind: 'effect'; type: 'stream'; path: string; value: string }
   | { kind: 'effect'; type: 'fork'; label: string; scenario: string }
   | { kind: 'effect'; type: 'mark'; target: string; kindOf: 'circle' | 'underline' | 'box' | 'arrow'; note?: string }
@@ -144,20 +147,16 @@ export type EffectDef =
   | { kind: 'effect'; type: 'callout'; target: string; text: string; side?: CalloutSide }
   | { kind: 'effect'; type: 'hold'; seconds: number }
   | { kind: 'effect'; type: 'say'; text: string }
-  | { kind: 'effect'; type: 'narrate'; text: string }
-  | { kind: 'effect'; type: 'camera'; targets: string[]; pad?: number; zoom?: number; ms?: number };
+  | { kind: 'effect'; type: 'narrate'; text: string };
 
 /** 标注气泡放在目标的哪一侧；不写时自动选画面里放得下的一侧（右、左、下、上）。 */
 export type CalloutSide = 'top' | 'right' | 'bottom' | 'left';
 
 const pathOf = (b: Bind | string): string => (isBind(b) ? bindPath(b) : b);
 export const set = (target: Bind, value: Json): EffectDef => ({ kind: 'effect', type: 'set', path: pathOf(target), value });
-/**
- * 一次改多处：patch($.data, { cam: 'chat', score: 3 }) 等于对每个键各写一个 set()。
- * 嵌套对象整体替换（与 set 相同）；步骤参数里直接展开数组即可：.system('…', patch($.data, {…}), hold(3))。
- */
+/** Several ordinary set effects. Values replace whole nested objects; accepts the namespace or a nested bind. */
 export const patch = (target: Bind | Record<string, unknown>, values: Record<string, Json>): EffectDef[] =>
-  Object.entries(values).map(([k, v]) => ({ kind: 'effect', type: 'set', path: `${pathOf(target as Bind)}.${k}`, value: v }));
+  Object.entries(values).map(([key, value]) => ({ kind: 'effect', type: 'set', path: `${pathOf(target as Bind)}.${key}`, value }));
 export const push = (target: Bind, value: Json): EffectDef => ({ kind: 'effect', type: 'append', path: pathOf(target), value });
 /** 与 sonner 一致：toast('…')、toast.success('…')、toast.error('…')。 */
 export const toast = Object.assign((text: string): EffectDef => ({ kind: 'effect', type: 'toast', text, tone: 'info' }), {
@@ -188,20 +187,6 @@ export const uses = (...rules: string[]): EffectDef => ({ kind: 'effect', type: 
  * 没有声明 layers 的方案：shot 在路径页面里聚焦。
  */
 export const shot = (...targets: string[]): EffectDef => ({ kind: 'effect', type: 'shot', targets });
-
-/** camera() 的选项：pad 取景留白（设计像素，默认 48）；zoom 最大放大倍数（默认 3）；ms 镜头运动时长（默认 1200）。 */
-export type CameraOpts = { pad?: number; zoom?: number; ms?: number };
-/**
- * 画布镜头：<Canvas> 里的镜头对准这些元素（取它们合起来的范围，按画布的设计尺寸等比放进画面），平滑推、拉、摇，不画焦点框。
- * 镜头位置会保留到下一次 camera()；camera() 不带元素 = 回到整张画布。导演会切到目标所在的层。
- *   .system('读入', camera('tape', 'machine'))
- *   .system('全景', camera({ ms: 2000 }))
- */
-export const camera = (...args: (string | CameraOpts)[]): EffectDef => {
-  const targets = args.filter((a): a is string => typeof a === 'string');
-  const o = Object.assign({}, ...args.filter((a) => typeof a === 'object' && a !== null)) as CameraOpts;
-  return { kind: 'effect', type: 'camera', targets, ...(o.pad !== undefined ? { pad: o.pad } : {}), ...(o.zoom !== undefined ? { zoom: o.zoom } : {}), ...(o.ms !== undefined ? { ms: o.ms } : {}) };
-};
 
 /**
  * 解说：这一步补充的一句话，显示在画面下方字幕区的第二行（说明下方、小一号）；建议不超过 48 个字（check 会提示）。
@@ -266,21 +251,6 @@ export const callout = (target: string, text: string, opts: { side?: CalloutSide
 export const hold = (seconds: number): EffectDef => ({ kind: 'effect', type: 'hold', seconds });
 
 /**
- * 调用链（D48）：这一步沿 Diagram 的连线走了哪条路径。节点与连线的 state 由每一步的 trace 自动推算，不用再手写 set / state 绑定：
- * 本步 trace 到的是 active，之前 trace 过、本步没再 trace 的是 ok，trace.fail 的是 error（保持到之后又被 trace 成功），
- * trace.skip 的是 dim，从未涉及的是 idle；节点或连线上显式写的 state 优先。
- * 参数是节点 id 或连线 id：trace('brain', 'biz', 'local') 是 brain→biz、biz→local 两段；每段要有对应的连线，
- * 方向 from→to 或 to→from 都算（反向时流动的小点逆向走）；同一方向有多条连线时写连线 id：trace('e_brain_biz')。
- * trace 同时相当于一个 shot（节点作为镜头目标，顺序有意义）；同一步再写 shot 时两者合并。
- */
-export const trace = Object.assign((...ids: string[]): EffectDef => ({ kind: 'effect', type: 'trace', ids, mode: 'ok' }), {
-  /** 这段失败：连线和终点节点标为 error（保持到场景结束，除非之后又被 trace 成功）。 */
-  fail: (...ids: string[]): EffectDef => ({ kind: 'effect', type: 'trace', ids, mode: 'fail' }),
-  /** 这次没被调用：节点（以及它们之间的连线）标为 dim；不移动镜头。 */
-  skip: (...ids: string[]): EffectDef => ({ kind: 'effect', type: 'trace', ids, mode: 'skip' }),
-});
-
-/**
  * 层级（视角，D43 / T-layers）：一个完全独立的画面，有自己的 JSX 树，单独渲染、按自己的布局占满舞台。
  * 各层共享同一份场景状态（ui / data / inputs），切层时步骤不变。需要全景就自己声明一个 overview 层。
  *   layers: { client: layer('客户端视角', <ClientView />), backend: layer('后端流转', <Arch />) }
@@ -291,7 +261,6 @@ export type LayerDef = { kind: 'layer'; title: string; tree: JNode | JNode[]; vi
 /** opts.role：这一层是谁的画面（feature.roles 的键，D56）；画面角落显示这个人的名牌，层级标签带上头像。 */
 export const layer = (title: string, tree: JNode | JNode[], opts: { viewport?: 'desktop' | 'mobile'; role?: string; icon?: LayerIcon } = {}): LayerDef => ({ kind: 'layer', title, tree, ...opts, source: callsite() });
 
-/** 步骤参数：字符串是字幕（可省略，省略时自动生成），其余是效果。 */
 /** 步骤参数：字幕、效果，或一组效果（patch() 返回数组，直接传入即可）。 */
 export type StepArg = string | EffectDef | readonly EffectDef[];
 
@@ -308,6 +277,10 @@ export type StepDef = {
   kind: 'user' | 'system' | 'card';
   action:
     | { type: 'click'; target: string }
+    | { type: 'drag'; target: string; to: string | { x: number; y: number } }
+    | { type: 'hover'; target: string; ms: number }
+    | { type: 'scroll'; target: string; to: string | { x: number; y: number } }
+    | { type: 'plugin'; name: string; target: string; data: Record<string, unknown> }
     | { type: 'type'; target: string; value: string }
     | { type: 'select'; target: string; value: string }
     | { type: 'toggle'; target: string; value: boolean }
@@ -331,7 +304,7 @@ export type FlowOpts = {
   /** 在 option.state 之上覆盖的初始状态。 */
   state?: StateInit;
   /**
-   * 接着另一个场景演（同一方案的场景键）：初始状态 = 那个场景最后一步之后的状态（路径、ui / data / inputs、画布镜头、导演层），
+   * 接着另一个场景演（同一方案的场景键）：初始状态 = 那个场景最后一步之后的状态（路径、ui / data / inputs、导演层），
    * 再叠上这里的 state。讲解片的章节、长流程的分段都用它，每一段从上一段结尾的画面开始，不用手抄状态。
    */
   from?: string;
@@ -368,6 +341,19 @@ export class Flow {
   }
   click(target: string, ...args: StepArg[]): this {
     return this.add('user', { type: 'click', target }, args);
+  }
+  drag(target: string, to: string | { x: number; y: number }, ...args: StepArg[]): this {
+    return this.add('user', { type: 'drag', target, to }, args);
+  }
+  hover(target: string, ms = 500, ...args: StepArg[]): this {
+    return this.add('user', { type: 'hover', target, ms }, args);
+  }
+  scroll(target: string, to: string | { x: number; y: number }, ...args: StepArg[]): this {
+    return this.add('user', { type: 'scroll', target, to }, args);
+  }
+  /** Namespaced plugin action; payload and matching are declared by its plugin. */
+  act(name: string, target: string, data: Record<string, unknown>, ...args: StepArg[]): this {
+    return this.add('user', { type: 'plugin', name, target, data }, args);
   }
   type(target: string, value: string, ...args: StepArg[]): this {
     return this.add('user', { type: 'type', target, value }, args);
@@ -410,6 +396,19 @@ export class Flow {
 /** 一条演示路径。 */
 export const flow = (name: string, opts: FlowOpts = {}): Flow => new Flow(name, opts);
 
+/** Unordered local reactions; the compiler permits only local state effects. */
+const reaction = (build: (f: Flow) => Flow): StepDef => ({ ...build(new Flow('free', {})).steps[0]!, source: callsite(4) });
+export const free = {
+  click: (target: string, ...args: StepArg[]) => reaction(f => f.click(target, ...args)),
+  type: (target: string, value: string, ...args: StepArg[]) => reaction(f => f.type(target, value, ...args)),
+  select: (target: string, value: string, ...args: StepArg[]) => reaction(f => f.select(target, value, ...args)),
+  toggle: (target: string, value: boolean, ...args: StepArg[]) => reaction(f => f.toggle(target, value, ...args)),
+  drag: (target: string, to: string | {x:number;y:number}, ...args: StepArg[]) => reaction(f => f.drag(target, to, ...args)),
+  hover: (target: string, ms = 500, ...args: StepArg[]) => reaction(f => f.hover(target, ms, ...args)),
+  scroll: (target: string, to: string | {x:number;y:number}, ...args: StepArg[]) => reaction(f => f.scroll(target, to, ...args)),
+  act: (name: string, target: string, data: Record<string, unknown>, ...args: StepArg[]) => reaction(f => f.act(name, target, data, ...args)),
+};
+
 export type OptionDef = {
   kind: 'option';
   name: string;
@@ -427,9 +426,12 @@ export type OptionDef = {
   coverage?: Record<string, CoverageDecl>;
   /** 层级（视角）：每层一个独立画面 { client: layer('客户端视角', <ClientView />), backend: layer('后端流转', <Arch />) }。 */
   layers?: Record<string, LayerDef>;
+  free?: Record<string, StepDef>;
   scenarios: Record<string, Flow>;
   source?: string;
 };
 export const option = (o: Omit<OptionDef, 'kind' | 'source'>): OptionDef => ({ kind: 'option', ...o, source: callsite() });
 
 export type { CondExpr as Condition };
+
+export type { JoploProps } from './props.ts';

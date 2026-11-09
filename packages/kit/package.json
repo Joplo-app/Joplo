@@ -1,16 +1,18 @@
 {
   "name": "@joplo-app/kit",
-  "version": "0.2.18",
+  "version": "0.3.0",
   "description": "Joplo 创作 SDK：组件、feature/option/flow 与 JSX 运行时（收集成数据，不作为 React 执行）",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./ui": "./src/ui.ts",
     "./jsx-runtime": "./src/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx-dev-runtime.ts",
     "./node": "./src/node.ts",
-    "./package.json": "./package.json"
+    "./plugin": "./src/plugin.ts",
+    "./package.json": "./package.json",
+    "./renderer": "./src/renderer.ts",
+    "./renderer-style": "./src/renderer-style.ts"
   },
   "files": [
     "dist"
@@ -29,10 +31,6 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
-      "./ui": {
-        "types": "./dist/ui.d.ts",
-        "default": "./dist/ui.js"
-      },
       "./jsx-runtime": {
         "types": "./dist/jsx-runtime.d.ts",
         "default": "./dist/jsx-runtime.js"
@@ -45,7 +43,19 @@
         "types": "./dist/node.d.ts",
         "default": "./dist/node.js"
       },
-      "./package.json": "./package.json"
+      "./plugin": {
+        "types": "./dist/plugin.d.ts",
+        "default": "./dist/plugin.js"
+      },
+      "./package.json": "./package.json",
+      "./renderer": {
+        "types": "./dist/renderer.d.ts",
+        "default": "./dist/renderer.js"
+      },
+      "./renderer-style": {
+        "types": "./dist/renderer-style.d.ts",
+        "default": "./dist/renderer-style.js"
+      }
     }
   },
   "repository": {
@@ -56,5 +66,8 @@
   "homepage": "https://github.com/Joplo-app/Joplo#readme",
   "bugs": {
     "url": "https://github.com/Joplo-app/Joplo/issues"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0"
   }
 }

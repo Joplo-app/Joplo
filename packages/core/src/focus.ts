@@ -1,5 +1,5 @@
 /**
- * 叙事焦点（D70）：每一步观众该看哪里（焦点对象），以及用什么形式呈现。纯函数，与 cameraAt / diagramStateAt 同级：
+ * 叙事焦点（D70）：每一步观众该看哪里（焦点对象），以及用什么形式呈现。纯函数，与 cameraAt 同级：
  * 看板、发布站（含嵌入、评审）、renderStep 截图、视频录制、check 都读这一份。
  *
  * 焦点对象（subject）按优先级：
@@ -13,14 +13,13 @@
  *   caption  画面上没有新东西，只看字幕（source = none）。
  *
  * 呈现：作者写的提示原样给出；默认只有“结果揭晓”（reveal）：本步新出现或变化、观众容易错过的元素轻轻脉冲一次，
- * 不移动镜头、不压暗、不拦截点击。克制规则：弹窗 / 抽屉自带遮罩不提示；DataCard / StateFlow 自己会突出变化；
+ * 不移动镜头、不压暗、不拦截点击。克制规则：弹窗 / 抽屉自带遮罩不提示；自行显示变化的元素 自己会突出变化；
  * 一次变化超过 REVEAL_MAX 处不提示（整块都变了，让观众自己看）；作者写了任何焦点时不加默认提示；换页、换层不提示；
  * 同一个元素连续变化、或往同一个容器里连续追加（终端、聊天记录一行行出现）时，只在第一次提示。
  * config({ autoFocus: false }) 关掉默认呈现（reveal 恒为空）；焦点对象仍照常推导，check 用它判断“长时间没有焦点”。
  */
-import { DIRECTOR_LAYER, GATED_CONTAINERS, PAGE_LAYER, childWidth } from './catalog.ts';
-import { diagramsIn } from './diagram/index.ts';
-import { appShellLayout, applyStep, cameraAt, initialState, isNodeDisabled, isSelfVisible, layersOf, resolveProps, sceneWidth, type PlayState } from './player.ts';
+import { DIRECTOR_LAYER, PAGE_LAYER, childWidth, pluginSpec, type PluginTable } from './catalog.ts';
+import { layoutRegions, applyStep, cameraAt, initialState, isNodeDisabled, isSelfVisible, layersOf, resolveProps, sceneWidth, type PlayState } from './player.ts';
 import type { Callout, Project, Scene, SceneNode, Step } from './schema.ts';
 
 export const HOLD_MIN_SECONDS = 0.5;
@@ -28,15 +27,7 @@ export const HOLD_MAX_SECONDS = 30;
 /** 默认揭晓最多提示几处；更多时不提示。 */
 export const REVEAL_MAX = 3;
 /** 自带遮罩、出现时本身就是焦点的浮层：默认揭晓不再画提示。 */
-const SELF_EVIDENT: ReadonlySet<string> = GATED_CONTAINERS;
 /** 自己会突出本步变化的组件（D56）。 */
-const SELF_CHANGING: ReadonlySet<string> = new Set(['DataCard', 'StateFlow']);
-/**
- * 关系类图表（D69）也自己呈现变化：新元素淡入、连线沿路径画出、trace / value 点亮。默认的结果揭晓不再叠一圈
- * （连线的外接矩形是一大块，状态机 value 变化会框住整张图），集成 0.2.8 的组合规则。
- */
-const DIAGRAM_FAMILY = /^(Diagram|StateMachine|Sequence)(\.|$)/;
-
 export type FocusSubject = 'cover' | 'card' | 'scene' | 'elements' | 'toast' | 'caption';
 export type FocusState = {
   /** 观众此刻该看的东西。 */
@@ -63,20 +54,19 @@ const EMPTY = (layer: string, subject: FocusSubject = 'caption'): FocusState => 
 type Vis = Pick<PlayState, 'ui' | 'data' | 'inputs'>;
 
 /**
- * 画面里此刻可见的元素 id（与 isNodeVisible 同一套规则：when、浮层 opened、断点、AppShell 收起），一次自上而下算完。
+ * 画面里此刻可见的元素 id（与 isNodeVisible 同一套规则：when、浮层 opened、断点、layout 收起），一次自上而下算完。
  */
 export function visibleIds(scene: Scene, state: Vis, width: number = sceneWidth(scene)): Set<string> {
   const out = new Set<string>();
   const ps = state as PlayState;
   const rec = (n: SceneNode, w: number, shell: { node: SceneNode; width: number } | null) => {
     if (!isSelfVisible(n, ps, w)) return;
-    const sh = n.type === 'AppShell' ? { node: n, width: w } : shell;
-    if (sh && (n.type === 'AppShell.Navbar' || n.type === 'AppShell.Aside')) {
-      const l = appShellLayout(sh.node.props, state, sh.width);
-      if ((n.type === 'AppShell.Navbar' ? l.navbar : l.aside)?.collapsed) return;
+    const sh = n.traits?.layout ? { node: n, width: w } : shell;
+    if (sh && n.traits?.region) {
+      if (layoutRegions(sh.node, state, sh.width)[n.traits.region]?.collapsed) return;
     }
     out.add(n.id);
-    const cw = childWidth(n.type, w, n.props);
+    const cw = childWidth(n, w, resolveProps(n, state));
     for (const c of n.children ?? []) rec(c, cw, sh);
   };
   rec(scene.root, width, null);
@@ -85,13 +75,13 @@ export function visibleIds(scene: Scene, state: Vis, width: number = sceneWidth(
 
 /** 本步新出现或变化的元素（最外层；文字变化记在包含它的元素上），按树的顺序。 */
 /** appended = 这一步新出现（不是原有元素的内容变化）。 */
-type Hit = { id: string; type: string; parent: string | null; appended: boolean };
-function changedElements(scene: Scene, before: PlayState, after: PlayState): Hit[] {
+type Hit = { id: string; type: string; selfEvident?: boolean; parent: string | null; appended: boolean };
+function changedElements(scene: Scene, before: PlayState, after: PlayState, plugins: PluginTable): Hit[] {
   const vb = visibleIds(scene, before);
   const va = visibleIds(scene, after);
   const hits: Hit[] = [];
   const parents = new Map<string, string | null>();
-  const add = (n: SceneNode | null, appended: boolean) => { if (n && !hits.some((h) => h.id === n.id)) hits.push({ id: n.id, type: n.type, parent: parents.get(n.id) ?? null, appended: appended && n.type !== '#text' }); };
+  const add = (n: SceneNode | null, appended: boolean) => { if (n && !hits.some((h) => h.id === n.id)) hits.push({ id: n.id, type: n.type, selfEvident: n.traits?.selfEvident || pluginSpec(plugins, n.type)?.selfEvident, parent: parents.get(n.id) ?? null, appended: appended && n.type !== '#text' }); };
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const rec = (n: SceneNode, parent: SceneNode | null) => {
     parents.set(n.id, parent?.id ?? null);
@@ -127,7 +117,7 @@ function explicitTargets(step: Step, layer: string): { targets: string[]; wholeL
     s.targets.forEach(add);
   }
   // trace 的焦点对象与镜头目标相同（D69 的 Trace.targets：时序图是消息那一行；旧 IR 没有时按 nodes）
-  for (const t of step.traces ?? []) if (t.mode !== 'skip') (t.targets ?? t.nodes).forEach(add);
+  (step.focusTargets ?? []).forEach(add);
   for (const c of step.cues ?? []) c.targets.forEach(add);
   for (const c of step.callouts ?? []) add(c.target);
   for (const m of step.marks ?? []) add(m.target);
@@ -209,7 +199,7 @@ export function focusTimeline(project: Project, scenarioId: string): FocusState[
     }
     // 本步新出现或变化的元素；用户自己操作的元素（及其内部）不算，鼠标已经在那里
     const target = actionTarget && scene ? findIn(scene.root, actionTarget) : null;
-    const hits = scene ? changedElements(scene, before, after).filter((h) => !(target && findIn(target, h.id))) : [];
+    const hits = scene ? changedElements(scene, before, after, project.plugins).filter((h) => !(target && findIn(target, h.id))) : [];
     for (const h of hits) { prevChanged.add(h.id); if (h.appended && h.parent) prevChanged.add(`^${h.parent}`); }
     const targets = [...(actionTarget ? [actionTarget] : []), ...hits.map((h) => h.id)];
     if (targets.length) Object.assign(f, { subject: 'elements', source: 'auto', targets });
@@ -217,7 +207,7 @@ export function focusTimeline(project: Project, scenarioId: string): FocusState[
     // 连续性：同一个元素上一步刚变过；或者往上一步刚追加过的同一个容器里再追加（终端、聊天记录一行行出现）。
     // 观众已经在看那里，不再重复提示
     const repeated = (h: Hit) => lastChanged.has(h.id) || (h.appended && !!h.parent && lastChanged.has(`^${h.parent}`));
-    const shown = hits.filter((h) => !SELF_EVIDENT.has(h.type) && !SELF_CHANGING.has(h.type) && !DIAGRAM_FAMILY.test(h.type) && !repeated(h));
+    const shown = hits.filter((h) => !h.selfEvident && !repeated(h));
     if (auto && shown.length <= REVEAL_MAX) f.reveal = shown.map((h) => h.id);
   }
   byScenario.set(scenarioId, out);
@@ -238,12 +228,7 @@ export function inShotFrame(root: SceneNode, id: string, frameTargets: readonly 
     const n = findIn(root, f);
     if (n && findIn(n, id)) return true;
   }
-  const diagrams = diagramsIn(root);
-  for (const f of frameTargets)
-    for (const d of diagrams) {
-      if (d.groupsOf.get(f)?.[0] === id) return true;
-      if (d.type === 'Sequence' && d.edges.some((e) => e.id === f && (e.from === id || e.to === id))) return true;
-    }
+  for (const f of frameTargets) if (findIn(root, f)?.framing?.include?.includes(id)) return true;
   return false;
 }
 

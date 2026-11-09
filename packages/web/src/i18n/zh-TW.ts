@@ -1,4 +1,4 @@
-import { autoCaptionMessages } from '@joplo-app/core';
+import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
 import { value, number, list, plural, type Value } from './format';
@@ -7,6 +7,13 @@ import type { Dictionary } from './en';
 export function createZhTW(locale: Locale = 'zh-TW') {
   return defineDictionary<Dictionary>()({
     player: {
+      freeExploration: `自由體驗中 · 按播放繼續`,
+      freeChangesDiscarded: `變更不會保留`,
+      freeReset: `重設`,
+      freeSwitchPrompt: (name: string) => `切換到「${name}」場景？`,
+      freeSwitchDescription: `從這個操作之前開始，目前體驗變更會捨棄。`,
+      freeSwitchConfirm: `切換場景`,
+      freeSwitchCancel: `留在這裡`,
       ...autoCaptionMessages('zh-TW'),
       mockSuccess: "模擬成功",
       mockFailure: "模擬失敗",
@@ -206,6 +213,8 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       thisDiagramHasNoNodesYet: "此圖表尚無節點",
       placeholder: "預留區塊",
       customComponent: "自訂元件：",
+      pluginLoading: "正在載入外掛 ",
+      pluginUnavailable: "外掛無法使用：",
       unnamed: "未命名",
       placeholderSuffix: "（預留區塊）",
       aComponentOutsideTheCatalogTheDemoFollowsIts: "非元件目錄內的元件。示範會依其宣告的元素 ID 與狀態執行。",

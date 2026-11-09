@@ -32,6 +32,7 @@ export function createBoardKo(locale: Locale = 'ko') {
       cloudSetupUsername: "사용자명 설정",
       cloudVisibility: "공개 범위",
 
+      mediaUnavailable: "음악을 사용할 수 없습니다 · 재생은 계속됩니다",
       localReviewMoveHint: "클릭하여 피드백을 열고 드래그하여 이동하세요. 방향키로 위치를 조정할 수 있습니다.",
       localReviewApprovedDraft: "이 검토는 다른 화면에서 승인되었습니다. 보내지 않은 초안은 복사할 수 있도록 보존됩니다.",
       localReviewTitle: "피드백 및 검토",

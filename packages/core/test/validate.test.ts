@@ -11,7 +11,7 @@ let root: string;
 let original: Project;
 beforeAll(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), 'joplo-validate-')));
-  await cp('examples/invite', root, { recursive: true });
+  await cp('examples/invite', root, { recursive: true, filter: s => !s.includes('node_modules') });
   await symlink(resolve('node_modules'), join(root, 'node_modules'));
   await writeFile(join(root, 'package.json'), JSON.stringify({ type: 'module' }));
   const loaded = await loadAuthoring(root, p => tsImport(p, { parentURL: import.meta.url, tsconfig: join(root, 'tsconfig.json') }));
@@ -24,7 +24,7 @@ const a = 'invite.a-modal';
 const scene = `${a}@/members`;
 const src = 'routes/members/page.tsx:99:3';
 function add(p: Project, node: Partial<SceneNode> = {}) {
-  p.scenes[scene]!.root.children!.push({ id: 'loose', type: 'Button', source: src, ...node });
+  p.scenes[scene]!.root.children!.push({ id: 'loose', type: 'ui:Button', source: src, ...node });
 }
 function diagnostic(p: Project, code: string, at: string, mode: 'structure' | 'replay' | 'all' = 'all') {
   expect(validate(p, { mode }).diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code, at })]));
@@ -46,14 +46,14 @@ test.each([{ unmodeled: true }, { disabled: true, disabledReason: '暂不可用'
 });
 test('布局在多个画面中出现，同一源位置仅诊断一次', () => {
   const p = fixture();
-  for (const s of Object.values(p.scenes)) s.root.children!.push({ id: 'shared', type: 'Button', source: 'layouts/app.tsx:100:5' });
+  for (const s of Object.values(p.scenes)) s.root.children!.push({ id: 'shared', type: 'ui:Button', source: 'layouts/app.tsx:100:5' });
   expect(validate(p).diagnostics.filter(d => d.at === 'layouts/app.tsx:100:5' && d.code === 'UNBOUND_INTERACTIVE')).toHaveLength(1);
 });
 test('页面/布局元素统计全部方案，堆叠元素只统计 from 方案', () => {
   const p = fixture();
   const as = p.scenarios['invite.a-modal.success']!;
   const bs = p.scenarios['invite.b-batch.partial']!;
-  for (const s of Object.values(p.scenes)) s.root.children!.push({ id: 'shared', type: 'Button', source: src });
+  for (const s of Object.values(p.scenes)) s.root.children!.push({ id: 'shared', type: 'ui:Button', source: src });
   bs.steps[0]!.action = { type: 'click', target: 'shared' };
   expect(validate(p, { mode: 'structure', optionId: a }).diagnostics.filter(d => d.at === src)).toEqual([]);
   findNode(p.scenes[scene]!, 'shared')!.node.from = a;

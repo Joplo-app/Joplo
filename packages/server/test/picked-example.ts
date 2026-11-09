@@ -1,3 +1,4 @@
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
 /**
  * 测试用：把 examples/ 下的样板复制到临时目录，给没有 pick 的功能补上选定方案（只改副本，不动仓库里的样板）。
  * camping、agent-arch 没有 pick，直接 build 时不发布任何场景（NOT_PICKED）；发布产物完整性与发布站回放的检查
@@ -16,6 +17,7 @@ export const SAMPLE_PICKS: Record<string, string> = { invite: 'a-modal', 'agent-
 export function pickedExample(name: string, pick = SAMPLE_PICKS[name]): string {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `joplo-${name}-`)));
   fs.cpSync(path.join(EXAMPLES, name), dir, { recursive: true, filter: (src) => !/[/\\](dist|node_modules|\.joplo)([/\\]|$)/.test(src) });
+  installFixturePlugins(dir);
   const featuresDir = path.join(dir, 'features');
   for (const f of fs.readdirSync(featuresDir)) {
     const file = path.join(featuresDir, f, 'feature.ts');

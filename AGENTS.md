@@ -20,7 +20,7 @@
 
 做任何 Example（`examples/` 下的示例，或为用户制作的任何演示项目）时，凡是发现了好的实践、新的范式（新的画面手法、组织方式、叙事结构）、踩过的坑，或为此修复了 Joplo 的问题，都要在**同一个 PR** 里写进 Joplo 技能，不只留在示例代码或聊天记录里。
 
-- 写进 `packages/core/src/guide.ts` 的对应主题（叙事进 story，画面与动效进 demo，焦点进 focus，组件进 components，诊断进 check）；主题范围变了就同步 `SKILL_TOPICS` 的简介，再运行 `pnpm skills:build`。
+- 引擎经验写进 `packages/core/src/guide.ts`（叙事进 story、调度与节奏进 demo、焦点进 focus、诊断进 check）；具体组件、画面手法、动效与其常见坑写进对应 `plugins/*/src/guide.ts`。主题范围变了就同步引擎 `SKILL_TOPICS` 或插件 `skillTopics`，再运行 `pnpm skills:build`。
 - 写成可复用的做法：什么情况下用、怎么写、为什么这样做、常见错误是什么。不写示例专属的数据、文案、人名或素材。
 - 交付示例时向用户说明这次沉淀了哪些条目；没有新东西可沉淀时也说一声。
 
@@ -28,7 +28,8 @@
 
 - `packages/core/src/agent-skill.ts`：官方 `joplo`、`joplo-feedback` 技能和安装到项目的 `AGENTS.md` 托管段的唯一模板。
 - `packages/core/src/guide.ts`：`joplo skill <topic>` 的版本对应使用指南。需要更多条件化细节时优先放到合适的主题，保持技能入口易发现、易读取。
-- `skills/*/SKILL.md`：生成产物。修改模板后运行 `pnpm skills:build`，不要只手改生成文件。
+- `plugins/*/src/guide.ts`：各插件组件、创作实践与常见坑的权威正文，插件清单通过 `skill` / `skillTopics` 提供；引擎技能不出现具体插件组件名。
+- `skills/**` 与 `templates/starter/.claude/skills/**`：生成产物。修改模板后运行 `pnpm skills:build`，不要只手改生成文件。
 - 新增或调整主题时，同步 `SKILL_TOPICS`、相关主题链接、技能路由、README 和 CLI 文档。命令、参数、事件、退出码与实现保持一致。
 - `joplo skill install` 与仓库官方技能应逐字一致；保留安装器对用户修改的保护，不用 `--force` 掩盖差异。
 
@@ -41,7 +42,7 @@
 
 ## 发布
 
-遵循 [docs/release.md](docs/release.md)：六个包统一版本，版本变化后重新生成技能，检查通过后合并，再按 tag 流程发布并验证 registry。发布时检查技能是否随相同版本正确安装，不能只验证工作区中的源码。
+遵循 [docs/release.md](docs/release.md)：十个包（含 plugin-diagram、plugin-alda、plugin-content、plugin-ui）统一版本，版本变化后重新生成技能，检查通过后合并，再按 tag 流程发布并验证 registry。发布时检查技能是否随相同版本正确安装，不能只验证工作区中的源码。
 
 ## Joplo 自身的设计项目
 

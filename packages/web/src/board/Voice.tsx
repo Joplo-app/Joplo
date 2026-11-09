@@ -1,3 +1,4 @@
+import { useMedia } from '../runtime/useMedia';
 import type { Text } from '../i18n/messages';
 import { LocalText } from '../i18n/LocalText';
 import { useBoardI18n } from '../i18n/board/context';
@@ -22,7 +23,7 @@ import { useI18n } from '../i18n/context';
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AudioLines, Check, Copy, KeyRound, Loader2, Play, Square, Volume2, VolumeX, X } from 'lucide-react';
-import { speakerRoleAt, spokenLine, type Project } from '@joplo-app/core';
+import { speakerRoleAt, spokenLine, type Project } from '@joplo-app/core/runtime';
 import { stepCaption } from '../i18n/step-caption';
 import { cn } from '@/lib/utils';
 import { Btn, Switch } from '../player/controls';
@@ -104,6 +105,7 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
   const refresh = () => fetchVoiceState(projectId, true).then((s) => s && setState(s));
 
   // narrator 跟着状态走；控制器在播放时用它
+  useMedia(ctl, project, on);
   narrator.enabled = on;
   narrator.browserVoice = browserVoice;
   // 内容多语言（D84）：浏览器朗读用内容语言；生成的音频用这种语言的声音（服务端 byLocale），没有时用默认声音

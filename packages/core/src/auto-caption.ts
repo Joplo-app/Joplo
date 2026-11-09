@@ -3,6 +3,9 @@ import { isContentLocale, type ContentLocale } from './content-i18n.ts';
 import type { Step } from './schema.ts';
 
 type AutoCaptionMessages = {
+    autoDrag: (label: string, value: string) => string;
+    autoHover: (label: string) => string;
+    autoScroll: (label: string, value: string) => string;
     autoClick: (label: string) => string;
     autoType: (label: string, text: string) => string;
     autoSelect: (label: string, text: string) => string;
@@ -15,6 +18,9 @@ type AutoCaptionMessages = {
 };
 const messages: Record<ContentLocale, AutoCaptionMessages> = {
   'en': {
+    autoDrag: (label: string, value: string) => `Drag \u201c${label}\u201d to ${value}`,
+    autoHover: (label: string) => `Hover over \u201c${label}\u201d`,
+    autoScroll: (label: string, value: string) => `Scroll \u201c${label}\u201d to ${value}`,
     autoClick: (label: string) => `Click “${label}”`,
     autoType: (label: string, text: string) => `Type “${text}” in “${label}”`,
     autoSelect: (label: string, text: string) => `Select “${text}” in “${label}”`,
@@ -26,6 +32,9 @@ const messages: Record<ContentLocale, AutoCaptionMessages> = {
     autoPress: (keys: string) => keys.trim() ? `Press ${keys}` : 'Press a key',
   },
   'zh-CN': {
+    autoDrag: (label: string, value: string) => `\u62d6\u52a8\u300c${label}\u300d\u5230 ${value}`,
+    autoHover: (label: string) => `\u60ac\u505c\u5728\u300c${label}\u300d`,
+    autoScroll: (label: string, value: string) => `\u6eda\u52a8\u300c${label}\u300d\u5230 ${value}`,
     autoClick: (label: string) => `\u70b9\u51fb\u300c${label}\u300d`,
     autoType: (label: string, text: string) => `\u5728\u300c${label}\u300d\u4e2d\u8f93\u5165“${text}”`,
     autoSelect: (label: string, text: string) => `\u5728\u300c${label}\u300d\u4e2d\u9009\u62e9“${text}”`,
@@ -37,6 +46,9 @@ const messages: Record<ContentLocale, AutoCaptionMessages> = {
     autoPress: (keys: string) => keys.trim() ? `\u6309\u4e0b ${keys}` : '\u6309\u4e0b\u6309\u952e',
   },
   'zh-TW': {
+    autoDrag: (label: string, value: string) => `\u62d6\u66f3\u300c${label}\u300d\u5230 ${value}`,
+    autoHover: (label: string) => `\u505c\u7559\u5728\u300c${label}\u300d\u4e0a`,
+    autoScroll: (label: string, value: string) => `\u6372\u52d5\u300c${label}\u300d\u5230 ${value}`,
     autoClick: (label: string) => `\u9ede\u9078\u300c${label}\u300d`,
     autoType: (label: string, text: string) => `\u5728\u300c${label}\u300d\u8f38\u5165\u300c${text}\u300d`,
     autoSelect: (label: string, text: string) => `\u5728\u300c${label}\u300d\u9078\u64c7\u300c${text}\u300d`,
@@ -48,6 +60,9 @@ const messages: Record<ContentLocale, AutoCaptionMessages> = {
     autoPress: (keys: string) => keys.trim() ? `\u6309\u4e0b ${keys}` : "\u6309\u4e0b\u6309\u9375",
   },
   'ja': {
+    autoDrag: (label: string, value: string) => `\u300c${label}\u300d\u3092 ${value} \u306b\u30c9\u30e9\u30c3\u30b0`,
+    autoHover: (label: string) => `\u300c${label}\u300d\u306b\u30dd\u30a4\u30f3\u30bf\u30fc\u3092\u5408\u308f\u305b\u308b`,
+    autoScroll: (label: string, value: string) => `\u300c${label}\u300d\u3092 ${value} \u307e\u3067\u30b9\u30af\u30ed\u30fc\u30eb`,
     autoClick: (label: string) => `\u300c${label}\u300d\u3092\u30af\u30ea\u30c3\u30af`,
     autoType: (label: string, text: string) => `\u300c${label}\u300d\u306b\u300c${text}\u300d\u3092\u5165\u529b`,
     autoSelect: (label: string, text: string) => `\u300c${label}\u300d\u3067\u300c${text}\u300d\u3092\u9078\u629e`,
@@ -59,6 +74,9 @@ const messages: Record<ContentLocale, AutoCaptionMessages> = {
     autoPress: (keys: string) => keys.trim() ? `${keys} \u3092\u62bc\u3059` : "\u30ad\u30fc\u3092\u62bc\u3059",
   },
   'ko': {
+    autoDrag: (label: string, value: string) => `\u201c${label}\u201d\uc744(\ub97c) ${value}(\uc73c)\ub85c \ub4dc\ub798\uadf8`,
+    autoHover: (label: string) => `\u201c${label}\u201d \uc704\uc5d0 \ud3ec\uc778\ud130 \ub193\uae30`,
+    autoScroll: (label: string, value: string) => `\u201c${label}\u201d\uc744(\ub97c) ${value}\uae4c\uc9c0 \uc2a4\ud06c\ub864`,
     autoClick: (label: string) => `“${label}” \ud074\ub9ad`,
     autoType: (label: string, text: string) => `“${label}”\uc5d0 “${text}” \uc785\ub825`,
     autoSelect: (label: string, text: string) => `“${label}”\uc5d0\uc11c “${text}” \uc120\ud0dd`,
@@ -70,6 +88,9 @@ const messages: Record<ContentLocale, AutoCaptionMessages> = {
     autoPress: (keys: string) => keys.trim() ? `${keys} \ub204\ub974\uae30` : "\ud0a4 \ub204\ub974\uae30",
   },
   'es': {
+    autoDrag: (label: string, value: string) => `Arrastra \u00ab${label}\u00bb a ${value}`,
+    autoHover: (label: string) => `Mant\u00e9n el puntero sobre \u00ab${label}\u00bb`,
+    autoScroll: (label: string, value: string) => `Desplaza \u00ab${label}\u00bb hasta ${value}`,
     autoClick: (label: string) => `Haz clic en «${label}»`,
     autoType: (label: string, text: string) => `Escribe «${text}» en «${label}»`,
     autoSelect: (label: string, text: string) => `Elige «${text}» en «${label}»`,
@@ -81,6 +102,9 @@ const messages: Record<ContentLocale, AutoCaptionMessages> = {
     autoPress: (keys: string) => keys.trim() ? `Pulsa ${keys}` : "Pulsa una tecla",
   },
   'fr': {
+    autoDrag: (label: string, value: string) => `Glisser \u00ab ${label} \u00bb vers ${value}`,
+    autoHover: (label: string) => `Survoler \u00ab ${label} \u00bb`,
+    autoScroll: (label: string, value: string) => `Faire d\u00e9filer \u00ab ${label} \u00bb jusqu\u2019\u00e0 ${value}`,
     autoClick: (label: string) => `Cliquer sur « ${label} »`,
     autoType: (label: string, text: string) => `Saisir « ${text} » dans « ${label} »`,
     autoSelect: (label: string, text: string) => `Choisir « ${text} » dans « ${label} »`,
@@ -92,6 +116,9 @@ const messages: Record<ContentLocale, AutoCaptionMessages> = {
     autoPress: (keys: string) => keys.trim() ? `Appuyer sur ${keys}` : "Appuyer sur une touche",
   },
   'de': {
+    autoDrag: (label: string, value: string) => `\u201e${label}\u201c nach ${value} ziehen`,
+    autoHover: (label: string) => `Zeiger auf \u201e${label}\u201c halten`,
+    autoScroll: (label: string, value: string) => `\u201e${label}\u201c bis ${value} scrollen`,
     autoClick: (label: string) => `„${label}“ anklicken`,
     autoType: (label: string, text: string) => `„${text}“ in „${label}“ eingeben`,
     autoSelect: (label: string, text: string) => `„${text}“ in „${label}“ wählen`,
@@ -103,6 +130,9 @@ const messages: Record<ContentLocale, AutoCaptionMessages> = {
     autoPress: (keys: string) => keys.trim() ? `${keys} drücken` : "Taste drücken",
   },
   'pt-BR': {
+    autoDrag: (label: string, value: string) => `Arraste \u201c${label}\u201d para ${value}`,
+    autoHover: (label: string) => `Mantenha o cursor sobre \u201c${label}\u201d`,
+    autoScroll: (label: string, value: string) => `Role \u201c${label}\u201d at\u00e9 ${value}`,
     autoClick: (label: string) => `Clique em “${label}”`,
     autoType: (label: string, text: string) => `Digite “${text}” em “${label}”`,
     autoSelect: (label: string, text: string) => `Selecione “${text}” em “${label}”`,
@@ -114,6 +144,9 @@ const messages: Record<ContentLocale, AutoCaptionMessages> = {
     autoPress: (keys: string) => keys.trim() ? `Pressione ${keys}` : "Pressione uma tecla",
   },
   'ru': {
+    autoDrag: (label: string, value: string) => `\u041f\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u044c \u00ab${label}\u00bb \u043a ${value}`,
+    autoHover: (label: string) => `\u041d\u0430\u0432\u0435\u0441\u0442\u0438 \u0443\u043a\u0430\u0437\u0430\u0442\u0435\u043b\u044c \u043d\u0430 \u00ab${label}\u00bb`,
+    autoScroll: (label: string, value: string) => `\u041f\u0440\u043e\u043a\u0440\u0443\u0442\u0438\u0442\u044c \u00ab${label}\u00bb \u0434\u043e ${value}`,
     autoClick: (label: string) => `Нажать «${label}»`,
     autoType: (label: string, text: string) => `Ввести «${text}» в «${label}»`,
     autoSelect: (label: string, text: string) => `Выбрать «${text}» в «${label}»`,
@@ -134,6 +167,9 @@ export function automaticCaption(auto: NonNullable<Step['captionAuto']>, locale:
   if (!isContentLocale(locale)) return null;
   const t = autoCaptionMessages(locale);
   switch (auto.kind) {
+    case 'drag': return t.autoDrag(auto.label, auto.value ?? '');
+    case 'hover': return t.autoHover(auto.label);
+    case 'scroll': return t.autoScroll(auto.label, auto.value ?? '');
     case 'click': return t.autoClick(auto.label);
     case 'type': return t.autoType(auto.label, auto.value ?? '');
     case 'select': return t.autoSelect(auto.label, auto.value ?? '');

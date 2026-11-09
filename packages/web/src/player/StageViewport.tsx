@@ -1,14 +1,17 @@
+import type { ClockSource } from '../runtime/clock';
+import { EngineClockContext } from '../renderer/engine-motion';
+import { useEngineAnimations } from '../renderer/engine-animations';
 import { useI18n } from '../i18n/context';
 /**
  * 舞台的显示区域（看板与发布站共用）：
  * - 电脑页面：舞台铺满可用区域（fillStage），逻辑尺寸随区域的宽高比变化，只在舞台边缘裁切；
- * - 手机页面：固定 390 宽，套上手机外框（直接复用目录组件 Phone 的 PhoneFrame），按比例放进可用区域。
+ * - 手机页面：固定 390 宽，套上手机外框（由插件提供外框），按比例放进可用区域。
  * children 接收舞台的逻辑尺寸，传给 Stage（镜头、聚焦小图、适应画面都按它计算）。
  */
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Notice } from '../runtime/demo';
 import { VIEWPORTS, type Viewport } from '../renderer/Stage';
-import { PHONE_BEZEL, PHONE_SAFE, PhoneFrame, phoneFrameSize } from '../renderer/components';
+import { viewportDecoration } from '../renderer/plugins';
 import { DeviceZoomContext, type DeviceFocus } from '../renderer/camera';
 import { CAMERA_EASE, CAMERA_MS } from '../runtime/pace';
 import { ThemeContext, type StageTheme, type StrokeMode } from '../renderer/rough';
@@ -34,7 +37,7 @@ import { JoploMark } from './JoploMark';
 /** 发布站水印的去向与读屏文字（D83）。 */
 export type StageWatermark = { href: string; label: string };
 
-export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false, video = false, watermark }: {
+export function StageViewport({ viewport, notice, onDismiss, onBack, children, tag, theme = 'sketch', stroke = 'rough', font = null, curtain, curtainUp = false, video = false, watermark, playground, clock }: {
   viewport: Viewport; notice: Notice | null; onDismiss: () => void; /** 「回到演示」（顺序不对的提示）。 */ onBack?: () => void; children: (size: { width: number; height: number }) => ReactNode; tag?: ReactNode; theme?: StageTheme; stroke?: StrokeMode; font?: AppearanceFont | null;
   /**
    * 幕布（D61：过渡卡、场景封面）：铺满整个显示区域，不进手机外框。逻辑尺寸与电脑页面的舞台相同（fillStage），
@@ -47,10 +50,13 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
   video?: boolean;
   /** 发布站水印（D83）：舞台右上角的小 Joplo 图标，在新标签页打开 href。只有发布站传；看板、Pro 分享、导出不传。 */
   watermark?: StageWatermark;
+  playground?: ReactNode;
+  clock?: ClockSource;
 }) {
   const { t: i18n } = useI18n();
 
   const box = useRef<HTMLDivElement>(null);
+  useEngineAnimations(box, clock);
   const [avail, setAvail] = useState({ w: 800, h: 500 });
   useLayoutEffect(() => {
     const el = box.current;
@@ -61,8 +67,10 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
     return () => ro.disconnect();
   }, []);
   const vp = VIEWPORTS[viewport];
-  const phone = viewport === 'mobile';
-  const frame = phone ? phoneFrameSize(vp.width, vp.height) : vp;
+  const decoration = viewportDecoration(viewport);
+  const Frame = decoration?.react ?? (({children}: {children?:ReactNode}) => <>{children}</>);
+  const phone = viewport === 'mobile' && !!decoration;
+  const frame = phone ? decoration!.size(vp.width, vp.height) : vp;
   const fill = video ? videoStage(avail, vp) : fillStage(avail, vp);
   const scale = phone ? fitStage(avail, frame) : fill.scale;
   const size = phone ? { width: vp.width, height: vp.height } : { width: fill.width, height: fill.height };
@@ -76,15 +84,16 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
     const fit = Math.min((avail.w - 48) / Math.max(1, focus.w * scale), (avail.h - 48) / Math.max(1, focus.h * scale));
     deviceZoom = Math.max(1, Math.min(focus.z, fit));
     if (deviceZoom > 1.02) {
-      const px = (4 + PHONE_BEZEL + PHONE_SAFE.x + focus.x) * scale;
-      const py = (PHONE_BEZEL + PHONE_SAFE.top + focus.y) * scale;
+      const px = ((decoration?.insets.x ?? 0) + focus.x) * scale;
+      const py = ((decoration?.insets.y ?? 0) + focus.y) * scale;
       deviceShift = { x: -deviceZoom * (px - (frame.width * scale) / 2), y: -deviceZoom * (py - (frame.height * scale) / 2) };
     } else deviceZoom = 1;
   }
   // 所有提示（含点错位置的三种）都在画面顶部居中，一条轻提示（D55）
   const view = noticeView(notice, i18n);
   return (
-    <div ref={box} className={cn('relative min-h-0 flex-1 overflow-hidden', phone && !video && 'bg-jb-app', video && 'bg-black')} data-testid="stage-viewport" data-scale={scale.toFixed(3)} data-device={viewport}>
+    <EngineClockContext.Provider value={clock}><div ref={box} className={cn('relative min-h-0 flex-1 overflow-hidden', phone && !video && 'bg-jb-app', video && 'bg-black')} data-testid="stage-viewport" data-scale={scale.toFixed(3)} data-device={viewport}>
+      {playground ? <div className="absolute bottom-3 left-3 z-30 max-w-[min(420px,calc(100%-24px))]">{playground}</div> : null}
       {tag ? <div className="absolute left-3 top-3 z-10 flex items-center gap-2 text-[12px]">{tag}</div> : null}
       {view ? (
         <div
@@ -115,9 +124,9 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
               style={{ transform: deviceZoom > 1 ? `translate(${deviceShift.x}px, ${deviceShift.y}px) scale(${deviceZoom})` : undefined, transformOrigin: 'center', transition: `transform ${CAMERA_MS}ms cubic-bezier(${CAMERA_EASE.join(',')})` }}
             >
               <DeviceZoomContext.Provider value={onDevice}>
-                <PhoneFrame width={vp.width} height={vp.height} scale={scale} seed="stage-phone">
+                <Frame width={vp.width} height={vp.height} scale={scale} seed="stage-phone">
                   {children(size)}
-                </PhoneFrame>
+                </Frame>
               </DeviceZoomContext.Provider>
             </div>
           </ThemeContext.Provider>
@@ -150,6 +159,6 @@ export function StageViewport({ viewport, notice, onDismiss, onBack, children, t
           </div>
         </div>
       ) : null}
-    </div>
+    </div></EngineClockContext.Provider>
   );
 }

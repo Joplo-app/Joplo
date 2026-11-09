@@ -11,7 +11,7 @@ export default defineConfig({
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'packages/web/src') } },
   oxc: { jsx: { runtime: 'automatic' } },
   test: {
-    include: ['packages/*/test/**/*.test.{ts,tsx}', 'scripts/test/**/*.test.ts'],
+    include: ['plugins/*/test/**/*.test.{ts,tsx}', 'packages/*/test/**/*.test.{ts,tsx}', 'scripts/test/**/*.test.ts'],
     env: { JOPLO_HOME },
   },
 });

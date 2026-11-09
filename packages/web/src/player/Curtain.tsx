@@ -9,9 +9,10 @@ import { useI18n } from '../i18n/context';
  * 不在 renderer/ 里：它画在舞台外（StageViewport / RenderApp 那一层）。文字与底色只读 --jp-*（跟随舞台主题）；
  * 所属与「约 N 步」这类小字、开始按钮是播放器的界面，用看板字体与主操作色（与嵌入封面的播放按钮一致）。
  */
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
+import { motion } from '../renderer/engine-motion';
 import { ListOrdered, Play, Timer, Users } from 'lucide-react';
-import { cardAt, roleOf, type CardAction, type Project, type RoleInfo } from '@joplo-app/core';
+import { cardAt, roleOf, type CardAction, type Project, type RoleInfo } from '@joplo-app/core/runtime';
 import type { CoverContent } from './cover-content';
 import { fontStyle, type AppearanceFont } from '../renderer/appearance';
 import type { StageTheme } from '../renderer/rough';

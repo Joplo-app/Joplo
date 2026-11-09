@@ -1,7 +1,7 @@
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
 import { $, done, eq, flow, not, option, set, toast, uses } from '@joplo-app/kit';
-import { Alert, Badge, Button, Center, Code, Divider, Group, NavLink, Paper, Stack, Text, Title } from '@joplo-app/kit/ui';
+import { Alert, Badge, Button, Center, Code, Divider, Group, NavLink, Paper, Stack, Text, Title } from '@joplo-app/plugin-ui';
 
 /** 一行功能：名称、目标、方案数、选定方案、缺口，右侧「查看」。 */
 const FeatureRow = (p: { id: string; name: string; goal: string; options: string; pick: string; gaps: string; unmodeled?: boolean }) => (

@@ -5,7 +5,7 @@
  * 有层级的方案：每层是独立画面，sceneId 是当前层的画面；镜头在这一层自己的坐标里对准它的焦点。
  * 没有层级的方案：sceneId = null（显示状态里的路径页面），镜头用 shot 写在路径页面上的焦点。
  */
-import { PAGE_LAYER, cameraAt, layersOf, type LayerIcon, type Project, type Scenario } from '@joplo-app/core';
+import { PAGE_LAYER, cameraAt, layersOf, type LayerIcon, type Project, type Scenario } from '@joplo-app/core/runtime';
 import type { CameraSpec } from '../renderer/camera';
 
 export type CameraPlan = {

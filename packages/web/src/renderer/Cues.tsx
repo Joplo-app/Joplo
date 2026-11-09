@@ -9,8 +9,8 @@
  * - animate=false（静态截图、减少动态效果）：直接画到位，没有脉冲；结果揭晓只是一次脉冲，静态时不画。
  */
 import { useContext, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { motion } from 'motion/react';
-import type { FocusState } from '@joplo-app/core';
+import { motion } from './engine-motion';
+import type { FocusState } from '@joplo-app/core/runtime';
 import type { Box } from './camera-math';
 import { ownershipEls } from './camera';
 import { markBox } from './marks-math';

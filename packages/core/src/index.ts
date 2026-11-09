@@ -17,7 +17,6 @@ export * from './scope.ts';
 export * from './agent-skill.ts';
 export * from './pace.ts';
 export * from './outline.ts';
-export * from './diagram/index.ts';
 export * from './voice.ts';
 export * from './content-i18n.ts';
 export * from './local-review.ts';
@@ -25,3 +24,8 @@ export * from './local-review.ts';
 export * from './feature-diff.ts';
 export * from './step-identity.ts';
 export * from './auto-caption.ts';
+export { mediaAt, advanceMedia, mediaResourceIds, pruneMediaAssets } from './media.ts';
+
+export { projectThemes } from './themes.ts';
+
+export * from './playground.ts';

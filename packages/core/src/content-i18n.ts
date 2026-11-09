@@ -1,3 +1,6 @@
+import { pluginActionSpec } from './actions.ts';
+import { pluginSpec } from './catalog.ts';
+import { mapSlotTexts, mapTextPaths } from './plugin-data.ts';
 /**
  * 作者内容多语言（D84）：源文件用默认语言写，译文放在 `locales/<语言>.json`（原文 → 译文）。
  *
@@ -31,7 +34,6 @@ const STRUCTURAL = new Set(['from', 'to', 'accessor', 'target', 'href', 'src', '
 const ITEM_VALUE = 'value';
 
 /** 显示文字的属性：收集时不跳过单个英文词（英文项目的按钮名就是一个词）。其余属性里的单个 ASCII 词多半是枚举（sm、blue），不收。 */
-const DISPLAY_PROPS = new Set(['text', 'label', 'title', 'description', 'placeholder', 'aria-label', 'alt', 'error', 'hint', 'caption', 'message', 'content', 'subtitle', 'tooltip', 'leftSection', 'rightSection', 'name', 'value', 'data', 'records', 'labels', 'emptyText', 'actionLabel', 'sub', 'badge', 'status', 'items']);
 /** 每一行都是邮箱或网址：不翻译。 */
 const addressLike = (s: string) => s.split('\n').every((l) => /^\s*([^\s@]+@[^\s@]+|https?:\/\/\S+)\s*$/.test(l));
 
@@ -62,14 +64,14 @@ function mapCondition(c: Condition | undefined, visit: Visit): Condition | undef
   return c;
 }
 
-function mapNode(n: SceneNode, visit: Visit): SceneNode {
-  const out: SceneNode = { ...n };
+function mapNode(n: SceneNode, visit: Visit, plugins: Project['plugins']): SceneNode {
+  const out: SceneNode = { ...n, ...(n.ext ? { ext: mapSlotTexts(n.ext, plugins, 'node', s => visit(s, 'text', n.source)) } : {}) };
   if (n.props) {
     const props: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(n.props)) props[k] = STRUCTURAL.has(k) ? v : mapDeep(v, (s, _p, itemValue) => visit(s, DISPLAY_PROPS.has(k) && !itemValue ? 'text' : 'prop', n.source), '');
-    out.props = props;
+    for (const [k, v] of Object.entries(n.props)) props[k] = STRUCTURAL.has(k) || !(n.type === '#text' && k === 'text' || pluginSpec(plugins, n.type)?.traits?.text?.includes(k)) ? v : mapDeep(v, (s, _p, itemValue) => visit(s, !itemValue ? 'text' : 'prop', n.source), '');
+    out.props = mapTextPaths(props, pluginSpec(plugins, n.type)?.traits?.textPaths ?? [], s => isBinding(s) ? s : visit(s, 'text', n.source)) as Record<string, unknown>;
   }
-  if (n.children) out.children = n.children.map((c) => mapNode(c, visit));
+  if (n.children) out.children = n.children.map((c) => mapNode(c, visit, plugins));
   if (n.when) out.when = mapCondition(n.when, visit);
   if (n.disabled && typeof n.disabled === 'object') out.disabled = mapCondition(n.disabled, visit);
   if (n.redact && typeof n.redact === 'object') out.redact = mapCondition(n.redact, visit);
@@ -82,22 +84,29 @@ function mapNode(n: SceneNode, visit: Visit): SceneNode {
 const t = (s: string | undefined, visit: Visit, at?: string) => (s ? visit(s, 'text', at) : s);
 const stateMap = (v: unknown, base: string, visit: Visit) => mapDeep(v, (s, p) => visit(s, 'state', undefined, `${base}${p}`), '');
 
-function mapStep(st: Step, visit: Visit): Step {
-  const at = st.source;
-  const a = st.action;
-  const action: Step['action'] =
-    a.type === 'card' ? { ...a, title: visit(a.title, 'text', at), ...(a.sub ? { sub: visit(a.sub, 'text', at) } : {}), ...(a.points ? { points: a.points.map((p) => visit(p, 'text', at)) } : {}) }
+function mapAction(a: Step['action'], visit: Visit, plugins: Project['plugins'], at?: string): Step['action'] {
+  return a.type === 'card' ? { ...a, title: visit(a.title, 'text', at), ...(a.sub ? { sub: visit(a.sub, 'text', at) } : {}), ...(a.points ? { points: a.points.map((p) => visit(p, 'text', at)) } : {}) }
       : a.type === 'type' || a.type === 'select' ? { ...a, value: visit(a.value, 'typed', at) }
         : a.type === 'event' ? { ...a, name: visit(a.name, 'text', at) }
+          : a.type === 'plugin' ? { ...a, data: Object.fromEntries(Object.entries(a.data).map(([key, value]) => [key, typeof value === 'string' && pluginActionSpec({ plugins }, a.name)?.fields[key]?.text ? visit(value, 'typed', at) : value])) }
           : a;
-  const effects = st.effects.map((e): Step['effects'][number] => {
+}
+function mapEffects(effects: Step['effects'], visit: Visit, at?: string): Step['effects'] {
+  return effects.map((e): Step['effects'][number] => {
     if (e.type === 'set' || e.type === 'append') return { ...e, value: stateMap(e.value, e.path, visit) as typeof e.value };
     if (e.type === 'stream') return { ...e, value: visit(e.value, 'text', at) };
     if (e.type === 'toast' || e.type === 'complete') return { ...e, text: visit(e.text, 'text', at) };
     return e;
   });
+}
+
+function mapStep(st: Step, visit: Visit, plugins: Project['plugins']): Step {
+  const at = st.source;
+  const action = mapAction(st.action, visit, plugins, at);
+  const effects = mapEffects(st.effects, visit, at);
   return {
     ...st,
+    ...(st.ext ? { ext: mapSlotTexts(st.ext, plugins, 'step', s => visit(s, 'text', st.source)) } : {}),
     action,
     // 自动字幕是英文兜底，网页按 captionAuto 生成；只换它引用的元素名和值
     caption: st.captionAuto ? st.caption : visit(st.caption, 'text', at),
@@ -112,16 +121,17 @@ function mapStep(st: Step, visit: Visit): Step {
   };
 }
 
-function mapScenario(sc: Scenario, visit: Visit): Scenario {
+function mapScenario(sc: Scenario, visit: Visit, plugins: Project['plugins']): Scenario {
   const at = sc.source;
   return {
     ...sc,
+    ...(sc.ext ? { ext: mapSlotTexts(sc.ext, plugins, 'step', s => visit(s, 'text', sc.source)) } : {}),
     name: visit(sc.name, 'text', at),
     description: t(sc.description, visit, at) ?? '',
     ...(sc.expected !== undefined ? { expected: t(sc.expected, visit, at) ?? '' } : {}),
     mock: sc.mock.auto ? sc.mock : { ...sc.mock, label: visit(sc.mock.label, 'text', at) },
     initial: { ...sc.initial, ui: stateMap(sc.initial.ui, 'ui', visit) as Record<string, unknown>, data: stateMap(sc.initial.data, 'data', visit) as Record<string, unknown>, inputs: stateMap(sc.initial.inputs, 'inputs', visit) as Record<string, unknown> },
-    steps: sc.steps.map((st) => mapStep(st, visit)),
+    steps: sc.steps.map((st) => mapStep(st, visit, plugins)),
   };
 }
 
@@ -138,6 +148,7 @@ function mapProject(p: Project, visit: Visit): Project {
     features: obj(p.features, (f) => ({ ...f, name: visit(f.name, 'text', f.source), goal: visit(f.goal, 'text', f.source), roles: arr(f.roles, (r) => ({ ...r, name: visit(r.name, 'text', f.source), ...(r.desc ? { desc: visit(r.desc, 'text', f.source) } : {}) })), constraints: arr(f.constraints, (c) => ({ ...c, text: visit(c.text, 'text', f.source) })) })),
     options: obj(p.options, (o) => ({
       ...o,
+      ...(o.free ? {free:obj(o.free, r => ({...r, action:mapAction(r.action, visit, p.plugins, r.source),effects:mapEffects(r.effects, visit, r.source)}))} : {}),
       name: visit(o.name, 'text', o.source),
       idea: visit(o.idea, 'text', o.source),
       ...(o.decisionFocus !== undefined ? { decisionFocus: t(o.decisionFocus, visit, o.source) ?? '' } : {}),
@@ -149,8 +160,8 @@ function mapProject(p: Project, visit: Visit): Project {
     cases: obj(p.cases, (c) => ({ ...c, title: visit(c.title, 'text', c.source), expected: t(c.expected, visit, c.source) ?? '' })),
     rules: obj(p.rules, (r) => ({ ...r, text: visit(r.text, 'text', r.source) })),
     issues: obj(p.issues, (q) => ({ ...q, text: visit(q.text, 'text', q.source) })),
-    scenes: obj(p.scenes, (s) => ({ ...s, root: mapNode(s.root, visit) })),
-    scenarios: obj(p.scenarios, (s) => mapScenario(s, visit)),
+    scenes: obj(p.scenes, (s) => ({ ...s, root: mapNode(s.root, visit, p.plugins) })),
+    scenarios: obj(p.scenarios, (s) => mapScenario(s, visit, p.plugins)),
   };
 }
 

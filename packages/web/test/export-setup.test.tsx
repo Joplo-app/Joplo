@@ -1,3 +1,4 @@
+import '../../../scripts/test/render-fixtures.ts';
 /**
  * 看板的导出组件（D66）：安装卡何时出现、进度文字、安装请求带本机令牌、渲染出的卡片。
  */

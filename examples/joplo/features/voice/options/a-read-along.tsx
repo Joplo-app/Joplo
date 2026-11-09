@@ -1,6 +1,6 @@
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
-import { $, callout, done, flow, highlight, notApplicable, option, set, shot, spotlight, trace, uses, type Bind } from '@joplo-app/kit';
+import { $, callout, done, flow, highlight, notApplicable, option, set, shot, spotlight, uses, type Bind } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 
 import { BROWSER_VOICE, PROVIDER_VOICE, initialUi, inner, layers, speak } from '../../../shared/voice/voice.tsx';
 

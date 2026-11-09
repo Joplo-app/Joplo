@@ -1,5 +1,6 @@
+import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
-import { config, feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, Project, type AuthoringProject } from '../src/index.ts';
 
@@ -17,7 +18,7 @@ function source(): AuthoringProject {
   }));
   return {
     root: '/p', config: { ...config({ name: 'Order' }), ...at('joplo.config.ts') }, layouts: {},
-    routes: { '/': { ...page({ title: 'Home' }, jsx('Text', { children: 'Home' })), ...at('routes/page.tsx') } }, features,
+    routes: { '/': { ...page({ title: 'Home' }, jsx('ui:Text', { children: 'Home' })), ...at('routes/page.tsx') } }, features,
   };
 }
 

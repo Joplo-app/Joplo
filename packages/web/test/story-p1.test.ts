@@ -1,8 +1,10 @@
+import '../../../scripts/test/render-fixtures.ts';
+import { dataRows, stateFlowItems, changeFor } from '../../../plugins/ui/src/story-data.ts';
 import { createZhCN } from '../src/i18n/zh-CN';
 import { I18nProvider } from '../src/i18n/context';
 import { describe, expect, it } from 'vitest';
 import type { Scenario } from '@joplo-app/core';
-import { keyboardAt, splitKeys, dataRows, stateFlowItems, changeFor } from '../src/renderer/story-data';
+import { keyboardAt, splitKeys } from '../src/renderer/story-data';
 import { markGeometry } from '../src/renderer/marks-math';
 import { timelineChips } from '../src/player/layout';
 import { subtitleFor } from '../src/player/subtitle-content';
@@ -67,10 +69,10 @@ describe('标注几何', () => {
   });
 });
 
-const p = Project.parse({ schemaVersion: 2, name: '原型', mode: 'publish', scenes: { s: { id: 's', optionId: 'f.a', route: '/', name: '画面', root: { id: 'root', type: 'Stack', children: [
-  { id: 'email', type: 'Email', props: { from: '营地助手', to: '阿杰', subject: '行程有更新', time: '周五 20:05' }, children: [{ id: 'open', type: 'Button', children: [{ id: 'body', type: '#text', props: { text: '查看行程' } }] }] },
-  { id: 'data', type: 'DataCard', props: { title: '行程', value: '$data.trip', fields: [{ key: 'budget', label: '预算' }] } },
-  { id: 'status', type: 'StateFlow', props: { value: '$data.trip.status', states: ['draft', 'shared'], labels: { draft: '草稿', shared: '已分享' } } },
+const p = Project.parse({ schemaVersion: 2, name: '原型', mode: 'publish', scenes: { s: { id: 's', optionId: 'f.a', route: '/', name: '画面', root: { id: 'root', type: 'ui:Stack', children: [
+  { id: 'email', type: 'ui:Email', props: { from: '营地助手', to: '阿杰', subject: '行程有更新', time: '周五 20:05' }, children: [{ id: 'open', type: 'ui:Button', children: [{ id: 'body', type: '#text', props: { text: '查看行程' } }] }] },
+  { id: 'data', type: 'ui:DataCard', props: { title: '行程', value: '$data.trip', fields: [{ key: 'budget', label: '预算' }] } },
+  { id: 'status', type: 'ui:StateFlow', props: { value: '$data.trip.status', states: ['draft', 'shared'], labels: { draft: '草稿', shared: '已分享' } } },
 ] } } }, scenarios: { s: { id: 's', optionId: 'f.a', name: '主线', mock: { label: '模拟成功', outcome: 'success' }, initial: { sceneId: 's', data: { trip: { status: 'draft', budget: 500 } } }, steps: [
   { id: 's#1', kind: 'user', caption: '按下 ⌘K', action: { type: 'press', keys: '⌘K' }, forks: [{ label: '另一条路', scenarioId: 'alt', at: 0 }], effects: [{ type: 'set', path: 'data.trip.status', value: 'shared' }, { type: 'set', path: 'data.trip.budget', value: 280 }] },
   { id: 's#2', kind: 'system', caption: '结束', action: { type: 'event', name: '结束' } },

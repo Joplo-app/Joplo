@@ -9,7 +9,7 @@ import { useI18n } from '../i18n/context';
  * 演示页、发布站、全屏、嵌入、renderStep 截图、导出图片与视频共用；视频用固定高度（fixedHeight），画面尺寸不变。
  */
 import { cn } from '@/lib/utils';
-import type { Fork } from '@joplo-app/core';
+import type { Fork } from '@joplo-app/core/runtime';
 import type { StageTheme } from '../renderer/rough';
 import { fontStyle, type AppearanceFont } from '../renderer/appearance';
 import { JP_SECONDARY, RoleAvatar } from './RoleAvatar';

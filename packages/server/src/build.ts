@@ -1,3 +1,6 @@
+import { inlineResources } from './local-resources.ts';
+import { inlinePluginAssets, PLUGIN_ASSET_BASE } from './plugin-assets.ts';
+import sharedModules from '@joplo-app/web/shared-modules.json' with { type: 'json' };
 /**
  * `joplo build`：静态发布站。
  *
@@ -23,7 +26,7 @@ import { stepIdentity, type StepIdentity, hasScope, JoploError, orderedFeatures,
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
-import type { DistWeb, SourceWeb } from './web-assets.ts';
+import type { DistWeb, SourceWeb, WebAssets } from './web-assets.ts';
 import { subsetSiteFonts } from './site-fonts.ts';
 import { joploHome } from './home.ts';
 import { ProfileStore, bundleVoice, reuseSharedVoice } from './voice.ts';
@@ -33,7 +36,7 @@ export function publishPayload(project: Project, home: string | null): { project
   // voiceConfig（D74）：profile 名与音色属于作者本机的设置，发布站只需要 build 写进的 voiceIndex
   const { rules: _r, cases: _c, issues: _i, voiceConfig: _v, ...rest } = project;
   const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, { id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick }]));
-  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {} }]));
+  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {}, ...(o.free ? {free:o.free} : {}) }]));
   const scenarios = Object.fromEntries(
     Object.entries(project.scenarios).map(([id, s]) => {
       const { caseIds: _ci, ...sr } = s;
@@ -137,6 +140,11 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     project = r.project;
     scope = r.info;
   }
+  if (compiled.resources) {
+    const resources = await inlineResources(project, compiled.resources.requests, compiled.resources.host);
+    if (Object.keys(resources.assets).length) project = { ...project, mediaAssets: resources.assets };
+    compiled.diagnostics.push(...resources.diagnostics);
+  }
   const inline: { project: Record<string, unknown>; home: string | null; scoped?: true } = publishPayload(project, compiled.home);
   if (scope) inline.scoped = true;
 
@@ -165,7 +173,11 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     const { html, inlined } = finalizeHtml(fs.readFileSync(siteHtml, 'utf8'), (rel) => fs.readFileSync(path.join(staging, rel), 'utf8'), inline, stepIdentity(project));
     fs.rmSync(siteHtml);
     for (const rel of inlined) fs.rmSync(path.join(staging, rel));
-    fs.writeFileSync(path.join(staging, 'index.html'), html.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));
+    // 插件运行时（D86）：每个打成一个文件，内联在入口脚本之前（file:// 也能打开）；只打包 IR 里用到的插件
+    const used = Object.fromEntries(Object.entries(compiled.pluginRuntimes).filter(([id]) => project.plugins?.[id]));
+    const pluginCode = await bundlePluginRuntimes(used, projectDir, web);
+    const withPlugins = injectPluginScripts(html, pluginCode);
+    fs.writeFileSync(path.join(staging, 'index.html'), withPlugins.replace(/<title>[^<]*<\/title>/i, () => `<title>${escapeHtml(project.name)} · Joplo</title>`));
 
     // D59: scan every staged text artifact, then retain only font subsets its content needs.
     subsetSiteFonts(staging, web);
@@ -200,7 +212,7 @@ async function buildSourceSite(web: SourceWeb, projectDir: string, staging: stri
     base: './',
     mode: 'production',
     logLevel: 'error',
-    resolve: { alias: [{ find: /^@joplo-app\/core$/, replacement: path.join(web.webDir, 'src/site/core-lite.ts') }, ...kitAliases(web, projectDir)] },
+    resolve: { alias: [{ find: /^@joplo-app\/core(?:\/runtime)?$/, replacement: path.join(web.webDir, 'src/site/core-lite.ts') }, ...kitAliases(web, projectDir)] },
     define: { 'process.env.NODE_ENV': '"production"' },
     plugins: [joploProjectPlugin(projectDir, web), react(), tailwindcss()],
     build: {
@@ -248,6 +260,58 @@ export async function stageDistSite(web: DistWeb, projectDir: string, staging: s
   } finally {
     fs.rmSync(cssOut, { recursive: true, force: true });
   }
+}
+
+/**
+ * 把每个插件运行时打成一个自包含的 ES 模块（依赖一起打进去），执行时注册到 globalThis.__JOPLO_PLUGINS__
+ * （web 的 renderer/plugins.ts 取走）。按插件 id 排序，产物稳定。
+ */
+export async function bundlePluginRuntimes(runtimes: Record<string, string>, projectDir: string, web: WebAssets, mode: 'factory' | 'module' = 'factory'): Promise<string[]> {
+  const out: string[] = [];
+  const modules: Record<string, string[]> = sharedModules;
+  const shared = Object.keys(modules);
+  const bridge = (name: string) => {
+    const keys = modules[name]!;
+    return `const shared = globalThis.__JOPLO_SHARED__[${JSON.stringify(name)}]; export default shared; ${keys.map(k => `export const ${k} = shared.${k};`).join(' ')}`;
+  };
+  for (const [id, file] of Object.entries(runtimes).sort(([a], [b]) => a.localeCompare(b))) {
+    const entry = '\0joplo-plugin-entry';
+    const r = (await viteBuild({
+      configFile: false,
+      envDir: false,
+      root: path.dirname(file),
+      base: PLUGIN_ASSET_BASE,
+      mode: 'production',
+      logLevel: 'error',
+      resolve: { alias: kitAliases(web, projectDir) },
+      define: { 'process.env.NODE_ENV': '"production"' },
+      oxc: { jsx: { runtime: 'automatic', importSource: 'react', development: false } },
+      plugins: [{
+        name: 'joplo:plugin-entry',
+        // Resolve shared modules before Vite finds a plugin's installed React copy.
+        enforce: 'pre',
+        resolveId: (src) => src === 'joplo-plugin-entry' ? entry : shared.includes(src) ? `\0joplo-shared:${src}` : null,
+        load: (resolved) => (resolved.startsWith('\0joplo-shared:') ? bridge(resolved.slice('\0joplo-shared:'.length)) : resolved === entry ? `import runtime from ${JSON.stringify(file)};\n${mode === 'module' ? 'export default runtime;' : '(globalThis.__JOPLO_PLUGINS__ ??= []).push(runtime);'}\n` : null),
+      }],
+      build: { write: false, assetsInlineLimit: 0, cssCodeSplit: false, minify: true, sourcemap: false, modulePreload: false, reportCompressedSize: false, emptyOutDir: false, rolldownOptions: { input: 'joplo-plugin-entry', ...(mode === 'module' ? {preserveEntrySignatures:'strict' as const} : {}), output: { format: 'es', codeSplitting: false } } },
+    })) as Rollup.RollupOutput | Rollup.RollupOutput[];
+    const output=(Array.isArray(r)?r:[r]).flatMap(o=>o.output);
+    const chunks=output.filter((x):x is Rollup.OutputChunk=>x.type==='chunk');
+    if (chunks.length !== 1) throw new JoploError('EXPORT_FAILED', `Plugin ${id}: expected one bundled runtime file, got ${chunks.length}`);
+    const code=inlinePluginAssets(id,chunks[0]!.code,output.filter((x):x is Rollup.OutputAsset=>x.type==='asset'));
+    // Defer evaluation until the host has initialized its shared React instance.
+    out.push(mode === 'module' ? code : `(globalThis.__JOPLO_PLUGIN_FACTORIES__ ??= []).push({id:${JSON.stringify(id)},load:()=>{\n${code}\n}});`);
+  }
+  return out;
+}
+
+/** 插件脚本放在第一个模块脚本（入口）之前：模块脚本按文档顺序执行，注册表载入时插件已经就位。 */
+export function injectPluginScripts(html: string, codes: string[]): string {
+  if (!codes.length) return html;
+  const tags = codes.map((c) => `<script type="module" data-joplo-plugin>${c.replace(/<\/script/gi, '<\\/script')}</script>`).join('\n');
+  const i = html.indexOf('<script type="module">');
+  if (i < 0) throw new JoploError('EXPORT_FAILED', 'Published site has no entry script to put plugin runtimes before');
+  return `${html.slice(0, i)}${tags}\n${html.slice(i)}`;
 }
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

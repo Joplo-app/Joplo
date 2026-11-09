@@ -1,5 +1,5 @@
 import { page } from '@joplo-app/kit';
-import { Card, SimpleGrid, Stack, Text, TextInput, Title } from '@joplo-app/kit/ui';
+import { Card, SimpleGrid, Stack, Text, TextInput, Title } from '@joplo-app/plugin-ui';
 
 export default page(
   { title: '空间设置' },
