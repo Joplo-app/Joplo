@@ -2,30 +2,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { JoploError, LOCAL_REVIEW_VERSION, localReviewStatus, type LocalReviewSession } from '@joplo-app/core';
-import { localReviewDir, localReviewFile, localReviewOwnerAlive, localReviewWatcherDir, readLocalReview, writeLocalReview } from '@joplo-app/core/node';
+import { JoploError, localReviewStatus, type LocalReviewSession } from '@joplo-app/core';
+import { listLocalReviews, localReviewDir, localReviewFile, localReviewOwnerAlive, localReviewWatcherDir, readLocalReview, writeLocalReview } from '@joplo-app/core/node';
 import { terminalText } from './cloud-error.ts';
 import { localFeedbackEvent, writeFeedbackEvent, type FeedbackStreamIo } from './feedback-stream.ts';
 const terminalLines = (text: string) => text.split('\n').map(line => terminalText(line)).join('\n');
 
-// 旧版本只按版本号丢弃，不解释旧结构；当前版本损坏仍然报错。
-function currentReview(dir: string, id: string): LocalReviewSession | null {
-  const raw = JSON.parse(fs.readFileSync(localReviewFile(dir, id), 'utf8')) as { v?: unknown };
-  return raw.v === LOCAL_REVIEW_VERSION ? readLocalReview(dir, id) : null;
-}
-function listLocalReviews(dir: string): LocalReviewSession[] {
-  let files: string[];
-  try { files = fs.readdirSync(localReviewDir(dir)); }
-  catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []; throw e; }
-  return files.filter(f => /^rv_[a-f0-9]{32}\.json$/.test(f)).flatMap(f => {
-    const record = currentReview(dir, f.slice(0, -5));
-    return record ? [record] : [];
-  }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
 export type ReviewFilter = { session?: string; workId?: string; all?: boolean; labels?: Record<string, string> };
 export function reviewSessions(dir: string, filter: ReviewFilter = {}): LocalReviewSession[] {
   const root = fs.realpathSync(path.resolve(dir));
-  return (filter.session ? [currentReview(root, filter.session)].filter((s): s is LocalReviewSession => s !== null) : listLocalReviews(root))
+  return (filter.session ? [readLocalReview(root, filter.session)] : listLocalReviews(root))
     .filter(s => !filter.workId || s.workId === filter.workId)
     .filter(s => filter.all || filter.session || localReviewStatus(s) === 'open' && localReviewOwnerAlive(s));
 }
@@ -137,8 +123,12 @@ export async function followLocalReviews(dir: string, opts: ReviewFilter & { aft
       try { stat = fs.statSync(path.join(localReviewDir(root), f), { bigint: true }); } catch { continue; }
       const stamp = `${stat.mtimeNs}:${stat.size}`;
       const hit = known.get(id);
-      const session = hit?.stamp === stamp ? hit.session : currentReview(root, id);
-      if (!session) continue;
+      let session: LocalReviewSession;
+      try { session = hit?.stamp === stamp ? hit.session : readLocalReview(root, id); }
+      catch (e) {
+        if (e instanceof JoploError && e.code === 'NOT_FOUND' || (e as NodeJS.ErrnoException).code === 'ENOENT') continue;
+        throw e;
+      }
       known.set(id, { stamp, session });
       out.push(session);
     }

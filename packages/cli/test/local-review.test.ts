@@ -216,3 +216,26 @@ it('--once ignores closed rounds from source edits (the agent own work) and stil
   expect(await result).toBe(0);
   expect(io.out).toContain('After the edit');
 });
+
+it('核心统一忽略旧版本，显式 CLI 会话选择保留重新发起提示', () => {
+  const x = setup();
+  const before = reviewSessions(x.dir, { all: true });
+  const id = `rv_${crypto.randomBytes(16).toString('hex')}`;
+  const file = localReviewFile(x.dir, id);
+  writeLocalReview(file, { ...x.session, id, v: 1 });
+  expect(reviewSessions(x.dir, { all: true })).toEqual(before);
+  expect(() => reviewSessions(x.dir, { session: id })).toThrowError(expect.objectContaining({ code: 'NOT_FOUND', message: expect.stringMatching(/older version of Joplo.*start a new review/i) }));
+  expect(fs.existsSync(file)).toBe(true);
+});
+
+it('独立作品的空功能归属在反馈流与 watch 回放中保持为空', async () => {
+  const x = setup(); x.feedback(); x.approve();
+  const saved = readLocalReview(x.dir, x.session.id);
+  writeLocalReview(localReviewFile(x.dir, saved.id), { ...saved, featureId: null, featureName: null, workId: 'intro', workTitle: 'Intro' });
+  const io = capture();
+  expect(await watchLocalReview(x.dir, { session: saved.id, json: true }, io.io)).toBe(0);
+  expect(io.out.trim().split('\n').map(line => JSON.parse(line))).toEqual([
+    expect.objectContaining({ type: 'feedback', featureId: null, workId: 'intro' }),
+    expect.objectContaining({ type: 'approved', featureId: null, workId: 'intro' }),
+  ]);
+});

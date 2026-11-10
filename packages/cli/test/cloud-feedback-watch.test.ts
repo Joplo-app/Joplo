@@ -98,7 +98,7 @@ describe('cloud snapshot polling', () => {
   });
   it('uses stable event ids across restarts, with server/version/option isolation', () => {
     const feedback = snapshot([comment('c1')], [decision()]);
-    expect(cloudFeedbackEvents(feedback, binding)).toEqual(cloudFeedbackEvents(feedback, { version: 3, workId: 'f.a', shareId, server: 'https://cloud.example' }));
+    expect(cloudFeedbackEvents(feedback, binding)).toEqual(cloudFeedbackEvents(feedback, { version: 3, workId: 'f.a', featureId: 'f', shareId, server: 'https://cloud.example' }));
     const id = cloudReviewIdentity(binding).sessionId;
     expect(cloudReviewIdentity({ ...binding, server: 'https://another.example' }).sessionId).not.toBe(id);
     expect(cloudReviewIdentity({ ...binding, version: 4 }).sessionId).not.toBe(id);
@@ -139,7 +139,7 @@ it('the unified CLI rejects incompatible modes before auth and streams cloud eve
 });
 
 it('独立作品通过内部播放 id 绑定反馈，面向人的监听与确认输出只用作品键', async () => {
-  const { client } = fixture([snapshot([], [decision('d1', { featureId: 'demo', targetId: 'demo' })])]);
+  const { client } = fixture([snapshot([], [decision('d1', { featureId: null, workId: 'demo', targetId: 'demo' })])]);
   const io = capture();
   expect(await watchCloudFeedback(client, shareId, { workId: 'demo', work: 'demo' }, io.io)).toBe(0);
   expect(io.out + io.err).not.toContain('demo.main');

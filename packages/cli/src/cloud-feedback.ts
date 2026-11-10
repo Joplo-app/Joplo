@@ -16,7 +16,7 @@ export const SHARE_ID = /^[A-Za-z0-9]{10}$/;
 const DECISION_ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const DECISION_KINDS = ['pick', 'confirm_rule', 'reject_rule', 'answer'] as const;
 
-export type FeedbackDecision = { id: string; kind: string; workId: string | null; featureId: string; targetId: string; note: string | null; decidedAt: string; version: number };
+export type FeedbackDecision = { id: string; kind: string; workId: string | null; featureId: string | null; targetId: string; note: string | null; decidedAt: string; version: number };
 export type FeedbackComment = { id: string; version: number; workId: string; scenario: string; step: number; stepId: string | null; element: { id: string; label: string } | null; body: string; author: { name: string }; createdAt: string };
 export type Feedback = { share: { id: string; version: number }; decisions: FeedbackDecision[]; comments: FeedbackComment[] };
 
@@ -50,8 +50,8 @@ export async function feedbackShareId(client: CloudClient, dir: string, explicit
 
 function readDecision(raw: unknown): FeedbackDecision {
   const d = object(raw);
-  if (!str(d.id, 64) || !d.id || !str(d.kind, 32) || !/^[a-z_]+$/.test(d.kind) || !str(d.featureId, 256) || !str(d.targetId, 256) || !(d.workId === null || str(d.workId, 256)) || !(d.note === null || d.note === undefined || str(d.note, 10_000)) || !iso(d.decidedAt) || !int(d.version, 1)) throw new CloudError('INVALID_RESPONSE');
-  return { id: d.id, kind: d.kind, workId: d.workId as string | null, featureId: d.featureId, targetId: d.targetId, note: typeof d.note === 'string' ? d.note : null, decidedAt: d.decidedAt, version: d.version };
+  if (!str(d.id, 64) || !d.id || !str(d.kind, 32) || !/^[a-z_]+$/.test(d.kind) || !(d.featureId === null || str(d.featureId, 256)) || !str(d.targetId, 256) || !(d.workId === null || str(d.workId, 256)) || !(d.note === null || d.note === undefined || str(d.note, 10_000)) || !iso(d.decidedAt) || !int(d.version, 1)) throw new CloudError('INVALID_RESPONSE');
+  return { id: d.id, kind: d.kind, workId: d.workId as string | null, featureId: d.featureId as string | null, targetId: d.targetId, note: typeof d.note === 'string' ? d.note : null, decidedAt: d.decidedAt, version: d.version };
 }
 
 function readComment(raw: unknown): FeedbackComment {
@@ -103,14 +103,16 @@ const line = (s: string, max = 300) => {
   const t = terminalText(s.replace(/[\r\n\t]+/g, ' ')).trim();
   return [...t].length > max ? `${[...t].slice(0, max - 1).join('')}…` : t;
 };
-/** pick 的 targetId 是方案 id（`功能.方案`）；只写方案键时补上功能。 */
-const optionLabel = (d: FeedbackDecision) => (d.targetId.includes('.') ? d.targetId : `${d.featureId}.${d.targetId}`);
+/** pick 的 targetId 已是完整作品 id；不从字符串猜功能归属。 */
+const optionLabel = (d: FeedbackDecision) => d.targetId;
 
 export function decisionLine(d: FeedbackDecision): string {
   const note = d.note?.trim() ? line(d.note) : '';
   switch (d.kind) {
     case 'pick':
-      return `Pick option ${line(optionLabel(d))} for feature ${line(d.featureId)}${note ? ` (note: ${note})` : ''}`;
+      return d.featureId === null
+        ? `Approve work ${line(optionLabel(d))}${note ? ` (note: ${note})` : ''}`
+        : `Pick option ${line(optionLabel(d))} for feature ${line(d.featureId)}${note ? ` (note: ${note})` : ''}`;
     case 'confirm_rule':
       return `Confirm rule ${line(d.targetId)}${note ? ` (note: ${note})` : ''}`;
     case 'reject_rule':

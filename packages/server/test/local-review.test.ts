@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
+import { work, chapter } from '@joplo-app/kit';
+import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, LocalReviewWrite, localReviewStatus, type Project } from '@joplo-app/core';
 import { listLocalReviews, readLocalReview } from '@joplo-app/core/node';
 import { reviewSource } from '../../core/test/fixtures/review.ts';
@@ -125,12 +127,29 @@ it('HTTP review endpoints enforce token, origin, project ownership, and revision
   expect(malformed.status).toBe(400);
 });
 
-it('独立作品评审不伪造所属功能（核心契约阻塞证据）', () => {
-  const p = project();
-  const work = p.works['f.a']!;
-  delete work.featureId;
-  const independent = { ...p, features: {}, entryIds: ['demo'], works: { demo: { ...work, id: 'demo', key: 'demo' } }, scenarios: {}, scenes: {} };
-  const dir = temp();
-  const h = hubFor(dir, independent);
-  expect(h.state(dir, 'demo').session.featureId).toBeNull();
+it('独立作品评审保留空功能归属，反馈、revision 与关闭均使用作品身份', () => {
+  const source = reviewSource();
+  const result = compile({ ...source, features: {}, works: { intro: {
+    ...work({ title: 'Intro', summary: 'Summary', stage: jsx('div', { children: 'Welcome' }), scenarios: { start: chapter('Start').system('Begin') } }),
+    file: 'works/intro.tsx',
+  } } }, 'dev');
+  expect(result.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+  const p = result.project!;
+  const dir = temp(), h = hubFor(dir, p), session = h.state(dir, 'intro').session;
+  expect(session).toMatchObject({ v: 2, featureId: null, featureName: null, workId: 'intro', workTitle: 'Intro' });
+  expect(readLocalReview(dir, session.id)).toEqual(session);
+  h.sync(dir, 'project-a', structuredClone(p));
+  expect(h.state(dir, 'intro').session.id).toBe(session.id);
+  h.write(dir, p, { sessionId: session.id, requestId: crypto.randomUUID(), type: 'feedback', body: 'Keep the opening',
+    context: { scenarioId: 'intro.start', position: 1, sceneId: p.scenarios['intro.start']!.initial.sceneId } });
+  h.write(dir, p, approve(session.id));
+  expect(readLocalReview(dir, session.id)).toMatchObject({ featureId: null, featureName: null, events: [{ type: 'feedback' }, { type: 'approved' }] });
+  p.works.intro!.summary = 'Updated summary';
+  h.sync(dir, 'project-a', p);
+  const next = h.state(dir, 'intro').session;
+  expect(next.id).not.toBe(session.id);
+  expect(next).toMatchObject({ featureId: null, featureName: null, workId: 'intro' });
+  expect(localReviewStatus(readLocalReview(dir, session.id))).toBe('approved');
+  h.invalidate(dir, 'server_stopped');
+  expect(readLocalReview(dir, next.id)).toMatchObject({ featureId: null, events: [{ type: 'closed', reason: 'server_stopped' }] });
 });

@@ -79,7 +79,7 @@ export class LocalReviewHub {
       if (old) this.closeSession(old, 'source_changed');
       const id = `rv_${crypto.randomBytes(16).toString('hex')}`;
       this.persist({ v: LOCAL_REVIEW_VERSION, id, instanceId: this.instanceId, ownerPid: process.pid, projectId, projectDir: dir, projectName: project.name,
-        featureId: entry.id, featureName: entry.title, workId: option.id, workTitle: option.title,
+        featureId: entry.featureId, featureName: entry.featureId === null ? null : entry.title, workId: option.id, workTitle: option.title,
         revision, createdAt: new Date().toISOString(), url: `${this.baseUrl()}#/${encodeURIComponent(projectId)}/f/${encodeURIComponent(entry.id)}?o=${encodeURIComponent(option.id)}`,
         events: [],
       });

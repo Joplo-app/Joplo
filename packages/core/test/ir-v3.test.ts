@@ -24,7 +24,10 @@ describe('IR v3 invariants', () => {
     const result=compile(src,'dev'); expect(result.diagnostics).toEqual([]); const p=result.project!;
     expect(p).not.toBeNull(); expect(p.works['f.a']).toMatchObject({roles:[],title:'Title'});
     expect(p.features.f).toMatchObject({workIds:['f.a'],alternatives:{'f.a':{decisionFocus:'Decision',tradeoffs:['Tradeoff'],coverage:{}}}});
-    expect(p.works['f.a']).not.toHaveProperty('tradeoffs'); expect(rolesOf(p,'f.a')[0].id).toBe('speaker');
+    expect(p.works['f.a']).not.toHaveProperty('tradeoffs'); const speaker = rolesOf(p, 'f.a')[0];
+    expect(speaker).toBeDefined();
+    if (!speaker) throw new Error('Expected an inherited speaker role');
+    expect(speaker.id).toBe('speaker');
     expect(roleOfScene(p,'f.a~stage')?.id).toBe('speaker');
     expect(Project.safeParse({...p,features:{f:{...p.features.f,alternatives:{}}}}).success).toBe(false);
     expect(Feature.safeParse({...p.features.f,alternatives:{}}).success).toBe(false);

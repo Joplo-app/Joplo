@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { LOCAL_REVIEW_MAX_FILE_BYTES, LocalReviewId, LocalReviewSession } from './local-review.ts';
+import { LOCAL_REVIEW_VERSION, LOCAL_REVIEW_MAX_FILE_BYTES, LocalReviewId, LocalReviewSession } from './local-review.ts';
 import { JoploError } from './result.ts';
 
 export const localReviewDir = (dir: string) => path.join(dir, '.joplo', 'reviews');
@@ -29,20 +29,32 @@ export function writeLocalReview(file: string, value: unknown): void {
   }
 }
 
-export function readLocalReview(dir: string, sessionId: string): LocalReviewSession {
+function currentLocalReview(dir: string, sessionId: string): LocalReviewSession | null {
   const file = localReviewFile(dir, sessionId);
   if (fs.statSync(file).size > LOCAL_REVIEW_MAX_FILE_BYTES) throw new JoploError('INVALID_SCHEMA', 'Local review file exceeds 16 MiB');
-  const result = LocalReviewSession.safeParse(JSON.parse(fs.readFileSync(file, 'utf8')));
+  const value: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
+  // 只读版本号；不解释、不迁移旧记录，当前版本损坏仍照常报错。
+  if (value && typeof value === 'object' && 'v' in value && value.v !== LOCAL_REVIEW_VERSION) return null;
+  const result = LocalReviewSession.safeParse(value);
   if (!result.success || result.data.id !== sessionId || result.data.projectDir !== fs.realpathSync(dir))
     throw new JoploError('INVALID_SCHEMA', `Invalid local review file: ${file}`);
   return result.data;
+}
+
+export function readLocalReview(dir: string, sessionId: string): LocalReviewSession {
+  const session = currentLocalReview(dir, sessionId);
+  if (!session) throw new JoploError('NOT_FOUND', 'This review session was created by an older version of Joplo; start a new review');
+  return session;
 }
 
 export function listLocalReviews(dir: string): LocalReviewSession[] {
   let files: string[];
   try { files = fs.readdirSync(localReviewDir(dir)); }
   catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []; throw e; }
-  return files.filter(f => /^rv_[a-f0-9]{32}\.json$/.test(f)).map(f => readLocalReview(dir, f.slice(0, -5)))
+  return files.filter(f => /^rv_[a-f0-9]{32}\.json$/.test(f)).flatMap(f => {
+    const session = currentLocalReview(dir, f.slice(0, -5));
+    return session ? [session] : [];
+  })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
