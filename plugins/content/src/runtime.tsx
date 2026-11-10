@@ -292,6 +292,11 @@ export const AWAY: Record<string, Keyframe> = {
   growUp: { scale: '1 0', transformOrigin: '50% 100%' },
   blur: { opacity: 0, filter: 'blur(14px)' },
 };
+/** Grow anchors stay fixed throughout the flight; an omitted endpoint would interpolate back to center. */
+function transitionFrames(away: Keyframe, entering: boolean): Keyframe[] {
+  const anchor = away.transformOrigin === undefined ? [] : [{ transformOrigin: away.transformOrigin, offset: entering ? 1 : 0 }];
+  return entering ? [{ ...away, offset: 0 }, ...anchor] : [...anchor, { ...away, offset: 1 }];
+}
 const ENTER_EASE = 'cubic-bezier(.16,1,.3,1)';
 const EXIT_EASE = 'cubic-bezier(.55,0,.75,.2)';
 const ENTER_MS = 600;
@@ -498,7 +503,7 @@ export const observe: PluginObserve = (root, initial) => {
     for (let a = el === removed ? null : el.parentElement; a && !host; a = a === removed ? null : a.parentElement) if (a.hasAttribute('data-jp-content-exit-stagger')) host = a;
     host ??= parent.closest('[data-jp-content-exit-stagger]');
     const delay = msOf(el.dataset.jpContentExitDelay, 0) + staggered(ranks, host, 'exitStagger');
-    const anim = ghost.animate([{ ...away, offset: 1 }], { duration: msOf(el.dataset.jpContentExitMs, EXIT_MS), delay, easing: easeOf(el.dataset.jpContentExitEase, EXIT_EASE), fill: 'forwards' });
+    const anim = ghost.animate(transitionFrames(away, false), { duration: msOf(el.dataset.jpContentExitMs, EXIT_MS), delay, easing: easeOf(el.dataset.jpContentExitEase, EXIT_EASE), fill: 'forwards' });
     anim.id = 'jexit';
     ghosts.set(outer, anim);
     const done = () => { if (ghosts.get(outer) === anim) drop(outer); };
@@ -611,7 +616,7 @@ export const observe: PluginObserve = (root, initial) => {
           const key = el.dataset.jpContentMotion;
           if (key && previous.has(key)) continue;
           const delay = msOf(el.dataset.jpContentEnterDelay, 0) + staggered(ranks, el.parentElement?.closest('[data-jp-content-enter-stagger]') ?? null, 'enterStagger');
-          const anim = el.animate([{ ...AWAY[kind], offset: 0 }], { duration: msOf(el.dataset.jpContentEnterMs, ENTER_MS), delay, easing: easeOf(el.dataset.jpContentEnterEase, ENTER_EASE), fill: 'backwards' });
+          const anim = el.animate(transitionFrames(AWAY[kind]!, true), { duration: msOf(el.dataset.jpContentEnterMs, ENTER_MS), delay, easing: easeOf(el.dataset.jpContentEnterEase, ENTER_EASE), fill: 'backwards' });
           anim.id = 'jenter';
           entering.add(anim);
           anim.addEventListener('finish', () => entering.delete(anim), { once: true });
