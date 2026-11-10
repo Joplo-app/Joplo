@@ -11,7 +11,7 @@ type Identity = { elementId: string | null; source: string | null; tag?: string 
 type Geometry = { coordinates: 'page-css-pixels'; root: LayoutBox; content: LayoutBox; safeAreas: LayoutBox[]; elements: (Identity & { box: LayoutBox })[]; textBoxes: (Identity & { box: LayoutBox; text: string })[]; findings: LayoutFinding[]; unknowns: (Identity & { reason: string })[]; phases: { phase: string; afterMs: number }[]; fonts: { status: string; families: string[] }; truncated: boolean };
 export type LayoutAuditSample = Omit<Geometry, 'phases'> & { phaseHints?: Geometry['phases']; atMs: number | null; timeBasis: 'engine-clock' | 'static-final-state'; phases: string[]; scenarioId: string; position: number; stepId: string | null; workId: string | null; evidence: string | null };
 export type LayoutAuditResult = { path: string; findings: number; samples: number };
-const browserSource = fs.readFileSync(path.join(import.meta.dirname, 'layout-audit.js'), 'utf8').replace(/^\/\*[\s\S]*?\*\/\s*/, '');
+const browserSource = fs.readFileSync(path.join(import.meta.dirname, 'layout-audit-browser.js'), 'utf8').replace(/^\/\*[\s\S]*?\*\/\s*/, '');
 function area(value: unknown): value is ExportCrop {
   if (typeof value === 'string') return value.trim().length > 0;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;

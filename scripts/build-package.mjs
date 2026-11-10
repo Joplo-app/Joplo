@@ -35,6 +35,7 @@ if (r.status !== 0) fail(`tsc 失败（退出码 ${r.status}）`);
 const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
 for (const f of walk(src)) {
   if (/\.(ts|tsx|mts)$/.test(f)) continue;
+  if (/\.(?:js|mjs)$/.test(f) && ['.ts', '.tsx', '.mts'].some(ext => fs.existsSync(f.replace(/\.(?:js|mjs)$/, ext)))) fail(`静态 JS 与 TypeScript 模块同名，会覆盖编译导出：${path.relative(src, f)}；请给浏览器注入源使用独立文件名`);
   const to = path.join(dist, path.relative(src, f));
   fs.mkdirSync(path.dirname(to), { recursive: true });
   fs.copyFileSync(f, to);
