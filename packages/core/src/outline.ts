@@ -90,7 +90,8 @@ export function outline(project: Project, opts: { workId?: string } = {}): Outli
         scenarios,
       };
     });
-    entries.push({ featureId: entry.featureId, sequencing: entry.sequencing, draft: entry.draft, id: entry.id, title: entry.title, summary: entry.summary, roles: entry.roles, pick: f?.pick ?? entry.workId, cases, works });
+    // Entry.workId may be a preview default; a feature decision must preserve its null pick.
+    entries.push({ featureId: entry.featureId, sequencing: entry.sequencing, draft: entry.draft, id: entry.id, title: entry.title, summary: entry.summary, roles: entry.roles, pick: f ? f.pick : entry.workId, cases, works });
   }
   return { name: project.name, mode: project.mode, entries };
 }

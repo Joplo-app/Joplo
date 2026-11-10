@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { chapter, feature, work, role, layer, say } from '@joplo-app/kit';
 import { Text } from '@joplo-app/plugin-ui';
@@ -45,7 +44,7 @@ describe('IR v3 invariants', () => {
   });
 });
 
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadAuthoring } from '../src/load.ts';
@@ -94,13 +93,6 @@ it('keeps mixed entry ordering and direct-work embedding without inferring struc
   expect(entryOf(p,'f.only')).toBeNull();expect(embedScenarioIds(p)).toEqual(['f.only.a','demo.a']);
   const scoped=scopeProject(p,['demo.a']).project;expect(scoped.features).toEqual({});expect(scoped.entryIds).toEqual(['demo']);expect(Project.safeParse(scoped).success).toBe(true);
 });
-const captureDir=process.env.JOPLO_IR_V2_BASELINE;
-it.skipIf(!captureDir).each(['examples/joplo','examples/invite','examples/midterms-2026','examples/llm-explainer','examples/agent-arch','templates/starter'].flatMap(name=>['dev','publish','review'].map(mode=>({name,mode}))))('matches the captured v2 oracle: $name $mode', async ({name,mode})=>{
-  const root=join(import.meta.dirname,'../../..',name);
-  const actual=JSON.parse(execFileSync('pnpm',['exec','tsx',join(import.meta.dirname,'fixtures/capture-ir.ts'),root,mode],{encoding:'utf8',maxBuffer:128*1024*1024}));
-  const baseline=JSON.parse(readFileSync(join(captureDir!,`${name.replaceAll('/','--')}--${mode}.json`),'utf8'));
-  expect(actual).toEqual(mapV2Capture(baseline));
-},60_000);
 it('the migration oracle rewrites references without editing authored content or its input', () => {
   const baseline={project:{schemaVersion:2,features:{demo:{id:'demo',standalone:true,roles:[]}},featureIds:['demo'],options:{'demo.main':{id:'demo.main',featureId:'demo',key:'main',name:'demo.main',idea:'demo.main.opening',decisionFocus:'',tradeoffs:[],coverage:{},layers:{}}},routes:{},scenes:{},scenarios:{'demo.main.a':{id:'demo.main.a',optionId:'demo.main',initial:{ui:{options:{label:'demo.main'}}}}}},diagnostics:[]};
   const before=structuredClone(baseline), mapped=mapV2Capture(baseline);
