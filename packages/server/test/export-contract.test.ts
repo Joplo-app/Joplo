@@ -78,6 +78,16 @@ describe('offline export fixture: two orientations, continuing chapters, three c
     const concurrent = await Promise.all([1, 2].map(i => renderFilm({ ...common, out: path.join(root, `concurrent-${i}.png`) })));
     expect(concurrent.every(r => r.files.length === 2)).toBe(true);
   }, 120000);
+  it('film layout audit uses the existing capture clock and JPEG evidence at actual commits', async()=>{
+    const out=path.join(root,'audited.png'),timelineFile=path.join(root,'audited-timeline.json');
+    const result=await renderFilm({projectDir:root,scenarioId:'export.a.one',out,voice:'off',sampleMs:50,every:250,logicalViewport:{width:160,height:90},timeline:timelineFile,auditLayout:{content:{x:0,y:0,width:5,height:5},important:['[data-jid="signal"]']}});
+    expect(result.audit).toBeDefined();
+    const audit=JSON.parse(fs.readFileSync(result.audit!.path,'utf8')),timeline=JSON.parse(fs.readFileSync(timelineFile,'utf8'));
+    expect(audit.sampleToleranceMs).toBe(50);
+    for(const step of timeline.steps){const sample=audit.samples.find((s:any)=>s.stepId===step.stepId&&s.phases.includes('post-commit'));expect(sample).toBeDefined();expect(Math.abs(sample.atMs-step.commitMs)).toBeLessThanOrEqual(50);}
+    expect(audit.samples.some((s:any)=>s.findings.some((f:any)=>f.code==='TEXT_OUTSIDE_CONTENT'))).toBe(true);
+    expect(audit.samples.filter((s:any)=>s.evidence).every((s:any)=>fs.existsSync(s.evidence))).toBe(true);
+  },120000);
   it.skipIf(process.env.JOPLO_EXPORT_VIDEO !== '1')('captures all real-duration narration in portrait and landscape videos with measured sync', async () => {
     for (const [width, height, ext] of [[180, 320, 'webm'], [320, 180, 'mp4']] as const) {
       const file = path.join(root, `video-${width}.${ext}`), timelineFile = path.join(root, `video-${width}.json`);

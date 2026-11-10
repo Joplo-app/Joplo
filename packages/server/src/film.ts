@@ -26,6 +26,7 @@ import { loadPlaywright } from './export-runtime.ts';
 import { assertNotProjectData, launch } from './render.ts';
 import { encodeMp4 } from './video-format.ts';
 import { commitOutput, writeOutput } from './output-file.ts';
+import { createLayoutAuditSession } from './layout-audit.ts';
 import { checkpointCommitsMatch, contentIdentity, exportRuntimeRoots } from './checkpoint.ts';
 import { capture, geometryQuery } from './capture.ts';
 import { frameTime, persistTimeline, playbackTimeline, type RawTimeline } from './timeline.ts';
@@ -164,6 +165,8 @@ function recordUrl(base: string, projectId: string, project: Project, o: { scena
 
 /** 胶片条：按引擎时间逐帧定格取样。 */
 async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScale?: number; framesOnly?: boolean }): Promise<FilmResult> {
+  if(opts.auditLayout&&opts.resume)throw new JoploError('USAGE','Layout audit requires a fresh render; do not combine it with --resume');
+  if(opts.auditLayout&&opts.framesOnly)throw new JoploError('USAGE','Layout audit supports static screenshots and --film, not --frames-out');
   const baselineRssBytes=process.memoryUsage().rss;
   const projectDir = realProjectDir(opts.projectDir);
   const out = check({ ...opts, projectDir });
@@ -201,6 +204,7 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
   const startedAt = Date.now();
   let browser: Browser | null = null;
   try {
+    const audit=opts.auditLayout?createLayoutAuditSession({out,project,crop:opts.crop,options:opts.auditLayout,overwrite:opts.overwrite,sampleMs}):null;
     const canvas = opts.width && opts.height ? { width: opts.width, height: opts.height } : opts.logicalViewport;
     const { url, size: defaultSize } = recordUrl(server.url, server.projectId, project, {...opts,audio:false,voice: opts.voice ?? (opts.framesOnly ? 'real' : 'estimate'), ...(canvas ? { canvas } : {})});
     const size = canvas ?? defaultSize;
@@ -279,6 +283,7 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
         continue;
       }
       const jpg = (await capture(page, '[data-jexport]', opts.crop, 'jpeg', opts.framesOnly ? 95 : 72, captureSession, t)).toString('base64');
+      await audit?.sample(page,{atMs:t,scenarioId:p.scenarioId??opts.scenarioId,position:p.position,jpg});
       const d = opts.framesOnly ? { diff: 0, changed: 0, still: 0 } : await helper.evaluate(([b64, crop, time, th, st]) => (window as unknown as { step: (...a: unknown[]) => Promise<{ diff: number; changed: number; still: number }> }).step(b64, crop, time, th, st), [jpg, stageRatio, t, PIXEL_THRESHOLD, STILL_CHANGED] as const);
       samples.push({ t, ...d, scenarioId: p.scenarioId, position: p.position, activeStep: p.activeStep, stepId: p.scenarioId ? project.scenarios[p.scenarioId]?.steps[p.position-1]?.id ?? null : null, ...(!opts.framesOnly && t % every === 0 ? { jpg } : {}) });
       if (opts.frames && (opts.framesOnly || t % every === 0)) { fs.mkdirSync(opts.frames, { recursive: true }); fs.writeFileSync(path.join(opts.frames, `${String(t).padStart(7, '0')}.jpg`), Buffer.from(jpg, 'base64')); }
@@ -342,7 +347,7 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
       files.push(file);
     }
     await ctx.close();
-    const result: FilmResult = { path: files[0] ?? out, files, durationMs, sampleMs, every, samples: samples.length, cuts, stills, boundaries, maxDiff: round(Math.max(0, ...samples.map((s) => s.diff))), warnings: sampleMs > 50 ? ['Coarse analysis: transitions shorter than the computation interval may be missed; use 50 ms for final QA.'] : [], measurement: { baselineRssBytes, endRssBytes:process.memoryUsage().rss, memoryScope:'node-process-lifetime', rssSamples, wallMs: Date.now() - startedAt, peakRssBytes: process.resourceUsage().maxRSS * 1024, resumedSamples: checkpoint?.samples.length ?? 0 } };
+    const result: FilmResult = { ...(audit?{audit:audit.finish()}:{}), path: files[0] ?? out, files, durationMs, sampleMs, every, samples: samples.length, cuts, stills, boundaries, maxDiff: round(Math.max(0, ...samples.map((s) => s.diff))), warnings: sampleMs > 50 ? ['Coarse analysis: transitions shorter than the computation interval may be missed; use 50 ms for final QA.'] : [], measurement: { baselineRssBytes, endRssBytes:process.memoryUsage().rss, memoryScope:'node-process-lifetime', rssSamples, wallMs: Date.now() - startedAt, peakRssBytes: process.resourceUsage().maxRSS * 1024, resumedSamples: checkpoint?.samples.length ?? 0 } };
     // 完整的判读数据（每一步提交前后的最大帧差、硬切、静止）放在胶片条旁边，评审时可以引用具体数字
     await writeOutput(metadataOut,JSON.stringify({ ...result, frames: samples.map(({ jpg: _jpg, ...rest }) => rest) }, null, 1),opts.overwrite);
     return result;
@@ -362,6 +367,7 @@ export async function renderVideo(opts: VideoOptions): Promise<VideoResult> {
   const out = check({ ...opts, projectDir });
   distinctOutputs([out, opts.timeline, opts.srt]);
   geometryQuery(opts);
+  if(opts.auditLayout)throw new JoploError('USAGE','Layout audit supports static screenshots and --film, not --video');
   if (opts.crop) throw new JoploError('USAGE', 'Video crop is not supported; use --viewport/--no-frame or --frames-out with --crop');
   if (opts.timeline) {
     check({ projectDir, out: opts.timeline, overwrite: opts.overwrite });
