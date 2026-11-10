@@ -18,6 +18,7 @@
  *
  * 字段流向：job（写入点：这里的 runJob）→ jobs Map（存储）→ SSE / GET（读取点）→ 看板的导出视频弹窗（消费者）。
  */
+import { playbackTimeline, type RawTimeline } from './timeline.ts';
 import { recordedCalibration } from './media-calibration.ts';
 import { muxRecordedAudio } from './media-mux.ts';
 import crypto from 'node:crypto';
@@ -60,12 +61,12 @@ export type VideoJob = {
 /** 字幕的一条（秒，相对视频开头）。 */
 export type VideoCue = { start: number; end: number; text: string };
 /** 录制结果（#56 #59）：字幕时间轴（对到视频时间）与没有音频、按估算时长停留的旁白。 */
-export type RecordOutcome = { cues: VideoCue[]; voice: { mode: 'estimate' | 'real' | 'off'; missing: { text: string; role: string | null }[] } };
+export type RecordOutcome = { timeline?: import('./timeline.ts').PlaybackTimeline; sync?: { offsetMs: number; videoEndMs: number; audioEndMs: number }; cues: VideoCue[]; voice: { mode: 'estimate' | 'real' | 'off'; missing: { text: string; role: string | null }[] } };
 
 /** 录制实现：报告进度，写好 out。测试可注入。size 是视口，也是视频分辨率（录屏按 CSS 像素取帧）。 */
 export type VideoRecorder = (input: { projectDir: string; url: string; size: { width: number; height: number }; out: string; total: number; progress: (step: number) => void; signal: AbortSignal; /** 最长录制时长（毫秒，默认 5 分钟）。 */ maxMs?: number }) => Promise<RecordOutcome | void>;
 
-type RecordWindow = { __JOPLO_RECORD__: { prepare?(): Promise<void>; play(): Promise<void>; calibrate?(): Promise<boolean>; calibratedAt?(): number | null; cues?(): { at: number; text: string | null }[]; voice?(): RecordOutcome['voice']; stopAudio?(): Promise<{ data: string } | null>; progress: { step: number; done: boolean; error: string | null } } };
+type RecordWindow = { __JOPLO_RECORD__: { timeline?(): RawTimeline; prepare?(): Promise<void>; play(): Promise<void>; calibrate?(): Promise<boolean>; calibratedAt?(): number | null; cues?(): { at: number; text: string | null }[]; voice?(): RecordOutcome['voice']; stopAudio?(): Promise<{ data: string } | null>; progress: { step: number; done: boolean; error: string | null } } };
 
 /** 页面里记下的字幕变化 → 视频时间轴上的字幕条（originMs = 视频第 0 秒对应的页面时间）。纯函数。 */
 export function videoCues(raw: readonly { at: number; text: string | null }[], originMs: number, endSeconds: number): VideoCue[] {
@@ -207,7 +208,7 @@ export function defaultRecorder(load: (projectDir: string) => Promise<Playwright
       await page.waitForTimeout(900); // 停留在结果画面
       const endAt = await page.evaluate(() => performance.now());
       const calibrated=await page.evaluate(()=> (window as unknown as RecordWindow).__JOPLO_RECORD__.calibrate?.()??false);
-      const page_ = await page.evaluate(() => { const r = (window as unknown as RecordWindow).__JOPLO_RECORD__; return { cues: r.cues?.() ?? [], voice: r.voice?.() ?? { mode: 'off' as const, missing: [] }, flash: r.calibratedAt?.() ?? null }; });
+      const page_ = await page.evaluate(() => { const r = (window as unknown as RecordWindow).__JOPLO_RECORD__; return { cues: r.cues?.() ?? [], voice: r.voice?.() ?? { mode: 'off' as const, missing: [] }, timeline: r.timeline?.(), flash: r.calibratedAt?.() ?? null }; });
       const audio = await page.evaluate(() => (window as unknown as RecordWindow).__JOPLO_RECORD__.stopAudio?.() ?? null);
       if (screencast) await page.screencast.stop();
       const video = screencast ? null : page.video();
@@ -215,6 +216,7 @@ export function defaultRecorder(load: (projectDir: string) => Promise<Playwright
       if (screencast) { if (!fs.existsSync(file)) throw new JoploError('EXPORT_FAILED', 'The browser did not generate a video'); fs.renameSync(file, out); }
       else { if (!video) throw new JoploError('EXPORT_FAILED', 'The browser did not generate a video'); await video.saveAs(out); }
       let endSeconds = (endAt - origin) / 1000;
+      let sync: RecordOutcome['sync'];
       if (audio) {
         if(!calibrated)throw new Error('Audio/video calibration unavailable');
         const analysis=await browser.newContext();const probe=await analysis.newPage();await probe.goto(url,{waitUntil:'domcontentloaded'});
@@ -224,10 +226,11 @@ export function defaultRecorder(load: (projectDir: string) => Promise<Playwright
           // 校准闪屏：页面时间 flash ↔ 视频时间 videoPTS，比录屏开始时的估计更准；视频在闪屏处截断
           if (page_.flash !== null) origin = page_.flash - timing.videoPTS * 1000;
           endSeconds = timing.videoPTS;
+          sync = { offsetMs: timing.offsetSeconds * 1000, videoEndMs: timing.videoPTS * 1000, audioEndMs: timing.audioPTS * 1000 };
         }
         finally{await analysis.close();}
       }
-      return { cues: videoCues(page_.cues, origin, endSeconds), voice: page_.voice };
+      return { cues: videoCues(page_.cues, origin, endSeconds), voice: page_.voice, ...(page_.timeline ? { timeline: playbackTimeline(page_.timeline, origin) } : {}), ...(sync ? { sync } : {}) };
     } finally {
       await browser.close().catch(() => undefined);
       fs.rmSync(tmp, { recursive: true, force: true });

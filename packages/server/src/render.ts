@@ -9,13 +9,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Browser } from 'playwright-core';
-import { JoploError, VIEWPORT_SIZE, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, scopeProject, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
+import { JoploError, narrationText, VIEWPORT_SIZE, isAppearanceFont, isAppearanceStroke, type AppearanceFont, type AppearanceStroke, displaySceneId, findNode, isNodeDisabled, nodeLabel, positionAfterStep, resolveProps, scopeProject, stateAt, walkNodes, type PlayState } from '@joplo-app/core';
 import { exportLocale } from './locale.ts';
 import type { RenderOptions, RenderResult, RenderedElement, SheetOptions, SheetResult } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';
 import { joploHome } from './home.ts';
 import { EXPORT_DOWNLOAD_MB, NOT_NEEDED, SETUP_COMMAND, loadPlaywright, type PlaywrightModule } from './export-runtime.ts';
+
+import { capture, geometryQuery } from './capture.ts';
 
 const STAGE_SIZE = VIEWPORT_SIZE;
 
@@ -57,7 +59,7 @@ function realish(p: string): string {
 }
 
 /** 截图不得覆盖项目源文件或 .joplo/（即使传了 overwrite）。 */
-function assertNotProjectData(projectDir: string, out: string) {
+export function assertNotProjectData(projectDir: string, out: string) {
   const fold = (p: string) => (process.platform === 'darwin' || process.platform === 'win32' ? p.toLowerCase() : p);
   const o = fold(realish(out));
   const dir = fold(realish(projectDir));
@@ -118,21 +120,23 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
     const theme = opts.theme ?? project.theme ?? 'sketch';
     const next = state.completed ? undefined : sc.steps[position];
     const nextTargetId = next && 'target' in next.action ? next.action.target : null;
-    const stage = STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];
+    const stage = opts.logicalViewport ?? STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];
     // 字幕与步骤标题条浮在舞台上（D97）：页面就是舞台大小
     const viewport = opts.viewport ?? { width: stage.width, height: stage.height };
 
     browser = await launch(playwright);
     const page = await browser.newPage({ viewport, deviceScaleFactor: opts.scale ?? 1, reducedMotion: 'reduce' });
     // D44：舞台宽度固定为页面自己的 viewport；指定 viewport 时它只是截图尺寸（舞台按比例放进去）
-    const q = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, locale: opts.locale, content: opts.content, font: opts.font, stroke: opts.stroke, ...(opts.viewport ? { viewport: opts.viewport } : {}) });
-    await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
+    const q0 = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, locale: opts.locale, content: opts.content, font: opts.font, stroke: opts.stroke, ...(opts.viewport ? { viewport: opts.viewport } : {}) });
+    const q = new URLSearchParams(q0);
+    for (const [key, value] of Object.entries(geometryQuery(opts))) q.set(key, value);
+      await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => (window as unknown as { __JOPLO_READY__?: boolean }).__JOPLO_READY__ === true, null, { timeout: 60000 });
     const err = await page.evaluate(() => (window as unknown as { __JOPLO_ERROR__?: string | null }).__JOPLO_ERROR__ ?? null);
     if (err) throw new JoploError('RENDER_FAILED', `Render route reported an error: ${err}`);
 
     const report = (await page.evaluate(`(${COLLECT_REPORT})(${JSON.stringify({ nextTargetId, theme })})`)) as PageReport;
-    const png = await page.locator(opts.viewport ? '[data-jshot]' : '[data-jrender]').screenshot({ type: 'png', animations: 'disabled' });
+    const png = await capture(page, opts.viewport ? '[data-jshot]' : '[data-jrender]', opts.crop);
     fs.mkdirSync(path.dirname(out), { recursive: true });
     if (opts.overwrite) fs.writeFileSync(out, png);
     else fs.writeFileSync(out, png, { flag: 'wx' });
@@ -197,25 +201,27 @@ export async function renderSheet(opts: SheetOptions): Promise<SheetResult> {
     for (let position = 0; position <= sc.steps.length; position++) {
       const state: PlayState = stateAt(project, sc.id, position);
       const scene = project.scenes[displaySceneId(project, sc.id, position)]!;
-      const stage = STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];
+      const stage = opts.logicalViewport ?? STAGE_SIZE[scene.viewport === 'mobile' ? 'mobile' : 'desktop'];
       const next = state.completed ? undefined : sc.steps[position];
       const nextTargetId = next && 'target' in next.action ? next.action.target : null;
       const page = await browser.newPage({ viewport: { width: stage.width, height: stage.height }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
-      const q = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, locale: opts.locale, content: opts.content, font: opts.font, stroke: opts.stroke });
+      const q0 = renderQuery({ projectId: server.projectId, scenarioId: sc.id, position, theme, locale: opts.locale, content: opts.content, font: opts.font, stroke: opts.stroke });
+      const q = new URLSearchParams(q0);
+      for (const [key, value] of Object.entries(geometryQuery(opts))) q.set(key, value);
       await page.goto(`${server.url}?${q}`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => (window as unknown as { __JOPLO_READY__?: boolean }).__JOPLO_READY__ === true, null, { timeout: 60000 });
       const err = await page.evaluate(() => (window as unknown as { __JOPLO_ERROR__?: string | null }).__JOPLO_ERROR__ ?? null);
       if (err) throw new JoploError('RENDER_FAILED', `Render route reported an error at step ${position}: ${err}`);
       const report = (await page.evaluate(`(${COLLECT_REPORT})(${JSON.stringify({ nextTargetId, theme })})`)) as PageReport;
       for (const w of report.warnings) warnings.push(`Step ${position}: ${w}`);
-      const png = await page.locator('[data-jrender]').screenshot({ type: 'png', animations: 'disabled' });
+      const png = await capture(page, '[data-jrender]', opts.crop);
       await page.close();
       const step = position > 0 ? sc.steps[position - 1] : undefined;
       cells.push({
         png: png.toString('base64'),
         label: position === 0 ? '0 · start' : `${position} · ${step!.kind}`,
         caption: step?.caption ?? sc.description ?? sc.name,
-        voice: step?.narrate ?? step?.say ?? '',
+        voice: step ? narrationText(step, step.caption) : '',
       });
     }
     const html = `<!doctype html><meta charset="utf-8"><style>

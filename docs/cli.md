@@ -33,7 +33,8 @@ npx joplo render [dir] --scenario-id <qid> --out <file> \
   [--width <pixels> --height <pixels>] [--scale <scale>] [--overwrite]
 npx joplo render [dir] --scenario-id <qid> --out <file> --sheet [--columns <n>] [--theme <theme>] [--overwrite]
 npx joplo render [dir] --scenario-id <qid> --out <file.png> --film [--chain] [--every <ms>] [--columns <n>] [--frames <dir>] [--format text|json] [--overwrite]
-npx joplo render [dir] --scenario-id <qid> --out <file.webm> --video [--chain] [--width <px> --height <px>] [--voice real|estimate|off] [--hide <items> | --clean] [--srt <file.srt>] [--overwrite]
+npx joplo render [dir] --scenario-id <qid> --frames-out <dir> [--fps 30] [--chain] [--viewport 720x1280] [--no-frame] [--crop <selector|x,y,w,h>]
+npx joplo render [dir] --scenario-id <qid> --out <file.webm|file.mp4> --video [--chain] [--width <px> --height <px>] [--voice real|estimate|off] [--hide <items> | --clean] [--srt <file.srt>] [--overwrite]
 ```
 
 可省略的 dir 默认为当前目录。`render` 的 scenario-id、out 必填。主输出和帮助写 stdout，服务日志、截图告警和项目依赖版本提示写 stderr；用法错误或缺少分享选择（CHOICE_REQUIRED）退出 2，领域或执行失败退出 1，云端需要登录（AUTH_REQUIRED / AUTH_EXPIRED）退出 3，账号空间不够（share）退出 6，Joplo Cloud 朗读额度不够（voice，`TTS_QUOTA_EXCEEDED`）退出 7，成功退出 0。
@@ -265,7 +266,7 @@ npx joplo preview [dir] [--port <port>]
 | `--out <file>` | 截图文件，必填；相对当前目录解析 |
 | `--step-id <qid>` | 指定步骤后的状态 |
 | `--theme <theme>` | 内置主题名或项目 themes/name.css 的名称，默认项目 config 的主题 |
-| `--width <pixels>` / `--height <pixels>` | 截图输出宽高，必须同时给出正整数；按比例容纳页面，不改变页面自己的 viewport 或响应式断点。配合 `--video` 时是视频分辨率（2–4096 的偶数，例如 1920×1080、1080×1920）：舞台（手机含外框）等比缩放后居中，四周是主题背景色，文字与线条按输出分辨率重新绘制，不是放大位图。舞台本身的宽高比不变（电脑 16:10），竖屏画幅放手机页面最合适。不能与 `--film` 同用 |
+| `--width <pixels>` / `--height <pixels>` | 截图输出宽高，必须同时给出正整数；按比例容纳页面，不改变页面自己的 viewport 或响应式断点。配合 `--video` 时是视频分辨率（2–4096 的偶数，例如 1920×1080、1080×1920）：舞台（手机含外框）等比缩放后居中，四周是主题背景色，文字与线条按输出分辨率重新绘制，不是放大位图。舞台本身的宽高比不变（电脑 16:10），竖屏画幅放手机页面最合适。配合 `--viewport` 可直接改变逻辑布局 |
 | `--scale <scale>` | 有限正数，像素倍率 |
 | `--overwrite` | 允许覆盖已有截图；仍不得覆盖项目源码或 `.joplo/` |
 | `--sheet` | 分镜：把场景从初始画面到最后一步逐步截图，拼成一张网格图，每格下面写步号、字幕与旁白（`narrate`，没有时为 `say`）；各步的截图告警加 `Step n:` 前缀写到 stderr。不能与 `--step-id`、`--width`、`--height` 同用。分镜只有每一步落定后的画面，看不出硬切与静止；运动用 `--film` 检查 |
@@ -279,6 +280,14 @@ npx joplo preview [dir] [--port <port>]
 | `--chain` | 配合 `--film` / `--video`：放完接着放同一方案的下一个场景（发布站连续播放的顺序），直到最后一个；`chapter()` 接力的章节一镜到底 |
 | `--every <ms>` | 胶片条每格的间隔（默认 250） |
 | `--frames <dir>` | 胶片条的每一格另存为 JPEG，便于全尺寸检查可疑的一帧 |
+| `--viewport <WIDTHxHEIGHT>` / `--no-frame` | 直接设置逻辑舞台尺寸，并可去掉设备外框；布局、镜头、覆盖层和命中区域共用同一坐标。输出像素仍由 width/height 决定 |
+| `--crop <selector-or-rect>` | 截图、sheet、film、frames 共用选择器或相对输出画布的 CSS 像素矩形；film 像素占比基于裁后画面。video 请用 viewport 定义画幅 |
+| `--frames-out <dir>` / `--fps <n>` | 公开逐帧 JPEG 导出，默认 30fps、干净画面、已有旁白真实时长；自动写 timeline.json。不需要 out，不调用云 TTS。累计 round(k×1000/fps)，允许约50ms调度容差 |
+| `--timeline <file>` | 帧序列、film、video 的 schemaVersion 1 实际播放事件；包含引擎和输出时间、步骤提交/结束、章边界、旁白、镜头与通用媒体快照 |
+| `--sample-ms <ms>` | film 计算间隔20–250ms，默认50；every仅控制保存格数。粗采样更快但可能漏掉短暂CUT，最终检查使用50ms |
+| `--checkpoint <file>` / `--resume` | 逐章保存像素分析；恢复时重放引擎状态，复用已验证分析。源码/运行时/配置不符拒绝恢复；输出目录不要共享 |
+| `--chapter-timeout <ms>` | film 每章墙钟处理超时，默认180000；失败保留最近检查点 |
+
 | `--format json` | 胶片条结果以 JSON 输出到 stdout |
 
 render 需要**导出组件**（Playwright + Chromium，见下方 `setup export`）。写演示、dev、check、build、share 都不需要它；本地看板的图片和视频导出、share 的预览图需要。没有时：
@@ -624,3 +633,7 @@ check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同�
 ### 检查含可选支线的短片
 
 先用 `joplo outline` 确认场景 ID，再按章 `joplo render --scenario-id <id> --sheet`。`flow('Slice title', { autoplay:false })` 标记的支线依然可独立渲染、手动选择或通过 fork 进入，但发布站连续播放会跳过它；支线结束后停下。fork 本身不会改变自动播放资格。`joplo check` 不证明本机配乐已成功编译，最终还须检查 build 的资源警告和真实输入、声音，再用 preview 离线验证 HTTP 播放。
+
+离线导出回归：`pnpm test packages/server/test/export-contract.test.ts` 验证横竖画幅、多章与三个可分发合成PCM音频片段；`JOPLO_EXPORT_VIDEO=1` 增加WebM/MP4编码、音频频率匹配与时差断言（需本机ffmpeg/ffprobe）；`JOPLO_EXPORT_LONG=1` 增加五分钟引擎时间性能测量。产物保留在 `scratch/output/`，不调用云TTS、不需要个人账户。
+
+`render --video --silent` 显式省略全部音轨并保留旁白节奏；`--voice off` 仅关闭旁白，不关闭背景配乐。`.mp4` 输出需要本机 ffmpeg（H.264/AAC），默认 `.webm` 无需外部编码器。

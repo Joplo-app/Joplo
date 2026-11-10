@@ -58,8 +58,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      - run: pnpm test
       - run: pnpm --filter @joplo-app/server exec playwright install --with-deps chromium
+      - run: pnpm test
       - run: pnpm release:smoke
 
       - name: Publish to npm
