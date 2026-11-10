@@ -1,7 +1,7 @@
 {
   "name": "@joplo-app/core",
   "version": "0.5.0",
-  "description": "Joplo 编译器、校验器与播放器（IR v3）",
+  "description": "Joplo 作品引擎：编译、校验与确定性播放，支持独立作品和功能方案评审",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "exports": {
