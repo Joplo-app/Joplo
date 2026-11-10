@@ -59,7 +59,7 @@ Viewers call a piece "a slide deck" when pictures swap in one frame and then sit
 ## Film framing and control space
 A camera close-up must not enlarge or move the controls viewers need to pause, seek or recover. Either keep authored navigation outside the transforming picture (an independently sized visual region with the chapter selector, credits and drag affordance in the surrounding layout), or use the installed visual plugin's fixed screen layer for full-bleed chrome over the moving picture and give the camera a safe area so targeted framings avoid it. Read that plugin's recipes.
 
-The host can draw an input/keyboard record after a type/press step, and toasts can move it upward. Reserve a clear band for those host overlays, then inspect the type step in both render --sheet and live playback. Do not infer safety from the authored tree alone or hide host overlays with project CSS. A camera can intentionally crop contextual menus during a close-up; the current action and its result still need to be visible and reachable.
+The host can draw an input/keyboard record after a type/press step, and toasts can move it upward. Reserve a clear band for those host overlays, then inspect the type step in both render --sheet and live playback. The step title occupies the upper-left corner and narration can cover the bottom of the stage; keep headings and live controls out of those regions. Verify with host overlays shown, not only a clean stage screenshot. Do not infer safety from the authored tree alone or hide host overlays with project CSS. A camera can intentionally crop contextual menus during a close-up; the current action and its result still need to be visible and reachable.
 
 ## Frames, deep links and verification
 - outline lists scenario and step ids. Use those ids in render/export; a deep link chooses where viewing starts and is not an access boundary. render takes qualified ids: --scenario-id <feature>.<option>.<scenario> and --step-id '<feature>.<option>.<scenario>#<n>' (the NOT_FOUND message lists the available scenario ids).
@@ -81,4 +81,4 @@ A project theme is themes/<name>.css selected by config({ theme: '<name>' }). De
 - Custom themes live in themes/<name>.css and define --jp-* tokens; do not change authored data to recolor a view. For component-specific layout, motion and visual variables, read its installed plugin skill.
 
 Related topics: authoring, plugins, focus, review, publish
-<!-- joplo-skill 0.5.0 sha256:44bd5f6cfa0ee435ea2420bd136d3c2f9962014c21e3e59fa3d0bfcbdb23d4f5 -->
+<!-- joplo-skill 0.5.0 sha256:2f45f01627518bb0ec32fe6410f2c749af1a5bea10e36cc1c20cfe7775391c09 -->

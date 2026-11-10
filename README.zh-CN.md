@@ -28,17 +28,20 @@ Agent 用代码写成的作品，能播放，也能上手试。发一个链接�
 需要 Node.js 22 或更新版本，以及 npm。
 
 ```sh
+# 比较功能方案（默认模板）
 npx joplo@latest init my-demo
+# 或从一件独立作品开始
+npx joplo@latest init my-demo --template work
 cd my-demo
 npm install
 npx joplo dev --open
 ```
 
-默认模板位于主仓库 `templates/starter`，按当前 CLI 的 `v<版本>` tag 下载。它显式安装并启用 ui、diagram、content、alda 四个标准插件；引擎不加载默认插件。离线用 `npx joplo init my-demo --template ./templates/starter`，自定义远端用 `--template github:owner/repo/path#ref`；私有仓库读取 `GITHUB_TOKEN` 或 `gh auth token`。下载与模板校验失败不会留下半截项目。
+内置模板位于主仓库 `templates/<名称>`，按当前 CLI 的 `v<版本>` tag 下载。默认 `starter`（也可写 `--template starter`）用来比较功能方案，显式启用 ui、diagram、content、alda 四个标准插件；`--template work` 从一件带两个接续章节、可编辑输入框的独立作品开始，只启用 ui。两者都不需要凭证或生成素材，引擎不加载默认插件。裸名称优先选择内置模板，即使当前目录有同名文件夹；本地目录要写 `--template ./work`。未知名称会列出可用内置模板：`starter`、`work`。离线用 `npx joplo init my-demo --template ./templates/starter`，自定义远端用 `--template github:owner/repo/path#ref`；私有仓库读取 `GITHUB_TOKEN` 或 `gh auth token`。下载与模板校验失败不会留下半截项目。
 
 保持看板进程运行，编辑生成的 TSX 文件，作品会自动更新。在另一个项目中运行 `npx joplo dev`，会把项目加入同一个看板进程。默认端口为 4790；启动新看板时可用 `--port <port>` 指定端口。
 
-当前 starter 用来比较功能方案。要在这个项目里开始一件独立作品，添加 `works/<key>.tsx`，导出 `work({ title, summary, stage, scenarios })`；连续章节用 `chapter()`。独立作品不需要功能或 `pick`。最小示例见 `npx joplo skill authoring`，完整契约见[作品模型](docs/work-model.md)。
+比较功能方案用默认模板；做一件给人播放、暂停、上手试的作品用 `--template work`。在作品模板里修改 `works/explainer.tsx` 的标题文字并保存，画面就会更新；暂停后可在输入框里临时改文字，播放或重置恢复脚本。也可以在任意项目手动添加 `works/<key>.tsx`，导出 `work({ title, summary, stage, scenarios })`，连续章节用 `chapter()`。独立作品不需要功能或 `pick`。最小示例见 `npx joplo skill authoring`，完整契约见[作品模型](docs/work-model.md)。
 
 ## 可交互
 
@@ -74,7 +77,7 @@ npx joplo dev --open
 
 ![Joplo 看板](docs/screenshots/board-play-initial.png)
 
-模板显式启用的 `@joplo-app/plugin-content` 提供 `content:Canvas`、`camera()`、FLIP 通用属性与 `content:studio` 主题。从插件包直接导入创作 API，并在 package.json 和 config.plugins 显式声明。`npx joplo skill content` 介绍连续讲解内容的做法，示例见 [llm-explainer](examples/llm-explainer)，契约见 [插件架构](docs/plugins.md)。章节用 `chapter()` 接力，分镜用 `joplo render --sheet --columns 3`。
+默认 starter 模板显式启用的 `@joplo-app/plugin-content` 提供 `content:Canvas`、`camera()`、FLIP 通用属性与 `content:studio` 主题。从插件包直接导入创作 API，并在 package.json 和 config.plugins 显式声明。`npx joplo skill content` 介绍连续讲解内容的做法，示例见 [llm-explainer](examples/llm-explainer)，契约见 [插件架构](docs/plugins.md)。章节用 `chapter()` 接力，分镜用 `joplo render --sheet --columns 3`。
 
 标准 UI 和 HTML 由 `@joplo-app/plugin-ui` 提供：直接从该包导入，并在 config.plugins 显式启用，IR 使用 `ui:Button` / `ui:div`。`joplo components` 读取当前插件清单，`joplo skill ui/components` 提供完整 UI 用法。diagram 的组件与 trace 从 `@joplo-app/plugin-diagram` 导入。见[插件契约](docs/plugins.md)。
 
@@ -93,7 +96,7 @@ npx joplo skill install                  # 在 Joplo 项目里：与项目安装
 ```
 
 - 想让 Agent 在任何仓库里都能发现 Joplo（例如从零开始做一件作品），用 `npx skills add`。[skills CLI](https://github.com/vercel-labs/skills) 会装到 Claude Code 的 `.claude/skills/` 和 Codex 的 `.agents/skills/`。
-- `npx joplo init` 新建项目时默认装好引擎技能、主题、四个插件技能与索引（以及 `AGENTS.md` 托管段），用 `--no-skill` 跳过。先装技能再 `npx joplo init .` 也可以：Agent 与 Git 文件（`.git`、`.gitignore`、`.agents/`、`.claude/`、`AGENTS.md`、`skills-lock.json` 等）不算目录非空；已装好的同版本技能会跳过，你改过的技能会保留（`npx joplo skill install --force` 才覆盖）。还有其他文件时仍需 `init . --keep`。
+- `npx joplo init` 新建项目时默认装好引擎技能、主题、模板启用的插件技能与索引（以及 `AGENTS.md` 托管段），用 `--no-skill` 跳过。先装技能再 `npx joplo init .` 也可以：Agent 与 Git 文件（`.git`、`.gitignore`、`.agents/`、`.claude/`、`AGENTS.md`、`skills-lock.json` 等）不算目录非空；已装好的同版本技能会跳过，你改过的技能会保留（`npx joplo skill install --force` 才覆盖）。还有其他文件时仍需 `init . --keep`。
 - 已经有 `joplo.config.ts` 的项目，用 `npx joplo skill install`：写入 `.claude/skills/joplo*/SKILL.md`，升级 Joplo 后自动更新没改过的文件，不覆盖你改过的文件（`--diff` 看差异、`--force` 覆盖），加 `--agents-md` 还会在 `AGENTS.md` 里写一段托管说明。
 - 技能故意很薄：只有心智模型、起步顺序和最常见的坑；具体 API 一律以 `npx joplo skill <主题>` 为准（与安装的版本一致）。
 

@@ -28,17 +28,20 @@ Playable, interactive shows your agent writes in code. Link them, embed them, ch
 Requires Node.js 22 or later and npm.
 
 ```sh
+# Compare feature options (default template)
 npx joplo@latest init my-demo
+# Or start one standalone show
+npx joplo@latest init my-demo --template work
 cd my-demo
 npm install
 npx joplo dev --open
 ```
 
-The default template lives in `templates/starter` in this repository and is downloaded from the CLI’s exact `v<version>` tag. It explicitly installs and enables ui, diagram, content, and alda; the engine loads no plugins implicitly. For offline use, run `npx joplo init my-demo --template ./templates/starter`; custom repositories use `--template github:owner/repo/path#ref`. Private repositories use `GITHUB_TOKEN` or `gh auth token`. Download or validation failures leave no partial project.
+Built-in templates live in `templates/<name>` in this repository and are downloaded from the CLI’s exact `v<version>` tag. The default `starter` (also `--template starter`) compares feature options and explicitly enables ui, diagram, content, and alda. `--template work` starts a standalone show with two continuous chapters and an editable input, using only ui; neither template needs credentials or generated assets. The engine loads no plugins implicitly. Bare names select built-ins even if a local directory has the same name; use `--template ./work` for a local directory. Unknown names list the available built-ins: `starter`, `work`. For offline use, run `npx joplo init my-demo --template ./templates/starter`; custom repositories use `--template github:owner/repo/path#ref`. Private repositories use `GITHUB_TOKEN` or `gh auth token`. Download or validation failures leave no partial project.
 
 Keep the Board process running. Edit the generated TSX files and watch the show update. Running `npx joplo dev` from another project adds it to the same Board process. The default port is 4790; `--port <port>` selects a port when starting a new Board.
 
-The current starter compares feature options. To start a standalone show in that project, add `works/<key>.tsx` and export `work({ title, summary, stage, scenarios })`; use `chapter()` for chapters that continue in order. A standalone show needs no feature or `pick`. Read `npx joplo skill authoring` for the minimal example and the [work model](docs/work-model.md) for the contract.
+Use the default template to compare feature options, or `--template work` to make a show people can play, pause and try. In the work template, edit the heading in `works/explainer.tsx` and save to update the picture; pause playback and type into the input to explore locally, then Play or Reset to restore the script. You can also add `works/<key>.tsx` manually to any project, exporting `work({ title, summary, stage, scenarios })` with `chapter()` for continuous chapters. A standalone show needs no feature or `pick`. Read `npx joplo skill authoring` for the minimal example and the [work model](docs/work-model.md) for the contract.
 
 ## Interactive
 
@@ -73,7 +76,7 @@ Source files are text: diff them in Git, translate the content, or ask your agen
 
 ![Joplo Board](docs/screenshots/board-play-initial.png)
 
-The template explicitly enables `@joplo-app/plugin-content`, which provides `content:Canvas`, `camera()`, FLIP properties and the `content:studio` theme. Import its authoring API directly from the package; declare it at the Joplo version in project dependencies and enable it in config.plugins. `npx joplo skill content` covers continuous visual explainers; see [llm-explainer](examples/llm-explainer) and the [plugin contracts](docs/plugins.md). Use `chapter()` for chapter continuity and `joplo render --sheet --columns 3` for storyboards.
+The default starter template explicitly enables `@joplo-app/plugin-content`, which provides `content:Canvas`, `camera()`, FLIP properties and the `content:studio` theme. Import its authoring API directly from the package; declare it at the Joplo version in project dependencies and enable it in config.plugins. `npx joplo skill content` covers continuous visual explainers; see [llm-explainer](examples/llm-explainer) and the [plugin contracts](docs/plugins.md). Use `chapter()` for chapter continuity and `joplo render --sheet --columns 3` for storyboards.
 
 Standard UI and HTML are provided by `@joplo-app/plugin-ui`: import markers directly from that package and explicitly enable it in config.plugins. IR uses `ui:Button` / `ui:div`. `joplo components` reads enabled plugin manifests; `joplo skill ui/components` provides the full UI guide. Import diagram components and trace from `@joplo-app/plugin-diagram`. See [plugin contracts](docs/plugins.md).
 
@@ -92,7 +95,7 @@ npx joplo skill install                  # inside a Joplo project: skills matchi
 ```
 
 - Use `npx skills add` when you want agents to discover Joplo in any repository, for example to start a new show. The [skills CLI](https://github.com/vercel-labs/skills) installs to `.claude/skills/` for Claude Code and `.agents/skills/` for Codex.
-- `npx joplo init` installs engine skills, topics, four plugin skills and their index (and an `AGENTS.md` block) into new projects; pass `--no-skill` to skip. Installing skills first and then running `npx joplo init .` works: agent and Git files (`.git`, `.gitignore`, `.agents/`, `.claude/`, `AGENTS.md`, `skills-lock.json`, …) do not make the directory non-empty, skills already installed at the same version are skipped, and skills you edited are kept (`npx joplo skill install --force` replaces them). Other existing files still need `init . --keep`.
+- `npx joplo init` installs engine skills, topics, the template’s enabled plugin skills and their index (and an `AGENTS.md` block) into new projects; pass `--no-skill` to skip. Installing skills first and then running `npx joplo init .` works: agent and Git files (`.git`, `.gitignore`, `.agents/`, `.claude/`, `AGENTS.md`, `skills-lock.json`, …) do not make the directory non-empty, skills already installed at the same version are skipped, and skills you edited are kept (`npx joplo skill install --force` replaces them). Other existing files still need `init . --keep`.
 - Use `npx joplo skill install` inside a project that already has `joplo.config.ts`. It writes `.claude/skills/joplo*/SKILL.md`, updates untouched files when Joplo is upgraded, never overwrites files you edited (`--diff` to compare, `--force` to replace), and with `--agents-md` also writes a managed block into `AGENTS.md`.
 - The skills are thin on purpose: a mental model, the start order, and common pitfalls. The detailed API always comes from `npx joplo skill <topic>`, which matches the installed version.
 

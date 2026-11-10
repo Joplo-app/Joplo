@@ -33,6 +33,7 @@ export const MENTAL_MODEL = [
 
 /** 推荐的起步顺序（X2：先做最小的一条正常流程 + 一条错误恢复流程，在看板里确认交互模型后再扩展）。 */
 export const START_ORDER = [
+  'Choose the starting template: compare feature options with npx joplo init <dir> (or --template starter); make one show people can play, pause and try with npx joplo init <dir> --template work. Bare names select built-ins, never a same-named local directory; use --template ./work for a local folder. Both use the CLI version tag and install engine skills, AGENTS.md and enabled plugin guides.',
   'Read npx joplo skill authoring and choose the capabilities; for feature review read cases before asking the user about edge cases; demo and installed plugin skills as needed.',
   'Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case\'s expected is its Then); show the plan to the user. A demo is a story, not a feature tour.',
   'With minimal code, write one chapter for a standalone work, or one happy path and one error-and-recovery scenario for feature review.',
@@ -100,7 +101,9 @@ function joploBody(): string {
     '',
     '## Quick start',
     '```sh',
-    'npx joplo@latest init demo && cd demo && npm install   # new project (an existing project uses its installed npx joplo)',
+    'npx joplo@latest init demo                            # compare feature options (default starter)',
+    '# Or: npx joplo@latest init demo --template work        # one standalone show',
+    'cd demo && npm install                                # an existing project uses its installed npx joplo',
     'npx joplo check                                        # compile and validate; fix until 0 errors',
     'npx joplo dev                                          # stdout: the board URL; stderr: the feedback command for agents',
     'npx joplo feedback watch . --local --follow --json     # in its own long-running shell: reviewer feedback as NDJSON',
@@ -108,7 +111,7 @@ function joploBody(): string {
     'Run dev and the follower in separate long-running shells. dev keeps the board live: every saved edit recompiles and refreshes it.',
     '',
     '## Workflow',
-    '1. No joplo.config.ts yet: npx joplo@latest init <dir>, or npx joplo@latest init . for the current directory, then npm install there (versions are pinned). Agent and Git files (.git, .gitignore, .agents, .claude, AGENTS.md, skills-lock.json) do not count as content; other existing files need init . --keep, which only adds missing files. init skips these skills when the same version is already installed and never overwrites edited ones. In an existing Joplo project, use its installed npx joplo.',
+    '1. No joplo.config.ts yet: npx joplo@latest init <dir> for feature comparisons, add --template work for a standalone show, or use . for the current directory, then npm install there (versions are pinned). Agent and Git files (.git, .gitignore, .agents, .claude, AGENTS.md, skills-lock.json) do not count as content; other existing files need init . --keep, which only adds missing files. init skips these skills when the same version is already installed and never overwrites edited ones. In an existing Joplo project, use its installed npx joplo.',
     ...list(START_ORDER).map(line => line.replace(/^(\d+)/, (_, n: string) => String(Number(n) + 1))),
     `${START_ORDER.length + 2}. Only when the user asks to share or publish: npx joplo share --private --no-review --format json publishes picked options; npx joplo share --private --review also publishes a separate, always-private link containing every option for reviewers (data.review.url); data.url is the main link. For scoped review results with data.mode = review, only the private review was published and its link is data.url; read skill publish for this boundary. Confirming an option in the board is not a publish request. To share part of the project, add --scenario <scenario id> or --work <entry key> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items.`,
     '',

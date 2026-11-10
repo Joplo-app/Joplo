@@ -17,13 +17,16 @@ Playable, interactive shows your agent writes in code. Link them, embed them, ch
 Requires Node.js 22 or later.
 
 ```sh
+# Compare feature options (default template)
 npx joplo@latest init my-demo
+# Or start one standalone show
+npx joplo@latest init my-demo --template work
 cd my-demo
 npm install
 npx joplo dev --open
 ```
 
-The current starter compares feature options. For a standalone show, add `works/<key>.tsx` in that project and export `work({ title, summary, stage, scenarios })`; use `chapter()` for continuous chapters. Read `npx joplo skill authoring` for the minimal example.
+Use the default `starter` (also `--template starter`) to compare feature options. Use `--template work` for one playable show with two continuous chapters: edit the heading in `works/explainer.tsx` and save, or pause and type in the input; Play or Reset restores the script. Both built-ins use the CLI’s exact version tag; bare names take priority over local directories, so use `--template ./work` for a local folder. You can also add `works/<key>.tsx` manually to any project, exporting `work({ title, summary, stage, scenarios })` with `chapter()` for continuous chapters. Read `npx joplo skill authoring` for the minimal example.
 
 - Author shows in TSX with `@joplo-app/kit`; feature review adds options, cases, rules, and a pick.
 - Review multiple projects in one local Board. Option/Alt-click an element to inspect its rules and exact source location.
