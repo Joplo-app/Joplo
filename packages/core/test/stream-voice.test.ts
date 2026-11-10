@@ -8,7 +8,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import * as ui from '@joplo-app/plugin-ui';
-import { $, Slot, feature, flow, layer, option, page, role, say, stream, type EffectDef } from '@joplo-app/kit';
+import { $, Slot, feature, flow, layer, work, page, role, say, stream, type EffectDef } from '@joplo-app/kit';
 import { compile, speakerRoleAt, stateAt, streamMs, streamPlan, voicePacedMs, type AuthoringProject } from '../src/index.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
@@ -17,8 +17,8 @@ const sid = 'f.a.happy';
 
 function build(steps: (f: ReturnType<typeof flow>) => ReturnType<typeof flow>) {
   const home = page({ title: '首页', layout: false }, h(ui.Stack, null, h(Slot, { name: 'main' })));
-  const opt = option({
-    name: 'A', idea: 'i', on: {},
+  const opt = work({
+    title: 'A', summary: 'i', on: {},
     state: { ui: { spoken: '', note: '' } },
     layers: { box: layer('输入框', h(ui.Stack, null, h(ui.Button, { id: 'mic' }, '麦克风'), h(ui.Text, { id: 'spoken' }, $.ui.spoken))) },
     scenarios: { happy: steps(flow('说', { start: '/' })) },
@@ -28,7 +28,7 @@ function build(steps: (f: ReturnType<typeof flow>) => ReturnType<typeof flow>) {
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, roles: { me: role('我'), bot: role('助手') }, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, roles: { me: role('我'), bot: role('助手') }, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return compile(src, 'dev');
 }

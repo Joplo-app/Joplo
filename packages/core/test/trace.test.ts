@@ -7,7 +7,7 @@ import { nodeData, frameData } from '../../../plugins/diagram/src/data.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { $, feature, flow, layer, option, page, set, shot, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
+import { $, feature, flow, layer, work, page, set, shot, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, resolveProps, stateAt, type AuthoringProject, type Project } from '../src/index.ts';
 
@@ -38,9 +38,9 @@ function build(steps: (f: Flow) => Flow, opts: { edgeState?: boolean; extraEdges
     h(D.Edge, { id: 'e_q2', from: 'queue', to: 'billing' }),
     ...((opts.extraEdges ?? []) as never[]),
   );
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {},
     state: { ui: { n_app: 'idle', n_biz: 'idle', n_billing: 'idle', e_app_biz: 'idle' } },
     layers: { client: layer('客户端视角', client as never), backend: layer('后端流转', backend as never) },
@@ -51,7 +51,7 @@ function build(steps: (f: Flow) => Flow, opts: { edgeState?: boolean; extraEdges
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return { dev: compile(src, 'dev'), publish: compile(src, 'publish') };
 }
@@ -168,7 +168,7 @@ describe('旧写法不变：$.ui 绑定 + set 驱动 state', () => {
   it('没有 trace 时推算为空；显式 state 绑定照常由 set 改变（与之前的结果一致）', () => {
     const p: Project = build((f) => f.system('预检', set($.ui.n_biz, 'active'), set($.ui.e_app_biz, 'active')).system('完成', set($.ui.n_biz, 'ok')), { edgeState: true }).dev.project!;
     expect(diagramStateAt(p, sid, 2)).toEqual({});
-    const scene = p.scenes[p.options['f.a']!.layers.backend!.sceneId]!;
+    const scene = p.scenes[p.works['f.a']!.layers.backend!.sceneId]!;
     const find = (n: typeof scene.root, id: string): typeof scene.root | undefined => (n.id === id ? n : (n.children ?? []).map((c) => find(c, id)).find(Boolean));
     const biz = find(scene.root, 'biz')!;
     const edge = find(scene.root, 'e_app_biz')!;

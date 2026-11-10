@@ -6,7 +6,7 @@ import { fixturePlugins } from '../../../scripts/test/fixtures.ts';
  * - components 不带名字时与 skill components 相同，带名字时输出属性、行为分组与示例。
  */
 import { afterEach, expect, test } from 'vitest';
-import { cp, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { componentIndex } from '@joplo-app/core';
@@ -55,10 +55,10 @@ test('JSON 大纲与文字同一份数据；--work 只看一个方案', async ()
   expect(r.code).toBe(0);
   const j = JSON.parse(r.out);
   expect(j).toMatchObject({ ok: true, data: { summary: { error: 0 } } });
-  const f = j.data.outline.features[0];
-  expect(f.options.map((o: { id: string }) => o.id)).toEqual(['invite.b-batch']);
+  const f = j.data.outline.entries[0];
+  expect(f.works.map((o: { id: string }) => o.id)).toEqual(['invite.b-batch']);
   expect(f.cases.find((c: { key: string }) => c.key === 'happy')).toMatchObject({ priority: 'high', dimension: 'main', expected: '管理员发出邀请，受邀者接受后成为成员', coverage: { 'invite.b-batch': expect.any(String) } });
-  expect(f.options[0].scenarios[0]).toMatchObject({ id: expect.stringMatching(/^invite\.b-batch\./), steps: expect.any(Number), ms: expect.any(Number), opening: false, ending: false });
+  expect(f.works[0].scenarios[0]).toMatchObject({ id: expect.stringMatching(/^invite\.b-batch\./), steps: expect.any(Number), ms: expect.any(Number), opening: false, ending: false });
   const bad = await run(['outline', d, '--work', 'invite.zz']);
   expect(bad.code).toBe(2);
   expect(bad.out).toMatch(/^USAGE {2}Work does not exist: invite\.zz/);
@@ -66,7 +66,7 @@ test('JSON 大纲与文字同一份数据；--work 只看一个方案', async ()
 
 test('有 error 时退出 1：能编译出 IR 时照常输出大纲并写出错误数；编译不出时只写错误数，JSON 是失败信封', async () => {
   const d = await project();
-  await writeFile(join(d, 'features/invite/options/broken.tsx'), 'export default 1;\n');
+  await writeFile(join(d, 'features/invite/works/broken.tsx'), 'export default 1;\n');
   const r = await run(['outline', d]);
   expect(r.code).toBe(1);
   expect(r.out).toContain('## invite · 团队成员邀请');
@@ -110,4 +110,33 @@ test('components：不带名字等于 skill components；带名字输出示例�
   expect(bad.code).toBe(2);
   expect(bad.out).toMatch(/^USAGE {2}Component Toastt: not declared/);
   } finally {process.chdir(prev);}
+});
+
+test.each((['null', 'omitted', 'picked', 'independent'] as const).flatMap(kind =>
+  (['json', 'text'] as const).map(format => ({ kind, format })),
+))('$format 大纲不把预览默认值当成选定：$kind', async ({ kind, format }) => {
+  const d = await project(kind === 'independent' ? 'llm-explainer' : 'camping');
+  if (kind === 'null' || kind === 'picked') {
+    const path = join(d, 'features/camp/feature.ts');
+    const source = await readFile(path, 'utf8');
+    await writeFile(path, source.replace('export default feature({', `export default feature({\n  pick: ${kind === 'null' ? 'null' : "'a-chat'"},`));
+  }
+  const result = await run(['outline', d, '--format', format]);
+  expect(result.code).toBe(0);
+  if (format === 'json') {
+    const entry = JSON.parse(result.out).data.outline.entries[0];
+    const expectedPick = kind === 'independent' ? 'llm' : kind === 'picked' ? 'camp.a-chat' : null;
+    expect(entry).toHaveProperty('pick', expectedPick);
+    expect(entry.works[0].picked).toBe(expectedPick !== null);
+  } else if (kind === 'independent') {
+    expect(result.out).toContain('## llm ·');
+    expect(result.out).not.toMatch(/picked:|no picked option/);
+  } else if (kind === 'picked') {
+    expect(result.out).toMatch(/## camp · .*   picked: a-chat/);
+    expect(result.out).toContain('(picked):');
+    expect(result.out).not.toContain('no picked option');
+  } else {
+    expect(result.out).toMatch(/## camp · .*   no picked option/);
+    expect(result.out).not.toMatch(/picked:|\(picked\)/);
+  }
 });

@@ -1,6 +1,7 @@
 /** 本地评审的持久化契约。浏览器、服务端和 CLI 共用；不依赖 Node。 */
 import { z } from 'zod';
 
+export const LOCAL_REVIEW_VERSION = 2 as const;
 export const LOCAL_REVIEW_MAX_BODY = 10_000;
 export const LOCAL_REVIEW_MAX_EVENTS = 1000;
 export const LOCAL_REVIEW_MAX_FILE_BYTES = 16 * 1024 * 1024;
@@ -29,21 +30,21 @@ const eventBase = {
 export const LocalReviewEvent = z.discriminatedUnion('type', [
   z.strictObject({ ...eventBase, type: z.literal('feedback'), body: z.string().trim().min(1).max(LOCAL_REVIEW_MAX_BODY), context: LocalReviewContext }),
   z.strictObject({ ...eventBase, type: z.literal('approved') }),
-  z.strictObject({ ...eventBase, type: z.literal('closed'), reason: z.enum(['source_changed', 'compile_error', 'option_removed', 'server_stopped']) }),
+  z.strictObject({ ...eventBase, type: z.literal('closed'), reason: z.enum(['source_changed', 'compile_error', 'work_removed', 'server_stopped']) }),
 ]);
 export type LocalReviewEvent = z.infer<typeof LocalReviewEvent>;
 export const LocalReviewSession = z.strictObject({
-  v: z.literal(1),
+  v: z.literal(LOCAL_REVIEW_VERSION),
   id: LocalReviewId,
   instanceId: z.string().uuid(),
   ownerPid: z.number().int().positive(),
   projectId: ref,
   projectDir: z.string().min(1),
   projectName: z.string(),
-  featureId: ref,
-  featureName: z.string(),
-  optionId: ref,
-  optionName: z.string(),
+  featureId: ref.nullable(),
+  featureName: z.string().nullable(),
+  workId: ref,
+  workTitle: z.string(),
   revision: z.string().regex(/^[a-f0-9]{64}$/),
   createdAt: z.iso.datetime(),
   url: z.string().url(),

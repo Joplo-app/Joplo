@@ -118,7 +118,7 @@ export const isCond = (v: unknown): v is CondExpr => typeof v === 'object' && v 
 /** 把 Bind 或条件表达式转成 IR 条件。 */
 export const toCondition = (x: unknown): unknown => (isBind(x) ? { truthy: bindPath(x) } : isCond(x) ? x.$cond : x);
 
-/** 取调用者位置，用于给 feature/option/flow 步骤记录源位置。 */
+/** 取调用者位置，用于给 feature/work/flow 步骤记录源位置。 */
 export function callsite(depth = 3): string | undefined {
   const line = new Error().stack?.split('\n')[depth];
   const m = line && /\(?((?:file:\/\/)?[^()\s]+?):(\d+):(\d+)\)?\s*$/.exec(line);

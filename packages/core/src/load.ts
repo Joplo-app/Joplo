@@ -6,7 +6,7 @@
  *   layouts/<id>.tsx
  *   routes/**\/page.tsx              routes/page.tsx → /，routes/members/page.tsx → /members
  *   features/<f>/feature.ts
- *   features/<f>/options/<o>.tsx
+ *   features/<f>/works/<o>.tsx
  *   works/<key>.tsx                影片 → 章节 → 步骤
  *   themes/<name>.css               作者主题（D51），按原文读取
  *   locales/<语言>.json             作者内容译文（D84）：原文 → 译文
@@ -44,7 +44,7 @@ export function discoverFiles(root: string): string[] {
     if (!isDir(fd)) continue;
     const ff = findFile(join(fd, 'feature'));
     if (ff) files.push(ff);
-    for (const o of list(join(fd, 'options'))) if (/\.(tsx|ts)$/.test(o)) files.push(join(fd, 'options', o));
+    for (const o of list(join(fd, 'works'))) if (/\.(tsx|ts)$/.test(o)) files.push(join(fd, 'works', o));
   }
   for (const f of list(join(r, 'works'))) if (/\.(tsx|ts)$/.test(f) && !isDir(join(r, 'works', f))) files.push(join(r, 'works', f));
   for (const f of list(join(r, 'themes'))) if (/\.css$/.test(f)) files.push(join(r, 'themes', f));
@@ -98,17 +98,27 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
   const relp = (p: string) => relative(r, p).split(sep).join('/');
   const fail = (file: string, message: string, code = 'LOAD_FAILED') => diags.push({ severity: 'error', code, message, source: 'schema', at: `${relp(file)}:1:1` });
 
+  const missingConfig = !existsSync(join(r, 'tsconfig.json'));
+  const configurationFailure = (file: string, detail: string) => {
+    if (diags.some(d => d.code === 'PROJECT_MODULE_CONFIG')) return;
+    fail(file, `Cannot load this project. Add tsconfig.json using jsx: "react-jsxdev" and jsxImportSource: "@joplo-app/kit" and package.json with "type": "module", then run check again (underlying error: ${detail})`, 'PROJECT_MODULE_CONFIG');
+  };
+
   const load = async (file: string, kind: string): Promise<any | null> => {
     try {
       const mod = await importer(file);
       const v = (mod.default ?? null) as { kind?: string } | null;
       if (!v || v.kind !== kind) {
-        fail(file, `Default export must be ${kind}(...); got ${v?.kind ?? typeof v}`, kind === 'work' ? 'WORK_INVALID' : 'WRONG_EXPORT');
+        const detail = `Default export must be ${kind}(...); got ${v?.kind ?? typeof v}`;
+        if (missingConfig) { configurationFailure(file, detail); return null; }
+        fail(file, detail, kind === 'work' ? 'WORK_INVALID' : 'WRONG_EXPORT');
         return null;
       }
       return { ...v, file: relp(file) };
     } catch (e) {
-      fail(file, `Load failed: ${e instanceof Error ? e.message : String(e)}`);
+      const detail = e instanceof Error ? e.message : String(e);
+      if (missingConfig) configurationFailure(file, detail);
+      else fail(file, `Load failed: ${detail}`);
       return null;
     }
   };
@@ -119,6 +129,7 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
     return { authoring: null, diagnostics: diags };
   }
   const config = await load(cfgFile, 'config');
+  if (!config && diags.some(d => d.code === 'PROJECT_MODULE_CONFIG')) return { authoring: null, diagnostics: diags };
 
   const layouts: AuthoringProject['layouts'] = {};
   for (const f of list(join(r, 'layouts'))) {
@@ -151,15 +162,16 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
       fail(fd, `Feature directory ${fid} is missing feature.ts`, 'MISSING_FEATURE');
       continue;
     }
+    if (isDir(join(fd, 'options'))) fail(join(fd, 'options'), 'Rename this directory to works/ and migrate the authoring call to work({ title, summary })', 'OPTIONS_DIR_RENAMED');
     const def = await load(ff, 'feature');
     if (!def) continue;
-    const options: Record<string, any> = {};
-    for (const o of list(join(fd, 'options'))) {
+    const works: Record<string, any> = {};
+    for (const o of list(join(fd, 'works'))) {
       if (!/\.(tsx|ts)$/.test(o)) continue;
-      const v = await load(join(fd, 'options', o), 'option');
-      if (v) options[stem(o)] = v;
+      const v = await load(join(fd, 'works', o), 'work');
+      if (v) works[stem(o)] = v;
     }
-    features[fid] = { def, options };
+    features[fid] = { def, works };
   }
 
   const works: NonNullable<AuthoringProject['works']> = {};

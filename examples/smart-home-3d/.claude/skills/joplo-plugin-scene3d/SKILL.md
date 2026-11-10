@@ -3,7 +3,7 @@ name: joplo-plugin-scene3d
 description: "Use the 3D scene plugin in Joplo; read its entry, component recipes and recovery rules for this project."
 ---
 
-# Joplo plugin scene3d: 3D scene 0.4.1
+# Joplo plugin scene3d: 3D scene 0.5.0
 Interactive 3D scenes (three.js): steps click objects, state drives lights, doors, windows, and the camera
 Author package: @joplo-app/plugin-3d
 ## When to use
@@ -42,7 +42,7 @@ Then in the option's flow: .click('lamp', 'Turn the lamp on', set($.data.lampOn,
 - Scene3D is the JSX export; the catalog name is scene3d:Scene. Use joplo components scene3d:Scene scene3d:Model when looking up props.
 - Object and Target must be direct children of Scene3D (PLUGIN_PARENT); other components inside Scene3D are ignored.
 - Dragging orbits locally. A scripted orbit uses .act('scene3d:rotate', 'home', { azimuth: 90, elevation: 32 }, set($.ui.azimuth, 90), set($.ui.elevation, 32)); bind these state paths to Scene3D azimuth/elevation for deterministic replay and screenshots. Matching tolerates 6 degrees; the demonstrator samples the engine clock. Arrow keys orbit too (Shift = fine adjustment). Playing/resetting discards an audience orbit.
-- Free device reactions use option({ free: { light: free.click('lamp', set($.data.lamp, false)) } }). A matching next action or another reachable scenario takes priority; the first stage input during playback pauses and applies immediately, including the same orbit drag or arrow key. Hover never pauses.
+- Free device reactions use work({ free: { light: free.click('lamp', set($.data.lamp, false)) } }). A matching next action or another reachable scenario takes priority; the first stage input during playback pauses and applies immediately, including the same orbit drag or arrow key. Hover never pauses.
 - Do not put text inside the scene to explain things; use captions, callout() on the object, or the surrounding UI.
 
 For real GLB geometry read npx joplo skill scene3d/models. For optional model() generation, cost approval and task recovery read npx joplo skill scene3d/generation. Existing GLB rendering needs no key.
@@ -58,4 +58,4 @@ General engine contracts: npx joplo skill plugins
 - [models](./topics/models.md): GLB assets, loading readiness, material tint, anchors and offline checks
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.4.1 sha256:ecf5ac05929c23b0af6264e45ed4779f90a5f3a1023f3e3d0158483328d408ed -->
+<!-- joplo-skill 0.5.0 sha256:d33c5a3e45fbbfd95fbff530d31d1a9f9c38d3299a04f147609079be4e427df5 -->

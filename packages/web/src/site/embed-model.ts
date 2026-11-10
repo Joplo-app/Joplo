@@ -10,6 +10,7 @@
  *   切换菜单里的章节带两位编号（支线不编号），封面写“N 章”；独立作品（featureId = null）的封面写作品标题与
  *   「N 章 · 约 M」/「N 个场景 · 约 M」。挂了功能、切片独立的条目，封面与菜单与以前一样。
  */
+import { entryForWork } from '../runtime/views';
 import { embedScenarioIds, embedStartScenario, entryOf, type Entry, type Project } from '@joplo-app/core/runtime';
 import { en, type Dictionary } from '../i18n/en';
 import { entryMetaText, entryOfScenario, firstSlice, isLinear, sliceLabel } from '../player/work-view';
@@ -46,7 +47,7 @@ export function embedInitial(project: Project, params: EmbedParams): { scenarioI
 /** 场景切换菜单：多个条目时写“条目 · 场景”，只有一个时只写场景名。章节写“01 · 标题”（支线不编号），按播放顺序。 */
 export function embedScenarioItems(project: Project, currentId: string | null, i18n: Dictionary = en): { id: string; label: string; current: boolean }[] {
   const ids = embedScenarioIds(project);
-  const features = new Set(ids.map((id) => project.options[project.scenarios[id]!.optionId]?.featureId));
+  const features = new Set(ids.map((id) => entryForWork(project, project.scenarios[id]!.workId)?.id));
   const linearEntries = new Map(
     [...features].flatMap((fid): (readonly [string, Entry])[] => {
       const entry = fid ? entryOf(project, fid) : null;
@@ -55,19 +56,19 @@ export function embedScenarioItems(project: Project, currentId: string | null, i
   );
   // 章节按 Entry 的切片顺序（顺序里的章节在前、支线在后）；切片独立的条目保持原来的顺序
   const order = linearEntries.size ? ids.map((id, i) => [id, i] as const).sort(([a, i], [b, j]) => {
-    const fa = project.options[project.scenarios[a]!.optionId]?.featureId ?? '';
-    const fb = project.options[project.scenarios[b]!.optionId]?.featureId ?? '';
+    const fa = entryForWork(project, project.scenarios[a]!.workId)?.id ?? '';
+    const fb = entryForWork(project, project.scenarios[b]!.workId)?.id ?? '';
     if (fa !== fb || !linearEntries.has(fa)) return i - j;
     const w = linearEntries.get(fa)!;
     return w.slices.findIndex((s) => s.id === a) - w.slices.findIndex((s) => s.id === b);
   }).map(([id]) => id) : ids;
   return order.map((id) => {
     const s = project.scenarios[id]!;
-    const fid = project.options[s.optionId]?.featureId ?? '';
-    const f = project.features[fid];
+    const fid = entryForWork(project, s.workId)?.id ?? '';
+    const f = entryOf(project, fid);
     const linear = linearEntries.get(fid);
     const name = linear ? sliceLabel(linear, id, s.name, i18n) : s.name;
-    return { id, label: features.size > 1 && f ? `${f.name} · ${name}` : name, current: id === currentId };
+    return { id, label: features.size > 1 && f ? `${f.title} · ${name}` : name, current: id === currentId };
   });
 }
 
@@ -102,7 +103,7 @@ export function embedProgress(position: number, total: number): number {
  * 全屏不可用时“在新标签页打开”的地址：同一个分享页，去掉嵌入参数（embed / scenario / autoplay / review），
  * 用发布站的 hash 路由停在当前场景和步骤。其他查询参数保留。
  */
-export function standaloneUrl(href: string, play: { featureId: string; scenarioId: string; step: number } | null): string {
+export function fullPageUrl(href: string, play: { featureId: string; scenarioId: string; step: number } | null): string {
   const u = new URL(href);
   for (const k of ['embed', 'scenario', 'autoplay', 'review']) u.searchParams.delete(k);
   u.hash = play ? siteHash({ kind: 'play', play: { featureId: play.featureId, scenarioId: play.scenarioId, ...(play.step > 0 ? { step: play.step } : {}) } }) : '';

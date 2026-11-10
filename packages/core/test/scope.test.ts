@@ -29,8 +29,8 @@ describe('resolveScope', () => {
   it('场景与功能合并，保持 IR 顺序', () => {
     const p = built('publish');
     expect(resolveScope(p, { scenarios: ['invite.a.full'] }, 'publish')).toEqual(['invite.a.full']);
-    expect(resolveScope(p, { features: ['invite'] }, 'publish')).toEqual(['invite.a.happy', 'invite.a.full', 'invite.a.jump']);
-    // 按演示顺序（featureIds：billing、exp、invite），与参数顺序无关
+    expect(resolveScope(p, { entryIds: ['invite'] }, 'publish')).toEqual(['invite.a.happy', 'invite.a.full', 'invite.a.jump']);
+    // 按演示顺序（entryIds：billing、exp、invite），与参数顺序无关
     expect(resolveScope(p, { scenarios: ['invite.a.happy', 'exp.a.csv'] }, 'publish')).toEqual(['exp.a.csv', 'invite.a.happy']);
   });
   it('写错场景 id：NOT_FOUND，并给出相近的场景', () => {
@@ -40,13 +40,13 @@ describe('resolveScope', () => {
   });
   it('没选定的方案的场景：publish 拒绝（dev IR 也一样），review 可以', () => {
     const dev = built('dev');
-    expect(() => resolveScope(dev, { scenarios: ['invite.b.batch'] }, 'publish')).toThrow(/not the picked option[\s\S]*--review/);
+    expect(() => resolveScope(dev, { scenarios: ['invite.b.batch'] }, 'publish')).toThrow(/not the picked work[\s\S]*--review/);
     expect(resolveScope(dev, { scenarios: ['invite.b.batch'] }, 'review')).toEqual(['invite.b.batch']);
-    expect(resolveScope(built('review'), { features: ['invite'] }, 'review')).toEqual(['invite.a.happy', 'invite.a.full', 'invite.a.jump', 'invite.b.batch']);
+    expect(resolveScope(built('review'), { entryIds: ['invite'] }, 'review')).toEqual(['invite.a.happy', 'invite.a.full', 'invite.a.jump', 'invite.b.batch']);
   });
   it('未知功能、空范围报错', () => {
     const p = built('publish');
-    expect(() => resolveScope(p, { features: ['nope'] }, 'publish')).toThrow(/Unknown feature "nope"/);
+    expect(() => resolveScope(p, { entryIds: ['nope'] }, 'publish')).toThrow(/Unknown entry "nope"/);
     expect(() => resolveScope(p, {}, 'publish')).toThrow(/no scenarios/);
   });
 });
@@ -59,12 +59,12 @@ describe('scopeProject', () => {
     expect(JSON.stringify(project)).not.toContain(SEAT);
     expect(Object.keys(project.scenarios)).toEqual(['invite.a.happy']);
     expect(Object.keys(project.features)).toEqual(['invite']);
-    expect(project.featureIds).toEqual(['invite']);
-    expect(Object.keys(project.options)).toEqual(['invite.a']);
+    expect(project.entryIds).toEqual(['invite']);
+    expect(Object.keys(project.works)).toEqual(['invite.a']);
     expect(Object.keys(project.routes)).toEqual(['/']);
     expect(project.features.invite!.pick).toBe('invite.a');
     expect(project.description).toBe('');
-    expect(info).toEqual({ key: 'invite.a.happy', scenarios: ['invite.a.happy'], features: ['invite'], borrowed: [] });
+    expect(info).toEqual({ key: 'invite.a.happy', scenarios: ['invite.a.happy'], entryIds: ['invite'], borrowed: [] });
     playable(project);
     // 输入不变
     expect(JSON.stringify(p)).toContain(OUT.banner);
@@ -76,7 +76,7 @@ describe('scopeProject', () => {
     expect(text).toContain(SEAT);
     expect(leaks(project)).toEqual([]);
     expect(text).not.toContain(OUT.banner);
-    expect(info.borrowed).toEqual([{ kind: 'element', featureId: 'billing', featureName: OUT.billingName, optionId: 'billing.a', elementId: 'seat_box', route: '/', refs: ['seat'], scenarios: ['invite.a.full'] }]);
+    expect(info.borrowed).toEqual([{ kind: 'element', entryId: 'billing', entryTitle: OUT.billingName, workId: 'billing.a', elementId: 'seat_box', route: '/', refs: ['seat'], scenarios: ['invite.a.full'] }]);
     playable(project);
   });
 
@@ -84,7 +84,7 @@ describe('scopeProject', () => {
     const { project, info } = scopeProject(built('publish'), ['invite.a.jump']);
     expect(Object.keys(project.routes).sort()).toEqual(['/', '/billing']);
     expect(project.routes['/billing']!.addedBy).toBeUndefined();
-    expect(info.borrowed).toEqual([{ kind: 'page', featureId: 'billing', featureName: OUT.billingName, optionId: 'billing.a', route: '/billing', scenarios: ['invite.a.jump'] }]);
+    expect(info.borrowed).toEqual([{ kind: 'page', entryId: 'billing', entryTitle: OUT.billingName, workId: 'billing.a', route: '/billing', scenarios: ['invite.a.jump'] }]);
     // 页面本身（标题）是借用的；功能名、目标、场景、横幅、其他按钮都不在
     // 路径 /billing 本身带着 billing：只排除这一项，其余 id 与文字照查
     expect(leaks(project, [OUT.billingPage, 'billing'])).toEqual([]);
@@ -102,7 +102,7 @@ describe('scopeProject', () => {
 
   it('评审版：只含范围内方案；没选定的方案场景 pick 置空，不暴露选定方案的 id', () => {
     const { project, info } = scopeProject(built('review'), ['invite.b.batch'], 'review');
-    expect(Object.keys(project.options)).toEqual(['invite.b']);
+    expect(Object.keys(project.works)).toEqual(['invite.b']);
     expect(project.features.invite!.pick).toBeNull();
     expect(JSON.stringify(project)).not.toContain('invite.a');
     expect(info.key).toBe('review:invite.b.batch');

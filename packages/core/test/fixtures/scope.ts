@@ -6,7 +6,7 @@ import { fixtureConfig as config } from '../../../../scripts/test/fixtures.ts';
  * - billing（选定 a）：席位徽标、when 隐藏的新定价横幅、新增 /billing 页面，名字、目标、场景都带 SECRET。
  * - exp（选定 a）：导出按钮。
  */
-import { $, feature, flow, go, option, page, role, rule, shot, Slot } from '@joplo-app/kit';
+import { $, feature, flow, go, work, page, role, rule, shot, Slot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import * as ui from '@joplo-app/plugin-ui';
 import type { AuthoringProject } from '../../src/index.ts';
@@ -34,8 +34,8 @@ export const SEAT = 'SEAT_BADGE_5_of_5';
 
 export function scopeSource(): AuthoringProject {
   const home = page({ title: 'Members', layout: false }, h(ui.Stack, { id: 'home' }, h(ui.Group, { id: 'header' }, h(Slot, { name: 'header' })), h(ui.Text, { id: 'list' }, 'Members list')));
-  const inviteA = option({
-    name: 'A modal', idea: 'Invite in place',
+  const inviteA = work({
+    title: 'A modal', summary: 'Invite in place',
     on: { '/': { header: h(ui.Button, { id: 'invite_btn' }, 'Invite') } },
     scenarios: {
       happy: flow('Happy invite', { start: '/' }).click('invite_btn', 'Open invite'),
@@ -43,9 +43,9 @@ export function scopeSource(): AuthoringProject {
       jump: flow('Jump to billing', { start: '/' }).click('invite_btn', 'Open invite', go('/billing')),
     },
   });
-  const inviteB = option({ name: OUT.inviteB, idea: 'Batch page', scenarios: { batch: flow('Batch', { start: '/' }).system('Batch', 'Batch only') } });
-  const billingA = option({
-    name: 'Tiered', idea: 'New tiers',
+  const inviteB = work({ title: OUT.inviteB, summary: 'Batch page', scenarios: { batch: flow('Batch', { start: '/' }).system('Batch', 'Batch only') } });
+  const billingA = work({
+    title: 'Tiered', summary: 'New tiers',
     on: {
       '/': {
         header: [
@@ -58,8 +58,8 @@ export function scopeSource(): AuthoringProject {
     rules: { discount: rule(OUT.billingRule) },
     scenarios: { upgrade: flow(OUT.billingScenario, { start: '/' }).click('seat', OUT.billingStep, go('/billing')) },
   });
-  const expA = option({
-    name: 'CSV', idea: 'Download',
+  const expA = work({
+    title: 'CSV', summary: 'Download',
     on: { '/': { header: h(ui.Button, { id: 'export_btn' }, OUT.exportLabel) } },
     scenarios: { csv: flow(OUT.exportScenario, { start: '/' }).click('export_btn', 'Export') },
   });
@@ -71,15 +71,15 @@ export function scopeSource(): AuthoringProject {
     features: {
       invite: {
         def: { ...feature({ name: 'Invite', goal: 'Invite members', roles: { lin: role('Lin') }, cases: { main: { title: 'Main' } }, pick: 'a' }), ...at('features/invite/feature.ts') },
-        options: { a: { ...inviteA, ...at('features/invite/options/a.tsx') }, b: { ...inviteB, ...at('features/invite/options/b.tsx') } },
+        works: { a: { ...inviteA, ...at('features/invite/works/a.tsx') }, b: { ...inviteB, ...at('features/invite/works/b.tsx') } },
       },
       billing: {
         def: { ...feature({ name: OUT.billingName, goal: OUT.billingGoal, roles: { fin: role(OUT.billingRole) }, cases: {}, pick: 'a' }), ...at('features/billing/feature.ts') },
-        options: { a: { ...billingA, ...at('features/billing/options/a.tsx') } },
+        works: { a: { ...billingA, ...at('features/billing/works/a.tsx') } },
       },
       exp: {
         def: { ...feature({ name: OUT.exportName, goal: 'Export data', cases: {}, pick: 'a' }), ...at('features/exp/feature.ts') },
-        options: { a: { ...expA, ...at('features/exp/options/a.tsx') } },
+        works: { a: { ...expA, ...at('features/exp/works/a.tsx') } },
       },
     },
   };

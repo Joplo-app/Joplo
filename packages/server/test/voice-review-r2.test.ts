@@ -31,10 +31,10 @@ const seed = (cache: VoiceCache, fp: string, stepId: string, text: string, local
 function project(i18n = false): Project {
   const step = (id: string, caption: string) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, forks: [], marks: [] });
   return {
-    schemaVersion: 2, name: 'T', mode: 'publish', routes: {}, features: {},
+    schemaVersion: 3, name: 'T', mode: 'publish', routes: {}, features: {},
     ...(i18n ? { i18n: { default: 'zh-CN', locales: ['zh-CN', 'en'], messages: { en: { 一: 'One', 二: 'Two' } } } } : {}),
-    scenarios: { 'f.a.s': { id: 'f.a.s', optionId: 'f.a', name: 'S', description: '', mock: { label: 'm', outcome: 'success', auto: true }, initial: { sceneId: 'x', ui: {}, data: {}, inputs: {} }, steps: [step('f.a.s#1', '一'), step('f.a.s#2', '二')] } },
-    options: { 'f.a': { id: 'f.a', featureId: 'f', layers: {} } },
+    scenarios: { 'f.a.s': { id: 'f.a.s', workId: 'f.a', name: 'S', description: '', mock: { label: 'm', outcome: 'success', auto: true }, initial: { sceneId: 'x', ui: {}, data: {}, inputs: {} }, steps: [step('f.a.s#1', '一'), step('f.a.s#2', '二')] } },
+    works: { 'f.a': { id: 'f.a', featureId: 'f', layers: {} } },
     scenes: {},
   } as unknown as Project;
 }
@@ -141,8 +141,8 @@ describe('R2 默认来源：发布索引能够播放新生成与沿用的不同�
   it('相同文字的新本地片段优先，旁白与角色的覆盖彼此独立', async () => {
     const p = project();
     p.features.f = { id: 'f', roles: [{ id: 'actor', name: 'Actor' }] } as never;
-    p.options['f.a']!.layers = { main: { title: 'Main', sceneId: 'actor-scene', role: 'actor' } } as never;
-    p.scenes['actor-scene'] = { id: 'actor-scene', layer: 'main', optionId: 'f.a' } as never;
+    p.works['f.a']!.layers = { main: { title: 'Main', sceneId: 'actor-scene', role: 'actor' } } as never;
+    p.scenes['actor-scene'] = { id: 'actor-scene', layer: 'main', workId: 'f.a' } as never;
     const steps = p.scenarios['f.a.s']!.steps;
     steps[0]!.caption = 'Same';
     steps[1]!.kind = 'user'; steps[1]!.say = 'Same';

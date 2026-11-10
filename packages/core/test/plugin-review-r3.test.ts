@@ -1,6 +1,6 @@
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import { jsx as h } from '@joplo-app/kit/jsx-runtime';
 import { definePlugin, pluginComponent, pluginEffect } from '@joplo-app/kit/plugin';
 import { compile, type AuthoringProject } from '../src/compile.ts';
@@ -14,7 +14,7 @@ function source(hooks: any, effect = false): AuthoringProject {
   return {
     root: '/p', config: { ...config({ name: 'Depth', plugins: [p] }), file }, layouts: {},
     routes: { '/': { ...page({ title: 'Home' }, h(pluginComponent(p, 'Item'), { id: 'item' })), file } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('One', ...(effect ? [pluginEffect('probe', 'x', null)] : [])) } }), file } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'A', summary: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('One', ...(effect ? [pluginEffect('probe', 'x', null)] : [])) } }), file } } } },
   };
 }
 function dag(depth: number) {

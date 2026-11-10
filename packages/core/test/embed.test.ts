@@ -3,21 +3,22 @@ import { expect, it } from 'vitest';
 import { embedScenarioIds, embedStartScenario } from '../src/index.ts';
 
 const project = {
+  entryIds: ['b','a','empty'],
   features: {
-    b: { id: 'b', optionIds: ['b.a', 'b.b'], pick: 'b.b' },
-    a: { id: 'a', optionIds: ['a.a'], pick: null },
-    empty: { id: 'empty', optionIds: [], pick: null },
+    b: { id: 'b', workIds: ['b.a', 'b.b'], pick: 'b.b' },
+    a: { id: 'a', workIds: ['a.a'], pick: null },
+    empty: { id: 'empty', workIds: [], pick: null },
   },
-  options: { 'b.a': { id: 'b.a' }, 'b.b': { id: 'b.b' }, 'a.a': { id: 'a.a' } },
+  works: { 'b.a': { id: 'b.a' }, 'b.b': { id: 'b.b' }, 'a.a': { id: 'a.a' } },
   scenarios: {
-    'b.a.main': { id: 'b.a.main', optionId: 'b.a' },
-    'b.b.main': { id: 'b.b.main', optionId: 'b.b' },
-    'a.a.main': { id: 'a.a.main', optionId: 'a.a' },
-    'b.b.fail': { id: 'b.b.fail', optionId: 'b.b' },
+    'b.a.main': { id: 'b.a.main', workId: 'b.a' },
+    'b.b.main': { id: 'b.b.main', workId: 'b.b' },
+    'a.a.main': { id: 'a.a.main', workId: 'a.a' },
+    'b.b.fail': { id: 'b.b.fail', workId: 'b.b' },
   },
 };
 
-it('lists picked-option scenarios in feature order, falling back to the first option', () => {
+it('lists picked-work scenarios in feature order, falling back to the first work', () => {
   expect(embedScenarioIds(project)).toEqual(['b.b.main', 'b.b.fail', 'a.a.main']);
 });
 
@@ -28,6 +29,6 @@ it('starts from the requested scenario only when it is playable', () => {
 });
 
 it('returns null for a project without scenarios', () => {
-  expect(embedStartScenario({ features: {}, options: {}, scenarios: {} })).toBeNull();
-  expect(embedScenarioIds({ features: { f: { id: 'f', optionIds: ['gone'], pick: 'gone' } }, options: {}, scenarios: {} })).toEqual([]);
+  expect(embedStartScenario({ entryIds: [], features: {}, works: {}, scenarios: {} })).toBeNull();
+  expect(embedScenarioIds({ entryIds: ['f'], features: { f: { id: 'f', workIds: ['gone'], pick: 'gone' } }, works: {}, scenarios: {} })).toEqual([]);
 });

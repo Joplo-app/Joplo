@@ -5,7 +5,7 @@
  */
 export type Selection = {
   featureId: string | null;
-  optionId: string | null;
+  workId: string | null;
   scenarioId: string | null;
   /** 0 = 初始状态，k = 已执行 k 步。 */
   position: number;

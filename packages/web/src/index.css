@@ -1,4 +1,5 @@
 @import "tailwindcss";
+/* 看板与发布站预构建需要 UI 插件运行时的固定工具类；作者类名另从公开载荷生成。 */
 @source "../../../plugins/ui/src";
 @import "./fonts/fonts.css";
 @import "./fonts/MarkerGothic.css";

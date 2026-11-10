@@ -2,7 +2,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { feature, flow, option, page, set, $ } from '@joplo-app/kit';
+import { feature, flow, work, page, set, $ } from '@joplo-app/kit';
 import { definePlugin, pluginComponent } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { Button, Modal } from '@joplo-app/plugin-ui';
@@ -12,7 +12,7 @@ import { visibleIds } from '../src/focus.ts';
 import { readPublicProject, featureDiff } from '../src/feature-diff.ts';
 const file = '/p/test.tsx';
 function source(tree: any, plugins: any[] = [], steps = flow('S', {start:'/'}).system('One')): AuthoringProject {
- return {root:'/p',config:{...config({name:'Test',plugins}),file},layouts:{},routes:{'/':{...page({title:'Home'},tree),file}},features:{f:{def:{...feature({name:'F',goal:'g',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'i',on:{},state:{ui:{open:false}},scenarios:{s:steps}}),file}}}}};
+ return {root:'/p',config:{...config({name:'Test',plugins}),file},layouts:{},routes:{'/':{...page({title:'Home'},tree),file}},features:{f:{def:{...feature({name:'F',goal:'g',cases:{},pick:'a'}),file},works:{a:{...work({title:'A',summary:'i',on:{},state:{ui:{open:false}},scenarios:{s:steps}}),file}}}}};
 }
 const h = (type: unknown, props: Record<string,unknown>={}) => jsx(type, props);
 
@@ -30,13 +30,13 @@ describe('P2 declaration-driven semantics',()=>{
   const p = definePlugin({id:'probe',title:'Probe',runtime:'/probe.js',components:{
    Root:{doc:'root',inherit:[{target:'probe:Gate',props:['expanded']}]},
    Gate:{doc:'gate',traits:{gate:['expanded'],selfEvident:true}},
-   Field:{doc:'field',interactive:true,traits:{input:'multiple',choices:{prop:'options'}}},
+   Field:{doc:'field',interactive:true,traits:{input:'multiple',choices:{prop:'works'}}},
    Device:{doc:'device',traits:{childWidth:{value:390}}},
    Layout:{doc:'layout',traits:{layout:{rail:{size:'width',defaultSize:200,breakpoint:true}}}},
    Rail:{doc:'rail',traits:{region:'rail'}},
   }} as any);
   const c=(name:string,props:Record<string,unknown>={})=>h(pluginComponent(p,name),props);
-  const tree=c('Root',{expanded:$.ui.open,children:[c('Gate',{id:'gate',children:c('Field',{id:'field',options:[{value:'a',label:'Alpha'},{value:'b',label:'Beta'}]})}),c('Device',{children:c('Layout',{rail:{breakpoint:'sm',width:180},children:c('Rail',{id:'rail'})})})]});
+  const tree=c('Root',{expanded:$.ui.open,children:[c('Gate',{id:'gate',children:c('Field',{id:'field',works:[{value:'a',label:'Alpha'},{value:'b',label:'Beta'}]})}),c('Device',{children:c('Layout',{rail:{breakpoint:'sm',width:180},children:c('Rail',{id:'rail'})})})]});
   const r=compile(source(tree,[p],flow('S',{start:'/'}).system('Open',set($.ui.open,true)).select('field','Alpha').select('field','Beta').select('field','Alpha')),'dev');
   expect(r.diagnostics.filter(d=>d.severity==='error')).toEqual([]);
   const project=JSON.parse(JSON.stringify(r.project)); const scene=project.scenes['f.a@/'];

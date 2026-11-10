@@ -325,6 +325,52 @@ async function smoke() {
     assert(!pkg.dependencies?.['@joplo-app/plugin-3d'] && !pkg.devDependencies?.['@joplo-app/plugin-3d'], 'Starter must omit optional 3D');
     assert(!fs.readFileSync(path.join(project,'joplo.config.ts'),'utf8').includes('plugin-3d'), 'Starter must not enable 3D');
 
+    // Standalone template: initialize before installing dependencies, then consume only packed packages.
+    const workProject = path.join(base, 'my-show');
+    const workInit = sh(npxJoplo, ['init', 'my-show', '--template', path.join(REPO, 'templates/work')], base, { env: ua });
+    const workPkg = readJson(path.join(workProject, 'package.json'));
+    assert(Object.keys(workPkg.devDependencies).sort().join(',') === '@joplo-app/kit,@joplo-app/plugin-ui,joplo', 'Work template should install only the packages it uses');
+    for (const [name, value] of Object.entries(workPkg.devDependencies)) assert(value === v, `Work template must pin ${name} to ${v}`);
+    for (const name of ['joplo', 'joplo-feedback']) assert(fs.readFileSync(path.join(workProject, '.claude/skills', name, 'SKILL.md'), 'utf8') === fs.readFileSync(path.join(REPO, 'skills', name, 'SKILL.md'), 'utf8'), `Work init skill ${name} differs from the official skill`);
+    assert(fs.readFileSync(path.join(workProject, 'AGENTS.md'), 'utf8') === fs.readFileSync(path.join(project, 'AGENTS.md'), 'utf8'), 'Both templates must install the same managed AGENTS.md block');
+    assert(workInit.stdout.includes('Template plugin guides are ready'), 'Work init must supply plugin guidance before npm install');
+    workPkg.devDependencies = Object.fromEntries(Object.keys(workPkg.devDependencies).map(name => [name, tgz[name]]));
+    workPkg.overrides = overrides;
+    fs.writeFileSync(path.join(workProject, 'package.json'), JSON.stringify(workPkg, null, 2) + '\n');
+    sh(npm, ['install', ...npmFlags], workProject);
+    const workJoplo = path.join(workProject, 'node_modules/.bin/joplo');
+    const workCheck = sh(workJoplo, ['check'], workProject);
+    assert(/0 error/.test(workCheck.stdout) && /0 warning/.test(workCheck.stdout), `Work check: ${workCheck.out}`);
+    sh(workJoplo, ['skill', 'install'], workProject);
+    sh(workJoplo, ['build'], workProject);
+    // Import entriesOf from the installed tarball, never from workspace sources.
+    sh(process.execPath, ['--input-type=module', '-e', String.raw`
+      import assert from 'node:assert/strict';
+      import fs from 'node:fs';
+      import { entriesOf, stateAt } from '@joplo-app/core';
+      const html = fs.readFileSync('dist/index.html', 'utf8');
+      const match = /<script type="application\/json" id="joplo-ir">([\s\S]*?)<\/script>/.exec(html);
+      assert(match, 'Built work must contain its public IR');
+      const { project } = JSON.parse(match[1]);
+      assert.equal(project.schemaVersion, 3);
+      assert.deepEqual(Object.keys(project.features), []);
+      const entries = entriesOf(project);
+      assert.equal(entries.length, 1);
+      const entry = entries[0];
+      assert.equal(entry.id, 'explainer');
+      assert.equal(entry.featureId, null);
+      assert.equal(entry.sequencing, 'linear');
+      assert.equal(entry.slices.length, 2);
+      const [first, second] = entry.slices.map(s => project.scenarios[s.id]);
+      assert.equal(second.from, first.id);
+      assert.deepEqual(second.initial.ui, stateAt(project, first.id, first.steps.length).ui);
+      assert.deepEqual(second.initial.inputs, stateAt(project, first.id, first.steps.length).inputs);
+      const typed = stateAt(project, second.id, 1);
+      assert.equal(typed.inputs.message, 'A show you can try');
+      assert.equal(typed.ui.message, typed.inputs.message);
+    `], workProject);
+    log('  ✓ Work template: init → npm install (tarballs) → check (0 errors/warnings) → skills → build → entriesOf: one standalone work, two continuing chapters');
+
     // 作者 className：Tailwind 要编译它
     const pageFile = path.join(project, 'routes/page.tsx');
     fs.writeFileSync(pageFile, addSmokeClassName(fs.readFileSync(pageFile, 'utf8')));
@@ -384,12 +430,12 @@ async function smoke() {
       import content, { Canvas, camera } from '@joplo-app/plugin-content';
       import runtime from '@joplo-app/plugin-content/runtime';
       import { skill } from '@joplo-app/plugin-content/guide';
-      import { config, feature, flow, option, page } from '@joplo-app/kit';
+      import { config, feature, flow, work, page } from '@joplo-app/kit';
       import { jsx } from '@joplo-app/kit/jsx-runtime';
       import { compile, stateAt } from '@joplo-app/core';
       if (content.id !== 'content' || typeof Canvas !== 'function' || camera('target').plugin !== 'content' || !content.themes.studio || !runtime.observe || !runtime.components.Canvas.react || !skill.includes('motion')) process.exit(1);
       const file = '/smoke/source.tsx';
-      const r = compile({ root:'/smoke', config:{...config({name:'Content smoke',theme:'content:studio',plugins:[ui,content]}),file}, layouts:{}, routes:{'/':{...page({title:'World'},jsx(Canvas,{children:jsx('div',{id:'target',motion:'piece',children:'Target'})})),file}}, features:{f:{def:{...feature({name:'F',goal:'G',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'I',scenarios:{s:flow('S',{start:'/'}).system('Aim',camera('target'))}}),file}}}} }, 'publish');
+      const r = compile({ root:'/smoke', config:{...config({name:'Content smoke',theme:'content:studio',plugins:[ui,content]}),file}, layouts:{}, routes:{'/':{...page({title:'World'},jsx(Canvas,{children:jsx('div',{id:'target',motion:'piece',children:'Target'})})),file}}, features:{f:{def:{...feature({name:'F',goal:'G',cases:{},pick:'a'}),file},works:{a:{...work({title:'A',summary:'I',scenarios:{s:flow('S',{start:'/'}).system('Aim',camera('target'))}}),file}}}} }, 'publish');
       if (!r.project || r.diagnostics.some(d=>d.severity==='error') || stateAt(r.project,'f.a.s',1).ui.__plugins.content.camera.targets[0] !== 'target' || !r.project.scenarios['f.a.s'].steps[0].ext.content) process.exit(1);
     `], project);
     const contentGuide = sh(joplo, ['skill', 'content'], project);
@@ -402,12 +448,12 @@ async function smoke() {
       import { COMPONENT_TYPES } from '@joplo-app/plugin-ui/catalog';
       import { skill } from '@joplo-app/plugin-ui/guide';
       import { TextInput } from '@joplo-app/plugin-ui';
-      import { config, feature, flow, option, page } from '@joplo-app/kit';
+      import { config, feature, flow, work, page } from '@joplo-app/kit';
       import { jsx } from '@joplo-app/kit/jsx-runtime';
       import { compile, stateAt } from '@joplo-app/core';
       if (!ui.runtime.endsWith('/runtime.js') || !skill.includes('ui:') || COMPONENT_TYPES.some(name => !runtime.components[name]?.react) || !runtime.viewports.mobile) process.exit(1);
       const file='/smoke/source.tsx';
-      const r=compile({root:'/smoke',config:{...config({name:'UI smoke',plugins:[ui]}),file},layouts:{},routes:{'/':{...page({title:'UI'},jsx('div',{children:jsx(TextInput,{id:'field'})})),file}},features:{f:{def:{...feature({name:'F',goal:'G',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'I',scenarios:{s:flow('S',{start:'/'}).type('field','value')}}),file}}}}},'publish');
+      const r=compile({root:'/smoke',config:{...config({name:'UI smoke',plugins:[ui]}),file},layouts:{},routes:{'/':{...page({title:'UI'},jsx('div',{children:jsx(TextInput,{id:'field'})})),file}},features:{f:{def:{...feature({name:'F',goal:'G',cases:{},pick:'a'}),file},works:{a:{...work({title:'A',summary:'I',scenarios:{s:flow('S',{start:'/'}).type('field','value')}}),file}}}}},'publish');
       if (!r.project || Object.values(r.project.scenes).some(s=>s.root.type!=='ui:div') || stateAt(r.project,'f.a.s',1).inputs.field!=='value') process.exit(1);
     `], project);
     const uiGuide=sh(joplo,['components','Button'],project);
@@ -518,20 +564,20 @@ async function smoke() {
       const ir = JSON.parse(irRes.text);
       assert(ir.ok === true && ir.project, `IR：${irRes.text.slice(0, 300)}`);
       const sceneId = Object.keys(ir.project.scenes).find((id) => JSON.stringify(ir.project.scenes[id]).includes('"id":"start"'));
-      const optionId = Object.keys(ir.project.options)[0];
-      assert(sceneId && optionId, '找不到包含按钮 start 的画面');
+      const workId = Object.keys(ir.project.works)[0];
+      assert(sceneId && workId, '找不到包含按钮 start 的画面');
       await verifySkillReadingBrowser(REPO,project,`http://127.0.0.1:${port}/#/${pid}/f/example?s=example.a.happy&step=0`);
       log('  ✓ Installed skills → ui + diagram + content → check → dev Chromium → built site over HTTP steps 1/2/1');
-      const body = JSON.stringify({ selection: { optionId, scenarioId: null, position: 0, sceneId, nodeId: 'start' } });
+      const body = JSON.stringify({ selection: { workId, scenarioId: null, position: 0, sceneId, nodeId: 'start' } });
       const put = await request(port, { method: 'PUT', path: `/__joplo/p/${pid}/selection`, body, headers: { origin: `http://127.0.0.1:${port}`, 'content-type': 'application/json', 'x-joplo-token': token, 'content-length': Buffer.byteLength(body) } });
       assert(put.status === 200, `PUT selection 返回 ${put.status}：${put.text}`);
       const at = JSON.parse(put.text).selection?.at;
-      assert(/^features\/example\/options\/a\.tsx:\d+:\d+$/.test(at ?? ''), `selection.at 应为项目相对的 文件:行:列，实际 ${at}`);
+      assert(/^features\/example\/works\/a\.tsx:\d+:\d+$/.test(at ?? ''), `selection.at 应为项目相对的 文件:行:列，实际 ${at}`);
       log(`  ✓ joplo dev --port ${port}：GET / 200 看板 HTML，IR ok，选中 start → ${at}`);
 
       // 本地评审必须在真正安装的 tarball 中工作：保存反馈 → stdout 先输出 → 确认后退出，再按游标补读。
       const reviews = JSON.parse(sh(joplo, ['feedback', 'list', '--local', '--json'], project).stdout);
-      const review = reviews.find((s) => s.optionId === optionId);
+      const review = reviews.find((s) => s.workId === workId);
       assert(review && review.projectDir === fs.realpathSync(project), 'feedback list 应返回当前项目、当前方案的评审会话');
       const listener = spawn(joplo, ['feedback', 'watch', '--local', '--session', review.id, '--json'], { cwd: project, env: cleanEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
       let listenerOut = '', listenerErr = '';
@@ -544,7 +590,7 @@ async function smoke() {
       };
       let listenerTimeout;
       try {
-        const scenario = Object.values(ir.project.scenarios).find(s => s.optionId === optionId);
+        const scenario = Object.values(ir.project.scenarios).find(s => s.workId === workId);
         assert(scenario, '评审冒烟应有可定位的场景');
         const feedback = await submitReview({ type: 'feedback', body: 'Smoke-test feedback', context: { scenarioId: scenario.id, position: 0, sceneId: scenario.initial.sceneId } });
         assert(feedback.status === 200, `提交本地反馈失败：${feedback.status}`);
@@ -605,7 +651,7 @@ async function smoke() {
 
     // 9. selection
     const sel = sh(joplo, ['selection'], project);
-    assert(/features\/example\/options\/a\.tsx:\d+:\d+/.test(sel.stdout) && sel.stdout.includes('<Button id="start">'), `selection 输出：${sel.stdout}`);
+    assert(/features\/example\/works\/a\.tsx:\d+:\d+/.test(sel.stdout) && sel.stdout.includes('<Button id="start">'), `selection 输出：${sel.stdout}`);
 
     // 10. 产物与运行时不引用仓库路径、不含 workspace: 协议
     const needles = [...new Set([REPO, fs.realpathSync(REPO)])];
@@ -621,6 +667,8 @@ async function smoke() {
       ...['joplo', '@joplo-app'].flatMap((n) => textFiles(path.join(project, 'node_modules', n))),
       ...textFiles(path.join(project, 'dist')),
       ...textFiles(path.join(project, '.claude')),
+      ...textFiles(path.join(workProject, 'dist')),
+      ...textFiles(path.join(workProject, '.claude')),
     ];
     const hits = [];
     for (const f of scanned) {

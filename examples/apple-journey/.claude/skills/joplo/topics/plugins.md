@@ -15,7 +15,7 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 6. joplo components inspects only the enabled manifests; a named query gives that component's declarations and example. For full recipes/behavior read its plugin skill.
 
 ## Optional 3D
-The starter does not include 3D or its large browser dependency. To add it: npm install @joplo-app/plugin-3d@0.4.1; default-import scene3d from that package in joplo.config.ts, add scene3d to config.plugins, then run npx joplo skill install. Read npx joplo skill scene3d, scene3d/models and scene3d/generation for rendering, existing assets and optional local generation. A key is unnecessary for existing assets; dry-run before approving any generation.
+The starter does not include 3D or its large browser dependency. To add it: npm install @joplo-app/plugin-3d@0.5.0; default-import scene3d from that package in joplo.config.ts, add scene3d to config.plugins, then run npx joplo skill install. Read npx joplo skill scene3d, scene3d/models and scene3d/generation for rendering, existing assets and optional local generation. A key is unnecessary for existing assets; dry-run before approving any generation.
 
 ## Errors and trust
 - UNKNOWN_PLUGIN: the element's author package is not enabled. Use its package provenance in the diagnostic to install/import it and add it to config.plugins. UNKNOWN_COMPONENT: no enabled manifest declares that element or intrinsic tag; read the installed catalogs.
@@ -58,11 +58,11 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 - Local credential clients must serialize requests with JSON.stringify and never log request bodies. Malformed JSON returns a fixed 400 USAGE message without request excerpts; correct serialization locally without copying the secret into diagnostics. A 404 means the plugin/key pair is not declared by the current project: reload its enabled declarations and use an existing card instead of guessing identities.
 - Release ctx.hold on success, error, superseded requests and unmount, after drawing the ready frame. Recheck scope before inlining assets; unused resources must not ship.
 - Step effects can emit play/stop commands for named tracks. Each step's media snapshot is taken at the moment the step commits; between two commits the anchor advances by the planned time (the previous step's stay or estimated narration, whichever is longer, plus the next step's action demonstration: cursor travel, press, typing). Continuous playback follows the one engine clock; jumping/replaying resets to the same snapshot, which now lands close to where continuous playback would be. Pause, speed, fade and narration ducking are host behavior, synthesis belongs to the plugin.
-- Free reactions are playback data: public payloads retain option.free after scope filtering, while authoring notes and source positions are stripped. Validate the actual built site (npx joplo preview) with arbitrary input and a secondary reaction; replay-only tests cannot detect a dropped free map.
+- Free reactions are playback data: public payloads retain work.free after scope filtering, while authoring notes and source positions are stripped. Validate the actual built site (npx joplo preview) with arbitrary input and a secondary reaction; replay-only tests cannot detect a dropped free map.
 - Scope before writing media. Build writes validated resources as separate asset files (assets/<hash>.<ext>, uploaded once per content by share) and inlines plugin runtimes; the site needs HTTP but no other network. In runtimes, accept asset URLs with embeddedAsset(src, kind) from @joplo-app/kit/plugin instead of testing for data: URLs. Video mixing capability is separate from playback support—state its actual limit.
 
 ## Verify the package
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.4.1 sha256:d840d8811336e6c4887ad7b77cf5a3361f66ed792a88c7ba147b838d9c2eecfe -->
+<!-- joplo-skill 0.5.0 sha256:d37240be39a301029657d6786dcaababc250a68191e8718939d959329e52deb2 -->

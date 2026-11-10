@@ -12,7 +12,7 @@ import { tsImport } from 'tsx/esm/api';
 import { describe, expect, it } from 'vitest';
 import { loadAuthoring } from '../src/load.ts';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { $, callout, feature, flow, go, highlight, hold, layer, mark, not, numbered, option, page, set, shot, spotlight, toast, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
+import { $, callout, feature, flow, go, highlight, hold, layer, mark, not, numbered, work, page, set, shot, spotlight, toast, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { applyStep, cameraAt, compile, explainClick, findNode, focusAt, initialState, isNodeVisible, replay, stateAt, validate, visibleIds, walkNodes, type AuthoringProject, type Project } from '../src/index.ts';
 
@@ -41,8 +41,8 @@ function build(o: Opts = {}) {
   const home = page({ title: '首页', layout: false }, o.layers === false ? chatTree() : h(ui.Text, { id: 'home' }, '首页'));
   const next = page({ title: '下一页', layout: false }, h(ui.Text, { id: 'next_page' }, '下一页'));
   const fl = (o.steps ?? ((f: Flow) => f.system('提示', set($.ui.warn, true))))(flow('主线', { start: '/' }));
-  const opt = option({
-    name: 'A', idea: 'i',
+  const opt = work({
+    title: 'A', summary: 'i',
     state: { ui: { reply: '你好', warn: false, status: '草稿', dlg: false, many: false, revealed: false } },
     ...(o.layers === false ? {} : { layers: { chat: layer('聊天', chatTree()), trip: layer('行程', tripTree()), arch: layer('架构', archTree()) } }),
     scenarios: { happy: fl },
@@ -52,7 +52,7 @@ function build(o: Opts = {}) {
     config: { ...config({ name: 'T', home: '/', ...(o.autoFocus === undefined ? {} : { autoFocus: o.autoFocus }) }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') }, '/next': { ...next, ...F('routes/next/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return { dev: compile(src, 'dev'), publish: compile(src, 'publish'), review: compile(src, 'review') };
 }

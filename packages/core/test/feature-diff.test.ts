@@ -1,7 +1,7 @@
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { flow, feature, option, page } from '@joplo-app/kit';
+import { flow, feature, work, page } from '@joplo-app/kit';
 import { compile, compareSteps, featureDiff, stateAt } from '../src/index.ts';
 import { diffProject, step } from './fixtures/feature-diff.ts';
 import type { AuthoringProject } from '../src/compile.ts';
@@ -107,7 +107,7 @@ describe('feature diff matching reliability', () => {
 
 it('compiler preserves legacy ids and keys, rejects duplicate and invalid keys', () => {
   const f = flow('Send').system('Open').key('open').system('Send').key('send');
-  const source: AuthoringProject = { root: '.', config: { ...config({ name: 'Keys' }), file: 'joplo.config.ts' }, layouts: {}, routes: { '/': { ...page({ title: 'Keys' }, jsx('ui:Text', {})), file: 'routes/page.tsx' } }, features: { invite: { def: { ...feature({ name: 'Invite', goal: 'Send', cases: {}, pick: 'main' }), file: 'features/invite/feature.ts' }, options: { main: { ...option({ name: 'Email', idea: 'Send', on: { '/': {} }, scenarios: { send: f } }), file: 'features/invite/options/main.tsx' } } } } };
+  const source: AuthoringProject = { root: '.', config: { ...config({ name: 'Keys' }), file: 'joplo.config.ts' }, layouts: {}, routes: { '/': { ...page({ title: 'Keys' }, jsx('ui:Text', {})), file: 'routes/page.tsx' } }, features: { invite: { def: { ...feature({ name: 'Invite', goal: 'Send', cases: {}, pick: 'main' }), file: 'features/invite/feature.ts' }, works: { main: { ...work({ title: 'Email', summary: 'Send', on: { '/': {} }, scenarios: { send: f } }), file: 'features/invite/works/main.tsx' } } } } };
   const good = compile(source, 'publish');
   expect(good.project?.scenarios['invite.main.send']?.steps.map(s => [s.id, s.key])).toEqual([['invite.main.send#1', 'open'], ['invite.main.send#2', 'send']]);
   f.steps[1]!.key = 'open';

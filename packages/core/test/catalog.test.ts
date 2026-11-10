@@ -7,7 +7,7 @@ import { fixtureDocs as standardDocs } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { feature, flow, layout, option, page, set, $, Outlet, Slot } from '@joplo-app/kit';
+import { feature, flow, layout, work, page, set, $, Outlet, Slot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { COMPONENT } from '@joplo-app/kit/node';
 import {
@@ -96,9 +96,9 @@ function build(viewport: 'desktop' | 'mobile' = 'desktop'): Project {
     ),
   );
   const home = page({ title: '首页', viewport }, h(ui.Stack, null, h(ui.Button, { id: 'open' }, '打开'), h(ui.Text, { id: 'wide_only', visibleFrom: 'md' }, '宽屏才显示'), h(Slot, { name: 'x' })));
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {
       '/': {
         overlay: h(ui.Modal, { id: 'dlg', opened: $.ui.open, title: '新建' },
@@ -135,7 +135,7 @@ function build(viewport: 'desktop' | 'mobile' = 'desktop'): Project {
     config: { ...config({ name: 'T', layout: 'shell', home: '/' }), ...F('joplo.config.ts') },
     layouts: { shell: { ...shell, ...F('layouts/shell.tsx') } },
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const r = compile(src, 'dev');
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
@@ -173,7 +173,7 @@ describe('Mantine 语义（编译 + 播放器）', () => {
     const d = replay(build(), 'f.a.bad').diagnostics;
     expect(d.map((x) => x.code)).toEqual(['UNKNOWN_CHOICE']);
     expect(d[0]!.message).toContain('编辑者/editor');
-    expect(d[0]!.at).toMatch(/^features\/f\/options\/a\.tsx|catalog\.test\.ts/);
+    expect(d[0]!.at).toMatch(/^features\/f\/works\/a\.tsx|catalog\.test\.ts/);
   });
 
   it('自动字幕读 Mantine 的 label；select 显示选项的 label；Checkbox 用“勾选”', () => {
@@ -238,9 +238,9 @@ describe('设备外框：Terminal 与 Phone', () => {
         ),
       ),
     );
-    const opt = option({
-      name: 'A',
-      idea: 'i',
+    const opt = work({
+      title: 'A',
+      summary: 'i',
       on: {},
       state: { ui: { ran: false } },
       scenarios: { run: flow('运行命令', { start: '/' }).type('cmd_in', 'npx joplo skill').system('回车', set($.ui.ran, true)) },
@@ -250,7 +250,7 @@ describe('设备外框：Terminal 与 Phone', () => {
       config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
       layouts: {},
       routes: { '/': { ...home, ...F('routes/page.tsx') } },
-      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
     };
     const r = compile(src, 'dev');
     expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
@@ -304,9 +304,9 @@ describe('架构图：Diagram / Diagram.Group / Diagram.Node / Diagram.Edge（D4
         ...edges,
       ),
     );
-    const opt = option({
-      name: 'A',
-      idea: 'i',
+    const opt = work({
+      title: 'A',
+      summary: 'i',
       on: {},
       state: { ui: { n_brain: 'idle', e1: 'idle' } },
       scenarios: { call: flow('一次调用', { start: '/' }).system('客户端发出消息', set($.ui.e1, 'active'), set($.ui.n_brain, 'active')).system('大脑回复', set($.ui.e1, 'ok'), set($.ui.n_brain, 'ok')) },
@@ -316,7 +316,7 @@ describe('架构图：Diagram / Diagram.Group / Diagram.Node / Diagram.Edge（D4
       config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
       layouts: {},
       routes: { '/': { ...home, ...F('routes/page.tsx') } },
-      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
     };
     return compile(src, 'dev');
   }

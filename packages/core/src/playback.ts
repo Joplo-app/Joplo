@@ -64,7 +64,7 @@ export function checkStep(project: Project, scenario: Scenario, state: PlayState
 }
 
 function checkStepInner(project: Project, scenario: Scenario, state: PlayState, step: Step): Diagnostic | null {
-  const ref = { kind: 'step', id: step.id, optionId: scenario.optionId, scenarioId: scenario.id, stepId: step.id };
+  const ref = { kind: 'step', id: step.id, workId: scenario.workId, scenarioId: scenario.id, stepId: step.id };
   if (state.completed) return { severity: 'error', code: 'ALREADY_COMPLETED', message: `Scenario has ended; cannot execute step ${step.id}`, source: 'replay', ref };
   const a = step.action;
   if (a.type === 'event' || a.type === 'card' || a.type === 'press') return null;
@@ -99,7 +99,7 @@ function checkStepInner(project: Project, scenario: Scenario, state: PlayState, 
       return {
         severity: 'error',
         code: 'UNKNOWN_CHOICE',
-        message: `Step ${step.id} field "${nodeLabel(node)}" cannot select "${a.value}"; it is not an available option (available: ${choices.map((c) => (c.label === c.value ? c.value : `${c.label}/${c.value}`)).join(', ')})`,
+        message: `Step ${step.id} field "${nodeLabel(node)}" cannot select "${a.value}"; it is not an available choice (available: ${choices.map((c) => (c.label === c.value ? c.value : `${c.label}/${c.value}`)).join(', ')})`,
         source: 'replay',
         ref,
       };
@@ -136,7 +136,7 @@ export function applyStep(project: Project, scenario: Scenario, state: PlayState
   if (a.type === 'back') next.sceneId = next.sceneStack.pop()!;
 
   step.effects.forEach((e, i) => {
-    const ref = { kind: 'step', id: step.id, optionId: scenario.optionId, scenarioId: scenario.id, stepId: step.id, path: `effects[${i}]` };
+    const ref = { kind: 'step', id: step.id, workId: scenario.workId, scenarioId: scenario.id, stepId: step.id, path: `effects[${i}]` };
     switch (e.type) {
       case 'set':
         setPath(next, e.path, e.value, 'set');
@@ -152,12 +152,12 @@ export function applyStep(project: Project, scenario: Scenario, state: PlayState
         break;
       case 'navigate': {
         const target = project.scenes[e.sceneId];
-        // 发布 IR 只有发布视图（`@/路径`，optionId 为 null）；dev / review 里跳转目标必须属于同一方案（D68 修复：以前发布站一跳转就报错）
-        if (!target || (target.optionId !== scenario.optionId && !(project.mode === 'publish' && target.optionId === null)))
-          throw new PlaybackError(`Step ${step.id} navigates to a stage that is missing or outside this option: ${e.sceneId}`, {
+        // 发布 IR 只有发布视图（`@/路径`，workId 为 null）；dev / review 里跳转目标必须属于同一方案（D68 修复：以前发布站一跳转就报错）
+        if (!target || (target.workId !== scenario.workId && !(project.mode === 'publish' && target.workId === null)))
+          throw new PlaybackError(`Step ${step.id} navigates to a stage that is missing or outside this work: ${e.sceneId}`, {
             severity: 'error',
             code: 'MISSING_SCENE',
-            message: `Navigation target stage ${e.sceneId} is missing or outside option ${scenario.optionId}`,
+            message: `Navigation target stage ${e.sceneId} is missing or outside work ${scenario.workId}`,
             source: 'replay',
             ref,
           });

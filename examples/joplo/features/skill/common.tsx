@@ -19,7 +19,7 @@ export const skillLines = (p: string, footer: string) => [
     id={`${p}_topic`}
     when={$.ui.topic}
     cmd="npx joplo skill authoring"
-    out={'# Joplo 创作：authoring（0.1.0）\n目录约定\n  routes/<path>/page.tsx → 页面路径；features/<f>/options/<o>.tsx → 方案\n…（共 118 行）\n相关主题：components、cases'}
+    out={'# Joplo 创作：authoring（0.1.0）\n目录约定\n  routes/<path>/page.tsx → 页面路径；features/<f>/works/<o>.tsx → 方案\n…（共 118 行）\n相关主题：components、cases'}
   />,
   <Cmd
     id={`${p}_typo`}

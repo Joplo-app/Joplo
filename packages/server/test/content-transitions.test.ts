@@ -27,7 +27,7 @@ describe('D92 content transitions in a real browser', () => {
     write('routes/other/page.tsx', `import {page} from '@joplo-app/kit';export default page({title:'Other',layout:false},<div id="elsewhere">Elsewhere</div>);`);
     write('features/f/feature.ts', `import{feature}from'@joplo-app/kit';export default feature({name:'F',goal:'G',cases:{},pick:'a'});`);
     const toggles = Array.from({ length: 10 }, (_, i) => `.system('t${i}','Toggle ${i}',set($.ui.on,${i % 2 === 1}))`).join('');
-    write('features/f/options/a.tsx', `import{$,option,flow,free,set,hold}from'@joplo-app/kit';import{camera}from'@joplo-app/plugin-content';export default option({name:'A',idea:'I',state:{ui:{era:'a',on:true,poked:false,sx:200}},free:{poke:free.click('poke',set($.ui.poked,true))},scenarios:{
+    write('features/f/works/a.tsx', `import{$,work,flow,free,set,hold}from'@joplo-app/kit';import{camera}from'@joplo-app/plugin-content';export default work({title:'A',summary:'I',state:{ui:{era:'a',on:true,poked:false,sx:200}},free:{poke:free.click('poke',set($.ui.poked,true))},scenarios:{
       swap:flow('Swap').system('swap','To new',set($.ui.era,'b'),hold(5)).system('back','Back',set($.ui.era,'a'),hold(5)),
       toggle:flow('Toggle')${toggles},
       drift:flow('Drift').system('look','Look',camera('spot',{ms:300,drift:{zoom:1.25,ms:1500}}),hold(10)).system('away','Away',camera('spot2',{ms:300})),

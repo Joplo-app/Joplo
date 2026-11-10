@@ -1,4 +1,4 @@
-/** 所有消费者共用编译器的功能顺序；旧 IR 只沿用已有的对象顺序，不在读取端重新排序。 */
-export function orderedFeatures<T>(project: { features: Record<string, T>; featureIds?: readonly string[] }): T[] {
-  return (project.featureIds ?? Object.keys(project.features)).map(id => project.features[id]).filter((f): f is T => f !== undefined);
+/** 按首页条目顺序读取真正的功能，作品由 entries.ts 投影。 */
+export function featuresOf<T>(project: { features: Record<string, T>; entryIds: readonly string[] }): T[] {
+  return project.entryIds.map(id => project.features[id]).filter((f): f is T => f !== undefined);
 }

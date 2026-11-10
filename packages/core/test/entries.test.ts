@@ -1,12 +1,12 @@
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 作品投影（D102）。不变量：任何形态的作品都投影成同一个 Entry；首页卡片与封面只读它。
- * - 形态只由 Feature.standalone 决定（缺省 demo）；
+ * - 功能归属由 Entry.featureId 表达，不依赖切片或作品数量；
  * - 播放用的方案：选定的方案，没有选定时取第一个；
  * - 切片先是连续播放顺序里的（from 链优先、autoplay:false 不进），再是支线；总时长只算顺序里的，等于各切片 stepPlan 之和。
  */
 import { describe, expect, it } from 'vitest';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import * as ui from '@joplo-app/plugin-ui';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '../src/compile.ts';
@@ -23,9 +23,9 @@ function build(pick: string | null = 'a') {
   });
   const src: AuthoringProject = {
     root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'Invite', goal: 'Invite teammates', roles: ['Admin', 'Member'], cases: {}, pick }), ...F('features/f/feature.ts') }, options: {
-      a: { ...option({ name: 'A', idea: 'i', scenarios: scenarios() }), ...F('features/f/options/a.tsx') },
-      b: { ...option({ name: 'B', idea: 'i', scenarios: { only: flow('Only', { start: '/' }).click('go', 'x') } }), ...F('features/f/options/b.tsx') },
+    features: { f: { def: { ...feature({ name: 'Invite', goal: 'Invite teammates', roles: ['Admin', 'Member'], cases: {}, pick }), ...F('features/f/feature.ts') }, works: {
+      a: { ...work({ title: 'A', summary: 'i', scenarios: scenarios() }), ...F('features/f/works/a.tsx') },
+      b: { ...work({ title: 'B', summary: 'i', scenarios: { only: flow('Only', { start: '/' }).click('go', 'x') } }), ...F('features/f/works/b.tsx') },
     } } },
   };
   const r = compile(src, 'dev');
@@ -34,7 +34,7 @@ function build(pick: string | null = 'a') {
 }
 
 describe('works', () => {
-  it('projects a demo: picked option, slices in play order with side branches last, duration from the step plan', () => {
+  it('projects a demo: picked work, slices in play order with side branches last, duration from the step plan', () => {
     const p = build();
     const w = entryOf(p, 'f')!;
     expect(w).toMatchObject({ id: 'f', featureId: 'f', sequencing: 'independent', title: 'Invite', summary: 'Invite teammates', audience: null, roles: ['Admin', 'Member'], draft: false, workId: 'f.a' });
@@ -48,7 +48,7 @@ describe('works', () => {
     expect(entryOf(p, 'nope')).toBeNull();
   });
 
-  it('falls back to the first option when nothing is picked', () => {
+  it('falls back to the first work when nothing is picked', () => {
     expect(entryOf(build(null), 'f')!.workId).toBe('f.a');
     expect(entryOf(build('b'), 'f')!.slices.map((s) => s.key)).toEqual(['only']);
   });
@@ -56,7 +56,7 @@ describe('works', () => {
   it('projects standalone, audience and draft independently of sequencing', () => {
     const p = structuredClone(build());
     expect(entryOf(p, 'f')!.featureId).toBe('f');
-    Object.assign(p.features.f!, { standalone: true, audience: 'Curious readers', draft: true });
-    expect(entryOf(p, 'f')).toMatchObject({ featureId: null, audience: 'Curious readers', draft: true });
+    const w=p.works['f.a']!; delete w.featureId; p.works.f={...w,id:'f',key:'f',roles:p.features.f!.roles,audience:'Curious readers',draft:true}; delete p.features.f; p.entryIds=['f'];
+    expect(entryOf(p, 'f')).toMatchObject({featureId:null,audience:'Curious readers',draft:true,sequencing:'independent'});
   });
 });

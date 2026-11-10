@@ -1,3 +1,4 @@
+import { rolesOf } from './entries.ts';
 /**
  * 演示投影（纯函数）：第 k 步之后观众看到什么——导演镜头、显示哪一层的画面、过渡卡、角色、流式输出的出字计划、
  * 分叉、标注，以及这一步改了哪些状态。只读 IR 与回放出的状态，不推进状态。
@@ -82,18 +83,17 @@ export function cardAt(project: Project, scenarioId: string | null | undefined, 
 }
 
 /** 方案所属功能里可引用的角色（有 id 的）。 */
-export function roleOf(project: Project, optionId: string | null | undefined, roleId: string | null | undefined): RoleInfo | null {
-  if (!optionId || !roleId) return null;
-  const opt = project.options[optionId];
-  const r = opt ? project.features[opt.featureId]?.roles?.find((x) => x.id === roleId) : undefined;
+export function roleOf(project: Project, workId: string | null | undefined, roleId: string | null | undefined): RoleInfo | null {
+  if (!workId || !roleId) return null;
+  const r = rolesOf(project, workId).find(x => x.id === roleId);
   return r && r.id ? { id: r.id, name: r.name, desc: r.desc, color: r.color } : null;
 }
 
 /** 某个画面是谁的（层级声明了 role 时）；路径页面与没有角色的层级返回 null。 */
 export function roleOfScene(project: Project, sceneId: string | null | undefined): RoleInfo | null {
   const scene = sceneId ? project.scenes[sceneId] : undefined;
-  if (!scene?.layer || !scene.optionId) return null;
-  return roleOf(project, scene.optionId, project.options[scene.optionId]?.layers[scene.layer]?.role);
+  if (!scene?.layer || !scene.workId) return null;
+  return roleOf(project, scene.workId, project.works[scene.workId]?.layers[scene.layer]?.role);
 }
 
 /** 第 index 步（0 起）流式输出的状态路径与文字。 */

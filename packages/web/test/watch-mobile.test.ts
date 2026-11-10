@@ -7,7 +7,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';
@@ -84,9 +84,9 @@ describe('nextScenarioId', () => {
 
 function project(autoplay?: boolean, mode: 'dev' | 'publish' = 'dev'): Project {
   const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     scenarios: {
       one: flow('One', { start: '/' }).click('go', 'First chapter'),
       two: flow('Two', { start: '/', autoplay }).click('go', 'Second chapter'),
@@ -97,7 +97,7 @@ function project(autoplay?: boolean, mode: 'dev' | 'publish' = 'dev'): Project {
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return compile(src, mode).project!;
 }
@@ -209,12 +209,12 @@ describe('DemoController 下一章倒计时（upNext）', () => {
 describe('DemoController 接力（flow({ from })，D92）：一镜到底，不倒计时、不重置', () => {
   function relay(): Project {
     const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
-    const opt = option({ name: 'A', idea: 'i', scenarios: {
+    const opt = work({ title: 'A', summary: 'i', scenarios: {
       one: flow('One', { start: '/' }).click('go', 'First chapter'),
       two: flow('Two', { from: 'one' }).click('go', 'Second chapter'),
     } });
     const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
-      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } } };
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } } };
     return compile(src, 'dev').project!;
   }
   it('接力的下一章：没有 upNext、播放不停、跳转计数 seek 不变，状态从上一章结尾继续', async () => {
@@ -243,14 +243,14 @@ describe('DemoController 接力（flow({ from })，D92）：一镜到底，不�
 describe('U2 默认无缝接下一个场景（D92）：看板与发布站同一条规则', () => {
   function chain(): Project {
     const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
-    const opt = option({ name: 'A', idea: 'i', scenarios: {
+    const opt = work({ title: 'A', summary: 'i', scenarios: {
       one: flow('One', { start: '/' }).click('go', 'First'),
       side: flow('Side', { start: '/', autoplay: false }).click('go', 'Side branch'),
       two: flow('Two', { from: 'one' }).click('go', 'Second'),
       three: flow('Three', { start: '/' }).click('go', 'Third'),
     } });
     const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
-      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } } };
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } } };
     return compile(src, 'dev').project!;
   }
   const fresh = (id = 'f.a.one') => { const c = new DemoController(null); c.reducedMotion = true; c.setProject(chain(), 1, null); c.setScenario(id, 0, { quiet: true }); return c; };
@@ -290,14 +290,14 @@ describe('U2 默认无缝接下一个场景（D92）：看板与发布站同一�
 describe('U2 from 链优先于声明顺序（D92 R9）', () => {
   it('逆声明顺序的接力章仍是下一个；链尾之后接下一个根场景；不会回到已经放过的章', () => {
     const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
-    const opt = option({ name: 'A', idea: 'i', scenarios: {
+    const opt = work({ title: 'A', summary: 'i', scenarios: {
       two: flow('Two', { from: 'one' }).click('go', 'Second'),
       side: flow('Side', { from: 'one', autoplay: false }).click('go', 'Side'),
       one: flow('One', { start: '/' }).click('go', 'First'),
       three: flow('Three', { start: '/' }).click('go', 'Third'),
     } });
     const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
-      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } } };
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } } };
     const p = compile(src, 'dev').project!;
     const c = new DemoController(null);
     c.setProject(p, 1, null);

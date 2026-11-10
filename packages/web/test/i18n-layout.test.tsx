@@ -19,7 +19,7 @@ import uiPlugin from '@joplo-app/plugin-ui';
 const uiPlugins = { ui: { id: 'ui', title: uiPlugin.title, components: Object.fromEntries(Object.entries(uiPlugin.components).map(([name, c]) => [name, { ...(c.label ? { label: c.label } : {}) }])) } };
 
 
-const project = Project.parse({schemaVersion:2,mode:'dev',name:'Author project',features:{f:{id:'f',name:'Author feature',goal:'Author goal',optionIds:['f.a'],caseIds:['f.main'],pick:'f.a'}},options:{'f.a':{id:'f.a',featureId:'f',key:'a',name:'Author option',idea:'Author idea',coverage:{'f.main':{status:'missing',basis:'derived'}}}},cases:{'f.main':{id:'f.main',featureId:'f',title:'Author case',dimension:'main'}}});
+const project = Project.parse({ entryIds: ["f"], schemaVersion: 3,mode:'dev',name:'Author project',features:{f:{ alternatives: { 'f.a': { decisionFocus: '', tradeoffs: [], coverage: {'f.main':{status:'missing',basis:'derived'}} } }, id:'f',name:'Author feature',goal:'Author goal',workIds:['f.a'],caseIds:['f.main'],pick:'f.a'}},works:{'f.a':{ roles: [],id:'f.a',featureId:'f',key:'a',title:'Author option',summary:'Author idea',}},cases:{'f.main':{id:'f.main',featureId:'f',title:'Author case',dimension:'main'}}});
 
 for(const locale of locales) for(const [width,height] of [[1280,800],[1440,900]] as const) {
   it(`${locale} ${width}×${height}: fits the topbar, dock, fullscreen bar and sidebar without wrapping labels`, () => {
@@ -60,7 +60,7 @@ for(const locale of locales) for(const [width,height] of [[1280,800],[1440,900]]
     const markup=renderToStaticMarkup(<I18nProvider explicit={locale} extend={boardDictionary}>
       <Btn label={t.player.play} /><Btn label={t.player.export} /><Btn label={t.player.inspect} />
       <Segmented value="1" items={SPEEDS.map(n=>({value:String(n),label:t.player.speedValue(n)}))} label={t.player.playbackSpeed(1)} onChange={()=>{}} />
-      <CaseNav project={project} featureId="f" optionId="f.a" caseId="f.main" scenarioId={null} onOption={()=>{}} onCase={()=>{}} onScenario={()=>{}} onOptionCase={()=>{}} onCopy={()=>{}} />
+      <CaseNav project={project} featureId="f" workId="f.a" caseId="f.main" scenarioId={null} onWork={()=>{}} onCase={()=>{}} onScenario={()=>{}} onWorkCase={()=>{}} onCopy={()=>{}} />
     </I18nProvider>);
     const buttons=[...markup.matchAll(/<button\b([^>]*)>/g)].map(m=>m[1]!);
     expect(buttons.slice(0,3+SPEEDS.length).every(attributes=>attributes.includes('whitespace-nowrap'))).toBe(true);

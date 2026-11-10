@@ -25,11 +25,11 @@ const eleven = (): VoiceProfile => ({ ...PRESETS.find((p) => p.id === 'elevenlab
 function project(): Project {
   const step = (id: string, caption: string) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, forks: [], marks: [] });
   return {
-    schemaVersion: 2, name: 'T', mode: 'publish',
+    schemaVersion: 3, name: 'T', mode: 'publish',
     i18n: { default: 'zh-CN', locales: ['zh-CN', 'en'], messages: { en: { 一: 'One', 二: 'Two' } } },
     routes: {}, features: {},
-    scenarios: { 'f.a.s': { id: 'f.a.s', optionId: 'f.a', name: 'S', description: '', mock: { label: 'm', outcome: 'success', auto: true }, initial: { sceneId: 'x', ui: {}, data: {}, inputs: {} }, steps: [step('f.a.s#1', '一'), step('f.a.s#2', '二')] } },
-    options: { 'f.a': { id: 'f.a', featureId: 'f', layers: {} } },
+    scenarios: { 'f.a.s': { id: 'f.a.s', workId: 'f.a', name: 'S', description: '', mock: { label: 'm', outcome: 'success', auto: true }, initial: { sceneId: 'x', ui: {}, data: {}, inputs: {} }, steps: [step('f.a.s#1', '一'), step('f.a.s#2', '二')] } },
+    works: { 'f.a': { id: 'f.a', featureId: 'f', layers: {} } },
     scenes: {},
   } as unknown as Project;
 }

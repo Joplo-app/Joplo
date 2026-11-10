@@ -158,7 +158,7 @@ try {
   if (await page.getByTestId('video-error').count()) bad++;
 
   // 编译错误：保留上一次成功的画面，显示 文件:行号
-  const file = path.join(tmp, 'features/invite/options/a-modal.tsx');
+  const file = path.join(tmp, 'features/invite/works/a-modal.tsx');
   const good = fs.readFileSync(file, 'utf8');
   fs.writeFileSync(file, good.replace('<Button id="btn_send"', '<Button id="btn_send" ={'));
   await page.getByTestId('diagnostics').waitFor();

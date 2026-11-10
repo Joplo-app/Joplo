@@ -57,7 +57,7 @@ export const shownIndex = (scenario: Scenario, position: number, activeStep: num
 export function speakerOf(project: Project, scenarioId: string, index: number): RoleInfo | null {
   const step = project.scenarios[scenarioId]?.steps[index - 1];
   // say(…, { role }) 写明了是谁（D100）：与朗读（core speakerRoleAt）同一规则
-  if (step?.say && step.sayRole) return roleOf(project, project.scenarios[scenarioId]?.optionId, step.sayRole);
+  if (step?.say && step.sayRole) return roleOf(project, project.scenarios[scenarioId]?.workId, step.sayRole);
   if (!step || step.kind !== 'user') return null;
   const layer = cameraAt(project, scenarioId, index).directorLayer;
   const sceneId = layersOf(project, scenarioId).find((l) => l.id === layer)?.sceneId;

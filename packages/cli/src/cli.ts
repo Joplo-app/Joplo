@@ -118,7 +118,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (opts.format === 'json') json(result(client.server, `${terminalText(data.user.email)} (${data.plan})`, data));
     else line(`${terminalText(data.user.email)} (${data.plan})${key ? `\n${key}` : ''}\nNew upload limit: ${data.limits.maxUploadBytes} bytes\nManifest total limit: ${data.limits.maxTotalBytes} bytes, ${data.limits.maxFiles} files\nPublications per hour: ${data.limits.publishesPerHour ?? 'Not provided by the server'}${data.storage ? `\nStorage: ${formatBytes(data.storage.usedBytes)} of ${formatBytes(data.storage.quotaBytes)} used` : ''}${data.voice ? `\n${voiceQuotaLine(data.voice)}` : ''}`);
   });
-  cloudCommand('voice').description('Generate missing narration audio for standalone works and picked feature options (same cache as the board): Joplo Cloud narration when signed in, or the source chosen in the board or joplo.config.ts')
+  cloudCommand('voice').description('Generate missing narration audio for independent works and picked feature options (same cache as the board): Joplo Cloud narration when signed in, or the source chosen in the board or joplo.config.ts')
     .argument('[dir]', 'Project directory', '.').addOption(format())
     .option('--dry-run', 'Only count the steps and characters that would be generated')
     .option('--locale <lang>', 'Only this content language from config locales (D84); repeatable', collect, [])
@@ -160,11 +160,11 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)')
     .option('--password [password]', 'Protect a private share (Pro); omit value for hidden terminal input or JOPLO_SHARE_PASSWORD').option('--no-password', 'Remove the existing access password (private shares only)')
     .option('--public', 'Publish publicly: portfolio and search engines').option('--private', 'Only people with the link can view')
-    .option('--review', 'Also publish a private review link: standalone works and every feature option').option('--no-review', 'Do not publish a review version').option('--json', 'Print structured JSON (non-interactive)')
+    .option('--review', 'Also publish a private review link: independent works and every feature option').option('--no-review', 'Do not publish a review version').option('--json', 'Print structured JSON (non-interactive)')
     .option('--pr <number>', 'Attach a GitHub pull request (PR preview); repo, commit, and run URL come from GitHub Actions', integer('pr', 2147483647))
     .option('--repo <owner/name>', 'Repository for --pr outside GitHub Actions').option('--sha <commit>', 'Commit for --pr (defaults to the PR head or git HEAD)')
     .option('--scenario <id>', 'Share only this scenario; repeatable. Other works, scenarios, and pages are left out of the uploaded files (D75)', collect, [])
-    .option('--work <id>', "Share one work entry: standalone key or feature key (picked option; every option with --review); repeatable", collect, [])
+    .option('--work <id>', "Share one work entry: independent key or feature key (picked option; every option with --review); repeatable", collect, [])
     .option('--update <link>', 'Update this existing share (its link, for example from another computer without .joplo/cloud.json) and reuse its narration audio (D84)')
     .action(async (dir, opts) => {
       if (opts.json) opts.format = 'json';
@@ -172,7 +172,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       if (args.some(a => a === '--password' || a.startsWith('--password=')) && args.includes('--no-password')) throw new JoploError('USAGE', '--password and --no-password are mutually exclusive');
       const client = await cloudClient(opts.server, opts.format);
       const { share } = await import('./cloud-share.ts');
-      const published = await share(client, dir, { ...opts, scenarios: opts.scenario, features: opts.work }, async options => (await serverFunction('buildSite'))(options), () => serverFunction('renderStep'));
+      const published = await share(client, dir, { ...opts, scenarios: opts.scenario, entryIds: opts.work }, async options => (await serverFunction('buildSite'))(options), () => serverFunction('renderStep'));
       if (opts.format === 'json') json(result(resolve(dir), 'Published', published.result));
       else {
         const scope = published.result.scope;
@@ -214,11 +214,11 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       else for (const l of f.feedbackText(data)) line(l);
     });
   feedbackCommand.command('list').description('List local review sessions').argument('[dir]', 'Project directory', '.').requiredOption('--local', 'Read this project’s local review sessions')
-    .option('--json', 'Print JSON').option('--all', 'Include completed and stopped sessions').option('--work <id>', 'Filter by standalone work key or qualified option id')
+    .option('--json', 'Print JSON').option('--all', 'Include completed and stopped sessions').option('--work <id>', 'Filter by independent work key or qualified option id')
     .action(async (dir, opts) => {
       const { reviewSessions, reviewSummary, reviewLine } = await import('./local-review.ts');
       const labels = await feedbackWorkLabels(dir);
-      const sessions = reviewSessions(dir, { ...opts, option: opts.work ? await feedbackWorkId(dir, opts.work) : undefined });
+      const sessions = reviewSessions(dir, { ...opts, workId: opts.work ? await feedbackWorkId(dir, opts.work) : undefined });
       if (opts.json) json(sessions.map(reviewSummary));
       else if (!sessions.length) line('No active reviews. Run joplo dev in this project, or use --all for history.');
       else sessions.forEach(s => line(reviewLine(s, labels)));
@@ -237,7 +237,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       // 父命令的 --share / --server 在 watch 前后均能识别；拒绝把旧的写回标记用到监听命令。
       const all = command.optsWithGlobals();
       opts.json = opts.json || all.format === 'json';
-      opts.option = opts.work ? await feedbackWorkId(dir, opts.work) : undefined;
+      opts.workId = opts.work ? await feedbackWorkId(dir, opts.work) : undefined;
       if (all.applied !== undefined || all.ref !== undefined) throw new JoploError('USAGE', '--applied and --ref cannot be used with feedback watch');
       const shareId = opts.share ?? all.share;
       const server = opts.server ?? all.server;
@@ -272,7 +272,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (opts.format === 'json') json({ok:!failed,data}); else for (const item of data) line(JSON.stringify(item));
     if (failed) exitCode = 1;
   });
-  program.command('check').argument('[dir]', 'Project directory', '.').addOption(format()).option('--work <qid>', 'Validate one standalone work key or qualified option id').action(async (dir, opts) => {
+  program.command('check').argument('[dir]', 'Project directory', '.').addOption(format()).option('--work <qid>', 'Validate one independent work key or qualified option id').action(async (dir, opts) => {
     const report = await check(dir, opts.work);
     const summary = `${report.summary.error} error, ${report.summary.warning} warning, ${report.summary.info} info`;
     if (opts.format === 'json') {
@@ -293,10 +293,10 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       else for (const l of i18nAddText(r)) line(l);
     });
   program.command('outline').description('Print works and their slices, steps and duration; features also show audience, cases, expected results and option coverage')
-    .argument('[dir]', 'Project directory', '.').addOption(format()).option('--work <qid>', 'One standalone work key or qualified option id').action(async (dir, opts) => {
+    .argument('[dir]', 'Project directory', '.').addOption(format()).option('--work <qid>', 'One independent work key or qualified option id').action(async (dir, opts) => {
       const { readOutline, outlineText } = await import('./outline.ts');
       const r = await readOutline(dir, opts.work);
-      if (opts.format === 'json') json(r.outline ? result(r.name, `${r.outline.features.length} feature(s)`, { outline: r.outline, summary: r.summary }, r.diagnostics) : { ...failure(new JoploError('INVALID_SCHEMA', `${r.summary.error} error`, { diagnostics: r.diagnostics })), data: { outline: null, summary: r.summary } });
+      if (opts.format === 'json') json(r.outline ? result(r.name, `${r.outline.entries.length} feature(s)`, { outline: r.outline, summary: r.summary }, r.diagnostics) : { ...failure(new JoploError('INVALID_SCHEMA', `${r.summary.error} error`, { diagnostics: r.diagnostics })), data: { outline: null, summary: r.summary } });
       else for (const l of outlineText(r)) line(l);
       // 与 check 一致：有 error 时退出 1（大纲照常输出，编译不出 IR 时只写错误数）
       if (!r.outline || r.summary.error) exitCode = 1;
@@ -314,7 +314,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     else { line(summary); for (const l of data.lines) line(`${l.number} | ${l.text}`); if (data.note) line(data.note); }
   });
   program.command('init').argument('[dir]', 'Project directory', '.').option('--name <name>', 'Project name (defaults to directory name)').option('--keep', 'Add missing files in a nonempty directory; preserve existing files')
-    .option('--template <spec>', 'Local directory or github:owner/repo[/subdir][#ref]; default is the CLI version tag')
+    .option('--template <spec>', 'Built-in starter (default) or work at the CLI version tag; names take priority over local directories (use ./work). Also accepts local paths or github:owner/repo[/subdir][#ref]')
     .option('--no-skill', 'Do not install the agent skills (.claude/skills/joplo*, AGENTS.md block)')
     .action(async (dir, opts) => { for (const l of initSummary(await initProject(dir, opts.name, { keep: opts.keep, skill: opts.skill, template: opts.template }))) line(l); });
   program.command('skill').description('Read agent usage on demand or install a usage pointer')
@@ -353,11 +353,11 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   });
   program.command('build').argument('[dir]', 'Project directory', '.').option('--out-dir <dir>', 'Output directory (default: project dist)').option('--out <dir>', 'Alias for --out-dir').option('--overwrite', 'Allow clearing a nonempty output directory')
     .option('--scenario <id>', 'Build only this scenario; repeatable (same scope as share --scenario)', collect, [])
-    .option('--work <id>', "Build one work entry: standalone key or feature key (picked option); repeatable", collect, [])
+    .option('--work <id>', "Build one work entry: independent key or feature key (picked option); repeatable", collect, [])
     .action(async (dir, opts) => {
     const buildSite = await serverFunction('buildSite');
     const output = opts.outDir ?? opts.out;
-    const scope = opts.scenario.length || opts.work.length ? { scope: { scenarios: opts.scenario, features: opts.work } } : {};
+    const scope = opts.scenario.length || opts.work.length ? { scope: { scenarios: opts.scenario, entryIds: opts.work } } : {};
     // 项目没选过声音来源时，已登录 Joplo Cloud 就按 cloud 带上已生成的音频（D85，与看板同一规则；只读本机登录，不联网）
     const signedIn = await cloudClient().then(c => c.auth()).then(Boolean, () => false);
     const data = await buildSite({ projectDir: resolve(dir), outDir: output === undefined ? undefined : resolve(output), overwrite: opts.overwrite, ...scope, voiceDefault: signedIn ? 'cloud' : null });
@@ -476,11 +476,11 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
 
 async function feedbackWorkId(dir: string, id: string): Promise<string> {
   const { existsSync } = await import('node:fs');
-  if (id.includes('.') && !existsSync(resolve(dir, 'joplo.config.ts'))) return id;
+  if (!existsSync(resolve(dir, 'joplo.config.ts'))) return id;
   const { checkWithProject } = await import('./check.ts');
   const { resolveWorkId } = await import('./work.ts');
   const r = await checkWithProject(dir);
-  if (!r.project) throw new JoploError('INVALID_SCHEMA', 'The project must compile to resolve a standalone work key');
+  if (!r.project) throw new JoploError('INVALID_SCHEMA', 'The project must compile to resolve an independent work key');
   return resolveWorkId(r.project, id);
 }
 

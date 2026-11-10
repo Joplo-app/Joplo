@@ -253,7 +253,7 @@ export function createFr(locale: Locale = 'fr') {
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "Prototype conceptuel créé avec Joplo · Pas une implémentation de production",
       featureNotFound: "Fonctionnalité introuvable.",
       goToHome: "Accueil",
-      switchFeature: "Changer de fonctionnalité",
+      switchFeature: "Changer d’entrée",
       copyLink: "Copier le lien",
       copyLinkToCurrentStep: "Copier le lien vers l’étape actuelle",
       linkCopied: "Lien copié",

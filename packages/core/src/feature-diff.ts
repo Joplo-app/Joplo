@@ -1,8 +1,9 @@
+import { entryOf, rolesOf } from './entries.ts';
 import { projectThemes } from './themes.ts';
 import { jsonData } from './plugins/data.ts';
 /** Public feature comparison. Positional ids are addresses, never cross-version identities. */
 import { z } from 'zod';
-import { Project, type Effect, type Scenario, type Step } from './schema.ts';
+import { Project, SCHEMA_VERSION, type Effect, type Scenario, type Step } from './schema.ts';
 import { JoploError } from './result.ts';
 
 export const GitSha = z.string().regex(/^[a-f0-9]{40}$/);
@@ -21,7 +22,7 @@ export const DiffStep = z.strictObject({
   results: z.array(Result).max(12).optional(),
 });
 export const DiffScenario = z.strictObject({
-  featureId: z.string(), featureName: z.string(), name: z.string(),
+  entryId: z.string(), entryTitle: z.string(), name: z.string(),
   before: z.string().nullable(), after: z.string().nullable(), status: Status,
   reasons: z.array(z.string()), steps: z.array(DiffStep),
 });
@@ -157,13 +158,13 @@ export function readPublicProject(value: unknown): Project {
   const nodePrivate = (n: Project['scenes'][string]['root']): boolean => n.source !== undefined || n.note !== undefined || (n.children ?? []).some(nodePrivate);
   if (Object.keys(p.rules).length || Object.keys(p.cases).length || Object.keys(p.issues).length || p.voiceConfig ||
       Object.values(p.routes).some(r => r.source) || Object.values(p.scenes).some(s => nodePrivate(s.root)) ||
-      Object.values(p.features).some(f => f.source || f.constraints.length || f.caseIds.length) ||
-      Object.values(p.options).some(o => o.source || o.decisionFocus || o.tradeoffs.length || Object.keys(o.coverage).length) ||
+      Object.values(p.features).some(f => f.source || f.constraints.length || f.caseIds.length || Object.values(f.alternatives).some(a => a.decisionFocus || a.tradeoffs.length || Object.keys(a.coverage).length)) ||
+      Object.values(p.works).some(o => o.source || o.draft) ||
       Object.values(p.scenarios).some(s => s.source || s.caseIds.length || s.steps.some(st => st.source || st.ruleIds.length)))
     throw new JoploError('INVALID_SCHEMA', 'Private authoring data found; rebuild both sites with joplo build');
   for (const [id, sc] of Object.entries(p.scenarios)) {
-    const op = p.options[sc.optionId];
-    if (sc.id !== id || !op || !p.features[op.featureId] || !p.scenes[sc.initial.sceneId] ||
+    const op = p.works[sc.workId];
+    if (sc.id !== id || !op || (op.featureId && !p.features[op.featureId]) || !p.scenes[sc.initial.sceneId] ||
         Object.values(op.layers).some(l => !p.scenes[l.sceneId]) ||
         sc.steps.some(st => st.effects.some(e => e.type === 'navigate' && !p.scenes[e.sceneId])) ||
         new Set(sc.steps.map(st => st.id)).size !== sc.steps.length)
@@ -172,12 +173,12 @@ export function readPublicProject(value: unknown): Project {
   return p;
 }
 function sceneInputs(p: Project, s: Scenario) {
-  const ids = new Set([s.initial.sceneId, ...Object.values(p.options[s.optionId]?.layers ?? {}).map(l => l.sceneId)]);
+  const ids = new Set([s.initial.sceneId, ...Object.values(p.works[s.workId]?.layers ?? {}).map(l => l.sceneId)]);
   for (const st of s.steps) for (const e of st.effects) if (e.type === 'navigate') ids.add(e.sceneId);
   return [...ids].sort().map(id => p.scenes[id] ?? { missing: id });
 }
 function actionContracts(p: Project, s: Scenario) {
-  const actions = [...s.steps.map(st => st.action), ...Object.values(p.options[s.optionId]?.free ?? {}).map(r => r.action)];
+  const actions = [...s.steps.map(st => st.action), ...Object.values(p.works[s.workId]?.free ?? {}).map(r => r.action)];
   const names = [...new Set(actions.flatMap(a => a.type === 'plugin' ? [a.name] : []))].sort();
   return names.map(name => { const [id, key] = name.split(':'); return [name, p.plugins?.[id!]?.actions?.[key!]]; });
 }
@@ -185,33 +186,33 @@ export function featureDiff(before: unknown, after: unknown, source: { baseSha?:
   if ([source.baseSha, source.headSha].some(sha => sha !== undefined && !GitSha.safeParse(sha).success)) throw new JoploError('USAGE', 'Source SHAs must be normalized 40-character hexadecimal git commits');
   const base = DiffSource.parse({ sha: source.baseSha ?? null }), head = DiffSource.parse({ sha: source.headSha ?? null });
   const result: FeatureDiffManifest = { formatVersion: 1, kind: 'joplo-feature-diff', base, head, status: 'unchanged', reasons: [], summary: { added: [], modified: [], removed: [] }, scenarios: [] };
-  if ((before as Project)?.schemaVersion !== 2 || (after as Project)?.schemaVersion !== 2) return { ...result, status: 'incompatible', reasons: ['schema-version'] };
+  if ((before as Project)?.schemaVersion !== SCHEMA_VERSION || (after as Project)?.schemaVersion !== SCHEMA_VERSION) return { ...result, status: 'incompatible', reasons: ['schema-version'] };
   const b = readPublicProject(before), a = readPublicProject(after);
   for (const id of new Set([...Object.keys(a.scenarios), ...Object.keys(b.scenarios)])) {
     const old = b.scenarios[id], next = a.scenarios[id], s = next ?? old!, p = next ? a : b;
-    const option = p.options[s.optionId], feature = p.features[option?.featureId ?? ''];
+    const work = p.works[s.workId], feature = entryOf(p, work?.featureId ?? work?.id);
     if (!feature) throw new JoploError('INVALID_SCHEMA', 'Scenario references a missing public feature');
     const steps = compareSteps(old?.steps ?? [], next?.steps ?? []), reasons: string[] = [];
     let status: DiffScenario['status'] = !old ? 'added' : !next ? 'removed' : 'unchanged';
     if (old && next) {
-      const bo = b.options[old.optionId], bf = b.features[bo!.featureId];
+      const bo = b.works[old.workId], bf = entryOf(b, bo?.featureId ?? bo?.id);
       if (canonical([old.initial, old.ext]) !== canonical([next.initial, next.ext])) reasons.push('initial-state');
       if (canonical(sceneInputs(b, old)) !== canonical(sceneInputs(a, next))) reasons.push('scenes');
       if (canonical([b.theme, projectThemes(b), b.autoFocus]) !== canonical([a.theme, projectThemes(a), a.autoFocus])) reasons.push('theme');
-      if (canonical(bo?.free) !== canonical(option?.free)) reasons.push('free-reactions');
+      if (canonical(bo?.free) !== canonical(work?.free)) reasons.push('free-reactions');
       if ((old.actionEntry ?? 'before') !== (next.actionEntry ?? 'before')) reasons.push('action-entry');
       if ((old.autoplay !== false) !== (next.autoplay !== false)) reasons.push('autoplay');
       if (canonical(actionContracts(b, old)) !== canonical(actionContracts(a, next))) reasons.push('action-contracts');
-      if (canonical([bo?.layers, bf?.roles]) !== canonical([option?.layers, feature.roles])) reasons.push('layers-roles');
-      if (canonical([old.name, old.description, old.expected, old.mock, bf?.name, bf?.goal, bo?.name, bo?.idea]) !== canonical([next.name, next.description, next.expected, next.mock, feature.name, feature.goal, option?.name, option?.idea])) reasons.push('description');
+      if (canonical([bo?.layers, rolesOf(b, old.workId)]) !== canonical([work?.layers, rolesOf(a, next.workId)])) reasons.push('layers-roles');
+      if (canonical([old.name, old.description, old.expected, old.mock, bf?.title, bf?.summary, bo?.title, bo?.summary]) !== canonical([next.name, next.description, next.expected, next.mock, feature.title, feature.summary, work?.title, work?.summary])) reasons.push('description');
       status = steps.some(st => st.status === 'uncertain') ? 'uncertain' : reasons.length || steps.some(st => st.status !== 'unchanged') ? 'modified' : 'unchanged';
     }
-    result.scenarios.push({ featureId: feature.id, featureName: feature.name, name: s.name, before: old?.id ?? null, after: next?.id ?? null, status, reasons, steps });
+    result.scenarios.push({ entryId: feature.id, entryTitle: feature.title, name: s.name, before: old?.id ?? null, after: next?.id ?? null, status, reasons, steps });
     const group = status === 'uncertain' ? 'modified' : status;
-    if (group !== 'unchanged' && result.summary[group].length < 100) result.summary[group].push(`${feature.name} / ${s.name}`.slice(0, 200));
+    if (group !== 'unchanged' && result.summary[group].length < 100) result.summary[group].push(`${feature.title} / ${s.name}`.slice(0, 200));
   }
   // Project metadata / unused shared scenes still changed even when no scenario can display it.
-  if (canonical([b.name, b.description, b.features, b.options, b.scenes, b.theme, projectThemes(b), b.routes, b.featureIds, b.autoFocus]) !== canonical([a.name, a.description, a.features, a.options, a.scenes, a.theme, projectThemes(a), a.routes, a.featureIds, a.autoFocus])) result.reasons.push('project-presentation');
+  if (canonical([b.name, b.description, b.features, b.works, b.scenes, b.theme, projectThemes(b), b.routes, b.entryIds, b.autoFocus]) !== canonical([a.name, a.description, a.features, a.works, a.scenes, a.theme, projectThemes(a), a.routes, a.entryIds, a.autoFocus])) result.reasons.push('project-presentation');
   result.status = result.scenarios.some(s => s.status === 'uncertain') ? 'uncertain' : result.reasons.length || result.scenarios.some(s => s.status !== 'unchanged') ? 'changed' : 'unchanged';
   return FeatureDiffManifest.parse(result);
 }

@@ -253,7 +253,7 @@ export function createDe(locale: Locale = 'de') {
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "Konzeptprototyp mit Joplo · Keine Produktivimplementierung",
       featureNotFound: "Funktion nicht gefunden.",
       goToHome: "Zur Startseite",
-      switchFeature: "Funktion wechseln",
+      switchFeature: "Eintrag wechseln",
       copyLink: "Link kopieren",
       copyLinkToCurrentStep: "Link zum aktuellen Schritt kopieren",
       linkCopied: "Link kopiert",

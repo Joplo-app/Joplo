@@ -3,16 +3,16 @@ import { Project, stateAt, playgroundState } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';
 import { coverShown } from '../src/player/cover-content';
 
-const project = () => Project.parse({schemaVersion:2, mode:'dev', name:'Playground',
-  features:{f:{id:'f',name:'F',goal:'G',pick:'f.a',optionIds:['f.a']}},
-  options:{'f.a':{id:'f.a',featureId:'f',key:'a',name:'A',idea:'I'}},
-  scenes:{'f.a@/':{id:'f.a@/',optionId:'f.a',route:'/',name:'Home',root:{id:'root',type:'ui:div',children:[
+const project = () => Project.parse({ entryIds: ["f"], schemaVersion: 3, mode:'dev', name:'Playground',
+  features:{f:{ alternatives: { 'f.a': { decisionFocus: '', tradeoffs: [], coverage: {},  } }, id:'f',name:'F',goal:'G',pick:'f.a',workIds:['f.a']}},
+  works:{'f.a':{ roles: [],id:'f.a',featureId:'f',key:'a',title:'A',summary:'I'}},
+  scenes:{'f.a@/':{id:'f.a@/',workId:'f.a',route:'/',name:'Home',root:{id:'root',type:'ui:div',children:[
     {id:'lamp',type:'ui:Switch',props:{checked:'$data.lamp'},traits:{input:'single',native:{action:'toggle',prop:'checked'}}},
     {id:'next',type:'ui:Button',props:{label:'Next'}}, {id:'other',type:'ui:Button',props:{label:'Other'}},
   ]}}},
   plugins:{ui:{id:'ui',title:'UI',components:{Switch:{interactive:true},Button:{interactive:true}}}},
-  scenarios:{'f.a.main':{id:'f.a.main',optionId:'f.a',name:'Main',mock:{label:'Mock',outcome:'success'},initial:{sceneId:'f.a@/',data:{lamp:true}},steps:[{id:'main:1',kind:'user',caption:'Next',action:{type:'click',target:'next'},effects:[{type:'set',path:'ui.script',value:true}]}]},
-    'f.a.other':{id:'f.a.other',optionId:'f.a',name:'Other',mock:{label:'Mock',outcome:'success'},initial:{sceneId:'f.a@/'},steps:[{id:'other:1',kind:'user',caption:'Other',action:{type:'click',target:'other'}}]}}});
+  scenarios:{'f.a.main':{id:'f.a.main',workId:'f.a',name:'Main',mock:{label:'Mock',outcome:'success'},initial:{sceneId:'f.a@/',data:{lamp:true}},steps:[{id:'main:1',kind:'user',caption:'Next',action:{type:'click',target:'next'},effects:[{type:'set',path:'ui.script',value:true}]}]},
+    'f.a.other':{id:'f.a.other',workId:'f.a',name:'Other',mock:{label:'Mock',outcome:'success'},initial:{sceneId:'f.a@/'},steps:[{id:'other:1',kind:'user',caption:'Other',action:{type:'click',target:'other'}}]}}});
 function controller() { const c = new DemoController(); c.setProject(project(),1); c.setScenario('f.a.main'); return c; }
 afterEach(() => vi.useRealTimers());
 

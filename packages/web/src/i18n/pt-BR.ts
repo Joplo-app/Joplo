@@ -253,7 +253,7 @@ export function createPtBR(locale: Locale = 'pt-BR') {
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "Protótipo conceitual feito com Joplo · Não é uma implementação de produção",
       featureNotFound: "Recurso não encontrado.",
       goToHome: "Ir ao início",
-      switchFeature: "Trocar recurso",
+      switchFeature: "Trocar item",
       copyLink: "Copiar link",
       copyLinkToCurrentStep: "Copiar link da etapa atual",
       linkCopied: "Link copiado",

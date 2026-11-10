@@ -604,7 +604,7 @@ test('F8 create 503 NETWORK 即使有 Retry-After 也不重放', async () => {
 
 // ---------------------------------------------------------------- 嵌入（预览图 + data.embed）
 const irHtml = (project: unknown) => `<html><head><script type="application/json" id="joplo-ir">${JSON.stringify({ project, home: null })}</script></head><body></body></html>`;
-const irProject = { features: { f: { id: 'f', optionIds: ['f.a'], pick: 'f.a' } }, options: { 'f.a': { id: 'f.a' } }, scenarios: { 'f.a.main': { id: 'f.a.main', optionId: 'f.a' }, 'f.a.other': { id: 'f.a.other', optionId: 'f.a' } } };
+const irProject = { entryIds: ['f'], features: { f: { id: 'f', workIds: ['f.a'], pick: 'f.a' } }, works: { 'f.a': { id: 'f.a' } }, scenarios: { 'f.a.main': { id: 'f.a.main', workId: 'f.a' }, 'f.a.other': { id: 'f.a.other', workId: 'f.a' } } };
 /** 1200×630 的最小 PNG 头（签名 + IHDR）。 */
 const png = (w = 1200, h = 630) => { const b = Buffer.alloc(33); Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b); b.writeUInt32BE(13, 8); b.write('IHDR', 12, 'ascii'); b.writeUInt32BE(w, 16); b.writeUInt32BE(h, 20); return b; };
 const manifestOf = () => calls.find(c => c.path === '/api/v1/shares')!.body.files as { path: string; size: number; contentType: string; sha256: string }[];
@@ -630,7 +630,7 @@ test('E1 没有 renderStep（旧 server）或项目没有场景时跳过预览�
   expect(manifestOf().map(f => f.path)).not.toContain('_joplo/preview.png');
   expect(r.stderr.split('\n').filter(l => l.startsWith('Skipped the preview image'))).toHaveLength(1);
   renderStep = vi.fn(async () => { throw new Error('should not render without scenarios'); });
-  files['index.html'] = irHtml({ features: {}, options: {}, scenarios: {} });
+  files['index.html'] = irHtml({ entryIds: [], features: {}, works: {}, scenarios: {} });
   r = await cli(['share', '--private', '--no-review',  project, '--format=json']); expect(r.code).toBe(0); expect(renderStep).not.toHaveBeenCalled();
   expect(r.stderr).toMatch(/Skipped the preview image \(no scenario/);
 });

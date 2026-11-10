@@ -3,6 +3,6 @@ import { en, type Dictionary } from '../i18n/en';
 import type { Project } from '@joplo-app/core/runtime';
 import { scenariosOf } from '../runtime/views';
 
-export function siteScenarioRows(project: Project, optionId: string | null, currentScenarioId: string | null, i18n: Dictionary = en): { id: string; name: string; steps: string; current: boolean }[] {
-  return scenariosOf(project, optionId).map((s) => ({ id: s.id, name: s.name, steps: i18n.site.stepCount(s.steps.length), current: s.id === currentScenarioId }));
+export function siteScenarioRows(project: Project, workId: string | null, currentScenarioId: string | null, i18n: Dictionary = en): { id: string; name: string; steps: string; current: boolean }[] {
+  return scenariosOf(project, workId).map((s) => ({ id: s.id, name: s.name, steps: i18n.site.stepCount(s.steps.length), current: s.id === currentScenarioId }));
 }

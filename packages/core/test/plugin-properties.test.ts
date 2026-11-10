@@ -2,7 +2,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { feature, flow, layer, option, page, set, $ } from '@joplo-app/kit';
+import { feature, flow, layer, work, page, set, $ } from '@joplo-app/kit';
 import { definePlugin, pluginComponent, pluginEffect, type PluginDef } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, projectThemes, stateAt, cameraAt, type AuthoringProject } from '../src/index.ts';
@@ -17,7 +17,7 @@ function source(p: PluginDef, props: Record<string, unknown> = {}, effect = plug
   const file = '/p/test.tsx';
   return { root: '/p', config: { ...config({ name: 'Generic', theme: 'probe:night', plugins: [p] }), file }, layouts: {},
     routes: { '/': { ...page({ title: 'Home' }, jsx('div', { children: 'home' })), file } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'G', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'I',
+    features: { f: { def: { ...feature({ name: 'F', goal: 'G', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'A', summary: 'I',
       layers: { first: layer('First', jsx('div', { children: 'first' })), second: layer('Second', jsx('div', { id: 'node', ...props })) },
       scenarios: { second: flow('Second', { from: 'first' }).system('Still', set($.ui.next, 1)), first: flow('First', { start: '/' }).system('Write', effect) },
     }), file } } } } };
@@ -48,7 +48,7 @@ describe('universal plugin properties and themes', () => {
     const p = probe();
     p.components.Item = { doc: 'container' };
     const s = source(p);
-    s.features.f!.options.a!.layers!.second!.tree = jsx(pluginComponent(p, 'Item'), { id: 'node', priority: 9 });
+    s.features.f!.works.a!.layers!.second!.tree = jsx(pluginComponent(p, 'Item'), { id: 'node', priority: 9 });
     expect(codes(compile(s, 'dev'))).toContain('PLUGIN_PROPERTY_INVALID');
   });
   it.each(['data-jid', 'onclick', 'data-jp-other-badge'])('cannot overwrite host/other plugin anchors with %s', attribute => {
@@ -77,7 +77,7 @@ describe('universal plugin properties and themes', () => {
   it('checks properties after component normalization', () => {
     const p = probe(); p.components.Item = { doc: 'item' };
     p.compile!.node = node => ({ ...node, props: { ...node.props, priority: 9 } });
-    const s = source(p); s.features.f!.options.a!.layers!.second!.tree = jsx(pluginComponent(p, 'Item'), { id: 'node' });
+    const s = source(p); s.features.f!.works.a!.layers!.second!.tree = jsx(pluginComponent(p, 'Item'), { id: 'node' });
     expect(codes(compile(s, 'dev'))).toContain('PLUGIN_PROPERTY_INVALID');
   });
   it.each(['ui.__proto__.x', 'ui.constructor.x', 'document.body', 'ui'])('rejects unsafe/non-state write path %s', path => {

@@ -6,15 +6,15 @@ const root = resolve('scratch/feature-diff');
 await mkdir(root, { recursive: true });
 for (const side of ['before', 'after']) {
   const dir = join(root, side + '-project');
-  await mkdir(join(dir, 'features/invite/options'), { recursive: true });
+  await mkdir(join(dir, 'features/invite/works'), { recursive: true });
   await mkdir(join(dir, 'routes'), { recursive: true });
   await rm(join(dir, 'routes/index'), { recursive: true, force: true });
   await writeFile(join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions: { jsx: 'react-jsxdev', jsxImportSource: '@joplo-app/kit', moduleResolution: 'Bundler', module: 'ESNext', target: 'ES2023' } }));
   await writeFile(join(dir, 'joplo.config.ts'), `import { config } from '@joplo-app/kit'; export default config({ name: 'Feature diff fixture', home: '/' });`);
   await writeFile(join(dir, 'features/invite/feature.ts'), `import { feature } from '@joplo-app/kit'; export default feature({ name: 'Invitations', goal: 'Preview and send an invitation', cases: {}, pick: 'main' });`);
   await writeFile(join(dir, 'routes/page.tsx'), `import { page, $ } from '@joplo-app/kit'; import { Stack, Title, Text } from '@joplo-app/plugin-ui'; export default page({ title: 'Invitation' }, <Stack p="xl"><Title>Team invitation</Title><Text>{$.ui.status}</Text><Text>{$.ui.preview}</Text></Stack>);`);
-  await writeFile(join(dir, 'features/invite/options/main.tsx'), `import { option, flow, set, $, done } from '@joplo-app/kit';
-export default option({ name: 'Email', idea: 'Review before sending', state: { ui: { status: 'Ready', preview: '' } }, on: { '/': {} }, scenarios: {
+  await writeFile(join(dir, 'features/invite/works/main.tsx'), `import { work, flow, set, $, done } from '@joplo-app/kit';
+export default work({ title: 'Email', summary: 'Review before sending', state: { ui: { status: 'Ready', preview: '' } }, on: { '/': {} }, scenarios: {
   send: flow('Single invitation').system('Open', set($.ui.status, 'Draft ready')).key('open')
     ${side === 'after' ? ".system('Preview', set($.ui.preview, 'Please join our team')).key('preview')" : ''}
     .system('Send', set($.ui.status, '${side === 'after' ? 'Sending…' : 'Sent'}')).key('send')

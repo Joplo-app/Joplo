@@ -2,10 +2,20 @@
  * 看板与发布站共用的只读视图计算：路径树（产品地图）、浏览视图的画面与状态、缺口统计。
  * 不推进业务状态；推进只在 demo.ts 里通过 core 的 applyStep / stateAt 完成。
  */
-import { orderedFeatures, nodeLabel, walkNodes, type Coverage, type Option, type PlayState, type Project, type Scenario, type Scene, type SceneNode } from '@joplo-app/core/runtime';
+import { featuresOf, entriesOf, visibleRoutes, type Entry, nodeLabel, walkNodes, type Coverage, type Work, type PlayState, type Project, type Scenario, type Scene, type SceneNode } from '@joplo-app/core/runtime';
 
-export const optionsOf = (project: Project, featureId: string | null): Option[] =>
-  featureId && project.features[featureId] ? project.features[featureId]!.optionIds.map((id) => project.options[id]).filter((o): o is Option => !!o) : [];
+/** 作品所属条目从核心投影定位；未选定方案通过功能显式声明的 workIds 定位。 */
+export const entryForWork = (project: Project, workId: string | null | undefined): Entry | null =>
+  workId ? entriesOf(project).find(e => e.workId === workId || (e.featureId !== null && project.features[e.featureId]?.workIds.includes(workId))) ?? null : null;
+export const featureForWork = (project: Project, workId: string | null | undefined) => {
+  const entry = entryForWork(project, workId);
+  return entry?.featureId ? project.features[entry.featureId] ?? null : null;
+};
+export const alternativeOf = (project: Project, workId: string | null | undefined) =>
+  workId ? featureForWork(project, workId)?.alternatives[workId] : undefined;
+
+export const worksOf = (project: Project, featureId: string | null): Work[] =>
+  featureId && project.features[featureId] ? project.features[featureId]!.workIds.map((id) => project.works[id]).filter((o): o is Work => !!o) : [];
 
 // 场景列表与连续播放顺序在 core（entries.ts，D102）：作品投影、outline 与这里共用同一份
 export { scenariosOf, playSequence } from '@joplo-app/core/runtime';
@@ -33,14 +43,14 @@ export function browseState(project: Project, sceneId: string): PlayState {
   const ui: Record<string, unknown> = {};
   const data: Record<string, unknown> = {};
   const inputs: Record<string, unknown> = {};
-  const optionIds = new Set<string>();
-  for (const f of orderedFeatures(project)) if (f.pick) optionIds.add(f.pick);
-  if (scene?.optionId) {
-    const own = project.options[scene.optionId];
-    if (own) for (const id of [...optionIds]) if (project.options[id]?.featureId === own.featureId) optionIds.delete(id);
-    optionIds.add(scene.optionId);
+  const workIds = new Set<string>();
+  for (const e of entriesOf(project)) if (e.workId && (e.featureId === null || project.features[e.featureId]?.pick === e.workId)) workIds.add(e.workId);
+  if (scene?.workId) {
+    const own = entryForWork(project, scene.workId);
+    if (own) for (const id of [...workIds]) if (entryForWork(project, id)?.id === own.id) workIds.delete(id);
+    workIds.add(scene.workId);
   }
-  for (const oid of optionIds) {
+  for (const oid of workIds) {
     const sc = scenariosOf(project, oid)[0];
     if (!sc) continue;
     Object.assign(ui, structuredClone(sc.initial.ui));
@@ -55,40 +65,40 @@ export type RouteTreeEntry = {
   title: string;
   depth: number;
   /** 由哪个方案新增（基础路径为 null）。 */
-  addedBy: Option | null;
+  addedBy: Work | null;
   /** 堆叠在该路径上的功能，以及各自涉及的方案。 */
-  features: { featureId: string; name: string; options: Option[] }[];
+  features: { featureId: string; name: string; works: Work[] }[];
 };
 
 /** 路径树：每个路径上堆叠了哪些功能的哪些方案；方案新增的路径标明来源。 */
 export function routeTree(project: Project): RouteTreeEntry[] {
-  const paths = Object.keys(project.routes).sort((a, b) => a.localeCompare(b));
+  const paths = visibleRoutes(project).map(r => r.path).sort((a, b) => a.localeCompare(b));
   return paths.map((path) => {
     const r = project.routes[path]!;
-    const features = orderedFeatures(project).flatMap(f => {
-      const options = optionsOf(project, f.id).filter(o => o.routes.includes(path));
-      return options.length ? [{ featureId: f.id, name: f.name, options }] : [];
+    const features = featuresOf(project).flatMap(f => {
+      const works = worksOf(project, f.id).filter(o => o.routes.includes(path));
+      return works.length ? [{ featureId: f.id, name: f.name, works }] : [];
     });
     return {
       path,
       title: r.title,
       depth: path === '/' ? 0 : path.split('/').length - 2,
-      addedBy: r.addedBy ? (project.options[r.addedBy] ?? null) : null,
+      addedBy: r.addedBy ? (project.works[r.addedBy] ?? null) : null,
       features,
     };
   });
 }
 
-export function gapCounts(option: Option | null | undefined): { missing: number; undecided: number } {
-  const cov = Object.values(option?.coverage ?? {}) as Coverage[];
+export function gapCounts(alternative: { coverage: Record<string, Coverage> } | null | undefined): { missing: number; undecided: number } {
+  const cov = Object.values(alternative?.coverage ?? {}) as Coverage[];
   return { missing: cov.filter((c) => c.status === 'missing').length, undecided: cov.filter((c) => c.status === 'undecided').length };
 }
 
 
 /** 元素来自哪个方案：堆叠节点自带 from；其后代按源文件对应到方案文件。 */
-export function optionOfNode(project: Project, node: SceneNode): Option | null {
-  if (node.from && project.options[node.from]) return project.options[node.from]!;
+export function workOfNode(project: Project, node: SceneNode): Work | null {
+  if (node.from && project.works[node.from]) return project.works[node.from]!;
   const file = node.source?.replace(/:\d+:\d+$/, '');
   if (!file) return null;
-  return Object.values(project.options).find((o) => o.source?.replace(/:\d+:\d+$/, '') === file) ?? null;
+  return Object.values(project.works).find((o) => o.source?.replace(/:\d+:\d+$/, '') === file) ?? null;
 }

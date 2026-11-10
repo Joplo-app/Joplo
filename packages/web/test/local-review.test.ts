@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { compile, type LocalReviewSession } from '@joplo-app/core';
 import { reviewSource } from '../../core/test/fixtures/review';
-import { captureReviewDraft, localReviewCommand, readReviewDraft, reviewDraftKey, saveReviewDraft } from '../src/board/review-model';
+import { captureReviewDraft, localReviewCommand, localReviewTitle, readReviewDraft, reviewDraftKey, saveReviewDraft } from '../src/board/review-model';
 
 afterEach(() => vi.unstubAllGlobals());
 const session = { id: 'rv_' + 'a'.repeat(32), projectDir: "/work/a project/it's-a-demo" } as LocalReviewSession;
@@ -35,4 +35,11 @@ it('survives disabled browser storage and ignores malformed stored context', () 
 it('quotes project paths in the exact-session command without executing their contents', () => {
   // The copied command follows the whole project, so it keeps working across options and new rounds.
   expect(localReviewCommand(session)).toBe("npx joplo feedback watch '/work/a project/it'\\''s-a-demo' --local --follow --json");
+});
+
+it('本地评审的独立作品会话只显示作品标题，不显示空功能名或 null', () => {
+  const independent = { featureId: null, featureName: null, workId: 'story', workTitle: 'A story' };
+  expect(localReviewTitle(independent)).toBe('A story');
+  const attached = { featureId: 'invite', featureName: 'Invite', workId: 'invite.a', workTitle: 'A · Dialog' };
+  expect(localReviewTitle(attached)).toBe('Invite / A · Dialog');
 });

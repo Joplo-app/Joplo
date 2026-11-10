@@ -1,4 +1,6 @@
 import { stepCaption } from '../i18n/step-caption';
+import { entryForWork, featureForWork } from '../runtime/views';
+import { rolesOf } from '@joplo-app/core/runtime';
 import { en, type Dictionary } from '../i18n/en';
 /**
  * 场景封面（D61，纯函数）：第 0 步不再是“初始状态”，而是一张封面。内容只由 IR 推导：
@@ -12,7 +14,7 @@ import { en, type Dictionary } from '../i18n/en';
  *   再加切片标题与它自己的 description。
  * 标题、简介、给谁看与时长只从 Entry 取（Entry.ms / EntrySlice.ms），不另算。挂了功能的条目（无论切片是不是章节）封面不变（entry = null）。
  */
-import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, scenarioPlanMs, entryOf, type Project, type RoleInfo, type Scenario, type Step, type Entry } from '@joplo-app/core/runtime';
+import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, scenarioPlanMs, type Project, type RoleInfo, type Scenario, type Step, type Entry } from '@joplo-app/core/runtime';
 import { chapterNumber, entryMetaText, firstSlice, isLinear } from './work-view';
 
 export type Duration = { unit: 's' | 'min'; value: number };
@@ -21,7 +23,7 @@ export type CoverContent = {
   scenarioId: string;
   /** 所属功能名与方案名（小字）；缺失时为 null。 */
   feature: string | null;
-  option: string | null;
+  work: string | null;
   title: string;
   /** flow 的 description；没写时用功能的 goal（D67：封面默认就说清“解决什么”）；两者都没有时为 null。 */
   description: string | null;
@@ -99,21 +101,20 @@ function rolesIn(project: Project, scenario: Scenario): RoleInfo[] {
     const r = roleOfScene(project, layers.find((l) => l.id === layer)?.sceneId);
     if (r) ids.add(r.id);
     const card = cardAt(project, scenario.id, i);
-    if (card?.role && roleOf(project, scenario.optionId, card.role)) ids.add(card.role);
+    if (card?.role && roleOf(project, scenario.workId, card.role)) ids.add(card.role);
   }
-  const featureId = project.options[scenario.optionId]?.featureId;
-  const declared = (featureId ? project.features[featureId]?.roles : undefined) ?? [];
-  return declared.flatMap((r) => (r.id && ids.has(r.id) ? [roleOf(project, scenario.optionId, r.id)!] : []));
+  const declared = rolesOf(project, scenario.workId);
+  return declared.flatMap((r) => (r.id && ids.has(r.id) ? [roleOf(project, scenario.workId, r.id)!] : []));
 }
 
 export function coverFor(project: Project, scenarioId: string | null | undefined, i18n: Dictionary = en): CoverContent | null {
   const sc = scenarioId ? project.scenarios[scenarioId] : undefined;
   if (!sc || sc.steps.length === 0) return null;
-  const opt = project.options[sc.optionId];
-  const feat = opt ? project.features[opt.featureId] : undefined;
+  const opt = project.works[sc.workId];
+  const feat = featureForWork(project, sc.workId);
   // 只问能力：没有挂功能的条目（独立作品）用作品封面；挂了功能的条目保持 D61 场景封面
-  const found = feat ? entryOf(project, feat.id) : null;
-  const work = found && found.featureId === null && found.workId === sc.optionId ? found : null;
+  const found = entryForWork(project, sc.workId);
+  const work = found && found.featureId === null && found.workId === sc.workId ? found : null;
   const cover = work ? entryCover(work, sc.id, i18n) : null;
   // 时长只读 Entry（作品封面 = 顺序里各切片之和，切片封面 = 这一个）；说明只用切片自己的 description
   const slice = work?.slices.find((s) => s.id === sc.id);
@@ -121,7 +122,7 @@ export function coverFor(project: Project, scenarioId: string | null | undefined
   return {
     scenarioId: sc.id,
     feature: feat?.name ?? null,
-    option: opt?.name ?? null,
+    work: opt?.title ?? null,
     title: sc.name,
     ...(cover ? describe((sc.description ?? '').trim(), '') : describe((sc.description ?? '').trim(), (feat?.goal ?? '').trim())),
     steps: sc.steps.length,

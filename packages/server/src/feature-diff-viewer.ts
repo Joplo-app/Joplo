@@ -18,7 +18,7 @@ const ICONS = {
   hidden: icon('<path d="M10.7 5.1A10 10 0 0 1 22 12a13 13 0 0 1-1.7 2.7M6.6 6.6A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/>'),
 };
 const MARK = '<svg width="24" height="24" viewBox="0 0 128 128" aria-hidden="true"><rect x="4" y="4" width="120" height="120" rx="30" fill="#FFD23F"/><circle cx="40" cy="40" r="9" fill="#1E1E1E"/><circle cx="43" cy="36" r="3" fill="#fff"/><circle cx="87" cy="40" r="9" fill="#1E1E1E"/><circle cx="90" cy="36" r="3" fill="#fff"/><path d="M93 60V72Q93 100 63 100Q41 100 31 82" fill="none" stroke="#1E1E1E" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-/** Tab icon: the same mark, standalone SVG so the viewer needs no extra file. */
+/** Tab icon: the same mark, independent SVG so the viewer needs no extra file. */
 const FAVICON = 'data:image/svg+xml,' + encodeURIComponent(MARK.replace('<svg width="24" height="24"', '<svg xmlns="http://www.w3.org/2000/svg"').replace(' aria-hidden="true"', ''));
 
 // Tokens mirror design/joplo-board.pen「设计 Token v1」; layout follows「功能差异 · 单画面（默认）」.

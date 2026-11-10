@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
+import { work, chapter } from '@joplo-app/kit';
+import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, LocalReviewWrite, localReviewStatus, type Project } from '@joplo-app/core';
 import { listLocalReviews, readLocalReview } from '@joplo-app/core/node';
 import { reviewSource } from '../../core/test/fixtures/review.ts';
@@ -62,7 +64,7 @@ describe('local review persistence and identity', () => {
     const dir = temp(), p = project(), h = hubFor(dir, p), old = h.state(dir, 'f.a').session;
     h.sync(dir, 'project-a', structuredClone(p));
     expect(h.state(dir, 'f.a').session.id).toBe(old.id);
-    const next = structuredClone(p); next.options['f.a']!.name = 'Changed option';
+    const next = structuredClone(p); next.works['f.a']!.title = 'Changed option';
     h.sync(dir, 'project-a', next);
     expect(h.state(dir, 'f.a').session.id).not.toBe(old.id);
     expect(readLocalReview(dir, old.id).events.at(-1)).toMatchObject({ type: 'closed', reason: 'source_changed' });
@@ -71,7 +73,7 @@ describe('local review persistence and identity', () => {
   it('preserves confirmed history when the option changes and does not carry approval forward', () => {
     const dir = temp(), p = project(), h = hubFor(dir, p), old = h.state(dir, 'f.a').session;
     h.write(dir, p, approve(old.id));
-    p.options['f.a']!.idea = 'New idea'; h.sync(dir, 'project-a', p);
+    p.works['f.a']!.summary = 'New idea'; h.sync(dir, 'project-a', p);
     expect(localReviewStatus(h.state(dir, 'f.a').session)).toBe('open');
     expect(localReviewStatus(readLocalReview(dir, old.id))).toBe('approved');
   });
@@ -82,8 +84,8 @@ describe('local review persistence and identity', () => {
     expect(readLocalReview(dir, old.id).events.at(-1)).toMatchObject({ type: 'closed', reason: 'compile_error' });
     h.sync(dir, 'project-a', p);
     const newer = h.state(dir, 'f.a').session;
-    delete p.options['f.a']; h.sync(dir, 'project-a', p);
-    expect(readLocalReview(dir, newer.id).events.at(-1)).toMatchObject({ type: 'closed', reason: 'option_removed' });
+    delete p.works['f.a']; h.sync(dir, 'project-a', p);
+    expect(readLocalReview(dir, newer.id).events.at(-1)).toMatchObject({ type: 'closed', reason: 'work_removed' });
     h.invalidate(dir, 'server_stopped');
     expect(listLocalReviews(dir).every(s => localReviewStatus(s) === 'closed')).toBe(true);
   });
@@ -97,7 +99,7 @@ describe('local review persistence and identity', () => {
   });
   it('revision changes for a shared page or theme, but not for another option only', () => {
     const p = project(), hash = localReviewRevision(p, 'f.a');
-    p.options['f.b']!.idea = 'Another idea';
+    p.works['f.b']!.summary = 'Another idea';
     expect(localReviewRevision(p, 'f.a')).toBe(hash);
     p.theme = 'clean'; expect(localReviewRevision(p, 'f.a')).not.toBe(hash);
   });
@@ -110,8 +112,8 @@ it('HTTP review endpoints enforce token, origin, project ownership, and revision
   installFixturePlugins(dir);
   const dev = await createDev({ projectDir: dir, port: 0, watch: false, log: () => {} }); hubs.push(dev);
   const p = dev.payload().project!;
-  const option = Object.keys(p.options)[0]!;
-  const url = `${dev.url}__joplo/p/${dev.projectId}/review?option=${encodeURIComponent(option)}`;
+  const option = Object.keys(p.works)[0]!;
+  const url = `${dev.url}__joplo/p/${dev.projectId}/review?workId=${encodeURIComponent(option)}`;
   const headers = { 'x-joplo-token': dev.token, 'content-type': 'application/json' };
   expect((await fetch(url)).status).toBe(403);
   expect((await fetch(url, { headers: { ...headers, origin: 'https://untrusted.example' } })).status).toBe(403);
@@ -123,4 +125,31 @@ it('HTTP review endpoints enforce token, origin, project ownership, and revision
   expect(localReviewStatus((await saved.json() as any).session)).toBe('approved');
   const malformed = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ type: 'feedback' }) });
   expect(malformed.status).toBe(400);
+});
+
+it('独立作品评审保留空功能归属，反馈、revision 与关闭均使用作品身份', () => {
+  const source = reviewSource();
+  const result = compile({ ...source, features: {}, works: { intro: {
+    ...work({ title: 'Intro', summary: 'Summary', stage: jsx('div', { children: 'Welcome' }), scenarios: { start: chapter('Start').system('Begin') } }),
+    file: 'works/intro.tsx',
+  } } }, 'dev');
+  expect(result.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+  const p = result.project!;
+  const dir = temp(), h = hubFor(dir, p), session = h.state(dir, 'intro').session;
+  expect(session).toMatchObject({ v: 2, featureId: null, featureName: null, workId: 'intro', workTitle: 'Intro' });
+  expect(readLocalReview(dir, session.id)).toEqual(session);
+  h.sync(dir, 'project-a', structuredClone(p));
+  expect(h.state(dir, 'intro').session.id).toBe(session.id);
+  h.write(dir, p, { sessionId: session.id, requestId: crypto.randomUUID(), type: 'feedback', body: 'Keep the opening',
+    context: { scenarioId: 'intro.start', position: 1, sceneId: p.scenarios['intro.start']!.initial.sceneId } });
+  h.write(dir, p, approve(session.id));
+  expect(readLocalReview(dir, session.id)).toMatchObject({ featureId: null, featureName: null, events: [{ type: 'feedback' }, { type: 'approved' }] });
+  p.works.intro!.summary = 'Updated summary';
+  h.sync(dir, 'project-a', p);
+  const next = h.state(dir, 'intro').session;
+  expect(next.id).not.toBe(session.id);
+  expect(next).toMatchObject({ featureId: null, featureName: null, workId: 'intro' });
+  expect(localReviewStatus(readLocalReview(dir, session.id))).toBe('approved');
+  h.invalidate(dir, 'server_stopped');
+  expect(readLocalReview(dir, next.id)).toMatchObject({ featureId: null, events: [{ type: 'closed', reason: 'server_stopped' }] });
 });

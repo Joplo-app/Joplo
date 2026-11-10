@@ -9,7 +9,7 @@ const zh = { ...createZhCN(), ...createBoardZhCN() };
 import { describe, expect, it } from 'vitest';
 import { CAPTION_MAX, EXPLAIN_MAX, captionLength, compile, validate, type AuthoringProject, type Scenario } from '@joplo-app/core';
 import * as ui from '@joplo-app/plugin-ui';
-import { explain, feature, flow, option, page, Slot } from '@joplo-app/kit';
+import { explain, feature, flow, work, page, Slot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { SUBTITLE_PX, TITLE_CAPTION_PX, TITLE_EXPLAIN_PX, spokenSubtitleFor, stepTitleFor } from '../src/player/subtitle-content';
 
@@ -58,13 +58,13 @@ describe('check：说明与 explain 过长时只给 warning（带 at），不改
     expect(captionLength(longCap)).toBeGreaterThan(CAPTION_MAX);
     expect(captionLength(longExp)).toBeGreaterThan(EXPLAIN_MAX);
     const home = page({ title: 'P', layout: false }, h(ui.Stack, null, h(ui.Button, { id: 'go' }, '去'), h(Slot, { name: 'main' })));
-    const opt = option({ name: 'A', idea: 'i', on: {}, state: { ui: {} }, scenarios: { s: flow('一次', { start: '/' }).click('go', longCap, explain(longExp)).system('短', '额度预检', explain('够用')) } });
+    const opt = work({ title: 'A', summary: 'i', on: {}, state: { ui: {} }, scenarios: { s: flow('一次', { start: '/' }).click('go', longCap, explain(longExp)).system('短', '额度预检', explain('够用')) } });
     const src: AuthoringProject = {
       root: '/p',
       config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
       layouts: {},
       routes: { '/': { ...home, ...F('routes/page.tsx') } },
-      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
     };
     const p = compile(src, 'dev').project!;
     expect(p.scenarios['f.a.s']!.steps[0]!.caption).toBe(longCap); // 原文不变

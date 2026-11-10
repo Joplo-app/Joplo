@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 
 it('translates the static-stage notice with only the published-site dictionary', async () => {
   const ctl = new DemoController(null);
-  ctl.setProject(Project.parse({schemaVersion:2,name:'Site',mode:'publish',scenes:{s:{id:'s',optionId:'f.a',route:'/',name:'Stage',root:{id:'root',type:'ui:Stack'}}}}),1);
+  ctl.setProject(Project.parse({entryIds: [], schemaVersion: 3,name:'Site',mode:'publish',scenes:{s:{id:'s',workId:'f.a',route:'/',name:'Stage',root:{id:'root',type:'ui:Stack'}}}}),1);
   ctl.preview('s');
   await ctl.clickNode('unmodeled',{x:0,y:0});
   const notice = ctl.getSnapshot().notice!;

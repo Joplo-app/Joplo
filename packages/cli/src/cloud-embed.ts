@@ -54,7 +54,7 @@ export function inlineProject(html: string): Parameters<typeof embedStartScenari
   try {
     const data = JSON.parse(m[1]!) as { project?: unknown };
     const p = data.project as Parameters<typeof embedStartScenario>[0] | undefined;
-    return p && typeof p === 'object' && p.features && p.options && p.scenarios ? p : null;
+    return p && typeof p === 'object' && p.features && p.works && p.scenarios ? p : null;
   } catch {
     return null;
   }

@@ -150,7 +150,7 @@ export function createBoardZhCN(locale: Locale = 'zh-CN') {
       directoryNotFound: "找不到目录",
       projectErrorCount: (p0: Value) => `${value(p0, locale)} 个错误`,
       viewProjectHome: "查看项目首页",
-      switchFeature: "切换功能",
+      switchFeature: "切换条目",
       inspect: "检查",
       exitInspectMode: "关闭检查模式",
       inspectModeClickAStageElementToSelectIt: "检查模式：单击画面元素 = 选中它（不执行步骤）；平时按住 ⌥ 单击也能检查元素",

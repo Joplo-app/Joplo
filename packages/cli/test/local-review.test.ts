@@ -23,7 +23,7 @@ const setup = () => {
 };
 const capture = () => { let out = '', err = ''; return { io: { out: (s: string) => { out += s; }, err: (s: string) => { err += s; } }, get out() { return out; }, get err() { return err; } }; };
 const until = async (test: () => boolean) => { const end = Date.now() + 4000; while (!test()) { if (Date.now() > end) throw new Error('Timed out'); await new Promise(r => setTimeout(r, 20)); } };
-const bContext = (project: ReturnType<typeof compile>['project'] & object) => { const sc = Object.values(project.scenarios).find(s => s.optionId === 'f.b')!; return { scenarioId: sc.id, position: 0, sceneId: sc.initial.sceneId }; };
+const bContext = (project: ReturnType<typeof compile>['project'] & object) => { const sc = Object.values(project.scenarios).find(s => s.workId === 'f.b')!; return { scenarioId: sc.id, position: 0, sceneId: sc.initial.sceneId }; };
 const signal = () => { const c = new AbortController(); controllers.push(c); return c; };
 
 it('streams submitted feedback before approval and returns 0 only after approval', async () => {
@@ -34,7 +34,7 @@ it('streams submitted feedback before approval and returns 0 only after approval
   x.feedback();
   await until(() => io.out.includes('feedback'));
   expect(ended).toBe(false);
-  expect(JSON.parse(io.out.trim())).toMatchObject({ sessionId: x.session.id, seq: 1, type: 'feedback', optionId: 'f.a', context: { route: '/', position: 1 } });
+  expect(JSON.parse(io.out.trim())).toMatchObject({ sessionId: x.session.id, seq: 1, type: 'feedback', workId: 'f.a', context: { route: '/', position: 1 } });
   x.approve();
   expect(await result).toBe(0);
   expect(io.out.trim().split('\n').map(l => JSON.parse(l).type)).toEqual(['feedback', 'approved']);
@@ -55,7 +55,7 @@ it('reconnects with --after and also reads a completed session after its server 
 
 it('refuses ambiguous options across instances and never lets B confirmation finish A', async () => {
   const x = setup(), second = new LocalReviewHub(() => 'http://127.0.0.1:4791/'); second.sync(x.dir, 'test-project', x.project);
-  await expect(watchLocalReview(x.dir, { option: 'f.a' }, capture().io)).rejects.toThrow(/Multiple local reviews/);
+  await expect(watchLocalReview(x.dir, { workId: 'f.a' }, capture().io)).rejects.toThrow(/Multiple local reviews/);
   const io = capture(), ac = signal();
   let ended = false;
   const result = watchLocalReview(x.dir, { session: x.session.id, json: true }, io.io, ac.signal).then(code => { ended = true; return code; });
@@ -84,10 +84,10 @@ it('aborting exits 130 and leaves the review open', async () => {
 it('source changes exit nonzero and keep the new session separate', async () => {
   const x = setup(), ac = signal(), io = capture();
   const result = watchLocalReview(x.dir, { session: x.session.id, json: true }, io.io, ac.signal);
-  x.project.options['f.a']!.name = 'Revised'; x.hub.sync(x.dir, 'test-project', x.project);
+  x.project.works['f.a']!.title = 'Revised'; x.hub.sync(x.dir, 'test-project', x.project);
   expect(await result).toBe(1);
   expect(JSON.parse(io.out.trim())).toMatchObject({ type: 'closed', reason: 'source_changed' });
-  expect(reviewSessions(x.dir, { option: 'f.a' })[0]!.id).not.toBe(x.session.id);
+  expect(reviewSessions(x.dir, { workId: 'f.a' })[0]!.id).not.toBe(x.session.id);
 });
 
 it('validates cursors, corrupt records, and paths before streaming', async () => {
@@ -122,7 +122,7 @@ it('--follow streams every option of the project, keeps going after one is appro
   const x = setup(), io = capture(), ac = signal();
   let ended = false;
   const result = followLocalReviews(x.dir, { json: true }, io.io, ac.signal).then(code => { ended = true; return code; });
-  const options = reviewSessions(x.dir).map(s => s.optionId).sort();
+  const options = reviewSessions(x.dir).map(s => s.workId).sort();
   expect(options.length).toBeGreaterThan(1);
   // Every followed round shows an agent listening in the board.
   for (const s of reviewSessions(x.dir)) expect(localReviewWatcherCount(x.dir, s.id)).toBe(1);
@@ -134,7 +134,7 @@ it('--follow streams every option of the project, keeps going after one is appro
   await new Promise(r => setTimeout(r, 550));
   expect(ended).toBe(false);
   // A source edit closes the open round and opens a new one; the follower attaches by itself.
-  x.project.options['f.b']!.name = 'Revised'; x.hub.sync(x.dir, 'test-project', x.project);
+  x.project.works['f.b']!.name = 'Revised'; x.hub.sync(x.dir, 'test-project', x.project);
   await until(() => io.out.includes('source_changed'));
   const next = x.hub.state(x.dir, 'f.b').session;
   expect(next.id).not.toBe(b.id);
@@ -142,7 +142,7 @@ it('--follow streams every option of the project, keeps going after one is appro
   await until(() => io.out.includes('Round two'));
   const events = io.out.trim().split('\n').map(l => JSON.parse(l));
   expect(new Set(events.map(e => e.eventId)).size).toBe(events.length);
-  expect(events.find(e => e.body === 'Round two')).toMatchObject({ sessionId: next.id, optionId: 'f.b', seq: 1 });
+  expect(events.find(e => e.body === 'Round two')).toMatchObject({ sessionId: next.id, workId: 'f.b', seq: 1 });
   expect(io.err).toContain('Following');
   ac.abort();
   expect(await result).toBe(130);
@@ -192,7 +192,7 @@ it('--follow --once exits 0 after the first new events, so a host that only wake
   await until(() => io3.err.includes('Following'));
   x.approve();
   expect(await third).toBe(0);
-  expect(JSON.parse(io3.out.trim())).toMatchObject({ type: 'approved', optionId: 'f.a' });
+  expect(JSON.parse(io3.out.trim())).toMatchObject({ type: 'approved', workId: 'f.a' });
 });
 
 it('--since must be an ISO time and --once / --since need --follow', async () => {
@@ -208,11 +208,34 @@ it('--once ignores closed rounds from source edits (the agent own work) and stil
   let ended = false;
   const result = followLocalReviews(x.dir, { json: true, once: true }, io.io).then(code => { ended = true; return code; });
   await until(() => io.err.includes('Following'));
-  x.project.options['f.b']!.name = 'Revised'; x.hub.sync(x.dir, 'test-project', x.project);
+  x.project.works['f.b']!.name = 'Revised'; x.hub.sync(x.dir, 'test-project', x.project);
   await until(() => io.out.includes('source_changed'));
   await new Promise(r => setTimeout(r, 550));
   expect(ended).toBe(false);
   x.feedback('After the edit');
   expect(await result).toBe(0);
   expect(io.out).toContain('After the edit');
+});
+
+it('核心统一忽略旧版本，显式 CLI 会话选择保留重新发起提示', () => {
+  const x = setup();
+  const before = reviewSessions(x.dir, { all: true });
+  const id = `rv_${crypto.randomBytes(16).toString('hex')}`;
+  const file = localReviewFile(x.dir, id);
+  writeLocalReview(file, { ...x.session, id, v: 1 });
+  expect(reviewSessions(x.dir, { all: true })).toEqual(before);
+  expect(() => reviewSessions(x.dir, { session: id })).toThrowError(expect.objectContaining({ code: 'NOT_FOUND', message: expect.stringMatching(/older version of Joplo.*start a new review/i) }));
+  expect(fs.existsSync(file)).toBe(true);
+});
+
+it('独立作品的空功能归属在反馈流与 watch 回放中保持为空', async () => {
+  const x = setup(); x.feedback(); x.approve();
+  const saved = readLocalReview(x.dir, x.session.id);
+  writeLocalReview(localReviewFile(x.dir, saved.id), { ...saved, featureId: null, featureName: null, workId: 'intro', workTitle: 'Intro' });
+  const io = capture();
+  expect(await watchLocalReview(x.dir, { session: saved.id, json: true }, io.io)).toBe(0);
+  expect(io.out.trim().split('\n').map(line => JSON.parse(line))).toEqual([
+    expect.objectContaining({ type: 'feedback', featureId: null, workId: 'intro' }),
+    expect.objectContaining({ type: 'approved', featureId: null, workId: 'intro' }),
+  ]);
 });

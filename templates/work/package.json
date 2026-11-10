@@ -1,0 +1,11 @@
+{
+  "name": "__PACKAGE_NAME__",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "joplo dev", "check": "joplo check", "build": "joplo build" },
+  "devDependencies": {
+    "joplo": "__JOPLO_VERSION__",
+    "@joplo-app/kit": "__JOPLO_VERSION__",
+    "@joplo-app/plugin-ui": "__JOPLO_VERSION__"
+  }
+}

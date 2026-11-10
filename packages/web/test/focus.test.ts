@@ -59,12 +59,12 @@ describe('呈现层不拦截点击（不变量 3）', () => {
     expect(src.match(/className="pointer-events-none/g)!.length).toBeGreaterThanOrEqual(3);
   });
   const scene = {
-    id: 'sc', optionId: null, route: '/', name: 'x', viewport: 'desktop',
+    id: 'sc', workId: null, route: '/', name: 'x', viewport: 'desktop',
     root: { id: 'root', type: 'ui:Stack', children: [{ id: 'key', type: 'ui:Code', redact: { falsy: 'ui.revealed' }, children: [{ id: '_t', type: '#text', props: { text: 'sk-live' } }] }, { id: 'go', type: 'ui:Button', children: [{ id: '_g', type: '#text', props: { text: 'Go' } }] }] },
   };
-  const sc = { id: 's', optionId: 'o', name: 's', description: '', caseIds: [], mock: { label: 'ok', outcome: 'success' }, initial: { sceneId: 'sc', ui: {}, data: {}, inputs: {} }, expected: '',
+  const sc = { id: 's', workId: 'o', name: 's', description: '', caseIds: [], mock: { label: 'ok', outcome: 'success' }, initial: { sceneId: 'sc', ui: {}, data: {}, inputs: {} }, expected: '',
     steps: [{ id: 's#1', kind: 'system', action: { type: 'event', name: 'e' }, caption: 'e', effects: [], ruleIds: [], shots: [], directorLayer: null, forks: [], marks: [], cues: [{ kind: 'spotlight', targets: ['key'] }], callouts: [{ target: 'go', text: '点这里' }], hold: 5000 }] };
-  const project = { schemaVersion: SCHEMA_VERSION, name: 'p', description: '', theme: 'sketch', themes: {}, mode: 'publish', routes: {}, features: {}, cases: {}, options: {}, rules: {}, scenes: { sc: scene }, scenarios: { s: sc }, issues: {} } as unknown as Project;
+  const project = { schemaVersion: SCHEMA_VERSION, name: 'p', description: '', theme: 'sketch', themes: {}, mode: 'publish', routes: {}, features: {}, cases: {}, works: {}, rules: {}, scenes: { sc: scene }, scenarios: { s: sc }, issues: {} } as unknown as Project;
   const state = (position: number, revealed = false): PlayState => ({ scenarioId: 's', position, sceneId: 'sc', ui: { revealed }, data: {}, inputs: {}, toasts: [], completed: null, sceneStack: [] });
   it('舞台：提示层存在且不接收指针；redact 按条件给元素加 data-jredact', () => {
     const html = renderToStaticMarkup(createElement(Stage, { project, state: state(1), theme: 'sketch', mode: 'demo', animate: false, viewportOverride: { width: 400, height: 300 } }));

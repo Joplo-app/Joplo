@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import type { Project } from '@joplo-app/core';
 import { SPEEDS } from '../src/runtime/pace';
 import { BOARD_WIDE, boardLayout, bookmarkTabs, dockWidth, layerTabs, timelineChips } from '../src/player/layout';
-import { caseCard, featureMenu, gapCommand, optionLabel, optionMeta, otherOptionTags } from '../src/board/nav-model';
+import { caseCard, featureMenu, gapCommand, workLabel, workMeta, otherWorkTags } from '../src/board/nav-model';
 
 describe('布局断点（34-窄屏收起规则 ①–④）', () => {
   it('≥ 1440 全部展开；< 1440 顶栏只剩图标、左栏 240、当前步 200、缩放只剩 − +', () => {
@@ -132,45 +132,45 @@ describe('层级标签放不下时像书签（bookmarkTabs）', () => {
 });
 
 // ---------- 左栏模型 ----------
-const project = {
-  features: { invite: { id: 'invite', name: '团队成员邀请', caseIds: ['invite.ok', 'invite.empty', 'invite.dup'], optionIds: ['invite.a', 'invite.b'], pick: 'invite.a' }, other: { id: 'other', name: '空间设置', caseIds: ['other.x'], optionIds: [], pick: null } },
+const project = { entryIds: ["invite", "other"],
+  features: { invite: { roles: [], alternatives: { 'invite.a': { decisionFocus: '', coverage: { 'invite.ok': { status: 'expressed', scenarioIds: ['invite.a.ok'] }, 'invite.empty': { status: 'missing', scenarioIds: [], reason: '还没有场景' }, 'invite.dup': { status: 'undecided', scenarioIds: [] } }, tradeoffs: ['+ 快'] }, 'invite.b': { decisionFocus: '', coverage: { 'invite.ok': { status: 'expressed', scenarioIds: ['invite.b.ok'] }, 'invite.empty': { status: 'expressed', scenarioIds: ['invite.b.empty'] } }, tradeoffs: [] } },  id: 'invite', name: '团队成员邀请', caseIds: ['invite.ok', 'invite.empty', 'invite.dup'], workIds: ['invite.a', 'invite.b'], pick: 'invite.a' }, other: { roles: [], alternatives: {  },  id: 'other', name: '空间设置', caseIds: ['other.x'], workIds: [], pick: null } },
   cases: { 'invite.ok': { title: '正常发出邀请' }, 'invite.empty': { title: '邮箱为空' }, 'invite.dup': { title: '已经是成员' }, 'other.x': { title: 'x' } },
-  options: {
-    'invite.a': { id: 'invite.a', featureId: 'invite', name: 'A · 单人邮件邀请弹窗', idea: '在成员页弹窗', tradeoffs: ['+ 快'], coverage: { 'invite.ok': { status: 'expressed', scenarioIds: ['invite.a.ok'] }, 'invite.empty': { status: 'missing', scenarioIds: [], reason: '还没有场景' }, 'invite.dup': { status: 'undecided', scenarioIds: [] } } },
-    'invite.b': { id: 'invite.b', featureId: 'invite', name: '独立页面批量邀请', idea: '单独一页', tradeoffs: [], coverage: { 'invite.ok': { status: 'expressed', scenarioIds: ['invite.b.ok'] }, 'invite.empty': { status: 'expressed', scenarioIds: ['invite.b.empty'] } } },
+  works: {
+    'invite.a': { roles: [], id: 'invite.a', featureId: 'invite', title: 'A · 单人邮件邀请弹窗', summary: '在成员页弹窗',   },
+    'invite.b': { roles: [], id: 'invite.b', featureId: 'invite', title: '独立页面批量邀请', summary: '单独一页',   },
   },
   scenarios: { 'invite.a.ok': { id: 'invite.a.ok', name: '发出邀请' }, 'invite.b.ok': { id: 'invite.b.ok', name: '批量发出' }, 'invite.b.empty': { id: 'invite.b.empty', name: '邮箱校验失败' } },
 } as unknown as Project;
 
 describe('左栏：方案行', () => {
   it('“A · 名字”拆成字母与名字；没有字母前缀时按顺序补 A / B / C', () => {
-    expect(optionLabel(project.options['invite.a']!, 0)).toEqual({ letter: 'A', title: '单人邮件邀请弹窗' });
-    expect(optionLabel(project.options['invite.b']!, 1)).toEqual({ letter: 'B', title: '独立页面批量邀请' });
-    expect(optionLabel({ name: '很长很长的前缀 · 名字' } as never, 2)).toEqual({ letter: 'C', title: '很长很长的前缀 · 名字' });
+    expect(workLabel(project.works['invite.a']!, 0)).toEqual({ letter: 'A', title: '单人邮件邀请弹窗' });
+    expect(workLabel(project.works['invite.b']!, 1)).toEqual({ letter: 'B', title: '独立页面批量邀请' });
+    expect(workLabel({ title: '很长很长的前缀 · 名字' } as never, 2)).toEqual({ letter: 'C', title: '很长很长的前缀 · 名字' });
   });
   it('元信息：是否选定、缺失与待决定的数量（没有覆盖记录算缺失）', () => {
-    expect(optionMeta(project, 'invite.a', zh)).toEqual({ picked: true, missing: 1, undecided: 1, text: '缺失 1 · 待决定 1' });
-    expect(optionMeta(project, 'invite.b', zh)).toEqual({ picked: false, missing: 1, undecided: 0, text: '缺失 1' });
-    expect(optionMeta(project, 'nope', zh)).toEqual({ picked: false, missing: 0, undecided: 0, text: '' });
+    expect(workMeta(project, 'invite.a', zh)).toEqual({ picked: true, missing: 1, undecided: 1, text: '缺失 1 · 待决定 1' });
+    expect(workMeta(project, 'invite.b', zh)).toEqual({ picked: false, missing: 1, undecided: 0, text: '缺失 1' });
+    expect(workMeta(project, 'nope', zh)).toEqual({ picked: false, missing: 0, undecided: 0, text: '' });
   });
 });
 
 describe('左栏：情况行', () => {
   it('其他方案的小标：字母 + 状态，悬停写全称“B：缺失”', () => {
-    expect(otherOptionTags(project, 'invite', 'invite.a', 'invite.dup', zh)).toEqual([{ optionId: 'invite.b', letter: 'B', status: 'none', tip: 'B：缺失' }]);
-    expect(otherOptionTags(project, 'invite', 'invite.a', 'invite.ok', zh)[0]!.tip).toBe('B：已表达');
-    expect(otherOptionTags(project, 'invite', null, 'invite.ok', zh).map((t) => t.letter)).toEqual(['A', 'B']);
+    expect(otherWorkTags(project, 'invite', 'invite.a', 'invite.dup', zh)).toEqual([{ workId: 'invite.b', letter: 'B', status: 'none', tip: 'B：缺失' }]);
+    expect(otherWorkTags(project, 'invite', 'invite.a', 'invite.ok', zh)[0]!.tip).toBe('B：已表达');
+    expect(otherWorkTags(project, 'invite', null, 'invite.ok', zh).map((t) => t.letter)).toEqual(['A', 'B']);
   });
   it('悬停卡片：每个方案的状态与原因（原因 > 场景名 > 缺省说明）', () => {
     expect(caseCard(project, 'invite', 'invite.empty', zh)).toEqual([
-      { optionId: 'invite.a', letter: 'A', title: '单人邮件邀请弹窗', status: 'missing', label: '缺失', detail: '还没有场景' },
-      { optionId: 'invite.b', letter: 'B', title: '独立页面批量邀请', status: 'expressed', label: '已表达', detail: '场景：邮箱校验失败' },
+      { workId: 'invite.a', letter: 'A', title: '单人邮件邀请弹窗', status: 'missing', label: '缺失', detail: '还没有场景' },
+      { workId: 'invite.b', letter: 'B', title: '独立页面批量邀请', status: 'expressed', label: '已表达', detail: '场景：邮箱校验失败' },
     ]);
     expect(caseCard(project, 'invite', 'invite.dup', zh)[1]).toMatchObject({ status: 'none', label: '缺失', detail: '还没有表达这个情况' });
     expect(caseCard(project, 'missing-feature', 'x', zh)).toEqual([]);
   });
   it('缺口汇总的命令', () => {
-    expect(gapCommand('invite.a')).toBe('npx joplo check --option invite.a');
+    expect(gapCommand('invite.a')).toBe('npx joplo check --work invite.a');
   });
 });
 

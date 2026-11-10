@@ -76,7 +76,7 @@ export type CloudStorage = { usedBytes: number; quotaBytes: number };
 export type CloudStorageFull = { usedBytes?: number; quotaBytes?: number; shareBytes?: number; replacedBytes?: number; manageUrl: string; upgradeUrl: string };
 
 /** 范围：都为空 = 整个项目（D75）。 */
-export type CloudPublishRequest = { password?: string | null; visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; features?: string[] };
+export type CloudPublishRequest = { password?: string | null; visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; entryIds?: string[] };
 
 export type CloudPublishResult = { passwordProtected?: boolean; mode?: 'review'; visibility?: CloudVisibility; portfolio?: CloudPortfolio; review?: { url: string; shareId: string }; shareId: string; url: string; expiresAt: string | null; version: number; plan: 'free' | 'pro'; scope?: ScopeInfo; /** 发布后的账号容量与这次大小（C27）。 */ storage?: CloudStorage & { shareBytes: number } };
 
@@ -162,17 +162,17 @@ export class CloudHub {
     if (!b.ok) return true;
     let request: CloudPublishRequest;
     try {
-      const body = (b.body ?? {}) as { scenarios?: unknown; features?: unknown; visibility?: unknown; review?: unknown; password?: unknown };
+      const body = (b.body ?? {}) as { scenarios?: unknown; entryIds?: unknown; visibility?: unknown; review?: unknown; password?: unknown };
       const scenarios = strings(body.scenarios, 'scenarios');
-      const features = strings(body.features, 'features');
+      const entryIds = strings(body.entryIds, 'entryIds');
       if (body.visibility !== 'public' && body.visibility !== 'private') throw new Error('Choose visibility: public / private');
       if (typeof body.review !== 'boolean') throw new Error('Choose review: true / false');
-      if (body.visibility === 'public' && (scenarios?.length || features?.length)) throw new Error('Scoped shares must be private');
+      if (body.visibility === 'public' && (scenarios?.length || entryIds?.length)) throw new Error('Scoped shares must be private');
       if (body.password !== undefined) {
         if (body.visibility !== 'private') throw new Error('Passwords require a private share');
         if (body.password !== null && (typeof body.password !== 'string' || Array.from(body.password).length < 8 || Array.from(body.password).length > 128)) throw new Error('Access password must contain 8–128 characters');
       }
-      request = { ...(body.password !== undefined ? { password: body.password as string | null } : {}), visibility: body.visibility, review: body.review, ...(scenarios?.length ? { scenarios } : {}), ...(features?.length ? { features } : {}) };
+      request = { ...(body.password !== undefined ? { password: body.password as string | null } : {}), visibility: body.visibility, review: body.review, ...(scenarios?.length ? { scenarios } : {}), ...(entryIds?.length ? { entryIds } : {}) };
     } catch (e) {
       return ctx.send(400, { error: { code: 'USAGE', message: e instanceof Error ? e.message : String(e) } }), true;
     }

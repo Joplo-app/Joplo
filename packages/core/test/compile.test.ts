@@ -39,7 +39,7 @@ describe('TSX 邀请示例编译', () => {
     expect(find(dev.scenes['invite.b-batch@/members']!.root, 'btn_invite')).toBeUndefined();
     const btn = find(a, 'btn_invite');
     expect(btn.from).toBe('invite.a-modal');
-    expect(btn.source).toMatch(/^features\/invite\/options\/a-modal\.tsx:\d+:\d+$/);
+    expect(btn.source).toMatch(/^features\/invite\/works\/a-modal\.tsx:\d+:\d+$/);
     expect(find(a, 'nav_settings').source).toMatch(/^layouts\/app\.tsx:/);
   });
 
@@ -49,7 +49,7 @@ describe('TSX 邀请示例编译', () => {
     expect(s.steps[1]!).toMatchObject({ caption: 'Type “li.lei@example.com” in “邮箱”', captionAuto: { kind: 'type', label: '邮箱', value: 'li.lei@example.com' } });
     expect(s.mock).toEqual({ label: 'Mock success', outcome: 'success', auto: true });
     expect(pub.scenarios[s.id]!.steps[1]!.captionAuto).toEqual(s.steps[1]!.captionAuto);
-    expect(s.steps.map((x) => x.source)).toEqual(s.steps.map(() => expect.stringMatching(/^features\/invite\/options\/a-modal\.tsx:\d+:\d+$/)));
+    expect(s.steps.map((x) => x.source)).toEqual(s.steps.map(() => expect.stringMatching(/^features\/invite\/works\/a-modal\.tsx:\d+:\d+$/)));
     expect(s.steps[0]!.ruleIds).toEqual(['invite.admin_only']);
   });
 
@@ -60,7 +60,7 @@ describe('TSX 邀请示例编译', () => {
   });
 
   it('覆盖：有场景即已表达，声明优先，其余自动标为缺失', () => {
-    const cov = dev.options['invite.a-modal']!.coverage;
+    const cov = dev.features.invite!.alternatives['invite.a-modal']!.coverage;
     expect(cov['invite.happy']).toMatchObject({ status: 'expressed', basis: 'derived' });
     expect(cov['invite.already_member']).toMatchObject({ status: 'undecided', basis: 'declared' });
     expect(cov['invite.revoked']).toEqual({ status: 'expressed', scenarioIds: ['invite.a-modal.revoke'], basis: 'derived' });
@@ -73,7 +73,7 @@ describe('TSX 邀请示例编译', () => {
   });
 
   it('发布模式：只含选定方案，去掉规则、情况、问题、备注与源路径', () => {
-    expect(Object.keys(pub.options)).toEqual(['invite.a-modal']);
+    expect(Object.keys(pub.works)).toEqual(['invite.a-modal']);
     expect(Object.keys(pub.routes)).not.toContain('/members/invite');
     expect(pub.rules).toEqual({});
     expect(pub.cases).toEqual({});
@@ -91,9 +91,9 @@ describe('TSX 邀请示例编译', () => {
     bad.features = {
       x: {
         def: { kind: 'feature', name: 'X', goal: 'g', cases: {}, file: 'features/x/feature.ts' } as any,
-        options: {
+        works: {
           o: {
-            kind: 'option', name: 'O', idea: 'i', file: 'features/x/options/o.tsx', scenarios: {},
+            kind: 'work', title: 'O', summary: 'i', file: 'features/x/works/o.tsx', scenarios: {},
             on: { '/members': { nope: jsx('Bogus', {}), 'header.actions': [jsx(((p: any) => p) as any, {}) as any] } },
           } as any,
         },

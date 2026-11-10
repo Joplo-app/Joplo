@@ -11,7 +11,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../src/i18n/context';
@@ -27,13 +27,13 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 
 function build(mode: 'publish' | 'dev', locales?: string[], tables: Record<string, Record<string, string>> = {}): Project {
   const home = page({ title: '首页', layout: false }, h(ui.Stack, { id: 'root' }, h(ui.Button, { id: 'invite' }, '邀请成员'), h(ui.Text, { id: 'hello' }, '你好')));
-  const a = option({ name: '方案', idea: '想法', state: { ui: {} }, scenarios: { main: flow('发出邀请', { start: '/' }).click('invite').click('invite', '管理员发出邀请') } });
+  const a = work({ title: '方案', summary: '想法', state: { ui: {} }, scenarios: { main: flow('发出邀请', { start: '/' }).click('invite').click('invite', '管理员发出邀请') } });
   const src: AuthoringProject = {
     root: '/p',
     config: { ...config({ name: '团队邀请', home: '/', ...(locales ? { locales } : {}) }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: '邀请', goal: '把同事拉进空间', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...a, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: '邀请', goal: '把同事拉进空间', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...a, ...F('features/f/works/a.tsx') } } } },
     ...(Object.keys(tables).length ? { locales: tables, localeFiles: Object.fromEntries(Object.keys(tables).map((l) => [l, `locales/${l}.json`])) } : {}),
   };
   const out = compile(src, mode);

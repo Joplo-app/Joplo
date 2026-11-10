@@ -1,6 +1,6 @@
 import { fixtureConfig as config } from '../../../../scripts/test/fixtures.ts';
 /** 评审版与评审清单的测试夹具：两个功能（f 有 A/B 两个方案，选定 A；g 没有选定），带功能级与方案级规则、AI 假设、问题、备注、取舍。 */
-import { explain, feature, flow, option, page, question, rule, uses } from '@joplo-app/kit';
+import { explain, feature, flow, work, page, question, rule, uses } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import * as ui from '@joplo-app/plugin-ui';
 import type { AuthoringProject } from '../../src/index.ts';
@@ -25,18 +25,18 @@ export const SECRET = {
 
 export function reviewSource(): AuthoringProject {
   const home = page({ title: 'Home', layout: false }, h(ui.Stack, { id: 'home' }, h(ui.Button, { id: 'go', note: SECRET.note }, 'Go'), h(ui.TextInput, { id: 'email', label: 'Email' }), h(ui.Text, null, 'plain')));
-  const a = option({
-    name: 'A modal', idea: 'Invite in place', focus: SECRET.focus, tradeoffs: [SECRET.tradeoff, 'second'],
+  const a = work({
+    title: 'A modal', summary: 'Invite in place', focus: SECRET.focus, tradeoffs: [SECRET.tradeoff, 'second'],
     rules: { keep: rule(SECRET.optionRule, { cases: ['happy'], elements: ['email'] }), retry: rule(SECRET.assumption, { origin: 'ai_assumption' }) },
     questions: { limit: question(SECRET.optionQuestion, { severity: 'blocker' }) },
     scenarios: { main: flow('Main', { start: '/', cases: ['happy'] }).click('go', uses('keep', 'admins'), explain('Why this matters')).type('email', 'a@b.c', 'Type email') },
   });
-  const b = option({
-    name: 'B batch', idea: 'Invite many',
+  const b = work({
+    title: 'B batch', summary: 'Invite many',
     rules: { batch: rule(SECRET.bRule) },
     scenarios: { only: flow('Batch', { start: '/' }).click('go') },
   });
-  const g = option({ name: 'Audit log', idea: 'Show history', scenarios: { view: flow('View', { start: '/' }).click('go') } });
+  const g = work({ title: 'Audit log', summary: 'Show history', scenarios: { view: flow('View', { start: '/' }).click('go') } });
   return {
     root: '/p',
     config: { ...config({ name: 'Review fixture', home: '/' }), ...at('joplo.config.ts') },
@@ -45,11 +45,11 @@ export function reviewSource(): AuthoringProject {
     features: {
       f: {
         def: { ...feature({ name: 'Invite', goal: 'Invite members', constraints: { revocable: SECRET.constraint }, cases: { happy: { title: SECRET.caseTitle } }, rules: { admins: rule(SECRET.featureRule, { origin: 'user', status: 'confirmed', elements: ['go'] }) }, questions: { dup: question(SECRET.featureQuestion, { severity: 'minor' }) }, pick: 'a' }), ...at('features/f/feature.ts') },
-        options: { a: { ...a, ...at('features/f/options/a.tsx') }, b: { ...b, ...at('features/f/options/b.tsx') } },
+        works: { a: { ...a, ...at('features/f/works/a.tsx') }, b: { ...b, ...at('features/f/works/b.tsx') } },
       },
       g: {
         def: { ...feature({ name: 'Audit', goal: 'See history', cases: {}, rules: { audit: rule(SECRET.gRule) } }), ...at('features/g/feature.ts') },
-        options: { a: { ...g, ...at('features/g/options/a.tsx') } },
+        works: { a: { ...g, ...at('features/g/works/a.tsx') } },
       },
     },
   };

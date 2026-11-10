@@ -8,7 +8,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { JoploError } from '@joplo-app/core';
+import { JoploError, REVIEW_LIMITS } from '@joplo-app/core';
 import { CloudError, terminalText } from './cloud-error.ts';
 import { object, type CloudClient } from './cloud.ts';
 
@@ -16,9 +16,10 @@ export const SHARE_ID = /^[A-Za-z0-9]{10}$/;
 const DECISION_ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const DECISION_KINDS = ['pick', 'confirm_rule', 'reject_rule', 'answer'] as const;
 
-export type FeedbackDecision = { id: string; kind: string; featureId: string; targetId: string; note: string | null; decidedAt: string; version: number };
-export type FeedbackComment = { id: string; version: number; scenario: string; step: number; stepId: string | null; element: { id: string; label: string } | null; body: string; author: { name: string }; createdAt: string };
-export type Feedback = { share: { id: string; version: number }; decisions: FeedbackDecision[]; comments: FeedbackComment[] };
+export type FeedbackDecision = { id: string; kind: string; workId: string | null; featureId: string | null; targetId: string; note: string | null; decidedAt: string; version: number };
+export type FeedbackComment = { id: string; version: number; workId: string; scenario: string; step: number; stepId: string | null; element: { id: string; label: string } | null; body: string; author: { name: string }; createdAt: string };
+export type FeedbackWork = { id: string; featureId: string | null };
+export type Feedback = { share: { id: string; version: number }; works: FeedbackWork[]; decisions: FeedbackDecision[]; comments: FeedbackComment[] };
 
 const str = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max;
 const iso = (v: unknown): v is string => typeof v === 'string' && v.length <= 64 && Number.isFinite(Date.parse(v));
@@ -48,17 +49,24 @@ export async function feedbackShareId(client: CloudClient, dir: string, explicit
   return record.shareId;
 }
 
+/** 云端从本版本评审清单的独立 works 与 features[].works 生成，不能从限定 ID 拆归属。 */
+function readWork(raw: unknown): FeedbackWork {
+  const w = object(raw);
+  if (!str(w.id, 256) || !w.id || !(w.featureId === null || str(w.featureId, 256) && !!w.featureId)) throw new CloudError('INVALID_RESPONSE');
+  return { id: w.id, featureId: w.featureId as string | null };
+}
+
 function readDecision(raw: unknown): FeedbackDecision {
   const d = object(raw);
-  if (!str(d.id, 64) || !d.id || !str(d.kind, 32) || !/^[a-z_]+$/.test(d.kind) || !str(d.featureId, 256) || !str(d.targetId, 256) || !(d.note === null || d.note === undefined || str(d.note, 10_000)) || !iso(d.decidedAt) || !int(d.version, 1)) throw new CloudError('INVALID_RESPONSE');
-  return { id: d.id, kind: d.kind, featureId: d.featureId, targetId: d.targetId, note: typeof d.note === 'string' ? d.note : null, decidedAt: d.decidedAt, version: d.version };
+  if (!str(d.id, 64) || !d.id || !str(d.kind, 32) || !/^[a-z_]+$/.test(d.kind) || !(d.featureId === null || str(d.featureId, 256)) || !str(d.targetId, 256) || !(d.workId === null || str(d.workId, 256)) || !(d.note === null || d.note === undefined || str(d.note, 10_000)) || !iso(d.decidedAt) || !int(d.version, 1)) throw new CloudError('INVALID_RESPONSE');
+  return { id: d.id, kind: d.kind, workId: d.workId as string | null, featureId: d.featureId as string | null, targetId: d.targetId, note: typeof d.note === 'string' ? d.note : null, decidedAt: d.decidedAt, version: d.version };
 }
 
 function readComment(raw: unknown): FeedbackComment {
   const c = object(raw), author = object(c.author), element = c.element === null || c.element === undefined ? null : object(c.element);
-  if (!str(c.id, 64) || !c.id || !int(c.version, 1) || !str(c.scenario, 256) || !int(c.step, 0) || !(c.stepId === null || c.stepId === undefined || str(c.stepId, 256)) || !str(c.body, 10_000) || !str(author.name, 200) || !iso(c.createdAt)) throw new CloudError('INVALID_RESPONSE');
+  if (!str(c.id, 64) || !c.id || !int(c.version, 1) || !str(c.scenario, 256) || !str(c.workId, 256) || !int(c.step, 0) || !(c.stepId === null || c.stepId === undefined || str(c.stepId, 256)) || !str(c.body, 10_000) || !str(author.name, 200) || !iso(c.createdAt)) throw new CloudError('INVALID_RESPONSE');
   if (element && (!str(element.id, 256) || !str(element.label, 200))) throw new CloudError('INVALID_RESPONSE');
-  return { id: c.id, version: c.version, scenario: c.scenario, step: c.step, stepId: typeof c.stepId === 'string' ? c.stepId : null, element: element ? { id: element.id as string, label: element.label as string } : null, body: c.body, author: { name: author.name }, createdAt: c.createdAt };
+  return { id: c.id, version: c.version, workId: c.workId as string, scenario: c.scenario, step: c.step, stepId: typeof c.stepId === 'string' ? c.stepId : null, element: element ? { id: element.id as string, label: element.label as string } : null, body: c.body, author: { name: author.name }, createdAt: c.createdAt };
 }
 
 export async function fetchFeedback(client: CloudClient, shareId: string, options: { signal?: AbortSignal; retry?: boolean } = {}): Promise<Feedback> {
@@ -67,8 +75,10 @@ export async function fetchFeedback(client: CloudClient, shareId: string, option
   const request = () => feedbackRequest(client, `/api/v1/shares/${shareId}/feedback`, token, undefined, options.signal);
   const d = options.retry === false ? await request() : await client.retry(request, { signal: options.signal });
   const share = object(d.share);
-  if (share.id !== shareId || !int(share.version, 0) || !Array.isArray(d.decisions) || !Array.isArray(d.comments) || d.decisions.length > 1000 || d.comments.length > 5000) throw new CloudError('INVALID_RESPONSE');
-  const out = { share: { id: shareId, version: share.version }, decisions: d.decisions.map(readDecision), comments: d.comments.map(readComment) };
+  if (share.id !== shareId || !int(share.version, 0) || !Array.isArray(d.works) || d.works.length > REVIEW_LIMITS.features * (REVIEW_LIMITS.works + 1) || !Array.isArray(d.decisions) || !Array.isArray(d.comments) || d.decisions.length > 1000 || d.comments.length > 5000) throw new CloudError('INVALID_RESPONSE');
+  const works = d.works.map(readWork);
+  if (new Set(works.map(w => w.id)).size !== works.length) throw new CloudError('INVALID_RESPONSE');
+  const out = { share: { id: shareId, version: share.version }, works, decisions: d.decisions.map(readDecision), comments: d.comments.map(readComment) };
   if (JSON.stringify(out).includes(token)) throw new CloudError('INVALID_RESPONSE');
   return out;
 }
@@ -103,14 +113,16 @@ const line = (s: string, max = 300) => {
   const t = terminalText(s.replace(/[\r\n\t]+/g, ' ')).trim();
   return [...t].length > max ? `${[...t].slice(0, max - 1).join('')}…` : t;
 };
-/** pick 的 targetId 是方案 id（`功能.方案`）；只写方案键时补上功能。 */
-const optionLabel = (d: FeedbackDecision) => (d.targetId.includes('.') ? d.targetId : `${d.featureId}.${d.targetId}`);
+/** pick 的 targetId 已是完整作品 id；不从字符串猜功能归属。 */
+const optionLabel = (d: FeedbackDecision) => d.targetId;
 
 export function decisionLine(d: FeedbackDecision): string {
   const note = d.note?.trim() ? line(d.note) : '';
   switch (d.kind) {
     case 'pick':
-      return `Pick option ${line(optionLabel(d))} for feature ${line(d.featureId)}${note ? ` (note: ${note})` : ''}`;
+      return d.featureId === null
+        ? `Approve work ${line(optionLabel(d))}${note ? ` (note: ${note})` : ''}`
+        : `Pick option ${line(optionLabel(d))} for feature ${line(d.featureId)}${note ? ` (note: ${note})` : ''}`;
     case 'confirm_rule':
       return `Confirm rule ${line(d.targetId)}${note ? ` (note: ${note})` : ''}`;
     case 'reject_rule':

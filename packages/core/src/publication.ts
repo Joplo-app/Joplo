@@ -2,21 +2,21 @@
 import type { Project, SceneNode } from './schema.ts';
 import { JoploError } from './result.ts';
 
-export function localOnlyOptions(project: Project): Set<string> {
+export function localOnlyWorks(project: Project): Set<string> {
   const ids = new Set<string>();
-  for (const f of Object.values(project.features)) {
-    if (!f.standalone) continue;
-    const slices = Object.values(project.scenarios).some(s => f.optionIds.includes(s.optionId));
-    if (f.draft || !slices) for (const id of f.optionIds) ids.add(id);
+  for (const w of Object.values(project.works)) {
+    if (w.featureId) continue;
+    const slices = Object.values(project.scenarios).some(s => s.workId === w.id);
+    if (w.draft || !slices) ids.add(w.id);
   }
   return ids;
 }
 
-export function assertExportableFeature(project: Project, featureId: string): void {
-  const f = project.features[featureId];
-  if (!f?.standalone) return;
-  if (f.draft) throw new JoploError('USAGE', `Work "${featureId}" is a draft and cannot be published or reviewed. Remove draft: true when it is ready`);
-  if (!Object.values(project.scenarios).some(s => f.optionIds.includes(s.optionId)))
+export function assertExportableEntry(project: Project, featureId: string): void {
+  const w = project.works[featureId];
+  if (!w || w.featureId) return;
+  if (w.draft) throw new JoploError('USAGE', `Work "${featureId}" is a draft and cannot be published or reviewed. Remove draft: true when it is ready`);
+  if (!Object.values(project.scenarios).some(s => s.workId === w.id))
     throw new JoploError('USAGE', `Work "${featureId}" has no slices and cannot be published or reviewed. Add at least one flow() or chapter() in scenarios`);
 }
 
@@ -37,7 +37,7 @@ export function localOnlyElementIds(project: Project, local: ReadonlySet<string>
     node.children?.forEach(n => walk(n, privateOwner));
   };
   for (const scene of Object.values(project.scenes))
-    walk(scene.root, local.has(scene.optionId ?? '') || local.has(project.routes[scene.route]?.addedBy ?? ''));
+    walk(scene.root, local.has(scene.workId ?? '') || local.has(project.routes[scene.route]?.addedBy ?? ''));
   for (const id of publicIds) privateIds.delete(id);
   return privateIds;
 }

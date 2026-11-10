@@ -7,7 +7,7 @@ import { compile, replay, type Project } from '../src/index.ts';
 import { loadAuthoring } from '../src/load.ts';
 
 const dir = resolve(import.meta.dirname, '../../../examples/joplo');
-const original = JSON.parse(await readFile(new URL('./fixtures/self-design-original-ids.json', import.meta.url), 'utf8')) as { featureIds: string[]; options: string[]; scenarios: string[] };
+const original = JSON.parse(await readFile(new URL('./fixtures/self-design-original-ids.json', import.meta.url), 'utf8')) as { entryIds: string[]; works: string[]; scenarios: string[] };
 const order = ['workbench_origin', 'authoring_model', 'home', 'player', 'views', 'frames', 'npm', 'skill', 'voice', 'review', 'share_scope', 'feature_diff', 'mobile_watch', 'content_i18n', 'storage_quota', 'cloud_usage', 'share_visibility', 'model_assets', 'music'];
 let dev: Project, published: Project;
 beforeAll(async () => {
@@ -23,21 +23,21 @@ beforeAll(async () => {
 
 describe('one real Joplo design workspace', () => {
   it('preserves every original feature, alternative and scenario ID through migration', () => {
-    for (const id of original.featureIds) expect(dev.features[id], id).toBeDefined();
-    for (const id of original.options) expect(dev.options[id], id).toBeDefined();
+    for (const id of original.entryIds) expect(dev.features[id], id).toBeDefined();
+    for (const id of original.works) expect(dev.works[id], id).toBeDefined();
     for (const id of original.scenarios) expect(dev.scenarios[id], id).toBeDefined();
     // film_form 保留稳定 ID；D102 修订已选定左栏章节清单，进入公开设计记录。
-    expect(dev.featureIds).toEqual([...order, 'film_form']);
+    expect(dev.entryIds).toEqual([...order, 'film_form']);
   });
   it('publishes every feature with a visible design journey while keeping unpicked alternatives private', () => {
-    expect(published.featureIds).toEqual([...order, 'film_form']);
+    expect(published.entryIds).toEqual([...order, 'film_form']);
     expect(published.features.film_form!.pick).toBe('film_form.a-chapters');
-    expect(published.options['film_form.b-timeline']).toBeUndefined();
-    expect(Object.keys(published.options)).toHaveLength(order.length + 1);
-    expect(published.options['workbench_origin.a-fold']).toBeUndefined();
-    expect(published.options['authoring_model.a-data']).toBeUndefined();
-    for (const feature of [...original.featureIds, 'mobile_watch', 'content_i18n', 'storage_quota', 'cloud_usage', 'share_visibility']) {
-      const picked = Object.values(published.options).find(o => o.featureId === feature)!;
+    expect(published.works['film_form.b-timeline']).toBeUndefined();
+    expect(Object.keys(published.works)).toHaveLength(order.length + 1);
+    expect(published.works['workbench_origin.a-fold']).toBeUndefined();
+    expect(published.works['authoring_model.a-data']).toBeUndefined();
+    for (const feature of [...original.entryIds, 'mobile_watch', 'content_i18n', 'storage_quota', 'cloud_usage', 'share_visibility']) {
+      const picked = Object.values(published.works).find(o => o.featureId === feature)!;
       const story = published.scenarios[`${picked.id}.design_journey`];
       expect(story, feature).toBeDefined();
       expect(story!.steps[0]!.action.type).toBe('card');

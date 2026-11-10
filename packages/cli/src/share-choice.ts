@@ -22,7 +22,7 @@ async function choose(question: string, choices: readonly string[], initial: num
 
 export async function shareChoices(client: CloudClient, opts: ShareOptions): Promise<{ visibility: 'public' | 'private'; review: boolean }> {
   if (opts.public && opts.private) throw new JoploError('USAGE', '--public and --private are mutually exclusive');
-  const restricted = opts.pr !== undefined ? 'PR previews' : opts.scenarios?.length || opts.features?.length ? 'scoped shares' : null;
+  const restricted = opts.pr !== undefined ? 'PR previews' : opts.scenarios?.length || opts.entryIds?.length ? 'scoped shares' : null;
   if (restricted && opts.public) throw new JoploError('USAGE', `${restricted} can only be private; remove --public`);
   // 不读取记录或配置。restricted 是模式约束，并非用户的可见性默认值。
   let visibility: 'public' | 'private' | undefined = restricted || opts.private ? 'private' : opts.public ? 'public' : undefined;

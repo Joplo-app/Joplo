@@ -10,13 +10,13 @@ import { loadAuthoring } from '@joplo-app/core/node';
 export type CheckReport = ValidationReport & { name: string };
 
 /** `joplo check` 的输出（不含 IR，`check --format json` 保持不变）。 */
-export async function check(dir: string, optionId?: string): Promise<CheckReport> {
-  const { project: _project, ...report } = await checkWithProject(dir, optionId);
+export async function check(dir: string, workId?: string): Promise<CheckReport> {
+  const { project: _project, ...report } = await checkWithProject(dir, workId);
   return report;
 }
 
 /** check 加上本次编译的 dev IR（share 用它生成评审清单，不再编译第二次）；编译失败时 project 为 null。 */
-export async function checkWithProject(dir: string, optionId?: string): Promise<CheckReport & { project: Project | null }> {
+export async function checkWithProject(dir: string, workId?: string): Promise<CheckReport & { project: Project | null }> {
   const root = await realpath(resolve(dir));
   const tsconfig = join(root, 'tsconfig.json');
   const loaded = await loadAuthoring(root, p => tsImport(p, { parentURL: import.meta.url, tsconfig: existsSync(tsconfig) ? tsconfig : false }));
@@ -40,8 +40,8 @@ export async function checkWithProject(dir: string, optionId?: string): Promise<
       if (result.diagnostic) resourceDiagnostics.push(result.diagnostic);
     }
   }
-  const selected = optionId && compiled?.project ? resolveWorkId(compiled.project, optionId) : undefined;
-  const validated = compiled?.project ? validate(compiled.project, { optionId: selected, mode: 'all' }) : null;
+  const selected = workId && compiled?.project ? resolveWorkId(compiled.project, workId) : undefined;
+  const validated = compiled?.project ? validate(compiled.project, { workId: selected, mode: 'all' }) : null;
   // 编译器也会为同一布局的每份画面输出相同诊断；在 CLI 边界统一去重。
   const seen = new Set<string>();
   const diagnostics: Diagnostic[] = [...resourceDiagnostics, ...loaded.diagnostics, ...(compiled?.diagnostics ?? []), ...(validated?.diagnostics ?? [])].map(d => ({ ...d, at: d.at ?? 'joplo.config.ts:1:1' })).filter(d => {

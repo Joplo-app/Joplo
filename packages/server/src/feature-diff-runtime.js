@@ -1,4 +1,4 @@
-/** Public diff shell. Keep this standalone: embedded verbatim, never executed by the publisher. */
+/** Public diff shell. Keep this independent: embedded verbatim, never executed by the publisher. */
 "use strict";
 // Self-contained so the same function works from source and packed server builds.
 function viewer() {
@@ -203,7 +203,7 @@ function viewer() {
         $('players').replaceChildren();
         $('sides').replaceChildren();
         const s = m.scenarios[i];
-        $('feature').textContent = s.featureName;
+        $('feature').textContent = s.entryTitle;
         $('title').textContent = s.name;
         $('badge').textContent = labels[s.status];
         $('badge').className = `badge ${s.status}`;
@@ -307,9 +307,9 @@ function viewer() {
                 hidden++;
                 return;
             }
-            if (!group || group.id !== s.featureId) {
-                group = { id: s.featureId };
-                nav.append(el('p', 'group', s.featureName));
+            if (!group || group.id !== s.entryId) {
+                group = { id: s.entryId };
+                nav.append(el('p', 'group', s.entryTitle));
             }
             const b = el('button', 'scenario');
             const changes = s.steps.filter(x => x.status !== 'unchanged').length;

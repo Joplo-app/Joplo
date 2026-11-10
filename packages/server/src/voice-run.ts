@@ -48,14 +48,10 @@ export type VoiceRunResult = {
 
 /** 选定方案的全部场景里，每一步要读的段（文字为空的跳过）。 */
 export function projectSegments(project: Project): Segment[] {
-  const picked = new Set(Object.values(project.features ?? {}).map((f) => (f as { pick?: string | null }).pick).filter((x): x is string => !!x));
+  const picked = new Set(Object.values(project.works).filter(w => !w.draft && (!w.featureId || project.features[w.featureId]?.pick === w.id)).map(w => w.id));
   const out: Segment[] = [];
   for (const sc of Object.values(project.scenarios)) {
-    const fid = project.options[sc.optionId]?.featureId;
-    if (fid && project.features?.[fid]?.draft) continue;
-    const pick = fid ? (project.features?.[fid] as { pick?: string | null } | undefined)?.pick : null;
-    // 选定方案的 id 可能是 “功能.方案” 或只有方案名：两种都认
-    if (!(picked.has(sc.optionId) || (pick && sc.optionId === `${fid}.${pick}`))) continue;
+    if (!picked.has(sc.workId)) continue;
     sc.steps.forEach((st, i) => {
       const line = spokenLine(st, st.caption, speakerRoleAt(project, sc.id, i + 1));
       if (line.text) out.push({ stepId: st.id, text: line.text, role: line.role });

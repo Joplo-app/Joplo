@@ -8,20 +8,32 @@ import { templateMessages as m } from './template-messages.ts';
 
 export type TemplateSource = { kind:'github'; owner:string; repo:string; subdir:string; ref:string } | { kind:'local'; dir:string };
 export type TemplateFiles = Map<string, Buffer>;
-export type TemplateDeps = { fetch?: typeof fetch; env?: Record<string,string|undefined>; ghToken?:()=>string|undefined; localStarter?:string|null };
+export type TemplateDeps = { fetch?: typeof fetch; env?: Record<string,string|undefined>; ghToken?:()=>string|undefined; localTemplates?:string|null };
 const MAX_DOWNLOAD=64*1024*1024, MAX_EXPANDED=256*1024*1024, MAX_FILES=20000;
 const fail=(reason:keyof typeof m, code:'USAGE'|'NOT_FOUND'|'PERMISSION_DENIED'='USAGE'):never=>{throw new JoploError(code,`${m[reason]} ${m.fallback}`);};
 
-export const defaultTemplateSpec=(version:string)=>`github:Joplo-app/Joplo/templates/starter#v${version}`;
-export function localStarter(): string|null {
+export const BUILTIN_TEMPLATES = ['starter', 'work'] as const;
+type BuiltinTemplate = typeof BUILTIN_TEMPLATES[number];
+const builtinSpec = (version:string,name:BuiltinTemplate) => `github:Joplo-app/Joplo/templates/${name}#v${version}`;
+export const defaultTemplateSpec = (version:string) => builtinSpec(version,'starter');
+/** Bare names never depend on cwd; explicit paths retain the local-template behavior. */
+function builtinName(spec:string):BuiltinTemplate|null {
+  if(spec.startsWith('github:')||spec.startsWith('.')||/[\\/]/.test(spec))return null;
+  if(!BUILTIN_TEMPLATES.includes(spec as BuiltinTemplate))return fail('unknownBuiltin');
+  return spec as BuiltinTemplate;
+}
+/** Source-only shortcut, identical for every built-in. Packed CLIs always use the release tag. */
+export function localTemplates(): string|null {
   if(!import.meta.filename.endsWith('.ts'))return null;
   const root=resolve(import.meta.dirname,'../../..');
-  return existsSync(join(root,'pnpm-workspace.yaml'))&&existsSync(join(root,'templates/starter/package.json'))?join(root,'templates/starter'):null;
+  return existsSync(join(root,'pnpm-workspace.yaml'))&&existsSync(join(root,'templates/starter/package.json'))?join(root,'templates'):null;
 }
 function safePath(path:string):boolean {
   return !!path&&!path.includes('\\')&&!/[\u0000-\u001f\u007f]/.test(path)&&!posix.isAbsolute(path)&&!(/^[a-z]:/i.test(path))&&!path.split('/').some(p=>p==='..'||p==='.');
 }
-export function parseTemplate(spec:string):TemplateSource {
+export function parseTemplate(spec:string,version:string):TemplateSource {
+  const name=builtinName(spec);
+  if(name)spec=builtinSpec(version,name);
   if(!spec.startsWith('github:'))return {kind:'local',dir:resolve(spec)};
   const match=/^github:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\/([^#]+))?(?:#(.+))?$/.exec(spec);
   if(!match||[match[1],match[2]].some(x=>x==='.'||x==='..'))return fail('invalidSpec');
@@ -108,8 +120,10 @@ async function download(source:Extract<TemplateSource,{kind:'github'}>,deps:Temp
   }catch(e){if(e instanceof JoploError)throw e;return fail('network');}
 }
 export async function loadTemplate(version:string,spec?:string,deps:TemplateDeps={}):Promise<{files:TemplateFiles;source:string}>{
-  const local=deps.localStarter===undefined?localStarter():deps.localStarter;
-  const chosen=spec??local??defaultTemplateSpec(version),source=parseTemplate(chosen);
+  const name=builtinName(spec??'starter');
+  const local=name?(deps.localTemplates===undefined?localTemplates():deps.localTemplates):null;
+  const chosen=name?(local?join(local,name):builtinSpec(version,name)):spec!;
+  const source=parseTemplate(chosen,version);
   const files=source.kind==='local'?await localFiles(source.dir):await archiveFiles(await download(source,deps),source.subdir);
   if(!files.size)fail('empty','NOT_FOUND');
   try{const pkg=JSON.parse(files.get('package.json')?.toString('utf8')??'null');if(!pkg||typeof pkg!=='object'||Array.isArray(pkg))fail('noPackage');}catch{fail('noPackage');}

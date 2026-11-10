@@ -47,7 +47,7 @@ describe('buildSite', () => {
     const ir = JSON.parse(/<script type="application\/json" id="joplo-ir">([\s\S]*?)<\/script>/.exec(html)![1]!);
     expect(ir.home).toBe('/members');
     expect(ir.project.mode).toBe('publish');
-    expect(Object.keys(ir.project.options)).toEqual(['invite.a-modal']);
+    expect(Object.keys(ir.project.works)).toEqual(['invite.a-modal']);
     expect(ir.project.features.invite.constraints).toBeUndefined();
     // D55 不变量 5：创作侧的界面（缺口横幅、检查、外观浮层、作者用的设备标注）只在看板里，不进发布站的产物
     for (const s of ['复制给 Agent', 'joplo check --option', '恢复项目默认', '设为所有项目的默认', 'selection.json', '手机页面 ·', '外观浮层']) expect(html, s).not.toContain(s);
@@ -118,7 +118,7 @@ async function authoringStrings(dir: string): Promise<string[]> {
     for (const c of (n.children ?? []) as (typeof n)[]) walk(c);
   };
   for (const s of Object.values(dev.scenes)) walk(s.root);
-  const out = [...Object.values(dev.rules).map((r) => r.text), ...Object.values(dev.issues).map((q) => q.text), ...notes, ...Object.values(dev.options).flatMap((o) => [...o.tradeoffs, o.decisionFocus].filter(Boolean))];
+  const out = [...Object.values(dev.rules).map((r) => r.text), ...Object.values(dev.issues).map((q) => q.text), ...notes, ...Object.values(dev.features).flatMap(f => Object.values(f.alternatives).flatMap(a => [...a.tradeoffs, a.decisionFocus].filter(Boolean)))];
   expect(Object.values(dev.rules).some((r) => r.origin === 'ai_assumption')).toBe(true);
   expect(Object.keys(dev.issues).length).toBeGreaterThan(0);
   return out;
@@ -141,9 +141,9 @@ describe('评审版构建（review: true，D63）', () => {
     const html = fs.readFileSync(path.join(r.outDir, 'index.html'), 'utf8');
     const ir = JSON.parse(/<script type="application\/json" id="joplo-ir">([\s\S]*?)<\/script>/.exec(html)![1]!);
     expect(ir.project.mode).toBe('review');
-    expect(Object.keys(ir.project.options).sort()).toEqual(['invite.a-modal', 'invite.b-batch']);
+    expect(Object.keys(ir.project.works).sort()).toEqual(['invite.a-modal', 'invite.b-batch']);
     expect(ir.project.features.invite.pick).toBe('invite.a-modal');
-    for (const s of Object.values(ir.project.scenarios) as { optionId: string; initial: { sceneId: string } }[]) expect(ir.project.scenes[s.initial.sceneId].optionId).toBe(s.optionId);
+    for (const s of Object.values(ir.project.scenarios) as { workId: string; initial: { sceneId: string } }[]) expect(ir.project.scenes[s.initial.sceneId].workId).toBe(s.workId);
     expect(ir.project.rules).toBeUndefined();
     expect(ir.project.issues).toBeUndefined();
   }, 120_000);
@@ -162,9 +162,9 @@ describe('publishPayload', () => {
   it('保留 feature.roles：角色属于演示（说话人、过渡卡、层级角色），播放器按层级的 role 查找它', () => {
     const roles = [{ id: 'xiaoyu', name: '小雨', desc: '发起人', color: '#e8a33d' }];
     const project = {
-      features: { f: { id: 'f', name: 'F', goal: 'G', roles, constraints: [{ id: 'c', text: '创作侧', hard: false }], caseIds: ['f.x'], optionIds: ['f.a'], pick: 'f.a' } },
-      featureIds: ['f'],
-      options: { 'f.a': { id: 'f.a', featureId: 'f', key: 'a', name: 'A', idea: 'I', routes: [], coverage: {}, layers: { me: { title: '我', sceneId: 'f.a~me', role: 'xiaoyu' } } } },
+      features: { f: { id: 'f', name: 'F', goal: 'G', roles, constraints: [{ id: 'c', text: '创作侧', hard: false }], caseIds: ['f.x'], workIds: ['f.a'], pick: 'f.a' } },
+      entryIds: ['f'],
+      works: { 'f.a': { id: 'f.a', featureId: 'f', key: 'a', title: 'A', summary: 'I', roles: [], routes: [], layers: { me: { title: '我', sceneId: 'f.a~me', role: 'xiaoyu' } } } },
       scenarios: {},
       routes: {},
       rules: {},
@@ -250,8 +250,8 @@ describe('发布产物是完整的 IR（只缺有意去掉的创作侧字段）'
   }
 
   it('样板没用到的演示字段（redact、autoFocus）同样原样保留', () => {
-    const scene = { id: 'o~v', optionId: 'f.a', route: '/', name: 'v', viewport: 'desktop', layer: 'v', root: { id: 'root', type: 'ui:Stack', props: {}, children: [{ id: 'key', type: 'ui:Code', props: {}, redact: { op: 'not', path: 'ui.shown' }, children: [] }] } };
-    const p = { name: 'T', autoFocus: false, routes: {}, scenes: { 'o~v': scene }, features: {}, options: {}, scenarios: {}, rules: {}, cases: {}, issues: [] } as unknown as Parameters<typeof publishPayload>[0];
+    const scene = { id: 'o~v', workId: 'f.a', route: '/', name: 'v', viewport: 'desktop', layer: 'v', root: { id: 'root', type: 'ui:Stack', props: {}, children: [{ id: 'key', type: 'ui:Code', props: {}, redact: { op: 'not', path: 'ui.shown' }, children: [] }] } };
+    const p = { name: 'T', autoFocus: false, routes: {}, scenes: { 'o~v': scene }, entryIds: [], features: {}, works: {}, scenarios: {}, rules: {}, cases: {}, issues: [] } as unknown as Parameters<typeof publishPayload>[0];
     const out = JSON.parse(JSON.stringify(publishPayload(p, null).project));
     expect(out.autoFocus).toBe(false);
     expect(out.scenes['o~v'].root.children[0].redact).toEqual({ op: 'not', path: 'ui.shown' });
@@ -317,7 +317,7 @@ describe('renderStep', () => {
     expect(r.sceneId).toBe('invite.a-modal@/members');
     const send = r.elements.find((e) => e.id === 'btn_send')!;
     expect(send).toMatchObject({ visible: true, disabled: false, type: 'ui:Button' });
-    expect(send.at).toMatch(/^features\/invite\/options\/a-modal\.tsx:\d+:\d+$/);
+    expect(send.at).toMatch(/^features\/invite\/works\/a-modal\.tsx:\d+:\d+$/);
     const alert = r.elements.find((e) => e.id === 'alert_send_error')!;
     expect(alert.visible).toBe(false);
     expect(alert.at).toMatch(/a-modal\.tsx/);
@@ -381,14 +381,14 @@ describe('范围构建（scope，D75）', () => {
     // options' contributions or the resulting scoped output.
     const ownLabels: string[] = [];
     walkNodes(dev.scenes[keep.initial.sceneId]!.root, (node, ancestors) => {
-      if (![node, ...ancestors].some(n => n.from && n.from !== keep.optionId))
+      if (![node, ...ancestors].some(n => n.from && n.from !== keep.workId))
         ownLabels.push(JSON.stringify(node.props ?? {}));
     });
-    const inScope = JSON.stringify(keep) + dev.features.home!.name + dev.features.home!.goal + JSON.stringify(dev.options['home.a-recent']) + ownLabels.join('');
+    const inScope = JSON.stringify(keep) + dev.features.home!.name + dev.features.home!.goal + JSON.stringify(dev.works['home.a-recent']) + ownLabels.join('');
     // 范围外的文字（与范围内重复的不算：例如两个功能共用的字幕）
     const outside = [
       ...Object.values(dev.features).filter((f) => f.id !== 'home').flatMap((f) => [f.name, f.goal]),
-      ...Object.values(dev.options).filter((o) => o.featureId !== 'home').flatMap((o) => [o.name, o.idea]),
+      ...Object.values(dev.works).filter((o) => o.featureId !== 'home').flatMap((o) => [o.name, o.idea]),
       ...Object.values(dev.scenarios).filter((s) => s.id !== SCENARIO).flatMap((s) => [s.name, ...s.steps.map((st) => st.caption)]),
       dev.description,
     ].filter((t) => t && t.length >= 6 && !inScope.includes(t));
@@ -396,7 +396,7 @@ describe('范围构建（scope，D75）', () => {
 
     const r = await buildSite({ projectDir: dir, outDir: path.join(dir, 'scoped'), scope: { scenarios: [SCENARIO] } });
     expect(r.scenarios).toEqual([SCENARIO]);
-    expect(r.scope).toMatchObject({ key: SCENARIO, scenarios: [SCENARIO], features: ['home'] });
+    expect(r.scope).toMatchObject({ key: SCENARIO, scenarios: [SCENARIO], entryIds: ['home'] });
     const text = siteText(r.outDir, r.files);
     for (const s of outside) expect(text, s).not.toContain(s);
     for (const id of ['player.', 'views.', 'frames.']) expect(text, id).not.toContain(`"${id}`);
@@ -404,7 +404,7 @@ describe('范围构建（scope，D75）', () => {
     expect(ir.scoped).toBe(true);
     expect(ir.project.description).toBe('');
     expect(Object.keys(ir.project.features)).toEqual(['home']);
-    expect(Object.keys(ir.project.options)).toEqual(['home.a-recent']);
+    expect(Object.keys(ir.project.works)).toEqual(['home.a-recent']);
     expect(Object.keys(ir.project.scenarios)).toEqual([SCENARIO]);
     expect(text).toContain(keep.steps[0]!.caption);
   }, 180_000);

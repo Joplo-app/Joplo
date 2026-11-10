@@ -7,7 +7,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../src/i18n/context';
@@ -19,13 +19,13 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 
 function build(tree: unknown): Project {
-  const opt = option({ name: 'A', idea: 'i', routes: { '/img': page({ title: 'P' }, tree as never) }, scenarios: { happy: flow('一次', { start: '/img' }) } });
+  const opt = work({ title: 'A', summary: 'i', routes: { '/img': page({ title: 'P' }, tree as never) }, scenarios: { happy: flow('一次', { start: '/img' }) } });
   const src: AuthoringProject = {
     root: '/p',
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...page({ title: 'P', layout: false }, h(ui.Text, { id: 'n' }, 'x')), ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const r = compile(src, 'dev');
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

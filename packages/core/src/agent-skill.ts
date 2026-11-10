@@ -10,7 +10,7 @@
 /** `npx joplo skill <主题>` 的主题与一句话用途（guide.ts 生成正文；技能里按这份清单列出主题）。 */
 export const SKILL_TOPICS = [
   { name: 'authoring', description: 'Works → slices → steps; feature review, chapters, drafts, files, explicit plugins, named local reactions, composable effects, state and conditions' },
-  { name: 'story', description: 'Plan a demo before coding; PM lens for feature-attached works from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos' },
+  { name: 'story', description: 'Plan a show before coding; for feature review start from needs, roles, goals and cases; for explainers and histories plan openings, continuity and captions' },
   { name: 'demo', description: 'Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots' },
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
   { name: 'cases', description: 'Feature-attached works only: cases and coverage; ask the user before starting' },
@@ -24,15 +24,16 @@ export const SKILL_TOPICS = [
 
 /** 心智模型：所有入口最先读到的几句话。 */
 export const MENTAL_MODEL = [
-  'Joplo turns ideas into clickable, replayable works: feature demos, explainers, tutorials and short films. It is a player for pre-declared scenarios, not a free-form app prototype with persistent data or real backend logic, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.',
+  'Joplo shows are playable, interactive pieces your agent writes in code: compare feature options, explain how a system runs, or show what happened. Share them by link or embed their player. It is a player for pre-declared scenarios, not a free-form app prototype with persistent data or real backend logic, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.',
   'Structure: a project is a portfolio of works; a work has slices (scenarios), and a slice has steps. Every work has a cover and enters the home page. Capabilities combine: feature review groups alternative works (options) with cases, coverage, rules and a pick; sequencing connects chapters; draft keeps a standalone work out of publication.',
   'A step is one user action (.click / .type / .select / .press / .drag / .hover / .scroll / .act) or system event plus its visible effects (set, toast, go, done). Results and errors come from these effects, not from real logic or a backend.',
   'During playback, the first picture-changing stage input pauses and applies that same input. Hover does not pause; blank clicks only pause without an exploration notice. Matching the next action advances the script and stays stopped; another reachable scenario asks to switch (default before the action; actionEntry: \'after\' consumes it on confirmation); native controls and declared free reactions change only a local playground. Play, jump, scenario change and reset discard exploration. Screenshots, video and deep links always use scripted state.',
-  'Compare designs and make decisions with feature() + option(); make an audience-facing film with work() + chapter() in works/<key>.tsx. Both can coexist. Standalone works need no pick; draft: true excludes them from build and share. Publish one entry with --work <key>; feature publication still uses pick.',
+  'work() is the only work entry point. Use work() + chapter() in works/<key>.tsx for a standalone show; compare feature options with feature() + work() in features/<f>/works/<key>.tsx. The UI calls these alternative works options. Both can coexist. Standalone works need no pick; draft: true excludes them from build and share. Publish one entry with --work <key>; feature publication still uses pick.',
 ] as const;
 
 /** 推荐的起步顺序（X2：先做最小的一条正常流程 + 一条错误恢复流程，在看板里确认交互模型后再扩展）。 */
 export const START_ORDER = [
+  'Choose the starting template: compare feature options with npx joplo init <dir> (or --template starter); make one show people can play, pause and try with npx joplo init <dir> --template work. Bare names select built-ins, never a same-named local directory; use --template ./work for a local folder. Both use the CLI version tag and install engine skills, AGENTS.md and enabled plugin guides.',
   'Read npx joplo skill authoring and choose the capabilities; for feature review read cases before asking the user about edge cases; demo and installed plugin skills as needed.',
   'Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case\'s expected is its Then); show the plan to the user. A demo is a story, not a feature tour.',
   'With minimal code, write one chapter for a standalone work, or one happy path and one error-and-recovery scenario for feature review.',
@@ -53,7 +54,7 @@ export const PITFALLS = [
   ["CHOICE_REQUIRED (exit 2): ask both publishing questions; never fix it by silently adding --private --no-review, and do not reuse the previous invocation", "publish"],
   ["Public portfolio work and the always-private review version are two separate links: give reviewers data.review.url, the audience data.url", "publish"],
   ["Required: before every share, ask the user public or private AND whether to also publish a review version. Never choose for them or reuse a previous choice; CI must pin both flags in its workflow", "publish"],
-  ["Public shares enter the portfolio and search engines: write the project name, description, and feature goals as search-result content; exclude unpublished information", "publish"],
+  ["Public shares enter the portfolio and search engines: write the project name, description, and feature goals and work summaries as search-result content; exclude unpublished information", "publish"],
   ["Never invent or set an access password for the user: ask them to type it in their own terminal or set JOPLO_SHARE_PASSWORD; never put passwords in command history, files, or conversation summaries. Private Pro shares accept --password; omit both password flags to preserve protection", "publish"],
   ["Never share or deploy without the user's go-ahead. Free links no longer expire, but every live share counts toward the account storage; if share fails with QUOTA_EXCEEDED (exit 6), tell the user the numbers and the two links from error.details, never delete their shares yourself", "publish"],
   ["Joplo Cloud narration spends the user's characters: run npx joplo voice --dry-run and tell them the estimate before a large batch; on TTS_QUOTA_EXCEEDED (exit 7) keep what was made, pass on error.details.usageUrl, and never retry in a loop or buy for them", "publish"],
@@ -66,7 +67,7 @@ export const PITFALLS = [
   ["For generated binary assets, first look for CC0/public-domain material; use an enabled generation plugin for gaps. Run resources --dry-run before spending; check/build/render never generate paid artifacts. Commit outputs and metadata, keep keys local", "plugins"],
   ["For background audio use a media plugin: enable it explicitly, read its skill, place play/stop in steps, and verify sound after a viewer gesture; local resource failures are warnings", "plugins"],
   ["Collect reusable assets before drawing complex visuals; keep source URLs, authors, licenses and changes in assets/SOURCES.md, and verify bundled fonts and samples separately", "story"],
-  ["For audience exploration, use native UI controls or option.free; keep deterministic results in flow steps. Read demo before using drag, hover, scroll or plugin actions", "demo"],
+  ["For audience exploration, use native UI controls or work.free; keep deterministic results in flow steps. Read demo before using drag, hover, scroll or plugin actions", "demo"],
   ["Components outside the catalog may exist as plugins: install the npm package, add it to config({ plugins }), then read npx joplo skill <plugin id> before writing its components", "plugins"],
 ] as const satisfies readonly (readonly [string, string])[];
 
@@ -76,7 +77,7 @@ const ZH_FEEDBACK = '本地评审、监听反馈、确认方案、评审有结�
 
 export type AgentSkill = { name: string; description: string; body: string };
 
-const JOPLO_DESCRIPTION = `Build clickable, replayable feature demos with Joplo (scripted scenarios in TSX, viewed in a local board) when the user wants a feature prototype, an interactive or clickable demo, an A/B comparison of options or edge cases, or a demo for product, design, or review, or a narrated explainer, tutorial, or news-explainer piece that should play like a video (${ZH_JOPLO}), including in a repo without joplo.config.ts, but not for slide decks, PPT, or editing real video footage.`;
+const JOPLO_DESCRIPTION = `Author playable, interactive shows with Joplo when the user wants to compare feature options and cases, explain an architecture, call chain or code change, or tell a story, explain news or trace a product's history, and deliver by link or embedded player (${ZH_JOPLO}), including an A/B comparison, a feature prototype, a clickable demo for product, design, or review, and work in a repo without joplo.config.ts, but not production backends, slide decks, PPT, or editing real video footage.`;
 const FEEDBACK_DESCRIPTION = `Receive and apply Joplo review feedback when the user wants to test a local demo, start or resume a feedback listener (npx joplo feedback watch --local --follow), confirm an option, monitor a Share review, or implement review conclusions (${ZH_FEEDBACK}); covers local live events and Cloud polling, without requiring a share for local review.`;
 
 const list = (items: readonly string[]) => items.map((s, i) => `${i + 1}. ${s}`);
@@ -100,7 +101,9 @@ function joploBody(): string {
     '',
     '## Quick start',
     '```sh',
-    'npx joplo@latest init demo && cd demo && npm install   # new project (an existing project uses its installed npx joplo)',
+    'npx joplo@latest init demo                            # compare feature options (default starter)',
+    '# Or: npx joplo@latest init demo --template work        # one standalone show',
+    'cd demo && npm install                                # an existing project uses its installed npx joplo',
     'npx joplo check                                        # compile and validate; fix until 0 errors',
     'npx joplo dev                                          # stdout: the board URL; stderr: the feedback command for agents',
     'npx joplo feedback watch . --local --follow --json     # in its own long-running shell: reviewer feedback as NDJSON',
@@ -108,9 +111,9 @@ function joploBody(): string {
     'Run dev and the follower in separate long-running shells. dev keeps the board live: every saved edit recompiles and refreshes it.',
     '',
     '## Workflow',
-    '1. No joplo.config.ts yet: npx joplo@latest init <dir>, or npx joplo@latest init . for the current directory, then npm install there (versions are pinned). Agent and Git files (.git, .gitignore, .agents, .claude, AGENTS.md, skills-lock.json) do not count as content; other existing files need init . --keep, which only adds missing files. init skips these skills when the same version is already installed and never overwrites edited ones. In an existing Joplo project, use its installed npx joplo.',
+    '1. No joplo.config.ts yet: npx joplo@latest init <dir> for feature comparisons, add --template work for a standalone show, or use . for the current directory, then npm install there (versions are pinned). Agent and Git files (.git, .gitignore, .agents, .claude, AGENTS.md, skills-lock.json) do not count as content; other existing files need init . --keep, which only adds missing files. init skips these skills when the same version is already installed and never overwrites edited ones. In an existing Joplo project, use its installed npx joplo.',
     ...list(START_ORDER).map(line => line.replace(/^(\d+)/, (_, n: string) => String(Number(n) + 1))),
-    `${START_ORDER.length + 2}. Only when the user asks to share or publish: npx joplo share --private --no-review --format json publishes picked options; npx joplo share --private --review also publishes a separate, always-private link containing every option for reviewers (data.review.url); data.url is the main link. For scoped review results with data.mode = review, only the private review was published and its link is data.url; read skill publish for this boundary. Confirming an option in the board is not a publish request. To share part of the project, add --scenario <scenario id> or --work <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items.`,
+    `${START_ORDER.length + 2}. Only when the user asks to share or publish: npx joplo share --private --no-review --format json publishes picked options; npx joplo share --private --review also publishes a separate, always-private link containing every option for reviewers (data.review.url); data.url is the main link. For scoped review results with data.mode = review, only the private review was published and its link is data.url; read skill publish for this boundary. Confirming an option in the board is not a publish request. To share part of the project, add --scenario <scenario id> or --work <entry key> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items.`,
     '',
     '## Show the product, not slides',
     'Every step is an action on the product and a visible change it causes. If a step could be a bullet on a slide, rebuild it as interface, state, or a trace.',
@@ -125,7 +128,7 @@ function joploBody(): string {
     'The user reviews in the board: they click through scenarios, write comments with the board\'s native feedback icon, and may confirm (approve) an option. You receive each event the moment it is saved.',
     '1. Start npx joplo feedback watch <dir> --local --follow --json in its own long-running shell (joplo dev prints this exact command; the board\'s feedback panel can copy it too). One follower covers every option of the project and attaches by itself to the new round each source edit opens.',
     '2. Then give the user the board URL that dev printed (do not assume port 4790) and point them to the native feedback icon. If they want to drive the UI themselves, only give the link.',
-    '3. While they test, read the follower\'s output with short waits (about 1–5 seconds). Each stdout line is one JSON event (feedback, approved, closed) carrying eventId, optionId, sessionId and context (route, scenario, step, source); deduplicate by eventId. A background shell alone does not wake an idle agent: stay in a receive loop, and do not claim you are still listening after ending your response unless the host can resume you.',
+    '3. While they test, read the follower\'s output with short waits (about 1–5 seconds). Each stdout line is one JSON event (feedback, approved, closed) carrying eventId, workId, sessionId and context (route, scenario, step, source); deduplicate by eventId. A background shell alone does not wake an idle agent: stay in a receive loop, and do not claim you are still listening after ending your response unless the host can resume you.',
     '   - If you will end your response while the user tests, and your host wakes you when a background command finishes (a host configured to resume on process exit does): run the follower in the background with --once added. It exits 0 on the first feedback or approval, which wakes you. Handle the events, then start it again with --since <createdAt of the last event> (the exit message prints this exact command) so nothing is replayed or lost. Without such a host, tell the user to message you after they confirm.',
     '4. On feedback, acknowledge the actual text and its page/step right away, in the reviewer\'s language, then keep listening. Change the demo only when the user asked for changes; after edits, run npx joplo check. closed (source_changed) is then expected and the follower moves to the new round.',
     '5. approved confirms that option version only: it is not proof the feedback was implemented and not permission to publish. The follower ends with exit 1 only when the board stops (restart dev, then the follower) or 130 on Ctrl+C.',
@@ -133,7 +136,7 @@ function joploBody(): string {
     '',
     '## Other ways to work together',
     '- Pointing at something: after the user Alt+clicks a board element, run npx joplo selection and edit only that location.',
-    '- Designing a product with Joplo itself: keep one project with stable feature IDs and multiple options/scenarios (repository example: examples/joplo). Preserve actual evidence and label historical reconstructions; never invent review or approval history. Public design narration must be curated into visible scenarios because build strips private authoring fields. Details: npx joplo skill authoring.',
+    '- Designing a product with Joplo itself: keep one project with stable feature IDs and multiple works/scenarios (repository example: examples/joplo). Preserve actual evidence and label historical reconstructions; never invent review or approval history. Public design narration must be curated into visible scenarios because build strips private authoring fields. Details: npx joplo skill authoring.',
     '- CI publication (only when authorized): separate PR comparison previews from the fixed main share, isolate credentials from author-code builds, and verify actual workflow runs after activation. A PR preview is published only while the PR is still open, so do not merge before its comparison link appears. Details: npx joplo skill diff.',
     '- Comparing versions or a PR: read npx joplo skill diff. Preserve stable .key() identities, treat repeated candidates as uncertain, and build two real publish versions. If an embedded player changes scenario independently, use Realign and wait for both target positions before resuming. Use prepare → uncredentialed build → trusted publish only within the user\'s authorized scope.',
     '',
@@ -165,7 +168,7 @@ function feedbackBody(): string {
     'npx joplo feedback watch ./demo --local --follow --json   # keep running in its own shell',
     '```',
     '- --follow streams every option of the project and attaches to the new round each source edit opens; approving one option does not stop it. It exits 1 when the board stops (restart dev, then rerun it) and 130 on Ctrl+C.',
-    '- stdout carries one JSON event per line (feedback, approved, closed) with eventId, sessionId, optionId, revision, seq and context; stderr is status, not feedback. Buffer partial lines and deduplicate by eventId: a restart replays the open rounds.',
+    '- stdout carries one JSON event per line (feedback, approved, closed) with eventId, sessionId, workId, revision, seq and context; stderr is status, not feedback. Buffer partial lines and deduplicate by eventId: a restart replays the open rounds.',
     '- Start the follower before giving the reviewer the URL dev printed (do not assume port 4790). Point them to the native draggable feedback icon, not a button inside the demo; if they want to operate the UI themselves, only give the link.',
     '- While they test, read the shell output with short tool waits (about 1–5 seconds). A background shell alone does not wake an idle agent: stay in a receive loop or use the host\'s notifications. Do not end your response claiming you are still listening unless the host can resume you; if you must yield, say so, and drain pending output before unrelated work.',
     '- On feedback, acknowledge the actual text and page/step right away in the reviewer\'s language, then keep listening. A delivery test is not a request to implement; if implementation was already requested, acknowledge first, then make the scoped change without asking again.',
@@ -173,7 +176,7 @@ function feedbackBody(): string {
     '',
     'Example stdout line and an immediate reply:',
     '```json',
-    '{"source":"local","type":"feedback","eventId":"rv_…:1","sessionId":"rv_…","optionId":"invite.a-modal","seq":1,"body":"Make the invite button clearer","context":{"route":"/members","scenarioId":"invite.a-modal.happy","position":2}}',
+    '{"source":"local","type":"feedback","eventId":"rv_…:1","sessionId":"rv_…","workId":"invite.a-modal","seq":1,"body":"Make the invite button clearer","context":{"route":"/members","scenarioId":"invite.a-modal.happy","position":2}}',
     '```',
     'Reply: Received your feedback on /members, step 2: "Make the invite button clearer." Then keep listening, or make that change if the user already asked you to apply feedback.',
     '',
@@ -182,7 +185,7 @@ function feedbackBody(): string {
     'npx joplo feedback list ./demo --local --json',
     'npx joplo feedback watch ./demo --local --session <id-from-list> [--after <last-handled-seq>] --json',
     '```',
-    '- Use it to wait for one option version\'s approval (exit 0 only on approval, 1 if the round closes) or to resume a round from a cursor. Match projectDir, optionId, instanceId and revision from list; if several match, choose explicitly instead of taking the newest.',
+    '- Use it to wait for one option version\'s approval (exit 0 only on approval, 1 if the round closes) or to resume a round from a cursor. Match projectDir, workId, instanceId and revision from list; if several match, choose explicitly instead of taking the newest.',
     '- Source edits close that round: list again and attach to the new one with its own cursor. Never reuse an old cursor on a new session or delete review records to reset a round.',
     '',
     '## Share review: poll, do not pretend it is a lossless stream',
@@ -196,7 +199,7 @@ function feedbackBody(): string {
     '',
     '## Apply conclusions when requested',
     '- Locate the code with feedback.context.source, scenarioId, position, stepId, and element, and check the source is still that revision. Missing Cloud route/source fields are unknown, not permission to guess. For an explicit Alt-click selection use npx joplo selection.',
-    '- pick: set pick in features/<feature>/feature.ts to the option file name (targetId without the "<feature>." prefix). A local approved names its optionId; apply the pick only within the requested task.',
+    '- pick: set pick in features/<feature>/feature.ts to the option file name (targetId without the "<feature>." prefix). A local approved names its workId; apply the pick only within the requested task.',
     '- confirm_rule: set that rule to origin: \'user\', status: \'confirmed\'.',
     '- reject_rule: rewrite the rule as the note says. If the alternative is unspecified, set status: \'conflict\' and ask the user; do not guess.',
     '- answer: delete the question and add a rule stating the answer with origin: \'user\', status: \'confirmed\'.',

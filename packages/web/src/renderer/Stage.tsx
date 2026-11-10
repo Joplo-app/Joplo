@@ -187,10 +187,10 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   }, [gesture?.action]);
   const zoomOn = !!zoom;
   const gestureActions = useMemo(() => {
-    const optionId = scenario?.optionId;
+    const workId = scenario?.workId;
     const current = scenario?.steps[state.position]?.action;
-    const all = Object.values(project.scenarios).filter(sc => sc.optionId === optionId).flatMap(sc => sc.steps.map(st => st.action));
-    return [...(current ? [current] : []), ...all, ...Object.values(project.options[optionId ?? '']?.free ?? {}).map(r => r.action)];
+    const all = Object.values(project.scenarios).filter(sc => sc.workId === workId).flatMap(sc => sc.steps.map(st => st.action));
+    return [...(current ? [current] : []), ...all, ...Object.values(project.works[workId ?? '']?.free ?? {}).map(r => r.action)];
   }, [project, scenario, state.position]);
   const gestureFor = (type: 'drag' | 'hover', element: HTMLElement) => {
     for (let node: HTMLElement | null = element; node && node !== rootRef.current; node = node.parentElement) {

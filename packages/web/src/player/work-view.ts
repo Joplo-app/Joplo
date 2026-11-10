@@ -1,3 +1,4 @@
+import { entryForWork } from '../runtime/views';
 import { en, type Dictionary } from '../i18n/en';
 /**
  * 条目的呈现（D102 修订，纯函数，看板、发布站、嵌入、截图页共用；不引用 board/）。
@@ -43,9 +44,8 @@ export function sliceWords(entry: Pick<Entry, 'sequencing'>, i18n: Dictionary = 
  * linear 时 main 按顺序编号（01 起）；independent 与支线不编号。
  */
 export function sliceRows(entry: Entry, currentScenarioId: string | null, i18n: Dictionary = en): { main: ChapterRow[]; side: ChapterRow[] } {
-  let n = 0;
   const rows = entry.slices.map((s): ChapterRow => {
-    const num = isLinear(entry) && s.inSequence ? ++n : null;
+    const num = chapterNumber(entry, s.id);
     return { ...s, n: num, no: num === null ? null : i18n.player.chapterNo(num), current: s.id === currentScenarioId };
   });
   return { main: rows.filter((r) => r.inSequence), side: rows.filter((r) => !r.inSequence) };
@@ -87,9 +87,8 @@ export function siteLanding(project: Project): { kind: 'home' } | { kind: 'work'
 /** 场景所属的条目（只认播放用的那件作品里的切片：功能没选定的方案里的场景返回 null）。 */
 export function entryOfScenario(project: Project, scenarioId: string | null | undefined): Entry | null {
   const sc = scenarioId ? project.scenarios[scenarioId] : undefined;
-  const featureId = sc ? project.options[sc.optionId]?.featureId : undefined;
-  const entry = featureId ? entryOf(project, featureId) : null;
-  return entry && entry.workId === sc!.optionId ? entry : null;
+  const entry = sc ? entryForWork(project, sc.workId) : null;
+  return entry && entry.workId === sc!.workId ? entry : null;
 }
 
 /** 单行场合的切片名（嵌入的切换菜单等）：linear 顺序里的章节「01 · 标题」，其余只有标题。 */

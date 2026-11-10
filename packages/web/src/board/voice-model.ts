@@ -16,11 +16,11 @@ export function newerVoiceState(prev: VoiceState | null, next: VoiceState): Voic
 }
 
 /** 这个方案所有场景要读的段（文字为空的步骤跳过）。 */
-export function voiceSegments(project: Project, optionId: string | null, i18n: Dictionary): VoiceSegment[] {
-  if (!optionId) return [];
+export function voiceSegments(project: Project, workId: string | null, i18n: Dictionary): VoiceSegment[] {
+  if (!workId) return [];
   const out: VoiceSegment[] = [];
   for (const sc of Object.values(project.scenarios)) {
-    if (sc.optionId !== optionId) continue;
+    if (sc.workId !== workId) continue;
     sc.steps.forEach((st, i) => {
       const line = spokenLine(st, stepCaption(st, i18n), speakerRoleAt(project, sc.id, i + 1));
       if (line.text) out.push({ stepId: st.id, ...line });

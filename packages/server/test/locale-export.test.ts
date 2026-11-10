@@ -8,7 +8,7 @@ import { ExportHub } from '../src/export.ts';
 import { renderQuery } from '../src/render.ts';
 
 const locales = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko', 'es', 'fr', 'de', 'pt-BR', 'ru'];
-const project = Project.parse({schemaVersion:2,mode:'dev',name:'Test',scenes:{s:{id:'s',optionId:'f.a',route:'/',name:'Stage',root:{id:'root',type:'ui:Stack'}}},scenarios:{s:{id:'s',optionId:'f.a',name:'Demo',mock:{label:'Mock success',outcome:'success'},initial:{sceneId:'s'},steps:[]}}});
+const project = Project.parse({schemaVersion:3,entryIds:[],mode:'dev',name:'Test',scenes:{s:{id:'s',workId:'f.a',route:'/',name:'Stage',root:{id:'root',type:'ui:Stack'}}},scenarios:{s:{id:'s',workId:'f.a',name:'Demo',mock:{label:'Mock success',outcome:'success'},initial:{sceneId:'s'},steps:[]}}});
 
 for (const locale of [...locales, undefined, 'xx', 'ja-JP', null, 3, {}, ['en']]) {
   it(`validates locale ${JSON.stringify(locale)} through image and video URLs`, async () => {

@@ -30,7 +30,7 @@ let responses: Map<string, { status?: number; body: unknown }>;
 let devIr: Project;
 let plan: 'free' | 'pro', rejectReview: number;
 const browser = vi.fn(async () => true);
-const files = { 'index.html': '<html><script type="application/json" id="joplo-ir">{"project":{"mode":"publish","features":{},"options":{},"scenarios":{}}}</script></html>', 'assets/a.css': 'body{}' };
+const files = { 'index.html': '<html><script type="application/json" id="joplo-ir">{"project":{"mode":"publish","features":{},"works":{},"scenarios":{}}}</script></html>', 'assets/a.css': 'body{}' };
 let built: Record<string, string>;
 const build = vi.fn(async ({ outDir, review }: { outDir?: string; review?: boolean }) => {
   const out = review ? { ...built, 'index.html': built['index.html']!.replace('"mode":"publish"', '"mode":"review"') } : built;
@@ -39,15 +39,16 @@ const build = vi.fn(async ({ outDir, review }: { outDir?: string; review?: boole
 });
 const checkProject = vi.fn(async (): Promise<any> => ({ name: 'Fixture', diagnostics: [], summary: { error: 0, warning: 0, info: 0 }, verification: {}, project: devIr }));
 const feedback = {
+  works: [{ id: 'f.a', featureId: 'f' }, { id: 'f.b', featureId: 'f' }],
   share: { id: 'Abc1234567', version: 3 },
   decisions: [
-    { id: 'd1', kind: 'pick', featureId: 'f', targetId: 'f.b', note: null, decidedAt: '2026-11-06T10:00:00.000Z', version: 3 },
-    { id: 'd2', kind: 'reject_rule', featureId: 'f', targetId: 'f.a.retry', note: 'Only block repeats within one minute', decidedAt: '2026-11-06T10:01:00.000Z', version: 3 },
-    { id: 'd3', kind: 'answer', featureId: 'f', targetId: 'f.dup', note: '7 days', decidedAt: '2026-11-06T10:02:00.000Z', version: 2 },
-    { id: 'd4', kind: 'confirm_rule', featureId: 'f', targetId: 'f.a.keep', note: null, decidedAt: '2026-11-06T10:03:00.000Z', version: 3 },
+    { id: 'd1', kind: 'pick', workId: 'f.b', featureId: 'f', targetId: 'f.b', note: null, decidedAt: '2026-11-06T10:00:00.000Z', version: 3 },
+    { id: 'd2', kind: 'reject_rule', workId: 'f.a', featureId: 'f', targetId: 'f.a.retry', note: 'Only block repeats within one minute', decidedAt: '2026-11-06T10:01:00.000Z', version: 3 },
+    { id: 'd3', kind: 'answer', workId: null, featureId: 'f', targetId: 'f.dup', note: '7 days', decidedAt: '2026-11-06T10:02:00.000Z', version: 2 },
+    { id: 'd4', kind: 'confirm_rule', workId: 'f.a', featureId: 'f', targetId: 'f.a.keep', note: null, decidedAt: '2026-11-06T10:03:00.000Z', version: 3 },
   ],
   comments: [
-    { id: 'c1', version: 2, scenario: 'f.a.main', step: 1, stepId: 'f.a.main#1', element: { id: 'go', label: 'Go' }, body: 'Button text is unclear\nsecond line', author: { name: 'Alice' }, createdAt: '2026-11-06T09:00:00.000Z' },
+    { id: 'c1', version: 2, workId: 'f.a', scenario: 'f.a.main', step: 1, stepId: 'f.a.main#1', element: { id: 'go', label: 'Go' }, body: 'Button text is unclear\nsecond line', author: { name: 'Alice' }, createdAt: '2026-11-06T09:00:00.000Z' },
   ],
 };
 
@@ -95,9 +96,9 @@ test('普通 share：构建参数不变（没有 review），请求体带 publis
   const r = await cli(['share', '--private', '--no-review',  project, '--format=json']); expect(r.code, r.stdout).toBe(0);
   expect(build.mock.calls[0]![0]).toEqual({ projectDir: project, outDir: expect.any(String), voiceDefault: 'cloud' });
   const body = createBody();
-  expect(body.review).toMatchObject({ v: 1, mode: 'publish' });
+  expect(body.review).toMatchObject({ v: 2, mode: 'publish' });
   expect(body.review.features.map((f: any) => f.id)).toEqual(['f']);
-  expect(body.review.features[0].options.map((o: any) => o.id)).toEqual(['f.a']);
+  expect(body.review.features[0].works.map((o: any) => o.id)).toEqual(['f.a']);
   expect(body.files.map((f: any) => f.path).sort()).toEqual(['assets/a.css', 'index.html']);
   expect(body.pr).toBeUndefined();
   expect(r.json().data.mode).toBeUndefined();
@@ -389,16 +390,16 @@ test('服务端因 review 字段返回 400：普通 share 去掉 review 重试�
 /** 假的范围构建：产物 IR 只有范围内的场景，并返回 scope（与 @joplo-app/server 的 buildSite 一致）。 */
 const scopedBuild = (borrowed: unknown[] = []) => async ({ outDir, scope }: { outDir?: string; scope?: { scenarios?: string[] } }) => {
   const ids = scope?.scenarios ?? [];
-  const html = `<html><script type="application/json" id="joplo-ir">${JSON.stringify({ project: { mode: 'publish', features: { f: {} }, options: {}, scenarios: Object.fromEntries(ids.map(id => [id, {}])) }, home: null, scoped: true })}</script></html>`;
+  const html = `<html><script type="application/json" id="joplo-ir">${JSON.stringify({ project: { mode: 'publish', features: { f: {} }, works: {}, scenarios: Object.fromEntries(ids.map(id => [id, {}])) }, home: null, scoped: true })}</script></html>`;
   await mkdir(outDir!, { recursive: true }); await writeFile(join(outDir!, 'index.html'), html);
-  return { outDir: outDir!, files: ['index.html'], diagnostics: [], routes: [], scenarios: ids, scope: { key: [...ids].sort().join(','), scenarios: ids, features: ['f'], borrowed } };
+  return { outDir: outDir!, files: ['index.html'], diagnostics: [], routes: [], scenarios: ids, scope: { key: [...ids].sort().join(','), scenarios: ids, entryIds: ['f'], borrowed } };
 };
 
 test('share --scenario：构建带范围；清单只含范围内；标题带场景名；记在 scoped，不动主链接', async () => {
   await login();
   await mkdir(join(project, '.joplo'), { recursive: true });
   await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/' }));
-  build.mockImplementationOnce(scopedBuild([{ kind: 'element', featureId: 'g', featureName: 'Audit', optionId: 'g.a', elementId: 'seat', route: '/', refs: ['seat'], scenarios: ['f.a.main'] }]));
+  build.mockImplementationOnce(scopedBuild([{ kind: 'element', entryId: 'g', entryTitle: 'Audit', workId: 'g.a', elementId: 'seat', route: '/', refs: ['seat'], scenarios: ['f.a.main'] }]));
   const r = await cli(['share', '--private', '--no-review',  project, '--scenario', 'f.a.main', '--format=json']); expect(r.code, r.stdout).toBe(0);
   expect(build.mock.calls[0]![0]).toEqual({ projectDir: project, outDir: expect.any(String), scope: { scenarios: ['f.a.main'] }, voiceDefault: 'cloud' });
   const body = createBody();
@@ -430,9 +431,9 @@ test('写错场景、没选定方案：在构建和任何云端请求之前失�
   expect(r.code).toBe(1); expect(r.json().error.code).toBe('NOT_FOUND'); expect(r.stdout).toContain('f.a.main');
   // 没选定方案属于用法错误（USAGE，退出码 2）
   r = await cli(['share', '--private', '--no-review',  project, '--scenario', 'f.b.only', '--format=json']);
-  expect(r.code).toBe(2); expect(r.json().error.message).toMatch(/not the picked option/);
+  expect(r.code).toBe(2); expect(r.json().error.message).toMatch(/not the picked work/);
   r = await cli(['share', '--private', '--no-review',  project, '--work', 'g', '--format=json']);
-  expect(r.code).toBe(2); expect(r.json().error.message).toMatch(/no picked option/);
+  expect(r.code).toBe(2); expect(r.json().error.message).toMatch(/no picked work/);
   expect(build).not.toHaveBeenCalled(); expect(calls).toEqual([]);
 });
 
@@ -458,10 +459,10 @@ test('share --work：独立作品范围、摘要与草稿拒绝；评审版不�
   }) as any);
   const r = await cli(['share', project, '--work', 'demo', '--no-review', '--format=json'], { JOPLO_API_KEY: apiKey });
   expect(r.code, r.stdout + r.stderr).toBe(0);
-  expect(build.mock.calls[0]![0]).toMatchObject({ scope: { scenarios: ['demo.main.intro'] } });
+  expect(build.mock.calls[0]![0]).toMatchObject({ scope: { scenarios: ['demo.intro'] } });
   expect(r.json().data.entries).toEqual([{ id: 'demo', title: 'demo', slices: 1, sequencing: 'linear' }]);
   expect(r.stderr).toContain('Works: 1 · demo (demo)'); expect(r.stderr).toContain('WORK_DRAFT_SKIPPED');
-  expect(calls.find(c => c.path === '/api/v1/shares')!.body.review.features.map((f: any) => f.id)).toEqual(['demo']);
+  expect(calls.find(c => c.path === '/api/v1/shares')!.body.review.works.map((w: any) => w.id)).toEqual(['demo']);
   for (const review of ['--no-review', '--review']) {
     calls = []; build.mockClear();
     const draft = await cli(['share', project, '--work', 'old', review, '--format=json'], { JOPLO_API_KEY: apiKey });

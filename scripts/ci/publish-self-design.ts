@@ -11,7 +11,7 @@ import { manifest, uploadPreparedFiles } from '../../packages/cli/src/cloud-shar
 
 export type MainDesignOptions = { shareId: string; title: string; assertCurrent?: () => Promise<void> };
 const SHARE_ID = /^[A-Za-z0-9]{10}$/;
-const invalidArtifact = () => new JoploError('INVALID_SCHEMA', 'Expected a standalone public Joplo build without private attachments');
+const invalidArtifact = () => new JoploError('INVALID_SCHEMA', 'Expected a self-contained public Joplo build without private attachments');
 
 // Limit this dedicated publisher to the actual static build surface. JSON review
 // attachments, authoring files and nested HTML are not part of that surface.

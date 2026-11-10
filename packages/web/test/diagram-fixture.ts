@@ -2,7 +2,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /** D69 测试用的小项目：三组、四个节点，D 逐段出现，有一条连到分组的连线。 */
 import { expect } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { $, feature, flow, layer, option, page, set, shot } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
+import { $, feature, flow, layer, work, page, set, shot } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
@@ -24,9 +24,9 @@ export function project(): Project {
     h(D.Edge, { id: 'cd', from: 'c', to: 'd', when: $.ui.showD }),
     h(D.Edge, { id: 'b_data', from: 'b', to: 'g_data', label: '写入' }),
   );
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {},
     state: { ui: { showD: false } },
     layers: { backend: layer('后端', arch as never) },
@@ -45,7 +45,7 @@ export function project(): Project {
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
@@ -66,9 +66,9 @@ export function machineProject(): Project {
     h(SM.Transition, { id: 't_pay', from: 'created', to: 'paid', label: '支付' }),
     h(SM.Transition, { id: 't_ship', from: 'paid', to: 'shipped', label: '发货' }),
   );
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {},
     state: { data: { order: { status: 'created' } } },
     layers: { life: layer('订单状态', sm as never) },
@@ -84,7 +84,7 @@ export function machineProject(): Project {
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

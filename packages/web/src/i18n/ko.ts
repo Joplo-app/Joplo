@@ -253,7 +253,7 @@ export function createKo(locale: Locale = 'ko') {
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "Joplo로 만든 콘셉트 프로토타입 · 실제 제품 구현이 아닙니다",
       featureNotFound: "기능을 찾을 수 없습니다.",
       goToHome: "홈으로",
-      switchFeature: "기능 전환",
+      switchFeature: "항목 전환",
       copyLink: "링크 복사",
       copyLinkToCurrentStep: "현재 단계 링크 복사",
       linkCopied: "링크 복사됨",

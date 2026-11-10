@@ -8,7 +8,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, go, hold, option, page, set, $, type CaseDef, type Flow } from '@joplo-app/kit';
+import { feature, flow, go, hold, work, page, set, $, type CaseDef, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { CARD_POINTS_MAX, DESCRIPTION_MAX, SCENARIO_MS_MAX, compile, outline, replay, scenarioEstimateMs, stateAt, stepDwell, stepPlan, ACTION_TIMING, validate, type AuthoringProject } from '../src/index.ts';
 import * as webPace from '../../web/src/runtime/pace.ts';
@@ -18,9 +18,9 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 
 function build(o: { cases?: Record<string, CaseDef>; scenarios?: Record<string, Flow>; extra?: unknown[]; roles?: string[]; pick?: string } = {}) {
   const home = page({ title: 'Home', layout: false }, h(ui.Stack, null, h(ui.Button, { id: 'go' }, 'Go'), h(ui.TextInput, { id: 'email', label: 'Email' }), ...(o.extra ?? [])));
-  const opt = option({
-    name: 'A · Modal',
-    idea: 'i',
+  const opt = work({
+    title: 'A · Modal',
+    summary: 'i',
     state: { ui: { done: false } },
     scenarios: o.scenarios ?? { happy: flow('Send', { start: '/', cases: ['happy'] }).click('go', set($.ui.done, true)) },
   });
@@ -29,7 +29,7 @@ function build(o: { cases?: Record<string, CaseDef>; scenarios?: Record<string, 
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'Invite', goal: 'Admins invite teammates so the team can start today', roles: o.roles, cases: o.cases ?? { happy: 'Happy', denied: { title: 'No permission', dimension: 'permission', priority: 'high', expected: 'Explain why' } }, pick: o.pick ?? 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'Invite', goal: 'Admins invite teammates so the team can start today', roles: o.roles, cases: o.cases ?? { happy: 'Happy', denied: { title: 'No permission', dimension: 'permission', priority: 'high', expected: 'Explain why' } }, pick: o.pick ?? 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const dev = compile(src, 'dev');
   expect(dev.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
@@ -59,7 +59,7 @@ describe('阅读节奏在 core，web 原样 re-export', () => {
     // D：一个字母约 67 ms，按 hold 的 0.5 s；长说明 16 个汉字 × 125 ms = 2 s，读完才走；每个系统事件提交前有 0.9 s 的停顿
     const want = 92_500 + 5 * ACTION_TIMING.systemHold;
     expect(scenarioEstimateMs(p, p.scenarios['f.a.happy']!)).toBe(want);
-    expect(outline(p).features[0]!.options[0]!.scenarios[0]!.ms).toBe(want);
+    expect(outline(p).entries[0]!.works[0]!.scenarios[0]!.ms).toBe(want);
     expect(codes(p, 'SCENARIO_TOO_LONG')).toHaveLength(1);
   });
 });
@@ -69,8 +69,8 @@ describe('outline', () => {
     const p = build({ roles: ['Admin', 'Invitee'] });
     const o = outline(p);
     expect(o.name).toBe('T');
-    const f = o.features[0]!;
-    expect(f).toMatchObject({ id: 'f', name: 'Invite', goal: 'Admins invite teammates so the team can start today', roles: ['Admin', 'Invitee'], pick: 'f.a' });
+    const f = o.entries[0]!;
+    expect(f).toMatchObject({ id: 'f', title: 'Invite', summary: 'Admins invite teammates so the team can start today', roles: ['Admin', 'Invitee'], pick: 'f.a' });
     expect(f.cases).toEqual([
       { id: 'f.happy', key: 'happy', title: 'Happy', dimension: 'main', priority: 'medium', expected: '', coverage: { 'f.a': 'expressed' } },
       { id: 'f.denied', key: 'denied', title: 'No permission', dimension: 'permission', priority: 'high', expected: 'Explain why', coverage: { 'f.a': 'missing' } },
@@ -81,8 +81,8 @@ describe('outline', () => {
       happy: flow('Send', { start: '/', cases: ['happy'], description: 'Short' }).card('Why').click('go').card('Done', { points: ['a', 'b'] }),
       denied: flow('Denied', { start: '/', cases: ['denied'], outcome: 'denied' }).click('go'),
     } });
-    const opt = outline(p).features[0]!.options[0]!;
-    expect(opt).toMatchObject({ id: 'f.a', key: 'a', name: 'A · Modal', picked: true, missing: 0, undecided: 0 });
+    const opt = outline(p).entries[0]!.works[0]!;
+    expect(opt).toMatchObject({ id: 'f.a', key: 'a', title: 'A · Modal', picked: true, missing: 0, undecided: 0 });
     const [happy, denied] = opt.scenarios;
     expect(happy).toMatchObject({ id: 'f.a.happy', key: 'happy', name: 'Send', description: 'Short', steps: 3, cards: 2, opening: true, ending: true, outcome: 'success', caseIds: ['f.happy'] });
     expect(denied).toMatchObject({ steps: 1, cards: 0, opening: false, ending: false, outcome: 'denied' });
@@ -91,12 +91,12 @@ describe('outline', () => {
   });
   it('只看一个方案；不存在的方案报 USAGE；发布 IR 没有情况时 cases 为空也不崩溃', () => {
     const p = build();
-    expect(outline(p, { optionId: 'f.a' }).features).toHaveLength(1);
-    expect(() => outline(p, { optionId: 'f.zz' })).toThrow(/Option does not exist/);
+    expect(outline(p, { workId: 'f.a' }).entries).toHaveLength(1);
+    expect(() => outline(p, { workId: 'f.zz' })).toThrow(/Work does not exist/);
     const pub = structuredClone(p);
     pub.cases = {};
     pub.features.f!.caseIds = [];
-    expect(outline(pub).features[0]!.cases).toEqual([]);
+    expect(outline(pub).entries[0]!.cases).toEqual([]);
   });
 });
 
@@ -155,11 +155,11 @@ describe('发布 IR 里的 go() 跳转（D68 修复）', () => {
   it('选定方案里 go() 到另一个路径：发布 IR 回放通过；dev 里跳到别的方案的画面仍报 MISSING_SCENE', () => {
     const home = page({ title: 'Home', layout: false }, h(ui.Stack, null, h(ui.Button, { id: 'go' }, 'Go')));
     const done = page({ title: 'Done', layout: false }, h(ui.Text, null, 'Done'));
-    const opt = option({ name: 'A', idea: 'i', scenarios: { happy: flow('S', { start: '/' }).click('go', go('/done')) } });
+    const opt = work({ title: 'A', summary: 'i', scenarios: { happy: flow('S', { start: '/' }).click('go', go('/done')) } });
     const src: AuthoringProject = {
       root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {},
       routes: { '/': { ...home, ...F('routes/page.tsx') }, '/done': { ...done, ...F('routes/done/page.tsx') } },
-      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
     };
     const pub = compile(src, 'publish').project!;
     expect(pub.scenarios['f.a.happy']!.steps[0]!.effects).toEqual([{ type: 'navigate', sceneId: '@/done' }]);

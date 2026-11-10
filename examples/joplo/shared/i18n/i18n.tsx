@@ -260,10 +260,10 @@ const JSON_UPDATED = `// locales/ja.json · 按 check 给的旧条目更新
   …
 }`;
 
-const SRC_OLD = `// features/invite/options/a-modal.tsx
+const SRC_OLD = `// features/invite/works/a-modal.tsx
 <Button id="btn_invite">邀请成员</Button>`;
 
-const SRC_NEW = `// features/invite/options/a-modal.tsx
+const SRC_NEW = `// features/invite/works/a-modal.tsx
 <Button id="btn_invite">邀请同事</Button>   // 只改了中文`;
 
 const Author = () => (
