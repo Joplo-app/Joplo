@@ -314,7 +314,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     else { line(summary); for (const l of data.lines) line(`${l.number} | ${l.text}`); if (data.note) line(data.note); }
   });
   program.command('init').argument('[dir]', 'Project directory', '.').option('--name <name>', 'Project name (defaults to directory name)').option('--keep', 'Add missing files in a nonempty directory; preserve existing files')
-    .option('--template <spec>', 'Built-in starter (default) or work at the CLI version tag; names take priority over local directories (use ./work). Also accepts local paths or github:owner/repo[/subdir][#ref]')
+    .option('--template <spec>', 'Template name from https://github.com/Joplo-app/joplo-templates default branch (starter by default; e.g. work); lowercase letters, digits and hyphens. Names take priority over local directories (use ./work). Also accepts local paths or github:owner/repo[/subdir][#ref]')
     .option('--no-skill', 'Do not install the agent skills (.claude/skills/joplo*, AGENTS.md block)')
     .action(async (dir, opts) => { for (const l of initSummary(await initProject(dir, opts.name, { keep: opts.keep, skill: opts.skill, template: opts.template }))) line(l); });
   program.command('skill').description('Read agent usage on demand or install a usage pointer')

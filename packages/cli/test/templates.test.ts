@@ -2,9 +2,9 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { mkdtemp, mkdir, readFile, writeFile, rm, stat, readdir, symlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { gzipSync } from 'node:zlib';
+import { fixtureArchive, releaseFixture, tar } from '../../../scripts/test/init-fixture.ts';
 import { archiveFiles, defaultTemplateSpec, loadTemplate, parseTemplate, renderTemplate } from '../src/templates.ts';
-import { initProject } from '../src/init.ts';
+import { initProject, initSummary } from '../src/init.ts';
 import { skillFiles, installSkill, pluginSkillFiles, pluginSkillManifest } from '../src/skill.ts';
 import { checkWithProject } from '../src/check.ts';
 import { entriesOf, stateAt } from '@joplo-app/core';
@@ -14,50 +14,38 @@ import ui from '../../../plugins/ui/src/plugin.ts';
 const dirs:string[]=[];
 afterEach(async()=>{await Promise.all(dirs.splice(0).map(d=>rm(d,{recursive:true,force:true})));});
 async function temp(){const d=await mkdtemp(join(tmpdir(),'joplo-template-'));dirs.push(d);return d;}
-// Construct the archive bytes ourselves so malformed names are not normalized by a tar writer.
-function tar(entries:Record<string,string>,type='0'){
- const parts:Buffer[]=[];
- for(const [name,body] of Object.entries(entries)){
-  const bytes=Buffer.from(body),header=Buffer.alloc(512);
-  header.write(name,0,100);header.write('0000644\0',100);header.write('0000000\0',108);header.write('0000000\0',116);
-  header.write(bytes.length.toString(8).padStart(11,'0')+'\0',124);header.write('00000000000\0',136);header.fill(32,148,156);header.write(type,156);header.write('ustar\0',257);header.write('00',263);
-  header.write([...header].reduce((a,b)=>a+b,0).toString(8).padStart(6,'0')+'\0 ',148);
-  parts.push(header,bytes,Buffer.alloc((512-bytes.length%512)%512));
- }
- return gzipSync(Buffer.concat([...parts,Buffer.alloc(1024)]));
-}
-const fixture=()=>tar({'repo/templates/starter/package.json':'{"name":"__PACKAGE_NAME__","devDependencies":{"joplo":"__JOPLO_VERSION__"}}','repo/templates/starter/joplo.config.ts':'export default { name: "__PROJECT_NAME__", plugins: [] };'});
+const fixture=()=>tar({'repo/starter/package.json':'{"name":"__PACKAGE_NAME__","devDependencies":{"joplo":"__JOPLO_VERSION__"}}','repo/starter/joplo.config.ts':'export default { name: "__PROJECT_NAME__", plugins: [] };'});
 const reply=(bytes=fixture())=>new Response(new Uint8Array(bytes));
-test('default is the exact CLI tag; custom refs/subdirectories and local paths are supported',()=>{
- expect(defaultTemplateSpec('2.3.4')).toBe('github:Joplo-app/Joplo/templates/starter#v2.3.4');
- expect(parseTemplate('github:owner/repo/templates/team#feature/name','2.3.4')).toEqual({kind:'github',owner:'owner',repo:'repo',subdir:'templates/team',ref:'feature/name'});
- expect(parseTemplate('./templates/starter','2.3.4').kind).toBe('local');
- expect(()=>parseTemplate('github:owner/repo/../secret','2.3.4')).toThrow(/模板/);
+test('default selects the template repository default branch; custom refs/subdirectories and local paths are supported',()=>{
+ expect(defaultTemplateSpec()).toBe('github:Joplo-app/joplo-templates/starter');
+ expect(parseTemplate('github:owner/repo/templates/team#feature/name')).toEqual({kind:'github',owner:'owner',repo:'repo',subdir:'templates/team',ref:'feature/name'});
+ expect(parseTemplate('./local-source').kind).toBe('local');
+ expect(()=>parseTemplate('github:owner/repo/../secret')).toThrow(/模板/);
 });
 test('anonymous download selects only requested subdirectory and initializes exact versions',async()=>{
  const parent=await temp(),root=join(parent,'new-project');const fetcher=vi.fn(async()=>reply());
- const r=await initProject(root,'Quote " and newline\n project',{skill:false,templateDeps:{fetch:fetcher as typeof fetch,env:{},ghToken:()=>undefined,localTemplates:null}});
- expect(fetcher.mock.calls[0]![0]).toContain('codeload.github.com/Joplo-app/Joplo/tar.gz/v');
+ const r=await initProject(root,'Quote " and newline\n project',{skill:false,templateDeps:{fetch:fetcher as typeof fetch,env:{},ghToken:()=>undefined}});
+ expect(fetcher.mock.calls[0]![0]).toContain('codeload.github.com/Joplo-app/joplo-templates/tar.gz/HEAD');
  expect(r.version).toBe(JSON.parse(await readFile(join(root,'package.json'),'utf8')).devDependencies.joplo);
  expect(await readFile(join(root,'joplo.config.ts'),'utf8')).toContain('Quote \\" and newline\\n project');
  expect(r.written).toEqual(['package.json','joplo.config.ts']);
 });
 test.each(['env','gh'])('private token from %s reaches only GitHub API, never codeload or files',async source=>{
  const token='private-test-token';const fetcher=vi.fn(async(url:unknown)=>String(url).startsWith('https://api.github.com')?new Response(null,{status:302,headers:{location:'https://codeload.github.com/owner/repo/legacy.tar.gz/ref'}}):reply());
- const result=await loadTemplate('2.0.0','github:owner/repo/templates/starter#ref',{env:source==='env'?{GITHUB_TOKEN:token}:{},ghToken:()=>source==='gh'?token:undefined,fetch:fetcher as typeof fetch});
+ const result=await loadTemplate('github:owner/repo/starter#ref',{env:source==='env'?{GITHUB_TOKEN:token}:{},ghToken:()=>source==='gh'?token:undefined,fetch:fetcher as typeof fetch});
  expect(fetcher.mock.calls[0]![1]).toMatchObject({headers:{Authorization:`Bearer ${token}`}});
  expect(fetcher.mock.calls[1]![1]).not.toHaveProperty('headers');
  expect([...result.files.values()].map(x=>x.toString()).join('')).not.toContain(token);
 });
 test.each([401,403,404,500])('HTTP %s reports Chinese recovery and leaves no project directory',async status=>{
  const root=join(await temp(),'new');
- await expect(initProject(root,undefined,{templateDeps:{localTemplates:null,env:{GITHUB_TOKEN:'never-print-me'},fetch:vi.fn(async()=>new Response(null,{status})) as typeof fetch}})).rejects.toThrow(/--template <本地路径>/);
+ await expect(initProject(root,undefined,{templateDeps:{env:{GITHUB_TOKEN:'never-print-me'},fetch:vi.fn(async()=>new Response(null,{status})) as typeof fetch}})).rejects.toThrow(/--template <本地路径>/);
  await expect(stat(root)).rejects.toMatchObject({code:'ENOENT'});
 });
 test('offline, bad archive, missing subdirectory, unsafe redirects never expose token or leave files',async()=>{
  for(const fetcher of [async()=>{throw Error('offline token-secret');},async()=>reply(Buffer.from('not tar')),async()=>reply(tar({'repo/elsewhere/file':'a'})),async()=>new Response(null,{status:302,headers:{location:'https://evil.example/archive'}})]){
   const root=join(await temp(),'new');
-  try{await initProject(root,undefined,{templateDeps:{localTemplates:null,env:{GITHUB_TOKEN:'token-secret'},fetch:fetcher as typeof fetch}});expect.fail('must reject');}catch(e){expect(String(e)).toContain('--template <本地路径>');expect(String(e)).not.toContain('token-secret');}
+  try{await initProject(root,undefined,{templateDeps:{env:{GITHUB_TOKEN:'token-secret'},fetch:fetcher as typeof fetch}});expect.fail('must reject');}catch(e){expect(String(e)).toContain('--template <本地路径>');expect(String(e)).not.toContain('token-secret');}
   await expect(stat(root)).rejects.toMatchObject({code:'ENOENT'});
  }
 });
@@ -77,25 +65,43 @@ test('empty or incomplete local templates fail before creating target; existing 
 });
 
 // Bare names are reserved for the product, regardless of directories in cwd.
-test.each(['starter', 'work'])('built-in %s downloads only its versioned repository subdirectory', async name => {
+test.each(['starter', 'work', 'new-show-2', '0'])('built-in %s downloads only its default-branch repository subdirectory', async name => {
  const fetcher = vi.fn(async () => reply(tar({
-  [`repo/templates/${name}/package.json`]: '{"name":"__PACKAGE_NAME__"}',
-  [`repo/templates/${name}/joplo.config.ts`]: 'export default {}',
-  'repo/templates/other/private.txt': 'not selected',
+  [`repo/${name}/package.json`]: '{"name":"__PACKAGE_NAME__"}',
+  [`repo/${name}/joplo.config.ts`]: 'export default {}',
+  'repo/other/private.txt': 'not selected',
  })));
- const result = await loadTemplate('2.3.4', name, {localTemplates:null, env:{}, ghToken:()=>undefined, fetch:fetcher as typeof fetch});
- expect(result.source).toBe(`github:Joplo-app/Joplo/templates/${name}#v2.3.4`);
+ const result = await loadTemplate(name, { env:{}, ghToken:()=>undefined, fetch:fetcher as typeof fetch});
+ expect(result.source).toBe(`github:Joplo-app/joplo-templates/${name}`);
  expect([...result.files.keys()]).toEqual(['package.json', 'joplo.config.ts']);
- expect(fetcher.mock.calls[0]![0]).toBe('https://codeload.github.com/Joplo-app/Joplo/tar.gz/v2.3.4');
+ expect(fetcher.mock.calls[0]![0]).toBe('https://codeload.github.com/Joplo-app/joplo-templates/tar.gz/HEAD');
 });
-test.each(['unknown', 'work#main', 'starter%2fsecret', ''])('unknown bare name %j fails before download or destination creation', async name => {
+test.each(['work#main', 'starter%2fsecret', '', 'Work', 'work_show', '-work', 'work?', 'work:secret', 'a b', '中', 'work\0'])('invalid bare name %j fails before download or destination creation', async name => {
  const fetcher = vi.fn(); const target = join(await temp(), 'new');
- await expect(initProject(target, undefined, {template:name, templateDeps:{localTemplates:null,fetch:fetcher}})).rejects.toThrow(/starter.*work/);
+ await expect(initProject(target, undefined, {template:name, templateDeps:{fetch:fetcher}})).rejects.toThrow(/名称.*小写.*数字.*连字符/);
  expect(fetcher).not.toHaveBeenCalled();
  await expect(stat(target)).rejects.toMatchObject({code:'ENOENT'});
 });
-test.each(['../work', '/work', 'templates/work', 'work/secret', 'work\\secret', './work', '.work', 'C:\\work'])('path %j never resolves as a built-in', spec => {
- expect(parseTemplate(spec,'2.3.4')).toEqual({kind:'local',dir:resolve(spec)});
+test('a new name needs no CLI release; missing directory links to the template repository', async () => {
+ const target=join(await temp(),'missing');
+ const fetcher=vi.fn(async()=>reply(tar({'repo/starter/package.json':'{}','repo/starter/joplo.config.ts':'export default {}'})));
+ await expect(initProject(target,undefined,{template:'new-template',templateDeps:{env:{},ghToken:()=>undefined,fetch:fetcher as typeof fetch}})).rejects.toThrow(/模板仓库里没有这个模板.*https:\/\/github.com\/Joplo-app\/joplo-templates/);
+ expect(fetcher.mock.calls[0]![0]).toBe('https://codeload.github.com/Joplo-app/joplo-templates/tar.gz/HEAD');
+ await expect(stat(target)).rejects.toMatchObject({code:'ENOENT'});
+ expect(parseTemplate('github:owner/repo/team')).toEqual({kind:'github',owner:'owner',repo:'repo',subdir:'team',ref:'HEAD'});
+});
+
+test('a template without plugin guides still installs engine skills and explains the next step', async () => {
+ const root=join(await temp(),'plain');
+ const result=await initProject(root,undefined,{templateDeps:{env:{},ghToken:()=>undefined,fetch:vi.fn(async()=>reply(fixtureArchive('starter',false))) as typeof fetch}});
+ expect(result.skill?.error).toBeUndefined(); expect(result.skill?.pendingPlugins).toBe(true);
+ for(const f of skillFiles(result.version))expect(await readFile(join(root,'.claude/skills',f.path))).toEqual(f.content);
+ await expect(stat(join(root,'.claude/skills/joplo-plugin-ui'))).rejects.toMatchObject({code:'ENOENT'});
+ expect(initSummary(result,{}).join('\n')).toContain('after installing dependencies run npx joplo skill install');
+ expect(initSummary(result,{}).join('\n')).not.toContain('guides are ready');
+});
+test.each(['../work', '/work', 'local/work', 'work/secret', 'work\\secret', './work', '.work', 'C:\\work'])('path %j never resolves as a built-in', spec => {
+ expect(parseTemplate(spec)).toEqual({kind:'local',dir:resolve(spec)});
 });
 test('a same-named local work directory requires ./work; built-in wins', async () => {
  const cwd = process.cwd(), base = await temp();
@@ -103,9 +109,9 @@ test('a same-named local work directory requires ./work; built-in wins', async (
  await writeFile(join(base,'work/joplo.config.ts'), 'export default {}');
  try {
   process.chdir(base);
-  const builtin = await loadTemplate('2.3.4','work');
+  const builtin = await loadTemplate('work', {env:{},ghToken:()=>undefined,fetch:vi.fn(async()=>reply(fixtureArchive('work'))) as typeof fetch});
   expect(builtin.files.has('works/explainer.tsx')).toBe(true);
-  const local = await loadTemplate('2.3.4','./work');
+  const local = await loadTemplate('./work');
   expect(JSON.parse(local.files.get('package.json')!.toString())).toEqual({local:true});
  } finally { process.chdir(cwd); }
 });
@@ -119,24 +125,25 @@ async function fileTree(root:string, base=''):Promise<Record<string,string>> {
  }
  return Object.fromEntries(Object.entries(files).sort());
 }
-test('default, explicit starter and the original local starter produce identical file lists and bytes', async () => {
- const roots = await Promise.all([undefined,'starter',resolve('templates/starter')].map(async template => {
-  const root=join(await temp(),'same-name'); await initProject(root,'Same project',{template}); return root;
+test('default, explicit starter and the offline fixture produce identical project files', async () => {
+ const roots = await Promise.all([undefined,'starter',releaseFixture('feature')].map(async template => {
+  const root=join(await temp(),'same-name'); await initProject(root,'Same project',{template,templateDeps:{env:{},ghToken:()=>undefined,fetch:vi.fn(async()=>reply(fixtureArchive('starter',false))) as typeof fetch}}); return root;
  }));
  const trees = await Promise.all(roots.map(r=>fileTree(r)));
  expect(trees[0]).toEqual(trees[1]); expect(trees[0]).toEqual(trees[2]);
- // The unchanged source template remains the complete baseline for project files.
- const source = await loadTemplate('2.3.4',resolve('templates/starter'));
+ // Local fixtures and downloaded bytes pass through the same rendering path.
+ const source = await loadTemplate(releaseFixture('feature'));
  const version=JSON.parse(await readFile(join(roots[0]!,'package.json'),'utf8')).devDependencies.joplo;
  for(const [path,bytes] of renderTemplate(source.files,{version,packageName:'same-name',projectName:'Same project'}))if(!path.startsWith('.claude/'))expect(trees[0]![path]).toBe(bytes.toString('base64'));
 });
 test('work init installs the shared skills before dependencies, then compiles two continuing chapters with 0 errors and warnings', async () => {
- const root=join(await temp(),'show'); const result=await initProject(root, 'My show', {template:'work'});
+ const root=join(await temp(),'show'); const result=await initProject(root, 'My show', {template:'work',templateDeps:{env:{},ghToken:()=>undefined,fetch:vi.fn(async()=>reply(fixtureArchive('work'))) as typeof fetch}});
  expect(result.skill?.error).toBeUndefined(); expect(result.skill?.pendingPlugins).toBe(true);
  for(const file of skillFiles(result.version))expect(await readFile(join(root,'.claude/skills',file.path))).toEqual(file.content);
  const guides=pluginSkillFiles(result.version,[{...ui,version:result.version}]);
- for(const file of guides)expect(await readFile(join(root,'.claude/skills',file.path))).toEqual(file.content);
- expect(await readFile(join(root,'.claude/skills/.joplo-plugins.json'))).toEqual(pluginSkillManifest(guides));
+ const bundled=pluginSkillFiles('0.0.1',[{...ui,version:'0.0.1'}]);
+ for(const file of bundled)expect(await readFile(join(root,'.claude/skills',file.path))).toEqual(file.content);
+ expect(await readFile(join(root,'.claude/skills/.joplo-plugins.json'))).toEqual(pluginSkillManifest(bundled));
  expect(await readFile(join(root,'AGENTS.md'),'utf8')).toContain('<!-- joplo:start -->');
  const tree=await fileTree(root);
  expect(Object.keys(tree).filter(p=>!p.startsWith('.claude/')&&p!=='AGENTS.md')).toEqual(['.gitignore','joplo.config.ts','package.json','tsconfig.json','works/explainer.tsx']);
@@ -144,7 +151,8 @@ test('work init installs the shared skills before dependencies, then compiles tw
  expect(pkg.type).toBe('module'); expect(Object.values(pkg.devDependencies)).toEqual([result.version,result.version,result.version]);
  expect(await readFile(join(root,'joplo.config.ts'),'utf8')).toContain('My show');
  await symlink(resolve('node_modules'),join(root,'node_modules'));
- const synced=await installSkill(root,result.version,{agentsMd:true}); expect(synced.code).toBe(0); expect(synced.written).toEqual([]);
+ const synced=await installSkill(root,result.version,{agentsMd:true}); expect(synced.code).toBe(0); expect(synced.written).toEqual(guides.map(f=>`.claude/skills/${f.path}`));
+ for(const file of guides)expect(await readFile(join(root,'.claude/skills',file.path))).toEqual(file.content);
  const report=await checkWithProject(root); expect(report.summary).toMatchObject({error:0,warning:0});
  expect(report.project).not.toBeNull(); const project=report.project!;
  expect(Object.keys(project.features)).toEqual([]);
@@ -166,7 +174,7 @@ test('work init installs the shared skills before dependencies, then compiles tw
 });
 test('init help explains built-in priority and explicit local paths', async () => {
  let out=''; expect(await runCli(['init','--help'],{stdout:s=>{out+=s;},stderr:()=>{}})).toBe(0);
- expect(out).toContain('starter'); expect(out).toContain('work'); expect(out).toContain('./work');
+ expect(out).toContain('starter'); expect(out).toContain('work'); expect(out).toContain('./work'); expect(out).toContain('default branch'); expect(out).toContain('https://github.com/Joplo-app/joplo-templates');
 });
 
 
@@ -188,15 +196,15 @@ describe('模板下载的空闲超时', () => {
     });
     return new Response(body, { status: 200 });
   };
-  const deps = (fetcher: unknown) => ({ localTemplates: null, env: {}, ghToken: () => undefined, fetch: fetcher as typeof fetch, idleMs: 80 });
+  const deps = (fetcher: unknown) => ({ env: {}, ghToken: () => undefined, fetch: fetcher as typeof fetch, idleMs: 80 });
 
   test('总时长超过空闲上限但一直有数据：下载成功', async () => {
     // 三块各隔 50ms，总共约 150ms > idleMs 80ms；以前的“总时长 30 秒”会在大模板包 + 慢网络下误判失败。
-    const result = await loadTemplate('2.3.4', 'starter', deps(slow(fixture(), 50)));
+    const result = await loadTemplate('starter', deps(slow(fixture(), 50)));
     expect([...result.files.keys()]).toContain('package.json');
   });
 
   test('中途停住超过空闲上限：报网络错误并给出离线做法', async () => {
-    await expect(loadTemplate('2.3.4', 'starter', deps(slow(fixture(), 10, 1)))).rejects.toThrow(/--template <本地路径>/);
+    await expect(loadTemplate('starter', deps(slow(fixture(), 10, 1)))).rejects.toThrow(/--template <本地路径>/);
   });
 });

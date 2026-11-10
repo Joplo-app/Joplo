@@ -14,7 +14,7 @@ async function project() {
   await mkdir(join(d, 'works'));
   await symlink(resolve('node_modules'), join(d, 'node_modules'));
   await writeFile(join(d, 'package.json'), '{"type":"module"}');
-  await cp('templates/starter/tsconfig.json', join(d, 'tsconfig.json'));
+  await cp('scripts/fixtures/smoke/feature/tsconfig.json', join(d, 'tsconfig.json'));
   await writeFile(join(d, 'joplo.config.ts'), "import { config } from '@joplo-app/kit';\nimport ui from '@joplo-app/plugin-ui';\nexport default config({name:'Portfolio',plugins:[ui]});\n");
   await work(d, 'demo');
   return d;

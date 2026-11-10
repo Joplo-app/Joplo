@@ -53,7 +53,7 @@ export async function initProject(dir: string, name?: string, opts: { keep?: boo
   // 只有 Agent / 版本控制文件时按 --keep 写入：已有的文件一字不改
   const keep = opts.keep || entries.length > 0;
   // Download/read/validate completely before touching the destination (D89).
-  const template=await loadTemplate(version,opts.template,{env:opts.env,...opts.templateDeps});
+  const template=await loadTemplate(opts.template,{env:opts.env,...opts.templateDeps});
   const files=renderTemplate(template.files,{version,packageName:packageName(basename(root)),projectName:name??(basename(root)||'Joplo')});
   // Skill installation is a separate all-or-nothing D64 transaction, including template guides.
   const templateSkills:SkillFile[]=[];
@@ -141,7 +141,7 @@ export function initSummary(r: InitResult, env: Record<string, string | undefine
     const skills = unchanged.length === skillFiles(r.version).length ? `.claude/skills/joplo, .claude/skills/joplo-feedback and engine references already installed (Joplo ${r.version}, unchanged)` : `.claude/skills/joplo, .claude/skills/joplo-feedback, engine references and enabled plugin skills${unchanged.length ? ` (${unchanged.join(', ')} already up to date)` : ''}`;
     lines.push(`✓ Agent skills: ${skills}, AGENTS.md (Joplo block${s.written.includes('AGENTS.md') ? '' : ', already up to date'}); skip with --no-skill`);
   }
-  if(s?.pendingPlugins)lines.push(`! Template plugin guides are ready to read; after installing dependencies run ${run} skill install to verify config.plugins.`);
+  if(s?.pendingPlugins)lines.push(`! Read any bundled plugin guides; after installing dependencies run ${run} skill install to verify config.plugins and install its guides.`);
   lines.push(nextStepLine(detectPackageManager(env), rel));
   return lines;
 }

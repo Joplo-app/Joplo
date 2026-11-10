@@ -309,31 +309,32 @@ async function smoke() {
 
     // 2. init
     const ua = { npm_config_user_agent: `npm/11.0.0 node/${process.version} ${process.platform} ${process.arch} workspaces/false` };
-    const init = sh(npxJoplo, ['init', 'my-demo', '--template', path.join(REPO,'templates/starter')], base, { env: ua });
+    const init = sh(npxJoplo, ['init', 'my-demo', '--template', path.join(REPO,'scripts/fixtures/smoke/feature')], base, { env: ua });
     const lastLine = init.stdout.trim().split('\n').at(-1);
     assert(lastLine === 'Next: cd my-demo && npm install && npx joplo dev', `init 最后一行：${lastLine}`);
     const project = path.join(base, 'my-demo');
     const pkg = readJson(path.join(project, 'package.json'));
     assert(pkg.devDependencies?.joplo === v && pkg.devDependencies?.['@joplo-app/kit'] === v, `init 应写入精确版本 ${v}：${JSON.stringify(pkg.devDependencies)}`);
-    sh(npxJoplo, ['init', 'my-demo', '--template', path.join(REPO,'templates/starter')], base, { env: ua, expect: 1 });
+    sh(npxJoplo, ['init', 'my-demo', '--template', path.join(REPO,'scripts/fixtures/smoke/feature')], base, { env: ua, expect: 1 });
     // init 默认安装 Agent 技能与 AGENTS.md 托管段（D64），与仓库 skills/ 逐字一致
     for (const name of ['joplo', 'joplo-feedback']) assert(fs.readFileSync(path.join(base, 'my-demo/.claude/skills', name, 'SKILL.md'), 'utf8') === fs.readFileSync(path.join(REPO, 'skills', name, 'SKILL.md'), 'utf8'), `init 应写入与 skills/${name} 相同的技能`);
     assert(fs.readFileSync(path.join(base, 'my-demo/AGENTS.md'), 'utf8').includes('<!-- joplo:start -->'), 'init 应写入 AGENTS.md 托管段');
     assert(init.stdout.includes('Agent skills') && init.stdout.includes('--no-skill'), `init 输出应说明安装的技能：${init.stdout}`);
     log(`  ✓ init 写入 "joplo": "${v}", "@joplo-app/kit": "${v}"；非空目录拒绝`);
 
-    assert(!pkg.dependencies?.['@joplo-app/plugin-3d'] && !pkg.devDependencies?.['@joplo-app/plugin-3d'], 'Starter must omit optional 3D');
-    assert(!fs.readFileSync(path.join(project,'joplo.config.ts'),'utf8').includes('plugin-3d'), 'Starter must not enable 3D');
+    assert(!pkg.dependencies?.['@joplo-app/plugin-3d'] && !pkg.devDependencies?.['@joplo-app/plugin-3d'], 'Feature fixture must omit optional 3D');
+    assert(!fs.readFileSync(path.join(project,'joplo.config.ts'),'utf8').includes('plugin-3d'), 'Feature fixture must not enable 3D');
 
-    // Standalone template: initialize before installing dependencies, then consume only packed packages.
+    // Standalone smoke fixture: initialize before installing dependencies, then consume only packed packages.
     const workProject = path.join(base, 'my-show');
-    const workInit = sh(npxJoplo, ['init', 'my-show', '--template', path.join(REPO, 'templates/work')], base, { env: ua });
+    const workInit = sh(npxJoplo, ['init', 'my-show', '--template', path.join(REPO, 'scripts/fixtures/smoke/standalone')], base, { env: ua });
     const workPkg = readJson(path.join(workProject, 'package.json'));
-    assert(Object.keys(workPkg.devDependencies).sort().join(',') === '@joplo-app/kit,@joplo-app/plugin-ui,joplo', 'Work template should install only the packages it uses');
-    for (const [name, value] of Object.entries(workPkg.devDependencies)) assert(value === v, `Work template must pin ${name} to ${v}`);
+    assert(Object.keys(workPkg.devDependencies).sort().join(',') === '@joplo-app/kit,@joplo-app/plugin-ui,joplo', 'Standalone fixture should install only the packages it uses');
+    for (const [name, value] of Object.entries(workPkg.devDependencies)) assert(value === v, `Standalone fixture must pin ${name} to ${v}`);
     for (const name of ['joplo', 'joplo-feedback']) assert(fs.readFileSync(path.join(workProject, '.claude/skills', name, 'SKILL.md'), 'utf8') === fs.readFileSync(path.join(REPO, 'skills', name, 'SKILL.md'), 'utf8'), `Work init skill ${name} differs from the official skill`);
-    assert(fs.readFileSync(path.join(workProject, 'AGENTS.md'), 'utf8') === fs.readFileSync(path.join(project, 'AGENTS.md'), 'utf8'), 'Both templates must install the same managed AGENTS.md block');
-    assert(workInit.stdout.includes('Template plugin guides are ready'), 'Work init must supply plugin guidance before npm install');
+    assert(fs.readFileSync(path.join(workProject, 'AGENTS.md'), 'utf8') === fs.readFileSync(path.join(project, 'AGENTS.md'), 'utf8'), 'Both fixtures must install the same managed AGENTS.md block');
+    assert(workInit.stdout.includes('after installing dependencies run npx joplo skill install'), 'Init without bundled guides must explain how to install them');
+    assert(!fs.existsSync(path.join(workProject, '.claude/skills/joplo-plugin-ui')), 'Fixture intentionally omits plugin guides before dependency installation');
     workPkg.devDependencies = Object.fromEntries(Object.keys(workPkg.devDependencies).map(name => [name, tgz[name]]));
     workPkg.overrides = overrides;
     fs.writeFileSync(path.join(workProject, 'package.json'), JSON.stringify(workPkg, null, 2) + '\n');
@@ -342,6 +343,9 @@ async function smoke() {
     const workCheck = sh(workJoplo, ['check'], workProject);
     assert(/0 error/.test(workCheck.stdout) && /0 warning/.test(workCheck.stdout), `Work check: ${workCheck.out}`);
     sh(workJoplo, ['skill', 'install'], workProject);
+    const installedWorkSkill = fs.readFileSync(path.join(workProject, '.claude/skills/joplo-plugin-ui/SKILL.md'), 'utf8');
+    assert(installedWorkSkill.includes(`joplo-skill ${v}`), 'Installed standalone plugin guide must match the packed version');
+    assert(!sh(workJoplo, ['skill', 'install'], workProject).stdout.includes('Wrote'), 'Repeated skill installation must preserve identical guides');
     sh(workJoplo, ['build'], workProject);
     // Import entriesOf from the installed tarball, never from workspace sources.
     sh(process.execPath, ['--input-type=module', '-e', String.raw`
@@ -369,14 +373,14 @@ async function smoke() {
       assert.equal(typed.inputs.message, 'A show you can try');
       assert.equal(typed.ui.message, typed.inputs.message);
     `], workProject);
-    log('  ✓ Work template: init → npm install (tarballs) → check (0 errors/warnings) → skills → build → entriesOf: one standalone work, two continuing chapters');
+    log('  ✓ Standalone fixture: init → npm install (tarballs) → check (0 errors/warnings) → skills → build → entriesOf: one standalone work, two continuing chapters');
 
     // 作者 className：Tailwind 要编译它
     const pageFile = path.join(project, 'routes/page.tsx');
     fs.writeFileSync(pageFile, addSmokeClassName(fs.readFileSync(pageFile, 'utf8')));
 
     // 3. npm install：registry 上还没有这些版本，改用 tarball（版本号已在上面断言）
-    for(const name of ['joplo','@joplo-app/kit',...['ui','diagram','content','alda'].map(p=>`@joplo-app/plugin-${p}`)])assert(pkg.devDependencies[name]===v,`Template must pin ${name} to ${v}`);
+    for(const name of ['joplo','@joplo-app/kit',...['ui','diagram','content','alda'].map(p=>`@joplo-app/plugin-${p}`)])assert(pkg.devDependencies[name]===v,`Feature fixture must pin ${name} to ${v}`);
     pkg.devDependencies = Object.fromEntries(Object.keys(pkg.devDependencies).map(name=>[name,tgz[name]??pkg.devDependencies[name]]));
     pkg.devDependencies['@joplo-app/plugin-3d'] = tgz['@joplo-app/plugin-3d'];
     pkg.overrides = overrides;
@@ -463,6 +467,20 @@ async function smoke() {
     const check = sh(joplo, ['check'], project);
     assert(/0 error/.test(check.stdout), `check 输出：${check.stdout}`);
     assert(!check.stderr.includes('!'), `check 不应有版本提示：${check.stderr}`);
+
+    sh(joplo, ['build', '--out-dir', path.join(base, 'feature-dist')], project);
+    sh(process.execPath, ['--input-type=module', '-e', String.raw`
+      import assert from 'node:assert/strict';
+      import fs from 'node:fs';
+      import { entriesOf } from '@joplo-app/core';
+      const html = fs.readFileSync('../feature-dist/index.html', 'utf8');
+      const { project } = JSON.parse(/id="joplo-ir">([\s\S]*?)<\/script>/.exec(html)[1]);
+      const entries = entriesOf(project);
+      assert.equal(entries.length, 1); assert.equal(entries[0].featureId, 'example');
+      assert.equal(entries[0].slices.length, 2);
+      assert.deepEqual(entries[0].slices.map(s => s.key).sort(), ['happy','retry']);
+      assert.equal('cases' in project.features.example, false, 'Public IR must strip review metadata');
+    `], project);
 
     // 5. skill（T-skill）
     const skill = sh(joplo, ['skill'], project);
@@ -630,7 +648,7 @@ async function smoke() {
 
       // 一个进程、多个项目（D39）：在另一个目录再运行 joplo dev → 注册到已运行的看板并退出（不启动第二个进程）
       const second = path.join(base, 'second');
-      sh(joplo, ['init', 'second', '--template', path.join(REPO,'templates/starter')], base);
+      sh(joplo, ['init', 'second', '--template', path.join(REPO,'scripts/fixtures/smoke/feature')], base);
       const secondPkg=readJson(path.join(second,'package.json'));
       secondPkg.devDependencies={...pkg.devDependencies};secondPkg.overrides=overrides;
       fs.writeFileSync(path.join(second,'package.json'),JSON.stringify(secondPkg,null,2));
@@ -666,6 +684,7 @@ async function smoke() {
       ...textFiles(extract),
       ...['joplo', '@joplo-app'].flatMap((n) => textFiles(path.join(project, 'node_modules', n))),
       ...textFiles(path.join(project, 'dist')),
+      ...textFiles(path.join(base, 'feature-dist')),
       ...textFiles(path.join(project, '.claude')),
       ...textFiles(path.join(workProject, 'dist')),
       ...textFiles(path.join(workProject, '.claude')),

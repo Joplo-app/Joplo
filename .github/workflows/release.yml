@@ -39,9 +39,6 @@ jobs:
             echo "::error::tag $TAG 与 packages/*/package.json 的版本 $v 不一致：先 pnpm release:version ${TAG#v} 并提交，再在那个提交上打 tag"
             exit 1
           fi
-          for file in templates/starter/package.json templates/starter/joplo.config.ts templates/starter/.claude/skills/.joplo-plugins.json; do
-            git cat-file -e "$GITHUB_SHA:$file" || { echo "::error::Release tag is missing $file"; exit 1; }
-          done
           git fetch -q origin main
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "::error::$TAG 指向的提交不在 main 上：先把版本提交推到 main，再打 tag"

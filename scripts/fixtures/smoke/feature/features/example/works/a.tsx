@@ -3,5 +3,5 @@ import { Button } from '@joplo-app/plugin-ui';
 export default work({
   title: 'Option A', summary: 'Complete the action with one button',
   on: { '/': { actions: <Button id="start">Start</Button> } },
-  scenarios: { happy: flow('Complete successfully', { cases: ['happy'], start: '/' }).click('start', 'Click Start', done('Completed')) },
+  scenarios: { happy: flow('Complete successfully', { cases: ['happy'], start: '/' }).click('start', 'Click Start', done('Completed')), retry: flow('Retry the action', { cases: ['retry'], start: '/' }).click('start', 'Retry', done('Retried')) },
 });

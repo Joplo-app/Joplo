@@ -420,9 +420,9 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 新增诊断：`FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID`、`PLUGIN_ACTION_INVALID`、`ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID`。按对应源码目标、字段或效果修复后重新 check；不要用运行时回调绕过编译校验。
 
 
-## 15. D89：纯引擎、插件技能与 GitHub 模板
+## 15. D89 / D105：纯引擎、插件技能与独立模板仓库
 
-生产依赖图不再让 kit/core/CLI/server/web 导入标准插件。core 只遍历 config.plugins；浏览器宿主按项目给出的 runtime URL 载入，并等待所需运行时完成后提交首个 IR。源码开发直接由 Vite 提供模块；npm 的预构建看板先将运行时及其依赖打包为 ES module，用共享模块代理引用宿主同一份 React，避免直接把 CommonJS 入口发给浏览器。发布站把这些运行时与共享 React 装配进静态 HTML，file:// 不依赖网络。模板默认带上标准库是作者项目的选择，不是引擎的隐式行为。
+生产依赖图不再让 kit/core/CLI/server/web 导入标准插件。core 只遍历 config.plugins；浏览器宿主按项目给出的 runtime URL 载入，并等待所需运行时完成后提交首个 IR。源码开发直接由 Vite 提供模块；npm 的预构建看板先将运行时及其依赖打包为 ES module，用共享模块代理引用宿主同一份 React，避免直接把 CommonJS 入口发给浏览器。发布站把这些运行时与共享 React 装配进静态 HTML，file:// 不依赖网络。模板默认带上标准库是作者项目的选择，不是引擎的隐式行为。模板仓库与主仓库隔离、手动维护，不随 CLI 发版；默认分支适配最新发布 CLI，旧 CLI 不保证可用。合法裸名称选择同名子目录，目录缺失时查看 https://github.com/Joplo-app/joplo-templates；本地目录需写显式路径。
 
 官方作者入口：UI/HTML 标记从 `@joplo-app/plugin-ui` 导入，diagram 标记和 trace 从 `@joplo-app/plugin-diagram` 导入，Canvas/camera 从 `@joplo-app/plugin-content` 导入，music 从 `@joplo-app/plugin-alda` 导入。`Custom`、Slot/Outlet、Fragment、故事和调度 API 留在 kit。配置、依赖与导入必须同时成立；UNKNOWN_PLUGIN 会用标记上的包来源给出安装/import/config 修法。
 
@@ -438,8 +438,8 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 | CompileOptions.pluginOptions[id] | 编译调用者 → 本次编译上下文 | 仅对应插件读取自己的编译选项；diagram 在插件内选择 ELK，测试可注入 layout，宿主不懂算法 |
 | init --template | CLI 参数 → parseTemplate / loadTemplate 的来源结构 | 本地读取或 GitHub tarball 下载；限制体积、文件数、路径、链接；完整验证后 renderTemplate 与事务写入目标 |
 | GITHUB_TOKEN / gh auth token | 用户环境/已登录 CLI → 本次请求内存 | GitHub API Authorization；跟随到 codeload 时不带头；文件、日志、输出中不保存令牌 |
-| templates/starter/* | 仓库模板 → release tag tarball / 本地目录 | init 选择 CLI 版本 tag，替换版本/包名/项目名占位符；npm 安装后作者 config 显式加载四个插件 |
-| templates/starter/.claude/skills/* | skills:build 显式读取官方插件 → 模板版本化技能 | init 尚未安装依赖时按 D64 安装这些说明；随后 skill install 从真实 config 重新同步 |
+| 模板仓库 `<name>/*` | 维护者手动更新 Joplo-app/joplo-templates 默认分支 → init 下载同名子目录 | `github:Joplo-app/joplo-templates/<name>`，不带 tag；替换 CLI 版本/包名/项目名占位符；写入项目 config 与依赖，随后 check/dev 读取 |
+| 模板随附 .claude/skills/* | 模板维护者手动更新 → init 保留插件指南；引擎技能来自 CLI 自身 | 可不附插件指南，初始化不报错；安装依赖后 skill install 从 config.plugins 生成并检查真实插件技能 |
 | .claude/skills/joplo/topics/*.md | core guide 模板 → skillFiles 带 SHA 的文件 | Agent 直接读相对链接，或 CLI skill 读取同源主题 |
 | .claude/skills/joplo-plugin-<id>/** 与 joplo-plugins/SKILL.md | config.plugins → pluginSkillFiles → 带 SHA 的 Markdown | Agent 读取组件技能/子主题；再次 install 对照哈希保护用户修改 |
 | .claude/skills/.joplo-plugins.json | install 成功事务 → format:1 + 自有文件路径列表 | 后续 install 计算过期插件文件；仅删除未修改文件，用户编辑导致整批停止；--diff 展示，--force 才替换/删除 |

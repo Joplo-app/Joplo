@@ -33,7 +33,7 @@ export const MENTAL_MODEL = [
 
 /** 推荐的起步顺序（X2：先做最小的一条正常流程 + 一条错误恢复流程，在看板里确认交互模型后再扩展）。 */
 export const START_ORDER = [
-  'Choose the starting template: compare feature options with npx joplo init <dir> (or --template starter); make one show people can play, pause and try with npx joplo init <dir> --template work. Bare names select built-ins, never a same-named local directory; use --template ./work for a local folder. Both use the CLI version tag and install engine skills, AGENTS.md and enabled plugin guides.',
+  'Choose the starting template: compare feature options with npx joplo init <dir> (or --template starter); make one show people can play, pause and try with npx joplo init <dir> --template work. Bare names select built-ins, never a same-named local directory; use --template ./work for a local folder. Names matching [a-z0-9][a-z0-9-]* select directories in the template repository default branch, without version tags. Init installs engine skills and AGENTS.md, preserving any bundled plugin guides; after installing dependencies run skill install.',
   'Read npx joplo skill authoring and choose the capabilities; for feature review read cases before asking the user about edge cases; demo and installed plugin skills as needed.',
   'Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case\'s expected is its Then); show the plan to the user. A demo is a story, not a feature tour.',
   'With minimal code, write one chapter for a standalone work, or one happy path and one error-and-recovery scenario for feature review.',
@@ -108,6 +108,7 @@ function joploBody(): string {
     'npx joplo dev                                          # stdout: the board URL; stderr: the feedback command for agents',
     'npx joplo feedback watch . --local --follow --json     # in its own long-running shell: reviewer feedback as NDJSON',
     '```',
+    'Templates download from github:Joplo-app/joplo-templates/<name> (default branch, default name starter); new names need no CLI release. Missing names link to https://github.com/Joplo-app/joplo-templates. Templates are maintained manually, separately from releases, for the latest published CLI; older CLIs are not guaranteed. Init fills version placeholders with its own version; for offline recovery use --template <local path>. See npx joplo skill authoring for name priority and download checks.',
     'Run dev and the follower in separate long-running shells. dev keeps the board live: every saved edit recompiles and refreshes it.',
     '',
     '## Workflow',

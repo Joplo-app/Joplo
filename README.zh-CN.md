@@ -37,7 +37,7 @@ npm install
 npx joplo dev --open
 ```
 
-内置模板位于主仓库 `templates/<名称>`，按当前 CLI 的 `v<版本>` tag 下载。默认 `starter`（也可写 `--template starter`）用来比较功能方案，显式启用 ui、diagram、content、alda 四个标准插件；`--template work` 从一件带两个接续章节、可编辑输入框的独立作品开始，只启用 ui。两者都不需要凭证或生成素材，引擎不加载默认插件。裸名称优先选择内置模板，即使当前目录有同名文件夹；本地目录要写 `--template ./work`。未知名称会列出可用内置模板：`starter`、`work`。离线用 `npx joplo init my-demo --template ./templates/starter`，自定义远端用 `--template github:owner/repo/path#ref`；私有仓库读取 `GITHUB_TOKEN` 或 `gh auth token`。下载与模板校验失败不会留下半截项目。
+内置模板从小体积的公开[模板仓库](https://github.com/Joplo-app/joplo-templates)默认分支下载，地址为 `github:Joplo-app/joplo-templates/<名称>`，不带版本 tag。默认 `starter`（也可写 `--template starter`）用来比较功能方案，启用 ui、diagram、content、alda；`--template work` 从一件带两个接续章节、可编辑输入框的独立作品开始，只启用 ui。名称匹配 `[a-z0-9][a-z0-9-]*` 就选择仓库里的同名目录，新增模板无需发 CLI；内置名优先于同名本地目录，本地目录写 `--template ./work`。目录不存在时会给出模板仓库链接。模板由维护者手动更新，与发版无关，默认分支以最新发布的 CLI 为准，不保证旧 CLI 可用。init 用自身精确版本填入占位符，安装引擎技能并保留随附插件指南；`npm install` 后运行 `npx joplo skill install`。离线用 `--template ./local-source`，自定义远端用 `--template github:owner/repo/path#ref`（省略 ref 取默认分支）；私有仓库读取 `GITHUB_TOKEN` 或 `gh auth token`。下载与模板校验失败不会留下半截项目。
 
 保持看板进程运行，编辑生成的 TSX 文件，作品会自动更新。在另一个项目中运行 `npx joplo dev`，会把项目加入同一个看板进程。默认端口为 4790；启动新看板时可用 `--port <port>` 指定端口。
 
