@@ -15,7 +15,7 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 6. joplo components inspects only the enabled manifests; a named query gives that component's declarations and example. For full recipes/behavior read its plugin skill.
 
 ## Optional 3D
-The starter does not include 3D or its large browser dependency. To add it: npm install @joplo-app/plugin-3d@0.4.1; default-import scene3d from that package in joplo.config.ts, add scene3d to config.plugins, then run npx joplo skill install. Read npx joplo skill scene3d, scene3d/models and scene3d/generation for rendering, existing assets and optional local generation. A key is unnecessary for existing assets; dry-run before approving any generation.
+The starter does not include 3D or its large browser dependency. To add it: npm install @joplo-app/plugin-3d@0.5.0; default-import scene3d from that package in joplo.config.ts, add scene3d to config.plugins, then run npx joplo skill install. Read npx joplo skill scene3d, scene3d/models and scene3d/generation for rendering, existing assets and optional local generation. A key is unnecessary for existing assets; dry-run before approving any generation.
 
 ## Errors and trust
 - UNKNOWN_PLUGIN: the element's author package is not enabled. Use its package provenance in the diagnostic to install/import it and add it to config.plugins. UNKNOWN_COMPONENT: no enabled manifest declares that element or intrinsic tag; read the installed catalogs.
@@ -65,4 +65,4 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.4.1 sha256:d840d8811336e6c4887ad7b77cf5a3361f66ed792a88c7ba147b838d9c2eecfe -->
+<!-- joplo-skill 0.5.0 sha256:5d74d8677a5cdb8d7ab79d58e86d6a6a15bb8f3c96c6c1366ee7131bccf07710 -->

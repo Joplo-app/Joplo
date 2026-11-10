@@ -76,4 +76,4 @@ See authoring for flow and rule syntax; check for locating coverage diagnostics.
 No mobile example yet; create a separate demo when mobile is needed (D44).
 
 Related topics: story, authoring, check
-<!-- joplo-skill 0.4.1 sha256:751900ae0c1fc075f938b38c5baf911457253efd049776e0f66a26d4dcc65545 -->
+<!-- joplo-skill 0.5.0 sha256:751900ae0c1fc075f938b38c5baf911457253efd049776e0f66a26d4dcc65545 -->

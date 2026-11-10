@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/plugin-alda",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "type": "module",
   "joplo": {
     "api": 2
