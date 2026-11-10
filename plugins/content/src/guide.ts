@@ -48,7 +48,7 @@ cameraSequence([
   { atMs: 6500, target: 'message', zoom: 1.22, ease: 'easeOut' },
 ])
 \`\`\`
-Waypoints start at 0, increase strictly, end within 60000 ms, and use existing element IDs (or targets: [...] for a group). Each waypoint may set pad/zoom; ease belongs to the incoming segment (easeInOut default, easeOut or linear). The step stays at least until the last waypoint. Pause and speed follow engine time. Static renders, deep-link jumps, animate=false and reduced motion show the final waypoint. Free exploration yields to the final layout. Existing camera() and drift remain valid; a sequence replaces drift for that framing state. End with camera() when changing the subject.
+Waypoints start at 0, increase strictly, end within 60000 ms, and use existing element IDs (or targets: [...] for a group). Each waypoint may set pad/zoom; ease belongs to the incoming segment (easeInOut default, easeOut or linear). The step stays at least until the last waypoint. Pause and speed follow engine time. Static renders, deep-link jumps, animate=false and reduced motion show the final waypoint. Free exploration yields to the final layout. Existing camera() and drift remain valid; a sequence replaces drift for that framing state. An ordinary next step inherits the current path; explicitly issuing even the same cameraSequence again restarts it. A continuing chapter inherits the final frame until it issues a new sequence. End with camera() when changing the subject.
 
 For the same subject changing material, keep one motion key and bind the destination layout, borderRadius, color, backgroundColor, opacity and text to state. Content interpolates those supported style values along the same motion flight; changed text crossfades through a temporary inert, aria-hidden clone without a second motion identity. Static jumps show destination styles immediately. This is a transition between authored states, not arbitrary per-frame drawing. Keep interactive controls in the live subject: the fading clone has no hit area or focus identity. Test long text at both endpoints and play the transition with Voice on; do not infer continuous motion from static storyboard frames.
 
@@ -143,7 +143,16 @@ chapter('What does it read?')
 - HAPPY_PATH_ONLY belongs to feature review. If an explainer receives it, move the piece to works/<key>.tsx with work()/chapter() and remove its artificial cases; do not invent product failures. Review every storyboard and verify animation separately from static renders.
 `;
 
-export const patterns = `# content recipes and pitfalls
+export const patterns = `
+## Dual-aspect explainers with source metadata
+When adapting one dataset to landscape and portrait, author two arrangements at readable design sizes; do not shrink the landscape composition wholesale. For native export also set the logical stage with render --viewport WIDTHxHEIGHT --no-frame; output --width/--height alone only change the surrounding frame. Reserve separate areas for brand, main subject, image credit, source/fact status and subtitles. Give photo panels an explicit image height and adjustable object-position; credit and archive year need their own measured height below the image. A title-first opening may place one main graphic below the title.
+
+For bilingual quotations show the full original, a translation explicitly labeled as translation, name, role, date and source. Test long original text and a long source name in both aspects; their actual wrapped heights determine the layout, not a short placeholder. Status labels and explanations belong to the author: preserve their meaning rather than replacing prediction, announcement or confirmation with one generic badge.
+
+Use a two-ended proportion bar when a dense point plot becomes unreadable in portrait. Keep left + right <= total and show total-left-right as undecided; position optional thresholds against the full total, not only the decided portion. Test the pure ratio calculation, then inspect real rendered chapters for text overflow. Shared wrapper components should forward bindings and when/enter/exit/motion props.
+
+See examples/explainer-layouts: shared fictional data, local original vector illustration explicitly labeled non-photographic, short/long quote chapters and customizable status. These components are example-owned; the independent templates repository is maintained separately. No external facts, paid generation or online images are required.
+# content recipes and pitfalls
 
 ## Museum-film composition
 - Collect licensed artwork and a real subject asset first. Let an archival image supply the historical texture and the subject supply the action; use CSS only for framing, gradients and typography. Label illustrative artwork when it is not evidence of the place or event.
