@@ -201,3 +201,11 @@ describe('cameraSequence', () => {
     expect(errorCodes(r)).toContain('CAMERA_INVALID');
   });
 });
+
+it('explicit identical sequences get distinct deterministic identities while ordinary steps inherit', () => {
+ const points = [{atMs:0,target:'chat'}, {atMs:6500,target:'tape'}];
+ const r=build({one:flow('One',{start:'/'}).system('First',cameraSequence(points)).system('Inherit').system('Replay',cameraSequence(points))});
+ expect(errorCodes(r)).toEqual([]);
+ const ids=r.project!.scenarios['f.a.one']!.steps.map(s=>(s.ext?.content as any).scenes['f.a~world'].camera.sequenceId);
+ expect(ids).toEqual([1,1,3]);
+});

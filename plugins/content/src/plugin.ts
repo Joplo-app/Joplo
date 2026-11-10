@@ -20,7 +20,7 @@ export const DriftSchema = z.union([z.literal(false), z.number().min(.5).max(2),
 const Safe = z.tuple([z.number().min(0).max(2000), z.number().min(0).max(2000), z.number().min(0).max(2000), z.number().min(0).max(2000)]);
 const CameraBase = z.strictObject({ targets: z.array(z.string()), pad: z.number().min(0).max(2000).optional(), zoom: z.number().min(.1).max(10).optional(), ms: z.number().min(0).max(10000).optional(), drift: DriftSchema.optional() });
 const Waypoint = CameraBase.omit({ ms: true, drift: true }).extend({ atMs: z.number().min(0).max(60000), ease: z.enum(['easeInOut', 'easeOut', 'linear']).optional() });
-const Camera = CameraBase.extend({ sequence: z.array(Waypoint).min(2).max(32).optional() });
+const Camera = CameraBase.extend({ sequence: z.array(Waypoint).min(2).max(32).optional(), sequenceId: z.number().int().nonnegative().optional() });
 export type CameraWaypoint = { atMs: number; target?: string; targets?: string[]; pad?: number; zoom?: number; ease?: 'easeInOut' | 'easeOut' | 'linear' };
 /** Explicit state-to-state camera waypoints, milliseconds from this step commit. */
 export const cameraSequence = (points: CameraWaypoint[]) => pluginEffect('content', 'camera', {
@@ -48,7 +48,7 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
     exitDelay: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-exit-delay' },
   },
   themes: { studio }, skill,
-  schemas: { step: Frame },
+  schemas: { step: z.union([Frame, z.strictObject({ cameraIssued: z.literal(true) })]) },
   data: { step: { scope: [{ path: ['scenes'], kind: 'map', domain: 'scene', children: [{ path: ['camera', 'targets'], kind: 'values', domain: 'element' }, { path: ['camera', 'sequence', '*', 'targets'], kind: 'values', domain: 'element' }] }] } },
   compile: {
     node(node, ctx) {
@@ -68,6 +68,7 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
       if (missing.length) { ctx.report('CAMERA_UNKNOWN', `camera(${missing.map(m => JSON.stringify(m)).join(', ')}) target is not in any layer or the stage for this step; aim it at elements inside a <Canvas>`, ctx.source); return; }
       return {
         writes: [{ path: 'ui.__plugins.content.camera', value }],
+        data: { cameraIssued: true },
         references: targets,
         ...(value.sequence ? { holdMs: value.sequence.at(-1)!.atMs } : {}),
         ...(value.targets.length ? { directorTarget: value.targets[0] } : {}),
@@ -79,7 +80,7 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
       const value = (ctx.state.ui.__plugins as { content?: { camera?: unknown } } | undefined)?.content?.camera;
       const parsed = Camera.safeParse(value ?? { targets: [] });
       if (!parsed.success) { ctx.report('CAMERA_INVALID', 'Invalid content camera state; use camera() with valid settings'); return; }
-      return { scenes: Object.fromEntries(scenes.map(s => [s.id, { camera: { ...parsed.data, targets: parsed.data.targets.filter(id => all(s.root).some(n => n.id === id)) } }])) };
+      return { scenes: Object.fromEntries(scenes.map(s => [s.id, { camera: { ...parsed.data, ...(parsed.data.sequence ? { sequenceId: ctx.position === 0 ? 0 : (ctx.data as {cameraIssued?: boolean})?.cameraIssued ? ctx.position : (ctx.previousData as ContentFrame | undefined)?.scenes[s.id]?.camera.sequenceId ?? 0 } : {}), targets: parsed.data.targets.filter(id => all(s.root).some(n => n.id === id)) } }])) };
     },
   },
 });
