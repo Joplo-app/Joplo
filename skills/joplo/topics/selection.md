@@ -19,4 +19,4 @@ Run check again afterward. Preserve other options, pages, and existing user deci
 .joplo/ is local runtime state, not the design authority. Do not commit it to Git.
 
 Related topics: check, authoring, review
-<!-- joplo-skill 0.6.1 sha256:52291362c98dd4468d3bb9dca92751c6843cdebccfae1f9b6bb53163f501a1f6 -->
+<!-- joplo-skill 0.6.2 sha256:52291362c98dd4468d3bb9dca92751c6843cdebccfae1f9b6bb53163f501a1f6 -->

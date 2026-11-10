@@ -143,4 +143,4 @@ For a long story use chapter() to inherit the previous ending by default; from i
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.6.1 sha256:db7742e8bd4e286b421e4ef1b23a237feab044cb7f435486dd3a37db62aa30af -->
+<!-- joplo-skill 0.6.2 sha256:db7742e8bd4e286b421e4ef1b23a237feab044cb7f435486dd3a37db62aa30af -->

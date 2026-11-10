@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/web",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Joplo 作品看板与发布站播放器的预构建资源：播放、暂停与上手体验；含 SIL OFL 1.1 手绘字体",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
