@@ -9,6 +9,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { createDev } from '../src/dev.ts';
+import { auditLayout } from '../src/layout-audit.ts';
 import { launch } from '../src/render.ts';
 
 const REPO = path.resolve(import.meta.dirname, '../../..');
@@ -25,16 +26,18 @@ describe('D92 content transitions in a real browser', () => {
     // U1：缩放的 Canvas（2560×1600 设计尺寸放进 1280×800）屏幕层上的时间轴：年份标签在上，游标在下一行
     write('routes/scrub/page.tsx', `import {page,$} from '@joplo-app/kit';import {Canvas} from '@joplo-app/plugin-content';import {Button} from '@joplo-app/plugin-ui';export default page({title:'Scrub',layout:false},<div style={{position:'relative',width:1280,height:800}}><Canvas w={2560} h={1600} view={[2560,1600]} drift={false}><div className="room" /><div screen className="bar"><div id="year_a" className="yr" style={{left:200}}>A</div><div id="year_b" className="yr" style={{left:1400}}>B</div><Button id="scrubber" className="scrub" style={{left:$.ui.sx}} motion="cursor">drag</Button></div></Canvas></div>);`);
     write('routes/morph/page.tsx', `import{page,$}from'@joplo-app/kit';import{Canvas}from'@joplo-app/plugin-content';export default page({title:'Morph',layout:false},<div style={{width:1280,height:800}}><Canvas drift={false}><div className="room"><div id="subject" className="panel" motion="message" style={{position:'absolute',left:100,top:100,width:400,height:200,borderRadius:$.ui.radius,color:$.ui.ink,backgroundColor:$.ui.material,opacity:$.ui.alpha}}><span className="label">{$.ui.message}</span></div></div></Canvas></div>);`);
+    write('routes/presets/page.tsx', `import{page,$}from'@joplo-app/kit';import{Canvas,Split}from'@joplo-app/plugin-content';export default page({title:'Presets',layout:false},<div style={{width:1280,height:800}}><Canvas drift={false}><div when={$.ui.presets} enterStagger={80}><div id="grow" className="grow-probe" enter="grow" exit="grow" enterMs={1000} exitMs={1000} enterEase="linear" exitEase="linear" style={{position:'absolute',left:100,top:100,width:300,height:40,background:'#2040aa'}}/><div id="growup" className="growup-probe" enter="growUp" exit="growUp" enterMs={1000} exitMs={1000} enterEase="linear" exitEase="linear" style={{position:'absolute',left:500,top:100,width:40,height:200,background:'#aa4020'}}/><Split id="split" text="One two three" enter="blur" enterEase="bounce" style={{position:'absolute',left:100,top:400,fontSize:32}}/></div></Canvas></div>);`);
     write('routes/other/page.tsx', `import {page} from '@joplo-app/kit';export default page({title:'Other',layout:false},<div id="elsewhere">Elsewhere</div>);`);
     write('features/f/feature.ts', `import{feature}from'@joplo-app/kit';export default feature({name:'F',goal:'G',cases:{},pick:'a'});`);
     const toggles = Array.from({ length: 10 }, (_, i) => `.system('t${i}','Toggle ${i}',set($.ui.on,${i % 2 === 1}))`).join('');
-    write('features/f/works/a.tsx', `import{$,work,flow,free,set,hold}from'@joplo-app/kit';import{camera,cameraSequence}from'@joplo-app/plugin-content';export default work({title:'A',summary:'I',state:{ui:{era:'a',on:true,poked:false,sx:200,radius:0,ink:'#102030',material:'#eeeeee',alpha:1,message:'Paper'}},free:{poke:free.click('poke',set($.ui.poked,true))},scenarios:{
+    write('features/f/works/a.tsx', `import{$,work,flow,free,set,hold}from'@joplo-app/kit';import{camera,cameraSequence}from'@joplo-app/plugin-content';export default work({title:'A',summary:'I',state:{ui:{presets:false,era:'a',on:true,poked:false,sx:200,radius:0,ink:'#102030',material:'#eeeeee',alpha:1,message:'Paper'}},free:{poke:free.click('poke',set($.ui.poked,true))},scenarios:{
       swap:flow('Swap').system('swap','To new',set($.ui.era,'b'),hold(5)).system('back','Back',set($.ui.era,'a'),hold(5)),
       toggle:flow('Toggle')${toggles},
       drift:flow('Drift').system('look','Look',camera('spot',{ms:300,drift:{zoom:1.25,ms:1500}}),hold(10)).system('away','Away',camera('spot2',{ms:300})),
       sequence:flow('Sequence',{start:'/'}).system('path','Path',cameraSequence([{atMs:0,target:'spot',zoom:1},{atMs:2500,target:'spot2',zoom:1.2},{atMs:6500,target:'spot2',zoom:1.4,ease:'easeOut'}]),hold(10)).system('inherit','Inherit',hold(1)).system('replay','Replay',cameraSequence([{atMs:0,target:'spot',zoom:1},{atMs:2500,target:'spot2',zoom:1.2},{atMs:6500,target:'spot2',zoom:1.4,ease:'easeOut'}]),hold(10)),
       sequenceRelay:flow('Sequence relay',{from:'sequence'}).system('again','Again',cameraSequence([{atMs:0,target:'spot',zoom:1},{atMs:2500,target:'spot2',zoom:1.2},{atMs:6500,target:'spot2',zoom:1.4,ease:'easeOut'}]),hold(10)),
       sequenceRelay2:flow('Sequence relay two',{from:'sequenceRelay'}).system('again','Again',cameraSequence([{atMs:0,target:'spot',zoom:1},{atMs:2500,target:'spot2',zoom:1.2},{atMs:6500,target:'spot2',zoom:1.4,ease:'easeOut'}]),hold(10)),
+      presets:flow('Presets',{start:'/presets'}).system('show','Show',set($.ui.presets,true),cameraSequence([{atMs:0,target:'grow',zoom:1},{atMs:2500,target:'grow',zoom:1.1}]),hold(10)).system('hide','Hide',set($.ui.presets,false),hold(10)),
       morph:flow('Morph',{start:'/morph'}).system('change','Change',set($.ui.radius,48),set($.ui.ink,'#ffffff'),set($.ui.material,'#2040aa'),set($.ui.alpha,.8),set($.ui.message,'Digital message'),hold(10)),
       leave:flow('Leave').system('go','Go',set($.ui.era,'b')),
       other:flow('Other',{start:'/other'}).system('x','X'),
@@ -321,6 +324,25 @@ describe('D92 content transitions in a real browser', () => {
     await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.stop();c.goto(0);c.goto(1);});await frame();
     expect(await page.locator('[data-jghost]').count()).toBe(0);
     expect(await page.locator('[data-jid="subject"]').textContent()).toBe('Digital message');
+  });
+
+  it('grow origins remain fixed at the left/bottom during enter and exit, alongside the engine camera', async () => {
+    await at('presets');await playTo(1);await page.evaluate(()=>(window as any).fixtureCtl.pause(false));
+    const measured=await page.evaluate(()=>['grow','growup'].map(id=>{const el=document.querySelector(`[data-jid="${id}"]`)!;const a=el.getAnimations().find(a=>a.id==='jenter')!;const effect=a.effect;a.effect=null;const final=el.getBoundingClientRect();a.effect=effect;a.currentTime=500+Number(effect!.getTiming().delay);const mid=el.getBoundingClientRect();return {id,left:mid.left,finalLeft:final.left,bottom:mid.bottom,finalBottom:final.bottom};}));
+    expect(measured[0]!.left).toBeCloseTo(measured[0]!.finalLeft,1);expect(measured[1]!.bottom).toBeCloseTo(measured[1]!.finalBottom,1);
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.stop();c.goto(1);});await frame();await playTo(2);await page.evaluate(()=>(window as any).fixtureCtl.pause(false));
+    const exit=await page.evaluate(()=>['grow-probe','growup-probe'].map(name=>{const el=document.querySelector(`[data-jghost] .${name},[data-jghost].${name}`)!;const a=el.getAnimations()[0]!;const effect=a.effect;a.effect=null;const final=el.getBoundingClientRect();a.effect=effect;a.currentTime=500+Number(effect!.getTiming().delay);const mid=el.getBoundingClientRect();return {left:mid.left,finalLeft:final.left,bottom:mid.bottom,finalBottom:final.bottom};}));
+    expect(exit[0]!.left).toBeCloseTo(exit[0]!.finalLeft,1);expect(exit[1]!.bottom).toBeCloseTo(exit[1]!.finalBottom,1);
+  });
+  it('Split stagger, spring easing and layout-audit phase hints stay on the shared paused clock', async () => {
+    await at('presets');await playTo(1);await page.evaluate(()=>(window as any).fixtureCtl.pause(false));
+    const pieces=()=>page.locator('[data-jid="split"] [data-jp-content-enter]').evaluateAll(els=>els.map(el=>{const a=el.getAnimations().find(a=>a.id==='jenter')!;return{delay:a.effect!.getTiming().delay,time:a.currentTime,easing:a.effect!.getTiming().easing};}));
+    const before=await pieces();expect(before.map(p=>p.delay)).toEqual([0,70,140]);expect(before.every(p=>p.easing.startsWith('linear(')||p.easing.startsWith('cubic-bezier('))).toBe(true);
+    await page.waitForTimeout(200);expect(await pieces()).toEqual(before);
+    const report=await auditLayout(page,{});expect(report.phases.some(p=>p.phase==='enter-end'&&p.afterMs>500)).toBe(true);expect(report.phases.some(p=>p.phase==='camera-waypoint')).toBe(true);
+    await page.evaluate(()=>(window as any).fixtureCtl.resume());await page.waitForTimeout(150);expect((await pieces())[0]!.time).toBeGreaterThan(Number(before[0]!.time));
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.stop();c.goto(0);c.goto(1);});await frame();expect(await page.locator('[data-jid="split"]').textContent()).toBe('One two threeOne two three');
+    expect(await page.locator('[data-jid="split"]').evaluate(el=>el.getAnimations({subtree:true}).filter(a=>a.id==='jenter').length)).toBe(0);
   });
 
 });

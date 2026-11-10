@@ -23,7 +23,7 @@ import { writeSkillReadingDemo, verifySkillReadingBrowser } from './skill-readin
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
-export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'plugin-media', 'core', 'web', 'server', 'cli', 'joplo'];
+export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'plugin-av', 'core', 'web', 'server', 'cli', 'joplo'];
 export const packageDir = (name, root = REPO) => path.join(root, name.startsWith('plugin-') ? `plugins/${name.slice(7)}` : `packages/${name}`);
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const LICENSE_PLACEHOLDER = 'UNLICENSED';
@@ -61,7 +61,7 @@ function version(root, v) {
     fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
   }
   // Runtime version metadata must not pull the workspace manifest into browser bundles.
-  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'plugin-media']) {
+  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'plugin-av']) {
   const pluginVersion = path.join(packageDir(name, root), 'src/version.json');
   fs.mkdirSync(path.dirname(pluginVersion), { recursive: true });
   fs.writeFileSync(pluginVersion, JSON.stringify({ version: v }, null, 2) + '\n');
@@ -383,13 +383,13 @@ async function smoke() {
     for(const name of ['joplo','@joplo-app/kit',...['ui','diagram','content','alda'].map(p=>`@joplo-app/plugin-${p}`)])assert(pkg.devDependencies[name]===v,`Feature fixture must pin ${name} to ${v}`);
     pkg.devDependencies = Object.fromEntries(Object.keys(pkg.devDependencies).map(name=>[name,tgz[name]??pkg.devDependencies[name]]));
     pkg.devDependencies['@joplo-app/plugin-3d'] = tgz['@joplo-app/plugin-3d'];
-    pkg.devDependencies['@joplo-app/plugin-media'] = tgz['@joplo-app/plugin-media'];
+    pkg.devDependencies['@joplo-app/plugin-av'] = tgz['@joplo-app/plugin-av'];
     pkg.overrides = overrides;
     fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
     sh(npm, ['install', ...npmFlags], project);
     const joplo = path.join(project, 'node_modules/.bin/joplo');
     assert(fs.realpathSync(joplo) === fs.realpathSync(path.join(project, 'node_modules/joplo/bin/joplo.cjs')), '项目的 .bin/joplo 应指向 joplo 入口包');
-    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-3d', '@joplo-app/plugin-content', '@joplo-app/plugin-ui', '@joplo-app/plugin-media', '@joplo-app/server', '@joplo-app/web']) {
+    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-3d', '@joplo-app/plugin-content', '@joplo-app/plugin-ui', '@joplo-app/plugin-av', '@joplo-app/server', '@joplo-app/web']) {
       const p = path.join(project, 'node_modules', n);
       assert(fs.existsSync(p) && !fs.lstatSync(p).isSymbolicLink(), `${n} 应从 tarball 安装（不是链接）`);
       assert(readJson(path.join(p, 'package.json')).version === v, `${n} 版本应为 ${v}`);
@@ -397,10 +397,10 @@ async function smoke() {
     assert(!fs.existsSync(path.join(project, 'node_modules/playwright')), 'playwright 不应被默认安装');
 
     sh(process.execPath, ['--input-type=module', '-e', `
-      import media, {withSoundEffects, sfx} from '@joplo-app/plugin-media';
-      import local from '@joplo-app/plugin-media/local';
-      import runtime from '@joplo-app/plugin-media/runtime';
-      import {skill} from '@joplo-app/plugin-media/guide';
+      import media, {withSoundEffects, sfx} from '@joplo-app/plugin-av';
+      import local from '@joplo-app/plugin-av/local';
+      import runtime from '@joplo-app/plugin-av/runtime';
+      import {skill} from '@joplo-app/plugin-av/guide';
       globalThis.fetch=()=>{throw new Error('Network forbidden during local sound smoke');};
       const b=Buffer.alloc(844);b.write('RIFF');b.writeUInt32LE(836,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(8000,24);b.writeUInt32LE(8000,28);b.writeUInt16LE(1,32);b.writeUInt16LE(8,34);b.write('data',36);b.writeUInt32LE(800,40);
       const input='data:audio/wav;base64,'+b.toString('base64'), plugin=withSoundEffects({cue:input});

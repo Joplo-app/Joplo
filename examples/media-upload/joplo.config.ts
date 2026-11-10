@@ -1,5 +1,5 @@
 import { config } from '@joplo-app/kit';
-import media from '@joplo-app/plugin-media';
+import media from '@joplo-app/plugin-av';
 import ui from '@joplo-app/plugin-ui';
 
 export default config({

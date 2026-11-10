@@ -2,7 +2,7 @@
  * 上传过程用录屏片段展示，完成时播放成功动画
  */
 import { $, done, chapter, narrate, work, set } from '@joplo-app/kit';
-import { playClip } from '@joplo-app/plugin-media';
+import { playClip } from '@joplo-app/plugin-av';
 
 const happy = chapter('上传成功', { expected: '看到进度走完，并出现成功的提示', description: '进度走完，出现成功的勾' })
   .click('pick', '选择文件', set($.ui.state, 'uploading'),

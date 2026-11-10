@@ -3,14 +3,16 @@ export const skill = `# Joplo media: media
 For moments a product UI cannot show by itself: a short screen recording, a product shot in motion, a polished success animation. Clips play on the engine clock (pause, speed, jumps, screenshots and video export stay consistent).
 Install at the same version as Joplo. Example: examples/media-upload.
 
+The npm package is @joplo-app/plugin-av; its plugin namespace and skill topic remain media. For projects using the earlier source-checkout package @joplo-app/plugin-media, replace the dependency and imports with the matching plugin-av version. Keep media:Video/media:Lottie and existing playback data unchanged; never enable both manifests with the same media id.
+
 ## Enable
-import media, { Video, Lottie, playClip } from '@joplo-app/plugin-media'; config({ plugins: [ui, media, …] }).
+import media, { Video, Lottie, playClip } from '@joplo-app/plugin-av'; config({ plugins: [ui, media, …] }).
 
 ## Independent local one-shot sounds
 Use withSoundEffects instead of the default media manifest (never enable both):
 \`\`\`tsx
 import { asset } from '@joplo-app/kit';
-import { withSoundEffects, sfx } from '@joplo-app/plugin-media';
+import { withSoundEffects, sfx } from '@joplo-app/plugin-av';
 config({ plugins: [ui, withSoundEffects({ send: asset('./assets/send.wav') })] });
 // In a scripted system step (not a free-reaction handler):
 sfx.play('send', { volume: .5, offsetMs: 0 });

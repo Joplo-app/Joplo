@@ -28,7 +28,7 @@ const StepS = z.union([
 const startOf = (node: PluginIRNode) => (typeof node.props?.start === 'number' && node.props.start >= 0 ? node.props.start : 0);
 
 const media = definePlugin({
-  packageName: '@joplo-app/plugin-media',
+  packageName: '@joplo-app/plugin-av',
   id: 'media', title: 'Media', version: packageInfo.version,
   runtime: new URL(new URL(import.meta.url).pathname.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
   components: {

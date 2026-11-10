@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/cli",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Joplo 命令实现：创建、预览、检查、构建与分享可播放作品；通常经由 joplo 命令入口使用",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",
