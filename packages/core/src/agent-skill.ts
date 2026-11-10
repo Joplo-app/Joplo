@@ -9,7 +9,7 @@
 
 /** `npx joplo skill <主题>` 的主题与一句话用途（guide.ts 生成正文；技能里按这份清单列出主题）。 */
 export const SKILL_TOPICS = [
-  { name: 'authoring', description: 'Works → slices → steps; feature review, chapters, drafts, files, explicit plugins, named local reactions, composable effects, state and conditions' },
+  { name: 'authoring', description: 'Works → slices → steps; feature review, chapters, drafts, files, explicit plugins, named local reactions, composable effects, state and conditions; read-only asset usage reports' },
   { name: 'story', description: 'Plan a show before coding; for feature review start from needs, roles, goals and cases; for explainers and histories plan openings, continuity and captions' },
   { name: 'demo', description: 'Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots' },
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },

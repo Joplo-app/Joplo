@@ -135,6 +135,26 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       else for (const l of r.lines) line(l);
       if (r.data.total.failed) exitCode = 1;
     });
+  program.command('assets').description('Read-only asset usage: author references, selected publish IR inclusion, and unknown sampled visibility')
+    .argument('[dir]', 'Project directory', '.').addOption(format())
+    .option('--usage', 'Report usage (the default; never deletes or uploads)')
+    .option('--scan <directory>', 'Explicit project-relative file or directory to inventory; repeatable, symlinks skipped', collect, [])
+    .option('--work <id>', 'Limit authored work scope by exact compiled work id')
+    .option('--scenario <id>', 'Limit chapter scope, including continuing predecessors')
+    .action(async (dir, opts) => {
+      const { assetsCommand } = await import('./assets.ts');
+      const report = await assetsCommand(resolve(dir), { scan: opts.scan, work: opts.work, scenario: opts.scenario });
+      if (opts.format === 'json') json(result(resolve(dir), `${report.entries.length} asset/resource record(s)`, report));
+      else {
+        line(`Asset scope: work=${report.scope.work ?? 'all'}, scenario=${report.scope.scenario ?? 'all'}; scanned ${report.scope.scan.join(', ') || '(no directories)'}`);
+        for (const entry of report.entries) {
+          line(`${entry.path ?? entry.id}: ${entry.mime ?? entry.kind}, ${entry.bytes === null ? 'unknown size' : `${entry.bytes} bytes`}; ${entry.authorReference}; ${entry.publication}; visibility unknown`);
+          for (const ref of entry.references) line(`  ${ref.workId ?? '?'} / ${ref.scenarioId ?? '?'} / ${ref.layer ?? '?'} / ${ref.elementId ?? '?'} / ${ref.source ?? '?'} (${ref.evidence})`);
+        }
+        for (const unknown of report.unknowns) line(`Unknown: ${unknown.source ?? '?'}: ${unknown.reason}`);
+        for (const limitation of report.limitations) line(limitation);
+      }
+    });
   const diff = program.command('diff').enablePositionalOptions().description('Compare two public builds; prepare and publish immutable PR comparisons')
     .argument('[before]', 'Baseline static build directory').argument('[after]', 'Current static build directory')
     .option('--out <dir>', 'New diff output directory').option('--base-sha <sha>', 'Normalized baseline commit SHA').option('--head-sha <sha>', 'Normalized current commit SHA').addOption(format())

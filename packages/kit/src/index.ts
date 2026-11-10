@@ -14,7 +14,7 @@ import { bindPath, callsite, isBind, type Bind, type CondExpr, type JNode } from
 
 export { isNode, isBind, bindPath, Custom, $, and, empty, eq, Fragment, neq, not, notEmpty, oneOf, or, Outlet, Slot } from './node.ts';
 export type { Bind, CondExpr, JNode } from './node.ts';
-export { asset } from './asset.ts';
+export { asset, captureAssetLoads, type AssetLoad } from './asset.ts';
 import type { PluginDef } from './plugin.ts';
 export type { PluginDef } from './plugin.ts';
 

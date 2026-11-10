@@ -25,5 +25,7 @@ export { inspectResources, mediaDiagnostics } from './media-check.ts';
 
 export { watchConfigDiagnostics } from './watch-config.ts';
 
+export { assetUsage, type AssetUsageReport, type AssetUsageEntry, type AssetUsageReference } from './asset-usage.ts';
+
 export type { ExportCrop, FramesOptions, FilmOptions, FilmResult, VideoOptions, VideoResult } from './contract.ts';
 export type { PlaybackTimeline, PlaybackEvent } from './timeline.ts';
