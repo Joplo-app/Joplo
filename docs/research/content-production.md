@@ -180,7 +180,7 @@ Joplo 的技能以 PolyForm Shield 1.0.0 分发。上面的做法都是用自己
 |---|---|---|
 | 第一版 | 每章一块图版（大标题、面板、底部来源、章末横幅），章节开场用遮罩 | 用户：“太像 PPT”，要更好的可视化、动效、连贯性 |
 | 第二版 | 一张大画布 + 手写镜头；所有物件的坐标按状态预先算好写进状态（约 250 行几何代码） | 效果对了，但作者（Agent）要手算镜头和每个物件的位置；机位算错一次，就出现内容挤在上半屏 |
-| 第三版（提交版） | 用本次新增的 Joplo 原语：`Canvas`、`camera()`、`motion`、`screen`、`flow({ from })`、`patch()` | 不再有坐标数学：只摆容器，每种排法写成静态 JSX，用 `when` 切换，同一 motion 键自动飞行；镜头写元素 id |
+| 第三版（提交版） | 用本次新增的 Joplo 原语：`Canvas`、`camera()`、`motion`、`screen`、`flow('Slice title', { from })`、`patch()` | 不再有坐标数学：只摆容器，每种排法写成静态 JSX，用 `when` 切换，同一 motion 键自动飞行；镜头写元素 id |
 
 画面手法（第三版）：
 - **开场**：熟悉的一幕 → 定格，每块露出概率 → 名字那一块翻成“南瓜” → 镜头拉远，露出旁边的“机器”，四个问题钉在各自要讲的位置。
@@ -209,7 +209,7 @@ Joplo 的技能以 PolyForm Shield 1.0.0 分发。上面的做法都是用自己
   7. 事实与示意；
   8. 收尾；
   9. Required 审片（分镜、看板试播、证据表）。
-- **authoring**：`flow({ from, layer })`、`patch()`、`camera()`。
+- **authoring**：`flow('Slice title', { from, layer })`、`patch()`、`camera()`。
 - **demo**：Canvas 一节、`render --sheet`。
 - **focus**：讲解片用 `camera()`，不用 `shot()`。
 - **check**：`CAMERA_*`、`FROM_*`、`LAYER_UNKNOWN`（flow 的 layer）；讲解类内容可以忽略 `HAPPY_PATH_ONLY`。
@@ -230,11 +230,11 @@ Joplo 的技能以 PolyForm Shield 1.0.0 分发。上面的做法都是用自己
 |---|---|---|---|
 | C1 | 在大画布上推、拉、摇，推近 2 倍以上，不画焦点框 | `shot()` 对界面最多 1.25 倍且画脉冲框；示例手写整张画布的 transform 与机位数学 | **已实现**：`<Canvas>` + `camera(...ids, { pad, zoom, ms })`，按内容取景、放大上限默认 3 倍、跨步保留 |
 | C2 | 同一个物件换排法 / 换容器时自动飞过去 | 每个物件、每一步的坐标预先算好写进状态 | **已实现**：`motion="key"`（FLIP），`motionDelay` / `motionMs`；与镜头同一步时同步落定 |
-| C3 | 下一章从上一章结尾接着演；一步改多处 | 自写 `S + go()` 累积状态，逐章 `flow({ state })` | **已实现**：`flow({ from })`（按依赖回放解析，成环 / 失败报错）、`patch()`、步骤参数可传数组 |
+| C3 | 下一章从上一章结尾接着演；一步改多处 | 自写 `S + go()` 累积状态，逐章 `flow('Slice title', { state })` | **已实现**：`flow('Slice title', { from })`（按依赖回放解析，成环 / 失败报错）、`patch()`、步骤参数可传数组 |
 | C4 | 讲解画面按设计尺寸等比缩放 | 容器查询单位自造 `--u`，所有尺寸包 `U()` | **已实现**：Canvas 的 `view`（默认 1280×800）；`screen` 子元素固定在屏幕上 |
 | C5 | 绑定能做简单计算 | 预先拼好样式字符串 | 有了 C2 后大多不再需要；**后续**视需要做受限派生绑定 |
 | C6 | 讲解类部件（翻面词元、计数器、可变形条形图、指针、问题标签） | 示例里手写 | **后续：扩展包**（见 4.1），先在示例里沉淀成可复制的作者组件 |
-| C7 | 只有系统步骤的场景也能从指定层开始 | 封面塞进世界层做遮罩 | **已实现**：`flow({ layer })`；`camera()` 也会切导演层。**后续**：指定封面帧 |
+| C7 | 只有系统步骤的场景也能从指定层开始 | 封面塞进世界层做遮罩 | **已实现**：`flow('Slice title', { layer })`；`camera()` 也会切导演层。**后续**：指定封面帧 |
 | C8 | 一条命令看完整场分镜 | ffmpeg 拼联系表、Playwright 脚本 | **已实现**：`joplo render --sheet`（每格带步号、字幕、旁白）。**后续**：看板里的分镜视图、按真实节奏回放的时间线 |
 | C9 | 封面“约 M 秒”与 outline 计入旁白 | 手算（示例 outline 显示 2 分 26 秒，实际约 4 分 20 秒） | **已实现**：按朗读估算（中日韩约 4.5 字 / 秒） |
 | C10 | 发布站按步留存统计 | 无 | 后续（Cloud） |
@@ -257,7 +257,7 @@ Joplo 的技能以 PolyForm Shield 1.0.0 分发。上面的做法都是用自己
 
 ### 4.2 本次修改的 Joplo 代码
 
-- **kit**：`camera()`、`patch()`、`flow({ from, layer })`、步骤参数可传效果数组、`Canvas` 组件与 `motion` / `motionDelay` / `motionMs` / `screen` 属性。
+- **kit**：`camera()`、`patch()`、`flow('Slice title', { from, layer })`、步骤参数可传效果数组、`Canvas` 组件与 `motion` / `motionDelay` / `motionMs` / `screen` 属性。
 - **core**：
   - 编译 `camera` 与 `from` / `layer`（新诊断 `CAMERA_*`、`FROM_*`）；
   - `Scenario.initial.layer`，`cameraAt` 读起始层；

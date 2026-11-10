@@ -32,3 +32,5 @@ npx joplo build
 ```
 
 Documentation and examples: [Joplo-app/Joplo](https://github.com/Joplo-app/Joplo). License: [PolyForm Shield 1.0.0](https://github.com/Joplo-app/Joplo/blob/main/LICENSE). Free for any use, including commercial, except building products that compete with Joplo or Joplo Cloud; see [COMMERCIAL.md](https://github.com/Joplo-app/Joplo/blob/main/COMMERCIAL.md).
+
+Use `work({ title, summary, … })` for every work. Standalone works live in `works/<key>.tsx`; alternatives under a feature live in `features/<f>/works/<key>.tsx`. Feature review is a layer over works. See the [current work model](https://github.com/Joplo-app/Joplo/blob/main/docs/work-model.md).

@@ -60,20 +60,20 @@ Pick relevant cases to ask the user before starting. Do not include every preset
 - Each option uses flow(..., { cases: ['happy'] }) to reference the shared cases for comparison.
 - A case with a scenario is automatically `expressed`; one with neither a scenario nor a declaration is `missing`.
 - After adding a case, run check: reconsider it in every option.
-- Start with two scenarios per option, the happy path and one error-and-recovery case; add the rest after the user has seen them in the board.
+- Start with two scenarios per work, the happy path and one error-and-recovery case; add the rest after the user has seen them in the board.
 - A rule the user stated in this conversation is origin: 'user', status: 'confirmed'; a rule you inferred stays ai_assumption, pending.
 
 ## Declare coverage without a scenario
 Coverage applies only to works attached to a feature.
 Coverage status values: `expressed`, `undecided`, `missing`, `not_applicable`, `excluded`.
-- option.coverage: { case_key: undecided('Why this is undecided') }.
+- work.coverage: { case_key: undecided('Why this is undecided') }.
 - missing('What is missing'): leave the gap explicit; do not pretend it is `expressed`.
 - notApplicable('Why not applicable') / excluded('Why excluded'): require a nonempty reason.
-- Explicit declarations override inference. Use scenarios for cases that need a demo.
+- Explicit declarations override inference. Use scenarios for cases that need a demo. Author work.coverage is stored in IR v3 as feature.alternatives[workId].coverage; work focus becomes decisionFocus in that same review record, beside tradeoffs.
 - Do not invent business rules for full coverage. Keep asking about undecided behavior.
 
 See authoring for flow and rule syntax; check for locating coverage diagnostics.
 No mobile example yet; create a separate demo when mobile is needed (D44).
 
 Related topics: story, authoring, check
-<!-- joplo-skill 0.5.0 sha256:751900ae0c1fc075f938b38c5baf911457253efd049776e0f66a26d4dcc65545 -->
+<!-- joplo-skill 0.5.0 sha256:de6af6255bebc0f91467f3db278b78478389b8c1879a5f29f415baabb6e82a06 -->

@@ -19,7 +19,7 @@
 
 Author pages and flows in TSX, review them in the local **Board**, then build a static **Published site** from the options you choose — or share it with one command and drop a playable badge or embedded player into a README, docs page, or blog post. Files are the source of truth; Git keeps the history. Option-click an element to give your agent its exact file and line.
 
-Joplo also makes standalone works, such as explainers: write `work()` / `chapter()` in `works/`; publish one entry with `--work <key>`.
+A project is a portfolio of works → slices → steps. `work()` is the only work entry point: standalone pieces live in `works/<key>.tsx`; alternative works under a feature live in `features/<f>/works/<key>.tsx`, also with `title` / `summary`. Feature review adds cases, coverage and a pick; the UI calls its alternative works options. For explainers use `chapter()` slices; publish one entry with `--work <key>`. See the [work model](docs/work-model.md).
 
 ![Joplo Board](docs/screenshots/board-play-initial.png)
 
@@ -105,7 +105,7 @@ For local reviews, open the **Feedback & review** icon on the right of the demo 
 npx joplo feedback watch --local --follow --json
 ```
 
-Submitted feedback streams as NDJSON, one event per line with `eventId`, `optionId` and `sessionId`. The follower covers every option and attaches by itself to the new review round that each source edit opens; approving one option does not stop it. It exits 1 when the board stops and 130 on Ctrl+C. To wait for one option version's approval or resume from a cursor, bind an exact session instead (`feedback list --local`, then `feedback watch --local --session <id> [--after <seq>]`, which exits 0 on approval). See the [CLI documentation](docs/cli.md).
+Submitted feedback streams as NDJSON, one event per line with `eventId`, `workId` and `sessionId`. The follower covers every option and attaches by itself to the new review round that each source edit opens; approving one option does not stop it. It exits 1 when the board stops and 130 on Ctrl+C. To wait for one option version's approval or resume from a cursor, bind an exact session instead (`feedback list --local`, then `feedback watch --local --session <id> [--after <seq>]`, which exits 0 on approval). See the [CLI documentation](docs/cli.md).
 
 For Share, use `npx joplo feedback watch --share <id> --work <feature.option> --interval 15 --json`. Polling defaults to 15 seconds, configurable from 10 to 30. The current Cloud endpoint exposes a pending-feedback snapshot, so records resolved/applied between polls can be missed; see the [Cloud follow-up requirements](docs/cloud-feedback-watch.md).
 
@@ -117,20 +117,20 @@ layouts/app.tsx
 routes/page.tsx
 routes/members/page.tsx
 features/invite/feature.ts
-features/invite/options/a.tsx
+features/invite/works/a.tsx
 shared/
 themes/brand.css
 .joplo/selection.json
 dist/
 ```
 
-Routes follow folders. Layouts provide the shell and named Slots; Options add content to those Slots or define new routes. A Feature holds its goal, cases, rules, and `pick`. Scenarios describe behavior with `flow()`. Use `@joplo-app/kit` for the authoring API and `@joplo-app/plugin-ui` for components named and configured like Mantine.
+Routes follow folders. Layouts provide the shell and named Slots; Works add content to those Slots or define new routes. A Feature holds its goal, cases, rules, and `pick`. Scenarios describe behavior with `flow()`. Use `@joplo-app/kit` for the authoring API and `@joplo-app/plugin-ui` for components named and configured like Mantine.
 
 Reuse modules inside the project with `shared/`. Keep runtime state in `.joplo/` and build output in `dist/` out of Git. See the authoring topic for exact APIs and [Themes](docs/themes.md) for CSS variables.
 
 ## Build and publish
 
-Set each Feature's `pick` to its chosen Option filename, then:
+Set each Feature's `pick` to its chosen work filename, then:
 
 ```sh
 npx joplo check
@@ -138,7 +138,7 @@ npx joplo build
 npx wrangler deploy --assets dist
 ```
 
-Build publishes only the selected Options. The Published site shares the Board's player layout and keeps the demo, subtitles, Layers, and Themes. Rules, assumptions, coverage gaps, and source locations stay on the authoring side. Image export works in the browser; video export is local only.
+Build publishes each feature’s selected work and every ready standalone work; drafts and works without slices stay local. The Published site shares the Board's player layout and keeps the demo, subtitles, Layers, and Themes. Rules, assumptions, coverage gaps, and source locations stay on the authoring side. Image export works in the browser; video export is local only.
 
 Use your own Wrangler account and configure the site name and compatibility date for deployment. The output also works with other static hosts. See [CLI reference](docs/cli.md) for output directories, overwrite options, and screenshots.
 
@@ -268,4 +268,4 @@ GLB 资源与生成：`asset('./model.glb')` 支持离线模型；scene3d 的 `M
 
 ### A journey through one apple
 
-[apple-journey](examples/apple-journey) combines six generated GLB subjects, public-domain paintings, original instrumental scores and Chinese narration. Pause to orbit, hover, drop the fruit, scrub a discrete timeline or choose a fairy-tale branch. Its asset ledger records licenses, generation costs and local optimization. Optional scenarios use `flow({ autoplay: false })`: they remain selectable but do not interrupt sequential playback.
+[apple-journey](examples/apple-journey) combines six generated GLB subjects, public-domain paintings, original instrumental scores and Chinese narration. Pause to orbit, hover, drop the fruit, scrub a discrete timeline or choose a fairy-tale branch. Its asset ledger records licenses, generation costs and local optimization. Optional scenarios use `flow('Slice title', { autoplay: false })`: they remain selectable but do not interrupt sequential playback.

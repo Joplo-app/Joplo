@@ -8,7 +8,7 @@
 
 保留稳定 ID：`home`、`player`、`views`、`frames`、`npm`、`skill`、`review`、`share_scope`、`voice`。补齐有源码和决策证据的 `workbench_origin`（最初三套工作台）、`authoring_model`（功能建模）、`feature_diff`（PR 功能差异）。历史方案与当前实现边界明确区分；缺少记录就说明缺少记录。
 
-每个功能仍使用原生 Feature / Option / Scenario，不建立另一套业务模型。公开播放中的设计过程仅使用主动整理的公开说明，不放入私有评审记录。未选择的方案继续留在源码与本地看板中；需要公开呈现的取舍要显式建模，不能依赖 publish 会暴露私有字段。
+每个功能仍使用原生 Feature / Work / Scenario，不建立另一套业务模型。公开播放中的设计过程仅使用主动整理的公开说明，不放入私有评审记录。未选择的方案继续留在源码与本地看板中；需要公开呈现的取舍要显式建模，不能依赖 publish 会暴露私有字段。
 
 ## 并行分工
 

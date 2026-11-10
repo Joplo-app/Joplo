@@ -274,14 +274,14 @@ trace 同时提供镜头目标。取景保留上下文：镜头对准图表里�
 
 | 方向 | 消息 | 时机 |
 | --- | --- | --- |
-| 演示 → 外层 | `{ type: "joplo:ready", protocol: 1, scenarios: [{ id, optionId, steps }] }` | 加载完成，一次 |
+| 演示 → 外层 | `{ type: "joplo:ready", protocol: 1, scenarios: [{ id, workId, steps }] }` | 加载完成，一次 |
 | 演示 → 外层 | `{ type: "joplo:position", protocol: 1, scenario, step, stepId, layer }` | ready 后立即一次；之后场景、步骤、层级任一项变化时各一次 |
 | 演示 → 外层 | `{ type: "joplo:pick-result", protocol: 1, element: { id, label } \| null }` | 选元素结束（null = Esc 或取消按钮） |
 | 外层 → 演示 | `{ type: "joplo:goto", protocol: 1, scenario, step, highlight: <元素 id> \| null }` | 定位到某条评论 |
 | 外层 → 演示 | `{ type: "joplo:pick", protocol: 1, active: boolean }` | 进入 / 退出选择元素 |
 
 - 发送一律 `window.parent.postMessage(msg, "*")`，内容只有场景、步骤和元素 id，不含秘密。
-- `scenarios`：IR 里的所有场景，按功能顺序 → 方案在 `feature.optionIds` 里的顺序 → 场景在 IR 里的顺序；`steps` 是步骤数。
+- `scenarios`：IR 里的所有场景，按 `entryIds` 条目顺序 → 功能的 `feature.workIds` 作品声明顺序（独立作品直接取自身）→ 切片顺序；`steps` 是步骤数。
 - `step` 是播放器位置：0 = 初始状态（封面），k = 已执行 k 步，范围 0..steps；`stepId` 是第 k 步（`steps[k-1]`）的 id，step 为 0 时是 null。评审清单 `steps[].index` 从 0 开始，所以 `index = step - 1`。`layer` 是有层级的方案里当前显示的层级键，没有层级时 null。相同的 (scenario, step, stepId, layer) 不重复发，自动播放的中间帧也不会刷屏。
 - 入站只处理 `event.source === window.parent` 且校验通过的消息：`protocol` 必须是数字 1；`goto.scenario` 必须是 IR 里有的场景（不认原型链上的键），`step` 必须是非负整数（超过步数时夹到步数），`highlight` 是 null、缺省或作者元素 id（`^[A-Za-z][A-Za-z0-9_-]{0,63}$`，编译器生成的 `_` 开头 id 不行）；`pick.active` 必须是布尔值。多余字段忽略，其余一律丢弃。处理出错不影响之后的消息。
 - `goto`：去掉嵌入封面、停止播放，跳到那个场景和步骤；`highlight` 的元素画红色描边（随镜头一起移动，换层后仍在）。观众自己切到别的场景或步骤，或者下一次 goto 时清除。
@@ -293,7 +293,7 @@ trace 同时提供镜头目标。取景保留上下文：镜头对准图表里�
 
 方法同上一节：分享源 `127.0.0.1` 返回 `joplo build examples/invite` 的产物，HTML 带 CSP `sandbox allow-scripts allow-popups allow-downloads; connect-src 'none'; form-action 'none'; base-uri 'none'`（另加 `Access-Control-Allow-Origin: *` 让字体能加载）；外层页面在另一个源，嵌入三个 iframe：`?embed=1&review=1`、不带 review 的 `?embed=1`，以及一个和外层同源、冒充外层给演示发消息的 iframe。产物有两份：普通发布（只含选定方案），以及 `buildSite({ review: true })`（即 `joplo share --private --review` 用的构建）产出的真实评审版（invite 的 a-modal、b-batch 两个方案共 5 个场景）。Playwright 在 Chromium、Firefox、WebKit 上，普通发布各 28 项、评审版各 29 项全部通过：
 
-- 收到 ready，场景列表与内联 IR 一致（id、optionId、步数、protocol 1）；沙箱里 `origin` 是 `null`、`localStorage` 抛 SecurityError。
+- 收到 ready，场景列表与内联 IR 一致（id、workId、步数、protocol 1）；沙箱里 `origin` 是 `null`、`localStorage` 抛 SecurityError。
 - ready 后立即收到一次 step 0 / stepId null 的 position。
 - 来自别的窗口的 goto、`protocol: 2`、`highlight: "_gen"`、不存在的场景都被忽略，没有新的 position。
 - 外层 goto（场景 + 第 3 步 + `in_email`）后收到一次字段正确的 position，`in_email` 有实线描边，封面已去掉；重复同一个 goto 不再发 position。

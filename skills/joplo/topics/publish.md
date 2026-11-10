@@ -3,9 +3,9 @@
 Compare cases and options in the board, then decide which option to publish for each feature.
 
 ## Standalone works and feature pick
-- Standalone works in works/ publish without pick. draft: true excludes the whole work, its slices and views from both ordinary and review versions; WORK_DRAFT_SKIPPED lists what was skipped. Only drafts means nothing can publish: finish a work first.
+- Standalone works in works/ publish without pick. Empty works stay local until they have a slice (WORK_EMPTY); explicit selection fails. draft: true excludes the whole work, its slices and views from both ordinary and review versions; WORK_DRAFT_SKIPPED lists what was skipped. Only drafts means nothing can publish: finish a work first.
 - --work <entry-key> restricts build/share to one entry: standalone work or a feature's picked option (all its options with --review). A selected draft fails explicitly. Every work has a cover; multiple entries open on the home page, one entry opens on its cover.
-- Set pick: 'a' in features/<f>/feature.ts to select options/a.tsx. It is not a qualified ID with a feature prefix.
+- Set pick: 'a' in features/<f>/feature.ts to select features/<f>/works/a.tsx. It is not a qualified ID with a feature prefix.
 - Publish only the picked option for each feature. Features without pick are omitted.
 - The board's Publish dialog checks the chosen scope first. With no picked option it says so and disables Publish: confirm an option in review (or set pick), then publish. Confirming an option is not itself a request to publish.
 - Pages and layouts compose the whole product; picked options add elements to routes or add routes.
@@ -25,7 +25,7 @@ Compare cases and options in the board, then decide which option to publish for 
 - On every surface (board, published site, fullscreen, embed, screenshots, image and video export) two things float over the stage. The subtitle at the bottom centre shows what is being said: narrate(), else say() with the speaker's avatar and name, else the caption; cards and the cover show it only for narrate / say. The step title pops out at the top left when the step changes (number, caption, explain on a second line, branch links), stays about 2.5–5 s of timeline time, then shrinks to a dot the viewer can click to reopen; static frames show it open.
 - Design for that: keep important content out of the bottom centre of every screen (about the bottom 12%) and expect the top-left corner to be briefly covered when a step starts. Put the reason in explain() or narrate(), not in a long caption: the caption is a short title.
 - Fullscreen keeps only the stage (with its subtitle and step title). Playback controls float below and hide automatically.
-- Autoplay plays the picked option's scenarios back to back, like chapters of one video: after the last step of a scenario an Up next card names the next one and counts down 3 seconds (Play now / Cancel; pausing pauses the countdown), then it starts; after the last scenario it stops. Stepping by hand never jumps. So order scenarios as chapters (the first one is the hook) and end each on a clear result. Use flow({ autoplay:false }) for optional branches: they remain manually selectable but are skipped by continuous playback, and stop at their own ending. A fork or return link alone does not remove a chapter from autoplay.
+- Autoplay plays the picked option's scenarios back to back, like chapters of one video: after the last step of a scenario an Up next card names the next one and counts down 3 seconds (Play now / Cancel; pausing pauses the countdown), then it starts; after the last scenario it stops. Stepping by hand never jumps. So order scenarios as chapters (the first one is the hook) and end each on a clear result. Use flow('Slice title', { autoplay:false }) for optional branches: they remain manually selectable but are skipped by continuous playback, and stop at their own ending. A fork or return link alone does not remove a chapter from autoplay.
 - On phones the published site becomes a video player: the 1280 × 800 desktop stage is scaled as a whole with black bars (never re-laid out to the phone width); portrait shows the video, full captions, one row of controls and the chapter list; turning the phone sideways (or tapping Landscape) fills the screen with stage and captions plus a separate control bar. Stage taps pause/explore and stage drags belong to the prototype; use the control bar to step. On an iPhone, which cannot fullscreen a page or lock orientation, the stage is rotated 90° until the phone is turned.
 - Design for that: text on a 1280 × 800 stage shrinks to about 30% in portrait, so keep key text large (24px or more) and let shots zoom into details.
 - Both local and published views can export images. Video export is local only.
@@ -37,7 +37,7 @@ Use your own Wrangler environment and account in the project directory:
 `npx wrangler deploy --assets dist`
 Provide the site name and compatibility date through Wrangler project configuration. Handle access control in deployment.
 
-Publication retains option.free reactions after scope filtering. Verify them in the actual built/shared player: the local response must work, reset must discard it, and scripted timeline state must remain unchanged. A compiler-only replay test does not verify this delivery boundary.
+Publication retains work.free reactions after scope filtering. Verify them in the actual built/shared player: the local response must work, reset must discard it, and scripted timeline state must remain unchanged. A compiler-only replay test does not verify this delivery boundary.
 Deploy only dist output, not author source files. MCP, comments, and collaboration are planned separately.
 
 ## Cloud sharing
@@ -45,7 +45,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - Pass --public or --private AND --review or --no-review on every share. Missing choices fail with CHOICE_REQUIRED (exit 2) before login, check, build, or network in non-TTY, CI, --json, or --format json. An interactive terminal asks for each missing choice; public and no-review are highlighted but require a keypress.
 - Public shares enter show.joplo.app/@username and search engines. Write project names, descriptions and feature goals as you want them to appear in search results; never include unpublished information. Private means only people holding the link can view; it is not password protection.
 - --pr and scoped --scenario / --work are always private: visibility flags may be omitted, --public is rejected (exit 2), but the review choice remains required. Comparisons (diff publish) are always private and do not support review versions, so neither choice is required there.
-- --review publishes picked options at data.url AND a separate private review version at data.review.url. Give reviewers the latter. It includes every option, is commentable, and never becomes a public portfolio entry. If the second publication fails, the main link may already be live: read stderr and retry with the same choices without --new.
+- --review publishes picked options at data.url AND a separate private review version at data.review.url. Give reviewers the latter. It includes every work, is commentable, and never becomes a public portfolio entry. If the second publication fails, the main link may already be live: read stderr and retry with the same choices without --new.
 - Success JSON may include visibility and portfolio { workUrl, profileUrl, needsUsername, setupPath }. With a username, use workUrl; with needsUsername, tell the user to set a username at <server><setupPath>. Old servers may omit these fields: do not dereference absent portfolio or null URLs.
 - Run npx joplo login and verify the code in your browser before authorizing. Use --no-browser to open the URL manually over SSH or without a local browser.
 - Agents publish with npx joplo share --private --no-review --format json. It checks, builds, and uploads only the published output.
@@ -143,4 +143,4 @@ For local comparisons and PR CI, read npx joplo skill diff. It compares two real
 - --ref works only together with --applied. --applied is idempotent; text output without --format json ends with a Next: line listing the ids.
 
 Related topics: diff, demo, review, plugins
-<!-- joplo-skill 0.5.0 sha256:b165f88e81cf58777a3801747c84e6997c3968ad38ca298a703facca2eec806b -->
+<!-- joplo-skill 0.5.0 sha256:028890cb3b87344b5720325d036667837514e442593230425ae07d68b3f59904 -->

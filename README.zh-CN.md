@@ -19,7 +19,7 @@
 
 用 TSX 创作页面和流程，在本地看板（Board）查看，选定方案后构建静态发布站（Published site）；也可以一条命令分享出去，把可播放的徽章或嵌入播放器放进 README、文档和博客。源文件是权威源，版本交给 Git。按住 ⌥（Option/Alt）单击元素，就能把精确的文件和行号交给 Agent。
 
-也可以做独立的作品（例如讲解片）：在 `works/` 用 `work()` / `chapter()` 创作，用 `--work <键>` 只发布一件。
+项目是作品集，结构是作品 → 切片 → 步骤。`work()` 是唯一作品入口：独立作品写在 `works/<key>.tsx`，功能下的作品写在 `features/<f>/works/<key>.tsx`，都用 `title` / `summary`。功能是叠在作品上的评审层，添加情况、覆盖与选定；它下面的作品在界面上叫“方案”。讲解片用 `chapter()` 切片，用 `--work <键>` 只发布一件。详见[作品模型](docs/work-model.md)。
 
 ![Joplo 看板](docs/screenshots/board-play-initial.png)
 
@@ -103,7 +103,7 @@ npx joplo selection
 npx joplo feedback watch --local --follow --json
 ```
 
-反馈逐条以 NDJSON 输出，每条带 `eventId`、`optionId`、`sessionId`。它覆盖所有方案，改源码后自动接上新一轮评审；某个方案确认不会让它结束。看板停止时退出 1，Ctrl+C 退出 130。需要等待某个方案版本的确认、或从游标补收时，改用精确会话：先 `feedback list --local`，再 `feedback watch --local --session <id> [--after <序号>]`，确认后退出 0。详见[本地评审命令](docs/cli.md#review本地评审与流式监听)。
+反馈逐条以 NDJSON 输出，每条带 `eventId`、`workId`、`sessionId`。它覆盖所有方案，改源码后自动接上新一轮评审；某个方案确认不会让它结束。看板停止时退出 1，Ctrl+C 退出 130。需要等待某个方案版本的确认、或从游标补收时，改用精确会话：先 `feedback list --local`，再 `feedback watch --local --session <id> [--after <序号>]`，确认后退出 0。详见[本地评审命令](docs/cli.md#review本地评审与流式监听)。
 
 Share 通过同一个入口轮询：`npx joplo feedback watch --share <id> --work <功能.方案> --interval 15 --json`。默认每 15 秒，可设 10–30 秒。当前是快照轮询，已解决／已写回记录的完整补收需要 Cloud 扩展，详见[接口说明](docs/cloud-feedback-watch.md)。
 
@@ -115,7 +115,7 @@ layouts/app.tsx
 routes/page.tsx
 routes/members/page.tsx
 features/invite/feature.ts
-features/invite/options/a.tsx
+features/invite/works/a.tsx
 shared/
 themes/brand.css
 .joplo/selection.json
@@ -136,7 +136,7 @@ npx joplo build
 npx wrangler deploy --assets dist
 ```
 
-build 只发布选定方案。发布站与看板共用演示页布局，保留演示、字幕、层级和主题；规则、假设、覆盖缺口和源码位置留在创作侧。图片可在浏览器导出，视频仅本地导出。
+build 发布各功能选定的作品和已准备好的独立作品；草稿与没有切片的作品留在本地。发布站与看板共用演示页布局，保留演示、字幕、层级和主题；规则、假设、覆盖缺口和源码位置留在创作侧。图片可在浏览器导出，视频仅本地导出。
 
 部署使用你自己的 Wrangler 账号，并配置站点名与兼容日期；产物也能交给其他静态托管服务。输出目录、覆盖选项与截图用法见 [CLI 文档](docs/cli.md)。
 

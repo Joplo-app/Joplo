@@ -27,20 +27,20 @@
       "featureId": "invite",
       "featureName": "Invitations",
       "name": "Single invitation",
-      "before": "invite.main.send",
-      "after": "invite.main.send",
+      "before": "invite.a.send",
+      "after": "invite.a.send",
       "status": "modified",
       "reasons": [],
       "steps": [
         {
           "before": {
-            "id": "invite.main.send#1",
+            "id": "invite.a.send#1",
             "position": 1,
             "key": "open",
             "caption": "Open"
           },
           "after": {
-            "id": "invite.main.send#1",
+            "id": "invite.a.send#1",
             "position": 1,
             "key": "open",
             "caption": "Open"
@@ -52,7 +52,7 @@
         {
           "before": null,
           "after": {
-            "id": "invite.main.send#2",
+            "id": "invite.a.send#2",
             "position": 2,
             "key": "preview",
             "caption": "Preview"
@@ -65,13 +65,13 @@
         },
         {
           "before": {
-            "id": "invite.main.send#2",
+            "id": "invite.a.send#2",
             "position": 2,
             "key": "send",
             "caption": "Send"
           },
           "after": {
-            "id": "invite.main.send#3",
+            "id": "invite.a.send#3",
             "position": 3,
             "key": "send",
             "caption": "Send"
@@ -92,13 +92,13 @@
         },
         {
           "before": {
-            "id": "invite.main.send#3",
+            "id": "invite.a.send#3",
             "position": 3,
             "key": "complete",
             "caption": "Complete"
           },
           "after": {
-            "id": "invite.main.send#4",
+            "id": "invite.a.send#4",
             "position": 4,
             "key": "complete",
             "caption": "Complete"
@@ -113,8 +113,8 @@
       "featureId": "invite",
       "featureName": "Invitations",
       "name": "Initial status",
-      "before": "invite.main.initial",
-      "after": "invite.main.initial",
+      "before": "invite.a.initial",
+      "after": "invite.a.initial",
       "status": "modified",
       "reasons": [
         "initial-state"
@@ -122,12 +122,12 @@
       "steps": [
         {
           "before": {
-            "id": "invite.main.initial#1",
+            "id": "invite.a.initial#1",
             "position": 1,
             "caption": "Finish"
           },
           "after": {
-            "id": "invite.main.initial#1",
+            "id": "invite.a.initial#1",
             "position": 1,
             "caption": "Finish"
           },
@@ -141,19 +141,19 @@
       "featureId": "invite",
       "featureName": "Invitations",
       "name": "Read status",
-      "before": "invite.main.unchanged",
-      "after": "invite.main.unchanged",
+      "before": "invite.a.unchanged",
+      "after": "invite.a.unchanged",
       "status": "unchanged",
       "reasons": [],
       "steps": [
         {
           "before": {
-            "id": "invite.main.unchanged#1",
+            "id": "invite.a.unchanged#1",
             "position": 1,
             "caption": "Read"
           },
           "after": {
-            "id": "invite.main.unchanged#1",
+            "id": "invite.a.unchanged#1",
             "position": 1,
             "caption": "Read"
           },
@@ -167,15 +167,15 @@
       "featureId": "invite",
       "featureName": "Invitations",
       "name": "Repeated retry",
-      "before": "invite.main.ambiguous",
-      "after": "invite.main.ambiguous",
+      "before": "invite.a.ambiguous",
+      "after": "invite.a.ambiguous",
       "status": "uncertain",
       "reasons": [],
       "steps": [
         {
           "before": null,
           "after": {
-            "id": "invite.main.ambiguous#1",
+            "id": "invite.a.ambiguous#1",
             "position": 1,
             "caption": "Retry"
           },
@@ -188,7 +188,7 @@
         {
           "before": null,
           "after": {
-            "id": "invite.main.ambiguous#2",
+            "id": "invite.a.ambiguous#2",
             "position": 2,
             "caption": "Retry"
           },
@@ -201,7 +201,7 @@
         {
           "before": null,
           "after": {
-            "id": "invite.main.ambiguous#3",
+            "id": "invite.a.ambiguous#3",
             "position": 3,
             "caption": "Retry"
           },
@@ -213,7 +213,7 @@
         },
         {
           "before": {
-            "id": "invite.main.ambiguous#1",
+            "id": "invite.a.ambiguous#1",
             "position": 1,
             "caption": "Retry"
           },
@@ -226,7 +226,7 @@
         },
         {
           "before": {
-            "id": "invite.main.ambiguous#2",
+            "id": "invite.a.ambiguous#2",
             "position": 2,
             "caption": "Retry"
           },
@@ -239,12 +239,12 @@
         },
         {
           "before": {
-            "id": "invite.main.ambiguous#3",
+            "id": "invite.a.ambiguous#3",
             "position": 3,
             "caption": "Finish"
           },
           "after": {
-            "id": "invite.main.ambiguous#4",
+            "id": "invite.a.ambiguous#4",
             "position": 4,
             "caption": "Finish"
           },
@@ -259,14 +259,14 @@
       "featureName": "Invitations",
       "name": "Batch invitation",
       "before": null,
-      "after": "invite.main.batch",
+      "after": "invite.a.batch",
       "status": "added",
       "reasons": [],
       "steps": [
         {
           "before": null,
           "after": {
-            "id": "invite.main.batch#1",
+            "id": "invite.a.batch#1",
             "position": 1,
             "caption": "Select team"
           },
@@ -279,7 +279,7 @@
         {
           "before": null,
           "after": {
-            "id": "invite.main.batch#2",
+            "id": "invite.a.batch#2",
             "position": 2,
             "caption": "Send batch"
           },
@@ -295,14 +295,14 @@
       "featureId": "invite",
       "featureName": "Invitations",
       "name": "Legacy invitation",
-      "before": "invite.main.removed",
+      "before": "invite.a.removed",
       "after": null,
       "status": "removed",
       "reasons": [],
       "steps": [
         {
           "before": {
-            "id": "invite.main.removed#1",
+            "id": "invite.a.removed#1",
             "position": 1,
             "caption": "Legacy"
           },

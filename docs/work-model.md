@@ -1,199 +1,239 @@
-# 作品模型：实现契约（D102，2026-11-09）
+# 作品模型：现行实现契约（D102 / D103）
 
-决策见 `DECISIONS.md` D102。**这一轮的范围：外面按最终模型定对，里面先不动。**
-
-- “外面”= 作者的创作入口与文件布局、首页条目的投影、界面、命令行、发布站、技能与文档。它们一律按第 1 节的模型说话。
-- “里面”= IR 的容器与引擎内部。这一轮不改名、不搬结构：独立作品在 IR 里仍然是“一个 `Feature` + 一个隐藏的 `Option`”。丑的部分关在两个接缝后面：**编译映射**（`packages/core/src/films.ts` 一带）与**条目投影**（`packages/core/src/entries.ts`）。以后设计互动作品时再重构内部，届时外面不用跟着改。
-- 实现者以本文档为准；发现它不可行或自相矛盾时停下来说明，不要各自发挥。
+决策见 `DECISIONS.md` D102、D103。本文合并两轮契约：创作、内部 IR、界面、命令行与发布都使用同一个作品模型。没有用户，不保留旧创作入口、旧文件布局或旧 IR 的读取别名；发现实现与本文冲突时应报告并修正，不能各自推断另一套结构。
 
 ## 1. 模型
 
-核心只有两层，引擎（编译、回放、调度、渲染、发布）只认识这两层：
+核心是 **作品 → 切片 → 步骤**：
 
 - **作品（work）**：一个舞台（画面、层级、初始状态）加一组切片；有封面，能进首页。
-- **切片（scenario）**：舞台上的一段步骤。内部名沿用 `Scenario`；界面上按能力叫“场景”或“章节”。
+- **切片（scenario）**：舞台上的一段步骤。内部名继续用 `Scenario`；界面按能力叫“场景”或“章节”。
+- **步骤（step）**：一次用户操作或系统事件，以及它造成的可见变化。
 - **项目**：作品集。发布时可以只发其中一件。
 
-其余都是叠在作品上的**能力**，可以组合，引擎不为“形态”分支：
+其余是叠在作品上的能力，可以组合，引擎不为“形态”分支：
 
-| 能力 | 是什么 | 谁在用 |
+| 能力 | 含义 | 常见用法 |
 | --- | --- | --- |
-| 功能（feature） | 把几件**互为备选的作品**放在一起做设计评审：情况、覆盖、规则、待决问题、选定。一个“方案”就是功能下面的一件作品 | 功能演示 |
-| 接续（sequencing） | 作品的切片之间的关系：`independent`（各自独立，缺省）或 `linear`（章节：按顺序、默认接着上一章结尾的画面）。以后加 `branching`（观众的选择决定去向） | 影片用 linear |
-| 草稿（draft） | 独立作品不进发布与分享 | 重做一版时的旧版 |
+| 功能（feature） | 把几件互为备选的作品放在一起做设计评审：情况、覆盖、规则、待决问题、选定。功能下面的一件作品在界面上叫“方案” | 功能演示 |
+| 接续（sequencing） | 切片之间独立（缺省 `independent`），或按顺序、默认接着上一章结束画面的章节（`linear`） | 影片用 linear |
+| 草稿（draft） | 独立作品留在本地，不进发布与分享 | 重做一版时保留旧版 |
 | 封面与首页 | 所有作品都有，不是可选能力 | 全部 |
 
-- IR 里**没有“形态”字段**。“影片”“功能演示”只是技能里教的两种常见搭配：影片 = 独立作品 + linear；功能演示 = 功能 + 若干作品（方案）。
-- 互动小说 / 游戏以后需要的两项（观众的选择决定去向、观众的状态跨切片保留）这一轮不做，只在 `sequencing` 的取值上留位置。
-- 判断“该不该加一种新能力”的标准：只有创作结构或外围流程不同才加；内容类型的差别（3D、代码、媒体）交给插件。
+IR 没有“形态”字段。“影片”“功能演示”是常见搭配：影片 = 独立作品 + linear；功能演示 = 功能 + 若干作品（方案）。同一项目可以同时有两者。“方案 / option / alternative”只是功能下面作品的界面与文档称呼，不是另一种 IR 容器、创作函数或目录。
 
-## 2. 创作 API（`@joplo-app/kit`）
+新增能力的标准：只有创作结构或外围流程不同才加；3D、代码、媒体等内容差别交给插件。互动小说 / 游戏的观众选择分支与跨切片持久状态尚未实现，不能把一次本地自由体验误认为持久状态。
 
-新增 `work()`（独立作品）与 `chapter()`（章节）。没有 `film()`。功能下面的方案这一轮仍然用 `option()`（字段不变）；把它也并成 `work()` 属于内部重构的一部分，以后做。
+## 2. 创作 API 与文件布局
+
+`work()` 是唯一的作品入口；切片用 `flow()` 或 `chapter()`。创作原语来自 `@joplo-app/kit`，组件来自项目显式启用的插件。项目保留 `package.json` 的 `type: module` 与 JSX tsconfig（`jsx: react-jsx`、`jsxImportSource: @joplo-app/kit`）。
 
 ```tsx
-// works/midterms.tsx —— 独立作品（文件名 = 作品的键）
-import { work, chapter, narrate } from '@joplo-app/kit';
+// works/explainer.tsx —— 独立作品，文件名就是作品键
+import { $, work, chapter, narrate, set } from '@joplo-app/kit';
+import { Stack, Text } from '@joplo-app/plugin-ui';
 
 export default work({
-  title: '特朗普丢掉国会之后',                 // 必填
-  summary: '五分钟看懂 2026 美国中期选举',     // 必填：一句话简介（首页卡片、封面）
-  audience: '关心时事、不熟悉美国选举制度的人', // 可选：给谁看
-  roles: { me: role('我') },                    // 可选：出场说话的人
-  stage: <World />,                             // 画面：stage 是“只有一个层级”的简写
-  state: { ui: { … } },
-  scenarios: {                                  // 切片；键 = 切片键，声明顺序 = 播放顺序
-    hook: chapter('一夜之间，特朗普丢掉了整个国会', { expected: '知道发生了什么，带着三个问题往下看' })
-      .system('开票夜', narrate('十一月三号晚上……')),
-    basics: chapter('中期选举，到底在选什么？')   // 默认接着上一章结尾的画面
-      .system(…),
+  title: '请求为什么需要排队？',
+  summary: '跟随一个请求看懂队列',
+  audience: '第一次接触队列的观众',
+  state: { ui: { status: '等待请求' } },
+  stage: <Stack><Text>{$.ui.status}</Text></Stack>,
+  scenarios: {
+    arrival: chapter('请求到达', { expected: '理解请求为什么等待' })
+      .system('入队', set($.ui.status, '排队中'), narrate('一个请求加入队列。')),
+    finish: chapter('处理完成')
+      .system('响应', set($.ui.status, '已完成'), narrate('工作进程处理请求。')),
   },
 });
 ```
 
-- `work()` 的字段：`title`、`summary`（必填）、`audience`、`roles`（写法同 `feature.roles` 的键值写法）、`stage` | `layers`、`on`、`routes`、`viewport`（只对 `stage`）、`state`、`free`、`draft`、`order`、`scenarios`（必填，可以是空对象）。
-- 独立作品里不能写只有功能下面才有意义的东西：切片选项里的 `cases`、步骤效果 `uses()`（没有情况，也没有规则）。
-- `flow(name, opts)`：独立的切片，不变。
-- `chapter(name, opts)`：章节。选项与 `flow` 相同，区别只有一条：`from` 缺省 = 声明顺序里的上一章（第一章从初始状态开始）；`from: null` = 从初始状态重新开始；`from: '键'` = 接指定的切片。
-- `chapter()` 在独立作品和功能下面的方案（`option()` 的 `scenarios`）里都能用。
-- 一件作品（一个 `work()` 或一个 `option()`）的切片要么全是 `chapter()`，要么全是 `flow()`，不混用（`WORK_SLICES_MIXED`）。全是 `chapter()` 的作品是 linear。
-- 标题里不手写 `00`、`01` 编号：linear 作品的编号由看板、发布站、outline 按播放顺序自动加。
-
-## 3. 文件布局
-
-- `works/<key>.tsx`（或 `.ts`）：独立作品，`export default work({...})`。
-- `features/<f>/feature.ts` + `features/<f>/options/<o>.tsx`：功能与它的方案，不变。
-- 独立作品的键与功能的文件夹名共用一个命名空间，重名报错。
-- 只用 `stage` / `layers` 的作品不需要 `routes/`：没有任何 `routes/` 页面的项目由编译器合成一个空白 `/` 页面（内部细节）。
-
-## 4. IR（内部不动，不升 `SCHEMA_VERSION`）
-
-独立作品编译成现有容器：
-
-| 独立作品 | IR |
-| --- | --- |
-| 键 `midterms` | `Feature.id = 'midterms'`，`Feature.standalone = true` |
-| `title` / `summary` | `Feature.name` / `Feature.goal`；`Option.name` / `Option.idea` 也用它们 |
-| `audience` | `Feature.audience` |
-| `roles` | `Feature.roles`（带 id） |
-| `draft: true` | `Feature.draft = true`（只在 dev IR；publish / review 模式整件作品不进 IR） |
-| （无） | `Feature.caseIds = []`，`Feature.optionIds = ['midterms.main']`，`Feature.pick = 'midterms.main'` |
-| 隐藏的方案 | `Option.id = 'midterms.main'`，`key = 'main'`，`coverage = {}` |
-| `stage` | 一个层级：`Option.layers = { stage: { title: <作品标题>, sceneId: 'midterms.main~stage' } }` |
-| 切片 `hook` | `Scenario.id = 'midterms.main.hook'`，`name`、`description`、`expected`，`caseIds = []`，`mock = { label, outcome: 'success', auto: true }` |
-| 切片全是 `chapter()` | `Option.sequencing = 'linear'`（功能下面的方案同样适用） |
-| 章节的接续 | `Scenario.from`（缺省上一章；`from: null` 时没有这个字段） |
-
-- 内部字段（相对今天早些时候的基线）：`Feature.kind` 删除，换成 `Feature.standalone?: true`；`Feature.audience?`、`Feature.draft?` 保留；新增 `Option.sequencing?: 'linear'`（缺省 = independent）。
-- 切片 id 里的 `.main.` 是内部结构在外面唯一的痕迹（`render --scenario-id midterms.main.hook`、深链）。这一轮接受它；内部重构时会变成两段。
-- 没有任何 `routes/` 页面的项目由编译器合成一个空白 `/` 页面。
-- 发布：没有标 `draft` 的独立作品总是发布（不需要 `pick`）；`draft` 的在 publish / review 模式下连同它的切片、画面都不进 IR，并给一条 info（`WORK_DRAFT_SKIPPED`）。功能照旧。范围分享对任何切片同样生效。
-- 发布载荷（`packages/server/src/build.ts` 的白名单等）保留 `Feature.standalone`、`Feature.audience`、`Option.sequencing`；`draft` 不进公开载荷。
-
-### 首页条目的投影（`packages/core/src/entries.ts`，取代 `works.ts`）
-
-这是“外面”读内部结构的唯一入口：界面、命令行、技能生成都通过它（以及 `playSequence` / `scenariosOf`）看作品，不直接读 `Feature.standalone`、`Option.sequencing`、`Feature.pick`。
-
 ```ts
-type Entry = {
-  id: string;            // 功能 id 或独立作品 id
-  featureId: string | null; // 挂着的功能；独立作品为 null（内部：Feature.standalone）
-  workId: string | null; // 播放用的作品的内部 id（现在是 Option id）：独立作品是隐藏的那个；功能是选定的方案，没有选定时取第一个
-  title: string;         // 功能：feature.name；独立作品：work.title
-  summary: string;       // 功能：feature.goal；独立作品：work.summary
-  audience: string | null;
-  roles: string[];
-  draft: boolean;
-  sequencing: 'independent' | 'linear';
-  slices: EntrySlice[];  // 先是连续播放顺序里的，再是支线
-  ms: number;
-};
-entriesOf(project): Entry[]      // 按演示顺序（现有的 orderedFeatures）
-entryOf(project, id): Entry | null
+// features/invite/feature.ts —— 功能的 pick 写作品的文件名键
+import { feature } from '@joplo-app/kit';
+export default feature({
+  name: '邀请成员', goal: '在成员列表里完成邀请',
+  cases: { happy: { title: '邀请一个成员', expected: '看到邀请已发出' } },
+  pick: 'a-modal',
+});
 ```
 
-首页卡片、封面、看板的下拉、outline 都只读 `Entry`。
+```tsx
+// features/invite/works/a-modal.tsx —— 功能下面的作品，界面称为方案
+import { $, work, flow, set } from '@joplo-app/kit';
+import { Stack, Text } from '@joplo-app/plugin-ui';
+export default work({
+  title: 'A · 列表内邀请', summary: '让管理员留在成员列表',
+  focus: '入口放在哪', tradeoffs: ['列表需要放下邀请状态'],
+  state: { ui: { status: '尚未邀请' } },
+  stage: <Stack><Text>{$.ui.status}</Text></Stack>,
+  scenarios: {
+    happy: flow('发出邀请', { cases: ['happy'] })
+      .system('已发送', set($.ui.status, '邀请已发出')),
+  },
+});
+```
 
-### 不变量
+### 字段按位置校验
 
-1. **外面不判断形态，也不读内部结构**：界面、命令行、技能里没有“是不是影片”这种判断，只问能力——`entry.featureId !== null`（有没有挂功能）、`entry.sequencing`（切片是不是章节）、`entry.draft`。`packages/web/src`、`packages/cli/src` 不直接读 `Feature.standalone` 与 `Option.sequencing`（用源码守护测试固定）。
-2. **章节的默认接续只在编译期应用一次**，写进 `Scenario.from`；下游只读 `from`。
-3. **功能演示的行为不变**：没有独立作品、没有用 `chapter()` 的项目，编译出的 IR 与诊断和改动前相同（除 `kind` 字段本来就不存在）。
-4. **首页与封面只读 `Entry`**，时长就是 `Entry.ms` / `EntrySlice.ms`（来自 stepPlan），界面不另算。
-5. **每个发布出去的项目打开时先落在首页或封面上**：只有一个条目 → 它的封面；多个 → 首页。范围分享、嵌入、评审模式、手机观看同样。
-6. 任何作品走同一条编译路径（同一个 `lowerStep`、同一批插件钩子）。
-
-### 与云端的边界
-
-- 内部不动，所以发给云端的接口字段不变。
-- `Feature.standalone` / `audience`、`Option.sequencing` 是公开 IR 的新字段：云端给 Agent 的 JSON / Markdown 接口用固定版本的 core 严格解析公开 IR，会拒绝带这些字段的分享（上传与播放不受影响）。需要云端升级 core，记为遗留。
-
-## 5. 诊断
-
-| 代码 | 级别 | 何时 |
+| 位置 | 字段 | 误用时诊断 |
 | --- | --- | --- |
-| `WORK_INVALID` | error | 默认导出不是 `work({...})`；缺 `title` / `summary`；`scenarios` 不是对象或某一项不是 `flow()` / `chapter()` |
-| `WORK_ID_CONFLICT` | error | 独立作品的键和某个功能的文件夹名相同 |
-| `WORK_SLICES_MIXED` | error | 一件作品里 `chapter()` 与 `flow()` 混用 |
-| `WORK_FEATURE_ONLY` | error | 独立作品写了只有功能下面才有意义的东西（切片的 `cases`、`uses()`） |
-| `FROM_UNKNOWN` | error | `from` 写了不存在的切片键；列出这件作品的全部切片键 |
-| `WORK_EMPTY` | info | 独立作品还没有切片 |
-| `WORK_DRAFT_SKIPPED` | info | publish / review 模式跳过了草稿作品 |
+| 两处都可用 | `title`、`summary`（必填），`stage` 或 `layers`、`viewport`、`on`、`routes`、`state`、`free`、`scenarios`（必填，可空对象） | 值或结构不合格为 `WORK_INVALID` |
+| 只在功能下面 | `focus`、`tradeoffs`、`coverage`、`rules`、`questions`、切片的 `cases`、步骤的 `uses()` | 独立作品误用为 `WORK_FEATURE_ONLY` |
+| 只在独立作品 | `audience`、`roles`、`draft`、`order` | 功能下面误用为 `WORK_STANDALONE_ONLY` |
 
-- `HAPPY_PATH_ONLY`、`CASE_NOT_COVERED` 等评审类诊断只对功能生效（它们本来就按功能遍历）。
-- 对 linear 作品的切片，`SCENARIO_TOO_LONG` / `EMPTY_SCENARIO` 等诊断的**代码不变**，文案里用 Chapter 和自动编号。
-- 诊断文案里，功能下面的方案仍然说 option；独立作品说 work，不出现它那个隐藏的方案（`<键>.main`）。
+- `title` / `summary` 分别是标题与一句话简介；功能仍用 `name` / `goal` 描述功能本身。
+- `roles` 的键值写法为 `{ me: role('我') }`。功能下面的作品共用功能的角色；不要在每个作品重复声明。
+- `stage` 是单层舞台的简写，与 `layers` 二选一；`viewport` 只对 `stage` 生效。`on` 向已有页面插槽添加内容，`routes` 新增作品页面；`free` 是命名的本地反应字典。
+- `flow(title, opts)` 定义独立切片；`chapter(title, opts)` 的选项和步骤方法相同，只有默认接续不同：省略 `from` 接声明顺序里的上一章，第一章从初始状态开始；`from: null` 从初始状态重来；`from: '键'` 接指定切片。
+- 一件作品全部用 `chapter()` 或全部用 `flow()`，不混用（`WORK_SLICES_MIXED`）。章节标题不要手写编号；界面和 outline 按播放顺序自动编号。
+- `works/<key>.tsx`（或 `.ts`）放独立作品；`features/<f>/feature.ts` 和 `features/<f>/works/<key>.tsx` 放功能与它的作品。独立作品键与功能文件夹名共用命名空间，冲突报 `WORK_ID_CONFLICT`。
+- 遗留的功能备选目录必须改为 `works`，否则报 `OPTIONS_DIR_RENAMED`；同时统一为 `work({ title, summary })`，不留旧构造器别名。
+- 没有路由页面时，编译器合成空白 `/` 页面。其标题是内部标记，不参与显示、翻译，也不出现在界面、大纲或发布站路径列表。作者不需要占位页面。
+- 裸目录缺少模块 / JSX 配置时，`check` / `dev` 必须能载入，或给出说明缺什么、如何补齐的诊断，不能只抛加载堆栈。
 
-## 6. 命令行
+## 3. IR v3
 
-- `--option <id>`（`check`、`outline`、`feedback` 等）改成 `--work <id>`：接受方案的限定 id（`<功能>.<方案>`）或独立作品的键（内部解析成它隐藏的方案）。
-- `share` / `build` 的范围：`--work <id>` 取代 `--feature <id>`，接受条目 id（独立作品的键，或功能的键 = 它选定的作品；评审版是它的全部作品）；`--scenario <id>` 不变。选到草稿时报错，不静默发布空内容。
-- `joplo outline`：按条目分组。独立作品一段：`<title> · N chapters|scenarios · about M`，每个切片一行（linear 带编号）；草稿标 `(draft)`。功能的输出不变（列名里的 option 保留）。`--format json` 里每个条目带 `standalone`、`sequencing`、`draft`。
-- `joplo build` / `share` 的摘要：按条目计数；跳过的草稿列出来。
-- 帮助文字里只说 feature / option 的地方，改成同时覆盖独立作品。
+`SCHEMA_VERSION = 3`。独立作品与功能下面的作品走同一段降级逻辑，不合成假的功能或隐藏作品。
 
-## 7. 界面
+```ts
+Project {
+  schemaVersion: 3,
+  features: Record<Id, Feature>, // 只有真正的功能
+  works: Record<Qid, Work>,
+  entryIds: Id[],               // 必填：首页演示顺序，每个条目恰好一次
+  cases, rules, scenes, scenarios, issues, routes, …
+}
+Feature {
+  id, name, goal, roles, constraints, caseIds, source,
+  workIds: Qid[],               // 作品声明顺序
+  pick: Qid | null,             // 选定作品的限定 id
+  alternatives: Record<Qid, {
+    decisionFocus: string;
+    tradeoffs: string[];
+    coverage: Record<Qid, Coverage>;
+  }>,                          // workIds 中每件作品恰好一项
+}
+Work {
+  id: Qid,                     // 独立：<key>；功能下面：<featureId>.<key>
+  key: Id,                     // 文件名
+  featureId?: Id,              // 没有则是独立作品
+  title: string,
+  summary: string,
+  audience?: string,           // 只在独立作品
+  roles: Role[],               // 独立作品的角色；功能下面为空
+  draft?: true,                // 只在独立作品，只进 dev IR
+  sequencing?: 'linear',       // 未写即 independent
+  free?, routes: string[], layers, source,
+}
+Scenario.workId
+Scene.workId                   // 可以为 null
+Rule.workId? / Issue.workId?
+Route.addedBy                  // 仍然是作品 id
+```
 
-对照原型 `examples/joplo/features/film_form`（用户选定方案 A「左栏章节清单」）。**打开功能时，看板、发布站、嵌入与现在完全一样**（文案里的“方案”“情况”“场景”都保留）。
+- 评审信息归功能的 `alternatives`：作者的 `focus` 降级为 `decisionFocus`；`tradeoffs` 与 `coverage` 同样按作品 id 归档。作品不存这三个评审字段。`Feature` 不存独立作品的受众、草稿或独立标记。
+- 切片 id 为 `${workId}.${sliceKey}`：独立作品 `explainer.arrival` 是两段；功能下面 `invite.a-modal.happy` 是三段。画面 id 同理由作品 id 推出，例如独立作品的 stage 为 `explainer~stage`。
+- 不靠拆 id 字符串找结构：切片找作品读 `scenario.workId`，作品找功能读 `work.featureId`，切片键只在 `entries.ts` 一处计算。
+- 统一的 `rolesOf(project, workId)`：挂功能时读功能角色，否则读作品角色。层级的 `role` 引用同一组声明。
+- 章节默认接续只在编译期解析一次，写入 `Scenario.from`；`from: null` 时没有该字段。下游只读降级结果。
+- **版本规则**：公开载荷（publish / review IR）的结构，只要增、删、改名或改语义，就升 `SCHEMA_VERSION`；读取方按版本号严格解析。只在 dev IR 的字段变化不升版本。
+
+### 首页条目投影（`packages/core/src/entries.ts`）
+
+界面与 CLI 经 `entriesOf` / `entryOf`、`scenariosOf` / `playSequence` 读作品结构，不自己推断容器关系。
+
+- `Entry.id` 是功能 id 或独立作品 id；`featureId` 是挂着的功能或 `null`。
+- `Entry.workId` 是播放用作品 id：独立作品是它自己；功能是选定作品，没有选定时取第一件，无可用作品时为 `null`。
+- `title` / `summary`：功能用 `name` / `goal`，独立作品用自身的标题 / 简介。其余为 `audience`、角色名字 `roles`、`draft`、`sequencing`、`slices`、`ms`。
+- `slices` 先是连续播放顺序，再是支线。时长来自 core `stepPlan`：操作演示 + 停留与朗读估算中较长者；界面不另算。`EntrySlice.ms` 是切片时长，`Entry.ms` 是连续播放合计。
+- `entriesOf` 按 `entryIds` 取条目，`entryOf` 未找到返回 `null`。空功能、只有一件作品的功能、没有功能或没有独立作品的项目都不能依赖假容器兜底。
+- 外围只问能力：`entry.featureId !== null`、`entry.sequencing`、`entry.draft`。web / CLI 不直接读 `Work.featureId` 判断独立作品；源码守护测试固定此边界。
+
+### 发布与信息边界
+
+普通版保留每个功能 picked 作品；独立作品不需要 pick。review 版保留功能的全部作品。独立草稿与没有切片的作品留在本地，publish / review 连同切片、画面跳过并提示；显式范围选中它们时报错。只有一个零步骤切片与完全没有切片不同：前者可用于显示初始状态。
+
+`packages/server/src/build.ts` 的白名单保留 / 去除的信息与重构前相同，只换容器和字段位置。`draft` 不进公开载荷；私有规则、问题、取舍、源码位置不因公开过程展示而泄漏。普通 build 的自设计过程需整理为可见场景，不直接发布私有 review manifest。
+
+草稿页面与 `on` 贡献在插件钩子之前隔离；评审清单、范围分享和朗读入口共用发布归属边界。发布 CSS 只从最终公开载荷生成，不扫描草稿或未选定源码。真实凭证与音色配置不进 IR。
+
+### 字段流向
+
+| 字段 | 写入点 → 存储 → 读取点 → 消费者 |
+| --- | --- |
+| `works`、`Work.title/summary`、`workId` | 两种位置的 `work()` → 同一编译降级与 Project.works / 场景等归属字段 → entries、播放器、scope、白名单 → 看板、outline、发布、渲染、评审 / 反馈 |
+| `entryIds` | 文件发现与条目排序 → Project.entryIds → entriesOf → 首页、下拉、大纲与演示顺序 |
+| `Feature.workIds/pick` | 功能下作品声明顺序与 feature.pick 文件键 → 限定作品 id / 可空选定 → 条目投影、发布筛选 → 本地评审与普通 / 评审版 |
+| `Feature.alternatives` | 作者 focus/tradeoffs/coverage 与编译推导 → 功能上按作品 id 的评审记录 → 看板覆盖 / 取舍、outline、reviewManifest、发布白名单 → 评审面板、大纲、云端评审与同位置过滤后的公开 IR |
+| `Work.roles/audience` | 独立作品作者字段 → Work；功能角色仍在 Feature → rolesOf、entries、翻译与语音 / 发布白名单 → 层级角色、字幕 / 朗读、给谁看、封面与首页 |
+| `Work.sequencing`、`Scenario.from` | chapter 声明顺序 / 例外 → 编译期一次解析 → playSequence、entries → 编号、封面、连续播放与链式导出 |
+| `Work.draft` | 独立作品 draft → dev IR → 发布归属与模式过滤 → 本地草稿标记、构建跳过诊断；不存公开 IR |
+| 机器输出 `works/workId` | IR 投影、评审清单与反馈归一化 → JSON / NDJSON、本地会话与云端边界 → CLI、Agent、看板与云端读取方 → 按作品筛选、评审与回写 |
+
+## 4. 诊断
+
+| 代码 | 级别 | 何时 / 修法 |
+| --- | --- | --- |
+| `WORK_INVALID` | error | 默认导出、必填 title/summary 或共享字段不合格；scenarios 必须是 flow/chapter 对象 |
+| `WORK_ID_CONFLICT` | error | 独立作品键与功能文件夹名重复，改其中一方 |
+| `WORK_SLICES_MIXED` | error | 同一作品混用章节与独立切片，统一 builder |
+| `WORK_FEATURE_ONLY` | error | 独立作品使用评审字段、切片 cases 或 uses；移除或挂到功能下 |
+| `WORK_STANDALONE_ONLY` | error | 功能下作品写 audience/roles/draft/order；共享角色和排序改放功能，独立字段留在独立作品 |
+| `OPTIONS_DIR_RENAMED` | error | 发现旧备选目录；迁至 features/<f>/works 并使用 work({ title, summary }) |
+| `FROM_UNKNOWN` | error | from 不存在，按诊断列出的切片键修正 |
+| `WORK_EMPTY` | info | 没有切片，本地空状态可编辑；发布跳过，显式范围选中报错 |
+| `WORK_DRAFT_SKIPPED` | info | publish / review 跳过草稿，准备好后才去掉 draft |
+
+`HAPPY_PATH_ONLY`、`CASE_NOT_COVERED` 等评审诊断只对功能生效，不为独立影片编造失败情况。linear 切片的 `SCENARIO_TOO_LONG` / `EMPTY_SCENARIO` 等代码不变，文案用 Chapter 与自动编号；独立作品称 work，功能下仍称 option。诊断源位置指向真实作者文件。
+
+## 5. 命令行与线上格式
+
+- `check`、`outline`、`feedback` 的 `--work <id>` 接受独立作品键或功能下限定作品 id；不存在时报用法错误。项目仍整体编译，筛选不掩盖全项目错误。
+- `build` / `share --work <id>` 接受条目 id：独立作品键或功能键（普通版选定作品，评审版全部作品）；可重复。`--scenario <id>` 保持切片范围。草稿 / 无切片作品不能被显式发布。
+- `outline` 按条目分组：独立作品显示标题、切片数、总时长、每个切片的键 / 标题 / 步数 / 时长；linear 自动编号，草稿标 `(draft)`；功能仍显示情况、方案和覆盖。
+- 机器可读大纲使用现有命令 `outline --format json`。容器与归属字段用 `works` / `workId`，功能名、切片名等字段以各自模型为准，不从显示用“方案”反推旧结构。
+- `build` / `share` 摘要按条目计数，列出跳过的草稿。帮助文字同时覆盖独立作品与功能下作品。
+- 代码标识符与机器输出（IR、评审清单、反馈记录、看板 / 服务端接口）统一用 `workId`、`works`、`entryIds`、`alternatives`。给人看的“方案”和各语言现有译法保持，i18n 键不要求改名。
+- 路由与深链格式保持；独立切片使用两段 id，例如 `render --scenario-id explainer.arrival`、`#/s/explainer.arrival`；反馈 context.scenarioId 同样使用它。不要按固定段数猜归属。
+- 发布需遵守既有显式可见性与评审选择，不因本次重构自动获得上传或发布授权。
+
+### 云端边界
+
+`Joplo-app/joplo-cloud` 在主仓库完成后由单独任务升级相应版本，按 `schemaVersion: 3` 严格解析公开 IR，Agent 接口、作品集、评审清单 / 投票与反馈统一读新结构。数据库不做破坏性迁移，可保留已有列名，在边界映射。schemaVersion 2 分享的 Agent 接口继续返回现有“不支持”错误，上传和播放不受影响。这是独立的下游交接，不表示本文档任务已验证云端上线。
+
+## 6. 界面
+
+以当前 `WorkNav.tsx`、`nav-model.ts`、`player/cover-content.ts`、`site/SiteApp.tsx` 为依据；自设计原型在 `examples/joplo/features/film_form`，选定 A「左栏章节清单」。
 
 ### 看板
 
-- 顶栏的条目下拉：分两组，先“作品”（独立作品）后“功能”；每项右侧写摘要（独立作品：`5 章 · 4:40` 或 `3 个场景 · 0:40`；功能：`2 个方案`）；草稿带“草稿 · 不发布”。只有一组时不显示分组标题。
-- 左栏（当前条目是独立作品时）：
-  - 作品信息：`N 章 · 约 M`（或 `N 个场景 · 约 M`），标题，简介，“给：audience”（有才显示），草稿标记；
-  - 切片清单：linear 时每行带自动编号（两位）、标题（可换行）、第二行“时长 · 步数”；independent 时不编号；当前切片高亮；点一下跳到它的开头；不在连续播放顺序里的切片单独一组“支线”；
-  - 审片（linear 时）：胶片条命令 `npx joplo render --film --chain --scenario-id <第一个切片 id>` + 复制；
-  - 空状态：说明 + 第一个切片怎么写。
-- 独立作品**不显示**：方案区、情况区、覆盖缺口、其他方案的小标、“确认方案”。
+- 条目下拉分组先“作品”（独立作品）后“功能”，只有一组不出分组标题。独立作品右侧如“5 章 · 4:40”或“3 个场景 · 0:40”，草稿加“草稿 · 不发布”；功能沿用当前的选定方案字母与缺口摘要，未选定时显示未选定，**不是方案数量**。混合项目的无障碍名称使用不限定功能的说法。
+- 独立作品左栏：切片数 / 约时长、标题、简介、观众（有才显示）与草稿标记。linear 行带两位编号，independent 不编号；标题可换行，第二行为时长 / 步数；当前切片高亮，点击跳到开头，支线单列。
+- linear 左栏提供胶片条命令 `npx joplo render --film --chain --scenario-id <第一章 id>` 与复制。空作品说明应在哪个源文件写第一段切片。
+- 独立作品不显示方案区、情况区、覆盖缺口、其他方案小标或“确认方案”。功能条目保留评审界面。
+- “下一章”卡片包含章节编号。看板样式扫描是否保留标准 UI 来源，由看板所需样式决定并在代码注明；发布站仍只从公开载荷产出 CSS。
 
 ### 发布站与嵌入
 
-- 首页（多个条目时）：每个条目一张卡片，读 `Entry`——标题、简介、“给：…”（`audience`，没有时用 `roles` 的名字，沿用现有的 `forRoles` 文案）、切片数与总时长（linear 写“5 章 · 约 4 分 40 秒”，independent 写“N 个场景 · 约 M”）、缩略图、打开按钮。
-- 不变量 6：打开先落在首页或封面上。
-- 封面（第 0 步、没在播放时）：标题、简介、给谁看、切片数与时长、播放。linear 作品从中间某一章直接打开时显示这一章的封面（“第 n 章 · 标题”与 description）。功能的封面外观不变（D61），数据从 `Entry` 取。
-- 用词按能力：linear → “章节”（电脑和手机一致，带编号与时长）；independent → “场景”。**功能选定的作品如果是 linear，同样叫章节。**
-- 只发布一件作品（`--work`）时，发布站就是这件作品：打开直接是它的封面，没有首页与条目切换。
-- 路由与深链的格式不变（条目 id 就是现在的 feature id）。
+- 多条目首页每个条目一张卡片：标题、简介、缩略图、打开按钮；独立作品显示切片数 / 总时长与 audience（没有时用角色名字）。**功能卡片只显示角色与切片数，不写总时长**；选定作品 linear 时切片数用“章”。
+- 任意发布项目先落首页或封面：一个条目直接到其封面，多个条目到首页；范围分享、嵌入、评审模式、手机观看同样。只发布一件作品时没有首页与条目切换。
+- 独立作品第一个切片的第 0 步是作品封面：标题、简介、给谁看、切片数 / 时长、播放。从中间打开时是切片封面：linear 用“第 n 章 · 作品标题”（支线另标）加切片标题与 description。
+- **功能选定作品即使 linear，封面也沿用 D61 场景封面**：所属功能与方案、切片标题 / description（缺省功能 goal）、步数 / 约时长、出场角色；不换成独立作品封面。
+- 用词按能力：linear 叫“章节”（电脑 / 手机一致，编号与时长），independent 叫“场景”；功能选定作品为 linear 同样叫章节。
+- 所有时长来自 stepPlan / Entry / EntrySlice，不由界面再算。新增界面文案补齐全部 10 种语言，遵循 `packages/web/src/i18n/README.md`。
 
-### 文案
+## 7. 验证、技能与示例
 
-新增 / 改动的界面文字补齐全部 10 种界面语言，遵循 `packages/web/src/i18n/README.md`。
+- 所有作品走相同的 lowerStep 与插件钩子。重构前保存仓库外 dev / publish / review IR（至少 joplo、invite、midterms-2026、llm-explainer、starter），用纯改名 / 字段搬家映射比较：画面、步骤、状态、时长与非改名诊断等价。
+- 没有功能、没有独立作品、空切片、pick 为 null、功能只有一件作品都需验证。外面不判断形态、不拆 id 推结构，章节默认接续只编译一次。
+- 技能先讲作品 → 切片 → 步骤；story 的 PM 视角、cases / coverage 明确只适用于功能下作品。内容技能用 work / chapter 教影片，不借情况当章节。
+- 引擎指南 / 入口与插件指南是权威来源；常见坑逐条保留，字段位置、诊断、两段切片 id 与 JSON 输出同步。运行 `pnpm skills:build` 和 `pnpm skills:build --check`，生成物与安装版逐字一致，不用强制覆盖掩盖用户修改。
+- 内容示例统一迁至 works：llm-explainer、midterms-2026、manus-voice、button-40-years、code-change、media-upload。重做旧版用另一件独立作品加 draft。保留实际角色、接续语义与翻译，移除占位页面与手写章节编号；case.expected 迁到章节 expected。
+- 自设计项目只维护 examples/joplo；保留稳定功能 ID 和真实决策证据，不伪造选定历史。starter 继续以功能评审起步，作品文件同样用 work 与功能下 works 目录。
 
-## 8. 示例、技能、模板
+## 8. 遗留
 
-- 迁成独立作品（`works/<key>.tsx`，切片用 `chapter()`）：`llm-explainer`、`midterms-2026`、`manus-voice`、`button-40-years`、`code-change`、`media-upload`。删除占位的 `routes/page.tsx` 与 `features/`；章节标题去掉手写编号；`case.expected` 搬到对应章节的 `expected`。
-  - `midterms-2026`：`b-film` → `works/midterms.tsx`；`a-explainer` → `works/midterms-v1.tsx`，标 `draft: true`。
-- 技能（发布站与技能是这次改动的一部分，不是收尾）：
-  - 引擎技能先讲模型：作品 → 切片 → 步骤；能力怎么叠（功能评审、章节接续、草稿）；“要比较方案、列情况、做设计决定 → 功能 + 方案；要做一支给人看的片子 → 独立作品 + 章节；同一个项目可以都有”。
-  - story 的 PM 视角、cases、coverage 这些主题开头写明只适用于挂了功能的作品。
-  - `plugins/content/src/guide.ts`（内容主题）按 `work()` / `chapter()` 讲，删掉“功能当一集、情况当章节”“忽略 HAPPY_PATH_ONLY”“重做时加一个方案”“每章写 flow({ from })”“路径页面只是占位”。
-  - check 的常见代码表加上第 5 节的新代码与修法；发布相关段落说明独立作品不需要 pick、草稿不发布、`--work` 只发一件。
-  - 常见坑逐条保留，不合并、不删减。改完运行 `pnpm skills:build`。
-- `examples/joplo/features/film_form` 是这次设计的记录：把里面的代码示例、规则、待决问题更新到最终的模型（`works/`、`work()`、没有 `film()`），`pick` 设为 `a-chapters`。
-- `templates/starter` 仍是功能演示，不改；是否再提供一个独立作品的模板待定。
-
-## 9. 遗留（内部重构时一起做）
-
-- IR 改成中性的两层：`Option` → `Work`、功能变成作品上面可选的一层、评审信息（覆盖、取舍）从作品移到功能、切片 id 变两段、`option()` 并成 `work()`。
-- 云端的 IR 解析升级。
-- `branching` 与跨切片保留观众状态（互动小说 / 游戏）。
+- `branching`：由观众选择决定切片去向。
+- 观众状态跨切片保留（互动小说 / 游戏）；当前自由体验仍会在播放、跳步、换切片、重置时丢弃。
+- 是否另提供独立作品起步模板；当前只有功能演示 starter。
