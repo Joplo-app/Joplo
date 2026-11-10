@@ -14,7 +14,8 @@ import { featuresOf } from './features.ts';
 import { JoploError } from './result.ts';
 import type { Project, SceneNode } from './schema.ts';
 
-export const REVIEW_MANIFEST_VERSION = 1 as const;
+/** 2（D103）：features[].options → works、optionId → workId、scenarios[].featureId 可为 null、新增顶层 works（独立作品）。清单的结构变了就升，云端按版本号严格解析。 */
+export const REVIEW_MANIFEST_VERSION = 2 as const;
 /** 契约 8.1：评审清单 JSON（UTF-8）最多 512 KiB。 */
 export const REVIEW_MANIFEST_MAX_BYTES = 512 * 1024;
 

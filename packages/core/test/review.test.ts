@@ -73,7 +73,7 @@ describe('reviewManifest', () => {
     const m = reviewManifest(dev, 'review');
     expect(keys(m)).toEqual(['elements', 'features', 'mode', 'scenarios', 'v', 'works']);
     expect(m.works).toEqual([]);
-    expect(m.v).toBe(1);
+    expect(m.v).toBe(2);
     expect(m.mode).toBe('review');
     expect(m.features.map((f) => f.id)).toEqual(['f', 'g']);
     for (const f of m.features) {
