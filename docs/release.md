@@ -170,3 +170,5 @@ npm deprecate '<old-package>@<range>' 'Use the corresponding @joplo-app package.
 [模板仓库](https://github.com/Joplo-app/joplo-templates)与主仓库隔离，由维护者手动更新默认分支；模板不参与发版，不同步版本、不打同版本 tag，发布 CI 不读写模板仓库。模板默认分支须能被最新发布的 CLI 使用，旧版本不保证。已发布的 0.6.0 及更早 CLI 仍下载主仓库原 tag，原 tag 的文件不受当前 checkout 删除影响。
 
 `release:smoke` 用 `scripts/fixtures/smoke/feature` 与 `scripts/fixtures/smoke/standalone` 两个本地测试夹具，通过 `init --template <夹具路径>` 走初始化；它们只供测试，不作为产品起步来源。全程不下载模板仓库；在仓库外只安装 tarball，保留 check/build、读回产物确认功能情况和独立作品章节、引擎技能一致性、安装后插件技能同步与产物扫描。另从安装后的技能文件构造 ui + diagram + content 演示，check 通过后用真实 Chromium 打开 dev，再用本机静态服务器打开构建产物（除它之外不许有网络请求，D98）前进/回退验证发布站。测试驱动使用工作区 Playwright，不把它安装到用户项目；CI 先安装 Chromium，本地可用 `pnpm --filter @joplo-app/server exec playwright install chromium` 准备。下载默认分支、名称解析、占位替换、私有令牌、解压失败与路径穿越由 CLI 单元测试中的内存 tarball 覆盖。
+
+`@joplo-app/plugin-media` 首次纳入公开发布。原有十一个包的 Trusted Publishing 配置不代表此新包已经配置；代码与 tarball 检查可以先进行，首次 npm 发布权限和可信发布方需在最终发布阶段单独核验。测试不得创建 registry 版本或写入发布凭证。

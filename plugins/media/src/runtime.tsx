@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import lottie from 'lottie-web/build/player/lottie_light';
+import lottie from 'lottie-web/build/player/lottie_light.js';
 import { defineRuntime, embeddedAsset, type ComponentCtx } from '@joplo-app/kit/plugin';
 import { useEngineFrame, useRoot } from '@joplo-app/kit/renderer';
 import type { ClipFrame } from './model.ts';

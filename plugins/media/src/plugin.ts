@@ -30,7 +30,7 @@ const startOf = (node: PluginIRNode) => (typeof node.props?.start === 'number' &
 const media = definePlugin({
   packageName: '@joplo-app/plugin-media',
   id: 'media', title: 'Media', version: packageInfo.version,
-  runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
+  runtime: new URL(new URL(import.meta.url).pathname.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
   components: {
     Video: { doc: 'src={asset(\'./clip.mp4\')} (mp4 / webm), w?, h?, fit?=\'cover\'|\'contain\', start? (seconds shown before the first play); a muted video clip played by playClip', needsId: true, selfEvident: true },
     Lottie: { doc: 'src={asset(\'./anim.json\')} (Lottie JSON), w?, h?, start?; a vector animation played by playClip', needsId: true, selfEvident: true },
@@ -94,7 +94,7 @@ export { sfx, type SfxOptions } from './sfx.ts';
 /** Enable this manifest instead of the default media manifest when using local sound effects. */
 export function withSoundEffects(assets: Record<string, string>) {
   return definePlugin({ ...media,
-    local: new URL(import.meta.url.endsWith('.ts') ? './local.ts' : './local.js', import.meta.url),
+    local: new URL(new URL(import.meta.url).pathname.endsWith('.ts') ? './local.ts' : './local.js', import.meta.url),
     compile: { ...media.compile, effect(effect, ctx) {
       if (effect.name !== 'sfx') return media.compile!.effect!(effect, ctx);
       const p = effect.payload as { name?: unknown; volume?: unknown; offsetMs?: unknown } | null;

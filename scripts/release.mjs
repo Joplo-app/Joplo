@@ -383,6 +383,7 @@ async function smoke() {
     for(const name of ['joplo','@joplo-app/kit',...['ui','diagram','content','alda'].map(p=>`@joplo-app/plugin-${p}`)])assert(pkg.devDependencies[name]===v,`Feature fixture must pin ${name} to ${v}`);
     pkg.devDependencies = Object.fromEntries(Object.keys(pkg.devDependencies).map(name=>[name,tgz[name]??pkg.devDependencies[name]]));
     pkg.devDependencies['@joplo-app/plugin-3d'] = tgz['@joplo-app/plugin-3d'];
+    pkg.devDependencies['@joplo-app/plugin-media'] = tgz['@joplo-app/plugin-media'];
     pkg.overrides = overrides;
     fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
     sh(npm, ['install', ...npmFlags], project);
@@ -394,6 +395,22 @@ async function smoke() {
       assert(readJson(path.join(p, 'package.json')).version === v, `${n} 版本应为 ${v}`);
     }
     assert(!fs.existsSync(path.join(project, 'node_modules/playwright')), 'playwright 不应被默认安装');
+
+    sh(process.execPath, ['--input-type=module', '-e', `
+      import media, {withSoundEffects, sfx} from '@joplo-app/plugin-media';
+      import local from '@joplo-app/plugin-media/local';
+      import runtime from '@joplo-app/plugin-media/runtime';
+      import {skill} from '@joplo-app/plugin-media/guide';
+      globalThis.fetch=()=>{throw new Error('Network forbidden during local sound smoke');};
+      const b=Buffer.alloc(844);b.write('RIFF');b.writeUInt32LE(836,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(8000,24);b.writeUInt32LE(8000,28);b.writeUInt16LE(1,32);b.writeUInt16LE(8,34);b.write('data',36);b.writeUInt32LE(800,40);
+      const input='data:audio/wav;base64,'+b.toString('base64'), plugin=withSoundEffects({cue:input});
+      if(media.id!=='media'||runtime.id!=='media'||!String(plugin.local).endsWith('/local.js')||!skill.includes('sfx.play'))throw new Error('Published media entrypoints failed');
+      const info=await local.compilers.sfx.inspect(input,{});const bytes=await local.compilers.sfx.compile(input,{maxBytes:10000});
+      if(info.durationMs!==100||!Buffer.from(bytes).equals(b))throw new Error('Published WAV compiler failed');
+      const lowered=plugin.compile.effect(sfx.play('cue'),{resource:()=> 'sound',report:()=>{throw new Error('Published SFX lowering failed');}});
+      if(!lowered.media[0].oneShot||lowered.media[0].durationMs!==100)throw new Error('Published SFX event failed');
+    `], project);
+    log('  ✓ installed media plugin: entrypoints, skill, local PCM WAV compiler and one-shot event');
 
     // Optional plugin is installed explicitly; its author/local/runtime exports must work without workspace tools.
     const probe = sh(process.execPath, ['--input-type=module', '-e', `
