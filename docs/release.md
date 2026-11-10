@@ -17,7 +17,7 @@
 | `@joplo-app/cli` | 命令实现 |
 | `joplo` | Node 版本检查与命令转发入口 |
 
-默认模板不安装 3D 插件，项目按需显式安装并启用。十二份公开 tarball（含 `@joplo-app/plugin-3d`）统一为 0.3.0；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
+默认模板不安装 3D 插件，项目按需显式安装并启用。十二份公开 tarball（含 `@joplo-app/plugin-3d` 与 `@joplo-app/plugin-media`）必须使用相同版本；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
 
 `release:version` 同步插件的轻量 `src/version.json`，运行时只读取版本，避免把整个开发 manifest 带进浏览器。
 
