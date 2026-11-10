@@ -12,7 +12,8 @@ fs.mkdirSync(root,{recursive:true});
 afterAll(()=>{/* Evidence intentionally retained. */});
 it('invalidates content identity when theme CSS, cached clip bytes or runtime build changes',()=>{
   const source=path.join(root,'source');fs.mkdirSync(path.join(source,'.joplo/voice/clips'),{recursive:true});
-  const files=['theme.css','.joplo/voice/clips/audio.wav','runtime.js'];
+  fs.mkdirSync(path.join(source,'output'),{recursive:true});
+  const files=['theme.css','render-custom.css','output/widget.ts','.joplo/voice/clips/audio.wav','runtime.js'];
   for(const name of files)fs.writeFileSync(path.join(source,name),'original');
   let before=contentIdentity([source]);
   for(const name of files){fs.writeFileSync(path.join(source,name),'changed');const after=contentIdentity([source]);expect(after).not.toBe(before);before=after;}

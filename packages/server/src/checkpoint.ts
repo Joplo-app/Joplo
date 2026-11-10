@@ -16,7 +16,10 @@ export function contentIdentity(roots: readonly string[], excluded: readonly str
     const stat = fs.statSync(real);
     if (stat.isDirectory()) {
       for (const name of fs.readdirSync(real).sort()) {
-        if (['node_modules','.git','scratch','output','coverage','.cache'].includes(name)||name.endsWith('.tmp')||name.endsWith('.lock')||/^(inspect|render|job)-/.test(name)) continue;
+        if (['node_modules','.git'].includes(name)) continue;
+        // Only the managed resource host owns these exact temporary naming schemes.
+        const resourceCache=real.split(path.sep).slice(-2).join('/')==='.joplo/resources';
+        if(resourceCache&&(/^(inspect|job)-[A-Za-z0-9]{6}$/.test(name)||/^[0-9a-f]{64}\.(?:mjs|json|info\.json)(?:\.[0-9a-f-]{36}\.tmp|\.lock)$/.test(name)))continue;
         if (name === '.joplo') { for (const cache of ['voice','binary','resources']) visit(path.join(real,name,cache)); continue; }
         visit(path.join(real,name));
       }
