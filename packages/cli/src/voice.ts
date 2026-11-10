@@ -81,7 +81,7 @@ export async function voiceCommand(projectDir: string, opts: { dryRun: boolean; 
     lines.push(opts.dryRun
       ? `${tag}${l.missing} clip(s) to generate for ${l.segments} step(s), about ${n(l.chars)} characters (steps with the same text share one clip)`
       : `${tag}generated ${l.generated}, ${l.skipped} already had audio${l.failed.length ? `, ${l.failed.length} failed` : ''}`);
-    if (opts.dryRun) for (const d of l.details ?? []) lines.push(`  ${d.workId} / ${d.scenarioId} / ${d.stepId}: ${d.chars} characters, ${d.missing ? `${d.billableChars} to generate` : d.text ? 'cached' : 'silent'}`);
+    if (opts.dryRun) for (const d of l.details ?? []) lines.push(`  ${d.workId} / ${d.scenarioId} / ${d.stepId}: ${d.chars} characters, ${d.missing ? `${d.estimatedBillableChars} estimated characters to generate (local cache only)` : d.text ? 'cached' : 'silent'}`);
     for (const f of l.failed) lines.push(`  failed ${f.stepId}: ${f.message}`);
   }
   if (r.quota) lines.push(voiceQuotaLine(r.quota));

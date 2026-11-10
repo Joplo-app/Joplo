@@ -401,7 +401,7 @@ it('explicit mute spends no characters, keeps caption fallback default, and reco
   const dry = await generateProjectVoice({ projectDir: proj, project: p, home, cloud: f.bridge, dryRun: true });
   expect(dry.total).toMatchObject({ segments: 1, missing: 1, chars: 4 });
   expect(dry.locales[0]!.details).toHaveLength(2);
-  expect(dry.locales[0]!.details![1]).toMatchObject({ chars: 0, billableChars: 0, missing: false });
+  expect(dry.locales[0]!.details![1]).toMatchObject({ chars: 0, estimatedBillableChars: 0, missing: false });
   expect(f.calls).toHaveLength(0);
   await generateProjectVoice({ projectDir: proj, project: p, home, cloud: f.bridge });
   expect(f.calls.map(c => c.text)).toEqual(['中文旁白']);

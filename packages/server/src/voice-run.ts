@@ -34,7 +34,8 @@ export type VoiceRunOptions = {
   fetch?: (url: string, init?: RequestInit) => Promise<Response>;
 };
 
-export type VoiceStepDetail = { workId: string; scenarioId: string; stepId: string; text: string; chars: number; missing: boolean; billableChars: number };
+/** Estimates use local cache only; remote Cloud cache hits can reduce the actual charge to zero. */
+export type VoiceStepDetail = { workId: string; scenarioId: string; stepId: string; text: string; chars: number; missing: boolean; estimatedBillableChars: number };
 export type VoiceRunLocale = { details?: VoiceStepDetail[]; locale: string | null; segments: number; missing: number; chars: number; generated: number; skipped: number; failed: { stepId: string; message: string }[] };
 export type VoiceRunResult = {
   profile: { id: string; name: string; kind: string } | null;
@@ -123,12 +124,12 @@ export async function generateProjectVoice(opts: VoiceRunOptions): Promise<Voice
     for (const sc of Object.values(p.scenarios)) for (const st of sc.steps) {
       if (!selectedIds.has(sc.id)) continue;
       const seg = segmentById.get(st.id);
-      if (!seg) { details.push({ workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: '', chars: 0, missing: false, billableChars: 0 }); continue; }
+      if (!seg) { details.push({ workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: '', chars: 0, missing: false, estimatedBillableChars: 0 }); continue; }
       const planned = cache.plan(seg, resolved);
       const missing = !!planned && !cache.clipOf(planned.key);
-      const billableChars = missing && planned && !seen.has(planned.key) ? spokenChars(planned.text) : 0;
+      const estimatedBillableChars = missing && planned && !seen.has(planned.key) ? spokenChars(planned.text) : 0;
       if (planned) seen.add(planned.key);
-      details.push({ workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: seg.text, chars: spokenChars(seg.text), missing, billableChars });
+      details.push({ workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: seg.text, chars: spokenChars(seg.text), missing, estimatedBillableChars });
     }
     const row: VoiceRunLocale = { details, locale, segments: segments.length, missing: est.steps, chars: est.chars, generated: 0, skipped: 0, failed: [] };
     result.locales.push(row);
