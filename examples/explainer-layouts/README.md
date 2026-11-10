@@ -13,7 +13,7 @@ pnpm joplo dev examples/explainer-layouts
 
 `QuoteCard` 同时展示原文、标明译文的中文、双语姓名、身份、日期与长来源名。`StatusBadge` 的状态/解释由作者传入；示例的“演示数据”不表示核实或认证。`RatioBar` 接收左右计数、总量、阈值与标签；中间保留未定量，不将已知部分重新归一化。纯计算测试覆盖总量和阈值边界。
 
-画面将品牌放在上方，主体从下方开始；来源状态与字幕有独立底部空间。长引语使用实际换行高度，竖屏不是横屏整体缩小。发布前检查每个章节终态和动态转换，长来源名、译文和图片署名都必须可见。密集点阵在窄屏中可改用比例条；本例不包含席位点阵，避免未经验证的点径算法。
+画面在顶部先为宿主步骤角标保留约 60 设计像素，再放品牌与主体；来源状态与作品脚注上移，底部另外留给宿主当前旁白条。长引语使用实际换行高度，竖屏不是横屏整体缩小。发布前检查每个章节终态和动态转换，长来源名、译文和图片署名都必须可见。密集点阵在窄屏中可改用比例条；本例不包含席位点阵，避免未经验证的点径算法。
 
 这是仓库 example，不改独立的 `Joplo-app/joplo-templates` 模板仓库。可复用实践已同步 `joplo skill content/patterns`：双画幅的安全区、长引语真实测量、资料状态的作者语义与未定比例。
 
@@ -25,4 +25,4 @@ pnpm joplo render examples/explainer-layouts --scenario-id landscape.long --shee
 pnpm joplo render examples/explainer-layouts --scenario-id portrait.short --video --chain --voice off --clean --viewport 720x1280 --width 720 --height 1280 --no-frame --out portrait.webm
 ```
 
-`--width/--height` 只决定输出画幅，不能代替 `--viewport`。`--clean` 隐藏播放器步骤标题/完成徽标，保留作品自行绘制的品牌、来源及字幕区；静态 sheet 的播放器标题仍可能显示在作品之上。
+`--width/--height` 只决定输出画幅，不能代替 `--viewport`。`--clean` 隐藏播放器步骤标题/完成徽标，保留作品自行绘制的品牌、来源及字幕区；静态 sheet 的播放器标题仍会显示，因此本例顶部和底部也给这些覆盖层留出空间。
