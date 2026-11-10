@@ -112,14 +112,14 @@ describe('IR v3 字段搬迁的消费者', () => {
   });
 });
 
-it('本地评审读取用 work 参数，选中写回正文用 workId；切换作品时不改变条目路由格式', async () => {
+it('本地评审读取用 workId 参数，选中写回正文用 workId；切换作品时不改变条目路由格式', async () => {
   const { fetchLocalReview, selectionWriter } = await import('../src/runtime/dev-client');
   const { boardHash, parseBoardHash } = await import('../src/runtime/route');
   vi.stubGlobal('document', { querySelector: () => ({ content: 'test-token' }) });
   const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ session: null, selection: null }), { status: 200 }));
   vi.stubGlobal('fetch', fetch);
   await fetchLocalReview('test-project', 'invite.a');
-  expect(fetch.mock.calls[0]![0]).toBe('/__joplo/p/test-project/review?work=invite.a');
+  expect(fetch.mock.calls[0]![0]).toBe('/__joplo/p/test-project/review?workId=invite.a');
   const input = { workId: 'invite.a', scenarioId: 'invite.a.main', sceneId: 'scene', position: 0, nodeId: null };
   await selectionWriter('test-project')(input);
   expect(JSON.parse(fetch.mock.calls[1]![1]!.body as string)).toEqual({ selection: input });

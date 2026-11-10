@@ -164,7 +164,7 @@ export async function fetchLocalReview(projectId: string, workId: string): Promi
   try {
     const headers = writeHeaders(false);
     if (!headers) throw new MessageError(m.board.thisPageHasNoLocalToken);
-    const res = await fetch(`/__joplo/p/${enc(projectId)}/review?work=${enc(workId)}`, { headers, cache: 'no-store' });
+    const res = await fetch(`/__joplo/p/${enc(projectId)}/review?workId=${enc(workId)}`, { headers, cache: 'no-store' });
     return res.ok ? { ok: true, state: await res.json() as LocalReviewState } : { ok: false, message: await readError(res) };
   } catch (e) { return { ok: false, message: errMsg(e) }; }
 }

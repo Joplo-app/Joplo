@@ -8,7 +8,7 @@ import { useBoardI18n } from '../i18n/board/context';
 import { LocalText } from '../i18n/LocalText';
 import type { Text } from '../i18n/messages';
 import { fetchLocalReview, writeLocalReviewEvent } from '../runtime/dev-client';
-import { captureReviewDraft, localReviewCommand, readReviewDraft, reviewDraftKey, saveReviewDraft, type ReviewDraft } from './review-model';
+import { captureReviewDraft, localReviewCommand, localReviewTitle, readReviewDraft, reviewDraftKey, saveReviewDraft, type ReviewDraft } from './review-model';
 import { useReviewDrag } from './useReviewDrag';
 
 /** 跨页面保留草稿的位置；portal 浮层与图标均不占布局宽度。 */
@@ -128,7 +128,7 @@ export function LocalReview({ projectId, project, workId, context, version, enab
       <div className="flex shrink-0 items-center justify-between border-b border-jb-line px-4 py-3"><h2 className="text-[15px] font-semibold">{l.localReviewTitle}</h2><Btn icon={<X className="size-4" />} label={l.localReviewClose} iconOnly variant="ghost" onClick={() => setOpen(false)} /></div>
       <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4">
         <div className="text-[12px] text-jb-muted" role="status">{!session ? l.localReviewLoading : status === 'approved' ? l.localReviewApproved : state!.watchers > 0 ? l.localReviewListening : l.localReviewSavedLocally}</div>
-        {session ? <p className="text-[13px] font-semibold">{session.featureName} / {session.workTitle}</p> : null}
+        {session ? <p className="text-[13px] font-semibold">{localReviewTitle(session)}</p> : null}
         {draft ? <div className="rounded-[6px] border border-jb-line bg-jb-sunken p-2 text-[12px]" data-testid="local-review-context"><div className="text-jb-muted">{l.localReviewLocation}</div><div>{draft.pageTitle}</div><div>{draft.scenarioName} · {t.player.number(draft.context.position)}</div></div> : null}
         {shifted ? <p className="text-[12px] text-jb-muted">{l.localReviewLocationKept}</p> : null}
         {!enabled ? <p role="alert" className="text-[12px] text-jb-danger">{l.localReviewCompileFirst}</p> : null}

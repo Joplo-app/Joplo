@@ -21,3 +21,8 @@ const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 export function localReviewCommand(session: LocalReviewSession): string {
   return `npx joplo feedback watch ${quote(session.projectDir)} --local --follow --json`;
 }
+
+/** 本地评审的标题：独立作品的会话没有所属功能。 */
+export function localReviewTitle(session: { featureName: string | null; workTitle: string }): string {
+  return session.featureName ? `${session.featureName} / ${session.workTitle}` : session.workTitle;
+}
