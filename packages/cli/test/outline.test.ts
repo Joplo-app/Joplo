@@ -55,10 +55,10 @@ test('JSON 大纲与文字同一份数据；--work 只看一个方案', async ()
   expect(r.code).toBe(0);
   const j = JSON.parse(r.out);
   expect(j).toMatchObject({ ok: true, data: { summary: { error: 0 } } });
-  const f = j.data.outline.features[0];
-  expect(f.options.map((o: { id: string }) => o.id)).toEqual(['invite.b-batch']);
+  const f = j.data.outline.entries[0];
+  expect(f.works.map((o: { id: string }) => o.id)).toEqual(['invite.b-batch']);
   expect(f.cases.find((c: { key: string }) => c.key === 'happy')).toMatchObject({ priority: 'high', dimension: 'main', expected: '管理员发出邀请，受邀者接受后成为成员', coverage: { 'invite.b-batch': expect.any(String) } });
-  expect(f.options[0].scenarios[0]).toMatchObject({ id: expect.stringMatching(/^invite\.b-batch\./), steps: expect.any(Number), ms: expect.any(Number), opening: false, ending: false });
+  expect(f.works[0].scenarios[0]).toMatchObject({ id: expect.stringMatching(/^invite\.b-batch\./), steps: expect.any(Number), ms: expect.any(Number), opening: false, ending: false });
   const bad = await run(['outline', d, '--work', 'invite.zz']);
   expect(bad.code).toBe(2);
   expect(bad.out).toMatch(/^USAGE {2}Work does not exist: invite\.zz/);
@@ -66,7 +66,7 @@ test('JSON 大纲与文字同一份数据；--work 只看一个方案', async ()
 
 test('有 error 时退出 1：能编译出 IR 时照常输出大纲并写出错误数；编译不出时只写错误数，JSON 是失败信封', async () => {
   const d = await project();
-  await writeFile(join(d, 'features/invite/options/broken.tsx'), 'export default 1;\n');
+  await writeFile(join(d, 'features/invite/works/broken.tsx'), 'export default 1;\n');
   const r = await run(['outline', d]);
   expect(r.code).toBe(1);
   expect(r.out).toContain('## invite · 团队成员邀请');

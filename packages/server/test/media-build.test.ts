@@ -10,7 +10,7 @@ it('publishes scoped fake WAV artifacts offline without author text, paths or lo
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-media-build-')));
   try {
     fs.writeFileSync(path.join(dir, 'private.sf3'), 'PRIVATE_SOUNDFONT_BYTES');
-    fs.mkdirSync(path.join(dir, 'routes')); fs.mkdirSync(path.join(dir, 'features/f/options'), {recursive:true});
+    fs.mkdirSync(path.join(dir, 'routes')); fs.mkdirSync(path.join(dir, 'features/f/works'), {recursive:true});
     fs.writeFileSync(path.join(dir,'tsconfig.json'),JSON.stringify({compilerOptions:{jsx:'react-jsx',jsxImportSource:'@joplo-app/kit'}}));
     fs.writeFileSync(path.join(dir,'runtime.ts'), `export default {id:'fake',apiVersion:2,components:{},media:async({audio,destination,bytes})=>{const buffer=await audio.decodeAudioData(bytes.buffer.slice(0));let source;return {update(f){if(source){source.stop();source=null;}if(f.playing){source=audio.createBufferSource();source.buffer=buffer;source.connect(destination);source.start(0,(f.offsetMs/1000)%buffer.duration);}},destroy(){source?.stop();}};}};`);
     fs.writeFileSync(path.join(dir,'local.ts'), `export default {compilers:{wav:{version:'1',mime:'audio/wav',compile(input){
@@ -21,7 +21,7 @@ it('publishes scoped fake WAV artifacts offline without author text, paths or lo
       export default config({name:'Media fixture',plugins:[{kind:'plugin',apiVersion:2,id:'fake',title:'Fake WAV',components:{},runtime:${JSON.stringify(path.join(dir,'runtime.ts'))},local:${JSON.stringify(path.join(dir,'local.ts'))},compile:{effect(e,ctx){return {media:[{track:'bgm',action:'play',resource:ctx.resource({compiler:'wav',input:e.payload}),loop:true}]};}}}]});`));
     fs.writeFileSync(path.join(dir,'routes/page.tsx'), `import {page} from '@joplo-app/kit';export default page({title:'Home'},<div>Home</div>);`);
     fs.writeFileSync(path.join(dir,'features/f/feature.ts'), `import {feature} from '@joplo-app/kit';export default feature({name:'F',goal:'g',cases:{},pick:'a'});`);
-    fs.writeFileSync(path.join(dir,'features/f/options/a.tsx'), `import {option,flow} from '@joplo-app/kit';import {pluginEffect} from '@joplo-app/kit/plugin';export default option({name:'A',idea:'i',on:{},scenarios:{a:flow('Included',{start:'/'}).system('Play',pluginEffect('fake','play','PRIVATE_SCORE_ALPHA')),b:flow('Omitted',{start:'/'}).system('Play',pluginEffect('fake','play','PRIVATE_SCORE_BETA'))}});`);
+    fs.writeFileSync(path.join(dir,'features/f/works/a.tsx'), `import {option,flow} from '@joplo-app/kit';import {pluginEffect} from '@joplo-app/kit/plugin';export default work({title:'A',summary:'i',on:{},scenarios:{a:flow('Included',{start:'/'}).system('Play',pluginEffect('fake','play','PRIVATE_SCORE_ALPHA')),b:flow('Omitted',{start:'/'}).system('Play',pluginEffect('fake','play','PRIVATE_SCORE_BETA'))}});`);
     const dev = await createDev({ projectDir: dir, port: 0, watch: false, log: () => undefined });
     try {
       expect(fs.readdirSync(path.join(dir, '.joplo/resources')).filter(f => f.endsWith('.json'))).toEqual([]);
@@ -53,7 +53,7 @@ it('publishes scoped fake WAV artifacts offline without author text, paths or lo
     expect(fs.readdirSync(path.join(dir,'.joplo/resources')).filter(f=>f.endsWith('.json'))).toHaveLength(1);
     fs.writeFileSync(path.join(dir,'local.ts'),`export default {compilers:{wav:{version:'2',mime:'audio/wav',compile(){throw new Error('No native tool')}}}};`);
     const silent=await buildSite({projectDir:dir,outDir:path.join(dir,'silent'),scope:{scenarios:['f.a.a']}});
-    expect(silent.diagnostics).toContainEqual(expect.objectContaining({code:'LOCAL_RESOURCE_FAILED',severity:'warning',at:expect.stringMatching(/features\/f\/options\/a.tsx:\d+:\d+/)}));
+    expect(silent.diagnostics).toContainEqual(expect.objectContaining({code:'LOCAL_RESOURCE_FAILED',severity:'warning',at:expect.stringMatching(/features\/f\/works\/a.tsx:\d+:\d+/)}));
     expect(fs.existsSync(path.join(silent.outDir,'index.html'))).toBe(true);
     const broken = await createDev({ projectDir: dir, port: 0, watch: false, log: () => undefined });
     try {

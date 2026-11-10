@@ -159,7 +159,7 @@ describe('一个进程，多个项目', () => {
     expect(irB.project.name).toBe('第二个项目');
     const irA = (await req(port, { path: `/__joplo/p/${idA}/ir` })).body;
     expect(Object.keys(irA.project.scenarios)).toContain('invite.a-modal.success');
-    const sel = { optionId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 0, sceneId: 'invite.a-modal@/members', nodeId: 'btn_invite' };
+    const sel = { workId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 0, sceneId: 'invite.a-modal@/members', nodeId: 'btn_invite' };
     const put = await req(port, { method: 'PUT', path: `/__joplo/p/${idA}/selection`, headers: json(token), body: JSON.stringify({ selection: sel }) });
     expect(put.status).toBe(200);
     expect(JSON.parse(fs.readFileSync(path.join(a, '.joplo/selection.json'), 'utf8')).nodeId).toBe('btn_invite');

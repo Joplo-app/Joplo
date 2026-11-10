@@ -1,6 +1,6 @@
-import { projectThemes } from '@joplo-app/core';
+import { entriesOf, projectThemes } from '@joplo-app/core';
 import crypto from 'node:crypto';
-import { JoploError, LOCAL_REVIEW_MAX_EVENTS, LOCAL_REVIEW_MAX_FILE_BYTES, LocalReviewSession, localReviewStatus, stateAt, type LocalReviewContext, type LocalReviewEvent, type LocalReviewLocation, type LocalReviewState, type LocalReviewWrite, type Project } from '@joplo-app/core';
+import { JoploError, LOCAL_REVIEW_VERSION, LOCAL_REVIEW_MAX_EVENTS, LOCAL_REVIEW_MAX_FILE_BYTES, LocalReviewSession, localReviewStatus, stateAt, type LocalReviewContext, type LocalReviewEvent, type LocalReviewLocation, type LocalReviewState, type LocalReviewWrite, type Project } from '@joplo-app/core';
 import { localReviewFile, localReviewWatcherCount, writeLocalReview } from '@joplo-app/core/node';
 
 /** 对象键的插入顺序不构成新版本；数组顺序属于方案内容。 */
@@ -9,20 +9,20 @@ function stable(value: unknown): unknown {
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, stable(v)]));
   return value;
 }
-export function localReviewRevision(project: Project, optionId: string): string {
-  const option = project.options[optionId]!;
-  const feature = project.features[option.featureId];
-  const own = <T extends { optionId?: string | null; featureId?: string }>(values: Record<string, T>) =>
-    Object.fromEntries(Object.entries(values).filter(([, v]) => v.optionId === optionId || (v.optionId == null && (v.featureId == null || v.featureId === option.featureId))));
+export function localReviewRevision(project: Project, workId: string): string {
+  const option = project.works[workId]!;
+  const feature = option.featureId ? project.features[option.featureId] : undefined;
+  const own = <T extends { workId?: string | null; featureId?: string }>(values: Record<string, T>) =>
+    Object.fromEntries(Object.entries(values).filter(([, v]) => v.workId === workId || (v.workId == null && (v.featureId == null || v.featureId === option.featureId))));
   const value = { name: project.name, description: project.description, theme: project.theme, themes: projectThemes(project), autoFocus: project.autoFocus,
-    feature, option, scenes: own(project.scenes), scenarios: own(project.scenarios), rules: own(project.rules), issues: own(project.issues),
+    feature, work: option, scenes: own(project.scenes), scenarios: own(project.scenarios), rules: own(project.rules), issues: own(project.issues),
     cases: Object.fromEntries(Object.entries(project.cases).filter(([, c]) => c.featureId === option.featureId)),
   };
   return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
 }
 
-export function localReviewContext(project: Project, optionId: string, input: LocalReviewLocation): LocalReviewContext {
-  const option = project.options[optionId];
+export function localReviewContext(project: Project, workId: string, input: LocalReviewLocation): LocalReviewContext {
+  const option = project.works[workId];
   const scene = project.scenes[input.sceneId];
   if (!option || !scene) throw new JoploError('INVALID_REFERENCE', 'Review page or option no longer exists');
   const layerScenes = Object.values(option.layers).map(l => l.sceneId);
@@ -31,7 +31,7 @@ export function localReviewContext(project: Project, optionId: string, input: Lo
   let scenarioName: string | null = null;
   if (input.scenarioId !== null) {
     const scenario = project.scenarios[input.scenarioId];
-    if (!scenario || scenario.optionId !== optionId || input.position > scenario.steps.length)
+    if (!scenario || scenario.workId !== workId || input.position > scenario.steps.length)
       throw new JoploError('INVALID_REFERENCE', 'Review scenario or step does not belong to this option');
     const state = stateAt(project, scenario.id, input.position);
     if (state.sceneId !== scene.id && !layerScenes.includes(scene.id)) throw new JoploError('INVALID_REFERENCE', 'Review page is not visible at this step');
@@ -39,7 +39,7 @@ export function localReviewContext(project: Project, optionId: string, input: Lo
     stepId = step?.id ?? null;
     source = step?.source ?? source;
     scenarioName = scenario.name;
-  } else if (input.position !== 0 || (scene.optionId !== optionId && !layerScenes.includes(scene.id))) {
+  } else if (input.position !== 0 || (scene.workId !== workId && !layerScenes.includes(scene.id))) {
     throw new JoploError('INVALID_REFERENCE', 'Review page does not belong to this option');
   }
   return { ...input, route: scene.route, pageTitle: scene.name, stepId, source, scenarioName };
@@ -58,7 +58,7 @@ export class LocalReviewHub {
       throw new JoploError('USAGE', 'Local review storage limit reached. Confirm this review before starting another');
     writeLocalReview(localReviewFile(session.projectDir, session.id), session);
     this.sessions.set(session.id, session);
-    this.current.set(this.key(session.projectDir, session.optionId), session);
+    this.current.set(this.key(session.projectDir, session.workId), session);
     return session;
   }
   private closeSession(session: LocalReviewSession, reason: Extract<LocalReviewEvent, { type: 'closed' }>['reason']) {
@@ -66,19 +66,21 @@ export class LocalReviewHub {
     this.persist({ ...session, events: [...session.events, { sessionId: session.id, seq: session.events.length + 1, requestId: crypto.randomUUID(), createdAt: new Date().toISOString(), type: 'closed', reason }] });
   }
   sync(dir: string, projectId: string, project: Project) {
-    for (const s of [...this.current.values()]) if (s.projectDir === dir && !project.options[s.optionId]) {
-      this.closeSession(s, 'option_removed');
-      this.current.delete(this.key(dir, s.optionId));
+    for (const s of [...this.current.values()]) if (s.projectDir === dir && !project.works[s.workId]) {
+      this.closeSession(s, 'work_removed');
+      this.current.delete(this.key(dir, s.workId));
     }
-    for (const option of Object.values(project.options)) {
+    for (const entry of entriesOf(project)) for (const workId of entry.featureId === null ? [entry.workId] : project.features[entry.featureId]!.workIds) {
+      const option = workId ? project.works[workId] : undefined;
+      if (!option) continue;
       const revision = localReviewRevision(project, option.id);
       const old = this.current.get(this.key(dir, option.id));
       if (old?.revision === revision && localReviewStatus(old) !== 'closed') continue;
       if (old) this.closeSession(old, 'source_changed');
       const id = `rv_${crypto.randomBytes(16).toString('hex')}`;
-      this.persist({ v: 1, id, instanceId: this.instanceId, ownerPid: process.pid, projectId, projectDir: dir, projectName: project.name,
-        featureId: option.featureId, featureName: project.features[option.featureId]!.name, optionId: option.id, optionName: option.name,
-        revision, createdAt: new Date().toISOString(), url: `${this.baseUrl()}#/${encodeURIComponent(projectId)}/f/${encodeURIComponent(option.featureId)}?o=${encodeURIComponent(option.id)}`,
+      this.persist({ v: LOCAL_REVIEW_VERSION, id, instanceId: this.instanceId, ownerPid: process.pid, projectId, projectDir: dir, projectName: project.name,
+        featureId: entry.id, featureName: entry.title, workId: option.id, workTitle: option.title,
+        revision, createdAt: new Date().toISOString(), url: `${this.baseUrl()}#/${encodeURIComponent(projectId)}/f/${encodeURIComponent(entry.id)}?o=${encodeURIComponent(option.id)}`,
         events: [],
       });
     }
@@ -86,11 +88,11 @@ export class LocalReviewHub {
   invalidate(dir: string, reason: 'source_changed' | 'compile_error' | 'server_stopped') {
     for (const session of [...this.current.values()]) if (session.projectDir === dir) {
       this.closeSession(session, reason);
-      this.current.delete(this.key(dir, session.optionId));
+      this.current.delete(this.key(dir, session.workId));
     }
   }
-  state(dir: string, optionId: string): LocalReviewState {
-    const session = this.current.get(this.key(dir, optionId));
+  state(dir: string, workId: string): LocalReviewState {
+    const session = this.current.get(this.key(dir, workId));
     if (!session) throw new JoploError('NOT_FOUND', 'No current review for this option. Wait for a successful compilation');
     return { session, watchers: localReviewWatcherCount(dir, session.id) };
   }
@@ -104,17 +106,17 @@ export class LocalReviewHub {
       if (!same) throw new JoploError('IDEMPOTENCY_MISMATCH', 'Request id was already used for different feedback');
       return { session, watchers: localReviewWatcherCount(dir, session.id) };
     }
-    if (this.current.get(this.key(dir, session.optionId))?.id !== session.id || localReviewRevision(project, session.optionId) !== session.revision)
+    if (this.current.get(this.key(dir, session.workId))?.id !== session.id || localReviewRevision(project, session.workId) !== session.revision)
       throw new JoploError('REVISION_CONFLICT', 'The option changed. Open its current review before submitting');
-    if (input.type === 'approved' && localReviewStatus(session) === 'approved') return this.state(dir, session.optionId);
+    if (input.type === 'approved' && localReviewStatus(session) === 'approved') return this.state(dir, session.workId);
     if (localReviewStatus(session) !== 'open') throw new JoploError('REVISION_CONFLICT', 'This review has ended');
     if (input.type === 'feedback' && session.events.length >= LOCAL_REVIEW_MAX_EVENTS - 1)
       throw new JoploError('USAGE', 'This review has reached its feedback limit. Confirm it before starting a new review');
     const base = { sessionId: session.id, seq: session.events.length + 1, requestId: input.requestId, createdAt: new Date().toISOString() };
     const event: LocalReviewEvent = input.type === 'feedback'
-      ? { ...base, type: 'feedback', body: input.body, context: localReviewContext(project, session.optionId, input.context) }
+      ? { ...base, type: 'feedback', body: input.body, context: localReviewContext(project, session.workId, input.context) }
       : { ...base, type: 'approved' };
     this.persist({ ...session, events: [...session.events, event] });
-    return this.state(dir, session.optionId);
+    return this.state(dir, session.workId);
   }
 }

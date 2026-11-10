@@ -30,7 +30,7 @@ let plan: 'free' | 'pro', rejectReview: number;
 let strictVisibility: boolean;
 let reviewErrorMessage: string | undefined;
 const browser = vi.fn(async () => true);
-const files = { 'index.html': '<html><script type="application/json" id="joplo-ir">{"project":{"mode":"publish","features":{},"options":{},"scenarios":{}}}</script></html>', 'assets/a.css': 'body{}' };
+const files = { 'index.html': '<html><script type="application/json" id="joplo-ir">{"project":{"mode":"publish","features":{},"works":{},"scenarios":{}}}</script></html>', 'assets/a.css': 'body{}' };
 let built: Record<string, string>;
 const buildFiles = async ({ outDir, review }: { outDir?: string; review?: boolean }) => {
   const out = review ? { ...built, 'index.html': built['index.html']!.replace('"mode":"publish"', '"mode":"review"') } : built;
@@ -208,9 +208,9 @@ test('--update 指向无本地记录的链接：私密更新不发送 visibility
 const scopedBuild = async ({ outDir, scope, review }: { outDir: string; scope?: { scenarios: string[] }; review?: boolean }) => {
   const ids = scope?.scenarios ?? [];
   await mkdir(outDir, { recursive: true });
-  await writeFile(join(outDir, 'index.html'), `<script type="application/json" id="joplo-ir">${JSON.stringify({ project: { mode: review ? 'review' : 'publish', features: {}, options: {}, scenarios: Object.fromEntries(ids.map(id => [id, {}])) } })}</script>`);
+  await writeFile(join(outDir, 'index.html'), `<script type="application/json" id="joplo-ir">${JSON.stringify({ project: { mode: review ? 'review' : 'publish', features: {}, works: {}, scenarios: Object.fromEntries(ids.map(id => [id, {}])) } })}</script>`);
   return { outDir, files: ['index.html'], diagnostics: [], routes: [], scenarios: ids,
-    scope: { key: `${review ? 'review:' : ''}${[...ids].sort().join(',')}`, scenarios: ids, features: ['f'], borrowed: [] } };
+    scope: { key: `${review ? 'review:' : ''}${[...ids].sort().join(',')}`, scenarios: ids, entryIds: ['f'], borrowed: [] } };
 };
 test.each([['--scenario', 'f.b.only'], ['--work', 'g']] as const)('范围评审 %s %s：没有 picked 内容时只发私密评审，保留普通记录', async (flag, id) => {
   await login(); await saveRecord(recordLink('Main123456', 'private'));
@@ -246,7 +246,7 @@ test('仅评审范围不把 --update 的普通链接改成评审版', async () =
 
 test('看板范围评审：仅评审结果携带 mode，不误显示为普通分享', async () => {
   await login(); build.mockImplementationOnce(scopedBuild as never);
-  const result = await boardPublish({ visibility: 'private', review: true, features: ['g'] });
+  const result = await boardPublish({ visibility: 'private', review: true, entryIds: ['g'] });
   expect(result).toMatchObject({ mode: 'review', url: `${base}/s/Rev1234567/`, visibility: 'private' });
   expect(calls.filter(c => c.path === '/api/v1/shares')).toHaveLength(1);
 });

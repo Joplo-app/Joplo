@@ -115,11 +115,11 @@ describe('ProfileStore', () => {
 function project(): Project {
   const step = (id: string, caption: string, extra: Record<string, unknown> = {}) => ({ id, kind: 'system', action: { type: 'event', name: caption }, caption, effects: [], ruleIds: [], shots: [], directorLayer: null, forks: [], marks: [], ...extra });
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     name: 'T',
     mode: 'publish',
-    scenarios: { 'f.a.s': { id: 'f.a.s', optionId: 'f.a', name: 'S', steps: [step('f.a.s#1', 'One'), step('f.a.s#2', 'Two', { say: 'Two, said fully' }), step('f.a.s#3', 'Three')] } },
-    options: { 'f.a': { id: 'f.a', featureId: 'f', layers: {} } },
+    scenarios: { 'f.a.s': { id: 'f.a.s', workId: 'f.a', name: 'S', steps: [step('f.a.s#1', 'One'), step('f.a.s#2', 'Two', { say: 'Two, said fully' }), step('f.a.s#3', 'Three')] } },
+    works: { 'f.a': { id: 'f.a', featureId: 'f', layers: {} } },
     scenes: {},
   } as unknown as Project;
 }

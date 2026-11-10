@@ -7,8 +7,8 @@ export type FeedbackStreamEvent = {
   source: 'local' | 'cloud';
   eventId: string;
   sessionId: string;
-  featureId: string;
-  optionId: string;
+  featureId: string | null;
+  workId: string;
   revision: string;
   createdAt: string;
   seq?: number;
@@ -27,14 +27,14 @@ export type FeedbackStreamEvent = {
 export type FeedbackStreamIo = { out: (s: string) => void; err: (s: string) => void };
 export function localFeedbackEvent(session: LocalReviewSession, event: LocalReviewEvent): FeedbackStreamEvent {
   return { source: 'local', eventId: `${session.id}:${event.seq}`, instanceId: session.instanceId, projectDir: session.projectDir,
-    featureId: session.featureId, optionId: session.optionId, revision: session.revision, ...event };
+    featureId: session.featureId, workId: session.workId, revision: session.revision, ...event };
 }
 export function writeFeedbackEvent(event: FeedbackStreamEvent, json: boolean, io: FeedbackStreamIo, label?: (id: string) => string): void {
   if (json) { io.out(JSON.stringify(event) + '\n'); return; }
   const prefix = `[${event.seq ?? event.eventId}] ${event.type}`;
   const body = event.type === 'feedback'
-    ? `${prefix} ${event.context.route ?? event.context.scenarioId ?? label?.(event.optionId) ?? event.optionId} · step ${event.context.position}\n${event.body.split('\n').map(line => `  ${line}`).join('\n')}`
+    ? `${prefix} ${event.context.route ?? event.context.scenarioId ?? label?.(event.workId) ?? event.workId} · step ${event.context.position}\n${event.body.split('\n').map(line => `  ${line}`).join('\n')}`
     : event.type === 'decision' ? `${prefix} ${event.decision.kind} ${event.decision.targetId}${event.decision.note ? `: ${event.decision.note}` : ''}`
-    : event.type === 'closed' ? `${prefix} (${event.reason})` : `${prefix} ${label?.(event.optionId) ?? event.optionId} @ ${event.revision}`;
+    : event.type === 'closed' ? `${prefix} (${event.reason})` : `${prefix} ${label?.(event.workId) ?? event.workId} @ ${event.revision}`;
   io.out(body.split('\n').map(line => terminalText(line)).join('\n') + '\n');
 }

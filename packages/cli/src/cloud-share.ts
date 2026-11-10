@@ -89,7 +89,7 @@ const recordJson = (server: string, r: ShareRecord) => ({
 export type ShareResult = { passwordProtected: boolean; visibility?: Visibility; portfolio?: Portfolio; review?: ShareResult; shareId: string; url: string; expiresAt: string | null; version: number; embed: EmbedSnippets; mode?: 'review'; pr?: PrCommentResult | null; /** 范围分享（D75）：范围、借用了哪些别的功能的内容。 */ scope?: ScopeInfo; entries?: BuildResult['entries']; /** 发布后的账号容量与这次大小（C27）；旧服务器不返回。 */ storage?: { usedBytes: number; quotaBytes: number; shareBytes: number } };
 /** scenarios / features：按场景保密分享（D75，`--scenario` / `--work`），可以一起用；都不写时分享整个项目。 */
 /** update（D84）：要更新的已有分享的链接；没有 .joplo/cloud.json 时（例如换了一台电脑）用它指定，并从它沿用朗读音频。 */
-export type ShareOptions = { password?: string | boolean | null; public?: boolean; private?: boolean; new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; features?: string[]; update?: string };
+export type ShareOptions = { password?: string | boolean | null; public?: boolean; private?: boolean; new?: boolean; title?: string; review?: boolean; pr?: number; repo?: string; sha?: string; scenarios?: string[]; entryIds?: string[]; update?: string };
 
 /** `--update <链接>`：分享页链接，路径里有 /s/<10 位分享 id>。 */
 export function parseUpdateLink(v: string): ShareLink {
@@ -116,21 +116,21 @@ export async function share(client: CloudClient, dir: string, opts: ShareOptions
     checked = await (client.deps.check ?? checkWithProject)(resolve(dir)) as Awaited<ReturnType<typeof checkWithProject>>;
     if (checked.summary.error) throw new JoploError('INVALID_SCHEMA', `Project validation failed: ${checked.summary.error} error`, { diagnostics: checked.diagnostics });
     if (!checked.project) throw new JoploError('UNSUPPORTED_ACTION', 'share --review needs the compiled project to build the review manifest');
-    const request = { scenarios: opts.scenarios ?? [], features: opts.features ?? [] };
+    const request = { scenarios: opts.scenarios ?? [], entryIds: opts.entryIds ?? [] };
     const ids = hasScope(request) ? resolveWorkScope(checked.project, request, 'review') : undefined;
     assertReviewManifestSize(reviewManifest(ids ? scopeProject(checked.project, ids, 'review').project : checked.project, 'review'));
     if (ids) {
       // 先按 review 校验完整范围，再筛选普通版：未选方案只能出现在独立私密评审里。
       const project = checked.project;
       const picked = ids.filter(id => {
-        const option = project.options[project.scenarios[id]!.optionId];
-        return option && !entryOf(project, option.featureId)?.draft && project.features[option.featureId]?.pick === option.id;
+        const workId = project.scenarios[id]!.workId;
+        return entriesOf(project).some(e => !e.draft && e.workId === workId && (e.featureId === null || project.features[e.featureId]?.pick === workId));
       });
       if (!picked.length) {
         client.warn('The scope has no picked scenarios. Publishing only the private review version; the ordinary share and --update target are unchanged.');
         return publishShare(client, dir, { ...opts, review: true, update: undefined }, 'private', build, render, checked);
       }
-      mainOptions = { ...mainOptions, scenarios: picked, features: [] };
+      mainOptions = { ...mainOptions, scenarios: picked, entryIds: [] };
     }
   }
   const result = await publishShare(client, dir, mainOptions, choices.visibility, build, render, checked);
@@ -154,7 +154,7 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
   // PR 信息在任何请求、登录和构建之前补全并校验（契约 8.5）
   const pr: SharePr | undefined = opts.pr === undefined ? undefined : await prContext({ pr: opts.pr, repo: opts.repo, sha: opts.sha }, client.env, project, client.deps.pr);
   const reviewMode = opts.review === true ? 'review' : 'publish';
-  const scopeRequest = { scenarios: opts.scenarios ?? [], features: opts.features ?? [] };
+  const scopeRequest = { scenarios: opts.scenarios ?? [], entryIds: opts.entryIds ?? [] };
   const scoped = hasScope(scopeRequest);
   let auth = await client.auth(true);
   if (!auth) {
@@ -188,7 +188,7 @@ async function publishShare(client: CloudClient, dir: string, opts: ShareOptions
   if (checked.project) {
     const entries = entriesOf(checked.project);
     if (entries.length && !entries.some(e => !e.draft && e.slices.length))
-      throw new JoploError('USAGE', entries.every(e => e.draft) ? 'There is no picked option or publishable work. All standalone works are drafts; remove draft: true when ready' : 'There is no picked option or publishable work. Add at least one flow() or chapter() to an empty work before sharing');
+      throw new JoploError('USAGE', entries.every(e => e.draft) ? 'There is no picked option or publishable work. All independent works are drafts; remove draft: true when ready' : 'There is no picked option or publishable work. Add at least one flow() or chapter() to an empty work before sharing');
   }
   const temporary = temporaryDirectory(join(tmpdir(), 'joplo-share-'));
   const staging = temporary.path;

@@ -11,7 +11,7 @@ export const publicIRFromHtml = readFeatureDiffBuild;
 async function checkFiles(dir: string, prefix = ''): Promise<void> {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     const relative = prefix + e.name;
-    if (e.isSymbolicLink() || /[\\?#%\x00-\x1f\x7f]/.test(e.name) || (!prefix && !['index.html', 'assets', 'fonts', 'voice', '_joplo'].includes(e.name))) throw new JoploError('INVALID_SCHEMA', `Not a standalone public build: ${relative}`);
+    if (e.isSymbolicLink() || /[\\?#%\x00-\x1f\x7f]/.test(e.name) || (!prefix && !['index.html', 'assets', 'fonts', 'voice', '_joplo'].includes(e.name))) throw new JoploError('INVALID_SCHEMA', `Not a independent public build: ${relative}`);
     if (e.isDirectory()) await checkFiles(join(dir, e.name), relative + '/');
     else if (!e.isFile()) throw new JoploError('INVALID_SCHEMA', 'Build contains a non-regular file');
   }

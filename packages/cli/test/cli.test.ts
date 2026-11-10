@@ -24,7 +24,7 @@ function cli(args: string[], cwd = process.cwd()) {
     p.on('error', rej); p.on('close', code => res({ code, stdout, stderr }));
   });
 }
-const option = 'features/invite/options/a-modal.tsx';
+const option = 'features/invite/works/a-modal.tsx';
 const feature = 'features/invite/feature.ts';
 async function edit(dir: string, file: string, change: (s: string) => string) {
   const path = join(dir, file); const text = change(await readFile(path, 'utf8')); await writeFile(path, text); return text;
@@ -47,7 +47,7 @@ test.each([
   ['UNKNOWN_CASE', option, (s: string) => s.replace("cases: ['no_permission']", "cases: ['absent']"), "denied: flow(", 1],
   ['ASSUMPTION_CONFIRMED', feature, (s: string) => s.replace("origin: 'user', status: 'confirmed'", "status: 'confirmed'"), "admin_only: rule(", 1],
   ['UNBOUND_INTERACTIVE', option, (s: string) => s.replace('<Group justify="flex-end" gap="sm">', '<Group justify="flex-end" gap="sm">\n              <Button id="loose">新按钮</Button>'), '<Button id="loose"', 0],
-  ['UNKNOWN_SLOT', option, (s: string) => s.replace("'header.actions':", "'absent':"), 'export default option(', 1],
+  ['UNKNOWN_SLOT', option, (s: string) => s.replace("'header.actions':", "'absent':"), 'export default work(', 1],
   ['CASE_NOT_COVERED', feature, (s: string) => s.replace('cases: {', "cases: {\n    new_case: '新增情况',"), 'export default feature(', 0],
 ] as const)('%s 包含正确文件及行号', async (code, file, change, needle, exit) => {
   const d = await temp(); const text = await edit(d, file, change);
@@ -55,7 +55,7 @@ test.each([
   expect(r.code, r.stdout + r.stderr).toBe(exit);
   const ds = JSON.parse(r.stdout).diagnostics;
   const expectedFile = code === 'CASE_NOT_COVERED' ? option : file;
-  const line = code === 'CASE_NOT_COVERED' ? at(await readFile(join(d, option), 'utf8'), 'export default option(') : at(text, needle);
+  const line = code === 'CASE_NOT_COVERED' ? at(await readFile(join(d, option), 'utf8'), 'export default work(') : at(text, needle);
   expect(ds, r.stdout).toEqual(expect.arrayContaining([expect.objectContaining({ code, at: expect.stringMatching(new RegExp(`^${expectedFile}:${line}:`)) })]));
 });
 test.each(['NaN', 'Infinity', "'1'"])('check 拒绝非法 order %s 并定位到 feature.ts', async (value) => {
@@ -70,7 +70,7 @@ test.each(['NaN', 'Infinity', "'1'"])('check 拒绝非法 order %s 并定位到 
 });
 test('selection 返回定位、标签与前后各三行，JSON 保留 Selection', async () => {
   const d = await temp(); const text = await readFile(join(d, option), 'utf8'); const line = at(text, '<Button id="btn_invite"');
-  const selection: Selection = { featureId: 'invite', optionId: 'invite.a-modal', scenarioId: null, position: 0, stepId: null, sceneId: 'invite.a-modal@/members', route: '/members', nodeId: 'btn_invite', at: `${option}:${line}:9`, label: '邀请成员', selectedAt: new Date().toISOString() };
+  const selection: Selection = { featureId: 'invite', workId: 'invite.a-modal', scenarioId: null, position: 0, stepId: null, sceneId: 'invite.a-modal@/members', route: '/members', nodeId: 'btn_invite', at: `${option}:${line}:9`, label: '邀请成员', selectedAt: new Date().toISOString() };
   await mkdir(join(d, '.joplo')); await writeFile(join(d, '.joplo/selection.json'), JSON.stringify(selection));
   const r = await cli(['selection', d]);
   expect(r.code).toBe(0); expect(r.stdout).toContain(selection.at); expect(r.stdout).toContain('邀请成员');

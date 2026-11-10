@@ -125,7 +125,7 @@ export function cloudBridge(opts: BridgeOptions): CloudBridge {
       const c = client((line) => progress(redact(line)), secrets);
       try {
         const { share } = await import('./cloud-share.ts');
-        const { result, plan } = await share(c, projectDir, { public: request.visibility === 'public', private: request.visibility === 'private', review: request.review, ...(request.password !== undefined ? { password: request.password } : {}), ...(request.scenarios?.length ? { scenarios: request.scenarios } : {}), ...(request.features?.length ? { features: request.features } : {}) }, opts.build, opts.render);
+        const { result, plan } = await share(c, projectDir, { public: request.visibility === 'public', private: request.visibility === 'private', review: request.review, ...(request.password !== undefined ? { password: request.password } : {}), ...(request.scenarios?.length ? { scenarios: request.scenarios } : {}), ...(request.entryIds?.length ? { entryIds: request.entryIds } : {}) }, opts.build, opts.render);
         return { passwordProtected: result.passwordProtected, shareId: result.shareId, url: result.url, expiresAt: result.expiresAt, version: result.version, plan, ...(result.scope ? { scope: result.scope } : {}), ...(result.storage ? { storage: result.storage } : {}), ...(result.mode ? { mode: result.mode } : {}), ...(result.visibility ? { visibility: result.visibility } : {}), ...(result.portfolio ? { portfolio: result.portfolio } : {}), ...(result.review ? { review: { url: result.review.url, shareId: result.review.shareId } } : {}) };
       } catch (e) {
         const code = e instanceof CloudError || e instanceof JoploError ? e.code : 'INTERNAL';

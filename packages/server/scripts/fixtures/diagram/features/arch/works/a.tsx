@@ -1,9 +1,9 @@
-import { $, done, flow, option, set } from '@joplo-app/kit';
+import { $, done, flow, work, set } from '@joplo-app/kit';
 import { Diagram } from '@joplo-app/plugin-diagram';
 
-export default option({
-  name: 'A · 脑手分离',
-  idea: '大脑只发出工具调用，工具实现在业务侧',
+export default work({
+  title: 'A · 脑手分离',
+  summary: '大脑只发出工具调用，工具实现在业务侧',
   on: {
     '/': {
       main: (

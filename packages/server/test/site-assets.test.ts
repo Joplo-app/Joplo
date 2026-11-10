@@ -93,7 +93,7 @@ describe('build：素材是独立文件，不再 base64 内联', () => {
     write('routes/dot.png', PNG);
     write('routes/page.tsx', `import { asset, page } from '@joplo-app/kit';\nimport { Image, Stack } from '@joplo-app/plugin-ui';\nexport default page({ title: 'P', layout: false }, <Stack><Image id="pic" src={asset('./dot.png')} alt="dot" /></Stack>);`);
     write('features/f/feature.ts', `import { feature } from '@joplo-app/kit'; export default feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' });`);
-    write('features/f/options/a.tsx', `import { flow, option } from '@joplo-app/kit'; export default option({ name: 'A', idea: 'i', scenarios: { s: flow('S', { start: '/' }).system('One', 'one') } });`);
+    write('features/f/works/a.tsx', `import { flow, work } from '@joplo-app/kit'; export default work({ title: 'A', summary: 'i', scenarios: { s: flow('S', { start: '/' }).system('One', 'one') } });`);
     const out = path.join(root, 'dist');
     const built = await buildSite({ projectDir: root, outDir: out, home: path.join(root, 'home') });
     expect(built.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

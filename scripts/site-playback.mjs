@@ -102,7 +102,7 @@ const errText = (e) => (e instanceof Error ? e.message.split('\n')[0] : String(e
  * motion = 'full'：完整动画（镜头过渡、先全景再推近、结果揭晓、打字），真实时间、1.5× 速度，慢一些，只播最短的一个场景。
  */
 async function playOnSite(browser, base, project, sc, { viewport, motion, maxFakeMs, maxRealMs = 180_000 }) {
-  const featureId = project.options[sc.optionId]?.featureId;
+  const featureId = project.works[sc.workId]?.featureId ?? sc.workId;
   const last = sc.steps.at(-1);
   const real = motion === 'full';
   const context = await browser.newContext({ viewport, reducedMotion: real ? 'no-preference' : 'reduce' });

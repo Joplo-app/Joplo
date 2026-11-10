@@ -38,7 +38,7 @@ export function writeSkillReadingDemo(project) {
   }
   // Same structure as the installed recipes: plugin markers are direct imports;
   // engine flow controls state; camera and trace remain plugin-owned effects.
-  fs.mkdirSync(path.join(project,'features/reading/options'),{recursive:true});
+  fs.mkdirSync(path.join(project,'features/reading/works'),{recursive:true});
   fs.writeFileSync(path.join(project,'features/reading/feature.ts'),`import {feature} from '@joplo-app/kit';
 export default feature({name:'Skill reading',goal:'Explain one request with three enabled plugins',cases:{happy:'Observe the result'},pick:'a'});
 `);
@@ -59,12 +59,12 @@ export const world=layer('Request world',
     </div>
   </Canvas>);
 `);
-  const file=path.join(project,'features/reading/options/a.tsx');
+  const file=path.join(project,'features/reading/works/a.tsx');
   fs.writeFileSync(file,`import { world } from '../world';
 import { trace } from '@joplo-app/plugin-diagram';
 import { camera } from '@joplo-app/plugin-content';
-import { $, option, flow, set, shot } from '@joplo-app/kit';
-export default option({name:'Request',idea:'Follow the same request from start to result',
+import { $, work, flow, set, shot } from '@joplo-app/kit';
+export default work({title:'Request',summary:'Follow the same request from start to result',
   state:{ui:{message:'Request ready'}},layers:{world},
   scenarios:{inspect:flow('Installed skills example',{cases:['happy'],start:'/',layer:'world'})
     .system('Call service',trace('client','service'),shot(),camera('cluster'),set($.ui.message,'Request sent'))
@@ -72,7 +72,7 @@ export default option({name:'Request',idea:'Follow the same request from start t
 });
 `);
   fs.mkdirSync(path.join(project,'.joplo'),{recursive:true});
-  fs.writeFileSync(path.join(project,'.joplo/skill-reading-evidence.json'),JSON.stringify({skillsRead:evidence,authored:['features/reading/feature.ts','features/reading/world.tsx','features/reading/options/a.tsx'],scenario:'reading.a.inspect'},null,2));
+  fs.writeFileSync(path.join(project,'.joplo/skill-reading-evidence.json'),JSON.stringify({skillsRead:evidence,authored:['features/reading/feature.ts','features/reading/world.tsx','features/reading/works/a.tsx'],scenario:'reading.a.inspect'},null,2));
 }
 
 /** Playwright is a test driver from the workspace, never installed into the authored project. */

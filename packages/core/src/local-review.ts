@@ -1,6 +1,7 @@
 /** 本地评审的持久化契约。浏览器、服务端和 CLI 共用；不依赖 Node。 */
 import { z } from 'zod';
 
+export const LOCAL_REVIEW_VERSION = 2 as const;
 export const LOCAL_REVIEW_MAX_BODY = 10_000;
 export const LOCAL_REVIEW_MAX_EVENTS = 1000;
 export const LOCAL_REVIEW_MAX_FILE_BYTES = 16 * 1024 * 1024;
@@ -33,7 +34,7 @@ export const LocalReviewEvent = z.discriminatedUnion('type', [
 ]);
 export type LocalReviewEvent = z.infer<typeof LocalReviewEvent>;
 export const LocalReviewSession = z.strictObject({
-  v: z.literal(1),
+  v: z.literal(LOCAL_REVIEW_VERSION),
   id: LocalReviewId,
   instanceId: z.string().uuid(),
   ownerPid: z.number().int().positive(),

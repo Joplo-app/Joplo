@@ -24,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { build as viteBuild, createServer, type Rollup } from 'vite';
-import { stepIdentity, type StepIdentity, hasScope, JoploError, entriesOf, entryOf, orderedFeatures, pruneMessages, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
+import { stepIdentity, type StepIdentity, hasScope, JoploError, entriesOf, entryOf, visibleRoutes, pruneMessages, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
@@ -33,24 +33,31 @@ import { subsetSiteFonts } from './site-fonts.ts';
 import { joploHome } from './home.ts';
 import { ProfileStore, bundleVoice, reuseSharedVoice } from './voice.ts';
 
-/** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。层级、镜头、角色（说话人、过渡卡、层级的 role）与 featureIds 顺序属于演示，保留（D43 / D56 / D61）。 */
+/** 发布站只需要的 IR：去掉创作侧字段（publish 模式下它们本来就为空）。层级、镜头、角色（说话人、过渡卡、层级的 role）与 entryIds 顺序属于演示，保留（D43 / D56 / D61）。 */
 export function publishPayload(project: Project, home: string | null): { project: Record<string, unknown>; home: string | null } {
   // voiceConfig（D74）：profile 名与音色属于作者本机的设置，发布站只需要 build 写进的 voiceIndex
   const { rules: _r, cases: _c, issues: _i, voiceConfig: _v, ...rest } = project;
-  const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, {
-    id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick,
-    // 作品能力与观众属于公开内容；只复制已有字段，保持旧功能演示的载荷逐字节不变。draft 仍只属于 dev。
-    ...(f.standalone !== undefined ? { standalone: f.standalone } : {}),
-    ...(f.audience !== undefined ? { audience: f.audience } : {}),
+  const features = Object.fromEntries(project.entryIds.flatMap(id => {
+    const f = project.features[id];
+    return f ? [[id, {
+      id: f.id, name: f.name, goal: f.goal, roles: f.roles, workIds: f.workIds, pick: f.pick,
+      alternatives: Object.fromEntries(f.workIds.map(workId => [workId, { decisionFocus: '', tradeoffs: [], coverage: {} }])),
+    }]] : [];
+  }));
+  const works = Object.fromEntries(Object.entries(project.works).map(([id, w]) => [id, {
+    id: w.id, key: w.key, title: w.title, summary: w.summary, roles: w.roles,
+    ...(w.featureId !== undefined ? { featureId: w.featureId } : {}),
+    ...(w.audience !== undefined ? { audience: w.audience } : {}),
+    routes: w.routes, layers: w.layers ?? {},
+    ...(w.sequencing ? { sequencing: w.sequencing } : {}), ...(w.free ? { free: w.free } : {}),
   }]));
-  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {}, ...(o.sequencing ? { sequencing: o.sequencing } : {}), ...(o.free ? {free:o.free} : {}) }]));
   const scenarios = Object.fromEntries(
     Object.entries(project.scenarios).map(([id, s]) => {
       const { caseIds: _ci, ...sr } = s;
       return [id, { ...sr, caseIds: [], steps: s.steps.map(({ ruleIds: _ri, key: _key, ...st }) => ({ ...st, ruleIds: [] })) }];
     }),
   );
-  const out = { ...rest, features, options, scenarios };
+  const out = { ...rest, features, works, scenarios };
   // 译文（D84）在去掉创作侧字段之后再裁剪一次：约束等只给作者看的原文不能作为译文的键留在站点里
   return { project: rest.i18n ? pruneMessages(out as unknown as Project) : out, home: home && project.routes[home] ? home : null };
 }
@@ -132,10 +139,10 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   try {
     compiled = await compileProject(loader, projectDir, opts.review === true ? 'review' : 'publish');
     // 发布编译已跳过草稿与未选功能；范围的公开校验需要原始条目，避免误报不存在。
-    if (opts.scope?.features?.length || opts.scope?.scenarios?.length && compiled.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED')) {
+    if (opts.scope?.entryIds?.length || opts.scope?.scenarios?.length && compiled.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED')) {
       const dev = await compileProject(loader, projectDir, 'dev');
       if (dev.project) {
-        for (const id of opts.scope?.features ?? []) {
+        for (const id of opts.scope?.entryIds ?? []) {
           const entry = entryOf(dev.project, id);
           if (!entry) throw new JoploError('NOT_FOUND', `Unknown work "${id}". Works: ${entriesOf(dev.project).map(e => e.id).join(', ') || 'none'}`);
           if (entry.featureId === null && !entry.slices.length) throw new JoploError('USAGE', `Work "${id}" has no slices and cannot be published or reviewed. Add at least one flow() or chapter() in scenarios`);
@@ -143,7 +150,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
         }
         for (const id of opts.scope?.scenarios ?? []) {
           const slice = dev.project.scenarios[id];
-          const entry = slice && entryOf(dev.project, dev.project.options[slice.optionId]?.featureId);
+          const entry = slice && entryOf(dev.project, dev.project.works[slice.workId]?.featureId ?? slice.workId);
           if (entry?.draft) throw new JoploError('USAGE', `Work "${entry.id}" is a draft and cannot be published or reviewed. Remove draft: true when it is ready`);
         }
         // 同时保留原有功能未选定、场景拼错与空范围的恢复提示。
@@ -158,7 +165,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     throw new JoploError('EXPORT_FAILED', `Project compilation failed; no published site was generated: \n${errs.map((d) => `${d.at ?? ''}  ${d.message}`).join('\n')}`, { diagnostics: compiled.diagnostics });
   }
   if (!entriesOf(compiled.project).length && compiled.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED' || d.code === 'WORK_EMPTY'))
-    throw new JoploError('USAGE', compiled.diagnostics.some(d => d.code === 'WORK_EMPTY') ? 'There is no picked option or publishable work. Add at least one flow() or chapter() to an empty work before building' : 'There is no picked option or publishable work. All standalone works are drafts; remove draft: true when ready', { diagnostics: compiled.diagnostics });
+    throw new JoploError('USAGE', compiled.diagnostics.some(d => d.code === 'WORK_EMPTY') ? 'There is no picked option or publishable work. Add at least one flow() or chapter() to an empty work before building' : 'There is no picked option or publishable work. All independent works are drafts; remove draft: true when ready', { diagnostics: compiled.diagnostics });
   // 按场景保密分享（D75）：先裁剪 IR，再生成产物；写错范围在写任何文件之前报错
   let project = compiled.project;
   let scope: ScopeInfo | undefined;
@@ -243,7 +250,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   return {
     outDir,
     files: listFiles(outDir),
-    routes: Object.keys(project.routes).sort(),
+    routes: visibleRoutes(project).map(r => r.path).sort(),
     scenarios: Object.keys(project.scenarios),
     diagnostics: compiled.diagnostics,
     ...(entriesOf(project).some(e => e.featureId === null || e.sequencing === 'linear') ? { entries: entriesOf(project).map(e => ({ id: e.id, title: e.title, slices: e.slices.length, sequencing: e.sequencing })) } : {}),

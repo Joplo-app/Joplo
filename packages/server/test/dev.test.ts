@@ -67,7 +67,7 @@ describe('startDev', () => {
     expect(p.ok).toBe(true);
     expect(p.home).toBe('/members');
     expect(Object.keys(p.project!.scenes)).toContain('invite.a-modal@/members');
-    expect(p.project!.scenarios['invite.a-modal.success']!.steps[0]!.source).toMatch(/^features\/invite\/options\/a-modal\.tsx:\d+:\d+$/);
+    expect(p.project!.scenarios['invite.a-modal.success']!.steps[0]!.source).toMatch(/^features\/invite\/works\/a-modal\.tsx:\d+:\d+$/);
     const r = await req(h, { path: `/__joplo/p/${h.projectId}/ir` });
     expect(r.status).toBe(200);
     expect(r.body.version).toBe(p.version);
@@ -85,7 +85,7 @@ describe('startDev', () => {
   });
 
   it('写接口：缺令牌 401、错误 Origin 403、错误 Content-Type 415、坏 JSON 400', async () => {
-    const good = { optionId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 0, sceneId: 'invite.a-modal@/members', nodeId: 'btn_invite' };
+    const good = { workId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 0, sceneId: 'invite.a-modal@/members', nodeId: 'btn_invite' };
     expect((await put(h, good, { 'x-joplo-token': 'nope' })).status).toBe(401);
     expect((await put(h, good, { origin: 'http://evil.example' })).status).toBe(403);
     expect((await put(h, good, { 'content-type': 'text/plain' })).status).toBe(415);
@@ -97,25 +97,25 @@ describe('startDev', () => {
   });
 
   it('选中：服务端计算 at/label/route；取消写 null；被拒绝（409）时写 null，不保留旧选中', async () => {
-    const ok = await put(h, { optionId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 1, sceneId: 'invite.a-modal@/members', nodeId: 'sel_role' }, { origin: `http://127.0.0.1:${h.port}` });
+    const ok = await put(h, { workId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 1, sceneId: 'invite.a-modal@/members', nodeId: 'sel_role' }, { origin: `http://127.0.0.1:${h.port}` });
     expect(ok.status).toBe(200);
     expect(selFile(dir)).toMatchObject({ nodeId: 'sel_role', label: '权限', route: '/members', stepId: 'invite.a-modal.success#1', featureId: 'invite' });
-    expect(selFile(dir).at).toMatch(/^features\/invite\/options\/a-modal\.tsx:\d+:\d+$/);
+    expect(selFile(dir).at).toMatch(/^features\/invite\/works\/a-modal\.tsx:\d+:\d+$/);
 
     // 位置 0 时弹窗未打开，但画面仍是同一个：元素在画面里即可选中；画面不符则拒绝
-    const rejected = await put(h, { optionId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 1, sceneId: 'invite.b-batch@/members', nodeId: 'btn_batch' });
+    const rejected = await put(h, { workId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 1, sceneId: 'invite.b-batch@/members', nodeId: 'btn_batch' });
     expect(rejected.status).toBe(409);
     expect(rejected.body.current).toBeNull();
     expect(selFile(dir)).toBeNull();
 
-    await put(h, { optionId: 'invite.a-modal', scenarioId: null, position: 0, sceneId: '@/members', nodeId: 'btn_invite' });
+    await put(h, { workId: 'invite.a-modal', scenarioId: null, position: 0, sceneId: '@/members', nodeId: 'btn_invite' });
     expect(selFile(dir)).toMatchObject({ scenarioId: null, sceneId: '@/members', nodeId: 'btn_invite' });
     expect((await put(h, null)).status).toBe(200);
     expect(selFile(dir)).toBeNull();
   });
 
   it('热更新：改文件 → 重新编译、版本递增；语法错误给出 文件:行:列 并保留上一次成功的 IR；修好恢复', async () => {
-    const file = path.join(dir, 'features/invite/options/a-modal.tsx');
+    const file = path.join(dir, 'features/invite/works/a-modal.tsx');
     const good = fs.readFileSync(file, 'utf8');
     const v0 = h.payload().version;
     fs.writeFileSync(file, good.replace('发送邀请</Button>', '立即发送</Button>'));
@@ -128,12 +128,12 @@ describe('startDev', () => {
     lines[ln] = lines[ln]!.replace('<Button', '<Button ={');
     fs.writeFileSync(file, lines.join('\n'));
     // 只等版本号会被上一次改动残留的重新编译抢先满足（并发时约 1/7 失败）：同时等这次的语法错误出现在结果里
-    await until(() => h.payload().version > v1 && !h.payload().ok && h.payload().diagnostics.some((x) => x.severity === 'error' && x.at?.startsWith('features/invite/options/a-modal.tsx:')));
+    await until(() => h.payload().version > v1 && !h.payload().ok && h.payload().diagnostics.some((x) => x.severity === 'error' && x.at?.startsWith('features/invite/works/a-modal.tsx:')));
     const bad = h.payload();
     expect(bad.ok).toBe(false);
     expect(bad.project).not.toBeNull();
     const d = bad.diagnostics.find((x) => x.severity === 'error')!;
-    expect(d.at).toMatch(new RegExp(`^features/invite/options/a-modal\\.tsx:${ln + 1}:\\d+$`));
+    expect(d.at).toMatch(new RegExp(`^features/invite/works/a-modal\\.tsx:${ln + 1}:\\d+$`));
 
     const v2 = h.payload().version;
     fs.writeFileSync(file, good);
@@ -173,7 +173,7 @@ describe('startDev 边界输入', () => {
       expect(p.project).toBeNull();
       expect(p.diagnostics[0]!.code).toBe('NOT_A_PROJECT');
       // 没有 IR 时选中被拒绝并写 null
-      const r = await put(h, { optionId: null, scenarioId: null, position: 0, sceneId: '@/', nodeId: 'x' });
+      const r = await put(h, { workId: null, scenarioId: null, position: 0, sceneId: '@/', nodeId: 'x' });
       expect(r.status).toBe(409);
     } finally {
       await h.close();
@@ -208,7 +208,7 @@ describe('resolveSelection', () => {
   });
 
   it('只选中步骤：at 为步骤的源位置', () => {
-    const r = resolveSelection(h.payload().project!, { optionId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 2, sceneId: 'invite.a-modal@/members', nodeId: null, stepId: 'invite.a-modal.success#2' });
+    const r = resolveSelection(h.payload().project!, { workId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 2, sceneId: 'invite.a-modal@/members', nodeId: null, stepId: 'invite.a-modal.success#2' });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.selection.stepId).toBe('invite.a-modal.success#2');
@@ -219,9 +219,9 @@ describe('resolveSelection', () => {
 
   it('越界、场景与方案不符、元素不存在、既无元素也无步骤：都拒绝', () => {
     const p = h.payload().project!;
-    const base = { optionId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 0, sceneId: 'invite.a-modal@/members', nodeId: 'btn_invite' };
+    const base = { workId: 'invite.a-modal', scenarioId: 'invite.a-modal.success', position: 0, sceneId: 'invite.a-modal@/members', nodeId: 'btn_invite' };
     expect(resolveSelection(p, { ...base, position: 99 }).ok).toBe(false);
-    expect(resolveSelection(p, { ...base, optionId: 'invite.b-batch' }).ok).toBe(false);
+    expect(resolveSelection(p, { ...base, workId: 'invite.b-batch' }).ok).toBe(false);
     expect(resolveSelection(p, { ...base, nodeId: 'nope' }).ok).toBe(false);
     expect(resolveSelection(p, { ...base, nodeId: null }).ok).toBe(false);
     expect(resolveSelection(p, { ...base, scenarioId: null, position: 1 }).ok).toBe(false);

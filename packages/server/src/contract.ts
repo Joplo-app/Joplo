@@ -68,7 +68,7 @@ export type RenderOptions = {
   stepId?: string;
   /** 主题名（D51）：内置主题或项目 themes/<name>.css；缺省用项目配置的主题。 */
   theme?: string;
-  /** UI language for the standalone render route. Unsupported values are ignored. */
+  /** UI language for the independent render route. Unsupported values are ignored. */
   locale?: string;
   /** Author content language (D84): one of config locales; the screenshot shows that translation. */
   content?: string;

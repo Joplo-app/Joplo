@@ -14,7 +14,7 @@ it.each(['generate','clip'])('%s 草稿旁白不调用任何外部语音服务',
  const speech=vi.fn();const fetch=vi.fn();
  const hub=new VoiceHub(home,{emit:()=>{},env:{},fetch,cloud:{status:async()=>({signedIn:false,server:'https://example.invalid',loginCommand:'login'}),speech}});
  const p=compile({root:'/p',config:{...config({name:'Test',plugins:[ui]}),file:'joplo.config.ts'},layouts:{},routes:{},features:{},works:{old:{...work({title:'Old',summary:'Private',draft:true,stage:jsx(Text,{children:'PRIVATE_NARRATION'}),scenarios:{one:chapter('Old').system('Speak',narrate('PRIVATE_NARRATION'))}}),file:'works/old.tsx'}}},'dev').project!;
- const segment={stepId:'old.main.one#1',text:'PRIVATE_NARRATION',role:null};let status=0;let output:unknown;
+ const segment={stepId:'old.one#1',text:'PRIVATE_NARRATION',role:null};let status=0;let output:unknown;
  await hub.handleProject('p',home,p,rest,{method:'POST'} as never,{} as never,{guardWrite:()=>true,jsonBody:async()=>({ok:true,body:rest==='clip'?{segment}:{segments:[segment]}}),send:(code,body)=>{status=code;output=body;}});
  expect(status).toBe(403);expect(JSON.stringify(output)).toMatch(/draft/i);expect(speech).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
 });

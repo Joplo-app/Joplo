@@ -302,7 +302,7 @@ export class VoiceHub {
 
   /** dev IR 的草稿仍能本地播放，但不能把它的朗读文字发送给任何供应商。 */
   private draftSegments(project: Project | null, segments: readonly Segment[]): boolean {
-    const privateIds = new Set(Object.values(project?.scenarios ?? {}).filter(s => project?.features?.[project.options[s.optionId]?.featureId ?? '']?.draft).flatMap(s => s.steps.map(st => st.id)));
+    const privateIds = new Set(Object.values(project?.scenarios ?? {}).filter(s => project?.works[s.workId]?.draft).flatMap(s => s.steps.map(st => st.id)));
     return segments.some(s => privateIds.has(s.stepId));
   }
 

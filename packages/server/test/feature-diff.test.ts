@@ -34,10 +34,10 @@ describe('static diff bundle', () => {
     const beforeDir = await site('b'), afterDir = await site('a');
     await expect(buildFeatureDiff({ beforeDir, afterDir, outDir: join(beforeDir, 'diff') })).rejects.toThrow(/separate/);
     await writeFile(join(beforeDir, 'review.json'), '{}');
-    await expect(buildFeatureDiff({ beforeDir, afterDir, outDir: join(root, 'diff') })).rejects.toThrow(/standalone/);
+    await expect(buildFeatureDiff({ beforeDir, afterDir, outDir: join(root, 'diff') })).rejects.toThrow(/self-contained/);
     await rm(join(beforeDir, 'review.json'));
     await symlink(join(afterDir, 'index.html'), join(beforeDir, 'assets/private.html'));
-    await expect(buildFeatureDiff({ beforeDir, afterDir, outDir: join(root, 'diff') })).rejects.toThrow(/standalone/);
+    await expect(buildFeatureDiff({ beforeDir, afterDir, outDir: join(root, 'diff') })).rejects.toThrow(/self-contained/);
     const review = await site('review', { ...diffProject(), mode: 'review' });
     await expect(buildFeatureDiff({ beforeDir: review, afterDir, outDir: join(root, 'diff') })).rejects.toThrow(/publish/);
   });

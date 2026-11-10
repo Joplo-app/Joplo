@@ -15,7 +15,7 @@ import { findNode, nodeLabel, stateAt, walkNodes, type Project, type Scene, type
 
 /** 浏览器提交的选中（服务端补全其余字段）。 */
 export const SelectionInput = z.strictObject({
-  optionId: z.string().min(1).max(256).nullable(),
+  workId: z.string().min(1).max(256).nullable(),
   scenarioId: z.string().min(1).max(256).nullable(),
   position: z.number().int().nonnegative().max(10000),
   sceneId: z.string().min(1).max(256),
@@ -31,16 +31,16 @@ export function resolveSelection(project: Project, input: SelectionInput, now = 
   let sceneId = input.sceneId;
   let stepId: string | null = null;
   let featureId: string | null = null;
-  const optionId = input.optionId;
-  if (optionId !== null) {
-    const opt = project.options[optionId];
-    if (!opt) return { ok: false, problem: `Option ${optionId} does not exist` };
-    featureId = opt.featureId;
+  const workId = input.workId;
+  if (workId !== null) {
+    const opt = project.works[workId];
+    if (!opt) return { ok: false, problem: `Option ${workId} does not exist` };
+    featureId = opt.featureId ?? null;
   }
   if (input.scenarioId !== null) {
     const sc = project.scenarios[input.scenarioId];
     if (!sc) return { ok: false, problem: `Scenario ${input.scenarioId} does not exist` };
-    if (optionId !== sc.optionId) return { ok: false, problem: `Scenario ${sc.id} does not belong to option ${optionId ?? '(none)'}` };
+    if (workId !== sc.workId) return { ok: false, problem: `Scenario ${sc.id} does not belong to option ${workId ?? '(none)'}` };
     if (input.position > sc.steps.length) return { ok: false, problem: `Position ${input.position} is outside scenario ${sc.id} range 0..${sc.steps.length}` };
     try {
       sceneId = stateAt(project, sc.id, input.position).sceneId;
@@ -48,7 +48,7 @@ export function resolveSelection(project: Project, input: SelectionInput, now = 
       return { ok: false, problem: `Scenario ${sc.id} cannot replay to position ${input.position}: ${e instanceof Error ? e.message : String(e)}` };
     }
     // 有层级的方案：用户看的是某一层的画面（各层共享同一份状态），也接受
-    const layerScenes = Object.values(project.options[sc.optionId]?.layers ?? {}).map((l) => l.sceneId);
+    const layerScenes = Object.values(project.works[sc.workId]?.layers ?? {}).map((l) => l.sceneId);
     if (layerScenes.includes(input.sceneId)) sceneId = input.sceneId;
     if (input.sceneId !== sceneId) return { ok: false, problem: `Position ${input.position} has stage ${sceneId}, not ${input.sceneId}` };
     stepId = sc.steps[input.position - 1]?.id ?? null;
@@ -59,8 +59,8 @@ export function resolveSelection(project: Project, input: SelectionInput, now = 
   } else if (input.position !== 0 || input.stepId) return { ok: false, problem: 'Without a scenario, position must be 0 and no step may be selected' };
   const scene = project.scenes[sceneId];
   if (!scene) return { ok: false, problem: `Stage ${sceneId} does not exist` };
-  if (input.scenarioId === null && optionId !== null && scene.optionId !== optionId && scene.optionId !== null)
-    return { ok: false, problem: `Stage ${sceneId} does not belong to option ${optionId}` };
+  if (input.scenarioId === null && workId !== null && scene.workId !== workId && scene.workId !== null)
+    return { ok: false, problem: `Stage ${sceneId} does not belong to option ${workId}` };
 
   let at: string | null = null;
   let label: string | null = null;
@@ -79,7 +79,7 @@ export function resolveSelection(project: Project, input: SelectionInput, now = 
     ok: true,
     selection: {
       featureId,
-      optionId,
+      workId,
       scenarioId: input.scenarioId,
       position: input.position,
       stepId,

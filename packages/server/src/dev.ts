@@ -534,9 +534,9 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       if (slot.compiling || slot.dirty || slot.timer || !slot.payload.ok || !slot.payload.project || slot.payload.diagnostics.some(d => d.severity === 'error'))
         throw new JoploError('REVISION_CONFLICT', 'Wait for the project to compile successfully before reviewing');
       if (method === 'GET') {
-        const optionId = new URL(req.url!, baseUrl()).searchParams.get('option');
-        if (!optionId) throw new JoploError('USAGE', 'option is required');
-        return sendJson(res, 200, reviewHub.state(slot.dir, optionId));
+        const workId = new URL(req.url!, baseUrl()).searchParams.get('workId');
+        if (!workId) throw new JoploError('USAGE', 'workId is required');
+        return sendJson(res, 200, reviewHub.state(slot.dir, workId));
       }
       const body = await jsonBody(req, res);
       if (!body.ok) return;

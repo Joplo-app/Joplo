@@ -35,7 +35,7 @@ const payload = (dir: string) => JSON.parse(/id="joplo-ir">([\s\S]*?)<\/script>/
 beforeAll(() => {
   sourceWeb = locateWebAssets({});
   fs.mkdirSync(path.join(project, 'works'), { recursive: true });
-  fs.mkdirSync(path.join(project, 'features/f/options'), { recursive: true });
+  fs.mkdirSync(path.join(project, 'features/f/works'), { recursive: true });
   fs.mkdirSync(path.join(project, 'themes'), { recursive: true });
   installFixturePlugins(project);
   fs.writeFileSync(path.join(project, 'package.json'), '{"type":"module"}');
@@ -47,7 +47,7 @@ beforeAll(() => {
 export default work({title:'Live',summary:'Public',state:{ui:{visual:${JSON.stringify(initial)}}},stage:<div><div className={$.ui.visual}>Public</div><div className={${JSON.stringify(quoted)}} note="before:content-['NOTE_PRIVATE']">Quoted</div></div>,scenarios:{one:flow('One').system('Begin',set($.ui.visual,${JSON.stringify(effect)})),two:flow('Two').system('Other',set($.ui.visual,${JSON.stringify(sliced)}))}});`);
   fs.writeFileSync(path.join(project, 'works/old.tsx'), `import { work, flow } from '@joplo-app/kit'; export default work({title:'Old',summary:'Draft',draft:true,stage:<div className={${JSON.stringify(draft)}}>Old</div>,scenarios:{one:flow('Old').system('Old')}});`);
   fs.writeFileSync(path.join(project, 'features/f/feature.ts'), `import { feature } from '@joplo-app/kit'; export default feature({name:'Feature',goal:'Compare',cases:{one:'One'},pick:'a'});`);
-  for (const key of ['a', 'b']) fs.writeFileSync(path.join(project, `features/f/options/${key}.tsx`), `import { option, flow, layer } from '@joplo-app/kit'; export default option({name:'${key}',idea:'${key}',layers:{main:layer('Main',<div className={${JSON.stringify(key === 'a' ? 'tracking-[0.37em]' : alternative)}}>${key}</div>)},scenarios:{one:flow('One',{cases:['one']}).system('Start')}});`);
+  for (const key of ['a', 'b']) fs.writeFileSync(path.join(project, `features/f/works/${key}.tsx`), `import { work, flow, layer } from '@joplo-app/kit'; export default work({title:'${key}',summary:'${key}',layers:{main:layer('Main',<div className={${JSON.stringify(key === 'a' ? 'tracking-[0.37em]' : alternative)}}>${key}</div>)},scenarios:{one:flow('One',{cases:['one']}).system('Start')}});`);
   // 使用真实 dist CSS 编译/复制路径；播放器模板最小化，避免测试依赖本机已有发包产物。
   const web = path.join(root, 'web'); const app = path.join(web, 'app');
   fs.mkdirSync(path.join(app, 'assets'), { recursive: true });
@@ -61,10 +61,10 @@ afterAll(() => { chosen.web = null; fs.rmSync(root, { recursive: true, force: tr
 const scopes = [
   { name: 'publish', review: false },
   { name: 'review', review: true },
-  { name: 'publish-scope', review: false, scope: { scenarios: ['live.main.one'] } },
-  { name: 'review-scope', review: true, scope: { scenarios: ['live.main.one'] } },
-  { name: 'publish-combined', review: false, scope: { features: ['f'], scenarios: ['live.main.one'] } },
-  { name: 'review-combined', review: true, scope: { features: ['f'], scenarios: ['live.main.one'] } },
+  { name: 'publish-scope', review: false, scope: { scenarios: ['live.one'] } },
+  { name: 'review-scope', review: true, scope: { scenarios: ['live.one'] } },
+  { name: 'publish-combined', review: false, scope: { entryIds: ['f'], scenarios: ['live.one'] } },
+  { name: 'review-combined', review: true, scope: { entryIds: ['f'], scenarios: ['live.one'] } },
 ];
 for (const mode of ['source', 'dist'] as const) for (const variant of scopes) it(`${mode} ${variant.name}：私有任意值文字/URL 不进入任何产物，公开类名完整`, async () => {
   chosen.web = mode === 'source' ? sourceWeb : distWeb;

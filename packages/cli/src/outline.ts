@@ -4,18 +4,19 @@ import { checkWithProject } from './check.ts';
 import { oneLine } from './common.ts';
 
 /** `joplo outline`（D67）：大纲 + 本次 check 的诊断数量（按代码）。编译失败时 outline 为 null。 */
-export async function readOutline(dir: string, optionId?: string): Promise<{ name: string; entries: Entry[]; works: Record<string, Entry>; outline: Outline | null; diagnostics: Diagnostic[]; summary: Record<'error' | 'warning' | 'info', number> }> {
-  const report = await checkWithProject(dir, optionId);
-  const selected = optionId && report.project ? resolveWorkId(report.project, optionId) : undefined;
+export async function readOutline(dir: string, workId?: string): Promise<{ name: string; entries: Entry[]; works: Record<string, Entry>; outline: Outline | null; diagnostics: Diagnostic[]; summary: Record<'error' | 'warning' | 'info', number> }> {
+  const report = await checkWithProject(dir, workId);
+  const selected = workId && report.project ? resolveWorkId(report.project, workId) : undefined;
   // 指定未选方案时，同样从条目投影读取它的章节能力。
-  const projected = report.project && selected ? { ...report.project, features: Object.fromEntries(Object.entries(report.project.features).map(([id, f]) => [id, f.optionIds.includes(selected) ? { ...f, pick: selected } : f])) } : report.project;
+  const projected = report.project && selected ? { ...report.project, features: Object.fromEntries(Object.entries(report.project.features).map(([id, f]) => [id, f.workIds.includes(selected) ? { ...f, pick: selected } : f])) } : report.project;
   const works: Record<string, Entry> = {};
-  if (report.project) for (const option of Object.values(report.project.options)) {
-    const feature = report.project.features[option.featureId]!;
-    works[option.id] = entryOf({ ...report.project, features: { ...report.project.features, [feature.id]: { ...feature, pick: option.id } } }, feature.id)!;
+  if (report.project) for (const entry of entriesOf(report.project)) {
+    if (entry.featureId === null) { if (entry.workId) works[entry.workId] = entry; continue; }
+    const feature = report.project.features[entry.featureId]!;
+    for (const workId of feature.workIds) works[workId] = entryOf({ ...report.project, features: { ...report.project.features, [feature.id]: { ...feature, pick: workId } } }, feature.id)!;
   }
-  const data = report.project ? outline(report.project, { optionId: selected }) : null;
-  if (data && selected) for (const f of data.features) f.sequencing = works[selected]!.sequencing;
+  const data = report.project ? outline(report.project, { workId: selected }) : null;
+  if (data && selected) for (const f of data.entries) f.sequencing = works[selected]!.sequencing;
   return { name: report.name, works, entries: projected ? entriesOf(projected) : [], outline: data, diagnostics: report.diagnostics, summary: report.summary };
 }
 
@@ -49,12 +50,12 @@ export function outlineText(r: Awaited<ReturnType<typeof readOutline>>): string[
     return out;
   }
   const o = r.outline;
-  const scenarios = o.features.flatMap((f) => f.options.flatMap((x) => x.scenarios));
+  const scenarios = o.entries.flatMap((f) => f.works.flatMap((x) => x.scenarios));
   const total = scenarios.reduce((n, s) => n + s.ms, 0);
-  const independent = o.features.some(f => r.entries.find(e => e.id === f.id)?.featureId === null);
-  if (independent) out.push(`${o.name} · ${o.features.length} work(s), ${scenarios.length} slice(s), ${approx(total)} at 1×`);
-  else out.push(`${o.name} · ${o.features.length} feature(s), ${o.features.reduce((n, f) => n + f.options.length, 0)} option(s), ${scenarios.length} scenario(s), ${approx(total)} at 1×`);
-  for (const f of o.features) {
+  const independent = o.entries.some(f => r.entries.find(e => e.id === f.id)?.featureId === null);
+  if (independent) out.push(`${o.name} · ${o.entries.length} work(s), ${scenarios.length} slice(s), ${approx(total)} at 1×`);
+  else out.push(`${o.name} · ${o.entries.length} feature(s), ${o.entries.reduce((n, f) => n + f.works.length, 0)} option(s), ${scenarios.length} scenario(s), ${approx(total)} at 1×`);
+  for (const f of o.entries) {
     const entry = r.entries.find(e => e.id === f.id)!;
     const chapters = entry.sequencing === 'linear';
     if (entry.featureId === null) {
@@ -63,23 +64,23 @@ export function outlineText(r: Awaited<ReturnType<typeof readOutline>>): string[
       for (const [i, slice] of entry.slices.entries()) out.push(`    ${chapters ? `${String(i + 1).padStart(2, '0')}  ` : ''}${slice.key}  ${oneLine(slice.title)}  ${slice.steps} step${slice.steps === 1 ? '' : 's'} ${approx(slice.ms)}`);
       continue;
     }
-    out.push('', `## ${f.id} · ${oneLine(f.name)}${f.pick ? `   picked: ${f.pick.slice(f.id.length + 1)}` : '   no picked option'}`);
-    out.push(`Goal: ${oneLine(f.goal)}`);
+    out.push('', `## ${f.id} · ${oneLine(f.title)}${f.pick ? `   picked: ${f.pick.slice(f.id.length + 1)}` : '   no picked option'}`);
+    out.push(`Goal: ${oneLine(f.summary)}`);
     out.push(`Roles: ${f.roles.length ? f.roles.map(oneLine).join(', ') : '(none declared; who is this for?)'}`);
     const caseKeys = new Map(f.cases.map((c) => [c.id, c.key]));
     if (f.cases.length) {
       const kw = Math.max(...f.cases.map((c) => displayWidth(c.key))) + 2;
-      out.push(`Cases (${f.options.map((x, i) => letter(i)).join(' ')}: ✓ shown ✗ missing ? undecided – not applicable ⊘ excluded):`);
+      out.push(`Cases (${f.works.map((x, i) => letter(i)).join(' ')}: ✓ shown ✗ missing ? undecided – not applicable ⊘ excluded):`);
       for (const c of f.cases) {
-        const marks = f.options.map((x) => STATUS[c.coverage[x.id] ?? ''] ?? ' ').join(' ');
+        const marks = f.works.map((x) => STATUS[c.coverage[x.id] ?? ''] ?? ' ').join(' ');
         out.push(`  ${pad(c.key, kw)}${pad(c.dimension, 12)}${pad(c.priority, 7)}${marks}  ${oneLine(c.title)} → ${c.expected.trim() ? oneLine(c.expected) : '(expected result not written)'}`);
       }
     } else out.push('Cases: (none; see npx joplo skill cases)');
-    f.options.forEach((x, i) => {
+    f.works.forEach((x, i) => {
       const work = r.works[x.id]!;
       const chapters = work.sequencing === 'linear';
       const slices = chapters ? work.slices.flatMap(slice => x.scenarios.filter(s => s.id === slice.id)) : x.scenarios;
-      out.push(`${letter(i)} · ${x.key} · ${oneLine(x.name)}${x.picked ? ' (picked)' : ''}: ${x.scenarios.length} ${chapters ? 'chapters' : 'scenario(s)'} ${approx(x.ms)}${x.missing || x.undecided ? ` · missing ${x.missing} · undecided ${x.undecided}` : ''}`);
+      out.push(`${letter(i)} · ${x.key} · ${oneLine(x.title)}${x.picked ? ' (picked)' : ''}: ${x.scenarios.length} ${chapters ? 'chapters' : 'scenario(s)'} ${approx(x.ms)}${x.missing || x.undecided ? ` · missing ${x.missing} · undecided ${x.undecided}` : ''}`);
       const kw = Math.max(0, ...x.scenarios.map((s) => displayWidth(s.key))) + 2;
       const nw = Math.min(40, Math.max(0, ...x.scenarios.map((s) => displayWidth(oneLine(s.name)))) + 2);
       for (const [index, s] of slices.entries()) out.push(scenarioLine({ ...s, key: chapters ? `${String(index + 1).padStart(2, '0')}  ${s.key}` : s.key }, caseKeys, kw + (chapters ? 4 : 0), nw));

@@ -68,7 +68,7 @@ describe('发布到云端接口', () => {
     expect((await req(port, { method: 'POST', path: url, headers: { ...j, origin: 'http://evil.example' }, body: JSON.stringify({visibility:'private',review:false}) })).status).toBe(403);
     expect((await req(port, { method: 'POST', path: url, headers: t, body: JSON.stringify({visibility:'private',review:false}) })).status).toBe(415);
     expect((await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({ scenarios: 'a.b.c' }) })).status).toBe(400);
-    expect((await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({ features: [1] }) })).status).toBe(400);
+    expect((await req(port, { method: 'POST', path: url, headers: j, body: JSON.stringify({ entryIds: [1] }) })).status).toBe(400);
     for (const body of [{}, {visibility:'public'}, {visibility:'private',review:'false'}, {visibility:'public',review:false,scenarios:['f.a.main']}]) {
       expect((await req(port,{method:'POST',path:url,headers:j,body:JSON.stringify(body)})).status).toBe(400);
     }
@@ -87,7 +87,7 @@ describe('发布到云端接口', () => {
         progress('Checking the project...');
         await gate;
         progress('Upload complete. Finalizing publication...');
-        return { shareId: 'Abc1234567', url: 'https://x/s/Abc1234567', expiresAt: null, version: 2, plan: 'pro', scope: { key: 'f.a.main', scenarios: ['f.a.main'], features: ['f'], borrowed: [] } };
+        return { shareId: 'Abc1234567', url: 'https://x/s/Abc1234567', expiresAt: null, version: 2, plan: 'pro', scope: { key: 'f.a.main', scenarios: ['f.a.main'], entryIds: ['f'], borrowed: [] } };
       },
     });
     const url = `/__joplo/p/${id}/cloud/publish`;

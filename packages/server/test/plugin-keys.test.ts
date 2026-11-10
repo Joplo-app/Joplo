@@ -56,9 +56,9 @@ it('routes current project declarations through guarded cards and keeps credenti
   fs.writeFileSync(path.join(root,'local.ts'),`export default {compilers:{}};`);
   fs.writeFileSync(path.join(root,'joplo.config.ts'),fixtureConfigSource(`import {config} from '@joplo-app/kit';import {definePlugin} from ${JSON.stringify(pluginPath)};const alpha=definePlugin({id:'alpha',title:'Alpha',components:{},runtime:new URL('./runtime.ts',import.meta.url),local:new URL('./local.ts',import.meta.url),keys:[${JSON.stringify(declaration)}]});export default config({name:'Key test',home:'/',plugins:[alpha]});`));
   fs.mkdirSync(path.join(root,'routes'),{recursive:true});fs.writeFileSync(path.join(root,'routes/page.tsx'),`import {page} from '@joplo-app/kit';export default page({title:'Home'},<p>Public content</p>);`);
-  fs.mkdirSync(path.join(root,'features/f/options'),{recursive:true});
+  fs.mkdirSync(path.join(root,'features/f/works'),{recursive:true});
   fs.writeFileSync(path.join(root,'features/f/feature.ts'),`import {feature} from '@joplo-app/kit';export default feature({name:'F',goal:'G',pick:'a',cases:{}});`);
-  fs.writeFileSync(path.join(root,'features/f/options/a.tsx'),`import {option,flow} from '@joplo-app/kit';export default option({name:'A',idea:'I',scenarios:{main:flow('Main',{start:'/'}).system('Ready')}});`);
+  fs.writeFileSync(path.join(root,'features/f/works/a.tsx'),`import {option,flow} from '@joplo-app/kit';export default work({title:'A',summary:'I',scenarios:{main:flow('Main',{start:'/'}).system('Ready')}});`);
   const dev=await createDev({projectDir:root,port:0,home,log:message=>logs.push(message)});
   const url=`${dev.url}__joplo/p/${dev.projectId}/plugin-keys`;
   const headers={'x-joplo-token':dev.token,'content-type':'application/json'};

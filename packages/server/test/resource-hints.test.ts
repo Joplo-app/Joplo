@@ -51,7 +51,7 @@ it('a stale hint never changes the result: metadata is re-checked, and a hint th
   const run = async () => {
     effects = 0;
     const r = await compileProject(server, dir, 'dev');
-    return { offset: r.project?.scenarios['demo.main.one']?.steps[0]?.media?.['probe:bgm']?.offsetMs, effects, errors: r.diagnostics.filter((d) => d.severity === 'error').map((d) => d.code) };
+    return { offset: r.project?.scenarios['demo.one']?.steps[0]?.media?.['probe:bgm']?.offsetMs, effects, errors: r.diagnostics.filter((d) => d.severity === 'error').map((d) => d.code) };
   };
 
   update({ old: 1000 });

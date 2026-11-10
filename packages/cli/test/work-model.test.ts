@@ -36,7 +36,7 @@ test('只有 works/：文字按作品与章节输出，JSON 带能力，--work �
   expect(text.out).toMatch(/02\s+end\s+Conclusion\s+1 step/);
   expect(text.out).not.toMatch(/Cases|option|picked|demo\.main/);
   const json = await run(['outline', d, '--work', 'demo', '--format', 'json']);
-  expect(JSON.parse(json.out).data.outline.features[0]).toMatchObject({ standalone: true, sequencing: 'linear', draft: false });
+  expect(JSON.parse(json.out).data.outline.entries[0]).toMatchObject({ featureId: null, sequencing: 'linear', draft: false });
   expect((await run(['check', d, '--work', 'demo'])).code).toBe(0);
 });
 test('草稿、空作品与独立场景；不存在的 --work 列出可用条目；拒绝旧参数', async () => {
@@ -60,33 +60,33 @@ test('独立作品诊断的文字与 JSON 都定位到 works 文件的行列', a
   const json = await cli(['check', d, '--format', 'json']);
   expect(json.code).toBe(1);
   expect(JSON.parse(json.out).diagnostics).toContainEqual(expect.objectContaining({ code: 'FROM_UNKNOWN', at: expect.stringMatching(/^works\/demo\.tsx:2:\d+$/) }));
-  const text = await cli(['check', d]); expect(text.out).toMatch(/works\/demo\.tsx:2:\d+  error  FROM_UNKNOWN/); expect(text.out).not.toContain('demo.main');
+  const text = await cli(['check', d]); expect(text.out).toMatch(/works\/demo\.tsx:2:\d+  error  FROM_UNKNOWN/); expect(text.out).not.toContain('demo');
 });
 test('混合项目保留功能正文；功能选定方案用章节时也带编号', async () => {
   const d = await project(); await cp('examples/invite/features', join(d, 'features'), { recursive: true }); await cp('examples/invite/routes', join(d, 'routes'), { recursive: true });
   const r = await run(['outline', d, '--work', 'invite.a-modal']);
   expect(r.out).toContain('## invite · 团队成员邀请   picked: a-modal'); expect(r.out).toContain('Cases (A:');
-  const file = join(d, 'features/invite/options/a-modal.tsx');
-  await writeFile(file, `import { option, chapter, page, narrate } from '@joplo-app/kit';
-export default option({name:'A',idea:'Chapters',routes:{'/linear':page({title:'Linear'},<div>Ready</div>)},scenarios:{first:chapter('First',{start:'/linear'}).system('Begin',narrate('Hello')),second:chapter('Second').system('Finish',narrate('Done'))}});`);
+  const file = join(d, 'features/invite/works/a-modal.tsx');
+  await writeFile(file, `import { work, chapter, page, narrate } from '@joplo-app/kit';
+export default work({title:'A',summary:'Chapters',routes:{'/linear':page({title:'Linear'},<div>Ready</div>)},scenarios:{first:chapter('First',{start:'/linear'}).system('Begin',narrate('Hello')),second:chapter('Second').system('Finish',narrate('Done'))}});`);
   const linear = await run(['outline', d, '--work', 'invite.a-modal']);
   expect(linear.out).toMatch(/\d+ chapters/); expect(linear.out).toMatch(/01\s+\w+/);
 });
 test('build --work 参数传入范围，旧项目构建摘要保持不变', async () => {
   const build = vi.fn(async () => ({ outDir: '/site', files: ['index.html'], scenarios: [], diagnostics: [] }));
   expect((await run(['build', 'project', '--work', 'demo'], { loadServer: async () => ({ buildSite: build }) })).code).toBe(0);
-  expect(build).toHaveBeenCalledWith(expect.objectContaining({ scope: { features: ['demo'], scenarios: [] } }));
+  expect(build).toHaveBeenCalledWith(expect.objectContaining({ scope: { entryIds: ['demo'], scenarios: [] } }));
 });
 test('真实构建仅发一件作品；草稿明确拒绝；跳过草稿列明原因；仅草稿不生成空站', async () => {
   const d = await project(); await work(d, 'other'); await work(d, 'old', 'draft:true,');
-  const built = await buildSite({ projectDir: d, outDir: join(d, 'one'), scope: { features: ['demo'] } });
+  const built = await buildSite({ projectDir: d, outDir: join(d, 'one'), scope: { entryIds: ['demo'] } });
   const html = await readFile(join(built.outDir, 'index.html'), 'utf8');
   const payload = JSON.parse(/id="joplo-ir">(.*?)<\/script>/.exec(html)![1]!);
   expect(Object.keys(payload.project.features)).toEqual(['demo']);
   expect(built.entries).toEqual([{ id: 'demo', title: 'demo', slices: 2, sequencing: 'linear' }]);
   expect(built.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED')).toBe(true);
-  await expect(buildSite({ projectDir: d, outDir: join(d, 'draft'), scope: { features: ['old'] } })).rejects.toThrow(/draft.*old|old.*draft/i);
-  await expect(buildSite({ projectDir: d, outDir: join(d, 'bad'), scope: { features: ['missing'] } })).rejects.toThrow(/Works:.*demo.*other/);
+  await expect(buildSite({ projectDir: d, outDir: join(d, 'draft'), scope: { entryIds: ['old'] } })).rejects.toThrow(/draft.*old|old.*draft/i);
+  await expect(buildSite({ projectDir: d, outDir: join(d, 'bad'), scope: { entryIds: ['missing'] } })).rejects.toThrow(/Works:.*demo.*other/);
   await work(d, 'demo', 'draft:true,'); await work(d, 'other', 'draft:true,');
   await expect(buildSite({ projectDir: d, outDir: join(d, 'empty') })).rejects.toThrow(/no picked option[\s\S]*draft/i);
 }, 60000);
@@ -95,7 +95,7 @@ test('技能用作品与能力教创作，诊断逐条可恢复，常见坑仍�
   const { skillTopic, agentSkills } = await import('@joplo-app/core');
   const authoring = skillTopic('authoring');
   expect(authoring).toContain('Works → slices → steps');
-  for (const text of ['work({', 'chapter(', 'feature({', 'option({', 'works/<key>', 'from: null', '--work <key>', '0 errors', '--sheet', '--film --chain']) expect(authoring).toContain(text);
+  for (const text of ['work({', 'chapter(', 'feature({', 'work({', 'works/<key>', 'from: null', '--work <key>', '0 errors', '--sheet', '--film --chain']) expect(authoring).toContain(text);
   for (const code of ['WORK_INVALID', 'WORK_ID_CONFLICT', 'WORK_SLICES_MIXED', 'WORK_FEATURE_ONLY', 'FROM_UNKNOWN', 'WORK_EMPTY', 'WORK_DRAFT_SKIPPED']) expect(skillTopic('check').split('\n').some(line => line.startsWith(`- ${code} (`)), code).toBe(true);
   const { skill, patterns } = await import('../../../plugins/content/src/guide.ts');
   expect(skill).not.toMatch(/a feature is the episode|HAPPY_PATH_ONLY is expected|flow\(\{ from/);
@@ -111,7 +111,7 @@ test('空独立作品不进入发布，--work 选空作品明确拒绝，仅空�
   const built=await buildSite({projectDir:d,outDir:join(d,'mixed-empty')});
   expect(built.entries!.map(e=>e.id)).toEqual(['demo']);
   expect(built.diagnostics).toContainEqual(expect.objectContaining({code:'WORK_EMPTY',severity:'info'}));
-  await expect(buildSite({projectDir:d,outDir:join(d,'selected-empty'),scope:{features:['empty']}})).rejects.toThrow(/empty|no slices|no scenarios/i);
+  await expect(buildSite({projectDir:d,outDir:join(d,'selected-empty'),scope:{entryIds:['empty']}})).rejects.toThrow(/empty|no slices|no scenarios/i);
   expect((await run(['build',d,'--work','empty','--out',join(d,'cli-empty')])).code).toBe(2);
   await work(d,'demo','', '');
   await expect(buildSite({projectDir:d,outDir:join(d,'all-empty')})).rejects.toThrow(/no picked option|no publishable/i);

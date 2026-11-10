@@ -1,4 +1,4 @@
-import { $, done, explain, flow, layer, option, set, shot } from '@joplo-app/kit';
+import { $, done, explain, flow, layer, work, set, shot } from '@joplo-app/kit';
 import { Button, ChatMessage, Paper, Placeholder, SimpleGrid, Stack, Text, ToolCall } from '@joplo-app/plugin-ui'; import { Diagram } from '@joplo-app/plugin-diagram';
 
 /**
@@ -34,9 +34,9 @@ const Arch = ({ id, h }: { id: string; h: number }) => (
   </Diagram>
 );
 
-export default option({
-  name: 'A · 混合',
-  idea: '端侧执行器 + 云端大脑',
+export default work({
+  title: 'A · 混合',
+  summary: '端侧执行器 + 云端大脑',
   on: {
     '/': { main: [<Text id="route_note">路径页面（声明了 layers 的方案在演示页显示各层自己的画面）</Text>] },
   },
