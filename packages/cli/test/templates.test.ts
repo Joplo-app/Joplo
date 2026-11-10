@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { mkdtemp, mkdir, readFile, writeFile, rm, stat, readdir, symlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -167,4 +167,36 @@ test('work init installs the shared skills before dependencies, then compiles tw
 test('init help explains built-in priority and explicit local paths', async () => {
  let out=''; expect(await runCli(['init','--help'],{stdout:s=>{out+=s;},stderr:()=>{}})).toBe(0);
  expect(out).toContain('starter'); expect(out).toContain('work'); expect(out).toContain('./work');
+});
+
+
+describe('模板下载的空闲超时', () => {
+  const slow = (bytes: Buffer, gapMs: number, stallAfter = Infinity) => async (_url: string | URL | Request, init?: RequestInit) => {
+    const signal = init?.signal as AbortSignal | undefined;
+    const parts = [bytes.subarray(0, 512), bytes.subarray(512, 1024), bytes.subarray(1024)];
+    const body = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        for (let i = 0; i < parts.length; i++) {
+          await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(resolve, i >= stallAfter ? 60_000 : gapMs);
+            signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
+          }).catch((e) => { controller.error(e); throw e; });
+          controller.enqueue(parts[i]!);
+        }
+        controller.close();
+      },
+    });
+    return new Response(body, { status: 200 });
+  };
+  const deps = (fetcher: unknown) => ({ localTemplates: null, env: {}, ghToken: () => undefined, fetch: fetcher as typeof fetch, idleMs: 80 });
+
+  test('总时长超过空闲上限但一直有数据：下载成功', async () => {
+    // 三块各隔 50ms，总共约 150ms > idleMs 80ms；以前的“总时长 30 秒”会在大模板包 + 慢网络下误判失败。
+    const result = await loadTemplate('2.3.4', 'starter', deps(slow(fixture(), 50)));
+    expect([...result.files.keys()]).toContain('package.json');
+  });
+
+  test('中途停住超过空闲上限：报网络错误并给出离线做法', async () => {
+    await expect(loadTemplate('2.3.4', 'starter', deps(slow(fixture(), 10, 1)))).rejects.toThrow(/--template <本地路径>/);
+  });
 });

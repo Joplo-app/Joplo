@@ -8,7 +8,8 @@ import { templateMessages as m } from './template-messages.ts';
 
 export type TemplateSource = { kind:'github'; owner:string; repo:string; subdir:string; ref:string } | { kind:'local'; dir:string };
 export type TemplateFiles = Map<string, Buffer>;
-export type TemplateDeps = { fetch?: typeof fetch; env?: Record<string,string|undefined>; ghToken?:()=>string|undefined; localTemplates?:string|null };
+/** idleMs：下载中多久收不到数据算失败（缺省 30 秒）。不限制总时长——模板包有几十 MB，慢网络下完整下载会超过半分钟。 */
+export type TemplateDeps = { fetch?: typeof fetch; env?: Record<string,string|undefined>; ghToken?:()=>string|undefined; localTemplates?:string|null; idleMs?:number };
 const MAX_DOWNLOAD=64*1024*1024, MAX_EXPANDED=256*1024*1024, MAX_FILES=20000;
 const fail=(reason:keyof typeof m, code:'USAGE'|'NOT_FOUND'|'PERMISSION_DENIED'='USAGE'):never=>{throw new JoploError(code,`${m[reason]} ${m.fallback}`);};
 
@@ -103,21 +104,27 @@ async function download(source:Extract<TemplateSource,{kind:'github'}>,deps:Temp
   const owner=encodeURIComponent(source.owner),repo=encodeURIComponent(source.repo),ref=encodeURIComponent(source.ref);
   let url=token?`https://api.github.com/repos/${owner}/${repo}/tarball/${ref}`:`https://codeload.github.com/${owner}/${repo}/tar.gz/${ref}`;
   let response:Response;
+  // 空闲超时：等响应头、等下一块数据各自最多 idleMs；只要还在收数据就不中断。
+  const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
+  const touch=()=>{clearTimeout(timer);timer=setTimeout(()=>controller.abort(),deps.idleMs??30000);};
   try{
-    response=await fetcher(url,{redirect:'manual',signal:AbortSignal.timeout(30000),headers:token?{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json'}:{}});
+    touch();
+    response=await fetcher(url,{redirect:'manual',signal:controller.signal,headers:token?{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json'}:{}});
     if([301,302,307,308].includes(response.status)){
       const location=response.headers.get('location');if(!location)fail('network');
       const next=new URL(location!,url);if(next.protocol!=='https:'||next.hostname!=='codeload.github.com'||next.username||next.password)fail('network');
-      url=next.href;response=await fetcher(url,{redirect:'error',signal:AbortSignal.timeout(30000)});
+      url=next.href;touch();response=await fetcher(url,{redirect:'error',signal:controller.signal});
     }
     if(response.status===401||response.status===403)fail('unauthorized','PERMISSION_DENIED');
     if(response.status===404)fail('missing','NOT_FOUND');
     if(!response.ok||!response.body)fail('network');
     if(Number(response.headers.get('content-length'))>MAX_DOWNLOAD)fail('tooLarge');
     const chunks:Buffer[]=[];let total=0;
-    for await(const chunk of response.body as unknown as AsyncIterable<Uint8Array>){total+=chunk.length;if(total>MAX_DOWNLOAD)fail('tooLarge');chunks.push(Buffer.from(chunk));}
+    touch();
+    for await(const chunk of response.body as unknown as AsyncIterable<Uint8Array>){touch();total+=chunk.length;if(total>MAX_DOWNLOAD)fail('tooLarge');chunks.push(Buffer.from(chunk));}
     return Buffer.concat(chunks);
   }catch(e){if(e instanceof JoploError)throw e;return fail('network');}
+  finally{clearTimeout(timer);}
 }
 export async function loadTemplate(version:string,spec?:string,deps:TemplateDeps={}):Promise<{files:TemplateFiles;source:string}>{
   const name=builtinName(spec??'starter');

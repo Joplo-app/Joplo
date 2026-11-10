@@ -32,7 +32,8 @@ pnpm install --frozen-lockfile
 pnpm release:version 0.3.0         # 改十一个包的版本，并重新生成 skills/（默认升 patch，破坏性变更升 minor）
 pnpm install --lockfile-only
 pnpm typecheck && pnpm test         # 本地先过一遍，CI 会再跑
-git add packages/*/package.json plugins/*/package.json plugins/*/src/version.json pnpm-lock.yaml skills templates/starter/.claude/skills CHANGELOG.md
+git add packages/*/package.json plugins/*/package.json plugins/*/src/version.json packages/core/src/guide.ts pnpm-lock.yaml skills templates/*/.claude/skills CHANGELOG.md
+git status --short                  # 应该是空的：release:version 改过的文件都要进这一个提交
 git commit -m "release: 0.3.0"
 git push origin main
 git tag v0.3.0 && git push origin v0.3.0   # 触发 .github/workflows/release.yml
@@ -92,7 +93,7 @@ git push origin v0.3.0
 顺序不能乱：
 
 1. `pnpm release:version <v>`：改十一个包的版本，并重新生成 `skills/*/SKILL.md`（带新版本标记）。
-2. 跑完检查后，把 `packages/*/package.json`、`plugins/*/package.json`、`plugins/*/src/version.json`、`pnpm-lock.yaml`、`skills/` 和 `templates/starter/.claude/skills/` 一起提交，推送 main。推送 main 不会触发发布。
+2. 跑完检查后，把 `packages/*/package.json`、`plugins/*/package.json`、`plugins/*/src/version.json`、`packages/core/src/guide.ts`（里面写着插件的安装版本）、`pnpm-lock.yaml`、`skills/` 和各模板的 `templates/*/.claude/skills/` 一起提交，推送 main。推送 main 不会触发发布。
 3. `pnpm release:publish --tag <标签>`：先一次性构建并打包全部包（与 `release:pack` 相同，含全部 tarball 检查），再按依赖顺序发布打好的 tarball（可续跑，见下），最后自动运行 `release:verify`，整体退出码就是 verify 的结果。
 4. 第 3 步失败（中途某个包没发出去，或 verify 不通过）：按提示处理后重跑同一条命令，已发布的包会跳过。也可以单独运行 `pnpm release:verify` 复查。
 5. 第 3 步以 0 退出后，在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`。tag 会触发 release.yml：重跑检查，发布步骤因为十一个包都已存在而跳过，然后生成 GitHub Release。用户用 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。注意 `npx skills add Joplo-app/Joplo@v<v>` 不能用：skills CLI 把 `@` 后面当成技能名，报 No matching skills found（2026-11-06 实测）。手动发布时 tag 要等 verify 通过再推，避免指向一个装不上的版本。
