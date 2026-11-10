@@ -3,6 +3,7 @@
  * dev（看板、截图）与 build（发布站）共用这一条路径。
  */
 import fs from 'node:fs';
+import { watchConfigDiagnostics } from './watch-config.ts';
 import path from 'node:path';
 import type { LocalResourceInfo, ResourceRequest } from '@joplo-app/kit/plugin';
 import { inspectResources, mediaDiagnostics } from './media-check.ts';
@@ -21,6 +22,7 @@ export type CompileOutcome = {
   home: string | null;
   /** 启用的插件（D86）：插件 id → 运行时入口的绝对路径（看板按它载入，build 按它打包）。 */
   pluginRuntimes: Record<string, string>;
+  watchIgnore?: string[];
   resources?: { requests: ResourceRequest[]; host: LocalResources };
 };
 
@@ -108,6 +110,7 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
     diagnostics.push(out);
   }
   if (!loaded.authoring) return { project: null, diagnostics, home: null, pluginRuntimes: {} };
+  diagnostics.push(...watchConfigDiagnostics(loaded.authoring.config.watch, loaded.authoring.config.source));
   const home = loaded.authoring.config.home ?? null;
   const pluginRuntimes = pluginRuntimesOf(loaded.authoring.config.plugins);
   if (diagnostics.some((d) => d.severity === 'error')) return { project: null, diagnostics, home, pluginRuntimes };
@@ -147,7 +150,7 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
     const result = await resources.host.ensure(request);
     if (result.diagnostic) diagnostics.push(result.diagnostic);
   }
-  return { project: extra.length ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes, resources };
+  return { watchIgnore: loaded.authoring.config.watch?.ignore, project: extra.length ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes, resources };
 }
 
 const requestKey = (request: { plugin: string; compiler: string; input: string }) => JSON.stringify([request.plugin, request.compiler, request.input]);

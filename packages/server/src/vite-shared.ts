@@ -26,11 +26,11 @@ export function realProjectDir(dir: string): string {
 /** 不参与编译的项目子目录。 */
 export const IGNORED_DIRS = ['.joplo', 'dist', 'node_modules', '.git'];
 
-export function isProjectSource(projectDir: string, file: string): boolean {
+export function isProjectSource(projectDir: string, file: string, ignored: readonly string[] = []): boolean {
   if (!file.startsWith(projectDir + path.sep)) return false;
   const rel = file.slice(projectDir.length + 1);
   const first = rel.split(path.sep)[0] ?? '';
-  return !IGNORED_DIRS.includes(first);
+  return !IGNORED_DIRS.includes(first) && !ignored.some(p => rel.split(path.sep).join('/') === p || rel.split(path.sep).join('/').startsWith(p + '/'));
 }
 
 /** 读 tsconfig（允许注释与尾逗号），沿相对路径的 extends 找 compilerOptions.jsxImportSource。 */

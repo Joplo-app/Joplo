@@ -1,5 +1,6 @@
 /** Node-only resource host. Work runs in a disposable process, never the browser. */
 import fs from 'node:fs';
+import { mediaBudgetDiagnostics } from './media-check.ts';
 import { PluginKeyStore, compilerEnvironment } from './plugin-keys.ts';
 import { joploHome } from './home.ts';
 import path from 'node:path';
@@ -222,6 +223,7 @@ export async function inlineResources(project: Project, requests: ResourceReques
     if (r.diagnostic) diagnostics.push(r.diagnostic);
   }
   if(rawBytes)diagnostics.push({severity:'info',source:'structure',code:'MEDIA_BUDGET',message:`All audio: ${rawBytes} raw bytes, ${embeddedBytes} embedded base64/data-URI bytes`});
+  diagnostics.push(...mediaBudgetDiagnostics(project, audioInfo));
   return { assets, audioInfo, diagnostics, credits: [...credits], licenses:[...licenses],rawBytes,embeddedBytes };
 }
 

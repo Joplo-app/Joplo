@@ -45,7 +45,7 @@ export type VoiceConfig = {
  * 可选：en、zh-CN、zh-TW、ja、ko、es、fr、de、pt-BR、ru。加一种语言：npx joplo i18n add <语言>。
  */
 /** plugins（D86）：启用的插件（npm 包的默认导出，`plugins: [scene3d]`（包 @joplo-app/plugin-3d 的默认导出））；用法见 npx joplo skill <插件 id>。 */
-export type ConfigDef = { kind: 'config'; name: string; description?: string; theme?: string; layout?: string; home?: string; autoFocus?: boolean; voice?: VoiceConfig; locales?: string[]; plugins?: PluginDef[]; source?: string };
+export type ConfigDef = { kind: 'config'; /** Project-relative output paths excluded from dev watching; restart dev after changing. */ watch?: { ignore?: string[] }; name: string; description?: string; theme?: string; layout?: string; home?: string; autoFocus?: boolean; voice?: VoiceConfig; locales?: string[]; plugins?: PluginDef[]; source?: string };
 export const config = (c: Omit<ConfigDef, 'kind' | 'source'>): ConfigDef => ({ kind: 'config', ...c, source: callsite() });
 
 export type LayoutDef = { kind: 'layout'; tree: JNode; source?: string };

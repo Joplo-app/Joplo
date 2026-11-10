@@ -72,6 +72,8 @@ npx joplo dev --open
 
 ## dev：一个进程，多个项目
 
+生成帧、视频或协作元数据写在项目内时，可在 `joplo.config.ts` 配置 `watch: { ignore: ['exports/frames', '.coord'] }`。排除项是项目相对的文件/目录路径（目录包含子项），不是 glob；重启该看板后生效，仅影响本项目。`.joplo`、`dist`、`node_modules`、`.git` 仍默认忽略。不要排除实际引用的素材目录；普通图片变更仍会更新作品。
+
 首次运行启动本地看板，默认绑定 `127.0.0.1:4790`，打印项目链接。`--open` 打开浏览器；`--port` 接受 1–65535 的整数，启动新看板时指定端口。端口被其他应用占用时明确报错，不静默换端口。
 
 同一个 `JOPLO_HOME` 下已有存活看板时，再次运行只注册当前项目、打印链接并退出，不再启动第二个进程；这时优先加入已有看板。加入时 stderr 写出那个看板的 Joplo 版本和启动目录（`[joplo] Joined the running board: Joplo 0.2.7, started in /path/to/demo (pid 123)`）；它的版本和当前项目的 Joplo 不一致时（0.2.6 及更早的看板不报版本，也算不一致）多一行 `!` 警告：看板可能表现不同，要用当前版本就在它的终端按 Ctrl+C（或 `kill <pid>`）停掉，再在这里运行 `joplo dev`（D65）。`JOPLO_HOME` 默认 `~/.joplo`：projects.json 记最近项目，server.json 记运行实例，settings.json 记主题选择。

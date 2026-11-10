@@ -148,3 +148,31 @@ it('does not retain final asynchronous recorder chunks after destroy',async()=>{
  const engine=new MediaEngine();await engine.startCapture({});engine.destroy();await Promise.resolve();
  expect((engine as any).chunks).toEqual([]);expect(stopped).toHaveBeenCalledTimes(2);
 });
+
+it('exposes asynchronous audio failures and ignores late failures after removal', async () => {
+ vi.stubGlobal('AudioContext',FakeAudio);
+ const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ mock.factory.mockRejectedValue(new Error('Media memory budget exceeded; shorten or split this music'));
+ const engine=new MediaEngine();engine.unlock();
+ engine.update(snapshot,{r:'data:audio/wav;base64,UklGRg=='},frame);
+ await new Promise(r=>setTimeout(r,0));
+ expect(engine.status().error).toContain('Audio r (fake:bgm) failed: Media memory budget exceeded');
+ expect(warn).toHaveBeenCalledOnce();
+ engine.update({}, {}, frame);expect(engine.status().error).toBeNull();
+ let reject!:(e:Error)=>void;
+ mock.factory.mockImplementation(()=>new Promise((_r,j)=>{reject=j;}));
+ engine.update(snapshot,{r:'data:audio/wav;base64,UklGRg=='},frame);
+ await new Promise(r=>setTimeout(r,0));engine.destroy();reject(new Error('late cancellation'));
+ await new Promise(r=>setTimeout(r,0));expect(warn).toHaveBeenCalledOnce();warn.mockRestore();
+});
+
+it('keeps capture failures sticky so an export cannot silently succeed after the failed cue disappears', async () => {
+ vi.stubGlobal('AudioContext',FakeAudio);const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ mock.factory.mockRejectedValue(new Error('Media memory budget exceeded'));
+ const engine=new MediaEngine();engine.unlock();
+ (engine as any).recorder={state:'inactive'};
+ engine.update(snapshot,{r:'data:audio/wav;base64,UklGRg=='},frame);await new Promise(r=>setTimeout(r,0));
+ engine.update({}, {}, frame);
+ await expect(engine.endCapture()).rejects.toThrow('Media memory budget exceeded');
+ engine.destroy();warn.mockRestore();
+});
