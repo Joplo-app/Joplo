@@ -16,7 +16,7 @@ const FEATURE = { f_invite: 'keep', sc_happy: 'keep', sc_full: 'keep', sc_expire
 
 export default withDesignRecord(work({
   title: 'A · 构建时裁剪',
-  summary: 'joplo share --private --no-review --scenario / --feature 在构建时就把范围外的功能、场景、页面和别的功能堆进来的元素裁掉；场景引用到的别的功能的元素只借用那一个',
+  summary: 'joplo share --private --no-review --scenario / --work 在构建时就把范围外的功能、场景、页面和别的功能堆进来的元素裁掉；场景引用到的别的功能的元素只借用那一个',
   focus: '保密看的是分享里有什么数据，而不是页面上有没有入口',
   tradeoffs: ['分享里确实没有其他功能，源码里也搜不到', '页面会少掉其他功能堆进来的按钮，和完整项目看起来不一样', '借用元素时由作者判断，不会自动拦下'],
 
@@ -56,9 +56,9 @@ export default withDesignRecord(work({
 
     feature: flow('只分享一个功能', { cases: ['feature'], start: '/share-scope', expected: '分享里是邀请成员的三个场景，账单和数据导出都不在' })
       .card('只分享「邀请成员」', { sub: '小周要看邀请的全部情况' })
-      .type('t_in', 'npx joplo share --private --no-review --feature invite', '按功能分享')
+      .type('t_in', 'npx joplo share --private --no-review --work invite', '按功能分享')
       .press('Enter', '三个场景都带上', clearIn, set(ui.tFeature, true), shot('t_term'))
-      .system('分享里有什么', '只有邀请成员', shot('inside'), set(ui.insideTitle, '--feature invite'), ...marks(FEATURE, 'cut'), spotlight('in_features'))
+      .system('分享里有什么', '只有邀请成员', shot('inside'), set(ui.insideTitle, '--work invite'), ...marks(FEATURE, 'cut'), spotlight('in_features'))
       .card('现在是小周', { role: 'zhou' })
       .system('打开链接', '左边是三个场景，没有别的功能', ...site('feature'), shot('s_root'), highlight('s_side'))
       .click('s_sc_full', '切到「席位已满时邀请」', set(ui.siteScenario, 'full'), set(ui.showSeat, true),

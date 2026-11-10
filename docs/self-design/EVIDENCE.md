@@ -61,7 +61,7 @@
 
 ### player：演示页按什么组织
 
-- **真实备选**：[A 按方案](../../examples/joplo/features/player/options/a-by-option.tsx)、[B 按情况](../../examples/joplo/features/player/options/b-by-case.tsx)。D39 与 `a8dbe9a` 记载选 B；原型 `pick: b-by-case` 与记录一致。
+- **真实备选**：[A 按方案](../../examples/joplo/features/player/works/a-by-option.tsx)、[B 按情况](../../examples/joplo/features/player/works/b-by-case.tsx)。D39 与 `a8dbe9a` 记载选 B；原型 `pick: b-by-case` 与记录一致。
 - **迭代证据**：`86e67c7` 实现情况分组/检查抽屉；D55 / `b3253bc` / `3054a0a` 整理外观浮层、舞台层级标签、时间线；D61 / `1564840` 增加场景封面、字幕角色与全屏过渡。
 - **当前实现**：`packages/web/src/board/App.tsx`、`CaseNav.tsx`、`InspectDrawer.tsx`、`packages/web/src/player/controls.tsx`。
 - **旧信息警告**：原型 still-open 的 inspect 手势、发布站导出问题不等同当前未实现。当前页面的 UI 要依据实现校对，早期原型保留为历史阶段。
@@ -152,12 +152,12 @@
 | --- | --- | --- |
 | 本地 `dev` | 所有方案、情况、规则/来源/确认、问题、取舍、源位置 | 是实际作者工作区，加载作者模块等同本机执行代码 |
 | 普通 `publish` / `build` | 每个 feature 的 picked option、画面、场景与字幕、可演示的角色/层级/镜头 | 无 pick 的 feature 整项省略；规则、情况、问题、源位置、元素备注、取舍/decisionFocus不进入公开产物 |
-| `review` 构建 | 所有 feature/option 的画面与场景，含未pick内容 | 同样剥离创作字段；它不是 dev 数据的公开拷贝 |
+| `review` 构建 | 所有 feature/work 的画面与场景，含未pick内容 | 同样剥离创作字段；它不是 dev 数据的公开拷贝 |
 | 私有 review manifest | 单独请求体可带规则、问题、取舍等评审内容 | 不是静态资产，不随公开分享页取得；有边界与体积上限，不能为展示历史直接公开 |
 
 仅把五个目录合并，然后 `joplo build`，用户会看不到未选方案、取舍和不少未 pick 的功能。建议使用现有表达能力，不改业务 schema：
 
-1. 统一项目保留真实 `feature/options` 用于本地创作与对比；历史原文件与 Git 提交作为可追溯来源。
+1. 统一项目保留真实 `feature/works` 用于本地创作与对比；历史原文件与 Git 提交作为可追溯来源。
 2. 若要普通公开分享也展示过程，为每个 Feature 增加**明确选作公开叙述的设计回放方案**，把已核验且适合公开的动机、方案差异、决定和限制写入画面、场景字幕或 `explain`；不是把私有规则表直接拷贝为资产。
 3. 历史 UI 的回放仍展示具体操作与结果，使用现有 `flow/when/set/shot/layer/Terminal`，避免变成整屏文字 PPT（D71）。例如 B：进入演示 → 切审阅 → 打开规则；C：选择原型标注 → 展开对应规则。
 4. 给这些回放写稳定 `.key()`，方便今后对同一个设计过程做 diff。区分“演示中选择历史方案”与“真正修改作者项目的 pick”；前者只改演示状态，不能假装触发实际审批。
@@ -175,7 +175,7 @@
 ### share_visibility：发布前选择公开还是私密
 
 - 依据：D85 的公开与私密、CLI 强制选择、作品集与自动 SEO 决定（决策分支 `DJJ/decision-capacity-show-tts`），以及本轮 D85 第二阶段客户端任务契约。
-- 新增原生 Feature `share_visibility` / Option `a-explicit`：整项目公开、私密加独立评审版、范围只能私密、更新已有私密链接。它是按当前已决定行为制作的演示，不是历史评审记录，也不代表云端已上线。已有 Feature IDs 不变。
+- 新增原生 Feature `share_visibility` / Work `a-explicit`：整项目公开、私密加独立评审版、范围只能私密、更新已有私密链接。它是按当前已决定行为制作的演示，不是历史评审记录，也不代表云端已上线。已有 Feature IDs 不变。
 - 该任务不做密码分享；Pen 工具因未打开设计文档不可用，画面沿用既有发布浮层与原生组件。实际浏览器/移动端手动检查清单在 PR 与 docs/web.md，未运行浏览器 E2E。
 
 ### P1-E 模型资产（2026-11-08）
@@ -184,4 +184,4 @@
 
 ### M / D93 配乐（2026-11-09）
 
-新增稳定 Feature `music` / Option `a-render`，依据 D93 与本任务已实现的 SoundFont 管线，展示 marker 核对、离线音色缓存恢复、未知 marker 修复。复用现有终端页面、Cmd 与输入动作；终端结果显式标为示意，不执行 shell、不下载或发布，不伪造新 UI 评审批准。Pen 未打开文档，无法操作，因此沿用项目已有终端视觉。可复用的曲式/鼓谱/RMS 与 LUFS 区别/未经人耳验证报告已同步插件技能。
+新增稳定 Feature `music` / Work `a-render`，依据 D93 与本任务已实现的 SoundFont 管线，展示 marker 核对、离线音色缓存恢复、未知 marker 修复。复用现有终端页面、Cmd 与输入动作；终端结果显式标为示意，不执行 shell、不下载或发布，不伪造新 UI 评审批准。Pen 未打开文档，无法操作，因此沿用项目已有终端视觉。可复用的曲式/鼓谱/RMS 与 LUFS 区别/未经人耳验证报告已同步插件技能。

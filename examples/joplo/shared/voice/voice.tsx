@@ -258,7 +258,7 @@ export default config({
   },                         // Key 不写在这里
 });`;
 
-const FLOW = `// features/invite/options/a-modal.tsx
+const FLOW = `// features/invite/works/a-modal.tsx
 .type('email', 'ajie@example.com', '输入阿杰的邮箱',
   narrate('她输入阿杰的邮箱，权限先给编辑者，以后随时能改'))
 // 角色亲口说的话用 say()，用角色的声音读

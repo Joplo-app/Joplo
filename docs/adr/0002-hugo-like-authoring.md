@@ -16,10 +16,10 @@
    | layouts/id.tsx | layout(tree) | 外壳、Outlet、Slot |
    | routes/path/page.tsx | page(meta, tree) | 文件夹对应页面路径 |
    | features/f/feature.ts | feature({...}) | 目标、情况、规则、问题、pick |
-   | features/f/options/o.tsx | option({...}) | 方案、堆叠、状态、层级、场景 |
+   | features/f/works/o.tsx | work({...}) | 方案、堆叠、状态、层级、场景 |
 
 3. **TSX 收集为数据**：kit 提供 JSX 运行时，jsxImportSource 为 `@joplo-app/kit`，开发转换使用 react-jsxdev 保留源位置。组件名称与属性对齐 Mantine，另有 Joplo 的 Diagram、Terminal、Phone 和 AI 组件。行为写成 flow 步骤，函数属性如 onClick 会被编译器拒绝。
-4. **编译为 IR v2**：Node 侧 loadAuthoring 加载作者模块，compile 生成路径画面及独立层级画面；播放器、看板、校验器和发布构建消费相同 IR。
+4. **编译为 IR v3**：Node 侧 loadAuthoring 加载作者模块，compile 生成路径画面及独立层级画面；播放器、看板、校验器和发布构建消费相同 IR。
    - dev 模式包含全部方案；每个方案上下文隔离同功能的其他方案，其他功能取选定方案。
    - 情况由场景推导为已表达，显式 coverage 声明优先，其余标记缺失。
    - 节点、步骤、规则的 source 转为项目相对位置，诊断使用 at，选中最终写入 `.joplo/selection.json`。

@@ -1,6 +1,6 @@
 # 同一个按钮的 40 年
 
-一部约一分半钟的可交互短片，**一个镜头讲完四十年**：观察窗口是 1984—2024，鼠标命令、桌面应用、手指触碰、自然语言意图。四套界面都是风格化创作；年代与产品锚点来自原始或官方资料，不宣称复刻其真实功能。
+一件约一分半钟、能播放也能暂停上手的作品，**一个镜头讲完四十年**：观察窗口是 1984—2024，鼠标命令、桌面应用、手指触碰、自然语言意图。四套界面都是风格化创作；年代与产品锚点来自原始或官方资料，不宣称复刻其真实功能。
 
 镜头语言：
 
@@ -19,7 +19,7 @@ pnpm joplo skill install examples/button-40-years
 pnpm joplo check examples/button-40-years
 pnpm joplo dev examples/button-40-years --port 4814
 pnpm joplo build examples/button-40-years
-pnpm joplo render examples/button-40-years --scenario-id forty.main.mac --film --chain --out scratch/film.png
+pnpm joplo render examples/button-40-years --scenario-id forty.mac --film --chain --out scratch/film.png
 ```
 
 使用本地模板 `joplo init --template ./templates/starter` 初始化；仓库内依赖用 `workspace:*`。独立使用时应改成匹配的已发行版本。配乐编译需要本机 Alda 2.4.8；观众只需浏览器。构建的 `dist/index.html` 可通过 `file://` 打开；首次点击播放解锁声音，旁白回退到浏览器语音，不会请求付费朗读。

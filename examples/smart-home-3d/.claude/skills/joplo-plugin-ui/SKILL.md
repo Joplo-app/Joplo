@@ -3,7 +3,7 @@ name: joplo-plugin-ui
 description: "Use the Standard UI plugin in Joplo; read its entry, component recipes and recovery rules for this project."
 ---
 
-# Joplo plugin ui: Standard UI 0.4.1
+# Joplo plugin ui: Standard UI 0.5.0
 
 Author package: @joplo-app/plugin-ui
 # Standard UI: ui
@@ -39,4 +39,4 @@ General engine contracts: npx joplo skill plugins
 - [patterns](./topics/patterns.md): UI recipes and individual pitfalls
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.4.1 sha256:4d804c998508b7610a819b2343964bf0c7cbe2a78329b90a65fcd1ccd360543f -->
+<!-- joplo-skill 0.5.0 sha256:267d456c15d752e7ae3e9d3ac89eae8ccf6991d1ad4385c22e9b8fd1893a5c1a -->

@@ -118,7 +118,7 @@ export const overlay = (p: string): JNode[] => [
       </Stack>
       <Stack gap={4}>
         <Text size="sm" fw={600}>源码</Text>
-        <Code>features/invite/options/a-modal.tsx:33:9</Code>
+        <Code>features/invite/works/a-modal.tsx:33:9</Code>
         <Text size="xs" c="dimmed">已写入 .joplo/selection.json：在 Agent 会话里说要改什么，Agent 运行 npx joplo selection 就只改这一处。</Text>
       </Stack>
       <Group justify="space-between">
