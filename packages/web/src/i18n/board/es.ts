@@ -144,7 +144,7 @@ export function createBoardEs(locale: Locale = 'es') {
       directoryNotFound: "Directorio no encontrado",
       projectErrorCount: (p0: Value) => plural(Number(p0), { one: "# error", other: "# errores" }, locale),
       viewProjectHome: "Ver inicio del proyecto",
-      switchFeature: "Cambiar función",
+      switchFeature: "Cambiar elemento",
       inspect: "Inspeccionar",
       exitInspectMode: "Salir de inspección",
       inspectModeClickAStageElementToSelectIt: "Modo de inspección: hacer clic solo selecciona el elemento, sin ejecutar pasos. Mantén ⌥ para inspeccionar temporalmente.",

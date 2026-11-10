@@ -2,6 +2,7 @@
  * 看板直接发布到云端（D76）的纯模型：范围选项 → 请求体；发布进度行 → 阶段；结果里的附加说明。
  * 进度行来自 CLI 的 share()（英文，与终端一致），这里只按开头识别阶段，其余行原样当作说明。
  */
+import { entriesOf, entryOf, type Project } from '@joplo-app/core/runtime';
 import type { CloudJob, CloudPublishRequest, CloudStorage, CloudStorageFull } from '../runtime/dev-client';
 
 export type CloudScopeChoice = 'scenario' | 'feature' | 'project';
@@ -11,7 +12,7 @@ export type CloudContext = { featureId: string; scenarioId: string | null; featu
 export function cloudRequest(choice: CloudScopeChoice, ctx: CloudContext): CloudPublishRequest {
   if (choice === 'scenario' && ctx.scenarioId) return { scenarios: [ctx.scenarioId] };
   if (choice === 'project') return {};
-  return { features: [ctx.featureId] };
+  return { entryIds: [ctx.featureId] };
 }
 
 /** 默认范围：有当前场景时是当前场景（D76）。 */
@@ -45,15 +46,15 @@ export const needsLogin = (job: CloudJob | null): job is CloudJob & { error: { l
 
 /** 发布只包含每个功能确认过的方案（feature.pick）。这里记下当前范围各级是否有确认的方案。 */
 export type CloudPicks = { scenario: boolean; feature: boolean; project: boolean };
-type PickSource = { features: Record<string, { pick?: string | null } | undefined>; scenarios: Record<string, { optionId: string } | undefined> };
-
-export function cloudPicks(project: PickSource, ctx: CloudContext): CloudPicks {
-  const pick = project.features[ctx.featureId]?.pick ?? null;
+export function cloudPicks(project: Project, ctx: CloudContext): CloudPicks {
+  const publishable = (entry: ReturnType<typeof entryOf>) => !!entry && !entry.draft && !!entry.workId &&
+    (entry.featureId === null || !!project.features[entry.featureId]?.pick);
+  const entry = entryOf(project, ctx.featureId);
   const sc = ctx.scenarioId ? project.scenarios[ctx.scenarioId] : undefined;
   return {
-    scenario: !!pick && !!sc && sc.optionId === pick,
-    feature: !!pick,
-    project: Object.values(project.features).some((f) => !!f?.pick),
+    scenario: publishable(entry) && !!sc && sc.workId === entry!.workId,
+    feature: publishable(entry),
+    project: entriesOf(project).some(publishable),
   };
 }
 

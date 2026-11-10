@@ -74,7 +74,7 @@ const writeLocal = (k: string, v: string | null) => {
 export type VoiceApi = ReturnType<typeof useVoice>;
 
 /** 看板播放页的朗读：narrator 交给 DemoController；状态来自 joplo dev。 */
-export function useVoice(projectId: string, project: Project | null, optionId: string | null, ctl: DemoController, locale: Locale, at: { scenarioId: string | null; position: number }, contentLocale: string | null = null) {
+export function useVoice(projectId: string, project: Project | null, workId: string | null, ctl: DemoController, locale: Locale, at: { scenarioId: string | null; position: number }, contentLocale: string | null = null) {
   const { t } = useI18n();
   const narrator = useMemo(() => new Narrator(), [projectId]);
   const [on, setOnState] = useState(() => readLocal(ON_KEY) === '1');
@@ -153,7 +153,7 @@ export function useVoice(projectId: string, project: Project | null, optionId: s
     writeLocal(BROWSER_KEY, v);
   };
 
-  const segments = useMemo(() => (project ? voiceSegments(project, optionId, t) : []), [project, optionId, t]);
+  const segments = useMemo(() => (project ? voiceSegments(project, workId, t) : []), [project, workId, t]);
   const segmentsRef = useRef(segments);
   segmentsRef.current = segments;
   // 预取：当前位置之后的 3 步（正在读的这一步由播放时当场生成）

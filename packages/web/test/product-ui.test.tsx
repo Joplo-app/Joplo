@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, option, page, set, $ } from '@joplo-app/kit';
+import { feature, flow, work, page, set, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, isNodeVisible, replay, stateAt, validate, type AuthoringProject, type Project } from '@joplo-app/core';
 import { I18nProvider } from '../src/i18n/context';
@@ -63,7 +63,7 @@ function build(): { dev: Project; publish: Project } {
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...page({ title: 'Members', layout: false }, tree), ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'Members', goal: 'Admins manage teammates so access stays right', roles: ['Space admin', 'Member'], cases: { happy: { title: 'Revoke an invite', priority: 'high', expected: 'The invite disappears and Undo is offered' }, gone: { title: 'Link already used', priority: 'high' } }, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...option({ name: 'A · Inline', idea: 'i', state: { ui: { menu: false, loading: false, revoked: false, selected: [], sort: null, empty: true, boStatus: 'Invited', boNew: true, unread: '3', read: false, count: 2 }, data: { signups: 128, total: '$45', members, weeks: [{ week: 'W1', signups: 2 }, { week: 'W2', signups: 5 }] } }, scenarios: { happy: fl } }), ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'Members', goal: 'Admins manage teammates so access stays right', roles: ['Space admin', 'Member'], cases: { happy: { title: 'Revoke an invite', priority: 'high', expected: 'The invite disappears and Undo is offered' }, gone: { title: 'Link already used', priority: 'high' } }, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...work({ title: 'A · Inline', summary: 'i', state: { ui: { menu: false, loading: false, revoked: false, selected: [], sort: null, empty: true, boStatus: 'Invited', boNew: true, unread: '3', read: false, count: 2 }, data: { signups: 128, total: '$45', members, weeks: [{ week: 'W1', signups: 2 }, { week: 'W2', signups: 5 }] } }, scenarios: { happy: fl } }), ...F('features/f/works/a.tsx') } } } },
   };
   const dev = compile(src, 'dev');
   expect(dev.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
@@ -183,14 +183,14 @@ describe('PM 视角的默认呈现（只读现有字段）', () => {
     expect(caseBrief(dev, 'f.gone')).toEqual({ high: true, expected: null });
     expect(caseBrief(dev, 'f.nope')).toEqual({ high: false, expected: null });
     expect(gapsOf(dev, 'f.a')).toEqual({ missing: 1, undecided: 0, missingHigh: 1 });
-    const nav = renderToStaticMarkup(<I18nProvider explicit="en"><CaseNav project={dev} featureId="f" optionId="f.a" caseId={null} scenarioId={null} onOption={() => {}} onCase={() => {}} onScenario={() => {}} onOptionCase={() => {}} onCopy={() => {}} /></I18nProvider>);
+    const nav = renderToStaticMarkup(<I18nProvider explicit="en"><CaseNav project={dev} featureId="f" workId="f.a" caseId={null} scenarioId={null} onWork={() => {}} onCase={() => {}} onScenario={() => {}} onWorkCase={() => {}} onCopy={() => {}} /></I18nProvider>);
     expect(nav).toContain('data-testid="feature-brief"');
     expect(nav).toContain('Admins manage teammates so access stays right');
     expect(nav).toContain('For: Space admin and Member');
     expect(nav).toContain('data-testid="case-f.happy-high"');
     expect(nav).toContain('data-testid="gap-high"');
     expect(nav).toContain('1 high priority');
-    const zh = renderToStaticMarkup(<I18nProvider explicit="zh-CN"><CaseNav project={dev} featureId="f" optionId="f.a" caseId={null} scenarioId={null} onOption={() => {}} onCase={() => {}} onScenario={() => {}} onOptionCase={() => {}} onCopy={() => {}} /></I18nProvider>);
+    const zh = renderToStaticMarkup(<I18nProvider explicit="zh-CN"><CaseNav project={dev} featureId="f" workId="f.a" caseId={null} scenarioId={null} onWork={() => {}} onCase={() => {}} onScenario={() => {}} onWorkCase={() => {}} onCopy={() => {}} /></I18nProvider>);
     expect(zh).toContain('面向：Space admin、Member');
     expect(zh).toContain('高优先级 1');
   });

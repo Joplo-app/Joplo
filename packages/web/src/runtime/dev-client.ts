@@ -160,11 +160,11 @@ async function post(url: string, body: unknown, method = 'POST'): Promise<Respon
 }
 
 /** 仅本地看板可用；读写都带本机令牌，发布站不导入这个客户端。 */
-export async function fetchLocalReview(projectId: string, optionId: string): Promise<{ ok: true; state: LocalReviewState } | { ok: false; message: Text }> {
+export async function fetchLocalReview(projectId: string, workId: string): Promise<{ ok: true; state: LocalReviewState } | { ok: false; message: Text }> {
   try {
     const headers = writeHeaders(false);
     if (!headers) throw new MessageError(m.board.thisPageHasNoLocalToken);
-    const res = await fetch(`/__joplo/p/${enc(projectId)}/review?option=${enc(optionId)}`, { headers, cache: 'no-store' });
+    const res = await fetch(`/__joplo/p/${enc(projectId)}/review?work=${enc(workId)}`, { headers, cache: 'no-store' });
     return res.ok ? { ok: true, state: await res.json() as LocalReviewState } : { ok: false, message: await readError(res) };
   } catch (e) { return { ok: false, message: errMsg(e) }; }
 }
@@ -526,10 +526,10 @@ export type CloudAccount =
 export type CloudStorage = { usedBytes: number; quotaBytes: number };
 export type CloudStorageFull = { usedBytes?: number; quotaBytes?: number; shareBytes?: number; replacedBytes?: number; manageUrl: string; upgradeUrl: string };
 export type CloudBorrowed =
-  | { kind: 'element'; featureId: string; featureName: string; optionId: string; elementId: string; route: string; refs: string[]; scenarios: string[] }
-  | { kind: 'page'; featureId: string; featureName: string; optionId: string; route: string; scenarios: string[] };
-export type CloudScope = { key: string; scenarios: string[]; features: string[]; borrowed: CloudBorrowed[] };
-export type CloudPublishRequest = { password?: string | null; visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; features?: string[] };
+  | { kind: 'element'; entryId: string; entryTitle: string; workId: string; elementId: string; route: string; refs: string[]; scenarios: string[] }
+  | { kind: 'page'; entryId: string; entryTitle: string; workId: string; route: string; scenarios: string[] };
+export type CloudScope = { key: string; scenarios: string[]; entryIds: string[]; borrowed: CloudBorrowed[] };
+export type CloudPublishRequest = { password?: string | null; visibility?: CloudVisibility; review?: boolean; scenarios?: string[]; entryIds?: string[] };
 export type CloudJob = {
   id: string;
   state: 'running' | 'done' | 'failed';

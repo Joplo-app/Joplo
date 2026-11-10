@@ -144,7 +144,7 @@ export function createBoardKo(locale: Locale = 'ko') {
       directoryNotFound: "디렉터리를 찾을 수 없음",
       projectErrorCount: (p0: Value) => plural(Number(p0), { other: "오류 #개" }, locale),
       viewProjectHome: "프로젝트 홈 보기",
-      switchFeature: "기능 전환",
+      switchFeature: "항목 전환",
       inspect: "요소 검사",
       exitInspectMode: "검사 모드 종료",
       inspectModeClickAStageElementToSelectIt: "검사 모드: 스테이지 요소를 클릭하면 선택만 하고 단계는 실행하지 않습니다. ⌥를 누르면 일시적으로 검사합니다.",

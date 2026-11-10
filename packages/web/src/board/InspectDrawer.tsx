@@ -15,7 +15,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, X } from 'lucide-react';
 import { disabledReasonOf, findNode, pluginSpec, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@joplo-app/core/runtime';
 import type { SelectionSync } from '../runtime/demo';
-import { optionOfNode, scenariosOf, shortName } from '../runtime/views';
+import { workOfNode, scenariosOf, shortName } from '../runtime/views';
 import { cn } from '@/lib/utils';
 import { CONFIRM_LABEL, ORIGIN_LABEL, pluginText, typeLabel } from './labels';
 
@@ -66,12 +66,12 @@ export function InspectDrawer({
   const scene = project.scenes[selection.sceneId];
   const node = scene && selection.nodeId ? (findNode(scene, selection.nodeId)?.node ?? null) : null;
   const fields = node ? (pluginSpec(project.plugins, node.type)?.inspect ?? []) : [];
-  const rules = node ? Object.values(project.rules).filter((r) => r.elementIds.includes(node.id) && (!selection.featureId || r.featureId === selection.featureId) && (!r.optionId || r.optionId === selection.optionId)) : [];
+  const rules = node ? Object.values(project.rules).filter((r) => r.elementIds.includes(node.id) && (!selection.featureId || r.featureId === selection.featureId) && (!r.workId || r.workId === selection.workId)) : [];
   // 覆盖的情况：本方案里有步骤操作这个元素的场景所覆盖的情况；没有这样的场景时取当前场景的情况
-  const scs = scenariosOf(project, selection.optionId);
+  const scs = scenariosOf(project, selection.workId);
   const targeting = node ? scs.filter((sc) => sc.steps.some((s) => 'target' in s.action && s.action.target === node.id)) : [];
   const caseIds = [...new Set((targeting.length ? targeting : scs.filter((s) => s.id === selection.scenarioId)).flatMap((s) => s.caseIds))];
-  const from = node ? optionOfNode(project, node) : null;
+  const from = node ? workOfNode(project, node) : null;
   const at = selection.at;
   // 当前场景里以它为目标的第一步（“第 1 步的目标”）
   const curSteps = selection.scenarioId ? (project.scenarios[selection.scenarioId]?.steps ?? []) : [];
@@ -91,7 +91,7 @@ export function InspectDrawer({
             </div>
             {node ? (
               <div className="mt-0.5 text-[12px] text-jb-muted" data-testid="sel-type">
-                {typeLabel(node.type, project.plugins, i18n, locale)} · {from ? i18n.board.optionLabel(shortName(from.name)) : node.source?.startsWith('layouts/') ? i18n.board.layout : node.source?.startsWith('routes/') ? i18n.board.page : '—'}
+                {typeLabel(node.type, project.plugins, i18n, locale)} · {from ? i18n.board.optionLabel(shortName(from.title)) : node.source?.startsWith('layouts/') ? i18n.board.layout : node.source?.startsWith('routes/') ? i18n.board.page : '—'}
                 {stepIdx >= 0 ? i18n.board.targetOfStep(stepIdx + 1) : ''}
               </div>
             ) : null}

@@ -1,6 +1,7 @@
 /**
  * 看板直接发布到云端（D76）的纯模型：范围 → 请求体、进度行 → 阶段、结果说明、是否需要登录。
  */
+import { workProject } from './work-fixture';
 import { describe, expect, it } from 'vitest';
 import { cloudNotes, cloudPicks, cloudRequest, cloudStage, cloudUnpicked, defaultChoice, formatStorage, needsLogin, storageFull, storageView } from '../src/board/cloud-model';
 import type { CloudJob } from '../src/runtime/dev-client';
@@ -41,9 +42,9 @@ describe('账号容量（C27，方案 B）', () => {
 describe('cloud-model', () => {
   it('范围：当前场景 / 当前功能 / 整个项目；没有当前场景时退回当前功能', () => {
     expect(cloudRequest('scenario', ctx)).toEqual({ scenarios: ['invite.a.happy'] });
-    expect(cloudRequest('feature', ctx)).toEqual({ features: ['invite'] });
+    expect(cloudRequest('feature', ctx)).toEqual({ entryIds: ['invite'] });
     expect(cloudRequest('project', ctx)).toEqual({});
-    expect(cloudRequest('scenario', { featureId: 'invite', scenarioId: null })).toEqual({ features: ['invite'] });
+    expect(cloudRequest('scenario', { featureId: 'invite', scenarioId: null })).toEqual({ entryIds: ['invite'] });
     expect(defaultChoice(ctx)).toBe('scenario');
     expect(defaultChoice({ featureId: 'invite', scenarioId: null })).toBe('feature');
   });
@@ -69,10 +70,14 @@ describe('cloud-model', () => {
   });
 
   it('发布前检查：所选范围没有已确认的方案时，指出是哪一级没确认（发布只包含 feature.pick）', () => {
-    const project = {
-      features: { invite: { pick: 'invite.a' }, billing: { pick: null } },
-      scenarios: { 'invite.a.happy': { optionId: 'invite.a' }, 'invite.b.happy': { optionId: 'invite.b' }, 'billing.a.pay': { optionId: 'billing.a' } },
-    };
+    const project = workProject({ noWork: true, withDemo: true });
+    const billing = structuredClone(project.features.invite!);
+    billing.id = 'billing'; billing.pick = null;
+    project.features.billing = billing;
+    project.entryIds.push('billing');
+    project.scenarios['invite.a.happy'] = { ...project.scenarios['invite.a.main']!, id: 'invite.a.happy' };
+    project.scenarios['invite.b.happy'] = { ...project.scenarios['invite.b.only']!, id: 'invite.b.happy' };
+    project.scenarios['billing.a.pay'] = { ...project.scenarios['invite.a.main']!, id: 'billing.a.pay', workId: 'billing.a' };
     const picks = (featureId: string, scenarioId: string | null) => cloudPicks(project, { featureId, scenarioId });
     // 当前场景属于已确认的方案：都可以发
     expect(cloudUnpicked('scenario', ctx, picks('invite', 'invite.a.happy'))).toBeNull();
@@ -89,7 +94,8 @@ describe('cloud-model', () => {
     // 没有当前场景时，场景范围退回功能（与 cloudRequest 一致）
     expect(cloudUnpicked('scenario', { featureId: 'billing', scenarioId: null }, picks('billing', null))).toBe('feature');
     // 整个项目一个确认的方案都没有
-    const none = { features: { billing: { pick: null } }, scenarios: {} };
+    const none = structuredClone(project);
+    none.features.invite!.pick = null;
     expect(cloudUnpicked('project', bill, cloudPicks(none, bill))).toBe('project');
     // 未知 id：当作未确认，不抛错
     expect(cloudUnpicked('feature', { featureId: 'nope', scenarioId: null }, cloudPicks(none, { featureId: 'nope', scenarioId: null }))).toBe('feature');

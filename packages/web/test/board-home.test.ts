@@ -10,7 +10,7 @@ const zh = { ...createZhCN(), ...createBoardZhCN() };
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { featureCard, moveSelection, projectBadge, projectMeta, shortPath } from '../src/board/home-model';
@@ -46,16 +46,16 @@ const h = (type: unknown, props: Record<string, unknown> | null, ...children: un
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 function proj(): Project {
   const home = page({ title: '首页', layout: false }, h(ui.Group, { id: 'row' }, h(ui.Button, { id: 'go' }, '去')));
-  const a = option({ name: 'A · 记住打开过的项目', idea: 'i', on: {}, state: { ui: {} }, scenarios: { s: flow('一次', { start: '/', cases: ['ok'] }).click('go') } });
-  const b = option({ name: 'B · 另一种', idea: 'i', on: {}, state: { ui: {} }, scenarios: { t: flow('两次', { start: '/' }).click('go') } });
+  const a = work({ title: 'A · 记住打开过的项目', summary: 'i', on: {}, state: { ui: {} }, scenarios: { s: flow('一次', { start: '/', cases: ['ok'] }).click('go') } });
+  const b = work({ title: 'B · 另一种', summary: 'i', on: {}, state: { ui: {} }, scenarios: { t: flow('两次', { start: '/' }).click('go') } });
   const src: AuthoringProject = {
     root: '/p',
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: {
-      f: { def: { ...feature({ name: '首页', goal: '打开看板就能看到最近的项目', cases: { ok: { title: '正常', dimension: 'main' }, bad: { title: '出错', dimension: 'input' } }, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...a, ...F('features/f/options/a.tsx') }, b: { ...b, ...F('features/f/options/b.tsx') } } },
-      g: { def: { ...feature({ name: '空功能', goal: 'g', cases: {} }), ...F('features/g/feature.ts') }, options: {} },
+      f: { def: { ...feature({ name: '首页', goal: '打开看板就能看到最近的项目', cases: { ok: { title: '正常', dimension: 'main' }, bad: { title: '出错', dimension: 'input' } }, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...a, ...F('features/f/works/a.tsx') }, b: { ...b, ...F('features/f/works/b.tsx') } } },
+      g: { def: { ...feature({ name: '空功能', goal: 'g', cases: {} }), ...F('features/g/feature.ts') }, works: {} },
     },
   };
   const r = compile(src, 'dev');
@@ -70,14 +70,14 @@ describe('首页右侧', () => {
   });
   it('功能卡片：选定方案的字母与名字、方案数、覆盖小结；整张可点，打开选定方案；缩略图用选定方案第一个场景的初始画面', () => {
     const c = featureCard(p, 'f')!;
-    expect(c).toMatchObject({ name: '首页', goal: '打开看板就能看到最近的项目', pick: { letter: 'A', title: '记住打开过的项目' }, optionCount: 2, coverage: { missing: 1, undecided: 0, allExpressed: false }, open: { featureId: 'f', optionId: 'f.a' } });
+    expect(c).toMatchObject({ name: '首页', goal: '打开看板就能看到最近的项目', pick: { letter: 'A', title: '记住打开过的项目' }, workCount: 2, coverage: { missing: 1, undecided: 0, allExpressed: false }, open: { featureId: 'f', workId: 'f.a' } });
     expect(c.thumb).toMatchObject({ scenarioId: 'f.a.s' });
     expect(p.scenes[c.thumb!.sceneId]).toBeTruthy();
   });
   it('没有方案的功能：不能打开，没有缩略图；没有选定方案时打开第一个方案', () => {
-    expect(featureCard(p, 'g')).toMatchObject({ pick: null, optionCount: 0, open: null, thumb: null });
+    expect(featureCard(p, 'g')).toMatchObject({ pick: null, workCount: 0, open: null, thumb: null });
     const noPick = { ...p, features: { ...p.features, f: { ...p.features.f!, pick: null } } } as Project;
-    expect(featureCard(noPick, 'f')).toMatchObject({ pick: null, open: { featureId: 'f', optionId: 'f.a' } });
+    expect(featureCard(noPick, 'f')).toMatchObject({ pick: null, open: { featureId: 'f', workId: 'f.a' } });
     expect(featureCard(p, 'nope')).toBeNull();
   });
 });

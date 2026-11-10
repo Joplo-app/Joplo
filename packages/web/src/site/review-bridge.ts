@@ -2,7 +2,7 @@
  * 发布站评审模式（`?embed=1&review=1`，云端契约 8.2）：演示与外层评审页之间的 postMessage 桥。
  *
  * 出站（演示 → 外层，一律 `window.parent.postMessage(msg, '*')`，位置信息对嵌入方本来就可见，不含秘密）：
- * - `joplo:ready { scenarios: [{ id, optionId, steps }] }`：IR 里的所有场景（评审版含所有方案），steps 是步骤数；
+ * - `joplo:ready { scenarios: [{ id, workId, steps }] }`：IR 里的所有场景（评审版含所有方案），steps 是步骤数；
  * - `joplo:position { scenario, step, stepId, layer }`：step 是播放器位置（0 = 初始状态，k = 已执行 k 步），
  *   stepId = 第 step 步的 id（step = 0 时为 null），layer = 当前显示的层级键（没有层级时 null）；任何一项变化时发一次；
  *   diff 模式额外确认每次合法 goto 后的实际位置，即使位置与上次相同，仍须等渲染器报告。
@@ -13,13 +13,13 @@
  *
  * 发布站的 `@joplo-app/core` 是 core-lite（不带 zod），所以这里手写校验。本文件是发布站里唯一使用 postMessage 的地方。
  */
-import { nodeLabel, orderedFeatures, type Project, type SceneNode } from '@joplo-app/core/runtime';
+import { nodeLabel, entriesOf, type Project, type SceneNode } from '@joplo-app/core/runtime';
 
 export const REVIEW_PROTOCOL = 1 as const;
 /** 作者写的元素 Id（与 IR 的 Id、Rule.elementIds 同一套）；编译器生成的 id 以 `_` 开头，不匹配。 */
 export const ELEMENT_ID = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 
-export type ReviewScenario = { id: string; optionId: string; steps: number };
+export type ReviewScenario = { id: string; workId: string; steps: number };
 export type ReviewPosition = { scenario: string; step: number; stepId: string | null; layer: string | null };
 export type ReviewElement = { id: string; label: string };
 export type ReviewGoto = { scenario: string; step: number; highlight: string | null };
@@ -27,7 +27,7 @@ export type ReviewInbound = ({ type: 'goto' } & ReviewGoto) | { type: 'pick'; ac
 
 const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
 
-/** ready 里的场景列表：功能顺序 → 方案在 feature.optionIds 里的顺序 → 场景在 IR 里的顺序；其余（理论上没有）排在最后。 */
+/** ready 里的场景列表：功能顺序 → 方案在 feature.workIds 里的顺序 → 场景在 IR 里的顺序；其余（理论上没有）排在最后。 */
 export function reviewScenarios(project: Project): ReviewScenario[] {
   const all = Object.values(project.scenarios ?? {});
   const out: ReviewScenario[] = [];
@@ -35,9 +35,12 @@ export function reviewScenarios(project: Project): ReviewScenario[] {
   const add = (s: (typeof all)[number]) => {
     if (seen.has(s.id)) return;
     seen.add(s.id);
-    out.push({ id: s.id, optionId: s.optionId, steps: s.steps.length });
+    out.push({ id: s.id, workId: s.workId, steps: s.steps.length });
   };
-  for (const f of orderedFeatures(project)) for (const oid of f.optionIds ?? []) for (const s of all) if (s.optionId === oid) add(s);
+  for (const entry of entriesOf(project)) {
+    const workIds = entry.featureId !== null ? project.features[entry.featureId]!.workIds : entry.workId ? [entry.workId] : [];
+    for (const workId of workIds) for (const s of all) if (s.workId === workId) add(s);
+  }
   for (const s of all) add(s);
   return out;
 }

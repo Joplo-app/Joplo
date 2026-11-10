@@ -11,12 +11,12 @@ import { useEffect, useMemo } from 'react';
 import { entryOf, type Coverage, type Project, type Scenario } from '@joplo-app/core/runtime';
 import type { DemoController, Snapshot } from '../runtime/demo';
 import type { PlayRoute } from '../runtime/route';
-import { optionsOf, scenariosOf } from '../runtime/views';
+import { worksOf, scenariosOf } from '../runtime/views';
 import { firstSlice, isLinear } from './work-view';
 
 export type Resolved = {
   ok: boolean;
-  optionId: string | null;
+  workId: string | null;
   scenarioId: string | null;
   step: number;
   caseId: string | null;
@@ -25,46 +25,46 @@ export type Resolved = {
 };
 
 export function resolvePlay(project: Project, play: PlayRoute): Resolved {
-  const f = project.features[play.featureId];
-  if (!f) return { ok: false, optionId: null, scenarioId: null, step: 0, caseId: null, gap: null };
-  const options = optionsOf(project, f.id);
-  const optionId = play.optionId && options.some((o) => o.id === play.optionId) ? play.optionId : f.pick && project.options[f.pick] ? f.pick : (options[0]?.id ?? null);
-  const option = optionId ? project.options[optionId]! : null;
-  const scs = scenariosOf(project, optionId);
-  const caseId = play.caseId && project.cases?.[play.caseId] ? play.caseId : null;
+  const entry = entryOf(project, play.featureId);
+  const f = entry?.featureId ? project.features[entry.featureId] : null;
+  if (!entry) return { ok: false, workId: null, scenarioId: null, step: 0, caseId: null, gap: null };
+  const works = worksOf(project, entry.featureId);
+  const workId = play.workId && works.some((o) => o.id === play.workId) ? play.workId : entry.workId;
+  const alternative = workId ? f?.alternatives[workId] : null;
+  const scs = scenariosOf(project, workId);
+  const caseId = f && play.caseId && project.cases?.[play.caseId] ? play.caseId : null;
   let scenarioId: string | null = null;
   let gap: Resolved['gap'] = null;
-  if (play.scenarioId && scs.some((s) => s.id === play.scenarioId) && (!caseId || project.scenarios[play.scenarioId]!.caseIds.includes(caseId) || option?.coverage[caseId]?.scenarioIds.includes(play.scenarioId)))
+  if (play.scenarioId && scs.some((s) => s.id === play.scenarioId) && (!caseId || project.scenarios[play.scenarioId]!.caseIds.includes(caseId) || alternative?.coverage[caseId]?.scenarioIds.includes(play.scenarioId)))
     scenarioId = play.scenarioId;
   else if (caseId) {
-    const cov = option?.coverage[caseId];
+    const cov = alternative?.coverage[caseId];
     const ids = (cov?.scenarioIds ?? []).filter((id) => scs.some((s) => s.id === id));
     const byCase = ids[0] ?? scs.find((s) => s.caseIds.includes(caseId))?.id ?? null;
     if (cov?.status === 'expressed' && byCase) scenarioId = byCase;
     else gap = { status: cov?.status ?? 'none', basis: cov?.basis, ...(cov?.reason ? { reason: cov.reason } : {}) };
   } else {
     // 章节从播放顺序里的第一章开始；只认播放用的那件作品（看板里切到功能的其他方案时用那个方案自己的第一个场景）
-    const entry = entryOf(project, f.id);
-    scenarioId = (entry && entry.workId === optionId && isLinear(entry) ? firstSlice(entry)?.id : null) ?? scs[0]?.id ?? null;
+    scenarioId = (entry && entry.workId === workId && isLinear(entry) ? firstSlice(entry)?.id : null) ?? scs[0]?.id ?? null;
   }
   const total = scenarioId ? project.scenarios[scenarioId]!.steps.length : 0;
   const step = Math.max(0, Math.min(play.step ?? 0, total));
-  return { ok: true, optionId, scenarioId, step, caseId, gap };
+  return { ok: true, workId, scenarioId, step, caseId, gap };
 }
 
 /** 方案的静态画面：方案自己的画面优先（它新增或堆叠的路径），没有则用发布视图。 */
-export function optionSceneId(project: Project, optionId: string | null): string | null {
-  if (!optionId) return null;
-  const sc = scenariosOf(project, optionId)[0];
+export function workSceneId(project: Project, workId: string | null): string | null {
+  if (!workId) return null;
+  const sc = scenariosOf(project, workId)[0];
   if (sc && project.scenes[sc.initial.sceneId]) return sc.initial.sceneId;
-  return Object.values(project.scenes).find((s) => s.optionId === optionId)?.id ?? null;
+  return Object.values(project.scenes).find((s) => s.workId === workId)?.id ?? null;
 }
 
 /** 场景变化时同步情况键；否则旧情况会在 resolvePlay 中把分叉目标重新解析回原场景。 */
 export function playForScenario(play: PlayRoute, scenario: Scenario, step: number): PlayRoute {
   const { caseId: previousCase, ...rest } = play;
   const caseId = previousCase && scenario.caseIds.includes(previousCase) ? previousCase : scenario.caseIds[0];
-  return { ...rest, optionId: scenario.optionId, scenarioId: scenario.id, step, ...(caseId ? { caseId } : {}) };
+  return { ...rest, workId: scenario.workId, scenarioId: scenario.id, step, ...(caseId ? { caseId } : {}) };
 }
 
 export function usePlaySync(ctl: DemoController, snap: Snapshot, project: Project | null, play: PlayRoute, write: (next: PlayRoute) => void): Resolved | null {
@@ -77,7 +77,7 @@ export function usePlaySync(ctl: DemoController, snap: Snapshot, project: Projec
       const same = snap.view === 'stage' && snap.scenarioId === resolved.scenarioId && snap.state?.position === resolved.step;
       if (!same) ctl.setScenario(resolved.scenarioId, resolved.step, { quiet: true });
     } else {
-      const sceneId = optionSceneId(project, resolved.optionId);
+      const sceneId = workSceneId(project, resolved.workId);
       if (sceneId && !(snap.view === 'browse' && snap.browseSceneId === sceneId)) ctl.preview(sceneId);
     }
     // 只在 URL（或首次拿到项目）时定位；控制器自身的变化由下面写回 URL

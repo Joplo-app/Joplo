@@ -69,14 +69,14 @@ describe('标注几何', () => {
   });
 });
 
-const p = Project.parse({ schemaVersion: 2, name: '原型', mode: 'publish', scenes: { s: { id: 's', optionId: 'f.a', route: '/', name: '画面', root: { id: 'root', type: 'ui:Stack', children: [
+const p = Project.parse({ entryIds: [], schemaVersion: 3, name: '原型', mode: 'publish', scenes: { s: { id: 's', workId: 'f.a', route: '/', name: '画面', root: { id: 'root', type: 'ui:Stack', children: [
   { id: 'email', type: 'ui:Email', props: { from: '营地助手', to: '阿杰', subject: '行程有更新', time: '周五 20:05' }, children: [{ id: 'open', type: 'ui:Button', children: [{ id: 'body', type: '#text', props: { text: '查看行程' } }] }] },
   { id: 'data', type: 'ui:DataCard', props: { title: '行程', value: '$data.trip', fields: [{ key: 'budget', label: '预算' }] } },
   { id: 'status', type: 'ui:StateFlow', props: { value: '$data.trip.status', states: ['draft', 'shared'], labels: { draft: '草稿', shared: '已分享' } } },
-] } } }, scenarios: { s: { id: 's', optionId: 'f.a', name: '主线', mock: { label: '模拟成功', outcome: 'success' }, initial: { sceneId: 's', data: { trip: { status: 'draft', budget: 500 } } }, steps: [
+] } } }, scenarios: { s: { id: 's', workId: 'f.a', name: '主线', mock: { label: '模拟成功', outcome: 'success' }, initial: { sceneId: 's', data: { trip: { status: 'draft', budget: 500 } } }, steps: [
   { id: 's#1', kind: 'user', caption: '按下 ⌘K', action: { type: 'press', keys: '⌘K' }, forks: [{ label: '另一条路', scenarioId: 'alt', at: 0 }], effects: [{ type: 'set', path: 'data.trip.status', value: 'shared' }, { type: 'set', path: 'data.trip.budget', value: 280 }] },
   { id: 's#2', kind: 'system', caption: '结束', action: { type: 'event', name: '结束' } },
-] }, alt: { id: 'alt', optionId: 'f.a', name: '另一条路', mock: { label: '模拟', outcome: 'other' }, initial: { sceneId: 's' }, steps: [] } } });
+] }, alt: { id: 'alt', workId: 'f.a', name: '另一条路', mock: { label: '模拟', outcome: 'other' }, initial: { sceneId: 's' }, steps: [] } } });
 describe('IR → 静态组件与控制器（无浏览器）', () => {
   it('邮件头部与正文按钮、数据行变化和状态前后值、键帽都由同一 IR 渲染', () => {
     const html = renderToStaticMarkup(createElement(I18nProvider, {explicit:'zh-CN', children:createElement(Stage, { project: p, state: stateAt(p, 's', 1), theme: 'sketch', mode: 'render', animate: false })}));
@@ -119,9 +119,9 @@ describe('IR → 静态组件与控制器（无浏览器）', () => {
 
 
 it('分叉切换同步 URL 的情况键，避免原 happy 情况把目标 cant_go 切回主线', () => {
-  const project = Project.parse({ ...p,
-    features: { f: { id: 'f', name: '功能', goal: '演示', pick: 'f.a' } },
-    options: { 'f.a': { id: 'f.a', featureId: 'f', key: 'a', name: '方案', idea: '说明', coverage: { 'f.happy': { status: 'expressed', scenarioIds: ['s'] }, 'f.alt': { status: 'expressed', scenarioIds: ['alt'] } } } },
+  const project = Project.parse({ ...p, entryIds: ['f'],
+    features: { f: { alternatives: { 'f.a': { decisionFocus: '', tradeoffs: [], coverage: { 'f.happy': { status: 'expressed', scenarioIds: ['s'] }, 'f.alt': { status: 'expressed', scenarioIds: ['alt'] } } } },  id: 'f', workIds: ['f.a'], name: '功能', goal: '演示', pick: 'f.a' } },
+    works: { 'f.a': { roles: [], id: 'f.a', featureId: 'f', key: 'a', title: '方案', summary: '说明',  } },
     cases: { 'f.happy': { id: 'f.happy', featureId: 'f', title: '主线', dimension: 'main' }, 'f.alt': { id: 'f.alt', featureId: 'f', title: '其他情况', dimension: 'main' } },
     scenarios: { ...p.scenarios, s: { ...p.scenarios.s, caseIds: ['f.happy'] }, alt: { ...p.scenarios.alt, caseIds: ['f.alt'] } },
   });

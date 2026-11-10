@@ -5,6 +5,7 @@
  * 不变量：每次写接口返回后，界面显示的选中 = 文件内容。写入被拒绝时以服务端返回的 current（被拒绝时为 null）为准并明确提示；
  * 网络失败时回滚到上一次确认的选中。写入串行，只有最后一次请求的结果反映到界面上。
  */
+import { entryForWork } from './views';
 import { findNode, nodeLabel, type Scenario, type Selection } from '@joplo-app/core/runtime';
 import { en } from '../i18n/en';
 import { reference } from '../i18n/messages';
@@ -62,13 +63,13 @@ export class SelectionWriteback {
     if (this.host.snapshot().view === 'stage') {
       const sc = this.host.scenario();
       if (!sc) return null;
-      return { optionId: sc.optionId, scenarioId: sc.id, position: st.position, sceneId: this.host.shownSceneId() ?? st.sceneId, nodeId, ...(stepId ? { stepId } : {}) };
+      return { workId: sc.workId, scenarioId: sc.id, position: st.position, sceneId: this.host.shownSceneId() ?? st.sceneId, nodeId, ...(stepId ? { stepId } : {}) };
     }
-    return { optionId: p.scenes[st.sceneId]?.optionId ?? null, scenarioId: null, position: 0, sceneId: st.sceneId, nodeId };
+    return { workId: p.scenes[st.sceneId]?.workId ?? null, scenarioId: null, position: 0, sceneId: st.sceneId, nodeId };
   }
 
   private inputOf(sel: Selection): SelectionInput {
-    return { optionId: sel.optionId, scenarioId: sel.scenarioId, position: sel.position, sceneId: sel.sceneId, nodeId: sel.nodeId, ...(sel.nodeId ? {} : { stepId: sel.stepId }) };
+    return { workId: sel.workId, scenarioId: sel.scenarioId, position: sel.position, sceneId: sel.sceneId, nodeId: sel.nodeId, ...(sel.nodeId ? {} : { stepId: sel.stepId }) };
   }
 
   /** 界面立即显示的选中（服务端确认后以服务端结果为准）。 */
@@ -80,8 +81,8 @@ export class SelectionWriteback {
     const step = !input.nodeId && input.stepId && input.scenarioId ? p.scenarios[input.scenarioId]?.steps.find((s) => s.id === input.stepId) : undefined;
     if (!hit && !step) return null;
     return {
-      featureId: input.optionId ? (p.options[input.optionId]?.featureId ?? null) : null,
-      optionId: input.optionId,
+      featureId: input.workId ? (entryForWork(p, input.workId)?.featureId ?? null) : null,
+      workId: input.workId,
       scenarioId: input.scenarioId,
       position: input.position,
       stepId: input.stepId ?? (input.scenarioId ? (p.scenarios[input.scenarioId]?.steps[input.position - 1]?.id ?? null) : null),

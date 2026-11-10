@@ -9,7 +9,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { expect } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { chapter, feature, flow, option, page, work, type Chapter, type Flow } from '@joplo-app/kit';
+import { chapter, feature, flow, work, page, layer, role, type Chapter, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 
@@ -35,12 +35,13 @@ export const DEFAULT_SLICES: SliceSpec[] = [
   { key: 'aside', title: 'Aside: how the House is counted', side: true, steps: 1 },
 ];
 
-export type WorkOptions = {
+export type WorkFixtureSettings = {
   mode?: 'dev' | 'publish';
   key?: string;
   title?: string;
   summary?: string;
   audience?: string;
+  roles?: boolean;
   draft?: boolean;
   /** 缺省 true：切片用 chapter()（linear）；false：用 flow()（independent）。 */
   linear?: boolean;
@@ -64,34 +65,37 @@ function slicesOf(specs: SliceSpec[], linear: boolean): Record<string, Flow | Ch
   return out;
 }
 
-const workSource = (key: string, o: { title: string; summary: string; audience?: string; draft?: boolean; linear: boolean; slices: SliceSpec[] }) => ({
+const workSource = (key: string, o: { title: string; summary: string; audience?: string; roles?: boolean; draft?: boolean; linear: boolean; slices: SliceSpec[] }) => ({
   ...work({
     title: o.title,
     summary: o.summary,
     ...(o.audience ? { audience: o.audience } : {}),
     ...(o.draft ? { draft: true } : {}),
-    stage: h(ui.Stack, { id: `${key}_world` }, h(ui.Text, { id: `${key}_frame` }, o.title)),
+    ...(o.roles ? {
+      roles: { speaker: role('Speaker', { desc: 'Presenter' }) },
+      layers: { stage: layer(o.title, h(ui.Stack, { id: `${key}_world` }, h(ui.Text, { id: `${key}_frame` }, o.title)), { role: 'speaker' }) },
+    } : { stage: h(ui.Stack, { id: `${key}_world` }, h(ui.Text, { id: `${key}_frame` }, o.title)) }),
     scenarios: slicesOf(o.slices, o.linear),
   }),
   ...F(`works/${key}.tsx`),
 });
 
 /** 编译出的项目（dev 或 publish）。slices: [] = 还没有切片的作品。 */
-export function workProject(o: WorkOptions = {}): Project {
+export function workProject(o: WorkFixtureSettings = {}): Project {
   const key = o.key ?? 'midterms';
   const works: NonNullable<AuthoringProject['works']> = {};
-  if (!o.noWork) works[key] = workSource(key, { title: o.title ?? 'After he lost Congress', summary: o.summary ?? 'The 2026 midterms in five minutes', audience: o.audience, draft: o.draft, linear: o.linear !== false, slices: o.slices ?? DEFAULT_SLICES });
+  if (!o.noWork) works[key] = workSource(key, { title: o.title ?? 'After he lost Congress', summary: o.summary ?? 'The 2026 midterms in five minutes', audience: o.audience, roles: o.roles, draft: o.draft, linear: o.linear !== false, slices: o.slices ?? DEFAULT_SLICES });
   if (o.second) works[o.second.key] = workSource(o.second.key, { title: o.second.title, summary: 'Earlier cut', draft: o.second.draft, linear: o.second.linear !== false, slices: o.second.slices ?? DEFAULT_SLICES.slice(0, 2) });
   const features: AuthoringProject['features'] = {};
   if (o.withDemo) {
     const linear = o.withDemo === 'linear';
-    const a = option({ name: 'A · Banner', idea: 'i', scenarios: linear
+    const a = work({ title: 'A · Banner', summary: 'i', scenarios: linear
       ? { main: chapter('Send an invite', { start: '/', cases: ['happy'] }).click('go', 'Send'), follow: chapter('Follow up', { cases: ['happy'] }).click('go', 'Remind') }
       : { main: flow('Send an invite', { start: '/', cases: ['happy'] }).click('go', 'Send') } });
-    const b = option({ name: 'B · Email', idea: 'i', scenarios: { only: flow('Email invite', { start: '/', cases: ['happy'] }).click('go', 'Email') } });
+    const b = work({ title: 'B · Email', summary: 'i', scenarios: { only: flow('Email invite', { start: '/', cases: ['happy'] }).click('go', 'Email') } });
     features.invite = {
       def: { ...feature({ name: 'Invite teammates', goal: 'Bring teammates in', roles: ['Admin'], cases: { happy: { title: 'Invite one person', dimension: 'main', priority: 'high', expected: 'Sent' }, gone: { title: 'Invitee left', dimension: 'lifecycle' } }, pick: 'a' }), ...F('features/invite/feature.ts') },
-      options: { a: { ...a, ...F('features/invite/options/a.tsx') }, b: { ...b, ...F('features/invite/options/b.tsx') } },
+      works: { a: { ...a, ...F('features/invite/works/a.tsx') }, b: { ...b, ...F('features/invite/works/b.tsx') } },
     };
   }
   const home = page({ title: 'Home', layout: false }, h(ui.Group, { id: 'row' }, h(ui.Button, { id: 'go' }, 'Go')));

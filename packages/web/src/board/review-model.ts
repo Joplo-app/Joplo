@@ -5,7 +5,7 @@ export function captureReviewDraft(session: LocalReviewSession, project: Project
   return { sessionId: session.id, text, context, pageTitle: project.scenes[context.sceneId]?.name ?? context.sceneId,
     scenarioName: context.scenarioId ? project.scenarios[context.scenarioId]?.name ?? context.scenarioId : null };
 }
-export function reviewDraftKey(projectId: string, optionId: string): string { return `joplo.review.draft:${projectId}:${optionId}`; }
+export function reviewDraftKey(projectId: string, workId: string): string { return `joplo.review.draft:${projectId}:${workId}`; }
 export function readReviewDraft(key: string): ReviewDraft | null {
   try {
     const d = JSON.parse(sessionStorage.getItem(key) ?? 'null') as ReviewDraft | null;

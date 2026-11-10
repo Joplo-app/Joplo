@@ -144,7 +144,7 @@ export function createBoardJa(locale: Locale = 'ja') {
       directoryNotFound: "ディレクトリが見つかりません",
       projectErrorCount: (p0: Value) => plural(Number(p0), { other: "# 件のエラー" }, locale),
       viewProjectHome: "プロジェクトのホームを表示",
-      switchFeature: "機能を切り替え",
+      switchFeature: "項目を切り替え",
       inspect: "要素を調査",
       exitInspectMode: "調査モードを終了",
       inspectModeClickAStageElementToSelectIt: "調査モード：ステージの要素をクリックすると選択のみ行い、ステップは実行しません。⌥ 長押しで一時的に調査できます。",

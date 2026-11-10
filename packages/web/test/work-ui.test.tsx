@@ -61,14 +61,14 @@ describe('四种能力搭配', () => {
     const p = workProject();
     const e = entryOf(p, 'midterms')!;
     expect(e).toMatchObject({ featureId: null, sequencing: 'linear' });
-    const html = nav(p, 'midterms', 'midterms.main.basics');
+    const html = nav(p, 'midterms', 'midterms.basics');
     expect(html).toContain('data-sequencing="linear"');
     expect(html).toContain('>Chapters<');
     expect(html).toContain('>Side chapters<');
     expect([...html.matchAll(/data-testid="slice-no">(\d+)</g)].map((m) => m[1])).toEqual(['01', '02', '03']);
-    expect(html).toContain('data-testid="review-strip-command">npx joplo render --film --chain --scenario-id midterms.main.hook<');
-    expect(html).not.toMatch(/option-switch|case-|gap-count/);
-    expect(coverFor(p, 'midterms.main.hook')!.entry).toMatchObject({ at: 'entry', linear: true, meta: entryMetaText(e, en) });
+    expect(html).toContain('data-testid="review-strip-command">npx joplo render --film --chain --scenario-id midterms.hook<');
+    expect(html).not.toMatch(/work-switch|case-|gap-count/);
+    expect(coverFor(p, 'midterms.hook')!.entry).toMatchObject({ at: 'entry', linear: true, meta: entryMetaText(e, en) });
     expect(entryMetaText(e, en)).toMatch(/^3 chapters · about /);
     expect(entryMenuHint(e)).toBe(`3 chapters · ${en.player.clock(e.ms)}`);
   });
@@ -87,9 +87,9 @@ describe('四种能力搭配', () => {
     expect(reviewStripCommand(e)).toBeNull();
     expect(entryMetaText(e, en)).toMatch(/^3 scenarios · about /);
     expect(entryMenuHint(e)).toBe(`3 scenarios · ${en.player.clock(e.ms)}`);
-    expect(coverFor(p, 'midterms.main.hook')!.entry).toMatchObject({ at: 'entry', linear: false, chapter: null });
+    expect(coverFor(p, 'midterms.hook')!.entry).toMatchObject({ at: 'entry', linear: false, chapter: null });
     // 从中间某个场景打开：小字只写作品标题，不写“第 n 章”
-    const mid = curtain(p, 'midterms.main.results');
+    const mid = curtain(p, 'midterms.results');
     expect(mid).toContain('data-testid="entry-cover" data-at="slice"');
     expect(mid).toContain('data-testid="cover-owner">After he lost Congress<');
     expect(mid).not.toContain('Chapter');
@@ -107,13 +107,13 @@ describe('四种能力搭配', () => {
     const e = entryOf(p, 'invite')!;
     expect(e).toMatchObject({ featureId: 'invite', sequencing: 'independent' });
     expect(workMenu(p, 'invite').map(({ featureId: _f, draft: _d, ...rest }: any) => rest)).toEqual(featureMenu(p, 'invite'));
-    expect(coverFor(p, 'invite.a.main')).toMatchObject({ entry: null, feature: 'Invite teammates', option: 'A · Banner' });
+    expect(coverFor(p, 'invite.a.main')).toMatchObject({ entry: null, feature: 'Invite teammates', work: 'A · Banner' });
     expect(curtain(p, 'invite.a.main')).toContain('data-testid="scene-cover"');
     expect(featureCard(p, 'invite')!.work).toBeNull();
     const home = renderToStaticMarkup(<I18nProvider explicit="en"><SiteHome project={featureOnly({ mode: 'publish' })} onView={() => {}} /></I18nProvider>);
     expect(home).toContain('>Features<');
     expect(home).toContain('For: Admin · 1 scenario');
-    expect(home).not.toMatch(/data-standalone|site-work-meta/);
+    expect(home).not.toMatch(/data-independent-work|site-work-meta/);
     vi.stubGlobal('location', loc);
     const s = site(featureOnly({ mode: 'publish' }));
     expect(s).toMatch(/data-testid="scenario-nav">/);
@@ -132,8 +132,8 @@ describe('四种能力搭配', () => {
     expect(e).toMatchObject({ featureId: 'invite', sequencing: 'linear' });
     // 看板：下拉与以前一样（选定方案与缺口），左栏是功能的方案 / 情况
     expect(workMenu(p, 'invite').map(({ featureId: _f, draft: _d, ...rest }: any) => rest)).toEqual(featureMenu(p, 'invite'));
-    const board = renderToStaticMarkup(<I18nProvider explicit="en" extend={boardDictionary}><CaseNav project={p} featureId="invite" optionId="invite.a" caseId={null} scenarioId={null} onOption={() => {}} onCase={() => {}} onScenario={() => {}} onOptionCase={() => {}} onCopy={() => {}} /></I18nProvider>);
-    expect(board).toContain('data-testid="option-switch"');
+    const board = renderToStaticMarkup(<I18nProvider explicit="en" extend={boardDictionary}><CaseNav project={p} featureId="invite" workId="invite.a" caseId={null} scenarioId={null} onWork={() => {}} onCase={() => {}} onScenario={() => {}} onWorkCase={() => {}} onCopy={() => {}} /></I18nProvider>);
+    expect(board).toContain('data-testid="work-switch"');
     // 封面：功能的场景封面（D61）不变
     expect(coverFor(p, 'invite.a.follow')!.entry).toBeNull();
     expect(curtain(p, 'invite.a.follow')).toContain('data-testid="scene-cover"');
@@ -167,7 +167,7 @@ describe('四种能力搭配', () => {
     expect(entriesOf(mixed).map((x) => x.id)).toEqual(['invite', 'midterms']);
     const home = renderToStaticMarkup(<I18nProvider explicit="en"><SiteHome project={workProject({ withDemo: true, mode: 'publish', audience: 'Curious readers' })} onView={() => {}} /></I18nProvider>);
     expect(home).toContain('>Works<');
-    expect(home).toMatch(/data-testid="site-feature-row-midterms" data-standalone=""/);
+    expect(home).toMatch(/data-testid="site-feature-row-midterms" data-independent-work=""/);
     expect(home).toMatch(/data-testid="site-feature-row-invite">/);
     expect(home).toContain('For: Curious readers');
     expect(home).toContain('For: Admin · 1 scenario');
@@ -186,9 +186,9 @@ describe('不变量 1：只问能力', () => {
   it('只有一个方案、没有情况的功能仍按功能呈现（不推断）', () => {
     const p = structuredClone(featureOnly());
     const f = p.features.invite!;
-    f.optionIds = ['invite.a'];
+    f.workIds = ['invite.a'];
     f.caseIds = [];
-    delete p.options['invite.b'];
+    delete p.works['invite.b'];
     expect(entryOf(p, 'invite')!.featureId).toBe('invite');
     expect(coverFor(p, 'invite.a.main')!.entry).toBeNull();
     expect(workMenu(p, 'invite')[0]).toMatchObject({ featureId: 'invite', hint: featureMenu(p, 'invite')[0]!.hint });
@@ -197,7 +197,7 @@ describe('不变量 1：只问能力', () => {
   it('呈现代码里没有“影片 / 形态”的判断，也没有按情况 / 方案数量推断的写法', () => {
     for (const file of ['../src/player/work-view.ts', '../src/board/WorkNav.tsx', '../src/site/embed-model.ts', '../src/player/cover-content.ts', '../src/site/SiteApp.tsx', '../src/board/nav-model.ts', '../src/player/WatchView.tsx']) {
       const src = readFileSync(new URL(file, import.meta.url), 'utf8');
-      expect(src, file).not.toMatch(/caseIds\.length|optionIds\.length|\.standalone\b|\bkind === 'film'|isFilm|filmOf/);
+      expect(src, file).not.toMatch(/caseIds\.length|workIds\.length|\.standalone\b|\bkind === 'film'|isFilm|filmOf/);
     }
     // 界面词典里不再有按“影片 / 功能演示”命名的类别
     expect(Object.keys(en.player)).not.toEqual(expect.arrayContaining(['film']));
@@ -211,20 +211,20 @@ describe('不变量 3：只读 Entry', () => {
   it('作品封面时长 = Entry.ms，切片封面 = EntrySlice.ms；标题、简介、观众来自 Entry', () => {
     const p = workProject({ audience: 'Curious readers' });
     const e = entryOf(p, 'midterms')!;
-    const c = coverFor(p, 'midterms.main.hook')!;
+    const c = coverFor(p, 'midterms.hook')!;
     expect(c.ms).toBe(e.ms);
     expect(c.entry).toEqual({ at: 'entry', linear: true, title: e.title, summary: e.summary, audience: 'Curious readers', meta: entryMetaText(e, en), chapter: 1, inSequence: true });
-    const r = coverFor(p, 'midterms.main.results')!;
-    expect(r.ms).toBe(e.slices.find((s) => s.id === 'midterms.main.results')!.ms);
+    const r = coverFor(p, 'midterms.results')!;
+    expect(r.ms).toBe(e.slices.find((s) => s.id === 'midterms.results')!.ms);
     expect(r).toMatchObject({ title: 'How big was the blue wave?', description: 'Seats in both chambers', entry: { at: 'slice', chapter: 3 } });
     // 切片没写 description 时不退回作品简介
-    expect(coverFor(p, 'midterms.main.basics')).toMatchObject({ description: null, entry: { at: 'slice', chapter: 2 } });
-    const html = curtain(p, 'midterms.main.hook');
+    expect(coverFor(p, 'midterms.basics')).toMatchObject({ description: null, entry: { at: 'slice', chapter: 2 } });
+    const html = curtain(p, 'midterms.hook');
     expect(html).toContain('data-testid="entry-cover" data-at="entry"');
     expect(html).toContain('For: Curious readers');
     expect(html).not.toContain('cover-owner');
-    expect(curtain(p, 'midterms.main.results')).toContain('Chapter 3 · After he lost Congress');
-    expect(curtain(p, 'midterms.main.aside')).toContain('Side chapter · After he lost Congress');
+    expect(curtain(p, 'midterms.results')).toContain('Chapter 3 · After he lost Congress');
+    expect(curtain(p, 'midterms.aside')).toContain('Side chapter · After he lost Congress');
   });
 
   it('「N 章 · 约 M」：数量 = 顺序里的切片数，时长 = approxLength(Entry.ms)；各语言格式', () => {
@@ -262,11 +262,11 @@ describe('不变量 4：编号', () => {
   it('按播放顺序从 01 编号；支线不编号、单独一组；作者标题原样；嵌入菜单同序', () => {
     const p = workProject({ slices: [{ key: 'a', title: '00 Cold open' }, { key: 'b', title: 'Aside', side: true }, { key: 'c', title: 'Second', from: 'a' }, { key: 'd', title: 'Restart', from: null }] });
     const e = entryOf(p, 'midterms')!;
-    const rows = sliceRows(e, 'midterms.main.c', en);
+    const rows = sliceRows(e, 'midterms.c', en);
     expect(rows.main.map((r) => [r.no, r.title, r.current])).toEqual([['01', '00 Cold open', false], ['02', 'Second', true], ['03', 'Restart', false]]);
     expect(rows.side.map((r) => [r.no, r.title])).toEqual([[null, 'Aside']]);
-    expect(chapterNumber(e, 'midterms.main.d')).toBe(3);
-    expect(chapterNumber(e, 'midterms.main.b')).toBeNull();
+    expect(chapterNumber(e, 'midterms.d')).toBe(3);
+    expect(chapterNumber(e, 'midterms.b')).toBeNull();
     const html = nav(p);
     expect(html).toContain('>00 Cold open<');
     expect(html.indexOf('data-testid="work-slices"')).toBeLessThan(html.indexOf('data-testid="work-side-slices"'));
@@ -283,7 +283,7 @@ describe('不变量 4：编号', () => {
     expect(html).toContain('>Side chapters<');
     for (const [i, s] of e.slices.filter((x) => x.inSequence).entries()) expect(html).toMatch(new RegExp(`site-scenario-${s.id.replace(/\./g, '\\.')}"[^>]*>.*?>0${i + 1}<.*?>${en.player.clock(s.ms)}<`));
     for (const locale of ['zh-CN', 'ja', 'ru'] as const) expect(site(p, '', locale)).toContain(`>${dictionary(locale).player.watchChapters}<`);
-    const rows = sliceRows(e, 'midterms.main.aside', en);
+    const rows = sliceRows(e, 'midterms.aside', en);
     const all = [...rows.main, ...rows.side].map((r) => ({ id: r.id, name: r.title, no: r.no, side: !r.inSequence, current: r.current, steps: en.player.clock(r.ms) }));
     const w = watch(all, 'chapters', p);
     expect(w).toContain('Chapters · 3');
@@ -312,13 +312,13 @@ describe('不变量 5：先落在首页或封面上', () => {
       for (const scoped of [false, true]) {
         const html = renderToStaticMarkup(<I18nProvider explicit="en"><SiteApp data={{ project: p, home: null, scoped }} search="" /></I18nProvider>);
         expect(html).not.toContain('data-testid="site-home"');
-        expect(html).toMatch(/data-testid="site-scenario-midterms\.main\.hook" aria-current="true"/);
+        expect(html).toMatch(/data-testid="site-scenario-midterms\.hook" aria-current="true"/);
         expect(html).toMatch(/<span data-testid="crumb-project"/);
         expect(html).not.toMatch(/<button[^>]*data-testid="crumb-project"/);
         expect(html).not.toContain('Switch feature');
       }
       const r = resolvePlay(p, { featureId: 'midterms' });
-      expect(r).toMatchObject({ scenarioId: 'midterms.main.hook', step: 0 });
+      expect(r).toMatchObject({ scenarioId: 'midterms.hook', step: 0 });
       expect(coverShown(p.scenarios[r.scenarioId!], r.step, false, null)).toBe(true);
       expect(coverFor(p, r.scenarioId)!.entry!.at).toBe('entry');
     }
@@ -334,11 +334,11 @@ describe('不变量 5：先落在首页或封面上', () => {
 
   it('第一个切片是支线时封面画在顺序里的第一章；深链到中间某一章是那一章的封面', () => {
     const p = workProject({ slices: [{ key: 'intro', title: 'Intro', side: true }, { key: 'one', title: 'One', from: null }, { key: 'two', title: 'Two' }] });
-    expect(resolvePlay(p, { featureId: 'midterms' }).scenarioId).toBe('midterms.main.one');
-    expect(coverFor(p, 'midterms.main.one')!.entry).toMatchObject({ at: 'entry', chapter: 1 });
-    expect(coverFor(p, 'midterms.main.two')!.entry).toMatchObject({ at: 'slice', chapter: 2 });
-    expect(coverFor(p, 'midterms.main.intro')!.entry).toMatchObject({ at: 'slice', chapter: null, inSequence: false });
-    expect(resolvePlay(p, { featureId: 'midterms', scenarioId: 'midterms.main.two' })).toMatchObject({ scenarioId: 'midterms.main.two', step: 0 });
+    expect(resolvePlay(p, { featureId: 'midterms' }).scenarioId).toBe('midterms.one');
+    expect(coverFor(p, 'midterms.one')!.entry).toMatchObject({ at: 'entry', chapter: 1 });
+    expect(coverFor(p, 'midterms.two')!.entry).toMatchObject({ at: 'slice', chapter: 2 });
+    expect(coverFor(p, 'midterms.intro')!.entry).toMatchObject({ at: 'slice', chapter: null, inSequence: false });
+    expect(resolvePlay(p, { featureId: 'midterms', scenarioId: 'midterms.two' })).toMatchObject({ scenarioId: 'midterms.two', step: 0 });
   });
 
   it('嵌入（?embed=1）、评审模式（?embed=1&review=1）、深链切片的嵌入都停在封面；作品的封面写作品标题与切片数', () => {
@@ -346,7 +346,7 @@ describe('不变量 5：先落在首页或封面上', () => {
     for (const linear of [true, false]) {
       const p = workProject({ mode: 'publish', linear });
       const meta = entryMetaText(entryOf(p, 'midterms')!, en);
-      for (const search of ['?embed=1', '?embed=1&review=1', '?embed=1&scenario=midterms.main.results']) {
+      for (const search of ['?embed=1', '?embed=1&review=1', '?embed=1&scenario=midterms.results']) {
         expect(embedInitial(p, parseEmbedParams(search)!).covered, search).toBe(true);
         const html = site(p, search);
         expect(html, search).toContain('data-testid="embed-cover"');
@@ -356,12 +356,12 @@ describe('不变量 5：先落在首页或封面上', () => {
       }
     }
     const p = workProject({ mode: 'publish' });
-    expect(embedInitial(p, parseEmbedParams('?embed=1&scenario=midterms.main.results')!).scenarioId).toBe('midterms.main.results');
+    expect(embedInitial(p, parseEmbedParams('?embed=1&scenario=midterms.results')!).scenarioId).toBe('midterms.results');
     // autoplay=1 是嵌入方显式要求跳过封面（云端嵌入契约），照旧
     expect(embedInitial(p, parseEmbedParams('?embed=1&autoplay=1')!).covered).toBe(false);
     const side = workProject({ mode: 'publish', slices: [{ key: 'intro', title: 'Intro', side: true }, { key: 'one', title: 'One', from: null }] });
-    expect(embedInitial(side, parseEmbedParams('?embed=1')!).scenarioId).toBe('midterms.main.one');
-    expect(embedInitial(side, parseEmbedParams('?embed=1&scenario=midterms.main.intro')!).scenarioId).toBe('midterms.main.intro');
+    expect(embedInitial(side, parseEmbedParams('?embed=1')!).scenarioId).toBe('midterms.one');
+    expect(embedInitial(side, parseEmbedParams('?embed=1&scenario=midterms.intro')!).scenarioId).toBe('midterms.intro');
   });
 });
 
@@ -371,11 +371,11 @@ describe('不变量 6：草稿', () => {
     const v1 = entryOf(p, 'v1')!;
     expect(v1.draft).toBe(true);
     expect(workMenu(p, 'v1').find((e) => 'name' in e && e.id === 'v1')).toMatchObject({ draft: true, hint: `2 chapters · ${en.player.clock(v1.ms)} · Draft · not published` });
-    expect(resolvePlay(p, { featureId: 'v1' })).toMatchObject({ ok: true, scenarioId: 'v1.main.hook' });
+    expect(resolvePlay(p, { featureId: 'v1' })).toMatchObject({ ok: true, scenarioId: 'v1.hook' });
     expect(nav(p, 'v1')).toContain('data-testid="work-draft">Draft · not published<');
     expect(nav(p, 'midterms')).not.toContain('work-draft');
     expect(featureCard(p, 'v1')!.work!.draft).toBe(true);
-    expect(Object.keys(workProject({ mode: 'publish', second: { key: 'v1', title: 'Earlier cut', draft: true } }).features)).toEqual(['midterms']);
+    expect(Object.keys(workProject({ mode: 'publish', second: { key: 'v1', title: 'Earlier cut', draft: true } }).works)).toEqual(['midterms']);
   });
 });
 
@@ -410,7 +410,7 @@ describe('不变量 7：十种语言', () => {
       expect(textW(t.board.sliceMeta(t.player.clock(95_000), 12), 12)).toBeLessThanOrEqual(inner - 24 - 10);
       const html = nav(workProject({ slices: [{ key: 'long', title: 'A'.repeat(140) }, ...DEFAULT_SLICES.slice(1)] }), 'midterms', null, locale);
       expect(html).toMatch(/line-clamp-2[^"]*\[overflow-wrap:anywhere\][^"]*">A{140}</);
-      expect(html).toMatch(/\[overflow-wrap:anywhere\]" data-testid="review-strip-command">npx joplo render --film --chain --scenario-id midterms\.main\.long</);
+      expect(html).toMatch(/\[overflow-wrap:anywhere\]" data-testid="review-strip-command">npx joplo render --film --chain --scenario-id midterms\.long</);
       expect(html).toMatch(new RegExp(`aria-label="${t.board.copyCommand}"[^>]*data-testid="review-strip-copy"`));
       expect(html).not.toMatch(/whitespace-nowrap[^"]*"[^>]*>A{10}/);
     });
@@ -443,8 +443,8 @@ describe('不变量 8：边界输入', () => {
     expect(entryMetaText(entryOf(workProject({ linear: false, slices: [{ key: 'only', title: 'Only' }] }), 'midterms')!, en)).toMatch(/^1 scenario · about/);
     expect(e.audience).toBeNull();
     expect(nav(p)).not.toMatch(/work-audience|For:/);
-    expect(coverFor(p, 'midterms.main.only')!.entry).toMatchObject({ at: 'entry', audience: null });
-    expect(curtain(p, 'midterms.main.only')).not.toContain('cover-audience');
+    expect(coverFor(p, 'midterms.only')!.entry).toMatchObject({ at: 'entry', audience: null });
+    expect(curtain(p, 'midterms.only')).not.toContain('cover-audience');
     expect(nav(workProject({ audience: 'Readers' }))).toContain('For: Readers');
   });
 
@@ -453,8 +453,8 @@ describe('不变量 8：边界输入', () => {
     const e = entryOf(p, 'midterms')!;
     expect(entryMetaText(e, en)).toBe('2 side chapters');
     expect(sliceRows(e, null, en).main).toEqual([]);
-    expect(reviewStripCommand(e)).toBe('npx joplo render --film --chain --scenario-id midterms.main.x');
-    expect(coverFor(p, 'midterms.main.x')!.entry).toMatchObject({ at: 'entry', chapter: null, meta: '2 side chapters' });
+    expect(reviewStripCommand(e)).toBe('npx joplo render --film --chain --scenario-id midterms.x');
+    expect(coverFor(p, 'midterms.x')!.entry).toMatchObject({ at: 'entry', chapter: null, meta: '2 side chapters' });
     expect(workMenu(p, 'midterms')[0]).toMatchObject({ hint: '2 side chapters' });
     const html = nav(p);
     expect(html).not.toContain('work-slices"');
@@ -462,13 +462,13 @@ describe('不变量 8：边界输入', () => {
     const ind = entryOf(workProject({ linear: false, slices: [{ key: 'x', title: 'X', side: true }] }), 'midterms')!;
     expect(entryMetaText(ind, en)).toBe('1 side scenario');
     // 手机列表：没有顺序里的切片时不出空的主列表
-    const w = watch([{ id: 'midterms.main.x', name: 'X', no: null, side: true, current: true, steps: '0:04' }], 'chapters', p);
+    const w = watch([{ id: 'midterms.x', name: 'X', no: null, side: true, current: true, steps: '0:04' }], 'chapters', p);
     expect(w).not.toContain('Chapters · 0');
     expect(w).toContain('Side chapters · 1');
   });
 
   it('窄屏竖条：linear 时只剩编号，independent 是图标；当前切片高亮', () => {
-    const rail = (p: Project) => renderToStaticMarkup(<I18nProvider explicit="en" extend={boardDictionary}><WorkRail entry={entryOf(p, 'midterms')!} scenarioId="midterms.main.basics" /></I18nProvider>);
+    const rail = (p: Project) => renderToStaticMarkup(<I18nProvider explicit="en" extend={boardDictionary}><WorkRail entry={entryOf(p, 'midterms')!} scenarioId="midterms.basics" /></I18nProvider>);
     const linear = rail(workProject());
     expect([...linear.matchAll(/data-testid="rail-slice">(\d+)</g)].map((m) => m[1])).toEqual(['01', '02', '03']);
     expect(linear).toMatch(/bg-jb-selected[^"]*" data-testid="rail-slice">02</);
@@ -479,8 +479,8 @@ describe('不变量 8：边界输入', () => {
 describe('看板切到功能的其他方案', () => {
   it('选定方案是章节时，打开另一个方案仍从那个方案自己的第一个场景开始', () => {
     const p = workProject({ noWork: true, withDemo: 'linear' });
-    expect(resolvePlay(p, { featureId: 'invite' })).toMatchObject({ optionId: 'invite.a', scenarioId: 'invite.a.main' });
-    expect(resolvePlay(p, { featureId: 'invite', optionId: 'invite.b' })).toMatchObject({ optionId: 'invite.b', scenarioId: 'invite.b.only' });
+    expect(resolvePlay(p, { featureId: 'invite' })).toMatchObject({ workId: 'invite.a', scenarioId: 'invite.a.main' });
+    expect(resolvePlay(p, { featureId: 'invite', workId: 'invite.b' })).toMatchObject({ workId: 'invite.b', scenarioId: 'invite.b.only' });
   });
 });
 

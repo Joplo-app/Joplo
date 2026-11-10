@@ -1,3 +1,5 @@
+import { entryForWork } from './views';
+import { entriesOf, entryOf, visibleRoutes } from '@joplo-app/core/runtime';
 import { scrollTarget, scrollPoint } from '../renderer/scroll-state';
 import { en, type Dictionary } from '../i18n/en';
 import { stepCaption, selectionLabel } from '../i18n/step-caption';
@@ -26,8 +28,8 @@ export const VISUAL_SETTLE_MS = 1200;
 import { dwellTexts } from '../player/cover-content';
 import { VOICE_BREATH_MS, speakerRoleAt, spokenLine } from '@joplo-app/core/runtime';
 import type { Narration, Narrator, NarrationSource } from './voice';
-import { ACTION_TIMING, stepPlan, orderedFeatures, streamPlan, type StreamPlan, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core/runtime';
-import { browseSceneId, browseState, optionsOf, scenariosOf, playSequence } from './views';
+import { ACTION_TIMING, stepPlan, streamPlan, type StreamPlan, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core/runtime';
+import { browseSceneId, browseState, worksOf, scenariosOf, playSequence } from './views';
 import { SelectionWriteback } from './selection-sync';
 
 /** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */
@@ -45,7 +47,7 @@ export type Notice =
 export type SelectionSync = { status: 'idle' | 'pending' | 'ok' } | { status: 'error'; message: Text };
 
 /** 浏览器提交给服务端的选中（服务端补全 at / label / route）。 */
-export type SelectionInput = { optionId: string | null; scenarioId: string | null; position: number; sceneId: string; nodeId: string | null; stepId?: string | null };
+export type SelectionInput = { workId: string | null; scenarioId: string | null; position: number; sceneId: string; nodeId: string | null; stepId?: string | null };
 export type SelectionWriteResult = { ok: true; selection: Selection | null } | { ok: false; message: Text; current?: Selection | null };
 export type SelectionWriter = (input: SelectionInput | null) => Promise<SelectionWriteResult>;
 
@@ -54,7 +56,7 @@ export type Snapshot = {
   version: number | null;
   home: string | null;
   featureId: string | null;
-  optionId: string | null;
+  workId: string | null;
   scenarioId: string | null;
   view: View;
   /** 浏览视图的画面（`@<路径>`）。 */
@@ -157,7 +159,7 @@ export class DemoController {
     version: null,
     home: null,
     featureId: null,
-    optionId: null,
+    workId: null,
     scenarioId: null,
     view: 'stage',
     browseSceneId: null,
@@ -277,7 +279,7 @@ export class DemoController {
         busy: this.snap.busy,
         view: this.snap.view,
         featureId: this.snap.featureId,
-        optionId: this.snap.optionId,
+        workId: this.snap.workId,
         scenarioId: this.snap.scenarioId,
         activeStep: this.snap.activeStep,
         version: this.snap.version,
@@ -327,19 +329,18 @@ export class DemoController {
     this.stop();
     this.indexes.clear();
     const prev = this.snap;
-    const features = orderedFeatures(project).map(f => f.id);
-    let featureId = prev.featureId && project.features[prev.featureId] ? prev.featureId : null;
-    let optionId = prev.optionId && project.options[prev.optionId] ? prev.optionId : null;
-    if (optionId && featureId && project.options[optionId]!.featureId !== featureId) optionId = null;
-    if (!featureId) featureId = optionId ? project.options[optionId]!.featureId : (features.find((f) => optionsOf(project, f).length > 0) ?? features[0] ?? null);
-    if (!optionId && featureId) {
-      const f = project.features[featureId]!;
-      optionId = f.pick && project.options[f.pick] ? f.pick : (optionsOf(project, featureId)[0]?.id ?? null);
+    const entries = entriesOf(project);
+    let featureId = prev.featureId && entryOf(project, prev.featureId) ? prev.featureId : null;
+    let workId = prev.workId && project.works[prev.workId] ? prev.workId : null;
+    if (workId && featureId && entryForWork(project, workId)?.id !== featureId) workId = null;
+    if (!featureId) featureId = (workId ? entryForWork(project, workId)?.id : null) ?? entries.find(e => e.workId)?.id ?? entries[0]?.id ?? null;
+    if (!workId && featureId) {
+      workId = entryOf(project, featureId)?.workId ?? null;
     }
-    let scenarioId = prev.scenarioId && project.scenarios[prev.scenarioId]?.optionId === optionId ? prev.scenarioId : null;
-    if (!scenarioId && optionId) scenarioId = scenariosOf(project, optionId)[0]?.id ?? null;
+    let scenarioId = prev.scenarioId && project.scenarios[prev.scenarioId]?.workId === workId ? prev.scenarioId : null;
+    if (!scenarioId && workId) scenarioId = scenariosOf(project, workId)[0]?.id ?? null;
 
-    const homeRoute = home && project.routes[home] ? home : (Object.keys(project.routes).sort()[0] ?? null);
+    const homeRoute = home && project.routes[home] ? home : (visibleRoutes(project).map(r => r.path).sort()[0] ?? null);
     let browse = prev.browseSceneId && project.scenes[prev.browseSceneId] ? prev.browseSceneId : null;
     if (!browse && homeRoute) browse = browseSceneId(project, homeRoute);
     let view: View = prev.version === null ? 'stage' : prev.view;
@@ -355,7 +356,7 @@ export class DemoController {
       state = r.state;
       playbackError = r.error;
     }
-    this.set({ project, version, home: homeRoute, featureId, optionId, scenarioId, view, browseSceneId: browse, state, playbackError, preview: null, ripple: null, systemEvent: null, activeStep: null });
+    this.set({ project, version, home: homeRoute, featureId, workId, scenarioId, view, browseSceneId: browse, state, playbackError, preview: null, ripple: null, systemEvent: null, activeStep: null });
     this.selection.revalidate();
   }
 
@@ -410,30 +411,30 @@ export class DemoController {
 
   setFeature(featureId: string) {
     const p = this.snap.project;
-    if (!p || !p.features[featureId]) return;
-    const f = p.features[featureId]!;
-    const opt = f.pick && p.options[f.pick] ? f.pick : (optionsOf(p, featureId)[0]?.id ?? null);
+    const entry = p ? entryOf(p, featureId) : null;
+    if (!entry) return;
+    const opt = entry.workId;
     this.stop();
     this.set({ featureId });
-    if (opt) this.setOption(opt);
-    else this.set({ optionId: null, scenarioId: null });
+    if (opt) this.setWork(opt);
+    else this.set({ workId: null, scenarioId: null });
   }
 
   /** 切换方案：播放它的第一个场景；没有场景时静态展示它的页面。 */
-  setOption(optionId: string) {
+  setWork(workId: string) {
     const p = this.snap.project;
-    if (!p || !p.options[optionId]) return;
+    if (!p || !p.works[workId]) return;
     this.stop();
-    const first = scenariosOf(p, optionId)[0] ?? null;
-    const featureId = p.options[optionId]!.featureId;
+    const first = scenariosOf(p, workId)[0] ?? null;
+    const featureId = entryForWork(p, workId)?.id ?? null;
     if (!first) {
-      this.set({ featureId, optionId, scenarioId: null });
-      const scene = Object.values(p.scenes).find((s) => s.optionId === optionId);
+      this.set({ featureId, workId, scenarioId: null });
+      const scene = Object.values(p.scenes).find((s) => s.workId === workId);
       if (scene) this.preview(scene.id);
       return;
     }
     const st = this.safeStateAt(p, first.id, 0);
-    this.set({ featureId, optionId, scenarioId: first.id, view: 'stage', state: st.state, playbackError: st.error, epoch: this.snap.epoch + 1, notice: null });
+    this.set({ featureId, workId, scenarioId: first.id, view: 'stage', state: st.state, playbackError: st.error, epoch: this.snap.epoch + 1, notice: null });
   }
 
   /** 播放某个场景的某个位置。quiet：由链接 / 左栏直接定位时不弹“已切换”提示。 */
@@ -444,8 +445,8 @@ export class DemoController {
     this.clock.mark();
     const sc = p.scenarios[scenarioId]!;
     const r = this.safeStateAt(p, scenarioId, Math.max(0, Math.min(position, sc.steps.length)));
-    const featureId = p.options[sc.optionId]?.featureId ?? this.snap.featureId;
-    this.set({ featureId, scenarioId, optionId: sc.optionId, view: 'stage', state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: opts.quiet ? null : { kind: 'switched', text: m.player.switchedToDataReset(sc.name) } });
+    const featureId = entryForWork(p, sc.workId)?.id ?? this.snap.featureId;
+    this.set({ featureId, scenarioId, workId: sc.workId, view: 'stage', state: r.state, playbackError: r.error, epoch: this.snap.epoch + 1, notice: opts.quiet ? null : { kind: 'switched', text: m.player.switchedToDataReset(sc.name) } });
     if (!opts.quiet) this.autoClear();
   }
 
@@ -611,7 +612,7 @@ export class DemoController {
     if (!p) return false;
     const r = this.safeStateAt(p, sc.id, 0);
     if (r.error || !r.state) return false;
-    this.set({ featureId: p.options[sc.optionId]?.featureId ?? this.snap.featureId, scenarioId: sc.id, optionId: sc.optionId, state: r.state, playbackError: null, dwell: null });
+    this.set({ featureId: entryForWork(p, sc.workId)?.id ?? this.snap.featureId, scenarioId: sc.id, workId: sc.workId, state: r.state, playbackError: null, dwell: null });
     return true;
   }
 
@@ -633,7 +634,7 @@ export class DemoController {
     const p = this.snap.project;
     const sc = p?.scenarios[id];
     if (!p || !sc) return null;
-    const sequence = playSequence(p, sc.optionId);
+    const sequence = playSequence(p, sc.workId);
     const i = sequence.findIndex((s) => s.id === id);
     return i >= 0 && i + 1 < sequence.length ? sequence[i + 1]!.id : null;
   };
@@ -792,8 +793,8 @@ export class DemoController {
     // Hover is passive during playback. Touch hover is preceded by pointerdown's pause.
     if (action.type === 'hover' && (this.snap.playing || this.snap.busy) && !this.snap.paused) return;
     this.stageInput(true);
-    let index = this.indexes.get(sc.optionId);
-    if (!index) { index = actionIndex(p, sc.optionId); this.indexes.set(sc.optionId, index); }
+    let index = this.indexes.get(sc.workId);
+    if (!index) { index = actionIndex(p, sc.workId); this.indexes.set(sc.workId, index); }
     const result = arbitrateAction(p, st, action, { layer: this.snap.playground, sceneId: this.shownSceneId() ?? undefined, index, native });
     if (result.kind === 'free') { this.set({ playground: applyPlayground(this.snap.playground, result.effects), freeMode: true, notice: null, switchPrompt: null }); return; }
     if (result.kind === 'switch') { this.set({ switchPrompt: result.candidates, notice: null }); return; }

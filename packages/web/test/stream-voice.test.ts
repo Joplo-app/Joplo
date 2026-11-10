@@ -7,7 +7,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { $, feature, flow, option, page, role, say, stream } from '@joplo-app/kit';
+import { $, feature, flow, work, page, role, say, stream } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';
@@ -26,8 +26,8 @@ const until = async (cond: () => boolean, ms = 3000) => {
 
 function project(): Project {
   const home = page({ title: 'Home', layout: false }, h(ui.Stack, null, h(ui.Button, { id: 'mic' }, 'Mic'), h(ui.Text, { id: 'box' }, $.ui.spoken)));
-  const opt = option({
-    name: 'A', idea: 'i',
+  const opt = work({
+    title: 'A', summary: 'i',
     state: { ui: { spoken: '' } },
     scenarios: {
       s: flow('Dictate', { start: '/' })
@@ -40,7 +40,7 @@ function project(): Project {
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, roles: { me: role('Me') }, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, roles: { me: role('Me') }, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const r = compile(src, 'dev');
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

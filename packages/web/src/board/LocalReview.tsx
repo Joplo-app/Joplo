@@ -12,15 +12,15 @@ import { captureReviewDraft, localReviewCommand, readReviewDraft, reviewDraftKey
 import { useReviewDrag } from './useReviewDrag';
 
 /** 跨页面保留草稿的位置；portal 浮层与图标均不占布局宽度。 */
-export function LocalReview({ projectId, project, optionId, context, version, enabled, completed, onOpen, approvable = true }: {
-  projectId: string; project: Project; optionId: string; context: LocalReviewLocation | null;
+export function LocalReview({ projectId, project, workId, context, version, enabled, completed, onOpen, approvable = true }: {
+  projectId: string; project: Project; workId: string; context: LocalReviewLocation | null;
   version: number; enabled: boolean; completed: boolean; onOpen: () => void;
   /** 能否“确认方案”：独立作品（D102 修订，entry.featureId === null）没有方案这一层，只留反馈，不出确认按钮。 */
   approvable?: boolean;
 }) {
   const { t } = useBoardI18n();
   const l = t.board;
-  const key = reviewDraftKey(projectId, optionId);
+  const key = reviewDraftKey(projectId, workId);
   const [draft, setDraft] = useState<ReviewDraft | null>(() => readReviewDraft(key));
   const [state, setState] = useState<LocalReviewState | null>(null);
   const [open, setOpen] = useState(false);
@@ -46,7 +46,7 @@ export function LocalReview({ projectId, project, optionId, context, version, en
       if (running || submitting.current) return;
       running = true;
       const order = ++requestOrder.current;
-      const result = await fetchLocalReview(projectId, optionId);
+      const result = await fetchLocalReview(projectId, workId);
       running = false;
       if (cancelled || order !== requestOrder.current) return;
       if (result.ok) {
@@ -69,7 +69,7 @@ export function LocalReview({ projectId, project, optionId, context, version, en
     void refresh();
     const timer = setInterval(() => void refresh(), open ? 1500 : 5000);
     return () => { cancelled = true; clearInterval(timer); };
-  }, [projectId, optionId, version, open]);
+  }, [projectId, workId, version, open]);
 
   const session = state?.session;
   const status = session ? localReviewStatus(session) : null;
@@ -128,7 +128,7 @@ export function LocalReview({ projectId, project, optionId, context, version, en
       <div className="flex shrink-0 items-center justify-between border-b border-jb-line px-4 py-3"><h2 className="text-[15px] font-semibold">{l.localReviewTitle}</h2><Btn icon={<X className="size-4" />} label={l.localReviewClose} iconOnly variant="ghost" onClick={() => setOpen(false)} /></div>
       <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4">
         <div className="text-[12px] text-jb-muted" role="status">{!session ? l.localReviewLoading : status === 'approved' ? l.localReviewApproved : state!.watchers > 0 ? l.localReviewListening : l.localReviewSavedLocally}</div>
-        {session ? <p className="text-[13px] font-semibold">{session.featureName} / {session.optionName}</p> : null}
+        {session ? <p className="text-[13px] font-semibold">{session.featureName} / {session.workTitle}</p> : null}
         {draft ? <div className="rounded-[6px] border border-jb-line bg-jb-sunken p-2 text-[12px]" data-testid="local-review-context"><div className="text-jb-muted">{l.localReviewLocation}</div><div>{draft.pageTitle}</div><div>{draft.scenarioName} · {t.player.number(draft.context.position)}</div></div> : null}
         {shifted ? <p className="text-[12px] text-jb-muted">{l.localReviewLocationKept}</p> : null}
         {!enabled ? <p role="alert" className="text-[12px] text-jb-danger">{l.localReviewCompileFirst}</p> : null}

@@ -12,14 +12,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, layer, option, page, shot } from '@joplo-app/kit';
+import { feature, flow, layer, work, page, shot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';
 import { I18nProvider } from '../src/i18n/context';
 import { dictionary } from '../src/i18n/dictionaries';
 import { SiteApp } from '../src/site/SiteApp';
-import { embedInitial, embedKey, embedProgress, embedScenarioItems, fullscreenAvailable, parseEmbedParams, standaloneUrl } from '../src/site/embed-model';
+import { embedInitial, embedKey, embedProgress, embedScenarioItems, fullscreenAvailable, parseEmbedParams, fullPageUrl } from '../src/site/embed-model';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
@@ -27,20 +27,20 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 /** 两个功能（各自选定方案）、三个场景；第一个方案带两个层级。 */
 function published(): Project {
   const home = page({ title: 'Home', layout: false }, h(ui.Group, { id: 'row' }, h(ui.Button, { id: 'go' }, 'Go'), h(ui.Button, { id: 'more' }, 'More')));
-  const a = option({
-    name: 'A', idea: 'i', state: { ui: {} },
+  const a = work({
+    title: 'A', summary: 'i', state: { ui: {} },
     layers: { app: layer('App', h(ui.Stack, { id: 'app' }, h(ui.Button, { id: 'go' }, 'Go'), h(ui.Button, { id: 'more' }, 'More'))), data: layer('Data', h(ui.Text, { id: 'data' }, 'Data')) },
     scenarios: { main: flow('Main path', { start: '/' }).click('go', shot('data')).click('more'), other: flow('Other path', { start: '/' }).click('more') },
   });
-  const b = option({ name: 'B', idea: 'i', state: { ui: {} }, scenarios: { only: flow('Second feature', { start: '/' }).click('go') } });
+  const b = work({ title: 'B', summary: 'i', state: { ui: {} }, scenarios: { only: flow('Second feature', { start: '/' }).click('go') } });
   const src: AuthoringProject = {
     root: '/p',
     config: { ...config({ name: 'Team "invite" <demo>', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: {
-      f: { def: { ...feature({ name: 'Invite', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...a, ...F('features/f/options/a.tsx') } } },
-      g: { def: { ...feature({ name: 'Audit', goal: 'g', cases: {}, pick: 'b' }), ...F('features/g/feature.ts') }, options: { b: { ...b, ...F('features/g/options/b.tsx') } } },
+      f: { def: { ...feature({ name: 'Invite', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...a, ...F('features/f/works/a.tsx') } } },
+      g: { def: { ...feature({ name: 'Audit', goal: 'g', cases: {}, pick: 'b' }), ...F('features/g/feature.ts') }, works: { b: { ...b, ...F('features/g/works/b.tsx') } } },
     },
   };
   const out = compile(src, 'publish');
@@ -84,9 +84,9 @@ describe('参数', () => {
     expect(embedProgress(9, 4)).toBe(1);
   });
   it('“在新标签页打开”：同一个分享页，去掉 embed / scenario / autoplay，停在当前场景与步骤', () => {
-    expect(standaloneUrl('https://joplo.app/s/Abc1234567/?embed=1&scenario=f.a.other&autoplay=1&x=1', { featureId: 'f', scenarioId: 'f.a.other', step: 2 })).toBe('https://joplo.app/s/Abc1234567/?x=1#/f/f?s=f.a.other&step=2');
-    expect(standaloneUrl('https://joplo.app/s/Abc1234567/?embed=1#/old', null)).toBe('https://joplo.app/s/Abc1234567/');
-    expect(standaloneUrl('file:///tmp/dist/index.html?embed=1', { featureId: 'f', scenarioId: 'f.a.main', step: 0 })).toBe('file:///tmp/dist/index.html#/f/f?s=f.a.main');
+    expect(fullPageUrl('https://joplo.app/s/Abc1234567/?embed=1&scenario=f.a.other&autoplay=1&x=1', { featureId: 'f', scenarioId: 'f.a.other', step: 2 })).toBe('https://joplo.app/s/Abc1234567/?x=1#/f/f?s=f.a.other&step=2');
+    expect(fullPageUrl('https://joplo.app/s/Abc1234567/?embed=1#/old', null)).toBe('https://joplo.app/s/Abc1234567/');
+    expect(fullPageUrl('file:///tmp/dist/index.html?embed=1', { featureId: 'f', scenarioId: 'f.a.main', step: 0 })).toBe('file:///tmp/dist/index.html#/f/f?s=f.a.main');
   });
   it('全屏可用性：嵌入方没给 allowfullscreen（fullscreenEnabled=false）时退回新标签页', () => {
     expect(fullscreenAvailable({ fullscreenEnabled: true, documentElement: { requestFullscreen: () => undefined } })).toBe(true);

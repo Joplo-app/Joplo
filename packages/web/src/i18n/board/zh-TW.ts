@@ -144,7 +144,7 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       directoryNotFound: "找不到目錄",
       projectErrorCount: (p0: Value) => plural(Number(p0), { other: "# 個錯誤" }, locale),
       viewProjectHome: "查看專案首頁",
-      switchFeature: "切換功能",
+      switchFeature: "切換項目",
       inspect: "檢查元素",
       exitInspectMode: "結束檢查模式",
       inspectModeClickAStageElementToSelectIt: "檢查模式：點選舞台元素只會選取，不會執行步驟。按住 ⌥ 可暫時檢查。",
