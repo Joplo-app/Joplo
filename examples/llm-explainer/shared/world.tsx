@@ -1,4 +1,4 @@
-import { Canvas } from '@joplo-app/plugin-content';
+import { Canvas, Split } from '@joplo-app/plugin-content';
 /**
  * 整支片子只有这一张画布（<Canvas>）：聊天窗、纸带、模型、概率条 / 抽签带、温度旋钮、计分板、四个问题标签。
  *
@@ -7,6 +7,8 @@ import { Canvas } from '@joplo-app/plugin-content';
  * - 同一个物件的每种“排法”写成一段静态 JSX，用 when 切换；同一个物件在各段里用同一个 motion 键，
  *   换排法、换容器时 Joplo 自动让它从旧位置飞到新位置（气泡里的词 → 纸带上的编号，概率条 → 抽签带）。
  * - 镜头在步骤里写 camera('元素', …)，按这些元素的范围取景；章节标记、来源、封面、片尾号召是 screen 元素，不随镜头动。
+ * - 一批一起出现的东西（逐字蹦出的回答、接上纸带的几块、概率条）：每个元素写 enter，容器写 enterStagger 错开，
+ *   不手算每个的 delay；要“弹一下”的落定用 enterEase="spring" / "bounce"。整句逐词出现用 <Split>。
  */
 import { $, and, eq, neq, notEmpty, oneOf, type CondExpr } from '@joplo-app/kit';
 import { Button, PromptInput } from '@joplo-app/plugin-ui';
@@ -26,18 +28,23 @@ const STRIP = { x: 1400, y: 1330, w: 1100, h: 84 };
 const DIAL = { x: 1400, y: 1470, w: 1100 };
 
 // ---------- 词元块 ----------
-type ChipOpts = { m: string; text: string; bg?: string; size?: number; cls?: string; delay?: number; sub?: string; minW?: number; mono?: boolean; ink?: string };
-function Chip({ m, text, bg, size = 34, cls, delay, sub, minW, mono, ink }: ChipOpts) {
+type ChipOpts = { m: string; text: string; bg?: string; size?: number; cls?: string; delay?: number; sub?: string; minW?: number; mono?: boolean; ink?: string; fx?: Record<string, string | number> };
+/** fx：进场属性（enter / enterMs / enterEase），写在带 motion 键的这一层上，FLIP 接管时就不会再叠一次进场。 */
+function Chip({ m, text, bg, size = 34, cls, delay, sub, minW, mono, ink, fx }: ChipOpts) {
   return (
-    <span motion={m} className={cls} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', animationDelay: delay ? `${delay}ms` : undefined }}>
+    <span motion={m} className={cls} {...fx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', animationDelay: delay ? `${delay}ms` : undefined }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: minW, height: size * 1.45, padding: bg ? `0 ${Math.round(size * 0.25)}px` : 0, borderRadius: 8, background: bg ?? 'transparent', color: ink ?? C.ink, fontSize: size, fontWeight: 800, fontFamily: mono ? 'var(--jp-font-mono)' : undefined, whiteSpace: 'nowrap', boxSizing: 'border-box' }}>{text}</span>
       {sub ? <span style={{ fontSize: 19, fontWeight: 800, color: C.accent, marginTop: 4 }}>{sub}</span> : null}
     </span>
   );
 }
-const Row = ({ gap, children, when }: { gap: number; children?: unknown; when?: CondExpr }) => (
-  <div when={when} style={{ display: 'flex', alignItems: 'flex-start', gap }}>{children as never}</div>
+const Row = ({ gap, children, when, stagger }: { gap: number; children?: unknown; when?: CondExpr; stagger?: number }) => (
+  <div when={when} enterStagger={stagger} style={{ display: 'flex', alignItems: 'flex-start', gap }}>{children as never}</div>
 );
+/** 逐字蹦出：每块从模糊里落定，按顺序错开（以前是 x-type + 手算 animationDelay）。 */
+const TYPE_FX = { enter: 'blur', enterMs: 260, enterEase: 'snappy' } as const;
+/** 新接上的一块：弹一下落定。 */
+const POP_FX = { enter: 'zoom', enterMs: 650, enterEase: 'spring' } as const;
 
 /** 你问的那句话：气泡里的三种排法（普通文字 / 切开 / 编号）。 */
 const PromptInBubble = () => (
@@ -52,7 +59,7 @@ const PromptInBubble = () => (
 /** 第一个回答：逐字出现 → 切开并标出概率 → 名字那一块翻成“南瓜”。 */
 const Answer = () => (
   <>
-    <Row gap={0} when={eq(ui.ans, 'plain')}>{ANSWER_TOKENS.map((t, i) => <Chip m={`a_${i}`} text={t} cls="x-type" delay={i * 160} />)}</Row>
+    <Row gap={0} when={eq(ui.ans, 'plain')} stagger={160}>{ANSWER_TOKENS.map((t, i) => <Chip m={`a_${i}`} text={t} fx={TYPE_FX} />)}</Row>
     <Row gap={10} when={eq(ui.ans, 'split')}>
       {ANSWER_TOKENS.map((t, i) => i === 4
         ? <>
@@ -64,9 +71,8 @@ const Answer = () => (
   </>
 );
 
-/** 纸带上的输出块：第 i 块在 out > i 时出现；快进时一次出现的几块错开 350ms。 */
+/** 纸带上的输出块：第 i 块在 out > i 时出现；快进时一次出现的几块由 tape_out 的 enterStagger 错开 350ms。 */
 const outShown = (i: number) => oneOf(ui.out, Array.from({ length: 9 - i }, (_, k) => i + 1 + k));
-const STAGGER: Record<number, number> = { 2: 350, 3: 700, 6: 350, 7: 700 };
 const TapeOut = () => (
   <>
     {[...ANSWER_TOKENS, '结束'].map((t, i) => i === 4
@@ -74,7 +80,7 @@ const TapeOut = () => (
           <span when={and(outShown(i), eq(ui.outFlip, false))}><Chip m="o_4" text={t} bg={tokenColor(11)} size={28} minW={70} /></span>
           <span when={and(outShown(i), eq(ui.outFlip, true))}><Chip m="o_4" text="南瓜" bg={C.accent} ink={C.bg} size={28} minW={70} cls="x-flip" /></span>
         </>
-      : <span when={outShown(i)}><Chip m={`o_${i}`} text={t} bg={i === 8 ? C.accent : tokenColor(7 + i)} ink={i === 8 ? C.bg : C.ink} size={28} minW={70} cls="x-pop" delay={STAGGER[i] ?? 0} /></span>)}
+      : <span when={outShown(i)}><Chip m={`o_${i}`} text={t} bg={i === 8 ? C.accent : tokenColor(7 + i)} ink={i === 8 ? C.bg : C.ink} size={28} minW={70} fx={POP_FX} /></span>)}
   </>
 );
 
@@ -100,12 +106,12 @@ export const STRIP_SETS: Record<string, BarSet> = {
 const SCALE = 60; // 条形图满刻度 60%
 function BarList({ k, set }: { k: string; set: BarSet }) {
   return (
-    <div when={eq(ui.bars, k)} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div when={eq(ui.bars, k)} enterStagger={90} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {set.cands.map((c, i) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, height: 52 }}>
           <span motion={i === 0 ? set.win : undefined} style={{ width: 132, textAlign: 'right', fontSize: 30, fontWeight: 850, color: set.pick === i ? C.accent : C.ink }}>{c.label}</span>
           <div style={{ position: 'relative', flex: 1, height: 52, borderRadius: 6, background: C.panel2 }}>
-            <div motion={`bar_${i}`} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, (c.p / SCALE) * 100)}%`, borderRadius: 6, background: set.pick === i ? C.accent : C.bar }} />
+            <div motion={`bar_${i}`} enter="grow" enterMs={900} enterEase="spring" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, (c.p / SCALE) * 100)}%`, borderRadius: 6, background: set.pick === i ? C.accent : C.bar }} />
           </div>
           <span style={{ width: 80, fontSize: 26, fontWeight: 800, color: set.pick === i ? C.accent : C.ink }}>{`${Math.round(c.p)}%`}</span>
         </div>
@@ -116,9 +122,9 @@ function BarList({ k, set }: { k: string; set: BarSet }) {
 function Strip({ k, set }: { k: string; set: BarSet }) {
   const sum = set.cands.reduce((a, c) => a + c.p, 0);
   return (
-    <div when={eq(ui.bars, k)} style={{ display: 'flex', width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden' }}>
+    <div when={eq(ui.bars, k)} enterStagger={60} style={{ display: 'flex', width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden' }}>
       {set.cands.map((c, i) => (
-        <div id={k === 'datesPick' ? `seg_${i}` : undefined} motion={`bar_${i}`} style={{ width: `${(c.p / sum) * 100}%`, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: set.pick === i ? C.accent : i === 5 ? '#39406a' : tokenColor(i), color: set.pick === i ? C.bg : C.ink, fontSize: 26, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+        <div id={k === 'datesPick' ? `seg_${i}` : undefined} motion={`bar_${i}`} enter="grow" enterEase="snappy" style={{ width: `${(c.p / sum) * 100}%`, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: set.pick === i ? C.accent : i === 5 ? '#39406a' : tokenColor(i), color: set.pick === i ? C.bg : C.ink, fontSize: 26, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden' }}>
           {(c.p / sum) * STRIP.w > 80 ? c.label : ''}
         </div>
       ))}
@@ -162,8 +168,8 @@ function Tag({ i }: { i: number }) {
   );
 }
 
-const Pill = ({ text, delay }: { text: string; delay: number }) => (
-  <span className="x-pop" style={{ display: 'inline-flex', alignItems: 'center', height: 50, padding: '0 20px', borderRadius: 30, background: C.accentSoft, border: `2px solid ${C.accent}`, color: C.accent, fontSize: 26, fontWeight: 850, animationDelay: `${delay}ms` }}>{text}</span>
+const Pill = ({ text }: { text: string }) => (
+  <span enter="zoom" enterMs={700} enterEase="bounce" style={{ display: 'inline-flex', alignItems: 'center', height: 50, padding: '0 20px', borderRadius: 30, background: C.accentSoft, border: `2px solid ${C.accent}`, color: C.accent, fontSize: 26, fontWeight: 850 }}>{text}</span>
 );
 const bubble = (user: boolean) => ({ padding: '14px 28px', borderRadius: 20, background: user ? C.blueSoft : C.panel2, border: `2px solid ${user ? 'rgba(91,140,255,.45)' : C.line}` });
 
@@ -180,11 +186,11 @@ export function WorldLayer() {
           <div when={ui.asked} id="q1_bubble" style={{ alignSelf: 'flex-end', ...bubble(true) }}><PromptInBubble /></div>
           <div when={neq(ui.ans, 'hidden')} id="a1_bubble" style={{ alignSelf: 'flex-start', ...bubble(false) }}><Answer /></div>
           <div when={ui.q2} className="x-rise" style={{ alignSelf: 'flex-end', ...bubble(true), fontSize: 34, fontWeight: 700 }}>{BIRTHDAY_Q}</div>
-          <div when={ui.q2} id="a2_bubble" style={{ alignSelf: 'flex-start', ...bubble(false), display: 'flex' }}>
-            {[...BIRTHDAY_A].map((ch, i) => <span className="x-type" style={{ fontSize: 34, fontWeight: 800, whiteSpace: 'pre', animationDelay: `${600 + i * 90}ms` }}>{ch}</span>)}
+          <div when={ui.q2} id="a2_bubble" style={{ alignSelf: 'flex-start', ...bubble(false) }}>
+            <Split text={BIRTHDAY_A} by="char" enter="blur" enterMs={220} enterEase="snappy" enterDelay={600} enterStagger={90} style={{ fontSize: 34, fontWeight: 800 }} />
           </div>
-          <div when={ui.tips} id="tips" style={{ display: 'flex', gap: 14 }}>
-            <Pill text="要出处" delay={0} /><Pill text="开联网" delay={150} /><Pill text="关键数字自己核对" delay={300} />
+          <div when={ui.tips} id="tips" enterStagger={150} style={{ display: 'flex', gap: 14 }}>
+            <Pill text="要出处" /><Pill text="开联网" /><Pill text="关键数字自己核对" />
           </div>
         </div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', padding: '0 40px 26px' }}>
@@ -196,9 +202,9 @@ export function WorldLayer() {
       {/* 纸带：模型读到的全部内容（问题的编号 + 它自己已经写出的块） */}
       <div id="tape" style={{ ...at(TAPE.x, TAPE.y), display: 'flex', gap: 8, alignItems: 'center', minWidth: 70, height: 60 }}>
         {PROMPT_IDS.map((t, i) => <span when={eq(ui.pAt, 'tape')}><Chip m={`p_${i}`} text={t} bg={tokenColor(i)} size={20} minW={70} mono /></span>)}
-        <span id="tape_out" style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 70, height: 60 }}><TapeOut /></span>
+        <span id="tape_out" enterStagger={350} style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 70, height: 60 }}><TapeOut /></span>
       </div>
-      <div when={ui.rail} className="x-fade" style={{ ...at(100, TAPE.y + 74, MACHINE.x - 100, 4), borderRadius: 2, background: `linear-gradient(90deg, rgba(91,140,255,0), ${C.blue})` }} />
+      <div when={ui.rail} enter="grow" enterMs={1100} style={{ ...at(100, TAPE.y + 74, MACHINE.x - 100, 4), borderRadius: 2, background: `linear-gradient(90deg, rgba(91,140,255,0), ${C.blue})` }} />
       <div when={ui.rail} className="x-fade" style={{ ...at(120, TAPE.y + 90), fontSize: 24, color: C.muted }}>模型每一圈都把这整条重新读一遍 →</div>
       <div when={notEmpty(ui.meter)} id="meter" style={{ ...at(780, TAPE.y + 84), display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <span style={{ fontSize: 46, fontWeight: 900, color: C.accent }}>{ui.meter}</span>
@@ -264,10 +270,10 @@ export function WorldLayer() {
       {/* 固定在屏幕上：章节标记、来源、片尾号召、封面 */}
       <div screen when={notEmpty(ui.hudN)} style={{ ...at(20, 16), display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px 8px 8px', borderRadius: 10, background: 'rgba(13,16,32,.88)', border: `1px solid ${C.line}` }}>
         <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: 2, color: C.bg, background: C.accent, borderRadius: 5, padding: '3px 10px' }}>{ui.hudN}</span>
-        <span style={{ fontSize: 20, fontWeight: 800 }}>{ui.hudT}</span>
+        <Split text={ui.hudT} enter="blur" enterMs={500} enterStagger={60} style={{ fontSize: 20, fontWeight: 800 }} />
       </div>
       <div screen style={{ ...at(28, 776, 1224), fontSize: 12, color: C.faint }}>{ui.src}</div>
-      <div screen when={ui.cta} className="x-rise" style={{ ...at(190, 650, 900, 104), borderRadius: 20, background: C.accent, color: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, boxShadow: '0 20px 60px rgba(0,0,0,.6)', pointerEvents: 'none' }}>
+      <div screen when={ui.cta} enter="rise" enterMs={800} enterEase="spring" style={{ ...at(190, 650, 900, 104), borderRadius: 20, background: C.accent, color: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, boxShadow: '0 20px 60px rgba(0,0,0,.6)', pointerEvents: 'none' }}>
         <span style={{ fontSize: 36, fontWeight: 900 }}>自己试一下</span>
         <span style={{ fontSize: 28, fontWeight: 750 }}>同一个问题问两遍，看名字变没变</span>
       </div>
