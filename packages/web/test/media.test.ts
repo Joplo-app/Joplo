@@ -190,3 +190,23 @@ it('natural one-shot ends release only that event and leave an overlapping share
  engine.update({b:{...cue,endAfterMs:2000}},assets,{...frame,elapsedMs:2000});
  expect(engine.status().tracks).toBe(0);engine.destroy();
 });
+it('does not resurrect completed cues on later estimated snapshots and restores them only after seek reset', async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const cue={plugin:'fake',resource:'r',offsetMs:0,volume:1,loop:false,fadeInMs:0,endAfterMs:1000};
+ engine.update({a:cue},assets,{...frame,elapsedMs:0,timeMs:0});await new Promise(r=>setTimeout(r,0));
+ engine.update({a:cue},assets,{...frame,elapsedMs:1500,timeMs:1500});expect(engine.status().tracks).toBe(0);
+ engine.update({a:{...cue,offsetMs:200,endAfterMs:800}},assets,{...frame,elapsedMs:0,timeMs:2000});
+ await new Promise(r=>setTimeout(r,0));expect(mock.factory).toHaveBeenCalledTimes(1);
+ engine.update({a:cue},assets,{...frame,identity:'seek-2',elapsedMs:0,timeMs:0});await new Promise(r=>setTimeout(r,0));
+ expect(mock.factory).toHaveBeenCalledTimes(2);engine.destroy();
+});
+it('new events of the same source never inherit the old event origin through spare migration',async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const cue={plugin:'fake',resource:'r',offsetMs:0,volume:1,loop:false,fadeInMs:0,endAfterMs:1000};
+ engine.update({a:cue},assets,{...frame,elapsedMs:0,timeMs:0});await new Promise(r=>setTimeout(r,0));
+ engine.update({b:cue},assets,{...frame,elapsedMs:0,timeMs:500});await new Promise(r=>setTimeout(r,0));
+ engine.update({b:cue},assets,{...frame,elapsedMs:100,timeMs:600});
+ expect(mock.factory).toHaveBeenCalledTimes(2);expect(mock.update.mock.lastCall?.[0].offsetMs).toBe(100);engine.destroy();
+});
