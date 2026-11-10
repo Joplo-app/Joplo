@@ -77,7 +77,8 @@ Success: check reports 0 errors; outline --work explainer shows the intended sli
 - npx joplo resources --dry-run lists missing persistent resources and estimated credits. Interactive resources confirms each item; unattended generation requires --allow-spend. check/build/render remain offline for these artifacts. Missing or corrupt output gives diagnostics, not an implicit paid retry. Keep large GLB files below 5 MB where possible and inspect MODEL_SIZE warnings before sharing.
 
 ## Structure and files
-- joplo.config.ts exports config({ name, plugins, layout?, home?, theme?, autoFocus?, voice?, locales? }). plugins is explicit; installation alone does not enable a plugin.
+- joplo.config.ts exports config({ name, plugins, layout?, home?, theme?, autoFocus?, voice?, locales?, watch? }). plugins is explicit; installation alone does not enable a plugin.
+- Dev watch exclusions: config({ watch: { ignore: ['exports/frames', '.coord'] } }) excludes project-relative output files/directories and their descendants from recompilation and review invalidation. Paths are literal, not globs; do not exclude real source or referenced assets. Existing .joplo/dist/node_modules/.git exclusions remain. Restart the dev board after changing this configuration; each project has its own exclusions. Ordinary image assets still trigger updates.
 - layouts/<id>.tsx exports layout(tree). Outlet places the current page; Slot declares a named insertion point. Those are engine composition primitives.
 - routes/**/page.tsx exports page({ title, layout?, viewport? }, tree). The directory determines its route. Set layout: false to opt out of the shared layout.
 - works/<key>.tsx (or .ts) exports work({ title, summary, scenarios, stage? | layers?, viewport?, on?, routes?, audience?, roles?, state?, free?, draft?, order? }). The filename is the entry key and must not collide with a feature folder.
@@ -143,4 +144,4 @@ For a long story use chapter() to inherit the previous ending by default; from i
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.6.2 sha256:db7742e8bd4e286b421e4ef1b23a237feab044cb7f435486dd3a37db62aa30af -->
+<!-- joplo-skill 0.6.2 sha256:2f14aedd8ce96bb41b21a04109fc7678327c061f7790c1f602e6b591e10e8780 -->

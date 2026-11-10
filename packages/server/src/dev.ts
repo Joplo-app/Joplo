@@ -32,7 +32,7 @@ import { CLOUD_EVENT, CloudHub, type CloudBridge } from './cloud.ts';
 import { Registry, clearServerInfo, joploHome, normalizeSettings, pidAlive, projectIdOf, readServerInfo, readSettings, writeServerInfo, writeSettings, type BoardSettings, type ProjectRecord } from './home.ts';
 import { compileProject, invalidateProjectModules } from './project.ts';
 import { SelectionBody, readSelection, resolveSelection, writeSelection } from './selection.ts';
-import { IGNORED_DIRS, cssSourcePlugin, isProjectSource, joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
+import { cssSourcePlugin, isProjectSource, joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
 import type { DistWeb, WebAssets } from './web-assets.ts';
 
 /** 文件绝对路径 → Vite 的 /@fs/ 地址。 */
@@ -200,6 +200,7 @@ export type ProjectSlot = {
   ready: Promise<void>;
   payload: DevPayload;
   runtimeModules: Map<string,string>;
+  watchIgnore: string[] | null;
   compiling: boolean;
   closed: boolean;
   running: Promise<void> | null;
@@ -270,7 +271,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
   const reviewHub = new LocalReviewHub(baseUrl);
 
   const activeDirs = () => [...slots.values()].filter((s) => !s.closed).map((s) => s.dir);
-  const slotOfFile = (file: string) => [...slots.values()].find((s) => !s.closed && isProjectSource(s.dir, file)) ?? null;
+  const slotOfFile = (file: string) => [...slots.values()].find((s) => !s.closed && isProjectSource(s.dir, file, s.watchIgnore ?? [])) ?? null;
   const recordOf = (id: string) => registry.list().find((r) => projectIdOf(r.dir) === id) ?? null;
 
   const summaries = (): ProjectSummary[] =>
@@ -321,6 +322,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     const loader = slot.loader!;
     invalidateProjectModules(loader, slot.dir);
     const out = await compileProject(loader, slot.dir, 'dev');
+    if (out.project && slot.watchIgnore === null) slot.watchIgnore = out.watchIgnore ?? [];
     if (out.resources) localResources.set(slot.id, out.resources);
     else localResources.delete(slot.id);
     resourceWarnings.set(slot.id, new Map());
@@ -329,6 +331,8 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       if (out.resources) {
         const resources = await inlineResources(out.project, out.resources.requests.filter(r => referencedResources(out.project).has(r.id)), out.resources.host);
         out.project.mediaAssets = {...out.project.mediaAssets, ...resources.assets};
+        out.project.mediaInfo = resources.audioInfo;
+        out.diagnostics.push(...resources.diagnostics);
       }
       out.project = binaryAssets(out.project, {directory:path.join(slot.dir,'.joplo','binary'),prefix:`/__joplo/p/${encodeURIComponent(slot.id)}/binary/`,diagnostics:out.diagnostics});
     }
@@ -397,6 +401,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       ready: Promise.resolve(),
       payload: { version: 0, ok: false, project: null, diagnostics: [], home: null },
       runtimeModules: new Map(),
+      watchIgnore: null,
       compiling: true,
       closed: false,
       running: null,
@@ -406,8 +411,8 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     slots.set(id, slot);
     slot.ready = (async () => {
       await startLoader(slot);
-      if (watch && server) server.watcher.add(dir);
       await run(slot);
+      if (watch && server) server.watcher.add(dir);
     })().catch((e) => log(`[joplo] Project startup failed: ${e instanceof Error ? e.message : String(e)}`));
     invalidateCss();
     return slot;
@@ -755,7 +760,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
       strictPort: true,
       open: false,
       ...(web.mode === 'dist' ? { fs: { allow: [web.webDir] } } : {}),
-      ...(watch ? { watch: { ignored: (p: string) => { const s = slotOfFile(p) ?? [...slots.values()].find((x) => p.startsWith(x.dir + path.sep)); return !!s && IGNORED_DIRS.includes(p.slice(s.dir.length + 1).split(path.sep)[0] ?? ''); } } } : { watch: null }),
+      ...(watch ? { watch: { ignored: (p: string) => { const s = slotOfFile(p) ?? [...slots.values()].find((x) => p.startsWith(x.dir + path.sep)); return !!s && p !== s.dir && !isProjectSource(s.dir, p, s.watchIgnore ?? []); } } } : { watch: null }),
     },
   });
 

@@ -20,6 +20,10 @@ export async function checkWithProject(dir: string, workId?: string): Promise<Ch
   const root = await realpath(resolve(dir));
   const tsconfig = join(root, 'tsconfig.json');
   const loaded = await loadAuthoring(root, p => tsImport(p, { parentURL: import.meta.url, tsconfig: existsSync(tsconfig) ? tsconfig : false }));
+  if (loaded.authoring?.config.watch !== undefined) {
+    const { watchConfigDiagnostics } = await import('@joplo-app/server');
+    loaded.diagnostics.push(...watchConfigDiagnostics(loaded.authoring.config.watch, loaded.authoring.config.source));
+  }
   // 与看板同一套布局（D69）：布局失败的图表在 check 里报 DIAGRAM_LAYOUT_FAILED
   const requests: ResourceRequest[] = [];
   let compiled = loaded.authoring ? compile(loaded.authoring, 'dev', { onResource:r=>requests.push(r) }) : null;

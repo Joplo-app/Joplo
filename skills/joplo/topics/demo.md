@@ -37,6 +37,7 @@ Start playback before testing stage gestures: covers and transition cards intent
 - A step's hold controls dwell; narration may extend waiting. The engine estimates spoken time and sequences chapters. Keep a long story in smaller scenarios with from, retaining the previous final state.
 - Transition cards mark a real opening/ending/time shift. Most information should change on the view, not arrive as a text deck. Read story and the installed visual plugins' recipes.
 - Media is provided by an explicitly configured plugin. A viewer gesture unlocks sound; pause/resume/speed share the clock and narration ducks background audio. Static frames stay silent. Read the plugin skill for resources and production limits.
+- Audio resource failures are exposed by the playback host; video recording fails instead of silently delivering missing audio. MEDIA_DECODE_BUDGET warns when simultaneous resources exceed the shared PCM budget at 48 kHz; MEDIA_DECODE_HEADROOM warns about 96 kHz devices. Check can estimate from inspected durations, while build uses decoded metadata when available; unknown resources and other device rates still need playback verification. Read the media plugin guide for concrete authoring remedies.
 - Media continuity is engine behavior for every media plugin: a track keeps playing across steps on the engine clock (it only re-seeks on a jump, reset or non-relay chapter change); playing the same resource again continues it; playing a different one with fadeMs crossfades (old out, new in, no silence); a continuing chapter starts with the music its previous chapter ended with. Explicit marker seeks reposition that track (even at 0ms) and start its fade from the marker, while ordinary steps/relay chapters preserve its driver. Overlapping outgoing/incoming audio both count toward the decoded-memory budget; the host applies fade/volume/narration ducking once. Video chain export records that same mix; film strips skip audio.
 
 ## Make it play like a film, not slides (Required for video-like pieces)
@@ -83,4 +84,4 @@ A project theme is themes/<name>.css selected by config({ theme: '<name>' }). De
 - Custom themes live in themes/<name>.css and define --jp-* tokens; do not change authored data to recolor a view. For component-specific layout, motion and visual variables, read its installed plugin skill.
 
 Related topics: authoring, plugins, focus, review, publish
-<!-- joplo-skill 0.6.2 sha256:2a17a4465255cf4cba7d3ae7b3a133cc32530f30a0114665057dd8f131837a9e -->
+<!-- joplo-skill 0.6.2 sha256:e96a7486f038faf19e402fe9cbe5e6f47c85aa947a59b0e6c61f3268030378de -->

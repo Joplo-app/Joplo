@@ -388,7 +388,7 @@ function RecordStage({ project, projectId, content, scenarioId, chain, captureAu
       progress: {
         step: snap.state?.position ?? 0,
         done: started && !snap.playing && !snap.upNext && (total === 0 || !!snap.state?.completed || (snap.state?.position ?? 0) >= total || !!snap.playbackError),
-        error: snap.playbackError ? translate(snap.playbackError, i18n) : null,
+        get error() { return snap.playbackError ? translate(snap.playbackError, i18n) : media.current?.status().error ?? null; },
         scenarioId: snap.scenarioId, position: snap.state?.position ?? 0, activeStep: snap.activeStep,
       },
     };

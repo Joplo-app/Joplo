@@ -22,3 +22,5 @@ export { generateResources } from './resources-run.ts';
 export { LocalResources } from './local-resources.ts';
 
 export { inspectResources, mediaDiagnostics } from './media-check.ts';
+
+export { watchConfigDiagnostics } from './watch-config.ts';

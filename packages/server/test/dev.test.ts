@@ -267,3 +267,40 @@ describe('项目目录之外的共享 TSX（#61）', () => {
     }
   }, 60_000);
 });
+
+it('watch.ignore prevents generated frames from recompiling or invalidating review; other projects and assets still update', async () => {
+  const dir = copy(), second = copy();
+  const config = path.join(dir, 'joplo.config.ts');
+  fs.writeFileSync(config, fs.readFileSync(config,'utf8').replace('name:', "watch: { ignore: ['exports/frames', '.coord'] }, name:"));
+  fs.mkdirSync(path.join(dir,'exports/frames'),{recursive:true});
+  fs.mkdirSync(path.join(dir,'.coord'),{recursive:true});
+  const h = await createDev({projectDir:dir,port:0,log:()=>{}});
+  try {
+    const other = h.hub.addProject(second).slot!; await other.ready;
+    await new Promise(r=>setTimeout(r,250));
+    const version = h.payload().version, otherVersion = other.payload.version;
+    const before = await req(h,{path:`/__joplo/p/${h.projectId}/review?workId=invite.a-modal`,headers:{'x-joplo-token':h.token}});
+    expect(before.status).toBe(200);
+    for (let batch=0;batch<10;batch++) {
+      for (let i=0;i<30;i++) fs.writeFileSync(path.join(dir,'exports/frames',`frame-${batch*30+i}.jpg`),'frame');
+      fs.writeFileSync(path.join(dir,'.coord','status.json'),JSON.stringify({batch}));
+      await new Promise(r=>setTimeout(r,30));
+    }
+    await new Promise(r=>setTimeout(r,300));
+    expect(h.payload().version).toBe(version);
+    const after = await req(h,{path:`/__joplo/p/${h.projectId}/review?workId=invite.a-modal`,headers:{'x-joplo-token':h.token}});
+    expect(after.status).toBe(200);
+    expect(after.body).toEqual(before.body);
+    fs.mkdirSync(path.join(second,'exports/frames'),{recursive:true});
+    fs.writeFileSync(path.join(second,'exports/frames','normal.jpg'),'asset');
+    await until(()=>other.payload.version>otherVersion);
+    expect(h.payload().version).toBe(version);
+    fs.mkdirSync(path.join(dir,'assets'),{recursive:true});
+    fs.writeFileSync(path.join(dir,'assets','normal.jpg'),'asset');
+    await until(()=>h.payload().version>version);
+    const updated=h.payload().version;
+    const source=path.join(dir,'routes/members/page.tsx');
+    fs.appendFileSync(source,'\n// author edit\n');
+    await until(()=>h.payload().version>updated);
+  } finally {await h.close();fs.rmSync(dir,{recursive:true,force:true});fs.rmSync(second,{recursive:true,force:true});}
+},60000);
