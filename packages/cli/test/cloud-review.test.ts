@@ -83,7 +83,7 @@ async function cli(args: string[], env: NodeJS.ProcessEnv = {}, interactive = fa
   let stdout = '', stderr = '';
   const code = await runCli(args, { stdout: s => stdout += s, stderr: s => stderr += s, cliVersion: '0.1.3',
     loadServer: async () => ({ buildSite: build, startDev: async () => ({ url: 'http://localhost:4790', attached: true }) }),
-    cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base, ...env }, interactive, openBrowser: browser, sleep: async () => undefined, now: () => 0, check: checkProject } });
+    cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base, ...env }, interactive, sharedVoice: async () => undefined, openBrowser: browser, sleep: async () => undefined, now: () => 0, check: checkProject } });
   for (const secret of [token, apiKey]) expect(stdout + stderr).not.toContain(secret);
   return { code, stdout, stderr, json: () => JSON.parse(stdout) };
 }

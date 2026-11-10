@@ -292,16 +292,21 @@ type SharedVoice = { index: NonNullable<Project['voiceIndex']>; fetch: (file: st
 const MAX_SHARED_CLIP = 20 * 1024 * 1024;
 /**
  * 读上一次发布的分享里的朗读音频（D84）：公开分享页内联的 voiceIndex（片段键 → voice/<sha256>.<ext>），以及按相对路径下载文件。
- * 只接受 https（本机测试服务可以是 http://127.0.0.1）；任何失败都当作没有，不影响分享。下载的文件由服务端按 sha256 校验后才收下。
+ * 只接受 https（本机测试服务可以是 http://127.0.0.1）。无法读取旧页面时拒绝覆盖，避免静默丢失音频；不要求旧 IR 符合当前项目 schema。
  */
 export async function previousShareVoice(url: string, fetchImpl: typeof fetch = fetch): Promise<SharedVoice | undefined> {
   let base: URL;
   try { base = new URL(url); } catch { return undefined; }
   if (base.protocol !== 'https:' && !(base.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(base.hostname))) return undefined;
   try {
-    const res = await fetchImpl(base, { redirect: 'error', signal: AbortSignal.timeout(10_000) });
-    if (!res.ok) return undefined;
-    const index = (inlineProject(await res.text()) as { voiceIndex?: unknown } | null)?.voiceIndex as SharedVoice['index'] | undefined;
+    const res = await fetchImpl(base, { headers: { Accept: 'text/html' }, redirect: 'error', signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error('Previous share unavailable');
+    const html = await res.text();
+    const match = /<script type="application\/json" id="joplo-ir">([\s\S]*?)<\/script>/.exec(html);
+    if (!match) throw new Error('Previous share did not return playback HTML');
+    const payload = JSON.parse(match[1]!);
+    if (!payload?.project || typeof payload.project !== 'object') throw new Error('Invalid previous playback data');
+    const index = payload.project.voiceIndex as SharedVoice['index'] | undefined;
     if (!index || typeof index !== 'object' || !index.clips || !Object.keys(index.clips).length) return undefined;
     return {
       index,
@@ -313,7 +318,9 @@ export async function previousShareVoice(url: string, fetchImpl: typeof fetch = 
         return body.byteLength > MAX_SHARED_CLIP ? null : body;
       },
     };
-  } catch { return undefined; }
+  } catch {
+    throw new JoploError('EXPORT_FAILED', 'Cannot verify narration from the previous share. Publication stopped to preserve existing audio. Check access to the original link and retry; do not regenerate TTS just to recover published clips.');
+  }
 }
 
 /** 检查响应值，不把 passwordProtected 这样的固定协议键误判为密码回显。 */
