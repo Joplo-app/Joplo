@@ -73,11 +73,11 @@ export const authorCode = (): JNode => (
   <Stack gap={4}>
     <Text fw={600}>作者怎么写</Text>
     <Code block>{
-      'option({\n' +
+      "work({\n  title: 'A · 混合执行', summary: '客户端与后端一起演示',\n" +
       '  layers: {\n' +
-      "    client:  layer('客户端视角', ['client']),   // 这一层框住哪些元素\n" +
-      "    backend: layer('后端流转', ['arch']),\n" +
-      '  },                                          // 另有自动的“全景”层\n' +
+      "    client:  layer('客户端视角', <ClientView />), // 独立画面树\n" +
+      "    backend: layer('后端流转', <BackendView />),\n" +
+      '  },                                          // 全景也由作者显式声明\n' +
       '  scenarios: {\n' +
       "    happy: flow('整理发票')\n" +
       "      .click('app_send', shot('msg_user'), shot('app', 'biz'))   // 一步可以给两层各定一个镜头\n" +

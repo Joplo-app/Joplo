@@ -18,7 +18,7 @@ npx joplo dev ./demo                                      # prints the board URL
 npx joplo feedback watch ./demo --local --follow --json   # keep running in its own shell
 ```
 - --follow streams every option of the project and attaches to the new round each source edit opens; approving one option does not stop it. It exits 1 when the board stops (restart dev, then rerun it) and 130 on Ctrl+C.
-- stdout carries one JSON event per line (feedback, approved, closed) with eventId, sessionId, optionId, revision, seq and context; stderr is status, not feedback. Buffer partial lines and deduplicate by eventId: a restart replays the open rounds.
+- stdout carries one JSON event per line (feedback, approved, closed) with eventId, sessionId, workId, revision, seq and context; stderr is status, not feedback. Buffer partial lines and deduplicate by eventId: a restart replays the open rounds.
 - Start the follower before giving the reviewer the URL dev printed (do not assume port 4790). Point them to the native draggable feedback icon, not a button inside the demo; if they want to operate the UI themselves, only give the link.
 - While they test, read the shell output with short tool waits (about 1–5 seconds). A background shell alone does not wake an idle agent: stay in a receive loop or use the host's notifications. Do not end your response claiming you are still listening unless the host can resume you; if you must yield, say so, and drain pending output before unrelated work.
 - On feedback, acknowledge the actual text and page/step right away in the reviewer's language, then keep listening. A delivery test is not a request to implement; if implementation was already requested, acknowledge first, then make the scoped change without asking again.
@@ -26,7 +26,7 @@ npx joplo feedback watch ./demo --local --follow --json   # keep running in its 
 
 Example stdout line and an immediate reply:
 ```json
-{"source":"local","type":"feedback","eventId":"rv_…:1","sessionId":"rv_…","optionId":"invite.a-modal","seq":1,"body":"Make the invite button clearer","context":{"route":"/members","scenarioId":"invite.a-modal.happy","position":2}}
+{"source":"local","type":"feedback","eventId":"rv_…:1","sessionId":"rv_…","workId":"invite.a-modal","seq":1,"body":"Make the invite button clearer","context":{"route":"/members","scenarioId":"invite.a-modal.happy","position":2}}
 ```
 Reply: Received your feedback on /members, step 2: "Make the invite button clearer." Then keep listening, or make that change if the user already asked you to apply feedback.
 
@@ -35,7 +35,7 @@ Reply: Received your feedback on /members, step 2: "Make the invite button clear
 npx joplo feedback list ./demo --local --json
 npx joplo feedback watch ./demo --local --session <id-from-list> [--after <last-handled-seq>] --json
 ```
-- Use it to wait for one option version's approval (exit 0 only on approval, 1 if the round closes) or to resume a round from a cursor. Match projectDir, optionId, instanceId and revision from list; if several match, choose explicitly instead of taking the newest.
+- Use it to wait for one option version's approval (exit 0 only on approval, 1 if the round closes) or to resume a round from a cursor. Match projectDir, workId, instanceId and revision from list; if several match, choose explicitly instead of taking the newest.
 - Source edits close that round: list again and attach to the new one with its own cursor. Never reuse an old cursor on a new session or delete review records to reset a round.
 
 ## Share review: poll, do not pretend it is a lossless stream
@@ -49,7 +49,7 @@ npx joplo feedback watch --share <share-id> --work <feature.option> --interval 1
 
 ## Apply conclusions when requested
 - Locate the code with feedback.context.source, scenarioId, position, stepId, and element, and check the source is still that revision. Missing Cloud route/source fields are unknown, not permission to guess. For an explicit Alt-click selection use npx joplo selection.
-- pick: set pick in features/<feature>/feature.ts to the option file name (targetId without the "<feature>." prefix). A local approved names its optionId; apply the pick only within the requested task.
+- pick: set pick in features/<feature>/feature.ts to the option file name (targetId without the "<feature>." prefix). A local approved names its workId; apply the pick only within the requested task.
 - confirm_rule: set that rule to origin: 'user', status: 'confirmed'.
 - reject_rule: rewrite the rule as the note says. If the alternative is unspecified, set status: 'conflict' and ask the user; do not guess.
 - answer: delete the question and add a rule stating the answer with origin: 'user', status: 'confirmed'.
@@ -64,4 +64,4 @@ npx joplo feedback watch --share <share-id> --work <feature.option> --interval 1
 - AUTH_REQUIRED / AUTH_EXPIRED (exit 3): tell the user how to run npx joplo login; do not log in/out or switch accounts without their instruction. Permission, quota, and missing-share errors are not approvals.
 - If a command is unavailable, check the project's installed Joplo version and its skill output. Do not silently switch to another instance or use another project's credentials.
 - .joplo runtime state stays local, and local feedback is never uploaded just because a Share exists. Details: npx joplo skill review; source write-back and publishing: npx joplo skill publish.
-<!-- joplo-skill 0.4.1 sha256:cfa130b54ae2ee684a0376f1792fb155049f559d02ec9944db86785b6e962b84 -->
+<!-- joplo-skill 0.5.0 sha256:2c43f61d46c45ac4e48554c5b5c3932507a89b0af99feb3772b1c9f01dc48352 -->

@@ -19,12 +19,13 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - The last line totals error, warning, info. Run check again after fixing.
 
 ## Common codes → fixes
-- WORK_INVALID (error): default export work({...}); supply nonempty title/summary, a stage/layers/on/routes view and scenarios object containing only flow()/chapter() entries.
+- WORK_INVALID (error): read the specific reason: default export must be work({...}); title and summary must each be nonempty; scenarios must be an object of flow()/chapter() entries; stage must be a JSX element; layers must be a layer-entry object; stage and layers cannot coexist. A project with no pages needs stage, layers, on or routes. Multiple invalid fields produce separate reasons. Standalone order must be finite; an invalid value has a work ref. Match the diagnostic code and ref, not an old full message.
+- PROJECT_MODULE_CONFIG (error): when loading a project without tsconfig.json fails, add jsx: "react-jsxdev" and jsxImportSource: "@joplo-app/kit" plus package.json type: module. The message ends with underlying error: inspect it for a missing dependency or an author-code exception as well as JSX/module setup; fix that cause and rerun. A bare project that loads successfully is accepted.
 - WORK_ID_CONFLICT (error): rename the work file or feature folder so their entry keys differ.
 - WORK_SLICES_MIXED (error): use all chapter() for a linear work or all flow() for independent slices, including options under a feature.
 - WORK_FEATURE_ONLY (error): standalone works cannot declare focus/tradeoffs/coverage/rules/questions, slice cases or step uses(). Remove those fields or attach the work to a feature for design review.
 - WORK_STANDALONE_ONLY (error): a feature-attached work cannot declare audience/roles/draft/order. Put shared roles and ordering on feature(); audience/draft belong to a standalone work.
-- OPTIONS_DIR_RENAMED (error): rename the legacy alternative directory to features/<f>/works/ and use work({ title, summary }); the old builder and directory have no aliases.
+- OPTIONS_DIR_RENAMED (error): "Rename this directory to works/ and migrate the authoring call to work({ title, summary })". Keep the feature-attached file at features/<f>/works/<key>.tsx; there are no legacy builder or directory aliases.
 - FROM_UNKNOWN (error): copy an existing slice key from the diagnostic's available-slices list; omit from for normal chapter continuation, or use from: null to restart.
 - WORK_EMPTY (info): add the first entry under scenarios, for example opening: chapter('Opening').system('Begin', narrate('Hello')). An empty work remains visible locally but is skipped in publish/review; explicit build --work selection fails.
 - WORK_DRAFT_SKIPPED (info): a draft was excluded from publish/review; remove draft: true only when it is ready. Explicit --work selection of a draft fails instead of publishing empty content.
@@ -114,4 +115,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.5.0 sha256:0d2176a54b401d6874814896b3d2b45240f30f4a397f7c97157c6015a32dae84 -->
+<!-- joplo-skill 0.5.0 sha256:7aa2ad2e395de1d9f497f2b086a2a82209047fb431c6aa0693179fecd0c65549 -->

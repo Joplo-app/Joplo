@@ -69,11 +69,11 @@ Coverage status values: `expressed`, `undecided`, `missing`, `not_applicable`, `
 - work.coverage: { case_key: undecided('Why this is undecided') }.
 - missing('What is missing'): leave the gap explicit; do not pretend it is `expressed`.
 - notApplicable('Why not applicable') / excluded('Why excluded'): require a nonempty reason.
-- Explicit declarations override inference. Use scenarios for cases that need a demo. Author work.coverage is stored in IR v3 as feature.alternatives[workId].coverage; work focus becomes decisionFocus in that same review record, beside tradeoffs.
+- Explicit declarations override inference. Use scenarios for cases that need a demo. Author work.coverage is stored in dev IR v3 as feature.alternatives[workId].coverage; work focus becomes decisionFocus in that same review record, beside tradeoffs. publish/review IR keeps the work-id keys but empties each record to { decisionFocus: '', tradeoffs: [], coverage: {} }; generate the private review manifest from dev IR.
 - Do not invent business rules for full coverage. Keep asking about undecided behavior.
 
 See authoring for flow and rule syntax; check for locating coverage diagnostics.
 No mobile example yet; create a separate demo when mobile is needed (D44).
 
 Related topics: story, authoring, check
-<!-- joplo-skill 0.5.0 sha256:de6af6255bebc0f91467f3db278b78478389b8c1879a5f29f415baabb6e82a06 -->
+<!-- joplo-skill 0.5.0 sha256:6ffc4ff9045550ae956605a7ef7316bc059eb668024f09de41dd8594b44b4f17 -->

@@ -718,3 +718,5 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
 - **线上格式影响**：IR、outline JSON、评审清单、反馈记录与看板 / 服务端接口统一为 works、workId、entryIds、alternatives。人的界面仍叫“方案”，i18n 键可保留。joplo-cloud 由独立任务跟随升级依赖并严格读 v3，Agent 接口、作品集、评审 / 投票与反馈一起迁移；数据库可保留旧列名，只在边界映射，不做破坏性迁移。v2 分享的 Agent 接口继续返回现有“不支持”错误，上传 / 播放不受影响；本文不表示云端已经上线验证。
 - **保持的边界**：条目投影仍是 UI / CLI 读结构的入口，不按拆 id 推归属；角色经 rolesOf 统一解析；章节接续只在编译期解析一次；发布白名单保留 / 去除的信息不变，草稿与空作品仍不发布。功能下只有一件作品、无 pick、没有功能 / 独立作品等边界不依赖假容器。
 - **仍然遗留**：branching、观众状态跨切片保留，以及是否提供独立作品起步模板。云端升级是明确的下游任务，不再把 IR 统一与创作入口合并记为遗留。
+
+- **D103 实现核对**：Feature.alternatives 在 dev IR 有评审值，publish / review IR 保留作品键但每项归空（decisionFocus 为空串、tradeoffs 为空数组、coverage 为空对象）；私有评审清单从 dev IR 生成。清单版本单独为 v2，顶层 works 承载独立作品元信息，功能下作品仍在 features[].works。范围错误的 details.scope 按 entry / scenario 区分；结构查询统一使用 rolesOf、sliceKey、visibleRoutes、featuresOf 与条目投影。

@@ -52,17 +52,17 @@ function distance(a:string,b:string):number{const row=Array.from({length:b.lengt
 const CONTENT:Record<SkillTopic,string>={
   authoring: `# Joplo authoring: authoring
 
-Joplo compiles trusted TS/TSX into deterministic scenes and schedules their playback. It does not supply a component library or execute real backend requests. Use components from the project's explicitly installed plugins; read their skills before writing view trees.
+Joplo turns trusted TS/TSX into playable, interactive shows; use them to compare feature options, explain how something runs, or show what happened. Compilation produces deterministic scenes and schedules their playback. It does not supply a component library or execute real backend requests. Use components from the project's explicitly installed plugins; read their skills before writing view trees.
 
 ## Works → slices → steps
 A project is a portfolio of works. A work combines its stage, initial state and slices; each slice is a sequence of steps. Every work has a cover and appears on the home page. Capabilities compose:
 - Feature review groups alternative works (options), shared cases, coverage, rules, questions and a pick. Feature is a review layer over works: an alternative work is called an option in the UI. Use feature() + work() when comparing solutions or making design decisions; work() is the only work entry point.
-- Sequencing is independent for flow() slices, linear for chapter() slices. Use work() + chapter() for an audience-facing explainer, tutorial, news piece or product film. Standalone and feature-attached works can coexist in one project; chapter() works in either location.
+- Sequencing is independent for flow() slices, linear for chapter() slices. Use work() + chapter() for a standalone explainer, tutorial, news show or product history. Standalone and feature-attached works can coexist in one project; chapter() works in either location.
 - draft: true on a standalone work keeps it available locally and excludes it from build/share. For a remake create another work and mark the old work as draft.
 - Publish one entry with npx joplo build --work <key> or npx joplo share --work <key> plus the explicitly authorized publication flags. A standalone work needs no pick; a feature key selects its picked option (all options in the review version).
 
 ### Minimal standalone work
-buildStage() is your local view tree made from explicitly enabled plugin elements; it displays the work state at $.ui.status. Read the installed plugin skill for its components. Keep package.json type: module and the starter's JSX tsconfig (jsx: react-jsx, jsxImportSource: @joplo-app/kit). stage/layers needs no routes/ directory. To reuse product pages, explicitly supply on or routes.
+buildStage() is your local view tree made from explicitly enabled plugin elements; it displays the work state at $.ui.status. Read the installed plugin skill for its components. Keep package.json type: module and the starter's JSX tsconfig (jsx: react-jsxdev, jsxImportSource: @joplo-app/kit). stage/layers needs no routes/ directory. To reuse product pages, explicitly supply on or routes.
 \`\`\`tsx
 // works/explainer.tsx
 import { $, work, chapter, narrate, set } from '@joplo-app/kit';
@@ -81,6 +81,7 @@ export default work({
 chapter() continues the previous chapter by declaration order; the first starts from the initial state. Only exceptions use from: null (restart) or from: 'sliceKey' (another predecessor). Do not mix flow() and chapter() in one work, write cases/uses() in standalone works, or number titles manually: the UI and outline number chapters automatically. Empty scenarios: {} is a valid local work in progress; it is skipped in publish/review, and explicit build --work selection fails until a slice is added.
 
 ### Migrating an existing piece
+- A compiler migration does not update code blocks or paths inside strings: search displayed file trees, terminal examples and source snippets too. Keep each example on the current work API, identify historical reconstructions explicitly, and update locale keys with changed source text. Compare check diagnostic counts before and after; a text-only update should not add missing/stale translations.
 - Before changing files, freeze the old dev IR. Compare every step, compiled plugin snapshot and every stateAt position with the migrated work. Renaming flow() to chapter() alone does not prove continuous state or audiovisual equivalence; review motion and sound as well.
 - Preserve independent starts: if an old chapter began from the initial state, give the new chapter from: null. Otherwise chapter two onward inherits ui/data/inputs and music from its predecessor. Keep default continuation only where the story really continues.
 - Move feature.roles audience descriptions into work.audience; preserve actual role() speakers. Keep say() role keys and config.voice.roles aligned so dialogue still uses the intended voices.
@@ -90,7 +91,7 @@ chapter() continues the previous chapter by declaration order; the first starts 
 - Verify draft exclusion in the built files: search the complete artifact text for a full sentence unique to the old draft, chosen so it is not a substring of current copy. Absence of a card in the UI alone does not prove the old content stayed out of publication.
 
 ### Minimal feature review
-Use the same cases to compare alternative designs; each alternative is a work in a separate file. buildStage() is the same project helper described above. This minimal feature has one work; add another only for a real alternative. An omitted pick compiles to null: local review still works, ordinary publication omits that feature.
+Use the same cases to compare alternative designs; each alternative is a work in a separate file. buildStage() is the same project helper described above. This minimal feature has one work; add another only for a real alternative. An omitted pick or explicit pick: null compiles to null: local review still works, ordinary publication omits that feature.
 \`\`\`ts
 // features/queue/feature.ts
 import { feature } from '@joplo-app/kit';
@@ -109,7 +110,7 @@ export default work({ title: 'A · Visible queue', summary: 'Explain the wait',
     .system('Queued', set($.ui.status, 'Queued'), narrate('The request is waiting.')) },
 });
 \`\`\`
-Success: check reports 0 errors; outline --work explainer shows the intended slices and estimated duration, with automatic chapter numbers. Inspect each chapter with render --scenario-id <id-from-outline> --sheet --out board.png; review motion using --film --chain --out film.png and actual playback before claiming it looks right. Standalone slice ids have two segments (explainer.arrival); feature-attached slice ids have three (queue.a.waiting). Copy ids from outline --format json for rendering, deep links and feedback context. JSON uses works and workId; human-facing feature alternatives are still called options. For the standalone example: render --scenario-id explainer.arrival; the short scenario link is #/s/explainer.arrival; feedback list --local --work explainer --json filters by the work key, and feedback context.scenarioId uses explainer.arrival.
+Success: check reports 0 errors; outline --work explainer shows the intended slices and estimated duration, with automatic chapter numbers. Inspect each chapter with render --scenario-id <id-from-outline> --sheet --out board.png; review motion using --film --chain --out film.png and actual playback before claiming it looks right. Standalone slice ids have two segments (explainer.arrival); feature-attached slice ids have three (queue.a.waiting). Copy ids from outline --format json for rendering, deep links and feedback context. Outline JSON groups works under entries[].works; feedback events identify them with workId. Human-facing feature alternatives are still called options. For the standalone example: render --scenario-id explainer.arrival; the short scenario link is #/s/explainer.arrival; feedback list --local --work explainer --json filters by the work key, and feedback context.scenarioId uses explainer.arrival.
 
 ## Start from the project
 1. Run npx joplo init <dir>, install its dependencies, then npx joplo skill install. In the Joplo source monorepo, initialize with --template ./templates/starter and use the monorepo workspace protocol for local package dependencies before installing; external projects keep pinned published versions. The starter supplies its own plugin choices; a custom project may choose different ones.
@@ -129,10 +130,12 @@ Success: check reports 0 errors; outline --work explainer shows the intended sli
 - works/<key>.tsx (or .ts) exports work({ title, summary, scenarios, stage? | layers?, viewport?, on?, routes?, audience?, roles?, state?, free?, draft?, order? }). The filename is the entry key and must not collide with a feature folder.
 - features/<id>/feature.ts exports feature({ name, goal, cases, order?, roles?, constraints?, rules?, questions?, pick? }). Finite numeric order sorts first; ties and omitted order use natural folder order. Do not number names by hand.
 - features/<id>/works/<key>.tsx exports work({ title, summary, focus?, tradeoffs?, coverage?, rules?, questions?, stage? | layers?, viewport?, on?, routes?, state?, free?, scenarios }). Keep stable feature/work ids when revising a design.
-- Field placement: focus/tradeoffs/coverage/rules/questions, slice cases and step uses() are feature-only (WORK_FEATURE_ONLY in standalone works). audience/roles/draft/order are standalone-only (WORK_STANDALONE_ONLY under a feature); declare shared roles on feature(). title/summary/stage/layers/viewport/on/routes/state/free/scenarios work in both locations (WORK_INVALID for invalid values). viewport applies only to stage.
+- Field placement checks explicit presence, including roles: {}, draft: false and order: 0. focus/tradeoffs/coverage/rules/questions, slice cases and step uses() are feature-only (WORK_FEATURE_ONLY in standalone works). audience/roles/draft/order are standalone-only (WORK_STANDALONE_ONLY under a feature); declare shared roles on feature(). title/summary/stage/layers/viewport/on/routes/state/free/scenarios work in both locations (WORK_INVALID for invalid values). viewport applies only to stage.
 - on adds a tree to a route's slot; routes adds an option-specific page; layers defines independently framed views. Obtain each tree from components documented by installed plugins.
 - state has ui, data and inputs namespaces. All effects and bindings use these paths. Source files are authoritative; do not hand-edit compiled IR.
 - Custom author functions may return reusable trees; author modules execute locally. Load only trusted projects. Event handlers/function props are not prototype business logic.
+
+For tools reading IR from @joplo-app/core, use entriesOf/entryOf for entries, featuresOf for real features in entryIds order, rolesOf(project, workId) for shared or standalone roles, sliceKey(scenario) for its author key, and visibleRoutes(project) for paths without the internal blank page. Follow scenario.workId and the projection; never split ids to infer ownership.
 
 ## Engine-only example
 In features/<f>/works/<key>.tsx, buildScreen is project code using the installed plugins' components. It must return enabled elements with ids email, send and result; read those plugin skills for the actual view code.
@@ -516,7 +519,7 @@ Coverage status values: \`expressed\`, \`undecided\`, \`missing\`, \`not_applica
 - work.coverage: { case_key: undecided('Why this is undecided') }.
 - missing('What is missing'): leave the gap explicit; do not pretend it is \`expressed\`.
 - notApplicable('Why not applicable') / excluded('Why excluded'): require a nonempty reason.
-- Explicit declarations override inference. Use scenarios for cases that need a demo. Author work.coverage is stored in IR v3 as feature.alternatives[workId].coverage; work focus becomes decisionFocus in that same review record, beside tradeoffs.
+- Explicit declarations override inference. Use scenarios for cases that need a demo. Author work.coverage is stored in dev IR v3 as feature.alternatives[workId].coverage; work focus becomes decisionFocus in that same review record, beside tradeoffs. publish/review IR keeps the work-id keys but empties each record to { decisionFocus: '', tradeoffs: [], coverage: {} }; generate the private review manifest from dev IR.
 - Do not invent business rules for full coverage. Keep asking about undecided behavior.
 
 See authoring for flow and rule syntax; check for locating coverage diagnostics.
@@ -542,12 +545,13 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - The last line totals error, warning, info. Run check again after fixing.
 
 ## Common codes → fixes
-- WORK_INVALID (error): default export work({...}); supply nonempty title/summary, a stage/layers/on/routes view and scenarios object containing only flow()/chapter() entries.
+- WORK_INVALID (error): read the specific reason: default export must be work({...}); title and summary must each be nonempty; scenarios must be an object of flow()/chapter() entries; stage must be a JSX element; layers must be a layer-entry object; stage and layers cannot coexist. A project with no pages needs stage, layers, on or routes. Multiple invalid fields produce separate reasons. Standalone order must be finite; an invalid value has a work ref. Match the diagnostic code and ref, not an old full message.
+- PROJECT_MODULE_CONFIG (error): when loading a project without tsconfig.json fails, add jsx: "react-jsxdev" and jsxImportSource: "@joplo-app/kit" plus package.json type: module. The message ends with underlying error: inspect it for a missing dependency or an author-code exception as well as JSX/module setup; fix that cause and rerun. A bare project that loads successfully is accepted.
 - WORK_ID_CONFLICT (error): rename the work file or feature folder so their entry keys differ.
 - WORK_SLICES_MIXED (error): use all chapter() for a linear work or all flow() for independent slices, including options under a feature.
 - WORK_FEATURE_ONLY (error): standalone works cannot declare focus/tradeoffs/coverage/rules/questions, slice cases or step uses(). Remove those fields or attach the work to a feature for design review.
 - WORK_STANDALONE_ONLY (error): a feature-attached work cannot declare audience/roles/draft/order. Put shared roles and ordering on feature(); audience/draft belong to a standalone work.
-- OPTIONS_DIR_RENAMED (error): rename the legacy alternative directory to features/<f>/works/ and use work({ title, summary }); the old builder and directory have no aliases.
+- OPTIONS_DIR_RENAMED (error): "Rename this directory to works/ and migrate the authoring call to work({ title, summary })". Keep the feature-attached file at features/<f>/works/<key>.tsx; there are no legacy builder or directory aliases.
 - FROM_UNKNOWN (error): copy an existing slice key from the diagnostic's available-slices list; omit from for normal chapter continuation, or use from: null to restart.
 - WORK_EMPTY (info): add the first entry under scenarios, for example opening: chapter('Opening').system('Begin', narrate('Hello')). An empty work remains visible locally but is skipped in publish/review; explicit build --work selection fails.
 - WORK_DRAFT_SKIPPED (info): a draft was excluded from publish/review; remove draft: true only when it is ready. Explicit --work selection of a draft fails instead of publishing empty content.
@@ -868,7 +872,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - Declared plugin caches and frame snapshots are projected to the same subset; a missing projection declaration stops the build with PLUGIN_SCOPE_UNSUPPORTED. Inspect the emitted JSON, not just the DOM.
 - Everything outside the scope is cut at build time, not hidden: other features, options, scenarios, their pages and stacked elements, and the project description never reach the uploaded files or the review manifest. A deep link (#/f/<feature>?s=<scenario>) or embed &scenario= only picks where viewing starts and is not private.
 - If a scoped step uses an element another feature stacked onto the page (action target, shot, mark, cue, callout, trace) or navigates to a page another feature added, only that element or page is kept. share prints "Borrowed from another feature: …" and lists them in data.scope.borrowed; tell the user and ask whether that is acceptable. To leave one out, change the scenario so it no longer uses it.
-- A wrong scenario or entry id fails with NOT_FOUND and suggestions. Without --review, a scenario of an option that is not picked, or a feature without pick, fails with USAGE (exit 2) before build/upload. With --review, the ordinary share contains only picked scenarios in the requested scope, while the private review includes all requested options. If that scope has no picked scenarios, only the private review is published: data.mode is review and data.url is the review link (no data.review); the ordinary share and --update target stay unchanged.
+- A wrong scenario or entry id fails with NOT_FOUND and suggestions. Scope errors for unknown/unpicked entries carry error.details: { scope: 'entry', id }; slice errors use scope: 'scenario'. Do not branch on the former feature scope value. Without --review, a scenario of an option that is not picked, or a feature without pick, fails with USAGE (exit 2) before build/upload. With --review, the ordinary share contains only picked scenarios in the requested scope, while the private review includes all requested options. If that scope has no picked scenarios, only the private review is published: data.mode is review and data.url is the review link (no data.review); the ordinary share and --update target stay unchanged.
 - Each scope is its own share, stored under scoped in .joplo/cloud.json (key: sorted scenario ids joined by commas, prefixed review: for --review). It never replaces the main or review link; re-sharing the same scope updates that link for free and Pro accounts.
 - Check the result locally first with npx joplo build --scenario <id> (same scope rules).
 - The author can also publish from the board: Export ▾ → Publish to Joplo Cloud (blue item) offers this scenario, this feature, or the whole project, and shows a copyable login command when signed out.
@@ -904,6 +908,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 For local comparisons and PR CI, read npx joplo skill diff. It compares two real publish builds and creates one immutable bundle; ordinary share --pr remains a single preview.
 
 ## Review and feedback (the joplo-feedback skill has the same steps)
+- The private review manifest has v: 2 and is generated from dev IR. Top-level works: [{ id, key, title, summary }] lists standalone works in entryIds order; feature alternatives live in features[].works. Each scenarios[].workId must resolve to exactly one item in that union; standalone scenarios have featureId: null. Draft/empty works and metadata excluded by count limits contribute no scenarios. This request-body manifest is separate from public IR schemaVersion: 3 and from uploaded files.
 - npx joplo share --private --review also publishes the review version at data.review.url: every option of every feature, so reviewers can compare A/B. Rules, questions, cases, and AI assumptions still never appear in uploaded files; they go only to the review page through the request body. Plain share publishes only picked options.
 - After reviewers comment and the owner decides on the review page, run npx joplo feedback --format json (uses the review share in .joplo/cloud.json, else the main share, or --share <id>). data.decisions are decisions not yet applied; data.comments are unresolved viewer comments with scenario, step, stepId, and element.
 - Apply each decision to the source, then run npx joplo check:

@@ -10,7 +10,7 @@
 /** `npx joplo skill <主题>` 的主题与一句话用途（guide.ts 生成正文；技能里按这份清单列出主题）。 */
 export const SKILL_TOPICS = [
   { name: 'authoring', description: 'Works → slices → steps; feature review, chapters, drafts, files, explicit plugins, named local reactions, composable effects, state and conditions' },
-  { name: 'story', description: 'Plan a demo before coding; PM lens for feature-attached works from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos' },
+  { name: 'story', description: 'Plan a show before coding; for feature review start from needs, roles, goals and cases; for explainers and histories plan openings, continuity and captions' },
   { name: 'demo', description: 'Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots' },
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
   { name: 'cases', description: 'Feature-attached works only: cases and coverage; ask the user before starting' },
@@ -24,11 +24,11 @@ export const SKILL_TOPICS = [
 
 /** 心智模型：所有入口最先读到的几句话。 */
 export const MENTAL_MODEL = [
-  'Joplo turns ideas into clickable, replayable works: feature demos, explainers, tutorials and short films. It is a player for pre-declared scenarios, not a free-form app prototype with persistent data or real backend logic, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.',
+  'Joplo shows are playable, interactive pieces your agent writes in code: compare feature options, explain how a system runs, or show what happened. Share them by link or embed their player. It is a player for pre-declared scenarios, not a free-form app prototype with persistent data or real backend logic, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.',
   'Structure: a project is a portfolio of works; a work has slices (scenarios), and a slice has steps. Every work has a cover and enters the home page. Capabilities combine: feature review groups alternative works (options) with cases, coverage, rules and a pick; sequencing connects chapters; draft keeps a standalone work out of publication.',
   'A step is one user action (.click / .type / .select / .press / .drag / .hover / .scroll / .act) or system event plus its visible effects (set, toast, go, done). Results and errors come from these effects, not from real logic or a backend.',
   'During playback, the first picture-changing stage input pauses and applies that same input. Hover does not pause; blank clicks only pause without an exploration notice. Matching the next action advances the script and stays stopped; another reachable scenario asks to switch (default before the action; actionEntry: \'after\' consumes it on confirmation); native controls and declared free reactions change only a local playground. Play, jump, scenario change and reset discard exploration. Screenshots, video and deep links always use scripted state.',
-  'work() is the only work entry point. Compare designs with feature() + work() in features/<f>/works/<key>.tsx; the UI calls these alternative works options; make an audience-facing film with work() + chapter() in works/<key>.tsx. Both can coexist. Standalone works need no pick; draft: true excludes them from build and share. Publish one entry with --work <key>; feature publication still uses pick.',
+  'work() is the only work entry point. Use work() + chapter() in works/<key>.tsx for a standalone show; compare feature options with feature() + work() in features/<f>/works/<key>.tsx. The UI calls these alternative works options. Both can coexist. Standalone works need no pick; draft: true excludes them from build and share. Publish one entry with --work <key>; feature publication still uses pick.',
 ] as const;
 
 /** 推荐的起步顺序（X2：先做最小的一条正常流程 + 一条错误恢复流程，在看板里确认交互模型后再扩展）。 */
@@ -76,7 +76,7 @@ const ZH_FEEDBACK = '本地评审、监听反馈、确认方案、评审有结�
 
 export type AgentSkill = { name: string; description: string; body: string };
 
-const JOPLO_DESCRIPTION = `Build clickable, replayable feature demos with Joplo (scripted scenarios in TSX, viewed in a local board) when the user wants a feature prototype, an interactive or clickable demo, an A/B comparison of options or edge cases, or a demo for product, design, or review, or a narrated explainer, tutorial, or news-explainer piece that should play like a video (${ZH_JOPLO}), including in a repo without joplo.config.ts, but not for slide decks, PPT, or editing real video footage.`;
+const JOPLO_DESCRIPTION = `Author playable, interactive shows with Joplo when the user wants to compare feature options and cases, explain an architecture, call chain or code change, or tell a story, explain news or trace a product's history, and deliver by link or embedded player (${ZH_JOPLO}), including an A/B comparison, a feature prototype, a clickable demo for product, design, or review, and work in a repo without joplo.config.ts, but not production backends, slide decks, PPT, or editing real video footage.`;
 const FEEDBACK_DESCRIPTION = `Receive and apply Joplo review feedback when the user wants to test a local demo, start or resume a feedback listener (npx joplo feedback watch --local --follow), confirm an option, monitor a Share review, or implement review conclusions (${ZH_FEEDBACK}); covers local live events and Cloud polling, without requiring a share for local review.`;
 
 const list = (items: readonly string[]) => items.map((s, i) => `${i + 1}. ${s}`);

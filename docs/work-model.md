@@ -26,7 +26,7 @@ IR 没有“形态”字段。“影片”“功能演示”是常见搭配：�
 
 ## 2. 创作 API 与文件布局
 
-`work()` 是唯一的作品入口；切片用 `flow()` 或 `chapter()`。创作原语来自 `@joplo-app/kit`，组件来自项目显式启用的插件。项目保留 `package.json` 的 `type: module` 与 JSX tsconfig（`jsx: react-jsx`、`jsxImportSource: @joplo-app/kit`）。
+`work()` 是唯一的作品入口；切片用 `flow()` 或 `chapter()`。创作原语来自 `@joplo-app/kit`，组件来自项目显式启用的插件。项目保留 `package.json` 的 `type: module` 与 JSX tsconfig（starter 使用 `jsx: react-jsxdev`、`jsxImportSource: @joplo-app/kit`）。
 
 ```tsx
 // works/explainer.tsx —— 独立作品，文件名就是作品键
@@ -49,7 +49,7 @@ export default work({
 ```
 
 ```ts
-// features/invite/feature.ts —— 功能的 pick 写作品的文件名键
+// features/invite/feature.ts —— 功能的 pick 写作品的文件名键，或显式 null 表示未选定
 import { feature } from '@joplo-app/kit';
 export default feature({
   name: '邀请成员', goal: '在成员列表里完成邀请',
@@ -82,6 +82,7 @@ export default work({
 | 只在功能下面 | `focus`、`tradeoffs`、`coverage`、`rules`、`questions`、切片的 `cases`、步骤的 `uses()` | 独立作品误用为 `WORK_FEATURE_ONLY` |
 | 只在独立作品 | `audience`、`roles`、`draft`、`order` | 功能下面误用为 `WORK_STANDALONE_ONLY` |
 
+- 位置校验看字段是否显式出现：`roles: {}`、`draft: false`、`order: 0` 仍会触发功能下的位置错误；不是只检查真值。
 - `title` / `summary` 分别是标题与一句话简介；功能仍用 `name` / `goal` 描述功能本身。
 - `roles` 的键值写法为 `{ me: role('我') }`。功能下面的作品共用功能的角色；不要在每个作品重复声明。
 - `stage` 是单层舞台的简写，与 `layers` 二选一；`viewport` 只对 `stage` 生效。`on` 向已有页面插槽添加内容，`routes` 新增作品页面；`free` 是命名的本地反应字典。
@@ -96,52 +97,71 @@ export default work({
 
 `SCHEMA_VERSION = 3`。独立作品与功能下面的作品走同一段降级逻辑，不合成假的功能或隐藏作品。
 
+以下结构摘要逐项对应 `packages/core/src/schema.ts`，不是作者直接编辑的格式。所有对象严格解析，未声明字段会被拒绝。
+
 ```ts
 Project {
   schemaVersion: 3,
+  name: string, description: string, theme: string,
+  autoFocus?: boolean,
+  voiceConfig?: VoiceConfig, voiceIndex?: VoiceIndex,
+  mediaAssets?: Record<string, string>, mediaInfo?: Record<string, AudioRegion>,
+  i18n?: ContentI18n, plugins?: Record<string, PluginMetadata>,
+  themes: Record<string, string>, mode: 'dev' | 'publish' | 'review',
+  routes: Record<string, Route>,
   features: Record<Id, Feature>, // 只有真正的功能
-  works: Record<Qid, Work>,
-  entryIds: Id[],               // 必填：首页演示顺序，每个条目恰好一次
-  cases, rules, scenes, scenarios, issues, routes, …
+  entryIds: Id[],               // 必填，每个条目恰好一次
+  cases: Record<Qid, Case>, works: Record<Qid, Work>,
+  rules: Record<Qid, Rule>, scenes: Record<Qid, Scene>,
+  scenarios: Record<Qid, Scenario>, issues: Record<Qid, Issue>,
 }
 Feature {
-  id, name, goal, roles, constraints, caseIds, source,
-  workIds: Qid[],               // 作品声明顺序
-  pick: Qid | null,             // 选定作品的限定 id
+  id: Id, name: string, goal: string,
+  roles: { id?: Id, name: string, desc: string, color: string }[],
+  constraints: { id: Id, text: string, hard: boolean }[],
+  caseIds: Qid[], workIds: Qid[], pick: Qid | null,
   alternatives: Record<Qid, {
     decisionFocus: string;
     tradeoffs: string[];
     coverage: Record<Qid, Coverage>;
   }>,                          // workIds 中每件作品恰好一项
+  source?: string,
 }
 Work {
-  id: Qid,                     // 独立：<key>；功能下面：<featureId>.<key>
-  key: Id,                     // 文件名
-  featureId?: Id,              // 没有则是独立作品
-  title: string,
-  summary: string,
-  audience?: string,           // 只在独立作品
-  roles: Role[],               // 独立作品的角色；功能下面为空
-  draft?: true,                // 只在独立作品，只进 dev IR
-  sequencing?: 'linear',       // 未写即 independent
-  free?, routes: string[], layers, source,
+  sequencing?: 'linear',
+  free?: Record<Id, { action: Action, effects: Effect[], source?: string }>,
+  id: Qid,                     // 独立：<key>；功能下：<featureId>.<key>
+  featureId?: Id, key: Id,
+  title: string, summary: string,
+  audience?: string,           // 只在独立作品；非空
+  roles: Feature['roles'],     // 功能下为空，统一由 rolesOf 继承
+  draft?: true,                // 只在独立作品、dev IR
+  routes: string[],
+  layers: Record<Id, { title: string, sceneId: Qid, role?: Id, icon?: LayerIcon }>,
+  source?: string,
 }
-Scenario.workId
-Scene.workId                   // 可以为 null
-Rule.workId? / Issue.workId?
-Route.addedBy                  // 仍然是作品 id
+Coverage {
+  status: 'expressed' | 'undecided' | 'missing' | 'not_applicable' | 'excluded',
+  scenarioIds: Qid[], reason?: string, basis: 'derived' | 'declared',
+}
+Scenario.workId: Qid
+Scene.workId: Qid | null
+Rule.workId?: Qid
+Issue.workId?: Qid
+Route.addedBy?: Qid             // 仍然是作品 id
 ```
 
-- 评审信息归功能的 `alternatives`：作者的 `focus` 降级为 `decisionFocus`；`tradeoffs` 与 `coverage` 同样按作品 id 归档。作品不存这三个评审字段。`Feature` 不存独立作品的受众、草稿或独立标记。
+- schema 默认值：Project.description 为 `''`、theme 为 `sketch`、themes 和实体字典为空对象；entryIds 必填、不补默认。Feature 的 roles/constraints/caseIds/workIds 默认空数组，pick 默认 null，alternatives 必填且键必须与无重复的 workIds 完全一致。Work.roles 默认空数组、routes 默认空数组、layers 默认空对象，未写 sequencing 表示 independent；audience、draft、free 等可选字段不会伪造值。Coverage.scenarioIds 默认空数组、basis 默认 declared。
+- 评审信息归功能的 `alternatives`：作者的 `focus` 降级为 `decisionFocus`；`tradeoffs` 与 `coverage` 同样按作品 id 归档。作品不存这三个评审字段。**dev IR 才保留评审值**；publish / review IR 仍为每个 workId 保留一项，但值归空为 `{ decisionFocus: '', tradeoffs: [], coverage: {} }`，不是删除 alternatives 或其键。`Feature` 不存独立作品的受众、草稿或独立标记。
 - 切片 id 为 `${workId}.${sliceKey}`：独立作品 `explainer.arrival` 是两段；功能下面 `invite.a-modal.happy` 是三段。画面 id 同理由作品 id 推出，例如独立作品的 stage 为 `explainer~stage`。
-- 不靠拆 id 字符串找结构：切片找作品读 `scenario.workId`，作品找功能读 `work.featureId`，切片键只在 `entries.ts` 一处计算。
+- 不靠拆 id 字符串找结构：切片找作品读 `scenario.workId`，作品找功能读 `work.featureId`，切片键只由 `entries.ts` 的 `sliceKey(scenario)` 按已知 workId 计算。
 - 统一的 `rolesOf(project, workId)`：挂功能时读功能角色，否则读作品角色。层级的 `role` 引用同一组声明。
 - 章节默认接续只在编译期解析一次，写入 `Scenario.from`；`from: null` 时没有该字段。下游只读降级结果。
 - **版本规则**：公开载荷（publish / review IR）的结构，只要增、删、改名或改语义，就升 `SCHEMA_VERSION`；读取方按版本号严格解析。只在 dev IR 的字段变化不升版本。
 
 ### 首页条目投影（`packages/core/src/entries.ts`）
 
-界面与 CLI 经 `entriesOf` / `entryOf`、`scenariosOf` / `playSequence` 读作品结构，不自己推断容器关系。
+界面与 CLI 经 `entriesOf` / `entryOf`、`scenariosOf` / `playSequence` 读作品结构，不自己推断容器关系。`featuresOf(project)` 按 entryIds 只取真正功能；`rolesOf(project, workId)` 统一取角色；`sliceKey(scenario)` 是切片键的唯一计算入口；`visibleRoutes(project)` 排除内部空白页面后提供路径列表。
 
 - `Entry.id` 是功能 id 或独立作品 id；`featureId` 是挂着的功能或 `null`。
 - `Entry.workId` 是播放用作品 id：独立作品是它自己；功能是选定作品，没有选定时取第一件，无可用作品时为 `null`。
@@ -152,7 +172,7 @@ Route.addedBy                  // 仍然是作品 id
 
 ### 发布与信息边界
 
-普通版保留每个功能 picked 作品；独立作品不需要 pick。review 版保留功能的全部作品。独立草稿与没有切片的作品留在本地，publish / review 连同切片、画面跳过并提示；显式范围选中它们时报错。只有一个零步骤切片与完全没有切片不同：前者可用于显示初始状态。
+compile 的 publish / review 模式先把 alternatives 的各项评审值归空；私有评审清单必须从 dev IR 生成。普通版保留每个功能 picked 作品；独立作品不需要 pick。review 版保留功能的全部作品。独立草稿与没有切片的作品留在本地，publish / review 连同切片、画面跳过并提示；显式范围选中它们时报错。只有一个零步骤切片与完全没有切片不同：前者可用于显示初始状态。
 
 `packages/server/src/build.ts` 的白名单保留 / 去除的信息与重构前相同，只换容器和字段位置。`draft` 不进公开载荷；私有规则、问题、取舍、源码位置不因公开过程展示而泄漏。普通 build 的自设计过程需整理为可见场景，不直接发布私有 review manifest。
 
@@ -165,7 +185,7 @@ Route.addedBy                  // 仍然是作品 id
 | `works`、`Work.title/summary`、`workId` | 两种位置的 `work()` → 同一编译降级与 Project.works / 场景等归属字段 → entries、播放器、scope、白名单 → 看板、outline、发布、渲染、评审 / 反馈 |
 | `entryIds` | 文件发现与条目排序 → Project.entryIds → entriesOf → 首页、下拉、大纲与演示顺序 |
 | `Feature.workIds/pick` | 功能下作品声明顺序与 feature.pick 文件键 → 限定作品 id / 可空选定 → 条目投影、发布筛选 → 本地评审与普通 / 评审版 |
-| `Feature.alternatives` | 作者 focus/tradeoffs/coverage 与编译推导 → 功能上按作品 id 的评审记录 → 看板覆盖 / 取舍、outline、reviewManifest、发布白名单 → 评审面板、大纲、云端评审与同位置过滤后的公开 IR |
+| `Feature.alternatives` | 作者 focus/tradeoffs/coverage 与编译推导 → dev 功能上按作品 id 的评审记录 → validate、outline、reviewManifest、翻译与 scope → 看板覆盖 / 取舍、大纲、私有清单；publish/review IR 同键值归空，再由发布白名单消费 |
 | `Work.roles/audience` | 独立作品作者字段 → Work；功能角色仍在 Feature → rolesOf、entries、翻译与语音 / 发布白名单 → 层级角色、字幕 / 朗读、给谁看、封面与首页 |
 | `Work.sequencing`、`Scenario.from` | chapter 声明顺序 / 例外 → 编译期一次解析 → playSequence、entries → 编号、封面、连续播放与链式导出 |
 | `Work.draft` | 独立作品 draft → dev IR → 发布归属与模式过滤 → 本地草稿标记、构建跳过诊断；不存公开 IR |
@@ -175,7 +195,8 @@ Route.addedBy                  // 仍然是作品 id
 
 | 代码 | 级别 | 何时 / 修法 |
 | --- | --- | --- |
-| `WORK_INVALID` | error | 默认导出、必填 title/summary 或共享字段不合格；scenarios 必须是 flow/chapter 对象 |
+| `WORK_INVALID` | error | 按具体原因分别报告：默认导出必须为 work；title / summary 各自非空；scenarios 为 flow/chapter 对象且切片条目有效；stage 必须 JSX、layers 必须层级对象，两者不能同写；无项目页面时需 stage/layers/on/routes。独立 order 非有限数字也用该代码并提供 work ref |
+| `PROJECT_MODULE_CONFIG` | error | 无 tsconfig 项目载入失败时，提示补 jsx: react-jsxdev、jsxImportSource 与 type: module；末尾 underlying error 带底层错误，继续排查依赖或作者代码，不只修 JSX |
 | `WORK_ID_CONFLICT` | error | 独立作品键与功能文件夹名重复，改其中一方 |
 | `WORK_SLICES_MIXED` | error | 同一作品混用章节与独立切片，统一 builder |
 | `WORK_FEATURE_ONLY` | error | 独立作品使用评审字段、切片 cases 或 uses；移除或挂到功能下 |
@@ -185,7 +206,7 @@ Route.addedBy                  // 仍然是作品 id
 | `WORK_EMPTY` | info | 没有切片，本地空状态可编辑；发布跳过，显式范围选中报错 |
 | `WORK_DRAFT_SKIPPED` | info | publish / review 跳过草稿，准备好后才去掉 draft |
 
-`HAPPY_PATH_ONLY`、`CASE_NOT_COVERED` 等评审诊断只对功能生效，不为独立影片编造失败情况。linear 切片的 `SCENARIO_TOO_LONG` / `EMPTY_SCENARIO` 等代码不变，文案用 Chapter 与自动编号；独立作品称 work，功能下仍称 option。诊断源位置指向真实作者文件。
+`HAPPY_PATH_ONLY`、`CASE_NOT_COVERED` 等评审诊断只对功能生效，不为独立影片编造失败情况。linear 切片的 `SCENARIO_TOO_LONG` / `EMPTY_SCENARIO` 等代码不变，文案用 Chapter 与自动编号；独立作品称 work，功能下仍称 option。诊断源位置指向真实作者文件。`WORK_INVALID` 可因多个无效字段产生多条具体原因；机器按代码与 ref 判断，不匹配整段旧兜底文案。功能 order 错误仍是 FEATURE_ORDER_INVALID，ref 为 feature；独立 order 的 WORK_INVALID ref 为 work。
 
 ## 5. 命令行与线上格式
 
@@ -195,8 +216,18 @@ Route.addedBy                  // 仍然是作品 id
 - 机器可读大纲使用现有命令 `outline --format json`。容器与归属字段用 `works` / `workId`，功能名、切片名等字段以各自模型为准，不从显示用“方案”反推旧结构。
 - `build` / `share` 摘要按条目计数，列出跳过的草稿。帮助文字同时覆盖独立作品与功能下作品。
 - 代码标识符与机器输出（IR、评审清单、反馈记录、看板 / 服务端接口）统一用 `workId`、`works`、`entryIds`、`alternatives`。给人看的“方案”和各语言现有译法保持，i18n 键不要求改名。
+- 范围错误：未知或未选定条目的 `error.details` 是 `{ scope: 'entry', id }`，切片错误用 `{ scope: 'scenario', id }`。ScopeRequest 用 entryIds，ScopeInfo 用 entryIds；借用项用 entryId / entryTitle / workId，不再按功能特例推断。
 - 路由与深链格式保持；独立切片使用两段 id，例如 `render --scenario-id explainer.arrival`、`#/s/explainer.arrival`；反馈 context.scenarioId 同样使用它。不要按固定段数猜归属。
 - 发布需遵守既有显式可见性与评审选择，不因本次重构自动获得上传或发布授权。
+
+### 私有评审清单 v2
+
+`REVIEW_MANIFEST_VERSION = 2`，独立于公开 IR 的 schemaVersion 3；清单结构变更单独升清单版本，由云端严格解析。由 `reviewManifest(devProject, mode)` 从 **dev IR** 读取规则与评审值，不能把 publish / review IR 当私有清单输入。
+
+- 顶层必有 `works: { id, key, title, summary }[]`，只放独立作品，按 entryIds 排序；纯功能项目为 `[]`。功能下作品仍在 `features[].works[]`，并带 tradeoffs；不是把独立作品包装成假功能。
+- 清单顶层为 `{ v: 2, mode, works, features, scenarios, elements }`。场景以 `workId` 关联元信息，必须在顶层 works 与 features[].works 的并集中恰好匹配一项；独立场景的 featureId 是 null。
+- 独立草稿与空作品不入清单。元信息先按数量上限裁剪，再收场景，不产生元信息已丢弃但场景仍在的悬空引用。独立作品最多 100 件，功能最多 100 个、每个功能最多 20 件作品；文字标题 200 码点、简介 2000 码点，id/key 不截断，仍受总计 512 KiB 限制。
+- 流向：作者 title/summary → Project.works → reviewManifest 读取 / 截断 → 顶层 works → 请求体 review → 服务端 / 云端 / CLI 显示独立作品标题与简介。清单不作为静态分享文件上传。
 
 ### 云端边界
 

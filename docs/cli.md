@@ -117,7 +117,7 @@ check: 0 error, 9 warning, 5 info (warning OUTCOME_MISMATCH ×1, warning CASE_NO
 - 情况一行：键、维度、优先级、每个方案的覆盖、标题 → 期望结果（case.expected，没写时提示）。这是 PM 视角的验收矩阵：标题是 Given，期望结果是 Then。
 - 场景一行：键、名字、步数与估算时长（1×，与自动播放同一份 stepPlan，包含操作演示，以及停留与朗读估算中的较长者）、结局、是否以过渡卡开场 / 收尾、覆盖的情况。
 - `--work <id>` 只看一件独立作品（键）或功能下面的方案（`功能.方案`）；不存在时 USAGE（退出 2）。有 error 时退出 1：能编译出 IR 时照常输出大纲，编译不出时只写错误数。
-- `--format json`：大纲在 `data.outline`，以 `works` 表示作品，归属引用用 `workId`；功能保留目标、角色、选定与情况覆盖，作品用 `title` / `summary` 描述标题与简介。切片包含 id、键、标题、步数与估算时长；`data.summary` 是 check 汇总。失败时为 `ok: false` 信封，无法编译时 `data.outline` 为 null。完整 IR v3 字段与端到端流向见 [作品模型](work-model.md#3-ir-v3)。
+- `--format json`：`data.outline = { name, mode, entries: [{ id, featureId, title, summary, roles, pick, sequencing, draft, cases, works: [{ id, key, title, picked, ms, missing, undecided, scenarios }] }] }`。独立条目的 featureId 为 null；作品在 works 下，切片项用 id/key/name/description/steps/ms/cards/opening/ending/outcome/caseIds。作品简介在条目的 summary，OutlineWork 自身提供 title；workId 用于 IR 归属与反馈记录。`data.summary` 是 check 汇总；失败为 `ok: false` 信封，无法编译时 `data.outline` 为 null。完整 IR v3 字段见[作品模型](work-model.md#3-ir-v3)。
 
 ## components
 
@@ -443,7 +443,7 @@ npx joplo share --private --no-review --work invite                      # 只�
 - 写错场景 / 功能（NOT_FOUND，列出相近或可分享的场景）、范围为空时，在构建和任何云端请求之前失败。不带 `--review` 时，场景属于没选定的方案、功能没有选定方案（USAGE，退出 2）同样提前失败；带 `--review` 时允许这些范围，普通版只含 picked 子集，没有 picked 子集就仅发布私密评审版。旧版 `@joplo-app/server` 忽略范围时（产物里有范围外场景）报 UNSUPPORTED_ACTION，不上传。
 - 预览图用范围内第一个场景（按演示顺序），用裁剪后的 IR 渲染。朗读音频只带范围内步骤用到的。
 - 每个范围是**单独的分享**，记在 `.joplo/cloud.json` 的 `scoped: { <范围键>: { shareId, url } }`，范围键是排序后的场景 id 用逗号连接（评审版加 `review:` 前缀），不覆盖主链接和评审链接。Pro 再次分享同一范围更新原链接，`--new` 新建；场景改名后是新范围、新链接。
-- 默认标题是“项目名 · 场景名”（多个场景时“项目名 · N scenarios”）。文本输出多一行 `Scope: …`；JSON 的 `data.scope = {key, scenarios, features, borrowed}`。
+- 默认标题是“项目名 · 场景名”（多个场景时“项目名 · N scenarios”）。文本输出多一行 `Scope: …`；JSON 的 `data.scope = {key, scenarios, entryIds, borrowed}`。
 - 已知边界：作者 CSS 与 Tailwind 扫描到的类名整份打包；`routes/` 下的基础页面所有功能共用，原样保留；元素 id 和项目名由作者自己起，可能带有含义。
 
 - 未登录：交互终端显示“Sharing requires a free Joplo account”，直接进入浏览器登录，完成后继续发布；非交互环境（包含 --format json、有效 CI 环境变量、JOPLO_NONINTERACTIVE=1）立即返回 AUTH_REQUIRED（退出 3），提示用户运行 `npx joplo login`。
@@ -461,8 +461,8 @@ npx joplo share --private --no-review --work invite                      # 只�
 - finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。链接永久有效，升级入口为当前 `<server>/settings/billing`。
 - 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的导出组件，见 `setup export`；项目里已有的 Playwright 也可以）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有导出组件、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”（没有导出组件时括号里给出 `npx joplo setup export`），share 照常成功、从不下载；分享页此时用通用预览图。
 - 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 沿用英文（D57），D85 指定的“已加密”、兼容错误和设置用户名提示除外）。
-- **评审清单**：每次 share 都在 `POST /api/v1/shares` 请求体里附上 `review`（契约字段 `{v: 1, mode, features, scenarios, elements}`），由 check 编译的 dev IR 经 core 的 `reviewManifest` 生成。它**不是分享文件**：不进上传清单、不进 R2，分享页拿不到；SaaS 只把它存进数据库给评审页用。`mode: "publish"` 只含选定方案（与发布站同一范围，没有选定方案的功能不出现），`--review` 时为 `"review"`，含所有功能的所有方案。id 全部沿用 IR，步骤 `index` 从 0 开始，`elements` 是画面里所有作者元素 id（与 `Rule.elementIds` 同一套）及 `nodeLabel` 标签。
-- **清单上限**：字符串按码点截断（末尾 “…”）——名字 200、目标/思路/规则/问题/explain 2000、取舍 500、字幕 500、元素标签 200；数组超出部分丢弃——每个功能 20 个方案、300 条规则、100 个问题，每个方案 20 条取舍，每条规则 50 个元素，最多 100 个功能、500 个场景、每个场景 200 步、每步 50 条规则、2000 个元素；id 永不截断。截断后序列化仍超过 512 KiB（524288 字节）时：`--review` 报 EXPORT_FAILED（`details: {maxBytes, actualBytes}`），在构建和上传之前失败，不静默丢内容；普通 share 不因清单失败，stderr 提示一行 “Skipped the review manifest (…)”，请求体省略 `review`（契约里它是可选字段），评审页此时看不到规则和问题。
+- **评审清单**：每次 share 都在 `POST /api/v1/shares` 请求体里附上 `review`（契约字段 `{v: 2, mode, works, features, scenarios, elements}`），由 check 编译的 dev IR 经 core 的 `reviewManifest` 生成。它**不是分享文件**：不进上传清单、不进 R2，分享页拿不到；SaaS 只把它存进数据库给评审页用。`mode: "publish"` 含独立作品与功能选定的作品（没有 pick 的功能不出现），`--review` 时为 `"review"`，含独立作品与所有功能作品。顶层 `works: [{id,key,title,summary}]` 只放独立作品，按 entryIds 排序，纯功能项目为 []；功能作品在 `features[].works[]`。`scenarios[].workId` 在两处元信息并集中恰好匹配一件，独立场景 featureId 为 null。草稿、空作品与数量上限排除的元信息不会带入场景。id 全部沿用 IR，步骤 `index` 从 0 开始，`elements` 是画面里所有作者元素 id（与 `Rule.elementIds` 同一套）及 `nodeLabel` 标签。
+- **清单上限**：字符串按码点截断（末尾 “…”）——名字/作品标题 200、目标/作品简介/规则/问题/explain 2000、取舍 500、字幕 500、元素标签 200；数组超出部分丢弃——每个功能 20 个方案、300 条规则、100 个问题，每个方案 20 条取舍，每条规则 50 个元素，最多 100 个功能与 100 件独立作品、500 个场景、每个场景 200 步、每步 50 条规则、2000 个元素；id 永不截断。截断后序列化仍超过 512 KiB（524288 字节）时：`--review` 报 EXPORT_FAILED（`details: {maxBytes, actualBytes}`），在构建和上传之前失败，不静默丢内容；普通 share 不因清单失败，stderr 提示一行 “Skipped the review manifest (…)”，请求体省略 `review`（契约里它是可选字段），评审页此时看不到规则和问题。
 - **发布顺序容错**：创建请求带着 `review` 被服务端以 HTTP 400 拒绝时（例如还不认识这个字段的旧版 SaaS；400 表示请求被拒、没有创建任何记录），普通 share 去掉 `review` 原样重试一次，stderr 提示一行 “The cloud rejected the review manifest (HTTP 400). Retrying once without it …”；评审步骤不重试，照常报 BAD_REQUEST；主分享可能已发布（评审版没有清单没有意义）。413、422、429 等其他状态不触发这个重试。
 - **`--review`（评审版，D63）**：构建时 `buildSite({ review: true })`，发布站包含所有功能的所有方案（未选定的功能也在），评审页通过 `joplo:goto` 指定任一场景即切换方案；规则、问题、情况、AI 假设、备注、取舍、源位置与普通发布一样不进任何上传文件。CLI 会核对产物里内联 IR 的 `mode` 是 `review`，旧版 `@joplo-app/server` 忽略该选项时报 UNSUPPORTED_ACTION，不上传。成功的 `data.review` 带 `mode: "review"`，文本写 “Published the review version …”。选择 `--no-review` 时只发布主分享。
 - **`--pr <number>`（PR 预览）**：请求体加 `pr: {provider: "github", repo, number, headSha, runUrl}`。在 GitHub Actions（`GITHUB_ACTIONS=true`）里：repo 取 `--repo` 或 `GITHUB_REPOSITORY`；headSha 取 `--sha`，否则读 `GITHUB_EVENT_PATH` 事件 JSON 的 `pull_request.head.sha`（PR 事件的 `GITHUB_SHA` 是合并提交），没有时用 `GITHUB_SHA`；runUrl 为 `GITHUB_SERVER_URL/GITHUB_REPOSITORY/actions/runs/GITHUB_RUN_ID`（重试的运行加 `/attempts/N`），只在 github.com 上生成，否则为 null。不在 Actions 里必须 `--repo owner/name`，headSha 取 `--sha` 或 `git rev-parse HEAD`。缺少或格式不对时在登录、检查、构建和任何请求之前报 USAGE（退出 2）。`--repo`、`--sha` 只能和 `--pr` 一起用。
@@ -520,6 +520,8 @@ npx joplo feedback --applied d1,d2 --ref "$(git rev-parse HEAD)" --format json
 - `--applied <id,…> [--ref <源码版本>]`：`POST /api/v1/shares/{id}/feedback/applied {decisionIds, ref?}` → `data = {shareId, applied}`，重复标记幂等。id 去重，1–200 个，每个只含字母、数字、`_`、`-`；`--ref` 1–200 个可打印字符，只能和 `--applied` 一起用。只有分享的主人能调用。
 - 错误：未登录 AUTH_REQUIRED（退出 3）；用登录凭证但不是分享主人时 403 为 FORBIDDEN “Only the owner of the share …”；API Key 缺少 feedback:read / feedback:write 时为 FORBIDDEN 权限说明；404 为 NOT_FOUND “The share does not exist or has no review data”；响应结构不对为 INVALID_RESPONSE；其余同 share。
 - Agent 按决定改源码的规则写在 `npx joplo skill publish`：pick → `feature.pick`；确认规则 → `origin: 'user'` + `status: 'confirmed'`；否决 → 按理由改写，理由没说怎么做时标 conflict 并问用户；回答问题 → 删掉 question、加一条 `origin: 'user'` 的规则；评论只作参考。改完运行 check，再 `--applied`。
+
+范围校验错误用 `error.details.scope: 'entry'` 表示未知或未选定条目，`'scenario'` 表示切片；借用记录用 entryId / entryTitle / workId，按条目读取，不按旧功能字段分支。
 
 ### 云端数据流
 
