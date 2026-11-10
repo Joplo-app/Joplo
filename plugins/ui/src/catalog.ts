@@ -145,7 +145,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   'Terminal.Command': 'prompt (default "$"); command text in children',
   'Terminal.Output': "tone: 'plain'|'ok'|'warn'|'error' (default plain); output text in children (preserves newlines)",
   Phone: 'scale (visual scale, default 1), h (screen height, default 844), landscape (turned sideways: content 772 × 358, notch on the left; use it for video-style or landscape mobile screens); phone frame, children laid out at mobile width 390 with breakpoints based on that width; viewport: "mobile" on a page adds it automatically; do not add Phone explicitly',
-  div: 'HTML fallback; prefer Box/Stack/Group',
+  div: 'HTML fallback; supports data-*, aria-*, role and title (data-j* reserved); prefer Box/Stack/Group',
   span: 'HTML fallback; prefer Text span',
   p: 'HTML fallback; prefer Text',
   h1: 'HTML fallback; prefer Title order={1}',

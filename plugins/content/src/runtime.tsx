@@ -189,10 +189,11 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
     const stranded = timed && !!clock && !clock.running && !clock.paused && seg.current.ms > 0 && now < seg.current.start + seg.current.ms;
     if (camMoves || jumped || !mounted || stranded || dk !== driftKey.current || !timed && seg.current.drift) {
       target.current = next;
-      driftKey.current = dk;
+
       // 只有连续播放中（时钟在走、已经挂载过、不是跳转）才补间；首次挂载、停止状态、跳转、截图与静态画面直接落定（D92 R1）。
       // 暂停时目标不会变，已有的镜头段原样冻结。
-      const glide = timed && camMoves && !jumped && mounted && !!clock?.running;
+      const glide = timed && (camMoves || dk !== driftKey.current) && !jumped && mounted && !!clock?.running;
+      driftKey.current = dk;
       const from = glide ? cameraAt(seg.current, now, lensView) : next;
       seg.current = { from, to: next, start: now, ms: glide ? cam?.ms ?? 1200 : 0, drift };
       redraw((n) => n + 1);

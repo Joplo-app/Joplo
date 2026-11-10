@@ -3,6 +3,7 @@ export const skill = `# Standard UI: ui
 Use this plugin for application interfaces, forms, overlays, navigation, data displays, device frames and HTML fallback content. Install @joplo-app/plugin-ui, import ui from it and list ui in config.plugins. The engine enables nothing implicitly.
 
 ## Start and verify
+- HTML fallback nodes forward scalar data-* and aria-* attributes, role and title to their DOM element. Reserve data-j* for Joplo; use your own prefix such as data-app-frame for export/test selectors. id remains a Joplo node identity exposed as data-jid, not a DOM id. Event handlers and arbitrary DOM properties are not forwarded.
 - Import author markers directly from @joplo-app/plugin-ui and write normal TSX. The compiler emits ui:Button and other namespaced types; write HTML tags directly, which compile to ui:div, ui:span, etc.
 - Read joplo skill ui/components for the enabled catalog; joplo components Menu DataTable gives props, behavior groups and runnable author snippets. If two plugins share a short name, request the full namespaced name.
 - Give interactive elements stable ids. Describe their behavior with flow steps, disabled plus disabledReason, or unmodeled. Run check, then render the affected steps; passing schema validation alone does not prove the intended screen is visible.

@@ -23,13 +23,15 @@ export async function inspectScore(score: string, directory: string): Promise<Lo
   const source = path.join(directory, 'score.alda'); await fs.writeFile(source, score);
   const parsed = JSON.parse(await run(['parse', '-f', source, '-o', 'data'], directory));
   const parts: Record<string, number> = {};
+  const partDurationsMs: Record<string, number> = {};
   let durationMs = 0;
   for (const [id, p] of Object.entries(parsed.parts) as [string, { name: string; 'current-offset': number }][]) {
     parts[`${p.name} (${id})`] = parsed.events.filter((e: { part: string; 'midi-note'?: number }) => e.part === id && typeof e['midi-note'] === 'number').length;
+    partDurationsMs[`${p.name} (${id})`] = p['current-offset'];
     durationMs = Math.max(durationMs, p['current-offset']);
   }
   if (!Number.isFinite(durationMs) || durationMs <= 0) throw new Error('Score contains no timed music');
-  return { durationMs, parts, markers: parsed.markers, credit };
+  return { durationMs, parts, partDurationsMs, markers: parsed.markers, credit };
 }
 export default { compilers: { audio: {
   requiresAttribution:true, version: `alda-2.4.8-${RENDER_VERSION}-${SOUNDFONT.sha256}-${MP3_VERSION}`, mime: 'audio/mpeg', timeoutMs: 180000,

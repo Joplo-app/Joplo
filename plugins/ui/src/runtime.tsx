@@ -64,7 +64,12 @@ function htmlImpl(tag: HtmlTag) {
   return function Html({ node, p, children }: NodeProps) {
     const root = useRoot(node, p, { className: `jh-${tag}` });
     const Tag = tag as 'div';
-    return <Tag {...root}>{children}</Tag>;
+    const attrs = Object.fromEntries(Object.entries(p).filter(([key, value]) =>
+      (key === 'role' || key === 'title' || /^(data|aria)-[a-z][a-z0-9_.:-]*$/.test(key))
+      && !key.startsWith('data-j')
+      && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+    ));
+    return <Tag {...attrs} {...root}>{children}</Tag>;
   };
 }
 

@@ -4,7 +4,7 @@
  * - renderFilm：Playwright 假时钟（page.clock）接管页面的 setTimeout / rAF / performance.now，演示控制器与引擎时钟
  *   因此按固定步长（sampleMs，默认 50 ms ≈ 20 fps）逐帧前进；每帧截一张图、在辅助页里用 canvas 算与上一帧的像素差。
  *   每隔 every（默认 250 ms）取一帧放进胶片条，标注时间、场景、步号与相邻帧差；同时客观地标出
- *   硬切（单帧整屏突变，前后帧都平静）与长时间静止（≥ stillMs 画面几乎不变）。结果确定、可复现，与墙钟无关。
+ *   硬切（单帧整屏突变，前后帧都平静）与长时间静止（≥ stillMs 画面几乎不变）。加载耗时不进入采样时间；浏览器调度与栅格差异仍须实测复核。
  * - renderVideo：复用看板导出的录制器（defaultRecorder，按真实时间），得到可以直接发布的 webm：
  *   开播前的准备不进视频（#57）；可指定输出分辨率（#55）；已生成的旁白混进音轨（voice=real，#56）；
  *   可隐藏封面、鼠标、步骤标题条、字幕条，字幕另存为 .srt（#59）。
@@ -95,8 +95,22 @@ window.step = async (b64, cropRatio, t, th, stillTh) => {
 </script>`;
 
 async function flush(page: Page) {
-  // React 用 MessageChannel 调度提交；假时钟不接管它。等两轮，让这一帧的状态都画出来。
-  for (let i = 0; i < 2; i++) await page.evaluate(() => new Promise<void>((r) => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); }));
+  // React 的提交可能跨多轮 MessageChannel；连续三轮无 DOM 变化后才采样。
+  await page.evaluate(`() => new Promise((resolve, reject) => {
+    let changed = false, quiet = 0, turns = 0;
+    const observer = new MutationObserver(() => { changed = true; });
+    observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
+    const channel = new MessageChannel();
+    const finish = () => { observer.disconnect(); channel.port1.close(); channel.port2.close(); };
+    channel.port1.onmessage = () => {
+      quiet = changed ? 0 : quiet + 1;
+      changed = false;
+      if (quiet >= 3) { finish(); resolve(); }
+      else if (++turns >= 100) { finish(); reject(new Error('Render did not settle within 100 message turns')); }
+      else channel.port2.postMessage(0);
+    };
+    channel.port2.postMessage(0);
+  })`);
 }
 
 function check(opts: { projectDir: string; out: string; overwrite?: boolean }) {
@@ -152,6 +166,8 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
     const ctx = await browser.newContext({ viewport: size, deviceScaleFactor: 0.5 });
     const page = await ctx.newPage();
     await page.clock.install({ time: 0 });
+    // 先冻结空白页，避免读 now 与 pauseAt 两次调用之间的墙钟竞态。
+    await page.clock.pauseAt(86_400_000);
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     // 载入阶段：真实时间里等网络与字体，假时间一点点往前推，直到渲染路由报告就绪
     const t0 = Date.now();
@@ -164,9 +180,8 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
     }
     const err = await page.evaluate(() => (window as unknown as { __JOPLO_ERROR__?: string | null }).__JOPLO_ERROR__ ?? null);
     if (err) throw new JoploError('RENDER_FAILED', `Render route reported an error: ${err}`);
-    // 就绪后冻结时钟：之后只由 runFor 推进，截图与像素比较花的真实时间不再混进引擎时间
-    const now = await page.evaluate(() => Date.now());
-    await page.clock.pauseAt(now + 1);
+    // 加载期间也只按 16ms 网格推进；开播相位不随网络和字体加载耗时改变。
+    await flush(page);
     const helper = await ctx.newPage();
     await helper.setContent(DIFF_PAGE);
     // 字幕与步骤标题条浮在画面上（D97）：胶片条只看画面本身的运动，采样时把它们藏起来，文字换行不算镜头切换
@@ -174,10 +189,21 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
     const stageRatio = 1;
     const samples: Sample[] = [];
     let tail = -1;
+    let advanced = 0;
     // 第一帧在开播之前采（封面 / 第 0 步）：开播那一下的切换也要量到
     for (let t = 0; t <= MAX_MS; t += sampleMs) {
-      if (t === sampleMs) await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { play(): void } }).__JOPLO_RECORD__.play());
-      if (t > 0) await page.clock.runFor(sampleMs);
+      if (t === sampleMs) {
+        await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { play(): void } }).__JOPLO_RECORD__.play());
+        await flush(page);
+      }
+      // 每个 rAF 网格点都等 React 提交，不能把多个动画帧一次推进后才 flush：
+      // 否则下一步 effect 可能在 runFor 中途或末尾启动，产生一个采样的漂移。
+      while (advanced < t) {
+        const next = Math.min(t, (Math.floor(advanced / 16) + 1) * 16);
+        await page.clock.runFor(next - advanced);
+        await flush(page);
+        advanced = next;
+      }
       await flush(page);
       const p = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { progress: Progress } }).__JOPLO_RECORD__.progress);
       if (p.error) throw new JoploError('RENDER_FAILED', `Playback failed at ${t} ms: ${p.error}`);

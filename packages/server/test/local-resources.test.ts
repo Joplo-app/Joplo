@@ -98,3 +98,11 @@ it('rejects corrupt cached envelopes and regenerates instead of returning unchec
  fs.writeFileSync(cache,JSON.stringify({...value,url:123}));
  expect((await new LocalResources(x.dir,{fake:x.entry}).ensure(x.req)).url).toBe(first.url);
 });
+
+it.each([[82944, 6542, false], [200000, 15000, true], [2100000, 6542, true], [112320, 9000, false]])('audio budget: %i bytes / %i ms warns=%s', async (bytes, durationMs, warn) => {
+  const x = setup();
+  fs.writeFileSync(x.entry, `export default {compilers:{wav:{version:'budget-1',mime:'audio/mpeg',inspect(){return {durationMs:${durationMs}}},compile(){return new Uint8Array(${bytes})}}}};`);
+  const project: any = { scenarios: { s: { media: {}, steps: [{ media: { 'fake:bgm': { resource: 'asset' } } }] } } };
+  const result = await inlineResources(project, [x.req], x.host);
+  expect(result.diagnostics.some(d => d.code === 'MEDIA_ASSET_LARGE')).toBe(warn);
+});

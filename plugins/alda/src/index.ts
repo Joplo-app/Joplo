@@ -22,7 +22,7 @@ export function alda(scores: Record<string, string>) {
       if (info && payload.from !== undefined && offsetMs === undefined) {
         ctx.report('MUSIC_MARKER_MISSING', `Music ${payload.name}: marker %${payload.from} does not exist; inspect joplo check marker times`, ctx.source, 'error'); return;
       }
-      if (info) ctx.report('MUSIC_SCORE', `${payload.name}: ${(info.durationMs! / 1000).toFixed(3)} s; notes ${Object.entries(info.parts ?? {}).map(([name, count]) => `${name}=${count}`).join(', ')}; markers ${Object.entries(info.markers ?? {}).map(([name, ms]) => `%${name}=${(ms / 1000).toFixed(3)} s`).join(', ') || '(none)'}`, ctx.source, 'info');
+      if (info) ctx.report('MUSIC_SCORE', `${payload.name}: ${(info.durationMs! / 1000).toFixed(3)} s; notes ${Object.entries(info.parts ?? {}).map(([name, count]) => `${name}=${count}`).join(', ')}; part ends ${Object.entries(info.partDurationsMs ?? {}).map(([name, ms]) => `${name}=${(ms / 1000).toFixed(3)} s`).join(', ') || '(unavailable)'}; markers ${Object.entries(info.markers ?? {}).sort((a, b) => a[1] - b[1]).map(([name, ms]) => `%${name}=${(ms / 1000).toFixed(3)} s`).join(', ') || '(none)'}`, ctx.source, 'info');
       return { media: [{ track: 'bgm', action: 'play', resource, offsetMs: offsetMs ?? 0, fadeMs: payload.fadeMs ?? 0, loop: payload.loop ?? false, volume: payload.volume ?? .25 }] };
     } },
   });

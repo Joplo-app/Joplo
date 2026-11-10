@@ -131,7 +131,7 @@ export type PluginCompileHooks = {
 export type ResourceRequest = { id: string; plugin: string; compiler: string; input: string; source?: string };
 export const localResource = (plugin: string, compiler: string, input: string) => ({ kind: 'local-resource' as const, plugin, compiler, input });
 /** Inspection runs only on the author machine; none of this metadata is automatically published. */
-export type LocalResourceInfo = { durationMs?: number; markers?: Record<string, number>; parts?: Record<string, number>; credit?: string };
+export type LocalResourceInfo = { durationMs?: number; markers?: Record<string, number>; parts?: Record<string, number>; partDurationsMs?: Record<string, number>; credit?: string };
 /** Numeric decoded-audio region; encoded guard/delay/padding never count as music time. */
 export type AudioRegion = { sourceSampleRate:number; cycleFrames:number; contentStartFrame:number; contentFrames:number; decodedFrames:number; encoderDelayFrames:number; paddingFrames:number; channels:number };
 export type LocalArtifact = { bytes:Uint8Array; audio?:AudioRegion; credit?:string; license?:string };
