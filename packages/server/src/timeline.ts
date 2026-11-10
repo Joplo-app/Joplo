@@ -3,9 +3,9 @@ import { writeOutput } from './output-file.ts';
 /** Versioned actual-playback observation schema. Times are milliseconds, never outline estimates. */
 export type TimelineStep = { scenarioId: string; stepId: string; position: number; commitMs: number; outputCommitMs: number; endMs: number; outputEndMs: number; camera: unknown; media: unknown; text: unknown };
 export type TimelineMediaEvent = { track: string; action: 'play' | 'stop' | 'seek' | 'volume'; engineMs: number; outputMs: number; resource: string; offsetMs: number; volume: number; fadeMs: number; snapshot: Record<string, unknown> };
-export type PlaybackTimeline = { mediaEvents: TimelineMediaEvent[]; assets?: { id: string; kind: 'narration' | 'media'; file: string; audioInfo?: AudioRegion }[]; steps: TimelineStep[]; chapters: { scenarioId: string; startMs: number; endMs: number }[]; schemaVersion: 1; origin: 'playback'; timing: { sampleToleranceMs: number; outputOriginMs: number }; events: PlaybackEvent[] };
+export type PlaybackTimeline = { completion?: { completed:boolean; scenarioId:string|null; engineMs:number; outputMs:number }; mediaEvents: TimelineMediaEvent[]; assets?: { id: string; kind: 'narration' | 'media'; file: string; audioInfo?: AudioRegion }[]; steps: TimelineStep[]; chapters: { scenarioId: string; startMs: number; endMs: number }[]; schemaVersion: 1; origin: 'playback'; timing: { sampleToleranceMs: number; outputOriginMs: number }; events: PlaybackEvent[] };
 export type PlaybackEvent = { at: number; engineMs: number; outputMs: number; scenarioId?: string | null; position?: number; stepId?: string | null; [key: string]: unknown };
-export type RawTimeline = { schemaVersion: 1; startedAt: number | null; events: (Record<string, unknown> & { at: number; engineMs: number })[] };
+export type RawTimeline = { completed?: boolean; schemaVersion: 1; startedAt: number | null; events: (Record<string, unknown> & { at: number; engineMs: number })[] };
 export function playbackTimeline(raw: RawTimeline, outputOriginMs = raw.startedAt ?? 0, sampleToleranceMs = 50): PlaybackTimeline {
   const steps: TimelineStep[] = [], chapters: PlaybackTimeline['chapters'] = [];
   const ended = new Set<string>(), dwelled = new Set<string>();
@@ -47,7 +47,8 @@ export function playbackTimeline(raw: RawTimeline, outputOriginMs = raw.startedA
     for (const [track, value] of Object.entries(previous)) if (!current[track] && value.stopAfterMs === undefined && value.endAfterMs === undefined) emit(track, 'stop', value);
     previous = current;
   }
-  return { mediaEvents, steps, chapters, schemaVersion: 1, origin: 'playback', timing: { sampleToleranceMs, outputOriginMs }, events: raw.events.map(e => ({ ...e, at: e.at - (raw.startedAt ?? 0), outputMs: e.at - outputOriginMs, ...(typeof e.endAt === 'number' ? { endAt: e.endAt - (raw.startedAt ?? 0), outputEndMs: e.endAt - outputOriginMs } : {}) })) };
+  const final=raw.events.at(-1);
+  return { completion:{completed:raw.completed??false,scenarioId:typeof final?.scenarioId==='string'?final.scenarioId:null,engineMs:final?.engineMs??0,outputMs:final?final.at-outputOriginMs:0}, mediaEvents, steps, chapters, schemaVersion: 1, origin: 'playback', timing: { sampleToleranceMs, outputOriginMs }, events: raw.events.map(e => ({ ...e, at: e.at - (raw.startedAt ?? 0), outputMs: e.at - outputOriginMs, ...(typeof e.endAt === 'number' ? { endAt: e.endAt - (raw.startedAt ?? 0), outputEndMs: e.endAt - outputOriginMs } : {}) })) };
 }
 /** Accumulated integer targets avoid ceil(1000 / fps) drift in Playwright runFor. */
 export function frameTime(index: number, fps: number): number { return Math.round(index * 1000 / fps); }

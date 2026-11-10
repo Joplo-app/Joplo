@@ -166,6 +166,9 @@ describe('offline export fixture: two orientations, continuing chapters, three c
     const timeline = JSON.parse(fs.readFileSync(result.timeline, 'utf8'));
     expect(timeline.chapters.map((c: any) => c.scenarioId)).toEqual(['export.a.one', 'export.a.two']);
     expect(timeline.steps).toHaveLength(3);
+    expect(timeline.completion.completed).toBe(true);
+    expect(timeline.completion.scenarioId).toBe('export.a.two');
+    expect(timeline.completion.engineMs).toBeGreaterThanOrEqual(timeline.steps[2].endMs);
     expect(timeline.steps[0].endMs).toBeLessThan(timeline.steps[1].commitMs);
     const tracks = timeline.steps.map((s: any) => Object.values(s.media) as any[]);
     expect(tracks[0][0].resource).toBe(tracks[1][0].resource);
