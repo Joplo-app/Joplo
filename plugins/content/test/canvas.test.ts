@@ -10,7 +10,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
 import { Canvas, camera } from '../src/plugin.ts';
-import { $, feature, flow, go, layer, narrate, option, page, patch, set, spotlight, type Flow } from '@joplo-app/kit';
+import { $, feature, flow, go, layer, narrate, work, page, patch, set, spotlight, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, scenarioEstimateMs, stateAt, voiceMs, type AuthoringProject } from '@joplo-app/core';
 
@@ -26,8 +26,8 @@ const other = () => h(ui.Text, { id: 'other' }, 'other layer');
 
 function build(scenarios: Record<string, Flow>) {
   const home = page({ title: 'Home', layout: false }, h(ui.Text, { id: 'home' }, 'home'));
-  const opt = option({
-    name: 'A', idea: 'i',
+  const opt = work({
+    title: 'A', summary: 'i',
     state: { ui: { onTape: false, chapter: '', n: 0 } },
     layers: { poster: layer('Poster', other()), world: layer('World', world()) },
     scenarios,
@@ -37,7 +37,7 @@ function build(scenarios: Record<string, Flow>) {
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return compile(src, 'dev');
 }
@@ -60,7 +60,7 @@ describe('camera()', () => {
     expect(stateAt(p, sc.id, 3).ui.__plugins).toEqual({ content: { camera: { targets: [] } } });
     expect(cameraAt(p, sc.id, 2).directorLayer).toBe('world');
   });
-  it('rejects unknown targets and invalid options', () => {
+  it('rejects unknown targets and invalid works', () => {
     expect(errorCodes(build({ one: flow('One', { start: '/' }).system('Zoom', camera('nope')) }))).toContain('CAMERA_UNKNOWN');
     expect(errorCodes(build({ one: flow('One', { start: '/' }).system('Zoom', camera('chat', { zoom: 0 })) }))).toContain('CAMERA_INVALID');
   });
@@ -137,13 +137,13 @@ describe('narration in time estimates', () => {
 function buildPages(scenarios: Record<string, Flow>) {
   const home = page({ title: 'Home', layout: false }, h(ui.Stack, null, h(ui.Text, { id: 'atext' }, 'on home')));
   const b = page({ title: 'B', layout: false }, h(ui.Stack, null, h(ui.Button, { id: 'bbtn' }, 'Open'), h(ui.Text, { id: 'btext' }, 'on b')));
-  const opt = option({ name: 'A', idea: 'i', state: { ui: { n: 0 } }, scenarios });
+  const opt = work({ title: 'A', summary: 'i', state: { ui: { n: 0 } }, scenarios });
   const src: AuthoringProject = {
     root: '/p',
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') }, '/b': { ...b, ...F('routes/b/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return compile(src, 'dev');
 }

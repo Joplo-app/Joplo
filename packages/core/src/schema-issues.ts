@@ -53,7 +53,7 @@ export function schemaDiagnostics(root: unknown, issues: readonly SchemaIssue[],
     const code = condition ? 'INVALID_CONDITION' : 'INVALID_SCHEMA';
     // 有源位置时说明只写元素内的相对路径，这样展开到多个画面的同一错误说明相同、能合并
     const message = condition ? whenMessage(value, element) : where ? `${element ? `<${element}> ` : ''}${local || full}: ${issue.message}` : `${full}: ${issue.message}`;
-    // 受影响的对象：画面 id（scenes.<id>）或表名 + id（options.<id> 等）
+    // 受影响的对象：画面 id（scenes.<id>）或表名 + id（works.<id> 等）
     const scope = path.length >= 2 ? (path[0] === 'scenes' ? path[1]! : `${path[0]}.${path[1]}`) : full;
     const key = JSON.stringify([code, where ?? full, message]);
     const group = groups.get(key);

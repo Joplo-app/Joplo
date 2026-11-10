@@ -5,7 +5,7 @@
  *   layouts/<id>.tsx           layout(<div>…<Outlet/>…</div>)
  *   routes/<path>/page.tsx     page({ title }, <…/>)        文件夹路径 = 页面路径
  *   features/<f>/feature.ts    feature({ name, goal, cases, rules, pick })
- *   features/<f>/options/<o>.tsx  option({ name, idea, on, routes, state, scenarios })
+ *   features/<f>/works/<w>.tsx  work({ title, summary, on, routes, state, scenarios })
  *   works/<key>.tsx              work({ title, summary, stage, scenarios })
  *
  * 所有函数只返回数据；画板不会执行这些代码，只消费编译出的 IR。
@@ -117,7 +117,7 @@ export type FeatureDef = {
   cases: Record<string, CaseDef>;
   rules?: Record<string, RuleDef>;
   questions?: Record<string, QuestionDef>;
-  /** 选定的方案（options/ 下的文件名）；build 只发布它。 */
+  /** 选定的方案（works/ 下的文件名）；build 只发布它。 */
   pick?: string | null;
   source?: string;
 };
@@ -182,7 +182,7 @@ export const mark = (target: string, opts: { kind?: 'circle' | 'underline' | 'bo
 export const go = (route: string): EffectDef => ({ kind: 'effect', type: 'go', route });
 /** 场景结束。 */
 export const done = (text: string, outcome: 'success' | 'failure' | 'cancelled' = 'success'): EffectDef => ({ kind: 'effect', type: 'complete', text, outcome });
-/** 这一步依据哪些规则（option 或 feature 中的规则键）。 */
+/** 这一步依据哪些规则（work 或 feature 中的规则键）。 */
 export const uses = (...rules: string[]): EffectDef => ({ kind: 'effect', type: 'uses', rules });
 
 /**
@@ -312,7 +312,7 @@ export type FlowOpts = {
   outcome?: 'success' | 'failure' | 'denied' | 'other';
   /** 起始路径；缺省为方案 on/routes 中的第一个路径。 */
   start?: string;
-  /** 在 option.state 之上覆盖的初始状态。 */
+  /** 在 work.state 之上覆盖的初始状态。 */
   state?: StateInit;
   /**
    * 接着另一个场景演（同一方案的场景键）：初始状态 = 那个场景最后一步之后的状态（路径、ui / data / inputs、导演层），
@@ -424,29 +424,6 @@ export const free = {
   act: (name: string, target: string, data: Record<string, unknown>, ...args: StepArg[]) => reaction(f => f.act(name, target, data, ...args)),
 };
 
-export type OptionDef = {
-  kind: 'option';
-  name: string;
-  idea: string;
-  /** 这个方案主要改变了哪项设计决策。 */
-  focus?: string;
-  tradeoffs?: string[];
-  /** 堆叠到已有路径：{ '/members': { 'header.actions': <Button/>, overlay: <Dialog/> } } */
-  on?: Record<string, Record<string, JNode | JNode[]>>;
-  /** 本方案新增的路径。 */
-  routes?: Record<string, PageDef>;
-  state?: StateInit;
-  rules?: Record<string, RuleDef>;
-  questions?: Record<string, QuestionDef>;
-  coverage?: Record<string, CoverageDecl>;
-  /** 层级（视角）：每层一个独立画面 { client: layer('客户端视角', <ClientView />), backend: layer('后端流转', <Arch />) }。 */
-  layers?: Record<string, LayerDef>;
-  free?: Record<string, StepDef>;
-  scenarios: Record<string, Flow | Chapter>;
-  source?: string;
-};
-export const option = (o: Omit<OptionDef, 'kind' | 'source'>): OptionDef => ({ kind: 'option', ...o, source: callsite() });
-
 export type { CondExpr as Condition };
 
 export type { JoploProps } from './props.ts';
@@ -473,14 +450,19 @@ export type WorkDef = {
   title: string;
   summary: string;
   /** 给观众看的受众说明，参与作者内容翻译。空字符串等于未写。 */
+  focus?: string;
+  tradeoffs?: string[];
+  rules?: Record<string, RuleDef>;
+  questions?: Record<string, QuestionDef>;
+  coverage?: Record<string, CoverageDecl>;
   audience?: string;
   roles?: Record<string, RoleDef>;
   /** stage 与 layers 二选一。 */
   stage?: JNode;
   layers?: Record<string, LayerDef>;
-  /** 复用项目页面的插槽与新增页面；与 option() 相同。 */
-  on?: OptionDef['on'];
-  routes?: OptionDef['routes'];
+  /** 复用项目页面的插槽与新增页面；两种位置共用同一编译路径。 */
+  on?: Record<string, Record<string, JNode | JNode[]>>;
+  routes?: Record<string, PageDef>;
   /** 只对 stage 生效。 */
   viewport?: 'desktop' | 'mobile';
   state?: StateInit;

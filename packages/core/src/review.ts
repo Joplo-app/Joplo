@@ -8,9 +8,9 @@
  * - 上限：字符串按 Unicode 码点截断（末尾 “…”），数组超出部分丢弃，id 永不截断（Qid ≤ 256、Id ≤ 64 由 schema 保证）；
  *   截断后序列化仍超过 512 KiB 时 assertReviewManifestSize 报错（share 在发任何请求之前失败），不静默丢内容。
  */
-import { localOnlyOptions, localOnlyElementIds, withoutLocalContributions } from './publication.ts';
+import { localOnlyWorks, localOnlyElementIds, withoutLocalContributions } from './publication.ts';
 import { nodeLabel } from './catalog.ts';
-import { orderedFeatures } from './features.ts';
+import { featuresOf } from './features.ts';
 import { JoploError } from './result.ts';
 import type { Project, SceneNode } from './schema.ts';
 
@@ -22,7 +22,7 @@ export const REVIEW_MANIFEST_MAX_BYTES = 512 * 1024;
 export const REVIEW_LIMITS = {
   features: 100,
   /** 每个功能的方案数。 */
-  options: 20,
+  works: 20,
   /** 每个功能的规则数（功能级 + 方案级）。 */
   rules: 300,
   questions: 100,
@@ -35,7 +35,7 @@ export const REVIEW_LIMITS = {
   /** 每一步关联的规则数。 */
   ruleIds: 50,
   elements: 2000,
-  text: { name: 200, goal: 2000, idea: 2000, tradeoff: 500, rule: 2000, question: 2000, caption: 500, explain: 2000, label: 200 },
+  text: { name: 200, goal: 2000, summary: 2000, tradeoff: 500, rule: 2000, question: 2000, caption: 500, explain: 2000, label: 200 },
 } as const;
 
 export type ReviewManifestMode = 'publish' | 'review';
@@ -47,11 +47,11 @@ export type ReviewManifest = {
     name: string;
     goal: string;
     pick: string | null;
-    options: { id: string; key: string; name: string; idea: string; tradeoffs: string[] }[];
-    rules: { id: string; optionId: string | null; text: string; origin: string; confirmation: string; elementIds: string[] }[];
-    questions: { id: string; optionId: string | null; text: string; severity: 'blocker' | 'major' | 'minor' }[];
+    works: { id: string; key: string; title: string; summary: string; tradeoffs: string[] }[];
+    rules: { id: string; workId: string | null; text: string; origin: string; confirmation: string; elementIds: string[] }[];
+    questions: { id: string; workId: string | null; text: string; severity: 'blocker' | 'major' | 'minor' }[];
   }[];
-  scenarios: { id: string; featureId: string; optionId: string; name: string; steps: { id: string; index: number; caption: string; explain: string | null; ruleIds: string[] }[] }[];
+  scenarios: { id: string; featureId: string | null; workId: string; name: string; steps: { id: string; index: number; caption: string; explain: string | null; ruleIds: string[] }[] }[];
   elements: { id: string; label: string }[];
 };
 
@@ -66,7 +66,7 @@ export function clipText(text: string, max: number): string {
 
 export function reviewManifest(project: Project, mode: ReviewManifestMode): ReviewManifest {
   if (project.mode !== 'dev') throw new JoploError('USAGE', `The review manifest needs the dev IR (rules and questions); got a ${project.mode} IR`);
-  const local = localOnlyOptions(project);
+  const local = localOnlyWorks(project);
   const privateElements = localOnlyElementIds(project, local);
   const L = REVIEW_LIMITS;
   const T = L.text;
@@ -74,42 +74,58 @@ export function reviewManifest(project: Project, mode: ReviewManifestMode): Revi
   const scenarios: ReviewManifest['scenarios'] = [];
   /** 参与的方案（publish：每个功能的选定方案）。 */
   const included = new Set<string>();
-  for (const f of orderedFeatures(project)) {
+  for (const f of featuresOf(project)) {
     // 清单读取 dev IR；草稿仍不能随普通分享或评审版上传。
-    if (f.optionIds.some(id => local.has(id))) continue;
-    const optionIds = (mode === 'publish' ? (f.pick ? [f.pick] : []) : f.optionIds).filter((id) => project.options[id]);
-    if (mode === 'publish' && !optionIds.length) continue;
-    for (const id of optionIds) included.add(id);
-    const inScope = (optionId: string | undefined) => optionId === undefined || optionIds.includes(optionId);
+    if (f.workIds.some(id => local.has(id))) continue;
+    const workIds = (mode === 'publish' ? (f.pick ? [f.pick] : []) : f.workIds).filter((id) => project.works[id]);
+    if (mode === 'publish' && !workIds.length) continue;
+    for (const id of workIds) included.add(id);
+    const inScope = (workId: string | undefined) => workId === undefined || workIds.includes(workId);
     features.push({
       id: f.id,
       name: clipText(f.name, T.name),
       goal: clipText(f.goal, T.goal),
       pick: f.pick ?? null,
-      options: optionIds.slice(0, L.options).map((id) => {
-        const o = project.options[id]!;
-        return { id: o.id, key: o.key, name: clipText(o.name, T.name), idea: clipText(o.idea, T.idea), tradeoffs: o.tradeoffs.slice(0, L.tradeoffs).map((t) => clipText(t, T.tradeoff)) };
+      works: workIds.slice(0, L.works).map((id) => {
+        const o = project.works[id]!;
+        return { id: o.id, key: o.key, title: clipText(o.title, T.name), summary: clipText(o.summary, T.summary), tradeoffs: f.alternatives[id]!.tradeoffs.slice(0, L.tradeoffs).map((t) => clipText(t, T.tradeoff)) };
       }),
       rules: Object.values(project.rules)
-        .filter((r) => r.featureId === f.id && inScope(r.optionId))
+        .filter((r) => r.featureId === f.id && inScope(r.workId))
         .slice(0, L.rules)
-        .map((r) => ({ id: r.id, optionId: r.optionId ?? null, text: clipText(r.text, T.rule), origin: r.origin, confirmation: r.confirmation, elementIds: r.elementIds.filter(id => !privateElements.has(id)).slice(0, L.elementIds) })),
+        .map((r) => ({ id: r.id, workId: r.workId ?? null, text: clipText(r.text, T.rule), origin: r.origin, confirmation: r.confirmation, elementIds: r.elementIds.filter(id => !privateElements.has(id)).slice(0, L.elementIds) })),
       questions: Object.values(project.issues)
-        .filter((q) => q.featureId === f.id && inScope(q.optionId))
+        .filter((q) => q.featureId === f.id && inScope(q.workId))
         .slice(0, L.questions)
-        .map((q) => ({ id: q.id, optionId: q.optionId ?? null, text: clipText(q.text, T.question), severity: q.severity })),
+        .map((q) => ({ id: q.id, workId: q.workId ?? null, text: clipText(q.text, T.question), severity: q.severity })),
     });
-    for (const optionId of optionIds) {
+    for (const workId of workIds) {
       for (const s of Object.values(project.scenarios)) {
-        if (s.optionId !== optionId) continue;
+        if (s.workId !== workId) continue;
         scenarios.push({
           id: s.id,
           featureId: f.id,
-          optionId: s.optionId,
+          workId: s.workId,
           name: clipText(s.name, T.name),
           steps: s.steps.slice(0, L.steps).map((st, index) => ({ id: st.id, index, caption: clipText(st.caption, T.caption), explain: st.explain === undefined ? null : clipText(st.explain, T.explain), ruleIds: st.ruleIds.slice(0, L.ruleIds) })),
         });
       }
+    }
+  }
+
+  for (const w of Object.values(project.works)) {
+    if (w.featureId || local.has(w.id)) continue;
+    included.add(w.id);
+    for (const s of Object.values(project.scenarios)) {
+      if (s.workId !== w.id) continue;
+      scenarios.push({
+        id: s.id, featureId: null, workId: w.id, name: clipText(s.name, T.name),
+        steps: s.steps.slice(0, L.steps).map((st, index) => ({
+          id: st.id, index, caption: clipText(st.caption, T.caption),
+          explain: st.explain === undefined ? null : clipText(st.explain, T.explain),
+          ruleIds: st.ruleIds.slice(0, L.ruleIds),
+        })),
+      });
     }
   }
 
@@ -120,7 +136,7 @@ export function reviewManifest(project: Project, mode: ReviewManifestMode): Revi
     for (const c of n.children ?? []) visit(c);
   };
   for (const scene of Object.values(project.scenes)) {
-    if (scene.optionId !== null && !included.has(scene.optionId)) continue;
+    if (scene.workId !== null && !included.has(scene.workId)) continue;
     const owner = project.routes[scene.route]?.addedBy;
     if (owner && local.has(owner)) continue;
     const root = withoutLocalContributions(scene.root, local);

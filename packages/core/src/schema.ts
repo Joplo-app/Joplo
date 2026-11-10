@@ -1,7 +1,7 @@
 import { ElementTraitsSchema, PluginInspectFieldSchema, PluginTextSchema } from './traits.ts';
 import type { ElementTraits } from '@joplo-app/kit/plugin';
 /**
- * Joplo IR（schemaVersion 2）：由 TSX 源文件编译得到的中间表示，不是作者直接编辑的格式。
+ * Joplo IR（schemaVersion 3）：由 TSX 源文件编译得到的中间表示，不是作者直接编辑的格式。
  * 权威源是项目文件夹里的 TSX/TS 文件（ADR-0002）；渲染器、播放器、校验器、构建只消费这里的 IR。
  *
  * 带 `source` 的对象记录其来源 `相对路径:行:列`，用于选中元素、诊断定位，让 Agent 只读写那一处。
@@ -21,7 +21,7 @@ const ScopeRule: z.ZodType<import('@joplo-app/kit/plugin').PluginScopeRule> = z.
 const SlotSpec = z.strictObject({ text: z.array(DataPath).optional(), scope: z.union([z.literal('global'), z.array(ScopeRule)]).optional() });
 const DataSpec = z.strictObject({ node: SlotSpec.optional(), step: SlotSpec.optional() });
 
-export const SCHEMA_VERSION = 2 as const;
+export const SCHEMA_VERSION = 3 as const;
 
 /** 作者可写的 ID（对象键、元素 id）。 */
 export const Id = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/, 'ID must start with a letter and contain only letters, digits, underscores, and hyphens');
@@ -114,7 +114,7 @@ export const SceneNode: z.ZodType<SceneNode> = z.lazy(() =>
 export const Scene = z.strictObject({
   id: Qid,
   /** 方案上下文；`null` 表示发布视图（所有功能都取选定方案）。 */
-  optionId: Qid.nullable(),
+  workId: Qid.nullable(),
   route: z.string().regex(/^\/[^\s]*$/),
   name: z.string().min(1),
   viewport: z.enum(['desktop', 'mobile']).default('desktop'),
@@ -237,7 +237,7 @@ export const Scenario = z.strictObject({
   media: MediaSnapshot.optional(),
   ext: z.record(z.string(), Json).optional(),
   id: Qid,
-  optionId: Qid,
+  workId: Qid,
   name: z.string().min(1),
   description: z.string().default(''),
   caseIds: z.array(Qid).default([]),
@@ -269,27 +269,6 @@ export const Route = z.strictObject({
   source: Source,
 });
 
-/** 独立作品仍复用 Feature 容器；外部通过 Entry 读取能力。 */
-export const Feature = z.strictObject({
-  /** work() 写入；entries.ts 将它投影为 Entry.featureId = null。公开载荷保留。 */
-  standalone: z.literal(true).optional(),
-  /** 给观众看的说明，参与作者内容多语言。 */
-  audience: z.string().min(1).optional(),
-  /** 只在 dev；发布与评审模式整件作品都跳过。 */
-  draft: z.literal(true).optional(),
-  id: Id,
-  name: z.string().min(1),
-  goal: z.string().min(1),
-  /** 角色（D56）：id 来自 { 键: role('名字') } 写法，可被层级和过渡卡引用；旧的名字数组没有 id。color 已按顺序补齐。 */
-  roles: z.array(z.strictObject({ id: Id.optional(), name: z.string().min(1), desc: z.string().default(''), color: z.string().min(1) })).default([]),
-  constraints: z.array(z.strictObject({ id: Id, text: z.string().min(1), hard: z.boolean().default(false) })).default([]),
-  caseIds: z.array(Qid).default([]),
-  optionIds: z.array(Qid).default([]),
-  /** 选定的方案；build 只发布它。 */
-  pick: Qid.nullable().default(null),
-  source: Source,
-});
-
 export const Case = z.strictObject({
   id: Qid,
   featureId: Id,
@@ -309,22 +288,47 @@ export const Coverage = z.strictObject({
   basis: z.enum(['derived', 'declared']).default('declared'),
 });
 
+/** 功能是作品之上的评审层；评审信息按作品 id 存放。 */
+export const Feature = z.strictObject({
+  id: Id,
+  name: z.string().min(1),
+  goal: z.string().min(1),
+  /** 角色（D56）：id 来自 { 键: role('名字') } 写法，可被层级和过渡卡引用；旧的名字数组没有 id。color 已按顺序补齐。 */
+  roles: z.array(z.strictObject({ id: Id.optional(), name: z.string().min(1), desc: z.string().default(''), color: z.string().min(1) })).default([]),
+  constraints: z.array(z.strictObject({ id: Id, text: z.string().min(1), hard: z.boolean().default(false) })).default([]),
+  caseIds: z.array(Qid).default([]),
+  workIds: z.array(Qid).default([]),
+  /** 选定的方案；build 只发布它。 */
+  pick: Qid.nullable().default(null),
+  alternatives: z.record(Qid, z.strictObject({
+    decisionFocus: z.string(),
+    tradeoffs: z.array(z.string()),
+    coverage: z.record(Qid, Coverage),
+  })),
+  source: Source,
+}).superRefine((f, ctx) => {
+  const keys = Object.keys(f.alternatives);
+  if (new Set(f.workIds).size !== f.workIds.length || keys.length !== f.workIds.length || keys.some(id => !f.workIds.includes(id)))
+    ctx.addIssue({ code: 'custom', path: ['alternatives'], message: 'alternatives must list every workId exactly once' });
+});
+
 export const FreeReaction = z.strictObject({ action: Action, effects: z.array(Effect).default([]), source: Source });
-export const Option = z.strictObject({
+export const Work = z.strictObject({
   /** 共享切片解析器在全部切片使用 chapter() 时写入；Entry.sequencing 消费，公开保留；缺省 independent。 */
   sequencing: z.literal('linear').optional(),
   free: z.record(Id, FreeReaction).optional(),
   id: Qid,
-  featureId: Id,
+  featureId: Id.optional(),
   /** 文件名，例如 `a-modal`。 */
   key: Id,
-  name: z.string().min(1),
-  idea: z.string().min(1),
-  decisionFocus: z.string().default(''),
-  tradeoffs: z.array(z.string()).default([]),
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  audience: z.string().min(1).optional(),
+  /** 独立作品声明角色；功能下面的作品保持为空，通过 rolesOf 继承功能角色。 */
+  roles: Feature.shape.roles,
+  draft: z.literal(true).optional(),
   /** 该方案触及的路径（堆叠或新增）。 */
   routes: z.array(z.string()).default([]),
-  coverage: z.record(Qid, Coverage).default({}),
   /** 层级（视角）：键 → 标题与这一层自己的画面（完全独立的页面）。演示信息，发布站保留。 */
   /** icon：作者显式选的预设图标（层级标签用）；不写时由 layersOf 按视口补默认。 */
   layers: z.record(Id, z.strictObject({ title: z.string().min(1), sceneId: Qid, role: Id.optional(), icon: z.enum(LAYER_ICONS).optional() })).default({}),
@@ -337,7 +341,7 @@ export const RULE_CONFIRMATIONS = ['pending', 'confirmed', 'conflict', 'out_of_s
 export const Rule = z.strictObject({
   id: Qid,
   featureId: Id,
-  optionId: Qid.optional(),
+  workId: Qid.optional(),
   text: z.string().min(1),
   origin: z.enum(RULE_ORIGINS),
   confirmation: z.enum(RULE_CONFIRMATIONS).default('pending'),
@@ -351,7 +355,7 @@ export const Rule = z.strictObject({
 export const Issue = z.strictObject({
   id: Qid,
   featureId: Id,
-  optionId: Qid.optional(),
+  workId: Qid.optional(),
   text: z.string().min(1),
   severity: z.enum(['blocker', 'major', 'minor']).default('major'),
   refs: z.array(z.string()).default([]),
@@ -427,26 +431,27 @@ export const Project = z.strictObject({
   mode: z.enum(['dev', 'publish', 'review']),
   routes: z.record(z.string(), Route).default({}),
   features: z.record(Id, Feature).default({}),
-  /** 编译器决定的演示顺序，发布时保留。旧 IR 可省略，读取时沿用其已有顺序。 */
-  featureIds: z.array(Id).optional(),
+  /** 编译器决定的条目顺序，发布时保留；每个条目恰好一次。 */
+  entryIds: z.array(Id),
   cases: z.record(Qid, Case).default({}),
-  options: z.record(Qid, Option).default({}),
+  works: z.record(Qid, Work).default({}),
   rules: z.record(Qid, Rule).default({}),
   scenes: z.record(Qid, Scene).default({}),
   scenarios: z.record(Qid, Scenario).default({}),
   issues: z.record(Qid, Issue).default({}),
 }).superRefine((p, ctx) => {
-  if (!p.featureIds) return;
-  const ids = new Set(p.featureIds);
-  if (ids.size !== p.featureIds.length || ids.size !== Object.keys(p.features).length || p.featureIds.some(id => !p.features[id]))
-    ctx.addIssue({ code: 'custom', path: ['featureIds'], message: 'featureIds must list every feature exactly once' });
+  const entries = [...Object.keys(p.features), ...Object.values(p.works).filter(w => !w.featureId).map(w => w.id)];
+  const ids = new Set(p.entryIds);
+  if (ids.size !== p.entryIds.length || ids.size !== entries.length || entries.some(id => !ids.has(id)))
+    ctx.addIssue({ code: 'custom', path: ['entryIds'], message: 'entryIds must list every entry exactly once' });
+
 });
 
 export type Project = z.infer<typeof Project>;
 export type Route = z.infer<typeof Route>;
 export type Feature = z.infer<typeof Feature>;
 export type Case = z.infer<typeof Case>;
-export type Option = z.infer<typeof Option>;
+export type Work = z.infer<typeof Work>;
 export type Coverage = z.infer<typeof Coverage>;
 export type Rule = z.infer<typeof Rule>;
 export type Issue = z.infer<typeof Issue>;

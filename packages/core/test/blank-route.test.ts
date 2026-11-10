@@ -4,7 +4,7 @@ import { chapter, layer, page, Slot, work } from '@joplo-app/kit';
 import { Stack, Text } from '@joplo-app/plugin-ui';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { fixtureConfig } from '../../../scripts/test/fixtures.ts';
-import { collectMessages, compile, localizeProject, stateAt, validate, type AuthoringProject } from '../src/index.ts';
+import { INTERNAL_BLANK_TITLE, visibleRoutes, collectMessages, compile, localizeProject, stateAt, validate, type AuthoringProject } from '../src/index.ts';
 
 const picture = (text = 'Author picture') => jsx(Text, { id: 'screen', children: text });
 const source = (layers = false): AuthoringProject => ({
@@ -34,16 +34,16 @@ describe('合成空白根页面', () => {
       const r = compile(src, mode); expect(r.project, JSON.stringify(r.diagnostics)).not.toBeNull();
       const p = r.project!;
       expect(collectMessages(p).map(m => m.text)).not.toContain('Work stage');
-      expect(p.routes['/']!.title.trim()).toBe('');
-      expect(p.scenes['@/']!.name.trim()).toBe('');
+      expect(p.routes['/']!.title).toBe(INTERNAL_BLANK_TITLE); expect(visibleRoutes(p).map(r=>r.path)).not.toContain('/'); expect(collectMessages(p).map(m=>m.text)).not.toContain(INTERNAL_BLANK_TITLE);
+      expect(p.scenes['@/']!.name).toBe(INTERNAL_BLANK_TITLE);
       expect(JSON.stringify(p)).not.toContain('Work stage');
       expect(r.diagnostics.filter(d => d.code.startsWith('I18N_'))).toEqual([]);
       expect(p.i18n!.stale?.ja ?? 0).toBe(0);
       const ja = localizeProject(p, 'ja');
-      expect(ja.routes['/']!.title.trim()).toBe('');
-      expect(ja.scenes['@/']!.name.trim()).toBe('');
+      expect(ja.routes['/']!.title).toBe(INTERNAL_BLANK_TITLE);
+      expect(ja.scenes['@/']!.name).toBe(INTERNAL_BLANK_TITLE);
       expect(validate(p).summary.error).toBe(0);
-      expect(stateAt(p, 'demo.main.one', 1)).toBeTruthy();
+      expect(stateAt(p, 'demo.one', 1)).toBeTruthy();
     }
   });
 
@@ -51,9 +51,9 @@ describe('合成空白根页面', () => {
     const src = withRoot(source(), 'demo'); translateAuthorText(src);
     const r = compile(src, mode); expect(r.project, JSON.stringify(r.diagnostics)).not.toBeNull();
     const p = r.project!;
-    expect(p.routes['/']).toMatchObject({ title: 'Real root', layout: null, slots: ['main'], addedBy: 'demo.main' });
+    expect(p.routes['/']).toMatchObject({ title: 'Real root', layout: null, slots: ['main'], addedBy: 'demo' });
     expect(p.scenes['@/']).toMatchObject({ name: 'Real root', viewport: 'mobile' });
-    expect(p.scenes['demo.main@/']).toMatchObject({ name: 'Real root · Route work', viewport: 'mobile' });
+    expect(p.scenes['demo@/']).toMatchObject({ name: 'Real root · Route work', viewport: 'mobile' });
     expect(collectMessages(p).map(m => m.text)).toContain('Real root');
     expect(r.diagnostics.filter(d => d.code.startsWith('I18N_'))).toEqual([]);
     expect(localizeProject(p, 'ja').routes['/']!.title).toBe('Translated: Real root');
@@ -65,8 +65,8 @@ describe('合成空白根页面', () => {
     const p = compile(src, 'dev').project!;
     expect(p.routes['/']!.title).toBe('Real root');
     expect(p.scenes['@/']!.name).toBe('Real root');
-    expect(p.scenes['demo.main@/']!.root.children).toBeUndefined();
-    expect(p.scenes['demo.main~stage']!.root.id).toBe('screen');
+    expect(p.scenes['demo@/']!.root.children).toBeUndefined();
+    expect(p.scenes['demo~stage']!.root.id).toBe('screen');
     expect(validate(p).summary.error).toBe(0);
   });
 
@@ -81,7 +81,7 @@ describe('合成空白根页面', () => {
   it('只有其他路径时仍补上空白 /，已有路径的作者标题照常翻译', () => {
     const src = source(); src.routes['/app'] = { ...page({ title: 'Real app', layout: false }, picture()), file: 'routes/app/page.tsx' };
     const p = compile(src, 'dev').project!;
-    expect(p.routes['/']!.title.trim()).toBe('');
+    expect(p.routes['/']!.title).toBe(INTERNAL_BLANK_TITLE); expect(visibleRoutes(p).map(r=>r.path)).not.toContain('/'); expect(collectMessages(p).map(m=>m.text)).not.toContain(INTERNAL_BLANK_TITLE);
     expect(p.routes['/app']!.title).toBe('Real app');
     expect(collectMessages(p).map(m => m.text)).toContain('Real app');
     expect(validate(p).summary.error).toBe(0);

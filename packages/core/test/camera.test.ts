@@ -6,7 +6,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { explain, feature, flow, layer, option, page, set, shot, Slot, $ } from '@joplo-app/kit';
+import { explain, feature, flow, layer, work, page, set, shot, Slot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { DIRECTOR_LAYER, LAYER_ICONS, PAGE_LAYER, cameraAt, compile, displaySceneId, explainClick, findNode, isNodeVisible, layersOf, layersWithNode, replay, stateAt, stepTouchesLayer, validate, type AuthoringProject } from '../src/index.ts';
 
@@ -27,9 +27,9 @@ function build(o: { layers?: Record<string, unknown> | null; steps?: (f: ReturnT
       .system('没有镜头')
       .system('回到整体', shot())
       .click('app_send', '再点一次：没有 shot，导演切到按钮所在的层')))(flow('整理发票', { start: '/' }));
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {},
     state: { ui: { sent: false } },
     ...(o.layers === null ? {} : { layers: (o.layers ?? { client: layer('客户端视角', clientTree()), backend: layer('后端流转', backendTree()) }) as never }),
@@ -40,7 +40,7 @@ function build(o: { layers?: Record<string, unknown> | null; steps?: (f: ReturnT
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return { dev: compile(src, 'dev'), publish: compile(src, 'publish') };
 }
@@ -63,13 +63,13 @@ describe('explain()：较长的解说写进 IR（T-director2）', () => {
 });
 
 describe('layer(title, tree)：每层一个独立画面', () => {
-  it('每层单独编译成画面（带 layer 键），不从路径页面里裁切；option.layers 指向这些画面', () => {
+  it('每层单独编译成画面（带 layer 键），不从路径页面里裁切；work.layers 指向这些画面', () => {
     const { dev } = build();
     expect(dev.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
     const p = dev.project!;
-    expect(p.options['f.a']!.layers).toEqual({ client: { title: '客户端视角', sceneId: 'f.a~client' }, backend: { title: '后端流转', sceneId: 'f.a~backend' } });
+    expect(p.works['f.a']!.layers).toEqual({ client: { title: '客户端视角', sceneId: 'f.a~client' }, backend: { title: '后端流转', sceneId: 'f.a~backend' } });
     const client = p.scenes['f.a~client']!;
-    expect(client).toMatchObject({ layer: 'client', optionId: 'f.a', viewport: 'desktop' });
+    expect(client).toMatchObject({ layer: 'client', workId: 'f.a', viewport: 'desktop' });
     expect(client.root.id).toBe('client_panel');
     expect(findNode(client, 'arch')).toBeNull(); // 客户端层里没有后端的内容
     expect(findNode(client, 'page_only')).toBeNull(); // 也没有路径页面的内容
@@ -120,24 +120,24 @@ describe('layer(title, tree)：每层一个独立画面', () => {
     const { dev, publish } = build({ layers: { client: layer('客户端视角', clientTree(), { icon: 'terminal' }), backend: layer('后端流转', backendTree()), phone: layer('手机', clientTree(), { viewport: 'mobile' }) } });
     expect(dev.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
     const p = dev.project!;
-    expect(p.options['f.a']!.layers.client!.icon).toBe('terminal');
-    expect(p.options['f.a']!.layers.backend!.icon).toBeUndefined();
+    expect(p.works['f.a']!.layers.client!.icon).toBe('terminal');
+    expect(p.works['f.a']!.layers.backend!.icon).toBeUndefined();
     expect(layersOf(p, sid).map((l) => [l.id, l.icon])).toEqual([['client', 'terminal'], ['backend', 'window'], ['phone', 'mobile']]);
-    expect(publish.project!.options['f.a']!.layers.client!.icon).toBe('terminal');
+    expect(publish.project!.works['f.a']!.layers.client!.icon).toBe('terminal');
     for (const icon of LAYER_ICONS) expect(build({ layers: { client: layer('c', clientTree(), { icon }) } }).dev.diagnostics.some((d) => d.code === 'ICON_UNKNOWN')).toBe(false);
     const bad = build({ layers: { client: layer('客户端视角', clientTree(), { icon: 'rocket' as never }), backend: layer('后端流转', backendTree()) } }).dev;
     const d = bad.diagnostics.find((x) => x.code === 'ICON_UNKNOWN');
     expect(d?.severity).toBe('error');
     expect(d?.message).toContain('rocket');
     expect(d?.at).toMatch(/camera\.test\.ts:\d+:\d+$/);
-    expect(bad.project?.options['f.a']?.layers.client?.icon).toBeUndefined();
+    expect(bad.project?.works['f.a']?.layers.client?.icon).toBeUndefined();
   });
 
   it('发布站保留层级画面与镜头', () => {
     const { publish } = build();
     expect(publish.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
     const p = publish.project!;
-    expect(p.options['f.a']!.layers.client!.sceneId).toBe('f.a~client');
+    expect(p.works['f.a']!.layers.client!.sceneId).toBe('f.a~client');
     expect(p.scenes['f.a~client']).toBeTruthy();
     expect(p.scenarios[sid]!.steps[0]!.directorLayer).toBe('client');
   });

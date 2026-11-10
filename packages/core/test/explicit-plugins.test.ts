@@ -1,13 +1,13 @@
 import { expect, test } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { config, feature, flow, option, page, Fragment } from '@joplo-app/kit';
+import { config, feature, flow, work, page, Fragment } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import ui, { Button } from '@joplo-app/plugin-ui';
 import { compile, type AuthoringProject } from '../src/index.ts';
 const file='/project/author.tsx';
 function source(plugins?:typeof ui[],tree=jsx(Fragment,{children:'Engine only'})):AuthoringProject{
- return {root:'/project',config:{...config({name:'Explicit',home:'/',...(plugins?{plugins}:{})}),file},layouts:{},routes:{'/':{...page({title:'Home',layout:false},tree),file}},features:{f:{def:{...feature({name:'Feature',goal:'Check plugin boundaries',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'Explicit plugins',scenarios:{s:flow('Scenario',{start:'/'}).system('Observe')}}),file}}}}};
+ return {root:'/project',config:{...config({name:'Explicit',home:'/',...(plugins?{plugins}:{})}),file},layouts:{},routes:{'/':{...page({title:'Home',layout:false},tree),file}},features:{f:{def:{...feature({name:'Feature',goal:'Check plugin boundaries',cases:{},pick:'a'}),file},works:{a:{...work({title:'A',summary:'Explicit plugins',scenarios:{s:flow('Scenario',{start:'/'}).system('Observe')}}),file}}}}};
 }
 test('no config.plugins means no plugins, including an explicit empty list',()=>{
  for(const plugins of [undefined,[]]){

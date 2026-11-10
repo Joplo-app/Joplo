@@ -29,7 +29,7 @@ export type Diagnostic = {
   message: string;
   source: DiagnosticSource;
   /** 定位：对象类别、ID，以及可选的场景/步骤/元素上下文。 */
-  ref?: { kind: string; id: string; optionId?: string; scenarioId?: string; stepId?: string; path?: string };
+  ref?: { kind: string; id: string; workId?: string; scenarioId?: string; stepId?: string; path?: string };
   /** 源文件位置 `相对路径:行:列`，Agent 据此只打开那一处。 */
   at?: string;
   /** 同一根因展开到多个画面 / 层级时，受影响的画面或对象（合并为一条后才有；新增字段）。 */

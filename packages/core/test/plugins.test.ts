@@ -6,7 +6,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, option, page, set, Slot, $ } from '@joplo-app/kit';
+import { feature, flow, work, page, set, Slot, $ } from '@joplo-app/kit';
 import { definePlugin, pluginComponent } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, explainClick, replay, stateAt, validate, type AuthoringProject } from '../src/index.ts';
@@ -30,13 +30,13 @@ function build(o: { plugins?: unknown[]; tree?: unknown; steps?: (f: ReturnType<
   const home = page({ title: 'Home', layout: false }, h(ui.Stack, null, h(Slot, { name: 'main' })));
   const tree = o.tree ?? h(Scene, { id: 'home' }, h(Obj, { id: 'sofa', shape: 'sofa' }), h(Target, { id: 'lamp', label: 'Lamp', lit: $.data.lamp }));
   const fl = (o.steps ?? ((f) => f.click('lamp', 'Turn the lamp off', set($.data.lamp, false))))(flow('Lamp', { start: '/' }));
-  const opt = option({ name: 'A', idea: 'i', on: { '/': { main: tree as never } }, state: { data: { lamp: true } }, scenarios: { s: fl } });
+  const opt = work({ title: 'A', summary: 'i', on: { '/': { main: tree as never } }, state: { data: { lamp: true } }, scenarios: { s: fl } });
   const src: AuthoringProject = {
     root: '/p',
     config: { ...config({ name: 'T', home: '/', plugins: (o.plugins ?? [plugin]) as never }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return { dev: compile(src, 'dev'), publish: compile(src, 'publish') };
 }

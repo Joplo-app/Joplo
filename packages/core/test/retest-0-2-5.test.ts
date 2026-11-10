@@ -3,7 +3,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  * 0.2.5 复测（X3）发现的问题：.back() 之后的画面推算、done 的结局、disabledReason 绑定状态。
  */
 import { describe, expect, it } from 'vitest';
-import { $, done, feature, flow, go, mark, option, page, set, shot, type Flow } from '@joplo-app/kit';
+import { $, done, feature, flow, go, mark, work, page, set, shot, type Flow } from '@joplo-app/kit';
 import * as ui from '@joplo-app/plugin-ui';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, explainClick, initialState, replay, stateAt, validate, type AuthoringProject } from '../src/index.ts';
@@ -21,7 +21,7 @@ function project(scenarios: Record<string, Flow>, opts: { tree?: unknown; state?
       '/': { ...page({ title: '首页', layout: false }, (opts.tree ?? home) as never), file: '/p/routes/page.tsx' },
       '/detail': { ...page({ title: '详情', layout: false }, detail), file: '/p/routes/detail/page.tsx' },
     },
-    features: { f: { def: { ...feature({ name: '功能', goal: '目标', cases: {}, pick: 'a' }), file: '/p/features/f/feature.ts' }, options: { a: { ...option({ name: '方案', idea: '说明', ...(opts.state ? { state: opts.state as never } : {}), scenarios }), file: '/p/features/f/options/a.tsx' } } } },
+    features: { f: { def: { ...feature({ name: '功能', goal: '目标', cases: {}, pick: 'a' }), file: '/p/features/f/feature.ts' }, works: { a: { ...work({ title: '方案', summary: '说明', ...(opts.state ? { state: opts.state as never } : {}), scenarios }), file: '/p/features/f/works/a.tsx' } } } },
   };
 }
 const codes = (src: AuthoringProject) => compile(src, 'dev').diagnostics.map((d) => d.code);

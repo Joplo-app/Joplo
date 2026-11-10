@@ -109,7 +109,7 @@ describe('作者内容多语言（D84）', () => {
 
   it('选项对象的 value 和状态、条件一起换：受控的 Tabs / Select 不会丢失选中项', () => {
     const p = {
-      name: 'P', description: '', routes: {}, features: {}, options: {}, cases: {}, rules: {}, issues: {},
+      name: 'P', description: '', routes: {}, features: {}, works: {}, cases: {}, rules: {}, issues: {},
       i18n: { default: 'en', locales: ['en', 'ja'], messages: { ja: { Overview: '概要' } } },
       plugins: { probe: {id:'probe',title:'Probe',components:{Chooser:{traits:{text:['data','value']}}}} },
       scenes: { s: { id: 's', root: { id: 'r', type: 'probe:Chooser', props: { value: '$ui.tab', data: [{ value: 'Overview', label: 'Overview' }] }, when: { eq: ['ui.tab', 'Overview'] } } } },

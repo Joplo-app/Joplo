@@ -29,7 +29,7 @@ const eventBase = {
 export const LocalReviewEvent = z.discriminatedUnion('type', [
   z.strictObject({ ...eventBase, type: z.literal('feedback'), body: z.string().trim().min(1).max(LOCAL_REVIEW_MAX_BODY), context: LocalReviewContext }),
   z.strictObject({ ...eventBase, type: z.literal('approved') }),
-  z.strictObject({ ...eventBase, type: z.literal('closed'), reason: z.enum(['source_changed', 'compile_error', 'option_removed', 'server_stopped']) }),
+  z.strictObject({ ...eventBase, type: z.literal('closed'), reason: z.enum(['source_changed', 'compile_error', 'work_removed', 'server_stopped']) }),
 ]);
 export type LocalReviewEvent = z.infer<typeof LocalReviewEvent>;
 export const LocalReviewSession = z.strictObject({
@@ -42,8 +42,8 @@ export const LocalReviewSession = z.strictObject({
   projectName: z.string(),
   featureId: ref,
   featureName: z.string(),
-  optionId: ref,
-  optionName: z.string(),
+  workId: ref,
+  workTitle: z.string(),
   revision: z.string().regex(/^[a-f0-9]{64}$/),
   createdAt: z.iso.datetime(),
   url: z.string().url(),

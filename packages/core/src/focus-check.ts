@@ -23,7 +23,7 @@ export function focusStructureDiagnostics(p: Project, scenarios: Scenario[], emi
     const sceneOfLayer = (lk: string): Scene | undefined => p.scenes[layers.find((l) => l.id === lk)?.sceneId ?? ''];
     sc.steps.forEach((st, i) => {
       const at = st.source ?? sc.source;
-      const ref = { kind: 'step' as const, id: st.id, optionId: sc.optionId, stepId: st.id };
+      const ref = { kind: 'step' as const, id: st.id, workId: sc.workId, stepId: st.id };
       for (const c of st.callouts ?? []) {
         const n = captionLength(c.text);
         if (n > CAPTION_MAX) emit('warning', 'CALLOUT_TOO_LONG', `callout("${c.target}") text is ${n} units (recommended maximum: ${CAPTION_MAX}, same as captions): "${c.text}". Say one reason in a few words; put the rest in explain()`, at, ref);
@@ -65,7 +65,7 @@ export function focusReplayDiagnostics(p: Project, sc: Scenario, emit: Emit): vo
   const flush = () => {
     if (run.length >= FOCUS_IDLE_RUN) {
       const first = sc.steps[run[0]!]!;
-      emit('info', 'FOCUS_IDLE', `${run.length} system steps in a row (${run.map((i) => i + 1).join(', ')}) change nothing on stage, so viewers only read captions. Merge them into one step, or show what happens: shot / highlight / callout the element, or set() state that the stage displays`, first.source ?? sc.source, { kind: 'step', id: first.id, optionId: sc.optionId, stepId: first.id });
+      emit('info', 'FOCUS_IDLE', `${run.length} system steps in a row (${run.map((i) => i + 1).join(', ')}) change nothing on stage, so viewers only read captions. Merge them into one step, or show what happens: shot / highlight / callout the element, or set() state that the stage displays`, first.source ?? sc.source, { kind: 'step', id: first.id, workId: sc.workId, stepId: first.id });
     }
     run = [];
   };

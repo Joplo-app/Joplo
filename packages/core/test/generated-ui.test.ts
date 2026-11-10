@@ -1,6 +1,6 @@
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { expect, it } from 'vitest';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import * as ui from '@joplo-app/plugin-ui';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, explainClick, initialState, type AuthoringProject } from '../src/index.ts';
@@ -12,13 +12,13 @@ const tree=jsx(ui.Stack,{children:[h(ui.Button,{id:'button',children:'作者按�
 const src: AuthoringProject={
   root:'/p',config:{...config({name:'Author project'}),file:'/p/joplo.config.ts'},layouts:{},
   routes:{'/':{...page({title:'Author page',layout:false},tree),file:'/p/routes/page.tsx'}},
-  features:{f:{def:{...feature({name:'Author feature',goal:'Author goal',cases:{},pick:'a'}),file:'/p/features/f/feature.ts'},options:{a:{...option({name:'Author option',idea:'Author idea',scenarios:{
+  features:{f:{def:{...feature({name:'Author feature',goal:'Author goal',cases:{},pick:'a'}),file:'/p/features/f/feature.ts'},works:{a:{...work({title:'Author work',summary:'Author idea',scenarios:{
     run:flow('Author scenario',{start:'/'}).click('button').type('input','作者輸入').select('select','one').toggle('check',true).toggle('check',false).toggle('switch',true).toggle('switch',false).back().press('Enter').press('').click('button','作者字幕').system('作者事件').card('作者卡片'),
     custom:flow('Author mock',{start:'/',mock:'作者模擬'}),
     failure:flow('Failure',{start:'/',outcome:'failure'}),
     denied:flow('Denied',{start:'/',outcome:'denied'}),
     other:flow('Other',{start:'/',outcome:'other'}),
-  }}),file:'/p/features/f/options/a.tsx'}}}},
+  }}),file:'/p/features/f/works/a.tsx'}}}},
 };
 
 for(const mode of ['dev','publish'] as const) it(`${mode}: preserves structured automatic UI text and author content through schema parsing`,()=>{

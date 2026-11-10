@@ -1,6 +1,6 @@
 import { pluginSpec } from './catalog.ts';
 import { entryOf, playSequence, scenariosOf } from './entries.ts';
-import { orderedFeatures } from './features.ts';
+import { featuresOf } from './features.ts';
 import { Project, type SceneNode } from './schema.ts';
 import { CAPTION_MAX, CARD_POINTS_MAX, DESCRIPTION_MAX, EXPLAIN_MAX, SAY_MAX, isInteractiveType, SCENARIO_MS_MAX, captionLength } from './catalog.ts';
 import { scenarioEstimateMs } from './outline.ts';
@@ -9,7 +9,7 @@ import { JoploError, type Diagnostic } from './result.ts';
 import { schemaDiagnostics } from './schema-issues.ts';
 import { focusReplayDiagnostics, focusStructureDiagnostics } from './focus-check.ts';
 
-export type ValidationOptions = { optionId?: string; mode: 'structure' | 'replay' | 'all' };
+export type ValidationOptions = { workId?: string; mode: 'structure' | 'replay' | 'all' };
 export type ValidationReport = {
   diagnostics: Diagnostic[];
   summary: Record<'error' | 'warning' | 'info', number>;
@@ -22,13 +22,8 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
   const diagnostics: Diagnostic[] = [];
   const verification: ValidationReport['verification'] = {};
   const seen = new Set<string>();
-  const publicMessage = (message: string) => {
-    for (const f of Object.values(project?.features ?? {})) if (f?.standalone) message = message.replaceAll(`Option ${f.id}.main`, `Work ${f.id}`).replaceAll(`option ${f.id}.main`, `work ${f.id}`).replaceAll(`${f.id}.main`, f.id);
-    return message;
-  };
   const emit = (severity: Diagnostic['severity'], code: string, message: string, at: string | undefined,
     ref?: Diagnostic['ref'], source: Diagnostic['source'] = 'structure') => {
-    message = publicMessage(message);
     const location = at ?? 'joplo.config.ts:1:1';
     // 同一布局/页面会复制到许多画面。相同问题只输出一次；不同情况/元素的诊断仍保留。
     const key = JSON.stringify([severity, code, location, message]);
@@ -44,68 +39,68 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
   const parsed = Project.safeParse(project);
   if (!parsed.success) {
     // 与编译器同一套：定位到最近的作者元素，同一根因合并成一条（schema-issues.ts）
-    for (const d of schemaDiagnostics(project, parsed.error.issues)) diagnostics.push({ ...d, message: publicMessage(d.message), at: d.at ?? 'joplo.config.ts:1:1' });
+    for (const d of schemaDiagnostics(project, parsed.error.issues)) diagnostics.push({ ...d, at: d.at ?? 'joplo.config.ts:1:1' });
     return report();
   }
   const p = parsed.data;
-  if (opts.optionId && !Object.hasOwn(p.options, opts.optionId)) throw new JoploError('USAGE', `Option does not exist: ${opts.optionId}`);
-  const options = Object.values(p.options).filter(o => !opts.optionId || o.id === opts.optionId);
-  const included = (optionId?: string | null) => !opts.optionId || !optionId || optionId === opts.optionId;
-  const scenarios = Object.values(p.scenarios).filter(s => included(s.optionId));
+  if (opts.workId && !Object.hasOwn(p.works, opts.workId)) throw new JoploError('USAGE', `Work does not exist: ${opts.workId}`);
+  const works = Object.values(p.works).filter(o => !opts.workId || o.id === opts.workId);
+  const included = (workId?: string | null) => !opts.workId || !workId || workId === opts.workId;
+  const scenarios = Object.values(p.scenarios).filter(s => included(s.workId));
   const chapterLabels = new Map<string, string>();
-  for (const o of Object.values(p.options)) if (o.sequencing === 'linear') {
+  for (const o of Object.values(p.works)) if (o.sequencing === 'linear') {
     const sequence = playSequence(p, o.id);
     const ids = new Set(sequence.map(s => s.id));
     [...sequence, ...scenariosOf(p, o.id).filter(s => !ids.has(s.id))].forEach((s, i) => chapterLabels.set(s.id, `Chapter ${String(i + 1).padStart(2, '0')}`));
   }
-  const ref = (ok: unknown, message: string, value: { id: string; source?: string; optionId?: string }, kind: string) => {
-    if (!ok) emit('error', 'INVALID_REFERENCE', message, value.source, { kind, id: value.id, optionId: value.optionId }, 'reference');
+  const ref = (ok: unknown, message: string, value: { id: string; source?: string; workId?: string }, kind: string) => {
+    if (!ok) emit('error', 'INVALID_REFERENCE', message, value.source, { kind, id: value.id, workId: value.workId }, 'reference');
   };
-  for (const o of options) verification[o.id] = 'unchecked';
+  for (const o of works) verification[o.id] = 'unchecked';
   if (opts.mode !== 'replay') {
-    for (const [kind, table] of Object.entries({ feature: p.features, case: p.cases, option: p.options, rule: p.rules, scenario: p.scenarios, issue: p.issues })) {
+    for (const [kind, table] of Object.entries({ feature: p.features, case: p.cases, work: p.works, rule: p.rules, scenario: p.scenarios, issue: p.issues })) {
       for (const [id, value] of Object.entries(table)) {
-        const optionId = 'optionId' in value ? value.optionId : kind === 'option' ? id : undefined;
-        if (included(optionId)) ref(id === value.id, `Record key ${id} does not match object ID ${value.id}`, { ...value, optionId }, kind);
+        const workId = 'workId' in value ? value.workId : kind === 'work' ? id : undefined;
+        if (included(workId)) ref(id === value.id, `Record key ${id} does not match object ID ${value.id}`, { ...value, workId }, kind);
       }
     }
-    for (const c of Object.values(p.cases).filter(c => !opts.optionId || c.featureId === p.options[opts.optionId]?.featureId)) {
+    for (const c of Object.values(p.cases).filter(c => !opts.workId || c.featureId === p.works[opts.workId]?.featureId)) {
       ref(p.features[c.featureId]?.caseIds.includes(c.id), `Case feature does not exist or does not list the case: ${c.featureId}`, c, 'case');
     }
-    for (const f of orderedFeatures(p).filter(f => !opts.optionId || f.optionIds.includes(opts.optionId))) {
+    for (const f of featuresOf(p).filter(f => !opts.workId || f.workIds.includes(opts.workId))) {
       for (const id of f.caseIds) ref(p.cases[id]?.featureId === f.id, `Feature case is missing or belongs to another feature: ${id}`, f, 'feature');
-      for (const id of f.optionIds) ref(p.options[id]?.featureId === f.id, `Feature option is missing or belongs to another feature: ${id}`, f, 'feature');
-      if (f.pick) ref(p.options[f.pick]?.featureId === f.id, `Picked option is missing or belongs to another feature: ${f.pick}`, f, 'feature');
+      for (const id of f.workIds) ref(p.works[id]?.featureId === f.id, `Feature work is missing or belongs to another feature: ${id}`, f, 'feature');
+      if (f.pick) ref(p.works[f.pick]?.featureId === f.id, `Picked work is missing or belongs to another feature: ${f.pick}`, f, 'feature');
     }
-    for (const o of options) {
-      const value = { ...o, optionId: o.id };
-      ref(p.features[o.featureId]?.optionIds.includes(o.id), `Option feature does not exist or does not list the option: ${o.featureId}`, value, 'option');
+    for (const o of works) {
+      const value = { ...o, workId: o.id };
+      if (o.featureId) ref(p.features[o.featureId]?.workIds.includes(o.id), `Work feature does not exist or does not list the work: ${o.featureId}`, value, 'work');
       const cases = Object.values(p.cases).filter(c => c.featureId === o.featureId);
-      for (const c of cases) if (!o.coverage[c.id]) emit('warning', 'CASE_NOT_COVERED', `Case has no coverage: ${c.id} ${c.title}`, o.source, { kind: 'case', id: c.id, optionId: o.id });
-      for (const [id, c] of Object.entries(o.coverage)) {
-        const r = { kind: 'case', id, optionId: o.id };
-        ref(p.cases[id]?.featureId === o.featureId, `coverage case is missing or belongs to another feature: ${id}`, value, 'option');
-        for (const sid of c.scenarioIds) ref(p.scenarios[sid]?.optionId === o.id, `coverage scenario is missing or belongs to another option: ${sid}`, value, 'option');
+      for (const c of cases) if (!(o.featureId ? p.features[o.featureId]?.alternatives[o.id]?.coverage ?? {} : {})[c.id]) emit('warning', 'CASE_NOT_COVERED', `Case has no coverage: ${c.id} ${c.title}`, o.source, { kind: 'case', id: c.id, workId: o.id });
+      for (const [id, c] of Object.entries((o.featureId ? p.features[o.featureId]?.alternatives[o.id]?.coverage ?? {} : {}))) {
+        const r = { kind: 'case', id, workId: o.id };
+        ref(p.cases[id]?.featureId === o.featureId, `coverage case is missing or belongs to another feature: ${id}`, value, 'work');
+        for (const sid of c.scenarioIds) ref(p.scenarios[sid]?.workId === o.id, `coverage scenario is missing or belongs to another work: ${sid}`, value, 'work');
         if (c.status === 'expressed' && !c.scenarioIds.length) emit('warning', 'EXPRESSED_WITHOUT_SCENARIO', `Covered case has no scenario: ${id}`, o.source, r);
         if (['not_applicable', 'excluded'].includes(c.status) && !c.reason?.trim()) emit('warning', 'COVERAGE_WITHOUT_REASON', `Not applicable or Excluded requires a reason: ${id}`, o.source, r);
         if (c.status === 'missing') emit('warning', 'CASE_NOT_COVERED', `Case is not yet Covered: ${id} ${p.cases[id]?.title ?? ''}${caseHint(p.cases[id])}`, o.source, r);
       }
     }
     // 只有顺利路径（D67，Joplo 要解决的“看不全”）：功能只声明了 main 情况，而且参与的方案里每个场景都成功
-    for (const f of orderedFeatures(p).filter(f => !opts.optionId || f.optionIds.includes(opts.optionId))) {
-      const own = scenarios.filter(s => p.options[s.optionId]?.featureId === f.id);
+    for (const f of featuresOf(p).filter(f => !opts.workId || f.workIds.includes(opts.workId))) {
+      const own = scenarios.filter(s => p.works[s.workId]?.featureId === f.id);
       const edge = f.caseIds.some(id => p.cases[id] && p.cases[id]!.dimension !== 'main');
       if (entryOf(p, f.id)?.featureId !== null && p.mode === 'dev' && own.length && !edge && own.every(s => s.mock.outcome === 'success'))
         emit('info', 'HAPPY_PATH_ONLY', `Feature "${f.name}" only shows the happy path: every case is a main-flow case and every scenario succeeds. Ask the user about input, permission, async, and lifecycle cases (npx joplo skill cases), then add at least one error-and-recovery scenario`, f.source, { kind: 'feature', id: f.id });
     }
-    for (const r of Object.values(p.rules).filter(r => included(r.optionId) && (!opts.optionId || r.featureId === p.options[opts.optionId]?.featureId))) {
+    for (const r of Object.values(p.rules).filter(r => included(r.workId) && (!opts.workId || r.featureId === p.works[opts.workId]?.featureId))) {
       ref(p.features[r.featureId], `Rule feature does not exist: ${r.featureId}`, r, 'rule');
-      if (r.optionId) ref(p.options[r.optionId]?.featureId === r.featureId, `Rule option is missing or belongs to another feature: ${r.optionId}`, r, 'rule');
+      if (r.workId) ref(p.works[r.workId]?.featureId === r.featureId, `Rule work is missing or belongs to another feature: ${r.workId}`, r, 'rule');
       for (const id of r.caseIds) ref(p.cases[id]?.featureId === r.featureId, `Rule case is missing or belongs to another feature: ${id}`, r, 'rule');
-      const scenes = Object.values(p.scenes).filter(s => s.optionId && (r.optionId ? s.optionId === r.optionId : p.options[s.optionId]?.featureId === r.featureId));
-      for (const id of r.elementIds) if (!scenes.some(s => findNode(s, id))) emit('warning', 'RULE_ELEMENT_NOT_FOUND', `Rule element is absent from every stage in the related options: ${id}`, r.source, { kind: 'rule', id: r.id, optionId: r.optionId });
-      if (r.origin === 'ai_assumption' && r.confirmation === 'pending') emit('info', 'PENDING_AI_ASSUMPTION', r.text, r.source, { kind: 'rule', id: r.id, optionId: r.optionId });
-      if (r.origin === 'ai_assumption' && r.confirmation === 'confirmed') emit('error', 'ASSUMPTION_CONFIRMED', 'An AI assumption cannot be Confirmed', r.source, { kind: 'rule', id: r.id, optionId: r.optionId });
+      const scenes = Object.values(p.scenes).filter(s => s.workId && (r.workId ? s.workId === r.workId : p.works[s.workId]?.featureId === r.featureId));
+      for (const id of r.elementIds) if (!scenes.some(s => findNode(s, id))) emit('warning', 'RULE_ELEMENT_NOT_FOUND', `Rule element is absent from every stage in the related works: ${id}`, r.source, { kind: 'rule', id: r.id, workId: r.workId });
+      if (r.origin === 'ai_assumption' && r.confirmation === 'pending') emit('info', 'PENDING_AI_ASSUMPTION', r.text, r.source, { kind: 'rule', id: r.id, workId: r.workId });
+      if (r.origin === 'ai_assumption' && r.confirmation === 'confirmed') emit('error', 'ASSUMPTION_CONFIRMED', 'An AI assumption cannot be Confirmed', r.source, { kind: 'rule', id: r.id, workId: r.workId });
     }
     // 从每个场景的路径和跳转追踪步骤目标；只按 id 全局匹配会误认其他页面的同名元素。
     const identity = (n: SceneNode) => JSON.stringify([n.source ?? '', n.from ?? '', n.id]);
@@ -114,32 +109,32 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
       let sceneId = sc.initial.sceneId;
       const stack: string[] = [];
       // 有层级的方案（T-layers）：步骤目标在各层自己的画面里（多层有同一个元素时都算绑定）
-      const layerScenes = Object.values(p.options[sc.optionId]?.layers ?? {}).map((l) => p.scenes[l.sceneId]).filter((x): x is NonNullable<typeof x> => !!x);
+      const layerScenes = Object.values(p.works[sc.workId]?.layers ?? {}).map((l) => p.scenes[l.sceneId]).filter((x): x is NonNullable<typeof x> => !!x);
       for (const step of sc.steps) {
         const s = p.scenes[sceneId];
         const hit = s && 'target' in step.action ? findNode(s, step.action.target)?.node : undefined;
-        if (hit && (!hit.from || hit.from === sc.optionId)) bound.add(identity(hit));
+        if (hit && (!hit.from || hit.from === sc.workId)) bound.add(identity(hit));
         if ('target' in step.action) for (const ls of layerScenes) { const h = findNode(ls, step.action.target)?.node; if (h) bound.add(identity(h)); }
         if (step.action.type === 'back') sceneId = stack.pop() ?? sceneId;
         for (const e of step.effects) if (e.type === 'navigate') { stack.push(sceneId); sceneId = e.sceneId; }
       }
     }
-    for (const option of Object.values(p.options)) for (const reaction of Object.values(option.free ?? {})) {
+    for (const work of Object.values(p.works)) for (const reaction of Object.values(work.free ?? {})) {
       if (!('target' in reaction.action)) continue;
-      for (const scene of Object.values(p.scenes).filter(s => s.optionId === option.id || s.optionId === null)) {
+      for (const scene of Object.values(p.scenes).filter(s => s.workId === work.id || s.workId === null)) {
         const hit = findNode(scene, reaction.action.target)?.node;
-        if (hit && (!hit.from || hit.from === option.id)) bound.add(identity(hit));
+        if (hit && (!hit.from || hit.from === work.id)) bound.add(identity(hit));
       }
     }
-    for (const s of Object.values(p.scenes).filter(s => included(s.optionId))) {
-      const value = { id: s.id, optionId: s.optionId ?? undefined, source: s.root.source ?? (s.optionId ? p.options[s.optionId]?.source : undefined) };
+    for (const s of Object.values(p.scenes).filter(s => included(s.workId))) {
+      const value = { id: s.id, workId: s.workId ?? undefined, source: s.root.source ?? (s.workId ? p.works[s.workId]?.source : undefined) };
       ref(p.scenes[s.id] === s, `Stage key does not match ID: ${s.id}`, value, 'scene');
-      if (s.optionId) ref(p.options[s.optionId], `Stage option does not exist: ${s.optionId}`, value, 'scene');
+      if (s.workId) ref(p.works[s.workId], `Stage work does not exist: ${s.workId}`, value, 'scene');
       ref(p.routes[s.route], `Stage route does not exist: ${s.route}`, value, 'scene');
       const ids = new Set<string>();
       walkNodes(s.root, n => {
         if (pluginSpec(p.plugins, n.type)?.needsId && n.id.startsWith('_')) emit('error', 'MISSING_ID', `<${n.type}> requires an author id; recompile after adding id`, n.source, { kind: 'element', id: n.id });
-        const r = { kind: 'element', id: n.id, optionId: n.from ?? s.optionId ?? undefined };
+        const r = { kind: 'element', id: n.id, workId: n.from ?? s.workId ?? undefined };
         if (ids.has(n.id)) emit('error', 'DUPLICATE_ELEMENT', `Duplicate element ID in stage: ${n.id}`, n.source, r, 'reference');
         ids.add(n.id);
         // Plugins may declare disabled as presentation-only, which requires no unavailability reason.
@@ -149,12 +144,12 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     }
     const stepIds = new Set<string>();
     for (const sc of scenarios) {
-      const o = p.options[sc.optionId];
-      ref(o, `Scenario option does not exist: ${sc.optionId}`, sc, 'scenario');
-      ref(p.scenes[sc.initial.sceneId]?.optionId === sc.optionId, `Scenario initial stage is missing or belongs to another option: ${sc.initial.sceneId}`, sc, 'scenario');
+      const o = p.works[sc.workId];
+      ref(o, `Scenario work does not exist: ${sc.workId}`, sc, 'scenario');
+      ref(p.scenes[sc.initial.sceneId]?.workId === sc.workId, `Scenario initial stage is missing or belongs to another work: ${sc.initial.sceneId}`, sc, 'scenario');
       for (const id of sc.caseIds) ref(p.cases[id]?.featureId === o?.featureId, `Scenario case is missing or belongs to another feature: ${id}`, sc, 'scenario');
       const chapter = chapterLabels.get(sc.id);
-      const sr = { kind: 'scenario', id: sc.id, optionId: sc.optionId };
+      const sr = { kind: 'scenario', id: sc.id, workId: sc.workId };
       if (!sc.steps.length) emit('info', 'EMPTY_SCENARIO', chapter ? `${chapter} has no steps: ${sc.name}` : `Scenario has no steps: ${sc.name}`, sc.source, sr);
       // 叙事（D67）：封面说明 30 字以内（D61）；一个场景讲一件事，太长时拆开
       const dl = captionLength(sc.description);
@@ -162,12 +157,12 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
       const ms = scenarioEstimateMs(p, sc);
       if (ms > SCENARIO_MS_MAX) emit('info', 'SCENARIO_TOO_LONG', `${chapter ?? 'Scenario'} "${sc.name}" plays about ${Math.round(ms / 1000)} s at 1× (${sc.steps.length} steps; recommended maximum: ${SCENARIO_MS_MAX / 1000} s). ${chapter ? 'One chapter tells one thing: split it into chapters' : 'One scenario tells one thing: split it into scenarios (for example the happy path and each recovery)'}, or branch with fork(); run npx joplo outline to see the pacing`, sc.source, sr);
       for (const st of sc.steps) {
-        const value = { ...st, optionId: sc.optionId };
+        const value = { ...st, workId: sc.workId };
         ref(!stepIds.has(st.id), `Duplicate step ID: ${st.id}`, value, 'step'); stepIds.add(st.id);
-        for (const id of st.ruleIds) { const rule = p.rules[id]; ref(rule && rule.featureId === o?.featureId && (!rule.optionId || rule.optionId === sc.optionId), `Step rule is missing or outside its scope: ${id}`, value, 'step'); }
-        for (const e of st.effects) if (e.type === 'navigate') ref(p.scenes[e.sceneId]?.optionId === sc.optionId, `Navigation stage is missing or belongs to another option: ${e.sceneId}`, value, 'step');
+        for (const id of st.ruleIds) { const rule = p.rules[id]; ref(rule && rule.featureId === o?.featureId && (!rule.workId || rule.workId === sc.workId), `Step rule is missing or outside its scope: ${id}`, value, 'step'); }
+        for (const e of st.effects) if (e.type === 'navigate') ref(p.scenes[e.sceneId]?.workId === sc.workId, `Navigation stage is missing or belongs to another work: ${e.sceneId}`, value, 'step');
         // 字幕只用来点一句（只提示，不截断、不改写作者的文字）；长内容放进单独的说明层，由导演切过去讲
-        const r = { kind: 'step' as const, id: st.id, optionId: sc.optionId, stepId: st.id };
+        const r = { kind: 'step' as const, id: st.id, workId: sc.workId, stepId: st.id };
         const at = st.source ?? sc.source;
         const cl = captionLength(st.caption);
         if (cl > CAPTION_MAX) emit('warning', 'CAPTION_TOO_LONG', `Caption length is ${cl} units (recommended maximum: ${CAPTION_MAX}; CJK characters count as 1 each, all others as 0.5; whitespace is not counted): "${st.caption}". Keep the caption to one point; move details to a separate explanation layer, for example layers: { why: layer('Design rationale', <Why />) }, then use shot('why_xxx') in this step to present it`, at, r);
@@ -194,7 +189,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
       }
     }
     focusStructureDiagnostics(p, scenarios, emit); // 焦点提示（D70）
-    for (const o of options) if (!diagnostics.some(d => d.severity === 'error' && (!d.ref?.optionId || d.ref.optionId === o.id))) verification[o.id] = 'structure_ok';
+    for (const o of works) if (!diagnostics.some(d => d.severity === 'error' && (!d.ref?.workId || d.ref.workId === o.id))) verification[o.id] = 'structure_ok';
   }
   if (opts.mode !== 'structure') {
     const failed = new Set<string>();
@@ -202,12 +197,12 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
       const result = replay(p, sc.id);
       if (!result.diagnostics.length) focusReplayDiagnostics(p, sc, emit); // 焦点提示（D70）
       for (const d of result.diagnostics) {
-        failed.add(sc.optionId);
+        failed.add(sc.workId);
         const step = sc.steps.find(st => st.id === (d.ref?.stepId ?? d.ref?.id)) ?? (result.finalState ? sc.steps[result.reached] : undefined);
-        emit(d.severity, d.code, d.message, step?.source ?? sc.source ?? p.options[sc.optionId]?.source, { ...d.ref, kind: d.ref?.kind ?? 'scenario', id: d.ref?.id ?? sc.id, optionId: sc.optionId }, 'replay');
+        emit(d.severity, d.code, d.message, step?.source ?? sc.source ?? p.works[sc.workId]?.source, { ...d.ref, kind: d.ref?.kind ?? 'scenario', id: d.ref?.id ?? sc.id, workId: sc.workId }, 'replay');
       }
     }
-    for (const o of options) if (!failed.has(o.id) && scenarios.some(s => s.optionId === o.id) && (opts.mode === 'replay' || verification[o.id] === 'structure_ok')) verification[o.id] = 'replay_ok';
+    for (const o of works) if (!failed.has(o.id) && scenarios.some(s => s.workId === o.id) && (opts.mode === 'replay' || verification[o.id] === 'structure_ok')) verification[o.id] = 'replay_ok';
   }
   return report();
 }

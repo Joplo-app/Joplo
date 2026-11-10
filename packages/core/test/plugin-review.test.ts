@@ -1,7 +1,7 @@
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { trace as pluginTrace } from '@joplo-app/plugin-diagram/effects';
 import { describe, expect, it } from 'vitest';
-import { feature, flow, option, page, layer, Slot } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
+import { feature, flow, work, page, layer, Slot } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx as h } from '@joplo-app/kit/jsx-runtime';
 import { Diagram, StateMachine } from '@joplo-app/plugin-diagram';
 import { definePlugin, pluginComponent, pluginEffect } from '@joplo-app/kit/plugin';
@@ -13,12 +13,12 @@ const file = '/p/test.tsx';
 const schema = { safeParse: () => ({ success: true }) };
 function plugin(hooks: any, extra: any = {}) { return definePlugin({ id: 'probe', title: 'Probe', runtime: '/probe.js', components: { Item: { doc: 'item' } }, schemas: { node: schema, step: schema }, compile: hooks, ...extra }); }
 function source(tree: any, plugins: any[] = [], effects: any[] = []): AuthoringProject {
-  return { root: '/p', config: { ...config({ name: 'Test', plugins }), file }, layouts: {}, routes: { '/': { ...page({ title: 'Home' }, tree), file } }, features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('One', ...effects).system('Two') } }), file } } } } };
+  return { root: '/p', config: { ...config({ name: 'Test', plugins }), file }, layouts: {}, routes: { '/': { ...page({ title: 'Home' }, tree), file } }, features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'A', summary: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('One', ...effects).system('Two') } }), file } } } } };
 }
 describe('P1-A review regressions', () => {
   it('rechecks identities after derive, even if trusted code changes an external scene reference', async () => {
     const { PluginCompiler } = await import('../src/plugins/compiler.ts');
-    const scene: any = { id: 'stage', optionId: null, route: '/', name: 'Stage', viewport: 'desktop', root: { id: 'root', type: 'probe:Item' } };
+    const scene: any = { id: 'stage', workId: null, route: '/', name: 'Stage', viewport: 'desktop', root: { id: 'root', type: 'probe:Item' } };
     const p = plugin({ derive() { scene.root.children = [{ id: 'same', type: 'ui:Text' }, { id: 'same', type: 'ui:Text' }]; } });
     const codes: string[] = [];
     new PluginCompiler([p], code => { codes.push(code); }).derive(scene);
@@ -75,7 +75,7 @@ describe('P1-A review regressions', () => {
   });
   it('removes omitted contributions from both the node tree and every derived slot', () => {
     const s = source(h(Diagram, { id: 'd', children: [h(Diagram.Node, { id: 'public', label: 'Public' }), h(Slot, { name: 'nodes' })] }));
-    s.features.g = { def: { ...feature({ name: 'Secret feature', goal: 'secret', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'Secret', idea: 'secret', on: { '/': { nodes: h(Diagram.Node, { id: 'secret', label: 'SECRET-LABEL', description: 'SECRET-DESCRIPTION' }) } }, scenarios: { s: flow('Secret', { start: '/' }).system('Secret') } }), file } } };
+    s.features.g = { def: { ...feature({ name: 'Secret feature', goal: 'secret', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'Secret', summary: 'secret', on: { '/': { nodes: h(Diagram.Node, { id: 'secret', label: 'SECRET-LABEL', description: 'SECRET-DESCRIPTION' }) } }, scenarios: { s: flow('Secret', { start: '/' }).system('Secret') } }), file } } };
     for (const mode of ['dev', 'publish', 'review'] as const) {
       const result = compile(s, mode);
       expect(result.diagnostics).toEqual([]);
@@ -100,7 +100,7 @@ describe('P1-A review regressions', () => {
       data: { node: { text: [['rows', '*', 'text']], scope: [rule] }, step: { text: [['byScene', '*', 'rows', '*', 'text']], scope: [{ path: ['byScene'], kind: 'map', domain: 'scene', children: [rule] }] } },
     });
     const s = source(h(pluginComponent(p, 'Item'), { id: 'root', children: [h('ui:Text', { id: 'public', label: 'Public' }), h(Slot, { name: 'foreign' })] }), [p]);
-    s.features.g = { def: { ...feature({ name: 'G', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'G', idea: 'g', on: { '/': { foreign: h('ui:Text', { id: 'cut', label: 'SECRET-CACHE-LABEL', children: 'SECRET-CACHE-LABEL' }) } }, scenarios: { s: flow('G', { start: '/' }).system('G') } }), file } } };
+    s.features.g = { def: { ...feature({ name: 'G', goal: 'g', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'G', summary: 'g', on: { '/': { foreign: h('ui:Text', { id: 'cut', label: 'SECRET-CACHE-LABEL', children: 'SECRET-CACHE-LABEL' }) } }, scenarios: { s: flow('G', { start: '/' }).system('G') } }), file } } };
     const r = compile(s, 'publish');
     expect(r.diagnostics).toEqual([]);
     expect(JSON.stringify(r.project!.scenarios['f.a.s']!.ext)).toContain('SECRET-CACHE-LABEL');
@@ -117,7 +117,7 @@ describe('P1-A review regressions', () => {
     const machine = (ids: string[], value: string) => h(StateMachine, { id: 'machine', value, children: ids.map(id => h(StateMachine.State, { id, label: id })) });
     const s = source(machine(['a', 'b'], 'a'));
     s.routes['/other'] = { ...page({ title: 'Other' }, machine(['x', 'y'], 'y')), file };
-    s.features.f!.options.a!.layers = { left: layer('Left', machine(['a', 'b'], 'a')), right: layer('Right', machine(['x', 'y'], 'y')) };
+    s.features.f!.works.a!.layers = { left: layer('Left', machine(['a', 'b'], 'a')), right: layer('Right', machine(['x', 'y'], 'y')) };
     const r = compile(s, 'dev');
     expect(r.diagnostics).toEqual([]);
     const frame = r.project!.scenarios['f.a.s']!.ext!.diagram as any;

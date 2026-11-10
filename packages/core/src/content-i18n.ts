@@ -1,3 +1,4 @@
+import { INTERNAL_BLANK_TITLE } from './entries.ts';
 import { pluginActionSpec } from './actions.ts';
 import { pluginSpec } from './catalog.ts';
 import { mapSlotTexts, mapTextPaths } from './plugin-data.ts';
@@ -137,23 +138,22 @@ function mapScenario(sc: Scenario, visit: Visit, plugins: Project['plugins']): S
 
 /** 对 IR 里所有作者内容字符串调用 visit，返回替换后的新 IR（不改原对象）。 */
 function mapProject(p: Project, visit: Visit): Project {
-  // 缺字段（旧 IR、测试里的最小 IR）原样保留，不补空对象
+  // 不完整的待校验输入或测试输入原样保留，不补空对象
   const obj = <T>(o: Record<string, T>, f: (v: T) => T) => (o ? Object.fromEntries(Object.entries(o).map(([k, v]) => [k, f(v)])) : o);
   const arr = <T>(a: T[], f: (v: T) => T) => (a ? a.map(f) : a);
   return {
     ...p,
     name: visit(p.name, 'text'),
     description: t(p.description, visit) ?? '',
-    routes: obj(p.routes, (r) => ({ ...r, title: visit(r.title, 'text', r.source) })),
-    features: obj(p.features, (f) => ({ ...f, name: visit(f.name, 'text', f.source), goal: visit(f.goal, 'text', f.source), ...(f.audience !== undefined ? { audience: visit(f.audience, 'text', f.source) } : {}), roles: arr(f.roles, (r) => ({ ...r, name: visit(r.name, 'text', f.source), ...(r.desc ? { desc: visit(r.desc, 'text', f.source) } : {}) })), constraints: arr(f.constraints, (c) => ({ ...c, text: visit(c.text, 'text', f.source) })) })),
-    options: obj(p.options, (o) => ({
+    routes: obj(p.routes, (r) => ({ ...r, title: r.title === INTERNAL_BLANK_TITLE ? r.title : visit(r.title, 'text', r.source) })),
+    features: obj(p.features, (f) => ({ ...f, name: visit(f.name, 'text', f.source), goal: visit(f.goal, 'text', f.source), roles: arr(f.roles, (r) => ({ ...r, name: visit(r.name, 'text', f.source), ...(r.desc ? { desc: visit(r.desc, 'text', f.source) } : {}) })), alternatives: obj(f.alternatives, a => ({...a, decisionFocus: t(a.decisionFocus, visit, f.source) ?? '', tradeoffs: arr(a.tradeoffs, x => visit(x, 'text', f.source)), coverage: obj(a.coverage, c => c.reason ? {...c, reason: visit(c.reason, 'text', f.source)} : c)})), constraints: arr(f.constraints, (c) => ({ ...c, text: visit(c.text, 'text', f.source) })) })),
+    works: obj(p.works, (o) => ({
       ...o,
       ...(o.free ? {free:obj(o.free, r => ({...r, action:mapAction(r.action, visit, p.plugins, r.source),effects:mapEffects(r.effects, visit, r.source)}))} : {}),
-      name: visit(o.name, 'text', o.source),
-      idea: visit(o.idea, 'text', o.source),
-      ...(o.decisionFocus !== undefined ? { decisionFocus: t(o.decisionFocus, visit, o.source) ?? '' } : {}),
-      tradeoffs: arr(o.tradeoffs, (x) => visit(x, 'text', o.source)),
-      coverage: obj(o.coverage, (c) => (c.reason ? { ...c, reason: visit(c.reason, 'text', o.source) } : c)),
+      title: visit(o.title, 'text', o.source),
+      summary: visit(o.summary, 'text', o.source),
+      ...(o.audience !== undefined ? { audience: visit(o.audience, 'text', o.source) } : {}),
+      roles: arr(o.roles, r => ({...r,name:visit(r.name,'text',o.source),...(r.desc ? {desc:visit(r.desc,'text',o.source)} : {})})),
       layers: obj(o.layers, (l) => ({ ...l, title: visit(l.title, 'text', o.source) })),
     })),
     // 创作侧信息（看板与评审里显示；发布站不带，所以发布 IR 里收不到也不带译文）

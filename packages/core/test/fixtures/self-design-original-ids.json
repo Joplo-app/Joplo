@@ -1,5 +1,5 @@
 {
-  "featureIds": [
+  "entryIds": [
     "frames",
     "home",
     "npm",
@@ -10,7 +10,7 @@
     "views",
     "voice"
   ],
-  "options": [
+  "works": [
     "frames.a-builtin",
     "home.a-recent",
     "npm.a-single",

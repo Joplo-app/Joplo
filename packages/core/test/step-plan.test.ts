@@ -8,7 +8,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  *   返回值是独立副本；回放失败的位置每次抛出同样的错误，失败之前的位置照常可取。
  */
 import { describe, expect, it } from 'vitest';
-import { $, feature, flow, hold, narrate, option, page, set, shot } from '@joplo-app/kit';
+import { $, feature, flow, hold, narrate, work, page, set, shot } from '@joplo-app/kit';
 import * as ui from '@joplo-app/plugin-ui';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '../src/compile.ts';
@@ -23,7 +23,7 @@ function build(steps: (f: ReturnType<typeof flow>) => ReturnType<typeof flow>) {
   const home = page({ title: 'Home', layout: false }, h(ui.Stack, null, h(ui.Button, { id: 'go' }, 'Go'), h(ui.TextInput, { id: 'email', label: 'Email' }), h(ui.Checkbox, { id: 'agree', label: 'Agree' })));
   const src: AuthoringProject = {
     root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...option({ name: 'A', idea: 'i', state: { ui: { n: 0 } }, scenarios: { s: steps(flow('S', { start: '/' })) } }), ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...work({ title: 'A', summary: 'i', state: { ui: { n: 0 } }, scenarios: { s: steps(flow('S', { start: '/' })) } }), ...F('features/f/works/a.tsx') } } } },
   };
   const r = compile(src, 'dev');
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

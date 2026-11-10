@@ -10,7 +10,7 @@ import { nodeData } from '../../../plugins/diagram/src/data.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { $, callout, feature, flow, highlight, layer, option, page, set, shot, spotlight, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
+import { $, callout, feature, flow, highlight, layer, work, page, set, shot, spotlight, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, focusAt, inShotFrame, validate, type AuthoringProject, type Project, type SceneNode } from '../src/index.ts';
 import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
@@ -47,9 +47,9 @@ const seq = () =>
 /** 有层级的项目：界面层、架构层、时序层。 */
 function layered(steps: (f: Flow) => Flow, extra: Record<string, unknown> = {}): { dev: ReturnType<typeof compile>; p: Project } {
   const home = page({ title: 'P', layout: false }, h(ui.Text, { id: 'note' }, 'x'));
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {},
     state: { ui: {}, data: {} },
     layers: {
@@ -64,7 +64,7 @@ function layered(steps: (f: Flow) => Flow, extra: Record<string, unknown> = {}):
     config: { ...config({ name: 'T', home: '/', ...extra }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const dev = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
   expect(dev.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
@@ -87,13 +87,13 @@ function paged(steps: (f: Flow) => Flow): Project {
     h(SM, { id: 'task_sm', value: $.data.task.status }, h(SM.State, { id: 'created', label: 'Created', initial: true }), h(SM.State, { id: 'paid', label: 'Paid' }), h(SM.Transition, { from: 'created', to: 'paid', label: 'pay' })),
   );
   const home = page({ title: 'P', layout: false }, tree);
-  const opt = option({ name: 'A', idea: 'i', on: {}, state: { ui: { showD: false, saved: false }, data: { task: { status: 'created' } } }, scenarios: { s: steps(flow('一次', { start: '/' })) } });
+  const opt = work({ title: 'A', summary: 'i', on: {}, state: { ui: { showD: false, saved: false }, data: { task: { status: 'created' } } }, scenarios: { s: steps(flow('一次', { start: '/' })) } });
   const src: AuthoringProject = {
     root: '/p',
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

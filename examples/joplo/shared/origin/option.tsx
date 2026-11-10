@@ -1,4 +1,4 @@
-import { $, done, explain, flow, option, set, uses } from '@joplo-app/kit';
+import { $, done, explain, flow, work, set, uses } from '@joplo-app/kit';
 import { originState, originWorkspace, type OriginVariant } from './workspace.tsx';
 
 const select = (variant: OriginVariant) => [
@@ -8,8 +8,8 @@ const select = (variant: OriginVariant) => [
 
 /** Each native option preserves its own initial layout; the shared history scene stays visible in publish too. */
 export function originOption(variant: OriginVariant, name: string, idea: string, tradeoffs: string[]) {
-  return option({
-    name, idea, focus: '默认少显示多少信息，以及需要时怎样找回规则与情况', tradeoffs,
+  return work({
+    title: name, summary: idea, focus: '默认少显示多少信息，以及需要时怎样找回规则与情况', tradeoffs,
     on: { '/origin': { main: originWorkspace() } },
     state: { ui: originState(variant) },
     scenarios: {
