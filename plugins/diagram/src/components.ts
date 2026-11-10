@@ -13,7 +13,7 @@ type Common = JoploProps;
 /** 布局提示：pin 把元素放到所在分组（或整张图）的第一层 / 最后一层；同层顺序就是源码顺序。 */
 type Hints = { pin?: 'start' | 'end' };
 /** direction 不写 = 按舞台比例自动选（D69 补充）；aspect = 想要的外框宽高比（缺省按舞台与 h 推算）。 */
-export type DiagramProps = Common & { id?: string; direction?: 'right' | 'down'; h?: number | string; aspect?: number };
+export type DiagramProps = Common & { id?: string; direction?: 'right' | 'down'; h?: number | string; aspect?: number; scale?: number };
 export type DiagramGroupProps = Common & Hints & { id?: string; label?: string; icon?: DiagramIcon; tone?: DiagramTone; group?: string };
 export type DiagramNodeProps = Common & Hints & { id: string; label?: string | Bind; description?: string | Bind; kind?: DiagramKind; group?: string; state?: DState | Bind };
 export type DiagramEdgeProps = Common & { id?: string; from: string; to: string; label?: string | Bind; async?: boolean; state?: DState | Bind };
@@ -52,7 +52,7 @@ export const StateMachine = Object.assign(c('diagram:StateMachine') as (p: State
   Transition: c('diagram:StateMachine.Transition') as (p: TransitionProps) => any,
 });
 
-export type SequenceProps = Common & { id?: string; h?: number | string; numbered?: boolean };
+export type SequenceProps = Common & { id?: string; h?: number | string; numbered?: boolean; scale?: number };
 export type ActorProps = Common & { id: string; label?: string | Bind; description?: string | Bind; kind?: DiagramKind; state?: DState | Bind };
 export type MessageProps = Common & { id?: string; from: string; to: string; label?: string | Bind; reply?: boolean; async?: boolean; state?: DState | Bind };
 export type BlockProps = Common & { id?: string; label?: string; kind?: 'alt' | 'opt' | 'loop' | 'par' | 'break' | 'critical' };

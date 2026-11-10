@@ -75,8 +75,8 @@ const hooks: PluginCompileHooks = {
   },
   effect(effect, ctx) {
     if (effect.name !== 'trace') { ctx.report('PLUGIN_EFFECT_UNKNOWN', `Unknown diagram effect ${effect.name}`, ctx.source); return; }
-    const p = effect.payload as { ids?: unknown; mode?: unknown } | null;
-    if (!p || !Array.isArray(p.ids) || !p.ids.every(id => typeof id === 'string') || !['ok', 'fail', 'skip'].includes(String(p.mode))) {
+    const p = effect.payload as { ids?: unknown; mode?: unknown; focus?: unknown } | null;
+    if (!p || !Array.isArray(p.ids) || !p.ids.every(id => typeof id === 'string') || !['ok', 'fail', 'skip'].includes(String(p.mode)) || (p.focus !== undefined && typeof p.focus !== 'boolean')) {
       ctx.report('TRACE_UNKNOWN', 'trace() needs a list of element ids and an ok / fail / skip mode', ctx.source); return;
     }
     const t = resolveTrace(ctx.roots.flatMap(r => diagramsIn(r as SceneNode)), p.ids as string[], p.mode as Trace['mode'], ctx.source, ctx.report);
@@ -86,7 +86,7 @@ const hooks: PluginCompileHooks = {
     return {
       ...(t.mode === 'ok' ? { holdMs: dotLapMs(ctx.roots, t.edges.map(e => e.id)) } : {}),
       data: { traces: [...previous?.traces ?? [], t], traceScenes: [...previous?.traceScenes ?? [], owner!.id] },
-      targets: t.mode === 'skip' ? undefined : t.targets ?? t.nodes,
+      targets: t.mode === 'skip' || p.focus === false ? undefined : t.targets ?? t.nodes,
       references: [...t.nodes, ...t.edges.map(e => e.id), ...t.groups ?? [], ...t.errorGroups ?? [], ...t.targets ?? []],
     };
   },

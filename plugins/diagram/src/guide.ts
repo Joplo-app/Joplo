@@ -16,6 +16,11 @@ Choose by the question: "what is where" → Diagram; "what happens in what order
 
 Import trace from @joplo-app/plugin-diagram. IR names are diagram:Diagram, diagram:StateMachine and diagram:Sequence; never hand-edit generated IR. UNKNOWN_PLUGIN means install this package and add diagram to config.plugins, then rerun check. Trace and state-machine transition states are compiled once per step, so seeking and offline playback read the same snapshot.
 
+## Canvas framing and design size
+Inside a content Canvas, let camera() own framing and write trace('api', 'kernel', { focus: false }) (also supported by trace.fail). This updates the same node/edge snapshots and timing without suggesting a host shot, so screen overlays and the outer frame stay fixed. The default remains host-focused for existing works. Do not combine a Canvas camera with an accidental second host zoom.
+
+Diagram, StateMachine and Sequence accept scale={2} to request twice the native node, text and edge size in design pixels. The whole diagram still shrinks to fit its container; a larger scale needs enough width and height. At a 1920px Canvas design width, start with scale={2}, then inspect a real frame at the final camera zoom; a crowded graph may still need fewer nodes or a closer Canvas camera. Default scale is 1. Invalid/non-positive values fall back to 1.
+
 ## Diagram: group by business domain
 \`\`\`tsx
 <Diagram id="arch" direction="right" h={520}>

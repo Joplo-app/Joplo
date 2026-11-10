@@ -74,9 +74,9 @@ export function pointAt(points: Point[], t: number): Point {
  * 整图缩放：整图放进容器宽度与高度 h，不放大、不滚动。
  * 看不清的细节交给舞台统一的缩放平移（滚轮 / 捏合 / 拖动）和镜头推近，图内部没有第二套滚动与拖动。
  */
-export function diagramFit(layout: Pick<GraphLayout, 'width' | 'height'>, availW: number, availH: number): { scale: number } {
+export function diagramFit(layout: Pick<GraphLayout, 'width' | 'height'>, availW: number, availH: number, requestedScale = 1): { scale: number } {
   if (!layout.width || !availW) return { scale: 1 };
-  return { scale: Math.max(0.05, Math.min(1, (availW - 8) / layout.width, (availH - 8) / layout.height)) };
+  return { scale: Math.max(0.05, Math.min(Number.isFinite(requestedScale) && requestedScale > 0 ? requestedScale : 1, (availW - 8) / layout.width, (availH - 8) / layout.height)) };
 }
 
 /** 折线点 → 路径：直线段，转角处用半径 ≤ 8px 的圆角（不会切到相邻通道，平行段间距保持不变）。 */

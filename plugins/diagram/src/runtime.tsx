@@ -216,7 +216,7 @@ function Diagram({ node, p }: NodeProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [structure, nowKey, JSON.stringify(machine.states)],
   );
-  const { scale } = diagramFit(layout, avail, H);
+  const { scale } = diagramFit(layout, avail, H, Number(r('scale') ?? 1));
   const rootProps = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: fill ? String(hRaw) : H, minHeight: fill ? 240 : undefined, overflow: 'hidden' } });
   const W = layout.width * scale;
   const HH = layout.height * scale;
@@ -556,7 +556,7 @@ function SequenceDiagram({ node, p }: NodeProps) {
   const hv = Number(hRaw);
   const H = fill ? availH || 420 : Number.isFinite(hv) && hv > 0 ? hv : Math.min(640, Math.max(240, layout.height));
   const { h: _h, numbered: _n, ...rest } = p;
-  const { scale } = diagramFit(layout, avail, H);
+  const { scale } = diagramFit(layout, avail, H, Number(r('scale') ?? 1));
   const rootProps = useRoot(node, rest, { style: { position: 'relative', width: '100%', height: fill ? String(hRaw) : H, minHeight: fill ? 240 : undefined, overflow: 'hidden' } });
   const W = layout.width * scale;
   const HH = layout.height * scale;
