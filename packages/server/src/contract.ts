@@ -102,6 +102,28 @@ export type FilmBoundary = { atMs: number; scenarioId: string | null; position: 
 export type FilmResult = { path: string; files: string[]; durationMs: number; sampleMs: number; every: number; samples: number; cuts: FilmCut[]; stills: FilmStill[]; boundaries: FilmBoundary[]; maxDiff: number; warnings: string[] };
 export declare function renderFilm(opts: FilmOptions): Promise<FilmResult>;
 /** 视频（`joplo render --video`）：与看板导出同一个录制器（真实时间，webm）。 */
-export type VideoOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 'scale'> & { chain?: boolean };
-export type VideoResult = { path: string; durationMs: number };
+export type VideoOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 'scale'> & {
+  chain?: boolean;
+  /**
+   * 输出分辨率（#55，两个都给或都不给）：舞台原样居中放进这个画幅，四周是主题背景色，按比例放大或缩小保持清晰
+   * （例如 1920×1080、1080×1920）。缺省 = 舞台尺寸（电脑 1280×800，手机带外框）。
+   */
+  width?: number;
+  height?: number;
+  /** 旁白（#56）：real（缺省）= 已生成的音频混进音轨并按真实时长停留，没有音频的段按估算；estimate = 不出声、按估算时长；off = 不读旁白。 */
+  voice?: 'real' | 'estimate' | 'off';
+  /** 干净画面（#59）：不画这些播放器元素。title 包括结束时的完成徽标。 */
+  hide?: ('cover' | 'cursor' | 'title' | 'subtitles')[];
+  /** 另存字幕（#59）：SubRip 文件路径，时间对到视频时间轴。 */
+  srt?: string;
+};
+export type VideoResult = {
+  path: string;
+  durationMs: number;
+  /** 视频分辨率。 */
+  size: { width: number; height: number };
+  /** 写了字幕文件时的路径。 */
+  srt: string | null;
+  voice: { mode: 'real' | 'estimate' | 'off'; /** 没有音频、按估算时长停留的段（只有 real 时有）。 */ missing: { text: string; role: string | null }[] };
+};
 export declare function renderVideo(opts: VideoOptions): Promise<VideoResult>;

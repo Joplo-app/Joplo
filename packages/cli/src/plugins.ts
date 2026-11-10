@@ -5,23 +5,28 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
-import { isPluginDef, PLUGIN_API_VERSION, type PluginDef } from '@joplo-app/kit/plugin';
+import { pluginEntryProblem, type PluginDef } from '@joplo-app/kit/plugin';
 
-export type ProjectPlugins = { plugins: PluginDef[]; error: string | null };
+/** configProblem：config 本身载入成功，但 plugins 写得不对（不是依赖没装好）。 */
+export type ProjectPlugins = { plugins: PluginDef[]; error: string | null; configProblem?: boolean };
+
+class ConfigProblem extends Error {}
 
 export async function projectPlugins(dir = '.'): Promise<ProjectPlugins> {
   const root = resolve(dir);
   const file = ['joplo.config.ts', 'joplo.config.tsx'].map((f) => join(root, f)).find((f) => existsSync(f));
-  if (!file) return { plugins: [], error: null };
+  if (!file) return { plugins: [], error: null, configProblem: false };
   try {
     const tsconfig = join(root, 'tsconfig.json');
     const mod = (await tsImport(file, { parentURL: import.meta.url, tsconfig: existsSync(tsconfig) ? tsconfig : false })) as { default?: { plugins?: unknown } };
-    if(!mod.default||typeof mod.default!=='object')throw new Error('joplo.config must default-export config({...})');
+    if(!mod.default||typeof mod.default!=='object')throw new ConfigProblem('joplo.config must default-export config({...})');
     const list=mod.default.plugins??[];
-    if(!Array.isArray(list)||list.some(p=>!isPluginDef(p)||p.apiVersion!==PLUGIN_API_VERSION))throw new Error(`config.plugins must contain API ${PLUGIN_API_VERSION} plugin manifests`);
-    if(new Set(list.map(p=>p.id)).size!==list.length)throw new Error('config.plugins contains duplicate plugin ids');
-    return {plugins:list,error:null};
+    if(!Array.isArray(list))throw new ConfigProblem('config.plugins must be a list of plugin manifests');
+    const problem=list.map((p,i)=>pluginEntryProblem(p,i)).find(Boolean);
+    if(problem)throw new ConfigProblem(problem);
+    if(new Set(list.map(p=>p.id)).size!==list.length)throw new ConfigProblem('config.plugins contains duplicate plugin ids');
+    return {plugins:list,error:null,configProblem:false};
   } catch (e) {
-    return { plugins: [], error: e instanceof Error ? e.message.split('\n')[0]! : String(e) };
+    return { plugins: [], error: e instanceof Error ? e.message.split('\n')[0]! : String(e), configProblem: e instanceof ConfigProblem };
   }
 }

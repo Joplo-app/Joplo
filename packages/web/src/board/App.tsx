@@ -403,7 +403,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
     if (!scenario) return;
     const run = () => {
       videoName.current = scenario.name;
-      void vid.start(scenario.id, a.saved, locale, contentLocale).then((ok) => !ok && setFlash(<LocalText value={m.board.videoExportFailed(vid.error ?? m.board.couldNotStart)} />));
+      void vid.start(scenario.id, a.saved, locale, contentLocale, voice.on).then((ok) => !ok && setFlash(<LocalText value={m.board.videoExportFailed(vid.error ?? m.board.couldNotStart)} />));
     };
     if (!needsSetup(run)) run();
   };

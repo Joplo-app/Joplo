@@ -51,8 +51,17 @@ test('render --film / --video：参数、摘要与互斥（D92）', async () => 
   expect(r.stdout).toContain('chapter → f.a.t at 9.00s: max adjacent diff 3.0%');
   expect(r.stdout).toContain('CUT 4.00s f.a.s step 3');
   expect(r.stdout).toContain('STILL 6.00s–8.00s (2.00s)');
-  const renderVideo = vi.fn(async () => ({ path: resolve('v.webm'), durationMs: 1 }));
-  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--video', '--chain', '--out', 'v.webm'], { renderVideo })).stdout).toBe(resolve('v.webm') + '\n');
+  const renderVideo = vi.fn(async () => ({ path: resolve('v.webm'), durationMs: 1, size: { width: 1280, height: 800 }, srt: null, voice: { mode: 'real' as const, missing: [] } }));
+  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--video', '--chain', '--out', 'v.webm'], { renderVideo })).stdout).toBe(`${resolve('v.webm')}\n1280×800 · voice real\n`);
+  // 发布用的视频（#55 #56 #59）：分辨率、旁白、干净画面与字幕文件都传给 renderVideo；没有音频的旁白列出来
+  const missing = vi.fn(async () => ({ path: resolve('v.webm'), durationMs: 1, size: { width: 1080, height: 1920 }, srt: resolve('v.srt'), voice: { mode: 'real' as const, missing: [{ text: 'No clip yet', role: null }] } }));
+  const v = await run(['render', 'project', '--scenario-id', 'f.a.s', '--video', '--width', '1080', '--height', '1920', '--clean', '--srt', 'v.srt', '--out', 'v.webm'], { renderVideo: missing });
+  expect(missing).toHaveBeenCalledWith(expect.objectContaining({ width: 1080, height: 1920, hide: ['cover', 'cursor', 'title', 'subtitles'], srt: resolve('v.srt') }));
+  expect(v.stdout).toContain(resolve('v.srt'));
+  expect(v.stdout).toContain('1 narration line(s) had no generated audio');
+  expect(v.stdout).toContain('  - No clip yet');
+  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--film', '--width', '10', '--height', '10', '--out', 'f.png'])).code).toBe(2);
+  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--clean', '--out', 'f.png'])).code).toBe(2);
   expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--film', '--sheet', '--out', 'f.png'])).code).toBe(2);
   expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--chain', '--out', 'f.png'])).code).toBe(2);
   expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--film', '--step-id', 'x', '--out', 'f.png'])).code).toBe(2);

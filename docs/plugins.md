@@ -297,7 +297,7 @@ content 的 camera 工厂产生插件效果信封，插件校验 `CAMERA_UNKNOWN
 | `PluginFrame.inputs`、`Snapshot.inputs`（D92 R6） | 控制器 stageInput（舞台上的点、按键、拖动按下）计数 → Stage `inputs` → 插件 frame | content observe：计数变化即落定进退场（幽灵、进场）；播放器暂停键不改变它；镜头冻结不落定 |
 | 媒体槽位的淡出锚点（D92 R2） | MediaEngine 第一次看到某键的 stopAfterMs 时记下引擎时间起点、时长与音量 | 之后的快照估算不再改变；淡完静音不复活；快照提前删除的淡出键在同一 seek 里按引擎时间淡完再销毁 |
 | `playSequence(project, workId)`（D92 R9） | 方案场景：根按声明顺序，深度优先接上 from 接力章，排除 autoplay:false 子树 | 控制器缺省 autoNext 与录制 --chain 共用 |
-| `FilmOptions` / `FilmResult`、`VideoOptions` / `VideoResult`（D92） | CLI `render --film/--video` 或 server API → renderFilm / renderVideo | 渲染路由 `record=1&chain=1&voice=estimate`；胶片条 PNG + JSON、webm；无新增项目 IR 字段 |
+| `FilmOptions` / `FilmResult`、`VideoOptions` / `VideoResult`（D92） | CLI `render --film/--video` 或 server API → renderFilm / renderVideo | 渲染路由 `record=1&chain=1&voice=estimate`（胶片条）/ `voice=real&hide=…&w=…&h=…`（视频）；胶片条 PNG + JSON、webm（+ .srt）；无新增项目 IR 字段 |
 
 ### 证据与边界
 

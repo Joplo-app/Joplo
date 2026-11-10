@@ -257,6 +257,24 @@ export function definePlugin(p: Omit<PluginDef, 'kind' | 'runtime' | 'apiVersion
 
 export const isPluginDef = (v: unknown): v is PluginDef => typeof v === 'object' && v !== null && (v as PluginDef).kind === 'plugin' && typeof (v as PluginDef).id === 'string';
 
+/**
+ * config({ plugins }) 的一项为什么不是可用的插件清单（#60）；是合格的清单时返回 null。
+ * 报错点名第几项与它实际是什么：插件包的默认导出多数是清单，少数是工厂函数（例如 alda(scores)），忘了调用最常见。
+ */
+export function pluginEntryProblem(v: unknown, index: number): string | null {
+  const at = `config.plugins[${index}]`;
+  if (typeof v === 'function') {
+    const name = (v as { name?: unknown }).name;
+    const call = typeof name === 'string' && /^[A-Za-z_$][\w$]*$/.test(name) ? `${name}(…)` : 'the factory with its options';
+    return `${at} is a function${typeof name === 'string' && name ? ` (${name})` : ''}, not a plugin manifest. This plugin's default export is a factory: call it, e.g. plugins: [${call}] (npx joplo skill plugins)`;
+  }
+  if (typeof v !== 'object' || v === null) return `${at} is ${v === null ? 'null' : typeof v}, not a plugin manifest; list the plugin packages' default exports (npx joplo skill plugins)`;
+  const p = v as Partial<PluginDef>;
+  if (p.kind !== 'plugin' || typeof p.id !== 'string') return `${at} is an object that is not a Joplo plugin manifest (manifests come from a plugin package's default export, made with definePlugin)`;
+  if (p.apiVersion !== PLUGIN_API_VERSION) return `${at} (${p.id}) targets plugin API ${String(p.apiVersion)}; this Joplo supports API ${PLUGIN_API_VERSION}. Update the plugin package to the same version as joplo`;
+  return null;
+}
+
 /** 组件类型名：`<插件 id>:<组件名>`。 */
 export const pluginType = (pluginId: string, name: string) => `${pluginId}:${name}`;
 

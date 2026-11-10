@@ -77,6 +77,11 @@ describe('插件组件', () => {
     expect(errors(build({ tree: h(Scene, { id: 'home' }, h(Target, { label: 'no id' })), steps: (f) => f.system('x') }).dev)).toContain('MISSING_ID');
     expect(errors(build({ plugins: [{ id: 'x' }] }).dev)).toContain('PLUGIN_INVALID');
     expect(errors(build({ plugins: [plugin, plugin] }).dev)).toContain('PLUGIN_DUPLICATE');
+    // 忘了调用工厂（#60）：点名第几项，提示调用
+    const factory = function alda() { return plugin; };
+    const d = build({ plugins: [plugin, factory] }).dev.diagnostics.find((x) => x.code === 'PLUGIN_INVALID')!;
+    expect(d.message).toMatch(/config\.plugins\[\d+\] is a function \(alda\).*alda\(…\)/);
+    expect(build({ plugins: [{ ...(plugin as object), apiVersion: 1 }] }).dev.diagnostics.find((x) => x.code === 'PLUGIN_INVALID')!.message).toMatch(/config\.plugins\[\d+\] \(\w+\) targets plugin API 1/);
   });
 
   it('definePlugin 拒绝非法 id、组件名、父组件与接口版本；runtime 接受 file URL', () => {

@@ -227,3 +227,43 @@ describe('resolveSelection', () => {
     expect(resolveSelection(p, { ...base, scenarioId: null, position: 1 }).ok).toBe(false);
   });
 });
+
+describe('项目目录之外的共享 TSX（#61）', () => {
+  const setup = (sharedTsconfig: boolean) => {
+    const repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-shared-')));
+    const demo = path.join(repo, 'demo');
+    fs.cpSync(EXAMPLE, demo, { recursive: true });
+    fs.mkdirSync(path.join(repo, 'shared'));
+    fs.writeFileSync(path.join(repo, 'shared/brand.tsx'), 'export function Brand() {\n  return <span>Shared brand</span>;\n}\n');
+    if (sharedTsconfig) fs.writeFileSync(path.join(repo, 'tsconfig.json'), '{\n  // 与项目相同的 JSX 设置\n  "compilerOptions": { "jsx": "react-jsxdev", "jsxImportSource": "@joplo-app/kit", },\n}\n');
+    const layout = path.join(demo, 'layouts/app.tsx');
+    fs.writeFileSync(layout, fs.readFileSync(layout, 'utf8').replace("import { layout,", "import { Brand } from '../../shared/brand';\nimport { layout,").replace('<Title order={4}>', '<Brand />\n        <Title order={4}>'));
+    return { repo, demo };
+  };
+
+  it('最近的 tsconfig 是 Joplo 的 JSX 设置：按 Joplo JSX 运行时编译', async () => {
+    const { repo, demo } = setup(true);
+    const h = await createDev({ projectDir: demo, port: 0, watch: false, log: () => undefined });
+    try {
+      expect(h.payload().diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      expect(JSON.stringify(h.payload().project)).toContain('Shared brand');
+    } finally {
+      await h.close();
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('没有 Joplo 的 JSX 设置：报错指向共享文件，并说明 JSX 运行时没有生效', async () => {
+    const { repo, demo } = setup(false);
+    const h = await createDev({ projectDir: demo, port: 0, watch: false, log: () => undefined });
+    try {
+      const err = h.payload().diagnostics.find((d) => d.code === 'LOAD_FAILED')!;
+      expect(err.at).toMatch(/^\.\.\/shared\/brand\.tsx:\d+:\d+$/);
+      expect(err.message).toContain("without Joplo's JSX runtime");
+      expect(err.message).toContain('jsxImportSource');
+    } finally {
+      await h.close();
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  }, 60_000);
+});

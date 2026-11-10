@@ -3,7 +3,8 @@
  *
  * - 图片：`POST /__joplo/p/<id>/export/image` `{ scenarioId, position, theme, font?, stroke? }` → PNG（当前步骤；尺寸跟随页面自己的 viewport，
  *   手机页面带外框；D44 起不再选择设备；镜头用这一步的导演镜头）。Playwright 打开本看板的渲染路由（与 renderStep 同一条渲染路径），截取 `[data-jexport]`。
- * - 视频（只在本机）：`POST …/export/video` `{ scenarioId, theme, font?, stroke? }` → 202 `{ jobId }`（尺寸跟随场景起始页面的 viewport）；
+ * - 视频（只在本机）：`POST …/export/video` `{ scenarioId, theme, font?, stroke?, voice? }` → 202 `{ jobId }`（尺寸跟随场景起始页面的 viewport；
+ *   voice: true = 看板开着朗读，已生成的旁白混进音轨并按真实时长停留，#56）；
  *   Playwright `recordVideo` 录下渲染路由的自动播放（含鼠标与字幕），保存为 `<项目>/exports/<场景>-<时间>.webm`。
  *   进度：`GET …/export/video/events`（SSE，先发当前状态，之后每次变化一条，结束后关闭）；`GET …/export/video` 取当前状态。
  *   同一项目同时只能有一个视频任务（再提交返回 409）；`DELETE …/export/video` 取消正在进行的任务（D55）。没有导出组件时图片返回 503 EXPORT_COMPONENT_MISSING、
@@ -56,8 +57,38 @@ export type VideoJob = {
   error: string | null;
 };
 
-/** 录制实现：报告进度，返回写好的文件绝对路径。测试可注入。 */
-export type VideoRecorder = (input: { projectDir: string; url: string; size: { width: number; height: number }; out: string; total: number; progress: (step: number) => void; signal: AbortSignal; /** 最长录制时长（毫秒，默认 5 分钟）。 */ maxMs?: number }) => Promise<void>;
+/** 字幕的一条（秒，相对视频开头）。 */
+export type VideoCue = { start: number; end: number; text: string };
+/** 录制结果（#56 #59）：字幕时间轴（对到视频时间）与没有音频、按估算时长停留的旁白。 */
+export type RecordOutcome = { cues: VideoCue[]; voice: { mode: 'estimate' | 'real' | 'off'; missing: { text: string; role: string | null }[] } };
+
+/** 录制实现：报告进度，写好 out。测试可注入。size 是视口，也是视频分辨率（录屏按 CSS 像素取帧）。 */
+export type VideoRecorder = (input: { projectDir: string; url: string; size: { width: number; height: number }; out: string; total: number; progress: (step: number) => void; signal: AbortSignal; /** 最长录制时长（毫秒，默认 5 分钟）。 */ maxMs?: number }) => Promise<RecordOutcome | void>;
+
+type RecordWindow = { __JOPLO_RECORD__: { prepare?(): Promise<void>; play(): Promise<void>; calibrate?(): Promise<boolean>; calibratedAt?(): number | null; cues?(): { at: number; text: string | null }[]; voice?(): RecordOutcome['voice']; stopAudio?(): Promise<{ data: string } | null>; progress: { step: number; done: boolean; error: string | null } } };
+
+/** 页面里记下的字幕变化 → 视频时间轴上的字幕条（originMs = 视频第 0 秒对应的页面时间）。纯函数。 */
+export function videoCues(raw: readonly { at: number; text: string | null }[], originMs: number, endSeconds: number): VideoCue[] {
+  const out: VideoCue[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i]!;
+    if (!c.text) continue;
+    const start = Math.max(0, (c.at - originMs) / 1000);
+    const end = Math.min(endSeconds, i + 1 < raw.length ? (raw[i + 1]!.at - originMs) / 1000 : endSeconds);
+    if (end - start >= 0.05) out.push({ start: Math.round(start * 1000) / 1000, end: Math.round(end * 1000) / 1000, text: c.text });
+  }
+  return out;
+}
+
+/** SubRip 字幕文件。纯函数。 */
+export function srt(cues: readonly VideoCue[]): string {
+  const ts = (sec: number) => {
+    const ms = Math.max(0, Math.round(sec * 1000));
+    const p = (n: number, w = 2) => String(n).padStart(w, '0');
+    return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`;
+  };
+  return cues.map((c, i) => `${i + 1}\n${ts(c.start)} --> ${ts(c.end)}\n${c.text.replace(/\r?\n+/g, '\n')}\n`).join('\n');
+}
 
 export type ExportDeps = {
   /** 按项目解析 Playwright（托管运行时优先，其次项目里已有的）。 */
@@ -107,12 +138,12 @@ export function exportAppearance(body: unknown): { font: AppearanceFont | null; 
 /** 渲染路由上的外观参数（null 不写）。 */
 const appearanceParams = (a: { font: AppearanceFont | null; stroke: AppearanceStroke | null }): Record<string, string> => ({ ...(a.font ? { font: a.font } : {}), ...(a.stroke ? { stroke: a.stroke } : {}) });
 
-/** content（D84）：作者内容语言；导出与看板当前预览的语言一致。 */
-type Look = { theme: string; font: AppearanceFont | null; stroke: AppearanceStroke | null; locale?: ExportLocale; content?: ExportLocale };
+/** content（D84）：作者内容语言；导出与看板当前预览的语言一致。voice（#56）：看板开着朗读，视频混进已生成的旁白。 */
+type Look = { theme: string; font: AppearanceFont | null; stroke: AppearanceStroke | null; locale?: ExportLocale; content?: ExportLocale; voice?: boolean };
 
 function parseRequest(project: Project | null, body: unknown, needPosition: boolean) {
   if (!project) throw new JoploError('INVALID_SCHEMA', 'Cannot export before the project compiles successfully');
-  const b = (body ?? {}) as { scenarioId?: unknown; position?: unknown; theme?: unknown; locale?: unknown; contentLocale?: unknown };
+  const b = (body ?? {}) as { scenarioId?: unknown; position?: unknown; theme?: unknown; locale?: unknown; contentLocale?: unknown; voice?: unknown };
   if (typeof b.scenarioId !== 'string' || !project.scenarios[b.scenarioId]) throw new JoploError('USAGE', `Scenario does not exist: ${String(b.scenarioId)}`);
   const sc = project.scenarios[b.scenarioId]!;
   const position = needPosition ? Number(b.position ?? 0) : 0;
@@ -122,7 +153,7 @@ function parseRequest(project: Project | null, body: unknown, needPosition: bool
   const device: Device = project.scenes[sceneId]?.viewport === 'mobile' ? 'mobile' : 'desktop';
   // 主题（D51）：请求里的主题名，没有或不合法时用项目配置的主题
   const theme = typeof b.theme === 'string' && THEME_NAME.test(b.theme) ? b.theme : project.theme;
-  return { sc, position, device, look: { theme, ...exportAppearance(body), locale: exportLocale(b.locale), ...(exportLocale(b.contentLocale) ? { content: exportLocale(b.contentLocale)! } : {}) } satisfies Look };
+  return { sc, position, device, look: { theme, ...exportAppearance(body), locale: exportLocale(b.locale), ...(exportLocale(b.contentLocale) ? { content: exportLocale(b.contentLocale)! } : {}), ...(b.voice === true ? { voice: true } : {}) } satisfies Look };
 }
 
 const fileSafe = (s: string) => s.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'scenario';
@@ -134,23 +165,39 @@ async function waitReady(page: Page) {
   if (err) throw new JoploError('RENDER_FAILED', `Render route reported an error: ${err}`);
 }
 
-/** 缺省的录制：Playwright recordVideo + 渲染路由的录制模式（window.__JOPLO_RECORD__）。 */
+/**
+ * 缺省的录制：渲染路由的录制模式（window.__JOPLO_RECORD__）。
+ *
+ * 开播前的准备（载入、字体、解码配乐与旁白）不进视频（#57）：Playwright 有 page.screencast 时，prepare() 之后才开始录屏，
+ * 视频从封面淡出 / 第一步开始；项目自带的旧版 Playwright 没有它时退回 recordVideo（从建页开始录）。
+ */
 export function defaultRecorder(load: (projectDir: string) => Promise<PlaywrightModule>): VideoRecorder {
   return async ({ projectDir, url, size, out, progress, signal, maxMs = 5 * 60_000 }) => {
     const pw = await load(projectDir);
     const browser: Browser = await launch(pw);
     const tmp = fs.mkdtempSync(path.join(path.dirname(out), '.rec-'));
     try {
-      const ctx = await browser.newContext({ viewport: size, deviceScaleFactor: 1, recordVideo: { dir: tmp, size } });
-      const page = await ctx.newPage();
+      let ctx = await browser.newContext({ viewport: size, deviceScaleFactor: 1 });
+      let page = await ctx.newPage();
+      const screencast = typeof (page as Partial<Page>).screencast?.start === 'function';
+      if (!screencast) {
+        await ctx.close();
+        ctx = await browser.newContext({ viewport: size, deviceScaleFactor: 1, recordVideo: { dir: tmp, size } });
+        page = await ctx.newPage();
+      }
       await page.goto(url, { waitUntil: 'domcontentloaded' });
       await waitReady(page);
       await page.waitForTimeout(400);
-      await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { play(): void } }).__JOPLO_RECORD__.play());
+      await page.evaluate(() => (window as unknown as RecordWindow).__JOPLO_RECORD__.prepare?.());
+      const file = path.join(tmp, 'screen.webm');
+      if (screencast) await page.screencast.start({ path: file, size });
+      // 视频第 0 秒对应的页面时间：录屏刚开始时（recordVideo 从建页开始录，近似为导航开始 = 0）
+      let origin = screencast ? await page.evaluate(() => performance.now()) : 0;
+      await page.evaluate(() => (window as unknown as RecordWindow).__JOPLO_RECORD__.play());
       const t0 = Date.now();
       for (;;) {
         if (signal.aborted) throw new JoploError('EXPORT_FAILED', 'Export cancelled');
-        const p = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { progress: { step: number; done: boolean; error: string | null } } }).__JOPLO_RECORD__.progress);
+        const p = await page.evaluate(() => (window as unknown as RecordWindow).__JOPLO_RECORD__.progress);
         if (p.error) throw new JoploError('EXPORT_FAILED', `Playback failed: ${p.error}`);
         progress(p.step);
         if (p.done) break;
@@ -158,18 +205,29 @@ export function defaultRecorder(load: (projectDir: string) => Promise<Playwright
         await page.waitForTimeout(150);
       }
       await page.waitForTimeout(900); // 停留在结果画面
-      const calibrated=await page.evaluate(()=> (window as unknown as {__JOPLO_RECORD__:{calibrate?():Promise<boolean>}}).__JOPLO_RECORD__.calibrate?.()??false);
-      const audio = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { stopAudio?(): Promise<{data:string}|null> } }).__JOPLO_RECORD__.stopAudio?.() ?? null);
-      const video = page.video();
+      const endAt = await page.evaluate(() => performance.now());
+      const calibrated=await page.evaluate(()=> (window as unknown as RecordWindow).__JOPLO_RECORD__.calibrate?.()??false);
+      const page_ = await page.evaluate(() => { const r = (window as unknown as RecordWindow).__JOPLO_RECORD__; return { cues: r.cues?.() ?? [], voice: r.voice?.() ?? { mode: 'off' as const, missing: [] }, flash: r.calibratedAt?.() ?? null }; });
+      const audio = await page.evaluate(() => (window as unknown as RecordWindow).__JOPLO_RECORD__.stopAudio?.() ?? null);
+      if (screencast) await page.screencast.stop();
+      const video = screencast ? null : page.video();
       await ctx.close();
-      if (!video) throw new JoploError('EXPORT_FAILED', 'The browser did not generate a video');
-      await video.saveAs(out);
+      if (screencast) { if (!fs.existsSync(file)) throw new JoploError('EXPORT_FAILED', 'The browser did not generate a video'); fs.renameSync(file, out); }
+      else { if (!video) throw new JoploError('EXPORT_FAILED', 'The browser did not generate a video'); await video.saveAs(out); }
+      let endSeconds = (endAt - origin) / 1000;
       if (audio) {
         if(!calibrated)throw new Error('Audio/video calibration unavailable');
         const analysis=await browser.newContext();const probe=await analysis.newPage();await probe.goto(url,{waitUntil:'domcontentloaded'});
-        try {const bytes=Buffer.from(audio.data,'base64');const timing=await recordedCalibration(probe,out,bytes);await muxRecordedAudio(out,bytes,timing.offsetSeconds,{videoEnd:timing.videoPTS,audioEnd:timing.audioPTS,audioDurations:timing.audioDurations});}
+        try {
+          const bytes=Buffer.from(audio.data,'base64');const timing=await recordedCalibration(probe,out,bytes);
+          await muxRecordedAudio(out,bytes,timing.offsetSeconds,{videoEnd:timing.videoPTS,audioEnd:timing.audioPTS,audioDurations:timing.audioDurations});
+          // 校准闪屏：页面时间 flash ↔ 视频时间 videoPTS，比录屏开始时的估计更准；视频在闪屏处截断
+          if (page_.flash !== null) origin = page_.flash - timing.videoPTS * 1000;
+          endSeconds = timing.videoPTS;
+        }
         finally{await analysis.close();}
       }
+      return { cues: videoCues(page_.cues, origin, endSeconds), voice: page_.voice };
     } finally {
       await browser.close().catch(() => undefined);
       fs.rmSync(tmp, { recursive: true, force: true });
@@ -286,7 +344,7 @@ export class ExportHub {
         this.update(job, { phase: 'starting', percent: 2 });
         await this.deps.recordVideo({
           projectDir: dir,
-          url: this.renderUrl(projectId, { scenario: scenarioId, position: '0', theme: look.theme, ...appearanceParams(look), ...(look.locale ? { locale: look.locale } : {}), ...(look.content ? { content: look.content } : {}), frame: '1', record: '1' }),
+          url: this.renderUrl(projectId, { scenario: scenarioId, position: '0', theme: look.theme, ...appearanceParams(look), ...(look.locale ? { locale: look.locale } : {}), ...(look.content ? { content: look.content } : {}), ...(look.voice ? { voice: 'real' } : {}), frame: '1', record: '1' }),
           size: EXPORT_SIZE[device],
           out,
           total,

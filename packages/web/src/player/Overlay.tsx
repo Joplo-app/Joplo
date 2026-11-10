@@ -96,6 +96,7 @@ export function Overlay({
             animate={{ scale: 1.6, opacity: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
+            data-joverlay="ripple"
             aria-hidden
           />
         ) : null}

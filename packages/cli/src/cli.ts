@@ -405,13 +405,17 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   });
   program.command('render').argument('[dir]', 'Project directory', '.').requiredOption('--scenario-id <qid>', 'Scenario ID').option('--step-id <qid>', 'Position after this step; defaults to the initial state')
     .option('--theme <theme>', 'Theme: built-in (sketch, clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast) or project themes/<name>.css; defaults to the project theme').requiredOption('--out <file>', 'Screenshot file')
-    .option('--width <pixels>', 'Screenshot width (stage width follows the page viewport); requires height', integer('width')).option('--height <pixels>', 'Screenshot height; requires width', integer('height'))
+    .option('--width <pixels>', 'Screenshot width (stage width follows the page viewport); with --video the video resolution, stage centered on the theme background (e.g. 1920x1080, 1080x1920); requires height', integer('width')).option('--height <pixels>', 'Screenshot / video height; requires width', integer('height'))
     .option('--scale <scale>', 'Pixel scale', scale).option('--overwrite', 'Allow overwriting the screenshot')
     .option('--content <lang>', 'Author content language from config locales (D84); defaults to the source language')
     .option('--sheet', 'Storyboard: every step of the scenario in one image, with step number, caption, and narration under each frame')
     .option('--columns <n>', 'Storyboard / film columns (with --sheet default 3, with --film default 8)', integer('columns'))
     .option('--film', 'Film strip: play the scenario on a frozen engine clock and sample a frame every --every ms, with time, step, adjacent-frame change, hard cuts, and still runs marked; one page per scenario')
-    .option('--video', 'Record a .webm of the scenario playing in real time (same recorder as the board export)')
+    .option('--video', 'Record a .webm of the scenario playing in real time (same recorder as the board export), with the media plugins\' music and generated narration on its audio track')
+    .option('--voice <mode>', 'With --video: real (default) mixes generated narration audio and holds each step for it, estimating lines without audio; estimate is silent with estimated timing; off reads nothing')
+    .option('--hide <items>', 'With --video: comma list of player elements to leave out: cover, cursor, title (step title bar and completion badge), subtitles')
+    .option('--clean', 'With --video: same as --hide cover,cursor,title,subtitles')
+    .option('--srt <file>', 'With --video: also write the subtitles as a SubRip file timed to the video')
     .option('--chain', 'With --film/--video: keep playing the next slices of the work in published order, to the last one')
     .option('--every <ms>', 'With --film: one cell every N ms of engine time (default 250)', integer('every'))
     .option('--frames <dir>', 'With --film: also save each cell as a JPEG in this directory')
@@ -419,15 +423,27 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'width and height must be provided together');
       if ([opts.sheet, opts.film, opts.video].filter(Boolean).length > 1) throw new JoploError('USAGE', '--sheet, --film and --video are separate modes; pick one');
       if ((opts.chain || opts.every !== undefined || opts.frames) && !opts.film && !opts.video) throw new JoploError('USAGE', '--chain, --every and --frames need --film (or --video for --chain)');
+      if ((opts.voice !== undefined || opts.hide !== undefined || opts.clean || opts.srt !== undefined) && !opts.video) throw new JoploError('USAGE', '--voice, --hide, --clean and --srt need --video');
       if (opts.film || opts.video) {
-        if (opts.stepId !== undefined || opts.width !== undefined) throw new JoploError('USAGE', '--film/--video play the whole scenario; do not combine with --step-id, --width, or --height');
+        if (opts.stepId !== undefined) throw new JoploError('USAGE', '--film/--video play the whole scenario; do not combine with --step-id');
+        if (opts.film && opts.width !== undefined) throw new JoploError('USAGE', '--film samples the stage itself; do not combine with --width or --height');
         const { askYesNo, isInteractive, withExportComponent } = await import('./setup.ts');
         const base = { projectDir: resolve(dir), scenarioId: opts.scenarioId, theme: opts.theme, out: resolve(opts.out), overwrite: opts.overwrite, chain: !!opts.chain, ...(opts.content ? { content: opts.content } : {}) };
         const setup = { server: setupServer, interactive: deps.interactive ?? isInteractive(), ask: deps.ask ?? askYesNo, io: setupIo() };
         if (opts.video) {
           const renderVideo = await serverFunction('renderVideo');
-          const video = await withExportComponent(() => renderVideo(base), setup);
+          // 未知项交给 renderVideo 报 USAGE（带可用项）
+          const hide = (opts.clean ? ['cover', 'cursor', 'title', 'subtitles'] : String(opts.hide ?? '').split(',').map((x: string) => x.trim()).filter(Boolean)) as ('cover' | 'cursor' | 'title' | 'subtitles')[];
+          const video = await withExportComponent(() => renderVideo({ ...base, ...(opts.width !== undefined ? { width: opts.width, height: opts.height } : {}), ...(opts.voice !== undefined ? { voice: opts.voice } : {}), ...(hide.length ? { hide } : {}), ...(opts.srt ? { srt: resolve(opts.srt) } : {}) }), setup);
           line(video.path);
+          if (video.srt) line(video.srt);
+          line(`${video.size.width}×${video.size.height} · voice ${video.voice.mode}`);
+          // 没有音频的旁白按估算时长停留：列出来，作者可以先 joplo voice 再录
+          if (video.voice.mode === 'real' && video.voice.missing.length) {
+            line(`${video.voice.missing.length} narration line(s) had no generated audio and used estimated timing (run npx joplo voice, then record again):`);
+            for (const m of video.voice.missing.slice(0, 10)) line(`  - ${m.role ? `${m.role}: ` : ''}${m.text.length > 70 ? `${m.text.slice(0, 69)}…` : m.text}`);
+            if (video.voice.missing.length > 10) line(`  … ${video.voice.missing.length - 10} more`);
+          }
           return;
         }
         const renderFilm = await serverFunction('renderFilm');

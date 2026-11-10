@@ -6,7 +6,7 @@ import type { MediaCommand, MediaSnapshot, ResourceRequest, LocalResourceInfo } 
 import { jsonData, snapshot, object, strings, syncResult, authoringData, materialize, errorMessage } from './data.ts';
 /** Node-side plugin host. Callbacks never enter IR or the player. */
 import { isNode, type JNode } from '@joplo-app/kit/node';
-import { PLUGIN_API_VERSION, type PluginDef, type PluginEffectDef, type PluginReport } from '@joplo-app/kit/plugin';
+import { pluginEntryProblem, type PluginDef, type PluginEffectDef, type PluginReport } from '@joplo-app/kit/plugin';
 import { initialState, applyStep, resolveProps, type PlayState } from '../player.ts';
 import type { Scene, SceneNode, Project, Scenario } from '../schema.ts';
 import type { PluginInfo } from '../catalog.ts';
@@ -64,11 +64,13 @@ export class PluginCompiler {
   readonly info: Record<string, PluginInfo> = {};
   constructor(configured: unknown, private report: PluginReport, source?: string, private options: CompileOptions = {}) {
     if (configured !== undefined && !Array.isArray(configured)) report('PLUGIN_INVALID', 'config({ plugins }) must be a list of plugins', source);
-    for (const raw of enabledPlugins(configured)) {
+    for (const [index, raw] of enabledPlugins(configured).entries()) {
       const p = raw as PluginDef | null;
-      if (!p || typeof p !== 'object' || p.kind !== 'plugin' || typeof p.id !== 'string' || !p.components || typeof p.components !== 'object' || Array.isArray(p.components)) { report('PLUGIN_INVALID', 'config({ plugins }) entries must be made with definePlugin', source); continue; }
+      const problem = pluginEntryProblem(raw, index);
+      if (problem && (!p || typeof p !== 'object' || p.kind !== 'plugin' || typeof p.id !== 'string')) { report('PLUGIN_INVALID', problem, source); continue; }
+      if (!p || !p.components || typeof p.components !== 'object' || Array.isArray(p.components)) { report('PLUGIN_INVALID', `config.plugins[${index}]${p && typeof p.id === 'string' ? ` (${p.id})` : ''} has no components map; plugin manifests must be made with definePlugin`, source); continue; }
       if (this.defs.has(p.id)) { report('PLUGIN_DUPLICATE', `Plugin ${p.id} is enabled twice in config({ plugins })`, source); continue; }
-      if (p.apiVersion !== PLUGIN_API_VERSION) { report('PLUGIN_INVALID', `Plugin ${p.id} targets API ${p.apiVersion}; supported: ${PLUGIN_API_VERSION}`, source); continue; }
+      if (problem) { report('PLUGIN_INVALID', problem, source); continue; }
       this.defs.set(p.id, p);
       const properties = this.envelope(p, p.properties ?? {}, source);
       // 清单不合格的插件整个不启用：不留下只注册了一半（有钩子、没有组件信息）的状态

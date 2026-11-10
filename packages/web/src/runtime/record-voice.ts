@@ -1,0 +1,98 @@
+/**
+ * 录制视频时的旁白（`joplo render --video --voice real`、看板开着朗读时的导出视频；#56）。
+ *
+ * - 这一段有已经生成好的音频（看板的 voice 状态，即 `.joplo/voice/` 里当前声音的片段）：在媒体引擎的 AudioContext 里播放，
+ *   同时进扬声器和录音轨，画面按真实音频时长停留（控制器等它读完）。
+ * - 没有音频：按 voiceMs 估算时长“读”（不出声，与 voice=estimate 相同），并记进 missing，录制结束后报告给作者。
+ * - 不生成音频、不调用朗读服务。
+ *
+ * 字段流向：prepare（写入点：预取并解码每一段的音频）→ buffers（存储）→ speak（读取点）→ 录音轨与控制器的停留（消费者）；
+ * missing（写入点：speak 找不到音频）→ RecordStage 的 __JOPLO_RECORD__.voice()（读取点）→ 服务端录制结果与 CLI 输出（消费者）。
+ */
+import { clipKey, voiceFingerprint } from '@joplo-app/core/runtime';
+import { Narrator, type Narration, type VoiceLookup } from './voice';
+
+export type RecordVoiceOutput = { audio: AudioContext; connect(node: AudioNode): void };
+export type MissingLine = { text: string; role: string | null };
+
+/** 一段已解码的旁白：用 AudioBufferSourceNode 播放；暂停 = 停掉并记住位置，继续 = 从那里重新开始。 */
+function playBuffer(out: RecordVoiceOutput, buffer: AudioBuffer, speed: number): Narration {
+  const { audio } = out;
+  let source: AudioBufferSourceNode | null = null;
+  let offset = 0; // 已经播完的秒数（缓冲区时间）
+  let startedAt = 0; // 当前这一段开始时的 audio.currentTime
+  let finished = false;
+  let finish: () => void = () => {};
+  const done = new Promise<void>((r) => { finish = r; });
+  const end = () => { if (finished) return; finished = true; source?.disconnect(); source = null; finish(); };
+  const run = () => {
+    const s = audio.createBufferSource();
+    s.buffer = buffer;
+    s.playbackRate.value = speed;
+    out.connect(s);
+    s.onended = () => { if (source === s) end(); };
+    startedAt = audio.currentTime;
+    s.start(0, offset);
+    source = s;
+  };
+  run();
+  const played = () => offset + (source ? (audio.currentTime - startedAt) * speed : 0);
+  return {
+    source: 'clip',
+    done,
+    progress: () => (finished ? 1 : Math.min(1, played() / Math.max(1e-3, buffer.duration))),
+    pause: () => {
+      if (!source || finished) return;
+      offset = played();
+      const s = source; source = null; s.onended = null; s.stop(); s.disconnect();
+    },
+    resume: () => { if (!source && !finished) run(); },
+    cancel: () => { const s = source; source = null; if (s) { s.onended = null; try { s.stop(); } catch { /* 还没开始 */ } s.disconnect(); } end(); },
+  };
+}
+
+export class RecordVoice {
+  readonly narrator = new Narrator();
+  readonly missing: MissingLine[] = [];
+  private buffers = new Map<string, AudioBuffer>();
+  /** 有没有可播的音频：一段都没有时不必录音轨（全部按估算时长）。 */
+  get hasAudio(): boolean { return this.buffers.size > 0; }
+  constructor(private readonly o: { output: () => RecordVoiceOutput | null; decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>; fallback: Narrator }) {
+    this.narrator.enabled = true;
+    this.narrator.speak = (text, role, speed) => this.speak(text, role, speed);
+  }
+
+  private urlOf(text: string, role: string | null): string | null {
+    const lookup = this.narrator.lookup;
+    const t = text.trim();
+    const fp = lookup ? voiceFingerprint(lookup, role, t) : null;
+    return fp ? (lookup!.clips[clipKey(fp, t)] ?? null) : null;
+  }
+
+  /** 预取并解码这些段的音频；取不到的段在播放时按估算时长处理。 */
+  async prepare(lookup: VoiceLookup | null, lines: readonly MissingLine[]) {
+    this.narrator.lookup = lookup;
+    const urls = [...new Set(lines.map((l) => this.urlOf(l.text, l.role)).filter((u): u is string => !!u))];
+    for (const url of urls) {
+      if (this.buffers.has(url)) continue;
+      try {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) continue;
+        this.buffers.set(url, await this.o.decode(await res.arrayBuffer()));
+      } catch {
+        // 解码失败：这一段按估算时长，记进 missing
+      }
+    }
+  }
+
+  private speak(text: string, role: string | null, speed: number): Narration | null {
+    const t = text.trim();
+    if (!t) return null;
+    const url = this.urlOf(t, role);
+    const buffer = url ? this.buffers.get(url) : undefined;
+    const out = buffer ? this.o.output() : null;
+    if (buffer && out) return playBuffer(out, buffer, speed);
+    this.missing.push({ text: t, role });
+    return this.o.fallback.speak(t, role, speed);
+  }
+}

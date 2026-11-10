@@ -33,6 +33,39 @@ export function isProjectSource(projectDir: string, file: string): boolean {
   return !IGNORED_DIRS.includes(first);
 }
 
+/** 读 tsconfig（允许注释与尾逗号），沿相对路径的 extends 找 compilerOptions.jsxImportSource。 */
+function tsconfigJsxSource(file: string, depth = 0): string | null {
+  let raw: { extends?: unknown; compilerOptions?: { jsxImportSource?: unknown } };
+  try {
+    const text = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\/|("(?:\\.|[^"\\])*")|\/\/[^\n]*/g, (m, str: string | undefined) => str ?? '').replace(/,(\s*[}\]])/g, '$1');
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const own = raw?.compilerOptions?.jsxImportSource;
+  if (typeof own === 'string') return own;
+  const ext = raw?.extends;
+  if (depth < 5 && typeof ext === 'string' && ext.startsWith('.')) {
+    const next = path.resolve(path.dirname(file), ext.endsWith('.json') ? ext : `${ext}.json`);
+    return tsconfigJsxSource(next, depth + 1);
+  }
+  return null;
+}
+
+/**
+ * 项目目录之外、不在 node_modules 里的源文件（例如一个仓库里多个 Joplo 项目共用的上层组件）：
+ * 最近的 tsconfig.json 声明了 jsxImportSource "@joplo-app/kit" 时，同样按 Joplo 的 JSX 运行时转译（#61）。
+ * 其余文件（Joplo 自己的界面源码等）保持原样。每次都重新查找（只在转译时调用），新建或修改 tsconfig 立即生效。
+ */
+export function isSharedJoploSource(projectDir: string, file: string): boolean {
+  if (!path.isAbsolute(file) || file.startsWith(projectDir + path.sep) || file.split(path.sep).includes('node_modules')) return false;
+  for (let dir = path.dirname(file); ; dir = path.dirname(dir)) {
+    const cfg = path.join(dir, 'tsconfig.json');
+    if (fs.existsSync(cfg)) return tsconfigJsxSource(cfg) === '@joplo-app/kit';
+    if (path.dirname(dir) === dir) return false;
+  }
+}
+
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 /** 语法错误的位置：从转译器报错里取 `文件:行:列`。 */
@@ -89,7 +122,7 @@ export function joploProjectPlugin(projectDir: string, web: WebAssets = locateWe
         if (web.mode === 'dist') css = css.replace(/@import\s+["']tailwindcss["']/, `@import ${JSON.stringify(tailwindIndexCss())}`);
         return { code: `${css}\n@source ${JSON.stringify(publicCssSource ?? projectDir)};\n`, map: null };
       }
-      if (!isProjectSource(projectDir, file) || !/\.(tsx|ts|jsx|js|mts)$/.test(file)) return;
+      if (!/\.(tsx|ts|jsx|js|mts)$/.test(file) || !(isProjectSource(projectDir, file) || isSharedJoploSource(projectDir, file))) return;
       const lang = file.endsWith('.tsx') ? 'tsx' : file.endsWith('.jsx') ? 'jsx' : file.endsWith('.js') ? 'js' : 'ts';
       try {
         const r = await transformWithOxc(code, file, {

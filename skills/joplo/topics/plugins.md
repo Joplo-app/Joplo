@@ -8,7 +8,7 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 
 ## Discover and use
 1. Read package.json and config.plugins. npx joplo skill lists engine topics plus enabled plugin entries/topics; .claude/skills/joplo-plugins/SKILL.md indexes installed files.
-2. Install a trusted author package, import its default manifest/factory and explicitly add it to config.plugins. Use the package's exact version when version-coupled to this CLI.
+2. Install a trusted author package, import its default manifest/factory and explicitly add it to config.plugins. Use the package's exact version when version-coupled to this CLI. A default export is either a manifest (list it as-is) or a factory that takes options (list its call, as its plugin guide shows); do not copy one package's form to another. A forgotten call is reported as config.plugins[i] is a function by check (PLUGIN_INVALID) and skill install, which then changes no skills; that message is a config fix, not missing dependencies.
 3. Run npx joplo skill <plugin-id> or <plugin-id>/<topic>, then import components and effects directly from that package. For ids colliding with engine topics use plugin:<id>/<topic>. Do not invent component names or copy another plugin's conventions.
 4. Run npx joplo skill install after adding/removing plugins. It synchronizes per-plugin files and removes unchanged generated files for removed plugins; edited files are protected (inspect --diff before --force). Outside a project it installs only engine skills.
 5. A template may carry manually maintained plugin guides for reading before dependency installation; their absence does not prevent init. After install, rerun skill install to verify the live config; unresolved imports never mean a plugin was enabled successfully.
@@ -65,4 +65,4 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.6.1 sha256:8bbc376d49428ebba8808ce71871f6208283bfa6f7f3d2ec31deeaba292c97a5 -->
+<!-- joplo-skill 0.6.1 sha256:0ecdce0b48e2baac558f6105f80a606d88784dbc687ea46d3854b66947fde0e2 -->
