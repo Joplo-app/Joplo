@@ -1,7 +1,8 @@
+import { withProductionUpdate } from '../../../shared/production/update.tsx';
 import { work } from '@joplo-app/kit';
 import { filmInitial, filmLayers, filmScenarios } from '../../../shared/film/lab.tsx';
 
-export default work({
+export default withProductionUpdate(work({
   title: 'A · 左栏章节清单',
   summary: '看板的布局不变，只把左栏的“方案、情况、缺口”换成章节清单：每章一行，带自动编号、步数和时长，上面是影片信息和总时长，下面是审片命令',
   focus: '影片的章节放在看板的哪里',
@@ -9,4 +10,4 @@ export default work({
   state: { ui: filmInitial() },
   layers: filmLayers('list'),
   scenarios: filmScenarios('list'),
-});
+}), 'film');

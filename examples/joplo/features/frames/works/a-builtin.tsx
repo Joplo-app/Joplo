@@ -1,3 +1,4 @@
+import { withProductionUpdate } from '../../../shared/production/update.tsx';
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
 import { $, done, flow, work, set, uses } from '@joplo-app/kit';
@@ -13,7 +14,7 @@ const API =
 
 const LONG = Array.from({ length: 30 }, (_, i) => `  第 ${i + 1} 行输出`).join('\n');
 
-export default withDesignRecord(work({
+export default withProductionUpdate(withDesignRecord(work({
   title: 'A · 目录组件 Terminal + Phone',
   summary: 'Terminal（标题、命令块、结果块、输入行）和 Phone（大圆角、侧边按键、按 390 宽排版）是目录里的正式组件；页面写 viewport: "mobile" 时舞台自动套上 Phone',
   focus: '外框做成组件：CLI 和移动端原型直接写，不用拼',
@@ -62,4 +63,4 @@ export default withDesignRecord(work({
       .type('f_cmd', 'npx joplo check', '输出 30 行：终端内部滚动，不把页面撑开', set($.ui.long, true), set($.inputs.f_cmd, ''))
       .system('结束', done('长输出在终端内滚动')),
   },
-}), designRecords.frames);
+}), designRecords.frames), 'frames');

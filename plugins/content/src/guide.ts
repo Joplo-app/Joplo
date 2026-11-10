@@ -144,6 +144,9 @@ chapter('What does it read?')
 `;
 
 export const patterns = `
+## Updating a public design replay from implementation evidence
+Preserve historical scenarios and stable feature/work IDs; append a clearly labeled source-derived update instead of rewriting an old approval. Put current status and limits in the visible scene: local implementation, work in progress, deployed and published are different claims. Commands displayed in a prototype are not real execution evidence. Reuse a new director layer when a work is already layered; for a route-only work, add a work-local route so adding the evidence view does not replace the original default stage. Keep the host badge/narration safe areas visible during verification.
+
 ## Dual-aspect explainers with source metadata
 When adapting one dataset to landscape and portrait, author two arrangements at readable design sizes; do not shrink the landscape composition wholesale. For native export also set the logical stage with render --viewport WIDTHxHEIGHT --no-frame; output --width/--height alone only change the surrounding frame. Reserve separate areas for brand, main subject, image credit, source/fact status and subtitles. Also leave room for host chrome: the step badge at the top and current narration/completion bar at the bottom. Check with chrome visible, not only clean video. Give photo panels an explicit image height and adjustable object-position; credit and archive year need their own measured height below the image. A title-first opening may place one main graphic below the title.
 
