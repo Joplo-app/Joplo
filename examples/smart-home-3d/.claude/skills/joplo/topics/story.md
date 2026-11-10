@@ -72,7 +72,7 @@ Joplo already has the parts of a user story; fill them in that spirit.
 - Rhythm: every short step waits 3 s, so a run of trivial steps feels like a metronome. Merge trivial steps (type, then click) and give key results an explain.
 
 ## 6. Narration: narrate() is a presenter talking, not the caption read aloud
-When the board or the published site reads a demo aloud, each step reads, in order of preference: narrate() in the narrator's voice; else say(), the character's own line in that role's voice; else the caption in the narrator's voice (cards read title and sub). A caption read aloud sounds like a screen reader, so give the steps that will be heard a narrate() line, written the way a person walks a colleague through a feature. It may later be recorded by a real voice, so write how people speak.
+When the board or the published site reads a demo aloud, each step reads, in order of preference: narrate() in the narrator's voice; else say(), the character's own line in that role's voice; else the caption in the narrator's voice (cards read title and sub). Use narrate(false) on a deliberately silent step: it suppresses narration, say(), caption/card fallback and the spoken subtitle; the step title stays visible and voice-paced streams use their normal text speed. narrate('') remains an error, not a silence marker. Without narrate(false), the existing fallback is unchanged. A caption read aloud sounds like a screen reader, so give the steps that will be heard a narrate() line, written the way a person walks a colleague through a feature. It may later be recorded by a real voice, so write how people speak.
 - Short first: one sentence, two at most, mostly 3–8 seconds. Cut every word the screen already shows; the viewer is watching.
 - Each line does one job: orient (who, where, what we are about to see), point (what to look at now and why it matters), connect (carry the viewer from the last step: 'Now over to Ajie'), or conclude (what this proved).
 - Say what the caption cannot: the intent, the reason, the consequence. Never repeat the caption word for word; name an on-screen label only when the viewer must find it.
@@ -117,4 +117,4 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.5.0 sha256:573de6ae1e3cbaf7464c8ed384f1e3ece0a41cd894146485fc1d7ff61783fb7d -->
+<!-- joplo-skill 0.7.0 sha256:1d2e3a5a2a3975e5e4b7cc6c04961039cf7aaf50b7ac9c0c406bbb06dda9fdef -->
