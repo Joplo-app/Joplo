@@ -635,6 +635,10 @@ check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同�
 
 先用 `joplo outline` 确认场景 ID，再按章 `joplo render --scenario-id <id> --sheet`。`flow('Slice title', { autoplay:false })` 标记的支线依然可独立渲染、手动选择或通过 fork 进入，但发布站连续播放会跳过它；支线结束后停下。fork 本身不会改变自动播放资格。`joplo check` 不证明本机配乐已成功编译，最终还须检查 build 的资源警告和真实输入、声音，再用 preview 离线验证 HTTP 播放。
 
+离线导出回归：`pnpm test packages/server/test/export-contract.test.ts` 验证横竖画幅、多章与三个可分发合成PCM音频片段；`JOPLO_EXPORT_VIDEO=1` 增加WebM/MP4编码、音频频率匹配与时差断言（需本机ffmpeg/ffprobe）；`JOPLO_EXPORT_LONG=1` 增加五分钟引擎时间性能测量。产物保留在 `scratch/output/`，不调用云TTS、不需要个人账户。
+
+`render --video --silent` 显式省略全部音轨并保留旁白节奏；`--voice off` 仅关闭旁白，不关闭背景配乐。`.mp4` 输出需要本机 ffmpeg（H.264/AAC），默认 `.webm` 无需外部编码器。
+
 
 ## assets
 
@@ -643,7 +647,3 @@ check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同�
 JSON 的 `data.scope` 说明扫描目录、源码入口和发布场景范围；`data.entries` 给出文件路径/资源 ID、类型/MIME（未知为 null）、大小（生成资源未知为 null）、已知声明元数据及引用位置。源码引用统计全体已加载作品（含 draft），引用上的 `inSelectedScope` 区分当前选区；没有精确步骤证据时不编造 stepId。相同内容文件使用哈希关联，`metadata.contentMatch` 明确来源歧义。
 
 三个维度必须分开读：`authorReference=referenced` 表示实际 asset() 调用、编译内容或插件资源声明；`publication=included-in-selected-ir` 仅表示所选发布 IR 中存在相应内容，不代表实际执行了 build 或生成资源；`sampledVisibility=unknown` 表示未渲染采样，无法断言屏幕可见。动态路径、模块缓存、插件内部解析等写进 `unknowns`；`not-found-in-loaded-model` 只表示本次加载模型中未找到，绝不等于“未使用”。不推测缺失的作者、年份或版权信息，不自动删除或上传。加载/编译失败时先修复 check，不为补齐报告擅自运行付费资源生成。
-
-离线导出回归：`pnpm test packages/server/test/export-contract.test.ts` 验证横竖画幅、多章与三个可分发合成PCM音频片段；`JOPLO_EXPORT_VIDEO=1` 增加WebM/MP4编码、音频频率匹配与时差断言（需本机ffmpeg/ffprobe）；`JOPLO_EXPORT_LONG=1` 增加五分钟引擎时间性能测量。产物保留在 `scratch/output/`，不调用云TTS、不需要个人账户。
-
-`render --video --silent` 显式省略全部音轨并保留旁白节奏；`--voice off` 仅关闭旁白，不关闭背景配乐。`.mp4` 输出需要本机 ffmpeg（H.264/AAC），默认 `.webm` 无需外部编码器。
