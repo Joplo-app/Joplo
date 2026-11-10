@@ -72,7 +72,7 @@ CI 不存 npm token，用 GitHub OIDC 向 npm 证明身份（[npm 文档](https:
 
 ```sh
 npm login
-for p in @joplo-app/kit @joplo-app/plugin-diagram @joplo-app/plugin-alda @joplo-app/plugin-3d @joplo-app/plugin-content @joplo-app/plugin-ui @joplo-app/core @joplo-app/web @joplo-app/server @joplo-app/cli joplo; do
+for p in @joplo-app/kit @joplo-app/plugin-diagram @joplo-app/plugin-alda @joplo-app/plugin-3d @joplo-app/plugin-content @joplo-app/plugin-ui @joplo-app/plugin-media @joplo-app/core @joplo-app/web @joplo-app/server @joplo-app/cli joplo; do
   npm trust github "$p" --repo Joplo-app/Joplo --file release.yml --allow-publish -y
 done
 npm trust list joplo                # 确认配置
