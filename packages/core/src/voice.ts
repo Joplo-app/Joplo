@@ -43,6 +43,7 @@ export function joinSpoken(parts: (string | null | undefined)[]): string {
  * speaker 是这一步的说话角色（speakerRoleAt）。text 为空串表示这一步不读；role 为 null 表示旁白。
  */
 export function spokenLine(step: Step, caption: string, speaker: string | null): { text: string; role: string | null } {
+  if (step.mute) return { text: '', role: null };
   if (step.narrate?.trim()) return { text: step.narrate.trim(), role: null };
   if (step.say?.trim()) return { text: step.say.trim(), role: speaker };
   if (step.action.type === 'card') return { text: joinSpoken([step.action.title, step.action.sub]), role: null };

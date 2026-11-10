@@ -148,7 +148,7 @@ export type EffectDef =
   | { kind: 'effect'; type: 'callout'; target: string; text: string; side?: CalloutSide }
   | { kind: 'effect'; type: 'hold'; seconds: number }
   | { kind: 'effect'; type: 'say'; text: string; role?: string }
-  | { kind: 'effect'; type: 'narrate'; text: string };
+  | { kind: 'effect'; type: 'narrate'; text: string | false };
 
 /** 标注气泡放在目标的哪一侧；不写时自动选画面里放得下的一侧（右、左、下、上）。 */
 export type CalloutSide = 'top' | 'right' | 'bottom' | 'left';
@@ -202,7 +202,7 @@ export const explain = (text: string): EffectDef => ({ kind: 'effect', type: 'ex
 /**
  * 旁白（D74）：讲解人用旁白的声音说的话，像在给同事介绍功能，不是把字幕念出来。和字幕分开存。
  * 朗读的优先级：narrate() > say()（角色台词）> 字幕（过渡卡读标题和副标题）；explain 不读。字幕兜底时也用旁白的声音。
- * 自动播放会等它读完再进下一步。
+ * 自动播放会等它读完再进下一步。narrate(false) 显式静音整步（包括 say 与字幕兜底）；空字符串不是静音。
  *
  * 写法（详见 npx joplo skill story 第 6 节）：
  * - 一句只做一件事：交代、指点、承接或收束；说字幕说不出的意图、原因、结果，不重复字幕；
@@ -212,7 +212,7 @@ export const explain = (text: string): EffectDef => ({ kind: 'effect', type: 'ex
  *   .click('share', '小雨把行程单分享给阿杰', narrate('行程用链接发给阿杰，他不用装 App。'))
  *   .card('现在是阿杰', { role: 'ajie' }, narrate('换到阿杰这边，他只收到一条消息。'))
  */
-export const narrate = (text: string): EffectDef => ({ kind: 'effect', type: 'narrate', text });
+export const narrate = (text: string | false): EffectDef => ({ kind: 'effect', type: 'narrate', text });
 
 /**
  * 角色台词（D74）：这一步里角色亲口说的话，用这个角色的声音读（feature.roles 与层级的 role；没有角色时用旁白的声音）。
@@ -450,6 +450,8 @@ export type WorkDef = {
   kind: 'work';
   title: string;
   summary: string;
+  /** System-step lead before commit, in seconds (0–30); omitted preserves 0.9s. */
+  pace?: { systemLead?: number };
   /** stage 与 layers 二选一。 */
   stage?: JNode;
   layers?: Record<string, LayerDef>;

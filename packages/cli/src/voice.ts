@@ -10,6 +10,7 @@
  */
 import { JoploError } from '@joplo-app/core';
 import type { buildSite, VoiceRunResult } from '@joplo-app/server';
+import { resolveWorkId } from './work.ts';
 import { checkWithProject } from './check.ts';
 import { cloudBridge } from './cloud-bridge.ts';
 import { CloudError } from './cloud-error.ts';
@@ -56,7 +57,7 @@ function mapError(e: unknown, loginFix: string): never {
   throw e;
 }
 
-export async function voiceCommand(projectDir: string, opts: { dryRun: boolean; locales: string[]; server?: string }, deps: VoiceCommandDeps): Promise<{ summary: string; lines: string[]; data: VoiceRunResult }> {
+export async function voiceCommand(projectDir: string, opts: { dryRun: boolean; locales: string[]; server?: string; work?: string; scenario?: string }, deps: VoiceCommandDeps): Promise<{ summary: string; lines: string[]; data: VoiceRunResult }> {
   const checked = await (deps.cloud?.check ?? checkWithProject)(projectDir);
   if (!checked.project || checked.summary.error) {
     throw new JoploError('INVALID_SCHEMA', `${checked.summary.error} error. Fix them first (joplo check):\n${checked.diagnostics.filter((d) => d.severity === 'error').slice(0, 5).map(diagnosticLine).join('\n')}`, { diagnostics: checked.diagnostics });
@@ -68,7 +69,7 @@ export async function voiceCommand(projectDir: string, opts: { dryRun: boolean; 
   const loginFix = status && !status.signedIn ? status.loginCommand : 'npx joplo login';
   let r: VoiceRunResult;
   try {
-    r = await generate({ projectDir, project: checked.project, home: credentialsHome(env), cloud: bridge.voice, dryRun: opts.dryRun, ...(opts.locales.length ? { locales: opts.locales } : {}), onProgress: deps.progress });
+    r = await generate({ projectDir, project: checked.project, home: credentialsHome(env), cloud: bridge.voice, dryRun: opts.dryRun, ...(opts.work ? { workId: resolveWorkId(checked.project, opts.work) } : {}), ...(opts.scenario ? { scenarioId: opts.scenario } : {}), ...(opts.locales.length ? { locales: opts.locales } : {}), onProgress: deps.progress });
   } catch (e) {
     mapError(e, loginFix);
   }
@@ -80,6 +81,7 @@ export async function voiceCommand(projectDir: string, opts: { dryRun: boolean; 
     lines.push(opts.dryRun
       ? `${tag}${l.missing} clip(s) to generate for ${l.segments} step(s), about ${n(l.chars)} characters (steps with the same text share one clip)`
       : `${tag}generated ${l.generated}, ${l.skipped} already had audio${l.failed.length ? `, ${l.failed.length} failed` : ''}`);
+    if (opts.dryRun) for (const d of l.details ?? []) lines.push(`  ${d.workId} / ${d.scenarioId} / ${d.stepId}: ${d.chars} characters, ${d.missing ? `${d.billableChars} to generate` : d.text ? 'cached' : 'silent'}`);
     for (const f of l.failed) lines.push(`  failed ${f.stepId}: ${f.message}`);
   }
   if (r.quota) lines.push(voiceQuotaLine(r.quota));

@@ -80,3 +80,10 @@ describe('check：说明与 explain 过长时只给 warning（带 at），不改
     }
   });
 });
+
+
+it('explicit silence hides spoken subtitles while preserving the step title', () => {
+  const silent = { ...sc, steps: [{ ...sc.steps[0]!, mute: true as const, narrate: 'Do not read', say: 'Do not say' }] };
+  expect(spokenSubtitleFor(silent, 1, null, zh)).toBeNull();
+  expect(stepTitleFor(silent, 1, null)).toMatchObject({ caption: '点击发送' });
+});

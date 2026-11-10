@@ -19,7 +19,7 @@ npx joplo build [dir] [--out-dir <dir>] [--overwrite] [--scenario <id>]… [--wo
 npx joplo login [--no-browser] [--format text|json] [--server <url>]
 npx joplo logout [--server <url>]
 npx joplo whoami [--format text|json] [--server <url>]
-npx joplo voice [dir] [--dry-run] [--locale <lang>]… [--format text|json] [--server <url>]
+npx joplo voice [dir] [--work <id>] [--scenario <id>] [--dry-run] [--locale <lang>]… [--format text|json] [--server <url>]
 npx joplo share [dir] (--public | --private) (--review | --no-review) [--format text|json] [--new] [--title <title>] [--json] [--password [<值>] | --no-password] \
   [--scenario <id>]… [--work <id>]… \
   [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
@@ -370,7 +370,7 @@ npx joplo whoami --format json
 生成缺少的朗读音频（D74 / D85），给 Agent 和脚本用；与看板的「生成缺少的音频」同一套缓存（`.joplo/voice/`）、声音来源与默认规则。
 
 ```sh
-npx joplo voice --dry-run            # 只估算：几步没有音频、约多少字、生成后还剩多少
+npx joplo voice --work short --dry-run # 只估算：几步没有音频、约多少字、生成后还剩多少
 npx joplo voice --format json        # 生成选定方案所有场景的缺少音频（每种内容语言各一遍）
 npx joplo voice --locale ja          # 只做一种内容语言（必须在 config 的 locales 里；可重复）
 ```
@@ -378,6 +378,9 @@ npx joplo voice --locale ja          # 只做一种内容语言（必须在 conf
 - 先 check：编译有 error 时以 `INVALID_SCHEMA` 退出 1，不生成。
 - 范围：每个功能选定方案的全部场景；项目写了 `locales` 时每种内容语言各一遍（D84，音色按 `resolveVoices(…, 语言)`）。朗读文字与 build 打包算片段键的文字相同（自动字幕用编译出的字幕；看板里自动字幕按界面语言生成，非英文界面时可能和这里不同）。
 - 声音来源：`joplo.config.ts` 的 `voice.profile` > 看板里选的 > 没选过时已登录用 Joplo Cloud 朗读（用 CLI 的登录或 `JOPLO_API_KEY`，Key 需要 `voice:generate`）> 都没有时 `VOICE_NO_SOURCE`。Joplo Cloud 的请求带 `locale`（内容语言；项目没写 locales 时不带）与 `project`（项目名，控制台明细用）。
+- 范围：`--work <id>` 接受独立作品键或功能方案的完整 id；`--scenario <id>`（别名 `--scenario-id`）选一章并包含 `from` 前置章节，两者同时写时章节必须属于该作品。省略时仍生成全部非草稿独立作品及选定方案。非法/草稿范围在请求语音前失败。
+- 明细：dry-run 文本逐步列出作品、章节、步骤、字符与待生成字数；JSON 的 `data.locales[].details` 包含 `workId/scenarioId/stepId/text/chars/missing/billableChars`。同声音同文字只计费一次，静音步骤列零。确认后去掉 `--dry-run`，范围外缓存和声音固定选择不受影响；build/share 仍按自己的范围打包已有音频。
+- 静音：步骤写 `narrate(false)`，禁止旁白、台词、字幕兜底与朗读字幕；没有显式静音时保留旧回退。`narrate('')` 仍报错。单语言项目也可写 `config({ locales: ['zh-CN'] })` 声明原文语言；没声明时片段记录为 `und`（未知），不拿界面语言冒充内容语言。
 - 字数：每段 `Array.from(文字).length`，生成成功才扣，云端缓存命中不扣；已经在 `.joplo/voice/` 的段不再请求。`--dry-run` 不发请求，只估算。
 - 文本输出：`Voice source: Joplo Cloud (default when signed in)`、每种语言一行（生成了几段、几段已有、几段失败及原因；`--dry-run` 时是要生成几段、覆盖几步、约多少字——文字相同的步骤共用一段）、剩余字数一行、最后一行合计。`--format json` 的 `data`：`{profile: {id, name, kind}, source: "config" | "board" | "default", dryRun, locales: [{locale, segments, missing, chars, generated, skipped, failed}], total: {segments, missing, chars, generated, failed}, quota, usageUrl, exhausted}`；`quota.totalRemainingChars` 是最后一段响应头里的剩余（不在本地估算）。有失败的段时退出 1（重跑只重试它们）。
 - 错误码：

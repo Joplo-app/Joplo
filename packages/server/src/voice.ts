@@ -935,7 +935,7 @@ export async function reuseSharedVoice(projectDir: string, project: Project, sha
         if (!rel || cache.clipOf(key)) continue;
         const file = rel.replace(/^voice\//, '');
         const bytes = await shared.fetch(rel).catch(() => null);
-        if (bytes && cache.adopt(key, file, bytes, { stepId: st.id, fp, text, locale: locale ?? 'en', origin: 'shared' })) reused++;
+        if (bytes && cache.adopt(key, file, bytes, { stepId: st.id, fp, text, locale: locale ?? project.i18n?.default ?? 'und', origin: 'shared' })) reused++;
       }
   return reused;
 }
@@ -988,7 +988,7 @@ export function bundleVoice(projectDir: string, project: Project, outDir: string
           const records = Object.entries(idx.clips)
             .filter(([key, c]) => {
               if (c.stepId !== st.id || (locale && c.locale !== locale) || typeof c.text !== 'string') return false;
-              const expected = automaticCaption(st.captionAuto!, c.locale);
+              const expected = c.locale === 'und' ? st.caption : automaticCaption(st.captionAuto!, c.locale);
               // 先证明文字仍属于当前内容，再考虑来源优先级；未知语言、旧文字或错配缓存键均不能发布。
               return expected !== null && c.text.replace(/\s+/g, ' ').trim() === expected.replace(/\s+/g, ' ').trim()
                 && key === clipKey(c.fp, expected) && !!cache.clipOf(key);

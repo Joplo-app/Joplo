@@ -120,11 +120,14 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   });
   cloudCommand('voice').description('Generate missing narration audio for independent works and picked feature options (same cache as the board): Joplo Cloud narration when signed in, or the source chosen in the board or joplo.config.ts')
     .argument('[dir]', 'Project directory', '.').addOption(format())
+    .option('--work <id>', 'Only this standalone work key or qualified feature work id')
+    .option('--scenario <id>', 'Only this chapter and its continuing-chapter dependencies')
+    .option('--scenario-id <id>', 'Alias for --scenario')
     .option('--dry-run', 'Only count the steps and characters that would be generated')
     .option('--locale <lang>', 'Only this content language from config locales (D84); repeatable', collect, [])
     .action(async (dir, opts) => {
       const { voiceCommand } = await import('./voice.ts');
-      const r = await voiceCommand(resolve(dir), { dryRun: !!opts.dryRun, locales: opts.locale, server: opts.server }, {
+      const r = await voiceCommand(resolve(dir), { dryRun: !!opts.dryRun, locales: opts.locale, server: opts.server, work: opts.work, scenario: opts.scenario ?? opts.scenarioId }, {
         version: deps.cliVersion ?? await readCliVersion(), cloud: deps.cloud, generate: () => serverFunction('generateProjectVoice'),
         build: async options => (await serverFunction('buildSite'))(options), render: () => serverFunction('renderStep'), progress: l => stderr(oneLine(l) + '\n'),
       });

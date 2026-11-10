@@ -343,7 +343,7 @@ export class VoiceHub {
       this.jobs.set(projectId, job);
       let summary: GenerateSummary;
       try {
-        summary = await cache.generate(segs as Segment[], content ?? (typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en'), resolved, this.store, {
+        summary = await cache.generate(segs as Segment[], content ?? project?.i18n?.default ?? (typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'und'), resolved, this.store, {
           fetch: this.opts.fetch,
           signal: job.abort.signal,
           inflight: this.inflightOf(projectId),
@@ -380,7 +380,7 @@ export class VoiceHub {
       if (!plan) return ctx.send(400, { error: { code: 'INVALID', message: 'No voice provider is selected for this project' } }), true;
       // Joplo Cloud 朗读不在播放时现场生成（会花用户的字数）：只有「生成缺少的音频」或 joplo voice 才请求云端；缺音频的步骤用浏览器朗读
       if (resolved.profile?.kind === 'cloud') return ctx.send(409, { error: { code: 'CLOUD_GENERATE_ONLY', message: 'Joplo Cloud narration is generated only with Generate missing audio (or npx joplo voice); this step uses the browser voice' } }), true;
-      const p = cache.generateOne(seg, content ?? (typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'en'), resolved, this.store, {
+      const p = cache.generateOne(seg, content ?? project?.i18n?.default ?? (typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'und'), resolved, this.store, {
         fetch: this.opts.fetch,
         inflight: this.inflightOf(projectId),
         cloud: this.opts.cloud,

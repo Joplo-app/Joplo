@@ -224,6 +224,10 @@ export const Step = z.strictObject({
   sayRole: z.string().min(1).optional(),
   /** 旁白（D74，来自 narrate()）：用旁白的声音读，优先于台词和字幕；没有时省略。发布站保留。 */
   narrate: z.string().min(1).optional(),
+  /** Explicit silence from narrate(false); suppresses narration, dialogue and caption fallback. */
+  mute: z.literal(true).optional(),
+  /** System-step lead before commit, in milliseconds. */
+  systemLead: z.number().int().min(0).max(30_000).optional(),
   source: Source,
 });
 

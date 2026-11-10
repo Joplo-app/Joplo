@@ -73,7 +73,7 @@ export function stepPlan(project: Pick<Project, 'plugins'>, step: Step, o: StepP
   if (a.type === 'card') {
     // 过渡卡：直接提交，停留由 dwell 负责
   } else if (a.type === 'press') gestureMs = reduced ? T.reducedStep : T.selectHold;
-  else if (step.kind === 'system' || a.type === 'event') gestureMs = reduced ? T.reducedStep : T.systemHold;
+  else if (step.kind === 'system' || a.type === 'event') gestureMs = step.systemLead ?? (reduced ? T.reducedStep : T.systemHold);
   else if (reduced) gestureMs = T.reducedStep;
   else if ('target' in a) {
     cursorMs = cursor ? T.cursorMove : 0;
@@ -93,7 +93,7 @@ export function stepPlan(project: Pick<Project, 'plugins'>, step: Step, o: StepP
     : stepDwell({ texts: o.texts ?? stepTexts(step), paced: step.hold !== undefined, cameraMoved: step.shots.length > 0 || !!step.directorLayer, streamMs });
   // hold 是看的时间，不是动画：减少动态效果时同样保留
   const dwellMs = Math.max(step.hold ?? 0, step.effectHold ?? 0, read, settleMs);
-  const voice = voiceMs(step.narrate ?? step.say);
+  const voice = voiceMs(step.mute ? undefined : step.narrate ?? step.say);
   const leadMs = cursorMs + rippleMs + gestureMs;
   return { cursorMs, rippleMs, gestureMs, leadMs, settleMs, dwellMs, voiceMs: voice, totalMs: leadMs + Math.max(dwellMs, voice) };
 }

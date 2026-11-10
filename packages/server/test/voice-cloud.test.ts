@@ -358,3 +358,54 @@ describe('多语言项目：cloud 请求带内容语言（D84）', () => {
     expect(r.quota?.totalRemainingChars).toBe(3);
   });
 });
+
+it('voice scope uses exact work identity, includes continuing predecessors, and preserves all outside clips and pins', async () => {
+  const p = project();
+  p.features = {};
+  const original = p.scenarios['f.a.s']!;
+  const make = (id: string, workId: string, text: string, from?: string) => ({ ...original, id, workId, ...(from ? { from } : {}), steps: [{ ...original.steps[0]!, id: `${id}#1`, caption: text }] });
+  p.works = { 'cut.short': { ...p.works['f.a']!, id: 'cut.short', featureId: null }, cut: { ...p.works['f.a']!, id: 'cut', featureId: null } };
+  p.scenarios = {
+    'opening.with.dots': make('opening.with.dots', 'cut.short', 'First'),
+    'continuation': make('continuation', 'cut.short', 'Next', 'opening.with.dots'),
+    'unrelated': make('unrelated', 'cut', 'Outside'),
+  };
+  const f = fakeBridge();
+  await generateProjectVoice({ projectDir: proj, project: p, home, cloud: f.bridge, workId: 'cut' });
+  const cache = new VoiceCache(proj);
+  cache.pin('ja', { 'narrator-warm-f': 'bright-f' });
+  const pinsBefore = cache.pins();
+  const before = fs.readFileSync(path.join(cache.root, 'index.json'), 'utf8');
+  const outsideClips = fs.readdirSync(cache.clipsDir).map(file => [file, fs.readFileSync(path.join(cache.clipsDir, file)).toString('hex')]);
+  const dry = await generateProjectVoice({ projectDir: proj, project: p, home, cloud: f.bridge, scenarioId: 'continuation', dryRun: true });
+  expect(dry.total).toMatchObject({ segments: 2, missing: 2, chars: 9 });
+  expect(dry.locales[0]!.details?.map(d => [d.workId, d.scenarioId])).toEqual([['cut.short', 'opening.with.dots'], ['cut.short', 'continuation']]);
+  expect(fs.readFileSync(path.join(cache.root, 'index.json'), 'utf8')).toBe(before);
+  const generated = await generateProjectVoice({ projectDir: proj, project: p, home, cloud: f.bridge, workId: 'cut.short' });
+  expect(generated.total.generated).toBe(2);
+  expect(cache.pins()).toEqual(pinsBefore);
+  expect(f.calls.map(c => c.text)).toEqual(['Outside', 'First', 'Next']);
+  expect(bundleVoice(proj, p, out, new ProfileStore(home), undefined, undefined, 'cloud').report).toMatchObject({ clips: 3, missing: 0 });
+  for (const [file, bytes] of outsideClips) expect(fs.readFileSync(path.join(cache.clipsDir, file!)).toString('hex')).toBe(bytes);
+  expect((await generateProjectVoice({ projectDir: proj, project: p, home, cloud: f.bridge, dryRun: true })).total.missing).toBe(0);
+  await expect(generateProjectVoice({ projectDir: proj, project: p, home, cloud: f.bridge, workId: 'missing' })).rejects.toMatchObject({ code: 'USAGE' });
+  await expect(generateProjectVoice({ projectDir: proj, project: p, home, cloud: f.bridge, workId: 'cut', scenarioId: 'continuation' })).rejects.toMatchObject({ code: 'USAGE' });
+});
+
+it('explicit mute spends no characters, keeps caption fallback default, and records undeclared source language as und', async () => {
+  const p = project();
+  p.features = { f: { id: 'f', name: 'F', pick: 'f.a' } } as Project['features'];
+  const sc = p.scenarios['f.a.s']!;
+  sc.steps = [{ ...sc.steps[0]!, caption: '中文旁白' }, { ...sc.steps[1]!, mute: true, narrate: 'Do not speak', say: 'Nor this' }];
+  const f = fakeBridge();
+  const dry = await generateProjectVoice({ projectDir: proj, project: p, home, cloud: f.bridge, dryRun: true });
+  expect(dry.total).toMatchObject({ segments: 1, missing: 1, chars: 4 });
+  expect(dry.locales[0]!.details).toHaveLength(2);
+  expect(dry.locales[0]!.details![1]).toMatchObject({ chars: 0, billableChars: 0, missing: false });
+  expect(f.calls).toHaveLength(0);
+  await generateProjectVoice({ projectDir: proj, project: p, home, cloud: f.bridge });
+  expect(f.calls.map(c => c.text)).toEqual(['中文旁白']);
+  expect(bundleVoice(proj, p, out, new ProfileStore(home), undefined, undefined, 'cloud').report).toMatchObject({ clips: 1, missing: 0 });
+  const index = JSON.parse(fs.readFileSync(path.join(proj, '.joplo/voice/index.json'), 'utf8'));
+  expect(Object.values(index.clips).map((c: any) => c.locale)).toEqual(['und']);
+});
