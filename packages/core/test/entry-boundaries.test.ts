@@ -34,4 +34,5 @@ it('web 与 CLI 不直接读取 Feature.standalone 或 Option.sequencing', () =>
     visit(source);
   }
   expect(hits).toEqual([]);
-});
+// 要为 web 与 CLI 的全部源码建类型检查器，CI 上超过默认的 5 秒。
+}, 60_000);
