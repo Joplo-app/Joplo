@@ -119,7 +119,7 @@ git push origin v0.3.0
 0.2.4 漏发了 core、0.2.6 漏发了 web：以前每个包 publish 前各自运行 prepublishOnly 构建，web 构建最慢，排在中间的包常在用户输入 OTP 之后失败。现在 `pnpm release:publish --tag latest` 分三步：
 
 1. 一次性构建并打包全部包到 `release/`（构建或任何 tarball 检查失败时一个包都不发）。
-2. 按依赖顺序（kit → plugin-diagram → plugin-alda → plugin-3d → plugin-content → plugin-ui → core → web → server → cli → joplo）逐个处理：先直接查询 registry（绕过本地缓存），已有这个版本就跳过；否则 `npm publish release/<包>.tgz --access public --tag <标签>`。任何一个包失败（包括查询 registry 失败）立刻停止，不再发后面的包，列出本次已发布、registry 上原本就有、还没发布的包，以非 0 退出。
+2. 按依赖顺序（kit → plugin-diagram → plugin-alda → plugin-3d → plugin-content → plugin-ui → plugin-media → core → web → server → cli → joplo）逐个处理：先直接查询 registry（绕过本地缓存），已有这个版本就跳过；否则 `npm publish release/<包>.tgz --access public --tag <标签>`。任何一个包失败（包括查询 registry 失败）立刻停止，不再发后面的包，列出本次已发布、registry 上原本就有、还没发布的包，以非 0 退出。
 3. 全部处理完后运行 `release:verify`，用它的结果作为整体退出码；通过时最后一行打印打 tag 的命令。
 
 中途失败后，处理登录、网络或 2FA 问题，再重跑同一条命令即可；已存在的版本会跳过，不必重发，也不必仅为重试增加版本号。实现见 [release.mjs](../scripts/release.mjs) 的 `publishRelease`，测试用替身注入打包、registry、npm publish 与 verify（scripts/test/release.test.ts）。
