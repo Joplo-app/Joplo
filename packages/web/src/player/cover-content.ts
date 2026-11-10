@@ -1,14 +1,19 @@
 import { stepCaption } from '../i18n/step-caption';
 import { en, type Dictionary } from '../i18n/en';
-import { stepDwell, voiceMs } from '../runtime/pace';
-import { holdMsOf } from '@joplo-app/core/runtime';
 /**
  * 场景封面（D61，纯函数）：第 0 步不再是“初始状态”，而是一张封面。内容只由 IR 推导：
  * 所属功能名 · 方案名、flow 的标题与 description、「约 N 步 · 约 M 秒」、出场角色。
- * 时长逐步调用 pace.ts 的 stepDwell 再求和（与演示控制器用同一份文字，见 dwellTexts）；参数在 pace.ts 里调整，这里不写死。
- * 估算不含鼠标移动、逐字输入与连线小点，所以写「约」。
+ * 时长是每一步时间计划（core 的 stepPlan，与演示控制器同一份：操作演示 + 停留与朗读估算中较长者）之和，文字用当前语言的字幕（dwellTexts）。
+ * 朗读是估算、切层引导只在播放时才知道，所以写「约」。
+ *
+ * 独立作品（D102 修订，Entry.featureId === null）：能力的判断在这里，播放器、嵌入与截图页（RenderApp）都只按 entry 字段画。
+ * - 顺序里第一个切片的第 0 步是作品封面：标题、简介、给谁看、「N 章 · 约 M」或「N 个场景 · 约 M」；
+ * - 从中间某个切片打开时是这个切片的封面：linear 写「第 n 章 · 作品标题」（支线写「支线」），independent 只写作品标题；
+ *   再加切片标题与它自己的 description。
+ * 标题、简介、给谁看与时长只从 Entry 取（Entry.ms / EntrySlice.ms），不另算。挂了功能的条目（无论切片是不是章节）封面不变（entry = null）。
  */
-import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, streamPlan, type Project, type RoleInfo, type Scenario, type Step } from '@joplo-app/core/runtime';
+import { cameraAt, cardAt, layersOf, roleOf, roleOfScene, scenarioPlanMs, entryOf, type Project, type RoleInfo, type Scenario, type Step, type Entry } from '@joplo-app/core/runtime';
+import { chapterNumber, entryMetaText, firstSlice, isLinear } from './work-view';
 
 export type Duration = { unit: 's' | 'min'; value: number };
 
@@ -28,7 +33,39 @@ export type CoverContent = {
   duration: Duration;
   /** 出场角色（导演层的角色与换人的过渡卡），按功能里声明的顺序；没有角色的项目为空。 */
   roles: RoleInfo[];
+  /** 独立作品的封面信息；挂了功能的条目为 null（外观不变）。 */
+  entry: EntryCover | null;
 };
+
+/** 独立作品的封面（at = entry，顺序里的第一个切片）或切片封面（at = slice，从中间某个切片打开）。 */
+export type EntryCover = {
+  at: 'entry' | 'slice';
+  /** 切片是不是章节（Entry.sequencing = linear）：决定小字写「第 n 章」还是只写作品标题。 */
+  linear: boolean;
+  /** 作品标题、简介、给谁看（Entry）。 */
+  title: string;
+  summary: string | null;
+  audience: string | null;
+  /** 「5 章 · 约 4 分 40 秒」/「3 个场景 · 约 40 秒」（entryMetaText）。 */
+  meta: string;
+  /** linear 时切片在播放顺序里的编号（1 起）；independent 与支线为 null。 */
+  chapter: number | null;
+  /** 这个切片在不在连续播放顺序里（支线为 false）。 */
+  inSequence: boolean;
+};
+
+function entryCover(entry: Entry, scenarioId: string, i18n: Dictionary): EntryCover {
+  return {
+    at: firstSlice(entry)?.id === scenarioId ? 'entry' : 'slice',
+    linear: isLinear(entry),
+    title: entry.title,
+    summary: entry.summary.trim() || null,
+    audience: entry.audience,
+    meta: entryMetaText(entry, i18n),
+    chapter: chapterNumber(entry, scenarioId),
+    inSequence: entry.slices.find((s) => s.id === scenarioId)?.inSequence ?? false,
+  };
+}
 
 /** 封面显示的条件：场景至少有一步、位置为 0、没在播放、也没有正在执行的一步。 */
 export function coverShown(scenario: Scenario | null | undefined, position: number, playing: boolean, activeStep: number | null, exploring = false): boolean {
@@ -40,11 +77,9 @@ export function dwellTexts(step: Step, i18n: Dictionary = en): (string | null | 
   return [stepCaption(step, i18n), step.explain, ...(step.action.type === 'card' ? [step.action.sub, ...(step.action.points ?? [])] : [])];
 }
 
-/** 整个场景按 1× 速度播放大约多久（毫秒）：每一步的 stepDwell 之和。 */
-export function scenarioMs(_project: Project, scenario: Scenario, i18n: Dictionary = en): number {
-  // hold（D70）：作者要求这一步至少停这么久
-  // 有旁白 / 台词的步骤按朗读估算（读完才进下一步），封面上的“约 M 秒”与带声音的真实时长一致
-  return scenario.steps.reduce((sum, step) => sum + Math.max(holdMsOf(step), voiceMs(step.narrate ?? step.say), stepDwell({ texts: dwellTexts(step, i18n), paced: step.hold !== undefined, cameraMoved: step.shots.length > 0 || !!step.directorLayer, streamMs: Math.max(0, ...streamPlan(step, null).map((x) => x.ms)) })), 0);
+/** 整个场景按 1× 速度播放大约多久（毫秒）：每一步时间计划的合计之和。 */
+export function scenarioMs(project: Project, scenario: Scenario, i18n: Dictionary = en): number {
+  return scenarioPlanMs(project, scenario.steps, (step) => dwellTexts(step, i18n));
 }
 
 /** 取整成好读的数：10 秒以内按秒向上取整，一分钟以内按 5 秒取整，再长按分钟四舍五入。 */
@@ -76,19 +111,27 @@ export function coverFor(project: Project, scenarioId: string | null | undefined
   if (!sc || sc.steps.length === 0) return null;
   const opt = project.options[sc.optionId];
   const feat = opt ? project.features[opt.featureId] : undefined;
-  const ms = scenarioMs(project, sc, i18n);
+  // 只问能力：没有挂功能的条目（独立作品）用作品封面；挂了功能的条目保持 D61 场景封面
+  const found = feat ? entryOf(project, feat.id) : null;
+  const work = found && found.featureId === null && found.workId === sc.optionId ? found : null;
+  const cover = work ? entryCover(work, sc.id, i18n) : null;
+  // 时长只读 Entry（作品封面 = 顺序里各切片之和，切片封面 = 这一个）；说明只用切片自己的 description
+  const slice = work?.slices.find((s) => s.id === sc.id);
+  const ms = cover ? (cover.at === 'entry' ? work!.ms : (slice?.ms ?? 0)) : scenarioMs(project, sc, i18n);
   return {
     scenarioId: sc.id,
     feature: feat?.name ?? null,
     option: opt?.name ?? null,
     title: sc.name,
-    ...describe((sc.description ?? '').trim(), (feat?.goal ?? '').trim()),
+    ...(cover ? describe((sc.description ?? '').trim(), '') : describe((sc.description ?? '').trim(), (feat?.goal ?? '').trim())),
     steps: sc.steps.length,
     ms,
     duration: approxDuration(ms),
     roles: rolesIn(project, sc),
+    entry: cover,
   };
 }
+
 
 /** 封面说明：作者写的 flow description 优先，没写时退回功能目标（feature.goal 在发布站也保留）。 */
 function describe(flow: string, goal: string): Pick<CoverContent, 'description' | 'descriptionFrom'> {

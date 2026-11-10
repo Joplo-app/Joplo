@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardEs(locale: Locale = 'es') {
@@ -188,6 +188,15 @@ export function createBoardEs(locale: Locale = 'es') {
       coverageFor: (p0: Value) => `Cobertura de ${value(p0, locale)}`,
       thisFeatureHasNoCasesYet: "Esta función aún no tiene casos.",
       otherScenarios: "Otros escenarios",
+      chaptersClock: (n: number, time: string) => `${plural(n, { one: '# capítulo', other: '# capítulos' }, locale)} · ${time}`,
+      scenariosClock: (n: number, time: string) => `${plural(n, { one: '# escenario', other: '# escenarios' }, locale)} · ${time}`,
+      draftNotPublished: "Borrador · no se publica",
+      sliceMeta: (time: string, steps: number) => `${time} · ${plural(steps, { one: '# paso', other: '# pasos' }, locale)}`,
+      reviewStrip: "Revisión",
+      reviewStripHint: "Tira de fotogramas de todos los capítulos seguidos, con cortes y pausas:",
+      copyCommand: "Copiar",
+      workEmptyTitle: "Esta obra aún no tiene contenido",
+      workEmptyBody: (file: string) => `Escribe el primer capítulo o escenario en scenarios de ${file}:`,
       copy: (p0: Value) => `Copiar ${value(p0, locale)}`,
       missing: "Sin cubrir",
       undecided: "Por decidir",
@@ -260,6 +269,7 @@ export function createBoardEs(locale: Locale = 'es') {
       error: "Error",
       notFound: "No encontrado",
       featuresPicked: (p0: Value, p1: Value, p2: Value) => `${plural(Number(p0), { one: "# función", other: "# funciones" }, locale)} · Elegidas ${value(p1, locale)} / ${value(p2, locale)}`,
+      workCount: (n: number) => plural(Number(n), { one: '# obra', other: '# obras' }, locale),
       covered: "Cubierto",
       aDemoScenarioCoversThisCaseThisDoesNot: "Un escenario de demo cubre este caso. Esto no confirma que el comportamiento de negocio sea correcto.",
       howToHandleThisCaseIsUndecided: "Está por decidir cómo resolver este caso",

@@ -47,7 +47,10 @@ export class LocalResources {
       if (!output || !('output' in output)) throw new Error('Local entry could not be bundled');
       return output.output.filter(x => x.type === 'chunk').map(x => x.code).join('\n');
     })());
-    return this.bundles.get(plugin)!;
+    // 宿主在热更新之间复用：失败的结果不留在缓存里，下一次编译重试
+    const pending = this.bundles.get(plugin)!;
+    pending.catch(() => { if (this.bundles.get(plugin) === pending) this.bundles.delete(plugin); });
+    return pending;
   }
   async describe(request: ResourceRequest): Promise<{ persistent: boolean; credits?: number; timeoutMs?: number; inspect?: boolean; requiresAttribution?:boolean }> {
     const code = await this.bundle(request.plugin), dir = path.join(this.directory, '.joplo', 'resources');
@@ -72,7 +75,9 @@ export class LocalResources {
       child.on('error',()=>finish(false));child.on('close',status=>finish(status===0));
       child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({entry,compiler:request.compiler,input:request.input}));
     }));
-    return this.descriptions.get(key)!;
+    const pending = this.descriptions.get(key)!;
+    pending.catch(() => { if (this.descriptions.get(key) === pending) this.descriptions.delete(key); });
+    return pending;
   }
   /** Lightweight author-only metadata. No rendering, bank download or provider spend. */
   async inspect(request: ResourceRequest): Promise<{ info?: LocalResourceInfo; diagnostic?: Diagnostic }> {

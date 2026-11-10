@@ -1,15 +1,15 @@
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 /**
  * 插件效果声明时长（D98）：效果编译结果可带 holdMs，这一步至少停留这么久（引擎时间）。
- * 端到端：effect 钩子 holdMs → 编译器校验 → Step.effectHold（同一步取最大）→ holdMsOf（自动播放、封面、outline 共用）
- * 与 stepAnchorMs（配乐等媒体锚点）。作者的 hold 仍是唯一“由作者掌握节奏、不套 3 秒下限”的信号。
+ * 端到端：effect 钩子 holdMs → 编译器校验 → Step.effectHold（同一步取最大）→ stepPlan 的 dwellMs（自动播放、封面、outline 共用）
+ * 与 commitGapMs（配乐等媒体锚点）。作者的 hold 仍是唯一“由作者掌握节奏、不套 3 秒下限”的信号。
  */
 import { describe, expect, it } from 'vitest';
 import { feature, flow, hold, option, page } from '@joplo-app/kit';
 import { definePlugin, pluginComponent, pluginEffect } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '../src/compile.ts';
-import { holdMsOf, stepAnchorMs } from '../src/focus.ts';
+import { ACTION_TIMING, commitGapMs, stepPlan } from '../src/step-plan.ts';
 import { outline } from '../src/outline.ts';
 import { focusTimeline } from '../src/focus.ts';
 
@@ -37,20 +37,28 @@ describe('插件效果时长 holdMs（D98）', () => {
     expect(b!.effectHold).toBeUndefined();
   });
 
-  it('holdMsOf = max(作者 hold, effectHold)，按速度缩放；作者 hold 的“不套下限”语义不受影响', () => {
-    const r = compile(source((f) => f.system('Clip', 'Play a clip', play(9000), hold(2)).system('Long hold', 'x', play(1000), hold(12))), 'dev');
-    const [a, b] = r.project!.scenarios['f.a.s']!.steps;
-    expect(holdMsOf(a)).toBe(9000);
-    expect(holdMsOf(a, 2)).toBe(4500);
-    expect(holdMsOf(b)).toBe(12000);
+  it('时间计划的停留 = max(作者 hold, effectHold, 阅读)；作者 hold 的“不套下限”语义不受影响', () => {
+    const r = compile(source((f) => f.system('Clip', 'Play a clip', play(9000), hold(2)).system('Long hold', 'x', play(1000), hold(12)).system('Short', 'x', hold(1))), 'dev');
+    const p = r.project!;
+    const [a, b, c] = p.scenarios['f.a.s']!.steps;
+    expect(stepPlan(p, a!).dwellMs).toBe(9000);
+    expect(stepPlan(p, b!).dwellMs).toBe(12000);
+    // 写了 hold：不套 3 秒阅读下限
+    expect(stepPlan(p, c!).dwellMs).toBe(1000);
     expect(a!.hold).toBe(2000);
+    // 减少动态效果时 hold 与效果时长同样保留（它是看的时间，不是动画）
+    expect(stepPlan(p, a!, { reduced: true }).dwellMs).toBe(9000);
   });
 
-  it('媒体锚点：max(hold ?? 3000, effectHold)', () => {
-    expect(stepAnchorMs({})).toBe(3000);
-    expect(stepAnchorMs({ hold: 2000 })).toBe(2000);
-    expect(stepAnchorMs({ effectHold: 9000 })).toBe(9000);
-    expect(stepAnchorMs({ hold: 2000, effectHold: 9000 })).toBe(9000);
+  it('媒体锚点 = 两次提交之间的计划时长：上一步的停留（与朗读估算取较长者）+ 下一步的操作演示', () => {
+    const p = compile(source((f) => f.system('Clip', 'Play a clip', play(9000)).system('Plain', 'x', hold(2))), 'dev').project!;
+    const steps = p.scenarios['f.a.s']!.steps;
+    // 场景开始 → 第 1 步提交：只有第 1 步的系统事件停顿
+    expect(commitGapMs(p, steps, -1)).toBe(ACTION_TIMING.systemHold);
+    expect(commitGapMs(p, steps, 0)).toBe(9000 + ACTION_TIMING.systemHold);
+    // 最后一步之后 = 到场景播完
+    expect(commitGapMs(p, steps, 1)).toBe(2000);
+    expect(commitGapMs(p, [], -1)).toBe(0);
   });
 
   it('outline 的时长估算包含效果时长', () => {

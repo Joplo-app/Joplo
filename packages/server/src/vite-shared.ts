@@ -4,7 +4,7 @@
  * - 看板与发布站的界面源码在 packages/web（Vite root）。
  * - 项目源文件（作者的 TSX）只在服务端经 ssrLoadModule 载入：用 automatic JSX、
  *   jsxImportSource '@joplo-app/kit'、development=true 转译，jsxDEV 因此拿到 文件:行:列。
- * - Tailwind 需要编译项目源文件里出现的 className：把项目目录追加为 index.css 的 @source。
+ * - 看板扫描项目源码；发布构建显式传入只来自公开 IR 的临时内容文件，不扫描作者目录。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -68,10 +68,10 @@ export function cssSourcePlugin(dirs: () => string[], web: WebAssets = locateWeb
 }
 
 /**
- * 转译项目源文件（TSX → 收集数据的 JS）；把 Tailwind @source 指向项目目录。
+ * 转译项目源文件（TSX → 收集数据的 JS）。看板默认扫描项目目录；发布时必须传入公开内容文件。
  * dist 形态下 CSS 入口是 @joplo-app/web/dist/project.css，其中的 `@import "tailwindcss"` 改为从 server 的依赖解析。
  */
-export function joploProjectPlugin(projectDir: string, web: WebAssets = locateWebAssets()): Plugin {
+export function joploProjectPlugin(projectDir: string, web: WebAssets = locateWebAssets(), publicCssSource?: string): Plugin {
   const entry = cssEntry(web);
   return {
     name: 'joplo:project',
@@ -80,8 +80,14 @@ export function joploProjectPlugin(projectDir: string, web: WebAssets = locateWe
       const file = id.split('?')[0]!;
       if (file === entry) {
         // Tailwind v4：@source 绝对路径；JSON.stringify 负责转义引号与反斜杠
-        const css = web.mode === 'dist' ? code.replace(/@import\s+["']tailwindcss["']/, `@import ${JSON.stringify(tailwindIndexCss())}`) : code;
-        return { code: `${css}\n@source ${JSON.stringify(projectDir)};\n`, map: null };
+        let css = code;
+        if (publicCssSource) {
+          css = css.replace(/(@import\s+["']tailwindcss["'])(?:\s+source\([^)]*\))?\s*;/, '$1 source(none);');
+          // 明确保留播放器自身的工具类与入口已有的插件样式来源。
+          if (web.mode === 'source') css += `\n@source ${JSON.stringify(path.join(web.webDir, 'src'))};`;
+        }
+        if (web.mode === 'dist') css = css.replace(/@import\s+["']tailwindcss["']/, `@import ${JSON.stringify(tailwindIndexCss())}`);
+        return { code: `${css}\n@source ${JSON.stringify(publicCssSource ?? projectDir)};\n`, map: null };
       }
       if (!isProjectSource(projectDir, file) || !/\.(tsx|ts|jsx|js|mts)$/.test(file)) return;
       const lang = file.endsWith('.tsx') ? 'tsx' : file.endsWith('.jsx') ? 'jsx' : file.endsWith('.js') ? 'js' : 'ts';

@@ -1,4 +1,5 @@
 import { pluginSpec } from './catalog.ts';
+import { entryOf, playSequence, scenariosOf } from './entries.ts';
 import { orderedFeatures } from './features.ts';
 import { Project, type SceneNode } from './schema.ts';
 import { CAPTION_MAX, CARD_POINTS_MAX, DESCRIPTION_MAX, EXPLAIN_MAX, SAY_MAX, isInteractiveType, SCENARIO_MS_MAX, captionLength } from './catalog.ts';
@@ -21,8 +22,13 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
   const diagnostics: Diagnostic[] = [];
   const verification: ValidationReport['verification'] = {};
   const seen = new Set<string>();
+  const publicMessage = (message: string) => {
+    for (const f of Object.values(project?.features ?? {})) if (f?.standalone) message = message.replaceAll(`Option ${f.id}.main`, `Work ${f.id}`).replaceAll(`option ${f.id}.main`, `work ${f.id}`).replaceAll(`${f.id}.main`, f.id);
+    return message;
+  };
   const emit = (severity: Diagnostic['severity'], code: string, message: string, at: string | undefined,
     ref?: Diagnostic['ref'], source: Diagnostic['source'] = 'structure') => {
+    message = publicMessage(message);
     const location = at ?? 'joplo.config.ts:1:1';
     // 同一布局/页面会复制到许多画面。相同问题只输出一次；不同情况/元素的诊断仍保留。
     const key = JSON.stringify([severity, code, location, message]);
@@ -38,7 +44,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
   const parsed = Project.safeParse(project);
   if (!parsed.success) {
     // 与编译器同一套：定位到最近的作者元素，同一根因合并成一条（schema-issues.ts）
-    for (const d of schemaDiagnostics(project, parsed.error.issues)) diagnostics.push({ ...d, at: d.at ?? 'joplo.config.ts:1:1' });
+    for (const d of schemaDiagnostics(project, parsed.error.issues)) diagnostics.push({ ...d, message: publicMessage(d.message), at: d.at ?? 'joplo.config.ts:1:1' });
     return report();
   }
   const p = parsed.data;
@@ -46,6 +52,12 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
   const options = Object.values(p.options).filter(o => !opts.optionId || o.id === opts.optionId);
   const included = (optionId?: string | null) => !opts.optionId || !optionId || optionId === opts.optionId;
   const scenarios = Object.values(p.scenarios).filter(s => included(s.optionId));
+  const chapterLabels = new Map<string, string>();
+  for (const o of Object.values(p.options)) if (o.sequencing === 'linear') {
+    const sequence = playSequence(p, o.id);
+    const ids = new Set(sequence.map(s => s.id));
+    [...sequence, ...scenariosOf(p, o.id).filter(s => !ids.has(s.id))].forEach((s, i) => chapterLabels.set(s.id, `Chapter ${String(i + 1).padStart(2, '0')}`));
+  }
   const ref = (ok: unknown, message: string, value: { id: string; source?: string; optionId?: string }, kind: string) => {
     if (!ok) emit('error', 'INVALID_REFERENCE', message, value.source, { kind, id: value.id, optionId: value.optionId }, 'reference');
   };
@@ -83,7 +95,7 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
     for (const f of orderedFeatures(p).filter(f => !opts.optionId || f.optionIds.includes(opts.optionId))) {
       const own = scenarios.filter(s => p.options[s.optionId]?.featureId === f.id);
       const edge = f.caseIds.some(id => p.cases[id] && p.cases[id]!.dimension !== 'main');
-      if (p.mode === 'dev' && own.length && !edge && own.every(s => s.mock.outcome === 'success'))
+      if (entryOf(p, f.id)?.featureId !== null && p.mode === 'dev' && own.length && !edge && own.every(s => s.mock.outcome === 'success'))
         emit('info', 'HAPPY_PATH_ONLY', `Feature "${f.name}" only shows the happy path: every case is a main-flow case and every scenario succeeds. Ask the user about input, permission, async, and lifecycle cases (npx joplo skill cases), then add at least one error-and-recovery scenario`, f.source, { kind: 'feature', id: f.id });
     }
     for (const r of Object.values(p.rules).filter(r => included(r.optionId) && (!opts.optionId || r.featureId === p.options[opts.optionId]?.featureId))) {
@@ -141,13 +153,14 @@ export function validate(project: Project, opts: ValidationOptions = { mode: 'al
       ref(o, `Scenario option does not exist: ${sc.optionId}`, sc, 'scenario');
       ref(p.scenes[sc.initial.sceneId]?.optionId === sc.optionId, `Scenario initial stage is missing or belongs to another option: ${sc.initial.sceneId}`, sc, 'scenario');
       for (const id of sc.caseIds) ref(p.cases[id]?.featureId === o?.featureId, `Scenario case is missing or belongs to another feature: ${id}`, sc, 'scenario');
+      const chapter = chapterLabels.get(sc.id);
       const sr = { kind: 'scenario', id: sc.id, optionId: sc.optionId };
-      if (!sc.steps.length) emit('info', 'EMPTY_SCENARIO', `Scenario has no steps: ${sc.name}`, sc.source, sr);
+      if (!sc.steps.length) emit('info', 'EMPTY_SCENARIO', chapter ? `${chapter} has no steps: ${sc.name}` : `Scenario has no steps: ${sc.name}`, sc.source, sr);
       // 叙事（D67）：封面说明 30 字以内（D61）；一个场景讲一件事，太长时拆开
       const dl = captionLength(sc.description);
-      if (dl > DESCRIPTION_MAX) emit('warning', 'DESCRIPTION_TOO_LONG', `flow description (the scenario cover text) is ${dl} units (recommended maximum: ${DESCRIPTION_MAX}; CJK characters count as 1 each, all others as 0.5): "${sc.description}". Say in one sentence what this scenario shows; the cover clips longer text`, sc.source, sr);
-      const ms = scenarioEstimateMs(sc);
-      if (ms > SCENARIO_MS_MAX) emit('info', 'SCENARIO_TOO_LONG', `Scenario "${sc.name}" plays about ${Math.round(ms / 1000)} s at 1× (${sc.steps.length} steps; recommended maximum: ${SCENARIO_MS_MAX / 1000} s). One scenario tells one thing: split it into scenarios (for example the happy path and each recovery), or branch with fork(); run npx joplo outline to see the pacing`, sc.source, sr);
+      if (dl > DESCRIPTION_MAX) emit('warning', 'DESCRIPTION_TOO_LONG', `${chapter ? `${chapter} description (the chapter cover text)` : 'flow description (the scenario cover text)'} is ${dl} units (recommended maximum: ${DESCRIPTION_MAX}; CJK characters count as 1 each, all others as 0.5): "${sc.description}". Say in one sentence what this ${chapter ? 'chapter' : 'scenario'} shows; the cover clips longer text`, sc.source, sr);
+      const ms = scenarioEstimateMs(p, sc);
+      if (ms > SCENARIO_MS_MAX) emit('info', 'SCENARIO_TOO_LONG', `${chapter ?? 'Scenario'} "${sc.name}" plays about ${Math.round(ms / 1000)} s at 1× (${sc.steps.length} steps; recommended maximum: ${SCENARIO_MS_MAX / 1000} s). ${chapter ? 'One chapter tells one thing: split it into chapters' : 'One scenario tells one thing: split it into scenarios (for example the happy path and each recovery)'}, or branch with fork(); run npx joplo outline to see the pacing`, sc.source, sr);
       for (const st of sc.steps) {
         const value = { ...st, optionId: sc.optionId };
         ref(!stepIds.has(st.id), `Duplicate step ID: ${st.id}`, value, 'step'); stepIds.add(st.id);

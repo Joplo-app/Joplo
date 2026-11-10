@@ -1,7 +1,7 @@
 import type { Locale } from '../i18n/locale';
 import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
 /** 看板（创作侧）专用的中文标签与芯片样式。不进入发布站。 */
-import type { Coverage, Rule } from '@joplo-app/core/runtime';
+import { pluginSpec, type Coverage, type PluginTable, type Rule } from '@joplo-app/core/runtime';
 
 export const COVERAGE_LABEL = (i18n: BoardMessages = boardEnglish): Record<Coverage['status'], { text: string; cls: string; hint: string }> => ({
   expressed: { text: i18n.board.covered, cls: 'border-[#1c5fb8] bg-[#eef4ff] text-[#1c5fb8]', hint: i18n.board.aDemoScenarioCoversThisCaseThisDoesNot },
@@ -41,72 +41,16 @@ export const DIMENSION_LABEL = (i18n: BoardMessages = boardEnglish): Record<stri
 export const SEVERITY_LABEL = (i18n: BoardMessages = boardEnglish): Record<string, string> => ({ blocker: i18n.board.blocker, major: i18n.board.major, minor: i18n.board.minor });
 
 /** 检查器里的类型名：Mantine 名称原样显示，附中文说明。 */
-const TYPE_ZH = (i18n: BoardMessages = boardEnglish): Record<string, string> => ({
-  AppShell: i18n.board.applicationShell,
-  'AppShell.Header': i18n.board.header,
-  'AppShell.Navbar': i18n.board.navigationSidebar,
-  'AppShell.Main': i18n.board.mainContent,
-  'AppShell.Aside': i18n.board.aside,
-  'AppShell.Footer': i18n.board.footer,
-  Stack: i18n.board.verticalStack,
-  Group: i18n.board.horizontalGroup,
-  SimpleGrid: i18n.board.simpleGrid,
-  Grid: i18n.board.grid,
-  Card: i18n.board.card,
-  Paper: i18n.board.panel,
-  Title: i18n.board.title,
-  Text: i18n.board.text,
-  Button: i18n.board.button,
-  ActionIcon: i18n.board.iconButton,
-  CloseButton: i18n.board.closeButton,
-  Anchor: i18n.board.link,
-  a: i18n.board.link,
-  NavLink: i18n.board.navigationLink,
-  Burger: i18n.board.navigationToggle,
-  TextInput: i18n.board.textInput,
-  PasswordInput: i18n.board.passwordInput,
-  NumberInput: i18n.board.numberInput,
-  Textarea: i18n.board.textArea,
-  Select: i18n.board.select,
-  MultiSelect: i18n.board.multipleSelect,
-  Checkbox: i18n.board.checkbox,
-  'Radio.Group': i18n.board.radioGroup,
-  Radio: i18n.board.radio,
-  Switch: i18n.board.switch,
-  SegmentedControl: i18n.board.segmentedControl,
-  FileInput: i18n.board.fileInput,
-  Tabs: i18n.board.tabs,
-  'Tabs.Tab': i18n.board.tab,
-  'Accordion.Control': i18n.board.accordionHeading,
-  Pagination: i18n.board.pagination,
-  Modal: i18n.board.modal,
-  Drawer: i18n.board.drawer,
-  Alert: i18n.board.alert,
-  Notification: i18n.board.notification,
-  DataTable: i18n.board.dataTable,
-  Table: i18n.board.table,
-  Badge: i18n.board.badge,
-  Loader: i18n.board.loader,
-  ChatMessage: i18n.board.chatMessage,
-  ToolCall: i18n.board.toolCall,
-  Email: i18n.board.email,
-  DataCard: i18n.board.dataCard,
-  StateFlow: i18n.board.stateFlow,
-  Thinking: i18n.board.thinking,
-  Artifact: i18n.board.artifact,
-  'Artifact.Ref': i18n.board.artifactRef,
-  PromptInput: i18n.board.promptInput,
-  Terminal: i18n.board.terminal,
-  'Terminal.Command': i18n.board.terminalCommand,
-  'Terminal.Output': i18n.board.terminalOutput,
-  'Terminal.Input': i18n.board.terminalInput,
-  Phone: i18n.board.phoneFrame,
-  'diagram:Diagram': i18n.board.diagram,
-  'diagram:Diagram.Group': i18n.board.diagramGroup,
-  'diagram:Diagram.Node': i18n.board.diagramNode,
-  'diagram:Diagram.Edge': i18n.board.diagramEdge,
-  Placeholder: i18n.board.placeholder,
-  Custom: i18n.board.customComponent,
-  '#text': i18n.board.text2,
-});
-export const typeLabel = (t: string, i18n: BoardMessages = boardEnglish, locale: Locale = 'en') => (locale !== 'en' && TYPE_ZH(i18n)[t] ? i18n.board.componentTypeName(t, TYPE_ZH(i18n)[t]!) : t);
+type Text = string | Record<string, string>;
+/** 插件清单里给人看的文字，按看板界面语言取；没有这种语言时退回 en。 */
+export const pluginText = (text: Text | undefined, locale: Locale = 'en'): string | undefined => (text === undefined ? undefined : typeof text === 'string' ? text : (text[locale] ?? text.en));
+
+/**
+ * 组件类型在看板里的显示名：类型名之后带上当前语言的名字（例如「ui:Button（按钮）」）。
+ * 名字来自插件清单的 label（IR 的 project.plugins），看板不认识任何具体组件；只有文本节点是引擎自己的类型。
+ */
+export const typeLabel = (t: string, plugins: PluginTable = undefined, i18n: BoardMessages = boardEnglish, locale: Locale = 'en') => {
+  if (locale === 'en') return t;
+  const label = t === '#text' ? i18n.board.text2 : pluginText(pluginSpec(plugins, t)?.label, locale);
+  return label ? i18n.board.componentTypeName(t, label) : t;
+};

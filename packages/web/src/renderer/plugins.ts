@@ -15,9 +15,10 @@ import * as JSXDev from 'react/jsx-dev-runtime';
  * 舞台把它的组件画成带说明的占位框，演示其余部分照常播放。
  */
 import { useLayoutEffect, useRef, useSyncExternalStore, type RefObject } from 'react';
-import type { PluginRuntime, PluginObservation, PluginObserver, PluginObserve } from '@joplo-app/kit/plugin';
+import { PLUGIN_API_VERSION, type PluginRuntime, type PluginObservation, type PluginObserver, type PluginObserve } from '@joplo-app/kit/plugin';
 
-export const PLUGIN_API_VERSION = 2;
+// 接口版本只有 kit 里那一份：宿主与插件对同一个数字
+export { PLUGIN_API_VERSION };
 
 export type PluginStatus = { state: 'loading' } | { state: 'ready'; runtime: PluginRuntime } | { state: 'error'; message: string };
 
@@ -141,8 +142,18 @@ export function usePluginObservers(root: RefObject<HTMLElement | null>, ids: rea
   });
 }
 
-/** Viewport decoration supplied by an enabled runtime. */
+/**
+ * 某种视口（例如 mobile）的外框装饰，由启用的插件运行时提供。
+ * 两个插件都给同一种视口提供装饰时，取插件 id 排在前面的那个（与载入先后无关，结果稳定），并在控制台说明一次。
+ */
+const viewportConflicts = new Set<string>();
 export function viewportDecoration(name: string) {
-  for (const entry of status.values()) if (entry.state === 'ready' && entry.runtime.viewports?.[name]) return entry.runtime.viewports[name];
-  return undefined;
+  const owners = [...status.entries()].filter(([, entry]) => entry.state === 'ready' && entry.runtime.viewports?.[name]).map(([id]) => id).sort();
+  if (!owners.length) return undefined;
+  if (owners.length > 1 && !viewportConflicts.has(`${name}|${owners.join(',')}`)) {
+    viewportConflicts.add(`${name}|${owners.join(',')}`);
+    console.warn(`Joplo: plugins ${owners.join(', ')} all decorate the ${name} viewport; using ${owners[0]}`);
+  }
+  const entry = status.get(owners[0]!)!;
+  return entry.state === 'ready' ? entry.runtime.viewports![name] : undefined;
 }

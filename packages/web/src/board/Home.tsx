@@ -31,6 +31,7 @@ import { useProjectIR } from './hooks';
 import { useBoardSettings } from './useSettings';
 import { effectiveAppearance } from './appearance-model';
 import { featureCards, moveSelection, projectBadge, projectMeta, shortPath, type FeatureCard } from './home-model';
+import { entryMetaText } from '../player/work-view';
 import { HomeCloudCard } from './CloudAccountCard';
 
 export function Home({
@@ -257,18 +258,24 @@ function FeatureCardView({ project, card, look, onOpen }: { project: Project; ca
   return (
     // 整张可点：一个盖住整张卡片的按钮（缩略图里的舞台也有按钮，不能把卡片本身做成 button）
     <div data-testid={`feature-${card.id}`} className={cn('group relative flex flex-col overflow-hidden rounded-[10px] border bg-jb-surface text-left has-[[data-card-open]:focus-visible]:border-jb-ink', disabled ? 'border-dashed border-jb-line' : 'border-jb-line hover:border-jb-ink hover:shadow-[var(--jb-e1)]')}>
-      {!disabled ? <button type="button" data-card-open="" onClick={onOpen} aria-label={i18n.board.openDemoFor(card.name)} data-testid={`open-${card.id}`} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" /> : null}
+      {!disabled ? <button type="button" data-card-open="" onClick={onOpen} aria-label={card.work ? i18n.site.watchFor(card.name) : i18n.board.openDemoFor(card.name)} data-testid={`open-${card.id}`} className="jb-focus absolute inset-0 z-[2] rounded-[10px]" /> : null}
       <StageThumb project={project} scenarioId={card.thumb?.scenarioId ?? null} sceneId={card.thumb?.sceneId ?? null} look={look} testid={`thumb-${card.id}`} />
       <div className="flex flex-col gap-1.5 border-t border-jb-line px-4 pb-4 pt-3">
         <div className="flex items-center gap-3">
           <span className="min-w-0 flex-1 truncate text-[17px] font-bold">{card.name}</span>
           {!disabled ? (
             <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold opacity-0 transition-opacity group-hover:opacity-100 group-has-[[data-card-open]:focus-visible]:opacity-100" data-testid={`view-${card.id}`}>
-              {i18n.board.openDemo}<ArrowRight className="size-4" aria-hidden />
+              {card.work ? i18n.site.watch : i18n.board.openDemo}<ArrowRight className="size-4" aria-hidden />
             </span>
           ) : null}
         </div>
         <p className="line-clamp-2 text-[13px] leading-5 text-jb-muted">{card.goal}</p>
+        {card.work ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px]" data-testid={`work-meta-${card.id}`}>
+            <span className="text-jb-muted">{entryMetaText(card.work, i18n)}</span>
+            {card.work.draft ? <span className="rounded-[4px] border border-jb-line px-1.5 py-px text-[11px] text-jb-muted" data-testid={`work-draft-${card.id}`}>{i18n.board.draftNotPublished}</span> : null}
+          </div>
+        ) : (
         <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px]" data-testid={`feature-gaps-${card.id}`}>
           {card.pick ? (
             <span className="rounded-[4px] bg-jb-inverse px-1.5 py-px text-[11px] font-medium text-jb-on-inverse">
@@ -296,6 +303,7 @@ function FeatureCardView({ project, card, look, onOpen }: { project: Project; ca
             </span>
           ) : null}
         </div>
+        )}
       </div>
     </div>
   );

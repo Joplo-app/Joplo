@@ -4,8 +4,6 @@
   "2026 美国中期选举": "2026 US Midterm Elections",
   "特朗普丢掉国会之后": "After Trump Lost Congress",
   "五分钟看懂 2026 美国中期选举：选的是什么、民主党赢了多少、特朗普接下来会被怎样卡住、AI 和股市会受什么影响": "The 2026 US midterms in five minutes: what was on the ballot, how much Democrats won, how Trump will be boxed in next, and what it means for AI and the stock market",
-  "深色快剪版": "Dark Fast-Cut Edition",
-  "自媒体快剪风格：深色舞台、红蓝强对比、真实照片做调色，每一章用钩子开场、用画面里的变化讲事实": "Fast-cut creator style: a dark stage, bold red-blue contrast and color-graded real photos; every chapter opens with a hook and tells the facts through what changes on screen",
   "开场": "Intro",
   "任期": "Terms",
   "选票": "Ballot",
@@ -16,10 +14,7 @@
   "历史": "History",
   "股市": "Stocks",
   "AI": "AI",
-  "一镜到底版": "One-Take Edition",
-  "整支片子是同一张“华盛顿地图”：选票、席位图、地图从头用到尾，镜头在区块间推拉摇；三个问题钉在各自的区块上，章末翻成答案": "The whole film is one “Washington map”: the ballot, seat charts and map stay in use from start to finish while the camera pushes, pulls and pans between zones; three questions are pinned to their zones and flip into answers at the end of each chapter",
   "世界": "World",
-  "00 一夜之间，特朗普丢掉了整个国会": "00 Overnight, Trump Lost All of Congress",
   "开场 20 秒内知道发生了什么，并带着三个问题往下看": "Within 20 seconds, know what happened and carry three questions forward",
   "01 中期选举，到底在选什么？": "01 What Are the Midterms Actually About?",
   "看懂一张选票上选了哪几样，以及它们对应国会的哪部分": "Understand what a single ballot decides and which part of Congress each race maps to",
@@ -559,5 +554,6 @@
   "全景": "Overview",
   "数据截至美东时间 2026 年 11 月 7 日；来源见各区块与 assets/CREDITS.md。": "Data as of Nov. 7, 2026 ET; sources in each zone and in assets/CREDITS.md.",
   "三个问题，三个答案": "Three questions, three answers",
-  "退后一步再看：中期选举选的是国会和州长；国会换了主人，法案、预算、人事都会被卡；钱的方面，利好只撑了一天，芯片和算力跌得最多。接下来两年，盯住否决、停摆和听证。": "Let's step back. The midterms pick Congress and governors. With Congress under new control, bills, budgets and appointments all get stuck. As for your money, the boost lasted one day, and chips and compute fell the most. Over the next two years, watch for vetoes, shutdowns and hearings."
+  "退后一步再看：中期选举选的是国会和州长；国会换了主人，法案、预算、人事都会被卡；钱的方面，利好只撑了一天，芯片和算力跌得最多。接下来两年，盯住否决、停摆和听证。": "Let's step back. The midterms pick Congress and governors. With Congress under new control, bills, budgets and appointments all get stuck. As for your money, the boost lasted one day, and chips and compute fell the most. Over the next two years, watch for vetoes, shutdowns and hearings.",
+  "特朗普丢掉国会之后（讲解版）": "After Trump Lost Congress (Explainer Edition)"
 }

@@ -26,11 +26,14 @@ describe('one real Joplo design workspace', () => {
     for (const id of original.featureIds) expect(dev.features[id], id).toBeDefined();
     for (const id of original.options) expect(dev.options[id], id).toBeDefined();
     for (const id of original.scenarios) expect(dev.scenarios[id], id).toBeDefined();
-    expect(dev.featureIds).toEqual(order);
+    // film_form 保留稳定 ID；D102 修订已选定左栏章节清单，进入公开设计记录。
+    expect(dev.featureIds).toEqual([...order, 'film_form']);
   });
   it('publishes every feature with a visible design journey while keeping unpicked alternatives private', () => {
-    expect(published.featureIds).toEqual(order);
-    expect(Object.keys(published.options)).toHaveLength(order.length);
+    expect(published.featureIds).toEqual([...order, 'film_form']);
+    expect(published.features.film_form!.pick).toBe('film_form.a-chapters');
+    expect(published.options['film_form.b-timeline']).toBeUndefined();
+    expect(Object.keys(published.options)).toHaveLength(order.length + 1);
     expect(published.options['workbench_origin.a-fold']).toBeUndefined();
     expect(published.options['authoring_model.a-data']).toBeUndefined();
     for (const feature of [...original.featureIds, 'mobile_watch', 'content_i18n', 'storage_quota', 'cloud_usage', 'share_visibility']) {

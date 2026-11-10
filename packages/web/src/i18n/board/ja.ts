@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardJa(locale: Locale = 'ja') {
@@ -188,6 +188,15 @@ export function createBoardJa(locale: Locale = 'ja') {
       coverageFor: (p0: Value) => `${value(p0, locale)} の対応状況`,
       thisFeatureHasNoCasesYet: "この機能にはまだケースがありません。",
       otherScenarios: "他のシナリオ",
+      chaptersClock: (n: number, time: string) => `${number(n, locale)} 章 · ${time}`,
+      scenariosClock: (n: number, time: string) => `${number(n, locale)} シナリオ · ${time}`,
+      draftNotPublished: "下書き · 公開しない",
+      sliceMeta: (time: string, steps: number) => `${time} · ${number(steps, locale)} ステップ`,
+      reviewStrip: "試写",
+      reviewStripHint: "全章を続けたフィルムストリップ（ハードカットと静止）：",
+      copyCommand: "コピー",
+      workEmptyTitle: "この作品にはまだ内容がありません",
+      workEmptyBody: (file: string) => `${file} の scenarios に最初の章かシナリオを書きます：`,
       copy: (p0: Value) => `${value(p0, locale)} をコピー`,
       missing: "未対応",
       undecided: "未決定",
@@ -260,6 +269,7 @@ export function createBoardJa(locale: Locale = 'ja') {
       error: "エラー",
       notFound: "見つかりません",
       featuresPicked: (p0: Value, p1: Value, p2: Value) => `${plural(Number(p0), { other: "# 機能" }, locale)} · 採用 ${value(p1, locale)}／${value(p2, locale)}`,
+      workCount: (n: number) => `作品 ${value(n, locale)} 件`,
       covered: "対応済み",
       aDemoScenarioCoversThisCaseThisDoesNot: "デモシナリオで対応していますが、業務上の動作が正しいと確認されたわけではありません。",
       howToHandleThisCaseIsUndecided: "このケースへの対応は未決定です",

@@ -145,7 +145,7 @@ function mapProject(p: Project, visit: Visit): Project {
     name: visit(p.name, 'text'),
     description: t(p.description, visit) ?? '',
     routes: obj(p.routes, (r) => ({ ...r, title: visit(r.title, 'text', r.source) })),
-    features: obj(p.features, (f) => ({ ...f, name: visit(f.name, 'text', f.source), goal: visit(f.goal, 'text', f.source), roles: arr(f.roles, (r) => ({ ...r, name: visit(r.name, 'text', f.source), ...(r.desc ? { desc: visit(r.desc, 'text', f.source) } : {}) })), constraints: arr(f.constraints, (c) => ({ ...c, text: visit(c.text, 'text', f.source) })) })),
+    features: obj(p.features, (f) => ({ ...f, name: visit(f.name, 'text', f.source), goal: visit(f.goal, 'text', f.source), ...(f.audience !== undefined ? { audience: visit(f.audience, 'text', f.source) } : {}), roles: arr(f.roles, (r) => ({ ...r, name: visit(r.name, 'text', f.source), ...(r.desc ? { desc: visit(r.desc, 'text', f.source) } : {}) })), constraints: arr(f.constraints, (c) => ({ ...c, text: visit(c.text, 'text', f.source) })) })),
     options: obj(p.options, (o) => ({
       ...o,
       ...(o.free ? {free:obj(o.free, r => ({...r, action:mapAction(r.action, visit, p.plugins, r.source),effects:mapEffects(r.effects, visit, r.source)}))} : {}),

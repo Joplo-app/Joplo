@@ -18,7 +18,7 @@ import { caseBrief, caseCard, gapCommand, gapsOf, letterOf, optionLabel, optionM
 
 export { gapsOf, statusOf } from './nav-model';
 
-function GroupHead({ title, right }: { title: string; right?: string }) {
+export function GroupHead({ title, right }: { title: string; right?: string }) {
   return (
     <div className="flex items-baseline justify-between px-2 pb-1.5 pt-2 font-jb text-[12px]">
       <span className="font-semibold tracking-[1px] text-jb-muted">{title}</span>

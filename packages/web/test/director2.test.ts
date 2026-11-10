@@ -29,12 +29,11 @@ describe('stepDwell（每一步的停留时长）', () => {
     expect(stepDwell({ texts: ['短'], speed: 1.5 })).toBe(MIN_DWELL / 1.5);
     expect(stepDwell({ texts: ['短'], speed: 0 })).toBe(MIN_DWELL);
   });
-  it('7 秒只限制阅读，镜头、小点、流式输出的等待互不截断', () => {
+  it('7 秒只限制阅读，镜头、流式输出的等待互不截断', () => {
     expect(CAMERA_MS).toBe(700);
     expect(pace.CAMERA_EASE).toEqual([0.16, 1, 0.3, 1]);
     expect(TIMING.layerSwitch).toBe(CAMERA_MS + 150);
     expect(stepDwell({ texts: [], speed: 10, cameraMoved: true })).toBe(CAMERA_MS + 200);
-    expect(stepDwell({ texts: ['短'], speed: 1.5, dotMs: 9000 })).toBe(9200);
     expect(stepDwell({ texts: ['调'.repeat(1000)], streams: ['字'.repeat(1000)] })).toBe(12500);
   });
   it('只接受 0.5 / 1 / 1.5', () => {

@@ -1,7 +1,7 @@
 import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
-import { value, number, list, plural, type Value } from './format';
+import { value, number, list, plural, twoDigits, clock, type Value } from './format';
 import type { Dictionary } from './en';
 
 export function createKo(locale: Locale = 'ko') {
@@ -98,6 +98,7 @@ export function createKo(locale: Locale = 'ko') {
       watchFinished: "모두 봤어요",
       watchAgain: "다시 보기",
       watchChapterOf: (n: Value, t: Value) => `챕터 ${value(n, locale)} / ${value(t, locale)}`,
+      watchScenarioOf: (n: Value, t: Value) => `시나리오 ${value(n, locale)} / ${value(t, locale)}`,
       upNextTitle: "다음 챕터",
       upNextIn: (n: Value) => `${value(n, locale)}초 후 재생`,
       upNextPlayNow: "지금 재생",
@@ -153,6 +154,17 @@ export function createKo(locale: Locale = 'ko') {
       coverStart: "시작",
       /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
       forRoles: (names: string[]) => `대상: ${list(names, locale)}`,
+      chapterNo: (n: number) => twoDigits(n, locale),
+      clock: (ms: number) => clock(ms, locale),
+      chapterCount: (n: number) => `${number(n, locale)}장`,
+      sideChapterCount: (n: number) => `번외 ${number(n, locale)}개`,
+      chaptersAbout: (n: number, min: number, sec: number) => `${number(n, locale)}장 · ${(min === 0 ? `약 ${number(sec, locale)}초` : sec === 0 ? `약 ${number(min, locale)}분` : `약 ${number(min, locale)}분 ${number(sec, locale)}초`)}`,
+      chapterKicker: (n: number) => `${number(n, locale)}장`,
+      sideChapter: "번외",
+      sideChapters: "번외",
+      scenariosAbout: (n: number, min: number, sec: number) => `${number(n, locale)}개 시나리오 · ${(min === 0 ? `약 ${number(sec, locale)}초` : sec === 0 ? `약 ${number(min, locale)}분` : `약 ${number(min, locale)}분 ${number(sec, locale)}초`)}`,
+      sideScenarioCount: (n: number) => `번외 시나리오 ${number(n, locale)}개`,
+      sideScenarios: "번외 시나리오",
       coverStartTitle: "처음부터 재생",
       coverSteps: (n: number) => plural(n, { other: '약 #단계' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `약 ${number(d.value, locale)}초` : `약 ${number(d.value, locale)}분`,
@@ -251,6 +263,11 @@ export function createKo(locale: Locale = 'ko') {
       // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
       embedPlayDemo: "데모 재생",
       embedCoverMeta: (n: number) => `클릭할 수 있는 프로토타입 · ${plural(Number(n), { other: "#개 시나리오" }, locale)}`,
+      embedCoverMetaChapters: (n: number) => `클릭할 수 있는 프로토타입 · ${number(n, locale)}장`,
+      works: "작품",
+      watch: "보기",
+      watchFor: (name: string) => `“${name}” 보기`,
+      embedPlay: "재생",
       embedMadeWithJoplo: "Joplo로 제작",
       embedCoverHint: "재생 후 일시정지, 단계별 보기, 전체 화면을 사용할 수 있습니다",
       embedStepProgress: (current: number, total: number) => `단계 ${number(current, locale)} / ${number(total, locale)}`,

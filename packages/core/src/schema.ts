@@ -1,4 +1,4 @@
-import { ElementTraitsSchema } from './traits.ts';
+import { ElementTraitsSchema, PluginInspectFieldSchema, PluginTextSchema } from './traits.ts';
 import type { ElementTraits } from '@joplo-app/kit/plugin';
 /**
  * Joplo IR（schemaVersion 2）：由 TSX 源文件编译得到的中间表示，不是作者直接编辑的格式。
@@ -269,7 +269,14 @@ export const Route = z.strictObject({
   source: Source,
 });
 
+/** 独立作品仍复用 Feature 容器；外部通过 Entry 读取能力。 */
 export const Feature = z.strictObject({
+  /** work() 写入；entries.ts 将它投影为 Entry.featureId = null。公开载荷保留。 */
+  standalone: z.literal(true).optional(),
+  /** 给观众看的说明，参与作者内容多语言。 */
+  audience: z.string().min(1).optional(),
+  /** 只在 dev；发布与评审模式整件作品都跳过。 */
+  draft: z.literal(true).optional(),
   id: Id,
   name: z.string().min(1),
   goal: z.string().min(1),
@@ -304,6 +311,8 @@ export const Coverage = z.strictObject({
 
 export const FreeReaction = z.strictObject({ action: Action, effects: z.array(Effect).default([]), source: Source });
 export const Option = z.strictObject({
+  /** 共享切片解析器在全部切片使用 chapter() 时写入；Entry.sequencing 消费，公开保留；缺省 independent。 */
+  sequencing: z.literal('linear').optional(),
   free: z.record(Id, FreeReaction).optional(),
   id: Qid,
   featureId: Id,
@@ -410,7 +419,7 @@ export const Project = z.strictObject({
     id: z.string().min(1),
     title: z.string(),
     version: z.string().optional(),
-    components: z.record(z.string(), z.strictObject({ interactive: z.boolean().optional(), parent: z.string().optional(), needsId: z.boolean().optional(), selfEvident: z.boolean().optional(), traits: ElementTraitsSchema.optional() })),
+    components: z.record(z.string(), z.strictObject({ label: PluginTextSchema.optional(), inspect: z.array(PluginInspectFieldSchema).optional(), interactive: z.boolean().optional(), parent: z.string().optional(), needsId: z.boolean().optional(), selfEvident: z.boolean().optional(), traits: ElementTraitsSchema.optional() })),
   })).optional(),
   /** 作者主题（D51）：主题名 → CSS 原文（themes/<name>.css）；渲染时自动限定在舞台范围内。发布站同样打包。 */
   themes: z.record(z.string(), z.string()).default({}),

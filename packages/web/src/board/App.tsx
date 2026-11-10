@@ -1,4 +1,4 @@
-import { projectThemes } from '@joplo-app/core/runtime';
+import { projectThemes, entryOf } from '@joplo-app/core/runtime';
 import { LanguageMenu } from '../player/LanguageMenu';
 import { LocalText } from '../i18n/LocalText';
 import { m } from '../i18n/board/messages';
@@ -33,10 +33,11 @@ import { ArrowRight, BookOpen, CircleCheck, Cloud, Loader2, Smartphone, CircleX,
 import { PlayerPage, useBoardLayout, type MenuEntry } from '../player/PlayerPage';
 import { Btn, Kbd } from '../player/controls';
 import type { ProjectSummary } from '../runtime/dev-client';
-import { featureMenu } from './nav-model';
+import { workMenu } from './nav-model';
 import { usePlaySync } from '../player/playRoute';
 import { copyText, downloadBlob, useFlash, useHash } from '../player/util';
 import { CaseNav, CaseRail } from './CaseNav';
+import { WorkNav, WorkRail } from './WorkNav';
 import { Home } from './Home';
 import { InspectDrawer } from './InspectDrawer';
 import { LocalReview } from './LocalReview';
@@ -334,6 +335,9 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
     );
 
   const option = resolved.optionId ? project.options[resolved.optionId] : null;
+  // 只问能力（D102 修订）：没有挂功能的条目（独立作品）换成作品左栏，没有方案、情况、缺口与“确认方案”
+  const entry = entryOf(project, feature.id);
+  const standalone = entry && entry.featureId === null ? entry : null;
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
   const state = snap.state;
   const home = () => navigate({ kind: 'home', projectId });
@@ -458,9 +462,13 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             label: feature.name,
             testid: 'crumb-feature',
             menuLabel: i18n.board.switchFeature,
-            // 功能 ▾：本项目的功能和缺口数；选一个 → 打开它的演示，停在第 0 步
+            // 条目 ▾：本项目的条目（D102 修订：先“作品”后“功能”，只有一组时不出分组标题）；选一个 → 打开它，停在第 0 步（封面）
             items: [
-              ...featureMenu(project, feature.id, i18n).map((f) => ({ id: `feature-${f.id}`, label: f.name, description: f.hint, checked: f.current, onClick: () => navigate({ kind: 'play', projectId, play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) })),
+              ...workMenu(project, feature.id, i18n).map((f): MenuEntry =>
+                'heading' in f
+                  ? { id: `feature-group-${f.id}`, custom: <div className="px-2.5 pb-1 pt-2 font-jb text-[11px] font-semibold tracking-[1px] text-jb-muted" data-testid={`work-group-${f.id}`}>{f.heading}</div> }
+                  : { id: `feature-${f.id}`, label: f.name, description: f.hint, checked: f.current, onClick: () => navigate({ kind: 'play', projectId, play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) },
+              ),
               { id: 'feature-divider', divider: true as const },
               { id: 'feature-home', icon: <LayoutGrid />, label: i18n.board.viewProjectHome, onClick: home },
             ],
@@ -485,7 +493,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         }
         inspectMode={inspectMode}
         completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={i18n.board.nextCase(nc.title)} kbd="Enter" variant="primary" className="max-w-[360px] [&>span]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
-        navRail={<CaseRail project={project} featureId={feature.id} optionId={resolved.optionId} caseId={resolved.caseId} />}
+        navRail={standalone ? <WorkRail entry={standalone} scenarioId={snap.scenarioId} /> : <CaseRail project={project} featureId={feature.id} optionId={resolved.optionId} caseId={resolved.caseId} />}
         exportBadge={vid.running && vid.job ? <ProgressRing percent={vid.job.percent} /> : rt.installing && rt.job ? <ProgressRing percent={rt.job.percent} /> : null}
         deviceTag={
           <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[6px] border border-jb-line bg-jb-surface px-2.5 font-jb text-[12px] text-jb-muted" data-testid="device-tag">
@@ -508,7 +516,15 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         theme={theme}
         font={a.look.font}
         stroke={a.look.stroke}
-        nav={
+        nav={standalone ? (
+          <WorkNav
+            project={project}
+            entry={standalone}
+            scenarioId={snap.scenarioId}
+            onScenario={(sid) => toPlay({ featureId: feature.id, scenarioId: sid })}
+            onCopy={(text) => void copyText(text).then((ok) => setFlash(<LocalText value={ok ? m.board.copied(text) : m.board.clipboardUnavailable} />))}
+          />
+        ) : (
           <CaseNav
             project={project}
             featureId={feature.id}
@@ -521,7 +537,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             onOptionCase={(oid, cid) => toPlay({ featureId: feature.id, optionId: oid, caseId: cid })}
             onCopy={(text) => void copyText(text).then((ok) => setFlash(<LocalText value={ok ? m.board.copied(text) : m.board.clipboardUnavailable} />))}
           />
-        }
+        )}
         banner={banner}
         menu={menu}
         onInspect={(id) => {
@@ -531,7 +547,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         selectedId={drawer && selection && state && selection.sceneId === state.sceneId ? selection.nodeId : null}
         stageOverlay={option ? (sceneId) => <LocalReview key={option.id} projectId={projectId} project={project} optionId={option.id}
           context={sceneId ? { sceneId, scenarioId: scenario?.id ?? null, position: state?.position ?? 0 } : null}
-          version={ir.payload?.version ?? 0} enabled={!compileError} completed={!!state?.completed} onOpen={() => ctl.pause()} /> : undefined}
+          version={ir.payload?.version ?? 0} enabled={!compileError} completed={!!state?.completed} onOpen={() => ctl.pause()} approvable={!standalone} /> : undefined}
         flash={flash}
         drawer={
           <>

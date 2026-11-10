@@ -19,6 +19,8 @@
 
 Author pages and flows in TSX, review them in the local **Board**, then build a static **Published site** from the options you choose — or share it with one command and drop a playable badge or embedded player into a README, docs page, or blog post. Files are the source of truth; Git keeps the history. Option-click an element to give your agent its exact file and line.
 
+Joplo also makes standalone works, such as explainers: write `work()` / `chapter()` in `works/`; publish one entry with `--work <key>`.
+
 ![Joplo Board](docs/screenshots/board-play-initial.png)
 
 Optional background music: install `@joplo-app/plugin-alda` at your Joplo version, enable `alda(scores)` in `config.plugins`, then read `npx joplo skill alda` in the project. Scores stay as text; build/share includes offline SoundFont-rendered MP3 96 kbps stereo audio and music credits; marker-based starts use numeric offsets. See [media and local plugin resources](docs/plugins.md#11-阶段-1-b媒体轨道与本机资源已实现).
@@ -105,7 +107,7 @@ npx joplo feedback watch --local --follow --json
 
 Submitted feedback streams as NDJSON, one event per line with `eventId`, `optionId` and `sessionId`. The follower covers every option and attaches by itself to the new review round that each source edit opens; approving one option does not stop it. It exits 1 when the board stops and 130 on Ctrl+C. To wait for one option version's approval or resume from a cursor, bind an exact session instead (`feedback list --local`, then `feedback watch --local --session <id> [--after <seq>]`, which exits 0 on approval). See the [CLI documentation](docs/cli.md).
 
-For Share, use `npx joplo feedback watch --share <id> --option <feature.option> --interval 15 --json`. Polling defaults to 15 seconds, configurable from 10 to 30. The current Cloud endpoint exposes a pending-feedback snapshot, so records resolved/applied between polls can be missed; see the [Cloud follow-up requirements](docs/cloud-feedback-watch.md).
+For Share, use `npx joplo feedback watch --share <id> --work <feature.option> --interval 15 --json`. Polling defaults to 15 seconds, configurable from 10 to 30. The current Cloud endpoint exposes a pending-feedback snapshot, so records resolved/applied between polls can be missed; see the [Cloud follow-up requirements](docs/cloud-feedback-watch.md).
 
 ## Project layout
 
@@ -181,7 +183,7 @@ The embed code from `--format json` or the Cloud console is ready to paste:
 - Add `&scenario=<scenario id>` to start from a specific scenario (`npx joplo outline` lists the ids) and `&autoplay=1` to skip the cover. Invalid values fall back to the cover and the default scenario.
 - Keep `allow="fullscreen *"`: the share page runs in a CSP sandbox, so plain `allow="fullscreen"` blocks fullscreen in Chromium, Firefox, and WebKit. Without it the player falls back to opening the demo in a new tab.
 - The embedded player makes no network requests and does not use storage. GitHub strips iframes from Markdown, so use the badge there.
-- `--scenario <id>` and `--feature <id>` share only part of a project. Everything else is cut at build time, not hidden.
+- `--scenario <id>` and `--work <id>` share only part of a project. Everything else is cut at build time, not hidden.
 - Links never expire, on free accounts too. Each account has storage instead (free 100 MB, Pro 5 GB, counted from the raw size of every live share), and `share` prints how much you use. Re-sharing updates the same link, so badges and embeds you already published stay current.
 - In CI, set `JOPLO_API_KEY` and run `npx joplo share --private --no-review --new --pr <number> --format json` for a PR preview. Agents should copy `data.embed.markdown` / `data.embed.iframe` as is rather than building URLs themselves.
 
@@ -258,7 +260,7 @@ Joplo accepts issues, not pull requests. Report bugs and request features in [is
 
 [PolyForm Shield 1.0.0](LICENSE). Anyone can use Joplo for free, including at companies and for commercial work; you may not use it to provide a product that competes with Joplo or Joplo Cloud. See [COMMERCIAL.md](COMMERCIAL.md). Versions 0.2.15 and earlier were released under Apache-2.0. Bundled fonts use [SIL OFL 1.1](packages/web/src/fonts/OFL.txt).
 
-The template explicitly enables `@joplo-app/plugin-content`, which provides `content:Canvas`, `camera()`, FLIP properties and the `content:studio` theme. Import its authoring API directly from the package; declare it at the Joplo version in project dependencies and enable it in config.plugins. `npx joplo skill content` covers continuous visual explainers; see [llm-explainer](examples/llm-explainer) and the [plugin contracts](docs/plugins.md). Use `flow({ from })` for chapter continuity and `joplo render --sheet --columns 3` for storyboards.
+The template explicitly enables `@joplo-app/plugin-content`, which provides `content:Canvas`, `camera()`, FLIP properties and the `content:studio` theme. Import its authoring API directly from the package; declare it at the Joplo version in project dependencies and enable it in config.plugins. `npx joplo skill content` covers continuous visual explainers; see [llm-explainer](examples/llm-explainer) and the [plugin contracts](docs/plugins.md). Use `chapter()` for chapter continuity and `joplo render --sheet --columns 3` for storyboards.
 
 Standard UI and HTML are provided by `@joplo-app/plugin-ui`: import markers directly from that package and explicitly enable it in config.plugins. IR uses `ui:Button` / `ui:div`. `joplo components` reads enabled plugin manifests; `joplo skill ui/components` provides the full UI guide. Import diagram components and trace from `@joplo-app/plugin-diagram`. See [plugin contracts](docs/plugins.md).
 

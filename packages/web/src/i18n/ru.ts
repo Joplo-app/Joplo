@@ -1,7 +1,7 @@
 import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
-import { value, number, list, plural, type Value } from './format';
+import { value, number, list, plural, twoDigits, clock, type Value } from './format';
 import type { Dictionary } from './en';
 
 export function createRu(locale: Locale = 'ru') {
@@ -98,6 +98,7 @@ export function createRu(locale: Locale = 'ru') {
       watchFinished: "Готово",
       watchAgain: "Смотреть снова",
       watchChapterOf: (n: Value, t: Value) => `Глава ${value(n, locale)} из ${value(t, locale)}`,
+      watchScenarioOf: (n: Value, t: Value) => `Сценарий ${value(n, locale)} из ${value(t, locale)}`,
       upNextTitle: "Далее",
       upNextIn: (n: Value) => `Начнётся через ${value(n, locale)} с`,
       upNextPlayNow: "Смотреть сейчас",
@@ -153,6 +154,17 @@ export function createRu(locale: Locale = 'ru') {
       coverStart: "Начать",
       /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
       forRoles: (names: string[]) => `Для: ${list(names, locale)}`,
+      chapterNo: (n: number) => twoDigits(n, locale),
+      clock: (ms: number) => clock(ms, locale),
+      chapterCount: (n: number) => plural(n, { one: '# глава', few: '# главы', many: '# глав', other: '# главы' }, locale),
+      sideChapterCount: (n: number) => plural(n, { one: '# побочная глава', few: '# побочные главы', many: '# побочных глав', other: '# побочной главы' }, locale),
+      chaptersAbout: (n: number, min: number, sec: number) => `${plural(n, { one: '# глава', few: '# главы', many: '# глав', other: '# главы' }, locale)} · ${(min === 0 ? `около ${number(sec, locale)} с` : sec === 0 ? `около ${number(min, locale)} мин` : `около ${number(min, locale)} мин ${number(sec, locale)} с`)}`,
+      chapterKicker: (n: number) => `Глава ${number(n, locale)}`,
+      sideChapter: "Побочная глава",
+      sideChapters: "Побочные главы",
+      scenariosAbout: (n: number, min: number, sec: number) => `${plural(n, { one: '# сценарий', few: '# сценария', many: '# сценариев', other: '# сценария' }, locale)} · ${(min === 0 ? `около ${number(sec, locale)} с` : sec === 0 ? `около ${number(min, locale)} мин` : `около ${number(min, locale)} мин ${number(sec, locale)} с`)}`,
+      sideScenarioCount: (n: number) => plural(n, { one: '# побочный сценарий', few: '# побочных сценария', many: '# побочных сценариев', other: '# побочного сценария' }, locale),
+      sideScenarios: "Побочные сценарии",
       coverStartTitle: "Воспроизвести с начала",
       coverSteps: (n: number) => plural(n, { one: 'Около # шага', few: 'Около # шагов', many: 'Около # шагов', other: 'Около # шага' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `Около ${number(d.value, locale)} с` : `Около ${number(d.value, locale)} мин`,
@@ -251,6 +263,11 @@ export function createRu(locale: Locale = 'ru') {
       // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
       embedPlayDemo: "Запустить демо",
       embedCoverMeta: (n: number) => `Интерактивный прототип · ${plural(Number(n), { one: "# сценарий", few: "# сценария", many: "# сценариев", other: "# сценария" }, locale)}`,
+      embedCoverMetaChapters: (n: number) => `Интерактивный прототип · ${plural(Number(n), { one: '# глава', few: '# главы', many: '# глав', other: '# главы' }, locale)}`,
+      works: "Работы",
+      watch: "Смотреть",
+      watchFor: (name: string) => `Смотреть «${name}»`,
+      embedPlay: "Смотреть",
       embedMadeWithJoplo: "Сделано в Joplo",
       embedCoverHint: "После запуска: пауза, пошаговый просмотр и полный экран",
       embedStepProgress: (current: number, total: number) => `Шаг ${number(current, locale)} / ${number(total, locale)}`,

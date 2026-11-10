@@ -11,13 +11,13 @@ import { boardEnglish, type BoardMessages } from '../i18n/board/dictionaries';
  * 写入状态，以及“Agent 运行 npx joplo selection”的提示。选中本身由控制器写入 `.joplo/selection.json`
  * （服务端计算 at / label，409 时清空并提示）。
  */
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, X } from 'lucide-react';
-import { disabledReasonOf, findNode, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@joplo-app/core/runtime';
+import { disabledReasonOf, findNode, pluginSpec, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@joplo-app/core/runtime';
 import type { SelectionSync } from '../runtime/demo';
 import { optionOfNode, scenariosOf, shortName } from '../runtime/views';
 import { cn } from '@/lib/utils';
-import { CONFIRM_LABEL, ORIGIN_LABEL, typeLabel } from './labels';
+import { CONFIRM_LABEL, ORIGIN_LABEL, pluginText, typeLabel } from './labels';
 
 function Chip({ cls, children }: { cls: string; children: React.ReactNode }) {
   return <span className={cn('inline-block shrink-0 rounded-[4px] border px-1.5 py-px text-[11px] leading-[16px]', cls)}>{children}</span>;
@@ -41,7 +41,6 @@ function RuleItem({ rule }: { rule: Rule }) {
 
 const H = ({ children }: { children: React.ReactNode }) => <h3 className="mb-1.5 mt-4 text-[12px] font-semibold tracking-[1px] text-jb-muted first:mt-0">{children}</h3>;
 
-const DIAGRAM_STATE = (i18n: BoardMessages = boardEnglish): Record<string, string> => ({ idle: i18n.board.idleIdle, active: i18n.board.runningActive, ok: i18n.board.successOk, error: i18n.board.errorError, dim: i18n.board.dimmedDim });
 
 export function InspectDrawer({
   project,
@@ -66,6 +65,7 @@ export function InspectDrawer({
   const [copied, setCopied] = useState(false);
   const scene = project.scenes[selection.sceneId];
   const node = scene && selection.nodeId ? (findNode(scene, selection.nodeId)?.node ?? null) : null;
+  const fields = node ? (pluginSpec(project.plugins, node.type)?.inspect ?? []) : [];
   const rules = node ? Object.values(project.rules).filter((r) => r.elementIds.includes(node.id) && (!selection.featureId || r.featureId === selection.featureId) && (!r.optionId || r.optionId === selection.optionId)) : [];
   // 覆盖的情况：本方案里有步骤操作这个元素的场景所覆盖的情况；没有这样的场景时取当前场景的情况
   const scs = scenariosOf(project, selection.optionId);
@@ -91,7 +91,7 @@ export function InspectDrawer({
             </div>
             {node ? (
               <div className="mt-0.5 text-[12px] text-jb-muted" data-testid="sel-type">
-                {typeLabel(node.type, i18n, locale)} · {from ? i18n.board.optionLabel(shortName(from.name)) : node.source?.startsWith('layouts/') ? i18n.board.layout : node.source?.startsWith('routes/') ? i18n.board.page : '—'}
+                {typeLabel(node.type, project.plugins, i18n, locale)} · {from ? i18n.board.optionLabel(shortName(from.name)) : node.source?.startsWith('layouts/') ? i18n.board.layout : node.source?.startsWith('routes/') ? i18n.board.page : '—'}
                 {stepIdx >= 0 ? i18n.board.targetOfStep(stepIdx + 1) : ''}
               </div>
             ) : null}
@@ -131,39 +131,28 @@ export function InspectDrawer({
           <p className="mb-1 text-[12px] text-jb-faint">{i18n.board.thisElementHasNoSourceLocation}</p>
         )}
 
-        {node && node.type.startsWith('diagram:Diagram.') ? (
-          <dl className="mb-2 grid grid-cols-[64px_1fr] gap-x-2 gap-y-1 rounded-[8px] bg-jb-subtle px-3 py-2 text-[13px]" data-testid="sel-diagram">
+        {node && fields.length ? (
+          <dl className="mb-2 grid grid-cols-[64px_1fr] gap-x-2 gap-y-1 rounded-[8px] bg-jb-subtle px-3 py-2 text-[13px]" data-testid="sel-fields">
             {(() => {
+              // 插件清单声明的专属信息行（例如图表元素的说明、连线两端、状态）：看板只照着声明显示属性的当前值
               const p = state && state.sceneId === selection.sceneId ? resolveProps(node, state) : (node.props ?? {});
-              const st = typeof p.state === 'string' ? p.state : 'idle';
-              return (
-                <>
-                  {typeof p.description === 'string' && p.description ? (
-                    <>
-                      <dt className="text-jb-muted">{i18n.board.note}</dt>
-                      <dd data-testid="sel-description">{p.description}</dd>
-                    </>
-                  ) : null}
-                  {node.type === 'diagram:Diagram.Edge' ? (
-                    <>
-                      <dt className="text-jb-muted">{i18n.board.edge}</dt>
-                      <dd data-testid="sel-endpoints">
-                        {String(p.from)} → {String(p.to)}
-                        {p.async === true ? i18n.board.async : ''}
-                      </dd>
-                    </>
-                  ) : null}
-                  {node.type !== 'diagram:Diagram.Group' ? (
-                    <>
-                      <dt className="text-jb-muted">{i18n.board.state}</dt>
-                      <dd data-testid="sel-state" data-state={st}>
-                        {DIAGRAM_STATE(i18n)[st] ?? st}
-                        {typeof node.props?.state === 'string' && node.props.state.startsWith('$') ? <span className="ml-1 font-mono text-[11px] text-jb-faint">{node.props.state}</span> : null}
-                      </dd>
-                    </>
-                  ) : null}
-                </>
-              );
+              return fields.map((field, i) => {
+                const raw = field.props.map((key) => p[key] ?? (field.props.length === 1 ? field.fallback : undefined));
+                if (raw.some((v) => v === undefined || v === null || v === '')) return null;
+                const shown = raw.map((v) => pluginText(field.values?.[String(v)], locale) ?? String(v)).join(field.join ?? ' ');
+                const flags = Object.entries(field.flags ?? {}).filter(([key]) => p[key] === true).map(([, text]) => pluginText(text, locale)).join('');
+                // 属性绑定在状态上（$ui.x）时把绑定的路径也写出来
+                const binding = field.props.length === 1 ? node.props?.[field.props[0]!] : undefined;
+                return (
+                  <Fragment key={i}>
+                    <dt className="text-jb-muted">{pluginText(field.label, locale)}</dt>
+                    <dd data-testid={`sel-${field.props.join('-')}`} data-value={raw.map(String).join(' ')}>
+                      {shown}{flags}
+                      {typeof binding === 'string' && binding.startsWith('$') ? <span className="ml-1 font-mono text-[11px] text-jb-faint">{binding}</span> : null}
+                    </dd>
+                  </Fragment>
+                );
+              });
             })()}
           </dl>
         ) : null}

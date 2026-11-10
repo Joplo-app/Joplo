@@ -4,7 +4,8 @@ import type { PluginIRNode as SceneNode } from '@joplo-app/kit/plugin';
 import { resolveProps, isSelfVisible, useEngineFrame, walkNodes } from '@joplo-app/kit/renderer';
 import { AnimatePresence } from 'motion/react';
 import { motion } from '@joplo-app/kit/renderer';
-import { useI18n, useCtx as useHostCtx, useR, useRoot, useRootAttrs, RenderNode, Rough, RoughPath, roundRectPath, useStroke, type NodeProps } from '@joplo-app/kit/renderer';
+import { useI18n, useCtx as useHostCtx, useRoot, useRootAttrs, RenderNode, type NodeProps } from '@joplo-app/kit/renderer';
+import { useR, Rough, RoughPath, roundRectPath, useStroke } from '@joplo-app/kit/renderer-internal';
 import { DANGER, DIMMED, INFO, INK, INK2, LINE_STRONG, MONO, OK, SURFACE, WARN, color, dim, fontSize, radius, tint } from '@joplo-app/kit/renderer-style';
 import { rectOf } from '@joplo-app/kit/renderer';
 import { DESC_FONT, EDGE_FONT, GROUP_FONT, NODE_FONT, arrowHead, diagramFit, diagramFocus, edgeEmphasized, effectiveState, edgePath, graphView, sequenceView, startEdgeId, type GraphLayout, type SequenceLayout } from './render-layout.ts';
@@ -429,9 +430,8 @@ function MovingDot({ d, color, animate: anim, reverse = false }: { d: string; co
       return;
     }
     place(reverse ? 1 : 0);
+    // 一圈的时长：trace() 效果在编译期用同一个算法声明这一步的 holdMs，自动播放据此等小点至少跑完一圈
     const dur = Math.max(0.9, len / 260);
-    // 一圈的时长写在元素上：自动播放会等本步 active 连线上的小点至少跑完一圈（T-director2）
-    dot.setAttribute('data-jdot-ms', String(Math.round(dur * 1000)));
     const t = (clock.elapsedMs % (dur * 1000)) / (dur * 1000);
     place(reverse ? 1 - t : t);
   }, [d, anim, reverse, clock?.timeMs]);

@@ -1,7 +1,7 @@
 import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
-import { value, number, list, plural, type Value } from './format';
+import { value, number, list, plural, twoDigits, clock, type Value } from './format';
 import type { Dictionary } from './en';
 
 export function createZhTW(locale: Locale = 'zh-TW') {
@@ -98,6 +98,7 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       watchFinished: "看完了",
       watchAgain: "重看",
       watchChapterOf: (n: Value, t: Value) => `第 ${value(n, locale)} / ${value(t, locale)} 章`,
+      watchScenarioOf: (n: Value, t: Value) => `第 ${value(n, locale)} / ${value(t, locale)} 個情境`,
       upNextTitle: "下一章",
       upNextIn: (n: Value) => `${value(n, locale)} 秒後播放`,
       upNextPlayNow: "立即播放",
@@ -153,6 +154,17 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       coverStart: "開始",
       /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
       forRoles: (names: string[]) => `對象：${list(names, locale)}`,
+      chapterNo: (n: number) => twoDigits(n, locale),
+      clock: (ms: number) => clock(ms, locale),
+      chapterCount: (n: number) => `${number(n, locale)} 章`,
+      sideChapterCount: (n: number) => `${number(n, locale)} 條支線`,
+      chaptersAbout: (n: number, min: number, sec: number) => `${number(n, locale)} 章 · ${(min === 0 ? `約 ${number(sec, locale)} 秒` : sec === 0 ? `約 ${number(min, locale)} 分` : `約 ${number(min, locale)} 分 ${number(sec, locale)} 秒`)}`,
+      chapterKicker: (n: number) => `第 ${number(n, locale)} 章`,
+      sideChapter: "支線",
+      sideChapters: "支線",
+      scenariosAbout: (n: number, min: number, sec: number) => `${number(n, locale)} 個情境 · ${(min === 0 ? `約 ${number(sec, locale)} 秒` : sec === 0 ? `約 ${number(min, locale)} 分` : `約 ${number(min, locale)} 分 ${number(sec, locale)} 秒`)}`,
+      sideScenarioCount: (n: number) => `${number(n, locale)} 個支線情境`,
+      sideScenarios: "支線",
       coverStartTitle: "從頭開始播放",
       coverSteps: (n: number) => plural(n, { other: '約 # 個步驟' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `約 ${number(d.value, locale)} 秒` : `約 ${number(d.value, locale)} 分鐘`,
@@ -251,6 +263,11 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
       embedPlayDemo: "播放示範",
       embedCoverMeta: (n: number) => `可點擊的原型示範 · ${plural(Number(n), { other: "# 個情境" }, locale)}`,
+      embedCoverMetaChapters: (n: number) => `可點擊的原型示範 · ${number(n, locale)} 章`,
+      works: "作品",
+      watch: "觀看",
+      watchFor: (name: string) => `觀看「${name}」`,
+      embedPlay: "播放",
       embedMadeWithJoplo: "使用 Joplo 製作",
       embedCoverHint: "播放後可暫停、逐步、全螢幕",
       embedStepProgress: (current: number, total: number) => `步驟 ${number(current, locale)} / ${number(total, locale)}`,

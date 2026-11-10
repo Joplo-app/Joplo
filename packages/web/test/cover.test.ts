@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
 import { explain, feature, flow, fork, layer, narrate, option, page, role, say, set, stream, Slot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { compile, spokenLine, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
+import { compile, spokenLine, stateAt, stepPlan, type AuthoringProject, type Project } from '@joplo-app/core';
 import { speakerOf, spokenSubtitleFor, stepTitleFor, titleDwellMs, TITLE_DWELL_MS, TITLE_DWELL_MAX_MS } from '../src/player/subtitle-content';
 import { approxDuration, coverFor, coverShown, dwellTexts, scenarioMs } from '../src/player/cover-content';
 import { stepDwell } from '../src/runtime/pace';
@@ -208,10 +208,12 @@ describe('coverFor / coverShown（场景封面）', () => {
 });
 
 describe('scenarioMs / approxDuration（「约 M 秒」）', () => {
-  it('逐步调用 stepDwell 再求和（与演示控制器用同一份文字：说明、explain、卡片副标题与要点、流式文字）', () => {
+  it('每一步时间计划（stepPlan）之和，文字与演示控制器同一份：说明、explain、卡片副标题与要点、流式文字', () => {
     const p = build();
     const sc = p.scenarios[sid]!;
-    const want = sc.steps.reduce((sum, st) => sum + stepDwell({ texts: dwellTexts(st, zh), cameraMoved: st.shots.length > 0 || !!st.directorLayer, streams: st.effects.flatMap((e) => (e.type === 'stream' ? [e.value] : [])) }), 0);
+    // 一步 = 提交前的操作演示（leadMs）+ 停留；停留就是原来的 stepDwell
+    const want = sc.steps.reduce((sum, st) => sum + stepPlan(p, st).leadMs + stepDwell({ texts: dwellTexts(st, zh), cameraMoved: st.shots.length > 0 || !!st.directorLayer, streams: st.effects.flatMap((e) => (e.type === 'stream' ? [e.value] : [])) }), 0);
+    expect(sc.steps.some((st) => stepPlan(p, st).leadMs > 0)).toBe(true);
     expect(scenarioMs(p, sc, zh)).toBe(want);
     expect(dwellTexts(sc.steps[0]!, zh)).toEqual([stepCaption(sc.steps[0]!, zh), sc.steps[0]!.explain, '两个人，预算 500']);
     expect(scenarioMs(p, { ...sc, steps: [] }, zh)).toBe(0);

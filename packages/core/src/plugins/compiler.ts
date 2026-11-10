@@ -1,7 +1,7 @@
 import { PluginAction } from '../schema.ts';
-import { ElementTraitsSchema, InheritSchema } from '../traits.ts';
+import { ElementTraitsSchema, InheritSchema, PluginInspectFieldSchema, PluginTextSchema } from '../traits.ts';
 import { advanceMedia } from '../media.ts';
-import { stepAnchorMs } from '../focus.ts';
+import { commitGapMs } from '../step-plan.ts';
 import type { MediaCommand, MediaSnapshot, ResourceRequest, LocalResourceInfo } from '@joplo-app/kit/plugin';
 import { jsonData, snapshot, object, strings, syncResult, authoringData, materialize, errorMessage } from './data.ts';
 /** Node-side plugin host. Callbacks never enter IR or the player. */
@@ -11,7 +11,14 @@ import { initialState, applyStep, resolveProps, type PlayState } from '../player
 import type { Scene, SceneNode, Project, Scenario } from '../schema.ts';
 import type { PluginInfo } from '../catalog.ts';
 
-export type CompileOptions = { onResource?: (request: ResourceRequest) => void; resourceInfo?: Record<string, LocalResourceInfo>; pluginOptions?: Record<string, Record<string, unknown>> };
+export type CompileOptions = {
+  onResource?: (request: ResourceRequest) => void;
+  /** 本机资源的元数据，按这次编译里的资源 id。 */
+  resourceInfo?: Record<string, LocalResourceInfo>;
+  /** 按请求内容（插件、编译器、输入）查元数据：上一次编译已经检查过的资源第一遍就能用上，宿主不必为了它再编译一遍。resourceInfo 里有的优先。 */
+  resourceInfoFor?: (request: { plugin: string; compiler: string; input: string }) => LocalResourceInfo | undefined;
+  pluginOptions?: Record<string, Record<string, unknown>>;
+};
 export function enabledPlugins(configured: unknown): unknown[] {
   return Array.isArray(configured) ? configured : [];
 }
@@ -34,6 +41,25 @@ export class PluginCompiler {
   readonly mediaCommands = new Map<string, (MediaCommand & { plugin: string })[]>();
   private resourceIds = new Map<string, string>();
   private resourceOwners = new Map<string, string>();
+  private resourceRequests = new Map<string, { plugin: string; compiler: string; input: string }>();
+  /**
+   * 钩子输入的只读副本，按画面根节点缓存：画面在派生（derive）之后不再变，同一棵树给每个效果、每一步、每个插件
+   * 用同一份深冻结的副本，不为每次钩子调用整棵重拷。只在这一次编译内有效。
+   */
+  private frozenRoots = new WeakMap<object, SceneNode>();
+  private frozenRoot(root: SceneNode): SceneNode {
+    let hit = this.frozenRoots.get(root);
+    if (!hit) this.frozenRoots.set(root, (hit = snapshot(root)));
+    return hit;
+  }
+  private frozenScenes(scenes: readonly Pick<Scene, 'id' | 'root'>[]) {
+    const list = scenes.map(s => Object.freeze({ id: s.id, root: this.frozenRoot(s.root) }));
+    return { roots: Object.freeze(list.map(s => s.root)), scenes: Object.freeze(list) };
+  }
+  private infoOf(id: string): LocalResourceInfo | undefined {
+    const request = this.resourceRequests.get(id);
+    return this.options.resourceInfo?.[id] ?? (request ? this.options.resourceInfoFor?.(request) : undefined);
+  }
   readonly defs = new Map<string, PluginDef>();
   readonly info: Record<string, PluginInfo> = {};
   constructor(configured: unknown, private report: PluginReport, source?: string, private options: CompileOptions = {}) {
@@ -45,7 +71,8 @@ export class PluginCompiler {
       if (p.apiVersion !== PLUGIN_API_VERSION) { report('PLUGIN_INVALID', `Plugin ${p.id} targets API ${p.apiVersion}; supported: ${PLUGIN_API_VERSION}`, source); continue; }
       this.defs.set(p.id, p);
       const properties = this.envelope(p, p.properties ?? {}, source);
-      if (!object(properties)) { this.invalid(p, source); continue; }
+      // 清单不合格的插件整个不启用：不留下只注册了一半（有钩子、没有组件信息）的状态
+      if (!object(properties)) { this.invalid(p, source); this.defs.delete(p.id); continue; }
       for (const [key, spec] of Object.entries(properties)) {
         if (!/^[A-Za-z][A-Za-z0-9]*$/.test(key) || ['id', 'children', 'style', 'className', 'when', 'disabled', 'redact', 'note'].includes(key)
           || !object(spec) || !['string', 'number', 'boolean'].includes(String(spec.type))
@@ -77,8 +104,16 @@ export class PluginCompiler {
         else this.themes[`${p.id}:${name}`] = css;
       }
       const checked: Record<string, import('@joplo-app/kit/plugin').ElementTraits> = {};
+      const shown: Record<string, Pick<import('../catalog.ts').ComponentInfo, 'label' | 'inspect'>> = {};
       for (const [name, c] of Object.entries(p.components)) {
         const type = `${p.id}:${name}`;
+        // 看板里给人看的名字与检查抽屉的信息行：纯数据，校验后进 dev IR（发布与评审版在编译末尾去掉）
+        if (c.label !== undefined || c.inspect !== undefined) {
+          const label = c.label === undefined ? undefined : PluginTextSchema.safeParse(this.envelope(p, c.label, source));
+          const inspect = c.inspect === undefined ? undefined : PluginInspectFieldSchema.array().safeParse(this.envelope(p, c.inspect, source));
+          if (label && !label.success || inspect && !inspect.success) report('PLUGIN_INVALID', `Plugin ${p.id}: invalid label or inspect declaration for ${name}`, source);
+          else shown[name] = { ...(label?.success ? { label: label.data as import('@joplo-app/kit/plugin').PluginText } : {}), ...(inspect?.success ? { inspect: inspect.data as import('@joplo-app/kit/plugin').PluginInspectField[] } : {}) };
+        }
         if (c.traits !== undefined) {
           const parsed = ElementTraitsSchema.safeParse(this.envelope(p, c.traits, source));
           if (!parsed.success) report('PLUGIN_TRAITS_INVALID', `Plugin ${p.id}: invalid traits for ${name}: ${parsed.error.message}`, source);
@@ -94,7 +129,7 @@ export class PluginCompiler {
           else this.intrinsic.set(c.intrinsic, type);
         }
       }
-      this.info[p.id] = { ...(Object.keys(actions).length ? { actions } : {}), ...(object(themes) && Object.keys(themes).length ? { themes: themes as Record<string, string> } : {}), ...(Object.keys(properties).length ? { properties: properties as NonNullable<PluginInfo['properties']> } : {}), ...(p.data ? { data: this.envelope(p, p.data, source) as PluginInfo['data'] } : {}), id: p.id, title: p.title, ...(p.version ? { version: p.version } : {}), components: Object.fromEntries(Object.entries(p.components).map(([name, c]) => [name, { ...(checked[name] ? {traits:checked[name]} : {}), ...(c?.interactive ? { interactive: true } : {}), ...(c?.parent ? { parent: c.parent } : {}), ...(c?.needsId ? { needsId: true } : {}), ...(c?.selfEvident ? { selfEvident: true } : {}) }])) };
+      this.info[p.id] = { ...(Object.keys(actions).length ? { actions } : {}), ...(object(themes) && Object.keys(themes).length ? { themes: themes as Record<string, string> } : {}), ...(Object.keys(properties).length ? { properties: properties as NonNullable<PluginInfo['properties']> } : {}), ...(p.data ? { data: this.envelope(p, p.data, source) as PluginInfo['data'] } : {}), id: p.id, title: p.title, ...(p.version ? { version: p.version } : {}), components: Object.fromEntries(Object.entries(p.components).map(([name, c]) => [name, { ...shown[name], ...(checked[name] ? {traits:checked[name]} : {}), ...(c?.interactive ? { interactive: true } : {}), ...(c?.parent ? { parent: c.parent } : {}), ...(c?.needsId ? { needsId: true } : {}), ...(c?.selfEvident ? { selfEvident: true } : {}) }])) };
     }
   }
   private run<T>(p: PluginDef, hook: string, at: string | undefined, fn: () => T): T | undefined {
@@ -125,7 +160,7 @@ export class PluginCompiler {
       }
       const key = JSON.stringify([plugin, compiler, input]);
       let id = this.resourceIds.get(key);
-      if (!id) { id = `resource-${this.resourceIds.size}`; this.resourceIds.set(key, id); this.resourceOwners.set(id, plugin); this.options.onResource?.({ id, plugin, compiler, input, source }); }
+      if (!id) { id = `resource-${this.resourceIds.size}`; this.resourceIds.set(key, id); this.resourceOwners.set(id, plugin); this.resourceRequests.set(id, { plugin, compiler, input }); this.options.onResource?.({ id, plugin, compiler, input, source }); }
       return `joplo-resource:${id}`;
     }
     return { ...value, ...Object.fromEntries(Object.entries(value).map(([k,v]) => [k, this.resourceProps(v, source)])) };
@@ -189,12 +224,13 @@ export class PluginCompiler {
     const p = this.defs.get(effect.plugin);
     if (!p?.compile?.effect) { this.report('PLUGIN_EFFECT_UNKNOWN', `Plugin ${effect.plugin} has no effect compiler for ${effect.name}`, source); return undefined; }
     return this.run(p, 'effect', source, () => {
-      const result = this.output(p, p.compile!.effect!(snapshot(effect), { roots: snapshot(scenes.map(s => s.root)), scenes: snapshot(scenes.map(s => ({ id: s.id, root: s.root }))), data: snapshot(data), source, report: this.report, resourceInfo: id => this.resourceOwners.get(id) === p.id ? snapshot(this.options.resourceInfo?.[id]) : undefined, resource: request => {
+      const frozen = this.frozenScenes(scenes);
+      const result = this.output(p, p.compile!.effect!(snapshot(effect), { roots: frozen.roots, scenes: frozen.scenes, data: snapshot(data), source, report: this.report, resourceInfo: id => this.resourceOwners.get(id) === p.id ? snapshot(this.infoOf(id)) : undefined, resource: request => {
         request = materialize(request);
         if (!request || typeof request.compiler !== 'string' || !/^[a-z][a-z0-9-]*$/.test(request.compiler) || typeof request.input !== 'string' || Object.keys(request).some(k => k !== 'compiler' && k !== 'input')) throw new Error('resource requires compiler and text input');
         const key = JSON.stringify([p.id, request.compiler, request.input]);
         let id = this.resourceIds.get(key);
-        if (!id) { id = `resource-${this.resourceIds.size}`; this.resourceIds.set(key, id); this.resourceOwners.set(id, p.id); this.options.onResource?.({ id, plugin: p.id, compiler: request.compiler, input: request.input, ...(source ? { source } : {}) }); }
+        if (!id) { id = `resource-${this.resourceIds.size}`; this.resourceIds.set(key, id); this.resourceOwners.set(id, p.id); this.resourceRequests.set(id, { plugin: p.id, compiler: request.compiler, input: request.input }); this.options.onResource?.({ id, plugin: p.id, compiler: request.compiler, input: request.input, ...(source ? { source } : {}) }); }
         return id;
       } }), source);
       if (result === undefined) return;
@@ -226,10 +262,11 @@ export class PluginCompiler {
     };
     for (const sc of Object.values(project.scenarios)) visit(sc);
     for (const sc of order) {
-      const scenes = Object.values(project.scenes).filter(s => s.optionId === sc.optionId || s.optionId == null).map(s => ({ id: s.id, root: s.root }));
-      const roots = scenes.map(s => s.root);
+      const option = project.options[sc.optionId];
+      const isolated = project.features[option?.featureId ?? '']?.standalone === true && !option?.routes.length;
+      const { roots, scenes } = this.frozenScenes(Object.values(project.scenes).filter(s => s.optionId === sc.optionId || !isolated && s.optionId == null));
       const prev = sc.from ? project.scenarios[sc.from] : undefined;
-      let media: MediaSnapshot = prev && ended.has(prev.id) ? advanceMedia(ended.get(prev.id)!, prev.steps.length ? stepAnchorMs(prev.steps[prev.steps.length - 1]!) : 0) : {};
+      let media: MediaSnapshot = prev && ended.has(prev.id) ? advanceMedia(ended.get(prev.id)!, commitGapMs(project, prev.steps, prev.steps.length - 1)) : {};
       const hasMedia = Object.keys(media).length > 0 || sc.steps.some(step => this.mediaCommands.has(step.id));
       let previousState: PlayState | undefined;
       let state = initialState(project, sc.id);
@@ -242,7 +279,8 @@ export class PluginCompiler {
         const target = i ? sc.steps[i - 1]! : sc;
         const ext = { ...target.ext };
         if (i) {
-          media = advanceMedia(media, i > 1 ? stepAnchorMs(sc.steps[i - 2]!) : 0);
+          // 配乐锚点：上一次提交（i = 1 时是场景开始）到这一步提交之间的计划时长（stepPlan：停留 / 朗读估算 + 这一步的操作演示）
+          media = advanceMedia(media, commitGapMs(project, sc.steps, i - 2));
           for (const c of this.mediaCommands.get(sc.steps[i - 1]!.id) ?? []) {
             const key = `${c.plugin}:${c.track}`;
             const current = media[key];
@@ -262,9 +300,11 @@ export class PluginCompiler {
           }
         }
         if (hasMedia) target.media = structuredClone(media);
+        // 这一步的状态冻结一次，所有插件的 frame 钩子共用（resolveProps 也读这一份，不为每次取值再拷状态）
+        const frozenState = snapshot(state), frozenPrevious = snapshot(previousState);
         for (const p of this.defs.values()) {
           if (p.compile?.frame) {
-            const value = this.run(p, 'frame', target.source, () => this.output(p, p.compile!.frame!({ roots: snapshot(roots), scenes: snapshot(scenes), state: snapshot(state), previousState: snapshot(previousState), resolveProps: (node, previous) => resolveProps(node, snapshot(previous && previousState ? previousState : state)), data: snapshot(target.ext?.[p.id]), previousData: snapshot(previousData[p.id]), position: i, report: this.report }), target.source));
+            const value = this.run(p, 'frame', target.source, () => this.output(p, p.compile!.frame!({ roots, scenes, state: frozenState, previousState: frozenPrevious, resolveProps: (node, previous) => resolveProps(node, previous && frozenPrevious ? frozenPrevious : frozenState), data: snapshot(target.ext?.[p.id]), previousData: snapshot(previousData[p.id]), position: i, report: this.report }), target.source));
             if (value !== undefined) ext[p.id] = value;
           }
         }

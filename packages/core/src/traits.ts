@@ -24,4 +24,7 @@ export const ElementTraitsSchema: z.ZodType<ElementTraits> = z.strictObject({
   text: z.array(key).optional(),
   textPaths: z.array(keys).optional(),
 });
+/** 给人看的文字（看板用）：英文，或带 en 的「语言 → 文字」。 */
+export const PluginTextSchema = z.union([z.string().min(1), z.record(z.string(), z.string().min(1)).refine((v) => typeof v.en === 'string', 'needs an en text')]);
+export const PluginInspectFieldSchema = z.strictObject({ label: PluginTextSchema, props: z.array(z.string().min(1)).min(1), join: z.string().optional(), values: z.record(z.string(), PluginTextSchema).optional(), flags: z.record(z.string(), PluginTextSchema).optional(), fallback: z.string().optional() });
 export const InheritSchema = z.array(z.strictObject({ target: key, props: keys }));

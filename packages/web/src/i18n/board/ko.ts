@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardKo(locale: Locale = 'ko') {
@@ -188,6 +188,15 @@ export function createBoardKo(locale: Locale = 'ko') {
       coverageFor: (p0: Value) => `${value(p0, locale)} 반영 상태`,
       thisFeatureHasNoCasesYet: "이 기능에는 아직 케이스가 없습니다.",
       otherScenarios: "다른 시나리오",
+      chaptersClock: (n: number, time: string) => `${number(n, locale)}장 · ${time}`,
+      scenariosClock: (n: number, time: string) => `${number(n, locale)}개 시나리오 · ${time}`,
+      draftNotPublished: "초안 · 게시 안 함",
+      sliceMeta: (time: string, steps: number) => `${time} · ${number(steps, locale)}단계`,
+      reviewStrip: "시사",
+      reviewStripHint: "모든 장을 이어 붙인 필름 스트립(하드 컷과 정지):",
+      copyCommand: "복사",
+      workEmptyTitle: "이 작품에는 아직 내용이 없습니다",
+      workEmptyBody: (file: string) => `${file}의 scenarios에 첫 장이나 시나리오를 작성하세요:`,
       copy: (p0: Value) => `${value(p0, locale)} 복사`,
       missing: "누락",
       undecided: "미정",
@@ -260,6 +269,7 @@ export function createBoardKo(locale: Locale = 'ko') {
       error: "오류",
       notFound: "찾을 수 없음",
       featuresPicked: (p0: Value, p1: Value, p2: Value) => `${plural(Number(p0), { other: "#개 기능" }, locale)} · 채택 ${value(p1, locale)}/${value(p2, locale)}`,
+      workCount: (n: number) => `작품 ${value(n, locale)}개`,
       covered: "반영됨",
       aDemoScenarioCoversThisCaseThisDoesNot: "데모 시나리오에 반영되어 있지만 업무 동작이 올바르다고 확인된 것은 아닙니다.",
       howToHandleThisCaseIsUndecided: "이 케이스의 처리 방식은 미정입니다",

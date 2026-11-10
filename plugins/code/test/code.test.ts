@@ -7,7 +7,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { feature, flow, option, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { compile, holdMsOf, type AuthoringProject } from '@joplo-app/core';
+import { compile, stepPlan, type AuthoringProject } from '@joplo-app/core';
 import code, { Editor, editCode, highlightLines, typeCode } from '../src/plugin.ts';
 import { applyOps, initialFrame, lineDiff, tokenize, typeMs } from '../src/model.ts';
 
@@ -66,7 +66,9 @@ describe('compile', () => {
     const steps = p.scenarios['f.a.s']!.steps;
     expect(steps[0]!.effectHold).toBeUndefined();
     expect(steps[1]!.effectHold).toBe(typeMs('  if (!res.ok) throw new Error(res.statusText);', 28));
-    expect(holdMsOf(steps[2])).toBe(1800);
+    expect(steps[2]!.effectHold).toBe(1800);
+    // 没写 hold 时仍套 3 秒阅读下限：停留 = max(效果时长, 阅读)
+    expect(stepPlan(p, steps[2]!).dwellMs).toBe(3000);
   });
   it('诊断：未知编辑器、空片段、非法行号与速度、未知语言', () => {
     const bad = project((f) => f.system('A', 'a', typeCode('nope', 'x')).system('B', 'b', typeCode('ed', '  ')).system('C', 'c', highlightLines('ed', 0)).system('D', 'd', typeCode('ed', 'x', { cps: 1 })));

@@ -110,6 +110,25 @@ describe('trace：分组、状态机、时序图', () => {
     h(D.Edge, { from: 'svc', to: 'data', id: 'to_data' }),
   );
 
+  it('trace() 声明这一步的效果时长：active 连线上的小点至少跑完一圈（编译期按布局算，播放器不查 DOM）', () => {
+    const r = build(arch, (f) => f.system('一', trace('api', 'svc')).system('二', trace.fail('svc', 'pg')).system('三', 'x'));
+    expect(codes(r)).toEqual([]);
+    const [ok, fail, plain] = r.project!.scenarios['f.a.s']!.steps;
+    // 一圈至少 0.9 秒，再留 0.2 秒
+    expect(ok!.effectHold).toBeGreaterThanOrEqual(1100);
+    // 失败的连线不画小点、普通步骤没有效果：都不声明时长
+    expect(fail!.effectHold).toBeUndefined();
+    expect(plain!.effectHold).toBeUndefined();
+  });
+
+  it('组件的显示名与检查抽屉信息来自清单，进 dev IR', () => {
+    const dev = build(arch).project!;
+    const node = dev.plugins!.diagram!.components['Diagram.Node']!;
+    expect(node.label).toMatchObject({ en: expect.any(String), 'zh-CN': expect.any(String) });
+    expect(node.inspect!.map((f) => f.props)).toEqual([['description'], ['state']]);
+    expect(dev.plugins!.diagram!.components['Diagram.Edge']!.inspect!.some((f) => f.props.join() === 'from,to')).toBe(true);
+  });
+
   it('路径经过的节点所在的各级分组：本步 active，之后 ok；fail 时终点所在的分组 error', () => {
     const r = build(arch, (f) => f.system('一', trace('api', 'svc')).system('二', trace('svc', 'pg')).system('三', trace.fail('svc', 'pg')));
     expect(codes(r)).toEqual([]);

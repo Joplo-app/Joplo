@@ -6,7 +6,7 @@ Referenced music is inspected by its enabled plugin on the author machine: durat
 
 STEP_KEY_INVALID: use a letter followed by up to 63 letters/digits/underscores/hyphens. STEP_KEY_DUPLICATE: each step key must be unique within its scenario; keep the same key only for the same action across versions. See diff for identity guidance.
 
-Run npx joplo check [dir]. Use --option feature.option to narrow structure checks and replay; --format json gives machine output.
+Run npx joplo check [dir]. Use --work <standalone-key|feature.option> to narrow structure checks and replay; --format json gives machine output.
 The whole project still compiles. Option filtering does not hide project compilation errors. Source files load locally.
 
 ## Read the output
@@ -19,6 +19,13 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - The last line totals error, warning, info. Run check again after fixing.
 
 ## Common codes → fixes
+- WORK_INVALID (error): default export work({...}); supply nonempty title/summary, a stage/layers/on/routes view and scenarios object containing only flow()/chapter() entries.
+- WORK_ID_CONFLICT (error): rename the work file or feature folder so their entry keys differ.
+- WORK_SLICES_MIXED (error): use all chapter() for a linear work or all flow() for independent slices, including options under a feature.
+- WORK_FEATURE_ONLY (error): remove cases/rules/uses() from standalone work; use feature() + option() if the task requires design review.
+- FROM_UNKNOWN (error): copy an existing slice key from the diagnostic's available-slices list; omit from for normal chapter continuation, or use from: null to restart.
+- WORK_EMPTY (info): add the first entry under scenarios, for example opening: chapter('Opening').system('Begin', narrate('Hello')).
+- WORK_DRAFT_SKIPPED (info): a draft was excluded from publish/review; remove draft: true only when it is ready. Explicit --work selection of a draft fails instead of publishing empty content.
 - FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID: give each free reaction a valid targeted action in this option and only set, append or toast with valid leaf state paths. Move navigation, completion, media and plugin effects into flow steps; do not add event callbacks.
 - ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID / PLUGIN_ACTION_INVALID: check the action shape, enabled plugin declaration, exact payload fields/ranges, allowed target type, and drag/scroll endpoint. Read the plugin skill; keep endpoints in the current stage, then rerun check.
 - UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
@@ -40,14 +47,16 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - EXPLAIN_TOO_LONG: Shorten the explain note to about 48 units, using the same CJK 1 / other 0.5 calculation. Put detailed rationale in a separate explanation layer. See demo.
 - SAY_TOO_LONG / NARRATE_TOO_LONG (warning): a say() or narrate() line over about 80 units (about 10 seconds aloud). Autoplay waits until it is read; say less or split the step.
 - SAY_EMPTY / NARRATE_EMPTY: say() needs the character's words, narrate() the narrator's. Remove it to fall back to the caption.
+- SAY_ROLE_CONFLICT: one step has say(…, { role }) lines from two different roles. A step reads one speaker; split the lines into consecutive steps.
+- STREAM_PACE_INVALID: stream()'s pace is only 'voice' (follow this step's spoken line); omit it for model-output speed.
 - VOICE_CONFIG_INVALID: config({ voice }) takes { profile?, narrator?, roles?: { roleKey: 'voice' }, locales?: { ja: { narrator?, roles? } } } with non-empty strings. API keys never go in the config.
 - LOCALES_INVALID / LOCALES_UNDECLARED: config({ locales }) lists supported languages once each, source language first; every locales/<lang>.json must be listed there and must not be the source language. LOCALE_FILE_INVALID: the file must be one JSON object of "source text": "translation" strings.
 - I18N_MISSING / I18N_STALE / I18N_UNUSED (warnings): texts with no translation (viewers see the source text), a source text that changed (the closest old entry is shown: rename the key and update the translation), entries nothing uses. npx joplo i18n add <lang> adds the missing keys.
 - DESCRIPTION_TOO_LONG: flow({ description }) is the scenario cover sentence; keep it within 30 units, one sentence saying what this scenario shows. See story.
 - CARD_TEXT_TOO_LONG (info): a transition card's sub is over 48 units, a point over 24, or more than 4 points. Keep one sentence and a few short points; move details into steps.
 - SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.
-- HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior. Explainers and other content whose chapters are all main-flow can ignore it (see content).
-- ROLE_UNKNOWN: A layer or card role is not in feature.roles. Declare roles as { key: role('Name') }; see demo.
+- HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior. This applies only to feature review; standalone explainers use work()/chapter() and have no cases.
+- ROLE_UNKNOWN: A layer, card or say() role is not in the work or feature roles. Declare roles as { key: role('Name') }; see demo.
 - ICON_UNKNOWN: A layer icon is not a preset. Use one of window, browser, mobile, desktop, terminal, chat, agent, server, data, email, doc, flow; see demo.
 - FORK_UNKNOWN: fork must target another scenario key in the same option; it cannot reference itself.
 - MARK_UNKNOWN: The mark target is absent from this step's route stage (after go() and back() in earlier steps) or, with layers, from every layer. Check the element id; currently hidden targets are valid references.
@@ -103,4 +112,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.3.0 sha256:99c6e24eaeb6ba1a696c29dc18c918707c049f92c78906af743c2548a331408e -->
+<!-- joplo-skill 0.4.1 sha256:eab435230d353b215337bc912e1c65b777c5a0eb016e893b15fc82c20690a7f1 -->

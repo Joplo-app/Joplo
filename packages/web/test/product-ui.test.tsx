@@ -19,7 +19,7 @@ import { Stage } from '../src/renderer/Stage';
 import { chartModel, diffTone, menuPlacement, notificationPlacement, selectedIds } from '../../../plugins/ui/src/runtime.tsx';
 import { CaseNav } from '../src/board/CaseNav';
 import { caseBrief, gapsOf, rolesOfFeature } from '../src/board/nav-model';
-import { SiteApp } from '../src/site/SiteApp';
+import { SiteApp, SiteHome } from '../src/site/SiteApp';
 import { Brand, JOPLO_SITE_URL } from '../src/player/PlayerPage';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
@@ -199,7 +199,8 @@ describe('PM 视角的默认呈现（只读现有字段）', () => {
     expect(publish.cases).toEqual({});
     expect(publish.features.f!.caseIds).toEqual([]);
     vi.stubGlobal('location', { hash: '', search: '', href: 'https://joplo.app/' });
-    const home = renderToStaticMarkup(<I18nProvider explicit="en"><SiteApp data={{ project: publish, home: '/' }} search="" /></I18nProvider>);
+    // D102：只有一个作品的发布站打开就是它的封面（不经过首页），所以这里直接渲染首页本身来看卡片
+    const home = renderToStaticMarkup(<I18nProvider explicit="en"><SiteHome project={publish} onView={() => {}} /></I18nProvider>);
     vi.unstubAllGlobals();
     expect(home).toContain('For: Space admin and Member · 1 scenario');
     expect(home).not.toContain('The invite disappears');

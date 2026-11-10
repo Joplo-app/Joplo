@@ -284,7 +284,8 @@ function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, 
   const media = useMedia(ctl, project, captureAudio);
   const recordingAssets = useMemo(() => {
     const sc = project.scenarios[scenarioId];
-    const sequence = chain ? playSequence(project, sc?.optionId ?? null) : [scenarioId];
+    // playSequence 返回场景对象；这里按 id 找当前章及其后面的章（原先拿 id 去对象数组里找，永远找不到，只收了第一章的配乐）
+    const sequence = chain ? playSequence(project, sc?.optionId ?? null).map((s) => s.id) : [scenarioId];
     const at = sequence.indexOf(scenarioId);
     const chapters = (at >= 0 ? sequence.slice(at) : [scenarioId]).map(id => project.scenarios[id]);
     const ids = new Set(chapters.flatMap(chapter => [chapter, ...(chapter?.steps ?? [])].flatMap(s => Object.values(s?.media ?? {}).map(t => t.resource))));

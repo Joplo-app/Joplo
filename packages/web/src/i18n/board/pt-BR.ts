@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardPtBR(locale: Locale = 'pt-BR') {
@@ -188,6 +188,15 @@ export function createBoardPtBR(locale: Locale = 'pt-BR') {
       coverageFor: (p0: Value) => `Cobertura de ${value(p0, locale)}`,
       thisFeatureHasNoCasesYet: "Este recurso ainda não tem casos.",
       otherScenarios: "Outros cenários",
+      chaptersClock: (n: number, time: string) => `${plural(n, { one: '# capítulo', other: '# capítulos' }, locale)} · ${time}`,
+      scenariosClock: (n: number, time: string) => `${plural(n, { one: '# cenário', other: '# cenários' }, locale)} · ${time}`,
+      draftNotPublished: "Rascunho · não publicado",
+      sliceMeta: (time: string, steps: number) => `${time} · ${plural(steps, { one: '# etapa', other: '# etapas' }, locale)}`,
+      reviewStrip: "Revisão",
+      reviewStripHint: "Tira de quadros de todos os capítulos em sequência, com cortes secos e pausas:",
+      copyCommand: "Copiar",
+      workEmptyTitle: "Esta obra ainda não tem conteúdo",
+      workEmptyBody: (file: string) => `Escreva o primeiro capítulo ou cenário em scenarios de ${file}:`,
       copy: (p0: Value) => `Copiar ${value(p0, locale)}`,
       missing: "Ausente",
       undecided: "A decidir",
@@ -260,6 +269,7 @@ export function createBoardPtBR(locale: Locale = 'pt-BR') {
       error: "Erro",
       notFound: "Não encontrado",
       featuresPicked: (p0: Value, p1: Value, p2: Value) => `${plural(Number(p0), { one: "# recurso", other: "# recursos" }, locale)} · Escolhidas ${value(p1, locale)} / ${value(p2, locale)}`,
+      workCount: (n: number) => plural(Number(n), { one: '# obra', other: '# obras' }, locale),
       covered: "Coberto",
       aDemoScenarioCoversThisCaseThisDoesNot: "Um cenário de demo cobre este caso. Isso não confirma que o comportamento de negócio está correto.",
       howToHandleThisCaseIsUndecided: "O tratamento deste caso está a decidir",

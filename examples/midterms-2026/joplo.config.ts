@@ -5,7 +5,6 @@ export default config({ plugins: [ui, diagram, content],
   locales: ['zh-CN', 'en', 'ja'],
   description: '自媒体快剪风格的资讯讲解：中期选举选什么、民主党赢了多少、特朗普接下来会被怎样卡住、AI 和股市受什么影响。数据截至美东时间 2026 年 11 月 7 日，来源见各页底部与 assets/CREDITS.md。',
   theme: 'newsroom',
-  home: '/',
   // 新闻讲解：沉稳的旁白；Joplo Cloud 的音色是多语言的，英文、日文按语言选推荐音色（D84）
   voice: { narrator: 'narrator-calm-m' },
 });

@@ -10,10 +10,13 @@ import { createServer, type IncomingMessage } from 'node:http';
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { compile, REVIEW_LIMITS, type Project } from '@joplo-app/core';
+import { work, chapter } from '@joplo-app/kit';
+import { jsx } from '@joplo-app/kit/jsx-runtime';
+import { compile, scopeProject, REVIEW_LIMITS, type Project } from '@joplo-app/core';
 import { runCli } from '../src/cli.ts';
 import { writeCredentials } from '../src/cloud.ts';
 import { prContext } from '../src/cloud-pr.ts';
+import { publicationSource, PRIVATE } from '../../core/test/fixtures/publication.ts';
 import { reviewSource } from '../../core/test/fixtures/review.ts';
 
 const token = 'session-token-NEVER-PRINT';
@@ -414,8 +417,8 @@ test('Pro 重新分享同一范围：只替换这个范围的分享，不用主�
   await mkdir(join(project, '.joplo'), { recursive: true });
   await writeFile(join(project, '.joplo/cloud.json'), JSON.stringify({ server: base, shareId: 'Main123456', url: base + '/s/Main123456/', scoped: { 'f.a.main': { shareId: 'Scop123456', url: base + '/s/Scop123456/' } } }));
   build.mockImplementationOnce(scopedBuild());
-  const r = await cli(['share', '--private', '--no-review',  project, '--feature', 'f', '--format=json']); expect(r.code, r.stdout).toBe(0);
-  // --feature f = 选定方案 a 的全部场景 = f.a.main，与上次是同一个范围
+  const r = await cli(['share', '--private', '--no-review',  project, '--work', 'f', '--format=json']); expect(r.code, r.stdout).toBe(0);
+  // --work f = 选定方案 a 的全部场景 = f.a.main，与上次是同一个范围
   expect(createBody().replaceShareId).toBe('Scop123456');
   const record = JSON.parse(await readFile(join(project, '.joplo/cloud.json'), 'utf8'));
   expect(record.shareId).toBe('Main123456');
@@ -428,7 +431,7 @@ test('写错场景、没选定方案：在构建和任何云端请求之前失�
   // 没选定方案属于用法错误（USAGE，退出码 2）
   r = await cli(['share', '--private', '--no-review',  project, '--scenario', 'f.b.only', '--format=json']);
   expect(r.code).toBe(2); expect(r.json().error.message).toMatch(/not the picked option/);
-  r = await cli(['share', '--private', '--no-review',  project, '--feature', 'g', '--format=json']);
+  r = await cli(['share', '--private', '--no-review',  project, '--work', 'g', '--format=json']);
   expect(r.code).toBe(2); expect(r.json().error.message).toMatch(/no picked option/);
   expect(build).not.toHaveBeenCalled(); expect(calls).toEqual([]);
 });
@@ -438,4 +441,52 @@ test('范围分享遇到忽略 scope 的旧 server（产物里有范围外场景
   const r = await cli(['share', '--private', '--no-review',  project, '--scenario', 'f.a.main', '--format=json']);
   expect(r.code).toBe(1); expect(r.json().error.code).toBe('UNSUPPORTED_ACTION');
   expect(calls.some(c => c.path === '/api/v1/shares')).toBe(false);
+});
+
+/** 独立作品同样通过范围解析、清单和构建链路，绝不因草稿而上传空内容。 */
+test('share --work：独立作品范围、摘要与草稿拒绝；评审版不泄露旧稿', async () => {
+  const source = reviewSource();
+  source.works = Object.fromEntries(['demo', 'old'].map(key => [key, {
+    ...work({ title: key, summary: 'Standalone', draft: key === 'old', stage: jsx('div', { children: key }),
+      scenarios: { intro: chapter('Introduction').system('Begin') } }), file: `/p/works/${key}.tsx`,
+  }]));
+  devIr = compile(source, 'dev').project!;
+  expect(devIr).not.toBeNull();
+  build.mockImplementationOnce(async opts => ({ ...await scopedBuild()(opts as any),
+    entries: [{ id: 'demo', title: 'demo', slices: 1, sequencing: 'linear' }],
+    diagnostics: [{ code: 'WORK_DRAFT_SKIPPED', severity: 'info', source: 'structure', message: 'Draft work "old" was skipped' }],
+  }) as any);
+  const r = await cli(['share', project, '--work', 'demo', '--no-review', '--format=json'], { JOPLO_API_KEY: apiKey });
+  expect(r.code, r.stdout + r.stderr).toBe(0);
+  expect(build.mock.calls[0]![0]).toMatchObject({ scope: { scenarios: ['demo.main.intro'] } });
+  expect(r.json().data.entries).toEqual([{ id: 'demo', title: 'demo', slices: 1, sequencing: 'linear' }]);
+  expect(r.stderr).toContain('Works: 1 · demo (demo)'); expect(r.stderr).toContain('WORK_DRAFT_SKIPPED');
+  expect(calls.find(c => c.path === '/api/v1/shares')!.body.review.features.map((f: any) => f.id)).toEqual(['demo']);
+  for (const review of ['--no-review', '--review']) {
+    calls = []; build.mockClear();
+    const draft = await cli(['share', project, '--work', 'old', review, '--format=json'], { JOPLO_API_KEY: apiKey });
+    expect(draft.code).toBe(2); expect(draft.json().error.message).toMatch(/draft/i);
+    expect(build).not.toHaveBeenCalled(); expect(calls).toEqual([]);
+  }
+});
+
+test.each(['stage','on','routes','translated'] as const)('分享请求的全部 JSON 不含 %s 草稿，普通/评审/范围分享均覆盖',async kind=>{
+  devIr=compile(publicationSource(kind),'dev').project!;
+  const original=build.getMockImplementation()!;
+  build.mockImplementation(async opts=>{
+    const baseResult=await original(opts);
+    const publicProject=compile(publicationSource(kind),opts.review?'review':'publish').project!;
+    const request=(opts as typeof opts & {scope?:{scenarios:string[]}}).scope;
+    const scoped=request?scopeProject(publicProject,request.scenarios,opts.review?'review':'publish'):undefined;
+    await writeFile(join(baseResult.outDir,'index.html'),`<script type="application/json" id="joplo-ir">${JSON.stringify({project:scoped?.project??publicProject})}</script>`);
+    return {...baseResult,...(scoped?{scope:scoped.info}:{})};
+  });
+  try {
+    for(const review of ['--review','--no-review'])for(const scoped of [false,true]){
+      const r=await cli(['share','--private',review,project,...(scoped?['--work','live']:[]),'--format=json'],{JOPLO_API_KEY:apiKey});
+      expect(r.code,r.stdout).toBe(0);
+      const sent=JSON.stringify(calls.filter(c=>c.path==='/api/v1/shares').map(c=>c.body));
+      for(const secret of PRIVATE)expect(sent).not.toContain(secret);
+    }
+  } finally {build.mockImplementation(original);}
 });

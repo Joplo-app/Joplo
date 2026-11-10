@@ -13,9 +13,9 @@ import { useI18n } from '../i18n/context';
 // skipAnimations，开播那一刻一帧消失（D92：胶片条与视频都量到了这处硬切）。
 import { AnimatePresence, motion } from 'motion/react';
 const noop = () => {};
-import { ListOrdered, Play, Timer, Users } from 'lucide-react';
+import { Clapperboard, ListOrdered, Play, Timer, Users } from 'lucide-react';
 import { cardAt, roleOf, type CardAction, type Project, type RoleInfo } from '@joplo-app/core/runtime';
-import type { CoverContent } from './cover-content';
+import type { CoverContent, EntryCover } from './cover-content';
 import { fontStyle, type AppearanceFont } from '../renderer/appearance';
 import type { StageTheme } from '../renderer/rough';
 import { JP_SECONDARY, RoleAvatar } from './RoleAvatar';
@@ -69,7 +69,7 @@ export function Curtain({ project, scenarioId, position, cover, onStart, theme, 
           // JS 帧循环（不走原生 WAAPI）：录制与胶片条的假时钟能逐帧取样这段淡入淡出
           onUpdate={noop}
         >
-          {card ? <TransitionCard card={card} role={cardRole} k={k} /> : cover ? <SceneCover cover={cover} k={k} onStart={onStart} /> : null}
+          {card ? <TransitionCard card={card} role={cardRole} k={k} /> : cover?.entry ? <EntryCoverView cover={cover} entry={cover.entry} k={k} onStart={onStart} /> : cover ? <SceneCover cover={cover} k={k} onStart={onStart} /> : null}
         </motion.div>
       ) : null}
     </AnimatePresence>
@@ -159,6 +159,85 @@ function SceneCover({ cover, k, onStart }: { cover: CoverContent; k: number; onS
           <p className="m-0 max-w-full" style={{ maxWidth: px(680), fontSize: px(19), lineHeight: 1.5, color: JP_SECONDARY, ...clampLines(2) }} title={cover.description} data-testid="cover-description" data-from={cover.descriptionFrom ?? undefined}>
             {cover.description}
           </p>
+        ) : null}
+        <ul className="m-0 flex max-w-full list-none flex-wrap items-center justify-center p-0 font-jb text-[var(--jp-muted)]" style={{ columnGap: px(14), rowGap: px(4), fontSize: px(14), lineHeight: 1.4 }} data-testid="cover-meta">
+          {meta.map((m) => (
+            <li key={m.key} className="flex min-w-0 items-center" style={{ gap: px(6) }}>
+              <m.icon aria-hidden className="shrink-0" style={icon} />
+              <span className="truncate">{m.text}</span>
+            </li>
+          ))}
+        </ul>
+        {onStart ? (
+          <button type="button" onClick={onStart} title={`${i18n.player.coverStartTitle} · ${i18n.player.space}`} className={`${btnCls} jb-focus mt-1 cursor-pointer transition-colors hover:bg-jb-accent-hover active:translate-x-[1px] active:translate-y-[1px] active:bg-jb-accent-press`} style={btnStyle} data-testid="cover-start">
+            {btnFace}
+          </button>
+        ) : (
+          <span aria-hidden className={`${btnCls} mt-1`} style={btnStyle} data-testid="cover-start">
+            {btnFace}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 独立作品的封面（D102 修订）：与场景封面同一套尺寸与底色。
+ * - 作品封面（顺序里的第一个切片）：标题、简介、给：观众、「N 章 · 约 M」或「N 个场景 · 约 M」、开始；
+ * - 切片封面（从中间某个切片打开）：小字 linear 写「第 n 章 · 作品标题」（支线「支线 · 作品标题」）、independent 只写作品标题；
+ *   切片标题、它的 description、这一个切片的时长、开始。
+ */
+function EntryCoverView({ cover, entry, k, onStart }: { cover: CoverContent; entry: EntryCover; k: number; onStart?: () => void }) {
+  const { t: i18n } = useI18n();
+  const px = (n: number) => Math.round(n * k);
+  const atEntry = entry.at === 'entry';
+  const kicker = atEntry ? null : !entry.linear ? entry.title : `${entry.chapter === null ? i18n.player.sideChapter : i18n.player.chapterKicker(entry.chapter)} · ${entry.title}`;
+  const title = atEntry ? entry.title : cover.title;
+  const description = atEntry ? entry.summary : cover.description;
+  const icon = { width: px(14), height: px(14) };
+  const meta: { key: string; icon: typeof Timer; text: string }[] = atEntry
+    ? [{ key: 'slices', icon: entry.linear ? Clapperboard : ListOrdered, text: entry.meta }]
+    : [{ key: 'time', icon: Timer, text: i18n.player.coverDuration(cover.duration) }];
+  const btnCls = 'flex items-center rounded-[8px] border-[1.5px] border-jb-ink bg-jb-accent font-jb font-semibold leading-none text-jb-on-accent shadow-jb-e1';
+  const btnStyle = { gap: px(8), padding: `${px(12)}px ${px(26)}px`, fontSize: px(17) };
+  const btnFace = (
+    <>
+      <Play aria-hidden style={{ width: px(18), height: px(18) }} />
+      {i18n.player.coverStart}
+    </>
+  );
+  return (
+    <div
+      className="flex h-full w-full items-center justify-center overflow-hidden px-[8%] text-center"
+      style={{
+        background: 'radial-gradient(ellipse 60% 60% at 50% 50%, color-mix(in srgb, var(--jp-bg) 97%, transparent) 0%, color-mix(in srgb, var(--jp-bg) 90%, transparent) 45%, color-mix(in srgb, var(--jp-bg) 84%, transparent) 100%)',
+        backdropFilter: 'blur(5px)',
+        WebkitBackdropFilter: 'blur(5px)',
+      }}
+      role="group"
+      aria-label={title}
+      data-testid="entry-cover"
+      data-at={entry.at}
+    >
+      <div className="flex max-w-full flex-col items-center" style={{ gap: px(18), maxWidth: px(820) }}>
+        {kicker ? (
+          <div className="max-w-full truncate font-jb text-[var(--jp-muted)]" style={{ fontSize: px(14), lineHeight: 1.4 }} data-testid="cover-owner">
+            {kicker}
+          </div>
+        ) : null}
+        <h2 className="m-0 max-w-full font-normal" style={{ fontSize: px(44), lineHeight: 1.2, ...clampLines(2) }} title={title} data-testid="cover-title">
+          {title}
+        </h2>
+        {description ? (
+          <p className="m-0 max-w-full" style={{ maxWidth: px(680), fontSize: px(19), lineHeight: 1.5, color: JP_SECONDARY, ...clampLines(2) }} title={description} data-testid="cover-description">
+            {description}
+          </p>
+        ) : null}
+        {atEntry && entry.audience ? (
+          <div className="max-w-full font-jb text-[var(--jp-muted)]" style={{ fontSize: px(15), lineHeight: 1.4, ...clampLines(2) }} title={entry.audience} data-testid="cover-audience">
+            {i18n.player.forRoles([entry.audience])}
+          </div>
         ) : null}
         <ul className="m-0 flex max-w-full list-none flex-wrap items-center justify-center p-0 font-jb text-[var(--jp-muted)]" style={{ columnGap: px(14), rowGap: px(4), fontSize: px(14), lineHeight: 1.4 }} data-testid="cover-meta">
           {meta.map((m) => (

@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardDe(locale: Locale = 'de') {
@@ -188,6 +188,15 @@ export function createBoardDe(locale: Locale = 'de') {
       coverageFor: (p0: Value) => `Abdeckung für ${value(p0, locale)}`,
       thisFeatureHasNoCasesYet: "Diese Funktion hat noch keine Fälle.",
       otherScenarios: "Weitere Szenarien",
+      chaptersClock: (n: number, time: string) => `${plural(n, { one: '# Kapitel', other: '# Kapitel' }, locale)} · ${time}`,
+      scenariosClock: (n: number, time: string) => `${plural(n, { one: '# Szenario', other: '# Szenarien' }, locale)} · ${time}`,
+      draftNotPublished: "Entwurf · nicht veröffentlicht",
+      sliceMeta: (time: string, steps: number) => `${time} · ${plural(steps, { one: '# Schritt', other: '# Schritte' }, locale)}`,
+      reviewStrip: "Abnahme",
+      reviewStripHint: "Filmstreifen aller Kapitel am Stück, mit harten Schnitten und Standbildern:",
+      copyCommand: "Kopieren",
+      workEmptyTitle: "Dieses Werk hat noch keinen Inhalt",
+      workEmptyBody: (file: string) => `Schreibe das erste Kapitel oder Szenario in scenarios von ${file}:`,
       copy: (p0: Value) => `${value(p0, locale)} kopieren`,
       missing: "Fehlt",
       undecided: "Unentschieden",
@@ -260,6 +269,7 @@ export function createBoardDe(locale: Locale = 'de') {
       error: "Fehler",
       notFound: "Nicht gefunden",
       featuresPicked: (p0: Value, p1: Value, p2: Value) => `${plural(Number(p0), { one: "# Funktion", other: "# Funktionen" }, locale)} · Gewählt ${value(p1, locale)} / ${value(p2, locale)}`,
+      workCount: (n: number) => plural(Number(n), { one: '# Werk', other: '# Werke' }, locale),
       covered: "Abgedeckt",
       aDemoScenarioCoversThisCaseThisDoesNot: "Ein Demo-Szenario deckt diesen Fall ab. Das bestätigt nicht die fachliche Korrektheit des Verhaltens.",
       howToHandleThisCaseIsUndecided: "Vorgehen für diesen Fall ist unentschieden",

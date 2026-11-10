@@ -22,6 +22,9 @@ describe('P2 declaration-driven semantics',()=>{
   const root = p.scenes['f.a@/']!.root;
   expect(root.type).toBe('ui:div'); expect(root.children!.map(n=>n.type)).toEqual(['ui:Button','ui:Modal']);
   expect(p.plugins?.ui?.components.Button?.interactive).toBe(true);
+  // 显示名只给本地看板：dev IR 有，发布与评审版去掉
+  expect(p.plugins?.ui?.components.Button?.label).toMatchObject({ en: expect.any(String), 'zh-CN': expect.any(String) });
+  for (const mode of ['publish','review'] as const) expect(compile(source(h('div',{children:[h(Button,{id:'go',unmodeled:true})]})),mode).project!.plugins?.ui?.components.Button).not.toHaveProperty('label');
  });
  it('plays third-party input, choices, gating, inheritance and viewport declarations using JSON alone',()=>{
   const p = definePlugin({id:'probe',title:'Probe',runtime:'/probe.js',components:{
@@ -57,6 +60,26 @@ it('P2 core and rendering/playback hosts contain no component dispatch, includin
  const forbidden=/\b(?:Button|Modal|Drawer|Menu|AppShell|Phone|DataCard|StateFlow|MultiSelect|Checkbox|Diagram|StateMachine|Sequence|Canvas)\b/;
  const hits=['packages/core/src','packages/web/src/renderer','packages/web/src/player'].flatMap(files).filter(f=>!documentation.has(f)&&forbidden.test(readFileSync(f,'utf8')));
  expect(hits).toEqual([]);
+ // 看板、控制器、服务端与 CLI 也不认识任何插件的类型名或专属 DOM 标记：组件的显示名、检查抽屉的信息行、
+ // 效果时长都由插件清单声明（label / inspect / holdMs），宿主只照着数据做
+ const qualified=/['"`](?:ui|diagram|content|scene3d|code|media|alda):[A-Za-z]|data-jdot/;
+ const named=['packages/web/src','packages/server/src','packages/cli/src','packages/kit/src'].flatMap(files).filter(f=>!f.includes('/i18n/')&&qualified.test(readFileSync(f,'utf8')));
+ expect(named).toEqual([]);
+});
+
+it('only the in-repo standard library uses the first-party internal contract layer', () => {
+ const files=(dir:string):string[]=>readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.name==='node_modules'?[]:e.isDirectory()?files(join(dir,e.name)):/\.tsx?$/.test(e.name)?[join(dir,e.name)]:[]);
+ // 标准库（与引擎同版本发布）可以用内部层；可选插件（3d / code / media / alda）将来迁到二方库，只能依赖稳定层
+ const standard=new Set(['ui','diagram','content']);
+ const internalTraits=/\b(?:selectionGate|disabledPresentation|toggleCaption|childWidth|choices|gate|layout|region)\s*:/;
+ for(const name of readdirSync('plugins')) {
+  if(standard.has(name)) continue;
+  const sources=files(join('plugins',name,'src'));
+  expect(sources.filter(f=>readFileSync(f,'utf8').includes('@joplo-app/kit/renderer-internal')),name).toEqual([]);
+  // 清单入口里不声明标准库内部层的特性
+  const manifest=sources.filter(f=>/\/(?:plugin|index)\.ts$/.test(f)).filter(f=>{const text=readFileSync(f,'utf8');const m=/traits:\s*\{([^}]*)\}/g;let hit=false;for(const t of text.matchAll(m))if(internalTraits.test(t[1]!))hit=true;return hit;});
+  expect(manifest,name).toEqual([]);
+ }
 });
 
 

@@ -21,14 +21,14 @@ import { m } from '../i18n/messages';
  */
 import { EngineClock, gesturePoint, gestureProgress } from './clock';
 import { actionIndex, arbitrateAction, applyPlayground, pluginActionSpec, type Playground, type ActionEntry, type Action } from '@joplo-app/core/runtime';
-import { stepDwell, CAMERA_MS } from './pace';
 /** 手动单步之后时钟再走多久（引擎时间）：覆盖 content camera 默认 1.2s 的补间与 0.9s 的元素飞行。 */
 export const VISUAL_SETTLE_MS = 1200;
 import { dwellTexts } from '../player/cover-content';
 import { VOICE_BREATH_MS, speakerRoleAt, spokenLine } from '@joplo-app/core/runtime';
 import type { Narration, Narrator, NarrationSource } from './voice';
-import { holdMsOf, orderedFeatures, streamPlan, type StreamPlan, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core/runtime';
+import { ACTION_TIMING, stepPlan, orderedFeatures, streamPlan, type StreamPlan, explainClick, applyStep, getScenario, nodeLabel, findNode, layersOf, layersWithNode, replay, stateAt, type PlayState, type Project, type Scenario, type Selection, type Step } from '@joplo-app/core/runtime';
 import { browseSceneId, browseState, optionsOf, scenariosOf, playSequence } from './views';
+import { SelectionWriteback } from './selection-sync';
 
 /** stage = 播放场景；browse = 静态画面（方案还没有覆盖某个情况时，展示方案的页面，不能推进）。 */
 export type View = 'stage' | 'browse';
@@ -131,19 +131,8 @@ function presentAction(action: Action, progress: number) {
   return Object.freeze({ action: data, progress });
 }
 
-export const TIMING = {
-  cursorMove: 0.55, // 秒（Motion）
-  ripple: 260,
-  typeChar: 45,
-  selectHold: 420,
-  toggleHold: 200,
-  systemHold: 900,
-  afterStep: 300,
-  gap: 350,
-  reducedStep: 450,
-  quickStep: 300,
-  layerSwitch: CAMERA_MS + 150, // 先切层再移动鼠标：等新画面淡入、镜头到位（不随速度缩放）
-};
+/** 操作演示各段的时长：core 的 ACTION_TIMING（时间计划 stepPlan 与封面、outline、配乐锚点共用同一份）。 */
+export const TIMING = ACTION_TIMING;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -211,15 +200,11 @@ export class DemoController {
   private cursorPos = { x: 760, y: 560 };
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
   private rippleKey = 0;
-  private syncSeq = 0;
-  private syncChain: Promise<void> = Promise.resolve();
-  /** 最近一次服务端确认的选中（写入失败时回滚到它）。 */
-  private confirmed: Selection | null = null;
   /** 播放速度（0.5 / 1 / 1.5，T-director2）：缩放动画与停留时长；镜头过渡与连线小点一圈不缩放。 */
   private playbackSpeed = 1;
   get speed() { return this.playbackSpeed; }
   set speed(value: number) { this.tickClock(); this.playbackSpeed = Number.isFinite(value) && value > 0 ? value : 1; this.tickClock(); }
-  /** 最近一次提交的时刻：停留时长从这里算起。 */
+  /** 最近一次提交的时刻（引擎时间）：停留时长从这里算起。 */
   private committedAt = 0;
   reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
@@ -228,7 +213,19 @@ export class DemoController {
   narrator: Narrator | null = null;
   private narrating: Narration | null = null;
 
-  constructor(private readonly writer: SelectionWriter | null = null) {}
+  /** 选中同步（审阅）：与播放调度无关，单独一个协作者；它只经这几个入口读写控制器。 */
+  private readonly selection: SelectionWriteback;
+  constructor(writer: SelectionWriter | null = null) {
+    this.selection = new SelectionWriteback(writer, {
+      snapshot: () => this.snap,
+      patch: (patch) => this.set(patch),
+      shownSceneId: () => this.shownSceneId(),
+      scenario: () => this.scenario(),
+      setScenario: (id, position) => this.setScenario(id, position),
+      stop: () => this.stop(),
+      clearNoticeLater: (ms) => this.autoClear(ms),
+    });
+  }
 
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
@@ -237,7 +234,28 @@ export class DemoController {
   getSnapshot = () => this.snap;
 
   private tickClock(now = performance.now()) {
-    this.clock.update(now, { running: (this.snap.playing || this.snap.busy) && !this.snap.paused, speed: this.speed, paused: this.snap.paused });
+    const running = (this.snap.playing || this.snap.busy) && !this.snap.paused;
+    this.clock.update(now, { running, speed: this.speed, paused: this.snap.paused });
+    if (running) this.scheduleFrame();
+  }
+  /**
+   * 引擎时钟唯一的帧驱动：时钟在走（播放或执行中、且没暂停）时每个显示帧采样一次，停了就不再排下一帧。
+   * 等待（wait）、朗读、配乐、逐帧呈现器都只订阅 / 读取时钟，不各自轮询推进它。
+   * rAF 与显示刷新对齐；页面在后台时 rAF 不触发，用一个 250ms 的定时器兜底（谁先到用谁），时间照常流逝、不会回来时一次跳一大段。
+   */
+  private frame: { raf: number | null; timer: ReturnType<typeof setTimeout> } | null = null;
+  private scheduleFrame() {
+    if (this.frame) return;
+    const run = () => {
+      const f = this.frame;
+      if (!f) return;
+      this.frame = null;
+      if (f.raf !== null) cancelAnimationFrame(f.raf);
+      clearTimeout(f.timer);
+      this.tickClock();
+    };
+    const hasRaf = typeof requestAnimationFrame === 'function';
+    this.frame = { raf: hasRaf ? requestAnimationFrame(run) : null, timer: setTimeout(run, hasRaf ? 250 : 16) };
   }
   /** Media and visual demonstrations sample the same clock and the same step anchor. */
   mediaElapsed(now = performance.now()): number { this.tickClock(now); return this.clock.getSnapshot().elapsedMs; }
@@ -338,25 +356,7 @@ export class DemoController {
       playbackError = r.error;
     }
     this.set({ project, version, home: homeRoute, featureId, optionId, scenarioId, view, browseSceneId: browse, state, playbackError, preview: null, ripple: null, systemEvent: null, activeStep: null });
-    this.revalidateSelection();
-  }
-
-  /** 热更新后：选中的元素仍在当前画面则保留（位置变化时重新写入）；否则取消选中并说明。 */
-  private revalidateSelection() {
-    const sel = this.snap.selection;
-    const p = this.snap.project;
-    const st = this.snap.state;
-    if (!sel || !p || !st) return;
-    const shown = this.shownSceneId() ?? st.sceneId;
-    const scene = p.scenes[sel.sceneId];
-    const hit = sel.nodeId && scene && (sel.sceneId === shown || sel.sceneId === st.sceneId) ? findNode(scene, sel.nodeId) : null;
-    const stepOk = !sel.nodeId && sel.stepId && sel.scenarioId && p.scenarios[sel.scenarioId]?.steps.some((s) => s.id === sel.stepId);
-    if (hit || stepOk) {
-      const at = hit ? (hit.node.source ?? null) : (p.scenarios[sel.scenarioId!]!.steps.find((s) => s.id === sel.stepId)?.source ?? null);
-      if (at !== sel.at || (hit && scene && nodeLabel(hit.node) !== sel.label)) void this.writeSelection(this.inputOf(sel), boardRef('board', 'selectedElementLocationUpdated'), boardRef('board', 'couldNotSyncSelectionToAgent'));
-      return;
-    }
-    void this.writeSelection(null, boardRef('board', 'theSelectedElementIsNoLongerInThisStage'), boardRef('board', 'couldNotSyncClearedSelectionToAgent'), true);
+    this.selection.revalidate();
   }
 
   private safeStateAt(project: Project, scenarioId: string, position: number): { state: PlayState | null; error: Text | null } {
@@ -549,7 +549,7 @@ export class DemoController {
     this.set({ playing: true, paused: false, busy: true, cursorVisible: !this.reducedMotion, notice: null });
     const at = this.snap.state.position;
     if (opts.hold && at > 0) {
-      this.committedAt = this.clock.rawTime;
+      this.committedAt = this.clock.time;
       this.narrate(sc, at);
       if (!(await this.dwellOn(sc, at - 1, gen))) return;
     }
@@ -569,7 +569,7 @@ export class DemoController {
       // 连续播放（mobile_watch）：自动播放把一个场景放完时，接着放下一个场景；手动一步步看、最后一个场景、被停止时不跳
       const end = this.snap.state;
       next = end && (end.completed || end.position >= sc.steps.length) ? (this.autoNext?.(sc.id) ?? null) : null;
-      const following = next ? this.snap.project?.scenarios[next] : undefined;
+      const following: Scenario | undefined = next ? this.snap.project?.scenarios[next] : undefined;
       if (!next || !following) {
         this.set({ playing: false, paused: false, busy: false, dwell: null });
         return;
@@ -642,27 +642,23 @@ export class DemoController {
 
   private fast: ((index: number) => boolean) | null = null;
 
+  /** 这一步的时间计划（core stepPlan）：文字用当前语言的字幕；流式输出用提交时按提交前状态算好的出字计划（D100）。 */
+  private planOf(step: Step, position?: number, cursor = true) {
+    const streamed = position !== undefined && this.snap.streamAt?.position === position ? Math.max(0, ...this.snap.streamAt.plan.map((x) => x.ms)) : undefined;
+    return stepPlan(this.snap.project ?? {}, step, { texts: dwellTexts(step, this.i18n), reduced: this.reducedMotion, cursor, ...(streamed !== undefined ? { streamMs: streamed } : {}) });
+  }
+
   /** 停留在刚提交的第 index 步（0 起）上；被取消时返回 false。 */
   private async dwellOn(sc: Scenario, index: number, gen: number): Promise<boolean> {
-    // 停留（T-director2）：按说明与解说的字数，至少 3 秒（写了 hold 时由作者掌握节奏，不套 3 秒下限，D92）；并等镜头过渡结束、本步 active 连线上的小点跑完一圈
-    const step = sc.steps[index]!;
-    // hold（D70）：作者要求的最短停留（按速度缩放）；减少动态效果时同样保留，它是看的时间，不是动画
-    const dwell = Math.max(holdMsOf(step, this.speed), this.reducedMotion
-      ? TIMING.reducedStep
-      : stepDwell({
-          texts: dwellTexts(step, this.i18n),
-          speed: this.speed,
-          paced: step.hold !== undefined,
-          cameraMoved: step.shots.length > 0 || !!step.directorLayer,
-          dotMs: this.activeDotMs(),
-          // 流式输出（D100）：刚提交的这一步用提交时算好的计划；否则按整段估算
-          streamMs: Math.max(0, ...(this.snap.streamAt?.position === index + 1 ? this.snap.streamAt.plan : streamPlan(step, null)).map((x) => x.ms)),
-        }));
-    const elapsed = Math.max(0, Math.round(this.clock.rawTime - this.committedAt));
-    this.set({ dwell: { position: index + 1, ms: Math.max(dwell, elapsed), elapsed } });
+    // 停留 = 时间计划里的 dwellMs（作者 hold、插件效果时长、阅读 / 镜头 / 流式输出中最长的），按引擎时间等：暂停不走、倍速与画面一致
+    const dwell = this.planOf(sc.steps[index]!, index + 1).dwellMs;
+    this.tickClock();
+    const elapsed = Math.max(0, this.clock.time - this.committedAt);
+    // 时间线上的进度条用浏览器时间画：换算成当前倍速下的真实毫秒
+    this.set({ dwell: { position: index + 1, ms: Math.round(Math.max(dwell, elapsed) / this.speed), elapsed: Math.round(elapsed / this.speed) } });
     // 朗读（D74）：停留 = max(画面停留, 声音读完 + 换气)；画面停够了、声音没读完时标出“在等声音”
     const ok2 = (await Promise.all([
-      this.wait(dwell - (this.clock.rawTime - this.committedAt), gen, true).then((ok) => {
+      this.wait(dwell - elapsed, gen).then((ok) => {
         if (ok && this.narrating && this.snap.narration && !this.snap.narration.waiting) this.set({ narration: { ...this.snap.narration, waiting: true } });
         return ok;
       }),
@@ -670,15 +666,6 @@ export class DemoController {
     ])).every(Boolean);
     if (this.snap.dwell) this.set({ dwell: null });
     return ok2;
-  }
-
-  /** 画面上 active 连线的小点跑一圈的最长时间（毫秒；没有为 0）。 */
-  private activeDotMs(): number {
-    let ms = 0;
-    this.stageEl?.querySelectorAll<SVGElement>('[data-state="active"] [data-jdot-ms]').forEach((d) => {
-      ms = Math.max(ms, Number(d.getAttribute('data-jdot-ms')) || 0);
-    });
-    return ms;
   }
 
   /** 快速带过一步（约 300ms）：不移动鼠标、不逐字输入。 */
@@ -744,22 +731,11 @@ export class DemoController {
   private async waitNarration(gen: number): Promise<boolean> {
     const n = this.narrating;
     if (!n) return gen === this.gen;
-    // 等声音时引擎时钟照常走（D92）：镜头漂移、进退场与逐字输出都由它驱动，不能因为“只在等旁白”就冻住画面
-    let reading = true;
-    void n.done.then(() => { reading = false; });
-    const ticking = (async () => {
-      while (reading && gen === this.gen) {
-        this.tickClock();
-        await new Promise<void>((resolve) => {
-          const done = () => { clearTimeout(timer); this.cancelWaiters = this.cancelWaiters.filter((f) => f !== done); resolve(); };
-          const timer = setTimeout(done, 16);
-          this.cancelWaiters.push(done);
-        });
-      }
-    })();
-    await Promise.race([n.done, new Promise<void>((r) => this.cancelWaiters.push(r))]);
-    reading = false;
-    await ticking;
+    // 等声音时引擎时钟照常走（D92）：镜头漂移、进退场与逐字输出都由它驱动；播放 / 执行中帧驱动一直在转，这里只等声音
+    this.tickClock();
+    let cancel = () => {};
+    await Promise.race([n.done, new Promise<void>((r) => { cancel = r; this.cancelWaiters.push(r); })]);
+    this.cancelWaiters = this.cancelWaiters.filter((f) => f !== cancel);
     if (gen !== this.gen) return false;
     return this.wait(VOICE_BREATH_MS, gen);
   }
@@ -881,98 +857,12 @@ export class DemoController {
     this.set({ notice: null });
   }
 
-  // ---------- 审阅：选中 ----------
-  /** 当前画面上下文中的选中请求。 */
-  private currentInput(nodeId: string | null, stepId?: string | null): SelectionInput | null {
-    const p = this.snap.project;
-    const st = this.snap.state;
-    if (!p || !st) return null;
-    if (this.snap.view === 'stage') {
-      const sc = this.scenario();
-      if (!sc) return null;
-      return { optionId: sc.optionId, scenarioId: sc.id, position: st.position, sceneId: this.shownSceneId() ?? st.sceneId, nodeId, ...(stepId ? { stepId } : {}) };
-    }
-    return { optionId: p.scenes[st.sceneId]?.optionId ?? null, scenarioId: null, position: 0, sceneId: st.sceneId, nodeId };
-  }
-
-  private inputOf(sel: Selection): SelectionInput {
-    return { optionId: sel.optionId, scenarioId: sel.scenarioId, position: sel.position, sceneId: sel.sceneId, nodeId: sel.nodeId, ...(sel.nodeId ? {} : { stepId: sel.stepId }) };
-  }
-
-  /** 界面立即显示的选中（服务端确认后以服务端结果为准）。 */
-  private localSelection(input: SelectionInput): Selection | null {
-    const p = this.snap.project;
-    if (!p) return null;
-    const scene = p.scenes[input.sceneId];
-    const hit = input.nodeId && scene ? findNode(scene, input.nodeId) : null;
-    const step = !input.nodeId && input.stepId && input.scenarioId ? p.scenarios[input.scenarioId]?.steps.find((s) => s.id === input.stepId) : undefined;
-    if (!hit && !step) return null;
-    return {
-      featureId: input.optionId ? (p.options[input.optionId]?.featureId ?? null) : null,
-      optionId: input.optionId,
-      scenarioId: input.scenarioId,
-      position: input.position,
-      stepId: input.stepId ?? (input.scenarioId ? (p.scenarios[input.scenarioId]?.steps[input.position - 1]?.id ?? null) : null),
-      sceneId: input.sceneId,
-      route: scene?.route ?? '',
-      nodeId: input.nodeId,
-      at: hit ? (hit.node.source ?? null) : (step?.source ?? null),
-      label: hit ? nodeLabel(hit.node) : (step ? stepCaption(step, en) : null),
-      selectedAt: new Date().toISOString(),
-    };
-  }
-
-  async select(nodeId: string | null, stepId?: string | null) {
-    const input = this.currentInput(nodeId, stepId);
-    if (!input) return;
-    const local = this.localSelection(input);
-    if (!local) return;
-    await this.writeSelection(input, boardRef('board', 'selectedTellAgentWhatYouWantToChange', selectionLabel(this.snap.project!, local)), boardRef('board', 'couldNotSyncSelectionToAgent'));
-  }
-
+  // ---------- 审阅：选中（实现在 selection-sync.ts） ----------
+  select(nodeId: string | null, stepId?: string | null) { return this.selection.select(nodeId, stepId); }
   /** 取消选中，并同步给 Agent（selection.json 写为 null）。 */
-  async clearSelection() {
-    await this.writeSelection(null, boardRef('board', 'selectionClearedAndSyncedToAgent'), boardRef('board', 'couldNotSyncClearedSelectionToAgent'));
-  }
-
-  /**
-   * 串行写回选中；只有最后一次请求的结果会反映到界面上。
-   * 不变量：返回后界面选中 = 文件内容。被拒绝时以服务端返回的 current 为准；网络失败回滚到上次确认的选中。
-   */
-  private writeSelection(input: SelectionInput | null, okText: Text, failText: Text, quietOk = false): Promise<void> {
-    const seq = ++this.syncSeq;
-    const optimistic = input ? this.localSelection(input) : null;
-    this.set({ selection: optimistic, selectionSync: { status: 'pending' } });
-    const writer = this.writer;
-    this.syncChain = this.syncChain.then(async () => {
-      const r: SelectionWriteResult = writer ? await writer(input).catch((e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) })) : { ok: false, message: boardRef('board', 'thisPageCannotWriteASelectionReadOnly') };
-      if (r.ok) this.confirmed = r.selection;
-      else if (r.current !== undefined) this.confirmed = r.current;
-      if (seq !== this.syncSeq) return;
-      if (r.ok) {
-        this.set({ selection: r.selection, selectionSync: { status: 'ok' }, notice: { kind: 'selected', text: okText } });
-        this.autoClear(quietOk ? 3000 : 5000);
-      } else {
-        const rolledBack = this.confirmed;
-        const tail = rolledBack ? boardRef('board', 'keepingThePreviousSelection', this.snap.project ? selectionLabel(this.snap.project, rolledBack) : rolledBack.label ?? rolledBack.nodeId ?? '') : boardRef('board', 'selectionCleared');
-        this.set({ selection: rolledBack, selectionSync: { status: 'error', message: r.message }, notice: { kind: 'error', text: boardRef('board', 'selectionSyncFailed', failText, r.message, tail) } });
-      }
-    });
-    return this.syncChain;
-  }
-
+  clearSelection() { return this.selection.clear(); }
   /** 页面载入时恢复文件里的选中（与当前项目不符时清除）。 */
-  async restoreSelection(sel: Selection | null) {
-    const p = this.snap.project;
-    if (!sel || !p) return;
-    if (sel.scenarioId && p.scenarios[sel.scenarioId]) this.setScenario(sel.scenarioId, sel.position);
-    else if (!sel.scenarioId && p.scenes[sel.sceneId]) {
-      this.stop();
-      this.set({ view: 'browse', browseSceneId: sel.sceneId, state: browseState(p, sel.sceneId), epoch: this.snap.epoch + 1 });
-    }
-    this.set({ notice: null });
-    await this.writeSelection(this.inputOf(sel), boardRef('board', 'previousSelectionRestored'), boardRef('board', 'previousSelectionIsNoLongerValid'), true);
-  }
+  restoreSelection(sel: Selection | null) { return this.selection.restore(sel); }
 
   /** 点击步骤条上的一步：跳到该步骤执行之后（-1 = 初始状态）。 */
   clickStepChip(index: number) {
@@ -999,57 +889,61 @@ export class DemoController {
     this.set({ activeStep: index });
     const a = step.action;
     const reduced = this.reducedMotion;
+    // 各段时长来自时间计划；这里只负责每一段画什么
+    const plan = this.planOf(step, undefined, opts.moveCursor);
 
     if (a.type === 'card') {
       // 过渡卡（D56）：直接提交，卡片淡入；停留由 play 的 dwell 负责
     } else if (a.type === 'press') {
       // 无目标用户操作：activeStep 投影为键帽，不移动鼠标，状态仍统一在 commit 推进。
-      if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.selectHold, gen))) return false;
+      if (!(await this.wait(plan.gestureMs, gen))) return false;
     } else if (step.kind === 'system' || a.type === 'event') {
       this.set({ systemEvent: a.type === 'event' ? a.name : stepCaption(step, m) });
-      if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.systemHold, gen))) return false;
+      if (!(await this.wait(plan.gestureMs, gen))) return false;
     } else if ('target' in a) {
       if (!(await this.leadTo(sc, a.target, gen))) return false;
       if (!(await this.frameTo(a.target, gen))) return false;
       if (reduced) {
-        if (!(await this.wait(TIMING.reducedStep, gen))) return false;
+        if (!(await this.wait(plan.gestureMs, gen))) return false;
       } else {
         const pt = opts.clickPoint ?? this.measureCenter(a.target);
         if (opts.moveCursor && pt) {
           this.set({ cursorVisible: true });
-          if (!(await this.moveCursor(pt, gen))) return false;
+          if (!(await this.moveCursor(pt, gen, plan.cursorMs))) return false;
         }
         if (pt) this.set({ ripple: { x: pt.x, y: pt.y, key: ++this.rippleKey } });
-        if (!(await this.wait(TIMING.ripple, gen))) return false;
+        if (!(await this.wait(plan.rippleMs, gen))) return false;
         if (a.type === 'drag') {
           const end = typeof a.to === 'string' ? this.measureCenter(a.to) : a.to;
           const from = pt ?? this.cursorPos;
-          if (!(await this.wait(800, gen, false, progress => {
+          if (!(await this.wait(plan.gestureMs, gen, progress => {
             this.set({ gesture: presentAction(a, progress) }, false);
             if (end) { this.cursorPos = gesturePoint(from, end, progress); if (this.cursorEl) this.cursorEl.style.transform = `translate(${this.cursorPos.x}px, ${this.cursorPos.y}px)`; }
           }))) return false;
         } else if (a.type === 'hover' || a.type === 'scroll' || a.type === 'plugin') {
-          const duration = a.type === 'hover' ? a.ms : a.type === 'plugin' ? pluginActionSpec(this.snap.project!, a.name)?.durationMs ?? 800 : 800;
           const scroll = a.type === 'scroll' ? this.scrollDemo(a.target, a.to) : null;
-          if (!(await this.wait(duration, gen, false, progress => { this.set({ gesture: presentAction(a, progress) }, false); scroll?.(progress); }))) return false;
+          if (!(await this.wait(plan.gestureMs, gen, progress => { this.set({ gesture: presentAction(a, progress) }, false); scroll?.(progress); }))) return false;
         } else if (a.type === 'type') {
-          for (let i = 1; i <= a.value.length; i++) {
-            this.set({ preview: { nodeId: a.target, text: a.value.slice(0, i) } });
-            if (!(await this.wait(TIMING.typeChar, gen))) return false;
-          }
+          // 逐字输入：一段等待，按进度露出前 n 个字（暂停、倍速与其他手势一致）
+          const chars = [...a.value];
+          let shown = 0;
+          if (!(await this.wait(plan.gestureMs, gen, progress => {
+            const n = Math.min(chars.length, Math.max(1, Math.ceil(progress * chars.length)));
+            if (n !== shown) { shown = n; this.set({ preview: { nodeId: a.target, text: chars.slice(0, n).join('') } }, false); }
+          }))) return false;
         } else if (a.type === 'select') {
           this.set({ preview: { nodeId: a.target, text: a.value } });
-          if (!(await this.wait(TIMING.selectHold, gen))) return false;
+          if (!(await this.wait(plan.gestureMs, gen))) return false;
         } else if (a.type === 'toggle') {
-          if (!(await this.wait(TIMING.toggleHold, gen))) return false;
+          if (!(await this.wait(plan.gestureMs, gen))) return false;
         }
       }
     } else {
-      if (!(await this.wait(reduced ? TIMING.reducedStep : TIMING.ripple, gen))) return false;
+      if (!(await this.wait(plan.rippleMs + plan.gestureMs, gen))) return false;
     }
     if (gen !== this.gen) return false;
     if (!this.commit(sc, true)) return false;
-    if (opts.moveCursor && !reduced && !(await this.wait(TIMING.afterStep, gen))) return false;
+    if (plan.settleMs && !(await this.wait(plan.settleMs, gen))) return false;
     if (gen === this.gen) this.set({ systemEvent: null, activeStep: null, ripple: null, gesture: null });
     return true;
   }
@@ -1067,7 +961,7 @@ export class DemoController {
       const n = this.snap.notice;
       // 推进后，锚定在元素上的就地提示（禁用原因、未覆盖、越序）已过时，关闭它。
       this.tickClock();
-      this.committedAt = this.clock.rawTime;
+      this.committedAt = this.clock.time;
       this.set({ playground: null, switchPrompt: null, leadFrame: null, state: next, streamAt: plan.length ? { position: next.position, speed: this.speed, plan, voice: () => this.voiceProgress(next.position) } : null, preview: null, playbackError: null, leadLayer: null, ...(n && 'nodeId' in n ? { notice: null } : {}) });
       // 朗读（D74）：播放提交的一步（自动播放、下一步、点原型）才读；跳转、上一步、热更新不读
       if (stream) this.narrate(sc, next.position);
@@ -1092,7 +986,7 @@ export class DemoController {
     const to = layersWithNode(p, sc.id, target)[0];
     if (!to || to === this.snap.leadLayer) return true;
     this.set({ leadLayer: to });
-    return this.wait(this.reducedMotion ? 0 : TIMING.layerSwitch, gen, true);
+    return this.wait(this.reducedMotion ? 0 : TIMING.layerSwitch, gen);
   }
 
   /**
@@ -1105,7 +999,7 @@ export class DemoController {
     const el = root.querySelector<HTMLElement>(`[data-jcontrol="${CSS.escape(target)}"]`) ?? root.querySelector<HTMLElement>(`[data-jid="${CSS.escape(target)}"]`);
     if (!el || fullyVisible(el, root)) return true;
     this.set({ leadFrame: target });
-    return this.wait(this.reducedMotion ? 0 : TIMING.layerSwitch, gen, true);
+    return this.wait(this.reducedMotion ? 0 : TIMING.layerSwitch, gen);
   }
 
   private scrollDemo(target: string, to: string | {x:number;y:number}): ((progress:number)=>void) | null {
@@ -1128,36 +1022,39 @@ export class DemoController {
     return { x: (r.left - rr.left + r.width / 2) / s, y: (r.top - rr.top + r.height / 2) / s };
   }
 
-  private async moveCursor(to: { x: number; y: number }, gen: number, duration = TIMING.cursorMove * 1000): Promise<boolean> {
+  private async moveCursor(to: { x: number; y: number }, gen: number, duration: number = TIMING.cursorMove): Promise<boolean> {
     const from = { ...this.cursorPos };
-    return this.wait(duration, gen, false, t => {
+    return this.wait(duration, gen, t => {
       this.cursorPos = gesturePoint(from, to, t);
       if (this.cursorEl) this.cursorEl.style.transform = `translate(${this.cursorPos.x}px, ${this.cursorPos.y}px)`;
     });
   }
 
-  /** Scheduler only: every consumer reads EngineClock; pause never advances any accumulator. */
-  private async wait(ms: number, gen: number, raw = false, frame?: (progress: number) => void): Promise<boolean> {
+  /**
+   * 等 ms 毫秒的引擎时间（倍速由时钟缩放）。只订阅时钟，不自己计时：暂停时时钟不走，等待也不走；
+   * stop()（gen 变化）时返回 false。frame 每个时钟帧收到一次进度（0–1）。
+   */
+  private wait(ms: number, gen: number, frame?: (progress: number) => void): Promise<boolean> {
     this.tickClock();
-    const start = raw ? this.clock.rawTime : this.clock.time;
-    const sample = () => {
-      if (gen === this.gen) frame?.(gestureProgress(raw ? this.clock.rawTime : this.clock.time, start, ms));
-    };
-    const unsubscribe = frame ? this.clock.subscribe(sample) : () => {};
-    sample();
-    try {
-      while (gen === this.gen) {
-        this.tickClock();
-        const now = raw ? this.clock.rawTime : this.clock.time;
-        if (gestureProgress(now, start, ms) >= 1) return true;
-        await new Promise<void>(resolve => {
-          const done = () => { clearTimeout(timer); this.cancelWaiters = this.cancelWaiters.filter(f => f !== done); resolve(); };
-          const timer = setTimeout(done, 16);
-          this.cancelWaiters.push(done);
-        });
-      }
-      return false;
-    } finally { unsubscribe(); }
+    if (gen !== this.gen) return Promise.resolve(false);
+    const start = this.clock.time;
+    frame?.(gestureProgress(start, start, ms));
+    if (gestureProgress(start, start, ms) >= 1) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      const finish = (ok: boolean) => {
+        unsubscribe();
+        this.cancelWaiters = this.cancelWaiters.filter((f) => f !== cancel);
+        resolve(ok);
+      };
+      const cancel = () => finish(false);
+      const unsubscribe = this.clock.subscribe(() => {
+        if (gen !== this.gen) return finish(false);
+        const progress = gestureProgress(this.clock.time, start, ms);
+        frame?.(progress);
+        if (progress >= 1) finish(true);
+      });
+      this.cancelWaiters.push(cancel);
+    });
   }
 
   private info(text: Text) {

@@ -22,5 +22,5 @@ import code, { Editor, typeCode, editCode, highlightLines } from '@joplo-app/plu
 - CODE_EDITOR_UNKNOWN: the editor id is not on a screen of this step (wrong layer or id).
 - A typed snippet counts its leading spaces; indent it as it will appear in the file.
 - Static frames (screenshots, deep links, jumps) show the end state; only playback animates. Check typing in the board with Play, not with Next.
-- Editor state is per scenario: a flow({ from }) chapter starts from the Editor's initial code, not from the previous chapter's last edit.
+- Editor state is per scenario: a chapter() slice starts from the Editor's initial code, not from the previous chapter's last edit.
 `;

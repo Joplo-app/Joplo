@@ -1,3 +1,4 @@
+import { publishCssContent } from './publish-css.ts';
 import { binaryAssets, extractSiteAssets } from './binary-assets.ts';
 import { inlineResources } from './local-resources.ts';
 import { inlinePluginAssets, PLUGIN_ASSET_BASE } from './plugin-assets.ts';
@@ -7,7 +8,7 @@ import sharedModules from '@joplo-app/web/shared-modules.json' with { type: 'jso
  *
  * 1. 用 Vite（中间件模式，不监听端口）ssrLoadModule 载入项目，compile(…, 'publish')：只含选定方案，
  *    已去掉规则、情况、问题、备注、源路径（D33）。这里再去掉 IR 中创作侧的空字段与约束、角色。
- * 2. vite build 发布站入口（packages/web/site.html），Tailwind 以项目目录为 @source。
+ * 2. vite build 发布站入口（packages/web/site.html），Tailwind 只扫描最终公开载荷的字符串与播放器样式来源。
  * 3. 后处理：IR 内联到 index.html；入口脚本内联为 <script type="module">、去掉 crossorigin，
  *    这样直接双击 index.html（file://）也能离线运行。产物是普通静态目录，可 `wrangler deploy --assets` 或任何静态托管发布。
  *
@@ -23,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { build as viteBuild, createServer, type Rollup } from 'vite';
-import { stepIdentity, type StepIdentity, hasScope, JoploError, orderedFeatures, pruneMessages, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
+import { stepIdentity, type StepIdentity, hasScope, JoploError, entriesOf, entryOf, orderedFeatures, pruneMessages, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
@@ -36,8 +37,13 @@ import { ProfileStore, bundleVoice, reuseSharedVoice } from './voice.ts';
 export function publishPayload(project: Project, home: string | null): { project: Record<string, unknown>; home: string | null } {
   // voiceConfig（D74）：profile 名与音色属于作者本机的设置，发布站只需要 build 写进的 voiceIndex
   const { rules: _r, cases: _c, issues: _i, voiceConfig: _v, ...rest } = project;
-  const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, { id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick }]));
-  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {}, ...(o.free ? {free:o.free} : {}) }]));
+  const features = Object.fromEntries(orderedFeatures(project).map(f => [f.id, {
+    id: f.id, name: f.name, goal: f.goal, roles: f.roles, optionIds: f.optionIds, pick: f.pick,
+    // 作品能力与观众属于公开内容；只复制已有字段，保持旧功能演示的载荷逐字节不变。draft 仍只属于 dev。
+    ...(f.standalone !== undefined ? { standalone: f.standalone } : {}),
+    ...(f.audience !== undefined ? { audience: f.audience } : {}),
+  }]));
+  const options = Object.fromEntries(Object.entries(project.options).map(([id, o]) => [id, { id: o.id, featureId: o.featureId, key: o.key, name: o.name, idea: o.idea, routes: o.routes, coverage: {}, layers: o.layers ?? {}, ...(o.sequencing ? { sequencing: o.sequencing } : {}), ...(o.free ? {free:o.free} : {}) }]));
   const scenarios = Object.fromEntries(
     Object.entries(project.scenarios).map(([id, s]) => {
       const { caseIds: _ci, ...sr } = s;
@@ -125,6 +131,25 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   let compiled: Awaited<ReturnType<typeof compileProject>>;
   try {
     compiled = await compileProject(loader, projectDir, opts.review === true ? 'review' : 'publish');
+    // 发布编译已跳过草稿与未选功能；范围的公开校验需要原始条目，避免误报不存在。
+    if (opts.scope?.features?.length || opts.scope?.scenarios?.length && compiled.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED')) {
+      const dev = await compileProject(loader, projectDir, 'dev');
+      if (dev.project) {
+        for (const id of opts.scope?.features ?? []) {
+          const entry = entryOf(dev.project, id);
+          if (!entry) throw new JoploError('NOT_FOUND', `Unknown work "${id}". Works: ${entriesOf(dev.project).map(e => e.id).join(', ') || 'none'}`);
+          if (entry.featureId === null && !entry.slices.length) throw new JoploError('USAGE', `Work "${id}" has no slices and cannot be published or reviewed. Add at least one flow() or chapter() in scenarios`);
+          if (entry.draft) throw new JoploError('USAGE', `Work "${id}" is a draft and cannot be published or reviewed. Remove draft: true when it is ready`);
+        }
+        for (const id of opts.scope?.scenarios ?? []) {
+          const slice = dev.project.scenarios[id];
+          const entry = slice && entryOf(dev.project, dev.project.options[slice.optionId]?.featureId);
+          if (entry?.draft) throw new JoploError('USAGE', `Work "${entry.id}" is a draft and cannot be published or reviewed. Remove draft: true when it is ready`);
+        }
+        // 同时保留原有功能未选定、场景拼错与空范围的恢复提示。
+        resolveScope(dev.project, opts.scope!, opts.review === true ? 'review' : 'publish');
+      }
+    }
   } finally {
     await loader.close();
   }
@@ -132,6 +157,8 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     const errs = compiled.diagnostics.filter((d) => d.severity === 'error');
     throw new JoploError('EXPORT_FAILED', `Project compilation failed; no published site was generated: \n${errs.map((d) => `${d.at ?? ''}  ${d.message}`).join('\n')}`, { diagnostics: compiled.diagnostics });
   }
+  if (!entriesOf(compiled.project).length && compiled.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED' || d.code === 'WORK_EMPTY'))
+    throw new JoploError('USAGE', compiled.diagnostics.some(d => d.code === 'WORK_EMPTY') ? 'There is no picked option or publishable work. Add at least one flow() or chapter() to an empty work before building' : 'There is no picked option or publishable work. All standalone works are drafts; remove draft: true when ready', { diagnostics: compiled.diagnostics });
   // 按场景保密分享（D75）：先裁剪 IR，再生成产物；写错范围在写任何文件之前报错
   let project = compiled.project;
   let scope: ScopeInfo | undefined;
@@ -155,13 +182,17 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
 
   // 2. vite build 到临时目录
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-build-'));
+  const cssSources = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-public-css-'));
+  const publicCssSource = path.join(cssSources, 'public-ir.html');
   let voiceReport: BuildResult['voice'];
   // React 与 plugin-react 依据 NODE_ENV 判断生产构建（测试运行器会把它设为 test）；构建期间强制 production。
   const prevEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   try {
-    if (web.mode === 'dist') await stageDistSite(web, projectDir, staging);
-    else await buildSourceSite(web, projectDir, staging);
+    // 内容文件与 Vite outDir 分离，避免 emptyOutDir 在扫描前删除它；永不复制进产物。
+    fs.writeFileSync(publicCssSource, publishCssContent(inline.project), { mode: 0o600 });
+    if (web.mode === 'dist') await stageDistSite(web, projectDir, staging, publicCssSource);
+    else await buildSourceSite(web, projectDir, staging, publicCssSource);
 
     // 朗读（D74）：当前声音已生成的音频拷进 voice/，IR 带上 voiceIndex；Key 不进产物
     const store = new ProfileStore(opts.home ?? joploHome());
@@ -207,6 +238,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     if (prevEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = prevEnv;
     fs.rmSync(staging, { recursive: true, force: true });
+    fs.rmSync(cssSources, { recursive: true, force: true });
   }
   return {
     outDir,
@@ -214,13 +246,14 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     routes: Object.keys(project.routes).sort(),
     scenarios: Object.keys(project.scenarios),
     diagnostics: compiled.diagnostics,
+    ...(entriesOf(project).some(e => e.featureId === null || e.sequencing === 'linear') ? { entries: entriesOf(project).map(e => ({ id: e.id, title: e.title, slices: e.slices.length, sequencing: e.sequencing })) } : {}),
     ...(voiceReport && (voiceReport.clips || voiceReport.profile) ? { voice: voiceReport } : {}),
     ...(scope ? { scope } : {}),
   };
 }
 
 /** 仓库里：直接编译 packages/web 的发布站入口。 */
-async function buildSourceSite(web: SourceWeb, projectDir: string, staging: string) {
+async function buildSourceSite(web: SourceWeb, projectDir: string, staging: string, publicCssSource: string) {
   const { default: react } = await import('@vitejs/plugin-react');
   await viteBuild({
     configFile: false,
@@ -231,7 +264,7 @@ async function buildSourceSite(web: SourceWeb, projectDir: string, staging: stri
     logLevel: 'error',
     resolve: { alias: [{ find: /^@joplo-app\/core(?:\/runtime)?$/, replacement: path.join(web.webDir, 'src/site/core-lite.ts') }, ...kitAliases(web, projectDir)] },
     define: { 'process.env.NODE_ENV': '"production"' },
-    plugins: [joploProjectPlugin(projectDir, web), react(), tailwindcss()],
+    plugins: [joploProjectPlugin(projectDir, web, publicCssSource), react(), tailwindcss()],
     build: {
       minify: true,
       sourcemap: false,
@@ -247,7 +280,7 @@ async function buildSourceSite(web: SourceWeb, projectDir: string, staging: stri
 }
 
 /** 从 npm 安装时：复制预构建的发布站，单独编译作者 className 的 CSS 并在 site.html 里引用。 */
-export async function stageDistSite(web: DistWeb, projectDir: string, staging: string) {
+export async function stageDistSite(web: DistWeb, projectDir: string, staging: string, publicCssSource: string) {
   for (const rel of web.siteFiles) {
     const to = path.join(staging, rel);
     fs.mkdirSync(path.dirname(to), { recursive: true });
@@ -262,7 +295,7 @@ export async function stageDistSite(web: DistWeb, projectDir: string, staging: s
       base: './',
       mode: 'production',
       logLevel: 'error',
-      plugins: [joploProjectPlugin(projectDir, web), tailwindcss()],
+      plugins: [joploProjectPlugin(projectDir, web, publicCssSource), tailwindcss()],
       build: { outDir: cssOut, emptyOutDir: true, minify: true, sourcemap: false, reportCompressedSize: false, write: true, rolldownOptions: { input: { project: web.projectCss } } },
     })) as Rollup.RollupOutput | Rollup.RollupOutput[];
     const files = (Array.isArray(out) ? out : [out]).flatMap((o) => o.output.map((x) => x.fileName)).filter((f) => f.endsWith('.css'));

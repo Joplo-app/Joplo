@@ -54,10 +54,64 @@ const CONTENT:Record<SkillTopic,string>={
 
 Joplo compiles trusted TS/TSX into deterministic scenes and schedules their playback. It does not supply a component library or execute real backend requests. Use components from the project's explicitly installed plugins; read their skills before writing view trees.
 
+## Works → slices → steps
+A project is a portfolio of works. A work combines its stage, initial state and slices; each slice is a sequence of steps. Every work has a cover and appears on the home page. Capabilities compose:
+- Feature review groups alternative works (options), shared cases, coverage, rules, questions and a pick. Use feature() + option() when comparing solutions or making design decisions.
+- Sequencing is independent for flow() slices, linear for chapter() slices. Use work() + chapter() for an audience-facing explainer, tutorial, news piece or product film. Both authoring paths can coexist in one project; chapter() also works inside option().
+- draft: true on a standalone work keeps it available locally and excludes it from build/share. For a remake create another work and mark the old work as draft.
+- Publish one entry with npx joplo build --work <key> or npx joplo share --work <key> plus the explicitly authorized publication flags. A standalone work needs no pick; a feature key selects its picked option (all options in the review version).
+
+### Minimal standalone work
+buildStage() is your local view tree made from explicitly enabled plugin elements. Keep package.json type: module and the starter's JSX tsconfig; only stage/layers needs no routes/ directory. To reuse product pages, explicitly supply on or routes.
+\`\`\`tsx
+// works/explainer.tsx
+import { work, chapter, narrate } from '@joplo-app/kit';
+import { buildStage } from '../shared/stage';
+export default work({
+  title: 'How the queue works', summary: 'Follow one request through a busy queue',
+  stage: buildStage(),
+  scenarios: {
+    arrival: chapter('A request arrives', { expected: 'Understand why requests wait' })
+      .system('Arrive', narrate('A request joins the queue.')),
+    finish: chapter('The worker responds').system('Respond', narrate('The worker handles the request.')),
+  },
+});
+\`\`\`
+chapter() continues the previous chapter by declaration order; the first starts from the initial state. Only exceptions use from: null (restart) or from: 'sliceKey' (another predecessor). Do not mix flow() and chapter() in one work, write cases/uses() in standalone works, or number titles manually: the UI and outline number chapters automatically. Empty scenarios: {} is a valid work in progress.
+
+### Migrating an existing piece
+- Before changing files, freeze the old dev IR. Compare every step, compiled plugin snapshot and every stateAt position with the migrated work. Renaming flow() to chapter() alone does not prove continuous state or audiovisual equivalence; review motion and sound as well.
+- Preserve independent starts: if an old chapter began from the initial state, give the new chapter from: null. Otherwise chapter two onward inherits ui/data/inputs and music from its predecessor. Keep default continuation only where the story really continues.
+- Move feature.roles audience descriptions into work.audience; preserve actual role() speakers. Keep say() role keys and config.voice.roles aligned so dialogue still uses the intended voices.
+- Rename project helper functions already called chapter before importing the kit's chapter builder; a name collision is not a compiler-model problem.
+- Remove manual numbering only from chapter titles. The same source string may still appear in a card or caption: use i18n checks to decide which translation keys remain in use, and check for stale/missing entries after edits.
+- Read a route before deleting it. A page containing only Slot or an empty container can go when the work uses stage/layers; preserve real screen content with explicit on reuse or the work's routes.
+- Verify draft exclusion in the built files: search the complete artifact text for a full sentence unique to the old draft, chosen so it is not a substring of current copy. Absence of a card in the UI alone does not prove the old content stayed out of publication.
+
+### Minimal feature review
+Use the same cases to compare alternative designs; each option remains a separate file. buildStage() below is a local enabled-plugin view tree.
+\`\`\`ts
+// features/queue/feature.ts
+import { feature } from '@joplo-app/kit';
+export default feature({ name: 'Queue', goal: 'Keep waiting understandable',
+  cases: { waiting: { title: 'A request waits', expected: 'See that it is queued' } }, pick: 'a' });
+\`\`\`
+\`\`\`tsx
+// features/queue/options/a.tsx
+import { option, flow, page, narrate } from '@joplo-app/kit';
+import { buildStage } from '../../../shared/stage';
+export default option({ name: 'A · Visible queue', idea: 'Explain the wait',
+  routes: { '/queue': page({ title: 'Queue' }, buildStage()) },
+  scenarios: { waiting: flow('Request waits', { cases: ['waiting'], start: '/queue' })
+    .system('Queued', narrate('The request is waiting.')) },
+});
+\`\`\`
+Success: check reports 0 errors; outline --work explainer shows the intended slices and estimated duration, with automatic chapter numbers. Inspect each chapter with render --scenario-id <id-from-outline> --sheet --out board.png; review motion using --film --chain --out film.png and actual playback before claiming it looks right. The scenario id used for rendering/deep links currently contains three segments; copy it from outline JSON rather than inventing it.
+
 ## Start from the project
 1. Run npx joplo init <dir>, install its dependencies, then npx joplo skill install. In the Joplo source monorepo, initialize with --template ./templates/starter and use the monorepo workspace protocol for local package dependencies before installing; external projects keep pinned published versions. The starter supplies its own plugin choices; a custom project may choose different ones.
 2. Read the installed engine skill and .claude/skills/joplo-plugins/SKILL.md. Read each relevant plugin's entry and component/recipe topics. npx joplo skill lists what this config enables.
-3. Create one feature, one option and a runnable scenario. Run check, inspect the rendered frames, then test the real inputs. For a short film or explainer that should feel like a video, also run the motion review in npx joplo skill demo ("Make it play like a film") — static frames cannot show hard cuts or frozen pictures.
+3. Create one standalone work and chapter, or one feature, option and runnable scenario for design review. Run check, inspect the rendered frames, then test the real inputs. For a short film or explainer that should feel like a video, also run the motion review in npx joplo skill demo ("Make it play like a film") — static frames cannot show hard cuts or frozen pictures.
 4. Required before handing a development round to the user: read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json. A running board alone does not receive feedback for the agent.
 
 ## Binary assets
@@ -69,6 +123,7 @@ Joplo compiles trusted TS/TSX into deterministic scenes and schedules their play
 - joplo.config.ts exports config({ name, plugins, layout?, home?, theme?, autoFocus?, voice?, locales? }). plugins is explicit; installation alone does not enable a plugin.
 - layouts/<id>.tsx exports layout(tree). Outlet places the current page; Slot declares a named insertion point. Those are engine composition primitives.
 - routes/**/page.tsx exports page({ title, layout?, viewport? }, tree). The directory determines its route. Set layout: false to opt out of the shared layout.
+- works/<key>.tsx (or .ts) exports work({ title, summary, scenarios, stage? | layers?, on?, routes?, audience?, roles?, state?, free?, draft?, order? }). The filename is the entry key and must not collide with a feature folder.
 - features/<id>/feature.ts exports feature({ name, goal, cases, order?, roles?, constraints?, rules?, questions?, pick? }). Finite numeric order sorts first; ties and omitted order use natural folder order. Do not number names by hand.
 - features/<id>/options/<key>.tsx exports option({ name, idea, focus?, tradeoffs?, on?, routes?, layers?, state?, free?, rules?, questions?, coverage?, scenarios }). Keep stable feature/option ids when revising a design.
 - on adds a tree to a route's slot; routes adds an option-specific page; layers defines independently framed views. Obtain each tree from components documented by installed plugins.
@@ -97,6 +152,7 @@ export default option({
 Declare both success and recovery cases in the feature. View code belongs to the chosen plugin; the engine example defines state and behavior only.
 
 ## Steps and effects
+- chapter(name, options) uses the same slice options as flow(); its default predecessor is the previous chapter, with from: null to restart. Use all chapter() or all flow() in one work/option.
 - flow(name, { cases?, start?, state?, from?, autoplay?, layer?, description?, expected?, mock?, outcome?, actionEntry? }). state overrides option state. description is the cover sentence; expected describes what the viewer should observe.
 - autoplay: false keeps an optional scenario selectable through a fork, chapter list or deep link, but skips it in sequential published-site playback. Playing that scenario manually stops at its end. Default/true preserves declaration order.
 - from: 'previousKey' continues that scenario's final route, ui/data/inputs and director layer. Validate steps and automatic captions against that ending page; dependency order does not change chapter order. Do not combine from with start. layer overrides the initial director layer.
@@ -113,7 +169,7 @@ Step arguments and card effects accept nested arrays, flattened in order. Compos
 const arrive = () => [patch($.ui, { screen: 'inbox', sent: false }), [hold(4)]];
 flow('Inbox').system('Arrive', arrive(), 'The inbox opens');
 \`\`\`
-For a long story use from to inherit the previous ending. An action-driven navigation entry can also declare actionEntry: 'after'; read demo for its confirmation and replay boundary.
+For a long story use chapter() to inherit the previous ending by default; from is an explicit exception. An action-driven navigation entry can also declare actionEntry: 'after'; read demo for its confirmation and replay boundary.
 
 ## Bindings, rules and reuse
 - $.ui.x / $.data.x / $.inputs.id are whole-value bindings. Expressions are not reevaluated. Props supported by a plugin may bind to these values; read that plugin's value and visibility rules.
@@ -125,6 +181,8 @@ For a long story use from to inherit the previous ending. An action-driven navig
 
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.`,
   story: `# Joplo storytelling and planning: story
+
+The PM lens, cases and coverage in this topic apply only to works attached to a feature. General storytelling also applies to standalone work()/chapter() pieces; those do not need review cases.
 
 A demo is a short story a viewer follows without you: who wants what, what gets in the way, what the product does, and the visible result.
 It is not a feature tour. Plan it in a few lines before writing TSX, show the plan to the user, then build. Sources: docs/research/storytelling-and-demos.md.
@@ -158,11 +216,12 @@ Backend behind the same feature: put a diagram component in its own layer and .s
 - Audience: who watches (product review, design review, a customer, engineers) and what they must decide afterward.
 - One to three points: what viewers must believe after watching. Each point becomes a scenario or an A/B comparison, never a single step.
 - Scenario list, one line per scenario: Given (who, where, starting state) → When (the user's actions) → Then (the visible result), plus how it opens and how it ends.
-- Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate.
+- Length: a scenario is usually 5–12 steps, about 20–60 s at 1×. check flags one over 90 s; npx joplo outline prints every estimate. An estimate is the sum of each step's time plan: the action demonstration (cursor travel, press, typing or a 0.9 s system pause) plus the longer of its stay and its estimated narration, the same plan autoplay runs.
 - Unsure how to frame it? Offer two or three one-line framings and let the user pick.
-- Recreating an existing video, GIF or screen recording: read it before planning. Extract frames into contact sheets (for example ffmpeg -i ref.gif -vf "fps=1,tile=3x3" sheet%02d.png, written outside the project) and list its chapters, the states each chapter passes through and every on-screen sentence; those become cases, steps and narration. Map the reference's own chrome to the player's instead of redrawing it: its chapter label → case title and the player's step title, its bottom progress → the player's chapter list, its key badge → the host key record after .press(), its spoken captions → narrate()/say(). Ask about anything the reference does not show (chapters cut off, unseen states) instead of inventing it; replace third-party logos with neutral shapes.
+- Recreating an existing video, GIF or screen recording: read it before planning. Extract frames into contact sheets (for example ffmpeg -i ref.gif -vf "fps=1,tile=3x3" sheet%02d.png, written outside the project) and list its chapters, the states each chapter passes through and every on-screen sentence; those become slices, steps and narration (shared cases only for feature review). Map the reference's own chrome to the player's instead of redrawing it: its chapter label → chapter title (case title in feature review) and the player's step title, its bottom progress → the player's chapter list, its key badge → the host key record after .press(), its spoken captions → narrate()/say(). Ask about anything the reference does not show (chapters cut off, unseen states) instead of inventing it; replace third-party logos with neutral shapes.
 
 ## 3. PM lens: from a need to roles, goal, cases, and scenarios
+This PM method applies only to works attached to a feature. For a standalone work, plan audience, takeaway and chapters with work()/chapter(); do not invent cases, coverage or rules.
 Joplo already has the parts of a user story; fill them in that spirit.
 - roles: who it is for, specific ('Workspace admin', 'Invited teammate'), not 'User'. Use role('Name', { desc }) keys when layers or cards belong to a person; plain names are fine otherwise.
 - goal (the I want + so that): one sentence, who can do what and why, independent of the solution so options A/B are two answers to it.
@@ -216,9 +275,9 @@ A character speaking: .click('can_go', 'Ajie replies: I can go', say('Count me i
 Check: read every line aloud in order without looking at the screen. It should sound like one person telling one story, briskly.
 
 ## 7. Explainers and news-style demos (a topic, not a product)
-When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets. The full method (package, hook, a continuous world, morphing objects, chapters with from, review): the installed explainer plugin skill.
-- Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. One chapter per scenario, one case per chapter; the published site plays them back to back with an Up next countdown, like one video.
-- Case titles are what viewers read in the board sidebar: for an explainer write them as numbered chapter headlines ('01 What is on the ballot?'), not acceptance criteria; name the option after the style ('Dark quick-cut'), not 'A'.
+When the demo explains a topic (an election, a policy, a market move) instead of a product, the rules above still hold: every claim becomes a graphic that changes on screen, never a slide of bullets. The full method (package, hook, a continuous world, morphing objects, work()/chapter() default continuation, review): the installed explainer plugin skill.
+- Arc: a hook naming what happened and who it happened to → the rule in about 30 seconds → the reveal (numbers change on screen) → a twist or context (history, base rates) → why it matters to the viewer → a short closing card. Write one chapter() slice per question under work().scenarios; the published site plays continuing chapters back to back without a countdown, like one video.
+- Chapter titles are what viewers read in the sidebar: write a question ('What is on the ballot?'), with expected describing what the viewer can now explain. The UI adds chapter numbers; standalone works need no option or cases.
 - Graphics that carry the story: a seat chart filling up, a tile map recoloring, bars growing or flipping, a document flying between two sides and getting stamped. Build them from divs with style bound to state (demo: Custom motion) and real photos (components: Real images).
 - Facts: keep every number in one data module with its source and as-of time, show a source line on each graphic, separate called or projected results from final ones, and leave out what you cannot verify rather than hedging on screen.
 - Collect assets before drawing complex visuals: list the needed interface primitives, fonts, icons and sounds; prefer suitable reusable libraries or licensed assets over hand-built SVG or models. Keep redistributable files in assets/ and record each source URL, author, license and modifications in assets/SOURCES.md; retain license files and show attribution where required. A library license does not automatically establish the license of its bundled fonts, logos or samples. Scope third-party styles and embed required assets for offline playback.
@@ -233,7 +292,7 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Explicitly distinguish the main sequence from optional branches and return paths. A closing menu may return to earlier chapters without making those chapters optional; verify autoplay order in the published player.
 
 ## 8. Before handing over
-- npx joplo outline: per feature, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
+- npx joplo outline: per entry, standalone slices and duration; for features, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
 - npx joplo check: CAPTION_TOO_LONG, EXPLAIN_TOO_LONG, DESCRIPTION_TOO_LONG, CARD_TEXT_TOO_LONG, SCENARIO_TOO_LONG, HAPPY_PATH_ONLY, CASE_NOT_COVERED (names the expected result).
 - Read only the captions from start to end: do they tell the story? Then look only at key frames (npx joplo render --step-id …): does the screen show it without captions?
 - If the key frames look like slide thumbnails (mostly cards, bullet points, or a screen that never changes), rebuild those steps as actions and visible changes (section 1).
@@ -278,7 +337,7 @@ Start playback before testing stage gestures: covers and transition cards intent
 - A step's hold controls dwell; narration may extend waiting. The engine estimates spoken time and sequences chapters. Keep a long story in smaller scenarios with from, retaining the previous final state.
 - Transition cards mark a real opening/ending/time shift. Most information should change on the view, not arrive as a text deck. Read story and the installed visual plugins' recipes.
 - Media is provided by an explicitly configured plugin. A viewer gesture unlocks sound; pause/resume/speed share the clock and narration ducks background audio. Static frames stay silent. Read the plugin skill for resources and production limits.
-- Media continuity is engine behavior for every media plugin: a track keeps playing across steps on the engine clock (it only re-seeks on a jump, reset or non-relay chapter change); playing the same resource again continues it; playing a different one with fadeMs crossfades (old out, new in, no silence); a from chapter starts with the music its previous chapter ended with. Explicit marker seeks reposition that track (even at 0ms) and start its fade from the marker, while ordinary steps/relay chapters preserve its driver. Overlapping outgoing/incoming audio both count toward the decoded-memory budget; the host applies fade/volume/narration ducking once. Video chain export records that same mix; film strips skip audio.
+- Media continuity is engine behavior for every media plugin: a track keeps playing across steps on the engine clock (it only re-seeks on a jump, reset or non-relay chapter change); playing the same resource again continues it; playing a different one with fadeMs crossfades (old out, new in, no silence); a continuing chapter starts with the music its previous chapter ended with. Explicit marker seeks reposition that track (even at 0ms) and start its fade from the marker, while ordinary steps/relay chapters preserve its driver. Overlapping outgoing/incoming audio both count toward the decoded-memory budget; the host applies fade/volume/narration ducking once. Video chain export records that same mix; film strips skip audio.
 
 ## Make it play like a film, not slides (Required for video-like pieces)
 Viewers call a piece "a slide deck" when pictures swap in one frame and then sit still. The static storyboard cannot show either problem, so it never proves the piece moves well.
@@ -286,7 +345,7 @@ Viewers call a piece "a slide deck" when pictures swap in one frame and then sit
 - No dead frames. Nothing on screen may be completely still for more than about 1.5 s; a still composition lasts at most about 3.5 s, and something changes at element level every 2–2.5 s. During reading holds keep a slow, eased camera drift with an end point (constant-speed motion reads as a screensaver). Use the installed visual plugin's drift and enter/exit transitions; read its recipes.
 - One main motion per beat; most beats 2–3 s. hold(seconds) is the author's pacing: a step with hold no longer gets the 3 s reading floor (caption reading time per character and narration still extend it). System steps show their event for about 0.9 s before committing; narration waits keep the engine clock (and therefore drift and transitions) running.
 - Anti-deck gate: before building, write one line per beat — the main moving object, its start → end state, and the verb (push, morph, rise, swap…). If most beats are only fades or panels appearing, redesign them. A contact sheet that reads like slide thumbnails fails.
-- Chapters: chain them with flow({ from }); sequential playback of a from chapter continues in the same shot (no countdown, no reset, music keeps playing). Bring the next chapter's music in on the beat before the visual swap (play the next score with fadeMs; the old track fades out under it — a J-cut). Play the same score again to keep it going. Stop music only at the real ending.
+- Chapters: use chapter() default continuation; sequential playback of a continuing chapter continues in the same shot (no countdown, no reset, music keeps playing). Bring the next chapter's music in on the beat before the visual swap (play the next score with fadeMs; the old track fades out under it — a J-cut). Play the same score again to keep it going. Stop music only at the real ending.
 - Required review: run npx joplo render <dir> --scenario-id <first chapter> --film --chain --out film.png and read every page (one per chapter; red = one-frame full-screen change, grey = nothing visible changed for ≥ 1.5 s). The CLI prints every CUT and STILL with time and step; film.json beside it has the largest adjacent-frame change around every step. Fix every CUT that is not a deliberate signature and every STILL, then film again. Also record --video (real time) and watch it once start to end. Cells are samples on the engine clock; check a suspicious moment with --frames <dir> at full size before changing code — fine textures (1-px checkers, hairlines) shimmer as moiré under zoom or drift and show up as cuts. The opposite also happens: in a product-recording piece the real change is a few characters, a caret or a timer, below the STILL threshold, so a typing sequence can be reported as one long STILL. Crop the changing area across consecutive --frames before adding motion only to satisfy the detector.
 - Review as a picky viewer, not the author: list issues with time code, evidence (frame/metric), impact, severity (blocker / major / minor / note) and verdict (APPROVE / APPROVE_WITH_NOTES / REVISE). Check mechanics first (cuts, stills, overlaps, cropped text), then meaning, then taste; "not cinematic enough" without evidence is not a finding. Do at least two rounds of film → issues → fix, and finish one chapter seam to delivery quality before copying the technique to the others.
 - Static frames (render, --sheet, thumbnails, deep links) show settled pictures: no drift, no half-finished transitions. That is deliberate and is why the film strip is the motion check.
@@ -384,6 +443,8 @@ flow('Plan a weekend trip', { start: '/' })
 Full example: examples/camping.`,
   cases: `# Joplo case checklist: cases
 
+This topic applies only to works attached to a feature. Standalone work() has no cases, coverage or uses(); use chapter expected for what viewers should understand.
+
 Before starting, read user requirements and project material. Use these dimensions to find gaps; ask only key questions that change the design.
 Record unanswered items as question or rules with status \`pending\`. Do not confirm AI assumptions on the user's behalf.
 
@@ -446,6 +507,7 @@ Pick relevant cases to ask the user before starting. Do not include every preset
 - A rule the user stated in this conversation is origin: 'user', status: 'confirmed'; a rule you inferred stays ai_assumption, pending.
 
 ## Declare coverage without a scenario
+Coverage applies only to works attached to a feature.
 Coverage status values: \`expressed\`, \`undecided\`, \`missing\`, \`not_applicable\`, \`excluded\`.
 - option.coverage: { case_key: undecided('Why this is undecided') }.
 - missing('What is missing'): leave the gap explicit; do not pretend it is \`expressed\`.
@@ -463,7 +525,7 @@ Referenced music is inspected by its enabled plugin on the author machine: durat
 
 STEP_KEY_INVALID: use a letter followed by up to 63 letters/digits/underscores/hyphens. STEP_KEY_DUPLICATE: each step key must be unique within its scenario; keep the same key only for the same action across versions. See diff for identity guidance.
 
-Run npx joplo check [dir]. Use --option feature.option to narrow structure checks and replay; --format json gives machine output.
+Run npx joplo check [dir]. Use --work <standalone-key|feature.option> to narrow structure checks and replay; --format json gives machine output.
 The whole project still compiles. Option filtering does not hide project compilation errors. Source files load locally.
 
 ## Read the output
@@ -476,6 +538,13 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - The last line totals error, warning, info. Run check again after fixing.
 
 ## Common codes → fixes
+- WORK_INVALID (error): default export work({...}); supply nonempty title/summary, a stage/layers/on/routes view and scenarios object containing only flow()/chapter() entries.
+- WORK_ID_CONFLICT (error): rename the work file or feature folder so their entry keys differ.
+- WORK_SLICES_MIXED (error): use all chapter() for a linear work or all flow() for independent slices, including options under a feature.
+- WORK_FEATURE_ONLY (error): remove cases/rules/uses() from standalone work; use feature() + option() if the task requires design review.
+- FROM_UNKNOWN (error): copy an existing slice key from the diagnostic's available-slices list; omit from for normal chapter continuation, or use from: null to restart.
+- WORK_EMPTY (info): add the first entry under scenarios, for example opening: chapter('Opening').system('Begin', narrate('Hello')).
+- WORK_DRAFT_SKIPPED (info): a draft was excluded from publish/review; remove draft: true only when it is ready. Explicit --work selection of a draft fails instead of publishing empty content.
 - FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID: give each free reaction a valid targeted action in this option and only set, append or toast with valid leaf state paths. Move navigation, completion, media and plugin effects into flow steps; do not add event callbacks.
 - ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID / PLUGIN_ACTION_INVALID: check the action shape, enabled plugin declaration, exact payload fields/ranges, allowed target type, and drag/scroll endpoint. Read the plugin skill; keep endpoints in the current stage, then rerun check.
 - UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
@@ -505,8 +574,8 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - DESCRIPTION_TOO_LONG: flow({ description }) is the scenario cover sentence; keep it within 30 units, one sentence saying what this scenario shows. See story.
 - CARD_TEXT_TOO_LONG (info): a transition card's sub is over 48 units, a point over 24, or more than 4 points. Keep one sentence and a few short points; move details into steps.
 - SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.
-- HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior. Explainers and other content whose chapters are all main-flow can ignore it (see content).
-- ROLE_UNKNOWN: A layer, card or say() role is not in feature.roles. Declare roles as { key: role('Name') }; see demo.
+- HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior. This applies only to feature review; standalone explainers use work()/chapter() and have no cases.
+- ROLE_UNKNOWN: A layer, card or say() role is not in the work or feature roles. Declare roles as { key: role('Name') }; see demo.
 - ICON_UNKNOWN: A layer icon is not a preset. Use one of window, browser, mobile, desktop, terminal, chat, agent, server, data, email, doc, flow; see demo.
 - FORK_UNKNOWN: fork must target another scenario key in the same option; it cannot reference itself.
 - MARK_UNKNOWN: The mark target is absent from this step's route stage (after go() and back() in earlier steps) or, with layers, from every layer. Check the element id; currently hidden targets are valid references.
@@ -595,7 +664,7 @@ Required after every round of development: start the follower before handing the
 ## Local review: feedback without leaving the board
 - The native feedback icon is draggable and remembers its relative position. Its floating panel never resizes the stage. Reviewers can type persistent review feedback here (prototype input is disposable exploration), or confirm without writing feedback. Point them to this native control, not a simulated icon inside the demo.
 - Each successful option revision is its own review round (session). The follower streams all of them: stdout is NDJSON, one event per line, each with sessionId, optionId and eventId; diagnostics go to stderr. Approving one option does not stop it. It exits 1 when the board stops (restart dev and run it again) and 130 on Ctrl+C. On restart it replays the open rounds, so deduplicate by eventId.
-- Exact-session mode is for waiting on one option version or resuming from a cursor: npx joplo feedback list [dir] --local --json (--all includes completed/stopped sessions, --option <qualified-id> filters), then npx joplo feedback watch [dir] --local --session <id> --json. Without --session or --follow, exactly one active match is required; never guess between multiple instances.
+- Exact-session mode is for waiting on one option version or resuming from a cursor: npx joplo feedback list [dir] --local --json (--all includes completed/stopped sessions, --work <qualified-id> filters), then npx joplo feedback watch [dir] --local --session <id> --json. Without --session or --follow, exactly one active match is required; never guess between multiple instances.
 - During an active review, read background output with short tool waits (about 1–5 seconds) and acknowledge feedback as it arrives. Do not wait for approved or process exit: a long output-read window can delay the agent's response even though the CLI emitted feedback immediately. A background shell alone is not an agent wake-up mechanism; stay in the active receive loop while the user is testing.
 - Ending your response while the user tests: if your host wakes you when a background command finishes (a host configured to resume on process exit does), run npx joplo feedback watch [dir] --local --follow --once --json in the background. It exits 0 on the first feedback or approval, which resumes you; handle it, then run it again with --since <createdAt of the last handled event> (the exit message prints this exact command), so nothing is replayed or lost while you work.
 - Do not finish your response and claim continued live reception unless the host supports a notification that resumes the agent. If you need to yield without that capability, tell the user. Before starting another task, drain and acknowledge any pending output; during longer work, keep checking the existing listener until the review ends or the user stops it.
@@ -632,7 +701,7 @@ Keep projectDir, the shell handle, and the eventIds you handled in the task cont
 Never carry an old seq to a new session, delete review records to reset one, or treat process shutdown as acceptance. For a finished review, explicit --session can replay its saved events even if its server stopped.
 
 ## Share: poll feedback through the same CLI
-- npx joplo feedback watch --share <id> --option <feature.option> --json [--interval 15] [--version <n>] [--server <url>]. Requires the owner's login or an API key with feedback:read. The target option is required; public viewing does not make the owner's feedback API anonymous.
+- npx joplo feedback watch --share <id> --work <feature.option> --json [--interval 15] [--version <n>] [--server <url>]. Requires the owner's login or an API key with feedback:read. The target option is required; public viewing does not make the owner's feedback API anonymous.
 - Poll immediately, then every 15 seconds by default; --interval accepts integer seconds from 10 to 30. Requests are sequential; transient network errors back off up to 30 seconds, and Ctrl+C cancels requests as well as waits.
 - Pin the first returned share version unless --version is given. A replacement version emits closed and exits 1; it never silently switches versions. Only a matching current-version owner pick becomes approved and exits 0; votes, rule confirmations, other options, and older decisions cannot end this watch.
 - source=cloud events share the feedback/approved/decision/closed vocabulary. Deduplicate by eventId (stable across restarts); Cloud has no local seq or --after cursor. Missing route/source data stays null rather than being guessed.
@@ -641,7 +710,7 @@ Never carry an old seq to a new session, delete review records to reset one, or 
 
 Example, scoped to one known option:
 
-    npx joplo feedback watch --share <share-id> --option invite.a-modal --interval 15 --json
+    npx joplo feedback watch --share <share-id> --work invite.a-modal --interval 15 --json
 
 ## Best practices and boundaries
 - Separate transport timing from agent response timing: Cloud requests are 10–30 seconds apart; local event output is immediate. During active testing, read either shell with short tool waits instead of buffering until it exits. A background process alone does not wake an idle agent.
@@ -702,7 +771,9 @@ The bundle has root index.html, before/, after/ and feature-diff.json. Only publ
 
 Compare cases and options in the board, then decide which option to publish for each feature.
 
-## pick
+## Standalone works and feature pick
+- Standalone works in works/ publish without pick. draft: true excludes the whole work, its slices and views from both ordinary and review versions; WORK_DRAFT_SKIPPED lists what was skipped. Only drafts means nothing can publish: finish a work first.
+- --work <entry-key> restricts build/share to one entry: standalone work or a feature's picked option (all its options with --review). A selected draft fails explicitly. Every work has a cover; multiple entries open on the home page, one entry opens on its cover.
 - Set pick: 'a' in features/<f>/feature.ts to select options/a.tsx. It is not a qualified ID with a feature prefix.
 - Publish only the picked option for each feature. Features without pick are omitted.
 - The board's Publish dialog checks the chosen scope first. With no picked option it says so and disables Publish: confirm an option in review (or set pick), then publish. Confirming an option is not itself a request to publish.
@@ -712,7 +783,7 @@ Compare cases and options in the board, then decide which option to publish for 
 - Run npx joplo check in the author project, then npx joplo build, then npx joplo preview to open the built site over HTTP (assets are separate files; file:// is not supported).
 - Default output: dist/. Set --out-dir <dir> to change it.
 - Nonempty output directories are rejected. After confirming the old output can be discarded, pass --overwrite to clear and rebuild.
-- The published site contains only feature names, goals, scenario demos, step captions, and the overall layout.
+- The published site contains work titles, summaries, slices, step captions and views; feature review metadata stays private.
 - Rule origins, AI assumptions, gaps, open questions, and source locations stay on the local authoring side.
 - This is a static, read-only demo with no real business data or backend.
 
@@ -742,7 +813,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - Required: before EVERY publication ask the user “public or private?” and “also publish a review version?”. Never decide either for them, infer from project settings, or reuse last time. Only publish within the authorized scope; the examples below assume the user explicitly chose those flags. CI must pin both choices in the workflow.
 - Pass --public or --private AND --review or --no-review on every share. Missing choices fail with CHOICE_REQUIRED (exit 2) before login, check, build, or network in non-TTY, CI, --json, or --format json. An interactive terminal asks for each missing choice; public and no-review are highlighted but require a keypress.
 - Public shares enter show.joplo.app/@username and search engines. Write project names, descriptions and feature goals as you want them to appear in search results; never include unpublished information. Private means only people holding the link can view; it is not password protection.
-- --pr and scoped --scenario / --feature are always private: visibility flags may be omitted, --public is rejected (exit 2), but the review choice remains required. Comparisons (diff publish) are always private and do not support review versions, so neither choice is required there.
+- --pr and scoped --scenario / --work are always private: visibility flags may be omitted, --public is rejected (exit 2), but the review choice remains required. Comparisons (diff publish) are always private and do not support review versions, so neither choice is required there.
 - --review publishes picked options at data.url AND a separate private review version at data.review.url. Give reviewers the latter. It includes every option, is commentable, and never becomes a public portfolio entry. If the second publication fails, the main link may already be live: read stderr and retry with the same choices without --new.
 - Success JSON may include visibility and portfolio { workUrl, profileUrl, needsUsername, setupPath }. With a username, use workUrl; with needsUsername, tell the user to set a username at <server><setupPath>. Old servers may omit these fields: do not dereference absent portfolio or null URLs.
 - Run npx joplo login and verify the code in your browser before authorizing. Use --no-browser to open the URL manually over SSH or without a local browser.
@@ -787,11 +858,11 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - The password goes only through browser POST → server → cloud-bridge → CLI → Cloud create request, in memory. Local records contain only passwordProtected; task snapshots/GET/WebSocket, logs, stdout/JSON, IR and build files never contain it. Cloud enforces the viewer gate for pages/resources/audio/Agent/embeds and generic preview cards; a local static build is not protected. Do not claim a local overlay provides access control.
 
 ## Share part of the project
-- To share only some scenarios, add --scenario <scenario id> (repeatable); --feature <feature id> shares that feature's picked-option scenarios (every option with --review). They combine. Scenario ids look like invite.a-modal.success; npx joplo outline lists them.
+- To share only some scenarios, add --scenario <scenario id> (repeatable); --work <entry key> shares one standalone work, or a feature's picked-option slices (every option with --review). They combine. Scenario ids look like invite.a-modal.success; npx joplo outline lists them.
 - Declared plugin caches and frame snapshots are projected to the same subset; a missing projection declaration stops the build with PLUGIN_SCOPE_UNSUPPORTED. Inspect the emitted JSON, not just the DOM.
 - Everything outside the scope is cut at build time, not hidden: other features, options, scenarios, their pages and stacked elements, and the project description never reach the uploaded files or the review manifest. A deep link (#/f/<feature>?s=<scenario>) or embed &scenario= only picks where viewing starts and is not private.
 - If a scoped step uses an element another feature stacked onto the page (action target, shot, mark, cue, callout, trace) or navigates to a page another feature added, only that element or page is kept. share prints "Borrowed from another feature: …" and lists them in data.scope.borrowed; tell the user and ask whether that is acceptable. To leave one out, change the scenario so it no longer uses it.
-- A wrong scenario or feature id fails with NOT_FOUND and suggestions. Without --review, a scenario of an option that is not picked, or a feature without pick, fails with USAGE (exit 2) before build/upload. With --review, the ordinary share contains only picked scenarios in the requested scope, while the private review includes all requested options. If that scope has no picked scenarios, only the private review is published: data.mode is review and data.url is the review link (no data.review); the ordinary share and --update target stay unchanged.
+- A wrong scenario or entry id fails with NOT_FOUND and suggestions. Without --review, a scenario of an option that is not picked, or a feature without pick, fails with USAGE (exit 2) before build/upload. With --review, the ordinary share contains only picked scenarios in the requested scope, while the private review includes all requested options. If that scope has no picked scenarios, only the private review is published: data.mode is review and data.url is the review link (no data.review); the ordinary share and --update target stay unchanged.
 - Each scope is its own share, stored under scoped in .joplo/cloud.json (key: sorted scenario ids joined by commas, prefixed review: for --review). It never replaces the main or review link; re-sharing the same scope updates that link for free and Pro accounts.
 - Check the result locally first with npx joplo build --scenario <id> (same scope rules).
 - The author can also publish from the board: Export ▾ → Publish to Joplo Cloud (blue item) offers this scenario, this feature, or the whole project, and shows a copyable login command when signed out.
@@ -867,15 +938,16 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 
 ## Write a plugin
 - Export definePlugin({ id, packageName, title, version, components, skill, skillTopics?, runtime, compile?, properties?, themes?, actions?, data?, schemas?, local?, keys? }) from @joplo-app/kit/plugin. Ship compiled JS and declarations; runtime and optional local entries are URLs resolved relative to the package.
-- components maps names to doc/example, interaction and declarative traits. Export pluginComponent(manifest, name) markers from this package. Intrinsic tag ownership is explicit and unique. No kit component forwarding or bare-name adapters.
+- components maps names to doc/example, interaction and declarative traits. Optional label is the name people see in the board inspector, and inspect lists rows of current property values shown there ({ label, props, join?, values?, flags?, fallback? }); both accept a string or { en, 'zh-CN', … } and enter the dev IR only. The board knows no component by name, so anything it should show about your component must be declared here. Export pluginComponent(manifest, name) markers from this package. Intrinsic tag ownership is explicit and unique. No kit component forwarding or bare-name adapters.
 - Runtime CSS imports and emitted local assets are bundled with the plugin: CSS is installed as a per-plugin style sheet, and local URLs become typed data URLs, including CSS images/fonts and imports above the normal inline threshold. Exercise source dev, npm prebuilt dev and the built site served by npx joplo preview (no other network) with real asset loading checks; a successful JS import alone does not prove styles or textures were delivered. Generated asset references that cannot be resolved fail explicitly.
 - Verify both source development and the installed production package in a real browser. A prebuilt host must share its own React instance with dynamic plugin modules; serving a raw CommonJS dependency URL is not sufficient. Production dev and offline publish use the same bundling/shared-module contract.
 - skill is the entry guide: when to use, how to enable/import, the smallest correct example, success checks, pitfalls and recovery. skillTopics maps topic keys to { description, body }; installed references and CLI topics come from this exact version. Do not put private project data or credentials in guides.
 - Node hooks normalize/derive/frame/effect/validate trusted author data. Outputs must be finite JSON within supported depth/size, immutable across calls, identity-safe, and serializable. Functions/prototypes/cycles are rejected. Hooks and source instructions are never shipped as runtime IR.
 - derive runs once for every node of your plugin and sees only that node's subtree. Validate references between elements (an arrow's from/to, a mark's target) from the container that holds them all, and return early for other nodes; validating at the referring node reports every target as unknown.
 - Effect compilers return declarative writes, references, optional directorTarget, media commands, derived data and optional holdMs. Preserve source ordering.
+- Traits come in two layers. The stable layer (text, textPaths, selfEvident, draggable, hover, native, input, frame) is for every plugin. The remaining traits (choices, gate, selectionGate, layout, region, childWidth, toggleCaption, disabledPresentation) are the in-repo standard library's internal layer: they change with ui / diagram / content and carry no compatibility promise, so an optional or third-party plugin must not declare them.
 - references name the elements an effect changes (an editor, a 3D object). They become the step's focus subject, so check does not report FOCUS_IDLE for steps that only change plugin drawing; the host adds no default pulse, so the plugin must show the change itself.
-- holdMs (0–60000, engine ms) is how long the step must at least stay for this effect: a code typing run, a clip, a Lottie. The host takes the largest holdMs of the step and the author's hold() for autoplay, cover and outline durations and media anchors. Derive it from the content (characters × per-character time, the clip's duration from resourceInfo), never a guess; animate by the engine clock so pause and speed match. It does not remove the reading-time floor; only the author's hold() does. Native behavior, choices, gates, text paths and action matching are manifest declarations, not host branches for a component name.
+- holdMs (0–60000, engine ms) is how long the step must at least stay for this effect: a code typing run, a clip, a Lottie, a dot travelling along a traced edge. The host never inspects your DOM to learn how long a drawing takes; an animation the step should wait for exists for the scheduler only if its effect declares holdMs, computed at compile time with the same formula the runtime animates by. The host takes the largest holdMs of the step and the author's hold() for the step's time plan, which autoplay, cover and outline durations and media anchors all read. Derive it from the content (characters × per-character time, the clip's duration from resourceInfo), never a guess; animate by the engine clock so pause and speed match. It does not remove the reading-time floor; only the author's hold() does. Native behavior, choices, gates, text paths and action matching are manifest declarations, not host branches for a component name.
 - actions declares field types/ranges/tolerances, targets, caption and duration. Runtime recognizers use ctx.act; frame.gesture and frame.clock present the same action. Do not accumulate private timeline time or advance state from a drawing callback.
 
 ## Runtime and projection
@@ -883,9 +955,10 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 - To draw something attached to other elements (connectors, annotation rings), find them by data-jid inside your own container and measure the offsetLeft/offsetTop chain up to that container. This is the final layout, independent of camera zoom and in-flight FLIP transforms, so getBoundingClientRect is wrong here. Re-measure with ResizeObserver, a subtree MutationObserver (targets appear/disappear through when) and document.fonts.ready; skip a target that is not rendered instead of drawing to a stale point.
 - For a canvas drag, report a named hit or stage CSS-pixel point through ctx.act. The host resolves points against declared drop-zone anchors, including ordinary DOM targets outside the canvas. Keep anchors current after camera/scale changes; do not report canvas-local pixels as stage pixels.
 - frame contains resolved state, drawing snapshot, animate, clock/gesture, local playground and reset epoch. animate=false renders final layout; use ctx.hold while required assets load. Stop handled gesture propagation where ownership requires it.
+- The engine clock has one frame driver, owned by the player: it samples once per display frame while playing and stops when paused or idle. A plugin only reads the clock (frame.clock, useEngineFrame()); it never advances it, and never runs its own requestAnimationFrame or timer loop to move timeline animation, which would drift from pause, speed, video export and film strips.
 - frame.clock (and useCtx().clock) is a coarse frame: its object changes only when running, paused or speed changes, while timeMs/elapsedMs/rawMs read the live engine time whenever you read them. The stage does not re-render every frame, so a large scene stays smooth during playback. A React presenter that must redraw every frame (a camera, a dot moving along a path, typed text) calls useEngineFrame() from @joplo-app/kit/renderer, and should memoize the children it renders so its subtree does not re-render with it. Imperative mount/update components already get update() every frame. Reading clock.timeMs in render or as an effect dependency without useEngineFrame() freezes the animation.
 - Testing an engine or plugin change from your own checkout: npx joplo dev joins any board already running under the same JOPLO_HOME, and that board serves its own build, so your change will not appear. Start a separate board with JOPLO_HOME=<empty dir> npx joplo dev <dir> --port <free port>, and run feedback watch with the same JOPLO_HOME.
-- Use @joplo-app/kit/renderer and renderer-style services instead of internal source imports. Share React through the published bridge; clean up observers/listeners and animation on destroy.
+- Use @joplo-app/kit/renderer and renderer-style services instead of internal source imports. kit/renderer is the stable layer (useCtx, useEngineFrame, useI18n, useRoot, useRootAttrs, RenderNode, rectOf, resolveProps, isSelfVisible, walkNodes, nodeLabel, motion). @joplo-app/kit/renderer-internal (rough strokes, responsive values, choices and layout regions, look) belongs to the in-repo standard library and may change in any release; do not import it from an optional or third-party plugin. Share React through the published bridge; clean up observers/listeners and animation on destroy.
 - properties declares literal types, constraints and namespaced DOM attributes. Attributes propagate to every anchor. An observe instance is local to a stage/runtime and updates after layout; switching/unmount destroys it. Exceptions disable that instance, not the engine.
 - themes is named CSS; the engine namespaces it by plugin id. Keep visual semantics in the plugin. Same deterministic snapshot must draw identically in board, built site, render and video.
 - data declares text and scope projections for node/step slots. Missing projection stops scoped publication; never leave cut content merely hidden in DOM. Translation changes only declared display paths, not ids, colors or structural values.
@@ -897,7 +970,7 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 - Declare local credentials with keys: [{ id, title, description, url, env }]; use lowercase ids, HTTPS acquisition URLs and uppercase environment variable names. These are metadata, never secret values. The board Voice → Manage keys lists only the current config.plugins declarations. Guarded project PUT saves/removes ~/.joplo/plugins/<plugin-id>/keys/<key-id>.json (0600; JOPLO_HOME overrides the directory); environment values take priority. The host passes only this plugin's declared values as ctx.keys[id] through stdin for explicitly authorized generation. Metadata workers receive none. Child processes inherit a minimal system environment, not account credentials or the key-store path. Never read credential files or process.env in a compiler; use ctx.keys, and never return, log or serialize credentials. The host redacts known values in failures and rejects outputs containing them; plugins remain trusted code, not a filesystem security sandbox. Missing/invalid keys: update the local card or environment, then resume the existing resource task; never put a key in config or input.
 - Local credential clients must serialize requests with JSON.stringify and never log request bodies. Malformed JSON returns a fixed 400 USAGE message without request excerpts; correct serialization locally without copying the secret into diagnostics. A 404 means the plugin/key pair is not declared by the current project: reload its enabled declarations and use an existing card instead of guessing identities.
 - Release ctx.hold on success, error, superseded requests and unmount, after drawing the ready frame. Recheck scope before inlining assets; unused resources must not ship.
-- Step effects can emit play/stop commands for named tracks. Replay uses fixed step anchors and one engine clock; jumping/replaying resets to the same snapshot. Pause, speed, fade and narration ducking are host behavior, synthesis belongs to the plugin.
+- Step effects can emit play/stop commands for named tracks. Each step's media snapshot is taken at the moment the step commits; between two commits the anchor advances by the planned time (the previous step's stay or estimated narration, whichever is longer, plus the next step's action demonstration: cursor travel, press, typing). Continuous playback follows the one engine clock; jumping/replaying resets to the same snapshot, which now lands close to where continuous playback would be. Pause, speed, fade and narration ducking are host behavior, synthesis belongs to the plugin.
 - Free reactions are playback data: public payloads retain option.free after scope filtering, while authoring notes and source positions are stripped. Validate the actual built site (npx joplo preview) with arbitrary input and a secondary reaction; replay-only tests cannot detect a dropped free map.
 - Scope before writing media. Build writes validated resources as separate asset files (assets/<hash>.<ext>, uploaded once per content by share) and inlines plugin runtimes; the site needs HTTP but no other network. In runtimes, accept asset URLs with embeddedAsset(src, kind) from @joplo-app/kit/plugin instead of testing for data: URLs. Video mixing capability is separate from playback support—state its actual limit.
 

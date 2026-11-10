@@ -23,7 +23,7 @@ One sentence: push in until the recurring object fills the frame, swap the world
 - Beat 2 (first step of chapter N+1): switch the state that swaps the worlds (old interface exit="fade", new interface enter="fade", 800–1000 ms each) and in the same step camera('<new overview>', { ms: 2400–2800 }). The camera curve starts slowly, so the crossfade happens while the object still covers the frame, then the new world opens up. Put the chapter's timeline/scrubber movement and year label change in this same step.
 - Keep (do not downgrade): the shared centre point (otherwise the camera whips across the world at 8× and the old ghost slides away), the slow-start pull-back, and exit/enter on whole interfaces rather than on each child.
 - Known pitfalls: a fine 1-px checker or hairline pattern behind the object shimmers (moiré) at high zoom — use a low-contrast texture; a deep link or timeline jump to beat 2 lands on the settled overview, which is what a viewer jumping chapters wants; verify the seam in the film strip (no red CUT) and at full size with --frames.
-- Reference: examples/button-40-years (features/forty/options/a.tsx, throughTheButton).
+- Reference: examples/button-40-years (works/forty.tsx, throughTheButton).
 
 An older variant moves the object out of its interface into a central arrangement before the next chapter catches it (same motion key, exclusive when). It reads as a transfer beat rather than a cut; verify a mid-flight frame in playback because static sheets show only the declared endpoints.
 
@@ -32,7 +32,7 @@ Use one motion key for the recurring object and distinct element ids for its loc
 
 A useful story holds the message or task constant while the surrounding interface changes. The motion gives continuity; the input, menu and result prove the interaction paradigm. Label canned results explicitly when the audience can type arbitrary requests. Do not imply a model or backend computed a result.
 
-For the match-cut transition above, use from for continuity, and the engine's actionEntry: 'after' when a confirmed chapter drag should immediately show the new arrangement. Static storyboards prove layout; observe real playback to verify FLIP travel. If a flight does not appear, check for two visible same-key objects, a replaced Canvas/stage, or a manual jump with animate=false before changing the animation.
+For the match-cut transition above, use chapter() default continuation, and the engine's actionEntry: 'after' when a confirmed chapter drag should immediately show the new arrangement. Static storyboards prove layout; observe real playback to verify FLIP travel. If a flight does not appear, check for two visible same-key objects, a replaced Canvas/stage, or a manual jump with animate=false before changing the animation.
 
 Keep credits and sources outside the animated object area. Render every chapter and inspect the target frame after seeking; then test real typing, first-input pause, hover/touch, reset, continue and cross-chapter confirmation. A menu temporarily covering content is expected while open; verify it closes before the next action needs that content.
 
@@ -52,7 +52,7 @@ For a topic explainer (an election, a policy, a market week), lay the whole epis
 
 ## Remaking a deck-like piece as a film
 Symptoms in an existing piece: one board per chapter (label, big title, panels, footer), a title card opening each chapter, hard cuts between layers, an on-screen headline that repeats the caption and the narration, and opening questions that are never closed.
-- Keep the data module, sources and licensed assets; rebuild only the stage and the script. Add the remake as a new option and pick it, so the board can compare it with the old one on the same cases.
+- Keep the data module, sources and licensed assets; rebuild only the stage and the script. Create the remake as another work in works/<new-key>.tsx and mark the old work draft: true. Both remain accessible locally; only the ready work is published. Use build/share --work <key> to publish just one piece; selecting a draft is an error.
 - Before TSX, map each old board to a cluster of one world and each old title card to a camera move. Turn on-screen sentences into labels: the subtitle carries the sentence.
 - Then follow the review loop: storyboard every chapter, film-strip the chain until CUT and STILL are gone, and play it in the board. If playback stutters, measure before changing the piece (npx joplo skill demo).
 
@@ -69,4 +69,4 @@ Symptoms in an existing piece: one board per chapter (label, big title, panels, 
 - Whole-screen white/colour flashes over a still picture look like a stalled player; keep the picture moving under any fade.
 
 Common pitfall: For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, film-strip the chain, and verify playback before claiming it works
-<!-- joplo-skill 0.5.0 sha256:9457540221d0661186b73ca41f4a38d1707f081c4098de4d8df40e645f0ebec3 -->
+<!-- joplo-skill 0.5.0 sha256:5338570d78a4e000ae9506ce9faca39da4f4f7919472d09bf0997c6d5d986661 -->

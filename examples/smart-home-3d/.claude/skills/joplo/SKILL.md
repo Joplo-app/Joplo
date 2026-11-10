@@ -4,11 +4,11 @@ description: Build clickable, replayable feature demos with Joplo (scripted scen
 ---
 # Joplo
 
-Joplo turns a feature idea into a clickable, replayable demo. It is a player for pre-declared scenarios, not a free-form app prototype with persistent data or real backend logic, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.
-Structure: a project has features; a feature has options (alternative designs, A/B) and cases (edge cases to cover); an option plays scenarios; a scenario is a list of steps.
+Joplo turns ideas into clickable, replayable works: feature demos, explainers, tutorials and short films. It is a player for pre-declared scenarios, not a free-form app prototype with persistent data or real backend logic, and not a slide or PPT tool: you write the screens and scripted scenarios in TSX, the local board plays them step by step, and reviewers compare options and leave feedback.
+Structure: a project is a portfolio of works; a work has slices (scenarios), and a slice has steps. Every work has a cover and enters the home page. Capabilities combine: feature review groups alternative works (options) with cases, coverage, rules and a pick; sequencing connects chapters; draft keeps a standalone work out of publication.
 A step is one user action (.click / .type / .select / .press / .drag / .hover / .scroll / .act) or system event plus its visible effects (set, toast, go, done). Results and errors come from these effects, not from real logic or a backend.
 During playback, the first picture-changing stage input pauses and applies that same input. Hover does not pause; blank clicks only pause without an exploration notice. Matching the next action advances the script and stays stopped; another reachable scenario asks to switch (default before the action; actionEntry: 'after' consumes it on confirmation); native controls and declared free reactions change only a local playground. Play, jump, scenario change and reset discard exploration. Screenshots, video and deep links always use scripted state.
-Options and cases are compared in the local board; only the picked option is published.
+Compare designs and make decisions with feature() + option(); make an audience-facing film with work() + chapter() in works/<key>.tsx. Both can coexist. Standalone works need no pick; draft: true excludes them from build and share. Publish one entry with --work <key>; feature publication still uses pick.
 
 ## When to use
 - The user wants to think a feature through before building it: a prototype, a clickable demo, A/B options, edge cases, or a walkthrough for product, design, or review.
@@ -32,13 +32,13 @@ Run dev and the follower in separate long-running shells. dev keeps the board li
 
 ## Workflow
 1. No joplo.config.ts yet: npx joplo@latest init <dir>, or npx joplo@latest init . for the current directory, then npm install there (versions are pinned). Agent and Git files (.git, .gitignore, .agents, .claude, AGENTS.md, skills-lock.json) do not count as content; other existing files need init . --keep, which only adds missing files. init skips these skills when the same version is already installed and never overwrites edited ones. In an existing Joplo project, use its installed npx joplo.
-2. Read npx joplo skill authoring; read cases before asking the user about edge cases; demo and installed plugin skills as needed.
+2. Read npx joplo skill authoring and choose the capabilities; for feature review read cases before asking the user about edge cases; demo and installed plugin skills as needed.
 3. Plan before coding (npx joplo skill story): audience, one to three points, one line per scenario (Given → When → Then, how it opens and ends; a case's expected is its Then); show the plan to the user. A demo is a story, not a feature tour.
-4. With minimal code, write one happy path and one error-and-recovery scenario.
+4. With minimal code, write one chapter for a standalone work, or one happy path and one error-and-recovery scenario for feature review.
 5. Run npx joplo check, then npx joplo dev; confirm typing, clicks, and layers really behave as intended in the board.
-6. Extend to every option and every case agreed with the user; run check until 0 errors.
+6. Extend to every option and every case agreed with the user for feature review, or to the agreed chapters for a standalone work; run check until 0 errors.
 7. Required after every round of development: before handing off, read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json in its own shell (joplo dev prints this exact command); only then give the user the board URL dev printed. Never hand off with only a URL, and never end your response without a running watcher (use --once below). While they test, read its output with short waits (about 1–5s) and acknowledge each feedback right away; do not wait for approval or process exit. If you end your response while they test, add --once so the watcher exits (and wakes a host that resumes on background exit) on the first event, then resume with --since. Receive and apply review results with the joplo-feedback skill.
-8. Only when the user asks to share or publish: npx joplo share --private --no-review --format json publishes picked options; npx joplo share --private --review also publishes a separate, always-private link containing every option for reviewers (data.review.url); data.url is the main link. For scoped review results with data.mode = review, only the private review was published and its link is data.url; read skill publish for this boundary. Confirming an option in the board is not a publish request. To share part of the project, add --scenario <scenario id> or --feature <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items.
+8. Only when the user asks to share or publish: npx joplo share --private --no-review --format json publishes picked options; npx joplo share --private --review also publishes a separate, always-private link containing every option for reviewers (data.review.url); data.url is the main link. For scoped review results with data.mode = review, only the private review was published and its link is data.url; read skill publish for this boundary. Confirming an option in the board is not a publish request. To share part of the project, add --scenario <scenario id> or --work <feature id> (repeatable): everything else stays out of the uploaded files; tell the user about any data.scope.borrowed items.
 
 ## Show the product, not slides
 Every step is an action on the product and a visible change it causes. If a step could be a bullet on a slide, rebuild it as interface, state, or a trace.
@@ -83,7 +83,7 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 - AiHubMix, OpenAI-compatible gateways and custom HTTP voice providers are gone: VOICE_UNSUPPORTED means ask the user to switch to Joplo Cloud narration, OpenAI or ElevenLabs (old audio still plays and ships); never hand-edit ~/.joplo/voice/profiles.json. See npx joplo skill publish.
 - Playing a demo never generates Joplo Cloud narration (it would spend characters): steps without audio use the browser voice until the user clicks Generate missing audio or you run npx joplo voice with their go-ahead. See npx joplo skill publish.
 - Re-sharing with the default voice keeps valid local clips plus reusable published clips, even when their voices differ (automatic captions must still match current text in the clip language; stale audio is excluded); an old custom provider named cloud stays unsupported until the user explicitly chooses official Joplo Cloud (use voice.profile: 'Joplo Cloud' when config owns the selection). See npx joplo skill publish.
-- HAPPY_PATH_ONLY is expected for explainers whose chapters are all main-flow; do not invent failure scenarios to silence it. See npx joplo skill check.
+- HAPPY_PATH_ONLY applies only to feature review: for a standalone explainer use work() + chapter(), with no cases or uses(); do not invent failure scenarios. See npx joplo skill check.
 - Required for short films and explainers: static storyboards cannot show hard cuts or frozen pictures. Run npx joplo render <dir> --scenario-id <first chapter> --film --chain, fix every CUT and STILL it reports, and watch --video once before handing over. See npx joplo skill demo.
 - For multimodal stories, list assets and licenses first, prove one real asset in a playable chapter, then extend the batch within the agreed spending limit. Keep source claims separate from interpretations. See npx joplo skill story.
 - For generated binary assets, first look for CC0/public-domain material; use an enabled generation plugin for gaps. Run resources --dry-run before spending; check/build/render never generate paid artifacts. Commit outputs and metadata, keep keys local. See npx joplo skill plugins.
@@ -94,16 +94,16 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 
 ## Reference
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists engine and enabled plugin topics. Installed engine references are linked below; plugin guides are indexed in ../joplo-plugins/SKILL.md.
-- [authoring](./topics/authoring.md): Engine model, page / option / flow, explicit plugins, named local reactions, composable effects, state and conditions
-- [story](./topics/story.md): Plan a demo before coding; PM lens from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos
+- [authoring](./topics/authoring.md): Works → slices → steps; feature review, chapters, drafts, files, explicit plugins, named local reactions, composable effects, state and conditions
+- [story](./topics/story.md): Plan a demo before coding; PM lens for feature-attached works from a need to roles, goal, cases, and scenarios; openings, endings, captions; explainers and news-style demos
 - [demo](./topics/demo.md): Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots
 - [focus](./topics/focus.md): Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
-- [cases](./topics/cases.md): Case dimensions: ask the user before starting
+- [cases](./topics/cases.md): Feature-attached works only: cases and coverage; ask the user before starting
 - [check](./topics/check.md): Read diagnostics, music duration/markers and timing warnings, UNBOUND_INTERACTIVE, and fix the indicated file and line
 - [selection](./topics/selection.md): Edit only the element selected by the user in the board
 - [review](./topics/review.md): Local live feedback, Share polling, prompt acknowledgement, session/version isolation, and recovery
 - [diff](./topics/diff.md): Compare public feature builds, stable step identity, uncertain matches, isolated PR CI publication
-- [publish](./topics/publish.md): pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
+- [publish](./topics/publish.md): Standalone works, drafts, --work scope, feature pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 - [plugins](./topics/plugins.md): Data-only action contracts, native local behavior, engine-clock presenters; Universal properties, plugin themes, state writes and director targets; Binary assets, explicit paid resource generation, persistent artifacts, media tracks and offline publishing; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.3.0 sha256:e61a80f31f6a72465073709d4e8f05e14338feddb0a886aeacdd311ac92503d2 -->
+<!-- joplo-skill 0.4.1 sha256:7a81c977d77ecf4ab973aa20e2dc162e8484d4a5421e3993acb8657a85bcd2b6 -->

@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
 import { feature, flow, go, hold, option, page, set, $, type CaseDef, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
-import { CARD_POINTS_MAX, DESCRIPTION_MAX, SCENARIO_MS_MAX, compile, outline, replay, scenarioEstimateMs, stateAt, stepDwell, validate, type AuthoringProject } from '../src/index.ts';
+import { CARD_POINTS_MAX, DESCRIPTION_MAX, SCENARIO_MS_MAX, compile, outline, replay, scenarioEstimateMs, stateAt, stepDwell, stepPlan, ACTION_TIMING, validate, type AuthoringProject } from '../src/index.ts';
 import * as webPace from '../../web/src/runtime/pace.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
@@ -45,18 +45,21 @@ describe('阅读节奏在 core，web 原样 re-export', () => {
     expect(webPace.CAMERA_MS).toBe(700);
     expect(webPace.CAMERA_EASE).toEqual([0.16, 1, 0.3, 1]);
   });
-  it('scenarioEstimateMs = 每一步 stepDwell 之和（说明 + explain + 过渡卡的副标题与要点）', () => {
+  it('scenarioEstimateMs = 每一步时间计划之和：操作演示（鼠标、波纹）+ 停留（说明 + explain + 过渡卡的副标题与要点）', () => {
     const p = build({ scenarios: { happy: flow('S', { start: '/', cases: ['happy'] }).card('Opening', { sub: 'why it matters' }).click('go', 'Send it') } });
     const sc = p.scenarios['f.a.happy']!;
-    expect(scenarioEstimateMs(sc)).toBe(stepDwell({ texts: ['Opening', 'why it matters'] }) + stepDwell({ texts: ['Send it'] }));
-    expect(scenarioEstimateMs({ ...sc, steps: [] })).toBe(0);
+    // 过渡卡没有操作演示；点击 = 鼠标移动 + 波纹，再停留
+    expect(scenarioEstimateMs(p, sc)).toBe(stepDwell({ texts: ['Opening', 'why it matters'] }) + ACTION_TIMING.cursorMove + ACTION_TIMING.ripple + stepDwell({ texts: ['Send it'] }));
+    expect(scenarioEstimateMs(p, sc)).toBe(sc.steps.reduce((sum, st) => sum + stepPlan(p, st).totalMs, 0));
+    expect(scenarioEstimateMs(p, { ...sc, steps: [] })).toBe(0);
   });
   it('outline 与 check 计入 hold；写了 hold 的步骤由作者掌握节奏，不再套 3 秒阅读下限（D92），字数阅读时间仍然计入', () => {
     const p = build({ scenarios: { happy: flow('S', { start: '/', cases: ['happy'] })
       .system('A', hold(30)).system('B', hold(30)).system('C', hold(30)).system('D', hold(0.5)).system('一句需要读上一会儿的较长说明文字', hold(0.5)) } });
-    // D：一个字母约 67 ms，按 hold 的 0.5 s；长说明 16 个汉字 × 125 ms = 2 s，读完才走
-    expect(scenarioEstimateMs(p.scenarios['f.a.happy']!)).toBe(92_500);
-    expect(outline(p).features[0]!.options[0]!.scenarios[0]!.ms).toBe(92_500);
+    // D：一个字母约 67 ms，按 hold 的 0.5 s；长说明 16 个汉字 × 125 ms = 2 s，读完才走；每个系统事件提交前有 0.9 s 的停顿
+    const want = 92_500 + 5 * ACTION_TIMING.systemHold;
+    expect(scenarioEstimateMs(p, p.scenarios['f.a.happy']!)).toBe(want);
+    expect(outline(p).features[0]!.options[0]!.scenarios[0]!.ms).toBe(want);
     expect(codes(p, 'SCENARIO_TOO_LONG')).toHaveLength(1);
   });
 });
@@ -83,7 +86,7 @@ describe('outline', () => {
     const [happy, denied] = opt.scenarios;
     expect(happy).toMatchObject({ id: 'f.a.happy', key: 'happy', name: 'Send', description: 'Short', steps: 3, cards: 2, opening: true, ending: true, outcome: 'success', caseIds: ['f.happy'] });
     expect(denied).toMatchObject({ steps: 1, cards: 0, opening: false, ending: false, outcome: 'denied' });
-    expect(happy!.ms).toBe(scenarioEstimateMs(p.scenarios['f.a.happy']!));
+    expect(happy!.ms).toBe(scenarioEstimateMs(p, p.scenarios['f.a.happy']!));
     expect(opt.ms).toBe(happy!.ms + denied!.ms);
   });
   it('只看一个方案；不存在的方案报 USAGE；发布 IR 没有情况时 cases 为空也不崩溃', () => {
@@ -119,7 +122,7 @@ describe('check：叙事与覆盖的新提示', () => {
   });
   it(`SCENARIO_TOO_LONG：估算超过 ${SCENARIO_MS_MAX / 1000} 秒时 info（一个场景讲一件事）`, () => {
     const many = (n: number) => { let f = flow('Long', { start: '/', cases: ['happy'] }); for (let i = 0; i < n; i++) f = f.click('go'); return f; };
-    const per = stepDwell({ texts: ['Click “Go”'] });
+    const per = ACTION_TIMING.cursorMove + ACTION_TIMING.ripple + stepDwell({ texts: ['Click “Go”'] });
     const fits = Math.floor(SCENARIO_MS_MAX / per);
     expect(codes(build({ scenarios: { happy: many(fits) } }), 'SCENARIO_TOO_LONG')).toEqual([]);
     const d = codes(build({ scenarios: { happy: many(fits + 1) } }), 'SCENARIO_TOO_LONG');

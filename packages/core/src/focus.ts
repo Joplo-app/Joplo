@@ -19,7 +19,7 @@
  * config({ autoFocus: false }) 关掉默认呈现（reveal 恒为空）；焦点对象仍照常推导，check 用它判断“长时间没有焦点”。
  */
 import { DIRECTOR_LAYER, PAGE_LAYER, childWidth, pluginSpec, type PluginTable } from './catalog.ts';
-import { layoutRegions, applyStep, cameraAt, initialState, isNodeDisabled, isSelfVisible, layersOf, resolveProps, sceneWidth, type PlayState } from './player.ts';
+import { layoutRegions, cameraAt, timelineStates, isNodeDisabled, isSelfVisible, layersOf, resolveProps, sceneWidth, type PlayState } from './player.ts';
 import type { Callout, Project, Scene, SceneNode, Step } from './schema.ts';
 
 export const HOLD_MIN_SECONDS = 0.5;
@@ -81,7 +81,8 @@ function changedElements(scene: Scene, before: PlayState, after: PlayState, plug
   const va = visibleIds(scene, after);
   const hits: Hit[] = [];
   const parents = new Map<string, string | null>();
-  const add = (n: SceneNode | null, appended: boolean) => { if (n && !hits.some((h) => h.id === n.id)) hits.push({ id: n.id, type: n.type, selfEvident: n.traits?.selfEvident || pluginSpec(plugins, n.type)?.selfEvident, parent: parents.get(n.id) ?? null, appended: appended && n.type !== '#text' }); };
+  const added = new Set<string>();
+  const add = (n: SceneNode | null, appended: boolean) => { if (n && !added.has(n.id)) { added.add(n.id); hits.push({ id: n.id, type: n.type, selfEvident: n.traits?.selfEvident || pluginSpec(plugins, n.type)?.selfEvident, parent: parents.get(n.id) ?? null, appended: appended && n.type !== '#text' }); } };
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const rec = (n: SceneNode, parent: SceneNode | null) => {
     parents.set(n.id, parent?.id ?? null);
@@ -93,8 +94,10 @@ function changedElements(scene: Scene, before: PlayState, after: PlayState, plug
   };
   rec(scene.root, null);
   // 只留最外层：祖先已经在列表里的去掉
-  const inside = (id: string, anc: string) => { const a = findIn(scene.root, anc); return !!a && a.id !== id && !!findIn(a, id); };
-  return hits.filter((h) => !hits.some((o) => o.id !== h.id && inside(h.id, o.id)));
+  // 沿上面记下的父链往上找（不为每一对元素整棵搜两遍：一步改了几百个元素的大画布上那是几秒）
+  const hit = new Set(hits.map((h) => h.id));
+  const hasHitAncestor = (id: string) => { for (let up = parents.get(id) ?? null; up; up = parents.get(up) ?? null) if (hit.has(up)) return true; return false; };
+  return hits.filter((h) => !hasHitAncestor(h.id));
 }
 
 function findIn(node: SceneNode, id: string): SceneNode | null {
@@ -148,16 +151,7 @@ export function focusTimeline(project: Project, scenarioId: string): FocusState[
   }
   const auto = project.autoFocus !== false;
   // 逐步回放（与 stateAt 同一个 applyStep）；回放失败之后的位置没有状态，只给作者写的焦点
-  const states: (PlayState | null)[] = [];
-  let s: PlayState | null = null;
-  try { s = initialState(project, scenarioId); } catch { s = null; }
-  states.push(s);
-  for (let i = 0; i < sc.steps.length; i++) {
-    if (s) {
-      try { s = applyStep(project, sc, s); } catch { s = null; }
-    }
-    states.push(s);
-  }
+  const states = timelineStates(project, scenarioId);
   out.push(EMPTY(shownScene(project, scenarioId, 0, states[0] ?? null).layer, 'cover'));
   /** 上一步变化过的元素与它们所在的容器（连续性：同一处连续变化只在第一次提示）。 */
   let prevChanged = new Set<string>();
@@ -244,16 +238,4 @@ export function focusAt(project: Project, scenarioId: string | null | undefined,
   if (!tl.length) return EMPTY(PAGE_LAYER);
   const k = Math.max(0, Math.min(tl.length - 1, Number.isFinite(position) ? Math.trunc(position) : 0));
   return structuredClone(tl[k]!);
-}
-
-/** 自动播放时这一步至少停留多久（毫秒，已按速度缩放；0 = 没写 hold）。 */
-export function holdMsOf(step: Pick<Step, 'hold' | 'effectHold'> | undefined, speed = 1): number {
-  // 作者的 hold 与插件效果时长（D98）取较大值
-  const ms = Math.max(step?.hold ?? 0, step?.effectHold ?? 0);
-  return ms > 0 ? Math.round(ms / (speed > 0 ? speed : 1)) : 0;
-}
-
-/** 媒体锚点（配乐跳转、接力）按每步推进的时长：作者 hold（缺省 3000）与效果时长（D98）取较大值，未按速度缩放。 */
-export function stepAnchorMs(step: Pick<Step, 'hold' | 'effectHold'>): number {
-  return Math.max(step.hold ?? 3000, step.effectHold ?? 0);
 }

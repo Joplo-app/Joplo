@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ResourceRequest } from '@joplo-app/kit/plugin';
+import type { LocalResourceInfo, ResourceRequest } from '@joplo-app/kit/plugin';
 import { inspectResources, mediaDiagnostics } from './media-check.ts';
 import { LocalResources, referencedResources } from './local-resources.ts';
 import { isPluginDef } from '@joplo-app/kit/plugin';
@@ -86,12 +86,34 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
   const pluginRuntimes = pluginRuntimesOf(loaded.authoring.config.plugins);
   if (diagnostics.some((d) => d.severity === 'error')) return { project: null, diagnostics, home, pluginRuntimes };
   // Enabled plugins derive their own layout and drawing snapshots; the host schedules resources.
-  const requests: ResourceRequest[] = [];
   const entries = Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).filter(p => p.local).map(p => [p.id, p.local!]));
-  const resources = { requests, host: new LocalResources(projectDir, entries, Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).map(p => [p.id, p.keys ?? []]))) };
-  const first = compile(loaded.authoring, mode, { onResource: request => requests.push(request) });
-  const inspected = await inspectResources(first.project, requests, resources.host);
-  const r = Object.keys(inspected.resourceInfo).length ? compile(loaded.authoring, mode, { resourceInfo: inspected.resourceInfo }) : first;
+  const host = resourceHost(projectDir, entries, Object.fromEntries(enabledPlugins(loaded.authoring.config.plugins).filter(isPluginDef).map(p => [p.id, p.keys ?? []])));
+  // 资源元数据（时长、marker）要先编译一遍才知道有哪些资源，再异步检查，再带着元数据编译一遍。
+  // 上一次检查到的元数据按请求内容记着，只当作提示：带着它编译一遍，然后照常重新检查——
+  // 只有“这一遍编译成功，并且每个资源重新检查到的元数据都和提示一致”时才直接用这一遍的结果。
+  // 其余情况（提示过期、提示让编译报错、多了或少了资源）一律退回不带提示的两遍流程，
+  // 所以提示永远不会改变结果，也不会让过期的元数据产生一个看起来成功的错误编译（D101 评审 P1）。
+  const known = knownInfo.get(projectDir);
+  let requests: ResourceRequest[] = [];
+  let inspected: Awaited<ReturnType<typeof inspectResources>> | null = null;
+  let r: ReturnType<typeof compile> | null = null;
+  if (known?.size) {
+    const hinted: ResourceRequest[] = [];
+    const fast = compile(loaded.authoring, mode, { onResource: request => hinted.push(request), resourceInfoFor: request => known.get(requestKey(request)) });
+    if (fast.project) {
+      const seen = await inspectResources(fast.project, hinted, host);
+      if (hinted.every(request => JSON.stringify(known.get(requestKey(request))) === JSON.stringify(seen.resourceInfo[request.id]))) { r = fast; requests = hinted; inspected = seen; }
+    }
+  }
+  if (!r || !inspected) {
+    requests = [];
+    const first = compile(loaded.authoring, mode, { onResource: request => requests.push(request) });
+    inspected = await inspectResources(first.project, requests, host);
+    r = Object.keys(inspected.resourceInfo).length ? compile(loaded.authoring, mode, { resourceInfo: inspected.resourceInfo }) : first;
+  }
+  const checked = inspected;
+  knownInfo.set(projectDir, new Map(requests.flatMap(request => checked.resourceInfo[request.id] ? [[requestKey(request), checked.resourceInfo[request.id]!] as const] : [])));
+  const resources = { requests, host };
   diagnostics.push(...inspected.diagnostics, ...(r.project ? mediaDiagnostics(r.project, inspected.resourceInfo) : []));
   const missing = Object.keys(r.project?.plugins ?? {}).filter((id) => !pluginRuntimes[id]);
   const extra: Diagnostic[] = missing.map((id) => ({ severity: 'error', code: 'PLUGIN_RUNTIME_MISSING', message: `Plugin ${id}: runtime file not found; reinstall the plugin package`, source: 'reference', at: `${loaded.authoring!.config.file}:1:1` }));
@@ -100,6 +122,40 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
     if (result.diagnostic) diagnostics.push(result.diagnostic);
   }
   return { project: extra.length ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes, resources };
+}
+
+const requestKey = (request: { plugin: string; compiler: string; input: string }) => JSON.stringify([request.plugin, request.compiler, request.input]);
+/** 项目目录 → 上一次编译检查到的资源元数据（按请求内容）。只是让第一遍编译用得上的提示；每次编译仍会重新检查并核对。 */
+const knownInfo = new Map<string, Map<string, LocalResourceInfo>>();
+/**
+ * 项目目录 → 本机资源宿主。打包插件的本机入口、在子进程里读取编译器描述都只做一次，热更新时复用；
+ * 插件入口文件或密钥声明变了（路径、修改时间、大小）就换一个新的。
+ */
+const hosts = new Map<string, { signature: string; host: LocalResources }>();
+function resourceHost(projectDir: string, entries: Record<string, string>, keys: ConstructorParameters<typeof LocalResources>[2]): LocalResources {
+  // 入口所在目录里的源文件都算进签名（入口会 import 同目录的模块）；不进 node_modules，最多看 400 个文件
+  const stamp = (entry: string) => {
+    const out: string[] = [];
+    const walk = (dir: string) => {
+      let names: fs.Dirent[] = [];
+      try { names = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const d of names.sort((a, b) => a.name.localeCompare(b.name))) {
+        if (out.length >= 400 || d.name === 'node_modules' || d.name.startsWith('.')) continue;
+        const file = path.join(dir, d.name);
+        if (d.isDirectory()) walk(file);
+        else { try { const s = fs.statSync(file); out.push(`${file}:${s.mtimeMs}:${s.size}`); } catch { /* removed meanwhile */ } }
+      }
+    };
+    if (!fs.existsSync(entry)) return ['missing'];
+    walk(path.dirname(entry));
+    return out;
+  };
+  const signature = JSON.stringify([Object.entries(entries).sort(([a], [b]) => a.localeCompare(b)).map(([id, file]) => [id, file, stamp(file)]), keys]);
+  const hit = hosts.get(projectDir);
+  if (hit?.signature === signature) return hit.host;
+  const host = new LocalResources(projectDir, entries, keys);
+  hosts.set(projectDir, { signature, host });
+  return host;
 }
 
 /** 让项目源文件在下次载入时重新转译、重新求值。 */

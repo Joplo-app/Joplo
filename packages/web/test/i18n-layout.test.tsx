@@ -14,6 +14,10 @@ import { Btn, Segmented } from '../src/player/controls';
 import { CaseNav } from '../src/board/CaseNav';
 import { FONT_CHOICES } from '../src/board/appearance-model';
 import { typeLabel } from '../src/board/labels';
+import uiPlugin from '@joplo-app/plugin-ui';
+// 组件的显示名来自插件清单（dev IR 的 project.plugins），看板自己不带任何组件名
+const uiPlugins = { ui: { id: 'ui', title: uiPlugin.title, components: Object.fromEntries(Object.entries(uiPlugin.components).map(([name, c]) => [name, { ...(c.label ? { label: c.label } : {}) }])) } };
+
 
 const project = Project.parse({schemaVersion:2,mode:'dev',name:'Author project',features:{f:{id:'f',name:'Author feature',goal:'Author goal',optionIds:['f.a'],caseIds:['f.main'],pick:'f.a'}},options:{'f.a':{id:'f.a',featureId:'f',key:'a',name:'Author option',idea:'Author idea',coverage:{'f.main':{status:'missing',basis:'derived'}}}},cases:{'f.main':{id:'f.main',featureId:'f',title:'Author case',dimension:'main'}}});
 
@@ -62,7 +66,7 @@ for(const locale of locales) for(const [width,height] of [[1280,800],[1440,900]]
     expect(buttons.slice(0,3+SPEEDS.length).every(attributes=>attributes.includes('whitespace-nowrap'))).toBe(true);
     expect(markup).toMatch(/class="[^"]*whitespace-nowrap[^"]*"/);
     expect(markup).toContain('truncate');
-    expect(typeLabel('Button',t,locale)).toBe(locale==='en'?'Button':t.board.componentTypeName('Button',t.board.button));
-    expect(typeLabel('AppShell.Header',t,locale)).toBe(locale==='en'?'AppShell.Header':t.board.componentTypeName('AppShell.Header',t.board.header));
+    expect(typeLabel('ui:Button',uiPlugins,t,locale)).toBe(locale==='en'?'ui:Button':t.board.componentTypeName('ui:Button',t.board.button));
+    expect(typeLabel('ui:AppShell.Header',uiPlugins,t,locale)).toBe(locale==='en'?'ui:AppShell.Header':t.board.componentTypeName('ui:AppShell.Header',t.board.header));
   });
 }

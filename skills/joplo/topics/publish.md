@@ -2,7 +2,9 @@
 
 Compare cases and options in the board, then decide which option to publish for each feature.
 
-## pick
+## Standalone works and feature pick
+- Standalone works in works/ publish without pick. draft: true excludes the whole work, its slices and views from both ordinary and review versions; WORK_DRAFT_SKIPPED lists what was skipped. Only drafts means nothing can publish: finish a work first.
+- --work <entry-key> restricts build/share to one entry: standalone work or a feature's picked option (all its options with --review). A selected draft fails explicitly. Every work has a cover; multiple entries open on the home page, one entry opens on its cover.
 - Set pick: 'a' in features/<f>/feature.ts to select options/a.tsx. It is not a qualified ID with a feature prefix.
 - Publish only the picked option for each feature. Features without pick are omitted.
 - The board's Publish dialog checks the chosen scope first. With no picked option it says so and disables Publish: confirm an option in review (or set pick), then publish. Confirming an option is not itself a request to publish.
@@ -12,7 +14,7 @@ Compare cases and options in the board, then decide which option to publish for 
 - Run npx joplo check in the author project, then npx joplo build, then npx joplo preview to open the built site over HTTP (assets are separate files; file:// is not supported).
 - Default output: dist/. Set --out-dir <dir> to change it.
 - Nonempty output directories are rejected. After confirming the old output can be discarded, pass --overwrite to clear and rebuild.
-- The published site contains only feature names, goals, scenario demos, step captions, and the overall layout.
+- The published site contains work titles, summaries, slices, step captions and views; feature review metadata stays private.
 - Rule origins, AI assumptions, gaps, open questions, and source locations stay on the local authoring side.
 - This is a static, read-only demo with no real business data or backend.
 
@@ -42,7 +44,7 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - Required: before EVERY publication ask the user “public or private?” and “also publish a review version?”. Never decide either for them, infer from project settings, or reuse last time. Only publish within the authorized scope; the examples below assume the user explicitly chose those flags. CI must pin both choices in the workflow.
 - Pass --public or --private AND --review or --no-review on every share. Missing choices fail with CHOICE_REQUIRED (exit 2) before login, check, build, or network in non-TTY, CI, --json, or --format json. An interactive terminal asks for each missing choice; public and no-review are highlighted but require a keypress.
 - Public shares enter show.joplo.app/@username and search engines. Write project names, descriptions and feature goals as you want them to appear in search results; never include unpublished information. Private means only people holding the link can view; it is not password protection.
-- --pr and scoped --scenario / --feature are always private: visibility flags may be omitted, --public is rejected (exit 2), but the review choice remains required. Comparisons (diff publish) are always private and do not support review versions, so neither choice is required there.
+- --pr and scoped --scenario / --work are always private: visibility flags may be omitted, --public is rejected (exit 2), but the review choice remains required. Comparisons (diff publish) are always private and do not support review versions, so neither choice is required there.
 - --review publishes picked options at data.url AND a separate private review version at data.review.url. Give reviewers the latter. It includes every option, is commentable, and never becomes a public portfolio entry. If the second publication fails, the main link may already be live: read stderr and retry with the same choices without --new.
 - Success JSON may include visibility and portfolio { workUrl, profileUrl, needsUsername, setupPath }. With a username, use workUrl; with needsUsername, tell the user to set a username at <server><setupPath>. Old servers may omit these fields: do not dereference absent portfolio or null URLs.
 - Run npx joplo login and verify the code in your browser before authorizing. Use --no-browser to open the URL manually over SSH or without a local browser.
@@ -87,11 +89,11 @@ Deploy only dist output, not author source files. MCP, comments, and collaborati
 - The password goes only through browser POST → server → cloud-bridge → CLI → Cloud create request, in memory. Local records contain only passwordProtected; task snapshots/GET/WebSocket, logs, stdout/JSON, IR and build files never contain it. Cloud enforces the viewer gate for pages/resources/audio/Agent/embeds and generic preview cards; a local static build is not protected. Do not claim a local overlay provides access control.
 
 ## Share part of the project
-- To share only some scenarios, add --scenario <scenario id> (repeatable); --feature <feature id> shares that feature's picked-option scenarios (every option with --review). They combine. Scenario ids look like invite.a-modal.success; npx joplo outline lists them.
+- To share only some scenarios, add --scenario <scenario id> (repeatable); --work <entry key> shares one standalone work, or a feature's picked-option slices (every option with --review). They combine. Scenario ids look like invite.a-modal.success; npx joplo outline lists them.
 - Declared plugin caches and frame snapshots are projected to the same subset; a missing projection declaration stops the build with PLUGIN_SCOPE_UNSUPPORTED. Inspect the emitted JSON, not just the DOM.
 - Everything outside the scope is cut at build time, not hidden: other features, options, scenarios, their pages and stacked elements, and the project description never reach the uploaded files or the review manifest. A deep link (#/f/<feature>?s=<scenario>) or embed &scenario= only picks where viewing starts and is not private.
 - If a scoped step uses an element another feature stacked onto the page (action target, shot, mark, cue, callout, trace) or navigates to a page another feature added, only that element or page is kept. share prints "Borrowed from another feature: …" and lists them in data.scope.borrowed; tell the user and ask whether that is acceptable. To leave one out, change the scenario so it no longer uses it.
-- A wrong scenario or feature id fails with NOT_FOUND and suggestions. Without --review, a scenario of an option that is not picked, or a feature without pick, fails with USAGE (exit 2) before build/upload. With --review, the ordinary share contains only picked scenarios in the requested scope, while the private review includes all requested options. If that scope has no picked scenarios, only the private review is published: data.mode is review and data.url is the review link (no data.review); the ordinary share and --update target stay unchanged.
+- A wrong scenario or entry id fails with NOT_FOUND and suggestions. Without --review, a scenario of an option that is not picked, or a feature without pick, fails with USAGE (exit 2) before build/upload. With --review, the ordinary share contains only picked scenarios in the requested scope, while the private review includes all requested options. If that scope has no picked scenarios, only the private review is published: data.mode is review and data.url is the review link (no data.review); the ordinary share and --update target stay unchanged.
 - Each scope is its own share, stored under scoped in .joplo/cloud.json (key: sorted scenario ids joined by commas, prefixed review: for --review). It never replaces the main or review link; re-sharing the same scope updates that link for free and Pro accounts.
 - Check the result locally first with npx joplo build --scenario <id> (same scope rules).
 - The author can also publish from the board: Export ▾ → Publish to Joplo Cloud (blue item) offers this scenario, this feature, or the whole project, and shows a copyable login command when signed out.
@@ -141,4 +143,4 @@ For local comparisons and PR CI, read npx joplo skill diff. It compares two real
 - --ref works only together with --applied. --applied is idempotent; text output without --format json ends with a Next: line listing the ids.
 
 Related topics: diff, demo, review, plugins
-<!-- joplo-skill 0.5.0 sha256:05da26148bd5eddfa765272e493b3b866ff7eeb8bd5ac13730c0381a9573f15b -->
+<!-- joplo-skill 0.5.0 sha256:b165f88e81cf58777a3801747c84e6997c3968ad38ca298a703facca2eec806b -->

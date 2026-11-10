@@ -97,8 +97,8 @@ it('anchors a crossfade fade-out on engine time so a finished fade never comes b
   expect(old.gain.setTargetAtTime.mock.lastCall[0]).toBe(0);
   expect(mock.update.mock.calls.filter(c => c[0].playing).length).toBeGreaterThan(0);
   // 新曲的淡入同样按引擎时间：5000 起淡入 2600 → 6300 时一半
-  const fresh = FakeAudio.gains[1];
-  expect(fresh.gain.setTargetAtTime.mock.calls.find((c: number[]) => c[0] > 0)).toBeTruthy();
+  const fresh = FakeAudio.gains[1]!;
+  expect(fresh.gain.setTargetAtTime.mock.calls.find((c: number[]) => c[0]! > 0)).toBeTruthy();
   // 再次 play 同一首（快照里没有淡出）才重新启用
   engine.update({ 'fake:bgm': { ...A, resource: 'b' }, 'fake:bgm>a': { ...A } }, assets, { ...f, timeMs: 9600, elapsedMs: 0 });
   expect(old.gain.setTargetAtTime.mock.lastCall[0]).toBe(.5);

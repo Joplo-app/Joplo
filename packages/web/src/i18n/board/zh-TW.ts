@@ -1,6 +1,6 @@
 import { defineDictionary } from '../define';
 import type { Locale } from '../locale';
-import { value, plural, type Value } from '../format';
+import { value, plural, number, type Value } from '../format';
 import type { BoardDictionary } from './en';
 
 export function createBoardZhTW(locale: Locale = 'zh-TW') {
@@ -188,6 +188,15 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       coverageFor: (p0: Value) => `${value(p0, locale)} 的涵蓋狀態`,
       thisFeatureHasNoCasesYet: "此功能尚無情況。",
       otherScenarios: "其他情境",
+      chaptersClock: (n: number, time: string) => `${number(n, locale)} 章 · ${time}`,
+      scenariosClock: (n: number, time: string) => `${number(n, locale)} 個情境 · ${time}`,
+      draftNotPublished: "草稿 · 不發佈",
+      sliceMeta: (time: string, steps: number) => `${time} · ${number(steps, locale)} 步`,
+      reviewStrip: "審片",
+      reviewStripHint: "所有章節連起來的膠片條（硬切與靜止）：",
+      copyCommand: "複製",
+      workEmptyTitle: "這件作品還沒有內容",
+      workEmptyBody: (file: string) => `在 ${file} 的 scenarios 裡寫第一章或第一個情境：`,
       copy: (p0: Value) => `複製 ${value(p0, locale)}`,
       missing: "缺少",
       undecided: "待決定",
@@ -260,6 +269,7 @@ export function createBoardZhTW(locale: Locale = 'zh-TW') {
       error: "錯誤",
       notFound: "找不到",
       featuresPicked: (p0: Value, p1: Value, p2: Value) => `${plural(Number(p0), { other: "# 個功能" }, locale)} · 已選定 ${value(p1, locale)}／${value(p2, locale)}`,
+      workCount: (n: number) => `${value(n, locale)} 件作品`,
       covered: "已涵蓋",
       aDemoScenarioCoversThisCaseThisDoesNot: "有示範情境涵蓋此情況，並不代表業務行為已確認正確。",
       howToHandleThisCaseIsUndecided: "尚未決定如何處理此情況",

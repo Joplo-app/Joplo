@@ -1,7 +1,7 @@
 import { autoCaptionMessages } from '@joplo-app/core/runtime';
 import { defineDictionary } from './define';
 import type { Locale } from './locale';
-import { value, number, list, plural, type Value } from './format';
+import { value, number, list, plural, twoDigits, clock, type Value } from './format';
 import type { Dictionary } from './en';
 
 export function createDe(locale: Locale = 'de') {
@@ -98,6 +98,7 @@ export function createDe(locale: Locale = 'de') {
       watchFinished: "Fertig",
       watchAgain: "Erneut ansehen",
       watchChapterOf: (n: Value, t: Value) => `Kapitel ${value(n, locale)} von ${value(t, locale)}`,
+      watchScenarioOf: (n: Value, t: Value) => `Szenario ${value(n, locale)} von ${value(t, locale)}`,
       upNextTitle: "Als Nächstes",
       upNextIn: (n: Value) => `Startet in ${value(n, locale)} s`,
       upNextPlayNow: "Jetzt abspielen",
@@ -153,6 +154,17 @@ export function createDe(locale: Locale = 'de') {
       coverStart: "Starten",
       /** 功能是给谁的（feature.roles 的名字，D67）：看板左栏、发布站的功能卡片与左栏。 */
       forRoles: (names: string[]) => `Für: ${list(names, locale)}`,
+      chapterNo: (n: number) => twoDigits(n, locale),
+      clock: (ms: number) => clock(ms, locale),
+      chapterCount: (n: number) => plural(n, { one: '# Kapitel', other: '# Kapitel' }, locale),
+      sideChapterCount: (n: number) => plural(n, { one: '# Nebenkapitel', other: '# Nebenkapitel' }, locale),
+      chaptersAbout: (n: number, min: number, sec: number) => `${plural(n, { one: '# Kapitel', other: '# Kapitel' }, locale)} · ${(min === 0 ? `etwa ${number(sec, locale)} Sek.` : sec === 0 ? `etwa ${number(min, locale)} Min.` : `etwa ${number(min, locale)} Min. ${number(sec, locale)} Sek.`)}`,
+      chapterKicker: (n: number) => `Kapitel ${number(n, locale)}`,
+      sideChapter: "Nebenkapitel",
+      sideChapters: "Nebenkapitel",
+      scenariosAbout: (n: number, min: number, sec: number) => `${plural(n, { one: '# Szenario', other: '# Szenarien' }, locale)} · ${(min === 0 ? `etwa ${number(sec, locale)} Sek.` : sec === 0 ? `etwa ${number(min, locale)} Min.` : `etwa ${number(min, locale)} Min. ${number(sec, locale)} Sek.`)}`,
+      sideScenarioCount: (n: number) => plural(n, { one: '# Nebenszenario', other: '# Nebenszenarien' }, locale),
+      sideScenarios: "Nebenszenarien",
       coverStartTitle: "Von vorn abspielen",
       coverSteps: (n: number) => plural(n, { one: 'Etwa # Schritt', other: 'Etwa # Schritte' }, locale),
       coverDuration: (d: { unit: 's' | 'min'; value: number }) => d.unit === 's' ? `Etwa ${number(d.value, locale)} Sek.` : `Etwa ${number(d.value, locale)} Min.`,
@@ -251,6 +263,11 @@ export function createDe(locale: Locale = 'de') {
       // site/EmbedApp.tsx: embed mode (?embed=1) on the published site.
       embedPlayDemo: "Demo abspielen",
       embedCoverMeta: (n: number) => `Interaktiver Prototyp · ${plural(Number(n), { one: "# Szenario", other: "# Szenarien" }, locale)}`,
+      embedCoverMetaChapters: (n: number) => `Interaktiver Prototyp · ${plural(Number(n), { one: '# Kapitel', other: '# Kapitel' }, locale)}`,
+      works: "Werke",
+      watch: "Ansehen",
+      watchFor: (name: string) => `„${name}“ ansehen`,
+      embedPlay: "Abspielen",
       embedMadeWithJoplo: "Mit Joplo erstellt",
       embedCoverHint: "Nach dem Start: Pause, Schritt für Schritt, Vollbild",
       embedStepProgress: (current: number, total: number) => `Schritt ${number(current, locale)} / ${number(total, locale)}`,

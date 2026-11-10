@@ -19,6 +19,8 @@
 
 用 TSX 创作页面和流程，在本地看板（Board）查看，选定方案后构建静态发布站（Published site）；也可以一条命令分享出去，把可播放的徽章或嵌入播放器放进 README、文档和博客。源文件是权威源，版本交给 Git。按住 ⌥（Option/Alt）单击元素，就能把精确的文件和行号交给 Agent。
 
+也可以做独立的作品（例如讲解片）：在 `works/` 用 `work()` / `chapter()` 创作，用 `--work <键>` 只发布一件。
+
 ![Joplo 看板](docs/screenshots/board-play-initial.png)
 
 ## 快速开始
@@ -103,7 +105,7 @@ npx joplo feedback watch --local --follow --json
 
 反馈逐条以 NDJSON 输出，每条带 `eventId`、`optionId`、`sessionId`。它覆盖所有方案，改源码后自动接上新一轮评审；某个方案确认不会让它结束。看板停止时退出 1，Ctrl+C 退出 130。需要等待某个方案版本的确认、或从游标补收时，改用精确会话：先 `feedback list --local`，再 `feedback watch --local --session <id> [--after <序号>]`，确认后退出 0。详见[本地评审命令](docs/cli.md#review本地评审与流式监听)。
 
-Share 通过同一个入口轮询：`npx joplo feedback watch --share <id> --option <功能.方案> --interval 15 --json`。默认每 15 秒，可设 10–30 秒。当前是快照轮询，已解决／已写回记录的完整补收需要 Cloud 扩展，详见[接口说明](docs/cloud-feedback-watch.md)。
+Share 通过同一个入口轮询：`npx joplo feedback watch --share <id> --work <功能.方案> --interval 15 --json`。默认每 15 秒，可设 10–30 秒。当前是快照轮询，已解决／已写回记录的完整补收需要 Cloud 扩展，详见[接口说明](docs/cloud-feedback-watch.md)。
 
 ## 项目结构
 
@@ -173,7 +175,7 @@ More embed options: https://cloud.joplo.app/shares/<share-id>
 - 加 `&scenario=<场景 id>` 从指定场景开始（`npx joplo outline` 列出场景 id），加 `&autoplay=1` 跳过封面直接播放。参数写错时照常显示封面、从默认场景开始。
 - 保留 `allow="fullscreen *"`：分享页运行在 CSP 沙箱里，只写 `allow="fullscreen"` 时 Chromium、Firefox、WebKit 都会拒绝全屏；去掉后播放器退回为在新标签页打开演示。
 - 嵌入播放器不发网络请求、不依赖存储。GitHub 会过滤 Markdown 里的 iframe，README 里请用徽章。
-- `--scenario <id>`、`--feature <id>` 只分享项目的一部分；范围外的内容在构建时就被裁掉，不是隐藏。
+- `--scenario <id>`、`--work <id>` 只分享项目的一部分；范围外的内容在构建时就被裁掉，不是隐藏。
 - 链接永久有效，免费账号也一样；限制的是账号空间（免费 100 MB、Pro 5 GB，按所有在线分享的原始大小计算），`share` 会打印用了多少。再次 share 更新同一个链接，已经贴出去的徽章和嵌入会跟着更新。
 - CI 中设置 `JOPLO_API_KEY`，用 `npx joplo share --private --no-review --new --pr <number> --format json` 发布 PR 预览。Agent 应原样使用 `data.embed.markdown` / `data.embed.iframe`，不要自己拼地址。
 
@@ -249,7 +251,7 @@ Joplo 接受 issue，不接受 pull request。bug 和功能需求请在 [issue](
 
 [PolyForm Shield 1.0.0](LICENSE)。任何人都可以免费使用 Joplo，包括在公司里和商业项目中使用；不得用它提供与 Joplo 或 Joplo Cloud 竞争的产品，详见 [COMMERCIAL.md](COMMERCIAL.md)。0.2.15 及更早的版本以 Apache-2.0 发布。随包字体使用 [SIL OFL 1.1](packages/web/src/fonts/OFL.txt)。
 
-模板显式启用的 `@joplo-app/plugin-content` 提供 `content:Canvas`、`camera()`、FLIP 通用属性与 `content:studio` 主题。从插件包直接导入创作 API，并在 package.json 和 config.plugins 显式声明。`npx joplo skill content` 介绍连续讲解内容的做法，示例见 [llm-explainer](examples/llm-explainer)，契约见 [插件架构](docs/plugins.md)。章节用 `flow({ from })` 接力，分镜用 `joplo render --sheet --columns 3`。
+模板显式启用的 `@joplo-app/plugin-content` 提供 `content:Canvas`、`camera()`、FLIP 通用属性与 `content:studio` 主题。从插件包直接导入创作 API，并在 package.json 和 config.plugins 显式声明。`npx joplo skill content` 介绍连续讲解内容的做法，示例见 [llm-explainer](examples/llm-explainer)，契约见 [插件架构](docs/plugins.md)。章节用 `chapter()` 接力，分镜用 `joplo render --sheet --columns 3`。
 
 标准 UI 和 HTML 由 `@joplo-app/plugin-ui` 提供：直接从该包导入，并在 config.plugins 显式启用，IR 使用 `ui:Button` / `ui:div`。`joplo components` 读取当前插件清单，`joplo skill ui/components` 提供完整 UI 用法。diagram 的组件与 trace 从 `@joplo-app/plugin-diagram` 导入。见[插件契约](docs/plugins.md)。
 
