@@ -176,3 +176,47 @@ it('keeps capture failures sticky so an export cannot silently succeed after the
  await expect(engine.endCapture()).rejects.toThrow('Media memory budget exceeded');
  engine.destroy();warn.mockRestore();
 });
+it('natural one-shot ends release only that event and leave an overlapping shared source alive', async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const cue={plugin:'fake',resource:'r',offsetMs:0,volume:.6,loop:false,fadeInMs:0,endAfterMs:1000};
+ engine.update({a:cue,b:{...cue,endAfterMs:2000}},assets,{...frame,elapsedMs:0});
+ await new Promise(r=>setTimeout(r,0));
+ engine.update({a:cue,b:{...cue,endAfterMs:2000}},assets,{...frame,elapsedMs:1000,speed:2});
+ expect(mock.destroy).toHaveBeenCalledTimes(1);expect(engine.status().tracks).toBe(1);
+ expect(FakeAudio.gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(.6,1,.015);
+ engine.update({b:{...cue,endAfterMs:2000}},assets,{...frame,elapsedMs:1500,playing:false});
+ expect(mock.update.mock.lastCall?.[0]).toMatchObject({playing:false,offsetMs:1500});
+ engine.update({b:{...cue,endAfterMs:2000}},assets,{...frame,elapsedMs:2000});
+ expect(engine.status().tracks).toBe(0);engine.destroy();
+});
+it('does not resurrect completed cues on later estimated snapshots and restores them only after seek reset', async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const cue={plugin:'fake',resource:'r',offsetMs:0,volume:1,loop:false,fadeInMs:0,endAfterMs:1000};
+ engine.update({a:cue},assets,{...frame,elapsedMs:0,timeMs:0});await new Promise(r=>setTimeout(r,0));
+ engine.update({a:cue},assets,{...frame,elapsedMs:1500,timeMs:1500});expect(engine.status().tracks).toBe(0);
+ engine.update({a:{...cue,offsetMs:200,endAfterMs:800}},assets,{...frame,elapsedMs:0,timeMs:2000});
+ await new Promise(r=>setTimeout(r,0));expect(mock.factory).toHaveBeenCalledTimes(1);
+ engine.update({a:cue},assets,{...frame,identity:'seek-2',elapsedMs:0,timeMs:0});await new Promise(r=>setTimeout(r,0));
+ expect(mock.factory).toHaveBeenCalledTimes(2);engine.destroy();
+});
+it('new events of the same source never inherit the old event origin through spare migration',async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const cue={plugin:'fake',resource:'r',offsetMs:0,volume:1,loop:false,fadeInMs:0,endAfterMs:1000};
+ engine.update({a:cue},assets,{...frame,elapsedMs:0,timeMs:0});await new Promise(r=>setTimeout(r,0));
+ engine.update({b:cue},assets,{...frame,elapsedMs:0,timeMs:500});await new Promise(r=>setTimeout(r,0));
+ engine.update({b:cue},assets,{...frame,elapsedMs:100,timeMs:600});
+ expect(mock.factory).toHaveBeenCalledTimes(2);expect(mock.update.mock.calls.slice(-2).map(c=>c[0].offsetMs)).toContain(100);engine.destroy();
+});
+it('keeps the real one-shot deadline when a later estimated snapshot prematurely drops the event',async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const cue={plugin:'fake',resource:'r',offsetMs:0,volume:.7,loop:false,fadeInMs:0,endAfterMs:4000};
+ engine.update({a:cue},assets,{...frame,elapsedMs:0,timeMs:0});await new Promise(r=>setTimeout(r,0));
+ engine.update({},assets,{...frame,elapsedMs:0,timeMs:2000});expect(engine.status().tracks).toBe(1);
+ expect(mock.update.mock.lastCall?.[0]).toMatchObject({offsetMs:2000,playing:true});
+ engine.update({},assets,{...frame,elapsedMs:0,timeMs:3000,playing:false});expect(mock.update.mock.lastCall?.[0].playing).toBe(false);
+ engine.update({},assets,{...frame,elapsedMs:0,timeMs:4000});expect(engine.status().tracks).toBe(0);expect(mock.destroy).toHaveBeenCalledTimes(1);engine.destroy();
+});

@@ -3,7 +3,7 @@ import type { Project } from './schema.ts';
 /** Pure clock projection. Neither resource compilation nor plugin semantics run here. */
 export function advanceMedia(snapshot: MediaSnapshot, elapsedMs: number): MediaSnapshot {
   const elapsed = Math.max(0, elapsedMs);
-  return Object.fromEntries(Object.entries(snapshot).flatMap(([id, t]) => t.stopAfterMs !== undefined && elapsed >= t.stopAfterMs ? [] : [[id, { ...t, offsetMs: t.offsetMs + elapsed, ...(t.stopAfterMs !== undefined ? { stopAfterMs: t.stopAfterMs - elapsed, volume: t.volume * (1 - elapsed / t.stopAfterMs) } : {}) }]]));
+  return Object.fromEntries(Object.entries(snapshot).flatMap(([id, t]) => (t.stopAfterMs !== undefined && elapsed >= t.stopAfterMs || t.endAfterMs !== undefined && elapsed >= t.endAfterMs) ? [] : [[id, { ...t, offsetMs: t.offsetMs + elapsed, ...(t.endAfterMs !== undefined ? { endAfterMs: t.endAfterMs - elapsed } : {}), ...(t.stopAfterMs !== undefined ? { stopAfterMs: t.stopAfterMs - elapsed, volume: t.volume * (1 - elapsed / t.stopAfterMs) } : {}) }]]));
 }
 export function mediaAt(project: Project, scenarioId: string, position: number, elapsedMs = 0): MediaSnapshot {
   const sc = project.scenarios[scenarioId];

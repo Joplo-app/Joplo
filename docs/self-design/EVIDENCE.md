@@ -185,3 +185,21 @@
 ### M / D93 配乐（2026-11-09）
 
 新增稳定 Feature `music` / Work `a-render`，依据 D93 与本任务已实现的 SoundFont 管线，展示 marker 核对、离线音色缓存恢复、未知 marker 修复。复用现有终端页面、Cmd 与输入动作；终端结果显式标为示意，不执行 shell、不下载或发布，不伪造新 UI 评审批准。Pen 未打开文档，无法操作，因此沿用项目已有终端视觉。可复用的曲式/鼓谱/RMS 与 LUFS 区别/未经人耳验证报告已同步插件技能。
+
+### 2026-11 本轮创作与导出能力：根据源码整理，尚未发布
+
+此节是对本轮 issue 与整合分支源码的整理，不是历史原型的人工批准记录，也不覆盖上方 `d566856` 的历史核对基线。未查询 npm registry 或生产服务；Cloud reader 的本地契约更新不等于已部署，十二包代码与 tarball 冒烟通过也不等于已发行。
+
+保留原 Feature / Work / Scenario IDs，在现有 picked 作品追加 `source_update` 场景；原操作场景及历史备选继续保留：
+
+| 稳定入口 | 本轮可见内容 | 来源与状态 |
+| --- | --- | --- |
+| `voice.a-read-along.source_update` | 作品/章节旁白 dry-run 范围、`narrate(false)` 显式静音、`pace.systemLead` 与 `hold` 的前后节奏 | Issues #72 / #73 / #95；`packages/cli/src/voice.ts`、`packages/kit/src/index.ts`、`packages/web/src/runtime/demo.ts`；本地已实现与测试，不生成真实旁白 |
+| `frames.a-builtin.source_update` | 原生逻辑画幅与输出像素分离、去外框、Canvas 内 diagram 高亮与字号、宿主覆盖层安全区 | Issues #75 / #77 / #79 / #87；`packages/server/src/render.ts`、`capture.ts`、`plugins/diagram/src/`；本地已实现，命令为示意 |
+| `film_form.a-chapters.source_update` | 实际播放时间轴、逐帧导出、可恢复检查点、只读素材审计与状态边界 | Issues #71 / #77 / #79 / #80 / #85 / #86 / #88 / #90–#92 / #96；`packages/server/src/film.ts`、`timeline.ts`、`asset-usage.ts`；本地已实现的契约整理；#85 已通过真实横竖画幅、字体 Range 及提交/入场/漂移/镜头节点动态采样验收，容差 50ms；仍只给几何告警和明确 unknown |
+
+共用 `examples/joplo/shared/production/update.tsx`，使用既有 UI 组件、状态绑定、系统步骤和稳定步骤 key。展示的命令不会执行，不请求付费资源、不自动清理素材、不上传或发布。素材引用、发布入包与实际采样可见性分别叙述，动态与未知情况不冒称未使用。恢复明确要求先有检查点，仍重放引擎恢复状态，不虚构任意时刻跳入能力。
+
+公开文字主动写在场景画面里，不依赖私有 review manifest。没有新增 `origin: user / status: confirmed` 规则，也没有替原用户批准未决项。当前 npm/Cloud 发布状态与版面审查边界直接显示，后续验收有新证据时应更新此处及同一场景，而不是悄悄改写历史场景。
+
+本次整理验证：`joplo check examples/joplo` 为 0 error（保留历史方案既有的 16 warning / 40 info）；项目类型检查以 Node 类型声明执行通过；普通 build 通过，129 个文件，三个 `source_update` 场景分别含 3 / 2 / 4 步并进入公开构建。使用当前 checkout、独立 JOPLO_HOME 的静态渲染逐帧核对三组场景，宿主角标和旁白条未遮挡正文。Pen 当前连接的是另一 worktree 的共享画布，因此未修改该画布，沿用既有 UI 组件与视觉约定。没有启动或停止其他 worktree 的看板，没有生成付费声音或素材。

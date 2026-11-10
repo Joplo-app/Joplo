@@ -1,6 +1,6 @@
 # npm 发布流程
 
-十一个包统一版本、按依赖顺序发布：
+十二个包统一版本、按依赖顺序发布：
 
 | 包 | 内容 |
 | --- | --- |
@@ -10,13 +10,14 @@
 | `@joplo-app/plugin-3d` | 3D 场景与 GLB、可选 Tripo 本机生成、费用确认及任务恢复技能 |
 | `@joplo-app/plugin-content` | 默认讲解内容插件、设计画布、取景、FLIP、studio 主题与技能 |
 | `@joplo-app/plugin-ui` | 默认 UI 与 HTML 词汇、绘制及组件指南 |
+| `@joplo-app/plugin-media` | 本地一次性音效、视频片段、Lottie 与媒体技能 |
 | `@joplo-app/core` | 编译、校验与播放器 |
 | `@joplo-app/web` | 预构建看板、发布站、字体与 OFL 许可证 |
 | `@joplo-app/server` | 本地看板、构建、截图与导出 |
 | `@joplo-app/cli` | 命令实现 |
 | `joplo` | Node 版本检查与命令转发入口 |
 
-默认模板不安装 3D 插件，项目按需显式安装并启用。十一份公开 tarball（含 `@joplo-app/plugin-3d`）统一为 0.3.0；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
+默认模板不安装 3D 插件，项目按需显式安装并启用。十二份公开 tarball（含 `@joplo-app/plugin-3d`）统一为 0.3.0；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
 
 `release:version` 同步插件的轻量 `src/version.json`，运行时只读取版本，避免把整个开发 manifest 带进浏览器。
 
@@ -29,7 +30,7 @@
 ```sh
 git switch main && git pull
 pnpm install --frozen-lockfile
-pnpm release:version 0.3.0         # 改十一个包的版本，并重新生成 skills/（默认升 patch，破坏性变更升 minor）
+pnpm release:version 0.3.0         # 改十二个包的版本，并重新生成 skills/（默认升 patch，破坏性变更升 minor）
 pnpm install --lockfile-only
 pnpm typecheck && pnpm test         # 本地先过一遍，CI 会再跑
 git add packages/*/package.json plugins/*/package.json plugins/*/src/version.json packages/core/src/guide.ts pnpm-lock.yaml skills CHANGELOG.md
@@ -41,7 +42,7 @@ git tag v0.3.0 && git push origin v0.3.0   # 触发 .github/workflows/release.ym
 
 [release.yml](../.github/workflows/release.yml) 收到 `v*` tag 后：
 
-1. 检查 tag 与十一个包的版本一致（不一致直接失败，提示先 `pnpm release:version`），且 tag 指向的提交在 main 上；
+1. 检查 tag 与十二个包的版本一致（不一致直接失败，提示先 `pnpm release:version`），且 tag 指向的提交在 main 上；
 2. typecheck → test → `release:smoke`；
 3. `release:publish`（正式版 `--tag latest`，带 `-` 的预发布版 `--tag beta`），最后自动 verify；
 4. 用 `node scripts/commits.mjs notes <tag>` 生成说明并创建 GitHub Release（预发布版标为 Pre-release）：上一个 `v*` tag 以来的提交按“破坏性变更 / 新功能 / 修复 / 性能”分组，去掉前缀、带短哈希，末尾附 compare 链接。其他类型（docs、test、ci……）不进说明。CHANGELOG.md 里如果有 `## <版本>` 一节，会放在最前面作为概要；不写也行。
@@ -67,11 +68,11 @@ git tag v0.3.0 && git push origin v0.3.0   # 触发 .github/workflows/release.ym
 
 ### 一次性配置：npm Trusted Publishing
 
-CI 不存 npm token，用 GitHub OIDC 向 npm 证明身份（[npm 文档](https://docs.npmjs.com/trusted-publishers)），无需 OTP，发布的包自动带 provenance。需要 npm CLI ≥ 11.5.1（workflow 会先升级 npm）。由有发布权限的维护者在自己的终端登录后，给十一个包各配一次：
+CI 不存 npm token，用 GitHub OIDC 向 npm 证明身份（[npm 文档](https://docs.npmjs.com/trusted-publishers)），无需 OTP，发布的包自动带 provenance。需要 npm CLI ≥ 11.5.1（workflow 会先升级 npm）。由有发布权限的维护者在自己的终端登录后，给十二个包各配一次：
 
 ```sh
 npm login
-for p in @joplo-app/kit @joplo-app/plugin-diagram @joplo-app/plugin-alda @joplo-app/plugin-3d @joplo-app/plugin-content @joplo-app/plugin-ui @joplo-app/core @joplo-app/web @joplo-app/server @joplo-app/cli joplo; do
+for p in @joplo-app/kit @joplo-app/plugin-diagram @joplo-app/plugin-alda @joplo-app/plugin-3d @joplo-app/plugin-content @joplo-app/plugin-ui @joplo-app/plugin-media @joplo-app/core @joplo-app/web @joplo-app/server @joplo-app/cli joplo; do
   npm trust github "$p" --repo Joplo-app/Joplo --file release.yml --allow-publish -y
 done
 npm trust list joplo                # 确认配置
@@ -92,11 +93,11 @@ git push origin v0.3.0
 
 顺序不能乱：
 
-1. `pnpm release:version <v>`：改十一个包的版本，并重新生成 `skills/*/SKILL.md`（带新版本标记）。
+1. `pnpm release:version <v>`：改十二个包的版本，并重新生成 `skills/*/SKILL.md`（带新版本标记）。
 2. 跑完检查后，把 `packages/*/package.json`、`plugins/*/package.json`、`plugins/*/src/version.json`、`packages/core/src/guide.ts`（里面写着插件的安装版本）、`pnpm-lock.yaml` 和 `skills/` 一起提交，推送 main。推送 main 不会触发发布。
 3. `pnpm release:publish --tag <标签>`：先一次性构建并打包全部包（与 `release:pack` 相同，含全部 tarball 检查），再按依赖顺序发布打好的 tarball（可续跑，见下），最后自动运行 `release:verify`，整体退出码就是 verify 的结果。
 4. 第 3 步失败（中途某个包没发出去，或 verify 不通过）：按提示处理后重跑同一条命令，已发布的包会跳过。也可以单独运行 `pnpm release:verify` 复查。
-5. 第 3 步以 0 退出后，在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`。tag 会触发 release.yml：重跑检查，发布步骤因为十一个包都已存在而跳过，然后生成 GitHub Release。用户用 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。注意 `npx skills add Joplo-app/Joplo@v<v>` 不能用：skills CLI 把 `@` 后面当成技能名，报 No matching skills found（2026-11-06 实测）。手动发布时 tag 要等 verify 通过再推，避免指向一个装不上的版本。
+5. 第 3 步以 0 退出后，在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`。tag 会触发 release.yml：重跑检查，发布步骤因为十二个包都已存在而跳过，然后生成 GitHub Release。用户用 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。注意 `npx skills add Joplo-app/Joplo@v<v>` 不能用：skills CLI 把 `@` 后面当成技能名，报 No matching skills found（2026-11-06 实测）。手动发布时 tag 要等 verify 通过再推，避免指向一个装不上的版本。
 
 `release:version` 会同时重新生成仓库根目录的官方 Agent 技能 `skills/*/SKILL.md`（带版本标记，D64），要和版本号一起提交；`scripts/test/skills.test.ts` 会在不一致时失败（单独重新生成：`pnpm skills:build`）。
 
@@ -118,7 +119,7 @@ git push origin v0.3.0
 0.2.4 漏发了 core、0.2.6 漏发了 web：以前每个包 publish 前各自运行 prepublishOnly 构建，web 构建最慢，排在中间的包常在用户输入 OTP 之后失败。现在 `pnpm release:publish --tag latest` 分三步：
 
 1. 一次性构建并打包全部包到 `release/`（构建或任何 tarball 检查失败时一个包都不发）。
-2. 按依赖顺序（kit → plugin-diagram → plugin-alda → plugin-3d → plugin-content → plugin-ui → core → web → server → cli → joplo）逐个处理：先直接查询 registry（绕过本地缓存），已有这个版本就跳过；否则 `npm publish release/<包>.tgz --access public --tag <标签>`。任何一个包失败（包括查询 registry 失败）立刻停止，不再发后面的包，列出本次已发布、registry 上原本就有、还没发布的包，以非 0 退出。
+2. 按依赖顺序（kit → plugin-diagram → plugin-alda → plugin-3d → plugin-content → plugin-ui → plugin-media → core → web → server → cli → joplo）逐个处理：先直接查询 registry（绕过本地缓存），已有这个版本就跳过；否则 `npm publish release/<包>.tgz --access public --tag <标签>`。任何一个包失败（包括查询 registry 失败）立刻停止，不再发后面的包，列出本次已发布、registry 上原本就有、还没发布的包，以非 0 退出。
 3. 全部处理完后运行 `release:verify`，用它的结果作为整体退出码；通过时最后一行打印打 tag 的命令。
 
 中途失败后，处理登录、网络或 2FA 问题，再重跑同一条命令即可；已存在的版本会跳过，不必重发，也不必仅为重试增加版本号。实现见 [release.mjs](../scripts/release.mjs) 的 `publishRelease`，测试用替身注入打包、registry、npm publish 与 verify（scripts/test/release.test.ts）。
@@ -138,7 +139,7 @@ pnpm release:verify 0.2.5      # 或显式指定
 
 它做两件事，任何一步失败都列出缺的包并以非 0 退出：
 
-1. 对十一个包逐个运行 `npm view <名字>@<版本> version --prefer-online`；registry 有延迟，大包（web）发布后 npm 可能“processing”几分钟，所以每个包最多试 21 次、间隔 15 秒（约 5 分钟；0.2.9 CI 发布时 60 秒不够）。
+1. 对十二个包逐个运行 `npm view <名字>@<版本> version --prefer-online`；registry 有延迟，大包（web）发布后 npm 可能“processing”几分钟，所以每个包最多试 21 次、间隔 15 秒（约 5 分钟；0.2.9 CI 发布时 60 秒不够）。
 2. 全部都在时，在系统临时目录、用全新的 npm 缓存实际运行一次 `npx -y joplo@<版本> --help`；失败时从 npm 输出（E404 / notarget）里找出缺的包。
 
 失败时按提示重跑 `pnpm release:publish --tag <同一标签>`（已发布的包会跳过，只补发缺的），等几十秒后再运行 `pnpm release:verify`，直到通过。实现见 [release.mjs](../scripts/release.mjs) 的 `verifyRelease`，测试用替身注入 registry 与 npx（scripts/test/release.test.ts）。
@@ -169,3 +170,5 @@ npm deprecate '<old-package>@<range>' 'Use the corresponding @joplo-app package.
 [模板仓库](https://github.com/Joplo-app/joplo-templates)与主仓库隔离，由维护者手动更新默认分支；模板不参与发版，不同步版本、不打同版本 tag，发布 CI 不读写模板仓库。模板默认分支须能被最新发布的 CLI 使用，旧版本不保证。已发布的 0.6.0 及更早 CLI 仍下载主仓库原 tag，原 tag 的文件不受当前 checkout 删除影响。
 
 `release:smoke` 用 `scripts/fixtures/smoke/feature` 与 `scripts/fixtures/smoke/standalone` 两个本地测试夹具，通过 `init --template <夹具路径>` 走初始化；它们只供测试，不作为产品起步来源。全程不下载模板仓库；在仓库外只安装 tarball，保留 check/build、读回产物确认功能情况和独立作品章节、引擎技能一致性、安装后插件技能同步与产物扫描。另从安装后的技能文件构造 ui + diagram + content 演示，check 通过后用真实 Chromium 打开 dev，再用本机静态服务器打开构建产物（除它之外不许有网络请求，D98）前进/回退验证发布站。测试驱动使用工作区 Playwright，不把它安装到用户项目；CI 先安装 Chromium，本地可用 `pnpm --filter @joplo-app/server exec playwright install chromium` 准备。下载默认分支、名称解析、占位替换、私有令牌、解压失败与路径穿越由 CLI 单元测试中的内存 tarball 覆盖。
+
+`@joplo-app/plugin-media` 首次纳入公开发布。原有十一个包的 Trusted Publishing 配置不代表此新包已经配置；代码与 tarball 检查可以先进行，首次 npm 发布权限和可信发布方需在最终发布阶段单独核验。测试不得创建 registry 版本或写入发布凭证。

@@ -39,11 +39,25 @@ Before building a device, historical interface or illustrated object, make an as
 - Beat 2: the twist, shown on stage (the answer splits into pieces with probabilities, a name changes on the second try).
 - Beat 3: pull back and name the questions the episode answers. Pin each question where it will be answered, and close every loop later.
 
+## Camera sequences and persistent materials
+Use cameraSequence for a single long explanation that needs deliberate framing throughout (not high-frequency drawing). Import it from @joplo-app/plugin-content and put it in a scripted system step:
+\`\`\`ts
+cameraSequence([
+  { atMs: 0, target: 'room', zoom: 1 },
+  { atMs: 2500, target: 'message', zoom: 1.15, ease: 'easeInOut' },
+  { atMs: 6500, target: 'message', zoom: 1.22, ease: 'easeOut' },
+])
+\`\`\`
+Waypoints start at 0, increase strictly, end within 60000 ms, and use existing element IDs (or targets: [...] for a group). Each waypoint may set pad/zoom; ease belongs to the incoming segment (easeInOut default, easeOut or linear). The step stays at least until the last waypoint. Pause and speed follow engine time. Static renders, deep-link jumps, animate=false and reduced motion show the final waypoint. Free exploration yields to the final layout. Existing camera() and drift remain valid; a sequence replaces drift for that framing state. An ordinary next step inherits the current path; explicitly issuing even the same cameraSequence again restarts it. A continuing chapter inherits the final frame until it issues a new sequence. End with camera() when changing the subject.
+
+For the same subject changing material, keep one motion key and bind the destination layout, borderRadius, color, backgroundColor, opacity and text to state. Content interpolates those supported style values along the same motion flight; changed text crossfades through a temporary inert, aria-hidden clone without a second motion identity. Static jumps show destination styles immediately. This is a transition between authored states, not arbitrary per-frame drawing. Keep interactive controls in the live subject: the fading clone has no hit area or focus identity. Test long text at both endpoints and play the transition with Voice on; do not infer continuous motion from static storyboard frames.
+
 ## 3. Not slides: one world, continuous objects, a moving camera (the core)
 Failure mode, even with nice graphics: one board per chapter (big title, panels, footer), chapter title cards, cards of bullets, things fading in and out. Viewers read it as a deck. Instead:
 - One layer holding one <Canvas w={2560} h={1600}> world (the default view is 1280×800, scaled to fit, never re-laid out; in a container without a height it sizes itself from the view ratio, and render warns 'Canvas has no size' if it still has none). Place a few containers absolutely in design pixels; lay out inside them with flex.
 - Objects keep their identity: give each one motion="key". Write each arrangement as static JSX switched with when, reusing the same key; between steps Joplo flies the object from its old place and size to the new one, also across containers. Morph, never replace: the question's words split into tokens, flip into ids, then fly onto a tape; bars rearrange into a lottery strip.
 - shot() draws the host focus ring and caps UI zoom at 1.25×; use camera() for traveling inside a Canvas without that ring.
+- For diagram trace inside Canvas, pass { focus: false } to trace(...ids, options) so only the Canvas camera owns framing.
 - When another plugin effect also suggests host focus (for example a diagram trace inside a Canvas), use an explicit shot() for the whole director layer if the Canvas camera should own the framing. Otherwise host zoom and Canvas zoom can multiply and push nearby text out of view. Verify the actual visible bounds in playback, not only DOM text.
 - Camera: camera('id', …) frames those elements (Joplo measures them, adds pad, caps zoom); camera() shows the whole canvas. Establish wide, push in on detail, pull back for the payoff. Object flights in the same step follow the camera's timing, so both land together.
 - Chapters continue: chapter() starts from the previous chapter's last frame (state, camera, director layer) by default. Only use from: null to restart, or from: 'sliceKey' for another predecessor; keep all slices chapter() within this work. patch($.ui, { … }) changes several values in one step.
@@ -129,7 +143,19 @@ chapter('What does it read?')
 - HAPPY_PATH_ONLY belongs to feature review. If an explainer receives it, move the piece to works/<key>.tsx with work()/chapter() and remove its artificial cases; do not invent product failures. Review every storyboard and verify animation separately from static renders.
 `;
 
-export const patterns = `# content recipes and pitfalls
+export const patterns = `
+## Updating a public design replay from implementation evidence
+Preserve historical scenarios and stable feature/work IDs; append a clearly labeled source-derived update instead of rewriting an old approval. Put current status and limits in the visible scene: local implementation, work in progress, deployed and published are different claims. Commands displayed in a prototype are not real execution evidence. Reuse a new director layer when a work is already layered; for a route-only work, add a work-local route so adding the evidence view does not replace the original default stage. Keep the host badge/narration safe areas visible during verification.
+
+## Dual-aspect explainers with source metadata
+When adapting one dataset to landscape and portrait, author two arrangements at readable design sizes; do not shrink the landscape composition wholesale. For native export also set the logical stage with render --viewport WIDTHxHEIGHT --no-frame; output --width/--height alone only change the surrounding frame. Reserve separate areas for brand, main subject, image credit, source/fact status and subtitles. Also leave room for host chrome: the step badge at the top and current narration/completion bar at the bottom. Check with chrome visible, not only clean video. Give photo panels an explicit image height and adjustable object-position; credit and archive year need their own measured height below the image. A title-first opening may place one main graphic below the title.
+
+For bilingual quotations show the full original, a translation explicitly labeled as translation, name, role, date and source. Test long original text and a long source name in both aspects; their actual wrapped heights determine the layout, not a short placeholder. Status labels and explanations belong to the author: preserve their meaning rather than replacing prediction, announcement or confirmation with one generic badge.
+
+Use a two-ended proportion bar when a dense point plot becomes unreadable in portrait. Keep left + right <= total and show total-left-right as undecided; position optional thresholds against the full total, not only the decided portion. Test the pure ratio calculation, then inspect real rendered chapters for text overflow. Shared wrapper components should forward bindings and when/enter/exit/motion props.
+
+See examples/explainer-layouts: shared fictional data, local original vector illustration explicitly labeled non-photographic, short/long quote chapters and customizable status. These components are example-owned; the independent templates repository is maintained separately. No external facts, paid generation or online images are required.
+# content recipes and pitfalls
 
 ## Museum-film composition
 - Collect licensed artwork and a real subject asset first. Let an archival image supply the historical texture and the subject supply the action; use CSS only for framing, gradients and typography. Label illustrative artwork when it is not evidence of the place or event.
@@ -197,5 +223,7 @@ Symptoms in an existing piece: one board per chapter (label, big title, panels, 
 - Every element using the same entrance: vary by meaning (section 3b) and stagger with enterDelay; let new things start before old ones finish leaving.
 - A whole interface replaced in one frame (when swap without exit/enter) is a hard cut. Give both sides a transition or cover the swap with the subject.
 - Whole-screen white/colour flashes over a still picture look like a stalled player; keep the picture moving under any fade.
+
+For runtime layout QA, use joplo render --audit-layout for a final-state screenshot and --film --audit-layout for motion. Declare important selectors, a content frame and reserved footer/subtitle rectangles; exclude intentional stamps/background overlays. Text Range bounds reflect loaded fonts and actual Canvas scaling. Canvas exposes its existing engine-clock camera, drift midpoint/end and sequence-waypoint deadlines only as DOM diagnostic hints; static/jump/exploration states do not claim future motion. A later step can interrupt a phase, and masks/rotation or hidden content remain unknown rather than "visible". Inspect evidence before changing intentional overlap.
 
 Common pitfall: For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, film-strip the chain, and verify playback before claiming it works`;

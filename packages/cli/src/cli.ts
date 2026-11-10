@@ -63,7 +63,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   let exitCode = 0;
   const serverPackage = '@joplo-app/server';
   const loadServer = deps.loadServer ?? (() => import(serverPackage));
-  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'startPreview' | 'renderStep' | 'renderSheet' | 'renderFilm' | 'renderVideo' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime' | 'generateProjectVoice' | 'generateResources'>(name: K): Promise<typeof Server[K]> {
+  async function serverFunction<K extends 'buildFeatureDiff' | 'startDev' | 'buildSite' | 'startPreview' | 'renderStep' | 'renderSheet' | 'renderFilm' | 'renderFrames' | 'renderVideo' | 'exportRuntimeStatus' | 'installExportRuntime' | 'uninstallExportRuntime' | 'generateProjectVoice' | 'generateResources'>(name: K): Promise<typeof Server[K]> {
     let module: Record<string, unknown>;
     try { module = await loadServer(); }
     catch (e) { throw new JoploError('UNSUPPORTED_ACTION', `@joplo-app/server cannot load ${name}: ${e instanceof Error ? e.message : String(e)}`); }
@@ -120,17 +120,40 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   });
   cloudCommand('voice').description('Generate missing narration audio for independent works and picked feature options (same cache as the board): Joplo Cloud narration when signed in, or the source chosen in the board or joplo.config.ts')
     .argument('[dir]', 'Project directory', '.').addOption(format())
+    .option('--work <id>', 'Only this standalone work key or qualified feature work id')
+    .option('--scenario <id>', 'Only this chapter and its continuing-chapter dependencies')
+    .option('--scenario-id <id>', 'Alias for --scenario')
     .option('--dry-run', 'Only count the steps and characters that would be generated')
     .option('--locale <lang>', 'Only this content language from config locales (D84); repeatable', collect, [])
     .action(async (dir, opts) => {
       const { voiceCommand } = await import('./voice.ts');
-      const r = await voiceCommand(resolve(dir), { dryRun: !!opts.dryRun, locales: opts.locale, server: opts.server }, {
+      const r = await voiceCommand(resolve(dir), { dryRun: !!opts.dryRun, locales: opts.locale, server: opts.server, work: opts.work, scenario: opts.scenario ?? opts.scenarioId }, {
         version: deps.cliVersion ?? await readCliVersion(), cloud: deps.cloud, generate: () => serverFunction('generateProjectVoice'),
         build: async options => (await serverFunction('buildSite'))(options), render: () => serverFunction('renderStep'), progress: l => stderr(oneLine(l) + '\n'),
       });
       if (opts.format === 'json') json(result(resolve(dir), r.summary, r.data));
       else for (const l of r.lines) line(l);
       if (r.data.total.failed) exitCode = 1;
+    });
+  program.command('assets').description('Read-only asset usage: author references, selected publish IR inclusion, and unknown sampled visibility')
+    .argument('[dir]', 'Project directory', '.').addOption(format())
+    .option('--usage', 'Report usage (the default; never deletes or uploads)')
+    .option('--scan <directory>', 'Explicit project-relative file or directory to inventory; repeatable, symlinks skipped', collect, [])
+    .option('--work <id>', 'Limit authored work scope by exact compiled work id')
+    .option('--scenario <id>', 'Limit chapter scope, including continuing predecessors')
+    .action(async (dir, opts) => {
+      const { assetsCommand } = await import('./assets.ts');
+      const report = await assetsCommand(resolve(dir), { scan: opts.scan, work: opts.work, scenario: opts.scenario });
+      if (opts.format === 'json') json(result(resolve(dir), `${report.entries.length} asset/resource record(s)`, report));
+      else {
+        line(`Asset scope: work=${report.scope.work ?? 'all'}, scenario=${report.scope.scenario ?? 'all'}; scanned ${report.scope.scan.join(', ') || '(no directories)'}`);
+        for (const entry of report.entries) {
+          line(`${entry.path ?? entry.id}: ${entry.mime ?? entry.kind}, ${entry.bytes === null ? 'unknown size' : `${entry.bytes} bytes`}; ${entry.authorReference}; ${entry.publication}; visibility unknown`);
+          for (const ref of entry.references) line(`  ${ref.workId ?? '?'} / ${ref.scenarioId ?? '?'} / ${ref.layer ?? '?'} / ${ref.elementId ?? '?'} / ${ref.source ?? '?'} (${ref.evidence})`);
+        }
+        for (const unknown of report.unknowns) line(`Unknown: ${unknown.source ?? '?'}: ${unknown.reason}`);
+        for (const limitation of report.limitations) line(limitation);
+      }
     });
   const diff = program.command('diff').enablePositionalOptions().description('Compare two public builds; prepare and publish immutable PR comparisons')
     .argument('[before]', 'Baseline static build directory').argument('[after]', 'Current static build directory')
@@ -404,37 +427,73 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     stderr(`Serving ${site} (read-only). Press Ctrl+C to stop.\n`);
   });
   program.command('render').argument('[dir]', 'Project directory', '.').requiredOption('--scenario-id <qid>', 'Scenario ID').option('--step-id <qid>', 'Position after this step; defaults to the initial state')
-    .option('--theme <theme>', 'Theme: built-in (sketch, clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast) or project themes/<name>.css; defaults to the project theme').requiredOption('--out <file>', 'Screenshot file')
+    .option('--theme <theme>', 'Theme: built-in (sketch, clean, blueprint, nord, dracula, solarized-light, terminal, kraft, contrast) or project themes/<name>.css; defaults to the project theme').option('--out <file>', 'Screenshot / film / video output file; frames-out writes its own directory')
     .option('--width <pixels>', 'Screenshot width (stage width follows the page viewport); with --video the video resolution, stage centered on the theme background (e.g. 1920x1080, 1080x1920); requires height', integer('width')).option('--height <pixels>', 'Screenshot / video height; requires width', integer('height'))
     .option('--scale <scale>', 'Pixel scale', scale).option('--overwrite', 'Allow overwriting the screenshot')
     .option('--content <lang>', 'Author content language from config locales (D84); defaults to the source language')
+    .option('--audit-layout', 'Measure actual text/clipping/safe-area geometry; static screenshot or --film only')
+    .option('--audit-content <selector-or-rect>', 'Content frame: CSS selector or x,y,width,height relative to the export root')
+    .option('--audit-safe-area <selector-or-rect>', 'Reserved area for declared important content; repeatable', collect, [])
+    .option('--audit-important <selector>', 'Important elements: CSS selector; repeatable', collect, [])
+    .option('--audit-exclude <selector>', 'Exclude decorations or intentional overlaps and their subtree; repeatable', collect, [])
+    .option('--audit-every-ms <ms>', 'Diagnostic probe interval in engine ms, 20–1000; phase deadlines sampled separately', Number)
+    .option('--crop <selector-or-rect>', 'Crop to CSS selector or x,y,width,height in CSS pixels')
+    .option('--viewport <size>', 'Logical stage WIDTHxHEIGHT, shared by layout, camera and overlays')
+    .option('--no-frame', 'Omit the device frame')
+    .option('--timeline <file>', 'Write versioned actual playback timestamps')
+    .option('--frames-out <dir>', 'Export offline JPEG frame sequence with timeline.json')
+    .option('--fps <n>', 'With --frames-out: frames per second (default 30)', Number)
+    .option('--chapter-timeout <ms>', 'Maximum wall-clock processing time per film chapter (default 180000)', integer('chapter-timeout'))
+    .option('--checkpoint <file>', 'Save film progress at chapter boundaries')
+    .option('--resume', 'Replay engine state and reuse verified checkpoint image analysis')
+    .option('--sample-ms <ms>', 'Film computation interval, 20–250 ms (default 50); larger values can miss brief CUTs', integer('sample-ms'))
     .option('--sheet', 'Storyboard: every step of the scenario in one image, with step number, caption, and narration under each frame')
     .option('--columns <n>', 'Storyboard / film columns (with --sheet default 3, with --film default 8)', integer('columns'))
     .option('--film', 'Film strip: play the scenario on a frozen engine clock and sample a frame every --every ms, with time, step, adjacent-frame change, hard cuts, and still runs marked; one page per scenario')
     .option('--video', 'Record a .webm of the scenario playing in real time (same recorder as the board export), with the media plugins\' music and generated narration on its audio track')
-    .option('--voice <mode>', 'With --video: real (default) mixes generated narration audio and holds each step for it, estimating lines without audio; estimate is silent with estimated timing; off reads nothing')
-    .option('--hide <items>', 'With --video: comma list of player elements to leave out: cover, cursor, title (step title bar and completion badge), subtitles')
-    .option('--clean', 'With --video: same as --hide cover,cursor,title,subtitles')
+    .option('--silent', 'With --video: omit all audio while keeping playback timing')
+    .option('--voice <mode>', 'Playback voice: real uses generated clip timing; estimate is silent with estimated timing; off reads nothing (video/frames default real, film defaults estimate)')
+    .option('--hide <items>', 'With playback exports: comma list of player elements to leave out: cover, cursor, title (step title bar and completion badge), subtitles')
+    .option('--clean', 'With playback exports: same as --hide cover,cursor,title,subtitles')
     .option('--srt <file>', 'With --video: also write the subtitles as a SubRip file timed to the video')
-    .option('--chain', 'With --film/--video: keep playing the next slices of the work in published order, to the last one')
-    .option('--every <ms>', 'With --film: one cell every N ms of engine time (default 250)', integer('every'))
+    .option('--chain', 'With --film/--video/--frames-out: play the next chapters of the work in published order, to the last one')
+    .option('--every <ms>', 'With --film: save one cell every N ms (default 250); computation remains --sample-ms', integer('every'))
     .option('--frames <dir>', 'With --film: also save each cell as a JPEG in this directory')
     .option('--format <format>', 'With --film: text or json summary', 'text').action(async (dir, opts) => {
+      if (!opts.out && !opts.framesOut) throw new JoploError('USAGE', '--out is required unless --frames-out is used');
+      const viewportParts = opts.viewport ? /^(\d+)x(\d+)$/.exec(opts.viewport) : null;
+      if (opts.viewport && !viewportParts) throw new JoploError('USAGE', '--viewport must be WIDTHxHEIGHT');
+      const cropParts = opts.crop && /^-?[\d.]+,-?[\d.]+,[\d.]+,[\d.]+$/.test(opts.crop) ? opts.crop.split(',').map(Number) : null;
+      const { auditOptions } = await import('./layout-audit.ts');
+      const auditLayout = auditOptions(opts);
+      if (auditLayout && (opts.sheet || opts.video || opts.framesOut)) throw new JoploError('USAGE', '--audit-layout currently supports static screenshots or --film; use --film for motion diagnostics');
+      if (auditLayout && opts.resume) throw new JoploError('USAGE', '--audit-layout requires a fresh render; do not combine with --resume');
+      if (auditLayout && opts.sampleMs !== undefined && opts.sampleMs > 50) throw new JoploError('USAGE', 'Motion layout audit requires --sample-ms <= 50');
+      const geometry = { ...(auditLayout ? { auditLayout } : {}), ...(viewportParts ? { logicalViewport: { width: Number(viewportParts[1]), height: Number(viewportParts[2]) } } : {}), ...(opts.frame === false ? { noFrame: true } : {}), ...(opts.crop ? { crop: cropParts ? { x: cropParts[0], y: cropParts[1], width: cropParts[2], height: cropParts[3] } : opts.crop } : {}) };
       if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'width and height must be provided together');
-      if ([opts.sheet, opts.film, opts.video].filter(Boolean).length > 1) throw new JoploError('USAGE', '--sheet, --film and --video are separate modes; pick one');
-      if ((opts.chain || opts.every !== undefined || opts.frames) && !opts.film && !opts.video) throw new JoploError('USAGE', '--chain, --every and --frames need --film (or --video for --chain)');
-      if ((opts.voice !== undefined || opts.hide !== undefined || opts.clean || opts.srt !== undefined) && !opts.video) throw new JoploError('USAGE', '--voice, --hide, --clean and --srt need --video');
-      if (opts.film || opts.video) {
+      if ([opts.sheet, opts.film, opts.video, opts.framesOut].filter(Boolean).length > 1) throw new JoploError('USAGE', '--sheet, --film, --video and --frames-out are separate modes; pick one');
+      if ((opts.chain || opts.every !== undefined || opts.frames) && !opts.film && !opts.video && !opts.framesOut) throw new JoploError('USAGE', '--chain, --every and --frames need --film (or --video for --chain)');
+      if ((opts.voice !== undefined || opts.hide !== undefined || opts.clean || opts.timeline) && !opts.video && !opts.framesOut && !opts.film) throw new JoploError('USAGE', '--voice, --hide, --clean and --timeline need playback export');
+      if (opts.silent && !opts.video) throw new JoploError('USAGE', '--silent needs --video');
+      if (opts.srt && !opts.video) throw new JoploError('USAGE', '--srt needs --video');
+      if (opts.fps !== undefined && !opts.framesOut) throw new JoploError('USAGE', '--fps needs --frames-out');
+      if ((opts.sampleMs !== undefined || opts.checkpoint || opts.resume || opts.chapterTimeout !== undefined) && !opts.film) throw new JoploError('USAGE', '--sample-ms, --checkpoint, --resume and --chapter-timeout need --film');
+      if (opts.film || opts.video || opts.framesOut) {
         if (opts.stepId !== undefined) throw new JoploError('USAGE', '--film/--video play the whole scenario; do not combine with --step-id');
-        if (opts.film && opts.width !== undefined) throw new JoploError('USAGE', '--film samples the stage itself; do not combine with --width or --height');
         const { askYesNo, isInteractive, withExportComponent } = await import('./setup.ts');
-        const base = { projectDir: resolve(dir), scenarioId: opts.scenarioId, theme: opts.theme, out: resolve(opts.out), overwrite: opts.overwrite, chain: !!opts.chain, ...(opts.content ? { content: opts.content } : {}) };
+        const exportHide = (opts.clean ? ['cover', 'cursor', 'title', 'subtitles'] : String(opts.hide ?? '').split(',').map((x: string) => x.trim()).filter(Boolean)) as ('cover' | 'cursor' | 'title' | 'subtitles')[];
+        const base = { ...geometry, ...(opts.voice ? { voice: opts.voice } : {}), ...(exportHide.length ? { hide: exportHide } : {}), ...(opts.timeline ? { timeline: resolve(opts.timeline) } : {}), ...(opts.width !== undefined ? { width: opts.width, height: opts.height } : {}), projectDir: resolve(dir), scenarioId: opts.scenarioId, theme: opts.theme, out: resolve(opts.out ?? `${opts.framesOut}/film.png`), overwrite: opts.overwrite, chain: !!opts.chain, ...(opts.content ? { content: opts.content } : {}) };
         const setup = { server: setupServer, interactive: deps.interactive ?? isInteractive(), ask: deps.ask ?? askYesNo, io: setupIo() };
+        if (opts.framesOut) {
+          const renderFrames = await serverFunction('renderFrames');
+          const result = await withExportComponent(() => renderFrames({ ...base, ...(opts.voice ? { voice: opts.voice } : {}), framesOut: resolve(opts.framesOut), fps: opts.fps, scale: opts.scale }), setup);
+          json(result); return;
+        }
         if (opts.video) {
           const renderVideo = await serverFunction('renderVideo');
           // 未知项交给 renderVideo 报 USAGE（带可用项）
           const hide = (opts.clean ? ['cover', 'cursor', 'title', 'subtitles'] : String(opts.hide ?? '').split(',').map((x: string) => x.trim()).filter(Boolean)) as ('cover' | 'cursor' | 'title' | 'subtitles')[];
-          const video = await withExportComponent(() => renderVideo({ ...base, ...(opts.width !== undefined ? { width: opts.width, height: opts.height } : {}), ...(opts.voice !== undefined ? { voice: opts.voice } : {}), ...(hide.length ? { hide } : {}), ...(opts.srt ? { srt: resolve(opts.srt) } : {}) }), setup);
+          const video = await withExportComponent(() => renderVideo({ ...base, ...(opts.silent ? { audio: false } : {}), ...(opts.width !== undefined ? { width: opts.width, height: opts.height } : {}), ...(opts.voice !== undefined ? { voice: opts.voice } : {}), ...(hide.length ? { hide } : {}), ...(opts.srt ? { srt: resolve(opts.srt) } : {}) }), setup);
           line(video.path);
           if (video.srt) line(video.srt);
           line(`${video.size.width}×${video.size.height} · voice ${video.voice.mode}`);
@@ -447,11 +506,12 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
           return;
         }
         const renderFilm = await serverFunction('renderFilm');
-        const film = await withExportComponent(() => renderFilm({ ...base, ...(opts.every ? { every: opts.every } : {}), ...(opts.columns ? { columns: opts.columns } : {}), ...(opts.frames ? { frames: resolve(opts.frames) } : {}) }), setup);
+        const film = await withExportComponent(() => renderFilm({ ...base, ...(opts.chapterTimeout ? { chapterTimeoutMs: opts.chapterTimeout } : {}), ...(opts.checkpoint ? { checkpoint: resolve(opts.checkpoint) } : {}), ...(opts.resume ? { resume: true } : {}), ...(opts.sampleMs ? { sampleMs: opts.sampleMs } : {}), ...(opts.every ? { every: opts.every } : {}), ...(opts.columns ? { columns: opts.columns } : {}), ...(opts.frames ? { frames: resolve(opts.frames) } : {}) }), setup);
         if (opts.format === 'json') { json(film); return; }
         for (const f of film.files) line(f);
         const s = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
         line(`duration ${s(film.durationMs)} · ${film.samples} frames every ${film.sampleMs} ms · max adjacent diff ${(film.maxDiff * 100).toFixed(1)}%`);
+        for (const warning of film.warnings) stderr(oneLine(warning) + '\n');
         for (const b of film.boundaries.filter(b => b.chapter)) line(`chapter → ${b.scenarioId} at ${s(b.atMs)}: max adjacent diff ${(b.maxDiff * 100).toFixed(1)}%, changed ${(b.maxChanged * 100).toFixed(0)}%`);
         for (const c of film.cuts) line(`CUT ${s(c.atMs)} ${c.scenarioId} step ${c.position}: ${(c.changed * 100).toFixed(0)}% of pixels changed in one frame`);
         for (const x of film.stills) line(`STILL ${s(x.fromMs)}–${s(x.toMs)} (${s(x.toMs - x.fromMs)}) ${x.scenarioId} step ${x.position}`);
@@ -461,7 +521,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         if (opts.stepId !== undefined || opts.width !== undefined) throw new JoploError('USAGE', '--sheet renders every step; do not combine it with --step-id, --width, or --height');
         const renderSheet = await serverFunction('renderSheet');
         const { askYesNo, isInteractive, withExportComponent } = await import('./setup.ts');
-        const sheet = await withExportComponent(() => renderSheet({ projectDir: resolve(dir), scenarioId: opts.scenarioId, theme: opts.theme, out: resolve(opts.out), overwrite: opts.overwrite, ...(opts.columns ? { columns: opts.columns } : {}), ...(opts.content ? { content: opts.content } : {}) }),
+        const sheet = await withExportComponent(() => renderSheet({ ...geometry, projectDir: resolve(dir), scenarioId: opts.scenarioId, theme: opts.theme, out: resolve(opts.out), overwrite: opts.overwrite, ...(opts.columns ? { columns: opts.columns } : {}), ...(opts.content ? { content: opts.content } : {}) }),
           { server: setupServer, interactive: deps.interactive ?? isInteractive(), ask: deps.ask ?? askYesNo, io: setupIo() });
         line(sheet.path);
         for (const warning of sheet.warnings) stderr(oneLine(warning) + '\n');
@@ -469,10 +529,11 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       }
       const renderStep = await serverFunction('renderStep');
       const { askYesNo, isInteractive, withExportComponent } = await import('./setup.ts');
-      const data = await withExportComponent(() => renderStep({ projectDir: resolve(dir), scenarioId: opts.scenarioId, stepId: opts.stepId, theme: opts.theme, out: resolve(opts.out),
+      const data = await withExportComponent(() => renderStep({ ...geometry, projectDir: resolve(dir), scenarioId: opts.scenarioId, stepId: opts.stepId, theme: opts.theme, out: resolve(opts.out),
         viewport: opts.width === undefined ? undefined : { width: opts.width, height: opts.height }, scale: opts.scale, overwrite: opts.overwrite, ...(opts.content ? { content: opts.content } : {}) }),
         { server: setupServer, interactive: deps.interactive ?? isInteractive(), ask: deps.ask ?? askYesNo, io: setupIo() });
       line(data.path);
+      if (data.audit) line(`Layout audit: ${data.audit.path} · ${data.audit.findings} warning(s), ${data.audit.samples} sample(s)`);
       for (const warning of data.warnings) stderr(oneLine(warning) + '\n');
     });
   try { await program.parseAsync(args, { from: 'user' }); }

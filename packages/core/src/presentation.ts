@@ -114,7 +114,7 @@ export function streamPlan(step: Step | undefined, prev: Pick<PlayState, 'ui' | 
     const before = prev ? readPath(prev, s.path) : undefined;
     const keep = typeof before === 'string' && before && s.value.startsWith(before) ? [...before].length : 0;
     const fresh = [...s.value].slice(keep).join('');
-    const voiced = s.pace === 'voice' ? voicePacedMs(step?.narrate ?? step?.say) : 0;
+    const voiced = s.pace === 'voice' && !step?.mute ? voicePacedMs(step?.narrate ?? step?.say) : 0;
     return { path: s.path, value: s.value, keep, ms: fresh ? (voiced || streamMs(fresh)) : 0, ...(s.pace ? { pace: s.pace } : {}) };
   });
 }

@@ -13,7 +13,7 @@ export { startPreview, SITE_CONTENT_TYPES, type PreviewHandle } from './preview.
 export { generateProjectVoice, type VoiceRunOptions, type VoiceRunResult } from './voice-run.ts';
 export type { CloudSpeechRequest, CloudSpeechResult, CloudVoice, CloudVoiceBridge, CloudVoiceCatalog, CloudVoiceInfo, CloudVoiceStatus, VoiceQuota } from './cloud.ts';
 export { renderSheet, renderStep } from './render.ts';
-export { renderFilm, renderVideo } from './film.ts';
+export { renderFilm, renderVideo, renderFrames } from './film.ts';
 export { EXPORT_DOWNLOAD_MB, PLAYWRIGHT_VERSION, SETUP_COMMAND, exportRuntimeStatus, installExportRuntime, uninstallExportRuntime, type ExportRuntimeStatus, type InstallProgress, type InstallResult } from './export-runtime.ts';
 
 export { buildFeatureDiff, publicIRFromHtml, type DiffBuildOptions, type DiffBuildResult } from './feature-diff.ts';
@@ -24,3 +24,10 @@ export { LocalResources } from './local-resources.ts';
 export { inspectResources, mediaDiagnostics } from './media-check.ts';
 
 export { watchConfigDiagnostics } from './watch-config.ts';
+
+export { assetUsage, type AssetUsageReport, type AssetUsageEntry, type AssetUsageReference } from './asset-usage.ts';
+
+export type { ExportCrop, FramesOptions, FilmOptions, FilmResult, VideoOptions, VideoResult } from './contract.ts';
+export type { PlaybackTimeline, PlaybackEvent } from './timeline.ts';
+
+export { auditLayout, createLayoutAuditSession, type LayoutAuditOptions, type LayoutFinding, type LayoutAuditSample } from './layout-audit.ts';

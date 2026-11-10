@@ -70,6 +70,14 @@ describe('say() 与 config({ voice })', () => {
 });
 
 describe('narrate() 与朗读优先级', () => {
+  it('narrate(false) explicitly silences narration, say and caption/card fallback without changing defaults', () => {
+    const p = compile(src({ scenarios: { happy: flow('Send', { start: '/', cases: ['happy'] }).click('go', 'Caption', say('Dialogue'), narrate(false)).card('Card title', { sub: 'Card subtitle' }, narrate(false)).click('go', 'Default caption') } }), 'publish').project!;
+    const [muted, card, normal] = p.scenarios['f.a.happy']!.steps;
+    expect(spokenLine(muted!, 'Translated caption', 'ana')).toEqual({ text: '', role: null });
+    expect(narrationText(card!, 'Translated card')).toBe('');
+    expect(narrationText(normal!, 'Default caption')).toBe('Default caption');
+  });
+
   it('narrate（旁白的声音）> say（角色的声音）> 字幕（旁白的声音）；空 narrate 报 NARRATE_EMPTY', () => {
     const p = compile(src({ scenarios: { happy: flow('Send', { start: '/', cases: ['happy'] }).click('go', 'Ana sends it', say('Here you go!'), narrate('She sends it as a link.')).click('go', 'Again', say('Once more!')).click('go', 'Last') } }), 'dev').project!;
     const [a, b, c] = p.scenarios['f.a.happy']!.steps;

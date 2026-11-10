@@ -279,6 +279,18 @@ importers:
         specifier: workspace:*
         version: link:../../plugins/ui
 
+  examples/explainer-layouts:
+    devDependencies:
+      '@joplo-app/kit':
+        specifier: workspace:*
+        version: link:../../packages/kit
+      '@joplo-app/plugin-content':
+        specifier: workspace:*
+        version: link:../../plugins/content
+      '@joplo-app/plugin-ui':
+        specifier: workspace:*
+        version: link:../../plugins/ui
+
   examples/feature-board:
     devDependencies:
       '@joplo-app/kit':

@@ -129,3 +129,20 @@ it.each([0,12000])('preserves numeric start offset %i through seek and scope; fa
   expect(scopeProject(p,['f.a.s']).project.scenarios['f.a.s']!.steps[0]!.media!['fake:bgm']!.offsetMs).toBe(offset);
  } finally { fake.compile!.effect=original; }
 });
+
+it('one-shot events overlap with stable identities and expire naturally without fading', () => {
+ const src = source();
+ const one = definePlugin({ id:'one', title:'One shots', components:{}, runtime:'/runtime.js', local:'/local.js', compile:{effect(e,ctx){return {media:[{track:'sfx',action:'play',resource:ctx.resource({compiler:'wav',input:'same'}),oneShot:true,durationMs:20000,offsetMs:1000,volume:.6}]};}} });
+ src.config.plugins = [...src.config.plugins!, one];
+ src.features.f!.works.a!.scenarios.s = flow('S',{start:'/'}).system('A',pluginEffect('one','play',{}),hold(1)).system('B',pluginEffect('one','play',{}),hold(1));
+ const result = compile(src,'publish'); expect(result.diagnostics).toEqual([]);
+ const a = result.project!, b = compile(src,'publish').project!;
+ const steps = a.scenarios['f.a.s']!.steps;
+ expect(steps.map(s=>s.media)).toEqual(b.scenarios['f.a.s']!.steps.map(s=>s.media));
+ expect(Object.keys(steps[1]!.media!)).toHaveLength(2);
+ const event = Object.values(steps[0]!.media!)[0]!;
+ expect(event).toMatchObject({offsetMs:1000,endAfterMs:19000,volume:.6,loop:false});
+ const midway=mediaAt(a,'f.a.s',1,9000);
+ expect(Object.values(midway)[0]).toMatchObject({volume:.6,endAfterMs:10000});
+ expect(mediaAt(a,'f.a.s',1,19000)).toEqual({});
+});

@@ -34,6 +34,22 @@ function builtin<T>(name: string): T {
   return get(name) as T;
 }
 
+/** Node-only provenance captured while loading author modules; never serialized into playback IR. */
+export type AssetLoad = { file: string; source?: string; mime: string; bytes: number; data: string };
+type CaptureStore = { getStore(): AssetLoad[] | undefined; run<T>(records: AssetLoad[], fn: () => Promise<T>): Promise<T> };
+const CAPTURE = Symbol.for('joplo.asset.capture');
+/** Async-local isolation prevents concurrent project reports from sharing paths or bytes. */
+export async function captureAssetLoads<T>(run: () => Promise<T>): Promise<{ value: T; assets: AssetLoad[] }> {
+  const globals = globalThis as typeof globalThis & { [CAPTURE]?: CaptureStore };
+  if (!globals[CAPTURE]) {
+    const { AsyncLocalStorage } = builtin<{ AsyncLocalStorage: new () => CaptureStore }>('node:async_hooks');
+    globals[CAPTURE] = new AsyncLocalStorage();
+  }
+  const assets: AssetLoad[] = [];
+  const value = await globals[CAPTURE]!.run(assets, run);
+  return { value, assets };
+}
+
 /** 读入图片或二进制资源，返回 data URI（用于 <Image src={…}>，也可以写进 style 的 backgroundImage: `url(${asset(…)})`）。 */
 export function asset(path: string, from?: string): string {
   const fs = builtin<Fs>('node:fs');
@@ -55,5 +71,7 @@ export function asset(path: string, from?: string): string {
   const limit = mime.startsWith('image/') ? ASSET_MAX_BYTES : 50 * 1024 * 1024;
   if (size > limit)
     throw new Error(`asset("${path}"): ${Math.round(size / 1024)} KB is over the ${limit / 1024 / 1024} MB limit; compress or resize the asset first`);
-  return `data:${mime};base64,${Buffer.from(fs.readFileSync(file)).toString('base64')}`;
+  const data = `data:${mime};base64,${Buffer.from(fs.readFileSync(file)).toString('base64')}`;
+  (globalThis as typeof globalThis & { [CAPTURE]?: CaptureStore })[CAPTURE]?.getStore()?.push({ file, source: callsite(), mime, bytes: size, data });
+  return data;
 }

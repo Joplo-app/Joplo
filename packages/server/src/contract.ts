@@ -61,7 +61,15 @@ export type BuildOptions = {
 export type BuildResult = { entries?: { id: string; title: string; slices: number; sequencing: 'linear' | 'independent' }[]; outDir: string; files: string[]; routes: string[]; scenarios: string[]; diagnostics: Diagnostic[]; voice?: { clips: number; bytes: number; missing: number; profile: string | null; reused?: number; locales?: Record<string, { missing: number }> }; /** 有 scope 时：范围与借用了哪些别的功能的内容（D75）。 */ scope?: ScopeInfo };
 export declare function buildSite(opts: BuildOptions): Promise<BuildResult>;
 
+export type ExportCrop = string | { x: number; y: number; width: number; height: number };
 export type RenderOptions = {
+  auditLayout?: import('./layout-audit.ts').LayoutAuditOptions | boolean;
+  /** CSS 选择器或相对输出画布的 CSS 像素矩形。所有像素诊断在裁切后计算。 */
+  crop?: ExportCrop;
+  /** 直接决定布局、镜头和交互坐标的逻辑舞台尺寸。 */
+  logicalViewport?: { width: number; height: number };
+  /** 不绘制设备外框。 */
+  noFrame?: boolean;
   projectDir: string;
   scenarioId: string;
   /** 渲染该步骤执行之后的状态；缺省为初始状态。 */
@@ -85,7 +93,7 @@ export type RenderOptions = {
   scope?: string[];
 };
 export type RenderedElement = { id: string; type: string; label: string; visible: boolean; disabled: boolean; at: string | null; box: { x: number; y: number; width: number; height: number } };
-export type RenderResult = { path: string; sceneId: string; position: number; scale: number; elements: RenderedElement[]; warnings: string[] };
+export type RenderResult = { audit?: import('./layout-audit.ts').LayoutAuditResult; path: string; sceneId: string; position: number; scale: number; elements: RenderedElement[]; warnings: string[] };
 export declare function renderStep(opts: RenderOptions): Promise<RenderResult>;
 /** 分镜（storyboard）：一个场景的每一步拼成一张图，每格下面是步号、字幕与旁白。 */
 export type SheetOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope'> & { /** 每行几格，默认 3。 */ columns?: number; /** 每格宽度（像素），默认 480。 */ cellWidth?: number };
@@ -95,14 +103,17 @@ export declare function renderSheet(opts: SheetOptions): Promise<SheetResult>;
  * 胶片条（`joplo render --film`）：按引擎时间逐帧定格（Playwright 假时钟），每 sampleMs 算一次相邻帧差，每 every 取一格。
  * 每个场景一页（多页时 out 之后加 -1、-2…）；cuts = 单帧整屏突变，stills = 至少 stillMs 没有可见变化，boundaries = 每次提交一步前后的最大相邻帧差。
  */
-export type FilmOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 'scale'> & { chain?: boolean; every?: number; sampleMs?: number; stillMs?: number; columns?: number; cellWidth?: number; /** 把胶片格另存为 JPEG 的目录（可选）。 */ frames?: string };
+export type FilmOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 'scale'> & { width?: number; height?: number; timeline?: string; checkpoint?: string; resume?: boolean; chapterTimeoutMs?: number; hide?: ('cover' | 'cursor' | 'title' | 'subtitles')[]; voice?: 'real' | 'estimate' | 'off'; chain?: boolean; every?: number; sampleMs?: number; stillMs?: number; columns?: number; cellWidth?: number; /** 把胶片格另存为 JPEG 的目录（可选）。 */ frames?: string };
 export type FilmCut = { atMs: number; diff: number; changed: number; scenarioId: string | null; position: number };
 export type FilmStill = { fromMs: number; toMs: number; scenarioId: string | null; position: number };
 export type FilmBoundary = { atMs: number; scenarioId: string | null; position: number; chapter: boolean; maxDiff: number; maxChanged: number };
-export type FilmResult = { path: string; files: string[]; durationMs: number; sampleMs: number; every: number; samples: number; cuts: FilmCut[]; stills: FilmStill[]; boundaries: FilmBoundary[]; maxDiff: number; warnings: string[] };
+export type FilmResult = { audit?: import('./layout-audit.ts').LayoutAuditResult; measurement?: { baselineRssBytes:number;endRssBytes:number;memoryScope:'node-process-lifetime';rssSamples:{engineMs:number;rssBytes:number}[]; wallMs: number; peakRssBytes: number; resumedSamples: number }; path: string; files: string[]; durationMs: number; sampleMs: number; every: number; samples: number; cuts: FilmCut[]; stills: FilmStill[]; boundaries: FilmBoundary[]; maxDiff: number; warnings: string[] };
 export declare function renderFilm(opts: FilmOptions): Promise<FilmResult>;
 /** 视频（`joplo render --video`）：与看板导出同一个录制器（真实时间，webm）。 */
 export type VideoOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 'scale'> & {
+  timeline?: string;
+  /** false records no narration or background audio while retaining playback timing. */
+  audio?: boolean;
   chain?: boolean;
   /**
    * 输出分辨率（#55，两个都给或都不给）：舞台原样居中放进这个画幅，四周是主题背景色，按比例放大或缩小保持清晰
@@ -118,6 +129,7 @@ export type VideoOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' |
   srt?: string;
 };
 export type VideoResult = {
+  sync?: { offsetMs: number; videoEndMs: number; audioEndMs: number };
   path: string;
   durationMs: number;
   /** 视频分辨率。 */
@@ -127,3 +139,7 @@ export type VideoResult = {
   voice: { mode: 'real' | 'estimate' | 'off'; /** 没有音频、按估算时长停留的段（只有 real 时有）。 */ missing: { text: string; role: string | null }[] };
 };
 export declare function renderVideo(opts: VideoOptions): Promise<VideoResult>;
+
+/** JPEG frame files named by engine milliseconds, plus a versioned actual-playback timeline. */
+export type FramesOptions = Omit<FilmOptions, 'out'> & { out?: string } & { framesOut: string; fps?: number; scale?: number };
+export declare function renderFrames(opts: FramesOptions): Promise<{ directory: string; timeline: string; fps: number; frames: number; durationMs: number; toleranceMs: number }>;

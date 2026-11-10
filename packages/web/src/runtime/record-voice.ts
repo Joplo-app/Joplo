@@ -57,7 +57,7 @@ export class RecordVoice {
   private buffers = new Map<string, AudioBuffer>();
   /** 有没有可播的音频：一段都没有时不必录音轨（全部按估算时长）。 */
   get hasAudio(): boolean { return this.buffers.size > 0; }
-  constructor(private readonly o: { output: () => RecordVoiceOutput | null; decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>; fallback: Narrator }) {
+  constructor(private readonly o: { output: () => RecordVoiceOutput | null; decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>; fallback: Narrator; timingOnly?: boolean }) {
     this.narrator.enabled = true;
     this.narrator.speak = (text, role, speed) => this.speak(text, role, speed);
   }
@@ -67,6 +67,14 @@ export class RecordVoice {
     const t = text.trim();
     const fp = lookup ? voiceFingerprint(lookup, role, t) : null;
     return fp ? (lookup!.clips[clipKey(fp, t)] ?? null) : null;
+  }
+
+  identity() { return { lookup:this.narrator.lookup, clips:[...this.buffers].map(([url,buffer])=>({url,durationMs:buffer.duration*1000})) }; }
+
+  describe(text: string, role: string | null) {
+    const url = this.urlOf(text, role);
+    const buffer = url ? this.buffers.get(url) : null;
+    return { clipId: url ? url.split('/').pop() ?? url : null, file: url, durationMs: buffer ? buffer.duration * 1000 : null, source: buffer ? 'clip' : 'estimate' };
   }
 
   /** 预取并解码这些段的音频；取不到的段在播放时按估算时长处理。 */
@@ -91,6 +99,14 @@ export class RecordVoice {
     const url = this.urlOf(t, role);
     const buffer = url ? this.buffers.get(url) : undefined;
     const out = buffer ? this.o.output() : null;
+    if (buffer && this.o.timingOnly) {
+      let left = buffer.duration * 1000 / speed, started = performance.now(), timer: ReturnType<typeof setTimeout> | null = null;
+      let finish!: () => void;
+      const done = new Promise<void>(resolve => { finish = resolve; });
+      const run = () => { started = performance.now(); timer = setTimeout(() => { timer = null; left = 0; finish(); }, left); };
+      run();
+      return { source: 'clip', done, pause: () => { if (timer) { clearTimeout(timer); timer = null; left = Math.max(0, left - (performance.now() - started)); } }, resume: () => { if (!timer && left > 0) run(); }, cancel: () => { if (timer) clearTimeout(timer); timer = null; left = 0; finish(); } };
+    }
     if (buffer && out) return playBuffer(out, buffer, speed);
     this.missing.push({ text: t, role });
     return this.o.fallback.speak(t, role, speed);

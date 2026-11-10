@@ -1,4 +1,4 @@
-import { flow, type EffectDef, type OptionDef } from '@joplo-app/kit';
+import { flow, type EffectDef, type WorkDef } from '@joplo-app/kit';
 
 /** Deliberately public narration, curated from evidence; never a private review export. */
 export type PublicDesignRecord = {
@@ -11,7 +11,7 @@ export type PublicDesignRecord = {
 };
 
 /** Keep every original scenario intact; frame one actual interaction as a design replay. */
-export function withDesignRecord(definition: OptionDef, record: PublicDesignRecord): OptionDef {
+export function withDesignRecord(definition: WorkDef, record: PublicDesignRecord): WorkDef {
   const example = definition.scenarios[record.scenario];
   if (!example) throw new Error(`Missing design replay scenario: ${record.scenario}`);
   const replay = flow('设计回放 · 问题、原型与后续取舍', {

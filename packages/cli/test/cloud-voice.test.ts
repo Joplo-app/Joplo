@@ -213,3 +213,20 @@ test('joplo voice：旧云端没有 /api/v1/voice（404）时不发请求，以 
   expect(dry.code).toBe(0);
   expect(speechCalls()).toHaveLength(0);
 });
+
+
+test('voice --work resolves qualified works and --scenario aliases expose scoped per-step dry-run detail', async () => {
+  await login();
+  const id = Object.keys(devIr.works).find(id => !devIr.works[id]!.draft)!;
+  const scenario = Object.values(devIr.scenarios).find(sc => sc.workId === id)!;
+  for (const flag of ['--scenario', '--scenario-id']) {
+    const r = await cli(['voice', project, '--work', id, flag, scenario.id, '--dry-run', '--format=json']);
+    expect(r.code).toBe(0);
+    const details = r.json().data.locales.flatMap((l: any) => l.details);
+    expect(details.length).toBeGreaterThan(0);
+    expect(details.every((d: any) => d.workId === id)).toBe(true);
+    expect(details.map((d: any) => d.stepId)).toContain(scenario.steps[0]!.id);
+  }
+  expect(speechCalls()).toHaveLength(0);
+  expect((await cli(['voice', project, '--work', 'missing', '--dry-run'])).code).toBe(2);
+});

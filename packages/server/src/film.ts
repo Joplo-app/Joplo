@@ -14,15 +14,22 @@
  * 停留时间与开着朗读的发布站一致。
  */
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright-core';
-import { JoploError, displaySceneId, type Project } from '@joplo-app/core';
+import { JoploError, VIEWPORT_SIZE, displaySceneId, type Project } from '@joplo-app/core';
 import type { FilmOptions, FilmResult, FilmCut, FilmStill, FilmBoundary, VideoOptions, VideoResult } from './contract.ts';
 import { createDev } from './dev.ts';
 import { realProjectDir } from './vite-shared.ts';
 import { joploHome } from './home.ts';
 import { loadPlaywright } from './export-runtime.ts';
-import { launch } from './render.ts';
+import { assertNotProjectData, launch } from './render.ts';
+import { encodeMp4 } from './video-format.ts';
+import { commitOutput, writeOutput } from './output-file.ts';
+import { createLayoutAuditSession } from './layout-audit.ts';
+import { checkpointCommitsMatch, contentIdentity, exportRuntimeRoots } from './checkpoint.ts';
+import { capture, geometryQuery } from './capture.ts';
+import { frameTime, persistTimeline, playbackTimeline, type RawTimeline } from './timeline.ts';
 import { EXPORT_SIZE, defaultRecorder, srt } from './export.ts';
 
 /** 单帧整屏突变：变化像素占比至少这么多，且是前后帧的 CUT_RATIO 倍以上（排除持续的快速运镜）。 */
@@ -32,10 +39,14 @@ export const CUT_RATIO = 2.5;
 export const STILL_CHANGED = 0.004;
 /** 一个像素的 RGB 平均差超过这个值才算“变了”（0–1）。 */
 const PIXEL_THRESHOLD = 0.08;
+function distinctOutputs(paths: (string | undefined)[]) {
+  const values = paths.filter((p): p is string => !!p).map(p => path.resolve(p));
+  if (new Set(values).size !== values.length) throw new JoploError('USAGE', 'Export output, timeline, subtitles and checkpoint paths must differ');
+}
 const MAX_MS = 10 * 60_000;
 
 type Progress = { step: number; done: boolean; error: string | null; scenarioId: string | null; position: number; activeStep: number | null };
-type Sample = { t: number; diff: number; changed: number; still: number; scenarioId: string | null; position: number; activeStep: number | null; jpg?: string };
+type Sample = { t: number; diff: number; changed: number; still: number; scenarioId: string | null; position: number; activeStep: number | null; stepId?: string | null; jpg?: string };
 
 /** 纯函数：从逐帧的相邻差找出硬切。changed[i] 是第 i 帧与第 i-1 帧之间变化像素的占比。 */
 export function findCuts(samples: readonly Pick<Sample, 't' | 'changed' | 'diff' | 'scenarioId' | 'position'>[]): FilmCut[] {
@@ -81,15 +92,18 @@ const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 /** 辅助页：解码 JPEG、裁掉字幕区，与上一帧、静止起点比较。状态留在页面里，每帧只传一次图片。 */
 const DIFF_PAGE = `<!doctype html><canvas id=c></canvas><script>
-let prev=null, anchor=null, anchorT=0;
+let prev=null, anchor=null, anchorT=0, history=[];
 async function load(b64){ const img=new Image(); img.src='data:image/jpeg;base64,'+b64; await img.decode(); return img; }
 function pixels(img, h){ const c=document.getElementById('c'); c.width=img.width; c.height=h; const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0); return g.getImageData(0,0,img.width,h).data; }
 function compare(a,b,th){ let sum=0, changed=0; const n=a.length/4; for(let i=0;i<a.length;i+=4){ const d=(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2]))/765; sum+=d; if(d>th) changed++; } return { diff: sum/n, changed: changed/n }; }
+window.dump = (back=0) => {const state=history[Math.max(0,history.length-1-back)]||{prev,anchor,anchorT};return {prev:Array.from(state.prev||[]),anchor:Array.from(state.anchor||[]),anchorT:state.anchorT};};
+window.restore = (s) => {prev=new Uint8ClampedArray(s.prev);anchor=new Uint8ClampedArray(s.anchor);anchorT=s.anchorT;history=[{prev,anchor,anchorT}];};
 window.step = async (b64, cropRatio, t, th, stillTh) => {
   const img = await load(b64); const d = pixels(img, Math.max(1, Math.round(img.height*cropRatio)));
   const adj = prev ? compare(prev, d, th) : { diff: 0, changed: 0 };
   prev = d;
   if (!anchor || compare(anchor, d, th).changed > stillTh) { anchor = d; anchorT = t; }
+  history.push({prev,anchor,anchorT}); if(history.length>12)history.shift();
   return { ...adj, still: t - anchorT };
 };
 </script>`;
@@ -115,6 +129,7 @@ async function flush(page: Page) {
 
 function check(opts: { projectDir: string; out: string; overwrite?: boolean }) {
   const out = path.resolve(opts.out);
+  assertNotProjectData(opts.projectDir, out);
   if (fs.existsSync(out) && !opts.overwrite) throw new JoploError('USAGE', `Output file already exists: ${out}. To overwrite, pass overwrite: true (CLI: --overwrite)`);
   const dataDir = path.join(realProjectDir(opts.projectDir), '.joplo');
   if (out === dataDir || out.startsWith(dataDir + path.sep)) throw new JoploError('USAGE', `Cannot write to project data: ${out} (.joplo/ is managed by Joplo)`);
@@ -125,7 +140,7 @@ async function compiled(projectDir: string) {
   const server = await createDev({ projectDir, port: 0, watch: false, log: () => undefined });
   const payload = server.payload();
   if (!payload.project) {
-    await server.close();
+    await server.close().catch(() => undefined);
     const errs = payload.diagnostics.filter((d) => d.severity === 'error');
     throw new JoploError('INVALID_SCHEMA', `Project compilation failed: ${errs.map((d) => `${d.at ?? ''} ${d.message}`).join('; ')}`, { diagnostics: payload.diagnostics });
   }
@@ -138,20 +153,36 @@ function videoDimension(name: string, v: number) {
   return v;
 }
 
-function recordUrl(base: string, projectId: string, project: Project, o: { scenarioId: string; theme?: string; chain?: boolean; audio?: boolean; locale?: string; content?: string; voice?: 'real' | 'estimate' | 'off'; hide?: readonly string[]; canvas?: { width: number; height: number } }) {
+function recordUrl(base: string, projectId: string, project: Project, o: { scenarioId: string; theme?: string; chain?: boolean; audio?: boolean; locale?: string; content?: string; voice?: 'real' | 'estimate' | 'off'; hide?: readonly string[]; logicalViewport?: { width: number; height: number }; noFrame?: boolean; canvas?: { width: number; height: number } }) {
   if (!project.scenarios[o.scenarioId]) throw new JoploError('NOT_FOUND', `Scenario does not exist: ${o.scenarioId} (available: ${Object.keys(project.scenarios).join(', ') || 'none'})`);
   if (o.content !== undefined && !project.i18n?.locales.includes(o.content))
     throw new JoploError('USAGE', project.i18n ? `--content ${o.content} is not in config locales (${project.i18n.locales.join(', ')})` : `--content needs config({ locales }); this project has a single language`);
   const voice = o.voice ?? 'estimate';
-  const q = new URLSearchParams({ render: '1', project: projectId, scenario: o.scenarioId, position: '0', theme: o.theme ?? project.theme ?? 'sketch', frame: '1', record: '1', ...(voice !== 'off' ? { voice } : {}), ...(o.chain ? { chain: '1' } : {}), ...(o.audio === false ? {audio:'0'} : {}), ...(o.locale ? { locale: o.locale } : {}), ...(o.content ? { content: o.content } : {}), ...(o.hide?.length ? { hide: o.hide.join(',') } : {}), ...(o.canvas ? { w: String(o.canvas.width), h: String(o.canvas.height) } : {}) });
+  const q = new URLSearchParams({ render: '1', project: projectId, scenario: o.scenarioId, position: '0', theme: o.theme ?? project.theme ?? 'sketch', frame: '1', record: '1', ...(voice !== 'off' ? { voice } : {}), ...(o.chain ? { chain: '1' } : {}), ...(o.audio === false ? {audio:'0'} : {}), ...(o.locale ? { locale: o.locale } : {}), ...(o.content ? { content: o.content } : {}), ...(o.hide?.length ? { hide: o.hide.join(',') } : {}), ...geometryQuery(o), ...(o.canvas ? { w: String(o.canvas.width), h: String(o.canvas.height) } : {}) });
   const device: 'mobile' | 'desktop' = project.scenes[displaySceneId(project, o.scenarioId, 0)]?.viewport === 'mobile' ? 'mobile' : 'desktop';
-  return { url: `${base}?${q}`, size: EXPORT_SIZE[device], device };
+  return { url: `${base}?${q}`, size: o.logicalViewport ?? (o.noFrame ? VIEWPORT_SIZE[device] : EXPORT_SIZE[device]), device };
 }
 
 /** 胶片条：按引擎时间逐帧定格取样。 */
-export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
+async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScale?: number; framesOnly?: boolean }): Promise<FilmResult> {
+  if(opts.auditLayout&&opts.resume)throw new JoploError('USAGE','Layout audit requires a fresh render; do not combine it with --resume');
+  if(opts.auditLayout&&opts.framesOnly)throw new JoploError('USAGE','Layout audit supports static screenshots and --film, not --frames-out');
+  const baselineRssBytes=process.memoryUsage().rss;
   const projectDir = realProjectDir(opts.projectDir);
   const out = check({ ...opts, projectDir });
+  const metadataOut = check({ projectDir, out: out.replace(/(\.png)?$/i, '.json'), overwrite: opts.overwrite });
+  if (opts.timeline) {
+    check({ projectDir, out: opts.timeline, overwrite: opts.overwrite });
+    assertNotProjectData(projectDir, path.join(`${path.resolve(opts.timeline).replace(/\.json$/i, '')}.assets`, '__asset.wav'));
+  }
+  distinctOutputs([out, metadataOut, opts.timeline, opts.checkpoint]);
+  geometryQuery(opts);
+  if (opts.voice && !['real', 'estimate', 'off'].includes(opts.voice)) throw new JoploError('USAGE', '--voice must be real, estimate or off');
+  if (opts.hide?.some(h => !['cover', 'cursor', 'title', 'subtitles'].includes(h))) throw new JoploError('USAGE', 'Unknown hide item');
+  if (opts.chapterTimeoutMs !== undefined && (!Number.isFinite(opts.chapterTimeoutMs) || opts.chapterTimeoutMs <= 0)) throw new JoploError('USAGE', 'chapterTimeoutMs must be positive');
+  if (opts.sampleMs !== undefined && !Number.isFinite(opts.sampleMs)) throw new JoploError('USAGE', 'sampleMs must be finite');
+  if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'Film width and height must be provided together');
+  if (opts.width !== undefined && ![opts.width, opts.height].every(n => Number.isInteger(n) && n! > 0 && n! <= 8192)) throw new JoploError('USAGE', 'Film dimensions must be integers from 1 to 8192');
   const sampleMs = Math.max(20, Math.min(250, Math.round(opts.sampleMs ?? 50)));
   const every = Math.max(sampleMs, Math.round((opts.every ?? 250) / sampleMs) * sampleMs);
   const stillMs = opts.stillMs ?? 1500;
@@ -159,12 +190,28 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
   const cellWidth = Math.max(120, Math.min(640, Math.round(opts.cellWidth ?? 224)));
   const playwright = await loadPlaywright({ home: joploHome(), projectDir });
   const { server, project } = await compiled(projectDir);
+  let fingerprint = '';
+  const checkpointFile = opts.checkpoint ? path.resolve(opts.checkpoint) : null;
+  if (checkpointFile) assertNotProjectData(projectDir, checkpointFile);
+  let checkpoint: { fingerprint: string; samples: Sample[]; diff: unknown; commits: {stepId:string;commitMs:number}[] } | null = null;
+  if (opts.resume) {
+    if (!checkpointFile) { await server.close(); throw new JoploError('USAGE', '--resume requires --checkpoint'); }
+    try {
+      checkpoint = JSON.parse(fs.readFileSync(checkpointFile, 'utf8'));
+      if(!checkpoint||typeof checkpoint.fingerprint!=='string'||!Array.isArray(checkpoint.samples)||checkpoint.samples.length===0||!Array.isArray(checkpoint.commits)||checkpoint.commits.some(c=>typeof c.stepId!=='string'||!Number.isFinite(c.commitMs)))throw new Error('Invalid checkpoint schema');
+    } catch { await server.close(); throw new JoploError('USAGE', 'Checkpoint is absent or invalid'); }
+  }
+  const startedAt = Date.now();
   let browser: Browser | null = null;
   try {
-    const { url, size } = recordUrl(server.url, server.projectId, project, {...opts,audio:false});
+    const audit=opts.auditLayout?createLayoutAuditSession({out,project,crop:opts.crop,options:opts.auditLayout,overwrite:opts.overwrite,sampleMs}):null;
+    const canvas = opts.width && opts.height ? { width: opts.width, height: opts.height } : opts.logicalViewport;
+    const { url, size: defaultSize } = recordUrl(server.url, server.projectId, project, {...opts,audio:false,voice: opts.voice ?? (opts.framesOnly ? 'real' : 'estimate'), ...(canvas ? { canvas } : {})});
+    const size = canvas ?? defaultSize;
     browser = await launch(playwright);
-    const ctx = await browser.newContext({ viewport: size, deviceScaleFactor: 0.5 });
+    const ctx = await browser.newContext({ viewport: size, deviceScaleFactor: opts.framesOnly ? opts.frameScale ?? 1 : 0.5 });
     const page = await ctx.newPage();
+    const captureSession = await ctx.newCDPSession(page);
     await page.clock.install({ time: 0 });
     // 先冻结空白页，避免读 now 与 pauseAt 两次调用之间的墙钟竞态。
     await page.clock.pauseAt(86_400_000);
@@ -182,31 +229,83 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
     if (err) throw new JoploError('RENDER_FAILED', `Render route reported an error: ${err}`);
     // 加载期间也只按 16ms 网格推进；开播相位不随网络和字体加载耗时改变。
     await flush(page);
+    await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { prepare(): Promise<void> } }).__JOPLO_RECORD__.prepare());
+    if(checkpointFile) {
+    const excluded = [out,metadataOut,opts.timeline,opts.timeline ? opts.timeline.replace(/\.json$/i,'')+'.assets' : null,opts.frames,checkpointFile].filter((p):p is string=>!!p);
+    const outStem=path.basename(out).replace(/\.png$/i,'');
+    for(const name of fs.existsSync(path.dirname(out))?fs.readdirSync(path.dirname(out)):[]) if(name.startsWith(outStem+'-')&&name.endsWith('.png')) excluded.push(path.join(path.dirname(out),name));
+    const sourceIdentity = contentIdentity([projectDir,...exportRuntimeRoots(projectDir,server.payload().plugins ?? {})],excluded);
+    const { projectDir:_projectDir,out:_out,overwrite:_overwrite,resume:_resume,checkpoint:_checkpoint,timeline:_timeline,frames:_frames,...rendering }=opts;
+    const voiceIdentity=await page.evaluate(()=>(window as unknown as {__JOPLO_RECORD__:{voiceIdentity():unknown}}).__JOPLO_RECORD__.voiceIdentity());
+    fingerprint=createHash('sha256').update(JSON.stringify({version:2,browser:browser.version(),platform:process.platform,arch:process.arch,node:process.versions.node,project,voiceIdentity,sourceIdentity,rendering,sampleMs,every,stillMs,plugins:server.payload().plugins})).digest('hex');
+    if (checkpoint?.fingerprint !== undefined && checkpoint.fingerprint !== fingerprint) throw new JoploError('USAGE','Checkpoint source, version or rendering options changed; start a fresh render');
+    }
     const helper = await ctx.newPage();
     await helper.setContent(DIFF_PAGE);
     // 字幕与步骤标题条浮在画面上（D97）：胶片条只看画面本身的运动，采样时把它们藏起来，文字换行不算镜头切换
     await page.addStyleTag({ content: '[data-jsubtitle],[data-testid="step-title"]{visibility:hidden!important}' });
     const stageRatio = 1;
     const samples: Sample[] = [];
+    let lastChapter: string | null = null;
+    let chapterStartedAt = Date.now();
+    const rssSamples: {engineMs:number;rssBytes:number}[]=[];
+    let nextMemoryAt=0;
     let tail = -1;
     // 第一帧在开播之前采（封面 / 第 0 步）：开播那一下的切换也要量到
-    for (let t = 0; t <= MAX_MS; t += sampleMs) {
-      if (t === sampleMs) {
+    let previousTime = 0;
+    for (let index = 0; ; index++) {
+      const t = opts.frameFps ? frameTime(index, opts.frameFps) : index * sampleMs;
+      if (t > MAX_MS) break;
+      if (index === 1) {
         await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { play(): void } }).__JOPLO_RECORD__.play());
         await flush(page);
       }
-      if (t > 0) await page.clock.runFor(sampleMs);
+      if (t > 0) await page.clock.runFor(t - previousTime);
+      previousTime = t;
       await flush(page);
       const p = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { progress: Progress } }).__JOPLO_RECORD__.progress);
       if (p.error) throw new JoploError('RENDER_FAILED', `Playback failed at ${t} ms: ${p.error}`);
-      const jpg = (await page.locator('[data-jexport]').screenshot({ type: 'jpeg', quality: 72 })).toString('base64');
-      const d = await helper.evaluate(([b64, crop, time, th, st]) => (window as unknown as { step: (...a: unknown[]) => Promise<{ diff: number; changed: number; still: number }> }).step(b64, crop, time, th, st), [jpg, stageRatio, t, PIXEL_THRESHOLD, STILL_CHANGED] as const);
-      samples.push({ t, ...d, scenarioId: p.scenarioId, position: p.position, activeStep: p.activeStep, ...(t % every === 0 ? { jpg } : {}) });
-      if (opts.frames && t % every === 0) { fs.mkdirSync(opts.frames, { recursive: true }); fs.writeFileSync(path.join(opts.frames, `${String(t).padStart(7, '0')}.jpg`), Buffer.from(jpg, 'base64')); }
+      if (p.scenarioId !== lastChapter) chapterStartedAt = Date.now();
+      if (Date.now() - chapterStartedAt > (opts.chapterTimeoutMs ?? 180_000)) throw new JoploError('RENDER_FAILED', `Chapter ${p.scenarioId} timed out at ${t} ms (wall clock); completed checkpoint was preserved`);
+      if(t>=nextMemoryAt) {rssSamples.push({engineMs:t,rssBytes:process.memoryUsage().rss});nextMemoryAt=t+5000;}
+      const restored = checkpoint?.samples[index];
+      if (restored) {
+        samples.push(restored);
+        if (index === checkpoint!.samples.length - 1) {
+          const currentStep = p.scenarioId ? project.scenarios[p.scenarioId]?.steps[p.position-1]?.id ?? null : null;
+          if(restored.scenarioId!==p.scenarioId||restored.position!==p.position||restored.activeStep!==p.activeStep||restored.stepId!==currentStep) throw new JoploError('RENDER_FAILED',`Checkpoint stable state diverged at ${t} ms; rerun without --resume`);
+          const raw = await page.evaluate(() => (window as unknown as {__JOPLO_RECORD__:{timeline():RawTimeline}}).__JOPLO_RECORD__.timeline());
+          const commits=playbackTimeline(raw).steps.map(s=>({stepId:s.stepId,commitMs:s.commitMs}));
+          if(!checkpointCommitsMatch(checkpoint!.commits,commits)) throw new JoploError('RENDER_FAILED','Checkpoint playback commits differ by more than 50 ms; rerun without --resume');
+          await helper.evaluate((state) => (window as unknown as { restore(s: unknown): void }).restore(state), checkpoint!.diff);
+        }
+        lastChapter = p.scenarioId;
+        continue;
+      }
+      const jpg = (await capture(page, '[data-jexport]', opts.crop, 'jpeg', opts.framesOnly ? 95 : 72, captureSession, t)).toString('base64');
+      await audit?.sample(page,{atMs:t,scenarioId:p.scenarioId??opts.scenarioId,position:p.position,jpg});
+      const d = opts.framesOnly ? { diff: 0, changed: 0, still: 0 } : await helper.evaluate(([b64, crop, time, th, st]) => (window as unknown as { step: (...a: unknown[]) => Promise<{ diff: number; changed: number; still: number }> }).step(b64, crop, time, th, st), [jpg, stageRatio, t, PIXEL_THRESHOLD, STILL_CHANGED] as const);
+      samples.push({ t, ...d, scenarioId: p.scenarioId, position: p.position, activeStep: p.activeStep, stepId: p.scenarioId ? project.scenarios[p.scenarioId]?.steps[p.position-1]?.id ?? null : null, ...(!opts.framesOnly && t % every === 0 ? { jpg } : {}) });
+      if (opts.frames && (opts.framesOnly || t % every === 0)) { fs.mkdirSync(opts.frames, { recursive: true }); fs.writeFileSync(path.join(opts.frames, `${String(t).padStart(7, '0')}.jpg`), Buffer.from(jpg, 'base64')); }
+      if (checkpointFile && lastChapter && lastChapter !== p.scenarioId && samples.length>4) {
+        // Keep a stable final-state anchor before the seam. Its small tail is
+        // recomputed, so accepted one-sample scheduling jitter never reuses seam pixels.
+        const back=Math.min(10,Math.ceil(100/sampleMs)+1), prefix=samples.slice(0,-back);
+        const diff=await helper.evaluate(back => (window as unknown as {dump(n:number):unknown}).dump(back),back);
+        const raw=await page.evaluate(() => (window as unknown as {__JOPLO_RECORD__:{timeline():RawTimeline}}).__JOPLO_RECORD__.timeline());
+        const cutoff=prefix.at(-1)!.t;
+        const commits=playbackTimeline({...raw,events:raw.events.filter(e=>e.at-(raw.startedAt??0)<=cutoff)}).steps.map(s=>({stepId:s.stepId,commitMs:s.commitMs}));
+        fs.mkdirSync(path.dirname(checkpointFile),{recursive:true});
+        const temp=`${checkpointFile}.${process.pid}.tmp`;
+        fs.writeFileSync(temp,JSON.stringify({fingerprint,samples:prefix,diff,commits}));fs.renameSync(temp,checkpointFile);
+      }
+      lastChapter = p.scenarioId;
       if (p.done && tail < 0) tail = t + 1000;
       if (tail >= 0 && t >= tail) break;
     }
     if (tail < 0) throw new JoploError('RENDER_FAILED', `Playback did not finish within ${MAX_MS / 60000} minutes of engine time`);
+    const raw = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { timeline(): RawTimeline } }).__JOPLO_RECORD__.timeline());
+    if (opts.timeline) { const file = check({ projectDir, out: opts.timeline, overwrite: opts.overwrite }); await persistTimeline(file, playbackTimeline(raw), project.mediaAssets ?? {}, server.url, opts.overwrite, server.token,project.mediaInfo); }
     const cuts = findCuts(samples);
     const stills = findStills(samples, stillMs);
     const boundaries = stepBoundaries(samples);
@@ -244,19 +343,21 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
       const png = await sheet.screenshot({ type: 'png', fullPage: true });
       await sheet.close();
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, png, opts.overwrite ? undefined : { flag: 'wx' });
+      await writeOutput(file,png,opts.overwrite);
       files.push(file);
     }
     await ctx.close();
-    const result: FilmResult = { path: files[0]!, files, durationMs, sampleMs, every, samples: samples.length, cuts, stills, boundaries, maxDiff: round(Math.max(0, ...samples.map((s) => s.diff))), warnings: [] };
+    const result: FilmResult = { ...(audit?{audit:audit.finish()}:{}), path: files[0] ?? out, files, durationMs, sampleMs, every, samples: samples.length, cuts, stills, boundaries, maxDiff: round(Math.max(0, ...samples.map((s) => s.diff))), warnings: sampleMs > 50 ? ['Coarse analysis: transitions shorter than the computation interval may be missed; use 50 ms for final QA.'] : [], measurement: { baselineRssBytes, endRssBytes:process.memoryUsage().rss, memoryScope:'node-process-lifetime', rssSamples, wallMs: Date.now() - startedAt, peakRssBytes: process.resourceUsage().maxRSS * 1024, resumedSamples: checkpoint?.samples.length ?? 0 } };
     // 完整的判读数据（每一步提交前后的最大帧差、硬切、静止）放在胶片条旁边，评审时可以引用具体数字
-    fs.writeFileSync(out.replace(/(\.png)?$/i, '.json'), JSON.stringify({ ...result, frames: samples.map(({ jpg: _jpg, ...rest }) => rest) }, null, 1));
+    await writeOutput(metadataOut,JSON.stringify({ ...result, frames: samples.map(({ jpg: _jpg, ...rest }) => rest) }, null, 1),opts.overwrite);
     return result;
   } finally {
     await browser?.close().catch(() => undefined);
-    await server.close();
+    await server.close().catch(() => undefined);
   }
 }
+
+export function renderFilm(opts: FilmOptions): Promise<FilmResult> { return samplePlayback(opts); }
 
 const HIDE = ['cover', 'cursor', 'title', 'subtitles'] as const;
 
@@ -264,6 +365,14 @@ const HIDE = ['cover', 'cursor', 'title', 'subtitles'] as const;
 export async function renderVideo(opts: VideoOptions): Promise<VideoResult> {
   const projectDir = realProjectDir(opts.projectDir);
   const out = check({ ...opts, projectDir });
+  distinctOutputs([out, opts.timeline, opts.srt]);
+  geometryQuery(opts);
+  if(opts.auditLayout)throw new JoploError('USAGE','Layout audit supports static screenshots and --film, not --video');
+  if (opts.crop) throw new JoploError('USAGE', 'Video crop is not supported; use --viewport/--no-frame or --frames-out with --crop');
+  if (opts.timeline) {
+    check({ projectDir, out: opts.timeline, overwrite: opts.overwrite });
+    assertNotProjectData(projectDir, path.join(`${path.resolve(opts.timeline).replace(/\.json$/i, '')}.assets`, '__asset.wav'));
+  }
   if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'Video width and height must be provided together');
   const video = opts.width !== undefined ? { width: videoDimension('width', opts.width), height: videoDimension('height', opts.height!) } : null;
   const bad = (opts.hide ?? []).find((h) => !(HIDE as readonly string[]).includes(h));
@@ -273,19 +382,42 @@ export async function renderVideo(opts: VideoOptions): Promise<VideoResult> {
   const srtOut = opts.srt ? check({ out: opts.srt, overwrite: opts.overwrite, projectDir }) : null;
   if (srtOut && srtOut === out) throw new JoploError('USAGE', 'The subtitle file must differ from the video file');
   const { server, project } = await compiled(projectDir);
+  let videoWork: string | null = null;
   try {
     // 输出分辨率（#55）：视口就是视频分辨率，渲染路由把舞台等比缩放进这块画布（录屏按 CSS 像素取帧，deviceScaleFactor 不会让它更清晰）
     const { url, size } = recordUrl(server.url, server.projectId, project, { ...opts, voice, hide: opts.hide ?? [], ...(video ? { canvas: video } : {}) });
     fs.mkdirSync(path.dirname(out), { recursive: true });
-    if (opts.overwrite) fs.rmSync(out, { force: true });
     const started = Date.now();
-    const outcome = await defaultRecorder((dir) => loadPlaywright({ home: joploHome(), projectDir: dir }))({ projectDir, url, size: video ?? size, out, total: 0, progress: () => undefined, signal: new AbortController().signal, maxMs: MAX_MS });
+    const mp4 = path.extname(out).toLowerCase() === '.mp4';
+    videoWork=fs.mkdtempSync(path.join(path.dirname(out),'.joplo-video-'));
+    const recordingOut=path.join(videoWork,'recording.webm');
+    const encodedOut=mp4?path.join(videoWork,'encoded.mp4'):recordingOut;
+    const outcome = await defaultRecorder((dir) => loadPlaywright({ home: joploHome(), projectDir: dir }))({ projectDir, url, size: video ?? size, out: recordingOut, total: 0, progress: () => undefined, signal: new AbortController().signal, maxMs: MAX_MS });
+    if (mp4) await encodeMp4(recordingOut,encodedOut);
     if (srtOut) {
       fs.mkdirSync(path.dirname(srtOut), { recursive: true });
       fs.writeFileSync(srtOut, srt(outcome?.cues ?? []), opts.overwrite ? undefined : { flag: 'wx' });
     }
-    return { path: out, durationMs: Date.now() - started, size: video ?? size, srt: srtOut, voice: outcome?.voice ?? { mode: voice, missing: [] } };
+    if (opts.timeline && outcome?.timeline) { const file = check({ projectDir, out: opts.timeline, overwrite: opts.overwrite }); await persistTimeline(file, outcome.timeline, project.mediaAssets ?? {}, server.url, opts.overwrite, server.token,project.mediaInfo); }
+    await commitOutput(encodedOut,out,opts.overwrite);
+    return { ...(outcome?.sync ? { sync: outcome.sync } : {}), path: out, durationMs: Date.now() - started, size: video ?? size, srt: srtOut, voice: outcome?.voice ?? { mode: voice, missing: [] } };
   } finally {
-    await server.close();
+    if(videoWork)fs.rmSync(videoWork,{recursive:true,force:true});
+    await server.close().catch(() => undefined);
   }
+}
+
+/** Public offline frame export. No audio synthesis or private browser bridge is needed by callers. */
+export async function renderFrames(opts: import('./contract.ts').FramesOptions) {
+  const fps = opts.fps ?? 30;
+  if (!Number.isFinite(fps) || fps < 1 || fps > 120) throw new JoploError('USAGE', 'fps must be from 1 to 120');
+  if (opts.scale !== undefined && (!Number.isFinite(opts.scale) || opts.scale <= 0 || opts.scale > 4)) throw new JoploError('USAGE', 'Frame scale must be above 0 and at most 4');
+  const dir = path.resolve(opts.framesOut);
+  assertNotProjectData(opts.projectDir, path.join(dir, '__frame.jpg'));
+  if (dir === realProjectDir(opts.projectDir)) throw new JoploError('USAGE', 'Frame output directory must differ from the project root');
+  if (fs.existsSync(dir) && fs.readdirSync(dir).length && !opts.overwrite) throw new JoploError('USAGE', 'Frame directory is not empty; use --overwrite');
+  const timeline = opts.timeline ?? path.join(dir, 'timeline.json');
+  if (opts.overwrite && fs.existsSync(dir)) for (const name of fs.readdirSync(dir)) if (/^\d{7}\.jpg$/.test(name)) fs.rmSync(path.join(dir, name));
+  const result = await samplePlayback({ ...opts, hide: opts.hide ?? ['cover', 'cursor', 'title', 'subtitles'], out: path.join(dir, 'film.png'), frames: dir, timeline, frameFps: fps, frameScale: opts.scale, framesOnly: true });
+  return { directory: dir, timeline, fps, frames: result.samples, durationMs: result.durationMs, toleranceMs: 50 };
 }

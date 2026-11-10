@@ -24,13 +24,18 @@ describe('D92 content transitions in a real browser', () => {
     write('routes/page.tsx', `import {page,$,eq} from '@joplo-app/kit';import {Canvas} from '@joplo-app/plugin-content';import {Button} from '@joplo-app/plugin-ui';export default page({title:'Room',layout:false},<div style={{position:'relative',width:1280,height:800}}><Canvas w={1280} h={800} drift={false}><div className="room"><section id="old" className="panel" when={eq($.ui.era,'a')} exit="fade" exitMs={1200} enter="rise"><p className="label">Old era</p>Old</section><section id="new" className="panel next" when={eq($.ui.era,'b')} enter="zoom" enterMs={1200} exit="iris">New</section><div id="row" className="row"><span id="t" className="chip" when={$.ui.on} enter="shrink" exit="shrink" exitMs={450}>T</span><span id="u" className="chip">U</span></div><div id="spot" className="spot" /><div id="spot2" className="spot" style={{left:100,top:600}} /></div></Canvas><Button id="poke">Poke</Button></div>);`);
     // U1：缩放的 Canvas（2560×1600 设计尺寸放进 1280×800）屏幕层上的时间轴：年份标签在上，游标在下一行
     write('routes/scrub/page.tsx', `import {page,$} from '@joplo-app/kit';import {Canvas} from '@joplo-app/plugin-content';import {Button} from '@joplo-app/plugin-ui';export default page({title:'Scrub',layout:false},<div style={{position:'relative',width:1280,height:800}}><Canvas w={2560} h={1600} view={[2560,1600]} drift={false}><div className="room" /><div screen className="bar"><div id="year_a" className="yr" style={{left:200}}>A</div><div id="year_b" className="yr" style={{left:1400}}>B</div><Button id="scrubber" className="scrub" style={{left:$.ui.sx}} motion="cursor">drag</Button></div></Canvas></div>);`);
+    write('routes/morph/page.tsx', `import{page,$}from'@joplo-app/kit';import{Canvas}from'@joplo-app/plugin-content';export default page({title:'Morph',layout:false},<div style={{width:1280,height:800}}><Canvas drift={false}><div className="room"><div id="subject" className="panel" motion="message" style={{position:'absolute',left:100,top:100,width:400,height:200,borderRadius:$.ui.radius,color:$.ui.ink,backgroundColor:$.ui.material,opacity:$.ui.alpha}}><span className="label">{$.ui.message}</span></div></div></Canvas></div>);`);
     write('routes/other/page.tsx', `import {page} from '@joplo-app/kit';export default page({title:'Other',layout:false},<div id="elsewhere">Elsewhere</div>);`);
     write('features/f/feature.ts', `import{feature}from'@joplo-app/kit';export default feature({name:'F',goal:'G',cases:{},pick:'a'});`);
     const toggles = Array.from({ length: 10 }, (_, i) => `.system('t${i}','Toggle ${i}',set($.ui.on,${i % 2 === 1}))`).join('');
-    write('features/f/works/a.tsx', `import{$,work,flow,free,set,hold}from'@joplo-app/kit';import{camera}from'@joplo-app/plugin-content';export default work({title:'A',summary:'I',state:{ui:{era:'a',on:true,poked:false,sx:200}},free:{poke:free.click('poke',set($.ui.poked,true))},scenarios:{
+    write('features/f/works/a.tsx', `import{$,work,flow,free,set,hold}from'@joplo-app/kit';import{camera,cameraSequence}from'@joplo-app/plugin-content';export default work({title:'A',summary:'I',state:{ui:{era:'a',on:true,poked:false,sx:200,radius:0,ink:'#102030',material:'#eeeeee',alpha:1,message:'Paper'}},free:{poke:free.click('poke',set($.ui.poked,true))},scenarios:{
       swap:flow('Swap').system('swap','To new',set($.ui.era,'b'),hold(5)).system('back','Back',set($.ui.era,'a'),hold(5)),
       toggle:flow('Toggle')${toggles},
       drift:flow('Drift').system('look','Look',camera('spot',{ms:300,drift:{zoom:1.25,ms:1500}}),hold(10)).system('away','Away',camera('spot2',{ms:300})),
+      sequence:flow('Sequence',{start:'/'}).system('path','Path',cameraSequence([{atMs:0,target:'spot',zoom:1},{atMs:2500,target:'spot2',zoom:1.2},{atMs:6500,target:'spot2',zoom:1.4,ease:'easeOut'}]),hold(10)).system('inherit','Inherit',hold(1)).system('replay','Replay',cameraSequence([{atMs:0,target:'spot',zoom:1},{atMs:2500,target:'spot2',zoom:1.2},{atMs:6500,target:'spot2',zoom:1.4,ease:'easeOut'}]),hold(10)),
+      sequenceRelay:flow('Sequence relay',{from:'sequence'}).system('again','Again',cameraSequence([{atMs:0,target:'spot',zoom:1},{atMs:2500,target:'spot2',zoom:1.2},{atMs:6500,target:'spot2',zoom:1.4,ease:'easeOut'}]),hold(10)),
+      sequenceRelay2:flow('Sequence relay two',{from:'sequenceRelay'}).system('again','Again',cameraSequence([{atMs:0,target:'spot',zoom:1},{atMs:2500,target:'spot2',zoom:1.2},{atMs:6500,target:'spot2',zoom:1.4,ease:'easeOut'}]),hold(10)),
+      morph:flow('Morph',{start:'/morph'}).system('change','Change',set($.ui.radius,48),set($.ui.ink,'#ffffff'),set($.ui.material,'#2040aa'),set($.ui.alpha,.8),set($.ui.message,'Digital message'),hold(10)),
       leave:flow('Leave').system('go','Go',set($.ui.era,'b')),
       other:flow('Other',{start:'/other'}).system('x','X'),
       scrubA:flow('Scrub A',{start:'/scrub',actionEntry:'after'}).drag('scrubber','year_a','To A',set($.ui.sx,200),hold(5)).system('later','Later',hold(5)),
@@ -276,4 +281,46 @@ describe('D92 content transitions in a real browser', () => {
     expect(await scale()).toBe(deep);
     expect(deep).toBeLessThan(later);
   });
+  it('camera sequence follows the clock across its waypoints, pauses, and static jumps show the final frame', async () => {
+    await at('sequence'); await playTo(1);
+    const transform=()=>page.locator('[data-jcanvas-world]').evaluate(el=>(el as HTMLElement).style.transform);
+    await page.waitForTimeout(200); const early=await transform();
+    await page.waitForTimeout(500); expect(await transform()).not.toBe(early);
+    await page.evaluate(()=>(window as any).fixtureCtl.pause(false));const paused=await transform();
+    await page.waitForTimeout(200);expect(await transform()).toBe(paused);
+    await page.evaluate(()=>(window as any).fixtureCtl.resume());await page.waitForTimeout(300);expect(await transform()).not.toBe(paused);
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.stop();c.goto(0);c.goto(1);});await frame();
+    const final=await transform();expect(final).toContain('scale(1.4)');await page.waitForTimeout(100);expect(await transform()).toBe(final);
+  });
+  it('identical explicit paths restart, inherited steps keep the same path, and reduced motion uses the final waypoint', async () => {
+    await at('sequence');await playTo(1);
+    const transform=()=>page.locator('[data-jcanvas-world]').evaluate(el=>(el as HTMLElement).style.transform);
+    await page.waitForTimeout(300);
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.pause(false);c.goto(2);});await frame();
+    const inherited=await transform();expect(inherited).toContain('scale(1.4)');
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.goto(2);void c.play();});
+    await page.waitForFunction(()=>(window as any).fixtureCtl.getSnapshot().state.position>=3);
+    const replay=await transform();expect(replay).not.toBe(inherited);
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.pause(false);c.continueInto(c.getSnapshot().project.scenarios['f.a.sequenceRelay']);});await frame();
+    await playTo(1);expect(await transform()).not.toContain('scale(1.4)');
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.pause(false);c.continueInto(c.getSnapshot().project.scenarios['f.a.sequenceRelay2']);});await frame();
+    await playTo(1);expect(await transform()).not.toContain('scale(1.4)');
+    await page.emulateMedia({reducedMotion:'reduce'});
+    await at('sequence');await playTo(1);await frame();expect(await transform()).toContain('scale(1.4)');
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    await page.evaluate(()=>(window as any).fixtureCtl.pause(false));
+  });
+  it('persistent subject interpolates material styles and crossfades text without duplicating hit identities', async () => {
+    await at('morph');expect(await page.locator('[data-jid="subject"]').evaluate(el=>getComputedStyle(el).borderRadius)).toBe('0px');await playTo(1);
+    const result=await page.locator('[data-jid="subject"]').evaluate(el=>{const a=el.getAnimations().find(a=>a.id==='jmotion');return {keys:(a?.effect as KeyframeEffect)?.getKeyframes(),ghosts:document.querySelectorAll('[data-jghost][aria-hidden="true"][inert]').length,identities:document.querySelectorAll('[data-jid="subject"]').length};});
+    expect(result.keys?.[0]?.borderRadius,JSON.stringify(result)).toBe('0px');expect(result.keys?.[1]?.borderRadius).toBe('48px');
+    expect(result.keys?.[0]?.backgroundColor).not.toBe(result.keys?.[1]?.backgroundColor);
+    expect(result.ghosts).toBe(1);expect(result.identities).toBe(1);
+    const ghostFont=await page.locator('[data-jghost] .label').evaluate(el=>({font:getComputedStyle(el).fontSize,spacing:getComputedStyle(el).letterSpacing}));
+    expect(ghostFont).toEqual({font:'17px',spacing:'2px'});
+    await page.evaluate(()=>{const c=(window as any).fixtureCtl;c.stop();c.goto(0);c.goto(1);});await frame();
+    expect(await page.locator('[data-jghost]').count()).toBe(0);
+    expect(await page.locator('[data-jid="subject"]').textContent()).toBe('Digital message');
+  });
+
 });

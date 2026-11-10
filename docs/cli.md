@@ -19,7 +19,8 @@ npx joplo build [dir] [--out-dir <dir>] [--overwrite] [--scenario <id>]… [--wo
 npx joplo login [--no-browser] [--format text|json] [--server <url>]
 npx joplo logout [--server <url>]
 npx joplo whoami [--format text|json] [--server <url>]
-npx joplo voice [dir] [--dry-run] [--locale <lang>]… [--format text|json] [--server <url>]
+npx joplo assets [dir] [--usage] [--scan <directory>]… [--work <id>] [--scenario <id>] [--format text|json]
+npx joplo voice [dir] [--work <id>] [--scenario <id>] [--dry-run] [--locale <lang>]… [--format text|json] [--server <url>]
 npx joplo share [dir] (--public | --private) (--review | --no-review) [--format text|json] [--new] [--title <title>] [--json] [--password [<值>] | --no-password] \
   [--scenario <id>]… [--work <id>]… \
   [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
@@ -33,7 +34,8 @@ npx joplo render [dir] --scenario-id <qid> --out <file> \
   [--width <pixels> --height <pixels>] [--scale <scale>] [--overwrite]
 npx joplo render [dir] --scenario-id <qid> --out <file> --sheet [--columns <n>] [--theme <theme>] [--overwrite]
 npx joplo render [dir] --scenario-id <qid> --out <file.png> --film [--chain] [--every <ms>] [--columns <n>] [--frames <dir>] [--format text|json] [--overwrite]
-npx joplo render [dir] --scenario-id <qid> --out <file.webm> --video [--chain] [--width <px> --height <px>] [--voice real|estimate|off] [--hide <items> | --clean] [--srt <file.srt>] [--overwrite]
+npx joplo render [dir] --scenario-id <qid> --frames-out <dir> [--fps 30] [--chain] [--viewport 720x1280] [--no-frame] [--crop <selector|x,y,w,h>]
+npx joplo render [dir] --scenario-id <qid> --out <file.webm|file.mp4> --video [--chain] [--width <px> --height <px>] [--voice real|estimate|off] [--hide <items> | --clean] [--srt <file.srt>] [--overwrite]
 ```
 
 可省略的 dir 默认为当前目录。`render` 的 scenario-id、out 必填。主输出和帮助写 stdout，服务日志、截图告警和项目依赖版本提示写 stderr；用法错误或缺少分享选择（CHOICE_REQUIRED）退出 2，领域或执行失败退出 1，云端需要登录（AUTH_REQUIRED / AUTH_EXPIRED）退出 3，账号空间不够（share）退出 6，Joplo Cloud 朗读额度不够（voice，`TTS_QUOTA_EXCEEDED`）退出 7，成功退出 0。
@@ -265,7 +267,7 @@ npx joplo preview [dir] [--port <port>]
 | `--out <file>` | 截图文件，必填；相对当前目录解析 |
 | `--step-id <qid>` | 指定步骤后的状态 |
 | `--theme <theme>` | 内置主题名或项目 themes/name.css 的名称，默认项目 config 的主题 |
-| `--width <pixels>` / `--height <pixels>` | 截图输出宽高，必须同时给出正整数；按比例容纳页面，不改变页面自己的 viewport 或响应式断点。配合 `--video` 时是视频分辨率（2–4096 的偶数，例如 1920×1080、1080×1920）：舞台（手机含外框）等比缩放后居中，四周是主题背景色，文字与线条按输出分辨率重新绘制，不是放大位图。舞台本身的宽高比不变（电脑 16:10），竖屏画幅放手机页面最合适。不能与 `--film` 同用 |
+| `--width <pixels>` / `--height <pixels>` | 截图输出宽高，必须同时给出正整数；按比例容纳页面，不改变页面自己的 viewport 或响应式断点。配合 `--video` 时是视频分辨率（2–4096 的偶数，例如 1920×1080、1080×1920）：舞台（手机含外框）等比缩放后居中，四周是主题背景色，文字与线条按输出分辨率重新绘制，不是放大位图。舞台本身的宽高比不变（电脑 16:10），竖屏画幅放手机页面最合适。配合 `--viewport` 可直接改变逻辑布局 |
 | `--scale <scale>` | 有限正数，像素倍率 |
 | `--overwrite` | 允许覆盖已有截图；仍不得覆盖项目源码或 `.joplo/` |
 | `--sheet` | 分镜：把场景从初始画面到最后一步逐步截图，拼成一张网格图，每格下面写步号、字幕与旁白（`narrate`，没有时为 `say`）；各步的截图告警加 `Step n:` 前缀写到 stderr。不能与 `--step-id`、`--width`、`--height` 同用。分镜只有每一步落定后的画面，看不出硬切与静止；运动用 `--film` 检查 |
@@ -279,6 +281,14 @@ npx joplo preview [dir] [--port <port>]
 | `--chain` | 配合 `--film` / `--video`：放完接着放同一方案的下一个场景（发布站连续播放的顺序），直到最后一个；`chapter()` 接力的章节一镜到底 |
 | `--every <ms>` | 胶片条每格的间隔（默认 250） |
 | `--frames <dir>` | 胶片条的每一格另存为 JPEG，便于全尺寸检查可疑的一帧 |
+| `--viewport <WIDTHxHEIGHT>` / `--no-frame` | 直接设置逻辑舞台尺寸，并可去掉设备外框；布局、镜头、覆盖层和命中区域共用同一坐标。输出像素仍由 width/height 决定 |
+| `--crop <selector-or-rect>` | 截图、sheet、film、frames 共用选择器或相对输出画布的 CSS 像素矩形；film 像素占比基于裁后画面。video 请用 viewport 定义画幅 |
+| `--frames-out <dir>` / `--fps <n>` | 公开逐帧 JPEG 导出，默认 30fps、干净画面、已有旁白真实时长；自动写 timeline.json。不需要 out，不调用云 TTS。累计 round(k×1000/fps)，允许约50ms调度容差 |
+| `--timeline <file>` | 帧序列、film、video 的 schemaVersion 1 实际播放事件；包含引擎和输出时间、步骤提交/结束、章边界、旁白、镜头与通用媒体快照 |
+| `--sample-ms <ms>` | film 计算间隔20–250ms，默认50；every仅控制保存格数。粗采样更快但可能漏掉短暂CUT，最终检查使用50ms |
+| `--checkpoint <file>` / `--resume` | 逐章保存像素分析；恢复时重放引擎状态，复用已验证分析。源码/运行时/配置不符拒绝恢复；输出目录不要共享 |
+| `--chapter-timeout <ms>` | film 每章墙钟处理超时，默认180000；失败保留最近检查点 |
+
 | `--format json` | 胶片条结果以 JSON 输出到 stdout |
 
 render 需要**导出组件**（Playwright + Chromium，见下方 `setup export`）。写演示、dev、check、build、share 都不需要它；本地看板的图片和视频导出、share 的预览图需要。没有时：
@@ -370,7 +380,7 @@ npx joplo whoami --format json
 生成缺少的朗读音频（D74 / D85），给 Agent 和脚本用；与看板的「生成缺少的音频」同一套缓存（`.joplo/voice/`）、声音来源与默认规则。
 
 ```sh
-npx joplo voice --dry-run            # 只估算：几步没有音频、约多少字、生成后还剩多少
+npx joplo voice --work short --dry-run # 只估算：几步没有音频、约多少字、生成后还剩多少
 npx joplo voice --format json        # 生成选定方案所有场景的缺少音频（每种内容语言各一遍）
 npx joplo voice --locale ja          # 只做一种内容语言（必须在 config 的 locales 里；可重复）
 ```
@@ -378,6 +388,9 @@ npx joplo voice --locale ja          # 只做一种内容语言（必须在 conf
 - 先 check：编译有 error 时以 `INVALID_SCHEMA` 退出 1，不生成。
 - 范围：每个功能选定方案的全部场景；项目写了 `locales` 时每种内容语言各一遍（D84，音色按 `resolveVoices(…, 语言)`）。朗读文字与 build 打包算片段键的文字相同（自动字幕用编译出的字幕；看板里自动字幕按界面语言生成，非英文界面时可能和这里不同）。
 - 声音来源：`joplo.config.ts` 的 `voice.profile` > 看板里选的 > 没选过时已登录用 Joplo Cloud 朗读（用 CLI 的登录或 `JOPLO_API_KEY`，Key 需要 `voice:generate`）> 都没有时 `VOICE_NO_SOURCE`。Joplo Cloud 的请求带 `locale`（内容语言；项目没写 locales 时不带）与 `project`（项目名，控制台明细用）。
+- 范围：`--work <id>` 接受独立作品键或功能方案的完整 id；`--scenario <id>`（别名 `--scenario-id`）选一章并包含 `from` 前置章节，两者同时写时章节必须属于该作品。省略时仍生成全部非草稿独立作品及选定方案。非法/草稿范围在请求语音前失败。
+- 明细：dry-run 文本逐步列出作品、章节、步骤、字符与待生成字数；JSON 的 `data.locales[].details` 包含 `workId/scenarioId/stepId/text/chars/missing/estimatedBillableChars`。这是基于本机缓存的字数上界估算，不是实际收费：远端 Cloud 缓存命中免费。同声音同文字只估算一次，静音步骤列零。确认后去掉 `--dry-run`，范围外缓存和声音固定选择不受影响；build/share 仍按自己的范围打包已有音频。
+- 静音：步骤写 `narrate(false)`，禁止旁白、台词、字幕兜底与朗读字幕；没有显式静音时保留旧回退。`narrate('')` 仍报错。单语言项目也可写 `config({ locales: ['zh-CN'] })` 声明原文语言；没声明时片段记录为 `und`（未知），不拿界面语言冒充内容语言。
 - 字数：每段 `Array.from(文字).length`，生成成功才扣，云端缓存命中不扣；已经在 `.joplo/voice/` 的段不再请求。`--dry-run` 不发请求，只估算。
 - 文本输出：`Voice source: Joplo Cloud (default when signed in)`、每种语言一行（生成了几段、几段已有、几段失败及原因；`--dry-run` 时是要生成几段、覆盖几步、约多少字——文字相同的步骤共用一段）、剩余字数一行、最后一行合计。`--format json` 的 `data`：`{profile: {id, name, kind}, source: "config" | "board" | "default", dryRun, locales: [{locale, segments, missing, chars, generated, skipped, failed}], total: {segments, missing, chars, generated, failed}, quota, usageUrl, exhausted}`；`quota.totalRemainingChars` 是最后一段响应头里的剩余（不在本地估算）。有失败的段时退出 1（重跑只重试它们）。
 - 错误码：
@@ -621,3 +634,34 @@ check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同�
 ### 检查含可选支线的短片
 
 先用 `joplo outline` 确认场景 ID，再按章 `joplo render --scenario-id <id> --sheet`。`flow('Slice title', { autoplay:false })` 标记的支线依然可独立渲染、手动选择或通过 fork 进入，但发布站连续播放会跳过它；支线结束后停下。fork 本身不会改变自动播放资格。`joplo check` 不证明本机配乐已成功编译，最终还须检查 build 的资源警告和真实输入、声音，再用 preview 离线验证 HTTP 播放。
+
+离线导出回归：`pnpm test packages/server/test/export-contract.test.ts` 验证横竖画幅、多章与三个可分发合成PCM音频片段；`JOPLO_EXPORT_VIDEO=1` 增加WebM/MP4编码、音频频率匹配与时差断言（需本机ffmpeg/ffprobe）；`JOPLO_EXPORT_LONG=1` 增加五分钟引擎时间性能测量。产物保留在 `scratch/output/`，不调用云TTS、不需要个人账户。
+
+`render --video --silent` 显式省略全部音轨并保留旁白节奏；`--voice off` 仅关闭旁白，不关闭背景配乐。`.mp4` 输出需要本机 ffmpeg（H.264/AAC），默认 `.webm` 无需外部编码器。
+
+恢复契约：检查点会对源码、主题CSS、媒体/语音缓存内容、已解码旁白时长、宿主/插件运行时、浏览器和所有渲染参数计算身份；变化后拒绝复用。恢复校验步骤ID及≤50ms提交偏移，并要求稳定锚点的场景/位置/activeStep完全一致；章节接缝短段重新计算。取景框宽高必须固定，动态改变裁切尺寸会报告时间点并失败。
+
+音频素材先校验内容hash，坏文件必须显式overwrite修复；JSON/音频/最终视频使用完整临时文件原子提交。MP4编码失败不会删除或覆盖原有成片。性能报告的RSS基线、末值、轨迹及进程峰值仅指Node进程，不含Chromium；同采样/画幅/质量才可比较提速，250ms快测不能代替50ms最终审查。
+
+离线混音必须读取media asset的 `audioInfo`：按 `sourceSampleRate` 把 `contentStartFrame/contentFrames/cycleFrames` 换算到解码采样率，裁掉校准/编码延迟/保护填充，仅循环cycleFrames。文件起点不必等于作品声音起点。回归夹具使用真实校准MP3区域及不同长度WAV旁白。
+
+同质量截图对照可重复运行：`JOPLO_EXPORT_COMPARE=1 JOPLO_CAPTURE_BASELINE=1 pnpm test packages/server/test/export-contract.test.ts -t 'representative short'` 对照locator截图；移除 `JOPLO_CAPTURE_BASELINE` 是当前CDP路径。两者都为50ms、160×90逻辑画幅、JPEG72、250ms保存格；产物中的wall/RSS仅在相同参数及相近负载下比较，不承诺跨机器速度。
+
+
+## assets
+
+`npx joplo assets . --usage --scan photos --format json` 是只读素材报告。`--scan` 可重复，只扫描项目内显式文件/目录，不跟随符号链接；不写报告文件、不清理素材、不构建、不生成资源、不渲染、不上传。加载作者模块与 check/build 一样会执行受信任的项目代码。`--work` 接受真实完整作品 ID，`--scenario` 接受场景 ID 并带上 `from` 前章。
+
+JSON 的 `data.scope` 说明扫描目录、源码入口和发布场景范围；`data.entries` 给出文件路径/资源 ID、类型/MIME（未知为 null）、大小（生成资源未知为 null）、已知声明元数据及引用位置。源码引用统计全体已加载作品（含 draft），引用上的 `inSelectedScope` 区分当前选区；没有精确步骤证据时不编造 stepId。相同内容文件使用哈希关联，`metadata.contentMatch` 明确来源歧义。
+
+三个维度必须分开读：`authorReference=referenced` 表示实际 asset() 调用、编译内容或插件资源声明；`publication=included-in-selected-ir` 仅表示所选发布 IR 中存在相应内容，不代表实际执行了 build 或生成资源；`sampledVisibility=unknown` 表示未渲染采样，无法断言屏幕可见。动态路径、模块缓存、插件内部解析等写进 `unknowns`；`not-found-in-loaded-model` 只表示本次加载模型中未找到，绝不等于“未使用”。不推测缺失的作者、年份或版权信息，不自动删除或上传。加载/编译失败时先修复 check，不为补齐报告擅自运行付费资源生成。
+
+## 真实版面审查
+
+静态终态：`joplo render . --scenario-id film.open --out still.png --audit-layout`。动态阶段：同命令加 `--film`，复用导出引擎时钟与帧图像；`--sample-ms` 不得大于 50，`--audit-every-ms` 控制额外常规审查间隔（20–1000，默认 250）。报告在输出旁的 `.layout.json`，发现问题的动态帧存进 `.layout-evidence/`。
+
+`--audit-content <selector|x,y,width,height>` 指定内容区；可重复的 `--audit-safe-area` 指定字幕/来源脚注等保留区，`--audit-important <selector>` 显式指定重要内容；`--audit-exclude <selector>` 排除装饰和有意叠盖子树。selector 必须指向本次导出画布中的元素；矩形单位为相对导出根的真实 CSS 像素（不是 Canvas 设计坐标），受 `--viewport`/输出缩放影响时优先选 selector。未指定 important 时仍检查所有文字的越界和裁切，不自行推测语义重要性。
+
+报告包含 work/scenario/step/source/element、采样时刻、真实字体/变换后的逐行 Range 包围盒、内容区/安全区、warning 与证据图。`TEXT_CLIPPED` 检查祖先 padding-box 裁切；`TEXT_OUTSIDE_CONTENT`/`IMPORTANT_OUTSIDE_CONTENT` 检查指定取景边界；`IMPORTANT_IN_SAFE_AREA` 检查重要内容与保留区；`POSSIBLE_OCCLUSION` 只是几何重叠启发式，不证明绘制层级或真正遮挡。旋转、mask、非矩形裁切及隐藏重要内容会明确列入 unknowns。
+
+静态样本 `atMs:null`，只证明终态，不证明入场或漂移。动态样本按真实提交、入场末和插件声明的镜头/漂移/waypoint 时点取样，误差不超过报告的 `sampleToleranceMs`（导出采样网格）；后一步可能中断前一动效，未采样区间不能宣称无问题。当前仅支持静态或 film，不支持 sheet/video/frames/resume；没有自动重排，不调用付费旁白/资源生成。复核证据后由作者决定修正文案、容器、取景还是排除有意装饰。

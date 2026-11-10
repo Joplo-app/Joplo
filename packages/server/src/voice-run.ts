@@ -10,7 +10,7 @@
  * - cloud 每段成功后用响应头的剩余字数更新 quota；402 时停止（已生成的保留），结果里的 quota 记需要 / 剩余，CLI 以 TTS_QUOTA_EXCEEDED 结束。
  */
 import type { Project } from '@joplo-app/core';
-import { localizeProject, speakerRoleAt, spokenLine } from '@joplo-app/core';
+import { JoploError, localizeProject, speakerRoleAt, spokenLine, spokenChars } from '@joplo-app/core';
 import type { CloudVoiceBridge, CloudVoiceStatus, VoiceQuota } from './cloud.ts';
 import { joploHome } from './home.ts';
 import { ProfileStore, UNSUPPORTED_MESSAGE, VoiceCache, VoiceError, estimateVoice, resolveVoices, voiceLocaleOf, type GenerateSummary, type Segment } from './voice.ts';
@@ -24,6 +24,9 @@ export type VoiceRunOptions = {
   /** 托管朗读（CLI 的 cloud bridge 的 voice）。 */
   cloud?: CloudVoiceBridge;
   dryRun?: boolean;
+  /** Exact compiled work id; CLI resolves standalone entry keys without splitting ids. */
+  workId?: string;
+  scenarioId?: string;
   /** 只做这几种内容语言（必须是项目声明的）；缺省全部。 */
   locales?: string[];
   onProgress?: (line: string) => void;
@@ -31,7 +34,9 @@ export type VoiceRunOptions = {
   fetch?: (url: string, init?: RequestInit) => Promise<Response>;
 };
 
-export type VoiceRunLocale = { locale: string | null; segments: number; missing: number; chars: number; generated: number; skipped: number; failed: { stepId: string; message: string }[] };
+/** Estimates use local cache only; remote Cloud cache hits can reduce the actual charge to zero. */
+export type VoiceStepDetail = { workId: string; scenarioId: string; stepId: string; text: string; chars: number; missing: boolean; estimatedBillableChars: number };
+export type VoiceRunLocale = { details?: VoiceStepDetail[]; locale: string | null; segments: number; missing: number; chars: number; generated: number; skipped: number; failed: { stepId: string; message: string }[] };
 export type VoiceRunResult = {
   profile: { id: string; name: string; kind: string } | null;
   source: 'config' | 'board' | 'default' | null;
@@ -47,11 +52,26 @@ export type VoiceRunResult = {
 };
 
 /** 选定方案的全部场景里，每一步要读的段（文字为空的跳过）。 */
-export function projectSegments(project: Project): Segment[] {
+export function voiceScenarioIds(project: Project, scope: Pick<VoiceRunOptions, 'workId' | 'scenarioId'> = {}): Set<string> {
+  const { workId, scenarioId } = scope;
+  if (workId && (!project.works[workId] || project.works[workId].draft)) throw new JoploError('USAGE', `Unknown or draft work: ${workId}`);
+  if (scenarioId && (!project.scenarios[scenarioId] || project.works[project.scenarios[scenarioId].workId]?.draft)) throw new JoploError('USAGE', `Unknown or draft scenario: ${scenarioId}`);
+  if (workId && scenarioId && project.scenarios[scenarioId]?.workId !== workId) throw new JoploError('USAGE', `Scenario ${scenarioId} does not belong to work ${workId}`);
   const picked = new Set(Object.values(project.works).filter(w => !w.draft && (!w.featureId || project.features[w.featureId]?.pick === w.id)).map(w => w.id));
+  const ids = new Set(Object.values(project.scenarios).filter(sc => scenarioId ? sc.id === scenarioId : workId ? sc.workId === workId : picked.has(sc.workId)).map(sc => sc.id));
+  // Continuing chapters depend on their predecessors, even when selecting one chapter.
+  for (const id of ids) {
+    const from = project.scenarios[id]?.from;
+    if (from && project.scenarios[from] && !project.works[project.scenarios[from].workId]?.draft) ids.add(from);
+  }
+  return ids;
+}
+
+export function projectSegments(project: Project, scope: Pick<VoiceRunOptions, 'workId' | 'scenarioId'> = {}): Segment[] {
+  const ids = voiceScenarioIds(project, scope);
   const out: Segment[] = [];
   for (const sc of Object.values(project.scenarios)) {
-    if (!picked.has(sc.workId)) continue;
+    if (!ids.has(sc.id)) continue;
     sc.steps.forEach((st, i) => {
       const line = spokenLine(st, st.caption, speakerRoleAt(project, sc.id, i + 1));
       if (line.text) out.push({ stepId: st.id, text: line.text, role: line.role });
@@ -61,6 +81,7 @@ export function projectSegments(project: Project): Segment[] {
 }
 
 export async function generateProjectVoice(opts: VoiceRunOptions): Promise<VoiceRunResult> {
+  voiceScenarioIds(opts.project, opts);
   const status: CloudVoiceStatus | null = opts.cloud ? await opts.cloud.status().catch(() => null) : null;
   const live = status?.signedIn && status.voice ? status.voice : null;
   const store = new ProfileStore(opts.home ?? joploHome(), process.env, { catalog: () => live });
@@ -94,16 +115,30 @@ export async function generateProjectVoice(opts: VoiceRunOptions): Promise<Voice
   for (const locale of locales) {
     const p = locale ? localizeProject(project, locale) : project;
     const resolved = resolveVoices(project.voiceConfig, selected, store, voiceLocaleOf(project, locale), fallback, cache.pins(), cache.officialCloud());
-    const segments = projectSegments(p);
+    const segments = projectSegments(p, opts);
     const est = estimateVoice(segments, resolved, cache);
-    const row: VoiceRunLocale = { locale, segments: segments.length, missing: est.steps, chars: est.chars, generated: 0, skipped: 0, failed: [] };
+    const seen = new Set<string>();
+    const segmentById = new Map(segments.map(s => [s.stepId, s]));
+    const selectedIds = voiceScenarioIds(p, opts);
+    const details: VoiceStepDetail[] = [];
+    for (const sc of Object.values(p.scenarios)) for (const st of sc.steps) {
+      if (!selectedIds.has(sc.id)) continue;
+      const seg = segmentById.get(st.id);
+      if (!seg) { details.push({ workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: '', chars: 0, missing: false, estimatedBillableChars: 0 }); continue; }
+      const planned = cache.plan(seg, resolved);
+      const missing = !!planned && !cache.clipOf(planned.key);
+      const estimatedBillableChars = missing && planned && !seen.has(planned.key) ? spokenChars(planned.text) : 0;
+      if (planned) seen.add(planned.key);
+      details.push({ workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: seg.text, chars: spokenChars(seg.text), missing, estimatedBillableChars });
+    }
+    const row: VoiceRunLocale = { details, locale, segments: segments.length, missing: est.steps, chars: est.chars, generated: 0, skipped: 0, failed: [] };
     result.locales.push(row);
     result.total.segments += segments.length;
     result.total.missing += est.steps;
     result.total.chars += est.chars;
     if (opts.dryRun || !est.steps || result.exhausted) continue;
     opts.onProgress?.(`Generating ${est.steps} clip(s)${locale ? ` for ${locale}` : ''} with ${base.profile.name} (about ${est.chars} characters)...`);
-    const summary: GenerateSummary = await cache.generate(segments, locale ?? 'en', resolved, store, {
+    const summary: GenerateSummary = await cache.generate(segments, locale ?? 'und', resolved, store, {
       cloud: opts.cloud,
       fetch: opts.fetch,
       project: project.name,

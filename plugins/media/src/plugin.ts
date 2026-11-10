@@ -1,3 +1,4 @@
+import { wavInfo } from './sfx.ts';
 import packageInfo from './version.json' with { type: 'json' };
 import { z } from 'zod';
 import { definePlugin, pluginComponent, pluginEffect, type PluginIRNode } from '@joplo-app/kit/plugin';
@@ -29,7 +30,7 @@ const startOf = (node: PluginIRNode) => (typeof node.props?.start === 'number' &
 const media = definePlugin({
   packageName: '@joplo-app/plugin-media',
   id: 'media', title: 'Media', version: packageInfo.version,
-  runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
+  runtime: new URL(new URL(import.meta.url).pathname.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
   components: {
     Video: { doc: 'src={asset(\'./clip.mp4\')} (mp4 / webm), w?, h?, fit?=\'cover\'|\'contain\', start? (seconds shown before the first play); a muted video clip played by playClip', needsId: true, selfEvident: true },
     Lottie: { doc: 'src={asset(\'./anim.json\')} (Lottie JSON), w?, h?, start?; a vector animation played by playClip', needsId: true, selfEvident: true },
@@ -88,3 +89,24 @@ const media = definePlugin({
 export const Video = pluginComponent(media, 'Video');
 export const Lottie = pluginComponent(media, 'Lottie');
 export default media;
+
+export { sfx, type SfxOptions } from './sfx.ts';
+/** Enable this manifest instead of the default media manifest when using local sound effects. */
+export function withSoundEffects(assets: Record<string, string>) {
+  return definePlugin({ ...media,
+    local: new URL(new URL(import.meta.url).pathname.endsWith('.ts') ? './local.ts' : './local.js', import.meta.url),
+    compile: { ...media.compile, effect(effect, ctx) {
+      if (effect.name !== 'sfx') return media.compile!.effect!(effect, ctx);
+      const p = effect.payload as { name?: unknown; volume?: unknown; offsetMs?: unknown } | null;
+      try {
+        if (!p || typeof p.name !== 'string' || !Object.hasOwn(assets, p.name)) throw new Error('Unknown sound name; declare it in withSoundEffects({ name: asset(...) })');
+        const { durationMs } = wavInfo(assets[p.name]);
+        const volume = p.volume ?? 1, offsetMs = p.offsetMs ?? 0;
+        if (typeof volume !== 'number' || !Number.isFinite(volume) || volume < 0 || volume > 1) throw new Error('volume must be 0–1');
+        if (typeof offsetMs !== 'number' || !Number.isFinite(offsetMs) || offsetMs < 0 || offsetMs >= durationMs) throw new Error('offsetMs must be inside the sound duration');
+        const resource = ctx.resource({ compiler: 'sfx', input: assets[p.name]! });
+        return { media: [{ track: 'sfx', action: 'play', resource, oneShot: true, durationMs, volume, offsetMs }] };
+      } catch (error) { ctx.report('SFX_INVALID', error instanceof Error ? error.message : 'Invalid sound effect', ctx.source); }
+    } },
+  });
+}

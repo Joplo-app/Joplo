@@ -68,6 +68,14 @@ const five = (f: Flow) =>
     .system('扣费失败', trace.fail('biz', 'billing'));
 
 describe('trace() 编译进 IR', () => {
+  it('focus:false keeps trace state and timing without a host shot', () => {
+    const { dev } = build(f => f.system('Only highlight', trace('app', 'biz', { focus: false })));
+    expect(errors(dev)).toEqual([]);
+    const step = dev.project!.scenarios[sid]!.steps[0]!;
+    expect(step.shots ?? []).toEqual([]);
+    expect(frameData(step)!.scenes['f.a~backend']!.traces).toHaveLength(1);
+  });
+
   it('多段路径解析成节点与连线；没写 id 的连线用缺省的 from->to；写连线 id 时取它两端；参数顺序就是节点顺序', () => {
     const { dev } = build(five);
     expect(errors(dev)).toEqual([]);

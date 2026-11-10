@@ -58,3 +58,7 @@ Joplo 的作品由 Agent 用代码写成，能播放，也能上手试。这里�
 | [midterms-2026/works/midterms-v1.tsx](midterms-2026/works/midterms-v1.tsx) | 同题旧讲解稿已标 `draft: true`，容易与当前稿混淆；建议在索引中按历史稿管理，保留源码 | [midterms-2026/works/midterms.tsx](midterms-2026/works/midterms.tsx) |
 
 其他示例各有独立的交互或画面用法，先保留在“更多”，不因主题相近就合并。运行方式与创作契约见[主 README](../README.zh-CN.md)与[作品模型](../docs/work-model.md)。
+
+## 横竖屏资料讲解
+
+[虚构档案馆 · 双画幅讲解](explainer-layouts)：同数据的 16:9 / 9:16 作品，含可调焦点图片面板、完整双语长引语、作者自定义来源状态、未定比例条与底部安全区；资源为本地原创示意图，无需付费生成。

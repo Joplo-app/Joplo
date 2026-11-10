@@ -70,7 +70,8 @@ export function installFakeLaunch(): { tags: string[] } {
       goto: async () => undefined,
       waitForFunction: async () => undefined,
       evaluate: async (arg: unknown) => (typeof arg === 'string' ? { elements: [], warnings: [] } : null),
-      locator: () => ({ screenshot: async () => Buffer.from(`png:${tag}`) }),
+      locator: () => ({ boundingBox: async () => ({ x: 0, y: 0, width: 1280, height: 800 }), screenshot: async () => Buffer.from(`png:${tag}`) }),
+      screenshot: async () => Buffer.from(`png:${tag}`),
     };
     return { newPage: async () => page, close: async () => undefined };
   };

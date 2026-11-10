@@ -1,3 +1,4 @@
+import { withProductionUpdate } from '../../../shared/production/update.tsx';
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
 import { $, callout, done, flow, highlight, notApplicable, work, set, shot, spotlight, uses, type Bind } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
@@ -13,7 +14,7 @@ const atStep1 = () => ({ ...initialUi(), voice: 'textwait', voiceIcon: '🔊', v
 const providerReady = () => ({ ...initialUi(), engine: 'provider', voiceOpen: true, voiceIcon: '🔊', voice: 'ready', genStatus: '3 段待生成' });
 const profileInputs = { b_v_profile: '公司网关' };
 
-export default withDesignRecord(work({
+export default withProductionUpdate(withDesignRecord(work({
   title: 'A · 边看边读',
   summary: '打开声音就用浏览器朗读，不用配置；想要所有人听到同一个声音时，再接外部供应商提前生成音频',
   focus: '声音参与决定每一步停多久：画面停够了、声音没读完，也要等声音读完',
@@ -99,4 +100,4 @@ export default withDesignRecord(work({
       .system('第 3 步', '读完第 3 步，播放结束', ...inner.s3(), ...speak(100, '作者生成的声音'), set(ui.playLabel, '▶ 重播'),
         done('小周打开链接就能听，不需要 Key')),
   },
-}), designRecords.voice);
+}), designRecords.voice), 'voice');

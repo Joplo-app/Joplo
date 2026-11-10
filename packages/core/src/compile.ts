@@ -139,6 +139,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const definitions = f ? sortedEntries(f.works) : [[id, works.get(id)!] as const];
     for (const [key, raw] of definitions) {
       const qid = f ? `${id}.${key}` : key;
+      if (raw.pace !== undefined && (!raw.pace || typeof raw.pace !== 'object' || Array.isArray(raw.pace) || Object.keys(raw.pace).some(k => k !== 'systemLead') || (raw.pace.systemLead !== undefined && (typeof raw.pace.systemLead !== 'number' || !Number.isFinite(raw.pace.systemLead) || raw.pace.systemLead < 0 || raw.pace.systemLead > 30))))
+        err('PACE_INVALID', 'work pace.systemLead must be a finite number of seconds from 0 to 30; omit it for the default 0.9 seconds', raw.source);
       const slices = resolveSlices(raw.scenarios, `Work ${qid}`, err);
       if (slices.linear) linearWorks.add(qid);
       const def = { ...raw, scenarios: slices.scenarios, ...(raw.stage !== undefined ? { layers: { stage: { kind: 'layer' as const, title: raw.title, tree: raw.stage, viewport: raw.viewport, source: raw.source } } } : {}) };
@@ -698,6 +700,7 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
     const says: string[] = [];
     let sayRole: string | null = null;
     const narrates: string[] = [];
+    let mute = false;
     /** 插件效果声明的最短停留（D98）：同一步取最大值。 */
     let effectHoldMs = 0;
     const ext: Record<string, unknown> = {};
@@ -733,7 +736,8 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
         if (typeof e.text === 'string' && e.text.trim()) says.push(e.text.trim());
         else err('SAY_EMPTY', 'say() needs the line the character speaks, for example say(\'I can make it!\'). Remove it to read the caption instead', st.source);
       } else if (e.type === 'narrate') {
-        if (typeof e.text === 'string' && e.text.trim()) narrates.push(e.text.trim());
+        if (e.text === false) mute = true;
+        else if (typeof e.text === 'string' && e.text.trim()) narrates.push(e.text.trim());
         else err('NARRATE_EMPTY', 'narrate() needs the narrator\'s words, for example narrate(\'She sends Ajie the plan as a link, so he needs no app.\'). Remove it to read say() or the caption instead', st.source);
       } else if (e.type === 'explain') {
         if (e.text.trim()) explains.push(e.text.trim());
@@ -890,6 +894,8 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
       ...(says.length ? { say: says.join(' ') } : {}),
       ...(says.length && sayRole ? { sayRole } : {}),
       ...(narrates.length ? { narrate: narrates.join(' ') } : {}),
+      ...(mute ? { mute: true as const } : {}),
+      ...(st.kind === 'system' && typeof def.pace?.systemLead === 'number' && Number.isFinite(def.pace.systemLead) && def.pace.systemLead >= 0 && def.pace.systemLead <= 30 ? { systemLead: Math.round(def.pace.systemLead * 1000) } : {}),
       ...(st.source ? { source: rel(st.source) } : {}),
     };
 }

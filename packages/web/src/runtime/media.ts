@@ -5,7 +5,9 @@ import { pluginStatus } from '../renderer/plugins';
 /** Browser host owns permission, clock, gain and lifecycle; the host decodes audio bytes; custom media plugins may supply a driver. */
 export class MediaEngine {
   private audio: AudioContext | null = null;
-  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; release?:()=>void; startOffset?: number; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
+  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; release?:()=>void; startOffset?: number; oneShot?: boolean; endOffset?: number; volume?: number; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
+  private completed = new Set<string>();
+  private mediaIdentity: string | undefined;
   private encoded=new MediaCache<{bytes:Uint8Array;audio?:AudioRegion}>({budgetBytes:4*1024*1024,concurrency:2});
   private decoded=new MediaCache<AudioBuffer>({budgetBytes:32*1024*1024,concurrency:1});
   private warm:(()=>void)[]=[];
@@ -96,12 +98,13 @@ export class MediaEngine {
   update(snapshot: MediaSnapshot, assets: Record<string, string>, frame: { playing: boolean; enabled: boolean; speed: number; elapsedMs: number; duck: boolean; identity: string; /** 引擎的连续时间（毫秒）；缺省时退回快照偏移。 */ timeMs?: number }, info:Record<string,AudioRegion>={}) {
     const audio = this.audio;
     if (!audio || audio.state !== 'running') return;
+    if (this.mediaIdentity !== frame.identity) { this.completed.clear(); this.mediaIdentity = frame.identity; }
     const keys = new Map<string, string>();
-    for (const [id, t] of Object.entries(snapshot)) if (assets[t.resource] && frame.enabled) keys.set(`${frame.identity}:${id}`, assets[t.resource]!);
+    for (const [id, t] of Object.entries(snapshot)) if (assets[t.resource] && frame.enabled && !this.completed.has(`${frame.identity}:${id}`)) keys.set(`${frame.identity}:${id}`, assets[t.resource]!);
     for (const [key, url] of keys) {
-      if (this.slots.get(key)?.resource === url) continue;
+      if (snapshot[key.slice(frame.identity.length + 1)]?.endAfterMs !== undefined || this.slots.get(key)?.resource === url) continue;
       // 空出来的槽位：快照不再要它，或者它的键现在要放别的资源（换曲时旧曲所在的轨道键）
-      const spare = [...this.slots.entries()].find(([k, slot]) => k !== key && keys.get(k) !== slot.resource && slot.resource === url && k.startsWith(`${frame.identity}:`));
+      const spare = [...this.slots.entries()].find(([k, slot]) => !slot.oneShot && k !== key && keys.get(k) !== slot.resource && slot.resource === url && k.startsWith(`${frame.identity}:`));
       if (!spare) continue;
       const displaced = this.slots.get(key);
       this.slots.delete(spare[0]);
@@ -111,7 +114,10 @@ export class MediaEngine {
     const wanted = new Set<string>();
     for (const [id, t] of Object.entries(snapshot)) {
       const key = `${frame.identity}:${id}`, url = assets[t.resource];
-      if (!url || !frame.enabled) continue;
+      if (!url || !frame.enabled || this.completed.has(key)) continue;
+      const existing = this.slots.get(key);
+      const projectedOffset = existing?.origin !== undefined && frame.timeMs !== undefined ? frame.timeMs - existing.origin : t.offsetMs + frame.elapsedMs;
+      if (t.endAfterMs !== undefined && projectedOffset >= t.offsetMs + t.endAfterMs) { this.completed.add(key); this.remove(key); continue; }
       wanted.add(key);
       let slot = this.slots.get(key);
       if (slot && (slot.resource !== url || slot.startOffset !== t.startOffsetMs)) { this.remove(key); slot = undefined; }
@@ -122,7 +128,7 @@ export class MediaEngine {
         const factory = runtime.runtime.media ?? audioMedia;
         const gain = audio.createGain(); gain.gain.value = 0; gain.connect(audio.destination);
         if (this.capture) gain.connect(this.capture);
-        slot = { resource: url, gain, dead: false, startOffset: t.startOffsetMs, origin: frame.timeMs === undefined ? undefined : frame.timeMs - (t.offsetMs + frame.elapsedMs) }; this.slots.set(key, slot);
+        slot = { resource: url, gain, dead: false, oneShot: t.endAfterMs !== undefined, endOffset: t.endAfterMs === undefined ? undefined : t.offsetMs + t.endAfterMs, volume: t.volume, startOffset: t.startOffsetMs, origin: frame.timeMs === undefined ? undefined : frame.timeMs - (t.offsetMs + frame.elapsedMs) }; this.slots.set(key, slot);
         const current = slot;
         const lease=this.bytes(url);current.release=lease.release;
         void lease.value.then(async loaded => {
@@ -161,6 +167,17 @@ export class MediaEngine {
       if (wanted.has(key)) continue;
       // 编译期按 hold 估算淡出已结束、快照不再列出它，但按引擎时间还没淡完（这一步比 hold 短）：在同一个 seek 里淡完再销毁（D92 R2）
       const now = frame.timeMs;
+      // Snapshot timing is an estimate. A live one-shot retains its actual clock anchor
+      // even when a later estimated snapshot has already omitted the event.
+      if (slot.oneShot && slot.origin !== undefined && now !== undefined && key.startsWith(`${frame.identity}:`) && frame.enabled) {
+        const offset = now - slot.origin;
+        if (offset < slot.endOffset!) {
+          slot.gain.gain.setTargetAtTime(frame.playing ? (slot.volume ?? 1) * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);
+          slot.driver?.update({ offsetMs: offset, volume: 1, loop: false, speed: frame.speed, playing: frame.playing });
+          continue;
+        }
+        this.completed.add(key);
+      }
       const left = slot.fade && slot.origin !== undefined && now !== undefined && key.startsWith(`${frame.identity}:`) && frame.enabled ? 1 - (now - slot.fade.start) / slot.fade.ms : 0;
       if (left <= 0) { this.remove(key); continue; }
       slot.gain.gain.setTargetAtTime(frame.playing ? slot.fade!.volume * left * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);
@@ -168,6 +185,6 @@ export class MediaEngine {
     }
   }
   private remove(key: string) { this.failures.delete(key); const slot = this.slots.get(key); if (!slot) return; slot.dead = true; slot.driver?.destroy(); slot.release?.();slot.gain.disconnect(); this.slots.delete(key); }
-  destroy() { this.disposed = true;this.captureClock?.stop();this.captureClock?.disconnect();this.captureClock=undefined; if(this.recorder)this.recorder.ondataavailable=null;if (this.recorder?.state === 'recording') this.recorder.stop(); this.capture?.stream.getTracks().forEach(t => t.stop()); for (const k of this.slots.keys()) this.remove(k); void this.audio?.close().catch(() => {}); this.audio = null;this.warm.splice(0).forEach(r=>r());this.encoded.dispose();this.decoded.dispose();this.chunks=[];this.recorder=undefined;this.capture=undefined; }
+  destroy() { this.completed.clear(); this.disposed = true;this.captureClock?.stop();this.captureClock?.disconnect();this.captureClock=undefined; if(this.recorder)this.recorder.ondataavailable=null;if (this.recorder?.state === 'recording') this.recorder.stop(); this.capture?.stream.getTracks().forEach(t => t.stop()); for (const k of this.slots.keys()) this.remove(k); void this.audio?.close().catch(() => {}); this.audio = null;this.warm.splice(0).forEach(r=>r());this.encoded.dispose();this.decoded.dispose();this.chunks=[];this.recorder=undefined;this.capture=undefined; }
   status() { return { error: this.captureError ?? this.failures.values().next().value ?? null, state: this.audio?.state ?? 'locked', tracks: [...this.slots.values()].filter(s => s.driver).length, time: this.audio?.currentTime ?? 0,cache:{encoded:this.encoded.status(),pcm:this.decoded.status()} }; }
 }

@@ -52,6 +52,7 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - SAY_TOO_LONG / NARRATE_TOO_LONG (warning): a say() or narrate() line over about 80 units (about 10 seconds aloud). Autoplay waits until it is read; say less or split the step.
 - SAY_EMPTY / NARRATE_EMPTY: say() needs the character's words, narrate() the narrator's. Remove it to fall back to the caption.
 - SAY_ROLE_CONFLICT: one step has say(…, { role }) lines from two different roles. A step reads one speaker; split the lines into consecutive steps.
+- PACE_INVALID: work({ pace: { systemLead } }) accepts a finite 0–30 seconds (0 removes system pre-commit lead); omit it to preserve the default 0.9 seconds. hold() only controls post-commit dwell.
 - STREAM_PACE_INVALID: stream()'s pace is only 'voice' (follow this step's spoken line); omit it for model-output speed.
 - VOICE_CONFIG_INVALID: config({ voice }) takes { profile?, narrator?, roles?: { roleKey: 'voice' }, locales?: { ja: { narrator?, roles? } } } with non-empty strings. API keys never go in the config.
 - LOCALES_INVALID / LOCALES_UNDECLARED: config({ locales }) lists supported languages once each, source language first; every locales/<lang>.json must be listed there and must not be the source language. LOCALE_FILE_INVALID: the file must be one JSON object of "source text": "translation" strings.
@@ -116,4 +117,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.6.2 sha256:82c436418a17ea5a1dc01be3b2b3e7e5402c69e31eeb67bf6e554e63e16c51a8 -->
+<!-- joplo-skill 0.6.2 sha256:45414ac1c7246a50785c06edfeffd1369bc892375139c5504b4d21619bb81944 -->

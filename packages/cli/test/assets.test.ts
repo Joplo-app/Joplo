@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { afterEach, expect, it } from 'vitest';
+import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
+import { runCli } from '../src/cli.ts';
+const dirs: string[] = [];
+afterEach(() => dirs.splice(0).forEach(dir => fs.rmSync(dir, { recursive: true, force: true })));
+it('assets --usage returns scoped structured references and explains uncertainty without creating output', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-cli-assets-')); dirs.push(root);
+  installFixturePlugins(root); fs.mkdirSync(path.join(root, 'works')); fs.mkdirSync(path.join(root, 'photos'));
+  fs.writeFileSync(path.join(root, 'package.json'), '{"type":"module"}');
+  fs.writeFileSync(path.join(root, 'tsconfig.json'), '{"compilerOptions":{"jsx":"react-jsxdev","jsxImportSource":"@joplo-app/kit","module":"ESNext","moduleResolution":"Bundler"}}');
+  fs.writeFileSync(path.join(root, 'photos/photo.png'), 'photo bytes');
+  fs.writeFileSync(path.join(root, 'joplo.config.ts'), `import {config} from '@joplo-app/kit'; import ui from '@joplo-app/plugin-ui'; export default config({name:'Asset CLI',plugins:[ui]});`);
+  fs.writeFileSync(path.join(root, 'works/film.tsx'), `import {work,chapter,asset} from '@joplo-app/kit'; import {Text} from '@joplo-app/plugin-ui'; import {jsx} from '@joplo-app/kit/jsx-runtime'; export default work({title:'Film',summary:'A film',stage:jsx(Text,{id:"image",style:{backgroundImage:'url('+asset('../photos/photo.png')+')'},children:"Photo"}),scenarios:{one:chapter('One').system('Show')}});`);
+  let output = '', error = '';
+  const code = await runCli(['assets', root, '--usage', '--work', 'film', '--scan', 'photos', '--format', 'json'], { stdout: text => output += text, stderr: text => error += text });
+  expect(code, error + output).toBe(0);
+  const report = JSON.parse(output).data;
+  expect(report.scope.work).toBe('film'); expect(report.entries[0]).toMatchObject({ path: 'photos/photo.png', authorReference: 'referenced', publication: 'included-in-selected-ir', sampledVisibility: 'unknown' });
+  expect(report.entries[0].references.some((ref: { workId: string }) => ref.workId === 'film')).toBe(true);
+  expect(fs.existsSync(path.join(root, '.joplo'))).toBe(false);
+});

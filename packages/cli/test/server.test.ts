@@ -60,7 +60,9 @@ test('render --film / --video：参数、摘要与互斥（D92）', async () => 
   expect(v.stdout).toContain(resolve('v.srt'));
   expect(v.stdout).toContain('1 narration line(s) had no generated audio');
   expect(v.stdout).toContain('  - No clip yet');
-  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--film', '--width', '10', '--height', '10', '--out', 'f.png'])).code).toBe(2);
+  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--film', '--width', '1080', '--height', '1920', '--viewport', '720x1280', '--no-frame', '--out', 'f.png'], { renderFilm })).code).toBe(0);
+  expect(renderFilm).toHaveBeenLastCalledWith(expect.objectContaining({ width: 1080, height: 1920, logicalViewport: { width: 720, height: 1280 }, noFrame: true }));
+  expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--film', '--width', '1080', '--out', 'f.png'])).code).toBe(2);
   expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--clean', '--out', 'f.png'])).code).toBe(2);
   expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--film', '--sheet', '--out', 'f.png'])).code).toBe(2);
   expect((await run(['render', 'project', '--scenario-id', 'f.a.s', '--chain', '--out', 'f.png'])).code).toBe(2);

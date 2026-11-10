@@ -31,7 +31,7 @@ export const designRecords = {
     exploration: 'D40 先补 Terminal / Phone，再用正式组件画 Joplo 自己。',
     scenario: 'terminal',
     decision: '正式组件承担表达，页面固定设备',
-    current: 'D44 固定每页设备。手机页需要独立设计；外框不会自动转换桌面交互。',
+    current: 'D44 仍固定每页设备。新增逻辑画幅导出见本轮源码场景；不会自动转换桌面交互，也不表示已发行。',
     evidence: 'DECISIONS D40 / D44；09c5f1b → 072ae3f → fb8d4aa',
   },
   npm: {
@@ -55,7 +55,7 @@ export const designRecords = {
     exploration: 'D74 从零配置朗读开始。下面观察声音更长时的等待、暂停与手动切步。',
     scenario: 'voice_longer',
     decision: '等声音读完，但始终服从人的操作',
-    current: '试听后补齐短旁白与供应商切换行为。视频带声音仍在后续范围。',
+    current: '历史试听稿保留。本轮作用域旁白、显式静音与可控节奏已写入源码；视频带音轨已有本地实现，Cloud/npm 尚未发布。',
     evidence: 'DECISIONS D74；b24b768 → 69102f3 → f76dd5b',
   },
   review: {

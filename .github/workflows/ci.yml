@@ -27,8 +27,33 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - run: pnpm --filter @joplo-app/server exec playwright install --with-deps chromium
       - run: pnpm test
       - run: pnpm release:smoke
+
+  export-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @joplo-app/server exec playwright install --with-deps chromium
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pnpm test packages/server/test/export-contract.test.ts
+        env:
+          JOPLO_EXPORT_VIDEO: '1'
+          JOPLO_EXPORT_LONG: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-export-evidence
+          path: scratch/output/export-contract-fixture-*
+          retention-days: 7
 
   # 提交标题前缀（D73，docs/release.md「提交信息约定」）：发布说明靠它分组。PR 上不合规就失败；直接推送只给警告。
   commits:

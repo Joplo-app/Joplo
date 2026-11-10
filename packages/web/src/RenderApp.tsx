@@ -77,6 +77,8 @@ type W = {
 
 /** 录制接口（服务端经 page.evaluate 调用）。prepare 做开播前的准备（解码配乐与旁白、开始录音），录屏在它之后才开始（#57）。 */
 export type RecordApi = {
+  timeline(): { completed: boolean; schemaVersion: 1; startedAt: number | null; events: Record<string, unknown>[] };
+  voiceIdentity(): unknown;
   prepare(): Promise<void>;
   play(): Promise<void>;
   stopAudio(): Promise<{ data: string } | null>;
@@ -215,9 +217,12 @@ export function RenderApp() {
   // 有层级的方案：显示这一步导演层的画面（每层是独立画面），设备取这个画面的设置
   const shownId = data.project.scenarios[scenarioId] ? displaySceneId(data.project, scenarioId, data.state.position) : data.state.sceneId;
   const viewport: Viewport = data.project.scenes[shownId]?.viewport === 'mobile' ? 'mobile' : 'desktop';
-  const vp = VIEWPORTS[viewport];
+  const vw = Number(params.get('vw')), vh = Number(params.get('vh'));
+  const logicalViewport = vw > 0 && vh > 0 ? { width: vw, height: vh } : null;
+  const deviceFrame = viewport === 'mobile' && params.get('noframe') !== '1' && !logicalViewport;
+  const vp = logicalViewport ?? VIEWPORTS[viewport];
   const framed = (stageNode: ReactNode) =>
-    viewport === 'mobile' ? (
+    deviceFrame ? (
       <ThemeContext.Provider value={{ theme, stroke: resolveLook({ theme, font, stroke }, projectThemes(data.project), i18n).stroke, font, registry }}>
         <DeviceFrame width={vp.width} height={vp.height} seed="stage-phone">
           {stageNode}
@@ -227,8 +232,8 @@ export function RenderApp() {
       stageNode
     );
   // 字幕与步骤标题条浮在舞台（手机含外框）上（D97）：截图、导出图片与视频的尺寸就是舞台本身
-  const fw = viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).width : vp.width;
-  const fh = viewport === 'mobile' ? phoneFrameSize(vp.width, vp.height).height : vp.height;
+  const fw = deviceFrame ? phoneFrameSize(vp.width, vp.height).width : vp.width;
+  const fh = deviceFrame ? phoneFrameSize(vp.width, vp.height).height : vp.height;
   // 幕布（D61：过渡卡、场景封面）盖在舞台（手机含外框）上，与演示页一样不进外框；只画不响应，不影响截图报告。
   // 场景封面只出现在导出图片、视频与固定尺寸截图（分享预览）里；单张截图（Agent 看画面用）保留第 0 步的真实画面。
   const withCurtain = (node: ReactNode, c: CurtainSpec | null, w: number, h: number) =>
@@ -270,7 +275,7 @@ export function RenderApp() {
     }
     if (frame)
       return (
-        <div data-jexport="" style={{ position: 'absolute', left: 0, top: 0, display: 'inline-block', ...(viewport === 'mobile' ? { background: '#ffffff', padding: 16 } : {}) }}>
+        <div data-jexport="" style={{ position: 'absolute', left: 0, top: 0, display: 'inline-block', ...(deviceFrame ? { background: '#ffffff', padding: 16 } : {}) }}>
           {withHud(withCurtain(framed(stageNode), c, fw, fh), hud, fw, fh)}
         </div>
       );
@@ -289,11 +294,12 @@ export function RenderApp() {
       </div>
     );
   };
-  if (record) return <RecordStage project={data.project} projectId={projectId} content={params.get('content')} scenarioId={scenarioId} chain={chain} captureAudio={captureAudio} voiceMode={voiceMode} hide={hide} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} />;
+  if (record) return <RecordStage project={data.project} projectId={projectId} content={params.get('content')} scenarioId={scenarioId} chain={chain} captureAudio={captureAudio} voiceMode={voiceMode} hide={hide} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} viewportOverride={logicalViewport} />;
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
   const plan = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null);
   return wrap(<Stage
+      viewportOverride={logicalViewport}
       project={data.project}
       state={data.state}
       theme={theme}
@@ -312,14 +318,15 @@ export function RenderApp() {
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
-function RecordStage({ project, projectId, content, scenarioId, chain, captureAudio, voiceMode, hide, theme, font, stroke, registry, setStage, wrap }: { project: Project; projectId: string; content: string | null; scenarioId: string; chain: boolean; captureAudio: boolean; voiceMode: VoiceMode; hide: ReadonlySet<HideItem>; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, hud: Hud, c: CurtainSpec | null) => ReactNode }) {
+function RecordStage({ viewportOverride, project, projectId, content, scenarioId, chain, captureAudio, voiceMode, hide, theme, font, stroke, registry, setStage, wrap }: { viewportOverride?: { width: number; height: number } | null; project: Project; projectId: string; content: string | null; scenarioId: string; chain: boolean; captureAudio: boolean; voiceMode: VoiceMode; hide: ReadonlySet<HideItem>; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, hud: Hud, c: CurtainSpec | null) => ReactNode }) {
   const { t: i18n } = useBoardI18n();
   // useMedia 要等控制器建好才能调用；旁白在播放时才用到引擎，经这个盒子晚一步拿到
   const engineBox = useRef<{ current: MediaEngine | null } | null>(null);
   const engine = () => engineBox.current?.current ?? null;
   // 真实旁白（#56）：有音频的段经媒体引擎播放并进录音轨，没有的按估算时长
-  const recordVoice = useMemo(() => voiceMode === 'real' ? new RecordVoice({ output: () => engine()?.narrationOutput() ?? null, decode: (b) => engine()?.decode(b) ?? Promise.reject(new Error('Media engine is not ready')), fallback: estimatedNarrator() }) : null, [voiceMode]);
+  const recordVoice = useMemo(() => voiceMode === 'real' ? new RecordVoice({ output: () => engine()?.narrationOutput() ?? null, decode: (b) => engine()?.decode(b) ?? Promise.reject(new Error('Media engine is not ready')), fallback: estimatedNarrator(), timingOnly: !captureAudio }) : null, [voiceMode, captureAudio]);
 
+  const timeline = useRef<{ schemaVersion: 1; startedAt: number | null; events: Record<string, unknown>[] }>({ schemaVersion: 1, startedAt: null, events: [] });
   const ctl = useMemo(() => {
     const c = new DemoController(null);
     c.reducedMotion = false;
@@ -332,10 +339,25 @@ function RecordStage({ project, projectId, content, scenarioId, chain, captureAu
     } else c.autoNext = null;
     if (voiceMode === 'estimate') c.narrator = estimatedNarrator();
     else if (recordVoice) c.narrator = recordVoice.narrator;
+    if (c.narrator) {
+      const speak = c.narrator.speak.bind(c.narrator);
+      c.narrator = new Narrator();
+      c.narrator.enabled = true;
+      c.narrator.speak = (text, role, speed) => {
+        const snap = c.getSnapshot();
+        const narration = speak(text, role, speed);
+        if (narration) {
+          const event = { type: 'narration', at: performance.now(), engineMs: c.clock.time, scenarioId: snap.scenarioId, position: snap.state?.position ?? 0, text, role, speed, source: narration.source, ...recordVoice?.describe(text, role), endAt: null as number | null, engineEndMs: null as number | null };
+          timeline.current.events.push(event);
+          void narration.done.then(() => { event.endAt = performance.now(); event.engineEndMs = c.clock.time; });
+        }
+        return narration;
+      };
+    }
     return c;
   }, [project, scenarioId, chain, voiceMode, recordVoice]);
   ctl.i18n = i18n;
-  const media = useMedia(ctl, project, captureAudio, !!recordVoice && captureAudio);
+  const media = useMedia(ctl, project, captureAudio, !!recordVoice);
   engineBox.current = media;
   // 要录的章：这一章，chain 时加上后面的章
   const chapters = useMemo(() => {
@@ -351,6 +373,20 @@ function RecordStage({ project, projectId, content, scenarioId, chain, captureAu
   }, [project, chapters]);
   // 要读的每一段（与控制器 narrate 同一个算法），开播前预取音频
   const voiceLines = useMemo(() => recordVoice ? chapters.flatMap(chapter => chapter.steps.map((step, i) => spokenLine(step, stepCaption(step, i18n), speakerRoleAt(project, chapter.id, i + 1)))).filter(l => l.text.trim()).map(l => ({ text: l.text, role: l.role })) : [], [recordVoice, chapters, project, i18n]);
+  useEffect(() => {
+    let last = '';
+    return ctl.subscribe(() => {
+      if (timeline.current.startedAt === null) return;
+      const s = ctl.getSnapshot();
+      const key = `${s.scenarioId}:${s.state?.position}:${s.activeStep}:${s.narration?.position}:${s.playing}:${s.upNext}:${s.dwell?.position}:${s.busy}`;
+      if (key === last) return;
+      last = key;
+      const chapter = s.scenarioId ? project.scenarios[s.scenarioId] : undefined;
+      const position = s.state?.position ?? 0;
+      const step = position > 0 ? chapter?.steps[position - 1] : undefined;
+      timeline.current.events.push({ at: performance.now(), engineMs: ctl.clock.time, scenarioId: s.scenarioId, position, stepId: step?.id ?? null, activeStep: s.activeStep, playing: s.playing, upNext: s.upNext, completed: !!s.state?.completed, dwell: s.dwell, camera: { shots: step?.shots ?? [], plan: cameraFor(project, s.scenarioId, cameraPosition(chapter, position, s.activeStep), s.leadLayer) }, ext: step?.ext ?? chapter?.ext ?? {}, media: step?.media ?? chapter?.media ?? {}, narration: s.narration ?? null, text: step ? spokenLine(step, stepCaption(step, i18n), speakerRoleAt(project, chapter!.id, position)).text : null });
+    });
+  }, [ctl, project, i18n]);
   const cues = useRef<RecordCue[]>([]);
   const prepared = useRef<Promise<void> | null>(null);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
@@ -373,9 +409,12 @@ function RecordStage({ project, projectId, content, scenarioId, chain, captureAu
       }
     })();
     w.__JOPLO_RECORD__ = {
+      timeline: () => ({ ...structuredClone(timeline.current), completed: started && !snap.playing && !snap.upNext && (total===0 || !!snap.state?.completed || (snap.state?.position??0)>=total) }),
+      voiceIdentity: () => ({ mode:voiceMode, prepared:recordVoice?.identity() ?? null }),
       prepare,
       play: async () => {
         await prepare();
+        timeline.current.startedAt ??= performance.now();
         setStarted(true);
         if (total === 0) return;
         void ctl.play();
@@ -412,6 +451,7 @@ function RecordStage({ project, projectId, content, scenarioId, chain, captureAu
   if (!snap.state) return null;
   return <EngineClockContext.Provider value={ctl.clock}>{wrap(
     <Stage
+      viewportOverride={viewportOverride}
       project={project}
       state={snap.state}
       clock={ctl.clock}
