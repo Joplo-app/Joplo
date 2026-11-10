@@ -40,13 +40,15 @@ npx joplo render [dir] --scenario-id <qid> --out <file.webm> --video [--chain] [
 
 ## init
 
-从版本化模板生成可运行项目。默认模板为 `github:Joplo-app/Joplo/templates/starter#v<CLI版本>`，直接下载 tarball，不需要 Git；在本仓库源码开发环境运行时使用本地 `templates/starter`。
+从独立公开[模板仓库](https://github.com/Joplo-app/joplo-templates)默认分支生成可运行项目。缺省为 `github:Joplo-app/joplo-templates/starter`，直接下载仅含模板的 tarball，不需要 Git；源码运行与发布 CLI 使用同一来源，不随 CLI 版本打模板 tag。
 
-- `--template starter` 等同默认，比较功能方案；`--template work` 创建一件可直接播放、暂停并修改输入的独立作品（`works/explainer.tsx`，两个默认接续的章节，无 `features/` 或占位 `routes/`）。作品模板只安装并启用 ui，不需要凭证或生成资源。
-- `--template` 的值不含 `/` 或 `\`、不以 `.` 开头且不是 `github:` 前缀时，按内置模板名解析；只接受 `starter`、`work`，未知名报错并列出这两项。内置名优先于同名本地目录，本地目录须写 `./work`。内置模板下载主仓库 `templates/<名称>#v<CLI版本>`；源码开发时改读当前 checkout 的 `templates/<名称>`，与原默认模板相同。
+- `--template starter` 等同默认，比较功能方案；`--template work` 创建一件可直接播放、暂停并修改输入的独立作品（`works/explainer.tsx`，两个默认接续的章节，无 `features/` 或占位 `routes/`），只启用 ui，不需要凭证或生成资源。
+- 不含路径分隔符、不以 `.` 开头、不是 `github:` 前缀的值按模板名解析，须匹配 `^[a-z0-9][a-z0-9-]*$`；任何合法名都下载模板仓库里的同名目录，新模板无需发 CLI。内置名优先于同名本地目录，本地目录须写 `./work`。目录不存在时报“模板仓库里没有这个模板”，并给出仓库网址；空名、大写、下划线、其他特殊字符在下载前拒绝。
+- 模板与主仓库隔离，由维护者直接手动更新模板仓库，不参与发版；默认分支须能被最新发布 CLI 使用，不保证旧版 CLI 可用。0.6.0 及更早的已发布 CLI 仍读主仓库原 tag，其中的文件不受当前删除影响。
 - `--template ./local-template` 使用本地目录，适合离线开发。
-- `--template github:owner/repo/templates/team#ref` 支持仓库、可选子目录和分支/tag/提交；省略 ref 时使用 HEAD。私有仓库优先读取 `GITHUB_TOKEN`，其次读取 `gh auth token`。令牌只发给 GitHub API，不写入文件、输出或 codeload 请求头。
+- `--template github:owner/repo/templates/team#ref` 支持仓库、可选子目录和分支/tag/提交；省略 ref 时使用 HEAD，即仓库默认分支。私有仓库优先读取 `GITHUB_TOKEN`，其次读取 `gh auth token`。令牌只发给 GitHub API，不写入文件、输出或 codeload 请求头。
 - 模板必须含有效 `package.json` 和 `joplo.config.ts`（或 tsx）。先完整读取、验证再创建目标；空目录、缺文件、下载失败、找不到 ref/子目录、压缩包损坏、链接或 `..` 路径都给出中文恢复提示，可改用本地模板，不留下半截目录。
+- 下载使用 30 秒空闲超时：持续收到数据时不限制总时长，大小上限、路径穿越防护和只允许 codeload 重定向的限制仍生效。
 - 模板占位符 `__JOPLO_VERSION__`、`__PACKAGE_NAME__`、`__PROJECT_NAME__` 分别替换成 CLI 精确版本、目录生成的 npm 包名、项目显示名；源码里的项目名占位符必须是完整引号字符串。
 
 - `--name <name>`：项目名，默认目录名。
@@ -214,7 +216,7 @@ Cloud 必须指定 `--share` 和 `--work`，避免另一个方案的确认结束
 
 写入引擎入口 `.claude/skills/joplo/SKILL.md`、`joplo-feedback/SKILL.md` 和 `joplo/topics/*.md`，与仓库 `skills/` 逐字一致。读取项目 config.plugins 后，生成每个插件的 `joplo-plugin-<id>/SKILL.md`、`topics/*.md` 和总索引 `joplo-plugins/SKILL.md`；`.joplo-plugins.json` 记录安装器拥有的插件文件。
 
-增删插件后重新运行 install：新增和更新当前插件技能，删除已禁用插件的未修改生成文件，不动无关技能。任何待写或待删技能被用户改过，整批操作都停止，退出 1；`--diff` 包含删除项，`--force` 才明确替换或删除。配置/依赖加载失败不视为“无插件”，保留全部已装技能并提示安装依赖后重试。init 在依赖未安装时使用模板随附的版本化插件技能；安装后再同步 config.plugins。`joplo` 负责创作演示和启动评审交接；`joplo-feedback` 负责本地／Share 的接收、及时回执、恢复以及按授权修改源码。完整使用指南和最佳实践通过 `npx joplo skill review` 按需读取，包括后台进程不会自动唤醒 Agent 的边界；不能挂起监听后结束响应却声称仍实时接收。AGENTS.md 已存在时更新 Joplo 托管段；不存在时仅在显式传 `--agents-md` 后创建。
+增删插件后重新运行 install：新增和更新当前插件技能，删除已禁用插件的未修改生成文件，不动无关技能。任何待写或待删技能被用户改过，整批操作都停止，退出 1；`--diff` 包含删除项，`--force` 才明确替换或删除。配置/依赖加载失败不视为“无插件”，保留全部已装技能并提示安装依赖后重试。init 自己安装引擎技能；依赖未安装时保留模板随附的插件技能（由模板维护者手动更新），未随附也不报错；安装依赖后运行 skill install 按 config.plugins 同步。`joplo` 负责创作演示和启动评审交接；`joplo-feedback` 负责本地／Share 的接收、及时回执、恢复以及按授权修改源码。完整使用指南和最佳实践通过 `npx joplo skill review` 按需读取，包括后台进程不会自动唤醒 Agent 的边界；不能挂起监听后结束响应却声称仍实时接收。AGENTS.md 已存在时更新 Joplo 托管段；不存在时仅在显式传 `--agents-md` 后创建。
 
 - `--diff`：只打印 unified diff，不创建或改写文件，优先于 force。
 - `--force`：允许覆盖或删除被用户修改过的托管技能文件。

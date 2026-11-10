@@ -261,7 +261,7 @@ compile 的 publish / review 模式先把 alternatives 的各项评审值归空�
 - 技能先讲作品 → 切片 → 步骤；story 的 PM 视角、cases / coverage 明确只适用于功能下作品。内容技能用 work / chapter 教影片，不借情况当章节。
 - 引擎指南 / 入口与插件指南是权威来源；常见坑逐条保留，字段位置、诊断、两段切片 id 与 JSON 输出同步。运行 `pnpm skills:build` 和 `pnpm skills:build --check`，生成物与安装版逐字一致，不用强制覆盖掩盖用户修改。
 - 内容示例统一迁至 works：llm-explainer、midterms-2026、manus-voice、button-40-years、code-change、media-upload。重做旧版用另一件独立作品加 draft。保留实际角色、接续语义与翻译，移除占位页面与手写章节编号；case.expected 迁到章节 expected。
-- 自设计项目只维护 examples/joplo；保留稳定功能 ID 和真实决策证据，不伪造选定历史。starter 继续以功能评审起步，作品文件同样用 work 与功能下 works 目录；独立作品起步模板已提供：joplo init <dir> --template work，包含两个默认接续的章节与可暂停修改的状态绑定输入，只启用 ui，无需占位页面。
+- 自设计项目只维护 examples/joplo；保留稳定功能 ID 和真实决策证据，不伪造选定历史。[独立模板仓库](https://github.com/Joplo-app/joplo-templates)的 starter 以功能评审起步，作品文件同样用 work 与功能下 works 目录；独立作品起步模板已提供：joplo init <dir> --template work，包含两个默认接续的章节与可暂停修改的状态绑定输入，只启用 ui，无需占位页面。
 
 ## 8. 遗留
 

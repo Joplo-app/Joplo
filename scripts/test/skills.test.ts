@@ -3,12 +3,7 @@ import { tmpdir } from 'node:os';
 import { readdir, readFile, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { readCliVersion, skillFiles, pluginSkillFiles, pluginSkillManifest } from '../../packages/cli/src/skill.ts';
-
-import ui from '../../plugins/ui/src/plugin.ts';
-import diagram from '../../plugins/diagram/src/plugin.ts';
-import content from '../../plugins/content/src/plugin.ts';
-import alda from '../../plugins/alda/src/index.ts';
+import { readCliVersion, skillFiles } from '../../packages/cli/src/skill.ts';
 
 const root = resolve(import.meta.dirname, '../..');
 
@@ -76,28 +71,20 @@ test('joplo 的 description 覆盖中英文触发词，可在没有 joplo.config
 });
 
 
-test.each([['starter',[ui,diagram,content,alda({})]],['work',[ui]]] as const)('%s template guides match enabled plugins before installation', async (name,plugins) => {
- const version=await readCliVersion(new URL('../../packages/cli/package.json',import.meta.url));
- const files=pluginSkillFiles(version,plugins.map(p=>({...p,version})));
- const base=join(root,'templates',name,'.claude/skills');
- for(const f of files)expect(await readFile(join(base,f.path))).toEqual(f.content);
- expect(await readFile(join(base,'.joplo-plugins.json'))).toEqual(pluginSkillManifest(files));
- expect((await readdir(base)).sort()).toEqual(['.joplo-plugins.json',...new Set(files.map(f=>f.path.split('/')[0]!))].sort());
-});
-
-
-test('skills:build --check detects stale work guides without writing; regeneration repairs both templates', async () => {
- const dir=await mkdtemp(join(tmpdir(),'joplo-template-skills-'));
+test('skills:build only manages skills/: stale engine files fail check and regeneration repairs them', async () => {
+ const dir=await mkdtemp(join(tmpdir(),'joplo-skills-'));
  const run=(...args:string[])=>spawnSync(process.execPath,['--import','tsx',join(root,'scripts/build-skills.ts'),'--root',dir,...args],{cwd:root,encoding:'utf8'});
  try {
   await mkdir(join(dir,'packages/cli'),{recursive:true});
-  await writeFile(join(dir,'packages/cli/package.json'),'{"version":"9.9.9"}');
+  await writeFile(join(dir,'packages/cli/package.json'),' {"version":"9.9.9"}');
   expect(run().status).toBe(0);
+  expect((await readdir(dir)).sort()).toEqual(['packages','skills']);
   expect(run('--check').status).toBe(0);
-  const file=join(dir,'templates/work/.claude/skills/joplo-plugin-ui/SKILL.md');
+  const file=join(dir,'skills/joplo/SKILL.md');
   await writeFile(file,'stale');
-  const check=run('--check'); expect(check.status).toBe(1); expect(check.stderr).toContain('templates/work');
+  const check=run('--check'); expect(check.status).toBe(1); expect(check.stderr).toContain('skills/joplo/SKILL.md');
   expect(await readFile(file,'utf8')).toBe('stale');
   expect(run().status).toBe(0); expect(run('--check').status).toBe(0);
+  expect((await readdir(dir)).sort()).toEqual(['packages','skills']);
  } finally { await rm(dir,{recursive:true,force:true}); }
 });

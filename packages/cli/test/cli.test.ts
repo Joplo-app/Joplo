@@ -1,3 +1,4 @@
+import { releaseFixture } from '../../../scripts/test/init-fixture.ts';
 import { afterEach, expect, test } from 'vitest';
 import { spawn } from 'node:child_process';
 import { cp, mkdtemp, readFile, writeFile, mkdir, rm, symlink } from 'node:fs/promises';
@@ -88,7 +89,7 @@ test('selection 文件不存在、null、无 at 均受控', async () => {
 });
 test('init 后立即 check 通过，非空目录拒绝且保留内容', async () => {
   const d = await temp(false); const target = join(d, 'new');
-  expect((await cli(['init', target, '--name', '最小项目'])).code).toBe(0);
+  expect((await cli(['init', target, '--template', releaseFixture('feature'), '--name', '最小项目'])).code).toBe(0);
   expect((await cli(['check', target])).code).toBe(0);
   const example = await readFile(join(target, 'features/example/works/a.tsx'), 'utf8');
   expect(example).toContain(".click('start', 'Click Start', done('Completed'))");
@@ -99,7 +100,7 @@ test('init 后立即 check 通过，非空目录拒绝且保留内容', async ()
   expect(await readFile(join(target, '.gitignore'), 'utf8')).toContain('exports/');
 });
 test('init 缺省名称，engine skill 与 help 主输出走 stdout', async () => {
-  const d = await temp(false); expect((await cli(['init', d])).code).toBe(0);
+  const d = await temp(false); expect((await cli(['init', d, '--template', releaseFixture('feature')])).code).toBe(0);
   const r = await cli(['skill','authoring']); expect(r.code).toBe(0); expect(r.stderr).toBe('');
 
   for (const word of ['flow', 'selection', 'check', 'pick']) expect(r.stdout).toContain(word);

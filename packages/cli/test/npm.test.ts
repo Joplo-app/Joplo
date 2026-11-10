@@ -9,10 +9,13 @@ import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { detectPackageManager, pmCommands } from '../src/pm.ts';
 import { cliVersion, projectNotes } from '../src/startup.ts';
-import { initProject, initSummary, nextStepLine } from '../src/init.ts';
+import { initProject as realInitProject, initSummary, nextStepLine } from '../src/init.ts';
 import { skillFiles } from '../src/skill.ts';
 import { stat } from 'node:fs/promises';
 import { runCli } from '../src/cli.ts';
+
+import { fixtureArchive, releaseFixture } from '../../../scripts/test/init-fixture.ts';
+const initProject = (dir: string, name?: string, opts: Parameters<typeof realInitProject>[2] = {}) => realInitProject(dir, name, {...opts, templateDeps:{env:{},ghToken:()=>undefined,fetch:async()=>new Response(new Uint8Array(fixtureArchive()))}});
 
 const dirs: string[] = [];
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
@@ -134,7 +137,7 @@ describe('init', () => {
     let out = '';
     try {
       process.chdir(base); process.env.npm_config_user_agent = 'pnpm/10.0.0 npm/? node/v22.12.0';
-      expect(await runCli(['init', 'my-demo'], { stdout: s => { out += s; }, stderr: () => {} })).toBe(0);
+      expect(await runCli(['init', 'my-demo', '--template', releaseFixture('feature')], { stdout: s => { out += s; }, stderr: () => {} })).toBe(0);
     } finally { process.chdir(prev); if (ua === undefined) delete process.env.npm_config_user_agent; else process.env.npm_config_user_agent = ua; }
     expect(out).toContain('✓ Created my-demo/');
     expect(out).toContain(`"joplo": "${VERSION}", "@joplo-app/kit": "${VERSION}"`);
@@ -172,7 +175,7 @@ describe('init 安装 Agent 技能（等同于对新项目运行 skill install -
     expect(initSummary(r, {}).some(l => l.includes('Agent skills'))).toBe(false);
     let out = '';
     const base = await temp(); const prev = process.cwd();
-    try { process.chdir(base); expect(await runCli(['init', 'x', '--no-skill'], { stdout: s => { out += s; }, stderr: () => {} })).toBe(0); }
+    try { process.chdir(base); expect(await runCli(['init', 'x', '--no-skill', '--template', releaseFixture('feature')], { stdout: s => { out += s; }, stderr: () => {} })).toBe(0); }
     finally { process.chdir(prev); }
     await expect(stat(join(base, 'x/.claude'))).rejects.toMatchObject({ code: 'ENOENT' });
     expect(out).not.toContain('Agent skills');

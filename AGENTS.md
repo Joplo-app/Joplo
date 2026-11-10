@@ -30,7 +30,7 @@
 - `packages/core/src/agent-skill.ts`：官方 `joplo`、`joplo-feedback` 技能和安装到项目的 `AGENTS.md` 托管段的唯一模板。
 - `packages/core/src/guide.ts`：`joplo skill <topic>` 的版本对应使用指南。需要更多条件化细节时优先放到合适的主题，保持技能入口易发现、易读取。
 - `plugins/*/src/guide.ts`：各插件组件、创作实践与常见坑的权威正文，插件清单通过 `skill` / `skillTopics` 提供；引擎技能不出现具体插件组件名。
-- `skills/**` 与 `templates/starter/.claude/skills/**`：生成产物。修改模板后运行 `pnpm skills:build`，不要只手改生成文件。
+- `skills/**`：生成产物。修改技能模板后运行 `pnpm skills:build`，不要只手改生成文件。产品起步模板在独立仓库 `Joplo-app/joplo-templates` 默认分支，由维护者手动更新（含随附插件指南），与本仓库发版隔离，不由 skills:build 生成；本仓库 scripts 下的冒烟夹具只供测试。
 - 新增或调整主题时，同步 `SKILL_TOPICS`、相关主题链接、技能路由、README 和 CLI 文档。命令、参数、事件、退出码与实现保持一致。
 - `joplo skill install` 与仓库官方技能应逐字一致；保留安装器对用户修改的保护，不用 `--force` 掩盖差异。
 

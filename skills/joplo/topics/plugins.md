@@ -11,7 +11,7 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 2. Install a trusted author package, import its default manifest/factory and explicitly add it to config.plugins. Use the package's exact version when version-coupled to this CLI.
 3. Run npx joplo skill <plugin-id> or <plugin-id>/<topic>, then import components and effects directly from that package. For ids colliding with engine topics use plugin:<id>/<topic>. Do not invent component names or copy another plugin's conventions.
 4. Run npx joplo skill install after adding/removing plugins. It synchronizes per-plugin files and removes unchanged generated files for removed plugins; edited files are protected (inspect --diff before --force). Outside a project it installs only engine skills.
-5. A new template carries its own generated plugin guides for reading before dependency installation. After install, rerun skill install to verify the live config; unresolved imports never mean a plugin was enabled successfully.
+5. A template may carry manually maintained plugin guides for reading before dependency installation; their absence does not prevent init. After install, rerun skill install to verify the live config; unresolved imports never mean a plugin was enabled successfully.
 6. joplo components inspects only the enabled manifests; a named query gives that component's declarations and example. For full recipes/behavior read its plugin skill.
 
 ## Optional 3D
@@ -65,4 +65,4 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.6.0 sha256:3947be4720f774f49504445a882815dd242b467cc47c270d5653777eab938e37 -->
+<!-- joplo-skill 0.6.0 sha256:53220b4b356b3145d879c19a0cde6d79025afdeadf7872d7651e969baddf4157 -->

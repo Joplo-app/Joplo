@@ -6,6 +6,8 @@ import ts from 'typescript';
 const root = resolve(import.meta.dirname, '../../..');
 const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef]/u;
 const whitelist: readonly (readonly [string, string, string])[] = [
+  ['packages/cli/src/template-messages.ts', "invalidName: '模板名称只能含小写字母、数字与连字符，且必须以小写字母或数字开头。本地目录请使用 ./name。',", 'D105 retains Chinese template recovery diagnostics.'],
+  ['packages/cli/src/template-messages.ts', "missingBuiltin: '模板仓库里没有这个模板。可用模板请查看 https://github.com/Joplo-app/joplo-templates 。',", 'D105 requires a missing-template message and repository link.'],
   ['packages/cli/src/template-messages.ts', "fallback: '可使用 --template <本地路径> 离线初始化。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
   ['packages/cli/src/template-messages.ts', "invalidSpec: '模板地址无效。请使用 github:owner/repo[/子目录][#ref] 或本地目录。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],
   ['packages/cli/src/template-messages.ts', "invalidPath: '模板包含不安全的路径或链接，已拒绝写入。',", 'D89 explicitly requires Chinese template recovery diagnostics.'],

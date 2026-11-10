@@ -32,7 +32,8 @@ pnpm install --frozen-lockfile
 pnpm release:version 0.3.0         # 改十一个包的版本，并重新生成 skills/（默认升 patch，破坏性变更升 minor）
 pnpm install --lockfile-only
 pnpm typecheck && pnpm test         # 本地先过一遍，CI 会再跑
-git add packages/*/package.json plugins/*/package.json plugins/*/src/version.json pnpm-lock.yaml skills templates/starter/.claude/skills CHANGELOG.md
+git add packages/*/package.json plugins/*/package.json plugins/*/src/version.json packages/core/src/guide.ts pnpm-lock.yaml skills CHANGELOG.md
+git status --short                  # 应该是空的：release:version 改过的文件都要进这一个提交
 git commit -m "release: 0.3.0"
 git push origin main
 git tag v0.3.0 && git push origin v0.3.0   # 触发 .github/workflows/release.yml
@@ -92,7 +93,7 @@ git push origin v0.3.0
 顺序不能乱：
 
 1. `pnpm release:version <v>`：改十一个包的版本，并重新生成 `skills/*/SKILL.md`（带新版本标记）。
-2. 跑完检查后，把 `packages/*/package.json`、`plugins/*/package.json`、`plugins/*/src/version.json`、`pnpm-lock.yaml`、`skills/` 和 `templates/starter/.claude/skills/` 一起提交，推送 main。推送 main 不会触发发布。
+2. 跑完检查后，把 `packages/*/package.json`、`plugins/*/package.json`、`plugins/*/src/version.json`、`packages/core/src/guide.ts`（里面写着插件的安装版本）、`pnpm-lock.yaml` 和 `skills/` 一起提交，推送 main。推送 main 不会触发发布。
 3. `pnpm release:publish --tag <标签>`：先一次性构建并打包全部包（与 `release:pack` 相同，含全部 tarball 检查），再按依赖顺序发布打好的 tarball（可续跑，见下），最后自动运行 `release:verify`，整体退出码就是 verify 的结果。
 4. 第 3 步失败（中途某个包没发出去，或 verify 不通过）：按提示处理后重跑同一条命令，已发布的包会跳过。也可以单独运行 `pnpm release:verify` 复查。
 5. 第 3 步以 0 退出后，在发布提交上打 `v<v>` tag 并推送：`git tag v<v> && git push origin v<v>`。tag 会触发 release.yml：重跑检查，发布步骤因为十一个包都已存在而跳过，然后生成 GitHub Release。用户用 `npx skills add https://github.com/Joplo-app/Joplo/tree/v<v>` 固定官方技能版本，装到的内容与该版本 `npx joplo skill install` 写出的一致。注意 `npx skills add Joplo-app/Joplo@v<v>` 不能用：skills CLI 把 `@` 后面当成技能名，报 No matching skills found（2026-11-06 实测）。手动发布时 tag 要等 verify 通过再推，避免指向一个装不上的版本。
@@ -163,8 +164,8 @@ npm deprecate '<old-package>@<range>' 'Use the corresponding @joplo-app package.
 这是添加弃用提示，不是删除版本。需要 2FA 时，由维护者在自己的终端执行弃用命令并完成认证。
 
 
-### 版本化 starter 模板（D89）
+### 独立模板与离线冒烟（D105）
 
-每个正式发布 tag 必须包含 `templates/starter/`，包括 package/config、示例、引擎版本占位符和四个插件的生成技能。`release:version` 后运行 `pnpm skills:build --check` 并一起提交；Release workflow 在 tag 提交上检查模板关键文件存在，再发布 npm。已发布 CLI 默认下载该 tag 的模板，因此不能先发布包、后补模板，也不能移动 tag 修补。
+[模板仓库](https://github.com/Joplo-app/joplo-templates)与主仓库隔离，由维护者手动更新默认分支；模板不参与发版，不同步版本、不打同版本 tag，发布 CI 不读写模板仓库。模板默认分支须能被最新发布的 CLI 使用，旧版本不保证。已发布的 0.6.0 及更早 CLI 仍下载主仓库原 tag，原 tag 的文件不受当前 checkout 删除影响。
 
-`release:smoke` 固定使用仓库本地 `--template templates/starter`，不下载 GitHub 模板；在仓库外只安装 tarball，验证四个插件的精确版本和实际技能同步。另从安装后的技能文件构造 ui + diagram + content 演示，check 通过后用真实 Chromium 打开 dev，再用本机静态服务器打开构建产物（除它之外不许有网络请求，D98）前进/回退验证发布站。测试驱动使用工作区 Playwright，不把它安装到用户项目；CI 先安装 Chromium，本地可用 `pnpm --filter @joplo-app/server exec playwright install chromium` 准备。下载、私有令牌、解压失败与路径穿越由 CLI 单元测试中的内存 tarball 覆盖。
+`release:smoke` 用 `scripts/fixtures/smoke/feature` 与 `scripts/fixtures/smoke/standalone` 两个本地测试夹具，通过 `init --template <夹具路径>` 走初始化；它们只供测试，不作为产品起步来源。全程不下载模板仓库；在仓库外只安装 tarball，保留 check/build、读回产物确认功能情况和独立作品章节、引擎技能一致性、安装后插件技能同步与产物扫描。另从安装后的技能文件构造 ui + diagram + content 演示，check 通过后用真实 Chromium 打开 dev，再用本机静态服务器打开构建产物（除它之外不许有网络请求，D98）前进/回退验证发布站。测试驱动使用工作区 Playwright，不把它安装到用户项目；CI 先安装 Chromium，本地可用 `pnpm --filter @joplo-app/server exec playwright install chromium` 准备。下载默认分支、名称解析、占位替换、私有令牌、解压失败与路径穿越由 CLI 单元测试中的内存 tarball 覆盖。

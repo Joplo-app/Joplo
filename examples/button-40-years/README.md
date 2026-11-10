@@ -22,7 +22,7 @@ pnpm joplo build examples/button-40-years
 pnpm joplo render examples/button-40-years --scenario-id forty.mac --film --chain --out scratch/film.png
 ```
 
-使用本地模板 `joplo init --template ./templates/starter` 初始化；仓库内依赖用 `workspace:*`。独立使用时应改成匹配的已发行版本。配乐编译需要本机 Alda 2.4.8；观众只需浏览器。构建的 `dist/index.html` 可通过 `file://` 打开；首次点击播放解锁声音，旁白回退到浏览器语音，不会请求付费朗读。
+可使用独立模板仓库默认分支的 starter（`joplo init`）起步；仓库内依赖用 `workspace:*`。独立使用时应改成匹配的已发行版本。配乐编译需要本机 Alda 2.4.8；观众只需浏览器。构建的 `dist/index.html` 可通过 `file://` 打开；首次点击播放解锁声音，旁白回退到浏览器语音，不会请求付费朗读。
 
 可以这样玩：
 

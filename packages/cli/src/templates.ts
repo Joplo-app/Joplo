@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { resolve, join, posix } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -8,32 +7,25 @@ import { templateMessages as m } from './template-messages.ts';
 
 export type TemplateSource = { kind:'github'; owner:string; repo:string; subdir:string; ref:string } | { kind:'local'; dir:string };
 export type TemplateFiles = Map<string, Buffer>;
-export type TemplateDeps = { fetch?: typeof fetch; env?: Record<string,string|undefined>; ghToken?:()=>string|undefined; localTemplates?:string|null };
+/** idleMs：下载中多久收不到数据算失败（缺省 30 秒）。不限制总时长，自定义模板或慢网络仍可持续下载。 */
+export type TemplateDeps = { fetch?: typeof fetch; env?: Record<string,string|undefined>; ghToken?:()=>string|undefined; idleMs?:number };
 const MAX_DOWNLOAD=64*1024*1024, MAX_EXPANDED=256*1024*1024, MAX_FILES=20000;
 const fail=(reason:keyof typeof m, code:'USAGE'|'NOT_FOUND'|'PERMISSION_DENIED'='USAGE'):never=>{throw new JoploError(code,`${m[reason]} ${m.fallback}`);};
 
-export const BUILTIN_TEMPLATES = ['starter', 'work'] as const;
-type BuiltinTemplate = typeof BUILTIN_TEMPLATES[number];
-const builtinSpec = (version:string,name:BuiltinTemplate) => `github:Joplo-app/Joplo/templates/${name}#v${version}`;
-export const defaultTemplateSpec = (version:string) => builtinSpec(version,'starter');
+const builtinSpec = (name:string) => `github:Joplo-app/joplo-templates/${name}`;
+export const defaultTemplateSpec = () => builtinSpec('starter');
 /** Bare names never depend on cwd; explicit paths retain the local-template behavior. */
-function builtinName(spec:string):BuiltinTemplate|null {
+function builtinName(spec:string):string|null {
   if(spec.startsWith('github:')||spec.startsWith('.')||/[\\/]/.test(spec))return null;
-  if(!BUILTIN_TEMPLATES.includes(spec as BuiltinTemplate))return fail('unknownBuiltin');
-  return spec as BuiltinTemplate;
-}
-/** Source-only shortcut, identical for every built-in. Packed CLIs always use the release tag. */
-export function localTemplates(): string|null {
-  if(!import.meta.filename.endsWith('.ts'))return null;
-  const root=resolve(import.meta.dirname,'../../..');
-  return existsSync(join(root,'pnpm-workspace.yaml'))&&existsSync(join(root,'templates/starter/package.json'))?join(root,'templates'):null;
+  if(!/^[a-z0-9][a-z0-9-]*$/.test(spec))return fail('invalidName');
+  return spec;
 }
 function safePath(path:string):boolean {
   return !!path&&!path.includes('\\')&&!/[\u0000-\u001f\u007f]/.test(path)&&!posix.isAbsolute(path)&&!(/^[a-z]:/i.test(path))&&!path.split('/').some(p=>p==='..'||p==='.');
 }
-export function parseTemplate(spec:string,version:string):TemplateSource {
+export function parseTemplate(spec:string):TemplateSource {
   const name=builtinName(spec);
-  if(name)spec=builtinSpec(version,name);
+  if(name)spec=builtinSpec(name);
   if(!spec.startsWith('github:'))return {kind:'local',dir:resolve(spec)};
   const match=/^github:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\/([^#]+))?(?:#(.+))?$/.exec(spec);
   if(!match||[match[1],match[2]].some(x=>x==='.'||x==='..'))return fail('invalidSpec');
@@ -103,29 +95,34 @@ async function download(source:Extract<TemplateSource,{kind:'github'}>,deps:Temp
   const owner=encodeURIComponent(source.owner),repo=encodeURIComponent(source.repo),ref=encodeURIComponent(source.ref);
   let url=token?`https://api.github.com/repos/${owner}/${repo}/tarball/${ref}`:`https://codeload.github.com/${owner}/${repo}/tar.gz/${ref}`;
   let response:Response;
+  // 空闲超时：等响应头、等下一块数据各自最多 idleMs；只要还在收数据就不中断。
+  const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
+  const touch=()=>{clearTimeout(timer);timer=setTimeout(()=>controller.abort(),deps.idleMs??30000);};
   try{
-    response=await fetcher(url,{redirect:'manual',signal:AbortSignal.timeout(30000),headers:token?{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json'}:{}});
+    touch();
+    response=await fetcher(url,{redirect:'manual',signal:controller.signal,headers:token?{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json'}:{}});
     if([301,302,307,308].includes(response.status)){
       const location=response.headers.get('location');if(!location)fail('network');
       const next=new URL(location!,url);if(next.protocol!=='https:'||next.hostname!=='codeload.github.com'||next.username||next.password)fail('network');
-      url=next.href;response=await fetcher(url,{redirect:'error',signal:AbortSignal.timeout(30000)});
+      url=next.href;touch();response=await fetcher(url,{redirect:'error',signal:controller.signal});
     }
     if(response.status===401||response.status===403)fail('unauthorized','PERMISSION_DENIED');
     if(response.status===404)fail('missing','NOT_FOUND');
     if(!response.ok||!response.body)fail('network');
     if(Number(response.headers.get('content-length'))>MAX_DOWNLOAD)fail('tooLarge');
     const chunks:Buffer[]=[];let total=0;
-    for await(const chunk of response.body as unknown as AsyncIterable<Uint8Array>){total+=chunk.length;if(total>MAX_DOWNLOAD)fail('tooLarge');chunks.push(Buffer.from(chunk));}
+    touch();
+    for await(const chunk of response.body as unknown as AsyncIterable<Uint8Array>){touch();total+=chunk.length;if(total>MAX_DOWNLOAD)fail('tooLarge');chunks.push(Buffer.from(chunk));}
     return Buffer.concat(chunks);
   }catch(e){if(e instanceof JoploError)throw e;return fail('network');}
+  finally{clearTimeout(timer);}
 }
-export async function loadTemplate(version:string,spec?:string,deps:TemplateDeps={}):Promise<{files:TemplateFiles;source:string}>{
+export async function loadTemplate(spec?:string,deps:TemplateDeps={}):Promise<{files:TemplateFiles;source:string}>{
   const name=builtinName(spec??'starter');
-  const local=name?(deps.localTemplates===undefined?localTemplates():deps.localTemplates):null;
-  const chosen=name?(local?join(local,name):builtinSpec(version,name)):spec!;
-  const source=parseTemplate(chosen,version);
+  const chosen=name?builtinSpec(name):spec!;
+  const source=parseTemplate(chosen);
   const files=source.kind==='local'?await localFiles(source.dir):await archiveFiles(await download(source,deps),source.subdir);
-  if(!files.size)fail('empty','NOT_FOUND');
+  if(!files.size)fail(name?'missingBuiltin':'empty','NOT_FOUND');
   try{const pkg=JSON.parse(files.get('package.json')?.toString('utf8')??'null');if(!pkg||typeof pkg!=='object'||Array.isArray(pkg))fail('noPackage');}catch{fail('noPackage');}
   if(!files.has('joplo.config.ts')&&!files.has('joplo.config.tsx'))fail('noConfig');
   return {files,source:chosen};

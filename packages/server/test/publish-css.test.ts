@@ -42,7 +42,7 @@ beforeAll(async () => {
   fs.mkdirSync(path.join(project, 'themes'), { recursive: true });
   installFixturePlugins(project);
   fs.writeFileSync(path.join(project, 'package.json'), '{"type":"module"}');
-  fs.cpSync(path.resolve('templates/starter/tsconfig.json'), path.join(project, 'tsconfig.json'));
+  fs.cpSync(path.resolve('scripts/fixtures/smoke/feature/tsconfig.json'), path.join(project, 'tsconfig.json'));
   fs.writeFileSync(path.join(project, 'joplo.config.ts'), `import { config } from '@joplo-app/kit'; import ui from '@joplo-app/plugin-ui'; export default config({name:'Public CSS',plugins:[ui],theme:'custom'});`);
   fs.writeFileSync(path.join(project, 'themes/custom.css'), '.author-theme{color:#123456}');
   fs.writeFileSync(path.join(project, 'works/live.tsx'), `import { work, flow, $, set } from '@joplo-app/kit';
