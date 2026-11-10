@@ -25,6 +25,8 @@ import { joploHome } from './home.ts';
 import { loadPlaywright } from './export-runtime.ts';
 import { assertNotProjectData, launch } from './render.ts';
 import { encodeMp4 } from './video-format.ts';
+import { commitOutput, writeOutput } from './output-file.ts';
+import { checkpointCommitsMatch, contentIdentity, exportRuntimeRoots } from './checkpoint.ts';
 import { capture, geometryQuery } from './capture.ts';
 import { frameTime, persistTimeline, playbackTimeline, type RawTimeline } from './timeline.ts';
 import { EXPORT_SIZE, defaultRecorder, srt } from './export.ts';
@@ -43,7 +45,7 @@ function distinctOutputs(paths: (string | undefined)[]) {
 const MAX_MS = 10 * 60_000;
 
 type Progress = { step: number; done: boolean; error: string | null; scenarioId: string | null; position: number; activeStep: number | null };
-type Sample = { t: number; diff: number; changed: number; still: number; scenarioId: string | null; position: number; activeStep: number | null; jpg?: string };
+type Sample = { t: number; diff: number; changed: number; still: number; scenarioId: string | null; position: number; activeStep: number | null; stepId?: string | null; jpg?: string };
 
 /** 纯函数：从逐帧的相邻差找出硬切。changed[i] 是第 i 帧与第 i-1 帧之间变化像素的占比。 */
 export function findCuts(samples: readonly Pick<Sample, 't' | 'changed' | 'diff' | 'scenarioId' | 'position'>[]): FilmCut[] {
@@ -89,17 +91,18 @@ const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 /** 辅助页：解码 JPEG、裁掉字幕区，与上一帧、静止起点比较。状态留在页面里，每帧只传一次图片。 */
 const DIFF_PAGE = `<!doctype html><canvas id=c></canvas><script>
-let prev=null, anchor=null, anchorT=0;
+let prev=null, anchor=null, anchorT=0, history=[];
 async function load(b64){ const img=new Image(); img.src='data:image/jpeg;base64,'+b64; await img.decode(); return img; }
 function pixels(img, h){ const c=document.getElementById('c'); c.width=img.width; c.height=h; const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0); return g.getImageData(0,0,img.width,h).data; }
 function compare(a,b,th){ let sum=0, changed=0; const n=a.length/4; for(let i=0;i<a.length;i+=4){ const d=(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2]))/765; sum+=d; if(d>th) changed++; } return { diff: sum/n, changed: changed/n }; }
-window.dump = () => ({prev:Array.from(prev||[]),anchor:Array.from(anchor||[]),anchorT});
-window.restore = (s) => {prev=new Uint8ClampedArray(s.prev);anchor=new Uint8ClampedArray(s.anchor);anchorT=s.anchorT;};
+window.dump = (back=0) => {const state=history[Math.max(0,history.length-1-back)]||{prev,anchor,anchorT};return {prev:Array.from(state.prev||[]),anchor:Array.from(state.anchor||[]),anchorT:state.anchorT};};
+window.restore = (s) => {prev=new Uint8ClampedArray(s.prev);anchor=new Uint8ClampedArray(s.anchor);anchorT=s.anchorT;history=[{prev,anchor,anchorT}];};
 window.step = async (b64, cropRatio, t, th, stillTh) => {
   const img = await load(b64); const d = pixels(img, Math.max(1, Math.round(img.height*cropRatio)));
   const adj = prev ? compare(prev, d, th) : { diff: 0, changed: 0 };
   prev = d;
   if (!anchor || compare(anchor, d, th).changed > stillTh) { anchor = d; anchorT = t; }
+  history.push({prev,anchor,anchorT}); if(history.length>12)history.shift();
   return { ...adj, still: t - anchorT };
 };
 </script>`;
@@ -161,6 +164,7 @@ function recordUrl(base: string, projectId: string, project: Project, o: { scena
 
 /** 胶片条：按引擎时间逐帧定格取样。 */
 async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScale?: number; framesOnly?: boolean }): Promise<FilmResult> {
+  const baselineRssBytes=process.memoryUsage().rss;
   const projectDir = realProjectDir(opts.projectDir);
   const out = check({ ...opts, projectDir });
   const metadataOut = check({ projectDir, out: out.replace(/(\.png)?$/i, '.json'), overwrite: opts.overwrite });
@@ -183,14 +187,16 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
   const cellWidth = Math.max(120, Math.min(640, Math.round(opts.cellWidth ?? 224)));
   const playwright = await loadPlaywright({ home: joploHome(), projectDir });
   const { server, project } = await compiled(projectDir);
-  const fingerprint = createHash('sha256').update(JSON.stringify({ version: 1, runtime: createHash('sha256').update(fs.readFileSync(import.meta.filename)).digest('hex'), project, scenarioId: opts.scenarioId, chain: opts.chain, crop: opts.crop, geometry: geometryQuery(opts), width: opts.width, height: opts.height, sampleMs, every, stillMs, voice: opts.voice, frameFps: opts.frameFps, hide: opts.hide })).digest('hex');
+  let fingerprint = '';
   const checkpointFile = opts.checkpoint ? path.resolve(opts.checkpoint) : null;
   if (checkpointFile) assertNotProjectData(projectDir, checkpointFile);
-  let checkpoint: { fingerprint: string; samples: Sample[]; diff: unknown } | null = null;
+  let checkpoint: { fingerprint: string; samples: Sample[]; diff: unknown; commits: {stepId:string;commitMs:number}[] } | null = null;
   if (opts.resume) {
     if (!checkpointFile) { await server.close(); throw new JoploError('USAGE', '--resume requires --checkpoint'); }
-    try { checkpoint = JSON.parse(fs.readFileSync(checkpointFile, 'utf8')); } catch { await server.close(); throw new JoploError('USAGE', 'Checkpoint is absent or invalid'); }
-    if (checkpoint?.fingerprint !== fingerprint) { await server.close(); throw new JoploError('USAGE', 'Checkpoint source, version or rendering options changed; start a fresh render'); }
+    try {
+      checkpoint = JSON.parse(fs.readFileSync(checkpointFile, 'utf8'));
+      if(!checkpoint||typeof checkpoint.fingerprint!=='string'||!Array.isArray(checkpoint.samples)||checkpoint.samples.length===0||!Array.isArray(checkpoint.commits)||checkpoint.commits.some(c=>typeof c.stepId!=='string'||!Number.isFinite(c.commitMs)))throw new Error('Invalid checkpoint schema');
+    } catch { await server.close(); throw new JoploError('USAGE', 'Checkpoint is absent or invalid'); }
   }
   const startedAt = Date.now();
   let browser: Browser | null = null;
@@ -220,6 +226,16 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
     // 加载期间也只按 16ms 网格推进；开播相位不随网络和字体加载耗时改变。
     await flush(page);
     await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { prepare(): Promise<void> } }).__JOPLO_RECORD__.prepare());
+    if(checkpointFile) {
+    const excluded = [out,metadataOut,opts.timeline,opts.timeline ? opts.timeline.replace(/\.json$/i,'')+'.assets' : null,opts.frames,checkpointFile].filter((p):p is string=>!!p);
+    const outStem=path.basename(out).replace(/\.png$/i,'');
+    for(const name of fs.existsSync(path.dirname(out))?fs.readdirSync(path.dirname(out)):[]) if(name.startsWith(outStem+'-')&&name.endsWith('.png')) excluded.push(path.join(path.dirname(out),name));
+    const sourceIdentity = contentIdentity([projectDir,...exportRuntimeRoots(projectDir,server.payload().plugins ?? {})],excluded);
+    const { projectDir:_projectDir,out:_out,overwrite:_overwrite,resume:_resume,checkpoint:_checkpoint,timeline:_timeline,frames:_frames,...rendering }=opts;
+    const voiceIdentity=await page.evaluate(()=>(window as unknown as {__JOPLO_RECORD__:{voiceIdentity():unknown}}).__JOPLO_RECORD__.voiceIdentity());
+    fingerprint=createHash('sha256').update(JSON.stringify({version:2,browser:browser.version(),platform:process.platform,arch:process.arch,node:process.versions.node,project,voiceIdentity,sourceIdentity,rendering,sampleMs,every,stillMs,plugins:server.payload().plugins})).digest('hex');
+    if (checkpoint?.fingerprint !== undefined && checkpoint.fingerprint !== fingerprint) throw new JoploError('USAGE','Checkpoint source, version or rendering options changed; start a fresh render');
+    }
     const helper = await ctx.newPage();
     await helper.setContent(DIFF_PAGE);
     // 字幕与步骤标题条浮在画面上（D97）：胶片条只看画面本身的运动，采样时把它们藏起来，文字换行不算镜头切换
@@ -228,6 +244,8 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
     const samples: Sample[] = [];
     let lastChapter: string | null = null;
     let chapterStartedAt = Date.now();
+    const rssSamples: {engineMs:number;rssBytes:number}[]=[];
+    let nextMemoryAt=0;
     let tail = -1;
     // 第一帧在开播之前采（封面 / 第 0 步）：开播那一下的切换也要量到
     let previousTime = 0;
@@ -245,24 +263,36 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
       if (p.error) throw new JoploError('RENDER_FAILED', `Playback failed at ${t} ms: ${p.error}`);
       if (p.scenarioId !== lastChapter) chapterStartedAt = Date.now();
       if (Date.now() - chapterStartedAt > (opts.chapterTimeoutMs ?? 180_000)) throw new JoploError('RENDER_FAILED', `Chapter ${p.scenarioId} timed out at ${t} ms (wall clock); completed checkpoint was preserved`);
+      if(t>=nextMemoryAt) {rssSamples.push({engineMs:t,rssBytes:process.memoryUsage().rss});nextMemoryAt=t+5000;}
       const restored = checkpoint?.samples[index];
       if (restored) {
-        if (restored.scenarioId !== p.scenarioId || Math.abs(restored.position - p.position) > 1) throw new JoploError('RENDER_FAILED', `Checkpoint replay diverged at ${t} ms; rerun without --resume`);
         samples.push(restored);
-        if (index === checkpoint!.samples.length - 1) await helper.evaluate((state) => (window as unknown as { restore(s: unknown): void }).restore(state), checkpoint!.diff);
+        if (index === checkpoint!.samples.length - 1) {
+          const currentStep = p.scenarioId ? project.scenarios[p.scenarioId]?.steps[p.position-1]?.id ?? null : null;
+          if(restored.scenarioId!==p.scenarioId||restored.position!==p.position||restored.activeStep!==p.activeStep||restored.stepId!==currentStep) throw new JoploError('RENDER_FAILED',`Checkpoint stable state diverged at ${t} ms; rerun without --resume`);
+          const raw = await page.evaluate(() => (window as unknown as {__JOPLO_RECORD__:{timeline():RawTimeline}}).__JOPLO_RECORD__.timeline());
+          const commits=playbackTimeline(raw).steps.map(s=>({stepId:s.stepId,commitMs:s.commitMs}));
+          if(!checkpointCommitsMatch(checkpoint!.commits,commits)) throw new JoploError('RENDER_FAILED','Checkpoint playback commits differ by more than 50 ms; rerun without --resume');
+          await helper.evaluate((state) => (window as unknown as { restore(s: unknown): void }).restore(state), checkpoint!.diff);
+        }
         lastChapter = p.scenarioId;
         continue;
       }
-      const jpg = (await capture(page, '[data-jexport]', opts.crop, 'jpeg', opts.framesOnly ? 95 : 72, captureSession)).toString('base64');
+      const jpg = (await capture(page, '[data-jexport]', opts.crop, 'jpeg', opts.framesOnly ? 95 : 72, captureSession, t)).toString('base64');
       const d = opts.framesOnly ? { diff: 0, changed: 0, still: 0 } : await helper.evaluate(([b64, crop, time, th, st]) => (window as unknown as { step: (...a: unknown[]) => Promise<{ diff: number; changed: number; still: number }> }).step(b64, crop, time, th, st), [jpg, stageRatio, t, PIXEL_THRESHOLD, STILL_CHANGED] as const);
-      samples.push({ t, ...d, scenarioId: p.scenarioId, position: p.position, activeStep: p.activeStep, ...(!opts.framesOnly && t % every === 0 ? { jpg } : {}) });
+      samples.push({ t, ...d, scenarioId: p.scenarioId, position: p.position, activeStep: p.activeStep, stepId: p.scenarioId ? project.scenarios[p.scenarioId]?.steps[p.position-1]?.id ?? null : null, ...(!opts.framesOnly && t % every === 0 ? { jpg } : {}) });
       if (opts.frames && (opts.framesOnly || t % every === 0)) { fs.mkdirSync(opts.frames, { recursive: true }); fs.writeFileSync(path.join(opts.frames, `${String(t).padStart(7, '0')}.jpg`), Buffer.from(jpg, 'base64')); }
-      if (checkpointFile && lastChapter !== p.scenarioId) {
-        const diff = await helper.evaluate(() => (window as unknown as { dump(): unknown }).dump());
-        fs.mkdirSync(path.dirname(checkpointFile), { recursive: true });
-        const temp = `${checkpointFile}.${process.pid}.tmp`;
-        fs.writeFileSync(temp, JSON.stringify({ fingerprint, samples, diff }));
-        fs.renameSync(temp, checkpointFile);
+      if (checkpointFile && lastChapter && lastChapter !== p.scenarioId && samples.length>4) {
+        // Keep a stable final-state anchor before the seam. Its small tail is
+        // recomputed, so accepted one-sample scheduling jitter never reuses seam pixels.
+        const back=Math.min(10,Math.ceil(100/sampleMs)+1), prefix=samples.slice(0,-back);
+        const diff=await helper.evaluate(back => (window as unknown as {dump(n:number):unknown}).dump(back),back);
+        const raw=await page.evaluate(() => (window as unknown as {__JOPLO_RECORD__:{timeline():RawTimeline}}).__JOPLO_RECORD__.timeline());
+        const cutoff=prefix.at(-1)!.t;
+        const commits=playbackTimeline({...raw,events:raw.events.filter(e=>e.at-(raw.startedAt??0)<=cutoff)}).steps.map(s=>({stepId:s.stepId,commitMs:s.commitMs}));
+        fs.mkdirSync(path.dirname(checkpointFile),{recursive:true});
+        const temp=`${checkpointFile}.${process.pid}.tmp`;
+        fs.writeFileSync(temp,JSON.stringify({fingerprint,samples:prefix,diff,commits}));fs.renameSync(temp,checkpointFile);
       }
       lastChapter = p.scenarioId;
       if (p.done && tail < 0) tail = t + 1000;
@@ -270,7 +300,7 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
     }
     if (tail < 0) throw new JoploError('RENDER_FAILED', `Playback did not finish within ${MAX_MS / 60000} minutes of engine time`);
     const raw = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { timeline(): RawTimeline } }).__JOPLO_RECORD__.timeline());
-    if (opts.timeline) { const file = check({ projectDir, out: opts.timeline, overwrite: opts.overwrite }); await persistTimeline(file, playbackTimeline(raw), project.mediaAssets ?? {}, server.url, opts.overwrite, server.token); }
+    if (opts.timeline) { const file = check({ projectDir, out: opts.timeline, overwrite: opts.overwrite }); await persistTimeline(file, playbackTimeline(raw), project.mediaAssets ?? {}, server.url, opts.overwrite, server.token,project.mediaInfo); }
     const cuts = findCuts(samples);
     const stills = findStills(samples, stillMs);
     const boundaries = stepBoundaries(samples);
@@ -308,13 +338,13 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
       const png = await sheet.screenshot({ type: 'png', fullPage: true });
       await sheet.close();
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, png, opts.overwrite ? undefined : { flag: 'wx' });
+      await writeOutput(file,png,opts.overwrite);
       files.push(file);
     }
     await ctx.close();
-    const result: FilmResult = { path: files[0] ?? out, files, durationMs, sampleMs, every, samples: samples.length, cuts, stills, boundaries, maxDiff: round(Math.max(0, ...samples.map((s) => s.diff))), warnings: sampleMs > 50 ? ['Coarse analysis: transitions shorter than the computation interval may be missed; use 50 ms for final QA.'] : [], measurement: { wallMs: Date.now() - startedAt, peakRssBytes: process.resourceUsage().maxRSS * 1024, resumedSamples: checkpoint?.samples.length ?? 0 } };
+    const result: FilmResult = { path: files[0] ?? out, files, durationMs, sampleMs, every, samples: samples.length, cuts, stills, boundaries, maxDiff: round(Math.max(0, ...samples.map((s) => s.diff))), warnings: sampleMs > 50 ? ['Coarse analysis: transitions shorter than the computation interval may be missed; use 50 ms for final QA.'] : [], measurement: { baselineRssBytes, endRssBytes:process.memoryUsage().rss, memoryScope:'node-process-lifetime', rssSamples, wallMs: Date.now() - startedAt, peakRssBytes: process.resourceUsage().maxRSS * 1024, resumedSamples: checkpoint?.samples.length ?? 0 } };
     // 完整的判读数据（每一步提交前后的最大帧差、硬切、静止）放在胶片条旁边，评审时可以引用具体数字
-    fs.writeFileSync(metadataOut, JSON.stringify({ ...result, frames: samples.map(({ jpg: _jpg, ...rest }) => rest) }, null, 1), opts.overwrite ? undefined : { flag: 'wx' });
+    await writeOutput(metadataOut,JSON.stringify({ ...result, frames: samples.map(({ jpg: _jpg, ...rest }) => rest) }, null, 1),opts.overwrite);
     return result;
   } finally {
     await browser?.close().catch(() => undefined);
@@ -346,23 +376,27 @@ export async function renderVideo(opts: VideoOptions): Promise<VideoResult> {
   const srtOut = opts.srt ? check({ out: opts.srt, overwrite: opts.overwrite, projectDir }) : null;
   if (srtOut && srtOut === out) throw new JoploError('USAGE', 'The subtitle file must differ from the video file');
   const { server, project } = await compiled(projectDir);
+  let videoWork: string | null = null;
   try {
     // 输出分辨率（#55）：视口就是视频分辨率，渲染路由把舞台等比缩放进这块画布（录屏按 CSS 像素取帧，deviceScaleFactor 不会让它更清晰）
     const { url, size } = recordUrl(server.url, server.projectId, project, { ...opts, voice, hide: opts.hide ?? [], ...(video ? { canvas: video } : {}) });
     fs.mkdirSync(path.dirname(out), { recursive: true });
-    if (opts.overwrite) fs.rmSync(out, { force: true });
     const started = Date.now();
     const mp4 = path.extname(out).toLowerCase() === '.mp4';
-    const recordingOut = mp4 ? path.join(path.dirname(out), `.${path.basename(out)}.${process.pid}.webm`) : out;
+    videoWork=fs.mkdtempSync(path.join(path.dirname(out),'.joplo-video-'));
+    const recordingOut=path.join(videoWork,'recording.webm');
+    const encodedOut=mp4?path.join(videoWork,'encoded.mp4'):recordingOut;
     const outcome = await defaultRecorder((dir) => loadPlaywright({ home: joploHome(), projectDir: dir }))({ projectDir, url, size: video ?? size, out: recordingOut, total: 0, progress: () => undefined, signal: new AbortController().signal, maxMs: MAX_MS });
-    if (mp4) { try { await encodeMp4(recordingOut, out, opts.overwrite); } finally { fs.rmSync(recordingOut, { force: true }); } }
+    if (mp4) await encodeMp4(recordingOut,encodedOut);
     if (srtOut) {
       fs.mkdirSync(path.dirname(srtOut), { recursive: true });
       fs.writeFileSync(srtOut, srt(outcome?.cues ?? []), opts.overwrite ? undefined : { flag: 'wx' });
     }
-    if (opts.timeline && outcome?.timeline) { const file = check({ projectDir, out: opts.timeline, overwrite: opts.overwrite }); await persistTimeline(file, outcome.timeline, project.mediaAssets ?? {}, server.url, opts.overwrite, server.token); }
+    if (opts.timeline && outcome?.timeline) { const file = check({ projectDir, out: opts.timeline, overwrite: opts.overwrite }); await persistTimeline(file, outcome.timeline, project.mediaAssets ?? {}, server.url, opts.overwrite, server.token,project.mediaInfo); }
+    await commitOutput(encodedOut,out,opts.overwrite);
     return { ...(outcome?.sync ? { sync: outcome.sync } : {}), path: out, durationMs: Date.now() - started, size: video ?? size, srt: srtOut, voice: outcome?.voice ?? { mode: voice, missing: [] } };
   } finally {
+    if(videoWork)fs.rmSync(videoWork,{recursive:true,force:true});
     await server.close().catch(() => undefined);
   }
 }

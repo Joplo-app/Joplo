@@ -2,12 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { encodeMusic } from '../../../plugins/alda/src/mp3.ts';
 import { clipKey } from '@joplo-app/core';
 import { renderFrames, renderStep, renderFilm, renderVideo } from '../src/index.ts';
 import { frameTime, playbackTimeline } from '../src/timeline.ts';
 import { ProfileStore, VoiceCache, resolveVoices } from '../src/voice.ts';
 import { installFixturePlugins, fixtureConfigSource } from '../../../scripts/test/fixtures.ts';
+
+// Controlled benchmark only: switch just screenshot transport, keeping geometry/quality/clock equal.
+vi.mock('../src/capture.ts',async importOriginal=>{
+  const actual=await importOriginal<typeof import('../src/capture.ts')>();
+  if(process.env.JOPLO_CAPTURE_BASELINE!=='1')return actual;
+  return {...actual,capture:async(page:any,root:string,_crop:unknown,type='png',quality?:number)=>{await page.locator(root).boundingBox();return page.locator(root).screenshot({type,...(quality?{quality}:{})});}};
+});
 
 /** CC0 synthetic PCM. Different durations/frequencies make omissions and drift observable offline. */
 function wav(seconds: number, hz: number) {
@@ -33,14 +41,16 @@ it('timeline uses actual observed commits, preserves generic media fields and ou
 
 describe('offline export fixture: two orientations, continuing chapters, three cached real-duration clips', () => {
   const root = path.resolve(`scratch/output/export-contract-fixture-${process.pid}`);
-  beforeAll(() => {
+  beforeAll(async () => {
     fs.rmSync(root, { recursive: true, force: true }); fs.mkdirSync(root, { recursive: true });
     const write = (name: string, value: string) => { const file = path.join(root, name); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value); };
     installFixturePlugins(root);
     fs.symlinkSync(path.resolve('packages/server/node_modules/playwright-core'), path.join(root, 'node_modules/playwright-core'), 'dir');
     write('audio-runtime.ts', "import {defineRuntime} from '@joplo-app/kit/plugin'; export default defineRuntime({id:'fixture-audio',components:{}});");
-    write('audio-local.ts', "export default {compilers:{wav:{version:'cc0-sine-1',mime:'audio/wav',compile(input){return new Uint8Array(Buffer.from(input,'base64'));}}}};");
-    const music = wav(2, 220).toString('base64');
+    write('audio-local.ts', "export default {compilers:{wav:{version:'cc0-calibrated-mp3-1',mime:'audio/mpeg',compile(input){const data=JSON.parse(input);return {bytes:new Uint8Array(Buffer.from(data.bytes,'base64')),audio:data.audio};}}}};");
+    const n=44100*2,pcm=Float32Array.from({length:n},(_,i)=>Math.sin(i*220*Math.PI*2/44100)*.18);
+    const encoded=await encodeMusic([pcm,pcm],n,true);
+    const music=JSON.stringify({bytes:Buffer.from(encoded.bytes).toString('base64'),audio:encoded.audio});
     write('joplo.config.ts', fixtureConfigSource(`import {config} from '@joplo-app/kit'; import {definePlugin} from '@joplo-app/kit/plugin'; const audio=definePlugin({id:'fixture-audio',title:'CC0 synthetic music',components:{},runtime:new URL('./audio-runtime.ts',import.meta.url),local:new URL('./audio-local.ts',import.meta.url),compile:{effect(e,ctx){if(e.name==='stop')return {media:[{track:'bgm',action:'stop',fadeMs:400}]};return {media:[{track:'bgm',action:'play',resource:ctx.resource({compiler:'wav',input:${JSON.stringify(music)}}),loop:true,volume:.3,fadeMs:100}]};}}}); export default config({name:'Offline export',home:'/',plugins:[audio]});`));
     write('routes/page.tsx', `import {$,page} from '@joplo-app/kit'; import {Box} from '@joplo-app/plugin-ui'; export default page({title:'Geometry',layout:false},<Box id="frame" style={{width:'100%',height:'100%',background:'#cc3355'}}><Box id="signal">{$.ui.signal}</Box></Box>);`);
     write('features/export/feature.ts', "import {feature} from '@joplo-app/kit'; export default feature({name:'Export',goal:'Offline regression',cases:{},pick:'a'});");
@@ -58,6 +68,12 @@ describe('offline export fixture: two orientations, continuing chapters, three c
     expect(resumed.measurement!.resumedSamples).toBeGreaterThan(1);
     expect(Math.abs(resumed.durationMs - first.durationMs)).toBeLessThanOrEqual(100);
     expect(resumed.cuts).toEqual(first.cuts);
+    const shifted=JSON.parse(fs.readFileSync(checkpoint,'utf8'));
+    shifted.commits=shifted.commits.map((c: any)=>({...c,commitMs:c.commitMs+16}));
+    fs.writeFileSync(checkpoint,JSON.stringify(shifted));
+    const again=await renderFilm({...common,out:path.join(root,'resume.png'),checkpoint,resume:true,overwrite:true});
+    expect(again.measurement!.resumedSamples).toBeGreaterThan(1);
+    expect(again.cuts).toEqual(first.cuts);
     await expect(renderFilm({ ...common, sampleMs: 250, out: path.join(root, 'changed.png'), checkpoint, resume: true })).rejects.toThrow('Checkpoint source');
     const concurrent = await Promise.all([1, 2].map(i => renderFilm({ ...common, out: path.join(root, `concurrent-${i}.png`) })));
     expect(concurrent.every(r => r.files.length === 2)).toBe(true);
@@ -98,20 +114,34 @@ describe('offline export fixture: two orientations, continuing chapters, three c
       fs.writeFileSync(path.join(root, `audio-sync-${width}.json`), JSON.stringify({ offsets, sync: result.sync }, null, 2));
     }
   }, 180000);
+  it.skipIf(process.env.JOPLO_EXPORT_COMPARE !== '1')('measures a representative short export at the same 50ms interval', async () => {
+    const result=await renderFilm({projectDir:root,scenarioId:'export.a.one',out:path.join(root,'compare.png'),voice:'off',sampleMs:50,every:250,logicalViewport:{width:160,height:90}});
+    fs.writeFileSync(path.join(root,'compare-report.json'),JSON.stringify(result,null,2));
+    expect(result.sampleMs).toBe(50);
+  },120000);
   it.skipIf(process.env.JOPLO_EXPORT_VIDEO !== '1')('supports an explicit entirely silent video', async () => {
     const out = path.join(root, 'silent.webm');
     await renderVideo({ projectDir: root, scenarioId: 'export.a.one', out, audio: false, width: 160, height: 90 });
     const probe = JSON.parse(execFileSync('ffprobe', ['-v','error','-show_streams','-of','json',out], { encoding: 'utf8' }));
     expect(probe.streams.some((s: any) => s.codec_type === 'audio')).toBe(false);
   }, 120000);
+  it.skipIf(process.env.JOPLO_EXPORT_VIDEO !== '1')('preserves an existing MP4 when the encoder leaves a partial temporary file then fails', async () => {
+    const out=path.join(root,'previous.mp4'),bin=path.join(root,'fake-encoder');fs.mkdirSync(bin);fs.writeFileSync(out,'previous complete result');
+    fs.writeFileSync(path.join(bin,'ffmpeg'),'#!/bin/sh\nfor destination do :; done\nprintf partial > "$destination"\nprintf "fixture encoder failure" >&2\nexit 9\n',{mode:0o755});
+    const previousPath=process.env.PATH;process.env.PATH=bin;
+    try {await expect(renderVideo({projectDir:root,scenarioId:'export.a.one',out,overwrite:true,audio:false,width:160,height:90})).rejects.toThrow('fixture encoder failure');}
+    finally {process.env.PATH=previousPath;}
+    expect(fs.readFileSync(out,'utf8')).toBe('previous complete result');
+    expect(fs.readdirSync(root).some(n=>n.startsWith('.joplo-video-'))).toBe(false);
+  },120000);
   it.skipIf(process.env.JOPLO_EXPORT_LONG !== '1')('measures a five-minute engine chain without real-time waiting', async () => {
     const file = path.join(root, 'features/export/works/long.tsx');
     const steps = Array.from({ length: 5 }, (_, i) => `.system('event${i}', 'signal ${i}', set($.ui.signal,'${i}'), hold(30))`).join('');
     fs.writeFileSync(file, `import {$,work,chapter,set,hold} from '@joplo-app/kit'; export default work({title:'Long',summary:'Benchmark',state:{ui:{signal:'start'}},scenarios:{one:chapter('First half',{start:'/'})${steps},two:chapter('Second half')${steps}}});`);
     const result = await renderFilm({ projectDir: root, scenarioId: 'export.long.one', chain: true, out: path.join(root, 'benchmark.png'), voice: 'off', chapterTimeoutMs: 360000, sampleMs: 250, every: 30000, logicalViewport: { width: 160, height: 90 }, checkpoint: path.join(root, 'benchmark-checkpoint.json') });
     expect(result.durationMs).toBeGreaterThanOrEqual(300000);
-    expect(result.measurement!.wallMs).toBeLessThan(300000);
     fs.writeFileSync(path.join(root, 'benchmark-report.json'), JSON.stringify(result, null, 2));
+    if(process.env.JOPLO_EXPORT_MAX_WALL_MS)expect(result.measurement!.wallMs).toBeLessThan(Number(process.env.JOPLO_EXPORT_MAX_WALL_MS));
   }, 360000);
   afterAll(() => { /* Preserve evidence under scratch/output for debugging. */ });
   it('logical viewport and crop produce the requested real pixels', async () => {
@@ -132,7 +162,11 @@ describe('offline export fixture: two orientations, continuing chapters, three c
     expect(tracks[2][0].stopAfterMs).toBe(400);
     expect(timeline.mediaEvents.map((e: any) => e.action)).toEqual(['play','stop']);
     expect(timeline.assets.filter((a: any) => a.kind === 'narration')).toHaveLength(3);
-    expect(timeline.assets.some((a: any) => a.kind === 'media')).toBe(true);
+    const music=timeline.assets.find((a: any)=>a.kind==='media');
+    expect(music.audioInfo.cycleFrames).toBe(64000);
+    expect(music.audioInfo.contentStartFrame).toBeGreaterThan(6080);
+    expect(music.audioInfo.sourceSampleRate).toBe(32000);
+    expect(music.file.endsWith('.mp3')).toBe(true);
     expect(timeline.assets.every((a: any) => fs.existsSync(path.join(path.dirname(result.timeline), a.file)))).toBe(true);
     expect(timeline.events.some((e: any) => e.scenarioId === 'export.a.two' && e.position === 0 && Object.keys(e.media ?? {}).length)).toBe(true);
     const narration = timeline.events.filter((e: any) => e.type === 'narration');

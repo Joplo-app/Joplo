@@ -639,6 +639,14 @@ check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同�
 
 `render --video --silent` 显式省略全部音轨并保留旁白节奏；`--voice off` 仅关闭旁白，不关闭背景配乐。`.mp4` 输出需要本机 ffmpeg（H.264/AAC），默认 `.webm` 无需外部编码器。
 
+恢复契约：检查点会对源码、主题CSS、媒体/语音缓存内容、已解码旁白时长、宿主/插件运行时、浏览器和所有渲染参数计算身份；变化后拒绝复用。恢复校验步骤ID及≤50ms提交偏移，并要求稳定锚点的场景/位置/activeStep完全一致；章节接缝短段重新计算。取景框宽高必须固定，动态改变裁切尺寸会报告时间点并失败。
+
+音频素材先校验内容hash，坏文件必须显式overwrite修复；JSON/音频/最终视频使用完整临时文件原子提交。MP4编码失败不会删除或覆盖原有成片。性能报告的RSS基线、末值、轨迹及进程峰值仅指Node进程，不含Chromium；同采样/画幅/质量才可比较提速，250ms快测不能代替50ms最终审查。
+
+离线混音必须读取media asset的 `audioInfo`：按 `sourceSampleRate` 把 `contentStartFrame/contentFrames/cycleFrames` 换算到解码采样率，裁掉校准/编码延迟/保护填充，仅循环cycleFrames。文件起点不必等于作品声音起点。回归夹具使用真实校准MP3区域及不同长度WAV旁白。
+
+同质量截图对照可重复运行：`JOPLO_EXPORT_COMPARE=1 JOPLO_CAPTURE_BASELINE=1 pnpm test packages/server/test/export-contract.test.ts -t 'representative short'` 对照locator截图；移除 `JOPLO_CAPTURE_BASELINE` 是当前CDP路径。两者都为50ms、160×90逻辑画幅、JPEG72、250ms保存格；产物中的wall/RSS仅在相同参数及相近负载下比较，不承诺跨机器速度。
+
 
 ## assets
 

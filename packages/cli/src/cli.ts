@@ -451,7 +451,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--clean', 'With --video: same as --hide cover,cursor,title,subtitles')
     .option('--srt <file>', 'With --video: also write the subtitles as a SubRip file timed to the video')
     .option('--chain', 'With --film/--video: keep playing the next slices of the work in published order, to the last one')
-    .option('--every <ms>', 'With --film: one cell every N ms of engine time (default 250)', integer('every'))
+    .option('--every <ms>', 'With --film: save one cell every N ms (default 250); computation remains --sample-ms', integer('every'))
     .option('--frames <dir>', 'With --film: also save each cell as a JPEG in this directory')
     .option('--format <format>', 'With --film: text or json summary', 'text').action(async (dir, opts) => {
       if (!opts.out && !opts.framesOut) throw new JoploError('USAGE', '--out is required unless --frames-out is used');
@@ -500,6 +500,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         for (const f of film.files) line(f);
         const s = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
         line(`duration ${s(film.durationMs)} · ${film.samples} frames every ${film.sampleMs} ms · max adjacent diff ${(film.maxDiff * 100).toFixed(1)}%`);
+        for (const warning of film.warnings) stderr(oneLine(warning) + '\n');
         for (const b of film.boundaries.filter(b => b.chapter)) line(`chapter → ${b.scenarioId} at ${s(b.atMs)}: max adjacent diff ${(b.maxDiff * 100).toFixed(1)}%, changed ${(b.maxChanged * 100).toFixed(0)}%`);
         for (const c of film.cuts) line(`CUT ${s(c.atMs)} ${c.scenarioId} step ${c.position}: ${(c.changed * 100).toFixed(0)}% of pixels changed in one frame`);
         for (const x of film.stills) line(`STILL ${s(x.fromMs)}–${s(x.toMs)} (${s(x.toMs - x.fromMs)}) ${x.scenarioId} step ${x.position}`);

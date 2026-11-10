@@ -1,14 +1,20 @@
 import { JoploError } from '@joplo-app/core';
 import type { CDPSession, Page } from 'playwright-core';
 import type { ExportCrop } from './contract.ts';
+const fixedFrames = new WeakMap<Page,{width:number;height:number}>();
 /** Numeric crop coordinates are relative to the chosen export root, in CSS pixels. */
-export async function capture(page: Page, root: string, crop: ExportCrop | undefined, type: 'png' | 'jpeg' = 'png', quality?: number, session?: CDPSession) {
+export async function capture(page: Page, root: string, crop: ExportCrop | undefined, type: 'png' | 'jpeg' = 'png', quality?: number, session?: CDPSession, fixedAtMs?: number) {
   const target = page.locator(root);
   const base = await target.boundingBox();
   if (!base) throw new JoploError('RENDER_FAILED', `Export root is not visible: ${root}`);
   // Locator screenshots wait for two stable animation frames; engine-time sampling already
   // settled React and must capture intentional motion immediately, without that wall-clock wait.
   const screenshot = async (clip: { x: number; y: number; width: number; height: number }) => {
+    if (fixedAtMs !== undefined) {
+      const previous=fixedFrames.get(page);
+      if(previous&&(Math.abs(previous.width-clip.width)>.01||Math.abs(previous.height-clip.height)>.01)) throw new JoploError('RENDER_FAILED',`Crop dimensions changed at ${fixedAtMs} ms: expected ${previous.width}x${previous.height}, got ${clip.width}x${clip.height}; use a fixed-size frame or numeric crop`);
+      fixedFrames.set(page,{width:clip.width,height:clip.height});
+    }
     if (session) { const result = await session.send('Page.captureScreenshot', { format: type, ...(quality ? { quality } : {}), clip: { ...clip, scale: 1 }, captureBeyondViewport: true, optimizeForSpeed: true }); return Buffer.from(result.data, 'base64'); }
     return page.screenshot({ type, clip, ...(quality ? { quality } : {}) });
   };

@@ -106,7 +106,7 @@ export type FilmOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 
 export type FilmCut = { atMs: number; diff: number; changed: number; scenarioId: string | null; position: number };
 export type FilmStill = { fromMs: number; toMs: number; scenarioId: string | null; position: number };
 export type FilmBoundary = { atMs: number; scenarioId: string | null; position: number; chapter: boolean; maxDiff: number; maxChanged: number };
-export type FilmResult = { measurement?: { wallMs: number; peakRssBytes: number; resumedSamples: number }; path: string; files: string[]; durationMs: number; sampleMs: number; every: number; samples: number; cuts: FilmCut[]; stills: FilmStill[]; boundaries: FilmBoundary[]; maxDiff: number; warnings: string[] };
+export type FilmResult = { measurement?: { baselineRssBytes:number;endRssBytes:number;memoryScope:'node-process-lifetime';rssSamples:{engineMs:number;rssBytes:number}[]; wallMs: number; peakRssBytes: number; resumedSamples: number }; path: string; files: string[]; durationMs: number; sampleMs: number; every: number; samples: number; cuts: FilmCut[]; stills: FilmStill[]; boundaries: FilmBoundary[]; maxDiff: number; warnings: string[] };
 export declare function renderFilm(opts: FilmOptions): Promise<FilmResult>;
 /** 视频（`joplo render --video`）：与看板导出同一个录制器（真实时间，webm）。 */
 export type VideoOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 'scale'> & {

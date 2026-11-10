@@ -1,7 +1,9 @@
+import type { AudioRegion } from '@joplo-app/kit/plugin';
+import { writeOutput } from './output-file.ts';
 /** Versioned actual-playback observation schema. Times are milliseconds, never outline estimates. */
 export type TimelineStep = { scenarioId: string; stepId: string; position: number; commitMs: number; outputCommitMs: number; endMs: number; outputEndMs: number; camera: unknown; media: unknown; text: unknown };
 export type TimelineMediaEvent = { track: string; action: 'play' | 'stop' | 'seek' | 'volume'; engineMs: number; outputMs: number; resource: string; offsetMs: number; volume: number; fadeMs: number; snapshot: Record<string, unknown> };
-export type PlaybackTimeline = { mediaEvents: TimelineMediaEvent[]; assets?: { id: string; kind: 'narration' | 'media'; file: string }[]; steps: TimelineStep[]; chapters: { scenarioId: string; startMs: number; endMs: number }[]; schemaVersion: 1; origin: 'playback'; timing: { sampleToleranceMs: number; outputOriginMs: number }; events: PlaybackEvent[] };
+export type PlaybackTimeline = { mediaEvents: TimelineMediaEvent[]; assets?: { id: string; kind: 'narration' | 'media'; file: string; audioInfo?: AudioRegion }[]; steps: TimelineStep[]; chapters: { scenarioId: string; startMs: number; endMs: number }[]; schemaVersion: 1; origin: 'playback'; timing: { sampleToleranceMs: number; outputOriginMs: number }; events: PlaybackEvent[] };
 export type PlaybackEvent = { at: number; engineMs: number; outputMs: number; scenarioId?: string | null; position?: number; stepId?: string | null; [key: string]: unknown };
 export type RawTimeline = { schemaVersion: 1; startedAt: number | null; events: (Record<string, unknown> & { at: number; engineMs: number })[] };
 export function playbackTimeline(raw: RawTimeline, outputOriginMs = raw.startedAt ?? 0, sampleToleranceMs = 50): PlaybackTimeline {
@@ -51,16 +53,17 @@ export function playbackTimeline(raw: RawTimeline, outputOriginMs = raw.startedA
 export function frameTime(index: number, fps: number): number { return Math.round(index * 1000 / fps); }
 
 /** Make the timeline useful after its temporary recording server has closed. Only referenced audio is copied. */
-export async function persistTimeline(file: string, timeline: PlaybackTimeline, mediaAssets: Readonly<Record<string, string>>, baseUrl: string, overwrite = false, localToken?: string) {
+export async function persistTimeline(file: string, timeline: PlaybackTimeline, mediaAssets: Readonly<Record<string, string>>, baseUrl: string, overwrite = false, localToken?: string, mediaInfo:Readonly<Record<string,AudioRegion>> = {}) {
   const fs = await import('node:fs/promises'), path = await import('node:path'), crypto = await import('node:crypto');
   const directory = `${file.replace(/\.json$/i, '')}.assets`, assets: NonNullable<PlaybackTimeline['assets']> = [];
-  const copy = async (id: string, kind: 'narration' | 'media', source: string) => {
+  const copy = async (id: string, kind: 'narration' | 'media', source: string, audioInfo?:AudioRegion) => {
     const url = new URL(source, baseUrl);
     let response: Response;
     if (localToken && url.origin === new URL(baseUrl).origin && /^\/__joplo\/p\/[^/]+\/resources\//.test(url.pathname)) {
       const resolved = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-joplo-token': localToken }, body: '{}' });
       if (!resolved.ok) throw new Error(`Timeline media resource ${id} could not be resolved (${resolved.status})`);
-      const result = await resolved.json() as { url?: string };
+      const result = await resolved.json() as { url?: string; audio?:AudioRegion };
+      audioInfo=result.audio??audioInfo;
       if (!result.url?.startsWith('data:')) throw new Error(`Timeline media resource ${id} is unavailable; prepare local resources first`);
       response = await fetch(result.url);
     } else response = await fetch(url);
@@ -70,9 +73,20 @@ export async function persistTimeline(file: string, timeline: PlaybackTimeline, 
     const suffix = mime.includes('wav') ? '.wav' : mime.includes('ogg') ? '.ogg' : mime.includes('flac') ? '.flac' : mime.includes('webm') ? '.webm' : '.mp3';
     const name = crypto.createHash('sha256').update(bytes).digest('hex') + suffix;
     await fs.mkdir(directory, { recursive: true });
-    await fs.writeFile(path.join(directory, name), bytes, { flag: 'wx' }).catch(e => { if (e.code !== 'EEXIST') throw e; });
+    const destination=path.join(directory,name);
+    let existing: Buffer | null=null;
+    try {existing=await fs.readFile(destination);} catch(e) {if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
+    const valid=existing?.length===bytes.length&&crypto.createHash('sha256').update(existing!).digest('hex')===name.split('.')[0];
+    if(existing&&!valid&&!overwrite)throw new Error(`Timeline asset ${name} is incomplete or corrupt; use --overwrite to replace it`);
+    if(!valid) {
+      try {await writeOutput(destination,bytes,!!existing&&overwrite);} catch(e) {
+        if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e;
+        const raced=await fs.readFile(destination);
+        if(raced.length!==bytes.length||crypto.createHash('sha256').update(raced).digest('hex')!==name.split('.')[0])throw new Error(`Concurrent timeline asset ${name} failed content validation`);
+      }
+    }
     const relative = `${path.basename(directory)}/${name}`;
-    if (!assets.some(a => a.id === id && a.kind === kind)) assets.push({ id, kind, file: relative });
+    if (!assets.some(a => a.id === id && a.kind === kind)) assets.push({ id, kind, file: relative, ...(audioInfo?{audioInfo}:{}) });
     return relative;
   };
   const voiceFiles = new Map<string, string>();
@@ -83,8 +97,8 @@ export async function persistTimeline(file: string, timeline: PlaybackTimeline, 
   }
   const resources = new Set<string>();
   for (const event of timeline.events) if (event.media && typeof event.media === 'object') for (const track of Object.values(event.media as Record<string, { resource?: string }>)) if (track.resource) resources.add(track.resource);
-  for (const id of resources) if (mediaAssets[id]) await copy(id, 'media', mediaAssets[id]);
+  for (const id of resources) if (mediaAssets[id]) await copy(id, 'media', mediaAssets[id],mediaInfo[id]);
   timeline.assets = assets;
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(timeline, null, 2), overwrite ? undefined : { flag: 'wx' });
+  await writeOutput(file,JSON.stringify(timeline,null,2),overwrite);
 }

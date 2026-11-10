@@ -78,6 +78,7 @@ type W = {
 /** 录制接口（服务端经 page.evaluate 调用）。prepare 做开播前的准备（解码配乐与旁白、开始录音），录屏在它之后才开始（#57）。 */
 export type RecordApi = {
   timeline(): { schemaVersion: 1; startedAt: number | null; events: Record<string, unknown>[] };
+  voiceIdentity(): unknown;
   prepare(): Promise<void>;
   play(): Promise<void>;
   stopAudio(): Promise<{ data: string } | null>;
@@ -409,6 +410,7 @@ function RecordStage({ viewportOverride, project, projectId, content, scenarioId
     })();
     w.__JOPLO_RECORD__ = {
       timeline: () => structuredClone(timeline.current),
+      voiceIdentity: () => ({ mode:voiceMode, prepared:recordVoice?.identity() ?? null }),
       prepare,
       play: async () => {
         await prepare();

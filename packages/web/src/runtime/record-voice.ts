@@ -69,6 +69,8 @@ export class RecordVoice {
     return fp ? (lookup!.clips[clipKey(fp, t)] ?? null) : null;
   }
 
+  identity() { return { lookup:this.narrator.lookup, clips:[...this.buffers].map(([url,buffer])=>({url,durationMs:buffer.duration*1000})) }; }
+
   describe(text: string, role: string | null) {
     const url = this.urlOf(text, role);
     const buffer = url ? this.buffers.get(url) : null;
