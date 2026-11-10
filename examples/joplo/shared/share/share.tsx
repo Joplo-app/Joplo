@@ -157,7 +157,7 @@ const Author = () => (
         <Terminal.Output id="t_happy_ok" when={$.ui.tHappyOk} tone="ok">{'上传 6 个文件（3 段朗读音频、预览图用「正常发出邀请」）\n✓ https://joplo.app/s/p7m2c  范围分享，主链接不变'}</Terminal.Output>
 
         {/* 按功能分享 */}
-        <Terminal.Command when={$.ui.tFeature}>npx joplo share --private --no-review --feature invite</Terminal.Command>
+        <Terminal.Command when={$.ui.tFeature}>npx joplo share --private --no-review --work invite</Terminal.Command>
         <Terminal.Output id="t_feature" when={$.ui.tFeature}>{'范围：邀请成员 · 选定方案 A · 弹窗（3 个场景）\n裁掉：2 个功能 · 3 个场景 · 2 个页面 · 3 个别的功能堆进来的元素'}</Terminal.Output>
         <Terminal.Output id="t_feature_borrow" when={$.ui.tFeature} tone="warn">{'带上了 1 个别的功能的元素：账单 › 「席位 5 / 5」徽标（「席位已满时邀请」第 2 步的镜头）'}</Terminal.Output>
         <Terminal.Output id="t_feature_ok" when={$.ui.tFeature} tone="ok">✓ https://joplo.app/s/n2v6h  范围分享</Terminal.Output>

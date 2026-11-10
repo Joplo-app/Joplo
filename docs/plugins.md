@@ -20,7 +20,7 @@
 内核只保留**所有形态共有的东西**。判断标准：换掉任何一种内容形态，它都还在。
 
 1. **故事模型**：项目 → 功能 → 方案 → 情况 → 场景 → 步骤；规则、覆盖、待决问题、评审与反馈。这是 Joplo 的产品视角，也是它和视频工具的区别。
-2. **时间线与状态机**：`ui / data / inputs` 状态；步骤的动作（click / type / select / toggle / press / drag / hover / scroll / plugin / back / event / card）与基础效果（set / append / go / done / fork / stream / toast）；`stateAt` 回放、`flow({ from })` 接力。纯函数、确定。
+2. **时间线与状态机**：`ui / data / inputs` 状态；步骤的动作（click / type / select / toggle / press / drag / hover / scroll / plugin / back / event / card）与基础效果（set / append / go / done / fork / stream / toast）；`stateAt` 回放、`flow('Slice title', { from })` 接力。纯函数、确定。
 3. **导演与节奏**：层级、镜头目标（shot）、焦点提示（spotlight / highlight / number / callout / mark）、字幕 / explain / narrate / say、停留与阅读时长、过渡卡、自动播放时钟。
 4. **寻址与检查**：元素 id、源位置（文件:行）、选中、DOM 锚点（`data-jid`）、评审定位到“第几步的哪个元素”。
 5. **输出管线**：看板、截图 / 分镜 / 视频、build / share、多语言、范围分享与脱敏、资源打包。
@@ -271,7 +271,7 @@ properties: {
 
 content 的 camera 工厂产生插件效果信封，插件校验 `CAMERA_UNKNOWN / CAMERA_INVALID`，写 `ui.__plugins.content.camera`，并在 frame 钩子输出每个舞台完整的取景快照（初始帧也有）。PR #35 示例的初始 `ui.__camera` 仅由插件兼容读取；后续新状态优先。Canvas 运行时只读编译快照，按目标 DOM 的 offset 布局范围取景；没有目标时看完整世界，默认视口 1280×800、默认 pad 48、zoom 上限 3、运动 1200ms。父容器没有高度时使用 view 的 aspect-ratio 撑开。任意一步直达与从头播放到该步，最终画面相同。
 
-引擎迁入 `flow({ from, layer })`、`patch()`、步骤效果数组、旁白时长估算与分镜。接力先按依赖决定逐步校验使用的路径 / 导演层，再回放前章结尾叠加本章 state，最后生成插件快照；IR 保持声明顺序。IR 记录 `Scenario.from`（D92：连续播放一镜到底、媒体快照继承、播放顺序；分享范围外的 from 被裁掉），初始状态与可选 `initial.layer` 仍是回放结果。错误为 `FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED / FROM_WITH_START / LAYER_UNKNOWN`。分镜含初始画面与每一步，标注字幕和旁白，告警带步号前缀；`--columns` 控制 1–6 列。
+引擎迁入 `flow('Slice title', { from, layer })`、`patch()`、步骤效果数组、旁白时长估算与分镜。接力先按依赖决定逐步校验使用的路径 / 导演层，再回放前章结尾叠加本章 state，最后生成插件快照；IR 保持声明顺序。IR 记录 `Scenario.from`（D92：连续播放一镜到底、媒体快照继承、播放顺序；分享范围外的 from 被裁掉），初始状态与可选 `initial.layer` 仍是回放结果。错误为 `FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED / FROM_WITH_START / LAYER_UNKNOWN`。分镜含初始画面与每一步，标注字幕和旁白，告警带步号前缀；`--columns` 控制 1–6 列。
 
 ### 新字段与槽位的端到端流向
 
@@ -296,7 +296,7 @@ content 的 camera 工厂产生插件效果信封，插件校验 `CAMERA_UNKNOWN
 | 媒体快照 `<plugin>:<track>>[资源]` 淡出键（D92） | 编译期：换曲且有 fadeMs 时旧曲移到该键并带 stopAfterMs | MediaEngine 把旧槽位挪到淡出键继续播；同一 seek 内偏移跟随引擎时钟；`Snapshot.seek` 变化才按快照重新定位 |
 | `PluginFrame.inputs`、`Snapshot.inputs`（D92 R6） | 控制器 stageInput（舞台上的点、按键、拖动按下）计数 → Stage `inputs` → 插件 frame | content observe：计数变化即落定进退场（幽灵、进场）；播放器暂停键不改变它；镜头冻结不落定 |
 | 媒体槽位的淡出锚点（D92 R2） | MediaEngine 第一次看到某键的 stopAfterMs 时记下引擎时间起点、时长与音量 | 之后的快照估算不再改变；淡完静音不复活；快照提前删除的淡出键在同一 seek 里按引擎时间淡完再销毁 |
-| `playSequence(project, optionId)`（D92 R9） | 方案场景：根按声明顺序，深度优先接上 from 接力章，排除 autoplay:false 子树 | 控制器缺省 autoNext 与录制 --chain 共用 |
+| `playSequence(project, workId)`（D92 R9） | 方案场景：根按声明顺序，深度优先接上 from 接力章，排除 autoplay:false 子树 | 控制器缺省 autoNext 与录制 --chain 共用 |
 | `FilmOptions` / `FilmResult`、`VideoOptions` / `VideoResult`（D92） | CLI `render --film/--video` 或 server API → renderFilm / renderVideo | 渲染路由 `record=1&chain=1&voice=estimate`；胶片条 PNG + JSON、webm；无新增项目 IR 字段 |
 
 ### 证据与边界
@@ -354,10 +354,12 @@ UI 的目录、属性提示、示例、资源检查和 React 实现在 `plugins/
 
 ### 作者接口与边界
 
+这是作品中自由反应与步骤的字段片段；把它与实际的 stage / layers / on / routes 画面一起放进作品文件，目标 id 与状态路径必须存在。
+
 ```tsx
-import { $, free, flow, option, set } from '@joplo-app/kit';
-option({
-  name: 'Explore', idea: 'Scripted results with local exploration',
+import { $, free, flow, work, set } from '@joplo-app/kit';
+work({
+  title: 'Explore', summary: 'Scripted results with local exploration',
   free: { profile: free.click('avatar', set($.ui.card, true)) },
   scenarios: {
     main: flow('Arrange')
@@ -403,7 +405,7 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 
 | 新字段 | 写入/编译 | 消费者 | 范围、翻译、diff 与静态输出 |
 |---|---|---|---|
-| `OptionDef.free` → `options[id].free[key].{action,effects,source?}` | kit `free.*` → compile 目标/效果校验，source 发布时移除 | core `arbitrateAction/applyPlayground` → controller 本机层 → Stage 视图 | scope 移除目标/端点被裁掉的反应；i18n 映射匹配值和显示效果；diff `free-reactions`；静态输出只保留声明、从不应用观众操作 |
+| `WorkDef.free` → `works[id].free[key].{action,effects,source?}` | kit `free.*` → compile 目标/效果校验，source 发布时移除 | core `arbitrateAction/applyPlayground` → controller 本机层 → Stage 视图 | scope 移除目标/端点被裁掉的反应；i18n 映射匹配值和显示效果；diff `free-reactions`；静态输出只保留声明、从不应用观众操作 |
 | `action.{type:drag/scroll,target,to}` / `hover.ms` | Flow 工厂 → Action schema → 端点/时长 check | 控制器演示、Stage 手势、纯数据匹配；scroll-state 回放最终滚动 | scope 的 stepRefs 包括端点；坐标/ID 不翻译；captionAuto 文案本地化；diff action；render 在对应步应用脚本滚动 |
 | `action.{type:plugin,name,target,data}` | Flow.act → 已启用清单/类型/payload 校验 | 通用匹配；插件运行时读取 gesture 绘制，无业务回调 | scope 保持有效目标；仅 text 字段参与翻译；diff action 与 action-contracts；最终效果由脚本 set 决定 |
 | `PluginDef.actions` → `project.plugins[id].actions` | PluginCompiler JSON 信封 + schema | matcher / check / caption / 控制器时长；浏览器无需 Node 清单 | 作为可发布契约数据；不带源码/计时器；diff 比较使用到的契约 |
@@ -455,13 +457,13 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 
 ## 16. 统一评审 P1 修复（FIX-BR）
 
-- BR-1：publishPayload 保留已经编译和 scope 裁剪的 option.free；普通/评审发布共用此路径。范围外舞台的反应仍先被过滤，不恢复作者源码字段；浏览器自由点击改变本机体验层，重置后还原，时间线不变。
+- BR-1：publishPayload 保留已经编译和 scope 裁剪的 work.free；普通/评审发布共用此路径。范围外舞台的反应仍先被过滤，不恢复作者源码字段；浏览器自由点击改变本机体验层，重置后还原，时间线不变。
 - BR-2：插件打包消费 JS chunk 之外的 OutputAsset。CSS 合并后随 runtime 注入，图片、字体和其他本地静态资源按 MIME 内联成 data URL；不论原资源大小或显式 no-inline，最终 npm dev 与发布站都自包含。未消费的生成资源 URL 明确报 EXPORT_FAILED，不再静默成功。脚本仍通过宿主共享 React；插件承担自身 CSS 选择器范围的约定。
 - BR-3：舞台保存脚本滚动目标的初始 DOM 偏移；跳转时恢复基线并应用当前步骤前缀的最后滚动动作。基线跨同舞台场景切换保留，断开的 DOM 元素清理；epoch 重置后重新投影。已应用目标不在 MutationObserver/动画帧中重复重置，游玩期间保留本机滚动，退出/重置按当前时间线恢复。
 
 | 写入点 → 存储 | 读取点 → 消费者 |
 | --- | --- |
-| option.free 作者声明 → compile 的 options.free → scopeProject 按保留舞台过滤 → publishPayload options.free | 内联 IR → 普通/评审/嵌入播放器的 arbitrateAction → 本机 playground effects；不回写 timeline |
+| work.free 作者声明 → compile 的 works.free → scopeProject 按保留舞台过滤 → publishPayload works.free | 内联 IR → 普通/评审/嵌入播放器的 arbitrateAction → 本机 playground effects；不回写 timeline |
 | Vite OutputAsset 与保留的生成资源 base → inlinePluginAssets 内存资源映射 | JS/CSS 中的本地资源引用改写成带 MIME 的 data URL → 浏览器图片、字体与 CSS 资源载入；无需额外资源端点或磁盘清单 |
 | CSS OutputAsset → 合并、资源改写后的 CSS 字符串 → runtime JS 的样式安装块 | 发布 factory 或 npm dev module 执行 → style#joplo-plugin-style:<id>.textContent；相同插件更新替换内容，不重复插入样式表 |
 | useScrollState 的初始目标 DOM 偏移 → baseline Map（元素生命周期内）、free 进入前 saved Map | scenario/position/epoch 变更与迟挂载目标观察 → 恢复初值、应用前缀最后滚动；不修改 IR 或逐帧覆盖正在演示的中间位置 |
@@ -509,7 +511,7 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 
 - canvas / WebGL 插件在真实指针移动时用 `ctx.hover?.(targetId)` 报告射线命中的元素，离开、开始拖动时传 `null`。宿主查当前脚本/自由反应的声明时长，统一处理停留、离开取消、重置与继续；播放中的 hover 不暂停也不执行。插件不自建时间线或猜测作者的停留阈值。此可选服务不序列化进 IR。
 - `ctx.act(id, { type:'drag', to:{x,y} })` 的点必须是舞台坐标；宿主会按该源元素已声明的目标锚点，把落在 DOM drop zone 中的点转换为目标 id。3D 与普通页面目标共用仲裁；不可见/零尺寸锚点不能接住拖拽。
-- `flow({ autoplay:false })` → `scenario.autoplay`（可选布尔）随编译、发布和范围投影保留 → 发布站顺序选择器跳过它。默认/true 保持旧行为。支线仍在章节列表、深链和 fork 中可访问；手动播放支线结束后停下。返回主线的 fork 不会隐式改变主线的播放资格。
+- `flow('Slice title', { autoplay:false })` → `scenario.autoplay`（可选布尔）随编译、发布和范围投影保留 → 发布站顺序选择器跳过它。默认/true 保持旧行为。支线仍在章节列表、深链和 fork 中可访问；手动播放支线结束后停下。返回主线的 fork 不会隐式改变主线的播放资格。
 
 ## 18. D101：统一时间计划、单一时钟驱动与契约分层
 

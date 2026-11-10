@@ -148,7 +148,7 @@ export function createBoardEn(locale: Locale = 'en') {
       directoryNotFound: "Directory not found",
       projectErrorCount: (p0: Value) => plural(Number(p0), { one: '# error', other: '# errors' }, locale),
       viewProjectHome: "View project home",
-      switchFeature: "Switch feature",
+      switchFeature: "Switch entry",
       inspect: "Inspect",
       exitInspectMode: "Exit inspect mode",
       inspectModeClickAStageElementToSelectIt: "Inspect mode: clicking a stage element only selects it; it does not execute a step. Hold ⌥ to inspect temporarily.",

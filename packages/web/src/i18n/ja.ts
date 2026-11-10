@@ -253,7 +253,7 @@ export function createJa(locale: Locale = 'ja') {
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "Joplo で作成したコンセプトプロトタイプ · 本番実装ではありません",
       featureNotFound: "機能が見つかりません。",
       goToHome: "ホームへ",
-      switchFeature: "機能を切り替え",
+      switchFeature: "項目を切り替え",
       copyLink: "リンクをコピー",
       copyLinkToCurrentStep: "現在のステップのリンクをコピー",
       linkCopied: "リンクをコピーしました",

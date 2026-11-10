@@ -1,3 +1,4 @@
+import { entryForWork } from '../runtime/views';
 import { PlaygroundNotice } from '../player/PlaygroundNotice';
 import { projectThemes } from '@joplo-app/core/runtime';
 /**
@@ -39,7 +40,7 @@ import { SiteVoiceButton, useSiteVoice } from '../player/SiteVoice';
 import { ContentFallbackNotice } from './ContentNotice';
 import { cn } from '@/lib/utils';
 import { authorElement, createReviewBridge, elementLabel, type ReviewBridge, type ReviewGoto } from './review-bridge';
-import { embedCover, embedSliceName, embedInitial, embedKey, embedProgress, embedScenarioItems, fullscreenAvailable, standaloneUrl, type EmbedParams } from './embed-model';
+import { embedCover, embedSliceName, embedInitial, embedKey, embedProgress, embedScenarioItems, fullscreenAvailable, fullPageUrl, type EmbedParams } from './embed-model';
 
 const BRAND_URL = 'https://joplo.app/';
 
@@ -224,8 +225,8 @@ export function EmbedApp({ project, params, branding = true }: { project: Projec
   }, [covered]);
   const openStandalone = () => {
     const sc = scenario ?? null;
-    const featureId = sc ? project.options[sc.optionId]?.featureId : null;
-    const url = standaloneUrl(location.href, sc && featureId ? { featureId, scenarioId: sc.id, step: pos } : null);
+    const featureId = sc ? entryForWork(project, sc.workId)?.id : null;
+    const url = fullPageUrl(location.href, sc && featureId ? { featureId, scenarioId: sc.id, step: pos } : null);
     window.open(url, '_blank', 'noopener,noreferrer');
   };
   const toggleFull = () => {

@@ -126,8 +126,8 @@ describe('消费者', () => {
     expect(appearanceFromParams(new URLSearchParams(''))).toEqual({ font: null, stroke: null });
   });
 
-  const scene = { id: 'sc', optionId: null, route: '/', name: 'x', viewport: 'desktop', root: { id: 'root', type: 'ui:Stack', props: {}, children: [{ id: 't', type: '#text', props: { text: '你好' } }] } };
-  const project = { schemaVersion: SCHEMA_VERSION, name: 'p', description: '', theme: 'sketch', themes: {}, mode: 'dev', routes: {}, features: {}, cases: {}, options: {}, rules: {}, scenes: { sc: scene }, scenarios: {}, issues: {} } as unknown as Project;
+  const scene = { id: 'sc', workId: null, route: '/', name: 'x', viewport: 'desktop', root: { id: 'root', type: 'ui:Stack', props: {}, children: [{ id: 't', type: '#text', props: { text: '你好' } }] } };
+  const project = { schemaVersion: SCHEMA_VERSION, name: 'p', description: '', theme: 'sketch', themes: {}, mode: 'dev', routes: {}, features: {}, cases: {}, works: {}, rules: {}, scenes: { sc: scene }, scenarios: {}, issues: {} } as unknown as Project;
   const state: PlayState = { scenarioId: '', position: 0, sceneId: 'sc', ui: {}, data: {}, inputs: {}, toasts: [], completed: null, sceneStack: [] };
   it('舞台根节点：data-theme、data-stroke（覆盖主题的线条）、--jp-font（覆盖主题的字体）', () => {
     const html = renderToStaticMarkup(createElement(Stage, { project, state, theme: 'sketch', font: 'serif', stroke: 'clean', mode: 'render', animate: false, viewportOverride: { width: 200, height: 100 } }));

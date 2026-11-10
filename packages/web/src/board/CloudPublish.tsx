@@ -218,8 +218,8 @@ function Result({ job, onFlash, server }: { job: CloudJob & { result: NonNullabl
           <div className="text-[13px] font-semibold">{i18n.board.cloudBorrowedTitle}</div>
           <ul className="flex flex-col gap-0.5 text-[12px]">
             {borrowed.map((b) => (
-              <li key={b.kind === 'element' ? `${b.optionId}|${b.elementId}` : `page|${b.route}`} className="break-words">
-                {b.kind === 'element' ? i18n.board.cloudBorrowedElement(b.featureName, b.elementId, b.route) : i18n.board.cloudBorrowedPage(b.featureName, b.route)}
+              <li key={b.kind === 'element' ? `${b.workId}|${b.elementId}` : `page|${b.route}`} className="break-words">
+                {b.kind === 'element' ? i18n.board.cloudBorrowedElement(b.entryTitle, b.elementId, b.route) : i18n.board.cloudBorrowedPage(b.entryTitle, b.route)}
               </li>
             ))}
           </ul>

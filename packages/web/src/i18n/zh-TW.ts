@@ -253,7 +253,7 @@ export function createZhTW(locale: Locale = 'zh-TW') {
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "使用 Joplo 製作的概念原型 · 非正式產品",
       featureNotFound: "找不到功能。",
       goToHome: "回首頁",
-      switchFeature: "切換功能",
+      switchFeature: "切換項目",
       copyLink: "複製連結",
       copyLinkToCurrentStep: "複製目前步驟的連結",
       linkCopied: "已複製連結",

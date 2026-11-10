@@ -1,7 +1,7 @@
 import '../../../scripts/test/render-fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { $, config, feature, flow, option, page } from '@joplo-app/kit';
+import { $, config, feature, flow, work, page } from '@joplo-app/kit';
 import ui, { PromptInput } from '@joplo-app/plugin-ui';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { applyPlayground, arbitrateAction, compile, playgroundState, stateAt, type AuthoringProject } from '@joplo-app/core';
@@ -11,7 +11,7 @@ function project(disabled=false) {
   const file='/test/prompt.tsx';
   const source:AuthoringProject={root:'/test',config:{...config({name:'Prompt',plugins:[ui]}),file},layouts:{},
     routes:{'/':{...page({title:'Compose',layout:false},jsx(PromptInput,{id:'prompt',value:$.ui.draft,placeholder:'Write a message',disabled,disabledReason:'Unavailable'})),file}},
-    features:{f:{def:{...feature({name:'Compose',goal:'Try a prompt',cases:{},pick:'a'}),file},options:{a:{...option({name:'A',idea:'Try',state:{ui:{draft:'Initial'}},scenarios:{s:flow('Write').type('prompt','Scripted')}}),file}}}}};
+    features:{f:{def:{...feature({name:'Compose',goal:'Try a prompt',cases:{},pick:'a'}),file},works:{a:{...work({title:'A',summary:'Try',state:{ui:{draft:'Initial'}},scenarios:{s:flow('Write').type('prompt','Scripted')}}),file}}}}};
   const result=compile(source,'dev');expect(result.diagnostics.filter(d=>d.severity==='error')).toEqual([]);return result.project!;
 }
 describe('PromptInput exploration',()=>{

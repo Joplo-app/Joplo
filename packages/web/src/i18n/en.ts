@@ -285,7 +285,7 @@ export function createEn(locale: Locale = 'en') {
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "Concept prototype made with Joplo · Not a production implementation",
       featureNotFound: "Feature not found.",
       goToHome: "Go to home",
-      switchFeature: "Switch feature",
+      switchFeature: "Switch entry",
       copyLink: "Copy link",
       copyLinkToCurrentStep: "Copy link to current step",
       linkCopied: "Link copied",

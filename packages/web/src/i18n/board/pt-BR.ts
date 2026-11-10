@@ -144,7 +144,7 @@ export function createBoardPtBR(locale: Locale = 'pt-BR') {
       directoryNotFound: "Diretório não encontrado",
       projectErrorCount: (p0: Value) => plural(Number(p0), { one: "# erro", other: "# erros" }, locale),
       viewProjectHome: "Ver início do projeto",
-      switchFeature: "Trocar recurso",
+      switchFeature: "Trocar item",
       inspect: "Inspecionar",
       exitInspectMode: "Sair da inspeção",
       inspectModeClickAStageElementToSelectIt: "Modo de inspeção: clicar só seleciona o elemento, sem executar etapas. Segure ⌥ para inspecionar temporariamente.",

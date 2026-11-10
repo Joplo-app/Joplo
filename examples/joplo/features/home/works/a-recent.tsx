@@ -71,7 +71,7 @@ export default withDesignRecord(work({
           <FeatureRow id="h_view_skill" name="Agent 用法：npx joplo skill" goal="编码 Agent 按需拿到正确写法" options="3 个方案" pick="已选 B · 指针 skill" gaps="缺失 0" unmodeled />
         </Stack>,
         <Alert id="h_shop_err" color="red" title="网店结算：编译失败，修复后自动刷新" when={eq($.ui.project, 'shop')}>
-          <Code block>{'features/cart/feature.ts:12:3  error  UNKNOWN_PICK  pick「c-fast」不是 options/ 下的方案\nfeatures/cart/options/a.tsx:40:7  error  MISSING_ID  可操作元素 Button 缺少 id'}</Code>
+          <Code block>{'features/cart/feature.ts:12:3  error  UNKNOWN_PICK  pick「c-fast」不是 works/ 下的方案\nfeatures/cart/works/a.tsx:40:7  error  MISSING_ID  可操作元素 Button 缺少 id'}</Code>
         </Alert>,
         <Alert id="h_old_err" color="gray" title="找不到项目目录" when={eq($.ui.project, 'old')}>
           <Stack gap="sm">

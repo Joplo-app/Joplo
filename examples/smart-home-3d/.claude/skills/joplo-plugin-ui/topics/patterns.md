@@ -15,7 +15,7 @@ Vendor only the required, redistributable CSS primitives; scope them under an au
 
 Choose --jp-stroke: clean in a project theme when CSS supplies historical borders and button bevels. UI components supply inline defaults for size, padding and color; a class alone may not win. Prefer documented props or explicit style overrides for ordinary cases. When a reusable vendor theme must own these values, narrowly scoped !important declarations can override just those defaults. Check computed styles, the actual rendered button and text contrast; do not globally change --jp-ink merely to tint a button.
 
-Native inputs are the editable surface; their displayed text is not a real backend. A local send reaction can set ui.sent while the result bubble reads inputs.<fieldId>, so the audience sees their own text without copying it into script data. Use a named option.free object, give each reaction a stable key, and retain the deterministic send effects in a scenario. Verify the same reaction in the actual built site as well as the board; a valid script does not prove that publication retained local reaction data. Test a non-script phrase: an exact next action can commit the script instead, and an exact action belonging to another scenario can prompt to switch.
+Native inputs are the editable surface; their displayed text is not a real backend. A local send reaction can set ui.sent while the result bubble reads inputs.<fieldId>, so the audience sees their own text without copying it into script data. Use a named work.free object, give each reaction a stable key, and retain the deterministic send effects in a scenario. Verify the same reaction in the actual built site as well as the board; a valid script does not prove that publication retained local reaction data. Test a non-script phrase: an exact next action can commit the script instead, and an exact action belonging to another scenario can prompt to switch.
 
 
 These examples use this explicitly enabled plugin. Engine flow/state/review rules remain in the engine skill.
@@ -46,13 +46,14 @@ Use when the reference is a real product's recording and the look must match clo
 - Hover and dragging need a visible click alternative. A discrete timeline can use one draggable handle plus labeled endpoint buttons; keep the effects identical in both paths. Use a large enough drop zone and test it after the Canvas scales, not only at design resolution.
 
 ### authoring: worked example
+Place this work in features/<f>/works/<key>.tsx and declare unknown_email in the feature cases; cases are only available under a feature.
 ```tsx
-import { $, done, flow, option, page, set } from '@joplo-app/kit';
+import { $, done, flow, work, page, set } from '@joplo-app/kit';
 import { Alert, Button, Loader, Stack, TextInput } from '@joplo-app/plugin-ui';
 const send = (name: string, cases: string[]) => flow(name, { start: '/reset', cases })
   .type('email', 'ana@exmple.com').click('send', 'Send the reset link', set($.ui.sending, true));
-export default option({
-  name: 'A · Email link', idea: 'Send a reset link by email',
+export default work({
+  title: 'A · Email link', summary: 'Send a reset link by email',
   state: { ui: { sending: false, sent: false, emailError: '' } },
   routes: { '/reset': page({ title: 'Reset password' }, <Stack>
     <TextInput id="email" label="Email" error={$.ui.emailError} />
@@ -175,4 +176,4 @@ From focus:
 Common pitfall: Only catalog components and the listed HTML tags exist; <br/> is UNKNOWN_COMPONENT, so write 'Line 1\nLine 2' inside <Text>
 
 Common pitfall: UI and HTML belong to this plugin: import author markers directly from @joplo-app/plugin-ui, explicitly enable ui in config.plugins, and read ui/components. The engine has no bare-name or old-IR compatibility layer.
-<!-- joplo-skill 0.4.1 sha256:b53af418c7f06b74eb8071aa5a5422ac08a0fa144e5f116e9ae93d657e0d57a4 -->
+<!-- joplo-skill 0.5.0 sha256:ef661f41ba3f78c48f5f68f70f05ed50b98e8e6eedcf801cfb1449983825e10c -->

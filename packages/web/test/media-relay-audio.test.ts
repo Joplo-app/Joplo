@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
-import { feature, flow, option, page, hold } from '@joplo-app/kit';
+import { feature, flow, work, page, hold } from '@joplo-app/kit';
 import { definePlugin, pluginEffect, type MediaSnapshot } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '../../core/src/compile.ts';
@@ -24,7 +24,7 @@ const frame={playing:true,enabled:true,speed:1,elapsedMs:0,timeMs:0,duck:false,i
 function chapters(){
  const plugin=definePlugin({id:'audio',title:'Audio',components:{},runtime:'/runtime.js',local:'/local.js',compile:{effect(e,c){return {media:[{track:'bgm',action:'play' as const,resource:c.resource({compiler:'mp3',input:String(e.payload)}),volume:.8,loop:true,fadeMs:e.name==='cross'?2000:0}]};}}});
  const play=(name:string,cross=false)=>pluginEffect('audio',cross?'cross':'play',name),file='/p/music.ts';
- const source:AuthoringProject={root:'/p',config:{...config({name:'Relay',plugins:[plugin]}),file},layouts:{},routes:{'/':{...page({title:'P'},jsx('div',{})),file}},features:{f:{def:{...feature({name:'F',goal:'G',pick:'a',cases:{}}),file},options:{a:{...option({name:'A',idea:'I',on:{},scenarios:{one:flow('One',{start:'/'}).system('A',play('a'),hold(3)).system('Same A',play('a'),hold(2)).system('B',play('b',true),hold(4)),two:flow('Two',{from:'one'}).system('Keep B',hold(1))}}),file}}}}};
+ const source:AuthoringProject={root:'/p',config:{...config({name:'Relay',plugins:[plugin]}),file},layouts:{},routes:{'/':{...page({title:'P'},jsx('div',{})),file}},features:{f:{def:{...feature({name:'F',goal:'G',pick:'a',cases:{}}),file},works:{a:{...work({title:'A',summary:'I',on:{},scenarios:{one:flow('One',{start:'/'}).system('A',play('a'),hold(3)).system('Same A',play('a'),hold(2)).system('B',play('b',true),hold(4)),two:flow('Two',{from:'one'}).system('Keep B',hold(1))}}),file}}}}};
  const requests:any[]=[];const result=compile(source,'publish',{onResource:r=>requests.push(r)});expect(result.diagnostics).toEqual([]);
  return {project:result.project!,assets:Object.fromEntries(requests.map((r,i)=>[r.id,'data:audio/mpeg;base64,'+btoa(String(i))])),info:Object.fromEntries(requests.map(r=>[r.id,region]))};
 }

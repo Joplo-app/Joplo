@@ -46,7 +46,7 @@ joplo diff publish diff-site --prepared comparison.json \
 独立 `<script type="application/json" id="joplo-step-keys">` 保存：
 
 ```json
-{"formatVersion":1,"scenarios":{"invite.main.send":{"invite.main.send#2":"send-invitation"}}}
+{"formatVersion":1,"scenarios":{"invite.a.send":{"invite.a.send#2":"send-invitation"}}}
 ```
 
 Core 的 `StepIdentity` / `applyStepIdentity` 校验格式、每个真实场景/步骤引用、重复 key 和冲突，读取时仅在内存补回 key。旧 Reader 继续严格解析普通 Project，无需忽略未知业务字段。新增 pinned `@joplo-app/core@0.2.10` 测试依赖验证严格 schema；它只用于测试，不随运行时分发。

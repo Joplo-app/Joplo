@@ -1,3 +1,4 @@
+import { entryOfScenario, sliceLabel } from './work-view';
 /**
  * 手机上像看视频一样看分享（mobile_watch，已在 examples/joplo 里确认）。只在发布站、且设备是手机时使用：
  * - 竖屏：精简顶栏；16:10 的画面（舞台按设计尺寸整体缩放，不按手机宽度重排）；完整字幕；一行控制条；章节列表；
@@ -327,7 +328,9 @@ export function UpNextCard({ ctl, snap, variant }: { ctl: DemoController; snap: 
   const { t: i18n } = useI18n();
   const up = snap.upNext;
   if (!up) return null;
-  const name = snap.project?.scenarios[up.scenarioId]?.name ?? '';
+  const title = snap.project?.scenarios[up.scenarioId]?.name ?? '';
+  const entry = snap.project ? entryOfScenario(snap.project, up.scenarioId) : null;
+  const name = entry ? sliceLabel(entry, up.scenarioId, title, i18n) : title;
   const card = (
     <div className="flex w-[300px] max-w-[86%] flex-col gap-2 rounded-[12px] bg-black/85 p-4 font-jb text-white shadow-lg" role="status" aria-live="polite" data-testid="up-next">
       <div className="text-[12px] font-semibold tracking-[1px] text-white/70">

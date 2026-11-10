@@ -110,13 +110,13 @@ export function BoardApp() {
       openAppearance={openAppearance}
       onAppearanceOpened={() => setOpenAppearance(false)}
       onSelect={(id) => navigate({ kind: 'home', projectId: id })}
-      onView={(projectId, featureId, optionId) => navigate({ kind: 'play', projectId, play: { featureId, ...(optionId ? { optionId } : {}) } })}
+      onView={(projectId, featureId, workId) => navigate({ kind: 'play', projectId, play: { featureId, ...(workId ? { workId } : {}) } })}
     />
   );
 }
 
 /** 首页 + 外观（所有项目范围）。 */
-function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpened, onSelect, onView }: { projects: ProjectSummary[] | null; error: Text | null; selected: string | null; openAppearance: boolean; onAppearanceOpened: () => void; onSelect: (id: string) => void; onView: (projectId: string, featureId: string, optionId?: string) => void }) {
+function BoardHome({ projects, error, selected, openAppearance, onAppearanceOpened, onSelect, onView }: { projects: ProjectSummary[] | null; error: Text | null; selected: string | null; openAppearance: boolean; onAppearanceOpened: () => void; onSelect: (id: string) => void; onView: (projectId: string, featureId: string, workId?: string) => void }) {
   const { t: i18n, locale } = useBoardI18n();
 
   useEffect(() => { document.title = i18n.board.joploBoard; }, [i18n]);
@@ -279,7 +279,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   const project = snap.project;
   // 标签页标题与 favicon 状态点（D55）：“功能 · 项目”；编译出错加 ✕ 和红点；导出中写进度、黄点
   const compileError = !!(ir.payload && !ir.payload.ok);
-  const featureName = project?.features[play.featureId]?.name ?? null;
+  const featureName = (project ? entryOf(project, play.featureId)?.title : null) ?? null;
   const exporting = vid.running && vid.job ? `${i18n.player.number(vid.job.step)}/${i18n.player.number(vid.job.total)}` : null;
   useEffect(() => {
     document.title = tabTitle({ feature: featureName, project: projectName ?? project?.name ?? null, error: compileError, exporting }, i18n, i18n.board.joploBoard);
@@ -309,7 +309,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   const toPlay = (next: PlayRoute, replace = false) => navigate({ kind: 'play', projectId, play: { ...(play.speed ? { speed: play.speed } : {}), ...next } }, replace);
   const resolved = usePlaySync(ctl, snap, project, play, (next) => toPlay(next, true));
   // 朗读（D74）：播放坞的「声音」按钮 → 浮层 →「管理供应商」对话框
-  const voice = useVoice(projectId, project, snap.optionId, ctl, locale, { scenarioId: snap.scenarioId, position: snap.state?.position ?? 0 }, contentLocale);
+  const voice = useVoice(projectId, project, snap.workId, ctl, locale, { scenarioId: snap.scenarioId, position: snap.state?.position ?? 0 }, contentLocale);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [voiceAnchor, setVoiceAnchor] = useState<HTMLButtonElement | null>(null);
   const [providersOpen, setProvidersOpen] = useState(false);
@@ -324,8 +324,9 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
       </div>
     );
   }
-  const feature = project.features[play.featureId];
-  if (!feature || !resolved?.ok)
+  const entry = entryOf(project, play.featureId);
+  const feature = entry?.featureId ? project.features[entry.featureId] : null;
+  if (!entry || !resolved?.ok)
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-[14px]" data-testid="feature-missing">
         <span>{i18n.board.featureNotFound(play.featureId)}</span>
@@ -334,10 +335,9 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
       </div>
     );
 
-  const option = resolved.optionId ? project.options[resolved.optionId] : null;
+  const work = resolved.workId ? project.works[resolved.workId] : null;
   // 只问能力（D102 修订）：没有挂功能的条目（独立作品）换成作品左栏，没有方案、情况、缺口与“确认方案”
-  const entry = entryOf(project, feature.id);
-  const standalone = entry && entry.featureId === null ? entry : null;
+  const independentWork = entry && entry.featureId === null ? entry : null;
   const scenario = snap.view === 'stage' ? ctl.scenario() : null;
   const state = snap.state;
   const home = () => navigate({ kind: 'home', projectId });
@@ -346,7 +346,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
 
   const nextStep = ctl.nextStep();
   const lastStep = scenario && state && state.position > 0 ? scenario.steps[state.position - 1] : null;
-  const editorAt = nextStep?.source ?? lastStep?.source ?? scenario?.steps[0]?.source ?? option?.source ?? null;
+  const editorAt = nextStep?.source ?? lastStep?.source ?? scenario?.steps[0]?.source ?? work?.source ?? null;
 
   const menu: MenuEntry[] = [
     ...(showSetupCard(rt.status, rt.job) ? [{ id: 'export-setup', custom: <ExportSetupCard rt={rt} /> }, { id: 'export-setup-divider', divider: true as const }] : []),
@@ -408,12 +408,12 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
     if (!needsSetup(run)) run();
   };
   // 缺口横幅（D55）：说清楚，再给下一步：复制给 Agent 的话；看已表达这个情况的方案怎么处理
-  const gb = gap && option ? gapBanner(project, feature.id, option.id, resolved.caseId, i18n) : null;
+  const gb = gap && work ? gapBanner(project, entry.id, work.id, resolved.caseId, i18n) : null;
   const banner = (
     <>
       {ir.payload && !ir.payload.ok ? <DiagnosticsBanner list={ir.payload.diagnostics} /> : null}
       {ir.payload?.ok ? <ResourceWarnings list={ir.payload.diagnostics} /> : null}
-      {gap && option && gb ? (
+      {gap && work && gb ? (
         <div role="status" className="flex shrink-0 flex-col gap-2 rounded-[10px] border-[1.5px] border-jb-ink bg-jb-surface px-4 py-3 font-jb" data-testid="gap-notice" data-status={gap.status}>
           <div className="flex items-center gap-2 text-[14px] font-semibold">
             <StatusIcon status={gap.status} size={16} />
@@ -422,7 +422,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           <div className="text-[13px] text-jb-muted">{i18n.board.gapBody(gb.letter, gap.basis === 'derived' ? i18n.board.thisCaseIsNotCoveredYet : gap.reason ?? '')}</div>
           <div className="flex flex-wrap items-center gap-2">
             <Btn icon={<Copy className="size-3.5" />} label={i18n.board.copyRequestForAgent} size={28} onClick={() => void copyText(gb.agentText).then((ok) => setFlash(<LocalText value={ok ? m.board.requestForAgentCopied : m.board.clipboardUnavailable} />))} data-testid="gap-copy" />
-            {gb.alt ? <Btn icon={<ArrowRight className="size-3.5" />} label={i18n.board.seeHowOptionHandlesThis(gb.alt.letter)} variant="primary" size={28} onClick={() => toPlay({ featureId: feature.id, optionId: gb.alt!.optionId, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })} data-testid="gap-alt" /> : null}
+            {gb.alt ? <Btn icon={<ArrowRight className="size-3.5" />} label={i18n.board.seeHowOptionHandlesThis(gb.alt.letter)} variant="primary" size={28} onClick={() => toPlay({ featureId: entry.id, workId: gb.alt!.workId, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })} data-testid="gap-alt" /> : null}
           </div>
           <div className="truncate text-[12px] text-jb-faint" data-testid="gap-command" title={gb.agentText}>
             {i18n.board.copiedText}{gb.agentText}
@@ -433,9 +433,9 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
   );
   // 场景完成后的“下一个情况”（左栏顺序里当前方案已表达的下一个；没有就不显示）
   // 没有选情况（直接打开了某个场景）时，从这个场景覆盖的最后一个情况往后找
-  const curCase = resolved.caseId ?? (scenario ? ([...feature.caseIds].reverse().find((c) => scenario.caseIds.includes(c)) ?? null) : null);
-  const nc = state?.completed && !snap.playing ? nextCase(project, feature.id, resolved.optionId, curCase) : null;
-  nextRef.current = nc ? () => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), caseId: nc.caseId }) : null;
+  const curCase = resolved.caseId ?? (scenario ? ([...(feature?.caseIds ?? [])].reverse().find((c) => scenario.caseIds.includes(c)) ?? null) : null);
+  const nc = state?.completed && !snap.playing ? nextCase(project, entry.id, resolved.workId, curCase) : null;
+  nextRef.current = nc ? () => toPlay({ featureId: entry.id, ...(resolved.workId ? { workId: resolved.workId } : {}), caseId: nc.caseId }) : null;
 
   const selection = snap.selection;
   return (
@@ -459,12 +459,12 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             ],
           },
           {
-            label: feature.name,
+            label: entry.title,
             testid: 'crumb-feature',
             menuLabel: i18n.board.switchFeature,
             // 条目 ▾：本项目的条目（D102 修订：先“作品”后“功能”，只有一组时不出分组标题）；选一个 → 打开它，停在第 0 步（封面）
             items: [
-              ...workMenu(project, feature.id, i18n).map((f): MenuEntry =>
+              ...workMenu(project, entry.id, i18n).map((f): MenuEntry =>
                 'heading' in f
                   ? { id: `feature-group-${f.id}`, custom: <div className="px-2.5 pb-1 pt-2 font-jb text-[11px] font-semibold tracking-[1px] text-jb-muted" data-testid={`work-group-${f.id}`}>{f.heading}</div> }
                   : { id: `feature-${f.id}`, label: f.name, description: f.hint, checked: f.current, onClick: () => navigate({ kind: 'play', projectId, play: { featureId: f.id, ...(play.speed ? { speed: play.speed } : {}) } }) },
@@ -493,7 +493,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         }
         inspectMode={inspectMode}
         completeAction={nc ? <Btn icon={<ArrowRight className="size-4" />} iconAfter label={i18n.board.nextCase(nc.title)} kbd="Enter" variant="primary" className="max-w-[360px] [&>span]:truncate" onClick={() => nextRef.current?.()} data-testid="next-case" /> : null}
-        navRail={standalone ? <WorkRail entry={standalone} scenarioId={snap.scenarioId} /> : <CaseRail project={project} featureId={feature.id} optionId={resolved.optionId} caseId={resolved.caseId} />}
+        navRail={independentWork ? <WorkRail entry={independentWork} scenarioId={snap.scenarioId} /> : <CaseRail project={project} featureId={entry.id} workId={resolved.workId} caseId={resolved.caseId} />}
         exportBadge={vid.running && vid.job ? <ProgressRing percent={vid.job.percent} /> : rt.installing && rt.job ? <ProgressRing percent={rt.job.percent} /> : null}
         deviceTag={
           <span className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[6px] border border-jb-line bg-jb-surface px-2.5 font-jb text-[12px] text-jb-muted" data-testid="device-tag">
@@ -516,25 +516,25 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
         theme={theme}
         font={a.look.font}
         stroke={a.look.stroke}
-        nav={standalone ? (
+        nav={independentWork ? (
           <WorkNav
             project={project}
-            entry={standalone}
+            entry={independentWork}
             scenarioId={snap.scenarioId}
-            onScenario={(sid) => toPlay({ featureId: feature.id, scenarioId: sid })}
+            onScenario={(sid) => toPlay({ featureId: entry.id, scenarioId: sid })}
             onCopy={(text) => void copyText(text).then((ok) => setFlash(<LocalText value={ok ? m.board.copied(text) : m.board.clipboardUnavailable} />))}
           />
         ) : (
           <CaseNav
             project={project}
-            featureId={feature.id}
-            optionId={resolved.optionId}
+            featureId={entry.id}
+            workId={resolved.workId}
             caseId={resolved.caseId}
             scenarioId={snap.scenarioId}
-            onOption={(id) => toPlay({ featureId: feature.id, optionId: id, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })}
-            onCase={(cid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), caseId: cid })}
-            onScenario={(sid) => toPlay({ featureId: feature.id, ...(resolved.optionId ? { optionId: resolved.optionId } : {}), scenarioId: sid })}
-            onOptionCase={(oid, cid) => toPlay({ featureId: feature.id, optionId: oid, caseId: cid })}
+            onWork={(id) => toPlay({ featureId: entry.id, workId: id, ...(resolved.caseId ? { caseId: resolved.caseId } : {}) })}
+            onCase={(cid) => toPlay({ featureId: entry.id, ...(resolved.workId ? { workId: resolved.workId } : {}), caseId: cid })}
+            onScenario={(sid) => toPlay({ featureId: entry.id, ...(resolved.workId ? { workId: resolved.workId } : {}), scenarioId: sid })}
+            onWorkCase={(oid, cid) => toPlay({ featureId: entry.id, workId: oid, caseId: cid })}
             onCopy={(text) => void copyText(text).then((ok) => setFlash(<LocalText value={ok ? m.board.copied(text) : m.board.clipboardUnavailable} />))}
           />
         )}
@@ -545,9 +545,9 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
           setDrawer(true);
         }}
         selectedId={drawer && selection && state && selection.sceneId === state.sceneId ? selection.nodeId : null}
-        stageOverlay={option ? (sceneId) => <LocalReview key={option.id} projectId={projectId} project={project} optionId={option.id}
+        stageOverlay={work ? (sceneId) => <LocalReview key={work.id} projectId={projectId} project={project} workId={work.id}
           context={sceneId ? { sceneId, scenarioId: scenario?.id ?? null, position: state?.position ?? 0 } : null}
-          version={ir.payload?.version ?? 0} enabled={!compileError} completed={!!state?.completed} onOpen={() => ctl.pause()} approvable={!standalone} /> : undefined}
+          version={ir.payload?.version ?? 0} enabled={!compileError} completed={!!state?.completed} onOpen={() => ctl.pause()} approvable={!independentWork} /> : undefined}
         flash={flash}
         drawer={
           <>
@@ -567,7 +567,7 @@ function BoardPlayer({ projectId, play, navigate, projects }: { projectId: strin
             ) : null}
             <VoicePopover api={voice} open={voiceOpen} anchor={voiceAnchor} onClose={() => setVoiceOpen(false)} onManage={() => (setVoiceOpen(false), setProvidersOpen(true))} />
             <VoiceKeysDialog api={voice} open={providersOpen} onClose={() => setProvidersOpen(false)} />
-            <CloudPublishPopover model={cloud} ctx={{ featureId: play.featureId, scenarioId: scenario?.id ?? null, featureScenarioIds: Object.values(project.scenarios).filter((s) => s.optionId === feature.pick).map((s) => s.id) }} names={{ feature: feature.name, scenario: scenario?.name ?? null }} picks={cloudPicks(project, { featureId: play.featureId, scenarioId: scenario?.id ?? null })} onFlash={setFlash} />
+            <CloudPublishPopover model={cloud} ctx={{ featureId: play.featureId, scenarioId: scenario?.id ?? null, featureScenarioIds: Object.values(project.scenarios).filter((s) => s.workId === entry.workId).map((s) => s.id) }} names={{ feature: entry.title, scenario: scenario?.name ?? null }} picks={cloudPicks(project, { featureId: play.featureId, scenarioId: scenario?.id ?? null })} onFlash={setFlash} />
             <AppearancePopover open={a.open} anchor={a.anchor} onClose={() => a.setOpen(false)} scope="project" projectId={projectId} configTheme={project.theme ?? 'sketch'} catalog={a.catalog} settings={a.settings} look={a.saved} save={a.save} onPreview={a.setPreview} onFlash={setFlash} copy={copyText} />
           </>
         }

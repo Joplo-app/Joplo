@@ -11,11 +11,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, layer, option, page, shot } from '@joplo-app/kit';
+import { feature, flow, layer, work, page, shot } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { authorElement, createReviewBridge, elementLabel, parseReviewMessage, reviewScenarios, type BridgeWindow } from '../src/site/review-bridge';
-import { embedInitial, parseEmbedParams, standaloneUrl } from '../src/site/embed-model';
+import { embedInitial, parseEmbedParams, fullPageUrl } from '../src/site/embed-model';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nProvider } from '../src/i18n/context';
 import { SiteApp } from '../src/site/SiteApp';
@@ -26,21 +26,21 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 /** 两个功能；f 有两个方案（a 选定、b 未选定），g 没有选定方案。dev 编译 = 含所有方案（与评审版同样的方案集合）。 */
 function project(): Project {
   const home = page({ title: 'Home', layout: false }, h(ui.Group, { id: 'row' }, h(ui.Button, { id: 'go' }, 'Go'), h(ui.Button, { id: 'more' }, 'More')));
-  const a = option({
-    name: 'A', idea: 'i', state: { ui: {} },
+  const a = work({
+    title: 'A', summary: 'i', state: { ui: {} },
     layers: { app: layer('App', h(ui.Stack, { id: 'app' }, h(ui.Button, { id: 'go' }, 'Go'), h(ui.Button, { id: 'more' }, 'More'))), data: layer('Data', h(ui.Text, { id: 'data' }, 'Data')) },
     scenarios: { main: flow('Main path', { start: '/' }).click('go', shot('data')).click('more'), other: flow('Other path', { start: '/' }).click('more') },
   });
-  const b = option({ name: 'B', idea: 'i', state: { ui: {} }, scenarios: { solo: flow('B path', { start: '/' }).click('go') } });
-  const c = option({ name: 'C', idea: 'i', state: { ui: {} }, scenarios: { only: flow('Second feature', { start: '/' }).click('go').click('more') } });
+  const b = work({ title: 'B', summary: 'i', state: { ui: {} }, scenarios: { solo: flow('B path', { start: '/' }).click('go') } });
+  const c = work({ title: 'C', summary: 'i', state: { ui: {} }, scenarios: { only: flow('Second feature', { start: '/' }).click('go').click('more') } });
   const src: AuthoringProject = {
     root: '/p',
     config: { ...config({ name: 'Demo', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: {
-      f: { def: { ...feature({ name: 'Invite', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...a, ...F('features/f/options/a.tsx') }, b: { ...b, ...F('features/f/options/b.tsx') } } },
-      g: { def: { ...feature({ name: 'Audit', goal: 'g', cases: {} }), ...F('features/g/feature.ts') }, options: { c: { ...c, ...F('features/g/options/c.tsx') } } },
+      f: { def: { ...feature({ name: 'Invite', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...a, ...F('features/f/works/a.tsx') }, b: { ...b, ...F('features/f/works/b.tsx') } } },
+      g: { def: { ...feature({ name: 'Audit', goal: 'g', cases: {} }), ...F('features/g/feature.ts') }, works: { c: { ...c, ...F('features/g/works/c.tsx') } } },
     },
   };
   const out = compile(src, 'dev');
@@ -80,10 +80,10 @@ describe('参数', () => {
 describe('ready 场景列表', () => {
   it('所有场景：按功能顺序 → 方案顺序 → 场景顺序；steps 是步骤数', () => {
     expect(reviewScenarios(project())).toEqual([
-      { id: 'f.a.main', optionId: 'f.a', steps: 2 },
-      { id: 'f.a.other', optionId: 'f.a', steps: 1 },
-      { id: 'f.b.solo', optionId: 'f.b', steps: 1 },
-      { id: 'g.c.only', optionId: 'g.c', steps: 2 },
+      { id: 'f.a.main', workId: 'f.a', steps: 2 },
+      { id: 'f.a.other', workId: 'f.a', steps: 1 },
+      { id: 'f.b.solo', workId: 'f.b', steps: 1 },
+      { id: 'g.c.only', workId: 'g.c', steps: 2 },
     ]);
   });
 });
@@ -282,7 +282,7 @@ describe('评审模式的边界', () => {
   it('pick-result 的 label 与清单同样最多 200 个码点；新标签页地址去掉 review 参数', () => {
     expect([...elementLabel({ scenes: {} } as unknown as Project, null, 'x', '名'.repeat(300))].length).toBe(200);
     expect(elementLabel({ scenes: {} } as unknown as Project, null, 'x', '名'.repeat(300)).endsWith('…')).toBe(true);
-    const url = new URL(standaloneUrl('https://joplo.app/s/Abc1234567/?embed=1&review=1&scenario=a&x=1', null));
+    const url = new URL(fullPageUrl('https://joplo.app/s/Abc1234567/?embed=1&review=1&scenario=a&x=1', null));
     expect(url.searchParams.has('review')).toBe(false);
     expect(url.searchParams.get('x')).toBe('1');
   });

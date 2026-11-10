@@ -253,7 +253,7 @@ export function createEs(locale: Locale = 'es') {
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "Prototipo conceptual creado con Joplo · No es una implementación de producción",
       featureNotFound: "Función no encontrada.",
       goToHome: "Ir al inicio",
-      switchFeature: "Cambiar función",
+      switchFeature: "Cambiar elemento",
       copyLink: "Copiar enlace",
       copyLinkToCurrentStep: "Copiar enlace al paso actual",
       linkCopied: "Enlace copiado",

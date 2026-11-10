@@ -12,7 +12,7 @@ import { createEn } from '../src/i18n/en';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { explain, feature, flow, fork, layer, narrate, option, page, role, say, set, stream, Slot, $ } from '@joplo-app/kit';
+import { explain, feature, flow, fork, layer, narrate, work, page, role, say, set, stream, Slot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, spokenLine, stateAt, stepPlan, type AuthoringProject, type Project } from '@joplo-app/core';
 import { speakerOf, spokenSubtitleFor, stepTitleFor, titleDwellMs, TITLE_DWELL_MS, TITLE_DWELL_MAX_MS } from '../src/player/subtitle-content';
@@ -39,9 +39,9 @@ function build(o: { roles?: boolean; description?: string; empty?: boolean; sayR
         .card('现在是阿杰', withRoles ? { role: 'ajie' } : {})
         .click('accept', '阿杰回复：我能去', say('我能去！'), set($.ui.accepted, true), fork('如果阿杰去不了', 'other'));
   const flx = o.sayRole ? fl.system('阿杰补一句', say('我带帐篷。', { role: 'ajie' })).system('助手确认', say('好的。')) : fl;
-  const opt = option({
-    name: 'A · 对话',
-    idea: 'i',
+  const opt = work({
+    title: 'A · 对话',
+    summary: 'i',
     on: {},
     state: { ui: { reply: '', accepted: false } },
     ...(withRoles
@@ -62,7 +62,7 @@ function build(o: { roles?: boolean; description?: string; empty?: boolean; sayR
     features: {
       f: {
         def: { ...feature({ name: '一起规划露营', goal: 'g', cases: {}, ...(withRoles ? { roles: { xiaoyu: role('小雨', { desc: '发起人' }), ajie: role('阿杰', { desc: '被拉进来的朋友', color: '#1971C2' }) } } : {}), pick: 'a' } as never), ...F('features/f/feature.ts') },
-        options: { a: { ...opt, ...F('features/f/options/a.tsx') } },
+        works: { a: { ...opt, ...F('features/f/works/a.tsx') } },
       },
     },
   };
@@ -174,7 +174,7 @@ describe('coverFor / coverShown（场景封面）', () => {
   it('功能名 · 方案名、flow 标题与 description、步数、估算时长、出场角色（按功能里的顺序）', () => {
     const p = build({ description: '小雨一句话，阿杰在手机上确认' });
     const c = coverFor(p, sid, zh)!;
-    expect(c).toMatchObject({ feature: '一起规划露营', option: 'A · 对话', title: '小雨约上了阿杰', description: '小雨一句话，阿杰在手机上确认', steps: 5 });
+    expect(c).toMatchObject({ feature: '一起规划露营', work: 'A · 对话', title: '小雨约上了阿杰', description: '小雨一句话，阿杰在手机上确认', steps: 5 });
     expect(c.roles.map((r) => r.name)).toEqual(['小雨', '阿杰']);
     expect(c.ms).toBe(scenarioMs(p, p.scenarios[sid]!, zh));
   });

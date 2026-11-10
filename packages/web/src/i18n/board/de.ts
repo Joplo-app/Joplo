@@ -144,7 +144,7 @@ export function createBoardDe(locale: Locale = 'de') {
       directoryNotFound: "Verzeichnis nicht gefunden",
       projectErrorCount: (p0: Value) => plural(Number(p0), { one: "# Fehler", other: "# Fehler" }, locale),
       viewProjectHome: "Projektstartseite ansehen",
-      switchFeature: "Funktion wechseln",
+      switchFeature: "Eintrag wechseln",
       inspect: "Prüfen",
       exitInspectMode: "Prüfmodus beenden",
       inspectModeClickAStageElementToSelectIt: "Prüfmodus: Ein Klick wählt Bühnenelemente aus, ohne Schritte auszuführen. ⌥ für vorübergehendes Prüfen halten.",

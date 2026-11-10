@@ -6,7 +6,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController, VISUAL_SETTLE_MS } from '../src/runtime/demo';
@@ -16,9 +16,9 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 
 function build(): Project {
   const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go')));
-  const opt = option({ name: 'A', idea: 'i', scenarios: { s: flow('S', { start: '/' }).click('go', 'First').click('go', 'Second') } });
+  const opt = work({ title: 'A', summary: 'i', scenarios: { s: flow('S', { start: '/' }).click('go', 'First').click('go', 'Second') } });
   const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {}, routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } } };
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } } };
   return compile(src, 'dev').project!;
 }
 

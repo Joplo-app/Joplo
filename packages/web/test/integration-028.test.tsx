@@ -10,7 +10,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { $, callout, feature, flow, highlight, layer, numbered, option, page, set, shot, spotlight } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
+import { $, callout, feature, flow, highlight, layer, numbered, work, page, set, shot, spotlight } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, focusAt, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
 import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
@@ -35,9 +35,9 @@ function project(autoFocus?: boolean): Project {
     h(D.Edge, { id: 'ac', from: 'a', to: 'c' }),
     h(D.Edge, { id: 'cd', from: 'c', to: 'd', when: $.ui.showD }),
   );
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {},
     state: { ui: { showD: false } },
     layers: { backend: layer('后端', arch as never) },
@@ -58,7 +58,7 @@ function project(autoFocus?: boolean): Project {
     config: { ...config({ name: 'T', home: '/', ...(autoFocus === undefined ? {} : { autoFocus }) }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const r = compile(src, 'dev', { pluginOptions: { diagram: { layout: elkLayout } } });
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

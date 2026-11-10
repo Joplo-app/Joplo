@@ -6,7 +6,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { feature, flow, layer, option, page, set, shot, $ } from '@joplo-app/kit';
+import { feature, flow, layer, work, page, set, shot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { PAGE_LAYER, compile, displaySceneId, type AuthoringProject } from '@joplo-app/core';
 import { CAMERA_PAD, MAX_ZOOM, MIN_NODE_PX, NODE_FONT_PX, fitCamera, highlightRect, project, revealScroll, union, visibleRect, type Box } from '../src/renderer/camera-math';
@@ -130,9 +130,9 @@ function director() {
   // 每层是独立画面：自己的 JSX 树，按自己的布局占满舞台
   const client = h(ui.Paper, { id: 'client_panel' }, h(ui.Button, { id: 'send' }, '发送'), h(ui.Text, { id: 'msg' }, '你好'));
   const arch = h(uiDiagram.Diagram, { id: 'arch' }, h(uiDiagram.Diagram.Node, { id: 'biz', label: 'Biz' }), h(uiDiagram.Diagram.Node, { id: 'billing', label: 'Billing' }));
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {},
     state: { ui: { sent: false } },
     layers: { client: layer('客户端视角', client as never), backend: layer('后端流转', arch as never) },
@@ -143,7 +143,7 @@ function director() {
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const r = compile(src, 'dev');
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
@@ -153,7 +153,7 @@ function director() {
 describe('cameraFor（演示页、静态截图、视频共用的镜头计划）', () => {
   const p = director();
   it('导演跟随：每一步取导演层的画面与它的焦点；没有镜头的步骤沿用上一步；shot() 让导演层回到整层', () => {
-    const scene = (id: string) => p.options['f.a']!.layers[id]!.sceneId;
+    const scene = (id: string) => p.works['f.a']!.layers[id]!.sceneId;
     expect(cameraFor(p, 'f.a.s', 0, null)).toMatchObject({ enabled: true, director: true, viewLayer: 'client', sceneId: scene('client'), spec: { targets: [] } });
     // 第 1 步 shot('msg') 在客户端层、shot('biz') 在后端层；第一个 shot 所在的层是导演层
     expect(cameraFor(p, 'f.a.s', 1, null)).toMatchObject({ viewLayer: 'client', sceneId: scene('client'), spec: { targets: ['msg'] } });
@@ -179,13 +179,13 @@ describe('cameraFor（演示页、静态截图、视频共用的镜头计划）'
   });
   it('没有层级的方案：仍显示路径页面（sceneId = null），shot 写在路径页面上', () => {
     const home = page({ title: '无层级', layout: false }, h(ui.Paper, { id: 'card' }, h(ui.Button, { id: 'go' }, '去')));
-    const opt = option({ name: 'B', idea: 'i', on: {}, state: { ui: {} }, scenarios: { s: flow('一次', { start: '/' }).click('go', shot('card')) } });
+    const opt = work({ title: 'B', summary: 'i', on: {}, state: { ui: {} }, scenarios: { s: flow('一次', { start: '/' }).click('go', shot('card')) } });
     const src: AuthoringProject = {
       root: '/p',
       config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
       layouts: {},
       routes: { '/': { ...home, ...F('routes/page.tsx') } },
-      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'b' }), ...F('features/f/feature.ts') }, options: { b: { ...opt, ...F('features/f/options/b.tsx') } } } },
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'b' }), ...F('features/f/feature.ts') }, works: { b: { ...opt, ...F('features/f/works/b.tsx') } } } },
     };
     const q = compile(src, 'dev').project!;
     expect(cameraFor(q, 'f.b.s', 0, null)).toMatchObject({ enabled: true, layers: [], viewLayer: PAGE_LAYER, sceneId: null, spec: { targets: [] } });
@@ -196,7 +196,7 @@ describe('cameraFor（演示页、静态截图、视频共用的镜头计划）'
 describe('先切层再操作（导演跟随时，操作目标不在当前层里）', () => {
   it('控制器先请求切到目标所在的层，再执行这一步；提交后清空；手动选层时不切', async () => {
     const p = director();
-    const scene = (id: string) => p.options['f.a']!.layers[id]!.sceneId;
+    const scene = (id: string) => p.works['f.a']!.layers[id]!.sceneId;
     const run = async (directorOn: boolean) => {
       const c = new DemoController(null);
       c.reducedMotion = true;

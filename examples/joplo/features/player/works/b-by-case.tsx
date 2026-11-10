@@ -41,7 +41,7 @@ export default withDesignRecord(work({
         <Alert id="pb_missing" color="orange" title="方案 B 还没有表达「发送请求失败」" when={$.ui.missing}>
           <Stack gap="xs">
             <Text size="sm">这是缺口，不是演示。可以在 Agent 会话里说“给方案 B 补上发送失败的场景”，或先查看：</Text>
-            <Code>npx joplo check --option invite.b-batch</Code>
+            <Code>npx joplo check --work invite.b-batch</Code>
           </Stack>
         </Alert>,
         main(P),

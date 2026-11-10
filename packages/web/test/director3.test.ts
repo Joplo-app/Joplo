@@ -5,7 +5,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { feature, flow, layer, option, page, set, shot, $ } from '@joplo-app/kit';
+import { feature, flow, layer, work, page, set, shot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, type AuthoringProject } from '@joplo-app/core';
 import { cameraFor, cameraPosition } from '../src/player/cameraFor';
@@ -18,9 +18,9 @@ function arch() {
   const home = page({ title: 'A', layout: false }, h(ui.Text, { id: 'note' }, '路径页面'));
   const client = h(ui.Stack, null, h(ui.ToolCall, { id: 'tc_sheet', title: 'make_sheet' }, '生成'), h(ui.Button, { id: 'send' }, '发送'));
   const backend = h(uiDiagram.Diagram, { id: 'arch' }, h(uiDiagram.Diagram.Node, { id: 'biz', label: 'Biz' }), h(uiDiagram.Diagram.Node, { id: 'sandbox', label: '沙箱' }), h(uiDiagram.Diagram.Edge, { id: 'e', from: 'biz', to: 'sandbox' }));
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {},
     state: { ui: { t: 'idle' } },
     layers: { client: layer('客户端视角', client as never), backend: layer('后端流转', backend as never) },
@@ -36,7 +36,7 @@ function arch() {
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   const r = compile(src, 'dev');
   expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);

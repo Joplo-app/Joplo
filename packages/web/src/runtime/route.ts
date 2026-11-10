@@ -13,7 +13,7 @@
  * speed = 自动播放速度（0.5 / 1.5；1× 不写）。
  * 设备不在 URL 里（D44）：每个页面只有一种设备，由 page 的 viewport 决定。
  */
-export type PlayRoute = { featureId: string; optionId?: string; caseId?: string; scenarioId?: string; step?: number; layer?: string; speed?: number };
+export type PlayRoute = { featureId: string; workId?: string; caseId?: string; scenarioId?: string; step?: number; layer?: string; speed?: number };
 
 export type BoardRoute = { kind: 'home'; projectId?: string } | { kind: 'play'; projectId: string; play: PlayRoute } | { kind: 'settings'; projectId?: string };
 export type SiteRoute = { kind: 'home' } | { kind: 'play'; play: PlayRoute } | { kind: 'scenario'; scenarioId: string };
@@ -33,7 +33,7 @@ function parsePlay(featureId: string, query: string): PlayRoute {
   const n = step === null ? NaN : Number(step);
   return {
     featureId,
-    ...(q.get('o') ? { optionId: q.get('o')! } : {}),
+    ...(q.get('o') ? { workId: q.get('o')! } : {}),
     ...(q.get('c') ? { caseId: q.get('c')! } : {}),
     ...(q.get('s') ? { scenarioId: q.get('s')! } : {}),
     ...(Number.isInteger(n) && n >= 0 ? { step: n } : {}),
@@ -44,7 +44,7 @@ function parsePlay(featureId: string, query: string): PlayRoute {
 
 function playQuery(p: PlayRoute): string {
   const q = new URLSearchParams();
-  if (p.optionId) q.set('o', p.optionId);
+  if (p.workId) q.set('o', p.workId);
   if (p.caseId) q.set('c', p.caseId);
   if (p.scenarioId) q.set('s', p.scenarioId);
   if (p.step !== undefined) q.set('step', String(p.step));
@@ -109,7 +109,7 @@ export function unknownPlayParams(hash: string): string[] {
 export function warnUnknownPlayParams(hash: string, warn: (message: string) => void = console.warn): boolean {
   const unknown = unknownPlayParams(hash);
   if (!unknown.length) return false;
-  warn(`Joplo: ignored URL parameter${unknown.length > 1 ? 's' : ''} ${unknown.map((k) => `"${k}"`).join(', ')}. Deep links use o=<option id>, c=<case id>, s=<scenario id>, step=<n>, l=<layer key>, speed=0.5|1.5 (see npx joplo skill demo).`);
+  warn(`Joplo: ignored URL parameter${unknown.length > 1 ? 's' : ''} ${unknown.map((k) => `"${k}"`).join(', ')}. Deep links use o=<work id>, c=<case id>, s=<scenario id>, step=<n>, l=<layer key>, speed=0.5|1.5 (see npx joplo skill demo).`);
   return true;
 }
 

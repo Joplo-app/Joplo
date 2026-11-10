@@ -1,6 +1,6 @@
 # 本地与 Share 评审：轮询兼容性及 Cloud 改动需求
 
-状态：CLI 已实现统一监听入口，Cloud 当前按快照兼容轮询。本文是服务端改动清单，不表示这些接口已经上线。
+状态：CLI 已实现统一监听入口，Cloud 当前按快照兼容轮询。本文是服务端改动清单，不表示这些接口已经上线。D103 的机器字段统一为 workId / works，云端跟随升级单独交接；现行格式见[作品模型](work-model.md#5-命令行与线上格式)。
 
 核对依据：2026-11-07，本机 `joplo-cloud` 工作副本，HEAD `2d379826` 的评审相关源码；不是对线上部署版本的核验。本次没有修改 Cloud 仓库或线上数据。
 
@@ -14,7 +14,7 @@ joplo feedback watch --share Abc1234567 --work invite.a-modal --interval 15 --js
 
 本地仍直接观察持久文件，Share 使用普通 GET 轮询。首次立即请求，成功后默认等待 15 秒；可选 10–30 整数秒。网络错误退避，鉴权／权限／配额错误明确结束；中断会取消在途请求和等待。本地的 `review list/watch` 作为兼容入口保留，原有云端 `feedback` 单次读取和 `--applied` 也不变。
 
-双方统一输出 `source/eventId/sessionId/featureId/optionId/revision/createdAt/type`。Cloud 只过滤绑定版本与方案的评论，并将匹配的作者 `pick` 映射为 `approved`；其他规则／回答决定为 `decision`，不会结束监听。分享发布新版本时输出 `closed` 并退出非零，不跟随新版本。`eventId` 跨重启稳定，便于消费端去重；Cloud 没有本地文件的递增 `seq`，不假装支持 `--after`。
+双方统一输出 `source/eventId/sessionId/featureId/workId/revision/createdAt/type`。Cloud 只过滤绑定版本与方案的评论，并将匹配的作者 `pick` 映射为 `approved`；其他规则／回答决定为 `decision`，不会结束监听。分享发布新版本时输出 `closed` 并退出非零，不跟随新版本。`eventId` 跨重启稳定，便于消费端去重；Cloud 没有本地文件的递增 `seq`，不假装支持 `--after`。
 
 ## 现有 Cloud 能直接复用什么
 
@@ -56,7 +56,7 @@ joplo feedback watch --share Abc1234567 --work invite.a-modal --interval 15 --js
 
 建议保留旧 `/feedback` 契约，新增 `/feedback/events`（名称待 Cloud 实现时确定）或显式的增量读取模式。最少包含：
 
-- 请求：`version`、`optionId`、服务端生成的不透明 `cursor`、有上限的 `limit`。
+- 请求：`version`、`workId`、服务端生成的不透明 `cursor`、有上限的 `limit`。
 - 响应：分享当前版本、事件／记录、`nextCursor`、`hasMore`，以及上述当前确认状态。
 - 已解决评论、已 applied 决定仍能按游标读到。需要报告撤回／解决／重新打开时，为状态变更提供稳定的版本或事件标识；不能仅按原始 createdAt 轮询可变行。
 - 游标排序和提交边界必须稳定，避免相同时间戳或较晚提交的旧时间记录被跳过。不能只使用时间戳或 OFFSET 宣称“不漏事件”。
@@ -74,7 +74,7 @@ joplo feedback watch --share Abc1234567 --work invite.a-modal --interval 15 --js
   "approval": {
     "version": 3,
     "featureId": "invite",
-    "optionId": "invite.a-modal",
+    "workId": "invite.a-modal",
     "status": "open",
     "decisionId": null
   }

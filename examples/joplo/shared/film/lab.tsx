@@ -2,7 +2,7 @@
  * “独立作品与章节能力”的设计记录（D40：新功能先用 Joplo 画出来，确认后再实现）。四个独立画面：
  * 创作文件（作者写什么）、看板（审片时看到什么）、终端（check / outline / build 说什么）、发布站（观众看到什么）。
  * 两个方案只在看板里“章节放在哪”不同：variant = 'list'（左栏清单）或 'timeline'（画面下方的时间轴）。
- * 这里记录最终外部模型；内部容器暂不改；示例影片借用 examples/midterms-2026 的章节。
+ * 这里记录 D102 与 D103 的最终模型；作品入口和 IR 已统一；示例影片借用 examples/midterms-2026 的章节。
  */
 import { $, done, eq, explain, flow, highlight, layer, neq, not, set, shot, uses, type Flow } from '@joplo-app/kit';
 import { Alert, Badge, Button, Code, Divider, Grid, Group, List, Menu, NavLink, Paper, Stack, Terminal, Text, Title } from '@joplo-app/plugin-ui';
@@ -27,7 +27,8 @@ export const filmInitial = () => ({
 });
 
 // ---------- 创作文件 ----------
-const BEFORE = `// routes/page.tsx —— 画面都在层级里，这一页只是占位
+const BEFORE = `// 历史的功能评审外壳，以下用当前 work API 重写
+// routes/page.tsx —— 画面都在层级里，这一页只是占位
 export default page({ title: '2026 美国中期选举', layout: false }, <Slot name="main" />)
 
 // features/midterms/feature.ts —— 每一章写一遍（当作“情况”）
@@ -42,9 +43,9 @@ export default feature({
   },
 })
 
-// features/midterms/options/b-film.tsx —— 每一章再写一遍（当作“场景”）
-export default option({
-  name: '一镜到底版', idea: '…',
+// features/midterms/works/b-film.tsx —— 每一章再写一遍（当作“场景”）
+export default work({
+  title: '一镜到底版', summary: '…',
   layers: { world: layer('世界', <World />) },
   scenarios: {
     hook:   flow('一夜之间…', { cases: ['hook'], start: '/' }).system(…),
@@ -101,11 +102,11 @@ const FilmFiles = () => (
         <Stack gap="sm">
           <Paper id="ff_tree" withBorder p="md">
             <Stack gap="xs" when={eq($.ui.form, 'before')}>
-              <Text fw={700}>历史：借功能演示的写法</Text>
+              <Text fw={700}>历史：借功能评审（按当前 API 重写）</Text>
               <Row name="joplo.config.ts" />
               <Row name="routes/page.tsx" note="占位" tone="red" />
               <Row name="features/midterms/feature.ts" note="每章写一遍" tone="red" />
-              <Row name="features/midterms/options/b-film.tsx" note="每章再写一遍" tone="red" />
+              <Row name="features/midterms/works/b-film.tsx" note="每章再写一遍" tone="red" />
               <Row name="shared/film/world.tsx" />
             </Stack>
             <Stack gap="xs" when={eq($.ui.form, 'after')}>
@@ -120,13 +121,13 @@ const FilmFiles = () => (
             <Stack gap="xs">
               <Text fw={700}>不用再写</Text>
               <List size="sm">
-                <List.Item>feature / option 两层外壳，pick、idea</List.Item>
+                <List.Item>功能评审外壳、pick 与重复的简介</List.Item>
                 <List.Item>cases：每一章的 dimension、priority</List.Item>
                 <List.Item>占位的 routes/page.tsx</List.Item>
                 <List.Item>每一章手写的 from: '上一章'</List.Item>
                 <List.Item>标题里手写的 00、01 编号</List.Item>
               </List>
-              <Text size="xs" c="dimmed">外部按作品与能力呈现；内部仍保留 Feature + 隐藏 Option。步骤、状态、镜头、旁白与配乐共用原引擎。</Text>
+              <Text size="xs" c="dimmed">创作与 IR 都按作品、切片与能力呈现；功能是评审层。步骤、状态、镜头、旁白与配乐共用同一编译路径。</Text>
             </Stack>
           </Paper>
         </Stack>

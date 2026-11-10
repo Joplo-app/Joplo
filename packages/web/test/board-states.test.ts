@@ -10,7 +10,7 @@ const zh = { ...createZhCN(), ...createBoardZhCN() };
  */
 import { describe, expect, it, vi } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController } from '../src/runtime/demo';
@@ -23,13 +23,13 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 
 function twoStep(): Project {
   const home = page({ title: '首页', layout: false }, h(ui.Group, { id: 'row' }, h(ui.Button, { id: 'go' }, '去'), h(ui.Button, { id: 'more' }, '再去')));
-  const opt = option({ name: 'A', idea: 'i', on: {}, state: { ui: {} }, scenarios: { s: flow('一次', { start: '/' }).click('go').click('more') } });
+  const opt = work({ title: 'A', summary: 'i', on: {}, state: { ui: {} }, scenarios: { s: flow('一次', { start: '/' }).click('go').click('more') } });
   const src: AuthoringProject = {
     root: '/p',
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return compile(src, 'dev').project!;
 }
@@ -99,13 +99,13 @@ describe('点错位置：就地说明，不打断（三种写法）', () => {
 });
 
 // ---------- 创作侧 ----------
-const project = {
-  features: { invite: { id: 'invite', name: '邀请', caseIds: ['c1', 'c2', 'c3', 'c4'], optionIds: ['o.a', 'o.b', 'o.c'], pick: 'o.a' } },
+const project = { entryIds: ["invite"],
+  features: { invite: { roles: [], alternatives: { 'o.a': { decisionFocus: '', coverage: { c1: { status: 'expressed', scenarioIds: [] }, c2: { status: 'missing', scenarioIds: [] }, c3: { status: 'undecided', scenarioIds: [] }, c4: { status: 'expressed', scenarioIds: [] } } }, 'o.b': { decisionFocus: '', tradeoffs: [], coverage: { c2: { status: 'missing', scenarioIds: [] } } }, 'o.c': { decisionFocus: '', tradeoffs: [], coverage: { c2: { status: 'expressed', scenarioIds: [] } } } },  id: 'invite', name: '邀请', caseIds: ['c1', 'c2', 'c3', 'c4'], workIds: ['o.a', 'o.b', 'o.c'], pick: 'o.a' } },
   cases: { c1: { title: '正常' }, c2: { title: '邮箱为空' }, c3: { title: '已经是成员' }, c4: { title: '发送失败' } },
-  options: {
-    'o.a': { id: 'o.a', featureId: 'invite', name: 'A · 弹窗', coverage: { c1: { status: 'expressed', scenarioIds: [] }, c2: { status: 'missing', scenarioIds: [] }, c3: { status: 'undecided', scenarioIds: [] }, c4: { status: 'expressed', scenarioIds: [] } } },
-    'o.b': { id: 'o.b', featureId: 'invite', name: 'B · 独立页', coverage: { c2: { status: 'missing', scenarioIds: [] } } },
-    'o.c': { id: 'o.c', featureId: 'invite', name: 'C · 批量', coverage: { c2: { status: 'expressed', scenarioIds: [] } } },
+  works: {
+    'o.a': { roles: [], id: 'o.a', featureId: 'invite', title: 'A · 弹窗',  },
+    'o.b': { roles: [], id: 'o.b', featureId: 'invite', title: 'B · 独立页',  },
+    'o.c': { roles: [], id: 'o.c', featureId: 'invite', title: 'C · 批量',  },
   },
   scenarios: {},
 } as unknown as Project;
@@ -129,8 +129,8 @@ describe('缺口横幅', () => {
     expect(gapBanner(project, 'invite', 'o.a', 'c2', zh)).toEqual({
       letter: 'A',
       caseTitle: '邮箱为空',
-      agentText: '给方案 A 补上「邮箱为空」的场景（npx joplo check --option o.a）',
-      alt: { optionId: 'o.c', letter: 'C' },
+      agentText: '给方案 A 补上「邮箱为空」的场景（npx joplo check --work o.a）',
+      alt: { workId: 'o.c', letter: 'C' },
     });
     // C 缺“已经是成员”：A 是待决定、B 没有记录，都不算已表达 → 不显示“看方案 X”
     expect(gapBanner(project, 'invite', 'o.c', 'c3', zh)!.alt).toBeNull();

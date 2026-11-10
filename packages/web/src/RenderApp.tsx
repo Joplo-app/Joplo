@@ -274,8 +274,8 @@ function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, 
     c.setScenario(scenarioId, 0, { quiet: true });
     // 不带 chain 时只录这一个场景（控制器缺省会接着播下一个）
     if (chain) {
-      const optionId = project.scenarios[scenarioId]?.optionId ?? null;
-      c.autoNext = (id) => nextScenarioId(playSequence(project, optionId), id);
+      const workId = project.scenarios[scenarioId]?.workId ?? null;
+      c.autoNext = (id) => nextScenarioId(playSequence(project, workId), id);
     } else c.autoNext = null;
     if (voiceEstimate) c.narrator = estimatedNarrator();
     return c;
@@ -285,7 +285,7 @@ function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, 
   const recordingAssets = useMemo(() => {
     const sc = project.scenarios[scenarioId];
     // playSequence 返回场景对象；这里按 id 找当前章及其后面的章（原先拿 id 去对象数组里找，永远找不到，只收了第一章的配乐）
-    const sequence = chain ? playSequence(project, sc?.optionId ?? null).map((s) => s.id) : [scenarioId];
+    const sequence = chain ? playSequence(project, sc?.workId ?? null).map((s) => s.id) : [scenarioId];
     const at = sequence.indexOf(scenarioId);
     const chapters = (at >= 0 ? sequence.slice(at) : [scenarioId]).map(id => project.scenarios[id]);
     const ids = new Set(chapters.flatMap(chapter => [chapter, ...(chapter?.steps ?? [])].flatMap(s => Object.values(s?.media ?? {}).map(t => t.resource))));

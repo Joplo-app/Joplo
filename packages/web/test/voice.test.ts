@@ -8,7 +8,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it, vi } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, narrate, option, page, say } from '@joplo-app/kit';
+import { feature, flow, narrate, work, page, say } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { VOICE_BREATH_MS, compile, type AuthoringProject, type Project } from '@joplo-app/core';
 import { DemoController, TIMING } from '../src/runtime/demo';
@@ -31,9 +31,9 @@ const until = async (cond: () => boolean, ms = 3000) => {
 
 function project(): Project {
   const home = page({ title: 'Home', layout: false }, h(ui.Group, null, h(ui.Button, { id: 'go' }, 'Go'), h(ui.Button, { id: 'more' }, 'More')));
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     state: { ui: {} },
     scenarios: { s: flow('One', { start: '/' }).click('go', 'Ana goes', narrate('She starts here.'), say('Here I go!')).click('more', 'Ana goes on', say('And again!')).click('go', 'Done') },
   });
@@ -42,7 +42,7 @@ function project(): Project {
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return compile(src, 'dev').project!;
 }

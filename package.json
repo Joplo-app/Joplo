@@ -1,5 +1,6 @@
 {
   "name": "joplo-monorepo",
+  "description": "Playable, interactive shows your agent writes in code. Link them, embed them, change one line and they update.",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.16.1",

@@ -5,7 +5,7 @@ export function captureReviewDraft(session: LocalReviewSession, project: Project
   return { sessionId: session.id, text, context, pageTitle: project.scenes[context.sceneId]?.name ?? context.sceneId,
     scenarioName: context.scenarioId ? project.scenarios[context.scenarioId]?.name ?? context.scenarioId : null };
 }
-export function reviewDraftKey(projectId: string, optionId: string): string { return `joplo.review.draft:${projectId}:${optionId}`; }
+export function reviewDraftKey(projectId: string, workId: string): string { return `joplo.review.draft:${projectId}:${workId}`; }
 export function readReviewDraft(key: string): ReviewDraft | null {
   try {
     const d = JSON.parse(sessionStorage.getItem(key) ?? 'null') as ReviewDraft | null;
@@ -20,4 +20,9 @@ const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 /** 给 Agent 的命令：跟住整个项目（所有方案、改源码后的新一轮），而不是只绑这一轮会话。 */
 export function localReviewCommand(session: LocalReviewSession): string {
   return `npx joplo feedback watch ${quote(session.projectDir)} --local --follow --json`;
+}
+
+/** 本地评审的标题：独立作品的会话没有所属功能。 */
+export function localReviewTitle(session: { featureName: string | null; workTitle: string }): string {
+  return session.featureName ? `${session.featureName} / ${session.workTitle}` : session.workTitle;
 }

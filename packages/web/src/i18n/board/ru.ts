@@ -144,7 +144,7 @@ export function createBoardRu(locale: Locale = 'ru') {
       directoryNotFound: "Каталог не найден",
       projectErrorCount: (p0: Value) => plural(Number(p0), { one: "# ошибка", few: "# ошибки", many: "# ошибок", other: "# ошибки" }, locale),
       viewProjectHome: "Открыть главную проекта",
-      switchFeature: "Сменить функцию",
+      switchFeature: "Сменить элемент",
       inspect: "Проверить",
       exitInspectMode: "Выйти из проверки",
       inspectModeClickAStageElementToSelectIt: "Режим проверки: нажатие лишь выбирает элемент сцены, не выполняя шаг. Удерживайте ⌥ для временной проверки.",

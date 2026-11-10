@@ -49,7 +49,7 @@ export type CurtainProps = {
 export function Curtain({ project, scenarioId, position, cover, onStart, theme, font = null, width, animate = true, passive = false }: CurtainProps) {
   const sc = scenarioId ? project.scenarios[scenarioId] : undefined;
   const card = cardAt(project, scenarioId, position);
-  const cardRole = card?.role ? roleOf(project, sc?.optionId, card.role) : null;
+  const cardRole = card?.role ? roleOf(project, sc?.workId, card.role) : null;
   const k = Math.max(0.7, Math.min(1, width / DESIGN_WIDTH));
   const key = card ? `card:${scenarioId}#${position}` : cover ? `cover:${cover.scenarioId}` : null;
   return (
@@ -118,7 +118,7 @@ function TransitionCard({ card, role, k }: { card: CardAction; role: RoleInfo | 
 function SceneCover({ cover, k, onStart }: { cover: CoverContent; k: number; onStart?: () => void }) {
   const { t: i18n } = useI18n();
   const px = (n: number) => Math.round(n * k);
-  const owner = [cover.feature, cover.option].filter(Boolean).join(' · ');
+  const owner = [cover.feature, cover.work].filter(Boolean).join(' · ');
   const icon = { width: px(14), height: px(14) };
   const meta: { key: string; icon: typeof Timer; text: string }[] = [
     { key: 'steps', icon: ListOrdered, text: i18n.player.coverSteps(cover.steps) },

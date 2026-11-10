@@ -48,7 +48,7 @@ export function Home({
   error: Text | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onView: (projectId: string, featureId: string, optionId?: string) => void;
+  onView: (projectId: string, featureId: string, workId?: string) => void;
   /** 顶栏右侧（外观按钮，D55）。 */
   right?: ReactNode;
   flash?: ReactNode | null;
@@ -181,7 +181,7 @@ function Errors({ list, note }: { list: Diagnostic[]; note: string }) {
   );
 }
 
-function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (projectId: string, featureId: string, optionId?: string) => void }) {
+function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (projectId: string, featureId: string, workId?: string) => void }) {
   const { t: i18n } = useBoardI18n();
 
   const ir = useProjectIR(summary.status === 'missing' ? null : summary.id);
@@ -236,7 +236,7 @@ function ProjectPanel({ summary, onView }: { summary: ProjectSummary; onView: (p
   );
 }
 
-function Features({ project, look, onView }: { project: Project; look: ReturnType<typeof effectiveAppearance>; onView: (featureId: string, optionId?: string) => void }) {
+function Features({ project, look, onView }: { project: Project; look: ReturnType<typeof effectiveAppearance>; onView: (featureId: string, workId?: string) => void }) {
   const { t: i18n } = useBoardI18n();
 
   const cards = featureCards(project);
@@ -244,7 +244,7 @@ function Features({ project, look, onView }: { project: Project; look: ReturnTyp
   return (
     <section className="grid grid-cols-1 gap-5 min-[1100px]:grid-cols-2" data-testid="home-features">
       {cards.map((c) => (
-        <FeatureCardView key={c.id} project={project} card={c} look={look} onOpen={() => c.open && onView(c.open.featureId, c.open.optionId)} />
+        <FeatureCardView key={c.id} project={project} card={c} look={look} onOpen={() => c.open && onView(c.open.featureId, c.open.workId)} />
       ))}
     </section>
   );
@@ -284,7 +284,7 @@ function FeatureCardView({ project, card, look, onOpen }: { project: Project; ca
           ) : (
             <span className="rounded-[4px] border border-jb-line px-1.5 py-px text-[11px] text-jb-muted">{i18n.board.noPickedOptionYet}</span>
           )}
-          <span className="text-jb-muted">{i18n.board.optionCount(card.optionCount)}</span>
+          <span className="text-jb-muted">{i18n.board.optionCount(card.workCount)}</span>
           {card.coverage.allExpressed ? (
             <span className="inline-flex items-center gap-1 text-jb-ok">
               <StatusIcon status="expressed" size={13} />

@@ -81,10 +81,10 @@
 | 角色（As a） | `feature.roles`（名字数组，或 `role()` 键） | 只有键写法、且层级或过渡卡引用时才显示；名字数组写法**在任何地方都不显示** | 评审者看不到“给谁” | 看板演示页左栏、发布站首页卡片与左栏写“面向：角色”；outline 列出角色 |
 | 目标与价值（I want / so that） | `feature.goal` | 看板首页卡片、发布站首页与左栏；**看板演示页看不到**；场景封面只写 flow description（多数示例没写，封面只有标题） | 看演示时说不清“解决什么” | 看板左栏顶部写 goal；封面说明缺省时用 goal；技能给出 goal 的好坏例子 |
 | 验收标准 Given | `case.title`、`case.dimension` | 情况行显示标题；dimension 不显示 | 可以接受 | outline 显示维度 |
-| 验收标准 Then | `case.expected`、`flow({ expected })` | 写进 IR，但**看板、check、发布站都不消费** | PM 最在意的“期望结果”写了也看不见 | 看板情况悬停卡写“期望结果”（没写时提示）；CASE_NOT_COVERED 带上 expected；outline 每个情况一行“标题 → 期望” |
+| 验收标准 Then | `case.expected`、`flow('Slice title', { expected })` | 写进 IR，但**看板、check、发布站都不消费** | PM 最在意的“期望结果”写了也看不见 | 看板情况悬停卡写“期望结果”（没写时提示）；CASE_NOT_COVERED 带上 expected；outline 每个情况一行“标题 → 期望” |
 | 优先级 | `case.priority` | 写进 IR，**没有任何地方使用** | 缺口汇总分不出轻重 | 情况行的高优先级带「!」；缺口汇总写“高优先级 N”；CASE_NOT_COVERED 标出 high priority |
 | 约束 | `feature.constraints` | 写进 dev IR，不显示也不检查；与 rules 重叠 | 两套写法 | 不改（记为已知问题：技能只推荐 rules） |
-| 验收覆盖 | `option.coverage`（由场景推导） | 情况行状态图标、其他方案小标、缺口汇总 | 已有，但看不到“要验收什么” | 同上（expected 进悬停卡）；outline 给出“情况 × 方案”的矩阵 |
+| 验收覆盖 | `Feature.alternatives[workId].coverage`（由场景推导） | 情况行状态图标、其他方案小标、缺口汇总 | 已有，但看不到“要验收什么” | 同上（expected 进悬停卡）；outline 给出“情况 × 方案”的矩阵 |
 | 只演示顺利路径 | — | 只有缺失情况时提示 | 功能只声明 main 情况、所有场景都成功时，什么都不提示（Joplo 要解决的“看不全”） | 新 check：HAPPY_PATH_ONLY（info） |
 | 拆分 / INVEST | 功能、方案、场景、fork | 技能里没有方法 | Agent 容易按步骤拆、或一个场景塞多件事 | story 技能的拆分顺序与 INVEST 映射；SCENARIO_TOO_LONG |
 

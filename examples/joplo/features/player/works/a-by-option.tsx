@@ -9,7 +9,7 @@ export default work({
   title: 'A · 左栏按方案分组',
   summary: '左栏是“方案 → 场景”两层：每个方案旁边标出缺口数，下面列出它的场景；缺口清单放在左栏底部',
   focus: '左栏怎么组织：先选方案，再选场景',
-  tradeoffs: ['和作者的写法（options/*.tsx 里的 scenarios）一一对应，最好理解', '看某个情况在各方案里怎么处理，要来回切方案', '方案多时左栏会变长'],
+  tradeoffs: ['和作者的写法（works/*.tsx 里的 scenarios）一一对应，最好理解', '看某个情况在各方案里怎么处理，要来回切方案', '方案多时左栏会变长'],
 
   on: {
     '/board/play': {

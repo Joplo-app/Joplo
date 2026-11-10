@@ -1,5 +1,7 @@
 # Joplo CLI（0.1.2）
 
+Joplo 的作品由 Agent 用代码写成，能播放，也能上手试；用来比较功能方案、解释系统运转，或讲清事情的经过，通过链接与嵌入交付。
+
 安装后的项目使用 `npx joplo`；仓库内使用 `pnpm joplo` 运行源码。需要 Node.js ≥ 22。任意命令都支持 `-h, --help`。
 
 ## 命令与参数
@@ -70,11 +72,11 @@ npx joplo dev --open
 首页可切换项目与功能；源文件变化只重新编译对应项目，保存后热更新。编译出错时显示诊断，并保留上一次成功的画面；修复后恢复。界面和交互见[看板文档](web.md)。
 
 ## 作品、切片与范围
-项目是作品集：作品 → 切片 → 步骤。比较方案、列情况、做设计决定用 `feature()` + `option()`；讲解片、资讯和产品片用 `works/<key>.tsx` 的 `work()` + `chapter()`，两者可以共存。章节默认接续上一章，编号由界面和 outline 自动生成；`flow()` 用于独立场景。所有作品都有封面并进入首页。
+项目是作品集：作品 → 切片 → 步骤。比较方案、列情况、做设计决定用 `feature()` + `work()`；讲解片、资讯和产品片用 `works/<key>.tsx` 的 `work()` + `chapter()`，两者可以共存。章节默认接续上一章，编号由界面和 outline 自动生成；`flow()` 用于独立场景。所有作品都有封面并进入首页；`work()` 是唯一作品入口，功能下写在 `features/<f>/works/<key>.tsx`，同样用 `title` / `summary`。
 
 `check` / `outline` / `feedback list|watch` 的 `--work` 接受独立作品键或限定方案 id；`build` / `share` 的 `--work` 接受条目键（独立作品或功能），只发一件，功能普通版取选定方案、评审版取全部方案。没有旧参数别名。独立作品无需 pick；`draft: true` 不进普通版或评审版，输出 `WORK_DRAFT_SKIPPED`，显式选择草稿时报错。只有草稿时先完成一件作品再发布。
 
-outline 按条目分组：独立作品显示标题、切片数、总时长，每行显示键、标题、步数和时长；章节有自动编号，草稿带 `(draft)`。JSON 每个条目含 `standalone`、`sequencing`、`draft`；渲染与深链仍复制 JSON 中的三段 scenario id。check 文本与 JSON 的诊断指向 `works/<key>.tsx:行:列`。构建/分享摘要列作品键与标题，并列明跳过的草稿。最小示例与恢复方法见 `npx joplo skill authoring`、`check` 和 `content`。
+outline 按条目分组：独立作品显示标题、切片数、总时长，每行显示键、标题、步数和时长；章节有自动编号，草稿带 `(draft)`。JSON 的作品容器与归属字段统一为 `works` / `workId`，接续能力用 `sequencing`。独立作品切片 id 是两段（`explainer.arrival`），功能下面是三段（`invite.a-modal.happy`）；渲染与深链复制 `outline --format json` 中的 id，不拆 id 推断结构。check 文本与 JSON 的诊断指向 `works/<key>.tsx:行:列`。构建/分享摘要列作品键与标题，并列明跳过的草稿。字段位置按 `WORK_FEATURE_ONLY` / `WORK_STANDALONE_ONLY` 校验，旧备选目录报 `OPTIONS_DIR_RENAMED`，具体字段表见[作品模型](work-model.md#字段按位置校验)。最小示例与恢复方法见 `npx joplo skill authoring`、`check` 和 `content`。
 
 ## check
 
@@ -84,7 +86,7 @@ outline 按条目分组：独立作品显示标题、切片数、总时长，每
 - `--work <id>`：接受独立作品键或限定方案 id，仅校验这件作品的结构和回放，例如 `invite.a-modal`；整个项目仍须编译。
 
 ```text
-features/invite/options/a-modal.tsx:24:16  warning  CASE_NOT_COVERED  Case is not yet Covered: invite.happy 正常发出邀请并被接受
+features/invite/works/a-modal.tsx:24:16  warning  CASE_NOT_COVERED  Case is not yet Covered: invite.happy 正常发出邀请并被接受
 0 error, 1 warning, 0 info
 ```
 
@@ -99,7 +101,7 @@ JSON 为 DomainResult 风格：成功含 `ok/projectId/revision/requestId/summar
 不打开看板也能检查一个演示“讲给谁、讲什么、讲多久”（D67）。与 check 一样编译 dev IR 并校验，然后输出：
 
 ```text
-团队邀请功能 · 1 feature(s), 2 option(s), 6 scenario(s), ≈ 1 min 6 s at 1×
+团队邀请功能 · 1 feature(s), 2 work(s), 6 scenario(s), ≈ 1 min 6 s at 1×
 
 ## invite · 团队成员邀请   picked: a-modal
 Goal: 空间管理员邀请同事加入空间并指定权限，让新成员当天就能开始协作
@@ -113,9 +115,9 @@ check: 0 error, 9 warning, 5 info (warning OUTCOME_MISMATCH ×1, warning CASE_NO
 ```
 
 - 情况一行：键、维度、优先级、每个方案的覆盖、标题 → 期望结果（case.expected，没写时提示）。这是 PM 视角的验收矩阵：标题是 Given，期望结果是 Then。
-- 场景一行：键、名字、步数与估算时长（1×，与自动播放同一份 stepDwell，并计入 hold 最短停留；不含鼠标移动与逐字输入）、结局、是否以过渡卡开场 / 收尾、覆盖的情况。
+- 场景一行：键、名字、步数与估算时长（1×，与自动播放同一份 stepPlan，包含操作演示，以及停留与朗读估算中的较长者）、结局、是否以过渡卡开场 / 收尾、覆盖的情况。
 - `--work <id>` 只看一件独立作品（键）或功能下面的方案（`功能.方案`）；不存在时 USAGE（退出 2）。有 error 时退出 1：能编译出 IR 时照常输出大纲，编译不出时只写错误数。
-- `--format json`：`data.outline = { name, mode, features: [{ id, name, goal, roles, pick, cases: [{ id, key, title, dimension, priority, expected, coverage: { 方案 id: 状态 } }], options: [{ id, key, name, picked, ms, missing, undecided, scenarios: [{ id, key, name, description, steps, ms, cards, opening, ending, outcome, caseIds }] }] }] }`，`data.summary` 是 check 的汇总；失败时是 `ok: false` 信封，`data.outline` 为 null。
+- `--format json`：`data.outline = { name, mode, entries: [{ id, featureId, title, summary, roles, pick, sequencing, draft, cases, works: [{ id, key, title, picked, ms, missing, undecided, scenarios }] }] }`。独立条目的 featureId 为 null；作品在 works 下，切片项用 id/key/name/description/steps/ms/cards/opening/ending/outcome/caseIds。作品简介在条目的 summary，OutlineWork 自身提供 title；workId 用于 IR 归属与反馈记录。`data.summary` 是 check 汇总；失败为 `ok: false` 信封，无法编译时 `data.outline` 为 null。完整 IR v3 字段见[作品模型](work-model.md#3-ir-v3)。
 
 ## components
 
@@ -144,11 +146,11 @@ npx joplo feedback watch [dir] --local --session <id> --after 3 --json
 
 保持 `joplo dev` 运行。`dev` 启动后在 stderr 打印第一条命令（stdout 仍只有看板地址），反馈面板里也能复制它。
 
-`--follow` 跟住整个项目：所有方案的进行中会话，以及之后新开的会话（改源码后的新一轮、新方案）。事件格式与单会话相同，靠 `sessionId`、`optionId`、`eventId` 区分；某个方案 `approved` 不结束监听。所有会话的看板进程都停止后输出提示并退出 1，Ctrl+C 退出 130。启动时没有存活的进行中会话退出（NOT_FOUND）；不能与 `--session`、`--after` 同用。启动时重放进行中会话的已有事件，消费者按 `eventId` 去重。正在跟的每个会话都写监听租约，看板显示 Agent 在线。
+`--follow` 跟住整个项目：所有方案的进行中会话，以及之后新开的会话（改源码后的新一轮、新方案）。事件格式与单会话相同，靠 `sessionId`、`workId`、`eventId` 区分；某个方案 `approved` 不结束监听。所有会话的看板进程都停止后输出提示并退出 1，Ctrl+C 退出 130。启动时没有存活的进行中会话退出（NOT_FOUND）；不能与 `--session`、`--after` 同用。启动时重放进行中会话的已有事件，消费者按 `eventId` 去重。正在跟的每个会话都写监听租约，看板显示 Agent 在线。
 
 需要等待某一个方案版本确认、或按游标补收时，使用精确会话：每个方案版本有独立会话。`list` 默认列出存活实例的未结束会话；`--all` 查看历史，`--work <功能.方案>` 筛选。`watch` 可省略 `--session`，但必须只有一个匹配的活跃会话；有多个时退出 2，列出候选，绝不自动选择“最新”实例。显式会话也始终限定在给定项目目录里，目录按真实路径解析，worktree 分别处理。
 
-`--json` 的 stdout 是 NDJSON，一行一个事件。状态与错误只写 stderr；不带 `--json` 时输出人可读文本。事件共有字段为 `sessionId`、`instanceId`、`projectDir`、`featureId`、`optionId`、`revision`、`seq`、`requestId`、`createdAt`：
+`--json` 的 stdout 是 NDJSON，一行一个事件。状态与错误只写 stderr；不带 `--json` 时输出人可读文本。事件共有字段为 `sessionId`、`instanceId`、`projectDir`、`featureId`、`workId`、`revision`、`seq`、`requestId`、`createdAt`：
 
 - `feedback`：已提交的完整反馈（`body`），以及服务端验证的 `context`：`route`、`sceneId`、`scenarioId`、`position`（已经执行的步数，初始为 0）、`stepId`、`source`、`pageTitle`、`scenarioName`。不会发送未提交的键盘输入。
 - `approved`：当前方案版本的确认；输出后监听退出 0，本地看板继续运行。确认只记录评审结论，不写 TSX 的 `pick`、不运行代码、不表示意见已经实现，也不发布网站。
@@ -175,7 +177,7 @@ Share 立即读取一次，随后默认每 15 秒轮询；`--interval` 接受 10
 
 Cloud 必须指定 `--share` 和 `--work`，避免另一个方案的确认结束监听。`--version` 可显式指定版本，否则锁定首次响应中的分享版本；分享更新时输出 `closed/source_changed` 并退出 1。只有该版本、该方案的作者 `pick` 决定映射为 `approved` 并退出 0；投票、规则确认、其他方案或旧版本决定都不会结束监听。不把 Cloud 的确认写入本地会话，也不自动标记决定 `applied`。
 
-本地和 Cloud 输出统一的 `source`、`eventId`、`sessionId`、`featureId`、`optionId`、`revision`、`createdAt` 及 `type`。`feedback` 携带 `body/context`，`approved` 表示确认，Cloud 的其他决定为 `decision`，监听目标失效为 `closed`。本地继续保留 `seq`、`requestId`、`instanceId`、`projectDir`；Cloud 携带 `server`、`shareId`、`version`，没有可伪造的 `seq`，也暂不接受 `--after`。Cloud 的页面路径与源码位置当前接口不提供，输出 null，保留已有的场景、步骤和元素信息。
+本地和 Cloud 输出统一的 `source`、`eventId`、`sessionId`、`featureId`、`workId`、`revision`、`createdAt` 及 `type`。`feedback` 携带 `body/context`，`approved` 表示确认，Cloud 的其他决定为 `decision`，监听目标失效为 `closed`。本地继续保留 `seq`、`requestId`、`instanceId`、`projectDir`；Cloud 携带 `server`、`shareId`、`version`，没有可伪造的 `seq`，也暂不接受 `--after`。Cloud 的页面路径与源码位置当前接口不提供，输出 null，保留已有的场景、步骤和元素信息。
 
 **当前兼容模式的边界：**复用 `GET /api/v1/shares/{id}/feedback`，仅能观察未解决评论及未撤回、未写回的决定。单次运行按稳定 `eventId` 去重；重新启动重放当前快照，消费者可按同一 `eventId` 去重。如果记录在两次轮询之间被解决或标记已写回，可能被漏掉。当前接口只取最新 1000 条未解决评论，且没有分页游标。客户端版本过滤也不能替代 Cloud 拍板接口的 `expectedVersion` 校验。完整的补收与旧页面保护需要 [Cloud 改动清单](cloud-feedback-watch.md) 中的服务端配合。
 
@@ -201,7 +203,7 @@ Cloud 必须指定 `--share` 和 `--work`，避免另一个方案的确认结束
 
 引擎主题不讲具体组件。`npx joplo skill ui`、`ui/components`、`diagram`、`diagram/patterns`、`content`、`content/patterns`、`alda` 由项目启用插件提供；在项目目录运行，CLI 会读取 config 模块，不启动服务端或编译整套作者文件。无项目时只列引擎指南与插件使用说明。
 
-`authoring` 说明具名 `option.free` 字典、可嵌套组合的效果数组与本机反应；`demo` 说明动作和播放仲裁。`flow({ actionEntry: 'after' })` 让跨场景确认直接落到匹配动作之后，用于时间轴等直接操纵；缺省或 `'before'` 仍停在动作前。取消保留本地体验，确认丢弃体验且只消费匹配动作，后续步骤等待继续；普通章节选择、自动播放与 `from` 不受该策略影响。效果对象拼错会报 `EFFECT_INVALID`，不会隐式结束场景。`story` 说明先收集素材、核实字体与样本许可证并记录 `assets/SOURCES.md`；插件指南补充复古主题作用域、同物件连续转场和逐章配乐。`plugins` 主题也说明动作声明、`ctx.act` 识别器、引擎时钟演示器、通用本机资源编译器与媒体轨道。可选 `@joplo-app/plugin-alda` 需要先安装并在项目 `config.plugins` 中显式启用，然后在该项目目录运行 `npx joplo skill alda`；不要把项目路径作为读取主题的第二参数（该参数只供 install 使用）。技能说明配乐文本、步骤 play/stop、缓存、warning 恢复和离线验证。`check` 不执行本机编译器；看板首次需要声音时生成，`build/share` 在范围裁剪后生成，失败 warning 保留在看板/构建结果，其他演示内容继续可用。
+`authoring` 说明具名 `work.free` 字典、可嵌套组合的效果数组与本机反应；`demo` 说明动作和播放仲裁。`flow('Slice title', { actionEntry: 'after' })` 让跨场景确认直接落到匹配动作之后，用于时间轴等直接操纵；缺省或 `'before'` 仍停在动作前。取消保留本地体验，确认丢弃体验且只消费匹配动作，后续步骤等待继续；普通章节选择、自动播放与 `from` 不受该策略影响。效果对象拼错会报 `EFFECT_INVALID`，不会隐式结束场景。`story` 说明先收集素材、核实字体与样本许可证并记录 `assets/SOURCES.md`；插件指南补充复古主题作用域、同物件连续转场和逐章配乐。`plugins` 主题也说明动作声明、`ctx.act` 识别器、引擎时钟演示器、通用本机资源编译器与媒体轨道。可选 `@joplo-app/plugin-alda` 需要先安装并在项目 `config.plugins` 中显式启用，然后在该项目目录运行 `npx joplo skill alda`；不要把项目路径作为读取主题的第二参数（该参数只供 install 使用）。技能说明配乐文本、步骤 play/stop、缓存、warning 恢复和离线验证。`check` 不执行本机编译器；看板首次需要声音时生成，`build/share` 在范围裁剪后生成，失败 warning 保留在看板/构建结果，其他演示内容继续可用。
 
 ### skill install
 
@@ -441,7 +443,7 @@ npx joplo share --private --no-review --work invite                      # 只�
 - 写错场景 / 功能（NOT_FOUND，列出相近或可分享的场景）、范围为空时，在构建和任何云端请求之前失败。不带 `--review` 时，场景属于没选定的方案、功能没有选定方案（USAGE，退出 2）同样提前失败；带 `--review` 时允许这些范围，普通版只含 picked 子集，没有 picked 子集就仅发布私密评审版。旧版 `@joplo-app/server` 忽略范围时（产物里有范围外场景）报 UNSUPPORTED_ACTION，不上传。
 - 预览图用范围内第一个场景（按演示顺序），用裁剪后的 IR 渲染。朗读音频只带范围内步骤用到的。
 - 每个范围是**单独的分享**，记在 `.joplo/cloud.json` 的 `scoped: { <范围键>: { shareId, url } }`，范围键是排序后的场景 id 用逗号连接（评审版加 `review:` 前缀），不覆盖主链接和评审链接。Pro 再次分享同一范围更新原链接，`--new` 新建；场景改名后是新范围、新链接。
-- 默认标题是“项目名 · 场景名”（多个场景时“项目名 · N scenarios”）。文本输出多一行 `Scope: …`；JSON 的 `data.scope = {key, scenarios, features, borrowed}`。
+- 默认标题是“项目名 · 场景名”（多个场景时“项目名 · N scenarios”）。文本输出多一行 `Scope: …`；JSON 的 `data.scope = {key, scenarios, entryIds, borrowed}`。
 - 已知边界：作者 CSS 与 Tailwind 扫描到的类名整份打包；`routes/` 下的基础页面所有功能共用，原样保留；元素 id 和项目名由作者自己起，可能带有含义。
 
 - 未登录：交互终端显示“Sharing requires a free Joplo account”，直接进入浏览器登录，完成后继续发布；非交互环境（包含 --format json、有效 CI 环境变量、JOPLO_NONINTERACTIVE=1）立即返回 AUTH_REQUIRED（退出 3），提示用户运行 `npx joplo login`。
@@ -459,8 +461,8 @@ npx joplo share --private --no-review --work invite                      # 只�
 - finalize 成功后尽力写 `.joplo/cloud.json`，写入失败时尽力删除旧记录（删除失败也只警告），提示“Could not save the share record. The next publication will not update this link”，仍输出链接和到期时刻、退出 0。链接永久有效，升级入口为当前 `<server>/settings/billing`。
 - 预览图：构建后用本地截图能力（与 `joplo render` 相同，依赖可选的导出组件，见 `setup export`；项目里已有的 Playwright 也可以）渲染默认场景（第一个功能的选定方案的第一个场景，和嵌入模式默认场景相同）的初始画面，得到 1200×630 PNG，作为普通文件 `_joplo/preview.png`（`image/png`）放进上传清单，计入清单总量和新上传字节。没有导出组件、浏览器启动失败、项目没有场景或截图尺寸不对时跳过，stderr 只提示一行 “Skipped the preview image (…)”（没有导出组件时括号里给出 `npx joplo setup export`），share 照常成功、从不下载；分享页此时用通用预览图。
 - 文本输出在链接和有效期之后打印 `Add to README: <Markdown 徽章>` 与 `More embed options: <server>/shares/<shareId>`（CLI 沿用英文（D57），D85 指定的“已加密”、兼容错误和设置用户名提示除外）。
-- **评审清单**：每次 share 都在 `POST /api/v1/shares` 请求体里附上 `review`（契约字段 `{v: 1, mode, features, scenarios, elements}`），由 check 编译的 dev IR 经 core 的 `reviewManifest` 生成。它**不是分享文件**：不进上传清单、不进 R2，分享页拿不到；SaaS 只把它存进数据库给评审页用。`mode: "publish"` 只含选定方案（与发布站同一范围，没有选定方案的功能不出现），`--review` 时为 `"review"`，含所有功能的所有方案。id 全部沿用 IR，步骤 `index` 从 0 开始，`elements` 是画面里所有作者元素 id（与 `Rule.elementIds` 同一套）及 `nodeLabel` 标签。
-- **清单上限**：字符串按码点截断（末尾 “…”）——名字 200、目标/思路/规则/问题/explain 2000、取舍 500、字幕 500、元素标签 200；数组超出部分丢弃——每个功能 20 个方案、300 条规则、100 个问题，每个方案 20 条取舍，每条规则 50 个元素，最多 100 个功能、500 个场景、每个场景 200 步、每步 50 条规则、2000 个元素；id 永不截断。截断后序列化仍超过 512 KiB（524288 字节）时：`--review` 报 EXPORT_FAILED（`details: {maxBytes, actualBytes}`），在构建和上传之前失败，不静默丢内容；普通 share 不因清单失败，stderr 提示一行 “Skipped the review manifest (…)”，请求体省略 `review`（契约里它是可选字段），评审页此时看不到规则和问题。
+- **评审清单**：每次 share 都在 `POST /api/v1/shares` 请求体里附上 `review`（契约字段 `{v: 2, mode, works, features, scenarios, elements}`），由 check 编译的 dev IR 经 core 的 `reviewManifest` 生成。它**不是分享文件**：不进上传清单、不进 R2，分享页拿不到；SaaS 只把它存进数据库给评审页用。`mode: "publish"` 含独立作品与功能选定的作品（没有 pick 的功能不出现），`--review` 时为 `"review"`，含独立作品与所有功能作品。顶层 `works: [{id,key,title,summary}]` 只放独立作品，按 entryIds 排序，纯功能项目为 []；功能作品在 `features[].works[]`。`scenarios[].workId` 在两处元信息并集中恰好匹配一件，独立场景 featureId 为 null。草稿、空作品与数量上限排除的元信息不会带入场景。id 全部沿用 IR，步骤 `index` 从 0 开始，`elements` 是画面里所有作者元素 id（与 `Rule.elementIds` 同一套）及 `nodeLabel` 标签。
+- **清单上限**：字符串按码点截断（末尾 “…”）——名字/作品标题 200、目标/作品简介/规则/问题/explain 2000、取舍 500、字幕 500、元素标签 200；数组超出部分丢弃——每个功能 20 个方案、300 条规则、100 个问题，每个方案 20 条取舍，每条规则 50 个元素，最多 100 个功能与 100 件独立作品、500 个场景、每个场景 200 步、每步 50 条规则、2000 个元素；id 永不截断。截断后序列化仍超过 512 KiB（524288 字节）时：`--review` 报 EXPORT_FAILED（`details: {maxBytes, actualBytes}`），在构建和上传之前失败，不静默丢内容；普通 share 不因清单失败，stderr 提示一行 “Skipped the review manifest (…)”，请求体省略 `review`（契约里它是可选字段），评审页此时看不到规则和问题。
 - **发布顺序容错**：创建请求带着 `review` 被服务端以 HTTP 400 拒绝时（例如还不认识这个字段的旧版 SaaS；400 表示请求被拒、没有创建任何记录），普通 share 去掉 `review` 原样重试一次，stderr 提示一行 “The cloud rejected the review manifest (HTTP 400). Retrying once without it …”；评审步骤不重试，照常报 BAD_REQUEST；主分享可能已发布（评审版没有清单没有意义）。413、422、429 等其他状态不触发这个重试。
 - **`--review`（评审版，D63）**：构建时 `buildSite({ review: true })`，发布站包含所有功能的所有方案（未选定的功能也在），评审页通过 `joplo:goto` 指定任一场景即切换方案；规则、问题、情况、AI 假设、备注、取舍、源位置与普通发布一样不进任何上传文件。CLI 会核对产物里内联 IR 的 `mode` 是 `review`，旧版 `@joplo-app/server` 忽略该选项时报 UNSUPPORTED_ACTION，不上传。成功的 `data.review` 带 `mode: "review"`，文本写 “Published the review version …”。选择 `--no-review` 时只发布主分享。
 - **`--pr <number>`（PR 预览）**：请求体加 `pr: {provider: "github", repo, number, headSha, runUrl}`。在 GitHub Actions（`GITHUB_ACTIONS=true`）里：repo 取 `--repo` 或 `GITHUB_REPOSITORY`；headSha 取 `--sha`，否则读 `GITHUB_EVENT_PATH` 事件 JSON 的 `pull_request.head.sha`（PR 事件的 `GITHUB_SHA` 是合并提交），没有时用 `GITHUB_SHA`；runUrl 为 `GITHUB_SERVER_URL/GITHUB_REPOSITORY/actions/runs/GITHUB_RUN_ID`（重试的运行加 `/attempts/N`），只在 github.com 上生成，否则为 null。不在 Actions 里必须 `--repo owner/name`，headSha 取 `--sha` 或 `git rev-parse HEAD`。缺少或格式不对时在登录、检查、构建和任何请求之前报 USAGE（退出 2）。`--repo`、`--sha` 只能和 `--pr` 一起用。
@@ -518,6 +520,8 @@ npx joplo feedback --applied d1,d2 --ref "$(git rev-parse HEAD)" --format json
 - `--applied <id,…> [--ref <源码版本>]`：`POST /api/v1/shares/{id}/feedback/applied {decisionIds, ref?}` → `data = {shareId, applied}`，重复标记幂等。id 去重，1–200 个，每个只含字母、数字、`_`、`-`；`--ref` 1–200 个可打印字符，只能和 `--applied` 一起用。只有分享的主人能调用。
 - 错误：未登录 AUTH_REQUIRED（退出 3）；用登录凭证但不是分享主人时 403 为 FORBIDDEN “Only the owner of the share …”；API Key 缺少 feedback:read / feedback:write 时为 FORBIDDEN 权限说明；404 为 NOT_FOUND “The share does not exist or has no review data”；响应结构不对为 INVALID_RESPONSE；其余同 share。
 - Agent 按决定改源码的规则写在 `npx joplo skill publish`：pick → `feature.pick`；确认规则 → `origin: 'user'` + `status: 'confirmed'`；否决 → 按理由改写，理由没说怎么做时标 conflict 并问用户；回答问题 → 删掉 question、加一条 `origin: 'user'` 的规则；评论只作参考。改完运行 check，再 `--applied`。
+
+范围校验错误用 `error.details.scope: 'entry'` 表示未知或未选定条目，`'scenario'` 表示切片；借用记录用 entryId / entryTitle / workId，按条目读取，不按旧功能字段分支。
 
 ### 云端数据流
 
@@ -603,4 +607,4 @@ check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同�
 
 ### 检查含可选支线的短片
 
-先用 `joplo outline` 确认场景 ID，再按章 `joplo render --scenario-id <id> --sheet`。`flow({ autoplay:false })` 标记的支线依然可独立渲染、手动选择或通过 fork 进入，但发布站连续播放会跳过它；支线结束后停下。fork 本身不会改变自动播放资格。`joplo check` 不证明本机配乐已成功编译，最终还须检查 build 的资源警告和真实输入、声音、file:// 离线播放。
+先用 `joplo outline` 确认场景 ID，再按章 `joplo render --scenario-id <id> --sheet`。`flow('Slice title', { autoplay:false })` 标记的支线依然可独立渲染、手动选择或通过 fork 进入，但发布站连续播放会跳过它；支线结束后停下。fork 本身不会改变自动播放资格。`joplo check` 不证明本机配乐已成功编译，最终还须检查 build 的资源警告和真实输入、声音，再用 preview 离线验证 HTTP 播放。

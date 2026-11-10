@@ -7,11 +7,11 @@ Referenced music is inspected by its enabled plugin on the author machine: durat
 STEP_KEY_INVALID: use a letter followed by up to 63 letters/digits/underscores/hyphens. STEP_KEY_DUPLICATE: each step key must be unique within its scenario; keep the same key only for the same action across versions. See diff for identity guidance.
 
 Run npx joplo check [dir]. Use --work <standalone-key|feature.option> to narrow structure checks and replay; --format json gives machine output.
-The whole project still compiles. Option filtering does not hide project compilation errors. Source files load locally.
+The whole project still compiles. Work filtering does not hide project compilation errors. Source files load locally.
 
 ## Read the output
 `file:line:column  severity  CODE  message`
-Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interactive element has no demo step.
+Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interactive element has no demo step.
 - File and line/column identify the edit location. Read nearby source and fix only that location; do not rewrite the page.
 - The location is the author element or call that caused the problem. joplo.config.ts:1:1 means no source location was known.
 - One root cause in a shared view (a layout, a component reused in routes and layers) prints once with "(affects N views)" and counts once; JSON adds affects: [view ids].
@@ -19,14 +19,17 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - The last line totals error, warning, info. Run check again after fixing.
 
 ## Common codes → fixes
-- WORK_INVALID (error): default export work({...}); supply nonempty title/summary, a stage/layers/on/routes view and scenarios object containing only flow()/chapter() entries.
+- WORK_INVALID (error): read the specific reason: default export must be work({...}); title and summary must each be nonempty; scenarios must be an object of flow()/chapter() entries; stage must be a JSX element; layers must be a layer-entry object; stage and layers cannot coexist. A project with no pages needs stage, layers, on or routes. Multiple invalid fields produce separate reasons. Standalone order must be finite; an invalid value has a work ref. Match the diagnostic code and ref, not an old full message.
+- PROJECT_MODULE_CONFIG (error): when loading a project without tsconfig.json fails, add jsx: "react-jsxdev" and jsxImportSource: "@joplo-app/kit" plus package.json type: module. The message ends with underlying error: inspect it for a missing dependency or an author-code exception as well as JSX/module setup; fix that cause and rerun. A bare project that loads successfully is accepted.
 - WORK_ID_CONFLICT (error): rename the work file or feature folder so their entry keys differ.
 - WORK_SLICES_MIXED (error): use all chapter() for a linear work or all flow() for independent slices, including options under a feature.
-- WORK_FEATURE_ONLY (error): remove cases/rules/uses() from standalone work; use feature() + option() if the task requires design review.
+- WORK_FEATURE_ONLY (error): standalone works cannot declare focus/tradeoffs/coverage/rules/questions, slice cases or step uses(). Remove those fields or attach the work to a feature for design review.
+- WORK_STANDALONE_ONLY (error): a feature-attached work cannot declare audience/roles/draft/order. Put shared roles and ordering on feature(); audience/draft belong to a standalone work.
+- OPTIONS_DIR_RENAMED (error): "Rename this directory to works/ and migrate the authoring call to work({ title, summary })". Keep the feature-attached file at features/<f>/works/<key>.tsx; there are no legacy builder or directory aliases.
 - FROM_UNKNOWN (error): copy an existing slice key from the diagnostic's available-slices list; omit from for normal chapter continuation, or use from: null to restart.
-- WORK_EMPTY (info): add the first entry under scenarios, for example opening: chapter('Opening').system('Begin', narrate('Hello')).
+- WORK_EMPTY (info): add the first entry under scenarios, for example opening: chapter('Opening').system('Begin', narrate('Hello')). An empty work remains visible locally but is skipped in publish/review; explicit build --work selection fails.
 - WORK_DRAFT_SKIPPED (info): a draft was excluded from publish/review; remove draft: true only when it is ready. Explicit --work selection of a draft fails instead of publishing empty content.
-- FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID: give each free reaction a valid targeted action in this option and only set, append or toast with valid leaf state paths. Move navigation, completion, media and plugin effects into flow steps; do not add event callbacks.
+- FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID: give each free reaction a valid targeted action in this work and only set, append or toast with valid leaf state paths. Move navigation, completion, media and plugin effects into flow steps; do not add event callbacks.
 - ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID / PLUGIN_ACTION_INVALID: check the action shape, enabled plugin declaration, exact payload fields/ranges, allowed target type, and drag/scroll endpoint. Read the plugin skill; keep endpoints in the current stage, then rerun check.
 - UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
 - UNKNOWN_PLUGIN / PLUGIN_PARENT / PLUGIN_INVALID / PLUGIN_DUPLICATE / PLUGIN_RUNTIME_MISSING: plugin components need their package in config({ plugins: [...] }) once, written inside the parent named in the message; a missing runtime means reinstall the package (npx joplo skill plugins).
@@ -35,10 +38,10 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - MISSING_ID / DUPLICATE_ID: Give interactive elements stable ids unique within the stage; update step references.
 - EFFECT_INVALID: Use documented helpers, with arrays for composition. Arbitrary or misspelled effect objects are rejected, never interpreted as done().
 - FUNCTION_PROP: Replace onClick and other callbacks with flow steps and state effects.
-- UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE: Check case, rule, and reference keys and their owning option.
+- UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE: Check case, rule, and reference keys and their owning work.
 - UNKNOWN_SLOT / UNKNOWN_ROUTE / UNKNOWN_LAYOUT: Check routes, layouts, and Slot declarations; add elements only to existing locations.
 - FEATURE_ORDER_INVALID: feature({ order }) must be a finite number; omit it for natural folder-name order. NaN, Infinity and strings are invalid.
-- UNKNOWN_PICK: pick must be an option filename under this feature's options/.
+- UNKNOWN_PICK: pick must be a work filename under this feature's works/.
 - NOT_PICKED: The feature has no picked option and will not publish. Compare options, then set feature.pick to the chosen filename.
 - ROUTE_EXISTS: An option route duplicates an existing route. Use on to add elements, or choose a new route.
 - BAD_ROUTE: The route does not start with /. Use an absolute static product route.
@@ -52,13 +55,13 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - VOICE_CONFIG_INVALID: config({ voice }) takes { profile?, narrator?, roles?: { roleKey: 'voice' }, locales?: { ja: { narrator?, roles? } } } with non-empty strings. API keys never go in the config.
 - LOCALES_INVALID / LOCALES_UNDECLARED: config({ locales }) lists supported languages once each, source language first; every locales/<lang>.json must be listed there and must not be the source language. LOCALE_FILE_INVALID: the file must be one JSON object of "source text": "translation" strings.
 - I18N_MISSING / I18N_STALE / I18N_UNUSED (warnings): texts with no translation (viewers see the source text), a source text that changed (the closest old entry is shown: rename the key and update the translation), entries nothing uses. npx joplo i18n add <lang> adds the missing keys.
-- DESCRIPTION_TOO_LONG: flow({ description }) is the scenario cover sentence; keep it within 30 units, one sentence saying what this scenario shows. See story.
+- DESCRIPTION_TOO_LONG: flow('Slice title', { description }) is the scenario cover sentence; keep it within 30 units, one sentence saying what this scenario shows. See story.
 - CARD_TEXT_TOO_LONG (info): a transition card's sub is over 48 units, a point over 24, or more than 4 points. Keep one sentence and a few short points; move details into steps.
 - SCENARIO_TOO_LONG (info): the scenario plays over 90 s at 1×. One scenario tells one thing: split it (happy path, then each recovery) or branch with fork(). npx joplo outline shows the pacing.
 - HAPPY_PATH_ONLY (info): every case is a main-flow case and every scenario succeeds. Ask about input, permission, async, and lifecycle cases (see cases), then add an error-and-recovery scenario. Do not invent behavior. This applies only to feature review; standalone explainers use work()/chapter() and have no cases.
 - ROLE_UNKNOWN: A layer, card or say() role is not in the work or feature roles. Declare roles as { key: role('Name') }; see demo.
 - ICON_UNKNOWN: A layer icon is not a preset. Use one of window, browser, mobile, desktop, terminal, chat, agent, server, data, email, doc, flow; see demo.
-- FORK_UNKNOWN: fork must target another scenario key in the same option; it cannot reference itself.
+- FORK_UNKNOWN: fork must target another scenario key in the same work; it cannot reference itself.
 - MARK_UNKNOWN: The mark target is absent from this step's route stage (after go() and back() in earlier steps) or, with layers, from every layer. Check the element id; currently hidden targets are valid references.
 - SHOT_UNKNOWN: The shot target is absent from this step's stage and all layers. Check its id and layer; see demo.
 - FOCUS_UNKNOWN / CALLOUT_EMPTY / CALLOUT_SIDE_INVALID / HOLD_INVALID: spotlight, highlight, numbered, callout need existing element ids (in a layer, or on this step's route stage); callout needs one short sentence and side top/right/bottom/left; hold takes 0.5–30 seconds. See focus.
@@ -67,9 +70,9 @@ Example: features/invite/options/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Inter
 - CALLOUT_TOO_LONG (warning): callout text over about 24 units (same count as captions). Say the reason in a few words; move the rest to explain().
 - FOCUS_IDLE (info): three or more system steps in a row change nothing on stage. Merge them, or show what happens (set() visible state, highlight, callout, shot).
 - INVALID_REDACT / AUTOFOCUS_INVALID: redact takes true/false or a condition (redact={not($.ui.revealed)}); config({ autoFocus }) takes true or false.
-- FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: from must name another scenario key in the same option, the dependency must not loop, and the preceding scenario must replay successfully. Fix that scenario first.
+- FROM_UNKNOWN / FROM_CYCLE / FROM_FAILED: from must name another scenario key in the same work, the dependency must not loop, and the preceding scenario must replay successfully. Fix that scenario first.
 - FROM_WITH_START: from already determines the starting route; remove start or start a separate story.
-- LAYER_UNKNOWN: Invalid layer key, missing content, or flow({ layer }) names no declared layer. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
+- LAYER_UNKNOWN: Invalid layer key, missing content, or flow('Slice title', { layer }) names no declared layer. Use letters/digits/underscores/hyphens, do not start with @, and provide nonempty JSX.
 - Every node belongs to a domain group; 2–6 groups, ~3–15 nodes per diagram. One group around everything says nothing (check reports PLUGIN_UNGROUPED).
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
 - Node kind: client, service, model, database, queue, storage, external, tool, user. description says the responsibility in a few words; edge label says what flows.
@@ -90,10 +93,10 @@ Read the relevant installed plugin skill for the visual component, its props and
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
 - INVALID_DISABLED_REASON: disabledReason got a number, condition, or other value. Use a string or a whole-value binding; for text that changes, set() it into state and bind it.
-- OUTCOME_MISMATCH: flow({ outcome }) and done(…, outcome) disagree; the badge uses flow's. Make them agree (cancelled corresponds to other).
+- OUTCOME_MISMATCH: flow('Slice title', { outcome }) and done(…, outcome) disagree; the badge uses flow's. Make them agree (cancelled corresponds to other).
 - CASE_NOT_COVERED: Add a scenario or declare coverage truthfully. Ask about missing behavior first. The message names high priority and the case's expected result, which is what the new scenario must end on.
 - EXPRESSED_WITHOUT_SCENARIO / COVERAGE_WITHOUT_REASON: Add a scenario or a reason for `not_applicable`/`excluded`.
-- RULE_ELEMENT_NOT_FOUND: Check rule.elements against element ids in the related option stages.
+- RULE_ELEMENT_NOT_FOUND: Check rule.elements against element ids in the related work stages.
 - PENDING_AI_ASSUMPTION: Ask the user to confirm; keep `pending` until then.
 - EMPTY_SCENARIO: Decide whether actions are needed. Zero steps are valid for showing initial states such as permissions.
 - MISSING_TARGET / MISSING_SCENE: Check step targets, the start route, and the stage after go.
@@ -112,4 +115,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.5.0 sha256:eab435230d353b215337bc912e1c65b777c5a0eb016e893b15fc82c20690a7f1 -->
+<!-- joplo-skill 0.5.0 sha256:7aa2ad2e395de1d9f497f2b086a2a82209047fb431c6aa0693179fecd0c65549 -->

@@ -68,7 +68,7 @@ Joplo already has the parts of a user story; fill them in that spirit.
 - System steps are narration of what happened ('The server rejects the address'), not labels ('System event').
 - Same name for the same person or thing throughout; button and field names exactly as on screen; no internal ids or API names unless the audience is engineers.
 - No filler ('Now let us…', 'a whole new experience'): every sentence does a job. Do not invent numbers or facts; record guesses as ai_assumption rules.
-- Cover text: flow({ description }) is the cover sentence, 30 units at most (DESCRIPTION_TOO_LONG). The cover falls back to the feature goal.
+- Cover text: flow('Slice title', { description }) is the cover sentence, 30 units at most (DESCRIPTION_TOO_LONG). The cover falls back to the feature goal.
 - Rhythm: every short step waits 3 s, so a run of trivial steps feels like a metronome. Merge trivial steps (type, then click) and give key results an explain.
 
 ## 6. Narration: narrate() is a presenter talking, not the caption read aloud
@@ -110,11 +110,11 @@ When the demo explains a topic (an election, a policy, a market move) instead of
 - Explicitly distinguish the main sequence from optional branches and return paths. A closing menu may return to earlier chapters without making those chapters optional; verify autoplay order in the published player.
 
 ## 8. Before handing over
-- npx joplo outline: per entry, standalone slices and duration; for features, who it is for, the goal, each case with its expected result and coverage per option, and each scenario's steps, duration, opening and ending.
+- npx joplo outline: per entry, standalone slices and duration; for features, who it is for, the goal, each case with its expected result and coverage per work, and each scenario's steps, duration, opening and ending.
 - npx joplo check: CAPTION_TOO_LONG, EXPLAIN_TOO_LONG, DESCRIPTION_TOO_LONG, CARD_TEXT_TOO_LONG, SCENARIO_TOO_LONG, HAPPY_PATH_ONLY, CASE_NOT_COVERED (names the expected result).
 - Read only the captions from start to end: do they tell the story? Then look only at key frames (npx joplo render --step-id …): does the screen show it without captions?
 - If the key frames look like slide thumbnails (mostly cards, bullet points, or a screen that never changes), rebuild those steps as actions and visible changes (section 1).
 - Tell the user which cases have no expected result yet and which options do not cover a high-priority case.
 
 Related topics: authoring, cases, demo, focus
-<!-- joplo-skill 0.5.0 sha256:c2de3b70d7bf1a392296c38230ef9daedfecd1fb68b1e0eeb98905ae76bb9e71 -->
+<!-- joplo-skill 0.5.0 sha256:573de6ae1e3cbaf7464c8ed384f1e3ece0a41cd894146485fc1d7ff61783fb7d -->

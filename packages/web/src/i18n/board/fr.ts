@@ -144,7 +144,7 @@ export function createBoardFr(locale: Locale = 'fr') {
       directoryNotFound: "Dossier introuvable",
       projectErrorCount: (p0: Value) => plural(Number(p0), { one: "# erreur", other: "# erreurs" }, locale),
       viewProjectHome: "Voir l’accueil du projet",
-      switchFeature: "Changer de fonctionnalité",
+      switchFeature: "Changer d’entrée",
       inspect: "Inspecter",
       exitInspectMode: "Quitter l’inspection",
       inspectModeClickAStageElementToSelectIt: "Mode inspection : cliquer sélectionne l’élément sans exécuter d’étape. Maintenir ⌥ pour inspecter temporairement.",

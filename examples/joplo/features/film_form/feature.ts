@@ -1,6 +1,6 @@
 import { feature, rule } from '@joplo-app/kit';
 
-/** D102 设计记录：作品、切片与能力；选定左栏章节清单，内部容器暂不重构。 */
+/** D102 设计记录：作品、切片与能力；选定左栏章节清单；D103 同步统一作品入口与内部容器。 */
 export default feature({
   order: 20,
   pick: 'a-chapters',
@@ -17,8 +17,8 @@ export default feature({
     empty: { title: '只写了标题，还没有章节', dimension: 'input', priority: 'low', expected: '看板和 check 告诉作者下一步写什么，不报错' },
   },
   rules: {
-    form: rule('核心是作品 → 切片 → 步骤；功能评审、章节接续与草稿是可组合的能力。独立作品在 works/ 写 work() 和 chapter()，外部按这个模型呈现；内部暂时仍是一个 Feature 和一个隐藏的 Option，不改引擎容器。', { origin: 'user', status: 'confirmed', cases: ['write', 'board'] }),
-    no_option: rule('作者创作独立作品时没有“方案”这一层；作品下面直接是切片，可以用 chapter() 或 flow()，不混用。功能下面的方案仍用 option()，也可叠加章节接续能力；内部隐藏容器不在创作入口出现。', { origin: 'user', status: 'confirmed', cases: ['write', 'board', 'recut'] }),
+    form: rule('核心是作品 → 切片 → 步骤；功能评审、章节接续与草稿是可组合的能力。独立作品在 works/ 写 work() 和 chapter()，创作与 IR 都按这个模型呈现；功能是作品上的评审层，独立作品不合成假的功能或隐藏作品。', { origin: 'user', status: 'confirmed', cases: ['write', 'board'] }),
+    no_option: rule('作者创作独立作品时没有“方案”这一层；作品下面直接是切片，可以用 chapter() 或 flow()，不混用。功能下面的方案同样在 features/<f>/works/<key>.tsx 用 work({ title, summary })，也可叠加章节接续能力；两种位置共用编译路径。', { origin: 'user', status: 'confirmed', cases: ['write', 'board', 'recut'] }),
     continue_default: rule("章节按声明顺序播放，每一章默认接着上一章结尾的画面；from: null 从干净的画面开始，from: '章节键' 接指定的章节。", { cases: ['write', 'board'] }),
     no_route: rule('影片不需要 routes/ 下的页面：画面写在 stage（一个画面）或 layers（多个视角）里。', { cases: ['write'] }),
     numbering: rule('章节编号由看板和发布站按顺序自动加，作者不在标题里手写 00、01。', { cases: ['write', 'board', 'publish'] }),

@@ -253,7 +253,7 @@ export function createRu(locale: Locale = 'ru') {
       conceptPrototypeMadeWithJoploNotAProductionImplementation: "Концептуальный прототип на Joplo · Не рабочая реализация",
       featureNotFound: "Функция не найдена.",
       goToHome: "На главную",
-      switchFeature: "Сменить функцию",
+      switchFeature: "Сменить элемент",
       copyLink: "Копировать ссылку",
       copyLinkToCurrentStep: "Копировать ссылку на текущий шаг",
       linkCopied: "Ссылка скопирована",
