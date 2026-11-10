@@ -221,4 +221,6 @@ Symptoms in an existing piece: one board per chapter (label, big title, panels, 
 - A whole interface replaced in one frame (when swap without exit/enter) is a hard cut. Give both sides a transition or cover the swap with the subject.
 - Whole-screen white/colour flashes over a still picture look like a stalled player; keep the picture moving under any fade.
 
+For runtime layout QA, use joplo render --audit-layout for a final-state screenshot and --film --audit-layout for motion. Declare important selectors, a content frame and reserved footer/subtitle rectangles; exclude intentional stamps/background overlays. Text Range bounds reflect loaded fonts and actual Canvas scaling. Canvas exposes its existing engine-clock camera, drift midpoint/end and sequence-waypoint deadlines only as DOM diagnostic hints; static/jump/exploration states do not claim future motion. A later step can interrupt a phase, and masks/rotation or hidden content remain unknown rather than "visible". Inspect evidence before changing intentional overlap.
+
 Common pitfall: For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, film-strip the chain, and verify playback before claiming it works`;

@@ -11,7 +11,7 @@
 export const SKILL_TOPICS = [
   { name: 'authoring', description: 'Works → slices → steps; feature review, chapters, drafts, files, explicit plugins, named local reactions, composable effects, state and conditions; read-only asset usage reports' },
   { name: 'story', description: 'Plan a show before coding; for feature review start from needs, roles, goals and cases; for explainers and histories plan openings, continuity and captions' },
-  { name: 'demo', description: 'Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots' },
+  { name: 'demo', description: 'Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots; real-browser layout audits and evidence' },
   { name: 'focus', description: 'Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact' },
   { name: 'cases', description: 'Feature-attached works only: cases and coverage; ask the user before starting' },
   { name: 'check', description: 'Read diagnostics, music duration/markers and timing warnings, UNBOUND_INTERACTIVE, and fix the indicated file and line' },

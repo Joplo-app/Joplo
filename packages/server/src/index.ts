@@ -29,3 +29,5 @@ export { assetUsage, type AssetUsageReport, type AssetUsageEntry, type AssetUsag
 
 export type { ExportCrop, FramesOptions, FilmOptions, FilmResult, VideoOptions, VideoResult } from './contract.ts';
 export type { PlaybackTimeline, PlaybackEvent } from './timeline.ts';
+
+export { auditLayout, createLayoutAuditSession, type LayoutAuditOptions, type LayoutFinding, type LayoutAuditSample } from './layout-audit.ts';

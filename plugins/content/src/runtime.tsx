@@ -250,7 +250,10 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
   return (
     <div {...root}>
       <style>{stillCss}</style>
-      <div ref={outer} style={{ position: 'absolute', inset: 0 }} data-jcanvas="" data-jreport-surface="Canvas">
+      <div ref={outer} style={{ position: 'absolute', inset: 0 }} data-jcanvas="" data-jreport-surface="Canvas" data-joplo-audit-phases={timed && !ctx.playground && (clock?.running || clock?.paused) ? JSON.stringify({ clockMs: now, phases: pathRef.current
+        ? pathRef.current.frames.map(point => ({ phase: 'camera-waypoint', atMs: pathRef.current!.start + point.atMs }))
+        : [{ phase: 'camera-end', atMs: seg.current.start + seg.current.ms }, ...(seg.current.drift ? [{ phase: 'drift-mid', atMs: seg.current.start + seg.current.ms + seg.current.drift.ms / 2 }, { phase: 'drift-end', atMs: seg.current.start + seg.current.ms + seg.current.drift.ms }] : [])],
+      }) : undefined}>
         <div
           ref={worldRef}
           data-jcanvas-world="" data-jreport-viewport=""

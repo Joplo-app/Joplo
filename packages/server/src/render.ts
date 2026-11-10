@@ -1,3 +1,4 @@
+import { auditLayout, layoutAuditOptions, layoutReportPath, writeLayoutReport } from './layout-audit.ts';
 /**
  * renderStep：用随机端口启动一次性的 dev 服务（只编译一次、不监听），Playwright 打开渲染路由，
  * 截取舞台并返回元素索引（带 at）与渲染告警：遮挡、溢出、Toast 重叠、字体（PRD 8.8 / AC-22）。
@@ -95,6 +96,10 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
   assertNotProjectData(projectDir, out);
   if (fs.existsSync(out) && !opts.overwrite) throw new JoploError('USAGE', `Output file already exists: ${out}. To overwrite, pass overwrite: true (CLI: --overwrite)`);
 
+  if (opts.auditLayout) {
+    layoutAuditOptions(opts.auditLayout);
+    if (fs.existsSync(layoutReportPath(out)) && !opts.overwrite) throw new JoploError('USAGE', `Layout report already exists: ${layoutReportPath(out)}`);
+  }
   // 先确认 Playwright 可用，再启动编译服务（缺失时尽快失败）
   const playwright = await loadPlaywright({ home: joploHome(), projectDir });
   const server = await createDev({ projectDir, port: 0, watch: false, log: () => undefined });
@@ -156,10 +161,11 @@ export async function renderStep(opts: RenderOptions): Promise<RenderResult> {
         box: { x: 0, y: 0, width: 0, height: 0 },
       });
     });
+    const audit = opts.auditLayout ? writeLayoutReport(layoutReportPath(out), [{ ...await auditLayout(page, layoutAuditOptions(opts.auditLayout), opts.crop), phases: ['static-final'], atMs: null, timeBasis: 'static-final-state', scenarioId: sc.id, position, stepId: sc.steps[position - 1]?.id ?? null, workId: sc.workId, evidence: out }], opts.overwrite) : undefined;
     const elements = [...report.elements, ...hidden];
     const warnings = [...report.warnings];
     if (nextTargetId && findNode(scene, nextTargetId) && !elements.find((e) => e.id === nextTargetId && e.visible)) warnings.push(`Next action target ${nextTargetId} is not visible in the stage`);
-    return { path: out, sceneId: scene.id, position, elements, warnings, scale: opts.scale ?? 1 };
+    return { ...(audit ? { audit } : {}), path: out, sceneId: scene.id, position, elements, warnings, scale: opts.scale ?? 1 };
   } finally {
     await browser?.close().catch(() => undefined);
     await server.close();

@@ -63,6 +63,7 @@ export declare function buildSite(opts: BuildOptions): Promise<BuildResult>;
 
 export type ExportCrop = string | { x: number; y: number; width: number; height: number };
 export type RenderOptions = {
+  auditLayout?: import('./layout-audit.ts').LayoutAuditOptions | boolean;
   /** CSS 选择器或相对输出画布的 CSS 像素矩形。所有像素诊断在裁切后计算。 */
   crop?: ExportCrop;
   /** 直接决定布局、镜头和交互坐标的逻辑舞台尺寸。 */
@@ -92,7 +93,7 @@ export type RenderOptions = {
   scope?: string[];
 };
 export type RenderedElement = { id: string; type: string; label: string; visible: boolean; disabled: boolean; at: string | null; box: { x: number; y: number; width: number; height: number } };
-export type RenderResult = { path: string; sceneId: string; position: number; scale: number; elements: RenderedElement[]; warnings: string[] };
+export type RenderResult = { audit?: import('./layout-audit.ts').LayoutAuditResult; path: string; sceneId: string; position: number; scale: number; elements: RenderedElement[]; warnings: string[] };
 export declare function renderStep(opts: RenderOptions): Promise<RenderResult>;
 /** 分镜（storyboard）：一个场景的每一步拼成一张图，每格下面是步号、字幕与旁白。 */
 export type SheetOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope'> & { /** 每行几格，默认 3。 */ columns?: number; /** 每格宽度（像素），默认 480。 */ cellWidth?: number };
@@ -106,7 +107,7 @@ export type FilmOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 
 export type FilmCut = { atMs: number; diff: number; changed: number; scenarioId: string | null; position: number };
 export type FilmStill = { fromMs: number; toMs: number; scenarioId: string | null; position: number };
 export type FilmBoundary = { atMs: number; scenarioId: string | null; position: number; chapter: boolean; maxDiff: number; maxChanged: number };
-export type FilmResult = { measurement?: { baselineRssBytes:number;endRssBytes:number;memoryScope:'node-process-lifetime';rssSamples:{engineMs:number;rssBytes:number}[]; wallMs: number; peakRssBytes: number; resumedSamples: number }; path: string; files: string[]; durationMs: number; sampleMs: number; every: number; samples: number; cuts: FilmCut[]; stills: FilmStill[]; boundaries: FilmBoundary[]; maxDiff: number; warnings: string[] };
+export type FilmResult = { audit?: import('./layout-audit.ts').LayoutAuditResult; measurement?: { baselineRssBytes:number;endRssBytes:number;memoryScope:'node-process-lifetime';rssSamples:{engineMs:number;rssBytes:number}[]; wallMs: number; peakRssBytes: number; resumedSamples: number }; path: string; files: string[]; durationMs: number; sampleMs: number; every: number; samples: number; cuts: FilmCut[]; stills: FilmStill[]; boundaries: FilmBoundary[]; maxDiff: number; warnings: string[] };
 export declare function renderFilm(opts: FilmOptions): Promise<FilmResult>;
 /** 视频（`joplo render --video`）：与看板导出同一个录制器（真实时间，webm）。 */
 export type VideoOptions = Omit<RenderOptions, 'stepId' | 'viewport' | 'scope' | 'scale'> & {

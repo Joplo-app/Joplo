@@ -431,6 +431,12 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--width <pixels>', 'Screenshot width (stage width follows the page viewport); with --video the video resolution, stage centered on the theme background (e.g. 1920x1080, 1080x1920); requires height', integer('width')).option('--height <pixels>', 'Screenshot / video height; requires width', integer('height'))
     .option('--scale <scale>', 'Pixel scale', scale).option('--overwrite', 'Allow overwriting the screenshot')
     .option('--content <lang>', 'Author content language from config locales (D84); defaults to the source language')
+    .option('--audit-layout', 'Measure actual text/clipping/safe-area geometry; static screenshot or --film only')
+    .option('--audit-content <selector-or-rect>', 'Content frame: CSS selector or x,y,width,height relative to the export root')
+    .option('--audit-safe-area <selector-or-rect>', 'Reserved area for declared important content; repeatable', collect, [])
+    .option('--audit-important <selector>', 'Important elements: CSS selector; repeatable', collect, [])
+    .option('--audit-exclude <selector>', 'Exclude decorations or intentional overlaps and their subtree; repeatable', collect, [])
+    .option('--audit-every-ms <ms>', 'Diagnostic probe interval in engine ms, 20–1000; phase deadlines sampled separately', Number)
     .option('--crop <selector-or-rect>', 'Crop to CSS selector or x,y,width,height in CSS pixels')
     .option('--viewport <size>', 'Logical stage WIDTHxHEIGHT, shared by layout, camera and overlays')
     .option('--no-frame', 'Omit the device frame')
@@ -458,7 +464,12 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       const viewportParts = opts.viewport ? /^(\d+)x(\d+)$/.exec(opts.viewport) : null;
       if (opts.viewport && !viewportParts) throw new JoploError('USAGE', '--viewport must be WIDTHxHEIGHT');
       const cropParts = opts.crop && /^-?[\d.]+,-?[\d.]+,[\d.]+,[\d.]+$/.test(opts.crop) ? opts.crop.split(',').map(Number) : null;
-      const geometry = { ...(viewportParts ? { logicalViewport: { width: Number(viewportParts[1]), height: Number(viewportParts[2]) } } : {}), ...(opts.frame === false ? { noFrame: true } : {}), ...(opts.crop ? { crop: cropParts ? { x: cropParts[0], y: cropParts[1], width: cropParts[2], height: cropParts[3] } : opts.crop } : {}) };
+      const { auditOptions } = await import('./layout-audit.ts');
+      const auditLayout = auditOptions(opts);
+      if (auditLayout && (opts.sheet || opts.video || opts.framesOut)) throw new JoploError('USAGE', '--audit-layout currently supports static screenshots or --film; use --film for motion diagnostics');
+      if (auditLayout && opts.resume) throw new JoploError('USAGE', '--audit-layout requires a fresh render; do not combine with --resume');
+      if (auditLayout && opts.sampleMs !== undefined && opts.sampleMs > 50) throw new JoploError('USAGE', 'Motion layout audit requires --sample-ms <= 50');
+      const geometry = { ...(auditLayout ? { auditLayout } : {}), ...(viewportParts ? { logicalViewport: { width: Number(viewportParts[1]), height: Number(viewportParts[2]) } } : {}), ...(opts.frame === false ? { noFrame: true } : {}), ...(opts.crop ? { crop: cropParts ? { x: cropParts[0], y: cropParts[1], width: cropParts[2], height: cropParts[3] } : opts.crop } : {}) };
       if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'width and height must be provided together');
       if ([opts.sheet, opts.film, opts.video, opts.framesOut].filter(Boolean).length > 1) throw new JoploError('USAGE', '--sheet, --film, --video and --frames-out are separate modes; pick one');
       if ((opts.chain || opts.every !== undefined || opts.frames) && !opts.film && !opts.video && !opts.framesOut) throw new JoploError('USAGE', '--chain, --every and --frames need --film (or --video for --chain)');
@@ -522,6 +533,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         viewport: opts.width === undefined ? undefined : { width: opts.width, height: opts.height }, scale: opts.scale, overwrite: opts.overwrite, ...(opts.content ? { content: opts.content } : {}) }),
         { server: setupServer, interactive: deps.interactive ?? isInteractive(), ask: deps.ask ?? askYesNo, io: setupIo() });
       line(data.path);
+      if (data.audit) line(`Layout audit: ${data.audit.path} · ${data.audit.findings} warning(s), ${data.audit.samples} sample(s)`);
       for (const warning of data.warnings) stderr(oneLine(warning) + '\n');
     });
   try { await program.parseAsync(args, { from: 'user' }); }

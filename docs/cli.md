@@ -655,3 +655,13 @@ check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同�
 JSON 的 `data.scope` 说明扫描目录、源码入口和发布场景范围；`data.entries` 给出文件路径/资源 ID、类型/MIME（未知为 null）、大小（生成资源未知为 null）、已知声明元数据及引用位置。源码引用统计全体已加载作品（含 draft），引用上的 `inSelectedScope` 区分当前选区；没有精确步骤证据时不编造 stepId。相同内容文件使用哈希关联，`metadata.contentMatch` 明确来源歧义。
 
 三个维度必须分开读：`authorReference=referenced` 表示实际 asset() 调用、编译内容或插件资源声明；`publication=included-in-selected-ir` 仅表示所选发布 IR 中存在相应内容，不代表实际执行了 build 或生成资源；`sampledVisibility=unknown` 表示未渲染采样，无法断言屏幕可见。动态路径、模块缓存、插件内部解析等写进 `unknowns`；`not-found-in-loaded-model` 只表示本次加载模型中未找到，绝不等于“未使用”。不推测缺失的作者、年份或版权信息，不自动删除或上传。加载/编译失败时先修复 check，不为补齐报告擅自运行付费资源生成。
+
+## 真实版面审查
+
+静态终态：`joplo render . --scenario-id film.open --out still.png --audit-layout`。动态阶段：同命令加 `--film`，复用导出引擎时钟与帧图像；`--sample-ms` 不得大于 50，`--audit-every-ms` 控制额外常规审查间隔（20–1000，默认 250）。报告在输出旁的 `.layout.json`，发现问题的动态帧存进 `.layout-evidence/`。
+
+`--audit-content <selector|x,y,width,height>` 指定内容区；可重复的 `--audit-safe-area` 指定字幕/来源脚注等保留区，`--audit-important <selector>` 显式指定重要内容；`--audit-exclude <selector>` 排除装饰和有意叠盖子树。selector 必须指向本次导出画布中的元素；矩形单位为相对导出根的真实 CSS 像素（不是 Canvas 设计坐标），受 `--viewport`/输出缩放影响时优先选 selector。未指定 important 时仍检查所有文字的越界和裁切，不自行推测语义重要性。
+
+报告包含 work/scenario/step/source/element、采样时刻、真实字体/变换后的逐行 Range 包围盒、内容区/安全区、warning 与证据图。`TEXT_CLIPPED` 检查祖先 padding-box 裁切；`TEXT_OUTSIDE_CONTENT`/`IMPORTANT_OUTSIDE_CONTENT` 检查指定取景边界；`IMPORTANT_IN_SAFE_AREA` 检查重要内容与保留区；`POSSIBLE_OCCLUSION` 只是几何重叠启发式，不证明绘制层级或真正遮挡。旋转、mask、非矩形裁切及隐藏重要内容会明确列入 unknowns。
+
+静态样本 `atMs:null`，只证明终态，不证明入场或漂移。动态样本按真实提交、入场末和插件声明的镜头/漂移/waypoint 时点取样，误差不超过报告的 `sampleToleranceMs`（导出采样网格）；后一步可能中断前一动效，未采样区间不能宣称无问题。当前仅支持静态或 film，不支持 sheet/video/frames/resume；没有自动重排，不调用付费旁白/资源生成。复核证据后由作者决定修正文案、容器、取景还是排除有意装饰。

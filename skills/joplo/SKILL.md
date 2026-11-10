@@ -100,7 +100,7 @@ Exact-session watching, Share polling, and applying pick / rule / question decis
 npx joplo skill <topic> prints guidance matching the installed version; npx joplo skill lists engine and enabled plugin topics. Installed engine references are linked below; plugin guides are indexed in ../joplo-plugins/SKILL.md.
 - [authoring](./topics/authoring.md): Works → slices → steps; feature review, chapters, drafts, files, explicit plugins, named local reactions, composable effects, state and conditions; read-only asset usage reports
 - [story](./topics/story.md): Plan a show before coding; for feature review start from needs, roles, goals and cases; for explainers and histories plan openings, continuity and captions
-- [demo](./topics/demo.md): Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots
+- [demo](./topics/demo.md): Scripted playback and local exploration, drag / hover / scroll / plugin actions, confirmed action entries, themes, layers, captions, deep links and screenshots; real-browser layout audits and evidence
 - [focus](./topics/focus.md): Guide attention: one focus per step, defaults, spotlight / highlight / callout / numbered / hold / redact
 - [cases](./topics/cases.md): Feature-attached works only: cases and coverage; ask the user before starting
 - [check](./topics/check.md): Read diagnostics, music duration/markers and timing warnings, UNBOUND_INTERACTIVE, and fix the indicated file and line
@@ -110,4 +110,4 @@ npx joplo skill <topic> prints guidance matching the installed version; npx jopl
 - [publish](./topics/publish.md): Standalone works, drafts, --work scope, feature pick, build, explicit public/private and review choices, portfolios and SEO, Pro passwords, review version, feedback write-back, deployment, chapters and phone viewing, viewers in several languages, narration (Joplo Cloud characters, keys, joplo voice)
 - [plugins](./topics/plugins.md): Data-only action contracts, native local behavior, engine-clock presenters; Universal properties, plugin themes, state writes and director targets; Binary assets, explicit paid resource generation, persistent artifacts, media tracks and offline publishing; API v2 immutable hooks, scoped/localized snapshots, shared React and production-package checks
 npx joplo components <Name> shows a component's props and an example. Pin these skills to a release: npx skills add https://github.com/Joplo-app/Joplo/tree/v<version> (Joplo-app/Joplo@v<version> does not work).
-<!-- joplo-skill 0.6.2 sha256:00dcf64d14369736c057c711db93bd6d7568718de67c12222e44c8e6a01d837b -->
+<!-- joplo-skill 0.6.2 sha256:92b462db7e0f938af748ef6133d565fb8c6f318711a07ce69d6748fb7b6878cf -->
