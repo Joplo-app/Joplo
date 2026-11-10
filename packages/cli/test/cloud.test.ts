@@ -127,7 +127,7 @@ async function cli(args: string[], options: { interactive?: boolean; ssh?: strin
   const code = await runCli(args, { stdout: s => stdout += s, stderr: s => stderr += s, cliVersion: '0.1.3',
     ...(options.realBuild ? {} : { loadServer: async () => ({ buildSite: build, startDev: async () => ({ url: 'http://localhost:4790', attached: true }), ...(renderStep ? { renderStep } : {}) }) }),
     cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base, SSH_CONNECTION: options.ssh, ...options.env }, interactive: options.interactive ?? false,
-      openBrowser: browser, confirm, sleep: options.sleep ?? (async ms => { waits.push(ms); clock += ms; }), now: () => clock, ...(options.realBuild ? {} : { check: checkProject }) },
+      sharedVoice: async () => undefined, openBrowser: browser, confirm, sleep: options.sleep ?? (async ms => { waits.push(ms); clock += ms; }), now: () => clock, ...(options.realBuild ? {} : { check: checkProject }) },
   });
   expect(stdout + stderr).not.toContain(token); expect(stdout + stderr).not.toContain(oldToken);
   expect(process.listenerCount('SIGINT')).toBe(0);
@@ -664,7 +664,7 @@ test('E1 没有导出组件（D66）：share 照常成功，提示一行安装�
   let stdout = '', stderr = '';
   const code = await runCli(['share', '--private', '--no-review',  project, '--format=json'], { stdout: s => stdout += s, stderr: s => stderr += s, cliVersion: '0.1.3',
     loadServer: async () => ({ buildSite: build, renderStep, installExportRuntime: install }),
-    cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base }, interactive: false, openBrowser: browser, confirm, sleep: async () => undefined, now: () => clock, check: checkProject } });
+    cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base }, interactive: false, sharedVoice: async () => undefined, openBrowser: browser, confirm, sleep: async () => undefined, now: () => clock, check: checkProject } });
   expect(code, stdout).toBe(0);
   expect(install).not.toHaveBeenCalled();
   expect(stderr.split('\n').filter(l => l.startsWith('Skipped the preview image'))).toEqual(['Skipped the preview image (the export component is not installed; to add preview images run: npx joplo setup export). The share page will use a generic image.']);
