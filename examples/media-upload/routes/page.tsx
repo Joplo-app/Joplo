@@ -1,5 +1,5 @@
 import { $, asset, eq, page } from '@joplo-app/kit';
-import { Lottie, Video } from '@joplo-app/plugin-media';
+import { Lottie, Video } from '@joplo-app/plugin-av';
 import { Badge, Button, Card, Group, Stack, Text, Title } from '@joplo-app/plugin-ui';
 
 const ui = $.ui;

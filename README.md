@@ -293,4 +293,4 @@ Joplo accepts issues, not pull requests. Report bugs and request features in [is
 
 [PolyForm Shield 1.0.0](LICENSE). Anyone can use Joplo for free, including at companies and for commercial work; you may not use it to provide a product that competes with Joplo or Joplo Cloud. See [COMMERCIAL.md](COMMERCIAL.md). Versions 0.2.15 and earlier were released under Apache-2.0. Bundled fonts use [SIL OFL 1.1](packages/web/src/fonts/OFL.txt).
 
-Local one-shot sound effects, video and Lottie: install `@joplo-app/plugin-media` at the Joplo version; enable `withSoundEffects({ name: asset("./assets/cue.wav") })` and use `sfx.play("name")`. See `joplo skill media` (PCM WAV only for sounds).
+Local one-shot sound effects, video and Lottie: install `@joplo-app/plugin-av` at the Joplo version; enable `withSoundEffects({ name: asset("./assets/cue.wav") })` and use `sfx.play("name")`. See `joplo skill media` (PCM WAV only for sounds).

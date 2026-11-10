@@ -10,14 +10,14 @@
 | `@joplo-app/plugin-3d` | 3D 场景与 GLB、可选 Tripo 本机生成、费用确认及任务恢复技能 |
 | `@joplo-app/plugin-content` | 默认讲解内容插件、设计画布、取景、FLIP、studio 主题与技能 |
 | `@joplo-app/plugin-ui` | 默认 UI 与 HTML 词汇、绘制及组件指南 |
-| `@joplo-app/plugin-media` | 本地一次性音效、视频片段、Lottie 与媒体技能 |
+| `@joplo-app/plugin-av` | 本地一次性音效、视频片段、Lottie 与媒体技能 |
 | `@joplo-app/core` | 编译、校验与播放器 |
 | `@joplo-app/web` | 预构建看板、发布站、字体与 OFL 许可证 |
 | `@joplo-app/server` | 本地看板、构建、截图与导出 |
 | `@joplo-app/cli` | 命令实现 |
 | `joplo` | Node 版本检查与命令转发入口 |
 
-默认模板不安装 3D 插件，项目按需显式安装并启用。十二份公开 tarball（含 `@joplo-app/plugin-3d` 与 `@joplo-app/plugin-media`）必须使用相同版本；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
+默认模板不安装 3D 插件，项目按需显式安装并启用。十二份公开 tarball（含 `@joplo-app/plugin-3d` 与 `@joplo-app/plugin-av`）必须使用相同版本；上表顺序与 `scripts/release.mjs` 的 `PACKAGES` 一致。
 
 `release:version` 同步插件的轻量 `src/version.json`，运行时只读取版本，避免把整个开发 manifest 带进浏览器。
 
@@ -72,7 +72,7 @@ CI 不存 npm token，用 GitHub OIDC 向 npm 证明身份（[npm 文档](https:
 
 ```sh
 npm login
-for p in @joplo-app/kit @joplo-app/plugin-diagram @joplo-app/plugin-alda @joplo-app/plugin-3d @joplo-app/plugin-content @joplo-app/plugin-ui @joplo-app/plugin-media @joplo-app/core @joplo-app/web @joplo-app/server @joplo-app/cli joplo; do
+for p in @joplo-app/kit @joplo-app/plugin-diagram @joplo-app/plugin-alda @joplo-app/plugin-3d @joplo-app/plugin-content @joplo-app/plugin-ui @joplo-app/plugin-av @joplo-app/core @joplo-app/web @joplo-app/server @joplo-app/cli joplo; do
   npm trust github "$p" --repo Joplo-app/Joplo --file release.yml --allow-publish -y
 done
 npm trust list joplo                # 确认配置
@@ -119,7 +119,7 @@ git push origin v0.3.0
 0.2.4 漏发了 core、0.2.6 漏发了 web：以前每个包 publish 前各自运行 prepublishOnly 构建，web 构建最慢，排在中间的包常在用户输入 OTP 之后失败。现在 `pnpm release:publish --tag latest` 分三步：
 
 1. 一次性构建并打包全部包到 `release/`（构建或任何 tarball 检查失败时一个包都不发）。
-2. 按依赖顺序（kit → plugin-diagram → plugin-alda → plugin-3d → plugin-content → plugin-ui → plugin-media → core → web → server → cli → joplo）逐个处理：先直接查询 registry（绕过本地缓存），已有这个版本就跳过；否则 `npm publish release/<包>.tgz --access public --tag <标签>`。任何一个包失败（包括查询 registry 失败）立刻停止，不再发后面的包，列出本次已发布、registry 上原本就有、还没发布的包，以非 0 退出。
+2. 按依赖顺序（kit → plugin-diagram → plugin-alda → plugin-3d → plugin-content → plugin-ui → plugin-av → core → web → server → cli → joplo）逐个处理：先直接查询 registry（绕过本地缓存），已有这个版本就跳过；否则 `npm publish release/<包>.tgz --access public --tag <标签>`。任何一个包失败（包括查询 registry 失败）立刻停止，不再发后面的包，列出本次已发布、registry 上原本就有、还没发布的包，以非 0 退出。
 3. 全部处理完后运行 `release:verify`，用它的结果作为整体退出码；通过时最后一行打印打 tag 的命令。
 
 中途失败后，处理登录、网络或 2FA 问题，再重跑同一条命令即可；已存在的版本会跳过，不必重发，也不必仅为重试增加版本号。实现见 [release.mjs](../scripts/release.mjs) 的 `publishRelease`，测试用替身注入打包、registry、npm publish 与 verify（scripts/test/release.test.ts）。
@@ -171,4 +171,11 @@ npm deprecate '<old-package>@<range>' 'Use the corresponding @joplo-app package.
 
 `release:smoke` 用 `scripts/fixtures/smoke/feature` 与 `scripts/fixtures/smoke/standalone` 两个本地测试夹具，通过 `init --template <夹具路径>` 走初始化；它们只供测试，不作为产品起步来源。全程不下载模板仓库；在仓库外只安装 tarball，保留 check/build、读回产物确认功能情况和独立作品章节、引擎技能一致性、安装后插件技能同步与产物扫描。另从安装后的技能文件构造 ui + diagram + content 演示，check 通过后用真实 Chromium 打开 dev，再用本机静态服务器打开构建产物（除它之外不许有网络请求，D98）前进/回退验证发布站。测试驱动使用工作区 Playwright，不把它安装到用户项目；CI 先安装 Chromium，本地可用 `pnpm --filter @joplo-app/server exec playwright install chromium` 准备。下载默认分支、名称解析、占位替换、私有令牌、解压失败与路径穿越由 CLI 单元测试中的内存 tarball 覆盖。
 
-`@joplo-app/plugin-media` 首次纳入公开发布。原有十一个包的 Trusted Publishing 配置不代表此新包已经配置；代码与 tarball 检查可以先进行，首次 npm 发布权限和可信发布方需在最终发布阶段单独核验。测试不得创建 registry 版本或写入发布凭证。
+`@joplo-app/plugin-av` 首次纳入公开发布。原有十一个包的 Trusted Publishing 配置不代表此新包已经配置；代码与 tarball 检查可以先进行，首次 npm 发布权限和可信发布方需在最终发布阶段单独核验。测试不得创建 registry 版本或写入发布凭证。
+
+
+### 新包首次发布的占位边界
+
+配置 trusted publisher 前，目标 npm 包必须已存在。首次 staging 会创建 `0.0.0-stage` 占位；在正式版本可从 registry 安装并核验前，保留初始化占位和暂存记录。不要把 `npm stage reject` 当成对包名无影响的临时文件清理：仅有初始化占位的新包可能因此被标成整包 `unpublished`，后续发布会失败。正式版本发布之后也不要自动删除占位，先核对 npm 当前行为和包级影响。
+
+2FA 完成、trust 配置成功、`npm publish` 返回处理通知，都不能单独证明版本已可下载；逐包核验版本与 dist-tag，最后使用全新缓存安装。遇到 `time.unpublished` 或首次包 404/409 时，保留原 tag 与已发布版本，先诊断 registry 状态，避免盲目反复发布或清理。参考 [npm staged publishing](https://docs.npmjs.com/staged-publishing/) 与 [unpublish policy](https://docs.npmjs.com/policies/unpublish/)。

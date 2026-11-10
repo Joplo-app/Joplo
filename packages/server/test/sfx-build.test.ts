@@ -10,13 +10,13 @@ import { buildSite } from '../src/build.ts';
 const REPO=path.resolve(import.meta.dirname,'../../..');
 it('checks actual local asset imports, builds one cached WAV offline and preserves independent cross-chapter events',async()=>{
  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'joplo-sfx-build-')));installFixturePlugins(root);
- fs.symlinkSync(path.join(REPO,'plugins/media'),path.join(root,'node_modules/@joplo-app/plugin-media'));
+ fs.symlinkSync(path.join(REPO,'plugins/av'),path.join(root,'node_modules/@joplo-app/plugin-av'));
  const write=(name:string,text:string|Buffer)=>{const f=path.join(root,name);fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,text);};
  const b=Buffer.alloc(44+32000);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(8000,24);b.writeUInt32LE(8000,28);b.writeUInt16LE(1,32);b.writeUInt16LE(8,34);b.write('data',36);b.writeUInt32LE(32000,40);for(let i=44;i<b.length;i++)b[i]=128+Math.round(40*Math.sin(i*.3));write('cue.wav',b);
- write('joplo.config.ts',fixtureConfigSource(`import{asset,config}from'@joplo-app/kit';import{withSoundEffects}from'@joplo-app/plugin-media';export default config({name:'SFX',plugins:[withSoundEffects({cue:asset('./cue.wav')})]});`));
+ write('joplo.config.ts',fixtureConfigSource(`import{asset,config}from'@joplo-app/kit';import{withSoundEffects}from'@joplo-app/plugin-av';export default config({name:'SFX',plugins:[withSoundEffects({cue:asset('./cue.wav')})]});`));
  write('routes/page.tsx',`import{page}from'@joplo-app/kit';export default page({title:'Sound'},<div>Local sound</div>);`);
  write('features/f/feature.ts',`import{feature}from'@joplo-app/kit';export default feature({name:'F',goal:'G',cases:{},pick:'a'});`);
- write('features/f/works/a.tsx',`import{flow,work,hold}from'@joplo-app/kit';import{sfx}from'@joplo-app/plugin-media';export default work({title:'A',summary:'I',on:{},scenarios:{one:flow('One',{start:'/'}).system('Send',sfx.play('cue',{volume:.5}),sfx.play('cue',{volume:.3}),hold(.5)),two:flow('Two',{from:'one'}).system('Continue',hold(.5))}});`);
+ write('features/f/works/a.tsx',`import{flow,work,hold}from'@joplo-app/kit';import{sfx}from'@joplo-app/plugin-av';export default work({title:'A',summary:'I',on:{},scenarios:{one:flow('One',{start:'/'}).system('Send',sfx.play('cue',{volume:.5}),sfx.play('cue',{volume:.3}),hold(.5)),two:flow('Two',{from:'one'}).system('Continue',hold(.5))}});`);
  try{
   const dev=await createDev({projectDir:root,port:0,watch:false,log:()=>{}});try{expect(dev.payload().diagnostics.filter(d=>d.severity==='error')).toEqual([]);}finally{await dev.close();}
   const result=await buildSite({projectDir:root,outDir:path.join(root,'site')});expect(result.diagnostics.filter(d=>d.severity==='error')).toEqual([]);
