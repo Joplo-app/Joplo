@@ -96,7 +96,8 @@ export async function installSkill(dir: string, version: string, options: Instal
   let plugins:PluginSkillSource[]=[];
   if (!options.engineOnly) {
     const loaded=await projectPlugins(root);
-    if(loaded.error) throw new JoploError('INVALID_SCHEMA',`Cannot read config.plugins: ${loaded.error}. Install this project's dependencies, then run joplo skill install again. No skills were changed.`);
+    // 依赖没装好时 config 载入失败；config 载入成功但 plugins 写错时只报那一项，不把人引向“装依赖”（#60）
+    if(loaded.error) throw new JoploError('INVALID_SCHEMA',loaded.configProblem?`Invalid joplo.config.ts: ${loaded.error}. Fix it, then run joplo skill install again. No skills were changed.`:`Cannot read config.plugins: ${loaded.error}. Install this project's dependencies, then run joplo skill install again. No skills were changed.`);
     plugins=loaded.plugins;
   }
   if(!hasConfig)lines.push('No joplo.config.ts here: installing engine skills only. In a project, enable plugins and read joplo skill <plugin-id> or <plugin-id>/<topic>.');

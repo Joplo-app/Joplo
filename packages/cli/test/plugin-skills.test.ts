@@ -58,7 +58,16 @@ test('malformed or duplicate config.plugins never silently removes installed plu
  const root=await temp();await config(root,[base]);await installSkill(root,'1.0');
  const path=file(root,'joplo-plugin-test/SKILL.md'),before=await readFile(path);
  for(const plugins of [[{...base,apiVersion:1}],[base,base],['invalid']]){
-  await config(root,plugins);await expect(installSkill(root,'1.0')).rejects.toThrow('Cannot read config.plugins');
+  await config(root,plugins);await expect(installSkill(root,'1.0')).rejects.toThrow(/Invalid joplo\.config\.ts: config\.plugins.*No skills were changed/);
   expect(await readFile(path)).toEqual(before);
  }
+});
+
+test('config.plugins entry that is an uncalled factory names the index and suggests calling it (#60)',async()=>{
+ const root=await temp();
+ await writeFile(join(root,'joplo.config.ts'),`const ok=${JSON.stringify(base)};\nexport function alda(scores){return {...ok,id:'alda'};}\nexport default {plugins:[ok,alda]};\n`);
+ const err=await installSkill(root,'1.0').catch(e=>e as Error);
+ expect(err.message).toContain('config.plugins[1] is a function (alda)');
+ expect(err.message).toContain('plugins: [alda(…)]');
+ expect(err.message).not.toContain('Install this project');
 });
