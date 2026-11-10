@@ -42,22 +42,30 @@ it('does not diagnose intentional overlays and a corrected layout as collisions'
 it('records real browser commit/entry/drift milestones and evidence using supplied engine sample times', async () => {
   await surface();
   await page.clock.install({ time: 0 }); await page.clock.pauseAt(1000);
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     const root = document.querySelector('#root')!;
     root.setAttribute('data-joplo-audit-phases', JSON.stringify({ clockMs: 0, phases: [{ phase: 'drift-mid', atMs: 200 }, { phase: 'drift-end', atMs: 400 }] }));
     const animation = document.querySelector('[data-jid="quote"]')!.animate([{ transform:'translateX(0px)' },{ transform:'translateX(80px)' }],{ duration:100, fill:'forwards' }); animation.id='jenter';
+    // Match bindEngineAnimations: WAAPI does not advance from Playwright's JS clock.
+    // Freeze before leaving this task so slow CI/compilation/screenshots cannot finish it.
+    animation.pause(); animation.currentTime=0; await animation.ready;
   });
+  await new Promise(resolve => setTimeout(resolve,150)); // longer than the entrance, while its engine time remains zero
+  expect(await page.evaluate(() => document.querySelector('[data-jid="quote"]')!.getAnimations().find(a=>a.id==='jenter')?.currentTime)).toBe(0);
   const project = compile({ root: '/fixture', config: { ...config({ name: 'Audit', plugins: [ui] }), file: 'joplo.config.ts' }, features: {}, routes: {}, layouts: {}, works: { film: { ...work({ title: 'Film', summary: 'Audit', stage: jsx(Text, { children: 'Stage' }), scenarios: { one: chapter('One').system('Commit') } }), file: 'works/film.tsx' } } }, 'dev').project!;
   const session = createLayoutAuditSession({ out: path.join(output,'film.png'), project, options: { everyMs:1000, important:['[data-jid="quote"]'] }, sampleMs:50 });
   for (const atMs of [0,50,100,150,200,250,300,350,400,450]) {
     if (atMs) await page.clock.runFor(50);
-    await page.evaluate(time => { document.querySelector('#root')!.setAttribute('data-joplo-audit-phases',JSON.stringify({clockMs:time,phases:[{phase:'drift-mid',atMs:200},{phase:'drift-end',atMs:400}]})); },atMs);
+    await page.evaluate(time => {
+      for (const animation of document.querySelector('[data-jid="quote"]')!.getAnimations()) if (animation.id==='jenter') { animation.pause(); animation.currentTime=time; }
+      document.querySelector('#root')!.setAttribute('data-joplo-audit-phases',JSON.stringify({clockMs:time,phases:[{phase:'drift-mid',atMs:200},{phase:'drift-end',atMs:400}]})); },atMs);
     const jpg=(await page.screenshot({type:'jpeg'})).toString('base64');
     await session.sample(page,{atMs,scenarioId:'film.one',position:1,jpg});
   }
   const result = session.finish(), report=JSON.parse(fs.readFileSync(result.path,'utf8'));
   expect(report.samples.flatMap((s: {phases:string[]})=>s.phases)).toEqual(expect.arrayContaining(['post-commit','enter-end','drift-mid','drift-end']));
   expect(report.samples.every((s: {stepId:string;atMs:number;evidence:string})=>s.stepId==='film.one#1' && Number.isFinite(s.atMs) && fs.existsSync(s.evidence))).toBe(true);
+  expect(report.samples.filter((s: {phases:string[]})=>s.phases.includes('enter-end')).map((s: {atMs:number})=>s.atMs)).toEqual([100]);
   expect(report.sampleToleranceMs).toBe(50);
 });
 it('rejects malformed options and ambiguous/outside content selectors explicitly', async () => {
