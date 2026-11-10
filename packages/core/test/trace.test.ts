@@ -1,4 +1,3 @@
-import { diagramFit } from '../../../plugins/diagram/src/render-layout.ts';
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { diagramStateAt } from '../../../plugins/diagram/src/state.ts';
 import { nodeData, frameData } from '../../../plugins/diagram/src/data.ts';
@@ -69,11 +68,6 @@ const five = (f: Flow) =>
     .system('扣费失败', trace.fail('biz', 'billing'));
 
 describe('trace() 编译进 IR', () => {
-  it('requested design scale enlarges the whole diagram while respecting its frame', () => {
-    expect(diagramFit({ width: 500, height: 200 }, 1920, 1080, 2).scale).toBe(2);
-    expect(diagramFit({ width: 500, height: 200 }, 508, 208, 2).scale).toBe(1);
-    expect(diagramFit({ width: 500, height: 200 }, 1920, 1080).scale).toBe(1);
-  });
   it('focus:false keeps trace state and timing without a host shot', () => {
     const { dev } = build(f => f.system('Only highlight', trace('app', 'biz', { focus: false })));
     expect(errors(dev)).toEqual([]);

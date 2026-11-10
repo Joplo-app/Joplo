@@ -71,7 +71,7 @@ export function pointAt(points: Point[], t: number): Point {
 }
 
 /**
- * 整图缩放：整图放进容器宽度与高度 h，不放大、不滚动。
+ * 整图缩放：整图放进容器宽度与高度 h；默认不放大，显式 scale 可放大但仍受容器约束，不滚动。
  * 看不清的细节交给舞台统一的缩放平移（滚轮 / 捏合 / 拖动）和镜头推近，图内部没有第二套滚动与拖动。
  */
 export function diagramFit(layout: Pick<GraphLayout, 'width' | 'height'>, availW: number, availH: number, requestedScale = 1): { scale: number } {

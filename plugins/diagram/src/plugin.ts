@@ -45,7 +45,10 @@ function dotLapMs(roots: readonly PluginIRNode[], edgeIds: string[]): number {
 const hooks: PluginCompileHooks = {
   node(raw, { ids, report }) {
     const n = clean(raw);
-    if (isDiagramRoot(n.type)) checkDiagramRoot(n, report);
+    if (isDiagramRoot(n.type)) {
+      checkDiagramRoot(n, report);
+      if (n.props.scale !== undefined && (typeof n.props.scale !== 'number' || !Number.isFinite(n.props.scale) || n.props.scale <= 0)) report('DIAGRAM_SCALE_INVALID', 'Diagram scale must be a finite number greater than 0', n.source);
+    }
     if (links.has(n.type) && typeof n.props.id !== 'string' && typeof n.props.from === 'string' && typeof n.props.to === 'string') {
       const base = `${n.props.from}->${n.props.to}`;
       let id = base;
@@ -77,7 +80,7 @@ const hooks: PluginCompileHooks = {
     if (effect.name !== 'trace') { ctx.report('PLUGIN_EFFECT_UNKNOWN', `Unknown diagram effect ${effect.name}`, ctx.source); return; }
     const p = effect.payload as { ids?: unknown; mode?: unknown; focus?: unknown } | null;
     if (!p || !Array.isArray(p.ids) || !p.ids.every(id => typeof id === 'string') || !['ok', 'fail', 'skip'].includes(String(p.mode)) || (p.focus !== undefined && typeof p.focus !== 'boolean')) {
-      ctx.report('TRACE_UNKNOWN', 'trace() needs a list of element ids and an ok / fail / skip mode', ctx.source); return;
+      ctx.report('TRACE_UNKNOWN', 'trace() needs a list of element ids, an ok / fail / skip mode, and optional boolean focus', ctx.source); return;
     }
     const t = resolveTrace(ctx.roots.flatMap(r => diagramsIn(r as SceneNode)), p.ids as string[], p.mode as Trace['mode'], ctx.source, ctx.report);
     if (!t) return;
