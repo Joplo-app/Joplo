@@ -44,7 +44,7 @@ export default page({ title: 'Board', layout: false },
   <Note id="note" pos="absolute" top={420} left={60}>A note</Note>
 </Board>);`);
     write('features/demo/feature.ts', `import { feature } from '@joplo-app/kit'; export default feature({ name: 'Board', goal: 'Show a flow', cases: {}, pick: 'a' });`);
-    write('features/demo/options/a.tsx', `import { $, flow, mark, work, set } from '@joplo-app/kit';
+    write('features/demo/works/a.tsx', `import { $, flow, mark, work, set } from '@joplo-app/kit';
 export default work({ title: 'A', summary: 'Board', state: { ui: { next: false } }, scenarios: {
   main: flow('Main', { start: '/' })
     .system('Mark first', 'Underline the hint', mark('hint', { kind: 'underline' }))

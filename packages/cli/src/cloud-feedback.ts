@@ -8,7 +8,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { JoploError } from '@joplo-app/core';
+import { JoploError, REVIEW_LIMITS } from '@joplo-app/core';
 import { CloudError, terminalText } from './cloud-error.ts';
 import { object, type CloudClient } from './cloud.ts';
 
@@ -18,7 +18,8 @@ export const DECISION_KINDS = ['pick', 'confirm_rule', 'reject_rule', 'answer'] 
 
 export type FeedbackDecision = { id: string; kind: string; workId: string | null; featureId: string | null; targetId: string; note: string | null; decidedAt: string; version: number };
 export type FeedbackComment = { id: string; version: number; workId: string; scenario: string; step: number; stepId: string | null; element: { id: string; label: string } | null; body: string; author: { name: string }; createdAt: string };
-export type Feedback = { share: { id: string; version: number }; decisions: FeedbackDecision[]; comments: FeedbackComment[] };
+export type FeedbackWork = { id: string; featureId: string | null };
+export type Feedback = { share: { id: string; version: number }; works: FeedbackWork[]; decisions: FeedbackDecision[]; comments: FeedbackComment[] };
 
 const str = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max;
 const iso = (v: unknown): v is string => typeof v === 'string' && v.length <= 64 && Number.isFinite(Date.parse(v));
@@ -48,6 +49,13 @@ export async function feedbackShareId(client: CloudClient, dir: string, explicit
   return record.shareId;
 }
 
+/** 云端从本版本评审清单的独立 works 与 features[].works 生成，不能从限定 ID 拆归属。 */
+function readWork(raw: unknown): FeedbackWork {
+  const w = object(raw);
+  if (!str(w.id, 256) || !w.id || !(w.featureId === null || str(w.featureId, 256) && !!w.featureId)) throw new CloudError('INVALID_RESPONSE');
+  return { id: w.id, featureId: w.featureId as string | null };
+}
+
 function readDecision(raw: unknown): FeedbackDecision {
   const d = object(raw);
   if (!str(d.id, 64) || !d.id || !str(d.kind, 32) || !/^[a-z_]+$/.test(d.kind) || !(d.featureId === null || str(d.featureId, 256)) || !str(d.targetId, 256) || !(d.workId === null || str(d.workId, 256)) || !(d.note === null || d.note === undefined || str(d.note, 10_000)) || !iso(d.decidedAt) || !int(d.version, 1)) throw new CloudError('INVALID_RESPONSE');
@@ -67,8 +75,10 @@ export async function fetchFeedback(client: CloudClient, shareId: string, option
   const request = () => feedbackRequest(client, `/api/v1/shares/${shareId}/feedback`, token, undefined, options.signal);
   const d = options.retry === false ? await request() : await client.retry(request, { signal: options.signal });
   const share = object(d.share);
-  if (share.id !== shareId || !int(share.version, 0) || !Array.isArray(d.decisions) || !Array.isArray(d.comments) || d.decisions.length > 1000 || d.comments.length > 5000) throw new CloudError('INVALID_RESPONSE');
-  const out = { share: { id: shareId, version: share.version }, decisions: d.decisions.map(readDecision), comments: d.comments.map(readComment) };
+  if (share.id !== shareId || !int(share.version, 0) || !Array.isArray(d.works) || d.works.length > REVIEW_LIMITS.features * (REVIEW_LIMITS.works + 1) || !Array.isArray(d.decisions) || !Array.isArray(d.comments) || d.decisions.length > 1000 || d.comments.length > 5000) throw new CloudError('INVALID_RESPONSE');
+  const works = d.works.map(readWork);
+  if (new Set(works.map(w => w.id)).size !== works.length) throw new CloudError('INVALID_RESPONSE');
+  const out = { share: { id: shareId, version: share.version }, works, decisions: d.decisions.map(readDecision), comments: d.comments.map(readComment) };
   if (JSON.stringify(out).includes(token)) throw new CloudError('INVALID_RESPONSE');
   return out;
 }

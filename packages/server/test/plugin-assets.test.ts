@@ -26,7 +26,7 @@ beforeAll(async()=>{
  write('joplo.config.ts',`import{config}from'@joplo-app/kit';import assets from './plugin';export default config({name:'Assets',plugins:[assets]});`);
  write('routes/page.tsx',`import{page}from'@joplo-app/kit';import{Widget}from'../plugin';export default page({title:'Assets',layout:false},<Widget id="widget"/>);`);
  write('features/f/feature.ts',`import{feature}from'@joplo-app/kit';export default feature({name:'F',goal:'G',cases:{},pick:'a'});`);
- write('features/f/works/a.ts',`import{option,flow}from'@joplo-app/kit';export default work({title:'A',summary:'I',scenarios:{s:flow('S',{start:'/'}).system('Observe')}});`);
+ write('features/f/works/a.ts',`import{work,flow}from'@joplo-app/kit';export default work({title:'A',summary:'I',scenarios:{s:flow('S',{start:'/'}).system('Observe')}});`);
  browser=await launch({chromium});server=await createDev({projectDir:root,port:0,watch:false,log:()=>{}});
  expect(server.payload().diagnostics.filter(d=>d.severity==='error')).toEqual([]);
 },120000);

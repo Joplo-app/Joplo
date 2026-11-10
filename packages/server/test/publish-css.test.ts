@@ -4,11 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { cssClasses, publicClassTokens } from './css-classes.ts';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import { build as viteBuild } from 'vite';
+import { build as viteBuild, createServer } from 'vite';
+import { entriesOf, Project as ProjectSchema, resolveScope, scopeProject, type Project } from '@joplo-app/core';
+import { compileProject } from '../src/project.ts';
 import tailwindcss from '@tailwindcss/vite';
 import { installFixturePlugins } from '../../../scripts/test/fixtures.ts';
 import { buildSite } from '../src/build.ts';
-import { joploProjectPlugin } from '../src/vite-shared.ts';
+import { joploProjectPlugin, kitAliases } from '../src/vite-shared.ts';
 import { locateWebAssets, type WebAssets } from '../src/web-assets.ts';
 
 const chosen = vi.hoisted(() => ({ web: null as WebAssets | null }));
@@ -28,11 +30,12 @@ const alternative = cls('OPTION_PRIVATE');
 const draft = cls('DRAFT_PRIVATE');
 const quoted = `after:content-['PUBLIC_"QUOTED"']`;
 let sourceWeb: WebAssets, distWeb: WebAssets;
+let devProject: Project;
 
 const styles = (dir: string) => files(dir).filter(f => f.endsWith('.css')).map(f => fs.readFileSync(f, 'utf8')).join('\n');
 const payload = (dir: string) => JSON.parse(/id="joplo-ir">([\s\S]*?)<\/script>/.exec(fs.readFileSync(path.join(dir, 'index.html'), 'utf8'))![1]!).project;
 
-beforeAll(() => {
+beforeAll(async () => {
   sourceWeb = locateWebAssets({});
   fs.mkdirSync(path.join(project, 'works'), { recursive: true });
   fs.mkdirSync(path.join(project, 'features/f/works'), { recursive: true });
@@ -55,6 +58,15 @@ export default work({title:'Live',summary:'Public',state:{ui:{visual:${JSON.stri
   fs.writeFileSync(path.join(app, 'assets/player.js'), 'globalThis.publicPlayer=true;');
   fs.writeFileSync(path.join(web, 'project.css'), '@import "tailwindcss" source(none);');
   distWeb = { mode: 'dist', webDir: web, appDir: app, siteFiles: ['site.html', 'assets/player.js'], projectCss: path.join(web, 'project.css'), version: 'test' };
+  const loader = await createServer({ configFile: false, envDir: false, root: project, logLevel: 'error', appType: 'custom', resolve: { alias: kitAliases(sourceWeb, project) }, plugins: [joploProjectPlugin(project, sourceWeb)], server: { middlewareMode: true, hmr: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] } });
+  try {
+    const result = await compileProject(loader, project, 'dev');
+    expect(result.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    expect(result.project).not.toBeNull();
+    if (!result.project) throw new Error('Expected the publication fixture to compile');
+    devProject = result.project;
+  } finally { await loader.close(); }
+
 });
 afterAll(() => { chosen.web = null; fs.rmSync(root, { recursive: true, force: true }); });
 
@@ -70,6 +82,12 @@ for (const mode of ['source', 'dist'] as const) for (const variant of scopes) it
   chosen.web = mode === 'source' ? sourceWeb : distWeb;
   const r = await buildSite({ projectDir: project, outDir: path.join(root, `${mode}-${variant.name}`), review: variant.review, ...('scope' in variant ? { scope: variant.scope } : {}) });
   const ir = payload(r.outDir);
+  expect(ir.schemaVersion).toBe(3);
+  const parsed = ProjectSchema.parse(ir);
+  const publicationMode = variant.review ? 'review' : 'publish';
+  const request = 'scope' in variant ? variant.scope : { entryIds: entriesOf(devProject).filter(e => !e.draft).map(e => e.id) };
+  const expected = scopeProject(devProject, resolveScope(devProject, request, publicationMode), publicationMode).project;
+  expect(entriesOf(parsed)).toEqual(entriesOf(expected));
   const css = styles(r.outDir);
   const classes = cssClasses(css);
   for (const token of [...initial.split(' '), ...effect.split(' ')]) expect(classes.has(token), token).toBe(true);

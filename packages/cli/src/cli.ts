@@ -239,7 +239,6 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       opts.json = opts.json || all.format === 'json';
       opts.workId = opts.work ? await feedbackWorkId(dir, opts.work) : undefined;
       if (all.applied !== undefined || all.ref !== undefined) throw new JoploError('USAGE', '--applied and --ref cannot be used with feedback watch');
-      opts.featureId = opts.workId ? await feedbackFeatureId(dir, opts.workId) : null;
       const shareId = opts.share ?? all.share;
       const server = opts.server ?? all.server;
       if ((opts.once || opts.since !== undefined) && !opts.follow) throw new JoploError('USAGE', '--once and --since work with --local --follow');
@@ -493,14 +492,4 @@ async function feedbackWorkLabels(dir: string): Promise<Record<string, string>> 
   const { entriesOf } = await import('@joplo-app/core');
   const r = await checkWithProject(dir);
   return Object.fromEntries(r.project ? entriesOf(r.project).flatMap(e => e.featureId === null && e.workId ? [[e.workId, e.id]] : []) : []);
-}
-
-async function feedbackFeatureId(dir: string, workId: string): Promise<string | null> {
-  const { existsSync } = await import('node:fs');
-  if (!existsSync(resolve(dir, 'joplo.config.ts'))) return null;
-  const { checkWithProject } = await import('./check.ts');
-  const r = await checkWithProject(dir);
-  if (!r.project) return null;
-  const { entriesOf } = await import('@joplo-app/core');
-  return entriesOf(r.project).find(e => e.workId === workId || e.featureId !== null && r.project!.features[e.featureId]!.workIds.includes(workId))?.featureId ?? null;
 }

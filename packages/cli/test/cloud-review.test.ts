@@ -39,6 +39,7 @@ const build = vi.fn(async ({ outDir, review }: { outDir?: string; review?: boole
 });
 const checkProject = vi.fn(async (): Promise<any> => ({ name: 'Fixture', diagnostics: [], summary: { error: 0, warning: 0, info: 0 }, verification: {}, project: devIr }));
 const feedback = {
+  works: [{ id: 'f.a', featureId: 'f' }, { id: 'f.b', featureId: 'f' }],
   share: { id: 'Abc1234567', version: 3 },
   decisions: [
     { id: 'd1', kind: 'pick', workId: 'f.b', featureId: 'f', targetId: 'f.b', note: null, decidedAt: '2026-11-06T10:00:00.000Z', version: 3 },

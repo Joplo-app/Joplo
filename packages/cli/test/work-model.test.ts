@@ -60,7 +60,7 @@ test('独立作品诊断的文字与 JSON 都定位到 works 文件的行列', a
   const json = await cli(['check', d, '--format', 'json']);
   expect(json.code).toBe(1);
   expect(JSON.parse(json.out).diagnostics).toContainEqual(expect.objectContaining({ code: 'FROM_UNKNOWN', at: expect.stringMatching(/^works\/demo\.tsx:2:\d+$/) }));
-  const text = await cli(['check', d]); expect(text.out).toMatch(/works\/demo\.tsx:2:\d+  error  FROM_UNKNOWN/); expect(text.out).not.toContain('demo');
+  const text = await cli(['check', d]); expect(text.out).toMatch(/works\/demo\.tsx:2:\d+  error  FROM_UNKNOWN/); expect(text.out).not.toContain('demo.main');
 });
 test('混合项目保留功能正文；功能选定方案用章节时也带编号', async () => {
   const d = await project(); await cp('examples/invite/features', join(d, 'features'), { recursive: true }); await cp('examples/invite/routes', join(d, 'routes'), { recursive: true });
@@ -82,7 +82,8 @@ test('真实构建仅发一件作品；草稿明确拒绝；跳过草稿列明�
   const built = await buildSite({ projectDir: d, outDir: join(d, 'one'), scope: { entryIds: ['demo'] } });
   const html = await readFile(join(built.outDir, 'index.html'), 'utf8');
   const payload = JSON.parse(/id="joplo-ir">(.*?)<\/script>/.exec(html)![1]!);
-  expect(Object.keys(payload.project.features)).toEqual(['demo']);
+  expect(payload.project.features).toEqual({});
+  expect(Object.keys(payload.project.works)).toEqual(['demo']);
   expect(built.entries).toEqual([{ id: 'demo', title: 'demo', slices: 2, sequencing: 'linear' }]);
   expect(built.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED')).toBe(true);
   await expect(buildSite({ projectDir: d, outDir: join(d, 'draft'), scope: { entryIds: ['old'] } })).rejects.toThrow(/draft.*old|old.*draft/i);

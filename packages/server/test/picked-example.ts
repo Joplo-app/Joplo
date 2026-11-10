@@ -25,7 +25,7 @@ export function pickedExample(name: string, pick = SAMPLE_PICKS[name]): string {
     if (!fs.existsSync(file) || !pick) continue;
     const src = fs.readFileSync(file, 'utf8');
     if (/^\s*pick\s*:/m.test(src)) continue;
-    if (!fs.existsSync(path.join(featuresDir, f, 'options', `${pick}.tsx`))) continue;
+    if (!fs.existsSync(path.join(featuresDir, f, 'works', `${pick}.tsx`))) continue;
     const at = src.lastIndexOf('});');
     if (at < 0) throw new Error(`${file}: cannot find the end of feature({...})`);
     fs.writeFileSync(file, `${src.slice(0, at).replace(/,?\s*$/, ',')}\n  pick: '${pick}',\n${src.slice(at)}`);

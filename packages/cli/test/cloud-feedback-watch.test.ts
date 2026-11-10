@@ -11,7 +11,7 @@ const shareId = 'Abc1234567';
 const binding = { server: 'https://cloud.example', shareId, workId: 'f.a', featureId: 'f', version: 3 };
 const comment = (id: string, changes: Partial<FeedbackComment> = {}): FeedbackComment => ({ id, version: 3, workId: 'f.a', scenario: 'f.a.main', step: 1, stepId: 'f.a.main#1', element: null, body: `Feedback ${id}`, author: { name: 'Reviewer' }, createdAt: '2026-11-07T10:00:00.000Z', ...changes });
 const decision = (id = 'd1', changes: Partial<FeedbackDecision> = {}): FeedbackDecision => ({ id, kind: 'pick', workId: 'f.a', featureId: 'f', targetId: 'f.a', note: null, decidedAt: '2026-11-07T10:01:00.000Z', version: 3, ...changes });
-const snapshot = (comments: FeedbackComment[] = [], decisions: FeedbackDecision[] = [], version = 3): Feedback => ({ share: { id: shareId, version }, comments, decisions });
+const snapshot = (comments: FeedbackComment[] = [], decisions: FeedbackDecision[] = [], version = 3): Feedback => ({ share: { id: shareId, version }, works: [{ id: 'f.a', featureId: 'f' }, { id: 'f.b', featureId: 'f' }, { id: 'g.a', featureId: 'g' }, { id: 'demo', featureId: null }], comments, decisions });
 const capture = () => { let out = '', err = ''; return { io: { out: (s: string) => { out += s; }, err: (s: string) => { err += s; } }, events: () => out.trim() ? out.trim().split('\n').map(l => JSON.parse(l)) : [], get out() { return out; }, get err() { return err; } }; };
 function fixture(responses: (Feedback | Error)[], onSleep?: (signal?: AbortSignal) => void) {
   const waits: number[] = [];
@@ -33,7 +33,7 @@ describe('cloud snapshot polling', () => {
   it('polls every 15 seconds, deduplicates records, outputs feedback before approval, and exits 0', async () => {
     const { client, waits, request } = fixture([snapshot([comment('c1')]), snapshot([comment('c1')]), snapshot([comment('c1'), comment('c2')], [decision()])]);
     const io = capture();
-    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', featureId: 'f', json: true }, io.io)).toBe(0);
+    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io)).toBe(0);
     expect(waits).toEqual([15000, 15000]); expect(request).toHaveBeenCalledTimes(3);
     expect(io.events().map(e => e.type)).toEqual(['feedback', 'feedback', 'approved']);
     expect(io.events()[0]).toMatchObject({ source: 'cloud', shareId, workId: 'f.a', revision: '3', context: { scenarioId: 'f.a.main', route: null } });
@@ -57,7 +57,7 @@ describe('cloud snapshot polling', () => {
       [decision('old', { version: 2 }), decision('other', { targetId: 'f.b' }), decision('another', { featureId: 'g', targetId: 'g.a' })]);
     const { client, waits } = fixture([foreign, snapshot([comment('mine')], [decision('mine', { targetId: 'f.a' })])]);
     const io = capture();
-    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', featureId: 'f', json: true }, io.io)).toBe(0);
+    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io)).toBe(0);
     expect(waits).toHaveLength(1);
     expect(io.events().map(e => e.type)).toEqual(['feedback', 'approved']);
     expect(io.out).not.toContain('collision');
@@ -65,13 +65,13 @@ describe('cloud snapshot polling', () => {
   it('emits rule/answer decisions without treating them as confirmation of the option', async () => {
     const partial = snapshot([], [decision('rule', { kind: 'confirm_rule', targetId: 'f.a.keep' }), decision('answer', { kind: 'answer', workId: null, targetId: 'f.question', note: 'Seven days' }), decision('other-rule', { kind: 'reject_rule', workId: 'f.b', targetId: 'f.b.rule' })]);
     const { client } = fixture([partial, snapshot([], [...partial.decisions, decision()])]); const io = capture();
-    await watchCloudFeedback(client, shareId, { workId: 'f.a', featureId: 'f', json: true }, io.io);
+    await watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io);
     expect(io.events().map(e => e.type)).toEqual(['decision', 'decision', 'approved']);
     expect(io.out).not.toContain('other-rule');
   });
   it('stops with source_changed instead of following a replaced share version', async () => {
     const { client } = fixture([snapshot([comment('c1')]), snapshot([], [decision('new', { version: 4 })], 4)]); const io = capture();
-    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', featureId: 'f', json: true }, io.io)).toBe(1);
+    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io)).toBe(1);
     expect(io.events().map(e => e.type)).toEqual(['feedback', 'closed']);
     expect(io.events()[1]).toMatchObject({ reason: 'source_changed', version: 3 });
   });
@@ -93,7 +93,7 @@ describe('cloud snapshot polling', () => {
   it('interrupts polling waits and makes no review mutations', async () => {
     const ac = new AbortController();
     const { client, request } = fixture([snapshot()], () => ac.abort()); const io = capture();
-    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', featureId: 'f', json: true }, io.io, ac.signal)).toBe(130);
+    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io, ac.signal)).toBe(130);
     expect(request).toHaveBeenCalledTimes(1); expect(io.out).toBe('');
   });
   it('uses stable event ids across restarts, with server/version/option isolation', () => {
@@ -144,4 +144,31 @@ it('独立作品通过内部播放 id 绑定反馈，面向人的监听与确认
   expect(await watchCloudFeedback(client, shareId, { workId: 'demo', work: 'demo' }, io.io)).toBe(0);
   expect(io.out + io.err).not.toContain('demo.main');
   expect(io.err).toContain('Work demo approved');
+});
+
+it('没有本地项目时从云端作品元数据绑定功能，包含功能级决定', async () => {
+  const data = { ...snapshot([], [decision('global', { kind: 'answer', workId: null, targetId: 'f.question' }), decision()]),
+    works: [{ id: 'f.a', featureId: 'f' }] };
+  const { client } = fixture([data]);
+  const io = capture();
+  expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io)).toBe(0);
+  expect(io.events().map(e => e.type)).toEqual(['decision', 'approved']);
+  expect(io.events().every(e => e.featureId === 'f')).toBe(true);
+});
+
+it('作品不在当前云端版本的元数据里时明确拒绝，不从 ID 猜功能', async () => {
+  const { client } = fixture([{ ...snapshot([], [decision()]), works: [] }]);
+  await expect(watchCloudFeedback(client, shareId, { workId: 'f.a' }, capture().io)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+});
+
+it.each([
+  undefined,
+  [{ id: 'f.a', featureId: 'f' }, { id: 'f.a', featureId: null }],
+  [{ id: '', featureId: null }],
+  [{ id: 'f.a', featureId: 3 }],
+])('rejects missing or malformed cloud work metadata before streaming', async works => {
+  const { client } = fixture([{ ...snapshot([], [decision()]), works } as Feedback]);
+  const io = capture();
+  await expect(watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  expect(io.out).toBe('');
 });

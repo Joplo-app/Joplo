@@ -7,7 +7,7 @@ import type { CloudClient } from './cloud.ts';
 import { writeFeedbackEvent, type FeedbackStreamEvent, type FeedbackStreamIo } from './feedback-stream.ts';
 
 export const DEFAULT_FEEDBACK_POLL_SECONDS = 15;
-export type CloudFeedbackWatchOptions = { workId: string; featureId?: string | null; work?: string; version?: number; interval?: number; json?: boolean };
+export type CloudFeedbackWatchOptions = { workId: string; work?: string; version?: number; interval?: number; json?: boolean };
 export function validateCloudWatchOptions(options: CloudFeedbackWatchOptions): void {
   if (!/^[A-Za-z][\w-]{0,63}(?:\.[A-Za-z][\w-]{0,63})?$/.test(options.workId ?? ''))
     throw new JoploError('USAGE', 'Cloud feedback watch requires --work <key|feature.option> so another work cannot finish this review');
@@ -16,13 +16,13 @@ export function validateCloudWatchOptions(options: CloudFeedbackWatchOptions): v
   if (options.version !== undefined && (!Number.isSafeInteger(options.version) || options.version < 1)) throw new JoploError('USAGE', 'version must be a positive integer');
 }
 
-export type CloudReviewBinding = { server: string; shareId: string; version: number; workId: string; featureId?: string | null };
+export type CloudReviewBinding = { server: string; shareId: string; version: number; workId: string; featureId: string | null };
 export function cloudReviewIdentity(binding: CloudReviewBinding) {
   return {
     source: 'cloud' as const,
     sessionId: `share_${createHash('sha256').update(JSON.stringify([binding.server, binding.shareId, binding.version, binding.workId])).digest('hex').slice(0, 24)}`,
     server: binding.server, shareId: binding.shareId, version: binding.version,
-    revision: String(binding.version), featureId: binding.featureId ?? null, workId: binding.workId,
+    revision: String(binding.version), featureId: binding.featureId, workId: binding.workId,
   };
 }
 /** 只输出绑定版本与方案的记录；先反馈／其他决定，再输出结束监听的确认。 */
@@ -36,7 +36,7 @@ export function cloudFeedbackEvents(feedback: Feedback, binding: CloudReviewBind
     });
   }
   for (const d of feedback.decisions) {
-    if (d.version !== binding.version) continue;
+    if (d.version !== binding.version || d.featureId !== binding.featureId) continue;
     if (d.kind === 'pick' ? d.targetId !== binding.workId : d.workId !== binding.workId && !(d.workId === null && binding.featureId != null && d.featureId === binding.featureId)) continue;
     events.push({ ...meta, eventId: `${meta.sessionId}:decision:${d.id}`, type: d.kind === 'pick' ? 'approved' : 'decision', createdAt: d.decidedAt, decision: d });
   }
@@ -73,7 +73,9 @@ export async function watchCloudFeedback(client: CloudClient, shareId: string, o
       if (feedback.share.version < 1) throw new CloudError('CONFLICT', 'This share has no published version to review');
       version ??= feedback.share.version;
       if (!binding) {
-        binding = { server: client.server, shareId, workId: options.workId, featureId: options.featureId, version };
+        const work = feedback.works.find(w => w.id === options.workId);
+        if (!work && feedback.share.version === version) throw new JoploError('NOT_FOUND', `Work ${options.workId} is not in share version ${version}`);
+        binding = { server: client.server, shareId, workId: options.workId, featureId: work?.featureId ?? null, version };
         io.err(`Bound to ${shareId} / ${options.work ?? options.workId} at version ${version}.\n`);
       }
       if (feedback.share.version !== version) {
@@ -89,7 +91,7 @@ export async function watchCloudFeedback(client: CloudClient, shareId: string, o
         seen.add(event.eventId);
       }
       if (events.some(e => e.type === 'approved')) {
-        io.err(`${options.work && !options.work.includes('.') ? 'Work' : 'Option'} ${options.work ?? options.workId} approved for share version ${version}. Watch completed.\n`);
+        io.err(`${binding.featureId === null ? 'Work' : 'Option'} ${options.work ?? options.workId} approved for share version ${version}. Watch completed.\n`);
         return 0;
       }
       await client.sleep(intervalMs, signal);

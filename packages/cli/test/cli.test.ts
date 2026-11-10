@@ -34,14 +34,14 @@ test('原样 check、缺省目录、text 和 DomainResult JSON 输出', async ()
   const d = await temp();
   const r = await cli(['check'], d);
   expect(r.code).toBe(0); expect(r.stderr).toBe(''); expect(r.stdout).toMatch(/0 error/);
-  expect(r.stdout).toMatch(/features\/invite\/options\/a-modal\.tsx:\d+:\d+  info  PENDING_AI_ASSUMPTION/);
+  expect(r.stdout).toMatch(/features\/invite\/works\/a-modal\.tsx:\d+:\d+  info  PENDING_AI_ASSUMPTION/);
   const json = await cli(['check', d, '--format', 'json', '--work', 'invite.a-modal']);
   expect(json.code).toBe(0);
   expect(JSON.parse(json.stdout)).toMatchObject({ ok: true, data: { summary: { error: 0 }, verification: { 'invite.a-modal': 'replay_ok' } } });
   expect(Object.keys(JSON.parse(json.stdout).data.verification)).toEqual(['invite.a-modal']);
 });
 test.each([
-  ['UNKNOWN_COMPONENT', option, (s: string) => s.replace('export default option', 'const Bogus = "Bogus";\nexport default option').replace('<Button id="btn_invite"', '<Bogus id="btn_invite"').replace('邀请成员\n        </Button>', '邀请成员\n        </Bogus>'), '<Bogus', 1],
+  ['UNKNOWN_COMPONENT', option, (s: string) => s.replace('export default work', 'const Bogus = "Bogus";\nexport default work').replace('<Button id="btn_invite"', '<Bogus id="btn_invite"').replace('邀请成员\n        </Button>', '邀请成员\n        </Bogus>'), '<Bogus', 1],
   ['MISSING_ID', option, (s: string) => s.replace('id="btn_invite" ', ''), '<Button disabled=', 1],
   ['FUNCTION_PROP', option, (s: string) => s.replace('<Button id="btn_invite"', '<Button onClick={() => {}} id="btn_invite"'), '<Button onClick=', 1],
   ['UNKNOWN_CASE', option, (s: string) => s.replace("cases: ['no_permission']", "cases: ['absent']"), "denied: flow(", 1],
@@ -90,7 +90,7 @@ test('init 后立即 check 通过，非空目录拒绝且保留内容', async ()
   const d = await temp(false); const target = join(d, 'new');
   expect((await cli(['init', target, '--name', '最小项目'])).code).toBe(0);
   expect((await cli(['check', target])).code).toBe(0);
-  const example = await readFile(join(target, 'features/example/options/a.tsx'), 'utf8');
+  const example = await readFile(join(target, 'features/example/works/a.tsx'), 'utf8');
   expect(example).toContain(".click('start', 'Click Start', done('Completed'))");
   expect(example).not.toMatch(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u);
   expect(JSON.parse(await readFile(join(target, 'tsconfig.json'), 'utf8')).compilerOptions).toMatchObject({ jsx: 'react-jsxdev', jsxImportSource: '@joplo-app/kit', allowImportingTsExtensions: true });

@@ -122,11 +122,11 @@ afterEach(async () => { for (const release of putBarrier ?? []) release(); for (
 async function credentials(serverUrl = base, accessToken = token) {
   await writeCredentials(home, { server: serverUrl, accessToken, user: { id: user.id, email: user.email }, createdAt: new Date().toISOString() });
 }
-async function cli(args: string[], works: { interactive?: boolean; ssh?: string; realBuild?: boolean; env?: NodeJS.ProcessEnv; sleep?: (ms: number, signal?: AbortSignal) => Promise<unknown> } = {}) {
+async function cli(args: string[], options: { interactive?: boolean; ssh?: string; realBuild?: boolean; env?: NodeJS.ProcessEnv; sleep?: (ms: number, signal?: AbortSignal) => Promise<unknown> } = {}) {
   let stdout = '', stderr = '';
   const code = await runCli(args, { stdout: s => stdout += s, stderr: s => stderr += s, cliVersion: '0.1.3',
     ...(options.realBuild ? {} : { loadServer: async () => ({ buildSite: build, startDev: async () => ({ url: 'http://localhost:4790', attached: true }), ...(renderStep ? { renderStep } : {}) }) }),
-    cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base, SSH_CONNECTION: options.ssh, ...works.env }, interactive: options.interactive ?? false,
+    cloud: { env: { JOPLO_HOME: home, JOPLO_CLOUD_URL: base, SSH_CONNECTION: options.ssh, ...options.env }, interactive: options.interactive ?? false,
       openBrowser: browser, confirm, sleep: options.sleep ?? (async ms => { waits.push(ms); clock += ms; }), now: () => clock, ...(options.realBuild ? {} : { check: checkProject }) },
   });
   expect(stdout + stderr).not.toContain(token); expect(stdout + stderr).not.toContain(oldToken);
@@ -604,7 +604,7 @@ test('F8 create 503 NETWORK 即使有 Retry-After 也不重放', async () => {
 
 // ---------------------------------------------------------------- 嵌入（预览图 + data.embed）
 const irHtml = (project: unknown) => `<html><head><script type="application/json" id="joplo-ir">${JSON.stringify({ project, home: null })}</script></head><body></body></html>`;
-const irProject = { features: { f: { id: 'f', workIds: ['f.a'], pick: 'f.a' } }, works: { 'f.a': { id: 'f.a' } }, scenarios: { 'f.a.main': { id: 'f.a.main', workId: 'f.a' }, 'f.a.other': { id: 'f.a.other', workId: 'f.a' } } };
+const irProject = { entryIds: ['f'], features: { f: { id: 'f', workIds: ['f.a'], pick: 'f.a' } }, works: { 'f.a': { id: 'f.a' } }, scenarios: { 'f.a.main': { id: 'f.a.main', workId: 'f.a' }, 'f.a.other': { id: 'f.a.other', workId: 'f.a' } } };
 /** 1200×630 的最小 PNG 头（签名 + IHDR）。 */
 const png = (w = 1200, h = 630) => { const b = Buffer.alloc(33); Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b); b.writeUInt32BE(13, 8); b.write('IHDR', 12, 'ascii'); b.writeUInt32BE(w, 16); b.writeUInt32BE(h, 20); return b; };
 const manifestOf = () => calls.find(c => c.path === '/api/v1/shares')!.body.files as { path: string; size: number; contentType: string; sha256: string }[];
@@ -630,7 +630,7 @@ test('E1 没有 renderStep（旧 server）或项目没有场景时跳过预览�
   expect(manifestOf().map(f => f.path)).not.toContain('_joplo/preview.png');
   expect(r.stderr.split('\n').filter(l => l.startsWith('Skipped the preview image'))).toHaveLength(1);
   renderStep = vi.fn(async () => { throw new Error('should not render without scenarios'); });
-  files['index.html'] = irHtml({ features: {}, works: {}, scenarios: {} });
+  files['index.html'] = irHtml({ entryIds: [], features: {}, works: {}, scenarios: {} });
   r = await cli(['share', '--private', '--no-review',  project, '--format=json']); expect(r.code).toBe(0); expect(renderStep).not.toHaveBeenCalled();
   expect(r.stderr).toMatch(/Skipped the preview image \(no scenario/);
 });

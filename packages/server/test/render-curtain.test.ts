@@ -35,7 +35,7 @@ export default page({title:'Prototype',layout:false,viewport:'${viewport}'},
 </Box>);`);
     }
     write('features/demo/feature.ts', `import { feature } from '@joplo-app/kit'; export default feature({name:'Export',goal:'Keep cards readable',cases:{},pick:'a'});`);
-    write('features/demo/options/a.tsx', `import { $, flow, work, set } from '@joplo-app/kit';
+    write('features/demo/works/a.tsx', `import { $, flow, work, set } from '@joplo-app/kit';
 const scene = (start) => flow('Design replay',{start}).card('Opening context',{sub:'Read the design problem'}).system('Prototype interaction','Subtitle floats over the stage',set($.ui.status,'after')).card('Closing boundary',{sub:'Keep the evidence readable'});
 export default work({title:'A',summary:'Compare scene and curtain',state:{ui:{status:'before'}},scenarios:{desktop:scene('/'),phone:scene('/phone')}});`);
     server = await createDev({ projectDir: root, port: 0, watch: false, log: () => undefined });

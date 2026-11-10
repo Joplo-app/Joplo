@@ -396,7 +396,7 @@ describe('范围构建（scope，D75）', () => {
 
     const r = await buildSite({ projectDir: dir, outDir: path.join(dir, 'scoped'), scope: { scenarios: [SCENARIO] } });
     expect(r.scenarios).toEqual([SCENARIO]);
-    expect(r.scope).toMatchObject({ key: SCENARIO, scenarios: [SCENARIO], features: ['home'] });
+    expect(r.scope).toMatchObject({ key: SCENARIO, scenarios: [SCENARIO], entryIds: ['home'] });
     const text = siteText(r.outDir, r.files);
     for (const s of outside) expect(text, s).not.toContain(s);
     for (const id of ['player.', 'views.', 'frames.']) expect(text, id).not.toContain(`"${id}`);
