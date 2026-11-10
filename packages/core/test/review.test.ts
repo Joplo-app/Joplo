@@ -71,7 +71,8 @@ describe('reviewManifest', () => {
   it('review：字段与契约 8.1 一致，id 与 IR 一致', () => {
     const dev = devProject();
     const m = reviewManifest(dev, 'review');
-    expect(keys(m)).toEqual(['elements', 'features', 'mode', 'scenarios', 'v']);
+    expect(keys(m)).toEqual(['elements', 'features', 'mode', 'scenarios', 'v', 'works']);
+    expect(m.works).toEqual([]);
     expect(m.v).toBe(1);
     expect(m.mode).toBe('review');
     expect(m.features.map((f) => f.id)).toEqual(['f', 'g']);

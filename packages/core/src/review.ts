@@ -42,6 +42,8 @@ export type ReviewManifestMode = 'publish' | 'review';
 export type ReviewManifest = {
   v: typeof REVIEW_MANIFEST_VERSION;
   mode: ReviewManifestMode;
+  /** 参与清单的独立作品，按 entryIds 排序；功能下的作品在 features[].works。 */
+  works: { id: string; key: string; title: string; summary: string }[];
   features: {
     id: string;
     name: string;
@@ -71,13 +73,15 @@ export function reviewManifest(project: Project, mode: ReviewManifestMode): Revi
   const L = REVIEW_LIMITS;
   const T = L.text;
   const features: ReviewManifest['features'] = [];
+  const works: ReviewManifest['works'] = [];
   const scenarios: ReviewManifest['scenarios'] = [];
   /** 参与的方案（publish：每个功能的选定方案）。 */
   const included = new Set<string>();
   for (const f of featuresOf(project)) {
+    if (features.length >= L.features) break;
     // 清单读取 dev IR；草稿仍不能随普通分享或评审版上传。
     if (f.workIds.some(id => local.has(id))) continue;
-    const workIds = (mode === 'publish' ? (f.pick ? [f.pick] : []) : f.workIds).filter((id) => project.works[id]);
+    const workIds = (mode === 'publish' ? (f.pick ? [f.pick] : []) : f.workIds).filter((id) => project.works[id]).slice(0, L.works);
     if (mode === 'publish' && !workIds.length) continue;
     for (const id of workIds) included.add(id);
     const inScope = (workId: string | undefined) => workId === undefined || workIds.includes(workId);
@@ -86,7 +90,7 @@ export function reviewManifest(project: Project, mode: ReviewManifestMode): Revi
       name: clipText(f.name, T.name),
       goal: clipText(f.goal, T.goal),
       pick: f.pick ?? null,
-      works: workIds.slice(0, L.works).map((id) => {
+      works: workIds.map((id) => {
         const o = project.works[id]!;
         return { id: o.id, key: o.key, title: clipText(o.title, T.name), summary: clipText(o.summary, T.summary), tradeoffs: f.alternatives[id]!.tradeoffs.slice(0, L.tradeoffs).map((t) => clipText(t, T.tradeoff)) };
       }),
@@ -113,8 +117,11 @@ export function reviewManifest(project: Project, mode: ReviewManifestMode): Revi
     }
   }
 
-  for (const w of Object.values(project.works)) {
-    if (w.featureId || local.has(w.id)) continue;
+  for (const id of project.entryIds) {
+    if (works.length >= L.features) break;
+    const w = project.works[id];
+    if (!w || w.featureId || local.has(w.id)) continue;
+    works.push({ id: w.id, key: w.key, title: clipText(w.title, T.name), summary: clipText(w.summary, T.summary) });
     included.add(w.id);
     for (const s of Object.values(project.scenarios)) {
       if (s.workId !== w.id) continue;
@@ -146,7 +153,8 @@ export function reviewManifest(project: Project, mode: ReviewManifestMode): Revi
   return {
     v: REVIEW_MANIFEST_VERSION,
     mode,
-    features: features.slice(0, L.features),
+    features,
+    works,
     scenarios: scenarios.slice(0, L.scenarios),
     elements: [...elements].slice(0, L.elements).map(([id, label]) => ({ id, label })),
   };

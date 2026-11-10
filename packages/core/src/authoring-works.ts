@@ -6,13 +6,21 @@ type Report = (code: string, message: string, at?: string, severity?: Diagnostic
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 export function validateWork(key: string, f: WorkDef & { file: string }, feature: boolean, report: Report, hasPages = false): boolean {
   const at = f?.source ?? `${f?.file ?? `works/${key}.tsx`}:1:1`;
-  if (!f || f.kind !== 'work' || typeof f.title !== 'string' || !f.title.trim() || typeof f.summary !== 'string' || !f.summary.trim()
-    || f.stage !== undefined && (f.layers !== undefined || !isNode(f.stage))
-    || f.layers !== undefined && !record(f.layers) || !record(f.scenarios)
-    || !hasPages && f.stage === undefined && f.layers === undefined && f.on === undefined && f.routes === undefined) {
-    report('WORK_INVALID', `Work ${key} requires non-empty title and summary and a scenarios object of flow(...) or chapter(...) entries (stage and layers cannot be combined)`, at);
+  if (!f || f.kind !== 'work') {
+    report('WORK_INVALID', `Work ${key} must default export work({...})`, at);
     return false;
   }
+  let valid = true;
+  const invalid = (reason: string) => { report('WORK_INVALID', `Work ${key}: ${reason}`, at); valid = false; };
+  if (typeof f.title !== 'string' || !f.title.trim()) invalid('requires a non-empty title');
+  if (typeof f.summary !== 'string' || !f.summary.trim()) invalid('requires a non-empty summary');
+  if (!record(f.scenarios)) invalid('scenarios must be an object of flow(...) or chapter(...) entries');
+  if (f.stage !== undefined && f.layers !== undefined) invalid('stage and layers cannot be combined; choose one');
+  if (f.stage !== undefined && !isNode(f.stage)) invalid('stage must be a JSX element');
+  if (f.layers !== undefined && !record(f.layers)) invalid('layers must be an object of layer(...) entries');
+  if (!hasPages && f.stage === undefined && f.layers === undefined && f.on === undefined && f.routes === undefined)
+    invalid('requires stage, layers, on or routes when the project has no pages');
+  if (!valid) return false;
   const forbidden = feature ? ['audience', 'roles', 'draft', 'order'] : ['cases', 'focus', 'tradeoffs', 'coverage', 'rules', 'questions'];
   for (const field of forbidden) if (Object.hasOwn(f, field))
     report(feature ? 'WORK_STANDALONE_ONLY' : 'WORK_FEATURE_ONLY', `Work ${key}: ${field} is only available ${feature ? 'on an independent work' : 'under a feature for design review'}`, at);

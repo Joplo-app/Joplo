@@ -99,9 +99,9 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
   const fail = (file: string, message: string, code = 'LOAD_FAILED') => diags.push({ severity: 'error', code, message, source: 'schema', at: `${relp(file)}:1:1` });
 
   const missingConfig = !existsSync(join(r, 'tsconfig.json'));
-  const configurationFailure = (file: string) => {
+  const configurationFailure = (file: string, detail: string) => {
     if (diags.some(d => d.code === 'PROJECT_MODULE_CONFIG')) return;
-    fail(file, 'Cannot load this project. Add tsconfig.json using jsx: "react-jsxdev" and jsxImportSource: "@joplo-app/kit" and package.json with "type": "module", then run check again', 'PROJECT_MODULE_CONFIG');
+    fail(file, `Cannot load this project. Add tsconfig.json using jsx: "react-jsxdev" and jsxImportSource: "@joplo-app/kit" and package.json with "type": "module", then run check again (underlying error: ${detail})`, 'PROJECT_MODULE_CONFIG');
   };
 
   const load = async (file: string, kind: string): Promise<any | null> => {
@@ -109,14 +109,15 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
       const mod = await importer(file);
       const v = (mod.default ?? null) as { kind?: string } | null;
       if (!v || v.kind !== kind) {
-        if (missingConfig) { configurationFailure(file); return null; }
-        fail(file, `Default export must be ${kind}(...); got ${v?.kind ?? typeof v}`, kind === 'work' ? 'WORK_INVALID' : 'WRONG_EXPORT');
+        const detail = `Default export must be ${kind}(...); got ${v?.kind ?? typeof v}`;
+        if (missingConfig) { configurationFailure(file, detail); return null; }
+        fail(file, detail, kind === 'work' ? 'WORK_INVALID' : 'WRONG_EXPORT');
         return null;
       }
       return { ...v, file: relp(file) };
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
-      if (missingConfig) configurationFailure(file);
+      if (missingConfig) configurationFailure(file, detail);
       else fail(file, `Load failed: ${detail}`);
       return null;
     }

@@ -123,7 +123,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   // 排序只在编译时决定；显式列表不依赖对象键的枚举顺序，发布模式也保留这份演示内容。
   for (const [id, def] of [...Object.entries(src.features).map(([id, f]) => [id, f.def] as const), ...works]) {
     if (def.order !== undefined && (typeof def.order !== 'number' || !Number.isFinite(def.order)))
-      err(works.has(id) ? 'WORK_INVALID' : 'FEATURE_ORDER_INVALID', `${works.has(id) ? 'Work' : 'Feature'} ${id} order must be a finite number; omit it for folder-name order`, def.source ?? `${def.file}:1:1`);
+      err(works.has(id) ? 'WORK_INVALID' : 'FEATURE_ORDER_INVALID', `${works.has(id) ? 'Work' : 'Feature'} ${id} order must be a finite number; omit it for folder-name order`, def.source ?? `${def.file}:1:1`, { kind: works.has(id) ? 'work' : 'feature', id });
   }
   if (diags.some(d => d.severity === 'error')) return { project: null, diagnostics: diags };
   const natural = new Intl.Collator('en', { numeric: true });

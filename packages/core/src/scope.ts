@@ -70,11 +70,11 @@ export function resolveScope(project: Project, request: ScopeRequest, mode: Scop
     const entry = entryOf(project, fid);
     if (!entry) {
       const known = entriesOf(project).map((x) => x.id).join(', ') || 'none';
-      throw new JoploError('NOT_FOUND', `Unknown entry "${fid}"${mode === 'publish' ? ', or it has no picked work' : ''}. Entries: ${known}`, { details: { scope: 'feature', id: fid } });
+      throw new JoploError('NOT_FOUND', `Unknown entry "${fid}"${mode === 'publish' ? ', or it has no picked work' : ''}. Entries: ${known}`, { details: { scope: 'entry', id: fid } });
     }
     assertExportableEntry(project, fid);
     const opts = f ? mode === 'review' ? f.workIds : f.pick ? [f.pick] : [] : [fid];
-    if (!opts.length) throw new JoploError('USAGE', `Feature "${fid}" has no picked work, so nothing of it is published. Pick an alternative (feature.pick), or share the review version (--review)`, { details: { scope: 'feature', id: fid } });
+    if (!opts.length) throw new JoploError('USAGE', `Feature "${fid}" has no picked work, so nothing of it is published. Pick an alternative (feature.pick), or share the review version (--review)`, { details: { scope: 'entry', id: fid } });
     for (const s of Object.values(project.scenarios)) if (opts.includes(s.workId)) out.add(s.id);
   }
   for (const sid of request.scenarios ?? []) {

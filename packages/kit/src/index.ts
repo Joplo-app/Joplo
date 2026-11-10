@@ -446,17 +446,10 @@ export class Chapter extends Flow<'chapter'> {
 export const chapter = (title: string, opts: ChapterOpts = {}): Chapter => new Chapter(title, opts);
 
 export type WorkDef = {
+  /** 两处都可用：作品内容、画面、状态与切片。 */
   kind: 'work';
   title: string;
   summary: string;
-  /** 给观众看的受众说明，参与作者内容翻译。空字符串等于未写。 */
-  focus?: string;
-  tradeoffs?: string[];
-  rules?: Record<string, RuleDef>;
-  questions?: Record<string, QuestionDef>;
-  coverage?: Record<string, CoverageDecl>;
-  audience?: string;
-  roles?: Record<string, RoleDef>;
   /** stage 与 layers 二选一。 */
   stage?: JNode;
   layers?: Record<string, LayerDef>;
@@ -467,11 +460,23 @@ export type WorkDef = {
   viewport?: 'desktop' | 'mobile';
   state?: StateInit;
   free?: Record<string, StepDef>;
+  scenarios: Record<string, Flow | Chapter>;
+  source?: string;
+
+  /** 只在功能下面：设计评审信息与规则。 */
+  focus?: string;
+  tradeoffs?: string[];
+  rules?: Record<string, RuleDef>;
+  questions?: Record<string, QuestionDef>;
+  coverage?: Record<string, CoverageDecl>;
+
+  /** 只在独立作品：受众、角色、草稿与首页排序。 */
+  /** 给观众看的受众说明，参与作者内容翻译。空字符串等于未写。 */
+  audience?: string;
+  roles?: Record<string, RoleDef>;
   /** 草稿只进入 dev IR。 */
   draft?: boolean;
   order?: number;
-  scenarios: Record<string, Flow | Chapter>;
-  source?: string;
 };
-/** 一件独立作品；键来自 works/<key>.tsx 的文件名。结构错误由编译器带源位置报告。 */
+/** 一件作品；键来自所在 works/<key>.tsx 的文件名。结构错误由编译器带源位置报告。 */
 export const work = (f: Omit<WorkDef, 'kind' | 'source'>): WorkDef => ({ kind: 'work', ...f, source: callsite() });
