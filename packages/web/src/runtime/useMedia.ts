@@ -3,12 +3,13 @@ import type { Project } from '@joplo-app/core/runtime';
 import type { DemoController } from './demo';
 import { MediaEngine } from './media';
 /** Shared by interactive players and video recording; static screenshots never mount it. */
-export function useMedia(ctl: DemoController, project: Project | null, enabled: boolean) {
+/** always：没有配乐也建引擎（录制带旁白的视频时，旁白经它进录音轨）。 */
+export function useMedia(ctl: DemoController, project: Project | null, enabled: boolean, always = false) {
   const reference = useRef<MediaEngine | null>(null);
   const current = useRef({ project, enabled });
   current.current = { project, enabled };
   useEffect(() => {
-    if (!project?.mediaAssets || !Object.keys(project.mediaAssets).length) return;
+    if (!always && (!project?.mediaAssets || !Object.keys(project.mediaAssets).length)) return;
     const engine = new MediaEngine(); reference.current = engine;
     const unlock = (e: Event) => { if (e.isTrusted) engine.unlock(); };
     window.addEventListener('pointerdown', unlock, true); window.addEventListener('keydown', unlock, true);
@@ -26,6 +27,6 @@ export function useMedia(ctl: DemoController, project: Project | null, enabled: 
     };
     raf = requestAnimationFrame(tick);
     return () => { reference.current = null; cancelAnimationFrame(raf); engine.destroy(); window.removeEventListener('pointerdown', unlock, true); window.removeEventListener('keydown', unlock, true); };
-  }, [ctl, project?.mediaAssets]);
+  }, [ctl, project?.mediaAssets, always]);
   return reference;
 }

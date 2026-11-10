@@ -5,10 +5,12 @@
  *   因此按固定步长（sampleMs，默认 50 ms ≈ 20 fps）逐帧前进；每帧截一张图、在辅助页里用 canvas 算与上一帧的像素差。
  *   每隔 every（默认 250 ms）取一帧放进胶片条，标注时间、场景、步号与相邻帧差；同时客观地标出
  *   硬切（单帧整屏突变，前后帧都平静）与长时间静止（≥ stillMs 画面几乎不变）。结果确定、可复现，与墙钟无关。
- * - renderVideo：复用看板导出的录制器（defaultRecorder，Playwright recordVideo，按真实时间），得到可以直接看的 webm。
+ * - renderVideo：复用看板导出的录制器（defaultRecorder，按真实时间），得到可以直接发布的 webm：
+ *   开播前的准备不进视频（#57）；可指定输出分辨率（#55）；已生成的旁白混进音轨（voice=real，#56）；
+ *   可隐藏封面、鼠标、步骤标题条、字幕条，字幕另存为 .srt（#59）。
  *
  * 两者都走渲染路由的录制模式（record=1&frame=1）：与看板导出视频同一套演示控制器、鼠标、字幕；
- * chain=1 按发布站的顺序连续播放到方案的最后一个场景；voice=estimate 让旁白按估算时长“读”（不出声、不调用朗读服务），
+ * chain=1 按发布站的顺序连续播放到方案的最后一个场景。胶片条用 voice=estimate：旁白按估算时长“读”（不出声、不调用朗读服务），
  * 停留时间与开着朗读的发布站一致。
  */
 import fs from 'node:fs';
@@ -21,7 +23,7 @@ import { realProjectDir } from './vite-shared.ts';
 import { joploHome } from './home.ts';
 import { loadPlaywright } from './export-runtime.ts';
 import { launch } from './render.ts';
-import { EXPORT_SIZE, defaultRecorder } from './export.ts';
+import { EXPORT_SIZE, defaultRecorder, srt } from './export.ts';
 
 /** 单帧整屏突变：变化像素占比至少这么多，且是前后帧的 CUT_RATIO 倍以上（排除持续的快速运镜）。 */
 export const CUT_CHANGED = 0.3;
@@ -116,13 +118,20 @@ async function compiled(projectDir: string) {
   return { server, project: payload.project };
 }
 
-function recordUrl(base: string, projectId: string, project: Project, o: { scenarioId: string; theme?: string; chain?: boolean; audio?: boolean; locale?: string; content?: string }) {
+/** 视频分辨率：2–4096 的偶数（VP8 / VP9 编码要求偶数边长）。 */
+function videoDimension(name: string, v: number) {
+  if (!Number.isInteger(v) || v < 2 || v > 4096 || v % 2) throw new JoploError('USAGE', `--${name} for --video must be an even number of pixels from 2 to 4096 (got ${v})`);
+  return v;
+}
+
+function recordUrl(base: string, projectId: string, project: Project, o: { scenarioId: string; theme?: string; chain?: boolean; audio?: boolean; locale?: string; content?: string; voice?: 'real' | 'estimate' | 'off'; hide?: readonly string[]; canvas?: { width: number; height: number } }) {
   if (!project.scenarios[o.scenarioId]) throw new JoploError('NOT_FOUND', `Scenario does not exist: ${o.scenarioId} (available: ${Object.keys(project.scenarios).join(', ') || 'none'})`);
   if (o.content !== undefined && !project.i18n?.locales.includes(o.content))
     throw new JoploError('USAGE', project.i18n ? `--content ${o.content} is not in config locales (${project.i18n.locales.join(', ')})` : `--content needs config({ locales }); this project has a single language`);
-  const q = new URLSearchParams({ render: '1', project: projectId, scenario: o.scenarioId, position: '0', theme: o.theme ?? project.theme ?? 'sketch', frame: '1', record: '1', voice: 'estimate', ...(o.chain ? { chain: '1' } : {}), ...(o.audio === false ? {audio:'0'} : {}), ...(o.locale ? { locale: o.locale } : {}), ...(o.content ? { content: o.content } : {}) });
-  const device = project.scenes[displaySceneId(project, o.scenarioId, 0)]?.viewport === 'mobile' ? 'mobile' : 'desktop';
-  return { url: `${base}?${q}`, size: EXPORT_SIZE[device] };
+  const voice = o.voice ?? 'estimate';
+  const q = new URLSearchParams({ render: '1', project: projectId, scenario: o.scenarioId, position: '0', theme: o.theme ?? project.theme ?? 'sketch', frame: '1', record: '1', ...(voice !== 'off' ? { voice } : {}), ...(o.chain ? { chain: '1' } : {}), ...(o.audio === false ? {audio:'0'} : {}), ...(o.locale ? { locale: o.locale } : {}), ...(o.content ? { content: o.content } : {}), ...(o.hide?.length ? { hide: o.hide.join(',') } : {}), ...(o.canvas ? { w: String(o.canvas.width), h: String(o.canvas.height) } : {}) });
+  const device: 'mobile' | 'desktop' = project.scenes[displaySceneId(project, o.scenarioId, 0)]?.viewport === 'mobile' ? 'mobile' : 'desktop';
+  return { url: `${base}?${q}`, size: EXPORT_SIZE[device], device };
 }
 
 /** 胶片条：按引擎时间逐帧定格取样。 */
@@ -231,18 +240,33 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
   }
 }
 
+const HIDE = ['cover', 'cursor', 'title', 'subtitles'] as const;
+
 /** 视频：与看板导出相同的录制器（真实时间）。 */
 export async function renderVideo(opts: VideoOptions): Promise<VideoResult> {
   const projectDir = realProjectDir(opts.projectDir);
   const out = check({ ...opts, projectDir });
+  if ((opts.width === undefined) !== (opts.height === undefined)) throw new JoploError('USAGE', 'Video width and height must be provided together');
+  const video = opts.width !== undefined ? { width: videoDimension('width', opts.width), height: videoDimension('height', opts.height!) } : null;
+  const bad = (opts.hide ?? []).find((h) => !(HIDE as readonly string[]).includes(h));
+  if (bad) throw new JoploError('USAGE', `Unknown --hide item ${JSON.stringify(bad)} (use ${HIDE.join(', ')})`);
+  const voice = opts.voice ?? 'real';
+  if (!['real', 'estimate', 'off'].includes(voice)) throw new JoploError('USAGE', `--voice must be real, estimate or off (got ${String(voice)})`);
+  const srtOut = opts.srt ? check({ out: opts.srt, overwrite: opts.overwrite, projectDir }) : null;
+  if (srtOut && srtOut === out) throw new JoploError('USAGE', 'The subtitle file must differ from the video file');
   const { server, project } = await compiled(projectDir);
   try {
-    const { url, size } = recordUrl(server.url, server.projectId, project, opts);
+    // 输出分辨率（#55）：视口就是视频分辨率，渲染路由把舞台等比缩放进这块画布（录屏按 CSS 像素取帧，deviceScaleFactor 不会让它更清晰）
+    const { url, size } = recordUrl(server.url, server.projectId, project, { ...opts, voice, hide: opts.hide ?? [], ...(video ? { canvas: video } : {}) });
     fs.mkdirSync(path.dirname(out), { recursive: true });
     if (opts.overwrite) fs.rmSync(out, { force: true });
     const started = Date.now();
-    await defaultRecorder((dir) => loadPlaywright({ home: joploHome(), projectDir: dir }))({ projectDir, url, size, out, total: 0, progress: () => undefined, signal: new AbortController().signal, maxMs: MAX_MS });
-    return { path: out, durationMs: Date.now() - started };
+    const outcome = await defaultRecorder((dir) => loadPlaywright({ home: joploHome(), projectDir: dir }))({ projectDir, url, size: video ?? size, out, total: 0, progress: () => undefined, signal: new AbortController().signal, maxMs: MAX_MS });
+    if (srtOut) {
+      fs.mkdirSync(path.dirname(srtOut), { recursive: true });
+      fs.writeFileSync(srtOut, srt(outcome?.cues ?? []), opts.overwrite ? undefined : { flag: 'wx' });
+    }
+    return { path: out, durationMs: Date.now() - started, size: video ?? size, srt: srtOut, voice: outcome?.voice ?? { mode: voice, missing: [] } };
   } finally {
     await server.close();
   }

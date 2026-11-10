@@ -39,12 +39,28 @@ export class MediaEngine {
     const data = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]!); reader.onerror = () => reject(reader.error); reader.readAsDataURL(blob); });
     this.captureClock?.stop();this.captureClock?.disconnect();this.captureClock=undefined;this.chunks=[];this.recorder=undefined;this.capture?.stream.getTracks().forEach(t=>t.stop());this.capture=undefined;return { data };
   }
+  /** 校准闪屏出现那一刻的页面时间（performance.now）；录制端用它把字幕时间对到视频时间轴上。 */
+  calibratedAt: number | null = null;
+  /**
+   * 录制旁白（#56）：在同一个 AudioContext 里播一段已解码的旁白，同时进扬声器和录音轨（配乐因此照常避让）。
+   * 没有 AudioContext 时返回 null。
+   */
+  narrationOutput(): { audio: AudioContext; connect(node: AudioNode): void } | null {
+    const audio = this.audio; if (!audio) return null;
+    return { audio, connect: (node) => { node.connect(audio.destination); if (this.capture) node.connect(this.capture); } };
+  }
+  /** 解码录制要用的一段旁白（与配乐同一个 AudioContext）。 */
+  async decode(bytes: ArrayBuffer): Promise<AudioBuffer> {
+    this.unlock();
+    const audio = this.audio; if (!audio) throw new Error('AudioContext unavailable');
+    return audio.decodeAudioData(bytes);
+  }
   async calibrate() {
     const audio=this.audio,capture=this.capture;if(!audio||!capture)return false;
     const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgb(255,0,255);pointer-events:none';
     const tone=audio.createOscillator(),gain=audio.createGain();gain.gain.value=.65;tone.frequency.value=2000;tone.connect(gain);gain.connect(capture);
     const when=audio.currentTime+.06;tone.start(when);tone.stop(when+.15);tone.onended=()=>{tone.disconnect();gain.disconnect();};
-    await new Promise<void>(resolve=>{const tick=()=>{if(audio.currentTime>=when){document.body.append(overlay);resolve();}else requestAnimationFrame(tick);};requestAnimationFrame(tick);});
+    await new Promise<void>(resolve=>{const tick=()=>{if(audio.currentTime>=when){document.body.append(overlay);this.calibratedAt=performance.now();resolve();}else requestAnimationFrame(tick);};requestAnimationFrame(tick);});
     await new Promise(r=>setTimeout(r,230));return true;
   }
   unlock = () => {

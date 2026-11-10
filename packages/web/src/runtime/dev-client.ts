@@ -212,7 +212,8 @@ export async function exportImage(projectId: string, body: ExportRequest): Promi
   }
 }
 
-export async function startVideo(projectId: string, body: Omit<ExportRequest, 'position'>): Promise<{ ok: true; job: VideoJob } | { ok: false; message: Text; job?: VideoJob }> {
+/** voice（#56）：看板开着朗读时为 true，导出的视频混进已生成的旁白并按真实时长停留。 */
+export async function startVideo(projectId: string, body: Omit<ExportRequest, 'position'> & { voice?: boolean }): Promise<{ ok: true; job: VideoJob } | { ok: false; message: Text; job?: VideoJob }> {
   try {
     const res = await post(`/__joplo/p/${enc(projectId)}/export/video`, body);
     const b = (await res.json().catch(() => null)) as { job?: VideoJob; error?: { message?: string } } | null;

@@ -21,6 +21,7 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 ## Common codes → fixes
 - WORK_INVALID (error): read the specific reason: default export must be work({...}); title and summary must each be nonempty; scenarios must be an object of flow()/chapter() entries; stage must be a JSX element; layers must be a layer-entry object; stage and layers cannot coexist. A project with no pages needs stage, layers, on or routes. Multiple invalid fields produce separate reasons. Standalone order must be finite; an invalid value has a work ref. Match the diagnostic code and ref, not an old full message.
 - PROJECT_MODULE_CONFIG (error): when loading a project without tsconfig.json fails, add jsx: "react-jsxdev" and jsxImportSource: "@joplo-app/kit" plus package.json type: module. The message ends with underlying error: inspect it for a missing dependency or an author-code exception as well as JSX/module setup; fix that cause and rerun. A bare project that loads successfully is accepted.
+- LOAD_FAILED "was compiled without Joplo's JSX runtime": a TSX file outside the project directory (shared components above several projects in one repository) is compiled with the JSX settings of its own nearest tsconfig.json, not the project's. The diagnostic points at that file; give its folder (or the repository root) a tsconfig.json with jsx: "react-jsxdev" and jsxImportSource: "@joplo-app/kit", or add the /** @jsxRuntime automatic */ /** @jsxImportSource @joplo-app/kit */ pragmas. node_modules packages are never recompiled this way; ship plugin components as compiled packages instead. The board watches only the project directory, so after editing a shared file save any project file (or rerun check) to reload it.
 - WORK_ID_CONFLICT (error): rename the work file or feature folder so their entry keys differ.
 - WORK_SLICES_MIXED (error): use all chapter() for a linear work or all flow() for independent slices, including options under a feature.
 - WORK_FEATURE_ONLY (error): standalone works cannot declare focus/tradeoffs/coverage/rules/questions, slice cases or step uses(). Remove those fields or attach the work to a feature for design review.
@@ -115,4 +116,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.6.1 sha256:7aa2ad2e395de1d9f497f2b086a2a82209047fb431c6aa0693179fecd0c65549 -->
+<!-- joplo-skill 0.6.1 sha256:82c436418a17ea5a1dc01be3b2b3e7e5402c69e31eeb67bf6e554e63e16c51a8 -->

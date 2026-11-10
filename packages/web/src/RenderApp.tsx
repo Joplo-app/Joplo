@@ -18,11 +18,19 @@ import { useBoardI18n } from './i18n/board/context';
  * - chain=1（与 record 同用）：放完一个场景接着放同一方案的下一个场景，顺序与发布站的连续播放相同（nextScenarioId）。
  * - voice=estimate（与 record 同用，`joplo render --film/--video`）：不出声，但每段旁白按 voiceMs 估算的时长“读”，
  *   画面停留与发布站开着朗读时一致；不调用任何朗读服务。
+ * - voice=real（与 record 同用，#56）：已经生成的旁白音频混进录音轨，按真实音频时长停留；没有音频的段按估算时长，
+ *   __JOPLO_RECORD__.voice() 列出这些段。不生成音频。
+ * - hide=cover,cursor,title,subtitles（与 record 同用，#59）：干净画面，不画开场封面、鼠标与点击波纹、步骤标题条（含完成徽标）、字幕条。
+ *   字幕即使隐藏也照常记录时间（__JOPLO_RECORD__.cues()），供服务端另存为 .srt。
+ * - frame=1 且给了 w/h（#55）：`[data-jexport]` 是 w×h 的画布（主题背景色），舞台（手机含外框）等比缩放后居中。
+ *   视频的录屏按 CSS 像素取帧、不跟 deviceScaleFactor，所以服务端让视口就是输出分辨率，舞台在这里用 CSS 缩放（文字与矢量重新栅格化，清晰）；
+ *   演示控制器量位置时已经按舞台的实际缩放换算。
  */
-import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { THEME_NAME, displaySceneId, stateAt, type AppearanceFont, type AppearanceStroke, type PlayState, type Project } from '@joplo-app/core/runtime';
 import { fetchIR } from './runtime/dev-client';
 import { useMedia } from './runtime/useMedia';
+import type { MediaEngine } from './runtime/media';
 import { DemoController } from './runtime/demo';
 import { Stage, VIEWPORTS, type Viewport } from './renderer/Stage';
 import { viewportDecoration } from './renderer/plugins';
@@ -49,6 +57,11 @@ import { Narrator, type Narration } from './runtime/voice';
 import { voiceMs } from '@joplo-app/core/runtime';
 import { nextScenarioId } from './player/watch';
 import { playSequence } from './runtime/views';
+import { RecordVoice, type MissingLine } from './runtime/record-voice';
+import { fetchVoiceState } from './runtime/dev-client';
+import { boardVoiceLookup } from './i18n/content';
+import { stepCaption } from './i18n/step-caption';
+import { speakerRoleAt, spokenLine } from '@joplo-app/core/runtime';
 
 /** 截图用的 IR：content 参数是项目的内容语言时换成这种语言（与看板预览同一个 viewProject）。 */
 export function renderProject(project: Project, content: string | null, uiLocale: string): Project {
@@ -59,8 +72,30 @@ type W = {
   __JOPLO_READY__?: boolean;
   __JOPLO_STATE__?: PlayState | null;
   __JOPLO_ERROR__?: string | null;
-  __JOPLO_RECORD__?: { play(): Promise<void>; stopAudio(): Promise<{ data: string } | null>; calibrate():Promise<boolean>; progress: RecordProgress };
+  __JOPLO_RECORD__?: RecordApi;
 };
+
+/** 录制接口（服务端经 page.evaluate 调用）。prepare 做开播前的准备（解码配乐与旁白、开始录音），录屏在它之后才开始（#57）。 */
+export type RecordApi = {
+  prepare(): Promise<void>;
+  play(): Promise<void>;
+  stopAudio(): Promise<{ data: string } | null>;
+  calibrate(): Promise<boolean>;
+  /** 校准闪屏出现时的页面时间（performance.now）；没有校准时为 null。 */
+  calibratedAt(): number | null;
+  /** 字幕变化（页面时间，text = null 表示字幕消失），开播之后才记。 */
+  cues(): RecordCue[];
+  voice(): { mode: VoiceMode; missing: MissingLine[] };
+  progress: RecordProgress;
+};
+export type RecordCue = { at: number; text: string | null };
+export type VoiceMode = 'estimate' | 'real' | 'off';
+/** hide 参数里认识的项（#59）。 */
+export const HIDE_ITEMS = ['cover', 'cursor', 'title', 'subtitles'] as const;
+export type HideItem = (typeof HIDE_ITEMS)[number];
+export function parseHide(raw: string | null): Set<HideItem> {
+  return new Set((raw ?? '').split(',').map((x) => x.trim()).filter((x): x is HideItem => (HIDE_ITEMS as readonly string[]).includes(x)));
+}
 
 export type RecordProgress = { step: number; done: boolean; error: string | null; scenarioId: string | null; position: number; activeStep: number | null };
 
@@ -107,7 +142,9 @@ export function RenderApp() {
   const record = params.get('record') === '1';
   const chain = params.get('chain') === '1';
   const captureAudio = params.get('audio') !== '0';
-  const voiceEstimate = params.get('voice') === 'estimate';
+  const voiceParam = params.get('voice');
+  const voiceMode: VoiceMode = voiceParam === 'estimate' || voiceParam === 'real' ? voiceParam : 'off';
+  const hide = useMemo(() => parseHide(params.get('hide')), [location.search]);
   // 可选的截图尺寸（renderStep 的 viewport）：只决定画布大小，舞台宽度仍是页面自己的 viewport（D44）
   const w = Number(params.get('w'));
   const h = Number(params.get('h'));
@@ -220,6 +257,17 @@ export function RenderApp() {
     </>
   );
   const wrapInner = (stageNode: ReactNode, hud: Hud, c: CurtainSpec | null) => {
+    if (frame && shot) {
+      // 输出画布（#55）：舞台等比缩放后居中，四周是主题背景色
+      const k = Math.min(shot.width / fw, shot.height / fh);
+      return (
+        <div data-jexport="" className="jtheme" data-theme={theme} style={{ position: 'absolute', left: 0, top: 0, width: shot.width, height: shot.height, overflow: 'hidden', background: 'var(--jp-bg, #f8f9fa)' }}>
+          <div style={{ position: 'absolute', left: (shot.width - fw * k) / 2, top: (shot.height - fh * k) / 2, width: fw, height: fh, ...(k !== 1 ? { transform: `scale(${k})`, transformOrigin: '0 0' } : {}) }}>
+            {withHud(withCurtain(framed(stageNode), c, fw, fh), hud, fw, fh)}
+          </div>
+        </div>
+      );
+    }
     if (frame)
       return (
         <div data-jexport="" style={{ position: 'absolute', left: 0, top: 0, display: 'inline-block', ...(viewport === 'mobile' ? { background: '#ffffff', padding: 16 } : {}) }}>
@@ -241,7 +289,7 @@ export function RenderApp() {
       </div>
     );
   };
-  if (record) return <RecordStage project={data.project} scenarioId={scenarioId} chain={chain} captureAudio={captureAudio} voiceEstimate={voiceEstimate} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} />;
+  if (record) return <RecordStage project={data.project} projectId={projectId} content={params.get('content')} scenarioId={scenarioId} chain={chain} captureAudio={captureAudio} voiceMode={voiceMode} hide={hide} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} />;
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
   const plan = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null);
@@ -264,8 +312,13 @@ export function RenderApp() {
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
-function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, theme, font, stroke, registry, setStage, wrap }: { project: Project; scenarioId: string; chain: boolean; captureAudio: boolean; voiceEstimate: boolean; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, hud: Hud, c: CurtainSpec | null) => ReactNode }) {
+function RecordStage({ project, projectId, content, scenarioId, chain, captureAudio, voiceMode, hide, theme, font, stroke, registry, setStage, wrap }: { project: Project; projectId: string; content: string | null; scenarioId: string; chain: boolean; captureAudio: boolean; voiceMode: VoiceMode; hide: ReadonlySet<HideItem>; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, hud: Hud, c: CurtainSpec | null) => ReactNode }) {
   const { t: i18n } = useBoardI18n();
+  // useMedia 要等控制器建好才能调用；旁白在播放时才用到引擎，经这个盒子晚一步拿到
+  const engineBox = useRef<{ current: MediaEngine | null } | null>(null);
+  const engine = () => engineBox.current?.current ?? null;
+  // 真实旁白（#56）：有音频的段经媒体引擎播放并进录音轨，没有的按估算时长
+  const recordVoice = useMemo(() => voiceMode === 'real' ? new RecordVoice({ output: () => engine()?.narrationOutput() ?? null, decode: (b) => engine()?.decode(b) ?? Promise.reject(new Error('Media engine is not ready')), fallback: estimatedNarrator() }) : null, [voiceMode]);
 
   const ctl = useMemo(() => {
     const c = new DemoController(null);
@@ -277,20 +330,29 @@ function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, 
       const workId = project.scenarios[scenarioId]?.workId ?? null;
       c.autoNext = (id) => nextScenarioId(playSequence(project, workId), id);
     } else c.autoNext = null;
-    if (voiceEstimate) c.narrator = estimatedNarrator();
+    if (voiceMode === 'estimate') c.narrator = estimatedNarrator();
+    else if (recordVoice) c.narrator = recordVoice.narrator;
     return c;
-  }, [project, scenarioId, chain, voiceEstimate]);
+  }, [project, scenarioId, chain, voiceMode, recordVoice]);
   ctl.i18n = i18n;
-  const media = useMedia(ctl, project, captureAudio);
-  const recordingAssets = useMemo(() => {
+  const media = useMedia(ctl, project, captureAudio, !!recordVoice && captureAudio);
+  engineBox.current = media;
+  // 要录的章：这一章，chain 时加上后面的章
+  const chapters = useMemo(() => {
     const sc = project.scenarios[scenarioId];
     // playSequence 返回场景对象；这里按 id 找当前章及其后面的章（原先拿 id 去对象数组里找，永远找不到，只收了第一章的配乐）
     const sequence = chain ? playSequence(project, sc?.workId ?? null).map((s) => s.id) : [scenarioId];
     const at = sequence.indexOf(scenarioId);
-    const chapters = (at >= 0 ? sequence.slice(at) : [scenarioId]).map(id => project.scenarios[id]);
-    const ids = new Set(chapters.flatMap(chapter => [chapter, ...(chapter?.steps ?? [])].flatMap(s => Object.values(s?.media ?? {}).map(t => t.resource))));
-    return Object.fromEntries([...ids].filter(id => project.mediaAssets?.[id]).map(id => [id, project.mediaAssets![id]!]));
+    return (at >= 0 ? sequence.slice(at) : [scenarioId]).map(id => project.scenarios[id]).filter((x): x is NonNullable<typeof x> => !!x);
   }, [project, scenarioId, chain]);
+  const recordingAssets = useMemo(() => {
+    const ids = new Set(chapters.flatMap(chapter => [chapter, ...chapter.steps].flatMap(s => Object.values(s?.media ?? {}).map(t => t.resource))));
+    return Object.fromEntries([...ids].filter(id => project.mediaAssets?.[id]).map(id => [id, project.mediaAssets![id]!]));
+  }, [project, chapters]);
+  // 要读的每一段（与控制器 narrate 同一个算法），开播前预取音频
+  const voiceLines = useMemo(() => recordVoice ? chapters.flatMap(chapter => chapter.steps.map((step, i) => spokenLine(step, stepCaption(step, i18n), speakerRoleAt(project, chapter.id, i + 1)))).filter(l => l.text.trim()).map(l => ({ text: l.text, role: l.role })) : [], [recordVoice, chapters, project, i18n]);
+  const cues = useRef<RecordCue[]>([]);
+  const prepared = useRef<Promise<void> | null>(null);
   const snap = useSyncExternalStore(ctl.subscribe, ctl.getSnapshot);
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
   const [started, setStarted] = useState(false);
@@ -300,17 +362,28 @@ function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, 
     const current = snap.scenarioId ? project.scenarios[snap.scenarioId] : undefined;
     const total = current?.steps.length ?? 0;
     w.__JOPLO_STATE__ = snap.state;
+    const prepare = () => prepared.current ??= (async () => {
+      if (recordVoice) {
+        const state = await fetchVoiceState(projectId);
+        await recordVoice.prepare(boardVoiceLookup(state, content), voiceLines);
+      }
+      if (captureAudio && (Object.keys(recordingAssets).length || recordVoice?.hasAudio)) {
+        if (!media.current) throw new Error('Recording media engine is not ready');
+        await media.current.startCapture(recordingAssets,project.mediaInfo);
+      }
+    })();
     w.__JOPLO_RECORD__ = {
+      prepare,
       play: async () => {
-        if (captureAudio && Object.keys(recordingAssets).length) {
-          if (!media.current) throw new Error('Recording media engine is not ready');
-          await media.current.startCapture(recordingAssets,project.mediaInfo);
-        }
+        await prepare();
         setStarted(true);
         if (total === 0) return;
         void ctl.play();
       },
       calibrate: () => media.current?.calibrate() ?? Promise.resolve(false),
+      calibratedAt: () => media.current?.calibratedAt ?? null,
+      cues: () => cues.current.slice(),
+      voice: () => ({ mode: voiceMode, missing: recordVoice?.missing.slice() ?? [] }),
       stopAudio: () => media.current?.endCapture() ?? Promise.resolve(null),
       progress: {
         step: snap.state?.position ?? 0,
@@ -319,7 +392,7 @@ function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, 
         scenarioId: snap.scenarioId, position: snap.state?.position ?? 0, activeStep: snap.activeStep,
       },
     };
-  }, [snap, started, ctl, project, scenarioId, recordingAssets, media, captureAudio]);
+  }, [snap, started, ctl, project, projectId, content, scenarioId, recordingAssets, media, captureAudio, recordVoice, voiceLines, voiceMode]);
 
   const next = ctl.nextStep();
   const nextTargetId = next && 'target' in next.action ? next.action.target : null;
@@ -328,6 +401,14 @@ function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, 
   const shownScenario = snap.scenarioId ?? scenarioId;
   const plan = cameraFor(project, shownScenario, cameraPosition(ctl.scenario(), snap.state?.position ?? 0, snap.activeStep), snap.leadLayer);
   useLayoutEffect(() => ctl.setStageView(plan.sceneId, true), [ctl, plan.sceneId]);
+  const subtitle = snap.state ? spokenSubtitleFor(sc, snap.state.position, snap.activeStep, i18n, project) : null;
+  // 字幕时间（#59）：开播后每次变化记一条，隐藏字幕条时也照常记
+  const cueText = started ? (subtitle?.text ?? null) : undefined;
+  useEffect(() => {
+    if (cueText === undefined) return;
+    const last = cues.current[cues.current.length - 1];
+    if (!last ? cueText !== null : last.text !== cueText) cues.current.push({ at: performance.now(), text: cueText });
+  }, [cueText, snap.scenarioId]);
   if (!snap.state) return null;
   return <EngineClockContext.Provider value={ctl.clock}>{wrap(
     <Stage
@@ -355,7 +436,7 @@ function RecordStage({ project, scenarioId, chain, captureAudio, voiceEstimate, 
       }}
       overlay={<Overlay snap={snap} stage={stageEl} nextTargetId={null} setCursorEl={ctl.setCursorEl} onBackToDemo={() => undefined} onDismiss={() => undefined} />}
     />,
-    { subtitle: spokenSubtitleFor(sc, snap.state.position, snap.activeStep, i18n, project), title: stepTitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n), clock: ctl.clock },
-    { scenarioId: shownScenario, position: snap.state.position, cover: coverShown(sc, snap.state.position, snap.playing, snap.activeStep, snap.freeMode) ? coverFor(project, shownScenario, i18n) : null, animate: true },
-  )}</EngineClockContext.Provider>;
+    { subtitle: hide.has('subtitles') ? null : subtitle, title: hide.has('title') ? null : stepTitleFor(sc, snap.state.position, snap.activeStep, snap.state.completed, i18n), clock: ctl.clock },
+    { scenarioId: shownScenario, position: snap.state.position, cover: !hide.has('cover') && coverShown(sc, snap.state.position, snap.playing, snap.activeStep, snap.freeMode) ? coverFor(project, shownScenario, i18n) : null, animate: true },
+  )}{hide.has('cursor') ? <style>{'[data-joverlay="cursor"],[data-joverlay="ripple"]{visibility:hidden!important}'}</style> : null}</EngineClockContext.Provider>;
 }

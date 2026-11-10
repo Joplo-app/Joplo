@@ -34,3 +34,14 @@ describe('stepBoundaries', () => {
     expect(b.map(x => [x.atMs, x.position, x.chapter, x.maxChanged])).toEqual([[100, 1, false, 0.3], [250, 0, true, 0.1]]);
   });
 });
+
+describe('renderVideo 的纯函数（#59）', () => {
+  it('videoCues：页面时间对到视频时间，空字幕结束上一条，结尾截到视频末尾', async () => {
+    const { videoCues, srt } = await import('../src/export.ts');
+    const cues = videoCues([{ at: 1500, text: '第一句' }, { at: 3500, text: null }, { at: 4000, text: 'Second\nline' }], 1000, 6);
+    expect(cues).toEqual([{ start: 0.5, end: 2.5, text: '第一句' }, { start: 3, end: 6, text: 'Second\nline' }]);
+    expect(srt(cues)).toBe('1\n00:00:00,500 --> 00:00:02,500\n第一句\n\n2\n00:00:03,000 --> 00:00:06,000\nSecond\nline\n');
+    // 开播前（origin 之前）的字幕从 0 开始；太短的丢掉
+    expect(videoCues([{ at: 900, text: 'a' }, { at: 1020, text: 'b' }, { at: 1040, text: null }], 1000, 5)).toEqual([]);
+  });
+});

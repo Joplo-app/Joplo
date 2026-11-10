@@ -33,7 +33,7 @@ npx joplo render [dir] --scenario-id <qid> --out <file> \
   [--width <pixels> --height <pixels>] [--scale <scale>] [--overwrite]
 npx joplo render [dir] --scenario-id <qid> --out <file> --sheet [--columns <n>] [--theme <theme>] [--overwrite]
 npx joplo render [dir] --scenario-id <qid> --out <file.png> --film [--chain] [--every <ms>] [--columns <n>] [--frames <dir>] [--format text|json] [--overwrite]
-npx joplo render [dir] --scenario-id <qid> --out <file.webm> --video [--chain] [--overwrite]
+npx joplo render [dir] --scenario-id <qid> --out <file.webm> --video [--chain] [--width <px> --height <px>] [--voice real|estimate|off] [--hide <items> | --clean] [--srt <file.srt>] [--overwrite]
 ```
 
 可省略的 dir 默认为当前目录。`render` 的 scenario-id、out 必填。主输出和帮助写 stdout，服务日志、截图告警和项目依赖版本提示写 stderr；用法错误或缺少分享选择（CHOICE_REQUIRED）退出 2，领域或执行失败退出 1，云端需要登录（AUTH_REQUIRED / AUTH_EXPIRED）退出 3，账号空间不够（share）退出 6，Joplo Cloud 朗读额度不够（voice，`TTS_QUOTA_EXCEEDED`）退出 7，成功退出 0。
@@ -263,13 +263,17 @@ npx joplo preview [dir] [--port <port>]
 | `--out <file>` | 截图文件，必填；相对当前目录解析 |
 | `--step-id <qid>` | 指定步骤后的状态 |
 | `--theme <theme>` | 内置主题名或项目 themes/name.css 的名称，默认项目 config 的主题 |
-| `--width <pixels>` / `--height <pixels>` | 截图输出宽高，必须同时给出正整数；按比例容纳页面，不改变页面自己的 viewport 或响应式断点 |
+| `--width <pixels>` / `--height <pixels>` | 截图输出宽高，必须同时给出正整数；按比例容纳页面，不改变页面自己的 viewport 或响应式断点。配合 `--video` 时是视频分辨率（2–4096 的偶数，例如 1920×1080、1080×1920）：舞台（手机含外框）等比缩放后居中，四周是主题背景色，文字与线条按输出分辨率重新绘制，不是放大位图。舞台本身的宽高比不变（电脑 16:10），竖屏画幅放手机页面最合适。不能与 `--film` 同用 |
 | `--scale <scale>` | 有限正数，像素倍率 |
 | `--overwrite` | 允许覆盖已有截图；仍不得覆盖项目源码或 `.joplo/` |
 | `--sheet` | 分镜：把场景从初始画面到最后一步逐步截图，拼成一张网格图，每格下面写步号、字幕与旁白（`narrate`，没有时为 `say`）；各步的截图告警加 `Step n:` 前缀写到 stderr。不能与 `--step-id`、`--width`、`--height` 同用。分镜只有每一步落定后的画面，看不出硬切与静止；运动用 `--film` 检查 |
 | `--columns <n>` | 分镜每行几格（1–6，默认 3）；胶片条每行几格（默认 8） |
 | `--film` | 胶片条（D92）：用渲染路由的录制模式真实播放场景，Playwright 假时钟按引擎时间逐帧定格（约 50 ms 一帧算相邻帧差），每 `--every` 毫秒取一格；每格标时间、步号、本格最大相邻帧差。红框 = 单帧整屏突变（硬切），灰框 = 至少 1.5 s 没有可见变化（静止）。每个场景一页（多页时文件名加 `-1`、`-2`…），旁边写 `<out>.json`（全部帧的差值、硬切、静止、每次提交前后的最大帧差）。stdout 打印文件路径、时长、换章处的最大帧差以及每个 `CUT` / `STILL`。旁白按估算时长“读”（不出声、不调用朗读服务），停留与开着朗读的发布站一致 |
-| `--video` | 视频：同一录制模式按真实时间录 webm（与看板导出同一个录制器；不含声音） |
+| `--video` | 视频：同一录制模式按真实时间录 webm（与看板导出同一个录制器）。音轨是媒体插件的配乐混音加上已生成的旁白（见 `--voice`）；浏览器朗读（Web Speech）录不进去。开播前的载入、字体与音频准备不进视频，画面从封面淡出、第一步开始（项目自带的旧版 Playwright 没有录屏接口时退回从建页开始录）。stdout 打印视频路径、`--srt` 路径、分辨率与旁白模式；`real` 模式下列出没有音频、按估算时长停留的旁白 |
+| `--voice <mode>` | 配合 `--video`：`real`（默认）= 已用 `joplo voice` / 看板生成的旁白音频（`.joplo/voice/`，当前声音）混进音轨，按真实音频时长停留，没有音频的段按估算时长（不出声）并在输出里列出；`estimate` = 全部按估算时长、不出声；`off` = 不读旁白，停留只按阅读时间。从不生成音频、不花朗读额度 |
+| `--hide <items>` | 配合 `--video`：干净画面，逗号分隔：`cover`（开场封面）、`cursor`（鼠标与点击波纹）、`title`（左上角步骤标题条，含结束时的完成徽标）、`subtitles`（底部字幕条）。章节之间的过渡卡是内容，不隐藏 |
+| `--clean` | 配合 `--video`：等于 `--hide cover,cursor,title,subtitles` |
+| `--srt <file>` | 配合 `--video`：另存字幕为 SubRip 文件，时间对到视频时间轴（字幕条出现到消失）；隐藏字幕条时也可以用，交给视频平台用它自己的字幕样式 |
 | `--chain` | 配合 `--film` / `--video`：放完接着放同一方案的下一个场景（发布站连续播放的顺序），直到最后一个；`chapter()` 接力的章节一镜到底 |
 | `--every <ms>` | 胶片条每格的间隔（默认 250） |
 | `--frames <dir>` | 胶片条的每一格另存为 JPEG，便于全尺寸检查可疑的一帧 |
