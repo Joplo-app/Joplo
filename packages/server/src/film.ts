@@ -189,21 +189,13 @@ export async function renderFilm(opts: FilmOptions): Promise<FilmResult> {
     const stageRatio = 1;
     const samples: Sample[] = [];
     let tail = -1;
-    let advanced = 0;
     // 第一帧在开播之前采（封面 / 第 0 步）：开播那一下的切换也要量到
     for (let t = 0; t <= MAX_MS; t += sampleMs) {
       if (t === sampleMs) {
         await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { play(): void } }).__JOPLO_RECORD__.play());
         await flush(page);
       }
-      // 每个 rAF 网格点都等 React 提交，不能把多个动画帧一次推进后才 flush：
-      // 否则下一步 effect 可能在 runFor 中途或末尾启动，产生一个采样的漂移。
-      while (advanced < t) {
-        const next = Math.min(t, (Math.floor(advanced / 16) + 1) * 16);
-        await page.clock.runFor(next - advanced);
-        await flush(page);
-        advanced = next;
-      }
+      if (t > 0) await page.clock.runFor(sampleMs);
       await flush(page);
       const p = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { progress: Progress } }).__JOPLO_RECORD__.progress);
       if (p.error) throw new JoploError('RENDER_FAILED', `Playback failed at ${t} ms: ${p.error}`);
