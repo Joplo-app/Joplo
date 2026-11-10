@@ -8,7 +8,10 @@
     ".": "./src/index.ts",
     "./node": "./src/node.ts",
     "./package.json": "./package.json",
-    "./runtime": "./src/runtime.ts"
+    "./runtime": "./src/runtime.ts",
+    "./schema": "./src/schema.ts",
+    "./features": "./src/features.ts",
+    "./catalog": "./src/catalog.ts"
   },
   "files": [
     "dist"
@@ -39,6 +42,18 @@
       "./runtime": {
         "types": "./dist/runtime.d.ts",
         "default": "./dist/runtime.js"
+      },
+      "./schema": {
+        "types": "./dist/schema.d.ts",
+        "default": "./dist/schema.js"
+      },
+      "./features": {
+        "types": "./dist/features.d.ts",
+        "default": "./dist/features.js"
+      },
+      "./catalog": {
+        "types": "./dist/catalog.d.ts",
+        "default": "./dist/catalog.js"
       }
     }
   },
