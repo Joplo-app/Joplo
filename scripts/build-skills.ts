@@ -32,21 +32,30 @@ for (const file of skillFiles(version)) {
   await writeFile(path, file.content);
   console.log(`Wrote skills/${file.path} (${version})`);
 }
-// The template is a versioned product artifact. It supplies guidance before npm install;
+// Templates are versioned product artifacts. It supplies guidance before npm install;
 // project skill install will later regenerate these files from its actual config.
-const templateSkills=pluginSkillFiles(version,[ui,diagram,content,alda({})].map(p=>({...p,version})));
-const templateRoot=join(root,'templates/starter/.claude/skills');
-const manifestPath=join(templateRoot,PLUGIN_SKILL_MANIFEST);
-const previous=await readFile(manifestPath,'utf8').then(s=>JSON.parse(s).files as string[],()=>[]);
-const next=new Set(templateSkills.map(f=>f.path));
-for(const path of previous)if(!next.has(path)){
-  stale++;if(check)console.error(`Stale template skill: ${path}`);else await unlink(join(templateRoot,path)).catch(()=>{});
-}
-for(const file of [...templateSkills,{path:PLUGIN_SKILL_MANIFEST,content:pluginSkillManifest(templateSkills)}]){
- const path=join(templateRoot,file.path),current=await readFile(path).catch(()=>null);
- if(current?.equals(file.content))continue;
- stale++;if(check){console.error(`Template skill ${file.path} is out of date; run pnpm skills:build`);continue;}
- await mkdir(dirname(path),{recursive:true});await writeFile(path,file.content);
+for (const [name, plugins] of [['starter', [ui, diagram, content, alda({})]], ['work', [ui]]] as const) {
+  const templateSkills = pluginSkillFiles(version, plugins.map(p => ({ ...p, version })));
+  const templateRoot = join(root, 'templates', name, '.claude/skills');
+  const manifestPath = join(templateRoot, PLUGIN_SKILL_MANIFEST);
+  const previous = await readFile(manifestPath, 'utf8').then(s => JSON.parse(s).files as string[], () => []);
+  const next = new Set(templateSkills.map(f => f.path));
+  for (const path of previous) if (!next.has(path)) {
+    stale++;
+    if (check) console.error(`Stale templates/${name} skill: ${path}`);
+    else await unlink(join(templateRoot, path)).catch(() => {});
+  }
+  for (const file of [...templateSkills, { path: PLUGIN_SKILL_MANIFEST, content: pluginSkillManifest(templateSkills) }]) {
+    const path = join(templateRoot, file.path), current = await readFile(path).catch(() => null);
+    if (current?.equals(file.content)) continue;
+    stale++;
+    if (check) {
+      console.error(`templates/${name} skill ${file.path} is out of date; run pnpm skills:build`);
+      continue;
+    }
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, file.content);
+  }
 }
 if (check && stale) process.exit(1);
 if (!stale) console.log(`skills/ is up to date (${version})`);

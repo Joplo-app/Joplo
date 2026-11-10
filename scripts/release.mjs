@@ -325,6 +325,52 @@ async function smoke() {
     assert(!pkg.dependencies?.['@joplo-app/plugin-3d'] && !pkg.devDependencies?.['@joplo-app/plugin-3d'], 'Starter must omit optional 3D');
     assert(!fs.readFileSync(path.join(project,'joplo.config.ts'),'utf8').includes('plugin-3d'), 'Starter must not enable 3D');
 
+    // Standalone template: initialize before installing dependencies, then consume only packed packages.
+    const workProject = path.join(base, 'my-show');
+    const workInit = sh(npxJoplo, ['init', 'my-show', '--template', path.join(REPO, 'templates/work')], base, { env: ua });
+    const workPkg = readJson(path.join(workProject, 'package.json'));
+    assert(Object.keys(workPkg.devDependencies).sort().join(',') === '@joplo-app/kit,@joplo-app/plugin-ui,joplo', 'Work template should install only the packages it uses');
+    for (const [name, value] of Object.entries(workPkg.devDependencies)) assert(value === v, `Work template must pin ${name} to ${v}`);
+    for (const name of ['joplo', 'joplo-feedback']) assert(fs.readFileSync(path.join(workProject, '.claude/skills', name, 'SKILL.md'), 'utf8') === fs.readFileSync(path.join(REPO, 'skills', name, 'SKILL.md'), 'utf8'), `Work init skill ${name} differs from the official skill`);
+    assert(fs.readFileSync(path.join(workProject, 'AGENTS.md'), 'utf8') === fs.readFileSync(path.join(project, 'AGENTS.md'), 'utf8'), 'Both templates must install the same managed AGENTS.md block');
+    assert(workInit.stdout.includes('Template plugin guides are ready'), 'Work init must supply plugin guidance before npm install');
+    workPkg.devDependencies = Object.fromEntries(Object.keys(workPkg.devDependencies).map(name => [name, tgz[name]]));
+    workPkg.overrides = overrides;
+    fs.writeFileSync(path.join(workProject, 'package.json'), JSON.stringify(workPkg, null, 2) + '\n');
+    sh(npm, ['install', ...npmFlags], workProject);
+    const workJoplo = path.join(workProject, 'node_modules/.bin/joplo');
+    const workCheck = sh(workJoplo, ['check'], workProject);
+    assert(/0 error/.test(workCheck.stdout) && /0 warning/.test(workCheck.stdout), `Work check: ${workCheck.out}`);
+    sh(workJoplo, ['skill', 'install'], workProject);
+    sh(workJoplo, ['build'], workProject);
+    // Import entriesOf from the installed tarball, never from workspace sources.
+    sh(process.execPath, ['--input-type=module', '-e', String.raw`
+      import assert from 'node:assert/strict';
+      import fs from 'node:fs';
+      import { entriesOf, stateAt } from '@joplo-app/core';
+      const html = fs.readFileSync('dist/index.html', 'utf8');
+      const match = /<script type="application\/json" id="joplo-ir">([\s\S]*?)<\/script>/.exec(html);
+      assert(match, 'Built work must contain its public IR');
+      const { project } = JSON.parse(match[1]);
+      assert.equal(project.schemaVersion, 3);
+      assert.deepEqual(Object.keys(project.features), []);
+      const entries = entriesOf(project);
+      assert.equal(entries.length, 1);
+      const entry = entries[0];
+      assert.equal(entry.id, 'explainer');
+      assert.equal(entry.featureId, null);
+      assert.equal(entry.sequencing, 'linear');
+      assert.equal(entry.slices.length, 2);
+      const [first, second] = entry.slices.map(s => project.scenarios[s.id]);
+      assert.equal(second.from, first.id);
+      assert.deepEqual(second.initial.ui, stateAt(project, first.id, first.steps.length).ui);
+      assert.deepEqual(second.initial.inputs, stateAt(project, first.id, first.steps.length).inputs);
+      const typed = stateAt(project, second.id, 1);
+      assert.equal(typed.inputs.message, 'A show you can try');
+      assert.equal(typed.ui.message, typed.inputs.message);
+    `], workProject);
+    log('  ✓ Work template: init → npm install (tarballs) → check (0 errors/warnings) → skills → build → entriesOf: one standalone work, two continuing chapters');
+
     // 作者 className：Tailwind 要编译它
     const pageFile = path.join(project, 'routes/page.tsx');
     fs.writeFileSync(pageFile, addSmokeClassName(fs.readFileSync(pageFile, 'utf8')));
@@ -621,6 +667,8 @@ async function smoke() {
       ...['joplo', '@joplo-app'].flatMap((n) => textFiles(path.join(project, 'node_modules', n))),
       ...textFiles(path.join(project, 'dist')),
       ...textFiles(path.join(project, '.claude')),
+      ...textFiles(path.join(workProject, 'dist')),
+      ...textFiles(path.join(workProject, '.claude')),
     ];
     const hits = [];
     for (const f of scanned) {

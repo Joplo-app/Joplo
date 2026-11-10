@@ -42,6 +42,8 @@ npx joplo render [dir] --scenario-id <qid> --out <file.webm> --video [--chain] [
 
 从版本化模板生成可运行项目。默认模板为 `github:Joplo-app/Joplo/templates/starter#v<CLI版本>`，直接下载 tarball，不需要 Git；在本仓库源码开发环境运行时使用本地 `templates/starter`。
 
+- `--template starter` 等同默认，比较功能方案；`--template work` 创建一件可直接播放、暂停并修改输入的独立作品（`works/explainer.tsx`，两个默认接续的章节，无 `features/` 或占位 `routes/`）。作品模板只安装并启用 ui，不需要凭证或生成资源。
+- `--template` 的值不含 `/` 或 `\`、不以 `.` 开头且不是 `github:` 前缀时，按内置模板名解析；只接受 `starter`、`work`，未知名报错并列出这两项。内置名优先于同名本地目录，本地目录须写 `./work`。内置模板下载主仓库 `templates/<名称>#v<CLI版本>`；源码开发时改读当前 checkout 的 `templates/<名称>`，与原默认模板相同。
 - `--template ./local-template` 使用本地目录，适合离线开发。
 - `--template github:owner/repo/templates/team#ref` 支持仓库、可选子目录和分支/tag/提交；省略 ref 时使用 HEAD。私有仓库优先读取 `GITHUB_TOKEN`，其次读取 `gh auth token`。令牌只发给 GitHub API，不写入文件、输出或 codeload 请求头。
 - 模板必须含有效 `package.json` 和 `joplo.config.ts`（或 tsx）。先完整读取、验证再创建目标；空目录、缺文件、下载失败、找不到 ref/子目录、压缩包损坏、链接或 `..` 路径都给出中文恢复提示，可改用本地模板，不留下半截目录。
@@ -57,7 +59,10 @@ npx joplo render [dir] --scenario-id <qid> --out <file.webm> --video [--chain] [
 - 最后一行提示安装依赖并启动看板；命令写法按 npm/pnpm/yarn/bun 环境选择。
 
 ```sh
+# 比较功能方案
 npx joplo@latest init my-demo
+# 或从独立作品开始
+npx joplo@latest init my-demo --template work
 cd my-demo
 npm install
 npx joplo dev --open

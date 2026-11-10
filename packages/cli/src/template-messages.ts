@@ -1,6 +1,7 @@
-/** D89 explicitly requests Chinese template errors. Keep localized output separate from engine logic. */
+/** D89 keeps existing template recovery diagnostics in Chinese. Keep output separate from engine logic. */
 export const templateMessages = {
   fallback: '可使用 --template <本地路径> 离线初始化。',
+  unknownBuiltin: 'Unknown built-in template. Available templates: starter, work. Use an explicit path such as ./work for a local directory.',
   invalidSpec: '模板地址无效。请使用 github:owner/repo[/子目录][#ref] 或本地目录。',
   invalidPath: '模板包含不安全的路径或链接，已拒绝写入。',
   noDirectory: '本地模板目录不存在或不是目录。',

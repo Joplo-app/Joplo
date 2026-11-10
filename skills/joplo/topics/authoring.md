@@ -9,6 +9,11 @@ A project is a portfolio of works. A work combines its stage, initial state and 
 - draft: true on a standalone work keeps it available locally and excludes it from build/share. For a remake create another work and mark the old work as draft.
 - Publish one entry with npx joplo build --work <key> or npx joplo share --work <key> plus the explicitly authorized publication flags. A standalone work needs no pick; a feature key selects its picked option (all options in the review version).
 
+### Choose a starting template
+Use npx joplo init <dir> (or --template starter) to compare feature options. Use npx joplo init <dir> --template work for one show people can play, pause and try: it contains works/explainer.tsx with two continuing chapters, no feature or placeholder routes, and only the UI plugin. Edit a visible text literal and save to change the picture; pause and edit the bound input to explore locally, then Play or Reset to restore the script. No credentials or generated assets are required. You can also add works/<key>.tsx manually to an existing project.
+
+Bare --template values without / or a backslash, not starting with . or github:, select built-ins; only starter and work are accepted. Unknown names list both choices. Built-ins download templates/<name> from the CLI exact v<version> tag; a same-named local directory never overrides them (use --template ./work). Explicit local paths and github:owner/repo[/subdir][#ref] retain their meaning. Download/validation errors leave no partial project; use an explicit local template path offline.
+
 ### Minimal standalone work
 buildStage() is your local view tree made from explicitly enabled plugin elements; it displays the work state at $.ui.status. Read the installed plugin skill for its components. Keep package.json type: module and the starter's JSX tsconfig (jsx: react-jsxdev, jsxImportSource: @joplo-app/kit). stage/layers needs no routes/ directory. To reuse product pages, explicitly supply on or routes.
 ```tsx
@@ -61,7 +66,7 @@ export default work({ title: 'A · Visible queue', summary: 'Explain the wait',
 Success: check reports 0 errors; outline --work explainer shows the intended slices and estimated duration, with automatic chapter numbers. Inspect each chapter with render --scenario-id <id-from-outline> --sheet --out board.png; review motion using --film --chain --out film.png and actual playback before claiming it looks right. Standalone slice ids have two segments (explainer.arrival); feature-attached slice ids have three (queue.a.waiting). Copy ids from outline --format json for rendering, deep links and feedback context. Outline JSON groups works under entries[].works; feedback events identify them with workId. Human-facing feature alternatives are still called options. For the standalone example: render --scenario-id explainer.arrival; the short scenario link is #/s/explainer.arrival; feedback list --local --work explainer --json filters by the work key, and feedback context.scenarioId uses explainer.arrival.
 
 ## Start from the project
-1. Run npx joplo init <dir>, install its dependencies, then npx joplo skill install. In the Joplo source monorepo, initialize with --template ./templates/starter and use the monorepo workspace protocol for local package dependencies before installing; external projects keep pinned published versions. The starter supplies its own plugin choices; a custom project may choose different ones.
+1. Run npx joplo init <dir> for feature comparisons or npx joplo init <dir> --template work for a standalone show, then install dependencies. Both install the same engine skills and AGENTS.md block, plus guides for their enabled plugins even before dependencies exist; after installation, npx joplo skill install verifies them against config.plugins. Source-monorepo CLIs resolve built-ins to the current checkout’s templates/<name>; explicit --template ./templates/starter or ./templates/work works too. Inside the monorepo use workspace protocol for local dependencies; outside it, link local dependencies for development or keep pinned published versions. A custom project may choose different plugins.
 2. Read the installed engine skill and .claude/skills/joplo-plugins/SKILL.md. Read each relevant plugin's entry and component/recipe topics. npx joplo skill lists what this config enables.
 3. Create one standalone work and chapter, or one feature, option and runnable scenario for design review. Run check, inspect the rendered frames, then test the real inputs. For a short film or explainer that should feel like a video, also run the motion review in npx joplo skill demo ("Make it play like a film") — static frames cannot show hard cuts or frozen pictures.
 4. Required before handing a development round to the user: read npx joplo skill review and start npx joplo feedback watch [dir] --local --follow --json. A running board alone does not receive feedback for the agent.
@@ -127,6 +132,7 @@ flow('Inbox').system('Arrive', arrive(), 'The inbox opens');
 For a long story use chapter() to inherit the previous ending by default; from is an explicit exception. An action-driven navigation entry can also declare actionEntry: 'after'; read demo for its confirmation and replay boundary.
 
 ## Bindings, rules and reuse
+- Keep scripted shared state explicit: .type('field', 'value', set($.ui.message, 'value')) records the input and updates the ui value used elsewhere on stage. Native local binding synchronization during audience exploration does not replace scripted effects. Verify both the input and the text beside it at that scripted step, then try a non-script value while paused.
 - $.ui.x / $.data.x / $.inputs.id are whole-value bindings. Expressions are not reevaluated. Props supported by a plugin may bind to these values; read that plugin's value and visibility rules.
 - when takes a binding or not/eq/neq/empty/notEmpty/oneOf/and/or. A JS boolean/expression is evaluated once and produces INVALID_CONDITION. For author-time conditions, return one tree or another in ordinary TS; for playback-time changes, use state and effects.
 - disabled takes a boolean or condition; disabledReason is text or a whole-value binding. Use meaningful reasons. Plugin visibility, inheritance and native behavior are declarative traits.
@@ -137,4 +143,4 @@ For a long story use chapter() to inherit the previous ending by default; from i
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.5.0 sha256:fdf964f063a545346880efd20061e24aeffb5fe1318aa986ac0f647c5ab3f624 -->
+<!-- joplo-skill 0.5.0 sha256:15fff49d596637b9efb41e4546a4b46a1787d7febd2afbe40fc36b0b15c061e6 -->
