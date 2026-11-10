@@ -11,7 +11,7 @@ import { isPluginDef } from '@joplo-app/kit/plugin';
 import { compile, type CompileMode, type Diagnostic, type Project } from '@joplo-app/core';
 import { discoverFiles, loadAuthoring, enabledPlugins } from '@joplo-app/core/node';
 import type { ViteDevServer } from 'vite';
-import { isProjectSource } from './vite-shared.ts';
+import { isProjectSource, isSharedJoploSource } from './vite-shared.ts';
 
 export type CompileOutcome = {
   /** 本次编译成功的 IR；失败时为 null。 */
@@ -33,17 +33,33 @@ export function pluginRuntimesOf(plugins: unknown): Record<string, string> {
 
 const LOC_IN_MESSAGE = /((?:[\w@.-]+\/)*[\w@.-]+\.(?:tsx|ts|jsx|js|mts)):(\d+):(\d+)/;
 
-/** 运行时错误（模块求值时抛出）：从调用栈里找第一处项目文件位置。 */
+/** 运行时错误（模块求值时抛出）：从调用栈里找第一处项目文件位置（项目外按 Joplo JSX 转译的共享文件也算，路径相对项目目录）。 */
 function stackLoc(projectDir: string, e: unknown): string | null {
   const stack = e instanceof Error ? (e.stack ?? '') : '';
+  const jsxMissing = jsxRuntimeMissing(e);
   for (const line of stack.split('\n')) {
     const m = /\(?((?:file:\/\/)?\/[^():\s]+):(\d+):(\d+)\)?\s*$/.exec(line);
     if (!m) continue;
     const file = decodeURIComponent(m[1]!.replace(/^file:\/\//, ''));
-    if (isProjectSource(projectDir, file)) return `${path.relative(projectDir, file).split(path.sep).join('/')}:${m[2]}:${m[3]}`;
+    // JSX 运行时没生效（#61）：抛错的就是那个没有按 Joplo JSX 转译的 TSX，不管它在不在项目里
+    const culprit = jsxMissing && /\.(tsx|jsx)$/.test(file) && !file.split(path.sep).includes('node_modules');
+    if (culprit || isProjectSource(projectDir, file) || isSharedJoploSource(projectDir, file)) return `${path.relative(projectDir, file).split(path.sep).join('/')}:${m[2]}:${m[3]}`;
   }
   return null;
 }
+
+/**
+ * JSX 没有走 Joplo 的运行时（项目外、最近的 tsconfig 不是 Joplo 的 JSX 设置）：经典转译后找不到 React，
+ * 或自动转译去找 react/jsx-dev-runtime。返回能确定的那个文件（绝对路径），只知道是这类错误时返回 true。
+ */
+function jsxRuntimeMissing(e: unknown): string | boolean {
+  const msg = e instanceof Error ? e.message : '';
+  if (e instanceof ReferenceError && /\bReact is not defined\b/.test(msg)) return true;
+  const m = /Cannot find (?:module|package) '(?:react\/jsx-(?:dev-)?runtime|react)' imported from '([^']+)'/.exec(msg);
+  return m ? decodeURIComponent(m[1]!.replace(/^file:\/\//, '')) : false;
+}
+
+const JSX_HINT = "was compiled without Joplo's JSX runtime. TSX outside the project uses the JSX settings of its nearest tsconfig.json: give that folder a tsconfig.json with jsx: \"react-jsxdev\" and jsxImportSource: \"@joplo-app/kit\", or start the file with /** @jsxRuntime automatic */ /** @jsxImportSource @joplo-app/kit */";
 
 export async function compileProject(server: ViteDevServer, projectDir: string, mode: CompileMode): Promise<CompileOutcome> {
   const errorAt = new Map<string, string>(); // 载入失败的文件（绝对路径）→ 精确位置
@@ -55,6 +71,13 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
       const m = LOC_IN_MESSAGE.exec(msg);
       const at = m ? `${m[1]}:${m[2]}:${m[3]}` : stackLoc(projectDir, e);
       if (at) errorAt.set(abs, at);
+      const jsx = jsxRuntimeMissing(e);
+      if (jsx) {
+        // 能从报错里确定文件时以它为准（位置只知道文件，记为第 1 行）
+        const culprit = typeof jsx === 'string' ? `${path.relative(projectDir, jsx).split(path.sep).join('/')}:1:1` : at;
+        if (culprit) errorAt.set(abs, culprit);
+        throw new Error(`${culprit ? culprit.replace(/:\d+:\d+$/, '') : 'A TSX file'} ${JSX_HINT}`);
+      }
       throw e instanceof Error ? e : new Error(msg);
     }
   };
@@ -162,7 +185,7 @@ function resourceHost(projectDir: string, entries: Record<string, string>, keys:
 export function invalidateProjectModules(server: ViteDevServer, projectDir: string): void {
   for (const env of Object.values(server.environments)) {
     const graph = env.moduleGraph as unknown as { idToModuleMap: Map<string, { file: string | null }>; invalidateModule(m: unknown): void };
-    for (const mod of graph.idToModuleMap.values()) if (mod.file && isProjectSource(projectDir, mod.file)) graph.invalidateModule(mod);
+    for (const mod of graph.idToModuleMap.values()) if (mod.file && (isProjectSource(projectDir, mod.file) || isSharedJoploSource(projectDir, mod.file))) graph.invalidateModule(mod);
   }
 }
 
