@@ -5,8 +5,13 @@ import { studio } from './theme.ts';
 import { skill, patterns } from './guide.ts';
 
 /** 进退场预设（D92）：每个预设是一个“离场姿态”，进场 = 离场姿态 → 原样，退场 = 原样 → 离场姿态。 */
-export const TRANSITIONS = ['fade', 'rise', 'zoom', 'shrink', 'wipe', 'iris'] as const;
+export const TRANSITIONS = ['fade', 'rise', 'zoom', 'shrink', 'wipe', 'iris', 'grow', 'growUp', 'blur'] as const;
 export type Transition = (typeof TRANSITIONS)[number];
+/** 缓动预设：进场、退场、变形各自的“怎么落定”。smooth = 各自的默认曲线；spring / bounce 会冲过终点再回来。 */
+export const EASES = ['smooth', 'snappy', 'spring', 'bounce', 'linear'] as const;
+export type Ease = (typeof EASES)[number];
+/** <Split by>：按词（Intl.Segmenter，中文也能切成词）或按字拆开，逐块进场。 */
+export const SPLITS = ['word', 'char'] as const;
 /** 镜头漂移（D92）：落定后继续缓慢推近 / 拉远 / 平移，有终点、非匀速。数字 = 在 ms 内再推近到这个倍数。 */
 export type Drift = number | false | { zoom?: number; x?: number; y?: number; ms?: number };
 export type CameraOpts = { pad?: number; zoom?: number; ms?: number; drift?: Drift };
@@ -34,7 +39,10 @@ const all = (n: PluginIRNode): PluginIRNode[] => [n, ...(n.children ?? []).flatM
 const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes and individual pitfalls', body: patterns } }, packageName: '@joplo-app/plugin-content',
   id: 'content', title: 'Visual explainers', version: packageInfo.version,
   runtime: new URL(import.meta.url.endsWith('.ts') ? './runtime.tsx' : './runtime.js', import.meta.url),
-  components: { Canvas: { doc: 'w, h, view=[1280,800], drift?, safe?=[top,right,bottom,left]; scaled design world with fixed screen children; drift = default camera drift; safe = the view area not covered by screen chrome, where targeted camera() frames land', selfEvident: true } },
+  components: {
+    Canvas: { doc: 'w, h, view=[1280,800], drift?, safe?=[top,right,bottom,left]; scaled design world with fixed screen children; drift = default camera drift; safe = the view area not covered by screen chrome, where targeted camera() frames land', selfEvident: true },
+    Split: { doc: 'text, by="word"|"char"; text that enters piece by piece: enter / enterMs / enterEase apply to each piece, enterStagger (default word 70, char 30 ms) spaces them; screen readers get the whole text', example: '<Split text="It is not typing, it is guessing" enter="rise" enterEase="spring" />', traits: { text: ['text'] }, selfEvident: true },
+  },
   properties: {
     motion: { type: 'string', nonempty: true, attribute: 'data-jp-content-motion' },
     motionDelay: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-motion-delay' },
@@ -46,12 +54,25 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
     exit: { type: 'string', values: [...TRANSITIONS], attribute: 'data-jp-content-exit' },
     exitMs: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-exit-ms' },
     exitDelay: { type: 'number', min: 0, max: 10000, attribute: 'data-jp-content-exit-delay' },
+    enterEase: { type: 'string', values: [...EASES], attribute: 'data-jp-content-enter-ease' },
+    exitEase: { type: 'string', values: [...EASES], attribute: 'data-jp-content-exit-ease' },
+    motionEase: { type: 'string', values: [...EASES], attribute: 'data-jp-content-motion-ease' },
+    enterStagger: { type: 'number', min: 0, max: 2000, attribute: 'data-jp-content-enter-stagger' },
+    exitStagger: { type: 'number', min: 0, max: 2000, attribute: 'data-jp-content-exit-stagger' },
   },
   themes: { studio }, skill,
   schemas: { step: z.union([Frame, z.strictObject({ cameraIssued: z.literal(true) })]) },
   data: { step: { scope: [{ path: ['scenes'], kind: 'map', domain: 'scene', children: [{ path: ['camera', 'targets'], kind: 'values', domain: 'element' }, { path: ['camera', 'sequence', '*', 'targets'], kind: 'values', domain: 'element' }] }] } },
   compile: {
     node(node, ctx) {
+      if (node.type === 'content:Split') {
+        const text = node.props?.text;
+        // 绑定状态（$.ui.title）在这里不是字符串；只拦没写、空白和数字 / 布尔字面量
+        if (text === undefined || text === null || (typeof text === 'string' ? !text.trim() : typeof text === 'number' || typeof text === 'boolean')) ctx.report('SPLIT_INVALID', '<Split text>: write the text to split as a nonempty string (it may be a state binding like $.ui.title)', node.source);
+        if (node.props?.by !== undefined && !(SPLITS as readonly unknown[]).includes(node.props.by)) ctx.report('SPLIT_INVALID', `<Split by>: use one of ${SPLITS.join(', ')}`, node.source);
+        if (node.children?.length) ctx.report('SPLIT_INVALID', '<Split>: put the text in the text prop, not in children', node.source);
+        return;
+      }
       if (node.type !== 'content:Canvas') return;
       if (node.props.drift !== undefined && !DriftSchema.safeParse(node.props.drift).success) ctx.report('CAMERA_INVALID', `<Canvas drift>: use false, a zoom factor 0.5–2 (e.g. 1.04), or { zoom 0.5–2, x/y −2000–2000 design px, ms 500–60000 }`, node.source);
       if (node.props.safe !== undefined && !Safe.safeParse(node.props.safe).success) ctx.report('CAMERA_INVALID', `<Canvas safe>: use [top, right, bottom, left] in design px (each 0–2000), the part of the view your screen chrome covers`, node.source);
@@ -85,4 +106,5 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
   },
 });
 export const Canvas = pluginComponent(content, 'Canvas');
+export const Split = pluginComponent(content, 'Split');
 export default content;

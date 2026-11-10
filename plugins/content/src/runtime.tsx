@@ -5,7 +5,7 @@ import type { ContentFrame } from './plugin.ts';
 const stillCss = '.jstage[data-jstill] [data-jcanvas],.jstage[data-jstill] [data-jcanvas] *{transition:none!important;animation-delay:0s!important;animation-duration:0s!important}';
 
 type Box = { x: number; y: number; w: number; h: number };
-type SubjectBox = Box & { style?: Record<string, string>; text?: string; clone?: HTMLElement; shells?: HTMLElement[] };
+type SubjectBox = Box & { style?: Record<string, string>; text?: string; look?: string; clone?: HTMLElement; shells?: HTMLElement[] };
 const subjectStyle = (el: HTMLElement) => {
   // Read the authored destination, not this observer's currently interpolated style.
   const active = (el.getAnimations?.() ?? []).filter(a => a.id === 'jmotion').map(a => ({ a, effect: a.effect }));
@@ -287,12 +287,54 @@ export const AWAY: Record<string, Keyframe> = {
   shrink: { opacity: 0, scale: '.84' },
   wipe: { clipPath: 'inset(0 100% 0 0)' },
   iris: { clipPath: 'circle(0% at 50% 50%)' },
+  /** 从 0 长出来：grow 从左边横向长（横条、时间轴线、下划线），growUp 从底边往上长（柱子）。方向写明，不按宽高猜（很短的横条比它的高还窄）。 */
+  grow: { scale: '0 1', transformOrigin: '0 50%' },
+  growUp: { scale: '1 0', transformOrigin: '50% 100%' },
+  blur: { opacity: 0, filter: 'blur(14px)' },
 };
 const ENTER_EASE = 'cubic-bezier(.16,1,.3,1)';
 const EXIT_EASE = 'cubic-bezier(.55,0,.75,.2)';
 const ENTER_MS = 600;
 const EXIT_MS = 450;
 const msOf = (v: string | undefined, d: number) => (v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Math.max(0, Number(v)));
+
+/**
+ * 阻尼弹簧从 0 到 1 的位置。时间归一化：t = 1 时振幅包络衰减到千分之一（视觉上已落定），
+ * 所以作者写的 ms 就是弹簧的总时长。zeta 是阻尼比：越小冲得越远、晃得越多。
+ */
+export function springAt(zeta: number, t: number): number {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  const w = Math.log(1000) / zeta;
+  const wd = w * Math.sqrt(1 - zeta * zeta);
+  return 1 - Math.exp(-zeta * w * t) * (Math.cos(wd * t) + (zeta * w / wd) * Math.sin(wd * t));
+}
+/** 把弹簧采样成 CSS linear() 缓动：WAAPI 直接用，引擎时钟照常采样（暂停、跳转、导出都一致）。 */
+export function springEasing(zeta: number, samples = 60): string {
+  const pts = Array.from({ length: samples + 1 }, (_, i) => (i === samples ? 1 : springAt(zeta, i / samples)));
+  return `linear(${pts.map(v => String(Math.round(v * 10000) / 10000)).join(', ')})`;
+}
+/** 不支持 linear() 的浏览器（el.animate 会因非法缓动抛错）退回一条略冲过终点的贝塞尔。 */
+const linearOk = () => typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('animation-timing-function', 'linear(0, 1)');
+const EASE_CURVES: Record<string, () => string> = {
+  snappy: () => 'cubic-bezier(.05,.7,.1,1)',
+  linear: () => 'linear',
+  spring: () => (linearOk() ? springEasing(.5) : 'cubic-bezier(.34,1.4,.64,1)'),
+  bounce: () => (linearOk() ? springEasing(.32) : 'cubic-bezier(.34,1.8,.64,1)'),
+};
+/** 缓动预设 → CSS 缓动；没写或 smooth 用这一类动画自己的默认曲线。 */
+export function easeOf(preset: string | undefined, fallback: string): string {
+  const curve = preset && preset !== 'smooth' ? EASE_CURVES[preset] : undefined;
+  return curve ? curve() : fallback;
+}
+/** 错峰：同一个容器里这一次一起出现（或一起离开）的元素，第 rank 个多等 rank × stagger 毫秒。 */
+export function staggered(ranks: Map<Element, number>, host: Element | null, attr: 'enterStagger' | 'exitStagger'): number {
+  if (!(host instanceof HTMLElement)) return 0;
+  const step = msOf(host.dataset[attr === 'enterStagger' ? 'jpContentEnterStagger' : 'jpContentExitStagger'], 0);
+  const rank = ranks.get(host) ?? 0;
+  ranks.set(host, rank + 1);
+  return rank * step;
+}
 /** 幽灵不带身份：不能被镜头、FLIP、检查、提示、无障碍树或键盘找到。 */
 const IDENTITY = ['id', 'name', 'for', 'tabindex', 'autofocus', 'contenteditable', 'data-jid', 'data-jinteractive', 'data-jhover'];
 function strip(el: Element) {
@@ -311,6 +353,71 @@ function copyLive(from: Element, to: Element) {
     else if ((src instanceof HTMLTextAreaElement || src instanceof HTMLSelectElement) && (dst instanceof HTMLTextAreaElement || dst instanceof HTMLSelectElement)) dst.value = src.value;
     else if (src instanceof HTMLCanvasElement && dst instanceof HTMLCanvasElement) { try { dst.getContext('2d')?.drawImage(src, 0, 0); } catch { /* tainted / zero-size */ } }
   });
+}
+
+/**
+ * <Split> 的拆法：返回一串“组”，字符串是原样保留的空白，数组是一个不断行的词（里面每一项是一块，逐块进场）。
+ * word：Intl.Segmenter 按词切（中文也能切成词），标点贴在前一个词后面，行首不会出现孤立的标点。
+ * char：先按词分组（词内不断行），组内按字形（emoji、组合字符不拆）一块一块。
+ */
+export function splitPieces(text: string, by: 'word' | 'char' = 'word'): (string | string[])[] {
+  const Seg = (Intl as { Segmenter?: new (l?: string, o?: { granularity: string }) => { segment(t: string): Iterable<{ segment: string; isWordLike?: boolean }> } }).Segmenter;
+  const words: { s: string; space: boolean }[] = [];
+  const raw = Seg ? [...new Seg(undefined, { granularity: 'word' }).segment(text)] : text.split(/(\s+)/).filter(Boolean).map(segment => ({ segment, isWordLike: !/^\s+$/.test(segment) }));
+  let lead = '';
+  for (const { segment, isWordLike } of raw) {
+    const space = /^\s+$/.test(segment);
+    const prev = words[words.length - 1];
+    // 开括号、开引号贴到后一个词上；其余标点（不是词也不是空白）贴到前一个词上
+    if (!space && !isWordLike && /^[\p{Ps}\p{Pi}]+$/u.test(segment)) { lead += segment; continue; }
+    if (!space && !isWordLike && !lead && prev && !prev.space) { prev.s += segment; continue; }
+    if (space) { if (lead) { words.push({ s: lead, space: false }); lead = ''; } words.push({ s: segment, space }); continue; }
+    words.push({ s: lead + segment, space: false }); lead = '';
+  }
+  if (lead) words.push({ s: lead, space: false });
+  const graphemes = (s: string) => (Seg ? [...new Seg(undefined, { granularity: 'grapheme' }).segment(s)].map(g => g.segment) : Array.from(s));
+  return words.map(w => (w.space ? w.s : by === 'char' ? graphemes(w.s) : [w.s]));
+}
+const SPLIT_STAGGER = { word: 70, char: 30 };
+const SR_ONLY = { position: 'absolute', width: 1, height: 1, margin: -1, padding: 0, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 } as const;
+const PIECE_ATTRS = ['data-jp-content-enter', 'data-jp-content-enter-ms', 'data-jp-content-enter-delay', 'data-jp-content-enter-ease'] as const;
+/** 逐块进场的文字：进场属性写在每一块上（根元素自己不进场），根元素上的 enterStagger 决定间隔；读屏读整句。 */
+function Split({ ctx: context }: { ctx: ComponentCtx }) {
+  const p = context.node.props;
+  const text = p.text === undefined || p.text === null ? '' : String(p.text);
+  const by = p.by === 'char' ? 'char' : 'word';
+  const { text: _t, by: _b, ...rest } = p;
+  const root: Record<string, unknown> = useRoot(context.model, rest, {});
+  const piece: Record<string, unknown> = { 'data-jp-content-enter': 'rise' };
+  for (const a of PIECE_ATTRS) if (root[a] !== undefined) { piece[a] = root[a]; delete root[a]; }
+  root['data-jp-content-enter-stagger'] ??= String(SPLIT_STAGGER[by]);
+  const groups = useMemo(() => splitPieces(text, by), [text, by]);
+  let n = 0;
+  return (
+    <span {...root}>
+      <span style={SR_ONLY}>{text}</span>
+      <span aria-hidden="true">
+        {groups.map((g, i) => typeof g === 'string' ? g : (
+          // key 带上整句：换了文字就是新的一批节点，整句重新逐块进场
+          <span key={`${text}|${i}`} style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>
+            {g.map(c => <span key={n} {...piece} style={{ display: 'inline-block', whiteSpace: 'pre' }}>{(n++, c)}</span>)}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * 外观指纹：去掉身份与 Joplo 锚点属性（id、data-j*、aria-*）后的标记。同一个 motion 键前后指纹不同（换了 class、
+ * 内联样式、内部结构或文字）时，旧样子要跟着飞并淡出，不能只插值键元素自己的几个样式（内层的底色、斜面边框会跳变）。
+ */
+export function lookKey(el: Element): string {
+  const c = el.cloneNode(true) as Element;
+  // 退场幽灵插在原父元素里，可能就在这个键元素内部：不算它的外观
+  for (const g of c.querySelectorAll('[data-jghost]')) g.remove();
+  for (const n of [c, ...c.querySelectorAll('*')]) for (const a of [...n.getAttributeNames()]) if (a === 'id' || a.startsWith('data-j') || a.startsWith('aria-') || a === 'tabindex' || a === 'inert') n.removeAttribute(a);
+  return c.outerHTML;
 }
 
 /** One observer per stage: cache only design-space layouts, never player state. */
@@ -356,10 +463,11 @@ export const observe: PluginObserve = (root, initial) => {
     for (const [outer, a] of [...ghosts]) { a?.cancel(); drop(outer); }
     for (const a of [...entering]) { entering.delete(a); a.cancel(); }
   };
-  const ghostOf = (el: HTMLElement, removed: HTMLElement, parent: Node, next: Node | null, world: HTMLElement) => {
+  const ghostOf = (el: HTMLElement, removed: HTMLElement, parent: Node, next: Node | null, world: HTMLElement, ranks: Map<Element, number>) => {
     const box = exitBoxes.get(world)?.get(el);
     const kind = el.dataset.jpContentExit ?? '';
-    if (!box || !AWAY[kind] || typeof el.animate !== 'function') return;
+    const away = AWAY[kind];
+    if (!box || !away || typeof el.animate !== 'function') return;
     // 同一个 motion 键在新画面里还在：交给 FLIP（以变形为准，不叠加退场）
     const key = el.dataset.jpContentMotion;
     if (key && world.querySelector(`[data-jp-content-motion="${CSS.escape(key)}"]`)) return;
@@ -385,7 +493,12 @@ export const observe: PluginObserve = (root, initial) => {
     const origin = offsetIn(ghost, world);
     if (!origin) { outer.remove(); return; }
     put('left', `${box.x - origin.x}px`); put('top', `${box.y - origin.y}px`);
-    const anim = ghost.animate([{ ...AWAY[kind], offset: 1 }], { duration: msOf(el.dataset.jpContentExitMs, EXIT_MS), delay: msOf(el.dataset.jpContentExitDelay, 0), easing: EXIT_EASE, fill: 'forwards' });
+    // 错峰的容器：先在一起被移除的子树里找，再从仍在页面上的父元素往上找
+    let host: Element | null = null;
+    for (let a = el === removed ? null : el.parentElement; a && !host; a = a === removed ? null : a.parentElement) if (a.hasAttribute('data-jp-content-exit-stagger')) host = a;
+    host ??= parent.closest('[data-jp-content-exit-stagger]');
+    const delay = msOf(el.dataset.jpContentExitDelay, 0) + staggered(ranks, host, 'exitStagger');
+    const anim = ghost.animate([{ ...away, offset: 1 }], { duration: msOf(el.dataset.jpContentExitMs, EXIT_MS), delay, easing: easeOf(el.dataset.jpContentExitEase, EXIT_EASE), fill: 'forwards' });
     anim.id = 'jexit';
     ghosts.set(outer, anim);
     const done = () => { if (ghosts.get(outer) === anim) drop(outer); };
@@ -393,13 +506,14 @@ export const observe: PluginObserve = (root, initial) => {
     anim.addEventListener('cancel', done, { once: true });
   };
   const handle = (records: MutationRecord[], world: HTMLElement) => {
+    const ranks = new Map<Element, number>();
     for (const r of records) for (const n of r.removedNodes) {
       if (!(n instanceof HTMLElement) || n.isConnected || ghosts.has(n) || n.hasAttribute('data-jghost') || quiet) continue;
       const marked = [...(n.hasAttribute('data-jp-content-exit') ? [n] : []), ...n.querySelectorAll<HTMLElement>('[data-jp-content-exit]')];
       for (const el of marked) {
         let outermost = true;
         for (let a = el === n ? null : el.parentElement; a; a = a === n ? null : a.parentElement) if (a.hasAttribute('data-jp-content-exit')) { outermost = false; break; }
-        if (outermost) ghostOf(el, n, r.target, r.nextSibling, world);
+        if (outermost) ghostOf(el, n, r.target, r.nextSibling, world, ranks);
       }
     }
   };
@@ -450,15 +564,16 @@ export const observe: PluginObserve = (root, initial) => {
           const r = offsetIn(el, w);
           if (!r) continue;
           const prev = previous.get(key);
-          const style = subjectStyle(el), text = el.textContent ?? '';
+          const style = subjectStyle(el), text = el.textContent ?? '', look = lookKey(el);
           const shells: HTMLElement[] = [];
           for (let p = el.parentElement; p && p !== w; p = p.parentElement) shells.push(p.cloneNode(false) as HTMLElement);
-          seen.set(key, { ...r, style, text, clone: el.cloneNode(true) as HTMLElement, shells });
+          seen.set(key, { ...r, style, text, look, clone: el.cloneNode(true) as HTMLElement, shells });
           if (!context.frame.animate) { for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); }
           // 跳转、停止后的提交与静态画面直接显示新布局（D92）：变形飞行只属于连续播放
           if (!prev || !context.frame.animate || context.frame.playground || quiet) { if (quiet) for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); continue; }
           const styleChanged = prev.style && Object.keys(style).some(k => prev.style![k] !== style[k as keyof typeof style]);
-          const textChanged = prev.text !== undefined && prev.text !== text;
+          // 文字变了，或外观指纹变了（同键换成另一个样子：纯文字 → 彩色块、1984 的按钮 → 1995 的按钮）：旧样子交叉淡出
+          const textChanged = prev.text !== undefined && prev.text !== text || prev.look !== undefined && prev.look !== look;
           if (!styleChanged && !textChanged && Math.abs(prev.x - r.x) < 0.5 && Math.abs(prev.y - r.y) < 0.5 && Math.abs(prev.w - r.w) < 0.5 && Math.abs(prev.h - r.h) < 0.5) continue;
           const dx = prev.x + prev.w / 2 - (r.x + r.w / 2);
           const dy = prev.y + prev.h / 2 - (r.y + r.h / 2);
@@ -468,7 +583,7 @@ export const observe: PluginObserve = (root, initial) => {
           if (typeof el.animate !== 'function') continue;
           const anim = el.animate(
             [{ ...prev.style, ...(textChanged ? { opacity: 0 } : {}), translate: `${dx}px ${dy}px`, scale: `${sx} ${sy}` }, { ...style, translate: '0px 0px', scale: '1 1' }],
-            { duration: el.dataset.jpContentMotionMs === undefined ? flight.ms : Number(el.dataset.jpContentMotionMs), easing: flight.ease, delay: Number(el.dataset.jpContentMotionDelay) || 0, fill: 'backwards' },
+            { duration: el.dataset.jpContentMotionMs === undefined ? flight.ms : Number(el.dataset.jpContentMotionMs), easing: easeOf(el.dataset.jpContentMotionEase, flight.ease), delay: Number(el.dataset.jpContentMotionDelay) || 0, fill: 'backwards' },
           );
           if (textChanged && prev.clone) {
             const ghost = prev.clone.cloneNode(true) as HTMLElement;
@@ -477,7 +592,7 @@ export const observe: PluginObserve = (root, initial) => {
             strip(outer); outer.setAttribute('aria-hidden', 'true'); outer.setAttribute('inert', ''); outer.dataset.jghost = '';
             Object.assign(ghost.style, { position: 'absolute', left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px`, margin: '0', pointerEvents: 'none', ...prev.style });
             w.appendChild(outer);
-            const fade = ghost.animate([{ opacity: prev.style?.opacity ?? '1', translate: `${dx}px ${dy}px`, scale: `${sx} ${sy}` }, { opacity: 0, translate: '0px 0px', scale: '1 1' }], { duration: el.dataset.jpContentMotionMs === undefined ? flight.ms : Number(el.dataset.jpContentMotionMs), easing: flight.ease, delay: Number(el.dataset.jpContentMotionDelay) || 0, fill: 'both' });
+            const fade = ghost.animate([{ opacity: prev.style?.opacity ?? '1', translate: `${dx}px ${dy}px`, scale: `${sx} ${sy}` }, { opacity: 0, translate: '0px 0px', scale: '1 1' }], { duration: el.dataset.jpContentMotionMs === undefined ? flight.ms : Number(el.dataset.jpContentMotionMs), easing: easeOf(el.dataset.jpContentMotionEase, flight.ease), delay: Number(el.dataset.jpContentMotionDelay) || 0, fill: 'both' });
             ghosts.set(outer, fade); fade.addEventListener('finish', () => drop(outer), { once: true }); fade.addEventListener('cancel', () => drop(outer), { once: true });
           }
           anim.id = 'jmotion';
@@ -486,6 +601,8 @@ export const observe: PluginObserve = (root, initial) => {
           anim.addEventListener('cancel', () => forget(anim), { once: true });
         }
         // 3) 进场：第一次出现的元素（新的 DOM 节点）。画布刚出现、安静的提交、FLIP 接管的同键元素都不播
+        // 错峰按文档顺序数：同一个 enterStagger 容器里这次真正播进场的第 n 个，多等 n × stagger
+        const ranks = new Map<Element, number>();
         for (const el of w.querySelectorAll<HTMLElement>('[data-jp-content-enter]')) {
           if (present.has(el)) continue;
           present.add(el);
@@ -493,7 +610,8 @@ export const observe: PluginObserve = (root, initial) => {
           if (fresh || quiet || !AWAY[kind] || typeof el.animate !== 'function' || el.closest('[data-jghost]')) continue;
           const key = el.dataset.jpContentMotion;
           if (key && previous.has(key)) continue;
-          const anim = el.animate([{ ...AWAY[kind], offset: 0 }], { duration: msOf(el.dataset.jpContentEnterMs, ENTER_MS), delay: msOf(el.dataset.jpContentEnterDelay, 0), easing: ENTER_EASE, fill: 'backwards' });
+          const delay = msOf(el.dataset.jpContentEnterDelay, 0) + staggered(ranks, el.parentElement?.closest('[data-jp-content-enter-stagger]') ?? null, 'enterStagger');
+          const anim = el.animate([{ ...AWAY[kind], offset: 0 }], { duration: msOf(el.dataset.jpContentEnterMs, ENTER_MS), delay, easing: easeOf(el.dataset.jpContentEnterEase, ENTER_EASE), fill: 'backwards' });
           anim.id = 'jenter';
           entering.add(anim);
           anim.addEventListener('finish', () => entering.delete(anim), { once: true });
@@ -522,4 +640,4 @@ export const observe: PluginObserve = (root, initial) => {
   };
 };
 
-export default defineRuntime({ id: 'content', observe, components: { Canvas: { react: Canvas } } });
+export default defineRuntime({ id: 'content', observe, components: { Canvas: { react: Canvas }, Split: { react: Split } } });

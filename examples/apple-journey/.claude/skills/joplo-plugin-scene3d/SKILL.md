@@ -3,7 +3,7 @@ name: joplo-plugin-scene3d
 description: "Use the 3D scene plugin in Joplo; read its entry, component recipes and recovery rules for this project."
 ---
 
-# Joplo plugin scene3d: 3D scene 0.5.0
+# Joplo plugin scene3d: 3D scene 0.7.0
 Interactive 3D scenes (three.js): steps click objects, state drives lights, doors, windows, and the camera
 Author package: @joplo-app/plugin-3d
 ## When to use
@@ -58,4 +58,4 @@ General engine contracts: npx joplo skill plugins
 - [models](./topics/models.md): GLB assets, loading readiness, material tint, anchors and offline checks
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.5.0 sha256:d33c5a3e45fbbfd95fbff530d31d1a9f9c38d3299a04f147609079be4e427df5 -->
+<!-- joplo-skill 0.7.0 sha256:127aa88721262314fe69fd7a33838930c7c32e9e9e81306642b4ba7465304c3a -->

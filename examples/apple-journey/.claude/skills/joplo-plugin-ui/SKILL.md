@@ -3,7 +3,7 @@ name: joplo-plugin-ui
 description: "Use the Standard UI plugin in Joplo; read its entry, component recipes and recovery rules for this project."
 ---
 
-# Joplo plugin ui: Standard UI 0.5.0
+# Joplo plugin ui: Standard UI 0.7.0
 
 Author package: @joplo-app/plugin-ui
 # Standard UI: ui
@@ -11,6 +11,7 @@ Author package: @joplo-app/plugin-ui
 Use this plugin for application interfaces, forms, overlays, navigation, data displays, device frames and HTML fallback content. Install @joplo-app/plugin-ui, import ui from it and list ui in config.plugins. The engine enables nothing implicitly.
 
 ## Start and verify
+- HTML fallback nodes forward scalar data-* and aria-* attributes, role and title to their DOM element. Reserve data-j* for Joplo; use your own prefix such as data-app-frame for export/test selectors. id remains a Joplo node identity exposed as data-jid, not a DOM id. Event handlers and arbitrary DOM properties are not forwarded.
 - Import author markers directly from @joplo-app/plugin-ui and write normal TSX. The compiler emits ui:Button and other namespaced types; write HTML tags directly, which compile to ui:div, ui:span, etc.
 - Read joplo skill ui/components for the enabled catalog; joplo components Menu DataTable gives props, behavior groups and runnable author snippets. If two plugins share a short name, request the full namespaced name.
 - Give interactive elements stable ids. Describe their behavior with flow steps, disabled plus disabledReason, or unmodeled. Run check, then render the affected steps; passing schema validation alone does not prove the intended screen is visible.
@@ -39,4 +40,4 @@ General engine contracts: npx joplo skill plugins
 - [patterns](./topics/patterns.md): UI recipes and individual pitfalls
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.5.0 sha256:267d456c15d752e7ae3e9d3ac89eae8ccf6991d1ad4385c22e9b8fd1893a5c1a -->
+<!-- joplo-skill 0.7.0 sha256:30b70ba7299197f2a515ee604c3167065cef7759c4344902115a86b29325f951 -->

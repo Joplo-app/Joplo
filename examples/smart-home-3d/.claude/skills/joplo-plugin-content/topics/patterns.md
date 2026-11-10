@@ -1,3 +1,15 @@
+
+## Updating a public design replay from implementation evidence
+Preserve historical scenarios and stable feature/work IDs; append a clearly labeled source-derived update instead of rewriting an old approval. Put current status and limits in the visible scene: local implementation, work in progress, deployed and published are different claims. Commands displayed in a prototype are not real execution evidence. Reuse a new director layer when a work is already layered; for a route-only work, add a work-local route so adding the evidence view does not replace the original default stage. Keep the host badge/narration safe areas visible during verification.
+
+## Dual-aspect explainers with source metadata
+When adapting one dataset to landscape and portrait, author two arrangements at readable design sizes; do not shrink the landscape composition wholesale. For native export also set the logical stage with render --viewport WIDTHxHEIGHT --no-frame; output --width/--height alone only change the surrounding frame. Reserve separate areas for brand, main subject, image credit, source/fact status and subtitles. Also leave room for host chrome: the step badge at the top and current narration/completion bar at the bottom. Check with chrome visible, not only clean video. Give photo panels an explicit image height and adjustable object-position; credit and archive year need their own measured height below the image. A title-first opening may place one main graphic below the title.
+
+For bilingual quotations show the full original, a translation explicitly labeled as translation, name, role, date and source. Test long original text and a long source name in both aspects; their actual wrapped heights determine the layout, not a short placeholder. Status labels and explanations belong to the author: preserve their meaning rather than replacing prediction, announcement or confirmation with one generic badge.
+
+Use a two-ended proportion bar when a dense point plot becomes unreadable in portrait. Keep left + right <= total and show total-left-right as undecided; position optional thresholds against the full total, not only the decided portion. Test the pure ratio calculation, then inspect real rendered chapters for text overflow. Shared wrapper components should forward bindings and when/enter/exit/motion props.
+
+See examples/explainer-layouts: shared fictional data, local original vector illustration explicitly labeled non-photographic, short/long quote chapters and customizable status. These components are example-owned; the independent templates repository is maintained separately. No external facts, paid generation or online images are required.
 # content recipes and pitfalls
 
 ## Museum-film composition
@@ -60,13 +72,18 @@ Symptoms in an existing piece: one board per chapter (label, big title, panels, 
 
 ## Pitfalls that make a film feel like slides
 - Several steps under the same camera() go still once the drift reaches its end: the same target and drift do not restart it, and the film strip marks STILL. Let the camera follow the action (the side where the document lands, the panel that just opened, the end of the chart being discussed) or give the step a new drift.
-- camera({ zoom }) is a cap, not a forced zoom. If a cluster's shape does not match the safe area, neighbouring clusters show at the edges. Shape the opening cluster to the frame for a clean thumbnail.
+- camera({ zoom }) is a cap, not a forced zoom. Padding expands the target bounds before fitting: a target already as wide as the safe area will zoom OUT when pad > 0 (870px / (870px + 2 × 70px) ≈ 0.86). For a full-width portrait target use pad: 0; for smaller targets start with 12–18 design pixels and inspect the frame. There is no minimum zoom clamp; fitting a larger target may require zooming out. If a cluster's shape does not match the safe area, neighbouring clusters show at the edges. Shape the opening cluster to the frame for a clean thumbnail.
 - <br> is not an element; write line breaks as '
 ' with whiteSpace: 'pre-line'.
 - Holds with a frozen camera: drift is on by default; do not turn it off for reading holds — a 1–8 % eased push is enough. If the film strip still marks STILL, the drift is too weak for that framing (flat UI shows little change); raise zoom or add x/y.
-- Every element using the same entrance: vary by meaning (section 3b) and stagger with enterDelay; let new things start before old ones finish leaving.
+- Every element using the same entrance: vary by meaning (section 3b) and stagger a batch with enterStagger on its container; let new things start before old ones finish leaving.
+- Everything springs: a spring on every entrance reads as a toy. Springs for things that land, smooth or snappy for text and frames, bounce at most once a chapter.
+- Put the look you want to interpolate on the element that carries the motion key. Changes inside it (an inner wrapper's background, a bevelled border, a gradient) only crossfade; border colours, shadows and background images do not interpolate.
+- Put enter (and enterEase) on the element that carries the motion key, not on a wrapper around it: when the key flies in from elsewhere the wrapper would still enter and the piece would both fly and fade.
 - A whole interface replaced in one frame (when swap without exit/enter) is a hard cut. Give both sides a transition or cover the swap with the subject.
 - Whole-screen white/colour flashes over a still picture look like a stalled player; keep the picture moving under any fade.
 
+For runtime layout QA, use joplo render --audit-layout for a final-state screenshot and --film --audit-layout for motion. Declare important selectors, a content frame and reserved footer/subtitle rectangles; exclude intentional stamps/background overlays. Text Range bounds reflect loaded fonts and actual Canvas scaling. Canvas exposes its existing engine-clock camera, drift midpoint/end and sequence-waypoint deadlines only as DOM diagnostic hints; static/jump/exploration states do not claim future motion. A later step can interrupt a phase, and masks/rotation or hidden content remain unknown rather than "visible". Inspect evidence before changing intentional overlap.
+
 Common pitfall: For visual explainers, read npx joplo skill content: keep a continuous visual story, storyboard every chapter, film-strip the chain, and verify playback before claiming it works
-<!-- joplo-skill 0.5.0 sha256:5338570d78a4e000ae9506ce9faca39da4f4f7919472d09bf0997c6d5d986661 -->
+<!-- joplo-skill 0.7.0 sha256:4642218b1b256cc9edca4dc1e6c5241a000066954f7e0e93155638898e308dd6 -->

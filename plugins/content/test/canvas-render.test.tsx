@@ -7,7 +7,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as ui from '@joplo-app/plugin-ui';
-import { Canvas, camera } from '../src/plugin.ts';
+import { Canvas, Split, camera } from '../src/plugin.ts';
 import { feature, flow, work, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, stateAt, type AuthoringProject, type Project } from '@joplo-app/core';
@@ -60,4 +60,25 @@ it('preserves author HTML metadata without replacing Joplo anchors', () => {
   expect(out).toContain('title="Title"');
   expect(out).toContain('data-jid="probe"');
   expect(out).not.toContain('forged');
+});
+
+describe('<Split>', () => {
+  it('puts the entrance on each piece, keeps the root still, and reads the whole text once to screen readers', () => {
+    const out = html(build(h(Canvas, { id: 'cv' }, h(Split, { id: 's', text: 'Not typing, guessing', enter: 'blur', enterMs: 500, enterEase: 'spring', exit: 'fade' }))));
+    const root = out.match(/<span[^>]*data-jid="s"[^>]*>/)?.[0] ?? '';
+    expect(root).not.toContain('data-jp-content-enter=');
+    expect(root).toContain('data-jp-content-enter-stagger="70"');
+    expect(root).toContain('data-jp-content-exit="fade"');
+    const pieces = [...out.matchAll(/<span[^>]*data-jp-content-enter="blur"[^>]*>([^<]*)<\/span>/g)].map(m => m[1]);
+    expect(pieces).toEqual(['Not', 'typing,', 'guessing']);
+    expect(out).toContain('data-jp-content-enter-ease="spring"');
+    expect(out).toContain('aria-hidden="true"');
+    expect(out.split('Not typing, guessing').length - 1).toBe(1);
+  });
+  it('char mode defaults to rise and a shorter stagger; an explicit enterStagger wins', () => {
+    const out = html(build(h(Canvas, { id: 'cv' }, h(Split, { id: 's', text: 'ab', by: 'char' }), h(Split, { id: 't', text: 'cd', enterStagger: 200 }))));
+    expect(out).toContain('data-jp-content-enter-stagger="30"');
+    expect(out).toContain('data-jp-content-enter-stagger="200"');
+    expect([...out.matchAll(/data-jp-content-enter="rise"[^>]*>([^<]*)</g)].map(m => m[1])).toEqual(['a', 'b', 'cd']);
+  });
 });

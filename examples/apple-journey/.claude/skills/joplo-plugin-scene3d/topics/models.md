@@ -27,4 +27,4 @@ The loader supports embedded textures and meshopt geometry compression without e
 - Check mouse rotation, keyboard arrows, a declared object drag, hover, and a click independently. A declared model drag takes priority over orbit; drag empty canvas to rotate that scene. Reset/play discard local orbit, but snapshots always read scripted angles.
 
 Keep web geometry around 10k–50k faces and GLB below 5 MB. Inspect actual GLB accessor/index counts and bytes; a generation parameter alone is not proof of the exported budget. Models above 5 MB warn, above 50 MB fail. Check the initial frame and a focused frame, then open the build with npx joplo preview and no other network. A GLB download succeeding alone does not prove texture, anchoring or camera fit.
-<!-- joplo-skill 0.5.0 sha256:fdbeac554d71a7626908a7390dd4a3e1708a95581d118d611efb9a571f59bec6 -->
+<!-- joplo-skill 0.7.0 sha256:fdbeac554d71a7626908a7390dd4a3e1708a95581d118d611efb9a571f59bec6 -->

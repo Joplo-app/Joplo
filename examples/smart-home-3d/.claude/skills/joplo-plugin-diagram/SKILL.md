@@ -3,7 +3,7 @@ name: joplo-plugin-diagram
 description: "Use the Diagrams plugin in Joplo; read its entry, component recipes and recovery rules for this project."
 ---
 
-# Joplo plugin diagram: Diagrams 0.5.0
+# Joplo plugin diagram: Diagrams 0.7.0
 
 Author package: @joplo-app/plugin-diagram
 # Joplo diagrams: diagram
@@ -22,6 +22,11 @@ Three diagram components explain backend, architecture, and logic:
 Choose by the question: "what is where" → Diagram; "what happens in what order" → Sequence; "what states can it be in" → StateMachine.
 
 Import trace from @joplo-app/plugin-diagram. IR names are diagram:Diagram, diagram:StateMachine and diagram:Sequence; never hand-edit generated IR. UNKNOWN_PLUGIN means install this package and add diagram to config.plugins, then rerun check. Trace and state-machine transition states are compiled once per step, so seeking and offline playback read the same snapshot.
+
+## Canvas framing and design size
+Inside a content Canvas, let camera() own framing and write trace('api', 'kernel', { focus: false }) (also supported by trace.fail). This updates the same node/edge snapshots and timing without suggesting a host shot, so screen overlays and the outer frame stay fixed. The default remains host-focused for existing works. Do not combine a Canvas camera with an accidental second host zoom.
+
+Diagram, StateMachine and Sequence accept scale={2} to request twice the native node, text and edge size in design pixels. The whole diagram still shrinks to fit its container; a larger scale needs enough width and height. At a 1920px Canvas design width, start with scale={2}, then inspect a real frame at the final camera zoom; a crowded graph may still need fewer nodes or a closer Canvas camera. Default scale is 1. Invalid/non-positive values report DIAGRAM_SCALE_INVALID; fix the value before publishing.
 
 ## Diagram: group by business domain
 ```tsx
@@ -116,4 +121,4 @@ General engine contracts: npx joplo skill plugins
 - [patterns](./topics/patterns.md): Recipes and individual pitfalls
 
 Engine contracts: [plugins](../joplo/topics/plugins.md).
-<!-- joplo-skill 0.5.0 sha256:6e4e76e1a24c4bee80e583b6d804e705c7247d3b1aba4dee44d5ef0803f4be7a -->
+<!-- joplo-skill 0.7.0 sha256:58140f60b1c3f5849a31be6aa2a1fd9005e6a2c43568c48d38e05371d9f75afe -->

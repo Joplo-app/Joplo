@@ -238,7 +238,7 @@ tone: 'plain'|'ok'|'warn'|'error' (default plain); output text in children (pres
 scale (visual scale, default 1), h (screen height, default 844), landscape (turned sideways: content 772 × 358, notch on the left; use it for video-style or landscape mobile screens); phone frame, children laid out at mobile width 390 with breakpoints based on that width; viewport: "mobile" on a page adds it automatically; do not add Phone explicitly
 
 ## div
-HTML fallback; prefer Box/Stack/Group
+HTML fallback; supports data-*, aria-*, role and title (data-j* reserved); prefer Box/Stack/Group
 
 ## span
 HTML fallback; prefer Text span
@@ -512,4 +512,4 @@ data: string[] | [{ value, label, icon?, badge? }], value / defaultValue, aria-l
 </Stack>
 // steps: .select('tabs', 'trips', go('/trips'))
 ```
-<!-- joplo-skill 0.5.0 sha256:ad699fadea2fbcef8e18e38d92b2caa00f9bf431621b10954d1cf8e26887d1b0 -->
+<!-- joplo-skill 0.7.0 sha256:acd58306cd767c76af9591c89d432e890a83ea0200351ca3945dad0c5326fb6b -->

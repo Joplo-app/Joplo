@@ -35,7 +35,7 @@ describe('enter / exit', () => {
   it('rejects unknown presets and out-of-range timing with the list of presets', () => {
     const bad = errors(build(canvas({}, { enter: 'slide' })));
     expect(bad.map(d => d.code)).toEqual(['PLUGIN_PROPERTY_INVALID']);
-    expect(bad[0]!.message).toContain('one of fade, rise, zoom, shrink, wipe, iris');
+    expect(bad[0]!.message).toContain('one of fade, rise, zoom, shrink, wipe, iris, grow, growUp, blur');
     expect(errors(build(canvas({}, { exitMs: 20000 }))).map(d => d.code)).toEqual(['PLUGIN_PROPERTY_INVALID']);
     expect(errors(build(canvas({}, { exit: 3 }))).map(d => d.code)).toEqual(['PLUGIN_PROPERTY_INVALID']);
   });
