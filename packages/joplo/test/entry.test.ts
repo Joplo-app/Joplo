@@ -139,6 +139,21 @@ describe('真实入口转发', () => {
     expect(r.status).toBe(7);
   });
 
+  test('工作区的 CLI 指向 TypeScript 源码：先注册 tsx 再载入，参数属性等写法在任何 Node 版本都能运行（#62）', () => {
+    const project = temp();
+    const dir = path.join(project, 'node_modules/@joplo-app/cli');
+    fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'node_modules'));
+    // 与真实 CLI 一样从自己的依赖里找 tsx
+    fs.symlinkSync(path.dirname(require.resolve('tsx/package.json', { paths: [path.resolve(PKG, '../cli')] })), path.join(dir, 'node_modules/tsx'));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: '@joplo-app/cli', version: '0.0.2', type: 'module', bin: { 'joplo-cli': './src/bin.ts' } }));
+    fs.writeFileSync(path.join(dir, 'src/bin.ts'), "class Say { constructor(private readonly word: string) {} out(): string { return this.word; } }\nconsole.log(new Say('ts-cli').out() + ' ' + JSON.stringify(process.argv.slice(2)));\n");
+    const r = spawnSync(process.execPath, [BIN, 'skill'], { cwd: project, encoding: 'utf8', env: { ...process.env, npm_config_user_agent: '' } });
+    expect(r.stderr).not.toMatch(/Error/);
+    expect(r.stdout).toBe('ts-cli ["skill"]\n');
+    expect(r.status).toBe(0);
+  });
+
   test('找不到 CLI 时退出 1 并说明', () => {
     const lonely = temp();
     fs.mkdirSync(path.join(lonely, 'bin')); fs.mkdirSync(path.join(lonely, 'lib'));

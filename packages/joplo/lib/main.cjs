@@ -96,7 +96,24 @@ async function main() {
     return;
   }
   for (const n of choice.notes) process.stderr.write(n + '\n');
+  if (isTypeScript(choice.bin)) registerTsx(choice.dir);
   await import(pathToFileURL(choice.bin).href);
 }
 
-module.exports = { main, pickCli, findUp };
+const isTypeScript = (file) => /\.[cm]?tsx?$/.test(file);
+
+/**
+ * 仓库工作区里的 @joplo-app/cli 直接指向 TypeScript 源码（发布的包是编译好的 dist）。Node 自带的类型剥离不支持参数属性等写法，
+ * Node 22 早期版本也没有它，所以先用那份 CLI 自己依赖的 tsx 注册加载器（#62）。找不到 tsx 时照常载入，由 Node 报原错误。
+ */
+function registerTsx(cliDir) {
+  let api;
+  try {
+    api = require(require.resolve('tsx/esm/api', { paths: [cliDir] }));
+  } catch {
+    return;
+  }
+  api.register();
+}
+
+module.exports = { main, pickCli, findUp, isTypeScript };
