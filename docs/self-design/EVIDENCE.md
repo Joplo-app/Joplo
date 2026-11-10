@@ -196,7 +196,7 @@
 | --- | --- | --- |
 | `voice.a-read-along.source_update` | 作品/章节旁白 dry-run 范围、`narrate(false)` 显式静音、`pace.systemLead` 与 `hold` 的前后节奏 | Issues #72 / #73 / #95；`packages/cli/src/voice.ts`、`packages/kit/src/index.ts`、`packages/web/src/runtime/demo.ts`；本地已实现与测试，不生成真实旁白 |
 | `frames.a-builtin.source_update` | 原生逻辑画幅与输出像素分离、去外框、Canvas 内 diagram 高亮与字号、宿主覆盖层安全区 | Issues #75 / #77 / #79 / #87；`packages/server/src/render.ts`、`capture.ts`、`plugins/diagram/src/`；本地已实现，命令为示意 |
-| `film_form.a-chapters.source_update` | 实际播放时间轴、逐帧导出、可恢复检查点、只读素材审计与状态边界 | Issues #76–#84 / #86 / #93 / #94；`packages/server/src/film.ts`、`timeline.ts`、`asset-usage.ts`；本地已实现的契约整理；#85 实际版面审查仍在实现与验收 |
+| `film_form.a-chapters.source_update` | 实际播放时间轴、逐帧导出、可恢复检查点、只读素材审计与状态边界 | Issues #71 / #77 / #79 / #80 / #85 / #86 / #88 / #90–#92 / #96；`packages/server/src/film.ts`、`timeline.ts`、`asset-usage.ts`；本地已实现的契约整理；#85 已通过真实横竖画幅、字体 Range 及提交/入场/漂移/镜头节点动态采样验收，容差 50ms；仍只给几何告警和明确 unknown |
 
 共用 `examples/joplo/shared/production/update.tsx`，使用既有 UI 组件、状态绑定、系统步骤和稳定步骤 key。展示的命令不会执行，不请求付费资源、不自动清理素材、不上传或发布。素材引用、发布入包与实际采样可见性分别叙述，动态与未知情况不冒称未使用。恢复明确要求先有检查点，仍重放引擎恢复状态，不虚构任意时刻跳入能力。
 

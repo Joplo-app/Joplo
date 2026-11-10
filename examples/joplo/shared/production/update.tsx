@@ -15,13 +15,13 @@ const updates: Record<'voice' | 'film' | 'frames', { title: string; source: stri
     { title: '时间轴来自实际提交与旁白事件', detail: '逐帧序列使用累计帧目标时间；timeline 同时保存章节、步骤、媒体与旁白事件。它与 outline 的估算时长不同。', code: 'joplo render --scenario-id <id> --frames-out frames\n  --fps 30 --timeline timeline.json' },
     { title: '长作品按章节保存可恢复检查点', detail: '首次导出不加 --resume。恢复时仍重放引擎以恢复状态，复用经验证的已完成分析；输入或取景条件变化应拒绝旧检查点，不把恢复说成任意逐帧跳入。', code: 'joplo render --scenario-id <id> --film --chain\n  --checkpoint film.checkpoint.json --resume --out film.png' },
     { title: '素材引用分成三种证据', detail: '源码引用、所选发布范围入包、采样画面实际可见并不等价。动态路径与未知可见性明确标未知；报告只读，不删除、不上传。', code: 'joplo assets --usage --scan assets\n  --work <work-id> --format json' },
-    { title: '版面审查仍在实现，发布仍是独立步骤', detail: '实际几何采样的版面审查正在实现与验收，不冒称 check 已保证无溢出。Cloud reader 与 npm 尚未发布；本轮截图也不是生产验收。', code: '本轮：本地源码与测试证据\n待验收：版面审查\n未执行：Cloud 部署 / npm 发行', status: '实现中 / 未发布' },
+    { title: '版面审查来自真实字体和动态采样', detail: '静态与胶片审查已通过真实横竖画幅验收，动态采样覆盖提交、入场结束和镜头漂移，容差 50ms。告警仍需结合证据图判断；Cloud reader 与 npm 尚未发布。', code: 'joplo render --scenario-id <id> --film --audit-layout --out film.png\n已验证：本地几何 / 动态时钟；未执行：Cloud 部署 / npm 发行', status: '本地已验证 / 未发布' },
   ] },
 };
 /** Curated source-derived workflow, not a fabricated approval or live CLI result. */
 export function withProductionUpdate(definition: WorkDef, kind: keyof typeof updates): WorkDef {
   const update = updates[kind];
-  const scenario = flow('本轮能力 · 根据源码整理', { ...(definition.layers ? { layer: 'source_update' } : { start: '/production-update' }), mock: '根据本轮 issue 与实现源码整理；命令只展示，不执行、不生成付费资源、不上传', expected: '区分本地已实现、实现中和未发布，不伪造人工批准' });
+  const scenario = flow('本轮能力 · 根据源码整理', { ...(definition.layers ? { layer: 'source_update' } : { start: '/production-update' }), mock: '根据本轮 issue 与实现源码整理；命令只展示，不执行、不生成付费资源、不上传', expected: '区分本地已实现、已验证和未发布，不伪造人工批准' });
   for (const [i, beat] of update.beats.entries()) scenario.system(beat.title, set($.ui.sourceUpdate, i), shot('source-update-root'), hold(1)).key(`source-update-${kind}-${i + 1}`);
   const view = <Stack id="source-update-root" p={40} gap={20} style={{ paddingTop: 65, paddingBottom: 85, height: 700, boxSizing: 'border-box' }}>
       <Group gap="sm"><Badge color="blue">根据源码整理</Badge><Badge color="gray">本地已实现 ≠ 已上线</Badge></Group>
