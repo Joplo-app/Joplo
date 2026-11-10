@@ -1,6 +1,6 @@
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
-import { $, feature, flow, option, page, Slot } from '@joplo-app/kit';
+import { $, feature, flow, work, page, Slot } from '@joplo-app/kit';
 import { jsx as h } from '@joplo-app/kit/jsx-runtime';
 import { definePlugin, pluginComponent, pluginEffect, type PluginScopeRule } from '@joplo-app/kit/plugin';
 import { compile, type AuthoringProject } from '../src/compile.ts';
@@ -15,15 +15,15 @@ function source(p: ReturnType<typeof plugin>, effects: any[] = []): AuthoringPro
   return {
     root: '/p', config: { ...config({ name: 'Test', plugins: [p] }), file }, layouts: {},
     routes: { '/': { ...page({ title: 'Home' }, h(pluginComponent(p, 'Item'), { id: 'public', label: 'Public', children: h(Slot, { name: 'contrib' }) })), file } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('One', ...effects).system('Two') } }), file } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'A', summary: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('One', ...effects).system('Two') } }), file } } } },
   };
 }
 const rows = (root: any): any[] => [...(root.props?.label ? [{ id: root.id, text: root.props.label }] : []), ...(root.children ?? []).flatMap(rows)];
 function stageSource(p: ReturnType<typeof plugin>) {
   const s = source(p);
   s.routes['/other'] = { ...page({ title: 'Other' }, h('ui:Text', { id: 'secret', label: 'ALLOWED-TEXT' })), file };
-  s.features.h = { def: { ...feature({ name: 'H', goal: 'h', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'H', idea: 'h', on: {}, scenarios: { s: flow('Other', { start: '/other' }).system('Other') } }), file } } };
-  s.features.g = { def: { ...feature({ name: 'G', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'G', idea: 'g', on: { '/': { contrib: h('ui:Text', { id: 'secret', label: 'OMITTED-SECRET-TEXT', children: h('ui:Text', { id: 'omitted_only', label: 'OMITTED-ONLY-TEXT' }) }) } }, scenarios: { s: flow('Private', { start: '/' }).system('Private') } }), file } } };
+  s.features.h = { def: { ...feature({ name: 'H', goal: 'h', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'H', summary: 'h', on: {}, scenarios: { s: flow('Other', { start: '/other' }).system('Other') } }), file } } };
+  s.features.g = { def: { ...feature({ name: 'G', goal: 'g', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'G', summary: 'g', on: { '/': { contrib: h('ui:Text', { id: 'secret', label: 'OMITTED-SECRET-TEXT', children: h('ui:Text', { id: 'omitted_only', label: 'OMITTED-ONLY-TEXT' }) }) } }, scenarios: { s: flow('Private', { start: '/' }).system('Private') } }), file } } };
   return s;
 }
 
@@ -102,7 +102,7 @@ describe('R2-2 stable hook output before validation', () => {
   });
   it('captures authoring bindings as stable values while preserving normal normalization', () => {
     const p = plugin({ node: (n: any) => ({ ...n, props: { ...n.props, label: $.data.title } }) });
-    const s = source(p); s.features.f!.options.a!.state = { data: { title: 'Bound title' } };
+    const s = source(p); s.features.f!.works.a!.state = { data: { title: 'Bound title' } };
     const r = compile(s, 'publish');
     expect(r.diagnostics).toEqual([]);
     expect(r.project!.scenes['@/']!.root.props!.label).toBe('$data.title');

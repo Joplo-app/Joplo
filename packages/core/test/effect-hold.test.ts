@@ -5,7 +5,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  * 与 commitGapMs（配乐等媒体锚点）。作者的 hold 仍是唯一“由作者掌握节奏、不套 3 秒下限”的信号。
  */
 import { describe, expect, it } from 'vitest';
-import { feature, flow, hold, option, page } from '@joplo-app/kit';
+import { feature, flow, hold, work, page } from '@joplo-app/kit';
 import { definePlugin, pluginComponent, pluginEffect } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '../src/compile.ts';
@@ -25,7 +25,7 @@ const play = (ms: unknown) => pluginEffect('timed', 'play', { ms });
 function source(steps: (f: ReturnType<typeof flow>) => ReturnType<typeof flow>): AuthoringProject {
   const file = '/p/test.tsx';
   return { root: '/p', config: { ...config({ name: 'Test', plugins: [timed] }), file }, layouts: {}, routes: { '/': { ...page({ title: 'Home' }, h(pluginComponent(timed, 'Box'), { id: 'box' })), file } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'i', on: {}, scenarios: { s: steps(flow('S', { start: '/' })) } }), file } } } } };
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'A', summary: 'i', on: {}, scenarios: { s: steps(flow('S', { start: '/' })) } }), file } } } } };
 }
 
 describe('插件效果时长 holdMs（D98）', () => {
@@ -64,7 +64,7 @@ describe('插件效果时长 holdMs（D98）', () => {
   it('outline 的时长估算包含效果时长', () => {
     const plain = compile(source((f) => f.system('Clip', 'Play a clip')), 'dev').project!;
     const clip = compile(source((f) => f.system('Clip', 'Play a clip', play(20000))), 'dev').project!;
-    const ms = (p: typeof plain) => outline(p).features[0]!.options[0]!.scenarios[0]!.ms;
+    const ms = (p: typeof plain) => outline(p).entries[0]!.works[0]!.scenarios[0]!.ms;
     expect(ms(clip)).toBeGreaterThanOrEqual(20000);
     expect(ms(clip)).toBeGreaterThan(ms(plain));
   });
@@ -86,7 +86,7 @@ describe('插件效果引用的元素是这一步的焦点对象（D98，代码�
   it('只改插件画面的系统步骤不再算“画面没变”，也不加默认脉冲', () => {
     const file = '/p/test.tsx';
     const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'Test', plugins: [touch] }), file }, layouts: {}, routes: { '/': { ...page({ title: 'Home' }, h(pluginComponent(touch, 'Box'), { id: 'box' })), file } },
-      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('A', 'a', poke()).system('B', 'b', poke()).system('C', 'c', poke()) } }), file } } } } };
+      features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'A', summary: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('A', 'a', poke()).system('B', 'b', poke()).system('C', 'c', poke()) } }), file } } } } };
     const p = compile(src, 'dev').project!;
     const tl = focusTimeline(p, 'f.a.s');
     for (const i of [1, 2, 3]) {

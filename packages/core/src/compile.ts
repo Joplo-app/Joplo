@@ -1,8 +1,9 @@
-import { lowerWorks } from './authoring-works.ts';
+import { rolesOf, INTERNAL_BLANK_TITLE } from './entries.ts';
+import { validateWork } from './authoring-works.ts';
 import { resolveSlices } from './sequencing.ts';
 import { validActionData, pluginActionSpec } from './actions.ts';
 /**
- * 编译：作者的源文件（经 @joplo-app/kit 收集成数据）→ IR v2。组件词汇对齐 Mantine（D35），见 catalog.ts。
+ * 编译：作者的源文件（经 @joplo-app/kit 收集成数据）→ IR v3。组件词汇对齐 Mantine（D35），见 catalog.ts。
  *
  * 路径优先的堆叠（D28）：画面 = 布局 + 页面 + 各功能方案填入插槽的元素。
  * - dev 模式：每个方案在每个路径上各有一个画面 `<方案>@<路径>`，其中其他功能取选定方案，本功能取该方案；
@@ -11,7 +12,7 @@ import { validActionData, pluginActionSpec } from './actions.ts';
  * - review 模式（评审版，D63）：画面与场景同 dev（所有功能的所有方案），创作侧信息按 publish 的规则去掉。
  */
 import { createNode, isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo-app/kit/node';
-import type { ConfigDef, FeatureDef, LayoutDef, OptionDef, PageDef, StepDef, EffectDef, CaseDef, PluginDef, WorkDef } from '@joplo-app/kit';
+import type { ConfigDef, FeatureDef, LayoutDef, WorkDef, PageDef, StepDef, EffectDef, CaseDef, PluginDef } from '@joplo-app/kit';
 import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, PAGE_LAYER, isInteractiveType, matchChoice, nodeLabel, pluginSpec, splitPluginType, type PluginInfo } from './catalog.ts';
 import { HOLD_MAX_SECONDS, HOLD_MIN_SECONDS, inShotFrame } from './focus.ts';
 import { cameraOf, choicesOf, commonPrefix, replayTo } from './player.ts';
@@ -29,8 +30,8 @@ export type AuthoringProject = {
   config: ConfigDef & { file: string };
   layouts: Record<string, LayoutDef & { file: string }>;
   routes: Record<string, PageDef & { file: string }>;
-  features: Record<string, { def: FeatureDef & { file: string }; options: Record<string, OptionDef & { file: string }> }>;
-  /** 独立作品文件名为条目键；可省略以保持既有项目的输入与 IR 不变。 */
+  features: Record<string, { def: FeatureDef & { file: string }; works: Record<string, WorkDef & { file: string }> }>;
+  /** 独立作品文件名为条目键；未声明独立作品时可省略。 */
   works?: Record<string, WorkDef & { file: string }>;
   /** 作者主题（D51）：themes/<name>.css 的原文。 */
   themes?: Record<string, string>;
@@ -49,18 +50,14 @@ export type CompileMode = 'dev' | 'publish' | 'review';
 
 export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileOptions = {}): CompileResult {
   /** 所有方案都参与（dev、review）；创作侧信息要去掉（publish、review）。 */
-  const allOpts = mode !== 'publish';
+  const allWorksIncluded = mode !== 'publish';
   const strip = mode !== 'dev';
   const diags: Diagnostic[] = [];
   const rel = (s?: string) => (s ? relSource(src.root, s) : undefined);
-  const publicMessage = (message: string): string => {
-    for (const key of Object.keys(src.works ?? {})) message = message.replaceAll(`Feature ${key}`, `Work ${key}`).replaceAll(`Option ${key}.main`, `Work ${key}`).replaceAll(`option ${key}.main`, `work ${key}`).replaceAll(`${key}.main`, key);
-    return message;
-  };
   const err = (code: string, message: string, at?: string, ref?: Diagnostic['ref']) =>
-    diags.push({ severity: 'error', code, message: publicMessage(message), source: 'reference', ...(at ? { at: rel(at) } : {}), ...(ref ? { ref } : {}) });
+    diags.push({ severity: 'error', code, message, source: 'reference', ...(at ? { at: rel(at) } : {}), ...(ref ? { ref } : {}) });
   const warn = (code: string, message: string, at?: string, ref?: Diagnostic['ref']) =>
-    diags.push({ severity: 'warning', code, message: publicMessage(message), source: 'structure', ...(at ? { at: rel(at) } : {}), ...(ref ? { ref } : {}) });
+    diags.push({ severity: 'warning', code, message, source: 'structure', ...(at ? { at: rel(at) } : {}), ...(ref ? { ref } : {}) });
   /** 元素树里的诊断：同一份 JSX 展开到多个画面时，提示类（warning / info）只报一次。 */
   const seenHints = new Set<string>();
   const report: ErrFn = (code, message, at, severity = 'error') => {
@@ -68,18 +65,32 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const key = `${code}|${at}|${message}`;
     if (seenHints.has(key)) return;
     seenHints.add(key);
-    diags.push({ severity, code, message: publicMessage(message), source: 'structure', ...(at ? { at: rel(at) } : {}) });
+    diags.push({ severity, code, message, source: 'structure', ...(at ? { at: rel(at) } : {}) });
   };
 
-  const lowered = lowerWorks(src, mode, report);
-  src = lowered.source;
-  const works = lowered.works;
+  const works = new Map(Object.entries(src.works ?? {}).filter(([key, def]) => {
+    if (Object.hasOwn(src.features, key)) {
+      report('WORK_ID_CONFLICT', `Work ${key} conflicts with features/${key}; rename the work file or the feature directory`, def?.source);
+      return false;
+    }
+    if (mode !== 'dev' && def?.kind === 'work' && def.draft === true) {
+      report('WORK_DRAFT_SKIPPED', `Draft work "${def.title}" was skipped; remove draft: true when it is ready to publish or review`, def.source, 'info');
+      return false;
+    }
+    if (!validateWork(key, def, false, report, Object.keys(src.routes).length > 0)) return false;
+    if (!Object.keys(def.scenarios).length) {
+      report('WORK_EMPTY', `Work "${def.title}" has no slices${mode === 'dev' ? '' : ' and was not published or reviewed'}. Add scenarios: { opening: chapter('Opening').system('Begin', narrate('Your opening line')) }`, def.source, 'info');
+      if (mode !== 'dev') return false;
+    }
+    return true;
+  }));
+  for (const [fid, feature] of Object.entries(src.features)) for (const [key, def] of Object.entries(feature.works)) validateWork(`${fid}.${key}`, def, true, report, Object.keys(src.routes).length > 0);
   const localOnly = (fid: string) => works.has(fid) && (works.get(fid)!.draft === true || !Object.keys(works.get(fid)!.scenarios).length);
   const isolated = (fid: string) => works.has(fid) && works.get(fid)!.on === undefined && works.get(fid)!.routes === undefined;
   if (diags.some(d => d.severity === 'error')) return { project: null, diagnostics: diags };
 
   /** flow({ from }) 接力：所有场景编译完后，按回放结果替换初始状态（见文末）。 */
-  const pendingFrom = new Map<string, { from: string; state: OptionDef['state']; layer: string | undefined; at: string | undefined }>();
+  const pendingFrom = new Map<string, { from: string; state: WorkDef['state']; layer: string | undefined; at: string | undefined }>();
   const out: Record<string, any> = {
     schemaVersion: SCHEMA_VERSION,
     name: src.config.name,
@@ -93,9 +104,9 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     mode,
     routes: {},
     features: {},
-    featureIds: [],
+    entryIds: [],
     cases: {},
-    options: {},
+    works: {},
     rules: {},
     scenes: {},
     scenarios: {},
@@ -110,55 +121,59 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
 
   // ---------- 1. 选出参与的方案 ----------
   // 排序只在编译时决定；显式列表不依赖对象键的枚举顺序，发布模式也保留这份演示内容。
-  for (const [fid, f] of Object.entries(src.features)) {
-    if (f.def.order !== undefined && (typeof f.def.order !== 'number' || !Number.isFinite(f.def.order)))
-      err('FEATURE_ORDER_INVALID', `Feature ${fid} order must be a finite number; omit it for folder-name order`, f.def.source ?? `${f.def.file}:1:1`, { kind: 'feature', id: fid });
+  for (const [id, def] of [...Object.entries(src.features).map(([id, f]) => [id, f.def] as const), ...works]) {
+    if (def.order !== undefined && (typeof def.order !== 'number' || !Number.isFinite(def.order)))
+      err(works.has(id) ? 'WORK_INVALID' : 'FEATURE_ORDER_INVALID', `${works.has(id) ? 'Work' : 'Feature'} ${id} order must be a finite number; omit it for folder-name order`, def.source ?? `${def.file}:1:1`, { kind: works.has(id) ? 'work' : 'feature', id });
   }
   if (diags.some(d => d.severity === 'error')) return { project: null, diagnostics: diags };
   const natural = new Intl.Collator('en', { numeric: true });
-  const features = Object.entries(src.features).sort(([a, af], [b, bf]) => {
-    const ao = af.def.order ?? Infinity, bo = bf.def.order ?? Infinity;
-    return ao !== bo ? ao - bo : natural.compare(a, b);
-  });
-  const linearOptions = new Set<string>();
-  type Opt = { fid: string; key: string; qid: string; def: OptionDef & { file: string } };
-  const allOptions: Opt[] = [];
-  const picked = new Map<string, Opt>(); // fid -> 选定方案
-  for (const [fid, f] of features) {
-    for (const [key, def] of sortedEntries(f.options)) {
-      const qid = `${fid}.${key}`;
-      const slices = resolveSlices(def.scenarios ?? {}, works.has(fid) ? `Work ${fid}` : `Option ${qid}`, err);
-      if (slices.linear) linearOptions.add(qid);
-      allOptions.push({ fid, key, qid, def: { ...def, scenarios: slices.scenarios } });
+  const entryOrder = [...Object.entries(src.features).map(([id, f]) => [id, f.def.order] as const), ...[...works].map(([id, w]) => [id, w.order] as const)]
+    .sort(([a, ao = Infinity], [b, bo = Infinity]) => ao !== bo ? ao - bo : natural.compare(a, b)).map(([id]) => id);
+  const features = entryOrder.flatMap(id => src.features[id] ? [[id, src.features[id]!] as const] : []);
+  const linearWorks = new Set<string>();
+  type WorkContext = { fid: string; key: string; qid: string; def: WorkDef & { file: string } };
+  const allWorks: WorkContext[] = [];
+  const picked = new Map<string, WorkContext>();
+  for (const id of entryOrder) {
+    const f = src.features[id];
+    const definitions = f ? sortedEntries(f.works) : [[id, works.get(id)!] as const];
+    for (const [key, raw] of definitions) {
+      const qid = f ? `${id}.${key}` : key;
+      const slices = resolveSlices(raw.scenarios, `Work ${qid}`, err);
+      if (slices.linear) linearWorks.add(qid);
+      const def = { ...raw, scenarios: slices.scenarios, ...(raw.stage !== undefined ? { layers: { stage: { kind: 'layer' as const, title: raw.title, tree: raw.stage, viewport: raw.viewport, source: raw.source } } } : {}) };
+      allWorks.push({ fid: id, key, qid, def });
     }
+    if (!f) { picked.set(id, allWorks.at(-1)!); continue; }
     const pick = f.def.pick ?? null;
     if (pick) {
-      const o = allOptions.find((x) => x.fid === fid && x.key === pick);
-      if (o) picked.set(fid, o);
-      else err('UNKNOWN_PICK', `Feature ${fid} pick "${pick}" is not an option under options/`, f.def.source);
-    } else if (mode === 'publish') warn('NOT_PICKED', `Feature "${f.def.name}" has no picked option and will not be published`, f.def.source);
+      const w = allWorks.find(x => x.fid === id && x.key === pick);
+      if (w) picked.set(id, w);
+      else err('UNKNOWN_PICK', `Feature ${id} pick "${pick}" is not a work under works/`, f.def.source);
+    } else if (mode === 'publish') warn('NOT_PICKED', `Feature "${f.def.name}" has no picked alternative and will not be published`, f.def.source);
   }
-  const included = allOpts ? allOptions : [...picked.values()];
+  const included = allWorksIncluded ? allWorks : [...picked.values()];
+  out.entryIds = entryOrder.filter(id => mode !== 'publish' || picked.has(id));
 
   // ---------- 2. 路径表 ----------
-  type RouteEntry = { path: string; page: PageDef & { file: string }; addedBy?: Opt };
+  type RouteEntry = { path: string; page: PageDef & { file: string }; addedBy?: WorkContext };
   const baseRoutes = new Map<string, RouteEntry>();
   for (const [path, p] of sortedEntries(src.routes)) baseRoutes.set(path, { path, page: p });
   const addedRoutes = new Map<string, RouteEntry>(); // `${qid}|${path}`
-  for (const o of allOptions) {
+  for (const o of allWorks) {
     for (const [path, p] of Object.entries(o.def.routes ?? {})) {
       if (!path.startsWith('/')) err('BAD_ROUTE', `Route must start with /: ${path}`, o.def.source);
-      if (baseRoutes.has(path)) err('ROUTE_EXISTS', `Option ${o.qid} adds route ${path} which already exists in routes/; use on to add elements instead`, p.source ?? o.def.source);
+      if (baseRoutes.has(path)) err('ROUTE_EXISTS', `Work ${o.qid} adds route ${path} which already exists in routes/; use on to add elements instead`, p.source ?? o.def.source);
       addedRoutes.set(`${o.qid}|${path}`, { path, page: { ...p, file: o.def.file }, addedBy: o });
     }
   }
   // 只使用 stage / layers 的独立作品从空白画面开始；写了 on / routes 就复用项目页面。
   // IR 的页面标题与画面名要求非空字符串；纯空白保持无可见文字，也不会成为作者翻译项。
-  const blankRoute: RouteEntry = { path: '/', page: { kind: 'page', title: ' ', layout: false, tree: createNode('#fragment', {}), file: '' } };
+  const blankRoute: RouteEntry = { path: '/', page: { kind: 'page', title: INTERNAL_BLANK_TITLE, layout: false, tree: createNode('#fragment', {}), file: '' } };
   const hasAddedRoot = [...addedRoutes.values()].some(r => r.path === '/' && !localOnly(r.addedBy!.fid) && included.some(o => o.qid === r.addedBy!.qid));
-  if (works.size && !baseRoutes.has('/') && !hasAddedRoot) baseRoutes.set('/', blankRoute);
+  if ((works.size || !baseRoutes.size && !addedRoutes.size) && !baseRoutes.has('/') && !hasAddedRoot) baseRoutes.set('/', blankRoute);
   /** 在给定方案上下文（null = 发布视图）中可见的路径。 */
-  const routesIn = (ctx: Opt | null): RouteEntry[] => {
+  const routesIn = (ctx: WorkContext | null): RouteEntry[] => {
     if (ctx && isolated(ctx.fid)) return [blankRoute];
     const added = [...addedRoutes.values()].filter((r) => {
       const by = r.addedBy!;
@@ -192,34 +207,33 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   for (const [fid, f] of features) {
     const fdef = f.def;
     if (mode === 'publish' && !picked.has(fid)) continue;
-    out.featureIds.push(fid);
-    const caseIds = Object.keys(fdef.cases ?? {}).map((k) => `${fid}.${k}`);
+    const caseIds = Object.keys(fdef?.cases ?? {}).map((k) => `${fid}.${k}`);
     out.features[fid] = {
       id: fid,
-      ...(works.has(fid) ? { standalone: true, ...(works.get(fid)!.audience?.trim() ? { audience: works.get(fid)!.audience!.trim() } : {}), ...(mode === 'dev' && works.get(fid)!.draft === true ? { draft: true } : {}) } : {}),
       name: fdef.name,
       goal: fdef.goal,
-      roles: rolesOf(fdef.roles),
+      roles: compileRoles(fdef.roles),
       constraints: Object.entries(fdef.constraints ?? {}).map(([id, c]) => (typeof c === 'string' ? { id, text: c, hard: true } : { id, text: c.text, hard: c.hard ?? true })),
       caseIds: strip ? [] : caseIds,
-      optionIds: included.filter((o) => o.fid === fid).map((o) => o.qid),
+      workIds: included.filter((o) => o.fid === fid).map((o) => o.qid),
       pick: picked.get(fid)?.qid ?? null,
+      alternatives: {},
       ...(fdef.source ? { source: rel(fdef.source) } : {}),
     };
     if (strip) continue;
-    for (const [k, c] of Object.entries(fdef.cases ?? {})) out.cases[`${fid}.${k}`] = caseOf(`${fid}.${k}`, fid, c, rel(fdef.source));
+    for (const [k, c] of Object.entries(fdef?.cases ?? {})) out.cases[`${fid}.${k}`] = caseOf(`${fid}.${k}`, fid, c, rel(fdef.source));
     for (const [k, r] of Object.entries(fdef.rules ?? {})) out.rules[`${fid}.${k}`] = ruleOf(`${fid}.${k}`, fid, undefined, r, rel);
     for (const [k, q] of Object.entries(fdef.questions ?? {})) out.issues[`${fid}.${k}`] = { id: `${fid}.${k}`, featureId: fid, text: q.text, severity: q.severity, refs: q.refs, ...(q.source ? { source: rel(q.source) } : {}) };
   }
 
   // ---------- 4. 画面合成 ----------
-  const contributionsFor = (ctx: Opt | null): Opt[] => {
+  const contributionsFor = (ctx: WorkContext | null): WorkContext[] => {
     if (ctx && isolated(ctx.fid)) return [ctx];
     const list = [...picked.values()].filter((o) => !localOnly(o.fid) && (!ctx || o.fid !== ctx.fid));
     if (ctx) list.push(ctx);
     return list;
   };
-  const composeScene = (route: RouteEntry, ctx: Opt | null): Scene => {
+  const composeScene = (route: RouteEntry, ctx: WorkContext | null): Scene => {
     const sceneId = ctx ? `${ctx.qid}@${route.path}` : `@${route.path}`;
     const page = route.page;
     const lid = layoutOf(page);
@@ -245,9 +259,9 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     for (const slot of contribs.keys()) {
       if (!used.has(slot)) {
         const from = contribs.get(slot)![0]!.from;
-        const o = allOptions.find((x) => x.qid === from);
-        err('UNKNOWN_SLOT', `Option ${from} adds elements to route ${route.path} slot "${slot}", but the page and layout have no <Slot name="${slot}" />`, o?.def.source, {
-          kind: 'option',
+        const o = allWorks.find((x) => x.qid === from);
+        err('UNKNOWN_SLOT', `Work ${from} adds elements to route ${route.path} slot "${slot}", but the page and layout have no <Slot name="${slot}" />`, o?.def.source, {
+          kind: 'work',
           id: from,
         });
       }
@@ -256,7 +270,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const rootJ: JNode = { ...base, type: base.type, children: [...base.children, ...overlays] };
     const ids = new Map<string, string | undefined>();
     const root = toSceneNode(rootJ, 'root', ids, nodeCtx, null);
-    const scene: Scene = { id: sceneId, optionId: ctx?.qid ?? null, route: route.path, name: `${page.title}${ctx ? ` · ${ctx.def.name}` : ''}`, viewport: page.viewport ?? 'desktop', root };
+    const scene: Scene = { id: sceneId, workId: ctx?.qid ?? null, route: route.path, name: `${page.title}${ctx ? ` · ${ctx.def.title}` : ''}`, viewport: page.viewport ?? 'desktop', root };
     if (!diags.some(d => d.severity === 'error')) host.derive(scene);
     return scene;
   };
@@ -280,33 +294,35 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     out.scenes[s.id] = s;
   };
   for (const r of routesIn(null)) addScene(composeScene(r, null));
-  for (const o of included) if (allOpts || works.has(o.fid)) for (const r of routesIn(o)) addScene(composeScene(r, o));
+  for (const o of included) if (allWorksIncluded || works.has(o.fid)) for (const r of routesIn(o)) addScene(composeScene(r, o));
 
   // ---------- 5. 方案、场景、覆盖 ----------
   for (const o of included) {
     const { def, fid, qid } = o;
-    const fdef = src.features[fid]!.def;
-    const isStandalone = out.features[fid]?.standalone === true;
+    const fdef = src.features[fid]?.def;
+    const isStandalone = !fdef;
     const isIsolated = isolated(fid);
     const ctxRoutes = new Set(routesIn(o).map((r) => r.path));
     const touched = [...Object.keys(def.on ?? {}), ...Object.keys(def.routes ?? {})];
-    for (const p of Object.keys(def.on ?? {})) if (!ctxRoutes.has(p)) err('UNKNOWN_ROUTE', `Option ${qid} adds elements to an unknown route ${p}`, def.source);
-    const sceneOf = (path: string) => (allOpts || isStandalone ? `${qid}@${path}` : `@${path}`);
+    for (const p of Object.keys(def.on ?? {})) if (!ctxRoutes.has(p)) err('UNKNOWN_ROUTE', `Work ${qid} adds elements to an unknown route ${p}`, def.source);
+    const sceneOf = (path: string) => (allWorksIncluded || isStandalone ? `${qid}@${path}` : `@${path}`);
 
     if (mode === 'dev') {
       for (const [k, r] of Object.entries(def.rules ?? {})) out.rules[`${qid}.${k}`] = ruleOf(`${qid}.${k}`, fid, qid, r, rel);
       for (const [k, q] of Object.entries(def.questions ?? {}))
-        out.issues[`${qid}.${k}`] = { id: `${qid}.${k}`, featureId: fid, optionId: qid, text: q.text, severity: q.severity, refs: q.refs, ...(q.source ? { source: rel(q.source) } : {}) };
+        out.issues[`${qid}.${k}`] = { id: `${qid}.${k}`, featureId: fid, workId: qid, text: q.text, severity: q.severity, refs: q.refs, ...(q.source ? { source: rel(q.source) } : {}) };
     }
     const ruleQid = (key: string, at?: string): string | null => {
       if (def.rules?.[key]) return `${qid}.${key}`;
-      if (fdef.rules?.[key]) return `${fid}.${key}`;
-      err('UNKNOWN_RULE', `uses("${key}") references an unknown rule (use a key from option.rules or feature.rules)`, at);
+      if (fdef?.rules?.[key]) return `${fid}.${key}`;
+      err('UNKNOWN_RULE', `uses("${key}") references an unknown rule (use a key from work.rules or feature.rules)`, at);
       return null;
     };
 
     /** 可被引用的角色键（D56）：feature.roles 写成 { 键: role('名字') } 时才有。 */
-    const roleKeys = new Set(fdef.roles && !Array.isArray(fdef.roles) ? Object.keys(fdef.roles) : []);
+    out.works[qid] = { id: qid, ...(fdef ? { featureId: fid } : {}), roles: fdef ? [] : compileRoles(def.roles) };
+    const roleScope = isStandalone ? 'work.roles' : 'feature.roles';
+    const roleKeys = new Set(rolesOf(out as Project, qid).flatMap(r => r.id ? [r.id] : []));
     // ---------- 层级（T-layers）：每层一个完全独立的画面，单独编译、单独渲染 ----------
     const layers: Record<string, { title: string; sceneId: string; role?: string; icon?: LayerIcon }> = {};
     const layerScenes: { key: string; scene: Scene }[] = [];
@@ -327,12 +343,12 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       const ids = new Map<string, string | undefined>();
       const root = toSceneNode(rootJ, `layer_${lk}`, ids, nodeCtx, null);
       const sceneId = `${qid}~${lk}`;
-      const scene: Scene = { id: sceneId, optionId: qid, route: layerRoute, name: `${ld.title} · ${def.name}`, viewport: ld.viewport ?? 'desktop', root, layer: lk };
+      const scene: Scene = { id: sceneId, workId: qid, route: layerRoute, name: `${ld.title} · ${def.title}`, viewport: ld.viewport ?? 'desktop', root, layer: lk };
       if (!diags.some(d => d.severity === 'error')) host.derive(scene);
       addScene(scene);
       layerScenes.push({ key: lk, scene });
       if (ld.role !== undefined && !roleKeys.has(ld.role))
-        err('ROLE_UNKNOWN', `Layer "${ld.title}" role "${ld.role}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ' (feature.roles must use { key: role(\'Name\') })'}`, at);
+        err('ROLE_UNKNOWN', `Layer "${ld.title}" role "${ld.role}" is not in ${roleScope}${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ` (${roleScope} must use { key: role('Name') })`}`, at);
       const icon = ld.icon as string | undefined;
       const iconOk = icon !== undefined && (LAYER_ICONS as readonly string[]).includes(icon);
       if (icon !== undefined && !iconOk) err('ICON_UNKNOWN', `Layer "${ld.title}" icon "${icon}" is not a preset icon (available: ${LAYER_ICONS.join(', ')})`, at);
@@ -343,7 +359,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const layersWith = (id: string): string[] => layerScenes.filter((l) => findIn(l.scene.root, id)).map((l) => l.key);
     const layerSceneWith = (id: string): Scene | undefined => layerScenes.find((l) => findIn(l.scene.root, id))?.scene;
 
-    const effectRoots = [...layerScenes.map(l => l.scene), ...[...sceneFor.values()].filter(x => x.optionId === qid || !isIsolated && x.optionId == null)];
+    const effectRoots = [...layerScenes.map(l => l.scene), ...[...sceneFor.values()].filter(x => x.workId === qid || !isIsolated && x.workId == null)];
 
     const scenarioIds: Record<string, string[]> = {};
     // flow({ from }) 接力：按依赖顺序编译，被接的场景先编译，记下它结尾的路径与导演层；
@@ -376,22 +392,22 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         continue;
       }
       for (const c of fl.opts.cases ?? []) {
-        if (!fdef.cases?.[c]) err('UNKNOWN_CASE', `Scenario ${sid} covers case "${c}", which is not in feature.cases`, fl.source);
+        if (!fdef?.cases?.[c]) err('UNKNOWN_CASE', `Scenario ${sid} covers case "${c}", which is not in feature.cases`, fl.source);
         else (scenarioIds[c] ??= []).push(sid);
       }
       // 镜头状态（与 player.cameraAt 同一规则，逐步累积）：判断焦点提示的目标在不在当前镜头里（D70）
       const frame = new Map<string, string[]>();
       let director = fromEnd?.director ?? (hasLayers ? Object.keys(layers)[0]! : PAGE_LAYER);
       if (fl.opts.layer !== undefined) {
-        if (!hasLayers || !Object.hasOwn(layers, fl.opts.layer)) err('LAYER_UNKNOWN', `flow({ layer: ${JSON.stringify(fl.opts.layer)} }) is not a layer of option ${qid}${hasLayers ? ` (layers: ${Object.keys(layers).join(', ')})` : '; this option declares no layers'}`, fl.source);
+        if (!hasLayers || !Object.hasOwn(layers, fl.opts.layer)) err('LAYER_UNKNOWN', `flow({ layer: ${JSON.stringify(fl.opts.layer)} }) is not a layer of work ${qid}${hasLayers ? ` (layers: ${Object.keys(layers).join(', ')})` : '; this work declares no layers'}`, fl.source);
         else director = fl.opts.layer;
       }
       if (fl.opts.from !== undefined) {
-        if (!Object.hasOwn(def.scenarios ?? {}, fl.opts.from) || fl.opts.from === skey) err('FROM_UNKNOWN', isStandalone || linearOptions.has(qid) ? `${linearOptions.has(qid) ? `Chapter ${String(Object.keys(scenarioDefs).indexOf(skey) + 1).padStart(2, '0')}` : `Slice ${skey}`} of ${isStandalone ? `work ${fid}` : `option ${qid}`}: from ${JSON.stringify(fl.opts.from)} must name another slice key (available slices: ${Object.keys(scenarioDefs).join(', ') || 'none'})` : `flow({ from: ${JSON.stringify(fl.opts.from)} }) must name another scenario key of option ${qid} (available: ${Object.keys(def.scenarios ?? {}).filter((k) => k !== skey).join(', ') || 'none'})`, fl.source);
+        if (!Object.hasOwn(def.scenarios ?? {}, fl.opts.from) || fl.opts.from === skey) err('FROM_UNKNOWN', isStandalone || linearWorks.has(qid) ? `${linearWorks.has(qid) ? `Chapter ${String(Object.keys(scenarioDefs).indexOf(skey) + 1).padStart(2, '0')}` : `Slice ${skey}`} of ${isStandalone ? `work ${fid}` : `work ${qid}`}: from ${JSON.stringify(fl.opts.from)} must name another slice key (available slices: ${Object.keys(scenarioDefs).join(', ') || 'none'})` : `flow({ from: ${JSON.stringify(fl.opts.from)} }) must name another scenario key of work ${qid} (available: ${Object.keys(def.scenarios ?? {}).filter((k) => k !== skey).join(', ') || 'none'})`, fl.source);
         else pendingFrom.set(sid, { from: `${qid}.${fl.opts.from}`, state: fl.opts.state, layer: fl.opts.layer, at: fl.source });
       }
       const stepKeys = new Set<string>();
-      const stepContext: StepContext = { err, rel, strip, host, out, qid, def, ctxRoutes, sceneOf, sceneFor, ruleQid, roleKeys, hasLayers, layers, layerScenes, layersWith, layerSceneWith, effectRoots, skey, sid, fl, start, stepKeys, frame, director };
+      const stepContext: StepContext = { err, rel, strip, host, out, qid, def, ctxRoutes, sceneOf, sceneFor, ruleQid, roleKeys, roleScope, hasLayers, layers, layerScenes, layersWith, layerSceneWith, effectRoots, skey, sid, fl, start, stepKeys, frame, director };
       const steps: Step[] = fl.steps.map((st: StepDef, i: number): Step => lowerStep(stepContext, st, i));
       director = stepContext.director;
       // 结局（D65）：flow 的 outcome 优先；没写时取 done(…, outcome) 的第二个参数（cancelled 记为 other）
@@ -404,11 +420,11 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       const sc: Scenario = {
         ...(fl.opts.actionEntry !== undefined ? { actionEntry: fl.opts.actionEntry } : {}),
         id: sid,
-        optionId: qid,
+        workId: qid,
         name: fl.name,
         ...(fl.opts.autoplay !== undefined ? { autoplay: fl.opts.autoplay } : {}),
         description: fl.opts.description ?? '',
-        caseIds: strip ? [] : (fl.opts.cases ?? []).filter((c) => fdef.cases?.[c]).map((c) => `${fid}.${c}`),
+        caseIds: strip ? [] : (fl.opts.cases ?? []).filter((c) => fdef?.cases?.[c]).map((c) => `${fid}.${c}`),
         mock: { label: fl.opts.mock ?? MOCK_LABEL[outcome], outcome, ...(fl.opts.mock === undefined ? { auto: true as const } : {}) },
         initial: { sceneId: sceneOf(start), ui: state.ui, data: state.data, inputs: state.inputs, ...(hasLayers && fl.opts.layer !== undefined && Object.hasOwn(layers, fl.opts.layer) ? { layer: fl.opts.layer } : {}) },
         steps,
@@ -428,7 +444,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
 
     // 所有场景完成后再解析分叉（允许向后声明的场景），不把创作信息参与前缀比较。
     for (const sc of Object.values(out.scenarios) as Scenario[]) {
-      if (sc.optionId !== qid) continue;
+      if (sc.workId !== qid) continue;
       for (const st of sc.steps) for (const f of st.forks) {
         const target = out.scenarios[f.scenarioId] as Scenario | undefined;
         if (target) f.at = commonPrefix(sc.steps, target.steps);
@@ -437,22 +453,22 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
 
     const coverage: Record<string, Coverage> = {};
     if (mode === 'dev') {
-      for (const ck of Object.keys(fdef.cases ?? {})) {
+      for (const ck of Object.keys(fdef?.cases ?? {})) {
         const decl = def.coverage?.[ck];
         const sids = scenarioIds[ck] ?? [];
         if (decl) coverage[`${fid}.${ck}`] = { status: decl.status, scenarioIds: sids, ...(decl.reason ? { reason: decl.reason } : {}), basis: 'declared' };
         else if (sids.length) coverage[`${fid}.${ck}`] = { status: 'expressed', scenarioIds: sids, basis: 'derived' };
         else coverage[`${fid}.${ck}`] = { status: 'missing', scenarioIds: [], basis: 'derived' };
       }
-      for (const ck of Object.keys(def.coverage ?? {})) if (!fdef.cases?.[ck]) err('UNKNOWN_CASE', `Option ${qid} coverage declares unknown case "${ck}"`, def.source);
+      for (const ck of Object.keys(def.coverage ?? {})) if (!fdef?.cases?.[ck]) err('UNKNOWN_CASE', `Work ${qid} coverage declares unknown case "${ck}"`, def.source);
     }
-    const free: NonNullable<import('./schema.ts').Option['free']> = {};
+    const free: NonNullable<import('./schema.ts').Work['free']> = {};
     for (const [key, reaction] of Object.entries(def.free ?? {})) {
       const a = Action.safeParse(reaction.action);
       if (!a.success || !('target' in reaction.action)) { err('FREE_ACTION_INVALID', `Free reaction ${key} needs a targeted action`, reaction.source); continue; }
-      const roots = effectRoots.filter(scene => scene.optionId === qid || mode === 'publish' && scene.optionId === null);
+      const roots = effectRoots.filter(scene => scene.workId === qid || mode === 'publish' && scene.workId === null);
       const target = reaction.action.target;
-      if (!roots.some(scene => findIn(scene.root, target))) err('FREE_TARGET_MISSING', `Free reaction ${key}: target ${reaction.action.target} is not in option ${qid}`, reaction.source);
+      if (!roots.some(scene => findIn(scene.root, target))) err('FREE_TARGET_MISSING', `Free reaction ${key}: target ${reaction.action.target} is not in work ${qid}`, reaction.source);
       const targets = roots.map(scene => findIn(scene.root, target)).filter((n): n is SceneNode => !!n);
       if (reaction.action.type === 'click' && targets.length && !targets.some(n => isInteractiveType(n.type, out.plugins))) err('FREE_ACTION_INVALID', `Free reaction ${key}: ${target} is not interactive`, reaction.source);
       if (['type', 'toggle', 'select'].includes(reaction.action.type) && targets.length && !targets.some(n => n.traits?.input)) err('FREE_ACTION_INVALID', `Free reaction ${key}: ${target} cannot accept values`, reaction.source);
@@ -467,18 +483,19 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       }
       free[key] = { action: a.data, effects, ...(reaction.source ? {source:rel(reaction.source)} : {}) };
     }
-    out.options[qid] = {
+    if (fdef) out.features[fid].alternatives[qid] = { decisionFocus: strip ? '' : def.focus ?? '', tradeoffs: strip ? [] : def.tradeoffs ?? [], coverage };
+    out.works[qid] = {
       ...(Object.keys(free).length ? { free } : {}),
       id: qid,
-      ...(linearOptions.has(qid) ? { sequencing: 'linear' } : {}),
-      featureId: fid,
+      ...(linearWorks.has(qid) ? { sequencing: 'linear' } : {}),
+      ...(fdef ? { featureId: fid } : {}),
+      roles: fdef ? [] : compileRoles(def.roles),
+      ...(!fdef && def.audience?.trim() ? { audience: def.audience.trim() } : {}),
+      ...(!fdef && mode === 'dev' && def.draft === true ? { draft: true } : {}),
       key: o.key,
-      name: def.name,
-      idea: def.idea,
-      decisionFocus: strip ? '' : (def.focus ?? ''),
-      tradeoffs: strip ? [] : (def.tradeoffs ?? []),
+      title: def.title,
+      summary: def.summary,
       routes: touched,
-      coverage,
       layers,
       ...(def.source ? { source: rel(def.source) } : {}),
     };
@@ -511,7 +528,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       if (!target || !prev) return false;
       try {
         const end = replayTo(out as Project, p.from, prev.steps.length);
-        const hasLayers = Object.keys(out.options[target.optionId]?.layers ?? {}).length > 0;
+        const hasLayers = Object.keys(out.works[target.workId]?.layers ?? {}).length > 0;
         const layer = p.layer ?? (hasLayers ? cameraOf(out as Project, p.from, prev.steps.length).directorLayer : undefined);
         const merged = mergeState({ ui: end.ui as never, data: end.data as never, inputs: end.inputs as never }, p.state);
         target.initial = { sceneId: end.sceneId, ui: merged.ui, data: merged.data, inputs: merged.inputs, ...(layer ? { layer } : {}) };
@@ -544,7 +561,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   const parsed = Project.safeParse(out);
   if (!parsed.success) {
     // 同一根因（共享的 JSX）在多个画面展开时合并成一条，定位到作者元素（schema-issues.ts）
-    diags.push(...schemaDiagnostics(out, parsed.error.issues, { limit: 20, rel }).map(d => ({ ...d, message: publicMessage(d.message) })));
+    diags.push(...schemaDiagnostics(out, parsed.error.issues, { limit: 20, rel }));
     return { project: null, diagnostics: diags };
   }
   let project = pruneMessages(parsed.data);
@@ -637,12 +654,13 @@ type StepContext = {
   out: Record<string, any>;
   /** 方案：限定 id、定义、可见路径、路径 → 画面 id。 */
   qid: string;
-  def: OptionDef & { file: string };
+  def: WorkDef & { file: string };
   ctxRoutes: Set<string>;
   sceneOf: (path: string) => string;
   sceneFor: Map<string, Scene>;
   ruleQid: (key: string, at?: string) => string | null;
   roleKeys: Set<string>;
+  roleScope: string;
   /** 层级（T-layers）：每层一个独立画面。 */
   hasLayers: boolean;
   layers: Record<string, { title: string; sceneId: string; role?: string; icon?: LayerIcon }>;
@@ -654,7 +672,7 @@ type StepContext = {
   /** 场景：键、限定 id、定义、起始路径、已用过的步骤键、各层当前镜头。 */
   skey: string;
   sid: string;
-  fl: NonNullable<OptionDef['scenarios']>[string];
+  fl: NonNullable<WorkDef['scenarios']>[string];
   start: string;
   stepKeys: Set<string>;
   frame: Map<string, string[]>;
@@ -667,7 +685,7 @@ type StepContext = {
  * 导演层随步骤推进，写回 c.director。
  */
 function lowerStep(c: StepContext, st: StepDef, i: number): Step {
-  const { err, rel, strip, host, out, qid, def, ctxRoutes, sceneOf, sceneFor, ruleQid, roleKeys, hasLayers, layers, layerScenes, layersWith, layerSceneWith, effectRoots, skey, sid, fl, start, stepKeys, frame } = c;
+  const { err, rel, strip, host, out, qid, def, ctxRoutes, sceneOf, sceneFor, ruleQid, roleKeys, roleScope, hasLayers, layers, layerScenes, layersWith, layerSceneWith, effectRoots, skey, sid, fl, start, stepKeys, frame } = c;
   let director = c.director;
     if (st.key !== undefined) {
       if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(st.key)) err('STEP_KEY_INVALID', 'Step key must start with a letter and contain at most 64 letters, digits, underscores or hyphens', st.source);
@@ -708,7 +726,7 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
       else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold') continue; // 镜头与焦点提示不是状态变化，下面单独归类
       else if (e.type === 'say') {
         if (e.role !== undefined) {
-          if (typeof e.role !== 'string' || !roleKeys.has(e.role)) err('ROLE_UNKNOWN', `say() role "${String(e.role)}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ' (feature.roles must use { key: role(\'Name\') })'}`, st.source);
+          if (typeof e.role !== 'string' || !roleKeys.has(e.role)) err('ROLE_UNKNOWN', `say() role "${String(e.role)}" is not in ${roleScope}${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ` (${roleScope} must use { key: role('Name') })`}`, st.source);
           else if (sayRole !== null && sayRole !== e.role) err('SAY_ROLE_CONFLICT', `One step has say() lines from two roles ("${sayRole}" and "${e.role}"); split them into two steps`, st.source);
           else sayRole = e.role;
         }
@@ -743,7 +761,7 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
     validateNewAction(st.action, hasLayers ? layerScenes.map(l => l.scene) : sceneBefore ? [sceneBefore] : [], out as Project, (code, message) => err(code, message, st.source));
     for (const e of st.effects) {
       if (e.type === 'fork') {
-        if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `Fork target "${e.scenario}" must be another scenario key in the same option`, st.source);
+        if (!Object.hasOwn(def.scenarios, e.scenario) || e.scenario === skey) err('FORK_UNKNOWN', `Fork target "${e.scenario}" must be another scenario key in the same work`, st.source);
         else if (e.label.trim()) forks.push({ label: e.label.trim(), scenarioId: `${qid}.${e.scenario}`, at: 0 });
       }
       if (e.type === 'mark') {
@@ -828,7 +846,7 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
     // 换人的过渡卡（D56）：卡片后面导演切到这个人的层级（卡片淡出时已经是 TA 的画面）
     if (st.action.type === 'card' && st.action.role !== undefined) {
       const r = st.action.role;
-      if (!roleKeys.has(r)) err('ROLE_UNKNOWN', `card("${st.action.title}") role "${r}" is not in feature.roles${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ''}`, st.source);
+      if (!roleKeys.has(r)) err('ROLE_UNKNOWN', `card("${st.action.title}") role "${r}" is not in ${roleScope}${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ''}`, st.source);
       else if (hasLayers && !directorLayer) directorLayer = Object.entries(layers).find(([, l]) => l.role === r)?.[0] ?? null;
     }
     // 焦点提示不推近镜头（D70）：目标不在这一层当前镜头里（inShotFrame：镜头目标本身、它的子元素，或 D69 取景一定带上的
@@ -878,7 +896,7 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
 
 export const ROLE_COLORS = ['#E8590C', '#1971C2', '#2F9E44', '#9C36B5', '#C2255C', '#0C8599'] as const;
 
-function rolesOf(roles: FeatureDef['roles']): { id?: string; name: string; desc: string; color: string }[] {
+function compileRoles(roles: FeatureDef['roles']): { id?: string; name: string; desc: string; color: string }[] {
   if (!roles) return [];
   const color = (i: number, c?: string) => c ?? ROLE_COLORS[i % ROLE_COLORS.length]!;
   if (Array.isArray(roles)) return roles.map((name, i) => ({ name, desc: '', color: color(i) }));
@@ -899,12 +917,12 @@ function caseOf(id: string, featureId: string, c: CaseDef, source?: string) {
   return { id, featureId, title: o.title, dimension: o.dimension ?? 'main', expected: o.expected ?? '', priority: o.priority ?? 'medium', ...(source ? { source } : {}) };
 }
 
-function ruleOf(id: string, featureId: string, optionId: string | undefined, r: { text: string; origin: string; status: string; cases: string[]; elements: string[]; source?: string }, rel: (s?: string) => string | undefined) {
+function ruleOf(id: string, featureId: string, workId: string | undefined, r: { text: string; origin: string; status: string; cases: string[]; elements: string[]; source?: string }, rel: (s?: string) => string | undefined) {
   const caseIds = r.cases.map((c) => (c.includes('.') ? c : `${featureId}.${c}`));
   return {
     id,
     featureId,
-    ...(optionId ? { optionId } : {}),
+    ...(workId ? { workId } : {}),
     text: r.text,
     origin: r.origin,
     confirmation: r.status,
@@ -914,7 +932,7 @@ function ruleOf(id: string, featureId: string, optionId: string | undefined, r: 
   };
 }
 
-function mergeState(a: OptionDef['state'], b: OptionDef['state']) {
+function mergeState(a: WorkDef['state'], b: WorkDef['state']) {
   const pick = (k: 'ui' | 'data' | 'inputs') => ({ ...structuredClone(a?.[k] ?? {}), ...structuredClone(b?.[k] ?? {}) });
   return { ui: pick('ui'), data: pick('data'), inputs: pick('inputs') };
 }
@@ -980,7 +998,7 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   for (const [k, v] of Object.entries(rest)) {
     if (v === undefined) continue; // 写了属性但值是 undefined（如 description={cond ? '…' : undefined}）= 没写
     if (typeof v === 'function' && !isBind(v)) {
-      err('FUNCTION_PROP', `<${n.type}> prop ${k} is a function. Put behavior in the option's flow steps instead of event callbacks`, at);
+      err('FUNCTION_PROP', `<${n.type}> prop ${k} is a function. Put behavior in the work's flow steps instead of event callbacks`, at);
       continue;
     }
     if (isNode(v)) {

@@ -7,7 +7,7 @@ import { nodeData, frameData } from '../../../plugins/diagram/src/data.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui'; import * as uiDiagram from '@joplo-app/plugin-diagram';
-import { $, feature, flow, layer, option, page, set, shot, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
+import { $, feature, flow, layer, work, page, set, shot, type Flow } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, type AuthoringProject, type SceneNode } from '../src/index.ts';
 import { elkLayout } from '../../../plugins/diagram/src/elk.ts';
@@ -20,9 +20,9 @@ const Q = uiDiagram.Sequence;
 
 function build(tree: unknown, steps: (f: Flow) => Flow = (f) => f, opts: { layout?: boolean; state?: Record<string, unknown> } = {}) {
   const home = page({ title: 'P', layout: false }, h(ui.Text, { id: 'note' }, 'x'));
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {},
     state: { ui: { show: false }, data: { order: { status: 'created' } }, ...(opts.state ?? {}) },
     layers: { v: layer('视图', tree as never) },
@@ -33,7 +33,7 @@ function build(tree: unknown, steps: (f: Flow) => Flow = (f) => f, opts: { layou
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return compile(src, 'dev', { pluginOptions: { diagram: { layout: opts.layout === false ? undefined : elkLayout } } });
 }

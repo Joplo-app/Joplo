@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { asset, feature, flow, layer, option, page } from '@joplo-app/kit';
+import { asset, feature, flow, layer, work, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '../src/index.ts';
 
@@ -16,13 +16,13 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 
 function build(tree: unknown) {
   const home = page({ title: 'P', layout: false }, h(ui.Text, { id: 'note' }, 'x'));
-  const opt = option({ name: 'A', idea: 'i', layers: { v: layer('视图', tree as never) }, scenarios: { s: flow('一次', { start: '/' }) } });
+  const opt = work({ title: 'A', summary: 'i', layers: { v: layer('视图', tree as never) }, scenarios: { s: flow('一次', { start: '/' }) } });
   const src: AuthoringProject = {
     root: '/p',
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return compile(src, 'dev');
 }
@@ -33,7 +33,7 @@ describe('asset()', () => {
   writeFileSync(join(dir, 'dot.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
   writeFileSync(join(dir, 'icon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
   writeFileSync(join(dir, 'notes.txt'), 'x');
-  const from = join(dir, 'features', 'f', 'options', 'a.tsx');
+  const from = join(dir, 'features', 'f', 'works', 'a.tsx');
 
   it('相对调用它的源文件解析路径，按扩展名给出 MIME，内容 base64', () => {
     expect(asset('../../../dot.png', from)).toBe(`data:image/png;base64,${Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64')}`);

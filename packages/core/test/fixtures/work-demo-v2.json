@@ -1,0 +1,490 @@
+{
+  "dev": {
+    "compiled": {
+      "project": {
+        "schemaVersion": 2,
+        "name": "Existing demo",
+        "description": "",
+        "theme": "sketch",
+        "themes": {},
+        "mode": "dev",
+        "routes": {
+          "/": {
+            "path": "/",
+            "title": "Home",
+            "layout": null,
+            "slots": [],
+            "source": "routes/page.tsx:2:1"
+          }
+        },
+        "features": {
+          "demo": {
+            "id": "demo",
+            "name": "Existing feature",
+            "goal": "Existing goal",
+            "roles": [],
+            "constraints": [],
+            "caseIds": [
+              "demo.main"
+            ],
+            "optionIds": [
+              "demo.a"
+            ],
+            "pick": "demo.a",
+            "source": "features/demo/feature.ts:2:1"
+          }
+        },
+        "featureIds": [
+          "demo"
+        ],
+        "cases": {
+          "demo.main": {
+            "id": "demo.main",
+            "featureId": "demo",
+            "title": "Main",
+            "dimension": "main",
+            "expected": "",
+            "priority": "medium",
+            "source": "features/demo/feature.ts:2:1"
+          }
+        },
+        "options": {
+          "demo.a": {
+            "id": "demo.a",
+            "featureId": "demo",
+            "key": "a",
+            "name": "A",
+            "idea": "Existing idea",
+            "decisionFocus": "",
+            "tradeoffs": [],
+            "routes": [],
+            "coverage": {
+              "demo.main": {
+                "status": "expressed",
+                "scenarioIds": [
+                  "demo.a.opening"
+                ],
+                "basis": "derived"
+              }
+            },
+            "layers": {},
+            "source": "features/demo/options/a.tsx:2:1"
+          }
+        },
+        "rules": {},
+        "scenes": {
+          "@/": {
+            "id": "@/",
+            "optionId": null,
+            "route": "/",
+            "name": "Home",
+            "viewport": "desktop",
+            "root": {
+              "id": "_root",
+              "type": "#fragment",
+              "children": [
+                {
+                  "id": "_root_0",
+                  "type": "#text",
+                  "props": {
+                    "text": "Home"
+                  }
+                }
+              ]
+            }
+          },
+          "demo.a@/": {
+            "id": "demo.a@/",
+            "optionId": "demo.a",
+            "route": "/",
+            "name": "Home · A",
+            "viewport": "desktop",
+            "root": {
+              "id": "_root",
+              "type": "#fragment",
+              "children": [
+                {
+                  "id": "_root_0",
+                  "type": "#text",
+                  "props": {
+                    "text": "Home"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "scenarios": {
+          "demo.a.opening": {
+            "id": "demo.a.opening",
+            "optionId": "demo.a",
+            "name": "Opening",
+            "description": "",
+            "caseIds": [
+              "demo.main"
+            ],
+            "mock": {
+              "label": "Mock success",
+              "outcome": "success",
+              "auto": true
+            },
+            "initial": {
+              "sceneId": "demo.a@/",
+              "ui": {},
+              "data": {},
+              "inputs": {}
+            },
+            "steps": [
+              {
+                "id": "demo.a.opening#1",
+                "kind": "system",
+                "action": {
+                  "type": "event",
+                  "name": "Open"
+                },
+                "caption": "Opening the demo",
+                "effects": [
+                  {
+                    "type": "set",
+                    "path": "ui.ready",
+                    "value": true
+                  }
+                ],
+                "ruleIds": [],
+                "shots": [],
+                "directorLayer": null,
+                "forks": [],
+                "marks": [],
+                "source": "features/demo/options/a.tsx:5:1"
+              }
+            ],
+            "expected": "Ready",
+            "source": "features/demo/options/a.tsx:4:1"
+          }
+        },
+        "issues": {}
+      },
+      "diagnostics": []
+    },
+    "validated": {
+      "diagnostics": [
+        {
+          "severity": "info",
+          "code": "HAPPY_PATH_ONLY",
+          "message": "Feature \"Existing feature\" only shows the happy path: every case is a main-flow case and every scenario succeeds. Ask the user about input, permission, async, and lifecycle cases (npx joplo skill cases), then add at least one error-and-recovery scenario",
+          "source": "structure",
+          "at": "features/demo/feature.ts:2:1",
+          "ref": {
+            "kind": "feature",
+            "id": "demo"
+          }
+        }
+      ],
+      "verification": {
+        "demo.a": "replay_ok"
+      },
+      "summary": {
+        "error": 0,
+        "warning": 0,
+        "info": 1
+      }
+    }
+  },
+  "publish": {
+    "compiled": {
+      "project": {
+        "schemaVersion": 2,
+        "name": "Existing demo",
+        "description": "",
+        "theme": "sketch",
+        "themes": {},
+        "mode": "publish",
+        "routes": {
+          "/": {
+            "path": "/",
+            "title": "Home",
+            "layout": null,
+            "slots": []
+          }
+        },
+        "features": {
+          "demo": {
+            "id": "demo",
+            "name": "Existing feature",
+            "goal": "Existing goal",
+            "roles": [],
+            "constraints": [],
+            "caseIds": [],
+            "optionIds": [
+              "demo.a"
+            ],
+            "pick": "demo.a"
+          }
+        },
+        "featureIds": [
+          "demo"
+        ],
+        "cases": {},
+        "options": {
+          "demo.a": {
+            "id": "demo.a",
+            "featureId": "demo",
+            "key": "a",
+            "name": "A",
+            "idea": "Existing idea",
+            "decisionFocus": "",
+            "tradeoffs": [],
+            "routes": [],
+            "coverage": {},
+            "layers": {}
+          }
+        },
+        "rules": {},
+        "scenes": {
+          "@/": {
+            "id": "@/",
+            "optionId": null,
+            "route": "/",
+            "name": "Home",
+            "viewport": "desktop",
+            "root": {
+              "id": "_root",
+              "type": "#fragment",
+              "children": [
+                {
+                  "id": "_root_0",
+                  "type": "#text",
+                  "props": {
+                    "text": "Home"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "scenarios": {
+          "demo.a.opening": {
+            "id": "demo.a.opening",
+            "optionId": "demo.a",
+            "name": "Opening",
+            "description": "",
+            "caseIds": [],
+            "mock": {
+              "label": "Mock success",
+              "outcome": "success",
+              "auto": true
+            },
+            "initial": {
+              "sceneId": "@/",
+              "ui": {},
+              "data": {},
+              "inputs": {}
+            },
+            "steps": [
+              {
+                "id": "demo.a.opening#1",
+                "kind": "system",
+                "action": {
+                  "type": "event",
+                  "name": "Open"
+                },
+                "caption": "Opening the demo",
+                "effects": [
+                  {
+                    "type": "set",
+                    "path": "ui.ready",
+                    "value": true
+                  }
+                ],
+                "ruleIds": [],
+                "shots": [],
+                "directorLayer": null,
+                "forks": [],
+                "marks": []
+              }
+            ],
+            "expected": "Ready"
+          }
+        },
+        "issues": {}
+      },
+      "diagnostics": []
+    },
+    "validated": {
+      "diagnostics": [
+        {
+          "severity": "error",
+          "code": "INVALID_REFERENCE",
+          "message": "Scenario initial stage is missing or belongs to another option: @/",
+          "source": "reference",
+          "at": "joplo.config.ts:1:1",
+          "ref": {
+            "kind": "scenario",
+            "id": "demo.a.opening",
+            "optionId": "demo.a"
+          }
+        }
+      ],
+      "verification": {
+        "demo.a": "unchecked"
+      },
+      "summary": {
+        "error": 1,
+        "warning": 0,
+        "info": 0
+      }
+    }
+  },
+  "review": {
+    "compiled": {
+      "project": {
+        "schemaVersion": 2,
+        "name": "Existing demo",
+        "description": "",
+        "theme": "sketch",
+        "themes": {},
+        "mode": "review",
+        "routes": {
+          "/": {
+            "path": "/",
+            "title": "Home",
+            "layout": null,
+            "slots": []
+          }
+        },
+        "features": {
+          "demo": {
+            "id": "demo",
+            "name": "Existing feature",
+            "goal": "Existing goal",
+            "roles": [],
+            "constraints": [],
+            "caseIds": [],
+            "optionIds": [
+              "demo.a"
+            ],
+            "pick": "demo.a"
+          }
+        },
+        "featureIds": [
+          "demo"
+        ],
+        "cases": {},
+        "options": {
+          "demo.a": {
+            "id": "demo.a",
+            "featureId": "demo",
+            "key": "a",
+            "name": "A",
+            "idea": "Existing idea",
+            "decisionFocus": "",
+            "tradeoffs": [],
+            "routes": [],
+            "coverage": {},
+            "layers": {}
+          }
+        },
+        "rules": {},
+        "scenes": {
+          "@/": {
+            "id": "@/",
+            "optionId": null,
+            "route": "/",
+            "name": "Home",
+            "viewport": "desktop",
+            "root": {
+              "id": "_root",
+              "type": "#fragment",
+              "children": [
+                {
+                  "id": "_root_0",
+                  "type": "#text",
+                  "props": {
+                    "text": "Home"
+                  }
+                }
+              ]
+            }
+          },
+          "demo.a@/": {
+            "id": "demo.a@/",
+            "optionId": "demo.a",
+            "route": "/",
+            "name": "Home · A",
+            "viewport": "desktop",
+            "root": {
+              "id": "_root",
+              "type": "#fragment",
+              "children": [
+                {
+                  "id": "_root_0",
+                  "type": "#text",
+                  "props": {
+                    "text": "Home"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "scenarios": {
+          "demo.a.opening": {
+            "id": "demo.a.opening",
+            "optionId": "demo.a",
+            "name": "Opening",
+            "description": "",
+            "caseIds": [],
+            "mock": {
+              "label": "Mock success",
+              "outcome": "success",
+              "auto": true
+            },
+            "initial": {
+              "sceneId": "demo.a@/",
+              "ui": {},
+              "data": {},
+              "inputs": {}
+            },
+            "steps": [
+              {
+                "id": "demo.a.opening#1",
+                "kind": "system",
+                "action": {
+                  "type": "event",
+                  "name": "Open"
+                },
+                "caption": "Opening the demo",
+                "effects": [
+                  {
+                    "type": "set",
+                    "path": "ui.ready",
+                    "value": true
+                  }
+                ],
+                "ruleIds": [],
+                "shots": [],
+                "directorLayer": null,
+                "forks": [],
+                "marks": []
+              }
+            ],
+            "expected": "Ready"
+          }
+        },
+        "issues": {}
+      },
+      "diagnostics": []
+    },
+    "validated": {
+      "diagnostics": [],
+      "verification": {
+        "demo.a": "replay_ok"
+      },
+      "summary": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { rolesOf } from './entries.ts';
 /**
  * 朗读（D74）的纯函数：看板、发布站、服务端（生成与 build）共用。
  *
@@ -57,7 +58,7 @@ export function narrationText(step: Step, caption: string): string {
 export function speakerRoleAt(project: Project, scenarioId: string, index: number): string | null {
   const step = project.scenarios[scenarioId]?.steps[index - 1];
   // say(…, { role }) 写明了是谁（D100）：任何步骤都以它为准（系统步骤没有“操作的人”）
-  if (step?.say && step.sayRole) return step.sayRole;
+  if (step?.say && step.sayRole) return rolesOf(project, project.scenarios[scenarioId]?.workId).find(r => r.id === step.sayRole)?.id ?? null;
   if (!step || step.kind !== 'user') return null;
   const layer = cameraAt(project, scenarioId, index).directorLayer;
   const sceneId = layersOf(project, scenarioId).find((l) => l.id === layer)?.sceneId;

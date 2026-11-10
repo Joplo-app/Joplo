@@ -1,6 +1,5 @@
-/** 首页条目：外部只读此投影，内部 Feature / Option 的接缝留在这里。 */
+/** 首页条目：外部只读此投影，作品可独立存在或挂在功能下面。 */
 import { scenarioPlanMs } from './step-plan.ts';
-import { orderedFeatures } from './features.ts';
 import type { Project, Scenario } from './schema.ts';
 
 /** 作品里可以单独打开的一段：功能演示的场景、影片的章节。 */
@@ -19,7 +18,7 @@ export type EntrySlice = {
 };
 
 export type Entry = {
-  /** 作品 id = IR 的 feature id。 */
+  /** 功能 id 或独立作品 id。 */
   id: string;
   /** 功能所属 id；独立作品为 null，不从情况或方案数量推断。 */
   featureId: string | null;
@@ -34,7 +33,7 @@ export type Entry = {
   roles: string[];
   /** 草稿：不进发布与分享。 */
   draft: boolean;
-  /** 播放用的方案：影片唯一的那个；功能演示是选定的方案，没有选定时取第一个；没有方案时为 null。 */
+  /** 播放用的作品：独立作品是自身；功能演示是选定的方案，没有选定时取第一个；没有方案时为 null。 */
   workId: string | null;
   /** 切片：先是连续播放顺序里的（playSequence），再是不在顺序里的支线，各自按声明顺序。 */
   slices: EntrySlice[];
@@ -43,15 +42,15 @@ export type Entry = {
 };
 
 /** 某个方案的场景，按声明顺序。 */
-export const scenariosOf = (project: Pick<Project, 'scenarios'>, optionId: string | null | undefined): Scenario[] =>
-  optionId ? Object.values(project.scenarios).filter((s) => s.optionId === optionId) : [];
+export const scenariosOf = (project: Pick<Project, 'scenarios'>, workId: string | null | undefined): Scenario[] =>
+  workId ? Object.values(project.scenarios).filter((s) => s.workId === workId) : [];
 
 /**
  * 连续播放的顺序（D92 U2 / R9；看板、发布站、嵌入与录制 --chain 共用）：按声明顺序取不接力的场景（根），每个根之后
  * 深度优先接上 from 接力它的章（多章接同一章时按声明顺序）。autoplay: false 的场景连同接在它后面的章都不进顺序。
  */
-export function playSequence(project: Pick<Project, 'scenarios'>, optionId: string | null | undefined): Scenario[] {
-  const all = scenariosOf(project, optionId);
+export function playSequence(project: Pick<Project, 'scenarios'>, workId: string | null | undefined): Scenario[] {
+  const all = scenariosOf(project, workId);
   const ids = new Set(all.map((s) => s.id));
   const out: Scenario[] = [];
   const seen = new Set<string>();
@@ -65,40 +64,55 @@ export function playSequence(project: Pick<Project, 'scenarios'>, optionId: stri
   return out;
 }
 
-/** 一个作品的投影；feature 不存在时为 null。 */
-export function entryOf(project: Project, featureId: string | null | undefined): Entry | null {
-  const f = featureId ? project.features[featureId] : undefined;
-  if (!f) return null;
-  const optionId = (f.pick && project.options[f.pick] ? f.pick : f.optionIds.find((id) => project.options[id])) ?? null;
-  const sequence = playSequence(project, optionId);
+/** 合成空白页的非显示内部标记；路径列表与翻译必须过滤它。 */
+export const INTERNAL_BLANK_TITLE = '__joplo_internal_blank__';
+export const visibleRoutes = (project: Pick<Project, 'routes'>) => Object.values(project.routes).filter(r => r.title !== INTERNAL_BLANK_TITLE);
+
+/** 唯一的角色读取入口：功能下的作品继承功能角色。 */
+export function rolesOf(project: Pick<Project, 'works' | 'features'>, workId: string | null | undefined): Project['features'][string]['roles'] {
+  const w = workId ? project.works[workId] : undefined;
+  return w ? (w.featureId ? project.features[w.featureId]?.roles ?? [] : w.roles) : [];
+}
+/** 切片键只在此处由已知 workId 的长度计算；不拆 ID 推断归属。 */
+export const sliceKey = (scenario: Pick<Scenario, 'id' | 'workId'>): string => scenario.id.slice(scenario.workId.length + 1);
+
+/** 一个首页条目的投影。 */
+export function entryOf(project: Project, id: string | null | undefined): Entry | null {
+  if (!id) return null;
+  const f = project.features[id];
+  const w = project.works[id];
+  if (!f && (!w || w.featureId)) return null;
+  const workId = f ? (f.pick && project.works[f.pick] ? f.pick : f.workIds.find(id => project.works[id])) ?? null : id;
+  const active = workId ? project.works[workId] : undefined;
+  const sequence = playSequence(project, workId);
   const inSequence = new Set(sequence.map((s) => s.id));
-  const ordered = [...sequence, ...scenariosOf(project, optionId).filter((s) => !inSequence.has(s.id))];
+  const ordered = [...sequence, ...scenariosOf(project, workId).filter((s) => !inSequence.has(s.id))];
   const slices = ordered.map((s): EntrySlice => ({
     id: s.id,
-    key: s.id.slice(s.optionId.length + 1),
+    key: sliceKey(s),
     title: s.name,
     description: s.description,
     steps: s.steps.length,
     ms: scenarioPlanMs(project, s.steps),
     inSequence: inSequence.has(s.id),
   }));
-  const roles = f.roles.map((r) => r.name.trim()).filter(Boolean);
+  const roles = (f ? f.roles : rolesOf(project, workId)).map((r) => r.name.trim()).filter(Boolean);
   return {
-    id: f.id,
-    featureId: f.standalone === true ? null : f.id,
-    sequencing: optionId ? project.options[optionId]?.sequencing ?? 'independent' : 'independent',
-    title: f.name,
-    summary: f.goal,
-    audience: f.audience?.trim() || null,
+    id,
+    featureId: f?.id ?? null,
+    sequencing: active?.sequencing ?? 'independent',
+    title: f ? f.name : w!.title,
+    summary: f ? f.goal : w!.summary,
+    audience: w?.audience?.trim() || null,
     roles: [...new Set(roles)],
-    draft: f.draft === true,
-    workId: optionId,
+    draft: w?.draft === true,
+    workId,
     slices,
     ms: slices.reduce((sum, s) => sum + (s.inSequence ? s.ms : 0), 0),
   };
 }
 
-/** 项目里的全部作品，按演示顺序（orderedFeatures）。首页的卡片、看板顶栏的下拉、outline 都从这里取。 */
+/** 项目里的全部作品，按演示顺序（entryIds）。首页的卡片、看板顶栏的下拉、outline 都从这里取。 */
 export function entriesOf(project: Project): Entry[] {
-  return orderedFeatures(project).map((f) => entryOf(project, f.id)!).filter(Boolean);
+  return project.entryIds.map(id => entryOf(project, id)!).filter(Boolean);
 }

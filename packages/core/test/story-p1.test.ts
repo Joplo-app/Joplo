@@ -1,6 +1,6 @@
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
-import { $, feature, flow, fork, layer, mark, option, page, push, set, stream, type Flow } from '@joplo-app/kit';
+import { $, feature, flow, fork, layer, mark, work, page, push, set, stream, type Flow } from '@joplo-app/kit';
 import * as ui from '@joplo-app/plugin-ui';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { applyStep, changedAt, commonPrefix, compile, forksAt, initialState, keyboardActionOf, marksAt, replay, stateAt, type AuthoringProject } from '../src/index.ts';
@@ -8,7 +8,7 @@ import { applyStep, changedAt, commonPrefix, compile, forksAt, initialState, key
 const h = (type: unknown, props: Record<string, unknown> = {}, ...children: unknown[]) => jsx(type, { ...props, children });
 function build(steps: (f: Flow) => Flow = f => f.press('⌘K', set($.data.trip.status, 'shared'), mark('share', { note: '生成完才能分享' }), fork('另一条路', 'alt')).system('结束'), layers = true) {
   const tree = h(ui.Stack, {}, h(ui.Button, { id: 'share', when: $.ui.visible }, '分享'), h(ui.Email, { from: '助手', to: '阿杰', subject: '行程有更新', time: '周五' }, h(ui.Text, {}, '正文')), h(ui.DataCard, { title: '行程', value: $.data.trip }), h(ui.StateFlow, { value: $.data.trip.status, states: ['draft', 'shared'] }));
-  const src: AuthoringProject = { root: '/p', config: { ...config({ name: '测试' }), file: '/p/joplo.config.ts' }, layouts: {}, routes: { '/': { ...page({ title: '首页', layout: false }, tree), file: '/p/routes/page.tsx' } }, features: { f: { def: { ...feature({ name: '功能', goal: '目标', cases: {}, pick: 'a' }), file: '/p/features/f/feature.ts' }, options: { a: { ...option({ name: '方案', idea: '说明', state: { ui: { visible: false }, data: { trip: { status: 'draft', budget: 500 }, rows: [] } }, ...(layers ? { layers: { main: layer('主层', tree), other: layer('另一层', h(ui.Text, { id: 'elsewhere' }, '其他')) } } : {}), scenarios: { happy: steps(flow('主线', { start: '/' })), alt: flow('分支', { start: '/' }).press('⌘K', set($.data.trip.status, 'shared')).press('Esc'), empty: flow('空场景', { start: '/' }) } }), file: '/p/features/f/options/a.tsx' } } } } };
+  const src: AuthoringProject = { root: '/p', config: { ...config({ name: '测试' }), file: '/p/joplo.config.ts' }, layouts: {}, routes: { '/': { ...page({ title: '首页', layout: false }, tree), file: '/p/routes/page.tsx' } }, features: { f: { def: { ...feature({ name: '功能', goal: '目标', cases: {}, pick: 'a' }), file: '/p/features/f/feature.ts' }, works: { a: { ...work({ title: '方案', summary: '说明', state: { ui: { visible: false }, data: { trip: { status: 'draft', budget: 500 }, rows: [] } }, ...(layers ? { layers: { main: layer('主层', tree), other: layer('另一层', h(ui.Text, { id: 'elsewhere' }, '其他')) } } : {}), scenarios: { happy: steps(flow('主线', { start: '/' })), alt: flow('分支', { start: '/' }).press('⌘K', set($.data.trip.status, 'shared')).press('Esc'), empty: flow('空场景', { start: '/' }) } }), file: '/p/features/f/works/a.tsx' } } } } };
   return { dev: compile(src, 'dev'), publish: compile(src, 'publish') };
 }
 const sid = 'f.a.happy';
@@ -67,7 +67,7 @@ describe('D56 P1 编译与纯函数', () => {
 describe('引用诊断带源码位置', () => {
   for (const target of ['absent', 'happy', '']) it(`错误分叉 ${target || '空'} → FORK_UNKNOWN`, () => {
     const d = build(f => f.press('Enter', fork('如果', target))).dev.diagnostics.find(d => d.code === 'FORK_UNKNOWN');
-    expect(d?.message).toContain(`Fork target "${target}" must be another scenario key in the same option`);
+    expect(d?.message).toContain(`Fork target "${target}" must be another scenario key in the same work`);
     expect(d?.at).toMatch(/story-p1.test.ts:\d+:\d+$/);
   });
   for (const target of ['absent', '']) it(`错误标注 ${target || '空'} → MARK_UNKNOWN`, () => {

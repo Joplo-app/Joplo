@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { feature, flow, option, page } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
+import { feature, flow, work, page } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 import { definePlugin, pluginComponent, pluginEffect } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { Diagram } from '@joplo-app/plugin-diagram';
@@ -12,7 +12,7 @@ import { compile, type AuthoringProject } from '../src/compile.ts';
 const h = (type: unknown, props: Record<string, unknown> = {}) => jsx(type, props);
 function source(tree: any, plugins: any[] = [], effects: any[] = []): AuthoringProject {
   const file = '/p/test.tsx';
-  return { root: '/p', config: { ...config({ name: 'Test', plugins }), file }, layouts: {}, routes: { '/': { ...page({ title: 'Home' }, tree), file } }, features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('One', ...effects).system('Two') } }), file } } } } };
+  return { root: '/p', config: { ...config({ name: 'Test', plugins }), file }, layouts: {}, routes: { '/': { ...page({ title: 'Home' }, tree), file } }, features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'A', summary: 'i', on: {}, scenarios: { s: flow('S', { start: '/' }).system('One', ...effects).system('Two') } }), file } } } } };
 }
 
 describe('plugin API v2', () => {

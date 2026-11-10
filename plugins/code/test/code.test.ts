@@ -5,7 +5,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  * → 每一步每个编辑器的完整快照（ext.code.editors）。跳到任意一步与一步步走到那里一致，只依赖 IR。
  */
 import { describe, expect, it } from 'vitest';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, stepPlan, type AuthoringProject } from '@joplo-app/core';
 import code, { Editor, editCode, highlightLines, typeCode } from '../src/plugin.ts';
@@ -18,7 +18,7 @@ function project(steps: (f: ReturnType<typeof flow>) => ReturnType<typeof flow>)
   const file = '/p/a.tsx';
   const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/', plugins: [code] }), file }, layouts: {},
     routes: { '/': { ...page({ title: 'Home', layout: false }, jsx(Editor, { id: 'ed', file: 'load.ts', lang: 'ts', code: V1 })), file } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'i', scenarios: { s: steps(flow('S', { start: '/' })) } }), file } } } } };
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'A', summary: 'i', scenarios: { s: steps(flow('S', { start: '/' })) } }), file } } } } };
   return compile(src, 'dev');
 }
 const editorAt = (p: NonNullable<ReturnType<typeof project>['project']>, i: number) => ((i ? p.scenarios['f.a.s']!.steps[i - 1]!.ext : p.scenarios['f.a.s']!.ext) as { code: { editors: Record<string, { code: string; anim: unknown; hl: unknown }> } }).code.editors.ed!;

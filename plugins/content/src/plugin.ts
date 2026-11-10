@@ -66,7 +66,7 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
       if (!scenes.length) return;
       const value = (ctx.state.ui.__plugins as { content?: { camera?: unknown } } | undefined)?.content?.camera;
       const parsed = Camera.safeParse(value ?? { targets: [] });
-      if (!parsed.success) { ctx.report('CAMERA_INVALID', 'Invalid content camera state; use camera() with valid options'); return; }
+      if (!parsed.success) { ctx.report('CAMERA_INVALID', 'Invalid content camera state; use camera() with valid settings'); return; }
       return { scenes: Object.fromEntries(scenes.map(s => [s.id, { camera: { ...parsed.data, targets: parsed.data.targets.filter(id => all(s.root).some(n => n.id === id)) } }])) };
     },
   },

@@ -223,7 +223,7 @@ export function isNodeDisabled(node: SceneNode, state: PlayState): boolean {
 /** 方案的层级（源码顺序）：每层一个完全独立的画面。没有声明时为空，演示照常显示路径页面。 */
 export function layersOf(project: Project, scenarioId: string | null): { id: string; title: string; sceneId: string; icon: LayerIcon }[] {
   const sc = scenarioId ? project.scenarios[scenarioId] : null;
-  const opt = sc ? project.options[sc.optionId] : null;
+  const opt = sc ? project.works[sc.workId] : null;
   // 图标：作者写的优先；没写时手机视口用 mobile，其余用 window
   return Object.entries(opt?.layers ?? {}).map(([id, l]) => ({ id, title: l.title, sceneId: l.sceneId, icon: l.icon ?? (project.scenes[l.sceneId]?.viewport === 'mobile' ? 'mobile' : 'window') }));
 }

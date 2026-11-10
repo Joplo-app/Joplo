@@ -8,18 +8,18 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
 import { Canvas, camera, TRANSITIONS } from '../src/plugin.ts';
 import { cameraAt, canvasFrame, drifted, driftOf, bezier, safeOf, DEFAULT_DRIFT, jumpedSince, AWAY, type CameraSegment } from '../src/runtime.tsx';
-import { $, feature, flow, option, page, type Flow } from '@joplo-app/kit';
+import { $, feature, flow, work, page, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '@joplo-app/core';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 function build(tree: unknown, scenarios: Record<string, Flow> = { one: flow('One', { start: '/' }).system('Look', camera('a')) }) {
-  const opt = option({ name: 'A', idea: 'i', state: { ui: { on: true } }, scenarios });
+  const opt = work({ title: 'A', summary: 'i', state: { ui: { on: true } }, scenarios });
   const src: AuthoringProject = {
     root: '/p', config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') }, layouts: {},
     routes: { '/': { ...page({ title: 'Home', layout: false }, tree as never), ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return compile(src, 'dev');
 }

@@ -6,7 +6,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { feature, flow, option, page } from '@joplo-app/kit';
+import { feature, flow, work, page } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '@joplo-app/core';
 import media, { Video, playClip } from '../src/plugin.ts';
@@ -23,7 +23,7 @@ function project(steps: (f: ReturnType<typeof flow>) => ReturnType<typeof flow>)
   const file = '/p/a.tsx';
   const src: AuthoringProject = { root: '/p', config: { ...config({ name: 'T', home: '/', plugins: [media] }), file }, layouts: {},
     routes: { '/': { ...page({ title: 'Home', layout: false }, jsx(Video, { id: 'rec', src: MP4 })), file } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, options: { a: { ...option({ name: 'A', idea: 'i', layers: {}, scenarios: { s: steps(flow('S', { start: '/' })) } }), file } } } } };
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), file }, works: { a: { ...work({ title: 'A', summary: 'i', layers: {}, scenarios: { s: steps(flow('S', { start: '/' })) } }), file } } } } };
   return compile(src, 'dev');
 }
 const clipAt = (r: ReturnType<typeof project>, i: number, id = 'rec') => ((i ? r.project!.scenarios['f.a.s']!.steps[i - 1]!.ext : r.project!.scenarios['f.a.s']!.ext) as { media: { clips: Record<string, unknown> } }).media.clips[id];

@@ -55,7 +55,7 @@ test('页面/布局元素统计全部方案，堆叠元素只统计 from 方案'
   const bs = p.scenarios['invite.b-batch.partial']!;
   for (const s of Object.values(p.scenes)) s.root.children!.push({ id: 'shared', type: 'ui:Button', source: src });
   bs.steps[0]!.action = { type: 'click', target: 'shared' };
-  expect(validate(p, { mode: 'structure', optionId: a }).diagnostics.filter(d => d.at === src)).toEqual([]);
+  expect(validate(p, { mode: 'structure', workId: a }).diagnostics.filter(d => d.at === src)).toEqual([]);
   findNode(p.scenes[scene]!, 'shared')!.node.from = a;
   diagnostic(p, 'UNBOUND_INTERACTIVE', src, 'structure');
   as.steps[0]!.action = { type: 'click', target: 'shared' };
@@ -66,10 +66,10 @@ test.each([
   ['not_applicable', 'COVERAGE_WITHOUT_REASON'],
   ['excluded', 'COVERAGE_WITHOUT_REASON'],
   ['missing', 'CASE_NOT_COVERED'],
-] as const)('coverage %s 定位 option.source', (status, code) => {
+] as const)('coverage %s 定位 work.source', (status, code) => {
   const p = fixture();
-  p.options[a]!.coverage['invite.happy'] = { status, scenarioIds: [], basis: 'declared' };
-  diagnostic(p, code, p.options[a]!.source!);
+  p.features.invite!.alternatives[a]!.coverage['invite.happy'] = { status, scenarioIds: [], basis: 'declared' };
+  diagnostic(p, code, p.works[a]!.source!);
 });
 test('规则在任一相关画面找到元素即可；找不到使用 rule.source，级别 warning', () => {
   const p = fixture(); const rule = p.rules[`${a}.keep_input`]!;
@@ -97,7 +97,7 @@ test('回放由 player.replay 执行并补 step.source；structure 模式不回�
   expect(validate(p, { mode: 'all' }).verification[a]).toBe('structure_ok');
 });
 test('空项目、无方案、无 pick、null 均受控', () => {
-  expect(validate(Project.parse({ schemaVersion: 2, name: '空', mode: 'dev' })).summary.error).toBe(0);
+  expect(validate(Project.parse({ schemaVersion: 3, entryIds: [], name: '空', mode: 'dev' })).summary.error).toBe(0);
   const p = fixture(); p.features.invite!.pick = null;
   expect(validate(p).summary.error).toBe(0);
   const r = validate(null as unknown as Project);
@@ -106,10 +106,10 @@ test('空项目、无方案、无 pick、null 均受控', () => {
 });
 test('仅校验指定方案；未知方案和无效模式是用法错误', () => {
   const p = fixture();
-  const r = validate(p, { mode: 'all', optionId: a });
+  const r = validate(p, { mode: 'all', workId: a });
   expect(Object.keys(r.verification)).toEqual([a]);
-  expect(r.diagnostics.some(d => d.ref?.optionId === 'invite.b-batch')).toBe(false);
-  expect(() => validate(p, { mode: 'all', optionId: 'absent' })).toThrow('Option does not exist');
+  expect(r.diagnostics.some(d => d.ref?.workId === 'invite.b-batch')).toBe(false);
+  expect(() => validate(p, { mode: 'all', workId: 'absent' })).toThrow('Work does not exist');
   expect(() => validate(p, { mode: 'bad' as any })).toThrow('Invalid validation mode');
 });
 test('回放缺少初始画面时定位场景，而非第一步', () => {
@@ -129,12 +129,12 @@ test('只在其他方案存在的元素不能满足方案规则，功能规则�
   expect(validate(p).diagnostics.filter(d => d.code === 'RULE_ELEMENT_NOT_FOUND' && d.ref?.id === 'invite.admin_only')).toEqual([]);
 });
 test.each([
-  ['记录键与 ID 不一致', (p: Project) => { p.options[a]!.id = 'wrong'; }, (p: Project) => p.options[a]!.source],
+  ['记录键与 ID 不一致', (p: Project) => { p.works[a]!.id = 'wrong'; }, (p: Project) => p.works[a]!.source],
   ['孤立情况', (p: Project) => { p.cases['invite.happy']!.featureId = 'absent'; }, (p: Project) => p.cases['invite.happy']!.source],
-  ['未知画面方案', (p: Project) => { p.scenes[scene]!.optionId = 'absent'; }, (p: Project) => p.scenes[scene]!.root.source],
+  ['未知画面方案', (p: Project) => { p.scenes[scene]!.workId = 'absent'; }, (p: Project) => p.scenes[scene]!.root.source],
   ['未知场景情况', (p: Project) => { p.scenarios[`${a}.success`]!.caseIds.push('absent'); }, (p: Project) => p.scenarios[`${a}.success`]!.source],
   ['未知步骤规则', (p: Project) => { p.scenarios[`${a}.success`]!.steps[0]!.ruleIds.push('absent'); }, (p: Project) => p.scenarios[`${a}.success`]!.steps[0]!.source],
-  ['未知覆盖场景', (p: Project) => { p.options[a]!.coverage['invite.happy']!.scenarioIds.push('absent'); }, (p: Project) => p.options[a]!.source],
+  ['未知覆盖场景', (p: Project) => { p.features.invite!.alternatives[a]!.coverage['invite.happy']!.scenarioIds.push('absent'); }, (p: Project) => p.works[a]!.source],
 ] as const)('IR v2 引用错误：%s，定位引用者源位置', (_name, change, source) => {
   const p = fixture(); change(p);
   expect(validate(p, { mode: 'structure' }).diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ severity: 'error', source: 'reference', at: source(p) })]));

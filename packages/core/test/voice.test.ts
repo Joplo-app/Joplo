@@ -4,7 +4,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, narrate, option, page, say, set, $, type ConfigDef, type Flow } from '@joplo-app/kit';
+import { feature, flow, narrate, work, page, say, set, $, type ConfigDef, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { clipKey, compile, joinSpoken, narrationText, spokenLine, validate, voiceFingerprint, type AuthoringProject } from '../src/index.ts';
 
@@ -13,9 +13,9 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 
 function src(o: { scenarios?: Record<string, Flow>; voice?: unknown } = {}): AuthoringProject {
   const home = page({ title: 'Home', layout: false }, h(ui.Stack, null, h(ui.Button, { id: 'go' }, 'Go')));
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     state: { ui: { done: false } },
     scenarios: o.scenarios ?? {
       happy: flow('Send', { start: '/', cases: ['happy'] })
@@ -30,7 +30,7 @@ function src(o: { scenarios?: Record<string, Flow>; voice?: unknown } = {}): Aut
     config: { ...cfg, ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'Invite', goal: 'Admins invite teammates so the team can start today', cases: { happy: 'Happy' }, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'Invite', goal: 'Admins invite teammates so the team can start today', cases: { happy: 'Happy' }, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
 }
 

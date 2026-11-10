@@ -9,7 +9,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { feature, flow, layer, option, page, role, set, stream, Slot, $ } from '@joplo-app/kit';
+import { feature, flow, layer, work, page, role, set, stream, Slot, $ } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { ROLE_COLORS, cameraAt, cardAt, compile, replay, roleOf, roleOfScene, stateAt, streamsOf, type AuthoringProject } from '../src/index.ts';
 
@@ -27,9 +27,9 @@ function build(o: { steps?: (f: ReturnType<typeof flow>) => ReturnType<typeof fl
         .click('accept', set($.ui.accepted, true))
         .card('出发前一天', set($.ui.weather, 'rain'))
         .card('这个方案确认了', { points: ['行程可以分享', '天气变了会提醒'] })))(flow('一起规划', { start: '/' }));
-  const opt = option({
-    name: 'A',
-    idea: 'i',
+  const opt = work({
+    title: 'A',
+    summary: 'i',
     on: {},
     state: { ui: { reply: '', accepted: false, weather: 'sunny' } },
     layers: {
@@ -44,7 +44,7 @@ function build(o: { steps?: (f: ReturnType<typeof flow>) => ReturnType<typeof fl
     config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, roles: roles as never, pick: 'a' }), ...F('features/f/feature.ts') }, options: { a: { ...opt, ...F('features/f/options/a.tsx') } } } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, roles: roles as never, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
   };
   return { dev: compile(src, 'dev'), publish: compile(src, 'publish') };
 }
@@ -93,8 +93,8 @@ describe('角色 role()', () => {
       { id: 'xiaoyu', name: '小雨', desc: '发起人', color: ROLE_COLORS[0] },
       { id: 'ajie', name: '阿杰', desc: '被拉进来的朋友', color: '#123456' },
     ]);
-    expect(p.options['f.a']!.layers.ajie!.role).toBe('ajie');
-    expect(roleOfScene(p, p.options['f.a']!.layers.ajie!.sceneId)?.name).toBe('阿杰');
+    expect(p.works['f.a']!.layers.ajie!.role).toBe('ajie');
+    expect(roleOfScene(p, p.works['f.a']!.layers.ajie!.sceneId)?.name).toBe('阿杰');
     expect(roleOfScene(p, '@/')).toBeNull();
     expect(roleOf(p, 'f.a', 'nobody')).toBeNull();
   });
@@ -104,7 +104,7 @@ describe('角色 role()', () => {
     delete (p.features.f as { roles?: unknown }).roles;
     expect(() => roleOf(p, 'f.a', 'ajie')).not.toThrow();
     expect(roleOf(p, 'f.a', 'ajie')).toBeNull();
-    expect(roleOfScene(p, p.options['f.a']!.layers.ajie!.sceneId)).toBeNull();
+    expect(roleOfScene(p, p.works['f.a']!.layers.ajie!.sceneId)).toBeNull();
   });
 
   it('旧写法（名字数组）仍可编译，但不能被引用：引用时报 ROLE_UNKNOWN', () => {
@@ -129,7 +129,7 @@ describe('角色 role()', () => {
   it('发布站保留角色、层级角色和卡片', () => {
     const p = build().publish.project!;
     expect(p.features.f!.roles.map((r) => r.id)).toEqual(['xiaoyu', 'ajie']);
-    expect(p.options['f.a']!.layers.ajie!.role).toBe('ajie');
+    expect(p.works['f.a']!.layers.ajie!.role).toBe('ajie');
     expect(p.scenarios[sid]!.steps[2]!.action).toMatchObject({ type: 'card', role: 'ajie' });
   });
 });

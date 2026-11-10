@@ -1,6 +1,6 @@
 import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
 import { describe, expect, it } from 'vitest';
-import { $, feature, flow, free, option, page, set, go } from '@joplo-app/kit';
+import { $, feature, flow, free, work, page, set, go } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { definePlugin } from '@joplo-app/kit/plugin';
 import { compile, stateAt, type AuthoringProject } from '../src/index.ts';
@@ -14,8 +14,8 @@ export function source(): AuthoringProject {
       jsx('Switch', { id: 'lamp', checked: $.data.lamp }), jsx('TextInput', { id: 'name', value: $.ui.name }),
       jsx('div', { id: 'drop', children: 'Drop here' }),
     ].map(n => ({ ...n, type: n.type.startsWith('ui:') ? n.type : `ui:${n.type}` })) })), file } },
-    features: { f: { def: { ...feature({ name: 'F', goal: 'G', cases: {}, pick: 'a' }), file }, options: {
-      a: { ...option({ name: 'A', idea: 'I', state: { data: { lamp: true }, ui: { name: '' } },
+    features: { f: { def: { ...feature({ name: 'F', goal: 'G', cases: {}, pick: 'a' }), file }, works: {
+      a: { ...work({ title: 'A', summary: 'I', state: { data: { lamp: true }, ui: { name: '' } },
         free: { next: free.click('next', set($.ui.free, true)), lamp: free.toggle('lamp', false, set($.ui.clicked, true)) },
         scenarios: { main: flow('Main').click('next', set($.ui.script, true)).type('name', 'Ada'), other: flow('Other').click('other', set($.ui.other, true)) },
       }), file },
@@ -35,7 +35,7 @@ describe('D88 pure input arbitration and separate playground', () => {
     expect(arbitrateAction(p, s, input).kind).toBe('advance');
     expect(s.position).toBe(0); expect(s.ui).toEqual({ name: '' });
   });
-  it('offers only another reachable scenario of this option, before free/native behavior', () => {
+  it('offers only another reachable scenario of this work, before free/native behavior', () => {
     const p = project(), s = stateAt(p, 'f.a.main', 0);
     const verdict = arbitrateAction(p, s, { type: 'click', target: 'other' });
     expect(verdict).toMatchObject({ kind: 'switch', candidates: [{ scenarioId: 'f.a.other', position: 0 }] });
@@ -46,7 +46,7 @@ describe('D88 pure input arbitration and separate playground', () => {
   });
   it('preserves the authored action entry policy in development and offline publication', () => {
     const s=source();
-    s.features.f!.options.a!.scenarios.other=flow('Other', {actionEntry:'after'}).click('other',set($.ui.other,true));
+    s.features.f!.works.a!.scenarios.other=flow('Other', {actionEntry:'after'}).click('other',set($.ui.other,true));
     for(const mode of ['dev','publish'] as const){
       const r=compile(s,mode);expect(r.diagnostics.filter(d=>d.severity==='error')).toEqual([]);
       expect(r.project!.scenarios['f.a.other']!.actionEntry).toBe('after');
@@ -64,7 +64,7 @@ describe('D88 pure input arbitration and separate playground', () => {
     expect(stateAt(p, s.scenarioId, 1)).toEqual({ ...original, position: 1, ui: { name: '', script: true } });
   });
   it('checks free reaction targets and rejects timeline-only effects', () => {
-    const s = source(); s.features.f!.options.a!.free = { invalid: free.click('missing', go('/')) };
+    const s = source(); s.features.f!.works.a!.free = { invalid: free.click('missing', go('/')) };
     const codes = compile(s, 'dev').diagnostics.map(d => d.code);
     expect(codes).toContain('FREE_TARGET_MISSING'); expect(codes).toContain('FREE_EFFECT_INVALID');
   });
@@ -79,13 +79,13 @@ describe('D88 pure input arbitration and separate playground', () => {
     const s = source(); s.config.plugins = [...s.config.plugins!, definePlugin({ id: 'probe', title: 'Probe', runtime: '/probe.js', components: {},
       actions: { rotate: { caption: 'Rotate {label}', durationMs: 800, fields: { angle: { type: 'number', min: 0, max: 360, tolerance: 2 } } } },
     })];
-    s.features.f!.options.a!.scenarios.main = flow('Gestures').drag('next', 'drop').hover('next', 500).scroll('drop', { x: 0, y: 200 }).act('probe:rotate', 'drop', { angle: 90 });
+    s.features.f!.works.a!.scenarios.main = flow('Gestures').drag('next', 'drop').hover('next', 500).scroll('drop', { x: 0, y: 200 }).act('probe:rotate', 'drop', { angle: 90 });
     const r = compile(s, 'publish'); expect(r.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
     expect(r.project!.plugins!.probe!.actions!.rotate!.durationMs).toBe(800);
     expect(stateAt(r.project!, 'f.a.main', 4).position).toBe(4);
     const spec = r.project!.plugins!.probe!.actions!.rotate!;
     expect(actionMatches({ type: 'plugin', name: 'probe:rotate', target: 'drop', data: { angle: 90 } }, { type: 'plugin', name: 'probe:rotate', target: 'drop', data: { angle: 91 } }, spec)).toBe(true);
-    s.features.f!.options.a!.scenarios.main = flow('Invalid').drag('next', 'missing').act('probe:rotate', 'drop', { angle: 900 });
+    s.features.f!.works.a!.scenarios.main = flow('Invalid').drag('next', 'missing').act('probe:rotate', 'drop', { angle: 900 });
     const codes = compile(s, 'dev').diagnostics.map(d => d.code);
     expect(codes).toContain('ACTION_DESTINATION_MISSING'); expect(codes).toContain('ACTION_DATA_INVALID');
   });
@@ -96,9 +96,9 @@ describe('D88 end-to-end projection', () => {
     const {scopeProject,stepRefs} = await import('../src/scope.ts');
     const s=source(); const file='/test/private.tsx';
     s.routes['/private']={...page({title:'Private'},jsx('div',{children:jsx('ui:Button',{id:'secret',children:'Private control'})})),file};
-    s.features.f!.options.a!.free!.secret=free.click('secret',set($.ui.secret,'Do not publish this'));
+    s.features.f!.works.a!.free!.secret=free.click('secret',set($.ui.secret,'Do not publish this'));
     const p=compile(s,'publish').project!; const scoped=scopeProject(p,['f.a.main']).project;
-    expect(scoped.options['f.a']!.free!.secret).toBeUndefined();
+    expect(scoped.works['f.a']!.free!.secret).toBeUndefined();
     expect(JSON.stringify(scoped)).not.toContain('Do not publish this');
     expect(actionIndex(scoped,'f.a').every(e=>e.scenarioId==='f.a.main')).toBe(true);
     expect(stepRefs({...p.scenarios['f.a.main']!.steps[0]!,action:{type:'drag',target:'next',to:'drop'}})).toEqual(['next','drop']);
@@ -107,22 +107,22 @@ describe('D88 end-to-end projection', () => {
     const {collectMessages,localizeProject} = await import('../src/content-i18n.ts');
     const s=source(); s.config.locales=['en','zh-CN'];
     s.locales={'zh-CN':{'Alice input':'爱丽丝输入','Exploration name':'体验名称','Profile shown':'已显示资料'}};
-    s.features.f!.options.a!.free!.input=free.type('name','Alice input',set($.ui.name,'Exploration name'));
+    s.features.f!.works.a!.free!.input=free.type('name','Alice input',set($.ui.name,'Exploration name'));
     const p=compile(s,'dev').project!;
     expect(collectMessages(p).map(m=>m.text)).toContain('Exploration name');
     const q=localizeProject(p,'zh-CN');
-    expect(q.options['f.a']!.free!.input!.action).toEqual({type:'type',target:'name',value:'爱丽丝输入'});
-    expect(q.options['f.a']!.free!.input!.effects).toEqual([{type:'set',path:'ui.name',value:'体验名称'}]);
+    expect(q.works['f.a']!.free!.input!.action).toEqual({type:'type',target:'name',value:'爱丽丝输入'});
+    expect(q.works['f.a']!.free!.input!.effects).toEqual([{type:'set',path:'ui.name',value:'体验名称'}]);
   });
   it('feature-diff reports free reactions and plugin matching-contract changes at scenario level', async () => {
     const {featureDiff} = await import('../src/feature-diff.ts');
     const s=source(); const p=compile(s,'publish').project!; const q=structuredClone(p);
     q.scenarios['f.a.main']!.actionEntry='after';
     expect(featureDiff(p,q).scenarios.find(s=>s.after==='f.a.main')?.reasons).toContain('action-entry');
-    q.options['f.a']!.free!.next!.effects=[{type:'set',path:'ui.free',value:false}];
+    q.works['f.a']!.free!.next!.effects=[{type:'set',path:'ui.free',value:false}];
     expect(featureDiff(p,q).scenarios.find(s=>s.after==='f.a.main')?.reasons).toContain('free-reactions');
     const plugin=definePlugin({id:'probe',title:'Probe',runtime:'/probe.js',components:{},actions:{rotate:{caption:'Rotate {label}',durationMs:800,fields:{angle:{type:'number',tolerance:2}}}}});
-    s.config.plugins=[...s.config.plugins!,plugin];s.features.f!.options.a!.scenarios.main=flow('Rotate').act('probe:rotate','drop',{angle:90});
+    s.config.plugins=[...s.config.plugins!,plugin];s.features.f!.works.a!.scenarios.main=flow('Rotate').act('probe:rotate','drop',{angle:90});
     const before=compile(s,'publish').project!;const after=structuredClone(before);after.plugins!.probe!.actions!.rotate!.fields.angle!.tolerance=8;
     expect(featureDiff(before,after).scenarios.find(s=>s.after==='f.a.main')?.reasons).toContain('action-contracts');
   });

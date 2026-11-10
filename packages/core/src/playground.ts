@@ -17,10 +17,10 @@ export type ActionVerdict =
 export { actionMatches, pluginActionSpec, validActionData } from './actions.ts';
 
 /** Index only positions whose prefix replays and whose action is available there. */
-export function actionIndex(project: Project, optionId: string): ActionEntry[] {
+export function actionIndex(project: Project, workId: string): ActionEntry[] {
   const entries: ActionEntry[] = [];
   for (const sc of Object.values(project.scenarios)) {
-    if (sc.optionId !== optionId) continue;
+    if (sc.workId !== workId) continue;
     try {
       let state = initialState(project, sc.id);
       for (const [position, step] of sc.steps.entries()) {
@@ -74,9 +74,9 @@ export function arbitrateAction(project: Project, timeline: PlayState, action: A
   const matches = (expected: Action) => inputs.some(input => available(input) && actionMatches(canonicalAction(expected, scene, view), canonicalAction(input, scene, view), expected.type === 'plugin' ? pluginActionSpec(project, expected.name) : undefined));
   const next = scenario.steps[timeline.position];
   if (next && !timeline.completed && matches(next.action) && !checkStep(project, scenario, timeline, next)) return { kind: 'advance' };
-  const candidates = (opts.index ?? actionIndex(project, scenario.optionId)).filter(entry => entry.scenarioId !== scenario.id && entry.sceneId === scene.id && matches(entry.action));
+  const candidates = (opts.index ?? actionIndex(project, scenario.workId)).filter(entry => entry.scenarioId !== scenario.id && entry.sceneId === scene.id && matches(entry.action));
   if (candidates.length) return { kind: 'switch', candidates };
-  const reaction = Object.values(project.options[scenario.optionId]?.free ?? {}).find(r => matches(r.action));
+  const reaction = Object.values(project.works[scenario.workId]?.free ?? {}).find(r => matches(r.action));
   const native = nativeEffects(scene, view, opts.native ?? action);
   const nativeFocus = action.type === 'click' && available(action) && !!findNode(scene, action.target)?.node.traits?.native;
   if (reaction || native.length || nativeFocus) return { kind: 'free', effects: [...native, ...(reaction?.effects.filter((e): e is LocalEffect => e.type === 'set' || e.type === 'append' || e.type === 'toast') ?? [])] };
