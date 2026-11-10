@@ -18,3 +18,13 @@ describe('canvasFrame', () => {
     expect(canvasFrame({ x: 0, y: 0, w: 10, h: 10 }, view, 3).k).toBe(3);
   });
 });
+
+
+it('waypoint interpolation is clamped, deterministic and uses destination easing', async () => {
+ const { sequenceFrameAt } = await import('../src/runtime.tsx');
+ const points = [{ atMs: 0, frame: { k: 1, tx: 0, ty: 0 } }, { atMs: 2500, frame: { k: 2, tx: 100, ty: 50 }, ease: 'linear' }, { atMs: 6500, frame: { k: 3, tx: 200, ty: 100 }, ease: 'easeOut' }];
+ expect(sequenceFrameAt(points, -1)).toEqual(points[0]!.frame);
+ expect(sequenceFrameAt(points, 1250)).toEqual({ k: 1.5, tx: 50, ty: 25 });
+ expect(sequenceFrameAt(points, 4500)).toEqual({ k: 2.875, tx: 187.5, ty: 93.75 });
+ expect(sequenceFrameAt(points, Infinity)).toEqual(points[2]!.frame);
+});

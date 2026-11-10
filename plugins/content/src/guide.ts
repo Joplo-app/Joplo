@@ -39,6 +39,19 @@ Before building a device, historical interface or illustrated object, make an as
 - Beat 2: the twist, shown on stage (the answer splits into pieces with probabilities, a name changes on the second try).
 - Beat 3: pull back and name the questions the episode answers. Pin each question where it will be answered, and close every loop later.
 
+## Camera sequences and persistent materials
+Use cameraSequence for a single long explanation that needs deliberate framing throughout (not high-frequency drawing). Import it from @joplo-app/plugin-content and put it in a scripted system step:
+\`\`\`ts
+cameraSequence([
+  { atMs: 0, target: 'room', zoom: 1 },
+  { atMs: 2500, target: 'message', zoom: 1.15, ease: 'easeInOut' },
+  { atMs: 6500, target: 'message', zoom: 1.22, ease: 'easeOut' },
+])
+\`\`\`
+Waypoints start at 0, increase strictly, end within 60000 ms, and use existing element IDs (or targets: [...] for a group). Each waypoint may set pad/zoom; ease belongs to the incoming segment (easeInOut default, easeOut or linear). The step stays at least until the last waypoint. Pause and speed follow engine time. Static renders, deep-link jumps, animate=false and reduced motion show the final waypoint. Free exploration yields to the final layout. Existing camera() and drift remain valid; a sequence replaces drift for that framing state. End with camera() when changing the subject.
+
+For the same subject changing material, keep one motion key and bind the destination layout, borderRadius, color, backgroundColor, opacity and text to state. Content interpolates those supported style values along the same motion flight; changed text crossfades through a temporary inert, aria-hidden clone without a second motion identity. Static jumps show destination styles immediately. This is a transition between authored states, not arbitrary per-frame drawing. Keep interactive controls in the live subject: the fading clone has no hit area or focus identity. Test long text at both endpoints and play the transition with Voice on; do not infer continuous motion from static storyboard frames.
+
 ## 3. Not slides: one world, continuous objects, a moving camera (the core)
 Failure mode, even with nice graphics: one board per chapter (big title, panels, footer), chapter title cards, cards of bullets, things fading in and out. Viewers read it as a deck. Instead:
 - One layer holding one <Canvas w={2560} h={1600}> world (the default view is 1280×800, scaled to fit, never re-laid out; in a container without a height it sizes itself from the view ratio, and render warns 'Canvas has no size' if it still has none). Place a few containers absolutely in design pixels; lay out inside them with flex.

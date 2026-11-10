@@ -18,7 +18,16 @@ export const camera = (...args: (string | CameraOpts)[]) => {
 };
 export const DriftSchema = z.union([z.literal(false), z.number().min(.5).max(2), z.strictObject({ zoom: z.number().min(.5).max(2).optional(), x: z.number().min(-2000).max(2000).optional(), y: z.number().min(-2000).max(2000).optional(), ms: z.number().min(500).max(60000).optional() })]);
 const Safe = z.tuple([z.number().min(0).max(2000), z.number().min(0).max(2000), z.number().min(0).max(2000), z.number().min(0).max(2000)]);
-const Camera = z.strictObject({ targets: z.array(z.string()), pad: z.number().min(0).max(2000).optional(), zoom: z.number().min(.1).max(10).optional(), ms: z.number().min(0).max(10000).optional(), drift: DriftSchema.optional() });
+const CameraBase = z.strictObject({ targets: z.array(z.string()), pad: z.number().min(0).max(2000).optional(), zoom: z.number().min(.1).max(10).optional(), ms: z.number().min(0).max(10000).optional(), drift: DriftSchema.optional() });
+const Waypoint = CameraBase.omit({ ms: true, drift: true }).extend({ atMs: z.number().min(0).max(60000), ease: z.enum(['easeInOut', 'easeOut', 'linear']).optional() });
+const Camera = CameraBase.extend({ sequence: z.array(Waypoint).min(2).max(32).optional() });
+export type CameraWaypoint = { atMs: number; target?: string; targets?: string[]; pad?: number; zoom?: number; ease?: 'easeInOut' | 'easeOut' | 'linear' };
+/** Explicit state-to-state camera waypoints, milliseconds from this step commit. */
+export const cameraSequence = (points: CameraWaypoint[]) => pluginEffect('content', 'camera', {
+  targets: points.at(-1)?.targets ?? (points.at(-1)?.target ? [points.at(-1)!.target!] : []),
+  drift: false,
+  sequence: points.map(({ target, targets, ...p }) => ({ ...p, targets: targets ?? (target ? [target] : []) })),
+});
 const Frame = z.strictObject({ scenes: z.record(z.string(), z.strictObject({ camera: Camera })) });
 export type ContentFrame = z.infer<typeof Frame>;
 const all = (n: PluginIRNode): PluginIRNode[] => [n, ...(n.children ?? []).flatMap(all)];
@@ -40,7 +49,7 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
   },
   themes: { studio }, skill,
   schemas: { step: Frame },
-  data: { step: { scope: [{ path: ['scenes'], kind: 'map', domain: 'scene', children: [{ path: ['camera', 'targets'], kind: 'values', domain: 'element' }] }] } },
+  data: { step: { scope: [{ path: ['scenes'], kind: 'map', domain: 'scene', children: [{ path: ['camera', 'targets'], kind: 'values', domain: 'element' }, { path: ['camera', 'sequence', '*', 'targets'], kind: 'values', domain: 'element' }] }] } },
   compile: {
     node(node, ctx) {
       if (node.type !== 'content:Canvas') return;
@@ -52,12 +61,15 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
       const parsed = Camera.safeParse(effect.payload);
       if (!parsed.success) { ctx.report('CAMERA_INVALID', `camera(…): targets must be strings; pad 0–2000, zoom 0.1–10, ms 0–10000, drift false | 0.5–2 | { zoom 0.5–2, x/y −2000–2000, ms 500–60000 } (${parsed.error.issues.map(i => i.message).join('; ')})`, ctx.source); return; }
       const value = parsed.data;
+      if (value.sequence && (value.sequence[0]!.atMs !== 0 || value.sequence.some((p, i, a) => i > 0 && p.atMs <= a[i - 1]!.atMs))) { ctx.report('CAMERA_INVALID', 'cameraSequence starts at 0 and needs strictly increasing atMs', ctx.source); return; }
+      const targets = [...value.targets, ...value.sequence?.flatMap(p => p.targets) ?? []];
       const nodes = ctx.roots.flatMap(all);
-      const missing = value.targets.filter(id => !nodes.some(n => n.id === id));
+      const missing = targets.filter(id => !nodes.some(n => n.id === id));
       if (missing.length) { ctx.report('CAMERA_UNKNOWN', `camera(${missing.map(m => JSON.stringify(m)).join(', ')}) target is not in any layer or the stage for this step; aim it at elements inside a <Canvas>`, ctx.source); return; }
       return {
         writes: [{ path: 'ui.__plugins.content.camera', value }],
-        references: value.targets,
+        references: targets,
+        ...(value.sequence ? { holdMs: value.sequence.at(-1)!.atMs } : {}),
         ...(value.targets.length ? { directorTarget: value.targets[0] } : {}),
       };
     },

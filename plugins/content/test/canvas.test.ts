@@ -9,7 +9,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
-import { Canvas, camera } from '../src/plugin.ts';
+import { Canvas, camera, cameraSequence } from '../src/plugin.ts';
 import { $, feature, flow, go, layer, narrate, work, page, patch, set, spotlight, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { cameraAt, compile, scenarioEstimateMs, stateAt, voiceMs, type AuthoringProject } from '@joplo-app/core';
@@ -182,5 +182,22 @@ describe('flow({ from }) checks each step against where the previous scenario en
       b: flow('B', { from: 'a', start: '/' }).system('stay', set($.ui.n, 2)),
     });
     expect(errorCodes(r)).toContain('FROM_WITH_START');
+  });
+});
+
+
+describe('cameraSequence', () => {
+  it('records deterministic waypoints, references and minimum clock duration', () => {
+    const r = build({ one: flow('One', { start: '/' }).system('Travel', cameraSequence([
+      { atMs: 0, target: 'chat', zoom: 1 }, { atMs: 2500, target: 'tape', zoom: 1.15, ease: 'easeInOut' }, { atMs: 6500, target: 'tape', zoom: 1.22, ease: 'easeOut' },
+    ])) });
+    expect(errorCodes(r)).toEqual([]);
+    const step = r.project!.scenarios['f.a.one']!.steps[0]!;
+    expect(step.ext?.content).toMatchObject({ scenes: { 'f.a~world': { camera: { sequence: [{ atMs: 0 }, { atMs: 2500 }, { atMs: 6500 }] } } } });
+    expect(JSON.stringify(stateAt(r.project!, 'f.a.one', 1))).toContain('6500');
+  });
+  it.each([[1, 5000], [0, 0], [0, -1]])('rejects nonzero start or non-increasing times %s', (a, b) => {
+    const r = build({ one: flow('One', { start: '/' }).system('Bad', cameraSequence([{ atMs: a, target: 'chat' }, { atMs: b, target: 'tape' }])) });
+    expect(errorCodes(r)).toContain('CAMERA_INVALID');
   });
 });

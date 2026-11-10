@@ -5,6 +5,14 @@ import type { ContentFrame } from './plugin.ts';
 const stillCss = '.jstage[data-jstill] [data-jcanvas],.jstage[data-jstill] [data-jcanvas] *{transition:none!important;animation-delay:0s!important;animation-duration:0s!important}';
 
 type Box = { x: number; y: number; w: number; h: number };
+type SubjectBox = Box & { style?: Record<string, string>; text?: string; clone?: HTMLElement };
+const subjectStyle = (el: HTMLElement) => {
+  // Read the authored destination, not this observer's currently interpolated style.
+  const active = (el.getAnimations?.() ?? []).filter(a => a.id === 'jmotion').map(a => ({ a, effect: a.effect }));
+  for (const { a } of active) a.effect = null;
+  try { const c = getComputedStyle(el); return { borderRadius: c.borderRadius, color: c.color, backgroundColor: c.backgroundColor, opacity: c.opacity }; }
+  finally { for (const { a, effect } of active) a.effect = effect; }
+};
 /** 元素在画布世界里的布局位置（offset 链，不受镜头和变形动画的 transform 影响）；不在 root 里时为 null。 */
 function offsetIn(el: HTMLElement, root: HTMLElement): Box | null {
   let x = 0;
@@ -21,7 +29,7 @@ const CAMERA_EASE = 'cubic-bezier(.65,0,.35,1)';
 const MOTION_EASE = 'cubic-bezier(.2,.8,.2,1)';
 const MOTION_MS = 900;
 type DriftSpec = { zoom: number; x: number; y: number; ms: number };
-type CanvasCamera = { targets?: string[]; pad?: number; zoom?: number; ms?: number; drift?: unknown };
+type CanvasCamera = { targets?: string[]; pad?: number; zoom?: number; ms?: number; drift?: unknown; sequence?: { atMs: number; targets: string[]; pad?: number; zoom?: number; ease?: 'easeInOut' | 'easeOut' | 'linear' }[] };
 const numOr = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : d);
 /** 默认漂移（D92）：画面永远不在数学意义上静止——落定后 8 秒内再推近 4%（约 0.5%/s），非匀速、有终点。 */
 export const DEFAULT_DRIFT: DriftSpec = { zoom: 1.04, x: 0, y: 0, ms: 8000 };
@@ -93,6 +101,19 @@ export function cameraAt(seg: CameraSegment, t: number, view: { w: number; h: nu
   return q > 0 ? drifted(seg.to, seg.drift, q, view) : seg.to;
 }
 
+/** Pure, clamped waypoint projection; each easing belongs to the destination waypoint. */
+export function sequenceFrameAt(points: { atMs: number; frame: Frame; ease?: string }[], elapsedMs: number): Frame {
+  if (elapsedMs <= points[0]!.atMs) return points[0]!.frame;
+  for (let i = 1; i < points.length; i++) {
+    const b = points[i]!, a = points[i - 1]!;
+    if (elapsedMs > b.atMs) continue;
+    const t = Math.max(0, Math.min(1, (elapsedMs - a.atMs) / (b.atMs - a.atMs)));
+    const q = b.ease === 'linear' ? t : b.ease === 'easeOut' ? 1 - (1 - t) ** 3 : cameraEase(t);
+    return { k: a.frame.k + (b.frame.k - a.frame.k) * q, tx: a.frame.tx + (b.frame.tx - a.frame.tx) * q, ty: a.frame.ty + (b.frame.ty - a.frame.ty) * q };
+  }
+  return points.at(-1)!.frame;
+}
+
 /** camera(…, { drift }) 优先，其次 <Canvas drift>，都没写时用 DEFAULT_DRIFT；false 关闭。 */
 export function driftOf(camera: unknown, canvas: unknown): DriftSpec | null {
   const v = camera !== undefined ? camera : canvas !== undefined ? canvas : DEFAULT_DRIFT;
@@ -151,16 +172,24 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
   const whole = canvasFrame({ x: 0, y: 0, ...world }, view, Infinity);
   const clock = ctx.clock;
   // 引擎时钟驱动（D92）：镜头的每一段从“此刻实际的取景”出发，落定后按 drift 漂移；没有时钟的宿主退回 CSS 过渡、不漂移
-  const timed = !!clock && ctx.animate;
+  const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const timed = !!clock && ctx.animate && !reduced;
   const now = clock?.timeMs ?? 0;
   const seg = useRef<CameraSegment>({ from: whole, to: whole, start: now, ms: 0, drift: null });
   const [, redraw] = useState(0);
   const lastMark = useRef<Mark | null>(null);
   const target = useRef<Frame>(whole);
   const driftKey = useRef('');
+  const pathRef = useRef<{ key: string; start: number; frames: { atMs: number; frame: Frame; ease?: string }[] } | null>(null);
   useLayoutEffect(() => {
     const w = worldRef.current;
     if (!w) return;
+    const frameFor = (ids: string[], pad = 48, zoom = 3): Frame => {
+      const boxes = ids.flatMap(id => { const el = w.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`); const b = el ? offsetIn(el, w) : null; return b ? [b] : []; });
+      if (!boxes.length) return whole;
+      const x = Math.min(...boxes.map(b => b.x)) - pad, y = Math.min(...boxes.map(b => b.y)) - pad;
+      return canvasFrame({ x, y, w: Math.max(...boxes.map(b => b.x + b.w)) + pad - x, h: Math.max(...boxes.map(b => b.y + b.h)) + pad - y }, view, zoom, safe);
+    };
     // 1) 取景：目标的布局范围（offset，不含 transform）合起来，加留白
     let next = whole;
     const ids = cam?.targets ?? [];
@@ -179,6 +208,11 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
         next = canvasFrame({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, view, cam?.zoom ?? 3, safe);
       }
     }
+    const pathKey = JSON.stringify(cam?.sequence ?? null);
+    if (cam?.sequence && (pathRef.current?.key !== pathKey || jumpedSince(lastMark.current, ctx))) {
+      const live = timed && !!clock?.running && lastMark.current !== null && !jumpedSince(lastMark.current, ctx) && !ctx.playground;
+      pathRef.current = { key: pathKey, start: live ? now : now - cam.sequence.at(-1)!.atMs, frames: cam.sequence.map(p => ({ atMs: p.atMs, frame: frameFor(p.targets, p.pad, p.zoom), ease: p.ease })) };
+    } else if (!cam?.sequence) pathRef.current = null;
     const drift = timed ? driftOf(cam?.drift, canvasDrift) : null;
     const dk = JSON.stringify(drift);
     const camMoves = !same(target.current, next);
@@ -211,7 +245,7 @@ function Canvas({ ctx: context }: { ctx: ComponentCtx }) {
   const s = box.w && box.h ? Math.min(box.w / view.w, box.h / view.h) : 0;
   const ox = (box.w - view.w * s) / 2;
   const oy = (box.h - view.h * s) / 2;
-  const frame = timed ? cameraAt(seg.current, now, lensView) : seg.current.to;
+  const frame = cam?.sequence && pathRef.current ? sequenceFrameAt(pathRef.current.frames, !timed || ctx.playground || !clock?.running && !clock?.paused ? Infinity : now - pathRef.current.start) : timed ? cameraAt(seg.current, now, lensView) : seg.current.to;
   const ms = cam?.ms ?? 1200;
   return (
     <div {...root}>
@@ -279,7 +313,7 @@ function copyLive(from: Element, to: Element) {
 /** One observer per stage: cache only design-space layouts, never player state. */
 export const observe: PluginObserve = (root, initial) => {
   const context0Inputs = initial?.frame.inputs;
-  const layouts = new Map<HTMLElement, Map<string, Box>>();
+  const layouts = new Map<HTMLElement, Map<string, SubjectBox>>();
   const clips = new Map<HTMLElement, { count: number; value: string; priority: string }>();
   // FLIP crosses containers; their normal overflow must not clip that travel.
   const lift = (el: HTMLElement, world: HTMLElement) => {
@@ -404,7 +438,7 @@ export const observe: PluginObserve = (root, initial) => {
       for (const w of worlds) {
         const fresh = !layouts.has(w);
         watch(w);
-        const previous = layouts.get(w) ?? new Map<string, Box>();
+        const previous = layouts.get(w) ?? new Map<string, SubjectBox>();
         const flight = { ms: Number(w.dataset.flightMs ?? MOTION_MS), ease: w.dataset.flightEase ?? MOTION_EASE };
         // 2) 变形（FLIP）：同一个 motion 键的布局位置变了 → 从旧位置、旧大小补间到新位置
         const seen = new Map(previous);
@@ -413,11 +447,14 @@ export const observe: PluginObserve = (root, initial) => {
           const r = offsetIn(el, w);
           if (!r) continue;
           const prev = previous.get(key);
-          seen.set(key, r);
+          const style = subjectStyle(el), text = el.textContent ?? '';
+          seen.set(key, { ...r, style, text, clone: el.cloneNode(true) as HTMLElement });
           if (!context.frame.animate) { for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); }
           // 跳转、停止后的提交与静态画面直接显示新布局（D92）：变形飞行只属于连续播放
           if (!prev || !context.frame.animate || context.frame.playground || quiet) { if (quiet) for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); continue; }
-          if (Math.abs(prev.x - r.x) < 0.5 && Math.abs(prev.y - r.y) < 0.5 && Math.abs(prev.w - r.w) < 0.5 && Math.abs(prev.h - r.h) < 0.5) continue;
+          const styleChanged = prev.style && Object.keys(style).some(k => prev.style![k] !== style[k as keyof typeof style]);
+          const textChanged = prev.text !== undefined && prev.text !== text;
+          if (!styleChanged && !textChanged && Math.abs(prev.x - r.x) < 0.5 && Math.abs(prev.y - r.y) < 0.5 && Math.abs(prev.w - r.w) < 0.5 && Math.abs(prev.h - r.h) < 0.5) continue;
           const dx = prev.x + prev.w / 2 - (r.x + r.w / 2);
           const dy = prev.y + prev.h / 2 - (r.y + r.h / 2);
           const sx = r.w > 0 && prev.w > 0 ? prev.w / r.w : 1;
@@ -425,9 +462,17 @@ export const observe: PluginObserve = (root, initial) => {
           for (const a of el.getAnimations()) if (a.id === 'jmotion') a.cancel();
           if (typeof el.animate !== 'function') continue;
           const anim = el.animate(
-            [{ translate: `${dx}px ${dy}px`, scale: `${sx} ${sy}` }, { translate: '0px 0px', scale: '1 1' }],
+            [{ ...prev.style, ...(textChanged ? { opacity: 0 } : {}), translate: `${dx}px ${dy}px`, scale: `${sx} ${sy}` }, { ...style, translate: '0px 0px', scale: '1 1' }],
             { duration: el.dataset.jpContentMotionMs === undefined ? flight.ms : Number(el.dataset.jpContentMotionMs), easing: flight.ease, delay: Number(el.dataset.jpContentMotionDelay) || 0, fill: 'backwards' },
           );
+          if (textChanged && prev.clone) {
+            const ghost = prev.clone.cloneNode(true) as HTMLElement; strip(ghost);
+            ghost.setAttribute('aria-hidden', 'true'); ghost.setAttribute('inert', ''); ghost.dataset.jghost = '';
+            Object.assign(ghost.style, { position: 'absolute', left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px`, margin: '0', pointerEvents: 'none', ...prev.style });
+            w.appendChild(ghost);
+            const fade = ghost.animate([{ opacity: prev.style?.opacity ?? '1', translate: `${dx}px ${dy}px`, scale: `${sx} ${sy}` }, { opacity: 0, translate: '0px 0px', scale: '1 1' }], { duration: el.dataset.jpContentMotionMs === undefined ? flight.ms : Number(el.dataset.jpContentMotionMs), easing: flight.ease, delay: Number(el.dataset.jpContentMotionDelay) || 0, fill: 'both' });
+            ghosts.set(ghost, fade); fade.addEventListener('finish', () => drop(ghost), { once: true }); fade.addEventListener('cancel', () => drop(ghost), { once: true });
+          }
           anim.id = 'jmotion';
           flights.set(anim, { el, world: w, effect: anim.effect, release: lift(el, w) });
           anim.addEventListener('finish', () => forget(anim), { once: true });
