@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { captureAssetLoads } from '@joplo-app/kit';
 import type { ResourceRequest } from '@joplo-app/kit/plugin';
-import { compile, JoploError, resolveScope, scopeProject, type Project, type SceneNode } from '@joplo-app/core';
+import { compile, JoploError, resolveScope, scopeProject, nodeResourceIds, mediaResourceIds, type Project, type SceneNode } from '@joplo-app/core';
 import { discoverFiles, loadAuthoring, type Importer } from '@joplo-app/core/node';
 import { publishPayload } from './build.ts';
 
@@ -30,18 +30,18 @@ const hashes = (value: unknown): Set<string> => {
   strings(value, s => { for (const m of s.matchAll(/data:[\w.+/-]+;base64,([A-Za-z0-9+/=]+)/g)) out.add(digest(Buffer.from(m[1]!, 'base64'))); });
   return out;
 };
-const includesId = (value: unknown, id: string) => { let found = false; strings(value, s => { if (s === id) found = true; }); return found; };
+const resourceKey = (request: ResourceRequest) => JSON.stringify([request.plugin, request.compiler, request.input]);
 
 export async function assetUsage(opts: { directory: string; importer: Importer; scan?: string[]; work?: string; scenario?: string }): Promise<AssetUsageReport> {
   const root = fs.realpathSync(opts.directory);
   const rel = (value: string) => path.relative(root, value).split(path.sep).join('/');
   const source = (value: string | undefined) => value ? (path.isAbsolute(value.replace(/:\d+:\d+$/, '')) ? rel(value) : value) : null;
-  const requests: ResourceRequest[] = [];
+  const requests: ResourceRequest[] = [], publishRequests: ResourceRequest[] = [];
   const captured = await captureAssetLoads(async () => {
     const loaded = await loadAuthoring(root, opts.importer);
     if (!loaded.authoring || loaded.diagnostics.some(d => d.severity === 'error')) throw new JoploError('INVALID_SCHEMA', 'Cannot report asset usage until project loading succeeds', { diagnostics: loaded.diagnostics });
     const dev = compile(loaded.authoring, 'dev', { onResource: request => requests.push(request) });
-    const published = compile(loaded.authoring, 'publish');
+    const published = compile(loaded.authoring, 'publish', { onResource: request => publishRequests.push(request) });
     if (!dev.project || !published.project || [...dev.diagnostics, ...published.diagnostics].some(d => d.severity === 'error')) throw new JoploError('INVALID_SCHEMA', `Cannot report asset usage until project compilation succeeds: ${[...dev.diagnostics, ...published.diagnostics].filter(d => d.severity === 'error').slice(0, 5).map(d => `${d.code}: ${d.message}`).join('; ')}`, { diagnostics: [...dev.diagnostics, ...published.diagnostics] });
     return { dev: dev.project, published: published.project };
   });
@@ -56,7 +56,9 @@ export async function assetUsage(opts: { directory: string; importer: Importer; 
     // Draft-only author scope is valid for reporting, with no publication payload.
     published = ids.length ? scopeProject(published, resolveScope(published, { scenarios: ids }, 'publish')).project : { ...published, scenarios: {}, scenes: {} };
   }
-  const payload = publishPayload(published, null).project;
+  const payload = Object.keys(published.scenarios).length ? publishPayload(published, null).project : null;
+  const publishedResources = payload ? new Set([...nodeResourceIds(payload), ...mediaResourceIds(published)]) : new Set<string>();
+  const publishedByKey = new Map(publishRequests.map(request => [resourceKey(request), request]));
   const publishedHashes = hashes(payload);
   const unknowns: AssetUsageReport['unknowns'] = [];
   if (!captured.assets.length) unknowns.push({ source: null, reason: 'No asset() evaluations were captured; module caching or helper/kit instances may hide provenance. Unmatched files remain unknown.' });
@@ -117,12 +119,12 @@ export async function assetUsage(opts: { directory: string; importer: Importer; 
   for (const request of new Map(requests.map(r => [r.id, r])).values()) {
     const references: AssetUsageReference[] = [];
     for (const sc of Object.values(dev.scenarios)) {
-      if (includesId(sc, request.id)) references.push({ workId: sc.workId, scenarioId: sc.id, layer: null, elementId: null, source: source(request.source), evidence: 'declared-resource' });
+      if (nodeResourceIds(sc).has(request.id) || mediaResourceIds({ scenarios: { [sc.id]: sc } }).has(request.id)) references.push({ workId: sc.workId, scenarioId: sc.id, layer: null, elementId: null, source: source(request.source), evidence: 'declared-resource' });
       for (const scene of Object.values(dev.scenes).filter(scene => scene.workId === sc.workId)) {
-        const visit = (node: SceneNode) => { const { children: _children, ...own } = node; if (includesId(own, request.id)) references.push({ workId: sc.workId, scenarioId: sc.id, layer: Object.entries(dev.works[sc.workId]?.layers ?? {}).find(([, l]) => l.sceneId === scene.id)?.[0] ?? null, elementId: node.id, source: source(node.source ?? request.source), evidence: 'declared-resource' }); node.children?.forEach(visit); }; visit(scene.root);
+        const visit = (node: SceneNode) => { const { children: _children, ...own } = node; if (nodeResourceIds(own).has(request.id)) references.push({ workId: sc.workId, scenarioId: sc.id, layer: Object.entries(dev.works[sc.workId]?.layers ?? {}).find(([, l]) => l.sceneId === scene.id)?.[0] ?? null, elementId: node.id, source: source(node.source ?? request.source), evidence: 'declared-resource' }); node.children?.forEach(visit); }; visit(scene.root);
       }
     }
-    entries.set(`resource:${request.id}`, { id: request.id, path: null, kind: 'plugin-declared', mime: null, bytes: null, authorReference: references.length ? 'referenced' : 'unknown', publication: includesId(payload, request.id) ? 'included-in-selected-ir' : 'not-in-selected-ir', sampledVisibility: 'unknown', metadata: { plugin: request.plugin, compiler: request.compiler }, references });
+    entries.set(`resource:${request.id}`, { id: request.id, path: null, kind: 'plugin-declared', mime: null, bytes: null, authorReference: references.length ? 'referenced' : 'unknown', publication: publishedResources.has(publishedByKey.get(resourceKey(request))?.id ?? '') ? 'included-in-selected-ir' : 'not-in-selected-ir', sampledVisibility: 'unknown', metadata: { plugin: request.plugin, compiler: request.compiler }, references });
     unknowns.push({ source: source(request.source), reason: `Resource ${request.id}: compiler output, binary size and provider metadata were not evaluated (read-only report).` });
   }
   for (const same of byHash.values()) if (same.length > 1) {

@@ -84,7 +84,7 @@ it('does not follow top-level or nested symlinks and rejects traversal outside t
 it('inventories plugin-declared binaries without importing or running the local compiler', async () => {
   const { definePlugin, pluginEffect } = await import('@joplo-app/kit/plugin');
   const f = fixture();
-  const plugin = definePlugin({ id: 'report-test', title: 'Report', version: '1.0.0', runtime: new URL(import.meta.url), local: path.join(f.root, 'must-not-load.mjs'), components: {}, schemas: { step: { safeParse: () => ({ success: true }) } }, data: { step: { scope: 'global' } }, compile: { effect: (_effect, ctx) => ({ data: { resource: ctx.resource({ compiler: 'audio', input: 'private composition' }) } }) } });
+  const plugin = definePlugin({ id: 'report-test', title: 'Report', version: '1.0.0', runtime: new URL(import.meta.url), local: path.join(f.root, 'must-not-load.mjs'), components: {}, schemas: { step: { safeParse: () => ({ success: true }) } }, data: { step: { scope: 'global' } }, compile: { effect: (_effect, ctx) => ({ data: { resource: `joplo-resource:${ctx.resource({ compiler: 'audio', input: 'private composition' })}` } }) } });
   const report = await assetUsage({ directory: f.root, importer: async file => {
     if (file.endsWith('joplo.config.ts')) return { default: config({ name: 'Declared', plugins: [ui, plugin] }) };
     return { default: work({ title: path.basename(file), summary: 'Resource', stage: jsx(Text, { children: 'Stage' }), scenarios: { one: chapter('One').system('Sound', pluginEffect('report-test', 'sound', {})) } }) };
@@ -103,4 +103,32 @@ it('includes continuing predecessors by scenario identity rather than splitting 
     return mod;
   } });
   expect(report.scope.publicationScenarios.sort()).toEqual(['wide.next', 'wide.one']);
+});
+it('does not mark residual shared state assets as packaged for a draft-only selection', async () => {
+  const f = fixture();
+  const report = await assetUsage({ directory: f.root, work: 'draft', scan: ['photos'], importer: async file => {
+    const mod = await f.importer(file);
+    if (mod.default.kind === 'work' && path.basename(file).startsWith('wide')) mod.default.state = { ui: { photo: asset('../photos/shared.png', file) } };
+    return mod;
+  } });
+  expect(report.scope.publicationScenarios).toEqual([]);
+  expect(report.entries.every(entry => entry.publication === 'not-in-selected-ir')).toBe(true);
+});
+it('matches independently numbered dev/publish resources by semantics and rejects plain-id string evidence', async () => {
+  const { definePlugin, pluginEffect } = await import('@joplo-app/kit/plugin');
+  const f = fixture();
+  const plugin = definePlugin({ id: 'semantic', title: 'Resource semantics', runtime: new URL(import.meta.url), components: {}, schemas: { step: { safeParse: () => ({ success: true }) } }, data: { step: { scope: 'global' } }, compile: { effect: (effect, ctx) => {
+    const id = ctx.resource({ compiler: 'audio', input: String(effect.payload) });
+    return { data: { value: effect.payload === 'wide' ? id : `joplo-resource:${id}` } };
+  } } });
+  const report = await assetUsage({ directory: f.root, importer: async file => {
+    if (file.endsWith('joplo.config.ts')) return { default: config({ name: 'Semantic', plugins: [ui, plugin] }) };
+    const key = path.basename(file, '.tsx');
+    return { default: work({ title: key, summary: key, draft: key === 'draft', stage: jsx(Text, { children: 'Stage' }), scenarios: { one: chapter('One').system('Declare', pluginEffect('semantic', 'declare', key)) } }) };
+  } });
+  // dev registers draft=0, tall=1, wide=2; publish registers tall=0, wide=1.
+  expect(report.entries.find(e => e.id === 'resource-0')).toMatchObject({ publication: 'not-in-selected-ir' });
+  expect(report.entries.find(e => e.id === 'resource-1')).toMatchObject({ publication: 'included-in-selected-ir' });
+  expect(report.entries.find(e => e.id === 'resource-2')).toMatchObject({ authorReference: 'unknown', publication: 'not-in-selected-ir', references: [] });
+  expect(JSON.stringify(report)).not.toContain('"input"');
 });
