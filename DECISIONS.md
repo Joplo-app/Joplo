@@ -767,5 +767,6 @@ Joplo 已实现本地 TSX 创作、单进程多项目看板、分层演示与静
   - `enterEase` / `exitEase` / `motionEase`：`smooth | snappy | spring | bounce | linear`。弹簧是自己写的阻尼弹簧（时长归一，包络在终点衰减到千分之一），采样成 CSS `linear()`，作者写的 ms 就是总时长；不支持 `linear()` 的浏览器退回略冲过终点的 cubic-bezier。没有给 content 加 Motion 依赖。
   - `enterStagger` / `exitStagger` 写在容器上：同一步里真正播放进场（或退场）的后代按文档顺序第 n 个多等 n × ms。改为飞行（FLIP）的同键元素不占位。
   - `<Split text by="word"|"char">`：渲染时拆成块（不改 React 管理的 DOM）。用 Intl.Segmenter 分词，中文也能切成词；标点贴在所在的词上，开引号和开括号贴到后一个词，词内不断行；读屏读整句。进场属性作用在每一块上，根元素自己不进场。text 可以绑定状态，换值时整句重新进场。
-- **边界（D94）**：这些都在描述“状态之间怎么过渡”。缓动预设是单个元素这一次过渡的参数，不是全片的“动效性格 token”。按行拆、形状形变，以及 Lottie / Rive 素材插件留待以后。
+- **同键换外观**（同日第二期，用户：“这个可以，继续做吧”）：作者写不了原生 SVG，所以“形状形变”落在 HTML 上。变基到 0.7.0 时，main 已经有“持续主体材质转换”（#98）：同键飞行时插值键元素自己的 borderRadius / color / backgroundColor / opacity，文字变了时旧样子交叉淡出。于是放弃本分支另写的一套形变（另起幽灵、插值边框与阴影），只补一处触发条件：外观指纹（去掉 id、data-j*、aria-*、幽灵节点后的标记，每次提交序列化一次）变了也交叉淡出，覆盖 class、内联样式、内部结构变化而文字不变的情况，例如纯文字变成彩色块、跨年代的按钮。飞行与淡出的幽灵都用 motionEase。
+- **边界（D94）**：这些都在描述“状态之间怎么过渡”。缓动预设是单个元素这一次过渡的参数，不是全片的“动效性格 token”。按行拆、SVG 路径形变、边框色与阴影插值留待以后。Lottie 已在 media 插件（D96 私有原型，由引擎时钟定位帧）。Rive 暂不接：它的价值在状态机交互，但状态机不能往回定位，跳步和深链只能从头重放；运行时还要自托管 wasm 并进入发布素材。等有具体作品需要时再做。
 - 示例：examples/llm-explainer 去掉手写的 `x-type` / `x-pop` 和逐个计算的 delay，改用 Split、enterStagger、spring 与 grow；手法写进 content 技能 3b / 5 节和常见坑。

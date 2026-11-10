@@ -5,7 +5,7 @@ import { fixtureConfig as config } from '../../../scripts/test/fixtures.ts';
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Canvas, Split, EASES } from '../src/plugin.ts';
-import { AWAY, easeOf, springAt, springEasing, splitPieces, staggered } from '../src/runtime.tsx';
+import { AWAY, easeOf, lookKey, springAt, springEasing, splitPieces, staggered } from '../src/runtime.tsx';
 import { $, feature, flow, work, page, type Flow } from '@joplo-app/kit';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '@joplo-app/core';
@@ -104,5 +104,23 @@ describe('easing and presets', () => {
     const ranks = new Map<Element, number>();
     const run = (host: El | null) => staggered(ranks, host as unknown as Element, 'enterStagger');
     expect([run(a), run(b), run(a), run(a), run(b), run(null)]).toEqual([0, 0, 80, 160, 30, 0]);
+  });
+});
+
+describe('same-key look change', () => {
+  it('lookKey ignores identity and Joplo anchors but sees style, class and text', () => {
+    type N = { attrs: Map<string, string>; kids: N[]; text: string; tag: string };
+    const mk = (attrs: Record<string, string>, text = '', kids: N[] = []): N => ({ attrs: new Map(Object.entries(attrs)), kids, text, tag: 'span' });
+    const wrap = (n: N): Element => {
+      const all = (x: N): N[] => [x, ...x.kids.flatMap(all)];
+      const html = (x: N): string => `<${x.tag}${[...x.attrs].map(([k, v]) => ` ${k}="${v}"`).join('')}>${x.text}${x.kids.map(html).join('')}</${x.tag}>`;
+      const el = (x: N): any => ({ getAttributeNames: () => [...x.attrs.keys()], removeAttribute: (k: string) => x.attrs.delete(k), get outerHTML() { return html(x); }, querySelectorAll: (sel: string) => sel.includes('jghost') ? [] : all(x).slice(1).map(el), cloneNode: () => { const copy = (y: N): N => ({ ...y, attrs: new Map(y.attrs), kids: y.kids.map(copy) }); return el(copy(x)); } });
+      return el(n);
+    };
+    const a = wrap(mk({ id: 'a', 'data-jid': 'a', 'data-jat': 'x.tsx:1', 'aria-hidden': 'true', style: 'color:red', class: 'chip' }, 'Hi', [mk({ 'data-jp-content-motion': 'k' }, '!')]));
+    const b = wrap(mk({ id: 'b', 'data-jid': 'b', 'data-jat': 'x.tsx:9', style: 'color:red', class: 'chip' }, 'Hi', [mk({}, '!')]));
+    const c = wrap(mk({ style: 'color:blue', class: 'chip' }, 'Hi', [mk({}, '!')]));
+    expect(lookKey(a)).toBe(lookKey(b));
+    expect(lookKey(a)).not.toBe(lookKey(c));
   });
 });

@@ -5,7 +5,7 @@ import type { ContentFrame } from './plugin.ts';
 const stillCss = '.jstage[data-jstill] [data-jcanvas],.jstage[data-jstill] [data-jcanvas] *{transition:none!important;animation-delay:0s!important;animation-duration:0s!important}';
 
 type Box = { x: number; y: number; w: number; h: number };
-type SubjectBox = Box & { style?: Record<string, string>; text?: string; clone?: HTMLElement; shells?: HTMLElement[] };
+type SubjectBox = Box & { style?: Record<string, string>; text?: string; look?: string; clone?: HTMLElement; shells?: HTMLElement[] };
 const subjectStyle = (el: HTMLElement) => {
   // Read the authored destination, not this observer's currently interpolated style.
   const active = (el.getAnimations?.() ?? []).filter(a => a.id === 'jmotion').map(a => ({ a, effect: a.effect }));
@@ -408,6 +408,18 @@ function Split({ ctx: context }: { ctx: ComponentCtx }) {
   );
 }
 
+/**
+ * 外观指纹：去掉身份与 Joplo 锚点属性（id、data-j*、aria-*）后的标记。同一个 motion 键前后指纹不同（换了 class、
+ * 内联样式、内部结构或文字）时，旧样子要跟着飞并淡出，不能只插值键元素自己的几个样式（内层的底色、斜面边框会跳变）。
+ */
+export function lookKey(el: Element): string {
+  const c = el.cloneNode(true) as Element;
+  // 退场幽灵插在原父元素里，可能就在这个键元素内部：不算它的外观
+  for (const g of c.querySelectorAll('[data-jghost]')) g.remove();
+  for (const n of [c, ...c.querySelectorAll('*')]) for (const a of [...n.getAttributeNames()]) if (a === 'id' || a.startsWith('data-j') || a.startsWith('aria-') || a === 'tabindex' || a === 'inert') n.removeAttribute(a);
+  return c.outerHTML;
+}
+
 /** One observer per stage: cache only design-space layouts, never player state. */
 export const observe: PluginObserve = (root, initial) => {
   const context0Inputs = initial?.frame.inputs;
@@ -552,15 +564,16 @@ export const observe: PluginObserve = (root, initial) => {
           const r = offsetIn(el, w);
           if (!r) continue;
           const prev = previous.get(key);
-          const style = subjectStyle(el), text = el.textContent ?? '';
+          const style = subjectStyle(el), text = el.textContent ?? '', look = lookKey(el);
           const shells: HTMLElement[] = [];
           for (let p = el.parentElement; p && p !== w; p = p.parentElement) shells.push(p.cloneNode(false) as HTMLElement);
-          seen.set(key, { ...r, style, text, clone: el.cloneNode(true) as HTMLElement, shells });
+          seen.set(key, { ...r, style, text, look, clone: el.cloneNode(true) as HTMLElement, shells });
           if (!context.frame.animate) { for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); }
           // 跳转、停止后的提交与静态画面直接显示新布局（D92）：变形飞行只属于连续播放
           if (!prev || !context.frame.animate || context.frame.playground || quiet) { if (quiet) for (const a of el.getAnimations?.() ?? []) if (a.id === 'jmotion') a.cancel(); continue; }
           const styleChanged = prev.style && Object.keys(style).some(k => prev.style![k] !== style[k as keyof typeof style]);
-          const textChanged = prev.text !== undefined && prev.text !== text;
+          // 文字变了，或外观指纹变了（同键换成另一个样子：纯文字 → 彩色块、1984 的按钮 → 1995 的按钮）：旧样子交叉淡出
+          const textChanged = prev.text !== undefined && prev.text !== text || prev.look !== undefined && prev.look !== look;
           if (!styleChanged && !textChanged && Math.abs(prev.x - r.x) < 0.5 && Math.abs(prev.y - r.y) < 0.5 && Math.abs(prev.w - r.w) < 0.5 && Math.abs(prev.h - r.h) < 0.5) continue;
           const dx = prev.x + prev.w / 2 - (r.x + r.w / 2);
           const dy = prev.y + prev.h / 2 - (r.y + r.h / 2);
