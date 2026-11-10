@@ -1,10 +1,23 @@
 export const skill = `# Joplo media: media
 
 For moments a product UI cannot show by itself: a short screen recording, a product shot in motion, a polished success animation. Clips play on the engine clock (pause, speed, jumps, screenshots and video export stay consistent).
-Prototype (D96): private in the Joplo monorepo; example: examples/media-upload.
+Install at the same version as Joplo. Example: examples/media-upload.
 
 ## Enable
 import media, { Video, Lottie, playClip } from '@joplo-app/plugin-media'; config({ plugins: [ui, media, …] }).
+
+## Independent local one-shot sounds
+Use withSoundEffects instead of the default media manifest (never enable both):
+\`\`\`tsx
+import { asset } from '@joplo-app/kit';
+import { withSoundEffects, sfx } from '@joplo-app/plugin-media';
+config({ plugins: [ui, withSoundEffects({ send: asset('./assets/send.wav') })] });
+// In a scripted system step (not a free-reaction handler):
+sfx.play('send', { volume: .5, offsetMs: 0 });
+\`\`\`
+First release supports local PCM WAV only (8/16/24/32-bit, 1–8 channels). Convert other formats offline; unknown/truncated duration is an error, never guessed. offsetMs is a source trim, not an event delay, and must be shorter than the asset. volume is 0–1. Each call creates a deterministic independent one-shot event; repeated calls and Alda BGM overlap. Effects use the host clock, pause/speed/seek/chapter continuation and narration ducking, and are included in offline build/share and video audio capture. No Alda compiler, network or paid generation is needed.
+
+Inspect scenario step media snapshots: track keys include stable step/event identity, resource is the generated asset ID, offsetMs is source position, endAfterMs is time remaining to natural end. The natural end removes the event without fading its volume; pause does not consume time. The same source shares the host resource cache; ending one event releases only its lease. For reproducible offline mixes retain the selected scenario timeline and packaged media assets. Resource inputs stay on the author machine; only used audio bytes ship. Use joplo check first; SFX_INVALID means fix name, PCM file or numeric options. Listen to overlapping cues with Voice enabled and record a local clip to verify the final mix.
 
 ## Write
 - <Video id="rec" src={asset('./upload.mp4')} w={640} h={360} fit="cover" /> — MP4 or WebM in the project. Video is always muted in this version (narration and music stay the soundtrack).

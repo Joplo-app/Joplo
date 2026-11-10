@@ -23,7 +23,7 @@ import { writeSkillReadingDemo, verifySkillReadingBrowser } from './skill-readin
 
 const REPO = path.resolve(import.meta.dirname, '..');
 /** 发布顺序（依赖在前）。目录名 → 包名见各自 package.json。 */
-export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'core', 'web', 'server', 'cli', 'joplo'];
+export const PACKAGES = ['kit', 'plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'plugin-media', 'core', 'web', 'server', 'cli', 'joplo'];
 export const packageDir = (name, root = REPO) => path.join(root, name.startsWith('plugin-') ? `plugins/${name.slice(7)}` : `packages/${name}`);
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const LICENSE_PLACEHOLDER = 'UNLICENSED';
@@ -61,7 +61,7 @@ function version(root, v) {
     fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
   }
   // Runtime version metadata must not pull the workspace manifest into browser bundles.
-  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui']) {
+  for (const name of ['plugin-diagram', 'plugin-alda', 'plugin-3d', 'plugin-content', 'plugin-ui', 'plugin-media']) {
   const pluginVersion = path.join(packageDir(name, root), 'src/version.json');
   fs.mkdirSync(path.dirname(pluginVersion), { recursive: true });
   fs.writeFileSync(pluginVersion, JSON.stringify({ version: v }, null, 2) + '\n');
@@ -388,7 +388,7 @@ async function smoke() {
     sh(npm, ['install', ...npmFlags], project);
     const joplo = path.join(project, 'node_modules/.bin/joplo');
     assert(fs.realpathSync(joplo) === fs.realpathSync(path.join(project, 'node_modules/joplo/bin/joplo.cjs')), '项目的 .bin/joplo 应指向 joplo 入口包');
-    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-3d', '@joplo-app/plugin-content', '@joplo-app/plugin-ui', '@joplo-app/server', '@joplo-app/web']) {
+    for (const n of ['joplo', '@joplo-app/cli', '@joplo-app/core', '@joplo-app/kit', '@joplo-app/plugin-diagram', '@joplo-app/plugin-alda', '@joplo-app/plugin-3d', '@joplo-app/plugin-content', '@joplo-app/plugin-ui', '@joplo-app/plugin-media', '@joplo-app/server', '@joplo-app/web']) {
       const p = path.join(project, 'node_modules', n);
       assert(fs.existsSync(p) && !fs.lstatSync(p).isSymbolicLink(), `${n} 应从 tarball 安装（不是链接）`);
       assert(readJson(path.join(p, 'package.json')).version === v, `${n} 版本应为 ${v}`);

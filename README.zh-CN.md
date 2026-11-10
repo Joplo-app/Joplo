@@ -291,3 +291,5 @@ Joplo 接受 issue，不接受 pull request。bug 和功能需求请在 [issue](
 ## 许可证
 
 [PolyForm Shield 1.0.0](LICENSE)。任何人都可以免费使用 Joplo，包括在公司里和商业项目中使用；不得用它提供与 Joplo 或 Joplo Cloud 竞争的产品，详见 [COMMERCIAL.md](COMMERCIAL.md)。0.2.15 及更早的版本以 Apache-2.0 发布。随包字体使用 [SIL OFL 1.1](packages/web/src/fonts/OFL.txt)。
+
+本地一次性音效、视频与 Lottie：安装同版本 `@joplo-app/plugin-media`，启用 `withSoundEffects({ name: asset("./assets/cue.wav") })` 后使用 `sfx.play("name")`。详见 `joplo skill media`，首期音效支持 PCM WAV。

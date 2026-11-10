@@ -112,6 +112,9 @@ export class MediaEngine {
     for (const [id, t] of Object.entries(snapshot)) {
       const key = `${frame.identity}:${id}`, url = assets[t.resource];
       if (!url || !frame.enabled) continue;
+      const existing = this.slots.get(key);
+      const projectedOffset = existing?.origin !== undefined && frame.timeMs !== undefined ? frame.timeMs - existing.origin : t.offsetMs + frame.elapsedMs;
+      if (t.endAfterMs !== undefined && projectedOffset >= t.offsetMs + t.endAfterMs) { this.remove(key); continue; }
       wanted.add(key);
       let slot = this.slots.get(key);
       if (slot && (slot.resource !== url || slot.startOffset !== t.startOffsetMs)) { this.remove(key); slot = undefined; }

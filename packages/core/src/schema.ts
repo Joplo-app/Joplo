@@ -175,7 +175,7 @@ export const Callout = z.strictObject({ target: z.string().min(1), text: z.strin
 
 export const MediaSnapshot = z.record(z.string(), z.strictObject({
   plugin: z.string().min(1), resource: z.string().min(1), offsetMs: z.number().nonnegative(), startOffsetMs: z.number().nonnegative().optional(),
-  volume: z.number().min(0).max(1), loop: z.boolean(), fadeInMs: z.number().nonnegative(), stopAfterMs: z.number().nonnegative().optional(),
+  volume: z.number().min(0).max(1), loop: z.boolean(), fadeInMs: z.number().nonnegative(), stopAfterMs: z.number().nonnegative().optional(), endAfterMs: z.number().nonnegative().optional(),
 }));
 
 export const Step = z.strictObject({

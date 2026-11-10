@@ -176,3 +176,17 @@ it('keeps capture failures sticky so an export cannot silently succeed after the
  await expect(engine.endCapture()).rejects.toThrow('Media memory budget exceeded');
  engine.destroy();warn.mockRestore();
 });
+it('natural one-shot ends release only that event and leave an overlapping shared source alive', async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const cue={plugin:'fake',resource:'r',offsetMs:0,volume:.6,loop:false,fadeInMs:0,endAfterMs:1000};
+ engine.update({a:cue,b:{...cue,endAfterMs:2000}},assets,{...frame,elapsedMs:0});
+ await new Promise(r=>setTimeout(r,0));
+ engine.update({a:cue,b:{...cue,endAfterMs:2000}},assets,{...frame,elapsedMs:1000,speed:2});
+ expect(mock.destroy).toHaveBeenCalledTimes(1);expect(engine.status().tracks).toBe(1);
+ expect(FakeAudio.gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(.6,1,.015);
+ engine.update({b:{...cue,endAfterMs:2000}},assets,{...frame,elapsedMs:1500,playing:false});
+ expect(mock.update.mock.lastCall?.[0]).toMatchObject({playing:false,offsetMs:1500});
+ engine.update({b:{...cue,endAfterMs:2000}},assets,{...frame,elapsedMs:2000});
+ expect(engine.status().tracks).toBe(0);engine.destroy();
+});
