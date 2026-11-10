@@ -208,5 +208,15 @@ it('new events of the same source never inherit the old event origin through spa
  engine.update({a:cue},assets,{...frame,elapsedMs:0,timeMs:0});await new Promise(r=>setTimeout(r,0));
  engine.update({b:cue},assets,{...frame,elapsedMs:0,timeMs:500});await new Promise(r=>setTimeout(r,0));
  engine.update({b:cue},assets,{...frame,elapsedMs:100,timeMs:600});
- expect(mock.factory).toHaveBeenCalledTimes(2);expect(mock.update.mock.lastCall?.[0].offsetMs).toBe(100);engine.destroy();
+ expect(mock.factory).toHaveBeenCalledTimes(2);expect(mock.update.mock.calls.slice(-2).map(c=>c[0].offsetMs)).toContain(100);engine.destroy();
+});
+it('keeps the real one-shot deadline when a later estimated snapshot prematurely drops the event',async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const cue={plugin:'fake',resource:'r',offsetMs:0,volume:.7,loop:false,fadeInMs:0,endAfterMs:4000};
+ engine.update({a:cue},assets,{...frame,elapsedMs:0,timeMs:0});await new Promise(r=>setTimeout(r,0));
+ engine.update({},assets,{...frame,elapsedMs:0,timeMs:2000});expect(engine.status().tracks).toBe(1);
+ expect(mock.update.mock.lastCall?.[0]).toMatchObject({offsetMs:2000,playing:true});
+ engine.update({},assets,{...frame,elapsedMs:0,timeMs:3000,playing:false});expect(mock.update.mock.lastCall?.[0].playing).toBe(false);
+ engine.update({},assets,{...frame,elapsedMs:0,timeMs:4000});expect(engine.status().tracks).toBe(0);expect(mock.destroy).toHaveBeenCalledTimes(1);engine.destroy();
 });

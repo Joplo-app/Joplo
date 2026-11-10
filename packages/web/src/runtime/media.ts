@@ -5,7 +5,7 @@ import { pluginStatus } from '../renderer/plugins';
 /** Browser host owns permission, clock, gain and lifecycle; the host decodes audio bytes; custom media plugins may supply a driver. */
 export class MediaEngine {
   private audio: AudioContext | null = null;
-  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; release?:()=>void; startOffset?: number; oneShot?: boolean; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
+  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; release?:()=>void; startOffset?: number; oneShot?: boolean; endOffset?: number; volume?: number; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
   private completed = new Set<string>();
   private mediaIdentity: string | undefined;
   private encoded=new MediaCache<{bytes:Uint8Array;audio?:AudioRegion}>({budgetBytes:4*1024*1024,concurrency:2});
@@ -128,7 +128,7 @@ export class MediaEngine {
         const factory = runtime.runtime.media ?? audioMedia;
         const gain = audio.createGain(); gain.gain.value = 0; gain.connect(audio.destination);
         if (this.capture) gain.connect(this.capture);
-        slot = { resource: url, gain, dead: false, oneShot: t.endAfterMs !== undefined, startOffset: t.startOffsetMs, origin: frame.timeMs === undefined ? undefined : frame.timeMs - (t.offsetMs + frame.elapsedMs) }; this.slots.set(key, slot);
+        slot = { resource: url, gain, dead: false, oneShot: t.endAfterMs !== undefined, endOffset: t.endAfterMs === undefined ? undefined : t.offsetMs + t.endAfterMs, volume: t.volume, startOffset: t.startOffsetMs, origin: frame.timeMs === undefined ? undefined : frame.timeMs - (t.offsetMs + frame.elapsedMs) }; this.slots.set(key, slot);
         const current = slot;
         const lease=this.bytes(url);current.release=lease.release;
         void lease.value.then(async loaded => {
@@ -167,6 +167,17 @@ export class MediaEngine {
       if (wanted.has(key)) continue;
       // 编译期按 hold 估算淡出已结束、快照不再列出它，但按引擎时间还没淡完（这一步比 hold 短）：在同一个 seek 里淡完再销毁（D92 R2）
       const now = frame.timeMs;
+      // Snapshot timing is an estimate. A live one-shot retains its actual clock anchor
+      // even when a later estimated snapshot has already omitted the event.
+      if (slot.oneShot && slot.origin !== undefined && now !== undefined && key.startsWith(`${frame.identity}:`) && frame.enabled) {
+        const offset = now - slot.origin;
+        if (offset < slot.endOffset!) {
+          slot.gain.gain.setTargetAtTime(frame.playing ? (slot.volume ?? 1) * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);
+          slot.driver?.update({ offsetMs: offset, volume: 1, loop: false, speed: frame.speed, playing: frame.playing });
+          continue;
+        }
+        this.completed.add(key);
+      }
       const left = slot.fade && slot.origin !== undefined && now !== undefined && key.startsWith(`${frame.identity}:`) && frame.enabled ? 1 - (now - slot.fade.start) / slot.fade.ms : 0;
       if (left <= 0) { this.remove(key); continue; }
       slot.gain.gain.setTargetAtTime(frame.playing ? slot.fade!.volume * left * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);
