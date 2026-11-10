@@ -26,7 +26,9 @@ const fail = (msg) => {
 };
 
 fs.rmSync(dist, { recursive: true, force: true });
-const tsc = createRequire(path.join(ROOT, 'package.json')).resolve('typescript/bin/tsc');
+const rootRequire = createRequire(path.join(ROOT, 'package.json'));
+const tsc = rootRequire.resolve('typescript/bin/tsc');
+const ts = rootRequire('typescript');
 const r = spawnSync(process.execPath, [tsc, '-p', path.join(dir, 'tsconfig.build.json')], { cwd: dir, stdio: 'inherit' });
 if (r.status !== 0) fail(`tsc 失败（退出码 ${r.status}）`);
 
@@ -58,7 +60,8 @@ for (const t of targets(pub.exports)) if (!fs.existsSync(path.join(dir, t))) fai
 
 for (const f of walk(dist).filter((x) => x.endsWith('.js') || x.endsWith('.d.ts'))) {
   const code = fs.readFileSync(f, 'utf8');
-  const bad = code.match(/(?:from|import)\s*\(?\s*["'](\.{1,2}\/[^"']*\.tsx?|\.\.\/\.\.\/[^"']*)["']/);
-  if (bad) fail(`${path.relative(dir, f)} 仍有源码相对导入：${bad[1]}`);
+  // 只看真正的导入语句：字符串里的示例代码（例如技能文本中的创作示例）不算。
+  const bad = ts.preProcessFile(code, true, true).importedFiles.map((x) => x.fileName).find((x) => /^\.{1,2}\/.*\.tsx?$/.test(x) || x.startsWith('../../'));
+  if (bad) fail(`${path.relative(dir, f)} 仍有源码相对导入：${bad}`);
 }
 console.log(`✓ ${pkg.name}@${pkg.version} → dist/（${walk(dist).length} 个文件）`);
