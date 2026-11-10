@@ -115,4 +115,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.6.0 sha256:7aa2ad2e395de1d9f497f2b086a2a82209047fb431c6aa0693179fecd0c65549 -->
+<!-- joplo-skill 0.6.1 sha256:7aa2ad2e395de1d9f497f2b086a2a82209047fb431c6aa0693179fecd0c65549 -->

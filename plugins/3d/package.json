@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/plugin-3d",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "type": "module",
   "joplo": {
     "api": 2
