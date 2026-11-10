@@ -15,7 +15,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, X } from 'lucide-react';
 import { disabledReasonOf, findNode, pluginSpec, resolveProps, type PlayState, type Project, type Rule, type Selection } from '@joplo-app/core/runtime';
 import type { SelectionSync } from '../runtime/demo';
-import { workOfNode, scenariosOf, shortName } from '../runtime/views';
+import { entryForWork, workOfNode, scenariosOf, shortName } from '../runtime/views';
 import { cn } from '@/lib/utils';
 import { CONFIRM_LABEL, ORIGIN_LABEL, pluginText, typeLabel } from './labels';
 
@@ -66,7 +66,10 @@ export function InspectDrawer({
   const scene = project.scenes[selection.sceneId];
   const node = scene && selection.nodeId ? (findNode(scene, selection.nodeId)?.node ?? null) : null;
   const fields = node ? (pluginSpec(project.plugins, node.type)?.inspect ?? []) : [];
-  const rules = node ? Object.values(project.rules).filter((r) => r.elementIds.includes(node.id) && (!selection.featureId || r.featureId === selection.featureId) && (!r.workId || r.workId === selection.workId)) : [];
+  // featureId 为 null 也可能是已选独立作品；只有未选作品/功能时才是全局浏览。
+  const globalBrowse = selection.workId === null && selection.featureId === null;
+  const featureId = selection.workId === null ? selection.featureId : entryForWork(project, selection.workId)?.featureId;
+  const rules = node ? Object.values(project.rules).filter((r) => r.elementIds.includes(node.id) && (globalBrowse || r.featureId === featureId) && (!r.workId || r.workId === selection.workId)) : [];
   // 覆盖的情况：本方案里有步骤操作这个元素的场景所覆盖的情况；没有这样的场景时取当前场景的情况
   const scs = scenariosOf(project, selection.workId);
   const targeting = node ? scs.filter((sc) => sc.steps.some((s) => 'target' in s.action && s.action.target === node.id)) : [];
