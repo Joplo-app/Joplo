@@ -56,7 +56,10 @@ function jsxRuntimeMissing(e: unknown): string | boolean {
   const msg = e instanceof Error ? e.message : '';
   if (e instanceof ReferenceError && /\bReact is not defined\b/.test(msg)) return true;
   const m = /Cannot find (?:module|package) '(?:react\/jsx-(?:dev-)?runtime|react)' imported from '([^']+)'/.exec(msg);
-  return m ? decodeURIComponent(m[1]!.replace(/^file:\/\//, '')) : false;
+  if (!m) return false;
+  // 只有导入方是作者写的 TSX / JSX 时才是“JSX 运行时没生效”；依赖包真的缺 react 时保留原错误
+  const file = decodeURIComponent(m[1]!.replace(/^file:\/\//, ''));
+  return /\.(tsx|jsx)$/.test(file) && !file.split(path.sep).includes('node_modules') ? file : false;
 }
 
 const JSX_HINT = "was compiled without Joplo's JSX runtime. TSX outside the project uses the JSX settings of its nearest tsconfig.json: give that folder a tsconfig.json with jsx: \"react-jsxdev\" and jsxImportSource: \"@joplo-app/kit\", or start the file with /** @jsxRuntime automatic */ /** @jsxImportSource @joplo-app/kit */";
