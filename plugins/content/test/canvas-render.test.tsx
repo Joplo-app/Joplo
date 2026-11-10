@@ -50,3 +50,14 @@ describe('<Canvas> sizing', () => {
     expect(root).toMatch(/aspect-ratio:1920 \/ 1080/);
   });
 });
+
+it('preserves author HTML metadata without replacing Joplo anchors', () => {
+  const out = html(build(h('div', { id: 'probe', 'data-app-frame': 'portrait', 'aria-label': 'Frame', 'aria-hidden': false, role: 'img', title: 'Title', 'data-jid': 'forged', 'data-jexport': 'forged' }, 'Picture')));
+  expect(out).toContain('data-app-frame="portrait"');
+  expect(out).toContain('aria-label="Frame"');
+  expect(out).toContain('aria-hidden="false"');
+  expect(out).toContain('role="img"');
+  expect(out).toContain('title="Title"');
+  expect(out).toContain('data-jid="probe"');
+  expect(out).not.toContain('forged');
+});

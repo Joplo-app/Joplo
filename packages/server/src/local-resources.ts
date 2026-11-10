@@ -214,9 +214,9 @@ export async function inlineResources(project: Project, requests: ResourceReques
           ? Number(bytes.readBigUInt64BE(18) & 0xfffffffffn) * 1000 / (bytes.readUInt32BE(18) >>> 12)
           : inspected.info?.durationMs;
         diagnostics.push({ severity: 'info', source: 'structure', code: 'MEDIA_ASSET', at: request.source, message: `${request.plugin}/${request.id}: ${bytes.length} bytes${durationMs ? `, ${(durationMs / 1000).toFixed(3)} s` : ''}` });
-        // 96 kbps is 0.72 MB/min; 0.75 allows framing, while short probes may still warn.
-        if (bytes.length > 2 * 1024 * 1024 || durationMs && bytes.length / durationMs * 60000 > 750000)
-          diagnostics.push({ severity: 'warning', source: 'structure', code: 'MEDIA_ASSET_LARGE', at: request.source, message: `${request.plugin}/${request.id}: audio exceeds 2 MiB per track or 0.75 MB/min (including MP3 context/padding); shorten or split the score (short loops also pay fixed context overhead)` });
+        // Short clips pay fixed codec context overhead; only assess bitrate after 15 seconds.
+        if (bytes.length > 2 * 1024 * 1024 || durationMs && durationMs >= 15000 && bytes.length / durationMs * 60000 > 750000)
+          diagnostics.push({ severity: 'warning', source: 'structure', code: 'MEDIA_ASSET_LARGE', at: request.source, message: `${request.plugin}/${request.id}: audio exceeds 2 MiB per track or 0.75 MB/min for clips at least 15 s long; shorten large tracks or review encoding bitrate (splitting does not reduce bitrate)` });
       }
     }
     if (r.diagnostic) diagnostics.push(r.diagnostic);

@@ -44,3 +44,15 @@ it('encodes exact sample count and loop endpoint without delay/padding, determin
     for (let i = 0; i < pcm.length; i++) expect(out.readInt16LE(i * 4)).toBe(Math.round(pcm[i]! * 32767) || 0);
   } finally { decoder.destroy(); }
 });
+
+it('reports every part end and sorts markers by score time', () => {
+  const plugin = alda({ piece: 'piano: c1' });
+  const reports: any[] = [];
+  plugin.compile!.effect!(music.play('piece'), {
+    report: (...args: any[]) => reports.push(args), resource: () => 'r',
+    resourceInfo: () => ({ durationMs: 10000, parts: { piano: 4, bass: 3 }, partDurationsMs: { piano: 10000, bass: 7500 }, markers: { end: 10000, start: 0, middle: 5000 } }),
+  } as any);
+  const message = reports.find(r => r[0] === 'MUSIC_SCORE')[1];
+  expect(message).toContain('part ends piano=10.000 s, bass=7.500 s');
+  expect(message).toContain('markers %start=0.000 s, %middle=5.000 s, %end=10.000 s');
+});
