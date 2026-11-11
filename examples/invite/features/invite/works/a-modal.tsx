@@ -1,7 +1,21 @@
-import { $, done, flow, go, not, notEmpty, work, page, rule, set, push, toast, undecided, uses } from '@joplo-app/kit';
+import { $, done, flow, go, mock, not, notEmpty, work, page, response, rule, set, push, toast, undecided, uses } from '@joplo-app/kit';
 import { ActionIcon, Alert, Button, Center, EmptyState, Group, Loader, Menu, Modal, Notification, Select, Stack, Text, TextInput } from '@joplo-app/plugin-ui';
 
 import { members, pending } from '../sample.ts';
+
+/**
+ * 「发送邀请」请求的两种结果，只写一次。按钮的 onClick 里写 sendInvite 表示“这里发出请求”：
+ * 剧本里点完后自动接一个系统步骤，结果由切片的 api 选项选（缺省 ok）；观众接管后点它用 ok。
+ */
+const sendInvite = mock('sendInvite', {
+  ok: response('邀请请求成功（模拟）', '发送成功：弹窗关闭，邀请进入待接受',
+    set($.ui.sending, false), set($.ui.error, ''), set($.ui.inviteOpen, false),
+    push($.data.pending, { email: 'li.lei@example.com', role: '编辑者', status: '待接受' }),
+    toast.success('已向 li.lei@example.com 发送邀请'),
+    done('邀请已发出，等待对方接受')),
+  timeout: response('邀请请求失败（模拟网络超时）', '发送失败：弹窗不关，保留已填内容',
+    set($.ui.sending, false), set($.ui.error, '网络超时。已保留你填写的内容，可以重试。'), uses('keep_input')),
+});
 
 /** 打开弹窗并填写，成功与失败两个场景共用。每个按钮点下去做什么写在按钮的 onClick 上，这里只写观众做什么。 */
 const fillAndSend = (name: string, opts: Parameters<typeof flow>[1]) =>
@@ -10,13 +24,6 @@ const fillAndSend = (name: string, opts: Parameters<typeof flow>[1]) =>
     .type('in_email', 'li.lei@example.com')
     .select('sel_role', '编辑者', uses('role_cap'))
     .click('btn_send', '点击「发送邀请」，按钮进入发送中状态');
-
-const sent = [
-  set($.ui.sending, false), set($.ui.error, ''), set($.ui.inviteOpen, false),
-  push($.data.pending, { email: 'li.lei@example.com', role: '编辑者', status: '待接受' }),
-  toast.success('已向 li.lei@example.com 发送邀请'),
-  done('邀请已发出，等待对方接受'),
-];
 
 export default work({
   title: 'A · 单人邮件邀请弹窗',
@@ -80,7 +87,7 @@ export default work({
             <Group justify="flex-end" gap="sm">
               <Button id="btn_cancel" variant="default" note="取消并关闭；再次打开时是否保留已填内容待决定" onClick={set($.ui.inviteOpen, false)}>取消</Button>
               <Button id="btn_send" disabled={$.ui.sending} disabledReason="正在发送，防止重复提交"
-                onClick={[set($.ui.sending, true), set($.ui.error, ''), uses('no_double_submit')]}>发送邀请</Button>
+                onClick={[set($.ui.sending, true), set($.ui.error, ''), uses('no_double_submit'), sendInvite]}>发送邀请</Button>
             </Group>
           </Stack>
         </Modal>,
@@ -123,14 +130,11 @@ export default work({
   },
 
   scenarios: {
-    success: fillAndSend('管理员成功发出邀请', { cases: ['happy', 'duplicate_submit'], expected: '弹窗关闭，出现成功提示，新邀请进入待接受列表' })
-      .system('邀请请求成功（模拟）', '发送成功：弹窗关闭，邀请进入待接受', ...sent),
+    success: fillAndSend('管理员成功发出邀请', { cases: ['happy', 'duplicate_submit'], expected: '弹窗关闭，出现成功提示，新邀请进入待接受列表' }),
 
-    failure: fillAndSend('发送失败后重试', { cases: ['request_failed'], outcome: 'failure', mock: '模拟失败后重试成功' })
-      .system('邀请请求失败（模拟网络超时）', '发送失败：弹窗不关，保留已填内容',
-        set($.ui.sending, false), set($.ui.error, '网络超时。已保留你填写的内容，可以重试。'), uses('keep_input'))
-      .click('btn_send', '点击「发送邀请」重试', uses('keep_input'))
-      .system('邀请请求成功（模拟）', ...sent),
+    // 第一次发送超时，重试成功
+    failure: fillAndSend('发送失败后重试', { cases: ['request_failed'], outcome: 'failure', mock: '模拟失败后重试成功', api: { sendInvite: ['timeout', 'ok'] } })
+      .click('btn_send', '点击「发送邀请」重试', uses('keep_input')),
 
     // PM 视角：Given 有一个待接受的邀请 → When 管理员撤销、对方再打开链接 → Then 看到“已失效”和下一步（revoked 的 expected）
     revoke: flow('撤销邀请后对方再打开链接', { cases: ['revoked'], start: '/members', description: '管理员撤销邀请，赵磊再打开链接时看到已失效',

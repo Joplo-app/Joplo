@@ -12,7 +12,7 @@ import { validActionData, pluginActionSpec } from './actions.ts';
  * - review 模式（评审版，D63）：画面与场景同 dev（所有功能的所有方案），创作侧信息按 publish 的规则去掉。
  */
 import { createNode, isBind, isNode, bindPath, toCondition, type JNode, type JChild } from '@joplo-app/kit/node';
-import type { ConfigDef, FeatureDef, LayoutDef, WorkDef, PageDef, StepDef, EffectDef, CaseDef, PluginDef } from '@joplo-app/kit';
+import type { ConfigDef, FeatureDef, LayoutDef, WorkDef, PageDef, StepDef, EffectDef, CaseDef, PluginDef, FlowOpts, MockDef } from '@joplo-app/kit';
 import { BUILTIN_THEMES, COMPONENT_TYPES, DIRECTOR_LAYER, PAGE_LAYER, isInteractiveType, matchChoice, nodeLabel, pluginSpec, splitPluginType, type PluginInfo } from './catalog.ts';
 import { HOLD_MAX_SECONDS, HOLD_MIN_SECONDS, inShotFrame } from './focus.ts';
 import { cameraOf, choicesOf, commonPrefix, replayTo } from './player.ts';
@@ -373,6 +373,10 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     /** 某一步（所在路径 route）点到的元素自带的 onClick。 */
     const eventOf = (route: string, target: string): ElementEvent | undefined =>
       hasLayers ? sceneEvents.get(layerSceneWith(target)?.id ?? '')?.get(target) : sceneEvents.get(sceneOf(route))?.get(target);
+    /** 写法 v2 第二步：这件作品用到的模拟请求（按名字），以及剧本实际演到的结果（name:outcome）。 */
+    const mocks = new Map<string, MockDef>();
+    const usedOutcomes = new Set<string>();
+    const registerMock = (m: MockDef, at?: string): boolean => registerMockIn(mocks, m, at, err);
 
     const scenarioIds: Record<string, string[]> = {};
     // flow({ from }) 接力：按依赖顺序编译，被接的场景先编译，记下它结尾的路径与导演层；
@@ -405,7 +409,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         continue;
       }
       // 写法 v2：点击步骤先执行被点元素的 onClick，再执行步骤自己写的效果。页面跟踪（go / back）看得到合并后的效果。
-      const fl = Object.assign(Object.create(Object.getPrototypeOf(authored)) as typeof authored, authored, { steps: withElementEvents(authored.steps, start, eventOf, warn) });
+      const fl = Object.assign(Object.create(Object.getPrototypeOf(authored)) as typeof authored, authored, { steps: expandSteps(authored, start, { eventOf, warn, err, registerMock, usedOutcomes }) });
       for (const c of fl.opts.cases ?? []) {
         if (!fdef?.cases?.[c]) err('UNKNOWN_CASE', `Scenario ${sid} covers case "${c}", which is not in feature.cases`, fl.source);
         else (scenarioIds[c] ??= []).push(sid);
@@ -503,12 +507,17 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       const seen = new Map<string, { json: string; at?: string }>();
       for (const scene of viewScenes) for (const [target, ev] of sceneEvents.get(scene.id) ?? []) {
         const effects: Step['effects'] = [];
-        for (const e of ev.effects) {
+        const local = (e: EffectDef, at?: string) => {
           if (e.type === 'go') {
-            if (!ctxRoutes.has(e.route)) { err('UNKNOWN_ROUTE', `onClick go("${e.route}") on ${target} navigates to an unknown route`, ev.at); continue; }
+            if (!ctxRoutes.has(e.route)) { err('UNKNOWN_ROUTE', `go("${e.route}") reached by clicking ${target} navigates to an unknown route`, at); return; }
             effects.push({ type: 'navigate', sceneId: sceneOf(e.route) });
           } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
           else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
+        };
+        for (const e of ev.effects) {
+          // 观众接管时，模拟请求用第一个结果；只取本地效果（完成、旁白、镜头属于剧本）
+          if (e.type === 'call') { if (registerMock(e.mock, ev.at)) for (const r of Object.values(e.mock.outcomes)[0]!.effects) local(r, Object.values(e.mock.outcomes)[0]!.source ?? ev.at); }
+          else local(e, ev.at);
         }
         const parsed = effects.map(e => Effect.safeParse(e));
         if (parsed.some(r => !r.success)) { err('EVENT_EFFECT_INVALID', `onClick on ${target} writes an invalid state path or value`, ev.at); continue; }
@@ -526,6 +535,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         free[key] = { action: { type: 'click', target }, effects: parsed.map(r => r.data!), ...(ev.at && rel(ev.at) ? { source: rel(ev.at)! } : {}) };
       }
     }
+    for (const m of mocks.values()) for (const [k, r] of Object.entries(m.outcomes))
+      if (!usedOutcomes.has(`${m.name}:${k}`)) warn('MOCK_OUTCOME_UNUSED', `Outcome ${k} of mock ${m.name} is not shown by any slice of work ${qid}; add a slice that picks it with flow(…, { api: { ${m.name}: ['${k}'] } }), or delete the outcome`, r.source ?? m.source);
     if (fdef) out.features[fid].alternatives[qid] = { decisionFocus: strip ? '' : def.focus ?? '', tradeoffs: strip ? [] : def.tradeoffs ?? [], coverage };
     out.works[qid] = {
       ...(Object.keys(free).length ? { free } : {}),
@@ -1042,7 +1053,7 @@ type NodeCtx = { host: PluginCompiler; plugins: Record<string, PluginInfo>; repo
 type ElementEvent = { effects: EffectDef[]; at?: string };
 type SceneEvents = Map<string, ElementEvent>;
 /** 元素事件里允许的效果：会改变画面状态的本地效果，加上规则关联。完成、镜头、朗读、插件效果属于剧本步骤。 */
-const EVENT_EFFECTS = new Set(['set', 'append', 'toast', 'go', 'uses']);
+const EVENT_EFFECTS = new Set(['set', 'append', 'toast', 'go', 'uses', 'call']);
 /** onClick={effect} 或 onClick={[effect, [effect]]}；不是效果时返回 null。 */
 function eventEffects(v: unknown): EffectDef[] | null {
   const out: EffectDef[] = [];
@@ -1201,27 +1212,74 @@ function stepRouteBefore(steps: StepDef[], i: number, start: string): string {
   return route;
 }
 
+type ExpandCtx = {
+  eventOf: (route: string, target: string) => ElementEvent | undefined;
+  warn: (code: string, message: string, at?: string) => void;
+  err: (code: string, message: string, at?: string) => void;
+  registerMock: (m: MockDef, at?: string) => boolean;
+  usedOutcomes: Set<string>;
+};
 /**
- * 写法 v2：把被点元素的 onClick 合并进点击步骤（元素效果在前，步骤自己的效果在后）。
- * 按与 stepRouteBefore 相同的顺序跟踪路径，并且看得到合并进来的 go()，所以元素跳页之后的步骤在新页面上找目标。
+ * 写法 v2：展开作者写的步骤。
+ * 1. 点击步骤先执行被点元素的 onClick，再执行步骤自己的效果。
+ * 2. 效果里的模拟请求（mock）从这一步取出，在它后面接一个系统步骤：结果按 flow({ api }) 依次取，缺省第一个；每次调用恰好用掉一个。
+ * 路径跟踪与 stepRouteBefore 同一顺序，看得到合并进来的 go() 和结果里的 go()。
  */
-function withElementEvents(steps: StepDef[], start: string, eventOf: (route: string, target: string) => ElementEvent | undefined, warn: (code: string, message: string, at?: string) => void): StepDef[] {
+function expandSteps(fl: { steps: StepDef[]; opts: FlowOpts; source?: string }, start: string, c: ExpandCtx): StepDef[] {
+  const queue = new Map<string, string[]>();
+  const api = fl.opts.api as unknown;
+  if (api !== undefined) {
+    if (!api || typeof api !== 'object' || Array.isArray(api) || Object.values(api).some(v => !Array.isArray(v) || v.some(x => typeof x !== 'string')))
+      c.err('FLOW_API_INVALID', `flow({ api }) maps a mock name to the outcomes this slice uses in order, for example api: { sendInvite: ['timeout', 'ok'] }; got ${JSON.stringify(api)}`, fl.source);
+    else for (const [k, v] of Object.entries(api as Record<string, string[]>)) queue.set(k, [...v]);
+  }
   let route = start;
   const stack: string[] = [];
-  return steps.map((st) => {
+  const out: StepDef[] = [];
+  const emit = (st: StepDef) => {
+    out.push(st);
+    for (const e of st.effects) if (e.type === 'go') { stack.push(route); route = e.route; }
+  };
+  for (const st of fl.steps) {
     if (st.action.type === 'back') route = stack.pop() ?? route;
-    let next = st;
+    let effects = st.effects;
     const target = st.action.type === 'click' ? st.action.target : null;
-    const ev = target ? eventOf(route, target) : undefined;
+    const ev = target ? c.eventOf(route, target) : undefined;
     if (target && ev) {
       const writes = new Set(ev.effects.flatMap(e => e.type === 'set' || e.type === 'append' ? [e.path] : []));
-      const repeated = (st.effects as EffectDef[]).find((e): e is Extract<EffectDef, { type: 'set' | 'append' }> => (e.type === 'set' || e.type === 'append') && writes.has(e.path));
-      if (repeated) warn('STEP_REPEATS_EVENT', `This click on ${target} writes ${repeated.path}, which its onClick already writes; delete the write from the step (onClick runs first, then the step's own effects)`, st.source);
-      next = { ...st, effects: [...ev.effects, ...st.effects] };
+      const repeated = st.effects.find((e): e is Extract<EffectDef, { type: 'set' | 'append' }> => (e.type === 'set' || e.type === 'append') && writes.has(e.path));
+      if (repeated) c.warn('STEP_REPEATS_EVENT', `This click on ${target} writes ${repeated.path}, which its onClick already writes; delete the write from the step (onClick runs first, then the step's own effects)`, st.source);
+      effects = [...ev.effects, ...st.effects];
     }
-    for (const e of next.effects) if (e.type === 'go') { stack.push(route); route = e.route; }
-    return next;
-  });
+    const calls = effects.filter((e): e is Extract<EffectDef, { type: 'call' }> => e.type === 'call');
+    emit(effects === st.effects && !calls.length ? st : { ...st, effects: effects.filter(e => e.type !== 'call') });
+    for (const { mock: m } of calls) {
+      if (!c.registerMock(m, st.source)) continue;
+      const q = queue.get(m.name);
+      const pick = q ? q.shift() : Object.keys(m.outcomes)[0];
+      if (pick === undefined) { c.err('MOCK_OUTCOMES_EXHAUSTED', `This step calls ${m.name} again, but flow({ api: { ${m.name}: [...] } }) has no outcome left; list one outcome per call, in order`, st.source); continue; }
+      if (!Object.hasOwn(m.outcomes, pick)) { c.err('MOCK_OUTCOME_UNKNOWN', `${m.name} has no outcome "${pick}" (outcomes: ${Object.keys(m.outcomes).join(', ')})`, fl.source ?? st.source); continue; }
+      const r = m.outcomes[pick]!;
+      c.usedOutcomes.add(`${m.name}:${pick}`);
+      const at = r.source ?? st.source;
+      emit({ kind: 'system', action: { type: 'event', name: r.name }, ...(r.caption ? { caption: r.caption } : {}), effects: [...r.effects], ...(at ? { source: at } : {}) });
+    }
+  }
+  for (const [name, q] of queue) if (q.length) c.err('MOCK_OUTCOMES_LEFTOVER', `flow({ api: { ${name}: [...] } }) lists ${q.length} more outcome(s) (${q.join(', ')}) than this slice calls ${name}; each call uses exactly one`, fl.source);
+  return out;
+}
+
+const canonicalMock = (m: MockDef) => JSON.stringify(m.outcomes, (k, v) => (k === 'source' ? undefined : v));
+/** 登记一件作品里的模拟请求：校验形状；同名但内容不同的两个请求报冲突。 */
+function registerMockIn(mocks: Map<string, MockDef>, m: MockDef, at: string | undefined, err: (code: string, message: string, at?: string) => void): boolean {
+  const outcomes = m && typeof m.outcomes === 'object' && m.outcomes ? Object.values(m.outcomes) : [];
+  const valid = !!m && typeof m.name === 'string' && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(m.name) && outcomes.length > 0
+    && outcomes.every(r => !!r && r.kind === 'response' && typeof r.name === 'string' && !!r.name.trim() && Array.isArray(r.effects) && !r.effects.some(e => e.type === 'call'));
+  if (!valid) { err('MOCK_INVALID', `mock(${JSON.stringify(m?.name)}, …) needs an id-like name and at least one outcome written as response('Event name', ...effects); a response cannot call another mock`, m?.source ?? at); return false; }
+  const prev = mocks.get(m.name);
+  if (prev && prev !== m && canonicalMock(prev) !== canonicalMock(m)) { err('MOCK_CONFLICT', `Two different mocks are named ${m.name} in this work (other: ${prev.source ?? 'unknown'}); give each request its own name`, m.source ?? at); return false; }
+  if (!prev) mocks.set(m.name, m);
+  return true;
 }
 
 /** 元素事件生成的本地反应用 on-<id> 作键；与作者写的 free 键重名时加序号。 */
