@@ -34,9 +34,9 @@ export async function inspectScore(score: string, directory: string): Promise<Lo
   return { durationMs, parts, partDurationsMs, markers: parsed.markers, credit };
 }
 export type RenderLosslessOptions = { directory:string; cacheDir:string; loop?:boolean; maxBytes?:number };
-async function sourcePCM(score:string,options:RenderLosslessOptions) {
+async function sourcePCM(score:string,options:Omit<RenderLosslessOptions,'cacheDir'> & {cacheDir?:string}) {
   if(typeof score!=='string'||!score.trim())throw new Error('Score must be nonempty');
-  if(typeof options.directory!=='string'||!options.directory.trim()||typeof options.cacheDir!=='string'||!options.cacheDir.trim())throw new Error('Provide a writable work directory and plugin cacheDir');
+  if(typeof options.directory!=='string'||!options.directory.trim())throw new Error('Provide a writable work directory');
   await fs.mkdir(options.directory,{recursive:true});
   const job=await fs.mkdtemp(path.join(options.directory,'alda-'));
   try {
@@ -50,6 +50,7 @@ async function sourcePCM(score:string,options:RenderLosslessOptions) {
 }
 /** Stable lossless author API. Uses the same PCM/master encoder as music.play, without MP3 probe/guards. */
 export async function renderLossless(score:string,options:RenderLosslessOptions):Promise<LocalArtifact & {audio:AudioRegion;info:LocalResourceInfo}> {
+  if(typeof options.cacheDir!=='string'||!options.cacheDir.trim())throw new Error('Provide an explicit plugin cacheDir');
   if(options.loop!==undefined&&typeof options.loop!=='boolean')throw new Error('loop must be boolean');
   if(options.maxBytes!==undefined&&(!Number.isInteger(options.maxBytes)||options.maxBytes<=0))throw new Error('maxBytes must be a positive integer');
   const {pcm,info}=await sourcePCM(score,options),bytes=await encodeFlac(pcm),frames=pcm[0]!.length;

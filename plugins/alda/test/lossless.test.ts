@@ -11,10 +11,11 @@ vi.mock('node:child_process',()=>({execFile:(_cmd:string,args:string[],options:a
   fs.writeFileSync(path.join(options.cwd,'score.mid'),'fixture MIDI');callback(null,'','');
  });return {};
 }}));
-vi.mock('../src/soundfont.ts',async original=>({...await original<any>(),soundfont:async()=>new Uint8Array([1])}));
+vi.mock('../src/soundfont.ts',async original=>({...await original<any>(),soundfont:vi.fn(async(_cacheDir?:string)=>new Uint8Array([1]))}));
 vi.mock('../src/render.ts',async original=>({...await original<any>(),renderPCM:async(_m:unknown,_s:unknown,_d:number,loop:boolean)=>{
  const pcm=Float32Array.from({length:loop?44100:50000},(_,i)=>Math.sin(i/31)*.1);return [pcm,pcm];
 }}));
+import {soundfont} from '../src/soundfont.ts';
 import local,{renderLossless} from '../src/local.ts';
 const roots:string[]=[];
 afterEach(()=>{state.missing=false;for(const p of roots.splice(0))fs.rmSync(p,{recursive:true,force:true});});
@@ -34,4 +35,13 @@ it('bounds bytes, validates options and explains missing pinned Alda without lea
  state.missing=true;await expect(renderLossless('piano: c1',options)).rejects.toThrow('Install Alda 2.4.8');
  expect(fs.readdirSync(options.directory)).toEqual([]);
  await expect(renderLossless('',options)).rejects.toThrow('nonempty');
+});
+
+it('preserves legacy compiler calls without cacheDir while the new file API requires it explicitly',async()=>{
+ const {options}=setup();
+ const artifact=await local.compilers.audio.compile(JSON.stringify({score:'piano: c1',loop:false}),{directory:options.directory,maxBytes:1024*1024} as any);
+ expect(artifact.bytes.length).toBeGreaterThan(0);
+ expect(vi.mocked(soundfont)).toHaveBeenLastCalledWith(undefined);
+ const {cacheDir:_cacheDir,...withoutCache}=options;
+ await expect(renderLossless('piano: c1',withoutCache as any)).rejects.toThrow('explicit plugin cacheDir');
 });
