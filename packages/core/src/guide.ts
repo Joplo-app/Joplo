@@ -32,6 +32,8 @@ export function pluginSkillIndex(plugins: readonly PluginSkillSource[]): string 
 export function findPluginTopic(topic: string, plugins: readonly PluginSkillSource[]): PluginSkillSource|null {
   const [id]=topic.replace(/^(?:plugin:|joplo-plugin-)/,'').split('/');
   if(!topic.startsWith('plugin:') && SKILL_TOPICS.some(t=>t.name===topic))return null;
+  const direct = !topic.startsWith('plugin:') && plugins.find(p=>p.id===topic.split('/')[0]);
+  if(direct)return direct;
   return plugins.find(p=>p.id===id)??null;
 }
 export function pluginSkillTopic(p: PluginSkillSource, topic?: string): string {

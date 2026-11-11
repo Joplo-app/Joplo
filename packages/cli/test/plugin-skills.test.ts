@@ -11,7 +11,7 @@ const base={kind:'plugin',apiVersion:2,id:'test',title:'Test provider',version:'
 async function config(root:string,plugins:unknown[]){await writeFile(join(root,'joplo.config.ts'),`export default ${JSON.stringify({plugins})};\n`);}
 const file=(root:string,path:string)=>join(root,'.claude/skills',path);
 test('installed plugin skill names route entries and topics, including engine-name collisions',async()=>{
- const root=await temp();await config(root,[base,{...base,id:'check',skill:'Plugin check entry.'}]);
+ const root=await temp();await config(root,[base,{...base,id:'check',skill:'Plugin check entry.'},{...base,id:'joplo-plugin-direct',skill:'Existing prefixed plugin id.'}]);
  const cwd=process.cwd();process.chdir(root);
  const read=async(topic:string)=>{let output='';const code=await runCli(['skill',topic],{stdout:s=>{output+=s;},stderr:s=>{output+=s;},loadServer:async()=>{throw Error('guide reads must not load server');}});return {code,output};};
  try {
@@ -19,6 +19,8 @@ test('installed plugin skill names route entries and topics, including engine-na
   expect(await read('joplo-plugin-test/recipe')).toEqual(await read('test/recipe'));
   expect(await read('joplo-plugin-check')).toEqual(await read('plugin:check'));
   expect((await read('check')).output).not.toContain('Plugin check entry.');
+  expect((await read('joplo-plugin-direct')).output).toContain('Existing prefixed plugin id.');
+  expect(await read('joplo-plugin-joplo-plugin-direct')).toEqual(await read('plugin:joplo-plugin-direct'));
   const disabled=await read('joplo-plugin-missing');
   expect(disabled.code).toBe(2);expect(disabled.output).toContain('not enabled in config.plugins');expect(disabled.output).not.toContain('Did you mean plugins');
   const missing=await read('joplo-plugin-test/missing');
