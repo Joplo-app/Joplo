@@ -53,6 +53,8 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 - data declares text and scope projections for node/step slots. Missing projection stops scoped publication; never leave cut content merely hidden in DOM. Translation changes only declared display paths, not ids, colors or structural values.
 
 ## Local resources and media
+- Read-only local compiler inspect(input, { directory, projectDir }) receives the project root to resolve relative source files and a temporary job directory. It receives no keys or allowSpend, and its process environment excludes account credential variables. This is a capability convention, not a filesystem sandbox: plugins remain trusted local code. Do not generate paid artifacts during inspection.
+- Resource references are objects, not URLs. Pass localResource(...) directly to a prop supported by its plugin; interpolating it into CSS url() produces JavaScript’s default object-string representation and LOCAL_RESOURCE_STRINGIFIED. This diagnostic recognizes that broken form in style and direct src/href/poster fields, not arbitrary prose or every possible string conversion. Use asset() for embedded CSS image URLs.
 - Node props can use localResource(plugin, compiler, input) from kit/plugin. The compiler extracts author-only input into ResourceRequest and leaves an opaque reference in IR; the renderer resolves it from the scoped asset table. No description or credentials belong in public IR.
 - Optional Node local entry exposes text-to-resource compilers. The host caches by compiler version/code and exact input, coalesces requests and records warnings for local failures. Requests/source text are not public IR.
 - A compiler may declare persistent:true and estimate(input):{credits}; its compile context receives projectDir, keys and allowSpend. Persistent output must be checked before credentials/network, and remains authoritative across compiler code updates. Only the explicit resources command grants allowSpend after displaying each estimate; ordinary host calls pass false. Do not infer permission from a configured key.
@@ -67,4 +69,4 @@ The starter does not include 3D or its large browser dependency. To add it: npm 
 Run typecheck and relevant schema, compiler, projection and real-browser tests. Use a second unrelated plugin to test generic hooks. Pack and install into an isolated project, enable it explicitly, check/build/render and test playback without network. Keep skill, manifest, runtime and package exports at the same version.
 
 Related topics: authoring, demo, check, publish
-<!-- joplo-skill 0.7.1 sha256:dc4c0e94e8e593eebf50c9a11808fb28084f4b3da934a71469cf91bfd826a238 -->
+<!-- joplo-skill 0.7.1 sha256:c3c773b95bc6207588f6105686a55cfcf7879ea228d009e543301373c08ee721 -->

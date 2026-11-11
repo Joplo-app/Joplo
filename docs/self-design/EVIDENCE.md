@@ -203,3 +203,11 @@
 公开文字主动写在场景画面里，不依赖私有 review manifest。没有新增 `origin: user / status: confirmed` 规则，也没有替原用户批准未决项。当前 npm/Cloud 发布状态与版面审查边界直接显示，后续验收有新证据时应更新此处及同一场景，而不是悄悄改写历史场景。
 
 本次整理验证：`joplo check examples/joplo` 为 0 error（保留历史方案既有的 16 warning / 40 info）；项目类型检查以 Node 类型声明执行通过；普通 build 通过，129 个文件，三个 `source_update` 场景分别含 3 / 2 / 4 步并进入公开构建。使用当前 checkout、独立 JOPLO_HOME 的静态渲染逐帧核对三组场景，宿主角标和旁白条未遮挡正文。Pen 当前连接的是另一 worktree 的共享画布，因此未修改该画布，沿用既有 UI 组件与视觉约定。没有启动或停止其他 worktree 的看板，没有生成付费声音或素材。
+
+### 2026-11 资源局部生成范围（根据源码整理，待本轮发行）
+
+保留 `model_assets.a-explicit.generate`，在既有生成流程中追加“限定当前作品”系统步骤，展示 `resources --work <qid> --dry-run`。来源为 issue #117 与本轮 `loadAuthoring` / `resources-run.ts` 源码及真实 CLI 离线测试，不构成人工批准记录。未选作品模块不求值；共享配置、布局和路由仍需有效；未使用的共享页面资源不会扩大生成计划，跨作品接续依赖未包含时明确报错。这里的命令是场景文字，不执行生成、不请求付费资源，也不表示本轮已发布。
+
+沿用既有模型状态页、组件和场景，不调整布局或新增平行项目。可复用的范围选择与依赖失败边界已同步引擎 authoring 及 3D generation 指南；资源对象应直接传 prop、不能插值成 CSS URL 的经验已同步 plugins 与 UI 指南。
+
+本轮验证：`joplo check examples/joplo` 为 0 error / 16 warning / 41 info；当前 checkout 普通 build 通过。修改仅追加既有系统步骤与状态文案，未修改页面布局。资源与技能相关 72 项测试及仓库类型检查通过；实际读取 authoring/plugins/ui/scene3d-generation 技能，并运行限定作品的 CLI JSON dry-run。

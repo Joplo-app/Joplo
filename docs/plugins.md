@@ -189,7 +189,7 @@ diagram 的独立包交付已完成；阶段 1 的其他扩展点、其他第一
 
 ### Node 本机能力
 
-- `PluginDef.local` 指向 Node 入口；默认导出 `PluginLocal`：`compilers[name] = { version, mime, inspect?, timeoutMs?, compile(input, { directory, maxBytes, home }) }`。返回 `Uint8Array`，临时文件写入宿主提供的工作目录；经校验的共享音色缓存放 home。可选 inspect 返回时长/marker/声部等本机数据，供最终同步编译的 ctx.resourceInfo 使用，不下载音色、不渲染、不付费。
+- `PluginDef.local` 指向 Node 入口；默认导出 `PluginLocal`：`compilers[name] = { version, mime, inspect?, timeoutMs?, compile(input, { directory, projectDir, maxBytes, cacheDir, keys, allowSpend }) }`。返回 `Uint8Array`，临时文件写入宿主提供的工作目录；插件私有缓存写入 cacheDir。可选 inspect(input, { directory, projectDir }) 可相对项目根目录读取源文件；directory 仍是临时工作目录，不提供 keys/allowSpend，子进程不继承凭证环境变量。这是可信本机代码的调用约定，并非文件系统沙箱。inspect 返回时长/marker/声部等本机数据，供最终同步编译的 ctx.resourceInfo 使用，不下载音色、不渲染、不付费。
 - effect 钩子通过 `ctx.resource({ compiler, input })` 登记请求并取得不透明资源 id，再由原有 effect 宿主物化、校验返回的 `media` 命令。请求表与 local 路径只在 `CompileOutcome.resources`，不进入 IR，也不使用公开 ext 槽位传递源码。
 - `LocalResources` 将本机入口及依赖打成 Node 模块，放在项目 `.joplo/resources/`；独立子进程执行编译，缺省硬超时 30 秒（声明 timeoutMs 可延长、上限180秒），输出上限50MiB。Alda 供应商另在 25 秒停止自身命令，失败提供可读信息。macOS/Linux 超时结束整个进程组；临时目录始终清理。
 - 缓存键为 SHA-256(plugin id、compiler id、含 version 声明的编译器代码、精确输入文本)。代码变化也失效，不对文本空白做归一化。成功产物原子写入缓存；内存请求合并与磁盘租约分别覆盖同进程和跨进程并发，已有产物不再编译。失败不持久缓存，修复工具或源码后可重试。

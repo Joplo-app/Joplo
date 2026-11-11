@@ -95,9 +95,9 @@ export class LocalResources {
           const script = `import {pathToFileURL} from 'node:url';
             let s=''; for await(const c of process.stdin)s+=c; const r=JSON.parse(s);
             try { const c=(await import(pathToFileURL(r.entry).href)).default.compilers[r.compiler];
-              process.stdout.write(JSON.stringify({info:await c.inspect(r.input,{directory:r.directory})}));
+              process.stdout.write(JSON.stringify({info:await c.inspect(r.input,{directory:r.directory,projectDir:r.projectDir})}));
             }catch(e){process.stdout.write(JSON.stringify({error:String(e.message)}));process.exitCode=1;}`;
-          const child = spawn(process.execPath, ['--input-type=module', '-e', script], { cwd: job, stdio: ['pipe', 'pipe', 'ignore'], detached: process.platform !== 'win32' });
+          const child = spawn(process.execPath, ['--input-type=module', '-e', script], { cwd: job, env: compilerEnvironment(), stdio: ['pipe', 'pipe', 'ignore'], detached: process.platform !== 'win32' });
           let output = '', settled = false;
           const finish = (error?: Error, value?: LocalResourceInfo) => {
             if (settled) return; settled = true; clearTimeout(timer);
@@ -108,7 +108,7 @@ export class LocalResources {
           child.stdout.on('data', b => { output += b; if (output.length > 128 * 1024) finish(new Error('Local resource metadata exceeds 128 KiB')); });
           child.on('error', e => finish(e));
           child.on('close', status => { try { const r = JSON.parse(output); if (status || !r.info || typeof r.info !== 'object') throw new Error(r.error || 'Invalid resource metadata'); finish(undefined, r.info); } catch(e) { finish(e as Error); } });
-          child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify({ entry, compiler: request.compiler, input: request.input, directory: job }));
+          child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify({ entry, compiler: request.compiler, input: request.input, directory: job, projectDir: this.directory }));
         });
         const tmp = `${cache}.${crypto.randomUUID()}.tmp`; fs.writeFileSync(tmp, JSON.stringify(info)); fs.renameSync(tmp, cache);
         return { info };

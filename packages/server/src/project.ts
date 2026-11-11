@@ -66,7 +66,7 @@ function jsxRuntimeMissing(e: unknown): string | boolean {
 
 const JSX_HINT = "was compiled without Joplo's JSX runtime. TSX outside the project uses the JSX settings of its nearest tsconfig.json: give that folder a tsconfig.json with jsx: \"react-jsxdev\" and jsxImportSource: \"@joplo-app/kit\", or start the file with /** @jsxRuntime automatic */ /** @jsxImportSource @joplo-app/kit */";
 
-export async function compileProject(server: ViteDevServer, projectDir: string, mode: CompileMode): Promise<CompileOutcome> {
+export async function compileProject(server: ViteDevServer, projectDir: string, mode: CompileMode, options: { work?: string } = {}): Promise<CompileOutcome> {
   const errorAt = new Map<string, string>(); // 载入失败的文件（绝对路径）→ 精确位置
   const importer = async (abs: string) => {
     try {
@@ -86,7 +86,7 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
       throw e instanceof Error ? e : new Error(msg);
     }
   };
-  const loaded = await loadAuthoring(projectDir, importer);
+  const loaded = await loadAuthoring(projectDir, importer, options);
   const rel = (abs: string) => path.relative(projectDir, abs).split(path.sep).join('/');
   const byRel = new Map([...errorAt].map(([abs, at]) => [rel(abs), at]));
   const seen = new Set<string>();

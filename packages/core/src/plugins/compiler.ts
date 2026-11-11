@@ -155,8 +155,10 @@ export class PluginCompiler {
         this.report('PLUGIN_PROPERTY_INVALID', `Plugin ${plugin.id}: ${key} requires a literal ${spec.type}${spec.min !== undefined ? ` >= ${spec.min}` : ''}${spec.max !== undefined ? ` <= ${spec.max}` : ''}${spec.nonempty ? ' (nonempty)' : ''}${spec.values ? ` (one of ${spec.values.join(', ')})` : ''}`, node.source);
     }
   }
-  private resourceProps(value: unknown, source?: string): unknown {
-    if (Array.isArray(value)) return value.map(v => this.resourceProps(v, source));
+  private resourceProps(value: unknown, source?: string, context: 'css' | 'url' | '' = ''): unknown {
+    if (typeof value === 'string' && (context === 'url' && value === '[object Object]' || context === 'css' && /url\(\s*["']?\[object Object\]["']?\s*\)/i.test(value)))
+      this.report('LOCAL_RESOURCE_STRINGIFIED', 'A resource URL contains [object Object]: an object was interpolated into a string. Pass localResource(...) directly to a resource-aware prop; resource references cannot be embedded in CSS strings.', source);
+    if (Array.isArray(value)) return value.map(v => this.resourceProps(v, source, context));
     if (!object(value)) return value;
     if (value.kind === 'local-resource') {
       const { plugin, compiler, input } = value;
@@ -168,7 +170,7 @@ export class PluginCompiler {
       if (!id) { id = `resource-${this.resourceIds.size}`; this.resourceIds.set(key, id); this.resourceOwners.set(id, plugin); this.resourceRequests.set(id, { plugin, compiler, input }); this.options.onResource?.({ id, plugin, compiler, input, source }); }
       return `joplo-resource:${id}`;
     }
-    return { ...value, ...Object.fromEntries(Object.entries(value).map(([k,v]) => [k, this.resourceProps(v, source)])) };
+    return { ...value, ...Object.fromEntries(Object.entries(value).map(([k,v]) => [k, this.resourceProps(v, source, context === 'css' || k === 'style' ? 'css' : ['src', 'href', 'poster'].includes(k) ? 'url' : '')])) };
   }
   node(node: JNode, ids: ReadonlyMap<string, string | undefined>): JNode {
     node = { ...node, props: this.resourceProps(node.props, node.source) as JNode['props'] };

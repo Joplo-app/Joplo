@@ -621,15 +621,18 @@ prepare 的返回基线是权威值；用它编译旧版，不能继续使用候
 
 组件目录由 config.plugins 生成：`joplo components` 列出启用插件的组件，`joplo skill ui/components` 读取 UI 专题；`joplo components ui:Button` 或唯一短名 `Button` 输出属性和例子。作者直接从插件包导入，不再使用 kit/ui 或 kit.trace；未启用插件时报安装与配置诊断。
 
-### `joplo resources [dir] [--dry-run] [--allow-spend] [--format json]`
+### `joplo resources [dir] [--work <qid>] [--dry-run] [--allow-spend] [--format json]`
 
 生成源码声明的持久本机资源（例如启用 Tripo 后的模型）。`--dry-run` 列出每项估计 credits，不联网、不生成。普通终端逐项显示费用后询问；非交互/JSON 模式不询问，也默认不花钱，只有显式 `--allow-spend` 才授权所展示的估计。已有项目产物直接复用、费用 0。拒绝生成或失败返回诊断与非零退出码，dry-run 仅估算。
 
 ```sh
 npx joplo resources --dry-run
+npx joplo resources --work intro --dry-run  # 独立作品键，或 feature.option
 npx joplo resources                 # 逐项确认
 npx joplo resources --allow-spend   # 已获得用户授权时的非交互调用
 ```
+
+--work 在模块载入前限定作品，其他作品的载入/编译错误不阻塞该任务；共享 config/routes/layouts 仍须有效。选择范围之外的跨作品引用会明确失败，不会自动扩大付费范围。
 
 check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同名 JSON 提交 Git，队友和 CI 不需要 Key；丢失输出时先从 Git 恢复。超时/断网后重新运行 resources 续查已记录 task_id；unknown/creating 日志必须先从供应商任务历史恢复，不能删日志盲重试。Key 在看板 Voice → 管理密钥 → Tripo 保存（本机 0600），或使用 TRIPO_API_KEY，不写项目配置。版本对应详细用法：`joplo skill scene3d/generation`、`joplo skill scene3d/models`。
 

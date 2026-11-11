@@ -283,10 +283,10 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         await withWatchSignal(signal => watchCloudFeedback(client, shareId, opts, { out: stdout, err: stderr }, signal));
       }
     });
-  program.command('resources').argument('[dir]', 'Project directory', '.').option('--dry-run', 'List missing persistent resources and estimated credits').option('--allow-spend', 'Authorize the displayed generation estimates').addOption(format()).action(async (dir, opts) => {
+  program.command('resources').argument('[dir]', 'Project directory', '.').option('--work <qid>', 'Generate resources for one independent work key or qualified option id').option('--dry-run', 'List missing persistent resources and estimated credits').option('--allow-spend', 'Authorize the displayed generation estimates').addOption(format()).action(async (dir, opts) => {
     const generateResources = await serverFunction('generateResources');
     const interactive = deps.interactive ?? (!!process.stdin.isTTY && !!process.stderr.isTTY && !process.env.CI);
-    const data = await generateResources(resolve(dir), { dryRun: !!opts.dryRun, allowSpend: !!opts.allowSpend, onProgress: s => stderr(`${s}\n`), confirm: interactive && opts.format !== 'json' ? deps.ask ?? (async message => {
+    const data = await generateResources(resolve(dir), { work: opts.work, dryRun: !!opts.dryRun, allowSpend: !!opts.allowSpend, onProgress: s => stderr(`${s}\n`), confirm: interactive && opts.format !== 'json' ? deps.ask ?? (async message => {
       const { createInterface } = await import('node:readline/promises');
       const rl = createInterface({input:process.stdin,output:process.stderr});
       try { return /^(y|yes)$/i.test((await rl.question(`${message} [y/N] `)).trim()); } finally { rl.close(); }
