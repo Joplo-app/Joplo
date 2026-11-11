@@ -1,3 +1,4 @@
+import type { FrameReadiness } from '../runtime/frame-readiness';
 import { useScrollState } from './scroll-state';
 import { useEngineAnimations } from './engine-animations';
 import { EngineClockContext } from './engine-motion';
@@ -55,6 +56,8 @@ export function pickTarget(el: HTMLElement, mode: RenderMode, inspect = false): 
 const STILL_CLOCK: ClockFrame = { timeMs: 0, elapsedMs: 0, rawMs: 0, running: false, speed: 1 };
 const noClock: ClockSource = { subscribe: () => () => {}, getSnapshot: () => STILL_CLOCK };
 export type StageProps = {
+  sampling?:boolean;
+  frameReadiness?:FrameReadiness;
   playground?: Playground | null;
   freeMode?: boolean;
   clock?: ClockSource;
@@ -119,7 +122,7 @@ function scrollsItself(target: EventTarget | null, root: HTMLElement, dy: number
   return false;
 }
 
-export function Stage({ project, state, theme, mode, selectedId = null, preview = null, activeStep = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false, font = null, stroke: strokeOverride = null, stream = null, playground = null, freeMode = false, clock, gesture = null, onStageInput, onAction, inputs = 0 }: StageProps) {
+export function Stage({ sampling=false,frameReadiness, project, state, theme, mode, selectedId = null, preview = null, activeStep = null, animate = true, registry = null, nextTargetId = null, epoch = 0, onNodeClick, stageRef, overlay, viewportOverride = null, camera = null, sceneId = null, zoom = null, inspect: inspectMode = false, font = null, stroke: strokeOverride = null, stream = null, playground = null, freeMode = false, clock, gesture = null, onStageInput, onAction, inputs = 0 }: StageProps) {
   const { t: i18n } = useI18n();
   // 只在运行 / 暂停 / 倍速变化时重渲染整个舞台；逐帧的呈现器自己订阅 useEngineFrame()
   const frame = useSyncExternalStore((clock ?? noClock).subscribe, () => coarseFrame(clock ?? noClock), noClock.getSnapshot);
@@ -177,7 +180,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   }, [resetKey]);
   const cam = useCamera(camera, { width: vp.width, height: vp.height, animate, clock, deps: [state, scene], user, establish: project.autoFocus !== false });
   usePluginObservers(rootRef, Object.keys(project.plugins ?? {}), {
-    frame: { clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, inputs: inputCount, mode, animate, scenarioId: state.scenarioId, sceneId: shownId, position: state.position, focus: camera?.targets ?? null, nextTarget: nextTargetId, selectedId, theme }, ext: ext ?? {},
+    frame: { sampling, clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, inputs: inputCount, mode, animate, scenarioId: state.scenarioId, sceneId: shownId, position: state.position, focus: camera?.targets ?? null, nextTarget: nextTargetId, selectedId, theme }, ext: ext ?? {},
   });
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -497,7 +500,7 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
         {/* 镜头包住画面内容与弹窗层（它们一起平移缩放）；Toast 与演示覆盖层在镜头之外 */}
         <div ref={cam.wrapRef} className="absolute inset-0" style={{ transformOrigin: '0 0' }} data-jcamera={camera ? '' : undefined}>
           {scene ? (
-            <RenderContext.Provider value={{ assets: project.mediaAssets, act: onAction ? (target, action, native) => onAction(pluginAction({ ...action, target }), native ? pluginAction(native) : undefined) : undefined, hover: id => hover.current?.move(id), interactive: !!onAction && mode === 'demo' && !inspectMode, draggable: onAction ? draggable : undefined, clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, inputs: inputCount, scene, stage: rootRef.current, state: viewState, mode, selectedId, preview: shownPreview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, ext, streaming, changed, plugins: project.plugins, nextTargetId }}>
+            <RenderContext.Provider value={{ sampling,frameReadiness, assets: project.mediaAssets, act: onAction ? (target, action, native) => onAction(pluginAction({ ...action, target }), native ? pluginAction(native) : undefined) : undefined, hover: id => hover.current?.move(id), interactive: !!onAction && mode === 'demo' && !inspectMode, draggable: onAction ? draggable : undefined, clock: clock ? frame : undefined, gesture, playground: !!playground?.effects.length, resetKey: `${shownId}:${epoch}`, inputs: inputCount, scene, stage: rootRef.current, state: viewState, mode, selectedId, preview: shownPreview, dialogLayer, animate, width: vp.width, focus: camera?.targets.length ? camera.targets : null, ext, streaming, changed, plugins: project.plugins, nextTargetId }}>
               {/* 换层（换画面）时淡入 */}
               <motion.div key={shownId} className="absolute inset-0" ref={cam.contentRef} initial={animate ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
                 <RenderNode node={scene.root} />

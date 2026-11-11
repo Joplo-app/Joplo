@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import lottie from 'lottie-web/build/player/lottie_light.js';
 import { defineRuntime, embeddedAsset, type ComponentCtx } from '@joplo-app/kit/plugin';
 import { useEngineFrame, useRoot } from '@joplo-app/kit/renderer';
-import { presentDecodedFrame } from './video-frame.ts';
+import { presentDecodedFrame, seekVideoFrame } from './video-frame.ts';
 import type { ClipFrame } from './model.ts';
 
 /**
@@ -17,7 +17,7 @@ const num = (v: unknown, d?: number) => (typeof v === 'number' && Number.isFinit
 /** 片段这一步要逐帧定位：只在它在播时订阅每一帧（D99）。 */
 function useClipTime(ctx: ComponentCtx, clip: ClipFrame | undefined): { t: number; playing: boolean } {
   const clock = ctx.frame.clock;
-  useEngineFrame(!!clip?.live && ctx.frame.animate && !!clock);
+  useEngineFrame((!!clip?.live || !!ctx.frame.sampling) && ctx.frame.animate && !!clock);
   return timeOf(ctx, clip);
 }
 
@@ -42,10 +42,16 @@ function Video({ ctx }: { ctx: ComponentCtx }) {
   const { src: _s, w, h, fit, start: _st, ...rest } = p;
   const root = useRoot(node, rest, { style: { width: num(w) ?? '100%', height: num(h) ?? 'auto', position: 'relative', overflow: 'hidden', borderRadius: 10, background: '#000' } });
   const speed = ctx.frame.clock?.speed ?? 1;
+  const sampleTime=ctx.frame.sampling?(ctx.frame.clock?.timeMs??0):0;
   useLayoutEffect(() => {
     const v = ref.current;
     if (!v) return;
     v.playbackRate = speed;
+    if(ctx.frame.sampling){
+      if(!canvas.current)return;
+      const image=canvas.current;
+      return ctx.frameReady(signal=>seekVideoFrame(v,image,t,signal,()=>setFrozen(true)));
+    }
     if (playing) {
       setFrozen(false);
       if (Math.abs(v.currentTime - t) > 0.25) v.currentTime = t;
@@ -68,7 +74,7 @@ function Video({ ctx }: { ctx: ComponentCtx }) {
     seek();
     const timer = setTimeout(release, 5000);
     return () => { clearTimeout(timer); v.removeEventListener('loadedmetadata',seek); v.removeEventListener('seeked', ready); v.removeEventListener('loadeddata', loaded); release(); };
-  }, [t, playing, speed, src]);
+  }, [t, playing, speed, src, sampleTime, ctx.frame.sampling, ctx.frame.resetKey, ctx.frame.scenarioId]);
   if (!src) return <div {...root} />;
   return (
     <div {...root}>

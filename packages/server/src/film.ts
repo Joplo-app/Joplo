@@ -127,6 +127,22 @@ async function flush(page: Page) {
   })`);
 }
 
+export async function waitForSample(page:Page,atMs:number,timeoutMs=10000,signal?:AbortSignal) {
+  const started=Date.now();let stable:number|undefined;
+  try {for(;;){
+    if(signal?.aborted)throw new JoploError('RENDER_FAILED',`Sample cancelled at ${atMs} ms`);
+    await flush(page);
+    const status=await page.evaluate(()=> (window as unknown as {__JOPLO_RECORD__?:{frameStatus?():{pending:number;error:string|null;revision?:number}}}).__JOPLO_RECORD__?.frameStatus?.()??{pending:0,error:null});
+    if(status.error)throw new JoploError('RENDER_FAILED',`Presentation failed at ${atMs} ms: ${status.error}`);
+    if(!status.pending){const revision=status.revision??0;if(stable===revision)return;stable=revision;}else stable=undefined;
+    if(Date.now()-started>=timeoutMs)throw new JoploError('RENDER_FAILED',`Presentation timed out at ${atMs} ms after ${timeoutMs} wall-clock ms (${status.pending} pending); complete or cancel frameReady tasks before capture`);
+    await page.waitForTimeout(5);
+  }}catch(error){
+    await page.evaluate(()=> (window as unknown as {__JOPLO_RECORD__?:{cancelFrame?():void}}).__JOPLO_RECORD__?.cancelFrame?.()).catch(()=>{});
+    throw error;
+  }
+}
+
 function check(opts: { projectDir: string; out: string; overwrite?: boolean }) {
   const out = path.resolve(opts.out);
   assertNotProjectData(opts.projectDir, out);
@@ -153,12 +169,12 @@ function videoDimension(name: string, v: number) {
   return v;
 }
 
-function recordUrl(base: string, projectId: string, project: Project, o: { scenarioId: string; theme?: string; chain?: boolean; audio?: boolean; locale?: string; content?: string; voice?: 'real' | 'estimate' | 'off'; hide?: readonly string[]; logicalViewport?: { width: number; height: number }; noFrame?: boolean; canvas?: { width: number; height: number } }) {
+function recordUrl(base: string, projectId: string, project: Project, o: { scenarioId: string; theme?: string; chain?: boolean; sampling?:boolean; audio?: boolean; locale?: string; content?: string; voice?: 'real' | 'estimate' | 'off'; hide?: readonly string[]; logicalViewport?: { width: number; height: number }; noFrame?: boolean; canvas?: { width: number; height: number } }) {
   if (!project.scenarios[o.scenarioId]) throw new JoploError('NOT_FOUND', `Scenario does not exist: ${o.scenarioId} (available: ${Object.keys(project.scenarios).join(', ') || 'none'})`);
   if (o.content !== undefined && !project.i18n?.locales.includes(o.content))
     throw new JoploError('USAGE', project.i18n ? `--content ${o.content} is not in config locales (${project.i18n.locales.join(', ')})` : `--content needs config({ locales }); this project has a single language`);
   const voice = o.voice ?? 'estimate';
-  const q = new URLSearchParams({ render: '1', project: projectId, scenario: o.scenarioId, position: '0', theme: o.theme ?? project.theme ?? 'sketch', frame: '1', record: '1', ...(voice !== 'off' ? { voice } : {}), ...(o.chain ? { chain: '1' } : {}), ...(o.audio === false ? {audio:'0'} : {}), ...(o.locale ? { locale: o.locale } : {}), ...(o.content ? { content: o.content } : {}), ...(o.hide?.length ? { hide: o.hide.join(',') } : {}), ...geometryQuery(o), ...(o.canvas ? { w: String(o.canvas.width), h: String(o.canvas.height) } : {}) });
+  const q = new URLSearchParams({ render: '1', project: projectId, scenario: o.scenarioId, position: '0', theme: o.theme ?? project.theme ?? 'sketch', frame: '1', record: '1', ...(voice !== 'off' ? { voice } : {}), ...(o.chain ? { chain: '1' } : {}), ...(o.sampling?{sampling:'1'}:{}), ...(o.audio === false ? {audio:'0'} : {}), ...(o.locale ? { locale: o.locale } : {}), ...(o.content ? { content: o.content } : {}), ...(o.hide?.length ? { hide: o.hide.join(',') } : {}), ...geometryQuery(o), ...(o.canvas ? { w: String(o.canvas.width), h: String(o.canvas.height) } : {}) });
   const device: 'mobile' | 'desktop' = project.scenes[displaySceneId(project, o.scenarioId, 0)]?.viewport === 'mobile' ? 'mobile' : 'desktop';
   return { url: `${base}?${q}`, size: o.logicalViewport ?? (o.noFrame ? VIEWPORT_SIZE[device] : EXPORT_SIZE[device]), device };
 }
@@ -206,7 +222,7 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
   try {
     const audit=opts.auditLayout?createLayoutAuditSession({out,project,crop:opts.crop,options:opts.auditLayout,overwrite:opts.overwrite,sampleMs}):null;
     const canvas = opts.width && opts.height ? { width: opts.width, height: opts.height } : opts.logicalViewport;
-    const { url, size: defaultSize } = recordUrl(server.url, server.projectId, project, {...opts,audio:false,voice: opts.voice ?? (opts.framesOnly ? 'real' : 'estimate'), ...(canvas ? { canvas } : {})});
+    const { url, size: defaultSize } = recordUrl(server.url, server.projectId, project, {...opts,sampling:true,audio:false,voice: opts.voice ?? (opts.framesOnly ? 'real' : 'estimate'), ...(canvas ? { canvas } : {})});
     const size = canvas ?? defaultSize;
     browser = await launch(playwright);
     const ctx = await browser.newContext({ viewport: size, deviceScaleFactor: opts.framesOnly ? opts.frameScale ?? 1 : 0.5 });
@@ -263,6 +279,7 @@ async function samplePlayback(opts: FilmOptions & { frameFps?: number; frameScal
       if (t > 0) await page.clock.runFor(t - previousTime);
       previousTime = t;
       await flush(page);
+      await waitForSample(page,t);
       const p = await page.evaluate(() => (window as unknown as { __JOPLO_RECORD__: { progress: Progress } }).__JOPLO_RECORD__.progress);
       if (p.error) throw new JoploError('RENDER_FAILED', `Playback failed at ${t} ms: ${p.error}`);
       if (p.scenarioId !== lastChapter) chapterStartedAt = Date.now();

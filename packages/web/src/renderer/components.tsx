@@ -1,3 +1,4 @@
+import type { FrameReadiness } from '../runtime/frame-readiness';
 import { EngineClockContext, motion as engineMotion } from './engine-motion';
 import type { ClockFrame } from '../runtime/clock';
 import type { ActionDispatch, EngineFrame, ActionPresentation } from '@joplo-app/kit/plugin';
@@ -16,6 +17,8 @@ import type { ComponentCtx, ComponentInstance, PluginNode } from '@joplo-app/kit
 export type RenderMode = 'review' | 'demo' | 'render';
 
 export type RenderCtx = {
+  sampling?:boolean;
+  frameReadiness?:FrameReadiness;
   assets?: Readonly<Record<string,string>>;
   act?: ActionDispatch;
   hover?: (id: string | null) => void;
@@ -174,6 +177,8 @@ function PluginHost({ node, p }: NodeProps) {
   const comp = status.state === 'ready' ? status.runtime.components[split.name] : undefined;
   const elRef = useRef<HTMLDivElement | null>(null);
   const inst = useRef<ComponentInstance | null>(null);
+  const frameOwner=useRef({});
+  useLayoutEffect(()=>()=>ctx.frameReadiness?.cancelOwner(frameOwner.current),[ctx.frameReadiness]);
   const [crash, setCrash] = useState<string | null>(null);
   const root = useRoot(node, p, { className: 'relative w-full' });
   // 命令式组件（mount/update，例如 3D）靠每次提交里的 update 推进画面：逐帧订阅时钟
@@ -213,7 +218,7 @@ function PluginHost({ node, p }: NodeProps) {
       const children = chosen.map(n => <RenderNode key={n.id} node={n} />);
       return container ? createPortal(children, container) : children;
     },
-    frame: { clock: ctx.clock, gesture: ctx.gesture, playground: ctx.playground, resetKey: ctx.resetKey, inputs: ctx.inputs, mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, sceneId: ctx.scene.id, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
+    frame: { sampling:ctx.sampling, clock: ctx.clock, gesture: ctx.gesture, playground: ctx.playground, resetKey: ctx.resetKey, inputs: ctx.inputs, mode: ctx.mode, animate: ctx.animate, scenarioId: ctx.state.scenarioId, sceneId: ctx.scene.id, position: ctx.state.position, focus: ctx.focus ?? null, nextTarget: ctx.nextTargetId ?? null, selectedId: ctx.selectedId, theme },
     css: (name) => { const el = element() ?? ctx.stage; return el ? getComputedStyle(el).getPropertyValue(name).trim() : ''; },
     act: ctx.act,
     hover: ctx.hover,
@@ -221,6 +226,10 @@ function PluginHost({ node, p }: NodeProps) {
       const el = element();
       const target = el?.querySelector<HTMLElement>(`[data-jid="${CSS.escape(id)}"]`) ?? el;
       target?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: at?.clientX ?? 0, clientY: at?.clientY ?? 0, altKey: at?.altKey ?? false }));
+    },
+    frameReady: task => {
+      if(!ctx.frameReadiness)throw new Error("This host has no sampled-frame readiness registry");
+      return ctx.frameReadiness.register(frameOwner.current,task,node.id);
     },
     hold: () => {
       const token = {};

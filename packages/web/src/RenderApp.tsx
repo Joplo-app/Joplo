@@ -1,3 +1,4 @@
+import { FrameReadiness } from './runtime/frame-readiness';
 import { EngineClockContext } from './renderer/engine-motion';
 import { projectThemes } from '@joplo-app/core/runtime';
 import { m } from './i18n/board/messages';
@@ -79,6 +80,11 @@ type W = {
 export type RecordApi = {
   timeline(): { completed: boolean; schemaVersion: 1; startedAt: number | null; events: Record<string, unknown>[] };
   voiceIdentity(): unknown;
+  frameStatus(): {pending:number;error:string|null;revision:number};
+  cancelFrame(): void;
+  pause():void;
+  resume():void;
+  seek(scenarioId:string,position:number):void;
   prepare(): Promise<void>;
   play(): Promise<void>;
   stopAudio(): Promise<{ data: string } | null>;
@@ -142,6 +148,9 @@ export function RenderApp() {
   const themeParam = params.get('theme');
   const frame = params.get('frame') === '1';
   const record = params.get('record') === '1';
+  const sampling=params.get('sampling')==='1';
+  const frameReadiness=useMemo(()=>new FrameReadiness(),[]);
+  useEffect(()=>()=>frameReadiness.dispose(),[frameReadiness]);
   const chain = params.get('chain') === '1';
   const captureAudio = params.get('audio') !== '0';
   const voiceParam = params.get('voice');
@@ -205,7 +214,7 @@ export function RenderApp() {
       while (registry.size > 0 && !cancelled) await new Promise<void>((r) => setTimeout(r, 20));
       await raf();
       await raf();
-      if (!cancelled) w.__JOPLO_READY__ = true;
+      if (!cancelled) {w.__JOPLO_ERROR__=frameReadiness.status().error;w.__JOPLO_READY__ = true;}
     })();
     return () => {
       cancelled = true;
@@ -294,11 +303,12 @@ export function RenderApp() {
       </div>
     );
   };
-  if (record) return <RecordStage project={data.project} projectId={projectId} content={params.get('content')} scenarioId={scenarioId} chain={chain} captureAudio={captureAudio} voiceMode={voiceMode} hide={hide} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} viewportOverride={logicalViewport} />;
+  if (record) return <RecordStage sampling={sampling} frameReadiness={frameReadiness} project={data.project} projectId={projectId} content={params.get('content')} scenarioId={scenarioId} chain={chain} captureAudio={captureAudio} voiceMode={voiceMode} hide={hide} theme={theme} font={font} stroke={stroke} registry={registry} setStage={setStage} wrap={wrap} viewportOverride={logicalViewport} />;
   const sc = data.project.scenarios[scenarioId];
   const next = sc && !data.state.completed ? sc.steps[data.state.position] : undefined;
   const plan = cameraFor(data.project, sc ? scenarioId : null, data.state.position, null);
   return wrap(<Stage
+      sampling={sampling} frameReadiness={frameReadiness}
       viewportOverride={logicalViewport}
       project={data.project}
       state={data.state}
@@ -318,7 +328,7 @@ export function RenderApp() {
 }
 
 /** 录制模式：与看板同一个演示控制器（鼠标、波纹、逐字输入、系统事件、字幕），由服务端触发自动播放。 */
-function RecordStage({ viewportOverride, project, projectId, content, scenarioId, chain, captureAudio, voiceMode, hide, theme, font, stroke, registry, setStage, wrap }: { viewportOverride?: { width: number; height: number } | null; project: Project; projectId: string; content: string | null; scenarioId: string; chain: boolean; captureAudio: boolean; voiceMode: VoiceMode; hide: ReadonlySet<HideItem>; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, hud: Hud, c: CurtainSpec | null) => ReactNode }) {
+function RecordStage({ sampling,frameReadiness, viewportOverride, project, projectId, content, scenarioId, chain, captureAudio, voiceMode, hide, theme, font, stroke, registry, setStage, wrap }: { sampling:boolean;frameReadiness:FrameReadiness; viewportOverride?: { width: number; height: number } | null; project: Project; projectId: string; content: string | null; scenarioId: string; chain: boolean; captureAudio: boolean; voiceMode: VoiceMode; hide: ReadonlySet<HideItem>; theme: StageTheme; font: AppearanceFont | null; stroke: AppearanceStroke | null; registry: RoughRegistry; setStage: (el: HTMLDivElement | null) => void; wrap: (n: ReactNode, hud: Hud, c: CurtainSpec | null) => ReactNode }) {
   const { t: i18n } = useBoardI18n();
   // useMedia 要等控制器建好才能调用；旁白在播放时才用到引擎，经这个盒子晚一步拿到
   const engineBox = useRef<{ current: MediaEngine | null } | null>(null);
@@ -356,6 +366,7 @@ function RecordStage({ viewportOverride, project, projectId, content, scenarioId
     }
     return c;
   }, [project, scenarioId, chain, voiceMode, recordVoice]);
+  useLayoutEffect(()=>{const sync=()=>{const f=ctl.clock.getSnapshot(),s=ctl.getSnapshot();frameReadiness.advance(`${f.timeMs}:${f.elapsedMs}:${s.scenarioId}:${s.state?.sceneId}:${s.seek}`);};sync();const a=ctl.clock.subscribe(sync),b=ctl.subscribe(sync);return()=>{a();b();};},[ctl,frameReadiness]);
   ctl.i18n = i18n;
   const media = useMedia(ctl, project, captureAudio, !!recordVoice);
   engineBox.current = media;
@@ -410,7 +421,12 @@ function RecordStage({ viewportOverride, project, projectId, content, scenarioId
     })();
     w.__JOPLO_RECORD__ = {
       timeline: () => ({ ...structuredClone(timeline.current), completed: started && !snap.playing && !snap.upNext && (total===0 || !!snap.state?.completed || (snap.state?.position??0)>=total) }),
+      frameStatus: () => ({...frameReadiness.status(),pending:frameReadiness.status().pending+registry.size}),
+      cancelFrame: () => frameReadiness.dispose(),
       voiceIdentity: () => ({ mode:voiceMode, prepared:recordVoice?.identity() ?? null }),
+      pause:()=>ctl.pause(false),
+      resume:()=>ctl.resume(),
+      seek:(id,position)=>ctl.setScenario(id,position,{quiet:true}),
       prepare,
       play: async () => {
         await prepare();
@@ -427,7 +443,7 @@ function RecordStage({ viewportOverride, project, projectId, content, scenarioId
       progress: {
         step: snap.state?.position ?? 0,
         done: started && !snap.playing && !snap.upNext && (total === 0 || !!snap.state?.completed || (snap.state?.position ?? 0) >= total || !!snap.playbackError),
-        get error() { return snap.playbackError ? translate(snap.playbackError, i18n) : media.current?.status().error ?? null; },
+        get error() { return snap.playbackError ? translate(snap.playbackError, i18n) : media.current?.status().error ?? frameReadiness.status().error; },
         scenarioId: snap.scenarioId, position: snap.state?.position ?? 0, activeStep: snap.activeStep,
       },
     };
@@ -451,6 +467,7 @@ function RecordStage({ viewportOverride, project, projectId, content, scenarioId
   if (!snap.state) return null;
   return <EngineClockContext.Provider value={ctl.clock}>{wrap(
     <Stage
+      sampling={sampling} frameReadiness={frameReadiness}
       viewportOverride={viewportOverride}
       project={project}
       state={snap.state}

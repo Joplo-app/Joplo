@@ -323,6 +323,9 @@ importers:
       '@joplo-app/kit':
         specifier: workspace:*
         version: link:../../packages/kit
+      '@joplo-app/plugin-av':
+        specifier: workspace:*
+        version: link:../../plugins/av
       '@joplo-app/plugin-content':
         specifier: workspace:*
         version: link:../../plugins/content

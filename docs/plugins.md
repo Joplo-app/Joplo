@@ -557,3 +557,28 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 play 命令可选 `startDelayMs`（0–60000 引擎毫秒）、`duck`（默认 true；旁白时 gain × .25，false 仅豁免该轨）与 `maxRetiring`（整数 0–32，默认不限制；每条命名轨，不含当前曲）。`maxRetiring:1` 保留当前曲和最近一条退场曲，淘汰按退休先后，不按资源名称或剩余淡出时长。宿主同时约束编译快照与运行时实际淡出槽；静态估算提前删去的旧槽不能绕过上限。
 
 快照保留原计划 `startDelayMs`、剩余 `delayRemainingMs` 与显式延迟事件的确定身份 `startEventId`；等待先于源位置推进，`offsetMs` 始终是源位置，`endAfterMs` 不含等待。暂停冻结引擎时钟，速率影响墙钟等待，fadeIn 从实际起音开始。跨章继承事件身份和剩余等待；seek 按该快照恢复。新曲等待时旧曲仍从提交开始退场。延迟不延长步骤 hold，不引入流式音频或子时间轴。实际 timeline 的 play 是观察到的提交事件；完整快照与离线音频元数据保留这些策略，不能据此声称额外的声画采样精度。
+
+### Async pixels during sampled export
+
+`PluginFrame.sampling === true` explicitly identifies engine-clock film and
+`renderFrames` capture. It is absent/false for board/site playback and real-time
+`renderVideo` recording, including automated browsers. It is runtime context, not
+published IR. Do not infer this mode from `navigator.webdriver`.
+
+A component with asynchronous decoding should subscribe with `useEngineFrame`,
+register `ctx.frameReady(signal => presentCurrentFrame(signal))` in a layout
+effect for each current frame, and return the provided cancellation function.
+Resolve only after pixels have been committed to the visible canvas/DOM. Reject
+failures; remove listeners and prevent late drawing when the signal aborts.
+Do not wait for a future engine tick: the exporter freezes engine time while
+waiting, with a ten-second host wall-clock deadline. Multiple components share
+one registry, scoped to clock/seek/scenario/scene generations and component
+lifetimes. Replacement/unmount cancels old tasks; old completion or rejection
+cannot satisfy or poison a new frame. Capture requires React/DOM quiet and two
+unchanged idle registry observations. Failure, timeout and cancellation clean up
+all current tasks and fail the export instead of capturing stale pixels.
+
+The AV plugin uses this handshake for engine-time seek followed by a synchronous
+decoder-to-canvas copy. Real-time recording retains native playback; validate its
+actual output separately. Existing 50 ms replay observation tolerance remains;
+this protocol adds presentation readiness, not a tighter scheduling promise.
