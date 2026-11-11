@@ -110,7 +110,7 @@ for (const name of ['invite', 'midterms-2026', 'joplo', 'llm-explainer']) it(`${
   const original = path.resolve('examples', name);
   const dir = path.join(root, `copy-${name}`);
   fs.cpSync(original, dir, { recursive: true, filter: file => !/[/\\](node_modules|dist|exports|\.joplo|\.git)([/\\]|$)/.test(file.slice(original.length)) });
-  installFixturePlugins(dir);
+  installFixturePlugins(dir, name === 'joplo' ? ['av'] : []);
   // 这些示例多数用组件属性/自定义主题而非 Tailwind；在临时副本加公开探针，避免零类名比较空过。
   const probe = "tracking-[0.37em] md:gap-[7px] [&>span]:text-[17px] w-1/2 before:content-['EXAMPLE_PUBLIC']";
   fs.mkdirSync(path.join(dir, 'works'), { recursive: true });

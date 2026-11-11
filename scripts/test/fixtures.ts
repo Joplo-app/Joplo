@@ -22,10 +22,10 @@ export function fixtureConfigSource(source:string):string{
 
 import { mkdirSync, existsSync, symlinkSync } from 'node:fs';
 /** Temporary projects install explicit author packages, as real npm consumers do. */
-export function installFixturePlugins(root:string){
+export function installFixturePlugins(root:string, additionalPlugins: readonly string[] = []){
  const scope=path.join(root,'node_modules/@joplo-app');mkdirSync(scope,{recursive:true});
  for(const name of ['kit','core'])if(!existsSync(path.join(scope,name)))symlinkSync(path.resolve(import.meta.dirname,`../../packages/${name}`),path.join(scope,name),'dir');
- for(const name of ['ui','diagram','content','alda']){
+ for(const name of new Set(['ui','diagram','content','alda',...additionalPlugins])){
   const target=path.join(scope,`plugin-${name}`);
   if(!existsSync(target))symlinkSync(path.resolve(import.meta.dirname,`../../plugins/${name}`),target,'dir');
  }
