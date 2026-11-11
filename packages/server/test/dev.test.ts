@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDev, isJsonContentType, type InternalDevHandle } from '../src/dev.ts';
+import { listLocalReviews } from '@joplo-app/core/node';
 import { resolveSelection } from '../src/selection.ts';
 
 const EXAMPLE = path.resolve(import.meta.dirname, '../../../examples/invite');
@@ -304,3 +305,14 @@ it('watch.ignore prevents generated frames from recompiling or invalidating revi
     await until(()=>h.payload().version>updated);
   } finally {await h.close();fs.rmSync(dir,{recursive:true,force:true});fs.rmSync(second,{recursive:true,force:true});}
 },60000);
+
+
+it('joining HTTP response waits for review registration without a browser request', async () => {
+  const dir = copy(), second = copy();
+  const h = await createDev({ projectDir: dir, port: 0, watch: false, log: () => {} });
+  try {
+    const result = await req(h, { method: 'POST', path: '/__joplo/projects', headers: { 'content-type': 'application/json', 'x-joplo-token': h.token }, body: JSON.stringify({ dir: second }) });
+    expect(result.status).toBe(200);
+    expect(listLocalReviews(second).filter(s => s.events.length === 0).length).toBeGreaterThan(0);
+  } finally { await h.close(); fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(second, { recursive: true, force: true }); }
+}, 60_000);

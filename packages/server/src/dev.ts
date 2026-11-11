@@ -686,6 +686,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
             const dir = (b.body as { dir?: unknown })?.dir;
             if (typeof dir !== 'string' || !path.isAbsolute(dir)) return sendJson(res, 400, { error: { code: 'USAGE', message: 'dir must be an absolute path to the project directory' } });
             const r = addProject(dir);
+            await r.slot?.ready;
             return sendJson(res, 200, { id: r.id, url: r.url });
           }
           const del = /^\/__joplo\/projects\/([^/]+)$/.exec(url.pathname);
@@ -862,7 +863,8 @@ export async function attachToRunning(home: string, projectDir: string, log: (s:
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-joplo-token': info.token },
     body: JSON.stringify({ dir: realProjectDir(projectDir) }),
-    signal: AbortSignal.timeout(10000),
+    // Registration acknowledges the initial compilation, which can take longer than a ping.
+    signal: AbortSignal.timeout(120000),
   });
   const body = (await res.json().catch(() => null)) as { url?: string; error?: { message?: string } } | null;
   if (!res.ok || !body?.url) throw new JoploError('UNSUPPORTED_ACTION', `Cannot add the project to the running board (${base}, pid ${info.pid}): ${body?.error?.message ?? `HTTP ${res.status}`}`);
@@ -912,7 +914,8 @@ export async function startDev(opts: DevOptions & { home?: string; exportDeps?: 
     }
     throw e;
   }
-  const { url } = hub.addProject(projectDir);
+  const { url, slot } = hub.addProject(projectDir);
+  await slot?.ready;
   const cleanup = () => clearServerInfo(home, process.pid);
   process.once('exit', cleanup);
   if (opts.open) openBrowser(url, log);
