@@ -370,7 +370,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const handle = await startDev({ projectDir: resolve(dir), port: opts.port, open: opts.open, log: s => stderr(oneLine(s) + '\n'), cloud });
     line(handle.url);
     // 已有存活的看板：项目已注册进去，本进程直接退出（不启动第二个看板进程）
-    if (handle.attached) stderr(`Joined the running board. Open ${handle.url}\n`);
+    if (handle.attached) stderr(`Joined the running board. Open ${handle.url}\nThe existing board process hosts this project. Keep its terminal running: stopping it stops this link and feedback watch. If it exits, run joplo dev and feedback watch again.\n`);
     // stdout 只有地址（脚本会读）；在 stderr 告诉 Agent 用哪一条命令跟住这个项目的全部评审反馈。
     const shown = /^[\w./@:+-]+$/.test(dir) ? dir : `'${dir.replace(/'/g, `'\\''`)}'`;
     stderr(`Agents: stream reviewer feedback from this board with\n  npx joplo feedback watch ${shown} --local --follow --json\nIf you end your response while the user tests and your host wakes you when a background command ends, add --once (it prints how to resume with --since).\n`);
