@@ -1,7 +1,7 @@
 import { audioResource } from './audio-source';
-import { playBuffer } from './record-voice';
+import { playLeasedAudio } from './record-voice';
 import type { Narration } from './voice';
-import { prepareRegion } from './audio-media';
+import { prepareRegion, type NarrationLease } from './audio-media';
 import { audioMedia, decodedLease } from './audio-media';
 import { MediaCache } from './media-cache';
 import type { AudioRegion, MediaDriver, MediaSnapshot } from '@joplo-app/kit/plugin';
@@ -67,38 +67,39 @@ export class MediaEngine {
     const audio = this.audio; if (!audio) throw new Error('AudioContext unavailable');
     return audio.decodeAudioData(bytes);
   }
-  /** Explicit narration shares the existing encoded/PCM budgets and content-region contract. */
-  narrate(url: string, speed: number, info?: AudioRegion): Narration {
-    let current: Narration | null = null, cancelled = false, paused = false, failure: string | null = null;
+  /** A consumer-owned lease over the existing encoded/PCM caches. Release cancels this consumer immediately. */
+  prepareNarration(url: string, info?: AudioRegion): NarrationLease {
     let encoded: ReturnType<MediaEngine['bytes']> | undefined;
     let pcm: ReturnType<typeof decodedLease> | undefined;
-    const release = () => { pcm?.release(); pcm = undefined; encoded?.release(); encoded = undefined; };
-    let finish!: () => void;
-    const done = new Promise<void>(resolve => { finish = resolve; });
-    void (async () => {
-      try {
-        this.unlock();
-        const audio = this.audio; if (!audio) throw new Error('AudioContext unavailable');
-        encoded = this.bytes(url);
-        const source = await encoded.value;
-        if (cancelled) return;
-        const audioInfo = info ?? source.audio;
-        pcm = decodedLease(audio, source.bytes, url, this.decoded, audioInfo);
-        const buffer = await pcm.value;
-        const region = prepareRegion(buffer, audioInfo);
-        if (cancelled) return;
-        const out = this.narrationOutput(); if (!out) throw new Error('Narration audio output unavailable');
-        current = playBuffer(out, buffer, speed, audioInfo ? region : undefined, paused);
-        await current.done;
-      } catch (e) {
-        if (!cancelled) failure = `Explicit narration audio failed: ${e instanceof Error ? e.message : String(e)}; no voice provider was called`;
-      } finally { release(); finish(); }
+    let cancelled = false, rejectCancel!: (error: Error) => void;
+    const cancellation = new Promise<never>((_, reject) => { rejectCancel = reject; });
+    const release = () => {
+      if (cancelled) return; cancelled = true;
+      pcm?.release(); pcm = undefined; encoded?.release(); encoded = undefined;
+      rejectCancel(new Error('Narration audio preparation cancelled'));
+    };
+    const loading = (async () => {
+      this.unlock();
+      const audio = this.audio; if (!audio) throw new Error('AudioContext unavailable');
+      encoded = this.bytes(url);
+      const source = await encoded.value;
+      if (cancelled) throw new Error('Narration audio preparation cancelled');
+      const audioInfo = info ?? source.audio;
+      pcm = decodedLease(audio, source.bytes, url, this.decoded, audioInfo);
+      const buffer = await pcm.value;
+      if (cancelled) throw new Error('Narration audio preparation cancelled');
+      return { buffer, region: prepareRegion(buffer, audioInfo), ...(audioInfo ? { info: audioInfo } : {}) };
     })();
-    const narration: Narration = { source: 'clip', done, failure: () => failure, progress: () => current?.progress?.() ?? 0,
-      pause: () => { paused = true; current?.pause(); }, resume: () => { paused = false; current?.resume(); },
-      cancel: () => { cancelled = true; current?.cancel(); release(); finish(); } };
+    const value = Promise.race([loading, cancellation]);
+    // Failed acquisition/validation releases before the caller handles its rejection.
+    void value.catch(() => release());
+    return { value, release };
+  }
+  /** Explicit narration shares the same lease/region path as recording. */
+  narrate(url: string, speed: number, info?: AudioRegion): Narration {
+    const narration = playLeasedAudio(this.prepareNarration(url, info), speed, { output: () => this.narrationOutput() });
     this.narrations.add(narration);
-    void done.then(() => this.narrations.delete(narration));
+    void narration.done.then(() => this.narrations.delete(narration));
     return narration;
   }
   async calibrate() {

@@ -60,7 +60,7 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - SAY_ROLE_CONFLICT: one step has say(…, { role }) lines from two different roles. A step reads one speaker; split the lines into consecutive steps.
 - AUDIO_SOURCE_INVALID / AUDIO_INVALID: supply asset() audio bytes or an enabled localResource() reference, prepare a valid decodable audio artifact and check again. No remote URL fetching or provider fallback occurs for explicit audio.
 - SPEECH_AUDIO_CONFLICT / HOLD_AUDIO_CONFLICT / HOLD_AUDIO_INVALID: one selected speech effect/clip and one audio-derived hold per step; pad is finite 0–30 seconds. Keep say(text, { role, audio }), not say(role, text).
-- AUDIO_TIMING_MEASURED / AUDIO_TIMING_ESTIMATED (info): measured duration is from matching prepared audio; estimated means no matching measurement is available. Neither check nor outline creates TTS audio. Changing the line, voice or content language invalidates the old cached timing. A measured duration plus pad still cannot truncate required actions or plugin effectHold.
+- AUDIO_TIMING_MEASURED / AUDIO_TIMING_ESTIMATED (info): measured duration is from matching prepared audio; estimated means no matching measurement is available. Neither check nor outline creates TTS audio. voice reports a missing supplied resource in failed/total.failed even when every ordinary TTS clip is already cached; zero billable missing/chars does not mean all supplied audio is ready. Prepared content measurements take priority over conflicting plugin inspect hints. Changing the line, voice or content language invalidates the old cached timing. A measured duration plus pad still cannot truncate required actions or plugin effectHold.
 - PACE_INVALID: work({ pace: { systemLead } }) accepts a finite 0–30 seconds (0 removes system pre-commit lead); omit it to preserve the default 0.9 seconds. hold() only controls post-commit dwell.
 - STREAM_PACE_INVALID: stream()'s pace is only 'voice' (follow this step's spoken line); omit it for model-output speed.
 - VOICE_CONFIG_INVALID: config({ voice }) takes { profile?, narrator?, roles?: { roleKey: 'voice' }, locales?: { ja: { narrator?, roles? } } } with non-empty strings. API keys never go in the config.
@@ -126,4 +126,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.7.1 sha256:945d7fbf5e4ad2f19fdac38b9d5daf651761e37f2286a0bcca1f6f14589d10b2 -->
+<!-- joplo-skill 0.7.1 sha256:54a862485688d455dcfa0b581d84420832246d16bd2eb1cde54db60fcd094953 -->

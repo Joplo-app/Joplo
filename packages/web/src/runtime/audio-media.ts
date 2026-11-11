@@ -1,4 +1,6 @@
 import type { MediaDriver, AudioRegion } from '@joplo-app/kit/plugin';
+export type PreparedNarration = { buffer: AudioBuffer; region: ReturnType<typeof prepareRegion>; info?: AudioRegion };
+export type NarrationLease = { value: Promise<PreparedNarration>; release(): void };
 import { MediaCache } from './media-cache';
 export function decodedLease(audio:AudioContext,bytes:Uint8Array,key:string,cache:MediaCache<AudioBuffer>,info?:AudioRegion) {
  const estimate=info?Math.ceil(info.decodedFrames/info.sourceSampleRate*audio.sampleRate)*info.channels*4:0;

@@ -88,3 +88,10 @@ it('work/scenario scope includes selected narration and hold audio but excludes 
   expect(scoped.mediaAssets).toEqual({ [selected]: audio });
   expect(nodeResourceIds(scoped).has(otherId)).toBe(false);
 });
+
+
+it('prefers prepared audio measurement over a conflicting inspect hint', () => {
+  const p=build([hold('audio',localResource('line','speak','prepared'),{pad:0})],{resourceInfo:{'resource-0':{durationMs:1000}},audioDurationFor:token=>token==='joplo-resource:resource-0'?600:undefined});
+  const st=p.scenarios['f.a.main']!.steps[0]!;
+  expect(st.holdFor!.durationMs).toBe(600);expect(stepPlan(p,st)).toMatchObject({audioMs:600,timingSource:'measured'});
+});

@@ -87,7 +87,7 @@ export class PluginCompiler {
   }
   audioDuration(source: string): number | undefined {
     const id = source.slice('joplo-resource:'.length);
-    const n = this.embeddedAudio[id] ? this.options.audioDurationFor?.(this.embeddedAudio[id]!) : this.infoOf(id)?.durationMs ?? this.options.audioDurationFor?.(source);
+    const n = this.embeddedAudio[id] ? this.options.audioDurationFor?.(this.embeddedAudio[id]!) : this.options.audioDurationFor?.(source) ?? this.infoOf(id)?.durationMs;
     return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined;
   }
   readonly defs = new Map<string, PluginDef>();
