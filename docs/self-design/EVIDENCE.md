@@ -217,3 +217,16 @@
 在既有 `music.a-render` 追加 `playback_policy`，复用终端 Cmd 和状态绑定，呈现 issues #93 / #109 的显式 startDelayMs、duck 豁免与每轨 maxRetiring。未修改 voice 功能场景，未新增人工批准记录；命令是文字示意，不执行 Alda、不生成付费声音。原计划与剩余等待、源位置、自然截止及轨级退场边界已同步引擎 plugins、Alda 与 media 指南。只追加文案和既有组件，未调整视觉布局。
 
 本轮验证：当前 checkout `check examples/joplo` 为 0 error / 16 warning / 41 info，普通 build 129 文件通过；独立 JOPLO_HOME 静态截图核对 `music.a-render.playback_policy#1` 正文与命令均完整，既有宿主角标覆盖导航链接的提示未因本轮改变。Core/播放器/插件媒体测试通过，技能生成及安装一致性测试通过，实际读取 plugins / alda / media 指南。离线 PCM WAV 的 Chromium 双事件、跨章录制保留全部延迟/duck字段及独立音频资产，400ms计划延迟实测提交到声能阈值387.07ms，按现有 timeline 50ms 容差验收；这是本机录制证据，不新增声学精度承诺，也不代替人工听感审查。未调用 TTS、Alda 渲染或付费生成。
+
+### #104 视频采样提交验证（当前源码，待本轮发行）
+
+`works/sampling-proof.tsx` 是独立实现验证作品，入口为 `sampling-proof.decode` / `sampling-proof.relay`，不是 `film_form` 的第三种章节布局方案。原 `film_form` 的方案、pick 与稳定 ID 不变。场景使用本地产生的编号视频与原生 Video，两个实例共享引擎时钟；逐帧 film/frames 等解码与 canvas 提交后采样，实时 video 录制保持原生播放，不冒称逐输出帧握手。素材来源见 `examples/joplo/assets/SOURCES.md`。
+
+从当前 checkout 核对：
+
+```sh
+pnpm joplo check examples/joplo --format json
+pnpm joplo render examples/joplo --scenario-id sampling-proof.decode --chain --frames-out scratch/output/sampling-proof-frames --fps 10 --voice off --viewport 1280x800 --no-frame
+```
+
+本地 check 为 0 error / 16 warning / 41 info；以上公开 frames 命令成功导出 35 帧、3400ms，验证独立作品与连续章节可运行。编号源视频逐帧像素、双视频、暂停恢复、跳转、解码失败及清理的回归在 `packages/server/test/sampling-video.test.ts`；沿用 50ms 观察容差，不承诺更严格调度或源帧插值。可复用的采样/实播区别与失败恢复已沉淀到引擎 demo/plugins 和 AV media 技能。本验证不执行付费生成、上传或发布。
