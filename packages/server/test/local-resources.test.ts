@@ -116,3 +116,12 @@ it('inspects project-relative files without spending context or inherited creden
  expect(await x.host.inspect({...x.req,input:'source.txt'})).toEqual({info:{credit:'project source'}});
  }finally{if(previous===undefined)delete process.env.JOPLO_INSPECT_TEST_SECRET;else process.env.JOPLO_INSPECT_TEST_SECRET=previous;}
 });
+
+it('reports the encoded playback limit during preparation and reads cached metadata without rendering again',async()=>{
+ const x=setup('large',`return {bytes:new Uint8Array(4*1024*1024+1),audio:{sourceSampleRate:48000,decodedFrames:1920000,contentFrames:1920000,cycleFrames:1920000,contentStartFrame:0,encoderDelayFrames:0,paddingFrames:0,channels:1}};`);
+ expect(await x.host.prepared(x.req)).toBeNull();
+ const result=await x.host.ensure(x.req);
+ expect(result.diagnostic).toMatchObject({code:'MEDIA_ENCODE_BUDGET',severity:'warning'});expect(result.url).toBeDefined();
+ expect(await x.host.prepared(x.req)).toMatchObject({bytes:4*1024*1024+1,audio:{channels:1}});
+ expect((await x.host.ensure(x.req)).diagnostic?.code).toBe('MEDIA_ENCODE_BUDGET');
+});

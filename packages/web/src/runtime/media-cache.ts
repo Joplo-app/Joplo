@@ -3,14 +3,14 @@ export class MediaCache<T = unknown> {
   private entries = new Map<string, { refs:number; used:number; bytes:number; value:Promise<T>; reject:(e:Error)=>void }>();
   private queue: (()=>void)[] = [];
   private active = 0; private clock = 0; private disposed = false;
-  constructor(private limits: { budgetBytes:number; concurrency:number; maxEntries?:number }) {}
+  constructor(private limits: { budgetBytes:number; concurrency:number; maxEntries?:number; label?:string }) {}
   private room(bytes:number, except?:string) {
     const used=()=>[...this.entries].reduce((n,[k,e])=>n+(k===except?0:e.bytes),0);
     for(const [key] of [...this.entries].filter(([k,e])=>k!==except&&!e.refs).sort((a,b)=>a[1].used-b[1].used)) {
       if(used()+bytes<=this.limits.budgetBytes && this.entries.size<=(this.limits.maxEntries??32)) break;
       this.entries.delete(key);
     }
-    if(bytes>this.limits.budgetBytes || used()+bytes>this.limits.budgetBytes) throw new Error('Media memory budget exceeded; shorten or split this music');
+    if(bytes>this.limits.budgetBytes || used()+bytes>this.limits.budgetBytes) throw new Error(`Media ${this.limits.label ?? 'cache'} budget exceeded: needs ${bytes} new bytes, ${used()} bytes already retained, limit ${this.limits.budgetBytes} bytes (${this.limits.budgetBytes/1048576} MiB). ${this.limits.label==='encoded audio'?'Transcode large WAV/PCM to lossless FLAC or a smaller supported format; splitting does not reduce simultaneous encoded bytes.':'Shorten simultaneous audio, finish fades before another cue, or reduce decoded duration/channels.'}`);
   }
   acquire(key:string, load:()=>Promise<{value:T;bytes:number}>, estimate=0) {
     let e=this.entries.get(key);

@@ -25,3 +25,14 @@ it('reports simultaneous decoded buffers including fades, with source locations 
  const region={sourceSampleRate:32000,decodedFrames:32000*90,channels:2};
  expect(mediaBudgetDiagnostics(project,{a:region} as any)[0]?.code).toBe('MEDIA_DECODE_BUDGET');
 });
+
+it('distinguishes encoded bytes from decoded mono PCM and ignores expired events',async()=>{
+ const {mediaBudgetDiagnostics}=await import('../src/media-check.ts');
+ const project:any={scenarios:{s:{id:'s',steps:[{source:'audio.ts:1:1',media:{bed:{...track(0,true),resource:'wav'}}}]}}};
+ const region:any={sourceSampleRate:48000,decodedFrames:48000*40,contentFrames:48000*40,channels:1,encodedBytes:7680044};
+ const diagnostics=mediaBudgetDiagnostics(project,{wav:region});
+ expect(diagnostics.map(d=>d.code)).toEqual(['MEDIA_ENCODE_BUDGET']);
+ expect(diagnostics[0]!.message).toContain('7680044 bytes');
+ project.scenarios.s.steps[0].media.bed.endAfterMs=0;
+ expect(mediaBudgetDiagnostics(project,{wav:region})).toEqual([]);
+});

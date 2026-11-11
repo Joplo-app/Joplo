@@ -101,7 +101,9 @@ it('anchors a crossfade fade-out on engine time so a finished fade never comes b
   expect(fresh.gain.setTargetAtTime.mock.calls.find((c: number[]) => c[0]! > 0)).toBeTruthy();
   // 再次 play 同一首（快照里没有淡出）才重新启用
   engine.update({ 'fake:bgm': { ...A, resource: 'b' }, 'fake:bgm>a': { ...A } }, assets, { ...f, timeMs: 9600, elapsedMs: 0 });
-  expect(old.gain.setTargetAtTime.mock.lastCall[0]).toBe(.5);
+  await new Promise(r=>setTimeout(r,0));
+  expect(FakeAudio.gains.at(-1)).not.toBe(old);
+  expect(FakeAudio.gains.at(-1).gain.setTargetAtTime.mock.lastCall[0]).toBe(.5);
   engine.destroy();
 });
 it('an anchored fade continues smoothly when the step is shorter than its hold, ducks with narration, and survives a relay chapter (D92 R2)', async () => {
@@ -219,4 +221,33 @@ it('keeps the real one-shot deadline when a later estimated snapshot prematurely
  expect(mock.update.mock.lastCall?.[0]).toMatchObject({offsetMs:2000,playing:true});
  engine.update({},assets,{...frame,elapsedMs:0,timeMs:3000,playing:false});expect(mock.update.mock.lastCall?.[0].playing).toBe(false);
  engine.update({},assets,{...frame,elapsedMs:0,timeMs:4000});expect(engine.status().tracks).toBe(0);expect(mock.destroy).toHaveBeenCalledTimes(1);engine.destroy();
+});
+
+it('releases faded drivers immediately without reviving stale snapshots, and rebuilds on explicit play or seek',async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockImplementation(async()=>({update:mock.update,destroy:mock.destroy}));
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const faded={'fake:bgm':{...snapshot['fake:bgm'],stopAfterMs:500}};
+ engine.update(faded,assets,{...frame,timeMs:1000,elapsedMs:0});await new Promise(r=>setTimeout(r,0));
+ expect(engine.status().cache.encoded.pinned).toBe(1);
+ engine.update(faded,assets,{...frame,timeMs:1499,elapsedMs:499,playing:false});expect(mock.destroy).not.toHaveBeenCalled();
+ engine.update(faded,assets,{...frame,timeMs:1500,elapsedMs:500});expect(mock.destroy).toHaveBeenCalledTimes(1);expect(engine.status().cache.encoded.pinned).toBe(0);
+ engine.update(faded,assets,{...frame,timeMs:1800,elapsedMs:800});await new Promise(r=>setTimeout(r,0));expect(mock.factory).toHaveBeenCalledTimes(1);
+ engine.update(snapshot,assets,{...frame,timeMs:1800,elapsedMs:0});await new Promise(r=>setTimeout(r,0));expect(mock.factory).toHaveBeenCalledTimes(2);
+ engine.update(faded,assets,{...frame,identity:'seek',timeMs:5000,elapsedMs:0});await new Promise(r=>setTimeout(r,0));expect(mock.factory).toHaveBeenCalledTimes(3);engine.destroy();
+});
+
+it('unpins actual decoded PCM when a fade ends during a long unchanged step',async()=>{
+ const decode=vi.fn(async()=>({duration:5,length:240000,numberOfChannels:1,sampleRate:48000}));
+ class Device extends FakeAudio {sampleRate=48000;decodeAudioData=decode;createBufferSource(){return {playbackRate:{value:1},connect:vi.fn(),disconnect:vi.fn(),start:vi.fn(),stop:vi.fn()};}}
+ vi.stubGlobal('AudioContext',Device);const previous=mock.factory;mock.factory=undefined as any;
+ try{const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='},faded={'fake:bgm':{...snapshot['fake:bgm'],stopAfterMs:500}};
+ engine.update(faded,assets,{...frame,timeMs:1000,elapsedMs:0});await new Promise(r=>setTimeout(r,0));expect(engine.status().cache.pcm.pinned).toBe(1);
+ engine.update(faded,assets,{...frame,timeMs:1500,elapsedMs:500});expect(engine.status().cache.pcm.pinned).toBe(0);expect(engine.status().cache.encoded.pinned).toBe(0);engine.destroy();
+ }finally{mock.factory=previous;}
+});
+
+it('admits exactly 4 MiB encoded data including base64 padding without a false over-budget estimate',async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockImplementation(async()=>({update:mock.update,destroy:mock.destroy}));
+ const engine=new MediaEngine();engine.unlock();const data='data:audio/wav;base64,'+Buffer.alloc(4*1048576).toString('base64');
+ engine.update(snapshot,{r:data},frame);await new Promise(r=>setTimeout(r,0));expect(engine.status().error).toBeNull();expect(engine.status().cache.encoded.bytes).toBe(4*1048576);engine.destroy();
 });

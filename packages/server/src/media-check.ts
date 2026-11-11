@@ -4,10 +4,11 @@ import type { LocalResources } from './local-resources.ts';
 export async function inspectResources(project: Project | null, requests: ResourceRequest[], host: LocalResources) {
   const used = project ? mediaResourceIds(project) : new Set<string>();
   for (const id of nodeResourceIds(project)) used.add(id);
-  const resourceInfo: Record<string, LocalResourceInfo> = {}, diagnostics: Diagnostic[] = [];
+  const resourceInfo: Record<string, LocalResourceInfo & {encodedBytes?:number}> = {}, diagnostics: Diagnostic[] = [];
   for (const request of requests) if (used.has(request.id)) {
     const result = await host.inspect(request);
-    if (result.info) resourceInfo[request.id] = result.info;
+    const prepared=await host.prepared(request);
+    if (result.info||prepared) resourceInfo[request.id] = { ...result.info, ...(prepared?.audio?{...prepared.audio,durationMs:prepared.audio.contentFrames/prepared.audio.sourceSampleRate*1000}:{}), ...(prepared?{encodedBytes:prepared.bytes}:{}) };
     if (result.diagnostic) diagnostics.push(result.diagnostic);
   }
   return { resourceInfo, diagnostics };
@@ -45,12 +46,18 @@ export function mediaDiagnostics(project: Project, info: Record<string, LocalRes
 }
 
 /** PCM memory is charged per resource, including both sides of an active crossfade. */
-export function mediaBudgetDiagnostics(project: Project, info: Record<string, LocalResourceInfo | import('@joplo-app/kit/plugin').AudioRegion>): Diagnostic[] {
+export function mediaBudgetDiagnostics(project: Project, info: Record<string, (LocalResourceInfo | import('@joplo-app/kit/plugin').AudioRegion) & {encodedBytes?:number}>): Diagnostic[] {
   const out: Diagnostic[] = [], budget = 32 * 1024 * 1024;
+  const encodedSeen=new Set<string>();
+  for(const sc of Object.values(project.scenarios))for(const [position,snapshot,at] of [[0,sc.media,undefined],...sc.steps.map((s,i)=>[i+1,s.media,s.source] as const)] as const){
+    const ids=[...new Set(Object.values(snapshot??{}).filter(t=>(t.stopAfterMs??1)>0&&(t.endAfterMs??1)>0).map(t=>t.resource))].sort();
+    const known=ids.filter(id=>info[id]?.encodedBytes!==undefined),bytes=known.reduce((n,id)=>n+info[id]!.encodedBytes!,0),key=ids.join(',');
+    if(bytes>4*1048576&&!encodedSeen.has(key)){encodedSeen.add(key);out.push({code:'MEDIA_ENCODE_BUDGET',severity:'warning',source:'structure',at,message:`${sc.id} position ${position}: simultaneous encoded audio [${ids.join(', ')}] needs ${bytes} bytes (${(bytes/1048576).toFixed(2)} MiB), exceeding the 4 MiB encoded cache${known.length<ids.length?'; additional resources unknown':''}. Transcode large WAV/PCM to lossless FLAC or another smaller supported format; the decoded 32 MiB budget is independent.`});}
+  }
   for (const sc of Object.values(project.scenarios)) {
     const seen = new Set<string>();
     for (const [position, snapshot, at] of [[0, sc.media, undefined], ...sc.steps.map((s, i) => [i + 1, s.media, s.source] as const)] as const) {
-      const ids = [...new Set(Object.values(snapshot ?? {}).filter(t => t.stopAfterMs === undefined || t.stopAfterMs > 0).map(t => t.resource))].sort();
+      const ids = [...new Set(Object.values(snapshot ?? {}).filter(t => (t.stopAfterMs === undefined || t.stopAfterMs > 0) && (t.endAfterMs === undefined || t.endAfterMs > 0)).map(t => t.resource))].sort();
       const key = ids.join(','); if (!key || seen.has(key)) continue; seen.add(key);
       let known = 0;
       const bytes = (rate: number) => ids.reduce((sum, id) => {
