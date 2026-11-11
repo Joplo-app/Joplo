@@ -3,12 +3,28 @@ import { mkdtemp, mkdir, readFile, writeFile, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { installSkill, managedSkillFile, PLUGIN_SKILL_MANIFEST } from '../src/skill.ts';
+import { runCli } from '../src/cli.ts';
 const dirs:string[]=[];
 afterEach(async()=>{await Promise.all(dirs.splice(0).map(d=>rm(d,{recursive:true,force:true})));});
 async function temp(){const d=await mkdtemp(join(tmpdir(),'joplo-plugin-skills-'));dirs.push(d);await writeFile(join(d,'package.json'),'{"type":"module"}');return d;}
 const base={kind:'plugin',apiVersion:2,id:'test',title:'Test provider',version:'1.0',packageName:'joplo-plugin-test',components:{},skill:'Read this entry before authoring.',skillTopics:{recipe:{description:'A recipe',body:'# Recipe\nUse the project contract.'}}};
 async function config(root:string,plugins:unknown[]){await writeFile(join(root,'joplo.config.ts'),`export default ${JSON.stringify({plugins})};\n`);}
 const file=(root:string,path:string)=>join(root,'.claude/skills',path);
+test('installed plugin skill names route entries and topics, including engine-name collisions',async()=>{
+ const root=await temp();await config(root,[base,{...base,id:'check',skill:'Plugin check entry.'}]);
+ const cwd=process.cwd();process.chdir(root);
+ const read=async(topic:string)=>{let output='';const code=await runCli(['skill',topic],{stdout:s=>{output+=s;},stderr:s=>{output+=s;},loadServer:async()=>{throw Error('guide reads must not load server');}});return {code,output};};
+ try {
+  expect(await read('joplo-plugin-test')).toEqual(await read('test'));
+  expect(await read('joplo-plugin-test/recipe')).toEqual(await read('test/recipe'));
+  expect(await read('joplo-plugin-check')).toEqual(await read('plugin:check'));
+  expect((await read('check')).output).not.toContain('Plugin check entry.');
+  const disabled=await read('joplo-plugin-missing');
+  expect(disabled.code).toBe(2);expect(disabled.output).toContain('not enabled in config.plugins');expect(disabled.output).not.toContain('Did you mean plugins');
+  const missing=await read('joplo-plugin-test/missing');
+  expect(missing.code).toBe(2);expect(missing.output).toContain('Available: recipe');
+ } finally {process.chdir(cwd);}
+});
 test('config.plugins drives installed entries, topics and index; adding/removing synchronizes only owned files',async()=>{
  const root=await temp();await config(root,[base]);
  const first=await installSkill(root,'1.0');expect(first.code).toBe(0);

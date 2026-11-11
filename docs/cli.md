@@ -198,6 +198,8 @@ Cloud 必须指定 `--share` 和 `--work`，避免另一个方案的确认结束
 
 `npx joplo skill` 先用几行讲清心智模型（预设场景的播放器，不是自由输入的应用原型）和起步顺序，再列出当前 CLI 版本、引擎主题、已启用插件及其主题；不限制技能长度，常见坑逐条保留。`npx joplo skill <主题>` 输出 Markdown，结尾指向相关主题。未知主题会建议编辑距离最近的名称并退出 2。
 
+已安装的插件技能名也可直接作为主题：`joplo skill joplo-plugin-<id>` 等价于 `joplo skill plugin:<id>`，子主题使用 `joplo-plugin-<id>/<topic>`。仅查找当前 `config.plugins` 启用的插件；未启用时说明配置与列表入口，不把插件名误猜成引擎主题。
+
 | 主题 | 内容 |
 | --- | --- |
 | authoring | 心智模型、起步顺序、目录、页面、布局、方案、flow、绑定、`when` 只接受条件表达式、带错误重试的表单示例、规则 |

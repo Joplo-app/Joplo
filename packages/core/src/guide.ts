@@ -30,7 +30,7 @@ export function pluginSkillIndex(plugins: readonly PluginSkillSource[]): string 
   ]),...(!plugins.length?['  None. Install an author package, add it to config.plugins, then read npx joplo skill <plugin-id>.']:[]),''].join('\n');
 }
 export function findPluginTopic(topic: string, plugins: readonly PluginSkillSource[]): PluginSkillSource|null {
-  const [id]=topic.replace(/^plugin:/,'').split('/');
+  const [id]=topic.replace(/^(?:plugin:|joplo-plugin-)/,'').split('/');
   if(!topic.startsWith('plugin:') && SKILL_TOPICS.some(t=>t.name===topic))return null;
   return plugins.find(p=>p.id===id)??null;
 }
@@ -958,7 +958,7 @@ The engine supplies authoring, compilation, state, scheduling and host services.
 ## Discover and use
 1. Read package.json and config.plugins. npx joplo skill lists engine topics plus enabled plugin entries/topics; .claude/skills/joplo-plugins/SKILL.md indexes installed files.
 2. Install a trusted author package, import its default manifest/factory and explicitly add it to config.plugins. Use the package's exact version when version-coupled to this CLI. A default export is either a manifest (list it as-is) or a factory that takes options (list its call, as its plugin guide shows); do not copy one package's form to another. A forgotten call is reported as config.plugins[i] is a function by check (PLUGIN_INVALID) and skill install, which then changes no skills; that message is a config fix, not missing dependencies.
-3. Run npx joplo skill <plugin-id> or <plugin-id>/<topic>, then import components and effects directly from that package. For ids colliding with engine topics use plugin:<id>/<topic>. Do not invent component names or copy another plugin's conventions.
+3. Run npx joplo skill <plugin-id> or <plugin-id>/<topic>, then import components and effects directly from that package. Installed skill names also work: joplo-plugin-<id> and joplo-plugin-<id>/<topic> resolve only enabled plugins. For ids colliding with engine topics use plugin:<id>/<topic> or the installed skill name. If a plugin guide is unavailable, check config.plugins and run npx joplo skill to list enabled guides. Do not invent component names or copy another plugin's conventions.
 4. Run npx joplo skill install after adding/removing plugins. It synchronizes per-plugin files and removes unchanged generated files for removed plugins; edited files are protected (inspect --diff before --force). Outside a project it installs only engine skills.
 5. A template may carry manually maintained plugin guides for reading before dependency installation; their absence does not prevent init. After install, rerun skill install to verify the live config; unresolved imports never mean a plugin was enabled successfully.
 6. joplo components inspects only the enabled manifests; a named query gives that component's declarations and example. For full recipes/behavior read its plugin skill.

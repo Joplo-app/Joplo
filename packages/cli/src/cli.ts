@@ -358,6 +358,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         const plugin = topic === undefined ? null : findPluginTopic(topic, plugins);
         if (plugin) stdout(pluginSkillTopic(plugin, topic?.split('/').slice(1).join('/') || undefined));
         else if (topic === undefined) stdout(`${skillIndex(await readCliVersion())}${pluginSkillIndex(plugins)}${note}`);
+        else if (/^(?:plugin:|joplo-plugin-)/.test(topic)) throw new JoploError('USAGE', `${note}Plugin guide "${topic}" is not enabled in config.plugins. Run npx joplo skill to list enabled plugin guides.`);
         else stdout(skillTopic(topic));
       }
     });
