@@ -3,13 +3,13 @@ import { ActionIcon, Alert, Button, Center, EmptyState, Group, Loader, Menu, Mod
 
 import { members, pending } from '../sample.ts';
 
-/** 打开弹窗并填写，成功与失败两个场景共用。 */
+/** 打开弹窗并填写，成功与失败两个场景共用。每个按钮点下去做什么写在按钮的 onClick 上，这里只写观众做什么。 */
 const fillAndSend = (name: string, opts: Parameters<typeof flow>[1]) =>
   flow(name, opts)
-    .click('btn_invite', '管理员点击右上角「邀请成员」，打开邀请弹窗', set($.ui.inviteOpen, true), uses('admin_only'))
+    .click('btn_invite', '管理员点击右上角「邀请成员」，打开邀请弹窗')
     .type('in_email', 'li.lei@example.com')
     .select('sel_role', '编辑者', uses('role_cap'))
-    .click('btn_send', '点击「发送邀请」，按钮进入发送中状态', set($.ui.sending, true), uses('no_double_submit'));
+    .click('btn_send', '点击「发送邀请」，按钮进入发送中状态');
 
 const sent = [
   set($.ui.sending, false), set($.ui.error, ''), set($.ui.inviteOpen, false),
@@ -27,7 +27,8 @@ export default work({
   on: {
     '/members': {
       'header.actions': (
-        <Button id="btn_invite" disabled={not($.ui.isAdmin)} disabledReason="只有空间管理员可以邀请成员" note="入口：成员页右上角，只对管理员可用">
+        <Button id="btn_invite" disabled={not($.ui.isAdmin)} disabledReason="只有空间管理员可以邀请成员" note="入口：成员页右上角，只对管理员可用"
+          onClick={[set($.ui.inviteOpen, true), uses('admin_only')]}>
           邀请成员
         </Button>
       ),
@@ -47,13 +48,13 @@ export default work({
       'pending.actions': (
         <Menu id="menu_pending" opened={$.ui.pendingMenu} position="bottom-end" when={$.ui.isAdmin}>
           <Menu.Target>
-            <ActionIcon id="btn_pending_more" variant="subtle" aria-label="管理待接受的邀请">⋯</ActionIcon>
+            <ActionIcon id="btn_pending_more" variant="subtle" aria-label="管理待接受的邀请" onClick={set($.ui.pendingMenu, true)}>⋯</ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
             <Menu.Label>zhao.lei@example.com</Menu.Label>
-            <Menu.Item id="mi_copy_link" leftSection="🔗" unmodeled>复制邀请链接</Menu.Item>
+            <Menu.Item id="mi_copy_link" leftSection="🔗" onClick={[set($.ui.pendingMenu, false), toast.success('已复制邀请链接')]}>复制邀请链接</Menu.Item>
             <Menu.Divider />
-            <Menu.Item id="mi_revoke" leftSection="✕" color="red">撤销邀请</Menu.Item>
+            <Menu.Item id="mi_revoke" leftSection="✕" color="red" onClick={[set($.ui.pendingMenu, false), set($.ui.revokeOpen, true), uses('revocable')]}>撤销邀请</Menu.Item>
           </Menu.Dropdown>
         </Menu>
       ),
@@ -77,8 +78,9 @@ export default work({
               <Text size="sm">正在发送邀请…</Text>
             </Group>
             <Group justify="flex-end" gap="sm">
-              <Button id="btn_cancel" variant="default" unmodeled note="取消并关闭：本版未建模，是否保留已填内容待决定">取消</Button>
-              <Button id="btn_send" disabled={$.ui.sending} disabledReason="正在发送，防止重复提交">发送邀请</Button>
+              <Button id="btn_cancel" variant="default" note="取消并关闭；再次打开时是否保留已填内容待决定" onClick={set($.ui.inviteOpen, false)}>取消</Button>
+              <Button id="btn_send" disabled={$.ui.sending} disabledReason="正在发送，防止重复提交"
+                onClick={[set($.ui.sending, true), set($.ui.error, ''), uses('no_double_submit')]}>发送邀请</Button>
             </Group>
           </Stack>
         </Modal>,
@@ -86,8 +88,11 @@ export default work({
         <Modal id="dlg_revoke" opened={$.ui.revokeOpen} title="撤销这个邀请？" size="sm">
           <Text size="sm">zhao.lei@example.com 的邀请链接会立即失效。之后还可以重新邀请。</Text>
           <Group justify="flex-end" gap="xs">
-            <Button id="btn_revoke_cancel" variant="default" unmodeled>取消</Button>
-            <Button id="btn_revoke_confirm" color="red">撤销邀请</Button>
+            <Button id="btn_revoke_cancel" variant="default" onClick={set($.ui.revokeOpen, false)}>取消</Button>
+            <Button id="btn_revoke_confirm" color="red"
+              onClick={[set($.ui.revokeOpen, false), set($.ui.revoked, true), set($.data.pending, [{ email: 'zhao.lei@example.com', role: '查看者', status: '已撤销' }]), uses('revocable')]}>
+              撤销邀请
+            </Button>
           </Group>
         </Modal>,
       ],
@@ -124,16 +129,15 @@ export default work({
     failure: fillAndSend('发送失败后重试', { cases: ['request_failed'], outcome: 'failure', mock: '模拟失败后重试成功' })
       .system('邀请请求失败（模拟网络超时）', '发送失败：弹窗不关，保留已填内容',
         set($.ui.sending, false), set($.ui.error, '网络超时。已保留你填写的内容，可以重试。'), uses('keep_input'))
-      .click('btn_send', '点击「发送邀请」重试', set($.ui.sending, true), set($.ui.error, ''), uses('keep_input'))
+      .click('btn_send', '点击「发送邀请」重试', uses('keep_input'))
       .system('邀请请求成功（模拟）', ...sent),
 
     // PM 视角：Given 有一个待接受的邀请 → When 管理员撤销、对方再打开链接 → Then 看到“已失效”和下一步（revoked 的 expected）
     revoke: flow('撤销邀请后对方再打开链接', { cases: ['revoked'], start: '/members', description: '管理员撤销邀请，赵磊再打开链接时看到已失效',
       expected: '链接页说明邀请已失效，并告诉对方去找空间管理员' })
-      .click('btn_pending_more', '打开待接受邀请的菜单', set($.ui.pendingMenu, true))
-      .click('mi_revoke', '选择「撤销邀请」', set($.ui.pendingMenu, false), set($.ui.revokeOpen, true), uses('revocable'))
-      .click('btn_revoke_confirm', '确认后邀请立即失效', set($.ui.revokeOpen, false), set($.ui.revoked, true),
-        set($.data.pending, [{ email: 'zhao.lei@example.com', role: '查看者', status: '已撤销' }]), uses('revocable'))
+      .click('btn_pending_more', '打开待接受邀请的菜单')
+      .click('mi_revoke', '选择「撤销邀请」')
+      .click('btn_revoke_confirm', '确认后邀请立即失效')
       .card('第二天', { sub: '赵磊打开了邮件里的邀请链接' })
       .system('打开邀请链接', '链接页说明已失效和下一步', go('/join'), done('赵磊知道邀请已失效、该找谁')),
 

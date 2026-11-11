@@ -69,7 +69,7 @@ describe('TSX 邀请示例编译', () => {
 
   it('禁用与未建模的点击解释仍由播放器决定', () => {
     expect(explainClick(dev, initialState(dev, 'invite.a-modal.denied'), 'btn_invite')).toEqual({ kind: 'disabled', reason: '只有空间管理员可以邀请成员' });
-    expect(explainClick(dev, initialState(dev, 'invite.a-modal.success'), 'nav_settings').kind).toBe('unmodeled');
+    expect(explainClick(dev, initialState(dev, 'invite.a-modal.success'), 'nav_overview').kind).toBe('unmodeled');
   });
 
   it('发布模式：只含选定方案，去掉规则、情况、问题、备注与源路径', () => {
