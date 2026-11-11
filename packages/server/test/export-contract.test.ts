@@ -191,3 +191,11 @@ describe('offline export fixture: two orientations, continuing chapters, three c
     expect(repeated.steps.map((s: any, i: number) => Math.abs(s.commitMs - timeline.steps[i].commitMs)).every((n: number) => n <= 50)).toBe(true);
   }, 120000);
 });
+
+it('timeline retains delay planning, remaining wait, duck and per-track policy and distinguishes same-source delayed events',()=>{
+ const cue={resource:'r',offsetMs:250,startOffsetMs:250,startDelayMs:500,delayRemainingMs:500,startEventId:'first',duck:false,maxRetiring:1,volume:.7,fadeInMs:100};
+ const raw={schemaVersion:1 as const,startedAt:100,events:[{at:200,engineMs:100,scenarioId:'a',position:1,stepId:'a#1',media:{bgm:cue}},{at:600,engineMs:500,scenarioId:'b',position:0,media:{bgm:{...cue,delayRemainingMs:100}}},{at:800,engineMs:700,scenarioId:'b',position:1,stepId:'b#1',media:{bgm:{...cue,startEventId:'second'}}}]};
+ const timeline=playbackTimeline(raw);expect(timeline.mediaEvents.filter(e=>e.action==='play')).toHaveLength(2);expect(timeline.mediaEvents[0]).toMatchObject({engineMs:100,snapshot:cue});
+ expect((timeline.events[1]!.media as any).bgm).toMatchObject({startDelayMs:500,delayRemainingMs:100,duck:false,maxRetiring:1});
+ expect(timeline.timing.sampleToleranceMs).toBe(50);
+});

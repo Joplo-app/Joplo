@@ -211,3 +211,9 @@
 沿用既有模型状态页、组件和场景，不调整布局或新增平行项目。可复用的范围选择与依赖失败边界已同步引擎 authoring 及 3D generation 指南；资源对象应直接传 prop、不能插值成 CSS URL 的经验已同步 plugins 与 UI 指南。
 
 本轮验证：`joplo check examples/joplo` 为 0 error / 16 warning / 41 info；当前 checkout 普通 build 通过。修改仅追加既有系统步骤与状态文案，未修改页面布局。资源与技能相关 72 项测试及仓库类型检查通过；实际读取 authoring/plugins/ui/scene3d-generation 技能，并运行限定作品的 CLI JSON dry-run。
+
+### 音轨增量：根据本轮源码整理，尚未发行
+
+在既有 `music.a-render` 追加 `playback_policy`，复用终端 Cmd 和状态绑定，呈现 issues #93 / #109 的显式 startDelayMs、duck 豁免与每轨 maxRetiring。未修改 voice 功能场景，未新增人工批准记录；命令是文字示意，不执行 Alda、不生成付费声音。原计划与剩余等待、源位置、自然截止及轨级退场边界已同步引擎 plugins、Alda 与 media 指南。只追加文案和既有组件，未调整视觉布局。
+
+本轮验证：当前 checkout `check examples/joplo` 为 0 error / 16 warning / 41 info，普通 build 129 文件通过；独立 JOPLO_HOME 静态截图核对 `music.a-render.playback_policy#1` 正文与命令均完整，既有宿主角标覆盖导航链接的提示未因本轮改变。Core/播放器/插件媒体测试通过，技能生成及安装一致性测试通过，实际读取 plugins / alda / media 指南。离线 PCM WAV 的 Chromium 双事件、跨章录制保留全部延迟/duck字段及独立音频资产，400ms计划延迟实测提交到声能阈值387.07ms，按现有 timeline 50ms 容差验收；这是本机录制证据，不新增声学精度承诺，也不代替人工听感审查。未调用 TTS、Alda 渲染或付费生成。

@@ -551,3 +551,9 @@ ctx.act?.('model', { type: 'plugin', name: 'probe:rotate', data: { angle: 90 } }
 ### 契约分层
 
 - 稳定层：`@joplo-app/kit/renderer`、`PublicTraits`。内部层：`@joplo-app/kit/renderer-internal`、`StandardLibraryTraits`。守护测试在 `packages/core/test/ui-plugin.test.ts`。
+
+### 音轨提交后的等待与退场策略
+
+play 命令可选 `startDelayMs`（0–60000 引擎毫秒）、`duck`（默认 true；旁白时 gain × .25，false 仅豁免该轨）与 `maxRetiring`（整数 0–32，默认不限制；每条命名轨，不含当前曲）。`maxRetiring:1` 保留当前曲和最近一条退场曲，淘汰按退休先后，不按资源名称或剩余淡出时长。宿主同时约束编译快照与运行时实际淡出槽；静态估算提前删去的旧槽不能绕过上限。
+
+快照保留原计划 `startDelayMs`、剩余 `delayRemainingMs` 与显式延迟事件的确定身份 `startEventId`；等待先于源位置推进，`offsetMs` 始终是源位置，`endAfterMs` 不含等待。暂停冻结引擎时钟，速率影响墙钟等待，fadeIn 从实际起音开始。跨章继承事件身份和剩余等待；seek 按该快照恢复。新曲等待时旧曲仍从提交开始退场。延迟不延长步骤 hold，不引入流式音频或子时间轴。实际 timeline 的 play 是观察到的提交事件；完整快照与离线音频元数据保留这些策略，不能据此声称额外的声画采样精度。

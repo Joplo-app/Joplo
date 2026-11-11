@@ -27,7 +27,10 @@ function validMediaCommand(value: unknown, plugin: string, owners: ReadonlyMap<s
   if (value.fadeMs !== undefined && (typeof value.fadeMs !== 'number' || value.fadeMs < 0 || value.fadeMs > 30000)) return false;
   if (value.action === 'stop') return Object.keys(value).every(k => ['track', 'action', 'fadeMs'].includes(k));
   if (value.action !== 'play' || typeof value.resource !== 'string' || owners.get(value.resource) !== plugin) return false;
-  return Object.keys(value).every(k => ['track', 'action', 'resource', 'volume', 'loop', 'fadeMs', 'offsetMs', 'oneShot', 'durationMs'].includes(k))
+  return Object.keys(value).every(k => ['track', 'action', 'resource', 'volume', 'loop', 'fadeMs', 'offsetMs', 'oneShot', 'durationMs', 'startDelayMs', 'duck', 'maxRetiring'].includes(k))
+    && (value.startDelayMs === undefined || typeof value.startDelayMs === 'number' && Number.isFinite(value.startDelayMs) && value.startDelayMs >= 0 && value.startDelayMs <= 60000)
+    && (value.duck === undefined || typeof value.duck === 'boolean')
+    && (value.maxRetiring === undefined || typeof value.maxRetiring === 'number' && Number.isSafeInteger(value.maxRetiring) && value.maxRetiring >= 0 && value.maxRetiring <= 32)
     && (value.oneShot === undefined || typeof value.oneShot === 'boolean')
     && (value.durationMs === undefined || typeof value.durationMs === 'number' && Number.isFinite(value.durationMs) && value.durationMs > 0)
     && (!value.oneShot || value.loop !== true && typeof value.durationMs === 'number' && value.durationMs > (typeof value.offsetMs === 'number' ? value.offsetMs : 0))
@@ -259,6 +262,7 @@ export class PluginCompiler {
   frames(project: Project): void {
     // 接力（flow({ from })，D92）：先算被接力的一章，下一章第 0 步继承它结尾的配乐（推进它最后一步的停留估算）
     const ended = new Map<string, MediaSnapshot>();
+    const retiringKeys = new Set<string>();
     const order: Scenario[] = [];
     const visit = (sc: Scenario, seen = new Set<string>()) => {
       if (order.includes(sc) || seen.has(sc.id)) return;
@@ -291,18 +295,27 @@ export class PluginCompiler {
           for (const [eventIndex, c] of (this.mediaCommands.get(sc.steps[i - 1]!.id) ?? []).entries()) {
             const key = `${c.plugin}:${c.track}${c.action === 'play' && c.oneShot ? `@${sc.steps[i - 1]!.id}:${eventIndex}` : ''}`;
             const current = media[key];
-            if (c.action === 'play' && current?.resource === c.resource && c.offsetMs === undefined) {
+            if (c.action === 'play' && current?.resource === c.resource && c.offsetMs === undefined && c.startDelayMs === undefined) {
               // 同一首再 play：继续播放（含取消正在进行的淡出），只更新音量与循环
-              const { stopAfterMs: _fading, ...kept } = current;
-              media[key] = { ...kept, volume: c.volume ?? 1, loop: c.loop ?? false };
+              const { stopAfterMs: _fading, duck: _duck, maxRetiring: _limit, ...kept } = current;
+              media[key] = { ...kept, volume: c.volume ?? 1, loop: c.loop ?? false, ...(c.duck !== undefined ? { duck: c.duck } : {}), ...(c.maxRetiring !== undefined ? { maxRetiring: c.maxRetiring } : {}) };
             } else if (c.action === 'play') {
               // 换曲：有 fadeMs 时旧曲换到「轨道>旧资源」键上同时淡出，与新曲交叉，中间没有静音
-              if (current && c.fadeMs) media[`${key}>${current.resource}`] = { ...current, stopAfterMs: Math.min(current.stopAfterMs ?? c.fadeMs, c.fadeMs) };
-              media[key] = { plugin: c.plugin, resource: c.resource, offsetMs: c.offsetMs ?? 0, ...(c.offsetMs !== undefined ? { startOffsetMs: c.offsetMs } : {}), volume: c.volume ?? 1, loop: c.loop ?? false, fadeInMs: c.fadeMs ?? 0, ...(c.oneShot ? { endAfterMs: c.durationMs! - (c.offsetMs ?? 0) } : {}) };
+              if (current && c.fadeMs) {
+                const old = `${key}>${current.resource}`;
+                const retiring = retiringKeys.has(old) ? `${old}@${sc.steps[i - 1]!.id}:${eventIndex}` : old;
+                retiringKeys.add(old);
+                media[retiring] = { ...current, stopAfterMs: Math.min(current.stopAfterMs ?? c.fadeMs, c.fadeMs) };
+              }
+              media[key] = { plugin: c.plugin, resource: c.resource, offsetMs: c.offsetMs ?? 0, ...(c.startDelayMs !== undefined ? { startDelayMs: c.startDelayMs, delayRemainingMs: c.startDelayMs, startEventId: `${sc.steps[i - 1]!.id}:${eventIndex}` } : {}), ...(c.duck !== undefined ? { duck: c.duck } : {}), ...(c.maxRetiring !== undefined ? { maxRetiring: c.maxRetiring } : {}), ...(c.offsetMs !== undefined ? { startOffsetMs: c.offsetMs } : {}), volume: c.volume ?? 1, loop: c.loop ?? false, fadeInMs: c.fadeMs ?? 0, ...(c.oneShot ? { endAfterMs: c.durationMs! - (c.offsetMs ?? 0) } : {}) };
             } else {
               for (const k of Object.keys(media)) if (k === key || k.startsWith(`${key}>`)) {
                 if (c.fadeMs) media[k] = { ...media[k]!, stopAfterMs: Math.min(media[k]!.stopAfterMs ?? c.fadeMs, c.fadeMs) }; else delete media[k];
               }
+            }
+            if (c.action === 'play' && c.maxRetiring !== undefined) {
+              const retiring = Object.keys(media).filter(k => k.startsWith(`${key}>`));
+              for (const old of retiring.slice(0, Math.max(0, retiring.length - c.maxRetiring))) delete media[old];
             }
           }
         }

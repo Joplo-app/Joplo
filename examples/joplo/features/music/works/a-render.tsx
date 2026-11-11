@@ -5,7 +5,7 @@ const recover = 'node --input-type=module -e "import(\'@joplo-app/plugin-alda/lo
 export default work({
   title: 'A · 本机渲染，音频随站点',
   summary: '按 D93 当前实现制作流程示意；终端文字是可读示例，精确测量以真实项目 check/build 为准',
-  state: { ui: { checked: false, built: false, offline: false, ready: false, wrong: false, fixed: false } },
+  state: { ui: { checked: false, built: false, offline: false, ready: false, wrong: false, fixed: false, policy: false } },
   on: { '/distribution/terminal': { lines: [
     <Cmd id="music_check" when={$.ui.checked} cmd="npx joplo check" out={'MUSIC_SCORE film: 24.000 s; piano=16, percussion=32\nmarkers %opening=0.000 s, %chapter=12.000 s\n0 error · 示例输出，按实际曲式核对'} />,
     <Cmd id="music_build" when={$.ui.built} cmd="npx joplo build" out={'MEDIA_ASSET: MP3 96kbps 字节数与时长\nMEDIA_BUDGET / SITE_BUDGET: 音频与整站预算\ncredits.txt + music-LICENSE.txt: FluidR3Mono GM · MIT\n源谱、SoundFont 和本机路径不进入站点'} />,
@@ -13,8 +13,10 @@ export default work({
     <Cmd id="music_ready" when={$.ui.ready} cmd={recover} out={'音色与许可 SHA-256 校验后保存在 JOPLO_HOME。\n再次构建复用缓存，不要求观众安装软件。'} />,
     <Cmd id="music_wrong" when={$.ui.wrong} cmd="npx joplo check" tone="error" out={'error MUSIC_MARKER_MISSING\nmusic.play 的 from 指向不存在的 %chpater\n这是检查结果示意；实际诊断包含作者文件与行号。'} />,
     <Cmd id="music_fixed" when={$.ui.fixed} cmd="npx joplo check" out={'from 改为 chapter（不带 %）\nMUSIC_SCORE: %chapter=12.000 s\n0 error；IR 写入 offsetMs=12000，不写 marker 字符串。'} />,
+    <Cmd id="music_policy" when={$.ui.policy} cmd="music.play('film', { startDelayMs: 300, duck: false, maxRetiring: 1 })" out={'根据 #93 / #109 本轮源码整理，尚未发行。\n提交后等 300 引擎毫秒；offset 仍是源位置，暂停冻结等待。\nduck:false 只豁免该轨；默认仍随旁白 × .25。\nmaxRetiring:1 = 当前曲 + 最近一条退场曲；默认不截断。'} />,
   ] } },
   scenarios: {
+    playback_policy: flow('音轨等待与退场策略', {start:'/distribution/terminal',mock:'根据本轮源码整理；命令是文字示意，不合成音频',expected:'区分等待、源位置、旁白避让与每轨退场上限'}).system('提交后等待',set($.ui.policy,true)).system('恢复与核验','跨章继承等待；跳转按快照恢复'),
     marker: run(flow('核对曲式，再从章节起播', {start:'/distribution/terminal',cases:['marker'],mock:'当前实现的终端流程示意；不会执行 shell 或发布',expected:'同一个 marker 时间用于起播、跳步和深链'}).card('先算小节，再核对章节', {sub:'8 小节 × 4 拍 × 60 / 80 BPM = 24 秒；旁白下留出空间'}), 'npx joplo check', $.ui.checked, '核对声部小节数和 marker 的实际时间', uses('timing')).key('check-markers')
       .system('从章节进入', '从 chapter 起播，旁白下压低配乐', uses('rendered'))
       .type('term_cmd','npx joplo build','只把音频与署名打进站点',set($.ui.built,true),set($.inputs.term_cmd,''))

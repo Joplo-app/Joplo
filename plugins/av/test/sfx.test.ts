@@ -18,3 +18,10 @@ it('lowers one-shot assets through resource cache and validates names/offset/vol
  for(const effect of [sfx.play('unknown'),sfx.play('send',{volume:NaN}),sfx.play('send',{offsetMs:1000})]) plugin.compile!.effect!(effect,ctx as never);
  expect(errors).toEqual(['SFX_INVALID','SFX_INVALID','SFX_INVALID']);
 });
+
+it('passes delay and duck exemption without changing source trim and rejects invalid policies',()=>{
+ const plugin=withSoundEffects({send:wav()}),errors:string[]=[];const ctx={report:(code:string)=>errors.push(code),resource:()=> 'r'};
+ expect(plugin.compile!.effect!(sfx.play('send',{offsetMs:200,startDelayMs:300,duck:false}),ctx as never)).toMatchObject({media:[{offsetMs:200,startDelayMs:300,duck:false,durationMs:1000}]});
+ for(const options of [{startDelayMs:-1},{startDelayMs:60001},{duck:'false'}])plugin.compile!.effect!(sfx.play('send',options as never),ctx as never);
+ expect(errors).toEqual(['SFX_INVALID','SFX_INVALID','SFX_INVALID']);
+});

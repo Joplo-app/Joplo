@@ -39,7 +39,7 @@ export function playbackTimeline(raw: RawTimeline, outputOriginMs = raw.startedA
     const emit = (track: string, action: TimelineMediaEvent['action'], value: Record<string, unknown>, fadeMs = 0) => mediaEvents.push({ track, action, engineMs: e.engineMs, outputMs: e.at - outputOriginMs, resource: String(value.resource), offsetMs: Number(value.offsetMs ?? 0), volume: Number(value.volume ?? 1), fadeMs, snapshot: value });
     for (const [track, value] of Object.entries(current)) {
       const before = previous[track];
-      if (!before || before.resource !== value.resource) emit(track, 'play', value, Number(value.fadeInMs ?? 0));
+      if (!before || before.resource !== value.resource || before.startEventId !== value.startEventId) emit(track, 'play', value, Number(value.fadeInMs ?? 0));
       else if (value.startOffsetMs !== undefined && value.startOffsetMs !== before.startOffsetMs) emit(track, 'seek', value, Number(value.fadeInMs ?? 0));
       if (value.stopAfterMs !== undefined && before?.stopAfterMs === undefined) emit(track, 'stop', value, Number(value.stopAfterMs));
       else if (before && value.volume !== before.volume && value.stopAfterMs === undefined) emit(track, 'volume', value);
