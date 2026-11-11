@@ -112,3 +112,27 @@ it('localResource guards stay outside recorded narration, measured hold and offl
   expect(timeline.assets.find((a: any) => a.kind === 'narration')).toMatchObject({ audioInfo: info });
   expect(JSON.stringify(timeline)).not.toContain('base64');
 }, 120000);
+
+it('samples video alongside supplied narration and delayed unducked sound across chapters', async () => {
+  const dir = fixture();
+  fs.symlinkSync(path.resolve('packages/server/node_modules/playwright-core'), path.join(dir, 'node_modules/playwright-core'), 'dir');
+  fs.copyFileSync(new URL('./fixtures/numbered-video.mp4', import.meta.url), path.join(dir, 'numbers.mp4'));
+  const media = JSON.stringify(path.resolve('plugins/av/src/plugin.ts'));
+  fs.writeFileSync(path.join(dir, 'joplo.config.ts'), fixtureConfigSource(`import {config,asset} from '@joplo-app/kit';import {withSoundEffects} from ${media};export default config({name:'Combined media',voice:{profile:'openai'},plugins:[withSoundEffects({cue:asset('./clip.wav')})]});`));
+  fs.writeFileSync(path.join(dir, 'works/demo.tsx'), `import {work,chapter,narrate,hold,asset} from '@joplo-app/kit';import {Video,playClip,sfx} from ${media};export default work({title:'Combined media',summary:'One shared clock',pace:{systemLead:.05},stage:<Video id="clip" src={asset('../numbers.mp4')} w={128} h={32}/>,scenarios:{intro:chapter('Intro').system('Long caption '.repeat(30),narrate('Supplied recording',{audio:asset('../clip.wav')}),hold('voice',{pad:.2}),playClip('clip',{from:0,to:.3}),sfx.play('cue',{startDelayMs:200,duck:false})),next:chapter('Next').system('Continue',narrate(false),hold('audio',asset('../clip.wav'),{pad:0}),playClip('clip',{from:.3,to:.6}))}});`);
+  const { renderFrames } = await import('../src/film.ts');
+  const output = await renderFrames({ projectDir: dir, scenarioId: 'demo.intro', chain: true, voice: 'real', framesOut: path.join(dir, 'frames'), fps: 10, logicalViewport: { width: 256, height: 128 }, crop: '[data-jid="clip"]' });
+  const timeline = JSON.parse(fs.readFileSync(output.timeline, 'utf8'));
+  const narration = timeline.events.filter((e: any) => e.type === 'narration');
+  expect(narration).toHaveLength(1);
+  expect(narration[0]).toMatchObject({ provided: true, source: 'clip', durationMs: 600 });
+  expect(timeline.mediaEvents).toEqual(expect.arrayContaining([expect.objectContaining({ action: 'play', snapshot: expect.objectContaining({ startDelayMs: 200, duck: false, startEventId: expect.any(String) }) })]));
+  expect(new Set(timeline.steps.map((s: any) => s.scenarioId))).toEqual(new Set(['demo.intro', 'demo.next']));
+  expect(timeline.assets.map((a: any) => a.kind)).toEqual(expect.arrayContaining(['narration', 'media']));
+  expect(timeline.assets.every((a: any) => fs.existsSync(path.resolve(path.dirname(output.timeline), a.file)))).toBe(true);
+  expect(JSON.stringify(timeline)).not.toContain('base64');
+  expect(output.frames).toBeGreaterThan(10);
+  expect(output.durationMs).toBeLessThan(3500);
+  const pixels = fs.readdirSync(output.directory).filter(name => name.endsWith('.jpg')).map(name => crypto.createHash('sha256').update(fs.readFileSync(path.join(output.directory, name))).digest('hex'));
+  expect(new Set(pixels).size).toBeGreaterThan(3);
+}, 120000);
