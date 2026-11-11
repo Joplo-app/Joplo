@@ -78,7 +78,7 @@ npx joplo dev --open
 
 首次运行启动本地看板，默认绑定 `127.0.0.1:4790`，打印项目链接。`--open` 打开浏览器；`--port` 接受 1–65535 的整数，启动新看板时指定端口。端口被其他应用占用时明确报错，不静默换端口。
 
-同一个 `JOPLO_HOME` 下已有存活看板时，再次运行只注册当前项目、打印链接并退出，不再启动第二个进程；这时优先加入已有看板。加入时 stderr 写出那个看板的 Joplo 版本和启动目录（`[joplo] Joined the running board: Joplo 0.2.7, started in /path/to/demo (pid 123)`）；它的版本和当前项目的 Joplo 不一致时（0.2.6 及更早的看板不报版本，也算不一致）多一行 `!` 警告：看板可能表现不同，要用当前版本就在它的终端按 Ctrl+C（或 `kill <pid>`）停掉，再在这里运行 `joplo dev`（D65）。`JOPLO_HOME` 默认 `~/.joplo`：projects.json 记最近项目，server.json 记运行实例，settings.json 记主题选择。
+同一个 `JOPLO_HOME` 下已有存活看板时，再次运行将当前项目加入该看板，等待初次编译完成后打印链接并退出，不再启动第二个进程；编译成功时无需先打开浏览器，打印的本地 feedback watch 命令即可读取评审登记。编译失败时先处理诊断并等待成功编译，再启动 watcher。评审没有闲置超时；用 `feedback list --local --all --json` 查看关闭原因（源码修改、编译失败或宿主退出）。加入的项目仍依赖原看板进程，保留其终端；宿主退出后重新运行 dev 和 watcher。加入时 stderr 写出那个看板的 Joplo 版本和启动目录（`[joplo] Joined the running board: Joplo 0.2.7, started in /path/to/demo (pid 123)`）；它的版本和当前项目的 Joplo 不一致时（0.2.6 及更早的看板不报版本，也算不一致）多一行 `!` 警告：看板可能表现不同，要用当前版本就在它的终端按 Ctrl+C（或 `kill <pid>`）停掉，再在这里运行 `joplo dev`（D65）。`JOPLO_HOME` 默认 `~/.joplo`：projects.json 记最近项目，server.json 记运行实例，settings.json 记主题选择。
 
 首页可切换项目与功能；源文件变化只重新编译对应项目，保存后热更新。编译出错时显示诊断，并保留上一次成功的画面；修复后恢复。界面和交互见[看板文档](web.md)。
 
@@ -197,6 +197,8 @@ Cloud 必须指定 `--share` 和 `--work`，避免另一个方案的确认结束
 ## skill
 
 `npx joplo skill` 先用几行讲清心智模型（预设场景的播放器，不是自由输入的应用原型）和起步顺序，再列出当前 CLI 版本、引擎主题、已启用插件及其主题；不限制技能长度，常见坑逐条保留。`npx joplo skill <主题>` 输出 Markdown，结尾指向相关主题。未知主题会建议编辑距离最近的名称并退出 2。
+
+已安装的插件技能名也可直接作为主题：`joplo skill joplo-plugin-<id>` 等价于 `joplo skill plugin:<id>`，子主题使用 `joplo-plugin-<id>/<topic>`。仅查找当前 `config.plugins` 启用的插件；未启用时说明配置与列表入口，不把插件名误猜成引擎主题。
 
 | 主题 | 内容 |
 | --- | --- |
@@ -619,15 +621,18 @@ prepare 的返回基线是权威值；用它编译旧版，不能继续使用候
 
 组件目录由 config.plugins 生成：`joplo components` 列出启用插件的组件，`joplo skill ui/components` 读取 UI 专题；`joplo components ui:Button` 或唯一短名 `Button` 输出属性和例子。作者直接从插件包导入，不再使用 kit/ui 或 kit.trace；未启用插件时报安装与配置诊断。
 
-### `joplo resources [dir] [--dry-run] [--allow-spend] [--format json]`
+### `joplo resources [dir] [--work <qid>] [--dry-run] [--allow-spend] [--format json]`
 
 生成源码声明的持久本机资源（例如启用 Tripo 后的模型）。`--dry-run` 列出每项估计 credits，不联网、不生成。普通终端逐项显示费用后询问；非交互/JSON 模式不询问，也默认不花钱，只有显式 `--allow-spend` 才授权所展示的估计。已有项目产物直接复用、费用 0。拒绝生成或失败返回诊断与非零退出码，dry-run 仅估算。
 
 ```sh
 npx joplo resources --dry-run
+npx joplo resources --work intro --dry-run  # 独立作品键，或 feature.option
 npx joplo resources                 # 逐项确认
 npx joplo resources --allow-spend   # 已获得用户授权时的非交互调用
 ```
+
+--work 在模块载入前限定作品，其他作品的载入/编译错误不阻塞该任务；共享 config/routes/layouts 仍须有效。选择范围之外的跨作品引用会明确失败，不会自动扩大付费范围。
 
 check/build/render 不会授予生成许可。把 `assets/models/*.glb` 和同名 JSON 提交 Git，队友和 CI 不需要 Key；丢失输出时先从 Git 恢复。超时/断网后重新运行 resources 续查已记录 task_id；unknown/creating 日志必须先从供应商任务历史恢复，不能删日志盲重试。Key 在看板 Voice → 管理密钥 → Tripo 保存（本机 0600），或使用 TRIPO_API_KEY，不写项目配置。版本对应详细用法：`joplo skill scene3d/generation`、`joplo skill scene3d/models`。
 

@@ -283,10 +283,10 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         await withWatchSignal(signal => watchCloudFeedback(client, shareId, opts, { out: stdout, err: stderr }, signal));
       }
     });
-  program.command('resources').argument('[dir]', 'Project directory', '.').option('--dry-run', 'List missing persistent resources and estimated credits').option('--allow-spend', 'Authorize the displayed generation estimates').addOption(format()).action(async (dir, opts) => {
+  program.command('resources').argument('[dir]', 'Project directory', '.').option('--work <qid>', 'Generate resources for one independent work key or qualified option id').option('--dry-run', 'List missing persistent resources and estimated credits').option('--allow-spend', 'Authorize the displayed generation estimates').addOption(format()).action(async (dir, opts) => {
     const generateResources = await serverFunction('generateResources');
     const interactive = deps.interactive ?? (!!process.stdin.isTTY && !!process.stderr.isTTY && !process.env.CI);
-    const data = await generateResources(resolve(dir), { dryRun: !!opts.dryRun, allowSpend: !!opts.allowSpend, onProgress: s => stderr(`${s}\n`), confirm: interactive && opts.format !== 'json' ? deps.ask ?? (async message => {
+    const data = await generateResources(resolve(dir), { work: opts.work, dryRun: !!opts.dryRun, allowSpend: !!opts.allowSpend, onProgress: s => stderr(`${s}\n`), confirm: interactive && opts.format !== 'json' ? deps.ask ?? (async message => {
       const { createInterface } = await import('node:readline/promises');
       const rl = createInterface({input:process.stdin,output:process.stderr});
       try { return /^(y|yes)$/i.test((await rl.question(`${message} [y/N] `)).trim()); } finally { rl.close(); }
@@ -358,6 +358,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         const plugin = topic === undefined ? null : findPluginTopic(topic, plugins);
         if (plugin) stdout(pluginSkillTopic(plugin, topic?.split('/').slice(1).join('/') || undefined));
         else if (topic === undefined) stdout(`${skillIndex(await readCliVersion())}${pluginSkillIndex(plugins)}${note}`);
+        else if (/^(?:plugin:|joplo-plugin-)/.test(topic)) throw new JoploError('USAGE', `${note}Plugin guide "${topic}" is not enabled in config.plugins. Run npx joplo skill to list enabled plugin guides.`);
         else stdout(skillTopic(topic));
       }
     });
@@ -369,7 +370,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const handle = await startDev({ projectDir: resolve(dir), port: opts.port, open: opts.open, log: s => stderr(oneLine(s) + '\n'), cloud });
     line(handle.url);
     // 已有存活的看板：项目已注册进去，本进程直接退出（不启动第二个看板进程）
-    if (handle.attached) stderr(`Joined the running board. Open ${handle.url}\n`);
+    if (handle.attached) stderr(`Joined the running board. Open ${handle.url}\nThe existing board process hosts this project. Keep its terminal running: stopping it stops this link and feedback watch. If it exits, run joplo dev and feedback watch again.\n`);
     // stdout 只有地址（脚本会读）；在 stderr 告诉 Agent 用哪一条命令跟住这个项目的全部评审反馈。
     const shown = /^[\w./@:+-]+$/.test(dir) ? dir : `'${dir.replace(/'/g, `'\\''`)}'`;
     stderr(`Agents: stream reviewer feedback from this board with\n  npx joplo feedback watch ${shown} --local --follow --json\nIf you end your response while the user tests and your host wakes you when a background command ends, add --once (it prints how to resume with --since).\n`);

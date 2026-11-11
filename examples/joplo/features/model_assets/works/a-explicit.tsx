@@ -7,6 +7,7 @@ export default work({
   scenarios:{
     generate:flow('从缺少模型到明确生成',{start:'/models',cases:['generate'],expected:'费用先展示，生成只发生在明确确认之后'})
       .system('先看估计',spotlight('model_status'),uses('spend'))
+      .system('限定当前作品',...show('先圈定生成范围','根据 #117 本轮源码整理：其他作品报错不阻塞；共享页面仍须有效，跨作品依赖不会偷偷扩大付费范围。','joplo resources --work model_assets.a-explicit --dry-run'))
       .system('保存密钥只配置本机',spotlight('model_key'))
       .system('终端逐项确认',...show('确认之后才创建任务','非交互环境默认不花钱；只有已经获得授权才加 --allow-spend。','joplo resources'))
       .system('提交可复用产物',...show('模型与元数据进入 Git','产物为 assets/models/<hash>.glb 与同名 JSON；不要提交密钥。','git add assets/models/'),done('队友能复用同一模型')),

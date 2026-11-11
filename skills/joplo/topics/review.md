@@ -8,6 +8,8 @@ Required after every round of development: start the follower before handing the
     npx joplo dev ./demo
     npx joplo feedback watch ./demo --local --follow --json
 
+A successful initial compilation registers local review rounds before dev returns its ready link, including when joining another board; opening a browser is not required. If compilation fails, fix the diagnostics and wait for a successful compile before starting the watcher. Review rounds have no idle timeout. Source edits and compilation failures close a round; use feedback list --local --all --json to inspect its closing reason rather than treating it as expiration. The joined-project terminal notice identifies a dependency, not a replacement host: a joined project still depends on the original board process, so keep that terminal running. If it stops, restart dev and the watcher.
+
 --follow covers every option of the project and attaches by itself to the new round that each source edit opens, so no session id is needed. Give the reviewer the URL dev printed only after the follower is ready; a running board may use a different port or serve several projects. If they want to operate the UI themselves, hand over the link without navigating or submitting on their behalf.
 
 ## Local review: feedback without leaving the board
@@ -70,4 +72,4 @@ Example, scoped to one known option:
 - Authentication failures (exit 3) need the correct owner login/API key; never silently switch accounts. Invalid responses, quota errors and missing shares are failures, not approval. If the project CLI lacks these commands, check its version before changing the environment.
 
 Related topics: selection, check, publish
-<!-- joplo-skill 0.7.1 sha256:a8fba90bc7f4412d7a6c6c489b88ba88f53990bc32babfdc24e5cf7ba5af0742 -->
+<!-- joplo-skill 0.7.1 sha256:6dba2e3bf30733c42d27a2418eb4abdd722dd3c8b283a59485363aa7b22c15b1 -->

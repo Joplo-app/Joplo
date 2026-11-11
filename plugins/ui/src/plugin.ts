@@ -78,7 +78,7 @@ export default definePlugin({ packageName: '@joplo-app/plugin-ui',
   node(n,{report}){
     if(n.type !== 'ui:Image') return;
     const {src,fit}=n.props;
-    if(typeof src==='string'&&src&&!src.startsWith('data:image/')) report('IMAGE_PLACEHOLDER',`<ui:Image src="${src.length>60?`${src.slice(0,57)}...`:src}"> is drawn as a placeholder: only embedded images are shown. Put the file in the project and write src={asset('./photo.jpg')} (path relative to this file; import asset from @joplo-app/kit)`,n.source,'warning');
+    if(typeof src==='string'&&src&&!src.startsWith('data:image/') && !/^joplo-resource:resource-\d+$/.test(src)) report('IMAGE_PLACEHOLDER',`<ui:Image src="${src.length>60?`${src.slice(0,57)}...`:src}"> is drawn as a placeholder: only embedded images are shown. Put the file in the project and write src={asset('./photo.jpg')} (path relative to this file; import asset from @joplo-app/kit)`,n.source,'warning');
     if(fit!==undefined&&!(typeof fit==='string'&&['cover','contain'].includes(fit))) report('INVALID_IMAGE_FIT',`<ui:Image> fit="${String(fit)}" is not supported (available: cover, contain)`,n.source);
   }},
 });

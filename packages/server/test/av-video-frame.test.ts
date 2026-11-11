@@ -1,0 +1,27 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {expect,it} from 'vitest';
+import {chromium} from 'playwright';
+import {createDev} from '../src/dev.ts';
+import {launch,renderQuery} from '../src/render.ts';
+import {fixtureConfigSource,installFixturePlugins} from '../../../scripts/test/fixtures.ts';
+it('presents selected decoded static video pixels through official Video, hold and render readiness',async()=>{
+ const root=path.resolve(`scratch/output/av-video-frame-${process.pid}`);fs.mkdirSync(root,{recursive:true});
+ const write=(p:string,s:string|Buffer)=>{const file=path.join(root,p);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,s);};
+ installFixturePlugins(root);
+ write('clip.mp4',Buffer.from('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','base64'));
+ write('joplo.config.ts',fixtureConfigSource(`import {config} from '@joplo-app/kit';import media from ${JSON.stringify(path.resolve('plugins/av/src/plugin.ts'))};export default config({name:'Video pixels',home:'/',plugins:[media]});`));
+ write('routes/page.tsx',`import {asset,page} from '@joplo-app/kit';import {Video} from ${JSON.stringify(path.resolve('plugins/av/src/plugin.ts'))};export default page({title:'Frames',layout:false},<><Video id="red" src={asset('../clip.mp4')} start={.1} w={160} h={90}/><Video id="blue" src={asset('../clip.mp4')} start={1.1} w={160} h={90}/></>);`);
+ write('features/f/feature.ts',`import {feature} from '@joplo-app/kit';export default feature({name:'F',goal:'Frames',cases:{},pick:'a'});`);
+ write('features/f/works/a.tsx',`import {work,chapter} from '@joplo-app/kit';export default work({title:'A',summary:'Frames',scenarios:{one:chapter('One',{start:'/'})}});`);
+ const server=await createDev({projectDir:root,port:0,watch:false,log:()=>{}}),browser=await launch({chromium});
+ try{
+  expect(server.payload().diagnostics.filter(d=>d.severity==='error')).toEqual([]);
+  const page=await browser.newPage({viewport:{width:1280,height:800}});
+  await page.goto(server.url+'?'+renderQuery({projectId:server.projectId,scenarioId:'f.a.one',position:0,theme:'clean'}));
+  await page.waitForFunction(()=>(window as any).__JOPLO_READY__===true);
+  const colors=await page.locator('canvas[data-jvideo-presented="1"]').evaluateAll(list=>list.map(el=>Array.from((el as HTMLCanvasElement).getContext('2d')!.getImageData(32,32,1,1).data)));
+    expect(colors).toHaveLength(2);expect(colors[0]![0]).toBeGreaterThan(200);expect(colors[0]![2]).toBeLessThan(40);expect(colors[1]![2],JSON.stringify(colors)).toBeGreaterThan(200);expect(colors[1]![0]).toBeLessThan(40);
+  await page.screenshot({path:path.join(root,'static-colors.png')});
+ }finally{await browser.close();await server.close();}
+},120000);

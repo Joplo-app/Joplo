@@ -106,3 +106,22 @@ it.each([[82944, 6542, false], [200000, 15000, true], [2100000, 6542, true], [11
   const result = await inlineResources(project, [x.req], x.host);
   expect(result.diagnostics.some(d => d.code === 'MEDIA_ASSET_LARGE')).toBe(warn);
 });
+
+it('inspects project-relative files without spending context or inherited credential variables', async()=>{
+ const x=setup();
+ fs.writeFileSync(path.join(x.dir,'source.txt'),'project source');
+ const previous=process.env.JOPLO_INSPECT_TEST_SECRET;process.env.JOPLO_INSPECT_TEST_SECRET='private';
+ try {
+ fs.writeFileSync(x.entry,`import fs from 'node:fs';import path from 'node:path';export default {compilers:{wav:{version:'inspect-root',mime:'audio/wav',inspect(input,ctx){if('keys' in ctx||'allowSpend' in ctx||process.env.JOPLO_INSPECT_TEST_SECRET)throw new Error('authorization leaked');if(ctx.directory===ctx.projectDir)throw new Error('job isolation lost');return {credit:fs.readFileSync(path.join(ctx.projectDir,input),'utf8')}},compile(){throw new Error('must not render')}}}};`);
+ expect(await x.host.inspect({...x.req,input:'source.txt'})).toEqual({info:{credit:'project source'}});
+ }finally{if(previous===undefined)delete process.env.JOPLO_INSPECT_TEST_SECRET;else process.env.JOPLO_INSPECT_TEST_SECRET=previous;}
+});
+
+it('reports the encoded playback limit during preparation and reads cached metadata without rendering again',async()=>{
+ const x=setup('large',`return {bytes:new Uint8Array(4*1024*1024+1),audio:{sourceSampleRate:48000,decodedFrames:1920000,contentFrames:1920000,cycleFrames:1920000,contentStartFrame:0,encoderDelayFrames:0,paddingFrames:0,channels:1}};`);
+ expect(await x.host.prepared(x.req)).toBeNull();
+ const result=await x.host.ensure(x.req);
+ expect(result.diagnostic).toMatchObject({code:'MEDIA_ENCODE_BUDGET',severity:'warning'});expect(result.url).toBeDefined();
+ expect(await x.host.prepared(x.req)).toMatchObject({bytes:4*1024*1024+1,audio:{channels:1}});
+ expect((await x.host.ensure(x.req)).diagnostic?.code).toBe('MEDIA_ENCODE_BUDGET');
+});

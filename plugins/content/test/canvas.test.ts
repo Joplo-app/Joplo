@@ -20,7 +20,7 @@ const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 const world = () => h(Canvas, { w: 2560, h: 1600 },
   h('div', { id: 'chat', style: { position: 'absolute', left: 60, top: 60, width: 1180, height: 700 } }, h(ui.Button, { id: 'send' }, 'Send')),
   h('div', { id: 'tape', style: { position: 'absolute', left: 120, top: 960 } },
-    h('span', { motion: 'tok_0', when: $.ui.onTape }, '4912')),
+    h('span', { motion: 'tok_0', when: $.ui.onTape }, h('span', { id: 'conditional' }, '4912'))),
   h('div', { screen: true, style: { position: 'absolute', left: 20, top: 16 } }, $.ui.chapter));
 const other = () => h(ui.Text, { id: 'other' }, 'other layer');
 
@@ -44,6 +44,22 @@ function build(scenarios: Record<string, Flow>) {
 const errorCodes = (r: ReturnType<typeof build>) => r.diagnostics.filter((d) => d.severity === 'error').map((d) => d.code);
 
 describe('camera()', () => {
+  it('warns when an active camera target disappears, including ancestors and inherited chapter starts', () => {
+    const r = build({
+      a: flow('A', { start: '/' })
+        .system('Show target', set($.ui.onTape, true), camera('conditional'))
+        .system('Hide target', set($.ui.onTape, false)),
+      b: flow('B', { from: 'a' }).system('Still hidden', set($.ui.n, 2)).system('Reset', camera()),
+    });
+    expect(errorCodes(r)).toEqual([]);
+    const warnings = r.diagnostics.filter(d => d.code === 'CAMERA_TARGET_HIDDEN');
+    expect(warnings.length).toBeGreaterThanOrEqual(3);
+    expect(warnings.every(d => d.severity === 'warning')).toBe(true);
+    expect(warnings.some(d => d.message.includes('position 0'))).toBe(true);
+    expect(warnings.every(d => d.message.includes('always-visible anchor'))).toBe(true);
+    const stable = build({ one: flow('One', { start: '/' }).system('Stable', camera('tape')).system('Hide child', set($.ui.onTape, false)) });
+    expect(stable.diagnostics.filter(d => d.code === 'CAMERA_TARGET_HIDDEN')).toEqual([]);
+  });
   it('records the frame as state, keeps it across steps, and moves the director to the target layer', () => {
     const r = build({
       one: flow('One', { start: '/' })

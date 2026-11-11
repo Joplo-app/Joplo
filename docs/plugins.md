@@ -129,7 +129,7 @@ ELK、结构校验、连线默认 id、trace 解析与状态推进、状态机�
 - `node(node, { ids, report })`：验证作者节点并可返回规范化节点。调用时子节点已处理，`ids` 可用于默认 id 去重。显式重复 id 仍由宿主诊断。
 - `derive(node, { viewport, options, report })`：输入深冻结；返回 `{ data, framing }`，由宿主校验后只写自己的槽位及子树内的取景元数据，不允许改 id/children 或其他命名空间。diagram 按完整结构布局，隐藏状态不参与布局；错误保留已有的网格降级及 `DIAGRAM_LAYOUT_FAILED` 提示。
 - `effect(effect, { roots, data, source, report })`：把 `pluginEffect(id, name, payload)` 降级为命名空间数据、`targets` 和 `references`。宿主把 targets 转成普通 shots、导演层与显式焦点；同一步多个效果按作者顺序合并。
-- `frame({ roots, scenes, state, previousState, data, previousData, position, resolveProps, report })`：宿主回放内核效果后，生成第 0 步及各步骤的完整快照。无效作者步骤仍由原有 replay/check 诊断，不能令编译崩溃。
+- `frame({ roots, scenes, state, previousState, data, previousData, position, resolveProps, isVisible, report })`：宿主回放内核效果后，生成第 0 步及各步骤的完整快照。`isVisible(sceneId, nodeId)` 复用当前状态的声明式可见性（含祖先条件与响应式收起），不存在或不在当前作品可访问舞台内时返回 false；不测量 CSS/DOM。无效作者步骤仍由原有 replay/check 诊断，不能令编译崩溃。
 
 所有钩子的输入均为隔离的深冻结副本，不能污染后续步骤或其他插件。derive 后再次检查舞台内元素身份；frame 通过宿主注入的 resolveProps(node, previous?) 读取绑定值，无需依赖 core 实现。宿主先按属性描述符把四类钩子返回值物化成自己持有的数据，再校验和使用同一份数据；拒绝 getter/setter 和 toJSON 方法，不重复读取返回对象。node 的作者绑定转换为稳定标记。宿主在消费前检查返回值信封；先验证有限、无环、深度不超过 100 的 JSON，再验证插件 schema，最后才剥离创作信息。共享引用展开为独立副本，不复用输出子树；只缓存原对象的属性描述符，避免重复读取原始对象。深度从根 0 开始，按最终展开后的每条路径计算，包含原始值叶子；发布成功前还检查完整 IR（包括 scene/step/ext 外层）的深度。超过上限报 PLUGIN_DATA_INVALID，应压平数据或用字符串 id 表达关联，不能依赖共享对象绕过限制。异步钩子/异步 schema 被拒绝且其 rejection 被接住。
 
@@ -189,7 +189,7 @@ diagram 的独立包交付已完成；阶段 1 的其他扩展点、其他第一
 
 ### Node 本机能力
 
-- `PluginDef.local` 指向 Node 入口；默认导出 `PluginLocal`：`compilers[name] = { version, mime, inspect?, timeoutMs?, compile(input, { directory, maxBytes, home }) }`。返回 `Uint8Array`，临时文件写入宿主提供的工作目录；经校验的共享音色缓存放 home。可选 inspect 返回时长/marker/声部等本机数据，供最终同步编译的 ctx.resourceInfo 使用，不下载音色、不渲染、不付费。
+- `PluginDef.local` 指向 Node 入口；默认导出 `PluginLocal`：`compilers[name] = { version, mime, inspect?, timeoutMs?, compile(input, { directory, projectDir, maxBytes, cacheDir, keys, allowSpend }) }`。返回 `Uint8Array`，临时文件写入宿主提供的工作目录；插件私有缓存写入 cacheDir。可选 inspect(input, { directory, projectDir }) 可相对项目根目录读取源文件；directory 仍是临时工作目录，不提供 keys/allowSpend，子进程不继承凭证环境变量。这是可信本机代码的调用约定，并非文件系统沙箱。inspect 返回时长/marker/声部等本机数据，供最终同步编译的 ctx.resourceInfo 使用，不下载音色、不渲染、不付费。
 - effect 钩子通过 `ctx.resource({ compiler, input })` 登记请求并取得不透明资源 id，再由原有 effect 宿主物化、校验返回的 `media` 命令。请求表与 local 路径只在 `CompileOutcome.resources`，不进入 IR，也不使用公开 ext 槽位传递源码。
 - `LocalResources` 将本机入口及依赖打成 Node 模块，放在项目 `.joplo/resources/`；独立子进程执行编译，缺省硬超时 30 秒（声明 timeoutMs 可延长、上限180秒），输出上限50MiB。Alda 供应商另在 25 秒停止自身命令，失败提供可读信息。macOS/Linux 超时结束整个进程组；临时目录始终清理。
 - 缓存键为 SHA-256(plugin id、compiler id、含 version 声明的编译器代码、精确输入文本)。代码变化也失效，不对文本空白做归一化。成功产物原子写入缓存；内存请求合并与磁盘租约分别覆盖同进程和跨进程并发，已有产物不再编译。失败不持久缓存，修复工具或源码后可重试。

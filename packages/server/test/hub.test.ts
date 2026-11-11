@@ -10,7 +10,8 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { JoploError } from '@joplo-app/core';
+import { JoploError, localReviewStatus } from '@joplo-app/core';
+import { listLocalReviews } from '@joplo-app/core/node';
 import { createHub, startDev, type Hub } from '../src/dev.ts';
 import { Registry, projectIdOf, readServerInfo, serverInfoFile, writeServerInfo } from '../src/home.ts';
 import { missingError } from '../src/export-runtime.ts';
@@ -112,6 +113,7 @@ describe('一个进程，多个项目', () => {
 
   it('连续两次 joplo dev：第二次只注册到已运行的看板（同一端口、同一进程），两个项目都在首页', async () => {
     expect(first.attached).toBe(false);
+    expect(listLocalReviews(a).some(s => localReviewStatus(s) === 'open')).toBe(true);
     expect(readServerInfo(home)!.pid).toBe(process.pid);
     const second = await startDev({ projectDir: b, port: 0, home, log: () => undefined });
     expect(second.attached).toBe(true);

@@ -90,7 +90,7 @@ export function loadLocales(root: string): { locales: Record<string, Record<stri
   return { locales, files, diagnostics };
 }
 
-export async function loadAuthoring(root: string, importer: Importer): Promise<{ authoring: AuthoringProject | null; diagnostics: Diagnostic[] }> {
+export async function loadAuthoring(root: string, importer: Importer, options: { work?: string } = {}): Promise<{ authoring: AuthoringProject | null; diagnostics: Diagnostic[] }> {
   // 步骤和规则的源位置来自调用栈；开启原生 source map，保证行号指向 TSX 源码而不是转译产物。
   process.setSourceMapsEnabled?.(true);
   const r = resolve(root);
@@ -153,8 +153,13 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
   };
   await walk(join(r, 'routes'), '');
 
+  // Resource commands can load one work without evaluating unrelated author modules.
+  const selected = options.work;
+  const standaloneSelected = !!selected && list(join(r, 'works')).some(f => /\.(tsx|ts)$/.test(f) && !isDir(join(r, 'works', f)) && stem(f) === selected);
+  let foundWork = false;
   const features: AuthoringProject['features'] = {};
   for (const fid of list(join(r, 'features'))) {
+    if (selected && (standaloneSelected || !list(join(r, 'features', fid, 'works')).some(f => /\.(tsx|ts)$/.test(f) && `${fid}.${stem(f)}` === selected))) continue;
     const fd = join(r, 'features', fid);
     if (!isDir(fd)) continue;
     const ff = findFile(join(fd, 'feature'));
@@ -167,20 +172,23 @@ export async function loadAuthoring(root: string, importer: Importer): Promise<{
     if (!def) continue;
     const works: Record<string, any> = {};
     for (const o of list(join(fd, 'works'))) {
-      if (!/\.(tsx|ts)$/.test(o)) continue;
+      if (!/\.(tsx|ts)$/.test(o) || selected && `${fid}.${stem(o)}` !== selected) continue;
+      foundWork = true;
       const v = await load(join(fd, 'works', o), 'work');
       if (v) works[stem(o)] = v;
     }
-    features[fid] = { def, works };
+    features[fid] = { def: selected ? { ...def, pick: Object.keys(works)[0] } : def, works };
   }
 
   const works: NonNullable<AuthoringProject['works']> = {};
   for (const f of list(join(r, 'works'))) {
-    if (!/\.(tsx|ts)$/.test(f) || isDir(join(r, 'works', f))) continue;
+    if (!/\.(tsx|ts)$/.test(f) || isDir(join(r, 'works', f)) || selected && (!standaloneSelected || stem(f) !== selected)) continue;
+    foundWork = true;
     const v = await load(join(r, 'works', f), 'work');
     if (v) works[stem(f)] = v;
   }
 
+  if (selected && !foundWork) fail(cfgFile, `Work does not exist: ${selected}`, 'WORK_NOT_FOUND');
   if (!config) return { authoring: null, diagnostics: diags };
   const loc = loadLocales(r);
   diags.push(...loc.diagnostics);

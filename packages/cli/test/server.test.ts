@@ -72,3 +72,13 @@ test('无服务端命令不触发动态 import；无效参数先拒绝', async (
   expect((await run(['guide'])).loadServer).not.toHaveBeenCalled();
   const r = await run(['dev', '--port', '65536']); expect(r.code).toBe(2); expect(r.loadServer).not.toHaveBeenCalled();
 });
+
+
+test('joining a shared board explains host lifetime and recovery without claiming takeover', async () => {
+  const startDev = vi.fn().mockResolvedValue({ url: 'http://127.0.0.1:4790/#/project', attached: true, close: vi.fn() });
+  const r = await run(['dev', 'project'], { startDev });
+  expect(r.code).toBe(0);
+  expect(r.stdout).toBe('http://127.0.0.1:4790/#/project\n');
+  expect(r.stderr).toContain('Keep its terminal running: stopping it stops this link and feedback watch.');
+  expect(r.stderr).toContain('If it exits, run joplo dev and feedback watch again.');
+});

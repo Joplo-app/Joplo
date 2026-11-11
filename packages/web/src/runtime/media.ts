@@ -5,11 +5,11 @@ import { pluginStatus } from '../renderer/plugins';
 /** Browser host owns permission, clock, gain and lifecycle; the host decodes audio bytes; custom media plugins may supply a driver. */
 export class MediaEngine {
   private audio: AudioContext | null = null;
-  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; release?:()=>void; startOffset?: number; oneShot?: boolean; endOffset?: number; volume?: number; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
+  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; retired?:boolean; release?:()=>void; startOffset?: number; oneShot?: boolean; endOffset?: number; volume?: number; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
   private completed = new Set<string>();
   private mediaIdentity: string | undefined;
-  private encoded=new MediaCache<{bytes:Uint8Array;audio?:AudioRegion}>({budgetBytes:4*1024*1024,concurrency:2});
-  private decoded=new MediaCache<AudioBuffer>({budgetBytes:32*1024*1024,concurrency:1});
+  private encoded=new MediaCache<{bytes:Uint8Array;audio?:AudioRegion}>({budgetBytes:4*1024*1024,concurrency:2,label:'encoded audio'});
+  private decoded=new MediaCache<AudioBuffer>({budgetBytes:32*1024*1024,concurrency:1,label:'decoded PCM'});
   private warm:(()=>void)[]=[];
   private disposed = false;
   private failures = new Map<string, string>();
@@ -87,7 +87,7 @@ export class MediaEngine {
       if(typeof data!=='string'||!/^data:[^;,]+;base64,/.test(data))throw new Error('Music resource unavailable');
       const bytes=Uint8Array.from(atob(data.slice(data.indexOf(',')+1)),c=>c.charCodeAt(0));
       return {value:{bytes,audio:result.audio},bytes:bytes.byteLength};
-    },url.startsWith('data:')?Math.ceil((url.length-url.indexOf(',')-1)*.75):0);
+    },url.startsWith('data:')?Math.floor((url.length-url.indexOf(',')-1)*.75)-(url.endsWith('==')?2:url.endsWith('=')?1:0):0);
   }
   /**
    * 连续性（D92）：同一个 identity（播放的 epoch，跳转 / 换章重置时才变）里，一条轨道一旦开始，偏移就跟着引擎时钟走
@@ -104,7 +104,7 @@ export class MediaEngine {
     for (const [key, url] of keys) {
       if (snapshot[key.slice(frame.identity.length + 1)]?.endAfterMs !== undefined || this.slots.get(key)?.resource === url) continue;
       // 空出来的槽位：快照不再要它，或者它的键现在要放别的资源（换曲时旧曲所在的轨道键）
-      const spare = [...this.slots.entries()].find(([k, slot]) => !slot.oneShot && k !== key && keys.get(k) !== slot.resource && slot.resource === url && k.startsWith(`${frame.identity}:`));
+      const spare = [...this.slots.entries()].find(([k, slot]) => !slot.oneShot && !slot.retired && k !== key && keys.get(k) !== slot.resource && slot.resource === url && k.startsWith(`${frame.identity}:`));
       if (!spare) continue;
       const displaced = this.slots.get(key);
       this.slots.delete(spare[0]);
@@ -121,6 +121,7 @@ export class MediaEngine {
       wanted.add(key);
       let slot = this.slots.get(key);
       if (slot && (slot.resource !== url || slot.startOffset !== t.startOffsetMs)) { this.remove(key); slot = undefined; }
+      if(slot?.retired){if(t.stopAfterMs!==undefined)continue;this.remove(key);slot=undefined;}
       if (!slot) {
         if (!frame.playing) continue;
         const runtime = pluginStatus(t.plugin);
@@ -157,6 +158,7 @@ export class MediaEngine {
       if (t.stopAfterMs === undefined) slot.fade = undefined;
       else if (!slot.fade) slot.fade = { start: anchored ? now - elapsed : 0, ms: Math.max(1, t.stopAfterMs), volume: t.volume };
       const fadeOut = !slot.fade ? 1 : anchored ? Math.max(0, 1 - (now - slot.fade.start) / slot.fade.ms) : Math.max(0, 1 - elapsed / Math.max(1, t.stopAfterMs!));
+      if(slot.fade&&fadeOut<=0){slot.gain.gain.setTargetAtTime(0,audio.currentTime,.015);slot.driver?.update({offsetMs:offset,volume:1,loop:t.loop,speed:frame.speed,playing:false});slot.dead=true;slot.retired=true;slot.driver?.destroy();slot.driver=undefined;slot.release?.();slot.release=undefined;slot.gain.disconnect();continue;}
       const volume = slot.fade && anchored ? slot.fade.volume : t.volume;
       const playing = frame.playing && fadeOut > 0;
       slot.gain.gain.setTargetAtTime(playing ? volume * fadeIn * fadeOut * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);

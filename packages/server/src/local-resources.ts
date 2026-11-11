@@ -11,6 +11,10 @@ import type { ResourceRequest, PluginKey, LocalResourceInfo, AudioRegion } from 
 import { AudioRegionSchema, nodeResourceIds as referencedResources, mediaResourceIds, type Project, type Diagnostic } from '@joplo-app/core';
 
 type Result = { url?: string; audio?:AudioRegion; credit?:string; license?:string; bytes?:number; diagnostic?: Diagnostic };
+function encodedBudget(result:Result,request:ResourceRequest):Result {
+  if(result.url?.startsWith('data:audio/')&&(result.bytes??0)>4*1048576)return {...result,diagnostic:{severity:'warning',source:'structure',code:'MEDIA_ENCODE_BUDGET',at:request.source,message:`${request.plugin}/${request.id}: encoded audio is ${result.bytes} bytes (${(result.bytes!/1048576).toFixed(2)} MiB), exceeding the independent 4 MiB encoded cache. Transcode large WAV/PCM to FLAC or another smaller supported format; the 50 MiB local artifact limit is not a playback budget.`}};
+  return result;
+}
 const inflight = new Map<string, Promise<Result>>();
 const digest = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 const LIMIT = 50 * 1024 * 1024;
@@ -95,9 +99,9 @@ export class LocalResources {
           const script = `import {pathToFileURL} from 'node:url';
             let s=''; for await(const c of process.stdin)s+=c; const r=JSON.parse(s);
             try { const c=(await import(pathToFileURL(r.entry).href)).default.compilers[r.compiler];
-              process.stdout.write(JSON.stringify({info:await c.inspect(r.input,{directory:r.directory})}));
+              process.stdout.write(JSON.stringify({info:await c.inspect(r.input,{directory:r.directory,projectDir:r.projectDir})}));
             }catch(e){process.stdout.write(JSON.stringify({error:String(e.message)}));process.exitCode=1;}`;
-          const child = spawn(process.execPath, ['--input-type=module', '-e', script], { cwd: job, stdio: ['pipe', 'pipe', 'ignore'], detached: process.platform !== 'win32' });
+          const child = spawn(process.execPath, ['--input-type=module', '-e', script], { cwd: job, env: compilerEnvironment(), stdio: ['pipe', 'pipe', 'ignore'], detached: process.platform !== 'win32' });
           let output = '', settled = false;
           const finish = (error?: Error, value?: LocalResourceInfo) => {
             if (settled) return; settled = true; clearTimeout(timer);
@@ -108,12 +112,24 @@ export class LocalResources {
           child.stdout.on('data', b => { output += b; if (output.length > 128 * 1024) finish(new Error('Local resource metadata exceeds 128 KiB')); });
           child.on('error', e => finish(e));
           child.on('close', status => { try { const r = JSON.parse(output); if (status || !r.info || typeof r.info !== 'object') throw new Error(r.error || 'Invalid resource metadata'); finish(undefined, r.info); } catch(e) { finish(e as Error); } });
-          child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify({ entry, compiler: request.compiler, input: request.input, directory: job }));
+          child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify({ entry, compiler: request.compiler, input: request.input, directory: job, projectDir: this.directory }));
         });
         const tmp = `${cache}.${crypto.randomUUID()}.tmp`; fs.writeFileSync(tmp, JSON.stringify(info)); fs.renameSync(tmp, cache);
         return { info };
       } finally { fs.rmSync(job, { recursive: true, force: true }); }
     } catch (e) { return { diagnostic: { severity: 'warning', source: 'structure', code: 'LOCAL_RESOURCE_INSPECTION_FAILED', message: `${request.plugin}/${request.compiler}: ${(e as Error).message}`, at: request.source?.replace(this.directory + path.sep, '') ?? 'joplo.config.ts:1:1' } }; }
+  }
+  /** Read existing prepared metadata only; never generate resources or incur provider spend. */
+  async prepared(request: ResourceRequest): Promise<{ bytes:number; audio?:import('@joplo-app/kit/plugin').AudioRegion } | null> {
+    try {
+      const code=await this.bundle(request.plugin),description=await this.describe(request);
+      if(description.persistent)return null;
+      const key=digest(JSON.stringify([request.plugin,request.compiler,code,request.input]));
+      const saved=JSON.parse(fs.readFileSync(path.join(this.directory,'.joplo','resources',`${key}.json`),'utf8'));
+      if(!Number.isInteger(saved.bytes)||saved.bytes<0||typeof saved.url!=='string')return null;
+      const data=/^data:audio\/[^;,]+;base64,/.exec(saved.url);if(!data)return null;
+      return {bytes:Buffer.byteLength(saved.url.slice(data[0].length),'base64'),...(saved.audio?{audio:AudioRegionSchema.parse(saved.audio)}:{})};
+    }catch{return null;}
   }
   async ensure(request: ResourceRequest, limits: { timeoutMs?: number; maxBytes?: number; allowSpend?: boolean; home?: string } = {}): Promise<Result> {
     const warning = (code: string, message: string): Result => ({ diagnostic: { severity: code==='LOCAL_RESOURCE_ATTRIBUTION_MISSING'?'error':'warning', source: 'structure', code, message: `${request.plugin}/${request.compiler}: ${message}`, at: request.source ? request.source.replace(this.directory + path.sep, '') : 'joplo.config.ts:1:1' } });
@@ -137,7 +153,7 @@ export class LocalResources {
           return saved;
         } catch { return undefined; }
       };
-      const hit = cached(); if (hit) return hit;
+      const hit = cached(); if (hit) return encodedBudget(hit,request);
       const lock = `${cache}:${maxBytes}:${!!limits.allowSpend}:${limits.timeoutMs ?? 30000}`;
       const existing = inflight.get(lock);
       if (existing) { const r = await existing; return r.diagnostic ? warning(r.diagnostic.code, r.diagnostic.message) : r; }
@@ -145,7 +161,7 @@ export class LocalResources {
         fs.mkdirSync(dir, { recursive: true });
         const release = description.persistent ? () => {} : await resourceLease(`${cache}.lock`, (description.timeoutMs ?? 30000) + 5000);
         try {
-        const hit = cached(); if (hit) return hit;
+        const hit = cached(); if (hit) return encodedBudget(hit,request);
         const entry = path.join(dir, `${digest(code)}.mjs`);
         if (!fs.existsSync(entry)) { const tmp = `${entry}.${crypto.randomUUID()}.tmp`; fs.writeFileSync(tmp, code); fs.renameSync(tmp, entry); }
         const jobDir = fs.mkdtempSync(path.join(dir, 'job-'));
@@ -181,7 +197,7 @@ export class LocalResources {
           const url = `data:${result.mime};base64,${result.data}`;
           const tmp = `${cache}.${crypto.randomUUID()}.tmp`;
           if (!description.persistent) { fs.writeFileSync(tmp, JSON.stringify({ url, bytes: result.bytes, audio:result.audio,credit:result.credit,license:result.license })); fs.renameSync(tmp, cache); }
-          return { url,bytes:result.bytes,audio:result.audio,credit:result.credit,license:result.license };
+          return encodedBudget({ url,bytes:result.bytes,audio:result.audio,credit:result.credit,license:result.license },request);
         } catch (e) {
           const err = e as Error & { code?: string };
           const safeCode = redact(err.code ?? '');

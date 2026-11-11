@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import lottie from 'lottie-web/build/player/lottie_light.js';
 import { defineRuntime, embeddedAsset, type ComponentCtx } from '@joplo-app/kit/plugin';
 import { useEngineFrame, useRoot } from '@joplo-app/kit/renderer';
+import { presentDecodedFrame } from './video-frame.ts';
 import type { ClipFrame } from './model.ts';
 
 /**
@@ -36,6 +37,8 @@ function Video({ ctx }: { ctx: ComponentCtx }) {
   const { t, playing } = useClipTime(ctx, clip);
   const src = embeddedAsset(p.src, 'video');
   const ref = useRef<HTMLVideoElement>(null);
+  const canvas=useRef<HTMLCanvasElement>(null);
+  const [frozen,setFrozen]=useState(false);
   const { src: _s, w, h, fit, start: _st, ...rest } = p;
   const root = useRoot(node, rest, { style: { width: num(w) ?? '100%', height: num(h) ?? 'auto', position: 'relative', overflow: 'hidden', borderRadius: 10, background: '#000' } });
   const speed = ctx.frame.clock?.speed ?? 1;
@@ -44,27 +47,33 @@ function Video({ ctx }: { ctx: ComponentCtx }) {
     if (!v) return;
     v.playbackRate = speed;
     if (playing) {
+      setFrozen(false);
       if (Math.abs(v.currentTime - t) > 0.25) v.currentTime = t;
       if (v.paused) void v.play().catch(() => {});
       return;
     }
     if (!v.paused) v.pause();
-    if (Math.abs(v.currentTime - t) <= 0.03 && v.readyState >= 2) return;
+    const present=()=>{if(!canvas.current||!presentDecodedFrame(v,canvas.current,t))return false;setFrozen(true);return true;};
+    if(present())return;
     // 静止画面：定位到这一帧，截图等它解码好
     const done = ctx.hold();
     let released = false;
     const release = () => { if (!released) { released = true; done(); } };
-    const ready = () => { v.removeEventListener('seeked', ready); v.removeEventListener('loadeddata', ready); release(); };
+    const ready = () => { if(present()) {v.removeEventListener('seeked',ready);v.removeEventListener('loadeddata',loaded);release();} };
+    const loaded=()=>{if(t===0)ready();};
+    const seek=()=>{try{v.currentTime=t;}catch{/* Metadata will retry. */}};
+    v.addEventListener('loadedmetadata',seek);
     v.addEventListener('seeked', ready);
-    v.addEventListener('loadeddata', ready);
-    try { v.currentTime = t; } catch { release(); }
+    v.addEventListener('loadeddata', loaded);
+    seek();
     const timer = setTimeout(release, 5000);
-    return () => { clearTimeout(timer); v.removeEventListener('seeked', ready); v.removeEventListener('loadeddata', ready); release(); };
+    return () => { clearTimeout(timer); v.removeEventListener('loadedmetadata',seek); v.removeEventListener('seeked', ready); v.removeEventListener('loadeddata', loaded); release(); };
   }, [t, playing, speed, src]);
   if (!src) return <div {...root} />;
   return (
     <div {...root}>
-      <video ref={ref} src={src} muted playsInline preload="auto" style={{ width: '100%', height: '100%', objectFit: fit === 'contain' ? 'contain' : 'cover', display: 'block' }} />
+      <video ref={ref} src={src} muted playsInline preload="auto" style={{ width: '100%', height: '100%', objectFit: fit === 'contain' ? 'contain' : 'cover', display: 'block',visibility:frozen?'hidden':'visible' }} />
+      <canvas ref={canvas} data-jvideo-presented={frozen?'1':'0'} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:fit==='contain'?'contain':'cover',visibility:frozen?'visible':'hidden'}} />
     </div>
   );
 }

@@ -8,18 +8,19 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as ui from '@joplo-app/plugin-ui';
 import { asset, feature, flow, layer, work, page } from '@joplo-app/kit';
+import { definePlugin, localResource } from '@joplo-app/kit/plugin';
 import { jsx } from '@joplo-app/kit/jsx-runtime';
 import { compile, type AuthoringProject } from '../src/index.ts';
 
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) => jsx(type, { ...(props ?? {}), ...(children.length ? { children } : {}) });
 const F = (file: string) => ({ file: `/p/${file}`, source: `/p/${file}:1:1` });
 
-function build(tree: unknown) {
+function build(tree: unknown, resourcePlugin = false) {
   const home = page({ title: 'P', layout: false }, h(ui.Text, { id: 'note' }, 'x'));
   const opt = work({ title: 'A', summary: 'i', layers: { v: layer('视图', tree as never) }, scenarios: { s: flow('一次', { start: '/' }) } });
   const src: AuthoringProject = {
     root: '/p',
-    config: { ...config({ name: 'T', home: '/' }), ...F('joplo.config.ts') },
+    config: { ...config({ name: 'T', home: '/', plugins: resourcePlugin ? [definePlugin({id:'image',packageName:'fixture-image',title:'Image fixture',version:'1',components:{},runtime:'/image.js',local:'/image-local.js',skill:'fixture'})] : [] }), ...F('joplo.config.ts') },
     layouts: {},
     routes: { '/': { ...home, ...F('routes/page.tsx') } },
     features: { f: { def: { ...feature({ name: 'F', goal: 'g', cases: {}, pick: 'a' }), ...F('features/f/feature.ts') }, works: { a: { ...opt, ...F('features/f/works/a.tsx') } } } },
@@ -54,6 +55,15 @@ describe('<Image> 的 src', () => {
     const r = build(h(ui.Image, { id: 'photo', src: 'data:image/png;base64,AAAA', alt: '照片', fit: 'contain' }));
     expect(warnings(r, 'IMAGE_PLACEHOLDER')).toEqual([]);
     expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+  });
+  it('字符串化资源出现在CSS url中给定位诊断，普通正文不误报', () => {
+    const bg=localResource('image','png','private input');
+    const r=build(h('div', { style: { backgroundImage: `url(${bg})` } }, h(ui.Text, {children:'url([object Object])'})));
+    expect(r.diagnostics.filter(d=>d.code==='LOCAL_RESOURCE_STRINGIFIED')).toHaveLength(1);
+    expect(JSON.stringify(r.diagnostics)).not.toContain('private input');
+  });
+  it('已提取的本地资源引用不会误报占位', () => {
+    expect(warnings(build(h(ui.Image, { id: 'photo', src: localResource('image','png','private source') }), true), 'IMAGE_PLACEHOLDER')).toEqual([]);
   });
   it('网址或相对路径：画成占位，并提示用 asset() 内嵌', () => {
     const r = build(h('div', null, h(ui.Image, { id: 'a', src: 'https://example.com/x.jpg', alt: 'x' }), h(ui.Image, { id: 'b', src: './x.jpg', alt: 'y' })));
