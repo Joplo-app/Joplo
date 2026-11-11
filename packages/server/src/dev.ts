@@ -326,7 +326,7 @@ export async function createHub(opts: HubOptions = {}): Promise<Hub> {
     if (out.resources) localResources.set(slot.id, out.resources);
     else localResources.delete(slot.id);
     resourceWarnings.set(slot.id, new Map());
-    if (out.project && out.resources?.requests.length) out.project.mediaAssets = Object.fromEntries(out.resources.requests.map(r => [r.id, `/__joplo/p/${encodeURIComponent(slot.id)}/resources/${encodeURIComponent(r.id)}`]));
+    if (out.project && out.resources?.requests.length) out.project.mediaAssets = { ...out.project.mediaAssets, ...Object.fromEntries(out.resources.requests.map(r => [r.id, `/__joplo/p/${encodeURIComponent(slot.id)}/resources/${encodeURIComponent(r.id)}`])) };
     if (out.project) {
       if (out.resources) {
         const resources = await inlineResources(out.project, out.resources.requests.filter(r => referencedResources(out.project).has(r.id)), out.resources.host);

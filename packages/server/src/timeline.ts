@@ -1,3 +1,4 @@
+import { AudioRegionSchema } from '@joplo-app/core';
 import type { AudioRegion } from '@joplo-app/kit/plugin';
 import { writeOutput } from './output-file.ts';
 /** Versioned actual-playback observation schema. Times are milliseconds, never outline estimates. */
@@ -92,8 +93,10 @@ export async function persistTimeline(file: string, timeline: PlaybackTimeline, 
   };
   const voiceFiles = new Map<string, string>();
   for (const event of timeline.events) if (event.type === 'narration' && event.source === 'clip' && typeof event.file === 'string') {
-    const source = event.file;
-    if (!voiceFiles.has(source)) voiceFiles.set(source, await copy(String(event.clipId ?? source), 'narration', source));
+    const reference = event.file;
+    const source = reference.startsWith('joplo-resource:') ? mediaAssets[reference.slice(15)] : reference;
+    if (!source) throw new Error('Explicit narration audio is unavailable; prepare the resource before exporting');
+    if (!voiceFiles.has(source)) voiceFiles.set(source, await copy(String(event.clipId ?? source), 'narration', source, event.audioInfo ? AudioRegionSchema.parse(event.audioInfo) : undefined));
     event.file = voiceFiles.get(source)!;
   }
   const resources = new Set<string>();

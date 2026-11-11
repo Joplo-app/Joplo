@@ -131,6 +131,10 @@ export const notApplicable = (reason: string): CoverageDecl => ({ kind: 'coverag
 export const excluded = (reason: string): CoverageDecl => ({ kind: 'coverage', status: 'excluded', reason });
 
 // ---------- 步骤效果 ----------
+/** An embedded asset() audio URL or an existing resource-plugin reference. */
+export type AudioSource = string | ReturnType<typeof import('./plugin.ts').localResource>;
+export type AudioHoldOptions = { pad?: number };
+
 export type EffectDef =
   | { kind: 'effect'; type: 'set'; path: string; value: Json }
   | { kind: 'effect'; type: 'append'; path: string; value: Json }
@@ -147,8 +151,9 @@ export type EffectDef =
   | { kind: 'effect'; type: 'cue'; cue: 'spotlight' | 'highlight' | 'number'; targets: string[] }
   | { kind: 'effect'; type: 'callout'; target: string; text: string; side?: CalloutSide }
   | { kind: 'effect'; type: 'hold'; seconds: number }
-  | { kind: 'effect'; type: 'say'; text: string; role?: string }
-  | { kind: 'effect'; type: 'narrate'; text: string | false };
+  | { kind: 'effect'; type: 'hold'; timing: 'voice' | 'audio'; audio?: AudioSource; pad?: number }
+  | { kind: 'effect'; type: 'say'; text: string; role?: string; audio?: AudioSource }
+  | { kind: 'effect'; type: 'narrate'; text: string | false; audio?: AudioSource };
 
 /** 标注气泡放在目标的哪一侧；不写时自动选画面里放得下的一侧（右、左、下、上）。 */
 export type CalloutSide = 'top' | 'right' | 'bottom' | 'left';
@@ -202,6 +207,7 @@ export const explain = (text: string): EffectDef => ({ kind: 'effect', type: 'ex
 /**
  * 旁白（D74）：讲解人用旁白的声音说的话，像在给同事介绍功能，不是把字幕念出来。和字幕分开存。
  * 朗读的优先级：narrate() > say()（角色台词）> 字幕（过渡卡读标题和副标题）；explain 不读。字幕兜底时也用旁白的声音。
+ * opts.audio：asset() 或已准备的 localResource() 音频；沿用字幕/旁白轨，绝不调用 TTS。
  * 自动播放会等它读完再进下一步。narrate(false) 显式静音整步（包括 say 与字幕兜底）；空字符串不是静音。
  *
  * 写法（详见 npx joplo skill story 第 6 节）：
@@ -212,16 +218,17 @@ export const explain = (text: string): EffectDef => ({ kind: 'effect', type: 'ex
  *   .click('share', '小雨把行程单分享给阿杰', narrate('行程用链接发给阿杰，他不用装 App。'))
  *   .card('现在是阿杰', { role: 'ajie' }, narrate('换到阿杰这边，他只收到一条消息。'))
  */
-export const narrate = (text: string | false): EffectDef => ({ kind: 'effect', type: 'narrate', text });
+export const narrate = (text: string | false, opts: { audio?: AudioSource } = {}): EffectDef => ({ kind: 'effect', type: 'narrate', text, ...(opts.audio !== undefined ? { audio: opts.audio } : {}) });
 
 /**
  * 角色台词（D74）：这一步里角色亲口说的话，用这个角色的声音读（feature.roles 与层级的 role；没有角色时用旁白的声音）。
  * 写第一人称、像真人说话：.click('can_go', '阿杰回复：我能去', say('我能去！'))。
  * 同一步写了 narrate() 时只读旁白。讲解、过渡、总结请用 narrate()。
+ * opts.audio 与 narrate 一样接受现成音频；缺失或解码失败报错，不回退供应商。
  * opts.role（D100）：写明是谁在说（feature.roles 的键）。系统步骤没有“操作的人”，要角色的声音时必须写；
  * 操作步骤写了也以它为准：.system('说', '“帮我写一封”', say('帮我写一封', { role: 'me' }))。
  */
-export const say = (text: string, opts: { role?: string } = {}): EffectDef => ({ kind: 'effect', type: 'say', text, ...(opts.role !== undefined ? { role: opts.role } : {}) });
+export const say = (text: string, opts: { role?: string; audio?: AudioSource } = {}): EffectDef => ({ kind: 'effect', type: 'say', text, ...(opts.role !== undefined ? { role: opts.role } : {}), ...(opts.audio !== undefined ? { audio: opts.audio } : {}) });
 
 // ---------- 焦点与呈现形式（D70）：这一步观众看哪里、用什么形式看 ----------
 // 镜头（shot）负责“取景”：推近、跟随。下面这些只负责“强调”：都不推近镜头；目标不在当前镜头里时，镜头先退回整层。
@@ -251,10 +258,20 @@ export const numbered = (...targets: string[]): EffectDef => ({ kind: 'effect', 
 export const callout = (target: string, text: string, opts: { side?: CalloutSide } = {}): EffectDef => ({ kind: 'effect', type: 'callout', target, text, ...(opts.side ? { side: opts.side } : {}) });
 /**
  * 停留：自动播放时这一步至少停 seconds 秒（0.5–30，按播放速度缩放），给观众时间看画面（图表、对比、一大段结果）。
+ * hold('voice', { pad: 0.4 }) / hold('audio', audio, { pad: 0 }) 按实测音频加余量；缺实测时明确估算。
+ * 这两种显式音频停留替代字幕阅读下限，仍取动作/镜头/流式输出和插件 effectHold 的最大值。
+ * pad 默认 0.45 秒（0–30），只加一次；数字 hold 的原义不变。
  * 不写时按字幕字数自动计算。
  *   .system('对比两种结果', '左边是旧流程，右边是新流程', hold(5))
  */
-export const hold = (seconds: number): EffectDef => ({ kind: 'effect', type: 'hold', seconds });
+export function hold(seconds: number): EffectDef;
+export function hold(source: 'voice', opts?: AudioHoldOptions): EffectDef;
+export function hold(source: 'audio', audio: AudioSource, opts?: AudioHoldOptions): EffectDef;
+export function hold(source: number | 'voice' | 'audio', audioOrOptions?: AudioSource | AudioHoldOptions, opts: AudioHoldOptions = {}): EffectDef {
+  if (typeof source === 'number') return { kind: 'effect', type: 'hold', seconds: source };
+  const options = source === 'voice' ? audioOrOptions as AudioHoldOptions | undefined : opts;
+  return { kind: 'effect', type: 'hold', timing: source, ...(source === 'audio' ? { audio: audioOrOptions as AudioSource } : {}), ...(options?.pad !== undefined ? { pad: options.pad } : {}) };
+}
 
 /**
  * 层级（视角，D43 / T-layers）：一个完全独立的画面，有自己的 JSX 树，单独渲染、按自己的布局占满舞台。

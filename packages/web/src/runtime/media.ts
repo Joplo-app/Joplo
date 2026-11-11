@@ -1,3 +1,7 @@
+import { audioResource } from './audio-source';
+import { playBuffer } from './record-voice';
+import type { Narration } from './voice';
+import { prepareRegion } from './audio-media';
 import { audioMedia, decodedLease } from './audio-media';
 import { MediaCache } from './media-cache';
 import type { AudioRegion, MediaDriver, MediaSnapshot } from '@joplo-app/kit/plugin';
@@ -13,6 +17,7 @@ export class MediaEngine {
   private decoded=new MediaCache<AudioBuffer>({budgetBytes:32*1024*1024,concurrency:1,label:'decoded PCM'});
   private warm:(()=>void)[]=[];
   private disposed = false;
+  private narrations = new Set<Narration>();
   private failures = new Map<string, string>();
   private captureError: string | null = null;
   private capture?: MediaStreamAudioDestinationNode;
@@ -62,6 +67,40 @@ export class MediaEngine {
     const audio = this.audio; if (!audio) throw new Error('AudioContext unavailable');
     return audio.decodeAudioData(bytes);
   }
+  /** Explicit narration shares the existing encoded/PCM budgets and content-region contract. */
+  narrate(url: string, speed: number, info?: AudioRegion): Narration {
+    let current: Narration | null = null, cancelled = false, paused = false, failure: string | null = null;
+    let encoded: ReturnType<MediaEngine['bytes']> | undefined;
+    let pcm: ReturnType<typeof decodedLease> | undefined;
+    const release = () => { pcm?.release(); pcm = undefined; encoded?.release(); encoded = undefined; };
+    let finish!: () => void;
+    const done = new Promise<void>(resolve => { finish = resolve; });
+    void (async () => {
+      try {
+        this.unlock();
+        const audio = this.audio; if (!audio) throw new Error('AudioContext unavailable');
+        encoded = this.bytes(url);
+        const source = await encoded.value;
+        if (cancelled) return;
+        const audioInfo = info ?? source.audio;
+        pcm = decodedLease(audio, source.bytes, url, this.decoded, audioInfo);
+        const buffer = await pcm.value;
+        const region = prepareRegion(buffer, audioInfo);
+        if (cancelled) return;
+        const out = this.narrationOutput(); if (!out) throw new Error('Narration audio output unavailable');
+        current = playBuffer(out, buffer, speed, audioInfo ? region : undefined, paused);
+        await current.done;
+      } catch (e) {
+        if (!cancelled) failure = `Explicit narration audio failed: ${e instanceof Error ? e.message : String(e)}; no voice provider was called`;
+      } finally { release(); finish(); }
+    })();
+    const narration: Narration = { source: 'clip', done, failure: () => failure, progress: () => current?.progress?.() ?? 0,
+      pause: () => { paused = true; current?.pause(); }, resume: () => { paused = false; current?.resume(); },
+      cancel: () => { cancelled = true; current?.cancel(); release(); finish(); } };
+    this.narrations.add(narration);
+    void done.then(() => this.narrations.delete(narration));
+    return narration;
+  }
   async calibrate() {
     const audio=this.audio,capture=this.capture;if(!audio||!capture)return false;
     const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgb(255,0,255);pointer-events:none';
@@ -77,17 +116,8 @@ export class MediaEngine {
   };
   private bytes(url:string) {
     return this.encoded.acquire(url,async()=>{
-      // 发布站（D98）：素材是独立文件，按相对路径 GET 取字节；看板的本机资源接口（/__joplo/…）返回 data URL
-      if(!url.startsWith('data:')&&!url.startsWith('/__joplo/')){
-        const res=await fetch(url);if(!res.ok)throw new Error('Music resource unavailable');
-        const bytes=new Uint8Array(await res.arrayBuffer());
-        return {value:{bytes,audio:undefined},bytes:bytes.byteLength};
-      }
-      const result=url.startsWith('data:')?{url}:await(await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-joplo-token':document.querySelector<HTMLMetaElement>('meta[name="joplo-token"]')?.content??''},body:'{}'})).json();
-      const data=result.url;
-      if(typeof data!=='string'||!/^data:[^;,]+;base64,/.test(data))throw new Error('Music resource unavailable');
-      const bytes=Uint8Array.from(atob(data.slice(data.indexOf(',')+1)),c=>c.charCodeAt(0));
-      return {value:{bytes,audio:result.audio},bytes:bytes.byteLength};
+      const value = await audioResource(url);
+      return { value, bytes: value.bytes.byteLength };
     },url.startsWith('data:')?Math.floor((url.length-url.indexOf(',')-1)*.75)-(url.endsWith('==')?2:url.endsWith('=')?1:0):0);
   }
   /**
@@ -207,6 +237,6 @@ export class MediaEngine {
     }
   }
   private remove(key: string) { this.failures.delete(key); const slot = this.slots.get(key); if (!slot) return; slot.dead = true; slot.driver?.destroy(); slot.release?.();slot.gain.disconnect(); this.slots.delete(key); }
-  destroy() { this.completed.clear(); this.disposed = true;this.captureClock?.stop();this.captureClock?.disconnect();this.captureClock=undefined; if(this.recorder)this.recorder.ondataavailable=null;if (this.recorder?.state === 'recording') this.recorder.stop(); this.capture?.stream.getTracks().forEach(t => t.stop()); for (const k of this.slots.keys()) this.remove(k); void this.audio?.close().catch(() => {}); this.audio = null;this.warm.splice(0).forEach(r=>r());this.encoded.dispose();this.decoded.dispose();this.chunks=[];this.recorder=undefined;this.capture=undefined; }
+  destroy() { for (const n of this.narrations) n.cancel(); this.narrations.clear(); this.completed.clear(); this.disposed = true;this.captureClock?.stop();this.captureClock?.disconnect();this.captureClock=undefined; if(this.recorder)this.recorder.ondataavailable=null;if (this.recorder?.state === 'recording') this.recorder.stop(); this.capture?.stream.getTracks().forEach(t => t.stop()); for (const k of this.slots.keys()) this.remove(k); void this.audio?.close().catch(() => {}); this.audio = null;this.warm.splice(0).forEach(r=>r());this.encoded.dispose();this.decoded.dispose();this.chunks=[];this.recorder=undefined;this.capture=undefined; }
   status() { return { error: this.captureError ?? this.failures.values().next().value ?? null, state: this.audio?.state ?? 'locked', tracks: [...this.slots.values()].filter(s => s.driver && !s.waiting).length, time: this.audio?.currentTime ?? 0,cache:{encoded:this.encoded.status(),pcm:this.decoded.status()} }; }
 }

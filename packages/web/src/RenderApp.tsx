@@ -62,7 +62,7 @@ import { RecordVoice, type MissingLine } from './runtime/record-voice';
 import { fetchVoiceState } from './runtime/dev-client';
 import { boardVoiceLookup } from './i18n/content';
 import { stepCaption } from './i18n/step-caption';
-import { speakerRoleAt, spokenLine } from '@joplo-app/core/runtime';
+import { speakerRoleAt, spokenLine, VOICE_BREATH_MS } from '@joplo-app/core/runtime';
 
 /** 截图用的 IR：content 参数是项目的内容语言时换成这种语言（与看板预览同一个 viewProject）。 */
 export function renderProject(project: Project, content: string | null, uiLocale: string): Project {
@@ -111,8 +111,8 @@ export type RecordProgress = { step: number; done: boolean; error: string | null
 export function estimatedNarrator(): Narrator {
   const n = new Narrator();
   n.enabled = true;
-  n.speak = (text: string, _role: string | null, speed: number): Narration | null => {
-    const ms = voiceMs(text.trim(), speed);
+  n.speak = (text, _role, speed, _audio, timing): Narration | null => {
+    const ms = timing?.voiceHold ? Math.max(0, timing.durationMs ?? (voiceMs(text.trim()) - VOICE_BREATH_MS)) / speed : voiceMs(text.trim(), speed);
     if (!ms) return null;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let left = ms;
@@ -353,11 +353,12 @@ function RecordStage({ sampling,frameReadiness, viewportOverride, project, proje
       const speak = c.narrator.speak.bind(c.narrator);
       c.narrator = new Narrator();
       c.narrator.enabled = true;
-      c.narrator.speak = (text, role, speed) => {
+      c.narrator.speak = (text, role, speed, audio, timing) => {
         const snap = c.getSnapshot();
-        const narration = speak(text, role, speed);
+        const narration = speak(text, role, speed, audio, timing);
         if (narration) {
-          const event = { type: 'narration', at: performance.now(), engineMs: c.clock.time, scenarioId: snap.scenarioId, position: snap.state?.position ?? 0, text, role, speed, source: narration.source, ...recordVoice?.describe(text, role), endAt: null as number | null, engineEndMs: null as number | null };
+          const explicitRef = snap.scenarioId ? project.scenarios[snap.scenarioId]?.steps[(snap.state?.position ?? 0) - 1]?.audio : undefined;
+          const event = { type: 'narration', at: performance.now(), engineMs: c.clock.time, scenarioId: snap.scenarioId, position: snap.state?.position ?? 0, text, role, speed, source: narration.source, ...recordVoice?.describe(text, role, audio, timing?.audioInfo), ...(explicitRef ? { file: explicitRef, clipId: explicitRef.slice(15), provided: true } : {}), endAt: null as number | null, engineEndMs: null as number | null };
           timeline.current.events.push(event);
           void narration.done.then(() => { event.endAt = performance.now(); event.engineEndMs = c.clock.time; });
         }
@@ -383,7 +384,7 @@ function RecordStage({ sampling,frameReadiness, viewportOverride, project, proje
     return Object.fromEntries([...ids].filter(id => project.mediaAssets?.[id]).map(id => [id, project.mediaAssets![id]!]));
   }, [project, chapters]);
   // 要读的每一段（与控制器 narrate 同一个算法），开播前预取音频
-  const voiceLines = useMemo(() => recordVoice ? chapters.flatMap(chapter => chapter.steps.map((step, i) => spokenLine(step, stepCaption(step, i18n), speakerRoleAt(project, chapter.id, i + 1)))).filter(l => l.text.trim()).map(l => ({ text: l.text, role: l.role })) : [], [recordVoice, chapters, project, i18n]);
+  const voiceLines = useMemo(() => recordVoice ? chapters.flatMap(chapter => chapter.steps.map((step, i) => spokenLine(step, stepCaption(step, i18n), speakerRoleAt(project, chapter.id, i + 1)))).filter(l => l.text.trim()).map(l => ({ text: l.text, role: l.role, ...(l.audio !== undefined ? { audio: project.mediaAssets?.[l.audio.slice(15)] ?? '', audioInfo: project.mediaInfo?.[l.audio.slice(15)] } : {}) })) : [], [recordVoice, chapters, project, i18n]);
   useEffect(() => {
     let last = '';
     return ctl.subscribe(() => {

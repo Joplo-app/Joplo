@@ -20,6 +20,7 @@ Read the relevant installed plugin skill for the visual component, its props and
 - "Notice this changed / this matters": highlight('id'). No zoom; a ring that pulses once.
 - One short reason next to an element: callout('id', 'Share after generation', { side? }). A note with a leader line; side is top / right / bottom / left, or omitted to pick the free side.
 - What a screen is made of, or an order of parts: numbered('input', 'preview', 'send'). Badges 1, 2, 3 (keep it to 5 or fewer).
+- Use an existing clip to determine dwell: hold('voice', { pad: 0.4 }) for this step's narration or hold('audio', asset('./cue.wav'), { pad: 0 }) for a separate clip. This replaces caption reading floors, never required action/plugin-effect time; measured versus estimated is visible in check/outline. See demo for the max rule, preparation and timing sources.
 - Give viewers time to look (a chart, a comparison, a long result): hold(5). Autoplay stays at least 5 seconds (0.5–30, scaled by speed).
 Read the relevant installed plugin skill for the visual component, its props and recovery rules.
 - Hand-drawn circle / underline / box / arrow: mark('id', { kind }) (see demo).
@@ -61,4 +62,4 @@ flow('Plan a weekend trip', { start: '/' })
 Full example: examples/camping.
 
 Related topics: demo, plugins, check
-<!-- joplo-skill 0.7.1 sha256:d82858420af727dff8a10004736809e54034ceb49acec7d238a4d37f0331a1d2 -->
+<!-- joplo-skill 0.7.1 sha256:9b9b123412c3f20bf66053967eec67b5dd717237280077e017f1d7f944c13428 -->

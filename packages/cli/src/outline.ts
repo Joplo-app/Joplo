@@ -36,7 +36,7 @@ export const displayWidth = (s: string) => [...s].reduce((n, ch) => n + ((ch.cod
 const pad = (s: string, n: number) => { const w = displayWidth(s); return w >= n ? `${s} ` : s + ' '.repeat(n - w); };
 
 function scenarioLine(s: OutlineScenario, caseKeys: Map<string, string>, width: number, nameWidth: number): string {
-  const shape = s.steps === 0 ? 'initial state only' : `${s.steps} step${s.steps === 1 ? '' : 's'} ${approx(s.ms)}`;
+  const shape = s.steps === 0 ? 'initial state only' : `${s.steps} step${s.steps === 1 ? '' : 's'} ${approx(s.ms)}${s.audioTiming ? `; audio timing: ${s.audioTiming.measured} measured, ${s.audioTiming.estimated} estimated` : ''}`;
   const frame = [s.opening ? 'opens with a card' : '', s.ending ? 'ends with a card' : ''].filter(Boolean).join(', ');
   const cases = s.caseIds.map((c) => caseKeys.get(c) ?? c).join(', ');
   return `    ${pad(s.key, width)}${pad(oneLine(s.name), nameWidth)}${pad(shape, 19)}${s.outcome}${frame ? ` · ${frame}` : ''}${cases ? ` · cases: ${cases}` : ''}`;

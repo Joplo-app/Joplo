@@ -137,7 +137,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   });
   let compiled: Awaited<ReturnType<typeof compileProject>>;
   try {
-    compiled = await compileProject(loader, projectDir, opts.review === true ? 'review' : 'publish');
+    compiled = await compileProject(loader, projectDir, opts.review === true ? 'review' : 'publish', { voiceDefault: opts.voiceDefault });
     // 发布编译已跳过草稿与未选功能；范围的公开校验需要原始条目，避免误报不存在。
     if (opts.scope?.entryIds?.length || opts.scope?.scenarios?.length && compiled.diagnostics.some(d => d.code === 'WORK_DRAFT_SKIPPED')) {
       const dev = await compileProject(loader, projectDir, 'dev');
@@ -178,7 +178,7 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
   let mediaCredits: string[] = [], mediaLicenses:string[]=[];
   if (compiled.resources) {
     const resources = await inlineResources(project, compiled.resources.requests, compiled.resources.host);
-    if (Object.keys(resources.assets).length) project = { ...project, mediaAssets: resources.assets,mediaInfo:resources.audioInfo };
+    if (Object.keys(resources.assets).length) project = { ...project, mediaAssets: { ...project.mediaAssets, ...resources.assets },mediaInfo:{ ...project.mediaInfo, ...resources.audioInfo } };
     compiled.diagnostics.push(...resources.diagnostics);
     mediaCredits = resources.credits;mediaLicenses=resources.licenses;
     if(resources.diagnostics.some(d=>d.severity==='error'))throw new JoploError('EXPORT_FAILED','Audio attribution is incomplete; no site was published',{diagnostics:resources.diagnostics});

@@ -1,10 +1,12 @@
+import { readCliVersion } from './skill.ts';
+import { CloudClient } from './cloud.ts';
 import { resolveWorkId } from './work.ts';
 import { existsSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tsImport } from 'tsx/esm/api';
 import { nodeResourceIds, compile, validate, type Diagnostic, type Project, type ValidationReport } from '@joplo-app/core';
-import { isPluginDef, type ResourceRequest } from '@joplo-app/kit/plugin';
+import { isPluginDef, type ResourceRequest, type LocalResourceInfo, type AudioRegion } from '@joplo-app/kit/plugin';
 import { loadAuthoring } from '@joplo-app/core/node';
 
 export type CheckReport = ValidationReport & { name: string };
@@ -28,21 +30,39 @@ export async function checkWithProject(dir: string, workId?: string): Promise<Ch
   const requests: ResourceRequest[] = [];
   let compiled = loaded.authoring ? compile(loaded.authoring, 'dev', { onResource:r=>requests.push(r) }) : null;
   const resourceDiagnostics: Diagnostic[] = [];
+  const timingAssets: Record<string, string> = {};
+  const timingInfo: Record<string, AudioRegion> = {};
+  let resourceInfo: Record<string, LocalResourceInfo> = {};
   if (requests.length && loaded.authoring) {
-    const { LocalResources, inspectResources, mediaDiagnostics } = await import('@joplo-app/server');
+    const { LocalResources, inspectResources } = await import('@joplo-app/server');
     const plugins = loaded.authoring.config.plugins ?? [];
     const host = new LocalResources(root,Object.fromEntries(plugins.filter(isPluginDef).filter(p=>p.local).map(p=>[p.id,p.local!])));
     const inspected = await inspectResources(compiled?.project ?? null, requests, host);
+    resourceInfo = inspected.resourceInfo;
     resourceDiagnostics.push(...inspected.diagnostics);
     if (Object.keys(inspected.resourceInfo).length) compiled = compile(loaded.authoring, 'dev', { resourceInfo: inspected.resourceInfo });
-    if (compiled?.project) resourceDiagnostics.push(...mediaDiagnostics(compiled.project, inspected.resourceInfo));
     for (const request of requests) {
       if (!nodeResourceIds(compiled?.project).has(request.id)) continue;
       const description = await host.describe(request);
       if (!description.persistent) continue;
       const result = await host.ensure(request);
       if (result.diagnostic) resourceDiagnostics.push(result.diagnostic);
+      if (result.url) timingAssets[request.id] = result.url;
+      if (result.audio) timingInfo[request.id] = result.audio;
     }
+  }
+  if (loaded.authoring && compiled?.project && Object.values(compiled.project.scenarios).some(sc => sc.steps.some(st => st.audio || st.holdFor))) {
+    const { readAudioTiming } = await import('@joplo-app/server');
+    const signedIn = await new CloudClient(undefined, await readCliVersion(), () => {}, () => {}, { interactive: false }).auth().then(Boolean, () => false);
+    const timing = await readAudioTiming(root, { ...compiled.project, mediaAssets: { ...compiled.project.mediaAssets, ...timingAssets }, mediaInfo: { ...compiled.project.mediaInfo, ...timingInfo } }, { defaultProfile: signedIn ? 'cloud' : null });
+    resourceDiagnostics.push(...timing.diagnostics);
+    compiled = compile(loaded.authoring, 'dev', { resourceInfo, audioDurationFor: timing.audioDurationFor, voiceDurationFor: timing.voiceDurationFor });
+    if (compiled.project && Object.keys(timingAssets).length) compiled.project.mediaAssets = { ...compiled.project.mediaAssets, ...timingAssets };
+    if (compiled.project && Object.keys(timingInfo).length) compiled.project.mediaInfo = { ...compiled.project.mediaInfo, ...timingInfo };
+  }
+  if (compiled?.project && Object.keys(resourceInfo).length) {
+    const { mediaDiagnostics } = await import('@joplo-app/server');
+    resourceDiagnostics.push(...mediaDiagnostics(compiled.project, resourceInfo));
   }
   const selected = workId && compiled?.project ? resolveWorkId(compiled.project, workId) : undefined;
   const validated = compiled?.project ? validate(compiled.project, { workId: selected, mode: 'all' }) : null;

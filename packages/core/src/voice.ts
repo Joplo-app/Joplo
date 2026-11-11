@@ -42,12 +42,12 @@ export function joinSpoken(parts: (string | null | undefined)[]): string {
  * 字幕（旁白的声音；过渡卡读标题和副标题）。caption 是这一步在当前语言下显示的字幕（网页用 stepCaption，服务端用 step.caption）；
  * speaker 是这一步的说话角色（speakerRoleAt）。text 为空串表示这一步不读；role 为 null 表示旁白。
  */
-export function spokenLine(step: Step, caption: string, speaker: string | null): { text: string; role: string | null } {
+export function spokenLine(step: Step, caption: string, speaker: string | null): { text: string; role: string | null; audio?: string } {
   if (step.mute) return { text: '', role: null };
-  if (step.narrate?.trim()) return { text: step.narrate.trim(), role: null };
-  if (step.say?.trim()) return { text: step.say.trim(), role: speaker };
-  if (step.action.type === 'card') return { text: joinSpoken([step.action.title, step.action.sub]), role: null };
-  return { text: caption.trim(), role: null };
+  if (step.narrate?.trim()) return { text: step.narrate.trim(), role: null, ...(step.audio ? { audio: step.audio } : {}) };
+  if (step.say?.trim()) return { text: step.say.trim(), role: speaker, ...(step.audio ? { audio: step.audio } : {}) };
+  if (step.action.type === 'card') return { text: joinSpoken([step.action.title, step.action.sub]), role: null, ...(step.audio ? { audio: step.audio } : {}) };
+  return { text: caption.trim(), role: null, ...(step.audio ? { audio: step.audio } : {}) };
 }
 
 /** 这一步要读的文字（不关心是谁读）。 */

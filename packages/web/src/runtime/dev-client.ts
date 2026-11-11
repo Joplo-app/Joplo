@@ -457,7 +457,7 @@ export async function selectVoiceProfile(projectId: string, profileId: string | 
   }
 }
 
-export type VoiceSegment = { stepId: string; text: string; role: string | null };
+export type VoiceSegment = { stepId: string; text: string; role: string | null; audio?: string };
 export type VoiceSummary = {
   total: number;
   generated: number;

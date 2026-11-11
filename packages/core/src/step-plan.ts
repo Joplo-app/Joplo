@@ -9,6 +9,7 @@
  */
 import { pluginActionSpec } from './actions.ts';
 import { CAMERA_MS, stepDwell, voiceMs } from './pace.ts';
+import { VOICE_BREATH_MS, narrationText } from './voice.ts';
 import { streamPlan } from './player.ts';
 import type { Project, Step } from './schema.ts';
 
@@ -46,6 +47,9 @@ export type StepPlan = {
   voiceMs: number;
   /** 这一步合计 = leadMs + max(dwellMs, voiceMs)。 */
   totalMs: number;
+  /** Explicit timing source, absent for legacy plans. */
+  timingSource?: 'measured' | 'estimated';
+  audioMs?: number;
 };
 
 export type StepPlanOptions = {
@@ -57,6 +61,9 @@ export type StepPlanOptions = {
   cursor?: boolean;
   /** 已经用提交前的状态算好的流式输出时长（D100）；缺省按整段重新出估算。 */
   streamMs?: number;
+  audioDurationMs?: number;
+  /** Runtime is already waiting for actual narration.done; do not also wait its estimate. */
+  voiceActive?: boolean;
 };
 
 /** 一步停留时要读的文字：说明、explain，过渡卡再加副标题与要点。 */
@@ -88,14 +95,26 @@ export function stepPlan(project: Pick<Project, 'plugins'>, step: Step, o: StepP
 
   const settleMs = cursor && !reduced ? T.afterStep : 0;
   const streamMs = o.streamMs ?? Math.max(0, ...streamPlan(step, null).map((x) => x.ms));
-  const read = reduced
+  const dynamic = step.holdFor;
+  const read = dynamic ? Math.max(streamMs, step.shots.length > 0 || step.directorLayer ? CAMERA_MS + 200 : 0) : reduced
     ? T.reducedStep
     : stepDwell({ texts: o.texts ?? stepTexts(step), paced: step.hold !== undefined, cameraMoved: step.shots.length > 0 || !!step.directorLayer, streamMs });
   // hold 是看的时间，不是动画：减少动态效果时同样保留
-  const dwellMs = Math.max(step.hold ?? 0, step.effectHold ?? 0, read, settleMs);
-  const voice = voiceMs(step.mute ? undefined : step.narrate ?? step.say);
+  let dwellMs = Math.max(step.hold ?? 0, step.effectHold ?? 0, read, settleMs);
+  let voice = voiceMs(step.mute ? undefined : step.narrate ?? step.say);
+  let audioMs: number | undefined;
+  let timingSource: 'measured' | 'estimated' | undefined;
+  if (dynamic) {
+    const measured = o.audioDurationMs ?? dynamic.durationMs;
+    timingSource = measured !== undefined ? 'measured' : 'estimated';
+    const estimate = Math.max(0, voiceMs(narrationText(step, step.caption)) - VOICE_BREATH_MS);
+    audioMs = (measured ?? estimate) + dynamic.padMs;
+    // voiceMs already includes the old breath: replace it, never add pad twice.
+    if (dynamic.kind === 'voice') voice = step.mute || o.voiceActive ? 0 : audioMs;
+  }
+  if (dynamic) dwellMs = Math.max(dwellMs, dynamic.kind === 'voice' && (step.mute || o.voiceActive) ? 0 : audioMs ?? 0);
   const leadMs = cursorMs + rippleMs + gestureMs;
-  return { cursorMs, rippleMs, gestureMs, leadMs, settleMs, dwellMs, voiceMs: voice, totalMs: leadMs + Math.max(dwellMs, voice) };
+  return { cursorMs, rippleMs, gestureMs, leadMs, settleMs, dwellMs, voiceMs: voice, totalMs: leadMs + Math.max(dwellMs, voice), ...(timingSource ? { timingSource, audioMs } : {}) };
 }
 
 /** 一个场景按 1× 自动播放大约多久（毫秒）：每一步 stepPlan 的合计之和。 */

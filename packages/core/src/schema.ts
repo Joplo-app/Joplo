@@ -227,6 +227,10 @@ export const Step = z.strictObject({
   narrate: z.string().min(1).optional(),
   /** Explicit silence from narrate(false); suppresses narration, dialogue and caption fallback. */
   mute: z.literal(true).optional(),
+  /** Selected pre-existing narration/dialogue audio; never sent to a TTS provider. */
+  audio: z.string().regex(/^joplo-resource:[a-z0-9-]+$/).optional(),
+  /** Explicit audio-derived dwell. Duration excludes pad; absent duration means estimated. */
+  holdFor: z.strictObject({ kind: z.enum(['voice', 'audio']), audio: z.string().regex(/^joplo-resource:[a-z0-9-]+$/).optional(), padMs: z.number().finite().min(0).max(30000), durationMs: z.number().finite().positive().optional(), durationKey: z.string().min(1).optional() }).refine(h => h.kind === 'audio' ? !!h.audio : h.audio === undefined, 'audio-derived hold requires exactly its audio reference').refine(h => (h.durationMs === undefined) === (h.durationKey === undefined), 'measured duration requires a matching identity').optional(),
   /** System-step lead before commit, in milliseconds. */
   systemLead: z.number().int().min(0).max(30_000).optional(),
   source: Source,

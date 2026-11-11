@@ -601,6 +601,7 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
   }
 
   if (diags.some((d) => d.severity === 'error')) return { project: null, diagnostics: diags };
+  if (Object.keys(host.embeddedAudio).length) out.mediaAssets = host.embeddedAudio;
   const parsed = Project.safeParse(out);
   if (!parsed.success) {
     // 同一根因（共享的 JSX）在多个画面展开时合并成一条，定位到作者元素（schema-issues.ts）
@@ -742,6 +743,8 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
     let sayRole: string | null = null;
     const narrates: string[] = [];
     let mute = false;
+    const sayAudio: unknown[] = [], narrateAudio: unknown[] = [];
+    let holdFor: Step['holdFor'];
     /** 插件效果声明的最短停留（D98）：同一步取最大值。 */
     let effectHoldMs = 0;
     const ext: Record<string, unknown> = {};
@@ -769,6 +772,7 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
       else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
       else if (e.type === 'shot' || e.type === 'mark' || e.type === 'fork' || e.type === 'cue' || e.type === 'callout' || e.type === 'hold') continue; // 镜头与焦点提示不是状态变化，下面单独归类
       else if (e.type === 'say') {
+        if (e.audio !== undefined) sayAudio.push(e.audio);
         if (e.role !== undefined) {
           if (typeof e.role !== 'string' || !roleKeys.has(e.role)) err('ROLE_UNKNOWN', `say() role "${String(e.role)}" is not in ${roleScope}${roleKeys.size ? ` (available: ${[...roleKeys].join(', ')})` : ` (${roleScope} must use { key: role('Name') })`}`, st.source);
           else if (sayRole !== null && sayRole !== e.role) err('SAY_ROLE_CONFLICT', `One step has say() lines from two roles ("${sayRole}" and "${e.role}"); split them into two steps`, st.source);
@@ -777,6 +781,7 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
         if (typeof e.text === 'string' && e.text.trim()) says.push(e.text.trim());
         else err('SAY_EMPTY', 'say() needs the line the character speaks, for example say(\'I can make it!\'). Remove it to read the caption instead', st.source);
       } else if (e.type === 'narrate') {
+        if (e.audio !== undefined) narrateAudio.push(e.audio);
         if (e.text === false) mute = true;
         else if (typeof e.text === 'string' && e.text.trim()) narrates.push(e.text.trim());
         else err('NARRATE_EMPTY', 'narrate() needs the narrator\'s words, for example narrate(\'She sends Ajie the plan as a link, so he needs no app.\'). Remove it to read say() or the caption instead', st.source);
@@ -846,6 +851,16 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
           if (!focusTargets.includes(e.target)) focusTargets.push(e.target);
         }
       } else if (e.type === 'hold') {
+        if ('timing' in e) {
+          const pad = e.pad ?? 0.45;
+          if (!['voice', 'audio'].includes(e.timing) || typeof pad !== 'number' || !Number.isFinite(pad) || pad < 0 || pad > 30) err('HOLD_AUDIO_INVALID', 'Audio-derived hold pad must be finite seconds from 0 to 30', st.source);
+          else if (holdFor) err('HOLD_AUDIO_CONFLICT', 'A step can have only one audio-derived hold declaration', st.source);
+          else {
+            const audio = e.timing === 'audio' ? host.audioSource(e.audio, st.source) : undefined;
+            holdFor = { kind: e.timing, padMs: Math.round(pad * 1000), ...(audio ? { audio } : {}) };
+          }
+          continue;
+        }
         const sec = e.seconds;
         if (typeof sec !== 'number' || !Number.isFinite(sec) || sec < HOLD_MIN_SECONDS || sec > HOLD_MAX_SECONDS)
           err('HOLD_INVALID', `hold(${String(sec)}) must be between ${HOLD_MIN_SECONDS} and ${HOLD_MAX_SECONDS} seconds`, st.source);
@@ -910,6 +925,16 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
     if (directorLayer) director = directorLayer;
     for (const s of shots) frame.set(s.layer === DIRECTOR_LAYER ? director : s.layer, [...s.targets]);
     const generated = st.caption === undefined ? autoCaption(st, (hasLayers && actionTarget ? layerSceneWith(actionTarget) : undefined) ?? sceneBefore, out as Project) : null;
+    const selectedAudio = narrates.length ? narrateAudio : sayAudio;
+    const selectedLines = narrates.length ? narrates : says;
+    if (!mute && selectedAudio.length && (selectedAudio.length !== 1 || selectedLines.length !== 1)) err('SPEECH_AUDIO_CONFLICT', 'An explicit audio clip must accompany exactly one selected narrate() or say() line per step', st.source);
+    const audio = !mute && selectedAudio.length === 1 ? host.audioSource(selectedAudio[0], st.source) : undefined;
+    if (holdFor) {
+      const cached = holdFor.kind === 'voice' && !audio && !mute ? host.voiceDuration(`${sid}#${i + 1}`) : undefined;
+      const duration = holdFor.kind === 'audio' ? (holdFor.audio ? host.audioDuration(holdFor.audio) : undefined)
+        : mute ? undefined : audio ? host.audioDuration(audio) : cached?.durationMs;
+      if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) holdFor = { ...holdFor, durationMs: duration, durationKey: cached?.key ?? (holdFor.kind === 'audio' ? holdFor.audio! : audio!) };
+    }
     c.director = director;
         return {
       id: `${sid}#${i + 1}`,
@@ -930,6 +955,8 @@ function lowerStep(c: StepContext, st: StepDef, i: number): Step {
       marks,
       ...(cues.length ? { cues } : {}),
       ...(callouts.length ? { callouts } : {}),
+      ...(audio ? { audio } : {}),
+      ...(holdFor ? { holdFor } : {}),
       ...(holdMs !== undefined ? { hold: holdMs } : {}),
       ...(effectHoldMs > 0 ? { effectHold: effectHoldMs } : {}),
       ...(says.length ? { say: says.join(' ') } : {}),

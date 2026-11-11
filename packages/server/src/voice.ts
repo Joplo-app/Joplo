@@ -606,7 +606,7 @@ export type Inflight = Map<string, Promise<GeneratedClip>>;
 type IndexFile = { version: 1; profileId: string | null; chosen?: boolean; cloudSource?: 'official'; pins?: VoicePins; clips: Record<string, ClipRecord>; failures: Record<string, { stepId: string; message: string; at: string }> };
 const FILE_RE = /^[0-9a-f]{64}\.(mp3|wav|ogg|flac|m4a|aac)$/;
 
-export type Segment = { stepId: string; text: string; role: string | null };
+export type Segment = { stepId: string; text: string; role: string | null; audio?: string };
 export type GenerateSummary = {
   total: number;
   generated: number;
@@ -751,6 +751,7 @@ export class VoiceCache {
 
   /** 这一段的键与要用的音色；文字为空或没有供应商时为 null。 */
   plan(seg: Segment, resolved: ResolvedVoices): { key: string; text: string; voice: string; fp: string } | null {
+    if (seg.audio) return null;
     const p = resolved.profile;
     const text = seg.text.replace(/\s+/g, ' ').trim();
     if (!p || !text) return null;
@@ -785,6 +786,7 @@ export class VoiceCache {
    * inflight：同一个项目共用的“正在生成”表（片段键 → 结果）。批量生成与边放边生成传同一张表，同一段同时只请求一次，后来的等先来的结果（generated 为 false）。
    */
   async generateOne(seg: Segment, locale: string, resolved: ResolvedVoices, store: ProfileStore, opts: GenerateOptions = {}): Promise<GeneratedClip> {
+    if (seg.audio) throw new VoiceError('INVALID', 'This line supplies existing audio; it must never call a voice provider');
     const p = resolved.profile;
     const j = this.plan(seg, resolved);
     if (!p || !j) throw new VoiceError('INVALID', 'No voice provider is selected for this project, or the text is empty');
@@ -921,6 +923,7 @@ export async function reuseSharedVoice(projectDir: string, project: Project, sha
       for (const [i, st] of sc.steps.entries()) {
         if (st.captionAuto && !st.say && !st.narrate) continue;
         const line = spokenLine(st, st.caption, speakerRoleAt(p, sc.id, i + 1));
+        if (line.audio) continue;
         const fp = voiceFingerprint(voices, line.role, line.text);
         if (!fp || !line.text) continue;
         // 默认来源下已有的新片段优先，不为同一片段额外下载旧声音。
@@ -975,6 +978,7 @@ export function bundleVoice(projectDir: string, project: Project, outDir: string
     for (const sc of Object.values(p.scenarios))
       sc.steps.forEach((st, i) => {
         const line = spokenLine(st, st.caption, speakerRoleAt(p, sc.id, i + 1));
+        if (line.audio) return;
         const primary = voiceFingerprint(voices, line.role);
         if (!primary || !line.text) return;
         const localFp = current ? voiceFingerprint(current, line.role) : null;

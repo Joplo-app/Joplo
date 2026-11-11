@@ -301,6 +301,10 @@ export class VoiceHub {
   }
 
   /** dev IR 的草稿仍能本地播放，但不能把它的朗读文字发送给任何供应商。 */
+  private suppliedSegments(project: Project | null, segments: readonly Segment[]): Segment[] {
+    const explicit = new Map(Object.values(project?.scenarios ?? {}).flatMap(sc => sc.steps.filter(st => st.audio).map(st => [st.id, st.audio!] as const)));
+    return segments.map(s => explicit.has(s.stepId) ? { ...s, audio: explicit.get(s.stepId)! } : s);
+  }
   private draftSegments(project: Project | null, segments: readonly Segment[]): boolean {
     const privateIds = new Set(Object.values(project?.scenarios ?? {}).filter(s => project?.works[s.workId]?.draft).flatMap(s => s.steps.map(st => st.id)));
     return segments.some(s => privateIds.has(s.stepId));
@@ -343,7 +347,7 @@ export class VoiceHub {
       this.jobs.set(projectId, job);
       let summary: GenerateSummary;
       try {
-        summary = await cache.generate(segs as Segment[], content ?? project?.i18n?.default ?? (typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'und'), resolved, this.store, {
+        summary = await cache.generate(this.suppliedSegments(project, segs as Segment[]), content ?? project?.i18n?.default ?? (typeof body.locale === 'string' ? body.locale.slice(0, 20) : 'und'), resolved, this.store, {
           fetch: this.opts.fetch,
           signal: job.abort.signal,
           inflight: this.inflightOf(projectId),
@@ -373,6 +377,7 @@ export class VoiceHub {
       const seg = body.segment;
       if (!seg || typeof seg.stepId !== 'string' || typeof seg.text !== 'string' || seg.text.length > MAX_TEXT || (seg.role !== null && typeof seg.role !== 'string')) return ctx.send(400, { error: { code: 'USAGE', message: 'segment must be { stepId, text, role }' } }), true;
       if (this.draftSegments(project, [seg])) return ctx.send(403, { error: { code: 'USAGE', message: 'Draft narration stays on this computer. Remove draft: true before sending it to a voice service' } }), true;
+      if (this.suppliedSegments(project, [seg])[0]?.audio) return ctx.send(409, { error: { code: 'AUDIO_PROVIDED', message: 'This step uses existing audio; no voice provider will be called' } }), true;
       const cache = new VoiceCache(dir);
       const content = contentLocaleOf(project, body.contentLocale);
       const resolved = await this.resolveFor(dir, project, content);

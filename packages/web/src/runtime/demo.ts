@@ -213,6 +213,8 @@ export class DemoController {
   i18n: Dictionary = en;
   /** 朗读（D74）：看板 / 发布站注入；为 null 或未开启时不读。 */
   narrator: Narrator | null = null;
+  /** Stage-local media host; available before the first frame and after narrator replacement. */
+  providedAudio: Narrator['provided'] = null;
   private narrating: Narration | null = null;
 
   /** 选中同步（审阅）：与播放调度无关，单独一个协作者；它只经这几个入口读写控制器。 */
@@ -647,7 +649,7 @@ export class DemoController {
   /** 这一步的时间计划（core stepPlan）：文字用当前语言的字幕；流式输出用提交时按提交前状态算好的出字计划（D100）。 */
   private planOf(step: Step, position?: number, cursor = true) {
     const streamed = position !== undefined && this.snap.streamAt?.position === position ? Math.max(0, ...this.snap.streamAt.plan.map((x) => x.ms)) : undefined;
-    return stepPlan(this.snap.project ?? {}, step, { texts: dwellTexts(step, this.i18n), reduced: this.reducedMotion, cursor, ...(streamed !== undefined ? { streamMs: streamed } : {}) });
+    return stepPlan(this.snap.project ?? {}, step, { texts: dwellTexts(step, this.i18n), reduced: this.reducedMotion, cursor, ...(position !== undefined && this.narrating && this.snap.narration?.position === position ? { voiceActive: true } : {}), ...(streamed !== undefined ? { streamMs: streamed } : {}) });
   }
 
   /** 停留在刚提交的第 index 步（0 起）上；被取消时返回 false。 */
@@ -709,13 +711,16 @@ export class DemoController {
     const p = this.snap.project;
     const step = sc.steps[position - 1];
     if (!p || !step || !this.narrator?.enabled) return;
+    if (this.providedAudio) this.narrator.provided = this.providedAudio;
     const line = spokenLine(step, stepCaption(step, this.i18n), speakerRoleAt(p, sc.id, position));
-    const n = this.narrator.speak(line.text, line.role, this.speed);
+    const n = this.narrator.speak(line.text, line.role, this.speed, line.audio !== undefined ? p.mediaAssets?.[line.audio.slice(15)] ?? '' : undefined, { ...(step.holdFor?.kind === 'voice' ? { voiceHold: true, durationMs: step.holdFor.durationMs } : {}), ...(line.audio && p.mediaInfo?.[line.audio.slice(15)] ? { audioInfo: p.mediaInfo[line.audio.slice(15)] } : {}) });
     if (!n) return;
     this.narrating = n;
     this.set({ narration: { position, source: n.source, waiting: false, ...(n.source === 'browser' && this.narrator.hasVoice(line.role) ? { fallback: true } : {}) } });
     void n.done.then(() => {
       if (this.narrating !== n) return;
+      const failure = n.failure?.();
+      if (failure) { this.stop(); this.set({ playbackError: failure, notice: { kind: 'error', text: failure } }); return; }
       this.narrating = null;
       if (this.snap.narration) this.set({ narration: null });
     });
@@ -739,7 +744,9 @@ export class DemoController {
     await Promise.race([n.done, new Promise<void>((r) => { cancel = r; this.cancelWaiters.push(r); })]);
     this.cancelWaiters = this.cancelWaiters.filter((f) => f !== cancel);
     if (gen !== this.gen) return false;
-    return this.wait(VOICE_BREATH_MS, gen);
+    const sc = this.scenario();
+    const step = sc?.steps[(this.snap.state?.position ?? 0) - 1];
+    return this.wait(step?.holdFor?.kind === 'voice' ? step.holdFor.padMs : VOICE_BREATH_MS, gen);
   }
 
   /** 取消一切正在进行的动画与自动播放；被取消的步骤不会推进状态。 */
