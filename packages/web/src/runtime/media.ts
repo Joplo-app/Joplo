@@ -5,7 +5,8 @@ import { pluginStatus } from '../renderer/plugins';
 /** Browser host owns permission, clock, gain and lifecycle; the host decodes audio bytes; custom media plugins may supply a driver. */
 export class MediaEngine {
   private audio: AudioContext | null = null;
-  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; retired?:boolean; release?:()=>void; startOffset?: number; oneShot?: boolean; endOffset?: number; volume?: number; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
+  private slots = new Map<string, { resource: string; gain: GainNode; driver?: MediaDriver; dead: boolean; retired?:boolean; release?:()=>void; startOffset?: number; startEventId?: string; beginOffset?: number; fadeInMs?: number; waiting?: boolean; duck?: boolean; retirementOrder?: number; oneShot?: boolean; endOffset?: number; volume?: number; origin?: number; loop?: boolean; fade?: { start: number; ms: number; volume: number } }>();
+  private retirementOrder = 0;
   private completed = new Set<string>();
   private mediaIdentity: string | undefined;
   private encoded=new MediaCache<{bytes:Uint8Array;audio?:AudioRegion}>({budgetBytes:4*1024*1024,concurrency:2,label:'encoded audio'});
@@ -104,7 +105,12 @@ export class MediaEngine {
     for (const [key, url] of keys) {
       if (snapshot[key.slice(frame.identity.length + 1)]?.endAfterMs !== undefined || this.slots.get(key)?.resource === url) continue;
       // 空出来的槽位：快照不再要它，或者它的键现在要放别的资源（换曲时旧曲所在的轨道键）
-      const spare = [...this.slots.entries()].find(([k, slot]) => !slot.oneShot && !slot.retired && k !== key && keys.get(k) !== slot.resource && slot.resource === url && k.startsWith(`${frame.identity}:`));
+      const base = key.split('>')[0]!;
+      const spare = key.includes('>') ? [...this.slots.entries()].find(([k, slot]) => {
+        const desired = snapshot[k.slice(frame.identity.length + 1)];
+        const replacing = keys.get(k) !== slot.resource || desired?.startEventId !== slot.startEventId || desired?.startOffsetMs !== slot.startOffset;
+        return !slot.oneShot && !slot.retired && k !== key && replacing && slot.resource === url && k.split('>')[0] === base;
+      }) : undefined;
       if (!spare) continue;
       const displaced = this.slots.get(key);
       this.slots.delete(spare[0]);
@@ -116,11 +122,11 @@ export class MediaEngine {
       const key = `${frame.identity}:${id}`, url = assets[t.resource];
       if (!url || !frame.enabled || this.completed.has(key)) continue;
       const existing = this.slots.get(key);
-      const projectedOffset = existing?.origin !== undefined && frame.timeMs !== undefined ? frame.timeMs - existing.origin : t.offsetMs + frame.elapsedMs;
+      const projectedOffset = existing?.origin !== undefined && frame.timeMs !== undefined ? frame.timeMs - existing.origin : t.offsetMs + frame.elapsedMs - (t.delayRemainingMs ?? t.startDelayMs ?? 0);
       if (t.endAfterMs !== undefined && projectedOffset >= t.offsetMs + t.endAfterMs) { this.completed.add(key); this.remove(key); continue; }
       wanted.add(key);
       let slot = this.slots.get(key);
-      if (slot && (slot.resource !== url || slot.startOffset !== t.startOffsetMs)) { this.remove(key); slot = undefined; }
+      if (slot && (slot.resource !== url || slot.startOffset !== t.startOffsetMs || slot.startEventId !== t.startEventId)) { this.remove(key); slot = undefined; }
       if(slot?.retired){if(t.stopAfterMs!==undefined)continue;this.remove(key);slot=undefined;}
       if (!slot) {
         if (!frame.playing) continue;
@@ -129,7 +135,7 @@ export class MediaEngine {
         const factory = runtime.runtime.media ?? audioMedia;
         const gain = audio.createGain(); gain.gain.value = 0; gain.connect(audio.destination);
         if (this.capture) gain.connect(this.capture);
-        slot = { resource: url, gain, dead: false, oneShot: t.endAfterMs !== undefined, endOffset: t.endAfterMs === undefined ? undefined : t.offsetMs + t.endAfterMs, volume: t.volume, startOffset: t.startOffsetMs, origin: frame.timeMs === undefined ? undefined : frame.timeMs - (t.offsetMs + frame.elapsedMs) }; this.slots.set(key, slot);
+        slot = { resource: url, gain, dead: false, oneShot: t.endAfterMs !== undefined, endOffset: t.endAfterMs === undefined ? undefined : t.offsetMs + t.endAfterMs, volume: t.volume, duck: t.duck, beginOffset: t.startOffsetMs ?? 0, fadeInMs: t.fadeInMs, startOffset: t.startOffsetMs, startEventId: t.startEventId, origin: frame.timeMs === undefined ? undefined : frame.timeMs - (t.offsetMs + frame.elapsedMs - (t.delayRemainingMs ?? t.startDelayMs ?? 0)) }; this.slots.set(key, slot);
         const current = slot;
         const lease=this.bytes(url);current.release=lease.release;
         void lease.value.then(async loaded => {
@@ -151,19 +157,29 @@ export class MediaEngine {
       const elapsed = frame.elapsedMs;
       const now = frame.timeMs;
       const anchored = slot.origin !== undefined && now !== undefined;
-      const offset = anchored ? now - slot.origin! : t.offsetMs + elapsed;
+      const offset = anchored ? now - slot.origin! : t.offsetMs + elapsed - (t.delayRemainingMs ?? t.startDelayMs ?? 0);
+      const waiting = offset < (slot.beginOffset ?? 0);
+      slot.waiting = waiting; slot.duck = t.duck;
       // 淡入按这条轨道自己的（引擎时间）偏移；淡出在第一次出现时锚定起点、时长与当时的音量（D92 R2）：
       // 之后各步快照里编译期按估算推进的 stopAfterMs / volume 不再改变它，淡完就一直静音，直到快照不再要求淡出（再次 play 同一首）
       const fadeIn = t.fadeInMs ? Math.max(0, Math.min(1, (offset - (t.startOffsetMs ?? 0)) / t.fadeInMs)) : 1;
       if (t.stopAfterMs === undefined) slot.fade = undefined;
-      else if (!slot.fade) slot.fade = { start: anchored ? now - elapsed : 0, ms: Math.max(1, t.stopAfterMs), volume: t.volume };
+      else if (!slot.fade) { slot.fade = { start: anchored ? now - elapsed : 0, ms: Math.max(1, t.stopAfterMs), volume: t.volume }; slot.retirementOrder = ++this.retirementOrder; }
       const fadeOut = !slot.fade ? 1 : anchored ? Math.max(0, 1 - (now - slot.fade.start) / slot.fade.ms) : Math.max(0, 1 - elapsed / Math.max(1, t.stopAfterMs!));
-      if(slot.fade&&fadeOut<=0){slot.gain.gain.setTargetAtTime(0,audio.currentTime,.015);slot.driver?.update({offsetMs:offset,volume:1,loop:t.loop,speed:frame.speed,playing:false});slot.dead=true;slot.retired=true;slot.driver?.destroy();slot.driver=undefined;slot.release?.();slot.release=undefined;slot.gain.disconnect();continue;}
+      if(slot.fade&&fadeOut<=0){slot.gain.gain.setTargetAtTime(0,audio.currentTime,.015);slot.driver?.update({offsetMs:Math.max(slot.beginOffset ?? 0,offset),volume:1,loop:t.loop,speed:frame.speed,playing:false});slot.dead=true;slot.retired=true;slot.driver?.destroy();slot.driver=undefined;slot.release?.();slot.release=undefined;slot.gain.disconnect();continue;}
       const volume = slot.fade && anchored ? slot.fade.volume : t.volume;
-      const playing = frame.playing && fadeOut > 0;
-      slot.gain.gain.setTargetAtTime(playing ? volume * fadeIn * fadeOut * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);
+      const playing = frame.playing && !waiting && fadeOut > 0;
+      slot.gain.gain.setTargetAtTime(playing ? volume * fadeIn * fadeOut * (frame.duck && slot.duck !== false ? .25 : 1) : 0, audio.currentTime, .015);
       slot.loop = t.loop;
-      slot.driver?.update({ offsetMs: offset, volume: 1, loop: t.loop, speed: frame.speed, playing });
+      slot.driver?.update({ offsetMs: Math.max(slot.beginOffset ?? 0, offset), volume: 1, loop: t.loop, speed: frame.speed, playing });
+    }
+    // Bound only this named track's retiring voices, preserving the newest retirement.
+    // Missing estimated snapshots may still have live fades, so the runtime enforces it too.
+    for (const [id, track] of Object.entries(snapshot)) if (!id.includes('>') && track.maxRetiring !== undefined) {
+      const prefix = `${frame.identity}:${id}>`;
+      const retiring = [...this.slots.entries()].filter(([key, slot]) => key.startsWith(prefix) && !!slot.fade && !slot.retired)
+        .sort((a, b) => (a[1].retirementOrder ?? 0) - (b[1].retirementOrder ?? 0));
+      for (const [key] of retiring.slice(0, Math.max(0, retiring.length - track.maxRetiring))) { this.completed.add(key); this.remove(key); }
     }
     for (const [key, slot] of this.slots) {
       if (wanted.has(key)) continue;
@@ -174,19 +190,23 @@ export class MediaEngine {
       if (slot.oneShot && slot.origin !== undefined && now !== undefined && key.startsWith(`${frame.identity}:`) && frame.enabled) {
         const offset = now - slot.origin;
         if (offset < slot.endOffset!) {
-          slot.gain.gain.setTargetAtTime(frame.playing ? (slot.volume ?? 1) * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);
-          slot.driver?.update({ offsetMs: offset, volume: 1, loop: false, speed: frame.speed, playing: frame.playing });
+          slot.waiting = offset < (slot.beginOffset ?? 0);
+          const fadeIn = slot.fadeInMs ? Math.max(0, Math.min(1, (offset - (slot.beginOffset ?? 0)) / slot.fadeInMs)) : 1;
+          slot.gain.gain.setTargetAtTime(frame.playing && !slot.waiting ? (slot.volume ?? 1) * fadeIn * (frame.duck && slot.duck !== false ? .25 : 1) : 0, audio.currentTime, .015);
+          slot.driver?.update({ offsetMs: Math.max(slot.beginOffset ?? 0, offset), volume: 1, loop: false, speed: frame.speed, playing: frame.playing && !slot.waiting });
           continue;
         }
         this.completed.add(key);
       }
       const left = slot.fade && slot.origin !== undefined && now !== undefined && key.startsWith(`${frame.identity}:`) && frame.enabled ? 1 - (now - slot.fade.start) / slot.fade.ms : 0;
       if (left <= 0) { this.remove(key); continue; }
-      slot.gain.gain.setTargetAtTime(frame.playing ? slot.fade!.volume * left * (frame.duck ? .25 : 1) : 0, audio.currentTime, .015);
-      slot.driver?.update({ offsetMs: now! - slot.origin!, volume: 1, loop: slot.loop ?? false, speed: frame.speed, playing: frame.playing });
+      const offset = now! - slot.origin!; slot.waiting = offset < (slot.beginOffset ?? 0);
+      const fadeIn = slot.fadeInMs ? Math.max(0, Math.min(1, (offset - (slot.beginOffset ?? 0)) / slot.fadeInMs)) : 1;
+      slot.gain.gain.setTargetAtTime(frame.playing && !slot.waiting ? slot.fade!.volume * left * fadeIn * (frame.duck && slot.duck !== false ? .25 : 1) : 0, audio.currentTime, .015);
+      slot.driver?.update({ offsetMs: Math.max(slot.beginOffset ?? 0, offset), volume: 1, loop: slot.loop ?? false, speed: frame.speed, playing: frame.playing && !slot.waiting });
     }
   }
   private remove(key: string) { this.failures.delete(key); const slot = this.slots.get(key); if (!slot) return; slot.dead = true; slot.driver?.destroy(); slot.release?.();slot.gain.disconnect(); this.slots.delete(key); }
   destroy() { this.completed.clear(); this.disposed = true;this.captureClock?.stop();this.captureClock?.disconnect();this.captureClock=undefined; if(this.recorder)this.recorder.ondataavailable=null;if (this.recorder?.state === 'recording') this.recorder.stop(); this.capture?.stream.getTracks().forEach(t => t.stop()); for (const k of this.slots.keys()) this.remove(k); void this.audio?.close().catch(() => {}); this.audio = null;this.warm.splice(0).forEach(r=>r());this.encoded.dispose();this.decoded.dispose();this.chunks=[];this.recorder=undefined;this.capture=undefined; }
-  status() { return { error: this.captureError ?? this.failures.values().next().value ?? null, state: this.audio?.state ?? 'locked', tracks: [...this.slots.values()].filter(s => s.driver).length, time: this.audio?.currentTime ?? 0,cache:{encoded:this.encoded.status(),pcm:this.decoded.status()} }; }
+  status() { return { error: this.captureError ?? this.failures.values().next().value ?? null, state: this.audio?.state ?? 'locked', tracks: [...this.slots.values()].filter(s => s.driver && !s.waiting).length, time: this.audio?.currentTime ?? 0,cache:{encoded:this.encoded.status(),pcm:this.decoded.status()} }; }
 }

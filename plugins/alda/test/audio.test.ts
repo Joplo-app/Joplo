@@ -56,3 +56,10 @@ it('reports every part end and sorts markers by score time', () => {
   expect(message).toContain('part ends piano=10.000 s, bass=7.500 s');
   expect(message).toContain('markers %start=0.000 s, %middle=5.000 s, %end=10.000 s');
 });
+
+it('validates and exposes per-track delay, duck exemption and retiring limits without changing marker offsets',()=>{
+ const plugin=alda({film:'piano: c1'}),errors:string[]=[];const ctx:any={report:(code:string)=>errors.push(code),resource:()=> 'r',resourceInfo:()=>({durationMs:4000,markers:{chapter:2000},parts:{piano:2}})};
+ expect(plugin.compile!.effect!(music.play('film',{from:'chapter',startDelayMs:300,duck:false,maxRetiring:1}),ctx)).toMatchObject({media:[{offsetMs:2000,startDelayMs:300,duck:false,maxRetiring:1}]});
+ for(const options of [{startDelayMs:-1},{startDelayMs:60001},{duck:'false'},{maxRetiring:33},{maxRetiring:1.5}])plugin.compile!.effect!(music.play('film',options as never),ctx);
+ expect(errors.filter(c=>c==='MUSIC_OPTIONS_INVALID')).toHaveLength(5);
+});

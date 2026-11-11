@@ -3,7 +3,14 @@ import type { Project } from './schema.ts';
 /** Pure clock projection. Neither resource compilation nor plugin semantics run here. */
 export function advanceMedia(snapshot: MediaSnapshot, elapsedMs: number): MediaSnapshot {
   const elapsed = Math.max(0, elapsedMs);
-  return Object.fromEntries(Object.entries(snapshot).flatMap(([id, t]) => (t.stopAfterMs !== undefined && elapsed >= t.stopAfterMs || t.endAfterMs !== undefined && elapsed >= t.endAfterMs) ? [] : [[id, { ...t, offsetMs: t.offsetMs + elapsed, ...(t.endAfterMs !== undefined ? { endAfterMs: t.endAfterMs - elapsed } : {}), ...(t.stopAfterMs !== undefined ? { stopAfterMs: t.stopAfterMs - elapsed, volume: t.volume * (1 - elapsed / t.stopAfterMs) } : {}) }]]));
+  return Object.fromEntries(Object.entries(snapshot).flatMap(([id, t]) => {
+    const activeMs = Math.max(0, elapsed - (t.delayRemainingMs ?? t.startDelayMs ?? 0));
+    if (t.stopAfterMs !== undefined && elapsed >= t.stopAfterMs || t.endAfterMs !== undefined && activeMs >= t.endAfterMs) return [];
+    return [[id, { ...t, offsetMs: t.offsetMs + activeMs,
+      ...(t.startDelayMs !== undefined || t.delayRemainingMs !== undefined ? { delayRemainingMs: Math.max(0, (t.delayRemainingMs ?? t.startDelayMs ?? 0) - elapsed) } : {}),
+      ...(t.endAfterMs !== undefined ? { endAfterMs: t.endAfterMs - activeMs } : {}),
+      ...(t.stopAfterMs !== undefined ? { stopAfterMs: t.stopAfterMs - elapsed, volume: t.volume * (1 - elapsed / t.stopAfterMs) } : {}) }]];
+  }));
 }
 export function mediaAt(project: Project, scenarioId: string, position: number, elapsedMs = 0): MediaSnapshot {
   const sc = project.scenarios[scenarioId];

@@ -251,3 +251,53 @@ it('admits exactly 4 MiB encoded data including base64 padding without a false o
  const engine=new MediaEngine();engine.unlock();const data='data:audio/wav;base64,'+Buffer.alloc(4*1048576).toString('base64');
  engine.update(snapshot,{r:data},frame);await new Promise(r=>setTimeout(r,0));expect(engine.status().error).toBeNull();expect(engine.status().cache.encoded.bytes).toBe(4*1048576);engine.destroy();
 });
+
+it('delays on engine time without consuming source trim, natural life or fade-in; seek restores remaining wait', async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const cue={plugin:'fake',resource:'r',offsetMs:200,startOffsetMs:200,startDelayMs:1000,delayRemainingMs:1000,startEventId:'step:0',endAfterMs:1000,volume:.8,loop:false,fadeInMs:200,duck:false};
+ const tick=(timeMs:number,snapshot:any={'fake:sfx@step':cue},extra={})=>engine.update(snapshot,assets,{...frame,elapsedMs:0,timeMs,duck:true,...extra});
+ tick(1000);await new Promise(r=>setTimeout(r,0));tick(1500);
+ expect(mock.update.mock.lastCall?.[0]).toMatchObject({offsetMs:200,playing:false});expect(engine.status().tracks).toBe(0);
+ tick(2000);expect(mock.update.mock.lastCall?.[0]).toMatchObject({offsetMs:200,playing:true});
+ tick(2100);expect(FakeAudio.gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(.4,1,.015);
+ tick(2500,{}, {playing:false});expect(mock.update.mock.lastCall?.[0]).toMatchObject({offsetMs:700,playing:false});
+ tick(2500,{}, {speed:2});expect(mock.update.mock.lastCall?.[0]).toMatchObject({offsetMs:700,speed:2,playing:true});
+ tick(3000,{});expect(engine.status().tracks).toBe(0);expect(mock.destroy).toHaveBeenCalledTimes(1);
+ // Static seek restores remaining wait, not the original delay or an elapsed source offset.
+ engine.update({'fake:sfx@step':{...cue,delayRemainingMs:500}},assets,{...frame,elapsedMs:0,timeMs:5000,identity:'seek'});
+ await new Promise(r=>setTimeout(r,0));engine.update({'fake:sfx@step':{...cue,delayRemainingMs:500}},assets,{...frame,elapsedMs:0,timeMs:5500,identity:'seek'});
+ expect(mock.update.mock.lastCall?.[0]).toMatchObject({offsetMs:200,playing:true});engine.destroy();
+});
+it('explicit delayed event identity restarts the same source while inherited snapshots do not',async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};
+ const cue={plugin:'fake',resource:'r',offsetMs:0,startOffsetMs:0,startDelayMs:500,delayRemainingMs:500,startEventId:'a',volume:1,loop:true,fadeInMs:0};
+ engine.update({'fake:bgm':cue},assets,{...frame,elapsedMs:0,timeMs:0});await new Promise(r=>setTimeout(r,0));
+ engine.update({'fake:bgm':{...cue,delayRemainingMs:0,offsetMs:100}},assets,{...frame,elapsedMs:0,timeMs:700});expect(mock.update.mock.lastCall?.[0].offsetMs).toBe(200);
+ engine.update({'fake:bgm':{...cue,startEventId:'b'}},assets,{...frame,elapsedMs:0,timeMs:700});await new Promise(r=>setTimeout(r,0));
+ engine.update({'fake:bgm':{...cue,startEventId:'b'}},assets,{...frame,elapsedMs:0,timeMs:1000});expect(mock.update.mock.lastCall?.[0].playing).toBe(false);
+ engine.update({'fake:bgm':{...cue,startEventId:'b'}},assets,{...frame,elapsedMs:0,timeMs:1200});expect(mock.update.mock.lastCall?.[0]).toMatchObject({offsetMs:0,playing:true});engine.destroy();
+});
+it('limits retiring slots per logical track by retirement order, preserves current and other tracks, and does not resurrect clipped slots',async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);mock.factory.mockResolvedValue({update:mock.update,destroy:mock.destroy});
+ const engine=new MediaEngine();engine.unlock();const assets={z:'data:audio/wav;base64,UklGRg==',a:'data:audio/wav;base64,UklGRh==',c:'data:audio/wav;base64,UklGRi=='};
+ const cue=(resource:string)=>({plugin:'fake',resource,offsetMs:0,volume:1,loop:true,fadeInMs:0});
+ const tick=(snapshot:any,timeMs:number)=>engine.update(snapshot,assets,{...frame,elapsedMs:0,timeMs});
+ tick({'fake:bgm':cue('z'),'fake:other':cue('z')},0);await new Promise(r=>setTimeout(r,0));
+ tick({'fake:bgm':cue('a'),'fake:bgm>z':{...cue('z'),stopAfterMs:10000},'fake:other':cue('z')},100);await new Promise(r=>setTimeout(r,0));
+ const next={'fake:bgm':{...cue('c'),maxRetiring:1},'fake:bgm>a':{...cue('a'),stopAfterMs:500},'fake:other':cue('z')};
+ tick(next,200);await new Promise(r=>setTimeout(r,0));tick(next,210);
+ expect(engine.status().tracks).toBe(3);expect(FakeAudio.gains[0].disconnect).toHaveBeenCalled();expect(FakeAudio.gains[1].disconnect).not.toHaveBeenCalled();
+ tick({...next,'fake:bgm>z':{...cue('z'),stopAfterMs:10000}},220);expect(engine.status().tracks).toBe(3);
+ tick({...next,'fake:bgm':{...cue('c'),maxRetiring:0}},230);expect(engine.status().tracks).toBe(2);engine.destroy();
+});
+
+it('same-source delayed replacement preserves the retiring driver and its actual offset',async()=>{
+ vi.stubGlobal('AudioContext',FakeAudio);const updates:any[]=[];mock.factory.mockImplementation(async()=>{const update=vi.fn();updates.push(update);return {update,destroy:vi.fn()};});
+ const engine=new MediaEngine();engine.unlock();const assets={r:'data:audio/wav;base64,UklGRg=='};const cue={plugin:'fake',resource:'r',offsetMs:0,startOffsetMs:0,startDelayMs:0,delayRemainingMs:0,startEventId:'a',volume:1,loop:true,fadeInMs:0};
+ engine.update({'fake:bgm':cue},assets,{...frame,elapsedMs:0,timeMs:1000});await new Promise(r=>setTimeout(r,0));engine.update({'fake:bgm':cue},assets,{...frame,elapsedMs:0,timeMs:3000});
+ const next={'fake:bgm':{...cue,startEventId:'b',startDelayMs:500,delayRemainingMs:500},'fake:bgm>r':{...cue,offsetMs:500,stopAfterMs:1000}};
+ engine.update(next,assets,{...frame,elapsedMs:0,timeMs:3000});await new Promise(r=>setTimeout(r,0));engine.update(next,assets,{...frame,elapsedMs:100,timeMs:3100});
+ expect(updates).toHaveLength(2);expect(updates[0].mock.lastCall?.[0]).toMatchObject({offsetMs:2100,playing:true});expect(updates[1].mock.lastCall?.[0].playing).toBe(false);engine.destroy();
+});

@@ -146,3 +146,37 @@ it('one-shot events overlap with stable identities and expire naturally without 
  expect(Object.values(midway)[0]).toMatchObject({volume:.6,endAfterMs:10000});
  expect(mediaAt(a,'f.a.s',1,19000)).toEqual({});
 });
+it('projects delay before source time and one-shot life while preserving original delay and policies',async()=>{
+ const {advanceMedia}=await import('../src/media.ts');
+ const start={'fake:sfx':{plugin:'fake',resource:'r',offsetMs:200,startOffsetMs:200,startDelayMs:1000,delayRemainingMs:1000,startEventId:'step:0',duck:false,maxRetiring:1,volume:.5,loop:false,fadeInMs:0,endAfterMs:800}};
+ const pending=advanceMedia(start,600);expect(pending['fake:sfx']).toMatchObject({offsetMs:200,startDelayMs:1000,delayRemainingMs:400,endAfterMs:800,duck:false,maxRetiring:1});
+ const active=advanceMedia(pending,500);expect(active['fake:sfx']).toMatchObject({offsetMs:300,delayRemainingMs:0,endAfterMs:700});
+ expect(advanceMedia(active,700)).toEqual({});
+});
+it('compiles deterministic delayed event identity, inherited remaining wait, and caps only the oldest retirement of that logical track',()=>{
+ const controlled=definePlugin({id:'controlled',title:'Controlled',components:{},runtime:'/runtime.js',local:'/local.js',compile:{effect(e,ctx){const {name,...options}=e.payload as any;return {media:[{track:'bgm',action:'play',resource:ctx.resource({compiler:'wav',input:name}),fadeMs:10000,...options}]};}}});
+ const src=source();src.config.plugins=[...src.config.plugins!.filter(p=>p.id!=='fake'),controlled];
+ const play=(name:string,options={})=>pluginEffect('controlled','play',{name,...options});
+ src.features.f!.works.a!.scenarios={a:flow('A',{start:'/'}).system('Z',play('z'),hold(.5)).system('A',play('a'),hold(.5)).system('C',play('c',{maxRetiring:1,startDelayMs:5000,duck:false}),hold(.5)),b:flow('B',{from:'a'}).system('Continue')};
+ const result=compile(src,'dev');expect(result.diagnostics.filter(d=>d.severity==='error')).toEqual([]);
+ const a=result.project!.scenarios['f.a.a']!,b=result.project!.scenarios['f.a.b']!;
+ const last=a.steps.at(-1)!.media!;expect(Object.keys(last).filter(k=>k.includes('>'))).toEqual(['controlled:bgm>resource-1']);
+ expect(last['controlled:bgm']).toMatchObject({resource:'resource-2',startDelayMs:5000,delayRemainingMs:5000,duck:false,maxRetiring:1});
+ expect(last['controlled:bgm']!.startEventId).toBeTruthy();expect(b.media!['controlled:bgm']!.startEventId).toBe(last['controlled:bgm']!.startEventId);expect(b.media!['controlled:bgm']!.delayRemainingMs).toBeLessThanOrEqual(5000);
+});
+it.each([{startDelayMs:-1},{startDelayMs:NaN},{startDelayMs:60001},{duck:'.25'},{maxRetiring:-1},{maxRetiring:1.5},{maxRetiring:33}])('rejects invalid generic playback policy %j',options=>{
+ const src=source();const bad=definePlugin({id:'badpolicy',title:'Bad',components:{},runtime:'/runtime.js',local:'/local.js',compile:{effect(_e,ctx){return {media:[{track:'bgm',action:'play',resource:ctx.resource({compiler:'wav',input:'x'}),...options} as any]};}}});
+ src.config.plugins=[...src.config.plugins!.filter(p=>p.id!=='fake'),bad];src.features.f!.works.a!.scenarios={s:flow('S',{start:'/'}).system('Bad',pluginEffect('badpolicy','play',{}))};
+ expect(compile(src,'dev').diagnostics.some(d=>d.code==='PLUGIN_DATA_INVALID')).toBe(true);
+});
+
+it('default crossfades retain repeated-resource retirements and zero clips only exiting voices after continuation',()=>{
+ const plugin=definePlugin({id:'retire',title:'Retire',components:{},runtime:'/runtime.js',local:'/local.js',compile:{effect(e,ctx){const {name,...options}=e.payload as any;return {media:[{track:'bgm',action:'play',resource:ctx.resource({compiler:'wav',input:name}),fadeMs:30000,...options}]};}}});
+ const src=source();src.config.plugins=[...src.config.plugins!.filter(p=>p.id!=='fake'),plugin];
+ const play=(name:string,options={})=>pluginEffect('retire','play',{name,...options});
+ src.features.f!.works.a!.scenarios={a:flow('A',{start:'/'}).system('A',play('a'),hold(.5)).system('B',play('b'),hold(.5)).system('A again',play('a'),hold(.5)).system('B again',play('b'),hold(.5)),b:flow('B',{from:'a'}).system('C',play('c',{maxRetiring:0}))};
+ const result=compile(src,'dev');expect(result.diagnostics.filter(d=>d.severity==='error')).toEqual([]);
+ const a=result.project!.scenarios['f.a.a']!.steps.at(-1)!.media!,b=result.project!.scenarios['f.a.b']!.steps[0]!.media!;
+ expect(Object.keys(a).filter(k=>k.includes('>'))).toHaveLength(3);expect(new Set(Object.keys(a)).size).toBe(4);
+ expect(Object.keys(b)).toEqual(['retire:bgm']);expect(b['retire:bgm']).toMatchObject({resource:'resource-2',maxRetiring:0});
+});

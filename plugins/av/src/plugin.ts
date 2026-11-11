@@ -97,15 +97,17 @@ export function withSoundEffects(assets: Record<string, string>) {
     local: new URL(new URL(import.meta.url).pathname.endsWith('.ts') ? './local.ts' : './local.js', import.meta.url),
     compile: { ...media.compile, effect(effect, ctx) {
       if (effect.name !== 'sfx') return media.compile!.effect!(effect, ctx);
-      const p = effect.payload as { name?: unknown; volume?: unknown; offsetMs?: unknown } | null;
+      const p = effect.payload as { name?: unknown; volume?: unknown; offsetMs?: unknown; startDelayMs?: unknown; duck?: unknown } | null;
       try {
         if (!p || typeof p.name !== 'string' || !Object.hasOwn(assets, p.name)) throw new Error('Unknown sound name; declare it in withSoundEffects({ name: asset(...) })');
         const { durationMs } = wavInfo(assets[p.name]);
         const volume = p.volume ?? 1, offsetMs = p.offsetMs ?? 0;
         if (typeof volume !== 'number' || !Number.isFinite(volume) || volume < 0 || volume > 1) throw new Error('volume must be 0–1');
         if (typeof offsetMs !== 'number' || !Number.isFinite(offsetMs) || offsetMs < 0 || offsetMs >= durationMs) throw new Error('offsetMs must be inside the sound duration');
+        if (p.startDelayMs !== undefined && (typeof p.startDelayMs !== 'number' || !Number.isFinite(p.startDelayMs) || p.startDelayMs < 0 || p.startDelayMs > 60000)) throw new Error('startDelayMs must be 0–60000 engine milliseconds');
+        if (p.duck !== undefined && typeof p.duck !== 'boolean') throw new Error('duck must be boolean');
         const resource = ctx.resource({ compiler: 'sfx', input: assets[p.name]! });
-        return { media: [{ track: 'sfx', action: 'play', resource, oneShot: true, durationMs, volume, offsetMs }] };
+        return { media: [{ track: 'sfx', action: 'play', resource, oneShot: true, durationMs, volume, offsetMs, ...(p.startDelayMs !== undefined ? {startDelayMs:p.startDelayMs as number}:{}), ...(p.duck !== undefined ? {duck:p.duck as boolean}:{}) }] };
       } catch (error) { ctx.report('SFX_INVALID', error instanceof Error ? error.message : 'Invalid sound effect', ctx.source); }
     } },
   });

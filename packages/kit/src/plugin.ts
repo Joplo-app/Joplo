@@ -139,9 +139,10 @@ export type LocalCompiler = { requiresAttribution?:boolean; version: string; mim
 /** Local-only credential metadata. Never put secret values in this declaration. */
 export type PluginKey = { id: string; title: string; description: string; url: string; env: string };
 export type PluginLocal = { compilers: Record<string, LocalCompiler> };
-export type MediaCommand = { track: string; action: 'play'; resource: string; oneShot?: boolean; durationMs?: number; offsetMs?: number; volume?: number; loop?: boolean; fadeMs?: number } | { track: string; action: 'stop'; fadeMs?: number };
-/** Full state at a step boundary; elapsed time is in unscaled engine milliseconds. */
-export type MediaSnapshot = Record<string, { plugin: string; resource: string; offsetMs: number; startOffsetMs?: number; volume: number; loop: boolean; fadeInMs: number; stopAfterMs?: number; endAfterMs?: number }>;
+/** startDelayMs waits after commit on engine time; offsetMs remains a source seek. duck defaults true. maxRetiring (0–32) caps exiting voices of this named track, excluding current. */
+export type MediaCommand = { track: string; action: 'play'; resource: string; oneShot?: boolean; durationMs?: number; offsetMs?: number; startDelayMs?: number; duck?: boolean; maxRetiring?: number; volume?: number; loop?: boolean; fadeMs?: number } | { track: string; action: 'stop'; fadeMs?: number };
+/** Full state at a step boundary; elapsed time is in unscaled engine milliseconds. startDelayMs is the original plan, delayRemainingMs the remaining wait, startEventId distinguishes explicit delayed plays. endAfterMs excludes waiting. */
+export type MediaSnapshot = Record<string, { plugin: string; resource: string; offsetMs: number; startOffsetMs?: number; startDelayMs?: number; delayRemainingMs?: number; startEventId?: string; duck?: boolean; maxRetiring?: number; volume: number; loop: boolean; fadeInMs: number; stopAfterMs?: number; endAfterMs?: number }>;
 export type MediaDriver = { update(frame: { offsetMs: number; volume: number; loop: boolean; speed: number; playing: boolean }): void; destroy(): void };
 export type MediaFactory = (ctx: { audio: AudioContext; destination: AudioNode; bytes: Uint8Array; audioInfo?:AudioRegion }) => MediaDriver | Promise<MediaDriver>;
 

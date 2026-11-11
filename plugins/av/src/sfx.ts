@@ -1,6 +1,6 @@
 import { pluginEffect } from '@joplo-app/kit/plugin';
 /** Source offset, not a delay; all times use the shared unscaled engine clock. */
-export type SfxOptions = { volume?: number; offsetMs?: number };
+export type SfxOptions = { volume?: number; offsetMs?: number; startDelayMs?: number; duck?: boolean };
 export const sfx = { play: (name: string, options: SfxOptions = {}) => pluginEffect('media', 'sfx', { name, ...options }) };
 /** PCM WAV only: exact duration without codecs, network access or paid generation. */
 export function wavInfo(src: unknown): { bytes: Uint8Array; durationMs: number } {
