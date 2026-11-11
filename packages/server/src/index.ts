@@ -31,3 +31,5 @@ export type { ExportCrop, FramesOptions, FilmOptions, FilmResult, VideoOptions, 
 export type { PlaybackTimeline, PlaybackEvent } from './timeline.ts';
 
 export { auditLayout, createLayoutAuditSession, type LayoutAuditOptions, type LayoutFinding, type LayoutAuditSample } from './layout-audit.ts';
+
+export { readAudioTiming, audioDuration } from './audio-timing.ts';

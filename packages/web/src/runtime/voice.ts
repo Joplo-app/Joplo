@@ -1,3 +1,4 @@
+import type { AudioRegion } from '@joplo-app/kit/plugin';
 /**
  * 网页里的朗读（D74）：看板与发布站共用。DemoController 在每一步提交时调用 narrator.speak，播放时等它读完。
  *
@@ -23,6 +24,8 @@ export interface Narration {
    * 跟着朗读出字的 stream(…, { pace: 'voice' }) 用它对齐真实声音；没有这个方法或返回 null 时按估算时长出字。
    */
   progress?(): number | null;
+  /** Explicit-asset playback failure; never a provider fallback. */
+  failure?(): string | null;
 }
 
 export type VoiceLookup = { narrator: string | null; roles: Record<string, string>; clips: Record<string, string>; overrides?: Record<string, string> };
@@ -245,8 +248,13 @@ function pendingClip(url: Promise<string | null>, o: { waitMs: number; play: (ur
 }
 
 /** 看板 / 发布站各有一个；enabled 关闭时什么都不读。 */
+export function failedAudio(message: string): Narration {
+  return { source: 'clip', done: Promise.resolve(), pause() {}, resume() {}, cancel() {}, failure: () => message };
+}
+
 export class Narrator {
   enabled = false;
+  provided: ((url: string, speed: number, info?: AudioRegion) => Narration) | null = null;
   /** 音频索引：看板来自 joplo dev（GET …/voice），发布站来自 IR 的 voiceIndex；没有时只用浏览器朗读。 */
   lookup: VoiceLookup | null = null;
   /** 看板里选的浏览器声音（voiceURI）；null = 按语言自动选。 */
@@ -261,9 +269,16 @@ export class Narrator {
   waitMs = 10_000;
 
   /** 读一段：role 为 null 时是旁白。返回 null 表示这一步不读。 */
-  speak(text: string, role: string | null, speed: number): Narration | null {
+  speak(text: string, role: string | null, speed: number, audio?: string, _timing?: { voiceHold?: boolean; durationMs?: number; audioInfo?: AudioRegion }): Narration | null {
     const t = text.trim();
     if (!this.enabled || !t) return null;
+    if (audio !== undefined) {
+      if (!audio) return failedAudio('The selected narration audio resource is missing; no voice provider was called');
+      if (this.provided) return this.provided(audio, speed, _timing?.audioInfo);
+      if (_timing?.audioInfo) return failedAudio('Calibrated narration audio needs the shared audio engine; no provider was called');
+      let failure: string | null = null;
+      return { ...playClip(audio, { speed, onFail: () => { failure = 'The selected narration audio could not be played; no voice provider was called'; return null; } }), failure: () => failure };
+    }
     const browser = () => speakBrowser(t, { speed, lang: speechLang(t, this.locale), voiceURI: this.browserVoice });
     const fp = this.lookup ? voiceFingerprint(this.lookup, role, t) : null;
     const url = fp ? this.lookup!.clips[clipKey(fp, t)] : undefined;
@@ -274,7 +289,8 @@ export class Narrator {
   }
 
   /** 预先生成后面几步（不等结果）。 */
-  prefetch(text: string, role: string | null) {
+  prefetch(text: string, role: string | null, audio?: string) {
+    if (audio !== undefined) return;
     const t = text.trim();
     if (!this.enabled || !t || this.hasClip(t, role)) return;
     void this.ensure?.(t, role)?.catch(() => null);

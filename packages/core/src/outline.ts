@@ -5,7 +5,7 @@
  * 估算按 1× 速度、用 IR 里的英文字幕兜底，不含鼠标移动与逐字输入，所以只是“约”。
  */
 import { entriesOf, scenariosOf, sliceKey, type Entry } from './entries.ts';
-import { scenarioPlanMs } from './step-plan.ts';
+import { stepPlan, scenarioPlanMs } from './step-plan.ts';
 import { JoploError } from './result.ts';
 import type { Coverage, Project, Scenario } from './schema.ts';
 
@@ -29,6 +29,8 @@ export type OutlineScenario = {
   /** 估算播放时长（毫秒，1×）。 */
   ms: number;
   cards: number;
+  /** Explicit audio timing facts; unavailable clips remain visibly estimated. */
+  audioTiming?: { measured: number; estimated: number };
   /** 第一步 / 最后一步是过渡卡。 */
   opening: boolean;
   ending: boolean;
@@ -72,6 +74,7 @@ export function outline(project: Project, opts: { workId?: string } = {}): Outli
           description: s.description,
           steps: s.steps.length,
           ms: scenarioEstimateMs(project, s),
+          ...(s.steps.some(st => st.holdFor) ? { audioTiming: { measured: s.steps.filter(st => st.holdFor && stepPlan(project, st).timingSource === 'measured').length, estimated: s.steps.filter(st => st.holdFor && stepPlan(project, st).timingSource === 'estimated').length } } : {}),
           cards: s.steps.filter((st) => st.action.type === 'card').length,
           opening: s.steps[0]?.action.type === 'card',
           ending: s.steps.length > 0 && s.steps.at(-1)!.action.type === 'card',

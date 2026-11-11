@@ -1,6 +1,7 @@
 import { PluginAction } from '../schema.ts';
 import { ElementTraitsSchema, InheritSchema, PluginInspectFieldSchema, PluginTextSchema } from '../traits.ts';
 import { advanceMedia } from '../media.ts';
+import { clipKey } from '../voice.ts';
 import { commitGapMs } from '../step-plan.ts';
 import type { MediaCommand, MediaSnapshot, ResourceRequest, LocalResourceInfo } from '@joplo-app/kit/plugin';
 import { jsonData, snapshot, object, strings, syncResult, authoringData, materialize, errorMessage } from './data.ts';
@@ -17,6 +18,9 @@ export type CompileOptions = {
   resourceInfo?: Record<string, LocalResourceInfo>;
   /** 按请求内容（插件、编译器、输入）查元数据：上一次编译已经检查过的资源第一遍就能用上，宿主不必为了它再编译一遍。resourceInfo 里有的优先。 */
   resourceInfoFor?: (request: { plugin: string; compiler: string; input: string }) => LocalResourceInfo | undefined;
+  /** Host-only measured durations; callbacks and local cache paths never enter IR. */
+  audioDurationFor?: (source: string) => number | undefined;
+  voiceDurationFor?: (stepId: string) => { durationMs: number; key: string } | undefined;
   pluginOptions?: Record<string, Record<string, unknown>>;
 };
 export function enabledPlugins(configured: unknown): unknown[] {
@@ -65,6 +69,26 @@ export class PluginCompiler {
   private infoOf(id: string): LocalResourceInfo | undefined {
     const request = this.resourceRequests.get(id);
     return this.options.resourceInfo?.[id] ?? (request ? this.options.resourceInfoFor?.(request) : undefined);
+  }
+  readonly embeddedAudio: Record<string, string> = {};
+  voiceDuration(stepId: string): { durationMs: number; key: string } | undefined { return this.options.voiceDurationFor?.(stepId); }
+  audioSource(value: unknown, source?: string): string {
+    if (typeof value === 'string' && /^data:audio\/[^;,]+;base64,[A-Za-z0-9+/=]+$/.test(value)) {
+      const id = `audio-${clipKey('embedded-audio', value)}`;
+      this.embeddedAudio[id] = value;
+      return `joplo-resource:${id}`;
+    }
+    const result = this.resourceProps(value, source);
+    if (typeof result !== 'string' || !/^joplo-resource:resource-\d+$/.test(result)) {
+      this.report('AUDIO_SOURCE_INVALID', 'Audio must be asset() audio data or a localResource() reference; paths and remote URLs are not implicit downloads', source);
+      return '';
+    }
+    return result;
+  }
+  audioDuration(source: string): number | undefined {
+    const id = source.slice('joplo-resource:'.length);
+    const n = this.embeddedAudio[id] ? this.options.audioDurationFor?.(this.embeddedAudio[id]!) : this.infoOf(id)?.durationMs ?? this.options.audioDurationFor?.(source);
+    return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined;
   }
   readonly defs = new Map<string, PluginDef>();
   readonly info: Record<string, PluginInfo> = {};

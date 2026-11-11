@@ -32,7 +32,7 @@ export function voiceSegments(project: Project, workId: string | null, i18n: Dic
 /** 已有音频的段数与失败数。 */
 export function voiceCoverage(segments: VoiceSegment[], has: (s: VoiceSegment) => boolean, failures: Record<string, { stepId: string }>): { total: number; have: number; failed: number } {
   const ids = new Set(segments.map((s) => s.stepId));
-  return { total: segments.length, have: segments.filter(has).length, failed: new Set(Object.values(failures).map((f) => f.stepId).filter((id) => ids.has(id))).size };
+  return { total: segments.length, have: segments.filter(s => s.audio !== undefined || has(s)).length, failed: new Set(Object.values(failures).map((f) => f.stepId).filter((id) => ids.has(id))).size };
 }
 
 /**
@@ -43,6 +43,7 @@ export function voiceEstimate(segments: VoiceSegment[], has: (s: VoiceSegment) =
   const seen = new Set<string>();
   let chars = 0;
   for (const s of segments) {
+    if (s.audio !== undefined) continue;
     const text = s.text.replace(/\s+/g, ' ').trim();
     const k = `${s.role ?? ''}|${text}`;
     if (!text || seen.has(k) || has(s)) continue;

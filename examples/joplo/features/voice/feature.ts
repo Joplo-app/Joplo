@@ -11,6 +11,7 @@ export default feature({
     zhou: role('小周', { desc: '在发布站看演示的观众' }),
   },
   cases: {
+    prepared_audio: { title: '已有音频接入旁白与时长', dimension: 'consistency', priority: 'high', expected: '现成音频复用旁白字幕和导出轨，不调用配音源；停留按实测音频加余量，未准备时明确估算' },
     browser: { title: '打开声音，边看边读', dimension: 'main', priority: 'high', expected: '不用任何配置，自动播放时每一步一边显示一边朗读' },
     voice_longer: { title: '旁白比字幕长', dimension: 'interrupt', priority: 'high', expected: '画面停留结束也不切走，等声音读完、换气 0.45 秒再进下一步；暂停时声音一起暂停；手动下一步立刻停掉当前声音' },
     profile: { title: '在看板里接入供应商（自定义 Base URL）', dimension: 'main', priority: 'high', expected: '在看板设置里新建 profile，OpenAI 兼容接口可填 Base URL、返回格式；测试通过才能保存；保存后直接播放、边放边生成，Key 只在本机' },

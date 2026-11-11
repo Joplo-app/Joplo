@@ -3,6 +3,7 @@
  * dev（看板、截图）与 build（发布站）共用这一条路径。
  */
 import fs from 'node:fs';
+import { readAudioTiming } from './audio-timing.ts';
 import { watchConfigDiagnostics } from './watch-config.ts';
 import path from 'node:path';
 import type { LocalResourceInfo, ResourceRequest } from '@joplo-app/kit/plugin';
@@ -66,7 +67,7 @@ function jsxRuntimeMissing(e: unknown): string | boolean {
 
 const JSX_HINT = "was compiled without Joplo's JSX runtime. TSX outside the project uses the JSX settings of its nearest tsconfig.json: give that folder a tsconfig.json with jsx: \"react-jsxdev\" and jsxImportSource: \"@joplo-app/kit\", or start the file with /** @jsxRuntime automatic */ /** @jsxImportSource @joplo-app/kit */";
 
-export async function compileProject(server: ViteDevServer, projectDir: string, mode: CompileMode, options: { work?: string } = {}): Promise<CompileOutcome> {
+export async function compileProject(server: ViteDevServer, projectDir: string, mode: CompileMode, options: { work?: string; voiceDefault?: string | null } = {}): Promise<CompileOutcome> {
   const errorAt = new Map<string, string>(); // 载入失败的文件（绝对路径）→ 精确位置
   const importer = async (abs: string) => {
     try {
@@ -143,14 +144,24 @@ export async function compileProject(server: ViteDevServer, projectDir: string, 
   const checked = inspected;
   knownInfo.set(projectDir, new Map(requests.flatMap(request => checked.resourceInfo[request.id] ? [[requestKey(request), checked.resourceInfo[request.id]!] as const] : [])));
   const resources = { requests, host };
-  diagnostics.push(...inspected.diagnostics, ...(r.project ? mediaDiagnostics(r.project, inspected.resourceInfo) : []));
+  diagnostics.push(...inspected.diagnostics);
   const missing = Object.keys(r.project?.plugins ?? {}).filter((id) => !pluginRuntimes[id]);
   const extra: Diagnostic[] = missing.map((id) => ({ severity: 'error', code: 'PLUGIN_RUNTIME_MISSING', message: `Plugin ${id}: runtime file not found; reinstall the plugin package`, source: 'reference', at: `${loaded.authoring!.config.file}:1:1` }));
+  const timingAssets = { ...r.project?.mediaAssets };
+  const timingInfo = { ...r.project?.mediaInfo };
   for (const request of requests) if (referencedResources(r.project).has(request.id)) {
     const result = await resources.host.ensure(request);
     if (result.diagnostic) diagnostics.push(result.diagnostic);
+    if (result.url) timingAssets[request.id] = result.url;
+    if (result.audio) timingInfo[request.id] = result.audio;
   }
-  return { watchIgnore: loaded.authoring.config.watch?.ignore, project: extra.length ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes, resources };
+  if (r.project && Object.values(r.project.scenarios).some(sc => sc.steps.some(st => st.audio || st.holdFor))) {
+    const timing = await readAudioTiming(projectDir, { ...r.project, mediaAssets: timingAssets, mediaInfo: timingInfo }, { voiceConfig: loaded.authoring.config.voice, defaultProfile: options.voiceDefault });
+    diagnostics.push(...timing.diagnostics);
+    r = compile(loaded.authoring, mode, { resourceInfo: inspected.resourceInfo, audioDurationFor: timing.audioDurationFor, voiceDurationFor: timing.voiceDurationFor });
+  }
+  if (r.project) diagnostics.push(...mediaDiagnostics(r.project, inspected.resourceInfo));
+  return { watchIgnore: loaded.authoring.config.watch?.ignore, project: extra.length || diagnostics.some(d => d.severity === 'error') ? null : r.project, diagnostics: [...diagnostics, ...r.diagnostics, ...extra], home, pluginRuntimes, resources };
 }
 
 const requestKey = (request: { plugin: string; compiler: string; input: string }) => JSON.stringify([request.plugin, request.compiler, request.input]);

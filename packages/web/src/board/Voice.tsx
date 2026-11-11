@@ -164,7 +164,7 @@ export function useVoice(projectId: string, project: Project | null, workId: str
     for (let i = at.position; i < Math.min(sc.steps.length, at.position + 3); i++) {
       const st = sc.steps[i]!;
       const line = spokenLine(st, stepCaption(st, t), speakerRoleAt(project, sc.id, i + 1));
-      narrator.prefetch(line.text, line.role);
+      narrator.prefetch(line.text, line.role, line.audio);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [on, ready, project, at.scenarioId, at.position, t]);

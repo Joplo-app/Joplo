@@ -13,8 +13,13 @@ export function useMedia(ctl: DemoController, project: Project | null, enabled: 
     const engine = new MediaEngine(); reference.current = engine;
     const unlock = (e: Event) => { if (e.isTrusted) engine.unlock(); };
     window.addEventListener('pointerdown', unlock, true); window.addEventListener('keydown', unlock, true);
+    const provided = (url: string, speed: number, info?: import('@joplo-app/kit/plugin').AudioRegion) => engine.narrate(url, speed, info);
+    ctl.providedAudio = provided;
+    const bound = new Set<NonNullable<DemoController['narrator']>>();
+    if (ctl.narrator) { ctl.narrator.provided = provided; bound.add(ctl.narrator); }
     let raf = 0;
     const tick = () => {
+      if (ctl.narrator) { ctl.narrator.provided = provided; bound.add(ctl.narrator); }
       const s = ctl.getSnapshot(), sc = s.scenarioId ? s.project?.scenarios[s.scenarioId] : undefined;
       const position = s.state?.position ?? 0;
       const media = (position ? sc?.steps[position - 1]?.media : sc?.media) ?? {};
@@ -26,7 +31,7 @@ export function useMedia(ctl: DemoController, project: Project | null, enabled: 
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => { reference.current = null; cancelAnimationFrame(raf); engine.destroy(); window.removeEventListener('pointerdown', unlock, true); window.removeEventListener('keydown', unlock, true); };
+    return () => { reference.current = null; if (ctl.providedAudio === provided) ctl.providedAudio = null; if (ctl.narrator?.provided === provided) ctl.narrator.provided = null; for (const n of bound) if (n.provided === provided) n.provided = null; cancelAnimationFrame(raf); engine.destroy(); window.removeEventListener('pointerdown', unlock, true); window.removeEventListener('keydown', unlock, true); };
   }, [ctl, project?.mediaAssets, always]);
   return reference;
 }

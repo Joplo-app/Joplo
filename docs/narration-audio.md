@@ -1,0 +1,24 @@
+# Prepared narration and audio-led dwell
+
+Upgrade CLI, Kit and Core together before using these authoring options. Older packages can ignore unknown speech options and retain their normal TTS path; zero-provider guarantees apply to the matching new toolchain. Start with `joplo check`, `joplo outline --format json`, and `joplo voice --dry-run --format json`: supplied lines show `audio: "provided"` with zero generation characters. None of these checks implicitly synthesize narration.
+
+```ts
+narrate('Presenter words', { audio: asset('./presenter.wav') })
+say('Character words', { role: 'actor', audio: localResource('voices', 'line', 'existing take') })
+hold('voice', { pad: 0.4 })
+hold('audio', asset('./cue.wav'), { pad: 0 })
+```
+
+Read the selected resource plugin's guide and prepare its artifact first. Audio accepts embedded `asset()` audio or a `localResource()` declaration, without a new resource compiler, DAG or dynamic MIME mechanism. File paths and remote URLs are not implicit downloads. Explicit audio never falls back to a provider; missing/undecodable audio is an error to fix, not a generation request. Narration still wins over dialogue and explicit silence suppresses both. One selected speech effect accompanies one supplied clip; ambiguous concatenations fail. Text, role labels and subtitles remain independent from the audio bytes. Translated text does not translate a literal recording.
+
+Numeric `hold(seconds)` retains its existing meaning. Explicit voice/audio hold replaces caption/explain reading floors with audio duration plus pad. Dwell remains the maximum of that duration, numeric hold, required camera/stream work and plugin effectHold; pre-commit actions/systemLead remain separate. Pad defaults to 450ms, accepts 0–30 seconds and is applied once. Runtime already waits for narration completion, so it does not also wait a character estimate when the actual voice is running. Pausing and speed changes use the same existing engine/audio clock.
+
+`AUDIO_TIMING_MEASURED` and `AUDIO_TIMING_ESTIMATED`, plus outline's `audioTiming` counts, disclose timing quality. Current cached voice measurements are selected using the text, voice fingerprint and content language; a changed identity does not inherit an old measurement. If an offline caller cannot identify the current default source, it keeps an estimate rather than guessing from unrelated old clips. Check again after preparing/changing audio. `--voice real` recording decodes existing clips without provider calls.
+
+Calibrated audio preserves the existing AudioRegion contract. Only contentStartFrame/contentFrames play; probes, encoder delay and padding remain outside the narration. Progress, pause/resume, completion and measured dwell use that content interval. Offline timeline assets keep the original file and numeric AudioRegion, so downstream mixing must apply the same region. Invalid native decoder trimming fails explicitly. Supplied live narration uses the existing 4 MiB encoded / 32 MiB PCM host caches and their diagnostics; rapid cancellation releases leases and late results cannot start playback. Do not bypass these budgets: shorten simultaneous content or prepare a suitable smaller encoding while retaining its region metadata.
+
+## Public playback contract gate
+
+Step stores only controlled `joplo-resource:<id>` references in `audio` and `holdFor.audio`; embedded bytes stay in `mediaAssets` and numeric audio regions in `mediaInfo`. Scope pruning keeps narration and hold-audio resources for the selected scenarios and removes other works' bytes. Author-local cache paths, resource compiler inputs, credentials and voiceConfig are not reintroduced into published IR or timeline JSON. Public missing-audio diagnostics contain text/role and `provided: true`, not data URLs. Timeline persistence resolves the controlled reference into an offline audio file with its AudioRegion.
+
+The additive optional fields are `audio` and `holdFor: { kind, audio?, padMs, durationMs?, durationKey? }`. `durationMs` excludes pad and has a matching identity. New readers retain old schemaVersion 3 playback support. The old strict Core 0.7.1 reader rejects these fields: keeping schemaVersion 3 is not a claim of forward compatibility. The matching new Core must be published and Cloud's exact dependency/lock updated from the real registry, then its old/new reader and public-projection matrix must pass before writing new audio IR to an existing share. This branch does not publish packages, invent lock integrity, install local overrides, deploy Cloud or upload shares. Related media-worker fields have the same separate release gate; root coordinates the combined matrix.

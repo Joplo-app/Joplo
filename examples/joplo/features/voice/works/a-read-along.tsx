@@ -1,7 +1,7 @@
 import { withProductionUpdate } from '../../../shared/production/update.tsx';
 import { withDesignRecord } from '../../../shared/design/record.ts';
 import { designRecords } from '../../../shared/design/records.ts';
-import { $, callout, done, flow, highlight, notApplicable, work, set, shot, spotlight, uses, type Bind } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
+import { asset, hold, narrate, $, callout, done, flow, highlight, notApplicable, work, set, shot, spotlight, uses, type Bind } from '@joplo-app/kit'; import { trace } from '@joplo-app/plugin-diagram';
 
 import { BROWSER_VOICE, PROVIDER_VOICE, initialUi, inner, layers, speak } from '../../../shared/voice/voice.tsx';
 
@@ -28,6 +28,11 @@ export default withProductionUpdate(withDesignRecord(work({
   },
 
   scenarios: {
+    prepared_audio: flow('已有音频与实测停留', { cases: ['prepared_audio'], start: '/voice', state: { ui: atStep1() }, expected: '样例使用本地合成验收音，不调用配音源；字幕仍显示旁白，停留按实测600ms加100ms余量' })
+      .system('沿用已有音频', '这段是本地合成验收音，用于验证旁白轨与实测停留', ...inner.s1(), set(ui.voice, 'ready'), set(ui.voicePct, 100),
+        narrate('本段使用已有音频，样例为合成验收音。', { audio: asset('../../../assets/voice-preview.wav') }), hold('voice', { pad: 0.1 }))
+      .system('资源时长控制停留', '同一资源也能只决定停留，不触发任何配音请求', set(ui.voice, 'textwait'), narrate(false), hold('audio', asset('../../../assets/voice-preview.wav'), { pad: 0 })),
+
     read_along: flow('打开声音，边看边读', { cases: ['browser'], start: '/voice', expected: '不用配置，自动播放时每一步一边显示一边朗读，声音没读完不切走' })
       .card('评审会上，大家边看边听', { sub: '林舟要放“邀请成员”的演示，不想一边播一边念字幕' })
       .click('b_voice', '林舟打开声音设置', set(ui.voiceOpen, true))

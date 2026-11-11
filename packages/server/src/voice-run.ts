@@ -35,7 +35,7 @@ export type VoiceRunOptions = {
 };
 
 /** Estimates use local cache only; remote Cloud cache hits can reduce the actual charge to zero. */
-export type VoiceStepDetail = { workId: string; scenarioId: string; stepId: string; text: string; chars: number; missing: boolean; estimatedBillableChars: number };
+export type VoiceStepDetail = { workId: string; scenarioId: string; stepId: string; text: string; chars: number; missing: boolean; estimatedBillableChars: number; audio?: 'provided' };
 export type VoiceRunLocale = { details?: VoiceStepDetail[]; locale: string | null; segments: number; missing: number; chars: number; generated: number; skipped: number; failed: { stepId: string; message: string }[] };
 export type VoiceRunResult = {
   profile: { id: string; name: string; kind: string } | null;
@@ -74,7 +74,7 @@ export function projectSegments(project: Project, scope: Pick<VoiceRunOptions, '
     if (!ids.has(sc.id)) continue;
     sc.steps.forEach((st, i) => {
       const line = spokenLine(st, st.caption, speakerRoleAt(project, sc.id, i + 1));
-      if (line.text) out.push({ stepId: st.id, text: line.text, role: line.role });
+      if (line.text) out.push({ stepId: st.id, ...line });
     });
   }
   return out;
@@ -82,6 +82,24 @@ export function projectSegments(project: Project, scope: Pick<VoiceRunOptions, '
 
 export async function generateProjectVoice(opts: VoiceRunOptions): Promise<VoiceRunResult> {
   voiceScenarioIds(opts.project, opts);
+  const supplied = projectSegments(opts.project, opts);
+  if (supplied.length && supplied.every(s => s.audio)) {
+    const declared = opts.project.i18n?.locales ?? [];
+    if ((opts.locales ?? []).some(l => !declared.includes(l))) throw new VoiceError('INVALID', 'Unknown content language');
+    const locales: (string | null)[] = opts.project.i18n ? opts.locales?.length ? opts.locales : declared : [null];
+    const rows = locales.map(locale => {
+      const p = locale ? localizeProject(opts.project, locale) : opts.project;
+      const segments = projectSegments(p, opts);
+      const selected = voiceScenarioIds(p, opts), byId = new Map(segments.map(seg => [seg.stepId, seg]));
+      const details: VoiceStepDetail[] = Object.values(p.scenarios).filter(sc => selected.has(sc.id)).flatMap(sc => sc.steps.map(st => {
+        const seg = byId.get(st.id);
+        return { workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: seg?.text ?? '', chars: 0, missing: !!seg?.audio && !p.mediaAssets?.[seg.audio.slice(15)], estimatedBillableChars: 0, ...(seg?.audio ? { audio: 'provided' as const } : {}) };
+      }));
+      const failed = details.filter(d => d.missing).map(d => ({ stepId: d.stepId, message: 'Explicit audio resource is not prepared; no voice provider was called' }));
+      return { locale, details, segments: segments.length, missing: 0, chars: 0, generated: 0, skipped: segments.length - failed.length, failed };
+    });
+    return { profile: { id: 'provided', name: 'Existing audio', kind: 'provided' }, source: null, dryRun: !!opts.dryRun, locales: rows, total: { segments: rows.reduce((n,r) => n+r.segments,0), missing: 0, chars: 0, generated: 0, failed: rows.reduce((n,r) => n+r.failed.length,0) }, quota: null, usageUrl: null, exhausted: null };
+  }
   const status: CloudVoiceStatus | null = opts.cloud ? await opts.cloud.status().catch(() => null) : null;
   const live = status?.signedIn && status.voice ? status.voice : null;
   const store = new ProfileStore(opts.home ?? joploHome(), process.env, { catalog: () => live });
@@ -126,10 +144,10 @@ export async function generateProjectVoice(opts: VoiceRunOptions): Promise<Voice
       const seg = segmentById.get(st.id);
       if (!seg) { details.push({ workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: '', chars: 0, missing: false, estimatedBillableChars: 0 }); continue; }
       const planned = cache.plan(seg, resolved);
-      const missing = !!planned && !cache.clipOf(planned.key);
+      const missing = seg.audio ? !p.mediaAssets?.[seg.audio.slice(15)] : !!planned && !cache.clipOf(planned.key);
       const estimatedBillableChars = missing && planned && !seen.has(planned.key) ? spokenChars(planned.text) : 0;
       if (planned) seen.add(planned.key);
-      details.push({ workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: seg.text, chars: spokenChars(seg.text), missing, estimatedBillableChars });
+      details.push({ workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: seg.text, chars: seg.audio ? 0 : spokenChars(seg.text), missing, estimatedBillableChars, ...(seg.audio ? { audio: 'provided' as const } : {}) });
     }
     const row: VoiceRunLocale = { details, locale, segments: segments.length, missing: est.steps, chars: est.chars, generated: 0, skipped: 0, failed: [] };
     result.locales.push(row);
