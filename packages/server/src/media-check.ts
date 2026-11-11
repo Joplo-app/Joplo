@@ -52,7 +52,7 @@ export function mediaBudgetDiagnostics(project: Project, info: Record<string, (L
   for(const sc of Object.values(project.scenarios))for(const [position,snapshot,at] of [[0,sc.media,undefined],...sc.steps.map((s,i)=>[i+1,s.media,s.source] as const)] as const){
     const ids=[...new Set(Object.values(snapshot??{}).filter(t=>(t.stopAfterMs??1)>0&&(t.endAfterMs??1)>0).map(t=>t.resource))].sort();
     const known=ids.filter(id=>info[id]?.encodedBytes!==undefined),bytes=known.reduce((n,id)=>n+info[id]!.encodedBytes!,0),key=ids.join(',');
-    if(bytes>4*1048576&&!encodedSeen.has(key)){encodedSeen.add(key);out.push({code:'MEDIA_ENCODE_BUDGET',severity:'warning',source:'structure',at,message:`${sc.id} position ${position}: simultaneous encoded audio [${ids.join(', ')}] needs ${bytes} bytes (${(bytes/1048576).toFixed(2)} MiB), exceeding the 4 MiB encoded cache${known.length<ids.length?'; additional resources unknown':''}. Transcode large WAV/PCM to lossless FLAC or another smaller supported format; the decoded 32 MiB budget is independent.`});}
+    if(bytes>4*1048576&&!encodedSeen.has(key)){encodedSeen.add(key);out.push({code:'MEDIA_ENCODE_BUDGET',severity:'warning',source:'structure',at,message:`${sc.id} position ${position}: planned simultaneous encoded audio [${ids.join(', ')}] needs ${bytes} bytes (${(bytes/1048576).toFixed(2)} MiB), exceeding the 4 MiB encoded cache${known.length<ids.length?'; additional resources unknown':''}. Transcode large WAV/PCM to lossless FLAC or another smaller supported format; the decoded 32 MiB budget is independent.`});}
   }
   for (const sc of Object.values(project.scenarios)) {
     const seen = new Set<string>();
@@ -69,7 +69,7 @@ export function mediaBudgetDiagnostics(project: Project, info: Record<string, (L
       const at48 = bytes(48000), at96 = bytes(96000);
       const code = at48 > budget ? 'MEDIA_DECODE_BUDGET' : at96 > budget ? 'MEDIA_DECODE_HEADROOM' : null;
       if (code) out.push({ code, severity: 'warning', source: 'structure', at,
-        message: `${sc.id} position ${position}: simultaneous audio [${ids.join(', ')}] needs ${(at48 / 1048576).toFixed(2)} MiB at 48 kHz and ${(at96 / 1048576).toFixed(2)} MiB at 96 kHz (32 MiB decoded budget${known < ids.length ? '; some resources unknown' : ''}). Shorten overlapping tracks or avoid crossfading them; actual device sample rate and decoder padding affect usage.` });
+        message: `${sc.id} position ${position}: planned simultaneous audio [${ids.join(', ')}] needs ${(at48 / 1048576).toFixed(2)} MiB at 48 kHz and ${(at96 / 1048576).toFixed(2)} MiB at 96 kHz (32 MiB decoded budget${known < ids.length ? '; some resources unknown' : ''}). Shorten overlapping tracks or avoid crossfading them; snapshot overlap is planned (actual narration can change retirement timing); device sample rate and decoder padding affect usage.` });
     }
   }
   return out;
