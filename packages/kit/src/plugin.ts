@@ -323,6 +323,8 @@ export type ActionDispatch = (id: string, action: ActionGesture, native?: Audien
 
 /** 演示此刻的情况：只读。 */
 export type PluginFrame = {
+  /** Frozen engine-time export. Missing/false means ordinary real-time presentation, not automation detection. */
+  sampling?: boolean;
   /** Only time source for demonstrations. Missing in old hosts; draw the final state then. */
   clock?: EngineFrame;
   gesture?: ActionPresentation | null;
@@ -367,6 +369,8 @@ export type ComponentCtx = {
   click: (id: string, at?: { clientX: number; clientY: number; altKey?: boolean }) => void;
   /** 截图、导出前要等待的工作（加载模型、首帧渲染）：返回一个 done 函数，完成后调用。 */
   hold: () => () => void;
+  /** Register async presentation of the current sampled state. Resolve after pixels are committed; reject on failure. Return value cancels registration and aborts its signal. Host also cancels on component unmount. Never wait for future engine time here. */
+  frameReady: (task: (signal: AbortSignal) => Promise<void>) => () => void;
 };
 
 export type ComponentInstance = { update(ctx: ComponentCtx): void; destroy(): void };
