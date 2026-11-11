@@ -422,7 +422,9 @@ function RecordStage({ sampling,frameReadiness, viewportOverride, project, proje
     })();
     w.__JOPLO_RECORD__ = {
       timeline: () => ({ ...structuredClone(timeline.current), completed: started && !snap.playing && !snap.upNext && (total===0 || !!snap.state?.completed || (snap.state?.position??0)>=total) }),
-      frameStatus: () => ({...frameReadiness.status(),pending:frameReadiness.status().pending+registry.size}),
+      // Legacy holds include future RAF measurements/animations. They gate initial loading,
+      // not a frozen sample; only frameReady tasks promise current-frame completion.
+      frameStatus: () => frameReadiness.status(),
       cancelFrame: () => frameReadiness.dispose(),
       voiceIdentity: () => ({ mode:voiceMode, prepared:recordVoice?.identity() ?? null }),
       pause:()=>ctl.pause(false),

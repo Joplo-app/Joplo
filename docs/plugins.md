@@ -570,6 +570,9 @@ register `ctx.frameReady(signal => presentCurrentFrame(signal))` in a layout
 effect for each current frame, and return the provided cancellation function.
 Resolve only after pixels have been committed to the visible canvas/DOM. Reject
 failures; remove listeners and prevent late drawing when the signal aborts.
+Legacy `ctx.hold()` and rough/layout measurement holds still gate initial loading;
+they may wait for future RAFs and are intentionally excluded from this frozen-frame
+registry. Use `frameReady` to declare asynchronous current-frame pixels.
 Do not wait for a future engine tick: the exporter freezes engine time while
 waiting, with a ten-second host wall-clock deadline. Multiple components share
 one registry, scoped to clock/seek/scenario/scene generations and component
