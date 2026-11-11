@@ -22,10 +22,10 @@ beforeAll(async()=>{
  server=await createDev({projectDir:root,port:0,watch:false,log:()=>{}});expect(server.payload().diagnostics.filter(d=>d.severity==='error')).toEqual([]);browser=await launch({chromium});
 },120000);
 afterAll(async()=>{await browser?.close();await server?.close();});
-async function open(sampling=true){
- const context=await browser.newContext({viewport:{width:256,height:128}}),page=await context.newPage();
+async function open(sampling=true,clean=true,scale=1,theme='clean'){
+ const context=await browser.newContext({viewport:{width:256,height:128},deviceScaleFactor:scale}),page=await context.newPage();
  if(sampling){await page.clock.install({time:0});await page.clock.pauseAt(86400000);}
- const query=new URLSearchParams({render:'1',project:server.projectId,scenario:'f.a.one',position:'0',theme:'clean',record:'1',frame:'1',chain:'1',audio:'0',hide:'cover,cursor,title,subtitles',vw:'256',vh:'128',w:'256',h:'128',...(sampling?{sampling:'1'}:{})});
+ const query=new URLSearchParams({render:'1',project:server.projectId,scenario:'f.a.one',position:'0',theme,record:'1',frame:'1',chain:'1',audio:'0',...(clean?{hide:'cover,cursor,title,subtitles'}:{}),vw:'256',vh:'128',w:'256',h:'128',...(sampling?{sampling:'1'}:{})});
  await page.goto(server.url+'?'+query,{waitUntil:'domcontentloaded'});
  if(sampling){const began=Date.now();while(!await page.evaluate(()=>(window as any).__JOPLO_READY__===true)){if(Date.now()-began>20000)throw Error('not ready');await page.clock.runFor(16);await page.waitForTimeout(5);}}
  else await page.waitForFunction(()=>(window as any).__JOPLO_READY__===true);
@@ -71,23 +71,52 @@ it('samples every numbered frame for two videos with pause/resume, rewind and co
   expect(await page.evaluate(()=>(window as any).__JOPLO_RECORD__.frameStatus().pending)).toBe(0);
  }finally{await context.close();}
 },120000);
+async function numberedJpeg(page:Page,bytes:Buffer){
+ return page.evaluate(async b64=>{
+  const image=new Image();image.src='data:image/jpeg;base64,'+b64;await image.decode();
+  const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+  const g=canvas.getContext('2d')!;g.drawImage(image,0,0);
+  const bands=Array.from({length:8},(_,bit)=>g.getImageData(Math.floor((bit+.5)*image.width/8),Math.floor(image.height/2),1,1).data[0]!);
+  return {width:image.width,height:image.height,bands,index:bands.reduce((n,v,bit)=>n|(v>128?1<<bit:0),0)};
+ },bytes.toString('base64'));
+}
 async function verifyExport(directory:string,timelineFile:string){
  const timeline=JSON.parse(fs.readFileSync(timelineFile,'utf8')),page=await browser.newPage();
  try {const decoded:number[]=[];for(const file of fs.readdirSync(directory).filter(n=>/^[0-9]+\.jpg$/.test(n)).sort()){
-  const t=Number(file.slice(0,-4)),data=fs.readFileSync(path.join(directory,file)).toString('base64');
-  const index=await page.evaluate(async b64=>{const image=new Image();image.src='data:image/jpeg;base64,'+b64;await image.decode();const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const g=canvas.getContext('2d')!;g.drawImage(image,0,0);let result=0;for(let bit=0;bit<8;bit++)if(g.getImageData(Math.floor((bit+.5)*image.width/8),Math.floor(image.height/2),1,1).data[0]!>128)result|=1<<bit;return result;},data);
+  const t=Number(file.slice(0,-4));
+  const image=await numberedJpeg(page,fs.readFileSync(path.join(directory,file)));
+  const {index}=image,diagnostic=JSON.stringify({file:path.join(directory,file),t,...image});
   const step=timeline.steps.filter((s:any)=>s.outputCommitMs<=t).at(-1);
-  if(!step)expect(index).toBe(0);else {
+  if(!step)expect(index,diagnostic).toBe(0);else {
    const from=step.position===1?0:.1,to=step.position===1?.8:.6,elapsed=Math.max(0,t-step.outputCommitMs)/1000;
    const low=Math.floor(Math.min(to,from+Math.max(0,elapsed-.05))*10+1e-6),high=Math.floor(Math.min(to,from+elapsed+.05)*10+1e-6);
-   expect(index,`${file} position ${step.position}`).toBeGreaterThanOrEqual(low);expect(index).toBeLessThanOrEqual(high);
+   expect(index,`${diagnostic} position ${step.position}`).toBeGreaterThanOrEqual(low);expect(index,diagnostic).toBeLessThanOrEqual(high);
   }decoded.push(index);
  }expect(new Set(decoded).size).toBeGreaterThan(6);return decoded;
  }finally{await page.close();}
 }
+it('a cropped source video can legitimately be covered by the default film curtain',async()=>{
+ const {context,page}=await open(true,false,.5,'sketch');try{
+  // Reproduce the CI timing deterministically: font/load work can leave the cover fully entered.
+  await page.clock.runFor(400);await waitForSample(page,0);
+  await page.evaluate(()=>(window as any).__JOPLO_RECORD__.play());await waitForSample(page,0);
+  const value=await observed(page);expect(value.progress.position).toBe(0);expect(value.images[0]!.index).toBe(0);
+  const box=await page.locator('[data-jid="a"]').boundingBox();expect(box).not.toBeNull();
+  const screenshot=await page.screenshot({type:'jpeg',clip:box!});
+  const proof=await numberedJpeg(page,screenshot);
+  expect(await page.locator('[data-jlayer="curtain"]').count()).toBeGreaterThan(0);
+  // Hold engine time and decoder pixels fixed; hide only the composited curtain.
+  const before=await page.evaluate(()=>Date.now());
+  await page.locator('[data-jlayer="curtain"]').evaluateAll(elements=>elements.forEach(el=>(el as HTMLElement).style.visibility='hidden'));
+  const unobstructed=await numberedJpeg(page,await page.screenshot({type:'jpeg',clip:box!}));
+  expect(await page.evaluate(()=>Date.now())).toBe(before);expect(unobstructed.index).toBe(0);
+  expect(proof.bands,JSON.stringify(proof)).not.toEqual(unobstructed.bands);
+  fs.writeFileSync(path.join(root,'curtain-pixel-proof.jpg'),screenshot);fs.writeFileSync(path.join(root,'curtain-pixel-proof.json'),JSON.stringify({source:value.images[0],screenshot:proof,unobstructed},null,2));
+ }finally{await context.close();}
+},30000);
 it('public frames and film use sampling; native video route stays real-time even in an automated browser',async()=>{
  const frame=await renderFrames({projectDir:root,scenarioId:'f.a.one',framesOut:path.join(root,'frames'),fps:10,voice:'off',logicalViewport:{width:256,height:128},crop:'[data-jid="a"]'});expect(frame.frames).toBeGreaterThan(10);await verifyExport(frame.directory,frame.timeline);
- const film=await renderFilm({projectDir:root,scenarioId:'f.a.one',out:path.join(root,'film.png'),sampleMs:100,every:100,frames:path.join(root,'film-frames'),timeline:path.join(root,'film-timeline.json'),voice:'off',logicalViewport:{width:256,height:128},crop:'[data-jid="a"]'});expect(film.samples).toBeGreaterThan(10);await verifyExport(path.join(root,'film-frames'),path.join(root,'film-timeline.json'));
+ const film=await renderFilm({projectDir:root,scenarioId:'f.a.one',out:path.join(root,'film.png'),sampleMs:100,every:100,hide:['cover','cursor','title','subtitles'],frames:path.join(root,'film-frames'),timeline:path.join(root,'film-timeline.json'),voice:'off',logicalViewport:{width:256,height:128},crop:'[data-jid="a"]'});expect(film.samples).toBeGreaterThan(10);await verifyExport(path.join(root,'film-frames'),path.join(root,'film-timeline.json'));
  const {context,page}=await open(false);try{await page.evaluate(()=>(window as any).__JOPLO_RECORD__.play());await page.waitForTimeout(300);const value=await observed(page);expect(value.sampling).toBe('false');expect(await page.evaluate(()=>navigator.webdriver)).toBe(true);expect(value.videos.some(v=>!v.paused)).toBe(true);}finally{await context.close();}
 },120000);
 it('fails rejected/timed-out readiness and supports cancellation without moving frozen time',async()=>{
