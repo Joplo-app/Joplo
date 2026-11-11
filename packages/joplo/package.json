@@ -1,6 +1,6 @@
 {
   "name": "joplo",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Joplo: playable, interactive shows your agent writes in code; link, embed, and edit them.",
   "license": "PolyForm-Shield-1.0.0",
   "bin": {

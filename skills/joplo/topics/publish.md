@@ -146,4 +146,4 @@ For local comparisons and PR CI, read npx joplo skill diff. It compares two real
 - --ref works only together with --applied. --applied is idempotent; text output without --format json ends with a Next: line listing the ids.
 
 Related topics: diff, demo, review, plugins
-<!-- joplo-skill 0.7.2 sha256:cef9d8f21f82ccb246b7a3ba4bcc2959a06c9bb5919dd283c24c79f239eeb1be -->
+<!-- joplo-skill 0.7.3 sha256:cef9d8f21f82ccb246b7a3ba4bcc2959a06c9bb5919dd283c24c79f239eeb1be -->

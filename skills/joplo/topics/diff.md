@@ -46,4 +46,4 @@ The bundle has root index.html, before/, after/ and feature-diff.json. Only publ
 - A successful finalize may be a historical link after a newer generation wins; do not claim it is the current PR pointer without Cloud confirmation. pr.comment=failed means publication succeeded but the comment did not; Cloud handles retry.
 
 Related topics: publish, review, plugins
-<!-- joplo-skill 0.7.2 sha256:7ce31b5c54eb0cb966e403b6c1a8a35ee8f1954943f280257c2952a4f3dbb3e4 -->
+<!-- joplo-skill 0.7.3 sha256:7ce31b5c54eb0cb966e403b6c1a8a35ee8f1954943f280257c2952a4f3dbb3e4 -->
