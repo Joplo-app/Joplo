@@ -37,6 +37,13 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - EVENT_CONFLICT: the same id has different onClick on two stages of one work; give the elements different ids, or make the behavior identical (shared layout links).
 - FREE_EVENT_CONFLICT: a work.free click reaction duplicates an element's onClick; move its effects into onClick and delete the free entry.
 - STEP_REPEATS_EVENT (warning): the step writes a path its target's onClick already writes; delete the write from the step.
+- MOCK_INVALID: mock(name, outcomes) needs an id-like name and at least one response('Event name', ...effects); a response cannot call another mock.
+- MOCK_CONFLICT: two different mocks share one name in a work; give each request its own name, or reuse the same mock object.
+- MOCK_OUTCOME_UNKNOWN: flow({ api }) names an outcome the mock does not have; copy one from the outcomes listed in the message.
+- MOCK_OUTCOMES_EXHAUSTED: the slice calls the mock more times than flow({ api }) lists outcomes; list one outcome per call, in order.
+- MOCK_OUTCOMES_LEFTOVER: flow({ api }) lists more outcomes than the slice calls that mock (or names a mock the slice never calls); remove the extra entries.
+- MOCK_OUTCOME_UNUSED (warning): no slice of the work shows this outcome; add a slice that picks it with flow({ api }), or delete the outcome.
+- FLOW_API_INVALID: flow({ api }) maps mock names to arrays of outcome names, for example api: { sendInvite: ['timeout', 'ok'] }.
 - ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID / PLUGIN_ACTION_INVALID: check the action shape, enabled plugin declaration, exact payload fields/ranges, allowed target type, and drag/scroll endpoint. Read the plugin skill; keep endpoints in the current stage, then rerun check.
 - UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
 - UNKNOWN_PLUGIN / PLUGIN_PARENT / PLUGIN_INVALID / PLUGIN_DUPLICATE / PLUGIN_RUNTIME_MISSING: plugin components need their package in config({ plugins: [...] }) once, written inside the parent named in the message; a missing runtime means reinstall the package (npx joplo skill plugins).
@@ -126,4 +133,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.7.2 sha256:54a862485688d455dcfa0b581d84420832246d16bd2eb1cde54db60fcd094953 -->
+<!-- joplo-skill 0.7.2 sha256:acf3910ede1f59d269608f7019e20c64928f9bcbe7a115f3df5a928e658d0889 -->

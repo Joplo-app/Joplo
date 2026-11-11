@@ -1,6 +1,17 @@
-import { $, done, flow, go, missing, not, work, page, push, rule, set, toast, uses } from '@joplo-app/kit';
+import { $, done, flow, go, missing, mock, not, work, page, push, response, rule, set, toast, uses } from '@joplo-app/kit';
 import { members, pending } from '../sample.ts';
 import { Alert, Button, Card, DataTable, Select, Stack, Textarea, Title } from '@joplo-app/plugin-ui';
+
+/** 批量发送请求：这一版只设计了部分失败这一种结果。 */
+const sendBatch = mock('sendBatch', {
+  partial: response('批量请求返回（模拟）', '2 个成功、1 个失败，逐个显示结果',
+    set($.ui.partial, true),
+    push($.data.results, { email: 'a@company.com', result: '已发送' }),
+    push($.data.results, { email: 'b@company.com', result: '已发送' }),
+    push($.data.results, { email: 'bad@', result: '失败：邮箱格式无效' }),
+    toast('2 个邀请已发送，1 个失败'),
+    done('部分完成：失败项可以单独重试')),
+});
 
 export default work({
   title: 'B · 独立页面批量邀请',
@@ -28,7 +39,7 @@ export default work({
             <Title order={4}>填写邮箱</Title>
             <Textarea id="in_emails" label="邮箱（每行一个）" placeholder={'a@company.com\nb@company.com'} minRows={3} />
             <Select id="sel_batch_role" label="统一权限" placeholder="选择权限" data={['查看者', '编辑者']} />
-            <Button id="btn_batch_send">发送全部邀请</Button>
+            <Button id="btn_batch_send" onClick={[uses('partial_result'), sendBatch]}>发送全部邀请</Button>
           </Stack>
         </Card>
         <Alert id="alert_partial" color="yellow" when={$.ui.partial}>
@@ -59,14 +70,7 @@ export default work({
       .click('btn_batch', '点击「批量邀请」进入独立页面')
       .type('in_emails', 'a@company.com\nb@company.com\nbad@', '输入三个邮箱（含一个错的）')
       .select('sel_batch_role', '编辑者')
-      .click('btn_batch_send', uses('partial_result'))
-      .system('批量请求返回（模拟）', '2 个成功、1 个失败，逐个显示结果',
-        set($.ui.partial, true),
-        push($.data.results, { email: 'a@company.com', result: '已发送' }),
-        push($.data.results, { email: 'b@company.com', result: '已发送' }),
-        push($.data.results, { email: 'bad@', result: '失败：邮箱格式无效' }),
-        toast('2 个邀请已发送，1 个失败'),
-        done('部分完成：失败项可以单独重试')),
+      .click('btn_batch_send'), // 之后自动接 sendBatch 的结果
 
     denied: flow('普通成员无权邀请', { cases: ['no_permission'], outcome: 'denied', mock: '模拟普通成员身份', state: { ui: { isAdmin: false } } }),
   },

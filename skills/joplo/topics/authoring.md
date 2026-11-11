@@ -96,21 +96,25 @@ Success: check reports 0 errors; outline --work explainer shows the intended sli
 For tools reading IR from @joplo-app/core, use entriesOf/entryOf for entries, featuresOf for real features in entryIds order, rolesOf(project, workId) for shared or standalone roles, sliceKey(scenario) for its author key, and visibleRoutes(project) for paths without the internal blank page. Follow scenario.workId and the projection; never split ids to infer ownership.
 
 ## Engine-only example
-In features/<f>/works/<key>.tsx, buildScreen is project code using the installed plugins' components. It must return enabled elements with ids email, send and result; read those plugin skills for the actual view code.
+In features/<f>/works/<key>.tsx, buildScreen is project code using the installed plugins' components. It must return enabled elements with ids email, send and result, and put the onClick it receives on send; read those plugin skills for the actual view code.
 ```ts
-import { $, work, flow, page, set, done } from '@joplo-app/kit';
+import { $, work, flow, page, set, done, mock, response } from '@joplo-app/kit';
 import { buildScreen } from './screen';
+// The request and its possible results, written once
+const sendLink = mock('sendLink', {
+  accepted: response('Accepted', set($.ui.sending, false), set($.ui.sent, true), done('Link sent')),
+  unknown: response('No account', set($.ui.sending, false), set($.ui.error, 'Check the address')),
+});
 export default work({
   title: 'A · Recover access', summary: 'A retry keeps the entered address',
-  routes: { '/reset': page({ title: 'Reset password' }, buildScreen()) },
+  routes: { '/reset': page({ title: 'Reset password' }, buildScreen({ onSend: [set($.ui.sending, true), sendLink] })) },
   state: { ui: { sending: false, error: '', sent: false } },
   scenarios: {
-    retry: flow('Correct an address and retry', { cases: ['unknown_email'], start: '/reset' })
-      .type('email', 'ana@example.invalid').click('send', set($.ui.sending, true))
-      .system('No account', set($.ui.sending, false), set($.ui.error, 'Check the address'))
+    // The first send finds no account, the retry is accepted
+    retry: flow('Correct an address and retry', { cases: ['unknown_email'], start: '/reset', api: { sendLink: ['unknown', 'accepted'] } })
+      .type('email', 'ana@example.invalid').click('send', 'Send the link')
       .type('email', 'ana@example.com', set($.ui.error, ''))
-      .click('send', set($.ui.sending, true))
-      .system('Accepted', set($.ui.sending, false), set($.ui.sent, true), done('Link sent')),
+      .click('send', 'Send again'),
   },
 });
 ```
@@ -118,11 +122,11 @@ Declare both success and recovery cases in the feature. View code belongs to the
 
 ## Steps and effects
 - chapter(name, options) uses the same slice options as flow(); its default predecessor is the previous chapter, with from: null to restart. Use all chapter() or all flow() in one work.
-- flow(name, { cases?, start?, state?, from?, autoplay?, layer?, description?, expected?, mock?, outcome?, actionEntry? }). state overrides work state. description is the cover sentence; expected describes what the viewer should observe.
+- flow(name, { cases?, start?, state?, from?, autoplay?, layer?, description?, expected?, mock?, outcome?, actionEntry?, api? }). The mock option is only the badge label (for example 'Mocked failure'); api picks mock() outcomes (System responses below). state overrides work state. description is the cover sentence; expected describes what the viewer should observe.
 - autoplay: false keeps an optional scenario selectable through a fork, chapter list or deep link, but skips it in sequential published-site playback. Playing that scenario manually stops at its end. Default/true preserves declaration order.
 - from: 'previousKey' continues that scenario's final route, ui/data/inputs and director layer. Validate steps and automatic captions against that ending page; dependency order does not change chapter order. Do not combine from with start. layer overrides the initial director layer.
 - .click(id), .type(id, value), .select(id, value), .toggle(id, boolean), .press(keys), .back(), .drag(id, destination), .hover(id, ms), .scroll(id, destination), .act(pluginAction, id, data). Read demo and the action-owning plugin skill for recognition requirements.
-- .system('event', ...effects) models a response, not a real request. .card() creates a transition. Strings are captions; other arguments are effects. Step arguments and card accept effect arrays.
+- .system('event', ...effects) models a response, not a real request. For the response to something the viewer triggers (send, save, load), write a mock() instead so the viewer gets it after taking over; keep .system() for story events (time passes, another person acts). .card() creates a transition. Strings are captions; other arguments are effects. Step arguments and card accept effect arrays.
 - set(path, value) replaces; push(path, value) appends; patch(path, object) expands to sets (nested objects replace, not deep-merge). go(route) navigates in this work; back returns to the prior route.
 - stream(path, text, { pace? }) writes like set, but during playback the bound text appears character by character (a model answering, speech being transcribed); jumps, screenshots and deep links show the full text. When the new value starts with the old one, only the added characters stream, so write each step's full value (previous text + the new words) rather than juggling separate fragments. pace: 'voice' spreads the new characters over this step's narrate()/say() line, so the words land as they are spoken; the default pace is model-output speed. Only a plain text child bound to the path streams ({$.ui.reply}); stream values are translated like other on-screen text, so keep every language's successive values prefix-consistent.
 - toast(text), toast.success/error/info(text) show an engine message. done(result, outcome?) ends a scenario; outcomes success/failure/cancelled must agree with flow's badge. uses(ruleKey, ...) links rules; it is an effect, not a flow method.
@@ -138,12 +142,29 @@ id="nav_settings" onClick={go('/settings')}
 // the step only says what the viewer does and why
 flow('Invite a teammate').click('btn_invite', 'The admin opens the invite dialog')
 ```
-- onClick takes one effect or an array: set, push, toast, go and uses. A scripted .click(id) runs the element's onClick first, then the step's own effects. Keep captions, narrate(), say(), camera and focus cues, done(), and the .system() response in the steps.
+- onClick takes one effect or an array: set, push, toast, go, uses and a mock() request. A scripted .click(id) runs the element's onClick first, then the step's own effects. Keep captions, narrate(), say(), camera and focus cues and done() in the steps; the request's result goes in mock().
 - Do not repeat the element's writes in the step (STEP_REPEATS_EVENT). Step effects stay available for what only this moment of the story does.
 - After the viewer pauses, every element with onClick works as a local reaction: go() changes page locally, uses() only links rules. Play, jump, scenario change and reset discard the local layer. A page reached only locally never advances the script; the next step still belongs to the timeline's page.
 - One id has one behavior per work: an id that appears on several pages (a layout nav link) needs the same onClick everywhere (EVENT_CONFLICT). Do not also declare work.free for that click (FREE_EVENT_CONFLICT).
 - Only onClick takes effects for now (EVENT_UNSUPPORTED). Inputs keep value={$.ui.name} and the typed value; put follow-up reactions in the step.
 - Give the controls a viewer will try (cancel, close, back, navigation) an onClick instead of marking them unmodeled; keep unmodeled for what this work deliberately leaves out.
+
+## System responses (mock / response)
+Write each request and its possible results once, then let each slice pick the result it shows:
+```tsx
+const sendInvite = mock('sendInvite', {
+  ok: response('Request succeeded (mock)', 'Sent', set($.ui.sending, false), set($.ui.open, false), done('Invite sent')),
+  timeout: response('Request timed out (mock)', 'Input kept', set($.ui.sending, false), set($.ui.error, 'Timeout')),
+});
+// on the element: onClick={[set($.ui.sending, true), sendInvite]}
+success: flow('Send').click('send', 'Send the invite'),                        // first outcome (ok)
+retry: flow('Retry', { api: { sendInvite: ['timeout', 'ok'] } }).click('send').click('send', 'Retry'),
+```
+- response(name, ...args) takes the same arguments as .system(name, ...args): the first string is its caption, the rest are effects, including done(), narrate() and camera.
+- In the script, every call to a mock (in an element's onClick or a step's effects) adds one system step right after that step. flow({ api: { name: [outcomes] } }) uses one outcome per call, in order; a mock the slice does not list uses its first outcome.
+- After the viewer takes over, clicking the element applies the first outcome's local effects (set, push, toast, go) at once; done(), narration and camera stay in the script.
+- The mock name is unique within a work; outcomes are the cases the design must show. Every outcome should appear in some slice (MOCK_OUTCOME_UNUSED).
+- A response cannot call another mock. Use .system() for an event nobody triggers on stage.
 
 ## Reusable effect factories
 Step arguments and card effects accept nested arrays, flattened in order. Compose helpers that return patch() plus other effects instead of copying transition state. Only done() completes a scenario; unknown effect objects report EFFECT_INVALID.
@@ -165,4 +186,4 @@ For a long story use chapter() to inherit the previous ending by default; from i
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.7.2 sha256:554c83df3626cfb51537c89a49ff1a24dccb7262754397f9785f34396bb07927 -->
+<!-- joplo-skill 0.7.2 sha256:c7ecc55e40ffeaf4db7d7c2e08f1ad3b69a1216560aa899ab8fbf1161da88deb -->

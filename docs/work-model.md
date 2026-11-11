@@ -102,6 +102,15 @@ export default work({
 - 一件作品里同一个 id 只有一种行为：多个画面上同一 id 的 `onClick` 必须相同；不能再为它手写 `free` 点击反应。
 - 只有 `onClick`；输入框继续用 `value` 绑定和输入的值。完整计划见 `docs/plans/authoring-v2.md`。
 
+### 系统响应（写法 v2 第二步，D109）
+
+`mock(name, { 结果: response('事件名', '说明', ...效果) })` 把一个模拟请求和它的各种结果写一次；`response` 的参数与 `.system()` 相同。
+
+- 返回值写进元素的 `onClick` 或步骤的效果，表示“这里发出了请求”。剧本里每调用一次，就在这一步后面接一个系统步骤；结果按 `flow({ api: { 名字: ['结果', …] } })` 依次取，每次调用恰好用掉一个，没写的请求缺省用第一个结果。
+- 观众接管后点这个元素，第一个结果的本地效果（set / push / toast / go）立刻生效；`done()`、旁白、镜头只在剧本里。
+- 一件作品里请求名唯一；某个结果没有任何切片演到时提示 `MOCK_OUTCOME_UNUSED`。
+- 全部在编译期展开成现有的系统步骤和本地反应，IR 不变。
+
 ## 3. IR v3
 
 `SCHEMA_VERSION = 3`。独立作品与功能下面的作品走同一段降级逻辑，不合成假的功能或隐藏作品。
@@ -197,6 +206,7 @@ compile 的 publish / review 模式先把 alternatives 的各项评审值归空�
 | `Feature.alternatives` | 作者 focus/tradeoffs/coverage 与编译推导 → dev 功能上按作品 id 的评审记录 → validate、outline、reviewManifest、翻译与 scope → 看板覆盖 / 取舍、大纲、私有清单；publish/review IR 同键值归空，再由发布白名单消费 |
 | `Work.roles/audience` | 独立作品作者字段 → Work；功能角色仍在 Feature → rolesOf、entries、翻译与语音 / 发布白名单 → 层级角色、字幕 / 朗读、给谁看、封面与首页 |
 | `Work.sequencing`、`Scenario.from` | chapter 声明顺序 / 例外 → 编译期一次解析 → playSequence、entries → 编号、封面、连续播放与链式导出 |
+| 模拟请求（`mock` / `response`） | 元素 `onClick` 或步骤效果里的请求 → 编译期按 `flow({ api })` 选结果、展开成紧跟其后的系统步骤（来源指向 `response()`），并把第一个结果的本地效果并进该元素的本地反应 → 回放读系统步骤，接管读本地反应；`MOCK_OUTCOME_UNUSED` 按作品统计没演到的结果。IR 不新增字段 |
 | `Work.free`（元素事件生成） | 元素 `onClick` → 编译期从节点 props 取出（不进 IR 节点）→ 合并进点击步骤的 `Step.effects`，并生成 `on-<id>` 本地反应 → `stateAt` / 回放读步骤；`arbitrateAction` / `playgroundState` / `shownSceneOf` 读本地反应 → 播放、深链、截图只读时间线；观众接管时看板、发布站与嵌入在本地层执行，范围发布保留本地跳转能到达的画面 |
 | `Work.draft` | 独立作品 draft → dev IR → 发布归属与模式过滤 → 本地草稿标记、构建跳过诊断；不存公开 IR |
 | 机器输出 `works/workId` | IR 投影、评审清单与反馈归一化 → JSON / NDJSON、本地会话与云端边界 → CLI、Agent、看板与云端读取方 → 按作品筛选、评审与回写 |
@@ -214,6 +224,13 @@ compile 的 publish / review 模式先把 alternatives 的各项评审值归空�
 | `EVENT_CONFLICT` | error | 同一件作品里同一 id 在两个画面上的 `onClick` 不同；换 id 或让行为一致 |
 | `FREE_EVENT_CONFLICT` | error | 手写的 `free` 点击反应与元素 `onClick` 重复；把效果挪进 `onClick`，删掉 free |
 | `STEP_REPEATS_EVENT` | warning | 步骤写了被点元素 `onClick` 已经写的路径；从步骤里删掉 |
+| `MOCK_INVALID` | error | `mock()` 需要像 id 的名字和至少一个 `response()`；结果里不能再调用请求 |
+| `MOCK_CONFLICT` | error | 一件作品里两个不同的请求同名 |
+| `MOCK_OUTCOME_UNKNOWN` | error | `flow({ api })` 写了请求没有的结果 |
+| `MOCK_OUTCOMES_EXHAUSTED` | error | 切片调用请求的次数比 `api` 里列的结果多 |
+| `MOCK_OUTCOMES_LEFTOVER` | error | `api` 里列的结果比切片调用的次数多，或写了切片没调用的请求 |
+| `MOCK_OUTCOME_UNUSED` | warning | 没有任何切片演到这个结果 |
+| `FLOW_API_INVALID` | error | `flow({ api })` 必须是“请求名 → 结果名数组” |
 | `WORK_SLICES_MIXED` | error | 同一作品混用章节与独立切片，统一 builder |
 | `WORK_FEATURE_ONLY` | error | 独立作品使用评审字段、切片 cases 或 uses；移除或挂到功能下 |
 | `WORK_STANDALONE_ONLY` | error | 功能下作品写 audience/roles/draft/order；共享角色和排序改放功能，独立字段留在独立作品 |

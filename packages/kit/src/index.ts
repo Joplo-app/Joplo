@@ -153,7 +153,8 @@ export type EffectDef =
   | { kind: 'effect'; type: 'hold'; seconds: number }
   | { kind: 'effect'; type: 'hold'; timing: 'voice' | 'audio'; audio?: AudioSource; pad?: number }
   | { kind: 'effect'; type: 'say'; text: string; role?: string; audio?: AudioSource }
-  | { kind: 'effect'; type: 'narrate'; text: string | false; audio?: AudioSource };
+  | { kind: 'effect'; type: 'narrate'; text: string | false; audio?: AudioSource }
+  | { kind: 'effect'; type: 'call'; mock: MockDef };
 
 /** 标注气泡放在目标的哪一侧；不写时自动选画面里放得下的一侧（右、左、下、上）。 */
 export type CalloutSide = 'top' | 'right' | 'bottom' | 'left';
@@ -342,7 +343,28 @@ export type FlowOpts = {
   layer?: string;
   description?: string;
   expected?: string;
+  /**
+   * 写法 v2：这个切片里每个模拟请求依次用哪个结果，例如 { sendInvite: ['timeout', 'ok'] }（第一次超时、第二次成功）。
+   * 每次调用恰好用掉一个；没写的请求缺省用第一个结果。
+   */
+  api?: Record<string, string[]>;
 };
+
+/** 模拟请求的一种结果：参数和 .system(name, ...args) 相同（字符串是说明，其余是效果），剧本里展开成一个系统步骤。 */
+export type ResponseDef = { kind: 'response'; name: string; caption?: string; effects: EffectDef[]; source?: string };
+export const response = (name: string, ...args: StepArg[]): ResponseDef => {
+  const flat = flattenArgs(args) as (string | EffectDef)[];
+  const caption = flat.find((a): a is string => typeof a === 'string');
+  return { kind: 'response', name, ...(caption ? { caption } : {}), effects: flat.filter((a): a is EffectDef => typeof a !== 'string'), source: callsite(3) };
+};
+/** 一个模拟请求和它的各种结果。名字在一件作品里唯一，flow({ api }) 用它选结果。 */
+export type MockDef = { name: string; outcomes: Record<string, ResponseDef>; source?: string };
+/**
+ * 写法 v2：系统响应写一次。把返回值放进元素的 onClick 或步骤的效果里，表示“这里发出了这个请求”：
+ * 剧本里这一步之后自动接一个系统步骤（结果由 flow({ api }) 依次选，缺省第一个）；观众接管时用第一个结果的本地效果。
+ *   const sendInvite = mock('sendInvite', { ok: response('Request succeeded (mock)', set($.ui.sent, true)), timeout: response('Timed out (mock)', set($.ui.error, 'Timeout')) });
+ */
+export const mock = (name: string, outcomes: Record<string, ResponseDef>): EffectDef => ({ kind: 'effect', type: 'call', mock: { name, outcomes, source: callsite(3) } });
 
 export class Flow<Kind extends 'flow' | 'chapter' = 'flow'> {
   readonly kind: Kind;

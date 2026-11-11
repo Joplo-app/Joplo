@@ -1,6 +1,6 @@
 # 写法 v2 提案：行为放回界面，接入产品自己的组件
 
-状态：**提案；第一步（元素 onClick + 本地层跳页面）已实现，见 DECISIONS.md D109**（2026-11-11）。其余部分未实现；`authoring-v2/invite/` 是按新写法改写的 `examples/invite`，用的 API 还不存在，不能编译。
+状态：**提案；第一步（元素 onClick + 本地层跳页面）与第二步（mock / response）已实现，见 DECISIONS.md D109**（2026-11-11）。其余部分未实现；`authoring-v2/invite/` 是按新写法改写的 `examples/invite`，用的 API 还不存在，不能编译。
 
 背景：Joplo 的重点收到“TSX 代码 → 可交互 / 互动的演示”，视频方向冻结。对照裸 HTML、Storybook 这类做法，现在的写法有两个根上的问题：观众接管时能做的事很少，也用不了产品自己的组件。
 
