@@ -114,6 +114,25 @@ Separate named pieces suit contrasting eras or a chapter that changes length ind
 
 MEDIA_ASSET_LARGE checks the 2 MiB absolute size for every track; the 0.75 MB/min rate check only applies to clips at least 15 seconds long. Short clips pay fixed codec context overhead: splitting them does not improve bitrate.
 
+## Stable local lossless files
+For pitched one-shot effects or external lossless mixing, import renderLossless from @joplo-app/plugin-alda/local. It shares music.play's Alda → MIDI → verified bank → normalized PCM → FLAC master path, with no MP3 calibration probe, guard or encoder padding. It does not read internal music-masters filenames or choose a JOPLO_HOME for you.
+\`\`\`ts
+import { renderLossless } from '@joplo-app/plugin-alda/local';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+const directory = await mkdtemp(join(tmpdir(), 'joplo-score-'));
+try {
+  const result = await renderLossless('piano: c1', {
+    directory, cacheDir: resolve('.cache/alda'), loop: false,
+    maxBytes: 50 * 1024 * 1024,
+  });
+  await writeFile('cue.flac', result.bytes);
+  console.log(result.audio, result.info.markers);
+} finally { await rm(directory, { recursive: true, force: true }); }
+\`\`\`
+directory is a caller-owned writable temporary-work parent; jobs clean their private subdirectory. cacheDir is an explicit persistent private plugin cache (a project-owned .cache/alda is valid); provision its verified SoundFont cache online before offline rendering. First use can download the same pinned bank/license as ordinary music. No cloud/TTS generation occurs. Install Alda 2.4.8 when the tool is missing, verify \`alda version\`, then retry; the API preserves the existing pinned-version/bank verification failures. Output is fixed 44.1kHz stereo 16-bit FLAC with existing AudioRegion metadata: contentStartFrame/encoderDelayFrames/paddingFrames are zero, contentFrames includes non-loop release/reverb tail, cycleFrames is the musical cycle, and info.durationMs/markers describe score timing. loop:true folds the tail into the cycle; loop:false keeps it. bytes/credit/license use the existing LocalArtifact fields; preserve attribution with downstream files. This is an author-file API, not a larger playback budget: verify encoded 4 MiB and decoded 32 MiB host limits before embedding the file.
+
 Pipeline: Alda 2.4.8 → temporary MIDI → SpessaSynth Core 4.4.9 with FluidR3Mono GM 2.312 → 44.1kHz stereo PCM → **MP3 96 kbps stereo at 32kHz**. The deterministic 24-tap/256-phase resampler, fixed LAME encoder (@breezystack/lamejs 1.2.7) and verification decoder (mpg123-decoder 1.0.3) run in Node; no ffmpeg or FluidSynth installation is required. FLAC (libflacjs 5.6.0) is only an author-side master in \`.joplo/music-masters\`; it never enters the site, and there is no lossless publication switch. First rendering downloads the pinned, SHA-256-verified ~14.5MB SF3 and license to \`JOPLO_HOME/plugins/alda/cache/soundfonts/<hash>/\` (default ~/.joplo). The bank stays local. Published \`credits.txt\` and \`music-LICENSE.txt\` preserve bank attribution and full license even when Alda inspection is unavailable; missing artifact attribution blocks publication.
 
 To preinstall on a connected author machine, run this **from the project**:
