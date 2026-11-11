@@ -101,6 +101,15 @@ const content = definePlugin({ skillTopics: { patterns: { description: 'Recipes 
       const value = (ctx.state.ui.__plugins as { content?: { camera?: unknown } } | undefined)?.content?.camera;
       const parsed = Camera.safeParse(value ?? { targets: [] });
       if (!parsed.success) { ctx.report('CAMERA_INVALID', 'Invalid content camera state; use camera() with valid settings'); return; }
+      // 历史 DOM 缓存无法在深链/静帧重现同样的取景；在编译快照中明确提示，作者可改用稳定锚点。
+      const targets = new Set([...parsed.data.targets, ...parsed.data.sequence?.flatMap(p => p.targets) ?? []]);
+      for (const scene of scenes) {
+        const nodes = all(scene.root);
+        for (const id of targets) {
+          const node = nodes.find(n => n.id === id);
+          if (node && !ctx.isVisible(scene.id, id)) ctx.report('CAMERA_TARGET_HIDDEN', `Camera target "${id}" is hidden at position ${ctx.position}; its bounds cannot be measured and framing may fall back to the whole canvas. Aim camera() at an always-visible anchor, switch to a visible target, or reset with camera().`, node.source, 'warning');
+        }
+      }
       return { scenes: Object.fromEntries(scenes.map(s => [s.id, { camera: { ...parsed.data, ...(parsed.data.sequence ? { sequenceId: ctx.position === 0 ? 0 : (ctx.data as {cameraIssued?: boolean})?.cameraIssued ? ctx.position : (ctx.previousData as ContentFrame | undefined)?.scenes[s.id]?.camera.sequenceId ?? 0 } : {}), targets: parsed.data.targets.filter(id => all(s.root).some(n => n.id === id)) } }])) };
     },
   },

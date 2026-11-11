@@ -125,7 +125,7 @@ export type PluginCompileHooks = {
   /** 一个作者效果降级为数据及内核原语。targets 贡献普通取景；directorTarget 只选择层。writes 按作者顺序生成 set；data 是同一步之前的降级结果。 */
   effect?: (effect: PluginEffectDef, ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; data: unknown; report: PluginReport; source?: string; resourceInfo: (id: string) => LocalResourceInfo | undefined; resource: (request: { compiler: string; input: string }) => string }) => { data?: unknown; targets?: string[]; references?: string[]; writes?: PluginWrite[]; directorTarget?: string; media?: MediaCommand[]; /** 这一步至少停留多久（引擎毫秒，0–60000，D98）：逐字打代码、播放片段等比阅读更长的效果。 */ holdMs?: number } | void;
   /** 编译器回放基础效果后，计算第 0 步及每一步的完整绘制快照。 */
-  frame?: (ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; state: PluginState; previousState?: PluginState; resolveProps: (node: PluginIRNode, previous?: boolean) => Record<string, unknown>; data: unknown; previousData: unknown; position: number; report: PluginReport }) => unknown;
+  frame?: (ctx: { roots: readonly PluginIRNode[]; scenes: readonly PluginScene[]; state: PluginState; previousState?: PluginState; resolveProps: (node: PluginIRNode, previous?: boolean) => Record<string, unknown>; /** 当前快照的声明式可见性，包含祖先条件与舞台断点；不测量 DOM。 */ isVisible: (sceneId: string, nodeId: string) => boolean; data: unknown; previousData: unknown; position: number; report: PluginReport }) => unknown;
 };
 /** Author-only requests never enter IR. Local compilers run in a bounded Node process. */
 export type ResourceRequest = { id: string; plugin: string; compiler: string; input: string; source?: string };
