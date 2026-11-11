@@ -24,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { build as viteBuild, createServer, type Rollup } from 'vite';
-import { stepIdentity, type StepIdentity, hasScope, JoploError, entriesOf, entryOf, visibleRoutes, pruneMessages, resolveScope, scopeProject, type Project, type ScopeInfo } from '@joplo-app/core';
+import { stepIdentity, type StepIdentity, hasScope, JoploError, entriesOf, entryOf, visibleRoutes, pruneMessages, resolveScope, scopeProject, type Project, type ScopeInfo, type Diagnostic } from '@joplo-app/core';
 import type { BuildOptions, BuildResult } from './contract.ts';
 import { compileProject } from './project.ts';
 import { joploProjectPlugin, kitAliases, locateWebAssets, realProjectDir } from './vite-shared.ts';
@@ -183,6 +183,16 @@ export async function buildSite(opts: BuildOptions): Promise<BuildResult> {
     mediaCredits = resources.credits;mediaLicenses=resources.licenses;
     if(resources.diagnostics.some(d=>d.severity==='error'))throw new JoploError('EXPORT_FAILED','Audio attribution is incomplete; no site was published',{diagnostics:resources.diagnostics});
   }
+  // Explicit speech must be deliverable in this selected publication. Timing-only
+  // holdFor.audio references may remain estimated and are not playback requirements.
+  const missingSpeech: Diagnostic[] = Object.values(project.scenarios).flatMap(sc => sc.steps.flatMap(step => {
+    if (!step.audio) return [];
+    const asset = project.mediaAssets?.[step.audio.slice('joplo-resource:'.length)];
+    if (typeof asset === 'string' && /^data:audio\/[^;,]+;base64,[A-Za-z0-9+/]+={0,2}$/.test(asset)) return [];
+    return [{ severity: 'error' as const, source: 'structure' as const, code: asset === undefined ? 'AUDIO_ASSET_MISSING' : 'AUDIO_ASSET_INVALID',
+      at: step.source, message: `${step.id}: explicit narration audio is missing or is not a prepared audio asset. Prepare or repair it before building; no voice provider was called.` }];
+  }));
+  if (missingSpeech.length) throw new JoploError('EXPORT_FAILED', 'Explicit narration audio is unavailable; no site was published', { diagnostics: missingSpeech });
   binaryAssets(project, {diagnostics:compiled.diagnostics});
   const inline: { project: Record<string, unknown>; home: string | null; scoped?: true } = publishPayload(project, compiled.home);
   if (scope) inline.scoped = true;
