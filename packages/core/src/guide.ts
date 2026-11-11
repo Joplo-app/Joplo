@@ -180,7 +180,24 @@ Declare both success and recovery cases in the feature. View code belongs to the
 - set(path, value) replaces; push(path, value) appends; patch(path, object) expands to sets (nested objects replace, not deep-merge). go(route) navigates in this work; back returns to the prior route.
 - stream(path, text, { pace? }) writes like set, but during playback the bound text appears character by character (a model answering, speech being transcribed); jumps, screenshots and deep links show the full text. When the new value starts with the old one, only the added characters stream, so write each step's full value (previous text + the new words) rather than juggling separate fragments. pace: 'voice' spreads the new characters over this step's narrate()/say() line, so the words land as they are spoken; the default pace is model-output speed. Only a plain text child bound to the path streams ({$.ui.reply}); stream values are translated like other on-screen text, so keep every language's successive values prefix-consistent.
 - toast(text), toast.success/error/info(text) show an engine message. done(result, outcome?) ends a scenario; outcomes success/failure/cancelled must agree with flow's badge. uses(ruleKey, ...) links rules; it is an effect, not a flow method.
-- free.click/type/select/toggle/drag/hover/scroll/act in work.free declare local reactions. free is a named object, not an array: free: { open: free.click('open', set($.ui.open, true)) }. Only set, push and toast are local effects; navigation, completion and media remain scripted. Play/jump/scenario/reset discard the local layer.
+- free.click/type/select/toggle/drag/hover/scroll/act in work.free declare local reactions for gestures an element cannot carry itself. free is a named object, not an array: free: { pick: free.select('year', '1984', set($.ui.era, 'mac')) }. Only set, push and toast are local effects; navigation, completion and media remain scripted. Play/jump/scenario/reset discard the local layer. For a click, write onClick on the element instead (next section).
+
+## Element events (onClick)
+Give a button, link, menu item or other interactive element its behavior where it is drawn, so the script and a viewer who takes over run the same effects:
+\`\`\`tsx
+// props on interactive elements from an installed plugin (read its skill for the component names)
+id="btn_invite"   disabled={not($.ui.isAdmin)} onClick={[set($.ui.inviteOpen, true), uses('admin_only')]}
+id="btn_cancel"   onClick={set($.ui.inviteOpen, false)}
+id="nav_settings" onClick={go('/settings')}
+// the step only says what the viewer does and why
+flow('Invite a teammate').click('btn_invite', 'The admin opens the invite dialog')
+\`\`\`
+- onClick takes one effect or an array: set, push, toast, go and uses. A scripted .click(id) runs the element's onClick first, then the step's own effects. Keep captions, narrate(), say(), camera and focus cues, done(), and the .system() response in the steps.
+- Do not repeat the element's writes in the step (STEP_REPEATS_EVENT). Step effects stay available for what only this moment of the story does.
+- After the viewer pauses, every element with onClick works as a local reaction: go() changes page locally, uses() only links rules. Play, jump, scenario change and reset discard the local layer. A page reached only locally never advances the script; the next step still belongs to the timeline's page.
+- One id has one behavior per work: an id that appears on several pages (a layout nav link) needs the same onClick everywhere (EVENT_CONFLICT). Do not also declare work.free for that click (FREE_EVENT_CONFLICT).
+- Only onClick takes effects for now (EVENT_UNSUPPORTED). Inputs keep value={$.ui.name} and the typed value; put follow-up reactions in the step.
+- Give the controls a viewer will try (cancel, close, back, navigation) an onClick instead of marking them unmodeled; keep unmodeled for what this work deliberately leaves out.
 
 ## Reusable effect factories
 Step arguments and card effects accept nested arrays, flattened in order. Compose helpers that return patch() plus other effects instead of copying transition state. Only done() completes a scenario; unknown effect objects report EFFECT_INVALID.
@@ -325,13 +342,13 @@ The engine renders scripted state at step k, plus disposable local exploration. 
 ## Playback and free exploration
 - The first picture-changing input while playing pauses and applies the same input. Matching the next script action advances once and stays stopped, including before a following system step. It behaves like manual pause followed by that input.
 - Declared work.free reactions remain available in build/share and review publications after scope filtering. Verify a non-scripted action in the actual published site, then reset; local effects must disappear without changing timeline state.
-- Arbitration: exact next action → reachable other scenario on the same stage (confirm first) → declared free reaction/native local behavior → existing hint. Type, value, target and plugin payload all matter; a bare click cannot complete a typing action.
+- Arbitration: exact next action → reachable other scenario on the same stage (confirm first) → element onClick, declared free reaction or native local behavior → existing hint. Type, value, target and plugin payload all matter; a bare click cannot complete a typing action.
 - Blank/noninteractive clicks only pause, with no local-change notice. Covers/transition cards remain inert. Hover never pauses; while paused it matches normally. Touch tap completing hover follows the click rule.
 - Pointerdown pauses immediately and the same drag continues. A declared element drag owns its pointer before stage pan or plugin orbit: the source follows the pointer (also inside scaled pictures) and is transparent to hit tests while dragged. On release the engine picks the destination under the pointer, else the one the dragged element overlaps most, else the nearest within about 48 stage px; with none it snaps back and changes nothing. Esc, a cancelled pointer, a window blur or a hidden page also snap back; a second finger or pointer never takes over a drag in progress. Known limit (0.3.0): that 48 px is measured in the outer stage scale, not the scale of a picture plugin inside it, so the "nearby" tolerance is larger in a shrunk picture and smaller in a magnified one — make endpoints big enough and keep unrelated endpoints apart. The first wheel event pauses and scrolls; keep the burst/inertia in its scroll container before stage zoom.
 - Playback controls stay outside stage input. Editing keys stay with a focused editable control. Plugin actions enter the same arbiter; never independently advance the timeline.
 - Sequential playback is the default everywhere (board, published site, embed, render --chain): when a scenario finishes during playback, the next scenario starts at once — no countdown, no end card. The order follows from chains first (a chapter that continues another plays right after it, wherever it is declared), then declaration order. A from chapter continues in the same shot; a scenario marked flow('Slice title', { autoplay: false }) is skipped together with the chapters that continue it, and playing such a branch stops at its end. Pausing, exploring, a pending scenario switch or stepping manually never jumps ahead; the replay / next-case controls appear only when the whole sequence has finished. Declare scenarios in viewing order.
 - Play, jump, scenario change and reset discard local effects. Screenshots, video, deep links and __JOPLO_STATE__ always read the timeline. Frozen in-flight previews must not paint over accepted local edits; preserve their original anchor for reset/resume.
-- Use native controls from installed plugins and read their skills for supported edits. Use work.free for declared secondary reactions; keep lasting results in scripted effects. Test actual inputs, not only autoplay.
+- Use native controls from installed plugins and read their skills for supported edits. Give clickable elements onClick so they work after takeover; use work.free for other declared secondary reactions; keep lasting results in scripted effects. Test actual inputs, not only autoplay.
 
 ## Actions and the shared clock
 - Scripted scroll is a timeline projection: returning to an earlier step, resetting, or switching scenarios on the same stage restores the initial scroll baseline and applies only the selected prefix. Test 0 → scrolled step → 0 and a scenario without scrolling. Pausing an in-flight scroll keeps its intermediate position; ordinary render frames must not reset it.
@@ -579,7 +596,13 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - FROM_UNKNOWN (error): copy an existing slice key from the diagnostic's available-slices list; omit from for normal chapter continuation, or use from: null to restart.
 - WORK_EMPTY (info): add the first entry under scenarios, for example opening: chapter('Opening').system('Begin', narrate('Hello')). An empty work remains visible locally but is skipped in publish/review; explicit build --work selection fails.
 - WORK_DRAFT_SKIPPED (info): a draft was excluded from publish/review; remove draft: true only when it is ready. Explicit --work selection of a draft fails instead of publishing empty content.
-- FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID: give each free reaction a valid targeted action in this work and only set, append or toast with valid leaf state paths. Move navigation, completion, media and plugin effects into flow steps; do not add event callbacks.
+- FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID: give each free reaction a valid targeted action in this work and only set, append or toast with valid leaf state paths. Move navigation, completion, media and plugin effects into flow steps; for a click, use the element's onClick instead.
+- EVENT_EFFECT_INVALID: onClick takes effect helpers only (set, push, toast, go, uses; one or an array) with valid state paths. Move done(), camera, focus cues, narration and plugin effects into the step that clicks it.
+- EVENT_NOT_INTERACTIVE: the element cannot be clicked, so onClick would never run; put it on a button, link, menu item or other interactive component.
+- EVENT_UNSUPPORTED: only onClick takes effects for now; bind inputs with value={$.ui.x} and put other reactions in steps or work.free.
+- EVENT_CONFLICT: the same id has different onClick on two stages of one work; give the elements different ids, or make the behavior identical (shared layout links).
+- FREE_EVENT_CONFLICT: a work.free click reaction duplicates an element's onClick; move its effects into onClick and delete the free entry.
+- STEP_REPEATS_EVENT (warning): the step writes a path its target's onClick already writes; delete the write from the step.
 - ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID / PLUGIN_ACTION_INVALID: check the action shape, enabled plugin declaration, exact payload fields/ranges, allowed target type, and drag/scroll endpoint. Read the plugin skill; keep endpoints in the current stage, then rerun check.
 - UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
 - UNKNOWN_PLUGIN / PLUGIN_PARENT / PLUGIN_INVALID / PLUGIN_DUPLICATE / PLUGIN_RUNTIME_MISSING: plugin components need their package in config({ plugins: [...] }) once, written inside the parent named in the message; a missing runtime means reinstall the package (npx joplo skill plugins).
@@ -587,7 +610,7 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - PLUGIN_DATA_INVALID: plugin output failed its JSON/schema contract, or the complete published IR exceeds depth 100 after shared references are expanded (root depth 0, including primitive leaves). For depth errors, flatten the cache or replace nested objects with string ids, then rebuild and verify that the published output can be compared with itself. See npx joplo skill plugins for the output contract.
 - MISSING_ID / DUPLICATE_ID: Give interactive elements stable ids unique within the stage; update step references.
 - EFFECT_INVALID: Use documented helpers, with arrays for composition. Arbitrary or misspelled effect objects are rejected, never interpreted as done().
-- FUNCTION_PROP: Replace onClick and other callbacks with flow steps and state effects.
+- FUNCTION_PROP: callbacks never run. Write onClick={set(...)} / onClick={[...]} with effects, or put the behavior in flow steps.
 - UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE: Check case, rule, and reference keys and their owning work.
 - UNKNOWN_SLOT / UNKNOWN_ROUTE / UNKNOWN_LAYOUT: Check routes, layouts, and Slot declarations; add elements only to existing locations.
 - FEATURE_ORDER_INVALID: feature({ order }) must be a finite number; omit it for natural folder-name order. NaN, Infinity and strings are invalid.

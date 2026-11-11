@@ -44,7 +44,7 @@ test('原样 check、缺省目录、text 和 DomainResult JSON 输出', async ()
 test.each([
   ['UNKNOWN_COMPONENT', option, (s: string) => s.replace('export default work', 'const Bogus = "Bogus";\nexport default work').replace('<Button id="btn_invite"', '<Bogus id="btn_invite"').replace('邀请成员\n        </Button>', '邀请成员\n        </Bogus>'), '<Bogus', 1],
   ['MISSING_ID', option, (s: string) => s.replace('id="btn_invite" ', ''), '<Button disabled=', 1],
-  ['FUNCTION_PROP', option, (s: string) => s.replace('<Button id="btn_invite"', '<Button onClick={() => {}} id="btn_invite"'), '<Button onClick=', 1],
+  ['FUNCTION_PROP', option, (s: string) => s.replace('<Button id="btn_undo_revoke"', '<Button onClick={() => {}} id="btn_undo_revoke"'), '<Button onClick=', 1],
   ['UNKNOWN_CASE', option, (s: string) => s.replace("cases: ['no_permission']", "cases: ['absent']"), "denied: flow(", 1],
   ['ASSUMPTION_CONFIRMED', feature, (s: string) => s.replace("origin: 'user', status: 'confirmed'", "status: 'confirmed'"), "admin_only: rule(", 1],
   ['UNBOUND_INTERACTIVE', option, (s: string) => s.replace('<Group justify="flex-end" gap="sm">', '<Group justify="flex-end" gap="sm">\n              <Button id="loose">新按钮</Button>'), '<Button id="loose"', 0],

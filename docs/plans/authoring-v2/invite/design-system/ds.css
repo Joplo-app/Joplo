@@ -1,0 +1,12 @@
+/* 产品自己的样式，随组件一起打进看板与发布站（提案 E3）。 */
+.ds-root { --ds-accent: #2f6fed; --ds-danger: #d64545; font: 14px/1.5 system-ui, sans-serif; }
+.ds-btn { border: 1px solid transparent; border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+.ds-btn--primary { background: var(--ds-accent); color: #fff; }
+.ds-btn--secondary { background: #fff; border-color: #d0d5dd; }
+.ds-btn--danger { background: var(--ds-danger); color: #fff; }
+.ds-btn:disabled { opacity: .5; cursor: not-allowed; }
+.ds-field { display: grid; gap: 4px; }
+.ds-field small { color: #667085; }
+.ds-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / .35); display: grid; place-items: center; }
+.ds-dialog { background: #fff; border-radius: 10px; min-width: 360px; padding: 16px; display: grid; gap: 12px; }
+.ds-dialog footer { display: flex; justify-content: flex-end; gap: 8px; }

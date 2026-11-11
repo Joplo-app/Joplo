@@ -93,6 +93,15 @@ export default work({
 - 没有路由页面时，编译器合成空白 `/` 页面。其标题是内部标记，不参与显示、翻译，也不出现在界面、大纲或发布站路径列表。作者不需要占位页面。
 - 裸目录缺少模块 / JSX 配置时，`check` / `dev` 必须能载入，或给出说明缺什么、如何补齐的诊断，不能只抛加载堆栈。
 
+### 元素事件（写法 v2 第一步，D109）
+
+可点击的元素自己带行为：`onClick={set($.ui.open, true)}` 或一个效果数组。只接受 `set`、`push`、`toast`、`go`、`uses`。
+
+- 剧本里 `.click(id)` 先执行这个元素的 `onClick`，再执行步骤自己写的效果。合并发生在编译场景之前，所以路径跟踪（`go` / `back`）看得到元素事件里的 `go()`。
+- 每个带事件的元素生成一条 `Work.free` 本地反应（键 `on-<id>`；`uses` 不进本地层）。观众暂停后点它，效果与剧本里那一步相同；`go()` 只在本地层换页面，播放、跳步、换切片、重置时丢弃。只在本地层到达的页面不会推进剧本。
+- 一件作品里同一个 id 只有一种行为：多个画面上同一 id 的 `onClick` 必须相同；不能再为它手写 `free` 点击反应。
+- 只有 `onClick`；输入框继续用 `value` 绑定和输入的值。完整计划见 `docs/plans/authoring-v2.md`。
+
 ## 3. IR v3
 
 `SCHEMA_VERSION = 3`。独立作品与功能下面的作品走同一段降级逻辑，不合成假的功能或隐藏作品。
@@ -188,6 +197,7 @@ compile 的 publish / review 模式先把 alternatives 的各项评审值归空�
 | `Feature.alternatives` | 作者 focus/tradeoffs/coverage 与编译推导 → dev 功能上按作品 id 的评审记录 → validate、outline、reviewManifest、翻译与 scope → 看板覆盖 / 取舍、大纲、私有清单；publish/review IR 同键值归空，再由发布白名单消费 |
 | `Work.roles/audience` | 独立作品作者字段 → Work；功能角色仍在 Feature → rolesOf、entries、翻译与语音 / 发布白名单 → 层级角色、字幕 / 朗读、给谁看、封面与首页 |
 | `Work.sequencing`、`Scenario.from` | chapter 声明顺序 / 例外 → 编译期一次解析 → playSequence、entries → 编号、封面、连续播放与链式导出 |
+| `Work.free`（元素事件生成） | 元素 `onClick` → 编译期从节点 props 取出（不进 IR 节点）→ 合并进点击步骤的 `Step.effects`，并生成 `on-<id>` 本地反应 → `stateAt` / 回放读步骤；`arbitrateAction` / `playgroundState` / `shownSceneOf` 读本地反应 → 播放、深链、截图只读时间线；观众接管时看板、发布站与嵌入在本地层执行，范围发布保留本地跳转能到达的画面 |
 | `Work.draft` | 独立作品 draft → dev IR → 发布归属与模式过滤 → 本地草稿标记、构建跳过诊断；不存公开 IR |
 | 机器输出 `works/workId` | IR 投影、评审清单与反馈归一化 → JSON / NDJSON、本地会话与云端边界 → CLI、Agent、看板与云端读取方 → 按作品筛选、评审与回写 |
 
@@ -198,6 +208,12 @@ compile 的 publish / review 模式先把 alternatives 的各项评审值归空�
 | `WORK_INVALID` | error | 按具体原因分别报告：默认导出必须为 work；title / summary 各自非空；scenarios 为 flow/chapter 对象且切片条目有效；stage 必须 JSX、layers 必须层级对象，两者不能同写；无项目页面时需 stage/layers/on/routes。独立 order 非有限数字也用该代码并提供 work ref |
 | `PROJECT_MODULE_CONFIG` | error | 无 tsconfig 项目载入失败时，提示补 jsx: react-jsxdev、jsxImportSource 与 type: module；末尾 underlying error 带底层错误，继续排查依赖或作者代码，不只修 JSX |
 | `WORK_ID_CONFLICT` | error | 独立作品键与功能文件夹名重复，改其中一方 |
+| `EVENT_EFFECT_INVALID` | error | `onClick` 只接受 set / push / toast / go / uses（单个或数组）；完成、镜头、朗读、插件效果写在点它的步骤里 |
+| `EVENT_NOT_INTERACTIVE` | error | 元素不能点击，`onClick` 不会执行；放到按钮、链接、菜单项等可交互组件上 |
+| `EVENT_UNSUPPORTED` | error | 目前只有 `onClick` 接受效果；输入框用 `value` 绑定 |
+| `EVENT_CONFLICT` | error | 同一件作品里同一 id 在两个画面上的 `onClick` 不同；换 id 或让行为一致 |
+| `FREE_EVENT_CONFLICT` | error | 手写的 `free` 点击反应与元素 `onClick` 重复；把效果挪进 `onClick`，删掉 free |
+| `STEP_REPEATS_EVENT` | warning | 步骤写了被点元素 `onClick` 已经写的路径；从步骤里删掉 |
 | `WORK_SLICES_MIXED` | error | 同一作品混用章节与独立切片，统一 builder |
 | `WORK_FEATURE_ONLY` | error | 独立作品使用评审字段、切片 cases 或 uses；移除或挂到功能下 |
 | `WORK_STANDALONE_ONLY` | error | 功能下作品写 audience/roles/draft/order；共享角色和排序改放功能，独立字段留在独立作品 |

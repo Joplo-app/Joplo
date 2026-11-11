@@ -22,7 +22,7 @@ import { m } from '../i18n/messages';
  * - 热更新（setProject）保持功能、方案、场景、位置（越界夹到合法范围）、视图与选中。
  */
 import { EngineClock, gesturePoint, gestureProgress } from './clock';
-import { actionIndex, arbitrateAction, applyPlayground, pluginActionSpec, type Playground, type ActionEntry, type Action } from '@joplo-app/core/runtime';
+import { actionIndex, arbitrateAction, applyPlayground, pluginActionSpec, shownSceneOf, type Playground, type ActionEntry, type Action } from '@joplo-app/core/runtime';
 /** 手动单步之后时钟再走多久（引擎时间）：覆盖 content camera 默认 1.2s 的补间与 0.9s 的元素飞行。 */
 export const VISUAL_SETTLE_MS = 1200;
 import { dwellTexts } from '../player/cover-content';
@@ -303,7 +303,8 @@ export class DemoController {
     const st = this.snap.state;
     if (!p || !st) return null;
     const v = this.stageView.sceneId;
-    return v && p.scenes[v] && this.snap.view === 'stage' ? v : st.sceneId;
+    // 本地层里跳过的页面（元素 onClick 的 go）也算正在看的画面；层级画面仍以报告的为准
+    return shownSceneOf(st, this.snap.playground, v && p.scenes[v] && this.snap.view === 'stage' ? v : null);
   }
   setCursorEl = (el: HTMLElement | null) => {
     this.cursorEl = el;

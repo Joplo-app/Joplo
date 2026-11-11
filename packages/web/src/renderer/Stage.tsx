@@ -133,7 +133,8 @@ export function Stage({ project, state, theme, mode, selectedId = null, preview 
   const inputCount = inputs + touches + (freeMode ? 1 : 0);
   const inputFns = useRef({ onStageInput, onAction, freeMode, frame, touch });
   inputFns.current = { onStageInput, onAction, freeMode, frame, touch };
-  const shownId = sceneId ?? state.sceneId;
+  // 观众接管后，元素 onClick 的 go() 只在本地层换页面：报告的是时间线所在的页面时，显示本地层的页面（与 core shownSceneOf 同一规则）
+  const shownId = sceneId && sceneId !== state.sceneId ? sceneId : viewState.sceneId;
   const scene = project.scenes[shownId];
   const vp = viewportOverride ? (typeof viewportOverride === 'string' ? VIEWPORTS[viewportOverride] : viewportOverride) : VIEWPORTS[scene?.viewport === 'mobile' ? 'mobile' : 'desktop'];
   const [dialogLayer, setDialogLayer] = useState<HTMLDivElement | null>(null);

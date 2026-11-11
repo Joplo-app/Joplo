@@ -81,7 +81,6 @@
   "发送失败": "Couldn't send",
   "正在发送邀请…": "Sending invite…",
   "取消": "Cancel",
-  "取消并关闭：本版未建模，是否保留已填内容待决定": "Cancel and close: not modeled in this version; whether to keep the input is undecided",
   "发送邀请": "Send invite",
   "正在发送，防止重复提交": "Sending; the button is locked to prevent a double send",
   "撤销这个邀请？": "Revoke this invite?",
@@ -145,5 +144,7 @@
   "失败：邮箱格式无效": "Failed: invalid email address",
   "2 个邀请已发送，1 个失败": "2 invites sent, 1 failed",
   "部分完成：失败项可以单独重试": "Partly done: retry the failed one on its own",
-  "2 个成功、1 个失败，逐个显示结果": "2 succeeded and 1 failed, with a result for each"
+  "2 个成功、1 个失败，逐个显示结果": "2 succeeded and 1 failed, with a result for each",
+  "已复制邀请链接": "Invite link copied",
+  "取消并关闭；再次打开时是否保留已填内容待决定": "Cancel and close; whether to keep what was entered when it reopens is still open"
 }

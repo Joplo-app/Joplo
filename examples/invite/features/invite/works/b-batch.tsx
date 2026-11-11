@@ -11,7 +11,7 @@ export default work({
   on: {
     '/members': {
       'header.actions': (
-        <Button id="btn_batch" variant="outline" disabled={not($.ui.isAdmin)} disabledReason="只有空间管理员可以邀请成员">
+        <Button id="btn_batch" variant="outline" disabled={not($.ui.isAdmin)} disabledReason="只有空间管理员可以邀请成员" onClick={go('/members/invite')}>
           批量邀请
         </Button>
       ),
@@ -56,7 +56,7 @@ export default work({
 
   scenarios: {
     partial: flow('批量邀请，其中一个失败', { cases: ['happy'], mock: '模拟部分失败' })
-      .click('btn_batch', '点击「批量邀请」进入独立页面', go('/members/invite'))
+      .click('btn_batch', '点击「批量邀请」进入独立页面')
       .type('in_emails', 'a@company.com\nb@company.com\nbad@', '输入三个邮箱（含一个错的）')
       .select('sel_batch_role', '编辑者')
       .click('btn_batch_send', uses('partial_result'))

@@ -30,7 +30,13 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - FROM_UNKNOWN (error): copy an existing slice key from the diagnostic's available-slices list; omit from for normal chapter continuation, or use from: null to restart.
 - WORK_EMPTY (info): add the first entry under scenarios, for example opening: chapter('Opening').system('Begin', narrate('Hello')). An empty work remains visible locally but is skipped in publish/review; explicit build --work selection fails.
 - WORK_DRAFT_SKIPPED (info): a draft was excluded from publish/review; remove draft: true only when it is ready. Explicit --work selection of a draft fails instead of publishing empty content.
-- FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID: give each free reaction a valid targeted action in this work and only set, append or toast with valid leaf state paths. Move navigation, completion, media and plugin effects into flow steps; do not add event callbacks.
+- FREE_ACTION_INVALID / FREE_TARGET_MISSING / FREE_EFFECT_INVALID: give each free reaction a valid targeted action in this work and only set, append or toast with valid leaf state paths. Move navigation, completion, media and plugin effects into flow steps; for a click, use the element's onClick instead.
+- EVENT_EFFECT_INVALID: onClick takes effect helpers only (set, push, toast, go, uses; one or an array) with valid state paths. Move done(), camera, focus cues, narration and plugin effects into the step that clicks it.
+- EVENT_NOT_INTERACTIVE: the element cannot be clicked, so onClick would never run; put it on a button, link, menu item or other interactive component.
+- EVENT_UNSUPPORTED: only onClick takes effects for now; bind inputs with value={$.ui.x} and put other reactions in steps or work.free.
+- EVENT_CONFLICT: the same id has different onClick on two stages of one work; give the elements different ids, or make the behavior identical (shared layout links).
+- FREE_EVENT_CONFLICT: a work.free click reaction duplicates an element's onClick; move its effects into onClick and delete the free entry.
+- STEP_REPEATS_EVENT (warning): the step writes a path its target's onClick already writes; delete the write from the step.
 - ACTION_INVALID / ACTION_UNKNOWN / ACTION_DATA_INVALID / ACTION_TARGET_INVALID / ACTION_DESTINATION_MISSING / ACTION_DESTINATION_INVALID / PLUGIN_ACTION_INVALID: check the action shape, enabled plugin declaration, exact payload fields/ranges, allowed target type, and drag/scroll endpoint. Read the plugin skill; keep endpoints in the current stage, then rerun check.
 - UNKNOWN_COMPONENT: Choose a supported name from components; do not invent components.
 - UNKNOWN_PLUGIN / PLUGIN_PARENT / PLUGIN_INVALID / PLUGIN_DUPLICATE / PLUGIN_RUNTIME_MISSING: plugin components need their package in config({ plugins: [...] }) once, written inside the parent named in the message; a missing runtime means reinstall the package (npx joplo skill plugins).
@@ -38,7 +44,7 @@ Example: features/invite/works/a.tsx:12:5  warning  UNBOUND_INTERACTIVE  Interac
 - PLUGIN_DATA_INVALID: plugin output failed its JSON/schema contract, or the complete published IR exceeds depth 100 after shared references are expanded (root depth 0, including primitive leaves). For depth errors, flatten the cache or replace nested objects with string ids, then rebuild and verify that the published output can be compared with itself. See npx joplo skill plugins for the output contract.
 - MISSING_ID / DUPLICATE_ID: Give interactive elements stable ids unique within the stage; update step references.
 - EFFECT_INVALID: Use documented helpers, with arrays for composition. Arbitrary or misspelled effect objects are rejected, never interpreted as done().
-- FUNCTION_PROP: Replace onClick and other callbacks with flow steps and state effects.
+- FUNCTION_PROP: callbacks never run. Write onClick={set(...)} / onClick={[...]} with effects, or put the behavior in flow steps.
 - UNKNOWN_CASE / UNKNOWN_RULE / INVALID_REFERENCE: Check case, rule, and reference keys and their owning work.
 - UNKNOWN_SLOT / UNKNOWN_ROUTE / UNKNOWN_LAYOUT: Check routes, layouts, and Slot declarations; add elements only to existing locations.
 - FEATURE_ORDER_INVALID: feature({ order }) must be a finite number; omit it for natural folder-name order. NaN, Infinity and strings are invalid.
@@ -117,4 +123,4 @@ Do not add fake steps just to silence the warning.
 When the user points to a stage element, read selection first for its exact location.
 
 Related topics: authoring, plugins, selection, diff
-<!-- joplo-skill 0.7.1 sha256:45414ac1c7246a50785c06edfeffd1369bc892375139c5504b4d21619bb81944 -->
+<!-- joplo-skill 0.7.1 sha256:be01007fbe64cfee5fbd8a10ce60fd31a012886674c6a8bb04250bcdddaef6d7 -->

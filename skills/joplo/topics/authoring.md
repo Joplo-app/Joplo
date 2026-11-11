@@ -126,7 +126,24 @@ Declare both success and recovery cases in the feature. View code belongs to the
 - set(path, value) replaces; push(path, value) appends; patch(path, object) expands to sets (nested objects replace, not deep-merge). go(route) navigates in this work; back returns to the prior route.
 - stream(path, text, { pace? }) writes like set, but during playback the bound text appears character by character (a model answering, speech being transcribed); jumps, screenshots and deep links show the full text. When the new value starts with the old one, only the added characters stream, so write each step's full value (previous text + the new words) rather than juggling separate fragments. pace: 'voice' spreads the new characters over this step's narrate()/say() line, so the words land as they are spoken; the default pace is model-output speed. Only a plain text child bound to the path streams ({$.ui.reply}); stream values are translated like other on-screen text, so keep every language's successive values prefix-consistent.
 - toast(text), toast.success/error/info(text) show an engine message. done(result, outcome?) ends a scenario; outcomes success/failure/cancelled must agree with flow's badge. uses(ruleKey, ...) links rules; it is an effect, not a flow method.
-- free.click/type/select/toggle/drag/hover/scroll/act in work.free declare local reactions. free is a named object, not an array: free: { open: free.click('open', set($.ui.open, true)) }. Only set, push and toast are local effects; navigation, completion and media remain scripted. Play/jump/scenario/reset discard the local layer.
+- free.click/type/select/toggle/drag/hover/scroll/act in work.free declare local reactions for gestures an element cannot carry itself. free is a named object, not an array: free: { pick: free.select('year', '1984', set($.ui.era, 'mac')) }. Only set, push and toast are local effects; navigation, completion and media remain scripted. Play/jump/scenario/reset discard the local layer. For a click, write onClick on the element instead (next section).
+
+## Element events (onClick)
+Give a button, link, menu item or other interactive element its behavior where it is drawn, so the script and a viewer who takes over run the same effects:
+```tsx
+// props on interactive elements from an installed plugin (read its skill for the component names)
+id="btn_invite"   disabled={not($.ui.isAdmin)} onClick={[set($.ui.inviteOpen, true), uses('admin_only')]}
+id="btn_cancel"   onClick={set($.ui.inviteOpen, false)}
+id="nav_settings" onClick={go('/settings')}
+// the step only says what the viewer does and why
+flow('Invite a teammate').click('btn_invite', 'The admin opens the invite dialog')
+```
+- onClick takes one effect or an array: set, push, toast, go and uses. A scripted .click(id) runs the element's onClick first, then the step's own effects. Keep captions, narrate(), say(), camera and focus cues, done(), and the .system() response in the steps.
+- Do not repeat the element's writes in the step (STEP_REPEATS_EVENT). Step effects stay available for what only this moment of the story does.
+- After the viewer pauses, every element with onClick works as a local reaction: go() changes page locally, uses() only links rules. Play, jump, scenario change and reset discard the local layer. A page reached only locally never advances the script; the next step still belongs to the timeline's page.
+- One id has one behavior per work: an id that appears on several pages (a layout nav link) needs the same onClick everywhere (EVENT_CONFLICT). Do not also declare work.free for that click (FREE_EVENT_CONFLICT).
+- Only onClick takes effects for now (EVENT_UNSUPPORTED). Inputs keep value={$.ui.name} and the typed value; put follow-up reactions in the step.
+- Give the controls a viewer will try (cancel, close, back, navigation) an onClick instead of marking them unmodeled; keep unmodeled for what this work deliberately leaves out.
 
 ## Reusable effect factories
 Step arguments and card effects accept nested arrays, flattened in order. Compose helpers that return patch() plus other effects instead of copying transition state. Only done() completes a scenario; unknown effect objects report EFFECT_INVALID.
@@ -148,4 +165,4 @@ For a long story use chapter() to inherit the previous ending by default; from i
 After editing, run check and actual playback. Use selection for the user's chosen element. Install skills again after changing config.plugins so agents discover the same vocabulary the compiler uses.
 
 Related topics: story, plugins, cases, demo, check
-<!-- joplo-skill 0.7.1 sha256:b20b8c83445ca8a3a349f9a411ffbcdebc8ca87f8659b6be07c4e6c813522f68 -->
+<!-- joplo-skill 0.7.1 sha256:554c83df3626cfb51537c89a49ff1a24dccb7262754397f9785f34396bb07927 -->

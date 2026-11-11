@@ -235,6 +235,8 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     if (ctx) list.push(ctx);
     return list;
   };
+  /** 每个画面的元素事件（写法 v2），编译剧本与本地反应时读取。 */
+  const sceneEvents = new Map<string, SceneEvents>();
   const composeScene = (route: RouteEntry, ctx: WorkContext | null): Scene => {
     const sceneId = ctx ? `${ctx.qid}@${route.path}` : `@${route.path}`;
     const page = route.page;
@@ -271,7 +273,9 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const base = tree as JNode;
     const rootJ: JNode = { ...base, type: base.type, children: [...base.children, ...overlays] };
     const ids = new Map<string, string | undefined>();
-    const root = toSceneNode(rootJ, 'root', ids, nodeCtx, null);
+    const events: SceneEvents = new Map();
+    const root = toSceneNode(rootJ, 'root', ids, { ...nodeCtx, events }, null);
+    sceneEvents.set(sceneId, events);
     const scene: Scene = { id: sceneId, workId: ctx?.qid ?? null, route: route.path, name: `${page.title}${ctx ? ` · ${ctx.def.title}` : ''}`, viewport: page.viewport ?? 'desktop', root };
     if (!diags.some(d => d.severity === 'error')) host.derive(scene);
     return scene;
@@ -343,8 +347,10 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
       }
       const rootJ: JNode = nodes.length === 1 ? nodes[0]! : { ...nodes[0]!, type: '#fragment', props: {}, children: nodes };
       const ids = new Map<string, string | undefined>();
-      const root = toSceneNode(rootJ, `layer_${lk}`, ids, nodeCtx, null);
       const sceneId = `${qid}~${lk}`;
+      const events: SceneEvents = new Map();
+      const root = toSceneNode(rootJ, `layer_${lk}`, ids, { ...nodeCtx, events }, null);
+      sceneEvents.set(sceneId, events);
       const scene: Scene = { id: sceneId, workId: qid, route: layerRoute, name: `${ld.title} · ${def.title}`, viewport: ld.viewport ?? 'desktop', root, layer: lk };
       if (!diags.some(d => d.severity === 'error')) host.derive(scene);
       addScene(scene);
@@ -362,6 +368,11 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     const layerSceneWith = (id: string): Scene | undefined => layerScenes.find((l) => findIn(l.scene.root, id))?.scene;
 
     const effectRoots = [...layerScenes.map(l => l.scene), ...[...sceneFor.values()].filter(x => x.workId === qid || !isIsolated && x.workId == null)];
+    /** 这件作品的观众会看到的画面：有层级时是各层，否则是每个路径在这件作品里的画面。 */
+    const viewScenes = hasLayers ? layerScenes.map(l => l.scene) : [...ctxRoutes].map(path => sceneFor.get(sceneOf(path))).filter((x): x is Scene => !!x);
+    /** 某一步（所在路径 route）点到的元素自带的 onClick。 */
+    const eventOf = (route: string, target: string): ElementEvent | undefined =>
+      hasLayers ? sceneEvents.get(layerSceneWith(target)?.id ?? '')?.get(target) : sceneEvents.get(sceneOf(route))?.get(target);
 
     const scenarioIds: Record<string, string[]> = {};
     // flow({ from }) 接力：按依赖顺序编译，被接的场景先编译，记下它结尾的路径与导演层；
@@ -383,16 +394,18 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
     /** 每个场景编译完之后的结尾：路径（按 go / back 推算）与导演层。 */
     const scenarioEnd = new Map<string, { route: string; director: string }>();
     for (const skey of orderedKeys) {
-      const fl = scenarioDefs[skey]!;
+      const authored = scenarioDefs[skey]!;
       const sid = `${qid}.${skey}`;
-      const fromEnd = fl.opts.from !== undefined && fl.opts.from !== skey ? scenarioEnd.get(fl.opts.from) : undefined;
-      if (fl.opts.from !== undefined && fl.opts.start !== undefined)
-        err('FROM_WITH_START', `flow({ from: ${JSON.stringify(fl.opts.from)}, start: ${JSON.stringify(fl.opts.start)} }): a scenario that continues another starts where that one ended; remove start (or remove from to start fresh)`, fl.source);
-      const start = fromEnd?.route ?? fl.opts.start ?? (isIsolated ? '/' : touched[0] ?? src.config.home ?? [...ctxRoutes][0]);
+      const fromEnd = authored.opts.from !== undefined && authored.opts.from !== skey ? scenarioEnd.get(authored.opts.from) : undefined;
+      if (authored.opts.from !== undefined && authored.opts.start !== undefined)
+        err('FROM_WITH_START', `flow({ from: ${JSON.stringify(authored.opts.from)}, start: ${JSON.stringify(authored.opts.start)} }): a scenario that continues another starts where that one ended; remove start (or remove from to start fresh)`, authored.source);
+      const start = fromEnd?.route ?? authored.opts.start ?? (isIsolated ? '/' : touched[0] ?? src.config.home ?? [...ctxRoutes][0]);
       if (!start || !ctxRoutes.has(start)) {
-        err('UNKNOWN_ROUTE', `Scenario ${sid} starts at unknown route ${start ?? '(none)'}`, fl.source);
+        err('UNKNOWN_ROUTE', `Scenario ${sid} starts at unknown route ${start ?? '(none)'}`, authored.source);
         continue;
       }
+      // 写法 v2：点击步骤先执行被点元素的 onClick，再执行步骤自己写的效果。页面跟踪（go / back）看得到合并后的效果。
+      const fl = Object.assign(Object.create(Object.getPrototypeOf(authored)) as typeof authored, authored, { steps: withElementEvents(authored.steps, start, eventOf, warn) });
       for (const c of fl.opts.cases ?? []) {
         if (!fdef?.cases?.[c]) err('UNKNOWN_CASE', `Scenario ${sid} covers case "${c}", which is not in feature.cases`, fl.source);
         else (scenarioIds[c] ??= []).push(sid);
@@ -484,6 +497,34 @@ export function compile(src: AuthoringProject, mode: CompileMode, opts: CompileO
         else effects.push(parsed.data);
       }
       free[key] = { action: a.data, effects, ...(reaction.source ? {source:rel(reaction.source)} : {}) };
+    }
+    // 元素事件生成本地反应：观众接管后点它，效果和剧本里那一步相同（uses 只是规则关联，不进本地层）
+    {
+      const seen = new Map<string, { json: string; at?: string }>();
+      for (const scene of viewScenes) for (const [target, ev] of sceneEvents.get(scene.id) ?? []) {
+        const effects: Step['effects'] = [];
+        for (const e of ev.effects) {
+          if (e.type === 'go') {
+            if (!ctxRoutes.has(e.route)) { err('UNKNOWN_ROUTE', `onClick go("${e.route}") on ${target} navigates to an unknown route`, ev.at); continue; }
+            effects.push({ type: 'navigate', sceneId: sceneOf(e.route) });
+          } else if (e.type === 'set' || e.type === 'append') effects.push({ type: e.type, path: e.path, value: e.value });
+          else if (e.type === 'toast') effects.push({ type: 'toast', text: e.text, tone: e.tone });
+        }
+        const parsed = effects.map(e => Effect.safeParse(e));
+        if (parsed.some(r => !r.success)) { err('EVENT_EFFECT_INVALID', `onClick on ${target} writes an invalid state path or value`, ev.at); continue; }
+        const json = JSON.stringify(effects);
+        const prev = seen.get(target);
+        if (prev) {
+          if (prev.json !== json) err('EVENT_CONFLICT', `${target} has a different onClick on two stages of work ${qid} (other location: ${rel(prev.at) ?? 'unknown'}); one id has one behavior, so give the elements different ids`, ev.at);
+          continue;
+        }
+        seen.set(target, { json, ...(ev.at ? { at: ev.at } : {}) });
+        if (!effects.length) continue;
+        const handWritten = Object.entries(free).find(([, r]) => r.action.type === 'click' && 'target' in r.action && r.action.target === target);
+        if (handWritten) { err('FREE_EVENT_CONFLICT', `Free reaction ${handWritten[0]} also handles clicks on ${target}, which has onClick; keep one: move its effects into onClick and delete the free reaction`, ev.at); continue; }
+        const key = eventFreeKey(target, free);
+        free[key] = { action: { type: 'click', target }, effects: parsed.map(r => r.data!), ...(ev.at && rel(ev.at) ? { source: rel(ev.at)! } : {}) };
+      }
     }
     if (fdef) out.features[fid].alternatives[qid] = { decisionFocus: strip ? '' : def.focus ?? '', tradeoffs: strip ? [] : def.tradeoffs ?? [], coverage };
     out.works[qid] = {
@@ -969,7 +1010,22 @@ function tagFrom(n: JNode, from: string): JNode {
 type ErrFn = (code: string, message: string, at?: string, severity?: 'error' | 'warning' | 'info') => void;
 
 /** JNode → IR 节点：展开 Fragment、文本变 #text、分离 Joplo 属性、生成非交互元素的 ID、检查 ID 唯一。 */
-type NodeCtx = { host: PluginCompiler; plugins: Record<string, PluginInfo>; report: ErrFn; rel: (s?: string) => string | undefined };
+type NodeCtx = { host: PluginCompiler; plugins: Record<string, PluginInfo>; report: ErrFn; rel: (s?: string) => string | undefined; events?: SceneEvents };
+/** 元素事件（写法 v2）：这一画面里每个元素 id 的 onClick 效果。只在编译期存在，不进 IR 节点。 */
+type ElementEvent = { effects: EffectDef[]; at?: string };
+type SceneEvents = Map<string, ElementEvent>;
+/** 元素事件里允许的效果：会改变画面状态的本地效果，加上规则关联。完成、镜头、朗读、插件效果属于剧本步骤。 */
+const EVENT_EFFECTS = new Set(['set', 'append', 'toast', 'go', 'uses']);
+/** onClick={effect} 或 onClick={[effect, [effect]]}；不是效果时返回 null。 */
+function eventEffects(v: unknown): EffectDef[] | null {
+  const out: EffectDef[] = [];
+  const rec = (x: unknown): boolean => {
+    if (Array.isArray(x)) return x.every(rec);
+    if (x && typeof x === 'object' && (x as { kind?: unknown }).kind === 'effect') { out.push(x as EffectDef); return true; }
+    return false;
+  };
+  return rec(v) && out.length ? out : null;
+}
 
 function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | undefined>, nc: NodeCtx, parentType: string | null): SceneNode {
   const { report: err, rel } = nc;
@@ -997,6 +1053,20 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   if (spec?.needsId && typeof rawId !== 'string' && !interactive) err('MISSING_ID', `<${n.type}> "${labelOf(n)}" requires an id`, at);
 
   const id = typeof rawId === 'string' ? rawId : `_${fallbackId}`;
+  for (const k of Object.keys(rest)) {
+    if (!/^on[A-Z]/.test(k)) continue;
+    const v = rest[k];
+    delete rest[k];
+    if (v === undefined) continue;
+    if (typeof v === 'function' && !isBind(v)) { err('FUNCTION_PROP', `<${n.type}> prop ${k} is a function, and callbacks never run. Give a button its behavior as effects, for example onClick={set($.ui.open, true)}, or put it in the flow steps`, at); continue; }
+    if (k !== 'onClick') { err('EVENT_UNSUPPORTED', `<${n.type}> ${k} is not supported yet; only onClick takes effects. Bind inputs with value={$.ui.name} and put other reactions in the steps`, at); continue; }
+    const effects = eventEffects(v);
+    if (!effects) { err('EVENT_EFFECT_INVALID', `<${n.type}> onClick must be effects, for example onClick={set($.ui.open, true)} or onClick={[set($.ui.open, true), go('/next')]}; got ${JSON.stringify(v)}`, at); continue; }
+    const bad = effects.find(e => !EVENT_EFFECTS.has(e.type));
+    if (bad) { err('EVENT_EFFECT_INVALID', `<${n.type}> onClick: ${bad.type === 'complete' ? 'done()' : `${bad.type}()`} cannot run when the viewer clicks. onClick takes set, push, toast, go and uses; put completion, camera, narration and plugin effects in the step that clicks it`, at); continue; }
+    if (!interactive) { err('EVENT_NOT_INTERACTIVE', `<${n.type}> "${labelOf(n)}" cannot be clicked, so onClick would never run; put it on a button, link or other interactive element`, at); continue; }
+    if (typeof rawId === 'string') nc.events?.set(rawId, { effects, ...(at ? { at } : {}) });
+  }
   if (ids.has(id)) err('DUPLICATE_ID', `Duplicate id "${id}" in the same stage (other location: ${rel(ids.get(id)) ?? 'unknown'})`, at);
   ids.set(id, at);
 
@@ -1004,7 +1074,7 @@ function toSceneNode(n: JNode, fallbackId: string, ids: Map<string, string | und
   for (const [k, v] of Object.entries(rest)) {
     if (v === undefined) continue; // 写了属性但值是 undefined（如 description={cond ? '…' : undefined}）= 没写
     if (typeof v === 'function' && !isBind(v)) {
-      err('FUNCTION_PROP', `<${n.type}> prop ${k} is a function. Put behavior in the work's flow steps instead of event callbacks`, at);
+      err('FUNCTION_PROP', `<${n.type}> prop ${k} is a function, and callbacks never run. Give a button its behavior as effects, for example onClick={set($.ui.open, true)}, or put it in the flow steps`, at);
       continue;
     }
     if (isNode(v)) {
@@ -1102,6 +1172,37 @@ function stepRouteBefore(steps: StepDef[], i: number, start: string): string {
     for (const e of st.effects) if (e.type === 'go') { stack.push(route); route = e.route; }
   }
   return route;
+}
+
+/**
+ * 写法 v2：把被点元素的 onClick 合并进点击步骤（元素效果在前，步骤自己的效果在后）。
+ * 按与 stepRouteBefore 相同的顺序跟踪路径，并且看得到合并进来的 go()，所以元素跳页之后的步骤在新页面上找目标。
+ */
+function withElementEvents(steps: StepDef[], start: string, eventOf: (route: string, target: string) => ElementEvent | undefined, warn: (code: string, message: string, at?: string) => void): StepDef[] {
+  let route = start;
+  const stack: string[] = [];
+  return steps.map((st) => {
+    if (st.action.type === 'back') route = stack.pop() ?? route;
+    let next = st;
+    const target = st.action.type === 'click' ? st.action.target : null;
+    const ev = target ? eventOf(route, target) : undefined;
+    if (target && ev) {
+      const writes = new Set(ev.effects.flatMap(e => e.type === 'set' || e.type === 'append' ? [e.path] : []));
+      const repeated = (st.effects as EffectDef[]).find((e): e is Extract<EffectDef, { type: 'set' | 'append' }> => (e.type === 'set' || e.type === 'append') && writes.has(e.path));
+      if (repeated) warn('STEP_REPEATS_EVENT', `This click on ${target} writes ${repeated.path}, which its onClick already writes; delete the write from the step (onClick runs first, then the step's own effects)`, st.source);
+      next = { ...st, effects: [...ev.effects, ...st.effects] };
+    }
+    for (const e of next.effects) if (e.type === 'go') { stack.push(route); route = e.route; }
+    return next;
+  });
+}
+
+/** 元素事件生成的本地反应用 on-<id> 作键；与作者写的 free 键重名时加序号。 */
+function eventFreeKey(target: string, taken: Record<string, unknown>): string {
+  const base = `on-${target}`.slice(0, 64);
+  let key = base;
+  for (let n = 2; Object.hasOwn(taken, key); n++) key = `${base.slice(0, 60)}-${n}`;
+  return key;
 }
 
 /** id 是 frameId 本身或它的子孙（在同一棵树里）。 */

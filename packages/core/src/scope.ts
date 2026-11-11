@@ -155,6 +155,8 @@ export function scopeProject(project: Project, scenarioIds: readonly string[], m
     useScene(s.initial.sceneId, sid);
     for (const st of s.steps) for (const e of st.effects) if (e.type === 'navigate') useScene(e.sceneId, sid);
     for (const l of Object.values(project.works[s.workId]?.layers ?? {})) useScene(l.sceneId, sid);
+    // 本地反应（元素 onClick 的 go）能到达的页面：观众接管后点得过去，范围发布也要带上
+    for (const r of Object.values(project.works[s.workId]?.free ?? {})) for (const e of r.effects) if (e.type === 'navigate') useScene(e.sceneId, sid);
   }
 
   const borrowed: ScopeBorrowed[] = [];
