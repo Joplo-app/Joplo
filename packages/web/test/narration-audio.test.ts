@@ -1,3 +1,4 @@
+import { prepareRegion } from '../src/runtime/audio-media';
 import { afterEach, expect, it, vi } from 'vitest';
 import { compile } from '@joplo-app/core';
 import { reviewSource } from '../../core/test/fixtures/review.ts';
@@ -23,9 +24,10 @@ it('explicit decoded dialogue uses the recording narrator output and never brows
   const audio: any = { currentTime: 0, createBufferSource: () => { const s = { buffer: null, playbackRate: { value: 1 }, start: vi.fn(), stop: vi.fn(), disconnect: vi.fn(), onended: null }; sources.push(s); return s; } };
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) })));
   const fallback = estimatedNarrator(); fallback.speak = vi.fn(() => null);
-  const voice = new RecordVoice({ output: () => ({ audio, connect: n => connected.push(n) }), decode: async () => ({ duration: .6 } as AudioBuffer), fallback });
+  const voice = new RecordVoice({ output: () => ({ audio, connect: n => connected.push(n) }), decode: async () => ({ duration: .6 } as AudioBuffer), provided: (_url, info) => { const buffer = { duration: .6 } as AudioBuffer; return { value: Promise.resolve({ buffer, region: prepareRegion(buffer, info), info }), release() {} }; }, fallback });
   await voice.prepare(null, [{ text: 'Actor line', role: 'actor', audio: 'data:audio/wav;base64,fixture' }]);
   const n = voice.narrator.speak('Actor line', 'actor', 2, 'data:audio/wav;base64,fixture')!;
+  await Promise.resolve();
   expect(n.source).toBe('clip'); expect(connected).toHaveLength(1); expect(sources[0].playbackRate.value).toBe(2);
   expect(voice.describe('Actor line', 'actor', 'data:audio/wav;base64,fixture')).toMatchObject({ durationMs: 600, source: 'clip' });
   sources[0].onended(); await n.done;
@@ -78,9 +80,10 @@ it('live and recorded supplied audio apply the same nonzero content region to pr
   expect(sources[0].start.mock.calls[0][2]).toBeCloseTo(.4);
   live.cancel(); await live.done; engine.destroy();
   const audio = new Audio();
-  const record = new RecordVoice({ output: () => ({ audio: audio as any, connect: () => {} }), decode: async () => buffer, fallback: estimatedNarrator() });
+  const record = new RecordVoice({ output: () => ({ audio: audio as any, connect: () => {} }), decode: async () => buffer, provided: (_url, info) => ({ value: Promise.resolve({ buffer, region: prepareRegion(buffer, info), info }), release() {} }), fallback: estimatedNarrator() });
   await record.prepare(null, [{ text: 'Line', role: 'actor', audio: 'data:audio/wav;base64,UklGRg==', audioInfo: info }]);
   const n = record.narrator.speak('Line', 'actor', 1, 'data:audio/wav;base64,UklGRg==', { audioInfo: info })!;
+  await Promise.resolve();
   expect(record.describe('Line', 'actor', 'data:audio/wav;base64,UklGRg==', info)).toMatchObject({ audioInfo: info, provided: true, file: null });
   expect(record.describe('Line', 'actor', 'data:audio/wav;base64,UklGRg==', info).durationMs).toBeCloseTo(400, 6);
   audio.currentTime = .1; expect(n.progress?.()).toBeCloseTo(.25);
@@ -135,4 +138,59 @@ it('immediate play binds the stage audio host before any animation frame, includ
   const previous=ctl.narrator;ctl.narrator=new Narrator();ctl.narrator.enabled=true;ctl.setScenario(sc.id,0,{quiet:true});
   const again=ctl.play();for(let i=0;i<30&&provided.mock.calls.length<2;i++)await Promise.resolve();
   expect(ctl.narrator).not.toBe(previous);expect(provided).toHaveBeenCalledTimes(2);ctl.stop();await again;
+});
+
+it('recording explicit audio enforces the shared encoded/PCM budgets without the legacy decode bypass', async () => {
+  const { MediaEngine } = await import('../src/runtime/media');
+  const decoded = vi.fn(async () => ({ duration: 100, sampleRate: 1000, length: 9 * 1024 * 1024, numberOfChannels: 1 } as AudioBuffer));
+  class Audio { sampleRate=1000;currentTime=0;destination={};resume(){return Promise.resolve();}close(){return Promise.resolve();}decodeAudioData=decoded; }
+  vi.stubGlobal('AudioContext',Audio);
+  const engine=new MediaEngine(), legacyDecode=vi.fn(async()=>{throw new Error('Explicit bypass');});
+  const record=new RecordVoice({output:()=>engine.narrationOutput(),decode:legacyDecode,provided:(url,info)=>engine.prepareNarration(url,info),fallback:estimatedNarrator()});
+  const huge='data:audio/wav;base64,'+'A'.repeat(Math.ceil(4*1024*1024/3)*4+4);
+  await record.prepare(null,[{text:'Huge encoded',role:null,audio:huge}]);
+  const encoded=record.narrator.speak('Huge encoded',null,1,huge)!;await encoded.done;
+  expect(encoded.failure?.()).toContain('encoded audio');expect(decoded).not.toHaveBeenCalled();
+  await record.prepare(null,[{text:'Huge PCM',role:null,audio:'data:audio/wav;base64,UklGRg=='}]);
+  const pcm=record.narrator.speak('Huge PCM',null,1,'data:audio/wav;base64,UklGRg==')!;await pcm.done;
+  expect(pcm.failure?.()).toContain('decoded PCM');expect(legacyDecode).not.toHaveBeenCalled();
+  expect(record.hasAudio).toBe(false);expect(engine.status().cache.encoded.pinned).toBe(0);expect(engine.status().cache.pcm.pinned).toBe(0);
+  expect(JSON.stringify(record.missing)).not.toContain('base64');record.dispose();engine.destroy();
+});
+
+it('recording prepare abort/cancel releases pending leases immediately and late results cannot populate facts', async () => {
+  const { MediaEngine } = await import('../src/runtime/media');
+  let resolveFetch!:(value:unknown)=>void,resolveDecode!:(value:AudioBuffer)=>void;
+  const decode=vi.fn(()=>new Promise<AudioBuffer>(r=>{resolveDecode=r;})),start=vi.fn();
+  class Audio {sampleRate=1000;currentTime=0;destination={};resume(){return Promise.resolve();}close(){return Promise.resolve();}decodeAudioData=decode;createBufferSource(){start();throw new Error('Late play');}}
+  vi.stubGlobal('AudioContext',Audio);vi.stubGlobal('fetch',vi.fn(()=>new Promise(r=>{resolveFetch=r;})));
+  const engine=new MediaEngine(),legacyDecode=vi.fn(async()=>{throw new Error('Explicit bypass');});
+  const record=new RecordVoice({output:()=>engine.narrationOutput(),decode:legacyDecode,provided:(url,info)=>engine.prepareNarration(url,info),fallback:estimatedNarrator()});
+  const abort=new AbortController();
+  const pendingFetch=record.prepare(null,[{text:'Pending',role:null,audio:'pending.wav'}],abort.signal);
+  expect(engine.status().cache.encoded.pinned).toBe(1);abort.abort();await pendingFetch;
+  expect(engine.status().cache.encoded.pinned).toBe(0);
+  resolveFetch({ok:true,arrayBuffer:async()=>new ArrayBuffer(4)});await new Promise(r=>setTimeout(r,0));expect(decode).not.toHaveBeenCalled();
+  const pendingDecode=record.prepare(null,[{text:'Pending PCM',role:null,audio:'data:audio/wav;base64,UklGRg=='}]);
+  while(!decode.mock.calls.length)await new Promise(r=>setTimeout(r,0));
+  expect(engine.status().cache.pcm.pinned).toBe(1);record.cancelPrepare();await pendingDecode;
+  expect(engine.status().cache.pcm.pinned).toBe(0);expect(engine.status().cache.encoded.pinned).toBe(0);
+  resolveDecode({duration:1,sampleRate:1000,length:1000,numberOfChannels:1} as AudioBuffer);await new Promise(r=>setTimeout(r,0));
+  expect(record.hasAudio).toBe(false);expect(record.identity().clips).toEqual([]);expect(start).not.toHaveBeenCalled();expect(legacyDecode).not.toHaveBeenCalled();record.dispose();engine.destroy();
+});
+
+it('explicit-only preparation keeps content/region facts, releases PCM, and reacquires/relinquishes the shared playback lease', async () => {
+  const { MediaEngine } = await import('../src/runtime/media');
+  const info={sourceSampleRate:1000,decodedFrames:1000,contentStartFrame:200,contentFrames:400,cycleFrames:400,encoderDelayFrames:50,paddingFrames:350,channels:1};
+  const sources:any[]=[];
+  class Audio {sampleRate=1000;currentTime=0;destination={};resume(){return Promise.resolve();}close(){return Promise.resolve();}decodeAudioData(){return Promise.resolve({duration:1,sampleRate:1000,length:1000,numberOfChannels:1} as AudioBuffer);}createBufferSource(){const s={buffer:null,playbackRate:{value:1},connect:vi.fn(),disconnect:vi.fn(),start:vi.fn(),stop:vi.fn(),onended:null};sources.push(s);return s;}}
+  vi.stubGlobal('AudioContext',Audio);const engine=new MediaEngine();
+  const record=new RecordVoice({output:()=>engine.narrationOutput(),decode:async()=>{throw new Error('Explicit bypass');},provided:(url,region)=>engine.prepareNarration(url,region),fallback:estimatedNarrator()});
+  const url='data:audio/wav;base64,UklGRg==';await record.prepare(null,[{text:'Only explicit',role:'actor',audio:url,audioInfo:info}]);
+  expect(record.hasAudio).toBe(true);expect(engine.status().cache.pcm.pinned).toBe(0);expect(engine.status().cache.encoded.pinned).toBe(0);
+  expect(record.describe('Only explicit','actor',url,info).durationMs).toBeCloseTo(400,6);expect(record.identity().clips).toHaveLength(1);
+  const identity=JSON.stringify(record.identity());expect(identity).not.toContain('base64');
+  const playing=record.narrator.speak('Only explicit','actor',1,url,{audioInfo:info})!;
+  while(!sources.length)await new Promise(r=>setTimeout(r,0));expect(engine.status().cache.pcm.pinned).toBe(1);
+  record.dispose();await playing.done;expect(engine.status().cache.pcm.pinned).toBe(0);expect(engine.status().cache.encoded.pinned).toBe(0);expect(sources[0].stop).toHaveBeenCalled();engine.destroy();
 });

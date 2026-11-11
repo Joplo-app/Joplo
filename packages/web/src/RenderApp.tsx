@@ -334,7 +334,9 @@ function RecordStage({ sampling,frameReadiness, viewportOverride, project, proje
   const engineBox = useRef<{ current: MediaEngine | null } | null>(null);
   const engine = () => engineBox.current?.current ?? null;
   // 真实旁白（#56）：有音频的段经媒体引擎播放并进录音轨，没有的按估算时长
-  const recordVoice = useMemo(() => voiceMode === 'real' ? new RecordVoice({ output: () => engine()?.narrationOutput() ?? null, decode: (b) => engine()?.decode(b) ?? Promise.reject(new Error('Media engine is not ready')), fallback: estimatedNarrator(), timingOnly: !captureAudio }) : null, [voiceMode, captureAudio]);
+  const recordVoice = useMemo(() => voiceMode === 'real' ? new RecordVoice({ output: () => engine()?.narrationOutput() ?? null, decode: (b) => engine()?.decode(b) ?? Promise.reject(new Error('Media engine is not ready')), fallback: estimatedNarrator(), timingOnly: !captureAudio, provided: (url, info) => engine()?.prepareNarration(url, info) ?? { value: Promise.reject(new Error('Recording audio host is unavailable')), release() {} } }) : null, [voiceMode, captureAudio]);
+
+  useEffect(() => () => recordVoice?.dispose(), [recordVoice]);
 
   const timeline = useRef<{ schemaVersion: 1; startedAt: number | null; events: Record<string, unknown>[] }>({ schemaVersion: 1, startedAt: null, events: [] });
   const ctl = useMemo(() => {

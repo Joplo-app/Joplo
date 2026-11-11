@@ -97,7 +97,7 @@ it('localResource guards stay outside recorded narration, measured hold and offl
   fs.symlinkSync(path.resolve('packages/server/node_modules/playwright-core'), path.join(dir, 'node_modules/playwright-core'), 'dir');
   const info = { sourceSampleRate: 8000, decodedFrames: 8000, contentStartFrame: 1600, contentFrames: 3200, cycleFrames: 3200, encoderDelayFrames: 0, paddingFrames: 3200, channels: 1 };
   fs.writeFileSync(path.join(dir, 'line-runtime.ts'), "import {defineRuntime} from '@joplo-app/kit/plugin';export default defineRuntime({id:'line',components:{}});");
-  fs.writeFileSync(path.join(dir, 'line-local.ts'), `export default {compilers:{wav:{version:'region-1',mime:'audio/wav',inspect:async()=>({durationMs:400}),compile:()=>({bytes:Uint8Array.from(${JSON.stringify([...wav(1)])}),audio:${JSON.stringify(info)}})}}};`);
+  fs.writeFileSync(path.join(dir, 'line-local.ts'), `export default {compilers:{wav:{version:'region-1',mime:'audio/wav',inspect:async()=>({durationMs:1000}),compile:()=>({bytes:Uint8Array.from(${JSON.stringify([...wav(1)])}),audio:${JSON.stringify(info)}})}}};`);
   fs.writeFileSync(path.join(dir, 'joplo.config.ts'), fixtureConfigSource("import {config} from '@joplo-app/kit'; import {definePlugin} from '@joplo-app/kit/plugin'; const line=definePlugin({id:'line',title:'Existing line',runtime:new URL('./line-runtime.ts',import.meta.url),local:new URL('./line-local.ts',import.meta.url),components:{}});export default config({name:'Region',plugins:[line]});"));
   fs.writeFileSync(path.join(dir, 'works/demo.tsx'), "import {work,chapter,say,hold,role} from '@joplo-app/kit';import {localResource} from '@joplo-app/kit/plugin';export default work({title:'Region',summary:'No guards',roles:{actor:role('Actor')},pace:{systemLead:0},stage:<div>Region</div>,scenarios:{intro:chapter('Intro').system('Existing actor',say('Actor text',{role:'actor',audio:localResource('line','wav','prepared')}),hold('voice',{pad:0}))}});");
   const { renderFilm } = await import('../src/film.ts');
@@ -136,3 +136,36 @@ it('samples video alongside supplied narration and delayed unducked sound across
   const pixels = fs.readdirSync(output.directory).filter(name => name.endsWith('.jpg')).map(name => crypto.createHash('sha256').update(fs.readFileSync(path.join(output.directory, name))).digest('hex'));
   expect(new Set(pixels).size).toBeGreaterThan(3);
 }, 120000);
+
+
+it('mixed cached TTS plus missing provided audio reports failure with zero billable work and no fallback', async () => {
+  const dir=fixture(false), project=(await checkWithProject(dir)).project!;
+  const store=new ProfileStore(dir,{});store.upsert('openai',{},'offline-test-key');
+  const cache=new VoiceCache(dir),resolved=resolveVoices(project.voiceConfig,cache.selection(),store);
+  const step=project.scenarios['demo.intro']!.steps[0]!;
+  const seg={stepId:step.id,text:step.narrate!,role:null}, plan=cache.plan(seg,resolved)!;
+  const bytes=wav(.6),file=`${crypto.createHash('sha256').update(bytes).digest('hex')}.wav`;
+  cache.adopt(plan.key,file,bytes,{stepId:step.id,fp:plan.fp,text:seg.text,locale:'und'});
+  project.scenarios['demo.intro']!.steps.push({...step,id:'demo.intro#2',narrate:'Missing provided',audio:'joplo-resource:missing'});
+  const fetch=vi.fn(()=>{throw new Error('No provider fallback');});
+  for(const dryRun of [false,true]){
+    const result=await generateProjectVoice({projectDir:dir,home:dir,project,dryRun,fetch});
+    expect(result.total).toMatchObject({missing:0,chars:0,generated:0,failed:1});
+    expect(result.locales[0]!.failed).toEqual([{stepId:'demo.intro#2',message:expect.stringContaining('no voice provider')}]);
+    expect(result.locales[0]!.details!.find(d=>d.stepId==='demo.intro#2')).toMatchObject({audio:'provided',missing:true,chars:0,estimatedBillableChars:0});
+  }
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it.skipIf(process.env.JOPLO_EXPORT_VIDEO !== '1')('explicit-only real video without BGM records an audio track', async () => {
+  const dir=fixture();
+  fs.symlinkSync(path.resolve('packages/server/node_modules/playwright-core'),path.join(dir,'node_modules/playwright-core'),'dir');
+  const {renderVideo}=await import('../src/film.ts');
+  const out=path.join(dir,'provided-only.webm');
+  const result=await renderVideo({projectDir:dir,scenarioId:'demo.intro',out,voice:'real',logicalViewport:{width:160,height:90},width:160,height:90});
+  expect(result.voice.missing).toEqual([]);
+  const {Input,ALL_FORMATS,BufferSource}=await import('mediabunny');
+  const input=new Input({formats:ALL_FORMATS,source:new BufferSource(fs.readFileSync(out))});
+  try {const audio=await input.getPrimaryAudioTrack();expect(audio).not.toBeNull();expect(await audio!.computeDuration()).toBeGreaterThan(.5);}
+  finally {input.dispose();}
+},120000);

@@ -130,6 +130,7 @@ export async function generateProjectVoice(opts: VoiceRunOptions): Promise<Voice
 
   let quota: VoiceQuota | null = live?.quota ? { ...live.quota } : null;
   const result: VoiceRunResult = { profile: { id: base.profile.id, name: base.profile.name, kind: base.profile.kind }, source: base.source, dryRun: !!opts.dryRun, locales: [], total: { segments: 0, missing: 0, chars: 0, generated: 0, failed: 0 }, quota, usageUrl, exhausted: null };
+  let billableFailed = 0;
   for (const locale of locales) {
     const p = locale ? localizeProject(project, locale) : project;
     const resolved = resolveVoices(project.voiceConfig, selected, store, voiceLocaleOf(project, locale), fallback, cache.pins(), cache.officialCloud());
@@ -149,7 +150,9 @@ export async function generateProjectVoice(opts: VoiceRunOptions): Promise<Voice
       if (planned) seen.add(planned.key);
       details.push({ workId: sc.workId, scenarioId: sc.id, stepId: st.id, text: seg.text, chars: seg.audio ? 0 : spokenChars(seg.text), missing, estimatedBillableChars, ...(seg.audio ? { audio: 'provided' as const } : {}) });
     }
-    const row: VoiceRunLocale = { details, locale, segments: segments.length, missing: est.steps, chars: est.chars, generated: 0, skipped: 0, failed: [] };
+    const providedFailed = details.filter(d => d.audio === 'provided' && d.missing).map(d => ({ stepId: d.stepId, message: 'Explicit audio resource is not prepared; no voice provider was called' }));
+    const row: VoiceRunLocale = { details, locale, segments: segments.length, missing: est.steps, chars: est.chars, generated: 0, skipped: 0, failed: providedFailed };
+    result.total.failed += providedFailed.length;
     result.locales.push(row);
     result.total.segments += segments.length;
     result.total.missing += est.steps;
@@ -167,7 +170,8 @@ export async function generateProjectVoice(opts: VoiceRunOptions): Promise<Voice
     });
     row.generated = summary.generated;
     row.skipped = summary.skipped;
-    row.failed = summary.failed;
+    row.failed.push(...summary.failed);
+    billableFailed += summary.failed.length;
     result.total.generated += summary.generated;
     result.total.failed += summary.failed.length;
     if (summary.quota) {
@@ -175,7 +179,7 @@ export async function generateProjectVoice(opts: VoiceRunOptions): Promise<Voice
       result.exhausted = { ...summary.quota, remainingSteps: 0 };
     } else if (summary.error) throw new VoiceError(summary.error.code as VoiceError['code'], summary.error.message);
   }
-  if (result.exhausted) result.exhausted.remainingSteps = result.total.missing - result.total.generated - result.total.failed;
+  if (result.exhausted) result.exhausted.remainingSteps = Math.max(0, result.total.missing - result.total.generated - billableFailed);
   result.quota = quota;
   return result;
 }
