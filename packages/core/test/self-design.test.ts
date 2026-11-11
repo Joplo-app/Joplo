@@ -27,13 +27,18 @@ describe('one real Joplo design workspace', () => {
     for (const id of original.works) expect(dev.works[id], id).toBeDefined();
     for (const id of original.scenarios) expect(dev.scenarios[id], id).toBeDefined();
     // film_form 保留稳定 ID；D102 修订已选定左栏章节清单，进入公开设计记录。
-    expect(dev.entryIds).toEqual([...order, 'film_form']);
+    expect(dev.entryIds).toEqual([...order, 'film_form', 'sampling-proof']);
   });
   it('publishes every feature with a visible design journey while keeping unpicked alternatives private', () => {
-    expect(published.entryIds).toEqual([...order, 'film_form']);
+    expect(published.entryIds).toEqual([...order, 'film_form', 'sampling-proof']);
     expect(published.features.film_form!.pick).toBe('film_form.a-chapters');
     expect(published.works['film_form.b-timeline']).toBeUndefined();
-    expect(Object.keys(published.works)).toHaveLength(order.length + 1);
+    // 采样证据是同项目独立作品；不会伪装成新的产品 Feature 或替换历史方案。
+    expect(published.features['sampling-proof']).toBeUndefined();
+    expect(published.works['sampling-proof']).toMatchObject({ id: 'sampling-proof' });
+    expect(published.works['sampling-proof']).not.toHaveProperty('featureId');
+    expect(Object.values(published.scenarios).filter(s => s.workId === 'sampling-proof').map(s => s.id)).toEqual(['sampling-proof.decode', 'sampling-proof.relay']);
+    expect(Object.keys(published.works)).toHaveLength(order.length + 2);
     expect(published.works['workbench_origin.a-fold']).toBeUndefined();
     expect(published.works['authoring_model.a-data']).toBeUndefined();
     for (const feature of [...original.entryIds, 'mobile_watch', 'content_i18n', 'storage_quota', 'cloud_usage', 'share_visibility']) {

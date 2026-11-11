@@ -356,7 +356,7 @@ describe('范围构建（scope，D75）', () => {
   beforeAll(() => {
     dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'joplo-scope-t-')));
     fs.cpSync(BOARD, dir, { recursive: true, filter: s => !/[/\\](node_modules|dist|exports|\.joplo)([/\\]|$)/.test(s.slice(BOARD.length)) });
-  installFixturePlugins(dir);
+    installFixturePlugins(dir, ['av']);
   });
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 
