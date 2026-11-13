@@ -1,6 +1,6 @@
 {
   "name": "@joplo-app/kit",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "description": "Joplo 创作 SDK：用 work、切片与步骤编写可播放、可上手体验的作品；功能评审为作品添加方案比较、情况与规则；含 JSX 运行时（收集为数据，不作为 React 执行）",
   "license": "PolyForm-Shield-1.0.0",
   "type": "module",

@@ -66,4 +66,4 @@ npx joplo feedback watch --share <share-id> --work <feature.option> --interval 1
 - AUTH_REQUIRED / AUTH_EXPIRED (exit 3): tell the user how to run npx joplo login; do not log in/out or switch accounts without their instruction. Permission, quota, and missing-share errors are not approvals.
 - If a command is unavailable, check the project's installed Joplo version and its skill output. Do not silently switch to another instance or use another project's credentials.
 - .joplo runtime state stays local, and local feedback is never uploaded just because a Share exists. Details: npx joplo skill review; source write-back and publishing: npx joplo skill publish.
-<!-- joplo-skill 0.7.3 sha256:87723bb405cbfda13d92eba1e4034232238371e10f9a70556a4c92477961cccd -->
+<!-- joplo-skill 0.8.0 sha256:87723bb405cbfda13d92eba1e4034232238371e10f9a70556a4c92477961cccd -->
