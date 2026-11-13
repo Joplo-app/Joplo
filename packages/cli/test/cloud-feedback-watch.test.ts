@@ -39,7 +39,8 @@ describe('cloud snapshot polling', () => {
     expect(io.events()[0]).toMatchObject({ source: 'cloud', shareId, workId: 'f.a', revision: '3', context: { scenarioId: 'f.a.main', route: null } });
     expect(new Set(io.events().map(e => e.eventId)).size).toBe(3);
     expect(io.err).toContain('not complete event history'); expect(io.out + io.err).not.toContain(key);
-    expect(request.mock.calls.every(c => c[0] === `/api/v1/shares/${shareId}/feedback` && c[2] === undefined)).toBe(true);
+    expect(request.mock.calls[0]![0]).toBe(`/api/v1/shares/${shareId}/feedback?cursor=0&limit=200`);
+    expect(request.mock.calls.slice(1).every(c => c[0] === `/api/v1/shares/${shareId}/feedback` && c[2] === undefined)).toBe(true);
   });
   it.each([10, 20, 30])('accepts a %i-second interval', async interval => {
     const { client, waits } = fixture([snapshot(), snapshot([], [decision()])]);
@@ -171,4 +172,61 @@ it.each([
   const io = capture();
   await expect(watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   expect(io.out).toBe('');
+});
+
+
+describe('cloud cursor polling', () => {
+  const page = (cursor: string, hasMore: boolean, comments: FeedbackComment[] = [], decisions: FeedbackDecision[] = []): Feedback => ({ ...snapshot(comments, decisions), nextCursor: cursor, hasMore });
+  it('recovers a comment resolved between polls and an approval already marked applied', async () => {
+    const resolved = { ...comment('c1'), resolvedAt: '2026-11-07T10:02:00.000Z', change: 'resolved' as const };
+    const applied = { ...decision(), appliedAt: '2026-11-07T10:03:00.000Z', change: 'applied' as const };
+    const { client, request } = fixture([page('41', false, [resolved]), page('42', false, [], [applied])]);
+    const io = capture();
+    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io)).toBe(0);
+    expect(io.events().map(e => e.type)).toEqual(['feedback', 'approved']);
+    expect(io.events().map(e => e.cursor)).toEqual(['41', '42']);
+    expect(request.mock.calls.map(call => call[0])).toEqual([
+      `/api/v1/shares/${shareId}/feedback?cursor=0&limit=200`,
+      `/api/v1/shares/${shareId}/feedback?cursor=41&limit=200`,
+    ]);
+  });
+  it('drains every page before emitting approval and coalesces multiple changes to one record', async () => {
+    const changed = { ...comment('c1'), change: 'reopened' as const };
+    const { client, request } = fixture([
+      page('1', true, [{ ...comment('c1'), change: 'created' as const }]),
+      page('2', false, [changed], [decision()]),
+    ]);
+    const io = capture();
+    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io)).toBe(0);
+    expect(io.events().map(e => e.type)).toEqual(['feedback', 'approved']);
+    expect(request).toHaveBeenCalledTimes(2); expect(io.err).toContain('Cloud cursor: 2');
+  });
+  it('does not treat a retracted historical pick as current approval', async () => {
+    const retracted = { ...decision('old'), retractedAt: '2026-11-07T10:02:00.000Z', change: 'retracted' as const };
+    const { client } = fixture([page('1', false, [], [retracted]), page('2', false, [], [decision('new')])]);
+    const io = capture();
+    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io)).toBe(0);
+    expect(io.events()).toHaveLength(1); expect(io.events()[0]).toMatchObject({ type: 'approved', cursor: '2', decision: { id: 'new' } });
+  });
+  it('resumes from an explicit opaque cursor without replaying older records', async () => {
+    const { client, request } = fixture([page('42', false, [comment('new')], [decision()])]);
+    const io = capture();
+    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', cursor: '41', json: true }, io.io)).toBe(0);
+    expect(request.mock.calls[0]![0]).toContain('cursor=41');
+    expect(io.events().every(event => event.cursor === '42')).toBe(true);
+  });
+  it('restarts a partial multi-page batch from its last committed cursor without dropping or duplicating output', async () => {
+    const { client, waits, request } = fixture([
+      page('1', true, [comment('c1')]), new CloudError('NETWORK'),
+      page('1', true, [comment('c1')]), page('2', false, [], [decision()]),
+    ]);
+    const io = capture();
+    expect(await watchCloudFeedback(client, shareId, { workId: 'f.a', json: true }, io.io)).toBe(0);
+    expect(io.events().map(e => e.type)).toEqual(['feedback', 'approved']);
+    expect(request.mock.calls.map(call => call[0])).toEqual([
+      `/api/v1/shares/${shareId}/feedback?cursor=0&limit=200`, `/api/v1/shares/${shareId}/feedback?cursor=1&limit=200`,
+      `/api/v1/shares/${shareId}/feedback?cursor=0&limit=200`, `/api/v1/shares/${shareId}/feedback?cursor=1&limit=200`,
+    ]);
+    expect(waits).toEqual([15000]);
+  });
 });

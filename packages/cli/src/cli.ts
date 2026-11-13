@@ -36,6 +36,10 @@ const cursor = (value: string) => {
   if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) throw new JoploError('USAGE', 'after must be a non-negative integer');
   return Number(value);
 };
+const position = (value: string) => {
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) throw new JoploError('USAGE', 'position must be a non-negative integer');
+  return Number(value);
+};
 const scale = (text: string) => {
   const n = Number(text);
   if (!Number.isFinite(n) || n <= 0) throw new JoploError('USAGE', 'scale must be positive');
@@ -53,6 +57,8 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
   }
   const envPassword = (deps.cloud?.env ?? process.env).JOPLO_SHARE_PASSWORD;
   if (envPassword && args.some(a => a === '--password' || a.startsWith('--password='))) secrets.add(envPassword);
+  const envVoiceKey = (deps.cloud?.env ?? process.env).JOPLO_VOICE_KEY;
+  if (envVoiceKey && args[0] === 'voice' && args[1] === 'key') secrets.add(envVoiceKey);
   const redact = (s: string) => { for (const token of secrets) for (const form of new Set([token, JSON.stringify(token).slice(1, -1), terminalText(token)])) if (form) s = s.split(form).join('[REDACTED]'); return s; };
   const writeStdout = (s: string) => (deps.stdout ?? (s => { process.stdout.write(s); }))(s);
   const stdout = (s: string) => writeStdout(redact(s));
@@ -88,7 +94,15 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     const { CloudClient } = await import('./cloud.ts');
     return new CloudClient(server, deps.cliVersion ?? await readCliVersion(), s => stderr(s + '\n'), s => secrets.add(s), { ...deps.cloud, format });
   };
+  const boardClient = async () => new (await import('./board.ts')).BoardClient(deps.cloud?.env ?? process.env);
+  const localInteractive = (outputFormat = 'text') => deps.interactive ?? (!!process.stdin.isTTY && !!process.stdout.isTTY && !process.env.CI && process.env.JOPLO_NONINTERACTIVE !== '1' && outputFormat !== 'json');
   const cloudCommand = (name: string) => program.command(name).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)');
+  const confirmDeletion = async (interactive: boolean, question: string, yes: boolean | undefined) => {
+    if (yes) return;
+    if (!interactive) throw new JoploError('USAGE', 'Deletion is disabled in non-interactive mode without --yes; no request was sent');
+    const ask = deps.ask ?? deps.cloud?.confirm ?? (await import('./setup.ts')).askYesNo;
+    if (!await ask(question)) throw new JoploError('USAGE', 'Deletion cancelled; nothing was deleted');
+  };
   const apiKeyNotice = 'JOPLO_API_KEY is set: cloud commands use the API key and ignore the saved login. Unset JOPLO_API_KEY to sign in with the browser';
   cloudCommand('login').description('Authorize the CLI in your browser').addOption(format()).option('--no-browser', 'Open the login URL manually').action(async opts => {
     const client = await cloudClient(opts.server, opts.format);
@@ -118,7 +132,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     if (opts.format === 'json') json(result(client.server, `${terminalText(data.user.email)} (${data.plan})`, data));
     else line(`${terminalText(data.user.email)} (${data.plan})${key ? `\n${key}` : ''}\nNew upload limit: ${data.limits.maxUploadBytes} bytes\nManifest total limit: ${data.limits.maxTotalBytes} bytes, ${data.limits.maxFiles} files\nPublications per hour: ${data.limits.publishesPerHour ?? 'Not provided by the server'}${data.storage ? `\nStorage: ${formatBytes(data.storage.usedBytes)} of ${formatBytes(data.storage.quotaBytes)} used` : ''}${data.voice ? `\n${voiceQuotaLine(data.voice)}` : ''}`);
   });
-  cloudCommand('voice').description('Generate missing narration audio for independent works and picked feature options (same cache as the board): Joplo Cloud narration when signed in, or the source chosen in the board or joplo.config.ts')
+  const voiceCommand = cloudCommand('voice').description('Generate missing narration audio for independent works and picked feature options (same cache as the board): Joplo Cloud narration when signed in, or the source chosen in the board or joplo.config.ts')
     .argument('[dir]', 'Project directory', '.').addOption(format())
     .option('--work <id>', 'Only this standalone work key or qualified feature work id')
     .option('--scenario <id>', 'Only this chapter and its continuing-chapter dependencies')
@@ -135,6 +149,51 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       else for (const l of r.lines) line(l);
       if (r.data.total.failed) exitCode = 1;
     });
+  voiceCommand.command('profiles').description('List voice sources, narrators, and non-secret key status from the running board').addOption(format()).action(async opts => {
+    const data = await (await import('./board-voice.ts')).boardVoiceProfiles(await boardClient());
+    if (opts.format === 'json') json(result('voice', `${data.profiles.length} voice profile(s)`, data));
+    else {
+      line(`Voice profiles: ${data.file}`);
+      for (const profile of data.profiles) line((await import('./board-voice.ts')).voiceProfileLine(profile));
+    }
+  });
+  voiceCommand.command('select').description('Select this project’s voice source in the running board').argument('[dir]', 'Project directory', '.')
+    .option('--profile <id>', 'Voice profile id (cloud, openai, elevenlabs, or a listed legacy id)').option('--browser', 'Use browser narration without a provider').addOption(format()).action(async (dir, opts) => {
+      if (!!opts.browser === !!opts.profile) throw new JoploError('USAGE', 'Choose exactly one of --profile <id> or --browser');
+      const state = await (await boardClient()).selectVoice(resolve(dir), opts.browser ? null : opts.profile);
+      if (opts.format === 'json') json(result(resolve(dir), 'Voice source selected', state));
+      else line(opts.browser ? 'Selected browser narration.' : `Selected voice profile ${opts.profile}.`);
+    });
+  voiceCommand.command('narrator').description('Set a voice profile’s default narrator in the running board').argument('<profileId>', 'Voice profile id').argument('<voiceId>', 'Narrator id from voice profiles').addOption(format()).action(async (profileId, voiceId, opts) => {
+    const profile = await (await import('./board-voice.ts')).selectBoardNarrator(await boardClient(), profileId, voiceId);
+    if (opts.format === 'json') json(result(profileId, 'Narrator selected', { profile }));
+    else line(`Narrator for ${profileId}: ${voiceId}`);
+  });
+  const voiceKey = voiceCommand.command('key').description('Manage OpenAI / ElevenLabs keys through the running board (values are never printed)');
+  const readVoiceKey = async () => {
+    if (envVoiceKey !== undefined) return envVoiceKey;
+    if (!localInteractive()) throw new JoploError('USAGE', 'Set JOPLO_VOICE_KEY in your own environment for non-interactive key storage; no key was sent');
+    const read = deps.cloud?.readPassword ?? (await import('./share-password.ts')).hiddenPassword;
+    const key = await read('API key (input hidden): '); secrets.add(key); return key;
+  };
+  voiceKey.command('set').description('Save a key from hidden input or JOPLO_VOICE_KEY').argument('<profileId>', 'openai or elevenlabs').addOption(format()).action(async (profileId, opts) => {
+    const key = await readVoiceKey();
+    const profile = await (await import('./board-voice.ts')).setBoardVoiceKey(await boardClient(), profileId, key);
+    if (opts.format === 'json') json(result(profileId, 'Voice key saved', { profile }));
+    else line(`Saved the ${profileId} key ${profile.key.hint ?? ''} in the board’s private profile store.`);
+  });
+  voiceKey.command('test').description('Test a saved key, or JOPLO_VOICE_KEY without saving it').argument('<profileId>', 'openai or elevenlabs').addOption(format()).action(async (profileId, opts) => {
+    const tested = await (await import('./board-voice.ts')).testBoardVoiceKey(await boardClient(), profileId, envVoiceKey || undefined);
+    if (opts.format === 'json') json(result(profileId, tested.ok ? 'Voice key works' : 'Voice key test failed', tested));
+    else line(tested.ok ? `Voice key works (${tested.contentType ?? 'audio'}, ${tested.bytes ?? 0} bytes).` : `Voice key test failed: ${JSON.stringify(tested.error)}`);
+    if (!tested.ok) exitCode = 1;
+  });
+  voiceKey.command('delete').description('Delete a saved key and reset that voice profile').argument('<profileId>', 'Voice profile id').option('--yes', 'Confirm deletion; required in non-interactive mode').addOption(format()).action(async (profileId, opts) => {
+    await confirmDeletion(localInteractive(opts.format), `Delete the saved key and local overrides for ${profileId}?`, opts.yes);
+    const data = await (await boardClient()).deleteVoiceProfile(profileId);
+    if (opts.format === 'json') json(result(profileId, 'Voice key deleted', data));
+    else line(`Deleted the ${profileId} key and reset its local overrides.`);
+  });
   program.command('assets').description('Read-only asset usage: author references, selected publish IR inclusion, and unknown sampled visibility')
     .argument('[dir]', 'Project directory', '.').addOption(format())
     .option('--usage', 'Report usage (the default; never deletes or uploads)')
@@ -179,7 +238,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       const published = await publishComparison(await cloudClient(opts.server, opts.format), resolve(dir), opts);
       if (opts.format === 'json') json(published); else line(`Feature diff published: ${published.url}`);
     });
-  cloudCommand('share').description('Check, build, and publish to the cloud').argument('[dir]', 'Project directory', '.').addOption(format())
+  const shareCommand = cloudCommand('share').description('Check, build, and publish to the cloud').argument('[dir]', 'Project directory', '.').addOption(format())
     .option('--new', 'Create a new share link').option('--title <title>', 'Share title (defaults to project name)')
     .option('--password [password]', 'Protect a private share (Pro); omit value for hidden terminal input or JOPLO_SHARE_PASSWORD').option('--no-password', 'Remove the existing access password (private shares only)')
     .option('--public', 'Publish publicly: portfolio and search engines').option('--private', 'Only people with the link can view')
@@ -216,16 +275,39 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         line(`Add to README: ${terminalText(published.result.embed.markdown)}\nMore embed options: ${client.server}/shares/${published.result.shareId}`);
       }
     });
+  shareCommand.command('list').description('List your Cloud shares').addOption(format()).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)').action(async opts => {
+    const client = await cloudClient(opts.server, opts.format);
+    const shares = await (await import('./cloud-shares.ts')).listCloudShares(client);
+    if (opts.format === 'json') json(result(client.server, `${shares.length} share(s)`, { shares }));
+    else if (!shares.length) line('No Cloud shares.');
+    else for (const share of shares) line((await import('./cloud-shares.ts')).cloudShareLine(share));
+  });
+  const shareShow = async (id: string, opts: { server?: string; format?: string }) => {
+    const client = await cloudClient(opts.server, opts.format);
+    const share = await (await import('./cloud-shares.ts')).showCloudShare(client, id);
+    if (opts.format === 'json') json(result(client.server, `${share.title} · v${share.version}`, share));
+    else for (const text of (await import('./cloud-shares.ts')).cloudShareText(share)) line(text);
+  };
+  shareCommand.command('show').description('Read a Cloud share and its embed snippets').argument('<shareId>', 'Ten-character share id').addOption(format()).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)').action(shareShow);
+  shareCommand.command('embed').description('Read embed snippets for an existing Cloud share').argument('<shareId>', 'Ten-character share id').addOption(format()).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)').action(shareShow);
+  shareCommand.command('delete').description('Permanently delete a Cloud share (interactive confirmation, or --yes)').argument('<shareId>', 'Ten-character share id').option('--yes', 'Confirm permanent deletion; required in non-interactive mode').addOption(format()).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)').action(async (id, opts) => {
+    const client = await cloudClient(opts.server, opts.format);
+    await confirmDeletion(deps.interactive ?? client.interactive, `Permanently delete Cloud share ${id} and its published files?`, opts.yes);
+    await (await import('./cloud-shares.ts')).deleteCloudShare(client, id);
+    const summary = `Deleted Cloud share ${id}`;
+    if (opts.format === 'json') json(result(client.server, summary, { shareId: id, deleted: true }));
+    else line(summary);
+  });
   const feedbackCommand = cloudCommand('feedback').description('Read cloud feedback, or watch local/cloud reviews').argument('[dir]', 'Project directory', '.').addOption(format())
-    .option('--share <id>', 'Share id (defaults to .joplo/cloud.json)').option('--applied <ids>', 'Mark comma-separated decision ids as applied to the source').option('--ref <ref>', 'Source version for --applied (for example a commit SHA)')
+    .option('--share <id>', 'Share id (defaults to .joplo/cloud.json)').option('--applied <ids>', 'Mark comma-separated decision ids as applied to the source').option('--ref <ref>', 'Source version for --applied (for example a commit SHA)').option('--expected-version <version>', 'Require this current share version for --applied', integer('expected-version'))
     .action(async (dir, opts) => {
-      if (opts.ref !== undefined && opts.applied === undefined) throw new JoploError('USAGE', '--ref applies only with --applied <ids>');
+      if ((opts.ref !== undefined || opts.expectedVersion !== undefined) && opts.applied === undefined) throw new JoploError('USAGE', '--ref and --expected-version apply only with --applied <ids>');
       const f = await import('./cloud-feedback.ts');
       const client = await cloudClient(opts.server, opts.format);
       const ids = opts.applied === undefined ? null : f.decisionIds(opts.applied);
       const shareId = await f.feedbackShareId(client, dir, opts.share);
       if (ids) {
-        const data = await f.markApplied(client, shareId, ids, opts.ref);
+        const data = await f.markApplied(client, shareId, ids, opts.ref, opts.expectedVersion);
         const summary = `Marked ${data.applied.length} decision(s) as applied`;
         if (opts.format === 'json') json(result(resolve(dir), summary, { shareId, ...data }));
         else line(`${summary}: ${data.applied.join(', ') || 'none'}`);
@@ -251,7 +333,7 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
     .option('--share <id>', 'Cloud share id (requires --work)').option('--work <id>', 'Standalone work key or qualified option id: feature.option')
     .option('--version <number>', 'Cloud share version; defaults to the first response', integer('version'))
     .option('--interval <seconds>', 'Cloud polling interval, 10–30 seconds (default: 15)', integer('interval', 30))
-    .option('--after <seq>', 'Local replay cursor', cursor).option('--json', 'Stream one normalized JSON event per line')
+    .option('--after <seq>', 'Local replay cursor', cursor).option('--cursor <cursor>', 'Cloud event cursor from a previous event or Cloud cursor status line').option('--json', 'Stream one normalized JSON event per line')
     .option('--follow', 'With --local: follow every option and every new round of this project until the board stops')
     .option('--once', 'With --follow: exit 0 as soon as new feedback or an approval arrives (for hosts that wake the agent when a background command ends)')
     .option('--since <time>', 'With --follow: skip events created at or before this ISO time (the createdAt of the last event you handled)')
@@ -261,13 +343,13 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
       const all = command.optsWithGlobals();
       opts.json = opts.json || all.format === 'json';
       opts.workId = opts.work ? await feedbackWorkId(dir, opts.work) : undefined;
-      if (all.applied !== undefined || all.ref !== undefined) throw new JoploError('USAGE', '--applied and --ref cannot be used with feedback watch');
+      if (all.applied !== undefined || all.ref !== undefined || all.expectedVersion !== undefined) throw new JoploError('USAGE', '--applied, --ref, and --expected-version cannot be used with feedback watch');
       const shareId = opts.share ?? all.share;
       const server = opts.server ?? all.server;
       if ((opts.once || opts.since !== undefined) && !opts.follow) throw new JoploError('USAGE', '--once and --since work with --local --follow');
       if (opts.local) {
-        if (shareId !== undefined || server !== undefined || opts.interval !== undefined || opts.version !== undefined)
-          throw new JoploError('USAGE', '--local cannot be combined with --share, --server, --interval, or --version');
+        if (shareId !== undefined || server !== undefined || opts.interval !== undefined || opts.version !== undefined || opts.cursor !== undefined)
+          throw new JoploError('USAGE', '--local cannot be combined with --share, --server, --interval, --version, or --cursor');
         opts.labels = await feedbackWorkLabels(dir);
         const { watchLocalReview, followLocalReviews } = await import('./local-review.ts');
         await withWatchSignal(signal => (opts.follow ? followLocalReviews : watchLocalReview)(dir, opts, { out: stdout, err: stderr }, signal));
@@ -283,6 +365,93 @@ export async function runCli(args: string[], deps: Dependencies = {}): Promise<n
         await withWatchSignal(signal => watchCloudFeedback(client, shareId, opts, { out: stdout, err: stderr }, signal));
       }
     });
+  const localReviewWrite = async (dir: string, opts: { work?: string; session?: string; body?: string; scenario?: string; position?: number; scene?: string; requestId?: string; approve?: boolean; format?: string }) => {
+    const written = await (await import('./board-review.ts')).writeBoardReview(await boardClient(), resolve(dir), opts);
+    const summary = written.type === 'approved' ? `Approved ${written.sessionId}` : `Submitted feedback to ${written.sessionId}`;
+    if (opts.format === 'json') json(result(resolve(dir), summary, written));
+    else line(`${summary}\nRequest: ${written.requestId}`);
+  };
+  feedbackCommand.command('submit').description('Submit feedback at an explicit scenario/position to a local review').argument('[dir]', 'Project directory', '.').requiredOption('--local', 'Write to the running local board')
+    .option('--session <id>', 'Exact local review session').option('--work <id>', 'Standalone work key or qualified option id').requiredOption('--body <text>', 'Submitted feedback, 1-10000 characters')
+    .requiredOption('--scenario <id>', 'Reviewed scenario id (not a playback action)').requiredOption('--position <n>', 'Executed step count: 0 is initial', position).option('--scene <id>', 'Visible scene id; defaults to the scene at this position').option('--request-id <uuid>', 'Idempotency key for a safe retry').addOption(format()).action(localReviewWrite);
+  feedbackCommand.command('approve').description('Confirm a local option revision (does not change pick or publish)').argument('[dir]', 'Project directory', '.').requiredOption('--local', 'Write to the running local board')
+    .option('--session <id>', 'Exact local review session').option('--work <id>', 'Standalone work key or qualified option id').option('--request-id <uuid>', 'Idempotency key for a safe retry').addOption(format()).action(async (dir, opts) => localReviewWrite(dir, { ...opts, approve: true }));
+  feedbackCommand.command('comment').description('Submit a Cloud review comment at an explicit version and position').requiredOption('--share <id>', 'Cloud share id').requiredOption('--review-id <id>', 'Review link id from cloud /review/<id>')
+    .requiredOption('--version <n>', 'Reviewed and expected current share version', integer('version')).requiredOption('--work <id>', 'Exact work id').requiredOption('--scenario <id>', 'Reviewed scenario id').requiredOption('--position <n>', 'Executed step count: 0 is initial', position)
+    .option('--step-id <id>', 'Step id; required after a step and omitted at position 0').option('--layer <id>', 'Visible layer id').option('--element <id>', 'Reviewed element id').option('--element-label <label>', 'Element label (defaults to its id)')
+    .requiredOption('--body <text>', 'Comment, 1-10000 characters').addOption(format()).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)').action(async opts => {
+      const client = await cloudClient(opts.server, opts.format);
+      const written = await (await import('./cloud-feedback-write.ts')).submitCloudComment(client, { shareId: opts.share, reviewId: opts.reviewId, body: opts.body, version: opts.version, workId: opts.work, scenario: opts.scenario, position: opts.position, stepId: opts.stepId, layer: opts.layer, element: opts.element, elementLabel: opts.elementLabel });
+      if (opts.format === 'json') json(result(opts.share, 'Cloud comment submitted', written)); else line(`Submitted Cloud comment ${written.id}`);
+    });
+  feedbackCommand.command('resolve').description('Resolve a Cloud comment (or reopen it with --reopen)').argument('<commentId>', 'Cloud comment id').requiredOption('--share <id>', 'Cloud share id').option('--reopen', 'Reopen instead of resolve').addOption(format()).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)').action(async (commentId, opts) => {
+    const client = await cloudClient(opts.server, opts.format);
+    const written = await (await import('./cloud-feedback-write.ts')).resolveCloudComment(client, opts.share, commentId, !opts.reopen);
+    if (opts.format === 'json') json(result(opts.share, opts.reopen ? 'Cloud comment reopened' : 'Cloud comment resolved', written)); else line(opts.reopen ? `Reopened Cloud comment ${commentId}` : `Resolved Cloud comment ${commentId}`);
+  });
+  feedbackCommand.command('decide').description('Record a Cloud pick/rule/answer decision with version protection').requiredOption('--share <id>', 'Cloud share id').requiredOption('--kind <kind>', 'pick, confirm_rule, reject_rule, or answer')
+    .option('--feature <id>', 'Feature id; omit for a standalone work').option('--work <id>', 'Exact work id when the decision is work-scoped').requiredOption('--target <id>', 'Work, rule, or question id').option('--note <text>', 'Decision note; required for answer and reject_rule')
+    .requiredOption('--expected-version <n>', 'Current share version the reviewer actually saw', integer('expected-version')).addOption(format()).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)').action(async opts => {
+      const client = await cloudClient(opts.server, opts.format);
+      const written = await (await import('./cloud-feedback-write.ts')).submitCloudDecision(client, { shareId: opts.share, kind: opts.kind, featureId: opts.feature, workId: opts.work, targetId: opts.target, note: opts.note, expectedVersion: opts.expectedVersion });
+      if (opts.format === 'json') json(result(opts.share, 'Cloud decision recorded', written)); else line(`Recorded Cloud decision ${written.id}`);
+    });
+  feedbackCommand.command('retract').description('Retract an unapplied Cloud decision (append-only and idempotent)').argument('<decisionId>', 'Cloud decision id').requiredOption('--share <id>', 'Cloud share id').addOption(format()).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)').action(async (decisionId, opts) => {
+    const client = await cloudClient(opts.server, opts.format);
+    const written = await (await import('./cloud-feedback-write.ts')).retractCloudDecision(client, opts.share, decisionId);
+    if (opts.format === 'json') json(result(opts.share, 'Cloud decision retracted', written)); else line(`Retracted Cloud decision ${decisionId}`);
+  });
+  feedbackCommand.command('vote').description('Vote for a Cloud option (a vote is not approval)').requiredOption('--share <id>', 'Cloud share id').requiredOption('--review-id <id>', 'Review link id').requiredOption('--feature <id>', 'Feature id').requiredOption('--work <id>', 'Exact option work id').requiredOption('--expected-version <n>', 'Current share version', integer('expected-version')).addOption(format()).option('--server <url>', 'Cloud server (overrides JOPLO_CLOUD_URL)').action(async opts => {
+    const client = await cloudClient(opts.server, opts.format);
+    const written = await (await import('./cloud-feedback-write.ts')).voteCloudReview(client, { shareId: opts.share, reviewId: opts.reviewId, featureId: opts.feature, workId: opts.work, expectedVersion: opts.expectedVersion });
+    if (opts.format === 'json') json(result(opts.share, 'Cloud vote recorded', written)); else line('Cloud vote recorded; this is not an approval.');
+  });
+  const boardCommand = program.command('board').description('Manage the running local board; playback and fullscreen remain browser interactions');
+  const boardProjects = async (opts: { format?: string }) => {
+    const projects = await (await boardClient()).projects();
+    if (opts.format === 'json') json(result('board', `${projects.length} project(s)`, { projects }));
+    else if (!projects.length) line('No projects in the running board.');
+    else for (const project of projects) line(`${project.id}  ${project.status}${project.errors ? ` (${project.errors} errors)` : ''}  ${terminalText(project.name)}  ${project.dir}`);
+  };
+  boardCommand.command('projects').description('List projects registered in the running board').addOption(format()).action(boardProjects);
+  boardCommand.command('list').description('Alias for board projects').addOption(format()).action(boardProjects);
+  boardCommand.command('add').description('Add and compile a project in the running board').argument('[dir]', 'Project directory', '.').addOption(format()).action(async (dir, opts) => {
+    const added = await (await boardClient()).addProject(resolve(dir));
+    if (opts.format === 'json') json(result(added.id, 'Project added', added));
+    else line(`Added ${added.id}\n${added.url}`);
+  });
+  boardCommand.command('remove').description('Remove a project record without deleting project files').argument('[dir]', 'Project directory or board project id', '.').option('--yes', 'Confirm record removal; required in non-interactive mode').addOption(format()).action(async (dir, opts) => {
+    await confirmDeletion(localInteractive(opts.format), `Remove ${dir} from the board? Project files will not be deleted.`, opts.yes);
+    const removed = await (await boardClient()).removeProject(dir);
+    if (opts.format === 'json') json(result(removed.id, 'Project record removed', { removed, filesDeleted: false }));
+    else line(`Removed ${removed.id} from the board. Project files were not deleted.`);
+  });
+  boardCommand.command('appearance').description('Read or update board appearance (global without dir, project override with dir)').argument('[dir]', 'Project directory; omit for global defaults')
+    .option('--theme <name>', 'Built-in or project theme name').option('--font <font>', 'hand, sans, serif, kai, or mono').option('--stroke <stroke>', 'rough or clean')
+    .addOption(new Option('--reset <fields>', 'Reset theme, font, stroke, or all to inherited defaults').choices(['theme', 'font', 'stroke', 'all'])).addOption(format()).action(async (dir, opts) => {
+      const client = await boardClient(), settings = await client.settings();
+      const changes = [opts.theme !== undefined, opts.font !== undefined, opts.stroke !== undefined, opts.reset !== undefined].filter(Boolean).length;
+      if (!changes) {
+        const data = { settings, scope: dir === undefined ? 'global' : 'project', projectId: dir === undefined ? null : (await import('./board.ts')).boardProjectId(resolve(dir)) };
+        if (opts.format === 'json') json(result('board', 'Board appearance', data)); else line(JSON.stringify(data, null, 2));
+        return;
+      }
+      if (changes > 1) throw new JoploError('USAGE', 'Update one appearance field at a time, or use --reset all');
+      const { THEME_NAME, isAppearanceFont, isAppearanceStroke } = await import('@joplo-app/core');
+      if (opts.theme !== undefined && !THEME_NAME.test(opts.theme)) throw new JoploError('USAGE', 'Invalid theme name');
+      if (opts.font !== undefined && !isAppearanceFont(opts.font)) throw new JoploError('USAGE', 'font must be hand, sans, serif, kai, or mono');
+      if (opts.stroke !== undefined && !isAppearanceStroke(opts.stroke)) throw new JoploError('USAGE', 'stroke must be rough or clean');
+      const patch = opts.reset === 'all' ? { theme: null, font: null, stroke: null } : opts.reset ? { [opts.reset]: null } : opts.theme !== undefined ? { theme: opts.theme } : opts.font !== undefined ? { font: opts.font } : { stroke: opts.stroke };
+      const next = dir === undefined ? { ...settings, ...patch } : { ...settings, projects: { ...settings.projects, [(await import('./board.ts')).boardProjectId(resolve(dir))]: { ...settings.projects?.[(await import('./board.ts')).boardProjectId(resolve(dir))], ...patch } } };
+      const saved = await client.writeSettings(next);
+      if (opts.format === 'json') json(result('board', 'Board appearance updated', { settings: saved })); else line('Board appearance updated.');
+    });
+  boardCommand.command('open').description('Open project source in the configured editor (not a browser playback command)').argument('[dir]', 'Project directory', '.').option('--at <location>', 'Source file:line[:column]; defaults to the current board selection').addOption(format()).action(async (dir, opts) => {
+    const at = opts.at ?? (await readSelection(resolve(dir))).selection?.at;
+    if (!at) throw new JoploError('USAGE', 'Pass --at <file:line[:column]>, or select an element in the board first');
+    await (await boardClient()).openEditor(resolve(dir), at);
+    if (opts.format === 'json') json(result(resolve(dir), 'Opened in editor', { at })); else line(`Opened ${at} in the configured editor.`);
+  });
   program.command('resources').argument('[dir]', 'Project directory', '.').option('--work <qid>', 'Generate resources for one independent work key or qualified option id').option('--dry-run', 'List missing persistent resources and estimated credits').option('--allow-spend', 'Authorize the displayed generation estimates').addOption(format()).action(async (dir, opts) => {
     const generateResources = await serverFunction('generateResources');
     const interactive = deps.interactive ?? (!!process.stdin.isTTY && !!process.stderr.isTTY && !process.env.CI);

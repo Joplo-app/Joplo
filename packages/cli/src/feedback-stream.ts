@@ -18,6 +18,8 @@ export type FeedbackStreamEvent = {
   server?: string;
   shareId?: string;
   version?: number;
+  /** Cloud 增量模式：处理完本事件后可用于 --cursor 的服务端游标。 */
+  cursor?: string;
 } & (
   | { type: 'feedback'; body: string; context: { scenarioId: string | null; position: number; stepId: string | null; sceneId: string | null; route: string | null; source: string | null; pageTitle?: string; scenarioName?: string | null; element?: { id: string; label: string } | null }; author?: { name: string } }
   | { type: 'approved'; decision?: FeedbackDecision }

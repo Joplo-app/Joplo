@@ -37,14 +37,16 @@ npx joplo feedback watch ./demo --local --session <id-from-list> [--after <last-
 ```
 - Use it to wait for one option version's approval (exit 0 only on approval, 1 if the round closes) or to resume a round from a cursor. Match projectDir, workId, instanceId and revision from list; if several match, choose explicitly instead of taking the newest.
 - Source edits close that round: list again and attach to the new one with its own cursor. Never reuse an old cursor on a new session or delete review records to reset a round.
+- For an explicitly requested scripted review action, feedback submit --local requires an exact work/scenario/position/body and feedback approve --local confirms that revision through the board API. The CLI does not pretend to know or control the reviewer's current browser position; approval never publishes.
 
-## Share review: poll, do not pretend it is a lossless stream
+## Share review: poll with a recoverable cursor
 ```sh
 npx joplo feedback watch --share <share-id> --work <feature.option> --interval 15 --json
 ```
 - Polling defaults to 15 seconds; --interval accepts 10–30. Pin --version <n> when the version is known; otherwise the first response sets it.
 - Only the target version's owner pick ends this watcher. Votes, rule confirmations, other options, and older versions do not. A replaced share version emits closed and exits 1.
-- Cloud returns only unresolved comments and unapplied/unretracted decisions, so records processed between polls can be missed. Restarting replays the current snapshot; deduplicate by eventId. Cloud has no --after cursor and never confirms a local session.
+- Cursor-capable Cloud returns persistent event pages. The CLI drains them before judging approval, so resolved comments and applied decisions are recovered and retracted picks do not approve. Each event carries cursor; resume with --cursor <last fully handled cursor> and deduplicate by eventId. Older Cloud falls back to snapshots and warns that resolved/applied records may be missed. Cloud never confirms a local session.
+- Cloud writes need feedback:write: feedback comment/resolve, decide/retract, and vote (not approval). Always preserve expectedVersion; comments/votes also need the /review/<id> link id. On 409 reread instead of replaying blindly.
 - To apply existing Cloud conclusions without watching, use npx joplo feedback --format json. It selects the review share from .joplo/cloud.json, else the main share; --share <id> selects another, including scoped shares. data.decisions and data.comments are separate.
 
 ## Apply conclusions when requested
@@ -64,4 +66,4 @@ npx joplo feedback watch --share <share-id> --work <feature.option> --interval 1
 - AUTH_REQUIRED / AUTH_EXPIRED (exit 3): tell the user how to run npx joplo login; do not log in/out or switch accounts without their instruction. Permission, quota, and missing-share errors are not approvals.
 - If a command is unavailable, check the project's installed Joplo version and its skill output. Do not silently switch to another instance or use another project's credentials.
 - .joplo runtime state stays local, and local feedback is never uploaded just because a Share exists. Details: npx joplo skill review; source write-back and publishing: npx joplo skill publish.
-<!-- joplo-skill 0.7.3 sha256:2c43f61d46c45ac4e48554c5b5c3932507a89b0af99feb3772b1c9f01dc48352 -->
+<!-- joplo-skill 0.7.3 sha256:87723bb405cbfda13d92eba1e4034232238371e10f9a70556a4c92477961cccd -->

@@ -1,94 +1,85 @@
-# 本地与 Share 评审：轮询兼容性及 Cloud 改动需求
+# 本地与 Share 评审：增量补收与 Cloud 写契约
 
-状态：CLI 已实现统一监听入口，Cloud 当前按快照兼容轮询。本文是服务端改动清单，不表示这些接口已经上线。D103 的机器字段统一为 workId / works，云端跟随升级单独交接；现行格式见[作品模型](work-model.md#5-命令行与线上格式)。
+状态：主仓库 CLI 已实现统一监听、游标补收和评审写操作。本文记录 2026-11-13 在并行 `joplo-cloud` 工作区核对到的实际路由与 schema；这些 Cloud 修改当时仍在该工作区中，不能据此宣称生产环境已经部署。CLI 使用本地 HTTP fixture 验证，真实部署联调仍需协调者完成。
 
-核对依据：2026-11-07，本机 `joplo-cloud` 工作副本，HEAD `2d379826` 的评审相关源码；不是对线上部署版本的核验。本次没有修改 Cloud 仓库或线上数据。
-
-## 已实现的客户端行为
+## 命令入口
 
 ```sh
 joplo feedback watch ./demo --local --follow --json
 joplo feedback watch ./demo --local --session <id> --json
 joplo feedback watch --share Abc1234567 --work invite.a-modal --interval 15 --json
+joplo feedback watch --share Abc1234567 --work invite.a-modal --cursor <最后完整处理的游标> --json
 ```
 
-本地仍直接观察持久文件，Share 使用普通 GET 轮询。首次立即请求，成功后默认等待 15 秒；可选 10–30 整数秒。网络错误退避，鉴权／权限／配额错误明确结束；中断会取消在途请求和等待。本地的 `review list/watch` 作为兼容入口保留，原有云端 `feedback` 单次读取和 `--applied` 也不变。
+本地仍直接观察持久文件。Share 使用普通 GET 轮询：首次立即请求，成功后默认等待 15 秒，可选 10–30 整数秒。网络错误退避，鉴权／权限／配额错误明确结束；中断取消在途请求和等待。
 
-双方统一输出 `source/eventId/sessionId/featureId/workId/revision/createdAt/type`。Cloud 只过滤绑定版本与方案的评论，并将匹配的作者 `pick` 映射为 `approved`；其他规则／回答决定为 `decision`，不会结束监听。分享发布新版本时输出 `closed` 并退出非零，不跟随新版本。`eventId` 跨重启稳定，便于消费端去重；Cloud 没有本地文件的递增 `seq`，不假装支持 `--after`。
+双方统一输出 `source/eventId/sessionId/featureId/workId/revision/createdAt/type`。Cloud 只过滤绑定版本与方案的评论，并将匹配的当前作者 `pick` 映射为 `approved`；其他规则／回答决定为 `decision`，投票不确认。分享发布新版本时输出 `closed` 并退出 1。`eventId` 跨重启稳定；Cloud 没有本地递增 `seq`，不伪造它。
 
-## 现有 Cloud 能直接复用什么
+## 增量读取：复用 feedback 路由
 
-| 能力 | 代码依据（相对 Cloud 仓库根目录） | 结论 |
-| --- | --- | --- |
-| 带版本的反馈结果 | `packages/share-contract/review.ts` 的 `feedbackResultSchema`、`feedbackDecisionSchema`、`feedbackCommentSchema` | 已有分享版本、每条记录版本、稳定 id、时间、场景／步骤／元素 |
-| 读取接口 | `packages/api/modules/reviews/procedures/v1.ts` 的 `feedback` | 普通 `GET /api/v1/shares/{shareId}/feedback` 可直接每 15 秒调用，无需 SSE、WebSocket 或新基础设施 |
-| 权限 | `packages/api/modules/reviews/service.ts` 的 `ownedForCli`，`packages/api/modules/api-keys/permissions.ts` | 保持分享主人或其 API Key 的 `feedback:read`；不能因为分享链接公开就开放匿名读取 |
-| 作者决定 | `packages/api/modules/reviews/service.ts` 的 `decide` / `retract` | 已有追加式决定和撤回记录，可复用选定方案语义；普通投票不能映射成确认 |
-| API Key 使用时间 | `packages/api/modules/api-keys/service.ts` | `lastUsedAt` 已有 60 秒更新节流，不需要每次轮询新增写入 |
+`GET /api/v1/shares/{shareId}/feedback` 保留无查询参数时的旧快照；传入 `cursor` 或 `limit` 时进入持久事件分页模式。
 
-## 必须区分“可轮询”与“可可靠补收”
+请求：
 
-现有 `feedback()` 只返回未撤回、未写回的决定和未解决评论。数据库 `listComments()` 只取最新 1000 条未解决评论，没有 `cursor/hasMore`。因此当前 CLI 能去重当前快照，却无法保证所有变化都收到：
+- `cursor`：可选，非负十进制字符串，最多 19 位；缺省为 `0`。由服务端事件 id 生成，不按时间戳或 OFFSET 猜测。
+- `limit`：可选，1–500；CLI 每页使用 200。
+- scope：分享主人登录，或 API Key 的 `feedback:read`。
 
-1. 第 1 次轮询后有人提交评论，随后被解决；第 2 次轮询已经看不到它。
-2. 作者确认方案后，另一个 Agent 把决定标成 applied；监听 Agent 的下次轮询看不到这条确认，可能继续等待。
-3. 返回超过上限的评论时，较老记录被截断，客户端无法知道是否还有遗漏。
-
-这些问题不能靠缩短间隔或客户端去重修好。也不能把一条记录“从结果中消失”推断成已解决、已撤回或已确认，因为缺失还可能来自截断。
-
-## Cloud 需要配合的改动
-
-### P0：确认时校验用户实际看到的版本
-
-当前 `packages/api/modules/reviews/types.ts` 的 `decideInput` 没有版本字段；`DecisionBoard.tsx` 发出 `{ shareId, kind, featureId, targetId, note }`，服务端 `decide()` 读取当时的 `share.version` 并写入决定。
-
-具体风险：用户打开 v3，期间发布 v4，再在旧页面点确认；服务端可能把这次动作记录为 v4 的确认。CLI 即使正确按返回的 version 过滤，也无法还原用户当时看到的是 v3。
-
-建议给决定请求增加 `expectedVersion`，前端传入当前展示的版本。服务端在与发布更新协调的事务／锁范围内检查版本，一旦不匹配返回 409，前端保留输入并要求查看新版。不能只在事务外读一次版本。`vote` 同样使用服务端当前版本，可一并检查，但投票仍不代表方案确认。
-
-### P0：补充不受 applied 过滤影响的“当前确认状态”
-
-返回指定版本、功能、方案的有效确认状态及决定 id；已写回只是处理状态，不能抹去确认事实。已撤回的确认不能生效，其他方案、其他版本的决定不能结束监听。新版本必须从未确认开始。
-
-这个状态应与轮询记录处于同一一致性快照，避免刚读完事件、再读确认时混用另一版本。CLI 在读取完整批次后依据当前有效状态结束，而不是看到历史里曾经存在一个 pick 就结束。
-
-### P1：可分页、可补收的普通 HTTP 读取
-
-建议保留旧 `/feedback` 契约，新增 `/feedback/events`（名称待 Cloud 实现时确定）或显式的增量读取模式。最少包含：
-
-- 请求：`version`、`workId`、服务端生成的不透明 `cursor`、有上限的 `limit`。
-- 响应：分享当前版本、事件／记录、`nextCursor`、`hasMore`，以及上述当前确认状态。
-- 已解决评论、已 applied 决定仍能按游标读到。需要报告撤回／解决／重新打开时，为状态变更提供稳定的版本或事件标识；不能仅按原始 createdAt 轮询可变行。
-- 游标排序和提交边界必须稳定，避免相同时间戳或较晚提交的旧时间记录被跳过。不能只使用时间戳或 OFFSET 宣称“不漏事件”。
-- 多页数据使用有界页大小，读取完整快照后再判断确认；每个轮询请求仍是普通 JSON，不是长连接。需要完整变更历史时可加按分享排序的事件记录；仅做版本校验及当前确认状态，可以先复用现有表。
-- 新路由必须在 `packages/api/modules/api-keys/permissions.ts` 登记 `feedback:read`，沿用 owner 检查、删除／撤销／账户不可用边界。无变化时 ETag/304 或轻量 revision 可后续减少响应体和查询成本。
-
-可选响应示意（拟议，不是当前 API）：
+响应保留 `share`、`works`、`decisions`、`comments`，并增加：
 
 ```json
 {
   "share": { "id": "Abc1234567", "version": 3 },
-  "events": [],
-  "nextCursor": "opaque-cursor",
-  "hasMore": false,
-  "approval": {
-    "version": 3,
-    "featureId": "invite",
-    "workId": "invite.a-modal",
-    "status": "open",
-    "decisionId": null
-  }
+  "works": [{ "id": "invite.a-modal", "featureId": "invite" }],
+  "comments": [],
+  "decisions": [],
+  "nextCursor": "42",
+  "hasMore": false
 }
 ```
 
-## Cloud 侧验收用例
+评论除原字段外可带 `resolvedAt` 与 `change: "created" | "resolved" | "reopened"`；决定除原字段外可带 `retractedAt`、`appliedAt`、`appliedRef` 与 `change: "decided" | "retracted" | "applied"`。因此评论解决、决定写回或撤回不会抹掉需要补收的历史。
 
-- 打开旧版本后发布新版，再确认：409，不能生成新版确认。
-- 两次轮询之间提交并解决评论：仍可补读这条反馈。
-- 两次轮询之间确认并 applied：仍能读取有效确认并结束监听。
-- 确认后撤回，再轮询：不把撤回的历史确认当成当前结论。
-- 多方案、多版本混合记录：仅目标方案和版本可结束监听。
-- 超过 1000 条、同时间戳、多页间有并发写入：游标不漏读，重复记录可按稳定 id 去重。
-- 新接口依然 owner-only；API Key 无 `feedback:read`、陌生分享、已删除分享不泄露记录。
+CLI 的可靠性规则：
 
-轮询支持本身无需 Cloud 先升级。要达到和本地文件监听一样的可靠补收与端到端版本保护，需要上面的服务端改动；当前兼容模式已经在 CLI 启动提示和文档里说明边界。
+1. 每轮从最后提交的游标读取，直到 `hasMore: false`，再输出本批事件并判断确认；不会在多页中间因先看到 pick 就提前结束。
+2. 同一实体的多次变化按最新记录合并；评论解决后仍补发正文，applied 后仍能确认，retracted 的历史 pick 不确认。
+3. 事件带本批最终 `cursor`，stderr 打印 `Cloud cursor: …`。显式 `--cursor` 只恢复事件流，不改变分享版本绑定。
+4. 多页中途网络失败不提交游标，下一轮从原位置重读；消费者按 `eventId` 去重。
+5. 旧 Cloud 没有 `nextCursor/hasMore` 时退回快照模式并警告其有损边界：解决/applied 后可能漏记录，重启只重放当前快照。
+
+## 评论与决定写接口
+
+所有路由都要求 Bearer 认证。API Key 使用 `feedback:write`；评论与投票另外要求有效 `reviewId`（Cloud `/review/<id>` 的链接 id）， owner 的决定/解决/撤回仍走 owner 检查。
+
+| 操作 | route / request | response |
+| --- | --- | --- |
+| 提交评论 | `POST /api/v1/shares/{shareId}/feedback/comments`；`{shareId,reviewId,expectedVersion,body,anchor:{version,workId,scenario,step,stepId,layer,element}}` | `{id}` |
+| 解决/重开 | `POST /api/v1/shares/{shareId}/feedback/comments/{commentId}/resolution`；`{shareId,commentId,resolved}` | `{success:true}` |
+| 记录决定 | `POST /api/v1/shares/{shareId}/feedback/decisions`；`{shareId,kind,featureId,workId,targetId,note,expectedVersion}` | `{id}` |
+| 撤回决定 | `POST /api/v1/shares/{shareId}/feedback/decisions/{decisionId}/retract`；`{shareId,decisionId}` | `{success:true}` |
+| 投票 | `POST /api/v1/shares/{shareId}/feedback/votes`；`{shareId,reviewId,featureId,workId,expectedVersion}` | `{success:true}` |
+| 标记写回 | `POST /api/v1/shares/{shareId}/feedback/applied`；`{decisionIds,ref?,expectedVersion?}` | `{applied:[…]}` |
+
+`expectedVersion` 在服务端与发布更新协调的事务／锁范围内检查。旧页面看到 v3、期间发布 v4 后再评论/确认时返回 409，不会误记为 v4。CLI 对所有评论、投票和决定强制传它；`--applied` 可显式传。409 后先读取当前版本与反馈，不自动重放非幂等写入。
+
+对应 CLI：
+
+```sh
+joplo feedback comment --share <id> --review-id <review-link-id> --version 3 --work invite.a-modal --scenario invite.a-modal.success --position 2 --step-id <step-id> --body '需要补充恢复说明'
+joplo feedback resolve <comment-id> --share <id> [--reopen]
+joplo feedback decide --share <id> --kind pick --feature invite --work invite.a-modal --target invite.a-modal --expected-version 3
+joplo feedback retract <decision-id> --share <id>
+joplo feedback vote --share <id> --review-id <review-link-id> --feature invite --work invite.a-modal --expected-version 3
+```
+
+## 分享管理 scope
+
+- `GET /api/v1/shares` 与 `GET /api/v1/shares/{shareId}`：`shares:read`。
+- `DELETE /api/v1/shares/{shareId}`：`shares:write`，返回 `{success:true}`。CLI 非交互删除必须显式 `--yes`。
+
+## 验收覆盖与剩余联调
+
+CLI fixture 已覆盖：解决后补收评论、applied 后补收确认、撤回不确认、多页排空、同实体变化合并、显式游标恢复、多页网络失败重读、旧快照降级，以及各写路由的请求体和版本字段。
+
+Cloud 侧仍应由其工作区验证：旧页面确认 409、两次轮询间提交并解决、确认并 applied、撤回、多方案/版本、超过 1000 条与同时间戳并发写入、owner/API Key 权限，以及生产路由部署后的真实联调。CLI 的测试不能替代这些 Cloud 验收。
