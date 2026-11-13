@@ -16,10 +16,10 @@ export const SHARE_ID = /^[A-Za-z0-9]{10}$/;
 const DECISION_ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const DECISION_KINDS = ['pick', 'confirm_rule', 'reject_rule', 'answer'] as const;
 
-export type FeedbackDecision = { id: string; kind: string; workId: string | null; featureId: string | null; targetId: string; note: string | null; decidedAt: string; version: number };
-export type FeedbackComment = { id: string; version: number; workId: string; scenario: string; step: number; stepId: string | null; element: { id: string; label: string } | null; body: string; author: { name: string }; createdAt: string };
+export type FeedbackDecision = { id: string; kind: string; workId: string | null; featureId: string | null; targetId: string; note: string | null; decidedAt: string; version: number; retractedAt?: string | null; appliedAt?: string | null; appliedRef?: string | null; change?: 'decided' | 'retracted' | 'applied' };
+export type FeedbackComment = { id: string; version: number; workId: string; scenario: string; step: number; stepId: string | null; element: { id: string; label: string } | null; body: string; author: { name: string }; createdAt: string; resolvedAt?: string | null; change?: 'created' | 'resolved' | 'reopened' };
 export type FeedbackWork = { id: string; featureId: string | null };
-export type Feedback = { share: { id: string; version: number }; works: FeedbackWork[]; decisions: FeedbackDecision[]; comments: FeedbackComment[] };
+export type Feedback = { share: { id: string; version: number }; works: FeedbackWork[]; decisions: FeedbackDecision[]; comments: FeedbackComment[]; nextCursor?: string; hasMore?: boolean };
 
 const str = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max;
 const iso = (v: unknown): v is string => typeof v === 'string' && v.length <= 64 && Number.isFinite(Date.parse(v));
@@ -58,27 +58,33 @@ function readWork(raw: unknown): FeedbackWork {
 
 function readDecision(raw: unknown): FeedbackDecision {
   const d = object(raw);
-  if (!str(d.id, 64) || !d.id || !str(d.kind, 32) || !/^[a-z_]+$/.test(d.kind) || !(d.featureId === null || str(d.featureId, 256)) || !str(d.targetId, 256) || !(d.workId === null || str(d.workId, 256)) || !(d.note === null || d.note === undefined || str(d.note, 10_000)) || !iso(d.decidedAt) || !int(d.version, 1)) throw new CloudError('INVALID_RESPONSE');
-  return { id: d.id, kind: d.kind, workId: d.workId as string | null, featureId: d.featureId as string | null, targetId: d.targetId, note: typeof d.note === 'string' ? d.note : null, decidedAt: d.decidedAt, version: d.version };
+  if (!str(d.id, 64) || !d.id || !str(d.kind, 32) || !/^[a-z_]+$/.test(d.kind) || !(d.featureId === null || str(d.featureId, 256)) || !str(d.targetId, 256) || !(d.workId === null || str(d.workId, 256)) || !(d.note === null || d.note === undefined || str(d.note, 10_000)) || !iso(d.decidedAt) || !int(d.version, 1) || !(d.retractedAt === undefined || d.retractedAt === null || iso(d.retractedAt)) || !(d.appliedAt === undefined || d.appliedAt === null || iso(d.appliedAt)) || !(d.appliedRef === undefined || d.appliedRef === null || str(d.appliedRef, 200)) || !(d.change === undefined || ['decided', 'retracted', 'applied'].includes(String(d.change)))) throw new CloudError('INVALID_RESPONSE');
+  return { id: d.id, kind: d.kind, workId: d.workId as string | null, featureId: d.featureId as string | null, targetId: d.targetId, note: typeof d.note === 'string' ? d.note : null, decidedAt: d.decidedAt, version: d.version, ...(d.retractedAt !== undefined ? { retractedAt: d.retractedAt as string | null } : {}), ...(d.appliedAt !== undefined ? { appliedAt: d.appliedAt as string | null } : {}), ...(d.appliedRef !== undefined ? { appliedRef: d.appliedRef as string | null } : {}), ...(d.change !== undefined ? { change: d.change as FeedbackDecision['change'] } : {}) };
 }
 
 function readComment(raw: unknown): FeedbackComment {
   const c = object(raw), author = object(c.author), element = c.element === null || c.element === undefined ? null : object(c.element);
-  if (!str(c.id, 64) || !c.id || !int(c.version, 1) || !str(c.scenario, 256) || !str(c.workId, 256) || !int(c.step, 0) || !(c.stepId === null || c.stepId === undefined || str(c.stepId, 256)) || !str(c.body, 10_000) || !str(author.name, 200) || !iso(c.createdAt)) throw new CloudError('INVALID_RESPONSE');
+  if (!str(c.id, 64) || !c.id || !int(c.version, 1) || !str(c.scenario, 256) || !str(c.workId, 256) || !int(c.step, 0) || !(c.stepId === null || c.stepId === undefined || str(c.stepId, 256)) || !str(c.body, 10_000) || !str(author.name, 200) || !iso(c.createdAt) || !(c.resolvedAt === undefined || c.resolvedAt === null || iso(c.resolvedAt)) || !(c.change === undefined || ['created', 'resolved', 'reopened'].includes(String(c.change)))) throw new CloudError('INVALID_RESPONSE');
   if (element && (!str(element.id, 256) || !str(element.label, 200))) throw new CloudError('INVALID_RESPONSE');
-  return { id: c.id, version: c.version, workId: c.workId as string, scenario: c.scenario, step: c.step, stepId: typeof c.stepId === 'string' ? c.stepId : null, element: element ? { id: element.id as string, label: element.label as string } : null, body: c.body, author: { name: author.name }, createdAt: c.createdAt };
+  return { id: c.id, version: c.version, workId: c.workId as string, scenario: c.scenario, step: c.step, stepId: typeof c.stepId === 'string' ? c.stepId : null, element: element ? { id: element.id as string, label: element.label as string } : null, body: c.body, author: { name: author.name }, createdAt: c.createdAt, ...(c.resolvedAt !== undefined ? { resolvedAt: c.resolvedAt as string | null } : {}), ...(c.change !== undefined ? { change: c.change as FeedbackComment['change'] } : {}) };
 }
 
-export async function fetchFeedback(client: CloudClient, shareId: string, options: { signal?: AbortSignal; retry?: boolean } = {}): Promise<Feedback> {
+export async function fetchFeedback(client: CloudClient, shareId: string, options: { signal?: AbortSignal; retry?: boolean; cursor?: string; limit?: number } = {}): Promise<Feedback> {
   options.signal?.throwIfAborted();
+  if (options.cursor !== undefined && !/^(0|[1-9]\d{0,18})$/.test(options.cursor)) throw new JoploError('USAGE', 'Cloud feedback cursor must be a non-negative decimal string of at most 19 digits');
+  if (options.limit !== undefined && (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 500)) throw new JoploError('USAGE', 'Cloud feedback page limit must be an integer from 1 to 500');
   const { token } = await client.requireAuth();
-  const request = () => feedbackRequest(client, `/api/v1/shares/${shareId}/feedback`, token, undefined, options.signal);
+  const query = new URLSearchParams();
+  if (options.cursor !== undefined) query.set('cursor', options.cursor);
+  if (options.limit !== undefined) query.set('limit', String(options.limit));
+  const suffix = query.size ? `?${query}` : '';
+  const request = () => feedbackRequest(client, `/api/v1/shares/${shareId}/feedback${suffix}`, token, undefined, options.signal);
   const d = options.retry === false ? await request() : await client.retry(request, { signal: options.signal });
   const share = object(d.share);
-  if (share.id !== shareId || !int(share.version, 0) || !Array.isArray(d.works) || d.works.length > REVIEW_LIMITS.features * (REVIEW_LIMITS.works + 1) || !Array.isArray(d.decisions) || !Array.isArray(d.comments) || d.decisions.length > 1000 || d.comments.length > 5000) throw new CloudError('INVALID_RESPONSE');
+  if (share.id !== shareId || !int(share.version, 0) || !Array.isArray(d.works) || d.works.length > REVIEW_LIMITS.features * (REVIEW_LIMITS.works + 1) || !Array.isArray(d.decisions) || !Array.isArray(d.comments) || d.decisions.length > 1000 || d.comments.length > 5000 || !(d.nextCursor === undefined || typeof d.nextCursor === 'string' && /^(0|[1-9]\d{0,18})$/.test(d.nextCursor)) || !(d.hasMore === undefined || typeof d.hasMore === 'boolean')) throw new CloudError('INVALID_RESPONSE');
   const works = d.works.map(readWork);
   if (new Set(works.map(w => w.id)).size !== works.length) throw new CloudError('INVALID_RESPONSE');
-  const out = { share: { id: shareId, version: share.version }, works, decisions: d.decisions.map(readDecision), comments: d.comments.map(readComment) };
+  const out: Feedback = { share: { id: shareId, version: share.version }, works, decisions: d.decisions.map(readDecision), comments: d.comments.map(readComment), ...(typeof d.nextCursor === 'string' ? { nextCursor: d.nextCursor } : {}), ...(typeof d.hasMore === 'boolean' ? { hasMore: d.hasMore } : {}) };
   if (JSON.stringify(out).includes(token)) throw new CloudError('INVALID_RESPONSE');
   return out;
 }
@@ -90,10 +96,11 @@ export function decisionIds(text: string): string[] {
   return ids;
 }
 
-export async function markApplied(client: CloudClient, shareId: string, ids: string[], ref?: string): Promise<{ applied: string[] }> {
+export async function markApplied(client: CloudClient, shareId: string, ids: string[], ref?: string, expectedVersion?: number): Promise<{ applied: string[] }> {
   if (ref !== undefined && (!ref.trim() || ref.trim().length > 200 || /[\x00-\x1f\x7f]/.test(ref))) throw new JoploError('USAGE', '--ref must contain 1-200 printable characters');
+  if (expectedVersion !== undefined && (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1)) throw new JoploError('USAGE', '--expected-version must be a positive integer');
   const { token } = await client.requireAuth();
-  const d = await client.retry(() => feedbackRequest(client, `/api/v1/shares/${shareId}/feedback/applied`, token, { decisionIds: ids, ...(ref !== undefined ? { ref: ref.trim() } : {}) }));
+  const d = await client.retry(() => feedbackRequest(client, `/api/v1/shares/${shareId}/feedback/applied`, token, { decisionIds: ids, ...(ref !== undefined ? { ref: ref.trim() } : {}), ...(expectedVersion !== undefined ? { expectedVersion } : {}) }));
   if (!Array.isArray(d.applied) || d.applied.some((id) => typeof id !== 'string' || !DECISION_ID.test(id))) throw new CloudError('INVALID_RESPONSE');
   return { applied: d.applied as string[] };
 }

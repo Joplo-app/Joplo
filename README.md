@@ -138,7 +138,9 @@ npx joplo feedback watch --local --follow --json
 
 Submitted feedback streams as NDJSON, one event per line with `eventId`, `workId` and `sessionId`. The follower covers every option and attaches by itself to the new review round that each source edit opens; approving one option does not stop it. It exits 1 when the board stops and 130 on Ctrl+C. To wait for one option version's approval or resume from a cursor, bind an exact session instead (`feedback list --local`, then `feedback watch --local --session <id> [--after <seq>]`, which exits 0 on approval). See the [CLI documentation](docs/cli.md).
 
-For Share, use `npx joplo feedback watch --share <id> --work <feature.option> --interval 15 --json`. Polling defaults to 15 seconds, configurable from 10 to 30. The current Cloud endpoint exposes a pending-feedback snapshot, so records resolved/applied between polls can be missed; see the [Cloud follow-up requirements](docs/cloud-feedback-watch.md).
+For Share, use `npx joplo feedback watch --share <id> --work <feature.option> --interval 15 --json`. Polling defaults to 15 seconds, configurable from 10 to 30. With the cursor-capable Cloud contract, the CLI drains persistent event pages so comments resolved and decisions applied between polls are still recovered; each event carries `cursor`, and `--cursor <cursor>` resumes after the last fully handled batch. Older Cloud servers fall back to pending snapshots with an explicit loss warning. See the [Cloud feedback contract](docs/cloud-feedback-watch.md).
+
+Scripted local writes use `feedback submit --local` with an explicit work/scenario/position, and `feedback approve --local`; neither pretends to know which page a reviewer is watching. The running board is manageable with `board projects/add/remove`, `board appearance`, and `board open --at <file:line>`. Voice sources and provider keys use `voice profiles`, `voice select`, `voice narrator`, and `voice key set|test|delete`; full keys stay hidden. Removal and deletion commands require interactive confirmation or explicit `--yes` in automation.
 
 ## Project layout
 
@@ -217,6 +219,7 @@ The embed code from `--format json` or the Cloud console is ready to paste:
 - The embedded player makes no network requests and does not use storage. GitHub strips iframes from Markdown, so use the badge there.
 - `--scenario <id>` and `--work <id>` share only part of a project. Everything else is cut at build time, not hidden.
 - Links never expire, on free accounts too. Each account has storage instead (free 100 MB, Pro 5 GB, counted from the raw size of every live share), and `share` prints how much you use. Re-sharing updates the same link, so badges and embeds you already published stay current.
+- Read existing shares with `share list` and `share show <id>` (including embed snippets), or `share embed <id>`. `share delete <id>` permanently removes one share and needs interactive confirmation or explicit `--yes`; it is never an automatic storage cleanup.
 - In CI, set `JOPLO_API_KEY` and run `npx joplo share --private --no-review --new --pr <number> --format json` for a PR preview. Agents should copy `data.embed.markdown` / `data.embed.iframe` as is rather than building URLs themselves.
 
 The preview image needs the optional export component (`npx joplo setup export`); without it, share still succeeds and uses a generic card. Details: [`share` in the CLI reference](docs/cli.md#share) and [embed mode](docs/web.md#嵌入模式).

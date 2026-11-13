@@ -24,6 +24,19 @@ npx joplo voice [dir] [--work <id>] [--scenario <id>] [--dry-run] [--locale <lan
 npx joplo share [dir] (--public | --private) (--review | --no-review) [--format text|json] [--new] [--title <title>] [--json] [--password [<值>] | --no-password] \
   [--scenario <id>]… [--work <id>]… \
   [--pr <number> [--repo <owner/name>] [--sha <commit>]] [--server <url>]
+npx joplo share list [--format text|json] [--server <url>]
+npx joplo share show|embed <shareId> [--format text|json] [--server <url>]
+npx joplo share delete <shareId> [--yes] [--format text|json] [--server <url>]
+npx joplo board projects|list [--format text|json]
+npx joplo board add [dir] [--format text|json]
+npx joplo board remove [dir] [--yes] [--format text|json]
+npx joplo board appearance [dir] [--theme <name> | --font <font> | --stroke <stroke> | --reset theme|font|stroke|all] [--format text|json]
+npx joplo board open [dir] [--at <file:line[:column]>] [--format text|json]
+npx joplo voice profiles [--format text|json]
+npx joplo voice select [dir] (--profile <id> | --browser) [--format text|json]
+npx joplo voice narrator <profileId> <voiceId> [--format text|json]
+npx joplo voice key set|test <profileId> [--format text|json]
+npx joplo voice key delete <profileId> [--yes] [--format text|json]
 npx joplo feedback [dir] [--share <id>] [--format text|json] [--server <url>]
 npx joplo feedback [dir] --applied <决定 id,…> [--ref <源码版本>] [--share <id>] [--format text|json]
 npx joplo feedback list [dir] --local [--json] [--all] [--work <功能.方案>]
@@ -81,6 +94,24 @@ npx joplo dev --open
 同一个 `JOPLO_HOME` 下已有存活看板时，再次运行将当前项目加入该看板，等待初次编译完成后打印链接并退出，不再启动第二个进程；编译成功时无需先打开浏览器，打印的本地 feedback watch 命令即可读取评审登记。编译失败时先处理诊断并等待成功编译，再启动 watcher。评审没有闲置超时；用 `feedback list --local --all --json` 查看关闭原因（源码修改、编译失败或宿主退出）。加入的项目仍依赖原看板进程，保留其终端；宿主退出后重新运行 dev 和 watcher。加入时 stderr 写出那个看板的 Joplo 版本和启动目录（`[joplo] Joined the running board: Joplo 0.2.7, started in /path/to/demo (pid 123)`）；它的版本和当前项目的 Joplo 不一致时（0.2.6 及更早的看板不报版本，也算不一致）多一行 `!` 警告：看板可能表现不同，要用当前版本就在它的终端按 Ctrl+C（或 `kill <pid>`）停掉，再在这里运行 `joplo dev`（D65）。`JOPLO_HOME` 默认 `~/.joplo`：projects.json 记最近项目，server.json 记运行实例，settings.json 记主题选择。
 
 首页可切换项目与功能；源文件变化只重新编译对应项目，保存后热更新。编译出错时显示诊断，并保留上一次成功的画面；修复后恢复。界面和交互见[看板文档](web.md)。
+
+## board：管理正在运行的本机看板
+
+以下命令读取当前 `JOPLO_HOME/server.json`，先核对看板进程身份，再携带本机令牌调用现有 HTTP 接口；不需要 Cloud 登录。看板未运行时先执行 `npx joplo dev`。它们不伪造浏览器观看能力：播放、暂停、全屏、点击演示和拖动仍只能在看板里操作。
+
+- `board projects`（别名 `board list`）列出项目及编译状态；`board add [dir]` 注册并等待初次编译；`board remove [dir]` 只移除 projects.json 记录，不删除项目文件。
+- `board appearance` 不带 dir 读改全局默认外观，带 dir 读改项目覆盖。每次只改 `--theme`、`--font`、`--stroke` 中一项，或用 `--reset theme|font|stroke|all` 恢复继承；不改变作者 config，也不把外观发布出去。
+- `board open [dir] --at <file:line[:column]>` 调用看板的编辑器启动器，按 `LAUNCH_EDITOR` / `EDITOR` 打开真实源码位置；省略 `--at` 时使用当前 `selection`，没有选中则报 USAGE。它不代替用户播放或点击演示。
+- `board remove`、下文 `voice key delete` 与 `share delete` 一样：交互终端默认询问且默认否；非交互/JSON 必须显式 `--yes`，否则退出 2 且不发请求。
+
+本地评审也可由脚本写入，但必须明确指出评审位置，不伪造“用户正在看的页面”：
+
+```sh
+npx joplo feedback submit . --local --work invite.a-modal --scenario invite.a-modal.success --position 2 --body '这里需要说明失败后的恢复'
+npx joplo feedback approve . --local --session <session-id>
+```
+
+`submit` 需要 `--work`、`--scenario` 和 `--position`；`--scene` 可显式指定可见画面，缺省由该场景位置推导。`--request-id <uuid>` 供安全重试，多个会话匹配时必须给 `--session`。`approve` 只确认这个方案版本，不改 TSX pick、不发布。两者都通过看板的版本校验与持久化路径，不直接改 `.joplo/reviews/` 文件。
 
 ## 作品、切片与范围
 项目是作品集：作品 → 切片 → 步骤。比较方案、列情况、做设计决定用 `feature()` + `work()`；讲解片、资讯和产品片用 `works/<key>.tsx` 的 `work()` + `chapter()`，两者可以共存。章节默认接续上一章，编号由界面和 outline 自动生成；`flow()` 用于独立场景。所有作品都有封面并进入首页；`work()` 是唯一作品入口，功能下写在 `features/<f>/works/<key>.tsx`，同样用 `title` / `summary`。
@@ -188,11 +219,11 @@ Share 立即读取一次，随后默认每 15 秒轮询；`--interval` 接受 10
 
 Cloud 必须指定 `--share` 和 `--work`，避免另一个方案的确认结束监听。`--version` 可显式指定版本，否则锁定首次响应中的分享版本；分享更新时输出 `closed/source_changed` 并退出 1。只有该版本、该方案的作者 `pick` 决定映射为 `approved` 并退出 0；投票、规则确认、其他方案或旧版本决定都不会结束监听。不把 Cloud 的确认写入本地会话，也不自动标记决定 `applied`。
 
-本地和 Cloud 输出统一的 `source`、`eventId`、`sessionId`、`featureId`、`workId`、`revision`、`createdAt` 及 `type`。`feedback` 携带 `body/context`，`approved` 表示确认，Cloud 的其他决定为 `decision`，监听目标失效为 `closed`。本地继续保留 `seq`、`requestId`、`instanceId`、`projectDir`；Cloud 携带 `server`、`shareId`、`version`，没有可伪造的 `seq`，也暂不接受 `--after`。Cloud 的页面路径与源码位置当前接口不提供，输出 null，保留已有的场景、步骤和元素信息。
+本地和 Cloud 输出统一的 `source`、`eventId`、`sessionId`、`featureId`、`workId`、`revision`、`createdAt` 及 `type`。`feedback` 携带 `body/context`，`approved` 表示确认，Cloud 的其他决定为 `decision`，监听目标失效为 `closed`。本地继续保留 `seq`、`requestId`、`instanceId`、`projectDir`；Cloud 携带 `server`、`shareId`、`version`，没有可伪造的 `seq`。Cloud 的页面路径与源码位置当前接口不提供，输出 null，保留已有的场景、步骤和元素信息。
 
-**当前兼容模式的边界：**复用 `GET /api/v1/shares/{id}/feedback`，仅能观察未解决评论及未撤回、未写回的决定。单次运行按稳定 `eventId` 去重；重新启动重放当前快照，消费者可按同一 `eventId` 去重。如果记录在两次轮询之间被解决或标记已写回，可能被漏掉。当前接口只取最新 1000 条未解决评论，且没有分页游标。客户端版本过滤也不能替代 Cloud 拍板接口的 `expectedVersion` 校验。完整的补收与旧页面保护需要 [Cloud 改动清单](cloud-feedback-watch.md) 中的服务端配合。
+**可靠增量补收：**CLI 首先调用 `GET /api/v1/shares/{id}/feedback?cursor=<游标>&limit=200`，排空所有页后才输出本批事件并判断当前确认。评论的 created/resolved/reopened 与决定的 decided/retracted/applied 都在事件历史中；已解决评论和已 applied 的决定不会再从两次轮询之间消失。撤回后的历史 pick 不会确认。事件带 `cursor`，stderr 也打印推进后的 `Cloud cursor: …`；用 `feedback watch … --cursor <游标>` 从最后完整处理的位置恢复。多页中途失败会从未提交游标重新读取，不跳过记录；消费者仍按 `eventId` 去重。
 
-该接口仍仅允许分享主人或其具备 `feedback:read` 的 API Key 读取；“公开 Share 链接”不等于匿名读取管理侧反馈。
+旧 Cloud 不认识游标时自动退回原快照轮询，并明确警告：只能观察未解决评论及未撤回、未写回决定，记录在两次轮询之间被解决或 applied 时可能漏掉。接口仍仅允许分享主人或其具备 `feedback:read` 的 API Key 读取；“公开 Share 链接”不等于匿名读取管理侧反馈。精确契约与兼容性见 [Cloud feedback watch](cloud-feedback-watch.md)。
 
 ## skill
 
@@ -341,7 +372,7 @@ CLI 和 skill 输出遵循 D57，统一使用英文；本文保留中文说明�
 - 值必须是 `jpk_` + 至少 32 位字母或数字，否则 USAGE（退出 2），不发请求。完整 Key 只出现在 Authorization 头里，输出中一律替换为 `[REDACTED]`，只显示前 8 位前缀。
 - `login` 只打印 “JOPLO_API_KEY is set: …” 并退出 0（不联网、不写凭证）；`logout` 不动本地凭证，提示取消环境变量或到控制台吊销。
 - Key 无效、过期或已吊销：AUTH_EXPIRED（退出 3），message 写前缀并指向 `<server>/settings/api-keys`（`details.fix`）。Key 缺少某个权限范围时服务端返回 403 FORBIDDEN，CLI 报 FORBIDDEN（退出 1），message 写前缀并说明是 Key 的权限范围不够（不报“账号不可用”），`details.fix` 指向 API Key 页。
-- 权限范围：`shares:publish`（whoami、share）、`shares:read`、`feedback:read`（feedback）、`feedback:write`（feedback --applied）、`voice:generate`（voice、看板里的 Joplo Cloud 朗读）。
+- 权限范围：`shares:publish`（whoami、share）、`shares:read`（share list/show/embed）、`shares:write`（share delete）、`feedback:read`（feedback/watch）、`feedback:write`（feedback --applied、评论/解决、决定/撤回与投票）、`voice:generate`（voice、看板里的 Joplo Cloud 朗读）。
 
 ## login
 
@@ -387,6 +418,19 @@ npx joplo voice --format json        # 生成选定方案所有场景的缺少�
 npx joplo voice --locale ja          # 只做一种内容语言（必须在 config 的 locales 里；可重复）
 ```
 
+声音来源与 Key 管理和生成是不同子命令，均操作正在运行的本机看板：
+
+```sh
+npx joplo voice profiles                         # 来源、音色与非秘密 Key 状态
+npx joplo voice select . --profile openai       # 或 --browser
+npx joplo voice narrator openai marin           # 改这个来源的默认旁白
+npx joplo voice key set openai                  # 交互隐藏输入；非交互先自行设置 JOPLO_VOICE_KEY
+npx joplo voice key test openai                 # 测已保存 Key，或测 JOPLO_VOICE_KEY 而不保存
+npx joplo voice key delete openai --yes          # 删除 Key 并恢复该预设的本地默认
+```
+
+这些子命令复用 `/__joplo/voice/profiles` 与项目 voice 接口，不读取或手改 profiles.json。只显示是否保存、末 4 位和对应环境变量；完整 Key 只在内存中传给本机看板，JSON/text 不回显，测试响应的 base64 音频也不会打印。`JOPLO_VOICE_KEY` 只在 `voice key` 命令中读取；Agent 不应代编或记录 Key。Cloud 来源使用登录，不通过这套 Key 管理。`voice select` 与 `narrator` 不改作者 config；config 写了 `voice.profile` 时仍以 config 为准。项目草稿不会送去生成。
+
 - 先 check：编译有 error 时以 `INVALID_SCHEMA` 退出 1，不生成。
 - 范围：每个功能选定方案的全部场景；项目写了 `locales` 时每种内容语言各一遍（D84，音色按 `resolveVoices(…, 语言)`）。朗读文字与 build 打包算片段键的文字相同（自动字幕用编译出的字幕；看板里自动字幕按界面语言生成，非英文界面时可能和这里不同）。
 - 声音来源：`joplo.config.ts` 的 `voice.profile` > 看板里选的 > 没选过时已登录用 Joplo Cloud 朗读（用 CLI 的登录或 `JOPLO_API_KEY`，Key 需要 `voice:generate`）> 都没有时 `VOICE_NO_SOURCE`。Joplo Cloud 的请求带 `locale`（内容语言；项目没写 locales 时不带）与 `project`（项目名，控制台明细用）。
@@ -421,6 +465,18 @@ PR 预览（`--pr`）与按场景/功能保密分享（`--scenario` / `--work`�
 
 公开成功时 JSON 附带云端返回的 `visibility` 与 `portfolio: {workUrl,profileUrl,needsUsername,setupPath}`；有用户名时文本输出作品详情地址，`needsUsername` 时输出“设置用户名后，这个作品会出现在你的作品集：<server><setupPath>”。字段缺失或 URL 为 null 时照常成功。`whoami` 透传可选 `username: string|null`、`portfolioUrl: string|null`；旧 Cloud 缺失时不补造值。
 
+### 已有分享管理与嵌入
+
+```sh
+npx joplo share list --format json
+npx joplo share show Abc1234567 --format json
+npx joplo share embed Abc1234567
+npx joplo share delete Abc1234567 --yes
+```
+
+- `list` 调 `GET /api/v1/shares`；`show` / `embed` 调 `GET /api/v1/shares/{id}`，返回现有标题、状态、版本、可见性、密码保护、时间与链接，并生成与发布结果一致的 `embed: {iframe,markdown,badge,preview}`。读取需要 `shares:read`，不会因为分享公开就允许匿名管理。
+- `delete` 调 `DELETE /api/v1/shares/{id}`，需要 `shares:write` 或主人登录。它永久删除线上分享与文件；交互终端默认询问且默认否，非交互/JSON 未带 `--yes` 时在鉴权和请求之前退出 2。不会为了腾空间自动删除，也不会顺带改其他分享或项目源码。
+
 ### 密码查看（Pro）
 
 私密分享可用 `--password [<值>]` 设置或更换访问密码，`--no-password` 去掉密码；两者互斥。不带这两个参数时保持已有保护（新建时不设密码），**环境变量本身不会开启密码**。密码按 Unicode 码点计算，8–128 个字符，不裁剪空格。
@@ -449,7 +505,7 @@ PR 预览（`--pr`）与按场景/功能保密分享（`--scenario` / `--work`�
 | portfolio | Cloud finalize → CLI readPortfolio → data.portfolio → cloud-bridge → CloudHub.job.result → 看板作品详情或 <server><setupPath> 新标签链接；缺失和 null 兼容 |
 | username / portfolioUrl | Cloud GET me → CloudClient.me → whoami JSON / cloud-bridge.account → server account → 看板账号模型；仅返回已存在字段 |
 | 链接 visibility 记录 | CLI finalize 后 atomicJson 写 .joplo/cloud.json 的 main/review/scoped 链接 → readShareRecord 按同服务器读取 → ① bridge.links → 本机 /cloud/links → 看板更新预填（缺字段私密，读取失败禁用发布并重试）；② CLI 按本次 replaceShareId 匹配记录，仅 public→private 更新显式发 private，private/缺字段/无匹配省略。CLI 仍独立要求本次选择，不用记录补选项 |
-| 云端 shares 列表 visibility | Cloud GET shares 每项 → 控制台列表消费者；开源 CLI 目前不消费该列表，看板从上述本机记录与任务结果读，缺失按私密 |
+| 云端 shares 列表 visibility | Cloud GET shares 每项 → 控制台列表与 CLI share list/show/embed；看板从上述本机记录与任务结果读，缺失按私密 |
 | 作者 name / url | Cloud 删除作者自带同名 meta 并仅为公开分享注入 head meta joplo-author → 分享 HTML → readAuthor → 普通播放器顶栏和结束画面；不写入 IR/本地记录，不进入嵌入/导出 |
 
 
@@ -545,7 +601,11 @@ npx joplo feedback --applied d1,d2 --ref "$(git rev-parse HEAD)" --format json
 - shareId：`--share <id>`，否则读项目 `.joplo/cloud.json`：有评审版记录（`review.shareId`）时用它，没有时用主 `shareId`（契约 8.1）。记录必须属于当前 server，否则 USAGE 并提示 `--server` / `--share`；没有记录或记录无效时 USAGE。
 - `GET /api/v1/shares/{id}/feedback` → `data = {share: {id, version}, decisions: [{id, kind, featureId, targetId, note, decidedAt, version}], comments: [{id, version, scenario, step, stepId, element: {id, label} | null, body, author: {name}, createdAt}]}`；只含未撤回、未写回的决定与未解决的评论。`kind` 是 `pick`（targetId = 方案 id）、`confirm_rule`、`reject_rule`（note = 理由）、`answer`（targetId = 问题 id，note = 回答）。`step` 是播放位置（0 = 初始状态，k = 已执行 k 步），`stepId` 是第 k 步的 id。
 - 文本输出决定在前，每条一行：“Pick option invite.b-batch for feature invite”“Reject rule <id>: <理由>”“Answer to question <id>: <回答>”“Confirm rule <id>”；再是未解决评论（场景 · 第几步（stepId） · 元素 id "标签" — 作者、版本、时间，下一行是正文）；有决定时最后提示 check 与 `--applied` 的完整命令。
-- `--applied <id,…> [--ref <源码版本>]`：`POST /api/v1/shares/{id}/feedback/applied {decisionIds, ref?}` → `data = {shareId, applied}`，重复标记幂等。id 去重，1–200 个，每个只含字母、数字、`_`、`-`；`--ref` 1–200 个可打印字符，只能和 `--applied` 一起用。只有分享的主人能调用。
+- `--applied <id,…> [--ref <源码版本>] [--expected-version <n>]`：`POST /api/v1/shares/{id}/feedback/applied {decisionIds, ref?, expectedVersion?}` → `data = {shareId, applied}`，重复标记幂等。id 去重，1–200 个，每个只含字母、数字、`_`、`-`；`--ref` 1–200 个可打印字符，只能和 `--applied` 一起用。`expectedVersion` 防止把另一版本的决定误写回；只有分享的主人能调用。
+- `feedback comment` 调 `POST …/feedback/comments`，需要 `--share --review-id --version --work --scenario --position --body`。`review-id` 是 Cloud `/review/<id>` 的评审链接 id，不是 shareId。position 0 省略 stepId，之后必须给 `--step-id`；可另给 layer/element。版本同时写入 anchor.version 与 expectedVersion，避免在看过新版后把评论误记到旧位置。返回 `{id}`。
+- `feedback resolve <commentId> --share <id> [--reopen]` 调 `POST …/comments/{commentId}/resolution {shareId,commentId,resolved}`，解决或重开评论。
+- `feedback decide` 调 `POST …/feedback/decisions`，必须给 `--kind pick|confirm_rule|reject_rule|answer --target <id> --expected-version <n>`；可给 feature/work/note，answer 与 reject_rule 必须有可执行的 note。返回 `{id}`。`feedback retract <decisionId>` 调 `POST …/decisions/{decisionId}/retract`，追加撤回且幂等；已写回决定不能撤回。pick 才是方案确认，投票不算。
+- `feedback vote` 调 `POST …/feedback/votes`，需要 share/review-id/feature/work/expected-version，仅记录投票。上述写操作需要 `feedback:write`；评论和投票还需要有效评审链接。非幂等请求不做自动重放，409 时先读取当前版本与反馈，不盲目重试。
 - 错误：未登录 AUTH_REQUIRED（退出 3）；用登录凭证但不是分享主人时 403 为 FORBIDDEN “Only the owner of the share …”；API Key 缺少 feedback:read / feedback:write 时为 FORBIDDEN 权限说明；404 为 NOT_FOUND “The share does not exist or has no review data”；响应结构不对为 INVALID_RESPONSE；其余同 share。
 - Agent 按决定改源码的规则写在 `npx joplo skill publish`：pick → `feature.pick`；确认规则 → `origin: 'user'` + `status: 'confirmed'`；否决 → 按理由改写，理由没说怎么做时标 conflict 并问用户；回答问题 → 删掉 question、加一条 `origin: 'user'` 的规则；评论只作参考。改完运行 check，再 `--applied`。
 

@@ -285,16 +285,16 @@ export class CloudClient {
     const c = await this.credentials(); if (!c) throw new CloudError('AUTH_REQUIRED', undefined, { fix: 'npx joplo login' }); return c;
   }
   /** 不回显远端错误正文或底层异常：其中可能包含 bearer、签名 URL 或代理回显。 */
-  async response(path: string, token?: string, body?: unknown, timeoutMs = 30000, signal?: AbortSignal): Promise<{ response: Response; data: Record<string, unknown> }> {
+  async response(path: string, token?: string, body?: unknown, timeoutMs = 30000, signal?: AbortSignal, method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'): Promise<{ response: Response; data: Record<string, unknown> }> {
     let response: Response;
     try {
       const timeout = AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs)));
-      response = await fetch(this.server + path, { method: body === undefined ? 'GET' : 'POST', redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      response = await fetch(this.server + path, { method: method ?? (body === undefined ? 'GET' : 'POST'), redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
         headers: { 'X-Joplo-Client': `joplo-cli/${this.version}`, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         body: body === undefined ? undefined : JSON.stringify(body) });
     } catch { signal?.throwIfAborted(); throw new CloudError('NETWORK'); }
     let data: Record<string, unknown>;
-    try { data = object(await response.json()); }
+    try { const raw: unknown = await response.json(); data = Array.isArray(raw) ? { items: raw } : object(raw); }
     catch (e) {
       signal?.throwIfAborted();
       // 已收到 4xx 的请求不能因为其正文截断/无效而变成可重试的网络错误。
@@ -303,8 +303,8 @@ export class CloudClient {
     }
     return { response, data };
   }
-  async request(path: string, token?: string, body?: unknown, options: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<Record<string, unknown>> {
-    const { response, data } = await this.response(path, token, body, options.timeoutMs, options.signal);
+  async request(path: string, token?: string, body?: unknown, options: { signal?: AbortSignal; timeoutMs?: number; method?: 'GET' | 'POST' | 'PATCH' | 'DELETE' } = {}): Promise<Record<string, unknown>> {
+    const { response, data } = await this.response(path, token, body, options.timeoutMs, options.signal, options.method);
     if (!response.ok) {
       if (path === '/api/auth/device/code' && response.status === 429) throw new CloudError('RATE_LIMITED');
       // API Key 缺少权限范围时 SaaS 返回 403 FORBIDDEN；不能被映射成“账号不可用”
